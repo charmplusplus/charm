@@ -6,6 +6,11 @@
 #include "PipeBroadcastStrategy.h"
 #include "BroadcastStrategy.h"
 
+#if USE_BLAS
+extern "C" complex zdotu_( const int *N,  complex *X, const int *incX,			       complex *Y, const int *incY);
+
+#endif
+
 typedef void (*FuncType) (complex a, complex b);
 PUPmarshallBytes(FuncType);
 
@@ -81,6 +86,12 @@ class PairCalculator: public CBase_PairCalculator {
           }
           complex sum(re,im);
         */
+#ifdef USE_BLAS
+      int incx=1;
+      int incy=1;
+      complex output=zdotu_(&n, psi1, &incx,  psi2, &incy);
+      return(output.re);
+#else
         
         int i;
         register double sum = 0;
@@ -89,6 +100,7 @@ class PairCalculator: public CBase_PairCalculator {
         }
         
         return sum;
+#endif
   }
  private:
   int numRecd, numExpected, grainSize, S, blkSize, N;

@@ -202,7 +202,7 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
 	    i=kLeftMark[kth];
 	    for(int jkth=0;jkth<junits;jkth++)
 	      {
-		j=kRightOffset[jkth];
+		j=kRightMark[jkth];
 		outData[(i+thisIndex.y)*S + j + thisIndex.x] = 
                     compute_entry(size, inDataLeft[i],
                                   inDataRight[j],op1);        
