@@ -113,7 +113,7 @@ int LBCommData::compute_key()
 		    destObj.id[2],destObj.id[3]);
   pcount -= 8;  /* The 'X's insure that the next few bytes are fixed */
 
-  int k=0x1234567887654321L;
+  int k=-1;
   for(int i=0; i < (pcount+3)/4; i++)
     k ^= kstring[i];
 
