@@ -83,8 +83,12 @@ void CkCheckpointMgr::Checkpoint(const char *dirname,CkCallback& cb){
 			((CkLocMgr*)(obj))->iterate(saver);
 		}
 	}
-	DEBCHK("[%d]CkCheckpointMgr::Checkpoint DONE. Invoking callback.\n",CkMyPe());
-	if(CkMyPe()==0) cb.send();
+	if(CkMyPe()==0)
+		DEBCHK("[%d]CkCheckpointMgr::Checkpoint DONE. ",CkMyPe());
+	else{
+		DEBCHK("[%d]CkCheckpointMgr::Checkpoint DONE. Invoking callback.\n",CkMyPe());
+		cb.send();
+	}
 }
 
 void CkStartCheckpoint(char* dirname,const CkCallback& cb){
@@ -286,29 +290,29 @@ void CkRestartMain(const char* dirname){
 	// restore nodegroups
 	// content of the file: numNodeGroups, GroupInfo[numNodeGroups], _nodeGroupTable(PUP'ed), nodegroups(PUP'ed)
 	if(CkMyRank()==0){
-	sprintf(filename,"%s/NodeGroups.dat",dirname);
-	FILE* fNodeGroups = fopen(filename,"rb");
-	if(!fNodeGroups) CkAbort("Failed to open checkpoint file for nodegroup table!");
-	fread(&numNodeGroups,sizeof(UInt),1,fNodeGroups);
-	if(CkMyPe()==0){ CksvAccess(_numNodeGroups) = numNodeGroups+1; }
-	else { CksvAccess(_numNodeGroups) = 1; }
+		sprintf(filename,"%s/NodeGroups.dat",dirname);
+		FILE* fNodeGroups = fopen(filename,"rb");
+		if(!fNodeGroups) CkAbort("Failed to open checkpoint file for nodegroup table!");
+		fread(&numNodeGroups,sizeof(UInt),1,fNodeGroups);
+		if(CkMyPe()==0){ CksvAccess(_numNodeGroups) = numNodeGroups+1; }
+		else { CksvAccess(_numNodeGroups) = 1; }
 
-	GroupInfo* tmpInfo2 = new GroupInfo [numNodeGroups];
-	if(numNodeGroups != fread(tmpInfo2,sizeof(GroupInfo),numNodeGroups,fNodeGroups)) CkAbort("error reading nodegroupinfo");
+		GroupInfo* tmpInfo2 = new GroupInfo [numNodeGroups];
+		if(numNodeGroups != fread(tmpInfo2,sizeof(GroupInfo),numNodeGroups,fNodeGroups)) CkAbort("error reading nodegroupinfo");
 
-	PUP::fromDisk pNodeGroups(fNodeGroups);
-	for(i=0;i<numNodeGroups;i++) {
-		CkGroupID gID = tmpInfo2[i].gID;
-		CksvAccess(_nodeGroupIDTable).push_back(gID);
-		int eIdx = tmpInfo2[i].MigCtor;
-		void *m = CkAllocSysMsg();
-		envelope* env = UsrToEnv((CkMessage *)m);
-		CkCreateLocalNodeGroup(gID, eIdx, env);
-		CksvAccess(_nodeGroupTable)->find(gID).getObj()->pup(pNodeGroups);
-		DEBCHK("Nodegroup PUP'ed out: gid = %d, name = %s\n",CksvAccess(_nodeGroupTable)->find(gID).getObj()->ckGetGroupID().idx,_chareTable[CksvAccess(_nodeGroupTable)->find(gID).getcIdx()]->name);
-	}
-	fclose(fNodeGroups);
-	delete [] tmpInfo2;
+		PUP::fromDisk pNodeGroups(fNodeGroups);
+		for(i=0;i<numNodeGroups;i++) {
+			CkGroupID gID = tmpInfo2[i].gID;
+			CksvAccess(_nodeGroupIDTable).push_back(gID);
+			int eIdx = tmpInfo2[i].MigCtor;
+			void *m = CkAllocSysMsg();
+			envelope* env = UsrToEnv((CkMessage *)m);
+			CkCreateLocalNodeGroup(gID, eIdx, env);
+			CksvAccess(_nodeGroupTable)->find(gID).getObj()->pup(pNodeGroups);
+			DEBCHK("Nodegroup PUP'ed out: gid = %d, name = %s\n",CksvAccess(_nodeGroupTable)->find(gID).getObj()->ckGetGroupID().idx,_chareTable[CksvAccess(_nodeGroupTable)->find(gID).getcIdx()]->name);
+		}
+		fclose(fNodeGroups);
+		delete [] tmpInfo2;
 	}
 
 	// for each location, restore arrays
