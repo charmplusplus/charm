@@ -12,11 +12,8 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.10  1996-03-22 23:01:26  sanjeev
- * *** empty log message ***
- *
- * Revision 2.9  1996/03/05 16:25:32  sanjeev
- * fixed spanning tree bugs
+ * Revision 2.11  1996-04-18 22:40:35  sanjeev
+ * CmiFreeSendFn uses CMMD_send_async
  *
  * Revision 2.8  1995/11/08 23:32:31  sanjeev
  * fixed bug in CmiFreeSendFn for msgs to myself
@@ -68,15 +65,10 @@ int Cmi_dim /* used in spantree.c */  ;
 
 static int msglength=0 ;
 static int numpes ;
-static void * SentMsgList = 0 ;
 static MSG_LIST *RecvMsgList = 0 ;
 
 extern void * FIFO_Create() ;
 extern void FIFO_EnQueue() ;
-
-static void CmiSyncReceive() ;
-static int CmiArrivedMsgLength() ;
-static int CmiProbe() ;
 
 CpvDeclare(void *, CmiLocalQueue) ;
 CpvDeclare(int, Cmi_mype) ;
@@ -104,96 +96,53 @@ void *CmiGetNonLocal()
 {
         void *env;
         int msglength;
-	MSG_LIST *prev ;
-	void *ret ;
-
-	if ( RecvMsgList != 0 ) {
-	/* msgs previously received in RecvMsgs but not given to system */
-		ret = RecvMsgList->msg ;
-		prev = RecvMsgList ;
-		RecvMsgList = RecvMsgList->next ;
-		CmiFree(prev) ;
-		return ret ;
-	}	
-
-        if (!CmiProbe())
-                return 0;
-        msglength = CmiArrivedMsgLength();
+        MSG_LIST *prev ;
+        void *ret ;
+        CMMD_mcb mcb1, mcb2 ;
+ 
+        if ( RecvMsgList != 0 ) {
+        /* msgs previously received in RecvMsgs but not given to system */
+                ret = RecvMsgList->msg ;
+                prev = RecvMsgList ;
+                RecvMsgList = RecvMsgList->next ;
+                CmiFree(prev) ;
+                return ret ;
+        }
+ 
+        if ( !(mcb1 = CMMD_mcb_pending(CMMD_ANY_NODE,CMMD_ANY_TAG)) )
+                return 0 ;
+ 
+        msglength = CMMD_mcb_bytes(mcb1) ;
+        CMMD_free_mcb(mcb1) ;
         env = (void *)  CmiAlloc(msglength);
         if (env == 0)
                 CmiPrintf("*** ERROR *** Memory Allocation Failed.\n");
-        CmiSyncReceive(msglength, env);
-        return env;
-}
-
-/* Next 3 fns are internal fns */
-static int CmiProbe()
-{
-	CMMD_mcb mcb1 ;
-
-        if ( !(mcb1 = CMMD_mcb_pending(CMMD_ANY_NODE,CMMD_ANY_TAG)) )
-                return(0) ;
-
-        msglength = CMMD_mcb_bytes( mcb1 ) ;
-        CMMD_free_mcb(mcb1) ;
-	return(1) ;
-}
-
-static int CmiArrivedMsgLength()
-{
-        return msglength;
-}
-
-static void CmiSyncReceive(size, buffer)
-int size ;
-void *buffer ;
-{
-/* Receive a message, dont return till the full message has been
-   received */
-	CMMD_mcb mcb2 ;
-
-	mcb2 = CMMD_receive_async(CMMD_ANY_NODE, CMMD_ANY_TAG, buffer,
-				  size, 0, 0) ;
-	while ( !CMMD_msg_done(mcb2) )
-		;
-	CMMD_free_mcb(mcb2) ;
-}
-
-
-/********************* MESSAGE SEND FUNCTIONS ******************/
+        mcb2 = CMMD_receive_async(CMMD_ANY_NODE, CMMD_ANY_TAG, env,
+                                  msglength, 0, 0) ;
+        while ( !CMMD_msg_done(mcb2) )
+                ;
+        CMMD_free_mcb(mcb2) ;
  
-/* McAsyncSendFree not used for now *
-
-static int CmiInsideMem = 1;
-
-* Next 3 fns are internal fns *
-static SendHandler(mcb, msg)
-CMMD_mcb *mcb ;
-void *msg ;
-{
-	CMMD_free_mcb(*mcb) ;
-	
-* msg is the buffer which contained the message *
-	if ( ! CmiInsideMem ) {	* For now CmiInsideMem is always 1 *
-		CmiFree(msg) ;
-		release_messages() ;
-	}
-	else { * put msg in list of messages that have to be freed *
-		((MSG_LIST *)msg)->next = (MSG_LIST *)SentMsgList ;
-		SentMsgList = msg ;
-	}
+        return env ;
 }
 
 
-static release_messages()
+
+/********************* MESSAGE SEND INTERNAL FUNCTIONS ******************/
+ 
+CpvExtern(int, CmiInterruptsBlocked) ;
+
+int * SentMsgList = 0 ;
+
+void FreeMsgs()
 {
-* used only to free messages that didnt get freed in the SendHandler *
+/* used only to free messages that didnt get freed in the SendHandler */
 
-	MSG_LIST *q, *q2 ;
+	int *q, *q2 ;
 
-	q = (MSG_LIST *)SentMsgList ;
+	q = SentMsgList ;
 	while ( q != 0 ) {
-		q2 = q->next ;
+		q2 = (int *)(*q) ;
 		CmiFree(q) ;
 		q = q2 ;
 	}
@@ -201,35 +150,33 @@ static release_messages()
 }
 
 
-void McAsyncSendFree(destPE, size, msg)
-int destPE;
-int size;
-void * msg;
+void SendHandler(mcb, msg)
+CMMD_mcb *mcb ;
+void *msg ;
 {
-        CMMD_mcb mcb ;
- 
-        if ( destPE == CmiMyPe() ) {
-                FIFO_EnQueue(CpvAccess(CmiLocalQueue), msg);
-                return ;
-        }
- 
-trysend:
-        mcb = CMMD_send_async(destPE, CMMD_DEFAULT_TAG, msg, size,
-                                SendHandler, msg) ;
-* the last arg to CMMD_send_async is the value passed to SendHandler
-   as the 2nd arg, so the buffer "msg" gets freed after being sent *
- 
-        if ( mcb == CMMD_ERRVAL ) {
-                RecvMsgs() ;    * try and receive msgs to unclog network *
-                goto trysend ;
-        }
+	int prevstate = CMMD_disable_interrupts() ;
+
+	CMMD_free_mcb(*mcb) ;
+	
+/* msg is the buffer which contained the message */
+	/* if ( ! CmiInsideMem ) {	For now CmiInsideMem is always 1 */
+	if ( ! CpvAccess(CmiInterruptsBlocked) ) {
+		CmiFree(msg) ;
+		FreeMsgs() ;
+	}
+	else { /* put msg in list of messages that have to be freed */
+		int *m = (int *)msg ;
+		*m = (int)SentMsgList ;
+		SentMsgList = msg ;
+	}
+
+	if ( prevstate )
+		CMMD_enable_interrupts() ;
 }
 
-***********************************************************************/
 
 
-
-static RecvMsgs()
+RecvMsgs()
 {
 /* Called to clear up network when CmiAsyncSend has run out of MCBs.
    Idea is that when this processor runs out of MCBs because other
@@ -243,23 +190,32 @@ static RecvMsgs()
 	void *env;
         int msglength;
 	MSG_LIST *msgptr ;
+        CMMD_mcb mcb1, mcb2 ;
 
-	while ( CmiProbe() ) {
-		msglength = CmiArrivedMsgLength();
-        	env = (void *) CmiAlloc(msglength);
-        	if (env == 0)
-                	CmiPrintf("*** ERROR *** Memory Allocation Failed.\n");
-        	CmiSyncReceive(msglength, env);
-
-		/* add env to the list of received but unprocessed msgs */
-		msgptr = (MSG_LIST *)CmiAlloc(sizeof(MSG_LIST)) ;
-		msgptr->next = RecvMsgList ;
-		msgptr->msg = env ;
-		RecvMsgList = msgptr ;
-	}
+        while ( (mcb1 = CMMD_mcb_pending(CMMD_ANY_NODE,CMMD_ANY_TAG)) != 0 ) {
+ 
+                msglength = CMMD_mcb_bytes(mcb1) ;
+                CMMD_free_mcb(mcb1) ;
+                env = (void *)  CmiAlloc(msglength);
+                if (env == 0)
+                        CmiPrintf("*** ERROR *** Memory Allocation Failed.\n");
+                mcb2 = CMMD_receive_async(CMMD_ANY_NODE, CMMD_ANY_TAG, env,
+                                        msglength, 0, 0) ;
+                while ( !CMMD_msg_done(mcb2) )
+                        ;
+                CMMD_free_mcb(mcb2) ;
+ 
+                /* add env to the list of received but unprocessed msgs */
+                msgptr = (MSG_LIST *)CmiAlloc(sizeof(MSG_LIST)) ;
+                msgptr->next = RecvMsgList ;
+                msgptr->msg = env ;
+                RecvMsgList = msgptr ;
+        }
 }	
 
-/********************* MESSAGE SEND FUNCTIONS ******************/
+
+
+/********************* CONVERSE MESSAGE SEND FUNCTIONS ******************/
 
 void CmiSyncSendFn(destPE, size, msg)
 int destPE;
@@ -307,19 +263,35 @@ trysend:
 	return ((CmiCommHandle)mcb) ;
 }
 
+
 void CmiFreeSendFn(destPE, size, msg)
 int destPE;
 int size;
 char * msg;
 {
-	if (CpvAccess(Cmi_mype)==destPE) {
-		FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg);
-	} 
-	else {
-		CMMD_send_noblock(destPE, CMMD_DEFAULT_TAG, msg, size) ;
-		CmiFree(msg);
-	}
+        CMMD_mcb mcb ;
+ 
+        if ( destPE == CmiMyPe() ) {
+                FIFO_EnQueue(CpvAccess(CmiLocalQueue), msg);
+                return ;
+        }
+ 
+/* Since we can free the msg, we do an asynchronous send, where the msg
+   gets freed in the SendHandler interrupt handler */
+ 
+        while ( 1 ) {
+                mcb = CMMD_send_async(destPE, CMMD_DEFAULT_TAG, msg, size,
+                                         SendHandler, msg) ;
+/* the last arg to CMMD_send_async is the value passed to SendHandler
+   as the 2nd arg, so the buffer "msg" gets freed after being sent */
+ 
+                if ( mcb != CMMD_ERRVAL )
+                        return ;
+                else
+                        RecvMsgs() ;
+        }
 }
+
 
 
 /*********************** BROADCAST FUNCTIONS **********************/
