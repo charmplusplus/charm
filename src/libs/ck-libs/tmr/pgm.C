@@ -115,25 +115,24 @@ init(void)
   }
   
   CkPrintf("Passing elements to framework\n");
-
-	// Register the Element entity and its connectivity array. Register the
-	// data arrays to set up the widths correctly at the beginning
-	FEM_Register_entity(FEM_Mesh_default_write(),FEM_ELEM,NULL,nEle,nEle,resize_nodes);
-	FEM_Register_array(FEM_Mesh_default_write(),FEM_ELEM,FEM_CONN,ele,FEM_INDEX_0,3);
-	
-	for(int k=0;k<3;k++){
-		void *t = new double[nEle];
-		FEM_Register_array(FEM_Mesh_default_write(),FEM_ELEM,FEM_DATA+k,t,FEM_DOUBLE,1);
-	}
-	
-
-/*Build the ghost layer for refinement border*/
+  
+  // Register the Element entity and its connectivity array. Register the
+  // data arrays to set up the widths correctly at the beginning
+  FEM_Register_entity(FEM_Mesh_default_write(),FEM_ELEM,NULL,nEle,nEle,resize_nodes);
+  FEM_Register_array(FEM_Mesh_default_write(),FEM_ELEM,FEM_CONN,ele,FEM_INDEX_0,3);
+  
+  for(int k=0;k<3;k++){
+    void *t = new double[nEle];
+    FEM_Register_array(FEM_Mesh_default_write(),FEM_ELEM,FEM_DATA+k,t,FEM_DOUBLE,1);
+  }
+  
+  /*Build the ghost layer for refinement border*/
   FEM_Add_ghost_layer(2,0); /*2 nodes/tuple, do not add ghost nodes*/
+  //FEM_Add_ghost_layer(2,1); /*2 nodes/tuple, do not add ghost nodes*/
   const static int tri2edge[6]={0,1, 1,2, 2,0};
   FEM_Add_ghost_elem(0,3,tri2edge);
-
+  
   CkPrintf("Finished with init\n");
-
 }
 
 struct myGlobals {

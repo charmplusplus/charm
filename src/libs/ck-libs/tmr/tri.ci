@@ -4,18 +4,9 @@
 module refine {
   // ----------------------------- Messages ---------------------------------
   message chunkMsg;
-  message nodeMsg;
-  message edgeMsg;
-  message remoteEdgeMsg;
-  message elementMsg;
-  message refineMsg;
-  message updateMsg;
-  message specialRequestMsg;
-  message specialResponseMsg;
-  message refMsg; 
-  message edgeUpdateMsg;
-  message intMsg;
+  message refMsg;
   message doubleMsg;
+  message intMsg;
 
   // ------------------------ Global Read-only Data -------------------------
   readonly CProxy_chunk mesh;
@@ -25,25 +16,24 @@ module refine {
   // ---------------------------- Chare Arrays ------------------------------
   array [1D] chunk {
     entry chunk(chunkMsg *);
-    entry void addRemoteEdge(remoteEdgeMsg *);
-    entry void refineElement(refineMsg *);
+    entry [threaded] void addRemoteEdge(int, int, edgeRef);
+    entry void refineElement(int, double);
     entry [threaded] void refiningElements();	
-    entry [sync] nodeMsg *getNode(intMsg *);
-    entry [sync] void updateElement(updateMsg *);
-    entry [threaded] void specialRequest(specialRequestMsg *);
-    entry [threaded] void specialRequestResponse(specialResponseMsg *);
-    entry [sync, threaded] doubleMsg *getArea(intMsg *);
-    entry [sync, threaded] nodeMsg *midpoint(intMsg *);
-    entry [sync] intMsg *lock(intMsg *);
-    entry [sync] void unlock(intMsg *);
-    entry [sync] intMsg *locked(intMsg *);
-    entry [sync, threaded] intMsg *checkElement(refMsg *);
-    entry [sync] refMsg *getNeighbor(refMsg *);
-    entry [sync] void setTargetArea(doubleMsg *);
-    entry [sync] void updateEdges(edgeUpdateMsg *);
-    entry [sync] void unsetDependency(intMsg *);
-    entry [sync] void setDependent(refMsg *);
-    entry [sync] intMsg *hasDependent(intMsg *);
+    entry [sync] void updateElement(int, objRef, objRef);
+    entry [threaded] void specialRequest(int, elemRef);
+    entry [threaded] void specialRequestResponse(int, double, double, double,
+	double, edgeRef);
+    entry [sync, threaded] doubleMsg *getArea(int);
+    entry [sync] intMsg *lock(int);
+    entry [sync] void unlock(int);
+    entry [sync] intMsg *locked(int);
+    entry [sync, threaded] intMsg *checkElement(objRef, int);
+    entry [sync] refMsg *getNeighbor(objRef, int);
+    entry [sync] void setTargetArea(int, double);
+    entry [sync] void updateEdges(int, edgeRef, edgeRef, edgeRef);
+    entry [sync] void unsetDependency(int);
+    entry [sync] void setDependent(objRef, int);
+    entry [sync] intMsg *hasDependent(int);
     entry [sync, threaded] void print();
     entry [sync, threaded] void out_print();
   };

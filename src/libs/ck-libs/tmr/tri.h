@@ -6,15 +6,12 @@
 #include "charm++.h"
 #include "tcharm.h"
 #include "charm-api.h"
-#include "refine.decl.h"
 
-// ------------------------ Global Read-only Data ---------------------------
-extern CProxy_chunk mesh;
+class node;
 class chunk;
-CtvExtern(chunk *, _refineChunk);
+class elemRef;
 
 // --------------------------- Helper Classes -------------------------------
-
 // objRef: References to mesh data require a chunk ID (cid) and an
 // index on that chunk (idx). Subclasses for nodeRefs, edgeRefs and
 // elemRefs define the same operators as the data they reference.
@@ -29,11 +26,8 @@ class objRef {
   int operator!=(const objRef& o) const { return !( (*this)==o ); }
   int isNull(void) const {return cid==-1;}
   void sanityCheck(chunk *C);
+  void pup(PUP::er &p) { p(cid); p(idx); }
 };
-
-class node;
-class chunk;
-class elemRef;
 
 // edge and element References: see actual classes below for
 // method descriptions
@@ -43,7 +37,6 @@ class edgeRef : public objRef {
   edgeRef(int c,int i) :objRef(c,i) {}
 
   void updateElement(chunk *C, elemRef oldval, elemRef newval);
-  void midpoint(chunk *C, node *result) const;
   int lock(chunk *C);
   void unlock(chunk *C);
   int locked(chunk *C) const;
@@ -63,74 +56,17 @@ class elemRef : public objRef {
   int hasDependent(chunk *C);
 };
 
-// ------------------------------ Messages ----------------------------------
+#include "refine.decl.h"
+// ------------------------ Global Read-only Data ---------------------------
+extern CProxy_chunk mesh;
+CtvExtern(chunk *, _refineChunk);
 
+// ------------------------------ Messages ----------------------------------
 // chunkMsg: information needed at startup
 class chunkMsg : public CMessage_chunkMsg {
  public:
   int nChunks;
   CProxy_TCharm myThreads;
-};
-
-
-// nodeMsg: coordinates of a node
-class nodeMsg : public CMessage_nodeMsg {
- public:
-  double x, y;
-};
-
-// edgeMsg: indices of nodes defining and references to elements sharing an 
-// edge
-class edgeMsg : public CMessage_edgeMsg {
- public:
-  int nodes[2];
-  elemRef elements[2];
-};
-
-// remoteEdgeMsg: used my FEM interface to add an edge reference to a
-// remote element
-class remoteEdgeMsg : public CMessage_remoteEdgeMsg {
- public:
-  int elem, localEdge;
-  edgeRef er;
-};
-
-// elementMsg: indices of nodes and references to edges defining an element; 
-// see element class below for relationship between nodes and edges
-class elementMsg : public CMessage_elementMsg {
- public: 
-  int nodes[3];
-  edgeRef edges[3];
-};
-
-// refineMsg: index of element to refine and area to refine it under
-class refineMsg : public CMessage_refineMsg {
- public:
-  int idx;
-  double area;
-};
-
-// updateMsg: update a reference for a node or edge in element idx
-class updateMsg : public CMessage_updateMsg {
- public:
-  int idx;
-  objRef oldval, newval;
-};
-
-// specialRequestMsg: requester makes a special request (to refine) of
-// requestee
-class specialRequestMsg : public CMessage_specialRequestMsg {
- public:
-  int requestee;
-  elemRef requester;
-};
-
-// specialResponseMsg: response to special request with refinement info
-class specialResponseMsg : public CMessage_specialRequestMsg {
- public:
-  int idx;
-  double newNodeX, newNodeY, otherNodeX, otherNodeY;
-  edgeRef newLongEdgeRef;
 };
 
 // refMsg: generic message for sending/receiving a reference to/from an element
@@ -140,24 +76,16 @@ class refMsg : public CMessage_refMsg {
   int idx;
 };
 
-// edgeUpdateMsg: update the edges of an element idx
-class edgeUpdateMsg : public CMessage_edgeUpdateMsg {
- public:
-  int idx;
-  edgeRef e0, e1, e2;
-};
-
-// intMsg: used to send parameterless messages to an element anInt
-class intMsg : public CMessage_intMsg {
- public:
-  int anInt;
-};
-
 // doubleMsg: used to send a double to an element idx
 class doubleMsg : public CMessage_doubleMsg {
  public:
-  int idx;
   double aDouble;
+};
+
+// intMsg: used to return integers from sync methods
+class intMsg : public CMessage_intMsg {
+ public:
+  int anInt;
 };
 
 // ---------------------------- Data Classes --------------------------------
@@ -221,39 +149,29 @@ class edge {
   int theLock;  // 0 if open; 1 if locked
 
  public:
-  int nodes[2];
   elemRef elements[2];
 
   // Basic edge contructor: unlocked by default
   edge() { 
-    for (int i=0; i<2; i++) {
-      nodes[i] = -1;
+    for (int i=0; i<2; i++)
       elements[i].init();
-    }
     myRef.init();  C = NULL;  theLock = 0; 
   }
   
   void sanityCheck(chunk *C,edgeRef ref);
-
   // Initializers for an edge: either set all fields, or just the
-  // index and chunk info.  Node and elements references can be set or
-  // modified later with updateNode & updateElement; added one that
-  // takes just the nodes to start with
+  // index and chunk info.  Element references can be set or
+  // modified later with updateElement
   void init() { theLock = 0; } // equivalent to constructor initializations
   void init(int i, chunk *cPtr);
-  void init(int *n, int i, chunk *cPtr);
-  void init(int *n, elemRef *e, int i, chunk *cPtr);
+  void init(elemRef *e, int i, chunk *cPtr);
 
-  // updateNode & updateElement: Set or modify the node indices or element
-  // references of the edge.  If the edge has not been initialized, passing
+  // updateElement: Set or modify the element references of the edge.  
+  // If the edge has not been initialized, passing
   // a -1 or the null reference as oldval will initialize any uninitialized
   // field in the edge
-  void updateNode(int oldval, int newval);
   void updateElement(elemRef oldval, elemRef newval);
-
   const edgeRef &getRef() const { return myRef; } // get reference to this edge
-  double length();              // compute edge length
-  void midpoint(node *result);  // compute edge midpoint; place in result
 
   // getNbrRef: called by an element on one of it's edges to get a
   // reference to the neighbor on the other side of the edge; the
@@ -262,10 +180,9 @@ class edge {
     if (er == elements[0])
       return elements[1];
     else if (!(er == elements[1]))
-      CkPrintf("ERROR: edge::getNbrRef: input edgeRef not on edge\n");
+      CkAbort("ERROR: edge::getNbrRef: input edgeRef not on edge\n");
     return elements[0];
   }
-
   // lock, unlock, and locked control access to the edge's lock
   void lock() { theLock = 1; }
   void unlock() { theLock = 0; }
@@ -352,7 +269,6 @@ class element {
   }
   double getTargetArea() { return targetArea; }
   double getCachedArea() { return currentArea; }
-  void getMidpointOnEdge(int e, node *m);
 
   // These methods manipulate this element's dependence on another
   void setDependency() { depend = 1; }
@@ -535,7 +451,7 @@ class chunk : public TCharmClient1D {
   void deriveNodes();
   int edgeLocal(elemRef e1, elemRef e2);
   int findEdge(int n1, int n2);
-  int addNewEdge(int n1, int n2);
+  int addNewEdge();
   int getNbrRefOnEdge(int n1, int n2, int *conn, int nGhost, int *gid, 
 		      int idx, elemRef *er);
   int hasEdge(int n1, int n2, int *conn, int idx);
@@ -565,28 +481,28 @@ class chunk : public TCharmClient1D {
   // entry methods
   
   // Initiates a refinement for a single element
-  void refineElement(refineMsg *);
+  void refineElement(int i, double area);
   // Loops through all elements performing refinements as needed
   void refiningElements();
 
   // The following methods simply provide remote access to local data
   // See above for details of each
-  nodeMsg *getNode(intMsg *);
-  void updateElement(updateMsg *);
-  void specialRequest(specialRequestMsg *);
-  void specialRequestResponse(specialResponseMsg *);
-  doubleMsg *getArea(intMsg *);
-  nodeMsg *midpoint(intMsg *);
-  intMsg *lock(intMsg *);
-  void unlock(intMsg *);
-  intMsg *locked(intMsg *);
-  intMsg *checkElement(refMsg *);
-  refMsg *getNeighbor(refMsg *);
-  void setTargetArea(doubleMsg *);
-  void updateEdges(edgeUpdateMsg *);
-  void unsetDependency(intMsg *im);
-  void setDependent(refMsg *rm);
-  intMsg *hasDependent(intMsg *im);
+  void updateElement(int i, objRef oldval, objRef newval);
+  void specialRequest(int reqestee, elemRef requester);
+  void specialRequestResponse(int i, double newNodeX, double newNodeY, 
+			      double otherNodeX, double otherNodeY, 
+			      edgeRef newLongEdgeRef);
+  doubleMsg *getArea(int i);
+  intMsg *lock(int i);
+  void unlock(int i);
+  intMsg *locked(int i);
+  intMsg *checkElement(objRef oR, int i);
+  refMsg *getNeighbor(objRef oR, int i);
+  void setTargetArea(int i, double area);
+  void updateEdges(int i, edgeRef e0, edgeRef e1, edgeRef e2);
+  void unsetDependency(int i);
+  void setDependent(objRef oR, int i);
+  intMsg *hasDependent(int i);
 
   // meshLock methods
   void accessLock();  // waits until meshExpandFlag not set, then decs meshLock
@@ -610,7 +526,7 @@ class chunk : public TCharmClient1D {
   // refinement is completed.
   void multipleRefine(double *desiredArea, refineClient *client);
   void newMesh(int nEl, int nGhost,const int *conn_,const int *gid_, int idxOffset);
-  void addRemoteEdge(remoteEdgeMsg *);
+  void addRemoteEdge(int elem, int localEdge, edgeRef er);
 
   
   // These access and set local flags
@@ -623,7 +539,7 @@ class chunk : public TCharmClient1D {
   void allocMesh(int nEl);
   void adjustMesh();
   int addNode(node n);
-  edgeRef addEdge(int n1, int n2);
+  edgeRef addEdge();
   elemRef addElement(int n1, int n2, int n3);
   elemRef addElement(int n1, int n2, int n3,
 		     edgeRef er1, edgeRef er2, edgeRef er3);

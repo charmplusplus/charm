@@ -20,13 +20,8 @@ void edgeRef::updateElement(chunk *C, elemRef oldval, elemRef newval)
 {
   if (cid == C->cid) // the edge is local; update its elemRef on this chunk
     C->theEdges[idx].updateElement(oldval, newval);
-  else { // the edge is remote; send elemRef update to remote chunk
-    updateMsg *um = new updateMsg;
-    um->idx = idx;
-    um->oldval = oldval;
-    um->newval = newval;
-    mesh[cid].updateElement(um);
-  }
+  else // the edge is remote; send elemRef update to remote chunk
+    mesh[cid].updateElement(idx, oldval, newval);
 }
 
 int edgeRef::lock(chunk *C)
@@ -41,10 +36,9 @@ int edgeRef::lock(chunk *C)
     }
   }
   else { // the edge is remote; tell remote chunk to lock it
-    intMsg *im1 = new intMsg, *im2;
+    intMsg *im2;
     int result;
-    im1->anInt = idx;
-    im2 = mesh[cid].lock(im1);
+    im2 = mesh[cid].lock(idx);
     result = im2->anInt;
     CkFreeMsg(im2);
     return result;
@@ -55,11 +49,8 @@ void edgeRef::unlock(chunk *C)
 {
   if (cid == C->cid) // the edge is local; unlock it on this chunk
     C->theEdges[idx].unlock();
-  else { // the edge is remote; tell remote chunk to unlock it
-    intMsg *im = new intMsg;
-    im->anInt = idx;
-    mesh[cid].unlock(im);
-  }
+  else // the edge is remote; tell remote chunk to unlock it
+    mesh[cid].unlock(idx);
 }
 
 int edgeRef::locked(chunk *C) const
@@ -67,27 +58,12 @@ int edgeRef::locked(chunk *C) const
   if (cid == C->cid) // the edge is local; query its lock on this chunk
     return C->theEdges[idx].locked();
   else { // the edge is remote; query its lock on the remote chunk
-    intMsg *im1 = new intMsg, *im2;
+    intMsg *im2;
     int result;
-    im1->anInt = idx;
-    im2 = mesh[cid].locked(im1);
+    im2 = mesh[cid].locked(idx);
     result = im2->anInt;
     CkFreeMsg(im2);
     return result;
-  }
-}
-
-void edgeRef::midpoint(chunk *C, node *result) const
-{
-  if (cid == C->cid) // the edge is local; compute the midpoint on this chunk
-    C->theEdges[idx].midpoint(result);
-  else { // the edge is remote; compute the midpoint on the remote chunk
-    nodeMsg *nm;
-    intMsg *im = new intMsg;
-    im->anInt = idx;
-    nm = mesh[cid].midpoint(im);
-    result->init(nm->x, nm->y);
-    CkFreeMsg(nm);
   }
 }
 
@@ -99,9 +75,7 @@ double elemRef::getArea(chunk *C)
   else { // the element is remote; get the area from the remote chunk
     doubleMsg *dm;
     double result;
-    intMsg *im = new intMsg;
-    im->anInt = idx;
-    dm = mesh[cid].getArea(im);
+    dm = mesh[cid].getArea(idx);
     result = dm->aDouble;
     CkFreeMsg(dm);
     return result;
@@ -115,10 +89,7 @@ int elemRef::checkIfLongEdge(chunk *C, edgeRef e)
   else { // the element is remote; check e == longEdge on remote chunk
     intMsg *im;
     int result;
-    refMsg *rm = new refMsg;
-    rm->aRef = e;
-    rm->idx = idx;
-    im = mesh[cid].checkElement(rm);
+    im = mesh[cid].checkElement(e, idx);
     result = im->anInt;
     CkFreeMsg(im);
     return result;
@@ -130,14 +101,8 @@ void elemRef::updateEdges(chunk *C, edgeRef e0, edgeRef e1,
 {
   if (cid == C->cid) // the element is local; updateEdges on this chunk
     C->theElements[idx].updateEdges(e0, e1, e2);
-  else { // the element is remote; update edges on remote chunk
-    edgeUpdateMsg *em = new edgeUpdateMsg;
-    em->idx = idx;
-    em->e0 = e0;
-    em->e1 = e1;
-    em->e2 = e2;
-    mesh[cid].updateEdges(em);
-  }
+  else // the element is remote; update edges on remote chunk
+    mesh[cid].updateEdges(idx, e0, e1, e2);
 }
 
 void elemRef::setDependent(chunk *C, int anIdx, int aCid)
@@ -150,13 +115,8 @@ void elemRef::setDependent(chunk *C, int anIdx, int aCid)
       mesh[cid].refiningElements(); // start it up now
     }
   }
-  else { // the element is remote; setDependent on remote chunk
-    refMsg *rm = new refMsg;
-    rm->idx = idx;
-    rm->aRef.cid = aCid;
-    rm->aRef.idx = anIdx;
-    mesh[cid].setDependent(rm);
-  }
+  else // the element is remote; setDependent on remote chunk
+    mesh[cid].setDependent(objRef(aCid, anIdx), idx);
 }
 
 void elemRef::unsetDependency(chunk *C)
@@ -169,11 +129,8 @@ void elemRef::unsetDependency(chunk *C)
       mesh[cid].refiningElements(); // start it up now
     }
   }
-  else { // the element is remote; unsetDependency on remote chunk
-    intMsg *im = new intMsg;
-    im->anInt = idx;
-    mesh[cid].unsetDependency(im);
-  }
+  else // the element is remote; unsetDependency on remote chunk
+    mesh[cid].unsetDependency(idx);
 }
 
 int elemRef::hasDependent(chunk *C)
@@ -181,10 +138,9 @@ int elemRef::hasDependent(chunk *C)
   if (cid == C->cid) // the element is local; query dependent on this chunk
     return (C->theElements[idx].hasDependent());
   else { // the element is remote; query dependent on remote chunk
-    intMsg *im1 = new intMsg, *im2;
+    intMsg *im2;
     int result;
-    im1->anInt = idx;
-    im2 = mesh[cid].hasDependent(im1);
+    im2 = mesh[cid].hasDependent(idx);
     result = im2->anInt;
     CkFreeMsg(im2);
     return result;
@@ -195,12 +151,8 @@ void elemRef::setTargetArea(chunk *C, double ta)
 {
   if (cid == C->cid) // the element is local; setTargetArea on this chunk
     C->theElements[idx].setTargetArea(ta);
-  else { // the element is remote; setTargetArea dependent on remote chunk
-    doubleMsg *dm = new doubleMsg;
-    dm->idx = idx;
-    dm->aDouble = ta;
-    mesh[cid].setTargetArea(dm);
-  }
+  else // the element is remote; setTargetArea dependent on remote chunk
+    mesh[cid].setTargetArea(idx, ta);
 }
 
 // edge methods
@@ -209,49 +161,10 @@ void edge::init(int i, chunk *cPtr)
   C = cPtr;  myRef.init(C->cid,i);  theLock = 0;
 }
 
-void edge::init(int *n, int i, chunk *cPtr) 
+void edge::init(elemRef *e, int i, chunk *cPtr) 
 {
-  nodes[0] = n[0];     nodes[1] = n[1];
-  C = cPtr;  myRef.init(C->cid,i);  theLock = 0;
-}
-
-void edge::init(int *n, elemRef *e, int i, chunk *cPtr) 
-{
-  nodes[0] = n[0];     nodes[1] = n[1];
   elements[0] = e[0];  elements[1] = e[1];
   C = cPtr;  myRef.init(C->cid,i);  theLock = 0;
-}
-
-double edge::length()
-{
-  int i;
-  node n[2];
-  double result;
-  
-  for (i=0; i<2; i++) // get node coordinates
-    n[i] = C->theNodes[nodes[i]];
-  result = n[0].distance(n[1]); // find distance between two nodes
-  return result;
-}
-
-void edge::midpoint(node *result)
-{
-  int i;
-  node n[2];
-  
-  for (i=0; i<2; i++) // get node coordinates
-    n[i] = C->theNodes[nodes[i]];
-  n[0].midpoint(n[1], result); // find midpoint between two nodes
-}
-
-void edge::updateNode(int oldval, int newval)
-{ // find which node matches oldval and replace it with newval
-  if (nodes[0] == oldval)
-    nodes[0] = newval;
-  else if (nodes[1] == oldval)
-    nodes[1] = newval;
-  else 
-    CkAbort("ERROR: edge::updateNode: no match for oldval\n");
 }
 
 void edge::updateElement(elemRef oldval, elemRef newval)
@@ -310,19 +223,6 @@ void element::init(int *n, edgeRef *e, int index, chunk *chk)
   unsetDependent();
 }
 
-void element::getMidpointOnEdge(int e, node *m)
-{
-  node n[2];
-
-  if (edges[e].cid == myRef.cid)
-    C->theEdges[edges[e].idx].midpoint(m);
-  else {
-    for (int i=0; i<2; i++) // get node coordinates
-      n[i] = C->theNodes[nodes[i]];
-    n[0].midpoint(n[1], m);
-  }
-}
-
 double element::getArea()
 { 
   calculateArea();
@@ -379,10 +279,7 @@ elemRef element::getNeighbor(int e) const
     return C->theEdges[edges[e].idx].getNbrRef(myRef);
   }
   else { // edges[e] is not local; getNeighbor on remote chunk
-    refMsg *gm = new refMsg;
-    gm->idx = edges[e].idx;
-    gm->aRef=myRef;
-    refMsg *result = mesh[edges[e].cid].getNeighbor(gm);
+    refMsg *result = mesh[edges[e].cid].getNeighbor(myRef, edges[e].idx);
     elemRef ret=*(elemRef *)&result->aRef;
     CkFreeMsg(result);
     return ret;
@@ -508,15 +405,15 @@ void element::splitBorderLocal(int longEdge, int opnode, int othernode,
             @____________@____________@ othernode(1)
               longEdge  m(2)  newLong
   */
-
+  int fixnode = 3 - opnode - othernode;
   // find midpoint on longest edge
   node m; // the new node
-  getMidpointOnEdge(longEdge, &m);
+  C->theNodes[nodes[othernode]].midpoint(C->theNodes[nodes[fixnode]], &m);
 
   // add new components to local chunk and get refs to them
   int mIdx = C->addNode(m);
-  edgeRef newEdgeRef = C->addEdge(nodes[opnode], mIdx);
-  edgeRef newLongRef = C->addEdge(mIdx, nodes[othernode]);
+  edgeRef newEdgeRef = C->addEdge();
+  edgeRef newLongRef = C->addEdge();
   elemRef newElemRef;
   if (opnode == 0) {
     if (othernode == 1)
@@ -543,7 +440,6 @@ void element::splitBorderLocal(int longEdge, int opnode, int othernode,
 				 edges[modEdge], newEdgeRef);
   }
 
-  C->theEdges[edges[longEdge].idx].updateNode(nodes[othernode], mIdx);
   edges[modEdge].updateElement(C, myRef, newElemRef);
   C->theEdges[newEdgeRef.idx].updateElement(nullRef, myRef);
   C->theEdges[newEdgeRef.idx].updateElement(nullRef, newElemRef);
@@ -611,11 +507,8 @@ void element::splitNeighbors(int longEdge)
     }
   }
   else { // neighbor is not local; send a special request to it
-    specialRequestMsg *srm = new specialRequestMsg;
-    srm->requester=myRef;
-    srm->requestee = nbr.idx;
     pendingRequest = 1; // indicates that this element is awaiting a response
-    mesh[nbr.cid].specialRequest(srm);
+    mesh[nbr.cid].specialRequest(nbr.idx, myRef);
   }
 }
 
@@ -625,15 +518,15 @@ void element::splitNeighborsLocal(int longEdge, int opnode, int othernode,
 				  const elemRef &nbr)
 {
   // find the new node along longEdge
+  int fixnode = 3 - opnode - othernode;
   node m;
-  getMidpointOnEdge(longEdge, &m);
+  C->theNodes[nodes[othernode]].midpoint(C->theNodes[nodes[fixnode]], &m);
 
   // add new components to local chunk and get refs to them
   int mIdx = C->addNode(m);
-  edgeRef newEdgeRef = C->addEdge(nodes[opnode], mIdx);
-  edgeRef newLongRef = C->addEdge(mIdx, nodes[othernode]);
-  edgeRef newNbrEdgeRef = C->addEdge(mIdx, 
-			     C->theElements[nbr.idx].nodes[nbrOpnode]);
+  edgeRef newEdgeRef = C->addEdge();
+  edgeRef newLongRef = C->addEdge();
+  edgeRef newNbrEdgeRef = C->addEdge();
   elemRef newElemRef;
   if (opnode == 0) {
     if (othernode == 1)
@@ -700,7 +593,6 @@ void element::splitNeighborsLocal(int longEdge, int opnode, int othernode,
 
   // link everything together properly
   edges[modEdge].updateElement(C, myRef, newElemRef);
-  C->theEdges[edges[longEdge].idx].updateNode(nodes[othernode], mIdx);
   C->theEdges[newEdgeRef.idx].updateElement(nullRef, myRef);
   C->theEdges[newEdgeRef.idx].updateElement(nullRef, newElemRef);
   C->theEdges[newLongRef.idx].updateElement(nullRef, newElemRef);
@@ -762,7 +654,7 @@ void element::splitHelp(int longEdge)
 
   // add new components and make proper connections
   newNodeIdx = C->addNode(newNode);
-  edgeRef newEdgeRef = C->addEdge(newNodeIdx, nodes[opnode]);
+  edgeRef newEdgeRef = C->addEdge();
   elemRef newElemRef;
   if (opnode == 0) {
     if (othernode == 1)
@@ -789,8 +681,6 @@ void element::splitHelp(int longEdge)
 				 newLongEdgeRef, edges[modEdge], newEdgeRef);
   }
 
-  if (edges[longEdge].cid == C->cid)
-    C->theEdges[edges[longEdge].idx].updateNode(nodes[othernode], newNodeIdx);
   C->theEdges[newEdgeRef.idx].updateElement(nullRef, myRef);
   C->theEdges[newEdgeRef.idx].updateElement(nullRef, newElemRef);
   newLongEdgeRef.updateElement(C, nullRef, newElemRef);
@@ -842,13 +732,14 @@ void element::splitResponse(int longEdge)
   }
 
   // find midpoint on longest edge
+  int fixnode = 3 - opnode - othernode;
   node m;
-  getMidpointOnEdge(longEdge, &m);
+  C->theNodes[nodes[othernode]].midpoint(C->theNodes[nodes[fixnode]], &m);
 
   // add new components to local chunk and get refs to them
   int mIdx = C->addNode(m);
-  edgeRef newEdgeRef = C->addEdge(nodes[opnode], mIdx);
-  edgeRef newLongRef = C->addEdge(mIdx, nodes[othernode]);
+  edgeRef newEdgeRef = C->addEdge();
+  edgeRef newLongRef = C->addEdge();
   elemRef newElemRef;
   if (opnode == 0) {
     if (othernode == 1)
@@ -875,25 +766,16 @@ void element::splitResponse(int longEdge)
 				 edges[modEdge], newEdgeRef);
   }
 
-  if (edges[longEdge].cid == C->cid)
-    C->theEdges[edges[longEdge].idx].updateNode(nodes[othernode], mIdx);
   edges[modEdge].updateElement(C, myRef, newElemRef);
   C->theEdges[newEdgeRef.idx].updateElement(nullRef, myRef);
   C->theEdges[newEdgeRef.idx].updateElement(nullRef, newElemRef);
   C->theEdges[newLongRef.idx].updateElement(nullRef, newElemRef);
 
-  if (!newLongRef.lock(C))
-    CkAbort("ERROR locking new long edge.\n");
-  // prepare specialRequestResponse
-  specialResponseMsg *srm = new specialResponseMsg;
-  srm->idx = specialRequester.idx;
-  srm->newNodeX = m.X();
-  srm->newNodeY = m.Y();
-  srm->otherNodeX = C->theNodes[nodes[othernode]].X();
-  srm->otherNodeY = C->theNodes[nodes[othernode]].Y();
-  srm->newLongEdgeRef = newLongRef;
+  if (!newLongRef.lock(C)) CkAbort("ERROR locking new long edge.\n");
   // tell other half of pair that it can proceed with refinement
-  mesh[specialRequester.cid].specialRequestResponse(srm);
+  mesh[specialRequester.cid].specialRequestResponse(specialRequester.idx,
+    m.X(), m.Y(), C->theNodes[nodes[othernode]].X(), 
+    C->theNodes[nodes[othernode]].Y(), newLongRef);
 
   nodes[othernode] = mIdx;
   edges[modEdge] = newEdgeRef;
@@ -917,11 +799,8 @@ void element::splitResponse(int longEdge)
 void element::refineNeighbor(int longEdge)
 {
   elemRef nbr = getNeighbor(longEdge);
-  refineMsg *rm;
-
   // this element and the neighbor on its long edge do not share the
   // same longEdge
-
   if (!nbr.hasDependent(C)) {
     double nbrArea = nbr.getArea(C);
     nbr.setDependent(C, myRef.idx, myRef.cid); // set nbr's dependent to this
@@ -929,12 +808,8 @@ void element::refineNeighbor(int longEdge)
     if (nbr.cid == myRef.cid) // nbr is local
       // force at least one refinement level on nbr
       C->theElements[nbr.idx].setTargetArea(nbrArea); 
-    else { // nbr not local; tell nbr's chunk to refine nbr element
-      rm = new refineMsg;
-      rm->idx = nbr.idx;
-      rm->area = nbrArea;
-      mesh[nbr.cid].refineElement(rm);
-    }
+    else // nbr not local; tell nbr's chunk to refine nbr element
+      mesh[nbr.cid].refineElement(nbr.idx, nbrArea);
   }
   // Note: if neighbor already has a dependent, only that dependent
   // will be notified when it refines. So this element must not be
@@ -965,11 +840,12 @@ chunk::chunk(chunkMsg *m)
   thread->resume();
 }
 
-void chunk::refineElement(refineMsg *m)
+void chunk::refineElement(int i, double area)
 {
   // we indicate a need for refinement by reducing an element's targetArea
-  theElements[m->idx].setTargetArea(m->area);
-  CkFreeMsg(m);
+  accessLock();
+  theElements[i].setTargetArea(area);
+  releaseLock();
   modified = 1;  // flag a change in one of the chunk's elements
   if (!refineInProgress) { // if refine loop not running
     refineInProgress = 1;
@@ -981,12 +857,13 @@ void chunk::refiningElements()
 {
   int i;
   
-  CkPrintf("Chunk %d: refiningElements\n", cid);
+  CkPrintf("[tmr] Chunk %d: refiningElements\n", cid);
   while (modified) { 
     // continue trying to refine elements until nothing changes during
     // a refinement cycle
     i = 0;
     modified = 0;
+    CkPrintf("[tmr] Chunk %d: Entering internal refinement loop...\n", cid);
     while (i < numElements) { // loop through the elements
       if (theElements[i].getCachedArea() < 0.0) // no cached area yet
       	theElements[i].calculateArea();
@@ -998,46 +875,37 @@ void chunk::refiningElements()
 	  || theElements[i].isRequestResponse()) {
 	// the element either needs refining or has been asked to
 	// refine or has asked someone else to refine
-	CkPrintf("Chunk %d: Element %d: hasdep? %c target=%f current=%f spcReq? %c pend? %c reqResp? %c\n", cid, i, (theElements[i].hasDependency() ? 'y' : 'n'), theElements[i].getTargetArea(), theElements[i].getCachedArea(), (theElements[i].isSpecialRequest() ? 'y' : 'n'), (theElements[i].isPendingRequest() ? 'y' : 'n'), (theElements[i].isRequestResponse() ? 'y' : 'n'));
+	//CkPrintf("[tmr] Chunk %d: Element %d: hasdep? %c target=%f current=%f spcReq? %c pend? %c reqResp? %c\n", cid, i, (theElements[i].hasDependency() ? 'y' : 'n'), theElements[i].getTargetArea(), theElements[i].getCachedArea(), (theElements[i].isSpecialRequest() ? 'y' : 'n'), (theElements[i].isPendingRequest() ? 'y' : 'n'), (theElements[i].isRequestResponse() ? 'y' : 'n'));
 	modified = 1; // something's bound to change
 	theElements[i].refine(); // refine the element
-	adjustMesh();
       }
       i++;
     }
-    if (CkMyPe() == 0) for (int j=0; j<numChunks; j++) mesh[j].print();
+    //if (CkMyPe() == 0) for (int j=0; j<numChunks; j++) mesh[j].print();
+    adjustMesh();
     CthYield(); // give other chunks on the same PE a chance
   }
   // nothing is in need of refinement; turn refine loop off
   refineInProgress = 0;  
+  CkPrintf("[tmr] Chunk %d: DONE refiningElements\n", cid);
 }
 
 
-// many remote access methods follow
-nodeMsg *chunk::getNode(intMsg *im)
+void chunk::updateElement(int i, objRef oldval, objRef newval)
 {
-  nodeMsg *nm = new nodeMsg;
-  nm->x = theNodes[im->anInt].X();
-  nm->y = theNodes[im->anInt].Y();
-  CkFreeMsg(im);
-  return nm;
-}
-
-void chunk::updateElement(updateMsg *um)
-{
-  elemRef ov, nv;
-  ov.idx = um->oldval.idx;   ov.cid = um->oldval.cid; 
-  nv.idx = um->newval.idx;   nv.cid = um->newval.cid; 
-  theEdges[um->idx].updateElement(ov, nv);
-  CkFreeMsg(um);
+  accessLock();
+  theEdges[i].updateElement(elemRef(oldval.cid, oldval.idx), 
+			    elemRef(newval.cid, newval.idx));
+  releaseLock();
 }
 
 // special requests need to wake things up on the local chunk
-void chunk::specialRequest(specialRequestMsg *m)
+void chunk::specialRequest(int requestee, elemRef requester)
 {
-  theElements[m->requestee].setSpecialRequest(m->requester);
+  accessLock();
+  theElements[requestee].setSpecialRequest(requester);
+  releaseLock();
   //  CkPrintf("Element %d on chunk %d received special request from element %d on chunk %d.\n", m->requestee, cid, m->requester.idx, m->requester.cid);
-  CkFreeMsg(m);
   modified = 1;
   if (!refineInProgress) {
     refineInProgress = 1;
@@ -1045,13 +913,16 @@ void chunk::specialRequest(specialRequestMsg *m)
   }
 }
 
-void chunk::specialRequestResponse(specialResponseMsg *m)
+void chunk::specialRequestResponse(int i, double newNodeX, double newNodeY, 
+				   double otherNodeX, double otherNodeY, 
+				   edgeRef newLongEdgeRef)
 {
-  node newNode(m->newNodeX, m->newNodeY);
-  node otherNode(m->otherNodeX, m->otherNodeY);
-  theElements[m->idx].setRequestResponse(newNode, otherNode,m->newLongEdgeRef);
+  node newNode(newNodeX, newNodeY);
+  node otherNode(otherNodeX, otherNodeY);
+  accessLock();
+  theElements[i].setRequestResponse(newNode, otherNode, newLongEdgeRef);
+  releaseLock();
   //  CkPrintf("Element %d on chunk %d received special request RESPONSE.\n", m->idx, cid);
-  CkFreeMsg(m);
   modified = 1;
   if (!refineInProgress) {
     refineInProgress = 1;
@@ -1059,85 +930,73 @@ void chunk::specialRequestResponse(specialResponseMsg *m)
   }
 }
 
-doubleMsg *chunk::getArea(intMsg *im)
+doubleMsg *chunk::getArea(int i)
 {
   doubleMsg *dm = new doubleMsg;
   accessLock();
-  dm->aDouble = theElements[im->anInt].getArea();
-  CkFreeMsg(im);
+  dm->aDouble = theElements[i].getArea();
   releaseLock();
   return dm;
 }
 
-nodeMsg *chunk::midpoint(intMsg *im)
-{
-  nodeMsg *nm = new nodeMsg;
-  node result;
-  accessLock();
-  theEdges[im->anInt].midpoint(&result);
-  CkFreeMsg(im);
-  releaseLock();
-  nm->x = result.X();
-  nm->y = result.Y();
-  return nm;
-}
-
-intMsg *chunk::lock(intMsg *im)
+intMsg *chunk::lock(int i)
 {
   intMsg *rm = new intMsg;
-  if (theEdges[im->anInt].locked())
+  accessLock();
+  if (theEdges[i].locked())
     rm->anInt = 0;
   else {
-    theEdges[im->anInt].lock();
+    theEdges[i].lock();
     rm->anInt = 1;
   }
-  CkFreeMsg(im);
+  releaseLock();
   return rm;
 }
 
-void chunk::unlock(intMsg *im)
+void chunk::unlock(int i)
 {
-  theEdges[im->anInt].unlock();
-  CkFreeMsg(im);
+  accessLock();
+  theEdges[i].unlock();
+  releaseLock();
 }
 
 
-intMsg *chunk::locked(intMsg *im)
+intMsg *chunk::locked(int i)
 {
   intMsg *rm = new intMsg;
-  rm->anInt = theEdges[im->anInt].locked();
-  CkFreeMsg(im);
+  accessLock();
+  rm->anInt = theEdges[i].locked();
+  releaseLock();
   return rm;
 }
 
-intMsg *chunk::checkElement(refMsg *rm)
+intMsg *chunk::checkElement(objRef oR, int i)
 {
   intMsg *im = new intMsg;
-  edgeRef eRef;
+  edgeRef eRef(oR.cid, oR.idx);
 
   accessLock();
-  eRef.idx = rm->aRef.idx; eRef.cid = rm->aRef.cid;
-  im->anInt = theElements[rm->idx].checkIfLongEdge(eRef);
-  CkFreeMsg(rm);
+  im->anInt = theElements[i].checkIfLongEdge(eRef);
   releaseLock();
   return im;
 }
 
-refMsg *chunk::getNeighbor(refMsg *gm)
+refMsg *chunk::getNeighbor(objRef oR, int i)
 {
   refMsg *rm = new refMsg;
-  elemRef er, ar;
-  ar.cid = gm->aRef.cid; ar.idx = gm->aRef.idx;
-  er = theEdges[gm->idx].getNbrRef(ar);
-  CkFreeMsg(gm);
+  elemRef er, ar(oR.cid, oR.idx);
+  accessLock();
+  er = theEdges[i].getNbrRef(ar);
+  releaseLock();
   rm->aRef = er;
   return rm;
 }
 
-void chunk::setTargetArea(doubleMsg *dm)
+void chunk::setTargetArea(int i, double area)
 {
-  theElements[dm->idx].setTargetArea(dm->aDouble);
-  CkFreeMsg(dm);
+  accessLock();
+  theElements[i].setTargetArea(area);
+  releaseLock();
   modified = 1;
   if (!refineInProgress) {
     refineInProgress = 1;
@@ -1145,17 +1004,18 @@ void chunk::setTargetArea(doubleMsg *dm)
   }
 }
 
-void chunk::updateEdges(edgeUpdateMsg *em)
+void chunk::updateEdges(int i, edgeRef e0, edgeRef e1, edgeRef e2)
 {
-  theElements[em->idx].updateEdges(em->e0, em->e1, em->e2);
-  CkFreeMsg(em);
+  accessLock();
+  theElements[i].updateEdges(e0, e1, e2);
+  releaseLock();
 }
 
-
-void chunk::setDependent(refMsg *rm)
+void chunk::setDependent(objRef oR, int i)
 {
-  theElements[rm->idx].setDependent(rm->aRef.cid, rm->aRef.idx);
-  CkFreeMsg(rm);
+  accessLock();
+  theElements[i].setDependent(oR.cid, oR.idx);
+  releaseLock();
   modified = 1;
   if (!refineInProgress) {
     refineInProgress = 1;
@@ -1163,24 +1023,26 @@ void chunk::setDependent(refMsg *rm)
   }
 }
 
-intMsg *chunk::hasDependent(intMsg *im)
+intMsg *chunk::hasDependent(int i)
 {
   intMsg *result = new intMsg;
-  result->anInt = theElements[im->anInt].hasDependent();
+  accessLock();
+  result->anInt = theElements[i].hasDependent();
+  releaseLock();
   return result;
 }
 
-void chunk::unsetDependency(intMsg *im)
+void chunk::unsetDependency(int i)
 {
-  theElements[im->anInt].unsetDependency();
-  CkFreeMsg(im);
+  accessLock();
+  theElements[i].unsetDependency();
+  releaseLock();
   modified = 1;
   if (!refineInProgress) {
     refineInProgress = 1;
     mesh[cid].refiningElements();
   }
 }
-
 
 // the following methods are for run-time additions and modifications
 // to the chunk components
@@ -1215,17 +1077,19 @@ void chunk::adjustRelease()
 
 void chunk::adjustMesh()
 {
-  if (sizeElements <= numElements+100) {
+  if ((sizeElements < numElements) || (sizeNodes < numNodes) || (sizeEdges < numEdges))
+    CkPrintf("[tmr] WARNING!\n\n     Mesh overrun! Data is probably corrupted!!!\n");
+  if (sizeElements <= numElements*4) {
     adjustFlag();
     adjustLock();
-    // CkPrintf("[%d] Adjusting mesh size...\n", cid);
-    sizeElements += 100;
-    sizeEdges += 300;
-    sizeNodes += 300;
+    CkPrintf("[tmr] [%d] Adjusting mesh size...\n", cid);
+    sizeElements = numElements*4;
+    sizeEdges = numEdges*12;
+    sizeNodes = numNodes*12;
     theElements.resize(sizeElements);
     theEdges.resize(sizeEdges);
     theNodes.resize(sizeNodes);
-    // CkPrintf("[%d] Done adjusting mesh size...\n", cid);
+    CkPrintf("[tmr] [%d] Done adjusting mesh size...\n", cid);
     adjustRelease();
   }
 }
@@ -1239,11 +1103,9 @@ int chunk::addNode(node n)
 }
 
 
-edgeRef chunk::addEdge(int n1, int n2)
+edgeRef chunk::addEdge()
 {
-  int n[2] = {n1, n2};
-
-  theEdges[numEdges].init(n, numEdges, this);
+  theEdges[numEdges].init(numEdges, this);
   edgeRef eRef(cid, numEdges);
   numEdges++;
   return eRef;
@@ -1332,8 +1194,6 @@ void chunk::out_print()
   for (i=0; i<numNodes; i++)
     fprintf(fp, "    %f %f\n", theNodes[i].X(), theNodes[i].Y());
   for (i=0; i<numEdges; i++) {
-    fprintf(fp, " %d %d ", theEdges[i].nodes[0], cid);
-    fprintf(fp, " %d %d ", theEdges[i].nodes[1], cid);
     fprintf(fp, "   ");
     fprintf(fp, " %d %d ", theEdges[i].elements[0].idx, theEdges[i].elements[0].cid);
     fprintf(fp, " %d %d\n", theEdges[i].elements[1].idx, theEdges[i].elements[1].cid);
@@ -1382,12 +1242,12 @@ void chunk::multipleRefine(double *desiredArea, refineClient *client)
   int i;
   theClient = client; // initialize refine client associated with this chunk
 
-  CkPrintf("Chunk %d: multipleRefine\n", cid);
+  CkPrintf("[tmr] Chunk %d: multipleRefine\n", cid);
   // set desired areas for elements
   for (i=0; i<numElements; i++)
     if (desiredArea[i] < theElements[i].getArea()) {
       theElements[i].setTargetArea(desiredArea[i]);
-      CkPrintf("Chunk %d: Element %d to be refined from %f to below %f\n",
+      CkPrintf("[tmr] Chunk %d: Element %d to be refined from %f to below %f\n",
 	       cid, i, theElements[i].getArea(), desiredArea[i]);
     }
   
@@ -1397,8 +1257,10 @@ void chunk::multipleRefine(double *desiredArea, refineClient *client)
 
   // start the refinement loop
   modified = 1;
-  refineInProgress = 1;
-  mesh[cid].refiningElements();
+  if (!refineInProgress) {
+    refineInProgress = 1;
+    mesh[cid].refiningElements();
+  }
 }
 
 /**************** Sanity Checking **********************/
@@ -1524,8 +1386,7 @@ void chunk::newMesh(int nEl, int nGhost, const int *conn_, const int *gid_, int 
 				      theElements[i].nodes[n2localIdx], 
 				      conn, numGhosts, gid, i, &nbrRef); 
 	if (edgeLocal(myRef, nbrRef)) { // make edge here
-	  newEdge = addNewEdge(theElements[i].nodes[n1localIdx], 
-			       theElements[i].nodes[n2localIdx]);
+	  newEdge = addNewEdge();
 	  // point edge to the two neighboring elements
 	  theEdges[newEdge].updateElement(nullRef, myRef);
 	  theEdges[newEdge].updateElement(nullRef, nbrRef);
@@ -1535,13 +1396,9 @@ void chunk::newMesh(int nEl, int nGhost, const int *conn_, const int *gid_, int 
 	  if (nbrRef.cid==cid) // Local neighbor
 	    theElements[nbrRef.idx].updateEdge(edgeIdx,
 					       theEdges[newEdge].getRef());
-	  else if (nbrRef.cid != -1) { // Remote neighbor
-	    remoteEdgeMsg *rem = new remoteEdgeMsg;
-	    rem->elem = nbrRef.idx;
-	    rem->er = theEdges[newEdge].getRef();
-	    rem->localEdge = edgeIdx;
-	    mesh[nbrRef.cid].addRemoteEdge(rem);
-	  }
+	  else if (nbrRef.cid != -1) // Remote neighbor
+	    mesh[nbrRef.cid].addRemoteEdge(nbrRef.idx, edgeIdx, 
+					   theEdges[newEdge].getRef());
 	}
 	// else edge will be made on a different chunk
       }
@@ -1566,15 +1423,15 @@ void chunk::deriveNodes()
 	if ((aNode + 1) > numNodes)
 	  numNodes = aNode + 1;
       }
-      else CkPrintf("WARNING: negative node id found in conn...\n");
+      else CkAbort("[tmr] ERROR: negative node id found in conn...\n");
     }
   }
 }
 
-void chunk::addRemoteEdge(remoteEdgeMsg *m)
+void chunk::addRemoteEdge(int elem, int localEdge, edgeRef er)
 {
-  theElements[m->elem].updateEdge(m->localEdge, m->er);
-  CkFreeMsg(m);
+  while (sizeElements == 0) CthYield();
+  theElements[elem].updateEdge(localEdge, er);
 }
 
 int chunk::edgeLocal(elemRef e1, elemRef e2)
@@ -1590,10 +1447,9 @@ int chunk::edgeLocal(elemRef e1, elemRef e2)
   else return 0;
 }
 
-int chunk::addNewEdge(int n1, int n2)
+int chunk::addNewEdge()
 {
-  int n[2] = { n1, n2 };
-  theEdges[numEdges].init(n, numEdges, this);
+  theEdges[numEdges].init(numEdges, this);
   numEdges++;
   return numEdges-1;
 }
