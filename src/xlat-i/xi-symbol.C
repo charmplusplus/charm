@@ -884,9 +884,8 @@ static const char *CIMsgClassAnsi =
 "    void operator delete(void*p){ CkFreeMsg(p);}\n"
 "    void operator delete(void*p,int*,const int){CkFreeMsg(p);}\n"
 "    void operator delete(void*p,int*){CkFreeMsg(p);}\n"
-"#else\n"
-"    void operator delete(void*p,size_t){CkFreeMsg(p);}\n"
 "#endif\n"
+"    void operator delete(void*p,size_t){CkFreeMsg(p);}\n"
 "    static void* alloc(int,size_t,int*,int);\n"
 ;
 
