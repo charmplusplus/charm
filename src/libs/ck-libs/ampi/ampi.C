@@ -28,6 +28,12 @@ extern "C" void conversemain_(int *argc,char _argv[][80],int length[])
 }
 
 CkChareID mainhandle;
+CkArrayID _ampiAid;
+
+static void allReduceHandler(void *,int dataSize,void *data)
+{
+  TempoArray::ckTempoBcast(0, data, dataSize, _ampiAid);
+}
 
 main::main(CkArgMsg *m)
 {
@@ -50,7 +56,10 @@ main::main(CkArgMsg *m)
   delete m;
   // CkGroupID mapID = CProxy_BlockMap::ckNew();
   // CProxy_ampi jarray(nblocks, mapID);
-  CProxy_ampi jarray(nblocks);
+  _ampiAid = CProxy_ampi::ckNew(nblocks);
+  // CkRegisterArrayReductionHandler(_ampiAid,allReduceHandler,0);
+  CProxy_ampi jarray(_ampiAid);
+  jarray.setReductionClient(allReduceHandler,0);
   for(i=0; i<nblocks; i++)
     jarray[i].run();
   mainhandle = thishandle;
@@ -99,6 +108,7 @@ ampi::ampi(void)
   firstfree = 0;
   nReductions = 0;
   nAllReductions = 0;
+  niRecvs = niSends = biRecv = biSend = 0;
   int i;
   for(i=0;i<100;i++) {
     irequests[i].nextfree = (i+1)%100;
@@ -159,22 +169,16 @@ ampi::run(void)
     CtvInitialize(int, numMigrateCalls);
     initCtv = 1;
   }
+
   CtvAccess(ampiPtr) = this;
   CtvAccess(numMigrateCalls) = 0;
 
-  // CkPrintf("[%d] main_ called\n", getIndex());
   main_();
-  // CkPrintf("[%d] main_ finished\n", getIndex());
+  // myThis = (ampi*) ampiArray->getElement(myIdx);
 
-  // itersDone();
   CProxy_main mp(mainhandle);
   mp.done();
-  // CkPrintf("[%d] sent donemsg\n", myThis->getIndex());
-  CkPrintf("[%d] #ctxt switches: %d\n", CmiMyPe(), CpvAccess(_numSwitches));
-  CkPrintf("[%d] #reductions: %d\n", thisIndex, nReductions);
-  CkPrintf("[%d] #Allreductions: %d\n", thisIndex, nAllReductions);
   CthSuspend();
-
 }
 
 extern "C" void migrate_(void *gptr)
@@ -215,59 +219,59 @@ extern "C" void migrate_(void *gptr)
     //CkPrintf("[%d] Migrated to %d\n", index, CkMyPe());
   }
 }
-extern "C" int MPI_Init(int *argc, char*** argv)
+extern "C" int AMPI_Init(int *argc, char*** argv)
 {
   return 0;
 }
 
-extern "C" void mpi_init_(int *ierr)
+extern "C" void ampi_init_(int *ierr)
 {
-  *ierr = MPI_Init(0,0);
+  *ierr = AMPI_Init(0,0);
 }
 
-extern "C" int MPI_Comm_rank(MPI_Comm comm, int *rank)
+extern "C" int AMPI_Comm_rank(AMPI_Comm comm, int *rank)
 {
   *rank = CtvAccess(ampiPtr)->getIndex();
   return 0;
 }
 
-extern "C" void mpi_comm_rank_(int *comm, int *rank, int *ierr)
+extern "C" void ampi_comm_rank_(int *comm, int *rank, int *ierr)
 {
-  *ierr = MPI_Comm_rank(*comm, rank);
+  *ierr = AMPI_Comm_rank(*comm, rank);
 }
 
-extern "C" int MPI_Comm_size(MPI_Comm comm, int *size)
+extern "C" int AMPI_Comm_size(AMPI_Comm comm, int *size)
 {
   *size = CtvAccess(ampiPtr)->getSize();
   return 0;
 }
 
-extern "C" void mpi_comm_size_(int *comm, int *size, int *ierr)
+extern "C" void ampi_comm_size_(int *comm, int *size, int *ierr)
 {
-  *ierr = MPI_Comm_size(*comm, size);
+  *ierr = AMPI_Comm_size(*comm, size);
 }
 
-extern "C" int MPI_Finalize(void)
+extern "C" int AMPI_Finalize(void)
 {
   return 0;
 }
 
-extern "C" void mpi_finalize_(int *ierr)
+extern "C" void ampi_finalize_(int *ierr)
 {
-  *ierr = MPI_Finalize();
+  *ierr = AMPI_Finalize();
 }
 
 static int typesize(int type, int count, ampi* ptr)
 {
   switch(type) {
-    case MPI_DOUBLE_PRECISION : return count*sizeof(double);
-    case MPI_INTEGER : return count*sizeof(int);
-    case MPI_REAL : return count*sizeof(float);
-    case MPI_COMPLEX: return 2*count*sizeof(double);
-    case MPI_LOGICAL: return count*sizeof(int);
-    case MPI_CHARACTER: return count*sizeof(char);
-    case MPI_BYTE: return count;
-    case MPI_PACKED: return count;
+    case AMPI_DOUBLE : return count*sizeof(double);
+    case AMPI_INT : return count*sizeof(int);
+    case AMPI_REAL : return count*sizeof(float);
+    case AMPI_COMPLEX: return 2*count*sizeof(double);
+    case AMPI_LOGICAL: return count*sizeof(int);
+    case AMPI_CHARACTER: return count*sizeof(char);
+    case AMPI_BYTE: return count;
+    case AMPI_PACKED: return count;
     default:
       if((type >= 100) && 
          (type-100 < ptr->ntypes))
@@ -281,8 +285,8 @@ static int typesize(int type, int count, ampi* ptr)
   }
 }
 
-extern "C" int MPI_Send(void *msg, int count, MPI_Datatype type, int dest, 
-                        int tag, MPI_Comm comm)
+extern "C" int AMPI_Send(void *msg, int count, AMPI_Datatype type, int dest, 
+                        int tag, AMPI_Comm comm)
 {
   ampi *ptr = CtvAccess(ampiPtr);
   int size = typesize(type, count, ptr);
@@ -292,14 +296,14 @@ extern "C" int MPI_Send(void *msg, int count, MPI_Datatype type, int dest,
   return 0;
 }
 
-extern "C" void mpi_send_(void *msg, int *count, int *type, int *dest, 
+extern "C" void ampi_send_(void *msg, int *count, int *type, int *dest, 
                           int *tag, int *comm, int *ierr)
 {
-  *ierr = MPI_Send(msg, *count, *type, *dest, *tag, *comm);
+  *ierr = AMPI_Send(msg, *count, *type, *dest, *tag, *comm);
 }
 
-extern "C" int MPI_Recv(void *msg, int count, int type, int src, int tag,
-                        MPI_Comm comm, MPI_Status *status)
+extern "C" int AMPI_Recv(void *msg, int count, int type, int src, int tag,
+                        AMPI_Comm comm, AMPI_Status *status)
 {
   ampi *ptr = CtvAccess(ampiPtr);
   int size = typesize(type, count, ptr);
@@ -309,30 +313,30 @@ extern "C" int MPI_Recv(void *msg, int count, int type, int src, int tag,
   return 0;
 }
 
-extern "C" void mpi_recv_(void *msg, int *count, int *type, int *src,
+extern "C" void ampi_recv_(void *msg, int *count, int *type, int *src,
                           int *tag, int *comm, int *status, int *ierr)
 {
-  *ierr = MPI_Recv(msg, *count, *type, *src, *tag, *comm, (MPI_Status*)status);
+  *ierr = AMPI_Recv(msg, *count, *type, *src, *tag, *comm, (AMPI_Status*)status);
 }
 
-extern "C" int MPI_Sendrecv(void *sbuf, int scount, int stype, int dest, 
+extern "C" int AMPI_Sendrecv(void *sbuf, int scount, int stype, int dest, 
                             int stag, void *rbuf, int rcount, int rtype,
-                            int src, int rtag, MPI_Comm comm, MPI_Status *sts)
+                            int src, int rtag, AMPI_Comm comm, AMPI_Status *sts)
 {
-  return (MPI_Send(sbuf,scount,stype,dest,stag,comm) ||
-          MPI_Recv(rbuf,rcount,rtype,src,rtag,comm,sts));
+  return (AMPI_Send(sbuf,scount,stype,dest,stag,comm) ||
+          AMPI_Recv(rbuf,rcount,rtype,src,rtag,comm,sts));
 }
 
-extern "C" void mpi_sendrecv_(void *sndbuf, int *sndcount, int *sndtype, 
+extern "C" void ampi_sendrecv_(void *sndbuf, int *sndcount, int *sndtype, 
                               int *dest, int *sndtag, void *rcvbuf, 
                               int *rcvcount, int *rcvtype, int *src, 
                               int *rcvtag, int *comm, int *status, int *ierr)
 {
-  mpi_send_(sndbuf, sndcount, sndtype, dest, sndtag, comm, ierr);
-  mpi_recv_(rcvbuf, rcvcount, rcvtype, src, rcvtag, comm, status, ierr);
+  ampi_send_(sndbuf, sndcount, sndtype, dest, sndtag, comm, ierr);
+  ampi_recv_(rcvbuf, rcvcount, rcvtype, src, rcvtag, comm, status, ierr);
 }
 
-extern "C" int MPI_Barrier(MPI_Comm comm)
+extern "C" int AMPI_Barrier(AMPI_Comm comm)
 {
   ampi *ptr = CtvAccess(ampiPtr);
   //CkPrintf("[%d] Barrier called\n", ptr->getIndex());
@@ -341,15 +345,15 @@ extern "C" int MPI_Barrier(MPI_Comm comm)
   return 0;
 }
 
-extern "C" void mpi_barrier_(int *comm, int *ierr)
+extern "C" void ampi_barrier_(int *comm, int *ierr)
 {
-  *ierr = MPI_Comm(*comm);
+  *ierr = AMPI_Comm(*comm);
 }
 
-#define MPI_BCAST_TAG 999
+#define AMPI_BCAST_TAG 999
 
-extern "C" int MPI_Bcast(void *buf, int count, int type, int root, 
-                         MPI_Comm comm)
+extern "C" int AMPI_Bcast(void *buf, int count, int type, int root, 
+                         AMPI_Comm comm)
 {
   ampi *ptr = CtvAccess(ampiPtr);
   int size = typesize(type, count, ptr);
@@ -357,40 +361,40 @@ extern "C" int MPI_Bcast(void *buf, int count, int type, int root,
   // CkPrintf("[%d] %dth Broadcast called size=%d\n", ptr->getIndex(), 
            // ptr->nbcasts, size);
   ptr->ckTempoBcast(((root)==ptr->getIndex())?1:0, 
-                    MPI_BCAST_TAG+ptr->nbcasts, buf, size);
+                    AMPI_BCAST_TAG+ptr->nbcasts, buf, size);
   // CkPrintf("[%d] %dth Broadcast finished\n", ptr->getIndex(), ptr->nbcasts);
   return 0;
 }
 
-extern "C" void mpi_bcast_(void *buf, int *count, int *type, int *root, 
+extern "C" void ampi_bcast_(void *buf, int *count, int *type, int *root, 
                            int *comm, int *ierr)
 {
-  *ierr = MPI_Bcast(buf, *count, *type, *root, *comm);
+  *ierr = AMPI_Bcast(buf, *count, *type, *root, *comm);
 }
 
 static void optype(int inop, int intype, int *outop, int *outtype)
 {
   switch(inop) {
-    case MPI_MAX : *outop = TEMPO_MAX; break;
-    case MPI_MIN : *outop = TEMPO_MIN; break;
-    case MPI_SUM : *outop = TEMPO_SUM; break;
-    case MPI_PROD : *outop = TEMPO_PROD; break;
+    case AMPI_MAX : *outop = TEMPO_MAX; break;
+    case AMPI_MIN : *outop = TEMPO_MIN; break;
+    case AMPI_SUM : *outop = TEMPO_SUM; break;
+    case AMPI_PROD : *outop = TEMPO_PROD; break;
     default:
       ckerr << "Op " << inop << " not supported." << endl;
       CmiAbort("exiting");
   }
   switch(intype) {
-    case MPI_REAL : *outtype = TEMPO_FLOAT; break;
-    case MPI_INTEGER : *outtype = TEMPO_INT; break;
-    case MPI_DOUBLE_PRECISION : *outtype = TEMPO_DOUBLE; break;
+    case AMPI_REAL : *outtype = TEMPO_FLOAT; break;
+    case AMPI_INT : *outtype = TEMPO_INT; break;
+    case AMPI_DOUBLE : *outtype = TEMPO_DOUBLE; break;
     default:
       ckerr << "Type " << intype << " not supported." << endl;
       CmiAbort("exiting");
   }
 }
 
-extern "C" int MPI_Reduce(void *inbuf, void *outbuf, int count, int type,
-                          MPI_Op op, int root, MPI_Comm comm)
+extern "C" int AMPI_Reduce(void *inbuf, void *outbuf, int count, int type,
+                          AMPI_Op op, int root, AMPI_Comm comm)
 {
   int myop, mytype;
   optype(op, type, &myop, &mytype);
@@ -402,42 +406,88 @@ extern "C" int MPI_Reduce(void *inbuf, void *outbuf, int count, int type,
   return 0;
 }
 
-extern "C" void mpi_reduce_(void *inbuf, void *outbuf, int *count, int *type,
+extern "C" void ampi_reduce_(void *inbuf, void *outbuf, int *count, int *type,
                             int *op, int *root, int *comm, int *ierr)
 {
-  *ierr = MPI_Reduce(inbuf, outbuf, *count, *type, *op, *root, *comm);
+  *ierr = AMPI_Reduce(inbuf, outbuf, *count, *type, *op, *root, *comm);
 }
 
-extern "C" int MPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
-                          MPI_Op op, MPI_Comm comm)
+extern "C" int AMPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
+                          AMPI_Op op, AMPI_Comm comm)
 {
-  int myop, mytype;
-  optype(op, type, &myop, &mytype);
+  CkReduction::reducerType mytype;
+  switch(op) {
+    case AMPI_MAX :
+      switch(type) {
+        case AMPI_REAL : mytype = CkReduction::max_float; break;
+        case AMPI_INT : mytype = CkReduction::max_int; break;
+        case AMPI_DOUBLE : mytype = CkReduction::max_double; break;
+        default:
+          ckerr << "Type " << type << " not supported." << endl;
+          CmiAbort("exiting");
+      }
+      break;
+    case AMPI_MIN :
+      switch(type) {
+        case AMPI_REAL : mytype = CkReduction::min_float; break;
+        case AMPI_INT : mytype = CkReduction::min_int; break;
+        case AMPI_DOUBLE : mytype = CkReduction::min_double; break;
+        default:
+          ckerr << "Type " << type << " not supported." << endl;
+          CmiAbort("exiting");
+      }
+      break;
+    case AMPI_SUM :
+      switch(type) {
+        case AMPI_REAL : mytype = CkReduction::sum_float; break;
+        case AMPI_INT : mytype = CkReduction::sum_int; break;
+        case AMPI_DOUBLE : mytype = CkReduction::sum_double; break;
+        default:
+          ckerr << "Type " << type << " not supported." << endl;
+          CmiAbort("exiting");
+      }
+      break;
+    case AMPI_PROD :
+      switch(type) {
+        case AMPI_REAL : mytype = CkReduction::product_float; break;
+        case AMPI_INT : mytype = CkReduction::product_int; break;
+        case AMPI_DOUBLE : mytype = CkReduction::product_double; break;
+        default:
+          ckerr << "Type " << type << " not supported." << endl;
+          CmiAbort("exiting");
+      }
+      break;
+    default:
+      ckerr << "Op " << op << " not supported." << endl;
+      CmiAbort("exiting");
+  }
   ampi *ptr = CtvAccess(ampiPtr);
+  int size = typesize(type, count, ptr);
+  ptr->contribute(size, inbuf, mytype);
   //CkPrintf("[%d] Allreduce called\n", ptr->getIndex());
   ptr->nAllReductions++;
-  ptr->ckTempoAllReduce(myop,inbuf,outbuf,count,mytype);
+  ptr->ckTempoRecv(0, BCAST_TAG, outbuf, size);
   //CkPrintf("[%d] Allreduce finished\n", ptr->getIndex());
   return 0;
 }
 
-extern "C" void mpi_allreduce_(void *inbuf,void *outbuf,int *count,int *type,
+extern "C" void ampi_allreduce_(void *inbuf,void *outbuf,int *count,int *type,
                                int *op, int *comm, int *ierr)
 {
-  *ierr = MPI_Allreduce(inbuf, outbuf, *count, *type, *op, *comm);
+  *ierr = AMPI_Allreduce(inbuf, outbuf, *count, *type, *op, *comm);
 }
 
-extern "C" double MPI_Wtime(void)
+extern "C" double AMPI_Wtime(void)
 {
   return CmiWallTimer();
 }
 
-extern "C" double mpi_wtime_(void)
+extern "C" double ampi_wtime_(void)
 {
-  return MPI_Wtime();
+  return AMPI_Wtime();
 }
 
-extern "C" int MPI_Start(MPI_Request *reqnum)
+extern "C" int AMPI_Start(AMPI_Request *reqnum)
 {
   ampi *ptr = CtvAccess(ampiPtr);
   if(*reqnum >= ptr->nrequests) {
@@ -453,12 +503,12 @@ extern "C" int MPI_Start(MPI_Request *reqnum)
   return 0;
 }
 
-extern "C" void mpi_start_(int *reqnum, int *ierr)
+extern "C" void ampi_start_(int *reqnum, int *ierr)
 {
-  *ierr = MPI_Start((MPI_Request*) reqnum);
+  *ierr = AMPI_Start((AMPI_Request*) reqnum);
 }
 
-extern "C" int MPI_Waitall(int count, MPI_Request *request, MPI_Status *sts)
+extern "C" int AMPI_Waitall(int count, AMPI_Request *request, AMPI_Status *sts)
 {
   ampi *ptr = CtvAccess(ampiPtr);
   int i;
@@ -493,13 +543,13 @@ extern "C" int MPI_Waitall(int count, MPI_Request *request, MPI_Status *sts)
   return 0;
 }
 
-extern "C" void mpi_waitall_(int *count, int *request, int *status, int *ierr)
+extern "C" void ampi_waitall_(int *count, int *request, int *status, int *ierr)
 {
-  *ierr = MPI_Waitall(*count, (MPI_Request*) request, (MPI_Status*) status);
+  *ierr = AMPI_Waitall(*count, (AMPI_Request*) request, (AMPI_Status*) status);
 }
 
-extern "C" int MPI_Recv_init(void *buf, int count, int type, int src, int tag,
-                             MPI_Comm comm, MPI_Request *req)
+extern "C" int AMPI_Recv_init(void *buf, int count, int type, int src, int tag,
+                             AMPI_Comm comm, AMPI_Request *req)
 {
   ampi *ptr = CtvAccess(ampiPtr);
   if(ptr->nrequests == 100) {
@@ -518,14 +568,14 @@ extern "C" int MPI_Recv_init(void *buf, int count, int type, int src, int tag,
   return 0;
 }
 
-extern "C" void mpi_recv_init_(void *buf, int *count, int *type, int *srcpe,
+extern "C" void ampi_recv_init_(void *buf, int *count, int *type, int *srcpe,
                                int *tag, int *comm, int *req, int *ierr)
 {
-  *ierr = MPI_Recv_init(buf,*count,*type,*srcpe,*tag,*comm,(MPI_Request*)req);
+  *ierr = AMPI_Recv_init(buf,*count,*type,*srcpe,*tag,*comm,(AMPI_Request*)req);
 }
 
-extern "C" int MPI_Send_init(void *buf, int count, int type, int dest, int tag,
-                             MPI_Comm comm, MPI_Request *req)
+extern "C" int AMPI_Send_init(void *buf, int count, int type, int dest, int tag,
+                             AMPI_Comm comm, AMPI_Request *req)
 {
   ampi *ptr = CtvAccess(ampiPtr);
   if(ptr->nrequests == 100) {
@@ -544,14 +594,14 @@ extern "C" int MPI_Send_init(void *buf, int count, int type, int dest, int tag,
   return 0;
 }
 
-extern "C" void mpi_send_init_(void *buf, int *count, int *type, int *destpe,
+extern "C" void ampi_send_init_(void *buf, int *count, int *type, int *destpe,
                                int *tag, int *comm, int *req, int *ierr)
 {
-  *ierr = MPI_Send_init(buf,*count,*type,*destpe,*tag,*comm,(MPI_Request*)req);
+  *ierr = AMPI_Send_init(buf,*count,*type,*destpe,*tag,*comm,(AMPI_Request*)req);
 }
 
-extern "C" int MPI_Type_contiguous(int count, MPI_Datatype oldtype, 
-                                   MPI_Datatype *newtype)
+extern "C" int AMPI_Type_contiguous(int count, AMPI_Datatype oldtype, 
+                                   AMPI_Datatype *newtype)
 {
   ampi *ptr = CtvAccess(ampiPtr);
   *newtype = ptr->ntypes;
@@ -561,50 +611,54 @@ extern "C" int MPI_Type_contiguous(int count, MPI_Datatype oldtype,
   return 0;
 }
 
-extern "C" int MPI_Type_commit(MPI_Datatype *datatype)
+extern "C" int AMPI_Type_commit(AMPI_Datatype *datatype)
 {
   return 0;
 }
 
-extern "C" int MPI_Type_free(MPI_Datatype *datatype)
+extern "C" int AMPI_Type_free(AMPI_Datatype *datatype)
 {
   return 0;
 }
 
-extern "C" void mpi_type_contiguous_(int *count, int *oldtype, int *newtype, 
+extern "C" void ampi_type_contiguous_(int *count, int *oldtype, int *newtype, 
                                 int *ierr)
 {
-  *ierr = MPI_Type_contiguous(*count, *oldtype, newtype);
+  *ierr = AMPI_Type_contiguous(*count, *oldtype, newtype);
 }
 
-extern "C" void mpi_type_commit_(int *type, int *ierr)
+extern "C" void ampi_type_commit_(int *type, int *ierr)
 {
-  *ierr = MPI_Type_commit(type);
+  *ierr = AMPI_Type_commit(type);
 }
 
-extern "C" void mpi_type_free_(int *type, int *ierr)
+extern "C" void ampi_type_free_(int *type, int *ierr)
 {
-  *ierr = MPI_Type_free(type);
+  *ierr = AMPI_Type_free(type);
 }
 
-extern "C" int MPI_Isend(void *buf, int count, MPI_Datatype datatype, int dest, 
-              int tag, MPI_Comm comm, MPI_Request *request)
+extern "C" int AMPI_Isend(void *buf, int count, AMPI_Datatype datatype, int dest, 
+              int tag, AMPI_Comm comm, AMPI_Request *request)
 {
     ampi *ptr = CtvAccess(ampiPtr);
-    ptr->ckTempoSendElem(tag, ptr->getIndex(), buf, 
-                         typesize(datatype, count, ptr), dest);
+    int size = typesize(datatype, count, ptr);
+    ptr->niSends++;
+    ptr->biSend += size;
+    ptr->ckTempoSendElem(tag, ptr->getIndex(), buf, size, dest);
     *request = (-1);
     return 0;
 }
 
-extern "C" int MPI_Irecv(void *buf, int count, MPI_Datatype datatype, int src, 
-              int tag, MPI_Comm comm, MPI_Request *request)
+extern "C" int AMPI_Irecv(void *buf, int count, AMPI_Datatype datatype, int src, 
+              int tag, AMPI_Comm comm, AMPI_Request *request)
 {
   ampi *ptr = CtvAccess(ampiPtr);
   if(ptr->nirequests == 100) {
     CmiAbort("Too many Irecv requests.\n");
   }
   int size = typesize(datatype, count, ptr);
+  ptr->niRecvs++;
+  ptr->biRecv += size;
   PersReq *req = &(ptr->irequests[ptr->firstfree]);
   req->sndrcv = 2;
   req->buf = buf;
@@ -621,208 +675,208 @@ extern "C" int MPI_Irecv(void *buf, int count, MPI_Datatype datatype, int src,
   return 0;
 }
 
-extern "C" void mpi_isend_(void *buf, int *count, int *datatype, int *dest,
+extern "C" void ampi_isend_(void *buf, int *count, int *datatype, int *dest,
                            int *tag, int *comm, int *request, int *ierr)
 {
-  *ierr = MPI_Isend(buf, *count, *datatype, *dest, *tag, *comm, request);
+  *ierr = AMPI_Isend(buf, *count, *datatype, *dest, *tag, *comm, request);
 }
 
-extern "C" void mpi_irecv_(void *buf, int *count, int *datatype, int *src,
+extern "C" void ampi_irecv_(void *buf, int *count, int *datatype, int *src,
                            int *tag, int *comm, int *request, int *ierr)
 {
-  *ierr = MPI_Irecv(buf, *count, *datatype, *src, *tag, *comm, request);
+  *ierr = AMPI_Irecv(buf, *count, *datatype, *src, *tag, *comm, request);
 }
 
-#define MPI_GATHER_TAG 5000
+#define AMPI_GATHER_TAG 5000
 
 extern "C" 
-int MPI_Allgatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype, 
+int AMPI_Allgatherv(void *sendbuf, int sendcount, AMPI_Datatype sendtype, 
                    void *recvbuf, int *recvcounts, int *displs, 
-                   MPI_Datatype recvtype, MPI_Comm comm) 
+                   AMPI_Datatype recvtype, AMPI_Comm comm) 
 {
   ampi *ptr = CtvAccess(ampiPtr);
   int size = ptr->getSize();
   int i;
   for(i=0;i<size;i++) {
-    MPI_Send(sendbuf, sendcount, sendtype, i, MPI_GATHER_TAG, comm);
+    AMPI_Send(sendbuf, sendcount, sendtype, i, AMPI_GATHER_TAG, comm);
   }
 
-  MPI_Status status;
+  AMPI_Status status;
   int itemsize = typesize(recvtype, 1, ptr);
   
   for(i=0;i<size;i++) {
-    MPI_Recv(((char*)recvbuf)+(itemsize*displs[i]), recvcounts[i], recvtype,
-             i, MPI_GATHER_TAG, comm, &status);
+    AMPI_Recv(((char*)recvbuf)+(itemsize*displs[i]), recvcounts[i], recvtype,
+             i, AMPI_GATHER_TAG, comm, &status);
   }
   return 0;
 }
 
 extern "C"
-void mpi_allgatherv_(void *sendbuf, int *sendcount, int *sendtype,
+void ampi_allgatherv_(void *sendbuf, int *sendcount, int *sendtype,
                      void *recvbuf, int *recvcounts, int *displs,
                      int *recvtype, int *comm, int *ierr)
 {
-  *ierr = MPI_Allgatherv(sendbuf, *sendcount, *sendtype, recvbuf, recvcounts,
+  *ierr = AMPI_Allgatherv(sendbuf, *sendcount, *sendtype, recvbuf, recvcounts,
                          displs, *recvtype, *comm);
 }
 
 extern "C"
-int MPI_Allgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
-                  void *recvbuf, int recvcount, MPI_Datatype recvtype,
-                  MPI_Comm comm)
+int AMPI_Allgather(void *sendbuf, int sendcount, AMPI_Datatype sendtype,
+                  void *recvbuf, int recvcount, AMPI_Datatype recvtype,
+                  AMPI_Comm comm)
 {
   ampi *ptr = CtvAccess(ampiPtr);
   int size = ptr->getSize();
   int i;
   for(i=0;i<size;i++) {
-    MPI_Send(sendbuf, sendcount, sendtype, i, MPI_GATHER_TAG, comm);
+    AMPI_Send(sendbuf, sendcount, sendtype, i, AMPI_GATHER_TAG, comm);
   }
 
-  MPI_Status status;
+  AMPI_Status status;
   int itemsize = typesize(recvtype, 1, ptr);
   
   for(i=0;i<size;i++) {
-    MPI_Recv(((char*)recvbuf)+(recvcount*itemsize*i), recvcount, recvtype,
-             i, MPI_GATHER_TAG, comm, &status);
+    AMPI_Recv(((char*)recvbuf)+(recvcount*itemsize*i), recvcount, recvtype,
+             i, AMPI_GATHER_TAG, comm, &status);
   }
   return 0;
 }
 
 extern "C"
-void mpi_allgather_(void *sendbuf, int *sendcount, int *sendtype,
+void ampi_allgather_(void *sendbuf, int *sendcount, int *sendtype,
                   void *recvbuf, int *recvcount, int *recvtype,
                   int *comm, int *ierr)
 {
-  *ierr = MPI_Allgather(sendbuf, *sendcount, *sendtype, recvbuf, *recvcount,
+  *ierr = AMPI_Allgather(sendbuf, *sendcount, *sendtype, recvbuf, *recvcount,
                         *recvtype, *comm);
 }
 
 extern "C"
-int MPI_Gatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
+int AMPI_Gatherv(void *sendbuf, int sendcount, AMPI_Datatype sendtype,
                 void *recvbuf, int *recvcounts, int *displs,
-                MPI_Datatype recvtype, int root, MPI_Comm comm)
+                AMPI_Datatype recvtype, int root, AMPI_Comm comm)
 {
   ampi *ptr = CtvAccess(ampiPtr);
   int size = ptr->getSize();
   int i;
 
-  MPI_Send(sendbuf, sendcount, sendtype, root, MPI_GATHER_TAG, comm);
+  AMPI_Send(sendbuf, sendcount, sendtype, root, AMPI_GATHER_TAG, comm);
 
   if(ptr->getIndex() == root) {
-    MPI_Status status;
+    AMPI_Status status;
     int itemsize = typesize(recvtype, 1, ptr);
   
     for(i=0;i<size;i++) {
-      MPI_Recv(((char*)recvbuf)+(itemsize*displs[i]), recvcounts[i], recvtype,
-               i, MPI_GATHER_TAG, comm, &status);
+      AMPI_Recv(((char*)recvbuf)+(itemsize*displs[i]), recvcounts[i], recvtype,
+               i, AMPI_GATHER_TAG, comm, &status);
     }
   }
   return 0;
 }
 
 extern "C"
-void mpi_gatherv_(void *sendbuf, int *sendcount, int *sendtype,
+void ampi_gatherv_(void *sendbuf, int *sendcount, int *sendtype,
                   void *recvbuf, int *recvcounts, int *displs,
                   int *recvtype, int *root, int *comm, int *ierr)
 {
-  *ierr = MPI_Gatherv(sendbuf, *sendcount, *sendtype, recvbuf, recvcounts,
+  *ierr = AMPI_Gatherv(sendbuf, *sendcount, *sendtype, recvbuf, recvcounts,
                       displs, *recvtype, *root, *comm);
 }
 
 extern "C"
-int MPI_Gather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
-               void *recvbuf, int recvcount, MPI_Datatype recvtype, 
-               int root, MPI_Comm comm)
+int AMPI_Gather(void *sendbuf, int sendcount, AMPI_Datatype sendtype,
+               void *recvbuf, int recvcount, AMPI_Datatype recvtype, 
+               int root, AMPI_Comm comm)
 {
   ampi *ptr = CtvAccess(ampiPtr);
   int size = ptr->getSize();
   int i;
-  MPI_Send(sendbuf, sendcount, sendtype, root, MPI_GATHER_TAG, comm);
+  AMPI_Send(sendbuf, sendcount, sendtype, root, AMPI_GATHER_TAG, comm);
 
   if(ptr->getIndex()==root) {
-    MPI_Status status;
+    AMPI_Status status;
     int itemsize = typesize(recvtype, 1, ptr);
   
     for(i=0;i<size;i++) {
-      MPI_Recv(((char*)recvbuf)+(recvcount*itemsize*i), recvcount, recvtype,
-               i, MPI_GATHER_TAG, comm, &status);
+      AMPI_Recv(((char*)recvbuf)+(recvcount*itemsize*i), recvcount, recvtype,
+               i, AMPI_GATHER_TAG, comm, &status);
     }
   }
   return 0;
 }
 
 extern "C"
-void mpi_gather_(void *sendbuf, int *sendcount, int *sendtype,
+void ampi_gather_(void *sendbuf, int *sendcount, int *sendtype,
                  void *recvbuf, int *recvcount, int *recvtype,
                  int *root, int *comm, int *ierr)
 {
-  *ierr = MPI_Gather(sendbuf, *sendcount, *sendtype, recvbuf, *recvcount, 
+  *ierr = AMPI_Gather(sendbuf, *sendcount, *sendtype, recvbuf, *recvcount, 
                      *recvtype, *root, *comm);
 }
 
 extern "C" 
-int MPI_Alltoallv(void *sendbuf, int *sendcounts, int *sdispls,
-                  MPI_Datatype sendtype, void *recvbuf, int *recvcounts,
-                  int *rdispls, MPI_Datatype recvtype, MPI_Comm comm)
+int AMPI_Alltoallv(void *sendbuf, int *sendcounts, int *sdispls,
+                  AMPI_Datatype sendtype, void *recvbuf, int *recvcounts,
+                  int *rdispls, AMPI_Datatype recvtype, AMPI_Comm comm)
 {
   ampi *ptr = CtvAccess(ampiPtr);
   int size = ptr->getSize();
   int itemsize = typesize(sendtype, 1, ptr);
   int i;
   for(i=0;i<size;i++) {
-    MPI_Send(((char*)sendbuf)+(itemsize*sdispls[i]), sendcounts[i], sendtype,
-             i, MPI_GATHER_TAG, comm);
+    AMPI_Send(((char*)sendbuf)+(itemsize*sdispls[i]), sendcounts[i], sendtype,
+             i, AMPI_GATHER_TAG, comm);
   }
 
-  MPI_Status status;
+  AMPI_Status status;
   itemsize = typesize(recvtype, 1, ptr);
   
   for(i=0;i<size;i++) {
-    MPI_Recv(((char*)recvbuf)+(itemsize*rdispls[i]), recvcounts[i], recvtype,
-             i, MPI_GATHER_TAG, comm, &status);
+    AMPI_Recv(((char*)recvbuf)+(itemsize*rdispls[i]), recvcounts[i], recvtype,
+             i, AMPI_GATHER_TAG, comm, &status);
   }
   return 0;
 }
 
 extern "C"
-void mpi_alltoallv_(void *sendbuf, int *sendcounts, int *sdispls,
+void ampi_alltoallv_(void *sendbuf, int *sendcounts, int *sdispls,
                     int *sendtype, void *recvbuf, int *recvcounts,
                     int *rdispls, int *recvtype, int *comm, int *ierr)
 {
-  *ierr = MPI_Alltoallv(sendbuf, sendcounts, sdispls, *sendtype, recvbuf,
+  *ierr = AMPI_Alltoallv(sendbuf, sendcounts, sdispls, *sendtype, recvbuf,
                         recvcounts, rdispls, *recvtype, *comm);
 }
 
 extern "C" 
-int MPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype, 
-                 void *recvbuf, int recvcount, MPI_Datatype recvtype, 
-                 MPI_Comm comm)
+int AMPI_Alltoall(void *sendbuf, int sendcount, AMPI_Datatype sendtype, 
+                 void *recvbuf, int recvcount, AMPI_Datatype recvtype, 
+                 AMPI_Comm comm)
 {
   ampi *ptr = CtvAccess(ampiPtr);
   int size = ptr->getSize();
   int itemsize = typesize(sendtype, 1, ptr);
   int i;
   for(i=0;i<size;i++) {
-    MPI_Send(((char*)sendbuf)+(itemsize*sendcount*i), sendcount, sendtype,
-             i, MPI_GATHER_TAG, comm);
+    AMPI_Send(((char*)sendbuf)+(itemsize*sendcount*i), sendcount, sendtype,
+             i, AMPI_GATHER_TAG, comm);
   }
 
-  MPI_Status status;
+  AMPI_Status status;
   itemsize = typesize(recvtype, 1, ptr);
   
   for(i=0;i<size;i++) {
-    MPI_Recv(((char*)recvbuf)+(itemsize*recvcount*i), recvcount, recvtype,
-             i, MPI_GATHER_TAG, comm, &status);
+    AMPI_Recv(((char*)recvbuf)+(itemsize*recvcount*i), recvcount, recvtype,
+             i, AMPI_GATHER_TAG, comm, &status);
   }
   return 0;
 }
 
 extern "C"
-void mpi_alltoall_(void *sendbuf, int *sendcount, int *sendtype,
+void ampi_alltoall_(void *sendbuf, int *sendcount, int *sendtype,
                    void *recvbuf, int *recvcount, int *recvtype,
                    int *comm, int *ierr)
 {
-  *ierr = MPI_Alltoall(sendbuf, *sendcount, *sendtype, recvbuf, *recvcount,
+  *ierr = AMPI_Alltoall(sendbuf, *sendcount, *sendtype, recvbuf, *recvcount,
                        *recvtype, *comm);
 }
 

@@ -76,6 +76,7 @@ class ampi : public TempoArray {
     void *packedBlock;
     int nReductions;
     int nAllReductions;
+    int niRecvs, niSends, biRecv, biSend;
 
     ampi(void);
     ampi(ArrayElementMigrateMessage *msg); 
