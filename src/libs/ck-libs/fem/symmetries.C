@@ -384,7 +384,8 @@ void FEM_Sym_List::applyVec(CkVector3d *vec,FEM_Symmetries_t symToApply) const
 FEM_Sym_Desc::~FEM_Sym_Desc() {}
 
 void FEM_Sym_Linear::pup(PUP::er &p) {
-	PUP::able::pup(p);
+	typedef PUP::able PUP_able;
+	PUP_able::pup(p);
 	p|shift;
 }
 
