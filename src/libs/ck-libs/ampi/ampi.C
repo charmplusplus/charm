@@ -2006,6 +2006,21 @@ int AMPI_Startall(int count, MPI_Request *requests){
   return 0;
 }
 
+// this function sets idx[count] such that reqs[idx[i]] is in asending order
+inline void swap(int& a,int& b){
+  int tmp;
+  tmp=a; a=b; b=tmp;
+}
+void sortedIndex(int n, int* arr, int* idx){
+  int i,j;
+  for(i=0;i<n;i++) 
+    idx[i]=i;
+  for (i=0; i<n-1; i++) 
+    for (j=0; j<n-1-i; j++)
+      if (arr[idx[j+1]] < arr[idx[j]]) 
+	swap(idx[j+1],idx[j]);
+}
+
 int PersReq::wait(MPI_Status *sts){
 	if(sndrcv == 2) {
 		if(-1==getAmpiInstance(comm)->recv(tag, src, buf, count, type, comm, (int*)sts))
@@ -2045,8 +2060,10 @@ CDECL
 int AMPI_Wait(MPI_Request *request, MPI_Status *sts)
 {
   AMPIAPI("AMPI_Wait");
-  if(*request == MPI_REQUEST_NULL)
+  if(*request == MPI_REQUEST_NULL){
+    stsempty(*sts);
     return 0;
+  }
   AmpiRequestList* reqs = getReqs();
   AMPI_DEBUG("MPI_Wait: request=%d, reqs.size=%d, &reqs=%d\n",*request,reqs->size(),reqs);
   (*reqs)[*request]->wait(sts);
@@ -2063,19 +2080,25 @@ int AMPI_Waitall(int count, MPI_Request request[], MPI_Status sts[])
   AMPIAPI("AMPI_Waitall");
   int i;
   AmpiRequestList* reqs = getReqs();
+  int *newidx = new int [count];
+  sortedIndex(count,request,newidx);
   for(i=0;i<count;i++) {
-    if(request[i] == MPI_REQUEST_NULL) continue;
-    (*reqs)[request[i]]->wait(sts+i);
+    if(request[newidx[i]] == MPI_REQUEST_NULL){
+      stsempty(sts[newidx[i]]);
+      continue;
+    }
+    (*reqs)[request[newidx[i]]]->wait(&sts[newidx[i]]);
   }
 #if CMK_BLUEGENE_CHARM
   TRACE_BG_AMPI_WAITALL(reqs);   // setup forward and backward dependence
 #endif
   // free memory of requests
   for(i=0;i<count;i++){ 
-    if(request[i] == MPI_REQUEST_NULL) continue;
-    if((*reqs)[request[i]]->getType() != 1) { // only free non-blocking request
-      reqs->free(request[i]);
-      request[i] = MPI_REQUEST_NULL;
+    if(request[newidx[i]] == MPI_REQUEST_NULL)
+      continue;
+    if((*reqs)[request[newidx[i]]]->getType() != 1) { // only free non-blocking request
+      reqs->free(request[newidx[i]]);
+      request[newidx[i]] = MPI_REQUEST_NULL;
     }
   }
   return 0;
@@ -2086,11 +2109,13 @@ int AMPI_Waitany(int count, MPI_Request *request, int *idx, MPI_Status *sts)
 {
   AMPIAPI("AMPI_Waitany");
   int flag=0;
+  int *newidx = new int [count];
+  sortedIndex(count,request,newidx);
   while(count>0){
     for(int i=0;i<count;i++) {
-      AMPI_Test(&request[i], &flag, sts);
-      if(flag == 1){
-        *idx = i;
+      AMPI_Test(&request[newidx[i]], &flag, sts);
+      if(flag == 1 && sts->MPI_COMM != 0){ // to skip MPI_REQUEST_NULL
+        *idx = newidx[i];
         return 0;
       }
     }
@@ -2106,12 +2131,14 @@ int AMPI_Waitsome(int incount, MPI_Request *array_of_requests, int *outcount,
   AMPIAPI("AMPI_Waitsome");
   MPI_Status sts;
   int flag;
+  int *newidx = new int [incount];
+  sortedIndex(incount,array_of_requests,newidx);
   *outcount = 0;
   while(1){
     for(int i=0;i<incount;i++) {
-      AMPI_Test(&array_of_requests[i], &flag, &sts);
-      if(flag == 1){
-        array_of_indices[(*outcount)]=i;
+      AMPI_Test(&array_of_requests[newidx[i]], &flag, &sts);
+      if(flag == 1){	// here we pass MPI_REQUEST_NULL along
+        array_of_indices[(*outcount)]=newidx[i];
 	array_of_statuses[(*outcount)++]=sts;
       }
     }
@@ -2163,6 +2190,7 @@ int AMPI_Test(MPI_Request *request, int *flag, MPI_Status *sts)
   AMPIAPI("AMPI_Test");
   if(*request==MPI_REQUEST_NULL) {
     *flag = 1;
+    stsempty(*sts);
     return 0;
   }
   AmpiRequestList* reqs = getReqs();
@@ -2179,12 +2207,14 @@ int AMPI_Test(MPI_Request *request, int *flag, MPI_Status *sts)
 CDECL
 int AMPI_Testany(int count, MPI_Request *request, int *index, int *flag, MPI_Status *sts){
   AMPIAPI("AMPI_Testany");
+  int *newidx = new int [count];
+  sortedIndex(count,request,newidx);
   *flag=0;
   for(int i=0;i<count;i++)
   {
-    AMPI_Test(&request[i], flag, sts);
-    if(*flag==1){
-      *index = i;
+    AMPI_Test(&request[newidx[i]], flag, sts);
+    if(*flag==1 && sts->MPI_COMM!=0){ // skip MPI_REQUEST_NULL
+      *index = newidx[i];
       return 0;
     }
   }
@@ -2197,12 +2227,17 @@ int AMPI_Testall(int count, MPI_Request *request, int *flag, MPI_Status *sts)
 {
   AMPIAPI("AMPI_Testall");
   int tmpflag;
+  AmpiRequestList* reqs = getReqs();
+  int *newidx = new int [count];
+  sortedIndex(count,request,newidx);
   *flag = 1;
   for(int i=0;i<count;i++)
   {
-    AMPI_Test(&request[i], &tmpflag, sts+i);
+    tmpflag = (*reqs)[request[newidx[i]]]->test(&sts[newidx[i]]);
     *flag *= tmpflag;
   }
+  if(flag) 
+    MPI_Waitall(count,request,sts);
   return 0;
 }
 
@@ -2213,11 +2248,13 @@ int AMPI_Testsome(int incount, MPI_Request *array_of_requests, int *outcount,
   AMPIAPI("AMPI_Testsome");
   MPI_Status sts;
   int flag;
+  int *newidx = new int [incount];
+  sortedIndex(incount,array_of_requests,newidx);
   *outcount = 0;
   for(int i=0;i<incount;i++) {
-    AMPI_Test(&array_of_requests[i], &flag, &sts);
+    AMPI_Test(&array_of_requests[newidx[i]], &flag, &sts);
     if(flag == 1){
-      array_of_indices[(*outcount)]=i;
+      array_of_indices[(*outcount)]=newidx[i];
       array_of_statuses[(*outcount)++]=sts;
     }
   }
