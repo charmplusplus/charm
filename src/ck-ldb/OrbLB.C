@@ -299,7 +299,7 @@ void OrbLB::mapPartitionsToNodes()
   if (_lb_args.debug()) {
     CmiPrintf("After partitioning: \n");
     for (i=0; i<npartition; i++) {
-      CmiPrintf("[%d=>%d] (%d,%d,%d) (%d,%d,%d) load:%f count:%d\n", i, partitions[i].node, partitions[i].origin[0], partitions[i].origin[1], partitions[i].origin[2], partitions[i].corner[0], partitions[i].corner[1], partitions[i].corner[2], partitions[i].load, partitions[i].count);
+      CmiPrintf("[%d=>%d] (%d,%d,%d) (%d,%d,%d) load:%f count:%d objload:%f\n", i, partitions[i].node, partitions[i].origin[0], partitions[i].origin[1], partitions[i].origin[2], partitions[i].corner[0], partitions[i].corner[1], partitions[i].corner[2], partitions[i].load, partitions[i].count, partitions[i].load-statsData->procs[partitions[i].bkpes[0]].bg_walltime);
     }
     for (i=npartition; i<P; i++) CmiPrintf("[%d] --------- \n", i);
   }
@@ -334,7 +334,7 @@ void OrbLB::work(CentralLB::LDStats* stats, int count)
     computeLoad[objIdx].v[XDIR] = odata.objID().id[0];
     computeLoad[objIdx].v[YDIR] = odata.objID().id[1];
     computeLoad[objIdx].v[ZDIR] = odata.objID().id[2];
-    computeLoad[objIdx].load = odata.wallTime;
+    computeLoad[objIdx].load = _lb_args.useCpuTime()?odata.cpuTime:odata.wallTime;
     computeLoad[objIdx].refno = 0;
     computeLoad[objIdx].partition = NULL;
     for (int k=XDIR; k<=ZDIR; k++) {
