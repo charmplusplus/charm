@@ -73,7 +73,7 @@ private:
 		CcsDelayedReply reply;
 	} ccsReply;
 	};
-	
+public:	
 	callbackType type; 
 	callbackData d;
 	
