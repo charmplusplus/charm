@@ -26,7 +26,7 @@ public:
   Refiner(double _overload) { 
     overLoad = _overload; computes=0; processors=0; 
   };
-  ~Refiner() { delete [] computes; delete [] processors; };
+  ~Refiner() {}
 
   static int* AllocProcs(int count, CentralLB::LDStats* stats);
   static void FreeProcs(int* bufs);
