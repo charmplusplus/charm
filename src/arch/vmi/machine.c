@@ -3406,24 +3406,37 @@ CMI_VMI_Handle_T *CMI_VMI_Allocate_Handle ()
   VMI_STATUS status;
 
   int i;
+  int j;
 
 
   DEBUG_PRINT ("CMI_VMI_Allocate_Handle() called.\n");
 
   i = CMI_VMI_Next_Handle;
+  j = CMI_VMI_Next_Handle;
   while ((&CMI_VMI_Handles[i])->refcount > 0) {
     i++;
 
     if (i >= CMI_VMI_Maximum_Handles) {
       i = 0;
+    }
 
-      status = VMI_Poll ();
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
+    if (i == j) {
+      i = CMI_VMI_Maximum_Handles;
+      CMI_VMI_Maximum_Handles *= 2;
+      CMI_VMI_Handles = (CMI_VMI_Handle_T *) realloc (CMI_VMI_Handles,
+		 CMI_VMI_Maximum_Handles * sizeof (CMI_VMI_Handle_T));
+      for (j = i; j < CMI_VMI_Maximum_Handles; j++) {
+	(&CMI_VMI_Handles[j])->index = j;
+	(&CMI_VMI_Handles[j])->refcount = 0;
+      }
     }
   }
 
   (&CMI_VMI_Handles[i])->refcount = 1;
-  CMI_VMI_Next_Handle = i;
+  CMI_VMI_Next_Handle = (i + 1);
+  if (CMI_VMI_Next_Handle >= CMI_VMI_Maximum_Handles) {
+    CMI_VMI_Next_Handle = 0;
+  }
 
   return (&CMI_VMI_Handles[i]);
 }
@@ -3481,7 +3494,7 @@ void CMI_VMI_CmiFree (void *ptr)
 
   DEBUG_PRINT ("CMI_VMI_CmiFree() (memory pool version) called.\n");
 
-  size = ((int *) ptr)[0];
+  size = (((int *) ptr)[0]) + sizeof (int) + sizeof (int);
 
   if (size < CMI_VMI_BUCKET1_SIZE) {
     status = VMI_Pool_Deallocate_Buffer (CMI_VMI_Bucket1_Pool, ptr);
