@@ -89,6 +89,8 @@ int CheckSocketsReady(int withDelayMs)
   FD_ZERO(&rfds);FD_ZERO(&wfds);
   if (Cmi_charmrun_fd!=-1)
   	FD_SET(Cmi_charmrun_fd, &rfds);
+  else 
+        return 0;	// standalone mode
   if (dataskt!=-1) {
   	FD_SET(dataskt, &rfds);
   	if (writeableDgrams || writeableAcks)
