@@ -32,7 +32,9 @@ void Group::pup(PUP::er &p)
 {
 	Chare::pup(p);
 	p|thisgroup;
+	p|ckEnableTracing;
 } 
+
 CkDelegateMgr::~CkDelegateMgr() { }
 
 //Default delegator implementation: do not delegate-- send directly
@@ -434,7 +436,7 @@ static inline void _processForChareMsg(envelope *env)
 static inline void _processForBocMsg(envelope *env)
 {
   register CkGroupID groupID =  env->getGroupNum();
-  register void *obj = _localBranch(groupID);
+  register Group *obj = _localBranch(groupID);
   if(!obj) { // groupmember not yet created
     CpvAccess(_groupTable).find(groupID).enqMsg(env);
     return;
@@ -442,10 +444,11 @@ static inline void _processForBocMsg(envelope *env)
   CpvAccess(_qd)->process();
   CpvAccess(_currentGroup) = groupID;
   register int epIdx = env->getEpIdx();
-  _TRACE_BEGIN_EXECUTE(env);
   _SET_USED(env, 0);
+  CmiBool tracingEnabled=obj->ckTracingEnabled();
+  if (tracingEnabled) _TRACE_BEGIN_EXECUTE(env);
   _entryTable[epIdx]->call(EnvToUsr(env), obj);
-  _TRACE_END_EXECUTE();
+  if (tracingEnabled) _TRACE_END_EXECUTE();
   _STATS_RECORD_PROCESS_BRANCH_1();
 }
 

@@ -81,9 +81,12 @@ class Chare {
 class Group : public Chare { //Superclass of all Groups
   protected:
     CkGroupID thisgroup;
+    CmiBool ckEnableTracing; //Normally true, except for array manager
   public:
-    Group(CkMigrateMessage *m) {}
-    Group() { thisgroup = CkGetGroupID(); }
+    inline CmiBool ckTracingEnabled(void) {return ckEnableTracing;}
+
+    Group(CkMigrateMessage *m) { }
+    Group() { thisgroup = CkGetGroupID(); ckEnableTracing=true; }
     virtual ~Group(); //<- needed for *any* child to have a virtual destructor
 
     virtual void pup(PUP::er &p);//<- pack/unpack routine
