@@ -280,7 +280,7 @@ class CkVec : private CkSTLHelper<T> {
 template <class T>
 inline void pupCkVec(PUP::er &p,CkVec<T> &vec) {
     int len=vec.pupbase(p);
-    PUParray(p,&vec[0],len);
+    if (len) PUParray(p,&vec[0],len);
 }
 
 #ifndef _MSC_VER
