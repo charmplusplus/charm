@@ -168,14 +168,16 @@ sent during an {\em AtSync}, or are buffered until the {\em ResumeFromSync}.
 
 \item {\bf manual mode}: The load balancer can be programmed to be started
 manually. To switch to the manual mode, you should call
-{\em TurnManualLBOn()}, so that no Load Balancer will be started automatically.
-{\em TurnManualLBOn()} should be called as early as possible in the
-program. It could be called at the initialization part of the program, 
+{\em TurnManualLBOn()} on every processor, so that no Load Balancer will 
+be started automatically. {\em TurnManualLBOn()} should be called as 
+early as possible in the program. It could be called at the initialization 
+part of the program, 
 for example from a global variable constructor, or an initcall.
 It can also be called in the constructor of a static array and
 definitely before the {\em doneInserting} call for a dynamic array.  This call 
 has to be made on all processors. It can be called multiple times on one 
-processor, but only the last one takes effect.   
+processor, but only the last one takes effect. One way to do this is to call
+{\em TurnManualLBOn()} in a {\em initcall} function.  
 
 The function call {\em StartLB()} will start the load balancer. 
 This call should be made at only one place on a processors as it automatically 
