@@ -129,7 +129,7 @@ include $(DEPENDFILE)
 CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
       queueing.h conv-cpath.h conv-cpm.h persistent.h\
       trace.h trace-bluegene.h trace-projections.h charm-api.h \
-      conv-ccs.h ccs-client.c ccs-client.h CcsServer.java\
+      conv-ccs.h ccs-client.c ccs-client.h \
       ccs-server.h ccs-auth.c ccs-auth.h \
       memory-isomalloc.h debug-conv.h debug-charm.h conv-autoconfig.h \
       conv-common.h conv-config.sh conv-config.h conv-mach.h conv-mach.sh \
@@ -226,9 +226,13 @@ dirs+sources:
 	./gathertree ../../src/arch/`cat .gdir`      .
 	./gatherflat ../../src/arch/`cat .vdir`      .
 	./gathertree ../../pgms ../pgms
-	rm -f ../bin/charmc ; cp charmc ../bin/
 	rm -f ../bin/dep.pl ; cp dep.pl ../bin/
-	chmod +x ../bin/charmc
+	chmod +x charmc
+	-./system_ln  ../tmp/charmc ../bin/
+	-./system_ln ../../java/bin charmjavabin
+	-./system_ln ../../java/bin ../bin/charmjavabin
+	-./system_ln charmjavabin/* ../bin/
+	-./system_ln ../java ..
 	rm -f .gdir
 	rm -rf ../include ; mkdir ../include
 	-./system_ln  ../tmp/conv-*.*h ../include
