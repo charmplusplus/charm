@@ -1,4 +1,4 @@
-OPTS=-g -Dcompile #-DCMK_OPTIMIZE=1 -DCMK_MEMCHECKS_OFF=1
+OPTS=-g #-DCMK_OPTIMIZE=1 -DCMK_MEMCHECKS_OFF=1
 
 
 include ../Makefile.common
@@ -25,13 +25,13 @@ OB: FatTree.o
 	cp FatTree.o ../tmp
 
 HyperCube.o: HyperCube.C HyperCube.h
-	$(CHARMC) -o HyperCube.o -seq HyperCube.C -I$(MACHINE)
+	$(CHARMC)  -Dcompile -o HyperCube.o -seq HyperCube.C -I$(MACHINE)
 
 Mesh3D.o: Mesh3D.C Mesh3D.h
-	$(CHARMC) -o Mesh3D.o -seq Mesh3D.C -I$(MACHINE)
+	$(CHARMC)  -Dcompile -o Mesh3D.o -seq Mesh3D.C -I$(MACHINE)
 
 FatTree.o: FatTree.C FatTree.h
-	$(CHARMC) -o FatTree.o -seq FatTree.C -I$(MACHINE)
+	$(CHARMC)  -Dcompile -o FatTree.o -seq FatTree.C -I$(MACHINE)
 
 clean:
 	rm -f charmrun conv-host *.o
