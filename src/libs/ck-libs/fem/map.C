@@ -29,7 +29,7 @@ Originally written by Orion Sky Lawlor, olawlor@acm.org, 9/28/2000
 that have a copy of it.  For the vast majority
 of nodes, the list will contain exactly one element.
 */
-class peList {
+class peList : public CkNoncopyable {
 public:
 	int pe;//Processor number or -1 if the list is empty
 	int localNo;//Local number of this node on this PE
@@ -55,16 +55,16 @@ public:
 		else return next->addPE(p,l);
 	}
 	//Return this node's local number on PE p (or -1 if none)
-	int localOnPE(int p) {
+	int localOnPE(int p) const {
 		if (pe==p) return localNo;
 		else if (next==NULL) return -1;
 		else return next->localOnPE(p);
 	}
-	int isEmpty(void) //Return 1 if this is an empty list 
+	int isEmpty(void) const //Return 1 if this is an empty list 
 		{return (pe==-1);}
-	int isShared(void) //Return 1 if this is a shared node
+	int isShared(void) const //Return 1 if this is a shared node
 		{return next!=NULL;}
-	int length(void) {
+	int length(void) const {
 		if (next==NULL) return isEmpty()?0:1;
 		else return 1+next->length();
 	}
@@ -74,6 +74,29 @@ public:
 	}
 };
 
+//Create a list of the chunks that all these lists belong to
+static void intersectPeLists(peList **lists,int nLists,int *chunks,int *nChunks)
+{
+	*nChunks=0; //Initially, intersection is empty
+	if (nLists==0) return; //No lists, so intersection is empty
+	
+	//Traverse the first list, testing each entry:
+	for (const peList *cur=lists[0];cur!=NULL;cur=cur->next)
+	{
+		int testPE=cur->pe;
+		for (int i=1;i<nLists;i++) 
+			if (lists[i]->localOnPE(testPE)==-1) 
+			{ //List i does *not* contain testPE-- testPE is not in intersection
+				testPE=-1;
+				break;
+			}
+		if (testPE!=-1) 
+		{ //TestPE lies in the intersection of all the lists-- return it
+			chunks[*nChunks]=testPE;
+			(*nChunks)++;
+		}
+	}	
+}
 
 
 //A dynamic (growing) representation of a chunk.  
@@ -148,30 +171,6 @@ bool addGhost(int global,int srcPe,int destPe,
 //Add an entire layer of ghost elements
 void add(const ghostLayer &g);
 
-//--- Used by consistency check ---
-void bad(const char *why) {
-	CkAbort(why);
-}
-void equal(int is,int should,const char *what) {
-	if (is!=should) {
-		CkPrintf("ERROR! Expected %s to be %d, got %d!\n",
-			what,should,is);
-		bad("Internal FEM data structure corruption! (unequal)\n");
-	}
-}
-void range(int value,int lo,int hi,const char *what) {
-	if (value<lo || value>=hi) {
-		CkPrintf("ERROR! %s out of range (%d,%d)!\n",value,lo,hi);
-		bad("Internal FEM data structure corruption! (out of range)\n");
-	}
-}
-void nonnegative(int value,const char *what) {
-	if (value<0) {
-		CkPrintf("ERROR! Expected %s to be non-negative, got %d!\n",
-			what,value);
-		bad("Internal FEM data structure corruption! (negative)\n");
-	}
-}
 
 
 public:
@@ -206,21 +205,52 @@ splitter(const FEM_Mesh *mesh_,int *elem2chunk_,int nchunks_)
 	delete[] msgs;
 }
 
-//Fill the gNode[] array with the processors sharing each node
-void buildCommLists(void);
+	//Fill the gNode[] array with the processors sharing each node
+	void buildCommLists(void);
+	
+	//Add the layers of ghost elements
+	void addGhosts(int nLayers,const ghostLayer *g);
+	
+	//Divide up the sparse data lists
+	void separateSparse(void);
+	
+	//Divide off this portion of the serial data
+	MeshChunk *createMessage(int c);
+	
+	void consistencyCheck(void);
+	
+//--- Used by consistency check ---
+void bad(const char *why) {
+	CkAbort(why);
+}
+void equal(int is,int should,const char *what) {
+	if (is!=should) {
+		CkPrintf("ERROR! Expected %s to be %d, got %d!\n",
+			what,should,is);
+		bad("Internal FEM data structure corruption! (unequal)\n");
+	}
+}
+void range(int value,int lo,int hi,const char *what) {
+	if (value<lo || value>=hi) {
+		CkPrintf("ERROR! %s out of range (%d,%d)!\n",value,lo,hi);
+		bad("Internal FEM data structure corruption! (out of range)\n");
+	}
+}
+void nonnegative(int value,const char *what) {
+	if (value<0) {
+		CkPrintf("ERROR! Expected %s to be non-negative, got %d!\n",
+			what,value);
+		bad("Internal FEM data structure corruption! (negative)\n");
+	}
+}
 
-//Add the layers of ghost elements
-void addGhosts(int nLayers,const ghostLayer *g);
+};
 
-//Divide off this portion of the serial data
-MeshChunk *createMessage(int c);
-
-
-void consistencyCheck(void)
+//Basic debugging tool: check interlinked ghost element data structures for consistency
+void splitter::consistencyCheck(void)
 {
-	if (0) return; //Skip check in production code
+	if (1) return; //Skip check in production code
 
-//Basic debugging tool: check interlinked data structures for consistency
 	printf("FEM> Performing consistency check...\n");
 
 	int t,c;
@@ -265,8 +295,6 @@ void consistencyCheck(void)
 	printf("FEM> Consistency check passed\n");
 }
 
-};
-
 void splitter::buildCommLists(void)
 {
 //First pass: add PEs to each node they touch
@@ -309,7 +337,71 @@ void splitter::buildCommLists(void)
 		       		}
 		}
 	}
+}
 
+//Decide which chunks each sparse data record belongs in.
+// This is another ridiculously complex two-phase "loop-count; loop-copy" algorithm.
+void splitter::separateSparse(void) 
+{
+	if (mesh->nSparse()==0) return; //No sparse data at all
+	
+	FEM_Sparse **dest=new (FEM_Sparse*)[nchunks]; //Destination sparse records
+	int *destLen=new int[nchunks]; //Number of records per chunk
+	int *destChunks=new int[nchunks]; //List of chunks a record belongs in
+	int s,i;
+	for (int t=0;t<mesh->nSparse();t++) 
+	{ //For each kind of sparse data:
+		//Prepare the messages to receive sparse records:
+		const FEM_Sparse &src=mesh->getSparse(t);
+		int c;//chunk number (to receive message)
+		for (c=0;c<nchunks;c++) { //Build and add a structure to receive this chunk's data
+			dest[c]=new FEM_Sparse(src.getNodesPer(),src.getDataPer());
+			destLen[c]=0;
+			msgs[c]->m.setSparse(t,dest[c]);
+		}
+		
+		//Determine which chunks each sparse record will land in,
+		// to count up the length of each chunk in destLen:
+		int nSrc=src.size(),nNodes=src.getNodesPer();
+		int nDest; //Number of destination chunks for this record
+		peList **srcPes=new (peList*)[nNodes];
+		for (s=0;s<nSrc;s++) {
+			for (i=0;i<nNodes;i++) srcPes[i]=&gNode[src.getNodes(s)[i]];
+			intersectPeLists(srcPes,nNodes,destChunks,&nDest);
+			if (nDest==0) CkAbort("FEM Partitioning> Sparse record does not lie on any PE!");
+			for (int destNo=0;destNo<nDest;destNo++) 
+				destLen[destChunks[destNo]]++;
+		}
+		
+		//Allocate room in each chunk for its sparse records
+		for (c=0;c<nchunks;c++) {
+			if (destLen[c]>0) {
+				dest[c]->allocate(destLen[c]);
+				destLen[c]=0; //Reset counter for use while inserting
+			}
+		}
+		
+		//Insert each sparse record into its chunks:
+		for (s=0;s<nSrc;s++) {
+			for (i=0;i<nNodes;i++) srcPes[i]=&gNode[src.getNodes(s)[i]];
+			intersectPeLists(srcPes,nNodes,destChunks,&nDest);
+			for (int destNo=0;destNo<nDest;destNo++) {
+				c=destChunks[destNo];
+				int d=destLen[c]++;
+				//Copying sparse record s into slot d of chunk c.
+				dest[c]->setData(d,src.getData(s));//Data is easy
+				//Nodes have to be given local numbers:
+				int *destNodes=dest[c]->getNodes(d);
+				for (i=0;i<nNodes;i++)
+					destNodes[i]=srcPes[i]->localOnPE(c);
+			}
+		}
+		
+		delete[] srcPes;
+	}
+	delete[] dest;
+	delete[] destLen;
+	delete[] destChunks;
 }
 
 //Now that we know which elements and nodes go where,
@@ -364,6 +456,7 @@ MeshChunk *splitter::createMessage(int c)
 		}
 		localStart+=nEl;
 	}
+	
 	msgs[c]=NULL;
 	return msg;
 }
@@ -405,6 +498,8 @@ void fem_split(const FEM_Mesh *mesh,int nchunks,int *elem2chunk,
 	
 	s.addGhosts(nGhostLayers,g);
 	
+	s.separateSparse();
+	
 	//Split up and send out the mesh
 	for (int c=0;c<nchunks;c++)
 		out->accept(c,s.createMessage(c));
@@ -437,6 +532,7 @@ a ghost layer is added, the set of interesting nodes grows.
 //Add one layer of ghost elements
 void splitter::addGhosts(int nLayers,const ghostLayer *g)
 {
+	if (nLayers==0) return; //No ghost layers-- nothing to do
 	
 //Build initial ghostNode table-- just the shared nodes
 	ghostNode=new unsigned char[mesh->node.n];

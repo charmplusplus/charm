@@ -11,6 +11,41 @@ Orion Sky Lawlor, olawlor@acm.org, 9/28/00
 
 #include "charm-api.h"
 #include "tcharm.h"
+#include "fem.h"
+
+// temporary Datatype representation
+// will go away once MPI user-defined datatypes are ready
+struct DType {
+  int base_type; //FEM_* datatype
+  int vec_len; //Number of items of this datatype
+  int init_offset; // offset of field in bytes from the beginning of data
+  int distance; // distance in bytes between successive field values
+  DType(void) {}
+  DType( const int b,  const int v=1,  const int i=0,  const int d=0)
+    : base_type(b), vec_len(v), init_offset(i) 
+  {
+    distance = (d ? d : length());
+  }
+  //Default copy constructor, assignment operator
+
+  //Return the total number of bytes required by this FEM_* data type
+  static int type_size(int dataType) {
+    switch(dataType) {
+      case FEM_BYTE : return 1; break;
+      case FEM_INT : return sizeof(int); break;
+      case FEM_REAL : return sizeof(float); break;
+      case FEM_DOUBLE : return sizeof(double); break;
+      default: CkAbort("Unrecognized data type field passed to FEM framework!\n");
+    }
+    return -1;
+  }
+  
+  //Return the total number of bytes required by the data stored in this DType
+  int length(const int nitems=1) const {
+    return type_size(base_type) * vec_len * nitems;
+  }
+};
+
 
 class FEMinit {
  public:
@@ -218,13 +253,120 @@ public:
 	  {return n*nodesPer;}
 };
 
+/*
+This is a simple 2D table.  The operations are mostly row-centric.
+*/
+template <class T>
+class BasicTable2d : public CkNoncopyable {
+protected:
+	int rows; //Number of entries in table
+	int cols; //Size of each entry in table
+	T *table; //Data in table [rows * cols]
+public:
+	BasicTable2d(T *src,int cols_,int rows_) 
+		:cols(cols_), rows(rows_), table(src) {}
+	
+	//"size" of the table is the number of rows:
+	inline int size(void) const {return rows;}
+	//Width of the table is the number of columns:
+	inline int width(void) const {return cols;}
+	
+	//Get a pointer to a row of the table:
+	inline T *getRow(int r) {return &table[r*cols];}
+	inline const T *getRow(int r) const {return &table[r*cols];}
+	inline T *operator[](int r) {return getRow(r);}
+	inline const T *operator[](int r) const {return getRow(r);}
+	void setRow(int r,const T *src) {
+		T *dest=getRow(r);
+		for (int i=0;i<cols;i++) dest[i]=src[i];
+	}
+	//As above, but with an index shift
+	void setRow(int r,const T *src,T idxBase) {
+		T *dest=getRow(r);
+		for (int i=0;i<cols;i++) dest[i]=src[i]-idxBase;
+	}
+};
+
+//As above, but heap-allocatable
+template <class T>
+class AllocTable2d : public BasicTable2d<T> {
+	T *allocTable; //Heap-allocated table 
+public:
+	AllocTable2d(int cols_=0,int rows_=0) 
+		:BasicTable2d<T>(NULL,cols_,rows_)
+	{
+		allocTable=NULL;
+		if (rows>0) allocate(rows);
+	}
+	~AllocTable2d() {delete[] allocTable;}
+	
+	void allocate(int rows_) { //Make room for n rows
+		if (allocTable!=NULL) delete[] allocTable;
+		rows=rows_;
+		allocTable=table=new T[rows*cols];
+	}
+	
+	//Pup routine and operator|:
+	void pup(PUP::er &p) {
+		p|rows; p|cols;
+		if (table==NULL) allocate(rows);
+		p(table,rows*cols); //T better be a basic type, or this won't compile!
+	}
+	friend void operator|(PUP::er &p,AllocTable2d<T> &t) {t.pup(p);}
+};
+
+
+/*Describes a set of records of sparse data that are all the
+same size and all associated with the same number of nodes.
+Sparse data is associated with some subset of the nodes in the mesh,
+and gets copied to every chunk that has all those nodes.  The canonical
+use of sparse data is to describe boundary conditions.
+*/
+class FEM_Sparse : public CkNoncopyable {
+	AllocTable2d<int> nodes; //Each row is the nodes surrounding a tuple
+	AllocTable2d<char> data; //Each row is the user data for a tuple
+public:
+	void allocate(int n_); //Allocate storage for data and nodes of n tuples
+	
+	FEM_Sparse() {} //Used during pup
+	FEM_Sparse(int nodesPer_,int bytesPer_) 
+		:nodes(nodesPer_), data(bytesPer_) {}
+	
+	//Return the number of records:
+	inline int size(void) const {return data.size();}
+	//Return the size of each record:
+	inline int getNodesPer(void) const {return nodes.width();}
+	inline int getDataPer(void) const {return data.width();}
+	
+	//Examine/change a single record:
+	inline const int *getNodes(int i) const {return nodes.getRow(i);}
+	inline const char *getData(int i) const {return data.getRow(i);}
+	inline int *getNodes(int i) {return nodes.getRow(i);}
+	inline char *getData(int i) {return data.getRow(i);}
+	inline void setNodes(int i,const int *d,int idxBase) {nodes.setRow(i,d,idxBase);}
+	inline void setData(int i,const char *d) {data.setRow(i,d);}
+	
+	//Allocate and set the entire table:
+	void set(int records,const int *n,int idxBase,const char *d);
+	
+	//Get the entire table:
+	void get(int *n,int idxBase,char *d) const;
+	
+	void pup(PUP::er &p) {p|nodes; p|data;}
+};
+PUPmarshall(FEM_Sparse);
 
 /*This class describes the nodes and elements in
   a finite-element mesh or submesh*/
 class FEM_Mesh : public CkNoncopyable {
+	CkPupPtrVec<FEM_Sparse> sparse;
 public:
+	int nSparse(void) const {return sparse.size();}
+	const FEM_Sparse &getSparse(int uniqueID) const;
+	void setSparse(int uniqueID,FEM_Sparse *s);
+	
 	FEM_Item node; //Describes the nodes in the mesh
-	NumberedVec<FEM_Elem> elem;
+	NumberedVec<FEM_Elem> elem; //Describes the different types of elements in the mesh
 	
 	//Return this type of element, given an element type
 	FEM_Item &getCount(int elTypeOrMinusOne) {
@@ -296,42 +438,8 @@ typedef marshallNewHeapCopy<MeshChunk> marshallMeshChunk;
 PUPmarshall(marshallMeshChunk);
 
 #include "fem.decl.h"
-#include "fem.h"
 
 #define CHK(p) do{if((p)==0)CkAbort("FEM>Memory Allocation failure.");}while(0)
-
-// temporary Datatype representation
-// will go away once MPI user-defined datatypes are ready
-struct DType {
-  int base_type;
-  int vec_len;
-  int init_offset; // offset of field in bytes from the beginning of data
-  int distance; // distance in bytes between successive field values
-  DType(void) {}
-  DType(const DType& dt) : 
-    base_type(dt.base_type), vec_len(dt.vec_len), init_offset(dt.init_offset),
-    distance(dt.distance) {}
-  void operator=(const DType& dt) {
-    base_type = dt.base_type; 
-    vec_len = dt.vec_len; 
-    init_offset = dt.init_offset;
-    distance = dt.distance;
-  }
-  DType( const int b,  const int v=1,  const int i=0,  const int d=0) : 
-    base_type(b), vec_len(v), init_offset(i) {
-    distance = (d ? d : length());
-  }
-  int length(const int nitems=1) const {
-    int blen;
-    switch(base_type) {
-      case FEM_BYTE : blen = 1; break;
-      case FEM_INT : blen = sizeof(int); break;
-      case FEM_REAL : blen = sizeof(float); break;
-      case FEM_DOUBLE : blen = sizeof(double); break;
-    }
-    return blen * vec_len * nitems;
-  }
-};
 
 class FEM_DataMsg : public CMessage_FEM_DataMsg
 {
@@ -417,11 +525,11 @@ private:
   void updateMesh(int callMeshUpdated,int doRepartition);
   void meshUpdated(marshallMeshChunk &);
 
-  int new_DT(int base_type, int vec_len=1, int init_offset=0, int distance=0) {
-    if(ntypes==MAXDT) {
-      CkAbort("FEM: registered datatypes limit exceeded.");
+  int new_DT(const DType &d) {
+    if(ntypes>=MAXDT) {
+      CkAbort("FEM_Create_Field> Too many registered datatypes!");
     }
-    dtypes[ntypes] = DType(base_type, vec_len, init_offset, distance);
+    dtypes[ntypes] = d;
     ntypes++;
     return ntypes-1;
   }

@@ -424,6 +424,88 @@ static const FEM_Mesh *getMesh(void) {
   }
 }
 
+/********** Sparse data ********/
+void FEM_Sparse::allocate(int n_) //Allocate storage for data and nodes of n tuples
+{
+	nodes.allocate(n_);
+	data.allocate(n_);
+}
+const FEM_Sparse &FEM_Mesh::getSparse(int uniqueID) const
+{
+	if (uniqueID<0 || uniqueID>=sparse.size())
+		CkAbort("FEM: Invalid sparse identifier!");
+	return *sparse[uniqueID];
+}
+void FEM_Mesh::setSparse(int uniqueID,FEM_Sparse *s)
+{
+	if (uniqueID<sparse.size()) CkAbort("FEM: Cannot re-use sparse identifiers!");
+	if (uniqueID>sparse.size()) CkAbort("FEM: Must use sparse identifiers in sequence!");
+	/*now uniqeID==sparse.size()*/
+	sparse.push_back(s);
+}
+void FEM_Sparse::set(int rows,const int *n,int idxBase,const char *d)
+{
+	allocate(rows);
+	BasicTable2d<int> nSrc((int *)n,nodes.width(),rows);
+	BasicTable2d<char> dSrc((char *)d,data.width(),rows);
+	for (int i=0;i<rows;i++) {
+		nodes.setRow(i,nSrc.getRow(i),idxBase);
+		data.setRow(i,dSrc.getRow(i));
+	}
+}
+void FEM_Sparse::get(int *n,int idxBase,char *d) const
+{
+	int rows=size();
+	BasicTable2d<int> nDest(n,nodes.width(),rows);
+	BasicTable2d<char> dDest(d,data.width(),rows);
+	for (int i=0;i<rows;i++) {
+		nDest.setRow(i,nodes.getRow(i),-idxBase);
+		dDest.setRow(i,data.getRow(i));
+	}
+}
+
+CDECL void FEM_Set_Sparse(int uniqueID,int nTuples,
+  	const int *nodes,int nodesPerTuple,
+  	const void *data,int dataPerTuple,int dataType)
+{
+	FEMAPI("FEM_Set_Sparse");
+	int bytesPerTuple=dataPerTuple*DType::type_size(dataType);
+	FEM_Sparse *s=new FEM_Sparse(nodesPerTuple,bytesPerTuple);
+	s->set(nTuples,nodes,0,(char *)data);
+	setMesh()->setSparse(uniqueID,s);
+}
+FDECL void FTN_NAME(FEM_SET_SPARSE,fem_set_sparse)
+	(int *uniqueID,int *nTuples,
+  	const int *nodes,int *nodesPerTuple,
+  	const void *data,int *dataPerTuple,int *dataType)
+{
+	FEMAPI("FEM_Set_Sparse");
+	int bytesPerTuple=(*dataPerTuple)*DType::type_size(*dataType);
+	FEM_Sparse *s=new FEM_Sparse(*nodesPerTuple,bytesPerTuple);
+	s->set(*nTuples,nodes,1,(char *)data);
+	setMesh()->setSparse(*uniqueID-1,s);
+}
+
+CDECL int  FEM_Get_Sparse_Length(int uniqueID)
+{
+	FEMAPI("FEM_Get_Sparse_Length");
+	return getMesh()->getSparse(uniqueID).size();
+}
+CDECL void FEM_Get_Sparse(int uniqueID,int *tuples,void *data)
+{
+	FEMAPI("FEM_Get_Sparse");
+	getMesh()->getSparse(uniqueID).get(tuples,0,(char *)data);
+}
+FDECL int  FTN_NAME(FEM_GET_SPARSE_LENGTH,fem_get_sparse_length)(int *uniqueID)
+{
+	return FEM_Get_Sparse_Length(*uniqueID-1);
+}
+FDECL void FTN_NAME(FEM_GET_SPARSE,fem_get_sparse)(int *uniqueID,int *tuples,void *data)
+{
+	FEMAPI("FEM_Get_Sparse");
+	getMesh()->getSparse(*uniqueID-1).get(tuples,1,(char *)data);
+}
+
 /****** Custom Partitioning API *******/
 static void Set_Partition(int *elem2chunk,int indexBase) {
 	if (_elem2chunk!=NULL) delete[] _elem2chunk;
@@ -1353,10 +1435,17 @@ FEM_Done(void)
 }
 
 CDECL int 
+FEM_Create_Simple_Field(int base_type, int vec_len)
+{
+  FEMAPI("FEM_Create_Field");
+  return getCurChunk()->new_DT(DType(base_type, vec_len));
+}
+
+CDECL int 
 FEM_Create_Field(int base_type, int vec_len, int init_offset, int distance)
 {
   FEMAPI("FEM_Create_Field");
-  return getCurChunk()->new_DT(base_type, vec_len, init_offset, distance);
+  return getCurChunk()->new_DT(DType(base_type, vec_len, init_offset, distance));
 }
 
 CDECL void
@@ -1475,6 +1564,11 @@ FDECL void FTN_NAME(FEM_MIGRATE,fem_migrate)
   FEM_Migrate();
 }
 
+FDECL int FTN_NAME(FEM_CREATE_SIMPLE_FIELD,fem_create_simple_field)
+  (int *bt, int *vl)
+{
+  return FEM_Create_Simple_Field(*bt, *vl);
+}
 FDECL int FTN_NAME(FEM_CREATE_FIELD,fem_create_field)
   (int *bt, int *vl, int *io, int *d)
 {
@@ -1818,6 +1912,7 @@ FDECL void FTN_NAME(FEM_GET_GHOST_LIST,fem_get_ghost_list)
 	getCurChunk()->emptyList();
 }
 
+
 /********* Debugging mesh printouts *******/
 # define ARRSTART 0
 
@@ -2077,6 +2172,9 @@ void FEM_Mesh::pup(PUP::er &p)  //For migration
 
 	p.comment(" Number of element types:");
 	elem.pup(p);
+	
+	p.comment("-------------- Sparse Data ------------");
+	sparse.pup(p);
 }
 void FEM_Item::pup(PUP::er &p) {
 	p.comment(" <number of items, including ghosts> <first ghost> <data per> ");
