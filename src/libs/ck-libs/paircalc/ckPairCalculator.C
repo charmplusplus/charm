@@ -160,7 +160,7 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
     }
 
     // FIXME: should do 'op2' here!!!
-    
+/*    
     double *ptr = new double[S*S*2];
     for(int i=0; i<S*S*2; i++)
       ptr[i] =0; 
@@ -188,11 +188,11 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
     
     contribute(S*S*sizeof(double) * 2, ptr, CkReduction::sum_double);
     delete [] ptr;
+*/
 
-    /*
-    r.add((int)thisIndex.y, (int)thisIndex.x, (int)(thisIndex.y+grainSize-1), (int)(thisIndex.x+grainSize-1), (CkTwoDoubles*)outData);
+   r.add((int)thisIndex.y, (int)thisIndex.x, (int)(thisIndex.y+grainSize-1), (int)(thisIndex.x+grainSize-1), (CkTwoDoubles*)outData);
     r.contribute(this, sparse_sum_TwoDoubles);
-    */
+
   }
 }
 
