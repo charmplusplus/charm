@@ -305,8 +305,8 @@ void TraceCounter::traceInit(char **argv)
 	      "     %s\n"
 	      "  <counter2>=%s\n"
 	      "     %s\n",
-	      counterArg1.arg, counterArg1.code, 
-	      counterArg2.arg, counterArg2.code);
+	      counterArg1.arg, counterArg1.desc, 
+	      counterArg2.arg, counterArg2.desc);
   }
   CpvAccess(_logPool) = new CountLogPool(CpvAccess(pgmName));
   DEBUGF(("%d Created _logPool at %08x\n", CkMyPe(), CpvAccess(_logPool)));
@@ -422,9 +422,9 @@ bool TraceCounter::matchArg(CounterArg* arg)
   if (matchCode == 0) {
     if (arg->arg[0] != '0' || arg->arg[1] != '\0') { matchCode = -1; }
   }
-  DEBUGF(("Matching %s or %d\n", arg->arg, matchCode));
+  // DEBUGF(("Matching %s or %d\n", arg->arg, matchCode));
   while (matchArg != NULL && !match) {
-    DEBUGF(("  Examining %d %s\n", matchArg->code, matchArg->arg));
+    // DEBUGF(("  Examining %d %s\n", matchArg->code, matchArg->arg));
     if (strcmp(matchArg->arg, arg->arg)==0) {
       match = true;
       arg->code = matchArg->code;
@@ -437,7 +437,7 @@ bool TraceCounter::matchArg(CounterArg* arg)
     }
     matchArg = matchArg->next;
   }
-  DEBUGF(("Match = %d\n", match));
+  // DEBUGF(("Match = %d\n", match));
   return match;
 }
 
