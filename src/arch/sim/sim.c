@@ -2,23 +2,22 @@
 #define TRACE_SENDCP_TIME 0
 #define TRACE_RECVCP_TIME 0
 
-PROCESSOR    *pe_table;
-SIM_TIME     gclock;
-PARAMETERS   num;
-THRESHOLD threshold;
-int          (*cpu_accepts)();
-int          (*scp_accepts)();
-int          (*network_accepts)();
-int          seed;
-int          scp_wait_on_list;
+static PROCESSOR    *pe_table;
+static SIM_TIME     gclock;
+static PARAMETERS   num;
+static THRESHOLD threshold;
+static int          (*cpu_accepts)();
+static int          (*scp_accepts)();
+static int          (*network_accepts)();
+static int          seed;
+static int          scp_wait_on_list;
 
 
-extern THRESHOLD   threshold;
 
 
 /***********************************************************************/
 
-int sim_read_parameters(filename,num,threshold)
+static int sim_read_parameters(filename,num,threshold)
 char *filename;
 PARAMETERS *num;
 THRESHOLD  *threshold;
@@ -135,7 +134,7 @@ THRESHOLD  *threshold;
 
 /***********************************************************************/
 
-void simulate()
+static void simulate()
 {
     int pno;
     
@@ -165,7 +164,7 @@ void simulate()
 /***********************************************************************/
 
 
-cpu_event(pno)
+static cpu_event(pno)
 int pno;
 {
     int             rcp_pno;
@@ -267,7 +266,7 @@ int pno;
 
 /***********************************************************************/
 
-recv_cp_event(pno)
+static recv_cp_event(pno)
 int pno;
 {
     SIM_TIME msg_arr_time;
@@ -312,7 +311,7 @@ int pno;
 
 /***********************************************************************/
 
-recv_cp_deposit(pno)
+static recv_cp_deposit(pno)
 int pno;
 {
     int cpu;
@@ -342,7 +341,7 @@ int pno;
 
 /***********************************************************************/
 
-send_cp_event(pno)
+static send_cp_event(pno)
 int pno;
 {
     int      dest,cpu;
@@ -387,7 +386,7 @@ int pno;
 
 /***********************************************************************/
 
-actual_broadcast(source,msg,delay)
+static actual_broadcast(source,msg,delay)
 MSG      *msg;
 REL_TIME delay;
 int      source;
@@ -426,7 +425,7 @@ int      source;
 
 /***********************************************************************/
 
-actual_send(d,msg,delay)
+static actual_send(d,msg,delay)
 int      d;
 MSG      *msg;
 REL_TIME delay;
@@ -459,7 +458,7 @@ REL_TIME delay;
 
 /***********************************************************************/
 
-wait_on_network(pno)
+static wait_on_network(pno)
 int pno;
 {
     int temp;
@@ -476,7 +475,7 @@ int pno;
 
 /***********************************************************************/
 
-wait_on_local(pno)
+static wait_on_local(pno)
 int pno;
 {
     /* only cpu or rcp can call this */
@@ -487,7 +486,7 @@ int pno;
 
 /***********************************************************************/
 
-release_waiting_network(t)
+static release_waiting_network(t)
 SIM_TIME t;
 {
     int temp;
@@ -504,7 +503,7 @@ SIM_TIME t;
 
 /***********************************************************************/
 
-release_waiting_local(pno,t)
+static release_waiting_local(pno,t)
 int  pno;
 SIM_TIME t;
 {
@@ -518,7 +517,7 @@ SIM_TIME t;
 /* ****************************************************************** */
 /* upgrade the event time to the lower bound                          */
 /* ****************************************************************** */
-update_etime(pno)
+static update_etime(pno)
 int pno;
 {
     if (less_time(pe_table[pno].etime,pe_table[pno].lower_bound))
@@ -530,7 +529,7 @@ int pno;
 
 /***********************************************************************/
 
-assign_etime(pno,t)
+static assign_etime(pno,t)
 int  pno;
 SIM_TIME t;
 {
@@ -542,7 +541,7 @@ SIM_TIME t;
 /* ****************************************************************** */
 /* increase the lower bound                                           */
 /* ****************************************************************** */
-update_lower_bound(pno,elapsed_time)
+static update_lower_bound(pno,elapsed_time)
 int pno;
 REL_TIME elapsed_time;
 {
@@ -552,7 +551,7 @@ REL_TIME elapsed_time;
 /* ****************************************************************** */
 /* advance the global time                                            */
 /* ****************************************************************** */
-advance_clock(pno)
+static advance_clock(pno)
 int pno;
 { 
     if (greater_time(gclock,pe_table[pno].etime) )
@@ -564,7 +563,7 @@ int pno;
 /* ****************************************************************** */
 /* select the processor which has the most recent event               */
 /* ****************************************************************** */
-select_processor()
+static select_processor()
 {
     int pno;
     
@@ -576,7 +575,7 @@ select_processor()
 
 /***********************************************************************/
 
-sim_send_message(pno,env,length,broadcast,destPE)
+static sim_send_message(pno,env,length,broadcast,destPE)
 int         pno;       /* source processor */
 void        *env;
 int         length;
@@ -610,7 +609,7 @@ int         destPE;
 
 /***********************************************************************/
 
-become_idle(pno)
+static become_idle(pno)
 int pno;
 {
     SIM_TIME maxtime;
@@ -623,7 +622,7 @@ int pno;
 
 /***********************************************************************/
 
-make_active(pno)
+static make_active(pno)
 int pno;
 {
     RESET_IDLE(pno);
@@ -642,7 +641,7 @@ int pno;
 /*  *************************************************************** */
 /*  initialize the data structure                                   */
 /*  *************************************************************** */
-int sim_initialize(paramFile,numpe)
+static int sim_initialize(paramFile,numpe)
 char *paramFile;
 int numpe;
 {
@@ -747,7 +746,7 @@ int numpe;
 }
 
 
-init_max_time_const()
+static init_max_time_const()
 {
    max_time_const = 1e+20;
 }
@@ -756,7 +755,7 @@ init_max_time_const()
 /*  *************************************************************** */
 /*  print  error message                                            */ 
 /*  *************************************************************** */
-int error_msg(err_msg,err_no)
+static int error_msg(err_msg,err_no)
 int  *err_no;
 char *err_msg;
 {
