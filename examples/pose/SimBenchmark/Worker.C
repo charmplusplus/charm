@@ -104,21 +104,14 @@ void worker::doWork()
   MediumWorkMsg *mm;
   LargeWorkMsg *lm;
 
-  if ((POSE_endtime > -1) && (OVT() > POSE_endtime))  return;
-
-  // do some computation based on gsIdx
-  if (granularity > 0.0) POSE_busy_wait(granularity);
-  else if (grainSize == FINE) POSE_busy_wait(FINE_GRAIN);
-  else if (grainSize == MEDIUM_GS) POSE_busy_wait(MEDIUM_GRAIN);
-  else if (grainSize == COARSE) POSE_busy_wait(COARSE_GRAIN);
-  else if (grainSize == MIX_GS) POSE_busy_wait(MEDIUM_GRAIN);
-
   // generate some events
   int actualMsgSize = msgSize;
   int local = (int)(((double)locality)/100.0 * (double)msgsPerWork);
-  int localNbr = (myHandle+1) % numObjs;
+  //CkPrintf("%d out of %d messages will be sent to local objects\n", local, msgsPerWork);
+  int localNbr;
   for (int i=0; i<msgsPerWork; i++) {
     if (sent >= numMsgs) return;
+    localNbr = (myHandle+1) % numObjs;
     elapse(elapseTime);
     if (msgSize == MIX_MS) actualMsgSize = (actualMsgSize + 1) % 3;
     if (actualMsgSize == SMALL) {
@@ -127,7 +120,7 @@ void worker::doWork()
       if (local > 0) local--;
       else localNbr = neighbor;
       POSE_invoke(workSmall(sm), worker, localNbr, 0);
-      //CkPrintf("%d sending small work to %d at %d. Sent=%d\n",myHandle,localNbr,ovt,sent);
+      CkPrintf("%d sending small work to %d at %d. Sent=%d\n",myHandle,localNbr,ovt,sent);
     }
     else if (actualMsgSize == MEDIUM) {
       mm = new MediumWorkMsg;

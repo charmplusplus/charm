@@ -71,7 +71,7 @@ main::main(CkArgMsg *m)
     wd->grainSize = grainSize;
     wd->granularity = granularity;
     wd->density = density;
-    wd->msgsPerWork = (lrand48() % 4) + 2;
+    wd->msgsPerWork = 10; //(lrand48() % 4) + 2;
 
     dest = map[i];
     wd->Timestamp(0);
