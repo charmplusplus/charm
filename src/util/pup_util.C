@@ -574,6 +574,14 @@ unsigned int PUP::fromTextFile::readUint(const char *fmt) {
   }
   return ret;  
 }
+CMK_TYPEDEF_INT8 PUP::fromTextFile::readLongInt(const char *fmt) {
+  CMK_TYPEDEF_INT8 ret=0;
+  if (1!=fscanf(f,fmt,&ret)) {
+    if (feof(f)) return 0u;
+    else parseError("could not match large integer");
+  }
+  return ret;
+}
 double PUP::fromTextFile::readDouble(void) {
   double ret=0;
   if (1!=fscanf(f,"%lg",&ret)) {

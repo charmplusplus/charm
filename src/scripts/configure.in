@@ -50,7 +50,7 @@ test_result() {
 #  additional arguments to c++ compiler are passed as $4
 test_cxx() {
         AC_MSG_CHECKING("$1")
-	$CMK_CXX -I../include -I. -c $t -o test.o $4 > out 2>&1
+	$CMK_CXX -I../include -I. -c $CMK_LIBDIR $CMK_INCDIR $t -o test.o $4 > out 2>&1
 	test_result $? "$1" "$2" "$3"
  	strictpass=$pass
 	strictfail=$fail
@@ -69,7 +69,7 @@ test_cxx() {
 #  additional arguments to c++ compiler are passed as $4
 test_link() {
         AC_MSG_CHECKING("$1")
-	$CMK_CXX -I../include -I. $t -o testlink $4 > out 2>&1
+	$CMK_CXX -I../include -I. $CMK_LIBDIR $CMK_INCDIR $t -o testlink $4 > out 2>&1
 	test_result $? "$1" "$2" "$3"
 	/bin/rm -f out
 }
@@ -81,7 +81,7 @@ test_link() {
 # $4: extra link option
 test_linkso() {
         AC_MSG_CHECKING("$1")
-	$CMK_CXX -I../include -I. $CMK_LD_SHARED $t -o testlink.$CMK_SHARED_SUF $4 > out 2>&1
+	$CMK_CXX -I../include -I. $CMK_LIBDIR $CMK_INCDIR $CMK_LD_SHARED $t -o testlink.$CMK_SHARED_SUF $4 > out 2>&1
 	test_result $? "$1" "$2" "$3"
 	/bin/rm -f out testlink.$CMK_SHARED_SUF
 }
@@ -540,10 +540,6 @@ test_link "whether PAPI exists" "yes" "no" "-lpapi"
 AC_DEFINE_UNQUOTED(CMK_HAS_COUNTER_PAPI, $pass, [whether PAPI exists])
 if test $pass -eq 1
 then 
-        cat >> ../include/conv-mach-opt.h <<EOT
-/* header added by configure script after detecting the presence of PAPI. */
-#include <papi.h>
-EOT
 	add_flag 'CMK_LIBS="$CMK_LIBS -lpapi"' "papi"
 fi
 fi

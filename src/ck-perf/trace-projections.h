@@ -18,6 +18,10 @@
 #include "trace.h"
 #include "ckhashtable.h"
 
+#if CMK_HAS_COUNTER_PAPI
+#include <papi.h>
+#endif
+
 #if CMK_PROJECTIONS_USE_ZLIB
 #include <zlib.h>
 #endif

@@ -8,6 +8,10 @@
 #ifndef _TRACE_H
 #define _TRACE_H
 
+#if CMK_HAS_COUNTER_PAPI
+#include <papi.h>
+#endif
+
 class envelope;
 
 /**
@@ -36,7 +40,7 @@ CkpvExtern(int, traceOnPe);
 #if CMK_HAS_COUNTER_PAPI
 typedef long_long LONG_LONG_PAPI;
 #else
-typedef int LONG_LONG_PAPI;
+typedef CMK_TYPEDEF_INT8  LONG_LONG_PAPI;
 #endif
 
 // Base class of all tracing strategies.

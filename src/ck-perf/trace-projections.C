@@ -1034,7 +1034,7 @@ void toProjectionsFile::bytes(void *p,int n,size_t itemSize,dataType t)
     case Tulong: CheckAndFPrintF(f," %lu",((unsigned long *)p)[i]); break;
     case Tfloat: CheckAndFPrintF(f," %.7g",((float *)p)[i]); break;
     case Tdouble: CheckAndFPrintF(f," %.15g",((double *)p)[i]); break;
-    case Tlonglong: CheckAndFPrintF(f," %lld",((LONG_LONG_PAPI *)p)[i]); break;
+    case Tlonglong: CheckAndFPrintF(f," %lld",((CMK_TYPEDEF_INT8 *)p)[i]); break;
     default: CmiAbort("Unrecognized pup type code!");
     };
 }
@@ -1061,6 +1061,7 @@ void fromProjectionsFile::bytes(void *p,int n,size_t itemSize,dataType t)
     case Tulong:((unsigned long *)p)[i]=readUint(); break;
     case Tfloat: ((float *)p)[i]=(float)readDouble(); break;
     case Tdouble:((double *)p)[i]=readDouble(); break;
+    case Tlonglong: ((CMK_TYPEDEF_INT8 *)p)[i]=readLongInt(); break;
     default: CmiAbort("Unrecognized pup type code!");
     };
 }

@@ -476,6 +476,7 @@ class fromTextFile : public er {
   FILE *f;
   int readInt(const char *fmt="%d");
   unsigned int readUint(const char *fmt="%u");
+  CMK_TYPEDEF_INT8 readLongInt(const char *fmt="%lld");
   double readDouble(void);
   
   virtual void bytes(void *p,int n,size_t itemSize,dataType t);

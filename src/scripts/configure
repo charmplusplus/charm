@@ -1246,7 +1246,7 @@ echo "${ECHO_T}\"$4\"" >&6
 test_cxx() {
         echo "$as_me:$LINENO: checking \"$1\"" >&5
 echo $ECHO_N "checking \"$1\"... $ECHO_C" >&6
-	$CMK_CXX -I../include -I. -c $t -o test.o $4 > out 2>&1
+	$CMK_CXX -I../include -I. -c $CMK_LIBDIR $CMK_INCDIR $t -o test.o $4 > out 2>&1
 	test_result $? "$1" "$2" "$3"
  	strictpass=$pass
 	strictfail=$fail
@@ -1266,7 +1266,7 @@ echo $ECHO_N "checking \"$1\"... $ECHO_C" >&6
 test_link() {
         echo "$as_me:$LINENO: checking \"$1\"" >&5
 echo $ECHO_N "checking \"$1\"... $ECHO_C" >&6
-	$CMK_CXX -I../include -I. $t -o testlink $4 > out 2>&1
+	$CMK_CXX -I../include -I. $CMK_LIBDIR $CMK_INCDIR $t -o testlink $4 > out 2>&1
 	test_result $? "$1" "$2" "$3"
 	/bin/rm -f out
 }
@@ -1279,7 +1279,7 @@ echo $ECHO_N "checking \"$1\"... $ECHO_C" >&6
 test_linkso() {
         echo "$as_me:$LINENO: checking \"$1\"" >&5
 echo $ECHO_N "checking \"$1\"... $ECHO_C" >&6
-	$CMK_CXX -I../include -I. $CMK_LD_SHARED $t -o testlink.$CMK_SHARED_SUF $4 > out 2>&1
+	$CMK_CXX -I../include -I. $CMK_LIBDIR $CMK_INCDIR $CMK_LD_SHARED $t -o testlink.$CMK_SHARED_SUF $4 > out 2>&1
 	test_result $? "$1" "$2" "$3"
 	/bin/rm -f out testlink.$CMK_SHARED_SUF
 }
@@ -1866,10 +1866,6 @@ _ACEOF
 
 if test $pass -eq 1
 then
-        cat >> ../include/conv-mach-opt.h <<EOT
-/* header added by configure script after detecting the presence of PAPI. */
-#include <papi.h>
-EOT
 	add_flag 'CMK_LIBS="$CMK_LIBS -lpapi"' "papi"
 fi
 fi
