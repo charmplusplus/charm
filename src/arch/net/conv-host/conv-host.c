@@ -1331,7 +1331,7 @@ void req_client_connect(void)
 	{/*Wait for the next client to connect to our server port.*/
 		unsigned int clientIP,clientPort;/*These are actually ignored*/
 		if (arg_verbose) printf("Conv-host> Waiting for client %d to connect.\n",client);
-		if (0==skt_select1(server_fd,60*1000))
+		if (0==skt_select1(server_fd,arg_timeout*1000))
 			client_connect_problem(client,"Timeout waiting for node-program to connect");
 		req_clients[client]=skt_accept(server_fd,&clientIP,&clientPort);
 		if (req_clients[client]==SOCKET_ERROR) 
@@ -1339,7 +1339,7 @@ void req_client_connect(void)
 		else 
 		{ /*This client has just connected-- fetch his name and IP*/
 			ChMessage msg;
-			if (!skt_select1(req_clients[client],60000))
+			if (!skt_select1(req_clients[client],arg_timeout*1000))
 			  client_connect_problem(client,"Timeout on IP request");
 			ChMessage_recv(req_clients[client],&msg);
 			req_handle_initnode(&msg,req_clients[client]);
