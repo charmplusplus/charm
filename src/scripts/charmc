@@ -238,9 +238,7 @@ do
 		# Parse out some fake languages (that are actually modules)
 		case "$1" in
 		"ampi") AddModules ampi
-			POST_LIBRARIES="$POST_LIBRARIES -lcomm" ;;
 		"ampif") AddModules ampif
-			 POST_LIBRARIES="$POST_LIBRARIES -lcomm" ;;
 		"fem") AddModules fem ;;
 		"femf") AddModules fem ; USE_F90_LIBRARIES="1" ;;
 		"mblock") AddModules mblock ;;
