@@ -10,6 +10,8 @@
 
 #include "conv-common.h"
 
+#define CMK_IA64                                           1
+
 #define CMK_ASYNC_NOT_NEEDED                               0
 #define CMK_ASYNC_USE_FIOASYNC_AND_FIOSETOWN               0
 #define CMK_ASYNC_USE_FIOASYNC_AND_SIOCSPGRP               0
@@ -47,6 +49,7 @@
 #define CMK_THREADS_REQUIRE_NO_CPV                         0
 #define CMK_THREADS_COPY_STACK                             0
 
+#define CMK_TIMER_USE_RDTSC                                0
 #define CMK_TIMER_USE_GETRUSAGE                            1
 #define CMK_TIMER_USE_SPECIAL                              0
 #define CMK_TIMER_USE_TIMES                                0
