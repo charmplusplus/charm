@@ -59,6 +59,19 @@ test_finish() {
 	exit $1
 }
 
+# try to decide the version of glibc
+get_glibc_version() {
+t=test.c
+cat > $t <<EOT
+#include <stdio.h>
+#include <gnu/libc-version.h>
+int main (void) { puts (gnu_get_libc_version ()); return 0; }
+EOT
+gcc -o gver test.c
+GLIBCVERSION=`./gver`
+/bin/rm -f $t gver
+}
+
 cat > $t <<EOT
 #include <stdio.h>
 void foo(void) {
@@ -269,10 +282,11 @@ case $version in
     AC_CHECK_PROG(TELNET, telnet, telnet )
     AC_CHECK_PROG(UUDECODE, uudecode, uudecode )
     
-    CHARMIP='128.174.241.211'
+    CHARMIP='128.174.241.207'
 #    CHARMIP='charm.cs.uiuc.edu'
-    VERSION=`nm /lib/libc.so.6 | grep "A GLIBC_" | tail -1 | sed -e "s/00000000 A GLIBC_//g"`
-    L="libpthread-$VERSION.a"
+#    VERSION=`nm /lib/libc.so.6 | grep "A GLIBC_" | tail -1 | sed -e "s/00000000 A GLIBC_//g"`
+    get_glibc_version
+    L="libpthread-$GLIBCVERSION.a"
     URL="http://${CHARMIP}/distrib/$L"
     finish=0
     printf "getting $L from $URL ..."
@@ -284,14 +298,18 @@ case $version in
     if test $finish = 0 && test -n "$LYNX"
     then
       printf "(lynx) ..."
-      $LYNX -source $URL > $L 2>/dev/null && mv $L ../lib && finish=1
+      $LYNX -source $URL > $L 2>/dev/null 
+      if file -L $L | grep 'archive' > /dev/null
+      then
+        mv $L ../lib && finish=1
+      fi
     fi
     if test $finish = 0 && test -n "$TELNET" && test -n "$UUDECODE"
     then
       printf "(telnet) ..."
       cat > get_libpthread <<EOT
 #! /bin/sh
-echo "GET /distrib/libpthread-$VERSION.uu 1.0"
+echo "GET /distrib/libpthread-$GLIBCVERSION.uu 1.0"
 echo
 # exit normally when the telnet session closes.
 trap "exit 0" 13
@@ -309,7 +327,7 @@ EOT
       echo "failed"
       echo "#####################################################################"
       echo "wget, lynx or telnet must be installed to get libpthread.a from charm website."
-      echo "Alternately, your version of GLIBC ($VERSION) is not yet supported--"
+      echo "Alternately, your version of GLIBC ($GLIBCVERSION) is not yet supported--"
       echo " contact ppl@cs.uiuc.edu for assistance."
       echo "#####################################################################"
       exit 1
