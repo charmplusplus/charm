@@ -59,7 +59,7 @@ class CkBitVector {
   CkBitVector & Invert();
   CkBitVector & Clear(prio_t bit);
   CkBitVector & Set(prio_t bit);
-  bool Test(prio_t bit) const;
+  CmiBool Test(prio_t bit) const;
 
   // Shift down and shift up shift the bits in the bit vector by bit
   // bits around. The bits in the vector are moved up or down the
@@ -79,12 +79,12 @@ class CkBitVector {
   CkBitVector & Concat(CkBitVector const &b);
 
   // Comparison operators
-  bool operator==(const CkBitVector &b) const { return 0; } // HERE
-  bool operator!=(const CkBitVector &b) const { return !(*this==b); }
-  bool operator<(const CkBitVector &b) const { return 0; } // HERE
-  bool operator<=(const CkBitVector &b) const { return *this==b||*this>b; }
-  bool operator>(const CkBitVector &b) const { return 0; } // HERE
-  bool operator>=(const CkBitVector &b) const { return *this==b||*this<b; }
+  CmiBool operator==(const CkBitVector &b) const { return CmiFalse; } // HERE
+  CmiBool operator!=(const CkBitVector &b) const { return (CmiBool)!(*this==b); }
+  CmiBool operator<(const CkBitVector &b) const { return CmiFalse; } // HERE
+  CmiBool operator<=(const CkBitVector &b) const { return (CmiBool)(*this==b||*this>b); }
+  CmiBool operator>(const CkBitVector &b) const { return CmiFalse; } // HERE
+  CmiBool operator>=(const CkBitVector &b) const { return (CmiBool)(*this==b||*this<b); }
 
   // Print the bit vector to either output stream type
   friend CkOutStream & operator<< (CkOutStream &ckos, CkBitVector const b);

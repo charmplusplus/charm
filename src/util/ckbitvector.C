@@ -179,9 +179,9 @@ CkBitVector & CkBitVector::Set(prio_t bit) {
 }
 
 // Is the bit given set?
-bool CkBitVector::Test(prio_t bit) const {
+CmiBool CkBitVector::Test(prio_t bit) const {
   // If it is out of range it's obviously false
-  if ( bit+1 > usedBits ) { return 0; }
+  if ( bit+1 > usedBits ) { return CmiFalse; }
 
   // If it's in range, calculate it's chunk and offset
   prio_t index = offset(bit);
@@ -190,7 +190,7 @@ bool CkBitVector::Test(prio_t bit) const {
 //ckerr << bit << ": at offset " << index << " mask " << bitMask << endl;
 
   // Access that bit, check it versus the mask and return the result
-  return ((data[index]&bitMask) != 0);
+  return (CmiBool)((data[index]&bitMask) != 0);
 }
 
 
