@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.12  1996-06-28 21:28:09  jyelon
+ * Revision 2.13  1996-07-15 21:03:09  jyelon
+ * Changed conv-mach flags from #ifdef to #if
+ *
+ * Revision 2.12  1996/06/28 21:28:09  jyelon
  * Added special code for simulator version.
  *
  * Revision 2.11  1995/09/19 23:10:24  jyelon
@@ -64,7 +67,7 @@ static char ident[] = "@(#)$Header$";
 #include "converse.h"
 
 
-#ifdef CMK_USE_STANDARD_DEFAULT_MAIN
+#if CMK_DEFAULT_MAIN_USES_COMMON_CODE
 
 CpvExtern(int, numHeapEntries);
 CpvExtern(int, numCondChkArryElts);
@@ -89,7 +92,7 @@ char *argv[];
 
 #endif
 
-#ifdef CMK_USE_SIMULATOR_DEFAULT_MAIN
+#if CMK_DEFAULT_MAIN_USES_SIMULATOR_CODE
 
 CpvExtern(int, numHeapEntries);
 CpvExtern(int, numCondChkArryElts);
