@@ -9,6 +9,10 @@ CpvDeclare(int, MinLoad);
 CpvDeclare(int, MinProc);
 CpvDeclare(int, Mindex);
 
+void LoadNotifyFn(int l)
+{
+}
+
 char *CldGetStrategy(void)
 {
   return "graph";
