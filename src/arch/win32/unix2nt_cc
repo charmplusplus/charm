@@ -10,6 +10,9 @@
 # Orion Sky Lawlor, olawlor@acm.org, 1/22/2001
 ##############################################################################
 
+#TMP environment variable seems get lost in sub shell
+export TMP=/tmp
+
 # Configurable option: Location of MSDEV
 VCC_DIR="C:/Program Files/Microsoft Visual Studio/Vc98"
 
