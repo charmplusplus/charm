@@ -1,3 +1,19 @@
+/*****************************************************************************
+ * $Source$
+ * $Author$
+ * $Date$
+ * $Revision$
+ *****************************************************************************/
+
+/*
+  These classes implement array sections which is a subset of ckarray.
+  Supported operation includes section multicast and reduction.
+  It is currently implemented using delegation.
+
+  Extracted from charm++.h into separate file on 6/22/2003 by
+  Gengbin Zheng.
+*/
+
 #ifndef _CKMULTICAST_H
 #define _CKMULTICAST_H
 
@@ -8,11 +24,11 @@ public:
   CkArrayID aid;
   int pe;
   union section_type {
-    struct sec_mcast {		// used for section multicast
+    struct sec_mcast {	// used for section multicast
       int redNo;
-      void *val;    // point to mCastCookie
+      void *val;    		// point to mCastCookie
     }  sCookie;
-    int  sectionId;		// used for commlib
+    int  sectionId;	// used for commlib
   } sInfo;
   char  type;
 public:
