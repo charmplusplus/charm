@@ -115,12 +115,12 @@ typedef struct {
 
 static CmiIdleState *CmiNotifyGetState(void) { return NULL; }
 
-static void CmiNotifyBeginIdle(CmiIdleState *)
+static void CmiNotifyBeginIdle(CmiIdleState *s)
 {
   
 }
 
-static void CmiNotifyStillIdle(CmiIdleState *)
+static void CmiNotifyStillIdle(CmiIdleState *s)
 {
 #if CMK_SHARED_VARS_UNAVAILABLE
   /*No comm. thread-- listen on sockets for incoming messages*/
