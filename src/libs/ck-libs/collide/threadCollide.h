@@ -6,7 +6,7 @@
 #define __OSL_THREADCOLLIDE_H
 
 #include "parCollide.h"
-#include "threadCollide.decl.h"
+#include "collide.decl.h"
 
 //This class describes one contributor of objects to a collision
 class contribRec {
@@ -66,21 +66,7 @@ public:
 
 /************** Client API: *****************/
 
-/*Decide how to declare C functions that are called from Fortran--
-  some fortran compiles expect all caps; some all lowercase, 
-  but with a trailing underscore.*/
-#if CMK_FORTRAN_USES_ALLCAPS
-# define FTN_NAME(caps,nocaps) caps  /*Declare name in all caps*/
-#else
-# if CMK_FORTRAN_USES_x__
-#  define FTN_NAME(caps,nocaps) nocaps##_ /*No caps, extra underscore*/
-# else
-#  define FTN_NAME(caps,nocaps) nocaps /*Declare name without caps*/
-# endif /*__*/
-#endif /*ALLCAPS*/
-
-#define CDECL extern "C" /*Function declaration for C linking*/
-#define FDECL extern "C" /*Function declaration for Fortran linking*/
+#include "charm-api.h"
 
 //Call this once at system-init time:
 CDECL void CollideInit(const double *gridStart,const double *gridSize);
