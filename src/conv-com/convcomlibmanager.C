@@ -89,12 +89,14 @@ void initComlibManager(){
     CkpvInitialize(int, RecvdummyHandle);
     CkpvAccess(RecvdummyHandle) = CkRegisterHandler((CmiHandler)recv_dummy);
 
+    /*
     // init strategy specific variables
     CsvInitialize(int, pipeBcastPropagateHandle);
     CsvInitialize(int, pipeBcastPropagateHandle_frag);
     CsvAccess(pipeBcastPropagateHandle) = CmiRegisterHandler((CmiHandler)propagate_handler);
     CsvAccess(pipeBcastPropagateHandle_frag) = CmiRegisterHandler((CmiHandler)propagate_handler_frag);
-
+    */
+    
     PUPable_reg(Strategy);
     PUPable_reg(RouterStrategy);
     PUPable_reg(MessageHolder);
