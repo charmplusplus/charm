@@ -35,8 +35,7 @@ void recv_dummy(void *msg){
 }
 
 //Creates a strategy, to write a new strategy add the appropriate constructor call!
-//For now the strategy constructor can only receive an int.
-Strategy* createStrategy(int s, int n){
+Strategy* createStrategy(int s){
     Strategy *strategy;
     switch (s) {
     case USE_MESH: 
@@ -45,7 +44,7 @@ Strategy* createStrategy(int s, int n){
         break;
     case USE_DIRECT: strategy = new DummyStrategy();
         break;
-    case USE_STREAMING : strategy = new StreamingStrategy(n);
+    case USE_STREAMING : strategy = new StreamingStrategy(0);
         break;
     case USE_MPI: strategy = new MPIStrategy();
         break;
@@ -62,15 +61,6 @@ void initComlibManager(void){
     //comm_debug = 1;
     ComlibInit();
     ComlibPrintf("Init Call\n");
-    /*
-    //Called once on each processor 
-    PUPable_reg(Strategy); 
-    PUPable_reg(EachToManyStrategy); 
-    PUPable_reg(DummyStrategy); 
-    PUPable_reg(MPIStrategy); 
-    PUPable_reg(StreamingStrategy);     
-    PUPable_reg(NodeMulticast);     
-    */
 
     CpvInitialize(int, RecvmsgHandle);
     CpvAccess(RecvmsgHandle) = CmiRegisterHandler((CmiHandler)recv_msg);
@@ -84,28 +74,21 @@ void initComlibManager(void){
 
 //ComlibManager Constructor with 1 int the strategy id being passed
 //s = Strategy (0 = tree, 1 = tree, 2 = mesh, 3 = hypercube) 
-ComlibManager::ComlibManager(int s){
+ComlibManager::ComlibManager(int stratID,int eltPerPE){
     init();
-    strategyID = s;
-    Strategy *strat = createStrategy(s, 0);
+    strategyID = stratID;
+    strategyTable[0].numElements = eltPerPE;
+    Strategy *strat = createStrategy(stratID);
     createInstance(strat);
 }
 
 //ComlibManager Constructor with 2 ints the strategy id and the 
 //number of array elements being passed. For Streaming the second 
 //int can be used for 
-ComlibManager::ComlibManager(int s, int n){
+ComlibManager::ComlibManager(Strategy *strat,int eltPerPE){
     init();
-    strategyID = s;
-    if(s == USE_STREAMING) 
-      strategyTable[0].numElements = 1;
-    else 
-      strategyTable[0].numElements = n;  
-    
-    //receivedTable = 1;
-    ComlibPrintf("Strategy %d %d\n", strategyID, strategyTable[0].numElements);
-
-    Strategy *strat = createStrategy(s, n);
+    strategyID = -1;
+    strategyTable[0].numElements = eltPerPE;
     createInstance(strat);
 }
 

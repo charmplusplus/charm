@@ -3,8 +3,8 @@ module ComlibModule {
   message DummyMsg;
 
   group ComlibManager{
-    entry ComlibManager(int s);
-    entry ComlibManager(int s, int n);
+    entry ComlibManager(int s,int n=1);
+    entry ComlibManager(Strategy *s, int n=1);
     entry ComlibManager();
 
     entry void barrier(void);
