@@ -23,7 +23,7 @@
 
 SHELL=/bin/sh
 
-all: charm++ IDL tsm sm pvm sdag
+all: charm++ libs IDL tsm sm pvm sdag
 
 charm++: converse charmxi charmlibs
 
@@ -38,6 +38,9 @@ pvm: converse libpvmc.a
 sdag: charm++ sdagx libsdag.a
 
 translators: sdagx charmxi conv-cpm charmidl
+
+libs: convlibs charmlibs
+	cd libs; make otherlibs OPTS='$(OPTS)'
 
 test-all: all
 	(cd ../pgms ; make test-all)
@@ -83,6 +86,7 @@ dirs+sources:
 	rm -rf ../lib ; mkdir ../lib
 	rm -rf ../src ; mkdir ../src
 	rm -rf ../pgms
+	rm -rf ../libsrc
 	../../src/Common/scripts/gatherflat ../../src/Common/scripts .
 	./gatherflat ../../src/Common/conv-core        .
 	./gatherflat ../../src/Common/conv-ldb         .
@@ -96,6 +100,7 @@ dirs+sources:
 	./gatherflat ../../src/Common/xlat-idl         .
 	./gatherflat ../../src/Common/xlatcpm          .
 	./gathertree ../../src/QuickThreads QuickThreads
+	./gathertree ../../src/Common/libs libs
 	./gatherflat ../../src/Common.`cat .gdir`      .
 	./gatherflat ../../src/`cat .vdir`             .
 	./gathertree ../../src/Common/langs   ../src/langs
@@ -103,6 +108,7 @@ dirs+sources:
 	./gathertree ../../src/Common/xlat-idl  ../src/xlat-idl
 	./gathertree ../../src/Common/xlatcpm ../src/xlatcpm
 	./gathertree ../../pgms ../pgms
+	./gathertree ../../src/Common/libs ../libsrc
 	ln -s ../../src/Common/scripts/Makefile ../src
 	@echo
 	@echo
@@ -127,7 +133,7 @@ CVLIBS=libconv-core.a libconv-cplus-n.a libconv-cplus-y.a libldb-rand.o libldb-s
 
 LIBCONV_CORE=threads.o convcore.o conv-conds.o spantree.o queueing.o fifo.o msgmgr.o memory.o cpm.o cpthreads.o futures.o cldb.o random.o debug-message.o debug-object.o info.o
 
-converse: basics QuickThreads/libckqt.a $(CVLIBS) conv-host-if-needed conv-cpm
+converse: basics QuickThreads/libckqt.a $(CVLIBS) conv-host-if-needed conv-cpm convlibs
 
 conv-host-if-needed:
 	if [ -f conv-host.c ] ; then make conv-host OPTS='$(OPTS)' ; fi
@@ -144,6 +150,9 @@ conv-host: conv-host.c
 	../bin/charmc $(OPTS) -cp ../bin -seq -o conv-host-notify conv-host.o
 	cp conv-host-notify conv-host
 	cp conv-host ../bin/conv-host
+
+convlibs:
+	cd libs; make convlibs OPTS='$(OPTS)'
 
 libconv-core.a: $(LIBCONV_CORE)
 	$(CHARMC) -cp ../lib/ -o $@ $(LIBCONV_CORE)
@@ -216,12 +225,11 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h trace.h \
 
 CK_LIBS_CORE=libck.a
 
-CK_LIBS=$(CK_LIBS_CORE)
-
 LIBCK_CORE=init.o register.o qd.o ck.o main.o msgalloc.o ckfutures.o \
            ckarray.o tempo.o
 
-charmlibs: converse $(CK_LIBS)
+charmlibs: converse $(CK_LIBS_CORE)
+	cd libs; make charmlibs OPTS='$(OPTS)'
 
 libck.a: $(LIBCK_CORE)
 	$(CHARMC) -cp ../lib/ -o $@ $(LIBCK_CORE)
