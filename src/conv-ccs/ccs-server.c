@@ -455,7 +455,7 @@ void CcsServer_sendReply(CcsImplHeader *hdr,int repBytes,const void *repData)
   skt_abortFn old=skt_set_abort(reply_abortFn);
   CCSDBG(("CCS   Sending %d bytes of reply data\n",repBytes));
   CcsServer_writeReply(fd,security,&hdr->attr,repBytes,(char *)repData);
-  //skt_close(fd);
+  skt_close(fd);
   CCSDBG(("CCS Reply socket closed.\n"));
   skt_set_abort(old);
 }
