@@ -230,7 +230,7 @@ public:
 	
 	OBJ get(const KEY &key) {
 		int i=key.hash()%len;
-		while(true) {//Assumes key or empty slot will be found
+		while(CmiTrue) {//Assumes key or empty slot will be found
 			char *cur=table+i*(sizeof(KEY)+sizeof(OBJ));
 			//An empty slot indicates the key is not here
 			if (-17==*(int *)cur) return OBJ(0);
