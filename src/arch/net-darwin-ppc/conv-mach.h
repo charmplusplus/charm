@@ -8,23 +8,15 @@
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
 
+#include "conv-common.h"
+
 #define CMK_ASYNC_NOT_NEEDED                               0
 #define CMK_ASYNC_USE_FIOASYNC_AND_FIOSETOWN               0
 #define CMK_ASYNC_USE_FIOASYNC_AND_SIOCSPGRP               0
 #define CMK_ASYNC_USE_FIOSSAIOSTAT_AND_FIOSSAIOOWN         0
 #define CMK_ASYNC_USE_F_SETFL_AND_F_SETOWN                 1
 
-#define CMK_CCS_AVAILABLE                                  1
-
-#define CMK_CMIDELIVERS_USE_COMMON_CODE                    1
-#define CMK_CMIDELIVERS_USE_SPECIAL_CODE                   0
-
-#define CMK_CMIPRINTF_IS_A_BUILTIN                         1
-#define CMK_CMIPRINTF_IS_JUST_PRINTF                       0
-
 #define CMK_GETPAGESIZE_AVAILABLE                          0
-
-#define CMK_HANDLE_SIGUSR                                  1
 
 #define CMK_MALLOC_USE_GNU_MALLOC                          0
 #define CMK_MALLOC_USE_OS_BUILTIN                          1
@@ -32,18 +24,7 @@
 #define CMK_MEMORY_PAGESIZE                                8192
 #define CMK_MEMORY_PROTECTABLE                             0
 
-#define CMK_MSG_HEADER_BASIC  { CmiUInt2 d0,d1,d2,d3,d4,d5,hdl,d7; }
-#define CMK_MSG_HEADER_EXT    { CmiUInt2 d0,d1,d2,d3,d4,d5,hdl,xhdl,info,d9,da,db; }
-
-#define CMK_MULTICAST_GROUP_TYPE                struct { unsigned pe, id; }
-#define CMK_MULTICAST_DEF_USE_COMMON_CODE                  1
-#define CMK_MULTICAST_LIST_USE_COMMON_CODE                 1
-#define CMK_MULTICAST_GROUP_USE_COMMON_CODE                1
-
 #define CMK_NODE_QUEUE_AVAILABLE                           0
-
-#define CMK_REDUCTION_USES_COMMON_CODE                     1
-#define CMK_REDUCTION_USES_SPECIAL_CODE                    0
 
 #define CMK_RSH_IS_A_COMMAND                               1
 #define CMK_RSH_NOT_NEEDED                                 0
@@ -64,10 +45,6 @@
 
 #define CMK_NETPOLL					   1
 
-#define CMK_SPANTREE_MAXSPAN                               4
-#define CMK_SPANTREE_USE_COMMON_CODE                       1
-#define CMK_SPANTREE_USE_SPECIAL_CODE                      0
-
 #define CMK_THREADS_REQUIRE_NO_CPV                         0
 #define CMK_THREADS_COPY_STACK                             0
 
@@ -83,9 +60,6 @@
 #define CMK_TYPEDEF_UINT8 unsigned long long
 #define CMK_TYPEDEF_FLOAT4 float
 #define CMK_TYPEDEF_FLOAT8 double
-
-#define CMK_VECTOR_SEND_USES_COMMON_CODE                   1
-#define CMK_VECTOR_SEND_USES_SPECIAL_CODE                  0
 
 #define CMK_USE_HP_MAIN_FIX                                0
 #define CMK_DONT_USE_HP_MAIN_FIX                           1
