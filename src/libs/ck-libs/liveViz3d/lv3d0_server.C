@@ -403,6 +403,20 @@ static void emptyDoneFn(void *param,void *msg) /* stage 3 */
 	delete s;
 }
 
+/**
+"lv3d_flush" CCS handler:
+	Throw away views for this client.
+
+Outgoing request a 1-int clientID.
+*/
+extern "C" void LV3D0_flush(char *msg) {
+	int clientID;
+	PUP_toNetwork_unpack p(&msg[CmiMsgHeaderSizeBytes]);
+	p|clientID;
+	CmiFree(msg);
+	theMgr->newClient(clientID);
+}
+
 /*
 "lv3d_balance" CCS handler:
 	Run load balancing.
@@ -437,6 +451,7 @@ void LV3D0_Init(LV3D_Universe *clientUniverse,LV3D_ServerMgr *mgr)
 	theUniverse=clientUniverse;
 	theMgr=mgr;
 	CcsRegisterHandler("lv3d_setup",(CmiHandler)LV3D0_setup);
+	CcsRegisterHandler("lv3d_flush",(CmiHandler)LV3D0_flush);
 	CcsRegisterHandler("lv3d_newViewpoint",(CmiHandler)LV3D0_newViewpoint);
 	CcsRegisterHandler("lv3d_getViews",(CmiHandler)LV3D0_getViews);
 	CcsRegisterHandler("lv3d_qd",(CmiHandler)LV3D0_qd);
