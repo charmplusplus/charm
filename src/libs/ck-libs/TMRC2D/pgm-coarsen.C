@@ -51,8 +51,8 @@ init(void)
 {
   CkPrintf("init started\n");
 
-  const char *eleName="xxx.1.ele";
-  const char *nodeName="xxx.1.node";
+  const char *eleName="out.1024.ele";
+  const char *nodeName="out.1024.node";
   int nPts=0; //Number of nodes
   vector2d *pts=0; //Node coordinates
 
@@ -467,10 +467,10 @@ CkPrintf("[%d] end init\n",myChunk);
     CkPrintf("Entering timeloop\n");
 	}	
 //  int tSteps=0x70FF00FF;
-  int tSteps=4;
+  int tSteps=1;
 	calcMasses(g);
   double startTime=CkWallTimer();
-  double curArea=2.0e-5;
+  double curArea=2.5e-5/1024;
   for (int t=0;t<tSteps;t++) {
 /*    if (1) { //Structural mechanics
     	//Compute forces on nodes exerted by elements
@@ -507,12 +507,7 @@ CkPrintf("[%d] end init\n",myChunk);
       }
       double *areas=new double[g.nelems];
 	//coarsen in the last step
-	if(t >= tSteps-1){
 		curArea = curArea*2.4;
-	}
-	else{
-	      curArea=curArea*0.499;
-	}
       for (i=0;i<g.nelems;i++) {
       #if 0
         double origArea=8e-8; //Typical triangle size
@@ -524,7 +519,7 @@ CkPrintf("[%d] end init\n",myChunk);
         areas[i]=curArea;
       }
 			//coarsen in the last step
-      if(t >= tSteps-1){
+//      if(t >= tSteps-1){
 				CkPrintf("[%d] Starting coarsening step: %d nodes, %d elements to %.3g\n",
 		       myChunk,g.nnodes,g.nelems,curArea);
 			
@@ -538,7 +533,7 @@ CkPrintf("[%d] end init\n",myChunk);
 	      CkPrintf("[%d] Done with coarsening step: %d nodes, %d elements\n",
 	       myChunk,g.nnodes,g.nelems);
 
-			}else{
+	/*		}else{
 	      CkPrintf("[%d] Starting refinement step: %d nodes, %d elements to %.3g\n",
 		       myChunk,g.nnodes,g.nelems,curArea);
 			
@@ -551,7 +546,7 @@ CkPrintf("[%d] end init\n",myChunk);
              
 	      CkPrintf("[%d] Done with refinement step: %d nodes, %d elements\n",
 	       myChunk,g.nnodes,g.nelems);
-  		}
+  		}*/
 			    
     
     if (1) { //Publish data to the net

@@ -406,6 +406,7 @@ void repeat_after_split(void *data){
 	calcMasses(*g);
 };
 
+void outputMesh(int *elem,double *node,int ne,int nn,char *str);
 
 extern "C" void
 driver(void)
@@ -467,7 +468,7 @@ CkPrintf("[%d] end init\n",myChunk);
     CkPrintf("Entering timeloop\n");
 	}	
 //  int tSteps=0x70FF00FF;
-  int tSteps=10;
+  int tSteps=9;
 	calcMasses(g);
   double startTime=CkWallTimer();
   double curArea=2.0e-5;
@@ -547,9 +548,32 @@ CkPrintf("[%d] end init\n",myChunk);
 	    NetFEM_End(n);
     }
   }
-
+	
+//	outputMesh(g.conn,(double *)g.coord,g.nelems,g.nnodes,"out.1024");
   if (CkMyPe()==0)
     CkPrintf("Driver finished\n");
 }
 
-
+void outputMesh(int *elem,double *node,int ne,int nn,char *str){
+	if(FEM_Num_partitions() != 1){
+		CkPrintf("This can be used to output a mesh only when there is one chunk\n");
+		return;
+	}
+	char fEle[100];
+	char fNode[100];
+	sprintf(fEle,"%s.ele",str);
+	FILE *fp = fopen(fEle,"w");
+	fprintf(fp,"%d 3 0\n",ne);
+	for(int i=0;i<ne;i++){
+		fprintf(fp,"%d %d %d %d \n",i+1,elem[3*i]+1,elem[3*i+1]+1,elem[3*i+2]+1);
+	}
+	fclose(fp);
+	
+	sprintf(fNode,"%s.node",str);
+	fp = fopen(fNode,"w");
+	fprintf(fp,"%d 2 0 0\n",nn);
+	for(int i=0;i<nn;i++){
+		fprintf(fp,"%d %.10lf %.10lf \n",i+1,node[2*i],node[2*i+1]);
+	}
+	fclose(fp);
+}
