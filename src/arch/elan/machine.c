@@ -249,6 +249,8 @@ void CmiReleaseCommHandle(CmiCommHandle c)
   return;
 }
 
+void release_pmsg_list();
+
 static void CmiReleaseSentMessages(void)
 {
   SMSG_LIST *msg_tmp=sent_msgs;
@@ -304,6 +306,8 @@ static void CmiReleaseSentMessages(void)
   
   if(cur_unsent == NULL)
     end_sent = prev;
+
+  release_pmsg_list();
 
 #ifndef CMK_OPTIMIZE 
   double rel_end_time = CmiWallTimer();

@@ -38,11 +38,45 @@ typedef struct _PersistentReqGrantedMsg {
   PersistentHandle sourceHandlerIndex;
 } PersistentReqGrantedMsg;
 
+/* Converse handler */
 int persistentRequestHandlerIdx;
 int persistenceReqGrantedHandlerIdx;
 
 #define RESET 0
 #define SET 1
+
+typedef struct pmsg_list {
+  ELAN_EVENT *e;
+  char *msg;
+  struct pmsg_list *next;
+  int size, destpe;
+  PersistentHandle  h;
+} PMSG_LIST;
+
+static PMSG_LIST *pending_persistent_msgs = NULL;
+static PMSG_LIST *end_pending_persistent_msgs = NULL;
+
+#define NEW_PMSG_LIST(evt, m, s, dest, ph) \
+  msg_tmp = (PMSG_LIST *) CmiAlloc(sizeof(PMSG_LIST));	\
+  msg_tmp->msg = m;	\
+  msg_tmp->e = evt;	\
+  msg_tmp->size = s;	\
+  msg_tmp->next = NULL;	\
+  msg_tmp->destpe = dest;	\
+  msg_tmp->h = ph;
+
+#define APPEND_PMSG_LIST(msg_tmp)	\
+  if (pending_persistent_msgs==0)	\
+    pending_persistent_msgs = msg_tmp;	\
+  else	\
+    end_pending_persistent_msgs->next = msg_tmp;	\
+  end_pending_persistent_msgs = msg_tmp;
+
+int getFreeSendSlot()
+{
+  if (persistentSendsTableCount == TABLESIZE) CmiAbort("persistentSendsTable full.\n");
+  return ++persistentSendsTableCount;
+}
 
 int getFreeRecvSlot()
 {
@@ -52,15 +86,17 @@ int getFreeRecvSlot()
 
 PersistentHandle CmiCreatePersistent(int destPE, int maxBytes)
 {
-  int h = ++persistentSendsTableCount; 
+  PersistentSendsTable *slot;
+  PersistentHandle h = getFreeSendSlot();
   if (h >= TABLESIZE) CmiAbort("persistentSendsTable full.\n");
 
-  persistentSendsTable[h].destPE = destPE;
-  persistentSendsTable[h].sizeMax = maxBytes;
-  persistentSendsTable[h].destAddress = NULL;
-  persistentSendsTable[h].destSlotFlagAddress = NULL;
-  persistentSendsTable[h].messagePtr = NULL;
-  persistentSendsTable[h].flag = SET;
+  slot = &persistentSendsTable[h];
+  slot->destPE = destPE;
+  slot->sizeMax = maxBytes;
+  slot->destAddress = NULL;
+  slot->destSlotFlagAddress = NULL;
+  slot->messagePtr = NULL;
+  slot->flag = SET;
 
   PersistentRequestMsg *msg = (PersistentRequestMsg *)CmiAlloc(sizeof(PersistentRequestMsg));
   msg->maxBytes = maxBytes;
@@ -97,17 +133,16 @@ void persistentRequestHandler(void *env)
 
 void persistenceReqGrantedHandler(void *env)
 {
+  PersistentSendsTable *slot;
   PersistentReqGrantedMsg *msg = (PersistentReqGrantedMsg *)env;
   int h = msg->sourceHandlerIndex;
-  persistentSendsTable[h].destSlotFlagAddress = msg->slotFlagAddress;
-  persistentSendsTable[h].destAddress = msg->msgAddr;
+  slot = &persistentSendsTable[h];
+  slot->destSlotFlagAddress = msg->slotFlagAddress;
+  slot->destAddress = msg->msgAddr;
 
-  if (persistentSendsTable[h].messagePtr) {
-    CmiSendPersistentMsg(h, persistentSendsTable[h].destPE, persistentSendsTable[h].messageSize, persistentSendsTable[h].messagePtr);
-/*
-    CmiSyncSend(persistentSendsTable[h].destPE, persistentSendsTable[h].messageSize, persistentSendsTable[h].messagePtr);
-*/
-    persistentSendsTable[h].messagePtr = NULL;
+  if (slot->messagePtr) {
+    CmiSendPersistentMsg(h, slot->destPE, slot->messageSize, slot->messagePtr);
+    slot->messagePtr = NULL;
   }
 }
 
@@ -126,24 +161,73 @@ CmiPrintf("[%d] CmiSendPersistentMsg handle: %d\n", CmiMyPe(), h);
   if (slot->destAddress) {
     ELAN_EVENT *e1, *e2;
     e1 = elan_put(elan_base->state, m, slot->destAddress, size, destPE);
+#if 1
+    PMSG_LIST *msg_tmp;
+    NEW_PMSG_LIST(e1, m, size, destPE, h);
+    APPEND_PMSG_LIST(msg_tmp);
+#else
     elan_wait(e1, ELAN_POLL_EVENT);
     e2 = elan_put(elan_base->state, &size, slot->destSlotFlagAddress, sizeof(int), destPE);
     elan_wait(e2, ELAN_POLL_EVENT);
-/*
-CmiPrintf("[%d] elan finished. \n", CmiMyPe());
-*/
+//CmiPrintf("[%d] elan finished. \n", CmiMyPe());
     CmiFree(m);
+#endif
   }
   else {
+#if 1
     if (slot->messagePtr != NULL) {
       CmiPrintf("Unexpected message in buffer on %d\n", CmiMyPe());
       CmiAbort("");
     }
     slot->messagePtr = m;
     slot->messageSize = size;
+#else
+  /* normal send */
+  CmiSyncSendAndFree(slot->destPE, size, m);
+#endif
   }
 }
 
+static int remote_put_done(PMSG_LIST *smsg)
+{
+  int flag = elan_poll(smsg->e, ELAN_POLL_EVENT);
+  if (flag) {
+    PersistentSendsTable *slot = &persistentSendsTable[smsg->h];
+    ELAN_EVENT *e2 = elan_put(elan_base->state, &smsg->size, slot->destSlotFlagAddress, sizeof(int), smsg->destpe);
+    elan_wait(e2, ELAN_POLL_EVENT);
+    CmiFree(smsg->msg);
+/*
+CmiPrintf("remote_put_done on %d\n", CmiMyPe());
+*/
+  }
+  return flag;
+}
+
+/* called in CmiReleaseSentMessages */
+void release_pmsg_list()
+{
+  PMSG_LIST *prev=0, *temp;
+  PMSG_LIST *msg_tmp = pending_persistent_msgs;
+
+  while (msg_tmp) {
+    if (remote_put_done(msg_tmp)) {
+      temp = msg_tmp->next;
+      if (prev==0)
+        pending_persistent_msgs = temp;
+      else
+        prev->next = temp;
+      CmiFree(msg_tmp);
+      msg_tmp = temp;
+    }
+    else {
+      prev = msg_tmp;
+      msg_tmp = msg_tmp->next;
+    }
+  }
+  end_pending_persistent_msgs = prev;
+}
+
+/* called in PumpMsgs */
 void PumpPersistent()
 {
   int i;
