@@ -237,6 +237,20 @@ ampi::bcastraw(void* buf, int len, CkArrayID aid)
   pa.generic(msg);
 }
 
+void ampi::checkpoint(DirMsg *msg)
+{
+#if AMPI_STANDALONE
+  CkAbort("Checkpointing not available in standalone AMPI lib!\n");
+#else
+  sprintf(str, "%s/%d", msg->dname, commidx);
+  mkdir(str, 0777);
+  sprintf(str, "%s/%d/%d.cpt", msg->dname, commidx, thisIndex);
+  delete msg;
+  CProxy_ampimain pm(ampimain::handle); 
+  pm.checkpoint(); 
+#endif
+}
+
 void ampi::pup(PUP::er &p)
 {
   if(!p.isUserlevel())
@@ -360,12 +374,17 @@ ampi::get_userdata(int idx)
   return userdata[idx];
 }
 
+void ampi::prepareCtv(void)
+{
+  CtvInitialize(ampi *, ampiPtr);
+  CtvAccess(ampiPtr) = this;   
+}
+
 void
 ampi::restart(DirMsg *m)
 {
   CkPrintf("[%d] restarting...\n", thisIndex);
-  CtvInitialize(ampi *, ampiPtr);
-  CtvAccess(ampiPtr) = this;
+  prepareCtv();
   restartThread(m->dname);
   delete m;
 }
@@ -374,23 +393,25 @@ ampi::restart(DirMsg *m)
 void
 ampi::run(ArgsInfo *msg)
 {
+#if AMPI_STANDALONE
+  CkAbort("ampi::run not supported by standalone AMPI lib!\n");
+#else
   int argc = msg->argc;
   char **argv = msg->argv;
   char *dname;
   delete msg;
-  CtvInitialize(ampi *, ampiPtr);
-  CtvAccess(ampiPtr) = this;
+  prepareCtv();
   ampimain::ampi_comms[commidx].mainfunc(argc, argv);
   CProxy_ampimain mp(ampimain::handle);
   mp.done();
+#endif
 }
 
 // This is invoked in the C++ version of AMPI
 void
 ampi::run(void)
 {
-  CtvInitialize(ampi *, ampiPtr);
-  CtvAccess(ampiPtr) = this;
+  prepareCtv();
   start();
 }
 
@@ -398,6 +419,11 @@ void
 ampi::start(void)
 {
   CkPrintf("You should write your own start(). \n");
+}
+
+static ampi *getAmpiInstance(void) {
+  ampi *ret = CtvAccess(ampiPtr);
+  return ret;
 }
 
 extern "C" void
@@ -419,6 +445,9 @@ AMPI_Migrate(void)
 extern "C" void
 AMPI_Checkpoint(char *dirname)
 {
+#if AMPI_STANDALONE
+  CkAbort("Checkpointing not supported by AMPI library version!\n");
+#else
   mkdir(dirname, 0777);
   ampi *ptr = CtvAccess(ampiPtr);
   ptr->cthread_id = CthSelf();
@@ -431,6 +460,7 @@ AMPI_Checkpoint(char *dirname)
   if(ptr->cthread_id != 0)
     CkAbort("cthread_id not 0 upon return !!\n");
   ptr->start_running();
+#endif
 }
 
 extern "C" 

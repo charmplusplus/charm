@@ -202,7 +202,9 @@ class AmpiMsg : public CMessage_AmpiMsg {
 #define AMPI_MAXUDATA 20
 
 class ampi : public ArrayElement1D {
-      char str[128];
+    char str[128];
+  protected:
+    void prepareCtv(void);
   public: // entry methods
     ampi(AmpiStartMsg *);
     ampi(CkMigrateMessage *msg) {}
@@ -229,15 +231,7 @@ class ampi : public ArrayElement1D {
       }
       return;
     }
-    void checkpoint(DirMsg *msg)
-    {
-      sprintf(str, "%s/%d", msg->dname, commidx);
-      mkdir(str, 0777);
-      sprintf(str, "%s/%d/%d.cpt", msg->dname, commidx, thisIndex);
-      delete msg;
-      CProxy_ampimain pm(ampimain::handle); 
-      pm.checkpoint(); 
-    }
+    void checkpoint(DirMsg *msg);
     void restart(DirMsg *);
     void restartThread(char *dname)
     {
