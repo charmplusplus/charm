@@ -114,7 +114,7 @@ void EachToManyStrategy::doneInserting(){
     NumDeposits(comid, messageBuf->length());
     
     while(!messageBuf->isEmpty()) {
-	CharmMessageHolder *cmsg = messageBuf->deq();
+        CharmMessageHolder *cmsg = messageBuf->deq();
         char * msg = cmsg->getCharmMessage();
         ComlibPrintf("Calling EachToMany %d %d %d procMap=%d\n", 
                      UsrToEnv(msg)->getTotalsize(), CkMyPe(), 

@@ -1,6 +1,7 @@
 #include "ComlibManager.h"
 
 #include "EachToManyStrategy.h"
+#include "EachToManyMulticastStrategy.h"
 #include "StreamingStrategy.h"
 #include "DummyStrategy.h"
 #include "MPIStrategy.h"

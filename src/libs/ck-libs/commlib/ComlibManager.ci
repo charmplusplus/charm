@@ -31,4 +31,5 @@ module ComlibModule {
   PUPable NodeMulticast;
   PUPable StreamingStrategy;
   PUPable MPIStrategy;
+  PUPable EachToManyMulticastStrategy;	
 };

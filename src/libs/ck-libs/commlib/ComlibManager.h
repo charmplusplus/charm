@@ -36,6 +36,11 @@ class CharmMessageHolder {
     int dest_proc;
     char *data;
     CharmMessageHolder *next; // also used for the refield at the receiver
+    
+    //For multicast, the user can pass the pelist and list of Pes he
+    //wants to send the data to.
+    int npes;
+    int *pelist;
 
     CharmMessageHolder(char * msg, int dest_proc);
     char * getCharmMessage();
