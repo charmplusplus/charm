@@ -10,6 +10,7 @@
 
 #include "../../../ck.h"
 #include "../../../envelope.h"
+#include "../../../trace.h"
 
 class envelope;
 
@@ -64,15 +65,29 @@ void CComlibEachToManyMulticast(comID id, int ep, void *msg, int bocnum, int npe
   env->setMsgtype(ForBocMsg);
   env->setEpIdx(ep);
   env->setGroupNum(bocnum);
+  env->setSrcPe(CkMyPe());
 
-  _infoFn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+//  _infoFn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
   _packFn((void **)&env);
-  _infoFn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+  _infoFn(env, &pfn, &len, &queueing, &priobits, &prioptr);
 
   CmiSetHandler(env, _charmHandlerIdx);
   _SET_USED(env, 1);
-  env->setSrcPe(CkMyPe());
+
+/*
+  for (int i=0; i<npe-1; i++)
+     CmiSyncSend(pelist[i], len, env);
+  CmiSyncSendAndFree(pelist[npe-1], len, env);
+*/
+
+  _TRACE_CREATION_N(env, npe);
+
   EachToManyMulticast(id, len, (void *)env, npe, pelist);
+
+  _STATS_RECORD_SEND_BRANCH_N(npe);
+  CpvAccess(_qd)->create();
+     
+//CkPrintf("EachToManyMulticast: len:%d npe:%d done\n", len, npe);
 }
 
 
