@@ -25,7 +25,7 @@ then resume the thread when the results arrive.
 
 CkChareID _mainhandle;
 CkArrayID _femaid;
-unsigned int _nchunks;
+int _nchunks;
 
 //_femptr gives the current chunk, and is only
 // valid in routines called from driver().
@@ -64,12 +64,30 @@ _allReduceHandler(void *, int datasize, void *data)
 
 extern void CreateMetisLB(void);
 
-//Partitions and maps the given mesh
+//Maps element number to (0-based) chunk number, allocated with new[]
+int *_elem2chunk=NULL;
+
+//Partitions and splits the given mesh
 static void mesh2msgs(const FEM_Mesh *mesh,ChunkMsg **msgs) {
-    int *elem2chunk=new int[mesh->nElems()];
-    fem_partition(mesh,_nchunks,elem2chunk);
+    int *elem2chunk=_elem2chunk;
+    if (elem2chunk==NULL) 
+    {//Partition the elements ourselves
+    	elem2chunk=new int[mesh->nElems()];
+    	fem_partition(mesh,_nchunks,elem2chunk);
+    }
+    //Build communication lists and split mesh data
     fem_map(mesh,_nchunks,elem2chunk,msgs);
+    //Blow away old partitioning
     delete[] elem2chunk;
+    _elem2chunk=NULL;
+}
+
+//Free the global serial mesh (if possible)
+static void freeMesh(void) {
+	if (_meshptr==NULL) return; //Nothing to do
+	_meshptr->deallocate();
+	delete _meshptr;
+	_meshptr=NULL;
 }
 
 main::main(CkArgMsg *am)
@@ -88,6 +106,8 @@ main::main(CkArgMsg *am)
       break;
     }
   }
+  delete am;
+  cmsgs=new ChunkMsg*[_nchunks]; CHK(cmsgs);
   CreateMetisLB();
   _femaid = CProxy_chunk::ckNew(_nchunks);
   CProxy_chunk farray(_femaid);
@@ -106,25 +126,18 @@ main::main(CkArgMsg *am)
   CpvAccess(_fem_state)=inDriver;
   if (_meshptr!=NULL) {
     //Partition the serial mesh online
-    ChunkMsg **msgs = new ChunkMsg*[_nchunks]; CHK(msgs);
-    mesh2msgs(_meshptr,msgs);
-    _meshptr->deallocate();
-    _meshptr=NULL;
-    for (i=0;i<_nchunks;i++)
-      farray[i].run(msgs[i]);
-    delete[] msgs;
+    mesh2msgs(_meshptr,cmsgs);
+    freeMesh();
+    for (i=0;i<_nchunks;i++) {
+      farray[i].run(cmsgs[i]);
+      cmsgs[i]=NULL;
+    }
   } else /*NULL==mesh*/ {
     //Each chunk will read its mesh from a file
     for(i=0;i<_nchunks;i++) {
       farray[i].run();
     }
   }
-  delete am;
-}
-
-static int compare_ChunkMsg(const void *a,const void *b) {
-  return ((const ChunkMsg **)a)[0]->fromChunk-
-         ((const ChunkMsg **)b)[0]->fromChunk;
 }
 
 //Called by a chunk on FEM_Update_Mesh
@@ -140,23 +153,22 @@ void main::updateMesh(ChunkMsg *msg)
     curUpdates.enq(msg);
     while (curUpdates.length()==_nchunks) {
       //We have all the chunks of the current mesh-- process them and start over
-      ChunkMsg **msgs=new ChunkMsg*[_nchunks]; CHK(msgs);
       int i;
-      for (i=0;i<_nchunks;i++)
-	msgs[i]=curUpdates.deq();
-      //Sort the messages by their source chunk
-      qsort((void *)msgs,_nchunks,sizeof(ChunkMsg*),compare_ChunkMsg);
-      //Save what to do with the mesh
-      int callMeshUpdated=msgs[0]->callMeshUpdated;
-      int doRepartition=msgs[0]->doRepartition;
-      if (_meshptr!=NULL) {
-	_meshptr->deallocate();
-	delete _meshptr;//Blow away the old serial mesh
+      for (i=0;i<_nchunks;i++) {
+      	ChunkMsg *m=curUpdates.deq();
+	cmsgs[m->fromChunk]=m;
       }
+      //Save what to do with the mesh
+      int callMeshUpdated=cmsgs[0]->callMeshUpdated;
+      int doRepartition=cmsgs[0]->doRepartition;
       //Assemble the current chunks into a serial mesh
-      _meshptr=fem_assemble(_nchunks,msgs);
-      //Blow away the old chunks (blow chunks? ;)
-      for (i=0;i<_nchunks;i++) CkFreeMsg(msgs[i]);
+      freeMesh();
+      _meshptr=fem_assemble(_nchunks,cmsgs);
+      //Blow away the old chunks
+      for (i=0;i<_nchunks;i++) {
+      	delete cmsgs[i];
+      	cmsgs[i]=NULL;
+      }
 
       //Now that the mesh is assembled, handle it
       if (callMeshUpdated) {
@@ -169,14 +181,14 @@ void main::updateMesh(ChunkMsg *msg)
 	CpvAccess(_fem_state)=inDriver;
       }
       if (doRepartition) {
-	mesh2msgs(_meshptr,msgs);
-	_meshptr->deallocate(); delete _meshptr;
-	_meshptr=NULL;
+	mesh2msgs(_meshptr,cmsgs);
+	freeMesh();
 	CProxy_chunk farray(_femaid);
-	for (i=0;i<_nchunks;i++)
-	  farray[i].meshUpdated(msgs[i]);	
+	for (i=0;i<_nchunks;i++) {
+	  farray[i].meshUpdated(cmsgs[i]);
+	  cmsgs[i]=NULL;
+	}
       }
-      delete[] msgs;
 
       //Check for relevant messages in the future buffer
       updateCount++;
@@ -304,6 +316,29 @@ static int chkET(int et)
   return et;
 }
 
+/****** Custom Partitioning API *******/
+static void Set_Partition(int *elem2chunk,int indexBase) {
+	if (_elem2chunk!=NULL) delete[] _elem2chunk;
+	const FEM_Mesh *m=getMesh();
+	int nElem=m->nElems();
+	_elem2chunk=new int[nElem];
+	for (int i=0;i<nElem;i++)
+		_elem2chunk[i]=elem2chunk[i]-indexBase;
+}
+
+//C bindings:
+CDECL void FEM_Set_Partition(int *elem2chunk) {
+	Set_Partition(elem2chunk,0);
+}
+
+//Fortran bindings:
+#if FEM_FORTRAN
+FDECL void FTN_NAME(FEM_SET_PARTITION,fem_set_partition_)
+	(int *elem2chunk) 
+{
+	Set_Partition(elem2chunk,1);
+}
+#endif
 /***** Mesh-Setting API: C bindings*/
 CDECL void FEM_Set_Node(int nNodes,int dataPer) 
 {
@@ -595,7 +630,7 @@ chunk::~chunk() //Destructor-- deallocate memory
 
 void chunk::deallocate(void) {
 	if (stored_mesh!=NULL) {
-		CkFreeMsg(stored_mesh);
+		delete stored_mesh;
 		stored_mesh=NULL;
 	} else {
 		m.deallocate();
@@ -650,6 +685,14 @@ chunk::run(void)
   callDriver();
   // Note: "this may have changed after we come back here 
   CtvAccess(_femptr)->stop_running();
+}
+
+//Switch this processor to start using this chunk
+void chunk::serialSwitch(ChunkMsg *msg)
+{
+  CtvInitialize(chunk*, _femptr);
+  CtvAccess(_femptr) = this;
+  readChunk(msg);
 }
 
 void
@@ -729,7 +772,7 @@ chunk::update(int fid, void *nodes)
   // now, if any of the field values have been received already,
   // process them
   DataMsg *dm;
-  while (dm = (DataMsg*)CmmGet(messages, 1, &seqnum, 0)) {
+  while ((dm = (DataMsg*)CmmGet(messages, 1, &seqnum, 0))!=NULL) {
     update_field(dm);
     delete dm;
     nRecd++;
@@ -818,7 +861,7 @@ chunk::updateMesh(int callMeshUpdated,int doRepartition) {
   int t,i;
   int newElemTot=updated_mesh->m.nElems();
   int newNode=updated_mesh->m.node.n;
-  int oldElem=m.nElems(),oldNode=m.node.n;
+  int oldNode=m.node.n;
   updated_mesh->elemNums=new int[newElemTot];
   updated_mesh->nodeNums=new int[newNode];
   updated_mesh->isPrimary=new int[newNode];
@@ -1147,6 +1190,25 @@ FEM_Print_Partition(void)
   }
 }
 
+CDECL int FEM_Get_Comm_Partners(void)
+{
+	return getCurChunk()->getComm().nPes;
+}
+CDECL int FEM_Get_Comm_Partner(int partnerNo)
+{
+	return getCurChunk()->getComm().peNums[partnerNo];
+}
+CDECL int FEM_Get_Comm_Count(int partnerNo)
+{
+	return getCurChunk()->getComm().numNodesPerPe[partnerNo];
+}
+CDECL void FEM_Get_Comm_Nodes(int partnerNo,int *nodeNos)
+{
+	const int *nNo=getCurChunk()->getComm().nodesPerPe[partnerNo];
+	int len=FEM_Get_Comm_Count(partnerNo);
+	for (int i=0;i<len;i++)
+		nodeNos[i]=nNo[i];
+}
 
 #if FEM_FORTRAN
 /************************ Fortran Bindings *********************************/
@@ -1205,7 +1267,7 @@ FDECL void FTN_NAME(FEM_READ_FIELD,fem_read_field_)
 FDECL int FTN_NAME(FEM_MY_PARTITION,fem_my_partition_)
   (void)
 {
-  return FEM_My_Partition();
+  return FEM_My_Partition()+1;
 }
 
 FDECL int FTN_NAME(FEM_NUM_PARTITIONS,fem_num_partitions_)
@@ -1250,6 +1312,46 @@ FDECL void FTN_NAME(FEM_DONE,fem_done_)
   FEM_Done();
 }
 
+FDECL int FTN_NAME(FEM_GET_COMM_PARTNERS,fem_get_comm_partners_)
+	(void)
+{
+	return FEM_Get_Comm_Partners();
+}
+FDECL int FTN_NAME(FEM_GET_COMM_PARTNER,fem_get_comm_partner_)
+	(int *partnerNo)
+{
+	return FEM_Get_Comm_Partner(*partnerNo-1)+1;
+}
+FDECL int FTN_NAME(FEM_GET_COMM_COUNT,fem_get_comm_count_)
+	(int *partnerNo)
+{
+	return FEM_Get_Comm_Count(*partnerNo-1);
+}
+FDECL void FTN_NAME(FEM_GET_COMM_NODES,fem_get_comm_nodes_)
+	(int *pNo,int *nodeNos)
+{
+	int partnerNo=*pNo-1;
+	const int *nNo=getCurChunk()->getComm().nodesPerPe[partnerNo];
+	int len=FEM_Get_Comm_Count(partnerNo);
+	for (int i=0;i<len;i++)
+		nodeNos[i]=nNo[i]+1;
+}
+
+FDECL void FTN_NAME(FEM_GET_ELEM_NUMBERS,fem_get_elem_numbers_)
+	(int *gNo)
+{
+	const int *no=getCurChunk()->get_elemnums();
+	int n=getMesh()->nElems();
+	for (int i=0;i<n;i++) gNo[i]=no[i]+1;
+}
+FDECL void FTN_NAME(FEM_GET_NODE_NUMBERS,fem_get_node_numbers_)
+	(int *gNo)
+{
+	const int *no=getCurChunk()->get_nodenums();
+	int n=getMesh()->node.n;
+	for (int i=0;i<n;i++) gNo[i]=no[i]+1;
+	
+}
 #endif /*FEM_FORTRAN*/
 
 
@@ -1408,9 +1510,12 @@ void commCounts::allocate(void) {
 void commCounts::deallocate(void) { //Free all stored memory
 	delete [] peNums;peNums=NULL;
 	delete [] numNodesPerPe;numNodesPerPe=NULL;
-	for (int p=0;p<nPes;p++)
-		delete [] nodesPerPe[p];
-	delete [] nodesPerPe;
+	if (nodesPerPe!=NULL) {
+        	for (int p=0;p<nPes;p++)
+	        	delete [] nodesPerPe[p];
+		delete [] nodesPerPe;
+		nodesPerPe=NULL;
+	}
 }
 void commCounts::pup(PUP::er &p)  //For migration
 {
@@ -1435,6 +1540,7 @@ int commCounts::size() const //Return total array storage size, in bytes
 }
 
 void ChunkMsg::deallocate(void) { //Free all stored memory
+	if (isPacked) return; //Delete will free memory
 	m.deallocate();
 	comm.deallocate();
 	delete [] elemNums;
@@ -1466,7 +1572,7 @@ chunk::pup(PUP::er &p)
     DataMsg *dm;
     int snum = CmmWildCard;
     CProxy_chunk cp(thisArrayID);
-    while (dm = (DataMsg*) CmmGet(messages, 1, &snum, 0))
+    while ((dm = (DataMsg*) CmmGet(messages, 1, &snum, 0))!=NULL)
       cp[thisIndex].recv(dm);
   }
 
@@ -1497,7 +1603,7 @@ chunk::pup(PUP::er &p)
   }
   CpvAccess(_fem_state)=inDriver;
 
-  if (p.isPacking()) 
+  if (!p.isUnpacking()) 
   {//In this case, pack the thread after the user data
     s.seek(1);
     tid = CthPup((pup_er) &p, tid);
@@ -1587,7 +1693,7 @@ ChunkMsg::unpack(void *msg)
 {
   ChunkMsg* c = (ChunkMsg *)msg;
   char *pos = (char *)msg + sizeof(ChunkMsg);
-
+  c->isPacked=1;
   //Handle all integer arrays
   UNPACK(c->elemNums,c->m.nElems()*sizeof(int));
   UNPACK(c->nodeNums,c->m.node.n*sizeof(int));
