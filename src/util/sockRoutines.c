@@ -38,6 +38,10 @@ skt_abortFn skt_set_abort(skt_abortFn f)
 	return old;
 }
 
+/* These little flags are used to ignore the SIGPIPE signal
+ * while we're inside one of our socket calls.
+ * This lets us only handle SIGPIPEs we generated. */
+static int skt_ignore_SIGPIPE=0;
 
 #if defined(_WIN32) && !defined(__CYGWIN__) /*Windows systems:*/
 static void doCleanup(void)
@@ -59,27 +63,31 @@ void skt_close(SOCKET fd)
 	closesocket(fd);
 }
 #else /*UNIX Systems:*/
+
+typedef void (*skt_signal_handler_fn)(int sig);
+static skt_signal_handler_fn skt_fallback_SIGPIPE=NULL;
 static void skt_SIGPIPE_handler(int sig) {
-	fprintf(stderr,"Caught SIGPIPE.\n");
-	signal(SIGPIPE,skt_SIGPIPE_handler);
+	if (skt_ignore_SIGPIPE) {
+		fprintf(stderr,"Caught SIGPIPE.\n");
+		signal(SIGPIPE,skt_SIGPIPE_handler);
+	}
+	else
+		skt_fallback_SIGPIPE(sig);
 }
 
 void skt_init(void)
 {
-#if 0
 	/* Install a SIGPIPE signal handler.
 	  This prevents us from dying when one of our network
-	  connections goes down; but interacts badly with a broken
-	  stdio output (since we can't tell that sigpipe from a
-	  broken network socket).  This means we infinite loop
-	  when called, e.g., by "less".
+	  connections goes down
 	*/
-	signal(SIGPIPE,skt_SIGPIPE_handler);
-#endif
+	skt_fallback_SIGPIPE=signal(SIGPIPE,skt_SIGPIPE_handler);
 }
 void skt_close(SOCKET fd)
 {
+	skt_ignore_SIGPIPE=1;
 	close(fd);
+	skt_ignore_SIGPIPE=0;
 }
 #endif
 
@@ -133,7 +141,9 @@ int skt_select1(SOCKET fd,int msec)
   {
     tmo.tv_sec=secLeft;
     tmo.tv_usec = (msec-1000*sec)*1000;
+    skt_ignore_SIGPIPE=1;
     nreadable = select(FD_SETSIZE, &rfds, NULL, NULL, &tmo);
+    skt_ignore_SIGPIPE=0;
     
     if (nreadable < 0) {
 		if (skt_should_retry()) continue;
@@ -293,6 +303,7 @@ SOCKET skt_server_ip(unsigned int *port,skt_ip_t *ip)
 {
   SOCKET             ret;
   int                len;
+  int on = 1; /* for setsockopt */
   int connPort=(port==NULL)?0:*port;
   struct sockaddr_in addr=skt_build_addr((ip==NULL)?skt_invalid_ip:*ip,connPort);
   
@@ -303,6 +314,8 @@ retry:
     if (skt_should_retry()) goto retry;
     else return skt_abort(93483,"Error creating server socket.");
   }
+  setsockopt(ret, SOL_SOCKET, SO_REUSEADDR, (void *) &on, sizeof(on));
+  
   if (bind(ret, (struct sockaddr *)&addr, sizeof(addr)) == SOCKET_ERROR) 
 	  return skt_abort(93484,"Error binding server socket.");
   if (listen(ret,5) == SOCKET_ERROR) 
@@ -375,7 +388,9 @@ int skt_recvN(SOCKET hSocket,void *buff,int nBytes)
   {
     if (0==skt_select1(hSocket,60*1000))
 	return skt_abort(93610,"Timeout on socket recv!");
-    nRead = recv(hSocket,pBuff,nLeft,0); /* MSG_NOSIGNAL); */
+    skt_ignore_SIGPIPE=1;
+    nRead = recv(hSocket,pBuff,nLeft,0);
+    skt_ignore_SIGPIPE=0;
     if (nRead<=0)
     {
        if (nRead==0) return skt_abort(93620,"Socket closed before recv.");
@@ -399,7 +414,9 @@ int skt_sendN(SOCKET hSocket,const void *buff,int nBytes)
   nLeft = nBytes;
   while (0 < nLeft)
   {
-    nWritten = send(hSocket,pBuff,nLeft,0); /* MSG_NOSIGNAL); */
+    skt_ignore_SIGPIPE=1;
+    nWritten = send(hSocket,pBuff,nLeft,0);
+    skt_ignore_SIGPIPE=0;
     if (nWritten<=0)
     {
           if (nWritten==0) return skt_abort(93720,"Socket closed before send.");
