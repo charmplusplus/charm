@@ -118,27 +118,27 @@ LogPool::LogPool(char *pgm) {
   strcpy(pgmname, pgm);
 }
 
-void LogPool::init(void)
+void LogPool::creatFiles(char *logFix, char *stsFix)
 {
   char pestr[10];
   sprintf(pestr, "%d", CkMyPe());
 #if CMK_PROJECTIONS_USE_ZLIB
   int len;
   if(compressed)
-    len = strlen(pgmname) + strlen(".log.") + strlen(pestr) + strlen(".gz") + 1;
+    len = strlen(pgmname) + strlen(logFix) + strlen(pestr) + strlen(".gz") + 2;
   else
-    len = strlen(pgmname) + strlen(".log.") + strlen(pestr) + 1;
+    len = strlen(pgmname) + strlen(logFix) + strlen(pestr) + 2;
 #else
-  int len = strlen(pgmname) + strlen(".log.") + strlen(pestr) + 1;
+  int len = strlen(pgmname) + strlen(logFix) + strlen(pestr) + 2;
 #endif
   fname = new char[len];
 #if CMK_PROJECTIONS_USE_ZLIB
   if(compressed)
-    sprintf(fname, "%s.%s.log.gz", pgmname, pestr);
+    sprintf(fname, "%s.%s%s.gz", pgmname, pestr, logFix);
   else
-    sprintf(fname, "%s.%s.log", pgmname, pestr);
+    sprintf(fname, "%s.%s%s", pgmname, pestr, logFix);
 #else
-  sprintf(fname, "%s.%s.log", pgmname, pestr);
+  sprintf(fname, "%s.%s%s", pgmname, pestr, logFix);
 #endif
   openLog("w+");
   if(!binary) {
@@ -153,8 +153,8 @@ void LogPool::init(void)
 
   if (CkMyPe() == 0) 
   {
-    char *fname = new char[strlen(CkpvAccess(traceRoot))+strlen(".sts")+1];
-    sprintf(fname, "%s.sts", CkpvAccess(traceRoot));
+    char *fname = new char[strlen(CkpvAccess(traceRoot))+strlen(stsFix)+1];
+    sprintf(fname, "%s%s", CkpvAccess(traceRoot), stsFix);
     do
     {
       stsfp = fopen(fname, "w");
@@ -168,6 +168,16 @@ void LogPool::init(void)
 LogPool::~LogPool() 
 {
   writeLog();
+
+#if CMK_BLUEGENE_CHARM
+  extern int correctTimeLog;
+  if (correctTimeLog) {
+    postProcessLog();
+    creatFiles("-bg.log", "-bg.sts");
+    writeLog();
+  }
+#endif
+
 #if !CMK_TRACE_LOGFILE_NUM_CONTROL
   closeLog();
 #endif
@@ -177,8 +187,6 @@ LogPool::~LogPool()
 
 void LogPool::writeLog(void)
 {
-  postProcessLog();
-
   OPEN_LOG
   if(binary) writeBinary();
 #if CMK_PROJECTIONS_USE_ZLIB
@@ -240,6 +248,10 @@ void LogPool::add(UChar type,UShort mIdx,UShort eIdx,double time,int event,int p
     numEntries = 0;
     new (&pool[numEntries++]) LogEntry(writeTime, BEGIN_INTERRUPT);
     new (&pool[numEntries++]) LogEntry(TraceTimer(), END_INTERRUPT);
+#if CMK_BLUEGENE_CHARM
+    extern int correctTimeLog;
+    if (correctTimeLog) CmiAbort("I/O interrupt!\n");
+#endif
   }
 #if CMK_BLUEGENE_CHARM
   switch (type) {
@@ -250,7 +262,7 @@ void LogPool::add(UChar type,UShort mIdx,UShort eIdx,double time,int event,int p
     case END_PACK:
     case BEGIN_UNPACK:
     case END_UNPACK:
-      bgAddProjEvent(this, time);
+      bgAddProjEvent(&pool[numEntries-1], time);
   }
 #endif
 }
@@ -341,6 +353,9 @@ void LogEntry::writeCompressed(gzFile zfp)
       break;
 
     case CREATION:
+      gzprintf(zfp, "%d %d %u %d %d %d %d\n", mIdx, eIdx, (UInt) (time*1.0e6), event, pe, msglen, (UInt)(recvTime*1.e6));
+      break;
+
     case BEGIN_PROCESSING:
     case END_PROCESSING:
     case MESSAGE_RECV:
@@ -394,7 +409,18 @@ void LogEntry::writeBinary(FILE* fp)
       fwrite(&pe,sizeof(int),1,fp);
       break;
 
-    case CREATION:
+    case CREATION: {
+      fwrite(&mIdx,sizeof(UShort),1,fp);
+      fwrite(&eIdx,sizeof(UShort),1,fp);
+      fwrite(&ttime,sizeof(UInt),1,fp);
+      fwrite(&event,sizeof(int),1,fp);
+      fwrite(&pe,sizeof(int),1,fp);
+      fwrite(&msglen,sizeof(int),1,fp);
+      
+      double duration = (UInt)(recvTime*1.e6);
+      fwrite(&duration,sizeof(UInt),1,fp);
+      break;
+    }
     case BEGIN_PROCESSING:
     case END_PROCESSING:
       fwrite(&mIdx,sizeof(UShort),1,fp);
@@ -452,7 +478,7 @@ TraceProjections::TraceProjections(char **argv): curevent(0), isIdle(0)
 #if CMK_PROJECTIONS_USE_ZLIB
   _logPool->setCompressed(compressed);
 #endif
-  _logPool->init();
+  _logPool->creatFiles(".log", ".sts");
 }
 
 /*

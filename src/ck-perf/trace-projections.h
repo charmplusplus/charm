@@ -83,7 +83,7 @@ class LogPool {
 #if CMK_PROJECTIONS_USE_ZLIB
     void setCompressed(int c) { compressed = c; }
 #endif
-    void init(void);
+    void creatFiles(char *logFix, char *stsFix);
     void openLog(const char *mode);
     void closeLog(void);
     void writeLog(void);
