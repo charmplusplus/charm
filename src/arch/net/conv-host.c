@@ -72,6 +72,17 @@ static void jsleep(int sec, int usec)
   }
 }
 
+int probefile(path)
+    char *path;
+{
+  struct stat s;
+  int ok = stat(path, &s);
+  if (ok<0) return 0;
+  if (!S_ISREG(s.st_mode)) return 0;
+  if (s.st_size==0) return 0;
+  return 1;
+}
+
 /****************************************************************************
  *
  * Death-notification
@@ -175,6 +186,50 @@ void ping_developers()
   sendto(skt, info, strlen(info), 0, (struct sockaddr *)&addr, sizeof(addr));
   close(skt);
 #endif /* NOTIFY */
+}
+
+/**************************************************************************
+ *
+ * Pathfix : alters a path according to a set of rewrite rules
+ *
+ *************************************************************************/
+
+typedef struct pathfixlist {
+  char *s1;
+  char *s2;
+  struct pathfixlist *next;
+} *pathfixlist;
+
+pathfixlist pathfix_append(char *s1, char *s2, pathfixlist l)
+{
+  pathfixlist pf = (pathfixlist)malloc(sizeof(struct pathfixlist));
+  pf->s1 = s1;
+  pf->s2 = s2;
+  pf->next = l;
+  return pf;
+}
+
+char *pathfix(char *path, pathfixlist fixes)
+{
+  char buffer[MAXPATHLEN]; pathfixlist l; 
+  char buf2[MAXPATHLEN]; 
+  char *offs; int mod, len;
+  strcpy(buffer,path);
+  mod = 1;
+  while (mod) {
+    mod = 0;
+    for (l=fixes; l; l=l->next) {
+      len = strlen(l->s1);
+      offs = strstr(buffer, l->s1);
+      if (offs) {
+	offs[0]=0;
+	sprintf(buf2,"%s%s%s",buffer,l->s2,offs+len);
+	strcpy(buffer,buf2);
+	mod = 1;
+      }
+    }
+  }
+  return strdup(buffer);
 }
 
 /**************************************************************************
@@ -720,224 +775,6 @@ int pparam_parsecmd(optchr, argv)
 
 /****************************************************************************
  *                                                                           
- * PATH                                                                      
- *                                                                           
- * path_simplify(P)                                                          
- *                                                                           
- *  - P is a pointer to a buffer containing a path.  All ".." and "."        
- *    components of the path are expanded out.                               
- *                                                                           
- * path_concat(P, rel)                                                       
- *                                                                           
- *  - P is a pointer to a buffer containing a path, rel is another path      
- *    relative to P.  The logical concatenation of the two paths are         
- *    stored in the buffer.                                                  
- *                                                                           
- * path_absolute(P)                                                          
- *                                                                           
- *  - If P is a relative path, it is assumed to be relative to the current   
- *    directory, and it is thereby converted into an absolute path.          
- *                                                                           
- * path_search(name, searchpath)                                             
- *                                                                           
- *  - name is a pointer to a buffer containing a program name or program     
- *    path, and searchpath is a string containing a list of directories      
- *   (as might be returned by getenv("PATH")).  The program's executable     
- *    is located and its absolute, readlinked path is stored in the name     
- *    buffer.                                                                
- *                                                                           
- * int path_isprefix(path1, path2)
- * 
- *  -  Routine to check whether path1 is a prefix of path2.  Returns 0 if
- *     not a prefix, or number of chars to chop off 'ipath' if it is a
- *     prefix.  path1 must be a path without a trailing slash.
- *
- *****************************************************************************/
-
-static char *path_segs[100];
-static int   path_nsegs;
-
-static void path_segs_free()
-{
-  while (path_nsegs) free(path_segs[--path_nsegs]);
-}
-
-static void path_dissect(path)
-    char *path;
-{
-  char buf[1000];
-  int len=0;
-  while (1)
-    {
-      if ((*path=='/')||(*path==0))
-	{
-	  buf[len]=0;
-	  path_segs[path_nsegs++] = strdup(buf);
-	  len=0;
-	}
-      else buf[len++] = *path;
-      if (*path==0) break;
-      path++;
-    }
-}
-
-static void path_reduce()
-{
-  int src, dst;
-  src = 0; dst = 0;
-  for (src=0; src<path_nsegs; src++)
-    {
-      char *t;
-      if ((strcmp(path_segs[src],"")==0)&&(src!=0)) continue;
-      if (strcmp(path_segs[src],".")==0) continue;
-      if (strcmp(path_segs[src],"..")==0) { if (dst) dst--; continue; }
-      t = path_segs[dst]; path_segs[dst]=path_segs[src]; path_segs[src]=t;
-      dst ++;
-    }
-  while (src>dst) free(path_segs[--src]);
-  path_nsegs = dst;
-}
-
-static void path_reconstitute(buff)
-    char *buff;
-{
-  int i;
-  for (i=0; i<path_nsegs; i++)
-    {
-      strcpy(buff, path_segs[i]);
-      buff+=strlen(buff);
-      *buff++ = '/';
-    }
-  *(--buff)=0;
-}
-
-void path_simplify(path)
-    char *path;
-{
-  path_nsegs = 0;
-  path_dissect(path);
-  path_reduce();
-  path_reconstitute(path);
-  path_segs_free();
-}
-
-void path_concat(base, rel)
-    char *base; char *rel;
-{
-  path_nsegs = 0;
-  if (rel[0]!='/') path_dissect(base);
-  path_dissect(rel);
-  path_reduce();
-  path_reconstitute(base);
-  path_segs_free();
-}
-
-void path_absolute(path)
-    char *path;
-{
-  char buff[1024];
-  if (path[0]=='/') return;
-  getcwd(buff, 1023);
-  path_concat(buff, path);
-  strcpy(path, buff);
-}
-
-int path_exists(path)
-    char *path;
-{
-  struct stat s;
-  int ok = stat(path, &s);
-  if (ok>=0) return 1;
-  return 0;
-}
-
-int path_executable(path)
-    char *path;
-{
-  struct stat s;
-  int ok = stat(path, &s);
-  if (ok<0) return 0;
-  if (!S_ISREG(s.st_mode)) return 0;
-  if((s.st_mode&S_IXOTH)&&(s.st_mode&S_IROTH)) return 1;
-  if((s.st_mode&S_IXGRP)&&(s.st_mode&S_IRGRP)&&(s.st_gid==getgid()))return 1;
-  if((s.st_mode&S_IXUSR)&&(s.st_mode&S_IRUSR)&&(s.st_uid==getuid()))return 1;
-  return 0;
-}
-
-int path_nonzero(path)
-    char *path;
-{
-  struct stat s;
-  int ok = stat(path, &s);
-  if (ok<0) return 0;
-  if (!S_ISREG(s.st_mode)) return 0;
-  if (s.st_size==0) return 0;
-  return 1;
-}
-
-int path_search(prog, path)
-    char *prog; char *path;
-{
-  char *end;
-  if (strchr(prog,'/'))
-    {
-      path_absolute(prog);
-      if (path_exists(prog)) return 0;
-      prog[0]=0; return -1;
-    }
-  if ((path)&&(*path)) while (1)
-    {
-      char buff[1024];
-      int len;
-      end = strchr(path, ':');
-      if (end==0) { end=path+strlen(path); }
-      len = (end - path);
-      memcpy(buff, path, len);
-      buff[len]=0;
-      path_concat(buff, prog);
-      path_absolute(buff);
-      if (path_executable(buff)) { strcpy(prog, buff); return 0; }
-      if (*end==0) break;
-      path=end+1;
-    }
-  prog[0]=0; errno=ENOENT; return -1;
-}
-
-int path_isprefix(ipre, ipath)
-    char *ipre; char *ipath;
-{
-  char pre[MAXPATHLEN];
-  char path[MAXPATHLEN];
-  struct stat preinfo;
-  struct stat pathinfo;
-  int ok, prelen; char *p;
-  strcpy(pre, ipre);
-  strcpy(path, ipath);
-  prelen = strlen(pre);
-  if (prelen==0) return 0;
-  if (pre[prelen-1]=='/') return 0;
-  if (strncmp(pre, path, prelen)==0) return prelen;
-  ok = stat(pre, &preinfo);
-  if (ok<0) return 0;
-  p=path;
-  while (1) {
-    int ch = *p;
-    if ((ch=='/')||(ch==0)) {
-      *p = 0;
-      ok = stat(path, &pathinfo);
-      if (ok<0) return 0;
-      if ((pathinfo.st_ino == preinfo.st_ino)&&
-          (pathinfo.st_dev == preinfo.st_dev)) return p-path;
-      *p = ch;
-    }
-    if (ch==0) break;
-    p++;
-  }
-  return 0;
-}
-
-/****************************************************************************
- *                                                                           
  * xstr                                                                      
  *                                                                           
  *  extendable (and otherwise dynamically-changing) strings.                 
@@ -1232,7 +1069,7 @@ prog prog_start(p, argv, useerr)
       dup2(p_stdout[1],1);
       dup2(useerr?p_stderr[1]:p_stdout[1],2);
       for(i=3; i<128; i++) close(i);
-      execv(p, argv);
+      execvp(p, argv);
       exit(1);
     }
   close(p_stdin[0]);
@@ -1326,29 +1163,24 @@ arg_init(argc, argv)
     exit(1);
   }
 
+  /* find the current directory, absolute version */
+  getcwd(buf, 1023);
+  arg_currdir_a = strdup(buf);
+  
   /* find the node-program, absolute version */
   if (argc<2) {
     fprintf(stderr,"You must specify a node-program.\n");
     exit(1);
   }
-  strcpy(buf, argv[1]);
-  path_search(buf, getenv("PATH"));
-  if (buf[0]==0)
-    { fprintf(stderr,"No such program %s\n",argv[1]); exit(1); }
-  arg_nodeprog_a = strdup(buf);
-
-  strcpy(buf, RSH_CMD);
-  path_search(buf, getenv("PATH"));
-  if (buf[0]==0)
-    { fprintf(stderr,"Cannot find '%s' in path.\n", RSH_CMD); exit(1); }
-  arg_rshprog = strdup(buf);
-
-  /* find the current directory, absolute version */
-  getcwd(buf, 1023);
-  arg_currdir_a = strdup(buf);
+  if (argv[1][0]=='/') {
+    arg_nodeprog_a = argv[1];
+  } else {
+    sprintf(buf,"%s/%s",arg_currdir_a,argv[1]);
+    arg_nodeprog_a = strdup(buf);
+  }
 
   arg_mylogin = mylogin();
-  arg_myhome = (char *) malloc(MAXPATHLEN);
+  arg_myhome = (char *)malloc(MAXPATHLEN);
   strcpy(arg_myhome, getenv("HOME"));
 }
 
@@ -1363,24 +1195,23 @@ char *nodetab_file_find()
   /* Find a nodes-file as specified by ++nodelist */
   if (arg_nodelist) {
     char *path = arg_nodelist;
-    if (path_nonzero(path)) return strdup(path);
+    if (probefile(path)) return strdup(path);
     fprintf(stderr,"No such nodelist file %s\n",path);
     exit(1);
   }
   /* Find a nodes-file as specified by getenv("NODELIST") */
   if (getenv("NODELIST")) {
     char *path = getenv("NODELIST");        
-    if (path && path_nonzero(path)) return strdup(path);
+    if (path && probefile(path)) return strdup(path);
     fprintf(stderr,"Cannot find nodelist file %s\n",path);
     exit(1);
   }
   /* Find a nodes-file by looking under 'nodelist' in the current directory */
-  if (path_nonzero("./nodelist")) return strdup("./nodelist");
+  if (probefile("./nodelist")) return strdup("./nodelist");
   if (getenv("HOME")) {
     char buffer[MAXPATHLEN];
-    strcpy(buffer,getenv("HOME"));
-    path_concat(buffer,".nodelist");
-    if (path_nonzero(buffer)) return strdup(buffer);
+    sprintf(buffer,"%s/.nodelist",getenv("HOME"));
+    if (probefile(buffer)) return strdup(buffer);
   }
   fprintf(stderr,"Cannot find a nodes file.\n");
   exit(1);
@@ -1388,33 +1219,46 @@ char *nodetab_file_find()
 
 
 typedef struct nodetab_host {
-  char *name;
-  char *login;
-  char *passwd;
-  char *home;
-  char *ext;
-  char *setup;
-  int   cpus;
-  int   rank;
-  double speed;
+  char    *name;
+  char    *login;
+  char    *passwd;
+  pathfixlist pathfixes;
+  char    *ext;
+  char    *setup;
+  int      cpus;
+  int      rank;
+  double   speed;
   unsigned int ip;
 } *nodetab_host;
-
-char    *default_login = "*";
-char    *default_group = "*";
-char    *default_passwd = "*";
-char    *default_home = "*";
-char    *default_ext = "*";
-char    *default_setup = "*";
-double   default_speed = 1.0;
-int      default_cpus = 1;
-int      default_rank = 0;
 
 nodetab_host *nodetab_table;
 int           nodetab_max;
 int           nodetab_size;
 int          *nodetab_rank0_table;
 int           nodetab_rank0_size;
+
+char        *default_login;
+char        *default_group;
+char        *default_passwd;
+pathfixlist  default_pathfixes;
+char        *default_ext;
+char        *default_setup;
+double       default_speed;
+int          default_cpus;
+int          default_rank;
+
+void nodetab_reset()
+{
+  default_login = "*";
+  default_group = "*";
+  default_passwd = "*";
+  default_pathfixes = 0;
+  default_ext = "*";
+  default_setup = "*";
+  default_speed = 1.0;
+  default_cpus = 1;
+  default_rank = 0;
+}
 
 void nodetab_add(nodetab_host res)
 {
@@ -1437,7 +1281,7 @@ void nodetab_makehost(char *host)
   res->name = host;
   res->login = default_login;
   res->passwd = default_passwd;
-  res->home = default_home;
+  res->pathfixes = default_pathfixes;
   res->ext = default_ext;
   res->setup = default_setup;
   res->speed = default_speed;
@@ -1466,6 +1310,7 @@ void nodetab_init()
   nodetab_rank0_table=(int*)malloc(arg_requested_pes*sizeof(int));
   nodetab_max=arg_requested_pes;
   
+  nodetab_reset();
   rightgroup = (strcmp(arg_nodegroup,"main")==0);
   
   while(fgets(input_line,sizeof(input_line)-1,f)!=0) {
@@ -1475,22 +1320,24 @@ void nodetab_init()
     b1 = skipblanks(input_line);
     e1 = skipstuff(b1); b2 = skipblanks(e1); 
     e2 = skipstuff(b2); b3 = skipblanks(e2);
+    e3 = skipstuff(b3);
     if (*b1==0) continue;
     if (strcmp(default_login, "*")==0) default_login = arg_mylogin;
-    if (strcmp(default_home, "*")==0) default_home = arg_myhome;
     if (strcmp(default_ext, "*")==0) default_ext = "";
-    if      (subeqs(b1,e1,"login")&&(*b3==0))  default_login = substr(b2,e2);
-    else if (subeqs(b1,e1,"passwd")&&(*b3==0)) default_passwd = substr(b2,e2);
-    else if (subeqs(b1,e1,"speed")&&(*b3==0))  default_speed = atof(b2);
-    else if (subeqs(b1,e1,"cpus")&&(*b3==0))   default_cpus = atol(b2);
-    else if (subeqs(b1,e1,"home")&&(*b3==0))   default_home = substr(b2,e2);
-    else if (subeqs(b1,e1,"ext")&&(*b3==0))    default_ext = substr(b2,e2);
-    else if (subeqs(b1,e1,"setup"))            default_setup = strdup(b2);
+    if      (subeqs(b1,e1,"login")&&(*b3==0))    default_login = substr(b2,e2);
+    else if (subeqs(b1,e1,"passwd")&&(*b3==0))   default_passwd = substr(b2,e2);
+    else if (subeqs(b1,e1,"speed")&&(*b3==0))    default_speed = atof(b2);
+    else if (subeqs(b1,e1,"cpus")&&(*b3==0))     default_cpus = atol(b2);
+    else if (subeqs(b1,e1,"pathfix")) 
+      default_pathfixes=pathfix_append(substr(b2,e2),substr(b3,e3),default_pathfixes);
+    else if (subeqs(b1,e1,"ext")&&(*b3==0))      default_ext = substr(b2,e2);
+    else if (subeqs(b1,e1,"setup"))              default_setup = strdup(b2);
     else if (subeqs(b1,e1,"host")&&(*b3==0)) {
       if (rightgroup)
 	for (default_rank=0; default_rank<default_cpus; default_rank++)
 	  nodetab_makehost(substr(b2,e2));
     } else if (subeqs(b1,e1, "group")&&(*b3==0)) {
+      nodetab_reset();
       rightgroup = subeqs(b2,e2,arg_nodegroup);
     } else {
       fprintf(stderr,"unrecognized command in nodesfile:\n");
@@ -1524,15 +1371,15 @@ nodetab_host nodetab_getinfo(i)
   return nodetab_table[i];
 }
 
-char        *nodetab_name(i) int i;    { return nodetab_getinfo(i)->name; }
-char        *nodetab_login(i) int i;   { return nodetab_getinfo(i)->login; }
-char        *nodetab_passwd(i) int i;  { return nodetab_getinfo(i)->passwd; }
-char        *nodetab_setup(i) int i;   { return nodetab_getinfo(i)->setup; }
-char        *nodetab_home(i) int i;    { return nodetab_getinfo(i)->home; }
-char        *nodetab_ext(i) int i;     { return nodetab_getinfo(i)->ext; }
-unsigned int nodetab_ip(i) int i;      { return nodetab_getinfo(i)->ip; }
-unsigned int nodetab_cpus(i) int i;    { return nodetab_getinfo(i)->cpus; }
-unsigned int nodetab_rank(i) int i;    { return nodetab_getinfo(i)->rank; }
+char        *nodetab_name(i) int i;     { return nodetab_getinfo(i)->name; }
+char        *nodetab_login(i) int i;    { return nodetab_getinfo(i)->login; }
+char        *nodetab_passwd(i) int i;   { return nodetab_getinfo(i)->passwd; }
+char        *nodetab_setup(i) int i;    { return nodetab_getinfo(i)->setup; }
+pathfixlist  nodetab_pathfixes(i) int i;{ return nodetab_getinfo(i)->pathfixes; }
+char        *nodetab_ext(i) int i;      { return nodetab_getinfo(i)->ext; }
+unsigned int nodetab_ip(i) int i;       { return nodetab_getinfo(i)->ip; }
+unsigned int nodetab_cpus(i) int i;     { return nodetab_getinfo(i)->cpus; }
+unsigned int nodetab_rank(i) int i;     { return nodetab_getinfo(i)->rank; }
 
  
 /****************************************************************************
@@ -1966,7 +1813,7 @@ prog rsh_start(nodeno)
   rshargv[3]=nodetab_login(nodeno);
   rshargv[4]="exec /bin/csh -f";
   rshargv[5]=0;
-  rsh = prog_start(arg_rshprog, rshargv, 0);
+  rsh = prog_start(RSH_CMD, rshargv, 0);
   if ((rsh==0)&&(errno!=EMFILE)) { perror("starting rsh"); exit(1); }
   if (rsh==0)
     {
@@ -1996,25 +1843,11 @@ int rsh_pump(p, nodeno, rank0no, argv)
 	      nodetab_ip(nodeno), req_ip, req_port, (getpid()&0x7FFF));
   prog_flush(p);
   
-  /* find the node-program, relative version */
-  sprintf(buf,"%s",getenv("HOME"));
-  if ((len=path_isprefix(buf,arg_nodeprog_a))!=0) {
-    sprintf(buf,"%s/%s%s",nodetab_home(nodeno),
-			  arg_nodeprog_a+len,nodetab_ext(nodeno));
-    arg_nodeprog_r = strdup(buf);
-  }
-  else {
-    sprintf(buf,"%s%s",arg_nodeprog_a,nodetab_ext(nodeno));
-    arg_nodeprog_r = strdup(buf);
-  }
-
+  /* find the node-program */
+  arg_nodeprog_r = pathfix(arg_nodeprog_a, nodetab_pathfixes(nodeno));
+  
   /* find the current directory, relative version */
-  sprintf(buf,"%s",getenv("HOME"));
-  if ((len=path_isprefix(buf, arg_currdir_a))!=0) {
-    sprintf(buf,"%s/%s",nodetab_home(nodeno),arg_currdir_a+len);
-    arg_currdir_r = strdup(buf);
-  }
-  else arg_currdir_r = arg_currdir_a;
+  arg_currdir_r = pathfix(arg_currdir_a, nodetab_pathfixes(nodeno));
 
   if (arg_debug || arg_debug_no_pause || arg_in_xterm) {
     xstr_printf(ibuf,"foreach dir ($path)\n");
