@@ -26,7 +26,7 @@
 extern "C" int start_counters(int e0, int e1);
 extern "C" int read_counters(int e0, long long *c0, int e1, long long *c1);
 inline double Count2Time(long long c) { return c*5.e-7; }
-#elif CMK_PAPI
+#elif CMK_HAS_COUNTER_PAPI
 #include <papi.h>
 int papiEvents[2] = { PAPI_TOT_CYC, PAPI_FP_INS };
 long_long papiValues[2];
@@ -83,7 +83,7 @@ int    BgGetArgc() { return arg_argc; }
      a different manner.
 ****************************************************************************/
 
-#ifdef CMK_PAPI
+#if CMK_HAS_COUNTER_PAPI
 int read_counters(int e0, long long *c0, int e1, long long *c1) {
   // PAPI_read_counters resets the counter, hence it behaves like the perfctr
   // code for Origin2000
@@ -656,7 +656,7 @@ void startVTimer()
       perror("start_counters");;
     }
   }
-#elif CMK_PAPI
+#elif CMK_HAS_COUNTER_PAPI
   else if (timingMethod == BG_COUNTER) {
     // do a fake read to reset the counters. It would be more efficient
     // to use the low level API, but that would be a lot more code to
@@ -684,7 +684,7 @@ void stopVTimer()
 //      tCURRTIME += 1e-6;
     }
   }
-#if CMK_ORIGIN2000 || CMK_PAPI
+#if CMK_ORIGIN2000 || CMK_HAS_COUNTER_PAPI
   else if (timingMethod == BG_COUNTER)  {
     long long c0, c1;
     if (read_counters(0, &c0, 21, &c1) < 0) perror("read_counters");
@@ -709,7 +709,7 @@ double BgGetTime()
   else if (timingMethod == BG_ELAPSE) {
     return tCURRTIME;
   }
-#if CMK_ORIGIN2000 || CMK_PAPI
+#if CMK_ORIGIN2000 || CMK_HAS_COUNTER_PAPI
   else if (timingMethod == BG_COUNTER) {
     if (tTIMERON) {
       long long c0, c1;
@@ -952,7 +952,7 @@ CmiStartFn bgMain(int argc, char **argv)
 #ifdef CMK_ORIGIN2000
   if(CmiGetArgFlagDesc(argv, "+bgcounter", "Use performance counter")) 
       timingMethod = BG_COUNTER;
-#elif CMK_PAPI
+#elif CMK_HAS_COUNTER_PAPI
   if (CmiGetArgFlagDesc(argv, "+bgpapi", "Use PAPI Performance counters")) {
     timingMethod = BG_COUNTER;
     // PAPI high level API does not require explicit library intialization
