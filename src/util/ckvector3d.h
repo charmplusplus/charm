@@ -37,6 +37,7 @@ public:
 	//real array constructor
 	CkVector3dT(const real *arr) {x=arr[0];y=arr[1];z=arr[2];}
 
+#if 0
 	//Constructors from other types of CkVector:
 	CkVector3dT(const CkVector3dT<float> &src) 
 	  {x=(real)src.x; y=(real)src.y; z=(real)src.z;}
@@ -44,6 +45,7 @@ public:
 	  {x=(real)src.x; y=(real)src.y; z=(real)src.z;}
 	CkVector3dT(const CkVector3dT<int> &src) 
 	  {x=(real)src.x; y=(real)src.y; z=(real)src.z;}
+#endif
 
 	//Copy constructor & assignment operator by default
 	
