@@ -235,7 +235,7 @@ void Array1D::RecvMigratedElementID(int index, ArrayElement *elem,
   ack_msg->index = index;
   ack_msg->arrivedAt = elementIDs[index].pe;
   ack_msg->handle = elementIDs[index].elementHandle;
-  ack_msg->deleteElement = true;
+  ack_msg->deleteElement = 1;
 
   CProxy_Array1D arr(thisgroup);
   arr.AckMigratedElement(ack_msg, elementIDs[index].cameFrom);
@@ -247,7 +247,7 @@ void Array1D::RecvMigratedElementID(int index, ArrayElement *elem,
     ack_msg->index = index;
     ack_msg->arrivedAt = elementIDs[index].pe;
     ack_msg->handle = elementIDs[index].elementHandle;
-    ack_msg->deleteElement = false;
+    ack_msg->deleteElement = 0;
 
     arr.AckMigratedElement(ack_msg, elementIDs[index].originalPE);
   }

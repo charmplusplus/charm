@@ -6,8 +6,6 @@
 
 extern void _registerCkArray(void);
 
-typedef enum {false, true} boolean;
-
 #define ALIGN8(x)       (int)(8*(((x)+7)/8))
 
 #define MessageIndex(mt)        CMessage_##mt##::__idx
@@ -177,7 +175,7 @@ class ArrayElementAckMessage : public CMessage_ArrayElementAckMessage
 public:
   int index;
   int arrivedAt;
-  boolean deleteElement;
+  int deleteElement;
   CkChareID handle;
   int hopCount;
 };
