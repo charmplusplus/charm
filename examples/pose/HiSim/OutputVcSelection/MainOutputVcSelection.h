@@ -5,6 +5,5 @@
 class OutputVcSelection {
         public:
         virtual int selectOutputVc(map<int,int> & Bufsize,const Packet *h){}
-        virtual int selectOutputVc(map<int,int> & Bufsize,map<int,int> & mapVc,const Packet *h){}
 };
 #endif

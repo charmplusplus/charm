@@ -4,6 +4,8 @@ int TorusRouting::selectRoute(int c,int d,int numP,int *next) {
         int xdiff,ydiff,zdiff,xdiff2,ydiff2,zdiff2,nextPort,select_torus=0;
         Position dst,pos; dst.init(d); pos.init(c);
 
+	if(c == d) return numP;
+
         xdiff = dst.x - pos.x; ydiff = dst.y - pos.y ; zdiff = dst.z - pos.z;   
 	xdiff2 = (netLength-(int)abs(xdiff)); ydiff2 = (netHeight-(int)abs(ydiff)); zdiff2 = (netWidth-(int)abs(zdiff));
 
@@ -35,4 +37,9 @@ int TorusRouting::expectedTime(int s,int d,int ovt,int origovt,int len,int *hops
         extra = (ovt-origovt) - expected;
         if(extra < 0) extra = 0;
         return extra;
+}
+
+int TorusRouting::convertOutputToInputPort(int port) {
+	if(port == 6) return 6;
+	return((port+3)%6);
 }

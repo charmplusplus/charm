@@ -1,6 +1,5 @@
 message Packet;
 message NetInterfaceMsg;
-message InputBufferMsg;
 message ChannelMsg;
 message flowStart;
 message NicMsg;
@@ -13,14 +12,6 @@ poser NetInterface : sim adapt2 chpt {
   entry [event] void storeMsgInAdvance(NicMsg *);
 };
 	
-poser InputBuffer : sim adapt2 chpt {
-  entry InputBuffer(InputBufferMsg *);
-  entry [event] void recvPacket(Packet *);
-  entry [event] void recvRequest(Packet *);
-  entry [event] void restartBufferFlow(flowStart *);
-  entry [event] void checkVC(flowStart *);
-};
-
 poser Channel : sim adapt2 chpt {
   entry Channel(ChannelMsg *);
   entry [event] void recvPacket(Packet *);

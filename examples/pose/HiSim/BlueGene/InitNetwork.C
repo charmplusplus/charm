@@ -8,32 +8,27 @@ void InitNetwork(MachineParams *mp) {
 	int nodeid,i;
 
 	NetInterfaceMsg *nic;
-	InputBufferMsg *inpbuf;
+	SwitchMsg *sbuf;
 	ChannelMsg *chan;
         switchP = 6;
 	
-        mp->config->InputBufferStart= mp->config->nicStart+mp->BGnodes; 
-        mp->config->ChannelStart = mp->config->InputBufferStart + (switchP+1)*(mp->BGnodes);
+        mp->config->switchStart= mp->config->nicStart+mp->BGnodes; 
+        mp->config->ChannelStart = mp->config->switchStart + mp->BGnodes;
 	
 
         for(i=mp->config->nicStart;i< mp->config->nicStart + mp->BGnodes ;i++) {
-                nic = new NetInterfaceMsg(i,mp->config->InputBufferStart+(i-mp->config->nicStart)*(switchP+1),switchP);
+                nic = new NetInterfaceMsg(i,mp->config->switchStart+(i-mp->config->nicStart),switchP);
                 nic->Timestamp(0);
                 mapPE = mp->procs*(i-mp->config->nicStart)/mp->BGnodes;
                 (*(CProxy_NetInterface *) &POSE_Objects)[i].insert(nic,mapPE);
         }
 
 	counter = mp->config->ChannelStart;
-        for(i=mp->config->InputBufferStart;i< mp->config->InputBufferStart+(switchP+1)*mp->BGnodes;i++) {
-                nodeid = (i-mp->config->InputBufferStart)/(switchP+1); portid = (i-mp->config->InputBufferStart)%(switchP+1);
-		if(((i-mp->config->InputBufferStart)%(switchP+1)) == 0) {
-			if(i != mp->config->InputBufferStart)
-			counter += (switchP+1);
-		}
-                inpbuf = new InputBufferMsg(i,portid,nodeid,switchP,counter);
-                inpbuf->Timestamp(0);
-                mapPE = mp->procs*(i-mp->config->InputBufferStart)/((switchP+1)*mp->BGnodes);
-                (*(CProxy_InputBuffer *) &POSE_Objects)[i].insert(inpbuf,mapPE);
+        for(i=mp->config->switchStart;i< mp->config->switchStart+mp->BGnodes;i++) {
+                sbuf = new SwitchMsg(i,switchP);
+                sbuf->Timestamp(0);
+                mapPE = mp->procs*(i-mp->config->switchStart)/(mp->BGnodes);
+                (*(CProxy_Switch *) &POSE_Objects)[i].insert(sbuf,mapPE);
         }
 
         for(i=mp->config->ChannelStart;i< mp->config->ChannelStart+(switchP+1)*mp->BGnodes;i++) {

@@ -8,5 +8,6 @@ class RoutingAlgorithm {
         virtual int selectRoute(int current,int dst,int numP,int *next){}
         virtual int expectedTime(int src,int dst,int ovt,int origovt,int len,int *hops){}
 	virtual int selectRoute(int,int,const Packet *){}
+	virtual int convertOutputToInputPort(int)=0;
 };
 #endif

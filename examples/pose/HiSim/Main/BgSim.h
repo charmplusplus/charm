@@ -163,8 +163,8 @@ class Header {
 
         void dump()
         {
-                CkPrintf("HEADER src %d dst %d pktid %d portId %d msgId %d \n",
-                                src,routeInfo.dst,pktId,portId,msgId);
+                CkPrintf("HEADER src %d dst %d portId %d msgId %d \n",
+                                src,routeInfo.dst,portId,msgId);
         }
 
         bool operator==(const Header &obj) const {
@@ -173,7 +173,8 @@ class Header {
 
         bool operator < (const Header &obj) const {
                 if(msgId < obj.msgId) return true; else
-                if((msgId == obj.msgId) && (pktId < obj.pktId)) return true;
+                if((msgId == obj.msgId) && (pktId < obj.pktId)) return true; else
+		if((msgId == obj.msgId) && (pktId == obj.pktId) && (src < obj.src)) return true;
                 else return false;
         }
 };
@@ -267,26 +268,6 @@ class remoteMsgId
 	}
 };
 
-
-class remotePktId
-{
-	public:
-	int pktId;
-	int len;
-
-	remotePktId(){}
-	remotePktId(int p,int l):pktId(p),len(l){}
-	remotePktId & operator=(const remotePktId &obj)
-	{	pktId = obj.pktId; len = obj.len; return *this;  }
-
-	bool operator<(const remotePktId &obj) const {
-		if(pktId < obj.pktId)  return true;   else  return false;
-	}
-	bool operator==(const remotePktId &obj) const {
-		if(pktId==obj.pktId  && len==obj.len)	return true;   else   return false;
-	}
-};
-
 class NetInterfaceMsg {
 	public:
 	int id;
@@ -308,31 +289,6 @@ class NetInterfaceMsg {
 	}
 		
 };
-
-class InputBufferMsg {
-	public:
-	int id;
-	int portid;
-	int nodeid;
-	int numP;
-	int startChannelId;
-	
-	InputBufferMsg(){}
-	InputBufferMsg(int i,int pid,int nid,int np,int sid):
-		id(i),portid(pid),nodeid(nid),numP(np),startChannelId(sid){}
-
-	~InputBufferMsg(){}	
-
-	InputBufferMsg& operator = (const InputBufferMsg& obj) {
-		eventMsg::operator=(obj);
-		id = obj.id;
-		portid = obj.portid;
-		nodeid = obj.nodeid;
-		numP = obj.numP;
-		startChannelId = obj.startChannelId;
-		return *this;
-	}
-};		
 
 class ChannelMsg {
 	public:
@@ -360,12 +316,14 @@ class ChannelMsg {
 class SwitchMsg {
 	public:
 	int id;
+	int numP;
 	SwitchMsg(){}
-	SwitchMsg(int i):id(i){}
+	SwitchMsg(int i,int p):id(i),numP(p){}
 	~SwitchMsg(){}
 	SwitchMsg &operator = (const SwitchMsg &obj) {
 		eventMsg::operator=(obj);
 		id = obj.id;
+		numP = obj.numP;
 		return *this;
 	}
 };
@@ -385,11 +343,11 @@ class NicConsts {
 class Switch {
 	public:
 	map <int,int> Bufsize;	 // Downstream buffer sizes .. Note this is not current switch buffer sizes.
+	map <int,int> mapVc;     // map input to output
 	map <int,vector <Header> > inBuffer;  // Save the packets when path is stalled
-	map <int,int> mapVc; // This is mainly a way to keep a way of updating credits for inputVc based on outputVc
 	map <int,int> requested;  // Used to do head of line blocking
 
-	int id;
+	int id,numP;
         unsigned  char InputRoundRobin,RequestRoundRobin,AssignVCRoundRobin;
         Topology *topology;
         InputVcSelection *inputVcSelect;
@@ -414,16 +372,14 @@ class Switch {
 	Switch& operator=(const Switch& obj) {
 	rep::operator=(obj);
 	Bufsize = obj.Bufsize; InputRoundRobin = obj.InputRoundRobin; RequestRoundRobin = obj.RequestRoundRobin;  
-	inBuffer = obj.inBuffer; AssignVCRoundRobin = obj.AssignVCRoundRobin; topology = obj.topology; mapVc = obj.mapVc;
-	requested = obj.requested;
+	inBuffer = obj.inBuffer; AssignVCRoundRobin = obj.AssignVCRoundRobin; topology = obj.topology; 
+	requested = obj.requested; mapVc = obj.mapVc;
 	return *this;
 	}
 	bool operator==(const Switch& obj) {
 	return(id==obj.id);
 	}
 };
-
-
 
 // Should take care of contention when multiple ports are sending data to nic ...
 class NetInterface {
@@ -476,57 +432,6 @@ class Request
         bool operator == (const Request &obj) const {
                if((nextId == obj.nextId) && (vcid == obj.vcid) && (datalen == obj.datalen)) return true; else return false;
         }
-};
-
-class InputBufferConsts {
-	public:
-	int id;
-	Position pos,*next;
-	int nodeid;	
-	int numP,startChannelId;
-	int portid;	
-};
-	
-class InputBuffer {
-	public:
-	InputBufferConsts *ibuf;
-	unsigned  char InputRoundRobin,RequestRoundRobin,AssignVCRoundRobin;
-        map <int,int> Bufsize;
-        map <int,int> requested;
-        map <int,vector <Header> >  inBuffer;
-        map <int,vector <Request> > requestQ;
-	Topology *topology;
-	InputVcSelection *inputVcSelect;
-	OutputVcSelection *outputVcSelect;
-
-	InputBuffer(){}
-	InputBuffer(InputBufferMsg *m);
-
-	void recvPacket(Packet *);
-	void recvPacket_anti(Packet *){restore(this);}
-	void recvPacket_commit(Packet *){}
-	void restartBufferFlow(flowStart *);
-	void restartBufferFlow_anti(flowStart *){restore(this);}
-	void restartBufferFlow_commit(flowStart *){}
-	void recvRequest(Packet *);
-	void recvRequest_anti(Packet *){restore(this);}
-	void recvRequest_commit(Packet *){}
-	void checkVC(flowStart *);
-	void checkVC_anti(flowStart *){restore(this);}
-	void checkVC_commit(flowStart *){}
-
-	~InputBuffer(){}
-
-	InputBuffer& operator=(const InputBuffer& obj) {
-	rep::operator=(obj);
-	ibuf = obj.ibuf;
-	Bufsize = obj.Bufsize; InputRoundRobin = obj.InputRoundRobin; RequestRoundRobin = obj.RequestRoundRobin; requested = obj.requested; 
-	inBuffer = obj.inBuffer; requestQ = obj.requestQ; AssignVCRoundRobin = obj.AssignVCRoundRobin; topology = obj.topology;
-	return *this;
-	}
-	bool operator==(const InputBuffer& obj) {
-	return(ibuf->id==(obj.ibuf)->id);
-	}
 };
 
 #endif
