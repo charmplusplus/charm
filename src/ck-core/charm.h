@@ -35,6 +35,7 @@ extern "C" {
 
 #define CkTimer  	CmiTimer
 #define CkWallTimer  	CmiWallTimer
+#define CkCpuTimer  	CmiCpuTimer
 
 #define CkMyPe		CmiMyPe
 #define CkMyRank	CmiMyRank
