@@ -12,17 +12,21 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-18 21:25:44  sanjeev
+ * Revision 2.1  1995-06-18 21:56:02  sanjeev
+ * *** empty log message ***
+ *
+ * Revision 2.0  1995/06/18  21:25:44  sanjeev
  * *** empty log message ***
  *
  ***************************************************************************/
 static char ident[] = "@(#)$Header$";
 
 
+#include <stdio.h>
 
-#include "machine.h"
 #include "converse.h"
-#include "conv_conds.h"
+#include "conv-mach.h"
+#include "conv-conds.h"
 
 /**** these variables are local to this file but are persistant *****/
 
