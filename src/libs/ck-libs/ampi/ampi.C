@@ -53,6 +53,10 @@ void MPI_MAX( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
     for(i=0;i<(*len);i++)
       if(((int *)invec)[i] > ((int *)inoutvec)[i]) ((int *)inoutvec)[i] = ((int *)invec)[i];
     break;
+  case MPI_LONG:
+    for(i=0;i<(*len);i++)
+      if(((long *)invec)[i] > ((long *)inoutvec)[i]) ((long *)inoutvec)[i] = ((long *)invec)[i];
+    break;
   case MPI_FLOAT:
     for(i=0;i<(*len);i++)
       if(((float *)invec)[i] > ((float *)inoutvec)[i]) ((float *)inoutvec)[i] = ((float *)invec)[i];
@@ -73,6 +77,10 @@ void MPI_MIN( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
     for(i=0;i<(*len);i++)
       if(((int *)invec)[i] < ((int *)inoutvec)[i]) ((int *)inoutvec)[i] = ((int *)invec)[i];
     break;
+  case MPI_LONG:
+    for(i=0;i<(*len);i++)
+      if(((long *)invec)[i] < ((long *)inoutvec)[i]) ((long *)inoutvec)[i] = ((long *)invec)[i];
+    break;
   case MPI_FLOAT:
     for(i=0;i<(*len);i++)
       if(((float *)invec)[i] < ((float *)inoutvec)[i]) ((float *)inoutvec)[i] = ((float *)invec)[i];
@@ -92,6 +100,10 @@ void MPI_SUM( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
   case MPI_INT:
     for(i=0;i<(*len);i++)
       ((int *)inoutvec)[i] += ((int *)invec)[i];
+    break;
+  case MPI_LONG:
+    for(i=0;i<(*len);i++)
+      ((long *)inoutvec)[i] += ((long *)invec)[i];
     break;
   case MPI_FLOAT:
     for(i=0;i<(*len);i++)
@@ -118,6 +130,10 @@ void MPI_PROD( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
   case MPI_INT:
     for(i=0;i<(*len);i++)
       ((int *)inoutvec)[i] *= ((int *)invec)[i];
+    break;
+  case MPI_LONG:
+    for(i=0;i<(*len);i++)
+      ((long *)inoutvec)[i] *= ((long *)invec)[i];
     break;
   case MPI_FLOAT:
     for(i=0;i<(*len);i++)
