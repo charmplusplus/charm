@@ -67,12 +67,12 @@ extern "C" void pack_doubles_(long* me, double* i, int* count)
   ((Packer*)(*me))->pack(i,*count);
 }
 
-extern "C" int pack_buffer_size(long* me)
+extern "C" int pack_buffer_size_(long* me)
 {
   return ((Packer*)(*me))->buffer_size();
 }
 
-extern "C" void pack_fill_buffer(long* me, char* buffer, int* bytes)
+extern "C" void pack_fill_buffer_(long* me, char* buffer, int* bytes)
 {
   ((Packer*)(*me))->fill_buffer(buffer,*bytes);
 }
