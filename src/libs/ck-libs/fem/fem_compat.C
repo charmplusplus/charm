@@ -17,19 +17,29 @@ public, documented interfaces.
 
 /***************** Mesh Set ******************/
 
-// Little utility routine: get/set real and ghost data, as doubles
-static void mesh_double_data(int fem_mesh,int entity, const double *data) {
+// Little utility routine: get/set real and ghost data
+static void mesh_data(int fem_mesh,int entity, int dtype,void *v_data) {
 	int n=FEM_Mesh_get_length(fem_mesh,entity);
 	int per=FEM_Mesh_get_width(fem_mesh,entity,FEM_DATA);
-	FEM_Mesh_data(fem_mesh,entity,FEM_DATA,(void *)data, 0,n, FEM_DOUBLE,per);
+	FEM_Mesh_data(fem_mesh,entity,FEM_DATA,v_data, 0,n, dtype,per);
 	int nGhosts=FEM_Mesh_get_length(fem_mesh,FEM_GHOST+entity);
+	char *data=(char *)v_data;
+	int size=IDXL_Layout::type_size(dtype);
 	if (nGhosts>0) /* Grab ghost data on the end of the regular data */ 
 		FEM_Mesh_data(fem_mesh,FEM_GHOST+entity,FEM_DATA,
-			(void *)&data[n*per], 0,nGhosts, FEM_DOUBLE,per);
+			(void *)&data[n*per*size], 0,nGhosts, dtype,per);
+}
+// Little utility routine: get/set real and ghost data, as doubles
+static void mesh_double_data(int fem_mesh,int entity, const double *data) {
+	mesh_data(fem_mesh,entity,FEM_DOUBLE,(void *)data);
 }
 static void mesh_fortran_conn(int mesh,int entity, int *conn, int first,int n, int per)
 {
 	FEM_Mesh_data(mesh,entity, FEM_CONN, conn, first,n, FEM_INDEX_1, per);
+}
+
+int mesh_get_ghost_length(int mesh,int entity) {
+	return FEM_Mesh_get_length(mesh,entity)+FEM_Mesh_get_length(mesh,FEM_GHOST+entity);
 }
 
 // Lengths
@@ -132,12 +142,41 @@ FDECL void FTN_NAME(FEM_SET_SPARSE_ELEM,fem_set_sparse_elem)
 
 
 /***************** Mesh Get ******************/
-// Lengths
-
-int mesh_get_ghost_length(int mesh,int entity) {
-	return FEM_Mesh_get_length(mesh,entity)+FEM_Mesh_get_length(mesh,FEM_GHOST+entity);
+// Renumber connectivity from bizarre new double-ended indexing to 
+//  sensible old "first real, then ghost" connectivity.
+static void renumberGhostConn(int nodeGhostStart, //Index of first ghost node
+	int *conn,int per,int n,int idxbase) 
+{
+	for (int r=0;r<n;r++)
+	for (int c=0;c<per;c++)
+	{
+		int i=conn[r*per+c];
+		if (idxbase==0) { /* C version: */
+			if (FEM_Is_ghost_index(i))
+				conn[r*per+c]=nodeGhostStart+FEM_From_ghost_index(i);
+		} else { /* f90 version: */
+			if (i<0)
+				conn[r*per+c]=nodeGhostStart-1+(-i);
+		}
+	}
 }
 
+// read this entity types' connectivity, as both real and ghost:
+static void mesh_conn(int fem_mesh,int entity,int *conn,int idxBase) {
+	int n=FEM_Mesh_get_length(fem_mesh,entity);
+	int per=FEM_Mesh_get_width(fem_mesh,entity,FEM_CONN);
+	FEM_Mesh_data(fem_mesh,entity,FEM_CONN, conn, 0,n, FEM_INDEX_0+idxBase,per);
+	int nGhosts=FEM_Mesh_get_length(fem_mesh,FEM_GHOST+entity);
+	if (nGhosts>0) { /* Grab ghost data on the end of the regular data */ 
+		int *ghostConn=&conn[n*per];
+		FEM_Mesh_data(fem_mesh,FEM_GHOST+entity,FEM_CONN,
+			ghostConn, 0,nGhosts, FEM_INDEX_0+idxBase,per);
+		renumberGhostConn(FEM_Mesh_get_length(fem_mesh,FEM_NODE),ghostConn,per,nGhosts,idxBase);
+	}
+}
+
+
+// Lengths
 CDECL void FEM_Get_node(int *nNodes,int *perNode) {
 	*nNodes=mesh_get_ghost_length(G,FEM_NODE);
 	*perNode=FEM_Mesh_get_width(G,FEM_NODE,FEM_DATA);
@@ -170,46 +209,19 @@ FORTRAN_AS_C(FEM_GET_ELEM_DATA_R,FEM_Get_elem_data,fem_get_elem_data_r,
 
 // Connectivity
 CDECL void FEM_Get_elem_conn(int elType,int *conn) {
-	int fem_mesh=G;
-	int entity=FEM_ELEM+elType;
-	int n=FEM_Mesh_get_length(fem_mesh,entity);
-	int per=FEM_Mesh_get_width(fem_mesh,entity,FEM_CONN);
-	FEM_Mesh_conn(fem_mesh,entity,conn, 0,n, per);
-	int nGhosts=FEM_Mesh_get_length(fem_mesh,FEM_GHOST+entity);
-	if (nGhosts>0) { /* Grab ghost data on the end of the regular data */ 
-		int *ghostConn=&conn[n*per];
-		FEM_Mesh_conn(fem_mesh,FEM_GHOST+entity,
-			ghostConn, 0,nGhosts, per);
-		// Renumber indices for ghost nodes (put them after regular nodes):
-		int nodeGhostStart=FEM_Mesh_get_length(fem_mesh,FEM_NODE);
-		for (int r=0;r<nGhosts;r++) {
-			for (int c=0;c<per;c++) {
-				int i=ghostConn[r*per+c];
-				if (FEM_Is_ghost_index(i))
-					ghostConn[r*per+c]=nodeGhostStart+FEM_From_ghost_index(i);
-			}
-		}
-	}
+	mesh_conn(G,FEM_ELEM+elType,conn,0);
 }
 
 FDECL void FTN_NAME(FEM_GET_ELEM_CONN_R, fem_get_elem_conn_r)
 	(int *elType,int *conn)
 {
-	FEM_Get_elem_conn(*elType,conn); //Grab the zero-based version:
-	int fem_mesh=G;
-	int entity=FEM_ELEM+*elType;
-	int n=mesh_get_ghost_length(fem_mesh,entity);
-	int per=FEM_Mesh_get_width(fem_mesh,entity,FEM_CONN);
-	//Swap from zero to one-based indexing
-	for (int i=0;i<n;i++) 
-	for (int j=0;j<per;j++)
-		conn[i*per+j]++;
+	mesh_conn(G,FEM_ELEM+*elType,conn,1);
 }
 
 
 // Sparse
 CDECL int  FEM_Get_sparse_length(int sid) {
-	return FEM_Mesh_get_length(G,FEM_SPARSE+sid);
+	return mesh_get_ghost_length(G,FEM_SPARSE+sid);
 }
 FORTRAN_AS_C_RETURN(int, FEM_GET_SPARSE_LENGTH,FEM_Get_sparse_length,fem_get_sparse_length,
 	(int *sid), (*sid))
@@ -217,26 +229,16 @@ FORTRAN_AS_C_RETURN(int, FEM_GET_SPARSE_LENGTH,FEM_Get_sparse_length,fem_get_spa
 CDECL void FEM_Get_sparse(int sid,int *nodes,void *data) {
 	int fem_mesh=G;
 	int entity=FEM_SPARSE+sid;
-	int nRecords=FEM_Mesh_get_length(fem_mesh,entity);
-	int nodesPerRec=FEM_Mesh_get_width(fem_mesh,entity,FEM_CONN);
-	int dataPerRec=FEM_Mesh_get_width(fem_mesh,entity,FEM_DATA);
 	int dataType=FEM_Mesh_get_datatype(fem_mesh,entity,FEM_DATA);
-	FEM_Mesh_conn(fem_mesh,entity,
-		nodes, 0,nRecords, nodesPerRec);
-	FEM_Mesh_data(fem_mesh,entity,FEM_DATA,
-		data, 0,nRecords, dataType,dataPerRec);
+	mesh_data(fem_mesh,entity,dataType,data);
+	mesh_conn(fem_mesh,entity,nodes,0);
 }
 FDECL void FTN_NAME(FEM_GET_SPARSE,fem_get_sparse)(int *sid,int *nodes,void *data) {
 	int fem_mesh=G;
 	int entity=FEM_SPARSE+*sid;
-	int nRecords=FEM_Mesh_get_length(fem_mesh,entity);
-	int nodesPerRec=FEM_Mesh_get_width(fem_mesh,entity,FEM_CONN);
-	int dataPerRec=FEM_Mesh_get_width(fem_mesh,entity,FEM_DATA);
 	int dataType=FEM_Mesh_get_datatype(fem_mesh,entity,FEM_DATA);
-	mesh_fortran_conn(fem_mesh,entity,
-		nodes, 0,nRecords, nodesPerRec);
-	FEM_Mesh_get_data(fem_mesh,entity,FEM_DATA,
-		data, 0,nRecords, dataType,dataPerRec);
+	mesh_data(fem_mesh,entity,dataType,data);
+	mesh_conn(fem_mesh,entity,nodes,1);
 }
 
 CDECL int FEM_Get_node_ghost(void) 
