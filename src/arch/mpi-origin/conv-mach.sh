@@ -34,3 +34,4 @@ CMK_QT='origin'
 CMK_XIOPTS=''
 CMK_F90OBJS='fmain.o'
 CMK_F90LIBS='-L/usr/lib64 -lfortran -lftn'
+CMK_MOD_EXT="M"
