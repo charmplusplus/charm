@@ -1,0 +1,181 @@
+/*Charm++ Network FEM: C implementation file
+
+Orion Sky Lawlor, olawlor@acm.org, 10/28/2001
+*/
+#include "charm++.h"
+#include "netfem.h"
+#include "netfem.decl.h"
+#include "charm-api.h"
+#include "conv-ccs.h"
+#include <string.h>
+
+#include "netfem_data.h"
+
+#include "toNetwork4.h"
+
+//Describes what to do with incoming data
+class NetFEM_flavor {
+public:	
+	int flavor; //What to do with the data
+	bool doCopy;
+	bool doWrite;
+	NetFEM_flavor(int flavor_) 
+		:flavor(flavor_)
+	{
+		doCopy=(flavor>=NetFEM_COPY);
+		doWrite=(flavor==NetFEM_WRITE);		
+	}
+};
+
+//As above, but including what to do with the data
+class NetFEM_updatePackage : public NetFEM_update {
+	NetFEM_flavor flavor; //What to do with the data
+public:
+	NetFEM_updatePackage(int dim_,int ts_,int flavor_)
+		:NetFEM_update(dim_,ts_),flavor(flavor_) {}
+
+	const NetFEM_flavor &getFlavor(void) const {return flavor;}
+};
+
+
+//Keeps all stored FEM data for a processor
+class NetFEM_state {
+	/*STUPID HACK:  Only keep one update around, ever.
+	  Need to:
+	     -Index updates by source FEM element
+	     -Make copies of updates if asked
+	     -Write updates to disk if asked
+	*/
+	NetFEM_updatePackage *cur;
+public:
+	NetFEM_state() {cur=NULL;}
+	~NetFEM_state() {delete cur;}
+	void add(NetFEM_updatePackage *u)
+	{
+		delete cur;
+		cur=u;
+	}
+	
+	void getCurrent(char *request,CcsDelayedReply reply)
+	{
+		//HACK: ignore requested data (should grab timestep, source, etc.)
+
+		//Figure out how long our response will be
+		int respLen;
+		{PUP_toNetwork4_sizer p; cur->pup(p); respLen=p.size();}
+		//Allocate a buffer and pack our response into it
+		void *respBuf=malloc(respLen);
+		{PUP_toNetwork4_pack p(respBuf); cur->pup(p); }
+		//Deliver the response
+		CcsSendDelayedReply(reply,respLen,respBuf);
+		free(respBuf);
+	}
+	NetFEM_update *stateForStep(int stepNo) {
+		/*HACK: need to look up based on element and step*/
+		return cur;
+	}
+};
+
+CpvDeclare(NetFEM_state *,netfem_state);
+
+static NetFEM_state *getState(void) {
+	NetFEM_state *ret=CpvAccess(netfem_state);
+	if (ret==NULL) {
+		ret=new NetFEM_state;
+		CpvAccess(netfem_state)=ret;
+	}
+	return ret;
+}
+
+extern "C" void NetFEM_getCurrent(void *request) 
+{
+	CcsDelayedReply reply=CcsDelayReply();
+	char *reqPtr=(char *)request;
+	reqPtr+=CmiMsgHeaderSizeBytes;//Skip over converse header
+	getState()->getCurrent(reqPtr,reply);
+	CmiFree(request);
+}
+
+//Must be called exactly once on each node
+void NetFEM_Init(void) 
+{
+	CpvInitialize(NetFEM_state *,netfem_state);
+	CcsRegisterHandler("NetFEM_current",(CmiHandler)NetFEM_getCurrent);
+}
+
+
+/*----------------------------------------------
+All NetFEM calls must be between a Begin and End pair:*/
+CDECL NetFEM NetFEM_Begin(
+	int dim,/*Number of spatial dimensions (2 or 3)*/
+	int timestep,/*Integer ID for this instant (need not be sequential)*/
+	int flavor /*What to do with data (point at, write, or copy)*/
+) 
+{
+	return (NetFEM)(new NetFEM_updatePackage(dim,timestep,flavor));
+}
+
+#define N ((NetFEM_updatePackage *)n)
+
+CDECL void NetFEM_End(NetFEM n) { /*Publish these updates*/
+	getState()->add(N);
+}
+
+/*---- Register the locations of the nodes.  (Exactly once, required)
+   In 2D, node i has location (loc[2*i+0],loc[2*i+1])
+   In 3D, node i has location (loc[3*i+0],loc[3*i+1],loc[3*i+2])
+*/
+CDECL void NetFEM_Nodes(NetFEM n,int nNodes,double *loc,const char *name) {
+	N->addNodes(new NetFEM_nodes(nNodes,N->getDim(),loc,name));
+}
+
+/*----- Register the connectivity of the elements. 
+   Element i is adjacent to nodes conn[nodePerEl*i+{0,1,...,nodePerEl-1}]
+*/
+CDECL void NetFEM_Elements(NetFEM n,int nEl,int nodePerEl,int *conn,const char *name)
+{
+	N->addElems(new NetFEM_elems(nEl,nodePerEl,conn,0,name));
+}
+
+/*--------------------------------------------------
+Associate a spatial vector (e.g., displacement, velocity, accelleration)
+with each of the previous objects (nodes or elements).
+*/
+CDECL void NetFEM_Vector_Field(NetFEM n,double *start,
+	int init_offset,int distance,
+	const char *name)
+{
+	NetFEM_item::format fmt(N->getDim(),init_offset,distance);
+	N->getItem()->add(start,fmt,name,true);
+}
+
+/*Simpler version of the above if your data is packed as
+data[item*3+{0,1,2}].
+*/
+CDECL void NetFEM_Vector(NetFEM n,double *data,const char *name)
+{
+	NetFEM_Vector_Field(n,data,0,sizeof(double)*N->getDim(),name);
+}
+
+/*--------------------------------------------------
+Associate a scalar (e.g., stress, temperature, pressure, damage)
+with each of the previous objects (nodes or elements).
+*/
+CDECL void NetFEM_Scalar_Field(NetFEM n,double *start,
+	int vec_len,int init_offset,int distance,
+	const char *name)
+{
+	NetFEM_item::format fmt(vec_len,init_offset,distance);
+	N->getItem()->add(start,fmt,name,false);
+}
+
+/*Simpler version of above for contiguous double-precision data*/
+CDECL void NetFEM_Scalar(NetFEM n,double *start,int doublePer,
+	const char *name)
+{
+	NetFEM_Scalar_Field(n,start,doublePer,0,sizeof(double)*doublePer,name);
+}
+
+
+#include "netfem.def.h"
+
