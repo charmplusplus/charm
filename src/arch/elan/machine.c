@@ -40,13 +40,13 @@ ELAN_QUEUE    *elan_q;
 const int SMALL_MESSAGE_SIZE= 16384;    /* for comm bench */
                                      /* Message sizes greater will be 
 					  probe received adding 5us overhead*/
-#define SYNC_MESSAGE_SIZE 32768
+#define SYNC_MESSAGE_SIZE 160000
                                        /* Message sizes greater will be 
 				       sent synchronously thus avoiding copying*/
 
 #define NON_BLOCKING_MSG  256          /* Message sizes greater 
 					  than this will be sent asynchronously*/
-#define RECV_MSG_Q_SIZE 8
+#define RECV_MSG_Q_SIZE 16
 
 ELAN_EVENT *esmall[RECV_MSG_Q_SIZE], *elarge;
 #define TAG_SMALL 0x69
@@ -949,16 +949,18 @@ void elan_barrier(){
 void *elan_CmiAlloc(int size){
     char *res = NULL;
     char *buf;
-    
-    if(size <= SMALL_MESSAGE_SIZE + 2 * sizeof(int)) {
+    /*
+    if((size <= SMALL_MESSAGE_SIZE + 2 * sizeof(int))
+       && (size > SMALL_MESSAGE_SIZE/2 + 2 * sizeof(int))) {
         size = SMALL_MESSAGE_SIZE + 4 * sizeof(int);
         if(!PCQueueEmpty(localBufferQueue))
             buf = PCQueuePop(localBufferQueue);
         else
             buf = (char *)malloc_nomigrate(size);
     }
-    else 
-        buf =(char *)malloc_nomigrate(size + 2 * sizeof(int));
+    else
+    */
+    buf =(char *)malloc_nomigrate(size + 2 * sizeof(int));
 
     TYPE_FIELD(buf) = DYNAMIC_MESSAGE;
     res = (char *)((char *)buf + 2 * sizeof(int));
@@ -971,14 +973,16 @@ void elan_CmiFree(void *res){
     
     if(TYPE_FIELD(buf) != DYNAMIC_MESSAGE)
         return;
-   
+    /*
     //Called from Cmifree so we know the size and 
     //we dont hve to store it again
     int size = SIZE_FIELD(buf);
-    if(size <= SMALL_MESSAGE_SIZE) 
+    if((size <= SMALL_MESSAGE_SIZE) 
+       && (size > SMALL_MESSAGE_SIZE/2))
         PCQueuePush(localBufferQueue, buf);
-    else       
-        free_nomigrate(buf);
+    else 
+    */              
+    free_nomigrate(buf);
 }
 
 //Called from the application for static messages which 

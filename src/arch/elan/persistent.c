@@ -338,7 +338,7 @@ void PumpPersistent()
       int size = slot->recvSize;
       void *msg = slot->messagePtr;
 
-#if 1
+#if 0
       // return messagePtr directly and user MUST make sure not to delete it.      
       void *dupmsg;
       dupmsg = CmiAlloc(size);
