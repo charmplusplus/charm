@@ -52,7 +52,7 @@ static void ampiNodeInit(void)
 {
   CtvInitialize(ampiParent*, ampiPtr);
   mpi_nworlds=0;
-  for(int i=0;i<mpi_nworlds; i++)
+  for(int i=0;i<MPI_MAX_COMM_WORLDS; i++)
   {
     MPI_COMM_UNIVERSE[i] = MPI_COMM_WORLD+1+i;
   }
