@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.3  1995-10-20 17:29:32  jyelon
+ * Revision 2.4  1995-10-25 19:58:49  jyelon
+ * corrected a warning.
+ *
+ * Revision 2.3  1995/10/20  17:29:32  jyelon
  * Corrected a warning message.
  *
  * Revision 2.2  1995/09/07  21:22:53  jyelon
@@ -360,7 +363,7 @@ char           *module;
 		fprintf(outh, "  %s%s = ", temp, REFSUFFIX);
 		dummy = MyModulePrefix(module, table->name);
 		fprintf(outh, "%s%s;\n", dummy, REFSUFFIX);
-		fprintf(outh, "  (%s) %s = (%s) %s;\n", FunctionType, temp, FunctionType, dummy);
+		fprintf(outh, "%s = (%s) %s;\n", temp, FunctionType, dummy);
 		dontfree(temp);
 		dontfree(dummy);
 		break;
