@@ -1,0 +1,50 @@
+// Triangular Mesh Refinement Framework - 2D (TMR)
+// Created by: Terry L. Wilmarth
+
+module refine {
+  // ----------------------------- Messages ---------------------------------
+  message chunkMsg;
+  message nodeMsg;
+  message edgeMsg;
+  message remoteEdgeMsg;
+  message elementMsg;
+  message refineMsg;
+  message updateMsg;
+  message specialRequestMsg;
+  message specialResponseMsg;
+  message refMsg; 
+  message edgeUpdateMsg;
+  message intMsg;
+  message doubleMsg;
+
+  // ------------------------ Global Read-only Data -------------------------
+  readonly CProxy_chunk mesh;
+
+  initproc void refineChunkInit(void);
+
+  // ---------------------------- Chare Arrays ------------------------------
+  array [1D] chunk {
+    entry chunk(chunkMsg *);
+    entry void addRemoteEdge(remoteEdgeMsg *);
+    entry void refineElement(refineMsg *);
+    entry [threaded] void refiningElements();	
+    entry [sync] nodeMsg *getNode(intMsg *);
+    entry [sync] void updateElement(updateMsg *);
+    entry [threaded] void specialRequest(specialRequestMsg *);
+    entry [threaded] void specialRequestResponse(specialResponseMsg *);
+    entry [sync, threaded] doubleMsg *getArea(intMsg *);
+    entry [sync, threaded] nodeMsg *midpoint(intMsg *);
+    entry [sync] intMsg *lock(intMsg *);
+    entry [sync] void unlock(intMsg *);
+    entry [sync] intMsg *locked(intMsg *);
+    entry [sync, threaded] intMsg *checkElement(refMsg *);
+    entry [sync] refMsg *getNeighbor(refMsg *);
+    entry [sync] void setTargetArea(doubleMsg *);
+    entry [sync] void updateEdges(edgeUpdateMsg *);
+    entry [sync] void unsetDependency(intMsg *);
+    entry [sync] void setDependent(refMsg *);
+    entry [sync] intMsg *hasDependent(intMsg *);
+    entry [sync, threaded] void print();
+    entry [sync, threaded] void out_print();
+  };
+};

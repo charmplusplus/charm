@@ -1,0 +1,6 @@
+This is a triangle mesh refinement library,
+and pgm.C is a (poor) example code.
+
+You'll have to run the program with at least
++vp2, because it depends on having at least two
+virtual processors.
