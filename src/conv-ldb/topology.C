@@ -169,25 +169,28 @@ private:
   // inherited int npes;
   int* Cardinality;
   int VirtualProcessorCount;
+  int* TempCo;
 private:
-	int GetNeighborID(int ProcessorID, int number) {
-		CmiAssert(number>=0 && number<max_neighbors());
-		int displacement = (number%2)? -1: 1;
-		for(int i=0;i<number/2; i++) {
-			displacement *= Cardinality[i];
-		}
-		do{
-			ProcessorID = (ProcessorID + displacement) % VirtualProcessorCount;
-		} while (ProcessorID >= npes);
-		return ProcessorID;
-	}
+  int GetNeighborID(int ProcessorID, int number) {
+    CmiAssert(number>=0 && number<max_neighbors());
+    CmiAssert(ProcessorID>=0 && ProcessorID<npes);
+    get_processor_coordinates(ProcessorID, TempCo);
+
+    int index = number/2;
+    int displacement = (number%2)? -1: 1;
+    do{
+      TempCo[index] = (TempCo[index] + displacement + Cardinality[index]) % Cardinality[index];
+      get_processor_id(TempCo, &ProcessorID);
+    } while (ProcessorID >= npes);
+    return ProcessorID;
+  }
 public:
   LBTopo_torus_nd(int p): LBTopology(p) /*inherited :npes(p) */ {
     CmiAssert(dimension>=1 && dimension<=16);
     CmiAssert(p>=1);
 
     Cardinality = new int[dimension];
-
+    TempCo = new int[dimension];
     double pp = p;
     for(int i=0;i<dimension;i++) {
       Cardinality[i] = (int)ceil(pow(pp,1.0/(dimension-i))-1e-5);
@@ -199,61 +202,66 @@ public:
     }
   }
   ~LBTopo_torus_nd() {
-  	delete[] Cardinality;
+    delete[] Cardinality;
+    delete[] TempCo;
   }
   virtual int max_neighbors() {
-  	return dimension*2;
+    return dimension*2;
   }
   virtual void neighbors(int mype, int* _n, int &nb) {
-  	nb = 0;
-  	for(int i=0;i<dimension*2;i++) {
-  		_n[nb] = GetNeighborID(mype, i);
-  		if (_n[nb]!=mype && (nb==0 || _n[nb-1]!=_n[nb]) ) nb++;
-  	}
+    nb = 0;
+    for(int i=0;i<dimension*2;i++) {
+      _n[nb] = GetNeighborID(mype, i);
+      if (_n[nb]!=mype && (nb==0 || _n[nb-1]!=_n[nb]) ) nb++;
+    }
   }
   virtual int get_dimension() {
-  	return dimension;
+    return dimension;
   }
   virtual bool get_processor_coordinates(int processor_id, int* processor_coordinates) {
-		CmiAssert(processor_id>=0 && processor_id<VirtualProcessorCount);
-		CmiAssert( processor_coordinates != NULL );
-		for(int i=0;i<dimension;i++) {
-			processor_coordinates[i] = processor_id % Cardinality[i];
-			processor_id = processor_id / Cardinality[i];
-		}
-		return true;
+    CmiAssert(processor_id>=0 && processor_id<VirtualProcessorCount);
+    CmiAssert( processor_coordinates != NULL );
+    for(int i=0;i<dimension;i++) {
+      processor_coordinates[i] = processor_id % Cardinality[i];
+      processor_id = processor_id / Cardinality[i];
+    }
+    return true;
   }
   virtual bool get_processor_id(const int* processor_coordinates, int* processor_id) {
-  		CmiAssert( processor_coordinates != NULL );
-  		CmiAssert( processor_id != NULL );
-		(*processor_id) = 0;
-		for(int i=dimension-1;i>=0;i--) {
-			(*processor_id) = (*processor_id)* Cardinality[i] + processor_coordinates[i];
-		}
-		return true;
+    CmiAssert( processor_coordinates != NULL );
+    CmiAssert( processor_id != NULL );
+    for(int i=dimension-1;i>=0;i--) 
+      CmiAssert( 0<=processor_coordinates[i] && processor_coordinates[i]<Cardinality[i]);
+    (*processor_id) = 0;
+    for(int i=dimension-1;i>=0;i--) {
+      (*processor_id) = (*processor_id)* Cardinality[i] + processor_coordinates[i];
+    }
+    return true;
   }
+  //Note: if abs(difference)*2 = cardinality, the difference is set to zero
   virtual bool coordinate_difference(const int* my_coordinates, const int* target_coordinates, int* difference) { 
-  	CmiAssert( my_coordinates != NULL);
-  	CmiAssert( target_coordinates != NULL);
-  	CmiAssert( difference != NULL);
-		for(int i=0;i<dimension;i--) {
-			difference[i] = target_coordinates[i] - my_coordinates[i];
-			if (abs(difference[i])*2 > Cardinality[i]) {
-				difference[i] += (difference[i]>0) ? -Cardinality[i] : Cardinality[i];
-			} else if (abs(difference[i])*2 == Cardinality[i]) {
-				difference[i] = 0;
-			}
-		}
-		return true;
+    CmiAssert( my_coordinates != NULL);
+    CmiAssert( target_coordinates != NULL);
+    CmiAssert( difference != NULL);
+    for(int i=0;i<dimension;i--) {
+      difference[i] = target_coordinates[i] - my_coordinates[i];
+      if (abs(difference[i])*2 > Cardinality[i]) {
+        difference[i] += (difference[i]>0) ? -Cardinality[i] : Cardinality[i];
+      } else if (abs(difference[i])*2 == Cardinality[i]) {
+        difference[i] = 0;
+      }
+    }
+    return true;
   }
+  //Note: if abs(difference)*2 = cardinality, the difference is set to zero
   virtual bool coordinate_difference(int my_processor_id, int target_processor_id, int* difference) { 
-  	CmiAssert( difference != NULL);
-	int my_coordinates[dimension];
-  	int target_coordinates[dimension];
-  	get_processor_coordinates(my_processor_id, my_coordinates);
-  	get_processor_coordinates(target_processor_id, target_coordinates);
-  	coordinate_difference(my_coordinates, target_coordinates, difference);
-  	return true; 
+    CmiAssert( difference != NULL);
+    int my_coordinates[dimension];
+    int target_coordinates[dimension];
+    get_processor_coordinates(my_processor_id, my_coordinates);
+    get_processor_coordinates(target_processor_id, target_coordinates);
+    coordinate_difference(my_coordinates, target_coordinates, difference);
+    return true;
   }
 };
 
@@ -342,7 +350,7 @@ extern "C" int getTopoMaxNeighbors(void *topo)
 extern "C" void printoutTopo()
 {
   for (int i=0; i<lbTopoMap.length(); i++) {
-    CmiPrintf("	%s\n", lbTopoMap[i]->name);
+    CmiPrintf("  %s\n", lbTopoMap[i]->name);
   }
 }
 
