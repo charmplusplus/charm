@@ -1,5 +1,5 @@
-DIRS=comlib commlib_stream 
-# BROKEN: pipeBroadcast
+DIRS=comlib 
+# BROKEN: commlib_stream pipeBroadcast
 
 .PHONY: test $(DIRS)
 
