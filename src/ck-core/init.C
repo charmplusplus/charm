@@ -259,6 +259,11 @@ static void _nullFn(void *, void *)
 
 #if CMK_DEBUG_MODE
 extern char* getEnvInfo(envelope *env);
+extern char* makeCharmSymbolTableInfo(void);
+extern int getEpIdx(char *msg);
+extern void symbolTableFnArrayRegister(int hndlrID, int noOfBreakPoints,
+				       symbolTableFunction f, 
+				       indirectionFunction g);
 
 static char* fHeader(char* msg)
 {
@@ -372,6 +377,12 @@ void _initCharm(int argc, char **argv)
     CpvAccess(_qd)->create(CkNumPes()-1);
     _initDone();
   }
+
+#if CMK_DEBUG_MODE
+  symbolTableFnArrayRegister(_charmHandlerIdx, _numEntries,
+			     makeCharmSymbolTableInfo,
+			     getEpIdx);
+#endif
 }
 
 GroupTable::GroupTable() 

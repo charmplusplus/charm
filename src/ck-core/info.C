@@ -12,6 +12,11 @@ int getCharmMsgHandlers(int *handleArray)
 
 CsvDeclare(int*,  BreakPoints);
 CsvDeclare(char*, SymbolTableInfo);
+CpvDeclare(symbolTableType, SymbolTableFnArray);
+typedef int offsetType[MAX_NUM_HANDLERS];
+CpvDeclare(offsetType, offsetArray);
+CpvDeclare(int, numBreakPoints);
+CpvDeclare(indirectionType, indirectionFnArray);
 
 CpvExtern(handlerType, handlerArray);
 
@@ -33,7 +38,7 @@ char* getEnvInfo(envelope *env)
   return(returnInfo);
 }
 
-char* makeSymbolTableInfo(void)
+char* makeCharmSymbolTableInfo(void)
 {
   int i, chareIndex;
   int size;
@@ -57,6 +62,39 @@ char* makeSymbolTableInfo(void)
   return(returnInfo);
 }
 
+int getEpIdx(char *msg)
+{
+  envelope *env;
+  
+  env = (envelope *)msg;
+  return(env->getEpIdx());
+}
+
+char *makeSymbolTableInfo(void)
+{
+  symbolTableFunction f;
+  char *returnInfo, *newReturnInfo;
+  int i;
+
+  returnInfo = (char *)malloc(1);
+  returnInfo[0] = '\0';
+  for(i = 0; i < MAX_NUM_HANDLERS; i++){
+    if((f = CpvAccess(SymbolTableFnArray)[i]) != 0){
+      char *p;
+
+      p = (*f)();
+      newReturnInfo = (char *)malloc(strlen(p) + strlen(returnInfo) + 1);
+      strcpy(newReturnInfo, returnInfo);
+      strcat(newReturnInfo, p);
+      free(returnInfo);
+      free(p);
+      returnInfo = newReturnInfo;
+    }
+  }
+  
+  return(returnInfo);
+}
+
 extern "C"
 void CpdInitializeBreakPoints(void)
 {
@@ -64,8 +102,28 @@ void CpdInitializeBreakPoints(void)
 
   CsvInitialize(int *, BreakPoints);
   CsvInitialize(char *, SymbolTableInfo);
+  CpvInitialize(symbolTableType, SymbolTableFnArray);
+  CpvInitialize(offsetType, offsetArray);
+  CpvInitialize(int, numBreakPoints);
+  CpvInitialize(indirectionType, indirectionFnArray);
+
   CsvAccess(BreakPoints) = 0;
   CsvAccess(SymbolTableInfo) = 0;
+  for(i = 0; i < MAX_NUM_HANDLERS; i++){
+    CpvAccess(SymbolTableFnArray)[i] = 0;
+    CpvAccess(offsetArray)[i] = 0;
+    CpvAccess(indirectionFnArray)[i] = 0;
+  }
+  CpvAccess(numBreakPoints) = 0;
+}
+
+void symbolTableFnArrayRegister(int hndlrID, int noOfBreakPoints,
+				symbolTableFunction f, indirectionFunction g)
+{
+  CpvAccess(SymbolTableFnArray)[hndlrID] = f;
+  CpvAccess(indirectionFnArray)[hndlrID] = g;
+  CpvAccess(offsetArray)[hndlrID] = CpvAccess(numBreakPoints);
+  CpvAccess(numBreakPoints) += noOfBreakPoints;
 }
 
 char *getSymbolTableInfo(void)
@@ -80,7 +138,7 @@ void setBreakPoints(char *newBreakPoints)
   int i;
   char *temp;
 
-  for(i = 0; i < _numEntries; i++)
+  for(i = 0; i < CpvAccess(numBreakPoints); i++)
     CsvAccess(BreakPoints)[i] = (newBreakPoints[i] - '0');
 }
 
@@ -90,15 +148,16 @@ char *getBreakPoints(void)
   int i;
 
   if(CsvAccess(BreakPoints) == 0){
-    CsvAccess(BreakPoints) = (int *)malloc(_numEntries * sizeof(int));
-    for(i = 0; i < _numEntries; i++)
+    CsvAccess(BreakPoints) = (int *)malloc(CpvAccess(numBreakPoints) 
+					   *sizeof(int));
+    for(i = 0; i < CpvAccess(numBreakPoints); i++)
       CsvAccess(BreakPoints)[i] = 0;
   }
 
-  temp = (char *)malloc(_numEntries*2*sizeof(char)+6);
+  temp = (char *)malloc(CpvAccess(numBreakPoints)*2*sizeof(char)+6);
   strcpy(temp, "");
-  sprintf(temp, "%d#", _numEntries);
-  for(i = 0; i < _numEntries; i++){
+  sprintf(temp, "%d#", CpvAccess(numBreakPoints));
+  for(i = 0; i < CpvAccess(numBreakPoints); i++){
     char t[3];
     sprintf(t, "%d#", CsvAccess(BreakPoints)[i]);
     strcat(temp, t);
@@ -108,20 +167,23 @@ char *getBreakPoints(void)
 
 int isBreakPoint(char *msg)
 {
-  envelope *env;
-  int epIndex;
   int hndlrID;
   int i;
 
   if(CsvAccess(BreakPoints) == 0){
-    CsvAccess(BreakPoints) = (int *)malloc(_numEntries*sizeof(int));
-    for(i = 0; i < _numEntries; i++)
+    CsvAccess(BreakPoints) = (int *)malloc(CpvAccess(numBreakPoints)
+					   *sizeof(int));
+    for(i = 0; i < CpvAccess(numBreakPoints); i++)
       CsvAccess(BreakPoints)[i] = 0;
   }
   hndlrID = CmiGetHandler(msg);
   if(CpvAccess(handlerArray)[hndlrID][0] != 0){
-    env = (envelope *)msg;
-    return(CsvAccess(BreakPoints)[env->getEpIdx()]);
+    int offset;
+    indirectionFunction f;
+
+    f = CpvAccess(indirectionFnArray)[hndlrID];
+    offset = CpvAccess(offsetArray)[hndlrID] + (*f)(msg);
+    return(CsvAccess(BreakPoints)[offset]);
   } else {
     return 0;
   }

@@ -991,6 +991,12 @@ typedef char* (*hndlrIDFunction)(char *);
 typedef hndlrIDFunction handlerType[MAX_NUM_HANDLERS][2];
 void handlerArrayRegister(int, hndlrIDFunction, hndlrIDFunction);
 
+typedef int (*indirectionFunction)(char *);
+typedef indirectionFunction indirectionType[MAX_NUM_HANDLERS];
+
+typedef char* (*symbolTableFunction)(void);
+typedef symbolTableFunction symbolTableType[MAX_NUM_HANDLERS];
+
 char* getSymbolTableInfo();
 int isBreakPoint(char *msg);
 int isEntryPoint(char *msg);
