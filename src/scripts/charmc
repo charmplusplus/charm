@@ -967,6 +967,7 @@ do
 		Abort "I'm not yet smart enough to compile $FILE"
 		;;
 	*.o|*.so|*.sl|*.a)
+		[ ! -s $FILE ] && Abort "$FILE: file not recognized: File truncated"
 		OBJECTFILES="$OBJECTFILES $FILE"
 		;;
 	*.M|*.mod)
@@ -1014,7 +1015,7 @@ MakeSO() {
 	echo "!!      Failed to compile Charm++ shared library               !!"
 	echo "!!      compile Charm++ again with -no-build-shared option     !!"
 	echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-	 Abort "Command $soCmd returned error code $Do_res"
+	Abort "Command $soCmd returned error code $Do_res"
 	fi
 	Copyobj
 }
