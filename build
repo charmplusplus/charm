@@ -67,7 +67,7 @@ syntax() {
   echo '  --incdir=DIR	  specify additional include path for compiler'
   echo '  --libdir=DIR	  specify additional lib path for compiler'
   echo '  --basedir=DIR	  shortcut for the above two - DIR/include and DIR/lib'
-  echo '  -j NUM          parallel make, NUM is the number of paralle make jobs'
+  echo '  -jNUM          parallel make, NUM is the number of paralle make jobs'
   fi
   echo ''
   echo '<charmc-options>: normal compiler options e.g. -g -O -save -verbose'
@@ -84,8 +84,8 @@ syntax() {
   echo '4. compile Charm++ for Windows with VC++ (Cygwin required):'
   echo '  ./build charm++ net-win32 -O'
   echo '5. compile on IBM SP with MPI using parallel gmake, 4 jobs simultaneously:'
-  echo '  MAKE=gmake  ./build charm++ mpi-sp -j 4 -O            # sh'
-  echo '  setenv MAKE gmake;  ./build charm++ mpi-sp -j 4 -O    # csh'
+  echo '  MAKE=gmake  ./build charm++ mpi-sp -j4 -O            # sh'
+  echo '  setenv MAKE gmake;  ./build charm++ mpi-sp -j4 -O    # csh'
   echo ''
   echo 'Note: This script:'
   echo ' 1. Creates directories <version> and <version>/tmp';
@@ -204,15 +204,9 @@ do
 	    --no-shared)
 		BUILD_SHARED=""; shift
 		;;
-	    -j)
-		shift
-		MAKEOPTS="$MAKEOPTS -j $1"
-		if [ -z "$1" ] 
-		then
-                  echo "Error> Number of jobs for parallel make is not specified!"
-		  echo ''
-		  printOption
-		fi
+	    -j*)
+                PMAKENUM=`echo $1 | awk -Fj '{print $2}'`
+		MAKEOPTS="$MAKEOPTS -j $PMAKENUM"
 		shift;
 		;;
     -*) 
