@@ -24,35 +24,35 @@
 #include <sys/time.h>
 #include <varargs.h>
 
-#ifdef CMK_HAVE_STRINGS_H
+#if CMK_STRINGS_USE_STRINGS_H
 #include <strings.h>
 #endif
 
-#ifdef CMK_HAVE_STRING_H
+#if CMK_STRINGS_USE_STRING_H
 #include <string.h>
 #endif
 
-#ifdef CMK_JUST_DECLARE_STRING_FNS
+#if CMK_STRINGS_USE_OWN_DECLARATIONS
 char *strchr(), *strrchr(), *strdup();
 #endif
 
-#ifdef CMK_HAVE_WAITFLAGS_H
+#if CMK_WAIT_USES_WAITFLAGS_H
 #include <waitflags.h>
 #endif
-#ifdef CMK_HAVE_SYS_WAIT_H
+#if CMK_WAIT_USES_SYS_WAIT_H
 #include <sys/wait.h>
 #endif
 
-#ifdef CMK_STRERROR_USE_SYS_ERRLIST
+#if CMK_STRERROR_USE_SYS_ERRLIST
 extern char *sys_errlist[];
 #define strerror(i) (sys_errlist[i])
 #endif
 
-#ifdef CMK_RSH_IS_A_COMMAND
+#if CMK_RSH_IS_A_COMMAND
 #define RSH_CMD "rsh"
 #endif
 
-#ifdef CMK_RSH_USE_REMSH
+#if CMK_RSH_USE_REMSH
 #define RSH_CMD "remsh"
 #endif
 
