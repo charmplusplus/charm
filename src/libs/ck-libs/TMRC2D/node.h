@@ -73,6 +73,11 @@ class node {  // a 2D double coordinate
 	     e.cid, l, x, y);
       return 1;
     }
+    else if (e.cid == lockHolder.cid) {
+      CkPrintf("TMRC2D: Fail lock %d on %d with l=%f node %f,%f\n", e.idx, 
+	       e.cid, l, x, y);
+      return 0;
+    }
     else if (l >= lockLength) {
       CkPrintf("TMRC2D: Fail lock %d on %d with l=%f node %f,%f\n", e.idx, 
 	       e.cid, l, x, y);

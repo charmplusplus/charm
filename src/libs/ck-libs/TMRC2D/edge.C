@@ -10,6 +10,11 @@ void edge::reset()
   newNode.reset(); incidentNode.reset(); fixNode.reset(); 
 }
 
+int edge::isPending(elemRef e)
+{
+  return (pending && (waitingFor == e));
+}
+
 void edge::checkPending(elemRef e) 
 {
   elemRef nullRef;
@@ -136,23 +141,46 @@ int edge::collapse(elemRef requester, node kNode, node dNode)
     // need to lock adjacent nodes
     CkPrintf("TMRC2D: edge::collapse: ** PART 1! ** On edge=%d on chunk=%d, requester==(%d,%d) with nbr=(%d,%d)\n", myRef.idx, myRef.cid, requester.cid, requester.idx, nbr.cid, nbr.idx);
     length = kNode.distance(dNode);
-    intMsg *im = mesh[requester.cid].nodeLockup(requester.idx, kNode, myRef, myRef,
-						nbr, length);
-    if (im->anInt == -1) 
+
+    CkPrintf("TMRC2D: LOCK start... edge=%d requester=%d nbr=%d\n", myRef.idx, requester.idx, nbr.idx);
+    // lock kNode
+    intMsg *im = mesh[requester.cid].nodeLockup(requester.idx, kNode, myRef, 
+						myRef, nbr, length);
+    intMsg *jm;
+    if (im->anInt == 0) return -1;
+    if (im->anInt == -1) {
       im = mesh[nbr.cid].nodeLockup(nbr.idx, kNode, myRef, myRef, requester, 
 				    length);
-    if (!im->anInt) return -1;
-    else {
-      im = mesh[requester.cid].nodeLockup(requester.idx, dNode, myRef, myRef,
-					  nbr, length);
-      if (im->anInt == -1) 
-	im = mesh[nbr.cid].nodeLockup(nbr.idx, kNode, myRef, myRef, requester, 
-				      length);
-      if (!im->anInt) return -1;
+      if (im->anInt == 0) {
+	// unlock requester side of kNode
+	jm = mesh[requester.cid].nodeUpdate(requester.idx,kNode,myRef,nbr,kNode);
+	return -1;
+      }
+    }
+    // knode locked; now lock dNode
+    im = mesh[requester.cid].nodeLockup(requester.idx, dNode, myRef, myRef,
+					nbr, length);
+    if (im->anInt == 0) {
+      // unlock kNode
+      jm = mesh[requester.cid].nodeUpdate(requester.idx,kNode,myRef,nbr,kNode);
+      if (jm->anInt == -1)
+	jm = mesh[nbr.cid].nodeUpdate(nbr.idx,kNode,myRef,requester,kNode);
+      return -1;
+    }
+    else if (im->anInt == -1) {
+      im = mesh[nbr.cid].nodeLockup(nbr.idx, dNode, myRef, myRef, requester, 
+				    length);
+      if (im->anInt == 0) {
+	// unlock requester side of dNode
+	jm = mesh[requester.cid].nodeUpdate(requester.idx,dNode,myRef,nbr,dNode);	// unlock kNode
+	jm = mesh[requester.cid].nodeUpdate(requester.idx,kNode,myRef,nbr,kNode);
+	if (jm->anInt == -1)
+	  jm = mesh[nbr.cid].nodeUpdate(nbr.idx,kNode,myRef,requester,kNode);
+	return -1;
+      }
     }
     // both nodes locked
     CkPrintf("TMRC2D: edge::collapse: LOCKS obtained... On edge=%d on chunk=%d, requester==(%d,%d) with nbr=(%d,%d)\n", myRef.idx, myRef.cid, requester.cid, requester.idx, nbr.cid, nbr.idx);
-
     setPending();
     kNode.midpoint(dNode, newNode);
     incidentNode = dNode;
@@ -183,6 +211,8 @@ int edge::nodeLockup(node n, edgeRef start, elemRef from, elemRef end,
 		     double l)
 {
   elemRef next = getNot(from);
+  CkPrintf("TMRC2D: In edge[%d]::nodeLockup: from=%d next=%d\n", 
+	   myRef.idx, from.idx, next.idx);
   if (next.cid == -1) return -1;
   intMsg *im = mesh[next.cid].nodeLockup(next.idx, n, myRef, start, end, l);
   return im->anInt;

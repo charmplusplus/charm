@@ -166,6 +166,7 @@ class chunk : public TCharmClient1D {
   intMsg *nodeUpdateER(int idx, node n, elemRef from, elemRef end, node newNode);
   intMsg *nodeDelete(int idx, node n, edgeRef from, elemRef end);
   intMsg *nodeDeleteER(int idx, node n, elemRef from, elemRef end);
+  intMsg *isPending(int idx, objRef e);
   void checkPending(int idx, objRef aRef);
   void checkPending(int idx, objRef aRef1, objRef aRef2);
   void updateElement(int idx, objRef oldval, objRef newval);

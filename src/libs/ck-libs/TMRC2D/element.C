@@ -191,6 +191,15 @@ void element::collapse(int shortEdge)
   int opnode, delNode, keepNode, delEdge, keepEdge, result;
   elemRef delNbr;
 
+  if (edges[shortEdge].isPending(myRef)) {
+  }
+  else if (edges[(shortEdge+1)%3].isPending(myRef)) {
+    shortEdge = (shortEdge+1)%3;
+  }
+  else if (edges[(shortEdge+2)%3].isPending(myRef)) {
+    shortEdge = (shortEdge+2)%3;
+  }
+
   opnode = (shortEdge + 2) % 3;
   delNode = shortEdge;
   delEdge = opnode;
@@ -233,7 +242,6 @@ void element::collapse(int shortEdge)
     // edge[shortEdge] handles removal of delNode and shortEdge, as well as
     // update of keepNode
   }
-  // else collapse failed; try again later
 }
 
 int element::nodeLockup(node n, edgeRef from, edgeRef start, elemRef end, 
@@ -244,14 +252,19 @@ int element::nodeLockup(node n, edgeRef from, edgeRef start, elemRef end,
     if (n == C->theNodes[nodes[i]]) nIdx = i;
     if (from == edges[i]) fIdx = i;
   }
+  CkAssert((nIdx > -1) && (nIdx < 3));
+  CkAssert((fIdx > -1) && (fIdx < 3));
   int lockResult = C->theNodes[nIdx].lock(l, start);
   if (!lockResult) return 0;
   if (myRef == end) return 1;
   if (nIdx == fIdx) nextIdx = (nIdx + 2) % 3;
   else nextIdx = nIdx;
+  CkPrintf("TMRC2D: In element[%d]::nodeLockup: from=%d nIdx=%d fIdx=%d nextIdx=%d\n", 
+	   myRef.idx, from.idx, nIdx, fIdx, nextIdx);
   edgeRef nextRef = edges[nextIdx];
   intMsg *im = mesh[nextRef.cid].nodeLockupER(nextRef.idx, n, start, myRef, 
 					      end, l);
+  if (im->anInt == 0) C->theNodes[nIdx].unlock();
   return im->anInt;
 }
 

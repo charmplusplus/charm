@@ -52,6 +52,16 @@ int edgeRef::collapse(elemRef requester, node kNode, node dNode)
   return result;
 }
 
+int edgeRef::isPending(elemRef e)
+{
+  intMsg *im;
+  int result;
+  im = mesh[cid].isPending(idx, e);
+  result = im->anInt;
+  CkFreeMsg(im);
+  return result;
+}
+
 void edgeRef::resetEdge()
 {
   mesh[cid].resetEdge(idx);

@@ -211,6 +211,16 @@ intMsg *chunk::nodeDeleteER(int idx, node n, elemRef from, elemRef end)
   return im;
 }
 
+intMsg *chunk::isPending(int idx, objRef e)
+{
+  intMsg *im = new intMsg;
+  elemRef eR(e.cid, e.idx);
+  accessLock();
+  im->anInt = theEdges[idx].isPending(eR);
+  releaseLock();
+  return im;
+}
+
 void chunk::checkPending(int idx, objRef aRef)
 {
   elemRef eRef;

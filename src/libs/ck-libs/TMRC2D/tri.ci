@@ -33,6 +33,7 @@ module refine {
     entry [sync, threaded] intMsg *nodeUpdateER(int, node, elemRef, elemRef, node);
     entry [sync, threaded] intMsg *nodeDelete(int, node, edgeRef, elemRef);
     entry [sync, threaded] intMsg *nodeDeleteER(int, node, elemRef, elemRef);
+    entry [sync] intMsg *isPending(int, objRef);
     entry void checkPending(int, objRef);
     entry void checkPending(int, objRef, objRef);
     entry [sync] void updateElement(int, objRef, objRef);

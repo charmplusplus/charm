@@ -34,6 +34,7 @@ class edgeRef : public objRef {
 	    elemRef requester, int *local, int *first, int *nullNbr);
   int collapse(elemRef requester, node kNode, node dNode);
   void resetEdge();
+  int isPending(elemRef e);
   void checkPending(elemRef e);
   void checkPending(elemRef e, elemRef ne);
 };

@@ -78,6 +78,7 @@ class edge {
   }
   void setPending() { pending = 1; }
   void unsetPending() { pending = 0; }
+  int isPending(elemRef e);
   void checkPending(elemRef e);
   void checkPending(elemRef e, elemRef ne);
   int split(int *m, edgeRef *e_prime, node iNode, node fNode,
