@@ -7,6 +7,13 @@
 #define DEBUGF(x)           // CmiPrintf x
 
 CkpvStaticDeclare(Trace*, _traceproj);
+class UsrEvent {
+public:
+  int e;
+  char *str;
+  UsrEvent(int _e, char* _s): e(_e),str(_s) {}
+};
+CkpvStaticDeclare(CkVec<UsrEvent *>, usrEvents);
 
 
 #ifdef CMK_OPTIMIZE
@@ -26,6 +33,7 @@ void _createTraceprojector(char **argv)
 {
   DEBUGF(("%d createTraceProjector\n", CkMyPe()));
   CkpvInitialize(Trace*, _traceproj);
+  CkpvInitialize(CkVec<UsrEvent *>, usrEvents);
   CkpvAccess(_traceproj) = new  TraceProjector(argv);
   CkpvAccess(_traces)->addTrace(CkpvAccess(_traceproj));
 }
@@ -41,8 +49,20 @@ TraceProjector::TraceProjector(char **argv)
 
 int TraceProjector::traceRegisterUserEvent(const char* evt, int e)
 {
-	/** Projector doesn't have it at the moment **/
-	return 0;
+CkAssert(e==-1 || e>=0);
+  CkAssert(evt != NULL);
+  int event;
+  int biggest = 0;
+  for (int i=0; i<CkpvAccess(usrEvents).length(); i++) {
+    int cur = CkpvAccess(usrEvents)[i]->e;
+    if (cur == e) 
+      CmiAbort("UserEvent double registered!");
+    if (cur > biggest) biggest = cur;
+  }
+  if (e==-1) event = biggest;
+  else event = e;
+  CkpvAccess(usrEvents).push_back(new UsrEvent(event,(char *)evt));
+  return event;
 }
 
 void TraceProjector::traceClearEps(void)
@@ -83,8 +103,8 @@ extern "C" void writeSts(){
 		 _entryTable[i]->chareIdx, _entryTable[i]->msgIdx);
 	 for(i=0;i<_numMsgs;i++)
 	      fprintf(stsfp, "MESSAGE %d %d\n", i, _msgTable[i]->size);
-	 /*for(i=0;i<CkpvAccess(usrEvents).length();i++)
-	      fprintf(stsfp, "EVENT %d %s\n", CkpvAccess(usrEvents)[i]->e, CkpvAccess(usrEvents)[i]->str);*/
+	 for(i=0;i<CkpvAccess(usrEvents).length();i++)
+	      fprintf(stsfp, "EVENT %d %s\n", CkpvAccess(usrEvents)[i]->e, CkpvAccess(usrEvents)[i]->str);
 	 fprintf(stsfp, "END\n");
 	fclose(stsfp);
 			     
@@ -120,6 +140,7 @@ void TraceProjector::userEvent(int e)
 
 void TraceProjector::userBracketEvent(int e, double bt, double et)
 {
+	_LOG_E_USER_EVENT_PAIR_CHARM(e,bt,et);
 }
 
 void TraceProjector::creation(envelope *e)
