@@ -19,7 +19,7 @@ int LBgroup::computeObjectLoad(int ovt, int eet, double rbOh, int sync, int gvt)
   int offset = eet - gvt; 
 
   if (!offset)  return 100;
-  else if (offset < GVT_WINDOW)  return 90;
+  else if (offset < SPEC_WINDOW)  return 90;
   else if (eet < 0)  return 50;
   else  return 80;
 }

@@ -17,6 +17,7 @@ extern CkGroupID ThePVT;
 extern CkGroupID TheGVT;
 
 class SRtable;  // from srtable.h
+class SRentry;  // from srtable.h
 
 /// Message to send info to GVT 
 /** PVT sends processor virtual time and send/recv information to GVT.  
@@ -28,10 +29,10 @@ public:
   int optPVT;
   /// PVT of local conservative objects
   int conPVT;
-  /// # sends on PVT indexed by timestamp
-  int sends[GVT_WINDOW];
-  /// # recvs on PVT indexed by timestamp
-  int recvs[GVT_WINDOW];
+  /// # sends/recvs at particular timestamps less than PVT
+  SRentry *SRs;
+  /// Count of entries in SRs
+  int countSRs;
   /// Earliest send/recv timestamp in previous GVT invocation
   int earlyTS;
   /// Number of sends at lastEarliest
@@ -74,8 +75,6 @@ class PVT : public Group {
   int estGVT;       
   /// Simulation termination flag
   int simdone;
-  /// Flag to synchronize PVTs with GVT to avoid overlap
-  int waitingForGVT;                 
   /// Table to store send/recv timestamps
   SRtable *SendsAndRecvs;            
   /// List of objects registered with this PVT branch
@@ -138,6 +137,8 @@ public:
   void runGVT(UpdateMsg *);
   /// ENTRY: Gathers PVT reports; calculates and broadcasts GVT to PVTs
   void computeGVT(UpdateMsg *); 
+  /// Adds incoming send/recv information to a list
+  void addSR(SRentry **SRs, SRentry e);
 };
 
 #endif

@@ -145,7 +145,8 @@ Event *eventQueue::RecomputeRollbackTime()
 {
   //sanitize();
   Event *ev = frontPtr->next; // start at front
-  while ((ev->done == 1) && (ev != currentPtr)) ev = ev->next;
+  //  while ((ev->done == 1) && (ev != currentPtr)) ev = ev->next;
+  while (ev->done == 1) ev = ev->next;
   if (ev == currentPtr) return NULL; // no unexecuted events up to currentPtr
   return ev;
 }

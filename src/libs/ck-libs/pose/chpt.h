@@ -48,7 +48,8 @@ void chpt<StateType>::checkpoint(StateType *data)
   CmiAssert(!(parent->myStrat->currentEvent->cpData));
   //  if ((myStrat->currentEvent->timestamp > 
   //myStrat->currentEvent->prev->timestamp) || (sinceLast == STORE_RATE)) {
-  if ((sinceLast == STORE_RATE) || (CpvAccess(stateRecovery) == 1) ||
+  if ((sinceLast == ((opt *)myStrat)->cpRate) || 
+      (CpvAccess(stateRecovery) == 1) || 
       (myStrat->currentEvent->prev == parent->eq->front())) {
     myStrat->currentEvent->cpData = new StateType;
     myStrat->currentEvent->cpData->copy = 1;

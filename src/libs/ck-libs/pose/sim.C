@@ -53,11 +53,10 @@ void sim::Step()
   case CONS_T:
   case OPT_T:
   case OPT2_T: // pass this step call directly to strategy
-    localPVT->objUpdate(myPVTidx, myStrat->SafeTime(), -1, -1);
     myStrat->Step();
     break;
   case OPT3_T: // prioritize this step call if work exists
-    if (eq->currentPtr->timestamp >= 0) {
+    if (eq->currentPtr->timestamp > -1) {
       pm = new prioMsg;
       pm->setPriority(eq->currentPtr->timestamp-INT_MAX);
       POSE_Objects[thisIndex].Step(pm);
@@ -66,7 +65,6 @@ void sim::Step()
   case SPEC_T:
   case ADAPT_T:
   case ADAPT2_T: // pass this step call directly to strategy
-    localPVT->objUpdate(myPVTidx, myStrat->SafeTime(), -1, -1);
     myStrat->Step();
     break;
   default: 
@@ -90,7 +88,6 @@ void sim::Step(prioMsg *m)
     localStats->TimerStart(SIM_TIMER);
   else localStats->SwitchTimer(SIM_TIMER);
 #endif
-  localPVT->objUpdate(myPVTidx, myStrat->SafeTime(), -1, -1);
   myStrat->Step(); // Call Step on strategy
 #ifdef POSE_STATS_ON
   if (!tstat)
@@ -144,7 +141,7 @@ void sim::ReportLBdata()
 
   if (DOs-UNDOs == 0) rbOh = 1.0;
   else rbOh = ((double)DOs)/((double)(DOs-UNDOs));
-  while (tmp->timestamp >= 0) {
+  while (tmp->timestamp > -1) {
     numEvents++;
     tmp = tmp->next;
   }

@@ -18,7 +18,7 @@ PVT::PVT()
   localStats->TimerStart(GVT_TIMER);
 #endif
   optPVT = conPVT = estGVT = -1;
-  waitingForGVT = simdone = 0;
+  simdone = 0;
   SendsAndRecvs = new SRtable();
 #ifdef POSE_STATS_ON
   localStats->TimerStop();
@@ -33,7 +33,6 @@ void PVT::startPhase()
 #endif
   CProxy_GVT g(TheGVT);
   static int gvtTurn = 0;
-  UpdateMsg *umsg;
   int i;
 
   objs.Wake(); // wake objects to make sure all have reported
@@ -44,29 +43,48 @@ void PVT::startPhase()
     if (objs.objs[i].isPresent()) {
       if (objs.objs[i].isOptimistic()) { // check optPVT 
 	if ((optPVT < 0) || ((objs.objs[i].getOVT() < optPVT) && 
-			     (objs.objs[i].getOVT() >= 0))) 
+			     (objs.objs[i].getOVT() > -1))) {
 	  optPVT = objs.objs[i].getOVT();
+	  if ((objs.objs[i].getOVT() < estGVT) && (objs.objs[i].getOVT() > -1))
+	    CkPrintf("Object %d has strange value %d < estGVT %d", i, 
+		     objs.objs[i].getOVT(), estGVT);
+	}
       }
       else if (objs.objs[i].isConservative()) { // check conPVT
 	if ((conPVT < 0) || ((objs.objs[i].getOVT() < conPVT) && 
-			     (objs.objs[i].getOVT() >= 0)))
+			     (objs.objs[i].getOVT() > -1)))
 	  conPVT = objs.objs[i].getOVT();
       }
+      if ((optPVT < estGVT) && (optPVT != -1) && (estGVT != -1))
+	CkPrintf("optPVT=%d estGVT=%d\n", optPVT, estGVT);
       CmiAssert((optPVT >= estGVT) || (optPVT == -1) || (estGVT == -1));
       CmiAssert((conPVT >= estGVT) || (conPVT == -1) || (estGVT == -1));
     }
 
   // pack PVT data
-  umsg = new UpdateMsg;
-  //for (i=0; i<GVT_WINDOW; i++) {
-  //  umsg->sends[i] = SendsAndRecvs->sends[i];
-  //  umsg->recvs[i] = SendsAndRecvs->recvs[i];
-  //}
-  memcpy(umsg->sends, SendsAndRecvs->sends, GVT_WINDOW*sizeof(int));
-  memcpy(umsg->recvs, SendsAndRecvs->recvs, GVT_WINDOW*sizeof(int));
-  if (SendsAndRecvs->residuals)
-    umsg->earlyTS = SendsAndRecvs->residuals->timestamp();
-  else umsg->earlyTS = -1;
+  // (1) Find out the local PVT from optPVT and conPVT
+  int pvt = optPVT;
+  if ((conPVT < pvt) && (conPVT > -1)) pvt = conPVT;
+  // (2) Find out how many timestamp send/recv records we need to send
+  int counter = 0;
+  SRentry *tmp = SendsAndRecvs->srs;
+  while (tmp && ((tmp->timestamp() <= pvt) || (pvt == -1))) {
+    counter++;
+    tmp = tmp->next();
+  }
+  // (3) Create the message
+  UpdateMsg *umsg = new(counter, 0) UpdateMsg;
+  // (4) Pack the SRtable data into the message
+  int index=0;
+  tmp = SendsAndRecvs->srs;
+  while (tmp && ((tmp->timestamp() <= pvt) || (pvt == -1))) {
+    umsg->SRs[index] = *tmp;
+    index++;
+    tmp = tmp->next();
+  }
+  CmiAssert(index == counter);
+  umsg->countSRs = counter;
+  // (5) Pack the PVT info into the message
   umsg->optPVT = optPVT;
   umsg->conPVT = conPVT;
   umsg->runGVTflag = 0;
@@ -78,7 +96,6 @@ void PVT::startPhase()
     g[gvtTurn].computeGVT(umsg);           // transmit info to GVT
     gvtTurn = (gvtTurn + 1) % CkNumPes();  // calculate next GVT location
   }
-  waitingForGVT = 1;
   objs.SetIdle(); // Set objects to idle
 #ifdef POSE_STATS_ON
   localStats->TimerStop();
@@ -96,9 +113,7 @@ void PVT::setGVT(GVTMsg *m)
   simdone = m->done;
   CkFreeMsg(m);
   SendsAndRecvs->PurgeBelow(estGVT);
-  if (!simdone) SendsAndRecvs->FileResiduals();
   objs.Commit();
-  waitingForGVT = 0;
   p[CkMyPe()].startPhase();
 #ifdef POSE_STATS_ON
   localStats->TimerStop();
@@ -131,17 +146,14 @@ void PVT::objUpdate(int timestamp, int sr)
 void PVT::objUpdate(int pvtIdx, int safeTime, int timestamp, int sr)
 {
   int index = (pvtIdx-CkMyPe())/1000;
-  CmiAssert((timestamp >= estGVT) || (timestamp == -1) || (estGVT == -1));
-  if (!((safeTime >= estGVT) || (safeTime == -1) || (estGVT == -1))) {
-    CkPrintf("Oh NO!!! st=%d gvt=%d\n", safeTime, estGVT);
-    abort();
-  }
+  //CmiAssert((timestamp >= estGVT) || (timestamp == -1) || (estGVT == -1));
+  CmiAssert((safeTime >= estGVT) || (safeTime == -1));
   // minimize the non-idle OVT
-  if ((safeTime >= 0) && 
+  if ((safeTime > -1) && 
       ((objs.objs[index].getOVT() > safeTime) || 
        (objs.objs[index].getOVT() < 0)))
     objs.objs[index].setOVT(safeTime);
-  if ((sr == SEND) || (sr == RECV)) SendsAndRecvs->Insert(timestamp, sr);
+  //if ((sr == SEND) || (sr == RECV)) SendsAndRecvs->Insert(timestamp, sr);
   // sr could be -1 in which case we just ignore it here
 }
 
@@ -179,7 +191,6 @@ void GVT::runGVT(UpdateMsg *m)
   inactive = m->inactive;
   inactiveTime = m->inactiveTime;
   nextLBstart = m->nextLB;
-  CProxy_PVT p(ThePVT);
   CProxy_GVT g(TheGVT);
   m->runGVTflag = 1;
   g[CkMyPe()].computeGVT(m);  // start the next PVT phase of the GVT algorithm
@@ -197,31 +208,22 @@ void GVT::computeGVT(UpdateMsg *m)
   CProxy_PVT p(ThePVT);
   CProxy_GVT g(TheGVT);
   GVTMsg *gmsg = new GVTMsg;
-  int lastGVT = 0, firstEarly, i;
+  int lastGVT = 0, i;
   static int optGVT = -1, conGVT = -1, done=0;
-  static int earliestMsg=-1, earlySends=0, earlyRecvs=0, earlyResidual=-1;
-  static int sends[GVT_WINDOW], recvs[GVT_WINDOW];
+  static int earliestMsg=-1;
+  static SRentry *SRs = NULL;
   static int startOffset = 0;
 
-  //CmiAssert((m->optPVT >= estGVT) || (m->optPVT < 0) || (estGVT < 0));
-  //CmiAssert((m->conPVT >= estGVT) || (m->conPVT < 0) || (estGVT < 0));
-  if (done == 0) for (i=0; i<GVT_WINDOW; i++) sends[i] = recvs[i] = 0;
   if (CkMyPe() != 0) startOffset = 1;
   if (m->runGVTflag == 1) done++;
   else {
     // see if message provides new min optGVT or conGVT
-    if ((optGVT < 0) || ((m->optPVT >= 0) && (m->optPVT < optGVT)))
+    if ((optGVT < 0) || ((m->optPVT > -1) && (m->optPVT < optGVT)))
       optGVT = m->optPVT;
-    if ((conGVT < 0) || ((m->conPVT >= 0) && (m->conPVT < conGVT)))
+    if ((conGVT < 0) || ((m->conPVT > -1) && (m->conPVT < conGVT)))
       conGVT = m->conPVT;
-    // add send/recv info to arrays
-    for (i=0; i<GVT_WINDOW; i++) {
-      sends[i] += m->sends[i];
-      recvs[i] += m->recvs[i];
-    }
-    if (((m->earlyTS < earlyResidual) && (m->earlyTS != -1)) 
-	|| (earlyResidual == -1))
-      earlyResidual = m->earlyTS;
+    // add send/recv info to SRs
+    for (i=0; i<m->countSRs; i++) addSR(&SRs, m->SRs[i]);
     done++;
   }
   CkFreeMsg(m);
@@ -238,24 +240,23 @@ void GVT::computeGVT(UpdateMsg *m)
     
     // derive GVT estimate from min optimistic & conservative GVTs
     estGVT = optGVT;
-    if ((conGVT >= 0) && (estGVT >= 0) && (conGVT < estGVT))  estGVT = conGVT;
+    if ((conGVT > -1) && (estGVT > -1) && (conGVT < estGVT))  estGVT = conGVT;
 
     // Check if send/recv activity provides lower possible estimate
-    i=0;
-    firstEarly = -1;
-    while (i < GVT_WINDOW) {
-      if ((firstEarly == -1) && ((sends[i] != 0) || (recvs[i] != 0))) 
-	firstEarly = i + lastGVT;
-      if (sends[i] != recvs[i]) {
-	earliestMsg = i + lastGVT;
-	earlySends = sends[i];
-	earlyRecvs = recvs[i];
+    SRentry *tmp = SRs;
+    int lastSR = -1;
+    while (tmp && ((tmp->timestamp() < estGVT) || (estGVT == -1))) {
+      lastSR = tmp->timestamp();
+      if (tmp->sends() != tmp->recvs()) {
+	earliestMsg = tmp->timestamp();
 	break;
       }
-      i++;
+      tmp = tmp->next();
     }
-    if (earliestMsg == -1) earliestMsg = earlyResidual;
     if ((earliestMsg < estGVT) && (earliestMsg != -1)) estGVT = earliestMsg;
+    else if ((earliestMsg == -1) && (lastSR != -1) && (estGVT == -1)
+	     && (lastSR > lastGVT)) 
+      estGVT = lastSR;
 
     // check for inactivity
     if (((estGVT == lastGVT) || (estGVT < 0)) && (earliestMsg == -1)) {
@@ -270,16 +271,15 @@ void GVT::computeGVT(UpdateMsg *m)
     else inactive = 0;
 
     // check the estimate
-    //CkPrintf("opt=%d con=%d lastGVT=%d early=%d first=%d resid=%d et=%d\n", 
-    //optGVT, conGVT, lastGVT, earliestMsg, firstEarly, earlyResidual,
-    //POSE_endtime);
+    //    CkPrintf("opt=%d con=%d lastGVT=%d early=%d lastSR=%d et=%d\n", 
+    //optGVT, conGVT, lastGVT, earliestMsg, lastSR, POSE_endtime);
     CmiAssert(estGVT >= lastGVT); 
-    if (estGVT % 100 == 0)
-      CkPrintf("[%d] New GVT = %d\n", CkMyPe(), estGVT);
+    //if (estGVT % 100 == 0)
+    //CkPrintf("[%d] New GVT = %d\n", CkMyPe(), estGVT);
 
     // check for termination conditions
     int term = 0;
-    if ((estGVT >= POSE_endtime) && (POSE_endtime >= 0)) {
+    if ((estGVT >= POSE_endtime) && (POSE_endtime > -1)) {
       CkPrintf("At endtime: %d\n", POSE_endtime);
       term = 1;
     }
@@ -292,7 +292,7 @@ void GVT::computeGVT(UpdateMsg *m)
     gmsg->estGVT = estGVT;
     gmsg->done = term;
     if (term) {
-      if (POSE_endtime >= 0) gmsg->estGVT = POSE_endtime + 1;
+      if (POSE_endtime > -1) gmsg->estGVT = POSE_endtime + 1;
       else gmsg->estGVT++;
       CkPrintf("Final GVT = %d\n", gmsg->estGVT);
       p.setGVT(gmsg);
@@ -330,10 +330,57 @@ void GVT::computeGVT(UpdateMsg *m)
     }
 
     // reset static data
-    optGVT = conGVT = earliestMsg = earlyResidual = -1;
-    //earlySends = earlyRecvs = 0;
+    optGVT = conGVT = earliestMsg = -1;
+    SRentry *cur = SRs;
+    SRs = NULL;
+    while (cur) {
+      tmp = cur->next();
+      delete cur;
+      cur = tmp;
+    }
   }
 #ifdef POSE_STATS_ON
   localStats->TimerStop();
 #endif
+}
+
+void GVT::addSR(SRentry **SRs, SRentry e)
+{
+  SRentry *tmp;
+  if (!(*SRs)) { // no entries yet
+    (*SRs) = new SRentry(e.timestamp(), NULL);
+    (*SRs)->setSends(e.sends());
+    (*SRs)->setRecvs(e.recvs());
+  }
+  else {
+    if (e.timestamp() < (*SRs)->timestamp()) { // goes before first entry
+      (*SRs) = new SRentry(e.timestamp(), (*SRs));
+      (*SRs)->setSends(e.sends());
+      (*SRs)->setRecvs(e.recvs());
+    }
+    else if (e.timestamp() == (*SRs)->timestamp()) { // goes in first entry
+      (*SRs)->setSends((*SRs)->sends() + e.sends());
+      (*SRs)->setRecvs((*SRs)->recvs() + e.recvs());
+    }
+    else { // search for position
+      tmp = (*SRs);
+      while (tmp->next() && (e.timestamp() > tmp->next()->timestamp()))
+	tmp = tmp->next();
+      if (!tmp->next()) { // goes at end of SRs
+	tmp->setNext(new SRentry(e.timestamp(), NULL));
+	tmp->next()->setSends(tmp->next()->sends() + e.sends());
+	tmp->next()->setRecvs(tmp->next()->recvs() + e.recvs());
+      }
+      else if (e.timestamp() == tmp->next()->timestamp()) { //goes in tmp->next
+	tmp->next()->setSends(tmp->next()->sends() + e.sends());
+	tmp->next()->setRecvs(tmp->next()->recvs() + e.recvs());
+      }
+      else { // goes after tmp but before tmp->next
+	tmp->setNext(new SRentry(e.timestamp(), tmp->next()));
+	tmp->next()->setSends(tmp->next()->sends() + e.sends());
+	tmp->next()->setRecvs(tmp->next()->recvs() + e.recvs());
+      }
+    }
+  }
+
 }

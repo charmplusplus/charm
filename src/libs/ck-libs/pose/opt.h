@@ -25,8 +25,11 @@ protected:
   /// Undo a single event, cancelling its spawned events
   virtual void UndoEvent(Event *e);     
 public:
+  /// Checkpoint rate
+  /** Checkpoint once for every cpRate events */
+  int cpRate;
   /// Basic Constructor
-  opt() { STRAT_T = OPT_T; }
+  opt() { STRAT_T = OPT_T; cpRate = STORE_RATE; }
   /// Initialize the synchronization strategy type of the poser
   void initSync() { parent->sync = OPTIMISTIC; }
   /// Perform a single forward execution step

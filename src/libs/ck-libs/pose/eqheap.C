@@ -130,7 +130,7 @@ void EqHeap::InsertEvent(Event *e)
 {
   HeapNode *eh;
 
-  CmiAssert((top == NULL) || (top->subheapsize >= 1));
+  CmiAssert((top == NULL) || (top->subheapsize > 0));
   if (top == NULL) // make the top of the heap
     top = new HeapNode(e, 1, NULL, NULL);
   else if (e->timestamp <= top->e->timestamp) { // insert at top of heap
@@ -173,7 +173,7 @@ void EqHeap::InsertEvent(Event *e)
 Event *EqHeap::GetAndRemoveTopEvent()
 {
   CmiAssert(top != NULL);
-  CmiAssert(top->subheapsize >= 1);
+  CmiAssert(top->subheapsize > 0);
   HeapNode *tmp = top;
   Event *result;
 

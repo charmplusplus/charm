@@ -29,13 +29,13 @@ void opt::Step()
 
   // Execute an event
   ev = eq->currentPtr;
-  if (ev->timestamp >= 0) {
+  if (ev->timestamp > -1) {
     currentEvent = ev;
     ev->done = 2;
     parent->ResolveFn(ev->fnIdx, ev->msg); // execute it
     ev->done = 1; // complete the event execution
     eq->ShiftEvent(); // shift to next event
-    if (eq->currentPtr->timestamp >= 0) { // if more events, schedule the next
+    if (eq->currentPtr->timestamp > -1) { // if more events, schedule the next
       prioMsg *pm = new prioMsg;
       pm->setPriority(eq->currentPtr->timestamp-INT_MAX);
       POSE_Objects[parent->thisIndex].Step(pm);
@@ -47,9 +47,6 @@ void opt::Step()
 void opt::Rollback()
 {
   Event *ev = eq->currentPtr->prev, *recoveryPoint;
-  RBevent = eq->RecomputeRollbackTime();
-  if (!RBevent) return; // no rollback necessary
-
   // find earliest event that must be undone
   recoveryPoint = RBevent;
   // skip forward over other stragglers
@@ -123,7 +120,7 @@ void opt::CancelEvents()
       if (ev == eq->back()) ev = ev->prev;
       if (ev->timestamp <= it->timestamp) {
 	// search forward for 'it' from currentPtr to backPtr
-	while (!found && (ev->timestamp >= 0) && 
+	while (!found && (ev->timestamp > -1) && 
 	       (ev->timestamp <= it->timestamp)) {
 	  if (ev->evID == it->evID) found = 1; // found it
 	  else ev = ev->next;
@@ -137,7 +134,7 @@ void opt::CancelEvents()
 	ev = eq->currentPtr; // set search start point
 	if (ev == eq->back()) ev = ev->prev;
 	if (ev->timestamp >= it->timestamp) { // search backward
-	  while (!found && (ev->timestamp >= 0) && 
+	  while (!found && (ev->timestamp > -1) && 
 		 (ev->timestamp >= it->timestamp)) {
 	    if (ev->evID == it->evID)  found = 1; // found it
 	    else ev = ev->prev;
@@ -180,11 +177,11 @@ void opt::CancelEvents()
       eq->DeleteEvent(recoveryPoint); // delete the targetEvent
       targetEvent = NULL;
       // currentPtr may have unexecuted events in front of it
-      while ((eq->currentPtr->prev->timestamp >= 0) 
+      while ((eq->currentPtr->prev->timestamp > -1) 
 	     && (eq->currentPtr->prev->done == 0))
 	eq->currentPtr = eq->currentPtr->prev;
 #ifdef POSE_STATS_ON
-      localStats->SwitchTimer(SIM_TIMER);
+      localStats->SwitchTimer(CAN_TIMER);
 #endif
     }
     if (it == last) {

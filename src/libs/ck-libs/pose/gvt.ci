@@ -4,7 +4,9 @@ module gvt {
   readonly CkGroupID ThePVT;
   readonly CkGroupID TheGVT;
   /// Message to send info to GVT 
-  message UpdateMsg;
+  message UpdateMsg {
+    SRentry SRs[];
+  };
   /// Message to send GVT estimate back to PVT
   message GVTMsg;
 

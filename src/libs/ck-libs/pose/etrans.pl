@@ -518,7 +518,6 @@ while (@line=split(' ',($thisline=getcodeline($inChandle)))) {
       $outChandle->print("    if ((e->timestamp < eq->currentPtr->timestamp)\n");
       $outChandle->print("        || (eq->currentPtr == eq->backPtr)) {\n");
       $outChandle->print("      myStrat->ResetRBevent(e);\n");
-#      $outChandle->print("      myStrat->Rollback();\n");
       $outChandle->print("    }\n");
       $outChandle->print("    Step();\n");
       $outChandle->print("  }\n");
@@ -526,7 +525,7 @@ while (@line=split(' ',($thisline=getcodeline($inChandle)))) {
       $outChandle->print("  srVector[$messagename->fromPE]++;\n");
       $outChandle->print("#ifdef POSE_STATS_ON\n");
       $outChandle->print("  if (tstat)\n");
-      $outChandle->print("    localStats->SwitchTimer(DO_TIMER);\n");
+      $outChandle->print("    localStats->SwitchTimer(tstat);\n");
       $outChandle->print("  else\n");
       $outChandle->print("    localStats->TimerStop();\n");
       $outChandle->print("#endif\n");

@@ -12,19 +12,18 @@
 //#define LB_ON 1
 #ifdef POSE_COMM_ON
 #include <StreamingStrategy.h>
-#define COMM_TIMEOUT 20
-#define COMM_MAXMSG 100
+#define COMM_TIMEOUT 10
+#define COMM_MAXMSG 10
 #endif 
 #include "pose.decl.h"
 
 /// Synchronization strategy constants
-#define MAX_ITERATIONS 10000   // maximum forward executions per Step call
-#define STORE_RATE 500       // default checkpoint rate: 1 for every n events
+#define MAX_ITERATIONS 100000   // maximum forward executions per Step call
+#define STORE_RATE 100       // default checkpoint rate: 1 for every n events
 #define SPEC_WINDOW 100      // speculative event window size
 #define MIN_LEASH 10        // min speculative window for adaptive strategy
 #define MAX_LEASH 500       // max  "     "     "     "        "     "
 #define LEASH_FLEX 1        // leash increment
-#define GVT_WINDOW 500      // Maximum time GVT can advance
 
 /// Load balancer constants
 #define LB_SKIP 51          // LB done 1/LB_SKIP times GVT iterations

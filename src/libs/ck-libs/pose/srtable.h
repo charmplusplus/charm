@@ -36,6 +36,13 @@ class SRentry {
     if (sr == SEND) { sendCount = 1; recvCount = 0; }
     else { sendCount = 0; recvCount = 1; }
   }
+  /// Assignment operator
+  SRentry& operator=(const SRentry& e) {
+    theTimestamp = e.theTimestamp;
+    sendCount = e.sendCount;
+    recvCount = e.recvCount;
+    return *this;
+  }
   /// Set timestamp
   void setTimestamp(int ts) { theTimestamp = ts; }
   /// Set next pointer
@@ -85,23 +92,13 @@ class SRentry {
 /// An table for storing the number of sends and recvs at a timestamp
 /** This class is used in GVT to keep track of messages sent/received */
 class SRtable {
- private:
-  /// Helper function to Insert
-  /** Stores new send/recv record in residuals */
-  void listInsert(int timestamp, int srSt);
  public:
-  /// sends[i] is number of sends at timestamp offset+i
-  /** Size of table GVT_WINDOW specified in pose.h */
-  int sends[GVT_WINDOW];
-  /// recvs[i] is number of receives at timestamp offset+i
-  /** Size of table GVT_WINDOW specified in pose.h */
-  int recvs[GVT_WINDOW];
   /// Base timestamp to index tables
   /** offset is the current GVT */
   int offset;
-  /// Stores send/recv records ith timestamp >= offset+GVT_WINDOW
+  /// Stores send/recv records 
   /** One entry per timestamp, all sends/recvs stored in same entry */
-  SRentry *residuals;
+  SRentry *srs;
   /// Basic constructor
   /** Initializes all data fields, including entire sends and recvs arrays */
   SRtable();
@@ -111,10 +108,6 @@ class SRtable {
   void Insert(int timestamp, int srSt); 
   /// Purge entries from table with timestamp below ts
   void PurgeBelow(int ts);      
-  /// Move entries to table from residuals if timestamp < offset+GVT_WINDOW
-  void FileResiduals();         
-  /// Copy table to cp
-  void CopyTable(SRtable *cp);
   /// Free residual entries, reset counters and pointers
   void FreeTable();
   /// Dump data fields
