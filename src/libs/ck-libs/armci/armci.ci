@@ -1,5 +1,5 @@
 module armci {
-	initcall void armciNodeInit(void);
+	initproc void armciProcInit(void);
 
 	readonly int armci_nproc;
 

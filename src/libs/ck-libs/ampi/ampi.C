@@ -16,7 +16,7 @@
 
 /* change this define to "x" to trace all send/recv's */
 #define MSG_ORDER_DEBUG(x) /* empty */
-#define STARTUP_DEBUG(x) /* ckout<<"[pe "<<CkMyPe()<<"] "<< x <<endl; */
+#define STARTUP_DEBUG(x)  /* ckout<<"ampi[pe "<<CkMyPe()<<"] "<< x <<endl; */
 
 #if 0
 #define AMPI_DEBUG CkPrintf
@@ -312,8 +312,6 @@ CtvDeclare(ampiParent*, ampiPtr);
 CtvDeclare(int, ampiInitDone);
 static void ampiNodeInit(void)
 {
-  CtvInitialize(ampiParent*, ampiPtr);
-  CtvInitialize(int,ampiInitDone);
   mpi_nworlds=0;
   for(int i=0;i<MPI_MAX_COMM_WORLDS; i++)
   {
@@ -327,6 +325,8 @@ static void ampiNodeInit(void)
 }
 
 static void ampiProcInit(void){
+  CtvInitialize(ampiParent*, ampiPtr);
+  CtvInitialize(int,ampiInitDone);
   REGISTER_AMPI
   initAmpiProjections();
 }

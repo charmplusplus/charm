@@ -58,14 +58,14 @@ static int tcharm_initted=0;
 
 void TCharm::nodeInit(void)
 {
-  CtvInitialize(TCharm *,_curTCharm);
-  CtvAccess(_curTCharm)=NULL;
-
-  tcharm_initted=1;
 }
 
 void TCharm::procInit(void)
 {
+  CtvInitialize(TCharm *,_curTCharm);
+  CtvAccess(_curTCharm)=NULL;
+  tcharm_initted=1;
+
   // called on every pe to eat these arguments
   char **argv=CkGetArgv();
   tcharm_nomig=CmiGetArgFlagDesc(argv,"+tcharm_nomig","Disable migration support (debugging)");
@@ -727,7 +727,7 @@ void TCharm::semaPut(int id,void *data) {
 	TCharmSemaphore *s=findSema(id);
 	if (s->data!=NULL) CkAbort("Duplicate calls to TCharm::semaPut!");
 	s->data=data;
-	DBG("semaPut "<<id);
+	DBG("semaPut "<<id<<" "<<data);
 	if (s->thread!=NULL) {//Awaken the thread
 		s->thread=NULL;
 		resume();
@@ -740,7 +740,7 @@ void TCharm::semaPut(int id,void *data) {
 void *TCharm::semaGet(int id) {
 	TCharmSemaphore *s=getSema(id);
 	void *ret=s->data;
-	DBG("semaGet "<<id);
+	DBG("semaGet "<<id<<" "<<ret);
 	// Now remove the semaphore from the list:
 	freeSema(s);
 	return ret;

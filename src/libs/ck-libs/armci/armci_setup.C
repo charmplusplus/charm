@@ -39,7 +39,7 @@ CDECL int ARMCI_Init(void) {
 CtvDeclare(ArmciVirtualProcessor *, _armci_ptr);
 
 // Node initialization (made by initcall of the module armci)
-void armciNodeInit(void) {
+void armciProcInit(void) {
   CtvInitialize(ArmciVirtualProcessor, _armci_ptr);
   CtvAccess(_armci_ptr) = NULL;
 
