@@ -150,47 +150,85 @@ FDECL void FTN_NAME(NETFEM_END,netfem_end)(NetFEMF nf) {
    In 2D, node i has location (loc[2*i+0],loc[2*i+1])
    In 3D, node i has location (loc[3*i+0],loc[3*i+1],loc[3*i+2])
 */
-CDECL void NetFEM_Nodes(NetFEM n,int nNodes,double *loc,const char *name) {
+
+CDECL void NetFEM_Nodes_field(NetFEM n,int nNodes,
+		int init_offset,int distance,
+		const void *loc,const char *name) 
+{
 	NETFEMAPI("NetFEM_Nodes");
-	N->addNodes(new NetFEM_nodes(nNodes,N->getDim(),loc,name));
+	int d=N->getDim();
+	N->addNodes(new NetFEM_nodes(nNodes,NetFEM_item::format(d,distance),
+		CkShiftPointer((double *)loc,init_offset),name));
+}
+
+FDECL void FTN_NAME(NETFEM_NODES_FIELD,netfem_nodes_field)
+	(NetFEMF nf,int *nNodes,int *off,int *dist,const void *loc,FTN_STR_DECL)
+{
+	CkShortStr s=FTN_STR;
+	NetFEM_Nodes_field((NetFEM)NF,*nNodes,*off,*dist,loc,s);
+}
+
+CDECL void NetFEM_Nodes(NetFEM n,int nNodes,const double *loc,const char *name) {
+	NetFEM_Nodes_field(n,nNodes,0,N->getDim()*sizeof(double),loc,name);
 }
 
 FDECL void FTN_NAME(NETFEM_NODES,netfem_nodes)
-	(NetFEMF nf,int *nNodes,double *loc,FTN_STR_DECL)
+	(NetFEMF nf,int *nNodes,const double *loc,FTN_STR_DECL)
 {
-	NETFEMAPI("NetFEM_nodes");
-	NF->addNodes(new NetFEM_nodes(*nNodes,NF->getDim(),loc,FTN_STR));
+	CkShortStr s=FTN_STR;
+	NetFEM_Nodes((NetFEM)NF,*nNodes,loc,s);
 }
 
 /*----- Register the connectivity of the elements. 
    Element i is adjacent to nodes conn[nodePerEl*i+{0,1,...,nodePerEl-1}]
 */
-CDECL void NetFEM_Elements(NetFEM n,int nEl,int nodePerEl,int *conn,const char *name)
+
+CDECL void NetFEM_Elements_field(NetFEM n,int nEl,int nodePerEl,
+	int initOffset,int bytePerEl,int idxBase,
+	const void *conn,const char *name)
 {
-	NETFEMAPI("NetFEM_Elements");
-	N->addElems(new NetFEM_elems(nEl,nodePerEl,conn,0,name));
+	NETFEMAPI("NetFEM_Elements_field");
+	N->addElems(new NetFEM_elems(nEl,nodePerEl,bytePerEl,
+		idxBase,CkShiftPointer((int *)conn,initOffset),name));
+}
+
+FDECL void FTN_NAME(NETFEM_ELEMENTS_FIELD,netfem_elements_field)
+	(NetFEMF nf,int *nEl,int *nodePer,
+	int *initOff,int *bytePer,int *idxBase,
+	const void *conn,FTN_STR_DECL)
+{
+	CkShortStr s=FTN_STR;
+	NetFEM_Elements_field((NetFEM)NF,*nEl,*nodePer,*initOff,*bytePer,*idxBase,conn,s);
+}
+
+CDECL void NetFEM_Elements(NetFEM n,int nEl,int nodePerEl,const int *conn,const char *name)
+{
+	NetFEM_Elements_field(n,nEl,nodePerEl,0,sizeof(int)*nodePerEl,0,conn,name);
 }
 
 FDECL void FTN_NAME(NETFEM_ELEMENTS,netfem_elements)
-	(NetFEMF nf,int *nEl,int *nodePerEl,int *conn,FTN_STR_DECL)
+	(NetFEMF nf,int *nEl,int *nodePerEl,const int *conn,FTN_STR_DECL)
 {
-	NETFEMAPI("NetFEM_elements");
-	NF->addElems(new NetFEM_elems(*nEl,*nodePerEl,conn,1,FTN_STR));
+	CkShortStr s=FTN_STR;
+	NetFEM_Elements_field((NetFEM)NF,*nEl,*nodePerEl,0,sizeof(int)* *nodePerEl,1,conn,s);
 }
+
+
+
 /*--------------------------------------------------
 Associate a spatial vector (e.g., displacement, velocity, accelleration)
 with each of the previous objects (nodes or elements).
 */
-CDECL void NetFEM_Vector_field(NetFEM n,double *start,
+CDECL void NetFEM_Vector_field(NetFEM n,const void *start,
 	int init_offset,int distance,
 	const char *name)
 {
 	NETFEMAPI("NetFEM_Vector_field");
-	NetFEM_item::format fmt(N->getDim(),init_offset,distance);
-	N->getItem()->add(start,fmt,name,true);
+	NetFEM_item::format fmt(N->getDim(),distance);
+	N->getItem()->add(CkShiftPointer((double *)start,init_offset),fmt,name,true);
 }
 FDECL void FTN_NAME(NETFEM_VECTOR_FIELD,netfem_vector_field)
-	(NetFEMF nf,double *start,int *init_offset,int *distance,FTN_STR_DECL)
+	(NetFEMF nf,const double *start,int *init_offset,int *distance,FTN_STR_DECL)
 {
 	NETFEMAPI("NetFEM_vector_field");
 	CkShortStr s=FTN_STR;
@@ -200,12 +238,12 @@ FDECL void FTN_NAME(NETFEM_VECTOR_FIELD,netfem_vector_field)
 /*Simpler version of the above if your data is packed as
 data[item*3+{0,1,2}].
 */
-CDECL void NetFEM_Vector(NetFEM n,double *data,const char *name)
+CDECL void NetFEM_Vector(NetFEM n,const double *data,const char *name)
 {
 	NetFEM_Vector_field(n,data,0,sizeof(double)*N->getDim(),name);
 }
 FDECL void FTN_NAME(NETFEM_VECTOR,netfem_vector)
-	(NetFEMF nf,double *data,FTN_STR_DECL)
+	(NetFEMF nf,const double *data,FTN_STR_DECL)
 {
 	CkShortStr s=FTN_STR;
 	NetFEM_Vector((NetFEM)NF,data,s);
@@ -215,17 +253,17 @@ FDECL void FTN_NAME(NETFEM_VECTOR,netfem_vector)
 Associate a scalar (e.g., stress, temperature, pressure, damage)
 with each of the previous objects (nodes or elements).
 */
-CDECL void NetFEM_Scalar_field(NetFEM n,double *start,
+CDECL void NetFEM_Scalar_field(NetFEM n,const void *start,
 	int vec_len,int init_offset,int distance,
 	const char *name)
 {
 	NETFEMAPI("NetFEM_Scalar_field");
-	NetFEM_item::format fmt(vec_len,init_offset,distance);
-	N->getItem()->add(start,fmt,name,false);
+	NetFEM_item::format fmt(vec_len,distance);
+	N->getItem()->add(CkShiftPointer((double *)start,init_offset),fmt,name,false);
 }
 
 FDECL void FTN_NAME(NETFEM_SCALAR_FIELD,netfem_scalar_field)
-	(NetFEMF nf,double *start,int *veclen,int *init_offset,
+	(NetFEMF nf,const double *start,int *veclen,int *init_offset,
 	 int *distance,FTN_STR_DECL)
 {
 	NETFEMAPI("NetFEM_scalar_field");
@@ -235,13 +273,13 @@ FDECL void FTN_NAME(NETFEM_SCALAR_FIELD,netfem_scalar_field)
 
 
 /*Simpler version of above for contiguous double-precision data*/
-CDECL void NetFEM_Scalar(NetFEM n,double *start,int doublePer,
+CDECL void NetFEM_Scalar(NetFEM n,const double *start,int doublePer,
 	const char *name)
 {
 	NetFEM_Scalar_field(n,start,doublePer,0,sizeof(double)*doublePer,name);
 }
 FDECL void FTN_NAME(NETFEM_SCALAR,netfem_scalar)
-	(NetFEMF nf,double *start,int *veclen,FTN_STR_DECL)
+	(NetFEMF nf,const double *start,int *veclen,FTN_STR_DECL)
 {
 	CkShortStr s=FTN_STR;
 	NetFEM_Scalar((NetFEM)NF,start,*veclen,s);

@@ -28,6 +28,8 @@ available.
 #define NetFEM_COPY_5  (NetFEM_COPY+5) /*Keep the last 5 versions*/
 #define NetFEM_COPY_10 (NetFEM_COPY+10) /*Keep the last 10 versions*/
 
+/* Extract an initial offset and distance from this struct/field pair: */
+#define NetFEM_Field(myStruct,myValue) offsetof(myStruct,myValue),sizeof(myStruct)
 
 /*----------------------------------------------
 All NetFEM calls must be between a Begin and End pair:*/
@@ -43,36 +45,41 @@ void NetFEM_End(NetFEM n); /*Publish these updates*/
    In 2D, node i has location (loc[2*i+0],loc[2*i+1])
    In 3D, node i has location (loc[3*i+0],loc[3*i+1],loc[3*i+2])
 */
-void NetFEM_Nodes(NetFEM n,int nNodes,double *loc,const char *name);
+void NetFEM_Nodes(NetFEM n,int nNodes,const double *loc,const char *name);
+void NetFEM_Nodes_field(NetFEM n,int nNodes,
+	int init_offset,int bytesPerNode,const void *loc,const char *name);
 
 /*----- Register the connectivity of the elements. 
    Element i is adjacent to nodes conn[nodePerEl*i+{0,1,...,nodePerEl-1}]
 */
-void NetFEM_Elements(NetFEM n,int nEl,int nodePerEl,int *conn,const char *name);
+void NetFEM_Elements(NetFEM n,int nEl,int nodePerEl,const int *conn,const char *name);
+void NetFEM_Elements_field(NetFEM n,int nEl,int nodePerEl,
+	int init_offset,int bytesPerEl,int indexBase,
+	const void *conn,const char *name);
 
 /*--------------------------------------------------
 Associate a spatial vector (e.g., displacement, velocity, accelleration)
 with each of the previous objects (nodes or elements).
 */
-void NetFEM_Vector_field(NetFEM n,double *start,
+void NetFEM_Vector_field(NetFEM n,const void *start,
 	int init_offset,int distance,
 	const char *name);
 
 /*Simpler version of the above if your data is packed as
 data[item*3+{0,1,2}].
 */
-void NetFEM_Vector(NetFEM n,double *data,const char *name);
+void NetFEM_Vector(NetFEM n,const double *data,const char *name);
 
 /*--------------------------------------------------
 Associate a scalar (e.g., stress, temperature, pressure, damage)
 with each of the previous objects (nodes or elements).
 */
-void NetFEM_Scalar_field(NetFEM n,double *start,
+void NetFEM_Scalar_field(NetFEM n,const void *start,
 	int vec_len,int init_offset,int distance,
 	const char *name);
 
 /*Simpler version of above for contiguous double-precision data*/
-void NetFEM_Scalar(NetFEM n,double *start,int doublePer,
+void NetFEM_Scalar(NetFEM n,const double *start,int doublePer,
 	const char *name);
 
 #ifdef __cplusplus

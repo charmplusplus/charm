@@ -39,6 +39,11 @@ Orion Sky Lawlor, olawlor@acm.org, 11/2/2001
 	};
 
 
+template <class T>
+inline T *CkShiftPointer(T *p,int bytesToShift) {
+	return (T *)(bytesToShift+(char *)p);
+}
+
 
 //Any list of items we can associate user data with.
 class NetFEM_item {
@@ -47,20 +52,19 @@ public:
 	class format {
 	public:
 		int vec_len;//Doubles per source item
-		int init_offset; //Bytes from start to first double of first item
 		int distance;//Bytes from first item to second item
 		format() {}
 		format(int len) 
-			:vec_len(len), init_offset(0), distance(len*sizeof(double))
+			:vec_len(len), distance(len*sizeof(double))
 			{}
-		format(int len,int off,int dist)
-			:vec_len(len), init_offset(off), distance(dist) 
+		format(int len,int dist)
+			:vec_len(len), distance(dist) 
 			{}
 		
 		//Return the start of this item's data list
 		double *forItem(double *start,int item) const {
 			char *s=(char *)start;
-			return (double *)(s+init_offset+item*distance);
+			return (double *)(s+item*distance);
 		}
 		const double *forItem(const double *start,int item) const {
 			return forItem((double *)start,item);
@@ -188,11 +192,11 @@ class NetFEM_nodes : public NetFEM_item {
 public:
 	NetFEM_nodes() {}
 
-	NetFEM_nodes(int nNode,int dim,double *coord,const CkShortStr &name) 
+	NetFEM_nodes(int nNode,const NetFEM_item::format &fmt,double *coord,const CkShortStr &name) 
 		:NetFEM_item(nNode)
 	{
 		//HACK: The first field of the nodes are the node coordinates
-		add(coord,format(dim),name,true);
+		add(coord,fmt,name,true);
 	}
 };
 
@@ -201,7 +205,7 @@ class NetFEM_elems : public NetFEM_item {
 	typedef NetFEM_item super;
 
 	CkShortStr name; //Name of element type (e.g. "Volumetric Tets"; "Surface Triangles")
-	int nodesPer,idxBase;
+	int nodesPer,bytesPer,idxBase;
 	int *conn;
 	bool isHeapAllocated; //Conn array on heap(true) or in user area(false)
 
@@ -216,20 +220,22 @@ class NetFEM_elems : public NetFEM_item {
 		allocate();
 		for (int i=0;i<getItems();i++)
 			for (int j=0;j<nodesPer;j++)
-				conn[i*nodesPer+j]=src[i*nodesPer+j]-idxBase;
+				conn[i*nodesPer+j]=CkShiftPointer(src,i*bytesPer)[j]-idxBase;
 		idxBase=0; //Array is now zero-based
+		bytesPer=nodesPer*sizeof(int); //Array is now dense
 	}
 public:
 	NetFEM_elems() {
 		nodesPer=0;
+		bytesPer=0;
 		idxBase=0;
 		conn=NULL;
 		isHeapAllocated=false;
 	}
 
-	NetFEM_elems(int nEl,int nodesPerEl,int *conn_,int idxBase_,
+	NetFEM_elems(int nEl,int nodesPerEl,int bytesPerEl,int idxBase_,int *conn_,
 		     const CkShortStr &name_) 
-		:super(nEl),nodesPer(nodesPerEl),idxBase(idxBase_),
+		:super(nEl),nodesPer(nodesPerEl),bytesPer(bytesPerEl),idxBase(idxBase_),
 		 conn(conn_),isHeapAllocated(false)
 	{
 		name=name_;
@@ -251,8 +257,10 @@ public:
 		name.pup(p);
 		super::pup(p);
 		p(nodesPer); 
-		if (p.isUnpacking()) //Unpack data into heap
+		if (p.isUnpacking()) { //Unpack data into heap
 			allocate();
+			bytesPer=nodesPer*sizeof(int);
+		}
 		else //Make canonical copy of data
 			localCopy();
 		p(conn,getItems()*nodesPer);
