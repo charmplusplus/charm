@@ -557,7 +557,6 @@ void TraceCounter::beginExecute
   if (!traceOn_ || overview_) { return; }
 
   execEP_=ep;
-  startEP_=TraceTimer();
 
   if (status_!= IDLE) {
     static bool print = true;
@@ -579,6 +578,7 @@ void TraceCounter::beginExecute
     CmiAbort("ERROR: start_counters() in beginExecute\n");
   }
 
+  startEP_=TraceTimer();
   DEBUGF(("%d/%d DEBUG:   beginExecute EP %d genStart %d\n", 
           CkMyPe(), CkNumPes(), ep, genStart_));
 }
@@ -729,13 +729,13 @@ void TraceCounter::beginOverview()
 {
   DEBUGF(("%d/%d DEBUG:   beginOverview\n", 
           CkMyPe(), CkNumPes()));
-  startEP_=TraceTimer();
   if ((genStart_=start_counters(counter1_->code, counter2_->code))<0)
   {
     CmiPrintf("genStart=%d counter1=%d counter2=%d\n", 
               genStart_, counter1_->code, counter2_->code);
     CmiAbort("ERROR: start_counters() in beginOverview\n");
   }
+  startEP_=TraceTimer();
   DEBUGF(("%d/%d DEBUG:   beginOverview\n", CkMyPe(), CkNumPes()));
   dirty_ = true;
 }
