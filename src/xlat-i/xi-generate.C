@@ -18,7 +18,7 @@ void GenerateRegisterCalls(ofstream& top, ofstream& bot) ;
 
 void Generate(char *interfacefile)
 {
-  char modulename[1024], topname[1024], botname[1024] ;
+  char modulename[1024], topname[1024], botname[1024], definename[1024] ;
   strcpy(modulename, interfacefile) ;
   modulename[strlen(interfacefile)-3] = '\0' ; // assume ModuleName.ci
   strcpy(topname,modulename) ;
@@ -28,8 +28,16 @@ void Generate(char *interfacefile)
 
   ofstream top(topname), bot(botname) ;
 
+  sprintf(definename, "CI_%s_TOP_H", modulename);
+  top << "#ifndef " << definename << "\n#define " << definename << endl;
+  sprintf(definename, "CI_%s_BOT_H", modulename);
+  bot << "#ifndef " << definename << "\n#define " << definename << endl;
+
   GenerateStructsFns(top, bot) ;
   GenerateRegisterCalls(top, bot) ;
+
+  top << "#endif\n";
+  bot << "#endif\n";
 }
 
 
@@ -71,9 +79,11 @@ void GenerateStructsFns(ofstream& top, ofstream& bot)
   Chare *c; 
   Entry *e;
 
-  top << "typedef struct { void *obj, *m; ";
-  top << "CHARE_BLOCK *chareblock; } Element;" << endl ;
-  top << "CpvExtern(CHARE_BLOCK *,currentChareBlock);" << endl ;
+//  bot << "#ifndef CI_THREAD_WRAPPER\n#define CI_THREAD_WRAPPER\n";
+  bot << "typedef struct { void *obj, *m; ";
+  bot << "CHARE_BLOCK *chareblock; } Element;" << endl ;
+  bot << "CpvExtern(CHARE_BLOCK *,currentChareBlock);" << endl ;
+//  bot << "#endif\n";
 
   /* Output all chare and EP id variables. Note : if this chare is not
      defined in this module, put "extern" and dont initialize.  */
