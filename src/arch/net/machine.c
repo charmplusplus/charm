@@ -237,6 +237,7 @@ int  portFinish = 0;
 #  define SIGBUS -1  /*These signals don't exist in Win32*/
 #  define SIGKILL -1
 #  define SIGQUIT -1
+#  define SIGTERM -1
 
 #else /*UNIX*/
 #  include <pwd.h>
@@ -335,6 +336,7 @@ static void KillOnAllSigs(int sigNo)
   }
   if (sigNo==SIGKILL) sig="caught signal KILL";
   if (sigNo==SIGQUIT) sig="caught signal QUIT";
+  if (sigNo==SIGTERM) sig="caught signal TERM";
   
   CmiError("------------- Processor %d Exiting: Caught Signal ------------\n"
   	"Signal: %s\n",CmiMyPe(),sig);
