@@ -175,7 +175,7 @@ typedef struct {
 #define MPI_STATUS_IGNORE (MPI_Status *)0
 
 typedef int MPI_Datatype;
-typedef int MPI_Aint;
+typedef int MPI_Aint;/* should be "long", but must be "int" for f90... */
 
 typedef int MPI_Errhandler;
 #define MPI_ERRORS_RETURN	1

@@ -2212,7 +2212,7 @@ int MPI_Type_ub(MPI_Datatype dtype, MPI_Aint* displacement){
 CDECL
 int MPI_Address(void* location, MPI_Aint *address){
   AMPIAPI("MPI_Address");
-  *address = (MPI_Aint)((char *)location);
+  *address = (MPI_Aint)(unsigned long)(char *)location;
   return 0;
 }
 
