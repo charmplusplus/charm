@@ -477,7 +477,9 @@ case $version in
     CHARMIP='128.174.241.207'
 #    CHARMIP='charm.cs.uiuc.edu'
 #    VERSION=`nm /lib/libc.so.6 | grep "A GLIBC_" | tail -1 | sed -e "s/00000000 A GLIBC_//g"`
+    AC_MSG_CHECKING(glibc version)
     get_glibc_version
+    AC_MSG_RESULT($GLIBCVERSION)
     if test 1 = `expr $GLIBCVERSION \> 2.2.92` 
     then
       cat >> ./conv-mach-opt.h << EOT
