@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.12  1995-09-20 23:09:47  sanjeev
+ * Revision 2.13  1995-09-21 16:39:01  sanjeev
+ * *** empty log message ***
+ *
+ * Revision 2.12  1995/09/20  23:09:47  sanjeev
  * added comm_object
  *
  * Revision 2.11  1995/09/20  15:10:18  sanjeev
@@ -73,98 +76,9 @@
 
 #define NULL_EP -1
 
-extern "C" void CollectValue(int, int, ChareIDType *) ;
-extern "C" void * MonoValue(int) ;
 
-
-/****** This is the top level class from which all message types inherit *****/
-
-class comm_object {
-	void operator delete(void *msg) {
-		CkFreeMsg(msg) ;
-	}
-
-	void *operator new(int size, int id) {
-		return (void *)GenericCkAlloc(id, size, 0) ;
-	}
-
-	void *operator new(int size, int id, int prio) {
-		return (void *)GenericCkAlloc(id, size, prio) ;
-	}
-
-	void *operator new(int size, int id, int* sizes) {
-		return (void *)((ALLOCFNPTR)(CsvAccess(MsgToStructTable)[id].alloc))(id, size, sizes, 0) ;
-	}
-
-	void *operator new(int size, int id, int prio, int* sizes) {
-		return (void *)((ALLOCFNPTR)(CsvAccess(MsgToStructTable)[id].alloc))(id, size, sizes, prio) ;
-	}
-}
-
-
-
-
-
-
-/******* Top level chare class at root of chare hierarchy ********/
-
-class _CK_Object {  
-public:
-	ChareIDType thishandle ;   
-
-	_CK_Object() {}
-
-	_CK_Object(CHARE_BLOCK *chareblock) {
-        	SetID_onPE(thishandle, CmiMyPe());
-        	SetID_chare_magic_number(thishandle,GetID_chare_magic_number(chareblock->selfID)) ;
-        	SetID_chareBlockPtr(thishandle, chareblock);
-	}
-} ;
-
-
-
-class _CK_BOC {  /* top level BOC object */
-public:
-	int thishandle ;  /* stores BocNum */
-	ChareIDType thisbranchhandle ;
-
-	_CK_BOC() {}
-	_CK_BOC(CHARE_BLOCK *bocblock) {
-        	SetID_onPE(thisbranchhandle, CmiMyPe());
-        	SetID_chare_magic_number(thisbranchhandle,GetID_chare_magic_number(bocblock->selfID)) ;
-        	SetID_chareBlockPtr(thisbranchhandle, bocblock);
-
-		thishandle = bocblock->x.boc_num ;
-	}
-} ;
-
-
-class _CK_Accumulator { /* top level Accumulator object */
-
-public:
-	int _CK_MyId ;
-
-	virtual void * _CK_GetMsgPtr() = 0 ;
-
-	virtual void _CK_Combine(void *) = 0 ;
-
-	void CollectValue(int EpNum, ChareIDType cid)
-	{
-		::CollectValue(_CK_MyId, EpNum, &cid) ; 
-		/* in node_acc.c */
-	}
-} ;
-
-class _CK_Monotonic { /* top level Monotonic object */
-
-public:
-	int _CK_MyId ;
-
-	virtual void * _CK_GetMsgPtr() = 0 ;
-
-	virtual void _CK_SysUpdate(void *) = 0 ;  /* called by system */
-} ;
-
+class _CK_Object ;
+class _CK_BOC ;
 
 
 /* EPFnType is a pointer to a _CK_call_Chare_EP() function */
@@ -235,6 +149,7 @@ extern "C" void SendMsg(int, void *, ChareIDType *) ;
 extern "C" void *GetBocDataPtr(int) ;
 extern "C" void SetBocBlockPtr(int, CHARE_BLOCK *);
 
+
 extern "C" void VidRetrieveMessages(CHARE_BLOCK *, PeNumType, CHARE_BLOCK *) ;
 extern "C" void SendNodeStatistics() ;
 extern "C" void close_log() ;
@@ -249,8 +164,107 @@ extern "C" void CPlus_StartQuiescence(int, ChareIDType) ;
 extern "C" void * _CK_9GetAccDataPtr(void *) ;
 extern "C" void * _CK_9GetMonoDataPtr(void *) ;
 extern "C" void _CK_BroadcastMono(void *, int) ;
+extern "C" void CollectValue(int, int, ChareIDType *) ;
+extern "C" void * MonoValue(int) ;
 
 extern "C" void * CkPriorityPtr(void *) ;
 extern "C" ENVELOPE *CkCopyEnv(ENVELOPE *) ;
+
+
+
+
+
+/****** This is the top level class from which all message types inherit *****/
+
+class comm_object {
+public:	void operator delete(void *msg) {
+		CkFreeMsg(msg) ;
+	}
+
+	void *operator new(int size) {
+		CmiPrintf("[%d] ERROR: wrong new operator for message allocation\n",CmiMyPe()) ;
+	}
+
+	void *operator new(int size, int id) {
+		return (void *)GenericCkAlloc(id, size, 0) ;
+	}
+
+	void *operator new(int size, int id, int prio) {
+		return (void *)GenericCkAlloc(id, size, prio) ;
+	}
+
+	void *operator new(int size, int id, int* sizes) {
+		return (void *)((ALLOCFNPTR)(CsvAccess(MsgToStructTable)[id].alloc))(id, size, sizes, 0) ;
+	}
+
+	void *operator new(int size, int id, int prio, int* sizes) {
+		return (void *)((ALLOCFNPTR)(CsvAccess(MsgToStructTable)[id].alloc))(id, size, sizes, prio) ;
+	}
+} ;
+
+
+
+
+
+
+/******* Top level chare class at root of chare hierarchy ********/
+
+class _CK_Object {  
+public:
+	ChareIDType thishandle ;   
+
+	_CK_Object() {}
+
+	_CK_Object(CHARE_BLOCK *chareblock) {
+        	SetID_onPE(thishandle, CmiMyPe());
+        	SetID_chare_magic_number(thishandle,GetID_chare_magic_number(chareblock->selfID)) ;
+        	SetID_chareBlockPtr(thishandle, chareblock);
+	}
+} ;
+
+
+
+class _CK_BOC {  /* top level BOC object */
+public:
+	int thishandle ;  /* stores BocNum */
+	ChareIDType thisbranchhandle ;
+
+	_CK_BOC() {}
+	_CK_BOC(CHARE_BLOCK *bocblock) {
+        	SetID_onPE(thisbranchhandle, CmiMyPe());
+        	SetID_chare_magic_number(thisbranchhandle,GetID_chare_magic_number(bocblock->selfID)) ;
+        	SetID_chareBlockPtr(thisbranchhandle, bocblock);
+
+		thishandle = bocblock->x.boc_num ;
+	}
+} ;
+
+
+class _CK_Accumulator { /* top level Accumulator object */
+
+public:
+	int _CK_MyId ;
+
+	virtual void * _CK_GetMsgPtr() = 0 ;
+
+	virtual void _CK_Combine(void *) = 0 ;
+
+	void CollectValue(int EpNum, ChareIDType cid)
+	{
+		::CollectValue(_CK_MyId, EpNum, &cid) ; 
+		/* in node_acc.c */
+	}
+} ;
+
+class _CK_Monotonic { /* top level Monotonic object */
+
+public:
+	int _CK_MyId ;
+
+	virtual void * _CK_GetMsgPtr() = 0 ;
+
+	virtual void _CK_SysUpdate(void *) = 0 ;  /* called by system */
+} ;
+
 
 #endif
