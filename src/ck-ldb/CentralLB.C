@@ -157,9 +157,12 @@ void CentralLB::AtSync()
 #endif
 }
 
+#include "ComlibStrategy.h"
+
 void CentralLB::ProcessAtSync()
 {
 #if CMK_LBDB_ON
+
   if (CkMyPe() == cur_ld_balancer) {
     start_lb_time = CkWallTimer();
   }
@@ -361,7 +364,7 @@ void CentralLB::LoadBalance()
       getPredictedLoad(statsData, clients, migrateMsg, migrateMsg->expectedLoad, minObjLoad, maxObjLoad, 1);
   }
 
-//  CkPrintf("calling recv migration\n");
+  //  CkPrintf("calling recv migration\n");
   thisProxy.ReceiveMigration(migrateMsg);
 
   // Zero out data structures for next cycle
@@ -515,7 +518,7 @@ void CentralLB::MigrationDone(int balancing)
   if (balancing) theLbdb->ClearLoads();
   // Increment to next step
   theLbdb->incStep();
-  // if sync resume, invoke a barrier
+  // if sync resume invoke a barrier
   if (balancing && _lb_args.syncResume()) {
     CkCallback cb(CkIndex_CentralLB::ResumeClients((CkReductionMsg*)NULL), 
                   thisProxy);
@@ -534,6 +537,7 @@ void CentralLB::ResumeClients(CkReductionMsg *msg)
 
 void CentralLB::ResumeClients(int balancing)
 {
+
 #if CMK_LBDB_ON
   DEBUGF(("[%d] Resuming clients. balancing:%d.\n",CkMyPe(),balancing));
   if (balancing && _lb_args.debug() && CkMyPe() == cur_ld_balancer) {
@@ -545,6 +549,8 @@ void CentralLB::ResumeClients(int balancing)
   	      lbName(), end_lb_time - start_lb_time,
 	      (int)lbdbMemsize, (int)(useMem()/1000));
   }
+
+  ComlibNotifyMigrationDone();  
 
   theLbdb->ResumeClients();
   if (balancing)  {
