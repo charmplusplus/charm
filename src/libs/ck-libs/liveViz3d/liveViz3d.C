@@ -25,13 +25,16 @@ class liveViz3dManager : public CBase_liveViz3dManager {
 	bool hasDelayed;
 	CcsDelayedReply delayedReply;
 	
-	/// Pack up and send off all our stored views:
+	/// Pack up and send off up to 100KB of stored views:
 	void sendReply(CcsDelayedReply repl) {
-		int i,n=views.size();
-		CmiPrintf("Sending off %d new views\n",n);
+		int i,n;
 		PUP_toNetwork4_sizer ps;
 		ps|n;
-		for (i=0;i<n;i++) pup_pack(ps,*views[i]);
+		for (n=0;n<views.size();n++) {
+			pup_pack(ps,*views[n]);
+			if (ps.size()>100*1024) {n++; break;}
+		}
+		CmiPrintf("Sending off %d new views (%d bytes)\n",n,ps.size());
 		int len=ps.size();
 		char *retMsg=new char[len];
 		PUP_toNetwork4_pack pp(retMsg);
@@ -40,7 +43,14 @@ class liveViz3dManager : public CBase_liveViz3dManager {
 			pup_pack(pp,*views[i]);
 			views[i]->unref();
 		}
-		views.clear();//erase(views.begin(),views.end());
+		if (len!=pp.size()) {
+			CkError("Sizing pup was %d bytes; packing pup was %d!\n",
+				len,pp.size());
+			CkAbort("Pup size mismatch (logic error) in liveViz3d!\n");
+		}
+		
+		// views.clear();
+		views.erase(views.begin(),n+views.begin());
 		CcsSendDelayedReply(repl,len,retMsg);
 		delete[] retMsg;
 		CmiPrintf("Done sending off %d views\n",n);
