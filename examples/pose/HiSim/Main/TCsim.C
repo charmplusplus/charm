@@ -202,13 +202,20 @@ BGproc::BGproc(BGprocMsg *m)
   numTasks = tline.length();
   CmiAssert(numTasks>0);
   taskList = new Task[tline.length()];
+  int toskip = config.skip_on;
   int startEvt = 0;		// start event, to skip startup
   for(i=0;i<tline.length();i++) {
-    taskList[i].convertFrom(tline[i],myHandle,numWth);
-    if (config.skip_on && tline[i]->isStartEvent() && startEvt== 0) { 
+      taskList[i].convertFrom(tline[i],myHandle,numWth);
+      if (toskip && tline[i]->isStartEvent()) { 
 	CmiAssert(procNum==0); 
+        toskip--;
 	startEvt = i; 
-    }
+      }
+  }
+  // check if we have completely skipped all start events wanted
+  if (procNum == 0 && toskip != 0) {
+    CmiPrintf("WARNING: only skipped %d start events!\n", config.skip_on-toskip);
+    config.skip_on -= toskip;
   }
 
   buildHash();
@@ -243,7 +250,7 @@ BGproc::BGproc(BGprocMsg *m)
     CkPrintf("Info> timing factor %e ...\n", (double)factor);
     CkPrintf("Info> invoking startup task from proc 0 ...\n");
     if (config.skip_on)
-      CkPrintf("Info> Skipping startup to %d/%d at time %lld\n", startEvt, tline.length(), (CmiInt8)taskList[startEvt].startTime);
+      CkPrintf("Info> Skipping startup for %d to event %d/%d at time %lld\n", config.skip_on, startEvt, tline.length(), (CmiInt8)taskList[startEvt].startTime);
   }
 #if 1
     for (int i=startEvt; i<numTasks; i++) {
