@@ -799,68 +799,13 @@ int CsdScheduler(int maxmsgs)
   int *msg, csdMsgFlag = 0; /* To signal a message coming from the CsdNodeQueue */
   void *localqueue = CpvAccess(CmiLocalQueue);
   int cycle = CpvAccess(CsdStopFlag);
+  int pollmode = (maxmsgs==0);
   
 #if CMK_DEBUG_MODE
   /* To allow start in freeze state */
   msgListCleanup();
   msgListCache();
 #endif
-
-  if(maxmsgs == 0) {
-    while(1) {
-#if NODE_0_IS_CONVHOST
-      if(hostskt_ready_read) CHostGetOne();
-#endif
-      msg = CmiGetNonLocal();
-#if CMK_DEBUG_MODE
-      if(CpvAccess(freezeModeFlag)==1){
-
-        /* Check if the msg is an debug message to let it go
-           else, enqueue in the FIFO
-        */
-
-        if(msg != 0){
-          if(strncmp((char *)((char *)msg+CmiMsgHeaderSizeBytes),"req",3)!=0) {
-            /*CQdCreate(CpvAccess(cQdState), 1);*/
-            CsdEndIdle();
-            FIFO_EnQueue(CpvAccess(debugQueue), msg);
-            continue;
-          }
-        }
-      } else {
-        /* If the debugQueue contains any messages, process them */
-        while((!FIFO_Empty(CpvAccess(debugQueue))) && (CpvAccess(freezeModeFlag)==0)){
-          char *queuedMsg;
-          FIFO_DeQueue(CpvAccess(debugQueue), (void **)&queuedMsg);
-          CmiHandleMessage(queuedMsg);
-          maxmsgs--; if (maxmsgs==0) return maxmsgs;
-        }
-      }
-#endif
-      if (msg==0) FIFO_DeQueue(localqueue, (void **)&msg);
-#if CMK_NODE_QUEUE_AVAILABLE
-      csdMsgFlag = 0;
-      if (msg==0) msg = CmiGetNonLocalNodeQ();
-      if (msg==0 && !CqsEmpty(CsvAccess(CsdNodeQueue))
-                 && !CqsPrioGT(CqsGetPriority(CsvAccess(CsdNodeQueue)), 
-                               CqsGetPriority(CpvAccess(CsdSchedQueue)))) {
-        CmiLock(CsvAccess(CsdNodeQueueLock));
-        CqsDequeue(CsvAccess(CsdNodeQueue),&msg);
-        CmiUnlock(CsvAccess(CsdNodeQueueLock));
-		csdMsgFlag = 1;
-      }
-#endif
-	  if (msg && (!csdMsgFlag)) CQdProcess(CpvAccess(cQdState), 1);
-	  if (msg==0) CqsDequeue(CpvAccess(CsdSchedQueue),&msg);
-      if (msg) {
-        CmiHandleMessage(msg);
-        maxmsgs--;
-        if (CpvAccess(CsdStopFlag) != cycle) return maxmsgs;
-      } else {
-        return maxmsgs;
-      }
-    }
-  }
 
   while (1) {
 #if NODE_0_IS_CONVHOST
@@ -913,6 +858,7 @@ int CsdScheduler(int maxmsgs)
       maxmsgs--; if (maxmsgs==0) return maxmsgs;
       if (CpvAccess(CsdStopFlag) != cycle) return maxmsgs;
     } else {
+      if(pollmode) return maxmsgs;
       CsdBeginIdle();
       if (CpvAccess(CsdStopFlag) != cycle) {
 	CsdEndIdle();
