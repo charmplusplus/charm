@@ -28,9 +28,10 @@ t="test.cpp"
 # Test: tries to compile C++ file $t (described by $1).
 #  If successful, prints $2 and sets $pass/clears $fail
 #  If failure, prints $3 and sets $pass/clears $fail
+#  additional arguments to c++ compiler are passed as $4
 test_cxx() {
         AC_MSG_CHECKING("$1")
-	$CMK_CXX -I../include -c $t -o test.o > out 2>&1
+	$CMK_CXX -I../include -c $t -o test.o $4 > out 2>&1
 	if test $? -eq 0
 	then
                 AC_MSG_RESULT("$2")
@@ -79,7 +80,7 @@ void foo(void) {
 }
 EOT
 echo "set C++ compiler as: $CMK_CXX"
-test_cxx "whether C++ compiler works" "ok" "no"
+test_cxx "whether C++ compiler works" "ok" "no" ""
 if test $fail -eq 1
 then
 	echo "Cannot compile C++ programs with $CMK_CXX"
@@ -94,7 +95,7 @@ cat > $t <<EOT
 #include <stdlib.h>
 bool foo(void) { return true; }
 EOT
-test_cxx "whether C++ bool works" "ok" "no"
+test_cxx "whether C++ bool works" "ok" "no" ""
 AC_DEFINE_UNQUOTED(CMK_BOOL_DEFINED, $pass)
 AC_DEFINE_UNQUOTED(CMK_BOOL_UNDEFINED, $fail)
 
@@ -106,7 +107,7 @@ class er {
    explicit er(unsigned int inType) {};
 };
 EOT
-test_cxx "whether C++ class explicit keyword works" "ok" "no"
+test_cxx "whether C++ class explicit keyword works" "ok" "no" ""
 AC_DEFINE_UNQUOTED(CMK_EXPLICIT, $pass)
 
 #### check if signed char is same as char ####
@@ -118,13 +119,13 @@ class er {
    void operator()(signed char &v,const char *desc=NULL) {};
 };
 EOT
-test_cxx "whether C++ signed char and char differ" "yes" "no"
+test_cxx "whether C++ signed char and char differ" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_SIGNEDCHAR_DIFF_CHAR, $pass)
 
 cat > $t <<EOT
 int foo(float *t) {return *reinterpret_cast<int *>(t);}
 EOT
-test_cxx "whether C++ *_casts<> work" "ok" "no"
+test_cxx "whether C++ *_casts<> work" "ok" "no" ""
 AC_DEFINE_UNQUOTED(CMK_CPP_CAST_LEGAL, $pass)
 AC_DEFINE_UNQUOTED(CMK_CPP_CAST_ILLEGAL, $fail)
 
@@ -147,7 +148,7 @@ void myfunc()
   x.template memb<fn>();
 }
 EOT
-test_cxx "whether templated member functions work" "ok" "no"
+test_cxx "whether templated member functions work" "ok" "no" ""
 AC_DEFINE_UNQUOTED(CMK_TEMPLATE_MEMBERS_BROKEN, $fail)
 
 
@@ -155,7 +156,7 @@ cat > $t <<EOT
 #include <iostream>
 void foo(void) {}
 EOT
-test_cxx "whether including STL <foo> works" "ok" "no"
+test_cxx "whether including STL <foo> works" "ok" "no" ""
 AC_DEFINE_UNQUOTED(CMK_STL_USE_DOT_H, $fail)
 AC_DEFINE_UNQUOTED(CMK_STL_DONT_USE_DOT_H, $pass)
 
@@ -164,7 +165,7 @@ namespace foo {
 	int x;
 };
 EOT
-test_cxx "whether namespaces work" "ok" "no"
+test_cxx "whether namespaces work" "ok" "no" ""
 AC_DEFINE_UNQUOTED(CMK_NAMESPACES_BROKEN, $fail)
 
 
@@ -175,7 +176,7 @@ const char *foo(void) {
 	return typeid(x).name();
 }
 EOT
-test_cxx "whether typeinfo/typeid works" "ok" "no"
+test_cxx "whether typeinfo/typeid works" "ok" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_TYPEINFO, $pass)
 
 cat > $t <<EOT
@@ -183,7 +184,7 @@ namespace foo {
 	int x;
 };
 EOT
-test_cxx "whether namespaces work" "ok" "no"
+test_cxx "whether namespaces work" "ok" "no" ""
 AC_DEFINE_UNQUOTED(CMK_NAMESPACES_BROKEN, $fail)
 
 
@@ -195,7 +196,7 @@ public:
   void operator delete(void*p,int*){};
 };
 EOT
-test_cxx "whether operator delete can be overloaded in same class" "ok" "no"
+test_cxx "whether operator delete can be overloaded in same class" "ok" "no" ""
 AC_DEFINE_UNQUOTED(CMK_MULTIPLE_DELETE, $strictpass)
 
 #test if has poll
@@ -206,7 +207,7 @@ void foo(void) {
   poll(pos, 1, 1);
 }
 EOT
-test_cxx "whether it has poll" "yes" "no"
+test_cxx "whether it has poll" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_USE_POLL, $pass)
 
 #test if has sys/mman.h
@@ -216,8 +217,26 @@ cat > $t <<EOT
 void foo(void) { 
 }
 EOT
-test_cxx "whether it has sys/mman.h" "yes" "no"
+test_cxx "whether it has sys/mman.h" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_MMAN_H, $pass)
+
+#test if has zlib
+cat > $t <<EOT
+#include <zlib.h>
+void foo(void) { 
+  gzclose(gzopen("/tmp/x","r"));
+}
+EOT
+test_cxx "whether it has zlib" "yes" "no" "-lz"
+AC_DEFINE_UNQUOTED(CMK_PROJECTIONS_USE_ZLIB, $pass)
+if test $pass -eq 1
+then 
+cat >> ./conv-mach-opt.sh << EOT
+
+CMK_LIBS="$CMK_LIBS -lz"
+
+EOT
+fi
 
 #test fortran subroutine name
 FCC=`echo $CMK_CF90 | cut -d' ' -f1`

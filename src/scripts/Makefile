@@ -159,7 +159,6 @@ headerlinks: dirs+sources Makefile $(ALLHEADERS)
 
 dirs+sources:
 	rm -f .gdir
-#	(cd .. ; basename `pwd`) 			> .vdir
 	(cd .. ; basename `pwd` | sed -e 's@-.*@@') 	> .gdir
 	find . -type l -exec rm {} \;
 	rm -rf QuickThreads

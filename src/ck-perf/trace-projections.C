@@ -34,17 +34,46 @@ static int _threadMsg, _threadChare, _threadEP;
 On T3E, we need to have file number control by open/close files only when needed.
 */
 #if CMK_TRACE_LOGFILE_NUM_CONTROL
-#define OPEN_LOG  \
-  do  {  \
-    fp = fopen(fname, "a");   \
-  } while (!fp && (errno == EINTR || errno == EMFILE)); 	\
-  if(!fp) CmiAbort("Cannot open Projections Trace File for writing...\n");
-#define CLOSE_LOG  fclose(fp);
+  #define OPEN_LOG openLog("a");
+  #define CLOSE_LOG closeLog();
 #else
-#define OPEN_LOG
-#define CLOSE_LOG
+  #define OPEN_LOG
+  #define CLOSE_LOG
 #endif
 
+void LogPool::openLog(const char *mode)
+{
+#if CMK_PROJECTIONS_USE_ZLIB
+  if(compressed) {
+    do {
+      zfp = gzopen(fname, mode);
+    } while (!zfp && (errno == EINTR || errno == EMFILE));
+    if(!zfp) CmiAbort("Cannot open Projections Trace File for writing...\n");
+  } else {
+    do {
+      fp = fopen(fname, mode);
+    } while (!fp && (errno == EINTR || errno == EMFILE));
+    if(!fp) CmiAbort("Cannot open Projections Trace File for writing...\n");
+  }
+#else
+  do {
+    fp = fopen(fname, mode);
+  } while (!fp && (errno == EINTR || errno == EMFILE));
+  if(!fp) CmiAbort("Cannot open Projections Trace File for writing...\n");
+#endif
+}
+
+void LogPool::closeLog(void)
+{
+#if CMK_PROJECTIONS_USE_ZLIB
+  if(compressed)
+    gzclose(zfp);
+  else
+    fclose(fp);
+#else
+    fclose(fp);
+#endif
+}
 /**
   For each TraceFoo module, _createTraceFoo() must be defined.
   This function is called in _createTraces() generated in moduleInit.C
@@ -69,47 +98,84 @@ void traceProjectionsEndIdle(void)
   CkpvAccess(_trace)->endIdle();
 }
 
-LogPool::LogPool(char *pgm, int b) {
-  binary = b;
+LogPool::LogPool(char *pgm) {
   pool = new LogEntry[CkpvAccess(CtrLogBufSize)];
   numEntries = 0;
   poolSize = CkpvAccess(CtrLogBufSize);
+  pgmname = new char[strlen(pgm)+1];
+  strcpy(pgmname, pgm);
+}
+
+void LogPool::init(void)
+{
   char pestr[10];
   sprintf(pestr, "%d", CkMyPe());
-  int len = strlen(pgm) + strlen(".log.") + strlen(pestr) + 1;
+#if CMK_PROJECTIONS_USE_ZLIB
+  int len;
+  if(compressed)
+    len = strlen(pgmname) + strlen(".log.") + strlen(pestr) + strlen(".gz") + 1;
+  else
+    len = strlen(pgmname) + strlen(".log.") + strlen(pestr) + 1;
+#else
+  int len = strlen(pgmname) + strlen(".log.") + strlen(pestr) + 1;
+#endif
   fname = new char[len];
-  sprintf(fname, "%s.%s.log", pgm, pestr);
-  do
-  {
-    fp = fopen(fname, "w+");
-  } while (!fp && (errno == EINTR || errno == EMFILE));
-  if(!fp) {
-    CmiAbort("Cannot open Projections Trace File for writing...\n");
-  }
+#if CMK_PROJECTIONS_USE_ZLIB
+  if(compressed)
+    sprintf(fname, "%s.%s.log.gz", pgmname, pestr);
+  else
+    sprintf(fname, "%s.%s.log", pgmname, pestr);
+#else
+  sprintf(fname, "%s.%s.log", pgmname, pestr);
+#endif
+  openLog("w+");
   if(!binary) {
-    fprintf(fp, "PROJECTIONS-RECORD\n");
+    if(compressed)
+      gzprintf(zfp, "PROJECTIONS-RECORD\n");
+    else
+      fprintf(fp, "PROJECTIONS-RECORD\n");
   }
   CLOSE_LOG 
 }
 
 LogPool::~LogPool() 
 {
-  if(binary) writeBinary();
-  else write();
+  writeLog();
 #if !CMK_TRACE_LOGFILE_NUM_CONTROL
-  fclose(fp);
+  closeLog();
 #endif
   delete[] pool;
   delete [] fname;
 }
 
-void LogPool::write(void) 
+void LogPool::writeLog(void)
 {
   OPEN_LOG
-  for(UInt i=0; i<numEntries; i++)
-    pool[i].write(fp);
+  if(binary) writeBinary();
+#if CMK_PROJECTIONS_USE_ZLIB
+  else if(compressed) writeCompressed();
+#endif
+  else write();
   CLOSE_LOG
 }
+
+void LogPool::write(void) 
+{
+  for(UInt i=0; i<numEntries; i++)
+    pool[i].write(fp);
+}
+
+void LogPool::writeBinary(void) {
+  for(UInt i=0; i<numEntries; i++)
+    pool[i].writeBinary(fp);
+}
+
+#if CMK_PROJECTIONS_USE_ZLIB
+void LogPool::writeCompressed(void) {
+  for(UInt i=0; i<numEntries; i++)
+    pool[i].writeCompressed(zfp);
+}
+#endif
 
 void LogPool::writeSts(void)
 {
@@ -150,7 +216,7 @@ void LogPool::add(UChar type,UShort mIdx,UShort eIdx,double time,int event,int p
     LogEntry(time, type, mIdx, eIdx, event, pe, ml);
   if(poolSize==numEntries) {
     double writeTime = CkTimer();
-    if(binary) writeBinary(); else write();
+    writeLog();
     numEntries = 0;
     new (&pool[numEntries++]) LogEntry(writeTime, BEGIN_INTERRUPT);
     new (&pool[numEntries++]) LogEntry(CkTimer(), END_INTERRUPT);
@@ -202,6 +268,54 @@ void LogEntry::write(FILE* fp)
       break;
   }
 }
+
+#if CMK_PROJECTIONS_USE_ZLIB
+void LogEntry::writeCompressed(gzFile zfp)
+{
+  gzprintf(zfp, "%d ", type);
+
+  switch (type) {
+    case USER_EVENT:
+      gzprintf(zfp, "%d %u %d %d\n", mIdx, (UInt) (time*1.0e6), event, pe);
+      break;
+
+    case BEGIN_IDLE:
+    case END_IDLE:
+    case BEGIN_PACK:
+    case END_PACK:
+    case BEGIN_UNPACK:
+    case END_UNPACK:
+      gzprintf(zfp, "%u %d\n", (UInt) (time*1.0e6), pe);
+      break;
+
+    case CREATION:
+    case BEGIN_PROCESSING:
+    case END_PROCESSING:
+    case MESSAGE_RECV:
+      gzprintf(zfp, "%d %d %u %d %d %d\n", mIdx, eIdx, (UInt) (time*1.0e6), event, pe, msglen);
+      break;
+
+    case ENQUEUE:
+    case DEQUEUE:
+      gzprintf(zfp, "%d %u %d %d\n", mIdx, (UInt) (time*1.0e6), event, pe);
+      break;
+
+    case BEGIN_INTERRUPT:
+    case END_INTERRUPT:
+      gzprintf(zfp, "%u %d %d\n", (UInt) (time*1.0e6), event, pe);
+      break;
+
+    case BEGIN_COMPUTATION:
+    case END_COMPUTATION:
+      gzprintf(zfp, "%u\n", (UInt) (time*1.0e6));
+      break;
+
+    default:
+      CmiError("***Internal Error*** Wierd Event %d.\n", type);
+      break;
+  }
+}
+#endif
 
 void LogEntry::writeBinary(FILE* fp)
 {
@@ -269,7 +383,15 @@ TraceProjections::TraceProjections(char **argv): curevent(0), isIdle(0)
   CtvInitialize(int,curThreadEvent);
   CtvAccess(curThreadEvent)=0;
   int binary = CmiGetArgFlag(argv,"+binary-trace");
-  _logPool = new LogPool(CkpvAccess(traceRoot),binary);
+#if CMK_PROJECTIONS_USE_ZLIB
+  int compressed = CmiGetArgFlag(argv,"+gz-trace");
+#endif
+  _logPool = new LogPool(CkpvAccess(traceRoot));
+  _logPool->setBinary(binary);
+#if CMK_PROJECTIONS_USE_ZLIB
+  _logPool->setCompressed(compressed);
+#endif
+  _logPool->init();
 }
 
 

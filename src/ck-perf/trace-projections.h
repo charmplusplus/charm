@@ -18,6 +18,10 @@
 #include "stdio.h"
 #include "errno.h"
 
+#if CMK_PROJECTIONS_USE_ZLIB
+#include <zlib.h>
+#endif
+
 #include "trace-common.h"
 
 /// a log entry in trace projection
@@ -42,6 +46,9 @@ class LogEntry {
     int msglen;
     void write(FILE *fp);
     void writeBinary(FILE *fp);
+#if CMK_PROJECTIONS_USE_ZLIB
+    void writeCompressed(gzFile fp);
+#endif
 };
 
 /// log pool in trace projection
@@ -52,15 +59,28 @@ class LogPool {
     LogEntry *pool;
     FILE *fp;
     char *fname;
+    char *pgmname;
     int binary;
+#if CMK_PROJECTIONS_USE_ZLIB
+    gzFile zfp;
+    int compressed;
+#endif
   public:
-    LogPool(char *pgm, int b);
+    LogPool(char *pgm);
     ~LogPool();
+    void setBinary(int b) { binary = b; }
+#if CMK_PROJECTIONS_USE_ZLIB
+    void setCompressed(int c) { compressed = c; }
+#endif
+    void init(void);
+    void openLog(const char *mode);
+    void closeLog(void);
+    void writeLog(void);
     void write(void);
-    void writeBinary(void) {
-      for(UInt i=0; i<numEntries; i++)
-        pool[i].writeBinary(fp);
-    }
+    void writeBinary(void);
+#if CMK_PROJECTIONS_USE_ZLIB
+    void writeCompressed(void);
+#endif
     void writeSts(void);
     void add(UChar type,UShort mIdx,UShort eIdx,double time,int event,int pe, int ml=0);
 };
