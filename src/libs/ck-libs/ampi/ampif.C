@@ -27,6 +27,7 @@ FDECL {
 #define mpi_wait FTN_NAME( MPI_WAIT , mpi_wait )
 #define mpi_testall FTN_NAME( MPI_TESTALL , mpi_testall )
 #define mpi_test FTN_NAME( MPI_TEST , mpi_test )
+#define mpi_request_free FTN_NAME( MPI_REQUEST_FREE , mpi_request_free )
 #define mpi_send_init FTN_NAME( MPI_SEND_INIT , mpi_send_init )
 #define mpi_recv_init FTN_NAME( MPI_RECV_INIT , mpi_recv_init )
 #define mpi_type_contiguous FTN_NAME( MPI_TYPE_CONTIGUOUS , mpi_type_contiguous )
@@ -198,6 +199,11 @@ void mpi_testall(int *count, int *request, int *flag, int *status, int *ierr)
 void mpi_test(int *request, int *flag, int *status, int *ierr)
 {
   *ierr = MPI_Test((MPI_Request*) request, flag, (MPI_Status*) status);
+}
+
+void mpi_request_free(int *request, int *ierr)
+{
+  *ierr = MPI_Request_free(request);
 }
 
 void mpi_recv_init(void *buf, int *count, int *type, int *srcpe,

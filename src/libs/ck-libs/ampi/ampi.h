@@ -143,7 +143,7 @@ int MPI_Test(MPI_Request *request, int *flag, MPI_Status *sts);
 int MPI_Testall(int count, MPI_Request *request, int *flag, MPI_Status *sts);
 /* MPI_Testsome */
 /* MPI_Testany */
-/* MPI_Request_free */
+int MPI_Request_free(MPI_Request *request);
 /* MPI_Cancel */
 /* MPI_Test_cancel */
 int MPI_Iprobe(int src, int tag, MPI_Comm comm, int *flag, MPI_Status *sts);
