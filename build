@@ -56,13 +56,13 @@ syntax() {
   echo '  occ		  compile with out of core support'
   echo ''
   echo "Charm++ dynamic libraries:"
-  echo "  --build-shared  build Charm++ dynamic libaries (.so), this is on by default"
+  echo "  --build-shared  build Charm++ dynamic libraries (.so), this is on by default"
   echo "  --no-shared	  disable the compilation for Charm++'s shared libraries"
   echo ''
   echo 'Miscellaneous options:'
-  echo '  --incdir=DIR	  specify additional include path for compilers'
-  echo '  --libdir=DIR	  specify additional lib path for compilers'
-  echo '  --basedir=DIR	  specify additional path at once - DIR/include and DIR/lib'
+  echo '  --incdir=DIR	  specify additional include path for compiler'
+  echo '  --libdir=DIR	  specify additional lib path for compiler'
+  echo '  --basedir=DIR	  shortcut for the above two - DIR/include and DIR/lib'
   fi
   echo ''
   echo '<charmc-options>: normal compiler options e.g. -g -O -save -verbose'
