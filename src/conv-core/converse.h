@@ -980,6 +980,7 @@ void CmiDelayImmediate();
 #else
 #  define CmiBecomeImmediate(msg) /* empty */
 #endif
+int CmiIsImmRunning();
 
 /******** Trace ********/
 
