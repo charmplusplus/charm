@@ -488,6 +488,14 @@ CHARMINC="$CHARMBIN/../include"
 #
 ##############################################################################
 
+# Load machine-specific defaults:
+CMK_C_OPTIMIZE="-O"
+CMK_CXX_OPTIMIZE="-O"
+CMK_F90_OPTIMIZE="-O"
+CMK_C_DEBUG="-g"
+CMK_CXX_DEBUG="-g"
+CMK_F90_DEBUG="-g"
+
 if [ -r $CHARMINC/conv-mach-pre.sh ]
 then
 . $CHARMINC/conv-mach-pre.sh
