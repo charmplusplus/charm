@@ -729,8 +729,11 @@ libbluegene.a: BlueGene.C BlueGene.h BlueGene.decl.h BlueGene.def.h
 blue.o:  blue.h blue_impl.h blue.C
 	$(CHARMC) -c blue.C
 
-libconv-bluegene.a:   blue.o
-	$(CHARMC) -cp ../lib -o libconv-bluegene.a blue.o
+blue_timing.o:  blue.h blue_impl.h blue_timing.C blue_timing.h
+	$(CHARMC) -c blue_timing.C
+
+libconv-bluegene.a:   blue.o blue_timing.o
+	$(CHARMC) -cp ../lib -o libconv-bluegene.a blue.o blue_timing.o
 
 ###############################################################################
 #
