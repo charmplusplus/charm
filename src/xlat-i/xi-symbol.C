@@ -355,6 +355,19 @@ Chare::genGroupDecls(XStr& str)
   }
   str << " *) CkLocalBranch(_ck_gid);\n";
   str << "    }\n";
+  str << "    static ";
+  type->print(str);
+  if(templat) {
+    templat->genVars(str);
+  }
+  str << "* ckLocalBranch(int gID) {\n";
+  str << "      return (";
+  type->print(str);
+  if(templat) {
+    templat->genVars(str);
+  }
+  str << " *) CkLocalBranch(gID);\n";
+  str << "    }\n";
   if(list)
     list->genDecls(str);
   str.spew(CIChareEnd);
