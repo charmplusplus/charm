@@ -44,7 +44,7 @@ public:
 	JArray(const int numDims):dims(NULL), data(NULL), dimSize(NULL), useVirtual(0), start(NULL), end(NULL), stride(NULL)
 	{
 		//ckout << CkMyPe() << ": JArray(" << numDims << ") reached" << endl;
-		assert(numDims<=3); // @@ arbitrary limitation, code should work ok for larger dims
+//		assert(numDims<=3); // @@ arbitrary limitation, code should work ok for larger dims
 		setDimension(numDims);
 	}
 

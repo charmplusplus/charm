@@ -37,12 +37,14 @@ compilationUnit
 	:	(p:packageDefinition {
                 String name = J.pE(p.getFirstChild());
                 J.tmp.push(name);
+		J.pgmName = name;
 
                 J.ci.append((p.status?"main":"") +
                     "module " + name + " {\n");
                 J.h.append("\n#include <vector>\nusing std::vector;\n#include \"pup_stl.h\"\n");
                 J.h.append("\n#include \"jade.h\"\n");
-                J.h.append("\n#include \"" + name + ".decl.h\"\n\n");
+                // .decl.h is inserted right before main class
+                // J.h.append("\n#include \"" + name + ".decl.h\"\n\n");
                 J.c.append("\n#include \"" + name + ".h\"\n\n");
                 J.indentLevel++;
             }
@@ -133,6 +135,9 @@ typeDefinition
 //                     J.ciOff();
                 }
 
+                // insert .decl.h right before main class
+                if(c.status)
+                   J.h.append("\n#include \"" + J.pgmName + ".decl.h\"\n\n");
                 J.h.append(J.indent() + "class " + #IDENT.getText());
 //                 J.c.append(J.indent() + "class " + #IDENT.getText());
 
