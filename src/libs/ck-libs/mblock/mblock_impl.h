@@ -193,7 +193,7 @@ private:
     s.getInt3(start,end);
     thread->activateHeap();
     (bcs[bcNo].fn)(p1,p2,start,end);
-    thread->deativateHeap();
+    thread->deactivateHeap();
   }
 
   int apply_bc(const int bcnum, void *p1,void *p2)
