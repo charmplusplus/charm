@@ -20,7 +20,7 @@ and his students over the last 10 years at University of Illinois.
 
 We first describe our philosophy behind this work (why we do what we do).
 Later we give a brief introduction to \charmpp{} and rationale for \jade. We
-describe \jade in detail. Appendices contain the gory details of installing
+describe \jade in detail. Appendices contain the details of installing
 \jade, building and running \jade programs.
 
 \subsection{Our Philosophy}
@@ -90,6 +90,14 @@ standard over \charmpp{}.  \jade is described in the next section.
 
 Every mainchare's main is executed at startup.
 
+\subsection{threaded methods}
+
+\begin{alltt}
+class C {
+    public threaded void start(CProxy_CacheGroup cg) { ... }
+}
+\end{alltt}
+
 \subsection{readonly}
 
 \begin{alltt}
@@ -108,28 +116,13 @@ propagated to all processors.  Then execution begins.
 
 \begin{alltt}
 arr1.enroll();
+int a = arr1[10]; // get
 arr1[10] = 122; // set
 arr1[10] += 2;  // accumulate
+arr1.sync();    // sync
 \end{alltt}
 
 \subsection{\jade Status}
-
-\subsection{Compiling \jade Programs}
-
-\charmpp{} provides a cross-platform compile-and-link script called \charmc{}
-to compile C, \CC{}, Fortran, \charmpp{} and \jade programs.  This script
-resides in the \texttt{bin} subdirectory in the \charmpp{} installation
-directory. The main purpose of this script is to deal with the differences of
-various compiler names and command-line options across various machines on
-which \charmpp{} runs. While, \charmc{} handles C and \CC{} compiler
-differences most of the time, the support for \jade is new, and may have
-bugs.
-
-In spite of the platform-neutral syntax of \charmc{}, one may have to specify
-some platform-specific options for compiling and building \jade codes.
-Fortunately, if \charmc{} does not recognize any particular options on its
-command line, it promptly passes it to all the individual compilers and linkers
-it invokes to compile the program.
 
 \appendix
 
@@ -169,12 +162,25 @@ environment, with debugging info produced:
 > build jade net-linux -g
 \end{alltt}
 
-\section{Building and Running \jade Programs}
-\subsection{Building}
-\charmpp{} provides a compiler called \charmc in your charm/bin/ directory. 
-You can use this compiler to build your \jade program the same way as other
-compilers like cc. Especially, to build an \jade program, a command line 
-option \emph{-language jade} should be applied. All the command line 
+\section{Compiling and Running \jade Programs}
+\subsection{Compiling \jade Programs}
+
+\charmpp{} provides a cross-platform compile-and-link script called \charmc{}
+to compile C, \CC{}, Fortran, \charmpp{} and \jade programs.  This script
+resides in the \texttt{bin} subdirectory in the \charmpp{} installation
+directory. The main purpose of this script is to deal with the differences of
+various compiler names and command-line options across various machines on
+which \charmpp{} runs.
+
+In spite of the platform-neutral syntax of \charmc{}, one may have to specify
+some platform-specific options for compiling and building \jade codes.
+Fortunately, if \charmc{} does not recognize any particular options on its
+command line, it promptly passes it to all the individual compilers and linkers
+it invokes to compile the program.
+
+You can use \charmc{} to build your \jade program the same way as other
+compilers like \texttt{cc}.  To build an \jade program, the command line 
+option \emph{-language jade} should be specified. All the command line 
 flags that you would use for other compilers can be used with \charmc the 
 same way. For example:
 
@@ -185,11 +191,11 @@ same way. For example:
 
 \subsection{Running}
 
-\charmpp{} distribution contains a script called \texttt{charmrun} that makes
+The \charmpp{} distribution contains a script called \texttt{charmrun} that makes
 the job of running \jade programs portable and easier across all parallel
-machines supported by \charmpp{}. \texttt{charmrun} is copied to a directory
-where an \jade program is built using \charmc{}. It takes a command line
-parameter specifying number of processors, and the name of the program
+machines supported by \charmpp{}. When compiling a \jade program, \charmc{} copies \texttt{charmrun} to the directory
+where the \jade program is built.  \texttt{charmrun} takes a command line
+parameter specifying the number of processors to run on, and the name of the program
 followed by \jade options (such as TBD) and the program arguments. A typical
 invocation of \jade program \texttt{pgm} with \texttt{charmrun} is:
 
@@ -207,6 +213,7 @@ user-level thread associated with a chunk has the stack size of 3,276,800 bytes.
 
 \jade source files are spread out across several directories of the \charmpp{}
 CVS tree.
+
 \begin{tabular}{|r|l|}
 \hline\\
 charm/doc/jade                         & \jade user documentation files \\
@@ -218,6 +225,7 @@ charm/pgms/jade/                       & \jade example programs and tests \\
 \end{tabular}
 
 After building \jade, files are installed in:
+
 \begin{tabular}{|r|l|}
 \hline\\
 charm/include/                         & \jade runtime library header files\\
