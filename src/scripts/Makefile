@@ -578,7 +578,7 @@ $(L)/libtrace-converse.a: $(LIBTRACE_CONVERSE)
 
 # used for make depends
 TRACE_OBJS =  trace-projections.o  trace-summary.o  trace-counter.o	\
-	      trace-bluegene.o trace-projector.o trace-converse.o
+	      trace-bluegene.o trace-projector.o trace-converse.o trace-all.o
 
 ###############################################################################
 #

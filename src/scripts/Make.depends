@@ -225,6 +225,9 @@ trace-converse.o: trace-converse.c conv-trace.h converse.h conv-config.h \
   persistent.h debug-conv.h
 	$(CHARMC) -c -I. trace-converse.c
 
+trace-all.o: trace-all.C
+	$(CHARMC) -c -I. trace-all.C
+
 trace-common.o: trace-common.C charm.h converse.h conv-config.h \
   conv-common.h conv-mach.h conv-autoconfig.h conv-mach-opt.h pup_c.h \
   conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
