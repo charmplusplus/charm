@@ -307,6 +307,7 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
     statsMsgsList[pe] = m;
     // store per processor data right away
     struct ProcStats &procStat = statsData->procs[pe];
+    procStat.pe = pe;
     procStat.total_walltime = m->total_walltime;
     procStat.total_cputime = m->total_cputime;
     procStat.idletime = m->idletime;
