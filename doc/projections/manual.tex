@@ -13,184 +13,287 @@ Chee Wai Lee, and Sindhura Bandhakavi
 \maketitle
 
 \section{Introduction}
-\projections{} is a visualization tool to help you understand and analyze what it
-happening in your parallel (\charmpp{}) program. This performance visualization and
-feedback tool has a much more refined understanding of user computation than is
-possible in traditional tools.
 
-\projections{} displays information about the request for creation and the
-actual creation of tasks in \charmpp{} programs. \projections{} also provides the
-function of post-mortem clock synchronization. Additionally, it can also
-automatically partition the execution of the running program into logically
-separate units, and automatically analyzes each individual partition.
+\projections{} is a parallel performance analysis/visualization tool
+to help you understand and analyze what is happening in your parallel
+(\charmpp{}) program. It is a post-mortem trace-based tool with
+features that allow you to control the amount of information generated
+and to a lesser degree the amount of perturbation the tracing
+activities introduce into the application.
 
-Future versions will be able to provide recommendations/suggestions for
-improving performance as well.
+Performance analysis with \projections{} typically involves 3 phases:
 
-\section{Preparing the \charmpp{} Program}
+\begin{itemize}
+\item 
+Instrumentation of user code (automated by default) and linking trace
+generation modules. (see section \ref{sec::preparation})
+\item
+Generating trace data files. (see section \ref{sec::trace generation})
+\item
+Visualizing data and derived information (e.g. statistics); analyzing
+possible performance problems (currently a manual process) of the
+application. (see section \ref{sec::visualization})
+\end{itemize}
 
-In order to use \projections{} to analyse your program, you need to apply
-necessary compile options and command line options. Also, \charmpp{} allows
-you to insert user events that are detectable to \projections{}, by employing
-a set of function calls in your program.
+\section{Preparing the \charmpp{} Application}
+\label{sec::preparation}
 
-\subsection{Tracemodes}
-To use \projections{}, you first have to make sure your \charmpp{} program is
-compiled with proper \projections{} tracemode by giving corresponding compile
-option. Besides compile options, there are a few command line options for
-\projections{}.
+The \charmpp{} runtime is automatically instrumented by default. This
+means {\em most} users will not need to manually insert code into
+their applications (see section \ref{sec::api}) in order to generate
+trace data.
 
-\
+In the event that greater control over tracing activities
+(e.g. dynamically turning instrumentation on and off) are desired,
+\projections{} provides an API that allows users to insert code into
+their applications for such purposes. Users may also register and
+trace their own application-specific events (with limited support by
+the visualization tool) via this API.
 
-Currently there are 3 tracemodes available:
+Please note that automatic instrumentation introduces the overhead of
+an if-statement for each significant runtime event, even if no
+performance analysis traces are desired.
+
+Users who consider such an overhead to be unacceptable (e.g. for a
+production application which requires the absolute best performance)
+may recompile the \charmpp{} runtime with the {\tt -DCMK\_OPTIMIZE}
+flag which removes the instrumentation stubs.
+
+Otherwise, to enable the tracing of your application, users simply
+need to link the appropriate trace data generation module(s) (also
+referred to as {\em tracemode(s)}). (see section \ref{sec::trace modules})
+
+\subsection{\projections{} API}
+\label{sec::api}
+
+\subsubsection{Selective Tracing}
+
+\charmpp{} allows user to start/stop tracing the execution at certain
+points in time on the local processor. Users are advised to make these
+calls on all processors and at well-defined points in the application.
+
+Users may choose to have instrumentation turned off at first (by
+command line option {\tt +traceoff} - see section \ref{sec:: general
+runtime options}) if some period of time in middle of the
+application\'s execution is of interest to the user.
+
+Alternatively, users may start the application with instrumentation
+turned on (default) and turn off tracing for specific sections of the
+application.
+
+Again, users are advised to be consistent as the {\tt +traceoff}
+runtime option applies to all processors in the application.
+
 \begin{itemize}
 \item
-Projections mode
+{\tt void traceBegin()}
 
-Compile option: {\tt -tracemode projections}
-
-This tracemode generates log files that contain information about events like
-entry method calling and message packing during the execution of the program.
-These data are used by \projections{} in visualization and analysis.
-
-When you run your program compiled with this tracemode, a log file will be
-created for each processor.  An additional symbol table file will also be
-created.  The names of the log files will be NAME.\#.log, where NAME is the
-name of your executable and \# is the processor \#.  The name of the symbol
-table file is NAME.sts.
-
-Related command line options and their uses:
-
-{\tt +binary-trace}:  generate projections log in binary form
-
-{\tt +gz-trace}:      compress projections log.
+Enables the runtime to trace events (including all user events) on the local processor where {\tt traceBegin} is called.
 
 \item
-Summary mode
+{\tt void traceEnd()}
 
-Compile option: {\tt -tracemode sum}
-
-In this tracemode, only a rough summary of CPU utilization is created in running
-thusede program. A snap shot is taken every "bin-size" period of time. This brief
-information can be used to quickly outline the execution of the program. It helps
-user to find interesting spots in their program faster.
-
-Similarly, a summary file named NAME.\#.sum will be generated for each processor,
-plus a symbol table file NAME.sum.sts, where NAME is the name of the executable.
-
-Related command line options and their uses:
-
-{\tt +binsize TIME}:   set bin size for summary
-
-{\tt +version}:        set summary version to generate
-
-\item
-Counter mode \footnote{Currently implemented on Irix only}
-
-Compile option: {\tt -tracemode counter}
-
-This tracemode generates performance counter information like number of cache
-misses and number of entry point calls. These data are not used in the current
-version of \projections{} but will be supported in very near future.
-
-The counter files created are named NAME.\#.count and the symbol table file
-NAME.count.sts respectively, where NAME is the name of the executable.
+Prevents the runtime from tracing events (including all user events) on the local processor where {\tt traceEnd} is called.
 
 \end{itemize}
 
-Compile option {\tt +tracemode all} can be used to generate all available types
-of tracing data files.
+\subsubsection{User Events}
 
-Other command line options valid for all tracemodes and their uses include:
+\projections{} has a limited ability to visualize traceable user
+specified events. You can make use of the following API calls to do
+this. The general steps to do this are:
 
-{\tt +logsize SIZE}: to specify a logsize (actually log line number).
+\begin{enumerate}
+\item
+Register an event with an identifying string and either specify or acquire
+a globally unique event identifier.
 
-{\tt +traceroot DIR}: to specify an existing directory for putting log/sum/count/sts
-files.
+\item
+Use the event identifier to specify trace points in your code of interest to you.
+\end{enumerate}
 
-{\tt +traceoff}: to turn off tracing at the beginning.
-
-\
-
-Also, \charmpp{} allows user to start/stop tracing the execution at certain
-point of time by two \charmpp{} function calls {\tt traceBegin()} and {\tt traceEnd()}.
-They set/reset a flag to start/stop dumping tracing data from the local processor,
-so they should be called on all processors. Obviously tracing should be turned
-off at first (by command line option {\tt +traceoff}) if some period of time in
-middle of the execution is of interest to the user.
-
-\subsection{User Events}
-
-\projections{} has the ability to display in \projections{} the "user events"
-that have been added by the programmer into the code. The user events are
-like markers inserted in various places in the program and can then be inspected
-to see where they show up in relationship to the other \charmpp{} system events.
-This ability allows the user to participate more actively in the performance analysis
-of the program.
-
-There are a few \charmpp{} calls that insert user events into the program.
+The functions available are as follows:
 
 \begin{itemize}
 \item
 {\tt int traceRegisterUserEvent(char* EventDesc, int EventNum=-1) }
 
-This function registers a user event by associating an integer event number to
-the string description. Event number has to be the same on all processors. There
-are 3 ways to ensure that, and correspondingly 3 ways to call the function:
+This function registers a user event by associating {\tt EventNum} to
+{\tt EventDesc}. If {\tt EventNum} is not specified, a globally unique
+event identifier is obtained from the runtime and returned.
+
+{\tt EventNum} has to be the same on all processors. There are 3 ways
+to ensure that, and correspondingly 3 ways to call the function:
 
 \begin{enumerate}
 \item
 Call {\tt traceRegisterUserEvent} on node 0 in main::main without specifying
 an event number, and store returned event number into a readonly variable.
 \item
-Call {\tt traceRegisterUserEvent} on all nodes without specifying an event
-number. The returned value is the common event number that is agreed on system-wide.
+Call {\tt traceRegisterUserEvent} on all nodes without specifying an
+event number. The returned value is the common event number that is
+agreed on system-wide.
 \item
-Call {\tt traceRegisterUserEvent} and specify the event number on processor 0.
-Doing this on other processors would have no effect. Afterwards, the event number
-can be used in the following user event calls.
+Call {\tt traceRegisterUserEvent} and specify the event number on
+processor 0. Doing this on other processors would have no
+effect. Afterwards, the event number can be used in the following user
+event calls.
 \end{enumerate}
 
 Eg. {\tt traceRegisterUserEvent("Time Step Begin", 10);}
 
+Eg. {\tt eventID = traceRegisterUserEvent(``Time Step Begin'');}
+
 \item
 {\tt void traceUserEvent(int EventNum) }
 
-This function works like a marker, indicating an occurrence of the user event
-with the given {\tt EventNum}. It can be used to signalize a user event, in
-relationship to other system events.
+This function works like a marker, indicating an occurrence of a
+user-defined point event with the given {\tt EventNum}.
 
 Eg. {\tt traceUserEvent(10);}
 
 \item
 {\tt void traceUserBracketEvent(int EventNum, double StartTime, double EndTime) }
 
-This function brackets an event that lasts the period of time between
-{\tt StartTime} and {\tt EndTime}. Both times can be obtained from function call
-{\tt CmiWallTimer()} in second.
+This function records an event interval or activity identified by {\tt
+EventNum} that lasts the period of time between {\tt StartTime} and
+{\tt EndTime}. Both {\tt StartTime} and {\tt EndTime} can be obtained
+from function call {\tt CmiWallTimer()} in seconds.
 
 Eg.
 \begin{verbatim}
    traceRegisterUserEvent("Critical Code", 20);
    double critStart;  // times of start
-   critStart = TraceTimer();
+   critStart = CmiWallTimer();
    // do the critical code
    traceUserBracketEvent(20, critStart,CmiWallTimer());
 \end{verbatim}
 
 \end{itemize}
 
-\section{Compiling And Running \projections{}}
+\subsection{Tracemodes}
+\label{sec::trace modules}
+
+Currently there are 2 tracemodes available. Zero or more tracemodes
+may be specified at link-time. When no tracemodes are specified, no
+trace data is generated.
+
+\subsubsection{Projections mode}
+
+Link time option: {\tt -tracemode projections}
+
+This tracemode generates detailed log files that contain information
+about all \charmpp{} events like entry method calls and message
+packing during the execution of the program.  The data will be used by
+\projections{} in visualization and analysis.
+
+This tracemode generates a single symbol table file and $p$ ASCII log
+files for $p$ processors. The names of the log files will be
+NAME.\#.log where NAME is the name of your executable and \# is the
+processor \#. The name of the symbol table file is NAME.sts where NAME
+is the name of your executable.
+
+This is the main source of data expected by the performance
+visualizer. Certain tools like timeline will not work without the
+detailed data from this tracemode. Refer to \ref{apx::file
+formats} for more information about the format of the files generated
+by this tracemode.
+
+See section \ref{sec::projections runtime options} for application runtime
+options available to this tracemode for generating trace data.
+
+\subsubsection{Summary mode}
+
+Compile option: {\tt -tracemode summary}
+
+In this tracemode, execution time across all entry points for each
+processor is partitioned into a fixed number of equally sized
+time-interval bins. These bins are globally resized whenever they are
+all filled in order to accomodate longer execution times while keeping
+the amount of space used constant.
+
+Additional data like the total number of calls made to each entry
+point is summarised within each processor.
+
+This tracemode generates a single symbol table file and $p$ ASCII
+summary files for $p$ processors. The names of the summary files will
+be NAME.\#.sum where NAME is the name of your executable and \# is the
+processor \#. The name of the symbol table file is NAME.sum.sts where NAME
+is the name of your executable.
+
+This tracemode can be used to control the amount of output generated
+in a run. It is typically used in scenarios where a quick look at the
+overall utilization graph of the application is desired to identify
+smaller regions of time for more detailed study. Attempting to
+generate the same graph using the detailed logs of the prior tracemode
+may be unnecessarily time consuming or impossible.
+
+See section \ref{sec::summary runtime options} for application runtime
+options available to this tracemode for generating trace data.
+
+\section{Generating trace data}
+\label{sec::trace generation}
+
+A set of runtime options are available to you depending on which {\em
+tracemode(s)} you have specified at link time. These are used to
+control various aspects of trace file output.
+
+The appropriate files (see preceeding descriptions of available
+tracemodes) are generated automatically when the application is run.
+
+\subsection{General runtime options}
+\label{sec::general runtime options}
+
+The following is a list of runtime options available with the same
+semantics for all tracemodes:
+
+\begin{itemize}
+\item
+{\tt +traceroot DIR}: place all generated files in DIR.
+\item
+{\tt +traceoff}:      trace generation is turned off when the application is started. The user is expected to insert code to turn tracing on at some point in the run.
+\end{itemize}
+
+\subsection{Projections tracemode runtime options}
+\label{sec::projections runtime options}
+
+The following is a list of runtime options available under this tracemode:
+
+\begin{itemize}
+\item
+{\tt +logsize NUM}:   keep only NUM log entries in the memory of each processor. The logs are emptied and flushed to disk when filled.
+\item
+{\tt +binary-trace}:  generate projections log in binary form.
+\item
+{\tt +gz-trace}:      generated gzip (if available) compressed log files.
+\end{itemize}
+
+\subsection{Summary tracemode runtime options}
+\label{sec::summary runtime options}
+
+The following is a list of runtime options available under this tracemode:
+
+\begin{itemize}
+\item
+{\tt +logsize NUM}:   use NUM time-interval bins. The bins are resized and compacted when filled.
+\item
+{\tt +binsize TIME}:   sets the initial time quantum each bin represents.
+\item
+{\tt +version}:        set summary version to generate.
+\end{itemize}
+
+\section{The \projections{} Performance Visualization Tool}
+\label{sec::visualization}
 
 \subsection{Compiling \projections{}}
 \begin{enumerate}
 \item[1)]
-   Make sure the JDK commands "java", "javac" and "jar"
+   Make sure the JDK commands ``java'', ``javac'' and ``jar''
    are in your path
 \item[2)]
-   Type "make"
+   Type ``make''
 \item[3)]
-   The following files will be placed in 'bin':
+   The following files will be placed in `bin':
 
       {\tt projections}           : Starts projections, for UNIX machines
 
@@ -211,7 +314,7 @@ Also, if you attach a .sts file after the command line, \projections{} will
 open the file and initialize immediately. This trick saves time selecting file
 from the GUI filechooser.
 
-\section{Using \projections{}}
+\subsection{Using \projections{}}
 When \projections{} starts, you will see the main window with a title and
 six buttons:
 
@@ -242,7 +345,7 @@ Clicking on any of the buttons will bring up the appropriate next window, as
 described in the following sections.  Initially, only the Open File button
 will be active.
 
-\subsection{Open File}
+\subsubsection{Open File}
 
    Clicking on the Open File button brings up a dialog box to let you select
    the location of the data you want to look at.  Navigate to the directory
@@ -254,7 +357,7 @@ will be active.
    As mentioned in last section, a .sts file can be directly opened through command
    line, and thus time is saved.
 
-\subsection{Graphs}
+\subsubsection{Graphs}
 
    The Graphs window is where you can analyze your data by breaking it into
    any number of intervals and look at what goes on in each of those intervals.
@@ -378,7 +481,7 @@ will be active.
       \end{itemize}
     \end{enumerate}
 
-\subsection{Timelines}
+\subsubsection{Timelines}
 
    The Timeline window lets you look at what a specific processor is doing at
    each moment of the program.
@@ -524,7 +627,7 @@ will be active.
 
    \end{enumerate}
 
-\subsection{Usage Profile}
+\subsubsection{Usage Profile}
 
    The Usage Profile window lets you see percentage-wise what each processor
    spends its time on during a specified period.
@@ -547,7 +650,7 @@ will be active.
    portion of the bar, a pop-up window will appear telling you the name of the
    item, what percent of the usage it has, and the processor it is on.
 
-\subsection{Animations}
+\subsubsection{Animations}
 
    This window animates the processor usage by displaying
    different colors for different amount of usage.
@@ -556,7 +659,7 @@ will be active.
    the right box the processor time between frames.
 
 
-\subsection{View Log Files}
+\subsubsection{View Log Files}
 
    This window lets you see a translation of a log file from a bunch of numbers
    to an English version.  A dialog box asks which processor you want to look
@@ -569,14 +672,14 @@ will be active.
    \item[-] a description of what happened.
    \end{itemize}
 
-\subsection{Histograms}
+\subsubsection{Histograms}
 
 This module allows you to examine the execution time distribution of all your
 entry points(EP). It gives a histogram of different number of EP's that have
 execution time falling in different time bins. Under the graph there are also
 statistics given in numbers.
 
-\subsection{Overview}
+\subsubsection{Overview}
 
 Overview gives user an overview of the utilization of all processors during the
 execution. Each processor has a row of colored bars in the display, different colors
