@@ -19,22 +19,22 @@ extremely verbose, 2 shows most procedure entrance/exits,
 3 shows most communication, and 5 only shows rare or unexpected items.
 Displaying lower priority messages doesn't stop higher priority ones.
 */
-#define MACHINE_DEBUG_PRIO 2
+#define MACHINE_DEBUG_PRIO 3
 #define MACHINE_DEBUG_LOG 1 /**Controls whether output goes to log file*/
 
 FILE *debugLog;
 # define MACHSTATE_I(prio,args) if ((debugLog)&&(prio)>=MACHINE_DEBUG_PRIO) {\
 	fprintf args ; fflush(debugLog); }
 # define MACHSTATE(prio,str) \
-	MACHSTATE_I(prio,(debugLog,"[%.6f]> "str"\n",CmiWallTimer()))
+	MACHSTATE_I(prio,(debugLog,"[%d %.6f]> "str"\n",CmiMyRank(),CmiWallTimer()))
 # define MACHSTATE1(prio,str,a) \
-	MACHSTATE_I(prio,(debugLog,"[%.6f]> "str"\n",CmiWallTimer(),a))
+	MACHSTATE_I(prio,(debugLog,"[%d %.6f]> "str"\n",CmiMyRank(),CmiWallTimer(),a))
 # define MACHSTATE2(prio,str,a,b) \
-	MACHSTATE_I(prio,(debugLog,"[%.6f]> "str"\n",CmiWallTimer(),a,b))
+	MACHSTATE_I(prio,(debugLog,"[%d %.6f]> "str"\n",CmiMyRank(),CmiWallTimer(),a,b))
 # define MACHSTATE3(prio,str,a,b,c) \
-	MACHSTATE_I(prio,(debugLog,"[%.6f]> "str"\n",CmiWallTimer(),a,b,c))
+	MACHSTATE_I(prio,(debugLog,"[%d %.6f]> "str"\n",CmiMyRank(),CmiWallTimer(),a,b,c))
 # define MACHSTATE4(prio,str,a,b,c,d) \
-	MACHSTATE_I(prio,(debugLog,"[%.6f]> "str"\n",CmiWallTimer(),a,b,c,d))
+	MACHSTATE_I(prio,(debugLog,"[%d %.6f]> "str"\n",CmiMyRank(),CmiWallTimer(),a,b,c,d))
 #else
 # define MACHINE_DEBUG_LOG 0
 # define MACHSTATE(n,x) /*empty*/
