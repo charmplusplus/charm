@@ -43,10 +43,13 @@ void Refiner::create(int count, CentralLB::LDStats* stats, int** procs)
   int index = 0;
   for(j=0; j < count; j++) {
     processors[j].Id = j;
-    processors[j].backgroundLoad = 0;
+    processors[j].backgroundLoad = stats[j].bg_cputime;
     processors[j].load = processors[j].backgroundLoad;
     processors[j].computeLoad = 0;
     processors[j].computeSet = new Set();
+    processors[j].pe_speed = stats[j].pe_speed;
+    processors[j].utilization = stats[j].utilization;
+    processors[j].available = stats[j].available;
 
     LDObjData *odata = stats[j].objData;
     const int osz = stats[j].n_objs;  
