@@ -7,10 +7,11 @@
 #include "commlib.h"
 
 
-#define USE_DIRECT 0
+#define USE_STREAMING 0
 #define USE_TREE 1
 #define USE_MESH 2
 #define USE_HYPERCUBE 3
+#define USE_DIRECT 4
 #define USE_GRID 5
 #define NAMD_STRAT 6
 #define USE_MPI 7
@@ -66,6 +67,9 @@ class ComlibManager: public CkDelegateMgr{
     CkGroupID cmgrID;
     CharmMessageHolder * messageBuf;
 
+    CharmMessageHolder **streamingMsgBuf;
+    int *streamingMsgCount;
+
     int *procMap;
 
     int createDone, doneReceived;
@@ -86,14 +90,12 @@ class ComlibManager: public CkDelegateMgr{
     //flags
     int idSet, iterationFinished;
     
-    void init(int s, int n, int Messages, int nBytes); //strategy, nelements 
+    void init(int s, int n); //strategy, nelements 
     void setReverseMap(int *, int);
 
  public:
     ComlibManager(int s); //strategy, nelements 
     ComlibManager(int s, int n); //strategy, nelements 
-    ComlibManager(int s, int nMessages, int nBytes); //strategy, nelements 
-    ComlibManager(int s, int n, int nMessages, int nBytes); //strategy, nelements 
 
     void done();
     void localElement();

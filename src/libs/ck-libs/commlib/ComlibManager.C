@@ -8,6 +8,8 @@ MPI_Comm groupComm;
 MPI_Group group, groupWorld;
 #endif
 
+#define PERIOD 10
+
 void recv_msg(void *msg){
 
     if(msg == NULL)
@@ -30,24 +32,20 @@ void recv_dummy(void *msg){
 }
 
 ComlibManager::ComlibManager(int s){
-    init(s, 0, 1000000, 5000000);
+    init(s, 0);
 }
 
 //s = Strategy (0 = tree, 1 = tree, 2 = mesh, 3 = hypercube) 
 ComlibManager::ComlibManager(int s, int n){
-    init(s, n, 1000000, 5000000);
+    init(s, n);
 }
 
-
-ComlibManager::ComlibManager(int s, int nmFlush, int bFlush){
-    init(s, 0, nmFlush, bFlush);
+void call_endIteration(void *arg){
+    ((ComlibManager *)arg)->endIteration();
+    return;
 }
 
-ComlibManager::ComlibManager(int s, int n, int nmFlush, int bFlush){
-    init(s, n, nmFlush, bFlush);
-}
-
-void ComlibManager::init(int s, int n, int nmFlush, int bFlush){
+void ComlibManager::init(int s, int n){
     
     //comm_debug = 1;
 
@@ -60,16 +58,11 @@ void ComlibManager::init(int s, int n, int nmFlush, int bFlush){
     
     strategy = s;
     
-    if(nmFlush == 0)
-        nmFlush = 1000000;
-    if(bFlush == 0)
-        bFlush = 5000000;
-    
-    messagesBeforeFlush = nmFlush;
-    bytesBeforeFlush = bFlush;
-
-    nelements = n;  //number of elements on that processor, 
     //currently pased by the user. Should discover it.
+    if(strategy == USE_STREAMING)
+        nelements = 1;
+    else 
+        nelements = n;  //number of elements on that processor, 
 
     elementCount = 0;
     //    elementRecvCount = 0;
@@ -98,6 +91,14 @@ void ComlibManager::init(int s, int n, int nmFlush, int bFlush){
 
     messageBuf = NULL;
     messageCount = 0;
+
+    streamingMsgBuf = new CharmMessageHolder*[CkNumPes()];
+    streamingMsgCount = new int[CkNumPes()];
+
+    for(int count = 0; count < CkNumPes(); count ++){
+        streamingMsgBuf[count] = NULL;
+        streamingMsgCount[count] = 0;
+    }
 
     procMap = new int[CkNumPes()];
     for(int count = 0; count < CkNumPes(); count++)
@@ -255,7 +256,6 @@ void ComlibManager::endIteration(){
 	    }
 	    else if(strategy == USE_MPI){
 #if CHARM_MPI
-		
 		ComlibPrintf("[%d] In MPI strategy\n", CkMyPe());
 		
 		CharmMessageHolder *cmsg = messageBuf;
@@ -314,6 +314,44 @@ void ComlibManager::endIteration(){
 		    buf_ptr += MPI_MAX_MSG_SIZE;
 		}
 #endif
+	    }
+	    else if(strategy == USE_STREAMING){
+		ComlibPrintf("[%d] In Streaming strategy\n", CkMyPe());
+		
+		CharmMessageHolder *cmsg = messageBuf;
+
+                int buf_size = 0;
+                for(count = 0; count < CkNumPes(); count ++) {
+                    if(streamingMsgCount[count] == 0)
+                        continue;
+
+                    cmsg = streamingMsgBuf[count];
+                    char ** msgComps = new char*[streamingMsgCount[count]];
+                    int *sizes = new int[streamingMsgCount[count]];
+                    
+                    int msg_count = 0;
+                    while (cmsg != NULL) {
+                        char * msg = cmsg->getCharmMessage();
+                        envelope * env = UsrToEnv(msg);
+                        sizes[msg_count] = env->getTotalsize();
+                        msgComps[msg_count] = (char *)env;
+
+                        cmsg = cmsg->next;
+                        msg_count ++;
+                    }
+                    
+                    CmiMultipleSend(count, streamingMsgCount[count], sizes, msgComps);
+                    delete [] msgComps;
+                    delete [] sizes;
+                }
+
+                for(count = 0; count < CkNumPes(); count ++){
+                    streamingMsgBuf[count] = NULL;
+                    streamingMsgCount[count] = 0;
+                }
+
+                beginIteration();
+                CcdCallFnAfter(call_endIteration, (void *)this, PERIOD);
 	    }
 	    else{
                 ComlibPrintf("%d:Setting Num Deposit to %d\n", CkMyPe(), messageCount);
@@ -377,6 +415,11 @@ void ComlibManager::receiveID(int npes, int *pelist, comID id){
 
     comid = id; 
     idSet = 1;
+
+    if(strategy == USE_STREAMING) {
+        CcdCallFnAfter(call_endIteration, (void *)this, PERIOD);
+        return;
+    }   
 
     if(iterationFinished){
 
@@ -460,6 +503,39 @@ void ComlibManager::receiveID(int npes, int *pelist, comID id){
 	    }
 #endif
         }
+        /*
+        else if(strategy == USE_STREAMING){
+		ComlibPrintf("[%d] In Streaming strategy\n", CkMyPe());
+		
+		CharmMessageHolder *cmsg = messageBuf;
+
+                int buf_size = 0;
+                for(count = 0; count < CkNumPes(); count ++) {
+                    if(streamingMsgCount[count] == 0)
+                        continue;
+
+                    cmsg = streamingMsgBuf[count];
+                    char ** msgComps = new char*[streamingMsgCount[count]];
+                    int *sizes = new int[streamingMsgCount[count]];
+                    
+                    int msg_count = 0;
+                    while (cmsg != NULL) {
+                        char * msg = cmsg->getCharmMessage();
+                        envelope * env = UsrToEnv(msg);
+                        sizes[msg_count] = env->getTotalsize();
+                        msgComps[msg_count] = (char *)env;
+
+                        cmsg = cmsg->next;
+                        msg_count ++;
+                    }
+                    
+                    CmiMultipleSend(count, streamingMsgCount[count], sizes, msgComps);
+                    beginIteration();
+
+                    CcdCallFnAfter(call_endIteration, (void *)this, PERIOD);
+                }
+        }
+        */
 	else {
 	    
 	    NumDeposits(comid, messageCount);
@@ -533,8 +609,16 @@ void ComlibManager::ArraySend(int ep, void *msg,
     cmsg->ep = ep;
     */
     messageCount ++;
-    cmsg->next = messageBuf;
-    messageBuf = cmsg;    
+
+    if(strategy != USE_STREAMING) {
+        cmsg->next = messageBuf;
+        messageBuf = cmsg;    
+    }
+    else {
+        cmsg->next = streamingMsgBuf[cmsg->dest_proc];
+        streamingMsgBuf[cmsg->dest_proc] = cmsg;
+        streamingMsgCount[cmsg->dest_proc] ++;
+    }
 }
 
 #include "qd.h"
@@ -576,8 +660,16 @@ void ComlibManager::GroupSend(int ep, void *msg, int onPE, CkGroupID gid){
     cmsg->ep = ep;
     */
     messageCount ++;
-    cmsg->next = messageBuf;
-    messageBuf = cmsg;    
+    
+    if(strategy != USE_STREAMING) {
+        cmsg->next = messageBuf;
+        messageBuf = cmsg;    
+    }
+    else {
+        cmsg->next = streamingMsgBuf[cmsg->dest_proc];
+        streamingMsgBuf[cmsg->dest_proc] = cmsg;
+        streamingMsgCount[cmsg->dest_proc] ++;
+    }
 }
 
 void ComlibManager::receiveNamdMessage(ComlibMsg * msg){
@@ -669,4 +761,3 @@ CharmMessageHolder * ComlibMsg::next(){
 }
 
 #include "ComlibModule.def.h"
-
