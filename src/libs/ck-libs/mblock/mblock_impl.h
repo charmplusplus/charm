@@ -242,7 +242,7 @@ class MBlockSetupCookie
   void createArray(void);
 };
 
-
+#define MBLOCKAPI(routineName) TCHARM_API_TRACE(routineName,"mblock")
 
 #endif
 
