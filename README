@@ -11,6 +11,27 @@ and is portable to a wide variety of parallel machines.
 Source code is provided, and non-commercial use is free.
 
 
+GETTING THE LATEST CHARM SOURCE
+===============================
+
+You can use our anonymous cvs server to checkout the charm++ latest source code.
+(It may not be the latest stable version though) 
+What you need to do is as following:
+
+1. login the cvs server:
+
+      cvs -d :pserver:checkout@thrift.cs.uiuc.edu:/expand6/cvsroot login
+
+      when CVS passwd is prompted, just type <Enter>.
+2. checkout charm:
+
+      cvs co -P charm
+
+      You should get latest charm source tree.
+3. logout the cvs server:
+
+      cvs logout
+
 PICKING A VERSION
 =================
 
@@ -39,7 +60,7 @@ threads; "sim-" switches between processors and counts communications.
 
 	"linux"   Linux 
 	"win32"   MS Windows NT/98/2k (and MS Visual C++ compiler)
-	"cygwin"  MS Windows with Cygnus' Cygwin Unix layer
+	"cygwin"  MS Windows 98/NT/2k with Cygnus' Cygwin Unix layer
 	"irix"    SGI IRIX
 	"origin"  SGI Origin 2000 IRIX
 	"sol"     Solaris
@@ -91,7 +112,8 @@ BUILDING THE SOURCE
 
 If you have downloaded a binary version of Charm++, you can skip
 this step-- Charm++ should already be compiled.  For win32 systems,
-see README.win32; for net- version, see README.net
+see README.win32; for Cygwin version, see README.cygwin; for net- version, 
+see README.net.
 
 Once you have decided on a version, unpack Charm++, cd into charm,
 and run
@@ -129,13 +151,50 @@ attack another.
 To build the program, type make.  You should get an
 executable named "pgm".
 
-To run the program on two processors, type
-     > ./charmrun pgm 12 100 +p2
+
+RUNNING A PROGRAM
+==================
+
+Following the previous example, to run the program on two processors, type
+
+     > ./charmrun ./pgm 12 100 +p2
 
 This should run for a few seconds, and print out:
 There are 14200 Solutions to 12 queens. Finish time=4.030000
 
+Charmrun is now available on all platforms. Depending on what platform you are 
+running charm program, charmrun could be just a shell script which is a wrapper
+ for mpirun, for example, in mpi- version. The idea of charmrun is trying to 
+provide a uniform parameters across all platforms.
 
+For net- version, charmrun is an executable which invokes rsh or ssh to start 
+node programs on remote machines. Remember that you should set up a ~/.nodelist that enumerates all the machines you want to run jobs on, otherwise it will
+create a default ~/.nodelist for you that contains only localhost. Here is a 
+typical .nodelist file:
+
+group main ++shell /bin/ssh
+host machinename
+
+The default remote shell program is rsh, but you can define differnt remote 
+shell you like to start remote processes in the ++shell option. You should 
+also make sure that you can rsh or ssh to these machines without passwd 
+authentication. Just type following command to verify:
+     > rsh(ssh) machinename date
+If this gives you current date immediately, your running environment with this 
+node has been setup correctly.
+
+Now, for test running purpose, net- version charmrun comes with an easy-to-use 
+"++local" options. No remote shell invocation is needed in this case. It starts
+ node programs right on your local machine. This could be useful if you just 
+want to run program on only one machine, for example, your laptop. This
+can save you all the hassle of setting up rsh/ssh or charmd daemons.
+To use this option, just type:
+     
+     > ./charmrun ++local ./pgm 12 100 +p2
+
+However, for best performance, you should launch one node program per processor.
+
+For more detailed information, please check the "INSTALLATION MANUAL" and "RUN MANUAL" under doc/install.
 
 FOR MORE INFORMATION
 ====================
