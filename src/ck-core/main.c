@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.3  1995-07-05 19:38:31  narain
+ * Revision 2.4  1995-07-05 21:04:11  narain
+ * *** empty log message ***
+ *
+ * Revision 2.3  1995/07/05  19:38:31  narain
  * No LdbFillBlock and StripMsg while InsideDataInit
  *
  * Revision 2.2  1995/06/29  21:44:50  narain
@@ -108,7 +111,7 @@ HANDLE_INCOMING_MSG(env)
 ENVELOPE *env;
 {
 	/* send to ldb strategy to extract load information if user message */
-        if(CpvAccess(InsideDataInit)
+        if(CpvAccess(InsideDataInit))
 	   LdbStripMsg(env);
 
 	switch (GetEnv_category(env)) {
