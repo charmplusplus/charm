@@ -258,11 +258,7 @@ Type		: SimpleType
 		| FuncType
 		{ $$ = $1; }
 		| Type '&'
-		{ $$ = new ReferenceType($1); }
-/*		| CONST Type   ...Causes ambiguity somehow...
-		{ $$ = new ConstType($2); }  */
-/*		| Type '[' ArrayDim ']' ...Not a valid C type string...
-		{ $$ = new ArrayType($1,$3); } */
+		{ $$ = $1; }
 		;
 		
 ArrayDim	: NUMBER
