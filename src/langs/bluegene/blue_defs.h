@@ -80,7 +80,8 @@ inline int isEqual(double v1, double v2){
                 tlog->addMsg(m, node, tid, local);	\
 	      else {	 /* standalone msg */		\
 		  /*CmiAssert(0);*/ 			\
-		  double curT = CmiBgMsgRecvTime(m);		\
+		  /*double curT = CmiBgMsgRecvTime(m);*/		\
+		  double curT = BgGetTime();		\
 		  bgTimeLog *newLog = new bgTimeLog(-1, "addMsg", curT, curT); \
 		  newLog->recvTime = newLog->effRecvTime = curT;	\
                   newLog->addMsg(m, node, tid, local);		\
