@@ -1,18 +1,9 @@
-//#include "PythonCCS.h"
 #include "server.decl.h"
 
 /*
-class Python_Main : public PythonChare {
- protected:
-  static PyMethodDef CkPy_MethodsCustom[];
-  PyObject *localArgs;
-  PyObject **localResult;
-  CthThread localThread;
-  PyThreadState *localPyThread;
- public:
-  PyMethodDef *getMethods() {return CkPy_MethodsCustom;}
-  void _Py_runhigh(PyObject*, PyObject**, CthThread, PyThreadState*);
-};
+  This test will generate a method called "runhigh" available to python
+  programs. This will be declared [python] in che .ci file, and available
+  through the module "charm" from any python script sent to Main.
 */
 
 class Main : public CBase_Main {
