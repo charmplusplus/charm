@@ -54,9 +54,11 @@ void recv_dummy(void *msg){
 //An initialization routine which does prelimnary initialization of the 
 //Converse commlib manager. Currently also initialized krishnans code
 void initComlibManager(){ 
-    if(CpvInitialized(conv_com_ptr))
-        return;
-    
+    CkpvInitialize(ConvComlibManager *, conv_comm_ptr);
+
+    if(CkpvAccess(conv_comm_ptr) != 0)
+       return;   
+ 
     ConvComlibManager *conv_com = new ConvComlibManager();
     
     CkpvInitialize(ConvComlibManager *, conv_comm_ptr);
