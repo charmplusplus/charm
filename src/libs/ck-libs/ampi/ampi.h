@@ -553,6 +553,8 @@ int AMPI_Init(int *argc, char*** argv);
 int AMPI_Initialized(int *isInit);
 #define MPI_Finalize AMPI_Finalize
 int AMPI_Finalize(void);
+#define MPI_Finalized AMPI_Finalized
+int AMPI_Finalized(int *);
 #define MPI_Abort AMPI_Abort
 int AMPI_Abort(MPI_Comm comm, int errorcode);
 

@@ -126,6 +126,7 @@ FDECL {
 #define mpi_initialized FTN_NAME( MPI_INITIALIZED , mpi_initialized )
 #define mpi_init_universe FTN_NAME( MPI_INIT_UNIVERSE , mpi_init_universe )
 #define mpi_finalize FTN_NAME( MPI_FINALIZE , mpi_finalize )
+#define mpi_finalized FTN_NAME( MPI_FINALIZED , mpi_finalized )
 #define mpi_abort FTN_NAME( MPI_ABORT , mpi_abort )
 
 #define mpi_yield FTN_NAME ( MPI_YIELD , mpi_yield )
@@ -208,6 +209,11 @@ void mpi_init(int *ierr){
 void mpi_initialized(int *isInit, int* ierr)
 {
   *ierr = AMPI_Initialized(isInit);
+}
+
+void mpi_finalized(int *isFinalized, int* ierr)
+{
+  *ierr = AMPI_Finalized(isFinalized);
 }
 
 void mpi_comm_rank(int *comm, int *rank, int *ierr)

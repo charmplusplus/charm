@@ -359,6 +359,7 @@ CDECL void AMPI_Setup_Switch(void) {
 static int nodeinit_has_been_called=0;
 CtvDeclare(ampiParent*, ampiPtr);
 CtvDeclare(int, ampiInitDone);
+CtvDeclare(int, ampiFinalized);
 static void ampiNodeInit(void)
 {
   mpi_nworlds=0;
@@ -376,6 +377,7 @@ static void ampiNodeInit(void)
 static void ampiProcInit(void){
   CtvInitialize(ampiParent*, ampiPtr);
   CtvInitialize(int,ampiInitDone);
+  CtvInitialize(int,ampiFinalized);
   REGISTER_AMPI
   initAmpiProjections();
 }
@@ -512,6 +514,7 @@ static ampi *ampiInit(char **argv)
   // Find our ampi object:
   ampi *ptr=(ampi *)TCharm::get()->semaGet(AMPI_TCHARM_SEMAID);
   CtvAccess(ampiInitDone)=1;
+  CtvAccess(ampiFinalized)=0;
   STARTUP_DEBUG("ampiInit> complete")
 #if CMK_BLUEGENE_CHARM
   TRACE_BG_AMPI_START(ptr->getThread(), "AMPI_START");
@@ -1617,6 +1620,13 @@ CDECL int AMPI_Initialized(int *isInit)
   return 0;
 }
 
+CDECL int AMPI_Finalized(int *isFinalized)
+{
+    AMPIAPI("AMPI_Initialized");     /* in case charm init not called */
+    *isFinalized=CtvAccess(ampiFinalized);
+    return 0;
+}
+
 CDECL int AMPI_Comm_rank(MPI_Comm comm, int *rank)
 {
   AMPIAPI("AMPI_Comm_rank");
@@ -1666,6 +1676,7 @@ CDECL
 int AMPI_Finalize(void)
 {
   AMPIAPI("AMPI_Finalize");
+  CtvAccess(ampiFinalized)=1;
 #if CMK_BLUEGENE_CHARM
   TRACE_BG_AMPI_SUSPEND();
 #endif
