@@ -37,8 +37,8 @@
 #include <StreamingStrategy.h>
 #include <PrioStreaming.h>
 #include <DummyStrategy.h> 
-#define COMM_TIMEOUT 5
-#define COMM_MAXMSG 5
+#define COMM_TIMEOUT 1
+#define COMM_MAXMSG 20
 #endif 
 
 /// Synchronization strategy constants
