@@ -1,6 +1,5 @@
 %expect 4 
 %{
-#include <iostream.h>
 #include "xi-symbol.h"
 #include "EToken.h"
 extern int yylex (void) ;
