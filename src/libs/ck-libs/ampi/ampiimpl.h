@@ -166,7 +166,7 @@ class ampi : public ArrayElement1D {
       delete msg;
       FILE *fp = fopen(str, "wb");
       if(fp!=0) {
-        PUP::toDisk p(fp);
+        PUP::toDisk p(fp); p.becomeUserlevel();
         pup(p);
       } else {
         CkError("Cannot checkpoint to file %s! Continuing...\n");
@@ -185,7 +185,7 @@ class ampi : public ArrayElement1D {
       strcat(str, idxstr);
       FILE *fp = fopen(str, "rb");
       if(fp!=0) {
-        PUP::fromDisk p(fp);
+        PUP::fromDisk p(fp); p.becomeUserlevel();
         pup(p);
         CthAwaken(thread_id);
         thread_id = 0;

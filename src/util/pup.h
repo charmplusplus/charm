@@ -145,7 +145,7 @@ class er {
  private:
   er(const er &p);//You don't want to copy PUP::er's.
  protected:
-  enum {IS_DELETING =0x0008};
+  enum {IS_DELETING =0x0008, IS_USERLEVEL =0x0004};
   enum {IS_SIZING   =0x0100,
   	IS_PACKING  =0x0200,
         IS_UNPACKING=0x0400,
@@ -168,6 +168,10 @@ class er {
   //This indicates that the pup routine should free memory during packing.
   void becomeDeleting(void) {PUP_er_state|=IS_DELETING;}
   CmiBool isDeleting(void) const {return (PUP_er_state&IS_DELETING)!=0?CmiTrue:CmiFalse;}
+  
+  //This indicates that the pup routine should not call system objects' pups.
+  void becomeUserlevel(void) {PUP_er_state|=IS_USERLEVEL;}
+  CmiBool isUserlevel(void) const {return (PUP_er_state&IS_USERLEVEL)!=0?CmiTrue:CmiFalse;}
   
 //For single elements, pretend it's an array containing one element
   void operator()(signed char &v)     {(*this)(&v,1);}

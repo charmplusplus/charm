@@ -69,17 +69,20 @@ int pup_isPacking(const pup_er p);
 int pup_isUnpacking(const pup_er p);
 int pup_isSizing(const pup_er p);
 int pup_isDeleting(const pup_er p);
+int pup_isUserlevel(const pup_er p);
 
 #if CMK_FORTRAN_USES_ALLCAPS
 int PUP_ISPACKING(const pup_er p);
 int PUP_ISUNPACKING(const pup_er p);
 int PUP_ISSIZING(const pup_er p);
 int PUP_ISDELETING(const pup_er p);
+int PUP_ISUSERLEVEL(const pup_er p);
 #else
 int pup_ispacking_(const pup_er p);
 int pup_isunpacking_(const pup_er p);
 int pup_issizing_(const pup_er p);
 int pup_isdeleting_(const pup_er p);
+int pup_isuserlevel_(const pup_er p);
 #endif
 
 /*Pack/unpack data items, declared with macros for brevity.

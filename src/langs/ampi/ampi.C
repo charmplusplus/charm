@@ -194,7 +194,8 @@ ampi::bcastraw(void* buf, int len, CkArrayID aid)
 
 void ampi::pup(PUP::er &p)
 {
-  // ArrayElement1D::pup(p);//Pack superclass
+  if(!p.isUserlevel())
+    ArrayElement1D::pup(p);//Pack superclass
   p(commidx);
   if(p.isDeleting())
   {//Resend saved messages to myself
