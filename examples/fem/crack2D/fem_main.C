@@ -65,7 +65,7 @@ void uploadNetFEM(MeshData *m,int timeStep) {
     NetFEM_Vector_field(n,m->nodes,NetFEM_Field(Node,vel),"Velocity (m/s)");
     NetFEM_Scalar_field(n,m->nodes,1,NetFEM_Field(Node,xM),"Mass (Kg)");
    
-   NetFEM_Elements_field(n,m->ne,6,NetFEM_Field(Vol,conn),0, m->vols,"Triangles");
+   NetFEM_Elements_field(n,m->ne,3,NetFEM_Field(Vol,conn),0, m->vols,"Triangles");
     NetFEM_Scalar_field(n,m->vols,3, NetFEM_Field(Vol,s11l), "S11");
     NetFEM_Scalar_field(n,m->vols,3, NetFEM_Field(Vol,s12l), "S12");
     NetFEM_Scalar_field(n,m->vols,3, NetFEM_Field(Vol,s22l), "S22");
