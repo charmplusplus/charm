@@ -378,7 +378,7 @@ static CkGroupID _nodeGroupCreate(envelope *env)
 int _getGroupIdx(int numNodes,int myNode,int numGroups)
 {
         int idx;
-        int x = (int)ceil(log(numNodes)/log(2));                // number of bits needed to store node number
+        int x = (int)ceil(log((double)numNodes)/log((double)2));// number of bits needed to store node number
         int n = 32 - (x+1);                                     // number of bits remaining for the index
         idx = (myNode<<n) + numGroups;                          // add number of processors, shift by the no. of bits needed,
                                                                 // then add the next available index
