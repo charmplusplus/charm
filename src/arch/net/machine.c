@@ -366,7 +366,13 @@ int size;
   cmi_state cs = CmiState();
   char *res;
   cs->NumAlloc++;
+#if CMK_MALLOC_USE_OS_BUILTIN
+  CmiMemLock();
+#endif
   res =(char *)malloc(size+8);
+#if CMK_MALLOC_USE_OS_BUILTIN
+  CmiMemUnlock();
+#endif
   if (res==0) KillEveryone("Memory allocation failed.");
   ((int *)res)[0]=size;
   return (void *)(res+8);
@@ -383,7 +389,15 @@ void *blk;
 {
   cmi_state cs = CmiState();
   cs->NumFree++;
-  free(((char *)blk)-8);
+#if CMK_MALLOC_USE_OS_BUILTIN
+  CmiMemLock();
+#endif
+  /* Its legal to free a null pointer */
+  if(blk != (void *)0)
+    free(((char *)blk)-8);
+#if CMK_MALLOC_USE_OS_BUILTIN
+  CmiMemUnlock();
+#endif
 }
 
 /*****************************************************************************
