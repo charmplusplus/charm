@@ -79,12 +79,10 @@ typedef struct PendingMsgStruct
   int mach_id;		/* receiver machine id */
   int dataport;		/* receiver data port */
   int node_idx;		/* receiver pe id */
-  int retry_count;      /* number of resent */
   struct PendingMsgStruct *next;
 }
 *PendingMsg;
 
-static PendingMsg  sendhead = NULL, sendtail = NULL;
 static int pendinglen = 0;
 
 /* reuse PendingMsg memory */
@@ -111,13 +109,12 @@ void enqueue_sending(char *msg, int length, OtherNode node, int size)
   pm->node_idx = node-nodes;
   pm->size = size;
   pm->next = NULL;
-  pm->retry_count = 0;
-  if (sendhead == NULL) {
-    sendhead = sendtail = pm;
+  if (node->sendhead == NULL) {
+    node->sendhead = node->sendtail = pm;
   }
   else {
-    sendtail->next = pm;
-    sendtail = pm;
+    node->sendtail->next = pm;
+    node->sendtail = pm;
   }
   pendinglen ++;
 #if GM_STATS
@@ -125,11 +122,11 @@ void enqueue_sending(char *msg, int length, OtherNode node, int size)
 #endif
 }
 
-#define peek_sending() (sendhead)
+#define peek_sending(node) (node->sendhead)
 
-#define dequeue_sending()  \
-  if (sendhead != NULL) {	\
-    sendhead = sendhead->next;	\
+#define dequeue_sending(node)  \
+  if (node->sendhead != NULL) {	\
+    node->sendhead = node->sendhead->next;	\
     pendinglen --;	\
   }
 
@@ -525,6 +522,7 @@ void send_callback(struct gm_port *p, void *context, gm_status_t status)
   PendingMsg out = (PendingMsg)context;
   void *msg = out->msg;
   unsigned char cksum;
+  OtherNode  node = nodes+out->node_idx;
 
   if (status != GM_SUCCESS) { 
     int srcpe, seqno, magic, broot;
@@ -552,19 +550,10 @@ void send_callback(struct gm_port *p, void *context, gm_status_t status)
       }
 #else
       case GM_SEND_TIMED_OUT: {
-	out->retry_count ++;
-	if (out->retry_count > 4) CmiAbort("gm send_callback failed with too many timeouts");
- 	CmiPrintf("gm send_callback timeout, drop sends and re-enable send (#%d)\n", out->retry_count ++);
-        /* resent this one and drop sends */
-        if (gm_alloc_send_token(gmport, GM_LOW_PRIORITY)) {
-                gm_send_with_callback(gmport, msg, out->size, out->length,
-                            GM_LOW_PRIORITY, out->mach_id, out->dataport,
-                            send_callback, out);
-        }
-        else
-                CmiAbort("Fatal error during resend!\n");
+ 	CmiPrintf("gm send_callback timeout, drop sends and re-enable send. \n");
         gm_drop_sends (gmport, GM_HIGH_PRIORITY, out->mach_id, out->dataport,
                          drop_send_callback, out);
+	node->disable=1;	/* disable normal send */
         return;
       }
       case GM_SEND_DROPPED:
@@ -572,7 +561,7 @@ void send_callback(struct gm_port *p, void *context, gm_status_t status)
         gm_send_with_callback(gmport, msg, out->size, out->length,
                             GM_HIGH_PRIORITY, out->mach_id, out->dataport, 
                             send_callback, out);
-        break;
+        return;
       default:
         CmiAbort("gm send_callback failed");
 #endif
@@ -600,48 +589,64 @@ void send_callback(struct gm_port *p, void *context, gm_status_t status)
   gm_free_send_token (gmport, GM_HIGH_PRIORITY);
   FreePendingMsg(out);
 
+  /* send message pending in gm firmware */
+  node->gm_pending --;
+  if (node->disable && node->gm_pending == 0) node->disable = 0;
+
   /* since we have one free send token, start next send */
   send_progress();
 }
 
 static void send_progress()
 {
+  static int nextnode = 0;
+  int skip;
+  OtherNode node;
   PendingMsg  out;
-
-#if GM_STATS
-  /* if we streaming, count how many message we possibly can combine */
-  PendingMsg  curout;
-  curout = peek_sending();
-  if (!curout) return;
-  out = curout->next;
-  while (out) {
-    if (out->mach_id == curout->mach_id && out->dataport == curout->dataport)
-       possible_streamed ++;
-    out = out->next;
-  }
-#endif
 
   while (1)
   {
-    out = peek_sending();
-    if (out && gm_alloc_send_token(gmport, GM_HIGH_PRIORITY)) {
-      if (dataport == out->dataport) {
-        gm_send_to_peer_with_callback(gmport, out->msg, out->size, out->length, 
-                            GM_HIGH_PRIORITY, out->mach_id,
+    int sent = 0;
+    for (skip=0; skip<_Cmi_numnodes; skip++) {
+      node = nodes+nextnode;
+      nextnode = (nextnode + 1) % _Cmi_numnodes;
+      if (node->disable) continue;
+      out = peek_sending(node);
+      if (!out) continue;
+      if (gm_alloc_send_token(gmport, GM_HIGH_PRIORITY)) {
+        if (dataport == out->dataport) {
+          gm_send_to_peer_with_callback(gmport, out->msg, out->size, 
+                            out->length, GM_HIGH_PRIORITY, out->mach_id,
                             send_callback, out);
-      }
-      else {
-        gm_send_with_callback(gmport, out->msg, out->size, out->length, 
+        }
+        else {
+          gm_send_with_callback(gmport, out->msg, out->size, out->length, 
                             GM_HIGH_PRIORITY, out->mach_id, out->dataport, 
                             send_callback, out);
-      }
-      /* dequeue out, but not free it, used at callback */
-      dequeue_sending();
+        }
+ 	node->gm_pending ++;
+        sent=1;
+        /* dequeue out, but not free it, used at callback */
+        dequeue_sending(node);
 #if GM_STATS
-      gm_stats[out->size] ++;
+        gm_stats[out->size] ++;
+        /* if we streaming, count how many message we possibly can combine */
+        {
+        PendingMsg  curout;
+        curout = peek_sending(node);
+        if (curout) {
+          out = curout->next;
+          while (out) {
+            possible_streamed ++;
+            out = out->next;
+          }
+        }
+        }
 #endif
-    }
-    else break;
+      }
+      else return;		/* no send token */
+    }		/* end for */
+    if (sent==0) return;
   }
 }
 
@@ -696,14 +701,6 @@ void EnqueueOutgoingDgram
     /* this potential screw up broadcast, because bcast packets can not be
        interrupted by other sends in CommunicationServer_nolock */
     enqueue_sending(buf, len, node, size);
-#if 0
-    while (pendinglen >= MAXPENDINGSEND && broot == DGRAM_ROOTPE_MASK) {
-      /* pending max len exceeded, busy wait until get a token 
-         Doing this surprisingly improve the performance by 2s for 200MB msg */
-      MACHSTATE(4,"Polling until token available")
-      CommunicationServer_nolock(0);
-    }
-#endif
     return;
   }
   enqueue_sending(buf, len, node, size);

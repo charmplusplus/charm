@@ -218,6 +218,8 @@ typedef struct ImplicitDgramStruct
 }
 *ImplicitDgram;
 
+struct PendingMsgStruct;
+
 typedef struct OtherNodeStruct
 {
   int nodestart, nodesize;
@@ -238,6 +240,11 @@ typedef struct OtherNodeStruct
   double                   send_primer;  /* time to send retransmit */
   unsigned int             send_ack_seqno; /* next ack seqno to send */
   int                      retransmit_leash; /*Maximum number of packets to retransmit*/
+#if CMK_USE_GM
+  struct PendingMsgStruct *sendhead, *sendtail;  /* gm send queue */
+  int 			   disable;
+  int 			   gm_pending;
+#endif
 
   int                      asm_rank;
   int                      asm_total;
@@ -282,6 +289,11 @@ static void OtherNode_init(OtherNode node)
     node->send_next=0;
     node->send_good=(unsigned int)(-1);
     node->send_ack_seqno=0;
+#if CMK_USE_GM
+    node->sendhead = node->sendtail = NULL;
+    node->disable = 0;
+    node->gm_pending = 0;
+#endif
 
     node->asm_rank=0;
     node->asm_total=0;
