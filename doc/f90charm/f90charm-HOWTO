@@ -1,0 +1,193 @@
+================================================================
+		       Fortran90 on Charm HOWTO
+================================================================
+
+To interface Fortran90 to Charm and thus obtain a parallel version of
+your program you need to do the following things:
+1. Write your F90 program with some constraints
+2. Write a Charm Interface file (extension .ci)
+3. Compile and Link with Charm's Fortran library
+4. Run it !
+
+This is best explained with an example: the hello program.  It is a
+simple ring program.  When executed, an array of several parallel
+CHAREs is created.  Each chare "says" hello when it receives a
+message, and then sends a message to the next chare. (Currently,
+Fortran print is not working with Charm, so you'll have to imagine the
+chares are saying hello. :) The Fortran main() subroutine starts off
+the events.  And the SayHi() subroutine does the say-hello and
+forward.
+
+================ 1.1 ================
+To start, you need to create a Fortran Module to represent a chare,
+e.g. <ChareName>Mod.
+
+      ## Just replace Hello throughout with your chare's name. ##
+      ## and add your chare's personal data below where indicated ##
+      ## Everything else remains the same ##
+      MODULE HelloMod
+
+      TYPE Hello
+      integer data
+      ## your chare's data goes here, the above integer is an example ##
+      END TYPE
+
+      TYPE HelloPtr
+      TYPE (Hello), POINTER ::  obj
+      integer*8 aid
+      END TYPE
+
+      END MODULE
+
+In the Fortran file you must write an allocate funtion for this chare
+with the name: <ChareName>_allocate
+
+      ## Just replace Hello throughout with your chare's name. ##
+      ## Everything else remains the same ##
+      SUBROUTINE Hello_allocate(objPtr, aid)
+      USE HelloMod
+      TYPE(HelloPtr) objPtr 
+      integer*8 aid
+
+      allocate(objPtr%obj)
+      objPtr%aid = aid;
+      END SUBROUTINE
+
+If you have written code for a chare array "Hello", as above, you will
+have the following subroutine available to you:
+
+  <ChareName>_CkNew(integer n, integer*8 aid)
+     This function creates a chare array at runtime
+     where n is the number of items in the array, and
+           aid is the array ID which is returned to you.
+
+We will see an example of using this function below.
+
+================ 1.2 ================
+Now that you have the chare, you need to write one or more ENTRY
+POINTs for it.  This is nothing but a Fortran subroutine that uses the
+above module.
+
+      ## p1, p2, etc represent user parameters
+      ## the "objPtr, myIndex" stuff is required in every Entry Point.
+      ## CkExit() must be called by the chare to terminate.
+      SUBROUTINE SayHi(objPtr, myIndex, p1)
+      USE HelloMod
+      IMPLICIT NONE
+
+      TYPE(HelloPtr) objPtr
+      integer myIndex
+      integer p1
+
+      objPtr%obj%data = 20
+      if (myIndex < 4) then
+          call SendTo_Hello_SayHi(objPtr%aid, myIndex+1, 1);
+      else 
+          call CkExit()
+      endif
+
+Once you have written code for an Entry Point, you now have available
+to you the following subroutine:
+
+   SendTo_<ChareName>_<SubroutineName>(integer*8 aid, integer myIndex,
+                          other parameters ....)
+     where aid is the target chare array ID
+           myIndex is the specific within the array
+                   we wish to send a message to
+           other parameters are the parameters in the above function.
+
+================ 1.3 ================
+You must have a Fortran main() subroutine where execution starts.
+Typically this main function will create a chare array and send a
+message to one of its members to get the computation started.
+
+      SUBROUTINE main()
+      USE HelloMod
+      integer i
+      integer*8 aid
+
+      print *, "hello"
+
+      call Hello_CkNew(5, aid)
+
+      call SendTo_Hello_SayHi(aid, 0, 1);
+
+      END
+
+================ 2 ================
+Now we move on to Step 2, the Charm Interface file.  This file must
+have a different name from the Fortran file, and must have an
+extension of .ci, e.g. if the above Fortran file is hellof.f90, this
+file could be called hello.ci.  Basically, its purpose is to tell
+Charm what you've done in the Fortran file, since Charm cannot read
+Fortran as of now.
+
+      ## Just replace Hello throughout with your chare's name. ##
+      ## and add your chare's entry points below where indicated ##
+      ## Everything else remains the same ##
+      mainmodule hello {
+        extern module main;
+      
+        // Create some arbitrary message to hold your parameters
+        // The message must have a unique name for each Entry Point.
+        message HiMsg { int } ;
+      
+        array Hello {
+          entry Hello();
+
+          // Note how your Fortran function takes the above defined
+          // message instead of a list of parameters.
+          entry void SayHi(HiMsg *);
+
+          // Other entry points go here
+
+        };              
+      };
+
+If the function has more parameters: e.g. A Fortran function FF(int,
+int, long) in module H, would be described in the .ci file as:
+  message MarshalParams { int, int, long };
+  array H {
+    entry H();
+    entry void FF(MarshalParams *);
+  }
+As mentioned above, the message must have a unique name.
+
+================ 3 ================
+
+Lastly, you need to compile and link the Fortran program with the
+Charm program as follows: (Let's say you have written hellof.f90, and
+hello.ci)
+
+  First, you will need the lib/ directory and its contents in your
+  program directory.  So copy it there.  Then:
+
+  f90 -c hellof.f90
+    will create hellof.o
+
+  charmxi -f90 hello.ci
+    will create hello.decl.h, hello.def.h, and helloHelper.C
+    (helloHelper.C is not yet implemented, but in the interim
+     you can copy and edit the example.  Very simple.)
+
+  charmc -Ilib -c helloHelper.C
+    will create helloHelper.o
+
+  charmc -language charm++ -o hello hello.o hellof.o lib/libmain.a -lfsu  -lsunmath
+    will link hellof.o, helloHelper.o and Charm's Fortran library
+    to create your executable program 'hello'
+
+================ 4 ================
+
+Finally, to run the program, make sure you have a nodelist file called
+"nodelist" and containing, for example,
+
+group main
+host <computername>.cs.uiuc.edu <login>
+
+and then type
+
+./conv-host +p2 hello
+
+which will run 'hello' on two virtual processors.
+
