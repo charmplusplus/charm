@@ -198,7 +198,7 @@ $(LIBS_DIR)\libconv-cplus-y.a : machine.c $(CVHEADERS)
 
 $(LIBS_DIR)\libconv-cplus-n.a : machine.c $(CVHEADERS)
 	$(CPP) $(CPP_PROJ) /D"FOR_CPLUS=0" machine.c
-	$(LINK) -lib $(LINK_FLAGS) /out:"$(LIBS_DIR)\libconv-cplus-y.a" \
+	$(LINK) -lib $(LINK_FLAGS) /out:"$(LIBS_DIR)\libconv-cplus-n.a" \
 	machine.obj
 
 $(LIBS_DIR)\libconv-util.a : $(LIBCONV_UTIL)
