@@ -19,6 +19,10 @@
 #include "vmi.h"
 
 
+#define CMI_VMI_USE_MEMORY_POOL   0
+#define CMI_VMI_OPTIMIZE          0
+
+
 
 #define CMI_VMI_MAX_HANDLES 1000
 
@@ -75,9 +79,6 @@
   the number of entries to preallocate when the pool is created and the
   number of entries to increase the pool when the pool is exhausted.
 */
-#define CMI_VMI_MESSAGE_BUFFER_POOL_PREALLOCATE       64
-#define CMI_VMI_MESSAGE_BUFFER_POOL_GROW              32
-
 #define CMI_VMI_CMICOMMHANDLE_POOL_PREALLOCATE        64
 #define CMI_VMI_CMICOMMHANDLE_POOL_GROW               32
 
@@ -93,12 +94,12 @@
 
 
 /*
-  If CMK_OPTIMIZE is defined, various optimizations are made to Charm++.
+  If CMI_VMI_OPTIMIZE is defined, various optimizations are made to Charm++.
   Inside this machine.c, these optimizations include not checking the
   return codes of calls into VMI.  The following macro definition is how
   this optimization is carried out.
 */
-#ifdef CMK_OPTIMIZE
+#if CMI_VMI_OPTIMIZE
 #define CMI_VMI_CHECK_SUCCESS(status,message)
 #else
 #define CMI_VMI_CHECK_SUCCESS(status,message)                             \
@@ -444,8 +445,8 @@ void CMI_VMI_RDMA_Publish_Handler (PVMI_CONNECT conn, PVMI_REMOTE_BUFFER rbuf);
 void CMI_VMI_RDMA_Notification_Handler (PVMI_CONNECT conn, UINT32 rdmasz,
      UINT32 context, VMI_STATUS rstatus);
 
-int CMI_VMI_CRM_Register (PUCHAR key, int numProcesses, BOOLEAN reg);
-BOOLEAN CMI_VMI_Open_Connections (PUCHAR synckey);
+int CMI_VMI_CRM_Register (char *key, int numProcesses, BOOLEAN reg);
+BOOLEAN CMI_VMI_Open_Connections (char *synckey);
 CMI_VMI_Handle_T *CMI_VMI_Allocate_Handle ();
 void *CMI_VMI_CmiAlloc (int size);
 void CMI_VMI_CmiFree (void *ptr);
@@ -477,7 +478,7 @@ void CmiReleaseCommHandle (CmiCommHandle cmicommhandle);
 
 BOOLEAN CRMInit ();
 SOCKET createSocket(char *hostName, int port, int *localAddr);
-BOOLEAN CRMRegister (PUCHAR key, ULONG numPE, int shutdownPort,
+BOOLEAN CRMRegister (char *key, ULONG numPE, int shutdownPort,
 		     SOCKET *clientSock, int *clientAddr, PCRM_Msg *msg2);
 BOOLEAN CRMParseMsg (PCRM_Msg msg, int rank, int *nodeIP,
 		     int *shutdownPort, int *nodePE);

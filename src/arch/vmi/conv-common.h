@@ -1,7 +1,3 @@
-/*
-  This #define only controls whether we use a memory pool or not.
-  That is, it could be 0 even in this code and things would be okay.
-*/
 #define CONVERSE_VERSION_VMI                               1
 
 #define CMK_CCS_AVAILABLE                                  1
@@ -16,16 +12,19 @@
 
 #define CMK_PERSISTENT_COMM                                1
 
-/*
-  CMK_MULTICAST_LIST_USE_SPECIAL_CODE builds code that is specific to
-  CMK_PERSISTENT_COMM above.  If you do not set CMK_PERSISTENT_COMM,
-  do not use CMK_MULTICAST_LIST_USE_SPECIAL_CODE.
-*/
+#if CMK_PERSISTENT_COMM
 #define CMK_MULTICAST_GROUP_TYPE                struct { unsigned pe, id; }
 #define CMK_MULTICAST_DEF_USE_COMMON_CODE                  1
 #define CMK_MULTICAST_LIST_USE_COMMON_CODE                 0
 #define CMK_MULTICAST_LIST_USE_SPECIAL_CODE                1
 #define CMK_MULTICAST_GROUP_USE_COMMON_CODE                1
+#else
+#define CMK_MULTICAST_GROUP_TYPE                struct { unsigned pe, id; }
+#define CMK_MULTICAST_DEF_USE_COMMON_CODE                  1
+#define CMK_MULTICAST_LIST_USE_COMMON_CODE                 0
+#define CMK_MULTICAST_LIST_USE_SPECIAL_CODE                1
+#define CMK_MULTICAST_GROUP_USE_COMMON_CODE                1
+#endif
 
 #define CMK_BROADCAST_SPANNING_TREE                        1
 #define CMK_SPANTREE_MAXSPAN                               4

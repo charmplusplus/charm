@@ -67,7 +67,7 @@ volatile int CMI_VMI_AsyncMsgCount;
 
 
 CMI_VMI_Handle_T CMI_VMI_Handle_Array[CMI_VMI_MAX_HANDLES];
-
+//CMI_VMI_Handle_T *CMI_VMI_Handle_Array;
 
 
 
@@ -120,7 +120,6 @@ PVMI_BUFFER_POOL CMI_VMI_Bucket5_Pool;
   The following global variables are pointers to buffer pools used within
   the computation.
 */
-PVMI_BUFFER_POOL CMI_VMI_MessageBuffer_Pool;
 PVMI_BUFFER_POOL CMI_VMI_CmiCommHandle_Pool;
 PVMI_BUFFER_POOL CMI_VMI_RDMABytesSent_Pool;
 PVMI_BUFFER_POOL CMI_VMI_RDMACacheEntry_Pool;
@@ -145,6 +144,14 @@ CpvDeclare (void *, CMI_VMI_RemoteQueue);
 /* The following are for the NCSA CRM code which we currently use. */
 char *CRMHost;
 int CRMPort;
+
+
+
+
+extern void CthInit (char **argv);
+extern void ConverseCommonInit (char **argv);
+
+
 
 
 /*************************************************************************/
@@ -324,6 +331,9 @@ void CMI_VMI_Connection_Disconnect_Handler (IN PVMI_CONNECT connection)
 {
   CMI_VMI_Process_Info_T *proc;
 
+
+  DEBUG_PRINT ("CMI_VMI_Connection_Disconnect_Handler() called.\n");
+
   proc = (CMI_VMI_Process_Info_T *)
          VMI_CONNECT_GET_RECEIVE_CONTEXT (connection);
   proc->state = CMI_VMI_CONNECTION_DISCONNECTED;
@@ -339,6 +349,9 @@ void CMI_VMI_Disconnection_Response_Handler (PVMI_CONNECT connection,
 				    PVOID context, VMI_STATUS status)
 {
   CMI_VMI_Process_Info_T *proc;
+
+
+  DEBUG_PRINT ("CMI_VMI_Disconnect_Response_Handler() called.\n");
 
   proc = (CMI_VMI_Process_Info_T *) context;
   proc->state = CMI_VMI_CONNECTION_DISCONNECTED;
@@ -795,6 +808,8 @@ void CMI_VMI_RDMA_Rendezvous_Handler (char *msg)
   CMI_VMI_Handle_T *handle;
 
 
+  DEBUG_PRINT ("CMI_VMI_RDMA_Rendezvous_Handler() called.\n");
+
   rank = ((CMI_VMI_Rendezvous_Message_T *) msg)->rank;
   msgsize = ((CMI_VMI_Rendezvous_Message_T *) msg)->msgsize;
   rhandleaddr = ((CMI_VMI_Rendezvous_Message_T *) msg)->context;
@@ -878,6 +893,8 @@ void CMI_VMI_Persistent_Request_Handler (char *msg)
   ULONG sz[1];
 
 
+  DEBUG_PRINT ("CMI_VMI_Persistent_Request_Handler() called.\n");
+
   rank = ((CMI_VMI_Persistent_Request_Message_T *) msg)->rank;
   maxsize = ((CMI_VMI_Persistent_Request_Message_T *) msg)->maxsize;
   rhandleaddr = ((CMI_VMI_Persistent_Request_Message_T *) msg)->context;
@@ -941,6 +958,8 @@ void CMI_VMI_Persistent_Grant_Handler (char *msg)
   CMI_VMI_Handle_T *handle;
 
 
+  DEBUG_PRINT ("CMI_VMI_Persistent_Grant_Handler() called.\n");
+
   handle = (CMI_VMI_Handle_T *) (VMI_ADDR_CAST)
             ((CMI_VMI_Persistent_Grant_Message_T *) msg)->context;
   handle->data.send.data.persistent.rdmarecvindx =
@@ -962,6 +981,8 @@ void CMI_VMI_Persistent_Destroy_Handler (char *msg)
 
   CMI_VMI_Handle_T *handle;
 
+
+  DEBUG_PRINT ("CMI_VMI_Persistent_Destroy_Handler() called.\n");
 
   rdmarecvindx = ((CMI_VMI_Persistent_Destroy_Message_T *) msg)->rdmarecvindx;
 
@@ -1003,7 +1024,7 @@ void CMI_VMI_Persistent_Destroy_Handler (char *msg)
 **       -1     - barrier only requested; barrier was successful
 **       -2     - error
 */
-int CMI_VMI_CRM_Register (PUCHAR key, int numProcesses, BOOLEAN reg)
+int CMI_VMI_CRM_Register (char *key, int numProcesses, BOOLEAN reg)
 {
   SOCKET clientSock;
   int i;
@@ -1015,6 +1036,8 @@ int CMI_VMI_CRM_Register (PUCHAR key, int numProcesses, BOOLEAN reg)
   pid_t processPID;
   int processRank;
 
+
+  DEBUG_PRINT ("CMI_VMI_CRM_Register() called.\n");
 
   /* Get our process ID. */
   myPID = getpid ();
@@ -1089,7 +1112,7 @@ int CMI_VMI_CRM_Register (PUCHAR key, int numProcesses, BOOLEAN reg)
 ** can store the connection information in the correct slot in the
 ** CMI_VMI_ProcessList[].
 */
-BOOLEAN CMI_VMI_Open_Connections (PUCHAR synckey)
+BOOLEAN CMI_VMI_Open_Connections (char *synckey)
 {
   VMI_STATUS status;
 
@@ -1109,6 +1132,8 @@ BOOLEAN CMI_VMI_Open_Connections (PUCHAR synckey)
   long nowtime;
 
 
+  DEBUG_PRINT ("CMI_VMI_Open_Connections() called.\n");
+
   /*
     **********
     * Step 1 *   Set up data structures.
@@ -1123,7 +1148,7 @@ BOOLEAN CMI_VMI_Open_Connections (PUCHAR synckey)
   }
 
   /* Allocate space for the remote key. */
-  remotekey = malloc (strlen ((const char *) synckey) + 32);
+  remotekey = malloc (strlen (synckey) + 32);
   if (!remotekey) {
     DEBUG_PRINT ("Unable to allocate memory for remote key.\n");
     return FALSE;
@@ -1173,7 +1198,7 @@ BOOLEAN CMI_VMI_Open_Connections (PUCHAR synckey)
     }
 
     /* Build the remote IPV4 address. We need remote hosts name for this. */
-    rhostinfo = gethostbyaddr ((const char *) &proc->nodeIP,
+    rhostinfo = gethostbyaddr (&proc->nodeIP,
          sizeof (proc->nodeIP), AF_INET);
     if (!rhostinfo) {
       DEBUG_PRINT ("Error looking up host [%d.%d.%d.%d].\n",
@@ -1311,6 +1336,8 @@ CMI_VMI_Handle_T *CMI_VMI_Allocate_Handle()
   int i;
 
 
+  DEBUG_PRINT ("CMI_VMI_Allocate_Handle() called.\n");
+
   i = 0;
   while ((&(CMI_VMI_Handle_Array[i]))->allocated) {
     i++;
@@ -1330,7 +1357,7 @@ CMI_VMI_Handle_T *CMI_VMI_Allocate_Handle()
 
 
 
-#if CONVERSE_VERSION_VMI
+#if CMI_VMI_USE_MEMORY_POOL
 /**************************************************************************
 **
 */
@@ -1340,6 +1367,8 @@ void *CMI_VMI_CmiAlloc (int size)
 
   void *ptr;
 
+
+  DEBUG_PRINT ("CMI_VMI_CmiAlloc() (memory pool version) called.\n");
 
   if (size < CMI_VMI_BUCKET1_SIZE) {
     status = VMI_Pool_Allocate_Buffer (CMI_VMI_Bucket1_Pool, &ptr, NULL);
@@ -1374,6 +1403,8 @@ void CMI_VMI_CmiFree (void *ptr)
   int size;
 
 
+  DEBUG_PRINT ("CMI_VMI_CmiFree() (memory pool version) called.\n");
+
   size = ((int *) ptr)[0];
 
   if (size < CMI_VMI_BUCKET1_SIZE) {
@@ -1395,7 +1426,28 @@ void CMI_VMI_CmiFree (void *ptr)
     free (ptr);
   }
 }
-#endif
+#else   /* CMI_VMI_USE_MEMORY_POOL */
+/**************************************************************************
+**
+*/
+void *CMI_VMI_CmiAlloc (int size)
+{
+  DEBUG_PRINT ("CMI_VMI_CmiAlloc() (simple version) called.\n");
+
+  return (malloc (size));
+}
+
+
+/**************************************************************************
+**
+*/
+void CMI_VMI_CmiFree (void *ptr)
+{
+  DEBUG_PRINT ("CMI_VMI_CmiFree() (simple version) called.\n");
+
+  free (ptr);
+}
+#endif   /* CMI_VMI_USE_MEMORY_POOL */
 
 
 
@@ -1412,6 +1464,8 @@ int CMI_VMI_Spanning_Children_Count (char *msg)
 
   int i;
 
+
+  DEBUG_PRINT ("CMI_VMI_Spanning_Children_Count() called.\n");
 
   childcount = 0;
 
@@ -1597,7 +1651,6 @@ void CMI_VMI_Send_Spanning_Children (int msgsize, char *msg)
 
 
 /**************************************************************************
-**
 ** argc
 ** argv
 ** startFn - the user-supplied function to run (function pointer)
@@ -1613,9 +1666,9 @@ void ConverseInit (int argc, char **argv, CmiStartFn startFn,
   char *a;
   int i;
 
-  PUCHAR synckey;
+  char *synckey;
   char *vmikey;
-  PUCHAR initkey;
+  char *initkey;
 
   char *vmiinlinesize;
 
@@ -1624,8 +1677,26 @@ void ConverseInit (int argc, char **argv, CmiStartFn startFn,
 
   DEBUG_PRINT ("ConverseInit() called.\n");
 
+
   /* Initialize the global asynchronous message count. */
   CMI_VMI_AsyncMsgCount = 0;
+
+  /* Set up the synchronization key for initial interaction with CRM. */
+  a = getenv ("VMI_KEY");
+  if (a) {
+    synckey = strdup (a);
+  }
+  else {
+    synckey = (char *) malloc (strlen (argv[0]) + 1);
+    if (!synckey) {
+      CmiAbort ("Unable to allocate memory for syncronization key.");
+    }
+
+    sprintf (synckey, "%s\0", argv[0]);
+  }
+
+  DEBUG_PRINT ("The initial synchronization key is %s.\n", synckey);
+
 
   /*
     **********
@@ -1654,22 +1725,6 @@ void ConverseInit (int argc, char **argv, CmiStartFn startFn,
   if (!CRMInit ()) {
     CmiAbort ("Failed to initialize CRM.");
   }
-
-  /* Set up the synchronization key for initial interaction with CRM. */
-  a = getenv ("VMI_KEY");
-  if (a) {
-    synckey = (PUCHAR) strdup (a);
-  }
-  else {
-    synckey = malloc (strlen (argv[0]) + 1);
-    if (!synckey) {
-      CmiAbort ("Unable to allocate memory for syncronization key.");
-    }
-
-    sprintf (synckey, "%s\0", argv[0]);
-  }
-
-  DEBUG_PRINT ("The initial synchronization key is %s.\n", synckey);
 
   /* Register with the CRM. */
   if ((_Cmi_mype = CMI_VMI_CRM_Register (synckey, _Cmi_numpes, TRUE)) < 0) {
@@ -1731,7 +1786,7 @@ void ConverseInit (int argc, char **argv, CmiStartFn startFn,
   }
 
   /* Set the VMI_KEY environment variable. */
-  vmikey = (char *) malloc (strlen ((const char *) synckey) + 32);
+  vmikey = (char *) malloc (strlen (synckey) + 32);
   if (!vmikey) {
     CmiAbort ("Unable to allocate memory for VMI_KEY environment variable.");
   }
@@ -1760,14 +1815,6 @@ void ConverseInit (int argc, char **argv, CmiStartFn startFn,
   CMI_VMI_CHECK_SUCCESS (status, "VMI_Init()");
 
   /* Create buffer pools. */
-  status = VMI_Pool_Create_Buffer_Pool (CMI_VMI_Medium_Message_Boundary,
-					sizeof (PVOID),
-       CMI_VMI_MESSAGE_BUFFER_POOL_PREALLOCATE,
-       CMI_VMI_MESSAGE_BUFFER_POOL_GROW,
-       (VMI_POOL_HANDLE | VMI_POOL_REGISTER | VMI_POOL_CLEARONCE),
-       &CMI_VMI_MessageBuffer_Pool);
-  CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Create_Buffer_Pool()");
-
   status = VMI_Pool_Create_Buffer_Pool (sizeof (CMI_VMI_CmiCommHandle_T),
        sizeof (PVOID), CMI_VMI_CMICOMMHANDLE_POOL_PREALLOCATE,
        CMI_VMI_CMICOMMHANDLE_POOL_GROW, VMI_POOL_CLEARONCE,
@@ -1793,6 +1840,7 @@ void ConverseInit (int argc, char **argv, CmiStartFn startFn,
        &CMI_VMI_RDMACacheEntry_Pool);
   CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Create_Buffer_Pool()");
 
+#if CONVERSE_VERSION_VMI
   status = VMI_Pool_Create_Buffer_Pool (CMI_VMI_BUCKET1_SIZE, sizeof (PVOID),
        CMI_VMI_BUCKET1_PREALLOCATE, CMI_VMI_BUCKET1_GROW, VMI_POOL_CLEARONCE,
        &CMI_VMI_Bucket1_Pool);
@@ -1817,11 +1865,13 @@ void ConverseInit (int argc, char **argv, CmiStartFn startFn,
        CMI_VMI_BUCKET5_PREALLOCATE, CMI_VMI_BUCKET5_GROW, VMI_POOL_CLEARONCE,
        &CMI_VMI_Bucket5_Pool);
   CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Create_Buffer_Pool()");
+#endif   /* CONVERSE_VERSION_VMI */
 
   /* Initialize handle array. */
+  //CMI_VMI_Handle_Array = (CMI_VMI_Handle_T *) malloc (sizeof (CMI_VMI_Handle_T));
   for (i = 0; i < CMI_VMI_MAX_HANDLES; i++) {
-    (&(CMI_VMI_Handle_Array[i]))->index = i;
-    (&(CMI_VMI_Handle_Array[i]))->allocated = FALSE;
+    (&CMI_VMI_Handle_Array[i])->index = i;
+    (&CMI_VMI_Handle_Array[i])->allocated = FALSE;
   }
 
   /* Create the FIFOs for holding local and remote messages. */
@@ -1861,7 +1911,7 @@ void ConverseInit (int argc, char **argv, CmiStartFn startFn,
   */
 
   /* Prepare the synchronization key to be used. */
-  initkey = (PUCHAR) malloc (strlen ((const char *) synckey) + 13);
+  initkey = (char *) malloc (strlen (synckey) + 13);
   if (!initkey) {
     CmiAbort ("Unable to allocate space for initialization key.");
   }
@@ -1872,7 +1922,7 @@ void ConverseInit (int argc, char **argv, CmiStartFn startFn,
     CmiAbort ("Unable to re-synchronize with all processes.");
   }
 
-  DEBUG_PRINT ("Successfully re-synchronized with all initialized processes.");
+  DEBUG_PRINT ("Successfully re-synchronized with all initialized processes.\n");
 
   /*
     **********
@@ -1982,9 +2032,6 @@ void ConverseExit ()
   }
 
   /* Destroy buffer pools. */
-  status = VMI_Pool_Destroy_Buffer_Pool (CMI_VMI_MessageBuffer_Pool);
-  CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Destroy_Buffer_Pool()");
-
   status = VMI_Pool_Destroy_Buffer_Pool (CMI_VMI_CmiCommHandle_Pool);
   CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Destroy_Buffer_Pool()");
 
@@ -1997,6 +2044,7 @@ void ConverseExit ()
   status = VMI_Pool_Destroy_Buffer_Pool (CMI_VMI_RDMACacheEntry_Pool);
   CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Destroy_Buffer_Pool()");
 
+#if CONVERSE_VERSION_VMI
   status = VMI_Pool_Destroy_Buffer_Pool (CMI_VMI_Bucket1_Pool);
   CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Destroy_Buffer_Pool()");
 
@@ -2011,6 +2059,7 @@ void ConverseExit ()
 
   status = VMI_Pool_Destroy_Buffer_Pool (CMI_VMI_Bucket5_Pool);
   CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Destroy_Buffer_Pool()");
+#endif   /* CONVERSE_VERSION_VMI */
 
   /* Free all dynamically-allocated memory. */
   free (CMI_VMI_Procs);
@@ -2810,6 +2859,7 @@ CmiCommHandle CmiAsyncBroadcastFn (int msgsize, char *msg)
       status = VMI_Stream_Send_Inline ((&CMI_VMI_Procs[i])->connection,
            addrs, sz, 1, sizeof (CMI_VMI_Rendezvous_Message_T));
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
+    }
 
     for (i = (_Cmi_mype + 1); i < _Cmi_numpes; i++) {
       status = VMI_Stream_Send_Inline ((&CMI_VMI_Procs[i])->connection,
@@ -2900,6 +2950,9 @@ void CmiFreeBroadcastAllFn (int msgsize, char *msg)
 */
 void CmiSyncListSendFn(int npes, int *pes, int len, char *msg)
 {
+  DEBUG_PRINT ("CmiSyncListSendFn() called.\n");
+
+
   CmiError("ListSend not implemented.");
 }
 
@@ -2909,6 +2962,9 @@ void CmiSyncListSendFn(int npes, int *pes, int len, char *msg)
 */
 CmiCommHandle CmiAsyncListSendFn(int npes, int *pes, int len, char *msg)
 {
+  DEBUG_PRINT ("CmiAsyncListSendFn() called.\n");
+
+
   CmiError("ListSend not implemented.");
   return (CmiCommHandle) 0;
 }
@@ -2929,6 +2985,8 @@ void CmiFreeListSendFn (int npes, int *pes, int msgsize, char *msg)
   int putlen;
   int i;
 
+
+  DEBUG_PRINT ("CmiFreeListSendFn() called.\n");
 
   // This code completely ignores pes passed in as a parameter and
   // instead uses the destinations held in the persistent handle array.
@@ -3047,6 +3105,9 @@ void CmiReleaseCommHandle (CmiCommHandle cmicommhandle)
 */
 void CmiPersistentInit ()
 {
+  DEBUG_PRINT ("CmiPersistentInit() called.\n");
+
+
   CMI_VMI_Persistent_Request_Handler_ID =
     CmiRegisterHandler ((CmiHandler) CMI_VMI_Persistent_Request_Handler);
 
@@ -3072,6 +3133,9 @@ PersistentHandle CmiCreatePersistent (int destrank, int maxsize)
   PVOID addrs[1];
   ULONG sz[1];
 
+
+
+  DEBUG_PRINT ("CmiCreatePersitsent() called.\n");
 
   handle = CMI_VMI_Allocate_Handle();
 
@@ -3114,6 +3178,9 @@ PersistentHandle CmiCreatePersistent (int destrank, int maxsize)
 */
 void CmiUsePersistentHandle (PersistentHandle *handle_array, int n)
 {
+  DEBUG_PRINT ("CmiUsePersistentHandle() called.\n");
+
+
   CMI_VMI_Persistent_Handles = handle_array;
   CMI_VMI_Persistent_Handles_Size = n;
 }
@@ -3132,6 +3199,8 @@ void CmiDestroyPersistent (PersistentHandle h)
   PVOID addrs[1];
   ULONG sz[1];
 
+
+  DEBUG_PRINT ("CmiDestroyPersistent() called.\n");
 
   handle = (CMI_VMI_Handle_T *) h;
 
@@ -3159,6 +3228,9 @@ void CmiDestroyPersistent (PersistentHandle h)
 */
 void CmiDestroyAllPersistent ()
 {
+  DEBUG_PRINT ("CmiDestroyAllPersistent() called.\n");
+
+
   printf ("*** WARNING: CmiDestroyAllPersistent() not implemented! ***\n");
 }
 #endif   /* CMK_PERSISTENT_COMM */
@@ -3209,6 +3281,9 @@ BOOLEAN CRMInit ()
   char *CRMLoc;
   char *temp;
 
+
+  DEBUG_PRINT ("CRMInit() called.\n");
+
   CRMLoc = getenv ("CRM");
   if (CRMLoc)
   {
@@ -3240,9 +3315,12 @@ BOOLEAN CRMInit ()
   return FALSE;
 }
 
-/* Socket Utility Functions */
-SOCKET createSocket(char *hostName, int port, int *localAddr){
 
+/**************************************************************************
+**
+*/
+SOCKET createSocket(char *hostName, int port, int *localAddr)
+{
 #ifdef WIN32  
   SOCKET sock;
 #endif
@@ -3253,6 +3331,9 @@ SOCKET createSocket(char *hostName, int port, int *localAddr){
   struct sockaddr_in local;
   struct hostent *hostEntry;
   unsigned long addr;
+
+
+  DEBUG_PRINT ("createSocket() called.\n");
   
 #ifdef WIN32
   sock = WSASocket(
@@ -3400,13 +3481,15 @@ SOCKET createSocket(char *hostName, int port, int *localAddr){
 /**************************************************************************
 **
 */
-BOOLEAN CRMRegister (PUCHAR key, ULONG numPE, int shutdownPort,
+BOOLEAN CRMRegister (char *key, ULONG numPE, int shutdownPort,
 		     SOCKET *clientSock, int *clientAddr, PCRM_Msg *msg2)
 {
   PCRM_Msg msg;
   int bytes;
   int bsend;
 
+
+  DEBUG_PRINT ("CRMRegister() called.\n");
 
   /* Perform sanity checking on variables passed to CRM. */
   if (strlen(key) > MAX_STR_LENGTH){
@@ -3542,6 +3625,8 @@ BOOLEAN CRMParseMsg (PCRM_Msg msg, int rank, int *nodeIP,
   PNodeCtx msgRank;
 
 
+  DEBUG_PRINT ("CRMParseMsg() called.\n");
+
   if ((msg->msgCode) != CRM_MSG_SUCCESS)
   {
     return FALSE;
@@ -3569,11 +3654,14 @@ int CRMSend (SOCKET s, char *msg, int n)
 {
   int sent;
   int bsent;
+
+
+  DEBUG_PRINT ("CRMSend() called.\n");
   
   sent = 0;
   while (sent < n)
   {
-    bsent = send (s, (const void *) msg + sent, (n - sent), 0);
+    bsent = send (s, (const void *) (msg + sent), (n - sent), 0);
     if (bsent < 0)
     {
       return bsent;
@@ -3596,10 +3684,13 @@ int CRMRecv (SOCKET s, char *msg, int n)
   int recvd;
   int brecv;
 
+
+  DEBUG_PRINT ("CRMRecv() called.\n");
+
   recvd = 0;
   while (recvd < n)
   {
-    brecv = recv (s, (void *) msg + recvd, (n - recvd), 0);
+    brecv = recv (s, (void *) (msg + recvd), (n - recvd), 0);
     if (brecv < 0)
     {
       return brecv;
