@@ -1772,7 +1772,7 @@ void start_nodes_local(char ** env)
 
 void nodetab_init_for_scyld()
 {
-  int maxNodes, i, node;
+  int maxNodes, i, node, npes;
   nodetab_host group;
   int tablesize;
 
@@ -1795,8 +1795,8 @@ void nodetab_init_for_scyld()
 #endif
   group.cpus = arg_ppn;
 
-  /* check which slave nodes available */
-  int npes = 0;
+  /* check which slave node is available from frompe to endpe */
+  npes = 0;
   for (i=-1; i<maxNodes && npes < arg_requested_pes; i++) {
     char hostname[256];
     if (bproc_nodestatus(i) != bproc_node_up) continue;
@@ -1818,9 +1818,9 @@ void nodetab_init_for_scyld()
 
   /* expand node table to arg_requested_pes */
   if (arg_requested_pes > npes) {
+    int orig_size = npes;
     int node = 0;
     if (nodetab_rank0_size > 1) node = arg_ppn;      /* skip -1 if we can */
-    int orig_size = npes;
     while (npes < arg_requested_pes) {
       if (npes+arg_ppn > arg_requested_pes) group.cpus = arg_requested_pes-npes;
       else group.cpus = arg_ppn;
