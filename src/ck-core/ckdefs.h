@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.7  1995-07-06 22:42:11  narain
+ * Revision 2.8  1995-10-24 19:48:42  brunner
+ * Added Ck* defines for all Mc functions.  For example, McTotalNumPe() ->
+ * CkNumPe().
+ *
+ * Revision 2.7  1995/07/06  22:42:11  narain
  * Changes for LDB interface revision
  *
  * Revision 2.6  1995/07/05  21:17:02  narain
@@ -100,6 +104,16 @@
 #define McSpanTreeChild(node, children) CmiSpanTreeChildren(node, children)
 #define McNumSpanTreeChildren(node) CmiNumSpanTreeChildren(node)
 #define McSendToSpanTreeLeaves(size, msg) CmiSendToSpanTreeLeaves(size, msg)
+
+/* We are going to only use Ck prefixes in Charm programs */
+#define CkMyPe() CmiMyPe()
+#define CkNumPe() CmiNumPe()
+#define CkSpanTreeInit() CmiSpanTreeInit()
+#define CkSpanTreeParent(node) CmiSpanTreeParent(node)
+#define CkSpanTreeRoot() CmiSpanTreeRoot()
+#define CkSpanTreeChild(node, children) CmiSpanTreeChildren(node, children)
+#define CkNumSpanTreeChildren(node) CmiNumSpanTreeChildren(node)
+#define CkSendToSpanTreeLeaves(size, msg) CmiSendToSpanTreeLeaves(size, msg)
 
 #define CkPrintf                CmiPrintf
 #define CPrintf                 CmiPrintf
