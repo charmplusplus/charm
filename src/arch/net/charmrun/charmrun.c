@@ -980,13 +980,15 @@ void nodeinfo_add(const ChSingleNodeinfo *in,SOCKET ctrlfd)
 		{fprintf(stderr,"Unexpected node %d registered!\n",node);exit(1);}
 	nt=nodetab_rank0_table[node];/*Nodetable index for this node*/
 	i.nPE=ChMessageInt_new(nodetab_cpus(nt));
-	i.IP=nodetab_ip(node);
 #if CMK_USE_GM
+        *(int *)&i.IP = ChMessageInt(i.dataport);
         if (ChMessageInt(i.dataport)==0) {
           fprintf(stderr, "Error> Node %d:%s, cannot open GM gm_port %d!\n", nt, nodetab_name(nt), nodetab_dataport(nt));
           portOk = 0;
         }
         i.dataport=ChMessageInt_new(nodetab_dataport(nt));
+#else
+	i.IP=nodetab_ip(node);
 #endif
 	nodeinfo_arr[node]=i;
 	for (pe=0;pe<nodetab_cpus(nt);pe++)

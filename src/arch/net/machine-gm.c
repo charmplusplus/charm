@@ -189,7 +189,7 @@ static void CommunicationServer(int withDelayMs)
   CmiCommLock();
 
   while (1) {
-    CheckSocketsReady(withDelayMs);
+    CheckSocketsReady(0);
 /*
     CmiCommLock();
 */
@@ -205,10 +205,10 @@ static void CommunicationServer(int withDelayMs)
 #if CMK_SHARED_VARS_UNAVAILABLE
   terrupt--;
 #endif
+*/
 
   CmiCommUnlock();
   MACHSTATE(2,"} CommunicationServer")
-*/
 
 }
 
@@ -481,8 +481,10 @@ void CmiCheckGmStatus()
   if (gmport == NULL) machine_exit(1);
   for (i=0; i<Cmi_numnodes; i++) {
     gm_status_t status;
-    char uid[6];
-    status = gm_node_id_to_unique_id(gmport, *(int *)&nodes[i].IP, uid);
+    char uid[6], str[100];
+    unsigned int ip;
+    memcpy(&ip, &nodes[i].IP, sizeof(nodes[i].IP));
+    status = gm_node_id_to_unique_id(gmport, ip, uid);
     if (status != GM_SUCCESS || ( uid[0]==0 && uid[1]== 0 
          && uid[2]==0 && uid[3]==0 && uid[4]==0 && uid[5]==0)) { 
       CmiPrintf("Error> gm node %d doesn't know node %d. \n", CmiMyPe(), i);
