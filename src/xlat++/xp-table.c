@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.8  1995-09-26 22:39:17  sanjeev
+ * Revision 2.9  1995-10-03 19:53:33  sanjeev
+ * new BOC syntax
+ *
+ * Revision 2.8  1995/09/26  22:39:17  sanjeev
  * *** empty log message ***
  *
  * Revision 2.7  1995/09/21  16:39:22  sanjeev
@@ -379,13 +382,17 @@ char *SendChare, *SendEP, *Msg ;
 int SendType ;
 char **charename ;
 {
+/* This fn checks (not very accurately right now) whether SendEP is a valid
+   entry point of the handle SendChare, and fills the type of SendChare
+   in charename */
+
 	int ind, len ;
 	char errstr[256] ;
 	EP *ep, *e ;
 	ChareInfo *chare ;
 	char *ident, *lastcoln, *scopestr ;
 
-	if ( strcmp(SendChare,"thishandle")==0 ) {
+	if ( strcmp(SendChare,"thishandle")==0 || strcmp(SendChare,"thisgroup")==0 ) {
 		*charename = (char *)malloc(sizeof(char)*(strlen(CurrentChare)+1));
 		strcpy(*charename,CurrentChare) ;
 		scopestr = (char *)malloc(sizeof(char)*2) ;
@@ -434,12 +441,21 @@ char **charename ;
 		scopestr = (char *)malloc(sizeof(char)*2) ;
 		strcpy(scopestr," ") ;
 
-		/* Search for charename in ChareTable */
+		/* Search for charename in ChareTable or BOCTable, since
+		   the handle could be a normal chare handle or a branch-id
+		   of a BOC branch */
 
 		ind = FoundInChareTable(ChareTable,charecount+1,*charename) ;
-		if ( ind == -1 )
-			goto endfn ;
-		for ( e=ChareTable[ind]->eps; e!=NULL; e=e->next ) {
+		if ( ind != -1 ) 
+			chare = ChareTable[ind] ;
+		else {
+			ind = FoundInChareTable(BOCTable,boccount+1,*charename) ;
+			if ( ind != -1 ) 
+				chare = BOCTable[ind] ;
+			else
+				goto endfn ;
+		}
+		for ( e=chare->eps; e!=NULL; e=e->next ) {
 			if ( strcmp(e->epname,SendEP) == 0 ) {
 				break ;
 			}
@@ -471,10 +487,10 @@ char **charename ;
 		*charename = scopestr ;	
 		scopestr = (char *)malloc(sizeof(char)*2) ;
 		strcpy(scopestr," ") ;
-		/* Search for charename in BOCTable */
 
+		/* Search for charename in BOCTable */
 		ind = FoundInChareTable(BOCTable,boccount+1,*charename) ;
-		if ( ind == -1 )
+		if ( ind == -1 ) 
 			goto endfn ;
 		for ( e=BOCTable[ind]->eps; e!=NULL; e=e->next ) {
 			if ( strcmp(e->epname,SendEP) == 0 ) {
@@ -1268,9 +1284,9 @@ OutputNewChareMsg(char *name, char *arg, char *placement)
 	}
 
 	/* First find whether name is a Chare, BOC or Message */	
-	if ( FoundInChareTable(ChareTable,charecount+1,name) != -1 )
+	if ( NewOpType == NEWCHARE )
 		type = CHARE ;
-	else if ( FoundInChareTable(BOCTable,boccount+1,name) != -1 )
+	else if ( NewOpType == NEWGROUP )
 		type = BRANCHED ;
 	else if ( FoundInMsgTable(name) != -1 ) 
 		type = MESSAGE ;
@@ -1328,7 +1344,7 @@ OutputNewChareMsg(char *name, char *arg, char *placement)
 	else { /* type == MESSAGE */
 		if ( placement == NULL || *placement=='\0' ) 
 			fprintf(outfile,"new (_CK_%s._CK_msg_%s) %s", CoreName, name, name) ;
-		else  /* handle placement = "sizes, prio" */
+		else  /* take care of placement = "sizes, prio" */
 			fprintf(outfile,"new (_CK_%s._CK_msg_%s, %s) %s", CoreName, name, placement, name) ;
 		if ( arg != NULL && *arg!='\0' ) 
 			fprintf(outfile,"(%s",arg) ;

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.3  1995-09-06 04:08:43  sanjeev
+ * Revision 2.4  1995-10-03 19:54:21  sanjeev
+ * new BOC syntax
+ *
+ * Revision 2.3  1995/09/06  04:08:43  sanjeev
  * added "message class"
  *
  * Revision 2.2  1995/07/25  00:29:31  jyelon
@@ -55,10 +58,6 @@
 #define TBL_NEVER_WAIT 2
 #define TBL_ALWAYS_WAIT 3
 
-message class TBL_MSG {
-public:	int key;
-	char *data;
-} ;
 
 extern int _CK_NumTables ;
 extern "C" void TblInsert(int, int, int, void *, int, int, ChareIDType *, int);

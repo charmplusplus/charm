@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.2  1995-09-07 18:58:15  sanjeev
+ * Revision 2.3  1995-10-03 19:53:33  sanjeev
+ * new BOC syntax
+ *
+ * Revision 2.2  1995/09/07  18:58:15  sanjeev
  * fixed bug in Graph_OutputPrivateCall
  *
  * Revision 2.1  1995/09/06  04:20:54  sanjeev
@@ -53,6 +56,7 @@ static char ident[] = "@(#)$Header$";
 #include <string.h>
 #include <ctype.h>
 
+#include "xp-ytab.h"
 #include "xp-t.h"
 #include "xp-extn.h"
 
@@ -76,6 +80,20 @@ char *argv[] ;
 	InsertSymTable("EntryPointType") ;
 	InsertSymTable("FunctionRefType") ;
 	InsertSymTable("ChareIDType") ;	/* for the table class */
+	
+	/* These are the system-defined messages */
+	CurrentAggType = MESSAGE ;
+	InsertSymTable("GroupIdMessage") ;	
+	InsertSymTable("QuiescenceMessage") ;	
+	InsertSymTable("TableMessage") ;	
+	InsertObjTable("GroupIdMessage") ;	
+	InsertObjTable("QuiescenceMessage") ;	
+	InsertObjTable("TableMessage") ;	
+	CurrentAggType = CLASS ;
+	InsertSymTable("groupmember") ;	
+	InsertObjTable("groupmember") ;	
+	CurrentAggType = -1 ;
+
 	retval = yyparse() ;
 
 	if ( shouldprint )
@@ -308,8 +326,8 @@ void GenerateStructsFns()
 		}
 
 		if ( chare->eps->defined ) {
-	    	    fprintf(outfile,"extern \"C\" _CK_BOC *_CK_create_%s(CHARE_BLOCK *c) ;\n",chare->name) ;
-	    	    fprintf(outfile,"_CK_BOC *_CK_create_%s(CHARE_BLOCK *c) {\n",chare->name) ;
+	    	    fprintf(outfile,"extern \"C\" groupmember *_CK_create_%s(CHARE_BLOCK *c) ;\n",chare->name) ;
+	    	    fprintf(outfile,"groupmember *_CK_create_%s(CHARE_BLOCK *c) {\n",chare->name) ;
 	    	    fprintf(outfile,"\treturn(new %s(c)) ;\n}\n\n",chare->name) ;
 		}
 	}
