@@ -16,6 +16,9 @@ CkGroupID TheGVT;
 // Basic initializations
 PVT::PVT() 
 {
+#ifdef POSE_COMM_ON
+  //comm_debug = 1;
+#endif
 #ifdef POSE_STATS_ON
   localStats = (localStat *)CkLocalBranch(theLocalStats);
   localStats->TimerStart(GVT_TIMER);
@@ -150,7 +153,7 @@ void PVT::objUpdate(int pvtIdx, int safeTime, int timestamp, int sr)
 
   CmiAssert((timestamp >= estGVT) || (timestamp == -1));
   // minimize the non-idle OVT
-  CmiAssert((safeTime >= estGVT) || (safeTime = -1));
+  CmiAssert((safeTime >= estGVT) || (safeTime == -1));
   if ((safeTime >= 0) && 
       ((objs.objs[index].ovt > safeTime) || (objs.objs[index].ovt < 0)))
     objs.objs[index].ovt = safeTime;
@@ -329,7 +332,7 @@ void GVT::computeGVT(UpdateMsg *m)
       CkAbort("FATAL ERROR: GVT exiting...\n");
     }
     
-    //CkPrintf("[%d] New GVT = %d\n", CkMyPe(), estGVT);
+    CkPrintf("[%d] New GVT = %d\n", CkMyPe(), estGVT);
 
     // STEP 5: Check for termination conditions
     int term = 0;

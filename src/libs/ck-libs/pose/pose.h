@@ -7,7 +7,7 @@
 
 // Primary versions
 #define POSE_STATS_ON 1
-//#define POSE_COMM_ON 1
+#define POSE_COMM_ON 1
 //#define LB_ON 1
 
 #ifdef POSE_COMM_ON
@@ -23,15 +23,16 @@
 // Strategy variables
 #define MAX_FUTURE_OFFSET 10000 // CancelList gets cancels w/ts < gvt+this
 #define STORE_RATE 1         // default store rate: 1 for every n events
-#define SPEC_WINDOW 50       // speculative event window
-#define MIN_LEASH 0          // min spec window for adaptive strategy
-#define MAX_LEASH 200        // max  "     "     "     "        " 
+#define SPEC_WINDOW 10     // speculative event window
+#define MIN_LEASH 10        // min spec window for adaptive strategy
+#define MAX_LEASH 100      // max  "     "     "     "        " 
+#define LEASH_FLEX 10       // leash increment
 #define GVT_WINDOW 8         // GVT improvement limit; sets s/r table size
 #define GVT_bucket 1         // number of buckets to sort sends/recvs into
-#define TBL_THRESHOLD 5000   // max # entries in table before it shrinks
-#define MAX_GVT_WINDOW 10000 // don't expand GVT SRtable beyond this
-#define MAX_EVENTS 50        // eventLeash controls quantity of events that
-#define MIN_EVENTS 1         // are executed by a Step call on a strategy
+#define TBL_THRESHOLD 100    // max # entries in table before it shrinks
+#define MAX_GVT_WINDOW 100  // don't expand GVT SRtable beyond this
+#define MAX_EVENTS 10       // eventLeash controls quantity of events that
+#define MIN_EVENTS 10        // are executed by a Step call on a strategy
 
 // MISC
 #define MAX_POOL_SIZE 20     // maximum size of an eventMsg pool
@@ -91,6 +92,9 @@ void POSE_busy_wait(double n);
 CpvExtern(int, stateRecovery);
 extern double busyWait;
 extern int POSE_endtime;
+#ifdef POSE_COMM_ON
+extern int comm_debug;
+#endif
 
 class callBack : public CMessage_callBack
 {

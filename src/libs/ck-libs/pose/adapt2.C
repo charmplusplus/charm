@@ -2,7 +2,7 @@
 #include "pose.h"
 
 adapt2::adapt2() { 
-  timeLeash = MIN_LEASH; 
+  timeLeash = SPEC_WINDOW; 
   eventLeash = MAX_EVENTS; 
   STRAT_T = ADAPT2_T; 
 }
@@ -68,7 +68,7 @@ void adapt2::Step()
     ev = eq->currentPtr;
     evCount++;
   }
-  if (timeLeash < MAX_LEASH) timeLeash++;
   if (eventLeash < MAX_EVENTS) eventLeash++;
+  else if (timeLeash < MAX_LEASH) timeLeash += LEASH_FLEX;
 }
 

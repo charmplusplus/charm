@@ -11,7 +11,8 @@ class eventQueue {
  public:
   EqHeap *eqh;
   Event *frontPtr, *currentPtr, *backPtr, *commitPtr;
-
+  int eqCount;
+  
   eventQueue();
   ~eventQueue();
   void InsertEvent(Event *e);      // Insert e in timestamp order.

@@ -99,7 +99,7 @@ int HeapNode::remove(eventID evID, int timestamp)
     if (timestamp < right->e->timestamp)         // subheap elements too high
       found = 0;                                 // set return status
     else if ((timestamp == right->e->timestamp) && (evID == right->e->evID)) {
-      // founf element on top
+      // found element on top
       tmp = right;                               // save a pointer to it
       right = right->left->conjoin(right->right);// remove it from heap
       subheapsize--;                 

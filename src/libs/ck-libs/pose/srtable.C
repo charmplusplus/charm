@@ -13,8 +13,8 @@
 // Basic constructor
 SRtable::SRtable() 
 { 
-  gvtWindow = 16;
-  availableBuckets = numBuckets = 2;
+  gvtWindow = 512;
+  availableBuckets = numBuckets = 64;
   residuals = residualsTail = recyc = recycTail = NULL;
   recycCount = 0;
   inBuckets = 0;

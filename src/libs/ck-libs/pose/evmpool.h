@@ -27,7 +27,7 @@ class Pool
 // Set of message pools for various size messages; 1 EventMsgPool per PE
 class EventMsgPool : public Group {
 private:
-  int numPools;    // corresponcs to number of message sizes
+  int numPools;    // corresponds to number of message sizes
   Pool *msgPools;  // the Pools
 public:
   EventMsgPool(PoolInitMsg *m) { // initialize and allocate number of pools

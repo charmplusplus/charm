@@ -31,7 +31,7 @@ CancelNode *CancelList::GetItem(int eGVT)
   return result;
 }
 
-// Remove a node from the list (presumably on that was cancelled)
+// Remove a node from the list (presumably one that was cancelled)
 void CancelList::RemoveItem(CancelNode *item)
 {
   int isEarliest = (item->timestamp == earliest);

@@ -65,8 +65,8 @@ void sim::Step()
     else myStrat->Step();
     break;
   case SPEC_T:
-  case ADAPT_T: 
-  case ADAPT2_T: // non-prioritized step
+  case ADAPT_T: // non-prioritized step
+  case ADAPT2_T:
     myStrat->Step(); // Call Step on strategy
     break;
   default: 
@@ -115,8 +115,8 @@ void sim::Commit()
 #ifdef POSE_STATS_ON
   int tstat = localStats->TimerRunning();
   if (!tstat)
-    localStats->TimerStart(SIM_TIMER);
-  else localStats->SwitchTimer(SIM_TIMER);
+    localStats->TimerStart(MISC_TIMER);
+  else localStats->SwitchTimer(MISC_TIMER);
 #endif
 
   if (localPVT->done() && (POSE_endtime == -1)) { //commit all events in queue
@@ -129,9 +129,9 @@ void sim::Commit()
       objID->terminus();
   }
   objID->ResetCheckpointRate();
-  //#ifdef POSE_STATS_ON
-  //  localStats->SwitchTimer(SIM_TIMER);
-  //#endif
+  #ifdef POSE_STATS_ON
+    localStats->SwitchTimer(SIM_TIMER);
+  #endif
   if (!localPVT->done() && 
       ((eq->currentPtr->timestamp >= 0) || !cancels.IsEmpty())) {
     Step();

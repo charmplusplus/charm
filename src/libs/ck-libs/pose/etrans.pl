@@ -484,7 +484,6 @@ while (@line=split(' ',($thisline=getcodeline($inChandle)))) {
       $outChandle->print("    localStats->TimerStart(SIM_TIMER);\n");
       $outChandle->print("#endif\n");
       $outChandle->print("  PVT *pvt = (PVT *)CkLocalBranch(ThePVT);\n");
-      $outChandle->print("  CmiAssert($messagename->timestamp >= pvt->getGVT());\n");
       $outChandle->print("  Event *e = new Event();\n");
       $outChandle->print("  if ((POSE_endtime < 0) || ($messagename->timestamp <= POSE_endtime)) {\n");
       $outChandle->print("    e->evID = $messagename->evID;\n");

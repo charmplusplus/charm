@@ -122,6 +122,7 @@ class SRbucket { // A bucket for holding a range of SRentries
     SRentry *tmp;
     if (bucket) {
       if (recycCount == NULL) { // actually moves bucket contents to residuals
+	// recyc is actually a pointer to residuals
 	bucketTail->next = recyc; 
 	recyc = bucket;
 	if (!recycTail) recycTail = bucketTail;

@@ -10,6 +10,7 @@ eventQueue::eventQueue()
 {
   Event *e;
 
+  eqCount = 0;
   eqh = new EqHeap();  // create the heap for incoming events
 
   // create the front sentinel node; initialize data fields
@@ -56,6 +57,8 @@ void eventQueue::InsertEvent(Event *e)
 {
   Event *tmp = backPtr->prev;               // start at back of queue
 
+  //eqCount++;
+  //CkPrintf("<%d> ", eqCount);
   // check if new event should go on heap: greater than last timestamp in queue, 
   // or currentPtr is at back (presumably because heap is empty)
   if ((tmp->timestamp <= e->timestamp) && (currentPtr != backPtr))
@@ -118,6 +121,7 @@ void eventQueue::CommitEvents(sim *obj, int ts)
     obj->ResolveCommitFn(commitPtr->fnIdx, commitPtr->msg); // commit fn
     if (commitPtr->commitBfrLen > 0)  { // print buffered I/O
       CkPrintf("%s", commitPtr->commitBfr);
+      free(commitPtr->commitBfr);
       if (commitPtr->commitErr) CmiAbort("Commit ERROR");
     }
     commitPtr = commitPtr->next;
@@ -127,6 +131,8 @@ void eventQueue::CommitEvents(sim *obj, int ts)
     if (commitPtr->prev->cpData)
       delete commitPtr->prev->cpData; 
     delete commitPtr->prev;  // delete committed event
+    //    eqCount--; 
+    //    CkPrintf("<%d> ", eqCount);
   }
   commitPtr->prev = frontPtr;  // reattach front sentinel node
   frontPtr->next = commitPtr;
@@ -183,6 +189,8 @@ void eventQueue::DeleteEvent(Event *ev)
   ev->prev->next = ev->next;
   ev->next->prev = ev->prev;
   delete ev;                // then delete the event
+  //  eqCount--; 
+  //  CkPrintf("<%d> ", eqCount);
 }
 
 // Add id, e and ts as an entry in currentPtr's spawned list

@@ -69,7 +69,7 @@ public:
     //localPool->PutEventMsg(MapSizeToIdx(msgSize), p);
     //}
     //else
-      CkFreeMsg(p);
+    CkFreeMsg(p);
   }
   void setPriority(int prio) {  // sets priority field
     *((int*)CkPriorityPtr(this)) = prio;
