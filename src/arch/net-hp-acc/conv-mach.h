@@ -123,8 +123,8 @@
 #define CMK_STL_USE_DOT_H                                  0
 #define CMK_STL_DONT_USE_DOT_H                             1
 
-#define CMK_BOOL_DEFINED				   0
-#define CMK_BOOL_UNDEFINED				   1
+#define CMK_BOOL_DEFINED				   1
+#define CMK_BOOL_UNDEFINED				   0
 
 #endif
 

@@ -69,7 +69,7 @@ extern void* CkPriorityPtr(void *msg);
  *
  *****************************************************************************/
 
-typedef struct {
+typedef struct _ckargmsg {
   int argc;
   char **argv;
 #ifdef __cplusplus
