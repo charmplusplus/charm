@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.14  1995-11-06 22:59:01  sanjeev
+ * Revision 2.15  1995-11-13 04:04:33  gursoy
+ * made changes related to initial msg synchronization
+ *
+ * Revision 2.14  1995/11/06  22:59:01  sanjeev
  * fixes for statistics collection
  *
  * Revision 2.13  1995/10/27  21:31:25  jyelon
@@ -135,9 +138,9 @@ CsvExtern(int, MainChareLanguage);
 CpvExtern(int, LDB_ELEM_SIZE);
 
 /* Handlers for various message-types */
+CpvExtern(int, HANDLE_INCOMING_MSG_Index);
 CsvExtern(int, BUFFER_INCOMING_MSG_Index);
 CsvExtern(int, MAIN_HANDLE_INCOMING_MSG_Index);
-CsvExtern(int, HANDLE_INCOMING_MSG_Index);
 CsvExtern(int, HANDLE_INIT_MSG_Index);
 CsvExtern(int, CkProcIdx_ForChareMsg);
 CsvExtern(int, CkProcIdx_DynamicBocInitMsg);

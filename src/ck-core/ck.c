@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.18  1995-11-07 17:53:45  sanjeev
+ * Revision 2.19  1995-11-13 04:04:33  gursoy
+ * made changes related to initial msg synchronization
+ *
+ * Revision 2.18  1995/11/07  17:53:45  sanjeev
  * fixed bugs in statistics collection
  *
  * Revision 2.17  1995/11/05  18:26:26  sanjeev
@@ -386,7 +389,7 @@ int destPE;
     SetEnv_msgType(env, NewChareMsg);
     /* This CmiSetHandler is here because load balancer will fail to call */
     /* CkCheck_and_Send on local messages.  Fix this.                     */
-    CmiSetHandler(env, CsvAccess(HANDLE_INCOMING_MSG_Index));
+    CmiSetHandler(env, CpvAccess(HANDLE_INCOMING_MSG_Index));
     CldNewSeedFromLocal(env, LDB_ELEMENT_PTR(env),
 			CkLdbSend,
 			GetEnv_queueing(env),

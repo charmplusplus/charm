@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.34  1995-11-07 17:53:45  sanjeev
+ * Revision 2.35  1995-11-13 04:04:33  gursoy
+ * made changes related to initial msg synchronization
+ *
+ * Revision 2.34  1995/11/07  17:53:45  sanjeev
  * fixed bugs in statistics collection
  *
  * Revision 2.33  1995/11/06  22:59:01  sanjeev
@@ -290,8 +293,6 @@ static void EndInitPhase()
 
   CpvAccess(CkInitPhase) = 0;
 
-  /* set the main handler to the unbuffering one */
-  CsvAccess(HANDLE_INCOMING_MSG_Index) = CsvAccess(MAIN_HANDLE_INCOMING_MSG_Index);
   
   if (CpvAccess(UserStartCharmDoneHandler))
     CpvAccess(UserStartCharmDoneHandler)();
@@ -317,7 +318,7 @@ static void EndInitPhase()
      initialization */
   while (!FIFO_Empty(CpvAccess(CkBuffQueue))  ) {
     FIFO_DeQueue(CpvAccess(CkBuffQueue), &buffMsg);
-    CmiSetHandler(buffMsg, CsvAccess(HANDLE_INCOMING_MSG_Index));
+    CmiSetHandler(buffMsg, CpvAccess(HANDLE_INCOMING_MSG_Index));
     CmiSyncSendAndFree(CmiMyPe(), GetEnv_TotalSize(buffMsg), buffMsg);
   }
 }
@@ -325,6 +326,9 @@ static void EndInitPhase()
 
 static void PropagateInitBarrier()
 {
+
+  if (CpvAccess(CkInitPhase) == 0) return;
+
   if (CpvAccess(CkCountArrived) && CpvAccess(CkInitCount)==0) {
     /* initialization phase is done, set the flag to 0 */
     if (CpvAccess(NumChildrenDoneWithStartCharm)==
@@ -332,10 +336,10 @@ static void PropagateInitBarrier()
       int parent = CmiSpanTreeParent(CmiMyPe());
       void *msg = (void *)CkAllocMsg(0);
       ENVELOPE *henv = ENVELOPE_UPTR(msg);
+      EndInitPhase();
       if (parent == -1) {
 	SetEnv_msgType(henv, InitBarrierPhase2);
 	CkCheck_and_BcastInitNL(henv);
-	EndInitPhase();
       } else {
 	SetEnv_msgType(henv, InitBarrierPhase1);
 	CkCheck_and_Send_Init(parent, henv);
@@ -367,6 +371,12 @@ FUNCTION_PTR donehandler;
         InitializeBocIDMessageCountTable();
         
         CharmRegisterHandlers();
+
+       /* set the main message handler to buffering handler */
+       /* after initialization phase, it will be assigned to regular handler */
+       CpvAccess(HANDLE_INCOMING_MSG_Index)
+             = CsvAccess(BUFFER_INCOMING_MSG_Index);
+
         if (CmiMyRank() == 0) InitializeEPTables();
         CmiNodeBarrier();          
   
@@ -530,7 +540,9 @@ ENVELOPE *env;
       break;
       
     case InitBarrierPhase2:
-      EndInitPhase();
+      /* set the main handler to the unbuffering one */
+      CpvAccess(HANDLE_INCOMING_MSG_Index) = 
+          CsvAccess(MAIN_HANDLE_INCOMING_MSG_Index);
       CmiFree(env);
       break;
       
@@ -799,11 +811,6 @@ InitializeEPTables()
     CmiPrintf("[%d] ERROR: registerMainChare() not called : uninitialized module exists\n",CmiMyPe()) ;
   }
   
-  /* set the main message handler to buffering handler */
-  /* after initialization phase, it will be assigned to regular handler */
-  CsvAccess(HANDLE_INCOMING_MSG_Index)
-    = CsvAccess(BUFFER_INCOMING_MSG_Index);
-
 
 
   

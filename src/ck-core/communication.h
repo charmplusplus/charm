@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.14  1995-09-29 09:51:12  jyelon
+ * Revision 2.15  1995-11-13 04:04:33  gursoy
+ * made changes related to initial msg synchronization
+ *
+ * Revision 2.14  1995/09/29  09:51:12  jyelon
  * Many small corrections.
  *
  * Revision 2.13  1995/09/20  14:24:27  jyelon
@@ -154,7 +157,7 @@
             PACK(env); \
         }\
         CldFillLdb(PE, LDB_ELEMENT_PTR(env)); \
-        CmiSetHandler(env,CsvAccess(HANDLE_INCOMING_MSG_Index)); \
+        CmiSetHandler(env,CpvAccess(HANDLE_INCOMING_MSG_Index)); \
         CmiSyncSendAndFree(PE,CmiSize(env),env); \
     }
 
@@ -170,28 +173,28 @@
 #define CkCheck_and_Broadcast(env)\
     {\
         CldFillLdb(CK_PE_ALL_BUT_ME, LDB_ELEMENT_PTR(env)); PACK(env); \
-        CmiSetHandler(env,CsvAccess(HANDLE_INCOMING_MSG_Index)); \
+        CmiSetHandler(env,CpvAccess(HANDLE_INCOMING_MSG_Index)); \
 	CmiSyncBroadcastAndFree(CmiSize(env),env); \
     }
 
 #define CkCheck_and_BroadcastNoFree(env)\
     { \
         CldFillLdb(CK_PE_ALL_BUT_ME, LDB_ELEMENT_PTR(env)); PACK(env); \
-        CmiSetHandler(env,CsvAccess(HANDLE_INCOMING_MSG_Index)); \
+        CmiSetHandler(env,CpvAccess(HANDLE_INCOMING_MSG_Index)); \
 	CmiSyncBroadcast(CmiSize(env),env); UNPACK(env); \
     }
 
 #define CkCheck_and_BroadcastNoFreeNoLdb(env)\
     { \
         PACK(env); \
-        CmiSetHandler(env,CsvAccess(HANDLE_INCOMING_MSG_Index)); \
+        CmiSetHandler(env,CpvAccess(HANDLE_INCOMING_MSG_Index)); \
 	CmiSyncBroadcast(CmiSize(env),env); UNPACK(env);  \
     }
 
 #define CkCheck_and_BroadcastAll(env)\
     { \
         CldFillLdb(CK_PE_ALL, LDB_ELEMENT_PTR(env)); PACK(env); \
-        CmiSetHandler(env,CsvAccess(HANDLE_INCOMING_MSG_Index)); \
+        CmiSetHandler(env,CpvAccess(HANDLE_INCOMING_MSG_Index)); \
 	CmiSyncBroadcastAllAndFree(CmiSize(env),env);\
     }
 
