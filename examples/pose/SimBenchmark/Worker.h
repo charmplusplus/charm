@@ -32,8 +32,7 @@
 
 class WorkerData {
  public:
-  int numObjs, numMsgs, msgSize, locality, density, grainSize, 
-    msgsPerWork;
+  int numObjs, numMsgs, msgSize, locality, density, grainSize;
   double granularity;
   WorkerData& operator=(const WorkerData& obj) {
     int i;
@@ -45,7 +44,6 @@ class WorkerData {
     grainSize = obj.grainSize;
     granularity = obj.granularity;
     density = obj.density;
-    msgsPerWork = obj.msgsPerWork;
     return *this;
   }
 };
@@ -53,9 +51,11 @@ class WorkerData {
 class SmallWorkMsg {
  public:
   int data[SM_MSG_SZ];
+  int fromPE;
   SmallWorkMsg& operator=(const SmallWorkMsg& obj) {
     eventMsg::operator=(obj);
     for (int i=0; i<SM_MSG_SZ; i++) data[i] = obj.data[i];
+    fromPE = obj.fromPE;
     return *this;
   }
 };
@@ -82,8 +82,9 @@ class LargeWorkMsg {
 
 
 class worker {
-  int numObjs, numMsgs, msgSize, locality, grainSize, density, msgsPerWork,
-    sent, totalObjs, elapseTime, elapseRem, neighbor;
+  int numObjs, numMsgs, msgSize, locality, grainSize, density, sent, totalObjs,
+    localMsgs, remoteMsgs, localNbr, remoteNbr, localCount, remoteCount,
+    fromLocal, fromRemote, received;
   double granularity, localDensity;
   int data[100];
  public:
@@ -94,8 +95,9 @@ class worker {
   void pup(PUP::er &p) { 
     chpt<state_worker>::pup(p); 
     p(numObjs); p(numMsgs); p(msgSize); p(density); p(localDensity);
-    p(locality); p(grainSize); p(granularity); p(msgsPerWork); p(sent);
-    p(totalObjs); p(elapseTime); p(elapseRem); p(neighbor);
+    p(locality); p(grainSize); p(granularity); p(sent); p(totalObjs); 
+    p(localMsgs); p(remoteMsgs); p(localNbr); p(remoteNbr); p(received);
+    p(localCount); p(remoteCount); p(fromLocal); p(fromRemote);
     p(data, 100);
   }
   void dump() {
@@ -103,6 +105,7 @@ class worker {
     CkPrintf("[worker: ");
   }
   void doWork();
+  void terminus();
 
   // Event methods
   void workSmall(SmallWorkMsg *m);
