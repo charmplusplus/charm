@@ -556,8 +556,18 @@ void PUP::toTextFile::comment(const char *message)
 }
 
 void PUP::fromTextFile::parseError(const char *what) {
-  fprintf(stderr,"Parse error during pup from text file: %s\n",what);
-  CmiAbort("Parse error during pup from text file!");
+  // find line number by counting how many returns
+  long cur = ftell(f);
+  int lineno=0;
+  rewind(f);
+  while (!feof(f)) {
+     char c;
+     fscanf(f,"%c",&c);
+     if (c=='\n') lineno++;
+     if (ftell(f) > cur) break;
+  }
+  fprintf(stderr,"Parse error during pup from text file: %s at line: %d\n",what, lineno);
+  CmiAbort("Parse error during pup from text file!\n");
 }
 int PUP::fromTextFile::readInt(const char *fmt) {
   int ret=0;
