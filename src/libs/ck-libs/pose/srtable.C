@@ -100,35 +100,6 @@ void SRtable::FileResiduals()
   //sanitize();
 }
 
-/// Find earliest timestamp in table and associated send/recv counts
-void SRtable::FindEarliest(int *eTS, int *eS, int *eR)
-{
-  //sanitize();
-  // search in arrays for earliest timestamp
-  for (int i=0; i<GVT_WINDOW; i++)
-    if ((sends[i] > 0) || (recvs[i] > 0)) {
-      *eTS = offset+i;  *eS = sends[i];  *eR = recvs[i];
-      return;
-    }
-  if (residuals) {
-    *eTS = residuals->timestamp();
-    *eS = residuals->sends();
-    *eR = residuals->recvs();
-  }
-}
-
-/// Find earliest timestamp difference between this and a previous table
-void SRtable::FindEarliestDiff(SRtable *cp, int *eTS)
-{
-  //sanitize();
-  for (int i=0; i<GVT_WINDOW; i++)
-    if ((sends[i] != cp->sends[i]) || (recvs[i] != cp->recvs[i])) {
-      *eTS = offset+i;
-      return;
-    }
-  if (residuals) *eTS = residuals->timestamp();
-}
-
 /// Copy table to cp
 void SRtable::CopyTable(SRtable *cp)
 {

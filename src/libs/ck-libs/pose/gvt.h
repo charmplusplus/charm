@@ -28,12 +28,15 @@ public:
   int optPVT;
   /// PVT of local conservative objects
   int conPVT;
-  /// Earliest send/recv timestamp on this processor
-  /** Used to send last earliest timestamp from GVT to next GVT invocation */
+  /// # sends on PVT indexed by timestamp
+  int sends[GVT_WINDOW];
+  /// # recvs on PVT indexed by timestamp
+  int recvs[GVT_WINDOW];
+  /// Earliest send/recv timestamp in previous GVT invocation
   int earlyTS;
-  /// Number of sends at earlyTS
+  /// Number of sends at lastEarliest
   int earlySends;
-  /// Number of receives at earlyTS
+  /// Number of receives at lastEarliest
   int earlyRecvs;
   /// Inactive status (GVT only)
   int inactive;
@@ -73,8 +76,6 @@ class PVT : public Group {
   int waitingForGVT;                 
   /// Table to store send/recv timestamps
   SRtable *SendsAndRecvs;            
-  /// Copy of SendsAndRecvs table for difference comparisons
-  SRtable *LastSendsAndRecvs;            
   /// List of objects registered with this PVT branch
   pvtObjects objs;                   
  public:

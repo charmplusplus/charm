@@ -20,7 +20,6 @@ PVT::PVT()
   optPVT = conPVT = estGVT = -1;
   waitingForGVT = simdone = 0;
   SendsAndRecvs = new SRtable();
-  LastSendsAndRecvs = new SRtable();
 #ifdef POSE_STATS_ON
   localStats->TimerStop();
 #endif
@@ -68,12 +67,13 @@ void PVT::startPhase()
 
   // pack PVT data
   umsg = new UpdateMsg;
-  umsg->earlyTS = -1;
-  //umsg->earlySends = umsg->earlyRecvs = 0;
-  SendsAndRecvs->FindEarliestDiff(LastSendsAndRecvs, &(umsg->earlyTS));
-  //  SendsAndRecvs->FindEarliest(&(umsg->earlyTS), &(umsg->earlySends), 
-  //			      &(umsg->earlyRecvs)); 
-  CmiAssert((umsg->earlyTS >= estGVT) || (umsg->earlyTS == -1));
+  for (i=0; i<GVT_WINDOW; i++) {
+    umsg->sends[i] = SendsAndRecvs->sends[i];
+    umsg->recvs[i] = SendsAndRecvs->recvs[i];
+  }
+  if (SendsAndRecvs->residuals)
+    umsg->earlyTS = SendsAndRecvs->residuals->timestamp();
+  else umsg->earlyTS = -1;
   umsg->optPVT = optPVT;
   umsg->conPVT = conPVT;
 
@@ -85,7 +85,6 @@ void PVT::startPhase()
     gvtTurn = (gvtTurn + 1) % CkNumPes();  // calculate next GVT location
   }
   waitingForGVT = 1;
-  SendsAndRecvs->CopyTable(LastSendsAndRecvs);
   objs.SetIdle(); // Set objects to idle
 #ifdef POSE_STATS_ON
   localStats->TimerStop();
@@ -137,7 +136,10 @@ void PVT::objUpdate(int pvtIdx, int safeTime, int timestamp, int sr)
 {
   int index = (pvtIdx-CkMyPe())/1000;
   CmiAssert((timestamp >= estGVT) || (timestamp == -1) || (estGVT == -1));
-  CmiAssert((safeTime >= estGVT) || (safeTime == -1) || (estGVT == -1));
+  if (!((safeTime >= estGVT) || (safeTime == -1) || (estGVT == -1))) {
+    CkPrintf("Oh NO!!! st=%d gvt=%d\n", safeTime, estGVT);
+    abort();
+  }
   // minimize the non-idle OVT
   if ((safeTime >= 0) && 
       ((objs.objs[index].getOVT() > safeTime) || 
@@ -201,35 +203,30 @@ void GVT::computeGVT(UpdateMsg *m)
   CProxy_PVT p(ThePVT);
   CProxy_GVT g(TheGVT);
   GVTMsg *gmsg = new GVTMsg;
-  int lastGVT = 0;
+  int lastGVT = 0, firstEarly, i;
   static int optGVT = -1, conGVT = -1, done=0;
-  static int earliestMsg=-1, earlySends=0, earlyRecvs=0;
+  static int earliestMsg=-1, earlySends=0, earlyRecvs=0, earlyResidual=-1;
+  static int sends[GVT_WINDOW], recvs[GVT_WINDOW];
 
-  CmiAssert((m->earlyTS >= estGVT) || (m->earlyTS < 0));
-  CmiAssert((m->optPVT >= estGVT) || (m->optPVT < 0));
-  CmiAssert((m->conPVT >= estGVT) || (m->conPVT < 0));
+  
+  CmiAssert((m->optPVT >= estGVT) || (m->optPVT < 0) || (estGVT < 0));
+  CmiAssert((m->conPVT >= estGVT) || (m->conPVT < 0) || (estGVT < 0));
+  if (done == 0) for (i=0; i<GVT_WINDOW; i++) sends[i] = recvs[i] = 0;
 
   // see if message provides new min optGVT or conGVT
   if ((optGVT < 0) || ((m->optPVT >= 0) && (m->optPVT < optGVT)))
     optGVT = m->optPVT;
   if ((conGVT < 0) || ((m->conPVT >= 0) && (m->conPVT < conGVT)))
     conGVT = m->conPVT;
-  // see if message provides new min earliestMsg
-  //CkPrintf("m:earlyMsg=%d early#S=%d early#R=%d\n", m->earlyTS, m->earlySends, m->earlyRecvs);
-  if (((m->earlyTS < earliestMsg) && (m->earlyTS >= 0)) 
-      || (earliestMsg == -1)) {
-    earliestMsg = m->earlyTS;
-    //earlySends = m->earlySends;
-    //earlyRecvs = m->earlyRecvs;
+  // add send/recv info to arrays
+  for (i=0; i<GVT_WINDOW; i++) {
+    sends[i] += m->sends[i];
+    recvs[i] += m->recvs[i];
   }
-  /*
-  else if (m->earlyTS == earliestMsg) {
-    earlySends += m->earlySends;
-    earlyRecvs += m->earlyRecvs;
-  }
-  */
+  if (((m->earlyTS < earlyResidual) && (m->earlyTS != -1)) 
+      || (earlyResidual == -1))
+    earlyResidual = m->earlyTS;
   CkFreeMsg(m);
-  //CkPrintf("c:earlyMsg=%d early#S=%d early#R=%d\n", earliestMsg, earlySends, earlyRecvs);
   done++;
 
   if (done == CkNumPes()) { // all PVT reports are in
@@ -238,6 +235,7 @@ void GVT::computeGVT(UpdateMsg *m)
 #endif
     done = 0;
     lastGVT = estGVT; // store previous estimate
+    if (lastGVT < 0) lastGVT = 0;
     estGVT = -1;
     
     // derive GVT estimate from min optimistic & conservative GVTs
@@ -245,29 +243,21 @@ void GVT::computeGVT(UpdateMsg *m)
     if ((conGVT >= 0) && (estGVT >= 0) && (conGVT < estGVT))  estGVT = conGVT;
 
     // Check if send/recv activity provides lower possible estimate
-    /*
-    if (earliestMsg >= 0) {
-      if ((earliestMsg == lastEarliest) && (earlySends == lastSends) &&
-	  (earlyRecvs == lastRecvs) && (earlySends == earlyRecvs)) {
-	// no change to earliest S/R info from last GVT estimation
-	lastEarliest = earliestMsg + 1; 
-        lastSends = lastRecvs = 0;
+    i=0;
+    firstEarly = -1;
+    while (i < GVT_WINDOW) {
+      if ((firstEarly == -1) && ((sends[i] != 0) || (recvs[i] != 0))) 
+	firstEarly = i + lastGVT;
+      if (sends[i] != recvs[i]) {
+	earliestMsg = i + lastGVT;
+	earlySends = sends[i];
+	earlyRecvs = recvs[i];
+	break;
       }
-      else {
-	lastEarliest = earliestMsg; 
-        lastSends = earlySends; lastRecvs = earlyRecvs;
-      }
+      i++;
     }
-    else {
-      lastEarliest = earliestMsg; 
-      lastSends = earlySends; lastRecvs = earlyRecvs;
-    }
-    if (((lastEarliest < estGVT) && (lastEarliest >= 0)) || (estGVT < 0))
-      estGVT = lastEarliest;
-    */
-    
-    if ((earliestMsg >= 0) && ((earliestMsg < estGVT) || (estGVT < 0)))
-      estGVT = earliestMsg;
+    if (earliestMsg == -1) earliestMsg = earlyResidual;
+    if ((earliestMsg < estGVT) && (earliestMsg != -1)) estGVT = earliestMsg;
 
     // check for inactivity
     if (((estGVT == lastGVT) || (estGVT < 0)) && (earliestMsg == -1)) {
@@ -282,9 +272,10 @@ void GVT::computeGVT(UpdateMsg *m)
     else inactive = 0;
 
     // check the estimate
+    //CkPrintf("opt=%d con=%d lastGVT=%d early=%d first=%d resid=%d et=%d\n", 
+    //optGVT, conGVT, lastGVT, earliestMsg, firstEarly, earlyResidual,
+    //POSE_endtime);
     CmiAssert(estGVT >= lastGVT); 
-    //CkPrintf("opt=%d con=%d lastGVT=%d early=%d et=%d\n", optGVT, conGVT, 
-    //	     lastGVT, earliestMsg, POSE_endtime);
     //CkPrintf("[%d] New GVT = %d\n", CkMyPe(), estGVT);
 
     // check for termination conditions
@@ -298,7 +289,7 @@ void GVT::computeGVT(UpdateMsg *m)
       term = 1;
     }
 
-    // report the new GVT estimate to all PVT branches
+    // report the last new GVT estimate to all PVT branches
     gmsg->estGVT = estGVT;
     gmsg->done = term;
     if (term) {
@@ -342,7 +333,7 @@ void GVT::computeGVT(UpdateMsg *m)
     }
 
     // reset static data
-    optGVT = conGVT = earliestMsg = -1;
+    optGVT = conGVT = earliestMsg = earlyResidual = -1;
     //earlySends = earlyRecvs = 0;
   }
 #ifdef POSE_STATS_ON
