@@ -26,7 +26,7 @@ public:
 	void *_userData = 0, CmiBool _migratable=CmiTrue) {
     parentDB = _parentDB;
     parentOM = _omhandle;
-    myid = _id;
+    myhandle.id = _id;
     userData = _userData;
     migratable = _migratable;
     registered = CmiFalse;
@@ -35,9 +35,9 @@ public:
   ~LBObj() { };
 
   void DepositHandle(const LDObjHandle &_h) {
+    CkAssert(_h == myhandle.id);
     myhandle = _h;
     data.handle = myhandle;
-    CkAssert(myid == myhandle.id);
     data.omHandle = _h.omhandle;
     data.migratable = migratable;
     data.cpuTime = 0.;
@@ -58,12 +58,11 @@ private:
   LBDB* parentDB;
   LDOMHandle parentOM;
   LDObjHandle myhandle;
-  LDObjid myid;
-  void *userData;
-  CmiBool migratable;
   LDObjData data;
+  void *userData;
   double startWTime;
   double startCTime;
+  CmiBool migratable;
   CmiBool registered;
 };
 
