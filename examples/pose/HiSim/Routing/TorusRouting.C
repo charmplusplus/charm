@@ -70,7 +70,7 @@ int TorusRouting::selectRoute(int c,int d,int numP,Topology *top,Packet *p,map<i
 			if(bubble == -1) {
 				nextPort = rand[p->hdr.routeInfo.dst % 3];  // this is a dummy case
 			} else
-				nextPort = bubble;  // return highest available buffer among bubble vc's
+				nextPort = bubble/config.switchVc;  // return highest available buffer among bubble vc's
 		}
 		CkAssert(nextPort < 6);	
 	} else {
@@ -84,6 +84,7 @@ int TorusRouting::selectRoute(int c,int d,int numP,Topology *top,Packet *p,map<i
         if(zdiff2 < (int)abs(zdiff)) { nextPort = (nextPort+3)%6; }
 	}   // Assume that self node won't be called
 	}
+	CkAssert(nextPort < 6);	
         return nextPort;
 }
 
