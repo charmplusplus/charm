@@ -18,7 +18,6 @@
 
 #include "Set.h"
 #include "elements.h"
-#include <iostream.h>
 
 
 Set::Set() 
@@ -94,11 +93,11 @@ InfoRecord * Set::iterator(Iterator *iter)
 
 InfoRecord * Set::next(Iterator *iter)
 {
-  //  cout << "set::next: " << iter->next << "\n";
+  //  ckout << "set::next: " << iter->next << "\n";
   if (!iter->next)
     { return 0;
     }
-  //  cout << "set::next: iter->next->info=" << iter->next->info << "\n";
+  //  ckout << "set::next: iter->next->info=" << iter->next->info << "\n";
   InfoRecord *temp = iter->next->info;
   iter->next = iter->next->next;
   return temp;
