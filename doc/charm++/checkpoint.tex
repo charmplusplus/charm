@@ -42,7 +42,14 @@ and checkpoint the matrix with final results of each timestep.
 Group and nodegroup objects(Section~\ref{sec:group}) are normally not 
 meant to be migrated. In order to checkpoint them, however, the user 
 wants to write PUP routines for the groups and declare them as 
-{\tt [migratable]} in the .ci file.
+{\tt [migratable]} in the .ci file. Some programs use {\it mainchares}
+to hold key control data like global object counts, and thus needs
+mainchares be checkpointed too. To do this, the programmer should write
+a PUP routine for the mainchare and declare them as {\tt [migratable]} 
+in the .ci file, just as in the case of Group and Nodegroup. In addition,
+the programmer also needs to put the proxy to the mainchare (usually 
+noted as mainproxy) as a read-only data in the code, and make sure 
+processor 0, which holds the mainchare, initiates the checkpoint.
 
 After {\tt CkStartCheckpoint} is executed, a directory of the designated
 name is created and a collection of checkpoint files are written into it. 
@@ -67,6 +74,14 @@ function, the function pointer might be lost and the user needs to register
 it again. A better alternative is to always use entry method of a chare
 object. Since all the entry methods are registered inside \charmpp{} system,
 in restart phase, the reduction client will be automatically restored.
+
+After a failure, the system may consist less number of processors. After
+a problem fixed, some processors may become available again. Therefore,
+the user may need to flexibility to restart on different number of processors
+than in the checkpointing phase. This is allowable by giving different 
+{\tt +pN} option at runtime. One thing to note is that the new load 
+distribution might differ from the previous one at checkpoint time,
+so running a load balancing (See Section~\ref{loadbalancing}) is suggested. 
 
 \subsubsection{Choosing What to Save}
 In your programs, you may use chare groups for different types of purposes. 
