@@ -146,10 +146,10 @@ void MsgPacker::deliver(CombinedMessage *cmb_msg){
 
             env->setTotalsize(sizeof(envelope) + size);
 
-            if(a_elem)
-                CkDeliverMessageFree(ep, data, a_elem);                     
-            else
-                ap.ckSend((CkArrayMessage *)data, ep);
+            //if(a_elem)
+            //  CkDeliverMessageFree(ep, data, a_elem);                     
+            //else
+            ap.ckSend((CkArrayMessage *)data, ep);
             
             delete[] senv.data;
         }        
