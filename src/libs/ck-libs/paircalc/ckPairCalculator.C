@@ -20,6 +20,11 @@ PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int
   this->N = -1;
   numRecd = 0;
   numExpected = grainSize;
+  kUnits=5;
+  kLeftOffset= new int[numExpected];
+  kRightOffset= new int[numExpected];
+  kLeftCount=0;
+  kRightCount=0;
   
   inDataLeft = new complex*[numExpected];
   for (int i = 0; i < numExpected; i++)
@@ -54,6 +59,9 @@ PairCalculator::pup(PUP::er &p)
   p|blkSize;
   p|op1;
   p|op2;
+  p|kRightCount;
+  p|kLeftCount;
+  p|kUnits;
   if (p.isUnpacking()) {
     outData = new double[grainSize * grainSize];
     inDataLeft = new complex*[numExpected];
@@ -64,6 +72,9 @@ PairCalculator::pup(PUP::er &p)
       for (int i = 0; i < numExpected; i++)
 	inDataLeft[i] = new complex[N];
     }
+    kLeftOffset= new int[numExpected];
+    kRightOffset= new int[numExpected];
+
   }
   for (int i = 0; i < numExpected; i++)
     p(inDataLeft[i], N);
@@ -71,6 +82,9 @@ PairCalculator::pup(PUP::er &p)
     for (int i = 0; i < numExpected; i++)
       p(inDataRight[i], N);
   }
+  p(kRightOffset, numExpected);
+  p(kLeftOffset, numExpected);
+
 }
 
 PairCalculator::~PairCalculator()
@@ -86,6 +100,8 @@ PairCalculator::~PairCalculator()
   }  
   if(!newData)
     delete [] newData;
+  delete [] kRightOffset;
+  delete [] kLeftOffset;
 }
 
 void
@@ -99,13 +115,21 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
   if (fromRow) {
     offset = sender - thisIndex.x;
     inData = inDataLeft;
+    kLeftOffset[kLeftCount++]=offset;
   }
   else {
     offset = sender - thisIndex.y;
     inData = inDataRight;
+    kRightOffset[kRightCount++]=offset;
   }
   if(symmetric && thisIndex.x == thisIndex.y){
     inData = inDataLeft;
+        if(!fromRow)
+      { //switch
+		kLeftOffset[kLeftCount++]=offset;
+		kRightCount--;
+      }
+
   }
 
   N = size;                                                             
@@ -121,29 +145,76 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
 
   // Because the vectors are not guaranteed contiguous, record each
   // offset so we can iterate through them
-  /*
-  if(kLefttCount > kUnits && ((kRightCount > kUnits) || (symmetric && thisIndex.x == thisIndex.y)))
+
+  if((kLeftCount >= kUnits 
+      && ((kRightCount >= kUnits) 
+	  || (symmetric && thisIndex.x == thisIndex.y) )) 
+     || (numRecd == numExpected * 2 || (symmetric && thisIndex.x==thisIndex.y 
+					&& numRecd==numExpected)))
     {
 
       // compute
-
       // count down kUnits from leftCount starting at kUnit'th element
-      for(int i=kUnits;i>0;i--)
-	{
+      int i, j, idxOffset;
+      int iunits=(kLeftCount < kUnits)? kLeftCount : kUnits;
+      int junits=(kRightCount < kUnits)? kRightCount : kUnits;
+      if (numRecd == numExpected * 2 || (symmetric && thisIndex.x==thisIndex.y && numRecd==numExpected))
+	{ //finish 
+	  iunits=kLeftCount;
+	  junits=kRightCount;
 	}
-
-      kLeftCount-=kUnits;
-      memcpy(kLeftOffset,kLeftOffset+kUnits,kLeftCount);
+      if(symmetric && thisIndex.x == thisIndex.y) {
+	for(int kth=0;kth<iunits;kth++)
+	  {
+	    i=kLeftOffset[kth];
+	    for(int jkth=0;jkth<iunits;jkth++)
+	      {
+		j=kLeftOffset[jkth];
+		outData[i * grainSize + j] = compute_entry(size, inDataLeft[i],
+							   inDataLeft[j], op1);        
+	      }
+	  }
+      }
+      else {                                                        
+	// compute a square region of the matrix. The correct part of the
+	// region will be used by the reduction.
+	for(int kth=0;kth<iunits;kth++)
+	  {
+	    i=kLeftOffset[kth];
+	    for(int jkth=0;jkth<junits;jkth++)
+	      {
+		j=kRightOffset[jkth];
+		outData[i * grainSize + j] = compute_entry(size, inDataLeft[i],
+								 inDataRight[j],op1);        
+	      }
+	  }
+      }
+      // remove used vectors
+      kLeftCount-=iunits;
+      if(kLeftCount>0)
+	memcpy(kLeftOffset,kLeftOffset+iunits,kLeftCount);
+      else
+	kLeftCount=0;
       if(!symmetric || thisIndex.x != thisIndex.y)
 	{
-          kRightCount-=kUnits;
-	  memcpy(kRighttOffset,kRightOffset+kUnits,kRightCount);
+	  kRightCount-=junits;
+	  if(kRightCount>0)
+	    memcpy(kRightOffset,kRightOffset+junits,kRightCount);
+	  else
+	    kRightCount=0;
 	}
     }
-
-  */
   if (numRecd == numExpected * 2 || (symmetric && thisIndex.x==thisIndex.y && numRecd==numExpected)) {
-  
+    numRecd = 0;
+    kLeftCount=0;
+    kRightCount=0;
+    r.add((int)thisIndex.y, (int)thisIndex.x, (int)(thisIndex.y+grainSize-1), (int)(thisIndex.x+grainSize-1), (CkTwoDoubles*)outData);
+    r.contribute(this, sparse_sum_double);
+  }
+
+  /*
+  if (numRecd == numExpected * 2 || (symmetric && thisIndex.x==thisIndex.y && numRecd==numExpected)) {
+    //    kLeftCount=kRightCount=0;  
 #ifdef _DEBUG_
     CkPrintf("     pairCalc[%d %d %d %d] got expected %d\n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z,  numExpected);
 #endif
@@ -196,6 +267,7 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
    r.add((int)thisIndex.y, (int)thisIndex.x, (int)(thisIndex.y+grainSize-1), (int)(thisIndex.x+grainSize-1), (CkTwoDoubles*)outData);
     r.contribute(this, sparse_sum_double);
   }
+  */
 }
 
 void
@@ -287,7 +359,6 @@ PairCalculator::acceptResult(int size, double *matrix, int rowNum, CkCallback cb
 	  }
       }
   }
-
   /* revise this to partition the data into S/M objects 
    * add new message and entry method for sumPartial result
    * to avoid message copying.
@@ -319,28 +390,23 @@ PairCalculator::acceptResult(int size, double *matrix, int rowNum, CkCallback cb
   if(!symmetric){    // Not right in value given!!!
     for(int segment=0;segment < segments;segment++)
       {  
-
 	CkArrayIndexIndex4D idx(thisIndex.w, segment*grainSize, thisIndex.y, thisIndex.z);
-
-        //CkPrintf("[%d %d %d %d]: sending N %d segment %d of %d segments \n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z, N, segment,segments);
-
-        //	partialResultMsg *msg = new (N*blocksize, 8*sizeof(int) )partialResultMsg(N*blocksize, mynewData+segment*N*blocksize, priority, cb);
-        
-	//	partialResultMsg *msg = new (N*blocksize, 0)partialResultMsg(N*blocksize, mynewData+segment*N*blocksize, priority, cb);
-
-	partialResultMsg *msg = new (N*blocksize, 0)partialResultMsg;
-	msg->N=N*blocksize;
-	memcpy(msg->result, mynewData+segment*N*blocksize, N*blocksize*sizeof(complex));
-	msg->priority=priority;
-	msg->cb=cb;
-	//	*((int*)CkPriorityPtr(msg)) = priority;
-	//	CkSetQueueing(msg, CK_QUEUEING_IFIFO); 
+	partialResultMsg *msg = new (N*blocksize, 8*sizeof(int) )partialResultMsg(N*blocksize, mynewData+segment*N*blocksize, priority, cb);
+	*((int*)CkPriorityPtr(msg)) = priority;
+	CkSetQueueing(msg, CK_QUEUEING_IFIFO); 
 	thisProxy(idx).sumPartialResult(msg);  
       }
   }
   else 
   {
-
+    CkArrayIndexIndex4D idx(thisIndex.w, 0, thisIndex.y, thisIndex.z);
+    priorSumMsg *msg = new (N*blocksize, 8*sizeof(int) )priorSumMsg(N*grainSize, mynewData, priority, cb);
+    thisProxy(idx).sumPartialResult(msg);
+    if (rowNum != thisIndex.x){
+      CkArrayIndexIndex4D idx(thisIndex.w, 0, thisIndex.x, thisIndex.z);
+      priorSumMsg *pmsg = new (N*blocksize, 8*sizeof(int) )priorSumMsg(N*grainSize, othernewData, priority, cb);
+      thisProxy(idx).sumPartialResult(pmsg);
+    }                                                                             
 /*    for(int segment=0;segment < segments;segment++){
 
       //      CkPrintf("[%d %d %d %d]: sending N %d segment %d of %d segments \n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z, N, segment,segments);
@@ -381,33 +447,15 @@ PairCalculator::acceptResult(int size, double *matrix, int rowNum, CkCallback cb
       }
     }
 */
+/*
     CkArrayIndexIndex4D idx(thisIndex.w, 0, thisIndex.y, thisIndex.z);
     thisProxy(idx).sumPartialResult(N*grainSize, mynewData, thisIndex.z, cb);
     if (rowNum != thisIndex.x){
       CkArrayIndexIndex4D idx(thisIndex.w, 0, thisIndex.x, thisIndex.z);
       thisProxy(idx).sumPartialResult(N*grainSize, othernewData, thisIndex.z, cb);
-    }                                                                             
+
+    }                                                                             */
   }
-
-
-
-  /*
-  else {
-    int priority=0xFFFFFFFF;
-    priorSumMsg *msg = new (N*grainSize, 8*sizeof(int) )priorSumMsg(priority,N*grainSize, cb, mynewData);
-    *((int*)CkPriorityPtr(msg)) = priority;
-    CkSetQueueing(msg, CK_QUEUEING_IFIFO); 
-    CkArrayIndexIndex4D idx(thisIndex.w, 0, thisIndex.y, thisIndex.z);
-    thisProxy(idx).sumPartialResult(msg);  
-    if (rowNum != thisIndex.x){
-      priorSumMsg *msg = new (N*grainSize, 8*sizeof(int) )priorSumMsg(priority,N*grainSize, cb, mynewData);
-      *((int*)CkPriorityPtr(msg)) = priority;
-      CkSetQueueing(msg, CK_QUEUEING_IFIFO); 
-      CkArrayIndexIndex4D idx(thisIndex.w, 0, thisIndex.x, thisIndex.z);
-      thisProxy(idx).sumPartialResult(msg);  
-    }
-  }
-  */
   delete [] mynewData;
   if(symmetric && thisIndex.x != thisIndex.y){
       delete [] othernewData;

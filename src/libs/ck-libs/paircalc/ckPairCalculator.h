@@ -33,28 +33,26 @@ class partialResultMsg : public CMessage_partialResultMsg {
   CkCallback cb;
 
   friend class CMessage_partialResultMsg;
-  /*
-    partialResultMsg() {} ;
+  
   partialResultMsg(unsigned int iN,   complex *iresult, int ipriority, CkCallback icb) : N(iN),  priority(ipriority), cb(icb)
-/    {
+    {
       memcpy(this->result,iresult,N*sizeof(complex));
     }
-  */
+
 };
 
 class priorSumMsg : public CMessage_priorSumMsg {
  public:
-  int priority;
   int N;
-  CkCallback cb;
   complex *result;
+  int priority;
+  CkCallback cb;
+
   friend class CMessage_priorSumMsg;
-  /*
-  priorSumMsg(int ipriority,unsigned int iN,   CkCallback icb,complex *iresult) : priority(ipriority), N(iN), cb(icb)
+  priorSumMsg(unsigned int iN,  complex *iresult,int ipriority,CkCallback icb) :  N(iN), priority(ipriority), cb(icb)
     {
       memcpy(this->result,iresult,N*sizeof(complex));
     }
-  */
 };
 
 class PairCalculator: public CBase_PairCalculator {
@@ -93,6 +91,9 @@ class PairCalculator: public CBase_PairCalculator {
   }
  private:
   int numRecd, numExpected, grainSize, S, blkSize, N;
+  int kRightCount, kLeftCount, kUnits;
+  int *kLeftOffset;
+  int *kRightOffset;
   int op1, op2;
   FuncType fn1, fn2;
   complex **inDataLeft, **inDataRight;
