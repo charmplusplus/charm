@@ -2,6 +2,7 @@
 #define _REFINELB_H_
 
 #include "CentralLB.h"
+#include "Refiner.h"
 #include "RefineLB.decl.h"
 
 class minheap;
@@ -32,6 +33,7 @@ private:
   CLBMigrateMsg* Strategy(CentralLB::LDStats* stats, int count);
 
 protected:
+/*
   void create(LDStats* stats, int count);
   void assign(computeInfo *c, int p);
   void assign(computeInfo *c, processorInfo *p);
@@ -39,6 +41,7 @@ protected:
   void computeAverage();
   double computeMax();
   int refine();
+*/
 };
 
 #endif /* _REFINELB_H_ */

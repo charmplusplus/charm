@@ -24,6 +24,7 @@ CmiBool RefineLB::QueryBalanceNow(int _step)
   return CmiTrue;
 }
 
+/*
 void RefineLB::create(CentralLB::LDStats* stats, int count)
 {
   int i,j;
@@ -61,7 +62,9 @@ void RefineLB::create(CentralLB::LDStats* stats, int count)
 //  for (i=0; i < numComputes; i++)
 //      processors[computes[i].oldProcessor].computeLoad += computes[i].load;
 }
+*/
 
+/*
 void RefineLB::assign(computeInfo *c, int processor)
 {
    assign(c, &(processors[processor]));
@@ -107,7 +110,9 @@ double RefineLB::computeMax()
    }
    return max;
 }
+*/
 
+/*
 int RefineLB::refine()
 {
    int finish = 1;
@@ -196,11 +201,15 @@ int RefineLB::refine()
    }  
    return finish;
 }
+*/
 
 CLBMigrateMsg* RefineLB::Strategy(CentralLB::LDStats* stats, int count)
 {
+  int obj, pe;
+
   //  CkPrintf("[%d] RefineLB strategy\n",CkMyPe());
 
+/*
   create(stats, count);
 
   int i;
@@ -212,9 +221,24 @@ CLBMigrateMsg* RefineLB::Strategy(CentralLB::LDStats* stats, int count)
   overLoad = 1.02;
 
   refine();
+*/
+
+  // get original object mapping
+  int** from_procs = Refiner::AllocProcs(count, stats);
+  for(pe=0;pe < count; pe++) 
+    for(obj=0;obj<stats[pe].n_objs;obj++) 
+	from_procs[pe][obj] = pe;
+
+  // Get a new buffer to refine into
+  int** to_procs = Refiner::AllocProcs(count,stats);
+
+  Refiner refiner(1.01);  // overload tolerance=1.05
+
+  refiner.Refine(count,stats,from_procs,to_procs);
 
   CkVector migrateInfo;
 
+/*
   for (int pe=0; pe < P; pe++) {
     Iterator nextCompute;
     nextCompute.id = 0;
@@ -234,16 +258,36 @@ CLBMigrateMsg* RefineLB::Strategy(CentralLB::LDStats* stats, int count)
 	             next((Iterator *)&nextCompute);
     }
   }
+*/
+
+  // Save output
+  for(pe=0;pe < count; pe++) {
+    for(obj=0;obj<stats[pe].n_objs;obj++) {
+      if (to_procs[pe][obj] != pe) {
+	//	CkPrintf("[%d] Obj %d migrating from %d to %d\n",
+	//		 CkMyPe(),obj,pe,to_procs[pe][obj]);
+	MigrateInfo *migrateMe = new MigrateInfo;
+	migrateMe->obj = stats[pe].objData[obj].handle;
+	migrateMe->from_pe = pe;
+	migrateMe->to_pe = to_procs[pe][obj];
+	migrateInfo.push_back((void*)migrateMe);
+      }
+    }
+  }
 
   int migrate_count=migrateInfo.size();
   CLBMigrateMsg* msg = new(&migrate_count,1) CLBMigrateMsg;
   msg->n_moves = migrate_count;
-  for(i=0; i < migrate_count; i++) {
+  for(int i=0; i < migrate_count; i++) {
     MigrateInfo* item = (MigrateInfo*)migrateInfo[i];
     msg->moves[i] = *item;
     delete item;
     migrateInfo[i] = 0;
   }
+
+  // Free the refine buffers
+  Refiner::FreeProcs(from_procs);
+  Refiner::FreeProcs(to_procs);
 
   return msg;
 };
