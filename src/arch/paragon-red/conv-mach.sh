@@ -24,6 +24,7 @@ CMK_SEQ_CC='cc'
 CMK_SEQ_LD='cc'
 CMK_SEQ_CXX='CC'
 CMK_SEQ_LDXX='CC'
+CMK_SEQ_AR='ciar qs'
 CMK_CPP_SUFFIX="i"
 CMK_XLATPP='charmxlat++ '
 CMK_QT='asci-red'
