@@ -152,11 +152,7 @@ Message::print(XStr& str)
     templat->genSpec(str);
   str << "message ";
   type->print(str);
-  if(isVarrays()) {
-    str << "{\n";
-    mvlist->print(str);
-    str << "}\n";
-  }
+  printVars(str);
   str << ";\n";
 }
 
@@ -739,114 +735,53 @@ static const char *CIMsgClass =
 "{\n"
 "  public:\n"
 "    static int __idx;\n"
-"    void*operator new(size_t s){return CkAllocMsg(__idx,s,0);}\n"
+"    void* operator new(size_t, const int pb=0);\n"
 "    void operator delete(void *p){CkFreeMsg(p);}\n"
-"    void*operator new(size_t,void*p){return p;}\n"
-"    void*operator new(size_t s, int p){return CkAllocMsg(__idx,s,p);}\n"
+"    void* operator new(size_t, void*p) {return p;}\n"
+"    void* operator new(size_t, int*, const int pb=0);\n"
+"    static void*alloc(int,size_t,int*,int);\n"
 ;
 
 static const char *CIMsgClassAnsi =
 "{\n"
 "  public:\n"
 "    static int __idx;\n"
-"    void*operator new(size_t s){return CkAllocMsg(__idx,s,0);}\n"
-"    void operator delete(void *p){CkFreeMsg(p);}\n"
-"    void*operator new(size_t,void*p){return p;}\n"
-"    void operator delete(void*,void*){}\n"
-"    void*operator new(size_t s, int p){return CkAllocMsg(__idx,s,p);}\n"
-"    void operator delete(void *,int){}\n"
-;
-
-static const char *CIAllocDecl =
-"    void *operator new(size_t s, int *sz, int p);\n"
-;
-
-static const char *CIAllocDeclAnsi =
-"    void *operator new(size_t s, int *sz, int p);\n"
-"    void operator delete(void*,int *,int);\n"
+"    void* operator new(size_t,void*p) { return p; }\n"
+"    void operator delete(void*p,void*){CkFreeMsg(p);}\n"
+"    void* operator new(size_t,const int pb=0);\n"
+"    void operator delete(void*p,const int pb=0){\n"
+"      CkFreeMsg(p);}\n"
+"    void* operator new(size_t, int*, const int pb=0);\n"
+"    void operator delete(void*p,int*,const int pb=0){\n"
+"      CkFreeMsg(p);}\n"
+"    static void* alloc(int,size_t,int*,int);\n"
 ;
 
 void
 Message::genAllocDecl(XStr &str)
 {
+  int i, num;
+  XStr mtype;
+  mtype << type;
+  if(templat) templat->genVars(mtype);
   if(compilemode==ansi)
     str << CIMsgClassAnsi;
   else str << CIMsgClass;
-
-  if(isVarsize()) {
-    if(compilemode==ansi)
-      str << CIAllocDeclAnsi;
-    else str << CIAllocDecl;
-  }
-  if(isVarrays()) {
-    int num = mvlist->len();
-    str << "    void *operator new(size_t s,";
-    int i;
+  str << "    static void *pack(" << mtype << " *p);\n";
+  str << "    static " << mtype << "* unpack(void* p);\n";
+  num = numVars();
+  if(num>0) {
+    str << "    void *operator new(size_t,";
     for(i=0;i<num;i++)
-      str << "int sz" << i << ", ";
-    str << "int p);\n";
+      str << "int, ";
+    str << "const int);\n";
     if(compilemode==ansi) {
-      str << "    void operator delete(void*,";
+      str << "    void operator delete(void *p,";
       for(i=0;i<num;i++)
         str << "int, ";
-      str << "int);\n";
+      str << "const int){CkFreeMsg(p)}\n";
     }
   }
-}
-
-void
-Message::genVarraysMacros(XStr& str)
-{
-  int num = mvlist->len();
-  assert(num>0);
-  MsgVarList *ml = mvlist;
-  MsgVar *mv = ml->msg_var;
-  int i;
-  str << "\n#define " << type << "_VARSIZE_MACROS() \\\n";
-  str << "  static void* alloc(int msgnum, int sz, int *sizes, int pb) {\\\n";
-  str << "    int offsets[" << num+1 << "];\\\n";
-  str << "    offsets[0] = ALIGN8(sz);\\\n";
-  for(i=1; i<=num; i++) {
-    str << "    offsets[" << i << "] = offsets[" << i-1 << "] + ";
-    str << "ALIGN8(sizeof(" << mv->type << ")*sizes[" << i-1 << "]);\\\n";
-    ml = ml->next;
-    if (ml != 0) mv = ml->msg_var;
-  }
-  ml = mvlist;
-  mv = ml->msg_var;
-  str << "    " << type << " *newmsg = (" << type << " *) ";
-  str << "CkAllocMsg(msgnum, offsets[" << num << "], pb);\\\n";
-  for(i=0;i<num;i++) {
-    str << "    newmsg->" << mv->name << " = (" << mv->type << " *) ";
-    str << "((char *)newmsg + offsets[" << i << "]);\\\n";
-    ml = ml->next;
-    if (ml != 0) mv = ml->msg_var;
-  }
-  str << "    return (void *) newmsg;\\\n";
-  str << "  }\\\n";
-  str << "  static void* pack(" << type << "* msg) {\\\n";
-  ml = mvlist;
-  mv = ml->msg_var;
-  for(i=0;i<num;i++) {
-    str << "    msg->" << mv->name << " = (" <<mv->type << " *) ";
-    str << "((char *)msg->" << mv->name << " - (char *)msg);\\\n";
-    ml = ml->next;
-    if (ml != 0) mv = ml->msg_var;
-  }
-  str << "    return (void *) msg;\\\n";
-  str << "  }\\\n";
-  str << "  static " << type << "* unpack(void* buf) {\\\n";
-  str << "    " << type << " * msg = (" << type << " *) buf;\\\n";
-  ml = mvlist;
-  mv = ml->msg_var;
-  for(i=0;i<num;i++) {
-    str << "    msg->" << mv->name << " = (" <<mv->type << " *) ";
-    str << "((size_t)msg->" << mv->name << " + (char *)msg);\\\n";
-    ml = ml->next;
-    if (ml != 0) mv = ml->msg_var;
-  }
-  str << "    return msg;\\\n";
-  str << "  }\n";
 }
 
 void
@@ -856,8 +791,6 @@ Message::genDecls(XStr& str)
   ptype<<proxyPrefix()<<type;
   if(type->isTemplated())
     return;
-  if(isVarrays())
-    genVarraysMacros(str);
   str << "/* DECLS: "; print(str); str << " */\n";
   if(templat)
     templat->genSpec(str);
@@ -868,7 +801,7 @@ Message::genDecls(XStr& str)
     templat->genSpec(str);
   str << "class "<<ptype;
   if(external || type->isTemplated()) {
-    str << ";";
+    str << ";\n";
     return;
   }
 //OSL 4/11/2000-- make *all* messages inherit from CkArrayMessage.
@@ -890,8 +823,15 @@ Message::genDecls(XStr& str)
 void
 Message::genDefs(XStr& str)
 {
-  XStr ptype;
+  int i, num = numVars();
+  MsgVarList *ml;
+  MsgVar *mv;
+  XStr ptype, mtype, tspec;
   ptype<<proxyPrefix()<<type;
+  if(templat) templat->genVars(ptype);
+  mtype << type;
+  if(templat) templat->genVars(mtype);
+  if(templat) { templat->genSpec(tspec); tspec << " "; }
   
   str << "/* DEFS: "; print(str); str << " */\n";
   if(!templat) {
@@ -900,84 +840,68 @@ Message::genDefs(XStr& str)
     str << "#ifdef CK_TEMPLATES_ONLY\n";
   }
   if(!(external||type->isTemplated())) {
-    // generate varsize new operator
-    if(isVarsize()) {
-      if(templat) {
-        templat->genSpec(str);
-        str << " ";
-      }
-      str << "void *"<<ptype;
-      if(templat)
-        templat->genVars(str);
-      str << "::operator new(size_t s, int *sz, int p)\n";
-      str << "{\n";
-      str << "  return ";
-      type->print(str);
-      if(templat)
-        templat->genVars(str);
-      str << "::alloc(__idx, s, sz, p);\n";
-      str << "}\n";
-
-      if(compilemode==ansi) {
-        // Generate corresponding delete
-        if(templat) {
-          templat->genSpec(str);
-          str << " ";
-        }
-        str << "void "<<ptype;
-        if(templat)
-          templat->genVars(str);
-        str << "::operator delete(void *p, int *, int)\n";
-        str << "{\n";
-        str << "  CkFreeMsg(p);\n";
-        str << "}\n";
-      }
-    }
-    if(isVarrays()) {
-      int num = mvlist->len();
-      if(templat) {
-        templat->genSpec(str);
-        str << " ";
-      }
-      str << "void *"<<ptype;
-      if(templat)
-        templat->genVars(str);
-      str << "::operator new(size_t s, ";
-      int i;
+    // new (size_t, priobits)
+    str << tspec << "void *" << ptype << "::operator new(size_t s,";
+    str << "const int pb){\n";
+    str << "  return " << mtype << "::alloc(__idx, s, 0, pb);\n}\n";
+    // new (size_t, int*, priobits)
+    str << tspec << "void *" << ptype << "::operator new(size_t s, int* sz,";
+    str << "const int pb){\n";
+    str << "  return " << mtype << "::alloc(__idx, s, sz, pb);\n}\n";
+    // new (size_t, int, int, ..., int, priobits)
+    if(num>0) {
+      str << tspec << "void *"<< ptype << "::operator new(size_t s, ";
       for(i=0;i<num;i++)
         str << "int sz" << i << ", ";
-      str << "int p) {\n";
-      str << "  int i, sizes[" << num << "];\n";
+      str << "const int p) {\n";
+      str << "  int i; int sizes[" << num << "];\n";
       for(i=0;i<num;i++)
         str << "  sizes[" << i << "] = sz" << i << ";\n";
-      str << "  return ";
-      type->print(str);
-      if(templat)
-        templat->genVars(str);
-      str << "::alloc(__idx, s, sizes, p);\n";
+      str << "  return " << mtype << "::alloc(__idx, s, sizes, p);\n";
       str << "}\n";
-
-      if(compilemode==ansi) {
-        // Generate corresponding delete
-        if(templat) {
-          templat->genSpec(str);
-          str << " ";
-        }
-        str << "void "<<ptype;
-        if(templat)
-          templat->genVars(str);
-        str << "::operator delete(void *p, \n";
-	for(i=0;i<num;i++)
-	  str << "int,";
-        str << "int) {\n";
-        str << "  CkFreeMsg(p);\n";
-        str << "}\n";
-      }
     }
+    // alloc(int, size_t, int*, priobits)
+    str << tspec << "void* " << ptype;
+    str << "::alloc(int msgnum, size_t sz, int *sizes, int pb) {\n";
+    str << "  int offsets[" << num+1 << "];\n";
+    str << "  offsets[0] = ALIGN8(sz);\n";
+    for(i=0, ml=mvlist; i<num; i++, ml=ml->next) {
+      mv = ml->msg_var;
+      str << "  if(sizes==0)\n";
+      str << "    offsets[" << i+1 << "] = offsets[0];\n";
+      str << "  else\n";
+      str << "    offsets[" << i+1 << "] = offsets[" << i << "] + ";
+      str << "ALIGN8(sizeof(" << mv->type << ")*sizes[" << i << "]);\n";
+    }
+    str << "  " << mtype << " *newmsg = (" << mtype << " *) ";
+    str << "CkAllocMsg(msgnum, offsets[" << num << "], pb);\n";
+    for(i=0, ml=mvlist; i<num; i++,ml=ml->next) {
+      mv = ml->msg_var;
+      str << "  newmsg->" << mv->name << " = (" << mv->type << " *) ";
+      str << "((char *)newmsg + offsets[" << i << "]);\n";
+    }
+    str << "  return (void *) newmsg;\n}\n";
+    // pack
+    str << tspec << "void* " << ptype << "::pack(" << mtype << " *msg) {\n";
+    for(i=0, ml=mvlist; i<num; i++, ml=ml->next) {
+      mv = ml->msg_var;
+      str << "  msg->" << mv->name << " = (" <<mv->type << " *) ";
+      str << "((char *)msg->" << mv->name << " - (char *)msg);\n";
+    }
+    str << "  return (void *) msg;\n}\n";
+    // unpack
+    str << tspec << mtype << "* " << ptype << "::unpack(void* buf) {\n";
+    str << "  " << mtype << " *msg = (" << mtype << " *) buf;\n";
+    for(i=0, ml=mvlist; i<num; i++, ml=ml->next) {
+      mv = ml->msg_var;
+      str << "  msg->" << mv->name << " = (" <<mv->type << " *) ";
+      str << "((size_t)msg->" << mv->name << " + (char *)msg);\n";
+    }
+    str << "  return msg;\n}\n";
   }
   if(!templat) {
     if(!external && !type->isTemplated()) {
-      str << "int "<<ptype<<"::__idx=0;\n";
+      str << "int "<< ptype <<"::__idx=0;\n";
 
       // Define the Marshalling message for Fortran
       if (fortranMode)
@@ -991,10 +915,7 @@ Message::genDefs(XStr& str)
       }
     }
   } else {
-    templat->genSpec(str);
-    str << "int "<<proxyPrefix()<<type;
-    templat->genVars(str);
-    str <<"::__idx=0;\n";
+    str << tspec << "int "<< ptype <<"::__idx=0;\n";
   }
   str << "#endif\n";
 }
@@ -1004,20 +925,11 @@ Message::genReg(XStr& str)
 {
   str << "/* REG: "; print(str); str << "*/\n";
   if(!templat && !external) {
-    str << "  "<<proxyPrefix()<<type<<"::";
-    str << "__register(\""<<type<<"\", sizeof("<<type<<"),";
-    if(isPacked()||isVarsize()) {
-      str << "(CkPackFnPtr) "<<type;
-      if(templat)
-        templat->genVars(str);
-      str << "::pack, ";
-      str << "(CkUnpackFnPtr) "<<type;
-      if(templat)
-        templat->genVars(str);
-      str << "::unpack);\n";
-    } else {
-      str << "0, 0);\n";
-    }
+    XStr ptype, mtype, tspec;
+    ptype<<proxyPrefix()<<type;
+    str << ptype << "::__register(\"" << type << "\", sizeof(" << type <<"),";
+    str << "(CkPackFnPtr) " << type << "::pack,";
+    str << "(CkUnpackFnPtr) " << type << "::unpack);\n";
   }
 }
 

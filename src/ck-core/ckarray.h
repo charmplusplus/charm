@@ -112,6 +112,11 @@ public:
   
   //This allows us to delete bare CkArrayMessages
   void operator delete(void *p){CkFreeMsg(p);}
+  static void* alloc(int idx, size_t sz, int *szs, int pb) {
+    return CkAllocMsg(idx, sz, pb);
+  }
+  static void *pack(CkArrayMessage *m) { return (void *) m; }
+  static CkArrayMessage *unpack(void *buf) { return (CkArrayMessage*) buf; }
 };
 
 #include "ckreduction.h"
@@ -449,9 +454,9 @@ protected:
 	void* packData;
 	~CkArrayElementMigrateMessage() {}
 public:
-	static void *alloc(int msgnum, int size, int *array, int priobits);
-	static void *pack(CkArrayElementMigrateMessage *);
-	static CkArrayElementMigrateMessage *unpack(void *in);
+  static void *alloc(int msgnum, size_t size, int *array, int priobits);
+  static void *pack(CkArrayElementMigrateMessage *);
+  static CkArrayElementMigrateMessage *unpack(void *in);
 };
 
 //Message: Remove the array element at the given index.

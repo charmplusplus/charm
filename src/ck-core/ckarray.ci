@@ -4,7 +4,7 @@ module CkArray {
   readonly CkGroupID _RRMapID;
   message CkArrayMessage;
   message CkArrayElementCreateMsg;
-  message [varsize] CkArrayElementMigrateMessage;
+  message CkArrayElementMigrateMessage;
   
   message CkArrayCreateMsg;
   message CkArrayRemoveMsg;

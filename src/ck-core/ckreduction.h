@@ -268,7 +268,7 @@ public:
 		CkReduction::reducerType reducer=CkReduction::invalid);
 
 	//Msg runtime support
-	static void *alloc(int msgnum, int size, int *reqSize, int priobits);
+	static void *alloc(int msgnum, size_t size, int *reqSize, int priobits);
 	static void *pack(CkReductionMsg *);
 	static CkReductionMsg *unpack(void *in);
 	

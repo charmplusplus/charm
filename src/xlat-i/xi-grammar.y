@@ -298,7 +298,13 @@ ReadonlyMsg	: READONLY MESSAGE SimpleType '*'  Name
 MAttribs	: /* Empty */
 		{ $$ = 0; }
 		| '[' MAttribList ']'
-		{ $$ = $2; }
+		{ 
+		  /*
+		  printf("Warning: Message attributes are being phased out.\n");
+		  printf("Warning: Please remove them from interface files.\n");
+		  */
+		  $$ = $2; 
+		}
 		;
 
 MAttribList	: MAttrib
@@ -308,9 +314,9 @@ MAttribList	: MAttrib
 		;
 
 MAttrib		: PACKED
-		{ $$ = SPACKED; }
+		{ $$ = 0; }
 		| VARSIZE
-		{ $$ = SVARSIZE; }
+		{ $$ = 0; }
 		;
 
 CAttribs	: /* Empty */
@@ -340,11 +346,11 @@ VarList		: Var
 		;
 
 Message		: MESSAGE MAttribs NamedType
-		{ $$ = new Message(lineno, $3, $2); }
+		{ $$ = new Message(lineno, $3); }
 		| MESSAGE MAttribs NamedType '{' TypeList '}'
-		{ $$ = new Message(lineno, $3, $2, $5); }
+		{ $$ = new Message(lineno, $3, $5); }
 		| MESSAGE MAttribs NamedType '{' VarList '}'
-		{ $$ = new Message(lineno, $3, $2, 0, $5); }
+		{ $$ = new Message(lineno, $3, 0, $5); }
 		;
 
 OptBaseList	: /* Empty */
@@ -406,7 +412,7 @@ TArray		: ARRAY ArrayIndexType Name OptBaseList MemberEList
 		;
 
 TMessage	: MESSAGE MAttribs Name ';'
-		{ $$ = new Message(lineno, new NamedType($3), $2); }
+		{ $$ = new Message(lineno, new NamedType($3)); }
 		;
 
 OptTypeInit	: /* Empty */

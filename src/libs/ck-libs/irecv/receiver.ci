@@ -1,6 +1,6 @@
 module receiver {
 
-  message [varsize] receiverMsg;
+  message receiverMsg;
 
   array [1D] receiver {
     entry receiver(void);

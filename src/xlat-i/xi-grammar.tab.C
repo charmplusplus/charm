@@ -206,14 +206,14 @@ static const short yyrline[] = { 0,
    208,   210,   212,   214,   216,   218,   220,   222,   226,   230,
    232,   236,   240,   242,   246,   248,   252,   256,   260,   262,
    264,   266,   268,   272,   274,   276,   280,   284,   286,   290,
-   294,   298,   300,   304,   306,   310,   312,   316,   318,   322,
-   324,   328,   332,   336,   338,   342,   344,   346,   350,   352,
-   356,   358,   362,   364,   368,   372,   376,   382,   386,   390,
-   392,   396,   400,   404,   408,   412,   414,   418,   420,   422,
-   426,   428,   430,   434,   436,   440,   444,   446,   448,   450,
-   452,   456,   458,   462,   464,   468,   470,   472,   476,   478,
-   480,   484,   486,   490,   492,   496,   498,   500,   502,   506,
-   508,   510,   514,   518,   520,   524,   526
+   294,   298,   300,   310,   312,   316,   318,   322,   324,   328,
+   330,   334,   338,   342,   344,   348,   350,   352,   356,   358,
+   362,   364,   368,   370,   374,   378,   382,   388,   392,   396,
+   398,   402,   406,   410,   414,   418,   420,   424,   426,   428,
+   432,   434,   436,   440,   442,   446,   450,   452,   454,   456,
+   458,   462,   464,   468,   470,   474,   476,   478,   482,   484,
+   486,   490,   492,   496,   498,   502,   504,   506,   508,   512,
+   514,   516,   520,   524,   526,   530,   532
 };
 #endif
 
@@ -424,7 +424,7 @@ static const short yycheck[] = {     1,
    253,   156,   268,   264,    -1,    -1,    -1,    -1,    -1,    73
 };
 /* -*-C-*-  Note some compilers choke on comments on `#line' lines.  */
-#line 3 "/home/csar2/bhandark/share/bison.simple"
+#line 3 "/usr/lib/bison.simple"
 /* This file comes from bison-1.28.  */
 
 /* Skeleton output parser for bison,
@@ -638,7 +638,7 @@ __yy_memcpy (char *to, char *from, unsigned int count)
 #endif
 #endif
 
-#line 217 "/home/csar2/bhandark/share/bison.simple"
+#line 217 "/usr/lib/bison.simple"
 
 /* The user can define YYPARSE_PARAM as the name of an argument to be passed
    into yyparse.  The argument should have type void *.
@@ -1260,102 +1260,108 @@ case 72:
     break;}
 case 73:
 #line 301 "xi-grammar.y"
-{ yyval.intval = yyvsp[-1].intval; ;
+{ 
+		  /*
+		  printf("Warning: Message attributes are being phased out.\n");
+		  printf("Warning: Please remove them from interface files.\n");
+		  */
+		  yyval.intval = yyvsp[-1].intval; 
+		;
     break;}
 case 74:
-#line 305 "xi-grammar.y"
+#line 311 "xi-grammar.y"
 { yyval.intval = yyvsp[0].intval; ;
     break;}
 case 75:
-#line 307 "xi-grammar.y"
+#line 313 "xi-grammar.y"
 { yyval.intval = yyvsp[-2].intval | yyvsp[0].intval; ;
     break;}
 case 76:
-#line 311 "xi-grammar.y"
-{ yyval.intval = SPACKED; ;
-    break;}
-case 77:
-#line 313 "xi-grammar.y"
-{ yyval.intval = SVARSIZE; ;
-    break;}
-case 78:
 #line 317 "xi-grammar.y"
 { yyval.intval = 0; ;
     break;}
-case 79:
+case 77:
 #line 319 "xi-grammar.y"
+{ yyval.intval = 0; ;
+    break;}
+case 78:
+#line 323 "xi-grammar.y"
+{ yyval.intval = 0; ;
+    break;}
+case 79:
+#line 325 "xi-grammar.y"
 { yyval.intval = yyvsp[-1].intval; ;
     break;}
 case 80:
-#line 323 "xi-grammar.y"
+#line 329 "xi-grammar.y"
 { yyval.intval = yyvsp[0].intval; ;
     break;}
 case 81:
-#line 325 "xi-grammar.y"
+#line 331 "xi-grammar.y"
 { yyval.intval = yyvsp[-2].intval | yyvsp[0].intval; ;
     break;}
 case 82:
-#line 329 "xi-grammar.y"
+#line 335 "xi-grammar.y"
 { yyval.intval = 0x01; ;
     break;}
 case 83:
-#line 333 "xi-grammar.y"
+#line 339 "xi-grammar.y"
 { yyval.mv = new MsgVar(yyvsp[-4].type, yyvsp[-3].strval); ;
     break;}
 case 84:
-#line 337 "xi-grammar.y"
+#line 343 "xi-grammar.y"
 { yyval.mvlist = new MsgVarList(yyvsp[0].mv); ;
     break;}
 case 85:
-#line 339 "xi-grammar.y"
+#line 345 "xi-grammar.y"
 { yyval.mvlist = new MsgVarList(yyvsp[-1].mv, yyvsp[0].mvlist); ;
     break;}
 case 86:
-#line 343 "xi-grammar.y"
-{ yyval.message = new Message(lineno, yyvsp[0].ntype, yyvsp[-1].intval); ;
+#line 349 "xi-grammar.y"
+{ yyval.message = new Message(lineno, yyvsp[0].ntype); ;
     break;}
 case 87:
-#line 345 "xi-grammar.y"
-{ yyval.message = new Message(lineno, yyvsp[-3].ntype, yyvsp[-4].intval, yyvsp[-1].typelist); ;
+#line 351 "xi-grammar.y"
+{ yyval.message = new Message(lineno, yyvsp[-3].ntype, yyvsp[-1].typelist); ;
     break;}
 case 88:
-#line 347 "xi-grammar.y"
-{ yyval.message = new Message(lineno, yyvsp[-3].ntype, yyvsp[-4].intval, 0, yyvsp[-1].mvlist); ;
+#line 353 "xi-grammar.y"
+{ yyval.message = new Message(lineno, yyvsp[-3].ntype, 0, yyvsp[-1].mvlist); ;
     break;}
 case 89:
-#line 351 "xi-grammar.y"
+#line 357 "xi-grammar.y"
 { yyval.typelist = 0; ;
     break;}
 case 90:
-#line 353 "xi-grammar.y"
+#line 359 "xi-grammar.y"
 { yyval.typelist = yyvsp[0].typelist; ;
     break;}
 case 91:
-#line 357 "xi-grammar.y"
+#line 363 "xi-grammar.y"
 { yyval.typelist = new TypeList(yyvsp[0].ntype); ;
     break;}
 case 92:
-#line 359 "xi-grammar.y"
+#line 365 "xi-grammar.y"
 { yyval.typelist = new TypeList(yyvsp[-2].ntype, yyvsp[0].typelist); ;
     break;}
 case 93:
-#line 363 "xi-grammar.y"
+#line 369 "xi-grammar.y"
 { yyval.chare = new Chare(lineno, yyvsp[-2].ntype, yyvsp[-1].typelist, yyvsp[0].mbrlist, yyvsp[-3].intval); ;
     break;}
 case 94:
-#line 365 "xi-grammar.y"
+#line 371 "xi-grammar.y"
 { yyval.chare = new MainChare(lineno, yyvsp[-2].ntype, yyvsp[-1].typelist, yyvsp[0].mbrlist, yyvsp[-3].intval); ;
     break;}
 case 95:
-#line 369 "xi-grammar.y"
+#line 375 "xi-grammar.y"
 { yyval.chare = new Group(lineno, yyvsp[-2].ntype, yyvsp[-1].typelist, yyvsp[0].mbrlist, yyvsp[-3].intval); ;
     break;}
 case 96:
-#line 373 "xi-grammar.y"
+#line 379 "xi-grammar.y"
 { yyval.chare = new NodeGroup(lineno, yyvsp[-2].ntype, yyvsp[-1].typelist, yyvsp[0].mbrlist, yyvsp[-3].intval); ;
     break;}
 case 97:
-#line 377 "xi-grammar.y"
+#line 383 "xi-grammar.y"
 {/*Stupid special case for [1D] indices*/
 			char *buf=new char[40];
 			sprintf(buf,"%sD",yyvsp[-2].strval);
@@ -1363,210 +1369,210 @@ case 97:
 		;
     break;}
 case 98:
-#line 383 "xi-grammar.y"
+#line 389 "xi-grammar.y"
 { yyval.ntype = new NamedType(yyvsp[-1].strval); ;
     break;}
 case 99:
-#line 387 "xi-grammar.y"
+#line 393 "xi-grammar.y"
 { yyval.chare = new Array(lineno, yyvsp[-3].ntype, yyvsp[-2].ntype, yyvsp[-1].typelist, yyvsp[0].mbrlist); ;
     break;}
 case 100:
-#line 391 "xi-grammar.y"
+#line 397 "xi-grammar.y"
 { yyval.chare = new Chare(lineno, new NamedType(yyvsp[-2].strval), yyvsp[-1].typelist, yyvsp[0].mbrlist, yyvsp[-3].intval);;
     break;}
 case 101:
-#line 393 "xi-grammar.y"
+#line 399 "xi-grammar.y"
 { yyval.chare = new MainChare(lineno, new NamedType(yyvsp[-2].strval), yyvsp[-1].typelist, yyvsp[0].mbrlist, yyvsp[-3].intval); ;
     break;}
 case 102:
-#line 397 "xi-grammar.y"
+#line 403 "xi-grammar.y"
 { yyval.chare = new Group(lineno, new NamedType(yyvsp[-2].strval), yyvsp[-1].typelist, yyvsp[0].mbrlist, yyvsp[-3].intval); ;
     break;}
 case 103:
-#line 401 "xi-grammar.y"
+#line 407 "xi-grammar.y"
 { yyval.chare = new NodeGroup( lineno, new NamedType(yyvsp[-2].strval), yyvsp[-1].typelist, yyvsp[0].mbrlist, yyvsp[-3].intval); ;
     break;}
 case 104:
-#line 405 "xi-grammar.y"
+#line 411 "xi-grammar.y"
 { yyval.chare = new Array( lineno, yyvsp[-3].ntype, new NamedType(yyvsp[-2].strval), yyvsp[-1].typelist, yyvsp[0].mbrlist); ;
     break;}
 case 105:
-#line 409 "xi-grammar.y"
-{ yyval.message = new Message(lineno, new NamedType(yyvsp[-1].strval), yyvsp[-2].intval); ;
+#line 415 "xi-grammar.y"
+{ yyval.message = new Message(lineno, new NamedType(yyvsp[-1].strval)); ;
     break;}
 case 106:
-#line 413 "xi-grammar.y"
+#line 419 "xi-grammar.y"
 { yyval.type = 0; ;
     break;}
 case 107:
-#line 415 "xi-grammar.y"
+#line 421 "xi-grammar.y"
 { yyval.type = yyvsp[0].type; ;
     break;}
 case 108:
-#line 419 "xi-grammar.y"
+#line 425 "xi-grammar.y"
 { yyval.strval = 0; ;
     break;}
 case 109:
-#line 421 "xi-grammar.y"
+#line 427 "xi-grammar.y"
 { yyval.strval = yyvsp[0].strval; ;
     break;}
 case 110:
-#line 423 "xi-grammar.y"
+#line 429 "xi-grammar.y"
 { yyval.strval = yyvsp[0].strval; ;
     break;}
 case 111:
-#line 427 "xi-grammar.y"
+#line 433 "xi-grammar.y"
 { yyval.tvar = new TType(new NamedType(yyvsp[-1].strval), yyvsp[0].type); ;
     break;}
 case 112:
-#line 429 "xi-grammar.y"
+#line 435 "xi-grammar.y"
 { yyval.tvar = new TFunc(yyvsp[-1].ftype, yyvsp[0].strval); ;
     break;}
 case 113:
-#line 431 "xi-grammar.y"
+#line 437 "xi-grammar.y"
 { yyval.tvar = new TName(yyvsp[-2].type, yyvsp[-1].strval, yyvsp[0].strval); ;
     break;}
 case 114:
-#line 435 "xi-grammar.y"
+#line 441 "xi-grammar.y"
 { yyval.tvarlist = new TVarList(yyvsp[0].tvar); ;
     break;}
 case 115:
-#line 437 "xi-grammar.y"
+#line 443 "xi-grammar.y"
 { yyval.tvarlist = new TVarList(yyvsp[-2].tvar, yyvsp[0].tvarlist); ;
     break;}
 case 116:
-#line 441 "xi-grammar.y"
+#line 447 "xi-grammar.y"
 { yyval.tvarlist = yyvsp[-1].tvarlist; ;
     break;}
 case 117:
-#line 445 "xi-grammar.y"
-{ yyval.templat = new Template(yyvsp[-1].tvarlist, yyvsp[0].chare); yyvsp[0].chare->setTemplate(yyval.templat); ;
-    break;}
-case 118:
-#line 447 "xi-grammar.y"
-{ yyval.templat = new Template(yyvsp[-1].tvarlist, yyvsp[0].chare); yyvsp[0].chare->setTemplate(yyval.templat); ;
-    break;}
-case 119:
-#line 449 "xi-grammar.y"
-{ yyval.templat = new Template(yyvsp[-1].tvarlist, yyvsp[0].chare); yyvsp[0].chare->setTemplate(yyval.templat); ;
-    break;}
-case 120:
 #line 451 "xi-grammar.y"
 { yyval.templat = new Template(yyvsp[-1].tvarlist, yyvsp[0].chare); yyvsp[0].chare->setTemplate(yyval.templat); ;
     break;}
-case 121:
+case 118:
 #line 453 "xi-grammar.y"
+{ yyval.templat = new Template(yyvsp[-1].tvarlist, yyvsp[0].chare); yyvsp[0].chare->setTemplate(yyval.templat); ;
+    break;}
+case 119:
+#line 455 "xi-grammar.y"
+{ yyval.templat = new Template(yyvsp[-1].tvarlist, yyvsp[0].chare); yyvsp[0].chare->setTemplate(yyval.templat); ;
+    break;}
+case 120:
+#line 457 "xi-grammar.y"
+{ yyval.templat = new Template(yyvsp[-1].tvarlist, yyvsp[0].chare); yyvsp[0].chare->setTemplate(yyval.templat); ;
+    break;}
+case 121:
+#line 459 "xi-grammar.y"
 { yyval.templat = new Template(yyvsp[-1].tvarlist, yyvsp[0].message); yyvsp[0].message->setTemplate(yyval.templat); ;
     break;}
 case 122:
-#line 457 "xi-grammar.y"
-{ yyval.mbrlist = 0; ;
-    break;}
-case 123:
-#line 459 "xi-grammar.y"
-{ yyval.mbrlist = yyvsp[-2].mbrlist; ;
-    break;}
-case 124:
 #line 463 "xi-grammar.y"
 { yyval.mbrlist = 0; ;
     break;}
-case 125:
+case 123:
 #line 465 "xi-grammar.y"
+{ yyval.mbrlist = yyvsp[-2].mbrlist; ;
+    break;}
+case 124:
+#line 469 "xi-grammar.y"
+{ yyval.mbrlist = 0; ;
+    break;}
+case 125:
+#line 471 "xi-grammar.y"
 { yyval.mbrlist = new MemberList(yyvsp[-1].member, yyvsp[0].mbrlist); ;
     break;}
 case 126:
-#line 469 "xi-grammar.y"
+#line 475 "xi-grammar.y"
 { yyval.member = yyvsp[-1].entry; ;
     break;}
 case 127:
-#line 471 "xi-grammar.y"
+#line 477 "xi-grammar.y"
 { yyval.member = yyvsp[-1].readonly; ;
     break;}
 case 128:
-#line 473 "xi-grammar.y"
+#line 479 "xi-grammar.y"
 { yyval.member = yyvsp[-1].readonly; ;
     break;}
 case 129:
-#line 477 "xi-grammar.y"
+#line 483 "xi-grammar.y"
 { yyval.entry = new Entry(lineno, yyvsp[-5].intval|yyvsp[-1].intval, new BuiltinType("void"), yyvsp[-3].strval, yyvsp[-2].rtype, yyvsp[0].val); ;
     break;}
 case 130:
-#line 479 "xi-grammar.y"
+#line 485 "xi-grammar.y"
 { yyval.entry = new Entry(lineno, yyvsp[-5].intval|yyvsp[-1].intval, yyvsp[-4].ptype, yyvsp[-3].strval, yyvsp[-2].rtype, yyvsp[0].val); ;
     break;}
 case 131:
-#line 481 "xi-grammar.y"
+#line 487 "xi-grammar.y"
 { yyval.entry = new Entry(lineno, yyvsp[-2].intval, 0, yyvsp[-1].strval, yyvsp[0].rtype, 0); ;
     break;}
 case 132:
-#line 485 "xi-grammar.y"
+#line 491 "xi-grammar.y"
 { yyval.intval = 0; ;
     break;}
 case 133:
-#line 487 "xi-grammar.y"
+#line 493 "xi-grammar.y"
 { yyval.intval = yyvsp[-1].intval; ;
     break;}
 case 134:
-#line 491 "xi-grammar.y"
+#line 497 "xi-grammar.y"
 { yyval.intval = yyvsp[0].intval; ;
     break;}
 case 135:
-#line 493 "xi-grammar.y"
+#line 499 "xi-grammar.y"
 { yyval.intval = yyvsp[-2].intval | yyvsp[0].intval; ;
     break;}
 case 136:
-#line 497 "xi-grammar.y"
+#line 503 "xi-grammar.y"
 { yyval.intval = STHREADED; ;
     break;}
 case 137:
-#line 499 "xi-grammar.y"
+#line 505 "xi-grammar.y"
 { yyval.intval = SSYNC; ;
     break;}
 case 138:
-#line 501 "xi-grammar.y"
+#line 507 "xi-grammar.y"
 { yyval.intval = SLOCKED; ;
     break;}
 case 139:
-#line 503 "xi-grammar.y"
+#line 509 "xi-grammar.y"
 { yyval.intval = SVIRTUAL; ;
     break;}
 case 140:
-#line 507 "xi-grammar.y"
+#line 513 "xi-grammar.y"
 { yyval.rtype = 0; ;
     break;}
 case 141:
-#line 509 "xi-grammar.y"
+#line 515 "xi-grammar.y"
 { yyval.rtype = new BuiltinType("void"); ;
     break;}
 case 142:
-#line 511 "xi-grammar.y"
+#line 517 "xi-grammar.y"
 { yyval.rtype = yyvsp[0].ptype; ;
     break;}
 case 143:
-#line 515 "xi-grammar.y"
+#line 521 "xi-grammar.y"
 { yyval.rtype = yyvsp[-1].rtype; ;
     break;}
 case 144:
-#line 519 "xi-grammar.y"
+#line 525 "xi-grammar.y"
 { yyval.val = 0; ;
     break;}
 case 145:
-#line 521 "xi-grammar.y"
+#line 527 "xi-grammar.y"
 { yyval.val = new Value(yyvsp[0].strval); ;
     break;}
 case 146:
-#line 525 "xi-grammar.y"
+#line 531 "xi-grammar.y"
 { yyval.intval = 0; ;
     break;}
 case 147:
-#line 527 "xi-grammar.y"
+#line 533 "xi-grammar.y"
 { if(strcmp(yyvsp[0].strval, "0")) { yyerror("expected 0"); exit(1); }
 		  yyval.intval = SPURE; 
 		;
     break;}
 }
    /* the action file gets copied in in place of this dollarsign */
-#line 543 "/home/csar2/bhandark/share/bison.simple"
+#line 543 "/usr/lib/bison.simple"
 
   yyvsp -= yylen;
   yyssp -= yylen;
@@ -1786,7 +1792,7 @@ yyerrhandle:
     }
   return 1;
 }
-#line 531 "xi-grammar.y"
+#line 537 "xi-grammar.y"
 
 void yyerror(const char *mesg)
 {

@@ -5,7 +5,7 @@ extern module LBDatabase;
 readonly CkGroupID nborBaselb;
 
 message NLBStatsMsg;
-message[varsize] NLBMigrateMsg;
+message NLBMigrateMsg;
 
 group NborBaseLB {
   entry void NborBaseLB(void);  

@@ -387,9 +387,6 @@ class NodeGroup : public Group {
 };
 
 
-#define SPACKED  0x01
-#define SVARSIZE 0x02
-
 class Message; // forward declaration
 //  typedef map< string, Message* > MessageList;
 class MessageList {
@@ -450,26 +447,28 @@ class MsgVarList : public Printable {
 };
 
 class Message : public TEntity, public Construct {
-    int attrib;
     NamedType *type;
     TypeList *contents;
     MsgVarList *mvlist;
+    void printVars(XStr& str) {
+      if(mvlist!=0) {
+        str << "{\n";
+        mvlist->print(str);
+        str << "}\n";
+      }
+    }
   public:
-    Message(int l, NamedType *t, int a, TypeList *c=0, MsgVarList *mv=0)
-      : attrib(a), type(t), contents(c), mvlist(mv) 
-      { line=l; setTemplate(0);
-        message_list.add(type->getBaseName(), this); }
+    Message(int l, NamedType *t, TypeList *c=0, MsgVarList *mv=0)
+      : type(t), contents(c), mvlist(mv) 
+      { line=l; setTemplate(0); message_list.add(type->getBaseName(), this); }
     void print(XStr& str);
     void genDecls(XStr& str);
     void genDefs(XStr& str);
     void genReg(XStr& str);
-    int  isPacked(void) { return attrib&SPACKED; }
-    int  isVarsize(void) { return attrib&SVARSIZE; }
-    int  isVarrays(void) { return (isVarsize() && (mvlist!=0)); }
     virtual char *proxyPrefix(void) {return msg_prefix();}
     TypeList *getContents(void) const { return contents; }
     void genAllocDecl(XStr& str);
-    void genVarraysMacros(XStr& str);
+    int numVars(void) { return ((mvlist==0) ? 0 : mvlist->len()); }
 };
 
 /* A formal argument of a template */

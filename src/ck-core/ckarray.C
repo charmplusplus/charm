@@ -1356,7 +1356,7 @@ CkArrayUpdateMsg::CkArrayUpdateMsg(const CkArrayIndex &idx)
 }
 
 void *
-CkArrayElementMigrateMessage::alloc(int msgnum,int size,int *array,int priobits)
+CkArrayElementMigrateMessage::alloc(int msgnum,size_t size,int *array,int priobits)
 {
   int totalsize;
   totalsize = size + array[0] + 8;

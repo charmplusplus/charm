@@ -3,8 +3,8 @@ mainmodule fem {
   readonly CkChareID _mainhandle;
   readonly CkArrayID _femaid;
   readonly unsigned int _nchunks;
-  message [varsize] DataMsg;
-  message [packed] ChunkMsg;
+  message DataMsg;
+  message ChunkMsg;
   mainchare main {
     entry main();
     entry void updateMesh(ChunkMsg *);

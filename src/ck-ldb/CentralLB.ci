@@ -4,8 +4,8 @@ extern module LBDatabase;
 
 readonly CkGroupID loadbalancer;
 
-message[varsize] CLBStatsMsg;
-message[varsize] CLBMigrateMsg;
+message CLBStatsMsg;
+message CLBMigrateMsg;
 
 group CentralLB {
   entry void CentralLB(void);  

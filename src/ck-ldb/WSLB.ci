@@ -5,7 +5,7 @@ extern module LBDatabase;
 readonly CkGroupID wslb;
 
 message WSLBStatsMsg;
-message[varsize] WSLBMigrateMsg;
+message WSLBMigrateMsg;
 
 group WSLB {
   entry void WSLB(void);  

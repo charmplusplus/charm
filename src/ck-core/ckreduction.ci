@@ -8,7 +8,7 @@ module CkReduction {
 	entry void callMeBack(CkGroupInitCallbackMsg *);
   };
   
-  message [varsize] CkReductionMsg;
+  message CkReductionMsg;
   message CkReductionNumberMsg;
   
   group CkReductionMgr : CkGroupInitCallback {
