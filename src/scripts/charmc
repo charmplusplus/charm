@@ -652,9 +652,10 @@ then
         LANGUAGE="bgcharm++"
 fi
 
-if [ "BUILD_SHARE" = "1" -a -n "$CMK_NO_BUILD_SHARED" ]
+if [ "$BUILD_SHARE" = "1" -a -n "$CMK_NO_BUILD_SHARED" ]
 then
 	BUILD_SHARE="0"
+	End 0
 fi
 
 if [ "$BUILD_SHARE" = "1" ]
