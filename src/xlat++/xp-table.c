@@ -12,14 +12,8 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.3  1995-09-07 21:24:33  jyelon
- * Added prefixes to Cpv and Csv macros, fixed bugs thereby revealed.
- *
- * Revision 2.2  1995/09/07  17:04:33  sanjeev
- * changed NULL_PE to CK_PE_ANY
- *
- * Revision 2.1  1995/09/06  04:20:54  sanjeev
- * new Charm++ syntax, CHARE_BLOCK changes
+ * Revision 2.4  1995-09-19 22:41:19  sanjeev
+ * fixed "handle" bug
  *
  * Revision 2.0  1995/06/05  19:01:24  brunner
  * Reorganized directory structure
@@ -41,9 +35,9 @@
  *
  ***************************************************************************/
 static char ident[] = "@(#)$Header$";
-#include "xp-ytab.h"
-#include "xp-t.h"
-#include "xp-extn.h"
+#include "y.tab.h"
+#include "t.h"
+#include "externs.h"
 
 
 char *CheckSendError() ;
@@ -221,7 +215,7 @@ char *name ;
 }	
 
 
-CheckCharmName()
+int CheckCharmName()
 {
 /* Check if CurrentTypedef is CHARM type, for use by the 
    possibly upcoming handle decl */
@@ -230,19 +224,23 @@ CheckCharmName()
 	char *lastagg ;
 	char *type ;
 	int printtype=1 ;
+	char *sptr ;
+
+	if ( strcmp(CurrentTypedef,"")==0 )
+		return 0 ;
 
 /*	FLUSHBUF() ;cant flush here because we want to remove 
 	the CurrentTypedef */
 	
-	char *sptr = Mystrstr(OutBuf,CurrentTypedef) ;
+	sptr = Mystrstr(OutBuf,CurrentTypedef) ;
 	if ( sptr != NULL ) {	/* This will happen for 1st var in the list */
 		*sptr = '\0' ;
 		type = CurrentTypedef ;
 	}
-	else if ( strcmp(CurrentDeclType,"") != 0 ){
+/***	else if ( strcmp(CurrentDeclType,"") != 0 ){  why was this code here ?
 		type = CurrentDeclType ;
 		printtype = 0 ;
-	}
+	} ***/ 
 	else
 		fprintf(stderr,"TRANSLATOR ERROR in handle decl: %s, line %d: \n",CurrentFileName,CurrentLine) ;
 	FLUSHBUF() ;
@@ -309,6 +307,10 @@ CheckCharmName()
 	if ( ScopedType )
 		RemoveScope(type) ;
 
+	if ( CurrentCharmType == -1 )
+		return 0 ;
+	else
+		return 1 ;
 }
 
 			
