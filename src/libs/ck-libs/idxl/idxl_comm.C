@@ -14,8 +14,8 @@ IDXL_Rec::IDXL_Rec(int entity_) {
 IDXL_Rec::~IDXL_Rec() {}
 void IDXL_Rec::pup(PUP::er &p)
 {
-	p(entity); 
-	shares.pup(p);
+	p|entity; 
+	p|shares;
 }
 void IDXL_Rec::add(int chk,int idx) 
 {

@@ -176,7 +176,7 @@ void TCharm::pup(PUP::er &p) {
   p(nUd);
   for(int i=0;i<nUd;i++)
     ud[i].pup(p);
-  sud.pup(p);
+  p|sud;
   TCharm::setState(inFramework);
 
   if (!p.isUnpacking())
