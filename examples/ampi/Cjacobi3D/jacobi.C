@@ -2,6 +2,13 @@
 #include <stdlib.h>
 #include "mpi.h"
 
+#if CMK_BLUEGENE_CHARM
+extern void BgPrintf(char *);
+#define BGPRINTF(x)  if (thisIndex == 0) BgPrintf(x);
+#else
+#define BGPRINTF(x)
+#endif
+
 #define DIMX 100
 #define DIMY 100
 #define DIMZ 100
@@ -110,9 +117,9 @@ int main(int ac, char** av)
   MPI_Comm_rank(MPI_COMM_WORLD, &thisIndex);
   MPI_Comm_size(MPI_COMM_WORLD, &nblocks);
 
-  if (ac != 4) {
+  if (ac < 4) {
     if (thisIndex == 0)
-      printf("Usage: jacobi X Y Z.\n");
+      printf("Usage: jacobi X Y Z [nIter].\n");
     MPI_Finalize();
   }
   NX = atoi(av[1]);
@@ -123,9 +130,15 @@ int main(int ac, char** av)
       printf("%d x %d x %d != %d\n", NX,NY,NZ, nblocks);
     MPI_Finalize();
   }
+  if (ac == 5)
+    niter = atoi(av[4]);
+  else
+    niter = 20;
 
+/*
   if(thisIndex == 0)
     niter = 20;
+*/
 
   MPI_Bcast(&niter, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
@@ -151,6 +164,7 @@ int main(int ac, char** av)
 
   maxerr = 0.0;
   for(iter=1; iter<=niter; iter++) {
+    BGPRINTF("interation starts at %f\n");
     maxerr = 0.0;
     copyout(cp->sbxm, cp->t, 1, 1, 1, DIMY, 1, DIMZ);
     copyout(cp->sbxp, cp->t, DIMX, DIMX, 1, DIMY, 1, DIMZ);
