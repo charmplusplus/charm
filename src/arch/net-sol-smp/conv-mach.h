@@ -99,8 +99,8 @@
 #define CMK_DONT_USE_HP_MAIN_FIX                           1
 
 
-#define CMK_LBDB_ON					   0
-#define CMK_LBDB_OFF					   1
+#define CMK_LBDB_ON					   1
+#define CMK_LBDB_OFF					   0
 
 
 
