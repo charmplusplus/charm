@@ -379,7 +379,7 @@ int MPI_Comm_free(MPI_Comm *comm);
 /* MPI_Graph_map */
 
 /***environment management***/
-/* MPI_Get_processor_name */
+int MPI_Get_processor_name(char *name, int *resultlen);
 int MPI_Errhandler_create(MPI_Handler_function *function, MPI_Errhandler *errhandler);
 int MPI_Errhandler_set(MPI_Comm comm, MPI_Errhandler errhandler);
 int MPI_Errhandler_get(MPI_Comm comm, MPI_Errhandler *errhandler);
@@ -403,10 +403,16 @@ void MPI_Migrate(void);
 void MPI_Checkpoint(char *dname);
 void *MPI_Get_userdata(int);
 void MPI_Datatype_iscontig(MPI_Datatype datatype, int *flag);
-
 /*Create a new threads array and attach to it*/
 typedef void (*MPI_MainFn) (int,char**);
 void MPI_Register_main(MPI_MainFn mainFn, const char *name);
+
+/*** MPI-2 Functions (Unsorted, no Fortran support) ***/
+int MPI_Type_get_envelope(MPI_Datatype datatype, int *num_integers, int *num_addresses,
+                          int *num_datatypes, int *combiner);
+int MPI_Type_get_contents(MPI_Datatype datatype, int max_integers, int max_addresses,
+                          int max_datatypes, int array_of_integers[], MPI_Aint array_of_addresses[],
+                          MPI_Datatype array_of_datatypes[]);
 
 #include "ampiProjections.h"
 #ifdef __cplusplus
@@ -414,3 +420,4 @@ void MPI_Register_main(MPI_MainFn mainFn, const char *name);
 #endif
 
 #endif
+

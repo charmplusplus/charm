@@ -7,7 +7,7 @@
 
 #define DDTDEBUG /* CkPrintf */
 
-#define CkDDT_TYPE_NULL  -1
+#define CkDDT_TYPE_NULL      -1
 #define CkDDT_DOUBLE          0
 #define CkDDT_INT             1
 #define CkDDT_FLOAT           2
@@ -34,13 +34,21 @@
 #define CkDDT_LB              23
 #define CkDDT_UB              24
 
-#define CkDDT_PRIMITIVE  24
-#define CkDDT_CONTIGUOUS 25
-#define CkDDT_VECTOR     26
-#define CkDDT_HVECTOR    27
-#define CkDDT_INDEXED    28
-#define CkDDT_HINDEXED   29
-#define CkDDT_STRUCT     30
+#define CkDDT_CONTIGUOUS      25
+#define CkDDT_VECTOR          26
+#define CkDDT_HVECTOR         27
+#define CkDDT_INDEXED         28
+#define CkDDT_HINDEXED        29
+#define CkDDT_STRUCT          30
+
+/* for the datatype decoders */
+#define CkDDT_COMBINER_NAMED         1
+#define CkDDT_COMBINER_CONTIGUOUS    2
+#define CkDDT_COMBINER_VECTOR        3
+#define CkDDT_COMBINER_HVECTOR       4
+#define CkDDT_COMBINER_INDEXED       5
+#define CkDDT_COMBINER_HINDEXED      6
+#define CkDDT_COMBINER_STRUCT        7
 
 typedef int CkDDT_Type ;
 class CkDDT ;
@@ -90,6 +98,7 @@ class CkDDT_DataType {
     int baseExtent;
     CkDDT_DataType *baseType;
     int baseIndex;
+    int oldtype;  // = CkDDT::types[baseIndex]
 
   public:
     CkDDT_DataType() { } ;
@@ -108,6 +117,9 @@ class CkDDT_DataType {
     virtual int getRefCount() ;
     virtual void pupType(PUP::er &p, CkDDT* ddt) ;
 
+    virtual int getEnvelope(int *num_integers, int *num_addresses, int *num_datatypes, int *combiner);
+    virtual int getContents(int max_integers, int max_addresses, int max_datatypes,
+                           int array_of_integers[], int array_of_addresses[], int array_of_datatypes[]);
     virtual int serialize(char* userdata, char* buffer, int num, int dir);
 };
 
@@ -118,14 +130,15 @@ class CkDDT_DataType {
 */
 
 class CkDDT_Contiguous : public CkDDT_DataType {
-
-  public:
+ public:
   CkDDT_Contiguous() { };
-  CkDDT_Contiguous(int count, int index, CkDDT_DataType* oldType);
+  CkDDT_Contiguous(int count, int index, CkDDT_DataType* oldType, int oldtype);
   CkDDT_Contiguous(const CkDDT_Contiguous& obj) ;
   CkDDT_Contiguous& operator=(const CkDDT_Contiguous& obj);
   virtual int serialize(char* userdata, char* buffer, int num, int dir);
-  virtual  void pupType(PUP::er &p, CkDDT* ddt) ;
+  virtual void pupType(PUP::er &p, CkDDT* ddt) ;
+  virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner);
+  virtual int getContents(int ni, int na, int nd, int i[], int a[], int d[]);
 };
 
 /*
@@ -145,22 +158,24 @@ class CkDDT_Vector : public CkDDT_DataType {
     int strideLength ;
   public:
     CkDDT_Vector(int count, int blklen, int stride, int index,
-               CkDDT_DataType* type);
+               CkDDT_DataType* type, int oldtype);
     CkDDT_Vector(const CkDDT_Vector& obj) ;
     CkDDT_Vector& operator=(const CkDDT_Vector& obj);
     CkDDT_Vector() { } ;
     ~CkDDT_Vector() { } ;
     virtual int serialize(char* userdata, char* buffer, int num, int dir);
     virtual  void pupType(PUP::er &p, CkDDT* ddt) ;
+    virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner);
+    virtual int getContents(int ni, int na, int nd, int i[], int a[], int d[]);
 };
 
 /*
-  This class maintains the HVector Datatype. 
-  HVector type allows replication of a datatype into locations 
-  that consist of equally spaced 
-  blocks. Each block is obtained by concatenating the same number of 
+  This class maintains the HVector Datatype.
+  HVector type allows replication of a datatype into locations
+  that consist of equally spaced
+  blocks. Each block is obtained by concatenating the same number of
   copies of the old datatype.
-  The Vector type assumes that the stride between successive blocks 
+  The Vector type assumes that the stride between successive blocks
   is a multiple of the oldtype
   extent. HVector type allows a stride which consists of an
   arbitrary number of bytes.
@@ -171,23 +186,25 @@ class CkDDT_HVector : public CkDDT_Vector {
   public:
     CkDDT_HVector() { } ;
     CkDDT_HVector(int nCount,int blength,int strideLen,int index,
-                CkDDT_DataType* type);
+                CkDDT_DataType* type, int oldtype);
     ~CkDDT_HVector() { } ;
     CkDDT_HVector(const CkDDT_HVector& obj) ;
     CkDDT_HVector& operator=(const CkDDT_HVector& obj);
     virtual int serialize(char* userdata, char* buffer, int num, int dir);
     virtual void pupType(PUP::er &p, CkDDT* ddt);
+    virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner);
+    virtual int getContents(int ni, int na, int nd, int i[], int a[], int d[]);
 };
 
 /*
-  The Indexed type allows one to specify a noncontiguous data 
+  The Indexed type allows one to specify a noncontiguous data
   layout where displacements between
-  successive blocks need not be equal. 
+  successive blocks need not be equal.
   This allows one to gather arbitrary entries from an array
-  and make a single buffer out of it. 
+  and make a single buffer out of it.
   All block displacements are measured  in units of oldtype extent.
 
-  arrayBlockLength - holds the array of block lengths 
+  arrayBlockLength - holds the array of block lengths
   arrayDisplacements - holds the array of displacements.
 */
 
@@ -199,18 +216,20 @@ class CkDDT_Indexed : public CkDDT_DataType {
 
   public:
 
-    CkDDT_Indexed(int count, int* arrBlock, int* arrDisp, int index, 
-                CkDDT_DataType* type);
+    CkDDT_Indexed(int count, int* arrBlock, int* arrDisp, int index,
+                CkDDT_DataType* type, int oldtype);
     CkDDT_Indexed(const CkDDT_Indexed& obj);
     CkDDT_Indexed& operator=(const CkDDT_Indexed& obj) ;
     CkDDT_Indexed() { } ;
     ~CkDDT_Indexed() ;
     virtual int serialize(char* userdata, char* buffer, int num, int dir);
     virtual  void pupType(PUP::er &p, CkDDT* ddt) ;
+    virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner);
+    virtual int getContents(int ni, int na, int nd, int i[], int a[], int d[]);
 };
 
 /*
-  The HIndexed type allows one to specify a noncontiguous data 
+  The HIndexed type allows one to specify a noncontiguous data
   layout where displacements between
   successive blocks need not be equal.
   This allows one to gather arbitrary entries from an array
@@ -226,19 +245,21 @@ class CkDDT_HIndexed : public CkDDT_Indexed {
   public:
     CkDDT_HIndexed() { } ;
     CkDDT_HIndexed(int count, int* arrBlock, int* arrDisp, int index, 
-                 CkDDT_DataType* type);
+                 CkDDT_DataType* type, int oldtype);
     CkDDT_HIndexed(const CkDDT_HIndexed& obj);
     CkDDT_HIndexed& operator=(const CkDDT_HIndexed& obj) ;
     virtual int serialize(char* userdata, char* buffer, int num, int dir);
     virtual void pupType(PUP::er &p, CkDDT* ddt);
+    virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner);
+    virtual int getContents(int ni, int na, int nd, int i[], int a[], int d[]);
 };
 
 /*
-  CkDDT_Struct is the most general type constructor. 
+  CkDDT_Struct is the most general type constructor.
   It further generalizes CkDDT_HIndexed in
-  that it allows each block to consist of replications of 
-  different datatypes. 
-  The intent is to allow descriptions of arrays of structures, 
+  that it allows each block to consist of replications of
+  different datatypes.
+  The intent is to allow descriptions of arrays of structures,
   as a single datatype.
 
   arrayBlockLength - array of block lengths
@@ -253,15 +274,18 @@ class CkDDT_Struct : public CkDDT_DataType {
     int* arrayDisplacements ;
     int* index;
     CkDDT_DataType** arrayDataType;
+    int* oldtypes;
 
   public:
     CkDDT_Struct() { } ;
     CkDDT_Struct(int count, int* arrBlock, int* arrDisp, int *index,
-               CkDDT_DataType **type);
+               CkDDT_DataType **type, int* oldtypes);
     CkDDT_Struct(const CkDDT_Struct& obj);
     CkDDT_Struct& operator=(const CkDDT_Struct& obj) ;
     virtual int serialize(char* userdata, char* buffer, int num, int dir);
     virtual  void pupType(PUP::er &p, CkDDT* ddt) ;
+    virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner);
+    virtual int getContents(int ni, int na, int nd, int i[], int a[], int d[]);
 };
 
 /*
@@ -275,7 +299,7 @@ class CkDDT_Struct : public CkDDT_DataType {
   Type_Vector -
   Type_HVector -
   Type_Indexed - 
-  Type_HIndexed - 
+  Type_HIndexed -
   Type_Struct - builds the new type 
                 Contiguous/Vector/Hvector/Indexed/HIndexed/Struct  from the old
                 Type provided and stores the new type in the table.
@@ -297,35 +321,58 @@ class CkDDT {
     typeTable = new CkDDT_DataType*[max_types];
     types = new int[max_types];
     typeTable[0] = new CkDDT_DataType(CkDDT_DOUBLE);
+    types[0] = CkDDT_DOUBLE;
     typeTable[1] = new CkDDT_DataType(CkDDT_INT);
+    types[1] = CkDDT_INT;
     typeTable[2] = new CkDDT_DataType(CkDDT_FLOAT);
+    types[2] = CkDDT_FLOAT;
     typeTable[3] = new CkDDT_DataType(CkDDT_COMPLEX);
+    types[3] = CkDDT_COMPLEX;
     typeTable[4] = new CkDDT_DataType(CkDDT_LOGICAL);
+    types[4] = CkDDT_LOGICAL;
     typeTable[5] = new CkDDT_DataType(CkDDT_CHAR);
+    types[5] = CkDDT_CHAR;
     typeTable[6] = new CkDDT_DataType(CkDDT_BYTE);
+    types[6] = CkDDT_BYTE;
     typeTable[7] = new CkDDT_DataType(CkDDT_PACKED);
+    types[7] = CkDDT_PACKED;
     typeTable[8] = new CkDDT_DataType(CkDDT_SHORT);
+    types[8] = CkDDT_SHORT;
     typeTable[9] = new CkDDT_DataType(CkDDT_LONG);
+    types[9] = CkDDT_LONG;
     typeTable[10] = new CkDDT_DataType(CkDDT_UNSIGNED_CHAR);
+    types[10] = CkDDT_UNSIGNED_CHAR;
     typeTable[11] = new CkDDT_DataType(CkDDT_UNSIGNED_SHORT);
+    types[11] = CkDDT_UNSIGNED_SHORT;
     typeTable[12] = new CkDDT_DataType(CkDDT_UNSIGNED);
+    types[12] = CkDDT_UNSIGNED;
     typeTable[13] = new CkDDT_DataType(CkDDT_UNSIGNED_SHORT);
+    types[13] = CkDDT_UNSIGNED_SHORT;
     typeTable[14] = new CkDDT_DataType(CkDDT_LONG_DOUBLE);
+    types[14] = CkDDT_LONG_DOUBLE;
     typeTable[15] = new CkDDT_DataType(CkDDT_FLOAT_INT);
+    types[15] = CkDDT_FLOAT_INT;
     typeTable[16] = new CkDDT_DataType(CkDDT_DOUBLE_INT);
+    types[16] = CkDDT_DOUBLE_INT;
     typeTable[17] = new CkDDT_DataType(CkDDT_LONG_INT);
+    types[17] = CkDDT_LONG_INT;
     typeTable[18] = new CkDDT_DataType(CkDDT_2INT);
+    types[18] = CkDDT_2INT;
     typeTable[19] = new CkDDT_DataType(CkDDT_SHORT_INT);
+    types[19] = CkDDT_SHORT_INT;
     typeTable[20] = new CkDDT_DataType(CkDDT_LONG_DOUBLE_INT);
+    types[20] = CkDDT_LONG_DOUBLE_INT;
     typeTable[21] = new CkDDT_DataType(CkDDT_2FLOAT);
+    types[21] = CkDDT_2FLOAT;
     typeTable[22] = new CkDDT_DataType(CkDDT_2DOUBLE);
+    types[22] = CkDDT_2DOUBLE;
     typeTable[23] = new CkDDT_DataType(CkDDT_LB);
+    types[23] = CkDDT_LB;
     typeTable[24] = new CkDDT_DataType(CkDDT_UB);
+    types[24] = CkDDT_UB;
     num_types = 25;
 
     int i;
-    for(i=0 ; i < num_types; i++)
-      types[i] = CkDDT_PRIMITIVE ;
     for(i=num_types ; i < max_types; i++)
     {
       typeTable[i] = 0;
@@ -352,10 +399,13 @@ class CkDDT {
     if(nIndex<num_types) return (types[nIndex]==CkDDT_CONTIGUOUS);
     else return 0;
   }
-  int  getSize(int nIndex, int count=1);
-  int  getExtent(int nIndex);
-  int  getLB(int nIndex);
-  int  getUB(int nIndex);
+  int getSize(int nIndex, int count=1);
+  int getExtent(int nIndex);
+  int getLB(int nIndex);
+  int getUB(int nIndex);
+  int getEnvelope(int nIndex, int *num_integers, int *num_addresses, int *num_datatypes, int *combiner);
+  int getContents(int nIndex, int max_integers, int max_addresses, int max_datatypes,
+                 int array_of_integers[], int array_of_addresses[], int array_of_datatypes[]);
   ~CkDDT() ;
 };
 

@@ -2230,6 +2230,13 @@ int MPI_Pack_size(int incount,MPI_Datatype datatype,MPI_Comm comm,int *sz)
   return incount*dttype->getSize() ;
 }
 
+CDECL
+int MPI_Get_processor_name(char *name, int *resultlen){
+  AMPIAPI("MPI_Get_processor_name");
+  sprintf(name,"AMPI VP#%d\n",getAmpiParent()->thisIndex);
+  *resultlen = strlen(name);
+}
+
 /* Error handling */
 #if defined(USE_STDARG)
 void error_handler(MPI_Comm *, int *, ...);
@@ -2494,14 +2501,17 @@ void MPI_Datatype_iscontig(MPI_Datatype datatype, int *flag){
   *flag = getDDT()->iscontig(datatype);
 }
 
-// Hack for some weird MPIR_* functions
-int MPIR_Err_setmsg( int errclass, int errkind,
-                     const char *routine_name,
-                     const char *generic_string,
-                     const char *default_string, ... )
-{
-  /* empty */
-  return 0;
+CDECL
+int MPI_Type_get_envelope(MPI_Datatype datatype, int *ni, int *na, int *nd, int *combiner){
+  AMPIAPI("MPI_Type_get_envelope");
+  return getDDT()->getEnvelope(datatype,ni,na,nd,combiner);
+}
+
+CDECL
+int MPI_Type_get_contents(MPI_Datatype datatype, int ni, int na, int nd, int i[], MPI_Aint a[], MPI_Datatype d[]){
+  AMPIAPI("MPI_Type_get_contents");
+  return getDDT()->getContents(datatype,ni,na,nd,i,a,d);
 }
 
 #include "ampi.def.h"
+
