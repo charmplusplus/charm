@@ -40,34 +40,41 @@ that causes a thread to be automatically scheduled by the converse
 scheduler {\tt CsdScheduler}.
 
 \function{int CthImplemented()}
+\index{CthImplemented}
 \desc{Returns true if the current hardware platform supports the threads
 functions described below.}
 
 \function{typedef struct CthThreadStruct *CthThread;}
+\index{CthThread}
 \desc{This is an opaque type defined in {\tt converse.h}.  It represents
 a first-class thread object.  No information is publicized about the
 contents of a CthThreadStruct.}
 
 \function{typedef void (CthVoidFn)();}
+\index{CthVoidFn}
 \desc{This is a type defined in {\tt threads.h}.  It represents
 a function that returns nothing.}
 
 \function{typedef CthThread (CthThFn)();}
+\index{CthThFn}
 \desc{This is a type defined in {\tt threads.h}.  It represents
 a function that returns a CthThread.}
 
 \function{void CthInit()}
+\index{CthInit}
 \desc{Caution: you must call either {\tt ConverseInit} {\tt or} {\tt
 CthInit} before calling any of the thread functions described below,
 but you must {\tt not} call both.}
 
 \function{CthThread CthSelf()}
+\index{CthSelf}
 \desc{Returns the currently-executing thread.  Note: even the initial
 flow of control that inherently existed when the program began
 executing {\tt main} counts as a thread.  You may retrieve that thread
 object using {\tt CthSelf} and use it like any other.}
 
 \function{void CthResume(CthThread t)}
+\index{CthResume}
 \desc{Immediately transfers control to thread {\tt t}.  Note:
 normally, the user of a thread package wouldn't explicitly choose
 which thread to transfer to.  Instead, the user would rely upon a
@@ -79,6 +86,7 @@ barriers, and other synchronization devices should also probably
 rely on {\tt CthSuspend} and {\tt CthAwaken}.}
 
 \function{CthThread CthCreate(CthVoidFn fn, void *arg, int size)}
+\index{CthCreate}
 \desc{Creates a new thread object.  The thread is not given control
 yet.  The thread is not passed to any scheduler.  When (and if) the
 thread eventually receives control, it will begin executing the
@@ -94,12 +102,14 @@ CthSelf} in {\tt main}), and it can be used like any other {\tt
 CthThread}.}
 
 \function{void CthFree(CthThread t)}
+\index{CthFree}
 \desc{Frees thread {\tt t}.  You may even free the currently-executing
 thread, although the free will actually be postponed until the thread
 suspends.  This is how a thread terminates itself: it calls {\tt
 CthFree(CthSelf())}, then gives up control to another thread.}
 
 \function{void CthSuspend()}
+\index{CthSuspend}
 \desc{This is part of the scheduler-interface.  When a scheduler is
 being used, threads should call {\tt CthSuspend} when they wish to
 give up control of the CPU.  {\tt CthSuspend} will then automatically
@@ -109,6 +119,7 @@ user-supplied ``choose-next'' function (see {\tt CthSetStrategy}
 below).}
 
 \function{void CthAwaken(CthThread t)}
+\index{CthAwaken}
 \desc{This is part of the scheduler-interface.  When a scheduler is
 being used, this function should be used to notify the scheduler that
 thread {\tt t} wants the CPU.  This will enable the scheduler to
@@ -119,6 +130,7 @@ function (see {\tt CthSetStrategy} below).  It is illegal to call
 the thread has been scheduled since the last awaken.}
 
 \function{void CthSetStrategy(CthThread t, CthVoidFn awakenfn, CthThFn choosefn)}
+\index{CthSetStrategy}
 \desc{This is part of the scheduler-interface.  It should be used by
 the creator of thread {\tt t} to specify the scheduling functions to
 be used for thread {\tt t}.  The scheduling functions must have the
@@ -159,6 +171,7 @@ module to resume {\tt t} whenever it so desires: presumably, the
 scheduling module knows when its threads want the CPU.}
 
 \function{void CthYield()}
+\index{CthYield}
 \desc{This function is part of the scheduler-interface.  It simply
 executes {\tt \{ CthAwaken(CthSelf()); CthSuspend(); \} }.  This combination
 gives up control temporarily, but ensures that control will eventually
@@ -207,6 +220,7 @@ that {\tt var} will be set to when {\tt t} is running.}
 }
 
 \function{void CthSetStrategyDefault(CthThread t)}
+\index{CthSetStrategyDefault}
 \desc{This the simple scheduler provided to converse users as a
 convenience.  Calling this function on a thread {\tt t} causes thread
 {\tt t} to be scheduled by the built-in converse scheduler {\tt

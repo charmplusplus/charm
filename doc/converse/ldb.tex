@@ -1,26 +1,43 @@
 \chapter{Load Balancer Calls}
 
-\internal{
-\function {void ClbInit(void)}
-Routine called at scheduler startup to allow the load balancer to
-register its own message handlers.
-}
 
-\function {void ClbEnqueue(Message *msg, FunctionPtr send\_func)}
-Function called by a handler to let the load balancer know about a
-``seed'' message. If the seed is to be processed locally, the
-load balancer will
-enqueue it in the scheduler's queue to be eventually executed.
-{\sf send\_func} specifies the function
-which should be used to send the seed to another processor
-if it is not to be processed locally.
+\function{CldNewSeedFromLocal()}
+\index{CldNewSeedFromLocal}
+\desc{}
 
-\function {void ClbEnqueuePrio(Message *msg, FunctionPtr send\_func,
-void *prio, int len)} 
-Same as {\sf ClbEnqueue()}, except that a priority {\sf prio} of length
-{\sf len} bytes is associated with the message.
+\function{CldNewSeedFromNet()}
+\index{CldNewSeedFromNet}
+\desc{}
 
+\function{CldFillLdb()}
+\index{CldFillLdb}
+\desc{}
 
+\function{CldStripLdb()}
+\index{CldStripLdb}
+\desc{}
+
+%\internal{
+%\function {void ClbInit(void)}
+%Routine called at scheduler startup to allow the load balancer to
+%register its own message handlers.
+%}
+%
+%\function {void ClbEnqueue(Message *msg, FunctionPtr send\_func)}
+%Function called by a handler to let the load balancer know about a
+%``seed'' message. If the seed is to be processed locally, the
+%load balancer will
+%enqueue it in the scheduler's queue to be eventually executed.
+%{\sf send\_func} specifies the function
+%which should be used to send the seed to another processor
+%if it is not to be processed locally.
+%
+%\function {void ClbEnqueuePrio(Message *msg, FunctionPtr send\_func,
+%void *prio, int len)} 
+%Same as {\sf ClbEnqueue()}, except that a priority {\sf prio} of length
+%{\sf len} bytes is associated with the message.
+%
+%
 %The most general load balancing scheme will have three opportunities
 %to migrate load.  The first will be when {\sf ClbEnQueue()} is called.
 %This routine will either immediately send the message elsewhere for

@@ -17,15 +17,18 @@ need to be pointers to converse messages.  They can be pointers to
 anything.
 
 \function{typedef struct CmmTableStruct *CmmTable}
+\index{CmmTable}
 \desc{This opaque type is defined in {\tt converse.h}.  It represents
 a table which can be used to store messages.  No information is publicized
 about the format of a CmmTableStruct.}
 
 \function{\#define CmmWildCard (-1)}
+\index{CmmWildCard}
 \desc{This \#define is in {\tt converse.h}.  The tag -1 is the ``wild
 card'' for the tag-based lookup functions in the message manager.}
 
 \function{CmmTable CmmNew();}
+\index{CmmNew}
 \desc{This function creates a new message-table and returns it.}
 
 \function{void CmmPut(CmmTable t, int ntags, int *tags, void *msg)}
@@ -35,6 +38,7 @@ array.  The {\tt tags} array contains the tags themselves.  {\tt msg}
 and {\tt t} specify the message and table, respectively.}
 
 \function{void *CmmGet(CmmTable t, int ntags, int *tags, int *ret\_tags)}
+\index{CmmGet}
 \desc{This function looks up a message from a message table.  A
 message will be retrieved that ``matches'' the specified {\tt tags}
 array.  If a message is found that ``matches'', the tags with which
@@ -50,10 +54,12 @@ CmmWildCard} (yes, that means if I can {\tt store} messages with
 wildcard tags, making it easier to find those messages on retrieval).}
 
 \function{void *CmmProbe(CmmTable t, int ntags, int *tags, int *ret\_tags)}
+\index{CmmProbe}
 \desc{This function is identical to {\tt CmmGet} above, except that
 the message is not deleted from the table.}
 
 \function{void CmmFree(CmmTable t);}
+\index{CmmFree}
 \desc{This function frees a message-table t.  WARNING: It also frees all
 the messages that have been inserted into the message table.  It assumes
 that the correct way to do this is to call {\tt CmiFree} on the message.

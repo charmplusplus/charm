@@ -12,7 +12,10 @@
 % REVISION HISTORY:
 %
 % $Log$
-% Revision 1.3  1995-10-30 17:33:54  milind
+% Revision 1.4  1995-11-01 21:16:23  milind
+% Added index entries.
+%
+% Revision 1.3  1995/10/30  17:33:54  milind
 % Changed Cth variables macros to Ctv macros.
 % Added "More on Shared Memory Machines" section.
 %
@@ -24,15 +27,26 @@
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\chapter{Global Variable Usage}
+\chapter{Machine Model and Global Variables}
 
+
+The machine model assumed by Converse consists of a collection of
+nodes, where each node comprises of a number of processors that
+share memory. In addition, each of the processors could have multiple
+threads running on them which share code and data but have different
+stacks. On networks of workstations or distributed memory MIMD
+machines, number of processors in each node is assumed to be one and on
+machines that do not have native thread support, there is only one
+thread per processor. Converse provides functions to determine rank of
+a processor within a node and a consistent access/modification
+mechanism to manipulate global variables.
+
+\section{Global Variables}
 
 Global variables are allowed in Converse via specific macros.  These macros 
 ensure that the program runs portably on various parallel machines. 
 Three classes of global variables are supported: node-private,
 process-private, and thread-private variables. 
-%These classes are
-%strongly related to the machine model described in Section x.
 
 \begin{description}
 \item[Node-private global variables] are specific to a node. They are
@@ -64,6 +78,11 @@ CsvInitialize(type,variable)
 CsvAccess(variable)
 \end{verbatim}
 
+\index{CsvDeclare}
+\index{CsvStaticDeclare}
+\index{CsvExtern}
+\index{CsvInitialize}
+\index{CsvAccess}
 
 Macros for process-private variables:
 \begin{verbatim}
@@ -73,6 +92,11 @@ CpvExtern(type,variable)
 CpvInitialize(type,variable)
 CpvAccess(variable)
 \end{verbatim}
+\index{CpvDeclare}
+\index{CpvStaticDeclare}
+\index{CpvExtern}
+\index{CpvInitialize}
+\index{CpvAccess}
 
 Macros for thread-private variables:
 \begin{verbatim}
@@ -82,9 +106,14 @@ CtvExtern(type,variable)
 CtvInitialize(type,variable)
 CtvAccess(variable)
 \end{verbatim}
+\index{CtvDeclare}
+\index{CtvStaticDeclare}
+\index{CtvExtern}
+\index{CtvInitialize}
+\index{CtvAccess}
 
 
-\section{Example of Usage}
+\subsection{Example of Usage}
 
     A sample code to illustrate the usage of the macros is provided
     in Figure~\ref{fig:cpv}.
@@ -127,28 +156,32 @@ File Module1.c
     int func1() 
     {
          CpvAccess(p).x = 0;
-         CpvAccess(p).y = 0;
+         CpvAccess(p).y = CpvAccess(p).x + 1;
     }
 \end{verbatim}
 \caption{An example code for global variable usage}
 \label{fig:cpv}
 \end{figure}
 
-\section{More on Shared-Memory machines}
+\section{Utility Functions}
 
-To simplify programming with global variables on shared memory machines,
+To further simplify programming with global variables on shared memory machines,
 Converse provides following functions and/or macros. \note{These functions
+are defined on machines other than shared-memory machines also, and
 have the effect of only one processor per node and only one thread per 
-processor on other machines.}
+processor.}
 
 \function{int CmiMyRank()}
+\index{CmiMyRank}
 \desc{Returns the rank of the calling processor within a shared memory node.}
 
 \function{void CmiNodeBarrier()}
+\index{CmiNodeBarrier}
 \desc{Provide barrier synchronization at the node level, i.e. all the 
 processors belonging to the node participate in this barrier.}
 
 \function{void *CmiSvAlloc(int size)}
+\index{CmiSvAlloc}
 \desc{Allocates a block of memory of \param{size} bytes from the heap in node's 
 local memory and returns pointer to the start of this block. \note{On 
 machines other than shared-memory machines, this is equivalent to 
