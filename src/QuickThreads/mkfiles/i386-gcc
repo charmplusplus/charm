@@ -3,7 +3,7 @@ CC=gcc -I. -O2
 
 all: qt stp testpgm
 
-qt:
+qt: md/i386.h qt.c md/i386.s
 	rm -f qtmd.h
 	ln -s md/i386.h qtmd.h
 	$(CC) -pedantic -Wall -c -o qt.o qt.c

@@ -3,7 +3,7 @@ CC=gcc -I. -O2
 
 all: qt stp testpgm
 
-qt:
+qt: md/i386.s md/i386_b.s md/i386.h qt.c qtmds.s
 	sed 's/\/\*/\/\//' < md/i386.s > qtmds.s
 	sed 's/\/\*/\/\//' < md/i386_b.s > qtmdb.s
 	rm -f qtmd.h

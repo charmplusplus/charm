@@ -3,7 +3,7 @@ CC=gcc -I. -O2
 
 all: qt stp testpgm
 
-qt:
+qt: md/stub.h qt.c md/stub.c
 	rm -f qtmd.h
 	ln -s md/stub.h qtmd.h
 	$(CC) -pedantic -Wall -c -o qt.o qt.c

@@ -3,7 +3,7 @@ CC=gcc -I. -O2
 
 all: qt stp testpgm
 
-qt:
+qt: md/mips.h qt.c md/mips-irix5.s
 	rm -f qtmd.h
 	ln -s md/mips.h qtmd.h
 	$(CC) -pedantic -Wall -c -o qt.o qt.c

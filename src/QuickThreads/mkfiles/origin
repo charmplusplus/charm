@@ -2,7 +2,7 @@ CC=cc -64 -I. -O
 
 all: qt stp testpgm
 
-qt:
+qt: md/mipspro.h qt.c md/mipspro.s
 	rm -f qtmd.h
 	ln -s md/mipspro.h qtmd.h
 	$(CC) -c -o qt.o qt.c

@@ -3,7 +3,7 @@ CC=cc -I. -O
 
 all: qt stp testpgm
 
-qt:
+qt: md/sparc.h qt.c md/sparc.s
 	rm -f qtmd.h
 	ln -s md/sparc.h qtmd.h
 	$(CC) -c -o qt.o qt.c
