@@ -22,6 +22,7 @@
 # include <iostream>
   typedef std::streambuf Ck_std_streambuf;
   typedef std::ostream Ck_std_ostream;
+  using std::endl;
 #endif
 
 /** 
