@@ -453,12 +453,13 @@ void CkMigratable::CkAbort(const char *why) const {
 
 void CkMigratable::ResumeFromSync(void)
 {
-	CkAbort("::ResumeFromSync() not defined for this array element!\n");
+//	CkAbort("::ResumeFromSync() not defined for this array element!\n");
 }
 #if CMK_LBDB_ON  //For load balancing:
 void CkMigratable::ckFinishConstruction(void) 
 {
-	if ((!usesAtSync) || barrierRegistered) return;
+//	if ((!usesAtSync) || barrierRegistered) return;
+	if (barrierRegistered) return;
 	DEBL((AA"Registering barrier client for %s\n"AB,idx2str(thisIndexMax)));
 	ldBarrierHandle = myRec->getLBDB()->AddLocalBarrierClient(
 		(LDBarrierFn)staticResumeFromSync,(void*)(this));
