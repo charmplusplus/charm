@@ -29,10 +29,10 @@ Orion Sky Lawlor, olawlor@acm.org, 7/22/2002
 /*************** Simple classes ***************/
 
 template <class A,class B> 
-inline void operator|(PUP::er &p,typename std::pair<A,B> &v)
+inline void operator|(PUP::er &p,typename std::pair<const A,B> &v)
 {
   p.syncComment(PUP::sync_index);
-  p|v.first;
+  p|*(A *)&v.first; /* cast away constness on A */
   p.syncComment(PUP::sync_item);
   p|v.second;
 }
