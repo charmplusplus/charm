@@ -404,7 +404,7 @@ onintr failure
 ##############################################################################
 
 if ($?LANGUAGE == 0) then
-    set LANGUAGE=charm
+    set LANGUAGE=charm++
     if ($?SEQUENTIAL) set LANGUAGE=c
 endif
 
@@ -470,38 +470,6 @@ foreach FILE ($FILES)
       /bin/rm -f $BASE.o $BASE.f.o
   endif
   switch ($FILE)
-    case "*.p"
-      set DELETE=($DELETE $BASE.headers)
-      ($ECHOCMD ; $CMK_CPP_CHARM $OPTS_CPP -I$CHARMINC $BASE.p > $TMP.cpp)
-      ($ECHOCMD ; $CHARMBIN/charmfilter < $TMP.cpp | $CMK_M4 > $TMP.space)
-      ($ECHOCMD ; $CHARMBIN/charmxlat $TMP.space $TMP.c)
-      if ($status) goto failure
-      ($ECHOCMD ; $CMK_CC $OPTS_CC -I$CHARMINC -c $TMP.c -o $TMP.o)
-      if ($status) goto failure
-      if ($?OBJECT == 0) then
-          ($ECHOCMD ; /bin/mv $TMP.o $BASE.o)
-      else
-          set OBJECTFILES=( $OBJECTFILES $TMP.o )
-      endif
-      breaksw
-    case "*.P"
-      # Put pgm.P into pgm.TMP.P.C because CC needs source files to end with .C
-      echo '#include "charm++.h"' >> $TMP.P.C
-      echo '#line 1 "'$BASE.P'"' >> $TMP.P.C
-      /bin/cat $BASE.P >> $TMP.P.C
-      ($ECHOCMD ; $CMK_CXXPP $OPTS_CPP -I$CHARMINC $TMP.P.C > $TMP.cpp)
-      ($ECHOCMD ; $CHARMBIN/$CMK_XLATPP $TMP.cpp $TMP.xlat)
-      if ($status) goto failure
-      ($ECHOCMD ; /bin/cat $BASE.headers > $TMP.$CMK_CPP_SUFFIX)
-      ($ECHOCMD ; /bin/cat $TMP.xlat >> $TMP.$CMK_CPP_SUFFIX)
-      ($ECHOCMD ; $CMK_CXX $OPTS_CXX -I$CHARMINC -c $TMP.$CMK_CPP_SUFFIX -o $TMP.o)
-      if ($status) goto failure
-      if ($?OBJECT == 0) then
-        ($ECHOCMD ; /bin/mv $TMP.o $BASE.o)
-      else
-        set OBJECTFILES=( $OBJECTFILES $TMP.o )
-      endif
-      breaksw
     case "*.ci"
       ($ECHOCMD ; $CHARMBIN/charmxi $BASE.ci)
       if ($status) goto failure
@@ -513,14 +481,6 @@ foreach FILE ($FILES)
     case "*.sdag"
       ($ECHOCMD ; $CHARMBIN/sdagx $BASE.sdag)
       if ($status) goto failure
-      breaksw
-    case "*.c"
-      ($ECHOCMD ; $CMK_CC $OPTS_CC -I$CHARMINC -c $BASE.c -o $BASE.o)
-      if ($status) goto failure
-      if ($?OBJECT) then
-	if ($OBJECT != $BASE.o) set DELETE=( $DELETE $BASE.o )
-        set OBJECTFILES=( $OBJECTFILES $BASE.o )
-      endif
       breaksw
     case "*.c"
       ($ECHOCMD ; $CMK_CC $OPTS_CC -I$CHARMINC -c $BASE.c -o $BASE.o)
@@ -646,7 +606,7 @@ endsw
 
 # Check for valid choice of TRACEMODE
 
-if (($LANGUAGE == charm) || ($LANGUAGE == charm++) || ($LANGUAGE == idl) || ($LANGUAGE == converse) || ($LANGUAGE == converse++) ) then
+if (($LANGUAGE == charm++) || ($LANGUAGE == idl) || ($LANGUAGE == converse) || ($LANGUAGE == converse++) ) then
 
     if (! -e $CHARMLIB/libtrace-none.a) then
         echo "charmc: trace libraries not installed."
@@ -713,16 +673,8 @@ rm -f CHARMC-MOD.TMP.dat CHARMC-MOD.TMP.c CHARMC-MOD.TMP.o
 #
 ###############################################################################
 
-if (($LANGUAGE == charm) || ($LANGUAGE == charm++) || ($LANGUAGE == idl)) then
-    if ($LANGUAGE == charm) then
-	echo 'void _CK_module_init_fn() {}' > CHARMC-MOD.TMP.c
-	($ECHOCMD ; $CMK_CC $OPTS_CC -c -o CHARMC-MOD.TMP.o CHARMC-MOD.TMP.c)
-        ($ECHOCMD ; $CMK_LD $OPTS_LD -o CHARMC-PRE.TMP.xxx -L$CHARMLIB \
-                      $BAL_OBJ $OBJECTFILES $LIBRARIES \
-		      CHARMC-MOD.TMP.o -lck-core -ltrace-$TRACEMODE \
-                      -lck-cplus-n -lconv-cplus-n -lconv-core \
-		      -lck-defmain-std -lcharm -lm $CMK_LIBS)
-    else if ($LANGUAGE == charm++) then
+if (($LANGUAGE == charm++) || ($LANGUAGE == idl)) then
+    if ($LANGUAGE == charm++) then
 	echo 'void _CK_module_init_fn() {}' > CHARMC-MOD.TMP.c
 	($ECHOCMD ; $CMK_CC $OPTS_CC -c -o CHARMC-MOD.TMP.o CHARMC-MOD.TMP.c)
         ($ECHOCMD ; $CMK_LDXX $OPTS_LDXX -o CHARMC-PRE.TMP.xxx -L$CHARMLIB \
@@ -760,13 +712,6 @@ endif
 ###############################################################################
 
 switch ($LANGUAGE)
-    case "charm"
-        ($ECHOCMD ; $CMK_LD $OPTS_LD -o $OBJECT -L$CHARMLIB \
-                      CHARMC-MOD.TMP.o $BAL_OBJ $OBJECTFILES \
-                      $LIBRARIES -lck-core -ltrace-$TRACEMODE \
-                      -lck-cplus-n -lconv-cplus-n -lconv-core \
-		      -lck-defmain-std -lcharm -lm $CMK_LIBS)
-        breaksw
     case "charm++"
         ($ECHOCMD ; $CMK_LDXX $OPTS_LDXX -o $OBJECT -L$CHARMLIB \
 		      CHARMC-MOD.TMP.o $BAL_OBJ $OBJECTFILES \

@@ -4,10 +4,10 @@
 # rules for building:
 #
 #     * The CONVERSE libraries
-#     * The CHARM libraries
-#     * The CHARM++ libraries
-#     * The CHARM translator
-#     * The CHARM++ translator
+#     * Charm++ runtime
+#     * ITC++ Translator
+#     * Charm++ IDL Translator
+#     * Languages
 # 
 # This Makefile is common to all machines.  This works because the charmc
 # is smart enough to "conceal" the differences between machines.  charmc
@@ -17,7 +17,7 @@
 # option, you can do so by setting OPTS.  For example, if you need a lot
 # of debugging information, you could type:
 #
-#     make charm OPTS="-g -save -verbose"
+#     make charm++ OPTS="-g -save -verbose"
 #
 ###############################################################################
 
@@ -25,9 +25,9 @@ SHELL=/bin/sh
 
 all: charm++ IDL smsg pvm sdag
 
-charm: converse charmxlat charmlibs libcharm
+charm: converse charmlibs
 
-charm++: charm charmxlat++ charmfilter++ charmxi libck-cplus-y.a libck-defmain-cpp.a
+charm++: charm charmxi libck-cplus-y.a libck-defmain-cpp.a
 
 IDL: charm++ charmidl libidl.a
 
@@ -37,19 +37,13 @@ pvm: converse libpvmc.a
 
 sdag: charm++ sdagx libsdag.a
 
-translators: sdagx charmxlat charmfilter charmxlat++ charmfilter++ charmxi conv-cpm charmidl
+translators: sdagx charmxi conv-cpm charmidl
 
 test-all: all
 	(cd ../pgms ; make test-all)
 
 test-converse: converse
 	(cd ../pgms ; make test-converse)
-
-test-charm: charm
-	(cd ../pgms ; make test-charm)
-
-test-charm++: charm++
-	(cd ../pgms ; make test-charm++)
 
 CHARMC=../bin/charmc $(CHARMOPTS) $(OPTS)
 
@@ -62,9 +56,9 @@ SEQCHARMC=../bin/charmc -seq $(CHARMOPTS)
 #
 ###############################################################################
 
-ALLHEADERS=charm++.h charm.h charm++-inc.h charm-inc.h dagger.h cpthreads.h converse.h conv-mach.h simplemsg.h trace.h generic_redn.h pvmc.h pvm3.h sdag.h CDep.h CCounter.h CMsgBuffer.h CWhenTrigger.h TList.h idl.h # pglib.h
+ALLHEADERS=charm++.h charm.h charm++-inc.h charm-inc.h cpthreads.h converse.h conv-mach.h simplemsg.h trace.h pvmc.h pvm3.h sdag.h CDep.h CCounter.h CMsgBuffer.h CWhenTrigger.h TList.h idl.h
 
-ALLINTERFACES=GENERIC-ACC.int GENERIC-HIST.int GENERIC-REDN.int barrier_redn.int cache.int dacc_count.int dacc_hist.int dcountredn.int dmaxredn.int dminredn.int dprodredn.int dsumredn.int facc_count.int facc_hist.int fcountredn.int fmaxredn.int fminredn.int fprodredn.int fsumredn.int iacc_count.int iacc_hist.int icountredn.int imaxredn.int iminredn.int iprodredn.int isumredn.int pg.int idl.ci
+ALLINTERFACES=idl.ci
 
 basics: dirs+sources $(ALLHEADERS) $(ALLINTERFACES) charmc conv-mach.csh
 	rm -rf ../include
@@ -98,11 +92,6 @@ dirs+sources:
 	./gatherflat ../../src/Common/langs/pvmc       .
 	./gatherflat ../../src/Common/langs/sdag/xlator       .
 	./gatherflat ../../src/Common/langs/sdag/runtime      .
-	./gatherflat ../../src/Common/lib-acc          .
-	./gatherflat ../../src/Common/lib-misc         .
-	./gatherflat ../../src/Common/lib-redn         .
-	./gatherflat ../../src/Common/xlat             .
-	./gatherflat ../../src/Common/xlat++           .
 	./gatherflat ../../src/Common/xlat-i           .
 	./gatherflat ../../src/Common/xlat-idl         .
 	./gatherflat ../../src/Common/xlatcpm          .
@@ -110,8 +99,6 @@ dirs+sources:
 	./gatherflat ../../src/Common.`cat .gdir`      .
 	./gatherflat ../../src/`cat .vdir`             .
 	./gathertree ../../src/Common/langs   ../src/langs
-	./gathertree ../../src/Common/xlat    ../src/xlat
-	./gathertree ../../src/Common/xlat++  ../src/xlat++
 	./gathertree ../../src/Common/xlat-i  ../src/xlat-i
 	./gathertree ../../src/Common/xlat-idl  ../src/xlat-idl
 	./gathertree ../../src/Common/xlatcpm ../src/xlatcpm
@@ -347,180 +334,6 @@ libck-cplus-y.a: cplus.o ckfutures.o
 
 libck-defmain-cpp.a: defmain-cpp.C $(CKHEADERS)
 	$(CHARMC) -cp ../lib/ -o $@ defmain-cpp.C
-
-###############################################################################
-#
-# libcharm
-#
-###############################################################################
-
-GENERIC_ACC_H=GENERIC-ACC.int GENERIC-ACC.p $(CKHEADERS)
-GENERIC_HIST_H=GENERIC-HIST.int GENERIC-HIST.p $(CKHEADERS)
-GENERIC_REDN_H=GENERIC-REDN.int GENERIC-REDN.p $(CKHEADERS)
-
-LIBCHARM=cache.o dag.o barrier_redn.o pglib.o \
-	 iacc_count.o facc_count.o dacc_count.o \
-         iacc_hist.o facc_hist.o dacc_hist.o \
-         iminredn.o imaxredn.o isumredn.o iprodredn.o icountredn.o \
-	 fminredn.o fmaxredn.o fsumredn.o fprodredn.o \
-	 dminredn.o dmaxredn.o dsumredn.o dprodredn.o
-
-
-libcharm: charmxlat libcharm.a
-
-libcharm.a: $(LIBCHARM)
-	$(CHARMC) -cp ../lib/ -o $@ $(LIBCHARM)
-
-pglib.o: pglib.p pglib.h pg.int $(CKHEADERS)
-	$(CHARMC) pglib.p
-
-cache.o: cache.p cache.int $(CKHEADERS)
-	$(CHARMC) cache.p
-
-dag.o: dag.c $(CKHEADERS)
-	$(CHARMC) dag.c
-
-barrier_redn.o: barrier_redn.p barrier_redn.int $(CKHEADERS)
-	$(CHARMC) barrier_redn.p
-
-iacc_count.o: iacc_count.int $(GENERIC_ACC_H)
-	$(CHARMC) -o iacc_count.o GENERIC-ACC.p -DHEAD='"iacc_count.int"'
-
-facc_count.o: facc_count.int $(GENERIC_ACC_H)
-	$(CHARMC) -o facc_count.o GENERIC-ACC.p -DHEAD='"facc_count.int"'
-
-dacc_count.o: dacc_count.int $(GENERIC_ACC_H)
-	$(CHARMC) -o dacc_count.o GENERIC-ACC.p -DHEAD='"dacc_count.int"'
-
-iacc_hist.o: iacc_hist.int $(GENERIC_HIST_H)
-	$(CHARMC) -o iacc_hist.o GENERIC-HIST.p -DHEAD='"iacc_hist.int"'
-
-facc_hist.o: facc_hist.int $(GENERIC_HIST_H)
-	$(CHARMC) -o facc_hist.o GENERIC-HIST.p -DHEAD='"facc_hist.int"'
-
-dacc_hist.o: dacc_hist.int $(GENERIC_HIST_H)
-	$(CHARMC) -o dacc_hist.o GENERIC-HIST.p -DHEAD='"dacc_hist.int"'
-
-imaxredn.o: imaxredn.int $(GENERIC_REDN_H)
-	$(CHARMC) -o imaxredn.o GENERIC-REDN.p -DHEAD='"imaxredn.int"'
-
-iminredn.o: iminredn.int $(GENERIC_REDN_H)
-	$(CHARMC) -o iminredn.o GENERIC-REDN.p -DHEAD='"iminredn.int"'
-
-isumredn.o: isumredn.int $(GENERIC_REDN_H)
-	$(CHARMC) -o isumredn.o GENERIC-REDN.p -DHEAD='"isumredn.int"'
-
-iprodredn.o: iprodredn.int $(GENERIC_REDN_H)
-	$(CHARMC) -o iprodredn.o GENERIC-REDN.p -DHEAD='"iprodredn.int"'
-
-icountredn.o: icountredn.int $(GENERIC_REDN_H)
-	$(CHARMC) -o icountredn.o GENERIC-REDN.p -DHEAD='"icountredn.int"'
-
-fmaxredn.o: fmaxredn.int $(GENERIC_REDN_H)
-	$(CHARMC) -o fmaxredn.o GENERIC-REDN.p -DHEAD='"fmaxredn.int"'
-
-fminredn.o: fminredn.int $(GENERIC_REDN_H)
-	$(CHARMC) -o fminredn.o GENERIC-REDN.p -DHEAD='"fminredn.int"'
-
-fsumredn.o: fsumredn.int $(GENERIC_REDN_H)
-	$(CHARMC) -o fsumredn.o GENERIC-REDN.p -DHEAD='"fsumredn.int"'
-
-fprodredn.o: fprodredn.int $(GENERIC_REDN_H)
-	$(CHARMC) -o fprodredn.o GENERIC-REDN.p -DHEAD='"fprodredn.int"'
-
-fcountredn.o: fcountredn.int $(GENERIC_REDN_H)
-	$(CHARMC) -o fcountredn.o GENERIC-REDN.p -DHEAD='"fcountredn.int"'
-
-dmaxredn.o: dmaxredn.int $(GENERIC_REDN_H)
-	$(CHARMC) -o dmaxredn.o GENERIC-REDN.p -DHEAD='"dmaxredn.int"'
-
-dminredn.o: dminredn.int $(GENERIC_REDN_H)
-	$(CHARMC) -o dminredn.o GENERIC-REDN.p -DHEAD='"dminredn.int"'
-
-dsumredn.o: dsumredn.int $(GENERIC_REDN_H)
-	$(CHARMC) -o dsumredn.o GENERIC-REDN.p -DHEAD='"dsumredn.int"'
-
-dprodredn.o: dprodredn.int $(GENERIC_REDN_H)
-	$(CHARMC) -o dprodredn.o GENERIC-REDN.p -DHEAD='"dprodredn.int"'
-
-dcountredn.o: dcountredn.int $(GENERIC_REDN_H)
-	$(CHARMC) -o dcountredn.o GENERIC-REDN.p -DHEAD='"dcountredn.int"'
-
-###############################################################################
-#
-#
-###############################################################################
-
-CHARMXLAT=xl-main.o xl-yacc.tab.o xl-sym.o xl-str.o xl-lex.o xl-lexsp.o xl-rdtok.o xl-parse.o xl-outh.o xl-srch.o xl-dag.o
-
-charmxlat charmfilter: $(CHARMXLAT) xl-sfspec.o
-	$(SEQCHARMC) -o charmxlat   -cp ../bin/ $(CHARMXLAT)
-	$(SEQCHARMC) -o charmfilter -cp ../bin/ xl-sfspec.o
-
-xl-main.o: xl-main.c
-	$(SEQCHARMC) xl-main.c
-
-xl-sym.o: xl-sym.c xl-sym.h
-	$(SEQCHARMC) xl-sym.c
-
-xl-str.o: xl-str.c
-	$(SEQCHARMC) xl-str.c
-
-xl-lex.o: xl-lex.c xl-lex.h xl-sym.h
-	$(SEQCHARMC) xl-lex.c
-
-xl-rdtok.o: xl-rdtok.c xl-lex.h xl-sym.h
-	$(SEQCHARMC) xl-rdtok.c
-
-xl-parse.o: xl-parse.c xl-lex.h xl-sym.h
-	$(SEQCHARMC) xl-parse.c
-
-xl-outh.o: xl-outh.c xl-lex.h xl-sym.h
-	$(SEQCHARMC) xl-outh.c
-
-xl-srch.o: xl-srch.c xl-lex.h xl-sym.h
-	$(SEQCHARMC) xl-srch.c
-
-xl-dag.o: xl-dag.c
-	$(SEQCHARMC) xl-dag.c
-
-xl-yacc.tab.o: xl-yacc.tab.c xl-lex.h xl-sym.h
-	$(SEQCHARMC) xl-yacc.tab.c
-
-xl-lexsp.o: xl-lexsp.c	
-	$(SEQCHARMC) xl-lexsp.c
-
-xl-sfspec.o: xl-sfspec.c
-	$(SEQCHARMC) xl-sfspec.c
-
-###############################################################################
-#
-# charmxlat++ and charmfilter++
-#
-###############################################################################
-
-XPHEADERS=xp-extn.h xp-t.tab.c
-
-CHARMXLATXX=xp-process.o xp-table.o xp-t.tab.o xp-lexer.o
-
-charmxlat++: $(CHARMXLATXX) xp-sfilter.o
-	$(SEQCHARMC) -o charmxlat++   -cp ../bin/ $(CHARMXLATXX)
-	$(SEQCHARMC) -o charmfilter++ -cp ../bin/ xp-sfilter.o
-
-xp-process.o: xp-process.c $(XPHEADERS)
-	$(SEQCHARMC) xp-process.c
-
-xp-table.o: xp-table.c $(XPHEADERS)
-	$(SEQCHARMC) xp-table.c
-
-xp-t.tab.o: xp-t.tab.c $(XPHEADERS)
-	$(SEQCHARMC) -DYYDEBUG xp-t.tab.c
-
-xp-lexer.o: xp-lexer.c $(XPHEADERS)
-	$(SEQCHARMC) xp-lexer.c
-
-xp-sfilter.o: xp-sfilter.c $(XPHEADERS)
-	$(SEQCHARMC) xp-sfilter.c
 
 ###############################################################################
 #
@@ -918,7 +731,6 @@ idl.top.h idl.bot.h: charmxi idl.ci
 ###############################################################################
 
 clean:
-	rm -f charmreplay charmxlat charmfilter charmxlat++ charmfilter++
 	rm -f conv-host conv-host-notify conv-host-silent charmxi conv-cpm
 	rm -f TAGS basics cmk_extras core
 	rm -f core *.a
