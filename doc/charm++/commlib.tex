@@ -98,7 +98,7 @@ dmid = CProxy_ComlibManager::ckNew();
 dmid = CProxy_ComlibManager::ckNew(strategy); 
 //or 
 dmid = CProxy_ComlibManager::ckNew(); 
-int stratid = (CProxy_ComlibManager(dmid).ckLocalBranch())->createStrategy(strategy);
+int stratid = (CProxy_ComlibManager(dmid).ckLocalBranch())->createInstance(strategy);
 (CProxy_ComlibManager(dmid).ckLocalBranch())->doneCreating();
 \end{verbatim}
 
@@ -109,7 +109,7 @@ int stratid = (CProxy_ComlibManager(dmid).ckLocalBranch())->createStrategy(strat
 (CProxy_ComlibManager(dmid).ckLocalBranch())->registerElement(stratid);
 
 //Here the stratid is 0, if the strategy is passed in the 
-//constructor or stratid if it is created from createStrategy
+//constructor or stratid if it is created from createInstance
 
 //Before calling an entry method whose message should go thorough the
 //library the proxy has to be delegated. Create a new copy of the
@@ -137,9 +137,9 @@ Strategy strat1 = new ....; \\
 Strategy strat2 = new ....; \\
 Strategy strat3 = new ....; \\
 
-int stratid1 = (CProxy\_ComlibManager(dmid).ckLocalBranch())->createStrategy(strat1); \\
-int stratid2 = (CProxy\_ComlibManager(dmid).ckLocalBranch())->createStrategy(strat2); \\
-int stratid3 = (CProxy\_ComlibManager(dmid).ckLocalBranch())->createStrategy(strat3); \\
+int stratid1 = (CProxy\_ComlibManager(dmid).ckLocalBranch())->createInstance(strat1); \\
+int stratid2 = (CProxy\_ComlibManager(dmid).ckLocalBranch())->createInstance(strat2); \\
+int stratid3 = (CProxy\_ComlibManager(dmid).ckLocalBranch())->createInstance(strat3); \\
 
 (CProxy\_ComlibManager(dmid).ckLocalBranch())->doneCreating(); \\
 
