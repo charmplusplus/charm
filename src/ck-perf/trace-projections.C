@@ -261,8 +261,9 @@ LogPool::~LogPool()
 #if CMK_BLUEGENE_CHARM
   extern int correctTimeLog;
   if (correctTimeLog) {
-    creatFiles("-bg");			// create *-bg.log and *-bg.sts
-    if (CkMyPe() == 0) writeSts();      // write "*-bg.sts"
+    closeLog();
+    creatFiles("-bg");
+    if (CkMyPe() == 0) writeSts();
     postProcessLog();
   }
 #endif
@@ -337,9 +338,9 @@ void LogPool::writeSts(void)
 static void updateProjLog(void *data, double t, double recvT, void *ptr)
 {
   LogEntry *log = (LogEntry *)data;
-  FILE *fp = (FILE *)ptr;
+  FILE *fp = *(FILE **)ptr;
   log->time = t;
-  log->recvTime = recvT;
+  log->recvTime = recvT<0.0?0:recvT;
   log->write(fp);
 }
 #endif
@@ -372,7 +373,7 @@ void LogPool::add(UChar type,UShort mIdx,UShort eIdx,double time,int event,int p
     case BEGIN_UNPACK:
     case END_UNPACK:
     case USER_EVENT_PAIR:
-      bgAddProjEvent(&pool[numEntries-1], time, updateProjLog);
+      bgAddProjEvent(&pool[numEntries-1], time, updateProjLog, &fp, 1);
   }
 #endif
 }
@@ -380,7 +381,7 @@ void LogPool::add(UChar type,UShort mIdx,UShort eIdx,double time,int event,int p
 void LogPool::postProcessLog()
 {
 #if CMK_BLUEGENE_CHARM
-  bgUpdateProj(fp);
+  bgUpdateProj(1);   // event type
 #endif
 }
 

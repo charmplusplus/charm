@@ -31,6 +31,7 @@ void traceUserEvent(int i) {}
 void traceUserBracketEvent(int a, double b, double c) {}
 int traceRegisterUserEvent(const char* e, int f) { return -1; }
 void traceClose(void) {}
+void traceCharmClose(void) {}
 void traceBegin(void) {}
 void traceEnd(void) {}
 void traceWriteSts(void) {}
