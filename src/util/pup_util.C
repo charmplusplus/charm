@@ -507,7 +507,7 @@ unsigned int PUP::fromTextFile::readUint(const char *fmt) {
 }
 double PUP::fromTextFile::readDouble(void) {
   double ret=0;
-  if (1!=fscanf(f,"%g",&ret)) parseError("could not match double");
+  if (1!=fscanf(f,"%lg",&ret)) parseError("could not match double");
   return ret;
 }
 void PUP::fromTextFile::bytes(void *p,int n,size_t itemSize,dataType t)
