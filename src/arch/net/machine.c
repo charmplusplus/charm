@@ -2652,7 +2652,7 @@ void CmiNotifyIdle()
     FD_SET(Cmi_charmrun_fd, &rfds);
   if (dataskt!=-1) {
     FD_SET(dataskt, &rfds);
-    FD_SET(dataskt, &wfds);
+/*    FD_SET(dataskt, &wfds);      */
   }
   select(FD_SETSIZE,&rfds,&wfds,0,&tv);
   if (Cmi_netpoll) CommunicationServer(5);
@@ -2908,6 +2908,10 @@ static void ConverseRunPE(int everReturn)
   CpvInitialize(void *,CmiLocalQueue);
   CpvAccess(CmiLocalQueue) = cs->localqueue;
 
+  /* better to show the status here */
+  if (Cmi_netpoll == 1 && CmiMyPe() == 0)
+    CmiPrintf("Charm++: scheduler running in netpoll mode.\n");
+
   if (!everReturn) {
     Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
     if (Cmi_usrsched==0) CsdScheduler(-1);
@@ -2976,8 +2980,11 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
 #endif
 #endif
   Cmi_argv = argv; Cmi_startfn = fn; Cmi_usrsched = usc;
-  Cmi_netpoll=CmiGetArgFlag(argv,"+netpoll");
-  Cmi_syncprint=CmiGetArgFlag(argv,"+syncprint");
+#if CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT
+  Cmi_netpoll = 1;      /* set as default, but still allow change next */
+#endif
+  Cmi_netpoll ^= CmiGetArgFlag(argv,"+netpoll");
+  Cmi_syncprint = CmiGetArgFlag(argv,"+syncprint");
   skt_init();
   atexit(exitDelay);
   parse_netstart();
