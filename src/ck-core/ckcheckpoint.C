@@ -125,7 +125,9 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback& cb){
 	CkPupArrayElementsData(p);
 	fclose(datFile);
 
+#if CMK_HAS_SYNC
 	system("sync");
+#endif
 
 	restartCB = cb;
 	DEBCHK("[%d]restartCB installed\n",CkMyPe());
