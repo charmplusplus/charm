@@ -44,7 +44,6 @@ void PipeBroadcastStrategy::propagate(envelope *env, int isFragmented){
     CmiSyncSend(destination, totalSendingSize, (char *)env);
     break;
   case USE_HYPERCUBE:
-    num_pes=0;
     tmp = srcPeNumber ^ CkMyPe();
     k = int(log((double)CkNumPes()) * log_of_2_inv + 2);
     if (tmp) {
@@ -56,6 +55,9 @@ void PipeBroadcastStrategy::propagate(envelope *env, int isFragmented){
     else env->setSrcPe(CkMyPe());  // where the message is coming from
     dest_pes = (int *)malloc(k*sizeof(int));
     --k;  // next dimension in the cube to be used
+    num_pes = HypercubeGetBcastDestinations(k, dest_pes);
+
+    /*
     for ( ; k>=0; --k) {
       // add the processor destination at level k if it exist
       dest_pes[num_pes] = CkMyPe() ^ (1<<k);
@@ -68,6 +70,8 @@ void PipeBroadcastStrategy::propagate(envelope *env, int isFragmented){
 	++num_pes;
       }
     }
+    */
+
     //CmiSyncListSend(num_pes, dest_pes, env->getTotalsize(), (char *)env);
     for (k=0; k<num_pes; ++k) CmiSyncSend(dest_pes[k], totalSendingSize, (char *)env);
     free(dest_pes);
