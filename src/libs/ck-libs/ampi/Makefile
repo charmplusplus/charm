@@ -44,7 +44,7 @@ headers: $(HEADERS)
 	cp $(HEADERS) $(CDIR)/include/
 	cp ampi.h $(CDIR)/include/mpi.h
 	cp ampif.h $(CDIR)/include/mpif.h
-	cp mpiCC mpicc mpif77 mpif90 $(CDIR)/bin
+	cp mpiCC mpicc mpif77 mpif90 ampirun $(CDIR)/bin
 	touch headers
 
 compat_ampius.o: compat_ampius.C

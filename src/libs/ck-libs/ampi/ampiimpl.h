@@ -165,6 +165,9 @@ class ampiCommStruct {
 	int ndims;
 	CkPupBasicVec<int> dims;
 	CkPupBasicVec<int> periods;
+	
+	// For communicator attributes (MPI_Attr_get): indexed by keyval
+	CkVec<void *> keyvals;
 
 	// graph virtual topology parameters
 	int nvertices;
@@ -198,6 +201,7 @@ public:
 		return indices;
 	}
 	const CkPupBasicVec<int> &getRemoteIndices(void) const {return remoteIndices;}
+	CkVec<void *> &getKeyvals(void) {return keyvals;}
 
 	//Get the proxy for the entire array
 	CProxy_ampi getProxy(void) const;
@@ -428,13 +432,13 @@ inline groupStruct rangeExclOp(int n, int ranges[][3], groupStruct vec){
 
 extern int mpi_nworlds;
 
-#define MPI_BCAST_TAG   MPI_TAG_UB+10
-#define MPI_BARR_TAG    MPI_TAG_UB+11
-#define MPI_REDUCE_TAG  MPI_TAG_UB+12
-#define MPI_GATHER_TAG  MPI_TAG_UB+13
-#define MPI_SCATTER_TAG MPI_TAG_UB+14
-#define MPI_SCAN_TAG 	MPI_TAG_UB+15
-#define MPI_ATA_TAG	MPI_TAG_UB+16
+#define MPI_BCAST_TAG   MPI_TAG_UB_VALUE+10
+#define MPI_BARR_TAG    MPI_TAG_UB_VALUE+11
+#define MPI_REDUCE_TAG  MPI_TAG_UB_VALUE+12
+#define MPI_GATHER_TAG  MPI_TAG_UB_VALUE+13
+#define MPI_SCATTER_TAG MPI_TAG_UB_VALUE+14
+#define MPI_SCAN_TAG 	MPI_TAG_UB_VALUE+15
+#define MPI_ATA_TAG	MPI_TAG_UB_VALUE+16
 
 #if 0
 // This is currently not used.
@@ -877,14 +881,12 @@ public:
 	MPI_Copy_function *copy_fn;
 	MPI_Delete_function *delete_fn;
 	void *extra_state;
-	void *value;
-	MPI_Comm comm;
-	bool valid;
+	/* value is associated with getKeyvals of communicator */
 
-	KeyvalNode(void): copy_fn(NULL), delete_fn(NULL), extra_state(NULL), value(NULL), comm(MPI_COMM_NULL), valid(false)
+	KeyvalNode(void): copy_fn(NULL), delete_fn(NULL), extra_state(NULL)
 	{ }
 	KeyvalNode(MPI_Copy_function *cf, MPI_Delete_function *df, void* es):
-		copy_fn(cf), delete_fn(df), extra_state(es), value(NULL), comm(MPI_COMM_NULL), valid(true)
+		copy_fn(cf), delete_fn(df), extra_state(es)
 	{ }
 	// KeyvalNode is not supposed to be pup'ed
 	void pup(PUP::er& p){ /* empty */ }
@@ -953,6 +955,10 @@ class ampiParent : public CBase_ampiParent {
     }
     void intraChildRegister(const ampiCommStruct &s);
 
+    // MPI MPI_Attr_get C binding returns a *pointer* to an integer,
+    //  so there needs to be some storage somewhere to point to.
+    int kv_builtin_storage;
+    int kv_is_builtin(int keyval);
     CkPupPtrVec<KeyvalNode> kvlist;
 
     int RProxyCnt;

@@ -160,7 +160,23 @@ void MPI_MINLOC   ( void *invec, void *inoutvec, int *len, MPI_Datatype *datatyp
  * This is so that the tags used by the system dont clash with user-tags.
  * MPI standard requires this to be at least 2^15.
  */
-#define MPI_TAG_UB  1073741824
+#define MPI_TAG_UB_VALUE  1073741824
+
+/** These are the builtin MPI keyvals.  You can pass them to 
+  MPI_Attr_get for any communicator.
+*/
+#define MPI_TAG_UB -10
+#define MPI_HOST -11
+#define MPI_IO -12
+#define MPI_WTIME_IS_GLOBAL -13
+
+/** These are AMPI-specific keyvals. They return information about
+the real (non-virtual) processors. */
+#define AMPI_KEYVAL_MYPE -14
+#define AMPI_KEYVAL_NUMPES -15
+#define AMPI_KEYVAL_MYNODE -16
+#define AMPI_KEYVAL_NUMNODES -17
+
 
 typedef int MPI_Comm;
 typedef int MPI_Group;

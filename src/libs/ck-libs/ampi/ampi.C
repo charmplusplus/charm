@@ -689,33 +689,58 @@ int ampiParent::createKeyval(MPI_Copy_function *copy_fn, MPI_Delete_function *de
 	return 0;
 }
 int ampiParent::freeKeyval(int *keyval){
-	if(*keyval != MPI_KEYVAL_INVALID && *keyval >= kvlist.size() && kvlist[*keyval] && !kvlist[*keyval]->valid) return -1;
+	if(*keyval <0 || *keyval >= kvlist.size() || !kvlist[*keyval])
+		return -1;
 	delete kvlist[*keyval];
 	kvlist[*keyval] = NULL;
 	return 0;
 }
+
 int ampiParent::putAttr(MPI_Comm comm, int keyval, void* attribute_val){
-	if(keyval != MPI_KEYVAL_INVALID && keyval >= kvlist.size() && kvlist[keyval] && !kvlist[keyval]->valid) return -1;
-	KeyvalNode* node = kvlist[keyval];
-	node->comm = comm;
-	node->value = attribute_val;
+	if(keyval<0 || keyval >= kvlist.size() || (kvlist[keyval]==NULL))
+		return -1;
+	ampiCommStruct &cs=*(ampiCommStruct *)&comm2CommStruct(comm);
+	// Enlarge the keyval list:
+	while (cs.getKeyvals().size()<=keyval) cs.getKeyvals().push_back(0);
+	cs.getKeyvals()[keyval]=attribute_val;
 	return 0;
 }
+int ampiParent::kv_is_builtin(int keyval) {
+	switch(keyval) {
+	case MPI_TAG_UB: kv_builtin_storage=MPI_TAG_UB_VALUE; return 1;
+	case MPI_HOST: kv_builtin_storage=MPI_PROC_NULL; return 1;
+	case MPI_IO: kv_builtin_storage=0; return 1;
+	case MPI_WTIME_IS_GLOBAL: kv_builtin_storage=0; return 1;
+	case AMPI_KEYVAL_MYPE: kv_builtin_storage=CkMyPe(); return 1;
+	case AMPI_KEYVAL_NUMPES: kv_builtin_storage=CkNumPes(); return 1;
+	case AMPI_KEYVAL_MYNODE: kv_builtin_storage=CkMyNode(); return 1;
+	case AMPI_KEYVAL_NUMNODES: kv_builtin_storage=CkNumNodes(); return 1;
+	default: return 0;
+	};
+}
 int ampiParent::getAttr(MPI_Comm comm, int keyval, void *attribute_val, int *flag){
-	if(keyval != MPI_KEYVAL_INVALID && keyval >= kvlist.size() && kvlist[keyval] && !kvlist[keyval]->valid) return -1;
-	KeyvalNode* node = kvlist[keyval];
-	if(comm == node->comm) {
-		*flag = true;
-		*(void **)attribute_val = node->value;
-	}else{
-		*flag = false;
+	*flag = false;
+	if (kv_is_builtin(keyval)) { /* Allow access to special builtin flags */
+	  *flag=true;
+	  *(void **)attribute_val = (void *)&kv_builtin_storage;
+	  return 0;
 	}
+	if(keyval<0 || keyval >= kvlist.size() || (kvlist[keyval]==NULL))
+		return -1; /* invalid keyval */
+	
+	ampiCommStruct &cs=*(ampiCommStruct *)&comm2CommStruct(comm);
+	if (keyval>=cs.getKeyvals().size())  
+		return 0; /* we don't have a value yet */
+	if (cs.getKeyvals()[keyval]==0)
+		return 0; /* we had a value, but now it's zero */
+	/* Otherwise, we have a good value */
+	*flag = true;
+	*(void **)attribute_val = cs.getKeyvals()[keyval];
 	return 0;
 }
 int ampiParent::deleteAttr(MPI_Comm comm, int keyval){
-	if(keyval != MPI_KEYVAL_INVALID && keyval >= kvlist.size() && kvlist[keyval] && !kvlist[keyval]->valid) return -1;
-	kvlist[keyval]->valid = false;
-	return 0;
+	/* no way to delete an attribute: just overwrite it with 0 */
+	return putAttr(comm,keyval,0);
 }
 
 //----------------------- ampi -------------------------
