@@ -32,7 +32,7 @@ public:
     CmiPrintf("msgID:%d sent:%f recvtime:%f dstPe:%d\n", msgID, sendTime, recvTime, dstPe);
   }
   void write(FILE *fp) {
-    fprintf(fp, "msgID:%d sent:%d recvtime:%f dstPe:%d\n", msgID, sendTime, recvTime, dstPe);
+    fprintf(fp, "msgID:%d sent:%f recvtime:%f dstPe:%d\n", msgID, sendTime, recvTime, dstPe);
   }
 #if DELAY_SEND
   void send();
