@@ -1967,8 +1967,10 @@ static void ConverseRunPE(int everReturn)
   CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,CmiNotifyBeginIdle,(void *)s);
   CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,CmiNotifyStillIdle,(void *)s);
 #if CMK_SHARED_VARS_UNAVAILABLE
-  if (Cmi_netpoll)
-    CcdPeriodicCallKeep(CommunicationServer,NULL);
+  if (Cmi_netpoll) /*Repeatedly call CommServer*/
+    CcdPeriodicCallKeep(CommunicationPeriodic,NULL);
+  else /*Only need this for retransmits*/
+    CcdCallFnAfter(CommunicationPeriodic,NULL,20);
 #endif
 
   if (CmiMyRank()==0 && Cmi_charmrun_fd!=-1)

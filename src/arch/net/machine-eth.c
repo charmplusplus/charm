@@ -522,7 +522,8 @@ int ReceiveDatagram()
   dg->len = ok;
 #define SIMULATE_PACKET_LOSS 0
 #if SIMULATE_PACKET_LOSS /*Randomly drop some incoming packets*/
-  if (((rand()+(int)(100.0*CmiWallTimer()))%64)==0) { 
+  if (((rand()+(int)(100.0*CmiWallTimer()))%32)==0) { 
+    printf("machine-eth.c intentionally dropping packet (net-debugging)\n");
     FreeExplicitDgram(dg);
     return 0;
   }

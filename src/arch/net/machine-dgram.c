@@ -483,6 +483,14 @@ void CommunicationsClock(void)
     ctrl_sendone_locking("ping",NULL,0,NULL,0); /*Charmrun may have died*/
   }
 }
+#if CMK_SHARED_VARS_UNAVAILABLE
+void CommunicationPeriodic(void *ignored) 
+{ /*Poll on the communications server*/
+  CommunicationServer(0);
+  if (!Cmi_netpoll)
+    CcdCallFnAfter(CommunicationPeriodic,NULL,20);
+}
+#endif
 
 #if !CMK_USE_GM
 
