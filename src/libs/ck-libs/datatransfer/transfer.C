@@ -46,20 +46,21 @@ double getSharedVolume(int s,const TetMesh &srcMesh,
 	cg3d::PointSet3d ps;
 	const int *sc=srcMesh.getTet(s);
 	const int *ds=destMesh.getTet(d);
-	cg3d::Tet3d S(&ps,srcMesh.getPoint(sc[0]),srcMesh.getPoint(sc[1]),
+	/*cg3d::Tet3d S(&ps,srcMesh.getPoint(sc[0]),srcMesh.getPoint(sc[1]),
 	           srcMesh.getPoint(sc[2]),srcMesh.getPoint(sc[3]));
 	cg3d::Tet3d D(&ps,destMesh.getPoint(ds[0]),destMesh.getPoint(ds[1]),
 	           destMesh.getPoint(ds[2]),destMesh.getPoint(ds[3]));
 	
+	double intVol2 = intersectDebug(&ps,S,D);
+	*/
 	double intVol = getSharedVolumeMgc(srcMesh,destMesh,sc,ds);
-	//double intVol2 = intersectDebug(&ps,S,D);
 	
 	if (dest==NULL){
 		return intVol;
 		//return intersectDebug(&ps,S,D);
 	}
 	else /* user provided a destination */ {
-		cg3d::intersect(&ps,S,D,*dest);
+		//cg3d::intersect(&ps,S,D,*dest);
 		return -1;
 	}
 }
