@@ -1,0 +1,71 @@
+
+When running the megacon test, you can skip a test by typing a
+negative-sign and the test's name on the command line.  For example,
+
+  % conv-host pgm +p4 -timer -specmsg
+
+would run all the tests except the timer and specmsg tests.
+
+The megacon test currently contains these modules.
+
+  bigmsg - sends a 1-meg message in a ring around the processors.
+  fibobj - computes fib(12) using a charm-like programming style.
+  fibthr - computes fib(12) using threads and thread-sync mechanisms.
+  priotest - enqueues many messages, makes sure they come out in right order.
+  timer - verifies that the CmiTimer is comparable to unix time function.
+  broadc - checks CmiSyncBroadcastAll, CmiSyncBroadcastAllAndFree.
+  ring - a ring that uses all the CPM packing and unpacking mechanisms.
+  vars - checks privacy of Ctv, Cpv, checks sharing of Csv.
+  deadlock - PE's 0 and 1 try to cram 50000 messages down each other's throats.
+  specmsg - verifies that CmiDeliverSpecificMsg works.
+  nodenum - checks that CmiMyRank and Csv vars are consistent.
+
+The major weaknesses in the tests above:
+
+  priotest - only tests integer priorities.
+  timer - assumes that CmiTimer is a real-time timer.
+  broadc - doesn't test Async broadcasts
+  ring - doesn't use the CPM type-declaration mechanisms.
+  nodenum - needs to test CmiNodeBarrier as well.
+
+These things need to be tested, but aren't tested at all:
+
+  - memory leakage.
+  - the message manager.
+
+Here are the rules for adding tests:
+
+  1. Each test has a function called testname_moduleinit, which is called
+     early on.  Use this to initialize Cpv variables and such.  Each test
+     also has a function called testname_init, which is used to trigger
+     the test into action.
+
+  2. A failed test may print an error message, but a successful test
+     must not print anything at all.  Successful tests must verify their
+     own functioning.  When the test is sure it has succeeded, it must
+     call the function Cpm_megacon_ack(CpmSend(0)) to acknowledge its
+     success to the main module.
+
+  3. The main module contains a table of tests.  Each entry in the table
+     has the following fields:
+
+	- test name,
+	- name of the init function,
+	- name of the moduleinit function,
+	- a flag if the test should be tested reentrantly,
+	- a count indicating how many acks the test will produce.
+
+     If the test is marked reentrant, the main module will attempt to run
+     several copies of the test at the same time.  The ack count indicates
+     how many times the test will call Cpm_megacon_ack on a successful
+     completion: 0 means as many times as there are processors.
+
+The megacon test will run
+
+	1. each test, one at a time,
+	2. each reentrant test, in a group of 5 at a time,
+	3. all the tests at the same time.
+
+If all this succeeds, megacon will declare the system OK.
+
+- Josh
