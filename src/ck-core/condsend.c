@@ -65,6 +65,9 @@ static void CallBocFn(arg)
   cbocstruct = (CallBocStuff *)arg;
   if ( !((*(cbocstruct->fn_ptr))(cbocstruct->bocNum)) )
       CcdPeriodicallyCall((CcdVoidFn)CallBocFn, (void *)arg);
+  else
+    CmiFree(arg);
+    
 
 }
 
