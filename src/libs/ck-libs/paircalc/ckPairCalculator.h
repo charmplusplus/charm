@@ -4,8 +4,6 @@
 #include "util.h"
 #include "cksparsecontiguousreducer.h"
 
-//void myfunction(complex a, complex b);
-
 typedef void (*FuncType) (complex a, complex b);
 PUPmarshallBytes(FuncType);
 
