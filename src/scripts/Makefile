@@ -654,14 +654,14 @@ charmidl: libdrv.a libbe.a libfe.a libast.a libutil.a libnarrow.a
 
 libidl.a: idl.o
 	$(CHARMC) -cp ../lib/ -o libidl.a idl.o
-	/bin/cp idl.top.h ../include/
+	/bin/cp idl.decl.h idl.def.h ../include/
 
-idl.o: basics idl.C idl.h idl.top.h idl.bot.h
+idl.o: basics idl.C idl.h idl.decl.h idl.def.h
 	$(CHARMC) -c idl.C
 
-idl.top.h idl.bot.h: charmxi idl.ci
+idl.decl.h idl.def.h: charmxi idl.ci
 	$(CHARMC) idl.ci
-	/bin/cp idl.top.h ../include/
+	/bin/cp idl.decl.h idl.def.h ../include/
 
 ###############################################################################
 #
