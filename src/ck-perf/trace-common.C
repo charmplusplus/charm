@@ -22,6 +22,7 @@ static int warned = 0;
 
 CpvDeclare(TraceArray*, _traces);
 
+CpvDeclare(double, traceInitTime);
 CpvDeclare(int, traceOn);
 CpvDeclare(int, CtrLogBufSize);
 CpvDeclare(char*, traceRoot);
