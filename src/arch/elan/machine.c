@@ -779,7 +779,6 @@ static int toggle = 0;  //Blocking receive posted only after all idle
 
 void CmiNotifyIdle(void)
 {
-    static int toggle = 0;
     static int previousSleepTime = 0;
     CmiReleaseSentMessages();
     ElanSendQueuedMessages();
