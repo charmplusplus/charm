@@ -565,9 +565,9 @@ void _processNodeBocInitMsg(envelope *env)
   _createNodeGroupMember(groupID, epIdx, EnvToUsr(env));
 }
 
-void _processHandler(void *msg)
+void _processHandler(void *converseMsg)
 {
-  register envelope *env = (envelope *) msg;
+  register envelope *env = (envelope *) converseMsg;
   switch(env->getMsgtype()) {
     case NewChareMsg :
       CpvAccess(_qd)->process();
@@ -625,10 +625,10 @@ void _processHandler(void *msg)
 
 /******************** Message Send **********************/
 
-void _infoFn(void *msg, CldPackFn *pfn, int *len,
+void _infoFn(void *converseMsg, CldPackFn *pfn, int *len,
              int *queueing, int *priobits, unsigned int **prioptr)
 {
-  register envelope *env = (envelope *)msg;
+  register envelope *env = (envelope *)converseMsg;
   *pfn = (CldPackFn)CkPackMessage;
   *len = env->getTotalsize();
   *queueing = env->getQueueing();
@@ -671,10 +671,10 @@ void CkUnpackMessage(envelope **pEnv)
 #include "queueing.h"
 
 static int index_skipCldHandler;
-static void _skipCldHandler(void *msg)
+static void _skipCldHandler(void *converseMsg)
 {
-  register envelope *env = (envelope *)(msg);
-  CmiSetHandler(msg, CmiGetXHandler(msg));
+  register envelope *env = (envelope *)(converseMsg);
+  CmiSetHandler(converseMsg, CmiGetXHandler(converseMsg));
   CqsEnqueueGeneral((Queue)CpvAccess(CsdSchedQueue),
   	env, env->getQueueing(),env->getPriobits(),
   	(unsigned int *)env->getPrioPtr());
@@ -792,7 +792,7 @@ void CkSendMsgInline(int entryIndex, void *msg, const CkChareID *pCid)
 {
   if (pCid->onPE==CkMyPe())
   { //Just directly call the chare (skip QD handling & scheduler)
-    register envelope *env = (envelope *) UsrToEnv(msg);
+    register envelope *env = UsrToEnv(msg);
     if (env->isPacked()) CkUnpackMessage(&env);
     _STATS_RECORD_PROCESS_MSG_1();
     _deliverForChareMsg(entryIndex,env,pCid->objPtr);
