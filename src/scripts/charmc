@@ -739,7 +739,15 @@ if (($LANGUAGE == charm) || ($LANGUAGE == charm++) || ($LANGUAGE == idl)) then
 		      CHARMC-MOD.TMP.o -lck-core -ltrace-$TRACEMODE \
                       -lck-cplus-n -lconv-cplus-n -lconv-core \
 		      -lck-defmain-std -lcharm -lm $CMK_LIBS)
-    else if (($LANGUAGE == charm++) || ($LANGUAGE == idl)) then
+    else if ($LANGUAGE == charm++) then
+	echo 'void _CK_module_init_fn() {}' > CHARMC-MOD.TMP.c
+	($ECHOCMD ; $CMK_CC $OPTS_CC -c -o CHARMC-MOD.TMP.o CHARMC-MOD.TMP.c)
+        ($ECHOCMD ; $CMK_LDXX $OPTS_LDXX -o CHARMC-PRE.TMP.xxx -L$CHARMLIB \
+		      $BAL_OBJ $OBJECTFILES $LIBRARIES \
+		      CHARMC-MOD.TMP.o -lck-core -ltrace-$TRACEMODE \
+                      -lck-cplus-y -lconv-cplus-y -lconv-core \
+		      -lck-defmain-cpp -lcharm -lm $CMK_LIBS)
+    else if ($LANGUAGE == idl) then
 	echo 'void _CK_module_init_fn() {}' > CHARMC-MOD.TMP.c
 	($ECHOCMD ; $CMK_CC $OPTS_CC -c -o CHARMC-MOD.TMP.o CHARMC-MOD.TMP.c)
         ($ECHOCMD ; $CMK_LDXX $OPTS_LDXX -o CHARMC-PRE.TMP.xxx -L$CHARMLIB \
