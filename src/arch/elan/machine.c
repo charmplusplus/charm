@@ -38,9 +38,9 @@
 ELAN_BASE     *elan_base;
 ELAN_TPORT    *elan_port;
 ELAN_QUEUE    *elan_q;
-#define SMALL_MESSAGE_SIZE 8192       /* Message sizes greater will be 
+#define SMALL_MESSAGE_SIZE 16384       /* Message sizes greater will be 
 					  probe received adding 5us overhead*/
-#define SYNC_MESSAGE_SIZE 8192        /* Message sizes greater will be 
+#define SYNC_MESSAGE_SIZE 16384        /* Message sizes greater will be 
 					sent synchronously thus avoiding copying*/
 
 
@@ -273,8 +273,10 @@ static void CmiReleaseSentMessages(void)
         prev->next = temp;
       
       if(CMI_MSG_TYPE(msg_tmp->msg) == 1) {
-	if(SIZEFIELD(msg_tmp->msg) == SMALL_MESSAGE_SIZE)
+	if(SIZEFIELD(msg_tmp->msg) == SMALL_MESSAGE_SIZE) {
+	  //	  CmiPrintf("ELAN Returning message to queue\n");
 	  CqsEnqueue(localMsgBuf, msg_tmp->msg);
+	}
 	else
 	  CmiFree(msg_tmp->msg);
       }
@@ -339,8 +341,10 @@ int PumpMsgs(int retflag)
 	//if(CmiMyPe() == 0)
 	//	CmiPrintf("%d:Posting %d, %d\n", CmiMyPe(), ecount, post_idx);
 
-	if(!CqsEmpty(localMsgBuf))
+	if(!CqsEmpty(localMsgBuf)) {
+	  //CmiPrintf("ELAN Getting message from queue\n");
 	  CqsDequeue(localMsgBuf, &sbuf[ecount]);
+	}
 	else
 	  sbuf[ecount] = (char *) CmiAlloc(SMALL_MESSAGE_SIZE);
 	
@@ -471,6 +475,7 @@ void *CmiGetNonLocal(void)
 
   if(!msg) {
     CmiReleaseSentMessages();
+    ElanSendQueuedMessages();
     if (PumpMsgs(0))  // PumpMsgs(1)
       return  PCQueuePop(cs->recv);
     else
@@ -624,8 +629,10 @@ void CmiFreeSendFn(int destPE, int size, char *msg)
     if(size <= NON_BLOCKING_MSG) {
       (void)elan_tportTxWait(elan_tportTxStart(elan_port, 0, destPE, CmiMyPe(), TAG_SMALL, msg, size));
 
-      if(SIZEFIELD(msg) == SMALL_MESSAGE_SIZE)
+      if(SIZEFIELD(msg) == SMALL_MESSAGE_SIZE) {
+	//	CmiPrintf("ELAN Returning message to queue\n");
 	CqsEnqueue(localMsgBuf, msg);
+      }
       else
 	CmiFree(msg);
     }
