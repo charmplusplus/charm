@@ -1783,29 +1783,48 @@ void nodetab_init_for_scyld()
 
   nodetab_reset(&group);
 
+  if (arg_ppn==0) arg_ppn=1;
+#if CMK_SHARED_VARS_UNAVAILABLE
+  if (arg_ppn > 1) {
+    fprintf(stderr,"Warning> Invalid ppn %d in nodelist ignored.\n", arg_ppn);
+    arg_ppn=1;
+  }
+#endif
+  group.cpus = arg_ppn;
+
   /* check which slave nodes available */
-  for (i=-1; i<maxNodes; i++) {
+  int npes = 0;
+  for (i=-1; i<maxNodes && npes < arg_requested_pes; i++) {
     char hostname[256];
     if (bproc_nodestatus(i) != bproc_node_up) continue;
     if (i!= -1 && i<arg_startpe) continue;
     sprintf(hostname, "%d", i);
-    nodetab_makehost(hostname, &group);
-    if (nodetab_rank0_size == arg_requested_pes) break;
+    if (npes + arg_ppn > arg_requested_pes) group.cpus = arg_requested_pes-npes;
+    else group.cpus = arg_ppn;
+    for (group.rank = 0; group.rank<arg_ppn; group.rank++) {
+      nodetab_makehost(hostname, &group);
+      if (++npes == arg_requested_pes) break;
+    }   
   }
   if (nodetab_rank0_size == 0) {
     fprintf(stderr, "Charmrun> no slave node available!\n");
     exit (1);
   }
   if (arg_verbose)
-    printf("Charmrun> There are %d slave nodes available.\n", nodetab_rank0_size);
+    printf("Charmrun> There are %d slave nodes available.\n", nodetab_rank0_size-1);
 
   /* expand node table to arg_requested_pes */
-  if (arg_requested_pes > nodetab_rank0_size) {
-    int node = 0;
-    int orig_size = nodetab_rank0_size;
-    while (nodetab_rank0_size < arg_requested_pes) {
-      nodetab_makehost(nodetab_name(node), &group);
-      node++; if (node == orig_size) node = 0;
+  if (arg_requested_pes > npes) {
+    int node = arg_ppn;      /* skip -1 */
+    int orig_size = npes;
+    while (npes < arg_requested_pes) {
+      if (npes+arg_ppn > arg_requested_pes) group.cpus = arg_requested_pes-npes;
+      else group.cpus = arg_ppn;
+      for (group.rank = 0; group.rank<arg_ppn; group.rank++) {
+        nodetab_makehost(nodetab_name(node), &group);
+        if (++node == orig_size) node = arg_ppn;
+        if (++npes == arg_requested_pes) break;
+      } 
     }
   }
 }
@@ -1817,11 +1836,12 @@ void start_nodes_scyld(void)
 
   envp[0] = (char *)malloc(256);
   envp[1] = 0;
-  for (i=0; i<arg_requested_pes; i++)
+  for (i=0;i<nodetab_rank0_size;i++)
   {
     int status = 0;
     int pid;
-    int nodeno = atoi(nodetab_name(i));
+    int pe=nodetab_rank0_table[i];
+    int nodeno = atoi(nodetab_name(pe));
 
     if (arg_verbose)
       printf("Charmrun> start node program on slave node: %d.\n", nodeno);
