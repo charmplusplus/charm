@@ -221,11 +221,23 @@ static void CpdList_ccs_list_items_txt(char *msg)
       if (p.size()!=bufLen)
 	CmiError("ERROR! Sizing/packing length mismatch for %s list pup function!\n",
 		acc->getPath());
+     //CmiPrintf("pupped the data successfully\n");
     }
     CcsSendReply(bufLen,(void *)buf);
+    //CmiPrintf("sent pupped data successfully\n");
   }
+  //CmiPrintf("before CmiFree msg\n");
   CmiFree(msg);
+  //CmiPrintf("after CmiFree msg\n");
 }
+
+
+extern void CpdSetBreakPoint (char *);
+extern void CpdRemoveBreakPoint (char *);
+extern void CpdRemoveAllBreakPoints (void);
+extern "C" void CpdContinueFromBreakPoint ();
+extern void CpdBreakPointInit();
+extern void CpdQuitDebug();
 
 //Introspection object
 class CpdList_introspect : public CpdListAccessor {
@@ -253,6 +265,34 @@ public:
       }
       curObj++;
     }
+  }
+};
+
+//Cpd Lists for local and scheduler queues
+class CpdList_localQ : public CpdListAccessor {
+  
+public:
+  CpdList_localQ() {}
+  virtual const char * getPath(void) const {return "converse/localqueue";}
+  virtual int getLength(void) const {
+    CmiPrintf("*******Returning fifo length*********\n");
+    return CdsFifo_Length((CdsFifo)(CpvAccess(CmiLocalQueue)));
+  }
+  virtual void pup(PUP::er &p, CpdListItemsRequest &req) {
+  }
+};
+
+
+class CpdList_schedQ : public CpdListAccessor {
+  
+public:
+  CpdList_schedQ() {}
+  virtual const char * getPath(void) const {return "converse/schedqueue";}
+  virtual int getLength(void) const {
+    CmiPrintf("*******Returning prio q length*********\n");
+    return (CqsLength((Queue)(CpvAccess(CsdSchedQueue))));
+  }
+  virtual void pup(PUP::er &p, CpdListItemsRequest &req) {
   }
 };
 
@@ -312,15 +352,29 @@ extern "C" void CpdListRegister_c(const char *path,
 #endif
 
 #if CMK_CCS_AVAILABLE
+
+
 // Initialization	
+
 static void CpdListInit(void) {
   CpvInitialize(CpdListTable_t *,cpdListTable);
   CpvAccess(cpdListTable)=new CpdListTable_t(31,0.5,
 	      CkHashFunction_string,CkHashCompare_string);
   CpdListRegister(new CpdList_introspect(CpvAccess(cpdListTable)));
 
+  CpdListRegister(new CpdList_localQ());
+  CpdListRegister(new CpdList_schedQ());
   CcsRegisterHandler("ccs_list_len",(CmiHandler)CpdList_ccs_list_len);
   CcsRegisterHandler("ccs_list_items.txt",(CmiHandler)CpdList_ccs_list_items_txt);
+  //added 9/16/2003
+ 
+  CpdBreakPointInit(); 
+  CcsRegisterHandler("ccs_set_break_point",(CmiHandler)CpdSetBreakPoint);
+  CcsRegisterHandler("ccs_remove_break_point",(CmiHandler)CpdRemoveBreakPoint);
+  CcsRegisterHandler("ccs_remove_all_break_points",(CmiHandler)CpdRemoveAllBreakPoints);
+  CcsRegisterHandler("ccs_continue_break_point",(CmiHandler)CpdContinueFromBreakPoint);
+  CcsRegisterHandler("ccs_debug_quit",(CmiHandler)CpdQuitDebug);
+  //CcsRegisterHandler("ccs_start_gdb",(CmiHandler)CpdStartGdb);
 }
 
 #if CMK_WEB_MODE
@@ -582,8 +636,156 @@ extern "C" void CcsBuiltinsInit(char **argv)
   CpdListInit();
 }
 
+#include "charm.h"
+#include "middle.h"
+#include "cklists.h"
+#include "register.h"
+
+typedef CkHashtableTslow<int,EntryInfo *> CpdBpFuncTable_t;
+
+
+extern void CpdFreeze(void);
+extern void CpdUnFreeze(void);
+extern int CkMessageToEpIdx(void *msg);
+
+
+CpvStaticDeclare(int, _debugMsg);
+CpvStaticDeclare(int, _debugChare);
+
+CpvStaticDeclare(CpdBpFuncTable_t *, breakPointEntryTable);
+
+CpvStaticDeclare(void *, lastBreakPointMsg);
+CpvStaticDeclare(void *, lastBreakPointObject);
+CpvStaticDeclare(int, lastBreakPointIndex);
+
+void CpdBreakPointInit()
+{
+  CpvInitialize(void *, lastBreakPointMsg);
+  CpvInitialize(void *, lastBreakPointObject);
+  CpvInitialize(int, lastBreakPointIndex);
+  CpvInitialize(int, _debugMsg);
+  CpvInitialize(int, _debugChare);
+  CpvInitialize(CpdBpFuncTable_t, breakPointEntryTable);
+  CpvAccess(lastBreakPointMsg) = NULL;
+  CpvAccess(lastBreakPointObject) = NULL;
+  CpvAccess(lastBreakPointIndex) = 0;
+  CpvAccess(_debugMsg) = CkRegisterMsg("debug_msg",0,0,0);
+  CpvAccess(_debugChare) = CkRegisterChare("debug_Chare",0);
+  CpvAccess(breakPointEntryTable) = new CpdBpFuncTable_t(10,0.5,CkHashFunction_int,CkHashCompare_int );
+}
+
+
+
+static void _call_freeze_on_break_point(void * msg, void * object)
+{
+      //Save breakpoint entry point index. This is retrieved from msg.
+      //So that the appropriate EntryInfo can be later retrieved from the hash table 
+      //of break point function entries, on continue.
+      CpvAccess(lastBreakPointMsg) = msg;
+      CpvAccess(lastBreakPointObject) = object;
+      CpvAccess(lastBreakPointIndex) = CkMessageToEpIdx(msg);
+      EntryInfo * breakPointEntryInfo = CpvAccess(breakPointEntryTable)->get(CpvAccess(lastBreakPointIndex));
+      CmiPrintf("Break point reached for Function = %s\n", breakPointEntryInfo->name);
+      CpdFreeze();
+}
+
+
+void CpdQuitDebug()
+{
+  CpdContinueFromBreakPoint();
+  CkExit();
+}
+
+//ccs handler when continue from a break point
+extern "C"
+void CpdContinueFromBreakPoint ()
+{
+    CpdUnFreeze();
+    if ( (CpvAccess(lastBreakPointMsg) != NULL) && (CpvAccess(lastBreakPointObject) != NULL) )
+    {
+        EntryInfo * breakPointEntryInfo = CpvAccess(breakPointEntryTable)->get(CpvAccess(lastBreakPointIndex));
+        if (breakPointEntryInfo != NULL)
+           breakPointEntryInfo->call(CpvAccess(lastBreakPointMsg), CpvAccess(lastBreakPointObject));
+    }
+    CpvAccess(lastBreakPointMsg) = NULL;
+    CpvAccess(lastBreakPointObject) = NULL;
+}
+
+//ccs handler to set a breakpoint with entry function name msg
+void CpdSetBreakPoint (char *msg)
+{
+  char functionName[128];
+  int tableSize, tableIdx = 0;
+  sscanf(msg+CmiMsgHeaderSizeBytes, "%s", functionName);
+  if (strlen(functionName) > 0)
+  {
+    tableSize = _entryTable.size();
+    // Replace entry in entry table with _call_freeze_on_break_point
+    // retrieve epIdx for entry method
+    for (tableIdx=0; tableIdx < tableSize; tableIdx++)
+    {
+       if (strstr(_entryTable[tableIdx]->name, functionName) != NULL)
+       {
+            EntryInfo * breakPointEntryInfo = new EntryInfo(_entryTable[tableIdx]->name, _entryTable[tableIdx]->call, _entryTable[tableIdx]->msgIdx, _entryTable[tableIdx]->chareIdx );
+           CmiPrintf("Breakpoint is set for function %s with an epIdx = %ld\n", _entryTable[tableIdx]->name, tableIdx);
+           CpvAccess(breakPointEntryTable)->put(tableIdx) = breakPointEntryInfo;  
+           _entryTable[tableIdx]->name = "debug_breakpoint_ep";  
+           _entryTable[tableIdx]->call = (CkCallFnPtr)_call_freeze_on_break_point;
+           _entryTable[tableIdx]->msgIdx = CpvAccess(_debugMsg); 
+           _entryTable[tableIdx]->chareIdx = CpvAccess(_debugChare);
+           break;
+       }
+    }
+    if (tableIdx == tableSize)
+    {
+      CmiPrintf("[ERROR]Entrypoint was not found for function %s\n", functionName); 
+      return;
+    }
+
+  }
+
+}
+
+void CpdRemoveBreakPoint (char *msg)
+{
+  char functionName[128];
+  sscanf(msg+CmiMsgHeaderSizeBytes, "%s", functionName);
+  void *objPointer;
+  void *keyPointer; 
+  CkHashtableIterator *it = CpvAccess(breakPointEntryTable)->iterator();
+  while(NULL!=(objPointer = it->next(&keyPointer)))
+  {
+    EntryInfo * breakPointEntryInfo = *(EntryInfo **)objPointer;
+    int idx = *(int *)keyPointer;
+    if (strstr(breakPointEntryInfo->name, functionName) != NULL){
+        _entryTable[idx]->name =  breakPointEntryInfo->name;
+        _entryTable[idx]->call = (CkCallFnPtr)breakPointEntryInfo->call;
+        _entryTable[idx]->msgIdx = breakPointEntryInfo->msgIdx;
+        _entryTable[idx]->chareIdx = breakPointEntryInfo->chareIdx;
+        CmiPrintf("Breakpoint is removed for function %s with epIdx %ld\n", _entryTable[idx]->name, idx);
+    }
+  }
+}
+
+void CpdRemoveAllBreakPoints ()
+{
+  void *objPointer;
+  void *keyPointer; 
+  CkHashtableIterator *it = CpvAccess(breakPointEntryTable)->iterator();
+  while(NULL!=(objPointer = it->next(&keyPointer)))
+  {
+    EntryInfo * breakPointEntryInfo = *(EntryInfo **)objPointer;
+    int idx = *(int *)keyPointer;
+    _entryTable[idx]->name =  breakPointEntryInfo->name;
+    _entryTable[idx]->call = (CkCallFnPtr)breakPointEntryInfo->call;
+    _entryTable[idx]->msgIdx = breakPointEntryInfo->msgIdx;
+    _entryTable[idx]->chareIdx = breakPointEntryInfo->chareIdx;
+  }
+}
+
 
 #endif /*CMK_CCS_AVAILABLE*/
+
 
 
 
