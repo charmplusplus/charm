@@ -167,11 +167,15 @@ typedef struct {
 
 CpvStaticDeclare(ccd_cond_callbacks, conds);   
 
+/*Make sure this matches the CcdPERIODIC_* list in converse.h*/
+#define CCD_PERIODIC_MAX 10
+const static double periodicCallInterval[CCD_PERIODIC_MAX]=
+{0.001, 0.010, 0.100, 1.0, 10.0, 60.0,10*60.0, 3600.0, 12*3600.0, 24*3600.0};
+
 typedef struct {
 	int nSkip;/*Number of opportunities to skip*/
 	double lastCheck;/*Time of last check*/
-	ccd_cblist periodic;
-	ccd_cblist keep;
+	double nextCall[CCD_PERIODIC_MAX];
 } ccd_periodic_callbacks;
 
 CpvStaticDeclare(ccd_periodic_callbacks, pcb);
@@ -273,10 +277,12 @@ static void ccd_heap_update(double ctime)
       (*(e[i].cb.fn))(e[i].cb.arg);
 }
 
+void CcdCallBacksReset(void *ignored);
+
 void CcdModuleInit(void)
 {
    int i;
-
+   double curTime=CmiWallTimer();
    CpvInitialize(ccd_heap_elem*, ccd_heap);
    CpvInitialize(ccd_cond_callbacks, conds);
    CpvInitialize(ccd_periodic_callbacks, pcb);
@@ -293,9 +299,11 @@ void CcdModuleInit(void)
    }
    CpvAccess(_ccd_numchecks) = 10;
    CpvAccess(pcb).nSkip = 10;
-   CpvAccess(pcb).lastCheck = CmiWallTimer();
-   init_cblist(&(CpvAccess(pcb).periodic), CBLIST_INIT_LEN);
-   init_cblist(&(CpvAccess(pcb).keep), CBLIST_INIT_LEN);
+   CpvAccess(pcb).lastCheck = curTime;
+   for (i=0;i<CCD_PERIODIC_MAX;i++)
+	   CpvAccess(pcb).nextCall[i]=curTime+periodicCallInterval[i];
+   CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,CcdCallBacksReset,0);
+   CcdCallOnConditionKeep(CcdPROCESSOR_END_IDLE,CcdCallBacksReset,0);
 }
 
 
@@ -322,28 +330,6 @@ void CcdCancelCallOnConditionKeep(int condnum, int idx)
   remove_elem(&(CpvAccess(conds).condcb_keep[condnum]), idx);
 }
 
-/* Add a function that will be called during next call to PeriodicChecks
- */
-int CcdPeriodicCall(CcdVoidFn fnp, void *arg)
-{
-  return append_elem(&(CpvAccess(pcb).periodic), fnp, arg);
-}
-
-int CcdPeriodicCallKeep(CcdVoidFn fnp, void *arg)
-{
-  return append_elem(&(CpvAccess(pcb).keep), fnp, arg);
-}
-
-void CcdCancelPeriodicCall(int idx)
-{
-  remove_elem(&(CpvAccess(pcb).periodic), idx);
-}
-
-void CcdCancelPeriodicCallKeep(int idx)
-{
-  remove_elem(&(CpvAccess(pcb).keep), idx);
-}
-
 /* Call the function with the provided argument after a minimum delay of deltaT
  */
 void CcdCallFnAfter(CcdVoidFn fnp, void *arg, unsigned int deltaT)
@@ -366,6 +352,7 @@ void CcdRaiseCondition(int condnum)
  */
 void CcdCallBacks(void)
 {
+  int i;
   ccd_periodic_callbacks *o=&CpvAccess(pcb);
   
   /* Figure out how many times to skip Ccd processing */
@@ -382,8 +369,35 @@ void CcdCallBacks(void)
   o->lastCheck=currTime;
   
   ccd_heap_update(currTime);
-    
-  call_cblist_remove(&(o->periodic));
-  call_cblist_keep(&(o->keep));
+  
+  for (i=0;i<CCD_PERIODIC_MAX;i++) 
+    if (o->nextCall[i]<=currTime) {
+      CcdRaiseCondition(CcdPERIODIC+i);
+      o->nextCall[i]+=periodicCallInterval[i];
+    }
+    else 
+      break; /*<- because intervals are multiples of one another*/
 } 
+
+/*Called when something drastic changes-- restart ccd_num_checks
+*/
+void CcdCallBacksReset(void *ignored)
+{
+  ccd_periodic_callbacks *o=&CpvAccess(pcb);
+  double currTime=CmiWallTimer();
+  o->nSkip=1;
+  CpvAccess(_ccd_numchecks)=o->nSkip;
+  o->lastCheck=currTime;
+}
+
+
+
+
+
+
+
+
+
+
+
 

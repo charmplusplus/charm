@@ -508,7 +508,13 @@ extern void *CsdNextMessage(CsdSchedulerState_t *state);
 
 extern void  *CmiGetNonLocal(void);
 extern void   CmiNotifyIdle(void);
+
+/*Different kinds of schedulers: generic, eternal, counting, polling*/
 extern  int CsdScheduler(int maxmsgs);
+extern void CsdScheduleForever(void);
+extern  int CsdScheduleCount(int maxmsgs);
+extern void CsdSchedulePoll(void);
+
 #define CsdExitScheduler()  (CpvAccess(CsdStopFlag)++)
 
 #if CMK_SPANTREE_USE_COMMON_CODE
@@ -667,8 +673,7 @@ void          CmiFreeNodeBroadcastAllFn(int, char *);
 
 int    CmiDeliverMsgs(int maxmsgs);
 void   CmiDeliverSpecificMsg(int handler);
-
-#define CmiHandleMessage(msg) (CmiGetHandlerFunction(msg))(msg)
+void   CmiHandleMessage(void *msg);
 
 /******** CQS: THE QUEUEING SYSTEM ********/
 
@@ -998,7 +1003,7 @@ void CPathMsgFree(void *msg);
 
 /******** CONVCONDS ********/
 
-typedef void (*CcdVoidFn)();
+typedef void (*CcdVoidFn)(void *);
 
 /*CPU conditions*/
 #define CcdPROCESSOR_BEGIN_BUSY 0
@@ -1007,27 +1012,34 @@ typedef void (*CcdVoidFn)();
 #define CcdPROCESSOR_END_BUSY 1 /*Synonym*/
 #define CcdPROCESSOR_STILL_IDLE 2
 
-/*Thread conditions*/
-#define CcdTHREAD_SUSPEND 5
-#define CcdTHREAD_RESUME  6
-#define CcdTHREAD_SUSPEND 5
+/*Periodic calls*/
+#define CcdPERIODIC       16 /*every few ms*/
+#define CcdPERIODIC_10ms  17 /*every 10ms (100Hz)*/
+#define CcdPERIODIC_100ms 18 /*every 100ms (10Hz)*/
+#define CcdPERIODIC_1second  19 /*every second*/
+#define CcdPERIODIC_1s       19 /*every second*/
+#define CcdPERIODIC_10second 20 /*every 10 seconds*/
+#define CcdPERIODIC_10seconds 20 /*every 10 seconds*/
+#define CcdPERIODIC_10s      20 /*every 10 seconds*/
+#define CcdPERIODIC_1minute  21 /*every minute*/
+#define CcdPERIODIC_10minute 22 /*every 10 minutes*/
+#define CcdPERIODIC_1hour    23 /*every hour*/
+#define CcdPERIODIC_12hour   24 /*every 12 hours*/
+#define CcdPERIODIC_1day     25 /*every day*/
 
-/*Other conditiions*/
+/*Other conditions*/
 #define CcdQUIESCENCE 30
-#define CcdSIGUSR0 32+0
 #define CcdSIGUSR1 32+1
 #define CcdSIGUSR2 32+2
 
+/*User-defined conditions start here*/
+#define CcdUSER    48
+
 void CcdCallFnAfter(CcdVoidFn fnp, void *arg, unsigned int msecs);
-int CcdPeriodicCall(CcdVoidFn fnp, void *arg);
-int CcdPeriodicCallKeep(CcdVoidFn fnp, void *arg);
 int CcdCallOnCondition(int condnum, CcdVoidFn fnp, void *arg);
 int CcdCallOnConditionKeep(int condnum, CcdVoidFn fnp, void *arg);
-void CcdCancelPeriodicCall(int idx);
-void CcdCancelPeriodicCallKeep(int idx);
 void CcdCancelCallOnCondition(int condnum, int idx);
 void CcdCancelCallOnConditionKeep(int condnum, int idx);
-
 void CcdRaiseCondition(int condnum);
 
 /* Command-Line-Argument handling */
