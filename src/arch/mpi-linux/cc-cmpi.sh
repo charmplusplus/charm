@@ -6,7 +6,7 @@ CMK_CPP_C="cmpicc -E"
 CMK_CC="cmpicc -icc -gm -fPIC "
 CMK_CXX="cmpic++ -icc -gm -fPIC "
 CMK_CXXPP="cmpi++ -E "
-CMK_LD="cmpic++ -icc -fPIC "
+CMK_LD="cmpicc -icc -fPIC -cxxlib-gcc "
 CMK_LDXX="cmpic++ -icc -fPIC "
 CMK_LIBS="-lckqt -lcmpi "
 
