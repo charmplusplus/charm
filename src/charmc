@@ -427,12 +427,9 @@ foreach FILE ($FILES)
       endif
       breaksw
     case "*.P"
-      echo '#include <stdio.h>' > $TMP.P.C
-      echo '#line 1 "'$BASE.P'"' >> $TMP.P.C
+# Put pgm.P into pgm.TMP.P.C because CC needs source files to end with .C
+      echo '#line 1 "'$BASE.P'"' > $TMP.P.C
       /bin/cat $BASE.P >> $TMP.P.C
-# For heavens sake, dont change CMK_CXX to CMK_CPP below ! The preprocessor
-# for Charm++ is "g++ -E", not "cpp". Ive fixed it before, but someone keeps
-# screwing it up again.  -- Sanjeev 8/30/95
       if ($?VERBOSE) echo "$CMK_CXXPP $OPTS_CPP -I$CHARMINC $TMP.P.C > $TMP.cpp"
       $CMK_CXXPP $OPTS_CPP -I$CHARMINC $TMP.P.C > $TMP.cpp
       if ($?VERBOSE) echo "$CHARMBIN/charmfilter++ $TMP.cpp | $CMK_M4 > $TMP.space"
