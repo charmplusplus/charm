@@ -73,7 +73,8 @@
 
 #include "../daemon.h"
 
-#define DEBUGF(x) /*printf x*/
+//#define DEBUGF(x) printf x
+#define DEBUGF(x) 
 
 #ifndef MAXPATHLEN
 #define MAXPATHLEN 1024
@@ -1246,6 +1247,9 @@ void req_handle_ccs(void) {}
  * connection.  The server must then contact the client, sending replies.
  *
  ****************************************************************************/
+ /** Macro to switch on the case when charmrun stays up even if
+ one of the processor crashes*/
+//#define __FAULT__
 
 SOCKET *req_clients; /*TCP request sockets for each node*/
 int  req_nClients;/*Number of entries in above list (==nodetab_rank0_size)*/
@@ -1352,6 +1356,7 @@ int req_handle_ending(ChMessage *msg,SOCKET fd)
 
 int req_handle_abort(ChMessage *msg,SOCKET fd)
 {
+	fprintf(stderr,"req_handle_abort called \n");
   if (msg->len==0) 
     fprintf(stderr,"Aborting!\n");
   else
@@ -1388,18 +1393,47 @@ int req_handler_dispatch(ChMessage *msg,SOCKET replyFd)
   else if (strcmp(cmd,"ending")==0)     return req_handle_ending(msg,replyFd);
   else if (strcmp(cmd,"abort")==0)      return req_handle_abort(msg,replyFd);
   else {
+#ifndef __FAULT__	
         fprintf(stderr,"Charmrun> Bad control socket request '%s'\n",cmd); 
         abort();
+				return ;
+#endif				
   }
   return REQ_OK;
 }
 
+void error_in_req_serve_client(SOCKET fd){
+	SOCKET * new_req_clients=(SOCKET *)malloc((req_nClients-1)*sizeof(SOCKET));
+	int count=0,i;
+	fprintf(stdout,"Socket %d failed \n",fd);
+	fflush(stdout);
+	skt_close(fd);
+	for(i=0;i<req_nClients;i++){
+		if(req_clients[i] != fd){
+			new_req_clients[count] = req_clients[i];
+			count++;
+		}else{
+		}
+	}
+	free(req_clients);
+	req_clients = new_req_clients;
+	req_nClients--;
+}
+
 void req_serve_client(SOCKET fd)
 {
+	int recv_status;
   int status;
   ChMessage msg;
   DEBUGF(("Getting message from client...\n"));
-  ChMessage_recv(fd,&msg);
+  recv_status = ChMessage_recv(fd,&msg);
+	if(recv_status < 0){
+#ifdef __FAULT__	
+		error_in_req_serve_client(fd);
+#endif		
+		return;
+	}
+	
   DEBUGF(("Message is '%s'\n",msg.header.type));
   status = req_handler_dispatch(&msg,fd);
   switch (status) 
@@ -1416,7 +1450,11 @@ void req_serve_client(SOCKET fd)
 
 int ignore_socket_errors(int c,const char *m)
 {/*Abandon on further socket errors during error shutdown*/
-  exit(2);return -1;
+  
+#ifndef __FAULT__	
+  exit(2);
+#endif	
+	return -1;
 }
 
 /*A socket went bad somewhere!  Immediately disconnect,
@@ -1424,13 +1462,19 @@ which kills everybody.
 */
 int socket_error_in_poll(int code,const char *msg)
 {
+//commenting it for fault tolerance
+//ifdef it
+
 	int i;
 	skt_set_abort(ignore_socket_errors);
 	fprintf(stderr,"Charmrun: error on request socket--\n"
 			"%s\n",msg);
-	for (i=0;i<req_nClients;i++)
+#ifndef __FAULT__			
+  for (i=0;i<req_nClients;i++)
 		skt_close(req_clients[i]);
 	exit(1);
+#endif	
+	
 	return -1;
 }
 
@@ -1458,9 +1502,11 @@ void req_poll()
 
   if (status==0) return;/*Nothing to do-- timeout*/
 
-  if (status<0) 
-	socket_error_in_poll(1359,"Node program terminated unexpectedly!\n");
-	
+  if (status<0){ 
+		fflush(stdout);
+		fflush(stderr);
+		socket_error_in_poll(1359,"Node program terminated unexpectedly!\n");
+	}
   for (i=0;i<req_nClients;i++)
 	if (FD_ISSET(req_clients[i],&rfds))
 	/*This client is ready to read*/
@@ -1482,6 +1528,7 @@ static SOCKET server_fd;
 
 int client_connect_problem(int code,const char *msg)
 {/*Called when something goes wrong during a client connect*/
+
 	fprintf(stderr,"Charmrun> error %d attaching to node:\n"
 		"%s\n",code,msg);
 	exit(1);
@@ -1495,7 +1542,9 @@ void req_client_connect(void)
 	nodeinfo_allocate();
 	req_nClients=nodetab_rank0_size;
 	req_clients=(SOCKET *)malloc(req_nClients*sizeof(SOCKET));
+	
 	skt_set_abort(client_connect_problem);
+	
 	for (client=0;client<req_nClients;client++)
 	{/*Wait for the next client to connect to our server port.*/
 		unsigned int clientPort;/*These are actually ignored*/
