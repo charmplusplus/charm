@@ -215,11 +215,10 @@ extern "C" int CkGetArgc(void) {
 extern "C"
 void CkCreateChare(int cIdx, int eIdx, void *msg, CkChareID *pCid, int destPE)
 {
-  double sendT;
-  _TRACE_ONLY(sendT = CmiTraceTimer());
   CkAssert(cIdx == _entryTable[eIdx]->chareIdx);
   envelope *env = UsrToEnv(msg);
   _CHECK_USED(env);
+  _TRACE_CREATION_1(env);
   if(pCid == 0) {
     env->setMsgtype(NewChareMsg);
   } else {
@@ -241,7 +240,7 @@ void CkCreateChare(int cIdx, int eIdx, void *msg, CkChareID *pCid, int destPE)
   else
     env->setForAnyPE(0);
   CldEnqueue(destPE, env, _infoIdx);
-  _TRACE_CREATION_1(env, sendT);
+  _TRACE_CREATION_DONE(1);
 }
 
 void _createGroupMember(CkGroupID groupID, int eIdx, void *msg)
@@ -399,30 +398,28 @@ int _getGroupIdx(int numNodes,int myNode,int numGroups)
 extern "C"
 CkGroupID CkCreateGroup(int cIdx, int eIdx, void *msg)
 {
-  double sendT;
-  _TRACE_ONLY(sendT = CmiTraceTimer());
   CkAssert(cIdx == _entryTable[eIdx]->chareIdx);
   register envelope *env = UsrToEnv(msg);
+  _TRACE_CREATION_N(env, CkNumPes());
   env->setMsgtype(BocInitMsg);
   env->setEpIdx(eIdx);
   env->setSrcPe(CkMyPe());
   CkGroupID gid = _groupCreate(env);
-  _TRACE_CREATION_N(env, sendT, CkNumPes());
+  _TRACE_CREATION_DONE(CkNumPes());
   return gid;
 }
 
 extern "C"
 CkGroupID CkCreateNodeGroup(int cIdx, int eIdx, void *msg)
 {
-  double sendT;
-  _TRACE_ONLY(sendT = CmiTraceTimer());
   CkAssert(cIdx == _entryTable[eIdx]->chareIdx);
   register envelope *env = UsrToEnv(msg);
+  _TRACE_CREATION_N(env, CkNumNodes());
   env->setMsgtype(NodeBocInitMsg);
   env->setEpIdx(eIdx);
   env->setSrcPe(CkMyPe());
   CkGroupID gid = _nodeGroupCreate(env);
-  _TRACE_CREATION_N(env, sendT, CkNumNodes());
+  _TRACE_CREATION_DONE(CkNumNodes());
   return gid;
 }
 
@@ -791,11 +788,10 @@ void CkSendMsg(int entryIdx, void *msg,const CkChareID *pCid)
   register envelope *env = UsrToEnv(msg);
   int destPE=_prepareMsg(entryIdx,msg,pCid);
   if (destPE!=-1) {
-    double sendT;
-    _TRACE_ONLY(sendT = CmiTraceTimer());
+    _TRACE_CREATION_1(env);
     CpvAccess(_qd)->create();
     CldEnqueue(destPE, env, _infoIdx);
-    _TRACE_CREATION_1(env, sendT);
+    _TRACE_CREATION_DONE(1);
   }
 }
 
@@ -817,11 +813,10 @@ void CkSendMsgInline(int entryIndex, void *msg, const CkChareID *pCid)
       int destPE=_prepareImmediateMsg(entryIndex,msg,pCid);
       // go into VidBlock when destPE is -1
       if (destPE!=-1) {
-        double sendT;
-        _TRACE_ONLY(sendT = CmiTraceTimer());
+        _TRACE_CREATION_1(env);
         CpvAccess(_qd)->create();
         _noCldEnqueue(destPE, env);
-        _TRACE_CREATION_1(env, sendT);
+        _TRACE_CREATION_DONE(1);
       }
     }
     else
@@ -855,25 +850,21 @@ static inline envelope *_prepareImmediateMsgBranch(int eIdx,void *msg,CkGroupID 
 static inline void _sendMsgBranch(int eIdx, void *msg, CkGroupID gID, 
                            int pe=CLD_BROADCAST_ALL)
 {
-  double sendT;
-  _TRACE_ONLY(sendT = CmiTraceTimer());
+  int numPes;
   register envelope *env = _prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
+  _TRACE_ONLY(numPes = (pe==CLD_BROADCAST_ALL?CkNumPes():1));
+  _TRACE_CREATION_N(env, numPes);
   _skipCldEnqueue(pe, env, _infoIdx);
-  if(pe==CLD_BROADCAST_ALL) {
-    _TRACE_CREATION_N(env, sendT, CkNumPes());
-  } else {
-    _TRACE_CREATION_1(env, sendT);
-  }
+  _TRACE_CREATION_DONE(numPes);
 }
 
 static inline void _sendMsgBranchMulti(int eIdx, void *msg, CkGroupID gID, 
                            int npes, int *pes)
 {
-  double sendT;
-  _TRACE_ONLY(sendT = CmiTraceTimer());
   register envelope *env = _prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
+  _TRACE_CREATION_N(env, npes);
   CldEnqueueMulti(npes, pes, env, _infoIdx);
-  _TRACE_CREATION_N(env, sendT, npes);
+  _TRACE_CREATION_DONE(npes);
 }
 
 extern "C"
@@ -907,18 +898,15 @@ void CkSendMsgBranchInline(int eIdx, void *msg, int destPE, CkGroupID gID)
 #if CMK_IMMEDIATE_MSG
   register envelope *env = UsrToEnv(msg);
   if (env->isImmediate()) {
-    double sendT;
-    _TRACE_ONLY(sendT = CmiTraceTimer());
+    int numPes;
+    _TRACE_ONLY(numPes = (destPE==CLD_BROADCAST_ALL?CkNumPes():1));
+    _TRACE_CREATION_N(env, numPes);
     env->setImmediate(CmiFalse);
     env = _prepareImmediateMsgBranch(eIdx,msg,gID,ForBocMsg);
     _noCldEnqueue(destPE, env);
+    _TRACE_CREATION_DONE(numPes);
     _STATS_RECORD_SEND_BRANCH_1();
     CpvAccess(_qd)->create();
-    if(destPE==CLD_BROADCAST_ALL) {
-      _TRACE_CREATION_N(env, sendT, CkNumPes());
-    } else {
-      _TRACE_CREATION_1(env, sendT);
-    }
   }
   else
 #endif
@@ -944,15 +932,12 @@ void CkBroadcastMsgBranch(int eIdx, void *msg, CkGroupID gID)
 static inline void _sendMsgNodeBranch(int eIdx, void *msg, CkGroupID gID, 
                            int node=CLD_BROADCAST_ALL)
 {
-  double sendT;
-  _TRACE_ONLY(sendT = CmiTraceTimer());
+  int numPes;
   register envelope *env = _prepareMsgBranch(eIdx,msg,gID,ForNodeBocMsg);
+  _TRACE_ONLY(numPes = (node==CLD_BROADCAST_ALL?CkNumNodes():1));
+  _TRACE_CREATION_N(env, numPes);
   CldNodeEnqueue(node, env, _infoIdx);
-  if(node==CLD_BROADCAST_ALL) {
-    _TRACE_CREATION_N(env, sendT, CkNumNodes());
-  } else {
-    _TRACE_CREATION_1(env, sendT);
-  }
+  _TRACE_CREATION_DONE(numPes);
 }
 
 extern "C"
@@ -988,18 +973,15 @@ void CkSendMsgNodeBranchInline(int eIdx, void *msg, int node, CkGroupID gID)
 #if CMK_IMMEDIATE_MSG
   register envelope *env = UsrToEnv(msg);
   if (env->isImmediate()) {
-    double sendT;
-    _TRACE_ONLY(sendT = CmiTraceTimer());
+    int numPes;
+    _TRACE_ONLY(numPes = (node==CLD_BROADCAST_ALL?CkNumNodes():1));
+    _TRACE_CREATION_N(env, numPes);
     env->setImmediate(CmiFalse);
     env = _prepareImmediateMsgBranch(eIdx,msg,gID,ForNodeBocMsg);
     _noCldNodeEnqueue(node, env);
     _STATS_RECORD_SEND_BRANCH_1();
     CpvAccess(_qd)->create();
-    if(node==CLD_BROADCAST_ALL) {
-      _TRACE_CREATION_N(env, sendT, CkNumNodes());
-    } else {
-      _TRACE_CREATION_1(env, sendT);
-    }
+    _TRACE_CREATION_DONE(numPes);
   }
   else
 #endif
