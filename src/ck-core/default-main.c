@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.9  1995-07-19 22:15:24  jyelon
+ * Revision 2.10  1995-09-19 17:56:25  sanjeev
+ * moved Charm's module inits from user_main to InitializeCharm
+ *
+ * Revision 2.9  1995/07/19  22:15:24  jyelon
  * *** empty log message ***
  *
  * Revision 2.8  1995/07/12  20:59:58  brunner
@@ -60,34 +63,16 @@ CpvExtern(int, numCondChkArryElts);
 CpvExtern(int, CsdStopFlag);
 
 
-void defaultmainModuleInit()
-{
-}
 
 user_main(argc, argv)
 int argc;
 char *argv[];
 {
-  if (CmiMyRank() != 0) CmiNodeBarrier();
-
-  defaultmainModuleInit();
-  bocModuleInit();
-  ckModuleInit();
-  condsendModuleInit();
-  globalsModuleInit();
-  initModuleInit();
-  mainModuleInit();
-  quiesModuleInit();
-  registerModuleInit();
-  statModuleInit();
-  tblModuleInit(); 
-  CldModuleInit();
-  perfModuleInit(argv[0]); /* pass program name */
-
-  if (CmiMyRank() == 0) CmiNodeBarrier();
-
   ConverseInit(argv);
+
+  InitializeCharm(argv) ;
   StartCharm(argv);
+
   CpvAccess(CsdStopFlag)=0;
 
   CsdScheduler(-1) ;

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.18  1995-09-14 20:49:17  jyelon
+ * Revision 2.19  1995-09-19 17:57:02  sanjeev
+ * moved Charm's module inits from user_main to InitializeCharm
+ *
+ * Revision 2.18  1995/09/14  20:49:17  jyelon
  * Added +fifo +lifo +ififo +ilifo +bfifo +blifo command-line options.
  *
  * Revision 2.17  1995/09/07  21:21:38  jyelon
@@ -199,6 +202,34 @@ char **argv;
     int argc=0;
     while (*argv) { argc++; argv++; }
     return argc;
+}
+
+
+void defaultmainModuleInit()
+{
+}
+
+InitializeCharm(argv)
+char **argv;
+{
+/* these lines were in user_main */
+  if (CmiMyRank() != 0) CmiNodeBarrier();
+
+  defaultmainModuleInit();
+  bocModuleInit();
+  ckModuleInit();
+  condsendModuleInit();
+  globalsModuleInit();
+  initModuleInit();
+  mainModuleInit();
+  quiesModuleInit();
+  registerModuleInit();
+  statModuleInit();
+  tblModuleInit(); 
+  CldModuleInit();
+  perfModuleInit(argv[0]); /* pass program name */
+
+  if (CmiMyRank() == 0) CmiNodeBarrier();
 }
 
 
