@@ -8,9 +8,9 @@
 #include "charm++.h"
 #include "commlib.h"
 
-#include "../../../ck.h"
-#include "../../../envelope.h"
-#include "../../../trace.h"
+#include "ck.h"
+#include "envelope.h"
+#include "trace.h"
 
 class envelope;
 

@@ -10,7 +10,7 @@ libcomm.a: $(OBJS)
 	$(CHARMC) -cp ../../../../lib -o libcomm.a $(OBJS)
 
 charm_bind.o: charm_bind.C commlib.h
-	$(CHARMC)  -c charm_bind.C
+	$(CHARMC)  -c -I../../.. charm_bind.C
 
 commlib.o:  commlib.C commlib_pvt.h
 	$(CHARMC)  -c commlib.C
