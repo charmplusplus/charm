@@ -125,14 +125,14 @@ class memBuf {
 };
 
 template <class T>
-void pupIntoBuf(memBuf &b,T &t) {
+inline void pupIntoBuf(memBuf &b,T &t) {
 	PUP::sizer ps;ps|t;
 	b.setSize(ps.size());
 	PUP::toMem pm(b.getData()); pm|t;	
 }
 
 template <class T>
-void pupFromBuf(const void *data,T &t) {
+inline void pupFromBuf(const void *data,T &t) {
 	PUP::fromMem p(data); p|t;
 }
 
