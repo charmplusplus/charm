@@ -463,11 +463,10 @@ void ComlibManager::ArraySend(CkDelegateData *pd,int ep, void *msg,
     
     CkArrayIndexMax myidx = idx;
     int dest_proc = getLastKnown(a, myidx); 
-    int amgr_destpe = CkArrayID::CkLocalBranch(a)->lastKnown(myidx);
     
-    //ComlibPrintf("Send Data %d %d %d %d\n", CkMyPe(), dest_proc, 
-    //	 UsrToEnv(msg)->getTotalsize(), receivedTable);
-
+    //Reading from two hash tables is a big overhead
+    //int amgr_destpe = CkArrayID::CkLocalBranch(a)->lastKnown(myidx);
+    
     register envelope * env = UsrToEnv(msg);
     
     env->getsetArrayMgr()=a;
@@ -480,23 +479,29 @@ void ComlibManager::ArraySend(CkDelegateData *pd,int ep, void *msg,
 
     //RECORD_SEND_STATS(curStratID, env->getTotalsize(), dest_proc);
 
-    CkPackMessage(&env);
-    CmiSetHandler(env, CkpvAccess(RecvmsgHandle));
-    
     if(isRemote) {
+        CkPackMessage(&env);        
         CharmMessageHolder *cmsg = new 
             CharmMessageHolder((char *)msg, dest_proc);
-
+        
         remoteQ.enq(cmsg);
         return;
     }
-    
+
     //Any bug here? FOO BAR??
-    if(amgr_destpe == CkMyPe()){
-        CProxyElement_ArrayBase ap(a,idx);
-        ap.ckSend((CkArrayMessage *)msg, ep);
+    //With migration some array messages may be directly sent
+    if(dest_proc == CkMyPe()){                
+        CkArray *amgr = (CkArray *)_localBranch(a);
+        amgr->deliver((CkArrayMessage *)msg, CkDeliver_queue);
+        
+        //CProxyElement_ArrayBase ap(a, idx);
+        //ap.ckSend((CkArrayMessage *)msg, ep);
+
         return;
     }
+    
+    CkPackMessage(&env);
+    CmiSetHandler(env, CkpvAccess(RecvmsgHandle));        
     
     //totalMsgCount ++;
     //totalBytes += UsrToEnv(msg)->getTotalsize();
@@ -504,11 +509,11 @@ void ComlibManager::ArraySend(CkDelegateData *pd,int ep, void *msg,
     CharmMessageHolder *cmsg = new 
         CharmMessageHolder((char *)msg, dest_proc);
     //get rid of the new.
-
+    
     ComlibPrintf("[%d] Before Insert on strat %d received = %d\n", CkMyPe(), curStratID, receivedTable);
-
+    
     if (receivedTable)
-      (* strategyTable)[curStratID].strategy->insertMessage(cmsg);
+        (* strategyTable)[curStratID].strategy->insertMessage(cmsg);
     else {
         flushTable = 1;
         (* strategyTable)[curStratID].tmplist.enq(cmsg);
