@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1995-06-08 17:07:12  gursoy
+ * Revision 2.2  1995-06-29 22:35:57  narain
+ * Changed cast of LDB_ELEMENT_UPTR to (void *) from (LDB_ELEMENT_PTR *)
+ *
+ * Revision 2.1  1995/06/08  17:07:12  gursoy
  * Cpv macro changes done
  *
  * Revision 1.4  1995/03/17  23:37:57  sanjeev
@@ -93,7 +96,7 @@ CpvExtern(int, _CK_Usr_To_Ldb);
 /* The following macros assume that -env- is an ENVELOPE pointer */
 /**********************************************************************/
 #define LDB_ELEMENT_PTR(env)  \
-	(LDB_ELEMENT *) (CHARRED(env) + _CK_Env_To_Ldb)
+	(void *) (CHARRED(env) + _CK_Env_To_Ldb)
 
 #define USER_MSG_PTR(env)\
     (CHARRED(env) + CpvAccess(_CK_Env_To_Usr))
