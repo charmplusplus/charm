@@ -93,14 +93,15 @@ void CmiHandleImmediate()
 {
    void *msg;
 
-   /* If somebody else is checking the queue, we don't need to
-   if (CmiTryLock(CsvAccess(NodeState).immRecvLock)!=0) return;
-   */
    /* converse init hasn't finish */
    if (!_immediateReady) return;
   
-   /* Make sure only one thread is running immediate messages: */
+   /* If somebody else is checking the queue, we don't need to */
+   if (CmiTryLock(CsvAccess(NodeState).immRecvLock)!=0) return;
+
+   /* Make sure only one thread is running immediate messages:
    CmiLock(CsvAccess(NodeState).immRecvLock);
+   */
 
    MACHLOCK_ASSERT(!_immRunning,"CmiHandleImmediate");
    _immRunning=1; /* prevents SIGIO reentrancy, and allows different send */
