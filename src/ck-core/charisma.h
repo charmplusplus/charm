@@ -579,7 +579,7 @@ class CkInPortMsg : public CharismaInPort
     }
     void send(void *data, int len)
     {
-      send((d*) _d);
+      send((d*) data);
     }
     void send(d *_d)
     {
