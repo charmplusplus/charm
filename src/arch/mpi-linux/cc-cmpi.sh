@@ -19,7 +19,10 @@ CMK_SEQ_LDXX="icpc  -fPIC -cxxlib-gcc "
 CMK_CF77="cmpifc -ifc "
 CMK_CF90="cmpif90c -ifc "
 CMK_CF90_FIXED="cmpif90c -ifc "
-CMK_F90LIBS='-lifcore  '
+# for_main.o is important
+F90DIR=`which ifort 2> /dev/null`
+test -n "$F90DIR" && F90MAIN="`dirname $F90DIR`/../lib/for_main.o"
+CMK_F90LIBS="-lifcore $F90MAIN "
 CMK_F77LIBS=$CMK_F90LIBS
 CMK_MOD_NAME_ALLCAPS=
 CMK_MOD_EXT="mod"
