@@ -122,6 +122,7 @@ class chunk : public ArrayElement1D
   void reduce(int fid, void *inbuf, void *outbuf, int op);
   void readField(int fid, void *nodes, char *fname);
   int id(void) { return thisIndex; }
+  int total(void) { return numElements; }
  private:
   void update_field(DataMsg *);
   void send(int fid, void *nodes);
@@ -136,7 +137,8 @@ int FEM_Create_Field(int base_type, int vec_len, int init_offset, int distance);
 void FEM_Update_Field(int fid, void *nodes);
 void FEM_Reduce_Field(int fid, void *nodes, void *outbuf, int op);
 void FEM_Reduce(int fid, void *inbuf, void *outbuf, int op);
-int FEM_Id(void);
+int FEM_My_Partition(void);
+int FEM_Num_Partitions(void);
 void FEM_Read_Field(int fid, void *nodes, char *fname);
 
 // Fortran Bindings
@@ -145,7 +147,8 @@ extern "C" int fem_create_field_(int *bt, int *vl, int *io, int *d);
 extern "C" void fem_update_field_(int *fid, void *nodes);
 extern "C" void fem_reduce_field_(int *fid, void *nodes, void *outbuf, int *op);
 extern "C" void fem_reduce_(int *fid, void *inbuf, void *outbuf, int *op);
-extern "C" int fem_id_(void);
+extern "C" int fem_my_partition_(void);
+extern "C" int fem_num_partitions_(void);
 // FIXME: correct fortran-c interoperability issue for passing character arrays
 extern "C" void fem_read_field_(int *fid, void *nodes, char *fname);
 

@@ -478,10 +478,17 @@ FEM_Read_Field(int fid, void *nodes, char *fname)
 }
 
 int
-FEM_Id(void)
+FEM_My_Partition(void)
 {
   chunk *cptr = CtvAccess(_femptr);
   return cptr->id();
+}
+
+int
+FEM_Num_Partitions(void)
+{
+  chunk *cptr = CtvAccess(_femptr);
+  return cptr->total();
 }
 
 // Fortran Bindings
@@ -517,9 +524,15 @@ fem_read_field_(int *fid, void *nodes, char *fname)
 }
 
 extern "C" int
-fem_id_(void)
+fem_my_partition_(void)
 {
-  return FEM_Id();
+  return FEM_My_Partition();
+}
+
+extern "C" int
+fem_num_partitions_(void)
+{
+  return FEM_Num_Partitions();
 }
 
 // Utility functions for Fortran
