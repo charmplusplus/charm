@@ -32,6 +32,12 @@
 void CkPupMessage(PUP::er &p,void **atMsg,int fast_and_dirty) {
 	UChar type;
 	int size,prioBits,envSize;
+
+	/* pup this simple flag so that we can handle the NULL msg */
+	int isNull = (*atMsg == NULL);   // be overwritten when unpacking
+	p(isNull);
+	if (isNull) { *atMsg = NULL; return; }
+
 	envelope *env=UsrToEnv(*atMsg);
 	unsigned char wasPacked=0;
 	p.comment("Begin Charm++ Message {");
