@@ -142,9 +142,6 @@ void ArrayElement::pup(PUP::er &p)
   reductionInfo.pup(p);
 }
 
-void operator|(PUP::er &p,CkIndex2D &i) {p(i.x);p(i.y);}
-void operator|(PUP::er &p,CkIndex3D &i) {p(i.x);p(i.y);p(i.z);}
-
 /*********************** Spring Cleaning *****************
 Periodically (every minute or so) remove expired broadcasts 
 from the queue.

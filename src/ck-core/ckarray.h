@@ -258,11 +258,11 @@ public:
 typedef ArrayElementT<int> ArrayElement1D;
 
 typedef struct {int x,y;} CkIndex2D;
-void operator|(PUP::er &p,CkIndex2D &i);
+inline void operator|(PUP::er &p,CkIndex2D &i) {p(i.x); p(i.y);}
 typedef ArrayElementT<CkIndex2D> ArrayElement2D;
 
 typedef struct {int x,y,z;} CkIndex3D;
-void operator|(PUP::er &p,CkIndex3D &i);
+inline void operator|(PUP::er &p,CkIndex3D &i) {p(i.x); p(i.y); p(i.z);}
 typedef ArrayElementT<CkIndex3D> ArrayElement3D;
 
 
