@@ -1068,7 +1068,7 @@ case "$OBJECT" in
 	    OBJECT=`echo $OBJECT | sed -e 's@lib/\([^/]*\)\.a$@lib_so/\1.a@'`
 	  else
 	    COPYTO=`echo $COPYTO | sed -e 's@lib[/]*$@lib_so@'`
-	    DESTDIR=COPYTO
+	    DESTDIR=$COPYTO
 	  fi
 	  OBJECT=`echo $OBJECT | sed -e 's/\.a$/.'"$CMK_SHARED_SUF"'/'`
 	  [ -f $DESTDIR/.charmso ] && MakeSO
