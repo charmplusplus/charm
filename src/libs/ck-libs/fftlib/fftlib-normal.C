@@ -14,10 +14,10 @@ NormalSlabArray::doFFT(int src_id, int dst_id)
     int lineSize = fftinfo.srcSize[1];
 
 	// do the 2D forward ffts
+    CmiAssert(fwd2DPlan!=NULL);
     int p;
-    if (fwd2DPlan)
-	for(p = 0; p < fftinfo.srcPlanesPerSlab; p++)
-	    fftwnd_one(fwd2DPlan, (fftw_complex*)dataPtr + p * planeSize, NULL);
+    for(p = 0; p < fftinfo.srcPlanesPerSlab; p++)
+      fftwnd_one(fwd2DPlan, (fftw_complex*)dataPtr + p * planeSize, NULL);
     
     // allocating the data for sending to destination side
     complex *sendData = new complex[fftinfo.srcPlanesPerSlab * fftinfo.destPlanesPerSlab * lineSize];
@@ -65,14 +65,14 @@ NormalSlabArray::acceptDataForFFT(int numPoints, complex *points, int posn, int 
     }
     if (counts[info_id] == fftinfo.destSize[0] / fftinfo.srcPlanesPerSlab) {
 	counts[info_id] = 0;
-	if (fwd1DPlan)
-	    for(p = 0; p < fftinfo.destPlanesPerSlab; p++) {
+	CkAssert(fwd1DPlan != NULL);
+	for(p = 0; p < fftinfo.destPlanesPerSlab; p++) {
 		fftw(fwd1DPlan, 
 		     lineSize,
 		     (fftw_complex*)dataPtr + p * planeSize,
 		     lineSize, 1, //stride, nextFFT
 		     NULL, 0, 0);
-	    }
+	}
 	doneFFT(info_id);
     }
 }
@@ -88,12 +88,12 @@ NormalSlabArray::doIFFT(int src_id, int dst_id)
     int planeSize = fftinfo.destSize[0] * fftinfo.destSize[1];
     int lineSize = fftinfo.destSize[1];
     
+    CmiAssert(bwd2DPlan!=NULL);
     int p;
-    if (bwd2DPlan)
-	for(p = 0; p < fftinfo.destPlanesPerSlab; p++)
-	    fftwnd_one(bwd2DPlan, 
-		       (fftw_complex*)dataPtr + p * planeSize,
-		       NULL);
+    for(p = 0; p < fftinfo.destPlanesPerSlab; p++)
+      fftwnd_one(bwd2DPlan, 
+	       (fftw_complex*)dataPtr + p * planeSize,
+	       NULL);
     
     complex *sendData = new complex[fftinfo.srcPlanesPerSlab * fftinfo.destPlanesPerSlab * lineSize];
     complex *temp;
@@ -135,24 +135,24 @@ NormalSlabArray::acceptDataForIFFT(int numPoints, complex *points, int posn, int
     
     if (counts[info_id] == fftinfo.srcSize[0] / fftinfo.destPlanesPerSlab) {
 	counts[info_id] = 0;
-	if (bwd1DPlan)
-	    for(p = 0; p < fftinfo.srcPlanesPerSlab; p++) {
+	CmiAssert(bwd1DPlan!=NULL);
+	for(p = 0; p < fftinfo.srcPlanesPerSlab; p++) {
 		fftw(bwd1DPlan,
 		     lineSize,
 		     (fftw_complex*)dataPtr + p * planeSize,
 		     lineSize, 1, //stride, nextFFT
 		     NULL, 0, 0);
-	    }
+	}
 	doneIFFT(info_id);
     }
 }
 
-NormalSlabArray::NormalSlabArray(NormalFFTinfo &info) 
+void NormalSlabArray::setup(NormalFFTinfo &info)
 {
     fftinfos[0] = new NormalFFTinfo(info);
     counts[0] = 0;
-    fwd2DPlan =	bwd2DPlan = 0;
-    fwd1DPlan = bwd1DPlan = 0;
+    fwd1DPlan = bwd1DPlan = NULL;
+    fwd2DPlan = bwd2DPlan = NULL;
     if (info.isSrcSlab) {
 	fwd2DPlan = fftw2d_create_plan(info.srcSize[0], info.srcSize[1], FFTW_FORWARD, FFTW_USE_WISDOM|FFTW_MEASURE|FFTW_IN_PLACE);
 	bwd1DPlan = fftw_create_plan(info.srcSize[1], FFTW_BACKWARD, FFTW_USE_WISDOM|FFTW_MEASURE|FFTW_IN_PLACE);
@@ -186,6 +186,9 @@ void NormalSlabArray::pup(PUP::er &p)
     ArrayElement1D::pup(p);
 
     for (i = 0; i < MAX_FFTS; i++) {
+	if (p.isUnpacking()) {
+          fftinfos[i] = NULL;
+	}
 	int val = fftinfos[i]? 1:0;
 	p | val; 
 	if (val) {                // if this entry is not NULL
