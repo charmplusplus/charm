@@ -574,8 +574,7 @@ void CthFree(CthThread t)
   } 
   else 
   {
-    CmiError("Not implemented CthFree.\n");
-    exit(1);
+    CmiAbort("Not implemented CthFree.\n");
   }
 }
 
@@ -1039,7 +1038,9 @@ void CthInit(char **argv)
   CpvAccess(_stksize) = CpvAccess(_stksize) ? CpvAccess(_stksize) : STACKSIZE;
   CpvAccess(_stksize) = (CpvAccess(_stksize)+(CMK_MEMORY_PAGESIZE*2)-1) & 
                        ~(CMK_MEMORY_PAGESIZE-1);
+#if CMK_THREADS_DEBUG
   CmiPrintf("[%d] Using stacksize of %d\n", CmiMyPe(), CpvAccess(_stksize));
+#endif
 
   CpvInitialize(void *, heapbdry);
   CpvInitialize(int, zerofd);
@@ -1055,18 +1056,24 @@ void CthInit(char **argv)
     int stacksize = CpvAccess(_stksize);
     _MEMCHECK(heap);
     _MEMCHECK(stack);
+#if CMK_THREADS_DEBUG
     CmiPrintf("[%d] heap=%p\tstack=%p\n",CmiMyPe(),heap,stack);
+#endif
     /* FIXME: Portability for 64bit systems? */
     /* FIXME: Assumes heap grows down */
-    /* FIXME: Assumes stack grows up */
     CpvAccess(heapbdry) = (void *)(((size_t)heap+(1<<30))&(~((1<<30)-1)));
+    /* FIXME: Assumes stack grows up */
     stackbdry = (void *)(((size_t)stack-(1<<28))&(~((1<<28)-1)));
+#if CMK_THREADS_DEBUG
     CmiPrintf("[%d] heapbdry=%p\tstackbdry=%p\n",
               CmiMyPe(),CpvAccess(heapbdry),stackbdry);
+#endif
     /* FIXME: assumes stackbdry > heapbdry, also assumes heapbdry as base */
     numslots = (((size_t)stackbdry-(size_t)CpvAccess(heapbdry))/stacksize)
                  / CmiNumPes();
+#if CMK_THREADS_DEBUG
     CmiPrintf("[%d] numthreads per pe=%d\n",CmiMyPe(),numslots);
+#endif
     CpvAccess(zerofd) = open("/dev/zero", O_RDWR);
     if(CpvAccess(zerofd)<0)
       CmiAbort("Cannot open /dev/zero. Aborting.\n");
@@ -1111,8 +1118,7 @@ CthThread t;
   if (t==CthCpvAccess(CthCurrent)) {
     CthCpvAccess(CthExiting) = 1;
   } else {
-    CmiError("Not implemented CthFree.\n");
-    exit(1);
+    CmiAbort("Not implemented CthFree.\n");
   }
 }
 
@@ -1151,7 +1157,9 @@ CthThread t;
   } else {
     QT_BLOCK((qt_helper_t*)CthBlockHelp, tc, 0, t->stackp);
   }
-  if (tc!=CthCpvAccess(CthCurrent)) { CmiError("Stack corrupted?\n"); exit(1); }
+  /*
+  if (tc!=CthCpvAccess(CthCurrent)) { CmiAbort("Stack corrupted?\n"); }
+  */
 }
 
 static void CthOnly(void *arg, void *vt, qt_userf_t fn)
@@ -1180,11 +1188,13 @@ CthVoidFn fn; void *arg; int size;
 {
   CthThread result; 
   int slotnum;
+#if CMK_THREADS_DEBUG
   if(size!=0 && size>CpvAccess(_stksize))
   {
     CmiPrintf("[%d] Nonzero stacksize %d bytes specified. Using %d bytes.\n",
       CmiMyPe(), size, CpvAccess(_stksize));
   }
+#endif
   result = (CthThread)malloc(sizeof(struct CthThreadStruct));
   _MEMCHECK(result);
   CthThreadInit(result);
@@ -1233,12 +1243,10 @@ void CthAwaken(th)
 CthThread th;
 {
   if (th->awakenfn == 0) CthNoStrategy();
+  th->awakened = 1;
   /* thread stack is not yet allocated. */
   if (th->slotnum == (-2))
-  {
-    th->awakened = 1;
     return;
-  }
   CpvAccess(curThread) = th;
 #ifndef CMK_OPTIMIZE
   if(CpvAccess(traceOn))
@@ -1256,11 +1264,9 @@ void CthYield()
 void CthAwakenPrio(CthThread th, int s, int pb, int *prio)
 {
   if (th->awakenfn == 0) CthNoStrategy();
+  th->awakened = 1;
   if (th->slotnum == (-2))
-  {
-    th->awakened = 1;
     return;
-  }
   CpvAccess(curThread) = th;
 #ifndef CMK_OPTIMIZE
   if(CpvAccess(traceOn))
@@ -1291,22 +1297,67 @@ int size;
 
 int CthPackBufSize(CthThread t)
 {
-  /* FIXME: import from copy_stack case */
-  CmiAbort("CthPackBufSize not implemented.\n");
-  return 0;
+  qt_t *stackbase;
+  int ssz;
+#ifndef CMK_OPTIMIZE
+  if (CthCpvAccess(CthCurrent) == t)
+    CmiAbort("Trying to pack a running thread!!\n");
+  if(t->slotnum < 0)
+    CmiAbort("Trying to pack a thread that is not migratable!!\n");
+#endif
+  /* FIXME: Assumption stackp < stackbase */
+  stackbase = QT_SP(t->stack, CpvAccess(_stksize));
+  ssz = ((char*)(stackbase)-(char*)(t->stackp));
+  return sizeof(struct CthThreadStruct) + t->datasize + ssz;
 }
 
 void CthPackThread(CthThread t, void *buffer)
 {
-  /* FIXME: import from copy_stack case */
-  CmiAbort("CthPackThread not implemented.\n");
+  qt_t *stackbase;
+  int ssz;
+  char *buf = (char *) buffer;
+#ifndef CMK_OPTIMIZE
+  if (CthCpvAccess(CthCurrent) == t)
+    CmiAbort("Trying to pack a running thread!!\n");
+  if(t->slotnum < 0)
+    CmiAbort("Trying to pack a thread that is not migratable!!\n");
+  /* FIXME: put in a check for thread in scheduler's queue */
+#endif
+  memcpy((void*)buf, (void *)t, sizeof(struct CthThreadStruct));
+  buf += sizeof(struct CthThreadStruct);
+  memcpy((void*)buf, (void *)t->data, t->datasize);
+  buf += t->datasize;
+  free((void *)t->data);
+  /* FIXME: Assumption stackp < stackbase */
+  stackbase = QT_SP(t->stack, CpvAccess(_stksize));
+  ssz = ((char*)(stackbase)-(char*)(t->stackp));
+  memcpy((void*)buf, (void *)t->stackp, ssz);
+  unmap_slot(t->slotnum);
+  free(t);
 }
 
 CthThread CthUnpackThread(void *buffer)
 {
-  /* FIXME: import from copy_stack case */
-  CmiAbort("CthUnpackThread not implemented.\n");
-  return (CthThread) 0;
+  qt_t *stack, *stackbase;
+  int ssz;
+  char *buf = (char *) buffer;
+  CthThread t = (CthThread) malloc(sizeof(struct CthThreadStruct));
+  _MEMCHECK(t);
+  memcpy((void*) t, (void*)buf, sizeof(struct CthThreadStruct));
+  buf += sizeof(struct CthThreadStruct);
+  t->data = (char *) malloc(t->datasize);
+  _MEMCHECK(t->data);
+  memcpy((void*)t->data, (void*)buf, t->datasize);
+  buf += t->datasize;
+  stack = (qt_t*) map_slot(t->slotnum);
+  _MEMCHECK(stack);
+  if(stack != t->stack)
+    CmiAbort("Stack pointers do not match after migration!!\n");
+  /* FIXME: Assumption stackp > stackbase */
+  stackbase = QT_SP(t->stack, CpvAccess(_stksize));
+  ssz = ((char*)(stackbase)-(char*)(t->stackp));
+  memcpy((void*)t->stackp, (void*)buf, ssz);
+  return t;
 }
 
 #else
@@ -1430,8 +1481,7 @@ CthThread t;
   if (t==CthCpvAccess(CthCurrent)) {
     CthCpvAccess(CthExiting) = 1;
   } else {
-    CmiError("Not implemented CthFree.\n");
-    exit(1);
+    CmiAbort("Not implemented CthFree.\n");
   }
 }
 
@@ -1466,7 +1516,7 @@ CthThread t;
   } else {
     QT_BLOCK((qt_helper_t*)CthBlockHelp, tc, 0, t->stackp);
   }
-  if (tc!=CthCpvAccess(CthCurrent)) { CmiError("Stack corrupted?\n"); exit(1); }
+  if (tc!=CthCpvAccess(CthCurrent)) { CmiAbort("Stack corrupted?\n"); }
 }
 
 static void CthOnly(void *arg, void *vt, qt_userf_t fn)
