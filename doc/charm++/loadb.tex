@@ -21,7 +21,7 @@ their computation and communication patterns, i.e. future can be to some
 extent predicted using the historical measurement data, allowing effective 
 measurement-based load balancing without application-specific knowledge. 
 
-Here are the two terms oftenly used in \charmpp{} load balancing framework:
+Here are the two terms often used in \charmpp{} load balancing framework:
 \begin{itemize}
 \item \kw{Load balancer or strategy} takes the measurement
    data and produces the new mapping of the objects. In \charmpp{}, it is
@@ -42,7 +42,7 @@ descriptions:
 \item \kw{RandRefLB}:    Randomly assign objects to processors, then refine;
 \item \kw{RefineLB}:     Move a few objects away from the most overloaded processors;
 \item \kw{RecBisectBfLB}:        Recursive partition with Breadth first enumeration;
-\item \kw{MetisLB}:      Use Metis(tm) to partitioning object communication graph;
+\item \kw{MetisLB}:      Use Metis^{tm} to partitioning object communication graph;
 \item \kw{CommLB}:       Greedy with communication;
 \item \kw{Comm1LB}:      another variation of CommLB;
 \item \kw{HeapCentLB}:   Heap Centralized;
@@ -61,7 +61,7 @@ Load balancing framework is well integrated with Chare array implementation -
 chare array when created automatically registers itself to load balancing
 framework, instrument of compute wall/cpu time and communication is 
 done automatically and APIs are provided for triggering the load balancing; 
-thus load balancing with array is prefered in \charmpp{}, although 
+thus load balancing with array is preferred in \charmpp{}, although 
 experienced users still can do load balancing on normal chares using load 
 balancing framework API, but this topic is currently beyond the scope of 
 this manual.
@@ -91,7 +91,7 @@ properly packed before migrating to
 other processors}. In this mode, load balancer works in parallel with 
 the application so application doesn't need to stop waiting for load 
 balancing to complete. However, in most cases, 
-application doesn't want load balancing to occur arbitarily because it knows 
+application does not want load balancing to occur arbitrarily because it knows 
 when is the proper time for load balancing\footnote{For example, in the 
 application with multiple iterations, load balancing best happens 
 every a few iterations}. {\em Automatic with sync} mode is designed for this 
@@ -99,17 +99,20 @@ scenario. In this mode, user inserts {\em AtSync()} calls at certain points
 in application where load balancing is desired. Load balancing is triggered 
 after all the local array elements on each processor reach the sync 
 point\footnote{It is implemented as a local barrier of all the array elements
-on one processor}.  The common practice is that the application 
-would choose to take a break and wait for the load balancing and migration 
-complete until it resumes when the load balancer calls 
-back {\em ResumeFromSync()} on each array element. 
-{\em ResumeFromSync()} is a virtual function of array element 
-base class which can be redefined in application. However, 
- {\em AtSync()} is not a blocking call, load balancing does
-not force the applicatio to stop. 
+on one processor}. However, {\em AtSync()} is not a blocking call, 
+load balancing does not force the application to block until it  
+finishes. When load balancing finishes, load balancer notifies every array
+element by calling {\em ResumeFromSync()}
+\footnote{{\em ResumeFromSync()} is a virtual function of array element
+base class which can be redefined in application.}. In many applications,
+it is often desirable that application waits for load balancing complete since
+there may be migration occurs when load balancing and application may want to
+respond to the migration. Thus, one of the popular strategy is that array
+elements stop sending message after {\em AtSync()} is called, and resume 
+work after load balancer calls back {\em ResumeFromSync()}.
 
 The two {\em automatic} load balancing modes described above hide nicely
-the details of invoking load balancer into the array implemetation itself,
+the details of invoking load balancer into the array implementation itself,
 which makes the use of load balancing easier. 
 However, this is relying on the assumption that load balancing occur only
 after all array elements are created, i.e. {\em doneInserting()} 
@@ -137,7 +140,7 @@ The detailed APIs of these three methods are described as follows:
 \item {\bf automatic without Sync}: By default, the array elements may be asked to migrate at any time
 provided that they are not in the middle of executing an entry method. 
 The array element's variable \kw{usesAtSync} being CmiFalse attributes
-to this default behaviour. 
+to this default behavior. 
 
 \item {\bf automatic with Sync}: Using the AtSync method, elements can 
 only be migrated at certain points in the execution. For the AtSync method, 
@@ -160,7 +163,7 @@ messages again in {\em ResumeFromSync}.
 If processing some messages would prevent your object
 from migrating (for example, because it would register itself with
 a local group object, or set up some persistent communication),
-then it is your responsitility to ensure such messages either aren't
+then it is your responsibility to ensure such messages either aren't
 sent during an {\em AtSync}, or are buffered until the {\em ResumeFromSync}.
 
 \item {\bf manual mode}: The load balancer can be programmed to be started
@@ -178,7 +181,7 @@ The function call {\em StartLB()} will start the load balancer.
 This call should be made at only one place on a processors as it automatically 
 start load balancing on all processors. The load balancer works in 
 the background and won't stop the array elements from functioning. 
-But since migration may happen at any time before load balancing finishs,
+But since migration may happen at any time before load balancing finishes,
 it is user's responsibility to make sure processing messages won't 
 prevent objects from migrating. You can also choose to stop sending messages 
 after calling {\em StartLB()}
@@ -227,7 +230,8 @@ Below are the descriptions about the compiler and run-time options:
 The list of existing load balancers are in section \ref{lbStrategy}.
 Note: you can have multiple -module *LBs options. LB modules are
 linked into a program, but they are not activated.
-Using -balancer to activate one LB as default at compile time. Having -balancer A implies -module A, so you don't have to write -module A, although it does't hurt.
+Using -balancer to activate one LB as default at compile time. Having -balancer A implies -module A, so you don't have to write -module A, although it does
+not hurt.
 Using EveryLB is a convenient way to link against all existing LBs. 
 One of the load balancer in EveryLB called MetisLB requires METIS library 
 which is located at: charm/src/libs/conv-libs/metis. 
