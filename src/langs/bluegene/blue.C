@@ -14,7 +14,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include <values.h>
 
 #include "cklists.h"
 
@@ -1518,7 +1517,7 @@ static void sendCorrectionStats()
   statsMsg->processCount = processCount;
   statsMsg->corrMsgCount = corrMsgCount;
   int numMsgs=0;
-  int maxTimelineLen=-1, minTimelineLen=MAXINT;
+  int maxTimelineLen=-1, minTimelineLen=CMK_MAXINT;
   int totalMem = 0;
   if (bgstats) {
   for (int nodeidx=0; nodeidx<cva(numNodes); nodeidx++) {
@@ -1552,7 +1551,7 @@ void statsCollectionHandlerFunc(void *msg)
 {
   static int count=0;
   static int pc=0, cc=0, realMsgCount=0;
-  static int maxTimelineLen=0, minTimelineLen=MAXINT;
+  static int maxTimelineLen=0, minTimelineLen=CMK_MAXINT;
   static int *histArray = NULL;
   int i;
 

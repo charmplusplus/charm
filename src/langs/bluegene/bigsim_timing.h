@@ -8,8 +8,10 @@
 #if CMK_HAS_VALUES_H
 #   include <values.h>
 #   define INVALIDTIME  MAXDOUBLE
+#   define CMK_MAXINT   MAXINT
 #else
 #   define INVALIDTIME  (9999999999.99)
+#   define CMK_MAXINT   (1000000000)
 #endif
 
 /* optimization parameters */
