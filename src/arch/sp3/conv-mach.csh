@@ -12,7 +12,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 1.3  1997-07-17 15:51:43  milind
+# Revision 1.4  1998-03-05 17:15:07  milind
+# Fixed conflicts.
+#
+# Revision 1.3  1997/07/17 15:51:43  milind
 # Fixed module initialization on SP3.
 #
 # Revision 1.2  1997/07/09 21:06:25  milind
@@ -108,9 +111,9 @@ set CMK_CXX          = 'mpCC '
 set CMK_CXXPP        = 'xlC -E '
 set CMK_CF77         = 'mpxlf'
 set CMK_C_DEBUG      = '-g'
-set CMK_C_OPTIMIZE   = '-O3 -qstrict -Q -qarch=pwr -qtune=pwr  '
+set CMK_C_OPTIMIZE   = '-O3 -qstrict -Q -qarch=pwr2 -qtune=pwr2  '
 set CMK_CXX_DEBUG    = '-g'
-set CMK_CXX_OPTIMIZE = '-O3 -qstrict -Q -qarch=pwr -qtune=pwr  '
+set CMK_CXX_OPTIMIZE = '-O3 -qstrict -Q -qarch=pwr2 -qtune=pwr2  '
 set CMK_LD           = 'mpcc -w -u_CK7CharmInit'
 set CMK_LDXX         = 'mpCC  -w -u_CK_call_main_main'
 set CMK_LD77         = ''

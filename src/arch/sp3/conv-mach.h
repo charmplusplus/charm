@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.7  1998-02-19 08:40:22  jyelon
+ * Revision 1.8  1998-03-05 17:15:06  milind
+ * Fixed conflicts.
+ *
+ * Revision 1.7  1998/02/19 08:40:22  jyelon
  * Added multicast code.
  *
  * Revision 1.6  1998/01/15 22:25:51  milind
@@ -113,8 +116,8 @@
 
 #define CMK_MACHINE_NAME                                   "sp3"
 
-#define CMK_MALLOC_USE_GNU_MALLOC                          1
-#define CMK_MALLOC_USE_OS_BUILTIN                          0
+#define CMK_MALLOC_USE_GNU_MALLOC                          0
+#define CMK_MALLOC_USE_OS_BUILTIN                          1
 
 #define CMK_MEMORY_PAGESIZE                                8192
 #define CMK_MEMORY_PROTECTABLE                             0

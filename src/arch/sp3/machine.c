@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.7  1998-02-13 23:56:06  pramacha
+ * Revision 1.8  1998-03-05 17:15:06  milind
+ * Fixed conflicts.
+ *
+ * Revision 1.7  1998/02/13 23:56:06  pramacha
  * Removed CmiAlloc, CmiFree and CmiSize
  * Added CmiAbort
  *
@@ -93,9 +96,6 @@ static char ident[] = "@(#)$Header$";
 #include <mpproto.h>
 #include <sys/systemcfg.h>
 
-void CmiMemLock() {}
-void CmiMemUnlock() {}
-
 #define FLIPBIT(node,bitnumber) (node ^ (1 << bitnumber))
 
 int Cmi_mype;
@@ -103,18 +103,27 @@ int Cmi_numpes;
 int Cmi_myrank;
 CpvDeclare(void*, CmiLocalQueue);
 
+#define BLK_LEN  512
+
+static void **recdQueue_blk;
+static unsigned int recdQueue_blk_len;
+static unsigned int recdQueue_first;
+static unsigned int recdQueue_len;
+static void recdQueueInit(void);
+static void recdQueueAddToBack(void *element);
+static void *recdQueueRemoveFromFront(void);
 
 typedef struct msg_list {
      int msgid;
      char *msg;
      struct msg_list *next;
-} MSG_LIST;
+} SMSG_LIST;
 
 static int Cmi_dim;
 static double itime;
 
-static MSG_LIST *sent_msgs=0;
-static MSG_LIST *end_sent=0;
+static SMSG_LIST *sent_msgs=0;
+static SMSG_LIST *end_sent=0;
 
 static int allmsg, dontcare, msgtype;
 
@@ -157,7 +166,7 @@ double CmiCpuTimer(void)
 
 static int CmiAllAsyncMsgsSent(void)
 {
-   MSG_LIST *msg_tmp = sent_msgs;
+   SMSG_LIST *msg_tmp = sent_msgs;
      
    while(msg_tmp!=0) {
     if(mpc_status(msg_tmp->msgid)<0)
@@ -169,7 +178,7 @@ static int CmiAllAsyncMsgsSent(void)
 
 int CmiAsyncMsgSent(CmiCommHandle c) {
      
-  MSG_LIST *msg_tmp = sent_msgs;
+  SMSG_LIST *msg_tmp = sent_msgs;
 
   while ((msg_tmp) && ((CmiCommHandle)msg_tmp->msgid != c))
     msg_tmp = msg_tmp->next;
@@ -188,9 +197,9 @@ void CmiReleaseCommHandle(CmiCommHandle c)
 
 static void CmiReleaseSentMessages(void)
 {
-  MSG_LIST *msg_tmp=sent_msgs;
-  MSG_LIST *prev=0;
-  MSG_LIST *temp;
+  SMSG_LIST *msg_tmp=sent_msgs;
+  SMSG_LIST *prev=0;
+  SMSG_LIST *temp;
      
   while(msg_tmp!=0) {
     if(mpc_status(msg_tmp->msgid)>=0) {
@@ -211,37 +220,20 @@ static void CmiReleaseSentMessages(void)
   end_sent = prev;
 }
 
-typedef struct rmsg_list {
-  char *msg;
-  struct rmsg_list *next;
-} RMSG_LIST;
-
-static RMSG_LIST *recd_msgs=0;
-static RMSG_LIST *end_recd=0;
-
 static void PumpMsgs(void)
 {
   int src, type, mstat;
   size_t nbytes;
   char *msg;
-  RMSG_LIST *msg_tmp;
 
   while(1) {
     src = dontcare; type = msgtype;
     mpc_probe(&src, &type, &mstat);
     if(mstat<0)
       return;
-    nbytes = mstat;
-    msg = (char *) CmiAlloc(nbytes);
-    mpc_brecv(msg, nbytes, &src, &type, &nbytes);
-    msg_tmp = (RMSG_LIST *) CmiAlloc(sizeof(RMSG_LIST));
-    msg_tmp->msg = msg;
-    msg_tmp->next = 0;
-    if(recd_msgs==0)
-      recd_msgs = msg_tmp;
-    else
-      end_recd->next = msg_tmp;
-    end_recd = msg_tmp;
+    msg = (char *) CmiAlloc((size_t) mstat);
+    mpc_brecv(msg, (size_t)mstat, &src, &type, &nbytes);
+    recdQueueAddToBack(msg);
   }
 }
 
@@ -249,24 +241,7 @@ static void PumpMsgs(void)
 
 void *CmiGetNonLocal(void)
 {
-  void *msg;
-  RMSG_LIST *msg_tmp;
-
-  msg_tmp = recd_msgs;
-  if(msg_tmp == 0) {
-    PumpMsgs();
-    msg_tmp = recd_msgs;
-    if(msg_tmp==0)
-      return 0;
-  }
-  if(msg_tmp == end_recd) {
-    recd_msgs = end_recd = 0;
-  } else {
-    recd_msgs = msg_tmp->next;
-  }
-  msg = msg_tmp->msg;
-  CmiFree(msg_tmp);
-  return msg;
+  return recdQueueRemoveFromFront();
 }
 
 void CmiNotifyIdle(void)
@@ -290,11 +265,11 @@ void CmiSyncSendFn(int destPE, int size, char *msg)
 
 CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg)
 {
-  MSG_LIST *msg_tmp;
+  SMSG_LIST *msg_tmp;
   int msgid;
      
   mpc_send(msg, size, destPE, msgtype, &msgid);
-  msg_tmp = (MSG_LIST *) CmiAlloc(sizeof(MSG_LIST));
+  msg_tmp = (SMSG_LIST *) CmiAlloc(sizeof(SMSG_LIST));
   msg_tmp->msgid = msgid;
   msg_tmp->msg = msg;
   msg_tmp->next = 0;
@@ -429,6 +404,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   CmiTimerInit();
   CpvInitialize(void *, CmiLocalQueue);
   CpvAccess(CmiLocalQueue) = (void *)FIFO_Create();
+  recdQueueInit();
   CthInit(argv);
   ConverseCommonInit(argv);
   if (initret==0) {
@@ -449,3 +425,62 @@ void CmiAbort(char *message)
   CmiError(message);
   exit(1);
 }
+ 
+/* ****************************************************************** */
+/*    The following internal functions implement recd msg queue       */
+/* ****************************************************************** */
+
+static void ** AllocBlock(unsigned int len)
+{
+  void ** blk;
+
+  blk=(void **)CmiAlloc(len*sizeof(void *));
+  if(blk==(void **)0) {
+    CmiError("Cannot Allocate Memory!\n");
+    mpc_stopall(1);
+  }
+  return blk;
+}
+
+static void 
+SpillBlock(void **srcblk, void **destblk, unsigned int first, unsigned int len)
+{
+  memcpy(destblk, &srcblk[first], (len-first)*sizeof(void *));
+  memcpy(&destblk[len-first],srcblk,first*sizeof(void *));
+}
+
+void recdQueueInit(void)
+{
+  recdQueue_blk = AllocBlock(BLK_LEN);
+  recdQueue_blk_len = BLK_LEN;
+  recdQueue_first = 0;
+  recdQueue_len = 0;
+}
+
+void recdQueueAddToBack(void *element)
+{
+  if(recdQueue_len==recdQueue_blk_len) {
+    void **blk;
+    recdQueue_blk_len *= 3;
+    blk = AllocBlock(recdQueue_blk_len);
+    SpillBlock(recdQueue_blk, blk, recdQueue_first, recdQueue_len);
+    CmiFree(recdQueue_blk);
+    recdQueue_blk = blk;
+    recdQueue_first = 0;
+  }
+  recdQueue_blk[(recdQueue_first+recdQueue_len++)%recdQueue_blk_len] = element;
+}
+
+
+void * recdQueueRemoveFromFront(void)
+{
+  if(recdQueue_len) {
+    void *element;
+    element = recdQueue_blk[recdQueue_first++];
+    recdQueue_first %= recdQueue_blk_len;
+    recdQueue_len--;
+    return element;
+  }
+  return 0;
+}
+
