@@ -23,7 +23,7 @@ void CEntry::generateCode(CString *className)
   // actual code begins
   pC(1,"CWhenTrigger *tr;\n");
   if(refNumNeeded) {
-    pC(1,"int refnum = GetRefNumber(msg);\n");
+    pC(1,"int refnum = CkGetRefNum(msg);\n");
     pC(1,"__cDep->bufferMessage(%d, (void *) msg, refnum);\n", entryNum);
     pC(1,"tr = __cDep->getTrigger(%d, refnum);\n", entryNum);
   } else {
