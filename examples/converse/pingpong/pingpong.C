@@ -96,7 +96,7 @@ CmiStartFn mymain()
   CpvInitialize(int,msgSize);
   CpvInitialize(int,cycleNum);
   CpvInitialize(int,sizeNum);
-  CpvAccess(sizeNum) = 1;
+  CpvAccess(sizeNum) = 2;	// leave 4 bytes for the size field
 
   CpvInitialize(int,exitHandler);
   CpvAccess(exitHandler) = CmiRegisterHandler((CmiHandler) exitHandlerFunc);
