@@ -24,14 +24,26 @@ CkChareID mainhandle;
 
 main::main(CkArgMsg *m)
 {
+  int i;
+  for(i=1;i<m->argc;i++) {
+    if(strncmp(m->argv[i], "+vp", 3) == 0) {
+      if (strlen(m->argv[i]) > 2) {
+        sscanf(m->argv[i], "+vp%d", &nblocks);
+      } else {
+        if (m->argv[i+1]) {
+          sscanf(m->argv[i+1], "%d", &nblocks);
+        }
+      }
+      break;
+    }
+  }
   CProxy_migrator::ckNew();
-  int nblocks = ampi::numBlocks();
   numDone = 0;
   delete m;
-  CkGroupID mapID = CProxy_BlockMap::ckNew();
+  // CkGroupID mapID = CProxy_BlockMap::ckNew();
   // CProxy_ampi jarray(nblocks, mapID);
   CProxy_ampi jarray(nblocks);
-  for(int i=0; i< nblocks; i++)
+  for(i=0; i<nblocks; i++)
     jarray[i].run();
   mainhandle = thishandle;
 }
@@ -42,8 +54,7 @@ main::qd(void)
   // CkWaitQD();
   CkPrintf("Created Elements\n");
   CProxy_ampi jarray(arr);
-  int nblocks = ampi::numBlocks();
-  for(int i=0; i< nblocks; i++)
+  for(int i=0; i<nblocks; i++)
     jarray[i].run();
   return;
 }
@@ -52,7 +63,7 @@ void
 main::done(void)
 {
   numDone++;
-  if(numDone==ampi::numBlocks()) {
+  if(numDone==nblocks) {
     ckout << "Exiting" << endl;
     CkExit();
   }
@@ -74,6 +85,13 @@ ampi::ampi(ArrayElementCreateMessage *msg) : TempoArray(msg)
   ampiArray = thisArray;
   nrequests = 0;
   ntypes = 0;
+  nirequests = 0;
+  firstfree = 0;
+  int i;
+  for(i=0;i<100;i++) {
+    irequests[i].nextfree = (i+1)%100;
+    irequests[i].prevfree = ((i-1)+100)%100;
+  }
   // delete msg;
 }
 
@@ -423,7 +441,7 @@ extern "C" int MPI_Start(MPI_Request *reqnum)
 {
   ampi *ptr = CtvAccess(ampiPtr);
   if(*reqnum >= ptr->nrequests) {
-    CmiAbort("Invalid Comm Request..\n");
+    CmiAbort("Invalid persistent Request..\n");
   }
   PersReq *req = &(ptr->requests[*reqnum]);
   if(req->sndrcv == 1) { // send request
@@ -431,11 +449,7 @@ extern "C" int MPI_Start(MPI_Request *reqnum)
              // req->buf, req->size, req->tag, req->proc);
     ptr->ckTempoSendElem(req->tag, ptr->getIndex(), req->buf, 
                          req->size, req->proc);
-  } else { // recv request
-    ptr->ckTempoRecv(req->tag, req->proc, req->buf, req->size);
-    // CkPrintf("[%d] received buf=%p, size=%d, tag=%d from %d\n", 
-                // ptr->getIndex(), req->buf, req->size, req->tag, req->proc);
-  }
+  } // recv request is handled in waitall
   return 0;
 }
 
@@ -446,6 +460,32 @@ extern "C" void mpi_start_(int *reqnum, int *ierr)
 
 extern "C" int MPI_Waitall(int count, MPI_Request *request, MPI_Status *sts)
 {
+  ampi *ptr = CtvAccess(ampiPtr);
+  int i;
+  for(i=0;i<count;i++) {
+    if(request[i] < 100) { // persistent request
+      PersReq *req = &(ptr->requests[request[i]]);
+      if(req->sndrcv == 2) { // recv request
+        ptr->ckTempoRecv(req->tag, req->proc, req->buf, req->size);
+        // CkPrintf("[%d] received buf=%p, size=%d, tag=%d from %d\n", 
+                // ptr->getIndex(), req->buf, req->size, req->tag, req->proc);
+      }
+    } else { // irecv request
+      int index = request[i] - 100;
+      PersReq *req = &(ptr->irequests[index]);
+      ptr->ckTempoRecv(req->tag, req->proc, req->buf, req->size);
+      // CkPrintf("[%d] received buf=%p, size=%d, tag=%d from %d\n", 
+              // ptr->getIndex(), req->buf, req->size, req->tag, req->proc);
+      // now free the request
+      ptr->nirequests--;
+      PersReq *ireq = &(ptr->irequests[0]);
+      req->nextfree = ptr->firstfree;
+      req->prevfree = ireq[ptr->firstfree].prevfree;
+      ireq[req->prevfree].nextfree = index;
+      ireq[req->nextfree].prevfree = index;
+      ptr->firstfree = index;
+    }
+  }
   return 0;
 }
 
@@ -541,6 +581,51 @@ extern "C" void mpi_type_commit_(int *type, int *ierr)
 extern "C" void mpi_type_free_(int *type, int *ierr)
 {
   *ierr = MPI_Type_free(type);
+}
+
+extern "C" int MPI_Isend(void *buf, int count, MPI_Datatype datatype, int dest, 
+              int tag, MPI_Comm comm, MPI_Request *request)
+{
+    ampi *ptr = CtvAccess(ampiPtr);
+    ptr->ckTempoSendElem(tag, ptr->getIndex(), buf, 
+                         typesize(datatype, count, ptr), dest);
+    return 0;
+}
+
+extern "C" int MPI_Irecv(void *buf, int count, MPI_Datatype datatype, int src, 
+              int tag, MPI_Comm comm, MPI_Request *request)
+{
+  ampi *ptr = CtvAccess(ampiPtr);
+  if(ptr->nirequests == 100) {
+    CmiAbort("Too many Irecv requests.\n");
+  }
+  int size = typesize(datatype, count, ptr);
+  PersReq *req = &(ptr->irequests[ptr->firstfree]);
+  req->sndrcv = 2;
+  req->buf = buf;
+  req->size = size;
+  req->proc = src;
+  req->tag = tag;
+  *request = ptr->firstfree + 100;
+  ptr->nirequests ++;
+  // remove this request from the free list
+  PersReq *ireq = &(ptr->irequests[0]);
+  ptr->firstfree = ireq[ptr->firstfree].nextfree;
+  ireq[req->nextfree].prevfree = req->prevfree;
+  ireq[req->prevfree].nextfree = req->nextfree;
+  return 0;
+}
+
+extern "C" void mpi_isend_(void *buf, int *count, int *datatype, int *dest,
+                           int *tag, int *comm, int *request, int *ierr)
+{
+  *ierr = MPI_Isend(buf, *count, *datatype, *dest, *tag, *comm, request);
+}
+
+extern "C" void mpi_irecv_(void *buf, int *count, int *datatype, int *src,
+                           int *tag, int *comm, int *request, int *ierr)
+{
+  *ierr = MPI_Irecv(buf, *count, *datatype, *src, *tag, *comm, request);
 }
 
 #include "ampi.def.h"

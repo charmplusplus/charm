@@ -8,6 +8,7 @@ extern CkChareID mainhandle;
 
 class main : public Chare
 {
+  int nblocks;
   int numDone;
   CkArrayID arr;
   public:
@@ -50,6 +51,7 @@ class PersReq {
     int size;
     int proc;
     int tag;
+    int nextfree, prevfree;
 };
 
 class ampi : public TempoArray {
@@ -60,6 +62,9 @@ class ampi : public TempoArray {
     int nrequests;
     int types[100]; // currently just gives the size
     int ntypes;
+    PersReq irequests[100];
+    int nirequests;
+    int firstfree;
     void *packedBlock;
 
     ampi(ArrayElementCreateMessage *msg);
@@ -67,7 +72,6 @@ class ampi : public TempoArray {
     int packsize(void);
     void pack(void *buf);
     void run(void);
-    static int numBlocks(void) { return 32; } // need a long term solution 
 };
 
 extern int migHandle;
