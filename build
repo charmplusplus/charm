@@ -36,6 +36,8 @@ MAKEOPTS=""
 OPTS=""
 MORE=""
 COMPILER=""
+LIBDIR=
+INCDIR=
 
 while [ ! $# -eq 0 ]
 do
@@ -49,25 +51,37 @@ do
           test "$1" = "help" && printOption
           while [ ! $# -eq 0 ]
           do
-            if test "$1" = "pgcc" || test "$1" = "icc" || test "$1" = "cxx" || test "$1" = "kcc" || test "$1" = "cc" || test "$1" = "cc64" || test "$1" = "acc" || test "$1" = "gcc3"
-            then
-              if [ ! -f src/$VERSION/conv-mach-$1.h ]
-              then
-                echo; echo "Error> option: $1 is not supported in this version!"; 
-                printOption
-              fi
-              COMPILER=$1; shift;
-            elif test "$1" = "gm" || test "$1" = "vmi" || test "$1" = "scyld" || test "$1" = "smp"
-            then
-              if [ ! -f src/$VERSION/conv-mach-$1.h ]
-              then
-                echo; echo "Error> option: $1 is not supported in this version!";
-                printOption
-              fi
-              MORE="$MORE $1"; shift;
-            else
-              OPTS="$OPTS $1"; shift;
-            fi
+            case "$1" in
+	    "pgcc"|"icc"|"cxx"|"kcc"|"cc"|"cc64"|"acc"|"gcc3")
+                if [ ! -f src/$VERSION/conv-mach-$1.h ]
+                then
+                  echo; 
+		  echo "Error> option: $1 is not supported in this version!"; 
+                  printOption
+                fi
+                COMPILER=$1; shift
+	        ;;
+            "gm"|"vmi"|"scyld"|"smp")
+                if [ ! -f src/$VERSION/conv-mach-$1.h ]
+                then
+                  echo; 
+		  echo "Error> option: $1 is not supported in this version!";
+                  printOption
+                fi
+                MORE="$MORE $1"; shift
+		;;
+    	    "--libdir")
+          	shift 
+          	LIBDIR="$LIBDIR -L $1"; shift
+ 	  	;;
+    	    "--incdir")
+          	shift 
+          	INCDIR="$INCDIR -I $1"; shift
+ 	  	;;
+            *)
+                OPTS="$OPTS $1"; shift
+		;;
+ 	    esac
 	  done
 	  ;;
   esac
@@ -127,6 +141,13 @@ fi
 
 chmod +x $VERSION/tmp/system_ln
 ln -s "../../src/Common/scripts/Makefile" $VERSION/tmp/Makefile
+
+ConvUsr="$VERSION/tmp/conv-mach-pre.sh"
+echo "Generating $ConvUsr"
+echo > $ConvUsr
+test -n "$LIBDIR" && echo "CMK_LIBDIR=\"$LIBDIR\"" >> $ConvUsr
+test -n "$INCDIR" && echo "CMK_INCDIR=\"$INCDIR\"" >> $ConvUsr
+chmod +x $ConvUsr
 
 #special options
 ConvHeader="$VERSION/tmp/conv-mach-opt.h"

@@ -491,6 +491,11 @@ CHARMINC="$CHARMBIN/../include"
 #
 ##############################################################################
 
+if [ -r $CHARMINC/conv-mach-pre.sh ]
+then
+. $CHARMINC/conv-mach-pre.sh
+fi
+
 if [ ! -r $CHARMINC/conv-mach.sh ]
 then
 	Abort "Can't find conv-mach.sh in $CHARMINC directory."
