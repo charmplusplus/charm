@@ -30,12 +30,11 @@ void bgMsgEntry::print()
 
 bgTimeLog::bgTimeLog(int epc, char *msg)
 {
-  if (msg == NULL) CmiAbort("bgTimeLog: msg is NULL!");
   ep = epc;
   startTime = BgGetTime();
   endTime = 0.0;
-  srcpe = CmiBgMsgSrcPe(msg);
-  msgID = CmiBgMsgID(msg);
+  srcpe = msg?CmiBgMsgSrcPe(msg):-1;
+  msgID = msg?CmiBgMsgID(msg):-1;
 }
 
 bgTimeLog::~bgTimeLog()

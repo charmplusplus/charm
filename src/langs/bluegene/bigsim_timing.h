@@ -53,7 +53,7 @@ extern void BgAdjustTimeLineForward(int msgID, double tAdjust, BgTimeLine &tline
 
 #if BLUEGENE_TIMING
 
-#define BG_ENTRYSTART(m)  \
+#define BG_ENTRYSTART(handler, m)  \
 	if (tTHREADTYPE == WORK_THREAD) tMYNODE->timelines[tMYID].enq(new bgTimeLog(handler, m));
 
 #define BG_ENTRYEND()  \
@@ -74,7 +74,7 @@ extern void BgAdjustTimeLineForward(int msgID, double tAdjust, BgTimeLine &tline
 	  /* log[log.length()-1]->print(); */		\
         }
 #else
-#define BG_ENTRYSTART(m)
+#define BG_ENTRYSTART(handler, m)
 #define BG_ENTRYEND()
 #define BG_ADDMSG(m)
 #endif

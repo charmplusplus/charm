@@ -344,7 +344,7 @@ void addBgThreadMessage(char *msgPtr, int threadID)
 #endif
   ckMsgQueue &que = tMYNODE->affinityQ[threadID];
   que.enq(msgPtr);
-//  if (que.length() == 1)
+  if (que.length() == 1)
     CthAwaken(tTHREADTABLE[threadID]);
 }
 
@@ -506,6 +506,9 @@ void nodeBroadcastPacketExcept_(int node, CmiUInt2 threadID, int handlerID, Work
   /* FIXME */
   CmiBgMsgRecvTime(sendmsg) = BgGetTime();	
 
+  // timing
+  BG_ADDMSG(sendmsg);
+
   DEBUGF(("[%d]CmiSyncBroadcastAllAndFree node: %d\n", BgMyNode(), node));
   CmiSyncBroadcastAllAndFree(numbytes,sendmsg);
 }
@@ -524,6 +527,9 @@ void threadBroadcastPacketExcept_(int node, CmiUInt2 threadID, int handlerID, Wo
   CmiBgMsgLength(sendmsg) = numbytes;
   /* FIXME */
   CmiBgMsgRecvTime(sendmsg) = BgGetTime();	
+
+  // timing
+  BG_ADDMSG(sendmsg);
 
   DEBUGF(("[%d]CmiSyncBroadcastAllAndFree node: %d tid:%d\n", BgMyNode(), node, threadID));
   CmiSyncBroadcastAllAndFree(numbytes,sendmsg);
@@ -785,7 +791,7 @@ static void ProcessMessage(char *msg)
   CmiSetHandler(msg, CmiBgMsgHandle(msg));
 
   // timing
-  BG_ENTRYSTART(msg);
+  BG_ENTRYSTART(handler, msg);
 
   entryFunc(msg);
 
@@ -849,7 +855,12 @@ void work_thread(threadInfo *tinfo)
   tSTARTTIME = CmiWallTimer();
 
 //  InitHandlerTable();
-  if (workStartFunc) workStartFunc(arg_argc, arg_argv);
+  if (workStartFunc) {
+    // timing
+    BG_ENTRYSTART(-1, NULL);
+    workStartFunc(arg_argc, arg_argv);
+    BG_ENTRYEND();
+  }
 
   for (;;) {
     char *msg=NULL;
@@ -893,7 +904,7 @@ void work_thread(threadInfo *tinfo)
     /* let other work thread do their jobs */
     tCURRTIME += (CmiWallTimer()-tSTARTTIME);
     // suspend work thread, awaken at line 347 - addBgThreadMessage().
-    CthSuspend();
+    CthYield();
     tSTARTTIME = CmiWallTimer();
   }
 }
