@@ -16,7 +16,9 @@ Written for migratable threads by Milind Bhandarkar around August 2000;
 generalized by Orion Lawlor November 2001.
 */
 #include "converse.h"
+#include "memory-isomalloc.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 
 /*Size in bytes of a single slot*/
@@ -70,10 +72,10 @@ static slotset *
 new_slotset(int startslot, int nslots)
 {
   int i;
-  slotset *ss = (slotset*) malloc(sizeof(slotset));
+  slotset *ss = (slotset*) malloc_reentrant(sizeof(slotset));
   _MEMCHECK(ss);
   ss->maxbuf = 16;
-  ss->buf = (slotblock *) malloc(sizeof(slotblock)*ss->maxbuf);
+  ss->buf = (slotblock *) malloc_reentrant(sizeof(slotblock)*ss->maxbuf);
   _MEMCHECK(ss->buf);
   ss->emptyslots = nslots;
   ss->buf[0].startslot = startslot;
@@ -115,13 +117,13 @@ add_slots(slotset *ss, int sslot, int nslots)
   {
     int i;
     int newsize = ss->maxbuf*2;
-    slotblock *newbuf = (slotblock *) malloc(sizeof(slotblock)*newsize);
+    slotblock *newbuf = (slotblock *) malloc_reentrant(sizeof(slotblock)*newsize);
     _MEMCHECK(newbuf);
     for (i=0; i<(ss->maxbuf); i++)
       newbuf[i] = ss->buf[i];
     for (i=ss->maxbuf; i<newsize; i++)
       newbuf[i].nslots  = 0;
-    free(ss->buf);
+    free_reentrant(ss->buf);
     ss->buf = newbuf;
     emptypos = ss->maxbuf;
     ss->maxbuf = newsize;
@@ -202,8 +204,8 @@ free_slots(slotset *ss, int sslot, int nslots)
 static void
 delete_slotset(slotset* ss)
 {
-  free(ss->buf);
-  free(ss);
+  free_reentrant(ss->buf);
+  free_reentrant(ss);
 }
 
 #if CMK_THREADS_DEBUG
@@ -377,14 +379,15 @@ static void init_ranges(char **argv)
   {
     char *staticData =(char *) __static_data_loc();
     char *code = (char *)&init_ranges;
+    char *codeDll = (char *)&fclose;
     char *heapLil = (char*) malloc(1);
     char *heapBig = (char*) malloc(4*1024*1024);
     char *stack = (char *)__cur_stack_frame();
 
     memRange_t meg=1024*1024; /*One megabyte*/
     memRange_t gig=1024*meg; /*One gigabyte*/
-    int i,nRegions=6;
-    memRegion_t regions[6]; /*used portions of address space*/
+    int i,nRegions=7;
+    memRegion_t regions[7]; /*used portions of address space*/
     memRegion_t freeRegion; /*Largest unused block of address space*/
 
 /*Mark off regions of virtual address space as ususable*/
@@ -399,12 +402,15 @@ static void init_ranges(char **argv)
     
     regions[3].type="Heap (small blocks)";
     regions[3].start=heapLil; regions[3].len=2u*gig;
-
+    
     regions[4].type="Heap (large blocks)";
-    regions[4].start=heapBig; regions[4].len=2u*gig;
+    regions[4].start=heapBig; regions[4].len=1u*gig;
     
     regions[5].type="Stack space";
     regions[5].start=stack; regions[5].len=256u*meg;
+
+    regions[6].type="Program dynamically linked code";
+    regions[6].start=codeDll; regions[6].len=256u*meg;    
 
     _MEMCHECK(heapBig); free(heapBig);
     _MEMCHECK(heapLil); free(heapLil); 
