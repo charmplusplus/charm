@@ -637,7 +637,7 @@ TraceProjections::TraceProjections(char **argv): curevent(0), isIdle(0)
   // (for compatibility).
   // Generating just the non delta log takes precedence over generating
   // both logs (if both arguments appear on the command line).
-  deltaLog = 1;
+  deltaLog = 0;
   nonDeltaLog = CmiGetArgFlagDesc(argv, "+logNonDelta",
 				  "Generate Delta encoded and simple timestamped log files");
   int oldLogOnly = CmiGetArgFlagDesc(argv, "+logNonDeltaOnly", 
