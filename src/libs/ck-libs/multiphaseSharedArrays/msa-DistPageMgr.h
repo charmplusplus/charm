@@ -434,7 +434,7 @@ protected:
 
         // send the RLE'd buffer to the page array
 
-        CkAssert(0 <= page && page < nPages);
+        CkAssert(page < nPages); // 0 <= page always, bcoz page is uint
         //ckout << "[" << CkMyPe() << "] sending page " << page << "to page array " << endl;
         pageArray[page].ReceiveRLEPage(buffer, currOffset, bytesPerPage, thisgroup, CkMyPe(), pageState[page]);
         delete[] buffer;
