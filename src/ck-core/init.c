@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.3  1995-06-18 22:10:34  sanjeev
+ * Revision 2.4  1995-06-20 14:54:24  gursoy
+ * fixed readonly's
+ *
+ * Revision 2.3  1995/06/18  22:10:34  sanjeev
  * removed CondSendInit
  *
  * Revision 2.2  1995/06/13  14:33:55  gursoy
@@ -105,7 +108,8 @@ CpvExtern(int,      pseudoCount);
 CpvExtern(int,      readMsgCount);
 CpvExtern(int,      readCount);	/* count of read-only functions. Should be
 				 * same as total number of modules */
-
+CsvStaticDeclare(int, sharedReadCount); /* it holds the value of readCount, */
+                                        /* and it is  shared within node    */
 
 extern void CPlus_ProcessBocInitMsg();	/* in cplus_node_init.c */
 extern void CPlus_CallCharmInit();	/* in cplus_node_init.c */
@@ -231,7 +235,7 @@ char **argv;
 		 * in Charm++ the CopyToBuffer fns also send out the
 		 * ReadonlyMsgs by calling ReadMsgInit()
 		 */
-		for (i = 0; i < CpvAccess(readCount); i++)
+		for (i = 0; i < CsvAccess(sharedReadCount); i++)
 			(CsvAccess(ROCopyToBufferTable)[i]) ();
 
 		/*
@@ -333,8 +337,10 @@ CharmInitLoop()
 	 * _CK_9_ReadMsgTable is passed as an arg because it is no longer
 	 * global
 	 */
-	for (i = 0; i < CpvAccess(readCount); i++)
+        if (CmiMyRank() == 0) {
+	   for (i = 0; i < CsvAccess(sharedReadCount); i++)
 		(CsvAccess(ROCopyFromBufferTable)[i]) (CsvAccess(_CK_9_ReadMsgTable));
+        }
 	CmiFree(readvarmsg);
 
 	while ( (envelope=DeQueueBocInitMsgs()) != NULL ) 
@@ -611,6 +617,8 @@ InitializeEPTables()
 	TotalModules = CpvAccess(readCount);
 	TotalReadMsgs = CpvAccess(readMsgCount);
 	TotalPseudos = CpvAccess(pseudoCount);
+
+        CsvAccess(sharedReadCount) = CpvAccess(readCount);
 }
 
 /* Adding entry points for system branch office chares. */
