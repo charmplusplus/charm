@@ -5,7 +5,7 @@ CMK_LDRO_WORKS=0
 CMK_CC='mpcc '  
 CMK_CC_RELIABLE='mpcc '
 CMK_CC_FASTEST='mpcc '
-CMK_CXX='mpCC '
+CMK_CXX='mpCC -qstaticinline '
 CMK_CXXPP='xlC -E '
 CMK_CF77='mpxlf'
 CMK_CF90='mpxlf90 -qsuffix=f=f90' 
