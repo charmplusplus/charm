@@ -844,15 +844,17 @@ static void ctrl_sendone_nolock(const char *type,
 				const char *data1,int dataLen1,
 				const char *data2,int dataLen2)
 {
+  const void *bufs[3]; int lens[3]; int nBuffers=0;
   ChMessageHeader hdr;
   skt_abortFn oldAbort=skt_set_abort(sendone_abort_fn);
   if (Cmi_charmrun_fd==-1) 
   	charmrun_abort("ctrl_sendone called in standalone!\n");
   Cmi_charmrun_fd_sendflag=1;
   ChMessageHeader_new(type,dataLen1+dataLen2,&hdr);
-  skt_sendN(Cmi_charmrun_fd,(const char *)&hdr,sizeof(hdr));
-  if (dataLen1>0) skt_sendN(Cmi_charmrun_fd,data1,dataLen1);
-  if (dataLen2>0) skt_sendN(Cmi_charmrun_fd,data2,dataLen2);
+  bufs[nBuffers]=&hdr; lens[nBuffers]=sizeof(hdr); nBuffers++;
+  if (dataLen1>0) {bufs[nBuffers]=data1; lens[nBuffers]=dataLen1; nBuffers++;}
+  if (dataLen2>0) {bufs[nBuffers]=data2; lens[nBuffers]=dataLen2; nBuffers++;}
+  skt_sendV(Cmi_charmrun_fd,nBuffers,bufs,lens);
   Cmi_charmrun_fd_sendflag=0;
   skt_set_abort(oldAbort);
 }
@@ -911,6 +913,7 @@ static void charmrun_abort(const char *s)
 static void ctrl_getone(void)
 {
   ChMessage msg;
+  MACHSTATE(2,"ctrl_getone");
   ChMessage_recv(Cmi_charmrun_fd,&msg);
 
   if (strcmp(msg.header.type,"die")==0) {
@@ -929,6 +932,7 @@ static void ctrl_getone(void)
 	*/
 	int pe=0;/*<- node-local processor number. Any one will do.*/
 	void *cmsg=(void *)CcsImpl_ccs2converse(hdr,msg.data+sizeof(CcsImplHeader),NULL);
+	MACHSTATE(2,"Incoming CCS request");
 	CmiPushPE(pe,cmsg);
 #endif
   }  else {
@@ -947,8 +951,10 @@ static void ctrl_getone(void)
   The data is forwarded to CCS server via charmrun.*/
 void CcsImpl_reply(CcsImplHeader *hdr,int repLen,const void *repData)
 {
+  MACHSTATE(2,"Outgoing CCS reply");
   ctrl_sendone_locking("reply_fw",(const char *)hdr,sizeof(CcsImplHeader),
-		       repData,repLen);  
+		       repData,repLen);
+  MACHSTATE(1,"Outgoing CCS reply away");
 }
 #endif
 
