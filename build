@@ -9,7 +9,7 @@ syntax() {
   echo '<versions>: ' 
   ( cd src ; ls -1 | egrep -v '(^Common)|(^CVS)|(^QuickThreads)|(^ccs-client)' | pr -3 -t )
   echo ''
-  echo '<options>: help cc cc64 cxx kcc pgcc acc icc gcc3 mpcc smp gm vmi scyld '
+  echo '<options>: help cc cc64 cxx kcc pgcc acc icc gcc3 mpcc smp gm tcp vmi scyld '
   echo ''
   echo '<charmc-options>: e.g. -g -save -verbose'
   echo 'Note: This script:'
@@ -61,7 +61,7 @@ do
                 fi
                 COMPILER=$1; shift
 	        ;;
-            "gm"|"vmi"|"scyld"|"smp")
+            "gm"|"vmi"|"scyld"|"smp"|"tcp")
                 if [ ! -f src/$VERSION/conv-mach-$1.h ]
                 then
                   echo; 
