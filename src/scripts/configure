@@ -1846,7 +1846,7 @@ _ACEOF
 
 
 #### check if PAPI exists ####
-if test -n "$CMK_USE_PAPI"
+if [ -n "$CMK_USE_PAPI" ]
 then
 cat > $t <<EOT
 #include <stdio.h>
