@@ -26,14 +26,14 @@
 
 #define CMK_FIX_HP_CONNECT_BUG                             0
 
-#define CMK_GETPAGESIZE_AVAILABLE                          0
+#define CMK_GETPAGESIZE_AVAILABLE                          1
 
 #define CMK_IS_HETERO                                      1
 
-#define CMK_MACHINE_NAME                                   "net-irix-64"
+#define CMK_MACHINE_NAME                                   "net-irix"
 
-#define CMK_MALLOC_USE_GNU_MALLOC                          0
-#define CMK_MALLOC_USE_OS_BUILTIN                          1
+#define CMK_MALLOC_USE_GNU_MALLOC                          1
+#define CMK_MALLOC_USE_OS_BUILTIN                          0
 
 #define CMK_MEMORY_PAGESIZE                                8192
 #define CMK_MEMORY_PROTECTABLE                             0
@@ -68,7 +68,7 @@
 #define CMK_SIGNAL_USE_SIGACTION                           0
 #define CMK_SIGNAL_USE_SIGACTION_WITH_RESTART              1
 
-#define CMK_SIZE_T                                         unsigned long
+#define CMK_SIZE_T                                         unsigned int
 
 #define CMK_SPANTREE_MAXSPAN                               4
 #define CMK_SPANTREE_USE_COMMON_CODE                       1
@@ -83,14 +83,14 @@
 
 #define CMK_SYNCHRONIZE_ON_TCP_CLOSE                       0
 
-#define CMK_THREADS_REQUIRE_NO_CPV                         0
-#define CMK_THREADS_COPY_STACK                             0
-
 #define CMK_THREADS_UNAVAILABLE                            0
 #define CMK_THREADS_USE_ALLOCA                             0
 #define CMK_THREADS_USE_JB_TWEAKING                        0
 #define CMK_THREADS_USE_JB_TWEAKING_EXEMPLAR               0
 #define CMK_THREADS_USE_JB_TWEAKING_ORIGIN                 1
+
+#define CMK_THREADS_REQUIRE_NO_CPV                         0
+#define CMK_THREADS_COPY_STACK                             0
 
 #define CMK_TIMER_USE_GETRUSAGE                            0
 #define CMK_TIMER_USE_SPECIAL                              0
@@ -122,7 +122,20 @@
 #define CMK_COMPILEMODE_ORIG                               1
 #define CMK_COMPILEMODE_ANSI                               0
 
+#define CMK_DEBUG_MODE                                     0
+#define CMK_WEB_MODE                                       0
+#define CMK_USE_PERSISTENT_CCS                             0
+
+#define CMK_LBDB_ON					   0
+#define CMK_LBDB_OFF					   1
+
+#define CMK_STL_USE_DOT_H                                  0
+#define CMK_STL_DONT_USE_DOT_H                             1
+
 #define CPP_LOCATION "/usr/lib/cpp"
+
+#define CMK_BOOL_DEFINED				   0
+#define CMK_BOOL_UNDEFINED				   1
 
 #endif
 

@@ -7,6 +7,10 @@
 #include <string.h>
 #endif
 
+#if CMK_BOOL_UNDEFINED
+enum bool {false=0, true=1};
+#endif
+
 #if CMK_DEBUG_MODE
 class Chare;
 extern void putObject(Chare *);

@@ -1,7 +1,5 @@
 set CMK_CPP_CHARM='/usr/lib/cpp '
-set CMK_CPP_C='cc -E -64 '
-set CMK_LDRO='ld -r -o'
-set CMK_LDRO_WORKS=0
+set CMK_CPP_C='cc -64 -E '
 set CMK_CC='cc  -w -64 '
 set CMK_CC_RELIABLE='cc  -w -64 '
 set CMK_CC_FASTEST='cc  -w -64 '
@@ -26,10 +24,8 @@ set CMK_SEQ_CC='cc -w -64 '
 set CMK_SEQ_LD='cc -w -64 '
 set CMK_SEQ_CXX='CC -w -64 '
 set CMK_SEQ_LDXX='CC -w -64 '
-set CMK_NM='nm'
-set CMK_NM_FILTER="grep '|GLOB |' | sed -e 's/.*|//'"
 set CMK_CPP_SUFFIX="i"
-set CMK_XLATPP='charmxlat++ -w '
+set CMK_XLATPP='charmxlat++  '
 set CMK_QT='origin'
 set CMK_XIOPTS=''
 

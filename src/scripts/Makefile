@@ -59,7 +59,7 @@ SEQCHARMC=../bin/charmc -seq $(CHARMOPTS)
 #
 ###############################################################################
 
-ALLHEADERS=charm++.h ckstream.h charm.h cpthreads.h converse.h conv-trace.h conv-mach.h simplemsg.h sm.h trace.h pvmc.h pvm3.h sdag.h CDep.h CCounter.h CMsgBuffer.h CWhenTrigger.h TList.h idl.h ckarray.h tempo.h waitqd.h
+ALLHEADERS=charm++.h ckstream.h charm.h cpthreads.h converse.h conv-trace.h conv-mach.h simplemsg.h sm.h trace.h pvmc.h pvm3.h sdag.h CDep.h CCounter.h CMsgBuffer.h CWhenTrigger.h TList.h idl.h ckarray.h tempo.h waitqd.h LBDatabase.h lbdb.h LBDB.h LBOM.h LBObj.h CentralLB.h RandCentLB.h
 
 ALLINTERFACES=idl.ci
 
@@ -92,6 +92,7 @@ dirs+sources:
 	./gatherflat ../../src/Common/conv-ldb         .
 	./gatherflat ../../src/Common/ck-core          .
 	./gatherflat ../../src/Common/ck-perf          .
+	./gatherflat ../../src/Common/ck-ldb           .
 	./gatherflat ../../src/Common/langs/simplemsg  .
 	./gatherflat ../../src/Common/langs/pvmc       .
 	./gatherflat ../../src/Common/langs/sdag/xlator       .
@@ -125,6 +126,9 @@ dirs+sources:
 CVHEADERS=converse.h conv-mach.h conv-mach.csh \
           ../include/CkFutures.decl.h CkFutures.def.h \
           ../include/CkArray.decl.h CkArray.def.h \
+          ../include/LBDatabase.decl.h LBDatabase.def.h \
+          ../include/CentralLB.decl.h CentralLB.def.h \
+          ../include/RandCentLB.decl.h RandCentLB.def.h \
           ../include/tempo.decl.h tempo.def.h \
           ../include/waitqd.decl.h waitqd.def.h
 
@@ -228,12 +232,16 @@ libldb-test.o: cldb.test.c $(CVHEADERS)
 ###############################################################################
 
 CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h trace.h \
-          ckfutures.h ckarray.h tempo.h waitqd.h $(CVHEADERS)
+          ckfutures.h ckarray.h tempo.h waitqd.h \
+	  LBDatabase.h lbdb.h LBDB.h LBOM.h LBObj.h \
+	  CentralLB.h RandCentLB.h \
+	  $(CVHEADERS)
 
 CK_LIBS_CORE=libck.a
 
 LIBCK_CORE=init.o register.o qd.o ck.o main.o msgalloc.o ckfutures.o \
-           ckarray.o tempo.o waitqd.o
+           ckarray.o tempo.o waitqd.o \
+	   LBDatabase.o lbdb.o LBDB.o LBObj.o CentralLB.o RandCentLB.o
 
 charmlibs: converse $(CK_LIBS_CORE)
 	cd libs; make charmlibs OPTS='$(OPTS)'
@@ -251,6 +259,15 @@ libtrace-projections.a: $(LIBTRACE_PROJ)
 
 ../include/CkArray.decl.h : CkArray.decl.h
 	/bin/cp CkArray.decl.h ../include
+
+../include/LBDatabase.decl.h : LBDatabase.decl.h
+	/bin/cp LBDatabase.decl.h ../include
+
+../include/CentralLB.decl.h : CentralLB.decl.h
+	/bin/cp CentralLB.decl.h ../include
+
+../include/RandCentLB.decl.h : RandCentLB.decl.h
+	/bin/cp RandCentLB.decl.h ../include
 
 ../include/CkFutures.decl.h : CkFutures.decl.h
 	/bin/cp CkFutures.decl.h ../include
@@ -273,6 +290,15 @@ waitqd.decl.h waitqd.def.h : waitqd.ci charmxi
 CkArray.decl.h CkArray.def.h : ckarray.ci charmxi
 	$(CHARMC) ckarray.ci
 
+LBDatabase.decl.h LBDatabase.def.h : LBDatabase.ci charmxi
+	$(CHARMC) LBDatabase.ci
+
+CentralLB.decl.h Central.def.h : CentralLB.ci charmxi
+	$(CHARMC) CentralLB.ci
+
+RandCentLB.decl.h RandCent.def.h : RandCentLB.ci charmxi
+	$(CHARMC) RandCentLB.ci
+
 init.o: init.C $(CKHEADERS)
 	$(CHARMC) -o init.o init.C
 
@@ -293,6 +319,24 @@ waitqd.o: waitqd.C $(CKHEADERS)
 
 ckarray.o: ckarray.C $(CKHEADERS)
 	$(CHARMC) -o ckarray.o ckarray.C
+
+lbdb.o: lbdb.C $(CKHEADERS)
+	$(CHARMC) -o lbdb.o lbdb.C
+
+LBDB.o:	LBDB.C $(CKHEADERS)
+	$(CHARMC) -o LBDB.o LBDB.C
+
+LBObj.o: LBObj.C $(CKHEADERS)
+	$(CHARMC) -o LBObj.o LBObj.C
+
+LBDatabase.o: LBDatabase.C $(CKHEADERS)
+	$(CHARMC) -o LBDatabase.o LBDatabase.C
+
+CentralLB.o: CentralLB.C $(CKHEADERS)
+	$(CHARMC) -o CentralLB.o CentralLB.C
+
+RandCentLB.o: RandCentLB.C $(CKHEADERS)
+	$(CHARMC) -o RandCentLB.o RandCentLB.C
 
 qd.o: qd.C $(CKHEADERS)
 	$(CHARMC) -o qd.o qd.C

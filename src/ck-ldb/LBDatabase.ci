@@ -1,0 +1,9 @@
+module LBDatabase {
+
+readonly CkGroupID lbdb;
+
+group LBDatabase {
+  entry void LBDatabase(void);  
+};
+
+};

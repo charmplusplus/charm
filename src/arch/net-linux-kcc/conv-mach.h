@@ -112,7 +112,16 @@
 #define CMK_COMPILEMODE_ORIG                               0
 #define CMK_COMPILEMODE_ANSI                               1
 
+#define CMK_LBDB_ON					   1
+#define CMK_LBDB_OFF					   0
+
+#define CMK_STL_USE_DOT_H                                  0
+#define CMK_STL_DONT_USE_DOT_H                             1
+
 #define CPP_LOCATION "/lib/cpp"
+
+#define CMK_BOOL_DEFINED				   1
+#define CMK_BOOL_UNDEFINED				   0
 
 #endif
 

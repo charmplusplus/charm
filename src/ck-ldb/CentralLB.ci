@@ -1,0 +1,16 @@
+module CentralLB {
+
+extern module LBDatabase;
+
+readonly CkGroupID loadbalancer;
+
+message[varsize] CLBStatsMsg;
+message[varsize] CLBMigrateMsg;
+
+group CentralLB {
+  entry void CentralLB(void);  
+  entry void ReceiveStats(CLBStatsMsg*);
+  entry void ReceiveMigration(CLBMigrateMsg*);	
+};
+
+};
