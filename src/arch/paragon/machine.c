@@ -60,7 +60,7 @@ double CmiCpuTimer()
    return (double)(tim[0]-utimerinit[0])/50000000.0;
 }
 
-static void CmiTimerInit()
+void CmiTimerInit()
 {
    hwclock(utimerinit) ;
 }
@@ -241,7 +241,6 @@ int usched, initret;
   Cmi_numpes = numnodes();
   neighbour_init(Cmi_mype);
   CpvAccess(CmiLocalQueue)= (void *) FIFO_Create();
-  CmiSpanTreeInit();
   CmiTimerInit();
   CthInit(argv);
   ConverseCommonInit(argv);
