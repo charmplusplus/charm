@@ -735,10 +735,12 @@ static const char *CIMsgClass =
 "{\n"
 "  public:\n"
 "    static int __idx;\n"
-"    void* operator new(size_t, const int pb=0);\n"
+"    void* operator new(size_t, const int);\n"
+"    void* operator new(size_t);\n"
 "    void operator delete(void *p){CkFreeMsg(p);}\n"
 "    void* operator new(size_t, void*p) {return p;}\n"
-"    void* operator new(size_t, int*, const int pb=0);\n"
+"    void* operator new(size_t, int*, const int);\n"
+"    void* operator new(size_t, int*);\n"
 "    static void*alloc(int,size_t,int*,int);\n"
 ;
 
@@ -748,12 +750,14 @@ static const char *CIMsgClassAnsi =
 "    static int __idx;\n"
 "    void* operator new(size_t,void*p) { return p; }\n"
 "    void operator delete(void*p,void*){CkFreeMsg(p);}\n"
-"    void* operator new(size_t,const int pb=0);\n"
-"    void operator delete(void*p,const int pb=0){\n"
-"      CkFreeMsg(p);}\n"
-"    void* operator new(size_t, int*, const int pb=0);\n"
-"    void operator delete(void*p,int*,const int pb=0){\n"
-"      CkFreeMsg(p);}\n"
+"    void* operator new(size_t,const int);\n"
+"    void operator delete(void*p,const int){CkFreeMsg(p);}\n"
+"    void* operator new(size_t);\n"
+"    void operator delete(void*p){ CkFreeMsg(p);}\n"
+"    void* operator new(size_t, int*, const int);\n"
+"    void operator delete(void*p,int*,const int){CkFreeMsg(p);}\n"
+"    void* operator new(size_t, int*);\n"
+"    void operator delete(void*p,int*){CkFreeMsg(p);}\n"
 "    static void* alloc(int,size_t,int*,int);\n"
 ;
 
@@ -840,10 +844,16 @@ Message::genDefs(XStr& str)
     str << "#ifdef CK_TEMPLATES_ONLY\n";
   }
   if(!(external||type->isTemplated())) {
+    // new (size_t)
+    str << tspec << "void *" << ptype << "::operator new(size_t s){\n";
+    str << "  return " << mtype << "::alloc(__idx, s, 0, 0);\n}\n";
     // new (size_t, priobits)
     str << tspec << "void *" << ptype << "::operator new(size_t s,";
     str << "const int pb){\n";
     str << "  return " << mtype << "::alloc(__idx, s, 0, pb);\n}\n";
+    // new (size_t, int*)
+    str << tspec << "void *" << ptype << "::operator new(size_t s, int* sz){\n";
+    str << "  return " << mtype << "::alloc(__idx, s, sz, 0);\n}\n";
     // new (size_t, int*, priobits)
     str << tspec << "void *" << ptype << "::operator new(size_t s, int* sz,";
     str << "const int pb){\n";
