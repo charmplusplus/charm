@@ -37,7 +37,7 @@ extern "C" LDObjHandle LDRegisterObj(LDOMHandle _h, LDObjid _id,
 				       void *_userData, int _migratable)
 {
   LBDB *const db = static_cast<LBDB*>(_h.ldb.handle);
-  return db->AddObj(_h, _id, _userData, static_cast<Bool>(_migratable));
+  return db->AddObj(_h, _id, _userData, static_cast<CmiBool>(_migratable));
 }
 
 extern "C" void LDUnregisterObj(LDObjHandle _h)

@@ -31,10 +31,10 @@ RandCentLB::RandCentLB()
   CkPrintf("[%d] RandCentLB created\n",CkMyPe());
 }
 
-Bool RandCentLB::QueryBalanceNow(int step)
+CmiBool RandCentLB::QueryBalanceNow(int step)
 {
   CkPrintf("[%d] Balancing on step %d\n",CkMyPe(),step);
-  return True;
+  return CmiTrue;
 }
 
 CLBMigrateMsg* RandCentLB::Strategy(CentralLB::LDStats* stats, int count)

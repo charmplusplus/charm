@@ -524,7 +524,7 @@ Chare::genArrayDecls(XStr& str)
   str << "    ";
   str<<array_prefix();
   type->print(str);
-  str << "(CkAID _aid) ";
+  str << "(CkArrayID _aid) ";
   if(bases !=0) {
     str << ":";
     bases->genProxyNames(str, "", "(_aid)", ", ");
@@ -551,8 +551,8 @@ Chare::genArrayDecls(XStr& str)
     bases->genProxyNames(str, "", "(__cid)", ", ");
   }
   str << "{ ckSetChareId(__cid);}\n";
-  str << "    CkAID ckGetArrayId(void) { return CkAID(_ck_aid, _elem); }\n";
-  str << "    void ckSetArrayId(CkAID _aid) { \n";
+  str << "    CkArrayID ckGetArrayId(void) { return CkArrayID(_ck_aid, _elem); }\n";
+  str << "    void ckSetArrayId(CkArrayID _aid) { \n";
   str << "      _setChare(0); _setAid(_aid._ck_aid); _elem = _aid._elem; \n";
   str << "    }\n";
   str << "    CkChareID ckGetChareId(void) { return _cid; }\n";
@@ -564,7 +564,7 @@ Chare::genArrayDecls(XStr& str)
   str << " operator [] (int idx) {\n";
   str << "      return " << array_prefix();
   type->print(str);
-  str << "(CkAID(_ck_aid, idx));\n";
+  str << "(CkArrayID(_ck_aid, idx));\n";
   str << "    }\n";
   if(list)
     list->genDecls(str);
@@ -1157,18 +1157,18 @@ void Entry::genArrayStaticConstructorDecl(XStr& str)
 {
   if(container->isAbstract())
     return;
-  str << "    static CkAID ckNew(int numElements)\n";
+  str << "    static CkArrayID ckNew(int numElements)\n";
   str << "{\n";
-  str << "  return CkAID(Array1D::CreateArray(numElements,_RRMapID,\n";
+  str << "  return CkArrayID(Array1D::CreateArray(numElements,_RRMapID,\n";
   str << "    __idx, ConstructorIndex(";
   str << name;
   str << ", ArrayElementCreateMessage), ConstructorIndex(";
   str << name;
   str << ", ArrayElementMigrateMessage)),-1);\n";
   str << "}\n";
-  str << "    static CkAID ckNew(int numElements, CkGroupID mapID)\n";
+  str << "    static CkArrayID ckNew(int numElements, CkGroupID mapID)\n";
   str << "{\n";
-  str << "  return CkAID(Array1D::CreateArray(numElements,mapID,\n";
+  str << "  return CkArrayID(Array1D::CreateArray(numElements,mapID,\n";
   str << "    __idx, ConstructorIndex(";
   str << name;
   str << ", ArrayElementCreateMessage), ConstructorIndex(";

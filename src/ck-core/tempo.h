@@ -87,9 +87,9 @@ class TempoArray : public ArrayElement, public Tempo
     TempoArray(ArrayElementMigrateMessage *msg) : ArrayElement(msg)
       { /*finishMigration();*/ }
     static void ckTempoSendElem(int tag1, int tag2, void *buffer, int buflen,
-                                CkAID aid, int idx);
+                                CkArrayID aid, int idx);
     static void ckTempoSendElem(int tag, void *buffer, int buflen,
-                                CkAID aid, int idx);
+                                CkArrayID aid, int idx);
     void ckTempoSendElem(int tag1, int tag2, void *buffer, int buflen, int idx);
     void ckTempoSendElem(int tag, void *buffer, int buflen, int idx);
     void ckTempoBarrier(void);

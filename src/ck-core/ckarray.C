@@ -538,7 +538,6 @@ ArrayElement::ArrayElement(ArrayElementCreateMessage *msg)
   thisArray = msg->arrayPtr;
   thisAID._setAid(thisArray->ckGetGroupId());
   thisAID._elem = (-1);
-  thisAID._setChare(0);
   thisIndex = msg->index;
 }
 
@@ -550,7 +549,6 @@ ArrayElement::ArrayElement(ArrayElementMigrateMessage *msg)
   thisArray = msg->arrayPtr;
   thisAID._setAid(thisArray->ckGetGroupId());
   thisAID._elem = (-1);
-  thisAID._setChare(0);
   thisIndex = msg->index;
 }
 

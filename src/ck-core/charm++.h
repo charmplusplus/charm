@@ -111,7 +111,26 @@ class _CK_AID {
     void _setChare(int c) { _chare = c; }
 };
 
-typedef _CK_AID CkArrayID;
+class CkArrayID {
+  public:
+    CkGroupID _ck_aid;
+    Array1D *_array;
+    int _elem;
+    void _setAid(CkGroupID aid) {
+      _ck_aid = aid;
+      _array = (Array1D*) CkLocalBranch(aid);
+    }
+    CkArrayID(CkGroupID aid) {
+      _setAid(aid);
+      _elem = -1;
+    }
+    CkArrayID(CkGroupID aid, int elem) {
+      _setAid(aid);
+      _elem = elem;
+    }
+    CkArrayID() {}
+};
+
 typedef CkArrayID CkAID;  /* Depricated usage */
 
 class CkQdMsg {

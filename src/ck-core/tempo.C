@@ -121,7 +121,7 @@ TempoGroup::ckTempoBcast(int sender, int tag, void *buffer, int buflen)
 // static
 void 
 TempoArray::ckTempoSendElem(int tag1, int tag2, void *buffer, int buflen,
-                            CkAID aid, int idx)
+                            CkArrayID aid, int idx)
 {
   TempoMessage *msg = new (&buflen, 0) TempoMessage(tag1, tag2, buflen, buffer);
   CProxy_TempoArray pta(aid);
@@ -130,7 +130,7 @@ TempoArray::ckTempoSendElem(int tag1, int tag2, void *buffer, int buflen,
 
 // static
 void 
-TempoArray::ckTempoSendElem(int tag,void *buffer,int buflen,CkAID aid, int idx)
+TempoArray::ckTempoSendElem(int tag,void *buffer,int buflen,CkArrayID aid, int idx)
 {
   ckTempoSendElem(tag, TEMPO_ANY, buffer, buflen, aid, idx);
 }

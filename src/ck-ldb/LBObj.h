@@ -9,13 +9,13 @@ friend class LBDB;
 
 public:
   LBObj(LBDB* _parentDB, LDOMHandle _omhandle, LDObjid _id,
-	void *_userData = 0, Bool _migratable=True) {
+	void *_userData = 0, CmiBool _migratable=CmiTrue) {
     parentDB = _parentDB;
     parentOM = _omhandle;
     myid = _id;
     userData = _userData;
     migratable = _migratable;
-    registered = False;
+    registered = CmiFalse;
   };
 
   ~LBObj() { };
@@ -28,7 +28,7 @@ public:
     data.omID = _h.omhandle.id;
     data.cpuTime = 0.;
     data.wallTime = 0.;
-    registered = True;
+    registered = CmiTrue;
   };
 
   void Clear(void);
@@ -44,11 +44,11 @@ private:
   LDObjHandle myhandle;
   LDObjid myid;
   void *userData;
-  Bool migratable;
+  CmiBool migratable;
   LDObjData data;
   double startWTime;
   double startCTime;
-  Bool registered;
+  CmiBool registered;
 };
 
 #endif

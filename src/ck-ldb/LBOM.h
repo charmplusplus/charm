@@ -22,21 +22,21 @@ private:
     myid = _id;
     userData = _userData;
     callbacks = _callbacks;
-    registering_objs = False;
+    registering_objs = CmiFalse;
   };
   ~LBOM() { }
 
   void DepositHandle(LDOMHandle _h) { myhandle = _h; };
   void Migrate(LDObjHandle _h, int dest) { callbacks.migrate(_h,dest); };
-  Bool RegisteringObjs() { return registering_objs; };
-  void SetRegisteringObjs(Bool _set) { registering_objs = _set; };
+  CmiBool RegisteringObjs() { return registering_objs; };
+  void SetRegisteringObjs(CmiBool _set) { registering_objs = _set; };
 
   LBDB *parent;
   LDOMid myid;
   LDOMHandle myhandle;
   void *userData;
   LDCallbacks callbacks;
-  Bool registering_objs;
+  CmiBool registering_objs;
 
 };
 

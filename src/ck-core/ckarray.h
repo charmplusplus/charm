@@ -69,7 +69,7 @@ protected:
   };
 
   int thisIndex;
-  CkAID thisAID;
+  CkArrayID thisAID;
   int numElements;
 
 public:
