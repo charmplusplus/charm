@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.7  1995-07-10 22:30:49  brunner
+ * Revision 2.8  1995-07-12 20:59:58  brunner
+ * Added argv[0] to perfModuleInit() call, so performance data files
+ * can use the prgram name in the log file name.
+ *
+ * Revision 2.7  1995/07/10  22:30:49  brunner
  * Added call to perfModuleInit() for CPV macros
  *
  * Revision 2.6  1995/07/03  17:55:55  gursoy
@@ -75,7 +79,7 @@ char *argv[];
   statModuleInit();
   tblModuleInit(); 
   ldbModuleInit();
-  perfModuleInit();
+  perfModuleInit(argv[0]); /* pass program name */
 
   if (CmiMyRank() == 0) CmiNodeBarrier();
 
