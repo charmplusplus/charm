@@ -7,7 +7,7 @@ goto begin
   echo.
   echo targets: converse, charm++
   echo.
-  echo versions:  ( net-win32 net-win32-smp )
+  echo versions:  ( net-win32 net-win32-smp uth-win32 )
   echo.
   echo Note: This script is trivial.  It
   echo.
