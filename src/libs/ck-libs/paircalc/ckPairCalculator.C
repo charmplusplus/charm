@@ -122,48 +122,44 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
     int i, j, idxOffset;
     
     if(symmetric && thisIndex.x == thisIndex.y) {
-        int size1 = 0;
+        int size1 = size%PARTITION_SIZE;
+        if(size1 > 0) {
+	    int start_offset = size-size1;
+            for (i = 0; i < grainSize; i++)
+                for (j = 0; j < grainSize; j++) 
+                    outData[i * grainSize + j] = compute_entry(size1, inDataLeft[i]+start_offset,
+                                                               inDataLeft[j]+start_offset, op1);        
+        }
         for(size1 = 0; size1 + PARTITION_SIZE < size; size1 += PARTITION_SIZE) {
             for (i = 0; i < grainSize; i++)
                 for (j = 0; j < grainSize; j++) 
                     outData[i * grainSize + j] += compute_entry(PARTITION_SIZE, inDataLeft[i]+size1,
                                                                 inDataLeft[j]+size1, op1);
         }        
-        
-        if(size1 < size) {
-            int cur_size = size - size1;
-            for (i = 0; i < grainSize; i++)
-                for (j = 0; j < grainSize; j++) 
-                    outData[i * grainSize + j] += compute_entry(cur_size, inDataLeft[i]+size1,
-                                                               inDataLeft[j]+size1, op1);        
-        }
     }     
     else {                                                        
       // compute a square region of the matrix. The correct part of the
       // region will be used by the reduction.
-        int size1 = 0;
+        int size1 = size%PARTITION_SIZE;
+        if(size1 > 0) {
+	    int start_offset = size-size1;
+            for (i = 0; i < grainSize; i++)
+                for (j = 0; j < grainSize; j++) 
+                    outData[i * grainSize + j] = compute_entry(size1, inDataLeft[i]+start_offset,
+                                                               inDataRight[j]+start_offset, op1);        
+        }
         for(size1 = 0; size1 + PARTITION_SIZE < size; size1 += PARTITION_SIZE) {
             for (i = 0; i < grainSize; i++)
                 for (j = 0; j < grainSize; j++) 
                     outData[i * grainSize + j] += compute_entry(PARTITION_SIZE, inDataLeft[i]+size1,
                                                                inDataRight[j]+size1, op1);      
         }
-
-        if(size1 < size) {
-            int cur_size = size - size1;
-            for (i = 0; i < grainSize; i++)
-                for (j = 0; j < grainSize; j++) 
-                    outData[i * grainSize + j] += compute_entry(cur_size, inDataLeft[i]+size1,
-                                                                inDataRight[j]+size1, op1);
-        }        
     }
 
     // FIXME: should do 'op2' here!!!
 
    r.add((int)thisIndex.y, (int)thisIndex.x, (int)(thisIndex.y+grainSize-1), (int)(thisIndex.x+grainSize-1), (CkTwoDoubles*)outData);
     r.contribute(this, sparse_sum_double);
-
-    memset(outData, 0, sizeof(double) * grainSize * grainSize);
   }
 }
 
@@ -200,20 +196,38 @@ PairCalculator::acceptResult(int size, double *matrix, int rowNum, CkCallback cb
   register double m=0;  
   //  complex zero=complex(0,0);  
 
-  for (int i = 0; i < grainSize; i++) {
-    int iSindex=i*S+index;
-    int iN=i*N;
-    complex *newiNdata=&mynewData[iN];
-    for (int j = 0; j < grainSize; j++){ 
-        //if(matrix[iSindex + j].notzero())
-        //  {
-        m = matrix[iSindex + j];
-        for (int p = 0; p < N; p++)
-            if(inDataLeft[j][p].notzero())
-                newiNdata[p] += inDataLeft[j][p] * m;
-        //}
-    }
+  int size1 = 0;
+  for(size1 = 0; size1 + PARTITION_SIZE < N; size1 += PARTITION_SIZE) {
+      for (int i = 0; i < grainSize; i++) {
+	  int iSindex=i*S+index;
+	  int iN=i*N;
+	  complex *newiNdata=&mynewData[iN];
+	  for (int j = 0; j < grainSize; j++){ 
+	      //if(matrix[iSindex + j].notzero())
+	      //  {
+	      m = matrix[iSindex + j];
+	      for (int p = size1; p < size1+PARTITION_SIZE; p++)
+		  if(inDataLeft[j][p].notzero())
+		      newiNdata[p] += inDataLeft[j][p] * m;
+	      //}
+	  }
+      }
   }
+  if(size1 > N) {
+      int start_offset = N-size1;
+        for (int i = 0; i < grainSize; i++) {
+	    int iSindex=i*S+index;
+	    int iN=i*N;
+	    complex *newiNdata=&mynewData[iN];
+	    for (int j = 0; j < grainSize; j++){ 
+		m = matrix[iSindex + j];
+		for (int p = start_offset; p < N; p++)
+		    if(inDataLeft[j][p].notzero())
+			newiNdata[p] += inDataLeft[j][p] * m;
+	    }
+	}
+  }
+
   /*  this one reads better but takes twice as long
   for (int i = 0; i < grainSize; i++) {
     for (int j = 0; j < grainSize; j++){ 
