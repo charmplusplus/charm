@@ -2240,7 +2240,10 @@ void ConverseCommonInit(char **argv)
   CmiInitImmediateMsg();
   CldModuleInit(argv);
 
+  /* main thread is suspendable */
+/*
   CthSetSuspendable(CthSelf(), 0);
+*/
 }
 
 void ConverseCommonExit(void)
