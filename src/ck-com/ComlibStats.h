@@ -189,6 +189,7 @@ class ComlibLocalStats {
 
     void setNstrats(int nst) {
         nstrats = nst;
+        cdata.resize(nstrats);
     }
 
     inline void recordSend(int sid, int size, int dest) {
