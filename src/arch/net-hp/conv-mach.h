@@ -74,6 +74,8 @@
 #define CMK_LBDB_ON					   1
 #define CMK_LBDB_OFF					   0
 
+#define CMK_NO_ISO_MALLOC				   1
+
 #include "conv-mach-opt.h"
 
 #endif
