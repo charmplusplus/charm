@@ -1,0 +1,50 @@
+module comlib {
+  initproc void initComlibManager();
+
+  message ComlibDummyMsg;
+  //  message PrioMsg;
+  message ComlibMulticastMsg {
+	CkArrayIndexMax indices[];
+	char usrMsg[];
+  };
+
+  group [migratable] ComlibManager {
+    entry ComlibManager();
+
+    entry void barrier(void);
+    entry void barrier2(void);
+    entry void resumeFromBarrier2(void);
+
+    //entry void beginIteration();
+    //entry void endIteration();
+    //entry void prioEndIteration(PrioMsg *);
+
+    entry void receiveTable(StrategyWrapper sw);
+    entry void receiveRemoteSend(CkQ<CharmMessageHolder *> &remoteQ, int id);
+
+    entry void learnPattern(int, int);
+  }
+
+  mainchare ComlibManagerMain {
+    entry ComlibManagerMain();	
+  }
+
+  //PUPable CharmStrategy;
+  //PUPable MessageHolder;
+  //PUPable CharmMessageHolder;
+
+  PUPable DummyStrategy;
+  PUPable NodeMulticast;
+  PUPable StreamingStrategy;
+  PUPable MPIStrategy;
+  PUPable DirectMulticastStrategy;
+  PUPable EachToManyMulticastStrategy;	
+  PUPable RingMulticastStrategy;	
+  PUPable PipeBroadcastStrategy;
+  PUPable MeshStreamingStrategy;
+  PUPable PrioStreaming;
+  PUPable BroadcastStrategy;
+
+  //Strategy pupable defined in the array manager code, along with the
+  //array listener code
+};
