@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.44  1997-07-26 16:41:14  jyelon
+ * Revision 2.45  1997-07-30 17:30:59  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.44  1997/07/26 16:41:14  jyelon
  * *** empty log message ***
  *
  * Revision 2.43  1997/07/18 21:21:07  milind
@@ -880,7 +883,6 @@ InitializeEPTables()
 /* Adding entry points for system branch office chares. */
 AddSysBocEps()
 {
-	CldAddSysBocEps();
 	QDAddSysBocEps();
 	WOVAddSysBocEps();
 	TblAddSysBocEps();

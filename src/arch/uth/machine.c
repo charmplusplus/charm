@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.25  1997-07-29 16:09:47  milind
+ * Revision 1.26  1997-07-30 17:31:13  jyelon
+ * *** empty log message ***
+ *
+ * Revision 1.25  1997/07/29 16:09:47  milind
  * Added CmiNodeLock macros and functions to the machine layer for all except
  * solaris SMP.
  *
@@ -295,6 +298,38 @@ void CmiNodeBarrier()
   }
   CmiYield();
 }
+
+CmiNodeLock CmiCreateLock()
+{
+  return (CmiNodeLock)malloc(sizeof(int));
+}
+
+void CmiLock(CmiNodeLock lk)
+{
+  while (*lk) CmiYield();
+  *lk = 1;
+}
+
+void CmiUnlock(CmiNodeLock lk)
+{
+  if (*lk==0) {
+    CmiError("CmiNodeLock not locked, can't unlock.");
+    exit(1);
+  }
+  *lk = 0;
+}
+
+int CmiTryLock(CmiNodeLock lk)
+{
+  if (*lk==0) { *lk=1; return 0; }
+  return -1;
+}
+
+void CmiDestroyLock(CmiNodeLock lk)
+{
+  free(lk);
+}
+
 
 /*****************************************************************************
  *

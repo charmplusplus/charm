@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.6  1996-02-08 23:33:36  sanjeev
+ * Revision 2.7  1997-07-30 17:31:03  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.6  1996/02/08 23:33:36  sanjeev
  * added documentation on how it works
  *
  * Revision 2.5  1995/11/06 17:55:09  milind
@@ -168,7 +171,6 @@ typedef struct ldb_status {
 
 extern int CldAddToken();
 extern int CldPickSeedAndSend();
-extern int Cldbtokensinit();
 
 extern void *CqsCreate();
 
@@ -600,7 +602,6 @@ BranchOffice LDB {
       exchanges = numBoss = 0;
       if (controller)
 	{
-	  Cldbtokensinit();
 /*	  LdbFreeChareQueue = CqsCreate(); */
 	  for (i=0; i<CLUSTER_SIZE; i++)
 	    load_cluster[i] = 0;

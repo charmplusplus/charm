@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1996-11-08 22:22:48  brunner
+ * Revision 2.2  1997-07-30 17:30:57  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.1  1996/11/08 22:22:48  brunner
  * Put _main in for HP-UX CC compilation.  It is ignored according to the
  * CMK_USE_HP_MAIN_FIX flag.
  *
@@ -84,3 +87,8 @@ void CPlus_SetMainChareID()
 void _CKmain_DumpNames() 
 {}
 
+void futuresModuleInit()
+{}
+
+void futuresCreateBOC()
+{}

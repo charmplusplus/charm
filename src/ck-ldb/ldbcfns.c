@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.5  1995-11-06 17:55:09  milind
+ * Revision 2.6  1997-07-30 17:31:04  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.5  1995/11/06 17:55:09  milind
  * Changed CldAdd Token to take priority info as parameters.
  *
  * Revision 2.4  1995/10/13  18:15:22  jyelon
@@ -38,25 +41,7 @@ static char ident[] = "@(#)$Header$";
 #define NULL 0
 #endif
 
-CpvDeclare(int, LDB_ELEM_SIZE);
-
-void CldModuleInit()
-{
-  CpvInitialize(int, LDB_ELEM_SIZE);
-
-  CpvAccess(LDB_ELEM_SIZE) = CldGetLdbSize();
-}
-
-void CldPickFreeChare(a)
-    void **a;
-{
-}
-
-CldAddSysBocEps()
-{
-}
-
-CpvDeclare(int, Cldnumseeds);
+void Cldhandler(void *);
 
 typedef struct Cldtokholder {
   char msg_header[CmiMsgHeaderSizeBytes];
@@ -66,9 +51,31 @@ typedef struct Cldtokholder {
   struct Cldtokholder *next;
 } CldTOK_HOLDER;
 
+CpvDeclare(int, LDB_ELEM_SIZE);
+CpvDeclare(int, Cldnumseeds);
 CpvDeclare(CldTOK_HOLDER*, Cldtokenlist);
 CpvDeclare(CldTOK_HOLDER*, Cldlasttoken);
 CpvDeclare(int, Cldhandlerid);
+
+void CldModuleInit()
+{
+  CpvInitialize(int, LDB_ELEM_SIZE);
+  CpvInitialize(int, Cldnumseeds);
+  CpvInitialize(CldTOK_HOLDER*, Cldtokenlist);
+  CpvInitialize(CldTOK_HOLDER*, Cldlasttoken);
+  CpvInitialize(int, Cldhandlerid);
+
+  CpvAccess(LDB_ELEM_SIZE) = CldGetLdbSize();
+  CpvAccess(Cldhandlerid) = CmiRegisterHandler(Cldhandler);
+  CpvAccess(Cldtokenlist) = NULL;
+  CpvAccess(Cldlasttoken) = NULL;
+  CpvAccess(Cldnumseeds) = 0;
+}
+
+void CldPickFreeChare(a)
+    void **a;
+{
+}
 
 CldTOK_HOLDER *new_CldTOK_HOLDER(sendfn, msgptr)
     void (*sendfn)(); void *msgptr;
@@ -159,19 +166,6 @@ void Cldhandler(msg)
     (CmiGetHandlerFunction(tok->msgptr))(tok->msgptr);
 }
 
-
-int Cldbtokensinit()
-{
-  CpvInitialize(int, Cldnumseeds);
-  CpvInitialize(CldTOK_HOLDER*, Cldtokenlist);
-  CpvInitialize(CldTOK_HOLDER*, Cldlasttoken);
-  CpvInitialize(int, Cldhandlerid);
-
-  CpvAccess(Cldtokenlist) = NULL;
-  CpvAccess(Cldlasttoken) = NULL;
-  CpvAccess(Cldnumseeds) = 0;
-  CpvAccess(Cldhandlerid) = CmiRegisterHandler(Cldhandler);
-}
 
 /*********************************************************************
  * Load function : Returns the number of seeds in the token list 

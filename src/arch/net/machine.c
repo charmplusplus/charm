@@ -1038,7 +1038,7 @@ static OtherNode *nodes_by_pe;  /* OtherNodes indexed by processor number */
 static OtherNode  nodes;        /* Indexed only by ``node number'' */
 
 static int        Cmi_shutdown_done;
-static CmiMutex   Cmi_scanf_mutex;
+static mutex_t    Cmi_scanf_mutex;
 static char      *Cmi_scanf_data;
 static double     Cmi_clock;
 
@@ -1122,10 +1122,6 @@ void CheckSocketsReady()
  *
  *    returns processor-specific state structure for the PE of rank n.
  *
- * CmiMutex, CmiMutexLock(), CmiMutexUnlock()
- *
- *    Lock/Unlock a mutex.  These are in converse.h
- *
  * CmiMemLock() and CmiMemUnlock()
  *
  *    The memory module calls these functions to obtain mutual exclusion
@@ -1173,10 +1169,23 @@ int CmiMyRank()
   return result->rank;
 }
 
-int CmiNodeFirst(int node) { return nodes[pe].nodestart; }
-int CmiNodeSize(int node)  { return nodes[pe].nodesize; }
+int CmiNodeFirst(int node) { return nodes[node].nodestart; }
+int CmiNodeSize(int node)  { return nodes[node].nodesize; }
 int CmiNodeOf(int pe)      { return (nodes_by_pe[pe] - nodes); }
-int CmiRankOf(int pe)      { return pe - (nodes_by_pe[pe].nodestart); }
+int CmiRankOf(int pe)      { return pe - (nodes_by_pe[pe]->nodestart); }
+
+CmiNodeLock CmiCreateLock()
+{
+  CmiNodeLock lk = (CmiNodeLock)malloc(sizeof(mutex_t));
+  mutex_init(lk,0,0);
+}
+
+void CmiDestroyLock(CmiNodeLock lk)
+{
+  mutex_destroy(lk);
+  free(lk);
+}
+
 
 #define CmiGetStateN(n) (Cmi_state_vector+(n))
 
@@ -1584,7 +1593,7 @@ static int InternalScanf(fmt, l)
   }
   if (nargs > 18) KillEveryone("CmiScanf only does 18 args.\n");
   for (i=0; i<nargs; i++) ptr[i]=va_arg(l, char *);
-  CmiMutexLock(&Cmi_scanf_mutex);
+  mutex_lock(&Cmi_scanf_mutex);
   ctrl_sendone(120, "scanf %s %d %s", Cmi_self_IP_str, ctrlport, fmt);
   while (Cmi_scanf_data == 0) jsleep(0, 250000);
   i = sscanf(Cmi_scanf_data, fmt,
@@ -1593,7 +1602,7 @@ static int InternalScanf(fmt, l)
 	     ptr[12], ptr[13], ptr[14], ptr[15], ptr[16], ptr[17]);
   free(Cmi_scanf_data);
   Cmi_scanf_data=0;
-  CmiMutexUnlock(&Cmi_scanf_mutex);
+  mutex_unlock(&Cmi_scanf_mutex);
   return i;
 }
 

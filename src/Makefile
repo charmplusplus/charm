@@ -343,12 +343,19 @@ trace-projections.o : trace-projections.c trace.h $(CKHEADERS)
 
 ###############################################################################
 #
-# The new, lightweight C++ stub library.
+# C++ code for the charm++ runtime library.
 #
 ###############################################################################
 
-libck-cplus-y.a: cplus.C c++interface.h $(CKHEADERS)
-	$(CHARMC) -cp ../lib/ -o $@ cplus.C
+ckfutures.o: ckfutures.C ckfutures.ci c++interface.h $(CKHEADERS)
+	$(CHARMC) ckfutures.ci
+	$(CHARMC) -c ckfutures.C
+
+cplus.o: cplus.C c++interface.h $(CKHEADERS)
+	$(CHARMC) -o cplus.o cplus.C
+
+libck-cplus-y.a: cplus.o ckfutures.o 
+	$(CHARMC) -cp ../lib/ -o $@ cplus.C ckfutures.o
 
 libck-defmain-cpp.a: defmain-cpp.C $(CKHEADERS)
 	$(CHARMC) -cp ../lib/ -o $@ defmain-cpp.C
@@ -368,8 +375,8 @@ LIBCHARM=cache.o dag.o barrier_redn.o pglib.o \
          iacc_hist.o facc_hist.o dacc_hist.o \
          iminredn.o imaxredn.o isumredn.o iprodredn.o icountredn.o \
 	 fminredn.o fmaxredn.o fsumredn.o fprodredn.o \
-	 dminredn.o dmaxredn.o dsumredn.o dprodredn.o \
-	 ckfutures.o
+	 dminredn.o dmaxredn.o dsumredn.o dprodredn.o
+
 
 libcharm: charmxlat libcharm.a
 
@@ -450,10 +457,6 @@ dprodredn.o: dprodredn.int $(GENERIC_REDN_H)
 
 dcountredn.o: dcountredn.int $(GENERIC_REDN_H)
 	$(CHARMC) -o dcountredn.o GENERIC-REDN.p -DHEAD='"dcountredn.int"'
-
-ckfutures.o: ckfutures.C ckfutures.ci
-	$(CHARMC) ckfutures.ci
-	$(CHARMC) -c ckfutures.C
 
 ###############################################################################
 #

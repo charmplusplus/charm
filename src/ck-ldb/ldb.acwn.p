@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.11  1996-02-08 23:52:06  sanjeev
+ * Revision 2.12  1997-07-30 17:31:02  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.11  1996/02/08 23:52:06  sanjeev
  * added notes
  *
  * Revision 2.10  1995/11/07 00:41:00  sanjeev
@@ -424,8 +427,6 @@ entry BranchInit : (message DUMMYMSG * dmsg)
 	myPE = CkMyPe();
 	numNeighbours = CmiNumNeighbours(myPE);
 	lastPeZeroLoadIndex = 0;
-
-	Cldbtokensinit();
 
 	if (numPe > 1)
 	{

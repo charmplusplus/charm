@@ -12,225 +12,9 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.71  1997-07-29 16:09:44  milind
- * Added CmiNodeLock macros and functions to the machine layer for all except
- * solaris SMP.
- *
- * Revision 2.70  1997/07/28 20:13:23  milind
- * Fixed bugs due to ckfutures declarations in c++interface.h
- * Also, wrote macros for node numbering in exemplar.
- *
- * Revision 2.69  1997/07/28 19:00:39  jyelon
+ * Revision 2.72  1997-07-30 17:31:06  jyelon
  * *** empty log message ***
  *
- * Revision 2.68  1997/07/26 16:41:16  jyelon
- * *** empty log message ***
- *
- * Revision 2.67  1997/07/24 18:32:12  jyelon
- * *** empty log message ***
- *
- * Revision 2.66  1997/07/24 17:29:36  milind
- * Added Parallel Java to the CVS repository in Common/langs.
- * Fixed a problem with size_t in converse.h
- *
- * Revision 2.65  1997/07/23 18:40:22  milind
- * Made charm++ to work on exemplar.
- *
- * Revision 2.64  1997/07/22 18:15:59  milind
- * fixed some exemplar-related bugs.
- *
- * Revision 2.63  1997/07/21 21:00:05  jyelon
- * added cpthreads.
- *
- * Revision 2.62  1997/07/07 23:03:38  rbrunner
- * Added stdio.h to CMI_PRINTF_IS_BUILTIN block
- *
- * Revision 2.61  1997/05/05 13:47:12  jyelon
- * Revamped threads package using quickthreads.
- *
- * Revision 2.60  1997/04/03 20:32:11  milind
- * Fixed compilation problem due to differing prototype declaration of
- * CthAutoYield.
- *
- * Revision 2.59  1997/04/03 19:42:08  jyelon
- * Working on threads stuff.
- *
- * Revision 2.58  1997/03/25 23:09:00  milind
- * Got threads to work on 64-bit irix. Had to add JB_TWEAKING_ORIGIN flag to
- * all the conv-mach.h files. Also, _PAGESZ was undefined on irix. Added
- * code to memory.c to make it a static variable.
- *
- * Revision 2.57  1997/03/19 04:31:04  jyelon
- * Redesigned ConverseInit
- *
- * Revision 2.56  1997/03/17 23:40:23  milind
- * Added Idle Notification Functionality:
- * The new Macros in converse.h for this are:
- * CsdSetNotifyIdle(fn1, fn2)
- * CsdStartNotifyIdle()
- * CsdStopNotifyIdle()
- *
- * Revision 2.55  1997/02/13 09:31:02  jyelon
- * Modified everything for new main/ConverseInit structure
- *
- * Revision 2.54  1997/02/07 02:15:37  jyelon
- * Added stuff for byte-order conversion.
- *
- * Revision 2.53  1997/02/06 19:53:37  jyelon
- * Fifo: added peek and pop.  Convcore: added support for new network version.
- *
- * Revision 2.52  1997/01/17 15:49:06  jyelon
- * Made many changes for SMP version.  In particular, memory module now uses
- * CmiMemLock and CmiMemUnlock instead of CmiInterruptsBlock, which no longer
- * exists.  Threads package uses CthCpv to declare all its global vars.
- * Much other restructuring.
- *
- * Revision 2.51  1996/11/23 02:25:33  milind
- * Fixed several subtle bugs in the converse runtime for convex
- * exemplar.
- *
- * Revision 2.50  1996/11/20 06:45:40  jyelon
- * Repaired rob's HP/C++ mods.
- *
- * Revision 2.49  1996/11/08 22:22:51  brunner
- * Put _main in for HP-UX CC compilation.  It is ignored according to the
- * CMK_USE_HP_MAIN_FIX flag.
- *
- * Revision 2.48  1996/10/24 19:40:21  milind
- * Added CMK_IS_HETERO to all the net-all versions.
- *
- * Revision 2.47  1996/07/16 17:23:18  jyelon
- * Misc
- *
- * Revision 2.46  1996/07/16 09:26:46  milind
- * Added vector send routines declarations.
- *
- * Revision 2.45  1996/07/15  21:02:39  jyelon
- * Changed mach-flags #ifdef to #if, added timer stuff.
- *
- * Revision 2.44  1996/07/02 21:01:55  jyelon
- * Added CMK_THREADS_USE_JB_TWEAKING
- *
- * Revision 2.43  1996/06/24 18:56:25  jyelon
- * *** empty log message ***
- *
- * Revision 2.42  1996/04/17 18:54:36  jyelon
- * *** empty log message ***
- *
- * Revision 2.41  1996/04/16 22:44:42  jyelon
- * *** empty log message ***
- *
- * Revision 2.40  1996/04/15 23:57:04  jyelon
- * *** empty log message ***
- *
- * Revision 2.39  1996/04/07 19:16:52  jyelon
- * Corrected bug in CmiInterruptsRelease (could lead to reentering sighandler)
- *
- * Revision 2.38  1996/02/14 20:46:11  jyelon
- * *** empty log message ***
- *
- * Revision 2.37  1996/01/17 08:04:56  jyelon
- * *** empty log message ***
- *
- * Revision 2.36  1996/01/03 23:18:37  sanjeev
- * CmiSize prototype should have void * argument
- *
- * Revision 2.35  1995/10/31 19:53:21  jyelon
- * Added 'CMK_THREADS_USE_ALLOCA_WITH_PRAGMA'
- *
- * Revision 2.34  1995/10/27  22:37:08  jyelon
- * Changed NumPe -> NumPes
- *
- * Revision 2.33  1995/10/27  21:39:32  jyelon
- * changed NumPe --> NumPes
- *
- * Revision 2.32  1995/10/23  23:09:05  jyelon
- * *** empty log message ***
- *
- * Revision 2.31  1995/10/20  17:29:10  jyelon
- * *** empty log message ***
- *
- * Revision 2.30  1995/10/19  18:22:08  jyelon
- * *** empty log message ***
- *
- * Revision 2.29  1995/10/18  22:20:37  jyelon
- * Added 'eatstack' threads implementation.
- *
- * Revision 2.28  1995/10/13  22:34:07  jyelon
- * *** empty log message ***
- *
- * Revision 2.27  1995/10/13  18:14:10  jyelon
- * K&R changes, etc.
- *
- * Revision 2.26  1995/10/12  20:18:19  sanjeev
- * modified prototype for CmiPrintf etc.
- *
- * Revision 2.25  1995/10/12  18:14:18  jyelon
- * Added parentheses in macro defs.
- *
- * Revision 2.24  1995/10/11  00:36:39  jyelon
- * Added CmiInterrupt stuff.
- *
- * Revision 2.23  1995/09/30  15:03:15  jyelon
- * A few changes for threaded-uniprocessor version.
- *
- * Revision 2.22  1995/09/29  09:51:44  jyelon
- * Many corrections, added protos, CmiGet-->CmiDeliver, etc.
- *
- * Revision 2.21  1995/09/27  22:23:15  jyelon
- * Many bug-fixes.  Added Cpv macros to threads package.
- *
- * Revision 2.20  1995/09/26  18:26:00  jyelon
- * Added CthSetStrategyDefault, and cleaned up a bit.
- *
- * Revision 2.19  1995/09/20  17:22:14  jyelon
- * Added CthImplemented
- *
- * Revision 2.18  1995/09/20  16:36:56  jyelon
- * *** empty log message ***
- *
- * Revision 2.17  1995/09/20  15:09:42  sanjeev
- * fixed CmiFree, put int CmiSpanTree stuff
- *
- * Revision 2.16  1995/09/20  15:04:45  jyelon
- * *** empty log message ***
- *
- * Revision 2.15  1995/09/20  14:58:12  jyelon
- * Did some work on threads stuff.
- *
- * Revision 2.14  1995/09/20  13:16:33  jyelon
- * Added prototypes for Cth (thread) functions.
- *
- * Revision 2.13  1995/09/19  21:43:58  brunner
- * Moved declaration of CmiTimer here from c++interface.h
- *
- * Revision 2.12  1995/09/19  19:31:51  jyelon
- * Fixed a bug.
- *
- * Revision 2.11  1995/09/19  18:57:17  jyelon
- * added CMK_PREPROCESSOR_USES_ANSI_STANDARD_CONCATENATION and other goodies.
- *
- * Revision 2.10  1995/09/07  21:14:15  jyelon
- * Added prefix to Cpv and Csv macros, then fixed bugs thereby revealed.
- *
- * Revision 2.9  1995/07/19  22:18:54  jyelon
- * *** empty log message ***
- *
- * Revision 2.8  1995/07/11  18:10:26  jyelon
- * Added CsdEnqueueFifo, etc.
- *
- * Revision 2.7  1995/07/11  16:52:37  gursoy
- * CsdExitScheduler is a function for uniprocessor now
- *
- * Revision 2.6  1995/07/07  14:04:35  gursoy
- * redone uniprocessors changes again, somehow an old version
- * is checked in
- *
- * Revision 2.5  1995/07/06  23:22:58  narain
- * Put back the different components of converse.h in this file.
- *
- * Revision 2.4  1995/06/29  21:25:29  narain
- * Split up converse.h and moved out the functionality to converse?????.h
  *
  ***************************************************************************/
 
@@ -324,15 +108,12 @@ extern void CmiMemLock();
 extern void CmiMemUnlock();
 #define CmiNodeBarrier() 0
 #define CmiSvAlloc CmiAlloc
-typedef int CmiMutex;
-#define CmiMutexLock(x) 0
-#define CmiMutexUnlock(x) 0
 
-typedef void *CmiNodeLock_t;
-#define CmiCreateLock() (void *) 0
+typedef void *CmiNodeLock;
+#define CmiCreateLock() ((void *)0)
 #define CmiLock(lock) 0
 #define CmiUnlock(lock) 0
-#define CmiProbeLock(lock) 0
+#define CmiTryLock(lock) 0
 #define CmiDestroyLock(lock) 0
 
 #endif
@@ -377,18 +158,19 @@ extern void CmiMemUnlock();
 extern void CmiNodeBarrier CMK_PROTO((void));
 extern void *CmiSvAlloc CMK_PROTO((int));
 
-typedef cps_mutex_t *CmiNodeLock_t;
-extern CmiNodeLock_t CmiCreateLock(void);
-#define CmiLock(lock) cps_mutex_lock(lock)
-#define CmiUnlock(lock) cps_mutex_unlock(lock)
-extern int CmiProbeLock(CmiNodeLock_t lock);
-#define CmiDestroyLock(lock) cps_mutex_free(lock)
+typedef cps_mutex_t *CmiNodeLock;
+extern CmiNodeLock CmiCreateLock(void);
+#define CmiLock(lock) (cps_mutex_lock(lock))
+#define CmiUnlock(lock) (cps_mutex_unlock(lock))
+#define CmiTryLock(lock) (cps_mutex_trylock(lock))
+#define CmiDestroyLock(lock) (cps_mutex_free(lock))
 
 #endif
 
 #if CMK_SHARED_VARS_SUN_THREADS
 
 #include <thread.h>
+#include <synch.h>
 
 extern int Cmi_numpes;
 extern int Cmi_mynodesize;
@@ -426,16 +208,14 @@ extern void CmiMemLock();
 extern void CmiMemUnlock();
 #define CmiNodeBarrier() 0
 #define CmiSvAlloc CmiAlloc
-typedef mutex_t CmiMutex;
-#define CmiMutexLock(m) mutex_lock(m)
-#define CmiMutexUnlock(m) mutex_unlock(m)
 
-typedef ?? CmiNodeLock_t;
-#define CmiCreateLock() ?
-#define CmiLock(lock) ?
-#define CmiUnlock(lock) ?
-#define CmiProbeLock(lock) ?
-#define CmiDestroyLock(lock) ?
+
+typedef mutex_t *CmiNodeLock;
+extern CmiNodeLock CmiCreateLock();
+#define CmiLock(lock) (mutex_lock(lock))
+#define CmiUnlock(lock) (mutex_unlock(lock))
+#define CmiTryLock(lock) (mutex_trylock(lock))
+extern void CmiDestroyLock(CmiNodeLock lock);
 
 #endif
 
@@ -475,16 +255,13 @@ extern int Cmi_numpes;
 #define CmiMemUnlock() 0
 extern void CmiNodeBarrier();
 #define CmiSvAlloc CmiAlloc
-typedef int CmiMutex;
-#define CmiMutexLock(x) 0
-#define CmiMutexUnlock(x) 0
 
-typedef int *CmiNodeLock_t;
-extern CmiNodeLock_t CmiCreateLock(void);
-#define CmiLock(lock) {if(*(lock)==1)CmiYield();else (*(lock))=1;}
-#define CmiUnlock(lock) {if(*(lock)==1) (*(lock)==0);}
-#define CmiProbeLock(lock) *(lock)
-#define CmiDestroyLock(lock) free(lock)
+typedef int *CmiNodeLock;
+extern CmiNodeLock  CmiCreateLock(void);
+extern void         CmiLock(CmiNodeLock lock);
+extern void         CmiUnlock(CmiNodeLock lock);
+extern int          CmiTryLock(CmiNodeLock lock);
+extern void         CmiDestroyLock(CmiNodeLock lock);
 
 #endif
 
