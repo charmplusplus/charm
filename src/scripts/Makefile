@@ -204,11 +204,11 @@ charmrun-target: daemon-target
 	if [ -d charmrun ] ; then ( cd charmrun ; make OPTS='$(OPTS)' ) ; fi
 	if [ -f charmrun ] ; then ( cp charmrun ../bin ) ; fi
 
-daemon-target: sockRoutines.o
+daemon-target: sockRoutines-seq.o
 	if test -f daemon.c ; then $(CHARMC) -seq daemon.c \
-		sockRoutines.o -o ../bin/charmd; fi 
+		sockRoutines-seq.o -o ../bin/charmd; fi 
 	if test -f daemon.c ; then $(CHARMC) -DFACELESS -seq daemon.c \
-		sockRoutines.o -o ../bin/charmd_faceless; fi 
+		sockRoutines-seq.o -o ../bin/charmd_faceless; fi 
 	touch daemon-target
 
 QuickThreads/libqt.a:
@@ -249,6 +249,9 @@ conv-ccs.o: conv-ccs.c $(CVHEADERS)
 
 sockRoutines.o: sockRoutines.c $(CVHEADERS) $(UTILHEADERS)
 	$(CHARMC) sockRoutines.c
+
+sockRoutines-seq.o: sockRoutines.c $(CVHEADERS) $(UTILHEADERS)
+	$(CHARMC) -seq -o sockRoutines-seq.o sockRoutines.c
 
 random.o: random.c $(CVHEADERS)
 	$(CHARMC) random.c
