@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.9  1996-07-15 20:59:22  jyelon
+ * Revision 1.10  1996-07-24 21:42:32  gursoy
+ * fixed CmiTimer superinstall problems
+ *
+ * Revision 1.9  1996/07/15  20:59:22  jyelon
  * Moved much timer, signal, etc code into common.
  *
  * Revision 1.8  1995/11/08 23:40:58  gursoy
@@ -47,6 +50,17 @@ static char ident[] = "@(#)$Header$";
 #include "machine.h"
 #include "converse.h"
 
+#ifdef CMK_TIMER_SIM_USE_TIMES
+#include <sys/times.h>
+#include <sys/unistd.h>
+#endif
+#ifdef CMK_TIMER_SIM_USE_GETRUSAGE
+#include <sys/time.h>
+#include <sys/resource.h>
+#endif
+
+
+
 static void **McQueue;
 
 int Cmi_mype;
@@ -60,7 +74,9 @@ CpvExtern(int, disable_sys_msgs);
 
 static void mycpy();
 double CmiTimer();
+
 static void CsiTimerInit();
+static double CsiTimer();
 
 
 CpvStaticDeclare(int,CmiBufferGrabbed);
@@ -414,7 +430,7 @@ void CsdExitScheduler()
 
 
 
-#if CMK_TIMER_USE_TIMES
+#if CMK_TIMER_SIM_USE_TIMES
 
 static struct tms inittime;
 
@@ -439,7 +455,7 @@ static double CsiTimer()
 
 #endif
 
-#if CMK_TIMER_USE_GETRUSAGE
+#if CMK_TIMER_SIM_USE_GETRUSAGE
 
 static struct rusage inittime;
 
