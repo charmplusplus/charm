@@ -147,8 +147,9 @@ public:
 		unsigned char hopCount;//number of hops since
 	} msg;
 	struct {
-		//Used for creation:
+		//Used for creation/migration messages:
 		short ctorIndex;//Entry index of array constructor
+		short chareType;//Kind of chare to create
 		short fromPE;//the source PE (for migrators)
   	} create;
   } type;
@@ -206,11 +207,11 @@ public:// <- should be protected, but causes errors.
 	CProxy_CkArrayBase(const CkArrayID &aid,CkArrayIndex *idx)
 	  {_aid=aid._aid;_idx=idx;}
 	
-	void insertAtIdx(int ctorIndex,int onPE,const CkArrayIndex &idx,CkArrayMessage *m=NULL);
+	void insertAtIdx(int ctorIndex,int chareType,int onPE,const CkArrayIndex &idx,CkArrayMessage *m=NULL);
 
 	//Create 1D initial elements
-	void create1Dinitial(int ctorIndex,int numElements,CkArrayMessage *m=NULL);
-	void doInsert(int ctorIndex,int onPE=-1,CkArrayMessage *m=NULL);
+	void create1Dinitial(int ctorIndex,int chareType,int numElements,CkArrayMessage *m=NULL);
+	void doInsert(int ctorIndex,int chareType=-1,int onPE=-1,CkArrayMessage *m=NULL);
 public:
 	CkGroupID ckGetGroupID(void) { return _aid; }
 //Messaging:
@@ -271,6 +272,7 @@ protected:
   CkArray *thisArray;//My source array
 
   CkArrayID thisArrayID;//My source array's ID
+  int thisChareType;//My chare type index
 
 #if CMK_LBDB_ON  //For load balancing:
   void AtSync(void);
@@ -346,9 +348,7 @@ class CkArray : public CkReductionMgr {
 	friend class CkArrayRec_buffering_migrated;
 public:
 //Array Creation:
-  static  CkGroupID CreateArray(int numInitial,
-  				CkGroupID mapID,
-				ChareIndexType elementChare);
+  static  CkGroupID CreateArray(CkGroupID mapID,int numInitial=0);
 
   CkArray(CkArrayCreateMsg *);
   CkArray(CkMigrateMessage *) {}
@@ -429,8 +429,7 @@ private:
   	int migrating;//Just left
   } num;//<- array element counts
   
-  ChareIndexType elementType;
-  int numInitial;//Initial array size (used only for 1D case)
+  int numInitial;//Number of 1D initial array elements (backward-compatability)
   CmiBool isInserting;//Are we currently inserting elements?
 
   //Allocate a new, uninitialized array element of the given (chare) type

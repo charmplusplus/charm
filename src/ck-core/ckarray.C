@@ -712,21 +712,16 @@ public:
   int numInitial;
   CkGroupID mapID;
   CkGroupID loadbalancer;
-  ChareIndexType elementType;
 };
 
 //static method
-CkGroupID CkArray::CreateArray(int numInitialElements,
-                               CkGroupID mapID,
-                               ChareIndexType elementChare)
+CkGroupID CkArray::CreateArray(CkGroupID mapID,int numInitial)
 {
   CkGroupID group;
 
   CkArrayCreateMsg *msg = new CkArrayCreateMsg;
-
-  msg->numInitial=numInitialElements;
+  msg->numInitial=numInitial;
   msg->mapID = mapID;
-  msg->elementType = elementChare;
 #if CMK_LBDB_ON
   msg->loadbalancer = lbdb;
 #endif
@@ -737,7 +732,6 @@ CkGroupID CkArray::CreateArray(int numInitialElements,
 CkArray::CkArray(CkArrayCreateMsg *msg) : CkReductionMgr()
 {
   //Set class variables
-  elementType = msg->elementType;
   numInitial=msg->numInitial;
   num.local=num.migrating=0;
   bcastNo=oldBcastNo=0;
@@ -816,7 +810,7 @@ void CkArray::initAfterMap(void)
 }
 
 //Create 1D initial array elements
-void CProxy_CkArrayBase::create1Dinitial(int ctorIndex,int numInitial,
+void CProxy_CkArrayBase::create1Dinitial(int ctorIndex,int chareType,int numInitial,
 	CkArrayMessage *inM)
 {
   DEBC(("In createInitial-- will build %d elements\n",numInitial));
@@ -832,26 +826,27 @@ void CProxy_CkArrayBase::create1Dinitial(int ctorIndex,int numInitial,
 	else
 	  m=inM;//Last time around, send off the original message
       }
-      insertAtIdx(ctorIndex,-1,CkArrayIndex1D(i),m);
+      insertAtIdx(ctorIndex,chareType,-1,CkArrayIndex1D(i),m);
     }
     DEBC(("Done building elements\n"));
     doneInserting();
   }
 }
 
-void CProxy_CkArrayBase::doInsert(int ctorIndex,int onPE,CkArrayMessage *m)
+void CProxy_CkArrayBase::doInsert(int ctorIndex,int chareType,int onPE,CkArrayMessage *m)
 {
   if (_idx==NULL) CkAbort("Must use arrayProxy[index].insert()!\n"); 
-  insertAtIdx(ctorIndex,onPE,*_idx,m);
+  insertAtIdx(ctorIndex,chareType,onPE,*_idx,m);
   delete _idx;//<- this lets us just blow away old element proxies.
   _idx=NULL;
 }
 
-void CProxy_CkArrayBase::insertAtIdx(int ctorIndex,int onPE,
+void CProxy_CkArrayBase::insertAtIdx(int ctorIndex,int chareType,int onPE,
 	const CkArrayIndex &idx,CkArrayMessage *m)
 {
   if (m==NULL) m=new CkArrayElementCreateMsg;
   m->type.create.ctorIndex=ctorIndex;
+  m->type.create.chareType=chareType;
   CkArray *aMgr=(CkArray *)CkLocalBranch(_aid);
   if (onPE==-1) onPE=aMgr->homePE(idx);
   
@@ -893,6 +888,7 @@ ArrayElement *CkArray::newElement(int chareType,CkArrayIndex *ind)
   el->thisindex=ind;
   el->thisArray=this;
   el->thisArrayID=thisgroup;
+  el->thisChareType=chareType;
   return el;
 }
 
@@ -924,7 +920,7 @@ void CkArray::InsertElement(CkArrayMessage *m)
   }
   //Build the element
   CkArrayIndex *elIdx=m->copyIndex();
-  ArrayElement *el=newElement(elementType,elIdx);
+  ArrayElement *el=newElement(m->type.create.chareType,elIdx);
 #if CMK_LBDB_ON //Load balancer utilities:
   el->usesAtSync=CmiFalse;
 #endif
@@ -1020,7 +1016,8 @@ void CkArray::migrateMe(ArrayElement *el, int where)
   CkArrayElementMigrateMessage *msg = 
     new (&bufSize, 0) CkArrayElementMigrateMessage;
   msg->type.create.fromPE=CkMyPe();
-  msg->type.create.ctorIndex=_chareTable[elementType]->getMigCtor();
+  msg->type.create.chareType=el->thisChareType;
+  msg->type.create.ctorIndex=_chareTable[el->thisChareType]->getMigCtor();
   { PUP::toMem p(msg->packData); el->pup(p);}
   msg =msg->insert(idx);
   DEBM((AA"Migrated index size %s\n"AB,idx2str(msg->index())));
@@ -1050,7 +1047,7 @@ void CkArray::RecvMigratedElement(CkArrayElementMigrateMessage *msg)
   /*Was: CkCreateChare(type.chareType, type.migrateType, msg, 0, CkMyPe());*/
   //Create the new element on this PE (passing on the msg)
   CkArrayIndex *elIdx=msg->copyIndex();
-  ArrayElement *el=newElement(elementType,elIdx);
+  ArrayElement *el=newElement(msg->type.create.chareType,elIdx);
   ctorElement(el,msg->type.create.ctorIndex,(CkMigrateMessage *)NULL);
   
   if (curElementIsDead) 
@@ -1143,13 +1140,17 @@ CkArrayRec* CkArray::pupArrayRec(PUP::er &p, CkArrayRec *rec, CkArrayIndex *idx)
   switch(ch) {
   case 'l':
     if (p.isUnpacking()) {
+      int elType;
       lrec = new CkArrayRec_local();
-	  el = newElement(elementType, idx);
-	  ctorElement(el, _chareTable[elementType]->getMigCtor(), 0);
+      p(elType);
+	  el = newElement(elType, idx);
+	  ctorElement(el, _chareTable[elType]->getMigCtor(), 0);
       rec = lrec;
     }
-    else 
-      el = rec->element();		
+    else {
+      el = rec->element();
+      p(el->thisChareType);
+    }
     rec->pup(p);
     el->pup(p);
     if (p.isUnpacking()) {
@@ -1250,12 +1251,11 @@ void CkArray::pup(PUP::er &p)
     thisproxy.DummyAtSync(CkMyPe());
   }
 #endif
+  p(numInitial);
   p(curElementIsDead);
   p(num.local);
   p(num.migrating);
-  p(elementType);
   CmiBool oldIsInserting;
-  p(numInitial);
   p(nSprings);
   if (p.isUnpacking())
 	isInserting = CmiTrue;
