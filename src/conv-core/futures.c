@@ -112,11 +112,11 @@ void CfutureDestroy(Cfuture f)
     CmiPrintf("error: CfutureDestroy: destroying an active future.\n");
     exit(1);
   }
-  if (f.data->value) free(f.data->value);
-  free(f);
+  if (f.data->value) CmiFree(f.data->value);
+  free(f.data);
 }
 
-void CfutureInit()
+void CfutureModuleInit()
 {
   CpvInitialize(int, CfutureStoreIndex);
   CpvAccess(CfutureStoreIndex) = CmiRegisterHandler(CfutureStore);
