@@ -218,6 +218,21 @@ void GenerateStructsFns(ofstream& top, ofstream& bot)
 
 
 
+  /* for allocked MsgTypes output the pack - unpack stub functions */
+  for ( m=thismodule->messages; m!=NULL; m=m->next ) {
+    if ( !m->packable )
+      continue ;
+    sprintf(str,
+    "static void *_CK_alloc_%s(int msgno, int size, int *array, int prio)\n{\n",
+      m->name) ; 
+    bot << str ;
+    sprintf(str, "\tvoid *out;\n");
+    bot << str;
+    sprintf(str,"\t(*out) = %s::alloc(msgno,size,array,prio);\n}\n",m->name) ;
+    bot << str ;
+    sprintf(str, "\treturn out;\n}\n");
+  }
+
   /* for packable MsgTypes output the pack - unpack stub functions */
   for ( m=thismodule->messages; m!=NULL; m=m->next ) {
     if ( !m->packable )
@@ -307,9 +322,14 @@ void GenerateRegisterCalls(ofstream& top, ofstream& bot)
 
 /* first register all messages */
   for ( Message *m=thismodule->messages; m!=NULL; m=m->next ) {
-    sprintf(str,
-      "_CK_msg_%s = registerMsg(\"%s\", (FUNCTION_PTR)&GenericCkAlloc, ",
-      m->name, m->name) ;
+    if( m->allocked)
+      sprintf(str,
+        "_CK_msg_%s = registerMsg(\"%s\", (FUNCTION_PTR)&_CK_alloc_%s, ",
+        m->name, m->name, m->name) ;
+    else
+      sprintf(str,
+        "_CK_msg_%s = registerMsg(\"%s\", (FUNCTION_PTR)&GenericCkAlloc, ",
+        m->name, m->name) ;
     bot << str ;
 
     if ( !m->packable ) 

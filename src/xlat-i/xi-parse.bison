@@ -30,6 +30,7 @@ int yyerror(char *);
 %token STACKSIZE
 %token TABLE
 %token THREADED
+%token VARSIZE
 %token EXTERN
 %token <strval>	IDENTIFIER
 %token <intval> NUMBER
@@ -123,7 +124,7 @@ EntryName:	Id
 
 Message	:	OptionalExtern MESSAGE MessageName ';'
 		{
-			Message *m = new Message($3, 0, $1) ;
+			Message *m = new Message($3, 0, 0, $1) ;
 			delete $3;
 			thismodule->AddMessage(m) ;
 		}
@@ -131,12 +132,21 @@ Message	:	OptionalExtern MESSAGE MessageName ';'
 
 PackMessage	:	OptionalExtern PACKMESSAGE MessageName ';'
 		{
-			Message *m = new Message($3, 1, $1) ;
+			Message *m = new Message($3, 1, 0, $1) ;
 			delete $3;
 			thismodule->AddMessage(m) ;
 		}
 	;
 
+VarsizeMessage	:	OptionalExtern VARSIZE MessageName ';'
+		{
+			Message *m = new Message($3, 1, 1, $1) ;
+			delete $3;
+			thismodule->AddMessage(m) ;
+		}
+	;
+
+MessageName:	Id
 MessageName:	Id
 	;
 

@@ -29,11 +29,12 @@ ReadOnly::ReadOnly(char *n, char *t, int i)
 	next = NULL ;
 }
 
-Message::Message(char *n, int p, int e)
+Message::Message(char *n, int p, int a, int e)
 {
 	name = new char [strlen(n)+1] ;
 	strcpy(name,n) ;
 	packable = p ;
+        allocked = a;
 	isextern = e ;
 	next = NULL ;
 }

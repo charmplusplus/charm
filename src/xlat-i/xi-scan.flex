@@ -62,7 +62,7 @@ struct rwtable {
 
 /* Reserved word table */
 struct rwtable rwtable[] = {
-	"",		11,
+	"",		12,
 /* MUST BE IN SORTED ORDER */
 	"boc",		BOC,
 	"chare",	CHARE,
@@ -75,6 +75,7 @@ struct rwtable rwtable[] = {
 	"stacksize",	STACKSIZE,
 	"table",	TABLE,
 	"threaded",	THREADED,
+        "varsize",      VARSIZE,
 /* MAKE SURE TO UPDATE THE NUMBER OF ENTRIES ABOVE */
 	"",		0,
 };

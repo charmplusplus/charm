@@ -39,10 +39,11 @@ public: char *name;
 class Message {
 public: char *name;
         int packable;   // 1 is this msg type has pack/unpack functions
+        int allocked;   // 1 if this msg type has user-defined alloc function
         Message *next;
 	int isextern;
 
-	Message(char *n, int p, int e);
+	Message(char *n, int p, int a, int e);
 	int isExtern() { return isextern ; }
 } ;
 
