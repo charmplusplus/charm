@@ -33,6 +33,7 @@ class AAPLearner : public ComlibLearner {
     
     Strategy ** optimizePattern(Strategy** , ComlibGlobalStats &) {
         CkAbort("Not implemented\n");
+        return NULL;
     }
 };
 
