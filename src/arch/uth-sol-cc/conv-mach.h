@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.1  1996-10-09 17:29:43  milind
+ * Revision 1.2  1996-10-24 19:40:34  milind
+ * Added CMK_IS_HETERO to all the net-all versions.
+ *
+ * Revision 1.1  1996/10/09 17:29:43  milind
  * uses CC and cc on solaris.
  *
  * Revision 1.16  1996/08/08 20:16:53  jyelon
@@ -63,6 +66,8 @@
 #define CMK_DGRAM_WINDOW_SIZE                              0
 
 #define CMK_FIX_HP_CONNECT_BUG                             0
+
+#define CMK_IS_HETERO                                      0
 
 #define CMK_MACHINE_NAME                                   "uth-sol-cc"
 

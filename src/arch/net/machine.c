@@ -1042,10 +1042,12 @@ static void send_ack(packet,penum)
      int penum;
 {
   NumSends++;
+#if CMK_IS_HETERO
   packet->seq_num = htonl(packet->seq_num);
   packet->PeNum = htonl(packet->PeNum);
   packet->pktidx = htonl(packet->pktidx);
   packet->rem_size = htonl(packet->rem_size);
+#endif
   my_sendto(data_skt, (char *)packet, sizeof(DATA_HDR), 0, 
     (struct sockaddr *)&addr_table[penum],
     sizeof(struct sockaddr_in));
@@ -1194,10 +1196,12 @@ int destpe;
 
     NumSends++ ;
     act_size=(packet->rem_size<MAXDSIZE)?packet->rem_size:MAXDSIZE;
+#if CMK_IS_HETERO
     packet->seq_num = htonl(packet->seq_num);
     packet->PeNum = htonl(packet->PeNum);
     packet->pktidx = htonl(packet->pktidx);
     packet->rem_size = htonl(packet->rem_size);
+#endif
     bytes_sent = my_sendto(data_skt, (char *)packet,
           act_size + sizeof(DATA_HDR),
           0, (struct sockaddr *)&addr_table[destpe],
@@ -1271,10 +1275,12 @@ static int RetransmitPackets()
         NumRetransmits++ ;
         NumSends++;
         act_size=(packet->rem_size<MAXDSIZE)?packet->rem_size:MAXDSIZE;
+#if CMK_IS_HETERO
         packet->seq_num = htonl(packet->seq_num);
         packet->PeNum = htonl(packet->PeNum);
         packet->pktidx = htonl(packet->pktidx);
         packet->rem_size = htonl(packet->rem_size);
+#endif
         my_sendto(data_skt, (char *)packet,
             act_size + sizeof(DATA_HDR), 0, (struct sockaddr *)&addr_table[i],
             sizeof(struct sockaddr_in)); 

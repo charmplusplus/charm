@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.14  1996-08-08 20:16:53  jyelon
+ * Revision 1.15  1996-10-24 19:40:33  milind
+ * Added CMK_IS_HETERO to all the net-all versions.
+ *
+ * Revision 1.14  1996/08/08 20:16:53  jyelon
  * *** empty log message ***
  *
  * Revision 1.13  1996/07/19 17:07:37  jyelon
@@ -63,6 +66,8 @@
 #define CMK_DGRAM_WINDOW_SIZE                              0
 
 #define CMK_FIX_HP_CONNECT_BUG                             0
+
+#define CMK_IS_HETERO                                      0
 
 #define CMK_MACHINE_NAME                                   "uth-hp"
 

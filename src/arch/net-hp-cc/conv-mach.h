@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.8  1996-10-22 19:08:32  milind
+ * Revision 1.9  1996-10-24 19:40:25  milind
+ * Added CMK_IS_HETERO to all the net-all versions.
+ *
+ * Revision 1.8  1996/10/22 19:08:32  milind
  * Added +z option to produce position independent code.
  * Needed for parallel perl.
  *
@@ -64,6 +67,8 @@
 #define CMK_DGRAM_WINDOW_SIZE                              20
 
 #define CMK_FIX_HP_CONNECT_BUG                             0
+
+#define CMK_IS_HETERO                                      1
 
 #define CMK_MACHINE_NAME                                   "net-hp-cc"
 

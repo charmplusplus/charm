@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.1  1996-10-09 19:46:22  milind
+ * Revision 1.2  1996-10-24 19:40:26  milind
+ * Added CMK_IS_HETERO to all the net-all versions.
+ *
+ * Revision 1.1  1996/10/09 19:46:22  milind
  * uses CC and cc instead of g++ and gcc.
  *
  * Revision 2.24  1996/08/08 20:16:53  jyelon
@@ -63,6 +66,8 @@
 #define CMK_DGRAM_WINDOW_SIZE                              24
 
 #define CMK_FIX_HP_CONNECT_BUG                             0
+
+#define CMK_IS_HETERO                                      1
 
 #define CMK_MACHINE_NAME                                   "net-sol"
 

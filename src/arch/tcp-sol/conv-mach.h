@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 2.25  1996-08-08 20:16:53  jyelon
+ * Revision 2.26  1996-10-24 19:40:32  milind
+ * Added CMK_IS_HETERO to all the net-all versions.
+ *
+ * Revision 2.25  1996/08/08 20:16:53  jyelon
  * *** empty log message ***
  *
  * Revision 2.24  1996/07/16 17:23:37  jyelon
@@ -60,6 +63,8 @@
 #define CMK_DGRAM_WINDOW_SIZE                              0
 
 #define CMK_FIX_HP_CONNECT_BUG                             0
+
+#define CMK_IS_HETERO                                      1
 
 #define CMK_MACHINE_NAME                                   "tcp-sol"
 

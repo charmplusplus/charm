@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.47  1996-07-16 17:23:18  jyelon
+ * Revision 2.48  1996-10-24 19:40:21  milind
+ * Added CMK_IS_HETERO to all the net-all versions.
+ *
+ * Revision 2.47  1996/07/16 17:23:18  jyelon
  * Misc
  *
  * Revision 2.46  1996/07/16 09:26:46  milind
@@ -289,9 +292,19 @@ CpvExtern(int,         CsdStopFlag);
 
 extern int CmiRegisterHandler CMK_PROTO((CmiHandler));
 
+#if CMK_IS_HETERO
+
+#define CmiGetHandler(env)  (ntohl((*((int *)(env)))))
+
+#define CmiSetHandler(env,x)  (*((int *)(env)) = (htonl(x)))
+
+#else
+
 #define CmiGetHandler(env)  (*((int *)(env)))
 
 #define CmiSetHandler(env,x)  (*((int *)(env)) = x)
+
+#endif
 
 #define CmiGetHandlerFunction(env)\
     (CpvAccess(CmiHandlerTable)[CmiGetHandler(env)])
