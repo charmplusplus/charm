@@ -338,6 +338,8 @@ void CParseNode::generateWhen(XStr& op)
           el->con4->text->charstar() << "_buf->msg;\n";
     op << "      __cDep->removeMessage(" << el->con4->text->charstar() <<
           "_buf);\n";
+    // gzheng
+    op << "      delete " << el->con4->text->charstar() << "_buf;\n";
   }
   op << "      " << constructs->front()->label->charstar() << 
         "(";

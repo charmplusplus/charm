@@ -42,6 +42,8 @@ void CEntry::generateCode(XStr& op)
       op << "(" << sv->type->charstar() << ") tr->args[" << i << "]";
     }
     op << ");\n";
+// gzheng
+    op << "    delete tr;\n";
     op << "    return;\n";
   } else {
     op << "    switch(tr->whenID) {\n";
@@ -56,6 +58,8 @@ void CEntry::generateCode(XStr& op)
         op << "(" << sv->type->charstar() << ") tr->args[" << i << "]";
       }
       op << ");\n";
+// gzheng
+      op << "      delete tr;\n";
       op << "      return;\n";
     }
     op << "    }\n";
