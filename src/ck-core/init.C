@@ -38,7 +38,7 @@ CpvDeclare(void*,       _currentChare);
 CpvDeclare(int,         _currentChareType);
 CpvDeclare(CkGroupID,   _currentGroup);
 CpvDeclare(CkGroupID,   _currentNodeGroup);
-CpvDeclare(GroupTable, _groupTable);
+CpvDeclare(GroupTable*, _groupTable);
 GroupTable* _nodeGroupTable = 0;
 
 CpvDeclare(Stats*, _myStats);
@@ -468,7 +468,7 @@ void _initCharm(int argc, char **argv)
 	CpvInitialize(int,   _currentChareType);
 	CpvInitialize(CkGroupID, _currentGroup);
 	CpvInitialize(CkGroupID, _currentNodeGroup);
-	CpvInitialize(GroupTable, _groupTable);
+	CpvInitialize(GroupTable*, _groupTable);
 	CpvInitialize(int, _numInitsRecd);
 	CpvInitialize(QdState*, _qd);
 	CpvInitialize(MsgPool*, _msgPool);
@@ -478,6 +478,7 @@ void _initCharm(int argc, char **argv)
 
 	CpvInitialize(Stats*, _myStats);
 	
+	CpvAccess(_groupTable) = new GroupTable();
 	CpvAccess(_buffQ) = new PtrQ();
 	_MEMCHECK(CpvAccess(_buffQ));
 	CpvAccess(_bocInitVec) = new PtrVec();
