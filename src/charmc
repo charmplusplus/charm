@@ -449,10 +449,6 @@ switch ($OBJECT)
             if ($?VERBOSE) echo mv $OBJECTFILES $OBJECT
             mv $OBJECTFILES $OBJECT
             if ($status) goto failure
-            if (! -e $OBJECT:r.$FILES:e) then
-                if ($?VERBOSE) echo ln -s $FILES $OBJECT:r.$FILES:e
-                ln -s $FILES $OBJECT:r.$FILES:e
-            endif
         endif
     else
         if ( $?VERBOSE ) echo $CMK_LDRO $OBJECT $OBJECTFILES
