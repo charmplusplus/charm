@@ -14,22 +14,28 @@
 % REVISION HISTORY:
 %
 % $Log$
-% Revision 2.0  1995-06-15 15:39:33  brunner
+% Revision 2.1  1995-06-15 15:44:58  brunner
+% Added info about .tex files and log comments.
+%
+% Revision 2.0  1995/06/15  15:39:33  brunner
 % Directions how to check in files
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
 1. To check in a file previously checked out:
-	ci -u filename.ext
+  i.	Add the correct header file, if one is missing.
+  ii.	ci -u filename.ext
+  iii.	Add comments for header when asked!!!
 note: if the previous checked-out file had version number <2.0, do
 ci -u2.0 filename.ext so all files in the new directory system have
 version 2.x numbers
 
 2. To enter a new file into an existing RCS directory:
-  i.	add the correct header, from RCSstuff directory
+  i.	add the correct header, from /charm/RCSstuff directory
   ii.	rcs -i -c" * " -L filename.[cCpPh]  /* for c-like code or */
 	rcs -i -c"# " -L filename.ext  /* for makefiles, shell scripts, or */
+	rcs -i -c"% " -L filename.ext  /* for .tex files, or */
         rcs -i -L filename.ext /* otherwise */
   iii.	ci -u2.0 filename.ext
 
