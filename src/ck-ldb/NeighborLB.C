@@ -141,8 +141,8 @@ NLBStatsMsg* NeighborLB::AssembleStats()
   msg->idletime = myStats.idletime;
   msg->bg_walltime = myStats.bg_walltime;
   msg->bg_cputime = myStats.bg_cputime;
-  msg->obj_walltime += myStats.obj_walltime;
-  msg->obj_cputime += myStats.obj_cputime;
+  msg->obj_walltime = myStats.obj_walltime;
+  msg->obj_cputime = myStats.obj_cputime;
 
   //  CkPrintf(
   //    "Proc %d speed=%d Total(wall,cpu)=%f %f Idle=%f Bg=%f %f Obj=%f %f\n",

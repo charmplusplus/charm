@@ -34,6 +34,8 @@ LBMachineUtil::LBMachineUtil()
   CpvInitialize(void*,machineUtilPtr);
   CpvAccess(machineUtilPtr) = (void*)this;
   CsdSetNotifyIdle(staticIdleStart,staticIdleEnd);
+  start_totalwall = start_totalcpu = -1.;
+  total_idletime = 0;
 };
 
 void LBMachineUtil::StatsOn()

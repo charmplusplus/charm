@@ -245,28 +245,30 @@ extern "C" void LDResumeClients(LDHandle _db)
   db->ResumeClients();
 }
 
-static int work(int iter_block) {
-  int result=0;
+static void work(int iter_block, int* result) {
   int i;
+  *result = 1;
   for(i=0; i < iter_block; i++) {
-    double b=0.1+0.1*result;
-    result=(int)(sqrt(log(atan(b))));
+    double b=0.1 + 0.1 * *result;
+    *result=(int)(sqrt(1+cos(b * 1.57)));
   }
-  return result;
 }
 
 extern "C" int LDProcessorSpeed()
 {
-  double wps = 0;
+  static int result=0;  // I don't care what this is, its just for
+			// timing, so this is thread safe.
+  int wps = 0;
   // First, count how many iterations for 1 second.
   // Since we are doing lots of function calls, this will be rough
   const double end_time = CmiCpuTimer()+1;
   wps = 0;
   while(CmiCpuTimer() < end_time) {
-    work(100);
+    work(100,&result);
     wps+=100;
   }
 
+  CmiPrintf("Initial wps= %d\n",wps);
   // Now we have a rough idea of how many iterations there are per
   // second, so just perform a few cycles of correction by
   // running for what we think is 1 second.  Then correct
@@ -275,10 +277,11 @@ extern "C" int LDProcessorSpeed()
   
   for(int i=0; i < 2; i++) {
     const double start_time = CmiCpuTimer();
-    work(wps);
+    work(wps,&result);
     const double end_time = CmiCpuTimer();
     const double correction = 1. / (end_time-start_time);
-    wps *= correction;
+    wps = (int)((double)wps * correction + 0.5);
+    CmiPrintf("wps= %d %f %f %f\n",wps,correction,start_time,end_time);
   }
   
   // If necessary, do a check now
