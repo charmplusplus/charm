@@ -246,6 +246,50 @@ chunk::result(DataMsg *msg)
 }
 
 void
+chunk::readField(int fid, void *nodes, char *fname)
+{
+  int btype = dtypes[fid].base_type;
+  int typelen = dtypes[fid].vec_len;
+  int btypelen = dtypes[fid].length()/typelen;
+  char *data = (char *)nodes + dtypes[fid].init_offset;
+  int distance = dtypes[fid].distance;
+  FILE* fp = fopen(fname, "r");
+  if(fp==0) {
+    CkError("Cannot open file %s for reading.\n", fname);
+    CkAbort("Exiting");
+  }
+  char str[80];
+  char* pos;
+  const char* fmt;
+  int i, j, curline;
+  curline = 0;
+  switch(btype) {
+    case FEM_INT: fmt = "%d%n"; break;
+    case FEM_REAL: fmt = "%f%n"; break;
+    case FEM_DOUBLE: fmt = "%lf%n"; break;
+  }
+  for(i=0;i<numNodes;i++) {
+    // skip lines to the next local node
+    for(j=curline;j<gNodeNums[i];j++)
+      fgets(str,80,fp);
+    curline = gNodeNums[i]+1;
+    fgets(str,80,fp);
+    int curnode, numchars;
+    sscanf(str,"%d%n",&curnode,&numchars);
+    pos = str + numchars;
+    if(curnode != gNodeNums[i]) {
+      CkError("Expecting info for node %d, got %d\n", gNodeNums[i], curnode);
+      CkAbort("Exiting");
+    }
+    for(j=0;j<typelen;j++) {
+      sscanf(pos, fmt, data+(j*btypelen), &numchars);
+      pos += numchars;
+    }
+    data += distance;
+  }
+}
+
+void
 chunk::readNodes(FILE* fp)
 {
   fscanf(fp, "%d", &numNodes);
@@ -342,6 +386,13 @@ FEM_Reduce(int fid, void *inbuf, void *outbuf)
   cptr->reduce(fid, inbuf, outbuf);
 }
 
+void
+FEM_Read_Field(int fid, void *nodes, char *fname)
+{
+  chunk *cptr = CtvAccess(_femptr);
+  cptr->readField(fid, nodes, fname);
+}
+
 int
 FEM_Id(void)
 {
@@ -373,6 +424,12 @@ extern "C" void
 fem_reduce_(int *fid, void *inbuf, void *outbuf)
 {
   FEM_Reduce(*fid, inbuf, outbuf);
+}
+
+extern "C" void
+fem_read_field_(int *fid, void *nodes, char *fname)
+{
+  FEM_Read_Field(*fid, nodes, fname);
 }
 
 extern "C" int

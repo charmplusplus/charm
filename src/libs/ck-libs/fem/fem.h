@@ -115,6 +115,7 @@ class chunk : public ArrayElement1D
   void update(int fid, void *nodes);
   void reduce_field(int fid, void *nodes, void *outbuf);
   void reduce(int fid, void *inbuf, void *outbuf);
+  void readField(int fid, void *nodes, char *fname);
   int id(void) { return thisIndex; }
  private:
   void update_field(DataMsg *);
@@ -131,6 +132,7 @@ void FEM_Update_Field(int fid, void *nodes);
 void FEM_Reduce_Field(int fid, void *nodes, void *outbuf);
 void FEM_Reduce(int fid, void *inbuf, void *outbuf);
 int FEM_Id(void);
+void FEM_Read_Field(int fid, void *nodes, char *fname);
 
 // Fortran Bindings
 
@@ -139,6 +141,8 @@ extern "C" void fem_update_field_(int *fid, void *nodes);
 extern "C" void fem_reduce_field_(int *fid, void *nodes, void *outbuf);
 extern "C" void fem_reduce_(int *fid, void *inbuf, void *outbuf);
 extern "C" int fem_id_(void);
+// FIXME: correct fortran-c interoperability issue for passing character arrays
+extern "C" void fem_read_field_(int *fid, void *nodes, char *fname);
 
 // Utility functions for Fortran
 
