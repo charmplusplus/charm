@@ -154,11 +154,11 @@ won't stop the chares from functioning.
 \label{lbOption}
 
 Load balancing strategies are implemented as libraries in \charmpp{}. This
-allow programmers to easily experiment with different existing strategies 
-in the library by simply linking a pool of strateges modules and choose 
+allows programmers to easily experiment with different existing strategies 
+in the library by simply linking a pool of strategy modules and choose 
 one to use at run-time via command line options.
 
-Linking a load balancing module is different with activating it:
+Linking a load balancing module is different from activating it:
 \begin{itemize}
 \item link a LB module: is to link a Load Balancer module(library) at 
    compile time; You can link against multiple LB libraries as candidates.
@@ -200,8 +200,8 @@ When you have used -balancer A at compile time, you don't have to use +balancer 
 
 When you don't activate any of load balancer at compile or runtime, you still 
 can run the program. This is done by creating a NullLB which does nothing 
-but resume from sync. The NullLB will take over when there is
-no LB activated, and will be silent when another LB is doing its job. 
+but resuming from sync. The NullLB will take over when there is
+no LB activated, and will keep silent when another LB is doing its job. 
 
 \end{enumerate}
 
