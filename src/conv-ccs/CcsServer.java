@@ -160,8 +160,9 @@ public class CcsServer
    	int replyLen=i.readInt(); 
 	debug("  Response will be "+replyLen+" bytes");	
    	byte[] reply=new byte[replyLen];
-   	if (replyLen!=i.read(reply,0,replyLen))
-   		throw new IOException("CCS Reply socket closed early!");
+        i.readFully(reply);  //All data may not come in the same packet.
+   	//if (replyLen!=i.read(reply,0,replyLen))
+   	//	throw new IOException("CCS Reply socket closed early!");
 	debug("  Got entire response: "+new String(reply));
    	s.close();
    	return reply;
