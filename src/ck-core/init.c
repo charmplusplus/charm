@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.37  1996-03-05 16:09:56  sanjeev
+ * Revision 2.38  1996-04-07 19:16:52  jyelon
+ * Was calling StartCharm-callback too soon, moved it later.
+ *
+ * Revision 2.37  1996/03/05 16:09:56  sanjeev
  * removed CmiSpanTreeInit from StartCharm
  *
  * Revision 2.36  1995/11/14 23:22:08  jyelon
@@ -300,9 +303,6 @@ static void EndInitPhase()
   CpvAccess(CkInitPhase) = 0;
 
   
-  if (CpvAccess(UserStartCharmDoneHandler))
-    CpvAccess(UserStartCharmDoneHandler)();
-  
   /* call all the CopyFromBuffer functions for ReadOnly variables.
    * _CK_9_ReadMsgTable is passed as an arg because it is no longer
    * global */
@@ -319,6 +319,10 @@ static void EndInitPhase()
     BocInitQueueDestroy();
   }
   
+  /* Charm is finally done Initializing */
+
+  if (CpvAccess(UserStartCharmDoneHandler))
+    CpvAccess(UserStartCharmDoneHandler)();
   
   /* process all the non-init messages arrived during the 
      initialization */
