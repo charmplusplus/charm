@@ -12,6 +12,13 @@ Orion Sky Lawlor, olawlor@acm.org, 11/3/1999
 
 #include <math.h>
 
+//MS Visual C++ defines max/min as a (cursed) macro
+#ifdef max
+#  undef max
+#  undef min
+#endif
+
+
 //CkVector3d is a cartesian vector in 3-space-- an x, y, and z.
 // For cross products, the space is assumed to be right-handed (x cross y = +z)
 template <class real>
@@ -104,11 +111,6 @@ typedef CkVector3dT<double> CkVector3d;
 typedef CkVector3dT<float> CkVector3f;
 typedef CkVector3dT<int> CkVector3i;
 
-//MS Visual C++ defines max/min as a (cursed) macro
-#ifdef max
-#  undef max
-#  undef min
-#endif
 
 //An axis-aligned 3D bounding box
 class CkBbox3d {
@@ -124,6 +126,9 @@ public:
 		if (max.x<p.x) max.x=p.x;
 		if (max.y<p.y) max.y=p.y;
 		if (max.z<p.z) max.z=p.z;
+	}
+	void union(const CkBbox3d &b) {
+		add(b.min); add(b.max);
 	}
 };
 
