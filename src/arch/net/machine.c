@@ -294,33 +294,70 @@ static void outlog_output(buf) char *buf;
  *
  **************************************************************************/
 
-#ifdef CMK_ASYNC_USE_SIOCGPGRP_AND_FIOASYNC
+#ifdef CMK_ASYNC_USE_FIOASYNC_AND_FIOSETOWN
+#include <sys/filio.h>
 static void enable_async(fd)
 int fd;
 {
   int pid = getpid();
   int async = 1;
-  if ( ioctl(fd, SIOCGPGRP, &pid) < 0  ) {
-    CmiError("getting socket owner") ;
+  if ( ioctl(fd, FIOSETOWN, &pid) < 0  ) {
+    CmiError("setting socket owner: %s\n", strerror(errno)) ;
     KillEveryoneCode(65788) ;
   }
   if ( ioctl(fd, FIOASYNC, &async) < 0 ) {
-    CmiError("setting socket async") ;
+    CmiError("setting socket async: %s\n", strerror(errno)) ;
     KillEveryoneCode(94458) ;
   }
 }
 #endif
 
-#ifdef CMK_ASYNC_USE_SETOWN_AND_SETFL
+#ifdef CMK_ASYNC_USE_FIOASYNC_AND_SIOCSPGRP
+#include <sys/filio.h>
+static void enable_async(fd)
+int fd;
+{
+  int pid = -getpid();
+  int async = 1;
+  if ( ioctl(fd, SIOCSPGRP, &pid) < 0  ) {
+    CmiError("setting socket owner: %s\n", strerror(errno)) ;
+    KillEveryoneCode(65788) ;
+  }
+  if ( ioctl(fd, FIOASYNC, &async) < 0 ) {
+    CmiError("setting socket async: %s\n", strerror(errno)) ;
+    KillEveryoneCode(94458) ;
+  }
+}
+#endif
+
+#ifdef CMK_ASYNC_USE_FIOSSAIOSTAT_AND_FIOSSAIOOWN
+#include <sys/ioctl.h>
+static void enable_async(fd)
+int fd;
+{
+  int pid = getpid();
+  int async = 1;
+  if ( ioctl(fd, FIOSSAIOOWN, &pid) < 0  ) {
+    CmiError("setting socket owner: %s\n", strerror(errno)) ;
+    KillEveryoneCode(65788) ;
+  }
+  if ( ioctl(fd, FIOSSAIOSTAT, &async) < 0 ) {
+    CmiError("setting socket async: %s\n", strerror(errno)) ;
+    KillEveryoneCode(94458) ;
+  }
+}
+#endif
+
+#ifdef CMK_ASYNC_USE_F_SETFL_AND_F_SETOWN
 static void enable_async(fd)
 int fd;
 {
   if ( fcntl(fd, F_SETOWN, getpid()) < 0 ) {
-    CmiError("setting socket owner") ;
+    CmiError("setting socket owner: %s\n", strerror(errno)) ;
     KillEveryoneCode(8789) ;
   }
   if ( fcntl(fd, F_SETFL, FASYNC) < 0 ) {
-    CmiError("setting socket async") ;
+    CmiError("setting socket async: %s\n", strerror(errno)) ;
     KillEveryoneCode(28379) ;
   }
 }
@@ -333,11 +370,13 @@ void (*handler)();
 {
   struct sigaction in, out ;
   in.sa_handler = handler;
+  sigemptyset(&in.sa_mask);
+  in.sa_flags = 0;
   sigaction(sig, &in, &out);
 }
 #endif
 
-#ifdef CMK_SIGNAL_USE_SIGACTION_AND_SIGEMPTYSET
+#ifdef CMK_SIGNAL_USE_SIGACTION_WITH_RESTART
 static void jsignal(sig, handler)
 int sig;
 void (*handler)();
@@ -345,7 +384,7 @@ void (*handler)();
   struct sigaction in, out ;
   in.sa_handler = handler ;
   sigemptyset(&in.sa_mask);
-  in.sa_flags = SA_RESTART;
+  in.sa_flags = SA_RESTART; 
   if(sigaction(sig, &in, &out) == -1)
       KillEveryone("sigaction failed.");
 }
@@ -1661,7 +1700,7 @@ static int data_getone()
   return kind;
 }
 
-static void dgram_scan()
+static int dgram_scan()
 {
   fd_set rfds;
   struct timeval tmo;
@@ -1687,12 +1726,63 @@ static void dgram_scan()
     ConstructMessages();
     AckReceivedMsgs();
   }
+  return gotsend;
+}
+
+#ifdef CMK_ASYNC_DOESNT_WORK_USE_TIMER_INSTEAD
+
+static int ticker_countup = 0;
+
+static void ticker_reset()
+{
+  struct itimerval i;
+  if (ticker_countup < 8) {
+    i.it_interval.tv_sec = 0;
+    i.it_interval.tv_usec = 25000;
+    i.it_value.tv_sec = 0;
+    i.it_value.tv_usec = 25000;
+  } else {
+    i.it_interval.tv_sec = 0;
+    i.it_interval.tv_usec = 250000;
+    i.it_value.tv_sec = 0;
+    i.it_value.tv_usec = 250000;
+  }
+  setitimer(ITIMER_REAL, &i, NULL);
 }
 
 static void InterruptHandler()
 {
   int prevmask ;
-  void dgram_scan();
+  int dgram_scan();
+  CmiInterruptHeader(InterruptHandler);
+
+  NumIntrCalls++;
+  NumOutsideMc++;
+  ticker_countup++;
+  sighold(SIGALRM);
+  
+  if (dgram_scan()) ticker_countup = 0;
+  RetransmitPackets();
+  ticker_reset();
+
+  sigrelse(SIGALRM);
+  NumIntr++ ;
+}
+
+static void InterruptInit()
+{
+  if (Cmi_enableinterrupts) {
+    jsignal(SIGALRM, InterruptHandler);
+    ticker_reset();
+  }
+}
+
+#else
+
+static void InterruptHandler()
+{
+  int prevmask ;
+  int dgram_scan();
   CmiInterruptHeader(InterruptHandler);
 
   NumIntrCalls++;
@@ -1714,6 +1804,7 @@ static void InterruptInit()
   }
 }
 
+#endif
 
 /*
 ** Synchronized send of "msg", of "size" bytes, to "destPE".
@@ -1841,7 +1932,7 @@ static int netSendV(destPE, n, sizes, msgs)
 static int CmiProbe() 
 {
   int val;
-  void dgram_scan();
+  int dgram_scan();
 
   CmiInterruptsBlock();
 

@@ -39,6 +39,7 @@ int  CmiScanf();
 #include <fcntl.h>
 #include <errno.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <rpc/rpc.h>
@@ -303,33 +304,70 @@ static void outlog_output(buf) char *buf;
  *
  **************************************************************************/
 
-#ifdef CMK_ASYNC_USE_SIOCGPGRP_AND_FIOASYNC
+#ifdef CMK_ASYNC_USE_FIOASYNC_AND_FIOSETOWN
+#include <sys/filio.h>
 static void enable_async(fd)
 int fd;
 {
   int pid = getpid();
   int async = 1;
-  if ( ioctl(fd, SIOCGPGRP, &pid) < 0  ) {
-    CmiError("getting socket owner") ;
+  if ( ioctl(fd, FIOSETOWN, &pid) < 0  ) {
+    CmiError("setting socket owner: %s\n", strerror(errno)) ;
     KillEveryoneCode(65788) ;
   }
   if ( ioctl(fd, FIOASYNC, &async) < 0 ) {
-    CmiError("setting socket async") ;
+    CmiError("setting socket async: %s\n", strerror(errno)) ;
     KillEveryoneCode(94458) ;
   }
 }
 #endif
 
-#ifdef CMK_ASYNC_USE_SETOWN_AND_SETFL
+#ifdef CMK_ASYNC_USE_FIOASYNC_AND_SIOCSPGRP
+#include <sys/filio.h>
+static void enable_async(fd)
+int fd;
+{
+  int pid = -getpid();
+  int async = 1;
+  if ( ioctl(fd, SIOCSPGRP, &pid) < 0  ) {
+    CmiError("setting socket owner: %s\n", strerror(errno)) ;
+    KillEveryoneCode(65788) ;
+  }
+  if ( ioctl(fd, FIOASYNC, &async) < 0 ) {
+    CmiError("setting socket async: %s\n", strerror(errno)) ;
+    KillEveryoneCode(94458) ;
+  }
+}
+#endif
+
+#ifdef CMK_ASYNC_USE_FIOSSAIOSTAT_AND_FIOSSAIOOWN
+#include <sys/ioctl.h>
+static void enable_async(fd)
+int fd;
+{
+  int pid = getpid();
+  int async = 1;
+  if ( ioctl(fd, FIOSSAIOOWN, &pid) < 0  ) {
+    CmiError("setting socket owner: %s\n", strerror(errno)) ;
+    KillEveryoneCode(65788) ;
+  }
+  if ( ioctl(fd, FIOSSAIOSTAT, &async) < 0 ) {
+    CmiError("setting socket async: %s\n", strerror(errno)) ;
+    KillEveryoneCode(94458) ;
+  }
+}
+#endif
+
+#ifdef CMK_ASYNC_USE_F_SETFL_AND_F_SETOWN
 static void enable_async(fd)
 int fd;
 {
   if ( fcntl(fd, F_SETOWN, getpid()) < 0 ) {
-    CmiError("setting socket owner") ;
+    CmiError("setting socket owner: %s\n", strerror(errno)) ;
     KillEveryoneCode(8789) ;
   }
-  if ( fcntl(fd, F_SETFL, O_NONBLOCK | FASYNC) < 0 ) {
-    CmiError("setting socket async") ;
+  if ( fcntl(fd, F_SETFL, FASYNC) < 0 ) {
+    CmiError("setting socket async: %s\n", strerror(errno)) ;
     KillEveryoneCode(28379) ;
   }
 }
@@ -342,11 +380,13 @@ void (*handler)();
 {
   struct sigaction in, out ;
   in.sa_handler = handler;
+  sigemptyset(&in.sa_mask);
+  in.sa_flags = 0;
   sigaction(sig, &in, &out);
 }
 #endif
 
-#ifdef CMK_SIGNAL_USE_SIGACTION_AND_SIGEMPTYSET
+#ifdef CMK_SIGNAL_USE_SIGACTION_WITH_RESTART
 static void jsignal(sig, handler)
 int sig;
 void (*handler)();
@@ -354,7 +394,7 @@ void (*handler)();
   struct sigaction in, out ;
   in.sa_handler = handler ;
   sigemptyset(&in.sa_mask);
-  in.sa_flags = SA_RESTART;
+  in.sa_flags = SA_RESTART; 
   if(sigaction(sig, &in, &out) == -1)
       KillEveryone("sigaction failed.");
 }
@@ -415,7 +455,7 @@ unsigned int *pfd;
   len = sizeof(addr);
   ok = getsockname(fd, (struct sockaddr *)&addr, &len);
   if (ok < 0) { perror("getsockname"); KillEveryoneCode(93583); }
-
+		  
   *pfd = fd;
   *ppo = ntohs(addr.sin_port);
 }
@@ -426,13 +466,16 @@ unsigned int *pip;
 unsigned int *ppo;
 unsigned int *pfd;
 {
-  int i, fd, ok;
+  int i, fd, ok, flag;
   struct sockaddr_in remote;
   i = sizeof(remote);
  acc:
   fd = accept(src, (struct sockaddr *)&remote, &i);
   if ((fd<0)&&(errno==EINTR)) goto acc;
   if (fd<0) { perror("accept"); KillEveryoneCode(39489); }
+  flag = 1;
+  ok = setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(int));
+  if (ok<0) { perror("setsockopt"); KillEveryoneCode(99331); }
   *pip=htonl(remote.sin_addr.s_addr);
   *ppo=htons(remote.sin_port);
   *pfd=fd;
@@ -442,7 +485,7 @@ static int skt_connect(ip, port, seconds)
 unsigned int ip; int port; int seconds;
 {
   struct sockaddr_in remote; short sport=port;
-  int fd, ok, len, retry, begin;
+  int fd, ok, len, retry, begin, flag;
     
   /* create an address structure for the server */
   memset(&remote, 0, sizeof(remote));
@@ -456,6 +499,9 @@ unsigned int ip; int port; int seconds;
     fd = socket(AF_INET, SOCK_STREAM, 0);
     if ((fd<0)&&(errno==EINTR)) goto sock;
     if (fd < 0) { perror("socket"); exit(1); }
+    flag = 1;
+    ok = setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(int));
+    if (ok<0) { perror("setsockopt"); KillEveryoneCode(20033271); }
     
   conn:
     ok = connect(fd, (struct sockaddr *)&(remote), sizeof(remote));
@@ -1070,21 +1116,22 @@ static void pump_ogms(pe)
       if ((errno!=EWOULDBLOCK)&&(errno!=EAGAIN))
 	KillEveryoneCode(7458781);
     } else {
-      if (ok==bytes) {
+      h->ptr += ok;
+      if (h->ptr == h->end) {
 	h->done = 1;
 	ni->ogm_head = h->next;
 	if (ni->ogm_head==0) 
 	  { FD_CLR(skt, &fds_write); }
 	if (h->autofree) { CmiFree(h->msg); free(h); }
-      } else h->ptr += ok;
+      }
     }
   }
 }
 
-void pumpmsgs()
+int pumpmsgs()
 {
   int i; fd_set r; fd_set w; int action=1;
-  struct timeval tv; int ok;
+  struct timeval tv; int ok, anyaction=0;
   while (action) {
     action = 0;
     tv.tv_sec = 0;
@@ -1103,8 +1150,55 @@ void pumpmsgs()
 	{ pump_icms(i); action=1; }
     if (FD_ISSET(ctrl_skt, &r))
       ctrl_getone();
+    if (action) anyaction=1;
   }
 }
+
+#ifdef CMK_ASYNC_DOESNT_WORK_USE_TIMER_INSTEAD
+
+static int ticker_countup = 0;
+
+static void ticker_reset()
+{
+  struct itimerval i;
+  if (ticker_countup < 8) {
+    i.it_interval.tv_sec = 0;
+    i.it_interval.tv_usec = 25000;
+    i.it_value.tv_sec = 0;
+    i.it_value.tv_usec = 25000;
+  } else {
+    i.it_interval.tv_sec = 0;
+    i.it_interval.tv_usec = 250000;
+    i.it_value.tv_sec = 0;
+    i.it_value.tv_usec = 250000;
+  }
+  setitimer(ITIMER_REAL, &i, NULL);
+}
+
+static void InterruptHandler()
+{
+  CmiInterruptHeader(InterruptHandler);
+  ticker_countup++;
+  if (pumpmsgs()) ticker_countup=0;
+  ticker_reset();
+}
+
+static void InterruptInit()
+{
+  int i;
+  FD_ZERO(&fds_read);
+  FD_ZERO(&fds_write);
+  FD_SET(ctrl_skt, &fds_read);
+  jsignal(SIGALRM, InterruptHandler);
+  ticker_reset();
+  for (i=0; i<CpvAccess(Cmi_numpes); i++) {
+    if (i!=CpvAccess(Cmi_mype)) {
+      FD_SET(node_table[i].talk_skt, &fds_read);
+    }
+  }
+}
+
+#else
 
 static void InterruptHandler()
 {
@@ -1126,6 +1220,9 @@ static void InterruptInit()
     }
   }
 }
+
+#endif
+
 
 static commhandle netsend(autofree, destPE, size, msg) 
      int autofree, destPE, size; 
