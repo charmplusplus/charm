@@ -948,14 +948,14 @@ esac
 #
 ########################################################################
 
-Postfix=
-targ=charmrun$POST_EXT
+targ=charmrun$CMK_POST_EXE
+convhost=conv-host$CMK_POST_EXE
 
 if [ -x $CHARMBIN/$targ ]
 then
 	DoNoErrCheck $RM $targ
 	Do $CP $CHARMBIN/$targ $targ
-	Do $LN -f -s $targ conv-host$POST_EXE
+	if [ ! -f $conv-host ]; then Do $LN -f -s $targ $conv-host; fi
 fi
 
 Copyobj
