@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.1  1995-06-13 11:32:16  jyelon
+ * Revision 1.2  1995-10-27 21:42:06  jyelon
+ * changed CmiNumPe --> CkNumPes
+ *
+ * Revision 1.1  1995/06/13  11:32:16  jyelon
  * Initial revision
  *
  * Revision 1.1  1995/06/13  10:06:34  jyelon
@@ -79,7 +82,7 @@ BranchOffice ProcessGroups
 
 	CkFreeMsg(pgmsg) ;
 	me = CmiMyPe() ;
-	totalBocs = CmiNumPe() ;
+	totalBocs = CkNumPes() ;
 
 	/* Set the size of the hash table.  If for some reason the user
 	 * has set the number of processors equal to the hash table size,
@@ -109,7 +112,7 @@ BranchOffice ProcessGroups
 	currGid->groupInfo.spanParent = PrivateCall(PgDefaultSpanTreeParent(me)) ;
 	currGid->groupInfo.spanNumChildren=PrivateCall(PgDefaultSpanTreeNumChildren(me)) ;
 	PrivateCall(PgDefaultSpanTreeChild(me,currGid->groupInfo.spanChildren)) ;
-	currGid->groupInfo.totalGroupSize = CmiNumPe() ;
+	currGid->groupInfo.totalGroupSize = CkNumPes() ;
 	currGid->groupInfo.groupRank = CmiMyPe() ;
 	
 	/* Since we don't have any partitions yet, clear copy list */
@@ -1095,7 +1098,7 @@ int node, *children;
     int i;
 
     for (i = 1; i <= MAX_SPAN_CHILDREN ; i++)
-	if (MAX_SPAN_CHILDREN * node + i < CmiNumPe())
+	if (MAX_SPAN_CHILDREN * node + i < CkNumPes())
 	     children[i-1] = node * MAX_SPAN_CHILDREN + i;
 	else children[i-1] = -1;
 }
@@ -1103,11 +1106,11 @@ int node, *children;
 private int PgDefaultSpanTreeNumChildren(node)
 int node;
 {
-    if ((node + 1) * MAX_SPAN_CHILDREN < CmiNumPe())
+    if ((node + 1) * MAX_SPAN_CHILDREN < CkNumPes())
          return(MAX_SPAN_CHILDREN);
-    else if (node * MAX_SPAN_CHILDREN + 1 >= CmiNumPe())
+    else if (node * MAX_SPAN_CHILDREN + 1 >= CkNumPes())
 	 return 0;
-    else return ((CmiNumPe() - 1) - node * MAX_SPAN_CHILDREN);
+    else return ((CkNumPes() - 1) - node * MAX_SPAN_CHILDREN);
 }
 
 /*********************************************************************/
