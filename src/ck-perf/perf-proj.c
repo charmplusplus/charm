@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.6  1995-09-22 20:44:02  sanjeev
+ * Revision 2.7  1995-09-26 19:47:51  sanjeev
+ * *** empty log message ***
+ *
+ * Revision 2.6  1995/09/22  20:44:02  sanjeev
  * bug fixes for working with new runtime
  *
  * Revision 2.5  1995/07/27  20:48:27  jyelon
@@ -343,8 +346,6 @@ close_log()
 		strcat(state_file, ".sts");
 		CpvAccess(state_file_fd) = (FILE *) fopen(state_file, "w");
 		
-		CmiPrintf("Creating %s file\n",state_file) ;
-
 		fprintf(CpvAccess(state_file_fd), "MACHINE %s\n",CMK_MACHINE_NAME );
 		fprintf(CpvAccess(state_file_fd), "PROCESSORS %d\n", CmiNumPe());
 		fprintf(CpvAccess(state_file_fd), "TOTAL_CHARES %d\n", 
