@@ -64,10 +64,10 @@ void FEM_REFINE2D_Split(int meshID,int nodeID,double *coord,int elemID,double *d
 	/*find out the attributes of the node 
 		TODO: replace FEM_NODE by paramter that specifies node type
 	*/
-	FEM_Entity *e=FEM_Entity_lookup(meshID,FEM_NODE,"REFINE2D_Mesh");
+	FEM_Entity *e=FEM_Entity_lookup(meshID,nodeID,"REFINE2D_Mesh");
 	CkVec<FEM_Attribute *> *attrs = e->getAttrVec();
 	
-	FEM_Entity *elem = FEM_Entity_lookup(meshID,FEM_ELEM,"REFIN2D_Mesh_elem");
+	FEM_Entity *elem = FEM_Entity_lookup(meshID,elemID,"REFIN2D_Mesh_elem");
 	CkVec<FEM_Attribute *> *elemattrs = elem->getAttrVec();
 
 	FEM_Attribute *connAttr = elem->lookup(FEM_CONN,"REFINE2D_Mesh");
@@ -80,7 +80,7 @@ void FEM_REFINE2D_Split(int meshID,int nodeID,double *coord,int elemID,double *d
     int tri,A,B,C,D;
     double frac;
 		// current number of nodes in the mesh
-		int cur_nodes = FEM_Mesh_get_length(meshID,FEM_NODE);
+		int cur_nodes = FEM_Mesh_get_length(meshID,nodeID);
 		int *connData = connTable.getData();
 
 
@@ -109,11 +109,11 @@ void FEM_REFINE2D_Split(int meshID,int nodeID,double *coord,int elemID,double *d
       AandB[0]=A;
 		  AandB[1]=B;
       /* Add a new node D between A and B */
-		  IDXL_Add_entity(FEM_Comm_shared(FEM_Mesh_default_read(),FEM_NODE),D,2,AandB);
+		  IDXL_Add_entity(FEM_Comm_shared(meshID,nodeID),D,2,AandB);
 		}
 		//add a new triangle
 		/*TODO: replace  FEM_ELEM with parameter*/
-		int newTri = FEM_Mesh_get_length(meshID,FEM_ELEM);
+		int newTri = FEM_Mesh_get_length(meshID,elemID);
     CkPrintf("---- Adding triangle %d after splitting %d \n",newTri,tri);
 		elem->setLength(newTri+1);
 		for(int j=0;j<elemattrs->size();j++){
