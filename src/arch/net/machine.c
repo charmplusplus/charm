@@ -827,8 +827,20 @@ typedef struct OtherNodeStruct
   ExplicitDgram           *recv_window;  /* Packets received, not integrated */
   int                      recv_winsz;   /* Number of packets in recv window */
   unsigned int             recv_next;    /* Seqno of first missing packet */
+
+  unsigned int             stat_total_intr; /* Total Number of Interrupts */
+  unsigned int             stat_proc_intr;  /* Processed Interrupts */
+  unsigned int             stat_send_pkt;   /* number of packets sent */
+  unsigned int             stat_resend_pkt; /* number of packets resent */
+  unsigned int             stat_send_ack;   /* number of acks sent */
+  unsigned int             stat_recv_pkt;   /* number of packets received */
+  unsigned int             stat_recv_ack;   /* number of acks received */
+  unsigned int             stat_ack_pkts;   /* packets acked */
 }
 *OtherNode;
+
+static OtherNode *nodes_by_pe;  /* OtherNodes indexed by processor number */
+static OtherNode  nodes;        /* Indexed only by ``node number'' */
 
 typedef struct CmiStateStruct
 {
@@ -846,6 +858,57 @@ void CmiStateInit(int pe, int rank, CmiState state)
   state->localqueue = FIFO_Create();
 }
 
+/**
+ * Printing Net Statistics -- milind
+ */
+
+char statstr[10000];
+
+void printNetStatistics(void)
+{
+  char tmpstr[1024];
+  OtherNode myNode;
+  int i;
+  unsigned int send_pkt=0, resend_pkt=0, recv_pkt=0, send_ack=0;
+  unsigned int recv_ack=0, ack_pkts=0;
+
+  myNode = nodes+CmiMyNode();
+  sprintf(tmpstr, "***********************************\n");
+  strcpy(statstr, tmpstr);
+  sprintf(tmpstr, "Net Statistics For Node %u\n", CmiMyNode());
+  strcat(statstr, tmpstr);
+  sprintf(tmpstr, "Interrupts: %u \tProcessed: %u\n",
+                  myNode->stat_total_intr, myNode->stat_proc_intr);
+  strcat(statstr, tmpstr);
+  sprintf(tmpstr, "***********************************\n");
+  strcat(statstr, tmpstr);
+  sprintf(tmpstr, "[Num]\tSENDTO\tRESEND\tRECV\tACKSTO\tACKSFRM\tPKTACK\n");
+  strcat(statstr,tmpstr);
+  sprintf(tmpstr, "=====\t======\t======\t====\t======\t=======\t======\n");
+  strcat(statstr,tmpstr);
+  for(i=0;i<CmiNumNodes();i++) {
+    OtherNode node = nodes+i;
+    sprintf(tmpstr, "[%u]\t%u\t%u\t%u\t%u\t%u\t%u\n",
+                     i, node->stat_send_pkt, node->stat_resend_pkt,
+		     node->stat_recv_pkt, node->stat_send_ack,
+		     node->stat_recv_ack, node->stat_ack_pkts);
+    strcat(statstr, tmpstr);
+    send_pkt += node->stat_send_pkt;
+    recv_pkt += node->stat_recv_pkt;
+    resend_pkt += node->stat_resend_pkt;
+    send_ack += node->stat_send_ack;
+    recv_ack += node->stat_recv_ack;
+    ack_pkts += node->stat_ack_pkts;
+  }
+  sprintf(tmpstr, "[TOTAL]\t%u\t%u\t%u\t%u\t%u\t%u\n",
+                     send_pkt, resend_pkt,
+		     recv_pkt, send_ack,
+		     recv_ack, ack_pkts);
+  strcat(statstr, tmpstr);
+  sprintf(tmpstr, "***********************************\n");
+  strcat(statstr, tmpstr);
+  CmiPrintf(statstr);
+}
 
 static ImplicitDgram Cmi_freelist_implicit;
 static ExplicitDgram Cmi_freelist_explicit;
@@ -920,6 +983,8 @@ static double Cmi_ack_delay;
 static int    Cmi_dgram_max_data;
 static int    Cmi_tickspeed;
 
+static int Cmi_print_stats = 0;
+
 static void setspeed_atm()
 {
   Cmi_max_dgram_size   = 2048;
@@ -972,6 +1037,9 @@ char **argv;
       DeleteArg(argv);
     } else if (strcmp(*argv,"++eth")==0) {
       setspeed_eth();
+      DeleteArg(argv);
+    } else if (strcmp(*argv,"++stats")==0) {
+      Cmi_print_stats = 1;
       DeleteArg(argv);
     } else argv++;
   }
@@ -1049,9 +1117,6 @@ static void log_done()
  *****************************************************************************/
 
 static int        ctrlport, dataport, ctrlskt, dataskt;
-
-static OtherNode *nodes_by_pe;  /* OtherNodes indexed by processor number */
-static OtherNode  nodes;        /* Indexed only by ``node number'' */
 
 static CmiNodeLock    Cmi_scanf_mutex;
 static volatile char *Cmi_scanf_data;
@@ -1281,8 +1346,10 @@ void CmiYield() { jsleep(0,100); }
 
 static void CommunicationInterrupt()
 {
+  nodes[CmiMyNode()].stat_total_intr++;
   if (comm_flag) return;
   if (memflag) return;
+  nodes[CmiMyNode()].stat_proc_intr++;
   CommunicationServer();
 }
 
@@ -1584,6 +1651,7 @@ int TransmitAckDatagram(OtherNode node)
 	 DGRAM_HEADER_SIZE + Cmi_window_size, 0,
 	 (struct sockaddr *)&(node->addr),
 	 sizeof(struct sockaddr_in));
+  node->stat_send_ack++;
 }
 
 void TransmitImplicitDgram(ImplicitDgram dg)
@@ -1601,6 +1669,7 @@ void TransmitImplicitDgram(ImplicitDgram dg)
   sendto(dataskt, (char *)head, len + DGRAM_HEADER_SIZE, 0,
 	      (struct sockaddr *)&(dest->addr), sizeof(struct sockaddr_in));
   *head = temp;
+  dest->stat_send_pkt++;
 }
 
 void TransmitImplicitDgram1(ImplicitDgram dg)
@@ -1618,6 +1687,7 @@ void TransmitImplicitDgram1(ImplicitDgram dg)
   sendto(dataskt, (char *)head, len + DGRAM_HEADER_SIZE, 0,
 	      (struct sockaddr *)&(dest->addr), sizeof(struct sockaddr_in));
   *head = temp;
+  dest->stat_resend_pkt++;
 }
 
 int TransmitAcknowledgement()
@@ -1819,6 +1889,7 @@ void IntegrateMessageDatagram(ExplicitDgram dg)
 
   LOG(Cmi_clock, Cmi_nodestart, 'M', dg->srcpe, dg->seqno);
   node = nodes_by_pe[dg->srcpe];
+  node->stat_recv_pkt++;
   seqno = dg->seqno;
   node->recv_ack_cnt++;
   if (node->recv_ack_time == 0.0)
@@ -1851,6 +1922,7 @@ void IntegrateAckDatagram(ExplicitDgram dg)
   seqno = (dgseqno + Cmi_window_size) & DGRAM_SEQNO_MASK;
   slot = seqno % Cmi_window_size;
   rxing = 0;
+  node->stat_recv_ack++;
   LOG(Cmi_clock, Cmi_nodestart, 'R', node->nodestart, dg->seqno);
   for (i=Cmi_window_size-1; i>=0; i--) {
     slot--; if (slot== ((unsigned int)-1)) slot+=Cmi_window_size;
@@ -1859,6 +1931,7 @@ void IntegrateAckDatagram(ExplicitDgram dg)
     if (idg) {
       if (idg->seqno == seqno) {
 	if (ack->window[i]) {
+	  node->stat_ack_pkts++;
 	  LOG(Cmi_clock, Cmi_nodestart, 'r', node->nodestart, seqno);
 	  node->send_window[slot] = 0;
 	  DiscardImplicitDgram(idg);
@@ -1872,6 +1945,7 @@ void IntegrateAckDatagram(ExplicitDgram dg)
 	  node->send_queue_h = idg;
 	}
       } else if (((idg->seqno - dgseqno) & DGRAM_SEQNO_MASK)>=Cmi_window_size){
+	node->stat_ack_pkts++;
 	LOG(Cmi_clock, Cmi_nodestart, 'r', node->nodestart, idg->seqno);
 	node->send_window[slot] = 0;
 	DiscardImplicitDgram(idg);
@@ -2057,6 +2131,8 @@ void ConverseExit()
 {
   if (CmiMyRank()==0) {
     CmiCommLock();
+    if(Cmi_print_stats)
+      printNetStatistics();
     log_done();
     ConverseCommonExit();
     CmiCommUnlock();
