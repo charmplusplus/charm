@@ -1,8 +1,8 @@
-CMK_CPP_C='pgcc -E '
-CMK_CC='pgcc '
-CMK_CC_RELIABLE='gcc '
-CMK_CXX='pgCC '
-CMK_CXXPP='pgCC -E '
+CMK_CPP_C="pgcc -E "
+CMK_CC="pgcc "
+CMK_CC_RELIABLE="gcc "
+CMK_CXX="pgCC "
+CMK_CXXPP="pgCC -E "
 CMK_LD="$CMK_CC "
 CMK_LDXX="$CMK_CXX "
 
@@ -21,9 +21,12 @@ CMK_NATIVE_CXX="g++ "
 CMK_NATIVE_LDXX="g++ "
 CMK_NATIVE_LIBS=""
 
-CMK_CF90='pgf90 '
+# fortran compiler
+CMK_CF77="pgf77 "
+CMK_CF90="pgf90 "
 CMK_CF90_FIXED="$CMK_CF90 -Mfixed "
-CMK_F90LIBS='-L/usr/local/pgi/linux86/lib  -lpgf90 -lpgf90_rpm1 -lpgf902 -lpgf90rtl -lpgftnrtl '
+CMK_F90LIBS="-L/usr/local/pgi/linux86/lib  -lpgf90 -lpgf90_rpm1 -lpgf902 -lpgf90rtl -lpgftnrtl "
 CMK_MOD_NAME_ALLCAPS=""
 CMK_MOD_EXT="mod"
 CMK_F90_USE_MODDIR=""
+
