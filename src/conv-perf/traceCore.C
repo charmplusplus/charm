@@ -144,15 +144,16 @@ void TraceCore::startPtc(){
 
 
 void TraceCore::closePtc(){
+	int i;
 	if(traceCoreOn ==0){
 		return;
 	}
 	fprintf(fpPtc,"%d %d ",maxlID,numLangs);
-	for(int i=0;i<numLangs;i++){
+	for(i=0;i<numLangs;i++){
 		fprintf(fpPtc,"%d %s ",lIDList[i],lNames[i]);
 	}
 	fprintf(fpPtc,"\n");
-	for(int i=0;i<numLangs;i++){
+	for(i=0;i<numLangs;i++){
 		fprintf(fpPtc,"%d %d %d ",lIDList[i],maxeID[i],numEvents[i]);
 		print_TraceCoreEvent(fpPtc,eventLists[i],lNames[i]);
 		fprintf(fpPtc,"\n");
