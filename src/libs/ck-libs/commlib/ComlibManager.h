@@ -72,9 +72,7 @@ class Strategy : public PUP::able{
     virtual void doneInserting() {};
 
     //Each strategy must define his own Pup interface.
-    virtual void pup(PUP::er &p){
-        PUP::able::pup(p);
-    }
+    virtual void pup(PUP::er &p){ }
 
     virtual void beginProcessing(int nelements){};
 

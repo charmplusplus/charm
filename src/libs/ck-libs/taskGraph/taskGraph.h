@@ -48,7 +48,6 @@ public:
   taskGraphSolver(CkMigrateMessage *m) : PUP::able(m) {};
 
   virtual void pup(PUP::er &p) {
-    PUP::able::pup(p);
   }
   PUPable_abstract(taskGraphSolver);
 
