@@ -29,7 +29,10 @@ public:
    int inputSpeedup;
    int use_transceiver;
    int inputBuffering;
-
+   int mixedBuffering;
+   int outputBuffering;
+   int loadRoutingTable;
+   int sourceRouting;
   int NodeStart;
   int HCAStart;
   int DMAchannelStart;
