@@ -619,7 +619,7 @@ static void _dynamicNodeGroupCreate(envelope *env, int retEp, CkChareID * retCha
   register envelope *newenv = UsrToEnv((void *)msg);
   newenv->setUsrMsg(env);
   newenv->setSrcPe(CkMyPe());
-  newenv->setEpIdx(retEp);
+  newenv->setRetEp(retEp);
   CmiSetHandler(newenv, _charmHandlerIdx);
   CmiSyncNodeSendAndFree(0, newenv->getTotalsize(), newenv); 
   CpvAccess(_qd)->create();
