@@ -116,6 +116,7 @@ class CkVec {
     CkVec() {block=NULL;blklen=len=0;}
     ~CkVec() { delete[] block; }
     CkVec(const CkVec<T> &src) {copyFrom(src);}
+    CkVec(int size) { len = 0; blklen = size; block = new T[blklen];} // added by Ramkumar
     CkVec<T> &operator=(const CkVec<T> &src) {
       delete[] block;
       copyFrom(src);
