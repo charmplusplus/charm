@@ -224,7 +224,6 @@ do
 		;;
 
 	"-module"|"-modules")
-#		MODULES="$MODULES `echo $1 | sed -e 's/,/ /g'`"
 		AddModules `echo $1 | sed -e 's/,/ /g'`
 		shift
 		;;
@@ -966,7 +965,7 @@ for module in $MODULES; do
 done
 if test -n "$BALANCER"
 then
-    echo 
+    [ -n "$VERBOSE" ] && echo "Adding load balancer for $BALANCER"
     echo "  extern void Create$BALANCER();" >> $modInitSrc
     echo "  LBSetDefaultCreate(Create$BALANCER);" >> $modInitSrc
 fi
