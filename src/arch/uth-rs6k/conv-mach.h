@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.1  1995-10-12 23:11:36  jyelon
+ * Revision 1.2  1995-10-13 18:17:44  jyelon
+ * I can't even remember.
+ *
+ * Revision 1.1  1995/10/12  23:11:36  jyelon
  * Initial revision
  *
  * Revision 1.6  1995/10/11  00:35:06  jyelon
@@ -45,8 +48,8 @@
 /* #define CMK_USE_GNU_MALLOC_WITH_INTERRUPT_SUPPORT */
 #define CMK_USE_OS_MALLOC
  
-/* #define CMK_CTHINIT_IS_IN_MAIN */
-#define CMK_CTHINIT_IS_IN_CONVERSEINIT
+/* #define CMK_CTHINIT_IS_IN_CONVERSEINIT */
+#define CMK_CTHINIT_IS_IN_MAIN
 
 /* #define CMK_CSDEXITSCHEDULER_IS_A_FUNCTION */
 #define CMK_CSDEXITSCHEDULER_SET_CSDSTOPFLAG

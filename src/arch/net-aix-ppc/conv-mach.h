@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.6  1995-10-11 00:35:06  jyelon
+ * Revision 1.7  1995-10-13 18:17:44  jyelon
+ * I can't even remember.
+ *
+ * Revision 1.6  1995/10/11  00:35:06  jyelon
  * Added MALLOC options.
  *
  * Revision 1.5  1995/09/30  15:04:25  jyelon
@@ -58,7 +61,7 @@
 /* #define CMK_SHARED_VARS_UNIPROCESSOR */
 #define CMK_NO_SHARED_VARS_AT_ALL
 
-/* #define CMK_PREPROCESSOR_USES_K_AND_R_STANDARD_CONCATENATION */
+/* #define CMK_PREPROCESSOR_CANNOT_DO_CONCATENATION */
 #define CMK_PREPROCESSOR_USES_ANSI_STANDARD_CONCATENATION
 
 /* #define CMK_COMPILER_HATES_PROTOTYPES */
