@@ -22,6 +22,8 @@ typedef union {
   TVarList *tvarlist;
   Value *val;
   ValueList *vallist;
+  MsgVar *mv;
+  MsgVarList *mvlist;
   char *strval;
   int intval;
 } YYSTYPE;
@@ -45,18 +47,19 @@ typedef union {
 #define	VOID	274
 #define	PACKED	275
 #define	VARSIZE	276
-#define	ENTRY	277
-#define	MAINCHARE	278
-#define	IDENT	279
-#define	NUMBER	280
-#define	LITERAL	281
-#define	INT	282
-#define	LONG	283
-#define	SHORT	284
-#define	CHAR	285
-#define	FLOAT	286
-#define	DOUBLE	287
-#define	UNSIGNED	288
+#define	VARRAYS	277
+#define	ENTRY	278
+#define	MAINCHARE	279
+#define	IDENT	280
+#define	NUMBER	281
+#define	LITERAL	282
+#define	INT	283
+#define	LONG	284
+#define	SHORT	285
+#define	CHAR	286
+#define	FLOAT	287
+#define	DOUBLE	288
+#define	UNSIGNED	289
 
 
 extern YYSTYPE yylval;

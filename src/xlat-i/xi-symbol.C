@@ -152,6 +152,11 @@ Message::print(XStr& str)
     templat->genSpec(str);
   str << "message ";
   type->print(str);
+  if(isVarrays()) {
+    str << "{\n";
+    mvlist->print(str);
+    str << "}\n";
+  }
   str << ";\n";
 }
 
@@ -762,12 +767,96 @@ static const char *CIAllocDeclAnsi =
 ;
 
 void
+Message::genAllocDecl(XStr &str)
+{
+  if(compilemode==ansi)
+    str << CIMsgClassAnsi;
+  else str << CIMsgClass;
+
+  if(isVarsize()) {
+    if(compilemode==ansi)
+      str << CIAllocDeclAnsi;
+    else str << CIAllocDecl;
+  } else if(isVarrays()) {
+    int num = mvlist->len();
+    str << "    void *operator new(size_t s,";
+    int i;
+    for(i=0;i<num;i++)
+      str << "int sz" << i << ", ";
+    str << "int p);\n";
+    if(compilemode==ansi) {
+      str << "    void operator delete(void*,";
+      for(i=0;i<num;i++)
+        str << "int, ";
+      str << "int);\n";
+    }
+  }
+}
+
+void
+Message::genVarraysMacros(XStr& str)
+{
+  int num = mvlist->len();
+  assert(num>0);
+  MsgVarList *ml = mvlist;
+  MsgVar *mv = ml->msg_var;
+  int i;
+  str << "\n#define " << type << "_VARRAYS_MACROS() \\\n";
+  str << "  static void* alloc(int msgnum, int sz, int *sizes, int pb) {\\\n";
+  str << "    int offsets[" << num+1 << "];\\\n";
+  str << "    offsets[0] = ALIGN8(sz);\\\n";
+  for(i=1; i<=num; i++) {
+    str << "    offsets[" << i << "] = offsets[" << i-1 << "] + ";
+    str << "ALIGN8(sizeof(" << mv->type << ")*sizes[" << i-1 << "]);\\\n";
+    ml = ml->next;
+    if (ml != 0) mv = ml->msg_var;
+  }
+  ml = mvlist;
+  mv = ml->msg_var;
+  str << "    " << type << " *newmsg = (" << type << " *) ";
+  str << "CkAllocMsg(msgnum, offsets[" << num << "], pb);\\\n";
+  for(i=0;i<num;i++) {
+    str << "    newmsg->" << mv->name << " = (" << mv->type << " *) ";
+    str << "((char *)newmsg + offsets[" << i << "]);\\\n";
+    ml = ml->next;
+    if (ml != 0) mv = ml->msg_var;
+  }
+  str << "    return (void *) newmsg;\\\n";
+  str << "  }\\\n";
+  str << "  static void* pack(" << type << "* msg) {\\\n";
+  ml = mvlist;
+  mv = ml->msg_var;
+  for(i=0;i<num;i++) {
+    str << "    msg->" << mv->name << " = (" <<mv->type << " *) ";
+    str << "((char *)msg->" << mv->name << " - (char *)msg);\\\n";
+    ml = ml->next;
+    if (ml != 0) mv = ml->msg_var;
+  }
+  str << "    return (void *) msg;\\\n";
+  str << "  }\\\n";
+  str << "  static " << type << "* unpack(void* buf) {\\\n";
+  str << "    " << type << " * msg = (" << type << " *) buf;\\\n";
+  ml = mvlist;
+  mv = ml->msg_var;
+  for(i=0;i<num;i++) {
+    str << "    msg->" << mv->name << " = (" <<mv->type << " *) ";
+    str << "((size_t)msg->" << mv->name << " + (char *)msg);\\\n";
+    ml = ml->next;
+    if (ml != 0) mv = ml->msg_var;
+  }
+  str << "    return msg;\\\n";
+  str << "  }\n";
+}
+
+void
 Message::genDecls(XStr& str)
 {
   XStr ptype;
   ptype<<proxyPrefix()<<type;
   if(type->isTemplated())
     return;
+  if(isVarrays())
+    genVarraysMacros(str);
   str << "/* DECLS: "; print(str); str << " */\n";
   if(templat)
     templat->genSpec(str);
@@ -785,15 +874,9 @@ Message::genDecls(XStr& str)
 //  This means users don't have to remember to type ",public ArrayMessage";
 // and eventually CkArrayMessage will be integrated into the envelope anyway.
   str << ":public CkArrayMessage";
-  if(compilemode==ansi)
-    str << CIMsgClassAnsi;
-  else str << CIMsgClass;
 
-  if(isVarsize()) {
-    if(compilemode==ansi)
-      str << CIAllocDeclAnsi;
-    else str << CIAllocDecl;
-  }
+  genAllocDecl(str);
+
   if(!(external||type->isTemplated())) {
    // generate register function
     str << "    static void __register(const char *s, size_t size, CkPackFnPtr pack, CkUnpackFnPtr unpack) {\n";
@@ -849,6 +932,47 @@ Message::genDefs(XStr& str)
         str << "}\n";
       }
     }
+    if(isVarrays()) {
+      int num = mvlist->len();
+      if(templat) {
+        templat->genSpec(str);
+        str << " ";
+      }
+      str << "void *"<<ptype;
+      if(templat)
+        templat->genVars(str);
+      str << "::operator new(size_t s, ";
+      int i;
+      for(i=0;i<num;i++)
+        str << "int sz" << i << ", ";
+      str << "int p) {\n";
+      str << "  int i, sizes[" << num << "];\n";
+      for(i=0;i<num;i++)
+        str << "  sizes[" << i << "] = sz" << i << ";\n";
+      str << "  return ";
+      type->print(str);
+      if(templat)
+        templat->genVars(str);
+      str << "::alloc(__idx, s, sizes, p);\n";
+      str << "}\n";
+
+      if(compilemode==ansi) {
+        // Generate corresponding delete
+        if(templat) {
+          templat->genSpec(str);
+          str << " ";
+        }
+        str << "void "<<ptype;
+        if(templat)
+          templat->genVars(str);
+        str << "::operator delete(void *p, \n";
+	for(i=0;i<num;i++)
+	  str << "int,";
+        str << "int) {\n";
+        str << "  CkFreeMsg(p);\n";
+        str << "}\n";
+      }
+    }
   }
   if(!templat) {
     if(!external && !type->isTemplated()) {
@@ -877,11 +1001,11 @@ Message::genDefs(XStr& str)
 void
 Message::genReg(XStr& str)
 {
-  str << "// REG: "; print(str);
+  str << "/* REG: "; print(str); str << "*/\n";
   if(!templat && !external) {
     str << "  "<<proxyPrefix()<<type<<"::";
     str << "__register(\""<<type<<"\", sizeof("<<type<<"),";
-    if(isPacked()||isVarsize()) {
+    if(isPacked()||isVarsize()||isVarrays()) {
       str << "(CkPackFnPtr) "<<type;
       if(templat)
         templat->genVars(str);
@@ -1794,7 +1918,7 @@ void Entry::genDefs(XStr& str)
 
 void Entry::genReg(XStr& str)
 {
-  str << "    // REG: "<<*this;
+  str << "    /* REG: "<<*this << "*/\n";
   if(isConstructor() && container->isAbstract())
     return;
     

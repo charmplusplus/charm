@@ -47,6 +47,7 @@ literal	{number}|{real}|{string}
 
 %%
 "//".*		{ /* ignore single line comments */ }
+"\r"		{ /* ignore ^M characters for dos-unix compat */ }
 "/*"		{ in_comment = 1; /* Single line C-style comments */ }
 "*/"		{ in_comment = 0; }
 {ws}		{ /* ignore white space */ }
@@ -86,6 +87,7 @@ struct rwtable rwtable[] = {
   "mainchare",	MAINCHARE,
   "packed",     PACKED,
   "varsize",    VARSIZE,
+  "varrays",    VARRAYS,
   "entry",      ENTRY,
   "int",        INT,
   "short",      SHORT,

@@ -33,6 +33,8 @@ ModuleList *modlist;
   TVarList *tvarlist;
   Value *val;
   ValueList *vallist;
+  MsgVar *mv;
+  MsgVarList *mvlist;
   char *strval;
   int intval;
 }
@@ -51,7 +53,7 @@ ModuleList *modlist;
 %token SYNC EXCLUSIVE VIRTUAL
 %token VOID
 %token PACKED
-%token VARSIZE
+%token VARSIZE VARRAYS
 %token ENTRY
 %token <intval> MAINCHARE
 %token <strval> IDENT NUMBER LITERAL
@@ -86,6 +88,8 @@ ModuleList *modlist;
 %type <tvarlist>	TVarList TemplateSpec
 %type <val>		ArrayDim Dim
 %type <vallist>		DimList
+%type <mv>		Var
+%type <mvlist>		VarList
 
 %%
 
@@ -307,6 +311,8 @@ MAttrib		: PACKED
 		{ $$ = SPACKED; }
 		| VARSIZE
 		{ $$ = SVARSIZE; }
+		| VARRAYS
+		{ $$ = SVARRAYS; }
 		;
 
 CAttribs	: /* Empty */
@@ -325,10 +331,22 @@ CAttrib		: MIGRATABLE
 		{ $$ = 0x01; }
 		;
 
+Var		: Type Name '[' ']' ';'
+		{ $$ = new MsgVar($1, $2); }
+		;
+
+VarList		: Var
+		{ $$ = new MsgVarList($1); }
+		| Var VarList
+		{ $$ = new MsgVarList($1, $2); }
+		;
+
 Message		: MESSAGE MAttribs NamedType
 		{ $$ = new Message(lineno, $3, $2); }
 		| MESSAGE MAttribs NamedType '{' TypeList '}'
 		{ $$ = new Message(lineno, $3, $2, $5); }
+		| MESSAGE MAttribs NamedType '{' VarList '}'
+		{ $$ = new Message(lineno, $3, $2, 0, $5); }
 		;
 
 OptBaseList	: /* Empty */

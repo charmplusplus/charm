@@ -389,6 +389,7 @@ class NodeGroup : public Group {
 
 #define SPACKED  0x01
 #define SVARSIZE 0x02
+#define SVARRAYS 0x04
 
 class Message; // forward declaration
 //  typedef map< string, Message* > MessageList;
@@ -426,13 +427,37 @@ public:
 
 extern MessageList message_list;
 
+class MsgVar {
+ public:
+  Type *type;
+  char *name;
+  MsgVar(Type *t, char *n) : type(t), name(n) {}
+  Type *getType() { return type; }
+  char *getName() { return name; }
+  void print(XStr &str) {type->print(str);str<<" "<<name<<"[];";}
+};
+
+class MsgVarList : public Printable {
+ public:
+  MsgVar *msg_var;
+  MsgVarList *next;
+  MsgVarList(MsgVar *mv, MsgVarList *n=0) : msg_var(mv), next(n) {}
+  void print(XStr &str) {
+    msg_var->print(str);
+    str<<"\n";
+    if(next) next->print(str);
+  }
+  int len(void) { return (next==0)?1:(next->len()+1); }
+};
+
 class Message : public TEntity, public Construct {
     int attrib;
     NamedType *type;
     TypeList *contents;
+    MsgVarList *mvlist;
   public:
-    Message(int l, NamedType *t, int a, TypeList *c=0)
-      : attrib(a), type(t), contents(c) 
+    Message(int l, NamedType *t, int a, TypeList *c=0, MsgVarList *mv=0)
+      : attrib(a), type(t), contents(c), mvlist(mv) 
       { line=l; setTemplate(0);
         message_list.add(type->getBaseName(), this); }
     void print(XStr& str);
@@ -441,8 +466,11 @@ class Message : public TEntity, public Construct {
     void genReg(XStr& str);
     int  isPacked(void) { return attrib&SPACKED; }
     int  isVarsize(void) { return attrib&SVARSIZE; }
+    int  isVarrays(void) { return attrib&SVARRAYS; }
     virtual char *proxyPrefix(void) {return msg_prefix();}
     TypeList *getContents(void) const { return contents; }
+    void genAllocDecl(XStr& str);
+    void genVarraysMacros(XStr& str);
 };
 
 /* A formal argument of a template */
