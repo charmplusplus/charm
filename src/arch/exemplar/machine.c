@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.18  1995-10-27 21:45:35  jyelon
+ * Revision 2.19  1995-11-09 22:00:55  gursoy
+ * fixed varsize related bug (CmiFreeSend...)
+ *
+ * Revision 2.18  1995/10/27  21:45:35  jyelon
  * Changed CmiNumPe --> CmiNumPes
  *
  * Revision 2.17  1995/10/19  20:42:45  jyelon
@@ -320,8 +323,7 @@ int destPE;
 int size;
 char  *msg;
 {
-    CmiSyncSendFn(destPE,size,msg);
-    CmiFree(msg);
+    McQueueAddToBack(MsgQueue[destPE],msg);
 }
 
 void CmiSyncBroadcastFn(size, msg)
