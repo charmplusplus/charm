@@ -22,7 +22,7 @@ syntax() {
 printOption() {
   echo
   ( cd src/$BASEVERSION; 
-    str=`ls conv-mach-*.h | sed 's/conv-mach-\([^.]*\).*/\1/'`; 
+    str=`ls conv-mach-*.h 2>/dev/null | sed 's/conv-mach-\([^.]*\).h/\1/'`; 
     printf 'supported options: '
     echo $str )
   echo
