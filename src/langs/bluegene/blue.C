@@ -21,7 +21,7 @@
 
 #include "blue.h"
 
-#include "blue_impl.h"
+#include "blue_impl.h"         // implementation header file
 
 template<class T> class bgQueue;
 
@@ -155,7 +155,7 @@ public:
 class threadInfo {
 public:
   int id;
-  int globalId;
+//  int globalId;
   ThreadType  type;
   CthThread me;			/* Converse thread handler */
   nodeInfo *myNode;		/* the node belonged to */
@@ -164,7 +164,7 @@ public:
 public:
   threadInfo(int _id, ThreadType _type, nodeInfo *_node): id(_id), type(_type), myNode(_node) {
     currTime=0.0;
-    if (id != -1) globalId = nodeInfo::Local2Global(_node->id)*(cva(numCth)+cva(numWth))+_id;
+//    if (id != -1) globalId = nodeInfo::Local2Global(_node->id)*(cva(numCth)+cva(numWth))+_id;
   }
   inline void setThread(CthThread t) { me = t; }
   inline CthThread getThread() { return me; }
@@ -481,7 +481,8 @@ int BgGetThreadID()
 int BgGetGlobalThreadID()
 {
   ASSERT(tTHREADTYPE == WORK_THREAD || tTHREADTYPE == COMM_THREAD);
-  return tMYGLOBALID;
+  return nodeInfo::Local2Global(tMYNODE->id)*(cva(numCth)+cva(numWth))+tMYID;
+//  return tMYGLOBALID;
 }
 
 char *BgGetNodeData()
@@ -638,8 +639,6 @@ void comm_thread(threadInfo *tinfo)
 
 void work_thread(threadInfo *tinfo)
 {
-  int handler;
-
   cta(threadinfo) = tinfo;
 
   tSTARTTIME = CmiWallTimer();
