@@ -1,0 +1,35 @@
+module PythonCCS {
+
+	//readonly CProxy_PythonGroup python;
+
+	mainchare PythonMain {
+		entry PythonMain(CkArgMsg *msg);
+	}
+
+	chare PythonChare {
+		entry PythonChare(void);
+		entry void execute (CkCcsRequestMsg *msg);
+	}
+
+	group PythonGroup {
+		entry PythonGroup(void);
+		entry void execute (CkCcsRequestMsg *msg);
+	}
+
+	nodegroup PythonNodeGroup {
+		entry PythonNodeGroup(void);
+		entry void execute (CkCcsRequestMsg *msg);
+	}
+
+	array [1D] PythonArray1D {
+		entry PythonArray1D(void);
+		entry void execute (CkCcsRequestMsg *msg);
+	}
+
+	array [2D] PythonArray2D {
+		entry PythonArray2D(void);
+		entry void execute (CkCcsRequestMsg *msg);
+	}
+
+	initnode void initializePythonDefault(void);
+}
