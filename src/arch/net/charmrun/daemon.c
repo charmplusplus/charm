@@ -139,7 +139,7 @@ int main()
     argLine[ChMessageInt(task.argLength)] = 0;
     
     {
-    // converting between windows and unix directory name 
+    /* converting between windows and unix directory name  */
     char c1, c2;
 #ifndef _WIN32
     c1 = '\\'; c2 = '/';
