@@ -116,7 +116,8 @@ class ComlibManager: public CkDelegateMgr{
 
     StrategyTable strategyTable[MAX_NSTRAT]; //A table of strategy pointers
     CkQ<Strategy *> ListOfStrategies;
-    int nstrats, curStratID;      //Number of strategies created by the user.
+    int nstrats, curStratID;      
+    //Number of strategies created by the user.
 
     //flags
     int receivedTable, flushTable, barrierReached, barrier2Reached;
@@ -126,8 +127,10 @@ class ComlibManager: public CkDelegateMgr{
 
  public:
     ComlibManager();  //Receommended constructor
-    ComlibManager(int strategyID,int eltPerPE=1);
-    ComlibManager(Strategy *strat,int eltPerPE=1);
+
+    ComlibManager(int strategyID, int eltPerPE=0);
+    ComlibManager(Strategy *strat, int eltPerPE=0);
+
     ComlibManager::ComlibManager(CkMigrateMessage *m){ }
     int useDefCtor(void){ return 1; }
 
@@ -154,8 +157,8 @@ class ComlibManager: public CkDelegateMgr{
                                  //with strategy identifier
     void endIteration();         //Notify end
 
-    void createId();                 //depricated
-    void createId(int *, int);       //depricated
+    //void createId();                 //depricated
+    //void createId(int *, int);       //depricated
     int createInstance(Strategy *);  //To create a new strategy, 
                                      //returns index to the strategy table;
     void doneCreating();             //Done creating instances
@@ -166,3 +169,9 @@ class ComlibManager: public CkDelegateMgr{
 };
 
 #endif
+
+
+
+
+
+

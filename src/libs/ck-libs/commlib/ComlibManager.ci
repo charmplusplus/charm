@@ -4,7 +4,7 @@ module ComlibModule {
 
   group [migratable] ComlibManager {
     entry ComlibManager(int s,int n=1);
-    entry ComlibManager(CkPointer<Strategy> s, int n=1);
+    entry ComlibManager(CkPointer<Strategy> s, int n=0);
     entry ComlibManager();
 
     entry void barrier(void);
