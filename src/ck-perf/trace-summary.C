@@ -127,7 +127,7 @@ void SumLogPool::write(void)
 {
   int i;
   unsigned int j;
-  fprintf(fp, "ver:%3.1f %d/%d count:%d ep:%d interval:%e", CkpvAccess(version), CmiMyPe(), CmiNumPes(), numEntries, _numEntries, CkpvAccess(binSize));
+  fprintf(fp, "ver:%3.1f %d/%d count:%d ep:%d interval:%e", CkpvAccess(version), CkMyPe(), CkNumPes(), numEntries, _numEntries, CkpvAccess(binSize));
   if (CkpvAccess(version)>=3.0)
   {
     fprintf(fp, " phases:%d", phaseTab.numPhasesCalled());
@@ -172,7 +172,7 @@ void SumLogPool::writeSts(void)
     CmiAbort("Cannot open summary sts file for writing.\n");
   delete[] fname;
   fprintf(sts, "MACHINE %s\n",CMK_MACHINE_NAME);
-  fprintf(sts, "PROCESSORS %d\n", CmiNumPes());
+  fprintf(sts, "PROCESSORS %d\n", CkNumPes());
   fprintf(sts, "TOTAL_CHARES %d\n", _numChares);
   fprintf(sts, "TOTAL_EPS %d\n", _numEntries);
   fprintf(sts, "TOTAL_MSGS %d\n", _numMsgs);
@@ -241,6 +241,7 @@ TraceSummary::TraceSummary(char **argv):curevent(0),msgNum(0),binStart(0.0),bin(
   if (CmiGetArgString(argv,"+version",&tmpStr))
   	sscanf(tmpStr,"%lf",&CkpvAccess(version));
   _logPool = new SumLogPool(CkpvAccess(traceRoot));
+  execEp=-2;
 }
 
 int TraceSummary::traceRegisterUserEvent(const char*)
@@ -255,14 +256,14 @@ void TraceSummary::traceClearEps(void)
 
 void TraceSummary::traceWriteSts(void)
 {
-  if(CmiMyPe()==0)
+  if(CkMyPe()==0)
       _logPool->writeSts();
 }
 
 void TraceSummary::traceClose(void)
 {
   CkpvAccess(_trace)->endComputation();
-  if(CmiMyPe()==0)
+  if(CkMyPe()==0)
       _logPool->writeSts();
   // destructor call the write()
   delete _logPool;
@@ -290,7 +291,7 @@ void TraceSummary::beginExecute(int event,int msgType,int ep,int srcPe, int mlen
   // fill gaps
   while ((ts = ts + CkpvAccess(binSize)) < t)
   {
-     _logPool->add(bin, CmiMyPe());
+     _logPool->add(bin, CkMyPe());
      bin=0.0;
      binStart = ts;
   }
@@ -303,6 +304,11 @@ void TraceSummary::endExecute(void)
   double ts = start;
   double nts = binStart;
 
+  if (execEp == -2) {
+    CmiPrintf("Warning: TraceSummary END_PROCESSING without BEGIN_PROCESSING!\n");
+    return;
+  }
+
   if (execEp != -1)
   {
     _logPool->setEp(execEp, t-ts);
@@ -312,11 +318,12 @@ void TraceSummary::endExecute(void)
   {
      bin += nts-ts;
      binStart  = nts;
-     _logPool->add(bin, CmiMyPe());
+     _logPool->add(bin, CkMyPe());
      bin = 0;
      ts = nts;
   }
   bin += t - ts;
+  execEp = -2;
 }
 
 void TraceSummary::beginPack(void)
@@ -359,8 +366,8 @@ void TraceSummary::beginComputation(void)
 void TraceSummary::endComputation(void)
 {
   if (msgNum==0) {
-//CmiPrintf("Add at last: %d pe:%d time:%f msg:%d\n", index, CmiMyPe(), bin, msgNum);
-     _logPool->add(bin, CmiMyPe());
+//CmiPrintf("Add at last: %d pe:%d time:%f msg:%d\n", index, CkMyPe(), bin, msgNum);
+     _logPool->add(bin, CkMyPe());
      msgNum ++;
 
      binStart  += CkpvAccess(binSize);
@@ -368,7 +375,7 @@ void TraceSummary::endComputation(void)
      double ts = binStart;
      while (ts < t)
      {
-       _logPool->add(bin, CmiMyPe());
+       _logPool->add(bin, CkMyPe());
        bin=0.0;
        ts += CkpvAccess(binSize);
      }
