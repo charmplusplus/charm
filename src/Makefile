@@ -42,7 +42,7 @@ CHARMC=../bin/charmc $(OPTS)
 #
 ###############################################################################
 
-ALLHEADERS=acc.h c++interface.h chare.h ckdefs.h common.h communication.h condsend.h const.h core_macros.h dagger.h dtable.h env_macros.h globals.h mono.h msg_macros.h prio_macros.h qd.h stat.h sys_macros.h table.h tbl.h trans_decls.h trans_defs.h trans_externs.h user_macros.h vid.h wrtone.h converse.h conversetypes.h conversedefns.h conversedefn1.h conversedefn2.h conv-mach.h internal.h quiescence.h performance.h dag.h generic_redn.h pglib.h
+ALLHEADERS=acc.h c++interface.h chare.h ckdefs.h common.h communication.h condsend.h const.h core_macros.h dagger.h dtable.h env_macros.h globals.h mono.h msg_macros.h prio_macros.h qd.h stat.h sys_macros.h table.h tbl.h trans_decls.h trans_defs.h trans_externs.h user_macros.h vid.h wrtone.h converse.h conv-mach.h internal.h quiescence.h performance.h dag.h generic_redn.h pglib.h
 
 ALLINTERFACES=GENERIC-ACC.int GENERIC-HIST.int GENERIC-REDN.int barrier_redn.int cache.int dacc_count.int dacc_hist.int dcountredn.int dmaxredn.int dminredn.int dprodredn.int dsumredn.int facc_count.int facc_hist.int fcountredn.int fmaxredn.int fminredn.int fprodredn.int fsumredn.int iacc_count.int iacc_hist.int icountredn.int imaxredn.int iminredn.int iprodredn.int isumredn.int pg.int
 
@@ -131,8 +131,6 @@ convcore.o: convcore.c $(CVHEADERS)
 conv-conds.o: conv-conds.c $(CVHEADERS)
 	$(CHARMC) conv-conds.c
 
-converse.h:	conversedefn1.h conversetypes.h conversedefn2.h
-
 
 cmk_extras:
 	csh -fc 'source conv-mach.csh ; set echo ; $$CMK_EXTRAS'
@@ -159,9 +157,9 @@ cmk_clean:
 CKHEADERS=chare.h const.h msg_macros.h prio_macros.h env_macros.h globals.h\
 	  sys_macros.h communication.h performance.h $(CVHEADERS)
 
-CK_LDB_N=libckn-ldb-rand.o  libckn-ldbvars.o #libckn-ldb-acwn.o  libckn-ldb-mngr.o libckn-ldb-priomngr.o libckn-ldb-recv.o libckn-ldb-tok.o libckn-ldb-btok.o
+CK_LDB_N=libckn-ldb-rand.o  libckn-ldbcfns.o #libckn-ldb-acwn.o  libckn-ldb-mngr.o libckn-ldb-priomngr.o libckn-ldb-recv.o libckn-ldb-tok.o libckn-ldb-btok.o
 
-CK_LDB_D= libckd-ldb-rand.o libckd-ldbvars.o #libckd-ldb-acwn.o libckd-ldb-mngr.o libckd-ldb-priomngr.o libckd-ldb-recv.o libckd-ldb-tok.o libckd-ldb-btok.o libckd-ldbvars.o
+CK_LDB_D= libckd-ldb-rand.o libckd-ldbcfns.o #libckd-ldb-acwn.o libckd-ldb-mngr.o libckd-ldb-priomngr.o libckd-ldb-recv.o libckd-ldb-tok.o libckd-ldb-btok.o 
 
 CK_CPLUS_N=libckn-cplus-n.o
 
@@ -249,13 +247,11 @@ libckn-ldb-recv.o: ldb.recv.p ldb.h
 libckd-ldb-recv.o: ldb.recv.p ldb.h
 	$(CHARMC) -cp ../lib/ -o $@ ldb.recv.p -DDEBUGGING_MODE
 
-ldb.h:	conversedefns.h
-	
-libckn-ldbvars.o: ldbvars.c
-	$(CHARMC) -cp ../lib/ -o $@ ldbvars.c
+libckn-ldbcfns.o: ldbcfns.c
+	$(CHARMC) -cp ../lib/ -o $@ ldbcfns.c
 
-libckd-ldbvars.o: ldbvars.c
-	$(CHARMC) -cp ../lib/ -o $@ ldbvars.c -DDEBUGGING_MODE
+libckd-ldbcfns.o: ldbcfns.c
+	$(CHARMC) -cp ../lib/ -o $@ ldbcfns.c -DDEBUGGING_MODE
 
 libckn-cplus-n.o: dummy.cplus.c
 	$(CHARMC) -cp ../lib/ -o $@ dummy.cplus.c
