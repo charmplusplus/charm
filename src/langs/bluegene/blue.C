@@ -44,6 +44,7 @@ CpvDeclare(int, numNodes);        /* number of bg nodes on this PE */
 /* emulator node level variables */
 CpvDeclare(SimState, simState);
 
+static int bg_stacksize = 0;
 static int arg_argc;
 static char **arg_argv;
 
@@ -774,7 +775,7 @@ void BgNodeInitialize(nodeInfo *ninfo)
   for (i=0; i< cva(bgMach).numWth; i++)
   {
     threadInfo *tinfo = ninfo->threadinfo[i];
-    t = CthCreate((CthVoidFn)run_thread, tinfo, 0);
+    t = CthCreate((CthVoidFn)run_thread, tinfo, bg_stacksize);
     if (t == NULL) CmiAbort("BG> Failed to create worker thread. \n");
     tinfo->setThread(t);
     /* put to thread table */
@@ -786,7 +787,7 @@ void BgNodeInitialize(nodeInfo *ninfo)
   for (i=0; i< cva(bgMach).numCth; i++)
   {
     threadInfo *tinfo = ninfo->threadinfo[i+cva(bgMach).numWth];
-    t = CthCreate((CthVoidFn)run_thread, tinfo, 0);
+    t = CthCreate((CthVoidFn)run_thread, tinfo, bg_stacksize);
     if (t == NULL) CmiAbort("BG> Failed to create communication thread. \n");
     tinfo->setThread(t);
     /* put to thread table */
@@ -895,6 +896,9 @@ CmiStartFn bgMain(int argc, char **argv)
   CmiGetArgIntDesc(argv, "+wth", &cva(bgMach).numWth, 
 		"The number of simulated worker threads per node");
 
+  CmiGetArgIntDesc(argv, "+bg_stacksize", &bg_stacksize, 
+		"Blue Gene thread stack size");
+
   genTimeLog = CmiGetArgFlagDesc(argv, "+bglog", "Write events to log file");
   correctTimeLog = CmiGetArgFlagDesc(argv, "+bgcorrect", "Apply timestamp correction to logs");
   if (correctTimeLog) genTimeLog = 1;
@@ -952,6 +956,8 @@ CmiStartFn bgMain(int argc, char **argv)
 
   if (CmiMyPe() == 0) {
     CmiPrintf("BG info> Simulating %dx%dx%d nodes with %d comm + %d work threads each.\n", cva(bgMach).x, cva(bgMach).y, cva(bgMach).z, cva(bgMach).numCth, cva(bgMach).numWth);
+    if (bg_stacksize)
+      CmiPrintf("BG info> BG stack size: %d bytes. \n", bg_stacksize);
     if (timingMethod == BG_ELAPSE) 
       CmiPrintf("BG info> Using BgElapse calls for timing method. \n");
     else if (timingMethod == BG_WALLTIME)
