@@ -28,7 +28,7 @@
 /* Only C++ needs this backup bool defined.  We'll assume that C doesn't
    use it */
 
-#ifndef CMK_BOOL_DEFINED
+#if ! CMK_BOOL_DEFINED
 enum CmiBool {CmiFalse=0, CmiTrue=1};
 #else
 typedef bool CmiBool;
