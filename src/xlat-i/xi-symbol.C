@@ -2182,8 +2182,10 @@ void Entry::genChareDefs(XStr& str)
       str << "    int destPE=CkChareMsgPrep("<<params<<");\n";
       str << "    if (destPE!=-1) ckDelegatedTo()->ChareSend(ckDelegatedPtr(),"<<params<<",destPE);\n";
       str << "  }\n";
-      char *opts = "";
-      if (isSkipscheduler())  opts = ",CK_MSG_SKIPSCHEDULER";
+      XStr opts;
+      opts << ",0";
+      if (isSkipscheduler())  opts << "+CK_MSG_EXPEDITED";
+      if (isInline())  opts << "+CK_MSG_INLINE";
       str << "  else CkSendMsg("<<params<<opts<<");\n";
     }
     str << "}\n";
@@ -2261,8 +2263,10 @@ void Entry::genArrayDefs(XStr& str)
     } 
     else 
     {
-      char *opts = "";
-      if (isSkipscheduler())  opts=",CK_MSG_SKIPSCHEDULER";
+      XStr opts;
+      opts << ",0";
+      if (isSkipscheduler())  opts << "+CK_MSG_EXPEDITED";
+      if (isInline())  opts << "+CK_MSG_INLINE";
       if (container->isForElement() || container->isForSection()) {
         str << "  ckSend(impl_amsg, "<<epIdx()<<opts<<");\n";
       }
@@ -2324,8 +2328,9 @@ void Entry::genGroupDecl(XStr& str)
     XStr parampg; parampg<<epIdx()<<", impl_msg, ckGetGroupPe(), ckGetGroupID()";
     // append options parameter
     XStr opts; opts<<",0";
-    if (isImmediate()) opts<<"+CK_MSG_IMMEDIATE";
-    else if (isSkipscheduler())  opts<<"+CK_MSG_SKIPSCHEDULER";
+    if (isImmediate()) opts << "+CK_MSG_IMMEDIATE";
+    if (isInline())  opts << "+CK_MSG_INLINE";
+    if (isSkipscheduler())  opts << "+CK_MSG_EXPEDITED";
 
     if (isSync() && !container->isForElement()) return; //No sync broadcast
     

@@ -106,6 +106,7 @@ struct rwtable rwtable[] = {
   "exclusive",	EXCLUSIVE,
   "immediate",  IMMEDIATE,
   "expedited",  SKIPSCHED,
+  "inline",  	INLINE,
   "virtual",    VIRTUAL,
   "mainchare",	MAINCHARE,
   "packed",     PACKED,

@@ -52,42 +52,43 @@
      EXCLUSIVE = 278,
      IMMEDIATE = 279,
      SKIPSCHED = 280,
-     VIRTUAL = 281,
-     MIGRATABLE = 282,
-     CREATEHERE = 283,
-     CREATEHOME = 284,
-     NOKEEP = 285,
-     NOTRACE = 286,
-     VOID = 287,
-     CONST = 288,
-     PACKED = 289,
-     VARSIZE = 290,
-     ENTRY = 291,
-     FOR = 292,
-     FORALL = 293,
-     WHILE = 294,
-     WHEN = 295,
-     OVERLAP = 296,
-     ATOMIC = 297,
-     FORWARD = 298,
-     IF = 299,
-     ELSE = 300,
-     CONNECT = 301,
-     PUBLISHES = 302,
-     PYTHON = 303,
-     IDENT = 304,
-     NUMBER = 305,
-     LITERAL = 306,
-     CPROGRAM = 307,
-     HASHIF = 308,
-     HASHIFDEF = 309,
-     INT = 310,
-     LONG = 311,
-     SHORT = 312,
-     CHAR = 313,
-     FLOAT = 314,
-     DOUBLE = 315,
-     UNSIGNED = 316
+     INLINE = 281,
+     VIRTUAL = 282,
+     MIGRATABLE = 283,
+     CREATEHERE = 284,
+     CREATEHOME = 285,
+     NOKEEP = 286,
+     NOTRACE = 287,
+     VOID = 288,
+     CONST = 289,
+     PACKED = 290,
+     VARSIZE = 291,
+     ENTRY = 292,
+     FOR = 293,
+     FORALL = 294,
+     WHILE = 295,
+     WHEN = 296,
+     OVERLAP = 297,
+     ATOMIC = 298,
+     FORWARD = 299,
+     IF = 300,
+     ELSE = 301,
+     CONNECT = 302,
+     PUBLISHES = 303,
+     PYTHON = 304,
+     IDENT = 305,
+     NUMBER = 306,
+     LITERAL = 307,
+     CPROGRAM = 308,
+     HASHIF = 309,
+     HASHIFDEF = 310,
+     INT = 311,
+     LONG = 312,
+     SHORT = 313,
+     CHAR = 314,
+     FLOAT = 315,
+     DOUBLE = 316,
+     UNSIGNED = 317
    };
 #endif
 #define MODULE 258
@@ -113,42 +114,43 @@
 #define EXCLUSIVE 278
 #define IMMEDIATE 279
 #define SKIPSCHED 280
-#define VIRTUAL 281
-#define MIGRATABLE 282
-#define CREATEHERE 283
-#define CREATEHOME 284
-#define NOKEEP 285
-#define NOTRACE 286
-#define VOID 287
-#define CONST 288
-#define PACKED 289
-#define VARSIZE 290
-#define ENTRY 291
-#define FOR 292
-#define FORALL 293
-#define WHILE 294
-#define WHEN 295
-#define OVERLAP 296
-#define ATOMIC 297
-#define FORWARD 298
-#define IF 299
-#define ELSE 300
-#define CONNECT 301
-#define PUBLISHES 302
-#define PYTHON 303
-#define IDENT 304
-#define NUMBER 305
-#define LITERAL 306
-#define CPROGRAM 307
-#define HASHIF 308
-#define HASHIFDEF 309
-#define INT 310
-#define LONG 311
-#define SHORT 312
-#define CHAR 313
-#define FLOAT 314
-#define DOUBLE 315
-#define UNSIGNED 316
+#define INLINE 281
+#define VIRTUAL 282
+#define MIGRATABLE 283
+#define CREATEHERE 284
+#define CREATEHOME 285
+#define NOKEEP 286
+#define NOTRACE 287
+#define VOID 288
+#define CONST 289
+#define PACKED 290
+#define VARSIZE 291
+#define ENTRY 292
+#define FOR 293
+#define FORALL 294
+#define WHILE 295
+#define WHEN 296
+#define OVERLAP 297
+#define ATOMIC 298
+#define FORWARD 299
+#define IF 300
+#define ELSE 301
+#define CONNECT 302
+#define PUBLISHES 303
+#define PYTHON 304
+#define IDENT 305
+#define NUMBER 306
+#define LITERAL 307
+#define CPROGRAM 308
+#define HASHIF 309
+#define HASHIFDEF 310
+#define INT 311
+#define LONG 312
+#define SHORT 313
+#define CHAR 314
+#define FLOAT 315
+#define DOUBLE 316
+#define UNSIGNED 317
 
 
 
@@ -191,7 +193,7 @@ typedef union YYSTYPE {
   SdagConstruct *sc;
 } YYSTYPE;
 /* Line 1249 of yacc.c.  */
-#line 194 "y.tab.h"
+#line 196 "y.tab.h"
 # define yystype YYSTYPE /* obsolescent; will be withdrawn */
 # define YYSTYPE_IS_DECLARED 1
 # define YYSTYPE_IS_TRIVIAL 1

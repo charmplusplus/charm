@@ -707,6 +707,7 @@ class Message : public TEntity {
 #define SNOTRACE      0x400
 #define SSKIPSCHED    0x800 //<- is a message skipping charm scheduler
 #define SPYTHON       0x1000
+#define SINLINE       0x2000 //<- inline message
 
 /* An entry construct */
 class Entry : public Member {
@@ -778,6 +779,7 @@ class Entry : public Member {
     int isExclusive(void) { return (attribs & SLOCKED); }
     int isImmediate(void) { return (attribs & SIMMEDIATE); }
     int isSkipscheduler(void) { return (attribs & SSKIPSCHED); }
+    int isInline(void) { return attribs & SINLINE; }
     int isCreate(void) { return (attribs & SCREATEHERE)||(attribs & SCREATEHOME); }
     int isCreateHome(void) { return (attribs & SCREATEHOME); }
     int isCreateHere(void) { return (attribs & SCREATEHERE); }

@@ -64,7 +64,7 @@ extern int macroDefined(char *str, int istrue);
 %token STACKSIZE
 %token THREADED
 %token TEMPLATE
-%token SYNC EXCLUSIVE IMMEDIATE SKIPSCHED VIRTUAL MIGRATABLE 
+%token SYNC EXCLUSIVE IMMEDIATE SKIPSCHED INLINE VIRTUAL MIGRATABLE 
 %token CREATEHERE CREATEHOME NOKEEP NOTRACE
 %token VOID
 %token CONST
@@ -252,6 +252,10 @@ BuiltinType	: INT
 		{ $$ = new BuiltinType("unsigned int"); }
 		| UNSIGNED LONG
 		{ $$ = new BuiltinType("unsigned long"); }
+		| UNSIGNED LONG INT
+		{ $$ = new BuiltinType("unsigned long"); }
+		| UNSIGNED LONG LONG
+		{ $$ = new BuiltinType("unsigned long long"); }
 		| UNSIGNED SHORT
 		{ $$ = new BuiltinType("unsigned short"); }
 		| UNSIGNED CHAR
@@ -662,6 +666,8 @@ EAttrib		: THREADED
                 { $$ = SIMMEDIATE; }
 		| SKIPSCHED
                 { $$ = SSKIPSCHED; }
+		| INLINE
+                { $$ = SINLINE; }
 		| PYTHON
                 { $$ = SPYTHON; }
 		;
