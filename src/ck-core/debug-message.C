@@ -79,20 +79,22 @@ void envelope::pup(PUP::er &p) {
 		p((void *)&(type.chare.ptr),sizeof(void *));
 		p(type.chare.forAnyPe);
 		break;
-	case DBocReqMsg: case DBocNumMsg: 
-	case DNodeBocReqMsg: case DNodeBocNumMsg:
-		p((void *)&(type.group.gtype.dgroup.usrMsg),sizeof(void *));
-		/*fallthrough, no break*/
 	case BocInitMsg: case ForNodeBocMsg:
 		p(type.group.num);
 		break;
+	case DBocReqMsg: case DBocNumMsg: 
+	case DNodeBocReqMsg: case DNodeBocNumMsg:
+		p(type.dgroup.num);
+		p((void *)&(type.dgroup.usrMsg),sizeof(void *));
+		break;
 	case ForBocMsg:
-		p(type.group.gtype.array.index.nInts);
-		p(type.group.gtype.array.index.index,CK_ARRAYINDEX_MAXLEN);
-		p(type.group.gtype.array.srcPe);
-		p(type.group.gtype.array.epIdx);
-		p(type.group.gtype.array.hopCount);
-		p(type.group.num);
+		p(type.array.num);
+		p(type.array.hopCount);		
+		p(type.array.epIdx);
+		p(type.array.index.nInts);
+		p(type.array.index.index,CK_ARRAYINDEX_MAXLEN);
+		p(type.array.srcPe);
+		p(type.array.broadcastCount);
 		break;
 	case RODataMsg:
 		p(type.roData.count);

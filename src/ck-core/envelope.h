@@ -60,20 +60,21 @@ public:
       	void *ptr;
       	UInt forAnyPe; //Used by new-only
       } chare;
-      struct s_group{ //BocInitMsg, DBocMsg, DNodeBocMsg, ForBocMsg, ForNodeBocMsg
-      	union u_gtype{
-          struct s_dgroup{
-            void *usrMsg; //For DBoc only
-      	  } dgroup;
-          struct s_array{ //For arrays only
-      	    CkArrayIndexStruct index;//Array element index
-      	    UInt srcPe;//Original sender
-      	    UShort epIdx;//Array element entry point
-      	    UChar hopCount;//number of times message has been routed
-      	  } array;
-        } gtype;//Group subtype
-        UChar num; //Group number
+      struct s_group {
+	UChar num; //Group number
       } group;
+      struct s_dgroup{
+	UChar num; //Group number
+	void *usrMsg; //For DBoc only
+      } dgroup;
+      struct s_array{ //For arrays only
+	UChar num; //Array manager group number
+	UChar hopCount;//number of times message has been routed
+	UShort epIdx;//Array element entry point
+	CkArrayIndexStruct index;//Array element index
+	UInt srcPe;//Original sender
+	UInt broadcastCount;//For creations-- initial broadcast count
+      } array;
       struct s_roData { //RODataMsg
       	UInt count;
       } roData;
@@ -93,7 +94,7 @@ private:
     u_type type; //Depends on message type (attribs.mtype)
     UShort ref; //Used by futures
     s_attribs attribs;
-    UChar align[_D(sizeof(u_type)+sizeof(UShort)+sizeof(s_attribs))];
+    UChar align[_D(CmiExtHeaderSizeBytes+sizeof(u_type)+sizeof(UShort)+sizeof(s_attribs))];
     
     //This struct should now be sizeof(void*) aligned.
     UShort priobits;
@@ -196,12 +197,12 @@ private:
     void*  getUsrMsg(void) const { 
       CkAssert(getMsgtype()==DBocReqMsg || getMsgtype()==DBocNumMsg
           || getMsgtype()==DNodeBocReqMsg || getMsgtype()==DNodeBocNumMsg); 
-      return type.group.gtype.dgroup.usrMsg; 
+      return type.dgroup.usrMsg; 
     }
     void   setUsrMsg(void *p) { 
       CkAssert(getMsgtype()==DBocReqMsg || getMsgtype()==DBocNumMsg
           || getMsgtype()==DNodeBocReqMsg || getMsgtype()==DNodeBocNumMsg); 
-      type.group.gtype.dgroup.usrMsg = p; 
+      type.dgroup.usrMsg = p; 
     }
     UInt   getGroupNum(void) const {
       CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==ForBocMsg
@@ -216,10 +217,11 @@ private:
       type.group.num = g;
     }
     CkArrayIndexMax &array_index(void) {return 
-        *(CkArrayIndexMax *)&type.group.gtype.array.index;}
-    unsigned short &array_ep(void) {return type.group.gtype.array.epIdx;}
-    unsigned char &array_hops(void) {return type.group.gtype.array.hopCount;}
-    unsigned int &array_srcPe(void) {return type.group.gtype.array.srcPe;}
+        *(CkArrayIndexMax *)&type.array.index;}
+    unsigned short &array_ep(void) {return type.array.epIdx;}
+    unsigned char &array_hops(void) {return type.array.hopCount;}
+    unsigned int &array_srcPe(void) {return type.array.srcPe;}
+    UInt &array_broadcastCount(void) {return type.array.broadcastCount;}
 };
 
 inline envelope *UsrToEnv(const void *const msg) {
