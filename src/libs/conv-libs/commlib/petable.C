@@ -244,9 +244,15 @@ int PeTable :: TotalMsgSize(int npe, int *pelist, int *nm, int *nd)
   return(totsize);
 }
 
+#if 0
+#include "queueing.h"
+extern Queue localMsgBuf;
+#define SIZEFIELD(m) ((int *)((char *)(m)-2*sizeof(int)))[0]
+#define ELAN_MESSAGE_SIZE 8192
+#endif
 
 comID defid;
-  
+
 #undef PACK
 #define PACK(type,data) {junk=(char *)&(data); for(int i=0;i< sizeof(type);i++) t[i]=junk[i];t+=sizeof(type);}
 #undef PACKMSG
@@ -353,12 +359,20 @@ char * PeTable ::ExtractAndPack(comID id, int ufield, int npe, int *pelist, int 
 	else {
 		offset=(PeList[index][j]->offset);
 	}
-  //ComlibPrintf("%d Packing msg_offset=%d\n", CmiMyPe(), offset);
+	//ComlibPrintf("%d Packing msg_offset=%d\n", CmiMyPe(), offset);
      	PACK(int, offset); 
 	if (--(PeList[index][j]->refCount) <=0) {
-		CmiFree(PeList[index][j]->msg);
-	  	//CmiFree(PeList[index][j]);
-	  	PTFREE(PeList[index][j]);
+
+#if 0
+	  // Return message to localMessageBuf
+	  if(SIZEFIELD(PeList[index][j]->msg) == ELAN_MESSAGE_SIZE)
+	    CqsEnqueue(localMsgBuf, PeList[index][j]->msg);
+	  else
+#endif
+	    CmiFree(PeList[index][j]->msg);
+
+	  //CmiFree(PeList[index][j]);
+	  PTFREE(PeList[index][j]);
 	}
 	PeList[index][j]=NULL;
       }
@@ -383,9 +397,9 @@ char * PeTable ::ExtractAndPack(comID id, int ufield, int npe, int *pelist, int 
 
   *length=actual_msgsize+headersize;
   //  ComlibPrintf("actual=%d, len=%d , %d\n", actual_msgsize+headersize, *length, nummsgs);
-#if 0 /*Sameer: what the heck is this?  It only compiles under mpi- versions */
+#if 0
   if (l1 < MAXBUFSIZE) 
-      ((CmiMsgHeaderBasic *)p)->rank = 1000;
+    ((CmiMsgHeaderBasic *)p)->type = 2;
 #endif
   return(p);
 } 
