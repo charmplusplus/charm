@@ -113,8 +113,6 @@ ampi::pack(void *buf)
 {
   TempoMessage *msg;
   int itags[2];
-  void *data; 
-  int len;
   itags[0] = TEMPO_ANY; itags[1] = TEMPO_ANY;
   // resend pending messages in table
   while((msg=(TempoMessage *)CmmGet(tempoMessages, 2, itags, 0))) {
@@ -203,81 +201,106 @@ extern "C" void migrate_(void *gptr)
     //CkPrintf("[%d] Migrated to %d\n", index, CkMyPe());
   }
 }
+extern "C" int MPI_Init(int *argc, char*** argv)
+{
+  return 0;
+}
 
 extern "C" void mpi_init_(int *ierr)
 {
-  *ierr = 0;
+  *ierr = MPI_Init(0,0);
+}
+
+extern "C" int MPI_Comm_rank(MPI_Comm comm, int *rank)
+{
+  *rank = CtvAccess(ampiPtr)->getIndex();
+  return 0;
 }
 
 extern "C" void mpi_comm_rank_(int *comm, int *rank, int *ierr)
 {
-  *ierr = 0;
-  *rank = CtvAccess(ampiPtr)->getIndex();
+  *ierr = MPI_Comm_rank(*comm, rank);
+}
+
+extern "C" int MPI_Comm_size(MPI_Comm comm, int *size)
+{
+  *size = CtvAccess(ampiPtr)->getSize();
+  return 0;
 }
 
 extern "C" void mpi_comm_size_(int *comm, int *size, int *ierr)
 {
-  *ierr = 0;
-  *size = CtvAccess(ampiPtr)->getSize();
+  *ierr = MPI_Comm_size(*comm, size);
+}
+
+extern "C" int MPI_Finalize(void)
+{
+  return 0;
 }
 
 extern "C" void mpi_finalize_(int *ierr)
 {
-  *ierr = 0;
+  *ierr = MPI_Finalize();
 }
-
-// these values have to match values in mpi.f90
-
-#define CMPI_DOUBLE_PRECISION 0
-#define CMPI_INTEGER 1
-#define CMPI_REAL 2
-#define CMPI_COMPLEX 3
-#define CMPI_LOGICAL 4
-#define CMPI_CHARACTER 5
-#define CMPI_BYTE 6
-#define CMPI_PACKED 7
-
-#define CMPI_MAX 1
-#define CMPI_MIN 2
-#define CMPI_SUM 3
-#define CMPI_PROD 4
 
 static int typesize(int type, int count)
 {
   switch(type) {
-    case CMPI_DOUBLE_PRECISION : return count*sizeof(double);
-    case CMPI_INTEGER : return count*sizeof(int);
-    case CMPI_REAL : return count*sizeof(float);
-    case CMPI_COMPLEX: return 2*count*sizeof(double);
-    case CMPI_LOGICAL: return 2*count*sizeof(int);
-    case CMPI_CHARACTER: return count*sizeof(char);
-    case CMPI_BYTE:
-    case CMPI_PACKED:
+    case MPI_DOUBLE_PRECISION : return count*sizeof(double);
+    case MPI_INTEGER : return count*sizeof(int);
+    case MPI_REAL : return count*sizeof(float);
+    case MPI_COMPLEX: return 2*count*sizeof(double);
+    case MPI_LOGICAL: return count*sizeof(int);
+    case MPI_CHARACTER: return count*sizeof(char);
+    case MPI_BYTE: return count;
+    case MPI_PACKED: return count;
     default:
-      return 2*count;
+      CmiError("Type %d not supported yet!\n", type);
+      CmiAbort("");
+      return 0; // keep compiler happy
   }
+}
+
+extern "C" int MPI_Send(void *msg, int count, MPI_Datatype type, int dest, 
+                        int tag, MPI_Comm comm)
+{
+  int size = typesize(type, count);
+  ampi *ptr = CtvAccess(ampiPtr);
+  //CkPrintf("[%d] sending %d bytes to %d tagged %d\n", ptr->getIndex(), 
+           //size, dest, tag);
+  ptr->ckTempoSendElem(tag, ptr->getIndex(), msg, size, dest);
+  return 0;
 }
 
 extern "C" void mpi_send_(void *msg, int *count, int *type, int *dest, 
                           int *tag, int *comm, int *ierr)
 {
-  int size = typesize(*type, *count);
+  *ierr = MPI_Send(msg, *count, *type, *dest, *tag, *comm);
+}
+
+extern "C" int MPI_Recv(void *msg, int count, int type, int src, int tag,
+                        MPI_Comm comm, MPI_Status *status)
+{
+  int size = typesize(type, count);
   ampi *ptr = CtvAccess(ampiPtr);
-  //CkPrintf("[%d] sending %d bytes to %d tagged %d\n", ptr->getIndex(), 
-           //size, *dest, *tag);
-  ptr->ckTempoSendElem(*tag, ptr->getIndex(), msg, size, *dest);
-  *ierr = 0;
+  //CkPrintf("[%d] waits for %d bytes tagged %d\n",ptr->getIndex(),size,tag);
+  ptr->ckTempoRecv(tag, src, msg, size);
+  //CkPrintf("[%d] received %d bytes tagged %d\n", ptr->getIndex(), size, tag);
+  return 0;
 }
 
 extern "C" void mpi_recv_(void *msg, int *count, int *type, int *src,
                           int *tag, int *comm, int *status, int *ierr)
 {
-  int size = typesize(*type, *count);
-  ampi *ptr = CtvAccess(ampiPtr);
-  //CkPrintf("[%d] waits for %d bytes tagged %d\n", ptr->getIndex(), size, *tag);
-  ptr->ckTempoRecv(*tag, *src, msg, size);
-  //CkPrintf("[%d] received %d bytes tagged %d\n", ptr->getIndex(), size, *tag);
-  *ierr = 0;
+  *ierr = MPI_Recv(msg, *count, *type, *src, *tag, *comm, (MPI_Status*)status);
+}
+
+extern "C" int MPI_Sendrecv(void *sbuf, int scount, int stype, int dest, 
+                            int stag, void *rbuf, int rcount, int rtype,
+                            int src, int rtag, MPI_Comm comm, MPI_Status *sts)
+{
+  return (MPI_Send(sbuf,scount,stype,dest,stag,comm) ||
+          MPI_Recv(rbuf,rcount,rtype,src,rtag,comm,sts));
 }
 
 extern "C" void mpi_sendrecv_(void *sndbuf, int *sndcount, int *sndtype, 
@@ -289,77 +312,107 @@ extern "C" void mpi_sendrecv_(void *sndbuf, int *sndcount, int *sndtype,
   mpi_recv_(rcvbuf, rcvcount, rcvtype, src, rcvtag, comm, status, ierr);
 }
 
-extern "C" void mpi_barrier_(int *comm, int *ierr)
+extern "C" int MPI_Barrier(MPI_Comm comm)
 {
   ampi *ptr = CtvAccess(ampiPtr);
   //CkPrintf("[%d] Barrier called\n", ptr->getIndex());
   ptr->ckTempoBarrier();
   //CkPrintf("[%d] Barrier finished\n", ptr->getIndex());
-  *ierr = 0;
+  return 0;
 }
 
-#define CMPI_BCAST_TAG 999
+extern "C" void mpi_barrier_(int *comm, int *ierr)
+{
+  *ierr = MPI_Comm(*comm);
+}
+
+#define MPI_BCAST_TAG 999
+
+extern "C" int MPI_Bcast(void *buf, int count, int type, int root, 
+                         MPI_Comm comm)
+{
+  int size = typesize(type, count);
+  ampi *ptr = CtvAccess(ampiPtr);
+  //CkPrintf("[%d] Broadcast called size=%d\n", ptr->getIndex(), size);
+  ptr->ckTempoBcast(((root)==ptr->getIndex())?1:0, MPI_BCAST_TAG, buf, size);
+  //CkPrintf("[%d] Broadcast finished\n", ptr->getIndex());
+  return 0;
+}
 
 extern "C" void mpi_bcast_(void *buf, int *count, int *type, int *root, 
                            int *comm, int *ierr)
 {
-  int size = typesize(*type, *count);
-  ampi *ptr = CtvAccess(ampiPtr);
-  //CkPrintf("[%d] Broadcast called size=%d\n", ptr->getIndex(), size);
-  ptr->ckTempoBcast(((*root)==ptr->getIndex())?1:0, CMPI_BCAST_TAG, buf, size);
-  //CkPrintf("[%d] Broadcast finished\n", ptr->getIndex());
-  *ierr = 0;
+  *ierr = MPI_Bcast(buf, *count, *type, *root, *comm);
 }
 
 static void optype(int inop, int intype, int *outop, int *outtype)
 {
   switch(inop) {
-    case CMPI_MAX : *outop = TEMPO_MAX; break;
-    case CMPI_MIN : *outop = TEMPO_MIN; break;
-    case CMPI_SUM : *outop = TEMPO_SUM; break;
-    case CMPI_PROD : *outop = TEMPO_PROD; break;
+    case MPI_MAX : *outop = TEMPO_MAX; break;
+    case MPI_MIN : *outop = TEMPO_MIN; break;
+    case MPI_SUM : *outop = TEMPO_SUM; break;
+    case MPI_PROD : *outop = TEMPO_PROD; break;
     default:
       ckerr << "Op " << inop << " not supported." << endl;
       CmiAbort("exiting");
   }
   switch(intype) {
-    case CMPI_REAL : *outtype = TEMPO_FLOAT; break;
-    case CMPI_INTEGER : *outtype = TEMPO_INT; break;
-    case CMPI_DOUBLE_PRECISION : *outtype = TEMPO_DOUBLE; break;
+    case MPI_REAL : *outtype = TEMPO_FLOAT; break;
+    case MPI_INTEGER : *outtype = TEMPO_INT; break;
+    case MPI_DOUBLE_PRECISION : *outtype = TEMPO_DOUBLE; break;
     default:
       ckerr << "Type " << intype << " not supported." << endl;
       CmiAbort("exiting");
   }
 }
 
+extern "C" int MPI_Reduce(void *inbuf, void *outbuf, int count, int type,
+                          MPI_Op op, int root, MPI_Comm comm)
+{
+  int myop, mytype;
+  optype(op, type, &myop, &mytype);
+  ampi *ptr = CtvAccess(ampiPtr);
+  //CkPrintf("[%d] reduction called\n", ptr->getIndex());
+  ptr->ckTempoReduce(root,myop,inbuf,outbuf,count,mytype);
+  //CkPrintf("[%d] reduction finished\n", ptr->getIndex());
+  return 0;
+}
+
 extern "C" void mpi_reduce_(void *inbuf, void *outbuf, int *count, int *type,
                             int *op, int *root, int *comm, int *ierr)
 {
+  *ierr = MPI_Reduce(inbuf, outbuf, *count, *type, *op, *root, *comm);
+}
+
+extern "C" int MPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
+                          MPI_Op op, MPI_Comm comm)
+{
   int myop, mytype;
-  optype(*op, *type, &myop, &mytype);
+  optype(op, type, &myop, &mytype);
   ampi *ptr = CtvAccess(ampiPtr);
-  //CkPrintf("[%d] reduction called\n", ptr->getIndex());
-  ptr->ckTempoReduce(*root,myop,inbuf,outbuf,*count,mytype);
-  //CkPrintf("[%d] reduction finished\n", ptr->getIndex());
+  //CkPrintf("[%d] Allreduce called\n", ptr->getIndex());
+  ptr->ckTempoAllReduce(myop,inbuf,outbuf,count,mytype);
+  //CkPrintf("[%d] Allreduce finished\n", ptr->getIndex());
+  return 0;
 }
 
 extern "C" void mpi_allreduce_(void *inbuf,void *outbuf,int *count,int *type,
                                int *op, int *comm, int *ierr)
 {
-  int myop, mytype;
-  optype(*op, *type, &myop, &mytype);
-  ampi *ptr = CtvAccess(ampiPtr);
-  //CkPrintf("[%d] Allreduce called\n", ptr->getIndex());
-  ptr->ckTempoAllReduce(myop,inbuf,outbuf,*count,mytype);
-  //CkPrintf("[%d] Allreduce finished\n", ptr->getIndex());
+  *ierr = MPI_Allreduce(inbuf, outbuf, *count, *type, *op, *comm);
 }
 
-extern "C" double mpi_wtime_(void)
+extern "C" double MPI_Wtime(void)
 {
   return CmiWallTimer();
 }
 
-extern "C" void mpi_start_(int *reqnum, int *ierr)
+extern "C" double mpi_wtime_(void)
+{
+  return MPI_Wtime();
+}
+
+extern "C" int MPI_Start(MPI_Request *reqnum)
 {
   ampi *ptr = CtvAccess(ampiPtr);
   if(*reqnum >= ptr->nrequests) {
@@ -369,58 +422,81 @@ extern "C" void mpi_start_(int *reqnum, int *ierr)
   if(req->sndrcv == 1) { // send request
     // CkPrintf("[%d] sending buf=%p, size=%d, tag=%d to %d\n", ptr->getIndex(),
              // req->buf, req->size, req->tag, req->proc);
-    ptr->ckTempoSendElem(req->tag, ptr->getIndex(), req->buf, req->size, req->proc);
+    ptr->ckTempoSendElem(req->tag, ptr->getIndex(), req->buf, 
+                         req->size, req->proc);
   } else { // recv request
     ptr->ckTempoRecv(req->tag, req->proc, req->buf, req->size);
-    // CkPrintf("[%d] received buf=%p, size=%d, tag=%d from %d\n", ptr->getIndex(),
-             // req->buf, req->size, req->tag, req->proc);
+    // CkPrintf("[%d] received buf=%p, size=%d, tag=%d from %d\n", 
+                // ptr->getIndex(), req->buf, req->size, req->tag, req->proc);
   }
-  *ierr = 0;
+  return 0;
+}
+
+extern "C" void mpi_start_(int *reqnum, int *ierr)
+{
+  *ierr = MPI_Start((MPI_Request*) reqnum);
+}
+
+extern "C" int MPI_Waitall(int count, MPI_Request *request, MPI_Status *sts)
+{
+  return 0;
 }
 
 extern "C" void mpi_waitall_(int *count, int *request, int *status, int *ierr)
 {
-  *ierr = 0;
+  *ierr = MPI_Waitall(*count, (MPI_Request*) request, (MPI_Status*) status);
+}
+
+extern "C" int MPI_Recv_init(void *buf, int count, int type, int src, int tag,
+                             MPI_Comm comm, MPI_Request *req)
+{
+  ampi *ptr = CtvAccess(ampiPtr);
+  if(ptr->nrequests == 100) {
+    CmiAbort("Too many persistent commrequests.\n");
+  }
+  int size = typesize(type, count);
+  ptr->requests[ptr->nrequests].sndrcv = 2;
+  ptr->requests[ptr->nrequests].buf = buf;
+  ptr->requests[ptr->nrequests].size = size;
+  ptr->requests[ptr->nrequests].proc = src;
+  ptr->requests[ptr->nrequests].tag = tag;
+  *req = ptr->nrequests;
+  ptr->nrequests ++;
+  // CkPrintf("[%d] recv request %d buf=%p, count=%d size=%d,tag=%d from %d\n",
+            // ptr->getIndex(), ptr->nrequests-1, buf, count, size, tag, *src);
+  return 0;
 }
 
 extern "C" void mpi_recv_init_(void *buf, int *count, int *type, int *srcpe,
                                int *tag, int *comm, int *req, int *ierr)
 {
-  ampi *ptr = CtvAccess(ampiPtr);
-  if(ptr->nrequests == 100) {
-    CmiAbort("Too many persistent commrequests.\n");
-  }
-  int size = typesize(*type, *count);
-  ptr->requests[ptr->nrequests].sndrcv = 2;
-  ptr->requests[ptr->nrequests].buf = buf;
-  ptr->requests[ptr->nrequests].size = size;
-  ptr->requests[ptr->nrequests].proc = *srcpe;
-  ptr->requests[ptr->nrequests].tag = *tag;
-  *req = ptr->nrequests;
-  ptr->nrequests ++;
-  *ierr = 0;
-  // CkPrintf("[%d] recv request %d buf=%p, count=%d size=%d, tag=%d, from %d\n",
-            // ptr->getIndex(), ptr->nrequests-1, buf, *count, size, *tag, *srcpe);
+  *ierr = MPI_Recv_init(buf,*count,*type,*srcpe,*tag,*comm,(MPI_Request*)req);
 }
 
-extern "C" void mpi_send_init_(void *buf, int *count, int *type, int *destpe,
-                               int *tag, int *comm, int *req, int *ierr)
+extern "C" int MPI_Send_init(void *buf, int count, int type, int dest, int tag,
+                             MPI_Comm comm, MPI_Request *req)
 {
   ampi *ptr = CtvAccess(ampiPtr);
   if(ptr->nrequests == 100) {
     CmiAbort("Too many persistent commrequests.\n");
   }
-  int size = typesize(*type, *count);
+  int size = typesize(type, count);
   ptr->requests[ptr->nrequests].sndrcv = 1;
   ptr->requests[ptr->nrequests].buf = buf;
   ptr->requests[ptr->nrequests].size = size;
-  ptr->requests[ptr->nrequests].proc = *destpe;
-  ptr->requests[ptr->nrequests].tag = *tag;
+  ptr->requests[ptr->nrequests].proc = dest;
+  ptr->requests[ptr->nrequests].tag = tag;
   *req = ptr->nrequests;
   ptr->nrequests ++;
-  *ierr = 0;
   // CkPrintf("[%d] send request %d buf=%p, count=%d size=%d, tag=%d, to %d\n",
-           // ptr->getIndex(), ptr->nrequests-1, buf, *count, size, *tag, *destpe);
+           // ptr->getIndex(), ptr->nrequests-1, buf, count, size, tag, destpe);
+  return 0;
+}
+
+extern "C" void mpi_send_init_(void *buf, int *count, int *type, int *destpe,
+                               int *tag, int *comm, int *req, int *ierr)
+{
+  *ierr = MPI_Send_init(buf,*count,*type,*destpe,*tag,*comm,(MPI_Request*)req);
 }
 
 #include "ampi.def.h"
