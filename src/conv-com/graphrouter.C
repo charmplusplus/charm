@@ -79,11 +79,13 @@ void GraphRouter::sendMessages(comID id, int cur_stage){
                                        pesToSend, &len);
         
 #if CMK_PERSISTENT_COMM
+/*
         if(len < PERSISTENT_BUFSIZE)
             if(currentIteration % 2)
                 CmiUsePersistentHandle(&handlerArrayOdd[cur_stage], 1);
             else
                 CmiUsePersistentHandle(&handlerArrayEven[cur_stage], 1);
+*/
 #endif          
         
 	if (newmsg) {
@@ -99,8 +101,10 @@ void GraphRouter::sendMessages(comID id, int cur_stage){
 	}
         
 #if CMK_PERSISTENT_COMM
+/*
         if(len < PERSISTENT_BUFSIZE)
             CmiUsePersistentHandle(NULL, 0);
+*/
 #endif          
     }
 }
@@ -226,6 +230,7 @@ void GraphRouter :: SetMap(int *pes)
     gpes=pes;
 
 #if CMK_PERSISTENT_COMM
+/*
     numNeighbors=0;
     neighborPeList = new int[NumPes];
 
@@ -247,5 +252,6 @@ void GraphRouter :: SetMap(int *pes)
         handlerArrayEven[pcount] = CmiCreatePersistent(dest, 
                                                        PERSISTENT_BUFSIZE);
     }
+*/
 #endif
 }
