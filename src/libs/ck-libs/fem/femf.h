@@ -55,45 +55,47 @@
        external FEM_Mesh_data_offset
        external FEM_Mesh_pup
        
-       external FEM_Set_Mesh
+       external FEM_Set_mesh
 
-       external FEM_Set_Node
-       external FEM_Get_Node
-       external FEM_Set_Elem
-       external FEM_Get_Elem
-       external FEM_Set_Elem_Conn_r
-       external FEM_Get_Elem_Conn_r
-       external FEM_Set_Node_Data_r
-       external FEM_Get_Node_Data_r
-       external FEM_Set_Elem_Data_r
-       external FEM_Get_Elem_Data_r
+       external FEM_Set_node
+       external FEM_Get_node
+       external FEM_Set_elem
+       external FEM_Get_elem
+       external FEM_Set_elem_conn_r
+       external FEM_Get_elem_conn_r
+       external FEM_Set_node_data_r
+       external FEM_Get_node_data_r
+       external FEM_Set_elem_data_r
+       external FEM_Get_elem_data_r
        
-       external FEM_Set_Sparse
-       external FEM_Set_Sparse_Elem
-       external FEM_Get_Sparse
+       external FEM_Set_sparse
+       external FEM_Set_sparse_elem
+       external FEM_Get_sparse
 
-       external FEM_Add_Linear_Periodicity
-       external FEM_Sym_Coordinates
+       external FEM_Add_linear_periodicity
+       external FEM_Sym_coordinates
 
-       external FEM_Set_Sym_Nodes
-       external FEM_Get_Sym
+       external FEM_Set_sym_nodes
+       external FEM_Get_sym
 
-       external FEM_Set_Partition
+       external FEM_Set_partition
 
-       external FEM_Add_Ghost_Layer
-       external FEM_Add_Ghost_Elem
+       external FEM_Add_ghost_layer
+       external FEM_Add_ghost_elem
+       external FEM_Add_ghost_stencil
+       external FEM_Add_ghost_stencil_type
 
        external FEM_Get_Comm_Nodes
 
-       external FEM_Reduce_Field
+       external FEM_Reduce_field
        external FEM_Reduce
-       external FEM_Update_Field
-       external FEM_Update_Ghost_Field
-       external FEM_Read_Field
+       external FEM_Update_field
+       external FEM_Update_ghost_field
+       external FEM_Read_field
        integer, external :: foffsetof
 
        external FEM_Barrier
-       external FEM_Get_Ghost_List
+       external FEM_Get_ghost_list
 
        integer, external :: FEM_Register
        external FEM_Migrate 

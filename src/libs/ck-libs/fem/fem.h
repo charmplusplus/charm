@@ -158,7 +158,12 @@ extern "C" {
 
   void FEM_Add_ghost_layer(int nodesPerTuple,int doAddNodes);
   void FEM_Add_ghost_elem(int elType,int tuplesPerElem,const int *elem2tuple);
-  
+
+  void FEM_Add_ghost_stencil(int nElts,int addNodes,
+	const int *ends,const int *adj);
+  void FEM_Add_ghost_stencil_type(int elType,int nElts,int addNodes,
+	const int *ends,const int *adj2);
+
   void FEM_Add_linear_periodicity(int nFaces,int nPer,
 	const int *facesA,const int *facesB,
 	int nNodes,const double *nodeLocs);

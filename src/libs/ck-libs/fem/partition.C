@@ -13,6 +13,7 @@ Originally written by Karthik Mahesh, September 2000.
 #include <stdlib.h>
 #include <assert.h>
 #include "fem_impl.h"
+#include "cktimer.h"
 
 class NList
 {
@@ -210,6 +211,7 @@ METIS_PartGraphKway (int* nv, int* xadj, int* adjncy, int* vwgt, int* adjwgt,
 */
 void FEM_Mesh_partition(const FEM_Mesh *mesh,int nchunks,int *elem2chunk)
 {
+	CkThresholdTimer time("FEM Split> Building graph for metis partitioner",1.0);
 	int nelems=mesh->nElems();
 	if (nchunks==1) {//Metis can't handle this case (!)
 		for (int i=0;i<nelems;i++) elem2chunk[i]=0;
@@ -225,14 +227,13 @@ void FEM_Mesh_partition(const FEM_Mesh *mesh,int nchunks,int *elem2chunk)
 	int wgtflag = 0; // no weights associated with elements or edges
 	int opts[5];
 	opts[0] = 0; //use default values
-	CmiPrintf("FEM> Calling metis partitioner...\n");
+	time.start("FEM Split> Calling metis partitioner");
 	if (nchunks<8) /*Metis manual says recursive version is higher-quality here*/
 	  METIS_PartGraphRecursive(&nelems, adjStart, adjList, 0, 0, &wgtflag, &numflag, 
                         &nchunks, opts, &ecut, elem2chunk);
 	else /*For many chunks, Kway is supposedly faster */
 	  METIS_PartGraphKway(&nelems, adjStart, adjList, 0, 0, &wgtflag, &numflag, 
                         &nchunks, opts, &ecut, elem2chunk);
-	CmiPrintf("FEM> Metis partitioner returned.\n");
 	delete[] adjStart;
 	delete[] adjList;
 }

@@ -21,6 +21,11 @@ Orion Sky Lawlor, olawlor@acm.org, 9/28/00
 /** \addtogroup fem_impl FEM Framework Library Implementation */
 /*\@{*/
 
+/* A stupid, stupid number: the maximum value of user-defined "elType" fields. 
+  This should be dynamic, so any use of this should be considered a bug.
+*/
+#define FEM_MAX_ELTYPE 20
+
 // Verbose abort routine used by FEM framework:
 void FEM_Abort(const char *msg);
 void FEM_Abort(const char *caller,const char *sprintf_msg,int int0=0,int int1=0,int int2=0);
@@ -86,6 +91,8 @@ public:
 	}
 	operator T *(void) {return sto;}
 	operator const T *(void) const {return sto;}
+	T& operator[](int i) {return sto[i];}
+	const T& operator[](int i) const {return sto[i];}
 };
 typedef ArrayPtrT<int> intArrayPtr;
 
@@ -238,9 +245,8 @@ private:
   void readField(int idxl_datatype, void *nodes, const char *fname);  
 };
 
-
-//Describes a single layer of ghost elements
-class ghostLayer : public CkNoncopyable {
+/// Describes a single layer of ghost elements.
+class FEM_Ghost_Layer : public CkNoncopyable {
 public:
 	int nodesPerTuple; //Number of shared nodes needed to connect elements
 	bool addNodes; //Add ghost nodes to the chunks
@@ -253,8 +259,61 @@ public:
 		~elemGhostInfo(void) {}
 		void pup(PUP::er &p) {CkAbort("FEM> Shouldn't call elemGhostInfo::pup!\n");}
 	};
-	NumberedVec<elemGhostInfo> elem;
+	elemGhostInfo elem[FEM_MAX_ELTYPE];
 };
+
+/// Describes a set of required adjacent elements for this kind of element,
+///  stored as an explicit adjacency list.
+class FEM_Ghost_Stencil {
+	/// Our element type.
+	int elType;
+	/// Number of elements we describe.
+	int n;
+	/// If true, add ghost nodes as well as elements
+	bool addNodes;
+	
+	/// Last adjacency entry (plus one), indexed by element.
+	///  That is, element i's data is at [ends[i-1],ends[i])
+	intArrayPtr ends;
+	
+	/** Adjacency entries for each element.
+	  Stored as a series of pairs: elType, elNum.
+	  The first pair for element i starts at
+	  	2*(ends[i-1]) 
+	  the last pair for element i starts at
+	  	2*(ends[i]-1)
+	  This array then has, in total, 2*ends[n-1] elements.
+	*/
+	intArrayPtr adj;
+public:
+	/**
+	  Create a stencil with this number of elements, 
+	  and these adjecent elements.
+	*/
+	FEM_Ghost_Stencil(int elType_, int n_,bool addNodes_,
+		const int *ends_,
+		const int *adj_,
+		int idxBase);
+	
+	/// Make sure this stencil makes sense for this mesh.
+	void check(const FEM_Mesh &mesh) const;
+	
+	/**
+	  Return a pair consisting of the i'th element's
+	  j'th neighbor: the return value's first int is an element type,
+	  the second int is an element number.  Returns NULL if i doesn't
+	  have a j'th neighbor.
+	*/
+	inline const int *getNeighbor(int i,int j) const {
+		int start=0;
+		if (i>0) start=ends[i-1];
+		if (j>=ends[i]-start) return 0;
+		return &adj[2*(start+j)];
+	}
+	
+	inline bool wantNodes(void) const {return addNodes;}
+};
+
 
 //Accumulates all symmetries of the mesh before splitting:
 class FEM_Initial_Symmetries; /*Defined in symmetries.C*/
@@ -265,7 +324,9 @@ class FEM_Partition : public CkNoncopyable {
 	int *elem2chunk;
 	
 	/// Describes the different layers of ghost elements:
-	CkVec<ghostLayer *> layers;
+	CkVec<FEM_Ghost_Layer *> layers;
+	/// Describes explicit ghost stencils, for different element types
+	FEM_Ghost_Stencil *stencils[FEM_MAX_ELTYPE];
 	
 	/// Describes the problem domain's spatial symmetries.
 	FEM_Initial_Symmetries *sym;
@@ -278,18 +339,26 @@ public:
 	const int *getPartition(FEM_Mesh *src,int nChunks) const;
 	
 // Manipulate ghost layers
-	ghostLayer *addLayer(void) {
-		ghostLayer *l=new ghostLayer();
+	FEM_Ghost_Layer *addLayer(void) {
+		FEM_Ghost_Layer *l=new FEM_Ghost_Layer();
 		layers.push_back(l);
 		return l;
 	}
-	ghostLayer *curLayer(void) {
+	FEM_Ghost_Layer *curLayer(void) {
 		if (layers.size()==0) CkAbort("Must call FEM_Add_ghost_layer before FEM_Add_ghost_elem\n");
 		return layers[layers.size()-1];
 	}
 	
 	int getLayers(void) const {return layers.size();}
-	const ghostLayer &getLayer(int layerNo) const {return *layers[layerNo];}
+	const FEM_Ghost_Layer &getLayer(int layerNo) const {return *layers[layerNo];}
+
+// Manipulate ghost stencils
+	void addGhostStencil(int elType,FEM_Ghost_Stencil *s) {
+		stencils[elType]=s;
+	}
+	const FEM_Ghost_Stencil *getGhostStencil(int elType) const {
+		return stencils[elType];
+	}
 	
 // Manipulate spatial symmetries:
 	void setSymmetries(int nNodes_,int *new_can,const int *sym_src);

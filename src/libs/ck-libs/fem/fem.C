@@ -221,13 +221,16 @@ FEM_Partition &FEM_curPartition(void) {
 }
 static void clearPartition(void) {delete partition; partition=NULL;}
 
-FEM_Partition::FEM_Partition() {
+FEM_Partition::FEM_Partition() 
+{
 	elem2chunk=NULL;
 	sym=NULL; 
+	for (int t=0;t<FEM_MAX_ELTYPE;t++) stencils[t]=0;
 }
 FEM_Partition::~FEM_Partition() {
 	if (elem2chunk) {delete[] elem2chunk;elem2chunk=NULL;}
 	for (int i=0;i<getLayers();i++) delete layers[i];
+	for (int t=0;t<FEM_MAX_ELTYPE;t++) delete stencils[t];
 }
 
 void FEM_Partition::setPartition(const int *e, int nElem, int idxBase) {
@@ -869,14 +872,136 @@ FDECL void FTN_NAME(FEM_GET_COMM_NODES,fem_get_comm_nodes)
 		nodeNos[i]=nNo[i]+1;
 }
 
+/******************** Ghost Stencil *********************/
+
+/**
+ Create a stencil with this number of elements, 
+  and these adjacent elements.
+ 
+ In C, userEnds[i] is the 0-based one-past-last element;
+ in F90, userEnds[i] is the 1-based last element, which
+ amounts to the same thing!
+  
+ In C, userAdj is 0-based; in F90, the even elType fields
+ are 0-based, and the odd elemNum fields are 1-based.
+*/
+FEM_Ghost_Stencil::FEM_Ghost_Stencil(int elType_, int n_,bool addNodes_,
+	const int *userEnds,
+	const int *userAdj,
+	int idxBase)
+	:elType(elType_), n(n_), addNodes(addNodes_),  
+	 ends(new int[n]), adj(new int[2*userEnds[n-1]])
+{
+	int i;
+	int lastEnd=0;
+	for (i=0;i<n;i++) {
+		ends[i]=userEnds[i];
+		if (ends[i]<lastEnd) {
+			CkError("FEM_Ghost_Stencil> ends array not monotonic!\n"
+				"   ends[%d]=%d < previous value %d\n",
+				i,ends[i],lastEnd);
+			CkAbort("FEM_Ghost_Stencil> ends array not monotonic");
+		}
+		lastEnd=ends[i];
+	}
+	int m=ends[n-1];
+	for (i=0;i<m;i++) {
+		adj[2*i+0]=userAdj[2*i+0];
+		adj[2*i+1]=userAdj[2*i+1]-idxBase;
+	}
+}
+
+CDECL void FEM_Add_ghost_stencil_type(int elType,int nElts,int addNodes,
+	const int *ends,const int *adj2)
+{
+	FEMAPI("FEM_Add_ghost_stencil_type");
+	FEM_Ghost_Stencil *s=new FEM_Ghost_Stencil(
+		elType, nElts, addNodes==1, ends, adj2, 0);
+	FEM_curPartition().addGhostStencil(elType,s);
+}
+FDECL void FTN_NAME(FEM_ADD_GHOST_STENCIL_TYPE,fem_add_ghost_stencil_type)(
+	int *elType,int *nElts,int *addNodes,
+	const int *ends,const int *adj2)
+{
+	FEMAPI("FEM_Add_ghost_stencil_type");
+	FEM_Ghost_Stencil *s=new FEM_Ghost_Stencil(
+		*elType, *nElts, *addNodes==1, ends, adj2, 1);
+	FEM_curPartition().addGhostStencil(*elType,s);
+}
+
+
+inline int globalElem2elType(const FEM_Mesh *m,int globalElem) {
+	int curStart=0;
+	for (int t=0;t<m->elem.size();t++) if (m->elem.has(t)) {
+		int n=m->elem[t].size();
+		if (globalElem>=curStart && globalElem<curStart+n)
+			return t;
+		curStart+=n;
+	}
+	CkError("FEM> Invalid global element number %d!\n",globalElem);
+	CkAbort("FEM> Invalid global element number!");
+	return 0;
+}
+
+/*
+ These non "_type" routines describe element adjacencies
+ using one big array, instead of one array per element type.
+ This one-piece format is more convenient for most users.
+*/
+CDECL void FEM_Add_ghost_stencil(int nElts,int addNodes,
+	const int *ends,const int *adj)
+{
+	FEMAPI("FEM_Add_ghost_stencil");
+	const FEM_Mesh *m=setMesh();
+	int adjSrc=0, endsSrc=0;
+	for (int t=0;t<m->elem.size();t++) if (m->elem.has(t)) {
+		const FEM_Elem &el=m->elem[t];
+		int n=el.size();
+		int nAdjLocal=ends[endsSrc+n-1]-adjSrc;
+		int *adjLocal=new int[2*nAdjLocal];
+		int *endsLocal=new int[n];
+		int adjDest=0, endsDest=0;
+		while (endsDest<n) {
+			while (adjSrc<ends[endsSrc]) {
+				/* Make adj array into elType, elNum pairs */
+				int et=globalElem2elType(m,adj[adjSrc]);
+				adjLocal[2*adjDest+0]=et;
+				adjLocal[2*adjDest+1]=adj[adjSrc]-m->nElems(et);
+				adjDest++; adjSrc++;
+			}
+			/* Use local end numbers in adjLocal array */
+			endsLocal[endsDest]=adjDest;
+			endsDest++; endsSrc++;
+		}
+		if (adjDest!=nAdjLocal)
+			CkAbort("FEM_Add_ghost_stencil adjacency count mismatch!");
+		FEM_Add_ghost_stencil_type(t,n,addNodes,endsLocal,adjLocal);
+		delete []endsLocal;
+		delete []adjLocal;
+	}
+	if (endsSrc!=nElts) {
+		CkError("FEM_Add_ghost_stencil: FEM thinks there are %d elements, but nElts is %d!\n",endsSrc,nElts);
+		CkAbort("FEM_Add_ghost_stencil elements mismatch!");
+	}
+}
+FDECL void FTN_NAME(FEM_ADD_GHOST_STENCIL,fem_add_ghost_stencil)(
+	int *nElts,int *addNodes,
+	const int *ends,int *adj)
+{
+	FEMAPI("FEM_Add_ghost_stencil");
+	int i;
+	for (i=0;i<*nElts;i++) adj[i]--; /* 1-based to 0-based */
+	FEM_Add_ghost_stencil(*nElts,*addNodes,ends,adj);
+	for (i=0;i<*nElts;i++) adj[i]++; /* 0-based to 1-based */
+}
+
 /******************** Ghost Layers *********************/
 CDECL void FEM_Add_ghost_layer(int nodesPerTuple,int doAddNodes)
 {
 	FEMAPI("FEM_Add_ghost_layer");
-	ghostLayer *cur=FEM_curPartition().addLayer();
+	FEM_Ghost_Layer *cur=FEM_curPartition().addLayer();
 	cur->nodesPerTuple=nodesPerTuple;
 	cur->addNodes=(doAddNodes!=0);
-	cur->elem.makeLonger(20);
 }
 FDECL void FTN_NAME(FEM_ADD_GHOST_LAYER,fem_add_ghost_layer)
 	(int *nodesPerTuple,int *doAddNodes)
@@ -884,7 +1009,7 @@ FDECL void FTN_NAME(FEM_ADD_GHOST_LAYER,fem_add_ghost_layer)
 
 static void add_ghost_elem(int elType,int tuplesPerElem,const int *elem2tuple,int idxBase) {
 	FEMAPI("FEM_Add_ghost_elem");
-	ghostLayer *cur=FEM_curPartition().curLayer();
+	FEM_Ghost_Layer *cur=FEM_curPartition().curLayer();
 	cur->elem[elType].add=true;
 	cur->elem[elType].tuplesPerElem=tuplesPerElem;
 	cur->elem[elType].elem2tuple=CkCopyArray(elem2tuple,

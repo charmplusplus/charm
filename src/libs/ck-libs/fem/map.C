@@ -24,6 +24,7 @@ Originally written by Orion Sky Lawlor, olawlor@acm.org, 9/28/2000
 #include <stdlib.h>
 #include <assert.h>
 #include "fem_impl.h"
+#include "cktimer.h"
 
 class elemList;
 
@@ -87,17 +88,30 @@ public:
 	}
 };
 
+static void checkEquality(const char *what, 
+	int v1,const char *src1, 
+	int v2,const char *src2)
+{
+	if (v1!=v2) {
+		CkPrintf("FEM> %s value %d, from %d, doesn't match %d, from %d!\n",
+			what, v1,src1, v2,src2);
+		CkAbort("FEM Equality assertation failed");
+	}
+}
+static void checkRange(const char *what,int v,int max)
+{
+	if ((v<0)||(v>=max)) {
+		CkPrintf("FEM> %s value %d should be between 0 and %d!\n",
+			what,v,max);
+		CkAbort("FEM Range assertation failed");
+	}
+}
+
 static void checkArrayEntries(const int *arr,int nArr,int max,const char *what)
 {
 #ifndef CMK_OPTIMIZE
 	//Check the array for out-of-bounds values
-	for (int e=0;e<nArr;e++) {
-		if ((arr[e]<0)||(arr[e]>=max)) {
-			CkError("FEM Map Error> Entry %d of %s is %d (but should be below %d)\n",
-				e,what,arr[e],max);
-			CkAbort("FEM Array element out of bounds");
-		} 
-	}
+	for (int e=0;e<nArr;e++) checkRange(what,arr[e],max);
 #endif
 }
 
@@ -127,6 +141,27 @@ static void check(const FEM_Partition &partition,const FEM_Mesh *mesh) {
 	if (canon!=NULL)
 	  checkArrayEntries(canon,mesh->node.size(),mesh->node.size(),
 		"node canonicalization array, from FEM_Set_Symmetries");
+}
+
+/// Make sure this stencil makes sense for this mesh.
+void FEM_Ghost_Stencil::check(const FEM_Mesh &mesh) const {
+	const FEM_Elem &elem=mesh.elem[mesh.chkET(elType)];
+	checkEquality("number of elements",
+		n,"FEM_Ghost_stencil",
+		elem.size(),"mesh");
+	int i,prevEnd=0;
+	for (i=0;i<n;i++) {
+		int nElts=ends[i]-prevEnd;
+		checkRange("FEM_Ghost_stencil index array",nElts,n);
+		prevEnd=ends[i];
+	}
+	int m=ends[n-1];
+	for (i=0;i<m;i++) {
+		int t=adj[2*i+0];
+		mesh.chkET(t);
+		checkRange("FEM_Ghost_stencil neighbor array",
+			adj[2*i+1],mesh.elem[t].size());
+	}
 }
 
 /************************ Splitter *********************/
@@ -216,7 +251,7 @@ class splitter {
 	int totGhostElem,totGhostNode; //For debugging printouts
 
 	/// Add an entire layer of ghost elements
-	void addLayer(const ghostLayer &g,const FEM_Partition &partition);
+	void addLayer(const FEM_Ghost_Layer &g,const FEM_Partition &partition);
 	
 	/// Return true if any of these global nodes are ghost nodes
 	bool hasGhostNodes(const int *conn,int nodesPer) 
@@ -233,6 +268,8 @@ class splitter {
 
 	/// Add this ghost, which arrises because of a mirror symmetry condition.
 	void addSymmetryGhost(const elemList &a);
+	/// Add the real element (srcType,srcNum) as a ghost for use by (destType,destNum).
+	void addGlobalGhost(int srcType,int srcNum,  int destType,int destNum, bool addNodes);
 	
 	/// Check if src should be added as a ghost on dest's chunk.
 	/// Calls addGhostElement and addGhostNode.
@@ -447,6 +484,7 @@ void FEM_Mesh_split(FEM_Mesh *mesh,int nChunks,
 {
 	const int *elem2chunk=partition.getPartition(mesh,nChunks);
 	//Check the elem2chunk mapping:
+	CkThresholdTimer time("FEM Split> Setting up",1.0);
 	checkArrayEntries(elem2chunk,mesh->nElems(),nChunks,
 		"elem2chunk, from FEM_Set_Partition or metis,");
 	check(mesh);
@@ -455,17 +493,17 @@ void FEM_Mesh_split(FEM_Mesh *mesh,int nChunks,
 	mesh->setSymList(partition.getSymList());
 	splitter s(mesh,elem2chunk,nChunks);
 
+	time.start("FEM Split> Finding comm lists");
 	s.buildCommLists();
 	
-	s.separateSparse(false); //Copies real sparse elements
-	
+	time.start("FEM Split> Finding ghosts");
+	s.separateSparse(false); //Copies real sparse elements	
 	s.addGhosts(partition);
-	
 	s.separateSparse(true); //Copies ghost sparse elements
 	
-	s.aboutToCreate(); //Free up memory
-	
+	time.start("FEM Split> Copying mesh data");
 	//Split up and send out the mesh
+	s.aboutToCreate(); //Free up memory
 	for (int c=0;c<nChunks;c++)
 		out->accept(c,s.createMesh(c));
 }
@@ -723,13 +761,36 @@ void splitter::addGhosts(const FEM_Partition &partition)
 		addLayer(partition.getLayer(i),partition);
 		consistencyCheck();
 	}
+
+// Add any stencils 
+	totGhostElem=0,totGhostNode=0; //For debugging
+
+	for (int t=0;t<mesh->elem.size();t++) 
+	  if (mesh->elem.has(t)) {
+		const FEM_Ghost_Stencil *s=partition.getGhostStencil(t);
+		if (s==NULL) continue;
+		s->check(*mesh);
+		int i,j,n=mesh->elem[t].size();
+		for (i=0;i<n;i++) {
+			const int *nbor;
+			j=0;
+			while (NULL!= (nbor=s->getNeighbor(i,j++))) {
+				/* Element i depends on element nbor[1],
+				   which is of type nbor[0]. */
+				addGlobalGhost(nbor[0],nbor[1],t,i, s->wantNodes());
+			}
+		}
+	}
+	
+	if (totGhostElem>0)
+	  CkPrintf("FEM Ghost stencil> %d new ghost elements, %d new ghost nodes\n",
+	       totGhostElem,totGhostNode);
 	
 	delete[] ghostNode; ghostNode=NULL;
 }
 
-
 //Add one layer of ghost elements
-void splitter::addLayer(const ghostLayer &g,const FEM_Partition &partition)
+void splitter::addLayer(const FEM_Ghost_Layer &g,const FEM_Partition &partition)
 {
 	tupleTable table(g.nodesPerTuple);
 	
@@ -812,6 +873,19 @@ void splitter::addSymmetryGhost(const elemList &a)
 {
 	if (a.sym==0) return; //Not a symmetry ghost
 	CkAbort("FEM map> Mirror symmetry ghosts not yet supported");
+}
+
+/// Add the real element (srcType,srcNum) as a ghost for use by (destType,destNum).
+void splitter::addGlobalGhost(
+	int srcType,int srcNum,  int destType,int destNum, bool doAddNodes)
+{
+	chunkList &srcC=gElem[srcType][srcNum];
+	chunkList &destC=gElem[destType][destNum];
+	if (srcC.chunk!=destC.chunk) { // On separate chunks-- try to add them:
+		elemList src(srcC.chunk, srcC.localNo, srcType, (FEM_Symmetries_t)0);
+		elemList dest(destC.chunk, destC.localNo, destType, (FEM_Symmetries_t)0);
+		addGhostPair(src,dest,doAddNodes);
+	}
 }
 
 /**
@@ -953,7 +1027,7 @@ void splitter::consistencyCheck(void)
 #endif
 	if (skipCheck) return; //Skip check in production code
 
-	printf("FEM> Performing consistency check...\n");
+	CkThresholdTimer time("FEM Split> Performing consistency check",1.0);
 
 	int t,c;
 	FEM_Symmetries_t sym=noSymmetries;
@@ -1001,8 +1075,6 @@ void splitter::consistencyCheck(void)
 	}
 
 	//FIXME: Make sure all the communication lists exactly match
-	
-	printf("FEM> Consistency check passed\n");
 }
 
 /****************** Assembly ******************
