@@ -91,8 +91,7 @@ public:
 	virtual CmiBool isPacking(void) const;//<- these all default to false
 	virtual CmiBool isUnpacking(void) const;
         //required for optimizations for thread migrators
-        virtual void *getBuf(void);
-        virtual void advance(int n);
+        virtual void *getBuf(int n);
 //For single elements, pretend it's an array containing one element
 	void operator()(signed char &v,const char *desc=NULL)     {(*this)(&v,1,desc);}
 	void operator()(char &v,const char *desc=NULL)            {(*this)(&v,1,desc);}
@@ -171,10 +170,10 @@ public:
 	//Write data to the given buffer
 	sizer(void) {nBytes=0;}
 	virtual CmiBool isSizing(void) const;
-        virtual void advance(int n);
 	
 	//Return the current number of bytes to be packed
 	int size(void) const {return nBytes;}
+        virtual void* getBuf(int n);
 };
 
 //For packing into a preallocated, presized memory buffer
@@ -186,8 +185,7 @@ protected:
 public:
 	//Write data to the given buffer
 	toMem(void *Nbuf) {buf=(myByte *)Nbuf;}
-        virtual void* getBuf(void);
-        virtual void advance(int n);
+        virtual void* getBuf(int n);
 };
 
 //For unpacking from a memory buffer
@@ -199,8 +197,7 @@ protected:
 public:
 	//Read data from the given buffer
 	fromMem(const void *Nbuf) {buf=(const myByte *)Nbuf;}
-        virtual void* getBuf(void);
-        virtual void advance(int n);
+        virtual void* getBuf(int n);
 };
 
 //For packing to a disk file
@@ -303,15 +300,13 @@ pupOpaqueObject(PUP::er &p, void *t, int &tsize, CkPacksizeFn pksz,
     retval = t;
   }
   p(tsize);
+  void *buf = p.getBuf(tsize);
   if(p.isPacking())
   {
-    pk(t,p.getBuf());
+    pk(t,buf);
     retval = 0;
   }
   if(p.isUnpacking())
-  {
-    retval = upk(p.getBuf());
-  }
-  p.advance(tsize);
+    retval = upk(buf);
   return retval;
 }
