@@ -32,7 +32,7 @@ ArrayMigrateMessage::unpack(void *in)
   CkPrintf("PE %d Unpacking me=%d from=%d index=%d elementSize=%d\n",
     CkMyPe(),me,me->from,me->index,me->elementSize);
   */
-  me->elementData = (char *)&(me->elementData) + (int)me->elementData;
+  me->elementData = (char *)&(me->elementData) + (size_t)me->elementData;
   return me;
 }
 
@@ -133,6 +133,7 @@ void Array1D::send(ArrayMessage *msg, int index, EntryIndexType ei)
 {
   msg->destIndex = index;
   msg->entryIndex = ei;
+  msg->hopCount = 0;
   if (elementIDs[index].state == here) {
     // CkPrintf("PE %d sending local message to index %d\n",CkMyPe(),index);
     CkSendMsg(ei,msg,&elementIDs[index].elementHandle);
@@ -164,6 +165,7 @@ void Array1D::RecvForElement(ArrayMessage *msg)
   /*
   CkPrintf("PE %d RecvForElement sending to index %d\n",CkMyPe(),msg->destIndex);
   */
+  msg->hopCount++;
   if (elementIDs[msg->destIndex].state == here) {
     // CkPrintf("PE %d DELIVERING index %d RecvForElement state %d\n",
       // CkMyPe(),msg->destIndex,elementIDs[msg->destIndex].state);

@@ -172,6 +172,7 @@ class ArrayMessage : public CMessage_ArrayMessage
 public:
   int destIndex;
   EntryIndexType entryIndex;
+  int hopCount;
 };
 
 class ArrayElementAckMessage : public CMessage_ArrayElementAckMessage
