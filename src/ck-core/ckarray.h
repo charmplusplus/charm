@@ -365,19 +365,12 @@ class CkMarshallMsg : public CMessage_CkMarshallMsg {
 public: char *msgBuf;
 };
 
-class CkProcSpeedMsg : public CMessage_CkProcSpeedMsg {
- private:
-   int _pe, _speed;
- public:
-   CkProcSpeedMsg(int pe, int speed) { _pe = pe; _speed = speed; }
-   int getPe(void) { return _pe; }
-   int getSpeed(void) { return _speed; }
-};
-
 static inline CkGroupID CkCreatePropMap(void)
 {
   return CProxy_PropMap::ckNew();
 }
+
+extern void _propMapInit(void);
 
 class CkArrayRec;//An array element record
 

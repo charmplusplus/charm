@@ -51,10 +51,10 @@ module CkArray {
     entry RRMap(void);
   };
 
-  message CkProcSpeedMsg;
+  initcall void _propMapInit(void);
+
   group PropMap : CkArrayMap {
     entry PropMap(void);
-    entry void recv(CkProcSpeedMsg *);
   };
 
   mainchare CkArrayInit {

@@ -221,6 +221,7 @@ class arrInfo {
    {
      _nelems = n;
      _map = new int[_nelems];
+     distrib(speeds);
    }
    ~arrInfo() { delete[] _map; }
    int getMap(const CkArrayIndex &i);
@@ -287,36 +288,65 @@ arrInfo::getMap(const CkArrayIndex &i)
     return _map[((i.hash()+739)%1280107)%_nelems];
 }
 
+CpvStaticDeclare(int*, speeds);
+
+#if CMK_USE_PROP_MAP
+typedef struct _speedmsg
+{
+  char hdr[CmiMsgHeaderSizeBytes];
+  int pe;
+  int speed;
+} speedMsg;
+
+static void _speedHdlr(void *m)
+{
+  speedMsg *msg = (speedMsg *) m;
+  CpvAccess(speeds)[msg->pe] = msg->speed;
+  CmiFree(m);
+}
+
+void _propMapInit(void)
+{
+  CpvInitialize(int*, speeds);
+  CpvAccess(speeds) = new int[CmiNumPes()];
+  int hdlr = CmiRegisterHandler((CmiHandler)_speedHdlr);
+  CmiPrintf("[%d]Measuring processor speed for prop. mapping...\n", CmiMyPe());
+  int s = LDProcessorSpeed();
+  speedMsg msg;
+  CmiSetHandler(&msg, hdlr);
+  msg.pe = CmiMyPe();
+  msg.speed = s;
+  CmiSyncBroadcast(sizeof(msg), &msg);
+  CpvAccess(speeds)[CmiMyPe()] = s;
+  int i;
+  for(i=1;i<CmiNumPes();i++)
+    CmiDeliverSpecificMsg(hdlr);
+}
+#else
+void _propMapInit(void)
+{
+  CpvInitialize(int*, speeds);
+  CpvAccess(speeds) = new int[CmiNumPes()];
+  int i;
+  for(i=0;i<CmiNumPes();i++)
+    CpvAccess(speeds)[i] = 1;
+}
+#endif
+
 class PropMap : public CkArrayMap
 {
 private:
-  int numrecd;
-  int *speeds;
   CkVec<arrInfo *> arrs;
 public:
   PropMap(void)
   {
     CpvInitialize(double*, rem);
-    speeds = new int[CkNumPes()];
-    numrecd = 0;
-    CkPrintf("Measuring processor speed for prop. mapping...\n");
-    int s = LDProcessorSpeed();
-    CProxy_PropMap grp(thisgroup);
-    grp.recv(new CkProcSpeedMsg(CkMyPe(),s));
   }
   PropMap(CkMigrateMessage *m) {}
-  void recv(CkProcSpeedMsg *m)
-  {
-    speeds[m->getPe()] = m->getSpeed();
-    delete m;
-    numrecd++;
-    if(numrecd==CkNumPes())
-      setReady();
-  }
   int registerArray(CkArrayMapRegisterMessage *msg)
   {
     int idx = arrs.length();
-    arrs.insertAtEnd(new arrInfo(msg->numElements, speeds));
+    arrs.insertAtEnd(new arrInfo(msg->numElements, CpvAccess(speeds)));
     delete msg;
     return idx;
   }
