@@ -1585,6 +1585,7 @@ void ConverseCommonInit(char **argv)
 {
 #if NODE_0_IS_CONVHOST
   int i,j;
+  char *ptr;
 #endif
   CmiTimerInit();
   CstatsInit(argv);
@@ -1613,17 +1614,17 @@ void ConverseCommonInit(char **argv)
   CmiEnableAsyncIO(hostskt);
   CHostRegister();
  
-  if(CmiMyPe() == 0){
-    char *ptr;
-    i = 0;
-    for(ptr = argv[i]; ptr != 0; i++, ptr = argv[i])
-      if(strcmp(ptr, "++server") == 0) {
+  /*  if(CmiMyPe() == 0){ */
+  i = 0;
+  for(ptr = argv[i]; ptr != 0; i++, ptr = argv[i])
+    if(strcmp(ptr, "++server") == 0) {
+      if (CmiMyPe() == 0)
 	serverFlag = 1;
-	for(j = i; argv[j] != 0; j++)
-	  argv[j] = argv[j+1];
-        break;
-      }
-  }
+      for(j = i; argv[j] != 0; j++)
+	argv[j] = argv[j+1];
+      break;
+    }
+  /*   } */
 #endif
   CldModuleInit();
   CrnInit();

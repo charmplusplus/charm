@@ -80,6 +80,13 @@ typedef struct {
 
 USER_PARAMETERS usrparam;
 
+static int CountArgs(char **argv)
+{
+  int count=0;
+  while (argv[0]) { count++; argv++; }
+  return count;
+}
+
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 {
   int i;
@@ -176,7 +183,7 @@ static void threadInit(void *arg)
   usadd(arena);
   ConverseCommonInit(usrparam->argv);
   if (usrparam->initret==0) {
-    usrparam->fn(usrparam->argc, usrparam->argv);
+    usrparam->fn(CountArgs(usrparam->argv), usrparam->argv);
     if (usrparam->usched==0) CsdScheduler(-1);
     ConverseExit();
   }
