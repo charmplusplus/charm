@@ -7,8 +7,9 @@
 #include <string.h>
 #include <list>
 #include <stack>
-template<class T> class DefaultEntry;  // needed in msa-DistPageMgr.ci, i.e. in msa.decl.h
 #include "msa-common.h"
+// forward decl needed in msa-DistPageMgr.ci, i.e. in msa.decl.h
+template<class T> class DefaultEntry;
 #include "msa.decl.h"
 
 using namespace std;
@@ -104,6 +105,7 @@ public:
 };
 
 //================================================================
+// THIS CODE IS UNUSED AS YET.
 
 /**
   Holds the untyped data for one MSA page.
@@ -173,9 +175,6 @@ public:
 template <class ENTRY_TYPE, class ENTRY_OPS_CLASS>
 class CacheGroup : public Group
 {
-// private:
-//     CkIndex_CacheGroup<ENTRY_TYPE, ENTRY_OPS_CLASS> ignore_me;  // just for template instantiation.
-
 protected:
     ENTRY_OPS_CLASS *entryOpsObject;
     unsigned int numberOfWorkerThreads;      // number of worker threads across all processors for this shared array
@@ -183,9 +182,10 @@ protected:
     unsigned int numberLocalWorkerThreads;   // number of worker threads on THIS processor for this shared array
     unsigned int enrollDoneq;                 // has enroll() been done on this processor?
 
-    page_ptr_t* pageTable;          // the page table for this PE
+    ENTRY_TYPE** pageTable;          // the page table for this PE
     unsigned int nPages;            // number of pages
-    unsigned int bytesPerPage;      // bytes per page
+//     unsigned int bytesPerPage;      // bytes per page
+    unsigned int numEntriesPerPage;      // number of entries per page
 
     char* pageState;                // for each available page, indicates whether its a read only
                                     // or read-write copy
@@ -220,7 +220,7 @@ protected:
 
     page_queue_entry_t* pageQueue;          // a queue of threads waiting for a given page
 
-    stack<page_ptr_t> pagePool;     // a pool of unused pages
+    stack<ENTRY_TYPE*> pagePool;     // a pool of unused pages
     vmLRUReplacementPolicy* replacementPolicy;
 
     // structure for the bounds of a single write
@@ -239,6 +239,12 @@ protected:
 
     int syncThreadCount;            // number of local threads that have issued Sync
     int syncThread;                 // thread that handles final sync call
+    /*********************************************************************************/
+
+    inline unsigned int indexToBytes(unsigned int index) { return index * sizeof(ENTRY_TYPE); }
+    inline unsigned int bytesToIndex(unsigned long int bytes) { CkAssert(bytes%sizeof(ENTRY_TYPE) ==0); return bytes/sizeof(ENTRY_TYPE); }
+    inline unsigned int getBPP() { return indexToBytes(numEntriesPerPage); }
+
     /*********************************************************************************/
     /** these routines deal with managing the page queue **/
     inline CthThread getThread() { return CthSelf(); }
@@ -350,9 +356,9 @@ protected:
     inline void pageFault(unsigned int page, int why)
     {
         // get an empty buffer into which to fetch the new page
-        page_ptr_t nu = pageTable[page];
+        ENTRY_TYPE* nu = pageTable[page];
         if (nu==0)
-            nu = getBuffer();
+            nu = getBuffer(); // @@@
 
         if(nu == NULL)
         {
@@ -372,7 +378,7 @@ protected:
         {
             // If the page has not been requested already, then request it.
             if (pageQueue[page].pageQueues[0].size()==0) {
-                pageArray[page].GetPage(thisgroup, CkMyPe(), bytesPerPage);
+                pageArray[page].GetPage(thisgroup, CkMyPe(), numEntriesPerPage);
                 //ckout << "Requesting page first time"<< endl;
             } else
                 ;//ckout << "Requesting page next time.  Skipping request."<< endl;
@@ -384,11 +390,11 @@ protected:
         }
         else if(why == Write_Fault)
         {
-            memset(nu, 0, bytesPerPage);
+            memset(nu, 0, getBPP()); // @@@ Is this OK for variable-size pages?
         }
         else
         {
-            zero(page, 0, bytesPerPage - 1);
+            zero(page, 0, numEntriesPerPage - 1);  // @@@
         }
     }
 
@@ -437,9 +443,9 @@ protected:
     }
 
     // Returns NULL if no page buffer available
-    inline void* getBuffer(int async=0)
+    inline ENTRY_TYPE* getBuffer(int async=0) // @@@
     {
-        void* nu = NULL;
+        ENTRY_TYPE* nu = NULL;
 
         // first try the page pool
         if(!pagePool.empty())
@@ -448,11 +454,11 @@ protected:
             pagePool.pop();
         }
 
-        // else try to allocate the buffer using malloc
-        if(nu == NULL && bytes + bytesPerPage <= max_bytes)
+        // else try to allocate the buffer
+        if(nu == NULL && bytes + getBPP() <= max_bytes)
         {
-            nu = malloc(bytesPerPage);
-            bytes += bytesPerPage;
+            nu = new ENTRY_TYPE[numEntriesPerPage];//malloc(bytesPerPage);
+            bytes += getBPP();
         }
 
         // else swap one of the pages
@@ -489,6 +495,13 @@ protected:
     // this function assumes that there are no overlapping writes in the list
     inline void sendChangesToPageArray(const unsigned int page, const int async)
     {
+        sendNonRLEChangesToPageArray(page, async);
+    }
+
+    inline void sendNonRLEChangesToPageArray(const unsigned int page, const int async) // @@@
+    {
+//         pageArray[page].ReceivePage(pageTable[page], numEntriesPerPage, thisgroup, CkMyPe(), pageState[page]);
+
         typename list<writebounds_t>::iterator iter;
         unsigned int i;
         // do a run length encoding of the writes. This encoding has the
@@ -503,7 +516,7 @@ protected:
 
         // allocate a buffer for creating the run
         unsigned int numRuns = writes[page]->size();
-        unsigned int buffSize = 3*sizeof(unsigned int)*numRuns + bytesPerPage;
+        unsigned int buffSize = 3*sizeof(unsigned int)*numRuns + getBPP();
         char* buffer = (char*)malloc(buffSize);
 
         //ckout << "[" << CkMyPe() << "] doing RLE encoding for page " << page << " with " << numRuns << "run(s)" << endl;
@@ -516,7 +529,7 @@ protected:
 
         // check the writes list
         for(iter = writes[page]->begin(); iter != writes[page]->end(); iter++)
-            CkAssert(iter->begin < bytesPerPage && iter->end < bytesPerPage && iter->begin < iter->end);
+            CkAssert(iter->begin < getBPP() && iter->end < getBPP() && iter->begin < iter->end);
 
         unsigned int currOffset = numRuns*sizeof(unsigned int);
         for(iter = writes[page]->begin(), i = 0; iter != writes[page]->end(); i++)
@@ -525,7 +538,80 @@ protected:
             ((unsigned int*)buffer)[i] = currOffset;
             unsigned int begin = iter->begin;
             unsigned int end = iter->end;
-            CkAssert(begin < bytesPerPage && end < bytesPerPage);
+//             CkAssert(begin < getBPP() && end < getBPP());
+            *((unsigned int*)(buffer + currOffset)) = begin; currOffset += sizeof(unsigned int);
+            *((unsigned int*)(buffer + currOffset)) = end; currOffset += sizeof(unsigned int);
+//             memcpy(buffer + currOffset, (char*)(pageTable[page]) + begin, end - begin + 1);
+            ENTRY_TYPE *bufPtr = (ENTRY_TYPE *)(buffer + currOffset);
+            ENTRY_TYPE *pagePtr = (ENTRY_TYPE *)((char*)(pageTable[page]) + begin);
+            for(int j=0; j< bytesToIndex(end - begin + 1); j++)
+                bufPtr[j] = pagePtr[j];
+            currOffset += end - begin + 1;
+            iter = writes[page]->erase(iter);
+        }
+
+        //ckout << "RLE encoding of " << currOffset << " bytes" << ", num writes for this page now = " << writes[page]->size() << endl;
+
+        *((unsigned int*)buffer) = numRuns;
+
+        // send the RLE'd buffer to the page array
+
+        CkAssert(page < nPages); // 0 <= page always, bcoz page is uint
+        //ckout << "[" << CkMyPe() << "] sending page " << page << "to page array " << endl;
+        pageArray[page].ReceiveRLEPage(buffer, currOffset, getBPP(), thisgroup, CkMyPe(), pageState[page]);
+        free(buffer);
+        //nChangesWaiting++;
+        IncrementChangesWaiting(page);
+
+        // TODO: Is this acknowledgement really necessary ?
+        if(!async)
+        {
+            //ckout << "[" << CkMyPe() << "] suspending thread in send changes to page array" << endl;
+            suspendThread();
+            //ckout << "[" << CkMyPe() << "] resumed thread in send changed to page array" << endl;
+        }
+    }
+
+    // this function assumes that there are no overlapping writes in the list
+    inline void sendRLEChangesToPageArray(const unsigned int page, const int async) // @@@
+    {
+        typename list<writebounds_t>::iterator iter;
+        unsigned int i;
+        // do a run length encoding of the writes. This encoding has the
+        // following format:
+        // <unsigned int>  : number of runs
+        // <unsigned int>+ : offset of each run in the data stream (except first)
+        // <for each run: start and end offsets of write followed by data>
+
+        // if there are 'k' runs and there are 'b' bytes per page, then the length
+        // of the entire encoding is bounded by:
+        // k*sizeof(unsigned int) + k*2*sizeof(unsigned int) + b
+
+        // allocate a buffer for creating the run
+        unsigned int numRuns = writes[page]->size();
+        unsigned int buffSize = 3*sizeof(unsigned int)*numRuns + getBPP();
+        char* buffer = (char*)malloc(buffSize);
+
+        //ckout << "[" << CkMyPe() << "] doing RLE encoding for page " << page << " with " << numRuns << "run(s)" << endl;
+
+        if(writes[page] == NULL || writes[page]->size() == 0)
+        {
+            //ckout << "[" << CkMyPe() << "] send changes request for empty page " << endl;
+            return;
+        }
+
+        // check the writes list
+        for(iter = writes[page]->begin(); iter != writes[page]->end(); iter++)
+            CkAssert(iter->begin < getBPP() && iter->end < getBPP() && iter->begin < iter->end);
+
+        unsigned int currOffset = numRuns*sizeof(unsigned int);
+        for(iter = writes[page]->begin(), i = 0; iter != writes[page]->end(); i++)
+        {
+            // write the offset of this write
+            ((unsigned int*)buffer)[i] = currOffset;
+            unsigned int begin = iter->begin;
+            unsigned int end = iter->end;
+            CkAssert(begin < getBPP() && end < getBPP());
             *((unsigned int*)(buffer + currOffset)) = begin; currOffset += sizeof(unsigned int);
             *((unsigned int*)(buffer + currOffset)) = end; currOffset += sizeof(unsigned int);
             memcpy(buffer + currOffset, (char*)(pageTable[page]) + begin, end - begin + 1);
@@ -541,8 +627,8 @@ protected:
 
         CkAssert(page < nPages); // 0 <= page always, bcoz page is uint
         //ckout << "[" << CkMyPe() << "] sending page " << page << "to page array " << endl;
-        pageArray[page].ReceiveRLEPage(buffer, currOffset, bytesPerPage, thisgroup, CkMyPe(), pageState[page]);
-        delete[] buffer;
+        pageArray[page].ReceiveRLEPage(buffer, currOffset, getBPP(), thisgroup, CkMyPe(), pageState[page]);
+        free(buffer);
         //nChangesWaiting++;
         IncrementChangesWaiting(page);
 
@@ -562,62 +648,63 @@ protected:
     }
 
     // TODO: combine multiple consecutive spans into a single span
-    inline void addToWriteList(unsigned int page, unsigned int begin, unsigned int end)
+    inline void addToWriteList(unsigned int page, unsigned int beginByte, unsigned int endByte) // @@@@
     {
         createWriteList(page);
 
-        CkAssert(begin < bytesPerPage && end < bytesPerPage && begin < end);
+        CkAssert(beginByte < getBPP() && endByte < getBPP() && beginByte < endByte);
 
         // combine consecutive spans into a single span
         typename list<writebounds_t>::iterator i;
         for(i = writes[page]->begin(); i != writes[page]->end(); i++)
         {
-            if(i->begin <= begin && i->end >= end)
+            if(i->begin <= beginByte && i->end >= endByte)
                 return;
-            else if(i->begin == end + 1)
+            else if(i->begin == endByte + 1)
             {
-                i->begin = begin;
-                if(pageState[page] == Accumulate_Fault) zero(page, begin, end);
+                i->begin = beginByte;
+                if(pageState[page] == Accumulate_Fault)
+                    zero(page, bytesToIndex(beginByte), bytesToIndex(endByte));
                 return;
             }
-            else if(i->end == begin - 1)
+            else if(i->end == beginByte - 1)
             {
-                i->end = end;
+                i->end = endByte;
                 CkAssert(i->begin < i->end);
-                if(pageState[page] == Accumulate_Fault) zero(page, begin, end);
+                if(pageState[page] == Accumulate_Fault)
+                    zero(page, bytesToIndex(beginByte), bytesToIndex(endByte));
                 return;
             }
         }
 
         writebounds_t b;
-        b.begin = begin; b.end = end;
+        b.begin = beginByte; b.end = endByte;
         writes[page]->push_back(b);
-        if(pageState[page] == Accumulate_Fault) zero(page, begin, end);
+        if(pageState[page] == Accumulate_Fault)
+            zero(page, bytesToIndex(beginByte), bytesToIndex(endByte));
     }
 
-    // TODO: call type specific combiner here, right now assume int
+    // begin, end are indexes
+    //
     // CacheGroup::
-    void combine(unsigned int page, const void* entry, unsigned int begin, unsigned int end)
+    void combine(unsigned int page, const ENTRY_TYPE* entryPtr, unsigned int begin, unsigned int end)
     {
-        ENTRY_TYPE* pagePtr = (ENTRY_TYPE*)((char*)pageTable[page] + begin);
-        ENTRY_TYPE* entryPtr = (ENTRY_TYPE*)entry;
-
-        for(unsigned int i = 0; i < (end - begin + 1)/sizeof(ENTRY_TYPE); i++)
+        ENTRY_TYPE* pagePtr = pageTable[page] + begin;
+        for(unsigned int i = 0; i < (end - begin + 1); i++)
             entryOpsObject->accumulate(pagePtr[i], entryPtr[i]);
     }
 
-    // TODO: call type specific initializer here
-    // begin, end are byte offsets
+    // begin, end are indexes
     // CacheGroup::
     //
-    // Rename this function.  zero actually means identity, e.g. if
+    // @@ Rename this function.  zero actually means identity, e.g. if
     // accumulate is SUM, then identity is 0; if product, identity is
     // 1.
     void zero(unsigned int page, unsigned int begin, unsigned int end)
     {
         // @@ assert ((end-begin +1)%sizeof(double) == 0)
-        ENTRY_TYPE* pagePtr = (ENTRY_TYPE*)((char*)pageTable[page] + begin);
-        for(unsigned int i = 0; i < (end - begin + 1)/sizeof(ENTRY_TYPE); i++)
+        ENTRY_TYPE* pagePtr = pageTable[page] + begin;
+        for(unsigned int i = 0; i < (end - begin + 1); i++)
             pagePtr[i] = entryOpsObject->getIdentity();
     }
 
@@ -631,6 +718,9 @@ protected:
     }
 
 public:
+
+    // 
+    //
     // CacheGroup::
     inline CacheGroup(unsigned int nPages_, unsigned int bytesPerPage_, CkArrayID pageArrayID,
                       unsigned int max_bytes_, unsigned int nEntries_, unsigned int numberOfWorkerThreads_)
@@ -640,7 +730,9 @@ public:
         enrollDoneq = 0;  // populated after enroll
 
         nPages = nPages_;
-        bytesPerPage = bytesPerPage_;
+        //bytesPerPage = bytesPerPage_;
+        CkAssert(bytesPerPage_%sizeof(ENTRY_TYPE) == 0);
+        numEntriesPerPage = bytesToIndex(bytesPerPage_);
         pageArray = CProxy_PageArray<ENTRY_TYPE, ENTRY_OPS_CLASS>(pageArrayID);
         bytes = 0;
         outOfBufferInPrefetch = 0;
@@ -648,7 +740,8 @@ public:
         entryOpsObject = new ENTRY_OPS_CLASS();
 
         // initialize the page table
-        pageTable = new page_ptr_t[nPages];
+        typedef ENTRY_TYPE* entry_type_ptr;
+        pageTable = new entry_type_ptr[nPages];
         pageState = new char[nPages];
         pageLock = new char[nPages];
         writes = new writelist_t*[nPages];
@@ -659,7 +752,7 @@ public:
         syncThreadCount = 0;
         syncThread = -1;
 
-        replacementPolicy = new vmLRUReplacementPolicy(pageTable, pageLock);
+        replacementPolicy = new vmLRUReplacementPolicy((page_ptr_t*) pageTable, pageLock);
 
         for(unsigned int i = 0; i < nPages; i++)
         {
@@ -689,10 +782,17 @@ public:
     }
 
     // CacheGroup::
-    inline const void* readablePage(unsigned int page)
+    inline const ENTRY_TYPE* readablePage(unsigned int page)
     {
         // If the page is not allocated, or even if it is, but there's
         // someone waiting for it to come back, then call pageFault.
+//         if (page == 6)
+//             ckout << "CacheGroup::readablePage " << page
+//                   << " " << pageTable[page]
+//                   << endl;
+        if (!(pageState[page]==Read_Fault || pageState[page]==Uninit_State))
+            ckout << "MSA Runtime error: Attempting to read from a page that is still in another mode." << endl;
+
         if ((pageTable[page] == 0) || (pageQueue[page].pageQueues[0].size()!=0))
             pageFault(page, Read_Fault);
         replacementPolicy->pageAccessed(page);
@@ -711,8 +811,17 @@ public:
     // obtains a write lock on the page.
     // begin and end are the offset in bytes into the page.
     // the caller is assumed to write only between begin and end ??
-    inline void* writeablePage(unsigned int page, unsigned int begin, unsigned int end)
-    {
+    inline ENTRY_TYPE* writeablePage(unsigned int page, unsigned int beginByte, unsigned int endByte)
+    { // @@@@
+//         if (page == 6 && beginByte <= 100)
+//             ckout << "CacheGroup::writeablePage " << page << " " << beginByte
+//                   << " " << endByte
+//                   << " " << pageTable[page]
+//                   << endl;
+
+        if (!(pageState[page]==Write_Fault || pageState[page]==Uninit_State))
+            ckout << "MSA Runtime error: Attempting to write to a page that is still in another mode." << endl;
+
         if(pageTable[page] == 0)
             pageFault(page, Write_Fault);
         else
@@ -729,14 +838,17 @@ public:
         // which bytes within a page are being modified. We store these indices in a
         // list.
 
-        addToWriteList(page, begin, end);
+        addToWriteList(page, beginByte, endByte);
         replacementPolicy->pageAccessed(page);
         return pageTable[page];
     }
 
     // CacheGroup::
-    inline void accumulate(unsigned int page, const void* entry, unsigned int begin, unsigned int end)
+    inline void accumulate(unsigned int page, const void* entry, unsigned int beginByte, unsigned int endByte)
     {
+        if (!(pageState[page]==Accumulate_Fault || pageState[page]==Uninit_State))
+            ckout << "MSA Runtime error: Attempting to accumulate to a page that is still in another mode." << endl;
+
         // What if multiple threads on pe access this page and it needs
         // to be fetched?  See readablePage().  Actually, its OK,
         // since for accumulate, no page is fetched.
@@ -745,14 +857,15 @@ public:
         else
             pageState[page] = Accumulate_Fault;
 
-        addToWriteList(page, begin, end);
-        combine(page, entry, begin, end);
+        addToWriteList(page, beginByte, endByte);
+        combine(page, entry, bytesToIndex(beginByte), bytesToIndex(endByte));
         replacementPolicy->pageAccessed(page);
     }
 
-    // bpp = bytes being sent (0 for empty page, bytesperpage otherwise)
-    inline void ReceivePage(unsigned int page, void* pageData, int isEmpty, int bpp)
+    // nEntriesInPage_ = num entries being sent (0 for empty page, num entries otherwise)
+    inline void ReceivePage(unsigned int page, ENTRY_TYPE* pageData, int isEmpty, int nEntriesInPage_)
     {
+        CkAssert(nEntriesInPage_ <=  numEntriesPerPage);
         // how many threads are waiting for this page?
         unsigned int size = pageQueue[page].pageQueues[0].size();
         //ckout << CkMyPe() << "Received page " << page << ", queue size = " << size << endl;
@@ -763,7 +876,8 @@ public:
         {
             /* check if a page has been allocated. if not probably this was a false/unused prefetch */
             if(pageTable[page])
-                memcpy(pageTable[page], pageData, bytesPerPage);
+                for(unsigned int i = 0; i < numEntriesPerPage; i++)
+                    pageTable[page][i] = pageData[i]; // @@@, calls assignment operator
         }
         else
         {
@@ -771,6 +885,8 @@ public:
             // TODO: this should ideally do type specific initialization
             // memset(pageTable[page], 0, bytesPerPage);
             // @@ do we need to allocate the page here?
+            if(pageTable[page])
+                memset(pageTable[page], 0, getBPP()); // @@@@ OK for now
         }
 
         // wake up the threads that are waiting for this page.
@@ -860,6 +976,7 @@ public:
         {
             if(pageTable[i] && (pageState[i] == Write_Fault || pageState[i] == Accumulate_Fault))
             {
+//                 ckout << "[" << CkMyPe() << "]" << "FlushCache sending page " << i << endl;
                 sendChangesToPageArray(i, 1);
             }
         }
@@ -910,7 +1027,7 @@ public:
         syncAckCount++;
         //ckout << "[" << CkMyPe() << "] SyncAckcount = " << syncAckCount << endl;
         if(syncAckCount == numberOfWorkerThreads) {
-            ckout << "[" << CkMyPe() << "]" << "Enroll operation is almost done" << endl;
+//             ckout << "[" << CkMyPe() << "]" << "Enroll operation is almost done" << endl;
             syncAckCount = 0;
             enrollDoneq = 1;
             CProxy_CacheGroup<ENTRY_TYPE, ENTRY_OPS_CLASS> self = thisgroup;
@@ -924,9 +1041,9 @@ public:
 
     inline void enrollDone()
     {
-        ckout << "[" << CkMyPe() << "] enrollDone.  Waking threads."
-              <<  " numberOfWorkerThreads=" << numberOfWorkerThreads
-              <<  " local=" << numberLocalWorkerThreads << endl;
+//         ckout << "[" << CkMyPe() << "] enrollDone.  Waking threads."
+//               <<  " numberOfWorkerThreads=" << numberOfWorkerThreads
+//               <<  " local=" << numberLocalWorkerThreads << endl;
         enrollDoneq = 1;
         // What if fewer worker threads than pe's ?  This pe may not
         // have any worker threads.
@@ -1069,7 +1186,7 @@ public:
         for(unsigned int i = 0; i < nPages; i++)
         {
             if(pageTable[i])
-                free(pageTable[i]);
+                delete [] pageTable[i]; // @@@
             if(writes[i])
                 delete writes[i];
         }
@@ -1078,7 +1195,7 @@ public:
 
         while(!pagePool.empty())
         {
-            free(pagePool.top());
+            delete [] pagePool.top();  // @@@
             pagePool.pop();
         }
 
@@ -1103,7 +1220,7 @@ public:
                 {
 
                     /* relocate the buffer asynchronously */
-                    page_ptr_t nu = getBuffer(1);
+                    ENTRY_TYPE* nu = getBuffer(1);
                     if(NULL == nu)
                     {
                         /* signal that sufficient buffer space is not available */
@@ -1114,13 +1231,13 @@ public:
                     pageTable[p] = nu;
                     pageState[p] = Read_Fault;
 
-                    pageArray[p].GetPage(thisgroup, CkMyPe(), bytesPerPage);
+                    pageArray[p].GetPage(thisgroup, CkMyPe(), numEntriesPerPage);
                     IncrementPagesWaiting(p);
                     //ckout << "Prefetch page" << p << ", pages waiting = " << nPagesWaiting << endl;
                     /* don't suspend the thread */
                 }
 
-                /* mark the page as begin locked */
+                /* mark the page as being locked */
                 pageLock[p] = 1;
             }
         }
@@ -1177,9 +1294,20 @@ public:
         memset(pageLock + startPage, 0, (endPage - startPage + 1)*sizeof(char));
     }
 
+    inline void emitBufferValue(unsigned int pageNum, unsigned int offset)
+    {
+        CkAssert( pageNum < nPages );
+        CkAssert( offset < numEntriesPerPage );
+
+        if (pageTable[pageNum] == 0)
+            ckout << "emitBufferValue: page " << pageNum << " not available in local cache." << endl;
+        else
+            ckout << "emitBufferValue: [" << pageNum << "," << offset << "] = " << pageTable[pageNum][offset] << endl;
+    }
+
     inline void emit(int offset)
     {
-        pageArray[0].emit(offset);
+        pageArray[6].emit(offset);
     }
 
 };
@@ -1194,57 +1322,58 @@ template<class ENTRY_TYPE, class ENTRY_OPS_CLASS>
 class PageArray : public ArrayElement1D
 {
 protected:
-    page_ptr_t page;                // the page data
-    unsigned int pageSize;          // the size of the page
+//     page_ptr_t page;                // the page data, @@@
+    ENTRY_TYPE *epage;
+//     unsigned int pageSize;          // the size of the page in bytes
+    unsigned int numEntries;
     unsigned char accumInit;        // flag to indicate whether the page has been initialized for
                                     // accumulate mode
     ENTRY_OPS_CLASS *entryOpsObject;
 
     unsigned int pageNo() { return thisIndex; }
 
-    inline void allocatePage(unsigned int bytesPerPage)
+    inline void allocatePage(unsigned int nEntriesInPage_) // @@@
     {
-        if(page == NULL)
+        if(epage == NULL)
         {
-            page = calloc(1, bytesPerPage);
-            pageSize = bytesPerPage;
+//             page = calloc(1, bytesPerPage); // @@@
+            epage = new ENTRY_TYPE[nEntriesInPage_];
+//             pageSize = bytesPerPage;
+            numEntries = nEntriesInPage_;
             accumInit = 0;
         }
     }
 
-    inline void set(const char* buffer, unsigned int begin, unsigned int end)
+    // begin and end are indexes into the page.
+    inline void set(const ENTRY_TYPE* buffer, unsigned int begin, unsigned int end)
     {
-        for(unsigned int i = 0; i < end - begin + 1; i++)
-            ((char*)page)[begin + i] = buffer[i];
+        for(unsigned int i = 0; i < (end - begin + 1); i++) {
+            epage[begin + i] = buffer[i]; // @@@, calls assignment operator
+        }
     }
 
-    // TODO: do type specific combining, right now assume int
     // PageArray::
-    inline void combine(const char* buffer, unsigned int begin, unsigned int end)
+    inline void combine(const ENTRY_TYPE* buffer, unsigned int begin, unsigned int end)
     {
-        const ENTRY_TYPE* buf = (ENTRY_TYPE*)buffer;
-        ENTRY_TYPE* pagePtr = (ENTRY_TYPE*)((char*)page + begin);
-
-        for(unsigned int i = 0; i < (end - begin + 1)/sizeof(ENTRY_TYPE); i++)
-            entryOpsObject->accumulate(pagePtr[i], buf[i]);
+        ENTRY_TYPE* pagePtr = epage + begin;
+        for(unsigned int i = 0; i < (end - begin + 1); i++)
+            entryOpsObject->accumulate(pagePtr[i], buffer[i]);
     }
 
-    // TODO: to type specific initialization, right now assume int
     // PageArray::
     inline void zero()
     {
-        ENTRY_TYPE* pagePtr = (ENTRY_TYPE*)page;
-
-        for(unsigned int i = 0; i < pageSize/sizeof(ENTRY_TYPE); i++)
-            pagePtr[i] = entryOpsObject->getIdentity();
+        for(unsigned int i = 0; i < numEntries; i++)
+            epage[i] = entryOpsObject->getIdentity();
     }
 
 public:
-    inline PageArray() : page(NULL), pageSize(0), accumInit(0) { entryOpsObject= new ENTRY_OPS_CLASS();}
+    inline PageArray() : epage(NULL), numEntries(0), accumInit(0) { entryOpsObject= new ENTRY_OPS_CLASS();}
     inline PageArray(CkMigrateMessage* m) { delete m; }
     inline ~PageArray()
     {
-        if(page) free(page);
+//         if(page) free(page); // @@@
+        if(epage) delete [] epage;
     }
 
     /* To change the accumulate function */
@@ -1253,17 +1382,53 @@ public:
     }
 
     // pe = to which to send page
-    inline void GetPage(CProxy_CacheGroup<ENTRY_TYPE, ENTRY_OPS_CLASS> cache, int pe, unsigned int bytesPerPage)
+    inline void GetPage(CProxy_CacheGroup<ENTRY_TYPE, ENTRY_OPS_CLASS> cache, int pe, unsigned int nEntriesInPage_)
     {
-        if(page == NULL)
-            cache[pe].ReceivePage(pageNo(), (char*)NULL, 1, 0); // send empty page
+        if(epage == NULL)
+            cache[pe].ReceivePage(pageNo(), (ENTRY_TYPE*)NULL, 1, 0); // send empty page
         else
-            cache[pe].ReceivePage(pageNo(), (char*)page, 0, bytesPerPage);
+            cache[pe].ReceivePage(pageNo(), epage, 0, nEntriesInPage_);  // @@@
     }
 
-    inline void ReceiveRLEPage(char* buffer, unsigned int size, unsigned int bytesPerPage, CProxy_CacheGroup<ENTRY_TYPE, ENTRY_OPS_CLASS> cache, int pe, int pageState)
+    inline void ReceivePage(ENTRY_TYPE *pageData, unsigned int nEntriesInPage_,
+                            CProxy_CacheGroup<ENTRY_TYPE, ENTRY_OPS_CLASS> cache,
+                            int pe, int pageState)
     {
-        allocatePage(bytesPerPage);
+        allocatePage(nEntriesInPage_);
+        if(accumInit == 0 && pageState == Accumulate_Fault) {
+            ckout << "Zeroing the page" << endl;
+            zero();
+            accumInit = 1;
+        }
+
+        if(pageState == Write_Fault)
+            set(pageData, 0, nEntriesInPage_-1); // @@@@, 0 should be got from entryOpsObject
+        else
+            combine(pageData, 0, nEntriesInPage_-1);
+
+        //ckout << "Page #" << thisIndex << " received " << val << " as " << ((pageState == Write_Fault) ? "Write" : "Accumulate") << endl;
+
+        // send the acknowledgement to the sender that we received 1 RLE page
+        //ckout << "Sending AckRLE to PE " << pe << endl;
+        cache[pe].AckRLEPage(thisIndex);
+    }
+
+    inline unsigned int bytesToIndex(unsigned long int bytes) {
+        CkAssert(bytes%sizeof(ENTRY_TYPE) ==0); return bytes/sizeof(ENTRY_TYPE); }
+    inline unsigned int bytesToIndexNoCheck(unsigned long int bytes) {
+        return bytes/sizeof(ENTRY_TYPE); }
+
+    // @@@
+    inline void ReceiveRLEPage(char* buffer, unsigned int size, unsigned int bytesPerPage,
+                               CProxy_CacheGroup<ENTRY_TYPE, ENTRY_OPS_CLASS> cache, int pe, int pageState)
+    {
+//         ckout << "[" << CkMyPe() << "] ReceiveRLEPage "
+//               << " size=" << size
+//               << " bpp=" << bytesPerPage
+//               << " sizeof=" << sizeof(ENTRY_TYPE)
+//               << " pe=" << pe
+//               << endl;
+        allocatePage(bytesToIndex(bytesPerPage)); // @@@
 
         // decode the buffer into the page using OR'ing as the combining operation. This
         // os OK since if an element will not be written twice
@@ -1282,8 +1447,8 @@ public:
         for(unsigned int i = 0; i < runlength; i++)
         {
             unsigned int offset = ((unsigned int*)buffer)[i];
-            unsigned int begin = *((unsigned int*)(buffer + offset)); offset += sizeof(unsigned int);
-            unsigned int end = *((unsigned int*)(buffer + offset)); offset += sizeof(unsigned int);
+            unsigned int beginByte = *((unsigned int*)(buffer + offset)); offset += sizeof(unsigned int);
+            unsigned int endByte = *((unsigned int*)(buffer + offset)); offset += sizeof(unsigned int);
 
             //if(i == 0 && thisIndex == 0)
             //  ckout << "PageArray[" << thisIndex << "] received " << *((double*)(buffer + offset)) << endl;
@@ -1291,12 +1456,12 @@ public:
             if(pageState == Write_Fault)
             {
 //                 val = *((double*)(buffer + offset));
-                set(buffer + offset, begin, end);
+                set((ENTRY_TYPE*)(buffer + offset), bytesToIndex(beginByte), bytesToIndexNoCheck(endByte)); // @@@
             }
             else
             {
 //                 val = *((double*)(buffer+offset));
-                combine(buffer + offset, begin, end);
+                combine((ENTRY_TYPE*)(buffer + offset), beginByte/sizeof(ENTRY_TYPE), endByte/sizeof(ENTRY_TYPE)); // @@@
             }
         }
 
@@ -1314,18 +1479,18 @@ public:
         contribute(0, NULL, CkReduction::concat);
     }
 
-    inline void emit(int offset)
+    inline void emit(int index)
     {
-        ckout << "emit: " << ((double*)page)[offset] << endl;
+        ckout << "emit: " << epage[index] << endl;
     }
 
     inline void pup(PUP::er& p)
     {
-        p | pageSize;
+        p | numEntries;  // @@@
         p | accumInit;
-        if(pageSize != 0 && p.isUnpacking())
-            allocatePage(pageSize);
-        p(page, pageSize);
+        if(numEntries != 0 && p.isUnpacking())
+            allocatePage(numEntries);
+        p(epage, numEntries);
     }
 };
 
