@@ -3,7 +3,7 @@
 
 #include "ckmulticast.h"
 
-#define DEBUGF(x)  // CmiPrintf x;
+#define DEBUGF(x)   // CkPrintf x;
 
 #define MAXMCASTCHILDREN  2
 
@@ -155,6 +155,7 @@ void CkMulticastMgr::setSection(CkSectionCookie &id)
   initCookie(id);
 }
 
+// this is used
 void CkMulticastMgr::setSection(CProxySection_ArrayElement &proxy)
 {
   CkSectionCookie &_id = proxy.ckGetSectionCookie();
@@ -174,7 +175,7 @@ void CkMulticastMgr::initCookie(CkSectionCookie s)
 {
   mCastEntry *entry = (mCastEntry *)s.val; 
   int n = entry->allElem.length();
-  DEBUGF(("init: %d elems\n", n));
+  DEBUGF(("init: %d elems %p\n", n, s.val));
   multicastSetupMsg *msg = new (n, n, 0) multicastSetupMsg;
   msg->nIdx = n;
   msg->parent = CkSectionCookie();
@@ -217,7 +218,7 @@ void CkMulticastMgr::freeup(CkSectionCookie cookie)
       mp[s.pe].freeup(s);
     }
     // free cookie
-CmiPrintf("[%d] Free up on %p\n", CkMyPe(), sect);
+CkPrintf("[%d] Free up on %p\n", CkMyPe(), sect);
     mCastEntry *oldc= sect->oldc;
     delete sect;
     sect = oldc;
@@ -233,7 +234,7 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
   entry->pe = CkMyPe();
   entry->rootSid = msg->rootSid;
   entry->parentGrp = msg->parent;
-  DEBUGF(("[%d] setup: redNo: %d => %d\n", CkMyPe(), entry->red.redNo, msg->redNo));
+  DEBUGF(("[%d] setup: %p redNo: %d => %d with %d elems\n", CkMyPe(), entry, entry->red.redNo, msg->redNo, msg->nIdx));
   entry->red.redNo = msg->redNo;
 
   int numpes = CkNumPes();
@@ -285,7 +286,7 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
         m->lastKnown[j] = slots[i][j].pe;
       }
       int childroot = slots[i][0].pe;
-      DEBUGF(("[%d]:call set up %d numelem:%d\n", CkMyPe(), childroot, n));
+      DEBUGF(("[%d] call set up %d numelem:%d\n", CkMyPe(), childroot, n));
       mCastGrp[childroot].setup(m);
     }
     delete [] slots;
@@ -300,7 +301,7 @@ void CkMulticastMgr::childrenReady(mCastEntry *entry)
 {
   entry->setReady();
   CProxy_CkMulticastMgr  mCastGrp(thisgroup);
-  DEBUGF(("entry %p childrenReady.\n", entry));
+  DEBUGF(("[%d] entry %p childrenReady with %d elems.\n", CkMyPe(), entry, entry->allElem.length()));
   if (entry->hasParent()) {
     mCastGrp[entry->parentGrp.pe].recvCookie(entry->parentGrp, CkSectionCookie(entry));
   }
@@ -530,7 +531,7 @@ void CkMulticastMgr::recvRedMsg(ReductionMsg *msg)
     return;
   }
 
-  DEBUGF(("[%d] recvRedMsg %d ref:%d\n", CkMyPe(), msg->flag, entry->red.redNo));
+  DEBUGF(("[%d] recvRedMsg flag:%d red:%d\n", CkMyPe(), msg->flag, entry->red.redNo));
   if (msg->flag == 1) entry->red.lcounter ++;
   if (msg->flag == 2) entry->red.ccounter ++;
   entry->red.gcounter += msg->gcounter;
@@ -542,7 +543,7 @@ void CkMulticastMgr::recvRedMsg(ReductionMsg *msg)
   entry->red.msgs.push_back(msg);
 
   if (CkMyPe() == 0)
-  DEBUGF(("[%d] lcounter:%d-%d, ccounter:%d-%d, gcounter:%d-%d\n", CkMyPe(),entry->red.lcounter,entry->localElem.length(), entry->red.ccounter, entry->children.length(), entry->red.gcounter, entry->allElem.length()));
+  DEBUGF(("[%d] lcounter:%d-%d, ccounter:%d-%d, gcounter:%d-%d root:%d\n", CkMyPe(),entry->red.lcounter,entry->localElem.length(), entry->red.ccounter, entry->children.length(), entry->red.gcounter, entry->allElem.length(), !entry->hasParent()));
 
   int currentTreeUp = 0;
   if (entry->red.lcounter == entry->localElem.length() && 
@@ -580,7 +581,7 @@ void CkMulticastMgr::recvRedMsg(ReductionMsg *msg)
       newmsg->redNo = oldRedNo;
       newmsg->gcounter = entry->red.gcounter;
       newmsg->rebuilt = rebuilt;
-      DEBUGF(("send to parent: %d\n", entry->parentGrp.pe));
+      DEBUGF(("send to parent %p: %d\n", entry->parentGrp.val, entry->parentGrp.pe));
       mCastGrp[entry->parentGrp.pe].recvRedMsg(newmsg);
     }
     else {   // root
