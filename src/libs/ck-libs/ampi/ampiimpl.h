@@ -10,7 +10,7 @@
 
 #include "ampi.h"
 #include "charm++.h"
-#include "ComlibManager.h" /* for ComlibManager */
+#include "EachToManyMulticastStrategy.h" /* for ComlibManager Strategy*/
 #include <string.h> /* for strlen */
 
 class CProxy_ampi;
@@ -217,7 +217,7 @@ inline groupStruct rangeExclOp(int n, int ranges[][3], groupStruct vec){
 
 #include "tcharm.h"
 #include "tcharmc.h"
-#include "ComlibManager.h"
+
 #include "ampi.decl.h"
 #include "ddt.h"
 #include "charm-api.h"
@@ -559,7 +559,7 @@ for its children, which are bound to it.
 */
 class ampiParent : public CBase_ampiParent {
     CProxy_TCharm threads;
-    CProxy_ComlibManager comlib;
+    ComlibInstanceHandle comlib;
     TCharm *thread;
     void prepareCtv(void);
 
@@ -597,7 +597,7 @@ class ampiParent : public CBase_ampiParent {
     }
 
 public:
-    ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_,CProxy_ComlibManager comlib_);
+    ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_,ComlibInstanceHandle comlib_);
     ampiParent(CkMigrateMessage *msg);
     void ckJustMigrated(void);
     ~ampiParent();
@@ -668,9 +668,10 @@ public:
       return getPosOp(thisIndex,vec);
     }
     
-    inline ComlibManager *getComlib(void) { 
-    	return comlib.ckLocalBranch(); 
+    ComlibInstanceHandle getComlib(void) { 
+    	return comlib; 
     }
+    
     int hasWorld(void) const {
         return worldPtr!=NULL;
     }
@@ -746,7 +747,7 @@ class ampi : public CBase_ampi {
     inline int getSize(void) const {return myComm.getSize();}
     inline MPI_Comm getComm(void) const {return myComm.getComm();}
     inline CProxy_ampi getProxy(void) const {return thisArrayID;}
-    inline ComlibManager *getComlib(void) { return parent->getComlib(); }
+    ComlibInstanceHandle getComlib(void) { return parent->getComlib(); }
 
     CkDDT *getDDT(void) {return parent->myDDT;}
   public:

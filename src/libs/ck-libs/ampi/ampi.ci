@@ -1,12 +1,11 @@
 module ampi {
-  extern module ComlibModule;
   message AmpiMsg;
  
   initnode void ampiNodeInit(void);
   initproc void ampiProcInit(void);
 
   array[1D] ampiParent {
-    entry ampiParent(int universeNo,CProxy_TCharm threads_,CProxy_ComlibManager comlib_);
+    entry ampiParent(int universeNo,CProxy_TCharm threads_,ComlibInstanceHandle comlib_);
     entry void ResumeThread();
     entry void Checkpoint(int len, char dname[len]);
   };

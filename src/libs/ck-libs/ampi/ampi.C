@@ -402,14 +402,18 @@ static ampi *ampiInit(char **argv)
 	int new_idx=mpi_nworlds;
 	MPI_Comm new_world=MPI_COMM_WORLD+1+new_idx;
 
-	CProxy_ComlibManager comlib = CProxy_ComlibManager::ckNew(strat, 1);
-	comlib.ckLocalBranch()->createId();
-	
+        //CProxy_ComlibManager comlib = CProxy_ComlibManager::ckNew(strat, 1);
+	//comlib.ckLocalBranch()->createId();
+	Strategy *strategy = new EachToManyMulticastStrategy(strat);
+        ComlibInstanceHandle cinst = ComlibRegisterStrategy(strategy); 
+
 	//Create and attach the ampiParent array
 	CkArrayID threads; int _nchunks;
         CkArrayOptions opts=TCHARM_Attach_start(&threads,&_nchunks);
 	CProxy_ampiParent parent;
-	parent=CProxy_ampiParent::ckNew(new_world,threads,comlib,opts);
+	parent=CProxy_ampiParent::ckNew(new_world,threads,cinst,opts);
+        
+        strategy->setSourceArray(parent.ckGetArrayID());
 
 	//Make a new ampi array
 	CkArrayID empty;
@@ -455,8 +459,8 @@ public:
 };
 
 //-------------------- ampiParent -------------------------
-ampiParent::ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_,CProxy_ComlibManager comlib_)
-	:threads(threads_), comlib(comlib_), worldNo(worldNo_)
+ampiParent::ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_, ComlibInstanceHandle cinst_)
+	:threads(threads_), comlib(cinst_), worldNo(worldNo_)
 {
   STARTUP_DEBUG("ampiParent> starting up")
   thread=NULL;
@@ -1949,8 +1953,10 @@ int MPI_Alltoallv(void *sendbuf, int *sendcounts, int *sdispls,
 
   // commlib support
   CProxy_ampi arrproxy = ptr->getProxy();
-  arrproxy.ckDelegate(ptr->getComlib());
-  ptr->getComlib()->beginIteration();
+  //arrproxy.ckDelegate(ptr->getComlib());
+  ComlibDelegateProxy(&arrproxy);
+
+  ptr->getComlib().beginIteration();
   for(i=0;i<size;i++) {
     ptr->delesend(MPI_GATHER_TAG,ptr->getRank(),((char*)sendbuf)+(itemsize*sdispls[i]),sendcounts[i],
                   sendtype, i, comm, arrproxy);
@@ -1960,7 +1966,7 @@ int MPI_Alltoallv(void *sendbuf, int *sendcounts, int *sdispls,
     _LOG_E_AMPI_MSG_SEND(MPI_GATHER_TAG,i,sendcounts[i],size)
 #endif
   }
-  ptr->getComlib()->endIteration();
+  ptr->getComlib().endIteration();
 
   MPI_Status status;
   dttype = ptr->getDDT()->getType(recvtype) ;
@@ -1990,8 +1996,10 @@ int MPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 
   // commlib support
   CProxy_ampi arrproxy = ptr->getProxy();
-  arrproxy.ckDelegate(ptr->getComlib());
-  ptr->getComlib()->beginIteration();
+  //arrproxy.ckDelegate(ptr->getComlib());
+  ComlibDelegateProxy(&arrproxy);
+
+  ptr->getComlib().beginIteration();
   for(i=0;i<size;i++) {
     ptr->delesend(MPI_GATHER_TAG, ptr->getRank(), ((char*)sendbuf)+(itemsize*i), sendcount,
                   sendtype, i, comm, arrproxy);
@@ -2001,7 +2009,7 @@ int MPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
     _LOG_E_AMPI_MSG_SEND(MPI_GATHER_TAG,i,sendcount,size)
 #endif
   }
-  ptr->getComlib()->endIteration();
+  ptr->getComlib().endIteration();
 
   MPI_Status status;
   dttype = ptr->getDDT()->getType(recvtype) ;
@@ -2031,8 +2039,10 @@ int MPI_Ialltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 
   // commlib support
   CProxy_ampi arrproxy = ptr->getProxy();
-  arrproxy.ckDelegate(ptr->getComlib());
-  ptr->getComlib()->beginIteration();
+  //arrproxy.ckDelegate(ptr->getComlib());
+  ComlibDelegateProxy(&arrproxy);
+
+  ptr->getComlib().beginIteration();
   for(i=0;i<size;i++) {
     ptr->delesend(MPI_GATHER_TAG, ptr->getRank(), ((char*)sendbuf)+(itemsize*i), sendcount,
                   sendtype, i, comm, arrproxy);
@@ -2042,7 +2052,7 @@ int MPI_Ialltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
     _LOG_E_AMPI_MSG_SEND(MPI_GATHER_TAG,i,sendcount,size)
 #endif
   }
-  ptr->getComlib()->endIteration();
+  ptr->getComlib().endIteration();
 
   // copy+paste from MPI_Irecv
   AmpiRequestList* reqs = getReqs();
