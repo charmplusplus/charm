@@ -44,6 +44,7 @@ goto begin
   xcopy /d /q     src\Common\conv-ldb\*   %version%\tmp
   xcopy /d /q     src\Common.win32\*.*    %version%\tmp
   xcopy /d /q     src\%version%\*.*       %version%\tmp
+  xcopy /d /q     src\Common\langs\ampi\*.* %version%\tmp
 
   echo You are ready to do a nmake now.
   cd %version%\tmp 
