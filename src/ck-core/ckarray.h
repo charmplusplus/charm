@@ -522,7 +522,6 @@ public:
     {mgr->contributorLeaving(getData(elt));}
   CmiBool ckElementArriving(ArrayElement *elt)
     {mgr->contributorArriving(getData(elt)); return CmiTrue; }
-  void flushState(ArrayElement *elt) { getData(elt)->redNo = 0; }
 };
 
 void _ckArrayInit(void);
