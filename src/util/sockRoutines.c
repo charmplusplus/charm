@@ -396,6 +396,15 @@ SOCKET skt_connect(skt_ip_t ip, int port, int timeout)
   return INVALID_SOCKET;
 }
 
+void skt_setSockBuf(SOCKET skt, int bufsize)
+{
+  int len = sizeof(int);
+  if (setsockopt(skt, SOL_SOCKET , SO_SNDBUF , (char *)&bufsize, len) == SOCKET_ERROR)
+	skt_abort(93496,"Error on SNDBUF sockopt for datagram socket.");
+  if (setsockopt(skt, SOL_SOCKET , SO_RCVBUF , (char *)&bufsize, len) == SOCKET_ERROR)
+	skt_abort(93496,"Error on RCVBUF sockopt for datagram socket.");
+}
+
 int skt_recvN(SOCKET hSocket,void *buff,int nBytes)
 {
   int nLeft,nRead;

@@ -178,6 +178,7 @@ SOCKET skt_connect(skt_ip_t ip, int port, int timeout);
 /*Utility*/
 void skt_close(SOCKET fd);
 int skt_select1(SOCKET fd,int msec);
+void skt_setSockBuf(SOCKET skt, int bufsize);
 
 /*Blocking Send/Recv*/
 int skt_sendN(SOCKET hSocket,const void *pBuff,int nBytes);
