@@ -1,21 +1,25 @@
 #ifndef __CKCOMPLEX_H__
 #define __CKCOMPLEX_H__
 
-#include "fftw.h"
+/*
+  #if defined(__INTEL_COMPILER)
+  #include <emmintrin.h>
+  #define PAIR_USE_SSE 0
+  #endif
+*/
 
-#if defined(__INTEL_COMPILER)
-#include <emmintrin.h>
-#define PAIR_USE_SSE 0
-#endif
+#include <malloc.h>
 
 struct complex {
-    fftw_real re;
-    fftw_real im;
+    double re;
+    double im;
     
     inline complex() {re=0; im=0;}
-    inline complex(fftw_real r) {re=r; im=0;}
-    inline complex(fftw_real r,fftw_real i) {re=r; im=i;}
+    inline complex(double r) {re=r; im=0;}
+    inline complex(double r,double i) {re=r; im=i;}
     
+    inline ~complex() {}
+
     inline double getMagSqr(void) const { 
 #if PAIR_USE_SSE      
         double ret;
@@ -146,23 +150,17 @@ struct complex {
     inline complex multiplyByi () {
         return complex(-im, re);
     }
-    
-    
-    void pup(PUP::er &p) {
-        p|re;
-        p|im;
-    }
-    
-    void * operator new[] (size_t size){
-        void *buf = malloc(size);
+        
+    inline void * operator new[] (size_t size){
+        void *buf = memalign(16, size);
         return buf;
     }
     
-    void operator delete[] (void *buf){
+    inline void operator delete[] (void *buf){
         free(buf);
     }
 };
 
-
+PUPbytes(complex);
 
 #endif
