@@ -120,12 +120,15 @@ void CkPupROData(PUP::er &p)
 void CkPupMainChareData(PUP::er &p)
 {
 	int nMains=_mainTable.size();
+	DEBCHK("[%d] CkPupMainChareData %s: nMains = %d\n", CkMyPe(),p.typeString(),nMains);
 	for(int i=0;i<nMains;i++){  /* Create all mainchares */
-		int entryMigCtor = _chareTable[_mainTable[i]->chareIdx]->getMigCtor();
+		ChareInfo *entry = _chareTable[_mainTable[i]->chareIdx];
+		int entryMigCtor = entry->getMigCtor();
 		if(entryMigCtor!=-1) {
-			Chare* obj = (Chare *)_mainTable[i]->getObj();
+			Chare* obj;
 			if (p.isUnpacking()) {
-				int size = _chareTable[_mainTable[i]->chareIdx]->size;
+				int size = entry->size;
+				DEBCHK("MainChare PUP'ed: name = %s, idx = %d, size = %d\n", entry->name, i, size);
 				obj = (Chare*)malloc(size);
 				_MEMCHECK(obj);
 				_mainTable[i]->setObj(obj);
@@ -137,6 +140,13 @@ void CkPupMainChareData(PUP::er &p)
 			obj->pup(p);
 		}
 	}
+	// to update mainchare proxy
+	// only readonly variables of Chare Proxy is taken care of here
+	// in general, if chare proxy is contained in some data structure
+	// for example CkCallback, it is user's responsibility to
+	// update them after restarting
+	if (p.isUnpacking() && CkMyPe()==0)
+		bdcastRO();
 }
 
 // handle GroupTable and data
@@ -371,7 +381,7 @@ void CkRestartMain(const char* dirname){
 		CkPupMainChareData(pMain);
 		fclose(fMain);
 		DEBCHK("[%d]CkRestartMain: mainchares restored\n",CkMyPe());
-		bdcastRO(); // to update mainchare proxy	
+		//bdcastRO(); // moved to CkPupMainChareData()
 	}
 	
 	// restore groups
