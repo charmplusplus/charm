@@ -161,7 +161,7 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
 # The .c files are there to be #included by clients whole
 # This is a bit unusual, but makes client linking simpler.
 UTILHEADERS=pup.h pupf.h pup_c.h pup_stl.h pup_mpi.h pup_toNetwork.h pup_toNetwork4.h pup_paged.h pup_cmialloc.h\
-	ckimage.h ckdll.h ckhashtable.h ckbitvector.h cklists.h \
+	ckimage.h ckdll.h ckhashtable.h ckbitvector.h cklists.h ckliststring.h \
 	ckstatistics.h ckvector3d.h conv-lists.h RTH.h ckcomplex.h \
 	sockRoutines.h sockRoutines.c
 
@@ -231,6 +231,7 @@ dirs+sources:
 	rm -rf ../lib ; mkdir ../lib
 	rm -rf ../lib_so ; mkdir ../lib_so; touch ../lib_so/.charmso
 	rm -rf ../pgms
+	rm -rf ../examples
 	rm -rf ../doc ; ln -s ../doc ../doc
 	../../src/scripts/gatherflat ../../src/scripts .
 	./gatherflat ../../src/conv-core        .
@@ -258,6 +259,7 @@ dirs+sources:
 	./gathertree ../../src/arch/`cat .gdir`      .
 	./gatherflat ../../src/arch/`cat .vdir`      .
 	./gathertree ../../pgms ../pgms
+	./gathertree ../../examples ../examples
 	rm -f ../bin/dep.pl ; cp dep.pl ../bin/
 	chmod +x charmc
 	-./system_ln  ../tmp/charmc ../bin/
@@ -888,13 +890,15 @@ clean:
 	if [ -d charmrun ] ; then ( cd charmrun; make clean ) ; fi
 	-( cd doc && make clean )
 	( cd libs; make clean )
-	( cd ../pgms; make clean )
+	( cd ../pgms && make clean )
+	( cd ../examples && make clean )
 
 veryclean:
 	rm -rf ../bin
 	rm -rf ../lib
 	rm -rf ../src
 	rm -rf ../pgms
+	rm -rf ../examples
 	rm -rf ../include
 	rm -rf ../doc
 	mv Makefile .Makefile
