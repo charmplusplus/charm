@@ -162,7 +162,7 @@ static void PropagateInitBarrier()
       if (parent == -1) {
 	SetEnv_msgType(henv, InitBarrierPhase2);
 	CmiSetHandler(henv, CsvAccess(HANDLE_INIT_MSG_Index));
-	CmiSyncBroadcastAndFree(GetEnv_TotalSize(henv), henv); 
+	CmiSyncBroadcastAllAndFree(GetEnv_TotalSize(henv), henv); 
       } else {
 	SetEnv_msgType(henv, InitBarrierPhase1);
         CmiSetHandler(henv, CsvAccess(HANDLE_INIT_MSG_Index));
