@@ -71,41 +71,6 @@ int pup_isSizing(const pup_er p);
 int pup_isDeleting(const pup_er p);
 int pup_isUserlevel(const pup_er p);
 
-#ifdef FNAME
-#undef FNAME
-#endif
-
-#if CMK_FORTRAN_USES_TWOSCORE
-#  define FNAME(x) x##__
-#elif CMK_FORTRAN_USES_ONESCORE
-#  define FNAME(x) x##_
-#else
-#  define FNAME(x) x
-#endif
-
-#if CMK_FORTRAN_USES_ALLCAPS
-#  define fpup_ispacking    FPUP_ISPACKING
-#  define fpup_isunpacking  FPUP_ISUNPACKING
-#  define fpup_issizing     FPUP_ISSIZING
-#  define fpup_isdeleting   FPUP_ISDELETING
-#  define fpup_isuserlevel  FPUP_ISUSERLEVEL
-#  define fpup_bytes        FPUP_BYTES
-#else
-#  define fpup_ispacking    FNAME(fpup_ispacking)
-#  define fpup_isunpacking  FNAME(fpup_isunpacking)
-#  define fpup_issizing     FNAME(fpup_issizing)
-#  define fpup_isdeleting   FNAME(fpup_isdeleting)
-#  define fpup_isuserlevel  FNAME(fpup_isuserlevel)
-#  define fpup_bytes        FNAME(fpup_bytes)
-#endif
-
-int fpup_ispacking(const pup_er p);
-int fpup_isunpacking(const pup_er p);
-int fpup_issizing(const pup_er p);
-int fpup_isdeleting(const pup_er p);
-int fpup_isuserlevel(const pup_er p);
-void fpup_bytes(pup_er p,void *ptr,int *nBytes);
-
 /*Pack/unpack data items, declared with macros for brevity.
 The macros expand like:
 void pup_int(pup_er p,int *i); <- single integer pack/unpack
@@ -114,26 +79,6 @@ void pup_ints(pup_er p,int *iarr,int nItems); <- array pack/unpack
 #define PUP_BASIC_DATATYPE(typeName,type) \
   void pup_##typeName(pup_er p,type *v); \
   void pup_##typeName##s(pup_er p,type *arr,int nItems);
-
-#if CMK_FORTRAN_USES_ALLCAPS
-#define PUP_BASIC_DATATYPEF(typeName,type) \
-  void FPUP_##typeName(pup_er p,type *v); \
-  void FPUP_##typeName##S(pup_er p,type *arr,int *nItems);
-PUP_BASIC_DATATYPEF(CHAR,char)
-PUP_BASIC_DATATYPEF(SHORT,short)
-PUP_BASIC_DATATYPEF(INT,int)
-PUP_BASIC_DATATYPEF(REAL,float)
-PUP_BASIC_DATATYPEF(DOUBLE,double)
-#else
-#define PUP_BASIC_DATATYPEF(typeName,type) \
-  void FNAME(fpup_##typeName)(pup_er p,type *v); \
-  void FNAME(fpup_##typeName##s)(pup_er p,type *arr,int *nItems);
-PUP_BASIC_DATATYPEF(char,char)
-PUP_BASIC_DATATYPEF(short,short)
-PUP_BASIC_DATATYPEF(int,int)
-PUP_BASIC_DATATYPEF(real,float)
-PUP_BASIC_DATATYPEF(double,double)
-#endif
 
 PUP_BASIC_DATATYPE(char,char)
 PUP_BASIC_DATATYPE(short,short)
