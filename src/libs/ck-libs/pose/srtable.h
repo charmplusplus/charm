@@ -124,6 +124,7 @@ class SRtable {
 #endif
     CmiAssert(ts >= offset);
     CmiAssert((sr == 0) || (sr == 1));
+    if (size_b == -1) size_b = (ts+1)/b;
     int destBkt = (ts-offset)/size_b;  // which bucket?
     SRentry *e = new SRentry(ts, sr, NULL);
     if (destBkt >= b) { // put in overflow bucket

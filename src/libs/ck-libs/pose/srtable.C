@@ -22,7 +22,7 @@ SRtable::SRtable()
 /// Initialize table to a minimum size
 void SRtable::Initialize()
 {
-  offset = 0; b = MAX_B; size_b = 1;
+  offset = 0; b = MAX_B; size_b = -1;
 #ifdef SR_SANITIZE
   sanitize();
 #endif
