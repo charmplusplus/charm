@@ -80,7 +80,11 @@ char **argv;
 }
 
 void *malloc(size)
+#ifdef _SIZE_T
+    size_t size;
+#else
     unsigned size;
+#endif
 {
   char *result;
   CmiMemLock();
@@ -98,7 +102,11 @@ void free(mem)
 }
 
 void *calloc(nelem, size)
+#ifdef _SIZE_T
+    size_t nelem, size;
+#else
     unsigned nelem, size;
+#endif
 {
   char *result;
   CmiMemLock();
