@@ -4,12 +4,15 @@
  * $Date$
  * $Revision$
  *****************************************************************************/
-
+/**
+\file
+\addtogroup CkEnvelope
+*/
 #ifndef _ENVELOPE_H
 #define _ENVELOPE_H
 
-#ifndef CINTBITS
-#define CINTBITS (sizeof(int)*8)
+#ifndef CkIntbits
+#define CkIntbits (sizeof(int)*8)
 #endif
 
 #ifndef CMK_OPTIMIZE
@@ -22,28 +25,40 @@
 #define _CHECK_USED(env) do{}while(0)
 #endif
 
-#define SVM1     (sizeof(double)-1)
-#define _ALIGN(x) (((x)+SVM1)&(~(SVM1)))
-#define _AA(x)     _ALIGN(x)
-#define _DD(x)     (_AA(x)-(x))
-#define PW(x)    ((x+CINTBITS-1)/CINTBITS)
+#define CkMsgAlignmentMask     (sizeof(double)-1)
+#define CkMsgAlignLength(x) (((x)+CkMsgAlignmentMask)&(~(CkMsgAlignmentMask)))
+#define CkMsgAlignOffset(x)     (CkMsgAlignLength(x)-(x))
+#define CkPriobitsToInts(nBits)    ((nBits+CkIntbits-1)/CkIntbits)
+// silly ancient name: for backward compatability only.
+#define PW(x) CkPriobitsToInts(x) 
 
-#define NewChareMsg    1
-#define NewVChareMsg   2
-#define BocInitMsg     3
-#define ForChareMsg    4
-#define ForBocMsg      5
-#define ForVidMsg      6
-#define FillVidMsg     7
-#define RODataMsg      8
-#define ROMsgMsg       9
-#define ExitMsg        10
-#define ReqStatMsg     11
-#define StatMsg        12
-#define NodeBocInitMsg 13
-#define ForNodeBocMsg  14
-#define ArrayEltInitMsg 15
-#define ForArrayEltMsg  16
+/**
+ This set of message type (mtype) constants
+ defines the basic class of charm++ message.
+ 
+ It is very questionable whether bizarre stuff like
+ "ExitMsg", "StatMsg", "ROMsgMsg" should actually
+ share the envelope with regular user messages;
+ but it doesn't waste any space so it's probably OK.
+*/
+typedef enum {
+  NewChareMsg    =1,
+  NewVChareMsg   =2,
+  BocInitMsg     =3,
+  ForChareMsg    =4,
+  ForBocMsg      =5,
+  ForVidMsg      =6,
+  FillVidMsg     =7,
+  RODataMsg      =8,
+  ROMsgMsg       =9,
+  ExitMsg        =10,
+  ReqStatMsg     =11,
+  StatMsg        =12,
+  NodeBocInitMsg =13,
+  ForNodeBocMsg  =14,
+  ArrayEltInitMsg =15,
+  ForArrayEltMsg  =16
+} CkEnvelopeType;
 
 typedef unsigned int   UInt;
 typedef unsigned short UShort;
@@ -57,57 +72,100 @@ typedef unsigned char  UChar;
 #define CmiReservedHeaderSize   CmiExtHeaderSizeBytes
 #endif
 
+/**
+The "envelope" sits at the start of every Charm++
+message. It stores information about the handler and
+destination of the charm++ message that follows, and 
+what to do with it on the receiving side.
+
+A Charm++ message's memory layout has the 
+Charm envelope ("envelope" class) first, which includes
+a Converse envelope as its first field.  After the 
+Charm envelope is a variable-length amount of user 
+data, and finally the priority data stored as ints.
+
+<pre>
+ Envelope pointer        \
+ Converse message pointer -> [ [ Converse envelope ]       ]
+                             [       Charm envelope        ] 
+ User message pointer     -> [ User data ... ]
+ Priority pointer         -> [ Priority ints ... ]
+</pre>
+
+The "message pointers" passed to and from
+users bypass the envelope and point *directly* to the 
+user data--the routine "EnvToUsr" below adjusts an 
+envelope (or converse message) pointer into this 
+direct-to-user pointer.  There is a corresponding
+routine "UsrToEnv" which takes the user data pointer
+and returns a pointer to the envelope/converse message.
+
+Unfortunately, in the guts of Charm++ it's not always 
+clear whether you've been given a converse or user
+message pointer, as both tend to be passed as void *.
+Confusing the two will invariably result in data 
+corruption and bizarre crashes.
+
+FIXME: Make CkMessage inherit from envelope,
+which would unify converse, envelope, and 
+user message pointers.
+*/
 class envelope {
   private:
+    /// Converse message envelope
     char   core[CmiReservedHeaderSize];
- //This union allows the different kinds of messages to have different
- // fields/types in an alignment-safe way without wasting any storage.
 public:
+ /**
+   This union stores the type-specific message information.
+   Keeing this in a union allows the different kinds of messages 
+   to have different fields/types, in an alignment-safe way, 
+   without wasting any storage.
+ */
     union u_type {
       struct s_chare { //NewChareMsg, NewVChareMsg, ForChareMsg, ForVidMsg, FillVidMsg
       	void *ptr;
-      	UInt forAnyPe; //Used by new-only
+      	UInt forAnyPe; ///< Used only by newChare
       } chare;
       struct s_group {
-	CkGroupID g; //GroupID
-	CkNodeGroupID rednMgr; //Reduction manager for this group (constructor only!)
-	int epoch; //"epoch" this group was created during (0--mainchare, 1--later)
-	UShort arrayEp; // Used only for array broadcasts
+	CkGroupID g; ///< GroupID
+	CkNodeGroupID rednMgr; ///< Reduction manager for this group (constructor only!)
+	int epoch; ///< "epoch" this group was created during (0--mainchare, 1--later)
+	UShort arrayEp; ///< Used only for array broadcasts
       } group;
-      struct s_array{ //For arrays only
-	CkArrayIndexStruct index;//Array element index
-	int listenerData[CK_ARRAYLISTENER_MAXLEN]; //For creation
-	CkGroupID arr; //Array manager GID
-	UChar hopCount;//number of times message has been routed
-    	UChar ifNotThere; //what to do if array element is missing
+      struct s_array{ ///< For arrays only
+	CkArrayIndexStruct index;///< Array element index
+	int listenerData[CK_ARRAYLISTENER_MAXLEN]; ///< For creation
+	CkGroupID arr; ///< Array manager GID
+	UChar hopCount;///< number of times message has been routed
+    	UChar ifNotThere; ///< what to do if array element is missing
       } array;
-      struct s_roData { //RODataMsg
+      struct s_roData { ///< RODataMsg
       	UInt count;
       } roData;
-      struct s_roMsg { //ROMsgMsg
+      struct s_roMsg { ///< ROMsgMsg
       	UInt roIdx;
       } roMsg;
     };
     struct s_attribs { //Packed bitwise struct
-    	UChar msgIdx; //Usertype of message (determines pack routine)
-	UChar mtype;
-    	UChar queueing:4; //Queueing strategy (FIFO, LIFO, PFIFO, ...)
-    	UChar isPacked:1;
-    	UChar isUsed:1;
-	UChar isImmediate:1;   //Used by immediate msgs
+    	UChar msgIdx; ///< Usertype of message (determines pack routine)
+	UChar mtype; ///< e.g., ForBocMsg
+    	UChar queueing:4; ///< Queueing strategy (FIFO, LIFO, PFIFO, ...)
+    	UChar isPacked:1; ///< If true, message must be unpacked before use
+    	UChar isUsed:1; ///< Marker bit to prevent message re-send.
+	UChar isImmediate:1;   ///< Used by immediate msgs
     };
 private:
-    u_type type; //Depends on message type (attribs.mtype)
-    UShort ref; //Used by futures
+    u_type type; ///< Depends on message type (attribs.mtype)
+    UShort ref; ///< Used by futures
     s_attribs attribs;
-    UChar align[_DD(CmiReservedHeaderSize+sizeof(u_type)+sizeof(UShort)+sizeof(s_attribs))];
+    UChar align[CkMsgAlignOffset(CmiReservedHeaderSize+sizeof(u_type)+sizeof(UShort)+sizeof(s_attribs))];
     
     //This struct should now be sizeof(void*) aligned.
-    UShort priobits;
-    UShort epIdx;  //Entry point to call
-    UInt   pe;    // source processor
-    UInt   event; // used by projections
-    UInt   totalsize; //Byte count from envelope start to end of priobits
+    UShort priobits; ///< Number of bits of priority data after user data
+    UShort epIdx;  ///< Entry point to call
+    UInt   pe;    ///< source processor
+    UInt   event; ///< used by projections
+    UInt   totalsize; ///< Byte count from envelope start to end of priobits
     
   public:
     void pup(PUP::er &p);
@@ -135,7 +193,7 @@ private:
     void   setPacked(const UChar p) { attribs.isPacked = p; }
     UShort getPriobits(void) const { return priobits; }
     void   setPriobits(const UShort p) { priobits = p; }
-    UShort getPrioWords(void) const { return (priobits+CINTBITS-1)/CINTBITS; }
+    UShort getPrioWords(void) const { return CkPriobitsToInts(priobits); }
     UShort getPrioBytes(void) const { return getPrioWords()*sizeof(int); }
     void*  getPrioPtr(void) const { 
       return (void *)((char *)this + totalsize - getPrioBytes());
@@ -143,7 +201,9 @@ private:
     static envelope *alloc(const UChar type, const UInt size=0, const UShort prio=0)
     {
       CkAssert(type>=NewChareMsg && type<=ForArrayEltMsg);
-      register UInt tsize = sizeof(envelope)+_ALIGN(size)+sizeof(int)*PW(prio);
+      register UInt tsize = sizeof(envelope)+ 
+            CkMsgAlignLength(size)+
+	    sizeof(int)*CkPriobitsToInts(prio);
       register envelope *env = (envelope *)CmiAlloc(tsize);
       env->setMsgtype(type);
       env->totalsize = tsize;
