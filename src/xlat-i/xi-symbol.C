@@ -1365,9 +1365,9 @@ Readonly::genDefs(XStr& str)
 
   if (!msg) { //Generate a pup for this readonly
     str << "extern \"C\" void __xlater_roPup_"<<makeIdent(qName());
-    str <<    "(void *pup_er) {\n";
-    str << "  PUP::er &p=*(PUP::er *)pup_er;\n";
-    str << "  p|"<<qName()<<";\n";
+    str <<    "(void *_impl_pup_er) {\n";
+    str << "  PUP::er &_impl_p=*(PUP::er *)_impl_pup_er;\n";
+    str << "  _impl_p|"<<qName()<<";\n";
     str << "}\n";
   }
 
