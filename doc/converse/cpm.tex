@@ -47,12 +47,27 @@ integer processor number.  The possible destinations for a message are
 described later.
 
 When the CPM scanner is applied to a C source file with a particular
-name, it generates all its code in an include file with a similar
-name: the {\tt .c} is replaced with {\tt .cpm.h}.  The include file
-must be included in the original {\tt .c} file, near the top of the
-file.  In addition, the code in the header file must be initialized by
-calling {\tt CpmInitializeThisModule()} in the module that includes
-the header file.
+name, it generates a great deal of parameter packing and unpacking
+code, and this code is inserted into an include file with a name
+similar to the original C file: the {\tt .c} is replaced with {\tt
+.cpm.h}.  The include file must be included in the original {\tt .c}
+file, after the declarations of the types which are being packed and
+unpacked, but before all uses of the CPM invocation mechanisms.
+
+Note that the {\tt .cpm.h} include file is {\em not} for prototyping.
+It contains the C code for the packing and unpacking mechanisms.
+Therefore, it should only be included in the one source file from
+which it was generated.  If the user wishes to prototype his code, he
+must do so normally, by writing a header file of his own.
+
+Each {\tt .cpm.h} file contains a function {\tt
+CpmInitializeThisModule}, which initializes the code in {\it that}
+{\tt .cpm.h} file.  The function is declared {\tt static}, so it is
+possible to have one in each {\tt .cpm.h} file without conflicts.  It
+is the responsibility of the CPM user to call each of these {\tt
+CpmInitializeThisModule} functions before using any of the CPM
+mechanisms.
+
 
 We demonstrate the use of the CPM mechanisms using the following
 short program {\tt myprog.c}:
@@ -92,7 +107,10 @@ line 17: messages that are sent by the CPM mechanism are received and
 handled by the scheduler, like any other Converse message.
 
 The effect of this program is that the first processor orders each of
-the other processors to print a random number.
+the other processors to print a random number.  Note that the example
+is somewhat minimalist, for example, it doesn't contain any code for
+terminating itself.  Also note that it would have been more efficient
+to use an explicit broadcast.  Broadcasts are described later.
 \pagebreak
 All launchers accept a {\it CpmDestination} as their first argument.  A
 {\it CpmDestination} is actually a pointer to a small C structure
@@ -162,7 +180,7 @@ with the argument 5.
 
 Functions preceeded by the word {\bf CpmInvokable} must have simple
 argument lists.  In particular, the argument list of a CpmInvokable
-function can only contain cpm-simple-arguments and cpm-array-arguments,
+function can only contain cpm-single-arguments and cpm-array-arguments,
 as defined by this grammar:
 
 \begin{verbatim}
@@ -175,7 +193,7 @@ being a pointer to an array.  In this case, CPM attempts to pack an
 entire array into the message, whereas it only attempts to pack a
 single element in the case of the cpm-single-argument notation.
 
-Each cpm-array-argument must be preceeded by a cpm-simple-argument of
+Each cpm-array-argument must be preceeded by a cpm-single-argument of
 type {\tt CpmDim}.  {\tt CpmDim} is simply an alias for {\tt int}, but
 when CPM sees an argument declared {\tt CpmDim}, it knows that the
 next argument will be a cpm-array-argument, and it interprets the {\tt
@@ -183,11 +201,55 @@ CpmDim} argument to be the size of the array.  Given a pointer to the
 array, its size, and its element-type, CPM handles the packing of
 array values as automatically as it handles single values.
 
-For each type the user wishes to pack, the user must supply some pack
-and unpack routines.  The subroutines needed depend upon whether the
-type is a pointer or a simple type.  Simple types are defined to be
-those that contain no pointers at all.  Note that some types fall
-into neither category, CPM cannot currently handle such types.
+Here is a second program, {\tt example2.c}, which uses array arguments:
+
+\begin{verbatim}
+ 1:    #include "example2.cpm.h"
+ 2:   
+ 3:    CpmInvokable print_program_arguments(CpmDim argc, CpmStr *argv)
+ 4:    {
+ 5:      int i;
+ 6:      CmiPrintf("The program's arguments are: ");
+ 7:      for (i=0; i<argc; i++) CmiPrintf("%s ", argv[i]);
+ 8:      CmiPrintf("\n");
+ 9:    }
+10:
+11:    user_main(int argc, char **argv)
+12:    {
+13:      ConverseInit(argv);
+14:      CpmModuleInit();
+15:      CpmInitializeThisModule();
+16:      if (CmiMyPe()==0)
+17:        Cpm_print_program_arguments(CpmSend(1), argc, argv);
+19:      CsdScheduler(-1);
+20:      ConverseExit(0);
+21:    }
+\end{verbatim}
+
+The word {\tt CpmStr} is a CPM built-in type, it represents a
+null-terminated string:
+
+\begin{verbatim}
+	typedef char *CpmStr;
+\end{verbatim}
+
+Therefore, the function {\tt print_program_arguments} takes exactly
+the same arguments as {\tt user_main}.  In this example, the main
+program running on processor 0 transmits the arguments to processor 1,
+which prints them out.
+
+Thus far, we have only shown functions whose prototypes contain
+builtin CPM types.  CPM has built-in knowledge of the following types:
+char, short, int, long, float, double, CpmDim, and CpmStr (pointer to
+a null-terminated string).  However, you may also also transmit
+user-defined types in a CPM message.
+
+For each (non-builtin) type the user wishes to pack, the user must
+supply some pack and unpack routines.  The subroutines needed depend
+upon whether the type is a pointer or a simple type.  Simple types are
+defined to be those that contain no pointers at all.  Note that some
+types are neither pointers, nor simple types.  CPM cannot currently
+handle such types.
 
 CPM knows which type is which only through the following declarations:
 
@@ -223,10 +285,72 @@ CpmPtrFree\_typename(v)} is called to free any memory allocated by the
 unpack routine. The user must supply the size, pack, unpack, and free
 routines.
 
-CPM provides built-in pack routines for the following types: char,
-short, int, long, float, double, and CpmStr (pointer to a
-null-terminated string).  When using these types, no CpmDeclareSimple,
-CpmDeclarePointer, or pack/unpack declarations are needed.
+The following program fragment shows the declaration of two
+user-defined types:
+
+\begin{verbatim}
+ 1:
+ 2:    typedef struct { double x,y; } coordinate;    
+ 3:    CpmDeclareSimple(coordinate);
+ 4:    
+ 5:    void CpmPack_coordinate(coordinate *p)
+ 6:    {
+ 7:      CpmPack_double(&(p->x));
+ 8:      CpmPack_double(&(p->y));
+ 9:    }
+10:
+11:    void CpmPack_coordinate(coordinate *p)
+12:    {
+13:      CpmUnpack_double(&(p->x));
+14:      CpmUnpack_double(&(p->y));
+15:    }
+16:
+17:    typedef int *intptr;
+18:    CpmDeclarePointer(intptr);
+19:
+20:    #define CpmPtrSize_intptr(p) sizeof(int)
+21:    
+22:    void CpmPtrPack_intptr(void *p, intptr v)
+23:    {
+24:      *(int *)p = *v;
+25:      CpmPack_int((int *)p);
+26:    }
+27:
+28:    intptr CpmPtrUnpack_intptr(void *p)
+29:    {
+30:      CpmUnpack_int((int *)p);
+31:      return (int *)p;
+32:    }
+33:
+34:    #define CpmPtrFree_intptr(p) (0)
+35:
+36:    #include "example3.cpm.h"
+37:    ...
+\end{verbatim}
+
+The first type declared in this file is the coordinate.  Line 2
+contains the C type declaration, and line 3 notifies CPM that it is a
+simple type, containing no pointers.  Lines 5-9 declare the pack
+function, which receives a pointer to a coordinate, and must pack it
+in place.  It makes use of the pack-function for doubles, which also
+packs in place.  The unpack function is similar.
+
+The second type declared in this file is the intptr, which we intend
+to mean a pointer to a single integer.  On line 18 we notify CPM that
+the type is a pointer, and that it should therefore use
+CpmPtrSize_intptr, CpmPtrPack_intptr, CpmPtrUnpack_intptr, and
+CpmPtrFree_intptr.  Line 20 shows the size function, a constant: we
+always need just enough space to store one integer.  The pack function
+copies the int into the message buffer, and packs it in place.  The
+unpack function unpacks it in place, and returns an intptr, which
+points right to the unpacked integer which is still in the message
+buffer.  Since the int is still in the message buffer, and not in
+dynamically allocated memory, the free function on line 34 doesn't
+have to do anything.
+
+Note that the inclusion of the {\tt .cpm.h} file comes after these
+type and pack declarations: the {\tt .cpm.h} file will reference these
+functions and macros, therefore, they must already be defined.
 
 \section{Inventing new kinds of CpmDestinations}
 
