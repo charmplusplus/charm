@@ -95,37 +95,37 @@ extern "C" void LDDumpDatabase(LDHandle _db)
   db->DumpDatabase();
 }
 
-void LDNotifyMigrated(LDHandle _db, LDMigratedFn fn, void* data)
+extern "C" void LDNotifyMigrated(LDHandle _db, LDMigratedFn fn, void* data)
 {
   LBDB *const db = (LBDB*)(_db.handle);
   db->NotifyMigrated(fn,data);
 }
 
-void LDAddStartLBFn(LDHandle _db, LDStartLBFn fn, void* data)
+extern "C" void LDAddStartLBFn(LDHandle _db, LDStartLBFn fn, void* data)
 {
   LBDB *const db = (LBDB*)(_db.handle);
   db->AddStartLBFn(fn,data);
 }
 
-void LDRemoveStartLBFn(LDHandle _db, LDStartLBFn fn)
+extern "C" void LDRemoveStartLBFn(LDHandle _db, LDStartLBFn fn)
 {
   LBDB *const db = (LBDB*)(_db.handle);
   db->RemoveStartLBFn(fn);
 }
 
-void LDStartLB(LDHandle _db)
+extern "C" void LDStartLB(LDHandle _db)
 {
   LBDB *const db = (LBDB*)(_db.handle);
   db->StartLB();
 }
 
-void LDTurnManualLBOn(LDHandle _db)
+extern "C" void LDTurnManualLBOn(LDHandle _db)
 {
   LBDB *const db = (LBDB*)(_db.handle);
   db->TurnManualLBOn();
 }
 
-void LDTurnManualLBOff(LDHandle _db)
+extern "C" void LDTurnManualLBOff(LDHandle _db)
 {
   LBDB *const db = (LBDB*)(_db.handle);
   db->TurnManualLBOff();
@@ -433,29 +433,29 @@ extern "C" int LDProcessorSpeed()
   return wps;
 }
 
-void LDSetLBPeriod(LDHandle _db, double s)   // s is in seconds
+extern "C" void LDSetLBPeriod(LDHandle _db, double s)   // s is in seconds
 {
   LBDB *const db = (LBDB*)(_db.handle);
   db->SetPeriod(s);
 }
 
-double LDGetLBPeriod(LDHandle _db)   // s is in seconds
+extern "C" double LDGetLBPeriod(LDHandle _db)   // s is in seconds
 {
   LBDB *const db = (LBDB*)(_db.handle);
   return db->GetPeriod();
 }
 
 // to be implemented
-void LDEstObjLoad(LDObjHandle h, double load)
+extern "C" void LDEstObjLoad(LDObjHandle h, double load)
 {
 }
 
 // to be implemented
-void LDQueryEstLoad(LDHandle bdb)
+extern "C" void LDQueryEstLoad(LDHandle bdb)
 {
 }
 
-int LDMemusage(LDHandle _db) 
+extern "C" int LDMemusage(LDHandle _db) 
 {
   LBDB *const db = (LBDB*)(_db.handle);
   return db->useMem();
