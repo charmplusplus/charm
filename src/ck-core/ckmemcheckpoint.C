@@ -157,7 +157,11 @@ class CkDiskCheckPTInfo: public CkCheckPTInfo
 public:
   CkDiskCheckPTInfo(CkArrayID a, CkGroupID loc, CkArrayIndexMax idx, int pno, int myidx): CkCheckPTInfo(a, loc, idx, pno)
   {
+#if !defined(_WIN32) || defined(__CYGWIN__)
     sprintf(fname, "/tmp/ckpt%d.%d", getpid(), myidx);
+#else
+    sprintf(fname, "/tmp/ckpt%d.%d", rand(), myidx);
+#endif
     bud1 = bud2 = -1;
     len = 0;
   }
