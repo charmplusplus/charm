@@ -557,44 +557,56 @@ endif
 
 # Check for valid choice of EXECMODE
 
-if ($?EXECMODE == 0) set EXECMODE=notrace
+if ($LANGUAGE != converse) then
 
-if (! -e $CHARMLIB/libck-core-$EXECMODE.a) then
-   echo "charmc : No such execmode $EXECMODE"
-   (cd $CHARMLIB ; ls -al libck-core-*)
-   goto failure
+    if ($?EXECMODE == 0) set EXECMODE=notrace
+
+    if (! -e $CHARMLIB/libck-core-$EXECMODE.a) then
+       echo "charmc : No such execmode $EXECMODE"
+       (cd $CHARMLIB ; ls -al libck-core-*)
+       goto failure
+    endif
+
 endif
 
 # Check for valid choice of BALANCE
 
-if ($?BALANCE == 0) set BALANCE=rand
+if ($LANGUAGE != converse) then
 
-# Check that EXECMODE is compatible with BALANCE
+    if ($?BALANCE == 0) set BALANCE=rand
 
-if ($EXECMODE == replay) then
-    if ($?BALANCE == 0) set BALANCE=replay
-    if ($BALANCE != replay) then
-        echo "Ignoring -balance $BALANCE, incompatible with -execmode replay"
+    # Check that EXECMODE is compatible with BALANCE
+
+    if ($EXECMODE == replay) then
+        if ($?BALANCE == 0) set BALANCE=replay
+        if ($BALANCE != replay) then
+            echo "Ignoring -balance $BALANCE, incompatible with -execmode replay"
+        endif
+        set BALANCE=replay
     endif
-    set BALANCE=replay
+
 endif
 
 # Check that the BAL_OBJ exists
 
-if ($BALANCE:h == $BALANCE) then
-   set BAL_OBJ = $CHARMLIB/libck-ldb-$BALANCE.o
-else
-   set BAL_OBJ = $BALANCE
-endif
+if ($LANGUAGE != converse) then
 
-if (! -e $BAL_OBJ) then
-   if ($BALANCE == $BAL_OBJ) then
-	echo "charmc : Could not find load balancer object $BAL_OBJ"
-   else
-	echo "charmc : Unknown load balancer $BALANCE"
-	(cd $CHARMLIB ; ls -al libck-ldb-*)
-   endif
-   goto failure
+    if ($BALANCE:h == $BALANCE) then
+       set BAL_OBJ = $CHARMLIB/libck-ldb-$BALANCE.o
+    else
+       set BAL_OBJ = $BALANCE
+    endif
+    
+    if (! -e $BAL_OBJ) then
+       if ($BALANCE == $BAL_OBJ) then
+    	echo "charmc : Could not find load balancer object $BAL_OBJ"
+       else
+    	echo "charmc : Unknown load balancer $BALANCE"
+    	(cd $CHARMLIB ; ls -al libck-ldb-*)
+       endif
+       goto failure
+    endif
+
 endif
 
 ########################################################################
