@@ -493,6 +493,28 @@ then
 	add_flag 'CMK_NO_BUILD_SHARED="true"' "build-shared"
 fi
 
+#### test the version number of bproc ####
+cat > $t <<EOT
+#include <stdio.h>
+#include <sys/bproc.h>
+int main()
+{
+  struct bproc_version_t vers;
+  bproc_version(&vers);
+  printf("%s\n", vers.version_string);
+  return 0;
+}
+EOT
+test_link "whether it is bproc" "yes" "no" "-lbproc"
+if test $pass -eq 1
+then 
+AC_MSG_CHECKING("bproc version")
+bproc_ver=`./testlink`
+test_result 0 "bproc version" "$bproc_ver" ""
+bproc_ver=`echo $bproc_ver | cut -d'.' -f1`
+AC_DEFINE_UNQUOTED(CMK_BPROC_VERSION, $bproc_ver, [bproc version])
+fi
+
 ################## Fortran #########################
 
 ### test fortran subroutine name ###
