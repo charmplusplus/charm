@@ -59,7 +59,7 @@ void tryPrint(void) {
 extern "C" void
 init(void)
 {
-  CkPrintf("init called\n");
+  CkPrintf("init called for %d chunks\n",FEM_Num_partitions());
   if (TEST_ARGS) printargs();
   tsteps=10;
   reduceValues=new double[tsteps];
