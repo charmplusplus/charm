@@ -21,7 +21,7 @@ class CkLBArgs
 {
 private:
   double _autoLbPeriod;		// in seconds
-  int _lb_debug;
+  int _lb_debug;		// 1 or greater
   int _lb_ignoreBgLoad;
   int _lb_syncResume;
 public:

@@ -221,9 +221,17 @@ void _loadbalancerInit()
   LBSimulation::simProcs = 0;
   CmiGetArgIntDesc(argv, "+LBSimProcs", &LBSimulation::simProcs, "Number of target processors.");
 
-  _lb_args.syncResume() = CmiGetArgFlagDesc(argv, "+LBSyncResume", "LB performs a barrier after migration is finished globally");
-  _lb_args.debug() = CmiGetArgFlagDesc(argv, "+LBDebug", "Turn on LB debugging printouts");
-  _lb_args.ignoreBgLoad() = CmiGetArgFlagDesc(argv, "+LBObjOnly", "Load balancer only balance migratable object without considering the background load, etc");
+  _lb_args.syncResume() = CmiGetArgFlagDesc(argv, "+LBSyncResume", 
+                  "LB performs a barrier after migration is finished globally");
+
+  // both +LBDebug and +LBDebug level should work
+  if (!CmiGetArgIntDesc(argv, "+LBDebug", &_lb_args.debug(), 
+                                          "Turn on LB debugging printouts"))
+    _lb_args.debug() = CmiGetArgFlagDesc(argv, "+LBDebug", 
+  					     "Turn on LB debugging printouts");
+
+  _lb_args.ignoreBgLoad() = CmiGetArgFlagDesc(argv, "+LBObjOnly", 
+                            "Load balancer ignores the background load.");
   if (CkMyPe() == 0) {
     if (_lb_args.debug()) {
       CmiPrintf("LB> Load balancer running with verbose mode, period time: %gs.\n", _lb_args.lbperiod());
