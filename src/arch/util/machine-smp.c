@@ -78,6 +78,8 @@ void CommunicationServerInit();
  *****************************************************************************/
 
 /************************ Win32 kernel SMP threads **************/
+static struct CmiStateStruct Cmi_default_state; /* State structure to return during startup */
+
 #if CMK_SHARED_VARS_NT_THREADS
 
 CmiNodeLock CmiMemLock_lock;
@@ -96,7 +98,10 @@ CmiState CmiGetState()
 {
   CmiState result;
   result = (CmiState)TlsGetValue(Cmi_state_key);
-  if(result == 0) PerrorExit("CmiGetState: TlsGetValue");
+  if(result == 0) {
+  	return &Cmi_default_state;
+  	/* PerrorExit("CmiGetState: TlsGetValue");*/
+  }
   return result;
 }
 #endif
@@ -222,11 +227,21 @@ static void CmiStartThreads(char **argv)
 /***************** Pthreads kernel SMP threads ******************/
 #elif CMK_SHARED_VARS_POSIX_THREADS_SMP
 
-static pthread_key_t Cmi_state_key;
+static pthread_key_t Cmi_state_key=(pthread_key_t)(-1);
 static CmiState     Cmi_state_vector;
 CmiNodeLock CmiMemLock_lock;
 
+#if 0
 #define CmiGetState() ((CmiState)pthread_getspecific(Cmi_state_key))
+#else
+CmiState CmiGetState() {
+	CmiState ret=(CmiState)pthread_getspecific(Cmi_state_key);
+	if (ret==NULL) {
+		return &Cmi_default_state;
+	}
+	return ret;
+}
+#endif
 
 CmiNodeLock CmiCreateLock(void)
 {
