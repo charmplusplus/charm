@@ -1826,7 +1826,7 @@ void Entry::genDefs(XStr& str)
   param->beginUnmarshall(str);
   if (!isConstructor() && fortranMode) {
     str << "/* FORTRAN */\n";
-    str << "  int index = impl_obj->getIndex();\n";
+    str << "  int index = impl_obj->thisIndex;\n";
     str << "  " << fortranify(name)
 	<< "_((char **)(impl_obj->user_data), &index, ";
     param->unmarshallAddress(str); str<<");\n";
