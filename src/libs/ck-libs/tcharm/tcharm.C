@@ -21,18 +21,6 @@ CtvDeclare(TCharm *,_curTCharm);
 CpvDeclare(inState,_stateTCharm);
 
 static int lastNumChunks=0;
-/*readonly*/ int tcharm_nomig=0, tcharm_nothreads=0;
-
-void TCharm::nodeInit(void)
-{
-  CtvInitialize(TCharm *,_curTCharm);
-  CtvAccess(_curTCharm)=NULL;
-  CpvInitialize(inState,_stateTCharm);
-  TCharm::setState(inNodeSetup);
-  TCharmUserNodeSetup();
-  FTN_NAME(TCHARM_USER_NODE_SETUP,tcharm_user_node_setup)();
-  TCharm::setState(inInit);
-}
 
 class TCharmTraceLibList {
 	enum {maxLibs=20,maxLibNameLen=15};
@@ -62,7 +50,34 @@ public:
 		else return checkIfTracing(lib);
 	}
 };
-TCharmTraceLibList tcharm_tracelibs;
+static TCharmTraceLibList tcharm_tracelibs;
+static int tcharm_nomig=0, tcharm_nothreads=0;
+static int tcharm_stacksize=1*1024*1024; /*Default stack size is 1MB*/
+
+void TCharm::nodeInit(void)
+{
+  CtvInitialize(TCharm *,_curTCharm);
+  CtvAccess(_curTCharm)=NULL;
+  CpvInitialize(inState,_stateTCharm);
+  char **argv=CkGetArgv();
+  tcharm_nomig=CmiGetArgFlag(argv,"+tcharm_nomig");
+  tcharm_nothreads=CmiGetArgFlag(argv,"+tcharm_nothread");
+  tcharm_nothreads|=CmiGetArgFlag(argv,"+tcharm_nothreads");
+  char *traceLibName=NULL;
+  while (CmiGetArgString(argv,"+tcharm_trace",&traceLibName))
+      tcharm_tracelibs.addTracing(traceLibName);
+  CmiGetArgInt(argv,"+tcharm_stacksize",&tcharm_stacksize);
+  if (CkMyPe()!=0) { //Processor 0 eats "+vp<N>" and "-vp<N>" later:
+  	int ignored;
+  	while (CmiGetArgInt(argv,"-vp",&ignored)) {}
+  	while (CmiGetArgInt(argv,"+vp",&ignored)) {}
+  }
+  
+  TCharm::setState(inNodeSetup);
+  TCharmUserNodeSetup();
+  FTN_NAME(TCHARM_USER_NODE_SETUP,tcharm_user_node_setup)();
+  TCharm::setState(inInit);
+}
 
 void TCharmApiTrace(const char *routineName,const char *libraryName)
 {
@@ -467,15 +482,10 @@ CDECL void TCharmInDefaultSetup(void) {
 class TCharmMain : public Chare {
 public:
   TCharmMain(CkArgMsg *msg) {
-    if (0!=(tcharm_nomig=CmiGetArgFlag(msg->argv,"+tcharm_nomig")))
+    if (0!=tcharm_nomig)
         CmiPrintf("TCHARM> Disabling migration support, for debugging\n");
-    tcharm_nothreads=CmiGetArgFlag(msg->argv,"+tcharm_nothread");
-    tcharm_nothreads|=CmiGetArgFlag(msg->argv,"+tcharm_nothreads");
     if (0!=tcharm_nothreads)
        CmiPrintf("TCHARM> Disabling thread support, for debugging\n");
-    char *traceLibName=NULL;
-    while (CmiGetArgString(msg->argv,"+tcharm_trace",&traceLibName))
-       tcharm_tracelibs.addTracing(traceLibName);
 
     TCharmSetupCookie cookie(msg->argv);
     TCharmSetupCookie::theCookie=&cookie;
@@ -526,8 +536,7 @@ TCharmSetupCookie::TCharmSetupCookie(char **argv_)
 	magic=correctMagic;
 	argv=argv_;
 	coord=NULL;
-	stackSize=1*1024*1024; /*Default stack size is 1MB*/
-	CmiGetArgInt(argv,"+tcharm_stacksize",&stackSize);
+	stackSize=tcharm_stacksize;
 }
 
 CkArrayOptions TCharmAttachStart(CkArrayID *retTCharmArray,int *retNumElts)
@@ -609,6 +618,7 @@ FDECL void FTN_NAME(TCHARM_CREATE_DATA,tcharm_create_data)
 CDECL int TCharmGetNumChunks(void)
 {
 	TCHARMAPI("TCharmGetNumChunks");
+	if (CkMyPe()!=0) CkAbort("TCharmGetNumChunks should only be called on PE 0 during setup!");
 	int nChunks=CkNumPes();
 	char **argv=CkGetArgv();
 	CmiGetArgInt(argv,"-vp",&nChunks);

@@ -1,7 +1,4 @@
 module tcharm {
-  readonly int tcharm_nomig;
-  readonly int tcharm_nothreads;
-  readonly TCharmTraceLibList tcharm_tracelibs;
   message TCharmInitMsg {
 	char data[];
   };
