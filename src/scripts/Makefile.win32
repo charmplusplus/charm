@@ -20,7 +20,7 @@ LINK = link.exe
 LIBR = lib.exe
 LINK_FLAGS = /nologo 
 
-CHARMXI=$(XLATI_DIR)\charmxlati.exe
+CHARMXI=$(XLATI_DIR)\charmxi.exe
 CONV_CPM=$(XLATI_DIR)\conv-cpm.exe
 
 LINK_OTHER = kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib \
@@ -521,7 +521,7 @@ $(CONV_CPM): conv-cpm.c
 	$(LINK) $(LINK_FLAGS) $(LINK_OTHER) /out:"$(XLATI_DIR)\conv-cpm.exe" conv-cpm.obj
 
 $(CHARMXI): $(CHARMXLATI)
-	$(LINK) $(LINK_FLAGS) /out:"$(XLATI_DIR)\charmxlati.exe" \
+	$(LINK) $(LINK_FLAGS) /out:"$(XLATI_DIR)\charmxi.exe" \
 	$(CHARMXLATI)
 
 xi-main.obj :                                         
