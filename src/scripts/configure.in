@@ -10,6 +10,11 @@ then
 fi
 . ./conv-mach.sh
 
+if test -r ./conv-mach-opt.sh 
+then
+        . ./conv-mach-opt.sh
+fi
+
 AC_MSG_CHECKING(machine name)
 version=`pwd | awk -F/ '{print $(NF-1)}'`
 AC_DEFINE_UNQUOTED(CMK_MACHINE_NAME, "$version")
