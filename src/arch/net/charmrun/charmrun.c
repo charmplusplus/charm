@@ -222,6 +222,9 @@ void zap_newline(char *s)
   char *p;
   p = s + strlen(s)-1;
   if (*p == '\n') *p = '\0';
+  /* in case of DOS ^m */
+  p--;
+  if (*p == '\15') *p = '\0';
 }
 
 /* get substring from lo to hi, remove quote chars */
@@ -2195,7 +2198,7 @@ int rsh_fork(int nodeno,const char *startScript)
       exit(1);
   }
   if (arg_verbose)
-    fprintf(stderr,"Charmrun> rsh (%s:%dd) started\n",
+    fprintf(stderr,"Charmrun> rsh (%s:%d) started\n",
     	nodetab_name(nodeno),nodeno);
   return pid;
 }
