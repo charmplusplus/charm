@@ -14,6 +14,10 @@ Most routines are provided right in the header file (for inlining).
 #ifndef __OSL_VECTOR_3D_H
 #define __OSL_VECTOR_3D_H
 
+/*Some stupid compilers (Microsoft VC++) define max/min using macros*/
+#undef max
+#undef min
+
 class vector3d;
 //Polar3d is a point expressed in a 3D spherical coordinate system--
 // theta is the angle (right-handed about +z) in the x-y axis (longitude);
