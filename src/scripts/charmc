@@ -590,7 +590,7 @@ do
 	        printUsage
 		;;
 	-*|+*)
-		Warning "passing unrecognized option $arg to all compilers and linkers"
+#		Warning "passing unrecognized option $arg to all compilers and linkers"
 		OPTS="$OPTS  $arg"
 		;;
 	*.*)
