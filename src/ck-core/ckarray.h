@@ -108,12 +108,12 @@ class ArrayElementAckMessage;
 class Array1D : public Group
 {
 public:
-  static  Array1D::CreateArray(int numElements,
-                               ChareIndexType mapChare,
-                               EntryIndexType mapConstructor,
-                               ChareIndexType elementChare,
-                               EntryIndexType elementConstructor,
-                               EntryIndexType elementMigrator);
+  static  CkGroupID CreateArray(int numElements,
+				ChareIndexType mapChare,
+				EntryIndexType mapConstructor,
+				ChareIndexType elementChare,
+				EntryIndexType elementConstructor,
+				EntryIndexType elementMigrator);
 
   Array1D(ArrayCreateMessage *);
   void send(ArrayMessage *msg, int index, EntryIndexType ei);

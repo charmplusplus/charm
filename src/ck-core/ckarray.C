@@ -54,9 +54,7 @@ CkGroupID Array1D::CreateArray(int numElements,
   msg->elementConstType = elementConstructor;
   msg->elementMigrateType = elementMigrator;
   group = CProxy_Array1D::ckNew(msg);
-  /*
-  CkPrintf("Created group %d\n",group);
-  */
+
   return group;
 }
 
@@ -65,7 +63,7 @@ Array1D::Array1D(ArrayCreateMessage *msg)
   numElements = msg->numElements;
   elementChareType = msg->elementChareType;
   elementConstType = msg->elementConstType;
-  elementMigrateType = msg->elementConstType;
+  elementMigrateType = msg->elementMigrateType;
 
   if (CkMyPe()==0) {
     ArrayMapCreateMessage *mapMsg = new ArrayMapCreateMessage;
@@ -91,13 +89,18 @@ void Array1D::RecvMapID(ArrayMap *mPtr, CkChareID mHandle,
   elementIDsReported = 0;
   numLocalElements=0;
   int i;
-  for(i=0; i < numElements; i++) {
-    elementIDs[i].state = creating;
+  for(i=0; i < numElements; i++)
+  {
     elementIDs[i].originalPE = elementIDs[i].pe = map->procNum(i);
     elementIDs[i].curHop = 0;
-    if (elementIDs[i].pe != CkMyPe()) {
+    if (elementIDs[i].pe != CkMyPe())
+    {
+      elementIDs[i].state = at;
       elementIDs[i].element = NULL;
-    } else {
+    }
+    else
+    {
+      elementIDs[i].state = creating;
       numLocalElements++;
 
       CkChareID vid;
@@ -189,7 +192,8 @@ void Array1D::migrateMe(int index, int where)
   msg->elementSize = bufSize;
   msg->hopCount = elementIDs[index].curHop + 1;
   elementIDs[index].element->pack(msg->elementData);
-  // CkPrintf("Sending to %d\n",where);
+  elementIDs[index].state = moving_to;
+  elementIDs[index].pe = where;
   numLocalElements--;
   CProxy_Array1D arr(thisgroup);
   arr.RecvMigratedElement(msg, where);
@@ -199,7 +203,6 @@ void Array1D::RecvMigratedElement(ArrayMigrateMessage *msg)
 {
   CkChareID vid;
   
-  // CkPrintf("PE %d received migrated element from %d\n",CkMyPe(),msg->from);
   int index =msg->index;
 
   elementIDs[index].state = arriving;
@@ -302,9 +305,6 @@ ArrayElement::ArrayElement(ArrayElementMigrateMessage *msg)
   thisAID.setAid(thisArray->ckGetGroupId());
   thisAID._elem = (-1);
   thisIndex = msg->index;
-  // CkPrintf("ArrayElement:%d Receiving migrated element %d\n",
-    // CkMyPe(),thisIndex,numElements,
-    // thisArray,CProxy_Array1D::ckLocalBranch(arrayGroupID));
   delete msg;
 }
 
