@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.13  1998-06-16 21:57:56  milind
+ * Revision 1.14  1998-06-25 21:57:52  milind
+ * Moved CmiTimer calls to machine.c to utilize the CPU clock registers.
+ *
+ * Revision 1.13  1998/06/16 21:57:56  milind
  * Fixed typedefs for t3e.
  *
  * Revision 1.12  1998/06/15 22:12:04  jyelon
@@ -185,8 +188,8 @@
 #define CMK_THREADS_REQUIRE_NO_CPV                         0
 
 #define CMK_TIMER_USE_GETRUSAGE                            0
-#define CMK_TIMER_USE_SPECIAL                              0
-#define CMK_TIMER_USE_TIMES                                1
+#define CMK_TIMER_USE_SPECIAL                              1
+#define CMK_TIMER_USE_TIMES                                0
 
 #define CMK_TYPEDEF_INT2 short
 #define CMK_TYPEDEF_INT4 int

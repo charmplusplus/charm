@@ -21,6 +21,7 @@ static char ident[] = "@(#)$Header$";
  */
 
 #include <stdlib.h>
+#include <unistd.h>
 #include <malloc.h>
 #include <mpp/shmem.h>
 #include "converse.h"
@@ -461,7 +462,6 @@ void
 ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 {
   CmiSpanTreeInit();
-  CmiTimerInit();
   McInit();
   CthInit(argv);
   ConverseCommonInit(argv);
@@ -856,5 +856,43 @@ static void * McQueueRemoveFromFront(McQueue *queue)
     queue->len--;
   }
   return element;
+}
+
+
+/* Timer Functions */
+
+static double clocktick;
+static long inittime_wallclock;
+static long inittime_virtual;
+
+void CmiTimerInit()
+{
+  inittime_wallclock = _rtc();
+  inittime_virtual = cpused();
+  clocktick = 1.0 / (sysconf(_SC_CLK_TCK));
+}
+
+double CmiWallTimer()
+{
+  long now;
+
+  now = _rtc();
+  return (clocktick * (now - inittime_wallclock));
+}
+
+double CmiCpuTimer()
+{
+  long now;
+
+  now = cpused();
+  return (clocktick * (now - inittime_virtual));
+}
+
+double CmiTimer()
+{
+  long now;
+
+  now = _rtc();
+  return (clocktick * (now - inittime_wallclock));
 }
 
