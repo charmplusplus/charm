@@ -400,14 +400,17 @@ void SumLogPool::shrink(void)
   for (int i=0; i<entries; i++)
   {
      pool[i].setTime(pool[i*2].getTime() + pool[i*2+1].getTime());
+     if (sumDetail)
      for (int e=0; e < epInfoSize; e++) {
          setCPUtime(i, e, getCPUtime(i*2, e) + getCPUtime(i*2+1, e));
          setNumExecutions(i, e, getNumExecutions(i*2, e) + getNumExecutions(i*2+1, e));
      }
   }
   // zero out the remaining intervals
-  memset(&cpuTime[entries*epInfoSize], 0, (numBins-entries)*epInfoSize*sizeof(double));
-  memset(&numExecutions[entries*epInfoSize], 0, (numBins-entries)*epInfoSize*sizeof(int));
+  if (sumDetail) {
+    memset(&cpuTime[entries*epInfoSize], 0, (numBins-entries)*epInfoSize*sizeof(double));
+    memset(&numExecutions[entries*epInfoSize], 0, (numBins-entries)*epInfoSize*sizeof(int));
+  }
   numBins = entries;
   CkpvAccess(binSize) *= 2;
 
