@@ -181,13 +181,27 @@ FDECL void FTN_NAME(IDXL_ADD_ENTITY,idxl_add_entity)
 
 
 /** Throw away this index list */
-void IDXL_Destroy(IDXL_t l) {
+CDECL void IDXL_Destroy(IDXL_t l) {
 	const char *callingRoutine="IDXL_Destroy";
 	IDXLAPI(callingRoutine); IDXL_Chunk *c=IDXL_Chunk::lookup(callingRoutine);
 	c->destroy(l);
 }
 FORTRAN_AS_C(IDXL_DESTROY,IDXL_Destroy,idxl_destroy,  (int *l), (*l));
 
+/*********************** Lookups ***********************/
+CDECL int IDXL_Get_source(IDXL_t l_t,int localNo) {
+	const char *callingRoutine="IDXL_Get_source";
+	IDXLAPI(callingRoutine); 
+	IDXL_Chunk *c=IDXL_Chunk::lookup(callingRoutine);
+	IDXL &l=c->lookup(l_t,callingRoutine);
+	const IDXL_Rec *rec=l.getRecv().getRec(localNo);
+	if (rec==NULL) CkAbort("IDXL_Get_source called on non-ghost entity!");
+	if (rec->getShared()>1) CkAbort("IDXL_Get_source called on multiply-shared entity!");
+	return rec->getChk(0);
+}
+FDECL int FTN_NAME(IDXL_GET_SOURCE,idxl_get_source)(int *l,int *localNo) {
+	return 1+IDXL_Get_source(*l,*localNo-1);
+}
 
 /************************* IDXL_Layout ************************/
 CDECL IDXL_Layout_t 

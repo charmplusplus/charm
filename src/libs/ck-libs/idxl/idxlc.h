@@ -56,6 +56,8 @@ int IDXL_Get_count(IDXL_Side_t l,int partnerNo);
 void IDXL_Get_list(IDXL_Side_t l,int partnerNo,int *list);
 int IDXL_Get(IDXL_Side_t l,int partnerNo,int listIndex);
  */
+/** Return the chunk this (ghost) local number is received from */
+int IDXL_Get_source(IDXL_t l,int localNo);
 
 
 /* Messaging */

@@ -56,6 +56,11 @@
          integer,intent (in) :: l
        end subroutine    
        
+       function IDXL_Get_source(l,localNo)
+          integer, intent(in) :: l,localNo
+          integer :: IDXL_Get_source
+       end function
+
        function IDXL_Layout_create(type,width)
           integer, intent(in) :: type, width
           integer :: IDXL_Layout_create
