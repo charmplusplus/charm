@@ -29,7 +29,9 @@ process. A separate call to \param{exit()} is needed after
 \function {\#define CmiMsgHeaderSizeBytes}
 \index{CmiMsgHeaderSizeBytes}
 \desc{This constant, defined in {\tt converse.h}, denotes
-the size of the message header in bytes.}
+the size of the message header in bytes.
+Every message buffer must allocate these many bytes at its beginning
+for the header.}
  
 \function {void CmiSetHandler(int *MessageBuffer, int HandlerId)}
 \index{CmiSetHandler}
@@ -87,18 +89,21 @@ the message buffer.}
 
 \function{void CmiSyncSend(unsigned int destPE, unsigned int size, void *msg)}
 \index{CmiSyncSend}
-\desc{ Sends \param{msg} of size \param{size} bytes to processor
+\desc{Sends \param{msg} of size \param{size} bytes to processor
 \param{destPE}. Message buffer for \param{msg} could be reused after
-the call returns.}
+the call returns.
+The first CmiMsgHeaderSizeBytes bytes of \param{msg} must be set aside
+for use by the system.  (This applies to all the calls below that send
+or broadcast a message.)}
 
 \function{void CmiSyncSendAndFree(unsigned int destPE, unsigned int size, void *msg)}
 \index{CmiSyncSendAndFree}
-\desc{ Sends \param{msg} of size \param{size} bytes to processor
+\desc{Sends \param{msg} of size \param{size} bytes to processor
 \param{destPE} and frees the message buffer for \param{msg}.}
 
 \function{CmiCommHandle CmiAsyncSend(unsigned int destPE, unsigned int size, void *msg)}
 \index{CmiAsyncSend}
-\desc{ Initiates an asynchronous send of \param{msg} of length
+\desc{Initiates an asynchronous send of \param{msg} of length
 \param{size} bytes to processor \param{destPE} and returns a
 communication handle which could be used to enquire the status of this
 communication. Message buffer for \param{mesg} should not be reused or freed
@@ -111,7 +116,7 @@ communication handle \param{handle}.}
 
 \function{void CmiReleaseCommHandle(CmiCommHandle handle)}
 \index{CmiReleaseCommHandle}
-\desc{ Releases the communication handle \param{handle} and
+\desc{Releases the communication handle \param{handle} and
 associated resources. It does not free the message buffer.
 \param{handle} could be reused by CMI for another communication after
 this call succeeds.}
@@ -134,26 +139,33 @@ communication is complete.}
 
 \function{void CmiGrabBuffer(void **pbuf)}
 \index{CmiGrabBuffer}
-\desc{ Transfers the ownership of the buffer pointed to by
-\param{*pbuf} to the calling procedure. If \param{*pbuf} points to a
-system buffer, CMI copies the buffer contents to newly allocated user
-space and updates \param{*pbuf} to point to the new buffer.}
+\desc{Transfers the ownership of the buffer pointed to by
+\param{*pbuf} to the calling procedure. On machines where 
+\param{*pbuf} points to a
+system buffer which cannot be allocated to the user, 
+CMI copies the buffer contents to newly allocated user
+space and updates \param{*pbuf} to point to the new buffer.
+In either case, the user should eventually free the buffer by calling
+\param{CmiFree}.}
 
 \function{int CmiDeliverMsgs(int MaxMsgs)}
 \index{CmiDeliverMsgs}
-\desc{ Retrieves messages from the network message queue and invokes 
+\desc{Retrieves messages from the network message queue and invokes 
 corresponding handler functions for arrived messages. This function 
 returns after either the network message queue becomes empty or after
 \param{MaxMsgs} messages have been retrieved and their handlers called. 
 It returns the difference between total messages delivered and \param{MaxMsgs}.
-Even after
-calling the handler functions, ownership of the message is kept with
-CMI and the handler function should call \param{CmiGrabBuffer()} to
-acquire the message buffer.}
+The handler is given a pointer to the message as  its parameter.
+Normally, the delivered message is owned by CMI,  and so the handler
+should not free it, or store it for later use.  
+If the handler wishes to  use the message later (for example, by
+enqueing the message with the scheduler), it must call
+\param{CmiGrabBuffer()} to
+acquire the  ownership of the message buffer.}
 
 \function{void CmiDeliverSpecificMsg(int HandlerId)}
 \index{CmiDeliverSpecificMsg}
-\desc{ Retrieves messages from the network queue and delivers the first message
+\desc{Retrieves messages from the network queue and delivers the first message
 with its handler field equal to \param{HandlerId}. This functions queues
 the remaining messages retrieved from the network. It returns after the 
 invoked handler function returns.}
@@ -224,7 +236,7 @@ frees the message buffer for \param{msg} before returning, so
 
 \function{CmiCommHandle CmiAsyncBroadcast(unsigned int size, void *msg)}
 \index{CmiAsyncBroadcast}
-\desc{ Initiates asynchronous broadcast of message \param{msg} of
+\desc{Initiates asynchronous broadcast of message \param{msg} of
 length \param{size} bytes to all processors excluding the processor on
 which the caller resides. It returns a communication handle which
 could be used to check the status of this send using
@@ -233,7 +245,7 @@ freed before the communication is complete.}
 
 \function{CmiCommHandle CmiAsyncBroadcastAll(unsigned int size, void *msg)}
 \index{CmiAsyncBroadcastAll}
-\desc{ Initiates asynchronous broadcast of message \param{msg} of
+\desc{Initiates asynchronous broadcast of message \param{msg} of
 length \param{size} bytes to all processors including the processor on
 which the caller resides. It returns a communication handle which
 could be used to check the status of this send using
@@ -253,13 +265,15 @@ and usually has at least microsecond accuracy.}
 
 \function{int CmiNumPe(void)}
 \index{CmiNumPe}
-\desc{ Returns total number of processors in the machine on which the 
+\desc{Returns total number of processors in the machine on which the 
 parallel program is being run.}
 
 \function{int CmiMyPe(void)}
 \index{CmiMyPe}
-\desc{ Returns the logical processor identifier of processor on which the 
+\desc{Returns the logical processor identifier of processor on which the 
 caller resides. A processor Id is between \param{0} and \param{CmiNumPe()-1}.}
+
+Also see the calls in section 4.2 % put a ref here..??
 
 \section{Memory Management}
 
@@ -321,7 +335,7 @@ processor-group \param{group} as children of processor penum. This function
 could be called only by the root processor of processor-group \param{group}.}
 
 \function{CommHandle CmiAsyncMulticast(Pgrp *group, unsigned int size, void *msg)}
-\desc{ Initiates asynchronous broadcast of message \param{msg} of
+\desc{Initiates asynchronous broadcast of message \param{msg} of
 length \param{size} bytes to all processors belonging to \param{group}
 excluding the processor on which the caller resides. It returns a
 communication handle which could be used to check the status of this
@@ -333,11 +347,11 @@ need not belong to \param{group}.}}
 \desc{Returns the processor id of root of processor-group \param{group}. }
 
 \function{int CmiNumChildren(Pgrp *group, int penum)}
-\desc{ Returns  number of children of processor \param{penum} 
+\desc{Returns  number of children of processor \param{penum} 
 in the processor-group \param{group}.}
 
 \function{int CmiParent(Pgrp *group, int penum)}
-\desc{ Returns  processor id of parent of processor \param{penum} 
+\desc{Returns  processor id of parent of processor \param{penum} 
 in the processor-group \param{group}.}
 
 \function{void CmiChildren(Pgrp *group, int node, int *children)}
@@ -348,27 +362,27 @@ array should atleast be of size \param{CmiNumChildren()}.}
 
 \section{Spanning Tree Calls}
 
-Converse defines a spanning tree organization of the processor nodes along
+Converse defines a spanning tree organization of the processor procNums along
 with routines for accessing elements of that tree.  The spanning tree
 routines come in handy when writing programs with collective communication
 because message communication patterns can be made to proceed along the
-spanning tree arcs to avoid bottlenecks at a single node.
+spanning tree arcs to avoid bottlenecks at a single procNum.
 
 \function{int CmiSpanTreeRoot()}
 \index{CmiSpanTreeRoot}
 \desc{Returns the processor number of the root of the spanning tree.}
 
-\function{int CmiSpanTreeParent(int node)}
+\function{int CmiSpanTreeParent(int procNum)}
 \index{CmiSpanTreeParent}
 \desc{This function returns the processor number of the parent of
-\param{node} in the spanning tree.}
+\param{procNum} in the spanning tree.}
 
-\function{int CmiNumSpanTreeChildren(int node)}
+\function{int CmiNumSpanTreeChildren(int procNum)}
 \index{CmiNumSpanTreeChildren}
-\desc{Returns the number of children of \param{node} in the spanning tree.}
+\desc{Returns the number of children of \param{procNum} in the spanning tree.}
 
-\function{void CmiSpanTreeChildren(int node, int *children)}
+\function{void CmiSpanTreeChildren(int procNum, int *children)}
 \index{CmiSpanTreeChildren}
 \desc{This function fills the array \param{children} with processor
-numbers of children of \param{node} in the spanning tree.}
+numbers of children of \param{procNum} in the spanning tree.}
 
