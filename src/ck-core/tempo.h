@@ -100,6 +100,7 @@ class TempoArray : public ArrayElement1D, public Tempo
     void ckTempoSendElem(int tag, void *buffer, int buflen, int idx);
     void ckTempoBarrier(void);
     void ckTempoBcast(int sender, int tag, void *buffer, int buflen);
+    static void ckTempoBcast(int tag, void *buffer, int buflen, CkArrayID aid);
     void ckTempoReduce(int root, int op, void *inbuf, void *outbuf, int count,
                        int type);
     void ckTempoAllReduce(int op,void *inbuf,void *outbuf,int count,int type);

@@ -217,7 +217,6 @@ static void _exitHandler(envelope *env)
 static inline void _processBufferedBocInits(void)
 {
   register envelope *env;
-  static   int j;
   CmiNumberHandler(_bocHandlerIdx, (CmiHandler)_processHandler);
   register int i = 0;
   register int len = CpvAccess(_bocInitVec)->length();

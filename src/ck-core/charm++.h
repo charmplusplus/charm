@@ -83,9 +83,12 @@ class CkArray;
 class CkArrayID {
   public:
     CkGroupID _aid;
+    CkArray *_array;
     CkArrayID(CkGroupID aid) {
+      _array = (CkArray *) CkLocalBranch(aid);
       _aid=aid;
     }
+    CkArray *getArrayManager(void) { return _array; }
     CkArrayID() {}
 };
 

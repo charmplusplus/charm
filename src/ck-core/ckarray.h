@@ -458,6 +458,8 @@ private:
 //Initialization support:
   static void static_initAfterMap(void *dis);
   void initAfterMap(void);
+public:
+  int array_size(void) { return numInitial; } // required for historic reasons
 };
 
 /************************** Array Messages ****************************/
