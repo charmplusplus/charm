@@ -15,9 +15,13 @@ class BroadcastStrategy : public Strategy {
 
     int handlerId;
     int spanning_factor;
+    int _topology;
+
+    void handleTree(char *msg);
+    void handleHypercube(char *msg);
 
  public:
-    BroadcastStrategy();
+    BroadcastStrategy(int topology = USE_HYPERCUBE);
     BroadcastStrategy(CkMigrateMessage *){}
     void insertMessage(CharmMessageHolder *msg);
     void doneInserting();

@@ -19,7 +19,8 @@ static void recv_bcast_handler(void *msg) {
 
 //Constructor, 
 //Can read spanning factor from command line
-BroadcastStrategy::BroadcastStrategy() : Strategy() {
+BroadcastStrategy::BroadcastStrategy(int topology) : 
+    Strategy(), _topology(topology) {
     spanning_factor = DEFAULT_BROADCAST_SPANNING_FACTOR;
     if(sfactor > 0)
         spanning_factor = sfactor;
@@ -32,6 +33,10 @@ void BroadcastStrategy::insertMessage(CharmMessageHolder *cmsg){
     CkPrintf("[%d] BRAODCASTING\n", CkMyPe());
 
     char *msg = cmsg->getCharmMessage();
+    if(_topology == USE_HYPERCUBE) {
+        envelope *env = UsrToEnv(msg);
+        env->setSrcPe(0);    
+    }
     handleMessage((char *)UsrToEnv(msg));
     
     delete cmsg;
@@ -47,8 +52,16 @@ void BroadcastStrategy::beginProcessing(int nelements) {
     handlerId = CkRegisterHandler((CmiHandler)recv_bcast_handler);
 }
 
-void BroadcastStrategy::handleMessage(char *msg)
-{
+void BroadcastStrategy::handleMessage(char *msg) {
+    if(_topology == USE_TREE)
+        handleTree(msg);
+    else if(_topology == USE_HYPERCUBE) 
+        handleHypercube(msg);
+    else CkAbort("Unknown Topology");
+}
+
+void BroadcastStrategy::handleTree(char *msg){
+    
     envelope *env = (envelope *)msg;
     int startpe = env->getSrcPe();
     int size = env->getTotalsize();
@@ -83,8 +96,43 @@ void BroadcastStrategy::handleMessage(char *msg)
                     env->getGroupNum());
 }
 
+
+void BroadcastStrategy::handleHypercube(char *msg){
+    envelope *env = (envelope *)msg;
+    int curcycle = env->getSrcPe();
+    int i;
+    int size = env->getTotalsize();
+    
+    double logp = CmiNumPes();
+    logp = log(logp)/log(2.0);
+    logp = ceil(logp);
+    
+    //CkPrintf("In hypercube %d, %d\n", (int)logp, curcycle); 
+    
+    /* assert(startpe>=0 && startpe<_Cmi_numpes); */
+    CmiSetHandler(msg, handlerId);
+    CmiSetXHandler(msg, getInstance());    
+
+    for (i = logp - curcycle - 1; i >= 0; i--) {
+        int p = CkMyPe() ^ (1 << i);
+
+        int newcycle = ++curcycle;
+        //CkPrintf("%d --> %d, %d\n", CkMyPe(), p, newcycle); 
+
+        env->setSrcPe(newcycle);
+        if(p < CmiNumPes()) {
+            CmiSyncSendFn(p, size, msg);
+        }
+    }
+
+    CkSendMsgBranch(env->getEpIdx(), EnvToUsr(env), CkMyPe(), 
+                    env->getGroupNum());
+}
+
+
 //Pack the group id and the entry point of the user message
 void BroadcastStrategy::pup(PUP::er &p){
     Strategy::pup(p);    
     p | spanning_factor;
+    p | _topology;
 }
