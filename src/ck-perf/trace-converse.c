@@ -17,10 +17,12 @@ int traceBluegeneLinked = 0;
 
 void traceInit(char **argv) {
   CpvInitialize(int, traceOn);
-  CpvInitialize(int, _traceCoreOn); 
   CpvAccess(traceOn)=0;
+#ifndef CMK_OPTIMIZE
+  CpvInitialize(int, _traceCoreOn); 
   CpvAccess(_traceCoreOn)=0; 
   /* initTraceCore(argv); */
+#endif
 }
 void traceMessageRecv(char *msg, int pe) {}
 void traceBeginIdle(void) {}
