@@ -1,0 +1,9 @@
+module liveViz {
+message liveVizRequestMsg;
+
+initcall void liveVizNodeInit(void);
+
+/*group liveViz {
+	entry liveViz(liveVizConfig cfg,CkArrayID A, CkCallback c);
+};*/
+}

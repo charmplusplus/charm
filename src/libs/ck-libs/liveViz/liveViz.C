@@ -1,0 +1,192 @@
+/*
+  liveViz: image-assembly interface.
+Orion Sky Lawlor, olawlor@acm.org, 6/11/2002
+*/
+#include "liveViz.h"
+#include "image.h"
+
+static liveVizConfig config;
+static CkCallback clientGetImageCallback;
+
+//Called by clients to start liveViz
+void liveVizInit(const liveVizConfig &cfg, CkArrayID a, CkCallback c)
+{
+  if (CkMyPe()!=0) CkAbort("liveVizInit must be called only on processor 0!");
+  config=cfg;
+  clientGetImageCallback=c;
+  liveViz0Init(cfg);
+}
+
+//Called by lower layers when an image request comes in
+void liveViz0Get(const liveVizRequest3d &req)
+{
+  clientGetImageCallback.send(new liveVizRequestMsg(req));
+}
+
+static CkReductionMsg *imageCombine(int nMsg,CkReductionMsg **msgs);
+static void vizReductionHandler(void *ignored,void *r_msg);
+
+static CkReduction::reducerType imageCombineReducer;
+static void liveVizNodeInit(void) {
+	imageCombineReducer=CkReduction::addReducer(imageCombine);
+}
+
+#if 1
+/****************** Fairly Slow, but simple image combining *****************
+The contributed data looks like:
+	liveVizRequest
+	Rectangle of image, in final image coordinates (fully clipped)
+	image data
+*/
+
+class imageHeader {
+public:
+	liveVizRequest req;
+	Rect r;
+	imageHeader(const liveVizRequest &req_,const Rect &r_)
+		:req(req_), r(r_) {}
+};
+
+static CkReductionMsg *allocateImageMsg(const liveVizRequest &req,const Rect &r,
+	byte **imgDest)
+{
+  imageHeader hdr(req,r);
+  CkReductionMsg *msg=CkReductionMsg::buildNew(
+  	sizeof(imageHeader)+r.area()*config.getBytesPerPixel(),
+	NULL,imageCombineReducer);
+  byte *dest=(byte *)msg->getData();
+  *(imageHeader *)dest=hdr;
+  *imgDest=dest+sizeof(hdr);
+  return msg;
+}
+
+//Called by clients to deposit a piece of the final image
+void liveVizDeposit(const liveVizRequest &req,
+		    int startx, int starty, 
+		    int sizex, int sizey, const byte * src,
+		    ArrayElement* client)
+{
+  if (config.getVerbose(2))
+    CkPrintf("liveVizDeposit> Deposited image at (%d,%d), (%d x %d) pixels, on pe %d\n",
+    	startx,starty,sizex,sizey,CkMyPe());
+
+//Allocate a reductionMessage:
+  Rect r(startx,starty, startx+sizex,starty+sizey);
+  r=r.getIntersect(Rect(req.wid,req.ht)); //Never copy out-of-bounds regions
+  if (r.isEmpty()) r.zero();
+  int bpp=config.getBytesPerPixel();
+  byte *dest;
+  CkReductionMsg *msg=allocateImageMsg(req,r,&dest);
+  
+//Copy our image into the reductionMessage:
+  if (!r.isEmpty()) {
+    //We can't just copy image with memcpy, because we may be clipping user data here:
+    Image srcImage(sizex,sizey,bpp,(byte *)src);
+    srcImage.window(r.getShift(-startx,-starty)); //Portion of src overlapping dest
+    Image destImage(r.wid(),r.ht(),bpp,dest);
+    destImage.put(0,0,srcImage);
+  }
+
+//Contribute this image to the reduction
+  msg->setCallback(CkCallback(vizReductionHandler));
+  client->contribute(msg);
+}
+
+static CkReductionMsg *imageCombine(int nMsg,CkReductionMsg **msgs)
+{
+  if (nMsg==1) { //Don't bother copying if there's only one source
+  	CkReductionMsg *ret=msgs[0]; 
+	msgs[0]=NULL; //Prevent reduction manager from double-delete
+	return ret;
+  }
+  int m;
+  int bpp=config.getBytesPerPixel();
+  imageHeader *firstHdr=(imageHeader *)msgs[0]->getData();
+
+//Determine the size of the output image
+  Rect destRect; destRect.makeEmpty();
+  for (m=0;m<nMsg;m++) destRect=destRect.getUnion(((imageHeader *)msgs[m]->getData())->r);
+  
+//Allocate output message of that size
+  byte *dest;
+  CkReductionMsg *msg=allocateImageMsg(firstHdr->req,destRect,&dest);
+  
+//Add each source image to the destination
+  Image destImage(destRect.wid(),destRect.ht(),bpp,dest);
+  destImage.clear();
+  for (m=0;m<nMsg;m++) {
+  	byte *src=(byte *)msgs[m]->getData();
+  	imageHeader *mHdr=(imageHeader *)src;
+	src+=sizeof(imageHeader);
+	Image srcImage(mHdr->r.wid(),mHdr->r.ht(),bpp,src);
+	destImage.add(mHdr->r.l-destRect.l,mHdr->r.t-destRect.t,srcImage);
+  }
+
+  return msg;
+}
+
+static void vizReductionHandler(void *ignored,void *r_msg)
+{
+  CkReductionMsg *msg = (CkReductionMsg*)r_msg;
+  imageHeader *hdr=(imageHeader *)msg->getData();
+  byte *srcData=sizeof(imageHeader)+(byte *)msg->getData();
+  int bpp=config.getBytesPerPixel();
+  Rect destRect(0,0,hdr->req.wid,hdr->req.ht);
+  if (destRect==hdr->r) { //Client contributed entire image-- pass along unmodified
+    liveViz0Deposit(hdr->req,srcData);
+  }
+  else 
+  { //Client didn't quite cover whole image-- have to pad
+    Image src(hdr->r.wid(),hdr->r.ht(),bpp,srcData);
+    AllocImage dest(hdr->req.wid,hdr->req.ht,bpp);
+    dest.clear();
+    dest.put(hdr->r.l,hdr->r.t,src);
+    liveViz0Deposit(hdr->req,dest.getData());
+  }
+  delete msg;
+}
+
+#else
+/****************** Fast but complex image combining *****************
+
+INCOMPLETE
+*/
+
+//Called by clients to deposit a piece of the final image
+void liveVizDeposit(const liveVizRequest &req,
+		    int startx, int starty, 
+		    int sizex, int sizey, const byte * src,
+		    ArrayElement* client)
+{
+//Allocate a reductionMessage:
+  int nRect=1;
+  Rect r(startx,starty, startx+sizex,starty+sizey);
+  r.intersect(Rect(req.wid,req.ht)); //Never copy out-of-bounds regions
+  int bpp=config.getBytesPerPixel();
+  int imgLen=r.area()*bpp;
+  CkReductionMsg *msg=buildNew(sizeof(liveVizRequest)+
+  	sizeof(nRect)+nRect*sizeof(Rect)+imgLen,imageCombineReducer);
+
+//Copy our image into the reductionMessage:
+  byte *dest=(byte *)msg->getData();
+  *(liveVizRequest *)dest=req; dest+=sizeof(liveVizRequest);
+  *(int *)dest=nRect; dest+=sizeof(int);
+  *(Rect *)dest=r; dest+=sizeof(Rect);
+  //We can't just copy image with memcpy, because we may be clipping user data here:
+  int wid=r.r-r.l, ht=r.b-r.t;
+  for (int y=0;y<ht;y++)
+  for (int x=0;x<wid;x++) {
+  	for (int i=0;i<bpp;i++) //Ick!  Need an abstraction here...
+  	  dest[(y*wid+x)*bpp+i]=src[((y+r.r-starty)*sizex+(x+r.l-startx))*bpp+i];
+  }
+  
+  msg->setCallback(CkCallback(vizReductionHandler));
+  client->contribute(msg);
+}
+
+
+
+#endif
+
+
+#include "liveViz.def.h"
