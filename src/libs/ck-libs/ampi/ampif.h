@@ -20,6 +20,14 @@
   integer, parameter :: AMPI_BYTE=6
   integer, parameter :: AMPI_PACKED=7
 
+  integer, parameter :: AMPI_SHORT=8
+  integer, parameter :: AMPI_LONG=9
+  integer, parameter :: AMPI_UNSIGNED_CHAR=10
+  integer, parameter :: AMPI_UNSIGNED_SHORT=11
+  integer, parameter :: AMPI_UNSIGNED=12
+  integer, parameter :: AMPI_UNSIGNED_LONG=13
+  integer, parameter :: AMPI_LONG_DOUBLE=14
+
   integer, parameter :: AMPI_MAX=1
   integer, parameter :: AMPI_MIN=2
   integer, parameter :: AMPI_SUM=3
