@@ -11,7 +11,7 @@ double *reduceValues=NULL;
 
 //Number of time steps to simulate
 int tsteps=10;
-const int dim=20;//Length of one side of the FEM mesh
+const int dim=20;//Length (elements) of one side of the FEM mesh
 const int np=4; //Nodes per element for a quad
 
 //Sum of sparse data[0] for both sets
@@ -363,15 +363,6 @@ printargs();
 	    testAssert(elGnum[elList[i]]%2,"Ghost list contents test");
     }
 
-#if 0 /*FIXME: This fails on more than two processors*/
-    double *nodeOut=new double[nnodes];
-    FEM_Set_Node(nnodes,1);
-    for (i=0;i<nnodes;i++) nodeOut[i]=nodes[i].val;
-    FEM_Set_Node_Data(nodeOut);
-    delete[] nodeOut;
-    FEM_Update_Mesh(1+t,0);
-#endif
-
 #if ENABLE_MIG /*Only works with -memory isomalloc*/
     CkPrintf("Before migrate: Thread %d on pe %d\n",myId,CkMyPe());
     FEM_Migrate();
@@ -380,23 +371,54 @@ printargs();
 
   }
 
-  FEM_Print("All tests passed.");
+#if 1
+/*Try reassembling the mesh*/
+    const int *noGnum=FEM_Get_Node_Nums();
+    double *nodeOut=new double[nnodes];
+    FEM_Set_Node(nnodes,1);
+    for (i=0;i<nnodes;i++) {
+    	nodeOut[i]=0.1*noGnum[i];
+    }
+    FEM_Set_Node_Data(nodeOut);
+    delete[] nodeOut;
+    const int *elGnum=FEM_Get_Elem_Nums();
+    double *elOut=new double[nelems];
+    FEM_Set_Elem(0,nelems,1,0);
+    for (i=0;i<nelems;i++) {
+    	elOut[i]=0.1*elGnum[i];
+    }
+    FEM_Set_Elem_Data(0,elOut);
+    delete[] elOut;
+    FEM_Update_Mesh(123,2);
+#endif
 
-  FEM_Done();
+  FEM_Print("All tests passed.");
 }
 
 extern "C" void
 mesh_updated(int param)
 {
-  int nnodes,dataPer;
+  int nnodes,nelems,i,nodePer,dataPer;
   CkPrintf("mesh_updated(%d) called.\n",param);
+  testEqual(param,123,"mesh_updated param");
+  
   FEM_Get_Node(&nnodes,&dataPer);
+  CkPrintf("Getting %d nodes (%d data per)\n",nnodes,dataPer);
   double *ndata=new double[nnodes*dataPer];
   FEM_Get_Node_Data(ndata);
-  double sum=0;
-  for (int i=0;i<nnodes;i++)
-    sum+=ndata[i];
-  testAssert(sum==reduceValues[param-1],"mesh_updated",0);
+  for (int i=0;i<nnodes;i++) {
+    testEqual(ndata[i],0.1*i,"mesh_updated node values");
+  }
+  delete[] ndata;
+  
+  FEM_Get_Elem(0,&nelems,&dataPer,&nodePer);
+  CkPrintf("Getting %d elems (%d data per)\n",nelems,dataPer);
+  double *ldata=new double[nelems*dataPer];
+  FEM_Get_Elem_Data(0,ldata);
+  for (int i=0;i<nelems;i++) {
+    testEqual(ldata[i],0.1*i,"mesh_updated elem values");
+  }
+  delete[] ldata;
 }
 
 extern "C" void
