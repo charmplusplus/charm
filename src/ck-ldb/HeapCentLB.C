@@ -63,6 +63,7 @@ void HeapCentLB::Heapify(HeapData *heap, int node, int heapSize)
 
 CLBMigrateMsg* HeapCentLB::Strategy(CentralLB::LDStats* stats, int count)
 {
+	int pe,obj;
   CkPrintf("[%d] HeapCentLB strategy\n",CkMyPe());
 
 #if CMK_STL_USE_DOT_H
@@ -75,7 +76,7 @@ CLBMigrateMsg* HeapCentLB::Strategy(CentralLB::LDStats* stats, int count)
 	HeapData *cpuData = new HeapData[count];
 	HeapData *objData;
 
-	for (int pe=0; pe < count; pe++) {
+	for (pe=0; pe < count; pe++) {
 		totalObjs += stats[pe].n_objs;
 		cpuData[pe].cpuTime = 0.;
 		cpuData[pe].pe = cpuData[pe].id = pe;
@@ -83,11 +84,11 @@ CLBMigrateMsg* HeapCentLB::Strategy(CentralLB::LDStats* stats, int count)
 
 	objData = new HeapData[totalObjs];
 	int objCount = 0;
-  for(int pe=0; pe < count; pe++) {
+  for(pe=0; pe < count; pe++) {
     CkPrintf("[%d] PE %d : %d Objects : %d Communication\n",
 	     CkMyPe(),pe,stats[pe].n_objs,stats[pe].n_comm);
 
-    for(int obj=0; obj < stats[pe].n_objs; obj++, objCount++) {
+    for(obj=0; obj < stats[pe].n_objs; obj++, objCount++) {
 
 			objData[objCount].cpuTime = stats[pe].objData[obj].cpuTime;
 			objData[objCount].pe = pe;
@@ -95,7 +96,7 @@ CLBMigrateMsg* HeapCentLB::Strategy(CentralLB::LDStats* stats, int count)
 		}
 	}
 
-	for (int obj=1; obj < totalObjs; obj++) {
+	for (obj=1; obj < totalObjs; obj++) {
 		HeapData key = objData[obj];
 		int i = obj-1;
 		while (i >=0 && objData[i].cpuTime < key.cpuTime) {
@@ -107,7 +108,7 @@ CLBMigrateMsg* HeapCentLB::Strategy(CentralLB::LDStats* stats, int count)
 
 	int heapSize = count-1;
 	HeapData minCpu;	
-	for (int obj=0; obj < totalObjs; obj++) {
+	for (obj=0; obj < totalObjs; obj++) {
 
 		//Operation of extracting the minimum(the least loaded processor) from the heap
 		minCpu = cpuData[0];
