@@ -90,40 +90,51 @@ void SumLogPool::addEventType(int eventType, double time)
 
 SumLogPool::SumLogPool(char *pgm) : phaseTab(MAX_PHASES) 
 {
-    if (TRACE_CHARM_PE() == 0) return;
-    int i;
-    poolSize = CkpvAccess(CtrLogBufSize);
-    if (poolSize % 2) poolSize++;	// make sure it is even
-    pool = new BinEntry[poolSize];
-    _MEMCHECK(pool);
-    numEntries = 0;
-    char pestr[10];
-    sprintf(pestr, "%d", CkMyPe());
-    int len = strlen(pgm) + strlen(".sum.") + strlen(pestr) + 1;
-    char *fname = new char[len+1];
-    sprintf(fname, "%s.%s.sum", pgm, pestr);
-    fp = NULL;
-    //CmiPrintf("TRACE: %s:%d\n", fname, errno);
-    do {
+   if (TRACE_CHARM_PE() == 0) return;
+   int i;
+   poolSize = CkpvAccess(CtrLogBufSize);
+   if (poolSize % 2) poolSize++;	// make sure it is even
+   pool = new BinEntry[poolSize];
+   _MEMCHECK(pool);
+   numEntries = 0;
+   char pestr[10];
+   sprintf(pestr, "%d", CkMyPe());
+   int len = strlen(pgm) + strlen(".sum.") + strlen(pestr) + 1;
+   char *fname = new char[len+1];
+   sprintf(fname, "%s.%s.sum", pgm, pestr);
+   fp = NULL;
+   //CmiPrintf("TRACE: %s:%d\n", fname, errno);
+   do {
     fp = fopen(fname, "w+");
     } while (!fp && errno == EINTR);
     delete[] fname;
     if(!fp) {
       CmiAbort("Cannot open Summary Trace File for writing...\n");
-    }
+   }
 
-    epSize = MAX_ENTRIES;
-    epTime = new double[epSize];
-    _MEMCHECK(epTime);
-    epCount = new int[epSize];
-    _MEMCHECK(epCount);
-    for (i=0; i< epSize; i++) {
-	epTime[i] = 0.0;
-	epCount[i] = 0;
-    };
+   epSize = MAX_ENTRIES;
+   epTime = new double[epSize];
+   _MEMCHECK(epTime);
+   epCount = new int[epSize];
+   _MEMCHECK(epCount);
+   for (i=0; i< epSize; i++) {
+     epTime[i] = 0.0;
+     epCount[i] = 0;
+   };
 
-    // event
-    markcount = 0;
+   // event
+   markcount = 0;
+
+   if (CkMyPe() == 0)
+   {
+    char *fname = new char[strlen(CkpvAccess(traceRoot))+strlen(".sum.sts")+1];
+    sprintf(fname, "%s.sum.sts", CkpvAccess(traceRoot));
+    stsfp = fopen(fname, "w+");
+    //CmiPrintf("File: %s \n", fname);
+    if(stsfp == 0)
+      CmiAbort("Cannot open summary sts file for writing.\n");
+    delete[] fname;
+   }
 }
 
 void SumLogPool::write(void) 
@@ -167,32 +178,25 @@ void SumLogPool::write(void)
 
 void SumLogPool::writeSts(void)
 {
-  char *fname = new char[strlen(CkpvAccess(traceRoot))+strlen(".sum.sts")+1];
-  sprintf(fname, "%s.sum.sts", CkpvAccess(traceRoot));
-  FILE *sts = fopen(fname, "w+");
-  //CmiPrintf("File: %s \n", fname);
-  if(sts==0)
-    CmiAbort("Cannot open summary sts file for writing.\n");
-  delete[] fname;
-  fprintf(sts, "MACHINE %s\n",CMK_MACHINE_NAME);
-  fprintf(sts, "PROCESSORS %d\n", CkNumPes());
-  fprintf(sts, "TOTAL_CHARES %d\n", _numChares);
-  fprintf(sts, "TOTAL_EPS %d\n", _numEntries);
-  fprintf(sts, "TOTAL_MSGS %d\n", _numMsgs);
-  fprintf(sts, "TOTAL_PSEUDOS %d\n", 0);
-  fprintf(sts, "TOTAL_EVENTS %d\n", _numEvents);
+  fprintf(stsfp, "MACHINE %s\n",CMK_MACHINE_NAME);
+  fprintf(stsfp, "PROCESSORS %d\n", CkNumPes());
+  fprintf(stsfp, "TOTAL_CHARES %d\n", _numChares);
+  fprintf(stsfp, "TOTAL_EPS %d\n", _numEntries);
+  fprintf(stsfp, "TOTAL_MSGS %d\n", _numMsgs);
+  fprintf(stsfp, "TOTAL_PSEUDOS %d\n", 0);
+  fprintf(stsfp, "TOTAL_EVENTS %d\n", _numEvents);
   int i;
   for(i=0;i<_numChares;i++)
-    fprintf(sts, "CHARE %d %s\n", i, _chareTable[i]->name);
+    fprintf(stsfp, "CHARE %d %s\n", i, _chareTable[i]->name);
   for(i=0;i<_numEntries;i++)
-    fprintf(sts, "ENTRY CHARE %d %s %d %d\n", i, _entryTable[i]->name,
+    fprintf(stsfp, "ENTRY CHARE %d %s %d %d\n", i, _entryTable[i]->name,
                  _entryTable[i]->chareIdx, _entryTable[i]->msgIdx);
   for(i=0;i<_numMsgs;i++)
-    fprintf(sts, "MESSAGE %d %d\n", i, _msgTable[i]->size);
+    fprintf(stsfp, "MESSAGE %d %d\n", i, _msgTable[i]->size);
   for(i=0;i<_numEvents;i++)
-    fprintf(sts, "EVENT %d Event%d\n", i, i);
-  fprintf(sts, "END\n");
-  fclose(sts);
+    fprintf(stsfp, "EVENT %d Event%d\n", i, i);
+  fprintf(stsfp, "END\n");
+  fclose(stsfp);
 }
 
 void SumLogPool::add(double time, int pe) 

@@ -128,7 +128,7 @@ class SumLogPool {
     UInt poolSize;
     UInt numEntries;
     BinEntry *pool;	/**< bins */
-    FILE *fp ;
+    FILE *fp, *stsfp ;
 
     double  *epTime;
     int *epCount;
