@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-15 20:14:47  sanjeev
+ * Revision 2.1  1995-07-05 22:14:42  sanjeev
+ * Megatest++ runs
+ *
+ * Revision 2.0  1995/06/15  20:14:47  sanjeev
  * *** empty log message ***
  *
  ***************************************************************************/
@@ -26,6 +29,7 @@ static char ident[] = "@(#)$Header$";
 /* #include <cm/cmmd-io.h>    not needed in CMMD 3.0 */
 
 #include "machine.h" 
+#include "converse.h"
 
 #define FLIPBIT(node,bitnumber) (node ^ (1 << bitnumber))
 
@@ -34,7 +38,7 @@ typedef struct msg_list {
 	struct msg_list *next ;
 } MSG_LIST ;
 
-int _MC_dim /* used in spantree.c */  ;   
+int Cmi_dim /* used in spantree.c */  ;   
 
 
 static int msglength=0 ;
@@ -42,10 +46,16 @@ static int numpes ;
 static void * SentMsgList = NULL ;
 static MSG_LIST *RecvMsgList = NULL ;
 
-static void *CmiLocalQueue ;
-
 extern void * FIFO_Create() ;
 extern void FIFO_EnQueue() ;
+
+static void McSyncReceive() ;
+static int McArrivedMsgLength() ;
+static int McProbe() ;
+
+void *CmiLocalQueue ;
+int Cmi_mype ;
+int Cmi_numpe ;
 
 
 /**************************  TIMER FUNCTIONS **************************/
@@ -124,16 +134,16 @@ void *CmiGetNonLocal()
 		ret = RecvMsgList->msg ;
 		prev = RecvMsgList ;
 		RecvMsgList = RecvMsgList->next ;
-		CkFree(prev) ;
+		CmiFree(prev) ;
 		return ret ;
 	}	
 
         if (!McProbe())
                 return NULL;
         msglength = McArrivedMsgLength();
-        env = (void *)  CkAlloc(msglength);
+        env = (void *)  CmiAlloc(msglength);
         if (env == NULL)
-                CkPrintf("*** ERROR *** Memory Allocation Failed.\n");
+                CmiPrintf("*** ERROR *** Memory Allocation Failed.\n");
         McSyncReceive(msglength, env);
         return env;
 }
@@ -144,7 +154,7 @@ void **pbuf ;
 }
 
 /* Next 3 fns are internal fns */
-static McProbe()
+static int McProbe()
 {
 	CMMD_mcb mcb1 ;
 
@@ -156,12 +166,12 @@ static McProbe()
 	return(1) ;
 }
 
-static McArrivedMsgLength()
+static int McArrivedMsgLength()
 {
         return msglength;
 }
 
-static McSyncReceive(size, buffer)
+static void McSyncReceive(size, buffer)
 int size ;
 void *buffer ;
 {
@@ -180,40 +190,68 @@ void *buffer ;
 
 /********************* MESSAGE SEND FUNCTIONS ******************/
 
-/* Next 3 fns are internal fns */
+/***************** CmiAsyncSendFree not used for now ***************
+static int CmiInsideMem = 1;
+
+* Next 3 fns are internal fns *
 static SendHandler(mcb, msg)
 CMMD_mcb *mcb ;
 void *msg ;
 {
 	CMMD_free_mcb(*mcb) ;
 	
-/* msg is the buffer which contained the message */
-	if ( ! _CKMEM_InsideMem ) {
-		CkFree(msg) ;
+* msg is the buffer which contained the message *
+	if ( ! CmiInsideMem ) {	* For now CmiInsideMem is always TRUE *
+		CmiFree(msg) ;
 		release_messages() ;
 	}
-	else { /* put msg in list of messages that have to be freed */
+	else { * put msg in list of messages that have to be freed *
 		((MSG_LIST *)msg)->next = (MSG_LIST *)SentMsgList ;
 		SentMsgList = msg ;
 	}
-		
 }
 
 
 static release_messages()
 {
-/* used only to free messages that didnt get freed in the SendHandler */
+* used only to free messages that didnt get freed in the SendHandler *
 
 	MSG_LIST *q, *q2 ;
 
 	q = (MSG_LIST *)SentMsgList ;
 	while ( q != NULL ) {
 		q2 = q->next ;
-		CkFree(q) ;
+		CmiFree(q) ;
 		q = q2 ;
 	}
 	SentMsgList = NULL ;
 }
+
+
+void CmiAsyncSendFree(destPE, size, msg)
+int destPE;
+int size;
+void * msg;
+{
+	CMMD_mcb mcb ;		
+
+	if ( destPE == CmiMyPe() ) {
+		FIFO_EnQueue(CmiLocalQueue, msg);
+		return ;
+	}
+
+trysend:
+	mcb = CMMD_send_async(destPE, CMMD_DEFAULT_TAG, msg, size,
+				SendHandler, msg) ;
+* the last arg to CMMD_send_async is the value passed to SendHandler
+   as the 2nd arg, so the buffer "msg" gets freed after being sent *
+
+	if ( mcb == CMMD_ERRVAL ) {
+		RecvMsgs() ;	* try and receive msgs to unclog network *
+		goto trysend ;
+	}
+}
+***********************************************************************/
 
 
 
@@ -234,13 +272,13 @@ static RecvMsgs()
 
 	while ( McProbe() ) {
 		msglength = McArrivedMsgLength();
-        	env = (void *) CkAlloc(msglength);
+        	env = (void *) CmiAlloc(msglength);
         	if (env == NULL)
-                	CkPrintf("*** ERROR *** Memory Allocation Failed.\n");
+                	CmiPrintf("*** ERROR *** Memory Allocation Failed.\n");
         	McSyncReceive(msglength, env);
 
 		/* add env to the list of received but unprocessed msgs */
-		msgptr = (MSG_LIST *)CkAlloc(sizeof(MSG_LIST)) ;
+		msgptr = (MSG_LIST *)CmiAlloc(sizeof(MSG_LIST)) ;
 		msgptr->next = RecvMsgList ;
 		msgptr->msg = env ;
 		RecvMsgList = msgptr ;
@@ -249,33 +287,7 @@ static RecvMsgs()
 
 
 
-
-void CmiAsyncSendFree(destPE, size, msg)
-int destPE;
-int size;
-void * msg;
-{
-	CMMD_mcb mcb ;		
-
-	if ( destPE == CmiMyPe() ) {
-		FIFO_EnQueue(CmiLocalQueue, msg);
-		return ;
-	}
-
-trysend:
-	mcb = CMMD_send_async(destPE, CMMD_DEFAULT_TAG, msg, size,
-				SendHandler, msg) ;
-/* the last arg to CMMD_send_async is the value passed to SendHandler
-   as the 2nd arg, so the buffer "msg" gets freed after being sent */
-
-	if ( mcb == CMMD_ERRVAL ) {
-		RecvMsgs() ;	/* try and receive msgs to unclog network */
-		goto trysend ;
-	}
-}
-
-
-CommHandle CmiAsyncSend(destPE, size, msg)
+CmiCommHandle CmiAsyncSend(destPE, size, msg)
 int destPE;
 int size;
 void * msg;
@@ -288,7 +300,7 @@ void * msg;
 		memcpy(m2, msg, size) ;
 		FIFO_EnQueue(CmiLocalQueue, m2);
 		
-		return CMMD_ERRVAL;
+		return ((CmiCommHandle)CMMD_ERRVAL) ;
 	}
 
 
@@ -301,7 +313,7 @@ trysend:
 		goto trysend ;
 	}
 
-	return ((CommHandle)mcb) ;
+	return ((CmiCommHandle)mcb) ;
 }
 
 void CmiSyncSend(destPE, size, msg)
@@ -322,22 +334,22 @@ void * msg;
 }
 
 
-int CmiAsyncMsgSent(CommHandle c)
+int CmiAsyncMsgSent(CmiCommHandle c)
 {
-	if ( c == CMMD_ERRVAL )
+	if ( c == (CmiCommHandle)CMMD_ERRVAL )
 		return 1 ;
-	if ( CMMD_msg_done(c) ) 
+	if ( CMMD_msg_done((int)c) ) 
 		return 1 ;
 	else
 		return 0 ;
 }
 
 
-void CmiReleaseCommHandle(CommHandle c)
+void CmiReleaseCommHandle(CmiCommHandle c)
 {
-	if ( c == CMMD_ERRVAL )
+	if ( c == (CmiCommHandle)CMMD_ERRVAL )
 		return ;
-	CMMD_free_mcb(c) ;
+	CMMD_free_mcb((int)c) ;
 }
 
 
@@ -349,9 +361,9 @@ void * msg;
 {
 	int i ;
 
-	for ( i=_MC_mypenum+1; i<numpes; i++ ) 
+	for ( i=CmiMyPe()+1; i<numpes; i++ ) 
                 CMMD_send_noblock(i, CMMD_DEFAULT_TAG, msg, size) ;
-	for ( i=0; i<_MC_mypenum; i++ ) 
+	for ( i=0; i<CmiMyPe(); i++ ) 
 	        CMMD_send_noblock(i, CMMD_DEFAULT_TAG, msg, size) ;
 
 }
@@ -364,7 +376,7 @@ void * msg;
 
 	for ( i=0; i<numpes; i++ ) 
                 CMMD_send_noblock(i, CMMD_DEFAULT_TAG, msg, size) ;
-	CkFree(msg) ;
+	CmiFree(msg) ;
 }
 
 
@@ -379,7 +391,7 @@ void * msg;
 }
 
 
-CommHandle CmiAsyncBroadcastAll(size, msg)
+CmiCommHandle CmiAsyncBroadcastAll(size, msg)
 int size;
 void * msg;
 {
@@ -387,21 +399,21 @@ void * msg;
 
 	for ( i=0; i<numpes; i++ ) 
                 CMMD_send_noblock(i, CMMD_DEFAULT_TAG, msg, size) ;
-	return((CommHandle)CMMD_ERRVAL) ;
+	return((CmiCommHandle)CMMD_ERRVAL) ;
 }
 
 
-CommHandle CmiAsyncBroadcast(size, msg)  /* same as SyncBroadcast for now */
+CmiCommHandle CmiAsyncBroadcast(size, msg)  /* same as SyncBroadcast for now */
 int size;
 void * msg;
 {
 	int i ;
 
-	for ( i=_MC_mypenum+1; i<numpes; i++ ) 
+	for ( i=CmiMyPe()+1; i<numpes; i++ ) 
                 CMMD_send_noblock(i, CMMD_DEFAULT_TAG, msg, size) ;
-	for ( i=0; i<_MC_mypenum; i++ ) 
+	for ( i=0; i<CmiMyPe(); i++ ) 
                 CMMD_send_noblock(i, CMMD_DEFAULT_TAG, msg, size) ;
-	return((CommHandle)CMMD_ERRVAL) ;
+	return((CmiCommHandle)CMMD_ERRVAL) ;
 }
 
 
@@ -410,26 +422,26 @@ void * msg;
 
 /* Neighbour functions used mainly in LDB : pretend the CM5 is a hypercube */
 
-int McNumNeighbours(node)
+int CmiNumNeighbours(node)
 int node;
 {
-    return _MC_dim;
+    return Cmi_dim;
 }
 
 
-McGetNodeNeighbours(node, neighbours)
+void CmiGetNodeNeighbours(node, neighbours)
 int node, *neighbours;
 {
     int i;
 
-    for (i = 0; i < _MC_dim; i++)
+    for (i = 0; i < Cmi_dim; i++)
         neighbours[i] = FLIPBIT(node,i);
 }
 
 
 
 
-int McNeighboursIndex(node, neighbour)
+int CmiNeighboursIndex(node, neighbour)
 int node, neighbour;
 {
     int index = 0;
@@ -448,16 +460,13 @@ int node, neighbour;
 
 /************************** MAIN ***********************************/
 
-
-void CmiInitMc(argc, argv)
+main(argc, argv)
 int argc;
-char *argv[];
+char **argv;
 {
-	int n ;
+	int n, i, j ;
 
-	/* Added 11/15/93 to match other machines' versions */
-	program_name(argv[0], "CM5");
-	/****************************************************/
+	/* program_name(argv[0], "CM5");  cant be called from converse */
 
         CMMD_fset_io_mode(stdin, CMMD_independent) ;
 	CMMD_fset_io_mode(stdout, CMMD_independent) ;
@@ -466,20 +475,51 @@ char *argv[];
         fcntl(fileno(stdout), F_SETFL, O_APPEND) ;
         fcntl(fileno(stderr), F_SETFL, O_APPEND) ;
 
-	_MC_mypenum = CMMD_self_address() ;
+	Cmi_mype = CMMD_self_address() ;
 
-	_MC_maxpenum = numpes = CMMD_partition_size() ;
+	if ( argc < 2 ) 
+		Cmi_numpe = numpes = CMMD_partition_size() ;
+	else { /* Check if theres a +p #procs */
+		for ( i=1; i<argc; i++ ) {
+			if ( strncmp(argv[i], "+p", 2) != 0) 
+				continue ;
+			if ( strlen(argv[i]) > 2 ) {
+				Cmi_numpe = numpes = atoi(&(argv[i][2])) ;
+				for ( j=i; j<argc-1; j++ )
+					argv[j] = argv[j+1] ;
+				argc-- ;
+			}
+			else {
+				Cmi_numpe = numpes = atoi(argv[i+1]) ;
+				for ( j=i; j<argc-2; j++ )
+					argv[j] = argv[j+2] ;
+				argc -= 2 ;
+			}
+			break ;
+		}
+	}
+
+	if ( Cmi_mype >= Cmi_numpe )
+		exit(0) ;
 
 	/* find dim = log2(numpes), to pretend we are a hypercube */
-	for ( _MC_dim=0,n=numpes; n>1; n/=2 )
-		_MC_dim++ ;
+	for ( Cmi_dim=0,n=numpes; n>1; n/=2 )
+		Cmi_dim++ ;
 
-	CmiSpanTreeInit(); 
- 
 	/* Initialize timers */
 	CMMD_node_timer_clear(TIMER_ID) ;
 	CMMD_node_timer_start(TIMER_ID) ;
 
+	charm_main(argc, argv);
+}
+
+
+
+void CmiInitMc(argv)
+char *argv[];
+{
+	CmiSpanTreeInit(); 
+ 
 	CmiLocalQueue = FIFO_Create() ;
 }
 
@@ -498,27 +538,26 @@ void CmiDeclareArgs()
  *
  *****************************************************************************/
  
-static int CmiInsideMem = 1;
  
 void *CmiAlloc(size)
 int size;
 {
-char *res;
-res =(char *)malloc(size+8);
-if (res==0) printf("Memory allocation failed.");
-((int *)res)[0]=size;
-return (void *)(res+8);
+	char *res;
+	res =(char *)malloc(size+8);
+	if (res==0) printf("Memory allocation failed.");
+	((int *)res)[0]=size;
+	return (void *)(res+8);
 }
  
 int CmiSize(blk)
 char *blk;
 {
-return ((int *)(blk-8))[0];
+	return ((int *)(blk-8))[0];
 }
  
 void CmiFree(blk)
 char *blk;
 {
-free(blk-8);
+	free(blk-8);
 }
 

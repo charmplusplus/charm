@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-15 20:14:52  sanjeev
+ * Revision 2.1  1995-07-05 22:14:42  sanjeev
+ * Megatest++ runs
+ *
+ * Revision 2.0  1995/06/15  20:14:52  sanjeev
  * *** empty log message ***
  *
  ***************************************************************************/
@@ -35,7 +38,7 @@ typedef struct spantreearray {
 static SpanTreeArray *SpanArray;
 static int *NodeStore;   /* used to store the nodes in the spanning 
 		       tree in breadth first order */
-extern int _MC_dim;
+extern int Cmi_dim;
 static int numnodes;
 
 CmiSpanTreeInit()
@@ -45,9 +48,9 @@ CmiSpanTreeInit()
     int next, currentnode;
     int neighbours[MAXCUBEDIM];
 
-    numnodes = (1 << _MC_dim);
-    SpanArray = (SpanTreeArray *)CkAlloc(sizeof(SpanTreeArray) * numnodes);
-    NodeStore = (int *) CkAlloc(sizeof(int) * numnodes);
+    numnodes = (1 << Cmi_dim);
+    SpanArray = (SpanTreeArray *)CmiAlloc(sizeof(SpanTreeArray) * numnodes);
+    NodeStore = (int *) CmiAlloc(sizeof(int) * numnodes);
     visited[0] = TRUE;
     NodeStore[0] = 0;  /* the root of the spanning tree */
     SpanArray[0].parent = -1;  /* no parent */
@@ -58,9 +61,9 @@ CmiSpanTreeInit()
     for (next = 1, i = 0; i < numnodes; i++)
     {
 	currentnode = NodeStore[i];
-	McGetNodeNeighbours(currentnode, neighbours);
+	CmiGetNodeNeighbours(currentnode, neighbours);
 	SpanArray[currentnode].noofchildren = 0;
-	for (j = 0; j < _MC_dim && 
+	for (j = 0; j < Cmi_dim && 
 	            SpanArray[currentnode].noofchildren < MAXSPAN; j++)
 	{
 	    if (!visited[neighbours[j]])
