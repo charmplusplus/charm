@@ -65,7 +65,8 @@ static void CldStillIdle(void *dummy)
 #endif
 
   myload = CldLoad();
-  CmiAssert(myload == 0);
+//  CmiAssert(myload == 0);
+  if (myload > 0) return;
 
   msg.pe = CmiMyPe();
   msg.load = myload;
@@ -73,7 +74,7 @@ static void CldStillIdle(void *dummy)
   CmiSyncMulticast(CpvAccess(neighborGroup), sizeof(loadmsg), &msg);
 
 #ifndef CMK_OPTIMIZE
-  traceUserBracketEvent(cldData->idleEvt, startT, CmiWallTimer());
+//  traceUserBracketEvent(cldData->idleEvt, startT, CmiWallTimer());
 #endif
 }
 
@@ -173,7 +174,7 @@ void CldBalance()
   }
   CldSendLoad();
 #ifndef CMK_OPTIMIZE
-  traceUserBracketEvent(CpvAccess(CldData)->balanceEvt, startT, CmiWallTimer());
+//  traceUserBracketEvent(CpvAccess(CldData)->balanceEvt, startT, CmiWallTimer());
 #endif
   CcdCallFnAfterOnPE((CcdVoidFn)CldBalance, NULL, PERIOD, CmiMyPe());
 /*  CcdCallBacksReset(0); */
@@ -378,7 +379,7 @@ static void CldComputeNeighborData()
   npe = getTopoMaxNeighbors(topo);
   pes = (int *)malloc(npe*sizeof(int));
   getTopoNeighbors(topo, CmiMyPe(), pes, &npe);
-#if 1
+#if 0
   CmiPrintf("Neighors (%d) for: %d\n", npe, CmiMyPe());
   for (i=0; i<npe; i++) {
     CmiAssert(pes[i] < CmiNumPes());
@@ -457,16 +458,8 @@ void CldGraphModuleInit(char **argv)
     CldBalance();
   }
 
-#if 1
+#if 0
   /* register an idle handler */
-/*
-  CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,
-      (CcdVoidFn) CldBeginIdle, NULL);
-  CcdCallOnConditionKeep(CcdPROCESSOR_END_IDLE,
-      (CcdVoidFn) CldEndIdle, NULL);
-  CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,
-      (CcdVoidFn) CldStillIdle, NULL);
-*/
   CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,
       (CcdVoidFn) CldStillIdle, NULL);
   CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,
