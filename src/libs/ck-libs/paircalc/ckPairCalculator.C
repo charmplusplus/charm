@@ -274,52 +274,78 @@ PairCalculator::acceptResult(int size, double *matrix, int rowNum, CkCallback cb
   /* revise this to partition the data into S/M objects 
    * add new message and entry method for sumPartial result
    * to avoid message copying.
-   */
+   */ 
+
+  //original version
+  
+
   if(!symmetric){
     CkArrayIndexIndex4D idx(thisIndex.w, 0, thisIndex.y, thisIndex.z);
     thisProxy(idx).sumPartialResult(N*grainSize, mynewData, thisIndex.z, cb);
   }
   else {
     CkArrayIndexIndex4D idx(thisIndex.w, 0, thisIndex.y, thisIndex.z);
-    thisProxy(idx).sumPartialResult(N*grainSize, mynewData, thisIndex.z, cb);  
+    thisProxy(idx).sumPartialResult(N*grainSize, mynewData, thisIndex.z, cb);
     if (rowNum != thisIndex.x){
       CkArrayIndexIndex4D idx(thisIndex.w, 0, thisIndex.x, thisIndex.z);
-      thisProxy(idx).sumPartialResult(N*grainSize, mynewData, thisIndex.z, cb);  
+      thisProxy(idx).sumPartialResult(N*grainSize, mynewData, thisIndex.z, cb);
+                                                                                
     }
   }
   /*
-  // commenting the reduction split out since it doesn't work yet.
+  if(!symmetric){
+    int segments=S/grainSize;
+    if(S%grainSize!=0)
+      segments+=1;
+    int blocksize=grainSize/segments;
+    int priority=0xFFFFFFFF;
+    for(int segment=0;segment < segments;segment++)
+      {  
+	//      CkPrintf("[%d %d %d %d]: sending N %d segment %d of %d segments \n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z, N, segment,segments);
+	CkArrayIndexIndex4D idx(thisIndex.w, segment*grainSize, thisIndex.y, thisIndex.z);
 
-  int segments=S/grainSize;
-  if(S%grainSize!=0)
-    segments+=1;
-  int blocksize=grainSize/segments;
-  int priority=0xFFFFFFFF;
-  for(int segment=0;segment < segments;segment++)
-    {  
-      //      CkPrintf("[%d %d %d %d]: sending N %d segment %d of %d segments \n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z, N, segment,segments);
-      CkArrayIndexIndex4D idx(thisIndex.w,segment*grainSize, thisIndex.y, thisIndex.z);
 
-      if(!symmetric){
+	//	partialResultMsg *msg = new (N*blocksize, 8*sizeof(int) )partialResultMsg(N*blocksize, mynewData+segment*N*blocksize, priority, cb);
 
-	partialResultMsg *msg = new (N*blocksize,8*sizeof(int))partialResultMsg(priority,N*blocksize, cb, mynewData+segment*N*blocksize);
-	*((int*)CkPriorityPtr(msg)) = priority;
-	CkSetQueueing(msg, CK_QUEUEING_IFIFO); 
+	//	partialResultMsg *msg = new (N*blocksize, 0)partialResultMsg(N*blocksize, mynewData+segment*N*blocksize, priority, cb);
+
+	partialResultMsg *msg = new (N*blocksize, 0)partialResultMsg;
+	msg->N=N*blocksize;
+	memcpy(msg->result, mynewData+segment*N*blocksize, N*blocksize*sizeof(complex));
+	msg->priority=priority;
+	msg->cb=cb;
+	//	*((int*)CkPriorityPtr(msg)) = priority;
+	//	CkSetQueueing(msg, CK_QUEUEING_IFIFO); 
 	thisProxy(idx).sumPartialResult(msg);  
       }
-      else {
-	partialResultMsg *msg = new (N*blocksize,8*sizeof(int))partialResultMsg(priority,N*blocksize,  cb, mynewData+segment*N*blocksize);
-	*((int*)CkPriorityPtr(msg)) = priority;
-	CkSetQueueing(msg, CK_QUEUEING_IFIFO); 
-	thisProxy(idx).sumPartialResult(msg);  
-	if (rowNum != thisIndex.x){
-	  partialResultMsg *msg = new (N*blocksize,8*sizeof(int))partialResultMsg(priority,N*blocksize, cb, mynewData+segment*N*blocksize);
-	  *((int*)CkPriorityPtr(msg)) = priority;
-	  CkSetQueueing(msg, CK_QUEUEING_IFIFO); 
-	  thisProxy(idx).sumPartialResult(msg);  
-	}
-      }
+  }
+  else {
+    CkArrayIndexIndex4D idx(thisIndex.w, 0, thisIndex.y, thisIndex.z);
+    thisProxy(idx).sumPartialResult(N*grainSize, mynewData, thisIndex.z, cb);
+    if (rowNum != thisIndex.x){
+      CkArrayIndexIndex4D idx(thisIndex.w, 0, thisIndex.x, thisIndex.z);
+      thisProxy(idx).sumPartialResult(N*grainSize, mynewData, thisIndex.z, cb);
     }
+  }
+
+  */
+
+  /*
+  else {
+    int priority=0xFFFFFFFF;
+    priorSumMsg *msg = new (N*grainSize, 8*sizeof(int) )priorSumMsg(priority,N*grainSize, cb, mynewData);
+    *((int*)CkPriorityPtr(msg)) = priority;
+    CkSetQueueing(msg, CK_QUEUEING_IFIFO); 
+    CkArrayIndexIndex4D idx(thisIndex.w, 0, thisIndex.y, thisIndex.z);
+    thisProxy(idx).sumPartialResult(msg);  
+    if (rowNum != thisIndex.x){
+      priorSumMsg *msg = new (N*grainSize, 8*sizeof(int) )priorSumMsg(priority,N*grainSize, cb, mynewData);
+      *((int*)CkPriorityPtr(msg)) = priority;
+      CkSetQueueing(msg, CK_QUEUEING_IFIFO); 
+      CkArrayIndexIndex4D idx(thisIndex.w, 0, thisIndex.x, thisIndex.z);
+      thisProxy(idx).sumPartialResult(msg);  
+    }
+  }
   */
   delete [] mynewData;
 }
@@ -335,7 +361,8 @@ PairCalculator::sumPartialResult(partialResultMsg *msg)
     segments+=1;
   segments*=blkSize;
   int psumblocksize=grainSize/segments;
-
+  if(symmetric)
+    segments+=thisIndex.x;
   sumPartialCount++;
 
   if(!newData){
@@ -358,6 +385,39 @@ PairCalculator::sumPartialResult(partialResultMsg *msg)
   }
   delete msg;
 }
+
+
+
+void 
+PairCalculator::sumPartialResult(priorSumMsg *msg)
+{
+#ifdef _DEBUG_
+  CkPrintf("[%d %d %d %d]: sum result \n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z );
+#endif
+
+  sumPartialCount++;
+
+  if(!newData){
+    newData = new complex[N*grainSize];
+  }  
+  for(int i=0; i<N*grainSize; i++){
+    newData[i] += msg->result[i];  // should be adjusted with offset
+  }
+  if (sumPartialCount == (S/grainSize)*blkSize) {
+    for(int j=0; j<grainSize; j++){
+      CkCallback mycb(msg->cb.d.array.ep, CkArrayIndex2D(thisIndex.y+j, thisIndex.w), msg->cb.d.array.id);
+      mySendMsg *outmsg = new (N, 0)mySendMsg(N, newData+j*N); // msg with newData (size N)
+      mycb.send(outmsg);
+    }
+    sumPartialCount = 0;
+    memset(newData,0,N*grainSize);
+    //    for(int k=0; k<N*grainSize; k++)
+    //	 newData[k] = complex(0,0);
+  }
+  delete msg;
+}
+
+
 void 
 PairCalculator::sumPartialResult(int size, complex *result, int offset, CkCallback cb)
 {

@@ -4,6 +4,10 @@ module ckPairCalculator {
 	  complex result[];
 	};
 
+	message priorSumMsg  {
+	  complex result[];
+	};
+
 	message mySendMsg  {
 	  complex data[];
 	};
@@ -16,6 +20,7 @@ module ckPairCalculator {
 		entry void acceptEntireResult(int size, double matrix[size], CkCallback cb);
 	  	entry void sumPartialResult(int size, complex result[size], int offset, CkCallback cb);
 	  	entry void sumPartialResult(partialResultMsg *msg);
+	  	entry void sumPartialResult(priorSumMsg *msg);
 	};
 
 	group PairCalcReducer {

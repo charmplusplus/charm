@@ -24,16 +24,29 @@ class mySendMsg : public CMessage_mySendMsg {
 
 class partialResultMsg : public CMessage_partialResultMsg {
  public:
+  int N;
+  complex *result;
+  int priority;
+  CkCallback cb;
+
+  friend class CMessage_partialResultMsg;
+  /*
+    partialResultMsg() {} ;
+  partialResultMsg(unsigned int iN,   complex *iresult, int ipriority, CkCallback icb) : N(iN),  priority(ipriority), cb(icb)
+/    {
+      memcpy(this->result,iresult,N*sizeof(complex));
+    }
+  */
+};
+
+class priorSumMsg : public CMessage_priorSumMsg {
+ public:
   int priority;
   int N;
   CkCallback cb;
   complex *result;
-  friend class CMessage_partialResultMsg;
-  partialResultMsg(int ipriority,unsigned int iN,   CkCallback icb,complex *iresult) : priority(ipriority), N(iN), cb(icb)
-    {
-      memcpy(this->result,iresult,N*sizeof(complex));
-    }
-  partialResultMsg(unsigned int iN, complex *iresult) : N(iN)
+  friend class CMessage_priorSumMsg;
+  priorSumMsg(int ipriority,unsigned int iN,   CkCallback icb,complex *iresult) : priority(ipriority), N(iN), cb(icb)
     {
       memcpy(this->result,iresult,N*sizeof(complex));
     }
@@ -49,6 +62,7 @@ class PairCalculator: public CBase_PairCalculator {
   void acceptEntireResult(int size, double *matrix, CkCallback cb);
   void acceptResult(int size, double *matrix, int rowNum, CkCallback cb);
   void sumPartialResult(int size, complex *result, int offset, CkCallback cb);
+  void sumPartialResult(priorSumMsg *msg);
   void sumPartialResult(partialResultMsg *msg);
   void pup(PUP::er &);
   inline double compute_entry(int n, complex *psi1, complex *psi2, int op) 
