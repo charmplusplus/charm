@@ -60,6 +60,11 @@ class LogEntry {
 
 #include <errno.h>
 
+typedef struct _LogMark {
+double time;
+int    flag;
+} LogMark;
+
 class LogPool {
   private:
     UInt poolSize;
@@ -71,8 +76,11 @@ class LogPool {
     int *epCount;
     int epSize;
 
+    LogMark events[256];
+    int markcount;
   public:
     LogPool(char *pgm) {
+      int i;
       poolSize = CpvAccess(CtrLogBufSize);
       if (poolSize % 2) poolSize++;	// make sure it is even
       pool = new LogEntry[poolSize];
@@ -101,10 +109,14 @@ class LogPool {
       epSize = 1000;
       epTime = new double[epSize];
       epCount = new int[epSize];
-      for (int i=0; i< epSize; i++) {
+      for (i=0; i< epSize; i++) {
 	epTime[i] = 0.0;
 	epCount[i] = 0;
       };
+
+      // event
+      for (i=0; i<256; i++) events[i].flag = 0;
+      markcount = 0;
     }
     ~LogPool() {
 //      add(index, bin, CmiMyPe());
@@ -147,6 +159,7 @@ class LogPool {
       epCount[epidx] ++;
     }
     void shrink(void) ;
+    void addEventType(int eventType, double time);
 };
 
 class TraceProjections : public Trace {
@@ -178,5 +191,7 @@ class TraceProjections : public Trace {
     void beginComputation(void);
     void endComputation(void);
 };
+
+extern "C" void Ck_Summary_MarkEvent(int eventType);
 
 #endif

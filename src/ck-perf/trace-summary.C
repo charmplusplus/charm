@@ -7,7 +7,7 @@
 
 #include "trace-summary.h"
 
-#define VER   "1.0"
+#define VER   "2.0"
 
 CpvDeclare(Trace*, _trace);
 CpvDeclare(int, traceOn);
@@ -129,18 +129,46 @@ void traceClose(void)
   delete CpvAccess(_logPool);
 }
 
+extern "C" void Ck_Summary_MarkEvent(int eventType)
+{
+   CpvAccess(_logPool)->addEventType(eventType, CmiTimer());
+}
+
+void LogPool::addEventType(int eventType, double time)
+{
+   if (eventType >= 256) {
+       CkPrintf("Invalid event type %d!\n", eventType);
+       CkExit();
+   }
+   if (events[eventType].flag == 1) {
+       CkPrintf("Duplicate event type %d!\n", eventType);
+       CkExit();
+   }
+   events[eventType].time = time;
+   events[eventType].flag = 1;
+   markcount ++;
+}
+
 void LogPool::write(void) 
 {
   int i;
   fprintf(fp, "%d/%d count:%d ep:%d interval:%le ver:%s\n", CmiMyPe(), CmiNumPes(), numEntries, _numEntries, CpvAccess(binSize), VER);
+  // write bin time
   for(i=0; i<numEntries; i++)
     pool[i].write(fp);
   fprintf(fp, "\n");
+  // write entry execution time
   for (i=0; i<_numEntries; i++)
     fprintf(fp, "%ld ", (long)(epTime[i]*1.0e6));
   fprintf(fp, "\n");
+  // write entry function call times
   for (i=0; i<_numEntries; i++)
     fprintf(fp, "%d ", epCount[i]);
+  fprintf(fp, "\n");
+  // write marks
+  fprintf(fp, "%d ", markcount);
+  for (i=0; i<256; i++)
+    if (events[i].flag) fprintf(fp, "%d %f ", i, events[i].time);
   fprintf(fp, "\n");
 }
 
