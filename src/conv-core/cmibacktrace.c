@@ -37,8 +37,8 @@ char **CmiBacktraceLookup(void **srcPtrs,int nLevels) {
 }
 
 #else /*Backtrace not available-- use do-nothing version*/
-void CmiBacktraceRecord(void **retPtrs,int nSkip,int nLevels) {
-	/* emtpy */
+void CmiBacktraceRecord(void **retPtrs,int nSkip,int *nLevels) {
+	*nLevels=0;
 }
 
 /* Look up the names of these function pointers */
