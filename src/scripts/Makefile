@@ -87,7 +87,7 @@ SEQCHARMC=../bin/charmc -seq $(CHARMOPTS)
 ###############################################################################
 
 CVHEADERS=cpthreads.h converse.h conv-mach.h conv-mach.sh \
-      conv-trace.h trace.h conv-ccs.h \
+      conv-trace.h trace.h conv-ccs.h cmimalloc.h\
       CkFutures.decl.h CkArray.decl.h CkReduction.decl.h \
       LBDatabase.decl.h CentralLB.decl.h \
       RandCentLB.decl.h RecBisectBfLB.decl.h \
@@ -133,7 +133,6 @@ headerlinks: dirs+sources Makefile
 	rm -f ../bin/charmc ; cp charmc ../bin/
 	chmod +x ../bin/charmc
 	rm -rf ../include ; mkdir ../include
-	cp conv-mach.sh ../include/
 	-for hdr in $(ALLHEADERS) $(ALLINTERFACES); do test ! -L ../include/$$hdr && ln -fs "../tmp/$$hdr" ../include ; done
 	touch headerlinks	
 
@@ -183,7 +182,7 @@ TRACELIBS=libtrace-none.a libtrace-projections.a libtrace-summary.a
 
 CVLIBS=libconv-core.a libconv-cplus-n.a libconv-cplus-y.a libconv-util.a libldb-rand.o libldb-spray.o libldb-graph.o libldb-test.o $(TRACELIBS)
 
-LIBCONV_CORE=threads.o convcore.o conv-conds.o queueing.o fifo.o msgmgr.o memory.o cpm.o cpthreads.o futures.o cldb.o random.o debug-message.o debug-object.o info.o generate.o edgelist.o conv-ccs.o quiescence.o 
+LIBCONV_CORE=threads.o convcore.o conv-conds.o queueing.o fifo.o msgmgr.o memory.o cpm.o cpthreads.o futures.o cldb.o random.o debug-message.o debug-object.o info.o generate.o edgelist.o conv-ccs.o quiescence.o cmimalloc.o
 
 LIBCONV_UTIL=pup_util.o pup_xlater.o pup_c.o ckhashtable.o sockRoutines.o
 
@@ -228,6 +227,9 @@ threads.o: threads.c $(CVHEADERS)
 
 convcore.o: convcore.c $(CVHEADERS)
 	$(CHARMC) convcore.c
+
+cmimalloc.o: cmimalloc.c $(CVHEADERS)
+	$(CHARMC) cmimalloc.c
 
 conv-ccs.o: conv-ccs.c $(CVHEADERS)
 	$(CHARMC) conv-ccs.c
@@ -305,6 +307,7 @@ ckhashtable.o: ckhashtable.C ckhashtable.h
 CK_LIBS_CORE=libck.a
 
 LIBCK_CORE=init.o register.o qd.o ck.o main.o msgalloc.o ckfutures.o \
+	   ckmalloc.o \
            ckarray.o ckreduction.o \
            tempo.o waitqd.o LBDatabase.o lbdb.o \
 	   LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o Refiner.o \
@@ -401,6 +404,9 @@ register.o: register.C $(CKHEADERS)
 
 ckfutures.o: ckfutures.C $(CKHEADERS)
 	$(CHARMC) -o ckfutures.o ckfutures.C
+
+ckmalloc.o: ckmalloc.C $(CKHEADERS)
+	$(CHARMC) -o ckmalloc.o ckmalloc.C
 
 tempo.o: tempo.C $(CKHEADERS)
 	$(CHARMC) -o tempo.o tempo.C
