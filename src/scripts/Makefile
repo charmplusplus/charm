@@ -892,7 +892,7 @@ CONVERSE_COM_OBJS = gridrouter.o de.o treerouter.o petable.o \
 
 comlib.def.h: comlib.decl.h
 
-comlib.decl.h : ComlibManager.ci
+comlib.decl.h : ComlibManager.ci charmxi
 	$(CHARMC) -c ComlibManager.ci
 
 COMLIB_OBJS = ComlibManager.o $(STRATEGY_OBJS) $(CONVERSE_COM_OBJS)
