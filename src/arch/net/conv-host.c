@@ -318,6 +318,15 @@ char *substr(lo, hi)
   return res;
 }
 
+int subeqs(lo, hi, str)
+     char *lo; char *hi; char *str;
+{
+  int len = strlen(str);
+  if (hi-lo != len) return 0;
+  if (memcmp(lo, str, len)) return 0;
+  return 1;
+}
+
 /* advance pointer over blank characters */
 char *skipblanks(p)
     char *p;
@@ -1244,7 +1253,7 @@ prog prog_start(p, argv, useerr)
  *****************************************************************************/
 
 
-#define MAX_NODES 100
+#define MAX_NODES 1000
 #define MAX_LINE_LENGTH 1000
 
 char **arg_argv;
@@ -1255,7 +1264,8 @@ int   arg_debug;
 int   arg_debug_no_pause;
 int   arg_in_xterm;
 int   arg_maxrsh;
-char *arg_nodesfile;
+char *arg_nodelist;
+char *arg_nodegroup;
 char *arg_display;
 char *arg_nodeprog_a;
 char *arg_nodeprog_r;
@@ -1263,26 +1273,28 @@ char *arg_rshprog;
 char *arg_currdir_a;
 char *arg_currdir_r;
 char *arg_mylogin;
-char *arg_myexec_home;
+char *arg_myhome;
 
 arg_init(argc, argv)
     int argc; char **argv;
 {
   static char buf[1024]; int len, i;
   
-  pparam_defint ("p"             , -1);
+  pparam_defint ("p"             ,  MAX_NODES);
   pparam_defflag("debug"             );
   pparam_defflag("debug-no-pause"    );
   pparam_defflag("in-xterm"          );
   pparam_defint ("maxrsh"        ,  5);
-  pparam_defstr ("nodesfile"     ,  0);
+  pparam_defstr ("nodelist"      ,  0);
+  pparam_defstr ("nodegroup"     ,  "main");
   
   pparam_doc("p",             "number of processes to create");
   pparam_doc("in-xterm",      "Run each node in an xterm window");
   pparam_doc("debug",         "Run each node under gdb in an xterm window");
   pparam_doc("debug-no-pause","Like debug, except doesn't pause at beginning");
   pparam_doc("maxrsh",        "Maximum number of rsh's to run at a time");
-  pparam_doc("nodesfile",     "file containing list of nodes");
+  pparam_doc("nodelist",      "file containing list of nodes");
+  pparam_doc("nodegroup",     "which group of nodes to use");
 
   if (pparam_parsecmd('+', argv) < 0) {
     fprintf(stderr,"syntax: %s\n",pparam_error);
@@ -1297,8 +1309,9 @@ arg_init(argc, argv)
   arg_debug          = pparam_getflag("debug");
   arg_debug_no_pause = pparam_getflag("debug-no-pause");
   arg_maxrsh         = pparam_getint("maxrsh");
-  arg_nodesfile      = pparam_getstr("nodesfile");
-
+  arg_nodelist       = pparam_getstr("nodelist");
+  arg_nodegroup      = pparam_getstr("nodegroup");
+  
   /* Find the current value of the DISPLAY variable */
   arg_display = getenv_display();
   if ((arg_debug || arg_debug_no_pause || arg_in_xterm) && (arg_display==0)) {
@@ -1328,8 +1341,8 @@ arg_init(argc, argv)
   arg_currdir_a = strdup(buf);
 
   arg_mylogin = mylogin();
-  arg_myexec_home = (char *) malloc(MAXPATHLEN);
-  strcpy(arg_myexec_home, getenv("HOME"));
+  arg_myhome = (char *) malloc(MAXPATHLEN);
+  strcpy(arg_myhome, getenv("HOME"));
 }
 
 /****************************************************************************
@@ -1376,58 +1389,88 @@ arg_init(argc, argv)
  *                                                                           
  ****************************************************************************/
 
-typedef struct nodetab_info {
-   char *name;
-   char *login;
-   char *passwd;
-   char *exec_home;
-   char *ext;
-   char *setup;
-   unsigned int ip;
-} *nodetab_info;
-
-nodetab_info nodetab_table;
-int          nodetab_size;
-
 char *nodetab_file_find()
 {
-  /* Find a nodes-file as specified by ++nodesfile */
-  if (arg_nodesfile)
-    {
-      char *path = arg_nodesfile;
-      if (path_nonzero(path)) return strdup(path);
-      fprintf(stderr,"No such nodes file %s\n",path);
-      exit(1);
-    }
-  /* Find a nodes-file as specified by getenv("NODES") */
-  if (getenv("NODES"))
-    {
-      char *path = getenv("NODES");        
-      if (path && path_nonzero(path)) return strdup(path);
-      fprintf(stderr,"Cannot find NODES file %s\n",path);
-      exit(1);
-    }
-  /* Find a nodes-file by looking under 'nodes' in the current directory */
-  if (path_nonzero("./nodes")) return strdup("./nodes");
-  if (getenv("HOME"))
-    {
-      char buffer[MAXPATHLEN];
-      strcpy(buffer,getenv("HOME"));
-      path_concat(buffer,".nodes");
-      if (path_nonzero(buffer)) return strdup(buffer);
-    }
+  /* Find a nodes-file as specified by ++nodelist */
+  if (arg_nodelist) {
+    char *path = arg_nodelist;
+    if (path_nonzero(path)) return strdup(path);
+    fprintf(stderr,"No such nodelist file %s\n",path);
+    exit(1);
+  }
+  /* Find a nodes-file as specified by getenv("NODELIST") */
+  if (getenv("NODELIST")) {
+    char *path = getenv("NODELIST");        
+    if (path && path_nonzero(path)) return strdup(path);
+    fprintf(stderr,"Cannot find nodelist file %s\n",path);
+    exit(1);
+  }
+  /* Find a nodes-file by looking under 'nodelist' in the current directory */
+  if (path_nonzero("./nodelist")) return strdup("./nodelist");
+  if (getenv("HOME")) {
+    char buffer[MAXPATHLEN];
+    strcpy(buffer,getenv("HOME"));
+    path_concat(buffer,".nodelist");
+    if (path_nonzero(buffer)) return strdup(buffer);
+  }
   fprintf(stderr,"Cannot find a nodes file.\n");
   exit(1);
 }
 
 
+typedef struct nodetab_host {
+  char *name;
+  char *login;
+  char *passwd;
+  char *home;
+  char *ext;
+  char *setup;
+  double speed;
+  int cpus;
+  unsigned int ip;
+} *nodetab_host;
+
+char    *default_login = "*";
+char    *default_group = "*";
+char    *default_passwd = "*";
+char    *default_home = "*";
+char    *default_ext = "*";
+char    *default_setup = "*";
+double   default_speed = 1.0;
+int      default_cpus = 1;
+
+nodetab_host *nodetab_table;
+int           nodetab_size;
+
+void nodetab_makehost(char *host)
+{
+  nodetab_host res;
+  int ip;
+  ip = lookup_ip(host);
+  if (ip==0) {
+    fprintf(stderr,"Cannot obtain IP address of %s\n", host);
+    exit(0);
+  }
+  res = (nodetab_host)malloc(sizeof(struct nodetab_host));
+  res->name = host;
+  res->login = default_login;
+  res->passwd = default_passwd;
+  res->home = default_home;
+  res->ext = default_ext;
+  res->setup = default_setup;
+  res->speed = default_speed;
+  res->cpus = default_cpus;
+  res->ip = ip;
+  nodetab_table[nodetab_size++] = res;
+}
+
 void nodetab_init()
 {
   FILE *f,*fopen();
-  char *nodesfile;
-  char *tok_ptr;
+  char *nodesfile; nodetab_host node;
   char input_line[MAX_LINE_LENGTH];
-  int i;
+  int nread, rightgroup, basicsize, i;
+  char *b1, *e1, *b2, *e2, *b3, *e3;
   
   /* Open the NODES_FILE. */
   nodesfile = nodetab_file_find();
@@ -1436,74 +1479,52 @@ void nodetab_init()
     exit(1);
   }
   
-  nodetab_table= (nodetab_info)malloc(MAX_NODES * sizeof(struct nodetab_info));
+  nodetab_table=(nodetab_host*)malloc(arg_requested_pes*sizeof(nodetab_host));
+  
+  rightgroup = (strcmp(arg_nodegroup,"main")==0);
 
-  /* Read in the machine definitions */
-  nodetab_size=0;
   while(fgets(input_line,sizeof(input_line)-1,f)!=0) {
-    char *b,*e;
-    nodetab_info node = nodetab_table+nodetab_size;
     if (input_line[0]=='#') continue;
     zap_newline(input_line);
-    b=skipblanks(input_line);
-    if (*b==0) continue;
-    if (nodetab_size == MAX_NODES) {
-      fprintf(stderr,"Too many nodes, truncating nodesfile.\n");
-      break;
-    }
-    e=skipstuff(b);
-    node->name=substr(b,e);
-    /* put default information */
-    node->login="*";
-    node->passwd="*";
-    node->exec_home = "*";
-    node->ext="*";
-    node->setup="";
-    b=skipblanks(e);
-    if (*b==0) goto endnode;
-    e=skipstuff(b);
-    node->login=substr(b,e);
-    b=skipblanks(e);
-    if (*b==0) goto endnode;
-    e=skipstuff(b);
-    node->passwd=substr(b,e);
-    b=skipblanks(e);
-    if (*b==0) goto endnode;
-    e=skipstuff(b);
-    node->exec_home=substr(b,e);
-    b=skipblanks(e);
-    if (*b==0) goto endnode;
-    e=skipstuff(b);
-    node->ext=substr(b,e);
-    b=skipblanks(e);
-    if (*b==0) goto endnode;
-    e=b+strlen(b);
-    node->setup=substr(b,e);
-  endnode:;
-    if (strcmp(node->login,"*")==0)
-      node->login = arg_mylogin;
-    if (strcmp(node->exec_home,"*")==0)
-      node->exec_home = arg_myexec_home;
-    if (strcmp(node->ext,"*")==0)
-      node->ext = "";
-    node->ip = lookup_ip(node->name);
-    if (node->ip==0) {
-      fprintf(stderr,"cannot get IP of %s\n",node->name);
+    b1 = skipblanks(input_line);
+    e1 = skipstuff(b1); b2 = skipblanks(e1); 
+    e2 = skipstuff(b2); b3 = skipblanks(e2);
+    if (*b1==0) continue;
+    if (strcmp(default_login, "*")==0) default_login = arg_mylogin;
+    if (strcmp(default_home, "*")==0) default_home = arg_myhome;
+    if (strcmp(default_ext, "*")==0) default_ext = "";
+    if      (subeqs(b1,e1,"login")&&(*b3==0))  default_login = substr(b2,e2);
+    else if (subeqs(b1,e1,"passwd")&&(*b3==0)) default_passwd = substr(b2,e2);
+    else if (subeqs(b1,e1,"speed")&&(*b3==0))  default_speed = atof(b2);
+    else if (subeqs(b1,e1,"cpus")&&(*b3==0))   default_cpus = atol(b2);
+    else if (subeqs(b1,e1,"home")&&(*b3==0))   default_home = substr(b2,e2);
+    else if (subeqs(b1,e1,"ext")&&(*b3==0))    default_ext = substr(b2,e2);
+    else if (subeqs(b1,e1,"setup"))            default_setup = strdup(b2);
+    else if (subeqs(b1,e1,"host")&&(*b3==0)) {
+      if (rightgroup) nodetab_makehost(substr(b2,e2));
+      if (nodetab_size == arg_requested_pes) break;
+    } else if (subeqs(b1,e1, "group")&&(*b3==0)) {
+      rightgroup = subeqs(b2,e2,arg_nodegroup);
+    } else {
+      fprintf(stderr,"unrecognized command in nodesfile:\n");
+      fprintf(stderr,"%s\n", input_line);
       exit(1);
     }
-    nodetab_size++;
-    if (nodetab_size == arg_requested_pes) break;
   }
-  if ((arg_requested_pes > 0)&&(nodetab_size != arg_requested_pes)) {
-    fprintf(stderr,"Cannot read %d nodes from nodesfile %s\n",
-	    arg_requested_pes, nodesfile);
+  basicsize = nodetab_size;
+  if (basicsize==0) {
+    fprintf(stderr,"No hosts in group %s\n", arg_nodegroup);
     exit(1);
+  }
+  while ((nodetab_size < arg_requested_pes)&&(arg_requested_pes!=MAX_NODES)) {
+    nodetab_table[nodetab_size] = nodetab_table[nodetab_size-basicsize];
+    nodetab_size++;
   }
   fclose(f);
 }
 
-nodetab_info nodetab_getinfo(i)
-    int i;
+nodetab_host nodetab_getinfo(i)
+  int i;
 {
   if (nodetab_table==0) {
     fprintf(stderr,"Node table not initialized.\n");
@@ -1513,16 +1534,18 @@ nodetab_info nodetab_getinfo(i)
     fprintf(stderr,"No such node %d\n",i);
     exit(1);
   }
-  return nodetab_table+i;
+  return nodetab_table[i];
 }
 
 char        *nodetab_name(i) int i;    { return nodetab_getinfo(i)->name; }
 char        *nodetab_login(i) int i;   { return nodetab_getinfo(i)->login; }
 char        *nodetab_passwd(i) int i;  { return nodetab_getinfo(i)->passwd; }
 char        *nodetab_setup(i) int i;   { return nodetab_getinfo(i)->setup; }
-char        *nodetab_exec_home(i) int i; { return nodetab_getinfo(i)->exec_home; }
-char        *nodetab_ext(i) int i; { return nodetab_getinfo(i)->ext; }
+char        *nodetab_home(i) int i;    { return nodetab_getinfo(i)->home; }
+char        *nodetab_ext(i) int i;     { return nodetab_getinfo(i)->ext; }
 unsigned int nodetab_ip(i) int i;      { return nodetab_getinfo(i)->ip; }
+ 
+
  
 /****************************************************************************
  *
@@ -1991,7 +2014,7 @@ int rsh_pump(p, nodeno, argv)
   /* find the node-program, relative version */
   sprintf(buf,"%s",getenv("HOME"));
   if ((len=path_isprefix(buf,arg_nodeprog_a))!=0) {
-    sprintf(buf,"%s/%s%s",nodetab_exec_home(nodeno),
+    sprintf(buf,"%s/%s%s",nodetab_home(nodeno),
 			  arg_nodeprog_a+len,nodetab_ext(nodeno));
     arg_nodeprog_r = strdup(buf);
   }
@@ -2003,7 +2026,7 @@ int rsh_pump(p, nodeno, argv)
   /* find the current directory, relative version */
   sprintf(buf,"%s",getenv("HOME"));
   if ((len=path_isprefix(buf, arg_currdir_a))!=0) {
-    sprintf(buf,"%s/%s",nodetab_exec_home(nodeno),arg_currdir_a+len);
+    sprintf(buf,"%s/%s",nodetab_home(nodeno),arg_currdir_a+len);
     arg_currdir_r = strdup(buf);
   }
   else arg_currdir_r = arg_currdir_a;
@@ -2058,7 +2081,7 @@ int rsh_pump(p, nodeno, argv)
   xstr_printf(ibuf,"  kill -9 $$\n");
   xstr_printf(ibuf,"endif\n");
   
-  if (nodetab_setup(nodeno)) {
+  if (strcmp(nodetab_setup(nodeno),"*")) {
     xstr_printf(ibuf,"cd .\n");
     xstr_printf(ibuf,"%s\n",nodetab_setup(nodeno));
     xstr_printf(ibuf,"if ($status == 1) then\n");
