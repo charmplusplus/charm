@@ -140,7 +140,7 @@ NLBMigrateMsg* WSLB::Strategy(NeighborLB::LDStats* stats, int count)
   int migrate_count=migrateInfo.size();
   NLBMigrateMsg* msg = new(&migrate_count,1) NLBMigrateMsg;
   msg->n_moves = migrate_count;
-  for(int i=0; i < migrate_count; i++) {
+  for(i=0; i < migrate_count; i++) {
     MigrateInfo* item = (MigrateInfo*) migrateInfo[i];
     msg->moves[i] = *item;
     delete item;
