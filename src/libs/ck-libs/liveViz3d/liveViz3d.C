@@ -57,7 +57,7 @@ public:
 	
 	//This client is requesting the latest views:
 	void getViews(int clientID) {
-	#if 0
+	#if 1
 		if (views.size()==0) { //Nothing to send yet-- wait for it
 			hasDelayed=true;
 			delayedReply=CcsDelayReply();

@@ -93,15 +93,15 @@ static CkViewpoint chooseViewpoint(const CkInterestSet &univ,
 		sum_z+=s.z;
 	}
 	double ave_z=sum_z/univ.size();
-	r.enlarge(1,1); //Add a few screen pixels (for a transparent border)
+	r.enlarge(2,2); //Add a few screen pixels (for a transparent border)
 	
 	if (r.area()>1024*1024)
 		CkAbort("liveViz3d> Absurdly large projected screen rectangle!\n");
 	
 //Determine the texture size (OpenGL textures *MUST* be a power of two in both directions)
-	const int start_sz=4, max_sz=64;
-	wid=start_sz; while (wid<r.wid()/4) wid*=2;
-	ht =start_sz; while (ht<r.ht()/4) ht*=2;
+	const int start_sz=4, max_sz=256;
+	wid=start_sz; while (wid<r.wid()/2) wid*=2;
+	ht =start_sz; while (ht<r.ht()/2) ht*=2;
 	if (wid>max_sz) wid=max_sz;
 	if (ht>max_sz) ht=max_sz;
 
@@ -132,7 +132,7 @@ void CkView::setTexView(const CkViewpoint &univ2texture)
 	for (int i=0;i<univ.size();i++) 
 	{ //Back-project my interest points to the texture plane:
 		CkRay r=univ2texture.getRay(univ[i]);
-		proj[i]=texturePlane.intersectPt(r.pos,r.dir);
+		proj[i]=texturePlane.intersectDirPt(r.pos,r.dir);
 	}
 }
 
