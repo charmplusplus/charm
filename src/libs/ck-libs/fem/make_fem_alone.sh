@@ -56,7 +56,7 @@ done
 
 # grab all the real headers:
 for header in ckhashtable.h cklists.h ckvector3d.h \
-	pup_c.h pupf.h pup.h pup_toNetwork4.h pup_toNetwork.h
+	pup_c.h pupf.h pup.h pup_toNetwork4.h pup_toNetwork.h pup_mpi.h
 do
 	Do $get $charm/include/$header .
 done
