@@ -659,6 +659,24 @@ ckobjQ.o: ckobjQ.C charm++.h charm.h converse.h conv-config.h \
   trace-bluegene.h queueing.h
 	$(CHARMC) -c -I. ckobjQ.C
 
+LBAgent.o: LBAgent.C LBAgent.h CentralLB.h BaseLB.h LBDatabase.h lbdb.h \
+  converse.h conv-config.h conv-common.h conv-mach.h conv-autoconfig.h \
+  conv-mach-opt.h pup_c.h conv-cpm.h conv-cpath.h conv-qd.h conv-random.h \
+  conv-lists.h conv-trace.h persistent.h debug-conv.h charm.h pup.h \
+  LBDatabase.decl.h charm++.h middle.h middle-conv.h cklists.h \
+  ckbitvector.h ckstream.h init.h ckhashtable.h debug-charm.h \
+  CkMarshall.decl.h cksection.h ckcallback.h conv-ccs.h sockRoutines.h \
+  ccs-server.h ckobjQ.h ckreduction.h CkReduction.decl.h \
+  cknodegroupreduction.h CkArrayReductionMgr.decl.h ckmemcheckpoint.h \
+  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h \
+  CkLocation.decl.h CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  trace-bluegene.h NullLB.decl.h BaseLB.decl.h CentralLB.decl.h \
+  CentralLBMsg.h topology.h
+	$(CHARMC) -c -I. LBAgent.C
+
 ckcheckpoint.o: ckcheckpoint.C charm++.h charm.h converse.h conv-config.h \
   conv-common.h conv-mach.h conv-autoconfig.h conv-mach-opt.h pup_c.h \
   conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \

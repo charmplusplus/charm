@@ -177,8 +177,8 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  ckarray.h cklocation.h ckreduction.h ckcheckpoint.h ckmemcheckpoint.h\
 	  ckobjQ.h readonly.h charisma.h ComlibArrayListener.h ComlibStrategy.h\
 	  ComlibLearner.h $(UTILHEADERS) \
-	  tempo.h waitqd.h LBDatabase.h lbdb.h \
-	  LBDBManager.h LBComm.h LBOM.h LBObj.h LBMachineUtil.h \
+	  tempo.h waitqd.h LBDatabase.h lbdb.h LBDBManager.h 	\
+	  LBComm.h LBOM.h LBObj.h LBMachineUtil.h LBAgent.h \
 	  Refiner.h RefinerComm.h ObjGraph.h heap.h elements.h CommLBHeap.h \
 	  BaseLB.h CentralLB.h CentralLBMsg.h RandCentLB.h RecBisectBfLB.h \
 	  RefineLB.h RefineCommLB.h OrbLB.h GreedyLB.h GreedyCommLB.h \
@@ -531,7 +531,7 @@ LIBCK_CORE=trace-common.o tracef.o init.o register.o qd.o ck.o main.o 	\
 	   msgalloc.o ckfutures.o debug-message.o debug-charm.o ckcallback.o \
 	   cklocation.o ckarray.o ckreduction.o ckarrayreductionmgr.o\
            tempo.o waitqd.o LBDatabase.o lbdb.o lbdbf.o charisma.o ckobjQ.o  \
-	   ckcheckpoint.o ckmemcheckpoint.o\
+	   LBAgent.o ckcheckpoint.o ckmemcheckpoint.o\
            LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o \
 	   BaseLB.o CentralLB.o CentralPredictor.o NborBaseLB.o WSLB.o \
            ObjGraph.o graph.o  \
