@@ -10,6 +10,8 @@
 */
 /*@{*/
 
+// http://www.scl.ameslab.gov/Projects/Rabbit/
+// http://www.support.compaq.com/nttools
 
 #include "conv-mach.h"
 #ifdef CMK_ORIGIN2000
