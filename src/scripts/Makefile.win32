@@ -9,11 +9,11 @@ INC = /I"$(COMMON_SRC)"
 
 CPP_PROJ=/nologo /MT /W3 /GX /Z7 /Od $(INC)\
  /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /YX \
- /Fo /FD /c
+ /Fo /c
 
 SEQCPP_PROJ=/nologo /ML /W3 /GX /Z7 /Od $(INC) \
  /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /YX \
- /Fo /FD /c
+ /Fo /c
 
 CPP = cl.exe
 LINK = link.exe
@@ -25,11 +25,11 @@ CONV_CPM=$(XLATI_DIR)\conv-cpm.exe
 
 LINK_OTHER = kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib \
  advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib \
- odbccp32.lib /subsystem:console /incremental:no /machine:I386 
+ odbccp32.lib /subsystem:console /incremental:no /machine:IX86
 
 ALL: CHARM++
 
-CHARM++ : CONVERSE TRANSLATORS
+CHARM++ : CONVERSE CHARMLIBS TRANSLATORS
 
 TRANSLATORS : $(CHARMXI) $(CONV_CPM)
 
@@ -83,8 +83,8 @@ BASICS : DIRSSOURCES $(ALLHEADERS)
 	@if exist ..\include\nul rd /s /q ..\include
 	@xcopy /q /i *.h ..\include
 	@xcopy /q /i sockRoutines.c ..\include
-	@if exist BASICS\nul rd /s /q BASICS
-	@mkdir BASICS
+	-@if exist BASICS\nul rd /s /q BASICS
+	-@mkdir BASICS
 
 DIRSSOURCES :
 	@echo Gathering source code...
@@ -116,7 +116,7 @@ DIRSSOURCES :
 
 TRACELIBS=libtrace-none.lib libtrace-projections.lib libtrace-summary.lib
 
-CVLIBS=$(LIBS_DIR)\libconv-core.lib $(LIBS_DIR)\libconv-cplus-n.lib $(LIBS_DIR)\libconv-cplus-y.lib $(LIBS_DIR)\libconv-util.lib libldb-rand.obj libldb-spray.obj libldb-graph.obj libldb-test.obj $(TRACELIBS)
+CVLIBS=$(LIBS_DIR)\libconv-core.lib $(LIBS_DIR)\libconv-cplus-n.lib $(LIBS_DIR)\libconv-cplus-y.lib $(LIBS_DIR)\libconv-util.lib $(LIBS_DIR)\libldb-rand.obj $(LIBS_DIR)\libldb-spray.obj $(LIBS_DIR)\libldb-graph.obj $(LIBS_DIR)\libldb-test.obj $(TRACELIBS)
 
 LIBCONV_CORE=threads.obj convcore.obj conv-conds.obj queueing.obj msgmgr.obj memory.obj cpm.obj cpthreads.obj futures.obj cldb.obj random.obj debug-message.obj debug-object.obj info.obj generate.obj edgelist.obj conv-ccs.obj quiescence.obj 
 
@@ -237,19 +237,19 @@ cldb.obj : cldb.c cldb.h $(CVHEADERS)
 quiescence.obj: quiescence.c $(CVHEADERS) 
 	$(CPP) $(CPP_PROJ) quiescence.c
 
-libldb-rand.obj : cldb.rand.c $(CVHEADERS)
+$(LIBS_DIR)\libldb-rand.obj : cldb.rand.c $(CVHEADERS)
 	$(CPP) $(CPP_PROJ) cldb.rand.c
 	@copy cldb.rand.obj ..\lib\libldb-rand.obj
 
-libldb-graph.obj : cldb.graph.c cldb.graph.h $(CVHEADERS)
+$(LIBS_DIR)\libldb-graph.obj : cldb.graph.c cldb.graph.h $(CVHEADERS)
 	$(CPP) $(CPP_PROJ) cldb.graph.c 
 	@copy cldb.graph.obj ..\lib\libldb-graph.obj
 
-libldb-spray.obj : cldb.spray.c $(CVHEADERS)
+$(LIBS_DIR)\libldb-spray.obj : cldb.spray.c $(CVHEADERS)
 	$(CPP) $(CPP_PROJ)  cldb.spray.c
 	@copy cldb.spray.obj ..\lib\libldb-spray.obj
 
-libldb-test.obj : cldb.test.c $(CVHEADERS)
+$(LIBS_DIR)\libldb-test.obj : cldb.test.c $(CVHEADERS)
 	$(CPP) $(CPP_PROJ) cldb.test.c
 	@copy cldb.test.obj ..\lib\libldb-test.obj
 
