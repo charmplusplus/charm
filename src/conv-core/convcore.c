@@ -2239,6 +2239,8 @@ void ConverseCommonInit(char **argv)
   CrnInit();
   CmiInitImmediateMsg();
   CldModuleInit(argv);
+
+  CthSetSuspendable(CthSelf(), 0);
 }
 
 void ConverseCommonExit(void)
