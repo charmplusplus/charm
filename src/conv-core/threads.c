@@ -119,7 +119,7 @@ typedef struct CthThreadBase
   */
   char cmicore[CmiMsgHeaderSizeBytes];
   
-  CmiObjId tid;        /* globally unique tid */
+  CmiObjId   tid;        /* globally unique tid */
   CthAwkFn   awakenfn;   /* Insert this thread into the ready queue */
   CthThFn    choosefn;   /* Return the next ready thread */
   CthThread  next; /* Next active thread */
@@ -143,6 +143,13 @@ typedef struct CthThreadBase
 CthCpvStatic(CthThread,  CthCurrent); /*Current thread*/
 CthCpvDeclare(char *,    CthData); /*Current thread's private data (externally visible)*/
 CthCpvStatic(int,        CthDatasize);
+
+void CthSetThreadID(CthThread th, int a, int b, int c)
+{
+  B(th)->tid.id[0] = a;
+  B(th)->tid.id[1] = b;
+  B(th)->tid.id[2] = c;
+}
 
 char *CthGetData(CthThread t) { return B(t)->data; }
 
@@ -184,7 +191,7 @@ CthCpvStatic(int, _defaultStackSize);
 
 static void CthThreadBaseInit(CthThreadBase *th)
 {
-  static int serialno = 0;
+  static int serialno = 1;
 #if CMK_LINUX_PTHREAD_HACK
   /*HACK for LinuxThreads: to support our user-level threads
     library, we use a slightly modified version of libpthread.a
