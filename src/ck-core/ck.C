@@ -31,7 +31,6 @@ void Chare::pup(PUP::er &p)
 
 IrrGroup::IrrGroup(void) {
   thisgroup = CkpvAccess(_currentGroup);
-  ckEnableTracing=CmiTrue;
 }
 IrrGroup::~IrrGroup() {}
 
@@ -39,7 +38,6 @@ void IrrGroup::pup(PUP::er &p)
 {
   Chare::pup(p);
   p|thisgroup;
-  p|ckEnableTracing;
 }
 
 
@@ -67,6 +65,29 @@ void CkComponentID::pup(PUP::er &p)
 {
 	p|gid;
 	p|index;
+}
+
+void CProxy::pup(PUP::er &p) {
+      CkGroupID delegatedTo;
+      delegatedTo.setZero();
+      int isNodeGroup = 0;
+      if (!p.isUnpacking()) {
+        if (delegatedMgr) {
+          delegatedTo = delegatedMgr->CkGetGroupID();
+ 	  isNodeGroup = delegatedMgr->isNodeGroup();
+        }
+      }
+      p|delegatedTo;
+      p|isNodeGroup;
+      if (p.isUnpacking()) {
+	if (!delegatedTo.isZero()) {
+//	  isNodeGroup? ckNodeDelegate(delegatedTo): ckDelegate(delegatedTo);
+	  if (isNodeGroup)
+		delegatedMgr=(CkDelegateMgr *)CkLocalNodeBranch(delegatedTo);
+	  else
+		delegatedMgr=(CkDelegateMgr *)CkLocalBranch(delegatedTo);
+	}
+      }
 }
 
 CkDelegateMgr::~CkDelegateMgr() { }
@@ -201,6 +222,27 @@ extern "C" int CkGetArgc(void) {
 	return CmiGetArgc(CpvAccess(Ck_argv));
 }
 
+/******************** Basic support *****************/
+static inline void _invokeEntryNoTrace(int epIdx,envelope *env,void *obj)
+{
+  register void *msg = EnvToUsr(env);
+  _SET_USED(env, 0);
+  _entryTable[epIdx]->call(msg, obj);
+}
+
+static inline void _invokeEntry(int epIdx,envelope *env,void *obj)
+{
+#ifndef CMK_OPTIMIZE /* Consider tracing: */
+  if (_entryTable[epIdx]->traceEnabled) {
+    _TRACE_BEGIN_EXECUTE(env);
+    _invokeEntryNoTrace(epIdx,env,obj);
+    _TRACE_END_EXECUTE();
+  }
+  else
+#endif
+    _invokeEntryNoTrace(epIdx,env,obj);
+}
+
 /********************* Creation ********************/
 
 extern "C"
@@ -234,9 +276,9 @@ void CkCreateChare(int cIdx, int eIdx, void *msg, CkChareID *pCid, int destPE)
   _TRACE_CREATION_DONE(1);
 }
 
-void _createGroupMember(CkGroupID groupID, int eIdx, void *msg)
+void _createGroupMember(CkGroupID groupID, int epIdx, envelope *env)
 {
-  register int gIdx = _entryTable[eIdx]->chareIdx;
+  register int gIdx = _entryTable[epIdx]->chareIdx;
   register void *obj = malloc(_chareTable[gIdx]->size);
   _MEMCHECK(obj);
   CkpvAccess(_groupTable)->find(groupID).setObj(obj);
@@ -249,15 +291,14 @@ void _createGroupMember(CkGroupID groupID, int eIdx, void *msg)
   }
 
   CkpvAccess(_currentGroup) = groupID;
-  CkpvAccess(_currentGroupRednMgr) = UsrToEnv(msg)->getRednMgr();
-  _SET_USED(UsrToEnv(msg), 0);
-  _entryTable[eIdx]->call(msg, obj);
+  CkpvAccess(_currentGroupRednMgr) = env->getRednMgr();
+  _invokeEntryNoTrace(epIdx,env,obj); /* can't trace groups: would cause nested begin's */
   _STATS_RECORD_PROCESS_GROUP_1();
 }
 
-void _createNodeGroupMember(CkGroupID groupID, int eIdx, void *msg)
+void _createNodeGroupMember(CkGroupID groupID, int epIdx, envelope *env)
 {
-  register int gIdx = _entryTable[eIdx]->chareIdx;
+  register int gIdx = _entryTable[epIdx]->chareIdx;
   register void *obj = malloc(_chareTable[gIdx]->size);
   _MEMCHECK(obj);
   CmiLock(CksvAccess(_nodeLock));
@@ -271,8 +312,7 @@ void _createNodeGroupMember(CkGroupID groupID, int eIdx, void *msg)
     delete ptrq;
   }
   CkpvAccess(_currentGroup) = groupID;
-  _SET_USED(UsrToEnv(msg), 0);
-  _entryTable[eIdx]->call(msg, obj);
+  _invokeEntryNoTrace(epIdx,env,obj);
   _STATS_RECORD_PROCESS_NODE_GROUP_1();
 }
 
@@ -287,28 +327,16 @@ void _createGroup(CkGroupID groupID, envelope *env)
   env->setSrcPe(CkMyPe());
   env->setRednMgr(rednMgr);
 
-  register void *msg =  EnvToUsr(env);
   if(CkNumPes()>1) {
-    if(!env->isPacked() && _msgTable[msgIdx]->pack) {
-      _TRACE_BEGIN_PACK();
-      msg = _msgTable[msgIdx]->pack(msg);
-      UsrToEnv(msg)->setPacked(1);
-      _TRACE_END_PACK();
-    }
-    env = UsrToEnv(msg);
+    CkPackMessage(&env);
     CmiSetHandler(env, _bocHandlerIdx);
     _numInitMsgs++;
     CmiSyncBroadcast(env->getTotalsize(), (char *)env);
     CpvAccess(_qd)->create(CkNumPes()-1);
-    if(env->isPacked() && _msgTable[msgIdx]->unpack) {
-      _TRACE_BEGIN_UNPACK();
-      msg = _msgTable[msgIdx]->unpack(msg);
-      UsrToEnv(msg)->setPacked(0);
-      _TRACE_END_UNPACK();
-    }
+    CkUnpackMessage(&env);
   }
   _STATS_RECORD_CREATE_GROUP_1();
-  _createGroupMember(groupID, epIdx, msg);
+  _createGroupMember(groupID, epIdx, env);
 }
 
 void _createNodeGroup(CkGroupID groupID, envelope *env)
@@ -321,27 +349,16 @@ void _createNodeGroup(CkGroupID groupID, envelope *env)
   env->setSrcPe(CkMyPe());
   register void *msg =  EnvToUsr(env);
   if(CkNumNodes()>1) {
-    if(!env->isPacked() && _msgTable[msgIdx]->pack) {
-      _TRACE_BEGIN_PACK();
-      msg = _msgTable[msgIdx]->pack(msg);
-      UsrToEnv(msg)->setPacked(1);
-      _TRACE_END_PACK();
-    }
-    env = UsrToEnv(msg);
+    CkPackMessage(&env);
     CmiSetHandler(env, _bocHandlerIdx);
     _numInitMsgs++;
     CksvAccess(_numInitNodeMsgs)++;
     CmiSyncNodeBroadcast(env->getTotalsize(), (char *)env);
     CpvAccess(_qd)->create(CkNumNodes()-1);
-    if(env->isPacked() && _msgTable[msgIdx]->unpack) {
-      _TRACE_BEGIN_UNPACK();
-      msg = _msgTable[msgIdx]->unpack(msg);
-      UsrToEnv(msg)->setPacked(0);
-      _TRACE_END_UNPACK();
-    }
+    CkUnpackMessage(&env);
   }
   _STATS_RECORD_CREATE_NODE_GROUP_1();
-  _createNodeGroupMember(groupID, epIdx, msg);
+  _createNodeGroupMember(groupID, epIdx, env);
 }
 
 // new _groupCreate
@@ -429,11 +446,7 @@ static inline void *_allocNewChare(envelope *env)
 static void _processNewChareMsg(CkCoreState *ck,envelope *env)
 {
   register void *obj = _allocNewChare(env);
-  register void *msg = EnvToUsr(env);
-  _TRACE_BEGIN_EXECUTE(env);
-  _SET_USED(env, 0);
-  _entryTable[env->getEpIdx()]->call(msg, obj);
-  _TRACE_END_EXECUTE();
+  _invokeEntry(env->getEpIdx(),env,obj);
 }
 
 static void _processNewVChareMsg(CkCoreState *ck,envelope *env)
@@ -451,39 +464,21 @@ static void _processNewVChareMsg(CkCoreState *ck,envelope *env)
   CmiSetHandler(ret, _charmHandlerIdx);
   CmiSyncSendAndFree(srcPe, ret->getTotalsize(), (char *)ret);
   CpvAccess(_qd)->create();
-  register void *msg = EnvToUsr(env);
-  _TRACE_BEGIN_EXECUTE(env);
-  _SET_USED(env, 0);
-  _entryTable[env->getEpIdx()]->call(msg, obj);
-  _TRACE_END_EXECUTE();
+  _invokeEntry(env->getEpIdx(),env,obj);
 }
 
 /************** Message Receive ****************/
-
-static inline void _deliverForChareMsg(CkCoreState *ck,int epIdx,envelope *env,void *obj)
-{
-  register void *msg = EnvToUsr(env);
-  _TRACE_BEGIN_EXECUTE(env);
-  _SET_USED(env, 0);
-  _entryTable[epIdx]->call(msg, obj);
-  _TRACE_END_EXECUTE();
-}
-
 
 static inline void _processForChareMsg(CkCoreState *ck,envelope *env)
 {
   register int epIdx = env->getEpIdx();
   register void *obj = env->getObjPtr();
-  _deliverForChareMsg(ck,epIdx,env,obj);
+  _invokeEntry(epIdx,env,obj);
 }
 
 static inline void _deliverForBocMsg(CkCoreState *ck,int epIdx,envelope *env,IrrGroup *obj)
 {
-  CmiBool tracingEnabled=obj->ckTracingEnabled();
-  if (tracingEnabled) _TRACE_BEGIN_EXECUTE(env);
-  _SET_USED(env, 0);
-  _entryTable[epIdx]->call(EnvToUsr(env), obj);
-  if (tracingEnabled) _TRACE_END_EXECUTE();
+  _invokeEntry(epIdx,env,obj);
   _STATS_RECORD_PROCESS_BRANCH_1();  
 }
 
@@ -555,14 +550,14 @@ void _processBocInitMsg(CkCoreState *ck,envelope *env)
 {
   register CkGroupID groupID = env->getGroupNum();
   register int epIdx = env->getEpIdx();
-  _createGroupMember(groupID, epIdx, EnvToUsr(env));
+  _createGroupMember(groupID, epIdx, env);
 }
 
 void _processNodeBocInitMsg(CkCoreState *ck,envelope *env)
 {
   register CkGroupID groupID = env->getGroupNum();
   register int epIdx = env->getEpIdx();
-  _createNodeGroupMember(groupID, epIdx, EnvToUsr(env));
+  _createNodeGroupMember(groupID, epIdx, env);
 }
 
 /**
@@ -799,7 +794,7 @@ void CkSendMsgInline(int entryIndex, void *msg, const CkChareID *pCid)
     register envelope *env = UsrToEnv(msg);
     if (env->isPacked()) CkUnpackMessage(&env);
     _STATS_RECORD_PROCESS_MSG_1();
-    _deliverForChareMsg(CkpvAccess(_coreState),entryIndex,env,pCid->objPtr);
+    _invokeEntryNoTrace(entryIndex,env,pCid->objPtr);
   }
   else {
 #if CMK_IMMEDIATE_MSG

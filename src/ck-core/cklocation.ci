@@ -16,6 +16,7 @@ module CkLocation {
 	//Load balancing:
 	entry void dummyAtSync(void);
   };
+  initcall void _CkLocMgrInit(void);
   
 //Array Map object support:
   group CkArrayMap {

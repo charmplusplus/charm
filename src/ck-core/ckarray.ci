@@ -8,9 +8,6 @@ module CkArray {
 	//Insertion
 	entry void insertElement(CkMessage *);
 	entry void remoteDoneInserting(void);
-	//Messaging
-	entry void deliver(CkMessage *);
-	entry void deliverViaQueue(CkMessage *);
 	//Broadcast
 	entry void sendBroadcast(CkMessage *);
 	entry void recvBroadcast(CkMessage *);

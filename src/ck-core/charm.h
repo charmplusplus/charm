@@ -251,6 +251,7 @@ extern char **CkGetArgv(void);
 extern int  CkGetArgc(void);
 extern void CkSummary_MarkEvent(int);
 extern void CkSummary_StartPhase(int);
+extern void CkDisableTracing(int epIdx);
 
 #ifdef __cplusplus
 }

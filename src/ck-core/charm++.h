@@ -339,10 +339,7 @@ PUPmarshall(CkComponentID)
 class IrrGroup : public Chare { 
   protected:
     CkGroupID thisgroup;
-    CmiBool ckEnableTracing; //Normally true, except for array manager
   public:
-    inline CmiBool ckTracingEnabled(void) {return ckEnableTracing;}
-
     IrrGroup(CkMigrateMessage *m) { }
     IrrGroup();
     virtual ~IrrGroup(); //<- needed for *any* child to have a virtual destructor
@@ -425,47 +422,16 @@ special delegateMgr group.
 */
 class CkDelegateMgr;
 
-/*
-class CProxy {
-  private:
-    CkGroupID delegatedTo;
-  protected: //Never allocate CProxy's-- only subclass them.
-    CProxy() { delegatedTo.pe = -1; }
-    CProxy(CkGroupID dTo) { delegatedTo = dTo; }
-  public:
-    void ckDelegate(CkGroupID to) {delegatedTo=to;}
-    void ckUndelegate(void) {delegatedTo.pe =-1;}
-    int ckIsDelegated(void) const {return (delegatedTo.pe != -1);}
-    CkGroupID ckDelegatedIdx(void) const {return delegatedTo;}
-    CkDelegateMgr *ckDelegatedTo(void) const {
-    	return (CkDelegateMgr *)CkLocalBranch(delegatedTo);
-    }
-    void pup(PUP::er &p) {
-      p|delegatedTo;
-    }
-};
-*/
-
-// changed CProxy
-
 class CProxy {
   private:
     CkDelegateMgr *delegatedMgr;      // can be either a group or a nodegroup
   protected: //Never allocate CProxy's-- only subclass them.
-    CProxy() { /*delegatedTo.idx = -1;*/ delegatedMgr=NULL; }
+    CProxy() { delegatedMgr=NULL;  }
     CProxy(CkGroupID dTo) { delegatedMgr=(dTo.isZero())?NULL:(CkDelegateMgr *)CkLocalBranch(dTo); }
   public:
     void ckDelegate(CkDelegateMgr *to) { delegatedMgr = to; }
-#if 0
-    void ckDelegate(CkGroupID to) {	// obsolete
-	delegatedMgr=(CkDelegateMgr *)CkLocalBranch(to);
-    }
-    void ckNodeDelegate(CkGroupID to) {	// obsolete
-	delegatedMgr=(CkDelegateMgr *)CkLocalNodeBranch(to);
-    }
-#endif
-    void ckUndelegate(void) {/*delegatedTo.idx = -1;*/ delegatedMgr=NULL;}
-    int ckIsDelegated(void) const {/*return (delegatedTo.idx != -1);*/ return(delegatedMgr!=NULL);}
+    void ckUndelegate(void) { delegatedMgr=NULL; }
+    int ckIsDelegated(void) const { return(delegatedMgr!=NULL);}
     CkGroupID ckDelegatedIdx(void) const {
     	if (delegatedMgr) return delegatedMgr->CkGetGroupID();
 	else {
@@ -474,28 +440,7 @@ class CProxy {
 	}
     }
     CkDelegateMgr *ckDelegatedTo(void) const { return delegatedMgr; }
-    void pup(PUP::er &p) {
-      CkGroupID delegatedTo;
-      delegatedTo.setZero();
-      int isNodeGroup = 0;
-      if (!p.isUnpacking()) {
-        if (delegatedMgr) {
-          delegatedTo = delegatedMgr->CkGetGroupID();
- 	  isNodeGroup = delegatedMgr->isNodeGroup();
-        }
-      }
-      p|delegatedTo;
-      p|isNodeGroup;
-      if (p.isUnpacking()) {
-	if (!delegatedTo.isZero()) {
-//	  isNodeGroup? ckNodeDelegate(delegatedTo): ckDelegate(delegatedTo);
-	  if (isNodeGroup)
-		delegatedMgr=(CkDelegateMgr *)CkLocalNodeBranch(delegatedTo);
-	  else
-		delegatedMgr=(CkDelegateMgr *)CkLocalBranch(delegatedTo);
-	}
-      }
-    }
+    void pup(PUP::er &p);
 };
 
 PUPmarshall(CProxy)

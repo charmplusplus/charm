@@ -721,14 +721,22 @@ CmiBool CkLocRec_local::invokeEntry(CkMigratable *obj,void *msg,int epIdx) {
 	CmiBool isDeleted=CmiFalse; //Enables us to detect deletion during processing
 	deletedMarker=&isDeleted;
 	startTiming();
-	if (msg) {
+#ifndef CMK_OPTIMIZE
+	if (msg) { /* Tracing: */
 		envelope *env=UsrToEnv(msg);
 	//	CkPrintf("ckLocation.C beginExecuteDetailed %d %d \n",env->getEvent(),env->array_srcPe());
-		_TRACE_BEGIN_EXECUTE_DETAILED(env->getEvent(),
-		     ForChareMsg,epIdx,env->array_srcPe(), env->getTotalsize());
+		if (_entryTable[epIdx]->traceEnabled)
+			_TRACE_BEGIN_EXECUTE_DETAILED(env->getEvent(),
+		    		 ForChareMsg,epIdx,env->array_srcPe(), env->getTotalsize());
 	}
+#endif
 	_entryTable[epIdx]->call(msg, obj);
-	if (msg) _TRACE_END_EXECUTE();
+#ifndef CMK_OPTIMIZE
+	if (msg) { /* Tracing: */
+		if (_entryTable[epIdx]->traceEnabled)
+			_TRACE_END_EXECUTE();
+	}
+#endif
 	if (isDeleted) return CmiFalse;//We were deleted
 	deletedMarker=NULL;
 	stopTiming();
@@ -994,7 +1002,6 @@ CkLocMgr::CkLocMgr(CkGroupID mapID_,CkGroupID lbdbID_,int numInitial)
 // moved to _CkMigratable_initInfoInit()
 //	CkpvInitialize(CkMigratable_initInfo,mig_initInfo);
 	
-	ckEnableTracing=CmiFalse; //Prevent us from being recorded
 	managers.init();
 	nManagers=0;
   	firstManager=NULL;
@@ -1011,6 +1018,12 @@ CkLocMgr::CkLocMgr(CkGroupID mapID_,CkGroupID lbdbID_,int numInitial)
 	
 //Find and register with the load balancer
 	initLB(lbdbID_);
+}
+
+void _CkLocMgrInit(void) {
+  /* Don't trace our deliver method--it does its own tracing */
+  CkDisableTracing(CkIndex_CkLocMgr::deliver(0));
+  CkDisableTracing(CkIndex_CkLocMgr::deliverImmediate(0));
 }
 
 

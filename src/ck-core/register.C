@@ -141,6 +141,11 @@ CkMarshallUnpackFn CkLookupMarshallUnpackFn(int epIndex)
 	return _entryTable[epIndex]->marshallUnpack;
 }
 
+extern "C" 
+void CkDisableTracing(int epIdx) {
+	_entryTable[epIdx]->traceEnabled=false;
+}
+
 
 // temporarily here for satisfying NAMD, it should go to tracing module
 
