@@ -39,12 +39,30 @@ class LogEntry {
     int msglen;
     double recvTime;
     CmiObjId   id;
+    int numpes;
+    int *pes;
   public:
     LogEntry() {}
     LogEntry(double tm, UChar t, UShort m=0, UShort e=0, int ev=0, int p=0, int ml=0, CmiObjId *d=NULL, double rt=0.) {
       type = t; mIdx = m; eIdx = e; event = ev; pe = p; time = tm; msglen = ml;
       if (d) id = *d; else {id.id[0]=id.id[1]=id.id[2]=0; };
       recvTime = rt; 
+    }
+    // **CW** new constructor for multicast data
+    LogEntry(double tm, UShort m, UShort e, int ev, int p,
+	     int ml, CmiObjId *d, double rt, int num, int *pelist) {
+      type = CREATION_MULTICAST; mIdx = m; eIdx = e; event = ev; pe = p; time = tm; msglen = ml;
+      if (d) id = *d; else {id.id[0]=id.id[1]=id.id[2]=0; };
+      recvTime = rt; 
+      numpes = num;
+      if (pelist != NULL) {
+	pes = new int[num];
+	for (int i=0; i<num; i++) {
+	  pes[i] = pelist[i];
+	}
+      } else {
+	pes= NULL;
+      }
     }
     void *operator new(size_t s) {void*ret=malloc(s);_MEMCHECK(ret);return ret;}
     void *operator new(size_t, void *ptr) { return ptr; }
@@ -108,6 +126,7 @@ class LogPool {
 #endif
     void writeSts(void);
     void add(UChar type,UShort mIdx,UShort eIdx,double time,int event,int pe, int ml=0, CmiObjId* id=0, double recvT=0.);
+    void addCreationMulticast(UShort mIdx,UShort eIdx,double time,int event,int pe, int ml=0, CmiObjId* id=0, double recvT=0., int num=0, int *pelist=NULL);
     void postProcessLog();
 };
 
@@ -130,6 +149,7 @@ class TraceProjections : public Trace {
     void userEvent(int e);
     void userBracketEvent(int e, double bt, double et);
     void creation(envelope *e, int epIdx, int num=1);
+    void creationMulticast(envelope *e, int epIdx, int num=1, int *pelist=NULL);
     void creationDone(int num=1);
     void beginExecute(envelope *e);
     void beginExecute(CmiObjId  *tid);

@@ -31,6 +31,8 @@
 #define  BEGIN_UNPACK       18
 #define  END_UNPACK         19
 
+#define  CREATION_MULTICAST 21
+
 #define  USER_EVENT_PAIR    100
 
 CkpvExtern(int, CtrLogBufSize);

@@ -392,6 +392,29 @@ void LogPool::add(UChar type,UShort mIdx,UShort eIdx,double time,int event,int p
 #endif
 }
 
+/* **CW** Not sure if this is the right thing to do. Feels more like
+   a hack than a solution to Sameer's request to add the destination
+   processor information to multicasts and broadcasts.
+
+   In the unlikely event this method is used for Broadcasts as well,
+   pelist == NULL will be used to indicate a global broadcast with 
+   num PEs.
+*/
+void LogPool::addCreationMulticast(UShort mIdx, UShort eIdx, double time,
+				   int event, int pe, int ml, CmiObjId *id,
+				   double recvT, int num, int *pelist)
+{
+  new (&pool[numEntries++])
+    LogEntry(time, mIdx, eIdx, event, pe, ml, id, recvT, num, pelist);
+  if(poolSize==numEntries) {
+    double writeTime = TraceTimer();
+    writeLog();
+    numEntries = 0;
+    new (&pool[numEntries++]) LogEntry(writeTime, BEGIN_INTERRUPT);
+    new (&pool[numEntries++]) LogEntry(TraceTimer(), END_INTERRUPT);
+  }
+}
+
 void LogPool::postProcessLog()
 {
 #if CMK_BLUEGENE_CHARM
@@ -444,6 +467,18 @@ double LogEntry::write(FILE* fp, double prevTime, double *timeErr)
     case CREATION:
       fprintf(fp, "%d %d %u %d %d %d %d\n", mIdx, eIdx, intTimeDiff, 
 	      event, pe, msglen, (UInt)(recvTime*1.e6));
+      break;
+    case CREATION_MULTICAST:
+      fprintf(fp, "%d %d %u %d %d %d %d %d ", mIdx, eIdx, intTimeDiff, 
+	      event, pe, msglen, (UInt)(recvTime*1.e6), numpes);
+      if (pes == NULL) {
+	fprintf(fp, "-1\n");
+      } else {
+	for (int i=0; i<numpes; i++) {
+	  fprintf(fp, "%d ", pes[i]);
+	}
+	fprintf(fp, "\n");
+      }
       break;
     case END_PROCESSING:
     case MESSAGE_RECV:
@@ -766,6 +801,27 @@ void TraceProjections::creation(envelope *e, int ep, int num)
                     curevent+i,CkMyPe(),e->getTotalsize(), 0, 0.0);
     }
     curevent += num;
+  }
+}
+
+/* **CW** Non-disruptive attempt to add destination PE knowledge to
+   Communication Library-specific Multicasts via new event 
+   CREATION_MULTICAST.
+*/
+
+void TraceProjections::creationMulticast(envelope *e, int ep, int num,
+					 int *pelist)
+{
+  double curTime = TraceTimer();
+  if (e==0) {
+    CtvAccess(curThreadEvent)=curevent;
+    _logPool->addCreationMulticast(ForChareMsg, ep, curTime, curevent++,
+				   CkMyPe(), 0, 0, 0.0, num, pelist);
+  } else {
+    int type=e->getMsgtype();
+    e->setEvent(curevent);
+    _logPool->addCreationMulticast(type, ep, curTime, curevent++, CkMyPe(),
+				   e->getTotalsize(), 0, 0.0, num, pelist);
   }
 }
 

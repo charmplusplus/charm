@@ -49,6 +49,8 @@ class Trace {
     virtual void userBracketEvent(int eventID, double bt, double et) {}
     // creation of message(s)
     virtual void creation(envelope *, int epIdx, int num=1) {}
+    virtual void creationMulticast(envelope *, int epIdx, int num=1,
+				     int *pelist=NULL) {}
     virtual void creationDone(int num=1) {}
     // ???
     virtual void messageRecv(char *env, int pe) {}
@@ -123,6 +125,7 @@ public:
     
     /* Creation needs to access _entryTable, so moved into trace-common.C */
     void creation(envelope *env, int ep, int num=1);
+    void creationMulticast(envelope *env, int ep, int num=1, int *pelist=NULL);
     
     inline void creationDone(int num=1) { ALLDO(creationDone(num)); }
     inline void beginExecute(envelope *env) {ALLDO(beginExecute(env));}
@@ -173,6 +176,7 @@ extern "C" {
 #define _TRACE_CREATION_1(env) _TRACE_ONLY(CkpvAccess(_traces)->creation(env,env->getEpIdx()))
 #define _TRACE_CREATION_DETAILED(env,ep) _TRACE_ONLY(CkpvAccess(_traces)->creation(env,ep))
 #define _TRACE_CREATION_N(env, num) _TRACE_ONLY(CkpvAccess(_traces)->creation(env,env->getEpIdx(), num))
+#define _TRACE_CREATION_MULTICAST(env, num, pelist) _TRACE_ONLY(CkpvAccess(_traces)->creationMulticast(env, env->getEpIdx(), num, pelist))
 #define _TRACE_CREATION_DONE(num) _TRACE_ONLY(CkpvAccess(_traces)->creationDone(num))
 #define _TRACE_BEGIN_EXECUTE(env) _TRACE_ONLY(CkpvAccess(_traces)->beginExecute(env))
 #define _TRACE_BEGIN_EXECUTE_DETAILED(evt,typ,ep,src,mlen,idx) \

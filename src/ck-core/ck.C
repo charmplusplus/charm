@@ -908,7 +908,7 @@ static inline void _sendMsgBranchMulti(int eIdx, void *msg, CkGroupID gID,
                            int npes, int *pes)
 {
   register envelope *env = _prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
-  _TRACE_CREATION_N(env, npes);
+  _TRACE_CREATION_MULTICAST(env, npes, pes);
   CldEnqueueMulti(npes, pes, env, _infoIdx);
   _TRACE_CREATION_DONE(npes);
 }
