@@ -1,92 +1,955 @@
-\documentclass[11pt]{article}
+\documentclass[10pt]{article}
+\usepackage{../pplmanual}
+\input{../pplmanual}
 
-\newif\ifpdf
-\ifx\pdfoutput\undefined
-  \pdffalse
-\else
-  \pdfoutput=1
-  \pdftrue
-\fi
-
-\ifpdf
-  \pdfcompresslevel=9
-  %\usepackage[pdftex,colorlinks=true,plainpages=false]{hyperref}
-\else
-\fi
-
-\usepackage{graphicx,calc}
-\usepackage{makeidx}
-\usepackage{alltt}
-
-\setcounter{topnumber}{2}
-\def\topfraction{1}
-\setcounter{bottomnumber}{1}
-\def\bottomfraction{1}
-\setcounter{totalnumber}{3}
-\def\textfraction{0.2}
-\def\floatpagefraction{0.8}
-
-\setlength{\parindent}{0.0in}
-\setlength{\parskip}{0.1in}
-\setlength{\textwidth}{6.5in}
-\setlength{\itemindent}{1in}
-\setlength{\textheight}{9.5in}
-\addtolength{\oddsidemargin}{0in}
-\addtolength{\topmargin}{-0.4in}
-
-\parskip 0.05in
-
-\newcommand{\internal}[1]{}
-\newcommand{\function}[1]{{\noindent{\textsf{\textbf{#1}}}\\}}
-\newcommand{\args}[1]{\hspace*{2em}{\textsf{#1}}\\}
-\newcommand{\param}[1]{{\textsf{#1}}}
-\newcommand{\kw}[1]{{\textsf{\textbf{#1}}}}
-\newcommand{\note}[1]{\noindent{(Note: {\em {#1}})}}
-
-\newcommand{\basea}{\renewcommand{\baselinestretch}{1.2}}
-\newcommand{\baseb}{\renewcommand{\baselinestretch}{1.0}}
-\newcommand{\mycomment}[1]{}
-
-\textwidth 6.4in
-\textheight 8.9in
-\topmargin -.4in
-\oddsidemargin 0.25in
-\evensidemargin 0.25in
-\parskip 0.1in
-
-\makeindex
-
-\begin{document}
-
-\begin{titlepage}
-\begin{flushright}
-{\Large 
-  Parallel Programming Laboratory\\
-  University of Illinois at Urbana-Champaign\\
-}
-\end{flushright}
-\rule{\textwidth}{3pt}
-\vspace{\fill}
-\begin{flushright}
-\textsf{
- {\Huge Adaptive Message Passing Interface\\ (AMPI)\\ Manual \\}
-}
-\end{flushright}
-\vspace{\fill}
-
+\title{Adaptive MPI Manual}
+\version{1.0}
+\credits{
 AMPI has been developed by Milind Bhandarkar with inputs from Gengbin Zheng and
 Orion Lawlor. The derived data types (DDT) library, which AMPI uses for the
 derived data types support, has been developed by Neelam Saboo.
+}
 
-\rule{\textwidth}{3pt}
+\begin{document}
+\maketitle
 
-\begin{flushright}
-{\large Version 1.0}
-\end{flushright}
-\end{titlepage}
+\section{Introduction}
 
-\tableofcontents
-\newpage
+This manual describes Adaptive MPI~(\ampi{}), which is an implementation of a
+significant subset of MPI 1.1 standard over \charmpp{}. \charmpp{} is a
+\CC{}-based parallel programming library developed by Prof. L. V. Kale and his
+students over the last 10 years at University of Illinois.
 
-\input{index}
+We first describe our philosophy behind this work (why we do what we do).
+Later we give a brief introduction to \charmpp{} and rationale for \ampi{}
+(tools of the trade). We describe \ampi{} in detail. Finally we summarize the
+changes required for original MPI codes to get them working with \ampi{}
+(current state of our work). Appendices contain the gory details of installing
+\ampi{}, building and running \ampi{} programs.
+
+\subsection{Our Philosophy}
+
+Developing parallel Computational Science and Engineering (CSE) applications is
+a complex task. One has to implement the right physics, develop or choose and
+code appropriate numerical methods, decide and implement the proper input and
+output data formats, perform visualizations, and be concerned with correctness
+and efficiency of the programs. It becomes even more complex for multi-physics
+coupled simulations such as the solid propellant rocket simulation application.  
+Our philosophy is to lessen the burden of the application developer by
+providing advanced programming paradigms and versatile runtime systems that can
+handle many common performance concerns automatically and let the application
+programmers focus on the actual application content.
+
+One such concern is that of load imbalance. In a dynamic simulation application
+such as rocket simulation, burning  solid fuel, sub-scaling for a certain part
+of the mesh, crack propagation, particle flows all contribute to load
+imbalance. Centralized load balancing strategy built into an application is
+impractical since each individual modules are developed almost independently by
+various developers. Thus, the runtime system support for load balancing becomes
+even more critical.
+
+Automatic load balancing is infeasible for a program about which nothing is
+known. Other approaches to automatic load balancing therefore require the
+applications to provide hints about the load to the runtime system, or restrict
+load balance to a certain kind of algorithms such as Adaptive Mesh Refinement
+or  to certain architectures such as shared memory machines. Our approach is
+based on actual measurement of load information at runtime, and on migrating
+computations from heavily loaded to lightly loaded processors.
+
+For this approach to be effective, we need the computation to be split into
+pieces many more in number than available processors. This allows us to
+flexibly map and re-map these computational pieces to available processors.
+This approach is usually called ``multi-domain decomposition''.
+
+\charmpp{}, which we use as a runtime system layer for the work described here
+exemplifies our approach. It embeds an elaborate performance tracing mechanism,
+a suite of plug-in load balancing strategies, infrastructure for defining and
+migrating computational load, and is interoperable with other programming
+paradigms.
+
+\subsection{Terminology}
+
+\begin{description}
+
+\item[Module] A module refers to either a complete program or a library with an
+orchestrator subroutine\footnote{Like many software engineering terms, this
+term is overused, and unfortunately clashes with Fortran 90 module that denotes
+a program unit. We specifically refer to the later as ``Fortran 90 module'' to
+avoid confusion.} . An orchestrator subroutine specifies the main control flow
+of the module by calling various subroutines from the associated library and
+does not usually have much state associated with it.
+
+\item[Thread] A thread is a lightweight process that owns a stack and machine
+registers including program counter, but shares code and data with other
+threads within the same address space. If the underlying operating system
+recognizes a thread, it is known as kernel thread, otherwise it is known as
+user-thread. A context-switch between threads refers to suspending one thread's
+execution and transferring control to another thread. Kernel threads typically
+have higher context switching costs than user-threads because of operating
+system overheads. The policy implemented by the underlying system for
+transferring control between threads is known as thread scheduling policy.
+Scheduling policy for kernel threads is determined by the operating system, and
+is often more inflexible than user-threads. Scheduling policy is said to be
+non-preemptive if a context-switch occurs only when the currently running
+thread willingly asks to be suspended, otherwise it is said to be preemptive.
+\ampi{} threads are non-preemptive user-level threads.
+
+\item[Chunk] A chunk is a combination of a user-level thread and the data it
+manipulates. When a program is converted from MPI to \ampi{}, we convert an MPI
+process into a chunk. This conversion is referred to as chunkification.
+
+\item[Object] An object is just a blob of memory on which certain computations
+can be performed. The memory is referred to as an object's state, and the set
+of computations that can be performed on the object is called the interface of
+the object.
+
+\end{description}
+
+\section{\charmpp{}}
+
+\charmpp{} is an object-oriented parallel programming library for \CC{}.  It
+differs from traditional message passing programming libraries (such as MPI) in
+that \charmpp{} is ``message-driven''. Message-driven parallel programs do not
+block the processor waiting for a message to be received.  Instead, each
+message carries with itself a computation that the processor performs on
+arrival of that message. The underlying runtime system of \charmpp{} is called
+\converse{}, which implements a ``scheduler'' that chooses which message to
+schedule next (message-scheduling in \charmpp{} involves locating the object
+for which the message is intended, and executing the computation specified in
+the incoming message on that object). A parallel object in \charmpp{} is a
+\CC{} object on which a certain computations can be asked to performe from
+remote processors.
+
+\charmpp{} programs exhibit latency tolerance since the scheduler always picks
+up the next available message rather than waiting for a particular messageto
+arrive.  They also tend to be modular, because of their object-based nature.
+Most importantly, \charmpp{} programs can be \emph{dynamically load balanced},
+because the messages are directed at objects and not at processors; thus
+allowing the runtime system to migrate the objects from heavily loaded
+processors to lightly loaded processors. It is this feature of \charmpp{} that
+we utilize for \ampi{}.
+
+Since many CSE applications are originally written using MPI, one would have to
+do a complete rewrite if they were to be converted to \charmpp{} to take
+advantage of dynamic load balancing. This is indeed impractical. However,
+\converse{} -- the runtime system of \charmpp{} -- came to our rescue here,
+since it supports interoperability between different parallel programming
+paradigms such as parallel objects and threads. Using this feature, we
+developed \ampi{}, an implementation of a significant subset of MPI 1.1
+standard over \charmpp{}.  \ampi{} is described in the next section.
+
+\section{AMPI}
+
+\ampi{} utilizes the dynamic load balancing capabilities of \charmpp{} by
+associating a ``user-level'' thread with each \charmpp{} migratable object.
+User's code runs inside this thread, so that it can issue blocking receive
+calls similar to MPI, and still present the underlying scheduler an opportunity
+to schedule other computations on the same processor. The runtime system keeps
+track of computation loads of each thread as well as communication graph
+between \ampi{} threads, and can migrate these threads in order to balance the
+overall load while simultaneously minimizing communication overhead. 
+
+For dynamic load balancing to be effective, one needs to map multiple
+user-level threads onto a processor. Traditional MPI programs assume that the
+entire processor is allocated to themselves, and that only one thread of
+control exists within the process's address space.  Thats where the need arises
+to make some transformations to the original MPI program in order to run
+correctly with \ampi{}.
+
+The basic transformation needed to port the MPI program to \ampi{} is
+privatization of global variables.\footnote{Typical Fortran MPI programs
+contain three types of global variables.
+
+\begin{enumerate}
+
+\item Global variables that are ``read-only''. These are either
+\emph{parameters} that are set at compile-time. Or other variables that are
+read as input or set at the beginning of the program and do not change during
+execution. It is not necessary to privatize such variables.
+
+\item Global variables that are used as temporary buffers. These are variables
+that are used temporarily to store values to be accessible across subroutines.
+These variables have a characteristic that there is no blocking call such as
+\texttt{MPI\_recv} between the time the variable is set and the time it is ever
+used. It is not necessary to privatize such variables either. 
+
+\item True global variables. These are used across subroutines that contain
+blocking receives and therefore possibility of a context switche between the
+definition and use of the variable. These variables need to be privatized.
+
+\end{enumerate}
+}
+With the MPI process model, each MPI node can keep a copy of its own
+``permanent variables'' -- variables that are accessible from more than one
+subroutines without passing them as arguments.  Module variables, ``saved''
+subroutine local variables, and common blocks in Fortran 90 belong to this
+category. If such a program is executed without privatization on \ampi{}, all
+the \ampi{} threads that reside on one processor will access the same copy of
+such variables, which is clearly not the desired semantics.  To ensure correct
+execution of the original source program, it is necessary to make such
+variables ``private'' to individual threads.  
+
+we have employed two strategies to do this privatization transformation. One is
+by argument passing. That is, the global variables are bunched together in a
+single user-defined type, which is allocated by each thread dynamically. Then a
+pointer to this type is passed from subroutine to subroutine as an argument.
+Since the subroutine arguments are passed on a stack, which is not shared
+across all threads, each subroutine, when executing within a thread operates on
+a private copy of the global variables. 
+
+The second method we have employed is called ``dimension increment''. Here, the
+dimension of global data items is increased by one. This added dimension is
+used to access thread private data by indexing it with the thread number (which
+can be obtained with \texttt{AMPI\_Comm\_rank} subroutine.) This scheme has a
+distinct disadvantage of wastage of space. Therefore it should be used only in
+case of small global data. There is another disadvantage, that of false
+sharing, if the global data items are not aligned properly.  \footnote{ Another
+strategy for doing privatization is also known. It employs registration of
+``thread-local data'' with the system and access to those data using ``keys''.
+This method is suitable for C and \CC{} programs, but the lack of consistency
+in Fortran 90 pointer implementations make it complicated to implement and use
+in Fortran.}
+
+These two schemes are demonstrated in the following examples. The original
+Fortran 90 code contains a module \texttt{shareddata}. This module is used in
+the main program and a subroutine \texttt{subA}.
+
+\begin{alltt}
+MODULE shareddata
+  INTEGER :: myrank
+  DOUBLE PRECISION :: xyz(100)
+END MODULE
+
+PROGRAM MAIN
+  USE shareddata
+  include 'mpif.h'
+  INTEGER :: i, ierr
+  CALL MPI_Init(ierr)
+  CALL MPI_Comm_rank(MPI_COMM_WORLD, myrank, ierr)
+  DO i = 1, 100
+    xyz(i) =  i + myrank
+  END DO
+  CALL subA
+  CALL MPI_Finalize(ierr)
+END PROGRAM
+
+SUBROUTINE subA
+  USE shareddata
+  INTEGER :: i
+  DO i = 1, 100
+    xyz(i) = xyz(i) + 1.0
+  END DO
+END SUBROUTINE
+\end{alltt}
+
+\ampi{} executes the main program inside a user-level thread as a subroutine.
+For this purpose, the main program needs to be changed to be a subroutine with
+the name \verb+AMPI_Main+.
+
+Now we transform this program using the first strategy. We first group the
+shared data into a user-defined type.
+
+\begin{alltt}
+MODULE shareddata
+  \emph{TYPE chunk}
+    INTEGER :: myrank
+    DOUBLE PRECISION :: xyz(100)
+  \emph{END TYPE}
+END MODULE
+\end{alltt}
+
+Now we modify the main program to dynamically allocate this data and change the
+references to them. Subroutine \texttt{subA} is then modified to take this data
+as argument.
+
+\begin{alltt}
+SUBROUTINE AMPI_Main
+  USE shareddata
+  USE AMPI
+  INTEGER :: i, ierr
+  \emph{TYPE(chunk), pointer :: c}
+  CALL AMPI_Init(ierr)
+  \emph{ALLOCATE(c)}
+  CALL AMPI_Comm_rank(AMPI_COMM_WORLD, c\%myrank, ierr)
+  DO i = 1, 100
+    \emph{c\%xyz(i) =  i + c\%myrank}
+  END DO
+  CALL subA(c)
+  CALL AMPI_Finalize(ierr)
+END SUBROUTINE
+
+SUBROUTINE subA(c)
+  USE shareddata
+  \emph{TYPE(chunk) :: c}
+  INTEGER :: i
+  DO i = 1, 100
+    \emph{c\%xyz(i) = c\%xyz(i) + 1.0}
+  END DO
+END SUBROUTINE
+\end{alltt}
+
+With these changes, the above program can be made thread-safe. Note that it is
+not really necessary to dynamically allocate \texttt{chunk}. One could have
+declared it as a local variable in subroutine \texttt{AMPI\_Main}.  (Or for a
+small example such as this, one could have just removed the \texttt{shareddata}
+module, and instead declared both variables \texttt{xyz} and \texttt{myrank} as
+local variables). This is indeed a good idea if shared data are small in size.
+For large shared data, it would be better to do heap allocation because in
+\ampi{}, the stack sizes are fixed at the beginning (can be specified from the
+command line) and stacks do not grow dynamically.
+
+In the second scheme, we extend the dimension of the shared data, assuming that
+we are going to run with maximum 16 threads.
+
+\begin{alltt}
+MODULE shareddata
+  INTEGER :: myrank(16)
+  DOUBLE PRECISION :: xyz(16, 100)
+END MODULE
+\end{alltt}
+
+Next we change the references to these shared data, by adding an additional
+level of indexing:
+
+\begin{alltt}
+SUBROUTINE AMPI_Main
+  USE shareddata
+  USE AMPI
+  INTEGER :: i, trank, ierr
+  CALL AMPI_Init(ierr)
+  CALL AMPI_Comm_rank(AMPI_COMM_WORLD, trank, ierr)
+  \emph{myrank(trank) = trank}
+  DO i = 1, 100
+    \emph{xyz(trank, i) =  i + myrank(trank)}
+  END DO
+  CALL subA()
+  CALL AMPI_Finalize(ierr)
+END SUBROUTINE
+
+SUBROUTINE subA(c)
+  USE shareddata
+  USE AMPI
+  INTEGER :: i, trank, ierr
+  CALL AMPI_Comm_rank(AMPI_COMM_WORLD, trank, ierr)
+  DO i = 1, 100
+    \emph{xyz(trank, i) = xyz(trank, i) + 1.0}
+  END DO
+END SUBROUTINE
+\end{alltt}
+
+Now, this program is also thread-safe and ready to run with \ampi{}.  
+
+\subsection{AMPI Status}
+
+Currently the following subset of MPI 1.1 standard is supported in \ampi{}.
+
+\begin{alltt}
+  AMPI_Wtime           AMPI_Init          AMPI_Comm_rank       
+  AMPI_Comm_size       AMPI_Finalize      AMPI_Send         
+  AMPI_Recv            AMPI_Isend         AMPI_Irecv        
+  AMPI_Sendrecv        AMPI_Barrier       AMPI_Bcast
+  AMPI_Reduce          AMPI_Allreduce     AMPI_Start           
+  AMPI_Waitall         AMPI_Send_init     AMPI_Recv_init    
+  AMPI_Type_contiguous AMPI_Type_vector   AMPI_Type_hvector 
+  AMPI_Type_indexed    AMPI_Type_hindexed AMPI_Type_struct
+  AMPI_Type_commit     AMPI_Type_free     AMPI_Type_extent     
+  AMPI_Type_size       AMPI_Allgatherv    AMPI_Allgather    
+  AMPI_Gatherv         AMPI_Gather        AMPI_Alltoallv    
+  AMPI_Alltoall        AMPI_Comm_dup      AMPI_Comm_free
+  AMPI_Abort
+\end{alltt}
+
+Following MPI 1.1 basic datatypes are supported in \ampi{}.
+
+\begin{alltt}
+AMPI_DOUBLE_PRECISION AMPI_INTEGER       AMPI_REAL          
+AMPI_COMPLEX          AMPI_LOGICAL       AMPI_CHARACTER     
+AMPI_BYTE             AMPI_PACKED        AMPI_SHORT            
+AMPI_LONG             AMPI_UNSIGNED_CHAR AMPI_UNSIGNED_SHORT
+AMPI_UNSIGNED         AMPI_UNSIGNED_LONG AMPI_LONG_DOUBLE
+\end{alltt}
+
+Following MPI 1.1 reduction operations are supported in \ampi{}.
+
+\begin{alltt}
+AMPI_MAX  AMPI_MIN  AMPI_SUM  AMPI_PROD
+\end{alltt}
+
+Notice that all \ampi{} functions (and literals such as
+\texttt{AMPI\_COMM\_WORLD} begin with ``AMPI\_'' and not ``MPI\_'' like the MPI
+1.1 standard. This is because on some parallel machines, \charmpp{} (actually
+\converse{}) is implemented on top of MPI. For correct execution, the user
+program should link with our \ampi{} library, while \charmpp{} should link with
+the system's MPI implementation. Unfortunately, the linkers have no way of
+distinguishing between calls to MPI if both AMPI and MPI calls have the same
+names.
+
+Thus another transformation that needs to be made to the user's MPI code is to
+change the names of all MPI functions to begin with ``\texttt{AMPI\_}'' instead
+of ``\texttt{MPI\_}''. We are experimenting with Fortran90 modules and
+subroutine overloading and module procedures to get rid of this inconvenience.
+
+Also, unlike the MPI 1.1 standard, the ``\texttt{mpif.h}'' should not be
+included in the \ampi{} program, neither should ``\texttt{use mpi}'' be used.
+Instead one needs to put the ``\texttt{use ampi}'' statement in program units
+that use \ampi{}.
+
+\subsection{Extensions for Migrations}
+
+For MPI chunks to migrate, we have added a few calls to \ampi{}. These include
+ability to register thread-specific data with the run-time system, to pack all
+the thread's data, and to express willingness to migrate.
+
+\subsubsection{Registering Chunk data}
+
+When the \ampi{} runtime system decides that load imbalance exists within the
+application, it will invoke one of its internal load balancing strategies,
+which determines the new mapping of \ampi{} chunks so as to balance the load.
+Then \ampi{} runtime has to pack up the chunk's state and move it to its new
+home processor. \ampi{} packs up any internal data in use by the chunk,
+including the thread's stack in use. This means that the local variables
+declared in subroutines in a chunk, which are created on stack, are
+automatically packed up by the \ampi{} runtime system. However, it has no way
+of knowing what other data are in use by the chunk. Thus upon starting
+execution, a chunk needs to notify the system about the data that it is going
+to use (apart from local variables.) Even with the data registration, \ampi{}
+cannot determine what size the data is, or whether the registered data contains
+pointers to other places in memory. For this purpose, a packing subroutine also
+needs to be provided to the \ampi{} runtime system alongwith registered data.
+(See next section for writing packing subroutines.) The call provided by
+\ampi{} for doing this is \texttt{AMPI\_Register}. This function takes two
+arguments: A data item to be transported alongwith the chunk, and the pack
+subroutine, and returns an integer denoting the registration identifier. In
+C/\CC{} programs, it may be necessary to use this return value after migration
+completes and control returns to the chunk, using function
+\texttt{AMPI\_Get\_userdata}. Therefore, the return value should be stored in a
+local variable.
+
+\subsubsection{Migration}
+
+The \ampi{} runtime system could detect load imbalance by itself and invoke the
+load balancing strategy. However, since the application code is going to
+pack/unpack the chunk's data, writing the pack subroutine will be complicated
+if migrations occur at a stage unknown to the application. For example, if the
+system decides to migrate a chunk while it is in initialization stage (say,
+reading input files), application code will have to keep track of how much data
+it has read, what files are open etc. Typically, since initialization occurs
+only once in the beginning, load imbalance at that stage would not matter much.
+Therefore, we want the demand to perform load balance check to be initiated by
+the application.
+
+\ampi{} provides a subroutine \texttt{AMPI\_Migrate} for this purpose. Each
+chunk periodically calls \texttt{AMPI\_Migrate}. Typical CSE applications are
+iterative and perform multiple time-steps. One should call
+\texttt{AMPI\_Migrate} in each chunk at the end of some fixed number of
+timesteps. The frequency of \texttt{AMPI\_Migrate} should be determined by a
+tradeoff between conflicting factors such as the load balancing overhead, and
+performance degradation caused by load imbalance. In some other applications,
+where application suspects that load imbalance may have occurred, as in the
+case of adaptive mesh refinement; it would be more effective if it performs a
+couple of timesteps before telling the system to re-map chunks. This will give
+the \ampi{} runtime system some time to collect the new load and communication
+statistics upon which it bases its migration decisions. Note that
+\texttt{AMPI\_Migrate} does NOT tell the system to migrate the chunk, but
+merely tells the system to check the load balance after all the chunks call
+\texttt{AMPI\_Migrate}. To migrate the chunk or not is decided only by the
+system's load balancing strategy.
+
+\subsubsection{Packing/Unpacking Thread Data}
+
+Once the \ampi{} runtime system decides which chunks to send to which
+processors, it calls the specified pack subroutine for that chunk, with the
+chunk-specific data that was registered with the system using
+\texttt{AMPI\_Register}. This section explains how a subroutine should be
+written for performing pack/unpack.
+
+There are three steps to transporting the chunk's data to other processor.
+First, the system calls a subroutine to get the size of the buffer required to
+pack the chunk's data. This is called the ``sizing'' step. In the next step,
+which is called immediately afterward on the source processor, the system
+allocates the required buffer and calls the subroutine to pack the chunk's data
+into that buffer. This is called the ``packing'' step. This packed data is then
+sent as a message to the destination processor, where first a chunk is created
+(alongwith the thread) and a subroutine is called to unpack the chunk's data
+from the buffer. This is called the ``unpacking'' step.
+
+Though the above description mentions three subroutines called by the \ampi{}
+runtime system, it is possible to actually write a single subroutine that will
+perform all the three tasks. This is achieved using something we call a
+``pupper''. A pupper is an external subroutine that is passed to the chunk's
+pack-unpack-sizing subroutine, and this subroutine, when called in different
+phases performs different tasks. An example will make this clear:
+
+Suppose the chunk data is defined as a user-defined type in Fortran 90:
+
+\begin{alltt}
+MODULE chunkmod
+  TYPE, PUBLIC :: chunk
+      INTEGER , parameter :: nx=4, ny=4, tchunks=16
+      REAL(KIND=8) t(22,22)
+      INTEGER xidx, yidx
+      REAL(KIND=8), dimension(400):: bxm, bxp, bym, byp
+  END TYPE chunk
+END MODULE
+\end{alltt}
+
+Then the pack-unpack subroutine \texttt{chunkpup} for this chunk module is
+written as:
+
+\begin{alltt}
+SUBROUTINE chunkpup(p, c)
+  USE pupmod
+  USE chunkmod
+  IMPLICIT NONE
+  INTEGER :: p
+  TYPE(chunk) :: c
+
+  call pup(p, c\%t)
+  call pup(p, c\%xidx)
+  call pup(p, c\%yidx)
+  call pup(p, c\%bxm)
+  call pup(p, c\%bxp)
+  call pup(p, c\%bym)
+  call pup(p, c\%byp)
+end subroutine
+\end{alltt}
+
+There are several things to note in this example. First, the same subroutine
+\texttt{pup} (declared in module \texttt{pupmod}) is called to size/pack/unpack
+any type of data. This is possible because of procedure overloading possible in
+Fortran 90. Second is the integer argument \texttt{p}. It is this argument that
+specifies whether this invocation of subroutine \texttt{chunkpup} is sizing,
+packing or unpacking. Third, the integer parameters declared in the type
+\texttt{chunk} need not be packed or unpacked since they are guaranteed to be
+constants and thus available on any processor.
+
+A few other functions are provided in module \texttt{pupmod}. These functions
+provide more control over the packing/unpacking process. Suppose one modifies
+the \texttt{chunk} type to include allocatable data or pointers that are
+allocated dynamically at runtime. In this case, when the chunk is packed, these
+allocated data structures should be deallocated after copying them to buffers,
+and when the chunk is unpacked, these data structures should be allocated
+before copying them from the buffers.  For this purpose, one needs to know
+whether the invocation of \texttt{chunkpup} is a packing one or unpacking one.
+For this purpose, the \texttt{pupmod} module provides functions
+\verb+pup_ispk+(\verb+pup_isupk+). These functions return logical value
+\verb+.TRUE.+ if the invocation is for packing (unpacking), and \verb+.FALSE.+
+otherwise. Following example demonstrates this:
+
+Suppose the type \texttt{dchunk} is declared as:
+
+\begin{alltt}
+MODULE dchunkmod
+  TYPE, PUBLIC :: dchunk
+      INTEGER :: asize
+      REAL(KIND=8), pointer :: xarr(:), yarr(:)
+  END TYPE dchunk
+END MODULE
+\end{alltt}
+
+Then the pack-unpack subroutine is written as:
+
+\begin{alltt}
+SUBROUTINE dchunkpup(p, c)
+  USE pupmod
+  USE dchunkmod
+  IMPLICIT NONE
+  INTEGER :: p
+  TYPE(dchunk) :: c
+
+  pup(p, c\%asize)
+  \emph{
+  IF (pup_isupk(p)) THEN       !! if invocation is for unpacking
+    allocate(c\%xarr(asize))
+    ALLOCATE(c\%yarr(asize))
+  ENDIF
+  }
+  pup(p, c\%xarr)
+  pup(p, c\%yarr)
+  \emph{
+  IF (pup_ispk(p)) THEN        !! if invocation is for packing
+    DEALLOCATE(c\%xarr(asize))
+    DEALLOCATE(c\%yarr(asize))
+  ENDIF
+  }
+
+END SUBROUTINE
+\end{alltt}
+
+One more function \verb+pup_issz+ is also available in module \texttt{pupmod}
+that returns \verb+.TRUE.+ when the invocation is a sizing one. In practice one
+almost never needs to use it.
+
+\subsection{Extensions for Interoperability}
+
+Interoperability between different modules is essential for coding coupled
+simulations.  In this extension to \ampi{}, each MPI application module runs
+within its own group of user-level threads distributed over the physical
+parallel machine.  In order to let \ampi{} know which chunks are to be created,
+and in what order, a top level registration routine needs to be written. A
+real-world example will make this clear. We have an MPI code for fluids and
+another MPI code for solids, both with their main programs, then we first
+transform each individual code to run correctly under \ampi{} as standalone
+codes. This involves the usual ``chunkification'' transformation so that
+multiple chunks from the application can run on the same processor without
+overwriting each other's data. This also involves making the main program into
+a subroutine and naming it \texttt{AMPI\_Main}.
+
+Thus now, we have two \texttt{AMPI\_Main}s, one for the fluids code and one for
+the solids code. We now make these codes co-exist within the same executable,
+by first renaming these \texttt{AMPI\_Main}s as \texttt{Fluids\_Main} and
+\texttt{Solids\_Main}\footnote{Currently, we assume that the interface code,
+which does mapping and interpolation among the boundary values of Fluids and
+Solids domain, is integrated with one of Fluids and Solids.} writing a
+subroutine called \texttt{AMPI\_Setup}.
+
+\begin{alltt}
+SUBROUTINE AMPI_Setup
+  USE ampi
+
+  CALL AMPI_Register_main(Solids_Main)
+  CALL AMPI_Register_main(Fluids_Main)
+
+END SUBROUTINE
+\end{alltt}
+
+This subroutine is called from the internal initialization routines of \ampi{}
+and tells \ampi{} how many number of distinct chunk types (modules) exist, and
+which orchestrator subroutines they execute.
+
+The number of chunks to create for each chunk type is specified on the command
+line when an \ampi{} program is run. Appendix B explains how \ampi{} programs
+are run, and how to specify the number of chunks (\verb|+vp| option). In the
+above case, suppose one wants to create 128 chunks of Solids and 64 chunks of
+Fluids on 32 physical processors, one would specify those with multiple
+\verb|+vp| options on the command line as:
+
+\begin{alltt}
+> charmrun gen1.x +p 32 +vp 128 +vp 64
+\end{alltt}
+
+This will ensure that multiple chunk types representing different complete
+applications can co-exist within the same executable. They can also continue to
+communicate among their own chunk-types using the same \ampi{} function calls
+to send and receive with communicator argument as \texttt{AMPI\_COMM\_WORLD}.
+But this would be completely useless if these individual applications cannot
+communicate with each other, which is essential for building efficient coupled
+codes.  For this purpose, we have extended the \ampi{} functionality to allow
+multiple ``\texttt{COMM\_WORLD}s''; one for each application. These \emph{world
+communicators} form a ``communicator universe'': an array of communicators
+aptly called \emph{AMPI\_COMM\_UNIVERSE}. This array of communicators in
+indexed $1\cdots\texttt{AMPI\_MAX\_COMM}$. In the current implementation,
+\texttt{AMPI\_MAX\_COMM} is 8, that is, maximum of 8 applications can co-exist
+within the same executable.
+
+The order of these \texttt{COMM\_WORLD}s within \texttt{AMPI\_COMM\_UNIVERSE}
+is determined by the order in which individual applications are registered in
+\texttt{AMPI\_Setup}.
+
+Thus, in the above example, the communicator for the Solids module would be
+\texttt{AMPI\_COMM\_UNIVERSE(1)} and communicator for Fluids module would be
+\texttt{AMPI\_COMM\_UNIVERSE(2)}.
+
+Now any chunk within one application can communicate with any chunk in the
+other application using the familiar send or receive \ampi{} calls by
+specifying the appropriate communicator and the chunk number within that
+communicator in the call. For example if a Solids chunk number 36 wants to send
+data to chunk number 47 within the Fluids module, it calls:
+
+\begin{alltt}
+INTEGER , PARAMETER :: Fluids_Comm = 2
+CALL AMPI_Send(InitialTime, 1, AMPI_Double_Precision, tag, &
+        \emph{47, AMPI_Comm_Universe(Fluids_Comm)}, ierr)
+\end{alltt}
+
+The Fluids chunk has to issue a corresponding receive call to receive this
+data:
+
+\begin{alltt}
+INTEGER , PARAMETER :: Solids_Comm = 1
+CALL AMPI_Recv(InitialTime, 1, AMPI_Double_Precision, tag, &
+        \emph{36, AMPI_Comm_Universe(Solids_Comm)}, stat, ierr)
+\end{alltt}
+
+\subsection{Compiling AMPI Programs}
+
+\charmpp{} provides a cross-platform compile-and-link script called \charmc{}
+to compile C, \CC{}, Fortran, \charmpp{} and \ampi{} programs.  This script
+resides in the \texttt{bin} subdirectory in the \charmpp{} installation
+directory. The main purpose of this script is to deal with the differences of
+various compiler names and command-line options across various machines on
+which \charmpp{} runs. While, \charmc{} handles C and \CC{} compiler
+differences most of the time, the support for Fortran 90 is new, and may have
+bugs. But \charmpp{} developers are aware of this problem and are working to
+fix them. Even in its alpha stage of Fortran 90 support, \charmc{} still
+handles many of the compiler differences across many machines, and it is
+recommended that \charmc{} be used to compile and linking \ampi{} programs. One
+major advantage of using \charmc{} is that one does not have to specify which
+libraries are to be linked for ensuring that \CC{} and Fortran 90 codes are
+linked correctly together. Appropriate libraries required for linking such
+modules together are known to \charmc{} for various machines.
+
+In spite of the platform-neutral syntax of \charmc{}, one may have to specify
+some platform-specific options for compiling and building \ampi{} codes.
+Fortunately, if \charmc{} does not recognize any particular options on its
+command line, it promptly passes it to all the individual compilers and linkers
+it invokes to compile the program.
+
+Currently, \ampi{} is tested to run correctly on Origin 2000, Sun (Solaris 5.7)
+workstation clusters, and Intel Linux clusters. Testing for IBM SP and Intel
+Paragon (ASCI Red) is in progress.
+
+\appendix
+
+\section{Installing AMPI}
+
+\ampi{} is included in the source distribution of \charmpp{}. \charmpp{} is
+publicly distributed from the website \verb+http://charm.cs.uiuc.edu/+.  As of
+today, the stable binary distribution of \charmpp{} available from the above
+website is version 5.0. \ampi{} is a recent addition to \charmpp{}, and is NOT
+included in the binary version. Even the new release of \charmpp{} in the near
+future (version 5.4) is not expected to contain \ampi{} in its binary
+distribution. There are several reasons for this. The most important being that
+the threads implementation required for executing migratable threaded programs
+(such as \ampi{} programs) is not the default threads implementation in
+\charmpp{} (the default is non-migratable threads that are very lightweight.)
+In order to install and use \ampi{}, one thus needs to download the publicly
+available source code of \charmpp{} and install it oneself. The source
+distributed in the \verb+src.tar.gz+ file on the download site will suffice.
+However, since \ampi{} is under active development, and bug fixes,
+optimizations and feature additions are being done frequently, it is your best
+bet to use the source control system (CVS\footnote{See
+\texttt{http://www.cvshome.org/} for more information on CVS.}) used by the
+Parallel Programming Laboratory (PPL) to download the latest copy of \charmpp{}
+source code.
+
+To get the latest sources from PPL, issue the following commands from the shell
+prompt (assuming C shell or tcsh):
+
+\begin{alltt}
+> setenv CVSROOT :pserver:checkout@thrift.cs.uiuc.edu:/expand6/cvsroot
+> cvs login
+(press ENTER when prompted for password)
+> cvs co -P charm
+\end{alltt}
+
+This will connect to the source control server \verb+thrift.cs.uiuc.edu+ and
+will download the latest version of \charmpp{} and \ampi{} into a directory
+called \texttt{charm}. Now one has to build \charmpp{} and \ampi{} from source.
+
+The build script for \charmpp{} is called \texttt{build}. The syntax for this
+script is:
+
+\begin{alltt}
+> build <target> <version> <opts>
+\end{alltt}
+
+For building \ampi{} (which also includes building \charmpp{} and other
+libraries needed by \ampi{}), specify \verb+<target>+ to be \verb+AMPI+. And
+\verb+<opts>+ are command line options passed to the \verb+charmc+ compile
+script.  Common compile time options such as \texttt{-g, -O, -Ipath, -Lpath,
+-llib} are accepted. In order to build \ampi{}, one needs to specify the
+following options:
+
+\begin{alltt}
+-O -DCMK_OPTIMIZE=1 -DCMK_THREADS_USE_ISOMALLOC=1
+\end{alltt}
+
+\verb+<version>+ depends on the machine, operating system, and the underlying
+communication library one wants to use for running \ampi{} programs. Your
+choice is determined by the following options.
+
+\begin{enumerate}
+
+\item The way a parallel program written in \ampi{} will communicate:
+
+\begin{itemize}
+
+\item ``net-'' \ampi{} communicates using the regular TCP/IP stack
+(UDP packets), which works everywhere but is fairly slow.  Use this
+option for networks of workstations, clusters, or single-machine 
+development and testing.
+
+\item ``mpi-'' Charm++ communicates using MPI calls.  Use this for
+machines with a good MPI implementation (such as the Origin 2000).
+
+\item ``exemplar'', ``ncube-2'', ``paragon-red'', ``sp3'', and ``t3e'' \ampi{} 
+communicates using direct calls to the machine's communication primitives.
+
+\item ``sim-'' and ``uth-'' are not actively maintained.  These are
+single-processor versions: ``uth-'' simulates processors as user-level
+threads; ``sim-'' switches between processors and counts communications.
+
+\end{itemize}
+
+\item  Your operating system and platform:
+
+\begin{itemize}
+\item ``linux''   Linux 
+\item ``win32''   MS Windows NT/98/2k (and MS Visual C++ compiler)
+\item ``cygwin''  MS Windows with Cygnus' Cygwin Unix layer
+\item ``irix''    SGI IRIX
+\item ``origin''  SGI Origin 2000 IRIX
+\item ``sol''     Solaris
+\item ``sun''     SunOS
+\item ``rs6k''    IBM R/S 6000 A/IX 
+\item ``sp''      IBM SP A/IX
+\item ``hp''      Hewlett-Packard HP-UX
+\item ``axp''     DEC Alpha DECUNIX
+\end{itemize}
+
+\item Your compiler and other options.  \ampi{} normally picks an
+appropriate compiler for the system, but you may select another
+compiler:
+
+\begin{itemize}
+\item ``-cc''      The OEM C/C++ compiler.  When given, this
+will override the choice of the GNU C/C++ compiler.
+\item ``-kcc''     Kuck \& Associates C++ compiler.
+\item ``-acc''     Uses HP's aCC instead of CC.
+\end{itemize}
+
+Some operating systems have other options, such as:
+
+\begin{itemize}
+\item ``-x86''     For Solaris, use PC hardware (instead of Sun).
+\item ``-axp''     For Linux, use Alpha hardware (instead of PC).
+\item ``-64''      For IRIX, use -64 instead of -32. 
+\end{itemize}
+
+You may also choose to enable direct SMP support with a ``-smp''
+version, which may result in more efficient communication in
+a cluster-of-SMPs.  A ``-smp'' version will communicate using
+shared memory within a machine; but message passing across machines.
+``-smp'' is currently only available with ``net-'' versions.
+Because of locking, ``-smp'' may slightly impact non-SMP performance.
+
+\end{enumerate}
+
+Your \ampi{} \verb+<version>+ is made by concatenating all three options, e.g.:
+
+\begin{itemize}
+\item ``net-linux''     \ampi{} for a network of Linux workstations, compiled
+using g++.
+\item ``net-linux-kcc'' \ampi{} for a network of Linux workstations, compiled
+using Kuck \& Associates C++ compiler.
+\item ``net-linux-smp'' \ampi{} for a network of Linux SMP workstations,
+compiled using g++.
+\item ``net-sol-cc''    \ampi{} for a network of Sun workstations, 
+compiled using Sun CC.
+\item ``mpi-origin''    \ampi{} for SGI Origin 2000, compiled using SGI CC.
+\end{itemize}
+
+\section{Running AMPI Programs}
+
+\charmpp{} distribution contains a script called \texttt{charmrun} that makes
+the job of running \ampi{} programs portable and easier across all parallel
+machines supported by \charmpp{}. \texttt{charmrun} is copied to a directory
+where an \ampi{} prgram is built using \charmc{}. It takes a command line
+parameter specifying number of processors, and the name of the program followed
+by \ampi{} options (such as number of chunks to create, and the stack size of
+every chunk) and the program arguments. A typical invocation of \ampi{} program
+\texttt{pgm} with \texttt{charmrun} is:
+
+\begin{alltt}
+> charmrun +p 16 pgm +vp 32 +stacksize 3276800
+\end{alltt}
+
+Here, the \ampi{} program \texttt{pgm} is run on 16 physical processors with
+32 chunks (which will be mapped 2 per processor initially), where each
+user-level thread associated with a chunk has the stack size of 3276800 bytes.
+
+Running \ampi{} program over a network of workstations requires an additional
+file that specifies the configuration of the network (such as which machines
+are on the network, which shell to use for executing jobs etc.) The
+\texttt{charmrun} command-line remains the same.  \texttt{charmrun} looks for
+thhis file with name \texttt{nodelist} in the directory from where the job is
+run. If it is not found in the current directory, then it tries to look for the
+file with name \texttt{.nodelist} in user's home directory. The format of this
+file allows you to define groups of machines, giving each group a name.  Each
+line of the nodes file is a command.  The most important command is:
+
+\begin{alltt}
+host <hostname> <qualifiers>
+\end{alltt}
+
+which specifies a host.  The other commands are qualifiers: they modify
+the properties of all hosts that follow them.  The qualifiers are:
+
+
+\begin{tabbing}
+{\tt group <groupname>}~~~\= - subsequent hosts are members of specified group\\
+{\tt login <login>  }     \> - subsequent hosts use the specified login\\
+{\tt shell <shell>  }     \> - subsequent hosts use the specified remote 
+shell\\
+{\tt setup <cmd>  }       \> - subsequent hosts should execute cmd\\
+{\tt home <dir> }         \> - subsequent hosts should find programs under dir\\
+{\tt cpus <n>}            \> - subsequent hosts should use N light-weight processes\\
+{\tt speed <s>}           \> - subsequent hosts have relative speed rating\\
+{\tt ext <extn>}          \> - subsequent hosts should append extn to the pgm name\\
+\end{tabbing}
+
+{\bf Note:}
+By default, charmrun uses a remote shell ``rsh'' to spawn node processes
+on the remote hosts. The {\tt shell} qualifier can be used to override
+it with say, ``ssh''. One can set the {\tt CONV\_RSH} environment variable
+or use charmrun option {\tt ++remote-shell} to override the default remote 
+shell for all hosts with unspecified {\tt shell} qualifier.
+
+All qualifiers accept ``*'' as an argument, this resets the modifier to
+its default value.  Note that currently, the passwd, cpus, and speed
+factors are ignored.  Inline qualifiers are also allowed:
+
+\begin{alltt}
+host copernicus.cse.uiuc.edu ++cpus 4 ++shell ssh
+\end{alltt}
+
+Except for ``group'', every other qualifier can be inlined, with the
+restriction that if the ``setup'' qualifier is inlined, it should be
+the last qualifier on the ``host'' or ``group'' statement line.
+
+Here is a simple nodes file:
+
+\begin{alltt}
+        group kale-sun ++cpus 1
+          host charm.cs.uiuc.edu ++shell ssh
+          host dp.cs.uiuc.edu
+          host grace.cs.uiuc.edu
+          host dagger.cs.uiuc.edu
+        group kale-sol
+          host beauty.cs.uiuc.edu ++cpus 2
+        group main
+          host localhost
+\end{alltt}
+
+This defines three groups of machines: group kale-sun, group kale-sol,
+and group main.  The ++nodegroup option is used to specify which group
+of machines to use.  Note that there is wraparound: if you specify
+more nodes than there are hosts in the group, it will reuse
+hosts. Thus,
+
+\begin{alltt}
+        charmrun pgm ++nodegroup kale-sun +p6
+\end{alltt}
+
+uses hosts (charm, dp, grace, dagger, charm, dp) respectively as
+nodes (0, 1, 2, 3, 4, 5).
+
+If you don't specify a ++nodegroup, the default is ++nodegroup main.
+Thus, if one specifies
+
+\begin{alltt}
+        charmrun pgm +p4
+\end{alltt}
+
+it will use ``localhost'' four times.  ``localhost'' is a Unix
+trick; it always find a name for whatever machine you're on.
+
+The user is required to set up remote login permissions on all nodes using the
+``.rhosts'' file in the home directory if ``rsh'' is used for remote login into
+the hosts. If ``ssh'' is used, the user will have to setup password-less login
+to remote hosts either using ``.shosts'' file, or using RSA authentication
+based on a key-pair and adding public keys to ``.ssh/authorized\_keys'' file.
+See ``ssh'' documentation for more information.
+
 \end{document}
