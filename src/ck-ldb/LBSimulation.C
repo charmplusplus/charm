@@ -58,22 +58,26 @@ void LBInfo::clear()
 void LBInfo::print()
 {
   int i;
-  double minLoad, maxLoad, sum, average;
+  double minLoad, maxLoad, maxObjLoad, maxComLoad, sum, average;
   sum = .0;
-  sum = minLoad = maxLoad = objLoads[0]+comLoads[0];
+  sum = minLoad = maxLoad = peLoads[0];
+  maxObjLoad = objLoads[0];
+  maxComLoad = comLoads[0];
   for (i = 1; i < numPes; i++) {
     double load = peLoads[i];
     if (load>maxLoad) maxLoad=load;
     else if (peLoads[i]<minLoad) minLoad=load;
+    if (objLoads[i]>maxObjLoad) maxObjLoad = objLoads[i];
+    if (comLoads[i]>maxComLoad) maxComLoad = comLoads[i];
     sum += load;
   }
   average = sum/numPes;
   CmiPrintf("The processor loads are: \n");
   CmiPrintf("PE   (Total Load) (Obj Load) (Comm Load) (BG Load)\n");
   for(i = 0; i < numPes; i++) {
-    CmiPrintf("%-4d %10f %10f %10f %10f", i, peLoads[i], objLoads[i], comLoads[i], bgLoads[i]);
-    CmiPrintf("\n");
+    CmiPrintf("%-4d %10f %10f %10f %10f\n", i, peLoads[i], objLoads[i], comLoads[i], bgLoads[i]);
   }
+  CmiPrintf("max: %10f %10f %10f\n", maxLoad, maxObjLoad, maxComLoad);
   CmiPrintf("Min : %f	Max : %f	Average: %f\n", minLoad, maxLoad, average);
   CmiPrintf("MinObj : %f	MaxObj : %f\n", minObjLoad, maxObjLoad, average);
 }
