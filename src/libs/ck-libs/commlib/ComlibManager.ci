@@ -36,6 +36,7 @@ module commlib {
   PUPable DirectMulticastStrategy;
   PUPable EachToManyMulticastStrategy;	
   PUPable RingMulticastStrategy;	
+  PUPable PipeBroadcastStrategy;
 
   //PUPable ComlibArrayListener;
 };

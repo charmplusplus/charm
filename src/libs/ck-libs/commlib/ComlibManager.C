@@ -9,6 +9,7 @@
 #include "NodeMulticast.h"
 #include "MsgPacker.h"
 #include "RingMulticastStrategy.h"
+#include "PipeBroadcastStrategy.h"
 
 CpvDeclare(int, RecvmsgHandle);
 CpvDeclare(int, RecvCombinedShortMsgHdlrIdx);

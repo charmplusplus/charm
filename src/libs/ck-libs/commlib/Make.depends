@@ -12,6 +12,7 @@ ComlibManager.o: \
 	NodeMulticast.h \
 	MsgPacker.h \
 	RingMulticastStrategy.h \
+	PipeBroadcastStrategy.h \
 	commlib.def.h
 	$(CHARMC) -c -o ComlibManager.o ComlibManager.C
 
@@ -80,4 +81,12 @@ RingMulticastStrategy.o: \
 	ComlibManager.h \
 	commlib.decl.h
 	$(CHARMC) -c -o RingMulticastStrategy.o RingMulticastStrategy.C
+
+PipeBroadcastStrategy.o: \
+        PipeBroadcastStrategy.C \
+        PipeBroadcastStrategy.h \
+        DirectMulticastStrategy.h \
+        ComlibManager.h \
+        commlib.decl.h
+	$(CHARMC) -c -o PipeBroadcastStrategy.o PipeBroadcastStrategy.C
 

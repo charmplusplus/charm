@@ -11,7 +11,8 @@ LIB = libmodulecommlib.a
 
 STRATEGY_OBJS = EachToManyStrategy.o MPIStrategy.o StreamingStrategy.o \
 		DummyStrategy.o NodeMulticast.o EachToManyMulticastStrategy.o \
-		MsgPacker.o DirectMulticastStrategy.o RingMulticastStrategy.o
+		MsgPacker.o DirectMulticastStrategy.o RingMulticastStrategy.o \
+		PipeBroadcastStrategy.o
 
 CONVERSE_COM_OBJS = $(COMMLIBDIR)/commlib.o $(COMMLIBDIR)/gridrouter.o \
 	$(COMMLIBDIR)/de.o $(COMMLIBDIR)/treerouter.o $(COMMLIBDIR)/petable.o\
@@ -43,6 +44,8 @@ $(LIB): $(OBJS) $(STRATEGY_OBJS) $(CONVERSE_COM_OBJS)
 	cp  NodeMulticast.h $(CDIR)/include
 	rm -f $(CDIR)/include/StreamingStrategy.h
 	cp  StreamingStrategy.h $(CDIR)/include
+	rm -f $(CDIR)/include/PipeBroadcastStrategy.h
+	cp  PipeBroadcastStrategy.h $(CDIR)/include
 	rm -f $(CDIR)/include/commlib.decl.h
 	cp  commlib.decl.h $(CDIR)/include
 	rm -f $(CDIR)/include/commlib.def.h
@@ -66,9 +69,10 @@ clean:
 	$(CDIR)/include/DummyStrategy.h      \
 	$(CDIR)/include/NodeMulticast.h      \
 	$(CDIR)/include/StreamingStrategy.h  \
+	$(CDIR)/include/PipeBroadcastStrategy.h \
 	$(CDIR)/include/commlib.decl.h       \
 	$(CDIR)/include/commlib.def.h        \
-        $(CDIR)/lib/libcomm.a                \
+	$(CDIR)/lib/libcomm.a                \
 	$(CDIR)/lib/libmodulecomlib.a
 
 depends:  $(CIFILES)

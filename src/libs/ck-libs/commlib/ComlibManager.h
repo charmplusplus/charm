@@ -13,6 +13,7 @@
 #define USE_DIRECT 4          //A dummy strategy that directly forwards 
                               //messages without any processing.
 #define USE_GRID 5            //Virtual topology is a 3d grid
+#define USE_LINEAR 6          //Virtual topology is a linear array
 
 #define CHARM_MPI 0 
 #define MAX_NSTRAT 1024
