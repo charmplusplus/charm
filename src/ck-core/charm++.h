@@ -54,15 +54,127 @@ class CMessage_CkMessage {
 	static int __idx;
 };
 
+class CkArray;
+
+/*******************************************************
+Array Index class.  An array index is just a hash key-- 
+a run of integers used to look up an object in a hash table.
+*/
+
+#include "ckhashtable.h"
+
+#ifndef CK_ARRAYINDEX_MAXLEN 
+#define CK_ARRAYINDEX_MAXLEN 3 /*Max. # of integers in an array index*/
+#endif
+
+class CkArrayIndex
+{
+public:
+	//Length of index in *integers*
+	int nInts;
+	
+	//Index data immediately follows...
+	
+	int *data(void) {return (&nInts)+1;}
+	const int *data(void) const {return (&nInts)+1;}
+	
+	void pup(PUP::er &p);
+
+    //These routines allow CkArrayIndex to be used in
+    //  a CkHashtableT
+	CkHashCode hash(void) const;
+	static CkHashCode staticHash(const void *a,size_t);
+	int compare(const CkArrayIndex &ind) const;
+	static int staticCompare(const void *a,const void *b,size_t);
+};
+
+//This class is as large as any CkArrayIndex
+class CkArrayIndexMax : public CkArrayIndex {
+	struct {
+		int data[CK_ARRAYINDEX_MAXLEN];
+	} index;
+	void copyFrom(const CkArrayIndex &that)
+	{
+		nInts=that.nInts;
+		index=((const CkArrayIndexMax *)&that)->index;
+		//for (int i=0;i<nInts;i++) index[i]=that.data()[i];
+	}
+public:
+	CkArrayIndexMax(void) { }
+	CkArrayIndexMax(const CkArrayIndex &that) 
+		{copyFrom(that);}
+	CkArrayIndexMax &operator=(const CkArrayIndex &that) 
+		{copyFrom(that); return *this;}
+        void print() { CmiPrintf("%d: %d %d %d\n", nInts,index.data[0], index.data[1], index.data[2]); }
+};
+
+//A layout-compatible version of a CkArrayIndexMax.
+//  Needed, e.g., for use in unions where a constructor is forbidden.
+class CkArrayIndexStruct {
+public:
+	int nInts;
+	int index[CK_ARRAYINDEX_MAXLEN];
+	CkArrayIndexMax &asMax(void) 
+		{return *(CkArrayIndexMax *)this;}
+	const CkArrayIndexMax &asMax(void) const
+		{return *(const CkArrayIndexMax *)this;}
+};
+
+class CkArrayID {
+	CkGroupID _gid;
+public:
+	CkArrayID() : _gid() { }
+	CkArrayID(CkGroupID g) :_gid(g) {}
+	inline void setZero(void) {_gid.setZero();}
+	inline int isZero(void) const {return _gid.isZero();}
+	operator CkGroupID() const {return _gid;}
+	CkArray *ckLocalBranch(void) const
+		{ return (CkArray *)CkLocalBranch(_gid); }
+	static CkArray *CkLocalBranch(CkArrayID id) 
+		{ return (CkArray *)::CkLocalBranch(id); }
+	void pup(PUP::er &p) {p | _gid; }
+};
+PUPmarshall(CkArrayID)
+
+class CkSectionCookie {
+public:
+  CkArrayID aid;
+  int pe;
+  void *val;    // point to mCastCookie
+  int redNo;
+public:
+  CkSectionCookie(): pe(-1), val(NULL), redNo(0) {}
+  CkSectionCookie(void *p): val(p), redNo(0) { pe = CkMyPe();};
+  CkSectionCookie(int e, void *p, int r):  pe(e), val(p), redNo(r) {}
+};
+
+class CkSectionID {
+public:
+  CkSectionCookie _cookie;
+  CkArrayIndexMax *_elems;
+  int _nElems;
+public:
+  CkSectionID(): _elems(NULL), _nElems(0) {}
+  CkSectionID(const CkSectionID &sid);
+  CkSectionID(const CkArrayID &aid, const CkArrayIndexMax *elems, const int nElems);
+  void operator=(const CkSectionID &);
+  ~CkSectionID();
+  void pup(PUP::er &p);
+};
+
+#include "ckcallback.h"
+
 //Used by parameter marshalling:
 #include "CkMarshall.decl.h"
+//This is the message type marshalled parameters get packed into:
 class CkMarshallMsg : public CMessage_CkMarshallMsg {
 public: 
 	char *msgBuf;
 };
 
 void CkPupMessage(PUP::er &p,void **atMsg,int fast_and_dirty=1);
-//For passing a Charm++ message via parameter marshalling
+
+//This is for passing a Charm++ message via parameter marshalling
 class CkMarshalledMessage {
 	void *msg;
 	//Don't use these: only pass by reference
@@ -159,6 +271,8 @@ public:
 	CHARM_INPLACE_NEW
 };
 
+
+/**************************** Proxies **************************/
 
 /*Message delegation support, where you send a message via
 a proxy normally, but the message ends up routed via a 
@@ -288,6 +402,7 @@ class CProxy_Group : public CProxy {
     	return ret; 
     }
     CkGroupID ckGetGroupID(void) const {return _ck_gid;}
+    operator CkGroupID () const {return ckGetGroupID();}
     void ckSetGroupID(CkGroupID g) {_ck_gid=g;}
     void pup(PUP::er &p) {
     	CProxy::pup(p);
@@ -299,10 +414,11 @@ PUPmarshall(CProxy_Group)
 #define CK_DISAMBIG_GROUP(super) \
 	CK_DISAMBIG_CPROXY(super) \
 	inline void ckCheck(void) const {super::ckCheck();} \
-	CkChareID ckGetChareID(void) const\
-    	   {return super::ckGetChareID();} \
-	CkGroupID ckGetGroupID(void) const\
-    	   {return super::ckGetGroupID();} \
+	CkChareID ckGetChareID(void) const \
+	   {return super::ckGetChareID();} \
+	CkGroupID ckGetGroupID(void) const \
+	   {return super::ckGetGroupID();} \
+	operator CkGroupID () const { return ckGetGroupID(); } \
 	void setReductionClient(CkReductionClientFn client,void *param=NULL) \
 	   {super::setReductionClient(client,param);}
 
@@ -353,52 +469,6 @@ typedef CProxy_Group CProxy_IrrGroup;
 typedef CProxyElement_Group CProxyElement_NodeGroup;
 typedef CProxyElement_Group CProxyElement_IrrGroup;
 typedef CkGroupID CkNodeGroupID;
-
-
-class CkArray;
-class CkArrayIndexMax;
-
-class CkArrayID {
-	CkGroupID _gid;
-public:
-	CkArrayID() : _gid() { }
-	CkArrayID(CkGroupID g) :_gid(g) {}
-	inline void setZero(void) {_gid.setZero();}
-	inline int isZero(void) const {return _gid.isZero();}
-	operator CkGroupID() const {return _gid;}
-	CkArray *ckLocalBranch(void) const
-		{ return (CkArray *)CkLocalBranch(_gid); }
-	static CkArray *CkLocalBranch(CkArrayID id) 
-		{ return (CkArray *)::CkLocalBranch(id); }
-	void pup(PUP::er &p) {p | _gid; }
-};
-PUPmarshall(CkArrayID)
-
-class CkSectionCookie {
-public:
-  CkArrayID aid;
-  int pe;
-  void *val;    // point to mCastCookie
-  int redNo;
-public:
-  CkSectionCookie(): pe(-1), val(NULL), redNo(0) {}
-  CkSectionCookie(void *p): val(p), redNo(0) { pe = CkMyPe();};
-  CkSectionCookie(int e, void *p, int r):  pe(e), val(p), redNo(r) {}
-};
-
-class CkSectionID {
-public:
-  CkSectionCookie _cookie;
-  CkArrayIndexMax *_elems;
-  int _nElems;
-public:
-  CkSectionID(): _elems(NULL), _nElems(0) {}
-  CkSectionID(const CkSectionID &sid);
-  CkSectionID(const CkArrayID &aid, const CkArrayIndexMax *elems, const int nElems);
-  void operator=(const CkSectionID &);
-  ~CkSectionID();
-  void pup(PUP::er &p);
-};
 
 //(CProxy_ArrayBase is defined in ckarray.h)
 
