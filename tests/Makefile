@@ -5,6 +5,11 @@ test:
 		(cd $$d; $(MAKE) test OPTS='$(OPTS)' || exit 1) || exit 1; \
 	done
 
+bgtest:
+	for d in charm++ ampi fem; do \
+		(cd $$d; $(MAKE) test OPTS='$(OPTS)' || exit 1) || exit 1; \
+	done
+
 test-converse:
 	cd converse; $(MAKE) test OPTS='$(OPTS)'
 

@@ -12,3 +12,6 @@ clean:
 test: pgm
 	./charmrun ./pgm +p2 +vp4
 
+bgtest: pgm
+	./charmrun ./pgm +p2 +vp4 +x2 +y1 +z1
+

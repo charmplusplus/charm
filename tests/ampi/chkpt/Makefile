@@ -10,6 +10,11 @@ test: clean ampi
 	./charmrun +p3 ./hello +vp8 +restart log
 	./charmrun +p2 ./hello +vp8 +restart log
 
+bgtest: clean ampi
+	./charmrun +p3 ./hello +vp8 +x3 +y1 +z1
+	./charmrun +p3 ./hello +vp8 +restart log +x3 +y1 +z1
+	./charmrun +p2 ./hello +vp8 +restart log +x2 +y1 +z1
+
 clean:
 	rm -f *.o *.mod moduleinit.C hello *~ conv-host charmrun
 	rm -rf log
