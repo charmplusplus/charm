@@ -472,8 +472,6 @@ static void init_ranges(char **argv)
   /*Largest value a signed int can hold*/
   memRange_t intMax=((memRange_t)1)<<(sizeof(int)*8-1)-1;
 
-  if (isomallocStart!=NULL) return; /*Must already be initialized.*/
-
   /*Round slot size up to nearest page size*/
   slotsize=16*1024;
   slotsize=(slotsize+CMK_MEMORY_PAGESIZE-1) & ~(CMK_MEMORY_PAGESIZE-1);
@@ -482,6 +480,7 @@ static void init_ranges(char **argv)
 #endif
 
   /* Find the largest unused region of virtual address space */
+  if (isomallocStart==NULL)
   {
     char *staticData =(char *) __static_data_loc();
     char *code = (char *)&init_ranges;
