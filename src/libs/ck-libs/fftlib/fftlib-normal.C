@@ -178,4 +178,41 @@ NormalSlabArray::~NormalSlabArray()
     for (i = 0; i < MAX_FFTS; i++)
 	delete fftinfos[i];
 }
+
+
+void NormalSlabArray::pup(PUP::er &p)
+{
+    int i;
+    ArrayElement1D::pup(p);
+
+    for (i = 0; i < MAX_FFTS; i++) {
+	int val = fftinfos[i]? 1:0;
+	p | val; 
+	if (val) {                // if this entry is not NULL
+	    if (p.isUnpacking()){
+		fftinfos[i] = new NormalFFTinfo;
+	    }  
+	    fftinfos[i]->pup(p);
+	    
+            if (p.isUnpacking()){
+	    if (fftinfos[i]->isSrcSlab) {
+		fwd2DPlan = fftw2d_create_plan(fftinfos[i]->srcSize[0],
+					       fftinfos[i]->srcSize[1], FFTW_FORWARD, FFTW_USE_WISDOM|FFTW_MEASURE|FFTW_IN_PLACE);
+		bwd1DPlan = fftw_create_plan(fftinfos[i]->srcSize[1],
+					     FFTW_BACKWARD, FFTW_USE_WISDOM|FFTW_MEASURE|FFTW_IN_PLACE);
+	    }
+	    else {
+		bwd2DPlan = fftw2d_create_plan(fftinfos[i]->destSize[0],
+					       fftinfos[i]->destSize[1], FFTW_BACKWARD, FFTW_USE_WISDOM|FFTW_MEASURE|FFTW_IN_PLACE);
+		fwd1DPlan = fftw_create_plan(fftinfos[i]->destSize[1],
+					     FFTW_FORWARD, FFTW_USE_WISDOM|FFTW_MEASURE|FFTW_IN_PLACE);
+	    }
+	    }	    
+	}
+    }
+    
+    p(counts, MAX_FFTS);
+}
+
+
 #include "fftlib.def.h"
