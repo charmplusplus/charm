@@ -589,6 +589,7 @@ void TraceSummary::endComputation(void)
   if (msgNum==0) {
 //CmiPrintf("Add at last: %d pe:%d time:%f msg:%d\n", index, CkMyPe(), bin, msgNum);
      _logPool->add(bin, CkMyPe());
+     bin = 0.0;
      msgNum ++;
 
      binStart  += CkpvAccess(binSize);
