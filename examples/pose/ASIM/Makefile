@@ -52,6 +52,10 @@ $(PGM):	$(SIM_OBJECTS)
 	$(CHARMC) $(SIM_OBJECTS) $(OTHER) $(LIBS) -o $(PGM) \
 	-lpose -language charm++
 
+$(PGM).alt:	$(SIM_OBJECTS) 
+	$(CHARMC) $(SIM_OBJECTS) $(OTHER) $(LIBS) -o $(PGM).alt \
+	-lpose -language charm++
+
 $(PGM).comm:	$(SIM_OBJECTS) 
 	$(CHARMC) $(SIM_OBJECTS) $(OTHER) $(LIBS) -o $(PGM).comm \
 	-lpose -language charm++ -module commlib

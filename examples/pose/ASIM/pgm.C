@@ -85,7 +85,7 @@ main::main(CkArgMsg *m)
   POSE_init();
   //POSE_useQD();
   POSE_useET(atoi(m->argv[7]));
-  POSE_useID();
+  //  POSE_useID();
 
   // create all the workers
   WorkerData *wd;
