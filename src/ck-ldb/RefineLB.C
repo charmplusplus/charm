@@ -93,33 +93,6 @@ void  RefineLB::deAssign(computeInfo *c, processorInfo *p)
    p->load = p->computeLoad + p->backgroundLoad;
 }
 
-void RefineLB::computeAverage()
-{
-   int i;
-   double total = 0;
-   for (i=0; i<numComputes; i++)
-      total += computes[i].load;
-
-   for (i=0; i<P; i++)
-      total += processors[i].backgroundLoad;
-
-   averageLoad = total/P;
-}
-
-double RefineLB::computeMax()
-{
-   int i;
-   double max = processors[0].load;
-   for (i=1; i<P; i++)
-   {
-      if (processors[i].load > max)
-         max = processors[i].load;
-   }
-   return max;
-}
-*/
-
-/*
 int RefineLB::refine()
 {
    int finish = 1;
