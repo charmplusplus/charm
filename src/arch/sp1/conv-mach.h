@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.10  1995-10-31 19:52:44  jyelon
+ * Revision 2.11  1995-10-31 20:38:39  jyelon
+ * Added CMK_USLEEP_WHEN_PROCESSOR_IDLE
+ *
+ * Revision 2.10  1995/10/31  19:52:44  jyelon
  * Added 'CMK_THREADS_USE_ALLOCA_WITH_PRAGMA'
  *
  * Revision 2.9  1995/10/20  20:26:45  sanjeev
@@ -91,6 +94,9 @@
 /* #define CMK_THREADS_USE_ALLOCA_WITH_HEADER_FILE */
 /* #define CMK_THREADS_USE_ALLOCA */
 #define CMK_THREADS_USE_ALLOCA_WITH_PRAGMA
+
+/* #define CMK_USLEEP_WHEN_PROCESSOR_IDLE */
+#define CMK_BUSYWAIT_WHEN_PROCESSOR_IDLE
 
 #define CMK_SIZE_T unsigned int
 

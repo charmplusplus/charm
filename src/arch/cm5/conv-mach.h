@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.11  1995-10-23 22:37:48  jyelon
+ * Revision 2.12  1995-10-31 20:38:39  jyelon
+ * Added CMK_USLEEP_WHEN_PROCESSOR_IDLE
+ *
+ * Revision 2.11  1995/10/23  22:37:48  jyelon
  * Enabled alloca-based threads.
  *
  * Revision 2.10  1995/10/20  20:26:45  sanjeev
@@ -93,6 +96,7 @@
 /* #define CMK_THREADS_USE_ALLOCA */
 /* #define CMK_THREADS_UNAVAILABLE */
 /* #define CMK_THREADS_USE_EATSTACK */
+/* #define CMK_THREADS_USE_ALLOCA_WITH_PRAGMA */
 #define CMK_THREADS_USE_ALLOCA_WITH_HEADER_FILE
 
 
@@ -127,6 +131,10 @@
 
 /* #define CMK_HAVE_WAITFLAGS_H */
 #define CMK_HAVE_SYS_WAIT_H
+
+/* #define CMK_USLEEP_WHEN_PROCESSOR_IDLE */
+#define CMK_BUSYWAIT_WHEN_PROCESSOR_IDLE
+
 
 #define CMK_SIZE_T long unsigned int
 

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.6  1995-10-25 20:00:43  jyelon
+ * Revision 1.7  1995-10-31 20:38:39  jyelon
+ * Added CMK_USLEEP_WHEN_PROCESSOR_IDLE
+ *
+ * Revision 1.6  1995/10/25  20:00:43  jyelon
  * *** empty log message ***
  *
  * Revision 1.5  1995/10/20  20:26:45  sanjeev
@@ -97,6 +100,7 @@
 /* #define CMK_THREADS_UNAVAILABLE */
 /* #define CMK_THREADS_USE_EATSTACK */
 /* #define CMK_THREADS_USE_ALLOCA_WITH_HEADER_FILE */
+/* #define CMK_THREADS_USE_ALLOCA_WITH_PRAGMA */
 #define CMK_THREADS_USE_ALLOCA
 
 
@@ -130,6 +134,9 @@
 
 #define CMK_HAVE_SYS_WAIT_H
 /* #define CMK_HAVE_WAITFLAGS_H */
+
+/* #define CMK_USLEEP_WHEN_PROCESSOR_IDLE */
+#define CMK_BUSYWAIT_WHEN_PROCESSOR_IDLE
 
 #define CMK_SIZE_T long unsigned int
 
