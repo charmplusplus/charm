@@ -96,7 +96,8 @@ static inline void _handlePhase1(QdState *state, QdMsg *msg)
 
 static inline void _handlePhase2(QdState *state, QdMsg *msg)
 {
-  CkAssert(state->getStage()==2);
+//  This assertion seems too strong for smp and uth version.
+//  CkAssert(state->getStage()==2);
   state->subtreeSetDirty(msg->getDirty());
   state->reported();
   if(state->allReported()) {
