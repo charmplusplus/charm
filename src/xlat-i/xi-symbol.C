@@ -2422,6 +2422,10 @@ void Entry::genCall(XStr& str, const XStr &preCall)
 {
   bool isArgcArgv=false;
   bool isMigMain=false;
+
+  if (param->isCkArgMsgPtr() && (!isConstructor() || !container->isMainChare()))
+    die("CkArgMsg can only be used in mainchare's constructor.\n");
+
   if (isConstructor() && container->isMainChare() && 
       (!param->isVoid()) && (!param->isCkArgMsgPtr())){
   	if(param->isCkMigMsgPtr()) isMigMain = true;
