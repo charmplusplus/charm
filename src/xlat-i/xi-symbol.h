@@ -26,7 +26,7 @@ class Construct : public Printable {
     virtual void genReg(XStr& str) = 0;
 };
 
-class ConstructList : public Construct, public Printable {
+class ConstructList : public Construct {
     Construct *construct;
     ConstructList *next;
   public:
@@ -116,7 +116,7 @@ class NamedType : public SimpleType {
     void genMsgProxyName(XStr& str) { str << msg_prefix() << name; }
 };
 
-class PtrType : public Type, public EnType {
+class PtrType : public EnType {
   private:
     Type *type;
     int numstars; // level of indirection
