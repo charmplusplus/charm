@@ -6,6 +6,7 @@ Orion Sky Lawlor, olawlor@acm.org, 10/28/2001
 #include "netfem.h"
 #include "netfem.decl.h"
 #include "charm-api.h"
+#include "pup_toNetwork4.h"
 #include "conv-ccs.h"
 #include <string.h>
 
@@ -34,10 +35,23 @@ public:
 class NetFEM_updatePackage : public NetFEM_update {
 	NetFEM_flavor flavor; //What to do with the data
 public:
-	NetFEM_updatePackage(int dim_,int ts_,int flavor_)
-		:NetFEM_update(dim_,ts_),flavor(flavor_) {}
+	NetFEM_updatePackage(int src_,int ts_,int dim_,int flavor_)
+		:NetFEM_update(src_,ts_,dim_),flavor(flavor_) {}
 
 	const NetFEM_flavor &getFlavor(void) const {return flavor;}
+	
+	/// Return a malloc'd buffer containing our data in (*len) bytes.
+	///  The buffer must be free'd when done.
+	void *pupMallocBuf(int *len) {
+		//Figure out how long our response will be
+		int respLen;
+		{PUP_toNetwork4_sizer p; pup(p); respLen=p.size();}
+		//Allocate a buffer and pack our response into it
+		void *respBuf=malloc(respLen);
+		{PUP_toNetwork4_pack p(respBuf); pup(p); }
+		*len=respLen;
+		return respBuf;
+	}
 };
 
 
@@ -62,13 +76,8 @@ public:
 	void getCurrent(char *request,CcsDelayedReply reply)
 	{
 		//HACK: ignore requested data (should grab timestep, source, etc.)
-
-		//Figure out how long our response will be
 		int respLen;
-		{PUP_toNetwork4_sizer p; cur->pup(p); respLen=p.size();}
-		//Allocate a buffer and pack our response into it
-		void *respBuf=malloc(respLen);
-		{PUP_toNetwork4_pack p(respBuf); cur->pup(p); }
+		void *respBuf=cur->pupMallocBuf(&respLen);
 		//Deliver the response
 		CcsSendDelayedReply(reply,respLen,respBuf);
 		free(respBuf);
@@ -131,7 +140,7 @@ CDECL NetFEM NetFEM_Begin(
 	//On one processor, this is our only chance to network!
 	if (CkNumPes()==1) CthYield();
 	//FIXME: actually use source
-	return (NetFEM)(new NetFEM_updatePackage(dim,timestep,flavor));
+	return (NetFEM)(new NetFEM_updatePackage(source,timestep,dim,flavor));
 }
 FDECL NetFEMF FTN_NAME(NETFEM_BEGIN,netfem_begin)(int *s,int *t,int *d,int *f)
 {
@@ -140,6 +149,28 @@ FDECL NetFEMF FTN_NAME(NETFEM_BEGIN,netfem_begin)(int *s,int *t,int *d,int *f)
 
 CDECL void NetFEM_End(NetFEM n) { /*Publish these updates*/
 	NETFEMAPI("NetFEM_End");
+	if (N->getFlavor().doWrite) 
+	{ /* Write data to disk, in file named "NetFEM/<timestep>/<vp>.dat" */
+		char dirName[256], fName[256];
+		const char *baseDir="NetFEM";
+		CmiMkdir(baseDir);
+		sprintf(dirName,"%s/%d",baseDir,N->getTimestep());
+		CmiMkdir(dirName);
+		sprintf(fName,"%s/%d.dat",dirName,N->getSource());
+		FILE *f=fopen(fName,"wb");
+		if (f!=NULL) {
+			int respLen;
+			void *respBuf=N->pupMallocBuf(&respLen);
+			if (respLen!=(int)fwrite(respBuf,1,respLen,f))
+				CkAbort("Error writing NetFEM output file!");
+			free(respBuf);
+			fclose(f);
+		}
+		else /*f==NULL*/ {
+			CkError("ERROR> Can't create NetFEM output file %s!\n",fName);
+			CkAbort("Can't create NetFEM output file!");
+		}
+	}
 	getState()->add(N);
 }
 FDECL void FTN_NAME(NETFEM_END,netfem_end)(NetFEMF nf) {
@@ -157,7 +188,7 @@ CDECL void NetFEM_Nodes_field(NetFEM n,int nNodes,
 {
 	NETFEMAPI("NetFEM_Nodes");
 	int d=N->getDim();
-	N->addNodes(new NetFEM_nodes(nNodes,NetFEM_item::format(d,distance),
+	N->addNodes(new NetFEM_nodes(nNodes,NetFEM_format(d,distance),
 		CkShiftPointer((double *)loc,init_offset),name));
 }
 
@@ -224,7 +255,7 @@ CDECL void NetFEM_Vector_field(NetFEM n,const void *start,
 	const char *name)
 {
 	NETFEMAPI("NetFEM_Vector_field");
-	NetFEM_item::format fmt(N->getDim(),distance);
+	NetFEM_format fmt(N->getDim(),distance);
 	N->getItem()->add(CkShiftPointer((double *)start,init_offset),fmt,name,true);
 }
 FDECL void FTN_NAME(NETFEM_VECTOR_FIELD,netfem_vector_field)
@@ -258,7 +289,7 @@ CDECL void NetFEM_Scalar_field(NetFEM n,const void *start,
 	const char *name)
 {
 	NETFEMAPI("NetFEM_Scalar_field");
-	NetFEM_item::format fmt(vec_len,distance);
+	NetFEM_format fmt(vec_len,distance);
 	N->getItem()->add(CkShiftPointer((double *)start,init_offset),fmt,name,false);
 }
 
