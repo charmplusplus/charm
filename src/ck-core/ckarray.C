@@ -105,10 +105,9 @@ Array1D::Array1D(ArrayCreateMessage *msg)
   myId.id = (int)thisgroup;
 
   LDCallbacks myCallbacks;
-  myCallbacks.migrate = reinterpret_cast<LDMigrateFn>(staticMigrate);
-  myCallbacks.setStats = reinterpret_cast<LDStatsFn>(staticSetStats);
-  myCallbacks.queryEstLoad =
-    reinterpret_cast<LDQueryEstLoadFn>(staticQueryLoad);
+  myCallbacks.migrate = (LDMigrateFn)(staticMigrate);
+  myCallbacks.setStats = (LDStatsFn)(staticSetStats);
+  myCallbacks.queryEstLoad = (LDQueryEstLoadFn)(staticQueryLoad);
   
   myHandle = the_lbdb->RegisterOM(myId,this,myCallbacks);
 #endif
@@ -153,13 +152,13 @@ void Array1D::RecvMapID(ArrayMap *mPtr, int mHandle)
   // Add myself as a local barrier receiver, so I know when I might
   // be registering objects.
   the_lbdb->
-    AddLocalBarrierReceiver(reinterpret_cast<LDBarrierFn>(staticRecvAtSync),
- 			      static_cast<void*>(this));
+    AddLocalBarrierReceiver((LDBarrierFn)(staticRecvAtSync),
+ 			      (void*)(this));
   // Also, add a dummy local barrier client, so there will always be
   // something to call DoneRegisteringObjects()
   dummyBarrierHandle = the_lbdb->AddLocalBarrierClient(
-    reinterpret_cast<LDResumeFn>(staticDummyResumeFromSync),
-    static_cast<void*>(this));
+    (LDResumeFn)(staticDummyResumeFromSync),
+    (void*)(this));
 
   // Activate the AtSync for this one immediately.  Note, that since
   // we have not yet called DoneRegisteringObjects(), nothing
@@ -551,17 +550,17 @@ void Array1D::DummyAtSync()
 
 void Array1D::staticMigrate(LDObjHandle _h, int _dest)
 {
-  (static_cast<Array1D*>(_h.omhandle.user_ptr))->Migrate(_h,_dest);
+  ((Array1D*)(_h.omhandle.user_ptr))->Migrate(_h,_dest);
 }
 
 void Array1D::staticSetStats(LDOMHandle _h, int _state)
 {
-  (static_cast<Array1D*>(_h.user_ptr))->SetStats(_h,_state);   
+  ((Array1D*)(_h.user_ptr))->SetStats(_h,_state);   
 }
 
 void Array1D::staticQueryLoad(LDOMHandle _h)
 {
-  (static_cast<Array1D*>(_h.user_ptr))->QueryLoad(_h);
+  ((Array1D*)(_h.user_ptr))->QueryLoad(_h);
 }
 
 void Array1D::Migrate(LDObjHandle _h, int _dest)
@@ -594,14 +593,14 @@ void Array1D::RegisterElementForSync(int index)
 //     // If this is a sync array, register a sync callback so I can
 //     // inform the db when I start registering objects 
 //     the_lbdb->
-//       AddLocalBarrierReceiver(reinterpret_cast<LDBarrierFn>(staticRecvAtSync),
-// 			      static_cast<void*>(this));
+//       AddLocalBarrierReceiver((LDBarrierFn)(staticRecvAtSync),
+// 			      (void*)(this));
 
 //     // Also, add a dummy local barrier client, so there will always be
 //     // something to call DoneRegisteringObjects()
 //     the_lbdb->AddLocalBarrierClient(
-//       reinterpret_cast<LDResumeFn>(staticDummyResumeFromSync),
-//       static_cast<void*>(this));
+//       (LDResumeFn)(staticDummyResumeFromSync),
+//       (void*)(this));
 //     CProxy_Array1D(thisgroup).dummyAtSync();
 //   }
     
@@ -610,14 +609,14 @@ void Array1D::RegisterElementForSync(int index)
   elementIDs[index].barrierData.index = index;
 
   elementIDs[index].barrierHandle = the_lbdb->
-    AddLocalBarrierClient(reinterpret_cast<LDResumeFn>(staticResumeFromSync),
-			  static_cast<void*>(&elementIDs[index].barrierData));
+    AddLocalBarrierClient((LDResumeFn)(staticResumeFromSync),
+			  (void*)(&elementIDs[index].barrierData));
 
 }
 
 void Array1D::staticDummyResumeFromSync(void* data)
 {
-  Array1D* me = static_cast<Array1D*>(data);
+  Array1D* me = (Array1D*)(data);
   me->DummyResumeFromSync();
 }
 
@@ -631,7 +630,7 @@ void Array1D::DummyResumeFromSync()
 
 void Array1D::staticRecvAtSync(void* data)
 {
-  static_cast<Array1D*>(data)->RecvAtSync();
+  ((Array1D*)(data))->RecvAtSync();
 }
 
 void Array1D::RecvAtSync()
@@ -644,7 +643,7 @@ void Array1D::RecvAtSync()
 void Array1D::staticResumeFromSync(void* data)
 {
   ElementIDs::BarrierClientData* barrierData = 
-    static_cast<ElementIDs::BarrierClientData*>(data);
+    (ElementIDs::BarrierClientData*)(data);
   (barrierData->me)->ResumeFromSync(barrierData->index);
 }
 

@@ -263,6 +263,9 @@ static void work(int iter_block, int* result) {
 
 extern "C" int LDProcessorSpeed()
 {
+  if (CmiNumPes() == 0)  // I think it is safe to assume that we can
+    return 1;            // skip this if we are only using 1 PE
+
   static int result=0;  // I don't care what this is, its just for
 			// timing, so this is thread safe.
   int wps = 0;

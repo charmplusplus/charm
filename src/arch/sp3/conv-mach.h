@@ -121,8 +121,8 @@
 #define CMK_COMPILEMODE_ORIG                               1
 #define CMK_COMPILEMODE_ANSI                               0
 
-#define CMK_LBDB_ON					   0
-#define CMK_LBDB_OFF					   1
+#define CMK_LBDB_ON					   1
+#define CMK_LBDB_OFF					   0
 
 #define CMK_STL_USE_DOT_H                                  0
 #define CMK_STL_DONT_USE_DOT_H                             1
@@ -132,8 +132,8 @@
 #define CMK_BOOL_DEFINED				   0
 #define CMK_BOOL_UNDEFINED				   1
 
-#define CMK_CPP_CAST_ILLEGAL                               0
-#define CMK_CPP_CAST_LEGAL                                 1
+#define CMK_CPP_CAST_ILLEGAL                               1
+#define CMK_CPP_CAST_LEGAL                                 0
 
 #endif
 
