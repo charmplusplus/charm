@@ -698,15 +698,14 @@ int AMPI_Info_free(MPI_Info *info);
 #define MPI_Win_c2f(win)   (MPI_Fint)(win)
 #define MPI_Win_f2c(win)   (MPI_Win)(win)
 
+extern int traceRegisterFunction(const char *name);
+extern void traceBeginFuncProj(char *,char *,int);
+extern void traceEndFuncProj(char *);
 
-extern void registerFunction(char *name);
-extern void beginFuncProj(char *,char *,int);
-extern void endFuncProj(char *);
-
-#define TRACEFUNC(code,name) beginFuncProj(name,__FILE__,__LINE__); \
+#define TRACEFUNC(code,name) traceBeginFuncProj(name,__FILE__,__LINE__); \
 code;\
-endFuncProj(name);
-#define REGISTER_FUNCTION(x) registerFunction(x);
+traceEndFuncProj(name);
+#define REGISTER_FUNCTION(x) traceRegisterFunction(x);
 
 #include "ampiProjections.h"
 #ifdef __cplusplus
