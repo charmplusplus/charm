@@ -108,7 +108,7 @@ class Type : public Printable {
     virtual int isCkArgMsg(void) const {return 0;}
     virtual int isReference(void) const {return 0;}
     virtual Type *deref(void) {return this;}
-    virtual char *getBaseName(void) = 0;
+    virtual char *getBaseName(void) const = 0;
     virtual int getNumStars(void) const {return 0;}
     virtual void genProxyName(XStr &str,forWhom forElement);
     virtual void genIndexName(XStr &str);
@@ -120,6 +120,9 @@ class Type : public Printable {
     XStr msgProxyName(void) 
     	{XStr ret; genMsgProxyName(ret); return ret;}
     virtual void printVar(XStr &str, char *var) {print(str); str<<" "; str<<var;}
+    int operator==(const Type &tp) const {
+      return  (strcmp(getBaseName(), tp.getBaseName())==0);
+    }
 };
 
 class BuiltinType : public Type {
@@ -130,7 +133,7 @@ class BuiltinType : public Type {
     int isBuiltin(void) const {return 1;}
     void print(XStr& str) { str << name; }
     int isVoid(void) const { return !strcmp(name, "void"); }
-    char *getBaseName(void) { return name; }
+    char *getBaseName(void) const { return name; }
 };
 
 class NamedType : public Type {
@@ -144,7 +147,7 @@ class NamedType : public Type {
     int isCkArgMsg(void) const {return 0==strcmp(name,"CkArgMsg");}
     void print(XStr& str);
     int isNamed(void) const {return 1;}
-    char *getBaseName(void) { return name; }
+    char *getBaseName(void) const { return name; }
     virtual void genProxyName(XStr& str,forWhom forElement);
     virtual void genIndexName(XStr& str) 
     { 
@@ -169,7 +172,7 @@ class PtrType : public Type {
     void indirect(void) { numstars++; }
     int getNumStars(void) const {return numstars; }
     void print(XStr& str);
-    char *getBaseName(void) { return type->getBaseName(); }
+    char *getBaseName(void) const { return type->getBaseName(); }
     virtual void genMsgProxyName(XStr& str) { 
       if(numstars != 1) {
         die("too many stars-- entry parameter must have form 'MTYPE *msg'"); 
@@ -189,7 +192,7 @@ class ReferenceType : public Type {
     int isReference(void) const {return 1;}
     void print(XStr& str) {str<<referant<<" &";}
     virtual Type *deref(void) {return referant;}
-    char *getBaseName(void) { return referant->getBaseName(); }
+    char *getBaseName(void) const { return referant->getBaseName(); }
 };
 /* I don't think these are useful any longer (OSL 11/30/2001)
 class ConstType : public Type {
@@ -199,7 +202,7 @@ class ConstType : public Type {
     ConstType(Type *t) : type(t) {}
     int isConst(void) const {return 1;}
     void print(XStr& str) {str<<"const "<<type;}
-    char *getBaseName(void) { return type->getBaseName(); }
+    char *getBaseName(void) const { return type->getBaseName(); }
 };
 */
 //This is used as a list of base classes
@@ -250,6 +253,9 @@ class Parameter {
       type->print(str);
       if(given_name!=0)
         str <<given_name;
+    }
+    int operator==(const Parameter &parm) const {
+      return *type == *parm.type;
     }
 };
 class ParamList {
@@ -308,6 +314,12 @@ class ParamList {
     void unmarshall(XStr &str);
     void unmarshallAddress(XStr &str);
     void endUnmarshall(XStr &str);
+    int operator==(const ParamList &plist) const {
+      if (!(*param == *(plist.param))) return 0;
+      if (!next && !plist.next) return 1;
+      if (!next || !plist.next) return 0;
+      return *next ==  *plist.next;
+    }
 };
 
 class FuncType : public Type {
@@ -324,7 +336,7 @@ class FuncType : public Type {
       if(params)
         params->print(str);
     }
-    char *getBaseName(void) { return name; }
+    char *getBaseName(void) const { return name; }
 };
 
 /****************** Template Support **************/
@@ -462,6 +474,7 @@ class Member : public Construct {
     virtual void collectSdagCode(CParsedFile *pf, int& sdagPresent) { return; }
     XStr makeDecl(const XStr &returnType,int forProxy=0);
     virtual void genIndexDecls(XStr& str)=0;
+    virtual void lookforCEntry(CEntry *centry)  {}
 };
 
 /* List of members of a chare or group */
@@ -494,6 +507,7 @@ class MemberList : public Printable {
     void genDefs(XStr& str);
     void genReg(XStr& str);
     void collectSdagCode(CParsedFile *pf, int& sdagPresent);
+    virtual void lookforCEntry(CEntry *centry);
 };
 
 /* Chare or group is a templated entity */
@@ -558,6 +572,7 @@ class Chare : public TEntity {
     virtual char *chareTypeName(void) {return (char *)"chare";}
     virtual char *proxyPrefix(void);
     virtual void genSubRegisterMethodDef(XStr& str);
+    void lookforCEntry(CEntry *centry);
 };
 
 class MainChare : public Chare {
@@ -718,6 +733,7 @@ class Entry : public Member {
     ParamList *param;
     ParamList *connectParam;
     int isConnect;
+    int isWhenEntry;
     Entry(int l, int a, Type *r, char *n, ParamList *p, Value *sz=0, SdagConstruct *sc =0, char *e=0, int connect=0, ParamList *connectPList =0);
     void setChare(Chare *c);
     int isConnectEntry(void) { return isConnect; }
@@ -742,6 +758,7 @@ class Entry : public Member {
     void generateEntryList(TList<CEntry*>&, SdagConstruct *);
     void collectSdagCode(CParsedFile *pf, int& sdagPresent);
     void propagateState(int);
+    void lookforCEntry(CEntry *centry);
 };
 
 class EntryList {

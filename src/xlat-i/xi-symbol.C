@@ -642,7 +642,7 @@ Chare::genDecls(XStr& str)
     //handle the case that some of the entries may be sdag Entries
     int sdagPresent = 0;
     XStr sdagStr;
-    CParsedFile *myParsedFile = new CParsedFile();
+    CParsedFile *myParsedFile = new CParsedFile(this);
     list->collectSdagCode(myParsedFile, sdagPresent);
     if(sdagPresent) {
       XStr classname;
@@ -1594,6 +1594,42 @@ void MemberList::genReg(XStr& str)
   }
 }
 
+void MemberList::lookforCEntry(CEntry *centry)
+{
+  if(member){
+    member->lookforCEntry(centry);
+  }
+  if(next) {
+    //str << endx;
+    next->lookforCEntry(centry);
+  }
+}
+
+void Entry::lookforCEntry(CEntry *centry)
+{
+   // compare name
+   if (strcmp(name, *centry->entry) != 0) return;
+   // compare param
+   if (param && !centry->paramlist) return;
+   if (!param && centry->paramlist) return;
+   if (param && !(*param == *centry->paramlist)) return;
+
+   isWhenEntry = 1;
+   centry->decl_entry = this;
+}
+
+void Chare::lookforCEntry(CEntry *centry)
+{
+  if(list)
+    list->lookforCEntry(centry);
+  if (centry->decl_entry == NULL)  {
+    cerr<<"Function \""<<*centry->entry
+        <<"\" appears in Sdag When construct, but not defined as an entry function. "
+        << endl;
+    die("(FATAL ERROR)");
+  }
+}
+
 ///////////////////////////// CPARSEDFILE //////////////////////
 /*void CParsedFile::print(int indent)
 {
@@ -1630,6 +1666,14 @@ void CParsedFile::propagateState(void)
 {
   for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
     cn->sdagCon->propagateState(0);
+  }
+}
+
+void CParsedFile::mapCEntry(void)
+{
+  CEntry *en;
+  for(en=entryList.begin(); !entryList.end(); en=entryList.next()) {
+    container->lookforCEntry(en);
   }
 }
 
@@ -1746,6 +1790,7 @@ Entry::Entry(int l, int a, Type *r, char *n, ParamList *p, Value *sz, SdagConstr
 { 
   line=l; container=NULL; 
   entryCount=-1;
+  isWhenEntry=0;
   if (param && param->isMarshalled()) attribs|=SNOKEEP;
 
   if(!isThreaded() && stacksize) die("Non-Threaded methods cannot have stacksize",line);

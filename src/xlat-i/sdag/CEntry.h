@@ -13,12 +13,14 @@
 #include "CList.h"
 #include "CStateVar.h"
 
+class Entry;
 class SdagConstruct;
 class ParamList;
 
 class CEntry{
   public:
     XStr *entry;
+    Entry *decl_entry;
     //CParseNode *paramlist;
     ParamList *paramlist;
     int entryNum;
@@ -35,6 +37,7 @@ class CEntry{
        }
        entryNum = numEntries++;
        refNumNeeded =0;
+       decl_entry = NULL;
     }
 
     void print(int indent) {
