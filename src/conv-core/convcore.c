@@ -1304,6 +1304,14 @@ void CthResumeSchedulingThread(CthThread t)
     CpvAccess(CthSleepingStandins) = me;
   }
   CpvAccess(CthSchedulingThread) = t;
+#ifndef CMK_OPTIMIZE
+#if ! CMK_TRACE_IN_CHARM
+  if(CpvAccess(traceOn))
+    CthTraceResume(t);
+/*    if(CpvAccess(_traceCoreOn)) 
+	        resumeTraceCore();*/
+#endif
+#endif
   CthResume(t);
 }
 
