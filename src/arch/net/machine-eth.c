@@ -640,7 +640,8 @@ void IntegrateAckDatagram(ExplicitDgram dg)
 	  continue;
 	}
 
-        if (dgseqno < idg->seqno)
+        /* if ack is really less than our packet seq (consider wrap around) */
+        if (dgseqno < idg->seqno && (idg->seqno - dgseqno <= Cmi_window_size))
         {
           continue;
         }
