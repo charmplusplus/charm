@@ -64,7 +64,7 @@ dirs+sources:
 	find . -type l -exec rm {} \;
 	find ../../src/Common -type f \! -name "*,v" -exec ln -s {} . \;
 	find ../../src/`cat .vdir` -type f \! -name "*,v" -exec ln -s {} . \;
-	find ../../src/Common.`cat .gdir` -type f \! -name "*,v" -exec ln -s {} . \;
+	if [ -d ../../src/Common.`cat .gdir` ] ; then find ../../src/Common.`cat .gdir` -type f \! -name "*,v" -exec ln -s {} . \; ; fi
 	@rm -f .vdir .gdir
 	touch dirs+sources
 
