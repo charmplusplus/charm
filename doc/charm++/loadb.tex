@@ -394,7 +394,8 @@ accepts the following command line options:
 \item {\em +LBDump StepStart}\\
         This will dump the instrument/communication data collected by the load balancing framework
 	starting from the load balancing step {\em StepStart} into a file on the disk. The name of the file
-	is given by the {\em +LBDumpFile} option.
+	is given by the {\em +LBDumpFile} option. The first step in the program is number 0. Negative
+	numbers will be converted to 0.
 \item {\em +LBDumpSteps StepsNo}\\
         This option specify for how many steps to dump the data to the disk. If omitted, default value is 1.
 	The program will exit after StepsNo files are dumped.
