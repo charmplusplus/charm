@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.16  1995-11-07 23:29:54  sanjeev
+ * Revision 2.17  1995-11-09 16:28:23  sanjeev
+ * *** empty log message ***
+ *
+ * Revision 2.16  1995/11/07  23:29:54  sanjeev
  * fixed bug for handle variable
  *
  * Revision 2.15  1995/11/02  23:22:52  sanjeev
@@ -250,7 +253,6 @@ int CheckCharmName()
 	int ScopedType=FALSE ;
 	char *lastagg ;
 	char *type ;
-	int printtype=1 ;
 	char *sptr ;
 
 	if ( strcmp(CurrentTypedef,"")==0 )
@@ -264,12 +266,10 @@ int CheckCharmName()
 		*sptr = '\0' ;
 		type = CurrentTypedef ;
 	}
-/***	else if ( strcmp(CurrentDeclType,"") != 0 ){  why was this code here ?
-		type = CurrentDeclType ;
-		printtype = 0 ;
-	} ***/ 
 	else {
-		/*	fprintf(stderr,"TRANSLATOR ERROR in handle decl: %s, line %d: \n",CurrentFileName,CurrentLine) ;   */
+		/* fprintf(stderr,"TRANSLATOR ERROR in handle decl: %s, line %d: \n",CurrentFileName,CurrentLine) ;   */
+		/* It is possible that CurrentTypedef is not found in OutBuf
+		   because CurrentTypedef is not set properly always */
 		return 0 ;
 	}
 
@@ -288,32 +288,28 @@ int CheckCharmName()
 
 	if ( (ind=FoundInChareTable(ChareTable,charecount+1,lastagg)) != -1 ) {
 		CurrentCharmType = CHARE ;
-		if ( printtype )
-			fprintf(outfile,"ChareIDType") ;
+		fprintf(outfile,"ChareIDType") ;
 	}
 	else if ( (ind=FoundInChareTable(BOCTable,boccount+1,lastagg)) != -1 ){
 		CurrentCharmType = BRANCHED ;
-		if ( printtype )
-			fprintf(outfile,"int") ;
+		fprintf(outfile,"int") ;
 	}
 	else if ( (ind=FoundInAccTable(AccTable,TotalAccs,lastagg)) != -1 ) {
 		CurrentCharmType = ACCUMULATOR ;
-		if ( printtype )
-			fprintf(outfile,"AccIDType") ;
+		fprintf(outfile,"AccIDType") ;
 	}
 	else if ( (ind=FoundInAccTable(MonoTable,TotalMonos,lastagg)) != -1 ) {
 		CurrentCharmType = MONOTONIC ;
-		if ( printtype )
-			fprintf(outfile,"MonoIDType") ;
+		fprintf(outfile,"MonoIDType") ;
 	}
 	else if ( strcmp(lastagg,"writeonce")==0 ) {
 		CurrentCharmType = WRITEONCE ;
-		if ( printtype )
-			fprintf(outfile,"WriteOnceID") ;
+		fprintf(outfile,"WriteOnceID") ;
 		ind = -1 ;
 	}
 	else {
 		CurrentCharmType = -1 ;
+		fprintf(outfile,"%s ",type) ; /* put type back into output */
 		ind = -1 ;
 	}
 
