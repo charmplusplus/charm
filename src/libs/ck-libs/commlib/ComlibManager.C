@@ -350,10 +350,12 @@ void ComlibManager::receiveID(comID id){
 
 void ComlibManager::receiveID(int npes, int *pelist, comID id){
 
+  if(npes != CkNumPes()) {
     this->npes = npes;
     this->pelist = new int[npes];
-
+    
     memcpy(this->pelist, pelist, sizeof(int) * npes);
+  }
 
 #if CHARM_MPI
     if(npes < CkNumPes()){
