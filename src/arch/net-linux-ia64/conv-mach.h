@@ -88,6 +88,8 @@
 #define CMK_VECTOR_SEND_USES_COMMON_CODE                   1
 #define CMK_VECTOR_SEND_USES_SPECIAL_CODE                  0
 
+#define CMK_DISABLE_SIGNAL                                 1
+
 #define CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT                   1
 #define CMK_WHEN_PROCESSOR_IDLE_USLEEP                     0
 
