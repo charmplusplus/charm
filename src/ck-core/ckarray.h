@@ -173,6 +173,7 @@ public:
   int destIndex;
   EntryIndexType entryIndex;
   int hopCount;
+  int serial_num;
 };
 
 class ArrayElementAckMessage : public CMessage_ArrayElementAckMessage

@@ -1,4 +1,5 @@
 #include "ckarray.h"
+#include "register.h"
 #include "CkArray.def.h"
 
 void *
@@ -129,14 +130,22 @@ void Array1D::RecvElementID(int index, ArrayElement *elem, CkChareID handle)
   */
 }
 
+static int serial_num = 0;
+
 void Array1D::send(ArrayMessage *msg, int index, EntryIndexType ei)
 {
   msg->destIndex = index;
   msg->entryIndex = ei;
   msg->hopCount = 0;
+  msg->serial_num = 1000*serial_num+CkMyPe();
+  serial_num++;
+
   if (elementIDs[index].state == here) {
-    // CkPrintf("PE %d sending local message to index %d\n",CkMyPe(),index);
-    CkSendMsg(ei,msg,&elementIDs[index].elementHandle);
+#if 0
+    CPrintf("PE %d sending local message to index %d\n",CMyPe(),index);
+#endif
+    CProxy_Array1D arr(thisgroup);
+    arr.RecvForElement(msg, CkMyPe());
   } else if (elementIDs[index].state == moving_to) {
     // CkPrintf("PE %d sending message to migrating index %d on PE %d\n",
       // CkMyPe(),index,elementIDs[index].pe);
@@ -147,7 +156,15 @@ void Array1D::send(ArrayMessage *msg, int index, EntryIndexType ei)
       // CkMyPe(),index);
     CProxy_Array1D arr(thisgroup);
     arr.RecvForElement(msg, CkMyPe());
-  } else {
+ } else if (elementIDs[index].state == at) {
+#if 0
+    CPrintf("PE %d AT message to index %d on original PE %d\n",
+            CMyPe(),elementIDs[index].state,index,
+            elementIDs[index].pe);
+#endif
+    CProxy_Array1D arr(thisgroup);
+    arr.RecvForElement(msg, elementIDs[index].pe);
+ } else {
     // CkPrintf("PE %d sending message to index %d on original PE %d\n",
       // CkMyPe(),index,elementIDs[index].originalPE);
     CProxy_Array1D arr(thisgroup);
@@ -168,9 +185,21 @@ void Array1D::RecvForElement(ArrayMessage *msg)
   msg->hopCount++;
   if (elementIDs[msg->destIndex].state == here) {
     // CkPrintf("PE %d DELIVERING index %d RecvForElement state %d\n",
-      // CkMyPe(),msg->destIndex,elementIDs[msg->destIndex].state);
-    CkSendMsg(msg->entryIndex,msg,&elementIDs[msg->destIndex].elementHandle);
-  } else if (elementIDs[msg->destIndex].state == at) {
+    // CkMyPe(),msg->destIndex,elementIDs[msg->destIndex].state);
+    // CkSendMsg(msg->entryIndex,msg,&elementIDs[msg->destIndex].elementHandle);
+    //    register int epIdx = env->getEpIdx();
+    register int epIdx = msg->entryIndex;
+    //    register void *obj = env->getObjPtr();
+    CkChareID handle = elementIDs[msg->destIndex].elementHandle;
+    register void *obj = handle.objPtr;
+    _entryTable[epIdx]->call(msg, obj);
+
+    //    EP_STRUCT *epinfo = CsvAccess(EpInfoTable)+msg->entryIndex;
+    //    CHARE_BLOCK *chareblock = GetID_chareBlockPtr(handle);
+    //    void *current_usr = msg;
+    //USER_MSG_PTR(env);
+    //    callep(epinfo->function,msg,chareblock->chareptr);
+ } else if (elementIDs[msg->destIndex].state == at) {
     // CkPrintf("PE %d Sending to SELF index %d RecvForElement state %d\n",
       // CkMyPe(),msg->destIndex,elementIDs[msg->destIndex].state);
     CProxy_Array1D arr(thisgroup);
