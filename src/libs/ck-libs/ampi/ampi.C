@@ -1582,6 +1582,30 @@ CDECL void AMPI_Migrate(void)
 #endif
 }
 
+CDECL void AMPI_Async_Migrate(void)
+{
+  AMPIAPI("AMPI_Async_Migrate");
+#if CMK_BLUEGENE_CHARM
+  TRACE_BG_AMPI_SUSPEND();
+#endif
+  TCHARM_Async_Migrate();
+#if CMK_BLUEGENE_CHARM
+  TRACE_BG_AMPI_START(getAmpiInstance(MPI_COMM_WORLD)->getThread(), "AMPI_MIGRATE")
+#endif
+}
+
+CDECL void AMPI_Allow_Migrate(void)
+{
+  AMPIAPI("AMPI_Allow_Migrate");
+#if CMK_BLUEGENE_CHARM
+  TRACE_BG_AMPI_SUSPEND();
+#endif
+  TCHARM_Allow_Migrate();
+#if CMK_BLUEGENE_CHARM
+  TRACE_BG_AMPI_START(getAmpiInstance(MPI_COMM_WORLD)->getThread(), "AMPI_ALLOW_MIGRATE")
+#endif
+}
+
 CDECL void AMPI_Setmigratable(MPI_Comm comm, int mig){
 #if CMK_LBDB_ON
   AMPIAPI("AMPI_Setmigratable");

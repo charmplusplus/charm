@@ -133,6 +133,8 @@ FDECL {
 #define mpi_print FTN_NAME( MPI_PRINT , mpi_print )
 #define mpi_register FTN_NAME( MPI_REGISTER , mpi_register )
 #define mpi_migrate FTN_NAME( MPI_MIGRATE , mpi_migrate )
+#define mpi_async_migrate FTN_NAME( MPI_ASYNC_MIGRATE , mpi_async_migrate )
+#define mpi_allow_migrate FTN_NAME( MPI_ALLOW_MIGRATE , mpi_allow_migrate )
 #define mpi_setmigratable FTN_NAME (MPI_SETMIGRATABLE , mpi_setmigratable )
 #define mpi_checkpoint FTN_NAME( MPI_CHECKPOINT , mpi_checkpoint )
 #define mpi_memcheckpoint FTN_NAME( MPI_MEMCHECKPOINT , mpi_memcheckpoint )
