@@ -591,6 +591,7 @@ char *arg_server_auth=NULL;
 
 #if CMK_SCYLD
 int   arg_startpe;
+int   arg_endpe;
 #endif
 
 void arg_init(int argc, char **argv)
@@ -627,6 +628,7 @@ void arg_init(int argc, char **argv)
 #endif
 #ifdef CMK_SCYLD
   pparam_int(&arg_startpe,   0, "startpe",   "first pe to start job(SCYLD)");
+  pparam_int(&arg_endpe,  1000000, "endpe",   "last pe to start job(SCYLD)");
 #endif
   pparam_flag(&arg_help,	0, "help", "print help messages");
   pparam_int(&arg_ppn,          0, "ppn",             "number of pes per node");
@@ -1776,6 +1778,7 @@ void nodetab_init_for_scyld()
 
   tablesize = arg_requested_pes;
   maxNodes = bproc_numnodes() + 1;
+  if (arg_endpe < maxNodes) maxNodes=arg_endpe+1;
   if (maxNodes > tablesize) tablesize = maxNodes;
   nodetab_table=(nodetab_host**)malloc(tablesize*sizeof(nodetab_host*));
   nodetab_rank0_table=(int*)malloc(tablesize*sizeof(int));
@@ -1815,7 +1818,8 @@ void nodetab_init_for_scyld()
 
   /* expand node table to arg_requested_pes */
   if (arg_requested_pes > npes) {
-    int node = arg_ppn;      /* skip -1 */
+    int node = 0;
+    if (nodetab_rank0_size > 1) node = arg_ppn;      /* skip -1 if we can */
     int orig_size = npes;
     while (npes < arg_requested_pes) {
       if (npes+arg_ppn > arg_requested_pes) group.cpus = arg_requested_pes-npes;
