@@ -78,7 +78,7 @@ charmc -o hello hello.C -language bluegene
 Sample applications in low level machine API can be found under directory
 charm/pgms/converse/bluegene.
 
-\subsubsection{Writing a Blue Gene application using Charm++}
+\subsubsection{Writing a Blue Gene application in Charm++}
 
 One can write a normal \charmpp{} application which can automatically 
 run on the emulator after compilation. \charmpp{} implements
@@ -97,7 +97,7 @@ library.
 Sample applications in \charmpp{} can be found under directory
 charm/pgms/charm++, specifically charm/pgms/charm++/littleMD.
 
-\subsubsection{Writing a Blue Gene application using MPI}
+\subsubsection{Writing a Blue Gene application in MPI}
 
 One can also write a MPI application for Blue Gene Simulator.
 The Adaptive MPI, or AMPI is implemented on top of Charm++ that supports
@@ -133,6 +133,9 @@ To run a Blue Gene application, you need to specify these parameters to
 \begin{enumerate}
 \item {\tt +x, +y} and {\tt +z}:  define the size of of machine in three dimensions, these define the number of nodes along each dimension of the machine;
 \item {\tt +wth} and {\tt +cth}:  For one node, these two parameters define the number of worker processors({\tt +wth}) and the number of communication processors({\tt +cth}).
+\item {\tt +bgcorrect}: starts the simulation mode for performance prediction. Otherwise the program is running without doing parallel event simulation for performance prediction of the application.
+\item {\tt +bgwalltime}: used only in simulation mode, when specified, use wallclock measurement of the time taken on the simulating machine to estimate the time it takes to run on the target machine.
+\item {\tt +bgcounter}:  used only in simulation mode, when specified, use the performance counter to estimate the time on target machine. This is currently only supported when perfex is installed, like Origin2000.
 \end{enumerate}
 
 For example, to simulate a Blue Gene/L machine of size 64K in 40x40x40, with 
@@ -141,5 +144,17 @@ real processors to simulate:
 \begin{verbatim}
 ./charmrun +p100 ./hello +x40 +y40 +z40 +cth1 +wth1
 \end{verbatim}
+
+To run an AMPI program, you may also want to specify the number of virtual 
+processors to run the MPI by using {\tt +vp}, for example:
+\begin{verbatim}
+./charmrun +p100 ./hello +x40 +y40 +z40 +cth1 +wth1 +vp 128000
+\end{verbatim}
+starts the simulation of Blue Gene/L of size 40x40x40 with 2 processors 
+in each node, running 128000 MPI threads (2 MPI threads on each Blue Gene node),
+ using 100 real processors to simulate. In this case, {\tt MPI\_Comm\_size()}
+returns 128000 for {\tt MPI\_COMM\_WORLD}. If you donot specify the {\tt +vp}
+option, the number of virtual processors will be equal to the number of 
+processors of the simulated machine, in this case 64000.
 
 
