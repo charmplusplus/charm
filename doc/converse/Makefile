@@ -12,7 +12,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 1.14  2000-06-22 22:08:15  milind
+# Revision 1.15  2000-06-22 22:12:56  milind
+# made proper clean.
+#
+# Revision 1.14  2000/06/22 22:08:15  milind
 # Added a cleanup stage before each make.
 #
 # Revision 1.13  2000/06/22 15:59:44  milind
@@ -108,7 +111,7 @@ install:
 all: ps html pdf install
 
 clean:	
-	rm -f *.ilg *.aux *.log *.dvi *.idx *.toc *~ index.tex
+	rm -f *.ilg *.aux *.log *.dvi *.idx *.toc *~ index.tex manual.out
 
 veryclean:
 	rm -rf *.ps *.pdf manual/
