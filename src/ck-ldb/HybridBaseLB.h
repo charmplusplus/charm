@@ -33,7 +33,6 @@ public:
   MyHierarchyTree() {}
   virtual ~MyHierarchyTree() {}
   virtual int numLevels() = 0;
-  virtual int numGroupsAtLevels(int level) = 0;
   virtual int parent(int mype, int level) = 0;
   virtual int isroot(int mype, int level) = 0;
   virtual int numChildren(int mype, int level) = 0;
