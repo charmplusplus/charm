@@ -250,8 +250,8 @@ int element::nodeLockup(node n, edgeRef from, edgeRef start, elemRef end,
   if (nIdx == fIdx) nextIdx = (nIdx + 2) % 3;
   else nextIdx = nIdx;
   edgeRef nextRef = edges[nextIdx];
-  intMsg *im = mesh[nextRef.cid].nodeLockupER(nextRef.idx, n, start, end, 
-					      myRef, l);
+  intMsg *im = mesh[nextRef.cid].nodeLockupER(nextRef.idx, n, start, myRef, 
+					      end, l);
   return im->anInt;
 }
 
