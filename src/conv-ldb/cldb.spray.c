@@ -190,10 +190,10 @@ void CldModuleInit()
   CrnSrand((int) (time(0)+CmiMyPe()));
   pinf = &CpvAccess(peinf);
   pinf->mype = CmiMyPe();
-  pinf->EnqueueHandler = CmiRegisterHandler(CldEnqueueHandler);
-  pinf->ReduceHandler  = CmiRegisterHandler(CldReduceHandler);
-  pinf->AverageHandler = CmiRegisterHandler(CldAverageHandler);
-  pinf->HopHandler     = CmiRegisterHandler(CldHopHandler);
+  pinf->EnqueueHandler = CmiRegisterHandler((CmiHandler)CldEnqueueHandler);
+  pinf->ReduceHandler  = CmiRegisterHandler((CmiHandler)CldReduceHandler);
+  pinf->AverageHandler = CmiRegisterHandler((CmiHandler)CldAverageHandler);
+  pinf->HopHandler     = CmiRegisterHandler((CmiHandler)CldHopHandler);
   pinf->load_total = 0.0;
   pinf->load_count = 0;
   pinf->spantree_children = CmiNumSpanTreeChildren(CmiMyPe());

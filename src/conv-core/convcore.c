@@ -1151,9 +1151,9 @@ void CthSchedInit()
   CpvAccess(CthSchedulingThread) = CthSelf();
   CpvAccess(CthSleepingStandins) = 0;
   CpvAccess(CthResumeNormalThreadIdx) =
-    CmiRegisterHandler(CthResumeNormalThread);
+    CmiRegisterHandler((CmiHandler)CthResumeNormalThread);
   CpvAccess(CthResumeSchedulingThreadIdx) =
-    CmiRegisterHandler(CthResumeSchedulingThread);
+    CmiRegisterHandler((CmiHandler)CthResumeSchedulingThread);
   CthSetStrategy(CthSelf(),
 		 CthEnqueueSchedulingThread,
 		 CthSuspendSchedulingThread);
@@ -1305,7 +1305,7 @@ void CmiGroupInit()
   CpvInitialize(int, CmiGroupHandlerIndex);
   CpvInitialize(int, CmiGroupCounter);
   CpvInitialize(GroupDef *, CmiGroupTable);
-  CpvAccess(CmiGroupHandlerIndex) = CmiRegisterHandler(CmiGroupHandler);
+  CpvAccess(CmiGroupHandlerIndex) = CmiRegisterHandler((CmiHandler)CmiGroupHandler);
   CpvAccess(CmiGroupCounter) = 0;
   CpvAccess(CmiGroupTable) =
     (GroupDef*)calloc(GROUPTAB_SIZE, sizeof(GroupDef));
@@ -1436,7 +1436,7 @@ void CmiMulticastInit()
 {
   CpvInitialize(int, CmiMulticastHandlerIndex);
   CpvAccess(CmiMulticastHandlerIndex) =
-    CmiRegisterHandler(CmiMulticastHandler);
+    CmiRegisterHandler((CmiHandler)CmiMulticastHandler);
 }
 
 #endif

@@ -215,7 +215,7 @@ void CldModuleInit()
 {
   CpvInitialize(int, CldHandlerIndex);
   CpvInitialize(int, CldBalanceHandlerIndex);
-  CpvAccess(CldHandlerIndex) = CmiRegisterHandler(CldHandler);
+  CpvAccess(CldHandlerIndex) = CmiRegisterHandler((CmiHandler)CldHandler);
   CpvAccess(CldBalanceHandlerIndex) = CmiRegisterHandler(CldBalanceHandler);
   CpvInitialize(int, CldRelocatedMessages);
   CpvInitialize(int, CldLoadBalanceMessages);

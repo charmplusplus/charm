@@ -126,5 +126,5 @@ void CfutureDestroy(Cfuture f)
 void CfutureModuleInit()
 {
   CpvInitialize(int, CfutureStoreIndex);
-  CpvAccess(CfutureStoreIndex) = CmiRegisterHandler(CfutureStore);
+  CpvAccess(CfutureStoreIndex) = CmiRegisterHandler((CmiHandler)CfutureStore);
 }

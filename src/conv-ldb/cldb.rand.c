@@ -109,7 +109,7 @@ void CldNodeEnqueue(int node, void *msg, int infofn)
 void CldModuleInit()
 {
   CpvInitialize(int, CldHandlerIndex);
-  CpvAccess(CldHandlerIndex) = CmiRegisterHandler(CldHandler);
+  CpvAccess(CldHandlerIndex) = CmiRegisterHandler((CmiHandler)CldHandler);
   CpvInitialize(int, CldRelocatedMessages);
   CpvInitialize(int, CldLoadBalanceMessages);
   CpvInitialize(int, CldMessageChunks);
