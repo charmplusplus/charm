@@ -10,6 +10,7 @@
 #include "MsgPacker.h"
 #include "RingMulticastStrategy.h"
 #include "PipeBroadcastStrategy.h"
+#include "MeshStreamingStrategy.h"
 
 CpvDeclare(int, RecvmsgHandle);
 CpvDeclare(int, RecvCombinedShortMsgHdlrIdx);

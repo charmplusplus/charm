@@ -35,16 +35,10 @@
 ** To understand the bundling/unbundling operations, knowledge of Converse
 ** and Charm++ message header formats is required.  I have attempted to
 ** provide documentation within this code to describe what is going on.
-**
-**
-** TODO: It is likely that there are much more efficient ways to move the
-** messages around in some places instead of allocating space and copying
-** over and over.
 */
 
 
 // TODO:
-//    * handle holes in the mesh
 //    * allow for the strategy to receive a list of processes
 
 
@@ -130,12 +124,13 @@ void periodic_flush_handler (void *ptr)
 */
 void *column_handler (char *msg)
 {
-  int strategy_id;
-  int num_msgs;
   int dest_pe;
-  int msgsize;
   int dest_row;
+  int msgsize;
+  int my_pe;
+  int num_msgs;
   int row_length;
+  int strategy_id;
   char *msgptr;
   char *newmsg;
   MeshStreamingStrategy *classptr;
@@ -143,7 +138,7 @@ void *column_handler (char *msg)
 
   ComlibPrintf ("[%d] column_handler() invoked.\n", CkMyPe());
 
-  int my_pe = CkMyPe();
+  my_pe = CkMyPe();
 
   strategy_id = ((int *) (msg + CmiMsgHeaderSizeBytes))[0];
   num_msgs = ((int *) (msg + CmiMsgHeaderSizeBytes))[1];
@@ -185,24 +180,52 @@ MeshStreamingStrategy::MeshStreamingStrategy ()
 {
   ComlibPrintf ("[%d] MeshStreamingStrategy::MeshStreamingStrategy() invoked.\n", CkMyPe());
 
-  // Empty.
+  num_pe = CkNumPes ();
+
+  num_columns = (int) (ceil (sqrt ((double) num_pe)));
+  num_rows = num_columns;
+  row_length = num_columns;
+
+  max_bucket_size = DEFAULT_MAX_BUCKET_SIZE;
+  flush_period = DEFAULT_FLUSH_PERIOD;
+
+  column_bucket = new CkQ<char *>[num_columns];
+  column_bytes = new int[num_columns];
+  row_bucket = new CkQ<char *>[num_rows];
 }
 
 
 
 
-
-MeshStreamingStrategy::MeshStreamingStrategy (int period, int something)
+/**************************************************************************
+**
+*/
+MeshStreamingStrategy::MeshStreamingStrategy (int period, int bucket_size)
 {
   ComlibPrintf ("[%d] MeshStreamingStrategy::MeshStreamingStrategy() invoked.\n", CkMyPe());
 
-  // Empty.
+  num_pe = CkNumPes ();
+
+  num_columns = (int) (ceil (sqrt ((double) num_pe)));
+  num_rows = num_columns;
+  row_length = num_columns;
+
+  max_bucket_size = bucket_size;
+  flush_period = period;
+
+  column_bucket = new CkQ<char *>[num_columns];
+  column_bytes = new int[num_columns];
+  row_bucket = new CkQ<char *>[num_rows];
 }
 
 
 
 
 
+#if 0
+/**************************************************************************
+**
+*/
 MeshStreamingStrategy::MeshStreamingStrategy (int numpe, int pelist[])
 {
   ComlibPrintf ("[%d] MeshStreamingStrategy::MeshStreamingStrategy() invoked.\n", CkMyPe());
@@ -213,6 +236,9 @@ MeshStreamingStrategy::MeshStreamingStrategy (int numpe, int pelist[])
 
 
 
+/**************************************************************************
+**
+*/
 MeshStreamingStrategy::MeshStreamingStrategy (int period, int something,
 					      int numpe, int pelist[])
 {
@@ -220,7 +246,7 @@ MeshStreamingStrategy::MeshStreamingStrategy (int period, int something,
 
   // Empty.
 }
-
+#endif
 
 
 
@@ -300,7 +326,7 @@ void MeshStreamingStrategy::insertMessage (CharmMessageHolder *cmsg)
   env = (char *) UsrToEnv (usr);
   blk = (char *) BLKSTART (env);
   env_size = SIZEFIELD (env);
-  misc_size = (blk - env);
+  misc_size = (env - blk);
   total_size = sizeof (int) + misc_size + env_size;
 
   if (dest_pe == my_pe) {
@@ -330,6 +356,7 @@ void MeshStreamingStrategy::insertMessage (CharmMessageHolder *cmsg)
 
 
 
+
 /**************************************************************************
 ** This method is not used for streaming strategies.
 */
@@ -354,12 +381,7 @@ void MeshStreamingStrategy::beginProcessing (int ignored)
 
   strategy_id = myInstanceID;
 
-  num_pe = CkNumPes ();
   my_pe = CkMyPe ();
-
-  num_columns = (int) (ceil (sqrt ((double) num_pe)));
-  num_rows = num_columns;
-  row_length = num_columns;
 
   my_column = my_pe % num_columns;
   my_row = my_pe / row_length;
@@ -373,9 +395,6 @@ void MeshStreamingStrategy::beginProcessing (int ignored)
   row_bucket = new CkQ<char *>[num_rows];
 
   column_handler_id = CmiRegisterHandler ((CmiHandler) column_handler);
-
-  max_bucket_size = DEFAULT_MAX_BUCKET_SIZE;
-  flush_period = DEFAULT_FLUSH_PERIOD;
 
   CcdCallOnConditionKeep (CcdPROCESSOR_BEGIN_IDLE, idle_flush_handler,
 			  (void *) this);
@@ -451,6 +470,9 @@ void MeshStreamingStrategy::FlushColumn (int column)
   assert (column < num_columns);
 
   dest_pe = column + (my_row * row_length);
+  if (dest_pe >= num_pe) {
+    dest_pe = column + ((my_row % (num_rows - 1) - 1) * row_length);
+  }
 
   num_msgs = column_bucket[column].length ();
 
@@ -465,7 +487,7 @@ void MeshStreamingStrategy::FlushColumn (int column)
     newmsgptr = (char *) (newmsg + CmiMsgHeaderSizeBytes + 2 * sizeof (int));
     for (int i = 0; i < num_msgs; i++) {
       msgptr = column_bucket[column].deq ();
-      msgsize = ((int *) msgptr)[1] + sizeof (int);
+      msgsize = ((int *) msgptr)[1] + (3 * sizeof (int));
       memcpy (newmsgptr, msgptr, msgsize);
 
       newmsgptr += msgsize;
@@ -605,19 +627,23 @@ int MeshStreamingStrategy::GetRowLength (void)
 
 
 /**************************************************************************
-** A generic pack/unpack method.
+** A very complicated pack/unpack method.
 */
 void MeshStreamingStrategy::pup (PUP::er &p)
 {
   ComlibPrintf ("[%d] MeshStreamingStrategy::pup() invoked.\n", CkMyPe());
 
+  Strategy::pup (p);
+
   p | num_pe;
   p | num_columns;
   p | num_rows;
   p | row_length;
+
   p | my_pe;
   p | my_column;
   p | my_row;
+
   p | max_bucket_size;
   p | flush_period;
   p | strategy_id;
@@ -625,10 +651,45 @@ void MeshStreamingStrategy::pup (PUP::er &p)
 
   if (p.isUnpacking ()) {
     column_bucket = new CkQ<char *>[num_columns];
-    column_bytes = new int[num_columns];
-    for (int i = 0; i < num_columns; i++) {
-      column_bytes[i] = 0;
+  }
+
+  for (int i = 0; i < num_columns; i++) {
+    int length = column_bucket[i].length ();
+
+    p | length;
+
+    for (int j = 0; j < length; j++) {
+      char *msg = column_bucket[i].deq ();
+      int size = sizeof (int) + ((int *) msg)[1];
+      p | size;
+      p(msg, size);
     }
+  }
+
+
+
+  if (p.isUnpacking ()) {
+    column_bytes = new int[num_columns];
+  }
+
+  p(column_bytes, num_columns);
+
+
+
+  if (p.isUnpacking ()) {
     row_bucket = new CkQ<char *>[num_rows];
+  }
+
+  for (int i = 0; i < num_rows; i++) {
+    int length = row_bucket[i].length ();
+
+    p | length;
+
+    for (int j = 0; j < length; j++) {
+      char *msg = row_bucket[i].deq ();
+      int size = ((int *) msg)[0];
+      p | size;
+      p(msg, size);
+    }
   }
 }
