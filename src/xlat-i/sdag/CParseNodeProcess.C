@@ -734,6 +734,7 @@ void CParseNode::generateWhen(XStr& op)
   int hasArray = 0;
   int isVoid = 0;
   int numParamsNeedingMarshalling =0;
+  int paramIndex =0;
   for(sv=stateVars->begin();!stateVars->end();sv=stateVars->next()) {
     if (sv->isVoid == 1) {
         isVoid = 1;
@@ -745,8 +746,11 @@ void CParseNode::generateWhen(XStr& op)
       }
       else 
          numParamsNeedingMarshalling++;
-      if (numParamsNeedingMarshalling == 1) 
+      if (numParamsNeedingMarshalling == 1) {
          op << "       int impl_off=0;\n";
+         paramIndex = iArgs;
+         iArgs++;
+      }
       if (sv->arrayLength !=0) {
          hasArray++;
          if (hasArray == 1)
@@ -793,7 +797,7 @@ void CParseNode::generateWhen(XStr& op)
 	                 ","<<sv->name->charstar()<<",impl_cnt_"<<sv->name->charstar()<<");\n";
         }  
      }
-  op << "       tr->args[" <<iArgs++ <<"] = (size_t) impl_msg;\n";
+  op << "       tr->args[" <<paramIndex <<"] = (size_t) impl_msg;\n";
   }   
   int iRef=0, iAny=0;
   for(el=elist->begin(); !elist->end(); el=elist->next()) {

@@ -162,7 +162,7 @@ void CEntry::generateCode(XStr& op)
     sv = (CStateVar *)cn->stateVars->begin();
     i = 0; iArgs = 0;
     lastWasVoid = 0;
-    for(; i<(cn->stateVars->length());i++, sv=(CStateVar *)cn->stateVars->next()) {
+    /*for(; i<(cn->stateVars->length());i++, sv=(CStateVar *)cn->stateVars->next()) {
        if (sv->isMsg == 1) {
           if((i!=0) && (lastWasVoid == 0))
 	     whenParams->append(", ");
@@ -176,7 +176,7 @@ void CEntry::generateCode(XStr& op)
        else if (sv->isVoid == 1) 
            op <<"    CkFreeSysMsg((void  *)tr->args[" <<iArgs++ <<"]);\n";
        lastWasVoid = sv->isVoid;
-    }
+    }*/
     sv = (CStateVar *)cn->stateVars->begin();
     i = 0;
     paramMarshalling = 0;
@@ -187,8 +187,21 @@ void CEntry::generateCode(XStr& op)
           op << "    CkMarshallMsg *impl_msg = (CkMarshallMsg *) tr->args[" <<iArgs <<"];\n"; 
           op << "    char *impl_buf=((CkMarshallMsg *)impl_msg)->msgBuf;\n";
           op << "    PUP::fromMem implP(impl_buf);\n";
+          iArgs++;
        }
-       if ((sv->isMsg == 0) && (sv->isVoid == 0)) {
+       if (sv->isMsg == 1) {
+          if((i!=0) && (lastWasVoid == 0))
+	     whenParams->append(", ");
+          whenParams->append("(");
+	  whenParams->append(sv->type1->charstar());
+	  whenParams->append(" *) tr->args[");
+	  *whenParams<<iArgs;
+	  whenParams->append("]");
+	  iArgs++;
+       }
+       else if (sv->isVoid == 1) 
+           op <<"    CkFreeSysMsg((void  *)tr->args[" <<iArgs++ <<"]);\n";
+       else if ((sv->isMsg == 0) && (sv->isVoid == 0)) {
           if((i > 0) &&(lastWasVoid == 0)) 
 	     whenParams->append(", ");
           whenParams->append(*(sv->name));
