@@ -18,6 +18,7 @@ Orion Sky Lawlor, olawlor@acm.org, 11/19/2001
 CtvDeclare(TCharm *,_curTCharm);
 CpvDeclare(inState,_stateTCharm);
 
+static int lastNumChunks=0;
 /*readonly*/ int tcharm_nomig=0, tcharm_nothreads=0;
 
 void TCharm::nodeInit(void)
@@ -524,6 +525,7 @@ CDECL int TCharmGetNumChunks(void)
 	char **argv=TCharmArgv();
 	CmiGetArgInt(argv,"-vp",&nChunks);
 	CmiGetArgInt(argv,"+vp",&nChunks);
+	lastNumChunks=nChunks;
 	return nChunks;
 }
 FDECL int FTN_NAME(TCHARM_GET_NUM_CHUNKS,tcharm_get_num_chunks)(void)
@@ -538,7 +540,12 @@ Callable from worker thread
 CDECL int TCharmElement(void)
 { return TCharm::get()->getElement();}
 CDECL int TCharmNumElements(void)
-{ return TCharm::get()->getNumElements();}
+{ 
+	if (TCharm::getState()==inDriver)
+		return TCharm::get()->getNumElements();
+	else
+		return lastNumChunks;
+}
 
 FDECL int FTN_NAME(TCHARM_ELEMENT,tcharm_element)(void) 
 { return TCharmElement();}
