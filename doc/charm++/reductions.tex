@@ -50,6 +50,8 @@ The result of the reduction operation is passed to the {\em reduction
 client}.  Many different kinds of reduction clients can be used, as
 explained below (Section~\ref{reductionClients}).
 
+
+
 \subsubsection{Reduction Clients}
 \label{reductionClients}
 
@@ -60,18 +62,17 @@ The important members of \kw{CkReductionMsg} are
 \kw{getSize()}, which returns the number of bytes of reduction data; and
 \kw{getData()}, which returns a ``void *'' to the actual reduced data.
 
-You may pass the client callback as an additional parameter to contribute.
-If different contribute calls pass different callbacks, some (unspecified,
+You may pass the client callback as an additional parameter to \kw{contribute}.
+If different \kw{contribute} calls pass different callbacks, some (unspecified,
 unreliable) callback will be chosen for use.
 \begin{alltt}
     double forces[2]=get_my_forces();
     //When done, broadcast the CkReductionMsg to ``myReductionEntry''
-    CkCallback cb(CkIndex_myArrayType::myReductionEntry(NULL),thisProxy);
-    contribute(2*sizeof(double),forces,CkReduction::sum_double,cb);
+    CkCallback cb(CkIndex_myArrayType::myReductionEntry(NULL), thisProxy);
+    contribute(2*sizeof(double), forces,CkReduction::sum_double, cb);
 \end{alltt}
 
-
-If no member passes a callback to contribute, the reduction will use
+If no member passes a callback to \tt{contribute}, the reduction will use
 the default callback. You set the default callback for an array or group
 using the \kw{ckSetReductionClient} proxy call on processor zero.
 Again, a \kw{CkReductionMsg} message will be passed to this callback,
@@ -82,11 +83,34 @@ which must delete the message when done.
     myProxy.ckSetReductionClient(new CkCallback(...));
 \end{alltt}
 
+So, for the previous reduction on chare array arr:
+\begin{alltt}
+    CkCallback *cb = new CkCallback(CkIndex_main::reportIn(NULL),  mainProxy);
+    arr.ckSetReductionClient(cb);
+\end{alltt}
+
+and the actual entry point:
+
+\begin{alltt}
+void myReductionEntry(CkReductionMsg *msg)
+\{
+  int reducedArrSize=msg->getSize() / sizeof(double);
+  double *output=(double *) msg->getData();
+  for(int i=0 ; i<reducedArrSize ; i++)
+  \{
+   // do something with the reduction results in each output[i] array element
+   .
+   .
+   .
+  \}
+  delete msg;
+\}
+\end{alltt}
 
 For backward compatability, rather than a general callback you can
 specify a peculiar kind of C function using \kw{ckSetReductionClient}
 or \kw{setReductionClient}.  This C function takes a user-defined
-parameter (passed to setReductionClient) and the actual reduction data,
+parameter (passed to \kw{setReductionClient}) and the actual reduction data,
 which it must not deallocate.
 
 \begin{alltt}
