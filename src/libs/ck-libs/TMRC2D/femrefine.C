@@ -88,10 +88,11 @@ void FEM_REFINE2D_Split(int meshID,int nodeID,double *coord,int elemID,double *d
 	}*/
 	printf("%d %d \n",nnodes,nelems);	
 	REFINE2D_Split(nnodes,coord,nelems,desiredAreas);
-	printf("called REFINE2D_Split\n");
 	
   
 	int nSplits=REFINE2D_Get_Split_Length();
+	printf("called REFINE2D_Split nSplits = %d \n",nSplits);
+
 	if(nSplits == 0){
 		return;
 	}

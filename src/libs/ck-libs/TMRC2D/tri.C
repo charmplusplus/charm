@@ -575,8 +575,9 @@ void chunk::multipleRefine(double *desiredArea, refineClient *client)
 
   for (i=0; i<elementSlots; i++)  // set desired areas for elements
     if ((theElements[i].isPresent()) && 
-	(desiredArea[i] < theElements[i].getArea()))
+	(desiredArea[i] < theElements[i].getArea())){
       theElements[i].setTargetArea(desiredArea[i]);
+	}
   // start refinement
   modified = 1;
   if (!refineInProgress) {
