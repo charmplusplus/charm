@@ -27,7 +27,7 @@ generalized by Orion Lawlor November 2001.
 static int slotsize;
 
 /*Total number of slots per processor*/
-static int numslots;
+static int numslots=0;
 
 /*Start and end of isomalloc-managed addresses*/
 static char *isomallocStart=NULL;
@@ -479,9 +479,8 @@ static void init_ranges(char **argv)
   CmiPrintf("[%d] Using slotsize of %d\n", CmiMyPe(), slotsize);
 #endif
 
-  /* Find the largest unused region of virtual address space */
-  if (isomallocStart==NULL)
-  {
+  if (CmiMyRank()==0 && numslots==0)
+  { /* Find the largest unused region of virtual address space */
     char *staticData =(char *) __static_data_loc();
     char *code = (char *)&init_ranges;
     char *codeDll = (char *)&fclose;
@@ -561,7 +560,9 @@ static void init_ranges(char **argv)
 	      ((memRange_t)numslots)*slotsize/meg);
 #endif
   }
-
+  /*SMP Mode: wait here for rank 0 to initialize numslots so we can set up myss*/
+  CmiNodeBarrier(); 
+  
   CpvInitialize(slotset *, myss);
   CpvAccess(myss) = new_slotset(pe2slot(CmiMyPe()), numslots);
 }
