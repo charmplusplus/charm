@@ -260,8 +260,8 @@ GenericElement::shapef_jacobian_at(const CPoint &p,CVector &natc,
 				   const ConcreteElement &e, // Source element
 				   CVector &fvec,CVector fjac[]) const
 {  
-  CPoint P[(const unsigned int)_size];
-  double SF[(const unsigned int)_size];
+  CPoint P[maxSize];
+  double SF[maxSize];
   this->shape_func(natc,SF);
   fvec=-p;
   for(int i = 0;i < _size;i++){
