@@ -371,6 +371,21 @@ MeshChunk *splitter::createMessage(int c)
 	return msg;
 }
 
+static void checkArrayEntries(const int *arr,int nArr,int max,const char *what)
+{
+#ifndef CMK_OPTIMIZE
+	//Check the array for out-of-bounds values
+	for (int e=0;e<nArr;e++) {
+		if ((arr[e]<0)||(arr[e]>=max)) {
+			CkError("FEM Map Error> Entry %d of %s is %d--out of bounds!\n",
+				e,what,arr[e]);
+			CkAbort("FEM Array element out of bounds");
+		} 
+	}
+#endif
+}
+
+
 /*External entry point:
 Create a sub-mesh for each chunk's elements,
 including communication lists between chunks.
@@ -378,13 +393,15 @@ including communication lists between chunks.
 void fem_split(const FEM_Mesh *mesh,int nchunks,int *elem2chunk,
 	       int nGhostLayers,const ghostLayer *g,MeshChunkOutput *out)
 {
-#ifndef CMK_OPTIMIZE
-	//Check the elem2chunk array for out-of-bounds values
-	for (int e=0;e<mesh->nElems();e++) {
-		if (elem2chunk[e]<0) CkAbort("Entry in elem2chunk is negative (did you do a bad FEM_Set_Partition?");
-		if (elem2chunk[e]>=nchunks) CkAbort("Entry in elem2chunk is too large (did you do a bad FEM_Set_Partition?");
+	//Check the elem2chunk mapping:
+	checkArrayEntries(elem2chunk,mesh->nElems(),nchunks,
+		"elem2chunk, from FEM_Set_Partition or metis,");
+	for (int t=0;t<mesh->nElemTypes;t++) {
+	//Check the user's connectivity array
+		checkArrayEntries(mesh->elem[t].conn,mesh->elem[t].n,
+		     mesh->node.n, "element connectivity, from FEM_Set_Elem_Conn,");
 	}
-#endif
+	
 	splitter s(mesh,elem2chunk,nchunks);
 
 	s.buildCommLists();
