@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.24  1997-07-23 18:40:24  milind
+ * Revision 2.25  1997-07-29 16:00:06  milind
+ * changed cmi_nodesize into cmi_mynodesize.
+ *
+ * Revision 2.24  1997/07/23 18:40:24  milind
  * Made charm++ to work on exemplar.
  *
  * Revision 2.23  1997/07/23 16:55:02  milind
@@ -119,7 +122,7 @@ static McQueue **MsgQueue;
 
 CpvDeclare(void*, CmiLocalQueue);
 int Cmi_numpes;
-int Cmi_nodesize;
+int Cmi_mynodesize;
 
 static node_private barrier_t barrier;
 static node_private barrier_t *barr;
@@ -270,7 +273,7 @@ void *arg;
     CpvInitialize(void*, CmiLocalQueue);
 
     Cmi_numpes =  usrparam->npe;
-    Cmi_nodesize  = Cmi_numpes;
+    Cmi_mynodesize  = Cmi_numpes;
 
     ConverseCommonInit(usrparam->argv);
     CthInit(usrparam->argv);
