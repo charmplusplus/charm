@@ -111,6 +111,7 @@ static CLA *CLAlist=NULL;
 static void CmiAddCLA(const char *arg,const char *param,const char *desc) {
 	int i;
 	if (CmiMyPe()!=0) return; /*Don't bother if we're not PE 0*/
+	if (desc==NULL) return; /*It's an internal argument*/
 	if (usageChecked) { /* Printf should work now */
 		if (printUsage)
 			CmiPrintf(CLAformatString,arg,param,desc);
@@ -155,7 +156,8 @@ void CmiArgInit(char **argv) {
 		    0==strcmp(argv[i],"--help")) 
 		{
 			printUsage=1;
-			CmiDeleteArgs(&argv[i],1);
+			/* Don't delete arg:  CmiDeleteArgs(&argv[i],1);
+			  Leave it there for user program to see... */
 			CmiPrintCLAs();
 		}
 	}
@@ -166,10 +168,17 @@ void CmiArgInit(char **argv) {
 	usageChecked=1;
 }
 
+/* Return 1 if we're currently printing command-line usage information. */
+int CmiArgGivingUsage(void) {
+	return (CmiMyPe()==0) && printUsage;
+}
 
-void CmiArgGroup(const char *groupName) {
-	if (CmiMyPe()==0 && printUsage)
+/* Identifies the module that accepts the following command-line parameters */
+void CmiArgGroup(const char *parentName,const char *groupName) {
+	if (CmiArgGivingUsage()) {
+		if (groupName==NULL) groupName=parentName; /* Start of a new group */
 		CmiPrintf("\n%s Command-line Parameters:\n",groupName);
+	}
 }
 
 /*Count the number of non-NULL arguments in list*/
@@ -229,7 +238,21 @@ int CmiGetArgString(char **argv,const char *arg,char **optDest) {
 	return CmiGetArgStringDesc(argv,arg,optDest,"");
 }
 
-/*Find the given argument and numeric option in argv.
+/*Find the given argument and floating-point option in argv.
+Remove it and return 1; or return 0.
+*/
+int CmiGetArgDoubleDesc(char **argv,const char *arg,double *optDest,const char *desc) {
+	char *number=NULL;
+	CmiAddCLA(arg,"number",desc);
+	if (!CmiGetArgStringDesc(argv,arg,&number,NULL)) return 0;
+	if (1!=sscanf(number,"%lg",optDest)) return 0;
+	return 1;
+}
+int CmiGetArgDouble(char **argv,const char *arg,double *optDest) {
+	return CmiGetArgDoubleDesc(argv,arg,optDest,"");
+}
+
+/*Find the given argument and integer option in argv.
 If the argument is present, parse and set the numeric option,
 delete both from argv, and return 1. If not present, return 0.
 e.g., arg=="-pack" matches argv=={...,"-pack","27",...},
@@ -408,11 +431,12 @@ char **argv;
   CpvAccess(CstatPrintQueueStatsFlag) = 0;
   CpvAccess(CstatPrintMemStatsFlag) = 0;
 
-  if (CmiGetArgFlag(argv,"+mems"))
+#if 0
+  if (CmiGetArgFlagDesc(argv,"+mems", "Print memory statistics at shutdown"))
     CpvAccess(CstatPrintMemStatsFlag)=1;
-  if (CmiGetArgFlag(argv,"+qs"))
+  if (CmiGetArgFlagDesc(argv,"+qs", "Print queue statistics at shutdown"))
     CpvAccess(CstatPrintQueueStatsFlag)=1;
-
+#endif
 }
 
 int CstatMemory(i)
@@ -1757,7 +1781,7 @@ static void on_busy(cmi_cpu_idlerec *rec)
 static void CIdleTimeoutInit(char **argv)
 {
   int idle_timeout=0; /*Seconds to wait*/
-  CmiGetArgInt(argv,"+idle-timeout",&idle_timeout);
+  CmiGetArgIntDesc(argv,"+idle-timeout",&idle_timeout,"Abort if idle for this many seconds");
   if(idle_timeout != 0) {
     cmi_cpu_idlerec *rec=(cmi_cpu_idlerec *)malloc(sizeof(cmi_cpu_idlerec));
     _MEMCHECK(rec);
@@ -1789,12 +1813,13 @@ void CommunicationServerInit()
 void ConverseCommonInit(char **argv)
 {
   CmiArgInit(argv);
-  CmiArgGroup("Converse");
   CmiMemoryInit(argv);
   CmiTimerInit();
   CstatsInit(argv);
   CcdModuleInit(argv);
   CmiHandlerInit();
+  CIdleTimeoutInit(argv);
+  
 #ifndef CMK_OPTIMIZE
   traceInit(argv);
 #endif
@@ -1814,7 +1839,6 @@ void ConverseCommonInit(char **argv)
 
   CldModuleInit();
   CrnInit();
-  CIdleTimeoutInit(argv);
 
   CmiInitImmediateMsg();
 }
