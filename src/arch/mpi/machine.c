@@ -54,6 +54,14 @@
 
 #define CMI_DEST_RANK(msg)               ((CmiMsgHeaderBasic *)msg)->rank
 
+#if CMK_USE_CHECKSUM
+#define CMI_SET_CHECKSUM(msg, len)	((CmiMsgHeaderBasic *)msg)->cksum = 0; ((CmiMsgHeaderBasic *)msg)->cksum = computeCheckSum(msg, len);
+#define CMI_CHECK_CHECKSUM(msg, len)	if (computeCheckSum(msg, len) != 0) CmiAbort("Fatal error: checksum doesn't agree!\n");
+#else
+#define CMI_SET_CHECKSUM(msg, len)
+#define CMI_CHECK_CHECKSUM(msg, len)
+#endif
+
 #if CMK_BROADCAST_SPANNING_TREE
 #  define CMI_SET_BROADCAST_ROOT(msg, root)  CMI_BROADCAST_ROOT(msg) = (root);
 #else
@@ -137,15 +145,7 @@ static void PerrorExit(const char *msg)
   exit(1);
 }
 
-
-char *CopyMsg(char *msg, int len)
-{
-  char *copy = (char *)CmiAlloc(len);
-  if (!copy)
-      fprintf(stderr, "Out of memory\n");
-  memcpy(copy, msg, len);
-  return copy;
-}
+extern unsigned char computeCheckSum(unsigned char *data, int len);
 
 /**************************  TIMER FUNCTIONS **************************/
 
@@ -419,6 +419,7 @@ static int PumpMsgs(void)
       CmiAbort("PumpMsgs: PMPI_Recv failed!\n");
 
     MACHSTATE2(3,"PumpMsgs recv one from node:%d to rank:%d", sts.MPI_SOURCE, CMI_DEST_RANK(msg));
+    CMI_CHECK_CHECKSUM(msg, nbytes);
 #if CMK_NODE_QUEUE_AVAILABLE
     if (CMI_DEST_RANK(msg)==DGRAM_NODEMESSAGE)
       CmiPushNode(msg);
@@ -709,6 +710,7 @@ static int SendMsgBuf()
 	PumpMsgs();
       }
       MACHSTATE2(3,"MPI_send to node %d rank: %d{", node, CMI_DEST_RANK(msg));
+      CMI_SET_CHECKSUM(msg, size);
       if (MPI_SUCCESS != PMPI_Isend((void *)msg,size,MPI_BYTE,node,TAG,MPI_COMM_WORLD,&(msg_tmp->req))) 
         CmiAbort("CmiAsyncSendFn: PMPI_Isend failed!\n");
       MACHSTATE(3,"}MPI_send end");
@@ -779,6 +781,7 @@ CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg)
 	CmiReleaseSentMessages();
 	PumpMsgs();
   }
+  CMI_SET_CHECKSUM(msg, size);
   if (MPI_SUCCESS != PMPI_Isend((void *)msg,size,MPI_BYTE,destPE,TAG,MPI_COMM_WORLD,&(msg_tmp->req))) 
     CmiAbort("CmiAsyncSendFn: PMPI_Isend failed!\n");
   MsgQueueLen++;
@@ -1000,16 +1003,16 @@ CmiCommHandle CmiAsyncNodeSendFn(int dstNode, int size, char *msg)
   CMI_DEST_RANK(msg) = DGRAM_NODEMESSAGE;
   switch (dstNode) {
   case NODE_BROADCAST_ALL:
-    CmiSendNodeSelf((char *)CopyMsg(msg,size));
+    CmiSendNodeSelf((char *)CmiCopyMsg(msg,size));
   case NODE_BROADCAST_OTHERS:
     CQdCreate(CpvAccess(cQdState), _Cmi_numnodes-1);
     for (i=0; i<_Cmi_numnodes; i++)
       if (i!=_Cmi_mynode) {
-        EnqueueMsg((char *)CopyMsg(msg,size), size, i);
+        EnqueueMsg((char *)CmiCopyMsg(msg,size), size, i);
       }
     break;
   default:
-    dupmsg = (char *)CopyMsg(msg,size);
+    dupmsg = (char *)CmiCopyMsg(msg,size);
     if(dstNode == _Cmi_mynode) {
       CmiSendNodeSelf(dupmsg);
     }
