@@ -518,6 +518,7 @@ void CthFixData(CthThread t)
   {
     t->datasize = datasize;
     t->data = (char *)realloc(t->data, datasize);
+    _MEMCHECK(t->data);
   }
 }
 
@@ -577,7 +578,7 @@ static void *CthAbortHelp(CthThread old)
 }
 
 
-static void CthFiberBlock(CthThread t)
+void CthFiberBlock(CthThread t)
 {
   CthThread tp;
   
@@ -633,6 +634,8 @@ CthThread CthCreate(CthVoidFn fn, void *arg, int size)
   _MEMCHECK(result);
   CthThreadInit(result);
   result->fiber = CreateFiber(0, FiberSetUp, (PVOID) fiberData);
+  if (!result->fiber)
+    CmiAbort("CthCreate failed to create fiber!\n");
   
   CthSetStrategyDefault(result);
   return result;
