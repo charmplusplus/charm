@@ -57,7 +57,7 @@ public:
 	void pup(PUP::er& p){ IrrGroup::pup(p); }
 };
 
-void CkStartCheckpoint(char* dirname,const CkCallback& cb = CkCallback(CkCallback::ignore));
+void CkStartCheckpoint(char* dirname,const CkCallback& cb);
 void CkRestartMain(const char* dirname);
 
 #endif //_CKCHECKPOINT_H
