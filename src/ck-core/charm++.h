@@ -366,6 +366,8 @@ class Chare {
     /// Return a strdup'd array containing this object's string name.
     virtual char *ckDebugChareName(void);
     virtual void ckDebugPup(PUP::er &p);
+    /// Called when a [threaded] charm entry method is created:
+    virtual void CkAddThreadListeners(CthThread tid);
 };
 
 //Superclass of all Groups that cannot participate in reductions.

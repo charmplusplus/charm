@@ -381,9 +381,9 @@ static void CthThreadBaseFree(CthThreadBase *th)
 	*/
 	struct CthThreadListener *l,*lnext;
 	for(l=th->listener;l!=NULL;l=lnext){
-			l->free(l);
 			lnext=l->next;
-			free(l);
+			l->next=0;
+			l->free(l);
 	}
   free(th->data);
   if (th->isMigratable) {
@@ -580,44 +580,19 @@ void CthYieldPrio(int s, int pb, unsigned int *prio)
 */
 void CthAddListener(CthThread t,struct CthThreadListener *l){
 		struct CthThreadListener *p=B(t)->listener;
-		if(p== NULL){
+		if(p== NULL){ /* first listener */
 			B(t)->listener=l;
 			l->thread = t;
 			l->next=NULL;
 			return;	
 		}
+		/* Add l at end of current chain of listeners: */
 		while(p->next != NULL){
 			p = p->next;
 		}
 		p->next = l;
 		l->next = NULL;
 		l->thread = t;
-}
-
-void NULL_LISTENER_FUNC(struct CthThreadListener *l){ /* NULL */ }
-
-void printer_suspend(struct CthThreadListener *l){
-	printf("Thread listener: suspend\n");
-}
-void printer_resume(struct CthThreadListener *l){
-	printf("Thread listener: resume\n");
-}
-void printer_free(struct CthThreadListener *l){
-	printf("Thread listener: free\n");
-}
-
-/** Currently only adding a printer listener. 
-    More system thread listener should be added here.
-    Listeners are allocated here and freed when the thread is destroyed.
-    */
-void CthUserAddListeners(CthThread th){
-#if 0
-	struct CthThreadListener *printer = (struct CthThreadListener *)malloc(sizeof(struct CthThreadListener));
-	printer->suspend = printer_suspend;
-	printer->resume = printer_resume;
-	printer->free = printer_free;
-	CthAddListener(th, printer);
-#endif
 }
 
 /*************************** Stack-Copying Threads (obsolete) *******************

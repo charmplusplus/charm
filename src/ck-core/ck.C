@@ -66,6 +66,12 @@ void Chare::ckDebugPup(PUP::er &p) {
   pup(p);
 }
 
+/// This method is called before starting a [threaded] entry method.
+void Chare::CkAddThreadListeners(CthThread th) {
+  /* FIXME: add tracing here */
+}
+
+
 void CkMessage::ckDebugPup(PUP::er &p,void *msg) {
   p.comment("Message has no debug pup routine.  Bytes:");
   int ts=UsrToEnv(msg)->getTotalsize();

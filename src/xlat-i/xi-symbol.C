@@ -2416,7 +2416,7 @@ XStr Entry::callThread(const XStr &procName,int prependEntryName)
   
   str << "  CthThread tid = CthCreate((CthVoidFn)"<<procFull
    <<", new CkThrCallArg(impl_msg,impl_obj), "<<getStackSize()<<");\n";
-  str << "  CthUserAddListeners(tid);\n";
+  str << "  ((Chare *)impl_obj)->CkAddThreadListeners(tid);\n";
 #if CMK_BLUEGENE_CHARM
   str << "  BgAttach(tid);\n";
 #endif
