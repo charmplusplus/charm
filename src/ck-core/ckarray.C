@@ -438,7 +438,7 @@ ArrayElement *CkArray::allocate(int elChareType,const CkArrayIndex &idx,
 /// This method is called by the user to add an element.
 CmiBool CkArray::insertElement(CkMessage *me)
 {
-  magic.check();
+  CK_MAGICNUMBER_CHECK
   CkArrayMessage *m=(CkArrayMessage *)me;
   const CkArrayIndex &idx=m->array_index();
   int ctorIdx=m->array_ep();
@@ -465,7 +465,7 @@ void CkArray::doneInserting(void)
 /// This is called on every processor after the last array insertion.
 void CkArray::remoteDoneInserting(void)
 {
-  magic.check();
+  CK_MAGICNUMBER_CHECK
   if (isInserting) {
     isInserting=CmiFalse;
     DEBC((AA"Done inserting objects\n"AB));
@@ -691,7 +691,7 @@ void CProxy_ArrayBase::ckBroadcast(CkArrayMessage *msg, int ep) const
 /// Reflect a broadcast off this Pe:
 void CkArray::sendBroadcast(CkMessage *msg)
 {
-	magic.check();
+	CK_MAGICNUMBER_CHECK
 	//Broadcast the message to all processors
 	thisProxy.recvBroadcast(msg);
 }
@@ -699,7 +699,7 @@ void CkArray::sendBroadcast(CkMessage *msg)
 /// Increment broadcast count; deliver to all local elements
 void CkArray::recvBroadcast(CkMessage *m)
 {
-	magic.check();
+	CK_MAGICNUMBER_CHECK
 	CkArrayMessage *msg=(CkArrayMessage *)m;
 	broadcaster.incoming(msg);
 	//Run through the list of local elements

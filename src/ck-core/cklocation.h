@@ -328,7 +328,7 @@ public:
 class CkMagicNumber_impl {
  protected:
 	int magic;
-	void badMagicNumber(int expected) const;
+	void badMagicNumber(int expected,const char *file,int line,void *obj) const;
 	CkMagicNumber_impl(int m);
 };
 template<class T>
@@ -336,12 +336,13 @@ class CkMagicNumber : public CkMagicNumber_impl {
 	enum {good=sizeof(T)^0x7EDC0000};
  public:
 	CkMagicNumber(void) :CkMagicNumber_impl(good) {}
-#ifdef CMK_OPTIMIZE 
-	inline void check(void) const { /*Empty, for speed*/ }
-#else
-	inline void check(void) const {
-		if (magic!=good) badMagicNumber(good);
+	inline void check(const char *file,int line,void *obj) const {
+		if (magic!=good) badMagicNumber(good,file,line,obj);
 	}
+#ifndef CMK_OPTIMIZE 
+#   define CK_MAGICNUMBER_CHECK magic.check(__FILE__,__LINE__,this);
+#else
+#   define CK_MAGICNUMBER_CHECK /*empty, for speed*/
 #endif
 };
 

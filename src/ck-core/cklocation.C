@@ -929,7 +929,7 @@ CkLocMgr::CkLocMgr(CkGroupID mapID_,CkGroupID lbdbID_,int numInitial)
 /// elements in.
 CkMigratableList *CkLocMgr::addManager(CkArrayID id,CkArrMgr *mgr)
 {
-	magic.check();
+	CK_MAGICNUMBER_CHECK
 	DEBC((AA"Adding new array manager\n"AB));
 	//Link new manager into list
 	ManagerRec *n=&managers.find(id);
@@ -996,7 +996,7 @@ void CkLocMgr::informHome(const CkArrayIndex &idx,int nowOnPe)
 CmiBool CkLocMgr::addElement(CkArrayID id,const CkArrayIndex &idx,
 		CkMigratable *elt,int ctorIdx,void *ctorMsg)
 {
-	magic.check();
+	CK_MAGICNUMBER_CHECK
 	CkLocRec *oldRec=elementNrec(idx);
 	CkLocRec_local *rec;
 	if (oldRec==NULL||oldRec->type()!=CkLocRec::local) 
@@ -1040,7 +1040,7 @@ void CkLocMgr::updateLocation(const CkArrayIndexMax &idx,int nowOnPe) {
 /*************************** LocMgr: DELETION *****************************/
 /// This index will no longer be used-- delete the associated elements
 void CkLocMgr::reclaim(const CkArrayIndex &idx,int localIdx) {
-	magic.check();
+	CK_MAGICNUMBER_CHECK
 	DEBC((AA"Destroying element %s (local %d)\n"AB,idx2str(idx),localIdx));
 	//Delete, and mark as empty, each array element
 	for (ManagerRec *m=firstManager;m!=NULL;m=m->next) {
@@ -1088,7 +1088,7 @@ void CkLocMgr::removeFromTable(const CkArrayIndex &idx) {
 /************************** LocMgr: MESSAGING *************************/
 /// Deliver message to this element, going via the scheduler if local
 void CkLocMgr::deliverViaQueue(CkMessage *m, CmiBool immediate) {
-	magic.check();
+	CK_MAGICNUMBER_CHECK
 	CkArrayMessage *msg=(CkArrayMessage *)m;
 	const CkArrayIndex &idx=msg->array_index();
 	DEBS((AA"deliverViaQueue %s\n"AB,idx2str(idx)));
@@ -1102,7 +1102,7 @@ void CkLocMgr::deliverViaQueue(CkMessage *m, CmiBool immediate) {
 }
 /// Deliver message directly to this element
 CmiBool CkLocMgr::deliver(CkMessage *m) {
-	magic.check();
+	CK_MAGICNUMBER_CHECK
 	CkArrayMessage *msg=(CkArrayMessage *)m;
 	const CkArrayIndex &idx=msg->array_index();
 	DEBS((AA"deliver %s\n"AB,idx2str(idx)));
@@ -1113,7 +1113,7 @@ CmiBool CkLocMgr::deliver(CkMessage *m) {
 		return deliverUnknown(msg, NOT_IMMEDIATE);
 }
 CmiBool CkLocMgr::deliverImmediate(CkMessage *m) {	// entry
-	magic.check();
+	CK_MAGICNUMBER_CHECK
 	CkArrayMessage *msg=(CkArrayMessage *)m;
 	const CkArrayIndex &idx=msg->array_index();
 	DEBS((AA"deliver %s\n"AB,idx2str(idx)));
@@ -1127,7 +1127,7 @@ CmiBool CkLocMgr::deliverImmediate(CkMessage *m) {	// entry
 /// This index is not hashed-- somehow figure out what to do.
 CmiBool CkLocMgr::deliverUnknown(CkArrayMessage *msg, CmiBool immediate)
 {
-	magic.check();
+	CK_MAGICNUMBER_CHECK
 	const CkArrayIndex &idx=msg->array_index();
 	int onPe=homePe(idx);
 	if (onPe!=CkMyPe()) 
@@ -1157,7 +1157,7 @@ CmiBool CkLocMgr::deliverUnknown(CkArrayMessage *msg, CmiBool immediate)
 
 CmiBool CkLocMgr::demandCreateElement(CkArrayMessage *msg,int onPe)
 {
-	magic.check();
+	CK_MAGICNUMBER_CHECK
 	const CkArrayIndex &idx=msg->array_index();
 	int chareType=_entryTable[msg->array_ep()]->chareIdx;
 	int ctor=_chareTable[chareType]->getDefaultCtor();
@@ -1185,7 +1185,7 @@ CmiBool CkLocMgr::demandCreateElement(CkArrayMessage *msg,int onPe)
 //This message took several hops to reach us-- fix it
 void CkLocMgr::multiHop(CkArrayMessage *msg)
 {
-	magic.check();
+	CK_MAGICNUMBER_CHECK
 	int srcPe=msg->array_getSrcPe();
 	if (srcPe==CkMyPe())
 		DEB((AA"Odd routing: local element %s is %d hops away!\n"AB,idx2str(msg),msg->array_hops()));
@@ -1237,7 +1237,7 @@ void CkLocMgr::pupElementsFor(PUP::er &p,CkLocRec_local *rec)
 /// Migrate this element to another processor.
 void CkLocMgr::migrate(CkLocRec_local *rec,int toPe)
 {
-	magic.check();
+	CK_MAGICNUMBER_CHECK
 	if (toPe==CkMyPe()) return; //You're already there!
 
 	int localIdx=rec->getLocalIndex();
@@ -1332,9 +1332,12 @@ void CkLocMgr::migrateIncoming(CkArrayElementMigrateMessage *msg)
 }
 
 /********************* LocMgr: UTILITY ****************/
-void CkMagicNumber_impl::badMagicNumber(int expected) const
+void CkMagicNumber_impl::badMagicNumber(
+	int expected,const char *file,int line,void *obj) const
 {
-	CkError("Expected magic number 0x%08x; found 0x%08x!\n",expected,magic);
+	CkError("FAILURE on pe %d, %s:%d> Expected %p's magic number "
+		"to be 0x%08x; but found 0x%08x!\n", CkMyPe(),file,line,obj,
+		expected, magic);
 	CkAbort("Bad magic number detected!  This implies either\n"
 		"the heap or a message was corrupted!\n");
 }
