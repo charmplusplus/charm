@@ -49,15 +49,15 @@ public:
 /**
  * There is only one Checkpoint Manager in the whole system
 **/
-class CkCheckpointMgr : public Group {
+class CkCheckpointMgr : public CBase_CkCheckpointMgr {
 private:
 	CkCallback restartCB;
 public:
 	CkCheckpointMgr() { }
-	CkCheckpointMgr(CkMigrateMessage *m):Group(m) { }
+	CkCheckpointMgr(CkMigrateMessage *m):CBase_CkCheckpointMgr(m) { }
 	void Checkpoint(const char *dirname,CkCallback& cb);
 	void SendRestartCB(CkReductionMsg *m);
-	void pup(PUP::er& p){ Group::pup(p); p|restartCB; }
+	void pup(PUP::er& p){ CBase_CkCheckpointMgr::pup(p); p|restartCB; }
 };
 
 typedef struct _GroupInfo{

@@ -104,7 +104,6 @@ void CkCheckpointMgr::SendRestartCB(CkReductionMsg *m){
 	restartCB.send(); 
 }
 
-// handle readonly table and data
 void CkPupROData(PUP::er &p)
 {
 	int _numReadonlies;
@@ -147,12 +146,12 @@ GroupInfo *CkPupGroupData(PUP::er &p, int &numGroups)
 
 	if (!p.isUnpacking()) {
 	  numGroups = CkpvAccess(_groupIDTable)->size();
-	  DEBCHK("[%d]CkStartCheckpoint: numGroups = %d\n",CkMyPe(),numGroups);
 	}
 	p|numGroups;
 	if (p.isUnpacking()) {
 	  if(CkMyPe()==0) { CkpvAccess(_numGroups) = numGroups+1; }else{ CkpvAccess(_numGroups) = 1; }
 	}
+	DEBCHK("[%d] CkPupGroupData %s: numGroups = %d\n", CkMyPe(),p.typeString(),numGroups);
 
 	GroupInfo *tmpInfo = new GroupInfo [numGroups];
 	if (!p.isUnpacking()) {
@@ -163,8 +162,9 @@ GroupInfo *CkPupGroupData(PUP::er &p, int &numGroups)
 		tmpInfo[i].MigCtor = _chareTable[ent.getcIdx()]->migCtor;
 		tmpInfo[i].DefCtor = _chareTable[ent.getcIdx()]->defCtor;
 		strncpy(tmpInfo[i].name,_chareTable[ent.getcIdx()]->name,255);
-		DEBCHK("[%d]CkStartCheckpoint: group %s has useDefCtor=%d\n",CkMyPe(),
-			tmpInfo[i].name,tmpInfo[i].useDefCtor);
+		DEBCHK("[%d] CkPupGroupData: %s group %s has useDefCtor=%d\n",
+			CkMyPe(), p.typeString(), tmpInfo[i].name,
+			tmpInfo[i].useDefCtor);
 
 		if(tmpInfo[i].useDefCtor==0 && tmpInfo[i].MigCtor==-1) {
 			char buf[512];
@@ -186,7 +186,7 @@ GroupInfo *CkPupGroupData(PUP::er &p, int &numGroups)
 		  CkCreateLocalGroup(gID, eIdx, env);
 		}
 		IrrGroup *gobj = CkpvAccess(_groupTable)->find(gID).getObj();
-		if(!tmpInfo[i].useDefCtor){
+		if(!tmpInfo[i].useDefCtor) {
                         gobj->pup(p);
                         DEBCHK("Group PUP'ed: gid = %d, name = %s\n",
 				gobj->ckGetGroupID().idx,
@@ -206,13 +206,13 @@ GroupInfo *CkPupNodeGroupData(PUP::er &p, int &numNodeGroups)
 	int i;
 	if (!p.isUnpacking()) {
 	  numNodeGroups = CksvAccess(_nodeGroupIDTable).size();
-	  DEBCHK("[%d]CkStartCheckpoint: numNodeGroups = %d\n",CkMyPe(),numNodeGroups);
 	}
 	p|numNodeGroups;
 	if (p.isUnpacking()) {
 	  if(CkMyPe()==0){ CksvAccess(_numNodeGroups) = numNodeGroups+1; }
 	  else { CksvAccess(_numNodeGroups) = 1; }
 	}
+	DEBCHK("[%d] CkPupNodeGroupData %s: numNodeGroups = %d\n",CkMyPe(),p.typeString(),numNodeGroups);
 
 	GroupInfo *tmpInfo2 = new GroupInfo [numNodeGroups];
 	if (!p.isUnpacking()) {
@@ -251,7 +251,7 @@ GroupInfo *CkPupNodeGroupData(PUP::er &p, int &numNodeGroups)
 void CkStartCheckpoint(char* dirname,const CkCallback& cb){
 	int i;
 	char filename[1024];
-	CkPrintf("Checkpoint starting in %s\n",dirname);
+	CkPrintf("[%d] Checkpoint starting in %s\n", CkMyPe(), dirname);
 	CmiMkdir(dirname);
 	
 	// save readonlys, and callback BTW
