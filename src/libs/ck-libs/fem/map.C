@@ -498,9 +498,9 @@ void fem_split(const FEM_Mesh *mesh,int nchunks,int *elem2chunk,
 
 	s.buildCommLists();
 	
-	s.addGhosts(nGhostLayers,g);
-	
 	s.separateSparse();
+	
+	s.addGhosts(nGhostLayers,g);
 	
 	//Split up and send out the mesh
 	for (int c=0;c<nchunks;c++)
@@ -695,10 +695,15 @@ void splitter::add(const ghostLayer &g)
 			  for (int u=0;u<g.elem[t].tuplesPerElem;u++) {
 				int tuple[tupleTable::MAX_TUPLE];
 				for (i=0;i<g.nodesPerTuple;i++) {
-					int n=conn[elem2tuple[i+u*g.nodesPerTuple]];
-					if (!ghostNode[n]) 
-						break; //This tuple has a bad node-- skip it
-					tuple[i]=n;
+					int eidx=elem2tuple[i+u*g.nodesPerTuple];
+					if (eidx==-1) { //"not-there" node--
+					  tuple[i]=-1; //Don't map via connectivity
+					} else { //Ordinary node
+					  int n=conn[eidx];
+					  if (!ghostNode[n]) 
+						break; //This tuple doesn't lie on a ghost boundary
+					  tuple[i]=n;
+					}
 				}
 				if (i==g.nodesPerTuple) 
 				{ //This was a good tuple-- add it
