@@ -1,5 +1,45 @@
-\subsection{Load Balancing Framework}
+
+\subsection{Load Balancing}
+\label{loadbalancing}
+
+Charm++supports Load Balancing, enabled by the fact there are a large
+number of chares or chare-array-elements typically available to map to
+existing processors, and that they can be migrated at runtime.
+
+Many parallel applications, especially physical simulations, are
+iterative in nature. They may contain a series of time-steps, and/or
+iterative solvers that run to convergence. For such computations,
+typically, the heuristic principle that we call "principle of
+persistence" holds: the computational loads and communication patterns
+between objects (chares) tend to persist over time, even in dynamic
+applications. In such cases, recent past is a good predictor of near
+future. Measurement-based chare migration strategies are useful in
+this context. Currently these apply to chare-array elements, but they
+may be extended to chares in future.
+
+For applications without such iterative structure, or with iterative
+structure but without the predictability (i.e. where the principle of
+persistence does not apply), Charm++ supports "seed balancers" that
+move seeds for new chares among processors (possibly repeatedly) to
+achieve load balance. These strategies are currently available for
+chares alone (and may be extended to chare-arrays in future). Seed
+balancers were the original load balancers provided in Charm since the
+late '80s. They are extremely useful for state-space search
+applications, and are also useful in other computations, as well as in
+conjunction with migration strategies.
+
+For iterative computations when the there is a correlation between
+iterations/steps but either it is not strong or the machine
+environment is not predictable (noise due to OS interrupts on small
+time steps, or time-shared desk-top machines), one can use a
+combination of the two kinds of strategies. The base-line load
+balancing is provided by migration strategies; But in each iteration
+one also spawns off work in the form of chares that can run on any
+processor. The seed balancer will handle such work as it arises.
+
+\subsubsection{Measurement-based Object Migration Strategies}
 \label{lbFramework}
+\label{migrationlb}
 
 In \charmpp{}, objects(except groups, nodegroups) can migrate from 
 processor to processor at run-time. Object migration can potentially 
@@ -18,7 +58,7 @@ load and communication structure during execution and stores them into a
 \kw{load balancing database}. \charmpp{} then provides a collection of 
 \kw{load balancing strategies} whose job is to decide on a new mapping of 
 objects to processors based on the information from the database.
-This is made possible because we can reasonably assume that objects
+This is possible when we can reasonably assume that objects
 in \charmpp{} application tend to exhibit temporal correlation in
 their computation and communication patterns, i.e. future can be to some
 extent predicted using the historical measurement data, allowing effective
@@ -392,7 +432,7 @@ This will collect data on files data.dat.{2,3,4,5}. Then, we can use this data t
 \end{verbatim}
 
 
-\subsection{Load Balancing Chares - seed load balancers}
+\subsubsection{Load Balancing Chares - seed load balancers}
 \label{seedlb}
 
 Seed load balancing involves the movement of object creation messages, or 
@@ -433,6 +473,3 @@ use link time command line option {\bf -balance foo}.
 All seed laod balaner modules should be compiled in the form of library
 under charm/lib, named as {\em libcldb-foo.a}, where {\em foo} is the strategy 
 name as is used in the link time option.
-
-
-
