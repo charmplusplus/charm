@@ -28,9 +28,9 @@ void Generate(char *interfacefile)
 
   ofstream top(topname), bot(botname) ;
 
-  sprintf(definename, "CI_%s_TOP_H", modulename);
+  sprintf(definename, "CI_%s_TOP_H", thismodule->name);
   top << "#ifndef " << definename << "\n#define " << definename << endl;
-  sprintf(definename, "CI_%s_BOT_H", modulename);
+  sprintf(definename, "CI_%s_BOT_H", thismodule->name);
   bot << "#ifndef " << definename << "\n#define " << definename << endl;
 
   GenerateStructsFns(top, bot) ;
