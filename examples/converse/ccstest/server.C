@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include "converse.h"
 #include "conv-ccs.h"
+#include <stdlib.h>
+#include <string.h>
 
 void handler(char *msg)
 {
@@ -16,8 +18,8 @@ void handler(char *msg)
 void user_main(int argc, char **argv)
 {
 int i;
-  CcsRegisterHandler("ping2", handler);
-  CcsRegisterHandler("ping", handler);
+  CcsRegisterHandler("ping2", (CmiHandler)handler);
+  CcsRegisterHandler("ping", (CmiHandler)handler);
   CmiPrintf("CCS Handlers registered.  Waiting for net requests...\n");
   
 }

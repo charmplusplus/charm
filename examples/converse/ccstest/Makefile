@@ -9,8 +9,8 @@ server: server.o
 client: client.o
 	$(CHARMC) -o $@ client.o -seq -language c++ -lccs-client
 
-server.o: server.c
-	$(CHARMC) -c server.c -language converse++
+server.o: server.C
+	$(CHARMC) -c server.C -language converse++
 
 client.o: client.C
 	$(CHARMC) -c client.C -seq -language c++ 
