@@ -87,8 +87,7 @@ class CkBitVector {
   bool operator>=(const CkBitVector &b) const { return *this==b||*this<b; }
 
   // Print the bit vector to either output stream type
-  friend CkOutStream & operator<< (CkOutStream &ckos, CkBitVector const b);
-  friend CkErrStream & operator<< (CkErrStream &ckes, CkBitVector const b);
+  friend Ck_std_ostream & operator<< (Ck_std_ostream &ckos, CkBitVector const b);
 
   // And for charm
   void pup(PUP::er &p);
