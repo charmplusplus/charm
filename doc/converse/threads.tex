@@ -82,6 +82,22 @@ executes {\tt \{ CthAwaken(CthSelf()); CthSuspend(); \} }.  This combination
 gives up control temporarily, but ensures that control will eventually
 return.}
 
+\function{CthThread CthGetNext(CthThread t)}
+\index{CthGetNext}
+\desc{Each thread contains space for the user to store a ``next'' field (the
+functions listed here pay no attention to the contents of this field).
+This field is typically used by the implementors of mutexes, condition
+variables, and other synchronization abstractions to link threads
+together into queues.  This function returns the contents of the next field.}
+
+\function{void CthSetNext(CthThread t, CthThread next)}
+\index{CthGetNext}
+\desc{Each thread contains space for the user to store a ``next'' field (the
+functions listed here pay no attention to the contents of this field).
+This field is typically used by the implementors of mutexes, condition
+variables, and other synchronization abstractions to link threads
+together into queues.  This function sets the contents of the next field.}
+
 \section{Thread Scheduling Hooks}
 
 Normally, when you CthAwaken a thread, it goes into the primary
