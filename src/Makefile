@@ -453,7 +453,7 @@ xl-sfspec.l.o: xl-sfspec.l.c
 xl-sfspec.l.c: xl-sfspec.l
 	flex -t xl-sfspec.l > xl-sfspec.l.c
 
-xl-yacc.tab.c xl-yacc.tab.h: xl-yacc.y
+xl-yacc.tab.c: xl-yacc.y
 	bison -d xl-yacc.y
 
 xl-lexsp.l.c: xl-lexsp.l
@@ -465,7 +465,7 @@ xl-lexsp.l.c: xl-lexsp.l
 #
 ###############################################################################
 
-XPHEADERS=xp-extn.h xp-t.tab.h
+XPHEADERS=xp-extn.h xp-t.tab.c
 
 CHARMXLATXX=xp-process.o xp-table.o xp-t.tab.o xp-lexer.l.o
 
@@ -488,7 +488,7 @@ xp-lexer.l.o: xp-lexer.l.c $(XPHEADERS)
 xp-sfilter.l.o: xp-sfilter.l.c $(XPHEADERS)
 	$(CHARMC) -seq xp-sfilter.l.c
 
-xp-t.tab.h xp-t.tab.c: xp-t.y
+xp-t.tab.c: xp-t.y
 	bison -d xp-t.y
 
 xp-lexer.l.c: xp-lexer.l
@@ -518,7 +518,7 @@ conv-cpm.l.c: conv-cpm.l
 #
 ###############################################################################
 
-XIHEADERS=xi-symbol.h xi-parse.tab.h
+XIHEADERS=xi-symbol.h xi-parse.tab.c
 CHARMXI=xi-main.o xi-symbol.o xi-generate.o xi-parse.tab.o xi-scan.l.o
 
 charmxi: $(CHARMXI)
@@ -541,7 +541,7 @@ xi-scan.l.o: xi-scan.l.c $(XIHEADERS)
 	cp xi-scan.l.c xi-scan.l.C
 	$(CHARMC) -seq xi-scan.l.C
 
-xi-parse.tab.h xi-parse.tab.c: xi-parse.y
+xi-parse.tab.c: xi-parse.y
 	bison -d xi-parse.y
 
 xi-scan.l.c: xi-scan.l
