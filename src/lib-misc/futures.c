@@ -72,8 +72,17 @@ for (i=0; i<size; i++ )
 if (i==size) { CmiPrintf(" future creation failed.\n"); return (-1); }
 futures[ i].ready = WAITING;
 futures[ i].waiters = NULL;
-CmiPrintf("new future at: %d\n", i);
 return(i);
+
+}
+
+int destroyFuture(int key)
+     /* this function added on 7/22/97. -- sanjay */
+{
+  futures[ i].ready = FREE;
+  futures[ i].waiters = NULL;
+  CmiFree(futures[ i].value);
+  futures[ i].value = NULL;
 
 }
 
@@ -128,6 +137,4 @@ void* waitFuture (int key, int free)
        return (reallyWait (key));
     }
   }
-
-
 
