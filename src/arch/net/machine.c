@@ -2057,7 +2057,7 @@ void ConverseInitPE()
 void ConverseExit()
 {
   ctrl_sendone(120,"aset done %d TRUE\n",CmiMyPe());
-  while (Cmi_shutdown_done == 0) jsleep(0, 250000);
+  while (Cmi_shutdown_done == 0) pause();
   ctrl_sendone(120,"ending\n");
   if (CmiMyRank()==0) log_done();
 }
