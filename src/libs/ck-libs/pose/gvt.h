@@ -117,6 +117,7 @@ class PVT : public Group {
   void reportReduce(UpdateMsg *);
   /// Adds incoming send/recv information to a list
   void addSR(SRentry **SRs, SRentry *e, POSE_TimeType og, int ne);
+  int getNumObjs() { return objs.getNumObjs(); }
 };
 
 /// GVT chare group for estimating GVT

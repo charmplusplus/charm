@@ -22,8 +22,8 @@
 //#define DETERMINISTIC_EVENTS 1
 
 /// Uncomment this to turn on coarse memory management
-//#define MEM_COARSE
-#define MAX_USAGE 10   // maximum uncommits per object for coarse mem. man.
+#define MEM_COARSE
+#define MAX_USAGE 10000   // maximum uncommits per object for coarse mem. man.
 
 /// Uncomment to save time on memory allocation and freeing
 #define MSG_RECYCLING 1

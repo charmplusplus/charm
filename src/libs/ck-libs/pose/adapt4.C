@@ -43,21 +43,22 @@ void adapt4::Step()
   //	     timeLeash, offset, eq->currentPtr->timestamp);
   //if (offset < 0) offset = POSE_TimeMax;
   // Shorten the leash as we near POSE_endtime
-  if ((POSE_endtime > POSE_UnsetTS) && ((lastGVT+offset > POSE_endtime) ||
-					(lastGVT+offset <= POSE_UnsetTS)))
+  if ((POSE_endtime > POSE_UnsetTS) && ((offset > POSE_endtime) ||
+					(offset <= POSE_UnsetTS)))
     offset = POSE_endtime;
 
   ev = eq->currentPtr;
-  //  CkPrintf("offset=%d timeLeash=%d avgRBoffset=%d specEventCount=%d eventCount=%d\n", offset, timeLeash, avgRBoffset, specEventCount, eventCount);
+  //CkPrintf("Object %d offset=%d timeLeash=%d itersAllowed=%d specEventCount=%d eventCount=%d\n", parent->thisIndex, offset, timeLeash, itersAllowed, specEventCount, eventCount);
   while ((ev->timestamp > POSE_UnsetTS) && (ev->timestamp <= offset) &&
 	 (itersAllowed > 0)) { 
 #ifdef MEM_COARSE
     // note: first part of check below ensures we don't deadlock:
     //       can't advance gvt if we don't execute events with timestamp > gvt
-    if (((eq->frontPtr->timestamp > lastGVT) ||
-         (eq->frontPtr->timestamp < ev->prev->timestamp)) &&
-        (eq->mem_usage > MAX_USAGE))
+    if ((ev->prev->timestamp > lastGVT) && 
+	(eq->mem_usage > MAX_USAGE/localPVT->getNumObjs() + STORE_RATE)) {
+      //      CkPrintf("Object %d waiting for new GVT: mem_usage=%d prev=%d gvt=%d\n", parent->thisIndex, eq->mem_usage, ev->prev->timestamp, lastGVT);
       break;
+    }
 #endif
     iter++;
     itersAllowed--;
