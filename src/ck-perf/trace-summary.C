@@ -61,7 +61,11 @@ void CkSummary_MarkEvent(int eventType)
 
 PhaseEntry::PhaseEntry() 
 {
-  for (int i=0; i<MAX_ENTRIES; i++) {
+  nEPs = _numEntries+10;
+  count = new int[nEPs];
+  times = new double[nEPs];
+  maxtimes = new double[nEPs];
+  for (int i=0; i<nEPs; i++) {
     count[i] = 0;
     times[i] = 0.0;
     maxtimes[i] = 0.;
@@ -96,7 +100,7 @@ void SumLogPool::addEventType(int eventType, double time)
    markcount ++;
 }
 
-SumLogPool::SumLogPool(char *pgm) : phaseTab(MAX_PHASES) 
+SumLogPool::SumLogPool(char *pgm) : numBins(0), phaseTab(MAX_PHASES) 
 {
    if (TRACE_CHARM_PE() == 0) return;
    int i;
@@ -104,7 +108,6 @@ SumLogPool::SumLogPool(char *pgm) : phaseTab(MAX_PHASES)
    if (poolSize % 2) poolSize++;	// make sure it is even
    pool = new BinEntry[poolSize];
    _MEMCHECK(pool);
-   numEntries = 0;
    char pestr[10];
    sprintf(pestr, "%d", CkMyPe());
    int len = strlen(pgm) + strlen(".sum.") + strlen(pestr) + 1;
@@ -122,10 +125,6 @@ SumLogPool::SumLogPool(char *pgm) : phaseTab(MAX_PHASES)
     }
    }
 
-   epSize = MAX_ENTRIES;
-   epInfo = new SumEntryInfo[epSize];
-   _MEMCHECK(epInfo);
-
    // event
    markcount = 0;
 
@@ -141,12 +140,19 @@ SumLogPool::SumLogPool(char *pgm) : phaseTab(MAX_PHASES)
    }
 }
 
+void SumLogPool::initMem()
+{
+   epInfoSize = _numEntries+10;
+   epInfo = new SumEntryInfo[epInfoSize];
+   _MEMCHECK(epInfo);
+}
+
 void SumLogPool::write(void) 
 {
   int i;
   unsigned int j;
 
-  fprintf(fp, "ver:%3.1f %d/%d count:%d ep:%d interval:%e", CkpvAccess(version), CkMyPe(), CkNumPes(), numEntries, _numEntries, CkpvAccess(binSize));
+  fprintf(fp, "ver:%3.1f %d/%d count:%d ep:%d interval:%e", CkpvAccess(version), CkMyPe(), CkNumPes(), numBins, _numEntries, CkpvAccess(binSize));
   if (CkpvAccess(version)>=3.0)
   {
     fprintf(fp, " phases:%d", phaseTab.numPhasesCalled());
@@ -158,7 +164,7 @@ void SumLogPool::write(void)
   int last=pool[0].getU();
   pool[0].writeU(fp, last);
   int count=1;
-  for(j=1; j<numEntries; j++) {
+  for(j=1; j<numBins; j++) {
     int u = pool[j].getU();
     if (last == u) {
       count++;
@@ -241,14 +247,14 @@ void SumLogPool::writeSts(void)
 
 void SumLogPool::add(double time, int pe) 
 {
-  new (&pool[numEntries++]) BinEntry(time);
-  if(poolSize==numEntries) shrink();
+  new (&pool[numBins++]) BinEntry(time);
+  if(poolSize==numBins) shrink();
 }
 
 void SumLogPool::setEp(int epidx, double time) 
 {
-  if (epidx >= epSize) {
-        CmiAbort("Too many entry points!!\n");
+  if (epidx >= epInfoSize) {
+        CmiAbort("Invalid entry point!!\n");
   }
   //CmiPrintf("set EP: %d %e \n", epidx, time);
   epInfo[epidx].setTime(time);
@@ -260,12 +266,12 @@ void SumLogPool::shrink(void)
 {
 //  double t = CmiWallTimer();
 
-  int entries = numEntries/2;
+  int entries = numBins/2;
   for (int i=0; i<entries; i++)
   {
      pool[i].setTime(pool[i*2].getTime() + pool[i*2+1].getTime());
   }
-  numEntries = entries;
+  numBins = entries;
   CkpvAccess(binSize) *= 2;
 
 //CkPrintf("Shrinked binsize: %f entries:%d takes %fs!!!!\n", CkpvAccess(binSize), numEntries, CmiWallTimer()-t);
@@ -430,6 +436,9 @@ void TraceSummary::beginComputation(void)
     _unpackChare = CkRegisterChare("dummy_unpack_chare", 0);
     _unpackEP = CkRegisterEp("dummy_unpack_ep", 0, _unpackMsg,_unpackChare);
   }
+
+  // initialze arrays becasue now the number of entries is known.
+  _logPool->initMem();
 }
 
 void TraceSummary::endComputation(void)

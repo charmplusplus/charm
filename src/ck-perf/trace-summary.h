@@ -22,8 +22,6 @@
 // time in seconds
 #define  BIN_SIZE	0.001
 
-#define  MAX_ENTRIES      500
-
 #define  MAX_MARKS       256
 
 #define  MAX_PHASES       10
@@ -52,14 +50,16 @@ class BinEntry {
 /// a phase entry for trace summary
 class PhaseEntry {
   private:
-    int count[MAX_ENTRIES];
-    double times[MAX_ENTRIES];
-    double maxtimes[MAX_ENTRIES];
+    int nEPs;
+    int *count;
+    double *times;
+    double *maxtimes;
   public:
     PhaseEntry();
+    ~PhaseEntry() { delete [] count; delete [] times; delete [] maxtimes; }
     /// one entry is called for 'time' seconds.
     void setEp(int epidx, double time) {
-	if (epidx>=MAX_ENTRIES) CmiAbort("Too many entry functions!\n");
+	if (epidx>=nEPs) CmiAbort("Too many entry functions!\n");
 	count[epidx]++;
 	times[epidx] += time;
 	if (maxtimes[epidx] < time) maxtimes[epidx] = time;
@@ -167,12 +167,12 @@ public:
 class SumLogPool {
   private:
     UInt poolSize;
-    UInt numEntries;
+    UInt numBins;
     BinEntry *pool;	/**< bins */
     FILE *fp, *stsfp ;
 
     SumEntryInfo  *epInfo;
-    int epSize;
+    UInt epInfoSize;
 
     /// a mark entry for trace summary
     typedef struct {
@@ -186,12 +186,13 @@ class SumLogPool {
   public:
     SumLogPool(char *pgm);
     ~SumLogPool();
+    void initMem();
     void write(void) ;
     void writeSts(void);
     void add(double time, int pe);
     void setEp(int epidx, double time);
     void clearEps() {
-      for(int i=0; i < epSize; i++) {
+      for(int i=0; i < epInfoSize; i++) {
 	epInfo[i].clear();
       }
     }
@@ -199,7 +200,7 @@ class SumLogPool {
     void addEventType(int eventType, double time);
     void startPhase(int phase) { phaseTab.startPhase(phase); }
     BinEntry *bins() { return pool; }
-    int getNumEntries() { return numEntries; }
+    int getNumEntries() { return numBins; }
 };
 
 /// class for recording trace summary events 
