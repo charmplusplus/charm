@@ -336,8 +336,16 @@ $VERSION/tmp/system_ln "../../src/scripts/Makefile" $VERSION/tmp/Makefile
 ConvUsr="$VERSION/tmp/conv-mach-pre.sh"
 echo "Generating $ConvUsr"
 echo > $ConvUsr
-test -n "$LIBDIR" && echo "CMK_LIBDIR=\"$LIBDIR\"" >> $ConvUsr
-test -n "$INCDIR" && echo "CMK_INCDIR=\"$INCDIR\"" >> $ConvUsr
+if test -n "$LIBDIR" 
+then
+  echo "OPTS_LD=\"$LIBDIR\"" >> $ConvUsr
+  echo "OPTS_LDXX=\"$LIBDIR\"" >> $ConvUsr
+fi
+if test -n "$INCDIR" 
+then
+  echo "OPTS_CC=\"$INCDIR\"" >> $ConvUsr
+  echo "OPTS_CXX=\"$INCDIR\"" >> $ConvUsr
+fi
 chmod +x $ConvUsr
 
 # Create conv-mach-opt headers with special build-time options
