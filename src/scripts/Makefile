@@ -75,7 +75,7 @@ translators: charmxi conv-cpm
 pose:  charm++
 	cd libs/ck-libs/pose && $(MAKE)
 
-msa:
+msa: charm++
 	cd libs/ck-libs/multiphaseSharedArrays && $(MAKE)
 
 jade: charm++ msa
