@@ -124,15 +124,15 @@ CVLIBS=libconv-core.a libconv-cplus-n.a libconv-cplus-y.a libldb-rand.o libldb-s
 
 LIBCONV_CORE=threads.o convcore.o conv-conds.o spantree.o queueing.o fifo.o msgmgr.o memory.o cpm.o cpthreads.o futures.o cldb.o random.o debug-message.o debug-object.o info.o
 
-converse: basics QuickThreads/libqt.a $(CVLIBS) conv-host-if-needed conv-cpm
+converse: basics QuickThreads/libckqt.a $(CVLIBS) conv-host-if-needed conv-cpm
 
 conv-host-if-needed:
 	if [ -f conv-host.c ] ; then make conv-host OPTS='$(OPTS)' ; fi
 
-QuickThreads/libqt.a:
+QuickThreads/libckqt.a:
 	csh -fc 'source conv-mach.csh;cd QuickThreads;./configure $$CMK_QT'
 	cd QuickThreads ; make qt
-	cp QuickThreads/libqt.a ../lib
+	cp QuickThreads/libqt.a ../lib/libckqt.a
 
 conv-host: conv-host.c
 	../bin/charmc $(OPTS) -c -seq -DSILENT conv-host.c
