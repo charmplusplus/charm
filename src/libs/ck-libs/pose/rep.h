@@ -29,6 +29,8 @@ class rep
   double ort;
   /// Flag to signify if this is a checkpointed copy of the real object
   int copy;                
+  /// Checkpointed seed for POSE_rand
+  unsigned int prand_seed;
   /// Flag indicating this object uses anti-methods rather than checkpoints
   int anti_methods;
   /// Basic Constructor
@@ -44,7 +46,7 @@ class rep
   }
   /// Initializing Constructor
   rep(POSE_TimeType init_ovt) { 
-    ovt = init_ovt; ort = 0.0; copy = 0; anti_methods = 0; 
+    ovt = init_ovt; ort = 0.0; copy = 0; anti_methods = 0;
   }
   /// Destructor
   virtual ~rep() { }
@@ -79,6 +81,7 @@ class rep
     ort = obj.ort;
     myHandle = obj.myHandle;
     anti_methods = obj.anti_methods;
+    prand_seed = obj.prand_seed;
     return *this;
   }
   /// Dump all data fields
@@ -90,12 +93,15 @@ class rep
   /// Pack/unpack/sizing operator
   /** Derived classes must provide pup */
   virtual void pup(PUP::er &p) { 
-    p(ovt); p(ort); p(myHandle); p(copy); p(anti_methods); 
+    p(ovt); p(ort); p(myHandle); p(copy); p(anti_methods); p(prand_seed);
   }
 #ifdef SEQUENTIAL_POSE
   void checkpoint(rep *) { }
   void restore(rep *) { }
 #endif  
+  void POSE_srand(unsigned int pseed) { prand_seed = pseed; }
+  int POSE_rand() { int rnum; srand(prand_seed); rnum = rand(); prand_seed = rnum+INT_MAX; return rnum; }
+  unsigned int POSE_urand() { int rnum; srand(prand_seed); rnum = rand(); prand_seed = rnum+INT_MAX; return prand_seed; }
 };
 
 #endif

@@ -19,6 +19,7 @@ void rep::init(eventMsg *m) {
   myStrat = m->str;
   myHandle = m->parent->thisIndex;
   anti_methods = 0;
+  prand_seed = myHandle;
 }
 
 /// Timestamps event message, sets priority, and records in spawned list

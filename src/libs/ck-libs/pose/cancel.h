@@ -49,8 +49,8 @@ class CancelList {
   void Insert(POSE_TimeType ts, eventID e) {
     CancelNode *newnode = new CancelNode(ts, e);
     count++;
-    if (count%1000 == 0) 
-      CkPrintf("WARNING: CancelList has %d events!\n", count);
+    /*if (count%1000 == 0) 
+      CkPrintf("WARNING: CancelList has %d events!\n", count); */
     if ((ts < earliest) || (earliest < 0)) // new event has earliest timestamp
       earliest = ts;
     newnode->next = cancellations; // place at front of list
