@@ -10,6 +10,7 @@
 #undef CkMyRank
 #undef CkMyNode
 #undef CkNumNodes
+#undef CkMyNodeSize
 
 #undef CmiSyncSend
 #undef CmiSyncSendAndFree
@@ -50,6 +51,7 @@ inline int CkMyPe() { return BgMyNode(); }
 inline int CkNumPes() { int x,y,z; BgGetSize(&x, &y, &z); return (x*y*z); }
 inline int CkMyRank() { return 0; }
 inline int BgNodeRank() { return BgMyRank(); }
+inline int CkMyNodeSize() { return 1; }
 
 static inline void CmiSyncSend(int pe, int nb, char *m) 
 {
@@ -130,6 +132,7 @@ static inline int CkMyRank() { return BgGetThreadID(); }
 static inline int BgNodeRank() { return BgMyRank()*BgGetNumWorkThread()+BgGetThreadID(); }
 static inline int CkMyNode() { return BgMyNode(); }
 static inline int CkNumNodes() { return BgNumNodes(); }
+static inline int CkMyNodeSize() { return BgGetNumWorkThread(); }
 
 static inline void CmiSyncSend(int pe, int nb, char *m) 
 {

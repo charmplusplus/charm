@@ -13,7 +13,7 @@ CkArrayReductionMgr::CkArrayReductionMgr(){
 	//ARPRINT("Array ReductionMgr Constructor called %d\n",thisgroup);
 	if(CkMyRank()== 0){
 	redNo=0;
-	size = CmiMyNodeSize();
+	size = CkMyNodeSize();
 	count = 0;
 	lockCount = CmiCreateLock();
 	}
