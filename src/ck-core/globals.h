@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.10  1995-09-20 15:40:58  gursoy
+ * Revision 2.11  1995-09-20 16:07:56  jyelon
+ * fyab
+ *
+ * Revision 2.10  1995/09/20  15:40:58  gursoy
  * added new handler indexes
  *
  * Revision 2.9  1995/09/14  20:49:01  jyelon
@@ -125,6 +128,7 @@ CpvExtern(int, LDB_ELEM_SIZE);
 /* Handlers for various message-types */
 CsvExtern(int, BUFFER_INCOMING_MSG_Index);
 CsvExtern(int, MAIN_HANDLE_INCOMING_MSG_Index);
+CsvExtern(int, HANDLE_INCOMING_MSG_Index);
 CsvExtern(int, HANDLE_INIT_MSG_Index);
 CsvExtern(int, CkProcIdx_ForChareMsg);
 CsvExtern(int, CkProcIdx_DynamicBocInitMsg);
