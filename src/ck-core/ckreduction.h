@@ -54,10 +54,9 @@ public:
 	//Combine the data passed by each element into an list of setElements.
 	// Each element may contribute arbitrary data (with arbitrary length).
 		set,
-		
-	//These are the user-defined reducers
-		user0,user1,user2,user3,user4,user5,user6,user7,
-		user8,user9,userA,userB,userC,userD,userE,userF
+
+	//Last system-defined reducer number (user-defined reducers follow)
+		lastSystemReducer
 	} reducerType;
 	
 	//This structure is used with the set reducer above,

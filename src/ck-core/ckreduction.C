@@ -662,7 +662,11 @@ The basic idea is to use the first message's data array as
  */
  
 static CkReductionMsg *invalid_reducer(int nMsg,CkReductionMsg **msg)
-{CkAbort("ERROR! Called the invalid reducer!\n");return NULL;}
+{
+	CkAbort("Called the invalid reducer type 0.  This probably\n"
+		"means you forgot to initialize your custom reducer index.\n");
+	return NULL;
+}
 
 #define SIMPLE_REDUCTION(name,dataType,typeStr,loop) \
 static CkReductionMsg *name(int nMsg,CkReductionMsg **msg)\
@@ -844,7 +848,7 @@ It's indexed by reducerType, so the order in this table
 must *exactly* match the reducerType enum declaration.
 The names don't have to match, but it helps.
 */
-int CkReduction::nReducers=16;//Number of reducers currently in table below
+int CkReduction::nReducers=CkReduction::lastSystemReducer;
 
 CkReduction::reducerFn CkReduction::reducerTable[CkReduction::MAXREDUCERS]={
     ::invalid_reducer,
