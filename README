@@ -35,8 +35,40 @@ What you need to do is as following:
 PICKING A VERSION
 =================
 
-First, you need to decide which version of charm++ to use.  Your
-choice is determined by three options:
+First, you need to decide which version of charm++ to use. 
+Here is a table for choosing correct version, for the detailed explanation
+of the options see the comments following the table.
+(Note: this table doesn't necessarily include all the current supported version,
+run ./build in charm top directory to check the latest versions.)
+
+Charm version          OS        Communication     Compiler  
+-------------       ---------    --------------   --------------------
+net-linux            PC Linux       UDP           GNU compiler
+net-linux-kcc        PC Linux       UDP           KAI C++ compiler
+net-linux-pgcc       PC Linux       UDP           Portland Group's C++ compiler
+net-linux-scyld      PC Linux     Scyld/UDP       GNU compiler
+net-linux-smp        PC Linux SMP workstations    GNU compiler
+mpi-linux            PC Linux       MPI           GNU compiler
+mpi-axp-cc           Alpha          MPI           DIGITAL C++ compiler  
+mpi-linux-axp        Alpha Linux    MPI           GNU compiler
+mpi-linux-axp-cxx    Alpha Linux    MPI           DIGITAL C++ compiler
+net-axp-cc           Alpha          UDP           DIGITAL C++ compiler
+net-cygwin           Win32/cygwin   UDP           GNU compiler
+net-win32            Win32          UDP           MS Visual C++
+net-sol-cc           Solaris        UDP           Sun WorkShop C++ Compiler
+net-sol              Solaris        UDP           GNU compiler
+net-irix             IRIX	    UDP           SGI C++ compiler
+net-irix-64          IRIX           UDP           SGI 64bits C++ compiler
+origin2000           Origin2000  shared-mem       SGI C++ compiler     
+mpi-origin           Origin2000     MPI           C++ compiler
+net-hp               HP-UX          UDP           GNU compiler
+net-hp-cc            HP-UX          UDP           HP-UX C++ compiler
+net-hp-acc           HP-UX          UDP           HP-UX aC++ compiler
+mpi-sp               AIX            MPI           AIX xlC Compiler 
+t3e                  Cray T3E    shared-mem       Cray C++ compiler
+
+
+Your choice is determined by three options:
 
 1.)  The way a parallel program written in Charm++ will communicate:
 
@@ -79,11 +111,14 @@ compiler:
 will override the choice of the GNU C/C++ compiler.
 	"-kcc"     Kuck & Associates C++ compiler.
 	"-acc"     Uses HP's aCC instead of CC.
+	"-pgcc"    Portland Group's ANSI and K&R C compiler.
 
 Some operating systems have other options, such as:
 	"-x86"     For Solaris, use PC hardware (instead of Sun).
 	"-axp"     For Linux, use Alpha hardware (instead of PC).
 	"-64"      For IRIX, use -64 instead of -32. 
+	"-scyld"   For Beowulf Cluster with Scyld.
+	"-vmi"	   For NCSA's Virtual Machine Interface.
 
 You may also choose to enable direct SMP support with a "-smp"
 version, which may result in more efficient communication in
