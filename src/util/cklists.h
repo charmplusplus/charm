@@ -64,7 +64,8 @@ class CkQ : private CkNoncopyable {
       for (int i=len; i>pos; i--)
         block[(i+first)%blklen] = block[(i-1+first)%blklen];
       block[(pos+first)%blklen] = elt;
-      len++;
+      if (pos > len) len = pos+1;
+      else len++;
     }
     //Peek at the n'th item from the queue
     T& operator[](size_t n) 
