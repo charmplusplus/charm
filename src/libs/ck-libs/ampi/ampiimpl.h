@@ -287,6 +287,7 @@ extern int mpi_nworlds;
 #define MPI_REDUCE_TAG  MPI_TAG_UB+12
 #define MPI_GATHER_TAG  MPI_TAG_UB+13
 #define MPI_SCATTER_TAG MPI_TAG_UB+14
+#define MPI_SCAN_TAG 	MPI_TAG_UB+15
 
 #if 0
 // This is currently not used.

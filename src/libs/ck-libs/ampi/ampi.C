@@ -1467,6 +1467,7 @@ CDECL
 int MPI_Barrier(MPI_Comm comm)
 {
   AMPIAPI("MPI_Barrier");
+  if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Barrier not allowed for Inter-communicator!");
   //HACK: Use collective operation as a barrier.
   MPI_Allreduce(NULL,NULL,0,MPI_INT,MPI_SUM,comm);
   return 0;
@@ -1477,6 +1478,7 @@ int MPI_Bcast(void *buf, int count, MPI_Datatype type, int root,
                          MPI_Comm comm)
 {
   AMPIAPI("MPI_Bcast");
+  if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Bcast not allowed for Inter-communicator!");
   if(comm==MPI_COMM_SELF) return 0;
   ampi *ptr = getAmpiInstance(comm);
   ptr->bcast(root, buf, count, type,comm);
@@ -1660,6 +1662,7 @@ int MPI_Reduce(void *inbuf, void *outbuf, int count, int type, MPI_Op op,
                int root, MPI_Comm comm)
 {
   AMPIAPI("MPI_Reduce");
+  if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Reduce not allowed for Inter-communicator!");
   if(comm==MPI_COMM_SELF) return copyDatatype(comm,type,count,inbuf,outbuf);
   ampi *ptr = getAmpiInstance(comm);
   CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type),inbuf,count,type,op);
@@ -1669,8 +1672,8 @@ int MPI_Reduce(void *inbuf, void *outbuf, int count, int type, MPI_Op op,
   ptr->contribute(msg);
 
   if (ptr->thisIndex == rootIdx){
-    /*HACK: Use recv() to block until reduction data comes back*/
     if(op==MPI_CONCAT) count*=ptr->getSize();
+    /*HACK: Use recv() to block until reduction data comes back*/
     ptr->recv(MPI_REDUCE_TAG, MPI_REDUCE_SOURCE, outbuf, count, type, MPI_REDUCE_COMM);
   }
   return 0;
@@ -1681,6 +1684,7 @@ int MPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
                   MPI_Op op, MPI_Comm comm)
 {
   AMPIAPI("MPI_Allreduce");
+  if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Allreduce not allowed for Inter-communicator!");
   if(comm==MPI_COMM_SELF) return copyDatatype(comm,type,count,inbuf,outbuf);
   ampi *ptr = getAmpiInstance(comm);
   CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type),inbuf,count,type,op);
@@ -1698,6 +1702,7 @@ int MPI_Iallreduce(void *inbuf, void *outbuf, int count, int type,
                    MPI_Op op, MPI_Comm comm, MPI_Request* request)
 {
   AMPIAPI("MPI_Allreduce");
+  if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Iallreduce not allowed for Inter-communicator!");
   ampi *ptr = getAmpiInstance(comm);
   if(comm==MPI_COMM_SELF) {
     // Just do a local copy: no need to do a reduction:
@@ -1720,6 +1725,7 @@ int MPI_Reduce_scatter(void* sendbuf, void* recvbuf, int *recvcounts,
                        MPI_Datatype datatype, MPI_Op op, MPI_Comm comm)
 {
   AMPIAPI("MPI_Reduce_scatter");
+  if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Reduce_scatter not allowed for Inter-communicator!");
   if(comm==MPI_COMM_SELF) return copyDatatype(comm,datatype,recvcounts[0],sendbuf,recvbuf);
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize();
@@ -1743,91 +1749,146 @@ int MPI_Reduce_scatter(void* sendbuf, void* recvbuf, int *recvcounts,
   return 0;
 }
 
-CDECL
-int MPI_Scan(void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype, MPI_Op op, MPI_Comm comm ){
-  AMPIAPI("MPI_Scan");
-
-  ampi *ptr = getAmpiInstance(comm);
-  int numvps = ptr->getSize();
-  CkDDT_DataType *ddt = ptr->getDDT()->getType(datatype);
-  int blklen = ddt->getSize(count);
-  void* tmpbuf = malloc(blklen*numvps); // holds P*count*sizeof(datatype)
-
-  MPI_Reduce(sendbuf, tmpbuf, count, datatype, MPI_CONCAT, 0, comm);
-
-  if(ptr->getRank()==0){
-    switch(datatype){
-    case MPI_FLOAT:
-      for(int i=1;i<numvps;i++)
-        for(int j=0;j<count;j++)
-        switch(op){
-	  case MPI_MAX:
-	    if(((float *)tmpbuf)[count*(i-1)+j] > ((float *)tmpbuf)[count*i+j]) ((float *)tmpbuf)[count*i+j] = ((float *)tmpbuf)[count*(i-1)+j];
-	    break;
-	  case MPI_MIN:
-	    if(((float *)tmpbuf)[count*(i-1)+j] < ((float *)tmpbuf)[count*i+j]) ((float *)tmpbuf)[count*i+j] = ((float *)tmpbuf)[count*(i-1)+j];
-	    break;
-	  case MPI_SUM:
-	    ((float *)tmpbuf)[count*i+j] += ((float *)tmpbuf)[count*(i-1)+j];
-	    break;
-	  case MPI_PROD:
-	    ((float *)tmpbuf)[count*i+j] *= ((float *)tmpbuf)[count*(i-1)+j];
-	    break;
-	  default:
-            ckerr << "Scan on type " << datatype << " with Op " << op << " not supported." << endl;
-	    CmiAbort("MPI_Scan()");
-	  }
+extern "C" void applyOp(MPI_Datatype datatype, MPI_Op op, int count, void* a, void* b) { // a[i] = a[i] op b[i]
+  switch(datatype){
+  case MPI_FLOAT:
+    switch(op){
+    case MPI_MAX:
+      for(int i=0;i<count;i++)
+        if(((float *)a)[i] < ((float *)b)[i])
+          ((float *)a)[i] = ((float *)b)[i];
       break;
-    case MPI_INT:
-      for(int i=1;i<numvps;i++)
-        for(int j=0;j<count;j++)
-          switch(op){
-	  case MPI_MAX:
-	    if(((int *)tmpbuf)[count*(i-1)+j] > ((int *)tmpbuf)[count*i+j]) ((int *)tmpbuf)[count*i+j] = ((int *)tmpbuf)[count*(i-1)+j];
-	    break;
-	  case MPI_MIN:
-	    if(((int *)tmpbuf)[count*(i-1)+j] < ((int *)tmpbuf)[count*i+j]) ((int *)tmpbuf)[count*i+j] = ((int *)tmpbuf)[count*(i-1)+j];
-	    break;
-	  case MPI_SUM:
-	    ((int *)tmpbuf)[count*i+j] += ((int *)tmpbuf)[count*(i-1)+j];
-	    break;
-	  case MPI_PROD:
-	    ((int *)tmpbuf)[count*i+j] *= ((int *)tmpbuf)[count*(i-1)+j];
-	    break;
-	  default:
-            ckerr << "Scan on type " << datatype << " with Op " << op << " not supported." << endl;
-	    CmiAbort("MPI_Scan()");
-	  }
+    case MPI_MIN:
+      for(int i=0;i<count;i++)
+        if(((float *)a)[i] > ((float *)b)[i]) 
+          ((float *)a)[i] = ((float *)b)[i];
       break;
-    case MPI_DOUBLE:
-      for(int i=1;i<numvps;i++)
-        for(int j=0;j<count;j++)
-          switch(op){
-	  case MPI_MAX:
-	    if(((double *)tmpbuf)[count*(i-1)+j] > ((double *)tmpbuf)[count*i+j]) ((double *)tmpbuf)[count*i+j] = ((double *)tmpbuf)[count*(i-1)+j];
-	    break;
-	  case MPI_MIN:
-	    if(((double *)tmpbuf)[count*(i-1)+j] < ((double *)tmpbuf)[count*i+j]) ((double *)tmpbuf)[count*i+j] = ((double *)tmpbuf)[count*(i-1)+j];
-	    break;
-	  case MPI_SUM:
-	    ((double *)tmpbuf)[count*i+j] += ((double *)tmpbuf)[count*(i-1)+j];
-	    break;
-	  case MPI_PROD:
-	    ((double *)tmpbuf)[count*i+j] *= ((double *)tmpbuf)[count*(i-1)+j];
-	    break;
-	  default:
-            ckerr << "Scan on type " << datatype << " with Op " << op << " not supported." << endl;
-	    CmiAbort("MPI_Scan()");
-	  }
+    case MPI_SUM:
+      for(int i=0;i<count;i++)
+        ((float *)a)[i] = (((float *)a)[i]) + (((float *)b)[i]);
+      break;
+    case MPI_PROD:
+      for(int i=0;i<count;i++)
+        ((float *)a)[i] = (((float *)a)[i]) * (((float *)b)[i]);
       break;
     default:
       ckerr << "Scan on type " << datatype << " with Op " << op << " not supported." << endl;
       CmiAbort("MPI_Scan()");
     }
+    break;
+  case MPI_DOUBLE:
+    switch(op){
+    case MPI_MAX:
+      for(int i=0;i<count;i++)
+        if(((double *)a)[i] < ((double *)b)[i]) 
+          ((double *)a)[i] = ((double *)b)[i];
+      break;
+    case MPI_MIN:
+      for(int i=0;i<count;i++)
+        if(((double *)a)[i] > ((double *)b)[i]) 
+          ((double *)a)[i] = ((double *)b)[i];
+      break;
+    case MPI_SUM:
+      for(int i=0;i<count;i++)
+        ((double *)a)[i] = (((double *)a)[i]) + (((double *)b)[i]);
+      break;
+    case MPI_PROD:
+      for(int i=0;i<count;i++)
+        ((double *)a)[i] = (((double *)a)[i]) * (((double *)b)[i]);
+      break;
+    default:
+      ckerr << "Scan on type " << datatype << " with Op " << op << " not supported." << endl;
+      CmiAbort("MPI_Scan()");
+    }
+    break;
+  case MPI_INT:
+    switch(op){
+    case MPI_MAX:
+      for(int i=0;i<count;i++)
+        if(((int *)a)[i] < ((int *)b)[i]) 
+          ((int *)a)[i] = ((int *)b)[i];
+      break;
+    case MPI_MIN:
+      for(int i=0;i<count;i++)
+        if(((int *)a)[i] > ((int *)b)[i]) 
+          ((int *)a)[i] = ((int *)b)[i];
+      break;
+    case MPI_SUM:
+      for(int i=0;i<count;i++)
+        ((int *)a)[i] = (((int *)a)[i]) + (((int *)b)[i]);
+      break;
+    case MPI_PROD:
+      for(int i=0;i<count;i++)
+        ((int *)a)[i] = (((int *)a)[i]) * (((int *)b)[i]);
+      break;
+    default:
+      ckerr << "Scan on type " << datatype << " with Op " << op << " not supported." << endl;
+      CmiAbort("MPI_Scan()");
+    }
+    break;
+  default:
+    ckerr << "Scan on type " << datatype << " with Op " << op << " not supported." << endl;
+    CmiAbort("MPI_Scan()");
+  }
+}
+
+/***** MPI_Scan algorithm (from MPICH) *******
+   recvbuf = sendbuf;
+   partial_scan = sendbuf;
+   mask = 0x1;
+   while (mask < size) {
+      dst = rank^mask;
+      if (dst < size) {
+         send partial_scan to dst;
+         recv from dst into tmp_buf;
+         if (rank > dst) {
+            partial_scan = tmp_buf + partial_scan;
+            recvbuf = tmp_buf + recvbuf;
+         }
+         else {
+            if (op is commutative)
+               partial_scan = tmp_buf + partial_scan;
+            else {
+               tmp_buf = partial_scan + tmp_buf;
+               partial_scan = tmp_buf;
+            }
+         }
+      }
+      mask <<= 1;
+   }
+ ***** MPI_Scan algorithm (from MPICH) *******/
+
+CDECL
+int MPI_Scan(void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype, MPI_Op op, MPI_Comm comm ){
+  AMPIAPI("MPI_Scan");
+  if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Scan not allowed for Inter-communicator!");
+  MPI_Status sts;
+  ampi *ptr = getAmpiInstance(comm);
+  int size = ptr->getSize();
+  int blklen = ptr->getDDT()->getType(datatype)->getSize(count);
+  int rank = ptr->getRank();
+  int mask = 0x1;
+  int dst;
+  void* tmp_buf = malloc(blklen);
+  void* partial_scan = malloc(blklen);
+  
+  memcpy(recvbuf, sendbuf, blklen);
+  memcpy(partial_scan, sendbuf, blklen);
+  while(mask < size){
+    dst = rank^mask;
+    if(dst < size){
+      MPI_Sendrecv(partial_scan,count,datatype,dst,MPI_SCAN_TAG,
+		   tmp_buf,count,datatype,dst,MPI_SCAN_TAG,comm,&sts);
+      applyOp(datatype,op,count,partial_scan,tmp_buf);
+      if(rank > dst){
+        applyOp(datatype,op,count,recvbuf,tmp_buf);
+      }
+      mask <<= 1;
+    }
   }
 
-  MPI_Scatter(tmpbuf, count, datatype, recvbuf, count, datatype, 0, comm);
-  free(tmpbuf);
+  free(tmp_buf);
+  free(partial_scan);
   return 0;
 }
 
@@ -2232,6 +2293,7 @@ int MPI_Allgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                   MPI_Comm comm)
 {
   AMPIAPI("MPI_Allgather");
+  if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Allgather not allowed for Inter-communicator!");
   if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize();
@@ -2262,6 +2324,7 @@ int MPI_Iallgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                     MPI_Comm comm, MPI_Request* request)
 {
   AMPIAPI("MPI_Iallgather");
+  if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Iallgather not allowed for Inter-communicator!");
   if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize();
@@ -2297,6 +2360,7 @@ int MPI_Allgatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                    MPI_Datatype recvtype, MPI_Comm comm)
 {
   AMPIAPI("MPI_Allgatherv");
+  if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Allgatherv not allowed for Inter-communicator!");
   if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize();
@@ -2327,6 +2391,7 @@ int MPI_Gather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                int root, MPI_Comm comm)
 {
   AMPIAPI("MPI_Gather");
+  if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Gather not allowed for Inter-communicator!");
   if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize();
@@ -2352,6 +2417,7 @@ int MPI_Gatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                 MPI_Datatype recvtype, int root, MPI_Comm comm)
 {
   AMPIAPI("MPI_Gatherv");
+  if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Gatherv not allowed for Inter-communicator!");
   if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize();
@@ -2378,6 +2444,7 @@ int MPI_Scatter(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                 int root, MPI_Comm comm)
 {
   AMPIAPI("MPI_Scatter");
+  if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Scatter not allowed for Inter-communicator!");
   if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize();
@@ -2406,6 +2473,7 @@ int MPI_Scatterv(void *sendbuf, int *sendcounts, int *displs, MPI_Datatype sendt
                  int root, MPI_Comm comm)
 {
   AMPIAPI("MPI_Scatterv");
+  if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Scatterv not allowed for Inter-communicator!");
   if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcounts[0],sendbuf,recvbuf);
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize();
@@ -2434,6 +2502,7 @@ int MPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                  MPI_Comm comm)
 {
   AMPIAPI("MPI_Alltoall");
+  if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Alltoall not allowed for Inter-communicator!");
   if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize();
@@ -2466,6 +2535,7 @@ int MPI_Ialltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                  MPI_Comm comm, MPI_Request *request)
 {
   AMPIAPI("MPI_Ialltoall");
+  if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Ialltoall not allowed for Inter-communicator!");
   if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize();
@@ -2499,6 +2569,7 @@ int MPI_Alltoallv(void *sendbuf, int *sendcounts, int *sdispls,
                   int *rdispls, MPI_Datatype recvtype, MPI_Comm comm)
 {
   AMPIAPI("MPI_Alltoallv");
+  if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Alltoallv not allowed for Inter-communicator!");
   if(comm==MPI_COMM_SELF) return 0;
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize();
