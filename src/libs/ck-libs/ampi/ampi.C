@@ -1324,18 +1324,13 @@ double MPI_Wtime(void)
 */
 ampiPersRequests::ampiPersRequests() {
   nrequests = 0;
-  nIrequests = 0;
-  firstfreeI = 0;
-  nATArequests = 0;
-  firstfreeATA = 0;
+  nirequests = 0;
+  firstfree = 0;
+  natarequests = 0;
   int i;
-  for(i=0;i<MAX_IREQS;i++) {
-    Irequests[i].nextfree = (i+1)%MAX_REQS;
-    Irequests[i].prevfree = ((i-1)+MAX_REQS)%MAX_REQS;
-  }
-  for(i=0;i<MAX_ATAREQS;i++) {
-    ATArequests[i]->nextfree = (i+1)%(MAX_REQS+MAX_IREQS);
-    ATArequests[i]->prevfree = ((i-1)+(MAX_REQS+MAX_IREQS))%(MAX_REQS+MAX_IREQS);
+  for(i=0;i<100;i++) {
+    irequests[i].nextfree = (i+1)%100;
+    irequests[i].prevfree = ((i-1)+100)%100;
   }
 }
 
@@ -1378,25 +1373,25 @@ int MPI_Waitall(int count, MPI_Request *request, MPI_Status *sts)
   for(i=0;i<count;i++) {
     if(request[i] == MPI_REQUEST_NULL)
       continue;
-    if(request[i] < MAX_REQS) { // persistent request
+    if(request[i] < 100) { // persistent request
       PersReq *req = &(ptr->requests[request[i]]);
       if(req->sndrcv == 2) { // recv request
         getAmpiInstance(req->comm)->recv(req->tag, req->proc, req->buf, req->count,
                   req->type, req->comm, (int*)(sts+i));
       }
-    } else if(request[i] < (MAX_REQS+MAX_IREQS)){ // irecv request
-      int index = request[i] - MAX_REQS;
-      PersReq *req = &(ptr->Irequests[index]);
+    } else if(request[i] < 200){ // irecv request
+      int index = request[i] - 100;
+      PersReq *req = &(ptr->irequests[index]);
       getAmpiInstance(req->comm)->recv(req->tag, req->proc, req->buf, req->count,
                 req->type, req->comm, (int*) (sts+i));
       // now free the request
-      ptr->nIrequests--;
-      PersReq *ireq = &(ptr->Irequests[0]);
-      req->nextfree = ptr->firstfreeI;
-      req->prevfree = ireq[ptr->firstfreeI].prevfree;
+      ptr->nirequests--;
+      PersReq *ireq = &(ptr->irequests[0]);
+      req->nextfree = ptr->firstfree;
+      req->prevfree = ireq[ptr->firstfree].prevfree;
       ireq[req->prevfree].nextfree = index;
       ireq[req->nextfree].prevfree = index;
-      ptr->firstfreeI = index;
+      ptr->firstfree = index;
     } else {  // alltoall request
       CmiAbort("MPI_Waitall cannot be used on MPI_Ialltoall request");
     }
@@ -1414,7 +1409,7 @@ int MPI_Waitany(int count, MPI_Request *request, int *idx, MPI_Status *sts)
       if(request[*idx] == MPI_REQUEST_NULL)
         return 0;
 
-      if(request[*idx] < MAX_REQS) { // persistent request
+      if(request[*idx] < 100) { // persistent request
         PersReq *req = &(ptr->requests[request[*idx]]);
         if(req->sndrcv == 2) { // recv request
           ampi *aptr=getAmpiInstance(req->comm);
@@ -1424,21 +1419,21 @@ int MPI_Waitany(int count, MPI_Request *request, int *idx, MPI_Status *sts)
             return 0;
           }
         }
-      } else if(request[*idx] < (MAX_REQS+MAX_IREQS)) { // irecv request
-        int index = request[*idx] - MAX_REQS;
-        PersReq *req = &(ptr->Irequests[index]);
+      } else if(request[*idx] < 200) { // irecv request
+        int index = request[*idx] - 100;
+        PersReq *req = &(ptr->irequests[index]);
         ampi *aptr=getAmpiInstance(req->comm);
         if(aptr->iprobe(req->tag, req->proc, req->comm, (int*) sts)) {
           aptr->recv(req->tag, req->proc, req->buf, req->count,
                     req->type, req->comm, (int*)sts);
           // now free the request
-          ptr->nIrequests--;
-          PersReq *ireq = &(ptr->Irequests[0]);
-          req->nextfree = ptr->firstfreeI;
-          req->prevfree = ireq[ptr->firstfreeI].prevfree;
+          ptr->nirequests--;
+          PersReq *ireq = &(ptr->irequests[0]);
+          req->nextfree = ptr->firstfree;
+          req->prevfree = ireq[ptr->firstfree].prevfree;
           ireq[req->prevfree].nextfree = index;
           ireq[req->nextfree].prevfree = index;
-          ptr->firstfreeI = index;
+          ptr->firstfree = index;
           return 0;
         }
       } else {  // alltoall request
@@ -1457,41 +1452,33 @@ int MPI_Wait(MPI_Request *request, MPI_Status *sts)
   ampiPersRequests *ptr = getPers();
   if(*request == MPI_REQUEST_NULL)
       return 0;
-  if(*request < MAX_REQS) { // persistent request
+  if(*request < 100) { // persistent request
     PersReq *req = &(ptr->requests[*request]);
     if(req->sndrcv == 2) { // recv request
       getAmpiInstance(req->comm)->recv(req->tag, req->proc, req->buf, req->count,
                 req->type, req->comm, (int*)sts);
     }
-  } else if(*request < (MAX_REQS+MAX_IREQS)) { // irecv request
-    int index = *request - MAX_REQS;
-    PersReq *req = &(ptr->Irequests[index]);
+  } else if(*request < 200) { // irecv request
+    int index = *request - 100;
+    PersReq *req = &(ptr->irequests[index]);
     getAmpiInstance(req->comm)->recv(req->tag, req->proc, req->buf, req->count,
               req->type, req->comm, (int*) sts);
     // now free the request
-    ptr->nIrequests--;
-    PersReq *ireq = &(ptr->Irequests[0]);
-    req->nextfree = ptr->firstfreeI;
-    req->prevfree = ireq[ptr->firstfreeI].prevfree;
+    ptr->nirequests--;
+    PersReq *ireq = &(ptr->irequests[0]);
+    req->nextfree = ptr->firstfree;
+    req->prevfree = ireq[ptr->firstfree].prevfree;
     ireq[req->prevfree].nextfree = index;
     ireq[req->nextfree].prevfree = index;
-    ptr->firstfreeI = index;
+    ptr->firstfree = index;
   } else {  // alltoall request
     int i;
-    int index = *request - (MAX_REQS+MAX_IREQS);
-    ATAReqs *req = ptr->ATArequests[index];
+    int index = *request - 200;
+    ATAReqs *req = ptr->atarequests[index];
     for(i=0;i<req->count;i++){
       getAmpiInstance(req->reqs[i].comm)->recv(req->reqs[i].tag, req->reqs[i].proc, req->reqs[i].buf,
                       req->reqs[i].count, req->reqs[i].type, req->reqs[i].comm, (int*)sts);
     }
-    // now free the request
-    ptr->nATArequests--;
-    ATAReqs **atareq = &(ptr->ATArequests[0]);
-    req->nextfree = ptr->firstfreeATA;
-    req->prevfree = atareq[ptr->firstfreeATA]->prevfree;
-    atareq[req->prevfree]->nextfree = index;
-    atareq[req->nextfree]->prevfree = index;
-    ptr->firstfreeATA = index;
   }
   return 0;
 }
@@ -1505,7 +1492,7 @@ int MPI_Test(MPI_Request *request, int *flag, MPI_Status *sts)
     *flag = 1;
     return 0;
   }
-  if(*request < MAX_REQS) { // persistent request
+  if(*request < 100) { // persistent request
     PersReq *req = &(ptr->requests[*request]);
     if(req->sndrcv == 2){ // recv request
       *flag = getAmpiInstance(req->comm)->iprobe(req->tag, req->proc, req->comm, (int*)sts);
@@ -1516,27 +1503,27 @@ int MPI_Test(MPI_Request *request, int *flag, MPI_Status *sts)
     }else{
       *flag = 1; // send request
     }
-  } else if(*request < (MAX_REQS+MAX_IREQS)){ // irecv request
-    int index = *request - MAX_REQS;
-    PersReq *req = &(ptr->Irequests[index]);
+  } else if(*request < 200){ // irecv request
+    int index = *request - 100;
+    PersReq *req = &(ptr->irequests[index]);
     *flag = getAmpiInstance(req->comm)->iprobe(req->tag, req->proc, req->comm, (int*) sts);
     if( *flag )
     {
         getAmpiInstance(req->comm)->recv(req->tag, req->proc, req->buf, req->count,
                                         req->type, req->comm, (int*) sts);
         // now free the request
-        ptr->nIrequests--;
-        PersReq *ireq = &(ptr->Irequests[0]);
-        req->nextfree = ptr->firstfreeI;
-        req->prevfree = ireq[ptr->firstfreeI].prevfree;
+        ptr->nirequests--;
+        PersReq *ireq = &(ptr->irequests[0]);
+        req->nextfree = ptr->firstfree;
+        req->prevfree = ireq[ptr->firstfree].prevfree;
         ireq[req->prevfree].nextfree = index;
         ireq[req->nextfree].prevfree = index;
-        ptr->firstfreeI = index;
+        ptr->firstfree = index;
     }
  } else {  // alltoall request
     int i;
-    int index = *request - (MAX_REQS+MAX_IREQS);
-    ATAReqs *req = ptr->ATArequests[index];
+    int index = *request - 200;
+    ATAReqs *req = ptr->atarequests[index];
     *flag = getAmpiInstance(req->reqs[0].comm)->iprobe(req->reqs[0].tag, req->reqs[0].proc, req->reqs[0].comm, (int*) sts);
     for(i=1;i<req->count;i++){
       *flag *= getAmpiInstance(req->reqs[i].comm)->iprobe(req->reqs[i].tag, req->reqs[i].proc, req->reqs[i].comm, (int*) sts);
@@ -1546,14 +1533,6 @@ int MPI_Test(MPI_Request *request, int *flag, MPI_Status *sts)
         getAmpiInstance(req->reqs[i].comm)->recv(req->reqs[i].tag, req->reqs[i].proc, req->reqs[i].buf,
                         req->reqs[i].count, req->reqs[i].type, req->reqs[i].comm, (int*)sts);
       }
-      // now free the request
-      ptr->nATArequests--;
-      ATAReqs **atareq = &(ptr->ATArequests[0]);
-      req->nextfree = ptr->firstfreeATA;
-      req->prevfree = atareq[ptr->firstfreeATA]->prevfree;
-      atareq[req->prevfree]->nextfree = index;
-      atareq[req->nextfree]->prevfree = index;
-      ptr->firstfreeATA = index;
     }
   }
   return 0;
@@ -1568,7 +1547,7 @@ int MPI_Testall(int count, MPI_Request *request, int *flag, MPI_Status *sts)
   *flag = 1;
   for(i=0;i<count;i++)
   {
-    if(request[i] >= (MAX_REQS+MAX_IREQS)) CmiAbort("MPI_Testall cannot be used on MPI_Ialltoall request");
+    if(request[i] >= 200) CmiAbort("MPI_Testall cannot be used on MPI_Ialltoall request");
     MPI_Test(&request[i], &tmpflag, sts+i);
     *flag = *flag && tmpflag;
   }
@@ -1582,17 +1561,17 @@ int MPI_Request_free(MPI_Request *request){
   if(*request==MPI_REQUEST_NULL) {
     return 0;
   }
-  if(*request < MAX_REQS) { // persistent request, don't free
-  } else if(*request < (MAX_REQS+MAX_IREQS)){ // irecv request
-    int index = *request - MAX_REQS;
-    PersReq *req = &(ptr->Irequests[index]);
-    ptr->nIrequests--;
-    PersReq *ireq = &(ptr->Irequests[0]);
-    req->nextfree = ptr->firstfreeI;
-    req->prevfree = ireq[ptr->firstfreeI].prevfree;
+  if(*request < 100) { // persistent request, don't free
+  } else if(*request < 200){ // irecv request
+    int index = *request - 100;
+    PersReq *req = &(ptr->irequests[index]);
+    ptr->nirequests--;
+    PersReq *ireq = &(ptr->irequests[0]);
+    req->nextfree = ptr->firstfree;
+    req->prevfree = ireq[ptr->firstfree].prevfree;
     ireq[req->prevfree].nextfree = index;
     ireq[req->nextfree].prevfree = index;
-    ptr->firstfreeI = index;
+    ptr->firstfree = index;
   } else {  // alltoall request, don't free for now
   }
   return 0;
@@ -1606,7 +1585,7 @@ int MPI_Recv_init(void *buf, int count, int type, int src, int tag,
 
   ampiPersRequests *ptr = getPers();
 
-  if(ptr->nrequests == MAX_REQS) {
+  if(ptr->nrequests == 100) {
     CmiAbort("Too many persistent commrequests.\n");
   }
   ptr->requests[ptr->nrequests].sndrcv = 2;
@@ -1627,7 +1606,7 @@ int MPI_Send_init(void *buf, int count, int type, int dest, int tag,
 {
   AMPIAPI("MPI_Send_init");
   ampiPersRequests *ptr = getPers();
-  if(ptr->nrequests == MAX_REQS) {
+  if(ptr->nrequests == 100) {
     CmiAbort("Too many persistent commrequests.\n");
   }
   ptr->requests[ptr->nrequests].sndrcv = 1;
@@ -1764,11 +1743,11 @@ int MPI_Irecv(void *buf, int count, MPI_Datatype type, int src,
 {
   AMPIAPI("MPI_Irecv");
   ampiPersRequests *ptr = getPers();
-  if(ptr->nIrequests == MAX_IREQS) {
+  if(ptr->nirequests == 100) {
     CmiAbort("Too many Irecv requests.\n");
   }
 
-  PersReq *req = &(ptr->Irequests[ptr->firstfreeI]);
+  PersReq *req = &(ptr->irequests[ptr->firstfree]);
   req->sndrcv = 2;
   req->buf = buf;
   req->count = count;
@@ -1776,11 +1755,11 @@ int MPI_Irecv(void *buf, int count, MPI_Datatype type, int src,
   req->proc = src;
   req->tag = tag;
   req->comm = comm;
-  *request = ptr->firstfreeI + MAX_REQS;
-  ptr->nIrequests ++;
+  *request = ptr->firstfree + 100;
+  ptr->nirequests ++;
   // remove this request from the free list
-  PersReq *ireq = &(ptr->Irequests[0]);
-  ptr->firstfreeI = ireq[ptr->firstfreeI].nextfree;
+  PersReq *ireq = &(ptr->irequests[0]);
+  ptr->firstfree = ireq[ptr->firstfree].nextfree;
   ireq[req->nextfree].prevfree = req->prevfree;
   ireq[req->prevfree].nextfree = req->nextfree;
   return 0;
@@ -1800,12 +1779,12 @@ int MPI_Ireduce(void *sendbuf, void *recvbuf, int count, int type, MPI_Op op, in
 
   if (ptr->thisIndex == rootIdx){
   ampiPersRequests *ptr = getPers();
-  if(ptr->nIrequests == MAX_IREQS) {
+  if(ptr->nirequests == 100) {
     CmiAbort("Too many Irecv requests in MPI_Ireduce.\n");
   }
 
   // using irecv instead recv to non-block the call and get request pointer
-  PersReq *req = &(ptr->Irequests[ptr->firstfreeI]);
+  PersReq *req = &(ptr->irequests[ptr->firstfree]);
     req->sndrcv = 2;
     req->buf = recvbuf;
     req->count = count;
@@ -1813,11 +1792,11 @@ int MPI_Ireduce(void *sendbuf, void *recvbuf, int count, int type, MPI_Op op, in
     req->proc = 0;
     req->tag = MPI_REDUCE_TAG;
     req->comm = comm;//MPI_COMM_WORLD;
-    *request = ptr->firstfreeI + MAX_REQS;
-    ptr->nIrequests ++;
+    *request = ptr->firstfree + 100;
+    ptr->nirequests ++;
     // remove this request from the free list
-    PersReq *ireq = &(ptr->Irequests[0]);
-    ptr->firstfreeI = ireq[ptr->firstfreeI].nextfree;
+    PersReq *ireq = &(ptr->irequests[0]);
+    ptr->firstfree = ireq[ptr->firstfree].nextfree;
     ireq[req->nextfree].prevfree = req->prevfree;
     ireq[req->prevfree].nextfree = req->nextfree;
   }
@@ -2095,11 +2074,11 @@ int MPI_Ialltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 
   // copy+paste from MPI_Irecv
   ampiPersRequests *reqptr = getPers();
-  if(reqptr->nATArequests >= 10) {
+  if(reqptr->natarequests >= 10) {
     CmiAbort("Too many Alltoall requests.\n");
   }
   ATAReqs *req = new ATAReqs(size);
-  reqptr->ATArequests[0] = req;
+  reqptr->atarequests[0] = req;
   for(i=0;i<size;i++){
     req->reqs[i].sndrcv = 2;
     req->reqs[i].buf = ((char*)recvbuf)+(itemsize*i);
@@ -2109,13 +2088,8 @@ int MPI_Ialltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
     req->reqs[i].tag = MPI_GATHER_TAG;
     req->reqs[i].comm = comm;
   }
-  *request = reqptr->nATArequests + (MAX_REQS+MAX_IREQS);
-  reqptr->nATArequests++;
-  // remove this request from the free list
-  ATAReqs **atareq = &(reqptr->ATArequests[0]);
-  reqptr->firstfreeATA = atareq[reqptr->firstfreeATA]->nextfree;
-  atareq[req->nextfree]->prevfree = req->prevfree;
-  atareq[req->prevfree]->nextfree = req->nextfree;
+  *request = reqptr->natarequests + 200;
+  //ptr->natarequest++;
 
   return 0;
 }

@@ -8,10 +8,6 @@
 #ifndef _AMPIIMPL_H
 #define _AMPIIMPL_H
 
-#define MAX_REQS 100
-#define MAX_IREQS 100
-#define MAX_ATAREQS 10
-
 #include "ampi.h"
 #include "charm++.h"
 #include <string.h> // for strlen
@@ -271,7 +267,6 @@ class ATAReqs {
 public:
   int count;
   PersReq* reqs;
-  int nextfree, prevfree;
   ATAReqs(int c_):count(c_) { reqs = new PersReq [c_]; }
   ~ATAReqs(void) { if(reqs) delete [] reqs; }
 };
@@ -411,14 +406,13 @@ public:
     ampiPersRequests();
     void pup(PUP::er &p);
 
-    PersReq requests[MAX_REQS];
+    PersReq requests[100];
     int nrequests;
-    PersReq Irequests[MAX_IREQS];
-    int nIrequests;
-    int firstfreeI;
-    ATAReqs *ATArequests[MAX_ATAREQS];
-    int nATArequests;
-    int firstfreeATA;
+    PersReq irequests[100];
+    int nirequests;
+    int firstfree;
+    ATAReqs *atarequests[10];
+    int natarequests;
 };
 PUPmarshall(ampiPersRequests);
 
