@@ -211,4 +211,96 @@ static void initializePythonDefault(void) {
   PyEval_ReleaseLock();
 }
 
+// a bunch of routines to ease the user code
+void PythonObject::pythonSetString(PyObject *arg, char *descr, char *value) {
+  PyObject *tmp = PyString_FromString(value);
+  PyObject_SetAttrString(arg, descr, tmp);
+  Py_DECREF(tmp);
+}
+
+void PythonObject::pythonSetString(PyObject *arg, char *descr, char *value, int len) {
+  PyObject *tmp = PyString_FromStringAndSize(value, len);
+  PyObject_SetAttrString(arg, descr, tmp);
+  Py_DECREF(tmp);
+}
+
+void PythonObject::pythonGetString(PyObject *arg, char *descr, char **result) {
+  PyObject *tmp = PyObject_GetAttrString(arg, descr);
+  *result = PyString_AsString(tmp);
+  Py_DECREF(tmp);
+}
+
+void PythonObject::pythonSetInt(PyObject *arg, char *descr, long value) {
+  PyObject *tmp = PyInt_FromLong(value);
+  PyObject_SetAttrString(arg, descr, tmp);
+  Py_DECREF(tmp);
+}
+
+void PythonObject::pythonGetInt(PyObject *arg, char *descr, long *result) {
+  PyObject *tmp = PyObject_GetAttrString(arg, descr);
+  *result = PyInt_AsLong(tmp);
+  Py_DECREF(tmp);
+}
+
+void PythonObject::pythonSetLong(PyObject *arg, char *descr, long value) {
+  PyObject *tmp = PyLong_FromLong(value);
+  PyObject_SetAttrString(arg, descr, tmp);
+  Py_DECREF(tmp);
+}
+
+void PythonObject::pythonSetLong(PyObject *arg, char *descr, unsigned long value) {
+  PyObject *tmp = PyLong_FromUnsignedLong(value);
+  PyObject_SetAttrString(arg, descr, tmp);
+  Py_DECREF(tmp);
+}
+
+void PythonObject::pythonSetLong(PyObject *arg, char *descr, double value) {
+  PyObject *tmp = PyLong_FromDouble(value);
+  PyObject_SetAttrString(arg, descr, tmp);
+  Py_DECREF(tmp);
+}
+
+void PythonObject::pythonGetLong(PyObject *arg, char *descr, long *result) {
+  PyObject *tmp = PyObject_GetAttrString(arg, descr);
+  *result = PyLong_AsLong(tmp);
+  Py_DECREF(tmp);
+}
+
+void PythonObject::pythonGetLong(PyObject *arg, char *descr, unsigned long *result) {
+  PyObject *tmp = PyObject_GetAttrString(arg, descr);
+  *result = PyLong_AsUnsignedLong(tmp);
+  Py_DECREF(tmp);
+}
+
+void PythonObject::pythonGetLong(PyObject *arg, char *descr, double *result) {
+  PyObject *tmp = PyObject_GetAttrString(arg, descr);
+  *result = PyLong_AsDouble(tmp);
+  Py_DECREF(tmp);
+}
+
+void PythonObject::pythonSetFloat(PyObject *arg, char *descr, double value) {
+  PyObject *tmp = PyFloat_FromDouble(value);
+  PyObject_SetAttrString(arg, descr, tmp);
+  Py_DECREF(tmp);
+}
+
+void PythonObject::pythonGetFloat(PyObject *arg, char *descr, double *result) {
+  PyObject *tmp = PyObject_GetAttrString(arg, descr);
+  *result = PyFloat_AsDouble(tmp);
+  Py_DECREF(tmp);
+}
+
+void PythonObject::pythonSetComplex(PyObject *arg, char *descr, double real, double imag) {
+  PyObject *tmp = PyComplex_FromDoubles(real, imag);
+  PyObject_SetAttrString(arg, descr, tmp);
+  Py_DECREF(tmp);
+}
+
+void PythonObject::pythonGetComplex(PyObject *arg, char *descr, double *real, double *imag) {
+  PyObject *tmp = PyObject_GetAttrString(arg, descr);
+  *real = PyComplex_RealAsDouble(tmp);
+  *imag = PyComplex_ImagAsDouble(tmp);
+  Py_DECREF(tmp);
+}
+
 #include "PythonCCS.def.h"

@@ -71,6 +71,24 @@ class PythonObject {
   void execute(CkCcsRequestMsg *msg);
   void iterate(CkCcsRequestMsg *msg);
 
+  // utility functions to manipulate python objects
+  void pythonSetString(PyObject*, char*, char*);
+  void pythonSetString(PyObject*, char*, char*, int);
+  void pythonSetInt(PyObject*, char*, long);
+  void pythonSetLong(PyObject*, char*, long);
+  void pythonSetLong(PyObject*, char*, unsigned long);
+  void pythonSetLong(PyObject*, char*, double);
+  void pythonSetFloat(PyObject*, char*, double);
+  void pythonSetComplex(PyObject*, char*, double, double);
+
+  void pythonGetString(PyObject*, char*, char**);
+  void pythonGetInt(PyObject*, char*, long*);
+  void pythonGetLong(PyObject*, char*, long*);
+  void pythonGetLong(PyObject*, char*, unsigned long*);
+  void pythonGetLong(PyObject*, char*, double*);
+  void pythonGetFloat(PyObject*, char*, double*);
+  void pythonGetComplex(PyObject*, char*, double*, double*);
+
   // the following methods should be overwritten by the user if used
 
   // methods for accessing charm varibles from inside python
