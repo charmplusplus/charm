@@ -38,16 +38,16 @@
 ELAN_BASE     *elan_base;
 ELAN_TPORT    *elan_port;
 ELAN_QUEUE    *elan_q;
-#define SMALL_MESSAGE_SIZE 20000     /* for comm bench */
+const int SMALL_MESSAGE_SIZE= 5000;     /* for comm bench */
                                      /* Message sizes greater will be 
 					  probe received adding 5us overhead*/
-#define SYNC_MESSAGE_SIZE 20000
+#define SYNC_MESSAGE_SIZE 165000
                                        /* Message sizes greater will be 
 				       sent synchronously thus avoiding copying*/
 
 #define NON_BLOCKING_MSG  256          /* Message sizes greater 
 					  than this will be sent asynchronously*/
-#define RECV_MSG_Q_SIZE 16
+#define RECV_MSG_Q_SIZE 32
 
 ELAN_EVENT *esmall[RECV_MSG_Q_SIZE], *elarge;
 #define TAG_SMALL 0x69
@@ -1009,16 +1009,16 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   
   int nslots = elan_base->tport_nslots;
   
-  //if(nslots < elan_base->state->nvp)
-  //nslots = elan_base->state->nvp;
-  //if(nslots > 256)
-  //nslots = 256;
+  if(nslots < elan_base->state->nvp)
+  nslots = elan_base->state->nvp;
+  if(nslots > 256)
+  nslots = 256;
 
   if (!(elan_port = elan_tportInit(elan_base->state,
 				   elan_q,
 				   nslots /*elan_base->tport_nslots*/, 
 				   elan_base->tport_smallmsg,
-				   elan_base->tport_bigmsg,
+				   100000, //elan_base->tport_bigmsg,
 				   elan_base->waitType, elan_base->retryCount,
 				   &(elan_base->shm_key),
 				   elan_base->shm_fifodepth, 

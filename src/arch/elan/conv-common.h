@@ -34,8 +34,8 @@
 #define CMK_CCS_AVAILABLE                                  1
 
 #define NODE_0_IS_CONVHOST                                 1
-#define CONVERSE_VERSION_ELAN
+#define CONVERSE_VERSION_ELAN                              1
 
-#define  CMK_PERSISTENT_COMM                               1
+#define  CMK_PERSISTENT_COMM                               0
 
 #define CMK_IMMEDIATE_MSG				   1
