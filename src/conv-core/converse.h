@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.68  1997-07-26 16:41:16  jyelon
+ * Revision 2.69  1997-07-28 19:00:39  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.68  1997/07/26 16:41:16  jyelon
  * *** empty log message ***
  *
  * Revision 2.67  1997/07/24 18:32:12  jyelon
@@ -283,14 +286,18 @@ extern "C" {
 #if CMK_SHARED_VARS_UNAVAILABLE
 
 extern int Cmi_mype;
-extern int Cmi_myrank;
 extern int Cmi_numpes;
-extern int Cmi_nodesize;
 
-#define CmiMyPe() Cmi_mype
-#define CmiMyRank() Cmi_myrank
-#define CmiNumPes() Cmi_numpes
-#define CmiNodeSize() Cmi_nodesize
+#define CmiMyPe()           Cmi_mype
+#define CmiMyRank()         0
+#define CmiNumPes()         Cmi_numpes
+#define CmiMyNodeSize()     1
+#define CmiMyNode()         Cmi_mype
+#define CmiNumNodes()       Cmi_numpes
+#define CmiNodeFirst(node)  (node)
+#define CmiNodeSize(node)   1
+#define CmiNodeOf(pe)       (pe)
+#define CmiRankOf(pe)       0
 
 #define SHARED_DECL
 #define CpvDeclare(t,v) t CMK_CONCAT(Cpv_Var_,v)
@@ -320,12 +327,18 @@ typedef int CmiMutex;
 #include <spp_prog_model.h>
 
 extern int Cmi_numpes;
-extern int Cmi_nodesize;
+extern int Cmi_mynodesize;
 
-#define CmiMyPe() my_thread()
-#define CmiMyRank() my_thread()
-#define CmiNumPes() Cmi_numpes
-#define CmiNodeSize() Cmi_nodesize
+#define CmiMyPe()           (my_thread())
+#define CmiMyRank()         (my_thread())
+#define CmiNumPes()         Cmi_numpes
+#define CmiMyNodeSize()     Cmi_mynodesize
+#define CmiMyNode()         ?
+#define CmiNumNodes()       ?
+#define CmiNodeFirst(node)  ?
+#define CmiNodeSize(node)   ?
+#define CmiNodeOf(pe)       ?
+#define CmiRankOf(pe)       ?
 
 #define SHARED_DECL
 #define CpvDeclare(t,v) t* CMK_CONCAT(Cpv_Var_,v)
@@ -333,7 +346,7 @@ extern int Cmi_nodesize;
 #define CpvStaticDeclare(t,v) static t* CMK_CONCAT(Cpv_Var_,v)
 #define CpvInitialize(t,v)\
     { if (CmiMyRank()) while (CMK_CONCAT(Cpv_Var_,v)==0);\
-    else { CMK_CONCAT(Cpv_Var_,v)=(t*)malloc(sizeof(t)*CmiNodeSize()); }}
+    else { CMK_CONCAT(Cpv_Var_,v)=(t*)malloc(sizeof(t)*CmiMyNodeSize()); }}
 #define CpvAccess(v) CMK_CONCAT(Cpv_Var_,v)[CmiMyRank()]
 
 #define CsvDeclare(t,v) t CMK_CONCAT(Csv_Var_,v)
@@ -355,12 +368,20 @@ extern void *CmiSvAlloc CMK_PROTO((int));
 #include <thread.h>
 
 extern int Cmi_numpes;
-extern int Cmi_nodesize;
+extern int Cmi_mynodesize;
+extern int Cmi_mynode;
+extern int Cmi_numnodes;
 
 extern int CmiMyPe();
 extern int CmiMyRank();
-#define CmiNumPes() Cmi_numpes
-#define CmiNodeSize() Cmi_nodesize
+#define CmiNumPes()         Cmi_numpes
+#define CmiMyNodeSize()     Cmi_mynodesize
+#define CmiMyNode()         Cmi_mynode
+#define CmiNumNodes()       Cmi_numnodes
+extern int CmiNodeFirst(int node);
+extern int CmiNodeSize(int node);
+extern int CmiNodeOf(int pe);
+extern int CmiRankOf(int pe);
 
 #define SHARED_DECL
 
@@ -369,7 +390,7 @@ extern int CmiMyRank();
 #define CpvStaticDeclare(t,v) static t* CMK_CONCAT(Cpv_Var_,v)
 #define CpvInitialize(t,v)\
   { if (CmiMyRank()) while (CMK_CONCAT(Cpv_Var_,v)==0);\
-    else { CMK_CONCAT(Cpv_Var_,v)=(t*)malloc(sizeof(t)*CmiNodeSize()); }}
+    else { CMK_CONCAT(Cpv_Var_,v)=(t*)malloc(sizeof(t)*CmiMyNodeSize()); }}
 #define CpvAccess(v) CMK_CONCAT(Cpv_Var_,v)[CmiMyRank()]
 
 #define CsvDeclare(t,v) t CMK_CONCAT(Csv_Var_,v)
@@ -393,10 +414,16 @@ typedef mutex_t CmiMutex;
 extern int Cmi_mype;
 extern int Cmi_numpes;
 
-#define CmiMyPe() Cmi_mype
-#define CmiMyRank() Cmi_mype
-#define CmiNumPes() Cmi_numpes
-#define CmiNodeSize() Cmi_numpes
+#define CmiMyPe()              Cmi_mype
+#define CmiMyRank()            Cmi_mype
+#define CmiNumPes()            Cmi_numpes
+#define CmiMyNodeSize()        Cmi_numpes
+#define CmiMyNode()            0
+#define CmiNumNodes()          1
+#define CmiNodeFirst(node)     0
+#define CmiNodeSize(node)      Cmi_numpes
+#define CmiNodeOf(pe)          0
+#define CmiRankOf(pe)          (pe)
 
 #define SHARED_DECL
 
@@ -850,32 +877,6 @@ void CcdRaiseCondition CMK_PROTO((int condnum));
 void CcdCallOnCondition CMK_PROTO((int condnum, CcdVoidFn fnp, void *arg));
 
 void CcdCallBacks();
-
-/******** NODE NUMBERING *********/
-
-#if CMK_MEMORY_DISTRIBUTED
-
-#define CmiMyNode()         (CmiMyPe())
-#define CmiNumNodes()       (CmiNumPes())
-#define CmiNodeFirst(node)  (node)
-#define CmiNodeSize(node)   1
-#define CmiNodeOf(pe)       (pe)
-#define CmiRankOf(pe)       0
-
-#endif
-
-#if CMK_MEMORY_SHARED
-
-#define CmiMyNode()         0
-#define CmiNumNodes()       1
-#define CmiNodeFirst(node)  0
-#define CmiNodeSize(node)   (CmiNumPes())
-#define CmiNodeOf(pe)       0
-#define CmiRankOf(pe)       (pe)
-
-#endif
-
-/* (note: if cmk_memory_clustered, see machine.c for these fns) */
 
 /**** DEAL WITH DIFFERENCES: KERNIGHAN-RITCHIE-C, ANSI-C, AND C++ ****/
 

@@ -880,9 +880,9 @@ static OutgoingMsg   Cmi_freelist_outgoing;
 
 
 int               Cmi_numpes;    /* Total number of processors */
-int               Cmi_nodesize;  /* Number of processors in my address space */
+int               Cmi_mynodesize;/* Number of processors in my address space */
+static int        Cmi_mynode;    /* Which address space am I */
 static int        Cmi_numnodes;  /* Total number of address spaces */
-static int        Cmi_nodenum;   /* Which address space am I */
 static int        Cmi_nodestart; /* First processor in this address space */
 static CmiStartFn Cmi_startfn;   /* The start function */
 static int        Cmi_usrsched;  /* Continue after start function finishes? */
@@ -930,8 +930,8 @@ static void parse_netstart()
   ns = getenv("NETSTART");
   if (ns==0) goto abort;
   nread = sscanf(ns, "%d%d%d%d%d%d%d%d",
-		 &Cmi_numnodes, &Cmi_nodenum,
-		 &Cmi_nodestart, &Cmi_nodesize, &Cmi_numpes,
+		 &Cmi_numnodes, &Cmi_mynode,
+		 &Cmi_nodestart, &Cmi_mynodesize, &Cmi_numpes,
 		 &Cmi_self_IP, &Cmi_host_IP, &Cmi_host_port, &Cmi_host_pid);
   if (nread!=8) goto abort;
   sprintf(Cmi_self_IP_str,"%d.%d.%d.%d",
@@ -1001,7 +1001,7 @@ static void log_init()
 static void log_done()
 {
   char logname[100]; FILE *f; int i, size;
-  sprintf(logname, "log.%d", Cmi_nodenum);
+  sprintf(logname, "log.%d", Cmi_mynode);
   f = fopen(logname, "w");
   if (f==0) { perror("fopen"); exit(1); }
   if (log_wrap) size = 50000; else size=log_pos;
@@ -1041,23 +1041,6 @@ static int        Cmi_shutdown_done;
 static CmiMutex   Cmi_scanf_mutex;
 static char      *Cmi_scanf_data;
 static double     Cmi_clock;
-
-/******************************************************************************
- *
- * Node Numbers
- *
- *****************************************************************************/
-
-#if CMK_MEMORY_CLUSTERED
-
-int CmiMyNode()            { return Cmi_nodenum; }
-int CmiNumNodes()          { return Cmi_numnodes; }
-int CmiNodeFirst(int node) { return nodes[pe].nodestart; }
-int CmiNodeSize(int node)  { return nodes[pe].nodesize; }
-int CmiNodeOf(int pe)      { return (nodes_by_pe[pe] - nodes); }
-int CmiRankOf(int pe)      { return pe - (nodes_by_pe[pe].nodestart); }
-
-#endif
 
 /****************************************************************************
  *                                                                          
@@ -1190,6 +1173,11 @@ int CmiMyRank()
   return result->rank;
 }
 
+int CmiNodeFirst(int node) { return nodes[pe].nodestart; }
+int CmiNodeSize(int node)  { return nodes[pe].nodesize; }
+int CmiNodeOf(int pe)      { return (nodes_by_pe[pe] - nodes); }
+int CmiRankOf(int pe)      { return pe - (nodes_by_pe[pe].nodestart); }
+
 #define CmiGetStateN(n) (Cmi_state_vector+(n))
 
 static mutex_t comm_mutex;
@@ -1230,10 +1218,10 @@ static void CmiStartThreads()
   
   thr_keycreate(&Cmi_state_key, 0);
   Cmi_state_vector =
-    (CmiState)calloc(Cmi_nodesize, sizeof(struct CmiStateStruct));
-  for (i=0; i<Cmi_nodesize; i++)
+    (CmiState)calloc(Cmi_mynodesize, sizeof(struct CmiStateStruct));
+  for (i=0; i<Cmi_mynodesize; i++)
     CmiStateInit(i+Cmi_nodestart, i, CmiGetStateN(i));
-  for (i=1; i<Cmi_nodesize; i++) {
+  for (i=1; i<Cmi_mynodesize; i++) {
     ok = thr_create(0, 256000, call_startfn, (void *)i,
 		    THR_DETACHED|THR_BOUND, &pid);
     if (ok<0) { perror("thr_create"); exit(1); }
@@ -1273,7 +1261,7 @@ static void CmiStartThreads()
 {
   struct itimerval i;
   
-  if ((Cmi_numpes != Cmi_numnodes) || (Cmi_nodesize != 1))
+  if ((Cmi_numpes != Cmi_numnodes) || (Cmi_mynodesize != 1))
     KillEveryone
       ("Multiple cpus unavailable, don't use cpus directive in nodesfile.\n");
   
@@ -1481,8 +1469,8 @@ static void ctrl_getone()
 static void node_addresses_obtain()
 {
   ctrl_sendone(120, "aset addr %d %s.%d.%d.%d.%d\n",
-	       Cmi_nodenum, Cmi_self_IP_str, ctrlport, dataport,
-	       Cmi_nodestart, Cmi_nodesize);
+	       Cmi_mynode, Cmi_self_IP_str, ctrlport, dataport,
+	       Cmi_nodestart, Cmi_mynodesize);
   ctrl_sendone(120, "aget %s %d addr 0 %d\n",
 	       Cmi_self_IP_str,ctrlport,Cmi_numnodes-1);
   while (nodes == 0) {
@@ -1809,18 +1797,18 @@ void DeliverOutgoingMessage(OutgoingMsg ogm)
   dst = ogm->dst;
   switch (dst) {
   case PE_BROADCAST_ALL:
-    for (rank = 0; rank<Cmi_nodesize; rank++)
+    for (rank = 0; rank<Cmi_mynodesize; rank++)
       PCQueuePush(CmiGetStateN(rank)->recv,CopyMsg(ogm->data,ogm->size));
     for (i=0; i<Cmi_numnodes; i++)
-      if (i!=Cmi_nodenum)
+      if (i!=Cmi_mynode)
 	DeliverViaNetwork(ogm, nodes + i, DGRAM_BROADCAST);
     break;
   case PE_BROADCAST_OTHERS:
-    for (rank = 0; rank<Cmi_nodesize; rank++)
+    for (rank = 0; rank<Cmi_mynodesize; rank++)
       if (rank + Cmi_nodestart != ogm->src)
 	PCQueuePush(CmiGetStateN(rank)->recv,CopyMsg(ogm->data,ogm->size));
     for (i = 0; i<Cmi_numnodes; i++)
-      if (i!=Cmi_nodenum)
+      if (i!=Cmi_mynode)
 	DeliverViaNetwork(ogm, nodes + i, DGRAM_BROADCAST);
     break;
   default:
@@ -1862,7 +1850,7 @@ void AssembleDatagram(OtherNode node, ExplicitDgram dg)
   if (node->asm_fill == node->asm_total) {
     if (node->asm_rank == DGRAM_BROADCAST) {
       int len = node->asm_total;
-      for (i=1; i<Cmi_nodesize; i++)
+      for (i=1; i<Cmi_mynodesize; i++)
 	PCQueuePush(CmiGetStateN(i)->recv, CopyMsg(msg, len));
       PCQueuePush(CmiGetStateN(0)->recv, msg);
     } else PCQueuePush(CmiGetStateN(node->asm_rank)->recv, msg);
