@@ -8,6 +8,10 @@ message LBMigrateMsg {
   double expectedLoad[];
 };
 
+message LBVectorMigrateMsg {
+  VectorMigrateInfo moves[];
+};
+
 group [migratable] BaseLB {
   entry void BaseLB(const CkLBOptions &);  
   entry void unregister(void);

@@ -152,6 +152,25 @@ public:
   LBMigrateMsg(): level(0), n_moves(0), next_lb(0) {}
 };
 
+struct VectorMigrateInfo {  
+    int from_pe;
+    int to_pe;
+    double load;
+    int async_arrival;	    // if an object is available for immediate migrate
+    VectorMigrateInfo():  async_arrival(0) {}
+};
+
+class LBVectorMigrateMsg : public CMessage_LBVectorMigrateMsg {
+public:
+  int level;			// which level in hierarchy, used in hybridLB
+
+  int n_moves;			// number of moves
+  VectorMigrateInfo* moves;
+
+public:
+  LBVectorMigrateMsg(): level(0), n_moves(0) {}
+};
+
 // for a FooLB, the following macro defines these functions for each LB:
 // CreateFooLB():        create BOC and register with LBDatabase with a 
 //                       sequence ticket,
