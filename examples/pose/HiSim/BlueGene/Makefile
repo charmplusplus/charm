@@ -49,7 +49,10 @@ all:
 	( cd $$i ; make $(MACHINE) MACHINE="../$(MACHINE)" ) ; \
 	done
 
-	$(CHARMC) -o InitNetwork.o -seq InitNetwork.C -I../Main -I./ ; cp InitNetwork.o ../tmp
+	$(CHARMC) -o InitNetwork.o -seq InitNetwork.C -I../Main -I./
+	$(CHARMC) -o util.o -seq util.C
+	cp *.o ../tmp
+
 	cd ../tmp;$(CHARMC) *.o $(OTHER) $(LIBS) -o $(PGM) -lpose -ltrace-projections -language charm++ -module commlib
 
 clean:

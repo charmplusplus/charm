@@ -6,7 +6,7 @@
 
 class RoutingAlgorithm {
         public:
-        virtual int selectRoute(int current,int dst,int numP,Topology *top,Packet *p){}
+        virtual int selectRoute(int current,int dst,int numP,Topology *top,Packet *p,map<int,int> & Bufsize){}
         virtual int expectedTime(int src,int dst,int ovt,int origovt,int len,int *hops){}
 	//virtual int selectRoute(int,int,const Packet *){}
 	virtual int convertOutputToInputPort(int)=0;

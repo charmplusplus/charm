@@ -20,7 +20,7 @@ int HammingDistance::expectedTime(int s,int d,int ovt,int origovt,int len,int *h
         while(i++ <  (sizeof(int)*8)) {
                 if(hammingCode & 0x01) (*hops)++;  hammingCode = hammingCode >> 1;
         }
-        expected = *hops * config.switchC_Delay + len/config.switchC_BW + START_LATENCY;
+        expected = *hops * config.switchC_Delay + (int)(len/config.switchC_BW) + START_LATENCY;
         extra = (ovt-origovt) - expected;
         if(extra < 0) extra = 0;
         return extra;

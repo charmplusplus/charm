@@ -8,7 +8,7 @@ int isDirectionChanged(int & src,int & dst,int & nodeRangeStart,int & nodeRangeE
                 return 0;
 }
 
-int UpDown::selectRoute(int c,int d,int numP,Topology *top,Packet *p) {
+int UpDown::selectRoute(int c,int d,int numP,Topology *top,Packet *p,map<int,int> & Bufsize) {
 //Do Static Routing for now
 	int goDown,nextP,dstOffset,fanout=(config.numP/2),portId;
 	portId = p->hdr.portId;
@@ -40,7 +40,7 @@ int UpDown::expectedTime(int s,int d,int ovt,int origovt,int len,int *hops) {
                 numhops -= 2;
         }
 
-        int expected = numhops * config.switchC_Delay + len/config.switchC_BW + START_LATENCY;
+        int expected = numhops * config.switchC_Delay + (int)(len/config.switchC_BW) + START_LATENCY;
         int extra = (ovt-origovt) - expected;
         if(extra < 0) extra = 0;
 	*hops = numhops;

@@ -43,14 +43,18 @@ OTHER = -lconv-bluegene-logs
 LIBS = -Lstdc++ -lm
 MACHINE = IB
 
-all:
+all: 
 	@echo
 	for i in $(SUBDIRS) ; do \
 	( cd $$i ; make $(MACHINE) MACHINE="../$(MACHINE)" ) ; \
 	done
 
-	$(CHARMC) -o InitNetwork.o -seq InitNetwork.C -I../Main -I./ ; cp InitNetwork.o ../tmp
+	$(CHARMC) -o InitNetwork.o -seq InitNetwork.C -I../Main -I./ 
+	$(CHARMC) -o util.o -seq util.C
+	cp *.o ../tmp
+
 	cd ../tmp;$(CHARMC) *.o $(OTHER) $(LIBS) -o $(PGM) -lpose -ltrace-projections -language charm++ -module commlib
+
 
 clean:
 	@echo

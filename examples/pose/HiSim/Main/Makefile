@@ -17,7 +17,6 @@ OPTS=-g#-DCMK_OPTIMIZE=1 -DCMK_MEMCHECKS_OFF=1
 CHARMBASE=../../../../
 CHARMBIN=$(CHARMBASE)/bin
 CHARMINC=$(CHARMBASE)/include
-
 CHARMC=$(CHARMBIN)/charmc -I$(CHARMINC)/pose $(OPTS)
 
 # Default Location variables
@@ -35,7 +34,7 @@ LIBS=-Lstdc++ -lm
 
 # Simulation object definitions 
 # *****************************
-SIM_OBJECTS=BgSim_sim.o TCsim_sim.o util.o
+SIM_OBJECTS=BgSim_sim.o TCsim_sim.o
 
 # EXECUTABLE GENERATION RULES 
 # - DO NOT MODIFY
@@ -72,11 +71,8 @@ BgSim.def.h BgSim.decl.h : BgSim_sim.ci
 	$(CHARMC) $(INCLUDES) $(LIBS) BgSim_sim.ci -I$(MACHINE)
  
 BgSim_sim.C BgSim_sim.h BgSim_sim.ci: BgSim.C \
-		BgSim.h BgSim.ci
-	$(CHARMBIN)/etrans.pl BgSim
-
-util.o: util.C util.h
-	$(CHARMC) -o util.o -seq util.C 
+		BgSim.h BgSim.ci Switch.C Nic.C Channel.C
+	$(CHARMBIN)/etrans.pl BgSim Switch.C Nic.C Channel.C
 
 clean:
 	rm -f charmrun conv-host *.o

@@ -44,7 +44,7 @@ main::main(CkArgMsg *m)
   mp->BGnodes = BGnodes;
   InitNetwork(mp);
 	
-  CkPrintf("%d %d %d %d %d %d %d %d %d %d %d %d %d %d\n",config.maxpacksize,config.switchVc,config.switchBufsize,config.switchC_BW,config.switchC_Delay,config.collection_interval,config.linkstats_on,config.msgstats_on,config.netsim_on,config.skip_on,config.InputBufferStart,config.nicStart,config.ChannelStart,config.numNodes);
+  CkPrintf("%d %d %d %f %d %d %d %d %d %d %d %d %d %d\n",config.maxpacksize,config.switchVc,config.switchBufsize,config.switchC_BW,config.switchC_Delay,config.collection_interval,config.linkstats_on,config.msgstats_on,config.netsim_on,config.skip_on,config.InputBufferStart,config.nicStart,config.ChannelStart,config.numNodes);
 
 	  BGprocMsg *bgm;
 	  for (w=0; w<netWidth; w++)

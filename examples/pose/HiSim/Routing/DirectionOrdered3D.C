@@ -17,7 +17,7 @@ int DirectionOrdered3D::expectedTime(int s,int d,int ovt,int origovt,int len,int
         Position src,pos;  src.init(s);pos.init(d);
         int extra,expected;
         *hops = abs(pos.x-src.x)+abs(pos.y-src.y)+abs(pos.z-src.y);
-        expected = *hops * config.switchC_Delay + len/config.switchC_BW + START_LATENCY;
+        expected = *hops * config.switchC_Delay + (int)(len/config.switchC_BW) + START_LATENCY;
         extra = (ovt-origovt) - expected;
         if(extra < 0) extra = 0;
         return extra;
