@@ -1,24 +1,55 @@
 #include "EachToManyStrategy.h"
 
-extern int * procMap;
 CpvExtern(int, RecvmsgHandle);
 CpvExtern(int, RecvdummyHandle);
+
+void setReverseMap(int *procMap, int *pelist, int npes){
+    
+    for(int pcount = 0; pcount < CkNumPes(); pcount++)
+        procMap[pcount] = -1;
+    
+    for(int pcount = 0; pcount < npes; pcount++) 
+        procMap[pelist[pcount]] = pcount;
+}
 
 EachToManyStrategy::EachToManyStrategy(int substrategy){
     routerID = substrategy;
     messageBuf = NULL;
     messageCount = 0;
 
+    comid = ComlibInstance(routerID, CkNumPes());
+    this->npes = npes;
+    
+    procMap = new int[CkNumPes()];
+    for(int count = 0; count < CkNumPes(); count ++){
+        procMap[count] = count;
+    }
+}
+
+EachToManyStrategy::EachToManyStrategy(int substrategy, int npes, int *pelist){
+    routerID = substrategy;
+    messageBuf = NULL;
+    messageCount = 0;
+
+    comid = ComlibInstance(routerID, CkNumPes());
+    comid = ComlibEstablishGroup(comid, npes, pelist);
+
+    procMap = new int[CkNumPes()];
+    setReverseMap(procMap, pelist, npes);
 }
 
 void EachToManyStrategy::insertMessage(CharmMessageHolder *cmsg){
+
+    ComlibPrintf("EachToMany: insertMessage\n");
+
     cmsg->next = messageBuf;
     messageBuf = cmsg;    
     messageCount ++;
 }
 
 void EachToManyStrategy::doneInserting(){
-    ComlibPrintf("%d:Setting Num Deposit to %d\n", CkMyPe(), messageCount);
+    ComlibPrintf("%d: DoneInserting \n", CkMyPe());
+    //ComlibPrintf("%d:Setting Num Deposit to %d\n", CkMyPe(), messageCount);
 
     if((messageCount == 0) && (CkNumPes() > 0)) {
         DummyMsg * dummymsg = new DummyMsg;
@@ -51,6 +82,20 @@ void EachToManyStrategy::doneInserting(){
     messageCount = 0;
 }
 
-void EachToManyStrategy::setID(comID id){
-    comid = id;
+void EachToManyStrategy::pup(PUP::er &p){
+    Strategy::pup(p);
+    
+    p | messageCount;
+    p | routerID;
+    p | comid;
+    p | npes;
+    p | messageCount;
+    
+    if(p.isUnpacking()) 
+        procMap = new int[CkNumPes()];
+        
+    p | procMap;
+    messageBuf = NULL;
 }
+
+PUPable_def(EachToManyStrategy); 

@@ -12,15 +12,15 @@
 #define USE_TREE 1            //Organizes the all to all as a tree
 #define USE_MESH 2            //Virtual topology is a mesh here
 #define USE_HYPERCUBE 3       //Virtual topology is a hypercube
-#define USE_GROUP_BY_PROCESSOR //Groups messages by destination processor 
-                               //(does not work as of now)
+#define USE_GROUP_BY_PROCESSOR 4 //Groups messages by destination processor 
+                                 //(does not work as of now)
 #define USE_GRID 5            //Virtual topology is a 3d grid
 #define NAMD_STRAT 6          //A speciliazed strategy for Namd, commented out
 #define USE_MPI 7             //Calls MPI_Alltoall
 #define USE_STREAMING 8       //Creates a message stream with periodic combining
 
 #define CHARM_MPI 0 
-
+#define MAX_NSTRAT 1024
 #define LEARNING_PERIOD 2     //Number of iterations after which the 
                               //learning framework will discover the appropriate 
                               //strategy, not completely implemented
@@ -43,27 +43,38 @@ class CharmMessageHolder {
     void setRefcount(char * root_msg);
 };
 
-//An abstract class that defines the entry methods that a strategy must define. 
+//Class that defines the entry methods that a strategy must define. 
 //To write a new strategy inherit from this class and define the methods. 
 //Notice there is no constructor. Every strategy can define its own 
 //constructor and have any number of arguments.
 //But for now the strategies can only receive an int in their constructor.
-class Strategy {
+class Strategy : public PUP::able{
  public:
+    Strategy() {};
+    Strategy(CkMigrateMessage *) {};
+
     //Called for each message
-    virtual void insertMessage(CharmMessageHolder *msg) = 0;
-    //Called after all chares and groups have finished depositing their messages 
-    //on that processor.
-    virtual void doneInserting() = 0;
+    virtual void insertMessage(CharmMessageHolder *msg) {};
 
-    //Needed for compatibility with older versions, I will get rid of it soon!
-    virtual void setID(comID id) {}
+    //Called after all chares and groups have finished depositing their 
+    //messages on that processor.
+    virtual void doneInserting() {};
 
-    //Will enable this later
     //Each strategy must define his own Pup interface.
-    //    virtual void pup(PUP::er &p) {}
+    virtual void pup(PUP::er &p){
+        PUP::able::pup(p);
+    }
+    PUPable_decl(Strategy);
 };
-//PUPmarshall(Strategy);
+
+class StrategyWrapper  {
+ public:
+    Strategy **s_table;
+    int nstrats;
+
+    void pup(PUP::er &p);
+};
+PUPmarshall(StrategyWrapper);
 
 #include "ComlibModule.decl.h"
 
@@ -72,11 +83,19 @@ class Strategy {
 class DummyMsg: public CMessage_DummyMsg {
     int dummy;
 };
-/*
-class StrategyMsg : public CMessage_StrategyMsg {
-    
-}
-*/
+
+struct StrategyList {
+    Strategy *strategy;
+    StrategyList *next;
+};
+
+struct StrategyTable {
+    Strategy *strategy;
+    CharmMessageHolder* tmplist_top, *tmplist_end;
+    int numElements;
+    int elementCount;
+};
+
 /*
 //A wrapper message for many charm++ messages.
 class ComlibMsg: public CMessage_ComlibMsg {
@@ -95,50 +114,49 @@ class ComlibManager: public CkDelegateMgr{
 
     CkGroupID cmgrID;
 
-    //int *procMap; //Should ideally belong to the strategy
-
-    int createDone, doneReceived;
-
     int npes;
     int *pelist;
 
-    int nelements; //number of array elements on one processor
-    int elementCount; //counter for the above
-    
+    //For compatibility and easier use!
     int strategyID; //Identifier of the strategy
-    Strategy *strategy; //Pointer to the strategy class
-    comID comid;
-    
-    //flags
-    int idSet, iterationFinished;
-    
-    void init(Strategy *s); //strategy, nelements 
-    void setReverseMap(int *, int);
 
+    StrategyTable strategyTable[MAX_NSTRAT]; //A table of strategy pointers
+    StrategyList *slist_top;      //Tmp list of strategies
+    StrategyList *slist_end;
+    int nstrats, curStratID;      //Number of strategies created by the user.
+
+    //flags
+    int receivedTable, flushTable; //iterationFinished;
     int totalMsgCount, totalBytes, nIterations;
 
+    void init(); //initialization function
+
  public:
-    ComlibManager(int s); //strategy, nelements 
-    ComlibManager(int s, int n); //strategy, nelements 
+    ComlibManager();             //Receommended constructor
+    ComlibManager(int s);        //strategy
+    ComlibManager(int s, int n); //strategy, nelements
 
-    //ComlibManager(Strategy *str); //Needs pup routines for strategies to be written
-
-    void done();
     void localElement();
+    void registerElement(int strat);    //Register a chare for an instance
+    void unRegisterElement(int strat);  //UnRegister a chare for an instance
 
-    void receiveID(comID id);
-    void receiveID(int npes, int *pelist, comID id);
+    void receiveID(comID id);                        //Depricated
+    void receiveID(int npes, int *pelist, comID id); //Depricated
+    void receiveTable(StrategyWrapper sw);      //Receive table of strategies.
 
     void ArraySend(int ep, void *msg, const CkArrayIndexMax &idx, CkArrayID a);
     void GroupSend(int ep, void *msg, int onpe, CkGroupID gid);
-    //    void setNumMessages(int nmessages);
     
     void beginIteration();
-    void endIteration();
+    void beginIteration(int id); //Notify begining of an iteration 
+                                 //with strategy identifier
+    void endIteration();         //Notify end
 
-    //void receiveNamdMessage(ComlibMsg * msg);
-    void createId();
-    void createId(int *, int);
+    void createId();                 //depricated
+    void createId(int *, int);       //depricated
+    int createInstance(Strategy *);  //To create a new strategy, 
+                                     //returns index to the strategy table;
+    void doneCreating();             //Done creating instances
 
     //Learning functions
     void learnPattern(int totalMessageCount, int totalBytes);

@@ -6,9 +6,19 @@ MPI_Comm groupComm;
 MPI_Group group, groupWorld;
 #endif
 
-MPIStrategy::MPIStrategy(int substrategy){
+MPIStrategy::MPIStrategy(){
     messageBuf = NULL;
     messageCount = 0;
+    npes = CkNumPes();
+    pelist = NULL;
+}
+
+MPIStrategy::MPIStrategy(int npes, int *pelist){
+    messageBuf = NULL;
+    messageCount = 0;
+
+    this->npes = npes;
+    this->pelist = pelist;
 }
 
 void MPIStrategy::insertMessage(CharmMessageHolder *cmsg){
@@ -78,3 +88,27 @@ void MPIStrategy::doneInserting(){
     }
 #endif
 }
+
+void MPIStrategy::pup(PUP::er &p) {
+    p | messageCount;
+    p | npes; 
+       
+    if(p.isUnpacking())
+        pelist = new int[npes];
+    p(pelist , npes);
+
+    messageBuf = NULL;
+    
+    if(p.isUnpacking()){
+#if CHARM_MPI
+        if(npes < CkNumPes()){
+            PMPI_Comm_group(MPI_COMM_WORLD, &groupWorld);
+            PMPI_Group_incl(groupWorld, npes, pelist, &group);
+            PMPI_Comm_create(MPI_COMM_WORLD, group, &groupComm);
+        }
+        else groupComm = MPI_COMM_WORLD;
+#endif
+    }
+}
+
+PUPable_def(MPIStrategy);

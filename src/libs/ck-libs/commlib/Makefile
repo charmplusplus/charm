@@ -17,6 +17,12 @@ OBJS = ComlibManager.o $(STRATEGY_OBJS) $(CONVERSE_COM_OBJS)
 all: cifiles conversecom $(LIB) 
 	rm -f $(CDIR)/include/ComlibManager.h
 	cp  ComlibManager.h $(CDIR)/include
+	rm -f $(CDIR)/include/EachToManyStrategy.h
+	cp  EachToManyStrategy.h $(CDIR)/include
+	rm -f $(CDIR)/include/DummyStrategy.h
+	cp  DummyStrategy.h $(CDIR)/include
+	rm -f $(CDIR)/include/StreamingStrategy.h
+	cp  StreamingStrategy.h $(CDIR)/include
 	rm -f $(CDIR)/include/ComlibModule.decl.h
 	cp  ComlibModule.decl.h $(CDIR)/include
 	rm -f $(CDIR)/include/ComlibModule.def.h

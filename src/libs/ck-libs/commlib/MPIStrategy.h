@@ -11,9 +11,16 @@ char mpi_recvbuf[MPI_BUF_SIZE];
 class MPIStrategy : public Strategy {
     CharmMessageHolder *messageBuf;
     int messageCount;
+    int npes, *pelist;
 
  public:
-    MPIStrategy(int substrategy);
+    MPIStrategy();
+    MPIStrategy(CkMigrateMessage *){}
+    MPIStrategy(int npes, int *pelist);
+
     void insertMessage(CharmMessageHolder *msg);
     void doneInserting();
+
+    virtual void pup(PUP::er &p);
+    PUPable_decl(MPIStrategy);
 };

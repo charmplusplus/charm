@@ -7,6 +7,11 @@ class StreamingStrategy : public Strategy {
 
  public:
     StreamingStrategy(int period);
+    StreamingStrategy(CkMigrateMessage *){}
     void insertMessage(CharmMessageHolder *msg);
     void doneInserting();
+    void periodicFlush();
+
+    virtual void pup(PUP::er &p);
+    PUPable_decl(StreamingStrategy);
 };

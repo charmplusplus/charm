@@ -1,6 +1,7 @@
 module ComlibModule { 
 //  readonly CkGroupID cmgrID;
 
+  initcall void initComlibManager();
   message DummyMsg;
 
 //  message ComlibMsg {
@@ -12,13 +13,13 @@ module ComlibModule {
   group ComlibManager{
     entry ComlibManager(int s);
     entry ComlibManager(int s, int n);
-//    entry ComlibManager(StrategyMsg *);
+    entry ComlibManager();
 
-    entry void done(void);
+//    entry void done(void);
+//    entry void receiveID(comID id);
+//    entry void receiveID(int n, int p[n], comID id);
 
-    entry void receiveID(comID id);
-    entry void receiveID(int n, int p[n], comID id);
-
+    entry void receiveTable(StrategyWrapper sw);
     entry void localElement(void);
     entry void ArraySend(int ep, void *msg, CkArrayIndexMax &idx, CkArrayID a);
     entry void GroupSend(int ep, void *msg, int onpe, CkGroupID gid);
