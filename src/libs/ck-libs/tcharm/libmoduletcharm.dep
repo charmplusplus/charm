@@ -1,1 +1,1 @@
--language charm++ 
+-language charm++ -lmoduletcharm-compat
