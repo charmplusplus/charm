@@ -1118,21 +1118,23 @@ void CkLocMgr::staticSpringCleaning(void *forWhom,double curWallTime) {
 	((CkLocMgr *)forWhom)->springCleaning();
 }
 
-void CkLocMgr::flushStates(void)
+// clean all buffer'ed messages and also free local objects
+void CkLocMgr::flushAllRecs(void)
 {
-  // clean all buffer'ed messages
   void *objp;
   void *keyp;
   CkHashtableIterator *it=hash.iterator();
   while (NULL!=(objp=it->next(&keyp))) {
     CkLocRec *rec=*(CkLocRec **)objp;
     CkArrayIndex &idx=*(CkArrayIndex *)keyp;
-    switch (rec->type()) {
-    case CkLocRec::buffering:
-    case CkLocRec::remote:
+    if (rec->type() != CkLocRec::local) {
       hash.remove(*(CkArrayIndexMax *)&idx);
       delete rec;
       it->seek(-1);//retry this hash slot
+    }
+    else {
+        callMethod((CkLocRec_local*)rec, &CkMigratable::ckDestroy);
+        it->seek(-1);//retry this hash slot
     }
   }
   delete it;
@@ -1548,6 +1550,18 @@ void CkLocMgr::callMethod(CkLocRec_local *rec,CkMigratable_voidfn_t fn)
 		CkMigratable *el=m->element(localIdx);
 		if (el) (el->* fn)();
 	}
+}
+
+/// return a list of migratables in this local record
+void CkLocMgr::migratableList(CkLocRec_local *rec, CkVec<CkMigratable *> &list)
+{
+        register ManagerRec *m;
+        int localIdx=rec->getLocalIndex();
+
+        for (m=firstManager;m!=NULL;m=m->next) {
+                CkMigratable *elt=m->element(localIdx);
+                list.push_back(elt);
+        }
 }
 
 /// Migrate this element to another processor.

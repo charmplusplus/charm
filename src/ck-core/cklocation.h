@@ -554,7 +554,10 @@ public:
 	void reclaimRemote(const CkArrayIndexMax &idx,int deletedOnPe);
 	void dummyAtSync(void);
 
-	virtual void flushStates(void);
+	/// return a list of migratables in this local record
+	void migratableList(CkLocRec_local *rec, CkVec<CkMigratable *> &list);
+
+	void flushAllRecs(void);
 	void pup(PUP::er &p);
 	
 private:
