@@ -4,7 +4,10 @@
 #include "lbdb.h"
 #include "LBDatabase.decl.h"
 
-void CreateLBDatabase();
+class LBDBInit : public Chare {
+  public:
+    LBDBInit(CkArgMsg*);
+};
 
 class LBDatabase : public Group {
 public:

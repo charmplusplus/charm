@@ -502,6 +502,7 @@ void _initCharm(int argc, char **argv)
     _registerCkArray();
     _registertempo();
     _registerwaitqd();
+    _registerLBDatabase();
     CkRegisterMainModule();
   }
   _TRACE_BEGIN_COMPUTATION();
@@ -563,9 +564,6 @@ void _initCharm(int argc, char **argv)
 			     (indirectionFunction) getEpIdx);
 #endif
 
-#if CMK_LBDB_ON
-  CreateLBDatabase();
-#endif
 
 }
 

@@ -1,9 +1,12 @@
 module LBDatabase {
 
-readonly CkGroupID lbdb;
+  readonly CkGroupID lbdb;
 
-group LBDatabase {
-  entry void LBDatabase(void);  
-};
+  mainchare LBDBInit {
+    entry LBDBInit();
+  };
+  group LBDatabase {
+    entry void LBDatabase(void);  
+  };
 
 };

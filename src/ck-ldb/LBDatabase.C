@@ -11,10 +11,13 @@
 
 CkGroupID lbdb;
 
-void CreateLBDatabase()
+LBDBInit::LBDBInit(CkArgMsg *m)
 {
+#ifdef CMK_LBDB_ON
   lbdb = CProxy_LBDatabase::ckNew();
   CkPrintf("[%d] New database created\n",CkMyPe());
+#endif
+  delete m;
 }
 
 #endif // CMK_LBDB_ON
