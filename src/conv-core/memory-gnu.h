@@ -154,6 +154,7 @@ extern __malloc_ptr_t __default_morecore __MALLOC_P ((ptrdiff_t __size))
        __attribute_malloc__;
 
 /* SVID2/XPG mallinfo structure */
+#ifndef _STRUCT_MALLINFO
 struct mallinfo {
   int arena;    /* total space allocated from system */
   int ordblks;  /* number of non-inuse chunks */
@@ -166,6 +167,7 @@ struct mallinfo {
   int fordblks; /* total non-inuse space */
   int keepcost; /* top-most, releasable (via malloc_trim) space */
 };
+#endif
 
 /* Returns a copy of the updated current mallinfo. */
 extern struct mallinfo mallinfo __MALLOC_P ((void));
