@@ -83,10 +83,10 @@ public:
     int getRecvHash(LDCommData &cData);
     void clear() {
       n_objs = n_comm = 0;
-      objData.resize(0);
-      commData.resize(0);
-      from_proc.resize(0);
-      to_proc.resize(0);
+      objData.free();
+      commData.free();
+      from_proc.free();
+      to_proc.free();
       deleteCommHash();
     }
     void print();
