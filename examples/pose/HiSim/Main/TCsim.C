@@ -9,7 +9,7 @@ extern roarray<char, 1024>  appname;
 
 POSE_TimeType Task::convertToInt(double inp) 
 {
-  POSE_TimeType out = (long long)(inp*factor);
+  POSE_TimeType out = (POSE_TimeType)(inp*factor);
   if (out <0 && inp != -1.0) {
     CmiPrintf("Invalid value in convertToInt() - %ld %f\n", out, inp);
     CmiPrintf("Considering changing factor %e to a smaller value. \n", factor);
