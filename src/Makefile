@@ -21,11 +21,11 @@
 #
 ###############################################################################
 
-all:
-	@echo 'try one of:'
-	@echo '  make converse'
-	@echo '  make charm'
-	@echo '  make charm++'
+all: charm++
+#	@echo 'try one of:'
+#	@echo '  make converse'
+#	@echo '  make charm'
+#	@echo '  make charm++'
 
 charm: converse charmxlat charmlibs libcharm
 
@@ -130,7 +130,7 @@ cmk_clean:
 CKHEADERS=chare.h const.h msg_macros.h prio_macros.h env_macros.h globals.h\
 	  sys_macros.h communication.h performance.h $(CVHEADERS)
 
-CK_LIBS_CORE=libck-core-notrace.o libck-core-summary.o
+CK_LIBS_CORE=libck-core-notrace.o libck-core-summary.o libck-core-projections.o
 
 CK_LIBS_LDB=libck-ldb-rand.o libck-ldb-acwn.o libck-ldb-mngr.o # libck-ldb-priomngr.o libck-ldb-recv.o libck-ldb-tok.o libck-ldb-btok.o
 
@@ -153,7 +153,7 @@ libck-core-summary.o: $(LIBCK_CORE_SUMMARY)
 	$(CHARMC) -cp ../lib/ -o $@ $(LIBCK_CORE_SUMMARY)
 
 LIBCK_CORE_PROJ=$(LIBCK_CORE) perf-proj.o perfio.o
-libck-core-proj.o: $(LIBCK_CORE_PROJ)
+libck-core-projections.o: $(LIBCK_CORE_PROJ)
 	$(CHARMC) -cp ../lib/ -o $@ $(LIBCK_CORE_PROJ)
 
 libck-ldb-acwn.o: ldb.acwn.p ldb.h $(CKHEADERS)
