@@ -510,7 +510,9 @@ CkPrintf("[%d] end init\n",myChunk);
       for (i=0;i<g.nelems;i++) {
       	areas[i]=calcArea(g,i);
       }
+	areas[0] *= 2.0;
 	areas[1] *= 2.0;
+	areas[5] *= 2.0;
 			//coarsen in the last step
 //      if(t >= tSteps-1){
 				CkPrintf("[%d] Starting coarsening step: %d nodes, %d elements to %.3g\n",

@@ -120,12 +120,12 @@ int edge::collapse(elemRef requester, node kNode, node dNode, elemRef kNbr,
       CkPrintf("TMRC2D: moving node %f,%f to %f,%f\n", kNode.X(), kNode.Y(), 
 	       newNode.X(), newNode.Y());
       im = mesh[requester.cid].nodeUpdate(requester.idx,kNode,myRef,keepNbr,newNode);
-      if (im->anInt == -1)
+      if ((im->anInt == -1) && (keepNbr.cid != -1))
 	im = mesh[keepNbr.cid].nodeUpdate(keepNbr.idx,kNode,keepEdge,requester,newNode);
       CkPrintf("TMRC2D: deleting node %f,%f\n", dNode.X(), dNode.Y());
       im = mesh[requester.cid].nodeDelete(requester.idx, dNode, myRef, delNbr,
 					  newNode);
-      if (im->anInt == -1)
+      if ((im->anInt == -1) && (delNbr.cid != -1))
 	im = mesh[delNbr.cid].nodeDelete(delNbr.idx, dNode, keepEdge, 
 					 requester, newNode);
       CkPrintf("TMRC2D: removing edge %d on %d\n", myRef.idx, myRef.cid);
@@ -136,12 +136,12 @@ int edge::collapse(elemRef requester, node kNode, node dNode, elemRef kNbr,
       CkPrintf("TMRC2D: moving node %f,%f to %f,%f\n", dNode.X(), dNode.Y(), 
 	       newNode.X(), newNode.Y());
       im = mesh[requester.cid].nodeUpdate(requester.idx,dNode,myRef,keepNbr,newNode);
-      if (im->anInt == -1)
+      if ((im->anInt == -1) && (keepNbr.cid != -1))
 	im = mesh[keepNbr.cid].nodeUpdate(keepNbr.idx,dNode,keepEdge,requester,newNode);
       CkPrintf("TMRC2D: deleting node %f,%f\n", kNode.X(), kNode.Y());
       im = mesh[requester.cid].nodeDelete(requester.idx, kNode, myRef, delNbr,
 					  newNode);
-      if (im->anInt == -1)
+      if ((im->anInt == -1) && (delNbr.cid != -1))
 	im = mesh[delNbr.cid].nodeDelete(delNbr.idx, kNode, keepEdge,
 					 requester, newNode);
       CkPrintf("TMRC2D: removing edge %d on %d\n", myRef.idx, myRef.cid);
