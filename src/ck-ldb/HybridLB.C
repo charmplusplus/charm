@@ -19,8 +19,6 @@
 #include "RefineCommLB.h"
 #include "RefineLB.h"
 
-#include "HybridLB.def.h"
-
 #define  DEBUGF(x)      // CmiPrintf x;
 
 CreateLBFunc_Def(HybridLB, "Hybrid load balancer");
@@ -898,6 +896,8 @@ int HybridLB::NeighborIndex(int pe, int atlevel)
     }
     return peslot;
 }
+
+#include "HybridLB.def.h"
 
 /*@{*/
 

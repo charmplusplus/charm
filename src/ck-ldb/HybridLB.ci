@@ -7,6 +7,8 @@ include "NeighborLBMsg.h";
 include "CentralLBMsg.h";
 include "HybridLBMsg.h";
 
+initnode void lbinit(void);
+
 group [migratable] HybridLB: BaseLB {
   entry void HybridLB(const CkLBOptions &);  
   entry void ProcessAtSync();
