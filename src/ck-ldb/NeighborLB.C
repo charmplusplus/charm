@@ -36,8 +36,8 @@ NLBMigrateMsg* NeighborLB::Strategy(NborBaseLB::LDStats* stats, int count)
   int i;
   for(i=0; i < count; i++) {
     // Scale times we need appropriately for relative proc speeds
-    const double scale =  ((double)myStats.proc_speed) 
-      / stats[i].proc_speed;
+    const double scale =  ((double)myStats.pe_speed) 
+      / stats[i].pe_speed;
 
     stats[i].total_walltime *= scale;
     stats[i].idletime *= scale;
@@ -68,15 +68,15 @@ NLBMigrateMsg* NeighborLB::Strategy(NborBaseLB::LDStats* stats, int count)
       procs.insert(item);
     }
       
-    maxHeap objs(myStats.obj_data_sz);
-    for(i=0; i < myStats.obj_data_sz; i++) {
+    maxHeap objs(myStats.n_objs);
+    for(i=0; i < myStats.n_objs; i++) {
       InfoRecord* item = new InfoRecord;
       item->load = myStats.objData[i].wallTime;
       item->Id = i;
       objs.insert(item);
     }
 
-    int objs_here = myStats.obj_data_sz;
+    int objs_here = myStats.n_objs;
     do {
       if (objs_here <= 1) break;  // For now, always leave 1 object
 
@@ -117,7 +117,7 @@ NLBMigrateMsg* NeighborLB::Strategy(NborBaseLB::LDStats* stats, int count)
       const int me = CkMyPe();
       // Apparently we can give this object to this processor
       //      CkPrintf("[%d] Obj %d of %d migrating from %d to %d\n",
-      //      	       CkMyPe(),obj->Id,myStats.obj_data_sz,me,p->Id);
+      //      	       CkMyPe(),obj->Id,myStats.n_objs,me,p->Id);
 
       MigrateInfo* migrateMe = new MigrateInfo;
       migrateMe->obj = myStats.objData[obj->Id].handle;

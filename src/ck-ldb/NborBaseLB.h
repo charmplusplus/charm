@@ -54,7 +54,13 @@ public:
     double bg_cputime;
     double obj_walltime;
     double obj_cputime;
-    int proc_speed;
+    int pe_speed;
+    CmiBool available;
+
+    int n_objs;
+    LDObjData* objData;
+    int n_comm;
+    LDCommData* commData;
   };
 
 protected:
@@ -71,9 +77,12 @@ protected:
     _n[1] = (CmiMyPe() + 1) % CmiNumPes();
   };
 
+  int NeighborIndex(int pe);   // return the neighbor array index
+
   LBDatabase* theLbdb;
+  /*
   struct {
-    int proc_speed;
+    int pe_speed;
     double total_walltime;
     double total_cputime;
     double idletime;
@@ -86,6 +95,8 @@ protected:
     double obj_walltime;
     double obj_cputime;
   } myStats;
+  */
+  LDStats myStats;
 
 private:
   void FindNeighbors();
@@ -109,7 +120,7 @@ class NLBStatsMsg : public CMessage_NLBStatsMsg {
 public:
   int from_pe;
   int serial;
-  int proc_speed;
+  int pe_speed;
   double total_walltime;
   double total_cputime;
   double idletime;

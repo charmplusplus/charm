@@ -60,12 +60,15 @@ NborBaseLB::NborBaseLB() :thisproxy(thisgroup)
   mig_msgs_received = 0;
   mig_msgs = 0;
 
-  myStats.proc_speed = theLbdb->ProcessorSpeed();
+  myStats.pe_speed = theLbdb->ProcessorSpeed();
 //  char hostname[80];
 //  gethostname(hostname,79);
-//  CkPrintf("[%d] host %s speed %d\n",CkMyPe(),hostname,myStats.proc_speed);
-  myStats.obj_data_sz = 0;
-  myStats.comm_data_sz = 0;
+//  CkPrintf("[%d] host %s speed %d\n",CkMyPe(),hostname,myStats.pe_speed);
+  myStats.from_pe = CkMyPe();
+  myStats.n_objs = 0;
+  myStats.objData = NULL;
+  myStats.n_comm = 0;
+  myStats.commData = NULL;
   receive_stats_ready = 0;
 
   theLbdb->CollectStatsOn();
@@ -132,16 +135,19 @@ NLBStatsMsg* NborBaseLB::AssembleStats()
   theLbdb->TotalTime(&myStats.total_walltime,&myStats.total_cputime);
   theLbdb->IdleTime(&myStats.idletime);
   theLbdb->BackgroundLoad(&myStats.bg_walltime,&myStats.bg_cputime);
-  myStats.obj_data_sz = theLbdb->GetObjDataSz();
-  myStats.objData = new LDObjData[myStats.obj_data_sz];
+
+  myStats.n_objs = theLbdb->GetObjDataSz();
+  if (myStats.objData) delete [] myStats.objData;
+  myStats.objData = new LDObjData[myStats.n_objs];
   theLbdb->GetObjData(myStats.objData);
 
-  myStats.comm_data_sz = theLbdb->GetCommDataSz();
-  myStats.commData = new LDCommData[myStats.comm_data_sz];
+  myStats.n_comm = theLbdb->GetCommDataSz();
+  if (myStats.commData) delete [] myStats.commData;
+  myStats.commData = new LDCommData[myStats.n_comm];
   theLbdb->GetCommData(myStats.commData);
 
   myStats.obj_walltime = myStats.obj_cputime = 0;
-  for(int i=0; i < myStats.obj_data_sz; i++) {
+  for(int i=0; i < myStats.n_objs; i++) {
     myStats.obj_walltime += myStats.objData[i].wallTime;
     myStats.obj_cputime += myStats.objData[i].cpuTime;
   }    
@@ -153,7 +159,7 @@ NLBStatsMsg* NborBaseLB::AssembleStats()
   msg->from_pe = CkMyPe();
   // msg->serial = rand();
   msg->serial = CrnRand();
-  msg->proc_speed = myStats.proc_speed;
+  msg->pe_speed = myStats.pe_speed;
   msg->total_walltime = myStats.total_walltime;
   msg->total_cputime = myStats.total_cputime;
   msg->idletime = myStats.idletime;
@@ -197,13 +203,8 @@ void NborBaseLB::ReceiveStats(NLBStatsMsg *m)
     const int pe = m->from_pe;
     //  CkPrintf("Stats msg received, %d %d %d %d %p\n",
     //  	   pe,stats_msg_count,m->n_objs,m->serial,m);
-    int peslot = -1;
-    for(int i=0; i < num_neighbors(); i++) {
-      if (pe == neighbor_pes[i]) {
-	peslot = i;
-	break;
-      }
-    }
+    int peslot = NeighborIndex(pe);
+
     if (peslot == -1 || statsMsgsList[peslot] != 0) {
       CkPrintf("*** Unexpected NLBStatsMsg in ReceiveStats from PE %d ***\n",
 	       pe);
@@ -215,9 +216,14 @@ void NborBaseLB::ReceiveStats(NLBStatsMsg *m)
       statsDataList[peslot].idletime = m->idletime;
       statsDataList[peslot].bg_walltime = m->bg_walltime;
       statsDataList[peslot].bg_cputime = m->bg_cputime;
-      statsDataList[peslot].proc_speed = m->proc_speed;
+      statsDataList[peslot].pe_speed = m->pe_speed;
       statsDataList[peslot].obj_walltime = m->obj_walltime;
       statsDataList[peslot].obj_cputime = m->obj_cputime;
+
+      statsDataList[peslot].n_objs = m->n_objs;
+      statsDataList[peslot].objData = m->objData;
+      statsDataList[peslot].n_comm = m->n_comm;
+      statsDataList[peslot].commData = m->commData;
       stats_msg_count++;
     }
   }
@@ -332,22 +338,34 @@ NLBMigrateMsg* NborBaseLB::Strategy(LDStats* stats,int count)
   for(int j=0; j < count; j++) {
     CkPrintf(
     "[%d] Proc %d Speed %d Total(wall,cpu)=%f %f Idle=%f Bg=%f %f obj=%f %f\n",
-    CkMyPe(),stats[j].from_pe,stats[j].proc_speed,
+    CkMyPe(),stats[j].from_pe,stats[j].pe_speed,
     stats[j].total_walltime,stats[j].total_cputime,
     stats[j].idletime,stats[j].bg_walltime,stats[j].bg_cputime,
     stats[j].obj_walltime,stats[j].obj_cputime);
   }
 
   delete [] myStats.objData;
-  myStats.obj_data_sz = 0;
+  myStats.n_objs = 0;
   delete [] myStats.commData;
-  myStats.comm_data_sz = 0;
+  myStats.n_comm = 0;
 
   int sizes=0;
   NLBMigrateMsg* msg = new(&sizes,1) NLBMigrateMsg;
   msg->n_moves = 0;
 
   return msg;
+}
+
+int NborBaseLB::NeighborIndex(int pe)
+{
+    int peslot = -1;
+    for(int i=0; i < num_neighbors(); i++) {
+      if (pe == neighbor_pes[i]) {
+	peslot = i;
+	break;
+      }
+    }
+    return peslot;
 }
 
 void* NLBMigrateMsg::alloc(int msgnum, size_t size, int* array, int priobits)
