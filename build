@@ -53,7 +53,7 @@ syntax() {
   echo '  tcp             use TCP sockets for communication (ony for net version)'
   echo "  vmi             use NCSA's VMI for communication (only for mpi version)"
   echo '  scyld           compile for Scyld Beowulf cluster based on bproc'
-  echo '  clustermatic    compile for Clustermatic Beowulf cluster based on bproc'
+  echo '  clustermatic    compile for Clustermatic (support version 3 and 4) '
   echo ''
   echo 'Advanced options:'
   echo '  bluegene	  compile for BigSim (Blue Gene) simulator'
@@ -67,7 +67,7 @@ syntax() {
   echo '  --incdir=DIR	  specify additional include path for compiler'
   echo '  --libdir=DIR	  specify additional lib path for compiler'
   echo '  --basedir=DIR	  shortcut for the above two - DIR/include and DIR/lib'
-  echo '  -jNUM          parallel make, NUM is the number of paralle make jobs'
+  echo '  -jNUM           parallel make, NUM is the number of paralle make jobs'
   fi
   echo ''
   echo '<charmc-options>: normal compiler options e.g. -g -O -save -verbose'
