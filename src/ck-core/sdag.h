@@ -445,6 +445,104 @@ class CDep {
    }
 };
 
+/** 
+ This class hides all of the details of dependencies between
+ overlap blocks and when blocks. 
+ */
+
+class COverDep {
+
+   int numOverlaps, numWhens;
+   TListCWhenTrigger **whens;
+   int *numOverlapDepends;
+   TListCWhenTrigger ***overlapDepends;
+   
+  public:
+     void pup(PUP::er& p) {
+        /*
+          no need for initMem() because __sdag_pup() will take care of
+          allocating of COverDep and call addOverlapDepends(), so we don't pup overlapsDepends here
+        */
+        int i; // , j;
+        for (i=0; i<numWhens; i++)    whens[i]->pup(p);
+
+        p(numOverlapDepends, numOverlaps);
+     }
+
+     COverDep(int no, int nw) : numOverlaps(no), numWhens(nw) { initMem(); }
+
+     ~COverDep() {
+        int i;
+        delete [] numOverlapDepends;
+        for(i=0;i<numWhens;i++) {
+            delete whens[i];
+        }
+        for(i=0;i<numOverlaps;i++) {
+            delete [] overlapDepends[i];
+
+        }
+	delete [] whens;
+	delete [] overlapDepends;
+     }
+     
+   private:
+     void initMem() {
+       // initialize the internal data structures here
+       whens = new TListCWhenTrigger *[numWhens];
+       numOverlapDepends = new int[numOverlaps];
+       overlapDepends = new TListCWhenTrigger **[numOverlaps];
+       int i;
+       for(i=0;i<numWhens;i++) {
+         whens[i] = new TListCWhenTrigger();
+       }
+       for(i=0;i<numOverlaps;i++) {
+         overlapDepends[i] = new TListCWhenTrigger *[numWhens];
+         numOverlapDepends[i] = 0;
+       }
+     }
+
+   public:
+     //adds a dependency of the whenID for each Overlap
+     // done only at initialization
+     void addOverlapDepends(int whenID, int overlap) {
+       overlapDepends[overlap][whenID] = whens[whenID];
+       //overlapDepends[overlap][numOverlapDepends[overlap]++] = whens[whenID];
+     }
+     
+     // register a trigger to be called with
+     // with <nEntries> specified
+     // in <entries> with corresponding <refnums>
+     void Register(CWhenTrigger *trigger)
+     {
+       whens[trigger->whenID]->append(trigger);
+     }
+     
+     // deregister trigger from all
+     // the entries it is registered for
+     void deRegister(CWhenTrigger *trigger)
+     {
+        whens[trigger->whenID]->remove(trigger);
+     }
+     
+     
+     // For a specified entry number and reference number,
+     // get the registered trigger which satisfies dependency.
+     // If no trigger exists
+     // for the given reference number, get the trigger registered for
+     // ANY ref num. If that also doesnt exist, Return NULL
+     CWhenTrigger *getTrigger(int overlapID, int whenID)
+     {
+        TListCWhenTrigger *wlist = overlapDepends[overlapID][whenID];
+        CWhenTrigger *elem=wlist->begin(); 
+        if (elem == 0)
+          return 0;	  
+        else {
+          deRegister(elem);
+	  return elem;
+        }
+     }
+};
+
 class CCounter {
   private:
     unsigned int count;
