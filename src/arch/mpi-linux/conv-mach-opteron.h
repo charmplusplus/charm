@@ -1,0 +1,11 @@
+
+#undef CMK_WEB_MODE
+#undef CMK_CCS_AVAILABLE
+#define CMK_WEB_MODE 					0
+#define CMK_CCS_AVAILABLE				0
+
+#undef CMK_TIMER_USE_RDTSC
+#undef CMK_TIMER_USE_GETRUSAGE
+#define CMK_TIMER_USE_RDTSC				0
+#define CMK_TIMER_USE_GETRUSAGE				0
+
