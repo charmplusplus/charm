@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.1  1997-07-08 22:10:56  milind
+ * Revision 1.2  1997-07-31 15:30:58  milind
+ * ANSIfied.
+ *
+ * Revision 1.1  1997/07/08 22:10:56  milind
  * Added IBM SP3 version. Developed and Tested on ANL machine.
  *
  * Revision 2.15  1997/04/25 20:48:17  jyelon
@@ -116,14 +119,14 @@ static int allmsg, dontcare, msgtype;
 
 /**************************  TIMER FUNCTIONS **************************/
 
-static void CmiTimerInit()
+static void CmiTimerInit(void)
 {
   struct timestruc_t time;
   gettimer(TIMEOFDAY,&time);
   itime=(double)time.tv_sec + 1.0e-9*((double) time.tv_nsec);
 }
 
-double CmiTimer()
+double CmiTimer(void)
 {
   double tmsec, t;
   struct timestruc_t time;
@@ -134,7 +137,7 @@ double CmiTimer()
   return tmsec / 1000.0;
 }
 
-double CmiWallTimer()
+double CmiWallTimer(void)
 {
   double tmsec, t;
   struct timestruc_t time;
@@ -145,7 +148,7 @@ double CmiWallTimer()
   return tmsec / 1000.0;
 }
 
-double CmiCpuTimer()
+double CmiCpuTimer(void)
 {
   double tmsec, t;
   struct timestruc_t time;
@@ -156,7 +159,7 @@ double CmiCpuTimer()
   return tmsec / 1000.0;
 }
 
-static int CmiAllAsyncMsgsSent()
+static int CmiAllAsyncMsgsSent(void)
 {
      MSG_LIST *msg_tmp = sent_msgs;
      
@@ -188,7 +191,7 @@ void CmiReleaseCommHandle(CmiCommHandle c)
 }
 
 
-static void CmiReleaseSentMessages()
+static void CmiReleaseSentMessages(void)
 {
      MSG_LIST *msg_tmp=sent_msgs;
      MSG_LIST *prev=0;
@@ -254,7 +257,7 @@ static void PumpMsgs(void)
 
 /********************* MESSAGE RECEIVE FUNCTIONS ******************/
 
-void *CmiGetNonLocal()
+void *CmiGetNonLocal(void)
 {
      void *msg;
 	  RMSG_LIST *msg_tmp;
@@ -273,7 +276,7 @@ void *CmiGetNonLocal()
 	  return msg;
 }
 
-void CmiNotifyIdle()
+void CmiNotifyIdle(void)
 {
 #if CMK_WHEN_PROCESSOR_IDLE_USLEEP
   tv.tv_sec=0; tv.tv_usec=5000;
@@ -283,10 +286,7 @@ void CmiNotifyIdle()
  
 /********************* MESSAGE SEND FUNCTIONS ******************/
 
-void CmiSyncSendFn(destPE, size, msg)
-     int destPE;
-     int size;
-     char * msg;
+void CmiSyncSendFn(int destPE, int size, char *msg)
 {
      char *dupmsg = (char *) CmiAlloc(size);
 	  memcpy(dupmsg, msg, size);
@@ -298,10 +298,7 @@ void CmiSyncSendFn(destPE, size, msg)
 }
 
 
-CmiCommHandle CmiAsyncSendFn(destPE, size, msg)
-     int destPE;
-     int size;
-     char * msg;
+CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg)
 {
      MSG_LIST *msg_tmp;
      int msgid;
@@ -319,9 +316,7 @@ CmiCommHandle CmiAsyncSendFn(destPE, size, msg)
      end_sent = msg_tmp;
 }
 
-void CmiFreeSendFn(destPE, size, msg)
-int destPE, size;
-char *msg;
+void CmiFreeSendFn(int destPE, int size, char *msg)
 {
 	if (Cmi_mype==destPE) {
 		FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg);
@@ -333,9 +328,7 @@ char *msg;
 
 /*********************** BROADCAST FUNCTIONS **********************/
 
-void CmiSyncBroadcastFn(size, msg)     /* ALL_EXCEPT_ME  */
-     int size;
-     char * msg;
+void CmiSyncBroadcastFn(int size, char *msg)     /* ALL_EXCEPT_ME  */
 {
      int i ;
      
@@ -346,9 +339,7 @@ void CmiSyncBroadcastFn(size, msg)     /* ALL_EXCEPT_ME  */
 }
 
 
-CmiCommHandle CmiAsyncBroadcastFn(size, msg)  
-int size;
-char * msg;
+CmiCommHandle CmiAsyncBroadcastFn(int size, char *msg)  
 {
 	int i ;
 
@@ -359,17 +350,13 @@ char * msg;
 	return (CmiCommHandle) (CmiAllAsyncMsgsSent());
 }
 
-void CmiFreeBroadcastFn(size, msg)
-    int size;
-    char *msg;
+void CmiFreeBroadcastFn(int size, char *msg)
 {
     CmiSyncBroadcastFn(size,msg);
 	 CmiFree(msg);
 }
  
-void CmiSyncBroadcastAllFn(size, msg)        /* All including me */
-     int size;
-     char * msg;
+void CmiSyncBroadcastAllFn(int size, char *msg)        /* All including me */
 {
      int i ;
      
@@ -377,9 +364,7 @@ void CmiSyncBroadcastAllFn(size, msg)        /* All including me */
 	  CmiSyncSendFn(i,size,msg) ;
 }
 
-CmiCommHandle CmiAsyncBroadcastAllFn(size, msg)  
-int size;
-char * msg;
+CmiCommHandle CmiAsyncBroadcastAllFn(int size, char *msg)  
 {
 	int i ;
 
@@ -388,9 +373,7 @@ char * msg;
 	return (CmiCommHandle) (CmiAllAsyncMsgsSent());
 }
 
-void CmiFreeBroadcastAllFn(size, msg)  /* All including me */
-     int size;
-     char * msg;
+void CmiFreeBroadcastAllFn(int size, char *msg)  /* All including me */
 {
      int i ;
      
@@ -403,15 +386,13 @@ void CmiFreeBroadcastAllFn(size, msg)  /* All including me */
 
 /* Neighbour functions used mainly in LDB : pretend the SP1 is a hypercube */
 
-int CmiNumNeighbours(node)
-int node;
+int CmiNumNeighbours(int node)
 {
      return Cmi_dim;
 }
 
 
-void CmiGetNodeNeighbours(node, neighbours)
-int node, *neighbours;
+void CmiGetNodeNeighbours(int node, int *neighbours)
 {
      int i;
      
@@ -422,8 +403,7 @@ int node, *neighbours;
 
 
 
-int CmiNeighboursIndex(node, neighbour)
-int node, neighbour;
+int CmiNeighboursIndex(int node, int neighbour)
 {
     int index = 0;
     int linenum = node ^ neighbour;
@@ -436,17 +416,17 @@ int node, neighbour;
     return index;
 }
 
-int CmiFlushPrintfs()
+int CmiFlushPrintfs(void)
 { }
 
 
 
 /************************** MAIN ***********************************/
 
-void CmiDeclareArgs()
+void CmiDeclareArgs(void)
 {}
 
-void ConverseExit()
+void ConverseExit(void)
 {
   int msgid = allmsg; 
   size_t nbytes;
@@ -454,11 +434,7 @@ void ConverseExit()
   exit(0);
 }
 
-void ConverseInit(argc, argv, fn, usched, initret)
-int argc;
-char *argv[];
-CmiStartFn fn;
-int usched, initret;
+void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 {
   int n ;
   int nbuf[4];
@@ -478,7 +454,7 @@ int usched, initret;
   CmiSpanTreeInit();
   CmiTimerInit();
   CpvInitialize(void *, CmiLocalQueue);
-  CpvAccess(CmiLocalQueue) = FIFO_Create();
+  CpvAccess(CmiLocalQueue) = (void *)FIFO_Create();
   ConverseCommonInit(argv);
   CthInit(argv);
   if (initret==0) {
@@ -494,8 +470,7 @@ int usched, initret;
  *
  *****************************************************************************/
  
-void *CmiAlloc(size)
-int size;
+void *CmiAlloc(int size)
 {
      char *res;
      res =(char *)malloc(size+8);
@@ -507,14 +482,12 @@ int size;
      return (void *)(res+8);
 }
 
-int CmiSize(blk)
-void *blk;
+int CmiSize(void *blk)
 {
 	return ((int *)( ((char *)blk)-8))[0];
 }
  
-void CmiFree(blk)
-void *blk;
+void CmiFree(void *blk)
 {
 	free( ((char*)blk)-8);
 }
