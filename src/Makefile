@@ -173,9 +173,9 @@ CK_LIBS_N=$(CK_LDB_N) $(CK_CPLUS_N) $(CK_CORE_N) libckn-defmain.o libckn-unimain
 
 CK_LIBS_D=$(CK_LDB_D) $(CK_CPLUS_D) $(CK_CORE_D) libckd-defmain.o libckd-unimain.o
 
-LIBCKN_CORE=common.n.o globals.n.o init.n.o register.n.o boc.n.o condsend.n.o qd.n.o vid.n.o rdonly.n.o stat.n.o wrtone.n.o acc.n.o mono.n.o tbl.n.o memstuff.n.o
+LIBCKN_CORE=common.n.o globals.n.o init.n.o register.n.o boc.n.o condsend.n.o qd.n.o vid.n.o rdonly.n.o stat.n.o wrtone.n.o acc.n.o mono.n.o tbl.n.o memstuff.n.o ldbcfns.n.o
 
-LIBCKD_CORE=common.d.o globals.d.o init.d.o register.d.o boc.d.o condsend.d.o qd.d.o vid.d.o rdonly.d.o stat.d.o wrtone.d.o acc.d.o mono.d.o tbl.d.o memstuff.d.o
+LIBCKD_CORE=common.d.o globals.d.o init.d.o register.d.o boc.d.o condsend.d.o qd.d.o vid.d.o rdonly.d.o stat.d.o wrtone.d.o acc.d.o mono.d.o tbl.d.o memstuff.d.o ldbcfns.d.o
 
 charmlibs: converse $(CK_LIBS_N) $(CK_LIBS_D)
 
@@ -247,12 +247,6 @@ libckn-ldb-recv.o: ldb.recv.p ldb.h
 libckd-ldb-recv.o: ldb.recv.p ldb.h
 	$(CHARMC) -cp ../lib/ -o $@ ldb.recv.p -DDEBUGGING_MODE
 
-libckn-ldbcfns.o: ldbcfns.c
-	$(CHARMC) -cp ../lib/ -o $@ ldbcfns.c
-
-libckd-ldbcfns.o: ldbcfns.c
-	$(CHARMC) -cp ../lib/ -o $@ ldbcfns.c -DDEBUGGING_MODE
-
 libckn-cplus-n.o: dummy.cplus.c
 	$(CHARMC) -cp ../lib/ -o $@ dummy.cplus.c
 
@@ -262,14 +256,18 @@ libckd-cplus-n.o: dummy.cplus.c
 libckn-defmain.o: default-main.c
 	$(CHARMC) -cp ../lib/ -o $@ default-main.c
 
-libckn-unimain.o: uni_user_main.c
-	$(CHARMC) -cp ../lib/ -o $@ uni_user_main.c
-
 libckd-defmain.o: default-main.c
 	$(CHARMC) -cp ../lib/ -o $@ default-main.c -DDEBUGGING_MODE
 
+libckn-unimain.o: uni_user_main.c
+	$(CHARMC) -cp ../lib/ -o $@ uni_user_main.c
+
 libckd-unimain.o: uni_user_main.c
 	$(CHARMC) -cp ../lib/ -o $@ uni_user_main.c -DDEBUGGING_MODE
+
+ldbcfns.n.o ldbcfns.d.o: ldbcfns.c $(CKHEADERS)
+	$(CHARMC) -o ldbcfns.n.o ldbcfns.c
+	$(CHARMC) -o ldbcfns.d.o ldbcfns.c -DDEBUGGING_MODE
 
 common.n.o common.d.o: common.c $(CKHEADERS)
 	$(CHARMC) -o common.n.o common.c
