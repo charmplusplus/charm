@@ -196,6 +196,14 @@ NLBStatsMsg* NborBaseLB::AssembleStats()
   msg->n_comm = csz;
   theLbdb->GetCommData(msg->commData);
 
+  // cleanup 
+  delete [] myStats.objData;
+  myStats.objData = NULL;
+  myStats.n_objs = 0;
+  delete [] myStats.commData;
+  myStats.commData = NULL;
+  myStats.n_comm = 0;
+
   //  CkPrintf(
   //    "Proc %d speed=%d Total(wall,cpu)=%f %f Idle=%f Bg=%f %f Obj=%f %f\n",
   //    CkMyPe(),msg->proc_speed,msg->total_walltime,msg->total_cputime,
@@ -288,11 +296,11 @@ void NborBaseLB::ReceiveStats(CkMarshalledNLBStatsMessage &data)
     }
     stats_msg_count=0;
 
-    theLbdb->ClearLoads();
+    //theLbdb->ClearLoads();
     if (CkMyPe() == 0) {
       double strat_end_time = CkWallTimer();
       if (_lb_args.debug())
-        CkPrintf("Strat elapsed time %f\n",strat_end_time-strat_start_time);
+        CkPrintf("[%d] %s Strat elapsed time %f\n",CkMyPe(),lbName(),strat_end_time-strat_start_time);
     }
   }
 #endif  
@@ -355,6 +363,8 @@ void NborBaseLB::MigrationDone()
   // Increment to next step
   mystep++;
 
+  theLbdb->ClearLoads();
+
   // if sync resume invoke a barrier
   if (_lb_args.syncResume()) {
     CkCallback cb(CkIndex_NborBaseLB::ResumeClients((CkReductionMsg*)NULL), 
@@ -391,11 +401,6 @@ LBMigrateMsg* NborBaseLB::Strategy(LDStats* stats,int count)
     stats[j].idletime,stats[j].bg_walltime,stats[j].bg_cputime,
     stats[j].obj_walltime,stats[j].obj_cputime);
   }
-
-  delete [] myStats.objData;
-  myStats.n_objs = 0;
-  delete [] myStats.commData;
-  myStats.n_comm = 0;
 
   int sizes=0;
   LBMigrateMsg* msg = new(sizes,CkNumPes(),CkNumPes(),0) LBMigrateMsg;
