@@ -31,7 +31,7 @@ charm++: converse $(L)/libck.a loadbalancers charmxi
 
 bluegene: charm++ $(L)/libconv-bluegene.a METIS multicast
 
-for-namd: charm++ pvm AMPIC
+bgampi: bluegene AMPI
 
 TSM: converse $(L)/libtsm.a
 
@@ -110,8 +110,8 @@ SEQCHARMC=../bin/charmc -seq $(CHARMOPTS)
 #
 ###############################################################################
 
-CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h queueing.h \
-      conv-cpath.h conv-cpm.h persistent.h\
+CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
+      queueing.h conv-cpath.h conv-cpm.h persistent.h\
       trace.h charm-api.h conv-ccs.h ccs-client.c ccs-client.h CcsServer.java\
       ccs-server.h ccs-auth.c ccs-auth.h \
       memory-isomalloc.h debug-conv.h debug-charm.h conv-autoconfig.h \
@@ -137,7 +137,8 @@ UTILHEADERS=pup.h pupf.h pup_c.h pup_stl.h pup_toNetwork4.h \
 
 CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  ckfutures.h \
-	  ckcallback.h CkCallback.decl.h ckcallback-ccs.h ckarrayreductionmgr.h cknodegroupreduction.h\
+	  ckcallback.h CkCallback.decl.h ckcallback-ccs.h 	\
+	  ckarrayreductionmgr.h cknodegroupreduction.h\
 	  ckarray.h cklocation.h ckreduction.h ckcheckpoint.h\
 	  readonly.h charisma.h \
 	  $(UTILHEADERS) \
@@ -308,8 +309,6 @@ isomalloc.o: isomalloc.c $(CVHEADERS)
 convcore.o: convcore.c $(CVHEADERS)
 	$(CHARMC) convcore.c
 
-
-
 conv-ccs.o: conv-ccs.c $(CVHEADERS)
 	$(CHARMC) conv-ccs.c
 
@@ -432,7 +431,7 @@ $(L)/libthreads-default.o: threads.c $(CVHEADERS)
 	$(CHARMC) -o $@ -DCMK_THREADS_BUILD_DEFAULT=1 -IQuickThreads threads.c
 
 $(L)/libthreads-qt.o: threads.c $(CVHEADERS)
-	$(CHARMC) -o $@ -IQuickThreads -DCMK_THREADS_BUILD_QT=1 threads.c
+	$(CHARMC) -o $@ -DCMK_THREADS_BUILD_QT=1 -IQuickThreads threads.c
 
 $(L)/libthreads-context.o: threads.c $(CVHEADERS)
 	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_CONTEXT=1 -IQuickThreads threads.c
@@ -452,8 +451,9 @@ $(L)/libthreads-fibers.o: threads.c $(CVHEADERS)
 
 CK_LIBS_CORE=$(L)/libck.a
 
-LIBCK_CORE=trace-common.o init.o register.o qd.o ck.o main.o msgalloc.o ckfutures.o \
-           debug-message.o ckcallback.o cklocation.o ckarray.o ckreduction.o ckarrayreductionmgr.o\
+LIBCK_CORE=trace-common.o init.o register.o qd.o ck.o main.o msgalloc.o \
+	   ckfutures.o debug-message.o ckcallback.o \
+	   cklocation.o ckarray.o ckreduction.o ckarrayreductionmgr.o\
            tempo.o waitqd.o LBDatabase.o lbdb.o charisma.o ckcheckpoint.o\
            LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o \
 	   BaseLB.o CentralLB.o NborBaseLB.o WSLB.o ObjGraph.o graph.o  \
@@ -544,7 +544,6 @@ CkArray.decl.h CkArray.def.h : ckarray.ci charmxi
 
 ckarray.o: ckarray.C $(CKHEADERS)
 	$(CHARMC) -o ckarray.o ckarray.C
-
 
 
 CkLocation.decl.h: cklocation.ci charmxi
@@ -694,8 +693,6 @@ converseProjections.o: converseProjections.C $(CVHEADERS)
 
 machineProjections.o: machineProjections.C $(CVHEADERS)
 	$(CHARMC) machineProjections.C
-
-
 
 trace-all.o:trace-all.C 
 	$(CHARMC) -o trace-all.o trace-all.C
@@ -908,7 +905,7 @@ blue_timing.o:  blue_impl.h blue_timing.C blue_timing.h $(CVHEADERS)
 blue_init.o:  blue_impl.h blue_init.C $(CVHEADERS)
 	$(CHARMC) -c blue_init.C
 
-$(L)/libconv-bluegene.a:   blue.o blue_init.o blue_timing.o
+$(L)/libconv-bluegene.a: blue.o blue_init.o blue_timing.o
 	$(CHARMC) -o $@ blue.o blue_init.o blue_timing.o
 
 ###############################################################################
