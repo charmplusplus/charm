@@ -12,7 +12,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 2.5  1995-10-02 18:59:47  knauff
+# Revision 2.6  1995-10-20 18:38:43  jyelon
+# added CMK_C_DEBUG, CMK_C_OPTIMIZE, CMK_CXX_DEBUG, CMK_CXX_OPTIMIZE
+#
+# Revision 2.5  1995/10/02  18:59:47  knauff
 # Added CMK_CXXPP.
 #
 # Revision 2.4  1995/07/26  21:25:18  knauff
@@ -39,6 +42,10 @@ set CMK_CC			= 'mpcc'
 set CMK_CXX			= 'mpCC'
 set CMK_CXXPP			= 'cc -E'
 set CMK_CF77			= 'mpxlf'
+set CMK_C_DEBUG                 = '-g'
+set CMK_C_OPTIMIZE              = '-O'
+set CMK_CXX_DEBUG               = '-g'
+set CMK_CXX_OPTIMIZE            = '-O'
 set CMK_LD			= 'mpcc -us'
 set CMK_LDXX			= 'mpCC -us'
 set CMK_LD77			= ''

@@ -12,7 +12,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 1.1  1995-10-13 20:05:13  jyelon
+# Revision 1.2  1995-10-20 18:38:43  jyelon
+# added CMK_C_DEBUG, CMK_C_OPTIMIZE, CMK_CXX_DEBUG, CMK_CXX_OPTIMIZE
+#
+# Revision 1.1  1995/10/13  20:05:13  jyelon
 # Initial revision
 #
 # Revision 2.4  1995/10/02  18:56:50  knauff
@@ -28,6 +31,10 @@ set CMK_LDRO='ld -r -o'
 set CMK_CC='gcc'
 set CMK_CXX='g++'
 set CMK_CXXPP='g++ -E'
+set CMK_C_DEBUG='-g'
+set CMK_C_OPTIMIZE='-O'
+set CMK_CXX_DEBUG='-g'
+set CMK_CXX_OPTIMIZE='-O'
 set CMK_CF77=''
 set CMK_LD='gcc -s'
 set CMK_LDXX='g++'
