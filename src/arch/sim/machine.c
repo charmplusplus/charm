@@ -38,20 +38,10 @@ static void CsiTimerInit();
 static double CsiTimer();
 
 
-CpvStaticDeclare(int,CmiBufferGrabbed);
-
-
 void CmiDeliversInit()
 {
-  CpvInitialize(int, CmiBufferGrabbed);
-  CpvAccess(CmiBufferGrabbed) = 0;
 }
 
-
-void CmiGrabBuffer(void **ppbuf)
-{
-  CpvAccess(CmiBufferGrabbed) = 1;
-}
 
 int CsdScheduler(maxmsgs)
 int maxmsgs;

@@ -172,12 +172,6 @@ static void simulate()
 }
 
 /***********************************************************************/
-void CmiHandleMessage(void *msg)
-{
-        CpvAccess(CmiBufferGrabbed)=0;
-        (CmiGetHandlerFunction(msg))(msg);
-        if (!CpvAccess(CmiBufferGrabbed)) CmiFree(msg);
-}
 
 static cpu_event(pno)
 int pno;
