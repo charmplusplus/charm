@@ -102,7 +102,7 @@ extern void BgInitTiming();
 extern void BgMsgSetTiming(char *msg);
 extern void BgPrintThreadTimeLine(int node, int th, BgTimeLine &tline);
 extern void BgWriteThreadTimeLine(char **argv, int x, int y, int z, int th, BgTimeLine &tline);
-extern void BgAdjustTimeLineInsert(BgTimeLine &tline);
+extern int BgAdjustTimeLineInsert(BgTimeLine &tline);
 extern int BgAdjustTimeLineForward(int msgID, double tAdjustAbs, BgTimeLine &tline);
 
 #if BLUEGENE_TIMING
@@ -117,7 +117,9 @@ extern int BgAdjustTimeLineForward(int msgID, double tAdjustAbs, BgTimeLine &tli
 	  if (tTHREADTYPE == WORK_THREAD) {	\
             BgTimeLine &log = tTIMELINE;	\
             log[log.length()-1]->closeLog();	\
-	    if (correctTimeLog) BgAdjustTimeLineInsert(log);	\
+	    if (correctTimeLog) 	\
+		if (BgAdjustTimeLineInsert(log))	\
+		  tCURRTIME = log[log.length()-1]->endTime;      \
           }	\
 	}
 
@@ -134,7 +136,10 @@ extern int BgAdjustTimeLineForward(int msgID, double tAdjustAbs, BgTimeLine &tli
             }						\
 	    /* log[log.length()-1]->print(); */		\
           }	\
-          tSTARTTIME = CmiWallTimer();	\
+	  if (timingMethod == BG_WALLTIME)	\
+          	tSTARTTIME = CmiWallTimer();	\
+          else if (timingMethod == BG_ELAPSE)	\
+                tSTARTTIME = tCURRTIME;	\
 	}
 #else
 #define BG_ENTRYSTART(handler, m)

@@ -155,16 +155,16 @@ static void BgGetMsgStartTime(double recvTime, BgTimeLine &tline, double* startT
 }
 
 // move the last entry in BgTimeLine to it's proper position
-void BgAdjustTimeLineInsert(BgTimeLine &tline)
+int BgAdjustTimeLineInsert(BgTimeLine &tline)
 {
 	/* ASSUMPTION: no error testing needed */
 
 	/* check is 'bgTimingLog' is for an in-order message */
-	if(tline.length() == 1) return;
+	if(tline.length() == 1) return 0;
 
 //	CmiPrintf("BgAdjustTimeLineInsert:: last %f secondlast %f\n", tline[tline.length()-1]->recvTime, tline[tline.length()-2]->recvTime); 
 	if(tline[tline.length()-1]->recvTime >= tline[tline.length()-2]->recvTime) {
-		return;
+		return 0;
 	}
 
 	bgTimeLog* tlog = tline.remove(tline.length()-1);
@@ -172,26 +172,25 @@ void BgAdjustTimeLineInsert(BgTimeLine &tline)
 	int idx = 0;
 	double startTime = 0;
 	BgGetMsgStartTime(tlog->recvTime, tline, &startTime, &idx);
-	double tAdjust = startTime - tlog->startTime;
-	tlog->updateStartTime(startTime);
 	
 	/* store entry corresponding to 'msg' in timeline at 'idx' */
 	tline.insert(idx, tlog);
 
-
 	// tAdjust is relative time
+	double tAdjust = startTime - tlog->startTime;
 	tline[idx]->adjustTimeLog(tAdjust);	// tAdjust would be '0' or -ve
 
 	/* adjust all entries following 'idx' in timeline */
 	while(idx < tline.length()-1) {
 		tAdjust = max(tline[idx]->endTime,tline[idx+1]->recvTime) - tline[idx+1]->startTime;
 		if(tAdjust <= 0.0)	// log fits in the idle time; would never be -ve
-			return;
+			return 1;
 		else {
 			idx++;
 			tline[idx]->adjustTimeLog(tAdjust); // tAdjust would be +ve
 		}
 	}
+	return 1;
 }
 
 int BgAdjustTimeLineForward(int msgID, double tAdjustAbs, BgTimeLine &tline)
@@ -222,12 +221,10 @@ int BgAdjustTimeLineForward(int msgID, double tAdjustAbs, BgTimeLine &tline)
   tlog->recvTime = tAdjustAbs;
   BgGetMsgStartTime(tlog->recvTime, tline, &startTime, &idx);
   // update to the new start time and insert back
-  double tAdjust = startTime - tlog->startTime;
-  tlog->updateStartTime(startTime);
   tline.insert(idx, tlog);
 
+  double tAdjust = startTime - tlog->startTime;
   if(tAdjust==0.) return 1;
-
   tline[idx]->adjustTimeLog(tAdjust);
 
   if(tAdjust<0) {
