@@ -4,6 +4,9 @@
     It also provides the derived templated class chpt for checkpointing. */
 #ifndef REP_H
 #define REP_H
+#include "sim.decl.h"
+
+extern CProxy_sim POSE_Objects_RO;
 
 /// Base representation class
 class rep 
@@ -14,6 +17,9 @@ class rep
   /// Pointer to synchronization strategy
   strat *myStrat;          
  public:
+#if POSE_COMM_ON
+  CProxy_sim POSE_Objects;
+#endif
   /// the object's unique handle
   /** Initialized to index of poser wrapper in POSE_objects array */
   int myHandle;            
@@ -29,6 +35,10 @@ class rep
   rep() { 
     ovt = 0; ort = 0.0; copy = 0; parent = NULL; myStrat = NULL; 
     anti_methods = 0;
+#ifdef POSE_COMM_ON    
+    POSE_Objects = POSE_Objects_RO;
+    ComlibDelegateProxy(&POSE_Objects);
+#endif
   }
   /// Initializing Constructor
   rep(POSE_TimeType init_ovt) { ovt = init_ovt; ort = 0.0; copy = 0; anti_methods = 0; }

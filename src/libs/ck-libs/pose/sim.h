@@ -14,6 +14,7 @@
 #include <stdarg.h>
 
 extern CProxy_sim POSE_Objects; 
+extern CProxy_sim POSE_Objects_RO; 
 extern CkChareID POSE_Coordinator_ID; 
 class sim; // needed for eventMsg definition below
 

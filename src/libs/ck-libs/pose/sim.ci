@@ -5,6 +5,7 @@ module sim {
   extern module mempool;
   extern module stats;
   readonly CProxy_sim POSE_Objects;
+  readonly CProxy_sim POSE_Objects_RO;
   readonly CkChareID POSE_Coordinator_ID;
   message eventMsg;
   message cancelMsg;

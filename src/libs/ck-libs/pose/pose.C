@@ -36,7 +36,7 @@ void POSE_init(int IDflag, int ET) // can specify both
   // Create the communication strategy for POSE
   //DummyStrategy *strategy = new DummyStrategy();
   StreamingStrategy *strategy =new StreamingStrategy(COMM_TIMEOUT,COMM_MAXMSG);
-  strategy->enableShortArrayMessagePacking();
+  //strategy->enableShortArrayMessagePacking();
   //Register the strategy
   cinst.setStrategy(strategy);
   //comm_debug=1;
@@ -46,13 +46,18 @@ void POSE_init(int IDflag, int ET) // can specify both
   MemPoolID = CProxy_MemoryPool::ckNew();
 #endif
   // Create array to hold all POSE objects
+#ifdef POSE_COMM_ON  
+  POSE_Objects_RO = CProxy_sim::ckNew(); 
+  POSE_Objects = POSE_Objects_RO;
+#else
   POSE_Objects = CProxy_sim::ckNew(); 
-#ifndef SEQUENTIAL_POSE
-#ifdef POSE_COMM_ON
+#endif
+  //#ifndef SEQUENTIAL_POSE
+  //#ifdef POSE_COMM_ON
   // Make POSE_Objects use the comm lib
-  ComlibDelegateProxy(&POSE_Objects);
-#endif
-#endif
+  //  ComlibDelegateProxy(&POSE_Objects);
+  //#endif
+  //#endif
   // Initialize statistics collection if desired
 #ifdef POSE_STATS_ON
   theLocalStats = CProxy_localStat::ckNew();

@@ -261,8 +261,7 @@ void GVT::computeGVT(UpdateMsg *m)
       lastSR = tmp->timestamp;
       if (tmp->sends != tmp->recvs) {
 	earliestMsg = tmp->timestamp;
-	CkPrintf("GVT: @ %d, sends=%d recvs=%d estGVT was %d.\n", earliestMsg,
-		 tmp->sends, tmp->recvs, estGVT);
+	//CkPrintf("GVT: @ %d, sends=%d recvs=%d estGVT was %d.\n", earliestMsg,		 tmp->sends, tmp->recvs, estGVT);
 	break;
       }
       tmp = tmp->next;

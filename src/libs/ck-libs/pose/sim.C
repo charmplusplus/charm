@@ -4,6 +4,7 @@
 
 /// Global readonly proxy to array containing all posers in a simulation
 CProxy_sim POSE_Objects;
+CProxy_sim POSE_Objects_RO;
 /// Coordinates all startup and shutdown behaviors for POSE simulations
 CkChareID POSE_Coordinator_ID;
 
