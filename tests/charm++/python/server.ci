@@ -1,0 +1,19 @@
+mainmodule server {
+
+	readonly CProxy_MyArray mypython;
+	readonly CProxy_Main mainProxy;
+
+	mainchare [python] Main {
+		entry Main(CkArgMsg *msg);
+		entry void exit(void);
+		entry void arrayResult(int value);
+		entry void ccs_kill (CkCcsRequestMsg *msg);
+		entry [python] void runhigh(int);
+	}
+
+	array [1D] MyArray {
+		entry MyArray(void);
+		entry void run(void);
+	}
+
+}
