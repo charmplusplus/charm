@@ -131,6 +131,8 @@ char **argv;
   CpvAccess(CstatsMaxChareQueueLength) = 0;
   CpvAccess(CstatsMaxForChareQueueLength) = 0;
   CpvAccess(CstatsMaxFixedChareQueueLength) = 0;
+  CpvAccess(CstatPrintQueueStatsFlag) = 0;
+  CpvAccess(CstatPrintMemStatsFlag) = 0;
 
   while (*argv) {
     if (strcmp(*argv, "+mems") == 0) {
@@ -1460,14 +1462,18 @@ void CcsSendReply(unsigned int ip, unsigned int port, int size, void *msg)
 }
 
 #endif
+
 /*****************************************************************************
  *
  * Converse Initialization
  *
  *****************************************************************************/
 
+extern void CrnInit(void);
+
 void ConverseCommonInit(char **argv)
 {
+  CrnInit();
   CmiTimerInit();
   CstatsInit(argv);
   CcdModuleInit(argv);
