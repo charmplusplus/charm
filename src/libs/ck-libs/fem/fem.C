@@ -129,7 +129,7 @@ main::main(CkArgMsg *am)
 }
 
 extern "C" void
-METIS_PartMeshDual(int*,int*,int*,int*,int*,int*,int*,int*,int*);
+METIS_PartMeshNodal(int*,int*,int*,int*,int*,int*,int*,int*,int*);
 
 extern void fem_map(int nelem, int nnodes, int ctype, int *connmat,
                     int nparts, int *epart, int *npart, ChunkMsg *msgs[]);
@@ -151,7 +151,7 @@ main::setMesh(int nelem, int nnodes, int ctype, int *connmat)
     ecut = 0;
   } else {
     // pass mesh to metis to be partitioned
-    METIS_PartMeshDual(&nelem, &nnodes, connmat, &ctype, &numflag, 
+    METIS_PartMeshNodal(&nelem, &nnodes, connmat, &ctype, &numflag, 
                        (int*)&_nchunks, &ecut, epart, npart);
   }
   // call the map function to compute communication info needed by the framework
@@ -571,7 +571,7 @@ chunk::readComm(ChunkMsg *msg)
     int k = 0;
     for(int i=0;i<numPes;i++) {
       peNums[i] = msg->peNums[i];
-      numNodesPerPe[i] = msg->nodesPerPe[i];
+      numNodesPerPe[i] = msg->numNodesPerPe[i];
       gPeToIdx[peNums[i]] = i;
       nodesPerPe[i] = new int[numNodesPerPe[i]]; CHK(nodesPerPe[i]);
       for(int j=0;j<numNodesPerPe[i];j++) {
@@ -600,6 +600,54 @@ chunk::readChunk(ChunkMsg *msg)
     readElems(msg);
     readComm(msg);
   }
+}
+
+void
+chunk::print(void)
+{
+  // FIXME: str will eventually overflow. replace it by xstr
+  char str[1024];
+  char tmpstr[80];
+  CkPrintf("[%d] Number of Elements = %d\n", thisIndex, numElems);
+  CkPrintf("[%d] Number of Nodes = %d\n", thisIndex, numNodes);
+  CkPrintf("[%d] Number of Comms = %d\n", thisIndex, numPes);
+  int i, j;
+  sprintf(str, "[%d] List of Elements:\n", thisIndex);
+  for(i=0;i<numElems;i++) {
+    sprintf(tmpstr, "  %d\n", gElemNums[i]);
+    strcat(str,tmpstr);
+  }
+  CkPrintf("%s", str);
+  sprintf(str, "[%d] List of Nodes: (num, prim)\n", thisIndex);
+  for(i=0;i<numNodes;i++) {
+    sprintf(tmpstr, "  %d  %d\n", gNodeNums[i],isPrimary[i]);
+    strcat(str,tmpstr);
+  }
+  CkPrintf("%s", str);
+  sprintf(str, "[%d] Connectivity:\n", thisIndex);
+  for(i=0;i<numElems;i++) {
+    sprintf(tmpstr, "  [%d] ", gElemNums[i]);
+    strcat(str,tmpstr);
+    for(j=0;j<numNodesPerElem;j++) {
+      sprintf(tmpstr, "%d ", gNodeNums[conn[i*numNodesPerElem+j]]);
+      strcat(str,tmpstr);
+    }
+    sprintf(tmpstr, "\n");
+    strcat(str,tmpstr);
+  }
+  CkPrintf("%s", str);
+  sprintf(str, "[%d] CommInfo: (penum, numnodes)\n", thisIndex);
+  for(i=0;i<numPes;i++) {
+    sprintf(tmpstr, "  [%d]  %d\n    ", peNums[i], numNodesPerPe[i]);
+    strcat(str,tmpstr);
+    for(j=0;j<numNodesPerPe[i];j++) {
+      sprintf(tmpstr, "%d ", gNodeNums[nodesPerPe[i][j]]);
+      strcat(str,tmpstr);
+    }
+    sprintf(tmpstr, "\n");
+    strcat(str,tmpstr);
+  }
+  CkPrintf("%s", str);
 }
 
 void 
@@ -661,6 +709,12 @@ void FEM_Print(char *str)
 {
   chunk *cptr = CtvAccess(_femptr);
   CkPrintf("[%d] %s\n", cptr->thisIndex, str);
+}
+
+void FEM_Print_Partition(void)
+{
+  chunk *cptr = CtvAccess(_femptr);
+  cptr->print();
 }
 
 // Fortran Bindings
@@ -773,6 +827,18 @@ fem_print_
   tmpstr[len] = '\0';
   FEM_Print(tmpstr);
   delete[] tmpstr;
+}
+
+extern "C" void 
+#if CMK_FORTRAN_USES_ALLCAPS
+FEM_PRINT_PARTITION
+#else
+fem_print_partition_
+#endif
+  (void)
+{
+  chunk *ptr = CtvAccess(_femptr);
+  ptr->print();
 }
 
 #include "fem.def.h"

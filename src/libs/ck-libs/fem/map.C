@@ -30,7 +30,7 @@ fem_map(int nelems, int nnodes, int ctype, int *connmat,
   int *ninfo = new int[nnodes]; CHK(ninfo);
   int esize = (ctype==FEM_TRIANGULAR) ? 3 :
               ((ctype==FEM_HEXAHEDRAL) ? 8 :
-	      4);
+              4);
   for(i=0;i<nparts;i++) {
     msgs[i] = new ChunkMsg; CHK(msgs[i]);
     msgs[i]->nelems = 0;
@@ -67,12 +67,12 @@ fem_map(int nelems, int nnodes, int ctype, int *connmat,
       // check if element belongs to this partition
       if(epart[j]==i) {
         // make all its bordering nodes belong to this partition
-	// if not already here
+        // if not already here
         for(k=0;k<esize;k++) {
-	  if(ninfo[connmat[j*esize+k]]==0) {
-	    ninfo[connmat[j*esize+k]] = 1;
-	    m->nnodes++;
-	  }
+          if(ninfo[connmat[j*esize+k]]==0) {
+            ninfo[connmat[j*esize+k]] = 1;
+            m->nnodes++;
+          }
         }
       }
     }
@@ -82,9 +82,8 @@ fem_map(int nelems, int nnodes, int ctype, int *connmat,
     for(j=0;j<nnodes;j++) {
       if(ninfo[j]==1) {
         m->gNodeNums[m->nnodes] = j;
-	m->primaryPart[m->nnodes] = npart[j];
-	// ninfo now contains the local index for a node
-	ninfo[j] = m->nnodes++;
+        // ninfo now contains the local index for a node
+        ninfo[j] = m->nnodes++;
       } else {
         // 0 is a valid local index, so set to (-1) to denote absence
         ninfo[j] = (-1);
@@ -95,7 +94,7 @@ fem_map(int nelems, int nnodes, int ctype, int *connmat,
       int telem = m->gElemNums[j];
       for(k=0;k<esize;k++) {
         int tnode = connmat[telem*esize+k];
-	assert(ninfo[tnode]>=0 && ninfo[tnode]<m->nnodes);
+        assert(ninfo[tnode]>=0 && ninfo[tnode]<m->nnodes);
         m->conn[j*esize+k] = ninfo[tnode];
       }
     }
@@ -114,6 +113,38 @@ fem_map(int nelems, int nnodes, int ctype, int *connmat,
       comm[tnode*nparts+j] = i;
     }
   }
+  // now find the primary partition
+  // ninfo[i] contains the number of partitions that node i belongs to
+  for(i=0;i<nnodes;i++) { ninfo[i] = 0; }
+  for(i=0;i<nnodes;i++) {
+    for(j=0;j<nparts;j++) {
+      // if node i belongs to partition j, increment ninfo[i]
+      if(comm[i*nparts+j] != (-1)) { ninfo[i]++; }
+    }
+  }
+  // now generate a random partition number among those 
+  // that the node belongs to. At the end of this loop, ninfo[i] contains
+  // the primary partition number for node i
+  for(i=0;i<nnodes;i++) {
+    assert(ninfo[i]>=1);
+    int ridx = CrnRand()%ninfo[i];
+    k = (-1);
+    for(j=0;j<nparts;j++) {
+      if(comm[i*nparts+j] != (-1)) { 
+        k++; 
+        if(k==ridx) { break; }
+      }
+    }
+    assert(j!=nparts);
+    ninfo[i] = j;
+  }
+  // now assign the primary partition number to nodes in each of the messages
+  for(i=0;i<nparts;i++) {
+    ChunkMsg *m = msgs[i];
+    for(j=0;j<(m->nnodes);j++) {
+      m->primaryPart[j] = ninfo[m->gNodeNums[j]];
+    }
+  }
   for(i=0;i<nparts;i++) {
     ChunkMsg *m = msgs[i];
     m->npes = 0;
@@ -121,12 +152,13 @@ fem_map(int nelems, int nnodes, int ctype, int *connmat,
     // communicate with partition j
     for(j=0;j<nparts;j++) { pinfo[j] = 0; }
     for(j=0;j<nparts;j++) {
+      if(i==j) continue;
       for(k=0;k<(m->nnodes);k++) {
         int tnode = m->gNodeNums[k];
-	// if tnode also belongs to partition j, i has to communicate with j
+        // if tnode also belongs to partition j, i has to communicate with j
         if(comm[tnode*nparts+j] != (-1)) {
-	  if(pinfo[j]==0) { m->npes++; }
-	  pinfo[j]++;
+          if(pinfo[j]==0) { m->npes++; }
+          pinfo[j]++;
         }
       }
     }
@@ -135,8 +167,8 @@ fem_map(int nelems, int nnodes, int ctype, int *connmat,
     for(j=0,k=0; j<nparts; j++) {
       if(pinfo[j]>0) {
         m->numNodesPerPe[k] = pinfo[j];
-	m->peNums[k] = j;
-	k++;
+        m->peNums[k] = j;
+        k++;
       }
     }
     int tcomm = 0;
@@ -147,7 +179,7 @@ fem_map(int nelems, int nnodes, int ctype, int *connmat,
       int tpe = m->peNums[j];
       for(k=0;k<(m->nnodes);k++) {
         int tnode = m->gNodeNums[k];
-	if(comm[tnode*nparts+tpe] != (-1)) { m->nodesPerPe[icomm++] = k; }
+        if(comm[tnode*nparts+tpe] != (-1)) { m->nodesPerPe[icomm++] = k; }
       }
     }
     assert(icomm==tcomm);

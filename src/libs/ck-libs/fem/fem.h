@@ -148,6 +148,7 @@ class chunk : public ArrayElement1D
   void readField(int fid, void *nodes, char *fname);
   int id(void) { return thisIndex; }
   int total(void) { return numElements; }
+  void print(void);
  private:
   FILE *fp;
   void update_field(DataMsg *);
@@ -168,6 +169,7 @@ int FEM_Num_Partitions(void);
 void FEM_Read_Field(int fid, void *nodes, char *fname);
 void FEM_Print(char *str);
 void FEM_Set_Mesh(int nelem, int nnodes, int ctype, int* connmat);
+void FEM_Print_Partition(void);
 
 // Fortran Bindings
 #if CMK_FORTRAN_USES_ALLCAPS
@@ -181,6 +183,7 @@ extern "C" int FEM_NUM_PARTITIONS(void);
 extern "C" void FEM_READ_FIELD(int *fid, void *nodes, char *fname, int len);
 extern "C" void FEM_PRINT(char *str, int len);
 extern "C" void FEM_SET_MESH(int *nelem,int *nnodes,int *ctype,int *connmat);
+extern "C" void FEM_PRINT_PARTITION(void);
 extern "C" int OFFSETOF(void *, void *);
 // to be provided by the application
 extern "C" void INIT(void);
@@ -197,6 +200,7 @@ extern "C" int fem_num_partitions_(void);
 extern "C" void fem_read_field_(int *fid, void *nodes, char *fname, int len);
 extern "C" void fem_print_(char *str, int len);
 extern "C" void fem_set_mesh_(int *nelem,int *nnodes,int *ctype,int *connmat);
+extern "C" void fem_print_partition_(void);
 extern "C" int offsetof_(void *, void *);
 // to be provided by the application
 extern "C" void init_(void);
