@@ -35,7 +35,8 @@ printf "\nRunning on $pes processors: $args\n"
 
 if [ -n "$PBS_NODEFILE" ]
 then
-  mpirun -np $pes $args
+# we are in a job shell
+  mpirun -np $pes -machinefile $PBS_NODEFILE $args
 elif [ -n "$LSB_HOSTS" ]
 then
 # Tungsten
