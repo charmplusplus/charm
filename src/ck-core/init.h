@@ -26,7 +26,7 @@ class GroupIdxArrayEntry {
   dtype *tab;
   int max;
   public:
-    GroupIdxArrayEntry() {}
+    GroupIdxArrayEntry() { tab=NULL; max=0; }
     void init(int _max) {
       max = _max;
       tab = new dtype[max];
@@ -52,9 +52,10 @@ class GroupIdxArray {
      void init(void) {
        tab = new GroupIdxArrayEntry<dtype>[CkNumPes()];
        tab[0].init(MAXBINSPE0); 
-       for(int i=1;i<CkNumPes();i++) {
-         tab[i].init(MAXBINSOTHER); 
-       }
+       if (MAXBINSOTHER)
+         for(int i=1;i<CkNumPes();i++) {
+           tab[i].init(MAXBINSOTHER); 
+         }
      }
     dtype& find(CkGroupID n) {return tab[n.pe].find(n.idx);}
 };
