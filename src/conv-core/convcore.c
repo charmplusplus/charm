@@ -1247,6 +1247,9 @@ void CmiMultipleSend(unsigned int destPE, int len, int sizes[], char *msgComps[]
   }
 
   CmiSyncVectorSend(destPE, 2*(len + 1), newSizes, newMsgComps);
+  CmiFree(newSizes);
+  CmiFree(newMsgComps);
+  CmiFree(header);
 }
 
 /****************************************************************************
