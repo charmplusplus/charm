@@ -76,7 +76,7 @@ NborBaseLB::NborBaseLB(const CkLBOptions &opt): BaseLB(opt)
   myStats.commData = NULL;
   receive_stats_ready = 0;
 
-  theLbdb->CollectStatsOn();
+  if (_lb_args.statsOn()) theLbdb->CollectStatsOn();
 #endif
 }
 

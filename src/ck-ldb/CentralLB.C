@@ -98,7 +98,7 @@ void CentralLB::initLB(const CkLBOptions &opt)
   lbdone = 0;
   int num_proc = CkNumPes();
 
-  theLbdb->CollectStatsOn();
+  if (_lb_args.statsOn()) theLbdb->CollectStatsOn();
 
   load_balancer_created = 1;
 #endif

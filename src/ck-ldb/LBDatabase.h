@@ -25,16 +25,21 @@ private:
   int _lb_ignoreBgLoad;
   int _lb_syncResume;
   int _lb_samePeSpeed;		// ignore cpu speed
+  int _lb_useCpuTime;           // use cpu instead of wallclock time
+  int _lb_statson;		// stats collection
 public:
   CkLBArgs() {
     _autoLbPeriod = 1.0;
-    _lb_debug = _lb_ignoreBgLoad = _lb_syncResume = 0;
+    _lb_debug = _lb_ignoreBgLoad = _lb_syncResume = _lb_useCpuTime = 0;
+    _lb_statson = 1;
   }
   double & lbperiod() { return _autoLbPeriod; }
   int & debug() { return _lb_debug; }
   int & ignoreBgLoad() { return _lb_ignoreBgLoad; }
   int & syncResume() { return _lb_syncResume; }
   int & samePeSpeed() { return _lb_samePeSpeed; }
+  int & useCpuTime() { return _lb_useCpuTime; }
+  int & statsOn() { return _lb_statson; }
 };
 extern CkLBArgs _lb_args;
 

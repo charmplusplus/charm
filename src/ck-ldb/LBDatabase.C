@@ -231,10 +231,16 @@ void _loadbalancerInit()
   					     "Turn on LB debugging printouts");
 
   _lb_args.ignoreBgLoad() = CmiGetArgFlagDesc(argv, "+LBObjOnly", 
-                           "Load balancer ignores the background load.");
+                      "Load balancer ignores the background load.");
 
   _lb_args.samePeSpeed() = CmiGetArgFlagDesc(argv, "+LBSameCpus", 
-                           "Load balancer assumes all CPUs are of same speed.");
+                      "Load balancer assumes all CPUs are of same speed.");
+
+  _lb_args.useCpuTime() = CmiGetArgFlagDesc(argv, "+LBUseCpuTime", 
+                      "Load balancer uses CPU time instead of wallclock time.");
+
+  _lb_args.statsOn() = !CmiGetArgFlagDesc(argv, "+LBOff",
+			"Turn load balancer instrumentation off");
 
   if (CkMyPe() == 0) {
     if (_lb_args.debug()) {
@@ -245,8 +251,12 @@ void _loadbalancerInit()
       CmiPrintf("LB> Load balancer only balance migratable object.\n");
     if (_lb_args.samePeSpeed())
       CmiPrintf("LB> Load balancer assumes all CPUs are same.\n");
+    if (_lb_args.useCpuTime())
+      CmiPrintf("LB> Load balancer uses CPU time instead of wallclock time.\n");
     if (LBSimulation::doSimulation)
       CmiPrintf("LB> Load balancer running in simulation mode.\n");
+    if (_lb_args.statsOn()==0)
+      CkPrintf("LB> Load balancing instrumentation is off.\n");
   }
 }
 
@@ -398,13 +408,19 @@ void TurnManualLBOff()
 
 void LBTurnInstrumentOn() { 
 #if CMK_LBDB_ON
-  LBDatabase::Object()->CollectStatsOn(); 
+  if (CkpvAccess(lbdatabaseInited))
+    LBDatabase::Object()->CollectStatsOn(); 
+  else
+    _lb_args.statsOn() = 1;
 #endif
 }
 
 void LBTurnInstrumentOff() { 
 #if CMK_LBDB_ON
-  LBDatabase::Object()->CollectStatsOff(); 
+  if (CkpvAccess(lbdatabaseInited))
+    LBDatabase::Object()->CollectStatsOff(); 
+  else
+    _lb_args.statsOn() = 0;
 #endif
 }
 
