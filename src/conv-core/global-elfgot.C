@@ -189,7 +189,7 @@ CtgGlobalList::CtgGlobalList() {
 	      || strcmp(sym_name, "_GLOBAL_OFFSET_TABLE_") == 0
 	    )) 
 	    { /* It's not system data */
-              if(ELF32_ST_TYPE(symt[symindx].st_info) == STT_OBJECT) /* ? */
+              if(ELF32_ST_TYPE(symt[symindx].st_info) == STT_OBJECT || ELF32_ST_TYPE(symt[symindx].st_info) == STT_NOTYPE) /* ? */
 	        if (isUserSymbol(sym_name))
 		{ /* It's got the right name-- it's a user global */
                     int gSize = ALIGN8(symt[symindx].st_size);
