@@ -537,6 +537,15 @@ public:\
 	PUP::able *pa=a;  p(&pa);  a=(className *)pa;\
     }
 
+//Declarations to include in an abstract PUP::able's body.
+//  Abstract PUP::ables do not need def or reg.
+#define PUPable_abstract(className) \
+public:\
+    friend inline void operator|(PUP::er &p,className &a) {a.pup(p);}\
+    friend inline void operator|(PUP::er &p,className* &a) {\
+	PUP::able *pa=a;  p(&pa);  a=(className *)pa;\
+    }
+
 //Definitions to include exactly once at file scope
 #define PUPable_def(className) \
 	PUP::able *className::call_PUP_constructor(void) \
