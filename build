@@ -70,6 +70,7 @@ syntax() {
   echo '  --libdir=DIR	  specify additional lib path for compiler'
   echo '  --basedir=DIR	  shortcut for the above two - DIR/include and DIR/lib'
   echo '  -j[N]           parallel make, N is the number of paralle make jobs'
+  echo "  --with-romio       build AMPI with ROMIO library"
   fi
   echo ''
   echo '<charmc-options>: normal compiler options e.g. -g -O -save -verbose'
@@ -174,6 +175,7 @@ LIBDIR=
 INCDIR=
 ARCH=
 BUILD_SHARED=
+WITH_ROMIO=
 
 [ "$1" = '--help' -o "$1" = '-h' ] && more=1 && syntax | more && exit 1
 [ $# -lt 2 ] && syntax && exit 1
@@ -218,6 +220,9 @@ do
  	  	;;
 	    --no-build-shared|-nobs|--no-shared)
 		BUILD_SHARED="-nobs"; shift
+		;;
+	    --with-romio)
+		WITH_ROMIO="true"; shift
 		;;
 	    --build-shared|-bs)
 		# obsolete, do nothing
@@ -357,6 +362,11 @@ fi
 if test  -n "$BUILD_SHARED" 
 then
     echo "CMK_NO_BUILD_SHARED=true" >> $ConvSh
+fi
+
+if test  -n "$WITH_ROMIO" 
+then
+    echo "CMK_AMPI_WITH_ROMIO=\"true\"" >> $ConvSh
 fi
 
 echo $BASEVERSION > $VERSION/tmp/.vdir
