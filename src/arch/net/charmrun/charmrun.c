@@ -1498,9 +1498,14 @@ int main(int argc, char **argv, char **envp)
   if(arg_verbose) fprintf(stderr, "Charmrun> node programs all started\n");
 
   /* Wait for all clients to connect */
-  req_client_connect();
-  if(arg_verbose) fprintf(stderr, "Charmrun> node programs all connected\n");
+#if !CMK_RSH_KILL
   finish_nodes();
+#endif
+  req_client_connect();
+#if CMK_RSH_KILL
+  kill_nodes();
+#endif
+  if(arg_verbose) fprintf(stderr, "Charmrun> node programs all connected\n");
 
   /* enter request-service mode */
   while (1) req_poll();
@@ -2034,10 +2039,6 @@ void finish_nodes()
      int status=0;
      if (arg_verbose) printf("Charmrun> waiting for rsh (%s:%d), pid %d\n",
 		host,rank0no,rsh_pids[rank0no]);
-#if CMK_RSH_KILL /*Just blow the rsh away*/
-     kill(rsh_pids[rank0no],9);
-     waitpid(rsh_pids[rank0no],&status,0); /*<- no zombies*/
-#else /*Wait for the rsh to finish properly*/
      do {
      	waitpid(rsh_pids[rank0no],&status,0);
      } while (!WIFEXITED(status));
@@ -2047,7 +2048,23 @@ void finish_nodes()
      		WEXITSTATUS(status),host,rank0no);
      	exit(1);
      }     
-#endif
+  }
+  free(rsh_pids);
+}
+
+void kill_nodes()
+{
+  int rank0no;
+  if (!rsh_pids) return; /*nothing to do*/
+  /*Now wait for all the rsh'es to finish*/
+  for (rank0no=0;rank0no<nodetab_rank0_size;rank0no++)
+  {
+     const char *host=nodetab_name(nodetab_rank0_table[rank0no]);
+     int status=0;
+     if (arg_verbose) printf("Charmrun> waiting for rsh (%s:%d), pid %d\n",
+		host,rank0no,rsh_pids[rank0no]);
+     kill(rsh_pids[rank0no],9);
+     waitpid(rsh_pids[rank0no],&status,0); /*<- no zombies*/
   }
   free(rsh_pids);
 }
