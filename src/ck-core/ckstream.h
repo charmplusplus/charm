@@ -33,7 +33,7 @@ class _CkOStream {
     }
 #define _OPSHIFTLEFT(type, format) \
     _CkOStream& operator << (type x) { \
-      sprintf(_tbuf, format, x); \
+      sprintf(_tbuf, format, (type) x); \
       _actlen += strlen(_tbuf); \
       if(_actlen > _buflen) \
         CmiAbort("Print Buffer Overflow!!\n"); \
@@ -52,7 +52,7 @@ class _CkOStream {
     _OPSHIFTLEFT(float, "%f");
     _OPSHIFTLEFT(double, "%lf");
     _OPSHIFTLEFT(const char*, "%s");
-    _OPSHIFTLEFT(void*, "%x");
+    _OPSHIFTLEFT(void*, "%p");
 };
 
 static inline _CkOStream& endl(_CkOStream& s)  { return s.endl(); }
@@ -127,7 +127,7 @@ class CkInStream {
   public:
 #define OPSHIFTRIGHT(type, format) \
     CkInStream& operator >> (type& x) { \
-      CkScanf(format, &x); \
+      CkScanf(format, (type *)&x); \
       return *this; \
     }
 
@@ -138,7 +138,7 @@ class CkInStream {
     OPSHIFTRIGHT(long, "%ld");
     OPSHIFTRIGHT(unsigned long, "%lu");
     OPSHIFTRIGHT(char, "%c");
-    OPSHIFTRIGHT(unsigned char, "%u");
+    OPSHIFTRIGHT(unsigned char, "%c");
     OPSHIFTRIGHT(float, "%f");
     OPSHIFTRIGHT(double, "%lf");
 
