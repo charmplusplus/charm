@@ -408,11 +408,11 @@ dcountredn.o: dcountredn.int $(GENERIC_REDN_H)
 #
 ###############################################################################
 
-CHARMXLAT=xl-main.o xl-yacc.tab.o xl-sym.o xl-str.o xl-lex.o xl-lexsp.l.o xl-rdtok.o xl-parse.o xl-outh.o xl-srch.o xl-dag.o
+CHARMXLAT=xl-main.o xl-yacc.tab.o xl-sym.o xl-str.o xl-lex.o xl-lexsp.o xl-rdtok.o xl-parse.o xl-outh.o xl-srch.o xl-dag.o
 
-charmxlat charmfilter: $(CHARMXLAT) xl-sfspec.l.o
+charmxlat charmfilter: $(CHARMXLAT) xl-sfspec.o
 	$(CHARMC) -seq -o charmxlat   -cp ../bin/ $(CHARMXLAT)
-	$(CHARMC) -seq -o charmfilter -cp ../bin/ xl-sfspec.l.o
+	$(CHARMC) -seq -o charmfilter -cp ../bin/ xl-sfspec.o
 
 xl-main.o: xl-main.c
 	$(CHARMC) -seq xl-main.c
@@ -444,20 +444,11 @@ xl-dag.o: xl-dag.c
 xl-yacc.tab.o: xl-yacc.tab.c xl-lex.h xl-sym.h
 	$(CHARMC) -seq xl-yacc.tab.c
 
-xl-lexsp.l.o: xl-lexsp.l.c	
-	$(CHARMC) -seq xl-lexsp.l.c
+xl-lexsp.o: xl-lexsp.c	
+	$(CHARMC) -seq xl-lexsp.c
 
-xl-sfspec.l.o: xl-sfspec.l.c
-	$(CHARMC) -seq xl-sfspec.l.c
-
-xl-sfspec.l.c: xl-sfspec.l
-	flex -t xl-sfspec.l > xl-sfspec.l.c
-
-xl-yacc.tab.c: xl-yacc.y
-	bison -d xl-yacc.y
-
-xl-lexsp.l.c: xl-lexsp.l
-	flex -t xl-lexsp.l > xl-lexsp.l.c
+xl-sfspec.o: xl-sfspec.c
+	$(CHARMC) -seq xl-sfspec.c
 
 ###############################################################################
 #
@@ -467,11 +458,11 @@ xl-lexsp.l.c: xl-lexsp.l
 
 XPHEADERS=xp-extn.h xp-t.tab.c
 
-CHARMXLATXX=xp-process.o xp-table.o xp-t.tab.o xp-lexer.l.o
+CHARMXLATXX=xp-process.o xp-table.o xp-t.tab.o xp-lexer.o
 
-charmxlat++: $(CHARMXLATXX) xp-sfilter.l.o
+charmxlat++: $(CHARMXLATXX) xp-sfilter.o
 	$(CHARMC) -seq -o charmxlat++   -cp ../bin/ $(CHARMXLATXX)
-	$(CHARMC) -seq -o charmfilter++ -cp ../bin/ xp-sfilter.l.o
+	$(CHARMC) -seq -o charmfilter++ -cp ../bin/ xp-sfilter.o
 
 xp-process.o: xp-process.c $(XPHEADERS)
 	$(CHARMC) -seq xp-process.c
@@ -482,20 +473,11 @@ xp-table.o: xp-table.c $(XPHEADERS)
 xp-t.tab.o: xp-t.tab.c $(XPHEADERS)
 	$(CHARMC) -seq -DYYDEBUG xp-t.tab.c
 
-xp-lexer.l.o: xp-lexer.l.c $(XPHEADERS)
-	$(CHARMC) -seq xp-lexer.l.c
+xp-lexer.o: xp-lexer.c $(XPHEADERS)
+	$(CHARMC) -seq xp-lexer.c
 
-xp-sfilter.l.o: xp-sfilter.l.c $(XPHEADERS)
-	$(CHARMC) -seq xp-sfilter.l.c
-
-xp-t.tab.c: xp-t.y
-	bison -d xp-t.y
-
-xp-lexer.l.c: xp-lexer.l
-	flex -t xp-lexer.l > xp-lexer.l.c
-
-xp-sfilter.l.c: xp-sfilter.l
-	flex -t xp-sfilter.l > xp-sfilter.l.c
+xp-sfilter.o: xp-sfilter.c $(XPHEADERS)
+	$(CHARMC) -seq xp-sfilter.c
 
 ###############################################################################
 #
@@ -503,14 +485,11 @@ xp-sfilter.l.c: xp-sfilter.l
 #
 ###############################################################################
 
-conv-cpm: conv-cpm.l.o
-	$(CHARMC) -seq -o conv-cpm -cp ../bin/ conv-cpm.l.o
+conv-cpm: conv-cpm.o
+	$(CHARMC) -seq -o conv-cpm -cp ../bin/ conv-cpm.o
 
-conv-cpm.l.o: conv-cpm.l.c
-	$(CHARMC) -seq conv-cpm.l.c
-
-conv-cpm.l.c: conv-cpm.l
-	flex -t conv-cpm.l > conv-cpm.l.c
+conv-cpm.o: conv-cpm.c
+	$(CHARMC) -seq conv-cpm.c
 
 ###############################################################################
 #
@@ -519,7 +498,7 @@ conv-cpm.l.c: conv-cpm.l
 ###############################################################################
 
 XIHEADERS=xi-symbol.h xi-parse.tab.c
-CHARMXI=xi-main.o xi-symbol.o xi-generate.o xi-parse.tab.o xi-scan.l.o
+CHARMXI=xi-main.o xi-symbol.o xi-generate.o xi-parse.tab.o xi-scan.o
 
 charmxi: $(CHARMXI)
 	$(CHARMC) -seq -language c++ -cp ../bin/ -o charmxi $(CHARMXI)
@@ -537,15 +516,8 @@ xi-parse.tab.o: xi-parse.tab.c $(XIHEADERS)
 	cp xi-parse.tab.c xi-parse.tab.C
 	$(CHARMC) -seq xi-parse.tab.C
 
-xi-scan.l.o: xi-scan.l.c $(XIHEADERS)
-	cp xi-scan.l.c xi-scan.l.C
-	$(CHARMC) -seq xi-scan.l.C
-
-xi-parse.tab.c: xi-parse.y
-	bison -d xi-parse.y
-
-xi-scan.l.c: xi-scan.l
-	flex -t xi-scan.l > xi-scan.l.c
+xi-scan.o: xi-scan.C $(XIHEADERS)
+	$(CHARMC) -seq xi-scan.C
 
 ###############################################################################
 #
