@@ -61,6 +61,11 @@ struct ampi_comm_struct
   int nobj;
   ampi_redn_spec rspec;
 };
+class ampi_comm_structs {
+	ampi_comm_struct s[AMPI_MAX_COMM];
+public:
+	ampi_comm_struct &operator[](int i) {return s[i];}
+};
 
 class AmpiStartMsg : public CMessage_AmpiStartMsg
 {
@@ -76,7 +81,8 @@ class ampimain : public Chare
   int qwait;
   public:
     static CkChareID handle;
-    static ampi_comm_struct ampi_comms[AMPI_MAX_COMM];
+    static ampi_comm_structs ampi_comms;
+
     static int ncomms;
     static void register_main(void (*)(int, char **), char *, int);
     ampimain(CkArgMsg *);
@@ -214,7 +220,9 @@ class ampi : public ArrayElement1D {
     void generic(AmpiMsg *);
     void migrate(void)
     {
+#if CMK_LBDB_ON
       AtSync();
+#endif
     }
     void saveState(void)
     {
@@ -251,11 +259,15 @@ class ampi : public ArrayElement1D {
     }
     void start_running(void)
     {
+#if CMK_LBDB_ON
       thisArray->the_lbdb->ObjectStart(ldHandle);
+#endif
     }
     void stop_running(void)
     {
+#if CMK_LBDB_ON
       thisArray->the_lbdb->ObjectStop(ldHandle);
+#endif
     }
 
   public: // to be used by AMPI_* functions

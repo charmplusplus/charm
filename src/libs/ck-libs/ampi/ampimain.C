@@ -1,7 +1,7 @@
 #include "ampiimpl.h"
 
 CkChareID ampimain::handle;
-ampi_comm_struct ampimain::ampi_comms[AMPI_MAX_COMM];
+ampi_comm_structs ampimain::ampi_comms;
 int ampimain::ncomms = 0;
 
 static void 
