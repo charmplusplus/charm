@@ -291,6 +291,17 @@ void ConverseExit()
   CmiNext();
 }
 
+#if CMK_CONDS_USE_SPECIAL_CODE
+static int CmiSwitchToPEFn(int newpe)
+{
+  int oldpe = _Cmi_mype;
+  if (newpe == CcdIGNOREPE) return CcdIGNOREPE;
+  _Cmi_mype = newpe;
+  return oldpe;
+}
+#endif
+
+
 void ConverseInit(argc,argv,fn,usched,initret)
 int argc;
 char **argv;
@@ -305,6 +316,8 @@ int usched, initret;
 #endif
 #endif
   
+  CmiSwitchToPE = CmiSwitchToPEFn;
+
   CmiArgv = CmiCopyArgs(argv);
   CmiStart = fn;
   CmiUsched = usched;
@@ -330,15 +343,5 @@ int usched, initret;
     ConverseExit();
   }
 }
-
-#if CMK_CONDS_USE_SPECIAL_CODE
-int CmiSwitchToPE(int newpe)
-{
-  int oldpe = _Cmi_mype;
-  if (newpe == CcdIGNOREPE) return CcdIGNOREPE;
-  _Cmi_mype = newpe;
-  return oldpe;
-}
-#endif
 
 /*@}*/
