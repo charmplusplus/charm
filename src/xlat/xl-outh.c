@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-05 18:52:05  brunner
+ * Revision 2.1  1995-06-15 20:57:00  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.0  1995/06/05  18:52:05  brunner
  * Reorganized file structure
  *
  * Revision 1.5  1995/05/04  21:26:15  milind
@@ -326,8 +329,8 @@ char           *module;
 		dummy = MyModulePrefix(module, table->name);
 		fprintf(outh, "%s%s;\n", dummy, REFSUFFIX);
 		fprintf(outh, "  %s = %s;\n", temp, dummy);
-		free(temp);
-		free(dummy);
+		dontfree(temp);
+		dontfree(dummy);
 		break;
 	case PRIVATEFNNAME:
 		break;
@@ -336,11 +339,11 @@ char           *module;
 		temp = ModuleCharePrefix(module, table->charename->name,
 					 table->name);
 		fprintf(outh, "  %s = ", temp);
-		free(temp);
+		dontfree(temp);
 		temp = MyModuleCharePrefix(module, table->charename->name,
 					   table->name);
 		fprintf(outh, "%s;\n", temp);
-		free(temp);
+		dontfree(temp);
 		break;
 	default:
 		break;
@@ -449,7 +452,7 @@ char           *name;
 			FunctionType, Map(name, itoa(table->msgno), "UNPACK"));
 	}
 	fprintf(outh, "sizeof(%s)); \n", table->name);
-	free(temp);
+	dontfree(temp);
 }
 
 void
@@ -473,7 +476,7 @@ SYMTABPTR       table;
 	fprintf(outh, "\"%s\",", table->name);
 	fprintf(outh, "sizeof(%s_Data),",table->name);
 	fprintf(outh, "(%s) NULL);\n",FunctionType);
-	free(temp);
+	dontfree(temp);
 }
 
 void
@@ -539,7 +542,7 @@ char           *module;
 		       		table->charename->name, table->name);
 		fprintf(outh, "%s,CHARM);\n",temp);
 	}
-	free(temp);
+	dontfree(temp);
 }
 
 void
@@ -572,7 +575,7 @@ char           *module;
 		fprintf(outh, "(%s) %s);\n", FunctionType, table->name);
 		fprintf(outh, "  %s = (%s) %s;\n", temp, FunctionType,
 			table->name);
-		free(temp);
+		dontfree(temp);
 	}
 	else
 	{
@@ -581,7 +584,7 @@ char           *module;
 					   ,table->name);
 		fprintf(outh, "  %s = registerFunction((%s) %s);\n", temp2,
 			FunctionType, temp);
-		free(temp2);
+		dontfree(temp2);
 	}
 }
 
@@ -609,7 +612,7 @@ char           *name;
 		fprintf(outh, "  temp = (void **)&(%s);\n", 
 			AppendMap(name, table->name));
 		fprintf(outh, "  *temp = _CK_ReadMsgTable[%s];\n", temp);
-		free(temp);
+		dontfree(temp);
 	}
 }
 
@@ -697,7 +700,7 @@ SYMTABPTR       table;
 		fprintf(outh, "(%s)%s,",FunctionType, 
 		    Map(table->modname->name, itoa(table->msgno), "COMBINE"));
 		fprintf(outh, "CHARM);\n");
-		free(temp);
+		dontfree(temp);
 		break;
 	case MONONAME:
 		temp = MyModulePrefix(table->modname->name, table->name);
@@ -708,7 +711,7 @@ SYMTABPTR       table;
 		fprintf(outh, "(%s)%s,",FunctionType, 
 			Map(table->modname->name,itoa(table->msgno), "UPDATE"));
 		fprintf(outh, "CHARM);\n");
-		free(temp);
+		dontfree(temp);
 		break;
 	case TABLENAME:
 		temp = AppendMap(CurrentModule->name, table->name);
@@ -721,7 +724,7 @@ SYMTABPTR       table;
 					"HASH"));
 		else
 			fprintf(outh, "NULL);\n");
-		free(temp);
+		dontfree(temp);
 		break;
 	default:
 		break;
@@ -791,8 +794,8 @@ int             modcomponent;
 	{
 		fprintf(outh, "  %s = %s;\n", temp1 = ModulePrefix(name, table->name),
 			temp2 = MyModulePrefix(name, table->name));
-		free(temp1);
-		free(temp2);
+		dontfree(temp1);
+		dontfree(temp2);
 	}
 }
 

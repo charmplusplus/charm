@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-05 18:52:05  brunner
+ * Revision 2.1  1995-06-15 20:57:00  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.0  1995/06/05  18:52:05  brunner
  * Reorganized file structure
  *
  * Revision 1.1  1994/11/03  17:41:58  brunner
@@ -60,5 +63,5 @@ int n;
 
 DestroyString(string)
 char *string;
-{ free(string); }
+{ dontfree(string); }
 	

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-05 18:52:05  brunner
+ * Revision 2.1  1995-06-15 20:57:00  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.0  1995/06/05  18:52:05  brunner
  * Reorganized file structure
  *
  * Revision 1.1  1994/11/03  17:41:36  brunner
@@ -85,7 +88,7 @@ char *module,*chare,*name;
 
   temp=CharePrefix(chare,name);
   dummy=ModulePrefix(module,temp);
-  free(temp);
+  dontfree(temp);
   return(dummy);
 }
 
@@ -95,7 +98,7 @@ char *module,*chare,*name;
 
   temp=CharePrefix(chare,name);
   dummy=MyModulePrefix(module,temp);
-  free(temp);
+  dontfree(temp);
   return(dummy);
 }
 
@@ -109,7 +112,7 @@ char *string;
 	{ error("Buffer Overflow",EXIT); exit(1); }
   strcpy(&(buffer.a[buffer.count]),string);
   buffer.count += size;
-  if (flag) free(string);
+  if (flag) dontfree(string);
 }
 
 void WriteReturn()
@@ -125,7 +128,7 @@ int freeflag;
 { int length;
 
   if ((CurrentOut==NULL)||(OUTPUTOFF)||(InPass1))
-	{ if (freeflag) free(string);
+	{ if (freeflag) dontfree(string);
  	  return;
 	}
 
@@ -146,6 +149,6 @@ int freeflag;
 	  fprintf(CurrentOut->file,"\n# line %d \"%s\"\n",CurrentInputLineNo,CurrentFileName);
 	}
   WriteString(string);
-  if (freeflag) free(string);
+  if (freeflag) dontfree(string);
 }
 

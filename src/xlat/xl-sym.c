@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-05 18:52:05  brunner
+ * Revision 2.1  1995-06-15 20:57:00  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.0  1995/06/05  18:52:05  brunner
  * Reorganized file structure
  *
  * Revision 1.1  1994/11/03  17:42:02  brunner
@@ -133,7 +136,7 @@ void PopStack(freeflag)
 int freeflag;
 { if (freeflag) FreeTree(StackTop->tableptr);
   StackTop=StackTop->prev;
-  free(StackTop->next);
+  dontfree(StackTop->next);
   StackTop->next=NULL;
   CurrentLevel--;
   CurrentTable=StackTop->tableptr;
@@ -147,7 +150,7 @@ TYPEPTR type;
   if (type->count) return;
   if (type->basictype > POINTERTYPE)
 	FreeTree(type->table);
-  free(type);
+  dontfree(type);
   */
 }
   
@@ -155,9 +158,9 @@ void FreeSymTabStruct(root)
 SYMTABPTR root;
 { /*
   if (root==NULL) return;
-  free(root->name); 
+  dontfree(root->name); 
   FreeTypeNode(root->type);
-  free(root);
+  dontfree(root);
   */
 }
 

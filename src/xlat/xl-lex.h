@@ -12,8 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1995-06-15 20:27:11  jyelon
- * got rid of myfree.
+ * Revision 2.2  1995-06-15 20:57:00  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.1  1995/06/15  20:27:11  jyelon
+ * got rid of dontfree.
  *
  * Revision 2.0  1995/06/05  18:52:05  brunner
  * Reorganized file structure
@@ -27,7 +30,7 @@
  ***************************************************************************/
 #include <stdio.h>
 
-#define free(x) (0)
+#define dontfree(x) 0
 
 extern char *CkPrefix;	/* defined in outh.c */
 extern char *CkPrefix_;	/* defined in outh.c */

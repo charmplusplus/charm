@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-05 18:52:05  brunner
+ * Revision 2.1  1995-06-15 20:57:00  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.0  1995/06/05  18:52:05  brunner
  * Reorganized file structure
  *
  * Revision 1.1  1994/11/03  17:41:56  brunner
@@ -100,7 +103,7 @@ SYMTABPTR node;
 	}
   else  /*  put the else, Jan 16,1991 Attila */
   writeoutput(temp,NOFREE);
-  free(temp);
+  dontfree(temp);
 }
 
 writeentry(node)
@@ -385,7 +388,7 @@ char *AppendedString(modname,name,padding)
 char *modname,*name,*padding;
 { static char *temp=NULL;
  
-  if (temp!=NULL) free(temp);
+  if (temp!=NULL) dontfree(temp);
 
   temp=GetMem(strlen(modname)+strlen(name)+2*strlen(CkPrefix)+1+strlen(padding));
   strcpy(temp,CkPrefix);
