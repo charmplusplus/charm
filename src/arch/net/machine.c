@@ -205,7 +205,8 @@ int printf(const char *fmt, ...) {
 #include <signal.h>
 #include <string.h>
 
-#if ! defined(_WIN32) || defined(__CYGWIN__)
+#ifndef _WIN32
+#include <sys/time.h>
 #include <sys/resource.h>
 #endif
 
@@ -1841,7 +1842,7 @@ static void ConverseRunPE(int everReturn)
   if (Cmi_netpoll == 1 && CmiMyPe() == 0)
     CmiPrintf("Charm++: scheduler running in netpoll mode.\n");
   
-#if ! defined(_WIN32) || defined(__CYGWIN__)
+#ifndef _WIN32
   if (nicelevel != -100)  {
     if (0!=setpriority(PRIO_PROCESS, 0, nicelevel))  {
       CmiPrintf("[%d] setpriority failed with value %d. \n", CmiMyPe(), nicelevel);
