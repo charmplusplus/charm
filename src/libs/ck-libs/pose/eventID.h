@@ -11,7 +11,9 @@ class eventID
   /// Large number for identifier unique on creation PE
   unsigned int id; 
   /// PE identifier field ensures uniqueness across PEs
-  int pe;          
+  int pe;
+  /// Object identifier field for ordering
+  int obj;
  public:
   /// Basic Constructor
   eventID() { id = 0; pe = CkMyPe(); }          

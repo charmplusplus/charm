@@ -99,6 +99,7 @@ void eventQueue::ShiftEvent() {
     currentPtr = e;
   }
   if (currentPtr == backPtr) largest = POSE_UnsetTS;
+  FindLargest();
   //sanitize();
 }
 
@@ -111,8 +112,9 @@ void eventQueue::CommitEvents(sim *obj, POSE_TimeType ts)
   localStat *localStats = (localStat *)CkLocalBranch(theLocalStats);
 #endif
   Event *target = frontPtr->next, *commitPtr = frontPtr->next;
-  if (ts == -1) ts = currentPtr->timestamp;  
-  if (ts == -1) ts = currentPtr->prev->timestamp;  
+  if (ts == POSE_UnsetTS) ts = currentPtr->timestamp;  
+  if (ts == POSE_UnsetTS) ts = currentPtr->prev->timestamp;  
+  ts++;
 
   if (obj->objID->usesAntimethods()) {
     while ((commitPtr->timestamp < ts) && (commitPtr != backPtr) 
@@ -226,8 +228,18 @@ void eventQueue::DeleteEvent(Event *ev)
   // first connect surrounding events
   ev->prev->next = ev->next;
   ev->next->prev = ev->prev;
+  POSE_TimeType ts = ev->timestamp;
   delete ev; // then delete the event
+  if (ts == largest) FindLargest();
   //sanitize();
+}
+
+/// Find largest timestamp of the unexecuted events
+void eventQueue::FindLargest()
+{
+  POSE_TimeType hs = eqh->FindMax();
+  largest = backPtr->prev->timestamp;
+  if (largest < hs) largest = hs;
 }
 
 /// Add id, e and ts as an entry in currentPtr's spawned list

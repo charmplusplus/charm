@@ -45,12 +45,20 @@ public:
       ec=parent->cancels.getEarliest(), gvt=localPVT->getGVT(), 
       worktime = eq->currentPtr->timestamp;
     // Object is idle; report -1
-    if (!RBevent && (ec < 0) && (worktime < 0) && (ovt <= gvt))  return -1;
+    if (!RBevent && (ec == POSE_UnsetTS) && (worktime == POSE_UnsetTS) && 
+	(ovt <= gvt))  
+      return POSE_UnsetTS;
     if (RBevent)  theTime = RBevent->timestamp;
-    if ((ec > -1) && ((ec < theTime) || (theTime == -1)))  theTime = ec;
-    if ((worktime < theTime) || (theTime == -1))  theTime = worktime;
-    if ((ovt > theTime) && (ovt > gvt)) theTime = ovt;
-    CkAssert((theTime == -1) || (theTime >= gvt));
+    if ((ec > POSE_UnsetTS) && ((ec < theTime) || (theTime == POSE_UnsetTS)))  
+      theTime = ec;
+    POSE_TimeType maxWork = worktime;
+    if (ovt > maxWork) maxWork = ovt;
+    if ((worktime == POSE_UnsetTS) && (ovt <= gvt)) maxWork = POSE_UnsetTS;
+    if (((maxWork != POSE_UnsetTS) && (maxWork < theTime)) || 
+	(theTime == POSE_UnsetTS))
+      theTime = maxWork;
+    CkAssert((theTime == POSE_UnsetTS) || (theTime >= gvt));
+    //if (theTime == gvt) CkPrintf("safe=%d ovt=%d wt=%d ec=%d gvt=%d\n", theTime, ovt, worktime, ec, gvt);
     return theTime;
   }
   /// Add spawned event to current event's spawned event list

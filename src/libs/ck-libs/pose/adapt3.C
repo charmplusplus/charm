@@ -6,6 +6,7 @@ void adapt3::Step()
 {
   Event *ev;
   static POSE_TimeType lastGVT = POSE_UnsetTS;
+  static int advances=0;
 #ifdef POSE_STATS_ON
   int iter=0;
 #endif
@@ -20,7 +21,8 @@ void adapt3::Step()
     CancelEvents();
     // if cancellations of executed events occurred, adjust timeLeash
     if ((ct > -1) && (eq->currentPtr->timestamp < ct))
-    timeLeash = eq->currentPtr->timestamp - lastGVT + 1;
+      timeLeash = eq->currentPtr->timestamp - lastGVT + 1;
+    if (timeLeash < 0) timeLeash = 10;
 #ifdef POSE_STATS_ON
     localStats->SwitchTimer(SIM_TIMER);      
 #endif
@@ -44,11 +46,24 @@ void adapt3::Step()
   ev = eq->currentPtr;
   // Avoid wasting this iteration by expanding speculative window to
   // include the earlier "half" of available work if there is any
-  if ((eq->largest > -1) && (ev->timestamp > -1) && 
-      (ev->timestamp > lastGVT + timeLeash))
-    timeLeash += (eq->largest - ev->timestamp + 1)/2;
-  while ((ev->timestamp > -1) && (ev->timestamp <= lastGVT + timeLeash)
-	 && (iter < MAX_ITERATIONS)) { // do all events at & under timeLeash
+  /*
+  if ((advances == 0) && (eq->largest > POSE_UnsetTS) && 
+      (ev->timestamp > POSE_UnsetTS) && 
+      (ev->timestamp > lastGVT + timeLeash) && (eq->largest >= ev->timestamp)) {
+    timeLeash = (eq->largest - ev->timestamp + 4)/4 + (ev->timestamp-lastGVT);
+    advances = 1;
+  }
+  */
+  if ((advances == 0) && (ev->timestamp > POSE_UnsetTS) && 
+      (ev->timestamp > lastGVT + timeLeash)) {
+    timeLeash = ev->timestamp = lastGVT + 1;
+    advances = 1;
+  }
+  else if (ev->timestamp <= lastGVT + timeLeash) advances = 0;
+  // CkPrintf("largo=%d cur=%d leash=%d gvt=%d ad=%d\n", eq->largest, ev->timestamp, timeLeash, lastGVT, advances);
+  while ((ev->timestamp > POSE_UnsetTS) && 
+	 (ev->timestamp <= lastGVT + timeLeash) && 
+	 (iter < MAX_ITERATIONS)) { // do all events at & under timeLeash
     currentEvent = ev;
     ev->done = 2;
     //CkPrintf("About to do event "); ev->evID.dump(); CkPrintf("...\n");

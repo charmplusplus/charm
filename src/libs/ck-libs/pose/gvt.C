@@ -270,13 +270,16 @@ void GVT::computeGVT(UpdateMsg *m)
       }
       tmp = tmp->next;
     }
-    if ((earliestMsg < estGVT) && (earliestMsg != POSE_UnsetTS)) estGVT = earliestMsg;
-    if ((lastSR != POSE_UnsetTS) && (estGVT == POSE_UnsetTS) && (lastSR > lastGVT)) 
+    if (((earliestMsg < estGVT) && (earliestMsg != POSE_UnsetTS)) ||
+	(estGVT == POSE_UnsetTS))
+      estGVT = earliestMsg;
+    if ((lastSR != POSE_UnsetTS) && (estGVT == POSE_UnsetTS) && 
+	(lastSR > lastGVT))
       estGVT = lastSR;
-    
 
     // check for inactivity
-    if (((estGVT == lastGVT) || (estGVT < 0)) && (earliestMsg == POSE_UnsetTS)) {
+    if ((optGVT == POSE_UnsetTS) && (earliestMsg == POSE_UnsetTS) && 
+	(lastSR == POSE_UnsetTS)) {
       inactive++; 
       estGVT = lastGVT;
       if (inactive == 1) inactiveTime = lastGVT;
@@ -296,7 +299,7 @@ void GVT::computeGVT(UpdateMsg *m)
 
     // check for termination conditions
     int term = 0;
-    if ((estGVT >= POSE_endtime) && (POSE_endtime > POSE_UnsetTS)) {
+    if ((estGVT > POSE_endtime) && (POSE_endtime > POSE_UnsetTS)) {
       CkPrintf("At endtime: %d\n", POSE_endtime);
       term = 1;
     }

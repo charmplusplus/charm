@@ -113,14 +113,8 @@ void sim::Commit()
   if (localPVT->getGVT() > lastGVT) {
     lastGVT = localPVT->getGVT();
     if (localPVT->done() && (POSE_endtime == POSE_UnsetTS)) { // simulation inactive
-      CkPrintf("END: Committing events up to POSE_endtime of %d\n", POSE_endtime);
       eq->CommitEvents(this, -1); // commit all events in queue
       objID->terminus(); // call terminus on all posers
-    }
-    else if (localPVT->done()) { 
-      CkPrintf("END: Committing all queued events\n");
-      eq->CommitEvents(this, lastGVT); // commit events up to GVT
-      if (localPVT->done()) objID->terminus(); // if sim done, term posers
     }
     else { 
       eq->CommitEvents(this, lastGVT); // commit events up to GVT

@@ -32,6 +32,8 @@ class HeapNode
   HeapNode *conjoin(HeapNode *h);           
   /// Remove heap node matching evID
   int remove(eventID evID, POSE_TimeType timestamp);  
+  /// Find maximum element
+  POSE_TimeType findMax();
   /// Dump all data fields
   void dump();                 
   /// Pack/unpack/sizing operator
@@ -61,6 +63,8 @@ class EqHeap {
       returns 1 if an event was successfully deleted, 0 if the event was not
       found in the heap */
   int DeleteEvent(eventID evID, POSE_TimeType timestamp);  
+  /// Find maximum element
+  POSE_TimeType FindMax();
   /// Dump entire heap
   void dump();                      
   /// Pack/unpack/sizing operator

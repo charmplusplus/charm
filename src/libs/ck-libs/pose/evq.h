@@ -54,6 +54,8 @@ class eventQueue {
   void AddSpawnToCurrent(int id, eventID e, POSE_TimeType ts);
   /// Return the first entry in currentPtr's spawned list and remove it
   SpawnedEvent *GetNextCurrentSpawn();
+  /// Find the largest timestamp of the unexecuted events
+  void FindLargest();
   /// Dump the event queue
   void dump();        
   /// Pack/unpack/sizing operator
