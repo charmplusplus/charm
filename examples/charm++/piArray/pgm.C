@@ -57,7 +57,7 @@ void main::results(int cnt)
 
 piPart::piPart()
 { 
-  CrnSrand((int) this);
+  CrnSrand((int)(long) this);
 }
 
 void
