@@ -47,7 +47,7 @@ include 'femf.h'
   do i=1,nnodes
     if (nnums(i) .eq. 1) nodes(i) = 1.0
   enddo
-  fid = FEM_Create_Field(FEM_DOUBLE, 1, 0, offsetof(nodes(1),nodes(2)))
+  fid = FEM_Create_Field(FEM_DOUBLE, 1, 0, 8)
   do i=1,nelems
     do j=1,npere
       elements(i) = elements(i) + nodes(conn(i,j))
