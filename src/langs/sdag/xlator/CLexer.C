@@ -39,12 +39,12 @@ CToken *CLexer::lookAhead(void)
       delete cToken;
       continue;
     } else {
-      char *yycopy = strdup(myyytext);
-      for(int i=strlen(yycopy)-1; i>=0; i-- ) {
+      char *slcopy = strdup(mysltext);
+      for(int i=strlen(slcopy)-1; i>=0; i-- ) {
         charNum--;
-        Unput(yycopy[i]) ;
+        Unput(slcopy[i]) ;
       }
-      free(yycopy);
+      free(slcopy);
       return cToken;
     }
   }
@@ -57,20 +57,20 @@ CToken *CLexer::getNextToken(void)
   CToken *cToken;
 
   while(1) {
-    type = yylex();
+    type = sllex();
     if ((int)type == 0)
       return (CToken *) 0;
-    charNum += strlen(myyytext);
+    charNum += strlen(mysltext);
     if(type == NEW_LINE) {
       lineNum++;
       charNum = 1;
       if (wsSignificant)
-        return new CToken(type, myyytext);
+        return new CToken(type, mysltext);
       else
         continue;
     }
     if((type != WSPACE) || wsSignificant) {
-      cToken = new CToken(type, myyytext);
+      cToken = new CToken(type, mysltext);
       // cToken->print(0);
       return cToken;
     }
@@ -79,7 +79,7 @@ CToken *CLexer::getNextToken(void)
 
 CToken *CLexer::getBracedCode(void)
 {
-  CToken *code = new CToken(BRACE_MATCHED_CPP_CODE, "{ ");
+  CToken *code = new CToken(MATCHED_CPP_CODE, "{ ");
   int currentScope = 1;
   wsSignificant = 1;
   // Code to eat C++ code
@@ -102,7 +102,7 @@ CToken *CLexer::getBracedCode(void)
 
 CToken *CLexer::getParenCode(void)
 {
-  CToken *code = new CToken(BRACE_MATCHED_CPP_CODE, "( ");
+  CToken *code = new CToken(MATCHED_CPP_CODE, "( ");
   int currentScope = 1;
   wsSignificant = 1;
   // Code to eat C++ code
@@ -156,9 +156,9 @@ CToken *CLexer::getIntExpr(EToken term)
         break;
     }
     if(cToken->type == term && !numBraces && !numParens && !numBrackets) {
-      for(int i=strlen(myyytext)-1; i>=0; i-- ) {
+      for(int i=strlen(mysltext)-1; i>=0; i-- ) {
         charNum--;
-        Unput(myyytext[i]) ;
+        Unput(mysltext[i]) ;
       }
       endExpr = 1;
     } else {

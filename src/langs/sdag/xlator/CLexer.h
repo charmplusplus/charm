@@ -13,8 +13,8 @@
 #include "sdag-globals.h"
 #include "string.h"
 
-extern "C" EToken yylex();
-extern "C" char *myyytext;
+extern "C" EToken sllex();
+extern "C" char *mysltext;
 extern "C" void Unput(char);
 
 class CLexer {

@@ -2,10 +2,10 @@
 #include "EToken.h"
 
 /* Assume that the C-style comments are not present in the source */
-char *myyytext;
+char *mysltext;
 
-#define Return(x) { myyytext = (char *) malloc(strlen(yytext)+1); \
-                    strcpy(myyytext, yytext); return (x); }
+#define Return(x) { mysltext = (char *) malloc(strlen(sltext)+1); \
+                    strcpy(mysltext, sltext); return (x); }
 
 %}
 
@@ -91,7 +91,7 @@ atomic			{Return(ATOMIC);}
 
 %%
 
-yywrap()
+slwrap()
 {
   return 1;
 }
