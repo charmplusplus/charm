@@ -385,10 +385,11 @@ void CkExit(void)
     CmiSyncSendAndFree(0, env->getTotalsize(), (char *)env);
   }
 #if ! CMK_BLUEGENE_THREAD
-  // if CkExit is called inside main(), it will hang here.
-  if (_mainDone == 1) {
-    _TRACE_END_EXECUTE();
+  _TRACE_END_EXECUTE();
+  if (_mainDone == 1) { //Not called from inside main-- wait for stats:
     CsdScheduler(-1);
+  } else { //Called from inside main-- just give up
+    ConverseExit();
   }
 #endif
 }
