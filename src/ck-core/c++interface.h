@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.7  1995-09-05 22:35:32  sanjeev
+ * Revision 2.8  1995-09-06 21:48:50  jyelon
+ * Eliminated 'CkProcess_BocMsg', using 'CkProcess_ForChareMsg' instead.
+ *
+ * Revision 2.7  1995/09/05  22:35:32  sanjeev
  * removed _CK_MyBocNum
  *
  * Revision 2.6  1995/09/05  22:02:09  sanjeev
@@ -204,7 +207,7 @@ extern "C" void GeneralSendMsgBranch(int, void *, int, int, int) ;
 extern "C" void GeneralBroadcastMsgBranch(int, void *, int, int) ;
 extern "C" void SendMsg(int, void *, ChareIDType *) ;
 extern "C" void *GetBocDataPtr(int) ;
-extern "C" void SetBocDataPtr(int, _CK_BOC *) ;
+extern "C" void SetBocBlockPtr(int, CHARE_BLOCK *);
 extern "C" double CmiTimer() ;
 extern "C" int CmiSpanTreeRoot() ;
 extern "C" int CmiNumSpanTreeChildren(int) ;

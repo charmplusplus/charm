@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.7  1995-09-01 02:13:17  jyelon
+ * Revision 2.8  1995-09-06 21:48:50  jyelon
+ * Eliminated 'CkProcess_BocMsg', using 'CkProcess_ForChareMsg' instead.
+ *
+ * Revision 2.7  1995/09/01  02:13:17  jyelon
  * VID_BLOCK, CHARE_BLOCK, BOC_BLOCK consolidated.
  *
  * Revision 2.6  1995/07/27  20:29:34  jyelon
@@ -74,7 +77,7 @@ typedef struct msg_element {
 
 typedef struct bocdata_queue_element {
 	ChareNumType bocNum;
-	void *dataptr;
+	CHARE_BLOCK *dataptr;
 	struct bocdata_queue_element *next;
 } BOCDATA_QUEUE_ELEMENT;
 
@@ -96,6 +99,8 @@ CpvStaticDeclare(int, number_dynamic_boc);
 CpvStaticDeclare(MSG_ELEMENT_, DynamicBocMsgList); 
 CpvStaticDeclare(BOCDATA_QUEUE_ELEMENT_, BocDataTable);
 CpvStaticDeclare(BOCID_MESSAGE_COUNT_, BocIDMessageCountTable);
+
+CHARE_BLOCK *CreateChareBlock();
 
 
 void bocModuleInit()
@@ -169,7 +174,7 @@ TRACE(CmiPrintf("[%d] GetDynamicBocMsg: ref=%d, ep=%d\n",
 }
 
 
-void * GetBocDataPtr(bocNum)
+CHARE_BLOCK *GetBocBlockPtr(bocNum)
 ChareNumType bocNum;
 {
 	int index;
@@ -179,7 +184,7 @@ ChareNumType bocNum;
 	index = bocNum % MAXBOC;
 	element = CpvAccess(BocDataTable)[index];
 
-TRACE(CmiPrintf("[%d] GetBocDataPtr: bocNum=%d, index=%d, element=0x%x\n",
+TRACE(CmiPrintf("[%d] GetBocBlockPtr: bocNum=%d, index=%d, element=0x%x\n",
 		 CmiMyPe(), bocNum, index, element));
 
 	while (element != NULL)
@@ -193,6 +198,12 @@ TRACE(CmiPrintf("[%d] GetBocDataPtr: bocNum=%d, index=%d, element=0x%x\n",
 		CmiMyPe(),  bocNum);
 }
 
+
+void * GetBocDataPtr(bocNum)
+ChareNumType bocNum;
+{
+    return GetBocBlockPtr(bocNum)->chareptr;
+}
 
 
 BOCID_MESSAGE_COUNT * GetBocIDMessageCount(bocnum)
@@ -234,9 +245,9 @@ TRACE(CmiPrintf("[%d] SetDynamicBocMsg: ref=%d, ep=%d\n",
 	return (new->ref);
 }
 
-SetBocDataPtr(bocNum, ptr)
+SetBocBlockPtr(bocNum, ptr)
 ChareNumType bocNum;
-void *ptr;
+CHARE_BLOCK *ptr;
 {
 	int index;
 	BOCDATA_QUEUE_ELEMENT *new;
@@ -252,7 +263,7 @@ void *ptr;
 	new->next = element;	
 	CpvAccess(BocDataTable)[index] = new;
 
-TRACE(CmiPrintf("[%d] SetBocDataPtr: bocNum=%d, index=%d, new=0x%x\n",
+TRACE(CmiPrintf("[%d] SetBocBlockPtr: bocNum=%d, index=%d, new=0x%x\n",
 		 CmiMyPe(), bocNum, index, new));
 }
 
@@ -491,7 +502,7 @@ DynamicBocInit()
 	/* Create a dummy block */
     	bocBlock = CreateChareBlock(sizeof(int), CHAREKIND_BOCNODE, 0);
         bocBlock->x.boc_num = DynamicBocNum;
-    	SetBocDataPtr(DynamicBocNum, (void *) (bocBlock + 1));
+    	SetBocBlockPtr(DynamicBocNum, bocBlock);
 }
 
 

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.7  1995-09-01 02:13:17  jyelon
+ * Revision 2.8  1995-09-06 21:48:50  jyelon
+ * Eliminated 'CkProcess_BocMsg', using 'CkProcess_ForChareMsg' instead.
+ *
+ * Revision 2.7  1995/09/01  02:13:17  jyelon
  * VID_BLOCK, CHARE_BLOCK, BOC_BLOCK consolidated.
  *
  * Revision 2.6  1995/07/27  20:29:34  jyelon
@@ -95,7 +98,7 @@ StatisticBocInit()
 
 	bocBlock = CreateChareBlock(0, CHAREKIND_BOCNODE, 0);
         bocBlock->x.boc_num = StatisticBocNum;
-	SetBocDataPtr(StatisticBocNum, (void *) (bocBlock + 1));
+	SetBocBlockPtr(StatisticBocNum, bocBlock);
 }
 
 

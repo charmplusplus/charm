@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.4  1995-09-01 02:13:17  jyelon
+ * Revision 2.5  1995-09-06 21:48:50  jyelon
+ * Eliminated 'CkProcess_BocMsg', using 'CkProcess_ForChareMsg' instead.
+ *
+ * Revision 2.4  1995/09/01  02:13:17  jyelon
  * VID_BLOCK, CHARE_BLOCK, BOC_BLOCK consolidated.
  *
  * Revision 2.3  1995/07/27  20:29:34  jyelon
@@ -57,9 +60,10 @@ void WOVBocInit()
 
 	TRACE(CmiPrintf("[%d]: WOVBocInit() called\n", CmiMyPe()));
 
-	bocBlock = CreateChareBlock(sizeof(WOV_Boc_Data), CHAREKIND_BOCNODE, 0);
+	bocBlock = CreateChareBlock(sizeof(WOV_Boc_Data),CHAREKIND_BOCNODE,0);
         bocBlock->x.boc_num = WOVBocNum;
-	SetBocDataPtr(WOVBocNum, (void *) (bocBlock+1));
+	SetBocBlockPtr(WOVBocNum, bocBlock);
+
 	bocData  = (WOV_Boc_Data *) (bocBlock + 1);
 
 	for(i = 0; i < MAXWRITEONCEVARS; i++)

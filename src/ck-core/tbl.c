@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.6  1995-09-01 02:13:17  jyelon
+ * Revision 2.7  1995-09-06 21:48:50  jyelon
+ * Eliminated 'CkProcess_BocMsg', using 'CkProcess_ForChareMsg' instead.
+ *
+ * Revision 2.6  1995/09/01  02:13:17  jyelon
  * VID_BLOCK, CHARE_BLOCK, BOC_BLOCK consolidated.
  *
  * Revision 2.5  1995/07/27  20:29:34  jyelon
@@ -69,7 +72,7 @@ TblBocInit()
 
     	bocBlock = CreateChareBlock(sizeof(DATA_BR_TBL), CHAREKIND_BOCNODE, 0);
         bocBlock->x.boc_num = TblBocNum;
-    	SetBocDataPtr(TblBocNum, (void *) (bocBlock + 1));
+    	SetBocBlockPtr(TblBocNum, bocBlock);
 
 	for (i=0; i<MAX_TBL_SIZE; i++)
 		CpvAccess(table)[i] = (TBL_ELEMENT *) NULL;

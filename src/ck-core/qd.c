@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.3  1995-07-27 20:29:34  jyelon
+ * Revision 1.4  1995-09-06 21:48:50  jyelon
+ * Eliminated 'CkProcess_BocMsg', using 'CkProcess_ForChareMsg' instead.
+ *
+ * Revision 1.3  1995/07/27  20:29:34  jyelon
  * Improvements to runtime system, general cleanup.
  *
  * Revision 1.2  1995/07/07  14:10:01  gursoy
@@ -94,13 +97,7 @@ typedef struct start_quiescence_msg {
 
 
 
-
-
-
-
-
-
-
+CHARE_BLOCK *CreateChareBlock();
 
 
 
@@ -201,18 +198,23 @@ void QDAddSysBocEps();
 ****************************************************************************/
 void QDBocInit()
 {
-	SetBocDataPtr(QDBocNum, NULL); /* we don't need data so make it
-							null in table */
-	CpvAccess(countResponses)         = 0;
-	CpvAccess(msgs_previously_processed) = 0;
-	CpvAccess(root_msgs_created) = CpvAccess(root_msgs_processed) = 0;
+    CHARE_BLOCK *bocblock;
 
-	CpvAccess(myPe)        = CmiMyPe();
-	CpvAccess(mainPe)      = 0;
-	CpvAccess(rootPe)      = CmiSpanTreeRoot();
-	CpvAccess(numKids)     = CmiNumSpanTreeChildren(CpvAccess(myPe));
-	CpvAccess(parentPe)    = (CpvAccess(myPe) == CpvAccess(rootPe)) ? CpvAccess(mainPe) : CmiSpanTreeParent(CpvAccess(myPe));
-	CpvAccess(quiescenceStarted) = 0;
+    /* Create a dummy BOC node */
+    bocblock = CreateChareBlock(0, CHAREKIND_BOCNODE, 0);
+    bocblock->x.boc_num = QDBocNum;
+    SetBocBlockPtr(QDBocNum, bocblock);
+
+    CpvAccess(countResponses)         = 0;
+    CpvAccess(msgs_previously_processed) = 0;
+    CpvAccess(root_msgs_created) = CpvAccess(root_msgs_processed) = 0;
+    
+    CpvAccess(myPe)        = CmiMyPe();
+    CpvAccess(mainPe)      = 0;
+    CpvAccess(rootPe)      = CmiSpanTreeRoot();
+    CpvAccess(numKids)     = CmiNumSpanTreeChildren(CpvAccess(myPe));
+    CpvAccess(parentPe)    = (CpvAccess(myPe) == CpvAccess(rootPe)) ? CpvAccess(mainPe) : CmiSpanTreeParent(CpvAccess(myPe));
+    CpvAccess(quiescenceStarted) = 0;
 }
 
 /***************************************************************************

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.5  1995-09-05 22:02:43  sanjeev
+ * Revision 2.6  1995-09-06 21:48:50  jyelon
+ * Eliminated 'CkProcess_BocMsg', using 'CkProcess_ForChareMsg' instead.
+ *
+ * Revision 2.5  1995/09/05  22:02:43  sanjeev
  * added chareptr to CHARE_BLOCK
  *
  * Revision 2.4  1995/09/01  02:13:17  jyelon
@@ -75,7 +78,7 @@ typedef struct chare_block {
      struct fifo_queue *vid_queue; /* if an Unfilled-VID */
  } x;
  void *chareptr ;		   /* Pointer to the data area of the chare */
- double dummy;                     /* Pad it to 8 bytes */
+ double data[1];                   /* Pad it to 8 bytes */
 } CHARE_BLOCK ;  
 
 #endif

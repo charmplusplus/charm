@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.11  1995-09-01 02:13:17  jyelon
+ * Revision 2.12  1995-09-06 21:48:50  jyelon
+ * Eliminated 'CkProcess_BocMsg', using 'CkProcess_ForChareMsg' instead.
+ *
+ * Revision 2.11  1995/09/01  02:13:17  jyelon
  * VID_BLOCK, CHARE_BLOCK, BOC_BLOCK consolidated.
  *
  * Revision 2.10  1995/08/24  15:48:26  gursoy
@@ -269,6 +272,7 @@ int sizeData, magic, kind;
   SetID_onPE(p->selfID, CmiMyPe());
   SetID_chareBlockPtr(p->selfID, p);
   p->charekind = kind;
+  p->chareptr = ((void *)(p->data));
   return((void *) p);
 }
 

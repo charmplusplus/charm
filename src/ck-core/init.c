@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.14  1995-09-06 04:08:58  sanjeev
+ * Revision 2.15  1995-09-06 21:48:50  jyelon
+ * Eliminated 'CkProcess_BocMsg', using 'CkProcess_ForChareMsg' instead.
+ *
+ * Revision 2.14  1995/09/06  04:08:58  sanjeev
  * fixed bugs
  *
  * Revision 2.13  1995/09/05  22:00:52  sanjeev
@@ -153,7 +156,6 @@ extern void HANDLE_INCOMING_MSG() ;
 extern void CkProcess_ForChareMsg();
 extern void CkProcess_DynamicBocInitMsg();
 extern void CkProcess_NewChareMsg();
-extern void CkProcess_BocMsg();
 extern void CkProcess_VidSendOverMsg();
 
 void initModuleInit()
@@ -369,8 +371,8 @@ CharmInitLoop()
 	case BroadcastBocMsg:
 	case ImmBroadcastBocMsg:
 	case QdBroadcastBocMsg:      
-	  CmiSetHandler(envelope,CsvAccess(CkProcIdx_BocMsg));
-	  CkEnqueue(envelope);
+          CmiPrintf("Internal error #324832498\n");
+          exit(1);
 	  break;
 
 	case NewChareNoBalanceMsg:
@@ -380,8 +382,12 @@ CharmInitLoop()
 	  break;
 	  
 	case ForChareMsg:
+          CmiPrintf("Internal error #30984790238\n");
+          exit(1);
+/*
 	  CmiSetHandler(envelope,CsvAccess(CkProcIdx_ForChareMsg));
 	  CkEnqueue(envelope);
+*/
 	  break;
 	  
 	case DynamicBocInitMsg:
@@ -434,7 +440,7 @@ ENVELOPE       *envelope;
   else
     bocBlock->chareptr = (void *)((CsvAccess(ChareFnTable)[current_chare])
 						(bocBlock)) ;
-  SetBocDataPtr(current_bocnum, bocBlock->chareptr);
+  SetBocBlockPtr(current_bocnum, bocBlock);
   trace_begin_execute(envelope);
   (current_epinfo->function)(usrMsg, bocBlock->chareptr);
   trace_end_execute(current_bocnum, current_msgType, current_ep);
@@ -653,8 +659,6 @@ InitializeEPTables()
     = CmiRegisterHandler(CkProcess_DynamicBocInitMsg);
   CsvAccess(CkProcIdx_NewChareMsg)
     = CmiRegisterHandler(CkProcess_NewChareMsg);
-  CsvAccess(CkProcIdx_BocMsg)
-    = CmiRegisterHandler(CkProcess_BocMsg);
   CsvAccess(CkProcIdx_VidSendOverMsg)
     = CmiRegisterHandler(CkProcess_VidSendOverMsg);
   

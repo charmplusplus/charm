@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.4  1995-09-01 02:13:17  jyelon
+ * Revision 2.5  1995-09-06 21:48:50  jyelon
+ * Eliminated 'CkProcess_BocMsg', using 'CkProcess_ForChareMsg' instead.
+ *
+ * Revision 2.4  1995/09/01  02:13:17  jyelon
  * VID_BLOCK, CHARE_BLOCK, BOC_BLOCK consolidated.
  *
  * Revision 2.3  1995/07/27  20:29:34  jyelon
@@ -124,7 +127,6 @@ CsvDeclare(int, HANDLE_INCOMING_MSG_Index);
 CsvDeclare(int, CkProcIdx_ForChareMsg);
 CsvDeclare(int, CkProcIdx_DynamicBocInitMsg);
 CsvDeclare(int, CkProcIdx_NewChareMsg);
-CsvDeclare(int, CkProcIdx_BocMsg);
 CsvDeclare(int, CkProcIdx_VidSendOverMsg);
 
 /* System-defined chare numbers */
