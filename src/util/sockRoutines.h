@@ -236,9 +236,10 @@ void ChMessage_new(const char *type,unsigned int len,
 int ChMessage_send(SOCKET fd,const ChMessage *src); /*You must free after send*/
 
 typedef struct {
-	ChMessageInt_t nPE;
-	ChMessageInt_t dataport;
-        skt_ip_t IP;
+	ChMessageInt_t nPE; /* Number of compute processors on this node */
+	ChMessageInt_t dataport; /* node's data port (UDP or GM) */
+	ChMessageInt_t mach_id; /* node's hardware address (GM-only) */
+	skt_ip_t IP; /* node's IP address */
 } ChNodeinfo;
 
 typedef struct {
