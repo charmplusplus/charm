@@ -461,11 +461,12 @@ void (*handler)();
 }
 #endif
 
+
 /*****************************************************************************
  *
- * The following are the CmiDeliverXXX functions.  A common implementation
- * is provided below.  The machine layer can provide an alternate 
- * implementation if it so desires.
+ * The following is the CsdScheduler function.  A common
+ * implementation is provided below.  The machine layer can provide an
+ * alternate implementation if it so desires.
  *
  * void CmiDeliversInit()
  *
@@ -523,79 +524,87 @@ void (*handler)();
  *
  *****************************************************************************/
 
-CpvDeclare(int, CsdStopNotifyFlag);
-CpvStaticDeclare(int, CsdIdleDetectedFlag);
 CpvDeclare(CmiHandler, CsdNotifyIdle);
 CpvDeclare(CmiHandler, CsdNotifyBusy);
+CpvDeclare(int, CsdStopNotifyFlag);
+CpvStaticDeclare(int, CsdIdleDetectedFlag);
 
+void CsdBeginIdle()
+{
+  if (!CpvAccess(CsdIdleDetectedFlag)) {
+    CpvAccess(CsdIdleDetectedFlag) = 1;
+    if(!CpvAccess(CsdStopNotifyFlag)) {
+      (CpvAccess(CsdNotifyIdle))();
+      trace_begin_idle();
+    }
+  }
+}
+  
+void CsdEndIdle()
+{
+  if(CpvAccess(CsdIdleDetectedFlag)) {
+    CpvAccess(CsdIdleDetectedFlag) = 0;
+    if(!CpvAccess(CsdStopNotifyFlag)) {
+      (CpvAccess(CsdNotifyBusy))();
+      trace_end_idle();
+    }
+  }
+}
 
 #if CMK_CMIDELIVERS_USE_COMMON_CODE
 
-CpvStaticDeclare(int, CmiBufferGrabbed);
 CpvExtern(void*, CmiLocalQueue);
-
-void CmiDeliversInit()
-{
-  CpvInitialize(int, CmiBufferGrabbed);
-  CpvAccess(CmiBufferGrabbed) = 0;
-}
+CtvStaticDeclare(int, CmiBufferGrabbed);
 
 void CmiGrabBuffer()
 {
-  CpvAccess(CmiBufferGrabbed) = 1;
+  CtvAccess(CmiBufferGrabbed) = 1;
 }
 
-int CmiDeliverMsgs(maxmsgs)
-int maxmsgs;
+void CmiHandleMessage(void *msg)
 {
-  int *buffergrabbed;
-  void *localqueue;
-  void *msg1, *msg2;
-  int counter;
-  
-  buffergrabbed = &CpvAccess(CmiBufferGrabbed);
-  localqueue = CpvAccess(CmiLocalQueue);
-  while (1) {
-    msg1 = CmiGetNonLocal();
-    if (msg1) {
-      if(CpvAccess(CsdIdleDetectedFlag)) {
-         CpvAccess(CsdIdleDetectedFlag) = 0;
-         if(!CpvAccess(CsdStopNotifyFlag)) {
-           (CpvAccess(CsdNotifyBusy))();
-           trace_end_idle();
-         }
-      }
-      *buffergrabbed = 0;
-      (CmiGetHandlerFunction(msg1))(msg1);
-      if (!*buffergrabbed) CmiFree(msg1);
-      maxmsgs--; if (maxmsgs==0) break;
-    }
-    FIFO_DeQueue(localqueue, &msg2);
-    if (msg2) {
-      if(CpvAccess(CsdIdleDetectedFlag)) {
-         CpvAccess(CsdIdleDetectedFlag) = 0;
-         if(!CpvAccess(CsdStopNotifyFlag)) {
-           (CpvAccess(CsdNotifyBusy))();
-           trace_end_idle();
-         }
-      }
-      *buffergrabbed = 0;
-      (CmiGetHandlerFunction(msg2))(msg2);
-      if (!*buffergrabbed) CmiFree(msg2);
-      maxmsgs--; if (maxmsgs==0) break;
-    }
-    if ((msg1==0)&&(msg2==0)) break;
-  }
-  return maxmsgs;
+  CtvAccess(CmiBufferGrabbed) = 0;
+  (CmiGetHandlerFunction(msg))(msg);
+  if (!CtvAccess(CmiBufferGrabbed)) CmiFree(msg);
 }
 
-/*
- * CmiDeliverSpecificMsg(lang)
- *
- * - waits till a message with the specified handler is received,
- *   then delivers it.
- *
- */
+void CmiDeliversInit()
+{
+  CtvInitialize(int, CmiBufferGrabbed);
+  CtvAccess(CmiBufferGrabbed) = 0;
+}
+
+int CmiDeliverMsgs(int maxmsgs)
+{
+  return CsdScheduler(maxmsgs);
+}
+
+int CsdScheduler(int maxmsgs)
+{
+  int *msg;
+  int cycle = CpvAccess(CsdStopFlag);
+  void *localqueue = CpvAccess(CmiLocalQueue);
+  
+  while (1) {
+    msg = CmiGetNonLocal();
+    if (msg==0) FIFO_DeQueue(localqueue, &msg);
+    if (msg==0) CqsDequeue(CpvAccess(CsdSchedQueue),&msg);
+    if (msg) {
+      CsdEndIdle();
+      CmiHandleMessage(msg);
+      maxmsgs--; if (maxmsgs==0) return maxmsgs;
+      if (CpvAccess(CsdStopFlag) != cycle) return maxmsgs;
+    } else {
+      CsdBeginIdle();
+      CmiNotifyIdle();
+      CcdRaiseCondition(CcdPROCESSORIDLE) ;
+      if (CpvAccess(CsdStopFlag) != cycle) {
+	CsdEndIdle();
+	return maxmsgs;
+      }
+    }
+  }
+}
 
 void CmiDeliverSpecificMsg(handler)
 int handler;
@@ -608,9 +617,7 @@ int handler;
     first = msg;
     do {
       if (CmiGetHandler(msg)==handler) {
-	CpvAccess(CmiBufferGrabbed)=0;
-	(CmiGetHandlerFunction(msg))(msg);
-	if (!CpvAccess(CmiBufferGrabbed)) CmiFree(msg);
+	CmiHandleMessage(msg);
 	return;
       } else {
 	FIFO_EnQueue(CpvAccess(CmiLocalQueue), msg);
@@ -622,12 +629,10 @@ int handler;
   
   /* receive message from network */
   while ( 1 ) { /* Loop till proper message is received */
-    while ( (msg = CmiGetNonLocal()) == NULL )
+    while ((msg=CmiGetNonLocal()) == NULL)
         ;
     if ( CmiGetHandler(msg)==handler ) {
-      CpvAccess(CmiBufferGrabbed)=0;
-      (CmiGetHandlerFunction(msg))(msg);
-      if (!CpvAccess(CmiBufferGrabbed)) CmiFree(msg);
+      CmiHandleMessage(msg);
       return;
     } else {
       FIFO_EnQueue(CpvAccess(CmiLocalQueue), msg);
@@ -637,43 +642,75 @@ int handler;
 
 #endif /* CMK_CMIDELIVERS_USE_COMMON_CODE */
 
-/*****************************************************************************
+/***************************************************************************
  *
- * threads: common code.
+ * Standin Schedulers.
  *
- * This section contains the following functions, which are common across
- * all implementations:
+ * We use the following strategy to make sure somebody's always running
+ * the scheduler (CsdScheduler).  Initially, we assume the main thread
+ * is responsible for this.  If the main thread blocks, we create a
+ * "standin scheduler" thread to replace it.  If the standin scheduler
+ * blocks, we create another standin scheduler to replace that one,
+ * ad infinitum.  Collectively, the main thread and all the standin
+ * schedulers are called "scheduling threads".
  *
- * void CthSchedInit()
+ * Suppose the main thread is blocked waiting for data, and a standin
+ * scheduler is running instead.  Suppose, then, that the data shows
+ * up and the main thread is CthAwakened.  This causes a token to be
+ * pushed into the queue.  When the standin pulls the token from the
+ * queue and handles it, the standin goes to sleep, and control shifts
+ * back to the main thread.  In this way, unnecessary standins are put
+ * back to sleep.  These sleeping standins are stored on the
+ * CthSleepingStandins list.
  *
- *     This must be called before calling CthSetStrategyDefault.
- *
- * void CthSetStrategyDefault(CthThread t)
- *
- *     Sets the scheduling strategy for thread t to be the default strategy.
- *     All threads, when created, are set for the default strategy.  The
- *     default strategy is to awaken threads by inserting them into the
- *     main CsdScheduler queue, and to suspend them by returning control
- *     to the thread running the CsdScheduler.
- *
- *****************************************************************************/
+ ***************************************************************************/
 
-CpvStaticDeclare(CthThread, CthSchedThreadVar);
-CpvStaticDeclare(int, CthSchedResumeIndex);
+CpvStaticDeclare(CthThread, CthMainThread);
+CpvStaticDeclare(CthThread, CthSchedulingThread);
+CpvStaticDeclare(CthThread, CthSleepingStandins);
+CpvStaticDeclare(int      , CthResumeNormalThreadIdx);
+CpvStaticDeclare(int      , CthResumeSchedulingThreadIdx);
 
-static CthThread CthSchedThread()
+/** addition for tracing */
+CpvExtern(CthThread, cThread);
+/* end addition */
+
+static void CthStandinCode()
 {
-  return CpvAccess(CthSchedThreadVar);
+  while (1) CsdScheduler(0);
 }
 
-  /** addition for tracing */
-CpvExtern(CthThread, cThread);
-  /* end addition */
-
-static void CthSchedResume(t)
-CthThread t;
+static CthThread CthSuspendNormalThread()
 {
-  CpvAccess(CthSchedThreadVar) = CthSelf();
+  return CpvAccess(CthSchedulingThread);
+}
+
+static void CthEnqueueSchedulingThread(CthThread t);
+static CthThread CthSuspendSchedulingThread();
+
+static CthThread CthSuspendSchedulingThread()
+{
+  CthThread succ = CpvAccess(CthSleepingStandins);
+  CthThread me = CthSelf();
+
+  if (succ) {
+    CpvAccess(CthSleepingStandins) = CthGetNext(succ);
+  } else {
+    succ = CthCreate(CthStandinCode, 0, 256000);
+    CthSetStrategy(succ,
+		   CthEnqueueSchedulingThread,
+		   CthSuspendSchedulingThread);
+
+  }
+  
+  CpvAccess(CthSchedulingThread) = succ;
+  return succ;
+}
+
+static void CthResumeNormalThread(CthThread t)
+{
+  CthThread me = CthSelf();
+  CmiGrabBuffer(&t);
   /** addition for tracing */
   CpvAccess(cThread) = t;
   trace_begin_execute(0);
@@ -681,31 +718,58 @@ CthThread t;
   CthResume(t);
 }
 
-static void CthSchedEnqueue(t)
-CthThread t;
+static void CthResumeSchedulingThread(CthThread t)
 {
-  CmiSetHandler(t, CpvAccess(CthSchedResumeIndex));
-  CsdEnqueueFifo(t);
+  CthThread me = CthSelf();
+  CmiGrabBuffer(&t);
+  if (me == CpvAccess(CthMainThread)) {
+    CthEnqueueSchedulingThread(me);
+  } else {
+    CthSetNext(me, CpvAccess(CthSleepingStandins));
+    CpvAccess(CthSleepingStandins) = me;
+  }
+  CpvAccess(CthSchedulingThread) = t;
+  CthResume(t);
+}
+
+static void CthEnqueueNormalThread(CthThread t)
+{
+  CmiSetHandler(t, CpvAccess(CthResumeNormalThreadIdx));
+  CsdEnqueueLifo(t);
+}
+
+static void CthEnqueueSchedulingThread(CthThread t)
+{
+  CmiSetHandler(t, CpvAccess(CthResumeSchedulingThreadIdx));
+  CsdEnqueueLifo(t);
+}
+
+void CthSetStrategyDefault(CthThread t)
+{
+  CthSetStrategy(t,
+		 CthEnqueueNormalThread,
+		 CthSuspendNormalThread);
 }
 
 void CthSchedInit()
 {
-  CpvInitialize(CthThread, CthSchedThreadVar);
-  CpvInitialize(int, CthSchedResumeIndex);
-  CpvAccess(CthSchedResumeIndex) = CmiRegisterHandler(CthSchedResume);
+  CpvInitialize(CthThread, CthMainThread);
+  CpvInitialize(CthThread, CthSchedulingThread);
+  CpvInitialize(CthThread, CthSleepingStandins);
+  CpvInitialize(int      , CthResumeNormalThreadIdx);
+  CpvInitialize(int      , CthResumeSchedulingThreadIdx);
+
+  CpvAccess(CthMainThread) = CthSelf();
+  CpvAccess(CthSchedulingThread) = CthSelf();
+  CpvAccess(CthSleepingStandins) = 0;
+  CpvAccess(CthResumeNormalThreadIdx) =
+    CmiRegisterHandler(CthResumeNormalThread);
+  CpvAccess(CthResumeSchedulingThreadIdx) =
+    CmiRegisterHandler(CthResumeSchedulingThread);
+  CthSetStrategy(CthSelf(),
+		 CthEnqueueSchedulingThread,
+		 CthSuspendSchedulingThread);
 }
-
-void CthSetStrategyDefault(t)
-CthThread t;
-{
-  CthSetStrategy(t, CthSchedEnqueue, CthSchedThread);
-}
-
-
-/***************************************************************************
- *
- * 
- ***************************************************************************/
 
 void CsdInit(argv)
   char **argv;
@@ -728,75 +792,6 @@ void CsdInit(argv)
 }
 
 
-int CsdScheduler(maxmsgs)
-int maxmsgs;
-{
-  int *msg;
-  
-  CpvAccess(CsdStopFlag) = 0 ;
-  
-  if(maxmsgs == 0) {
-    maxmsgs = CmiDeliverMsgs(maxmsgs);
-    if (CpvAccess(CsdStopFlag)) return maxmsgs;
-    while( !CqsEmpty(CpvAccess(CsdSchedQueue)) ) {
-      CqsDequeue(CpvAccess(CsdSchedQueue),&msg);
-      (CmiGetHandlerFunction(msg))(msg);
-      if (CpvAccess(CsdStopFlag)) return maxmsgs;
-      maxmsgs--;
-    }
-    return maxmsgs;
-  }
-  while (1) {
-    int oldmaxmsgs, ndelivered;
-
-    oldmaxmsgs = maxmsgs;
-    maxmsgs = CmiDeliverMsgs(oldmaxmsgs);
-    ndelivered = oldmaxmsgs - maxmsgs;
-    if (maxmsgs == 0) return maxmsgs;
-    
-    /* Check Scheduler queue */
-    if ( !CqsEmpty(CpvAccess(CsdSchedQueue)) ) {
-      if(CpvAccess(CsdIdleDetectedFlag)) {
-        CpvAccess(CsdIdleDetectedFlag) = 0;
-        if(!CpvAccess(CsdStopNotifyFlag)) {
-          (CpvAccess(CsdNotifyBusy))();
-          trace_end_idle();
-        }
-      }
-      CqsDequeue(CpvAccess(CsdSchedQueue),&msg);
-      (CmiGetHandlerFunction(msg))(msg);
-      if (CpvAccess(CsdStopFlag)) return maxmsgs;
-      maxmsgs--; if (maxmsgs==0) return maxmsgs;
-    } else { /* Processor is idle */
-      if (ndelivered == 0 && !CpvAccess(CsdIdleDetectedFlag)) {
-        CpvAccess(CsdIdleDetectedFlag) = 1;
-        if(!CpvAccess(CsdStopNotifyFlag)) {
-          (CpvAccess(CsdNotifyIdle))();
-          trace_begin_idle();
-        }
-      }
-      CmiNotifyIdle();
-      CcdRaiseCondition(CcdPROCESSORIDLE) ;
-      if (CpvAccess(CsdStopFlag)) { 
-        if(CpvAccess(CsdIdleDetectedFlag)) {
-          CpvAccess(CsdIdleDetectedFlag) = 0;
-          if(!CpvAccess(CsdStopNotifyFlag)) {
-            (CpvAccess(CsdNotifyBusy))();
-            trace_end_idle();
-          }
-        }
-        return maxmsgs;
-      }
-    }
-    
-    if (!CpvAccess(disable_sys_msgs)) {
-      if (CpvAccess(CcdNumChecks) > 0) {
-	CcdCallBacks();
-      }
-    }
-  }
-}
- 
 /*****************************************************************************
  *
  * Vector Send

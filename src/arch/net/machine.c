@@ -2146,8 +2146,8 @@ void CmiReleaseCommHandle(CmiCommHandle handle)
 void ConverseInitPE()
 {
   CmiState cs = CmiGetState();
-  ConverseCommonInit(Cmi_argv);
   CthInit(Cmi_argv);
+  ConverseCommonInit(Cmi_argv);
   CpvInitialize(void *,CmiLocalQueue);
   CpvAccess(CmiLocalQueue) = cs->localqueue;
 }

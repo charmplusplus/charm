@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.17  1997-10-03 19:51:54  milind
+ * Revision 2.18  1997-12-10 21:01:32  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.17  1997/10/03 19:51:54  milind
  * Made charmc to work again, after inserting trace calls in converse part,
  * i.e. threads and user events.
  *
@@ -531,8 +534,8 @@ int usched, initret;
   
   /* Initialize timers */
   CmiTimerInit();
-  ConverseCommonInit(argv);
   CthInit(argv);
+  ConverseCommonInit(argv);
   if (initret==0) {
     fn(argc, argv);
     if (usched==0) CsdScheduler(-1);

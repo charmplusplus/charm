@@ -184,8 +184,8 @@ static void threadInit(void *arg)
   printf("thread %d/%d started \n", CmiMyPe(), CmiNumPes());
 #endif
 
-  ConverseCommonInit(usrparam->argv);
   CthInit(usrparam->argv);
+  ConverseCommonInit(usrparam->argv);
   neighbour_init(Cmi_mype);
   CpvAccess(CmiLocalQueue) = (void *) FIFO_Create();
   CmiSpanTreeInit();

@@ -277,8 +277,8 @@ ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   CmiSpanTreeInit();
   CmiTimerInit();
   McInit();
-  ConverseCommonInit(argv);
   CthInit(argv);
+  ConverseCommonInit(argv);
   if (initret==0)
   {
     fn(argc,argv);

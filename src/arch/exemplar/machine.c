@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.28  1997-10-03 19:51:56  milind
+ * Revision 2.29  1997-12-10 21:01:34  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.28  1997/10/03 19:51:56  milind
  * Made charmc to work again, after inserting trace calls in converse part,
  * i.e. threads and user events.
  *
@@ -305,8 +308,8 @@ void *arg;
     Cmi_numpes =  usrparam->npe;
     Cmi_mynodesize  = Cmi_numpes;
 
-    ConverseCommonInit(usrparam->argv);
     CthInit(usrparam->argv);
+    ConverseCommonInit(usrparam->argv);
     CmiInitMc(usrparam->argv);
     usrparam->fn(usrparam->argc,usrparam->argv);
     if (usrparam->usched==0) CsdScheduler(-1);

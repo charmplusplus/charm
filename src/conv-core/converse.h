@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.75  1997-11-26 19:17:24  milind
+ * Revision 2.76  1997-12-10 21:01:06  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.75  1997/11/26 19:17:24  milind
  * Fixed some portability bugs due to varying integer and pointer sizes.
  *
  * Revision 2.74  1997/10/29 18:47:05  jyelon
@@ -466,7 +469,7 @@ extern void CsdExitScheduler CMK_PROTO((void));
 #endif 
 
 #if CMK_CSDEXITSCHEDULER_SET_CSDSTOPFLAG
-#define CsdExitScheduler()  (CpvAccess(CsdStopFlag)=1)
+#define CsdExitScheduler()  (CpvAccess(CsdStopFlag)++)
 #endif
 
 int      CmiSpanTreeRoot         CMK_PROTO(()) ;

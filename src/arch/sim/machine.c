@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.15  1997-08-06 20:35:36  jyelon
+ * Revision 1.16  1997-12-10 21:01:26  jyelon
+ * *** empty log message ***
+ *
+ * Revision 1.15  1997/08/06 20:35:36  jyelon
  * Fixed bugs.
  *
  * Revision 1.14  1997/08/06 14:57:32  milind
@@ -110,24 +113,31 @@ void CmiGrabBuffer()
   CpvAccess(CmiBufferGrabbed) = 1;
 }
 
+int CsdScheduler(maxmsgs)
+int maxmsgs;
+{
+  CmiError("Cannot call scheduling functions in SIM versions.\n");
+  exit(1);
+}
 
 int CmiDeliverMsgs(maxmsgs)
 int maxmsgs;
 {
-     return maxmsgs;
+  CmiError("Cannot call scheduling functions in SIM versions.\n");
+  exit(1);
 }
 
 void CmiDeliverSpecificMsg(handler)
 int handler;
 {
-  CmiError("CmiDeliverSpecificMsg not implemented in SIM versions.\n");
+  CmiError("Cannot call scheduling functions in SIM versions.\n");
   exit(1);
 }
 
 CmiUniContextSwitch(i)
 int i;
 {
-     Cmi_mype = i; 
+  Cmi_mype = i; 
 }
 
 void CmiNotifyIdle()
@@ -408,9 +418,9 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int initret)
   
   CsvAccess(CsdStopCount) = CmiNumPes();
   CmiUniContextSwitch(0);
-
+  
   while (CsvAccess(CsdStopCount)) simulate();
-
+  
   exit(0);
 }
 

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.30  1997-10-10 18:26:23  jyelon
+ * Revision 1.31  1997-12-10 21:01:28  jyelon
+ * *** empty log message ***
+ *
+ * Revision 1.30  1997/10/10 18:26:23  jyelon
  * I have no idea what i changed.
  *
  * Revision 1.29  1997/10/03 19:51:52  milind
@@ -405,44 +408,61 @@ void CmiDestroyLock(CmiNodeLock lk)
  *
  *****************************************************************************/
 
-CpvStaticDeclare(int, CmiBufferGrabbed);
-CpvExtern(void*, CmiLocalQueue);
-
-void CmiDeliversInit()
+void CmiNotifyIdle()
 {
-  CpvInitialize(int, CmiBufferGrabbed);
-  CpvAccess(CmiBufferGrabbed) = 0;
+#if CMK_WHEN_PROCESSOR_IDLE_USLEEP
+  struct timeval tv;
+  tv.tv_sec=0; tv.tv_usec=5000;
+  select(0,0,0,0,&tv);
+#endif
 }
+ 
+CtvStaticDeclare(int, CmiBufferGrabbed);
+CpvExtern(void*, CmiLocalQueue);
 
 void CmiGrabBuffer()
 {
-  CpvAccess(CmiBufferGrabbed) = 1;
+  CtvAccess(CmiBufferGrabbed) = 1;
 }
 
-int CmiDeliverMsgs(maxmsgs)
-int maxmsgs;
+void CmiHandleMessage(void *msg)
 {
-  void *msg;
+  CtvAccess(CmiBufferGrabbed) = 0;
+  (CmiGetHandlerFunction(msg))(msg);
+  if (!CtvAccess(CmiBufferGrabbed)) CmiFree(msg);
+}
+
+int CmiDeliverMsgs(int maxmsgs)
+{
+  return CsdScheduler(maxmsgs);
+}
+
+int CsdScheduler(int maxmsgs)
+{
+  int *msg;
+  int cycle = CpvAccess(CsdStopFlag);
+  void *localqueue = CpvAccess(CmiLocalQueue);
   
   while (1) {
     CmiYield();
-    FIFO_DeQueue(CpvAccess(CmiLocalQueue), &msg);
-    if (msg==0) break;
-    CpvAccess(CmiBufferGrabbed)=0;
-    (CmiGetHandlerFunction(msg))(msg);
-    if (!CpvAccess(CmiBufferGrabbed)) CmiFree(msg);
-    maxmsgs--; if (maxmsgs==0) break;
+    FIFO_DeQueue(localqueue, &msg);
+    if (msg==0) CqsDequeue(CpvAccess(CsdSchedQueue),&msg);
+    if (msg) {
+      CsdEndIdle();
+      CmiHandleMessage(msg);
+      maxmsgs--; if (maxmsgs==0) return maxmsgs;
+      if (CpvAccess(CsdStopFlag) != cycle) return maxmsgs;
+    } else {
+      CsdBeginIdle();
+      CmiNotifyIdle();
+      CcdRaiseCondition(CcdPROCESSORIDLE) ;
+      if (CpvAccess(CsdStopFlag) != cycle) {
+	CsdEndIdle();
+	return maxmsgs;
+      }
+    }
   }
-  return maxmsgs;
 }
-
-/*
- * CmiDeliverSpecificMsg(lang)
- *
- * - waits till a message with the specified handler is received,
- *   then delivers it.
- *
- */
 
 void CmiDeliverSpecificMsg(handler)
 int handler;
@@ -461,20 +481,15 @@ int handler;
     FIFO_EnQueue(CpvAccess(CmiLocalQueue), msg1);
   }
   FIFO_Destroy(tmpqueue);
-  CpvAccess(CmiBufferGrabbed)=0;
-  (CmiGetHandlerFunction(msg))(msg);
-  if (!CpvAccess(CmiBufferGrabbed)) CmiFree(msg);
+  CmiHandleMessage(msg);
 }
 
-void CmiNotifyIdle()
+void CmiDeliversInit()
 {
-#if CMK_WHEN_PROCESSOR_IDLE_USLEEP
-  struct timeval tv;
-  tv.tv_sec=0; tv.tv_usec=5000;
-  select(0,0,0,0,&tv);
-#endif
+  CtvInitialize(int, CmiBufferGrabbed);
+  CtvAccess(CmiBufferGrabbed) = 0;
 }
- 
+
 /********************* MESSAGE SEND FUNCTIONS ******************/
 
 void CmiSyncSendFn(destPE, size, msg)

@@ -150,6 +150,8 @@ CthCpvDeclare(char *,    CthData);
 CthCpvStatic(CthThread,  CthCurrent);
 CthCpvStatic(int,        CthExiting);
 CthCpvStatic(int,        CthDatasize);
+CpvStaticDeclare(CthThread, CthSchedThreadVar);
+CpvStaticDeclare(int, CthSchedResumeIndex);
 
 /** addition for tracing */
 CpvDeclare(CthThread, cThread);
@@ -275,7 +277,7 @@ static void CthOnly(void *arg, void *vt, qt_userf_t fn)
 CthThread CthCreate(fn, arg, size)
 CthVoidFn fn; void *arg; int size;
 {
-  CthThread result; qt_t *stack, *stacka, *stackb; size_t magic;
+  CthThread result; qt_t *stack, *stacka, *stackb; CMK_SIZE_T magic;
   if (size==0) size = STACKSIZE;
   size += QT_STKALIGN;
   result = (CthThread)malloc(sizeof(struct CthThreadStruct)+size);
@@ -287,9 +289,9 @@ CthVoidFn fn; void *arg; int size;
   stackb = QT_ARGS(stacka, arg, result, (qt_userf_t *)fn, CthOnly);
   result->stackp = stackb;
   if (stack==stacka) {
-    magic = ((size_t)stack) + (size*7)/8;
+    magic = ((CMK_SIZE_T)stack) + (size*7)/8;
   } else {
-    magic = ((size_t)stack) + (size/8);
+    magic = ((CMK_SIZE_T)stack) + (size/8);
   }
   result->magic = (int*)(magic & ~0xF);
   *result->magic = 0x12345678;
@@ -377,3 +379,4 @@ CthThread CthGetNext(CthThread t)
 {
   return t->qnext;
 }
+
