@@ -100,14 +100,15 @@ int skt_select1(SOCKET fd,int msec)
   int sec=msec/1000;
   fd_set  rfds;
   struct timeval tmo;
-  int  secLeft;
+  int  secLeft=sec;
   int            begin, nreadable;
   
   FD_ZERO(&rfds);
   FD_SET(fd, &rfds);
-  begin = time(0);
-  while(0<=(secLeft = sec - (time(0) - begin))) 
-  { 
+
+  if (msec>0) begin = time(0);
+  do
+  {
     tmo.tv_sec=secLeft;
     tmo.tv_usec = (msec-1000*sec)*1000;
     nreadable = select(FD_SETSIZE, &rfds, NULL, NULL, &tmo);
@@ -118,6 +119,8 @@ int skt_select1(SOCKET fd,int msec)
 	}
     if (nreadable >0) return 1; /*We gotta good socket*/
   }
+  while(msec>0 && (secLeft = sec - (time(0) - begin)));
+
   return 0;/*Timed out*/
 }
 
