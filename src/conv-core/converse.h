@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.24  1995-10-11 00:36:39  jyelon
+ * Revision 2.25  1995-10-12 18:14:18  jyelon
+ * Added parentheses in macro defs.
+ *
+ * Revision 2.24  1995/10/11  00:36:39  jyelon
  * Added CmiInterrupt stuff.
  *
  * Revision 2.23  1995/09/30  15:03:15  jyelon
@@ -219,10 +222,10 @@ void     CmiFree   CMK_PROTO((void *));
 double   CmiTimer  CMK_PROTO(());
 
 #define CsdEnqueueGeneral(x,s,i,p)\
-    (CqsEnqueueGeneral(CpvAccess(CsdSchedQueue),x,s,i,p))
-#define CsdEnqueueFifo(x)     (CqsEnqueueFifo(CpvAccess(CsdSchedQueue),x))
-#define CsdEnqueueLifo(x)     (CqsEnqueueLifo(CpvAccess(CsdSchedQueue),x))
-#define CsdEnqueue(x)         (CqsEnqueueFifo(CpvAccess(CsdSchedQueue),x))
+    (CqsEnqueueGeneral(CpvAccess(CsdSchedQueue),(x),(s),(i),(p)))
+#define CsdEnqueueFifo(x)     (CqsEnqueueFifo(CpvAccess(CsdSchedQueue),(x)))
+#define CsdEnqueueLifo(x)     (CqsEnqueueLifo(CpvAccess(CsdSchedQueue),(x)))
+#define CsdEnqueue(x)         (CqsEnqueueFifo(CpvAccess(CsdSchedQueue),(x)))
 #define CsdEmpty()            (CqsEmpty(CpvAccess(CsdSchedQueue)))
 
 #ifdef CMK_CMIMYPE_IS_A_BUILTIN
@@ -288,17 +291,17 @@ CmiCommHandle CmiAsyncBroadcastAllFn  CMK_PROTO((int, char *));
 void          CmiFreeBroadcastAllFn   CMK_PROTO((int, char *));
 
 
-#define CmiSyncSend(p,s,m)              (CmiSyncSendFn(p,s,(char *)(m)))
-#define CmiAsyncSend(p,s,m)             (CmiAsyncSendFn(p,s,(char *)(m)))
-#define CmiSyncSendAndFree(p,s,m)       (CmiFreeSendFn(p,s,(char *)(m)))
+#define CmiSyncSend(p,s,m)              (CmiSyncSendFn((p),(s),(char *)(m)))
+#define CmiAsyncSend(p,s,m)             (CmiAsyncSendFn((p),(s),(char *)(m)))
+#define CmiSyncSendAndFree(p,s,m)       (CmiFreeSendFn((p),(s),(char *)(m)))
 
-#define CmiSyncBroadcast(s,m)           (CmiSyncBroadcastFn(s,(char *)(m)))
-#define CmiAsyncBroadcast(s,m)          (CmiAsyncBroadcastFn(s,(char *)(m)))
-#define CmiSyncBroadcastAndFree(s,m)    (CmiFreeBroadcastFn(s,(char *)(m)))
+#define CmiSyncBroadcast(s,m)           (CmiSyncBroadcastFn((s),(char *)(m)))
+#define CmiAsyncBroadcast(s,m)          (CmiAsyncBroadcastFn((s),(char *)(m)))
+#define CmiSyncBroadcastAndFree(s,m)    (CmiFreeBroadcastFn((s),(char *)(m)))
 
-#define CmiSyncBroadcastAll(s,m)        (CmiSyncBroadcastAllFn(s,(char *)(m)))
-#define CmiASyncBroadcastAll(s,m)       (CmiAsyncBroadcastAllFn(s,(char *)(m)))
-#define CmiSyncBroadcastAllAndFree(s,m) (CmiFreeBroadcastAllFn(s,(char *)(m)))
+#define CmiSyncBroadcastAll(s,m)        (CmiSyncBroadcastAllFn((s),(char *)(m)))
+#define CmiASyncBroadcastAll(s,m)       (CmiAsyncBroadcastAllFn((s),(char *)(m)))
+#define CmiSyncBroadcastAllAndFree(s,m) (CmiFreeBroadcastAllFn((s),(char *)(m)))
 
 /******** CMI MESSAGE RECEPTION ********/
 
@@ -348,11 +351,11 @@ CmmTable   CmmNew();
 void       CmmFree(CmmTable t);
 void       CmmPut(CmmTable t, int ntags, int *tags, void *msg);
 void      *CmmFind(CmmTable t, int ntags, int *tags, int *returntags, int del);
-#define    CmmGet(t,nt,tg,rt)   (CmmFind(t,nt,tg,rt,1))
-#define    CmmProbe(t,nt,tg,rt) (CmmFind(t,nt,tg,rt,0))
+#define    CmmGet(t,nt,tg,rt)   (CmmFind((t),(nt),(tg),(rt),1))
+#define    CmmProbe(t,nt,tg,rt) (CmmFind((t),(nt),(tg),(rt),0))
 
 
-/****** FAST INTERRUPT BLOCKING FACILITY ********/
+/****** FAST INTERRUPT BLOCKING FACILITY (NOT FOR CONVERSE USER) ********/
 
 CpvExtern(int,       CmiInterruptsBlocked);
 CpvExtern(CthVoidFn, CmiInterruptFuncSaved);
