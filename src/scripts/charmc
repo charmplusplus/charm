@@ -877,7 +877,7 @@ case "$LANGUAGE" in
 	IS_F90="y"
 	;;
 "fem")
-        PRE_LIBRARIES="$PRE_LIBRARIES -lfem -lddt "
+        PRE_LIBRARIES="$PRE_LIBRARIES -lfem  -lcollide -lampilib -lddt "
         POST_LIBRARIES="$POST_LIBRARIES -lmetis "
 	;;
 "femf")
