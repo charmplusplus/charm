@@ -1,4 +1,4 @@
-                              Charm++ 5.4 (Release 1)
+                              Charm++ 5.4 (Release 2)
 
        Copyright (C) 1989-2000 Regents of the University of Illinois
 
@@ -24,10 +24,12 @@ To compile charm on cygwin:
    Under Windows2000/NT, ssh is recommended, I once had difficulty to have 
    inetd working.
      Starting from Charm++ version 5.4, ++local option is added to start
-   node programs directly ob your desktop machine. You no longer need rshd or 
+   node programs directly on your desktop machine. You no longer need rshd or 
    sshd to start charm program on local machine. This is for testing purpose 
    or small job run though, for best performance, launch one process per 
    processor with rsh daemons.
+   Starting from Charm++ V5.4R2, you can also run Charm++ program in standalone
+   mode without charmrun.
 
  ** RSH method **
    setup /etc/inetd.conf and /etc/services to start rshd, 
@@ -56,7 +58,11 @@ shell     514/tcp    cmd
    You may need to modify /etc/sshd_config or /etc/ssh_config for your needs.
      Setup ~/.shosts, or add your public key to your ~/.ssh/authorized_keys to 
    allow you to login without password authentication.
-   now you can start sshd and run charm programs.
+   now you can start sshd and run charm programs. To tell Charmrun to use ssh
+   instead of rsh(default), you need to add ++shell option in ~/.nodelist file:
+
+group main ++shell /bin/ssh
+host localhost 
 
  ** run only on local machine with ++local **
      This allows a user to run charm program on his/her desktop machine for 
@@ -65,6 +71,12 @@ shell     514/tcp    cmd
    "++local" option via:
   
      ./charmrun +p4 ++local ./pgm
+
+ ** run in standalone mode **
+     You can run Charm++ program without charmrun after Charm++ V5.4R2.
+   Simply type executable and command line options:
+   ./pgm 
+   This will run only one copy of program locally.
 
 4. If you have any problem with it, please check the FAQ below for help.
    Let me know if it works or not by sending email to (ppl@uiuc.edu).

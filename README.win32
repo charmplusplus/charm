@@ -1,9 +1,9 @@
 
-                              Charm++ 5.4 (Release 1)
+                              Charm++ 5.4 (Release 2)
 
        Copyright (C) 1989-2000 Regents of the University of Illinois
 
-Now you can compile charm++ under Windows9x/2000/NT with VC++ plus Cygwin.
+You can compile charm++ under Windows9x/2000/NT with VC++ plus Cygwin.
 Cygwin are ports of the popular GNU development tools and utilities for 
 Windows 9x/2K and NT, which emulates a UNIX environment under Windows.
 If you are not comfortable with Cygwin, you still can compile Charm++ with
@@ -15,14 +15,16 @@ VC++, but this is not prefered, see FAQ below for help.
 
 To compile charm with VC++:
 1. install cygwin from: http://sourceware.cygnus.com/cygwin
-   with inetutils, openssh, w32api packages and gcc. Remember to choose 
-   default file type as "unix" at the beginning of cygwin installation.
+   Remember to choose default file type as "unix" at the beginning of 
+   cygwin installation.
 
 2. Start a Cygwin's Bash Shell window, type "cl" to make sure VC++ compiler 
    command line mode is correctly set. If it is not correctly set, you need to 
-   run the VCVARS32.BAT which comes from VC++ installation bin directory. 
-   However VCVARS32.BAT cannot be executed under Bash Shell terminal, you
-   have to: for Win8x, you need to put it into AUTOEXEC.BAT; for WinNT, you 
+   run the VCVARS32.BAT at Windows startup time. VCVARS32.BAT can be located in
+   your VC++ install directory, usually at: 
+   /Program Files/Microsoft Visual Studio/VC98/Bin
+   However VCVARS32.BAT(a DOS Batch) cannot be executed under Bash Shell 
+   , you have to: for Win8x, put it into AUTOEXEC.BAT; for WinNT, you 
    have to merge the settings in VCVARS32.BAT into your environment varaibles 
    settings(the most important one is the PATH varaible)  
 
@@ -42,13 +44,17 @@ To compile charm with VC++:
    net-win32\pgms. For example, 
    cd net-win32/pgms/charm++/megatest, and type "make",
    it will invoke Charm++'s "charmc"(VC++ wrapper) to compile the test 
-   programs and generates an executable "pgm.exe" and a charm++ helper 
-   program - "charmrun.exe".
+   programs and generates an executable "pgm.exe" and a charm++'s parallel
+   run utility program - "charmrun.exe".
    Now you have two choices of running the executable:
    (1) locally on your desktop, using:
        ./charmrun +p1 ./pgm ++local
        this will fork one copy of node program on your local machine. You can 
-       choose using more than one virtual processors, using +p2 option.
+       choose using more than one virtual processors, e.g. using +p3  option.
+       Starting from Charm 5.4R2, You can also run, simply type executable and 
+       command line options:
+       ./pgm 
+       This will run only one copy of program locally.
 
    (2) run in parallel across machines:
        In this case, you need to write a .nodelist file under your home
@@ -89,10 +95,10 @@ email to (ppl@uiuc.edu).
    4 To compile Charm++ programs, see the Makefile.win32 examples under
      net-win32\pgms\charm++\megatest\Makefile.win32
      The command to use is: nmake /f Makefile.win32
-     Basically because the shell script compiler wrapper is not available,
-     you need to specify all the charm++ libraries to link against.
+     Basically you need to specify all the charm++ libraries to link against,
+     because shell script charmc is not available,
 
- 2. I just downloaded Charm++ net-win binaries from your website, how to use it?
+ 2. I just downloaded Charm++ net-win32 binaries from your website, how to use it?
 
    The recommended way to use windows binary package is still under Cygwin.
    First, unzip the binary packages to desired location; Set PATH environment
