@@ -44,6 +44,10 @@ CpvDeclare(int, threadMsg);
 CpvDeclare(int, threadEp);
 CpvDeclare(int, threadPe);
 CpvDeclare(int, threadEvent);
+CpvExtern(CthThread, cThread);
+
+extern void setEvent(CthThread t, int event);
+extern int getEvent(CthThread t);
 /* end addition */
 
 traceModuleInit(pargc, argv)
@@ -91,11 +95,10 @@ ENVELOPE *envelope;
 	int i;
 /* Addition for threads tracing */
   if(envelope == 0) {
-    CpvAccess(threadEvent) = CpvAccess(current_event);
-    CpvAccess(threadPe) = CmiMyPe();
+    setEvent(CpvAccess(cThread),CpvAccess(current_event));
     add_to_buffer(CREATION, CpvAccess(threadMsg), CpvAccess(threadEp),
-                            CkUTimer(), CpvAccess(threadEvent),
-                            CpvAccess(threadPe));
+                            CkUTimer(), getEvent(CpvAccess(cThread)),
+                            CmiMyPe());
     CpvAccess(current_event) += 1;
     return;
   }
@@ -122,8 +125,8 @@ ENVELOPE *envelope;
 /* Addition for threads tracing */
   if(envelope == 0) {
     msg_type = CpvAccess(threadMsg);
-    CpvAccess(begin_event) = CpvAccess(threadEvent);
-    CpvAccess(begin_pe) = CpvAccess(threadPe);
+    CpvAccess(begin_event) = getEvent(CpvAccess(cThread));
+    CpvAccess(begin_pe) = CmiMyPe();
     add_to_buffer(BEGIN_PROCESSING, msg_type, CpvAccess(threadEp), CkUTimer(),
                                     CpvAccess(begin_event), CpvAccess(begin_pe));
     return;

@@ -635,11 +635,16 @@ static CthThread CthSchedThread()
   return CpvAccess(CthSchedThreadVar);
 }
 
+  /** addition for tracing */
+CpvExtern(CthThread, cThread);
+  /* end addition */
+
 static void CthSchedResume(t)
 CthThread t;
 {
   CpvAccess(CthSchedThreadVar) = CthSelf();
   /** addition for tracing */
+  CpvAccess(cThread) = t;
   trace_begin_execute(0);
   /* end addition */
   CthResume(t);

@@ -126,14 +126,33 @@ struct CthThreadStruct
   int        autoyield_blocks;
   char      *data;
   int        datasize;
+/** addition for tracing */
+  int        Event;
+/** End Addition */
   CthThread  qnext;
   qt_t      *stackp;
 };
+
+/** addition for tracing */
+void setEvent(CthThread t, int event)
+{
+  t->Event = event;
+}
+
+int getEvent(CthThread t)
+{
+  return t->Event;
+}
+/** End Addition */
 
 CthCpvDeclare(char *,    CthData);
 CthCpvStatic(CthThread,  CthCurrent);
 CthCpvStatic(int,        CthExiting);
 CthCpvStatic(int,        CthDatasize);
+
+/** addition for tracing */
+CpvDeclare(CthThread, cThread);
+/** End Addition */
 
 int CthImplemented()
 { return 1; }
@@ -277,6 +296,7 @@ CthThread th;
 {
   if (th->awakenfn == 0) CthNoStrategy();
   /** addition for tracing */
+  CpvAccess(cThread) = th;
   trace_creation(0,0,0);
   /* end addition */
   th->awakenfn(th);
