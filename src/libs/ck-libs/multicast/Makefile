@@ -22,7 +22,7 @@ $(LIBDEST): $(LIBOBJ)
 
 CkMulticast.def.h: CkMulticast.decl.h
 
-CkMulticast.decl.h : ckmulticast.ci
+CkMulticast.decl.h : ckmulticast.ci $(CDIR)/bin/charmxi
 	$(CHARMC) -c ckmulticast.ci
 
 clean:
