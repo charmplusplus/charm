@@ -497,3 +497,6 @@ void FEM_REFINE2D_Coarsen(int meshID,int nodeID,double *coord,int elemID,double 
 	
 }  
 
+FDECL void FTN_NAME(FEM_REFINE2D_COARSEN,fem_refine2d_coarsen)(int *meshID,int *nodeID,double *coord,int *elemID,double *desiredAreas){
+	FEM_REFINE2D_Coarsen(*meshID,*nodeID,coord,*elemID,desiredAreas);
+}
