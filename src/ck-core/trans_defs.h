@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.2  1995-06-29 21:47:29  narain
+ * Revision 2.3  1995-07-07 02:04:59  narain
+ * Put in macro for immsendmsgbranch
+ *
+ * Revision 2.2  1995/06/29  21:47:29  narain
  * Changed members in MSG_STRUCT to packfn and unpackfn, and
  * member in PSEUDO_STRUCT to tbl
  *
@@ -79,6 +82,8 @@
 #define _CK_SendMsgBranch(ep,msg,boc,pe)	GeneralSendMsgBranch(ep,msg,pe,\
 					USERcat,BocMsg,boc)
 #endif
+#define _CK_ImmSendMsgBranch(ep,msg,boc,pe)	GeneralSendMsgBranch(ep,msg,pe,\
+					IMMEDIATEcat,BocMsg,boc)
 
 #define VOIDFNPTR			FUNCTION_PTR
 
