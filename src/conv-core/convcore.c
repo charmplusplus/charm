@@ -203,12 +203,6 @@ CpvDeclare(int, CstatsMaxFixedChareQueueLength);
 CpvStaticDeclare(int, CstatPrintQueueStatsFlag);
 CpvStaticDeclare(int, CstatPrintMemStatsFlag);
 
-#if CMK_WEB_MODE
-extern void CWebInit(void);
-#else
-#define CWebInit()
-#endif
-
 void CstatsInit(argv)
 char **argv;
 {
@@ -582,12 +576,12 @@ void (*handler)();
 
 void CsdBeginIdle(void)
 {
+  CcdCallBacks();
   CcdRaiseCondition(CcdPROCESSOR_BEGIN_IDLE) ;
 }
 
 void CsdStillIdle(void)
 {
-  CcdCallBacks();
   CcdRaiseCondition(CcdPROCESSOR_STILL_IDLE);
 }
 
@@ -595,7 +589,6 @@ void CsdEndIdle(void)
 {
   CcdRaiseCondition(CcdPROCESSOR_BEGIN_BUSY) ;
 }
-
 
 
 #if CMK_CMIDELIVERS_USE_COMMON_CODE
@@ -609,31 +602,48 @@ int CmiDeliverMsgs(int maxmsgs)
   return CsdScheduler(maxmsgs);
 }
 
+void CsdSchedulerState_new(CsdSchedulerState_t *s)
+{
+	s->localQ=CpvAccess(CmiLocalQueue);
+	s->schedQ=CpvAccess(CsdSchedQueue);
+#if CMK_NODE_QUEUE_AVAILABLE
+	s->nodeQ=CsvAccess(CsdNodeQueue);
+	s->nodeLock=CsvAccess(CsdNodeQueueLock);
+#endif
+}
+
+void *CsdNextMessage(CsdSchedulerState_t *s) {
+	void *msg;
+	if (NULL!=(msg=CmiGetNonLocal())) return msg;
+	if (NULL!=(msg=CdsFifo_Dequeue(s->localQ))) return msg;
+#if CMK_NODE_QUEUE_AVAILABLE
+	if (NULL!=(msg=CmiGetNonLocalNodeQ())) return msg;
+	if (!CqsEmpty(s->nodeQ)
+	 && !CqsPrioGT(CqsGetPriority(s->nodeQ),
+		       CqsGetPriority(s->schedQ))) {
+	  CmiLock(s->nodeLock);
+	  CqsDequeue(s->nodeQ,(void **)&msg);
+	  CmiUnlock(s->nodeLock);
+	  if (msg!=NULL) return msg;
+	}
+#endif
+	CqsDequeue(s->schedQ,(void **)&msg);
+	if (msg!=NULL) return msg;
+	return NULL;
+}
+
 int CsdScheduler(int maxmsgs)
 {
-  int *msg, csdMsgFlag = 0; /* To signal a message coming from the CsdNodeQueue */
-  void *localqueue = CpvAccess(CmiLocalQueue);
+  void *msg;
   int cycle = CpvAccess(CsdStopFlag);
   int pollmode = (maxmsgs==0);
   int isIdle=0;
+  CsdSchedulerState_t state;
+  CsdSchedulerState_new(&state);
   
   while (1) {
-    msg = CmiGetNonLocal();
-    if (msg==0) msg = CdsFifo_Dequeue(localqueue);
-#if CMK_NODE_QUEUE_AVAILABLE
-	csdMsgFlag = 0;
-    if (msg==0) msg = CmiGetNonLocalNodeQ();
-    if (msg==0 && !CqsEmpty(CsvAccess(CsdNodeQueue))
-               && !CqsPrioGT(CqsGetPriority(CsvAccess(CsdNodeQueue)), 
-                             CqsGetPriority(CpvAccess(CsdSchedQueue)))) {
-      CmiLock(CsvAccess(CsdNodeQueueLock));
-      CqsDequeue(CsvAccess(CsdNodeQueue),(void **)&msg);
-      CmiUnlock(CsvAccess(CsdNodeQueueLock));
-	  csdMsgFlag = 1;
-    }
-#endif
-    if (msg && (!csdMsgFlag)) CpvAccess(cQdState)->mProcessed++;
-    if (msg==0) CqsDequeue(CpvAccess(CsdSchedQueue),(void **)&msg);
+    msg = CsdNextMessage(&state);
+    if (msg) CpvAccess(cQdState)->mProcessed++;
     if (msg) {
       if (isIdle) {isIdle=0;CsdEndIdle();}
       CmiHandleMessage(msg);
@@ -641,8 +651,7 @@ int CsdScheduler(int maxmsgs)
       if (CpvAccess(CsdStopFlag) != cycle) return maxmsgs;
     } else { /*No message available-- go (or remain) idle*/
       if (!isIdle) {
-	isIdle=1;
-	
+	isIdle=1;	
 	CsdBeginIdle();
       }
       else CsdStillIdle();
@@ -1437,6 +1446,7 @@ void ConverseCommonInit(char **argv)
 {
   int i;
 
+  CmiMemoryInit(argv);
   CmiTimerInit();
   CstatsInit(argv);
   CcdModuleInit(argv);
@@ -1444,7 +1454,10 @@ void ConverseCommonInit(char **argv)
 #if CMK_THREADS_USE_ISOMALLOC
   CthHandlerInit();
 #endif
-  CmiMemoryInit(argv);
+#if CMK_CCS_AVAILABLE
+  CcsInit(argv);
+#endif
+  CpdInit();
   CmiDeliversInit();
   CsdInit(argv);
   CthSchedInit();
@@ -1452,19 +1465,10 @@ void ConverseCommonInit(char **argv)
   CmiMulticastInit();
   CmiInitMultipleSend();
   CQdInit();
-#if CMK_CCS_AVAILABLE
-  CcsInit(argv);
-#endif
-#if CMK_DEBUG_MODE
-  CpdInit();
-#endif
-  CWebInit();
 
   CldModuleInit();
   CrnInit();
-  CIdleTimeoutInit(argv);  
-
-  CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,CmiNotifyIdle,0);
+  CIdleTimeoutInit(argv);
 }
 
 void ConverseCommonExit(void)
