@@ -404,6 +404,7 @@ switch ($LANGUAGE)
     case "charm" 
     case "charm++" 
     case "converse"
+    case "converse++"
         breaksw
     default:
         echo "charmc: Unrecognized choice of language $LANGUAGE"
@@ -671,92 +672,76 @@ switch ($LANGUAGE)
     case "C++"
         echo 'Illegal choice of language for parallel program'
         goto failure
-    case "charm++"
-        set PRELOAD=($CMK_LDRO CHARMC-USR.TMP.o $OPTS_LDRO -L$CHARMLIB \
-                      $OBJECTFILES $LIBRARIES $BAL_OBJ)
-        set LOADER =($CMK_LDXX -o $OBJECT \
-		      CHARMC-USR.TMP.o CHARMC-MOD.TMP.o \
-                      $CHARMLIB/libck-core-$EXECMODE.a \
-        	      $CHARMLIB/libck-cplus-y.a \
-        	      $CHARMLIB/libconv-core.a \
-		      $CMK_LIBS $OPTS_LDXX -lm )
-        breaksw
     case "charm"
-        set PRELOAD=($CMK_LDRO CHARMC-USR.TMP.o $OPTS_LDRO -L$CHARMLIB \
-                      $OBJECTFILES $LIBRARIES $BAL_OBJ)
-	set LOADER=($CMK_LD $OPTS_LD -o $OBJECT \
-		      CHARMC-USR.TMP.o CHARMC-MOD.TMP.o \
-        	      $CHARMLIB/libck-core-$EXECMODE.a \
-        	      $CHARMLIB/libck-cplus-n.a \
-        	      $CHARMLIB/libconv-core.a \
+	set LOADER=($CMK_LD $OPTS_LD -L$CHARMLIB \
+                      CHARMC-MOD.TMP.o $BAL_OBJ $OBJECTFILES \
+                      $LIBRARIES -lck-core-$EXECMODE \
+                      -lck-cplus-n -lconv-core -lck-defmain \
+		      $CMK_LIBS -lm )
+        breaksw
+    case "charm++"
+        set LOADER =($CMK_LDXX $OPTS_LDXX -L$CHARMLIB \
+		      CHARMC-MOD.TMP.o $BAL_OBJ $OBJECTFILES \
+                      $LIBRARIES -lck-core-$EXECMODE \
+                      -lck-cplus-y -lconv-core -lck-defmain \
 		      $CMK_LIBS -lm )
         breaksw
     case "converse"
-        set PRELOAD=($CMK_LDRO CHARMC-USR.TMP.o $OPTS_LDRO -L$CHARMLIB \
-                      $OBJECTFILES $LIBRARIES)
-        set LOADER = ($CMK_LD $OPTS_LD -o $OBJECT \
-		      CHARMC-USR.TMP.o CHARMC-MOD.TMP.o \
-        	      $CHARMLIB/libconv-core.a \
-		      $CMK_LIBS -lm )
+        set LOADER = ($CMK_LD $OPTS_LD -L$CHARMLIB \
+		      CHARMC-MOD.TMP.o \
+                      $OBJECTFILES $LIBRARIES \
+        	      -lconv-core $CMK_LIBS -lm )
+        breaksw
+    case "converse++"
+        set LOADER = ($CMK_LDXX $OPTS_LD -L$CHARMLIB \
+		      CHARMC-MOD.TMP.o \
+                      $OBJECTFILES $LIBRARIES \
+                      -lconv-core $CMK_LIBS -lm )
         breaksw
 endsw
 
 ########################################################################
 #
-# Bind together user-specified objects and libraries, thereby
-# creating CHARMC-USR.TMP.o, then 'nm' that file, thereby yielding
-# a list of function names in CHARMC-USR.TMP.nm
+# Linkage is wierd.  First, we create a dummy module-init function
+# with nothing in it.  We then do a trial linkage.  We use NM to scan
+# the executable thereby produced, to see which modules need
+# initialization.  We then build a true module-init function, and
+# redo the linkage.
 #
 ########################################################################
 
-echo "linking $OBJECT with -language $LANGUAGE"
-
-set DELETE=(CHARMC-USR.TMP.o CHARMC-USR.TMP.nm $DELETE)
-($ECHOCMD ; $PRELOAD)
-if ($status) goto failure
-
-$CMK_NM CHARMC-USR.TMP.o | csh -fc "$CMK_NM_FILTER" > CHARMC-USR.TMP.nm
-if ($status) goto failure
-
-
-########################################################################
-#
-# Scan user-object for initialization functions, create CHARMC-MOD.TMP.o
-#
-########################################################################
-
-if ($?VERBOSE) echo "Creating CHARMC-MOD.TMP.c"
+set DELETE=(CHARMC-PGM.TMP.exe CHARMC-PGM.TMP.nm $DELETE)
 set DELETE=(CHARMC-MOD.TMP.dat CHARMC-MOD.TMP.c CHARMC-MOD.TMP.o $DELETE)
+rm -f CHARMC-PGM.TMP.exe CHARMC-MOD.TMP.nm
 rm -f CHARMC-MOD.TMP.dat CHARMC-MOD.TMP.c CHARMC-MOD.TMP.o
-awk '(/^_CK_.*_init$/&&(\!/^_CK_.*_struct_init$/)) { print substr($1, 5, length($1)-9); }' < CHARMC-USR.TMP.nm | sort | uniq > CHARMC-MOD.TMP.dat
-echo 'Charm Modules: '`cat CHARMC-MOD.TMP.dat`
-awk '{print "extern void _CK_"$1"_init();";}' < CHARMC-MOD.TMP.dat >> CHARMC-MOD.TMP.c
-echo '_CK_module_init_fn()' >> CHARMC-MOD.TMP.c
-echo '{' >> CHARMC-MOD.TMP.c
-awk '{print "_CK_"$1"_init();";}' < CHARMC-MOD.TMP.dat >> CHARMC-MOD.TMP.c
-echo '}' >> CHARMC-MOD.TMP.c
+
+if ($?VERBOSE) echo "Creating dummy CHARMC-MOD.TMP.c"
+echo '_CK_module_init_fn() {}' > CHARMC-MOD.TMP.c
 ($ECHOCMD ; $CMK_CC $OPTS_CC -c CHARMC-MOD.TMP.c)
 if ($status) goto failure
-
-########################################################################
-#
-# Scan user-object for the function 'user_main', if not defined,
-# add libck-defmain to list of object files.
-#
-########################################################################
-
-if (! { (egrep '^user_main$' < CHARMC-USR.TMP.nm >& /dev/null) }) then
-    set LOADER=($LOADER $CHARMLIB/libck-defmain.o)
-endif
-
-########################################################################
-#
-# Finally, link.
-#
-########################################################################
-
-($ECHOCMD ; $LOADER)
+($ECHOCMD ; $LOADER -o CHARMC-PGM.TMP.exe)
 if ($status) goto failure
+$CMK_NM CHARMC-PGM.TMP.exe | csh -fc "$CMK_NM_FILTER" > CHARMC-PGM.TMP.nm
+if ($status) goto failure
+awk '(/^_CK_.*_init$/&&(\!/^_CK_.*_struct_init$/)) { print substr($1, 5, length($1)-9); }' < CHARMC-PGM.TMP.nm | sort | uniq > CHARMC-MOD.TMP.dat
+if ( -z CHARMC-MOD.TMP.dat ) then
+    echo 'No charm modules.'
+    /bin/mv CHARMC-PGM.TMP.exe $OBJECT
+else
+    echo 'Charm Modules: '`cat CHARMC-MOD.TMP.dat`
+    if ($?VERBOSE) echo "Creating real CHARMC-MOD.TMP.c"
+    awk '{print "extern void _CK_"$1"_init();";}' < CHARMC-MOD.TMP.dat >> CHARMC-MOD.TMP.c
+    rm -f CHARMC-MOD.TMP.c
+    echo '_CK_module_init_fn()' > CHARMC-MOD.TMP.c
+    echo '{' >> CHARMC-MOD.TMP.c
+    awk '{print "_CK_"$1"_init();";}' < CHARMC-MOD.TMP.dat >> CHARMC-MOD.TMP.c
+    echo '}' >> CHARMC-MOD.TMP.c
+    ($ECHOCMD ; $CMK_CC $OPTS_CC -c CHARMC-MOD.TMP.c)
+    if ($status) goto failure
+    echo "linking $OBJECT with -language $LANGUAGE"
+    ($ECHOCMD ; $LOADER -o $OBJECT)
+    if ($status) goto failure
+endif
 
 ########################################################################
 #

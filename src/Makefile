@@ -175,7 +175,7 @@ CK_LIBS_LDB=libck-ldb-rand.o libck-ldb-acwn.o libck-ldb-mngr.o # libck-ldb-priom
 
 CK_LIBS_CPLUS=libck-cplus-n.a
 
-CK_LIBS_MAIN=libck-defmain.o libck-unimain.o
+CK_LIBS_MAIN=libck-defmain.a libck-unimain.a
 
 CK_LIBS=$(CK_LIBS_CORE) $(CK_LIBS_LDB) $(CK_LIBS_CPLUS) $(CK_LIBS_MAIN)
 
@@ -222,10 +222,10 @@ libck-ldb-recv.o: ldb.recv.p ldb.h $(CKHEADERS)
 libck-cplus-n.a: dummy.cplus.c $(CKHEADERS)
 	$(CHARMC) -cp ../lib/ -o $@ dummy.cplus.c
 
-libck-defmain.o: default-main.c $(CKHEADERS)
+libck-defmain.a: default-main.c $(CKHEADERS)
 	$(CHARMC) -cp ../lib/ -o $@ default-main.c
 
-libck-unimain.o: uni_user_main.c $(CKHEADERS)
+libck-unimain.a: uni_user_main.c $(CKHEADERS)
 	$(CHARMC) -cp ../lib/ -o $@ uni_user_main.c
 
 ldbcfns.o: ldbcfns.c $(CKHEADERS)
