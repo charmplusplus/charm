@@ -492,7 +492,7 @@ void ComlibManager::ArraySend(CkDelegateData *pd,int ep, void *msg,
     //With migration some array messages may be directly sent Also no
     //message processing should happen before the comlib barriers have
     //gone through
-    if(dest_proc == CkMyPe() && setupComplete){                
+    if(dest_proc == CkMyPe() && receivedTable /*setupComplete*/){           
         CkArray *amgr = (CkArray *)_localBranch(a);
         amgr->deliver((CkArrayMessage *)msg, CkDeliver_queue);
         
@@ -508,7 +508,7 @@ void ComlibManager::ArraySend(CkDelegateData *pd,int ep, void *msg,
     
     ComlibPrintf("[%d] Before Insert on strat %d received = %d\n", CkMyPe(), curStratID, setupComplete);
     
-    if (setupComplete)        
+    if (receivedTable /*setupComplete*/)        
         (* strategyTable)[curStratID].strategy->insertMessage(cmsg);
     else 
         (* strategyTable)[curStratID].tmplist.enq(cmsg);
@@ -534,7 +534,7 @@ void ComlibManager::GroupSend(CkDelegateData *pd,int ep, void *msg, int onPE, Ck
                  UsrToEnv(msg)->getTotalsize());
 
     register envelope * env = UsrToEnv(msg);
-    if(dest_proc == CkMyPe() && setupComplete){
+    if(dest_proc == CkMyPe() && receivedTable){
         _SET_USED(env, 0);
         CkSendMsgBranch(ep, msg, dest_proc, gid);
         return;
@@ -555,7 +555,7 @@ void ComlibManager::GroupSend(CkDelegateData *pd,int ep, void *msg, int onPE, Ck
     CharmMessageHolder *cmsg = new CharmMessageHolder((char *)msg, dest_proc); 
     //get rid of the new.
     
-    if(setupComplete)
+    if(receivedTable)
         (* strategyTable)[curStratID].strategy->insertMessage(cmsg);
     else {
         (* strategyTable)[curStratID].tmplist.enq(cmsg);
@@ -679,7 +679,7 @@ void ComlibManager::multicast(CharmMessageHolder *cmsg) {
 
     //Will be used to detect multicast message for learning
     
-    if (setupComplete)
+    if (receivedTable)
 	(* strategyTable)[curStratID].strategy->insertMessage(cmsg);
     else {
 	ComlibPrintf("Enqueuing message in tmplist at %d\n", curStratID);
