@@ -119,7 +119,7 @@ char **argv;
   CpvInitialize(int, CstatPrintQueueStatsFlag);
   CpvInitialize(int, CstatPrintMemStatsFlag);
 
-  CpvAccess(CtrLogBufSize) = 10000;
+  CpvAccess(CtrLogBufSize) = 100000;
   CpvAccess(CstatsMaxChareQueueLength) = 0;
   CpvAccess(CstatsMaxForChareQueueLength) = 0;
   CpvAccess(CstatsMaxFixedChareQueueLength) = 0;
