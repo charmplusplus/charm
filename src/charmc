@@ -674,12 +674,12 @@ switch ($LANGUAGE)
     case "charm++"
         set PRELOAD=($CMK_LDRO CHARMC-USR.TMP.o $OPTS_LDRO -L$CHARMLIB \
                       $OBJECTFILES $LIBRARIES $BAL_OBJ)
-        set LOADER =($CMK_LDXX $OPTS_LDXX -o $OBJECT \
+        set LOADER =($CMK_LDXX -o $OBJECT \
 		      CHARMC-USR.TMP.o CHARMC-MOD.TMP.o \
                       $CHARMLIB/libck-core-$EXECMODE.a \
         	      $CHARMLIB/libck-cplus-y.a \
         	      $CHARMLIB/libconv-core.a \
-		      $CMK_LIBS -lm )
+		      $CMK_LIBS $OPTS_LDXX -lm )
         breaksw
     case "charm"
         set PRELOAD=($CMK_LDRO CHARMC-USR.TMP.o $OPTS_LDRO -L$CHARMLIB \
