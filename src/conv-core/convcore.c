@@ -138,7 +138,7 @@ static void CmiHandlerInit()
 
 #ifdef CMK_USES_COMMON_CMIDELIVERS
 
-CpvStaticDeclare(int, CmiBufferGrabbed);
+CpvDeclare(int, CmiBufferGrabbed);
 CpvExtern(void*,      CmiLocalQueue);
 
 void CmiInit(argv)
