@@ -219,7 +219,7 @@ from the queue.
 
 inline void CkArray::springCleaning(void)
 {
-  DEBK((AA"Starting spring cleaning #%d\n"AB,nSprings,nSprings))
+  DEBK((AA"Starting spring cleaning\n"AB));
   broadcaster->springCleaning();
 }
 
