@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.2  1995-10-13 20:05:13  jyelon
+ * Revision 1.3  1995-10-13 22:05:59  gursoy
+ * put CmiGrabBuffer init stuff
+ *
+ * Revision 1.2  1995/10/13  20:05:13  jyelon
  * *** empty log message ***
  *
  * Revision 1.1  1995/10/13  16:08:54  gursoy
@@ -52,17 +55,11 @@ static void CsiTimerInit();
 
 CpvStaticDeclare(int,CmiBufferGrabbed);
 
-void CmiInit(argv)
-char **argv;
-{
-  void CmiInitMc();
-  void *FIFO_Create();
 
-  CmiHandlerInit();
+void CmiDeliversInit()
+{
   CpvInitialize(int, CmiBufferGrabbed);
   CpvAccess(CmiBufferGrabbed) = 0;
-  CmiInitMc(argv);
-  CmiSpanTreeInit(argv);
 }
 
 
