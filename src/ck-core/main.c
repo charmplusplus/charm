@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.13  1995-09-05 22:01:29  sanjeev
+ * Revision 2.14  1995-09-06 04:08:51  sanjeev
+ * fixed bugs
+ *
+ * Revision 2.13  1995/09/05  22:01:29  sanjeev
  * modified CkProcess_ForChareMsg, CkProcess_NewChareMsg, CkProcess_BocMsg
  * to integrate Charm++
  *
@@ -140,11 +143,11 @@ ENVELOPE *env;
 
   CpvAccess(currentChareBlock) = (void *)chareblock;
 
-  if ( chareblock->selfID.magic != GetEnv_chare_magic_number(envelope) ) {
-    CkPrintf([%d] ERROR *** Message env 0x%x to invalid or expired chareID.\n",
-							CmiMyPe(),envelope);
-    CkPrintf("[%d] envelope magic number %d, currentChareBlock number %d\n",
-      CmiMyPe(),GetEnv_chare_magic_number(envelope),chareblock->selfID.magic);
+  if ( chareblock->selfID.magic != GetEnv_chare_magic_number(env) ) {
+    CmiPrintf("[%d] ERROR *** Message env 0x%x to invalid or expired chare.\n",
+							CmiMyPe(),env);
+    CmiPrintf("[%d] envelope magic number %d, currentChareBlock number %d\n",
+      CmiMyPe(),GetEnv_chare_magic_number(env),chareblock->selfID.magic);
   }
 
   /* Run the entry-point */
@@ -189,8 +192,8 @@ ENVELOPE *env;
   if ( current_epinfo->language!=CHARMPLUSPLUS )
     current_block->chareptr = current_block + 1 ;
   else
-    current_block->chareptr = (CsvAccess(ChareFnTable)[current_chare])
-						(current_block);
+    current_block->chareptr = (void *)((CsvAccess(ChareFnTable)[current_chare])
+						(current_block));
   CpvAccess(currentChareBlock) = current_block;
 
   /* If virtual block exists, get all messages for this chare	*/

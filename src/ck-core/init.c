@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.13  1995-09-05 22:00:52  sanjeev
+ * Revision 2.14  1995-09-06 04:08:58  sanjeev
+ * fixed bugs
+ *
+ * Revision 2.13  1995/09/05  22:00:52  sanjeev
  * modified StartCharm and ProcessBocInit to integrate Charm++.
  *
  * Revision 2.12  1995/09/01  02:13:17  jyelon
@@ -113,6 +116,8 @@ CsvStaticDeclare(void, **_CK_9_ReadMsgTable);	/* was previously global */
 
 CpvDeclare(char*, ReadBufIndex);
 CpvDeclare(char*, ReadFromBuffer);
+
+CsvExtern(FUNCTION_PTR*,  ChareFnTable);
 
 #define BLK_LEN 512
 CpvStaticDeclare(BOCINIT_QUEUE*, BocInitQueueHead);
@@ -237,9 +242,10 @@ char **argv;
 		if (CsvAccess(MainChareLanguage) != CHARMPLUSPLUS) 
 			mainChareBlock->chareptr = mainChareBlock + 1 ;
 		else {
-			mainChareBlock->chareptr = (CsvAccess(ChareFnTable)
+			mainChareBlock->chareptr = (void *)
+						((CsvAccess(ChareFnTable)
 					      [CsvAccess(_CK_MainChareIndex)])
-							(mainChareBlock);
+						(CpvAccess(mainChareBlock)));
 			CPlus_SetMainChareID() ;  /* set mainhandle */
 		}
 
@@ -426,8 +432,8 @@ ENVELOPE       *envelope;
   if ( current_epinfo->language != CHARMPLUSPLUS ) 
     bocBlock->chareptr = (void *) (bocBlock + 1) ; 
   else
-    bocBlock->chareptr = (CsvAccess(ChareFnTable)[current_chare]))
-						(bocBlock) ;
+    bocBlock->chareptr = (void *)((CsvAccess(ChareFnTable)[current_chare])
+						(bocBlock)) ;
   SetBocDataPtr(current_bocnum, bocBlock->chareptr);
   trace_begin_execute(envelope);
   (current_epinfo->function)(usrMsg, bocBlock->chareptr);
