@@ -2009,8 +2009,8 @@ void ConverseCommonInit(char **argv)
   CmiInitMultipleSend();
   CQdInit();
 
-  CldModuleInit();
   CrnInit();
+  CldModuleInit();
 
   CmiInitImmediateMsg();
 }
