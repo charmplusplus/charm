@@ -11,7 +11,9 @@ class Table {
   public: 
     char *name;
     Table *next;
-    Table(char *n);
+    int isextern;
+    Table(char *n, int e=0);
+    int isExtern(void) { return isextern; }
 };
 
 class ReadOnly { 
@@ -19,8 +21,10 @@ class ReadOnly {
     char *name;
     char *type;
     int ismsg;      // 1 is this is a readonly-msg, 0 if a readonly-var
+    int isextern;
+    int isExtern(void) { return isextern; }
     ReadOnly *next;
-    ReadOnly(char *n, char *t, int i);
+    ReadOnly(char *n, char *t, int i, int e=0);
 };
 
 class Message {

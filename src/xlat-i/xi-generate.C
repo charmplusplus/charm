@@ -298,6 +298,8 @@ void GenerateStructsFns(ofstream& top, ofstream& bot)
   spew(top, CITopStart, thismodule->name);
 
   for (c=thismodule->chares; c!=0; c=c->next ) {
+    if(c->isExtern())
+      continue;
     top << "class _CK_chare_" << c->name << " ";
     if(c->numbases > 0) {
       top << ": ";
@@ -312,18 +314,15 @@ void GenerateStructsFns(ofstream& top, ofstream& bot)
     }
     top << " {\n";
     spew(top, CITopChareDeclStart, c->name);
-    if (!c->isExtern())
-      spew(bot, CIBotChareDef, c->name, thismodule->name);
+    spew(bot, CIBotChareDef, c->name, thismodule->name);
     for (e=c->entries; e!=0; e=e->next ) {
-      if(e->isMessage())
+      if(e->isMessage()) {
         spew(top, CITopEPMDecl, e->name, e->msgtype->name);
-      else
+        spew(bot, CIBotEPMDef, c->name, e->name, e->msgtype->name);
+      } else {
         spew(top, CITopEPDecl, e->name);
-      if (!c->isExtern())
-        if(e->isMessage())
-          spew(bot, CIBotEPMDef, c->name, e->name, e->msgtype->name);
-        else
-          spew(bot, CIBotEPDef, c->name, e->name);
+        spew(bot, CIBotEPDef, c->name, e->name);
+      }
     }
     spew(top, CITopChareDeclEnd, c->name);
   }
@@ -331,6 +330,8 @@ void GenerateStructsFns(ofstream& top, ofstream& bot)
   /* Output EP stub functions. Note : we assume main::main always
      has argc-argv. */
   for ( c=thismodule->chares; c!=0; c=c->next ) {
+    if(c->isExtern())
+      continue;
     for (e=c->entries; e!=0; e=e->next ) {
       // If this is the main::main EP
       if (strcmp(c->name,"main")==0 && strcmp(e->name,"main")==0 ) {
@@ -356,9 +357,12 @@ void GenerateStructsFns(ofstream& top, ofstream& bot)
 
   ReadOnly *r;
   /* Output ids for readonly messages */
-  for ( r=thismodule->readonlys; r!=0; r=r->next ) 
+  for ( r=thismodule->readonlys; r!=0; r=r->next ) {
+    if(r->isExtern())
+      continue;
     if ( r->ismsg )
       spew(bot, CIBotROMIndex, r->name);
+  }
 
   Message *m;
   /* Output ids for message types */
@@ -370,6 +374,8 @@ void GenerateStructsFns(ofstream& top, ofstream& bot)
 
   /* for allocked MsgTypes output the alloc stub functions */
   for (m=thismodule->messages; m!=0; m=m->next) {
+    if(m->isExtern())
+      continue;
     spew(bot, CIBotMsgCoerceFn, m->name);
     if ( !m->allocked )
       continue ;
@@ -378,6 +384,8 @@ void GenerateStructsFns(ofstream& top, ofstream& bot)
 
   /* for packable MsgTypes output the pack - unpack stub functions */
   for ( m=thismodule->messages; m!=0; m=m->next ) {
+    if(m->isExtern())
+      continue;
     if ( !m->packable )
       continue ;
     spew(bot, CIBotMsgPackFn, m->name);
@@ -390,6 +398,8 @@ void GenerateStructsFns(ofstream& top, ofstream& bot)
 
   spew(bot, CIBotFromROStart, thismodule->name);
   for ( r=thismodule->readonlys; r!=0; r=r->next ) {
+    if(r->isExtern())
+      continue;
     if ( r->ismsg )
       spew(bot, CIBotFromROMCopy, r->name);
     else
@@ -399,6 +409,8 @@ void GenerateStructsFns(ofstream& top, ofstream& bot)
 
   spew(bot, CIBotToROStart, thismodule->name);
   for ( r=thismodule->readonlys; r!=0; r=r->next ) {
+    if(r->isExtern())
+      continue;
     if ( r->ismsg )
       spew(bot, CIBotToROMCopy, r->name);
     else
@@ -490,6 +502,8 @@ void GenerateRegisterCalls(ofstream& bot)
 
 /* first register all messages */
   for ( Message *m=thismodule->messages; m!=0; m=m->next ) {
+    if(m->isExtern())
+      continue;
     if( m->allocked) {
       spew(bot, CIBotRegisterVarsizeMsg, m->name);
       continue;
@@ -503,6 +517,8 @@ void GenerateRegisterCalls(ofstream& bot)
 
 /* now register all chares and BOCs and their EPs */
   for ( Chare *chare=thismodule->chares; chare!=0; chare=chare->next ) {
+    if(chare->isExtern())
+      continue;
     spew(bot, CIBotRegisterChare, chare->name);
     for  ( Entry *ep=chare->entries; ep!=0; ep=ep->next ) {
       if(strcmp(chare->name, "main")==0 && strcmp(ep->name, "main")==0) {
@@ -524,12 +540,17 @@ void GenerateRegisterCalls(ofstream& bot)
 
 
 /* register distributed-table-variables */
-  for ( Table *t=thismodule->tables; t!=0; t=t->next )
+  for ( Table *t=thismodule->tables; t!=0; t=t->next ) {
+    if(t->isExtern())
+      continue;
     spew(bot, CIBotRegisterTable, t->name);
+  }
 
   spew(bot, CIBotRegisterROStart);
   ReadOnly *r;
   for ( r=thismodule->readonlys; r!=0; r=r->next ) {
+    if(r->isExtern())
+      continue;
     if ( r->ismsg )
       spew(bot, CIBotRegisterROM, r->name);
     else
@@ -722,6 +743,8 @@ void GenerateProxies(ofstream& top, ofstream& bot)
 
   /* Output Async Creation Methods for chares */
   for(c=thismodule->chares; c!=0; c=c->next) {
+    if(c->isExtern())
+      continue;
     // Do not emit creation method for main chare
     if(strcmp(c->name, "main")==0)
       continue;
@@ -739,6 +762,8 @@ void GenerateProxies(ofstream& top, ofstream& bot)
   }
   /* Output Proxy Classes for chares */
   for(c=thismodule->chares; c!=0; c=c->next) {
+    if(c->isExtern())
+      continue;
     if(c->chareboc == CHARE) {
       if(strcmp(c->name,"main")==0) {
         spew(top, CIProxyMainStart);

@@ -59,7 +59,7 @@ OptionalExtern
 	:	/* empty */
 		{ $$ = 0; }
 	|	EXTERN
-		{ $$ = 0; }
+		{ $$ = 1; }
 	;
 
 OptionalBaseList
@@ -116,7 +116,7 @@ OptionalThreaded
 	:	/* empty */
 		{ $$ = 0; }
 	|	THREADED
-		{ $$ = 0; }
+		{ $$ = 1; }
 	;
 
 OptionalStackSize
@@ -163,16 +163,16 @@ VarsizeMessage	:	OptionalExtern VARSIZE MessageName ';'
 MessageName:	Id
 	;
 
-ReadOnly:	READONLY SimpleType ReadOnlyName ';'
+ReadOnly:	OptionalExtern READONLY SimpleType ReadOnlyName ';'
 		{
-			ReadOnly *r = new ReadOnly($3, $2, 0) ;
-			delete $2;
+			ReadOnly *r = new ReadOnly($4, $3, 0, $1) ;
+			delete $3;
 			thismodule->AddReadOnly(r) ;
 		}
-	|	READONLY PtrType ReadOnlyName ';'
+	|	OptionalExtern READONLY PtrType ReadOnlyName ';'
 		{
-			ReadOnly *r = new ReadOnly($3, $2, 1) ;
-			delete $2;
+			ReadOnly *r = new ReadOnly($4, $3, 1, $1) ;
+			delete $3;
 			thismodule->AddReadOnly(r) ;
 		}
 	;
@@ -190,10 +190,10 @@ PtrType	:	Id '*'
 ReadOnlyName:	Id
 	;
 
-Table	:	TABLE TableName ';'
+Table	:	OptionalExtern TABLE TableName ';'
 		{
-			Table *t = new Table($2) ;
-			delete $2;
+			Table *t = new Table($3, $1) ;
+			delete $3;
 			thismodule->AddTable(t) ;
 		}
 	;

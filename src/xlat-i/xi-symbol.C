@@ -12,20 +12,22 @@ Module *thismodule;  // current module
 
 //------------------------------------------------------------------------------
 
-Table::Table(char *n)
+Table::Table(char *n, int e)
 {
   name = new char [strlen(n)+1] ;
   strcpy(name,n) ;
+  isextern = e;
   next = 0 ;
 }
 
-ReadOnly::ReadOnly(char *n, char *t, int i)
+ReadOnly::ReadOnly(char *n, char *t, int i, int e)
 {
   name = new char [strlen(n)+1] ;
   strcpy(name,n) ;
   type = new char [strlen(t)+1] ;
   strcpy(type,t) ;
   ismsg = i ;
+  isextern = e;
   next = 0 ;
 }
 
