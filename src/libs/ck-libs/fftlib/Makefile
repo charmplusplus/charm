@@ -10,7 +10,7 @@ OPTS=-g
 INCLUDE=-I$(FFTW_HOME)/include
 COMPILER=$(CHARMC) $(INCLUDE)
 
-LIB=libfftlib.a
+LIB=libmodulefftlib.a
 LIBDEST=$(CDIR)/lib/$(LIB)
 LIBOBJ=fftlib-normal.o fftlib-sparse.o translines.o
 INCDIR=$(CDIR)/include/fftlib
@@ -28,6 +28,7 @@ $(HEADERS): fftlib.h fftlib.decl.h
 
 $(LIBDEST): $(LIBOBJ)
 	$(CHARMC) -o $(LIBDEST) $(LIBOBJ)
+	/bin/cp libmodulefftlib.dep $(LIBDIR)
 
 
 fftlib-normal.o: fftlib-normal.C fftlib.h fftlib.decl.h
