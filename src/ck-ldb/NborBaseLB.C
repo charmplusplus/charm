@@ -38,7 +38,6 @@ NborBaseLB::NborBaseLB(const CkLBOptions &opt): BaseLB(opt)
 {
 #if CMK_LBDB_ON
   lbname = (char *)"NborBaseLB";
-  mystep = 0;
   thisProxy = CProxy_NborBaseLB(thisgroup);
   receiver = theLbdb->
     AddLocalBarrierReceiver((LDBarrierFn)(staticAtSync),
@@ -126,15 +125,15 @@ void NborBaseLB::AtSync()
   start_lb_time = 0;
 
   if (!QueryBalanceNow(step()) || mig_msgs_expected == 0) {
-    MigrationDone();
+    MigrationDone(0);
     return;
   }
 
   if (CkMyPe() == 0) {
     start_lb_time = CkWallTimer();
     if (_lb_args.debug())
-      CkPrintf("Load balancing step %d starting at %f\n",
-	       step(),start_lb_time);
+      CkPrintf("[%s] Load balancing step %d starting at %f\n",
+	       lbName(), step(),start_lb_time);
   }
 
   NLBStatsMsg* msg = AssembleStats();
@@ -224,7 +223,7 @@ void NborBaseLB::Migrated(LDObjHandle h, int waitBarrier)
   //  CkPrintf("[%d] An object migrated! %d %d\n",
   //  	   CkMyPe(),migrates_completed,migrates_expected);
   if (migrates_completed == migrates_expected) {
-    MigrationDone();
+    MigrationDone(1);
   }
 }
 
@@ -344,49 +343,51 @@ void NborBaseLB::ReceiveMigration(LBMigrateMsg *msg)
   //	   CkMyPe(),migrates_expected);
   mig_msgs_received = 0;
   if (migrates_expected == 0 || migrates_expected == migrates_completed)
-    MigrationDone();
+    MigrationDone(1);
 #endif
 }
 
 
-void NborBaseLB::MigrationDone()
+void NborBaseLB::MigrationDone(int balancing)
 {
 #if CMK_LBDB_ON
-  if (CkMyPe() == 0 && start_lb_time != 0.0) {
-    double end_lb_time = CkWallTimer();
-    if (_lb_args.debug())
-      CkPrintf("Load balancing step %d finished at %f duration %f\n",
-	        step(),end_lb_time,end_lb_time - start_lb_time);
-  }
   migrates_completed = 0;
   migrates_expected = -1;
   // Increment to next step
-  mystep++;
+  theLbdb->incStep();
 
   theLbdb->ClearLoads();
 
   // if sync resume invoke a barrier
-  if (_lb_args.syncResume()) {
+  if (balancing && _lb_args.syncResume()) {
     CkCallback cb(CkIndex_NborBaseLB::ResumeClients((CkReductionMsg*)NULL), 
                   thisProxy);
     contribute(0, NULL, CkReduction::sum_int, cb);
   }
   else 
-    thisProxy [CkMyPe()].ResumeClients();
+    thisProxy [CkMyPe()].ResumeClients(balancing);
   //thisProxy [CkMyPe()].ResumeClients();
 #endif
 }
 
 void NborBaseLB::ResumeClients(CkReductionMsg *msg)
 {
-  ResumeClients();
+  ResumeClients(1);
   delete msg;
 }
 
-void NborBaseLB::ResumeClients()
+void NborBaseLB::ResumeClients(int balancing)
 {
 #if CMK_LBDB_ON
   DEBUGF(("[%d] ResumeClients. \n", CkMyPe()));
+
+  if (CkMyPe() == 0 && balancing) {
+    double end_lb_time = CkWallTimer();
+    if (_lb_args.debug())
+      CkPrintf("[%s] Load balancing step %d finished at %f duration %f\n",
+	        lbName(), step()-1,end_lb_time,end_lb_time - start_lb_time);
+  }
+
   theLbdb->ResumeClients();
 #endif
 }

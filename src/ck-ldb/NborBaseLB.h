@@ -40,15 +40,14 @@ public:
 
   void ReceiveStats(CkMarshalledNLBStatsMessage &m); 		// Receive stats on PE 0
   void ResumeClients(CkReductionMsg *msg);
-  void ResumeClients();
+  void ResumeClients(int balancing);
   void ReceiveMigration(LBMigrateMsg *); 	// Receive migration data
 
   // Migrated-element callback
   static void staticMigrated(void* me, LDObjHandle h, int waitBarrier);
   void Migrated(LDObjHandle h, int waitBarrier);
 
-  void MigrationDone(void);  // Call when migration is complete
-  int step() { return mystep; };
+  void MigrationDone(int balancing);  // Call when migration is complete
 
   struct LDStats {  // Passed to Strategy
     int from_pe;
@@ -82,7 +81,6 @@ private:
   void FindNeighbors();
   NLBStatsMsg* AssembleStats();
 
-  int mystep;
   int stats_msg_count;
   NLBStatsMsg** statsMsgsList;
   LDStats* statsDataList;

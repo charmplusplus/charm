@@ -375,7 +375,7 @@ void CentralLB::LoadBalance()
 
 //  calculate predicted load
 //  very time consuming though, so only happen when debugging is on
-  if (_lb_args.debug()) {
+  if (_lb_args.debug()>1) {
       LBInfo info(migrateMsg->expectedLoad, clients);
       getPredictedLoadWithMsg(statsData, clients, migrateMsg, info, 1);
   }

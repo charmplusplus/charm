@@ -722,7 +722,7 @@ void HybridBaseLB::MigrationDone(int balancing)
   newObjs.free();
 
   DEBUGF(("[%d] calling ResumeClients.\n", CkMyPe()));
-  if (_lb_args.syncResume()) {
+  if (balancing && _lb_args.syncResume()) {
     CkCallback cb(CkIndex_HybridBaseLB::ResumeClients((CkReductionMsg*)NULL),
                   thisProxy);
     contribute(0, NULL, CkReduction::sum_int, cb);
