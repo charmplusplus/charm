@@ -19,11 +19,6 @@
 #include "vmi.h"
 
 
-
-
-#define CMI_VMI_COLLECT_STATISTICS 0
-
-
 /* This is the number of seconds to wait for connection setup. */
 #define CMI_VMI_CONNECTION_TIMEOUT 300
 
@@ -34,7 +29,7 @@
   this is faster than paying the cost of getting some pinned memory from
   cache.
 */
-#define CMI_VMI_VERYSHORT_MESSAGE_BOUNDARY 512
+#define CMI_VMI_SMALL_MESSAGE_BOUNDARY 512
 
 /*
   Messages of fewer bytes than the following boundary are sent by the
@@ -45,7 +40,7 @@
   This is an RDMA rendezvous protocol where a rendezvous message is first
   sent via a stream to initiate an RDMA transfer of the message data.
 */
-#define CMI_VMI_SHORT_MESSAGE_BOUNDARY 4096
+#define CMI_VMI_MEDIUM_MESSAGE_BOUNDARY 4096
 
 /*
   Receive contexts are stored in an array of CMI_VMI_MAX_RECEIVE_HANDLES
@@ -90,46 +85,6 @@
 #endif
 
 
-
-
-/*
-  If CMI_VMI_COLLECT_STATISTICS is defined, the following definitions set
-  the boundaries for the sizes of messages that are counted for each type
-  of send/broadcast.  Each send/broadcast routine has three separate
-  counters for keeping track of various size messages.  Messages of less
-  than BUCKET1 bytes are counted by the first counter; messages of less
-  than BUCKET2 bytes are counted by the second counter; all other messages
-  are counted by the third counter.  At program termination, the values of
-  the various counters are printed for analysis.
-*/
-#if CMI_VMI_COLLECT_STATISTICS
-#define CMI_VMI_SYNCSEND_BUCKET1_BOUNDARY 512
-#define CMI_VMI_SYNCSEND_BUCKET2_BOUNDARY 4096
-
-#define CMI_VMI_ASYNCSEND_BUCKET1_BOUNDARY 512
-#define CMI_VMI_ASYNCSEND_BUCKET2_BOUNDARY 4096
-
-#define CMI_VMI_FREESEND_BUCKET1_BOUNDARY 512
-#define CMI_VMI_FREESEND_BUCKET2_BOUNDARY 4096
-
-#define CMI_VMI_SYNCBROADCAST_BUCKET1_BOUNDARY 512
-#define CMI_VMI_SYNCBROADCAST_BUCKET2_BOUNDARY 4096
-
-#define CMI_VMI_ASYNCBROADCAST_BUCKET1_BOUNDARY 512
-#define CMI_VMI_ASYNCBROADCAST_BUCKET2_BOUNDARY 4096
-
-#define CMI_VMI_FREEBROADCAST_BUCKET1_BOUNDARY 512
-#define CMI_VMI_FREEBROADCAST_BUCKET2_BOUNDARY 4096
-
-#define CMI_VMI_SYNCBROADCASTALL_BUCKET1_BOUNDARY 512
-#define CMI_VMI_SYNCBROADCASTALL_BUCKET2_BOUNDARY 4096
-
-#define CMI_VMI_ASYNCBROADCASTALL_BUCKET1_BOUNDARY 512
-#define CMI_VMI_ASYNCBROADCASTALL_BUCKET2_BOUNDARY 4096
-
-#define CMI_VMI_FREEBROADCASTALL_BUCKET1_BOUNDARY 512
-#define CMI_VMI_FREEBROADCASTALL_BUCKET2_BOUNDARY 4096
-#endif
 
 
 
@@ -216,58 +171,29 @@ typedef struct
 
 
 /*
-  The following data structures describe the various types of messages
-  that can be sent in this machine layer.
-
   CMI_VMI_Connect_Message_T are connect messages that are only sent during
   the connection setup phase.
-
-  CMI_VMI_Message_T are the standard messages used throughout the system.
-  Each message consists of a CMI_VMI_Message_Header_T which identifies the
-  type of message (currently, either a "short" message or a "rendezvous"
-  message) and the size of the message data, and a CMI_VMI_Message_Body_T
-  which is either the message data (for "short" messages) or the address
-  of an RDMA context on the sending side which the receiver will reference
-  when it publishes a buffer for the sender to put data into.
 */
 typedef struct
 {
   int rank;
 } CMI_VMI_Connect_Message_T;
 
-typedef enum
-{
-  CMI_VMI_MESSAGE_TYPE_SHORT,
-  CMI_VMI_MESSAGE_TYPE_RENDEZVOUS
-} CMI_VMI_Message_Type_T;
+
+
+
 
 typedef struct
 {
-  CMI_VMI_Message_Type_T type;
-  int                    msgsz;
-} CMI_VMI_Message_Header_T;
+  char header[CmiMsgHeaderSizeBytes];
+  int rank;
+  int msgsize;
+  VMI_virt_addr_t context;
+} CMI_VMI_Rendezvous_Message_T;
 
-typedef struct
-{
-  char msg;
-} CMI_VMI_Message_Body_Short_T;
 
-typedef struct
-{
-  VMI_virt_addr_t addr;
-} CMI_VMI_Message_Body_Rendezvous_T;
 
-typedef union
-{
-  CMI_VMI_Message_Body_Short_T      shortmsg;
-  CMI_VMI_Message_Body_Rendezvous_T rendezvous;
-} CMI_VMI_Message_Body_T;
 
-typedef struct
-{
-  CMI_VMI_Message_Header_T hdr;
-  CMI_VMI_Message_Body_T   body;
-} CMI_VMI_Message_T;
 
 
 
@@ -324,7 +250,6 @@ typedef enum
 typedef struct
 {
   PVMI_CACHE_ENTRY   cacheentry;
-  CMI_VMI_Message_T *vmimsg;
 } CMI_VMI_Handle_Stream_T;
 
 typedef struct

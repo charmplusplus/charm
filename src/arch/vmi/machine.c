@@ -1,9 +1,10 @@
 /**************************************************************************
 ** Greg Koenig (koenig@uiuc.edu)
 **
-** MEMORY ALLOCATION OPTIMIZATIONS
-**    * hook CmiAlloc() and CmiFree() to use buffer pool (convcore.c:1177)
-**
+** PERSISTENT HANDLES
+**   charm/tmp/persistent.h
+**   charm/tmp/persistent.c
+**   Elan machine.c
 **
 ** HETEROGENEOUS SUPPORT
 **    * use network byte order for components of msg hdr
@@ -11,32 +12,14 @@
 **
 ** IMPROVE STARTUP/SHUTDOWN
 **    * startup via charmrun
-**    * startup via improved CRM (include client code into machine.c)
+**    * startup via improved CRM
 **    * processes organize into a ring for improved normal/fault shutdown
 **    * fix the race condition for shutdown
-**    * open connections as-needed, not all at startup
+**    * open connections as-needed, not all at startup (optional)
 **
 ** ALLOCATE SEND AND RECEIVE HANDLES AT STARTUP
 **
-** SHORT MESSAGE OPTIMIZATIONS
-**    * RDMA Short Message Protocol
-**
-** LARGE MESSAGE OPTIMIZATIONS
-**    * must use RDMA eager protocol, not rendezvous (due to latency)
-**
-** SHARED MEMORY OPTIMIZATIONS
-**    * deal with SMP inside the machine layer -OR-
-**    * write VMI 2 shared memory device
-**
-**
-**
-** -O -DCMK_OPTIMIZE=1
-**
-** CONV_RSH
-**
-** REMEMBER: If you start getting weird memory errors, check to see if you
-** are using malloc/free on memory that Converse is using CmiAlloc/CmiFree
-** on!
+** SHARED MEMORY SUPPORT
 */
 
 #include "machine.h"
@@ -57,11 +40,11 @@ int _Cmi_numpes;
 
 int _Cmi_myrank = 0;
 
-/* This is the global variable for CMI_VMI_VERYSHORT_MESSAGE_BOUNDARY. */
-int CMI_VMI_VeryShort_Message_Boundary;
+/* This is the global variable for CMI_VMI_SMALL_MESSAGE_BOUNDARY. */
+int CMI_VMI_Small_Message_Boundary;
 
-/* This is the global variable for CMI_VMI_SHORT_MESSAGE_BOUNDARY. */
-int CMI_VMI_Short_Message_Boundary;
+/* This is the global variable for CMI_VMI_MEDIUM_MESSAGE_BOUNDARY. */
+int CMI_VMI_Medium_Message_Boundary;
 
 /* This is the global variable for CMI_VMI_RDMA_MAX_OUTSTANDING. */
 int CMI_VMI_RDMA_Max_Outstanding;
@@ -72,6 +55,15 @@ int CMI_VMI_RDMA_Max_Chunk;
 
 /* This is the global count of outstanding asynchronous messages. */
 volatile int CMI_VMI_AsyncMsgCount;
+
+
+
+
+
+int CMI_VMI_RDMA_Rendezvous_Handler_ID;
+
+
+
 
 
 /*
@@ -103,41 +95,6 @@ PVMI_BUFFER_POOL CMI_VMI_Bucket4_Pool;
 PVMI_BUFFER_POOL CMI_VMI_Bucket5_Pool;
 #endif
 
-
-
-/*
-  The following global variables are used to compute statistics for the
-  machine interface module.  For performance, they may be removed with a
-  compile-time option.
-*/
-#if CMI_VMI_COLLECT_STATISTICS
-int CMI_VMI_Count_SyncSend_Bucket1;
-int CMI_VMI_Count_SyncSend_Bucket2;
-int CMI_VMI_Count_SyncSend_Bucket3;
-
-int CMI_VMI_Count_AsyncSend_Bucket1;
-int CMI_VMI_Count_AsyncSend_Bucket2;
-int CMI_VMI_Count_AsyncSend_Bucket3;
-
-int CMI_VMI_Count_FreeSend_Bucket1;
-int CMI_VMI_Count_FreeSend_Bucket2;
-int CMI_VMI_Count_FreeSend_Bucket3;
-
-int CMI_VMI_Count_SyncBroadcast_Bucket1;
-int CMI_VMI_Count_SyncBroadcast_Bucket2;
-int CMI_VMI_Count_SyncBroadcast_Bucket3;
-
-int CMI_VMI_Count_AsyncBroadcast_Bucket1;
-int CMI_VMI_Count_AsyncBroadcast_Bucket2;
-int CMI_VMI_Count_AsyncBroadcast_Bucket3;
-
-int CMI_VMI_Count_FreeBroadcast_Bucket1;
-int CMI_VMI_Count_FreeBroadcast_Bucket2;
-int CMI_VMI_Count_FreeBroadcast_Bucket3;
-
-int CMI_VMI_Count_StreamReceive;
-int CMI_VMI_Count_RDMAReceive;
-#endif
 
 
 /*
@@ -391,13 +348,7 @@ VMI_RECV_STATUS CMI_VMI_Stream_Receive_Handler (PVMI_CONNECT connection,
   VMI_STATUS status;
 
   PVMI_CACHE_ENTRY cacheentry;
-  CMI_VMI_Message_Header_T *hdr;
   char *msg;
-  char *pubaddr;
-  int pubsize;
-  CMI_VMI_RDMA_Receive_Context_T *rdmarecvctxt;
-  int rdmarecvindx;
-  VMI_virt_addr_t rhandleaddr;
   ULONG size;
   PVMI_SLAB_STATE state;
 
@@ -408,107 +359,27 @@ VMI_RECV_STATUS CMI_VMI_Stream_Receive_Handler (PVMI_CONNECT connection,
   status = VMI_Slab_Save_State (slab, &state);
   CMI_VMI_CHECK_SUCCESS (status, "VMI_Slab_Save_State()");
 
-  /* Make hdr point to the header of the incoming message. */
-  size = sizeof (CMI_VMI_Message_Header_T);
-  status = VMI_Slab_Try_Read (slab, &size, (PVOID) &hdr);
-  CMI_VMI_CHECK_SUCCESS (status, "VMI_Slab_Try_Read()");
+  size = VMI_SLAB_BYTES_REMAINING (slab);
 
-  /* Allocate space for the new message to be received. */
-  msg = CmiAlloc (hdr->msgsz);
-  
-  if (hdr->type == CMI_VMI_MESSAGE_TYPE_SHORT) {
-    /* Copy the message body into the message buffer. */
-    size = VMI_SLAB_BYTES_REMAINING (slab);
-    status = VMI_Slab_Copy_Bytes (slab, size, msg);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Slab_Copy_Bytes()");
+  msg = CmiAlloc (size);
 
-    /* Restore the slab state. */
-    status = VMI_Slab_Restore_State (slab, state);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Slab_Restore_State()");
+  /* Copy the message body into the message buffer. */
+  status = VMI_Slab_Copy_Bytes (slab, size, msg);
+  CMI_VMI_CHECK_SUCCESS (status, "VMI_Slab_Copy_Bytes()");
+
+  /* Restore the slab state. */
+  status = VMI_Slab_Restore_State (slab, state);
+  CMI_VMI_CHECK_SUCCESS (status, "VMI_Slab_Restore_State()");
 
 #if CMK_BROADCAST_SPANNING_TREE
-    /* Send the message to our spanning children (if any). */
-    if (CMI_BROADCAST_ROOT (msg)) {
-      CMI_VMI_Send_Spanning_Children (size, msg);
-    }
-#endif
-
-    /* Enqueue the message into the remote queue. */
-    CdsFifo_Enqueue (CpvAccess (CMI_VMI_RemoteQueue), msg);
-
-#if CMI_VMI_COLLECT_STATISTICS
-    /* Increment the count of stream receives. */
-    CMI_VMI_Count_StreamReceive++;
-#endif
-  } else {
-    /* Copy the RDMA handle address on the remote process. */
-    size = VMI_SLAB_BYTES_REMAINING (slab);
-    status = VMI_Slab_Copy_Bytes (slab, size, &rhandleaddr);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Slab_Copy_Bytes()");
-
-    /* Restore the slab state. */
-    status = VMI_Slab_Restore_State (slab, state);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Slab_Restore_State()");
-
-    /* Get an RDMA receive context. */
-    rdmarecvindx = CMI_VMI_Get_RDMA_Receive_Context();
-    rdmarecvctxt = &(CMI_VMI_RDMA_Receive_Context[rdmarecvindx]);
-
-    /* Initialize the RDAM receive context. */
-    rdmarecvctxt->rhandleaddr = rhandleaddr;
-    rdmarecvctxt->msg = msg;
-    rdmarecvctxt->msgsize = hdr->msgsz;
-    rdmarecvctxt->bytes_pub = 0;
-    rdmarecvctxt->bytes_rec = 0;
-    rdmarecvctxt->rdmacnt = 0;
-    rdmarecvctxt->sindx = 0;
-    rdmarecvctxt->rindx = 0;
-
-    /* Get an array of RDMA cache entries from the buffer pool. */
-    status = VMI_Pool_Allocate_Buffer (CMI_VMI_RDMACacheEntry_Pool,
-	 (PVOID) &(rdmarecvctxt->cacheentry), NULL);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
-
-    /* Pipeline the publishing of several buffers to receive message data. */
-    while ((rdmarecvctxt->bytes_pub < rdmarecvctxt->msgsize) &&
-	   (rdmarecvctxt->rdmacnt < CMI_VMI_RDMA_Max_Outstanding)) {
-
-      /*
-	Compute the publish address and publish size.  If the publish
-	size exceedes the maximum RDMA chunk size, adjust the publish
-	size accordingly.
-      */
-      pubaddr = rdmarecvctxt->msg + rdmarecvctxt->bytes_pub;
-      pubsize = rdmarecvctxt->msgsize - rdmarecvctxt->bytes_pub;
-      if (pubsize > CMI_VMI_RDMA_Max_Chunk) {
-	pubsize = CMI_VMI_RDMA_Max_Chunk;
-      }
-
-      /*
-	Get some pinned-down memory for the receive buffer and do some
-	bookkeeping operations to keep track of this cache entry.
-      */
-      status = VMI_Cache_Register (pubaddr, pubsize, &cacheentry);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
-
-      rdmarecvctxt->cacheentry[rdmarecvctxt->sindx] = cacheentry;
-
-      rdmarecvctxt->sindx++;
-      if (rdmarecvctxt->sindx >= CMI_VMI_RDMA_Max_Outstanding) {
-	rdmarecvctxt->sindx = 0;
-      }
-
-      rdmarecvctxt->rdmacnt++;
-
-      /* Publish the buffer. */
-      status = VMI_RDMA_Publish_Buffer (connection, cacheentry->bufferHandle,
-           (VMI_virt_addr_t) (VMI_ADDR_CAST) pubaddr, pubsize,
-           (VMI_virt_addr_t) rhandleaddr, (UINT32) rdmarecvindx);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
-
-      rdmarecvctxt->bytes_pub += pubsize;
-    }
+  /* Send the message to our spanning children (if any). */
+  if (CMI_BROADCAST_ROOT (msg)) {
+    CMI_VMI_Send_Spanning_Children (size, msg);
   }
+#endif
+
+  /* Enqueue the message into the remote queue. */
+  CdsFifo_Enqueue (CpvAccess (CMI_VMI_RemoteQueue), msg);
 
   /* Tell VMI that the slab can be discarded. */
   return VMI_SLAB_DONE;
@@ -557,9 +428,11 @@ void CMI_VMI_Stream_Completion_Handler (PVOID ctxt, VMI_STATUS sstatus)
   */
   handle->refcount--;
   if (handle->refcount < 1) {
+    /*
     status = VMI_Pool_Deallocate_Buffer (CMI_VMI_MessageBuffer_Pool,
 					 handle->data.stream.vmimsg);
     CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Deallocate_Buffer()");
+    */
 
     status = VMI_Cache_Deregister (handle->data.stream.cacheentry);
     CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Deregister()");
@@ -872,12 +745,87 @@ void CMI_VMI_RDMA_Notification_Handler (PVMI_CONNECT conn, UINT32 rdmasz,
     CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Deallocate_Buffer()");
 
     (&(CMI_VMI_RDMA_Receive_Context[context]))->allocated = FALSE;
-
-#if CMI_VMI_COLLECT_STATISTICS
-    CMI_VMI_Count_RDMAReceive++;
-#endif
   }
 }
+
+
+
+
+/**************************************************************************
+**
+*/
+void CMI_VMI_RDMA_Rendezvous_Handler (char *msg)
+{
+  VMI_STATUS status;
+
+  int rank;
+  int msgsize;
+  VMI_virt_addr_t rhandleaddr;
+  int rdmarecvindx;
+  CMI_VMI_RDMA_Receive_Context_T *rdmarecvctxt;
+  char *pubaddr;
+  int pubsize;
+  PVMI_CACHE_ENTRY cacheentry;
+  char *msg2;
+
+
+  rank = ((CMI_VMI_Rendezvous_Message_T *) msg)->rank;
+  msgsize = ((CMI_VMI_Rendezvous_Message_T *) msg)->msgsize;
+  rhandleaddr = ((CMI_VMI_Rendezvous_Message_T *) msg)->context;
+
+  CmiFree (msg);
+
+  rdmarecvindx = CMI_VMI_Get_RDMA_Receive_Context();
+  rdmarecvctxt = &(CMI_VMI_RDMA_Receive_Context[rdmarecvindx]);
+
+  msg2 = (char *) CmiAlloc (msgsize);
+
+  rdmarecvctxt->rhandleaddr = rhandleaddr;
+  rdmarecvctxt->msg = msg2;
+  rdmarecvctxt->msgsize = msgsize;
+  rdmarecvctxt->bytes_pub = 0;
+  rdmarecvctxt->bytes_rec = 0;
+  rdmarecvctxt->rdmacnt = 0;
+  rdmarecvctxt->sindx = 0;
+  rdmarecvctxt->rindx = 0;
+
+  status = VMI_Pool_Allocate_Buffer (CMI_VMI_RDMACacheEntry_Pool,
+       (PVOID) &(rdmarecvctxt->cacheentry), NULL);
+  CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
+
+  while ((rdmarecvctxt->bytes_pub < rdmarecvctxt->msgsize) &&
+	 (rdmarecvctxt->rdmacnt < CMI_VMI_RDMA_Max_Outstanding)) {
+
+    pubaddr = rdmarecvctxt->msg + rdmarecvctxt->bytes_pub;
+    pubsize = rdmarecvctxt->msgsize - rdmarecvctxt->bytes_pub;
+    if (pubsize > CMI_VMI_RDMA_Max_Chunk) {
+      pubsize = CMI_VMI_RDMA_Max_Chunk;
+    }
+
+    status = VMI_Cache_Register (pubaddr, pubsize, &cacheentry);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
+
+    rdmarecvctxt->cacheentry[rdmarecvctxt->sindx] = cacheentry;
+
+    rdmarecvctxt->sindx++;
+    if (rdmarecvctxt->sindx >= CMI_VMI_RDMA_Max_Outstanding) {
+      rdmarecvctxt->sindx = 0;
+    }
+
+    rdmarecvctxt->rdmacnt++;
+
+    status = VMI_RDMA_Publish_Buffer ((&CMI_VMI_Procs[rank])->connection,
+         cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) pubaddr,
+         pubsize, rhandleaddr, (UINT32) rdmarecvindx);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
+
+    rdmarecvctxt->bytes_pub += pubsize;
+  }
+}
+
+
+
+
 
 
 /*************************************************************************/
@@ -1346,13 +1294,9 @@ void CMI_VMI_Send_Spanning_Children (int msgsize, char *msg)
 {
   VMI_STATUS status;
 
-  PVMI_BUFFER bufHandles[2];
-  PVOID addrs[2];
-  ULONG sz[2];
-
-  CMI_VMI_Message_T inlmsg;
-  CMI_VMI_Message_T *vmimsg;
-  PVMI_BUFFER vmimsgbuf;
+  PVMI_BUFFER bufHandles[1];
+  PVOID addrs[1];
+  ULONG sz[1];
 
   CMI_VMI_Handle_T handle;
 
@@ -1367,33 +1311,22 @@ void CMI_VMI_Send_Spanning_Children (int msgsize, char *msg)
 
   DEBUG_PRINT ("CMI_VMI_Send_Spanning_Children() called.\n");
 
-  if (msgsize < CMI_VMI_Short_Message_Boundary) {
+  if (msgsize < CMI_VMI_Medium_Message_Boundary) {
     status = VMI_Cache_Register (msg, msgsize, &cacheentry);
     CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
-
-    status = VMI_Pool_Allocate_Buffer (CMI_VMI_MessageBuffer_Pool, (PVOID) &vmimsg,
-				       &vmimsgbuf);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
 
     handle.msg = msg;
     handle.msgsize = msgsize;
     handle.commhandle = NULL;
     handle.type = CMI_VMI_HANDLE_TYPE_SYNC_BROADCAST_STREAM;
     handle.data.stream.cacheentry = cacheentry;
-    handle.data.stream.vmimsg = vmimsg;
 
-    vmimsg->hdr.type = CMI_VMI_MESSAGE_TYPE_SHORT;
-    vmimsg->hdr.msgsz = msgsize;
-
-    bufHandles[0] = vmimsgbuf;
-    addrs[0] = (PVOID) vmimsg;
-    sz[0] = (ULONG) (sizeof (CMI_VMI_Message_Header_T));
-
-    bufHandles[1] = cacheentry->bufferHandle;
-    addrs[1] = (PVOID) msg;
-    sz[1] = (ULONG) msgsize;
+    bufHandles[0] = cacheentry->bufferHandle;
+    addrs[0] = (PVOID) msg;
+    sz[0] = (ULONG) msgsize;
 
     childcount = CMI_VMI_Spanning_Children_Count (msg);
+
     // If childcount is 0 here, we could exit immediately.
 
     handle.refcount = childcount + 1;
@@ -1416,7 +1349,7 @@ void CMI_VMI_Send_Spanning_Children (int msgsize, char *msg)
       destrank %= _Cmi_numpes;
 
       status = VMI_Stream_Send ((&CMI_VMI_Procs[destrank])->connection,
-           bufHandles, addrs, sz, 2, CMI_VMI_Stream_Completion_Handler,
+           bufHandles, addrs, sz, 1, CMI_VMI_Stream_Completion_Handler,
            (PVOID) &handle, TRUE);
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send()");
     }
@@ -1427,66 +1360,10 @@ void CMI_VMI_Send_Spanning_Children (int msgsize, char *msg)
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
     }
 
-    status = VMI_Pool_Deallocate_Buffer (CMI_VMI_MessageBuffer_Pool, vmimsg);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Deallocate_Buffer()");
-
     status = VMI_Cache_Deregister (cacheentry);
     CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Deregister()");
   } else {
-    handle.msg = msg;
-    handle.msgsize = msgsize;
-    handle.commhandle = NULL;
-    handle.type = CMI_VMI_HANDLE_TYPE_SYNC_BROADCAST_RDMA;
-
-    status = VMI_Pool_Allocate_Buffer (CMI_VMI_RDMABytesSent_Pool,
-	 (PVOID) &(handle.data.rdmabroad.bytes_sent), NULL);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
-
-    inlmsg.hdr.type = CMI_VMI_MESSAGE_TYPE_RENDEZVOUS;
-    inlmsg.hdr.msgsz = msgsize;
-    inlmsg.body.rendezvous.addr = (VMI_virt_addr_t) (VMI_ADDR_CAST) &handle;
-
-    addrs[0] = (PVOID) &inlmsg;
-    sz[0] = (ULONG) (sizeof (CMI_VMI_Message_Header_T) +
-		     sizeof (CMI_VMI_Message_Body_Rendezvous_T));
-
-    childcount = CMI_VMI_Spanning_Children_Count (msg);
-    // If childcount is 0 here, we could exit immediately.
-
-    handle.refcount = childcount + 1;
-
-    startrank = CMI_BROADCAST_ROOT (msg) - 1;
-    for (i = 1; i <= CMI_VMI_BROADCAST_SPANNING_FACTOR; i++) {
-      destrank = _Cmi_mype - startrank;
-
-      if (destrank < 0) {
-	destrank += _Cmi_numpes;
-      }
-
-      destrank = CMI_VMI_BROADCAST_SPANNING_FACTOR * destrank + i;
-
-      if (destrank > (_Cmi_numpes - 1)) {
-	break;
-      }
-
-      destrank += startrank;
-      destrank %= _Cmi_numpes;
-
-      status = VMI_Stream_Send_Inline ((&CMI_VMI_Procs[destrank])->connection,
-	   addrs, sz, 1, sizeof (CMI_VMI_Message_Header_T) +
-           sizeof (CMI_VMI_Message_Body_Rendezvous_T));
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
-    }
-
-    while (handle.refcount > 1) {
-      sched_yield ();
-      status = VMI_Poll ();
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
-    }
-
-    status = VMI_Pool_Deallocate_Buffer (CMI_VMI_RDMABytesSent_Pool,
-					 handle.data.rdmabroad.bytes_sent);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Deallocate_Buffer()");
+    CmiAbort ("Long Message Protocol (RDMA) not implemented yet.");
   }
 }
 #endif   /* CMK_BROADCAST_SPANNING_TREE */
@@ -1531,36 +1408,6 @@ void ConverseInit (int argc, char **argv, CmiStartFn startFn,
 
   /* Initialize the global asynchronous message count. */
   CMI_VMI_AsyncMsgCount = 0;
-
-  /* If statistics are being kept, initialize all counters. */
-#if CMI_VMI_COLLECT_STATISTICS
-  CMI_VMI_Count_SyncSend_Bucket1 = 0;
-  CMI_VMI_Count_SyncSend_Bucket2 = 0;
-  CMI_VMI_Count_SyncSend_Bucket3 = 0;
-
-  CMI_VMI_Count_AsyncSend_Bucket1 = 0;
-  CMI_VMI_Count_AsyncSend_Bucket2 = 0;
-  CMI_VMI_Count_AsyncSend_Bucket3 = 0;
-
-  CMI_VMI_Count_FreeSend_Bucket1 = 0;
-  CMI_VMI_Count_FreeSend_Bucket2 = 0;
-  CMI_VMI_Count_FreeSend_Bucket3 = 0;
-
-  CMI_VMI_Count_SyncBroadcast_Bucket1 = 0;
-  CMI_VMI_Count_SyncBroadcast_Bucket2 = 0;
-  CMI_VMI_Count_SyncBroadcast_Bucket3 = 0;
-
-  CMI_VMI_Count_AsyncBroadcast_Bucket1 = 0;
-  CMI_VMI_Count_AsyncBroadcast_Bucket2 = 0;
-  CMI_VMI_Count_AsyncBroadcast_Bucket3 = 0;
-
-  CMI_VMI_Count_FreeBroadcast_Bucket1 = 0;
-  CMI_VMI_Count_FreeBroadcast_Bucket2 = 0;
-  CMI_VMI_Count_FreeBroadcast_Bucket3 = 0;
-
-  CMI_VMI_Count_StreamReceive = 0;
-  CMI_VMI_Count_RDMAReceive = 0;
-#endif
 
   /*
     **********
@@ -1628,27 +1475,27 @@ void ConverseInit (int argc, char **argv, CmiStartFn startFn,
   /*
     Set the very short message boundary.
 
-    Messages of less than CMI_VMI_VeryShort_Message_Boundary bytes will be
+    Messages of less than CMI_VMI_Small_Message_Boundary bytes will be
     sent asynchronously regardless of how they were requested to be sent.
   */
-  a = getenv ("CMI_VMI_VERYSHORT_MESSAGE_BOUNDARY");
+  a = getenv ("CMI_VMI_SMALL_MESSAGE_BOUNDARY");
   if (a) {
-    CMI_VMI_VeryShort_Message_Boundary = atoi (a);
+    CMI_VMI_Small_Message_Boundary = atoi (a);
   } else {
-    CMI_VMI_VeryShort_Message_Boundary = CMI_VMI_VERYSHORT_MESSAGE_BOUNDARY;
+    CMI_VMI_Small_Message_Boundary = CMI_VMI_SMALL_MESSAGE_BOUNDARY;
   }
 
   /*
     Set the short message boundary.
 
-    Messages of greater than CMI_VMI_Short_Message_Boundary bytes will be
+    Messages of greater than CMI_VMI_Medium_Message_Boundary bytes will be
     sent via RDMA instead of stream.
   */
-  a = getenv ("CMI_VMI_SHORT_MESSAGE_BOUNDARY");
+  a = getenv ("CMI_VMI_MEDIUM_MESSAGE_BOUNDARY");
   if (a) {
-    CMI_VMI_Short_Message_Boundary = atoi (a);
+    CMI_VMI_Medium_Message_Boundary = atoi (a);
   } else {
-    CMI_VMI_Short_Message_Boundary = CMI_VMI_SHORT_MESSAGE_BOUNDARY;
+    CMI_VMI_Medium_Message_Boundary = CMI_VMI_MEDIUM_MESSAGE_BOUNDARY;
   }
 
   a = getenv ("CMI_VMI_RDMA_MAX_OUTSTANDING");
@@ -1683,8 +1530,7 @@ void ConverseInit (int argc, char **argv, CmiStartFn startFn,
     CmiAbort ("Unable to allocate memory for environment variable.");
   }
 
-  sprintf (vmiinlinesize, "VMI_INLINED_DATA_SZ=%d\0",
-       (sizeof (CMI_VMI_Message_Header_T) + CMI_VMI_Short_Message_Boundary));
+  sprintf (vmiinlinesize, "VMI_INLINED_DATA_SZ=%d\0", CMI_VMI_Medium_Message_Boundary);
 
   if (putenv (vmiinlinesize) == -1) {
     CmiAbort ("Unable to set VMI_INLINED_DATA_SZ environment variable.");
@@ -1696,8 +1542,8 @@ void ConverseInit (int argc, char **argv, CmiStartFn startFn,
   CMI_VMI_CHECK_SUCCESS (status, "VMI_Init()");
 
   /* Create buffer pools. */
-  status = VMI_Pool_Create_Buffer_Pool (sizeof (CMI_VMI_Message_Header_T) +
-       CMI_VMI_Short_Message_Boundary, sizeof (PVOID),
+  status = VMI_Pool_Create_Buffer_Pool (CMI_VMI_Medium_Message_Boundary,
+					sizeof (PVOID),
        CMI_VMI_MESSAGE_BUFFER_POOL_PREALLOCATE,
        CMI_VMI_MESSAGE_BUFFER_POOL_GROW,
        (VMI_POOL_HANDLE | VMI_POOL_REGISTER | VMI_POOL_CLEARONCE),
@@ -1836,10 +1682,15 @@ void ConverseInit (int argc, char **argv, CmiStartFn startFn,
   free (initkey);
   free (vmiinlinesize);
 
+
+
   DEBUG_PRINT ("ConverseInit() completed successfully.\n");
 
   CthInit (argv);
   ConverseCommonInit (argv);
+
+  // This has to come here because ConverseCommonInit() must be called first.
+  CMI_VMI_RDMA_Rendezvous_Handler_ID = CmiRegisterHandler ((CmiHandler) CMI_VMI_RDMA_Rendezvous_Handler);
 
   if (!initReturns) {
     startFn (CmiGetArgc (argv), argv);
@@ -1958,92 +1809,6 @@ void ConverseExit ()
   CdsFifo_Destroy (CpvAccess (CMI_VMI_RemoteQueue));
   CdsFifo_Destroy (CpvAccess (CmiLocalQueue));
 
-#if CMI_VMI_COLLECT_STATISTICS
-  printf ("\n\n\n");
-  printf ("Message Statistics:\n");
-  printf ("-------------------\n");
-  printf ("Total CmiSyncSend() calls: %d\n", CMI_VMI_Count_SyncSend_Bucket1 +
-       CMI_VMI_Count_SyncSend_Bucket2 + CMI_VMI_Count_SyncSend_Bucket3);
-  printf ("  Bucket1 (< %d bytes): %d\n", CMI_VMI_SYNCSEND_BUCKET1_BOUNDARY,
-       CMI_VMI_Count_SyncSend_Bucket1);
-  printf ("  Bucket2 (%d-%d bytes): %d\n", CMI_VMI_SYNCSEND_BUCKET1_BOUNDARY,
-       (CMI_VMI_SYNCSEND_BUCKET2_BOUNDARY-1), CMI_VMI_Count_SyncSend_Bucket2);
-  printf ("  Bucket3 (>= %d bytes): %d\n", CMI_VMI_SYNCSEND_BUCKET2_BOUNDARY,
-       CMI_VMI_Count_SyncSend_Bucket3);
-  printf ("\n");
-  printf ("Total CmiAsyncSend() calls: %d\n", CMI_VMI_Count_AsyncSend_Bucket1 +
-       CMI_VMI_Count_AsyncSend_Bucket2 + CMI_VMI_Count_AsyncSend_Bucket3);
-  printf ("  Bucket1 (< %d bytes): %d\n", CMI_VMI_ASYNCSEND_BUCKET1_BOUNDARY,
-       CMI_VMI_Count_AsyncSend_Bucket1);
-  printf ("  Bucket2 (%d-%d bytes): %d\n", CMI_VMI_ASYNCSEND_BUCKET1_BOUNDARY,
-       (CMI_VMI_ASYNCSEND_BUCKET2_BOUNDARY-1),CMI_VMI_Count_AsyncSend_Bucket2);
-  printf ("  Bucket3 (>= %d bytes): %d\n", CMI_VMI_ASYNCSEND_BUCKET2_BOUNDARY,
-       CMI_VMI_Count_AsyncSend_Bucket3);
-  printf ("\n");
-  printf ("Total CmiFreeSend() calls: %d\n", CMI_VMI_Count_FreeSend_Bucket1 +
-       CMI_VMI_Count_FreeSend_Bucket2 + CMI_VMI_Count_FreeSend_Bucket3);
-  printf ("  Bucket1 (< %d bytes): %d\n", CMI_VMI_FREESEND_BUCKET1_BOUNDARY,
-       CMI_VMI_Count_FreeSend_Bucket1);
-  printf ("  Bucket2 (%d-%d bytes): %d\n", CMI_VMI_FREESEND_BUCKET1_BOUNDARY,
-       (CMI_VMI_FREESEND_BUCKET2_BOUNDARY-1), CMI_VMI_Count_FreeSend_Bucket2);
-  printf ("  Bucket3 (>= %d bytes): %d\n", CMI_VMI_FREESEND_BUCKET2_BOUNDARY,
-       CMI_VMI_Count_FreeSend_Bucket3);
-  printf ("\n");
-  printf ("Total CmiSyncBroadcast() calls: %d\n",
-       CMI_VMI_Count_SyncBroadcast_Bucket1 +
-       CMI_VMI_Count_SyncBroadcast_Bucket2 +
-       CMI_VMI_Count_SyncBroadcast_Bucket3);
-  printf ("  Bucket1 (< %d bytes): %d\n",
-       CMI_VMI_SYNCBROADCAST_BUCKET1_BOUNDARY,
-       CMI_VMI_Count_SyncBroadcast_Bucket1);
-  printf ("  Bucket2 (%d-%d bytes): %d\n",
-       CMI_VMI_SYNCBROADCAST_BUCKET1_BOUNDARY,
-       (CMI_VMI_SYNCBROADCAST_BUCKET2_BOUNDARY - 1),
-       CMI_VMI_Count_SyncBroadcast_Bucket2);
-  printf ("  Bucket3 (>= %d bytes): %d\n",
-       CMI_VMI_SYNCBROADCAST_BUCKET2_BOUNDARY,
-       CMI_VMI_Count_SyncBroadcast_Bucket3);
-  printf ("\n");
-  printf ("Total CmiAsyncBroadcast() calls: %d\n",
-       CMI_VMI_Count_AsyncBroadcast_Bucket1 +
-       CMI_VMI_Count_AsyncBroadcast_Bucket2 +
-       CMI_VMI_Count_AsyncBroadcast_Bucket3);
-  printf ("  Bucket1 (< %d bytes): %d\n",
-       CMI_VMI_ASYNCBROADCAST_BUCKET1_BOUNDARY,
-       CMI_VMI_Count_AsyncBroadcast_Bucket1);
-  printf ("  Bucket2 (%d-%d bytes): %d\n",
-       CMI_VMI_ASYNCBROADCAST_BUCKET1_BOUNDARY,
-       (CMI_VMI_ASYNCBROADCAST_BUCKET2_BOUNDARY - 1),
-       CMI_VMI_Count_AsyncBroadcast_Bucket2);
-  printf ("  Bucket3 (>= %d bytes): %d\n",
-       CMI_VMI_ASYNCBROADCAST_BUCKET2_BOUNDARY,
-       CMI_VMI_Count_AsyncBroadcast_Bucket3);
-  printf ("\n");
-  printf ("Total CmiFreeBroadcast() calls: %d\n",
-       CMI_VMI_Count_FreeBroadcast_Bucket1 +
-       CMI_VMI_Count_FreeBroadcast_Bucket2 +
-       CMI_VMI_Count_FreeBroadcast_Bucket3);
-  printf ("  Bucket1 (< %d bytes): %d\n",
-       CMI_VMI_FREEBROADCAST_BUCKET1_BOUNDARY,
-       CMI_VMI_Count_FreeBroadcast_Bucket1);
-  printf ("  Bucket2 (%d-%d bytes): %d\n",
-       CMI_VMI_FREEBROADCAST_BUCKET1_BOUNDARY,
-       (CMI_VMI_FREEBROADCAST_BUCKET2_BOUNDARY - 1),
-       CMI_VMI_Count_FreeBroadcast_Bucket2);
-  printf ("  Bucket3 (>= %d bytes): %d\n",
-       CMI_VMI_FREEBROADCAST_BUCKET2_BOUNDARY,
-       CMI_VMI_Count_FreeBroadcast_Bucket3);
-  printf ("\n");
-  printf ("Messages received from network (non-local): %d\n",
-       CMI_VMI_Count_StreamReceive + CMI_VMI_Count_RDMAReceive);
-  printf ("  Stream receives: %d\n", CMI_VMI_Count_StreamReceive);
-  printf ("  RDMA receives: %d\n", CMI_VMI_Count_RDMAReceive);
-  printf ("\n\n");
-  printf ("VMI Cache Statistics:\n");
-  printf ("---------------------\n");
-  VMI_Cache_Stats();
-#endif
-
   exit (0);
 #if 0
   /* Terminate VMI. */
@@ -2125,24 +1890,15 @@ void CmiSyncSendFn (int destrank, int msgsize, char *msg)
   VMI_STATUS status;
 
   char *msgcopy;
-  CMI_VMI_Message_T inlmsg;
   PVOID addrs[2];
   ULONG sz[2];
 
   CMI_VMI_Handle_T handle;
 
+  CMI_VMI_Rendezvous_Message_T rendezvous_msg;
+
 
   DEBUG_PRINT ("CmiSyncSendFn() called.\n");
-
-#if CMI_VMI_COLLECT_STATISTICS
-  if (msgsize < CMI_VMI_SYNCSEND_BUCKET1_BOUNDARY) {
-    CMI_VMI_Count_SyncSend_Bucket1++;
-  } else if (msgsize < CMI_VMI_SYNCSEND_BUCKET2_BOUNDARY) {
-    CMI_VMI_Count_SyncSend_Bucket2++;
-  } else {
-    CMI_VMI_Count_SyncSend_Bucket3++;
-  }
-#endif
 
 #if CMK_BROADCAST_SPANNING_TREE
   CMI_SET_BROADCAST_ROOT (msg, 0);
@@ -2152,18 +1908,12 @@ void CmiSyncSendFn (int destrank, int msgsize, char *msg)
     msgcopy = CmiAlloc (msgsize);
     memcpy (msgcopy, msg, msgsize);
     CdsFifo_Enqueue (CpvAccess (CmiLocalQueue), msgcopy);
-  } else if (msgsize < CMI_VMI_Short_Message_Boundary) {
-    inlmsg.hdr.type = CMI_VMI_MESSAGE_TYPE_SHORT;
-    inlmsg.hdr.msgsz = msgsize;
-
-    addrs[0] = (PVOID) &inlmsg;
-    sz[0] = (ULONG) (sizeof (CMI_VMI_Message_Header_T));
-
-    addrs[1] = (PVOID) msg;
-    sz[1] = (ULONG) msgsize;
+  } else if (msgsize < CMI_VMI_Medium_Message_Boundary) {
+    addrs[0] = (PVOID) msg;
+    sz[0] = (ULONG) msgsize;
 
     status = VMI_Stream_Send_Inline ((&CMI_VMI_Procs[destrank])->connection,
-         addrs, sz, 2, sizeof (CMI_VMI_Message_Header_T) + msgsize);
+         addrs, sz, 1, msgsize);
     CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
   } else {
     handle.refcount = 2;
@@ -2173,17 +1923,20 @@ void CmiSyncSendFn (int destrank, int msgsize, char *msg)
     handle.type = CMI_VMI_HANDLE_TYPE_SYNC_SEND_RDMA;
     handle.data.rdma.bytes_sent = 0;
 
-    inlmsg.hdr.type = CMI_VMI_MESSAGE_TYPE_RENDEZVOUS;
-    inlmsg.hdr.msgsz = msgsize;
-    inlmsg.body.rendezvous.addr = (VMI_virt_addr_t) (VMI_ADDR_CAST) &handle;
+    CmiSetHandler ((int *) &rendezvous_msg, CMI_VMI_RDMA_Rendezvous_Handler_ID);
+    rendezvous_msg.rank = _Cmi_mype;
+    rendezvous_msg.msgsize = msgsize;
+    rendezvous_msg.context = (VMI_virt_addr_t) (VMI_ADDR_CAST) &handle;
 
-    addrs[0] = (PVOID) &inlmsg;
-    sz[0] = (ULONG) (sizeof (CMI_VMI_Message_Header_T) +
-		     sizeof (CMI_VMI_Message_Body_Rendezvous_T));
+#if CMK_BROADCAST_SPANNING_TREE
+    CMI_SET_BROADCAST_ROOT (&rendezvous_msg, 0);
+#endif
+
+    addrs[0] = (PVOID) &rendezvous_msg;
+    sz[0] = (ULONG) (sizeof (CMI_VMI_Rendezvous_Message_T));
 
     status = VMI_Stream_Send_Inline ((&CMI_VMI_Procs[destrank])->connection,
-	 addrs, sz, 1, sizeof (CMI_VMI_Message_Header_T) +
-	 sizeof (CMI_VMI_Message_Body_Rendezvous_T));
+	 addrs, sz, 1, sizeof (CMI_VMI_Rendezvous_Message_T));
     CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
 
     while (handle.refcount > 1) {
@@ -2204,32 +1957,20 @@ CmiCommHandle CmiAsyncSendFn (int destrank, int msgsize, char *msg)
   VMI_STATUS status;
 
   char *msgcopy;
-  CMI_VMI_Message_T inlmsg;
   PVMI_BUFFER bufHandles[2];
   PVOID addrs[2];
   ULONG sz[2];
 
   CMI_VMI_Handle_T *handle;
 
-  CMI_VMI_Message_T *vmimsg;
-  PVMI_BUFFER vmimsgbuf;
-
   CMI_VMI_CmiCommHandle_T *commhandle;
 
   PVMI_CACHE_ENTRY cacheentry;
 
+  CMI_VMI_Rendezvous_Message_T rendezvous_msg;
+
 
   DEBUG_PRINT ("CmiAsyncSendFn() called.\n");
-
-#if CMI_VMI_COLLECT_STATISTICS
-  if (msgsize < CMI_VMI_ASYNCSEND_BUCKET1_BOUNDARY) {
-    CMI_VMI_Count_AsyncSend_Bucket1++;
-  } else if (msgsize < CMI_VMI_ASYNCSEND_BUCKET2_BOUNDARY) {
-    CMI_VMI_Count_AsyncSend_Bucket2++;
-  } else {
-    CMI_VMI_Count_AsyncSend_Bucket3++;
-  }
-#endif
 
 #if CMK_BROADCAST_SPANNING_TREE
   CMI_SET_BROADCAST_ROOT (msg, 0);
@@ -2240,22 +1981,16 @@ CmiCommHandle CmiAsyncSendFn (int destrank, int msgsize, char *msg)
     memcpy (msgcopy, msg, msgsize);
     CdsFifo_Enqueue (CpvAccess (CmiLocalQueue), msgcopy);
     commhandle = NULL;
-  } else if (msgsize < CMI_VMI_VeryShort_Message_Boundary) {
-    inlmsg.hdr.type = CMI_VMI_MESSAGE_TYPE_SHORT;
-    inlmsg.hdr.msgsz = msgsize;
-
-    addrs[0] = (PVOID) &inlmsg;
-    sz[0] = (ULONG) (sizeof (CMI_VMI_Message_Header_T));
-
-    addrs[1] = (PVOID) msg;
-    sz[1] = msgsize;
+  } else if (msgsize < CMI_VMI_Small_Message_Boundary) {
+    addrs[0] = (PVOID) msg;
+    sz[0] = msgsize;
 
     status = VMI_Stream_Send_Inline ((&CMI_VMI_Procs[destrank])->connection,
-         addrs, sz, 2, sizeof (CMI_VMI_Message_Header_T) + msgsize);
+         addrs, sz, 1, msgsize);
     CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
 
     commhandle = NULL;
-  } else if (msgsize < CMI_VMI_Short_Message_Boundary) {
+  } else if (msgsize < CMI_VMI_Medium_Message_Boundary) {
     status = VMI_Pool_Allocate_Buffer (CMI_VMI_CmiCommHandle_Pool,
 				       (PVOID) &commhandle, NULL);
     CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
@@ -2267,34 +2002,22 @@ CmiCommHandle CmiAsyncSendFn (int destrank, int msgsize, char *msg)
     status = VMI_Cache_Register (msg, msgsize, &cacheentry);
     CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
 
-    status = VMI_Pool_Allocate_Buffer (CMI_VMI_MessageBuffer_Pool, (PVOID) &vmimsg,
-				       &vmimsgbuf);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
-
     handle->refcount = 1;
     handle->msg = msg;
     handle->msgsize = msgsize;
     handle->commhandle = commhandle;
     handle->type = CMI_VMI_HANDLE_TYPE_ASYNC_SEND_STREAM;
     handle->data.stream.cacheentry = cacheentry;
-    handle->data.stream.vmimsg = vmimsg;
 
-    vmimsg->hdr.type = CMI_VMI_MESSAGE_TYPE_SHORT;
-    vmimsg->hdr.msgsz = msgsize;
-
-    bufHandles[0] = vmimsgbuf;
-    addrs[0] = (PVOID) vmimsg;
-    sz[0] = (ULONG) (sizeof (CMI_VMI_Message_Header_T));
-
-    bufHandles[1] = cacheentry->bufferHandle;
-    addrs[1] = (PVOID) msg;
-    sz[1] = (ULONG) msgsize;
+    bufHandles[0] = cacheentry->bufferHandle;
+    addrs[0] = (PVOID) msg;
+    sz[0] = (ULONG) msgsize;
 
     commhandle->count = 1;
     CMI_VMI_AsyncMsgCount++;
 
     status = VMI_Stream_Send ((&CMI_VMI_Procs[destrank])->connection,
-	 bufHandles, addrs, sz, 2, CMI_VMI_Stream_Completion_Handler,
+	 bufHandles, addrs, sz, 1, CMI_VMI_Stream_Completion_Handler,
 	 (PVOID) handle, TRUE);
     CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send()");
   } else {
@@ -2313,21 +2036,25 @@ CmiCommHandle CmiAsyncSendFn (int destrank, int msgsize, char *msg)
     handle->type = CMI_VMI_HANDLE_TYPE_ASYNC_SEND_RDMA;
     handle->data.rdma.bytes_sent = 0;
 
-    inlmsg.hdr.type = CMI_VMI_MESSAGE_TYPE_RENDEZVOUS;
-    inlmsg.hdr.msgsz = msgsize;
-    inlmsg.body.rendezvous.addr = (VMI_virt_addr_t) (VMI_ADDR_CAST) handle;
+    CmiSetHandler ((int *) &rendezvous_msg, CMI_VMI_RDMA_Rendezvous_Handler_ID);
+    rendezvous_msg.rank = _Cmi_mype;
+    rendezvous_msg.msgsize = msgsize;
+    rendezvous_msg.context = (VMI_virt_addr_t) (VMI_ADDR_CAST) &handle;
 
-    addrs[0] = (PVOID) &inlmsg;
-    sz[0] = (ULONG) (sizeof (CMI_VMI_Message_Header_T) +
-		     sizeof (CMI_VMI_Message_Body_Rendezvous_T));
+#if CMK_BROADCAST_SPANNING_TREE
+    CMI_SET_BROADCAST_ROOT (&rendezvous_msg, 0);
+#endif
+
+    addrs[0] = (PVOID) &rendezvous_msg;
+    sz[0] = (ULONG) (sizeof (CMI_VMI_Rendezvous_Message_T));
 
     commhandle->count = 1;
     CMI_VMI_AsyncMsgCount++;
 
     status = VMI_Stream_Send_Inline ((&CMI_VMI_Procs[destrank])->connection,
-         addrs, sz, 1, sizeof (CMI_VMI_Message_Header_T) +
-         sizeof (CMI_VMI_Message_Body_Rendezvous_T));
+	 addrs, sz, 1, sizeof (CMI_VMI_Rendezvous_Message_T));
     CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
+
   }
 
   return ((CmiCommHandle) commhandle);
@@ -2343,24 +2070,15 @@ void CmiFreeSendFn (int destrank, int msgsize, char *msg)
   VMI_STATUS status;
 
   char *msgcopy;
-  CMI_VMI_Message_T inlmsg;
   PVOID addrs[2];
   ULONG sz[2];
 
   CMI_VMI_Handle_T handle;
 
+  CMI_VMI_Rendezvous_Message_T rendezvous_msg;
+
 
   DEBUG_PRINT ("CmiFreeSendFn() called.\n");
-
-#if CMI_VMI_COLLECT_STATISTICS
-  if (msgsize < CMI_VMI_FREESEND_BUCKET1_BOUNDARY) {
-    CMI_VMI_Count_FreeSend_Bucket1++;
-  } else if (msgsize < CMI_VMI_FREESEND_BUCKET2_BOUNDARY) {
-    CMI_VMI_Count_FreeSend_Bucket2++;
-  } else {
-    CMI_VMI_Count_FreeSend_Bucket3++;
-  }
-#endif
 
 #if CMK_BROADCAST_SPANNING_TREE
   CMI_SET_BROADCAST_ROOT (msg, 0);
@@ -2368,18 +2086,12 @@ void CmiFreeSendFn (int destrank, int msgsize, char *msg)
 
   if (destrank == _Cmi_mype) {
     CdsFifo_Enqueue (CpvAccess (CmiLocalQueue), msg);
-  } else if (msgsize < CMI_VMI_Short_Message_Boundary) {
-    inlmsg.hdr.type = CMI_VMI_MESSAGE_TYPE_SHORT;
-    inlmsg.hdr.msgsz = msgsize;
-
-    addrs[0] = (PVOID) &inlmsg;
-    sz[0] = (ULONG) (sizeof (CMI_VMI_Message_Header_T));
-
-    addrs[1] = (PVOID) msg;
-    sz[1] = (ULONG) msgsize;
+  } else if (msgsize < CMI_VMI_Medium_Message_Boundary) {
+    addrs[0] = (PVOID) msg;
+    sz[0] = (ULONG) msgsize;
 
     status = VMI_Stream_Send_Inline ((&CMI_VMI_Procs[destrank])->connection,
-         addrs, sz, 2, sizeof (CMI_VMI_Message_Header_T) + msgsize);
+         addrs, sz, 1, msgsize);
     CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
 
     CmiFree (msg);
@@ -2391,17 +2103,20 @@ void CmiFreeSendFn (int destrank, int msgsize, char *msg)
     handle.type = CMI_VMI_HANDLE_TYPE_SYNC_SEND_RDMA;
     handle.data.rdma.bytes_sent = 0;
 
-    inlmsg.hdr.type = CMI_VMI_MESSAGE_TYPE_RENDEZVOUS;
-    inlmsg.hdr.msgsz = msgsize;
-    inlmsg.body.rendezvous.addr = (VMI_virt_addr_t) (VMI_ADDR_CAST) &handle;
+    CmiSetHandler ((int *) &rendezvous_msg, CMI_VMI_RDMA_Rendezvous_Handler_ID);
+    rendezvous_msg.rank = _Cmi_mype;
+    rendezvous_msg.msgsize = msgsize;
+    rendezvous_msg.context = (VMI_virt_addr_t) (VMI_ADDR_CAST) &handle;
 
-    addrs[0] = (PVOID) &inlmsg;
-    sz[0] = (ULONG) (sizeof (CMI_VMI_Message_Header_T) +
-		     sizeof (CMI_VMI_Message_Body_Rendezvous_T));
+#if CMK_BROADCAST_SPANNING_TREE
+    CMI_SET_BROADCAST_ROOT (&rendezvous_msg, 0);
+#endif
+
+    addrs[0] = (PVOID) &rendezvous_msg;
+    sz[0] = (ULONG) (sizeof (CMI_VMI_Rendezvous_Message_T));
 
     status = VMI_Stream_Send_Inline ((&CMI_VMI_Procs[destrank])->connection,
-	 addrs, sz, 1, sizeof (CMI_VMI_Message_Header_T) +
-	 sizeof (CMI_VMI_Message_Body_Rendezvous_T));
+	 addrs, sz, 1, sizeof (CMI_VMI_Rendezvous_Message_T));
     CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
 
     while (handle.refcount > 1) {
@@ -2427,10 +2142,6 @@ void CmiSyncBroadcastFn (int msgsize, char *msg)
   PVOID addrs[2];
   ULONG sz[2];
 
-  CMI_VMI_Message_T inlmsg;
-  CMI_VMI_Message_T *vmimsg;
-  PVMI_BUFFER vmimsgbuf;
-
   CMI_VMI_Handle_T handle;
 
   int i;
@@ -2441,45 +2152,24 @@ void CmiSyncBroadcastFn (int msgsize, char *msg)
   int startrank;
   int destrank;
 
+  CMI_VMI_Rendezvous_Message_T rendezvous_msg;
 
 
   DEBUG_PRINT ("CmiSyncBroadcastFn() called.\n");
 
-#if CMI_VMI_COLLECT_STATISTICS
-  if (msgsize < CMI_VMI_SYNCBROADCAST_BUCKET1_BOUNDARY) {
-    CMI_VMI_Count_SyncBroadcast_Bucket1++;
-  } else if (msgsize < CMI_VMI_SYNCBROADCAST_BUCKET2_BOUNDARY) {
-    CMI_VMI_Count_SyncBroadcast_Bucket2++;
-  } else {
-    CMI_VMI_Count_SyncBroadcast_Bucket3++;
-  }
-#endif
-
-  if (msgsize < CMI_VMI_Short_Message_Boundary) {
+  if (msgsize < CMI_VMI_Medium_Message_Boundary) {
     status = VMI_Cache_Register (msg, msgsize, &cacheentry);
     CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
-
-    status = VMI_Pool_Allocate_Buffer (CMI_VMI_MessageBuffer_Pool, (PVOID) &vmimsg,
-				       &vmimsgbuf);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
 
     handle.msg = msg;
     handle.msgsize = msgsize;
     handle.commhandle = NULL;
     handle.type = CMI_VMI_HANDLE_TYPE_SYNC_BROADCAST_STREAM;
     handle.data.stream.cacheentry = cacheentry;
-    handle.data.stream.vmimsg = vmimsg;
 
-    vmimsg->hdr.type = CMI_VMI_MESSAGE_TYPE_SHORT;
-    vmimsg->hdr.msgsz = msgsize;
-
-    bufHandles[0] = vmimsgbuf;
-    addrs[0] = (PVOID) vmimsg;
-    sz[0] = (ULONG) (sizeof (CMI_VMI_Message_Header_T));
-
-    bufHandles[1] = cacheentry->bufferHandle;
-    addrs[1] = (PVOID) msg;
-    sz[1] = (ULONG) msgsize;
+    bufHandles[0] = cacheentry->bufferHandle;
+    addrs[0] = (PVOID) msg;
+    sz[0] = (ULONG) msgsize;
 
 #if CMK_BROADCAST_SPANNING_TREE
     CMI_SET_BROADCAST_ROOT (msg, (_Cmi_mype + 1));
@@ -2506,7 +2196,7 @@ void CmiSyncBroadcastFn (int msgsize, char *msg)
       destrank %= _Cmi_numpes;
 
       status = VMI_Stream_Send ((&CMI_VMI_Procs[destrank])->connection,
-	   bufHandles, addrs, sz, 2, CMI_VMI_Stream_Completion_Handler,
+	   bufHandles, addrs, sz, 1, CMI_VMI_Stream_Completion_Handler,
 	   (PVOID) &handle, TRUE);
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send()");
     }
@@ -2515,14 +2205,14 @@ void CmiSyncBroadcastFn (int msgsize, char *msg)
 
     for (i = 0; i < _Cmi_mype; i++) {
       status = VMI_Stream_Send ((&CMI_VMI_Procs[i])->connection, bufHandles,
-           addrs, sz, 2, CMI_VMI_Stream_Completion_Handler, (PVOID) &handle,
+           addrs, sz, 1, CMI_VMI_Stream_Completion_Handler, (PVOID) &handle,
            TRUE);
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send()");
     }
 
     for (i = (_Cmi_mype + 1); i < _Cmi_numpes; i++) {
       status = VMI_Stream_Send ((&CMI_VMI_Procs[i])->connection, bufHandles,
-           addrs, sz, 2, CMI_VMI_Stream_Completion_Handler, (PVOID) &handle,
+           addrs, sz, 1, CMI_VMI_Stream_Completion_Handler, (PVOID) &handle,
            TRUE);
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send()");
     }
@@ -2533,9 +2223,6 @@ void CmiSyncBroadcastFn (int msgsize, char *msg)
       status = VMI_Poll ();
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
     }
-
-    status = VMI_Pool_Deallocate_Buffer (CMI_VMI_MessageBuffer_Pool, vmimsg);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Deallocate_Buffer()");
 
     status = VMI_Cache_Deregister (cacheentry);
     CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Deregister()");
@@ -2549,13 +2236,17 @@ void CmiSyncBroadcastFn (int msgsize, char *msg)
 	 (PVOID) &(handle.data.rdmabroad.bytes_sent), NULL);
     CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
 
-    inlmsg.hdr.type = CMI_VMI_MESSAGE_TYPE_RENDEZVOUS;
-    inlmsg.hdr.msgsz = msgsize;
-    inlmsg.body.rendezvous.addr = (VMI_virt_addr_t) (VMI_ADDR_CAST) &handle;
+    CmiSetHandler ((int *) &rendezvous_msg, CMI_VMI_RDMA_Rendezvous_Handler_ID);
+    rendezvous_msg.rank = _Cmi_mype;
+    rendezvous_msg.msgsize = msgsize;
+    rendezvous_msg.context = (VMI_virt_addr_t) (VMI_ADDR_CAST) &handle;
 
-    addrs[0] = (PVOID) &inlmsg;
-    sz[0] = (ULONG) (sizeof (CMI_VMI_Message_Header_T) +
-		     sizeof (CMI_VMI_Message_Body_Rendezvous_T));
+#if CMK_BROADCAST_SPANNING_TREE
+    CMI_SET_BROADCAST_ROOT (&rendezvous_msg, 0);
+#endif
+
+    addrs[0] = (PVOID) &rendezvous_msg;
+    sz[0] = (ULONG) (sizeof (CMI_VMI_Rendezvous_Message_T));
 
 #if CMK_BROADCAST_SPANNING_TREE
     CMI_SET_BROADCAST_ROOT (msg, (_Cmi_mype + 1));
@@ -2582,8 +2273,7 @@ void CmiSyncBroadcastFn (int msgsize, char *msg)
       destrank %= _Cmi_numpes;
 
       status = VMI_Stream_Send_Inline ((&CMI_VMI_Procs[destrank])->connection,
-	   addrs, sz, 1, sizeof (CMI_VMI_Message_Header_T) +
-           sizeof (CMI_VMI_Message_Body_Rendezvous_T));
+	   addrs, sz, 1, sizeof (CMI_VMI_Rendezvous_Message_T));
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
     }
 #else   /* CMK_BROADCAST_SPANNING_TREE */
@@ -2591,15 +2281,13 @@ void CmiSyncBroadcastFn (int msgsize, char *msg)
 
     for (i = 0; i < _Cmi_mype; i++) {
       status = VMI_Stream_Send_Inline ((&CMI_VMI_Procs[i])->connection,
-	   addrs, sz, 1, sizeof (CMI_VMI_Message_Header_T) +
-           sizeof (CMI_VMI_Message_Body_Rendezvous_T));
+	   addrs, sz, 1, sizeof (CMI_VMI_Rendezvous_Message_T));
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
     }
 
     for (i = (_Cmi_mype + 1); i < _Cmi_numpes; i++) {
       status = VMI_Stream_Send_Inline ((&CMI_VMI_Procs[i])->connection,
-	   addrs, sz, 1, sizeof (CMI_VMI_Message_Header_T) +
-           sizeof (CMI_VMI_Message_Body_Rendezvous_T));
+	   addrs, sz, 1, sizeof (CMI_VMI_Rendezvous_Message_T));
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
     }
 #endif   /* CMK_BROADCAST_SPANNING_TREE */
@@ -2625,15 +2313,11 @@ CmiCommHandle CmiAsyncBroadcastFn (int msgsize, char *msg)
 {
   VMI_STATUS status;
 
-  CMI_VMI_Message_T inlmsg;
   PVMI_BUFFER bufHandles[2];
   PVOID addrs[2];
   ULONG sz[2];
 
   CMI_VMI_Handle_T *handle;
-
-  CMI_VMI_Message_T *vmimsg;
-  PVMI_BUFFER vmimsgbuf;
 
   CMI_VMI_CmiCommHandle_T *commhandle;
 
@@ -2645,29 +2329,14 @@ CmiCommHandle CmiAsyncBroadcastFn (int msgsize, char *msg)
   int startrank;
   int destrank;
 
+  CMI_VMI_Rendezvous_Message_T rendezvous_msg;
 
 
   DEBUG_PRINT ("CmiAsyncBroadcastFn() called.\n");
 
-#if CMI_VMI_COLLECT_STATISTICS
-  if (msgsize < CMI_VMI_ASYNCBROADCAST_BUCKET1_BOUNDARY) {
-    CMI_VMI_Count_AsyncBroadcast_Bucket1++;
-  } else if (msgsize < CMI_VMI_ASYNCBROADCAST_BUCKET2_BOUNDARY) {
-    CMI_VMI_Count_AsyncBroadcast_Bucket2++;
-  } else {
-    CMI_VMI_Count_AsyncBroadcast_Bucket3++;
-  }
-#endif
-
-  if (msgsize < CMI_VMI_VeryShort_Message_Boundary) {
-    inlmsg.hdr.type = CMI_VMI_MESSAGE_TYPE_SHORT;
-    inlmsg.hdr.msgsz = msgsize;
-
-    addrs[0] = (PVOID) &inlmsg;
-    sz[0] = (ULONG) (sizeof (CMI_VMI_Message_Header_T));
-
-    addrs[1] = (PVOID) msg;
-    sz[1] = msgsize;
+  if (msgsize < CMI_VMI_Small_Message_Boundary) {
+    addrs[0] = (PVOID) msg;
+    sz[0] = msgsize;
 
 #if CMK_BROADCAST_SPANNING_TREE
     CMI_SET_BROADCAST_ROOT (msg, (_Cmi_mype + 1));
@@ -2692,25 +2361,25 @@ CmiCommHandle CmiAsyncBroadcastFn (int msgsize, char *msg)
       destrank %= _Cmi_numpes;
 
       status = VMI_Stream_Send_Inline ((&CMI_VMI_Procs[destrank])->connection,
-           addrs, sz, 2, sizeof (CMI_VMI_Message_Header_T) + msgsize);
+           addrs, sz, 1, msgsize);
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
     }
 #else   /* CMK_BROADCAST_SPANNING_TREE */
     for (i = 0; i < _Cmi_mype; i++) {
       status = VMI_Stream_Send_Inline ((&CMI_VMI_Procs[i])->connection,
-           addrs, sz, 2, sizeof (CMI_VMI_Message_Header_T) + msgsize);
+           addrs, sz, 1, msgsize);
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
     }
 
     for (i = (_Cmi_mype + 1); i < _Cmi_numpes; i++) {
       status = VMI_Stream_Send_Inline ((&CMI_VMI_Procs[i])->connection,
-           addrs, sz, 2, sizeof (CMI_VMI_Message_Header_T) + msgsize);
+           addrs, sz, 1, msgsize);
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
     }
 #endif   /* CMK_BROADCAST_SPANNING_TREE */
 
     commhandle = NULL;
-  } else if (msgsize < CMI_VMI_Short_Message_Boundary) {
+  } else if (msgsize < CMI_VMI_Medium_Message_Boundary) {
     status = VMI_Pool_Allocate_Buffer (CMI_VMI_CmiCommHandle_Pool,
 				       (PVOID) &commhandle, NULL);
     CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
@@ -2722,27 +2391,15 @@ CmiCommHandle CmiAsyncBroadcastFn (int msgsize, char *msg)
     status = VMI_Cache_Register (msg, msgsize, &cacheentry);
     CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
 
-    status = VMI_Pool_Allocate_Buffer (CMI_VMI_MessageBuffer_Pool, (PVOID) &vmimsg,
-				       &vmimsgbuf);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
-
     handle->msg = msg;
     handle->msgsize = msgsize;
     handle->commhandle = commhandle;
     handle->type = CMI_VMI_HANDLE_TYPE_ASYNC_BROADCAST_STREAM;
     handle->data.stream.cacheentry = cacheentry;
-    handle->data.stream.vmimsg = vmimsg;
 
-    vmimsg->hdr.type = CMI_VMI_MESSAGE_TYPE_SHORT;
-    vmimsg->hdr.msgsz = msgsize;
-
-    bufHandles[0] = vmimsgbuf;
-    addrs[0] = (PVOID) vmimsg;
-    sz[0] = (ULONG) (sizeof (CMI_VMI_Message_Header_T));
-
-    bufHandles[1] = cacheentry->bufferHandle;
-    addrs[1] = (PVOID) msg;
-    sz[1] = (ULONG) msgsize;
+    bufHandles[0] = cacheentry->bufferHandle;
+    addrs[0] = (PVOID) msg;
+    sz[0] = (ULONG) msgsize;
 
 #if CMK_BROADCAST_SPANNING_TREE
     CMI_SET_BROADCAST_ROOT (msg, (_Cmi_mype + 1));
@@ -2771,7 +2428,7 @@ CmiCommHandle CmiAsyncBroadcastFn (int msgsize, char *msg)
       destrank %= _Cmi_numpes;
 
       status = VMI_Stream_Send ((&CMI_VMI_Procs[destrank])->connection,
-           bufHandles, addrs, sz, 2, CMI_VMI_Stream_Completion_Handler,
+           bufHandles, addrs, sz, 1, CMI_VMI_Stream_Completion_Handler,
 	   (PVOID) &handle, TRUE);
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send()");
     }
@@ -2782,14 +2439,14 @@ CmiCommHandle CmiAsyncBroadcastFn (int msgsize, char *msg)
 
     for (i = 0; i < _Cmi_mype; i++) {
       status = VMI_Stream_Send ((&CMI_VMI_Procs[i])->connection, bufHandles,
-           addrs, sz, 2, CMI_VMI_Stream_Completion_Handler, (PVOID) &handle,
+           addrs, sz, 1, CMI_VMI_Stream_Completion_Handler, (PVOID) &handle,
            TRUE);
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send()");
     }
 
     for (i = (_Cmi_mype + 1); i < _Cmi_numpes; i++) {
       status = VMI_Stream_Send ((&CMI_VMI_Procs[i])->connection, bufHandles,
-           addrs, sz, 2, CMI_VMI_Stream_Completion_Handler, (PVOID) &handle,
+           addrs, sz, 1, CMI_VMI_Stream_Completion_Handler, (PVOID) &handle,
            TRUE);
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send()");
     }
@@ -2812,13 +2469,17 @@ CmiCommHandle CmiAsyncBroadcastFn (int msgsize, char *msg)
 	 (PVOID) &(handle->data.rdmabroad.bytes_sent), NULL);
     CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
 
-    inlmsg.hdr.type = CMI_VMI_MESSAGE_TYPE_RENDEZVOUS;
-    inlmsg.hdr.msgsz = msgsize;
-    inlmsg.body.rendezvous.addr = (VMI_virt_addr_t) (VMI_ADDR_CAST) &handle;
+    CmiSetHandler ((int *) &rendezvous_msg, CMI_VMI_RDMA_Rendezvous_Handler_ID);
+    rendezvous_msg.rank = _Cmi_mype;
+    rendezvous_msg.msgsize = msgsize;
+    rendezvous_msg.context = (VMI_virt_addr_t) (VMI_ADDR_CAST) &handle;
 
-    addrs[0] = (PVOID) &inlmsg;
-    sz[0] = (ULONG) (sizeof (CMI_VMI_Message_Header_T) +
-		     sizeof (CMI_VMI_Message_Body_Rendezvous_T));
+#if CMK_BROADCAST_SPANNING_TREE
+    CMI_SET_BROADCAST_ROOT (&rendezvous_msg, 0);
+#endif
+
+    addrs[0] = (PVOID) &rendezvous_msg;
+    sz[0] = (ULONG) (sizeof (CMI_VMI_Rendezvous_Message_T));
 
 #if CMK_BROADCAST_SPANNING_TREE
     CMI_SET_BROADCAST_ROOT (msg, (_Cmi_mype + 1));
@@ -2830,6 +2491,7 @@ CmiCommHandle CmiAsyncBroadcastFn (int msgsize, char *msg)
     CMI_VMI_AsyncMsgCount += childcount;
 
     startrank = CMI_BROADCAST_ROOT (msg) - 1;
+
     for (i = 1; i <= CMI_VMI_BROADCAST_SPANNING_FACTOR; i++) {
       destrank = _Cmi_mype - startrank;
 
@@ -2847,8 +2509,7 @@ CmiCommHandle CmiAsyncBroadcastFn (int msgsize, char *msg)
       destrank %= _Cmi_numpes;
 
       status = VMI_Stream_Send_Inline ((&CMI_VMI_Procs[destrank])->connection,
-           addrs, sz, 1, sizeof (CMI_VMI_Message_Header_T) +
-           sizeof (CMI_VMI_Message_Body_Rendezvous_T));
+           addrs, sz, 1, sizeof (CMI_VMI_Rendezvous_Message_T));
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
     }
 #else   /* CMK_BROADCAST_SPANNING_TREE */
@@ -2858,15 +2519,12 @@ CmiCommHandle CmiAsyncBroadcastFn (int msgsize, char *msg)
 
     for (i = 0; i < _Cmi_mype; i++) {
       status = VMI_Stream_Send_Inline ((&CMI_VMI_Procs[i])->connection,
-           addrs, sz, 1, sizeof (CMI_VMI_Message_Header_T) +
-           sizeof (CMI_VMI_Message_Body_Rendezvous_T));
+           addrs, sz, 1, sizeof (CMI_VMI_Rendezvous_Message_T));
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
-    }
 
     for (i = (_Cmi_mype + 1); i < _Cmi_numpes; i++) {
       status = VMI_Stream_Send_Inline ((&CMI_VMI_Procs[i])->connection,
-           addrs, sz, 1, sizeof (CMI_VMI_Message_Header_T) +
-           sizeof (CMI_VMI_Message_Body_Rendezvous_T));
+           addrs, sz, 1, sizeof (CMI_VMI_Rendezvous_Message_T));
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
     }
 #endif   /* CMK_BROADCAST_SPANNING_TREE */
@@ -2888,10 +2546,6 @@ void CmiFreeBroadcastFn (int msgsize, char *msg)
   PVOID addrs[2];
   ULONG sz[2];
 
-  CMI_VMI_Message_T inlmsg;
-  CMI_VMI_Message_T *vmimsg;
-  PVMI_BUFFER vmimsgbuf;
-
   CMI_VMI_Handle_T handle;
 
   int i;
@@ -2902,45 +2556,24 @@ void CmiFreeBroadcastFn (int msgsize, char *msg)
   int startrank;
   int destrank;
 
+  CMI_VMI_Rendezvous_Message_T rendezvous_msg;
 
 
   DEBUG_PRINT ("CmiFreeBroadcastFn() called.\n");
 
-#if CMI_VMI_COLLECT_STATISTICS
-  if (msgsize < CMI_VMI_FREEBROADCAST_BUCKET1_BOUNDARY) {
-    CMI_VMI_Count_FreeBroadcast_Bucket1++;
-  } else if (msgsize < CMI_VMI_FREEBROADCAST_BUCKET2_BOUNDARY) {
-    CMI_VMI_Count_FreeBroadcast_Bucket2++;
-  } else {
-    CMI_VMI_Count_FreeBroadcast_Bucket3++;
-  }
-#endif
-
-  if (msgsize < CMI_VMI_Short_Message_Boundary) {
+  if (msgsize < CMI_VMI_Medium_Message_Boundary) {
     status = VMI_Cache_Register (msg, msgsize, &cacheentry);
     CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
-
-    status = VMI_Pool_Allocate_Buffer (CMI_VMI_MessageBuffer_Pool, (PVOID) &vmimsg,
-				       &vmimsgbuf);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
 
     handle.msg = msg;
     handle.msgsize = msgsize;
     handle.commhandle = NULL;
     handle.type = CMI_VMI_HANDLE_TYPE_SYNC_BROADCAST_STREAM;
     handle.data.stream.cacheentry = cacheentry;
-    handle.data.stream.vmimsg = vmimsg;
 
-    vmimsg->hdr.type = CMI_VMI_MESSAGE_TYPE_SHORT;
-    vmimsg->hdr.msgsz = msgsize;
-
-    bufHandles[0] = vmimsgbuf;
-    addrs[0] = (PVOID) vmimsg;
-    sz[0] = (ULONG) (sizeof (CMI_VMI_Message_Header_T));
-
-    bufHandles[1] = cacheentry->bufferHandle;
-    addrs[1] = (PVOID) msg;
-    sz[1] = (ULONG) msgsize;
+    bufHandles[0] = cacheentry->bufferHandle;
+    addrs[0] = (PVOID) msg;
+    sz[0] = (ULONG) msgsize;
 
 #if CMK_BROADCAST_SPANNING_TREE
     CMI_SET_BROADCAST_ROOT (msg, (_Cmi_mype + 1));
@@ -2967,7 +2600,7 @@ void CmiFreeBroadcastFn (int msgsize, char *msg)
       destrank %= _Cmi_numpes;
 
       status = VMI_Stream_Send ((&CMI_VMI_Procs[destrank])->connection,
-           bufHandles, addrs, sz, 2, CMI_VMI_Stream_Completion_Handler,
+           bufHandles, addrs, sz, 1, CMI_VMI_Stream_Completion_Handler,
            (PVOID) &handle, TRUE);
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send()");
     }
@@ -2976,14 +2609,14 @@ void CmiFreeBroadcastFn (int msgsize, char *msg)
 
     for (i = 0; i < _Cmi_mype; i++) {
       status = VMI_Stream_Send ((&CMI_VMI_Procs[i])->connection, bufHandles,
-           addrs, sz, 2, CMI_VMI_Stream_Completion_Handler, (PVOID) &handle,
+           addrs, sz, 1, CMI_VMI_Stream_Completion_Handler, (PVOID) &handle,
            TRUE);
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send()");
     }
 
     for (i = (_Cmi_mype + 1); i < _Cmi_numpes; i++) {
       status = VMI_Stream_Send ((&CMI_VMI_Procs[i])->connection, bufHandles,
-           addrs, sz, 2, CMI_VMI_Stream_Completion_Handler, (PVOID) &handle,
+           addrs, sz, 1, CMI_VMI_Stream_Completion_Handler, (PVOID) &handle,
            TRUE);
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send()");
     }
@@ -2994,9 +2627,6 @@ void CmiFreeBroadcastFn (int msgsize, char *msg)
       status = VMI_Poll ();
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
     }
-
-    status = VMI_Pool_Deallocate_Buffer (CMI_VMI_MessageBuffer_Pool, vmimsg);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Deallocate_Buffer()");
 
     status = VMI_Cache_Deregister (cacheentry);
     CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Deregister()");
@@ -3010,13 +2640,17 @@ void CmiFreeBroadcastFn (int msgsize, char *msg)
 	 (PVOID) &(handle.data.rdmabroad.bytes_sent), NULL);
     CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
 
-    inlmsg.hdr.type = CMI_VMI_MESSAGE_TYPE_RENDEZVOUS;
-    inlmsg.hdr.msgsz = msgsize;
-    inlmsg.body.rendezvous.addr = (VMI_virt_addr_t) (VMI_ADDR_CAST) &handle;
+    CmiSetHandler ((int *) &rendezvous_msg, CMI_VMI_RDMA_Rendezvous_Handler_ID);
+    rendezvous_msg.rank = _Cmi_mype;
+    rendezvous_msg.msgsize = msgsize;
+    rendezvous_msg.context = (VMI_virt_addr_t) (VMI_ADDR_CAST) &handle;
 
-    addrs[0] = (PVOID) &inlmsg;
-    sz[0] = (ULONG) (sizeof (CMI_VMI_Message_Header_T) +
-		     sizeof (CMI_VMI_Message_Body_Rendezvous_T));
+#if CMK_BROADCAST_SPANNING_TREE
+    CMI_SET_BROADCAST_ROOT (&rendezvous_msg, 0);
+#endif
+
+    addrs[0] = (PVOID) &rendezvous_msg;
+    sz[0] = (ULONG) (sizeof (CMI_VMI_Rendezvous_Message_T));
 
 #if CMK_BROADCAST_SPANNING_TREE
     CMI_SET_BROADCAST_ROOT (msg, (_Cmi_mype + 1));
@@ -3043,8 +2677,7 @@ void CmiFreeBroadcastFn (int msgsize, char *msg)
       destrank %= _Cmi_numpes;
 
       status = VMI_Stream_Send_Inline ((&CMI_VMI_Procs[destrank])->connection,
-	   addrs, sz, 1, sizeof (CMI_VMI_Message_Header_T) +
-           sizeof (CMI_VMI_Message_Body_Rendezvous_T));
+	   addrs, sz, 1, sizeof (CMI_VMI_Rendezvous_Message_T));
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
     }
 #else   /* CMK_BROADCAST_SPANNING_TREE */
@@ -3052,15 +2685,13 @@ void CmiFreeBroadcastFn (int msgsize, char *msg)
 
     for (i = 0; i < _Cmi_mype; i++) {
       status = VMI_Stream_Send_Inline ((&CMI_VMI_Procs[i])->connection,
-	   addrs, sz, 1, sizeof (CMI_VMI_Message_Header_T) +
-           sizeof (CMI_VMI_Message_Body_Rendezvous_T));
+	   addrs, sz, 1, sizeof (CMI_VMI_Rendezvous_Message_T));
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
     }
 
     for (i = (_Cmi_mype + 1); i < _Cmi_numpes; i++) {
       status = VMI_Stream_Send_Inline ((&CMI_VMI_Procs[i])->connection,
-	   addrs, sz, 1, sizeof (CMI_VMI_Message_Header_T) +
-           sizeof (CMI_VMI_Message_Body_Rendezvous_T));
+	   addrs, sz, 1, sizeof (CMI_VMI_Rendezvous_Message_T));
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
     }
 #endif   /* CMK_BROADCAST_SPANNING_TREE */
