@@ -457,7 +457,7 @@ LIBCK_CORE=trace-common.o init.o register.o qd.o ck.o main.o msgalloc.o \
            tempo.o waitqd.o LBDatabase.o lbdb.o charisma.o ckobjQ.o	\
 	   ckcheckpoint.o ckmemcheckpoint.o\
            LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o \
-	   BaseLB.o CentralLB.o NborBaseLB.o WSLB.o \
+	   BaseLB.o CentralLB.o CentralPredictor.o NborBaseLB.o WSLB.o \
            ObjGraph.o graph.o  \
            Refiner.o RefinerComm.o bitvecset.o Set.o heap.o CommLBHeap.o \
 	   NullLB.o LBSimulation.o 	\
