@@ -383,6 +383,9 @@ typedef struct CMK_MSG_HEADER_EXT   CmiMsgHeaderExt;
 #define CmiMsgHeaderSizeBytes (sizeof(CmiMsgHeaderBasic))
 #define CmiExtHeaderSizeBytes (sizeof(CmiMsgHeaderExt))
 
+/* all common extra fields in BigSim message header */
+#define CMK_BLUEGENE_FIELDS  int nd,n; double rt; CmiInt2 tID,hID; char t; CmiInt4 msgID,srcPe;
+
 #ifndef CmiReservedHeaderSize
 #if CMK_BLUEGENE_CHARM
 #  define CmiReservedHeaderSize   CmiBlueGeneMsgHeaderSizeBytes
@@ -1088,7 +1091,8 @@ typedef void (*CcdVoidFn)(void *userParam,double curWallTime);
 
 #define CcdIGNOREPE   -2
 #if CMK_CONDS_USE_SPECIAL_CODE
-int CmiSwitchToPE(int pe);
+typedef int (*CmiSwitchToPEFnPtr)(int pe);
+extern CmiSwitchToPEFnPtr CmiSwitchToPE;
 #else
 #define CmiSwitchToPE(pe)  pe
 #endif

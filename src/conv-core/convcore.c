@@ -39,6 +39,10 @@
 #include "conv-ooc.h"
 #endif
 
+#if CMK_CONDS_USE_SPECIAL_CODE
+CmiSwitchToPEFnPtr CmiSwitchToPE;
+#endif
+
 CpvExtern(int, _traceCoreOn);   /* projector */
 extern void CcdModuleInit(char **);
 extern void CmiMemoryInit(char **);
