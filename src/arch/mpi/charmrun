@@ -89,7 +89,7 @@ cd $indir
 # This is the actual command to run the job:
 cat \$PBS_NODEFILE
 $mpirun -np $pes $extra $args
-echo STATUS: $?
+echo STATUS: \$?
 EOF
         chmod 755 $script
 	while [ -z "$jobid" ]
