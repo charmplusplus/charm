@@ -1540,7 +1540,7 @@ void SdagConstruct::generateTrace()
       sprintf(text, "%s_%s", CParsedFile::className->charstar(), traceName->charstar());
       // remove blanks
       for (int i=0; i<strlen(text); i++)
-        if (isblank(text[i])) text[i]='_';
+        if (text[i]==' '||text[i]=='\t') text[i]='_';
     }
     else {
       sprintf(text, "%s%s", CParsedFile::className->charstar(), label->charstar());
