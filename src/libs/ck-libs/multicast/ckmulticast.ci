@@ -1,0 +1,26 @@
+
+module CkMulticast {
+  message cookieMsg;
+  message multicastSetupMsg {
+    CkArrayIndexMax arrIdx[];
+    int  lastKnown[];
+  };
+  message multicastGrpMsg {
+    char msg[];
+  };
+  message ReductionMsg {
+    char data[];
+  };
+  
+  group CkMulticastMgr {
+    entry CkMulticastMgr(void);
+    entry void recvMsg(multicastGrpMsg *m);
+    entry [threaded] void init(CkSectionID sid) stacksize=10k;
+    entry [threaded] void reset(CkSectionID sid);
+    entry [sync, threaded] void teardown(CkSectionID sid);
+    entry void freeup(CkSectionID sid);
+    entry [sync, threaded] cookieMsg * setup(multicastSetupMsg *);
+    // reduction
+    entry void recvRedMsg(ReductionMsg *msg);
+  };
+};
