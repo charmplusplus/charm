@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-08 16:35:12  gursoy
+ * Revision 2.1  1995-06-09 16:43:47  gursoy
+ * Initial implementation of CmiMyRank
+ *
+ * Revision 2.0  1995/06/08  16:35:12  gursoy
  * Reorganized directory structure
  *
  ***************************************************************************/
@@ -312,7 +315,7 @@ void **pbuf ;
 CmiMyRank()
 {
    /* to be implemented */
-   return 0;
+   return CmiMyPe();
 }
 
 
