@@ -182,7 +182,9 @@ void GenerateStructsFns(ofstream& top, ofstream& bot)
   /* Output ids for readonly messages */
   for ( r=thismodule->readonlys; r!=NULL; r=r->next ) 
     if ( r->ismsg ) {
-      top << "int _CK_index_" << r->name << ";" << endl ;
+      //       top << "int _CK_index_" << r->name << ";" << endl ;
+      // this declaration is needed only in bot. changed on 11/20/96 - sanjay
+      bot << "int _CK_index_" << r->name << ";" << endl ;
 // #### add isExtern to Readonly
 //      if (!r->isExtern())
 //        bot << "int _CK_index_" << r->name << ";" << endl ;
