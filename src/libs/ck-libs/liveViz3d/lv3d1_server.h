@@ -118,6 +118,11 @@ public:
 	virtual void LV3D_Prepare(void);
 	
 	/**
+	  Participate in load balancing.
+	*/
+	virtual void LV3D_DoBalance(void);
+	
+	/**
 	  This request is broadcast every time a client viewpoint changes.
 	  Internally, it asks the stored CkViewables if they should redraw,
 	  and if so, queues up a LV3DRenderMsg.

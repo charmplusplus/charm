@@ -19,7 +19,6 @@
 #define CMK_LIVEVIZ3D_SERVER 1
 #endif
 
-
 /// Private class that stores object data for the universe client side.
 class LV3D_Universe_Table;
 

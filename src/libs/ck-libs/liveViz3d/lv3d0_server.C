@@ -16,6 +16,7 @@ void _registerliveViz(void);
 // #include "lv3d1.decl.h" //For LV3D1 registration (for .def file)
 
 static /* readonly */ CProxy_LV3D0_Manager mgrProxy;
+static /* readonly */ int LV3D_Disable_Ship_Prio=0;
 #define masterProcessor 0
 
 /**
@@ -183,6 +184,7 @@ public:
 	/// A local object has a new view.
 	///  We are passed in our reference to this object.
 	void add(LV3D0_ViewMsg *v) {
+		if (LV3D_Disable_Ship_Prio) v->prio=0;
 		CkViewPrioHolder old=id2view.get(v->id);
 		/// FIXME: messages may come out of order-- check framenumber
 		if (old.v!=0) 
@@ -401,6 +403,29 @@ static void emptyDoneFn(void *param,void *msg) /* stage 3 */
 	delete s;
 }
 
+/*
+"lv3d_balance" CCS handler:
+	Run load balancing.
+*/
+extern "C" void LV3D0_balance(char *msg) 
+{
+	CkPrintf("CCS call to LV3D0_balance\n");
+	theMgr->doBalance();
+	CmiFree(msg);
+}
+
+/*
+"lv3d_quit" CCS handler:
+	Shut down the program.
+*/
+extern "C" void LV3D0_quit(char *msg) 
+{
+	CkPrintf("Exiting: CCS call to LV3D0_quit\n");
+	CcsSendReply(0,0);
+	CmiFree(msg);
+	CkExit();
+}
+
 /**
 Register for libsixty redraw requests.  This routine
 must be called exactly once on processor 0.
@@ -415,6 +440,8 @@ void LV3D0_Init(LV3D_Universe *clientUniverse,LV3D_ServerMgr *mgr)
 	CcsRegisterHandler("lv3d_newViewpoint",(CmiHandler)LV3D0_newViewpoint);
 	CcsRegisterHandler("lv3d_getViews",(CmiHandler)LV3D0_getViews);
 	CcsRegisterHandler("lv3d_qd",(CmiHandler)LV3D0_qd);
+	CcsRegisterHandler("lv3d_balance",(CmiHandler)LV3D0_balance);
+	CcsRegisterHandler("lv3d_quit",(CmiHandler)LV3D0_quit);
 	CProxy_LV3D0_Manager::ckNew();
 }
 

@@ -1,5 +1,6 @@
 module lv3d0 {
 	message LV3D_ViewpointMsg;
+	readonly int LV3D_Disable_Ship_Prio;
 	
 	message LV3D0_ViewMsg {
 		unsigned char view[];

@@ -29,6 +29,7 @@ public:
 	virtual ~LV3D_ServerMgr();
 	virtual void newClient(int clientID) =0;
 	virtual void newViewpoint(LV3D_ViewpointMsg *m) =0;
+	virtual void doBalance(void) =0;
 };
 
 /**

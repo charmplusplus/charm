@@ -8,6 +8,10 @@
 */
 #include "lv3d1_server.h"
 
+/* Readonlies, set only via a special CCS request */
+int LV3D_Disable_Render_Prio;
+int LV3D_Verbosity;
+
 /************** LV3D_Array: client interface & render requests ************
 Represents the list of objects to be viewed in the scene.
 */
@@ -91,11 +95,9 @@ public:
 			renderUpdate(m);
 			
 			int prioAdj=0;
-			array->thisProxy[array->thisIndexMax].LV3D_Render(
-				LV3D_RenderMsg::new_(
-					m->clientID,m->frameID,0,prioAdj
-				)
-			);
+			LV3D_RenderMsg *m= LV3D_RenderMsg::new_(
+				m->clientID,m->frameID,0,prioAdj);
+			array->thisProxy[array->thisIndexMax].LV3D_Render(m);
 		  }
 		}
 	}
@@ -125,6 +127,7 @@ public:
 /* The array itself just forwards everything to the impl_LV3D_Array */
 void LV3D_Array::init(void) {
 	impl=new impl_LV3D_Array(this);
+	usesAtSync=CmiTrue;
 }
 
 void LV3D_Array::addViewable(CkViewable *v) {
@@ -136,6 +139,11 @@ void LV3D_Array::removeViewable(CkViewable *v) {
 void LV3D_Array::pup(PUP::er &p) {
 	CBase_LV3D_Array::pup(p);
 	/* everything in impl can be thrown out during a migration */
+	if (LV3D_Verbosity>1) {
+		const int *data=thisIndexMax.data();
+		CkPrintf("LV3DArray(%d,%d,%d) pup on PE %d\n",
+			data[0],data[1],data[2],CkMyPe());
+	}
 }
 	
 LV3D_Array::~LV3D_Array() {
@@ -151,7 +159,12 @@ void LV3D_Array::LV3D_NewClient(int clientID)
 {
 	impl->newClient(clientID);
 }
-	
+
+/// Perform load balancing now.	
+void LV3D_Array::LV3D_DoBalance(void) {
+	AtSync();
+}
+
 /**
   This request is broadcast every time a client viewpoint changes.
   Internally, it asks the stored CkViewables if they should redraw,
@@ -240,6 +253,7 @@ LV3D_RenderMsg *LV3D_RenderMsg::new_(
 	m->prioAdj=prioAdj;
 	unsigned int *p=(unsigned int *)CkPriorityPtr(m);
 	p[0]=0x80000000u+(frame-prioAdj);
+	if (LV3D_Disable_Render_Prio) p[0]=0;
 	CkSetQueueing(m,CK_QUEUEING_BFIFO);
 	return m;
 }
@@ -258,6 +272,9 @@ public:
 	virtual void newViewpoint(LV3D_ViewpointMsg *m) {
 		a.LV3D_Viewpoint(m);
 	}
+	virtual void doBalance(void) {
+		a.LV3D_DoBalance();
+	}	
 };
 
 void LV3D1_Init(CkArrayID aid,LV3D_Universe *theUniverse)
