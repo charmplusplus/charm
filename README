@@ -144,8 +144,40 @@ also be specified on the command line, using the -D option.  For
 example,
     > ./build charm++ net-linux -O -DCMK_OPTIMIZE=1
 
-CMK_OPTIMIZE: Turn on optimizations in Charm++.
+CMK_OPTIMIZE: Turn on optimizations in Charm++/Converse. This disbles most of
+the run-time checking performed by Converse and Charm++ runtime. This option
+should be used only after the program has been debugged. Also, this option
+disables Converse/Charm++ tracing mechanisms such as projections and summary.
 
+CMK_THREADS_USE_ISOMALLOC: Ths option specifies that the user-level threads in
+Converse/Charm++ be migratable using a method called isomalloc. The
+isomalloc-based threads make sure that the thread's stack spans a unique range
+of virtual addresses across all the processors. Thus, references to stack
+remain valid even when a thread migrates to different processor.
+
+CMK_THREADS_USE_COPY_STACK: This option specifies that the user-level threads
+in Converse/Charm++ be migratable by using a method where the used portion of a
+thread's stack is copied in and out of a main stack on context-switch. Since
+the main (process) stack spans the same range of virtual addresses in all
+processes in a homogeneous cluster, references to stack remain valid across al
+te processors even after a thread migrates.
+
+CMK_THREADS_USE_PTHREADS: This is an alternate implementation of
+Converse/Charm++ user-level threads that use Posix threads. They have higher
+(about 10 times) context-switching costs over the default implementation of
+threads in Converse. However, they are more portable. In particular, they avoid
+some of the known problems in the way current linuxthreads implementation
+interacts with the default user-level threads in Converse. Also, memory
+debugging tols such as purify are incompatible with Converse's default
+user-level threads. The implementation based on posix threads can be used for
+memory debugging with purify.
+
+CMK_TRUECRASH: The net-* version of Converse trap a number of signals such as
+SIGSEGV and SIGBUS to gracefully handle premature termination of Converse
+programs. The downside to this is that these signals do not produce core dumps
+for post-mortem debugging. Setting CMK_TRUECRASH to 1 while building
+Converse/Charm++ on these machines allows core dumps to be produced on abnormal
+terminations.
 
 BUILDING A PROGRAM
 ==================
