@@ -1,7 +1,7 @@
-\documentstyle[11pt]{report}
+\documentclass[11pt]{report}
 
 \newif\ifpdf
-\ifx\pdfoutout\undefined
+\ifx\pdfoutput\undefined
   \pdffalse
 \else
   \pdfoutput=1
@@ -10,6 +10,7 @@
 
 \ifpdf
   \pdfcompresslevel=9
+  \usepackage[pdftex,colorlinks=true,plainpages=false]{hyperref}
 \else
 \fi
 
