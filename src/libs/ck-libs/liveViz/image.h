@@ -65,6 +65,14 @@ public:
 		for (int i=0;i<bpp;i++)
 			dest[i]+=src[i];
 	}
+	//Add the pixel at src to the one at dest, clipping instead of overflowing
+	inline void addPixelClip(const pixel_t *src,pixel_t *dest,
+		const pixel_t *clip) 
+	{
+		for (int i=0;i<bpp;i++)
+			dest[i]=clip[(int)dest[i]+(int)src[i]];
+	}
+	
 	
 	//Get a pixel
 	inline pixel_t *getPixel(int x,int y) {return data+x*bpp+y*row;}
@@ -104,6 +112,15 @@ public:
 		for (int y=0;y<src.ht;y++)
 		for (int x=0;x<src.wid;x++)
 			addPixel(src.getPixel(x,y),getPixel(x+sx,y+sy));
+	}
+	/*
+	 Add all of src onto this image starting at (x,y), clipping
+         values instead of overflowing.
+	 */
+	void addClip(int sx,int sy,const Image &src,const pixel_t *clip) {
+		for (int y=0;y<src.ht;y++)
+		for (int x=0;x<src.wid;x++)
+			addPixelClip(src.getPixel(x,y),getPixel(x+sx,y+sy),clip);
 	}
 };
 

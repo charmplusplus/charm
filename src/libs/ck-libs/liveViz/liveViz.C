@@ -51,8 +51,16 @@ static CkReductionMsg *imageCombine(int nMsg,CkReductionMsg **msgs);
 static void vizReductionHandler(void *r_msg);
 static CkReduction::reducerType imageCombineReducer;
 
+/*This array has 512 entries-- it's used to clip off large values
+when summing bytes (like image values) together.  On a machine with
+a small cache, it may be better to use an "if" instead of this table.
+*/
+static byte *overflowArray;
+
 static void liveVizNodeInit(void) {
 	imageCombineReducer=CkReduction::addReducer(imageCombine);
+	overflowArray=new byte[512];
+	for (int i=0;i<512;i++) overflowArray[i]=(byte)((i<256)?i:255);
 }
 
 #if 1
@@ -146,7 +154,8 @@ static CkReductionMsg *imageCombine(int nMsg,CkReductionMsg **msgs)
   CkReductionMsg *msg=allocateImageMsg(firstHdr->req,destRect,&dest);
   
 //Add each source image to the destination
-// Everything should be pre-clippped, so no further clipping is needed.
+// Everything should be pre-clippped, so no further geometric clipping is needed.
+// Brightness clipping, of course, is still necessary.
   Image destImage(destRect.wid(),destRect.ht(),bpp,dest);
   destImage.clear();
   for (m=0;m<nMsg;m++) {
@@ -157,7 +166,7 @@ static CkReductionMsg *imageCombine(int nMsg,CkReductionMsg **msgs)
 	    CkPrintf("imageCombine>    pe %d  image %d is (%d,%d, %d,%d)\n",
     	          CkMyPe(),m,mHdr->r.l,mHdr->r.t,mHdr->r.r,mHdr->r.b);
 	Image srcImage(mHdr->r.wid(),mHdr->r.ht(),bpp,src);
-	destImage.add(mHdr->r.l-destRect.l,mHdr->r.t-destRect.t,srcImage);
+	destImage.addClip(mHdr->r.l-destRect.l,mHdr->r.t-destRect.t,srcImage,overflowArray);
   }
 
   return msg;
