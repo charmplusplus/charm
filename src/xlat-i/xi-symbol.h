@@ -24,6 +24,7 @@ class Prefix {
 public:
   static const char *Proxy;
   static const char *ProxyElement;
+  static const char *ProxySection;
   static const char *Message;
   static const char *Index;
 };
@@ -451,6 +452,7 @@ class Chare : public TEntity {
     attrib_t attrib;
     int hasElement;//0-- no element type; 1-- has element type
     int forElement;//0-- applies to entire array/group; 1-- applies only to element
+    int hasSection; //1-- applies only to array section
 
     NamedType *type;
     MemberList *list;

@@ -16,6 +16,7 @@ const char *cur_file;
 
 const char *Prefix::Proxy="CProxy_";
 const char *Prefix::ProxyElement="CProxyElement_";
+const char *Prefix::ProxySection="CProxySection_";
 const char *Prefix::Message="CMessage_";
 const char *Prefix::Index="CkIndex_";
 
@@ -414,6 +415,7 @@ void NamedType::genProxyName(XStr& str,int forElement)
    if (forElement==1) str << Prefix::ProxyElement; 
    else if (forElement==0) str << Prefix::Proxy; 
    else if (forElement==-1) str << Prefix::Index;
+   else if (forElement==2) str << Prefix::ProxySection; 
    else die("Unrecognized forElement type passed to NamedType::genProxyName");
    print(str);
 }
@@ -447,8 +449,10 @@ void Chare::genIndexNames(XStr& str, const char *prefix,const char *middle,
 }
 char *Chare::proxyPrefix(void)
 {
-  if (forElement)
+  if (forElement==1)
     return (char *)Prefix::ProxyElement;
+  else if (forElement==2)
+    return (char *)Prefix::ProxySection;
   else
     return (char *)Prefix::Proxy;
 }
@@ -557,6 +561,12 @@ Chare::genDecls(XStr& str)
   	str << "/* ---------------- collective proxy -------------- */\n";
   	forElement=0;
   	genSubDecls(str);
+
+        if (hasSection) {
+  	  str << "/* ---------------- section proxy -------------- */\n";
+  	  forElement=2;
+  	  genSubDecls(str);
+	}
   	forElement=1;
   }
   
@@ -616,6 +626,7 @@ Group::Group(int ln, attrib_t Nattr,
 {
         hasElement=1;
 	forElement=1;
+	hasSection=0;
 	if (b==NULL) {//Add Group as a base class
 		if (isNodeGroup())
 			bases = new TypeList(new NamedType("NodeGroup"), NULL);
@@ -701,6 +712,7 @@ Array::Array(int ln, attrib_t Nattr, NamedType *index,
 {
         hasElement=1;
 	forElement=1;
+	hasSection=1;
 	index->print(indexSuffix);
 	if (indexSuffix!=(const char*)"none")
 		indexType<<"CkArrayIndex"<<indexSuffix;
@@ -737,7 +749,7 @@ Array::genSubDecls(XStr& str)
   bases->getFirst()->genProxyName(super,forElement);
   sharedDisambiguation(str,super);
   
-  if (forElement) 
+  if (forElement==1) 
   {/*For an individual element (no indexing)*/
     str << "    CK_DISAMBIG_ARRAY_ELEMENT("<<super<<")\n";
     str << "    "<<type<<tvars()<<" *ckLocal(void) const\n";
@@ -750,7 +762,7 @@ Array::genSubDecls(XStr& str)
          "    "<<ptype<<"(const CkArrayID &aid,const "<<indexType<<" &idx)\n"
          "        :";genProxyNames(str, "",NULL, "(aid,idx)", ", ");str<<" {}\n";  
   } 
-  else 
+  else if (forElement==0)
   {/*Collective, indexible version*/    
     str << "    CK_DISAMBIG_ARRAY("<<super<<")\n";
 
@@ -791,6 +803,43 @@ Array::genSubDecls(XStr& str)
          "        :";genProxyNames(str, "",NULL, "(aid,dTo)", ", ");str<<" {}\n";
     str <<"    "<<ptype<<"(const CkArrayID &aid) \n"
          "        :";genProxyNames(str, "",NULL, "(aid)", ", ");str<<" {}\n";
+  }
+  else if (forElement==2)
+  { /* for Section, indexible version*/    
+    str << "    CK_DISAMBIG_ARRAY_SECTION("<<super<<")\n";
+
+    XStr etype; etype<<Prefix::ProxyElement<<type;
+    if (indexSuffix!=(const char*)"none")
+    {
+      str <<
+    "//Generalized array indexing:\n"
+    "    "<<etype<<" operator [] (const "<<indexType<<" &idx) const\n"
+    "        {return "<<etype<<"(ckGetArrayID(), idx, ckDelegatedIdx());}\n"
+    "    "<<etype<<" operator() (const "<<indexType<<" &idx) const\n"
+    "        {return "<<etype<<"(ckGetArrayID(), idx, ckDelegatedIdx());}\n";
+    }
+  
+  //Add specialized indexing for these common types
+    if (indexSuffix==(const char*)"1D")
+    {
+    str << 
+    "    "<<etype<<" operator [] (int idx) const \n"
+    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex1D(idx), ckDelegatedIdx());}\n"
+    "    "<<etype<<" operator () (int idx) const \n"
+    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex1D(idx), ckDelegatedIdx());}\n";
+    } else if (indexSuffix==(const char*)"2D") {
+    str << 
+    "    "<<etype<<" operator () (int i0,int i1) const \n"
+    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex2D(i0,i1), ckDelegatedIdx());}\n";
+    } else if (indexSuffix==(const char*)"3D") {
+    str << 
+    "    "<<etype<<" operator () (int i0,int i1,int i2) const \n"
+    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex3D(i0,i1,i2), ckDelegatedIdx());}\n";
+    }
+    str <<"    "<<ptype<<"(const CkArrayID &aid, CkArrayIndexMax *elems, int nElems, CkGroupID dTo) \n"
+         "        :";genProxyNames(str, "",NULL, "(aid,elems,nElems,dTo)", ", ");str << " {}\n";
+    str <<"    "<<ptype<<"(const CkArrayID &aid, CkArrayIndexMax *elems, int nElems) \n"
+         "        :";genProxyNames(str, "",NULL, "(aid,elems,nElems)", ", ");str<<" {}\n";
   }
   
   if(list)
@@ -863,6 +912,10 @@ Chare::genDefs(XStr& str)
     { //Define the entry points for the element
       forElement=0;
       list->genDefs(str);
+      if (hasSection) {  // for Section
+        forElement=2;
+        list->genDefs(str);
+      }
       forElement=1;
     }
     str << "#endif /*CK_TEMPLATES_ONLY*/\n";
@@ -1525,7 +1578,7 @@ void Entry::genArrayDecl(XStr& str)
     genArrayStaticConstructorDecl(str);
   } else {
     // entry method broadcast declaration
-    str << "    "<<retType<<" "<<name<<"("<<paramType(1)<<") const;\n";
+    str << "    "<<retType<<" "<<name<<"("<<paramType(1)<<") ;\n";   // no const
   }
 }
 
@@ -1539,12 +1592,13 @@ void Entry::genArrayDefs(XStr& str)
     if (isCreateHere()) ifNot="CkArray_IfNotThere_createhere";
     if (isCreateHome()) ifNot="CkArray_IfNotThere_createhome";
     
+    int isForElement = container->isForElement();
     XStr retStr; retStr<<retType;
-    str << makeDecl(retStr,1)<<"::"<<name<<"("<<paramType(0)<<") const\n";
+    str << makeDecl(retStr,1)<<"::"<<name<<"("<<paramType(0)<<") \n"; //no const
     str << "{\n"<<marshallMsg();
     str << "  CkArrayMessage *impl_amsg=(CkArrayMessage *)impl_msg;\n";
     str << "  impl_amsg->array_setIfNotThere("<<ifNot<<");\n";
-    if (container->isForElement())
+    if (isForElement)
       str << "    ckSend(impl_amsg, "<<epIdx()<<");\n";
     else
       str << "    ckBroadcast(impl_amsg, "<<epIdx()<<");\n";
@@ -1558,7 +1612,7 @@ void Entry::genArrayStaticConstructorDecl(XStr& str)
     if (((Array *)container) ->is1D())
       str<< //With numInitial
       "    static CkArrayID ckNew("<<paramComma(1)<<"int numInitial,CkGroupID mapID=_RRMapID);\n";
-  if (container->isForElement())
+  if (container->isForElement()==1)
     str<<
       "    void insert("<<paramComma(1)<<"int onPE=-1);";
 }
@@ -1578,7 +1632,7 @@ void Entry::genArrayStaticConstructorDefs(XStr& str)
 	 "   return CkArrayID(ckCreateArray1D("<<epIdx()<<","<<callMsg<<",numElements,mapID));\n"
        "}\n";
 
-    if (container->isForElement())
+    if (container->isForElement()==1)
       str<<
       makeDecl("void",1)<<"::insert("<<paramComma(0)<<"int onPE)\n"
       "{ \n"<<marshallMsg(0)<<
