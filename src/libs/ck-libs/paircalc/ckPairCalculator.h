@@ -17,7 +17,7 @@
 #define _PAIRCALC_USE_ZGEMM_
 #define _PAIRCALC_USE_DGEMM_
 // Flags not yet correct
-//#define _PAIRCALC_SECONDPHASE_LOADBAL_
+#define _PAIRCALC_SECONDPHASE_LOADBAL_
 
 
 #ifdef FORTRANUNDERSCORE

@@ -655,7 +655,7 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
       segments+=1;
   int blocksize=grainSize/segments;
   int priority=0xFFFFFFFF;
-  if(!symmetric){    // Not right in value given!!!
+  if(!symmetric){    
     for(int segment=0;segment < segments;segment++)
       {  
 	CkArrayIndex4D idx(thisIndex.w, segment*grainSize, thisIndex.y, thisIndex.z);
@@ -670,25 +670,43 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
       }
   }
   else { // else part is NOT load balanced yet!!!
-
     CkArrayIndex4D idx(thisIndex.w, 0, thisIndex.y, thisIndex.z);
-    priorSumMsg *pmsg = new (N*grainSize, 8*sizeof(int) )priorSumMsg();
-    pmsg->N=N*grainSize;
-    memcpy(pmsg->result,mynewData, pmsg->N*sizeof(complex));
-    pmsg->cb= cb;
-    *((int*)CkPriorityPtr(pmsg)) = priority;
-    CkSetQueueing(pmsg, CK_QUEUEING_IFIFO); 
-    thisProxy(idx).sumPartialResult(pmsg);
-    if (thisIndex.y != thisIndex.x){
+    thisProxy(idx).sumPartialResult(N*grainSize, mynewData, thisIndex.z);
+    if (thisIndex.y != thisIndex.x){   // FIXME: rowNum will alway == thisIndex.x
       CkArrayIndex4D idx(thisIndex.w, 0, thisIndex.x, thisIndex.z);
-      priorSumMsg *pmsg = new (N*grainSize, 8*sizeof(int) )priorSumMsg();
-      pmsg->N=N*grainSize;
-      memcpy(pmsg->result,othernewData, pmsg->N*sizeof(complex));
-      pmsg->cb= cb;
-      *((int*)CkPriorityPtr(pmsg)) = priority;
-      CkSetQueueing(pmsg, CK_QUEUEING_IFIFO); 
-      thisProxy(idx).sumPartialResult(pmsg);  
+      thisProxy(idx).sumPartialResult(N*grainSize, othernewData, thisIndex.z);
     }
+
+/*
+    int segmentsSymm[2];
+    findSegNumber(thisIndex.x, thisIndex.y, S, grainSize, segmentsSymm);
+    for(int segment=0;segment < segmentsSymm[0];segment++)
+      {
+	  CkArrayIndex4D idx(thisIndex.w, thisIndex.y, thisIndex.y + segment*grainSize, thisIndex.z);
+	  partialResultMsg *msg = new (N*blocksize, 8*sizeof(int) )partialResultMsg;
+	  msg->N=N*blocksize;
+	  msg->myoffset = segment*blocksize;
+	  memcpy(msg->result,mynewData+segment*N*blocksize,msg->N*sizeof(complex));
+	  msg->cb= cb;
+	  *((int*)CkPriorityPtr(msg)) = priority;
+	  CkSetQueueing(msg, CK_QUEUEING_IFIFO); 
+	  thisProxy(idx).sumPartialResult(msg);  
+      }
+    if (thisIndex.y != thisIndex.x){ 
+	for(int segment=0;segment < segmentsSymm[1];segment++)
+	{  
+	  CkArrayIndex4D idx(thisIndex.w, thisIndex.x, thisIndex.x + segment*grainSize, thisIndex.z);
+	  partialResultMsg *msg = new (N*blocksize, 8*sizeof(int) )partialResultMsg;
+	  msg->N=N*blocksize;
+	  msg->myoffset = segment*blocksize;
+	  memcpy(msg->result,mynewData+segment*N*blocksize,msg->N*sizeof(complex));
+	  msg->cb= cb;
+	  *((int*)CkPriorityPtr(msg)) = priority;
+	  CkSetQueueing(msg, CK_QUEUEING_IFIFO); 
+	  thisProxy(idx).sumPartialResult(msg);  
+	}
+    }
+*/
   }
 #endif
 
@@ -742,7 +760,7 @@ void
 PairCalculator::sumPartialResult(int size, complex *result, int offset)
 {
 #ifdef _PAIRCALC_DEBUG_
-  CkPrintf("[%d %d %d %d]: sum result from %d\n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z, offset);
+  CkPrintf("[%d %d %d %d]: sum result from %d, count %d\n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z, offset, sumPartialCount);
 #endif
 
   sumPartialCount++;
@@ -849,8 +867,7 @@ void PairCalcReducer::startMachineReduction() {
     }
     
     if(isAllReduce) {
-        //CkPrintf("Calling BroadcastEntire\n");
-        broadcastEntireResult(size, dst_matrix,  symmtype);
+         broadcastEntireResult(size, dst_matrix,  symmtype);
         delete [] dst_matrix;
     }
     else {
