@@ -13,3 +13,4 @@ CMK_QT='generic64'
 CMK_XIOPTS=''
 CMK_F90LIBS='-lUfor -lfor -lFutil'
 CMK_MOD_EXT="mod"
+CMK_NO_BUILD_SHARED=true
