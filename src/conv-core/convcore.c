@@ -587,6 +587,11 @@ void CsdEndIdle(void)
   CcdRaiseCondition(CcdPROCESSOR_BEGIN_BUSY) ;
 }
 
+void CmiHandleMessage(void *msg)
+{
+	CpvAccess(cQdState)->mProcessed++;
+	(CmiGetHandlerFunction(msg))(msg);
+}
 
 #if CMK_CMIDELIVERS_USE_COMMON_CODE
 
@@ -597,12 +602,6 @@ void CmiDeliversInit()
 int CmiDeliverMsgs(int maxmsgs)
 {
   return CsdScheduler(maxmsgs);
-}
-
-void CmiHandleMessage(void *msg)
-{
-	CpvAccess(cQdState)->mProcessed++;
-	(CmiGetHandlerFunction(msg))(msg);
 }
 
 void CsdSchedulerState_new(CsdSchedulerState_t *s)
@@ -678,7 +677,7 @@ void CsdScheduleForever(void)
     } else { /*No message available-- go (or remain) idle*/
       SCHEDULE_IDLE
     }
-    if (CpvAccess(_ccd_numchecks)-- <= 0) CcdCallBacks();
+    CsdPeriodic();
   }
 }
 int CsdScheduleCount(int maxmsgs)
@@ -695,7 +694,7 @@ int CsdScheduleCount(int maxmsgs)
     } else { /*No message available-- go (or remain) idle*/
       SCHEDULE_IDLE
     }
-    if (CpvAccess(_ccd_numchecks)-- <= 0) CcdCallBacks();
+    CsdPeriodic();
   }
   return maxmsgs;
 }
@@ -703,12 +702,15 @@ int CsdScheduleCount(int maxmsgs)
 void CsdSchedulePoll(void)
 {
   SCHEDULE_TOP
-  while (NULL!=(msg = CsdNextMessage(&state)))
+  while (1)
   {
-     SCHEDULE_MESSAGE 
-     if (CpvAccess(_ccd_numchecks)-- <= 0) CcdCallBacks();
+	CsdPeriodic();
+	if (NULL!=(msg = CsdNextMessage(&state)))
+	{
+	     SCHEDULE_MESSAGE 
+     	}
+	else break;
   }
-  if (CpvAccess(_ccd_numchecks)-- <= 0) CcdCallBacks();
 }
 
 void CmiDeliverSpecificMsg(handler)
@@ -1486,10 +1488,7 @@ static void CIdleTimeoutInit(char **argv)
  *****************************************************************************/
 
 extern void CrnInit(void);
-
-#if CMK_THREADS_USE_ISOMALLOC
-extern void CthHandlerInit(void);
-#endif
+extern void CmiIsomallocInit(char **argv);
 
 void ConverseCommonInit(char **argv)
 {
@@ -1503,12 +1502,10 @@ void ConverseCommonInit(char **argv)
   traceInit(argv);
 #endif
   CmiHandlerInit();
-#if CMK_THREADS_USE_ISOMALLOC
-  CthHandlerInit();
-#endif
 #if CMK_CCS_AVAILABLE
   CcsInit(argv);
 #endif
+  CmiIsomallocInit(argv);
   CpdInit();
   CmiDeliversInit();
   CsdInit(argv);
