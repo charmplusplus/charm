@@ -22,10 +22,18 @@
 #
 ##############################################################################
 
-set OPTS_CC=()
-set OPTS_CPLUS=()
-set OPTS_LD=()
 set OPTS_CPP=()
+set OPTS_LDRO=()
+set OPTS_CC=()
+set OPTS_CXX=()
+set OPTS_LD=()
+set OPTS_LDXX=()
+
+unset OVERRIDE_CC
+unset OVERRIDE_CXX
+unset OVERRIDE_LD
+unset OVERRIDE_LDXX
+
 set FILES=()
 set OBJECTFILES=()
 set LIBRARIES=()
@@ -100,7 +108,7 @@ while ($argindex <= $#argv)
             breaksw
 
         case "-c++"
-            set OVERRIDE_CPLUS=( $argv[$argindex] )
+            set OVERRIDE_CXX=( $argv[$argindex] )
             @ argindex = $argindex + 1
             breaksw
 
@@ -109,13 +117,28 @@ while ($argindex <= $#argv)
             @ argindex = $argindex + 1
             breaksw
 
+        case "-ld++"
+	    set OVERRIDE_LDXX=( $argv[$argindex] )
+            @ argindex = $argindex + 1
+            breaksw
+
+        case "-cpp-option"
+	    set OPTS_CPP=( $OPTS_CPP $argv[$argindex] )
+	    @ argindex = $argindex + 1
+	    breaksw
+
+        case "-ldro-option"
+	    set OPTS_LDRO=( $OPTS_LDRO $argv[$argindex] )
+	    @ argindex = $argindex + 1
+            breaksw
+
         case "-cc-option"
             set OPTS_CC=( $OPTS_CC $argv[$argindex] )
             @ argindex = $argindex + 1
             breaksw
 
         case "-c++-option"
-            set OPTS_CPLUS=( $OPTS_CPLUS $argv[$argindex] )
+            set OPTS_CXX=( $OPTS_CXX $argv[$argindex] )
             @ argindex = $argindex + 1
             breaksw
 
@@ -124,6 +147,11 @@ while ($argindex <= $#argv)
             @ argindex = $argindex + 1
             breaksw
 
+        case "-ld++-option"
+	    set OPTS_LDXX=( $OPTS_LDXX $argv[$argindex] )
+            @ argindex = $argindex + 1
+            breaksw
+	    
         case "-c":
             # This is ignored.
             breaksw
@@ -140,31 +168,32 @@ while ($argindex <= $#argv)
 
         case "-D*"
             set OPTS_CPP=( $OPTS_CPP "$arg" )
-            set OPTS_CC=( $OPTS_CC "$arg" )
-            set OPTS_CPLUS=( $OPTS_CPLUS "$arg" )
+            set OPTS_CC= ( $OPTS_CC  "$arg" )
+            set OPTS_CXX=( $OPTS_CXX "$arg" )
             breaksw
 
         case "-I*"
             set OPTS_CPP=( $OPTS_CPP "$arg" )
-            set OPTS_CC=( $OPTS_CC "$arg" )
-            set OPTS_CPLUS=( $OPTS_CPLUS "$arg" )
+            set OPTS_CC= ( $OPTS_CC  "$arg" )
+            set OPTS_CXX=( $OPTS_CXX "$arg" )
             breaksw
 
         case "-L*"
-            set OPTS_CC=( $OPTS_CC "$arg" )
-            set OPTS_CPLUS=( $OPTS_CPLUS "$arg" )
-            set OPTS_LD=( $OPTS_LD "$arg" )
+            set OPTS_LD=  ( $OPTS_LD   "$arg" )
+            set OPTS_LDXX=( $OPTS_LDXX "$arg" )
+	    set OPTS_LDRO=( $OPTS_LDRO "$arg" )
             breaksw
 
         case "-g"
-            set OPTS_CC=( $OPTS_CC $arg )
-            set OPTS_CPLUS=( $OPTS_CPLUS $arg )
-            set OPTS_LD=( $OPTS_LD $arg )
+            set OPTS_CC=  ( $OPTS_CC   $arg )
+            set OPTS_CXX= ( $OPTS_CXX  $arg )
+            set OPTS_LD=  ( $OPTS_LD   $arg )
+            set OPTS_LDXX=( $OPTS_LDXX $arg )
             breaksw
 
         case "-O*"
-            set OPTS_CC=( $OPTS_CC $arg )
-            set OPTS_CPLUS=( $OPTS_CPLUS $arg )
+            set OPTS_CC= ( $OPTS_CC $arg )
+            set OPTS_CXX=( $OPTS_CXX $arg )
             breaksw
 
         case "-l*"
@@ -172,15 +201,17 @@ while ($argindex <= $#argv)
             breaksw
 
         case "-s"
-            set OPTS_LD=( $OPTS_LD $arg )
+            set OPTS_LD=  ( $OPTS_LD   $arg )
+	    set OPTS_LDXX=( $OPTS_LDXX $arg )
             breaksw
 
         case "-*"
             echo "passing unrecognized option $arg to all compilers and linkers"
-            set OPTS_CC=( $OPTS_CC $arg )
-            set OPTS_CPLUS=( $OPTS_CPLUS $arg )
-            set OPTS_LD=( $OPTS_LD $arg )
-	    set OPTS_CPP=( $OPTS_CPP $arg )
+	    set OPTS_CPP= ( $OPTS_CPP  $arg )
+            set OPTS_CC=  ( $OPTS_CC   $arg )
+            set OPTS_CXX= ( $OPTS_CXX  $arg )
+            set OPTS_LD=  ( $OPTS_LD   $arg )
+	    set OPTS_LDXX=( $OPTS_LDXX $arg )
             breaksw
 
         case "*.*"
@@ -284,9 +315,9 @@ if ($?OVERRIDE_CC) then
     set CMK_CC = ( $OVERRIDE_CC $CMK_CC )
 endif
 
-if ($?OVERRIDE_CPLUS) then
+if ($?OVERRIDE_CXX) then
     set CMK_CXX[1]=""
-    set CMK_CXX = ( $OVERRIDE_CPLUS $CMK_CXX )
+    set CMK_CXX = ( $OVERRIDE_CXX $CMK_CXX )
 endif
 
 if ($?OVERRIDE_LD) then
@@ -365,8 +396,8 @@ foreach FILE ($FILES)
       if ($?VERBOSE) echo "$CHARMBIN/charmxlat++ $TMP.space $TMP.C"
       $CHARMBIN/charmxlat++ $TMP.space $TMP.C
       if ($status) goto failure
-      if ($?VERBOSE) echo "$CMK_CXX $OPTS_CPLUS -I$CHARMINC -c $TMP.C"
-      $CMK_CXX $OPTS_CPLUS -I$CHARMINC -c $TMP.C
+      if ($?VERBOSE) echo "$CMK_CXX $OPTS_CXX -I$CHARMINC -c $TMP.C"
+      $CMK_CXX $OPTS_CXX -I$CHARMINC -c $TMP.C
       if ($status) goto failure
       if ($?OBJECT == 0) then
         if ($?VERBOSE) echo "/bin/mv $TMP.o $BASE.o"
@@ -385,8 +416,8 @@ foreach FILE ($FILES)
       endif
       breaksw
     case "*.C"
-      if ($?VERBOSE) echo "$CMK_CXX $OPTS_CPLUS -I$CHARMINC -c $BASE.C"
-      $CMK_CXX $OPTS_CPLUS -I$CHARMINC -c $BASE.C
+      if ($?VERBOSE) echo "$CMK_CXX $OPTS_CXX -I$CHARMINC -c $BASE.C"
+      $CMK_CXX $OPTS_CXX -I$CHARMINC -c $BASE.C
       if ($status) goto failure
       if ($?OBJECT) then
 	if ($OBJECT != $BASE.o) set DELETE=( $DELETE $BASE.o )
@@ -394,8 +425,8 @@ foreach FILE ($FILES)
       endif
       breaksw
     case "*.cxx"
-      if ($?VERBOSE) echo "$CMK_CXX $OPTS_CPLUS -I$CHARMINC -c $BASE.cxx"
-      $CMK_CXX $OPTS_CPLUS -I$CHARMINC -c $BASE.cxx
+      if ($?VERBOSE) echo "$CMK_CXX $OPTS_CXX -I$CHARMINC -c $BASE.cxx"
+      $CMK_CXX $OPTS_CXX -I$CHARMINC -c $BASE.cxx
       if ($status) goto failure
       if ($?OBJECT) then
 	if ($OBJECT != $BASE.o) set DELETE=( $DELETE $BASE.o )
@@ -439,8 +470,8 @@ switch ($OBJECT)
             if ($status) goto failure
         endif
     else
-        if ( $?VERBOSE ) echo $CMK_LDRO $OBJECT $OPTS_LD $OBJECTFILES
-        $CMK_LDRO $OBJECT $OPTS_LD $OBJECTFILES
+        if ( $?VERBOSE ) echo $CMK_LDRO $OBJECT $OBJECTFILES
+        $CMK_LDRO $OBJECT $OBJECTFILES
         if ($status) goto failure
     endif
     goto copyobj
@@ -548,8 +579,8 @@ endif
 echo "linking $OBJECT with -language $LANGUAGE"
 
 set DELETE=(CHARMC-USR.TMP.o CHARMC-USR.TMP.nm $DELETE)
-if ($?VERBOSE) echo "$CMK_LDRO CHARMC-USR.TMP.o $OPTS_LD $OBJECTFILES -L$CHARMLIB $LIBRARIES"
-$CMK_LDRO CHARMC-USR.TMP.o $OPTS_LD $OBJECTFILES -L$CHARMLIB $LIBRARIES
+if ($?VERBOSE) echo "$CMK_LDRO CHARMC-USR.TMP.o $OBJECTFILES -L$CHARMLIB $LIBRARIES"
+$CMK_LDRO CHARMC-USR.TMP.o $OBJECTFILES -L$CHARMLIB $LIBRARIES
 if ($status) goto failure
 nm CHARMC-USR.TMP.o | csh -fc "$CMK_NM_FILTER" > CHARMC-USR.TMP.nm
 if ($status) goto failure
