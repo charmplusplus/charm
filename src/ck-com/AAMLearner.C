@@ -49,8 +49,8 @@ Strategy *AAMLearner::optimizePattern(Strategy *strat,
         else if(hcost == mincost) 
             minstrat = USE_HYPERCUBE;               
 
-        CkPrintf("Choosing router %d, %g, %g, %g\n", minstrat, 
-                 mcost, hcost, dcost);
+        //CkPrintf("Choosing router %d, %g, %g, %g\n", minstrat, 
+        //       mcost, hcost, dcost);
         
         //if(minstrat != USE_DIRECT) {
         ostrat = new EachToManyMulticastStrategy

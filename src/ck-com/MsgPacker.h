@@ -41,7 +41,7 @@ inline void short_envelope::pup(PUP::er &p){
   char nints = 0;
 
   p | epIdx;
-  p | size;        
+  //  p | size;        
   //p | idx;
   
   //Complex pup of arrays, even want to save 3 bytes, GREEDY, GREEDY :)
@@ -52,15 +52,19 @@ inline void short_envelope::pup(PUP::er &p){
   idx.nInts = nints;
   p((int *)(idx.data()), idx.nInts);
   
-  p.pupCmiAllocBuf((void **)&data, size);
+  if(p.isUnpacking()) {
+      p.pupCmiAllocBuf((void **)&data);
+      size = SIZEFIELD(data);
+  }
+  else 
+      p.pupCmiAllocBuf((void **)&data, size);
 }
 
 struct CombinedMessage{
-
     char header[CmiReservedHeaderSize];
     CkArrayID aid;
-    int srcPE;
-    int nmsgs;
+    unsigned short srcPE;  //Will not work on a very large bluegene machine!
+    unsigned short nmsgs;
 };
 
 PUPbytes(CombinedMessage);

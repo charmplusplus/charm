@@ -198,6 +198,9 @@ void EachToManyMulticastStrategy::doneInserting(){
     if(routerID == USE_DIRECT && nexpected == 0)
         return;
     
+    if(MyPe < 0)
+        return;
+
     //ComlibPrintf("%d: DoneInserting \n", CkMyPe());    
     rstrat->doneInserting();
 }

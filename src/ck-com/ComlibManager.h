@@ -62,7 +62,7 @@ class ComlibInstanceHandle : public CkDelegateData {
     CkGroupID _dmid;
     int _srcPe;
     int toForward;
-    
+
  public:
     ComlibInstanceHandle();
     ComlibInstanceHandle(const ComlibInstanceHandle &h);
@@ -131,7 +131,7 @@ class ComlibManager: public CkDelegateMgr {
     //Number of strategies created by the user.
 
     //flags
-    int receivedTable, flushTable, barrierReached, barrier2Reached;
+    int receivedTable, setupComplete, barrierReached, barrier2Reached;
     CmiBool lbUpdateReceived;
 
     int bcount , b2count;

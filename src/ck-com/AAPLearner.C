@@ -50,8 +50,8 @@ Strategy *AAPLearner::optimizePattern(Strategy *strat,
     else if(hcost == mincost) 
         minstrat = USE_HYPERCUBE;
 
-    CkPrintf("Choosing router %d, %g, %g, %g, %g; %g : %g,%g,%g\n", minstrat, 
-             mcost, hcost, gcost, dcost, mincost, npes, msgsize, degree);
+    //CkPrintf("Choosing router %d, %g, %g, %g, %g; %g : %g,%g,%g\n", minstrat, 
+    //       mcost, hcost, gcost, dcost, mincost, npes, msgsize, degree);
     
     if(in_strat->getType() == ARRAY_STRATEGY) {
         CkArrayID said, daid;
