@@ -17,20 +17,11 @@
 #define VMI_DEVICENAME "converse"
 
 #include "vmi.h"
-//#include "crm.h"
-
-
 
 
 
 
 #define CMI_VMI_COLLECT_STATISTICS 0
-
-//#define CMK_BROADCAST_SPANNING_TREE 1
-#define CMK_BROADCAST_SPANNING_TREE 0
-
-
-
 
 
 /* This is the number of seconds to wait for connection setup. */
@@ -380,14 +371,6 @@ typedef struct
 #define CRM_MSG_REGISTER	1
 #define CRM_MSG_REMOVE		2
 #define CRM_MSG_FAILED		3
-
-/*
-typedef enum {
-  CMI_SEND_SYNC,
-  CMI_SEND_ASYNC,
-  CMI_SEND_FREE
-} CMI_SEND_MODE;
-*/
 
 /* Register Context. */
 typedef struct regMsg{

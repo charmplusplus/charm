@@ -15,29 +15,3 @@ CMK_QT='generic64'
 CMK_XIOPTS=''
 CMK_F90LIBS='-lvast90 -lg2c'
 CMK_MOD_EXT="vo"
-
-
-
-######################################################################
-##CMK_CC='gcc '
-#CMK_CC_RELIABLE='gcc '
-#CMK_CC_FASTEST='gcc '
-#CMK_C_DEBUG='-g'
-#CMK_C_OPTIMIZE='-O'
-#CMK_CXX_DEBUG='-g'
-#CMK_CXX_OPTIMIZE='-O'
-##CMK_LD='gcc -static '
-##CMK_LDXX='g++ -static '
-#CMK_LD77=''
-#CMK_M4='m4'
-#CMK_SUF='o'
-#CMK_AR='ar q'
-##CMK_LIBS='-lckqt'
-#CMK_SEQ_LIBS=''
-#CMK_SEQ_CC='gcc'
-#CMK_SEQ_LD='gcc'
-#CMK_SEQ_CXX='g++'
-#CMK_SEQ_LDXX='g++'
-#CMK_CPP_SUFFIX="ii"
-#CMK_XLATPP='charmxlat++ '
-
