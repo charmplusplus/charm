@@ -71,7 +71,7 @@ void FIFO_EnQueue_Front(queue, elt)
      void *elt;
 {
   if (queue->fill == queue->size) FIFO_Expand(queue);
-  queue->pull = ((queue->pull - 1) % queue->size);
+  queue->pull = ((queue->pull + queue->size - 1) % queue->size);
   queue->block[queue->pull] = elt;
   queue->fill++;
 }
@@ -98,7 +98,7 @@ void FIFO_DeQueue(queue, element)
 {
   if (queue->fill) {
     *element = queue->block[queue->pull];
-    queue->pull = (queue->pull + 1) % queue->size;
+    queue->pull = (queue->pull+1) % queue->size;
     queue->fill--;
   } else *element = 0;
 }
