@@ -15,10 +15,8 @@
 
 
 /* default as in busywaiting mode */
-#undef CMK_DISABLE_SIGNAL
 #undef CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT
 #undef CMK_WHEN_PROCESSOR_IDLE_USLEEP
-#define CMK_DISABLE_SIGNAL 		1
 #define CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT 1
 #define CMK_WHEN_PROCESSOR_IDLE_USLEEP 0
 
@@ -414,7 +412,7 @@ void CmiMachineInit()
   maxsize = gm_min_size_for_length(4096);
   Cmi_dgram_max_data = 4096 - DGRAM_HEADER_SIZE;
 */
-  maxsize = 21;
+  maxsize = 16;
 
   for (i=1; i<maxsize; i++) {
     int len = gm_max_length_for_size(i);
