@@ -1695,6 +1695,13 @@ int req_handle_ending(line)
   return REQ_OK;
 }
 
+int req_handle_abort(line)
+    char *line;
+{
+  fprintf(stderr, "%s\n", line+6);
+  exit(1);
+}
+
 int req_handle_scanf(line)
     char *line;
 {
@@ -1783,6 +1790,7 @@ int req_handle(line)
   else if (strcmp(cmd,"print")==0)      return req_handle_print(line);
   else if (strcmp(cmd,"printerr")==0)   return req_handle_printerr(line);
   else if (strcmp(cmd,"ending")==0)     return req_handle_ending(line);
+  else if (strcmp(cmd,"abort")==0)      return req_handle_abort(line);
   else if (strcmp(cmd,"getinfo")==0)    return req_handle_getinfo(line);
   else if (strcmp(cmd,"worker")==0)     return req_handle_worker(line);
   else return REQ_FAILED;
@@ -1917,7 +1925,8 @@ void req_worker(int workerno)
   for (i=0; i<numclients; i++) {
     while (1) {
       if (timeout <= 0) {
-	fprintf(stderr,"timeout waiting for nodes to connect\n");
+	sprintf(reply,"abort timeout waiting for nodes to connect\n");
+        req_write_to_host(hostfd, reply, strlen(reply)+1);
 	exit(1);
       }
       FD_ZERO(&rfds);
