@@ -107,4 +107,15 @@ int del;
   }
 }
 
+int CmmEntries(t)
+CmmTable t;
+{
+  int n = 0;
+  CmmEntry e = t->first;
+  while (e) {
+    e = e->next;
+    n++;
+  }
+  return n;
+}
 

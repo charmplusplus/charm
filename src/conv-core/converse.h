@@ -1000,6 +1000,7 @@ CmmTable   CmmNew();
 void       CmmFree(CmmTable t);
 void       CmmPut(CmmTable t, int ntags, int *tags, void *msg);
 void      *CmmFind(CmmTable t, int ntags, int *tags, int *returntags, int del);
+int        CmmEntries(CmmTable t);
 #define    CmmGet(t,nt,tg,rt)   (CmmFind((t),(nt),(tg),(rt),1))
 #define    CmmProbe(t,nt,tg,rt) (CmmFind((t),(nt),(tg),(rt),0))
 
