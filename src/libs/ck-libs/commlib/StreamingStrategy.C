@@ -10,12 +10,12 @@ StreamingStrategy::StreamingStrategy(int periodMs,int bufferMax_)
 
 void StreamingStrategy::insertMessage(CharmMessageHolder *cmsg) {
 
-    ComlibPrintf("StramingStrategy: InsertMessage\n");
+    ComlibPrintf("StramingStrategy: InsertMessage %d, %d\n",  PERIOD, bufferMax);
 
     int pe=cmsg->dest_proc;
     streamingMsgBuf[pe].enq(cmsg);
     streamingMsgCount[pe]++;
-    if (streamingMsgCount[pe]>bufferMax) flushPE(pe);
+    if (streamingMsgCount[pe] > bufferMax) flushPE(pe);
 }
 
 void StreamingStrategy::doneInserting(){
@@ -104,8 +104,8 @@ static void call_idleFlush(void *arg,double curWallTime){
 // When we're finally ready to go, register for timeout and idle flush.
 void StreamingStrategy::beginProcessing(int ignored) {
     registerFlush();
-    CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)call_idleFlush,
-                           (void *)this);
+    //CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)call_idleFlush,
+    //                     (void *)this);
 }
 
 void StreamingStrategy::pup(PUP::er &p){

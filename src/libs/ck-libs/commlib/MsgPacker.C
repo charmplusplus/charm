@@ -119,9 +119,12 @@ void MsgPacker::deliver(CombinedMessage *cmb_msg){
             env->getsetArraySrcPe()=CkMyPe();  //FOO Bar change later
             env->getsetArrayHops()=0;  //FOO BAR change later
             env->setQueueing(CK_QUEUEING_FIFO);            
+            env->setUsed(0);
 
             delete[] senv.data;
             
+            CkUnpackMessage(&env);
+
             //if(a_elem)
             //  CkDeliverMessageFree(ep, data, a_elem);                     
             //else
