@@ -1859,7 +1859,11 @@ prog rsh_start(nodeno)
   rshargv[1]=nodetab_name(nodeno);
   rshargv[2]="-l";
   rshargv[3]=nodetab_login(nodeno);
+#if CMK_CONV_HOST_CSH_UNAVAILABLE
+  rshargv[4]="exec /bin/sh -f";
+#else
   rshargv[4]="exec /bin/csh -f";
+#endif
   rshargv[5]=0;
 
   rsh = prog_start(nodetab_shell(nodeno), rshargv, 1);
@@ -1874,6 +1878,180 @@ prog rsh_start(nodeno)
   return rsh;
 }
 
+
+#if CMK_CONV_HOST_CSH_UNAVAILABLE
+void rsh_pump(p, nodeno, rank0no, argv)
+    prog p; int nodeno, rank0no; char **argv;
+{
+  char *arg_nodeprog_r,*arg_currdir_r;
+  char *dbg=nodetab_debugger(nodeno);
+  xstr ibuf = p->ibuf;
+  int randno = rand();
+  /* int randno = CrnRand(); */
+  
+  xstr_printf(ibuf,"echo 'remote responding...'\n");
+
+  xstr_printf(ibuf,"test -x ~/.conv-hostrc && . ~/.conv-hostrc\n");
+  if (arg_display)
+    xstr_printf(ibuf,"export DISPLAY=%s\n",arg_display);
+  xstr_printf(ibuf,"export NETSTART='%s'\n",create_netstart(rank0no));
+  prog_flush(p);
+
+  /* find the node-program */
+  arg_nodeprog_r = pathfix(arg_nodeprog_a, nodetab_pathfixes(nodeno));
+  
+  /* find the current directory, relative version */
+  arg_currdir_r = pathfix(arg_currdir_a, nodetab_pathfixes(nodeno));
+
+  if (arg_debug || arg_debug_no_pause || arg_in_xterm) {
+    xstr_printf(ibuf,"for dir in `echo $PATH | sed -e 's/:/ /g'`; do\n");
+    xstr_printf(ibuf,"  test -e $dir/%s && export F_XTERM=$dir/%s\n", 
+                     nodetab_xterm(nodeno), nodetab_xterm(nodeno));
+    xstr_printf(ibuf,"  test -e $dir/xrdb && export F_XRDB=$dir/xrdb\n");
+    xstr_printf(ibuf,"done\n");
+    xstr_printf(ibuf,"if test -z \"$F_XTERM\";  then\n");
+    xstr_printf(ibuf,"   echo '%s not in path --- set your path in your profile.'\n", nodetab_xterm(nodeno));
+    xstr_printf(ibuf,"   exit 1\n");
+    xstr_printf(ibuf,"fi\n");
+    xstr_printf(ibuf,"if test -z \"$F_XRDB\"; then\n");
+    xstr_printf(ibuf,"   echo 'xrdb not in path - set your path in your profile.'\n");
+    xstr_printf(ibuf,"   exit 1\n");
+    xstr_printf(ibuf,"fi\n");
+    if(arg_verbose) xstr_printf(ibuf,"echo 'using xterm' $F_XTERM\n");
+    prog_flush(p);
+  }
+
+  if (arg_debug || arg_debug_no_pause)
+  	{
+          xstr_printf(ibuf,"for dir in `echo $PATH | sed -e 's/:/ /g'`; do\n");
+          xstr_printf(ibuf,"  test -e $dir/%s && export F_DBG=$dir/%s\n",dbg,dbg);
+          xstr_printf(ibuf,"done\n");
+          xstr_printf(ibuf,"if -z \"$F_DBG\"; then\n");
+          xstr_printf(ibuf,"   echo '%s not in path - set your path in your cshrc.'\n",dbg);
+          xstr_printf(ibuf,"   exit 1\n");
+          xstr_printf(ibuf,"fi\n");
+          prog_flush(p);
+       }
+
+  if (arg_debug || arg_debug_no_pause || arg_in_xterm) {
+    xstr_printf(ibuf,"xrdb -query > /dev/null\n");
+    xstr_printf(ibuf,"if test $? != 0; then\n");
+    xstr_printf(ibuf,"  echo 'Cannot contact X Server '$DISPLAY'.  You probably'\n");
+    xstr_printf(ibuf,"  echo 'need to run xhost to authorize connections.'\n");
+    xstr_printf(ibuf,"  echo '(See manual for xhost for security issues)'\n");
+    xstr_printf(ibuf,"  exit 1\n");
+    xstr_printf(ibuf,"fi\n");
+    prog_flush(p);
+  }
+  
+  xstr_printf(ibuf,"if test ! -x %s; then\n",arg_nodeprog_r);
+  xstr_printf(ibuf,"  echo 'Cannot locate this node-program:'\n");
+  xstr_printf(ibuf,"  echo '%s'\n",arg_nodeprog_r);
+  xstr_printf(ibuf,"  exit 1\n");
+  xstr_printf(ibuf,"fi\n");
+  
+  xstr_printf(ibuf,"cd %s\n",arg_currdir_r);
+  xstr_printf(ibuf,"if test $? = 1; then\n");
+  xstr_printf(ibuf,"  echo 'Cannot propagate this current directory:'\n"); 
+  xstr_printf(ibuf,"  echo '%s'\n",arg_currdir_r);
+  xstr_printf(ibuf,"  exit 1\n");
+  xstr_printf(ibuf,"fi\n");
+  
+  if (strcmp(nodetab_setup(nodeno),"*")) {
+    xstr_printf(ibuf,"cd .\n");
+    xstr_printf(ibuf,"%s\n",nodetab_setup(nodeno));
+    xstr_printf(ibuf,"if test $? = 1; then\n");
+    xstr_printf(ibuf,"  echo 'this initialization command failed:'\n");
+    xstr_printf(ibuf,"  echo '\"%s\"'\n",nodetab_setup(nodeno));
+    xstr_printf(ibuf,"  echo 'edit your nodes file to fix it.'\n");
+    xstr_printf(ibuf,"  exit 1\n");
+    xstr_printf(ibuf,"fi\n");
+  }
+
+  if(arg_verbose) xstr_printf(ibuf,"echo 'starting node-program...'\n");  
+  if (arg_debug || arg_debug_no_pause ) {
+	 if ( strcmp(dbg, "gdb") == 0 ) {
+           xstr_printf(ibuf,"cat > /tmp/gdb%08x << END_OF_SCRIPT\n",randno);
+           xstr_printf(ibuf,"shell rm -f /tmp/gdb%08x\n",randno);
+           xstr_printf(ibuf,"handle SIGPIPE nostop noprint\n");
+           xstr_printf(ibuf,"handle SIGWINCH nostop noprint\n");
+           xstr_printf(ibuf,"handle SIGWAITING nostop noprint\n");
+           xstr_printf(ibuf,"set args");
+           while (*argv) { xstr_printf(ibuf," %s",*argv); argv++; }
+           xstr_printf(ibuf,"\n");
+           if (arg_debug_no_pause) xstr_printf(ibuf,"run\n");
+           xstr_printf(ibuf,"END_OF_SCRIPT\n");
+           if( arg_debug || arg_debug_no_pause){
+             xstr_printf(ibuf,"$F_XTERM");
+             xstr_printf(ibuf," -title 'Node %d (%s)' ",nodeno,nodetab_name(nodeno));
+             xstr_printf(ibuf," -e $F_DBG %s -x /tmp/gdb%08x",arg_nodeprog_r,randno);
+             xstr_printf(ibuf," < /dev/null 2> /dev/null &");
+             xstr_printf(ibuf,"\n");
+           }
+        } else if ( strcmp(dbg, "dbx") == 0 ) {
+          xstr_printf(ibuf,"cat > /tmp/dbx%08x << END_OF_SCRIPT\n",randno);
+          xstr_printf(ibuf,"sh rm -f /tmp/dbx%08x\n",randno);
+          xstr_printf(ibuf,"dbxenv suppress_startup_message 5.0\n");
+          xstr_printf(ibuf,"ignore SIGPOLL\n");
+          xstr_printf(ibuf,"ignore SIGPIPE\n");
+          xstr_printf(ibuf,"ignore SIGWINCH\n");
+          xstr_printf(ibuf,"ignore SIGWAITING\n");
+          xstr_printf(ibuf,"END_OF_SCRIPT\n");
+          if( arg_debug || arg_debug_no_pause){
+            xstr_printf(ibuf,"$F_XTERM");
+            xstr_printf(ibuf," -title 'Node %d (%s)' ",nodeno,nodetab_name(nodeno));
+            xstr_printf(ibuf," -e $F_DBG %s ",arg_debug_no_pause?"-r":"");
+	    if(arg_debug) {
+              xstr_printf(ibuf,"-c \'runargs ");
+              while (*argv) { xstr_printf(ibuf,"%s ",*argv); argv++; }
+              xstr_printf(ibuf,"\' ");
+	    }
+	    xstr_printf(ibuf, "-s/tmp/dbx%08x %s",randno,arg_nodeprog_r);
+	    if(arg_debug_no_pause) {
+              while (*argv) { xstr_printf(ibuf," %s",*argv); argv++; }
+	    }
+            xstr_printf(ibuf," < /dev/null 2> /dev/null &");
+            xstr_printf(ibuf,"\n");
+          }
+	} else { 
+	  fprintf(stderr, "Unknown debugger: %s.\n Exiting.\n", 
+	    nodetab_debugger(nodeno));
+	  exit(1);
+	}
+  } else if (arg_in_xterm) {
+    if(arg_verbose) {
+      fprintf(stderr, "Conv-host> node %d: xterm is %s\n", 
+              nodeno, nodetab_xterm(nodeno));
+    }
+    xstr_printf(ibuf,"cat > /tmp/inx%08x << END_OF_SCRIPT\n", randno);
+    xstr_printf(ibuf,"#!/bin/sh\n");
+    xstr_printf(ibuf,"rm -f /tmp/inx%08x\n",randno);
+    xstr_printf(ibuf,"%s", arg_nodeprog_r);
+    while (*argv) { xstr_printf(ibuf," %s",*argv); argv++; }
+    xstr_printf(ibuf,"\n");
+    xstr_printf(ibuf,"echo 'program exited with code '\\$?\n");
+    xstr_printf(ibuf,"read eoln\n");
+    xstr_printf(ibuf,"END_OF_SCRIPT\n");
+    xstr_printf(ibuf,"chmod 700 /tmp/inx%08x\n", randno);
+    xstr_printf(ibuf,"$F_XTERM");
+    xstr_printf(ibuf," -title 'Node %d (%s)' ",nodeno,nodetab_name(nodeno));
+    xstr_printf(ibuf," -sl 5000");
+    xstr_printf(ibuf," -e /tmp/inx%08x", randno);
+    xstr_printf(ibuf," < /dev/null >& /dev/null &");
+    xstr_printf(ibuf,"\n");
+  } else {
+    xstr_printf(ibuf,"%s",arg_nodeprog_r);
+    while (*argv) { xstr_printf(ibuf," %s",*argv); argv++; }
+    xstr_printf(ibuf," < /dev/null 2> /dev/null &");
+    xstr_printf(ibuf,"\n");
+  }
+  
+    xstr_printf(ibuf,"echo 'rsh phase successful.'\n");
+    xstr_printf(ibuf,"exit 0\n");
+  prog_flush(p);
+  
+}
+#else
 void rsh_pump(p, nodeno, rank0no, argv)
     prog p; int nodeno, rank0no; char **argv;
 {
@@ -2045,6 +2223,7 @@ void rsh_pump(p, nodeno, rank0no, argv)
   prog_flush(p);
   
 }
+#endif
 
 
 void start_nodes_rsh(void)
