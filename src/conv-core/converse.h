@@ -511,6 +511,7 @@ void CmiMkdir(const char *dirName);
 double   CmiCpuTimer(void);
 
 #if CMK_TIMER_USE_RDTSC 
+#ifndef __x86_64__
 # if ! (CMK_GCC_X86_ASM || CMK_GCC_IA64_ASM)
 /* Can't use rdtsc unless we have x86 or ia64 assembly: */
 #  undef CMK_TIMER_USE_RDTSC
@@ -519,6 +520,7 @@ double   CmiCpuTimer(void);
 #  define CMK_TIMER_USE_GETRUSAGE 1
 # endif
 #endif
+#endif
 
 #if CMK_TIMER_USE_RDTSC 
 extern double _cpu_speed_factor;
@@ -526,7 +528,14 @@ extern double _cpu_speed_factor;
 static __inline__ unsigned long long int rdtsc(void)
 {
         unsigned long long int x;
-#if CMK_GCC_IA64_ASM
+#ifdef __x86_64__
+	/* taken from papi code ("perfctr-p3.c") for machines like opteron */
+        do {
+          unsigned int a,d;
+          asm volatile("rdtsc" : "=a" (a), "=d" (d));
+          (x) = ((unsigned long)a) | (((unsigned long)d)<<32);
+        } while(0);
+#elif CMK_GCC_IA64_ASM
 	__asm__ __volatile__("mov %0=ar.itc" : "=r"(x) :: "memory");
 #elif CMK_GCC_X86_ASM
         __asm__ volatile (".byte 0x0f, 0x31" : "=A" (x));
