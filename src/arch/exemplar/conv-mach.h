@@ -37,5 +37,7 @@
 /* #define CMK_THREADS_USE_ALLOCA */
 #define CMK_THREADS_UNAVAILABLE
 
+#define CMK_MACHINE_NAME "EXEMPLAR"
+
 
 #endif

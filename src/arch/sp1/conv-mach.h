@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.2  1995-09-20 13:22:58  jyelon
+ * Revision 2.3  1995-09-22 17:54:52  sanjeev
+ * added CMK_MACHINE_NAME
+ *
+ * Revision 2.2  1995/09/20  13:22:58  jyelon
  * Added 'CMK_THREAD_' flags.
  *
  * Revision 2.1  1995/09/19  18:56:28  jyelon
@@ -46,6 +49,6 @@
 /* #define CMK_THREADS_USE_ALLOCA */
 #define CMK_THREADS_UNAVAILABLE
 
-
+#define CMK_MACHINE_NAME "SP1"
 
 #endif

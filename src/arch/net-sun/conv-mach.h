@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.5  1995-09-20 13:22:57  jyelon
+ * Revision 2.6  1995-09-22 17:54:52  sanjeev
+ * added CMK_MACHINE_NAME
+ *
+ * Revision 2.5  1995/09/20  13:22:57  jyelon
  * Added 'CMK_THREAD_' flags.
  *
  * Revision 2.4  1995/09/19  18:56:26  jyelon
@@ -77,5 +80,8 @@
 
 /* #define CMK_HAVE_WAITFLAGS_H */
 #define CMK_HAVE_SYS_WAIT_H
+
+#define CMK_MACHINE_NAME "NETWORK"
+
 
 #endif

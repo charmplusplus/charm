@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.6  1995-09-20 17:23:46  gursoy
+ * Revision 2.7  1995-09-22 17:54:52  sanjeev
+ * added CMK_MACHINE_NAME
+ *
+ * Revision 2.6  1995/09/20  17:23:46  gursoy
  * threads dont use alloca, this time fixed
  *
  * Revision 2.5  1995/09/20  17:20:49  gursoy
@@ -93,5 +96,7 @@
 
 #define CMK_HAVE_SYS_WAIT_H
 /* #define CMK_HAVE_WAITFLAGS_H */
+
+#define CMK_MACHINE_NAME "NETWORK"
 
 #endif
