@@ -261,7 +261,7 @@ void _loadbalancerInit()
 
   if (CkMyPe() == 0) {
     if (_lb_args.debug()) {
-      CmiPrintf("LB> Load balancer running with verbose mode, period time: %gs.\n", _lb_args.lbperiod());
+      CmiPrintf("LB> Load balancer running with verbose mode, period time: %gs, alpha: %es beta: %es.\n", _lb_args.lbperiod(), _lb_args.alpha(), _lb_args.beeta());
       CkPrintf("LB> Topology %s\n", _lbtopo);
     }
     if (_lb_args.ignoreBgLoad())
