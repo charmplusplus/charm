@@ -8,6 +8,7 @@
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
 
+#define CMK_IA64					   1
 
 #define CMK_DLL_CC   "g++ -shared -O3 -o "
 
