@@ -1754,7 +1754,7 @@ int rsh_start(int nodeno,const char *startScript)
   rshargv[1]=nodetab_name(nodeno);
   rshargv[2]="-l";
   rshargv[3]=nodetab_login(nodeno);
-  rshargv[4]="exec /bin/sh -f";
+  rshargv[4]="/bin/sh -f";
   rshargv[5]=0;
   if (arg_verbose) printf("Charmrun> Starting %s %s -l %s %s\n",nodetab_shell(nodeno), nodetab_name(nodeno),nodetab_login(nodeno), rshargv[4]);
   
