@@ -56,7 +56,7 @@ void HashTable::putObject(Chare* charePtr)
   int pigeonHole;
   int chareIndex;
   
-  chareIndex = (int)charePtr;
+  chareIndex = (size_t)charePtr;
   node = (struct HashTableElement *)malloc(sizeof(struct HashTableElement));
   node->charePtr = charePtr;
   node->chareIndex = chareIndex;
@@ -71,8 +71,9 @@ void HashTable::removeObject(Chare* charePtr)
   struct HashTableElement *node, *prev;
   int chareIndex;
   
-  chareIndex = (int)charePtr;
+  chareIndex = (size_t)charePtr;
   pigeonHole = chareIndex % PRIME;
+
   prev = 0;
   node = array[pigeonHole];
   while(node != 0){

@@ -357,6 +357,9 @@ double CmiTimer()
 
 #endif
 
+#if CMK_WEB_MODE
+int appletFd = -1;
+#endif
 
 #if NODE_0_IS_CONVHOST
 
@@ -598,7 +601,15 @@ void CHostGetOne()
       CmiPrintf("Line = %s\n", line);
       nscanfread = sscanf(line, "%s%u%u", cmd, &clientIP, &clientPort);
       if(nscanfread != 3){
+
+	/* DEBUGGING */
+	CmiPrintf("Entering further read...\n");
+
         fgets(rest, 999, f);
+
+	/* DEBUGGING */
+	CmiPrintf("Rest = %s\n", rest);
+
         sscanf(rest, "%u%u", &clientIP, &clientPort);
       }
       clientIP = (CmiUInt4) clientIP;
@@ -624,7 +635,25 @@ void CHostGetOne()
       write(fd, reply, strlen(reply));
       close(fd);
     }
-    else KillEveryoneCode(2932);
+    else if (strncmp(line, "clientdata", strlen("clientdata"))==0){
+      int nread;
+      int clientKillPort;
+      char cmd[20];
+      
+      nread = sscanf(line, "%s%d", cmd, &clientKillPort);
+      if(nread != 2){
+	fgets(rest, 999, f);
+	
+	/* DEBUGGING */
+	CmiPrintf("Rest = %s\n", rest);
+	
+        sscanf(rest, "%d", &clientKillPort);
+      }
+    }
+    else {
+      CmiPrintf("Request: %s\n", line);
+      KillEveryoneCode(2933);
+    }
   }
 #if CMK_WEB_MODE
   if(dont_close==0) {
@@ -1032,14 +1061,13 @@ void CpdUnFreeze(void)
 
 #if CMK_WEB_MODE
 
-#define WEB_INTERVAL 1000
+#define WEB_INTERVAL 2000
 #define MAXFNS 20
 
 /* For Web Performance */
 typedef int (*CWebFunction)();
 unsigned int appletIP;
 unsigned int appletPort;
-int appletFd = -1;
 int countMsgs;
 char **valueArray;
 CWebFunction CWebPerformanceFunctionArray[MAXFNS];

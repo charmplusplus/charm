@@ -319,6 +319,7 @@ void ConverseExit(void)
 {
   ConverseCommonExit();
   MPI_Finalize();
+  if (CmiMyPe() == 0) CmiPrintf("End of program\n");
   exit(0);
 }
 
