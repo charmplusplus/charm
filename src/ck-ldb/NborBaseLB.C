@@ -18,11 +18,11 @@
 
 //CreateLBFunc_Def(NborBaseLB);
 
-void NborBaseLB::staticMigrated(void* data, LDObjHandle h)
+void NborBaseLB::staticMigrated(void* data, LDObjHandle h, int waitBarrier)
 {
   NborBaseLB *me = (NborBaseLB*)(data);
 
-  me->Migrated(h);
+  me->Migrated(h, waitBarrier);
 }
 
 void NborBaseLB::staticAtSync(void* data)
@@ -208,7 +208,7 @@ NLBStatsMsg* NborBaseLB::AssembleStats()
 #endif
 }
 
-void NborBaseLB::Migrated(LDObjHandle h)
+void NborBaseLB::Migrated(LDObjHandle h, int waitBarrier)
 {
   migrates_completed++;
   //  CkPrintf("[%d] An object migrated! %d %d\n",

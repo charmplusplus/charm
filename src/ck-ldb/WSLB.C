@@ -38,11 +38,11 @@ static void lbinit(void) {
 }
 
 
-void WSLB::staticMigrated(void* data, LDObjHandle h)
+void WSLB::staticMigrated(void* data, LDObjHandle h, int waitBarrier)
 {
   WSLB *me = (WSLB*)(data);
 
-  me->Migrated(h);
+  me->Migrated(h, waitBarrier);
 }
 
 void WSLB::staticAtSync(void* data)
@@ -246,7 +246,7 @@ WSLBStatsMsg* WSLB::AssembleStats()
 #endif
 }
 
-void WSLB::Migrated(LDObjHandle h)
+void WSLB::Migrated(LDObjHandle h, int waitBarrier)
 {
 #if CMK_LBDB_ON
   migrates_completed++;

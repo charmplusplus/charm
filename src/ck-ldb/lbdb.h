@@ -244,7 +244,7 @@ void LDDumpDatabase(LDHandle _lbdb);
 /*
  * Calls from load balancer to load database
  */  
-typedef void (*LDMigratedFn)(void* data, LDObjHandle handle, int waitBarrier=1);
+typedef void (*LDMigratedFn)(void* data, LDObjHandle handle, int waitBarrier);
 void LDNotifyMigrated(LDHandle _lbdb, LDMigratedFn fn, void* data);
 
 typedef void (*LDStartLBFn)(void *user_ptr);

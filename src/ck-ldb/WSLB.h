@@ -36,8 +36,8 @@ public:
   void ReceiveMigration(LBMigrateMsg *); 	// Receive migration data
 
   // Migrated-element callback
-  static void staticMigrated(void* me, LDObjHandle h);
-  void Migrated(LDObjHandle h);
+  static void staticMigrated(void* me, LDObjHandle h, int waitBarrier);
+  void Migrated(LDObjHandle h, int waitBarrier);
 
   void MigrationDone(void);  // Call when migration is complete
   int step() { return mystep; };
