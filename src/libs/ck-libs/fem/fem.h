@@ -65,6 +65,12 @@ extern "C" {
   void FEM_Update_Mesh(int callMeshUpdated,int doRepartition);
   
   void FEM_Set_Partition(int *elem2chunk);
+
+  void FEM_Add_Ghost_Layer(int nodesPerTuple,int doAddNodes);
+  void FEM_Add_Ghost_Elem(int elType,int tuplesPerElem,const int *elem2tuple);
+
+  int FEM_Get_Node_Ghost(void);
+  int FEM_Get_Elem_Ghost(int elemType);  
   
   int FEM_Get_Comm_Partners(void);
   int FEM_Get_Comm_Partner(int partnerNo);
@@ -75,9 +81,19 @@ extern "C" {
   int FEM_Create_Field(int base_type, int vec_len, int init_offset, 
                        int distance);
   void FEM_Update_Field(int fid, void *nodes);
+  void FEM_Update_Ghost_Field(int fid, int elTypeOrMinusOne, void *nodes);
   void FEM_Reduce_Field(int fid, const void *nodes, void *outbuf, int op);
   void FEM_Reduce(int fid, const void *inbuf, void *outbuf, int op);
   void FEM_Read_Field(int fid, void *nodes, const char *fname);
+
+  /*Mesh modification*/
+  void FEM_Barrier(void);
+
+  void FEM_Add_Node(int localIdx,int nBetween,int *betweenNodes);  
+
+  void FEM_Exchange_Ghost_Lists(int elemType,int nIdx,const int *localIdx);
+  int FEM_Get_Ghost_List_Length(void);
+  void FEM_Get_Ghost_List(int *dest);
 
   /*Migration */
   int FEM_Register(void *userData,FEM_PupFn _pup_ud);

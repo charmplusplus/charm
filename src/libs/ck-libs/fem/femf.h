@@ -39,21 +39,49 @@
        external FEM_Get_Elem_Numbers
        external FEM_Get_Node_Numbers
 
+       external FEM_Add_Ghost_Layer
+       external FEM_Add_Ghost_Elem
+
        external FEM_Get_Comm_Nodes
 
        external FEM_Reduce_Field
        external FEM_Reduce
        external FEM_Update_Field
+       external FEM_Update_Ghost_Field
        external FEM_Read_Field
        external FEM_Print
        external FEM_Print_Partition
        integer, external :: offsetof
 
+       external FEM_Barrier
+       external FEM_Get_Ghost_List
+
        integer, external :: FEM_Register
        external FEM_Migrate 
 
        interface
+       function FEM_Get_Node_Ghost()
+         integer :: FEM_Get_Node_Ghost
+       end function
+       function FEM_Get_Elem_Ghost(elemType)
+	 integer, intent(in) :: elemType
+         integer :: FEM_Get_Elem_Ghost
+       end function
 
+       subroutine FEM_Add_Node(idx,nBetween,between)
+         integer,intent (in) :: idx, nBetween
+         integer, intent(in) :: between(nBetween)
+       end subroutine       
+
+       subroutine FEM_Exchange_Ghost_Lists(elemType,nIdx,localIdx)
+         integer,intent (in) :: elemType,nIdx
+         integer, intent(in) :: localIdx(nIdx)
+       end subroutine
+
+       function FEM_Get_Ghost_List_Length()
+         integer :: FEM_Get_Ghost_List_Length
+       end function
+       
        function FEM_Get_Comm_Partners()
          integer :: FEM_Get_Comm_Partners
        end function

@@ -1,22 +1,21 @@
 module fem {
   message FEM_DataMsg;
-  message ChunkMsg;
 
   initcall void FEMnodeInit(void);
 
   chare FEMcoordinator {
     entry FEMcoordinator(int nChunks);
     entry void setArray( CkArrayID fem);
-    entry void updateMesh(ChunkMsg *);
+    entry void updateMesh(marshallMeshChunk);
   };
 
   array [1D] FEMchunk {
     entry FEMchunk(FEMinit f);
     entry void run(void);
-    entry void run(ChunkMsg *);
-    entry void write(ChunkMsg *);
+    entry void run(marshallMeshChunk);
     entry void recv(FEM_DataMsg *);
     entry void reductionResult(FEM_DataMsg *);
-    entry void meshUpdated(ChunkMsg *);
+    entry void meshUpdated(marshallMeshChunk);
+    entry void recvList(int elType,int fmChk,int nidx,int idx[nidx]);
   };
 };

@@ -1,12 +1,12 @@
 /*Charm++ Finite Element Framework:
 C++ implementation file
 
-This code implements fem_map and fem_assemble.
-Fem_map takes a mesh and partitioning table (which maps elements
+This code implements fem_split and fem_assemble.
+Fem_split takes a mesh and partitioning table (which maps elements
 to chunks) and creates a sub-mesh for each chunk,
 including the communication lists. Fem_assemble is the inverse.
 
-The fem_map algorithm is O(n) in space and time (with n nodes,
+The fem_split algorithm is O(n) in space and time (with n nodes,
 e elements, p processors; and n>e>p^2).  The central data structure
 is a bit unusual-- it's a table that maps nodes to lists of processors
 (all the processors that share the node).  For any reasonable problem,
@@ -17,10 +17,6 @@ Memory usage for the large temporary arrays is n*sizeof(peList)
 +p^2*sizeof(peList), all allocated contiguously.  Shared nodes
 will result in a few independently allocated peList entries,
 but shared nodes should be rare so this should not be expensive.
-
-Note that the implementation could be significantly simplified
-with judicious use of std::vector (or similar class); as 
-have to do a size pass, allocate, then a copy pass.
 
 Originally written by Orion Sky Lawlor, olawlor@acm.org, 9/28/2000
 */
@@ -35,7 +31,7 @@ of nodes, the list will contain exactly one element.
 */
 class peList {
 public:
-	int pe;
+	int pe;//Processor number or -1 if the list is empty
 	int localNo;//Local number of this node on this PE
 	peList *next;
 	peList() {pe=-1;next=NULL;}
@@ -45,30 +41,29 @@ public:
 		next=NULL;
 	}
 	~peList() {delete next;}
-	int addPE(int p,int l) {
+	void set(int p,int l) {
+		pe=p; localNo=l; 
+	}
+	//Is this processor in the list?  If so, return false.
+	// If not, add it and return true.
+	bool addPE(int p,int l) {
 		//Add PE p to the list with local index l,
 		// if it's not there already
-		if (pe==p) return 0;//Already in the list
-		if (pe==-1) {pe=p;localNo=l;return 1;}
-		if (next==NULL) {next=new peList(p,l);return 1;}
+		if (pe==p) return false;//Already in the list
+		if (pe==-1) {set(p,l);return true;}
+		if (next==NULL) {next=new peList(p,l);return true;}
 		else return next->addPE(p,l);
 	}
-	void addAlways(int p,int l) {
-		//Add PE p to the list with local index l
-		if (pe==-1) {pe=p;localNo=l;}
-		else {
-			peList *nu=new peList(p,l);
-			nu->next=next;
-			next=nu;
-		}
-	}
+	//Return this node's local number on PE p (or -1 if none)
 	int localOnPE(int p) {
-		//Return this node's local number on PE p
 		if (pe==p) return localNo;
+		else if (next==NULL) return -1;
 		else return next->localOnPE(p);
 	}
 	int isEmpty(void) //Return 1 if this is an empty list 
 		{return (pe==-1);}
+	int isShared(void) //Return 1 if this is a shared node
+		{return next!=NULL;}
 	int length(void) {
 		if (next==NULL) return isEmpty()?0:1;
 		else return 1+next->length();
@@ -81,148 +76,564 @@ public:
 
 
 
-/*Create a sub-mesh for each chunk's elements,
-including communication lists between chunks.
-*/
-void fem_map(const FEM_Mesh *mesh,int nchunks,int *elem2chunk,ChunkMsg **msgs)
+//A dynamic (growing) representation of a chunk.  
+// Lists the global numbers of the chunk.
+class dynChunk {
+public:
+	class elemCount : public CkVec<int> {
+	public:
+		
+	};
+	elemCount elem[FEM_MAX_ELEMTYPES];
+	CkVec<int> node;
+	
+	//Return the next unused local number of this type
+	int nextElement(int type) const {return elem[type].size();}
+	int addElement(int type,int globalNo) {
+		int ret=nextElement(type);
+		elem[type].push_back(globalNo);
+		return ret;
+	}
+	int nextNode(void) const {return node.size();}
+	int addNode(int globalNo) {
+		int ret=nextNode();
+		node.push_back(globalNo);
+		return ret;
+	}
+};
+
+class splitter {
+//Inputs:
+	const FEM_Mesh *mesh; //Unsplit source mesh
+	int *elem2chunk; //Maps global element number to destination chunk
+	int nchunks; //Number of pieces to divide into
+//Output:
+	MeshChunk **msgs; //Output chunks [nchunks]
+
+//Processing:
+	peList *gNode; //Map global node to owning processors [mesh->node.n]
+	dynChunk *chunks; //Growing list of output elements [nchunks]
+	
+//---- Used by ghost layer builder ---
+	peList *gElem[FEM_MAX_ELEMTYPES]; //Map global element to owning processors
+	unsigned char *ghostNode; //Flag: this node borders ghost elements [mesh->node.n]
+
+//Return true if any of these nodes are ghost nodes
+bool hasGhostNodes(const int *conn,int nodesPer) 
 {
-//Allocate messages to return
+	for (int i=0;i<nodesPer;i++)
+		if (ghostNode[conn[i]])
+			return true;
+	return false;
+}
+
+//Add this global number as a new entry in the given dest.
+// Applies to both nodes and elements.
+// Returns false if this is not a good ghost pair.
+bool addGhost(int global,int srcPe,int destPe,
+	      CkVec<int> &destChunk, peList *gDest,
+	      FEM_Mesh::count &src,FEM_Mesh::count &dest)
+{
+	if (srcPe==destPe) 
+		return false; //Never add ghosts from same pe!
+	if (-1!=gDest[global].localOnPE(destPe))
+		return false; //Dest already has a copy of this item
+	int srcLocal=gDest[global].localOnPE(srcPe);
+	if (src.isGhostIndex(srcLocal))
+		return false; //Never add ghosts of ghosts!
+	int destLocal=destChunk.size();
+	destChunk.push_back(global);
+	gDest[global].addPE(destPe,destLocal);
+	src.ghostSend.add(srcPe,srcLocal,destPe,destLocal,
+			  dest.ghostRecv);
+	return true;
+}
+
+//Add an entire layer of ghost elements
+void add(const ghostLayer &g);
+
+//--- Used by consistency check ---
+void bad(const char *why) {
+	CkAbort(why);
+}
+void equal(int is,int should,const char *what) {
+	if (is!=should) {
+		CkPrintf("ERROR! Expected %s to be %d, got %d!\n",
+			what,should,is);
+		bad("Internal FEM data structure corruption! (unequal)\n");
+	}
+}
+void range(int value,int lo,int hi,const char *what) {
+	if (value<lo || value>=hi) {
+		CkPrintf("ERROR! %s out of range (%d,%d)!\n",value,lo,hi);
+		bad("Internal FEM data structure corruption! (out of range)\n");
+	}
+}
+void nonnegative(int value,const char *what) {
+	if (value<0) {
+		CkPrintf("ERROR! Expected %s to be non-negative, got %d!\n",
+			what,value);
+		bad("Internal FEM data structure corruption! (negative)\n");
+	}
+}
+
+
+public:
+splitter(const FEM_Mesh *mesh_,int *elem2chunk_,int nchunks_)
+	:mesh(mesh_), elem2chunk(elem2chunk_),nchunks(nchunks_)
+{
+	msgs=new MeshChunk* [nchunks];
 	int c;//chunk number (to receive message)
 	for (c=0;c<nchunks;c++) {
-		msgs[c]=new ChunkMsg; //Ctor starts all node and element counts at zero
+		msgs[c]=new MeshChunk; //Ctor starts all node and element counts at zero
 		msgs[c]->m.copyType(*mesh);
 	}
 	
-//First pass, build a list of the PEs that share each node
-//  (also find the local element and node counts)
-	peList *nodes=new peList[mesh->node.n];
+	chunks=new dynChunk[nchunks];
+	gNode=new peList[mesh->node.n];
+	//Initialize ghost data:
+	for (int t=0;t<mesh->nElemTypes;t++) {
+		gElem[t]=new peList[mesh->elem[t].n];
+	}
+	ghostNode=NULL;
+}
+
+~splitter() {
+	delete[] gNode;
+	delete[] chunks;
+	for (int t=0;t<mesh->nElemTypes;t++)
+		delete[] gElem[t];
+	for (int c=0;c<nchunks;c++)
+		delete msgs[c];
+	delete[] msgs;
+}
+
+//Fill the gNode[] array with the processors sharing each node
+void buildCommLists(void);
+
+//Add the layers of ghost elements
+void addGhosts(int nLayers,const ghostLayer *g);
+
+//Divide off this portion of the serial data
+MeshChunk *createMessage(int c);
+
+
+void consistencyCheck(void)
+{
+	if (0) return; //Skip check in production code
+
+//Basic debugging tool: check interlinked data structures for consistency
+	printf("FEM> Performing consistency check...\n");
+
+	int t,c;
+	//Make sure everything in chunks is also in gElem[] and gNode[]
+	for (c=0;c<nchunks;c++) {
+		for (t=0;t<mesh->nElemTypes;t++) {
+			const CkVec<int> &srcIdx=chunks[c].elem[t];
+			int nEl=srcIdx.size();
+			for (int lNo=0;lNo<nEl;lNo++) {
+				int gNo=srcIdx[lNo];
+				range(gNo,0,mesh->elem[t].n,"global element number");
+				equal(gElem[t][gNo].localOnPE(c),lNo,"gElem[t] local number");
+			}
+		} 
+		const CkVec<int> &srcIdx=chunks[c].node;
+		int nNo=srcIdx.size();
+		for (int lNo=0;lNo<nNo;lNo++) {
+			int gNo=srcIdx[lNo];
+			range(gNo,0,mesh->node.n,"global node number");
+			equal(gNode[gNo].localOnPE(c),lNo,"gNode[] local number");
+		}
+	}
+	
+	//Make sure everything in gElem and gNode is also in chunks
+	for (t=0;t<mesh->nElemTypes;t++) {
+		for (int gNo=0;gNo<mesh->elem[t].n;gNo++) {
+			for (peList *l=&gElem[t][gNo];l!=NULL;l=l->next) {
+				range(l->pe,0,nchunks,"gElem pe");
+				equal(chunks[l->pe].elem[t][l->localNo],gNo,"chunk element");
+			}
+		}
+	}
+	for (int gNo=0;gNo<mesh->node.n;gNo++) {
+		for (peList *l=&gNode[gNo];l!=NULL;l=l->next) {
+			range(l->pe,0,nchunks,"gNode pe");
+			equal(chunks[l->pe].node[l->localNo],gNo,"chunk node");
+		}
+	}
+
+	//FIXME: Make sure all the communication lists exactly match
+	
+	printf("FEM> Consistency check passed\n");
+}
+
+};
+
+void splitter::buildCommLists(void)
+{
+//First pass: add PEs to each node they touch
+//  (also find the local elements and node counts)
 	int t;//Element type
 	int e;//Element number in type
 	int n;//Node number around element
 	for (t=0;t<mesh->nElemTypes;t++) {
 		int typeStart=mesh->nElems(t);//Number of elements before type t
-		const FEM_Mesh::elemCount src=mesh->elem[t]; 
+		const FEM_Mesh::elemCount &src=mesh->elem[t]; 
 		for (e=0;e<src.n;e++) {
-			c=elem2chunk[typeStart+e];
+			int c=elem2chunk[typeStart+e];
 			FEM_Mesh &dest=msgs[c]->m;
 			const int *srcConn=&src.conn[e*src.nodesPer];
-			dest.elem[t].n++;//Found a new local element
-			for (n=0;n<src.nodesPer;n++)
-				if (nodes[srcConn[n]].addPE(c,dest.node.n))
-					dest.node.n++;//Found a new local node
-		}
-		
-	}
-
-//Allocate memory for all local elements and nodes
-	int *curElem=new int[nchunks]; //Next local element number to add
-	int *curElem_type=new int[nchunks]; //Next element-type-local element number to add
-	for (c=0;c<nchunks;c++) {
-		FEM_Mesh &dest=msgs[c]->m;
-		dest.node.allocUdata();
-		for (t=0;t<mesh->nElemTypes;t++) {
-			dest.elem[t].allocUdata();
-			dest.elem[t].allocConn();
-		}
-		msgs[c]->elemNums=new int[dest.nElems()];
-		msgs[c]->nodeNums=new int[dest.node.n];
-		for (n=0;n<dest.node.n;n++) msgs[c]->nodeNums[n]=-1;
-		msgs[c]->isPrimary=new int[dest.node.n];
-		for (n=0;n<dest.node.n;n++) msgs[c]->isPrimary[n]=0;
-		curElem[c]=0;
-	}
-
-//Second pass, add each local element and node to the local lists.
-//  If we used std::vector instead of just int [], we could do this all in one pass!
-	for (t=0;t<mesh->nElemTypes;t++) {
-		for (c=0;c<nchunks;c++) curElem_type[c]=0;//Restart type-local count
-		int typeStart=mesh->nElems(t);//Number of elements before type t
-		const FEM_Mesh::elemCount &src=mesh->elem[t]; 
-		const FEM_Mesh::count &nsrc=mesh->node; 
-		for (e=0;e<src.n;e++) {
-			c=elem2chunk[typeStart+e];
-			FEM_Mesh::elemCount &dest=msgs[c]->m.elem[t];
-			FEM_Mesh::count &ndest=msgs[c]->m.node;
-			msgs[c]->elemNums[curElem[c]++]=typeStart+e;
-			//Compute this element's global and local (type-specific) number
-			int geNo=e;
-			int leNo=curElem_type[c]++;
-			dest.udataIs(leNo,src.udataFor(geNo));
-
-			for (n=0;n<src.nodesPer;n++)
-			{//Compute each node's local and global number
-				int gnNo=src.conn[geNo*src.nodesPer+n];
-				int lnNo=nodes[gnNo].localOnPE(c);
-				dest.conn[leNo*dest.nodesPer+n]=lnNo;
-				if (msgs[c]->nodeNums[lnNo]==-1) {
-					msgs[c]->nodeNums[lnNo]=gnNo;
-					ndest.udataIs(lnNo,nsrc.udataFor(gnNo));
+			gElem[t][e].set(c,chunks[c].addElement(t,e));
+			int lNo=chunks[c].node.size();
+			for (n=0;n<src.nodesPer;n++) {
+				int gNo=srcConn[n];
+				if (gNode[gNo].addPE(c,lNo)) {
+					//Found a new local node
+					chunks[c].addNode(gNo);
+					lNo++;
 				}
 			}
 		}
 	}
-	delete[] curElem;
-	delete[] curElem_type;
 	
-//Find chunk comm. lists
-//  (also set primary PEs)
-	peList *commLists=new peList[nchunks*nchunks];
+//Second pass: add shared nodes to comm. lists
 	for (n=0;n<mesh->node.n;n++) {
-		int len=nodes[n].length();
-		if (len==1) {//Usual case: a private node
-			msgs[nodes[n].pe]->isPrimary[nodes[n].localNo]=1;
-		} else if (len==0) {
-			CkPrintf("FEM> Warning!  Node %d is not referenced by any element!\n",n);
-		} else {/*Node is referenced by more than one processor-- 
-			Add it to all the processor's comm. lists.*/
-			//Make the node primary on the first processor
-			msgs[nodes[n].pe]->isPrimary[nodes[n].localNo]=1;
+		if (gNode[n].isShared()) 
+		{/*Node is referenced by more than one processor-- 
+		   Add it to all the processor's comm. lists.*/
+			int len=gNode[n].length();
 			for (int bi=0;bi<len;bi++)
 				for (int ai=0;ai<bi;ai++)
-	       			{
-		       			peList &a=nodes[n][ai];
-		       			peList &b=nodes[n][bi];
-		       			commLists[a.pe*nchunks+b.pe].addAlways(b.pe,a.localNo);
-		       			commLists[b.pe*nchunks+a.pe].addAlways(a.pe,b.localNo);
+				{
+					peList &a=gNode[n][ai];
+		       			peList &b=gNode[n][bi];
+					msgs[a.pe]->comm.add(a.pe,a.localNo,
+							     b.pe,b.localNo,msgs[b.pe]->comm);
 		       		}
 		}
 	}
-	delete[] nodes;
-	
-//Copy chunk comm. lists into comm. arrays
-	for (int a=0;a<nchunks;a++) {
-		int b;
-		commCounts &comm=msgs[a]->comm;
-		//First pass: compute communicating processors
-		comm.nPes=0;
-		for (b=0;b<nchunks;b++) 
-			if (!commLists[a*nchunks+b].isEmpty())
-			//Processor a communicates with processor b
-				comm.nPes++;
-		
-		comm.allocate();//Now that we know nPes...
-		
-		//Second pass: add all shared nodes
-		int curPe=0;
-		for (b=0;b<nchunks;b++) 
-		{
-			int len=commLists[a*nchunks+b].length();
-			if (len>0)
-			{
-				comm.peNums[curPe]=b;
-				comm.numNodesPerPe[curPe]=len;
-				comm.nodesPerPe[curPe]=new int[len];
-				peList *l=&commLists[a*nchunks+b];
-				for (int i=0;i<len;i++) {
-					comm.nodesPerPe[curPe][i]=l->localNo;
-					l=l->next;
-				}
-				curPe++;
+
+}
+
+//Now that we know which elements and nodes go where,
+// actually copy the user and connectivity data there.
+MeshChunk *splitter::createMessage(int c)
+{
+	int t;
+	MeshChunk *msg=msgs[c];
+	FEM_Mesh &dest=msg->m;
+
+//Make room in the chunk for the incoming data
+	dest.node.n=chunks[c].node.size();
+	dest.node.allocUdata();
+	for (t=0;t<dest.nElemTypes;t++) {
+		dest.elem[t].n=chunks[c].elem[t].size();
+		dest.elem[t].allocUdata();
+		dest.elem[t].allocConn();
+	}	
+	msg->allocate();
+
+//Add each local node
+	const CkVec<int> &srcIdx=chunks[c].node;
+	int nNode=srcIdx.size();	
+	for (int lNo=0;lNo<nNode;lNo++) {
+		int gNo=srcIdx[lNo];
+		peList *l=&gNode[gNo];
+		//A node is primary on its first processor
+		msg->isPrimary[lNo]=(l->pe==c);
+		msg->nodeNums[lNo]=gNo;
+		//Copy the node userdata
+		dest.node.udataIs(lNo,mesh->node.udataFor(gNo));
+	}
+
+//Add each local element
+	int localStart=0; //Local element counter, across all element types
+	for (t=0;t<dest.nElemTypes;t++) {
+		const FEM_Mesh::elemCount &src=mesh->elem[t];
+		const CkVec<int> &srcIdx=chunks[c].elem[t];
+		int nEl=srcIdx.size();
+		int globalStart=mesh->nElems(t);
+		for (int lNo=0;lNo<nEl;lNo++) {
+			int gNo=srcIdx[lNo];
+			msg->elemNums[localStart+lNo]=globalStart+gNo;
+			//Copy the element userdata
+			dest.elem[t].udataIs(lNo,src.udataFor(gNo));
+			//Translate the connectivity from global to local
+			for (int n=0;n<src.nodesPer;n++) {
+				int gnNo=src.conn[gNo*src.nodesPer+n];
+				int lnNo=gNode[gnNo].localOnPE(c);
+				dest.elem[t].conn[lNo*src.nodesPer+n]=lnNo;
 			}
 		}
+		localStart+=nEl;
 	}
-	delete[] commLists;
+	msgs[c]=NULL;
+	return msg;
 }
+
+/*External entry point:
+Create a sub-mesh for each chunk's elements,
+including communication lists between chunks.
+*/
+void fem_split(const FEM_Mesh *mesh,int nchunks,int *elem2chunk,
+	       int nGhostLayers,const ghostLayer *g,MeshChunkOutput *out)
+{
+	splitter s(mesh,elem2chunk,nchunks);
+
+	s.buildCommLists();
+	
+	s.addGhosts(nGhostLayers,g);
+	
+	//Split up and send out the mesh
+	for (int c=0;c<nchunks;c++)
+		out->accept(c,s.createMessage(c));
+}
+
+
+/********************************************************
+Ghost elements: read-only copies of elements on other processors.
+
+We define the ghost region in "layers".  A layer of ghosts
+is formed by adding all the elements that share 
+exactly n nodes with an existing element to each chunk.
+
+To do this, we need to map element -> adjacent elements.  One sensible
+way to do this is to define a "tuple" as a group of n nodes,
+then map each element to its adjacent tuples (using, e.g., a 
+tiny table passed by the user); then map tuples to adjacent elements.
+
+Mapping tuples to elements requires something like a hashtable, 
+and done naively would require a large amount of space.
+To make this efficient, we start off by restricting
+the table to only "interesting" tuples-- tuples consisting
+of nodes that could cross a processor boundary.  
+
+The "interesting" nodes are marked in ghostNodes, and for
+the first layer are equal to the shared nodes.  Each time
+a ghost layer is added, the set of interesting nodes grows.
+*/
+
+//Add one layer of ghost elements
+void splitter::addGhosts(int nLayers,const ghostLayer *g)
+{
+	
+//Build initial ghostNode table-- just the shared nodes
+	ghostNode=new unsigned char[mesh->node.n];
+	int n,nNode=mesh->node.n;
+	for (n=0;n<nNode;n++) {
+		ghostNode[n]=(gNode[n].isShared());
+	}
+//Set up the ghostStart counts:
+	for (int c=0;c<nchunks;c++) {
+		msgs[c]->m.node.ghostStart=chunks[c].node.size();
+		for (int t=0;t<mesh->nElemTypes;t++) 
+			msgs[c]->m.elem[t].ghostStart=chunks[c].elem[t].size();
+	}
+
+//Add each layer
+	consistencyCheck();
+	for (int i=0;i<nLayers;i++) {
+		add(g[i]);
+		consistencyCheck();
+	}
+
+//Free up memory
+	delete[] ghostNode; ghostNode=NULL;
+	for (int t=0;t<mesh->nElemTypes;t++)
+	  {delete[] gElem[t];gElem[t]=NULL;}
+}
+
+
+//A linked list of elements surrounding a tuple.
+//ElemLists are allocated one at a time, and hence much simpler than pelists:
+class elemList {
+public:
+	int pe;
+	int localNo;//Local number of this element on this PE
+	int type; //Kind of element
+	elemList *next;
+
+	elemList() {next=NULL;}
+	elemList(int pe_,int localNo_,int type_,elemList *next_=NULL)
+		:pe(pe_),localNo(localNo_),type(type_),next(next_) {}
+};
+
+static CkHashCode CkHashFunction_ints(const void *keyData,size_t keyLen)
+{
+	const int *d=(const int *)keyData;
+	int l=keyLen/sizeof(int);
+	CkHashCode ret=d[0];
+	for (int i=1;i<l;i++)
+		ret=ret^circleShift(d[i],i*23);
+	return ret;
+}
+static int CkHashCompare_ints(const void *k1,const void *k2,size_t keyLen)
+{
+	const int *d1=(const int *)k1;
+	const int *d2=(const int *)k2;
+	int l=keyLen/sizeof(int);
+	for (int i=0;i<l;i++) if (d1[i]!=d2[i]) return 0;
+	return 1;
+}
+
+extern "C" int ck_fem_map_compare_int(const void *a, const void *b)
+{
+	return (*(const int *)a)-(*(const int *)b);
+}
+
+//Maps node tuples to element lists
+class tupleTable : public CkHashtable {
+	int tupleLen; //Nodes in a tuple
+	CkHashtableIterator *it;
+public:
+	enum {MAX_TUPLE=8};
+	tupleTable(int tupleLen_)
+		:CkHashtable(tupleLen_*sizeof(int),
+			     sizeof(elemList),
+			     137,0.75,
+			     CkHashFunction_ints,
+			     CkHashCompare_ints)
+	{
+		tupleLen=tupleLen_;
+		if (tupleLen>MAX_TUPLE) CkAbort("Cannot have that many shared nodes!\n");
+		it=NULL;
+	}
+	~tupleTable() {
+		beginLookup();
+		elemList *doomed;
+		while (NULL!=(doomed=(elemList *)lookupNext()))
+			delete doomed->next;
+	}
+	void addTuple(const int *tuple,int pe,int localNo,int type)
+	{
+		//Must make a canonical version of this tuple so different
+		// orderings of the same nodes don't end up in different lists.
+		//I canonicalize by sorting:
+		int can[MAX_TUPLE];
+		switch(tupleLen) {
+		case 1: //Short lists are easy to sort:
+			can[0]=tuple[0]; break;
+		case 2:
+			if (tuple[0]<tuple[1])
+			  {can[0]=tuple[0]; can[1]=tuple[1];}
+			else
+			  {can[0]=tuple[1]; can[1]=tuple[0];}
+			break;
+		default: //Should use std::sort here:
+			memcpy(can,tuple,tupleLen*sizeof(int));
+			qsort(can,tupleLen,sizeof(int),ck_fem_map_compare_int);
+		};
+		
+		//First try for an existing list:
+		elemList *dest=(elemList *)get(can);
+		if (dest!=NULL) 
+		{ //A list already exists here-- add in the new record
+			dest->next=new elemList(pe,localNo,type,dest->next);
+		} else {//No pre-existing list-- initialize a new one.
+			dest=(elemList *)put(can);
+			*dest=elemList(pe,localNo,type);
+		}
+	}
+	//Return all registered elemLists:
+	void beginLookup(void) {
+		it=iterator();
+	}
+	elemList *lookupNext(void) {
+		void *ret=it->next();
+		if (ret==NULL) {
+			delete it; 
+			return NULL;
+		}
+		return (elemList *)ret;
+	}
+};
+
+//Add one layer of ghost elements
+void splitter::add(const ghostLayer &g)
+{
+	int totTuples=0,totGhostElem=0,totGhostNode=0; //For debugging
+	//Build table mapping node-tuples to adjacent elements
+	tupleTable table(g.nodesPerTuple);
+	for (int c=0;c<nchunks;c++) {
+	   for (int t=0;t<mesh->nElemTypes;t++) {
+		if (!g.elem[t].add) continue;
+		const CkVec<int> &src=chunks[c].elem[t];
+		const int *elem2tuple=g.elem[t].elem2tuple;
+		//For every element of every chunk:
+		for (int e=0;e<src.size();e++) {
+			int i,gNo=src[e];
+			const int *conn=mesh->elem[t].connFor(gNo);
+			if (hasGhostNodes(conn,mesh->elem[t].nodesPer))
+			{ //Loop over this element's tuples:
+			  for (int u=0;u<g.elem[t].tuplesPerElem;u++) {
+				int tuple[tupleTable::MAX_TUPLE];
+				for (i=0;i<g.nodesPerTuple;i++) {
+					int n=conn[elem2tuple[i+u*g.nodesPerTuple]];
+					if (!ghostNode[n]) 
+						break; //This tuple has a bad node-- skip it
+					tuple[i]=n;
+				}
+				if (i==g.nodesPerTuple) 
+				{ //This was a good tuple-- add it
+					table.addTuple(tuple,c,e,t);
+					totTuples++;
+				}
+			  }
+			}
+	        }
+	   }
+	}
+       
+	//Loop over all the tuples, connecting adjacent elements
+	table.beginLookup();
+	elemList *l;
+	while (NULL!=(l=table.lookupNext())) {
+		//Find all referenced processors:
+		int pes[20];
+		int nPes=0;
+		for (elemList *b=l;b!=NULL;b=b->next) {
+			int p;
+			for (p=0;p<nPes;p++)
+				if (b->pe==pes[p])
+					break;
+			if (p==nPes) //Not yet in list
+				pes[nPes++]=b->pe;
+		}
+		
+		//Consider adding each element as a ghost on each processor
+		for (const elemList *a=l;a!=NULL;a=a->next)
+		{
+		  int t=a->type;
+		  int srcPe=a->pe;
+		  int gNo=chunks[srcPe].elem[t][a->localNo];
+		  for (int p=0;p<nPes;p++)
+		  {
+			int destPe=pes[p];
+			if (addGhost(gNo,srcPe,destPe,chunks[destPe].elem[t],gElem[t],
+				     msgs[srcPe]->m.elem[t],msgs[destPe]->m.elem[t]))
+			{
+				totGhostElem++;
+				//Add this element's nodes as ghost nodes
+				const int *conn=mesh->elem[t].connFor(gNo);
+				for (int i=0;i<mesh->elem[t].nodesPer;i++)
+				{
+					int gnNo=conn[i];
+					ghostNode[gnNo]=1;
+					if (g.addNodes) {
+						if (addGhost(gnNo,srcPe,destPe,chunks[destPe].node,gNode,
+							     msgs[srcPe]->m.node,msgs[destPe]->m.node))
+							totGhostNode++;
+					}
+				}
+			}
+		  }
+		}
+	}
+	
+	printf("FEM Ghost layer> %d tuples, %d new ghost elements, %d new ghost nodes\n",
+	       totTuples,totGhostElem,totGhostNode);
+}
+
 
 /****************** Assembly ******************
 The inverse of fem_map: reassemble split chunks into a 
@@ -234,7 +645,7 @@ For now, deleted nodes and elements leave a hole in the
 global-numbered node- and element- table; and added nodes
 and elements are added at the end. 
 */
-FEM_Mesh *fem_assemble(int nchunks,ChunkMsg **msgs)
+FEM_Mesh *fem_assemble(int nchunks,MeshChunk **msgs)
 {
 	FEM_Mesh *m=new FEM_Mesh;
 	int i,t,c,e,n;
@@ -242,7 +653,7 @@ FEM_Mesh *fem_assemble(int nchunks,ChunkMsg **msgs)
 //Find the global total number of nodes and elements
 	int minOld_n=1000000000,maxOld_n=0,new_n=0; //Pre-existing and newly-created nodes
 	for(c=0; c<nchunks;c++) {
-		const ChunkMsg *msg=msgs[c];
+		const MeshChunk *msg=msgs[c];
 		for (n=0;n<msg->m.node.n;n++)
 			if (msg->isPrimary[n])
 			{
@@ -270,7 +681,7 @@ FEM_Mesh *fem_assemble(int nchunks,ChunkMsg **msgs)
 		maxOld_e[t]=0;
 		new_e=0;
 		for(c=0; c<nchunks;c++) {
-			const ChunkMsg *msg=msgs[c];
+			const MeshChunk *msg=msgs[c];
 			int startDex=msg->m.nElems(t);
 			for (e=0;e<msg->m.elem[t].n;e++)
 			{
@@ -297,7 +708,7 @@ FEM_Mesh *fem_assemble(int nchunks,ChunkMsg **msgs)
 //Now copy over the local data and connectivity into the global mesh
 	new_n=0;
 	for(c=0; c<nchunks;c++) {
-		ChunkMsg *msg=msgs[c];
+		MeshChunk *msg=msgs[c];
 		for (n=0;n<msg->m.node.n;n++)
 			if (msg->isPrimary[n])
 			{
@@ -315,7 +726,7 @@ FEM_Mesh *fem_assemble(int nchunks,ChunkMsg **msgs)
 	for (t=0;t<m->nElemTypes;t++) {
 		new_e=0;
 		for(c=0; c<nchunks;c++) {
-			const ChunkMsg *msg=msgs[c];
+			const MeshChunk *msg=msgs[c];
 			int startDex=msg->m.nElems(t);
 			for (e=0;e<msg->m.elem[t].n;e++)
 			{
