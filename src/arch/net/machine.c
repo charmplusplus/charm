@@ -205,6 +205,10 @@ int printf(const char *fmt, ...) {
 #include <signal.h>
 #include <string.h>
 
+#if ! defined(_WIN32) || defined(__CYGWIN__)
+#include <sys/resource.h>
+#endif
+
 /* define machine debug */
 #include "machine.h"
 
@@ -264,6 +268,7 @@ void ConverseCommonExit(void);
 static unsigned int dataport=0;
 static int Cmi_mach_id=0; /* Machine-specific identifier (GM-only) */
 static SOCKET       dataskt;
+static int    nicelevel=-100;      /* process priority */
 
 /****************************************************************************
  *
@@ -1836,6 +1841,18 @@ static void ConverseRunPE(int everReturn)
   if (Cmi_netpoll == 1 && CmiMyPe() == 0)
     CmiPrintf("Charm++: scheduler running in netpoll mode.\n");
   
+#if ! defined(_WIN32) || defined(__CYGWIN__)
+  if (nicelevel != -100)  {
+    if (0!=setpriority(PRIO_PROCESS, 0, nicelevel))  {
+      CmiPrintf("[%d] setpriority failed with value %d. \n", CmiMyPe(), nicelevel);
+      perror("setpriority");
+      CmiAbort("setpriority failed.");
+    }
+    else
+      CmiPrintf("[%d] setpriority %d\n", CmiMyPe(), nicelevel);
+  }
+#endif
+
 #if CMK_USE_GM
   if (Cmi_charmrun_fd != -1)
 #endif
@@ -1991,6 +2008,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
     /* idlesleep use sleep instead if busywait when idle */
   if (CmiGetArgFlagDesc(argv,"+idlesleep","Make sleep calls when idle")) Cmi_idlepoll = 0;
   Cmi_syncprint = CmiGetArgFlagDesc(argv,"+syncprint", "Flush each CmiPrintf to the terminal");
+  CmiGetArgIntDesc(argv,"+nice",&nicelevel,"Set the process priority level");
 
   MACHSTATE2(5,"Init: (netpoll=%d), (idlepoll=%d)",Cmi_netpoll,Cmi_idlepoll);
 

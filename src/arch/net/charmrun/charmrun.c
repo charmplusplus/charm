@@ -812,6 +812,7 @@ typedef struct nodetab_host {
   int      cpus;  /* # of physical CPUs*/
   int      rank;  /*Rank of this CPU*/
   double   speed; /*Relative speed of each CPU*/
+  int      nice;  /* process priority */
   /*These fields are set during node-startup*/
   int     dataport;/*UDP port number*/
   SOCKET  ctrlfd;/*Connection to control port*/
@@ -840,6 +841,7 @@ void nodetab_reset(nodetab_host *h)
   h->speed = 1.0;
   h->cpus = 1;
   h->rank = 0;
+  h->nice=-100;
   h->dataport=-1;
   h->ctrlfd=-1;
 #if CMK_USE_RSH
@@ -906,6 +908,7 @@ char *nodetab_args(char *args,nodetab_host *h)
       e2 = e3;       /* for the skipblanks at the end */
     } 
     else if (subeqs(b1,e1,"ext"))  h->ext = substr(b2,e2);
+    else if (subeqs(b1,e1,"nice"))  h->nice = atoi(b2);
     else return args;
     args = skipblanks(e2);
   }
@@ -1055,6 +1058,7 @@ skt_ip_t     nodetab_ip(int i)       { return nodetab_getinfo(i)->ip; }
 unsigned int nodetab_cpus(int i)     { return nodetab_getinfo(i)->cpus; }
 unsigned int nodetab_rank(int i)     { return nodetab_getinfo(i)->rank; }
 int          nodetab_dataport(int i) { return nodetab_getinfo(i)->dataport; }
+int          nodetab_nice(int i)     { return nodetab_getinfo(i)->nice; }
 SOCKET      nodetab_ctrlfd(int i)    { return nodetab_getinfo(i)->ctrlfd;}
 #if CMK_USE_RSH
 char        *nodetab_setup(int i)    { return nodetab_getinfo(i)->setup; }
@@ -2294,6 +2298,10 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv)
        fprintf(f,"\"%s\" ",arg_runscript);
     fprintf(f,"\"%s\" ",arg_nodeprog_r);
     fprint_arg(f,argv);
+    if (nodetab_nice(nodeno) != -100) {
+      if(arg_verbose) fprintf(stderr, "Charmrun> nice -n %d\n", nodetab_nice(nodeno));
+      fprintf(f," +nice %d ",nodetab_nice(nodeno));
+    }
     fprintf(f,"\nres=$?\n");
     /* If shared libraries fail to load, the program dies without
        calling charmrun back.  Since we *have* to close down stdin/out/err,
