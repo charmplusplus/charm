@@ -614,7 +614,7 @@ class Message : public TEntity {
 class Entry : public Member {
   private:
     int line,entryCount;
-    int attribs;
+    int attribs;    
     Type *retType;
     char *name;
     ParamList *param;
@@ -623,6 +623,9 @@ class Entry : public Member {
     
     XStr proxyName(void) {return container->proxyName();}
     XStr indexName(void) {return container->indexName();}
+
+    int hasCallMarshall;
+    void genCall(XStr &dest,const XStr &preCall);
 
     XStr epStr(void);
     XStr epIdx(int fromProxy=1);

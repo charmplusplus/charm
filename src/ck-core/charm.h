@@ -139,6 +139,10 @@ extern void CkRegisterReadonlyMsg(const char *name,const char *type,
 	void** pMsg);
 extern void CkRegisterMainModule(void);
 
+typedef int (*CkMarshallUnpackFn)(char *marshall_buf,void *object);
+extern void CkRegisterMarshallUnpackFn(int epIndex,CkMarshallUnpackFn m);
+extern CkMarshallUnpackFn CkLookupMarshallUnpackFn(int epIndex);
+
 /******************************************************************************
  *
  * Object Creation Calls

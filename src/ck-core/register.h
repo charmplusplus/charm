@@ -14,9 +14,10 @@ class EntryInfo {
     CkCallFnPtr call;
     int msgIdx;
     int chareIdx;
+    CkMarshallUnpackFn marshallUnpack;
 
     EntryInfo(const char *n, CkCallFnPtr c, int m, int ci) : 
-      name(n), call(c), msgIdx(m), chareIdx(ci)
+      name(n), call(c), msgIdx(m), chareIdx(ci), marshallUnpack(0)
     {}
 };
 

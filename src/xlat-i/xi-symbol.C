@@ -1493,6 +1493,9 @@ void Entry::setChare(Chare *c) {
 		param=new ParamList(new Parameter(line,t));
 	}
 	entryCount=c->nextEntry();
+	
+	//Make a special "callmarshall" method, for communication optimizations to use:
+	hasCallMarshall=param->isMarshalled() && !isThreaded() && !isSync() && !isExclusive() && !fortranMode;
 }
 
 // "parameterType *msg" or "void".
@@ -1833,6 +1836,10 @@ void Entry::genIndexDecls(XStr& str)
   if(isThreaded()) {
     str << "    static void _callthr_"<<epStr()<<"(CkThrCallArg *);\n";
   }
+  if (hasCallMarshall) {
+    str << "    static int _callmarshall_"<<epStr()<<"(char* impl_buf,"<<
+      container->baseName()<<"* impl_obj);\n";
+  }
 }
 
 void Entry::genDecls(XStr& str)
@@ -1874,6 +1881,46 @@ XStr Entry::callThread(const XStr &procName,int prependEntryName)
   str << "  "<<container->baseName()<<" *impl_obj = ("<<container->baseName()<<" *) impl_arg->obj;\n";
   str << "  delete impl_arg;\n";
   return str;
+}
+
+/*
+  Generate the code to actually unmarshall the parameters and call 
+  the entry method.
+*/
+void Entry::genCall(XStr& str, const XStr &preCall)
+{
+  bool isArgcArgv=false;
+  if (isConstructor() && container->isMainChare() && 
+      (!param->isVoid()) && (!param->isCkArgMsgPtr()))
+  	isArgcArgv=true;
+  else //Normal case: Unmarshall variables
+	param->beginUnmarshall(str);
+  str << preCall;
+  if (!isConstructor() && fortranMode) {
+    str << "/* FORTRAN */\n";
+    str << "  int index = impl_obj->thisIndex;\n";
+    str << "  " << fortranify(name)
+	<< "_((char **)(impl_obj->user_data), &index, ";
+    param->unmarshallAddress(str); str<<");\n";
+    str << "/* FORTRAN END */\n";
+  }
+  else { //Normal case: call regular method
+    if (isArgcArgv) str<<"  CkArgMsg *m=(CkArgMsg *)impl_msg;\n"; //Hack!
+  
+    if(isConstructor()) {//Constructor: call "new (obj) foo(parameters)"
+  	str << "  new (impl_obj) "<<container->baseName();
+    } else {//Regular entry method: call "obj->bar(parameters)"
+  	str << "  impl_obj->"<<name;
+    }
+    
+    if (isArgcArgv) { //Extract parameters from CkArgMsg (should be parameter marshalled)
+        str<<"(m->argc,m->argv);\n";
+	str<<"  delete m;\n";
+    }
+    else {//Normal case: unmarshall parameters (or just pass message)
+        str<<"("; param->unmarshall(str); str<<");\n";
+    }
+  }
 }
 
 void Entry::genDefs(XStr& str)
@@ -1962,41 +2009,21 @@ void Entry::genDefs(XStr& str)
   str << "{\n";
   if(isThreaded()) str << callThread(epStr());
   str << preMarshall;
-  bool isArgcArgv=false;
-  if (isConstructor() && container->isMainChare() && 
-      (!param->isVoid()) && (!param->isCkArgMsgPtr()))
-  	isArgcArgv=true;
-  else //Normal case: Unmarshall variables
-	param->beginUnmarshall(str);
-  str << preCall;
-  if (!isConstructor() && fortranMode) {
-    str << "/* FORTRAN */\n";
-    str << "  int index = impl_obj->thisIndex;\n";
-    str << "  " << fortranify(name)
-	<< "_((char **)(impl_obj->user_data), &index, ";
-    param->unmarshallAddress(str); str<<");\n";
-    str << "/* FORTRAN END */\n";
-  }
-  else { //Normal case: call regular method
-    if (isArgcArgv) str<<"  CkArgMsg *m=(CkArgMsg *)impl_msg;\n"; //Hack!
-  
-    if(isConstructor()) {//Constructor: call "new (obj) foo(parameters)"
-  	str << "  new (impl_obj) "<<containerType;
-    } else {//Regular entry method: call "obj->bar(parameters)"
-  	str << "  impl_obj->"<<name;
-    }
-    
-    if (isArgcArgv) { //Extract parameters from CkArgMsg (should be parameter marshalled)
-        str<<"(m->argc,m->argv);\n";
-	str<<"  delete m;\n";
-    }
-    else {//Normal case: unmarshall parameters (or just print message)
-        str<<"("; param->unmarshall(str); str<<");\n";
-    }
-  }
+  if (param->isMarshalled()) str << "  char *impl_buf=((CkMarshallMsg *)impl_msg)->msgBuf;\n";
+  genCall(str,preCall);
   param->endUnmarshall(str);
   str << postCall;
   str << "}\n";
+  
+  if (hasCallMarshall) {
+    str << makeDecl("int")<<"::_callmarshall_"<<epStr()<<"(char* impl_buf,"<<containerType<<" * impl_obj) {\n";
+      genCall(str,preCall);
+    /*FIXME: implP.size() is wrong if the parameter list contains arrays--
+       need to add in the size of the arrays.
+     */
+    str << "  return implP.size();\n";
+    str << "}\n";
+  }
 }
 
 void Entry::genReg(XStr& str)
@@ -2021,6 +2048,9 @@ void Entry::genReg(XStr& str)
     if(attribs&SMIGRATE)
       str << "  CkRegisterMigCtor(__idx, "<<epIdx(0)<<");\n";
   }
+  if (hasCallMarshall)
+      str << "  CkRegisterMarshallUnpackFn("<<epIdx(0)<<
+            ",(CkMarshallUnpackFn)_callmarshall_"<<epStr()<<");\n";
 }
 
 
@@ -2170,16 +2200,22 @@ void ParamList::marshall(XStr &str)
 	{
 		str<<"  //Marshall: ";print(str,0);str<<"\n";
 		//First pass: find sizes
-		str<<"  int impl_off=0,impl_arrstart=0;\n";
+		str<<"  int impl_off=0;\n";
 		int hasArrays=orEach(&Parameter::isArray);
 		if (hasArrays) {
+		  str<<"  int impl_arrstart=0;\n";
 		  callEach(&Parameter::marshallArraySizes,str);
 		}
 		str<<"  { //Find the size of the PUP'd data\n";
 		str<<"    PUP::sizer implP;\n";
 		callEach(&Parameter::pup,str);
-		str<<"    impl_arrstart=CK_ALIGN(implP.size(),16);\n";
-		str<<"    impl_off+=impl_arrstart;\n";
+		if (hasArrays)
+		{ /*round up pup'd data length--that's the first array*/
+		  str<<"    impl_arrstart=CK_ALIGN(implP.size(),16);\n";
+		  str<<"    impl_off+=impl_arrstart;\n";
+		}
+		else  /*No arrays--no padding*/
+		  str<<"    impl_off+=implP.size();\n";
 		str<<"  }\n";
 		//Now that we know the size, allocate the packing buffer
 		str<<"  CkMarshallMsg *impl_msg=new (impl_off,0)CkMarshallMsg;\n";
@@ -2231,7 +2267,6 @@ void ParamList::beginUnmarshall(XStr &str)
     	if (isMarshalled()) 
     	{
     		str<<"  //Unmarshall pup'd fields: ";print(str,0);str<<"\n";
-    		str<<"  char *impl_buf=((CkMarshallMsg *)impl_msg)->msgBuf;\n";
     		str<<"  PUP::fromMem implP(impl_buf);\n";
     		callEach(&Parameter::beginUnmarshall,str);
     		str<<"  impl_buf+=CK_ALIGN(implP.size(),16);\n";

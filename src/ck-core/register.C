@@ -128,6 +128,20 @@ void CkRegisterReadonlyMsg(const char *name,const char *type,void **pMsg)
   return;
 }
 
+
+extern "C"
+void CkRegisterMarshallUnpackFn(int epIndex,CkMarshallUnpackFn m)
+{
+	_entryTable[epIndex]->marshallUnpack=m;
+}
+
+extern "C"
+CkMarshallUnpackFn CkLookupMarshallUnpackFn(int epIndex)
+{
+	return _entryTable[epIndex]->marshallUnpack;
+}
+
+
 // temporarily here for satisfying NAMD, it should go to tracing module
 
 extern "C"
