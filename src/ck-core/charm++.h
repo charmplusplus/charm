@@ -742,10 +742,7 @@ class CkThrCallArg {
 
 extern void CkStartQD(const CkCallback& cb);
 
-#if CMK_MEM_CHECKPOINT
 #include "ckmemcheckpoint.h"
-#endif
-
 #include "readonly.h"
 #include "ckarray.h"
 #include "ckstream.h"

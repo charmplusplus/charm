@@ -42,12 +42,15 @@ CkCallback CkMemCheckPT::cpCallback;    // static
 
 CpvStaticDeclare(CkProcCheckPTMessage*, procChkptBuf);
 
+int cur_restart_phase = 0;
+
 // compute the backup processor
 // FIXME: avoid crashed processors
 inline int ChkptOnPe() { return (CkMyPe()+1)%CkNumPes(); }
 
 // called in array element constructor
 // choose and register with 2 buggies for checkpoiting 
+#if CMK_MEM_CHECKPOINT
 void ArrayElement::init_checkpt() {
 	// CmiPrintf("[%d] ArrayElement::init_checkpt %d\n", CkMyPe(), info.fromMigration);
         budPEs[0] = (CkMyPe()-1+CkNumPes())%CkNumPes();
@@ -86,10 +89,12 @@ void ArrayElement::inmem_checkpoint(CkArrayCheckPTReqMessage *m) {
   checkptMgr.recvData(msg, 2, budPEs);
   delete m;
 }
+#endif
 
 // called by checkpoint mgr to restore an array element
 void CkMemCheckPT::inmem_restore(CkArrayCheckPTMessage *m) 
 {
+#if CMK_MEM_CHECKPOINT
   //DEBUGF("[%d] inmem_restore restore", CmiMyPe());  m->index.print();
   PUP::fromMem p(m->packData);
   CkLocMgr *mgr = CProxy_CkLocMgr(m->locMgr).ckLocalBranch();
@@ -108,6 +113,7 @@ void CkMemCheckPT::inmem_restore(CkArrayCheckPTMessage *m)
   contributorInfo *c=(contributorInfo *)&elt->listenerData[elt->thisArray->reducer->ckGetOffset()];
   if (c) c->redNo = 0;
 */
+#endif
 }
 
 CkMemCheckPT::CkMemCheckPT()
