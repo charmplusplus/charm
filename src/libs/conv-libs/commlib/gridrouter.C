@@ -43,22 +43,42 @@ GridRouter::GridRouter(int n, int me)
   MyPe=me;
   gpes=NULL;
   COLLEN=ColLen(NumPes);
-  recvExpected=0;
+  recvExpected = Expect(MyPe, NumPes);
+
   int myrow=MyPe/COLLEN;
-  int myrep=myrow*COLLEN;
-  int numunmappedpes=myrep+ROWLEN-NumPes;
-  int nummappedpes=ROWLEN;
-  if (numunmappedpes >0) {
-	nummappedpes=NumPes-myrep;
-	int i=NumPes+MyPe-myrep;
-	while (i<myrep+ROWLEN) {
-		recvExpected+=Expect(i, NumPes);
-		i+=nummappedpes;
-	}
+  int mycol=MyPe%COLLEN;  
+  int lastrow = (NumPes - 1)/COLLEN;
+  
+  if(lastrow * COLLEN + mycol > NumPes - 1) {
+      //We have a hole in the lastrow
+      if(lastrow * COLLEN + myrow <= NumPes - 1) 
+          //We have a processor which wants to send data to that hole
+          recvExpected ++;
+      
+      if((myrow == 0) && ((NumPes - 1)%COLLEN == COLLEN - 1))
+          //Special case with one hole only
+          recvExpected ++;
+      
+      LPMsgExpected = (NumPes - 1)/COLLEN;
+  }
+  else {
+      LPMsgExpected = (NumPes - 1)/COLLEN + 1;
   }
 
-  recvExpected += Expect(MyPe, NumPes);
-  LPMsgExpected=nummappedpes;
+  /*
+    int myrep=myrow*COLLEN;
+    int nummappedpes=ROWLEN;
+    int numunmappedpes=myrep+ROWLEN-NumPes;
+    if (numunmappedpes >0) {
+    nummappedpes=NumPes-myrep;
+    int i=NumPes+MyPe-myrep;
+    while (i<myrep+ROWLEN) {
+    recvExpected+=Expect(i, NumPes);
+    i+=nummappedpes;
+    }
+    }
+  */
+  
   //ComlibPrintf("%d LPMsgExpected=%d\n", MyPe, LPMsgExpected);
 
   PeMesh = new PeTable(/*CmiNumPes()*/NumPes);
@@ -111,6 +131,8 @@ void GridRouter::EachToManyMulticast(comID id, int size, void *msg, int numpes, 
       //    ComlibPrintf("ROWLEN = %d, COLLEN =%d\n", ROWLEN, COLLEN);
 
     int MYROW=MyPe/ROWLEN;
+    int MYCOL = MyPe%COLLEN;
+    
     int nextrowrep=i*ROWLEN;
     int myrep=MYROW*ROWLEN;
     int nextpe=MyPe-myrep+nextrowrep;
@@ -118,8 +140,13 @@ void GridRouter::EachToManyMulticast(comID id, int size, void *msg, int numpes, 
     
     if (nummappedpes <= 0) continue;
     if (nextpe >= NumPes) {
-      int mm=(nextpe-NumPes) % nummappedpes;
-      nextpe=nextrowrep+mm;
+      //Previously hole assigned to elements in the same row as nextpe
+      //int mm=(nextpe-NumPes) % nummappedpes;
+      //nextpe=nextrowrep+mm;
+
+      // Now they are spread across the grid in the same column as nextpe
+      int nextcol = nextpe % COLLEN;
+      nextpe = COLLEN * (MYCOL % MYROW) + nextcol;
     }
 
     int rowlength=ROWLEN;

@@ -257,9 +257,12 @@ void KDoneEP(DummyMsg *m)
   comID id=m->id;
   CpvAccess(ImplTable)[id.srcpe][id.ImplIndex]->Done();
   
-  //  CmiSetHandler(m, callBackHandler);
-  //CmiSyncSendAndFree(CmiMyPe(), sizeof(DummyMsg), m);
-  CmiFree(m);
+  if(callBackHandler != 0) {
+      CmiSetHandler(m, callBackHandler);
+      CmiSyncSendAndFree(CmiMyPe(), sizeof(DummyMsg), m);
+  }
+  else 
+      CmiFree(m);
 }
 
 void KDone(comID id)
