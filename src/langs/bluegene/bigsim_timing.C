@@ -123,6 +123,23 @@ void BgMsgSetTiming(char *msg)
   CmiBgMsgSrcPe(msg) = BgMyNode();	// global serial number
 }
 
+void BgLogEntryCommit(BgTimeLineRec &tlinerec) {
+  if (!genTimeLog) return;
+  tlinerec.logEntryClose();
+  BgTimeLine &timeline = tlinerec.timeline;
+  if(bgSkipEndFlag == 0)
+	timeline[timeline.length()-1]->closeLog();
+  else
+        bgSkipEndFlag=0;
+  CmiAssert(tlinerec.bgCurLog == NULL);
+  if (correctTimeLog) {
+	BgAdjustTimeLineInsert(tlinerec);
+	if (timeline.length()) 
+          tCURRTIME = timeline[timeline.length()-1]->endTime;
+	tlinerec.clearSendingLogs();
+  }
+}
+
 inline int adjustTimeLog(bgTimeLog* log, BgTimeLine& tline, 
                          int mynode, int sendImmediately)
 {

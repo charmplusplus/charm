@@ -65,7 +65,7 @@ inline int isEqual(double v1, double v2){
 	tTIMELINEREC.logEntryStart(m);
 
 #define BG_ENTRYEND()  \
-	tTIMELINEREC.logEntryCommit();
+	BgLogEntryCommit(tTIMELINEREC);
 
 #define BG_ADDMSG(m, node, tid, local)  	\
         if (genTimeLog)	{ \

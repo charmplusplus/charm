@@ -201,7 +201,7 @@ public:
 #endif
   }
   void logEntryStart(char *m);
-  void logEntryCommit();
+//  void logEntryCommit();
   void logEntryInsert(bgTimeLog* log);
   void logEntryStart(bgTimeLog* log);
   void logEntryClose();

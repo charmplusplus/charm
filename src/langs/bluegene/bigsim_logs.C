@@ -213,6 +213,7 @@ void BgTimeLineRec::logEntryStart(char *m) {
   enq(bgCurLog, 1);
 }
 
+#if 0
 void BgTimeLineRec::logEntryCommit() {
   if (!genTimeLog) return;
   if(bgSkipEndFlag == 0)
@@ -227,6 +228,7 @@ void BgTimeLineRec::logEntryCommit() {
   }
   bgCurLog = NULL;
 }
+#endif
 
 void BgTimeLineRec::logEntryInsert(bgTimeLog* log)
 {

@@ -80,6 +80,7 @@ extern int BgGetTimeLineIndexByRecvTime(BgTimeLineRec &, bgTimeLog *, int, int);
 extern int BgAdjustTimeLineFromIndex(int index, BgTimeLineRec &tlinerec, int mynode);
 extern int BgGetIndexFromTime(double effT, int seqno, BgTimeLineRec &tline);
 extern void BgSendPendingCorrections(BgTimeLineRec &tlinerec, int mynode);
+extern void BgLogEntryCommit(BgTimeLineRec &tlinerec);
 
 
 #if 0
