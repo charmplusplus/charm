@@ -1,7 +1,7 @@
 all: xi-grammar.tab.h xi-grammar.tab.C xi-scan.C sdag/trans.c
 
 xi-grammar.tab.h xi-grammar.tab.C: xi-grammar.y
-	bison -v -y -d xi-grammar.y
+	bison -y -d xi-grammar.y
 	mv y.tab.c xi-grammar.tab.C
 	mv y.tab.h xi-grammar.tab.h
 
