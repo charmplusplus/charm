@@ -17,16 +17,17 @@
 #ifndef CMK_NO_SOCKETS /*<- for ASCI Red*/
 
 /*Just print out error message and exit*/
-static void default_skt_abort(int code,const char *msg)
+static int default_skt_abort(int code,const char *msg)
 {
   fprintf(stderr,"Fatal socket error: code %d-- %s\n",code,msg);
   exit(1);
+  return -1;
 }
 
-static skt_idleFunc idleFunc=NULL;
-static skt_abortFunc skt_abort=default_skt_abort;
-void skt_set_idle(skt_idleFunc f) {idleFunc=f;}
-void skt_set_abort(skt_abortFunc f) {skt_abort=f;}
+static skt_idleFn idleFunc=NULL;
+static skt_abortFn skt_abort=default_skt_abort;
+void skt_set_idle(skt_idleFn f) {idleFunc=f;}
+skt_abortFn skt_set_abort(skt_abortFn f) {skt_abort=f;}
 
 
 #ifdef _WIN32 /*Windows systems:*/
@@ -165,22 +166,22 @@ retry:
   ret = socket(AF_INET,SOCK_DGRAM,0);
   if (ret == SOCKET_ERROR) {
     if (skt_should_retry()) goto retry;  
-    skt_abort(93490,"Error creating datagram socket.");
+    return skt_abort(93490,"Error creating datagram socket.");
   }
   if (bind(ret, (struct sockaddr *)&addr, sizeof(addr)) == SOCKET_ERROR)
-	  skt_abort(93491,"Error binding datagram socket.");
+	  return skt_abort(93491,"Error binding datagram socket.");
   
   len = sizeof(addr);
   if (getsockname(ret, (struct sockaddr *)&addr , &len))
-	  skt_abort(93492,"Error getting address on datagram socket.");
+	  return skt_abort(93492,"Error getting address on datagram socket.");
 
   if (bufsize) 
   {
     len = sizeof(int);
     if (setsockopt(ret, SOL_SOCKET , SO_RCVBUF , (char *)&bufsize, len) == SOCKET_ERROR) 
-		skt_abort(93495,"Error on RCVBUF sockopt for datagram socket.");
+		return skt_abort(93495,"Error on RCVBUF sockopt for datagram socket.");
     if (setsockopt(ret, SOL_SOCKET , SO_SNDBUF , (char *)&bufsize, len) == SOCKET_ERROR) 
-		skt_abort(93496,"Error on SNDBUF sockopt for datagram socket.");
+		return skt_abort(93496,"Error on SNDBUF sockopt for datagram socket.");
   }
   
   if (port!=NULL) *port = ntohs(addr.sin_port);
@@ -199,15 +200,15 @@ retry:
   
   if (ret == SOCKET_ERROR) {
     if (skt_should_retry()) goto retry;
-    else skt_abort(93483,"Error creating server socket.");
+    else return skt_abort(93483,"Error creating server socket.");
   }
   if (bind(ret, (struct sockaddr *)&addr, sizeof(addr)) == SOCKET_ERROR) 
-	  skt_abort(93484,"Error binding server socket.");
+	  return skt_abort(93484,"Error binding server socket.");
   if (listen(ret,5) == SOCKET_ERROR) 
-	  skt_abort(93485,"Error listening on server socket.");
+	  return skt_abort(93485,"Error listening on server socket.");
   len = sizeof(addr);
   if (getsockname(ret, (struct sockaddr *)&addr, &len) == SOCKET_ERROR) 
-	  skt_abort(93486,"Error getting name on server socket.");
+	  return skt_abort(93486,"Error getting name on server socket.");
 
   if (port!=NULL) *port = ntohs(addr.sin_port);
   return ret;
@@ -223,7 +224,7 @@ retry:
   ret = accept(src_fd, (struct sockaddr *)&addr, &len);
   if (ret == SOCKET_ERROR) {
     if (skt_should_retry()) goto retry;
-    else skt_abort(93523,"Error in accept.");
+    else return skt_abort(93523,"Error in accept.");
   }
   
   if (port!=NULL) *port=ntohs(addr.sin_port);
@@ -245,7 +246,7 @@ SOCKET skt_connect(unsigned int ip, int port, int timeout)
     if (ret==SOCKET_ERROR) 
     {
 	  if (skt_should_retry()) continue;  
-      else skt_abort(93512,"Error creating socket");
+      else return skt_abort(93512,"Error creating socket");
     }
     ok = connect(ret, (struct sockaddr *)&(addr), sizeof(addr));
     if (ok != SOCKET_ERROR) 
@@ -253,30 +254,31 @@ SOCKET skt_connect(unsigned int ip, int port, int timeout)
 	else { /*Bad connect*/
 	  skt_close(ret);
 	  if (skt_should_retry()) continue;
-	  else skt_abort(93515,"Error connecting to socket\n");
+	  else return skt_abort(93515,"Error connecting to socket\n");
     }
   }
   /*Timeout*/
   if (timeout==60)
-     skt_abort(93517,"Timeout in socket connect\n");
+     return skt_abort(93517,"Timeout in socket connect\n");
   return INVALID_SOCKET;
 }
 
-void skt_recvN(SOCKET hSocket,char *pBuff,int nBytes)
+int skt_recvN(SOCKET hSocket,void *buff,int nBytes)
 {
   int nLeft,nRead;
+  char *pBuff=(char *)buff;
 
   nLeft = nBytes;
   while (0 < nLeft)
   {
     if (0==skt_select1(hSocket,60*1000))
-	skt_abort(93610,"Timeout on socket recv!");
+	return skt_abort(93610,"Timeout on socket recv!");
     nRead = recv(hSocket,pBuff,nLeft,0);
     if (nRead<=0)
     {
-       if (nRead==0) skt_abort(93620,"Socket closed before recv.");
+       if (nRead==0) return skt_abort(93620,"Socket closed before recv.");
        if (skt_should_retry()) continue;/*Try again*/
-       else skt_abort(93650+hSocket,"Error on socket recv!");
+       else return skt_abort(93650+hSocket,"Error on socket recv!");
     }
     else
     {
@@ -284,21 +286,23 @@ void skt_recvN(SOCKET hSocket,char *pBuff,int nBytes)
       pBuff += nRead;
     }
   }
+  return 0;
 }
 
-void skt_sendN(SOCKET hSocket,const char *pBuff,int nBytes)
+int skt_sendN(SOCKET hSocket,const void *buff,int nBytes)
 {
   int nLeft,nWritten;
-
+  const char *pBuff=(const char *)buff;
+  
   nLeft = nBytes;
   while (0 < nLeft)
   {
     nWritten = send(hSocket,pBuff,nLeft,0);
     if (nWritten<=0)
     {
-          if (nWritten==0) skt_abort(93720,"Socket closed before send.");
+          if (nWritten==0) return skt_abort(93720,"Socket closed before send.");
 	  if (skt_should_retry()) continue;/*Try again*/
-	  else skt_abort(93700+hSocket,"Error on socket send!");
+	  else return skt_abort(93700+hSocket,"Error on socket send!");
     }
     else
     {
@@ -306,6 +310,7 @@ void skt_sendN(SOCKET hSocket,const char *pBuff,int nBytes)
       pBuff += nWritten;
     }
   }
+  return 0;
 }
 
 
@@ -353,15 +358,16 @@ unsigned int ChMessageInt(ChMessageInt_t src)
   return ret;
 }
 
-void ChMessage_recv(SOCKET fd,ChMessage *dst)
+int ChMessage_recv(SOCKET fd,ChMessage *dst)
 {
   /*Get the binary header*/
-  skt_recvN(fd,(char *)&dst->header,sizeof(dst->header));
+  if (0!=skt_recvN(fd,(char *)&dst->header,sizeof(dst->header))) return -1;
   /*Allocate a recieve buffer*/
   dst->len=ChMessageInt(dst->header.len);
   dst->data=(char *)malloc(dst->len);
   /*Get the actual data*/
-  skt_recvN(fd,dst->data,dst->len);
+  if (0!=skt_recvN(fd,dst->data,dst->len)) return -1;
+  return 0;
 }
 void ChMessage_free(ChMessage *doomed)
 {
@@ -384,10 +390,11 @@ void ChMessage_new(const char *type,unsigned int len,
   dst->len=len;
   dst->data=(char *)malloc(dst->len);
 }
-void ChMessage_send(SOCKET fd,const ChMessage *src)
+int ChMessage_send(SOCKET fd,const ChMessage *src)
 {
-  skt_sendN(fd,(const char *)&src->header,sizeof(src->header));
-  skt_sendN(fd,(const char *)src->data,src->len);
+  if (0!=skt_sendN(fd,&src->header,sizeof(src->header))) return -1;
+  if (0!=skt_sendN(fd,src->data,src->len)) return -1;
+  return 0;
 } /*You must free after send*/
 
 #endif /*!CMK_NO_SOCKETS*/

@@ -58,11 +58,11 @@
  *     the socket can recv or accept, or (failing that) in the given
  *     number of milliseconds.  Returns 0 on timeout; 1 on readable.
  *
- * void skt_recvN(SOCKET fd,      char *buf,int nBytes)
- * void skt_sendN(SOCKET fd,const char *buf,int nBytes)
+ * int skt_recvN(SOCKET fd,      void *buf,int nBytes)
+ * int skt_sendN(SOCKET fd,const void *buf,int nBytes)
  *   - Blocking send/recv nBytes on the given socket.
  *     Retries if possible (e.g., if interrupted), but aborts 
- *     on serious errors.
+ *     on serious errors.  Returns zero or an abort code.
  *
  * void skt_set_idle(idleFunc f)
  *   - Specify a routine to be called while waiting for the network.
@@ -113,10 +113,10 @@ void skt_init(void);/*Is a function*/
 
 
 /*Error and idle handling*/
-typedef void (*skt_idleFunc)(void);
-typedef void (*skt_abortFunc)(int errCode,const char *msg);
-void skt_set_idle(skt_idleFunc f);
-void skt_set_abort(skt_abortFunc f);
+typedef void (*skt_idleFn)(void);
+typedef int (*skt_abortFn)(int errCode,const char *msg);
+void skt_set_idle(skt_idleFn f);
+skt_abortFn skt_set_abort(skt_abortFn f);
 
 /*DNS*/
 unsigned long skt_my_ip(void);
@@ -136,8 +136,8 @@ void skt_close(SOCKET fd);
 int skt_select1(SOCKET fd,int msec);
 
 /*Blocking Send/Recv*/
-void skt_sendN(SOCKET hSocket,const char *pBuff,int nBytes);
-void skt_recvN(SOCKET hSocket,      char *pBuff,int nBytes);
+int skt_sendN(SOCKET hSocket,const void *pBuff,int nBytes);
+int skt_recvN(SOCKET hSocket,      void *pBuff,int nBytes);
 
 #endif /*!CMK_NO_SOCKETS*/
 
@@ -191,13 +191,13 @@ typedef struct ChMessage {
   int len; /*Length of message data below*/
   char *data; /*Pointer to heap-allocated data*/
 } ChMessage;
-void ChMessage_recv(SOCKET fd,ChMessage *dst);
+int ChMessage_recv(SOCKET fd,ChMessage *dst);
 void ChMessage_free(ChMessage *doomed);
 void ChMessageHeader_new(const char *type,unsigned int len,
 		   ChMessageHeader *dst);
 void ChMessage_new(const char *type,unsigned int len,
 		   ChMessage *dst);
-void ChMessage_send(SOCKET fd,const ChMessage *src); /*You must free after send*/
+int ChMessage_send(SOCKET fd,const ChMessage *src); /*You must free after send*/
 
 /******* CCS Message type (included here for convenience) *******/
 #define CCS_HANDLERLEN 32 /*Maximum length for the handler field*/
