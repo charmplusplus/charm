@@ -3,18 +3,18 @@
 syntax() {
   echo ''
   echo 'Usage: build <target> <version> [charmc-options ...]'
-  echo ''
+#  echo ''
   echo '<targets>: converse, charm++ libs ampi IDL tsm sm pvm sdag'
   echo '<targets>: doc ps-doc pdf-doc html-doc'
   echo '<versions>: ' 
-  ( cd src ; ls -1 | egrep -v '(^Common)|(^CVS)|(^QuickThreads)|(^ccs-client)' | pr -4 -t )
-  echo ''
+  ( cd src ; ls -1 | egrep -v '(^Common)|(^CVS)|(^QuickThreads)|(^ccs-client)' | pr -3 -t )
+#  echo ''
   echo 'example <charmc-options>: -g -save -verbose'
   echo 'Note: This script is trivial.  It'
   echo ' 1. Creates directories <version> and <version>/tmp';
-  echo ' 2. Copies src/Common/scripts/Makefile into <version>/tmp';
-  echo ' 3. Does a "make <target> <version> OPTS=<charmc-options>" in <version>/tmp.'
-  echo "That's all build does.  The rest is handled by the Makefile."
+#  echo ' 2. Copies src/Common/scripts/Makefile into <version>/tmp';
+  echo ' 2. Does a "make <target> <version> OPTS=<charmc-options>" in <version>/tmp.'
+#  echo "That's all build does.  The rest is handled by the Makefile."
   exit 1
 }
 
