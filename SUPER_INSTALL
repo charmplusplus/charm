@@ -24,19 +24,36 @@ syntax() {
 }
 
   [ $# -lt 2 ] && syntax
-  PROGRAM=$1 ; shift
-  VERSION=$1 ; shift
 
-  [ "x$VERSION" = "x" ] && syntax
+MAKEOPTS=""
+OPTS=""
+
+while [ ! $# -eq 0 ]
+do
+  case "$1" in
+    -*) 
+          MAKEOPTS="$MAKEOPTS $1"; shift
+	  ;;
+    *)
+          PROGRAM=$1 ; shift
+          VERSION=$1 ; shift
+          while [ ! $# -eq 0 ]
+          do
+            OPTS="$OPTS $1"; shift
+	  done
+	  ;;
+  esac
+done
+
+[ "x$VERSION" = "x" ] && syntax
 	
-  ( echo $2 | egrep -s '^Common' ) && syntax
-  [ -d src/$VERSION ] || goto syntax
+( echo $VERSION | egrep -s '^Common' ) && syntax
+[ -d src/$VERSION ] || goto syntax
 
-  echo "Creating directories: $VERSION and $VERSION/tmp"
-  [ -d $VERSION ] || mkdir $VERSION
-  [ -d $VERSION/tmp ] || mkdir $VERSION/tmp
-  echo "Copying src/Common/scripts/Makefile to $VERSION/tmp"
-  rm -f $VERSION/tmp/Makefile
-  ln -s "../../src/Common/scripts/Makefile" $VERSION/tmp/Makefile
-  echo "Performing 'make $PROGRAM OPTS="$*"' in $VERSION/tmp"
-  cd $VERSION/tmp ; make $PROGRAM OPTS="$*"
+[ -d $VERSION ] || echo "Creating dir: $VERSION" || mkdir $VERSION
+[ -d $VERSION/tmp ] || echo "Creating dir: $VERSION/tmp" || mkdir $VERSION/tmp
+echo "Copying src/Common/scripts/Makefile to $VERSION/tmp"
+rm -f $VERSION/tmp/Makefile
+ln -s "../../src/Common/scripts/Makefile" $VERSION/tmp/Makefile
+echo "Performing 'make $MAKEOPTS $PROGRAM OPTS="$OPTS"' in $VERSION/tmp"
+cd $VERSION/tmp ; make $MAKEOPTS $PROGRAM OPTS="$OPTS"

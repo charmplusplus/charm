@@ -24,4 +24,4 @@ clean: mostlyclean
 
 EOF
 
-echo "You're ready to do a make now."
+#echo "You're ready to do a make now."

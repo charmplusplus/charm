@@ -8,11 +8,11 @@ qt: md/sparc.h qt.c md/sparc.s
 	ln -s md/sparc.h qtmd.h
 	$(CC) -c -o qt.o qt.c
 	$(CC) -c -o qtmds.o md/sparc.s
-	ar crv libqt.a qt.o qtmds.o
+	ar cr libqt.a qt.o qtmds.o
 
 stp:
 	$(CC) -c stp.c
-	ar crv libstp.a stp.o
+	ar cr libstp.a stp.o
 
 testpgm:
 	$(CC) -c meas.c

@@ -13,8 +13,8 @@ Barrier.decl.h Barrier.def.h: barrier.ci
 	$(CHARMC) barrier.ci
 
 $(CDIR)/include/Barrier.decl.h: Barrier.decl.h
-	cp Barrier.decl.h $(CDIR)/include
+	/bin/cp Barrier.decl.h $(CDIR)/include
 
 $(CDIR)/include/barrier.h: barrier.h
-	cp barrier.h $(CDIR)/include
+	/bin/cp barrier.h $(CDIR)/include
 

@@ -38,12 +38,11 @@ pvm: converse libpvmc.a
 sdag: charm++ sdagx libsdag.a
 
 ampi: charm++ libampi.a libampif.a
-	
 
 translators: sdagx charmxi conv-cpm charmidl
 
 libs: convlibs charmlibs
-	cd libs; make otherlibs irecvlibs OPTS='$(OPTS)'
+	cd libs; make otherlibs OPTS='$(OPTS)'
 
 test-all: all
 	cd ../pgms ; make test-all  OPTS='$(OPTS)'
@@ -89,14 +88,12 @@ basics: dirs+sources $(ALLHEADERS) $(ALLINTERFACES) charmc conv-mach.sh
 	touch basics
 
 dirs+sources:
-	@rm -f .vdir .gdir
-	@(cd .. ; basename `pwd`) 			> .vdir
-	@(cd .. ; basename `pwd` | sed -e 's@-.*@@') 	> .gdir
-	@echo
-	@echo 'Gathering source code.'
-	@echo
+	rm -f .vdir .gdir
+	(cd .. ; basename `pwd`) 			> .vdir
+	(cd .. ; basename `pwd` | sed -e 's@-.*@@') 	> .gdir
 	find . -type l -exec rm {} \;
 	rm -rf QuickThreads
+	rm -rf libs
 	rm -rf ../bin ; mkdir ../bin
 	rm -rf ../lib ; mkdir ../lib
 	rm -rf ../src ; mkdir ../src
@@ -127,9 +124,7 @@ dirs+sources:
 	./gathertree ../../pgms ../pgms
 	./gathertree ../../src/Common/libs ../libsrc
 	ln -s ../../src/Common/scripts/Makefile ../src
-	@echo
-	@echo
-	@rm -f .vdir .gdir
+	rm -f .vdir .gdir
 	touch dirs+sources
 
 
@@ -439,7 +434,6 @@ tempo.o: tempo.C $(CKHEADERS)
 waitqd.o: waitqd.C $(CKHEADERS)
 	$(CHARMC) -o waitqd.o waitqd.C
 
-
 CkReduction.decl.h CkReduction.def.h : ckreduction.ci charmxi
 	$(CHARMC) ckreduction.ci
 
@@ -479,7 +473,7 @@ LBComm.o:	LBComm.C $(CKHEADERS)
 LBObj.o: LBObj.C $(CKHEADERS)
 	$(CHARMC) -o LBObj.o LBObj.C
 
-LBMachineUtil.o: LBObj.C $(CKHEADERS)
+LBMachineUtil.o: LBMachineUtil.C $(CKHEADERS)
 	$(CHARMC) -o LBMachineUtil.o LBMachineUtil.C
 
 LBDatabase.o: LBDatabase.C $(CKHEADERS)
@@ -662,13 +656,15 @@ libampi.a: ampi.o
 libampif.a: ampif.o ampimain.o
 	$(CHARMC) -cp ../lib -o libampif.a ampimain.o ampif.o
 
-ampi.o: ampi.C ampi.h ampiimpl.h ampi.decl.h ampi.def.h ampimain.decl.h ampimain.def.h
+ampi.o: ampi.C ampi.h ampiimpl.h ampi.decl.h ampi.def.h ampimain.decl.h \
+        ampimain.def.h
 	$(CHARMC) -c ampi.C
 
 ampif.o: ampi.C ampi.h ampiimpl.h ampi.decl.h ampi.def.h
 	$(CHARMC) -DAMPI_FORTRAN -o ampif.o -c ampi.C
 
-ampimain.o: ampimain.C ampi.h ampiimpl.h ampi.decl.h ampi.def.h ampimain.decl.h ampimain.def.h
+ampimain.o: ampimain.C ampi.h ampiimpl.h ampi.decl.h ampi.def.h \
+            ampimain.decl.h ampimain.def.h
 	$(CHARMC) -c ampimain.C
 
 libsdag.a: CDep.o
@@ -722,7 +718,7 @@ CCFLAGS  = -g
 IDLCHARMC = $(SEQCHARMC) $(CPPFLAGS) $(CCFLAGS)
 RANLIB          = /bin/true
 AR              = ar
-ARFLAGS         = crv
+ARFLAGS         = cr
 
 drv_init.o: drv_init.cc
 	$(IDLCHARMC) drv_init.cc

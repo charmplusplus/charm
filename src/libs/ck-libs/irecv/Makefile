@@ -11,12 +11,12 @@ LIBDEST =  $(CDIR)/lib/libirecv.a
 all: $(LIBDEST) $(HEADERS)
 
 $(HEADERS): receiver.decl.h receiver.h receiverf.h
-	cp receiver.decl.h $(CDIR)/include
-	cp receiver.h $(CDIR)/include
-	cp receiverf.h $(CDIR)/include
+	/bin/cp receiver.decl.h $(CDIR)/include
+	/bin/cp receiver.h $(CDIR)/include
+	/bin/cp receiverf.h $(CDIR)/include
 
 $(LIBDEST) : $(LIB)
-	cp $(LIB) $(LIBDEST)
+	/bin/cp $(LIB) $(LIBDEST)
 
 $(LIB): $(LIBOBJ)
 	$(CHARMC) -o $(LIB) $(LIBOBJ) 
