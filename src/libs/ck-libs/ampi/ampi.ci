@@ -1,4 +1,7 @@
 module ampi {
+  extern module ComlibModule;
+  readonly CkGroupID dmid;
+  
   message AmpiMsg;
  
   initcall void ampiNodeInit(void);

@@ -7,15 +7,18 @@
 
 #define exit exit /*Supress definition of exit in ampi.h*/
 #include <iostream.h>
+#include "ComlibManager.h"
 #include "ampiimpl.h"
 #include "../../../ampiEvents.h" /*** for trace generation for projector *****/
+
+CkGroupID dmid;
+char *comlibStrat;
 
 //------------- startup -------------
 static mpi_comm_worlds mpi_worlds;
 
 int mpi_nworlds; /*Accessed by ampif*/
 int MPI_COMM_UNIVERSE[MPI_MAX_COMM_WORLDS]; /*Accessed by user code*/
-
 
 // ------------ maxLoc/minLoc reduction support -----------
 // The Sun CC compiler (and possibly others) *can't* build
@@ -377,6 +380,21 @@ static void ampiAttach(const char *name,int namelen)
 	//Record info. in the mpi_worlds array
 	mpi_worlds[new_idx].comm=ampiCommStruct(new_world,arr,_nchunks);
 	mpi_worlds[new_idx].name = copyCountedStr(name,namelen);
+
+	// CommLib support
+	int strat = USE_DIRECT;
+	if(0!=CmiGetArgString(CkGetArgv(), "+strategy", &comlibStrat)){
+		//CkPrintf("AMPI: Comlib initialized with %s\n",comlibStrat);
+		if(0==strcmp(comlibStrat,"USE_DIRECT")){
+			strat = USE_DIRECT;
+		} else if(0==strcmp(comlibStrat,"USE_MESH")){
+			strat = USE_MESH;
+		} else if(0==strcmp(comlibStrat,"USE_GRID")){
+			strat = USE_GRID;
+		}
+	}
+	dmid = CProxy_ComlibManager::ckNew(strat, 1);
+	CProxy_ComlibManager(dmid).ckLocalBranch()->createId();
 }
 
 //-------------------- ampiParent -------------------------
@@ -458,6 +476,9 @@ ampi::ampi()
   msgs=NULL;
   waitingForGeneric=0;
   seqEntries=-1;
+
+  //CommLib support
+  //(CProxy_ComlibManager(dmid).ckLocalBranch())->localElement();
 }
 
 ampi::ampi(CkArrayID parent_,const ampiCommStruct &s)
@@ -758,6 +779,21 @@ ampi::sendraw(int t, int s, void* buf, int len, CkArrayID aid, int idx)
   memcpy(msg->data, buf, len);
   CProxy_ampi pa(aid);
   pa[idx].generic(msg);
+}
+
+void
+ampi::delesend(int t, int s, const void* buf, int count, int type,  int rank, MPI_Comm destcomm, CProxy_ampi arrproxy)
+{
+  const ampiCommStruct &dest=comm2proxy(destcomm);
+  int idx = dest.getIndexForRank(rank);
+  int seq = -1;
+  if (destcomm<=MPI_COMM_WORLD && t<=MPI_TAG_UB)
+  { //Not cross-module: set seqno
+     seq = nextseq[idx]++;
+  }
+
+  AmpiMsg *msg = makeAmpiMsg(t,s,buf,count,type,destcomm,seq);
+  arrproxy[idx].generic(msg);
 }
 
 void
@@ -1814,25 +1850,42 @@ int MPI_Alltoallv(void *sendbuf, int *sendcounts, int *sdispls,
   CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
   int itemsize = dttype->getSize() ;
   int i;
+
+  // commlib support
+  CProxy_ampi arrproxy = ptr->getProxy();
+  arrproxy.ckDelegate(CProxy_ComlibManager(dmid).ckLocalBranch());
+  (CProxy_ComlibManager(dmid).ckLocalBranch())->beginIteration();
   for(i=0;i<size;i++) {
-    MPI_Send(((char*)sendbuf)+(itemsize*sdispls[i]), sendcounts[i], sendtype,
-             i, MPI_GATHER_TAG, comm);
+    ptr->delesend(MPI_GATHER_TAG,ptr->getRank(),((char*)sendbuf)+(itemsize*sdispls[i]),sendcounts[i],
+                  sendtype, i, comm, arrproxy);
+#ifndef CMK_OPTIMIZE
+    int size=0;
+    MPI_Type_size(sendtype,&size);
+    _LOG_E_AMPI_MSG_SEND(MPI_GATHER_TAG,i,sendcounts[i],size)
+#endif
   }
+  (CProxy_ComlibManager(dmid).ckLocalBranch())->endIteration();
 
   MPI_Status status;
   dttype = ptr->getDDT()->getType(recvtype) ;
   itemsize = dttype->getSize() ;
-  
+
   for(i=0;i<size;i++) {
-    MPI_Recv(((char*)recvbuf)+(itemsize*rdispls[i]), recvcounts[i], recvtype,
-             i, MPI_GATHER_TAG, comm, &status);
+#ifndef CMK_OPTIMIZE
+    _LOG_E_END_AMPI_PROCESSING()
+#endif
+    ptr->recv(MPI_GATHER_TAG,i,((char*)recvbuf)+(itemsize*rdispls[i]),
+              recvcounts[i], recvtype, comm, (int*)&status);
+#ifndef CMK_OPTIMIZE
+    _LOG_E_BEGIN_AMPI_PROCESSING(MPI_GATHER_TAG,i,recvcounts[i])
+#endif
   }
   return 0;
 }
 
 CDECL
-int MPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype, 
-                 void *recvbuf, int recvcount, MPI_Datatype recvtype, 
+int MPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
+                 void *recvbuf, int recvcount, MPI_Datatype recvtype,
                  MPI_Comm comm)
 {
   AMPIAPI("MPI_Alltoall");
@@ -1841,18 +1894,35 @@ int MPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
   int itemsize = dttype->getSize(sendcount) ;
   int i;
+
+  // commlib support
+  CProxy_ampi arrproxy = ptr->getProxy();
+  arrproxy.ckDelegate(CProxy_ComlibManager(dmid).ckLocalBranch());
+  (CProxy_ComlibManager(dmid).ckLocalBranch())->beginIteration();
   for(i=0;i<size;i++) {
-    MPI_Send(((char*)sendbuf)+(itemsize*i), sendcount, sendtype,
-             i, MPI_GATHER_TAG, comm);
+    ptr->delesend(MPI_GATHER_TAG, ptr->getRank(), ((char*)sendbuf)+(itemsize*i), sendcount,
+                  sendtype, i, comm, arrproxy);
+#ifndef CMK_OPTIMIZE
+    int size=0;
+    MPI_Type_size(sendtype,&size);
+    _LOG_E_AMPI_MSG_SEND(MPI_GATHER_TAG,i,sendcount,size)
+#endif
   }
+  (CProxy_ComlibManager(dmid).ckLocalBranch())->endIteration();
 
   MPI_Status status;
   dttype = ptr->getDDT()->getType(recvtype) ;
   itemsize = dttype->getSize(recvcount) ;
-  
+
   for(i=0;i<size;i++) {
-    MPI_Recv(((char*)recvbuf)+(itemsize*i), recvcount, recvtype,
-             i, MPI_GATHER_TAG, comm, &status);
+#ifndef CMK_OPTIMIZE
+    _LOG_E_END_AMPI_PROCESSING()
+#endif
+    ptr->recv(MPI_GATHER_TAG,i,((char*)recvbuf)+(itemsize*i),
+              recvcount,recvtype, comm, (int*)&status);
+#ifndef CMK_OPTIMIZE
+    _LOG_E_BEGIN_AMPI_PROCESSING(MPI_GATHER_TAG,i,recvcount)
+#endif
   }
   return 0;
 }
@@ -2101,7 +2171,7 @@ CDECL
 void MPI_Restart(char *dname)
 {
   AMPIAPI("MPI_Restart");
-  CkPrintf("MPI_Restart not implemented\n");
+  CkPrintf("MPI_Restart not finished.\n");
 }
 
 CDECL
