@@ -17,7 +17,7 @@ echo "   manager.o" >> $out
 echo >> $out
 
 cat >> $out << EOB 
-manager.o: manager.C manager.h
+manager.o: manager.C manager.h $(CVHEADERS)
 	\$(CHARMC) -c manager.C
 
 EOB
@@ -59,10 +59,10 @@ done
 echo "    manager.o" >> $out
 cat >> $out <<EOB
 
-EveryLB.o: EveryLB.C EveryLB.decl.h
+EveryLB.o: EveryLB.C EveryLB.decl.h $(CVHEADERS)
 	\$(CHARMC) -c EveryLB.C
 
-EveryLB.decl.h: EveryLB.ci
+EveryLB.decl.h: EveryLB.ci $(CVHEADERS)
 	\$(CHARMC) EveryLB.ci
 
 \$(L)/libmoduleEveryLB.a: \$(LB_OBJ)
