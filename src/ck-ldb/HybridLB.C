@@ -38,8 +38,10 @@ HybridLB::HybridLB(const CkLBOptions &opt): HybridBaseLB(opt)
 //  tree = new ThreeLevelTree;
 
   // decide which load balancer to call
-  greedy = (CentralLB *)AllocateGreedyLB();
+  // IMPORTANT: currently, the greedy LB must allow objects that
+  // are not from existing processors.
   refine = (CentralLB *)AllocateRefineLB();
+  greedy = (CentralLB *)AllocateGreedyLB();
 #endif
 }
 
