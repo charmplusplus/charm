@@ -7,8 +7,11 @@
 
 #define MAXMCASTCHILDREN 2
 
+// turn on or off fragmentation in multicast
 #define SPLIT_MULTICAST 0
+// each multicast message is split into SPLIT_NUM fragments
 #define SPLIT_NUM 2
+
 // maximum number of fragments into which a message can be broken
 #define MAXFRAGS 5
 
@@ -34,11 +37,8 @@ public:
 public:
   reductionInfo(): storedCallback(NULL), storedClientParam(NULL), redNo(0),
                    npProcessed(0) {
-    for (int i=0; i<MAXFRAGS; i++) {
-      lcount [i] = 0;
-      ccount [i] = 0;
-      gcount [i] = 0;
-    }
+    for (int i=0; i<MAXFRAGS; i++) 
+      lcount [i] = ccount [i] = gcount [i] = 0;
   }
 };
 
@@ -132,8 +132,10 @@ extern void CkUnpackMessage(envelope **pEnv);
 
 void _ckMulticastInit(void)
 {
+/*
   CkDisableTracing(CkIndex_CkMulticastMgr::recvMsg(0));
   CkDisableTracing(CkIndex_CkMulticastMgr::recvRedMsg(0));
+*/
 }
 
 mCastEntry::mCastEntry (mCastEntry *old): 

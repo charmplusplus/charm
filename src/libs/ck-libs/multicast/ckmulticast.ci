@@ -18,10 +18,10 @@ module CkMulticast {
     entry void teardown(CkSectionInfo sid);
     entry void freeup(CkSectionInfo sid);
     // multicast
-    entry void recvMsg(multicastGrpMsg *m);
+    entry [notrace] void recvMsg(multicastGrpMsg *m);
     entry void recvPacket(CkSectionInfo _cookie, int n, char data[n], int seqno, int count, int totalsize, int frombufer);
     // reduction
-    entry void recvRedMsg(CkReductionMsg *msg);
+    entry [notrace] void recvRedMsg(CkReductionMsg *msg);
     entry void updateRedNo(mCastEntryPtr e, int no);
   };
 
