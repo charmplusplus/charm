@@ -115,7 +115,6 @@ void traceUserEvent(int e)
 extern "C"
 int traceRegisterUserEvent(const char*x)
 {
-  OPTIMIZE_WARNING
   return CpvAccess(_traces)->traceRegisterUserEvent(x);
 }
 

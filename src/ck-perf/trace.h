@@ -55,33 +55,40 @@ class TraceArray {
 private:
   CkVec<Trace *>  traces;
 public:
-    void addTrace(Trace *tr) { traces.push_back(tr); }
-    int length() { return traces.length(); }
+    inline void addTrace(Trace *tr) { traces.push_back(tr); }
+    inline int length() const { return traces.length(); }
 
-    void userEvent(int e) { ALLDO(userEvent(e));}
-    void creation(envelope *env, int num=1) { ALLDO(creation(env, num));}
-    void beginExecute(envelope *env) {ALLDO(beginExecute(env));}
-    void beginExecute(int event,int msgType,int ep,int srcPe) {ALLDO(beginExecute(event, msgType, ep, srcPe));}
-    void endExecute(void) {ALLDO(endExecute());}
-    void beginIdle(void) {ALLDO(beginIdle());}
-    void endIdle(void) {ALLDO(endIdle());}
-    void beginPack(void) {ALLDO(beginPack());}
-    void endPack(void) {ALLDO(endPack());}
-    void beginUnpack(void) {ALLDO(beginUnpack());}
-    void endUnpack(void) {ALLDO(endUnpack());}
-    void beginCharmInit(void) {ALLDO(beginCharmInit()); }
-    void endCharmInit(void) {ALLDO(endCharmInit());}
-    void enqueue(envelope *e) {ALLDO(enqueue(e));}
-    void dequeue(envelope *e) {ALLDO(dequeue(e));}
-    void beginComputation(void) {ALLDO(beginComputation());}
-    void endComputation(void) {ALLDO(endComputation());}
-    void traceInit(char **argv) {ALLDO(traceInit(argv));}
-    int traceRegisterUserEvent(const char*x) {ALLDO(traceRegisterUserEvent(x)); return 1;}
-    void traceClearEps() {ALLDO(traceClearEps());}
-    void traceWriteSts() {ALLDO(traceWriteSts());}
-    void traceClose() {ALLDO(traceClose());}
-    void traceBegin() {ALLDO(traceBegin());}
-    void traceEnd() {ALLDO(traceEnd());}
+    inline void userEvent(int e) { ALLDO(userEvent(e));}
+    inline void creation(envelope *env, int num=1) { ALLDO(creation(env, num));}
+    inline void beginExecute(envelope *env) {ALLDO(beginExecute(env));}
+    inline void beginExecute(int event,int msgType,int ep,int srcPe) {ALLDO(beginExecute(event, msgType, ep, srcPe));}
+    inline void endExecute(void) {ALLDO(endExecute());}
+    inline void beginIdle(void) {ALLDO(beginIdle());}
+    inline void endIdle(void) {ALLDO(endIdle());}
+    inline void beginPack(void) {ALLDO(beginPack());}
+    inline void endPack(void) {ALLDO(endPack());}
+    inline void beginUnpack(void) {ALLDO(beginUnpack());}
+    inline void endUnpack(void) {ALLDO(endUnpack());}
+    inline void beginCharmInit(void) {ALLDO(beginCharmInit()); }
+    inline void endCharmInit(void) {ALLDO(endCharmInit());}
+    inline void enqueue(envelope *e) {ALLDO(enqueue(e));}
+    inline void dequeue(envelope *e) {ALLDO(dequeue(e));}
+    inline void beginComputation(void) {ALLDO(beginComputation());}
+    inline void endComputation(void) {ALLDO(endComputation());}
+    inline void traceInit(char **argv) {ALLDO(traceInit(argv));}
+    inline int traceRegisterUserEvent(const char*x) {
+	  int eno = 0;
+	  for (int i=0; i<traces.length(); i++) {
+	    int e = traces[i]->traceRegisterUserEvent(x);
+	    if (e) eno = e;
+          }
+	  return eno;
+    }  
+    inline void traceClearEps() {ALLDO(traceClearEps());}
+    inline void traceWriteSts() {ALLDO(traceWriteSts());}
+    inline void traceClose() {ALLDO(traceClose());}
+    inline void traceBegin() {ALLDO(traceBegin());}
+    inline void traceEnd() {ALLDO(traceEnd());}
 };
 
 CpvExtern(TraceArray*, _traces);
