@@ -725,7 +725,7 @@ $CMK_NM CHARMC-PGM.TMP.exe | csh -fc "$CMK_NM_FILTER" > CHARMC-PGM.TMP.nm
 if ($status) goto failure
 awk '(/^_CK_.*_init$/&&(\!/^_CK_.*_struct_init$/)) { print substr($1, 5, length($1)-9); }' < CHARMC-PGM.TMP.nm | sort | uniq > CHARMC-MOD.TMP.dat
 if ( -z CHARMC-MOD.TMP.dat ) then
-    echo 'No charm modules.'
+    echo 'Charm Modules: none.'
     /bin/mv CHARMC-PGM.TMP.exe $OBJECT
 else
     echo 'Charm Modules: '`cat CHARMC-MOD.TMP.dat`
