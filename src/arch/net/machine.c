@@ -601,6 +601,10 @@ static void extract_common_args(char **argv)
 
 CsvDeclare(CmiNodeState, NodeState);
 
+/* Immediate message support */
+#define CMI_DEST_RANK(msg)	*(int *)(msg)
+#include "immediate.c"
+
 /******************************************************************************
  *
  * Packet Performance Logging
@@ -801,8 +805,8 @@ static void CmiPushPE(int pe,void *msg)
   MACHSTATE1(2,"Pushing message into %d's queue",pe);
 #if CMK_IMMEDIATE_MSG
   if ((CmiGetHandler(msg) == CpvAccessOther(CmiImmediateMsgHandlerIdx,pe))) {
-    *(int *)msg = pe;         /* store the rank in msg header */
-    PCQueuePush(CsvAccess(NodeState).imm, (char *)msg);
+    CMI_DEST_RANK(msg) = pe;         /* store the rank in msg header */
+    CmiPushImmediateMsg(msg);
     return;
   }
 #endif
@@ -820,8 +824,8 @@ static void CmiPushNode(void *msg)
   MACHSTATE1(2,"Pushing message into node queue",pe);
 #if CMK_IMMEDIATE_MSG
   if ((CmiGetHandler(msg) == CpvAccessOther(CmiImmediateMsgHandlerIdx,0))) {
-    *(int *)msg = 0;         /* store the rank in msg header, pretend 0 */
-    PCQueuePush(CsvAccess(NodeState).imm, (char *)msg);
+    CMI_DEST_RANK(msg) = 0;        /* store the rank in msg header, pretend 0 */
+    CmiPushImmediateMsg(msg);
     return;
   }
 #endif
@@ -1700,49 +1704,13 @@ void CmiReleaseCommHandle(CmiCommHandle handle)
   FreeOutgoingMsg(((OutgoingMsg)handle));
 }
 
-#if CMK_IMMEDIATE_MSG
-static int immDone=1;
-void CmiDelayImmediate()
-{
-  immDone = 0;
-}
-
-void CmiHandleImmediate()
-{
-   static int intr = 0;
-   int qlen, i;
-   if (intr) { return; }
-   intr = 1;
-   qlen = PCQueueLength(CsvAccess(NodeState).imm);
-   if (qlen == 0) { intr=0; return; }
-   else
-   {
-#ifdef CMK_CPV_IS_SMP
-     CmiState cs = CmiGetState();
-     int oldRank = cs->rank;
-#endif
-     for (i=0; i<qlen; i++) {
-       void *msg = PCQueuePop(CsvAccess(NodeState).imm);
-#ifdef CMK_CPV_IS_SMP
-       /* switch to the worker thread */
-       cs->rank = *(int*)msg;
-#endif
-       immDone = 1;
-       CmiHandleMessage(msg);
-       if (!immDone) PCQueuePush(CsvAccess(NodeState).imm, msg);
-     }
-#ifdef CMK_CPV_IS_SMP
-     cs->rank = oldRank;
-#endif
-   }
-   intr = 0;
-}
 
 void CmiProbeImmediateMsg()
 {
+#if CMK_IMMEDIATE_MSG
   CommunicationServerThread(0);
-}
 #endif
+}
 
 /******************************************************************************
  *
