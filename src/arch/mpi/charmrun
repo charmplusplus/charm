@@ -50,7 +50,7 @@ then
 # Some machine specific 
 	hostname=`hostname`
 	case "$hostname" in
-	turing*.turing.uiuc.edu) 
+	turing*.turing.uiuc.edu|tg-login*) 
 		ppn='#PBS -l nodes='$pes':ppn=1'
 		extra='-machinefile $PBS_NODEFILE'
 		;;
