@@ -132,7 +132,7 @@ double CmiCpuTimer(void)
   return MPI_Wtime() - starttimer;
 }
 
-static PCQueue   msgBuf;
+static PCQueue  *msgBuf;
 
 /************************************************************
  * 
@@ -301,13 +301,21 @@ static int PumpMsgs(void)
 
 static int inexit = 0;
 
+static int MsgQueueEmpty()
+{
+  int i;
+  for (i=0; i<Cmi_mynodesize; i++)
+    if (!PCQueueEmpty(msgBuf[i])) return 0;
+  return 1;
+}
+
 static void CommunicationServer(int sleepTime)
 {
   SendMsgBuf(); 
   CmiReleaseSentMessages();
   PumpMsgs();
   if (inexit == 1) {
-    while(!PCQueueEmpty(msgBuf) || !CmiAllAsyncMsgsSent()) {
+    while(!MsgQueueEmpty() || !CmiAllAsyncMsgsSent()) {
       SendMsgBuf(); 
       PumpMsgs();
       CmiReleaseSentMessages();
@@ -371,28 +379,32 @@ static int SendMsgBuf()
   SMSG_LIST *msg_tmp;
   char *msg;
   int node, rank, size;
+  int i;
 
-  while (!PCQueueEmpty(msgBuf))
+  for (i=0; i<Cmi_mynodesize; i++)
   {
-    msg_tmp = (SMSG_LIST *)PCQueuePop(msgBuf);
-    node = msg_tmp->destpe;
-    size = msg_tmp->size;
-    msg = msg_tmp->msg;
-    msg_tmp->next = 0;
-    while (MsgQueueLen > request_max) {
+    while (!PCQueueEmpty(msgBuf[i]))
+    {
+      msg_tmp = (SMSG_LIST *)PCQueuePop(msgBuf[i]);
+      node = msg_tmp->destpe;
+      size = msg_tmp->size;
+      msg = msg_tmp->msg;
+      msg_tmp->next = 0;
+      while (MsgQueueLen > request_max) {
 	/*printf("Waiting for %d messages to be sent\n", MsgQueueLen);*/
 	CmiReleaseSentMessages();
 	PumpMsgs();
+      }
+      if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,node,TAG,MPI_COMM_WORLD,&(msg_tmp->req))) 
+        CmiAbort("CmiAsyncSendFn: MPI_Isend failed!\n");
+      MsgQueueLen++;
+      if(sent_msgs==0)
+        sent_msgs = msg_tmp;
+      else
+        end_sent->next = msg_tmp;
+      end_sent = msg_tmp;
     }
-    if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,node,TAG,MPI_COMM_WORLD,&(msg_tmp->req))) 
-      CmiAbort("CmiAsyncSendFn: MPI_Isend failed!\n");
-    MsgQueueLen++;
-    if(sent_msgs==0)
-      sent_msgs = msg_tmp;
-    else
-      end_sent->next = msg_tmp;
-    end_sent = msg_tmp;
-  }
+  } 
 }
 
 CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg)
@@ -420,7 +432,7 @@ CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg)
   msg_tmp->msg = msg;
   msg_tmp->size = size;
   msg_tmp->destpe = node;
-  PCQueuePush(msgBuf,(char *)msg_tmp);
+  PCQueuePush(msgBuf[CmiMyRank()],(char *)msg_tmp);
   return 0;
 #else
   msg_tmp = (SMSG_LIST *) CmiAlloc(sizeof(SMSG_LIST));
@@ -721,7 +733,11 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   }
 
   CmiTimerInit();
-  msgBuf = PCQueueCreate();
+#if CMK_SMP
+  msgBuf = (PCQueue *)malloc(Cmi_mynodesize * sizeof(PCQueue));
+  for (i=0; i<Cmi_mynodesize; i++)
+    msgBuf[i] = PCQueueCreate();
+#endif
 
 #if 0
   CthInit(argv);
