@@ -7,38 +7,13 @@
 #define __UIUC_CHARM_LIVEVIZ_H
 
 #include "liveViz0.h"
-#include "liveViz.decl.h"
 #include "ckimage.h"
 #include "colorScale.h"
 
-extern CProxy_liveVizPollArray proxy;
-extern liveVizConfig lv_config;
-extern CProxy_liveVizGroup lvG;
-
-
-// A shadow array to handle reductions as well as to deal with
-class liveVizPollArray : public ArrayElementMax {
-private:
-  CkMsgQ<liveVizPollRequestMsg> requests;
-public:
-  liveVizPollArray() : requests() { usesAtSync = CmiTrue; };
-  liveVizPollArray(CkMigrateMessage *m) : requests() { usesAtSync = CmiTrue; };
-  void isAtSync() { AtSync(); };
-  void pup(PUP::er &p) {
-    ArrayElementMax::pup(p);
-    p|requests;
-  }
-  void request(liveVizPollRequestMsg *msg) {
-    requests.enq(msg);
-  }
-  liveVizPollRequestMsg * poll(double timestep) {
-    if ( ! requests.length() ) {
-      return NULL;
-    } else {
-      return requests.deq();
-    }
-  }
-};
+/********************** LiveVizPoll **********************
+These declarations should probably live in a header named "liveVizPoll.h"
+*/
+#include "liveVizPoll.decl.h"
 
 // liveVizPollMode controls how the image is reassembled:
 typedef enum {
@@ -56,18 +31,6 @@ This mode is not yet implemented.
 /* other modes may be added in the future */
 } liveVizPollMode;
 
-
-
-/*
-  Start liveVizPoll. This routine should be called once on proc 0
-*/
-void liveVizPollInit(const liveVizConfig &cfg,
-                     CkArrayOptions &opts,
-                     liveVizPollMode mode=liveVizPollMode_skew);
-
-void liveVizPollSync(ArrayElement *from);
-void liveVizPoll0Get(liveVizRequestMsg *req);
-
 /*
 Initialize the poll mode of liveViz.  This routine should
 be called from main::main or just before creating the array
@@ -83,6 +46,12 @@ to the new array.  The listeners would recieve ordinary liveViz
 request callbacks, queue up the requests until the next
 liveVizPoll, and perform any buffering or synchronization needed.
 */ 
+void liveVizPollInit(const liveVizConfig &cfg,
+                     CkArrayOptions &opts,
+                     liveVizPollMode mode=liveVizPollMode_skew);
+
+void liveVizPollSync(ArrayElement *from);
+
   
 class liveVizPollRequestMsg : public CMessage_liveVizPollRequestMsg {
 public:
@@ -154,56 +123,9 @@ inline void liveVizPollDeposit(ArrayElement *from,
   delete reqMsg;
 }
 
-// A listener to create a fully shadowed array. I have a feeling that this
-// should probably be globalized into a library somewhere eventually rather
-// than kept local to liveViz as it seems like a useful tool.
-class liveVizArrayListener : public CkArrayListener {
-public:
-  liveVizArrayListener() : CkArrayListener(0) {};
-  void ckBeginInserting() {
-  }
-  void ckEndInserting() {
-    proxy.doneInserting();
-  }
-  void ckElementCreating(ArrayElement *elt) {
-    proxy(elt->thisIndexMax).insert();
-  }
-};
 
-// Moved here from liveViz.C so that liveVizPoll.C can see it too.
-class imageHeader {
-public:
-	liveVizRequest req;
-	CkRect r;
-	imageHeader(const liveVizRequest &req_,const CkRect &r_)
-		:req(req_), r(r_) {}
-};
-
-//Image combining reduction type: defined below.
-extern CkReductionMsg *imageCombine(int nMsg,CkReductionMsg **msgs);
-extern CkReduction::reducerType imageCombineReducer;
-extern void vizReductionHandler(void *r_msg);
-extern CkReductionMsg *allocateImageMsg(const liveVizRequest &req,const CkRect &r, byte **imgDest);
-void liveVizInitComplete(void *rednMessage);
-extern CkCallback clientGetImageCallback;
-
-//The liveVizGroup is only used to set lv_config on every processor.
-class liveVizGroup : public Group {
-public:
-	liveVizGroup(const liveVizConfig &cfg) {
-		lv_config=cfg;
-		contribute(0,0,CkReduction::sum_int,CkCallback(liveVizInitComplete));
-	}
-
-	CkComponent *ckLookupComponent(int userIndex) {
-		if ( userIndex == 4321 ) {
-			return new liveVizArrayListener();
-		} else {
-			return IrrGroup::ckLookupComponent(userIndex);
-		}
-	}
-};
-
+/********************** LiveViz ***********************/
+#include "liveViz.decl.h"
 
 /*
   Start liveViz.  This routine should be called once on processor 0

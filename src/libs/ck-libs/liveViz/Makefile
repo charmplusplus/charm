@@ -1,7 +1,7 @@
 CDIR=../../../..
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
-HEADERS=liveViz.h liveViz.decl.h liveViz0.h colorScale.h
+HEADERS=liveViz.h liveViz.decl.h liveVizPoll.decl.h liveViz0.h colorScale.h
 HEADDEP=$(HEADERS) liveViz.def.h networkVar.h
 OBJS=liveViz0.o liveViz.o liveVizPoll.o networkVar.o colorScale.o
 DEST=$(CDIR)/lib/libmoduleliveViz.a
@@ -32,6 +32,9 @@ colorScale.o: colorScale.C $(HEADDEP)
 
 liveViz.decl.h liveViz.def.h: liveViz.ci
 	$(CHARMC) liveViz.ci
+
+liveVizPoll.decl.h liveVizPoll.def.h: liveVizPoll.ci
+	$(CHARMC) liveVizPoll.ci
 
 clean:
 	rm -rf *.a *.def.h *.decl.h *.o SunWS_cache $(DEST) headers

@@ -4,6 +4,7 @@
 Orion Sky Lawlor, olawlor@acm.org, 6/11/2002
 */
 #include "liveViz.h"
+#include "liveViz_impl.h"
 
 liveVizConfig lv_config;
 CProxy_liveVizGroup lvG;

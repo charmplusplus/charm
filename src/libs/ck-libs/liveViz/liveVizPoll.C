@@ -1,21 +1,70 @@
 /*
-  liveViz: image-assembly interface.
-
-Orion Sky Lawlor, olawlor@acm.org, 6/11/2002
-
-Heavily modified by
+  liveVizPoll: application-polling image-assembly interface.
 
 Jonathan A. Booth, jbooth@uiuc.edu
 */
 #include "liveViz.h"
+#include "liveViz_impl.h"
 
 CProxy_liveVizPollArray proxy;
+extern CProxy_liveVizPollArray proxy;
+void liveVizPoll0Get(liveVizRequestMsg *req);
+
+// A shadow array to handle reductions as well as to deal with image synch.
+class liveVizPollArray : public ArrayElementMax {
+private:
+  CkMsgQ<liveVizPollRequestMsg> requests;
+public:
+  liveVizPollArray() : requests() { usesAtSync = CmiTrue; };
+  liveVizPollArray(CkMigrateMessage *m) : requests() { usesAtSync = CmiTrue; };
+  void isAtSync() { AtSync(); };
+  void pup(PUP::er &p) {
+    ArrayElementMax::pup(p);
+    p|requests;
+  }
+  void request(liveVizPollRequestMsg *msg) {
+    requests.enq(msg);
+  }
+  liveVizPollRequestMsg * poll(double timestep) {
+    if ( ! requests.length() ) {
+      return NULL;
+    } else {
+      return requests.deq();
+    }
+  }
+};
+
+
+// A listener to create a fully shadowed array. I have a feeling that this
+// should probably be globalized into a library somewhere eventually rather
+// than kept local to liveViz as it seems like a useful tool.
+class liveVizArrayListener : public CkArrayListener {
+public:
+  liveVizArrayListener() : CkArrayListener(0) {};
+  void ckBeginInserting() {
+  }
+  void ckEndInserting() {
+    proxy.doneInserting();
+  }
+  void ckElementCreating(ArrayElement *elt) {
+    proxy(elt->thisIndexMax).insert();
+  }
+};
+
+
+CkComponent *liveVizGroup::ckLookupComponent(int userIndex) {
+	if ( userIndex == 4321 ) {
+		return new liveVizArrayListener();
+	} else {
+		return IrrGroup::ckLookupComponent(userIndex);
+	}
+}
 
 
 //Called by clients to start liveViz.
 void liveVizPollInit(const liveVizConfig &cfg,
 		     CkArrayOptions &opts,
-		     liveVizPollMode mode=liveVizPollMode_skew)
+		     liveVizPollMode mode)
 {
   if (CkMyPe()!=0) CkAbort("liveVizInit must be called only on processor 0!");
 
@@ -98,3 +147,6 @@ void liveVizPollDeposit(ArrayElement *client,
   }
   p->contribute(msg);
 }
+
+#include "liveVizPoll.def.h"
+

@@ -1,6 +1,6 @@
 module liveViz {
+extern module liveVizPoll;
 message liveVizRequestMsg;
-message liveVizPollRequestMsg;
 
 initcall void liveVizNodeInit(void);
 
@@ -9,9 +9,4 @@ group liveVizGroup {
 	entry liveVizGroup(const liveVizConfig &cfg);
 };
 
-readonly CProxy_liveVizPollArray proxy;
-array [Max] liveVizPollArray {
-	entry liveVizPollArray(void);
-	entry void request(liveVizPollRequestMsg *msg);
-};
 }
