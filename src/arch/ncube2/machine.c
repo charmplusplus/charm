@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.10  1995-10-27 21:45:35  jyelon
+ * Revision 2.11  1995-11-08 23:36:13  gursoy
+ * fixed varSize problem
+ *
+ * Revision 2.10  1995/10/27  21:45:35  jyelon
  * Changed CmiNumPe --> CmiNumPes
  *
  * Revision 2.9  1995/10/18  22:23:05  jyelon
@@ -173,7 +176,15 @@ int destPE;
 int size;
 char * msg;
 {
-    nwrite(msg, size, destPE, MSG_TYPE, &cflag);
+    char *temp;
+    if (CpvAccess(Cmi_mype) == destPE)
+       {
+          temp = (char *)CmiAlloc(size) ;
+          memcpy(temp, msg, size) ;
+          FIFO_EnQueue(CpvAccess(CmiLocalQueue), temp);
+       }
+    else
+          nwrite(msg, size, destPE, MSG_TYPE, &cflag);
 }
 
 
@@ -191,8 +202,13 @@ void CmiFreeSendFn(destPE, size, msg)
      int destPE, size;
      char *msg;
 {
-    CmiSyncSendFn(destPE, size, msg);
-    CmiFree(msg);
+    if (CpvAccess(Cmi_mype) == destPE)
+        FIFO_EnQueue(CpvAccess(CmiLocalQueue), temp);
+    else
+      {
+        nwrite(msg, size, destPE, MSG_TYPE, &cflag);
+        CmiFree(msg);
+      }
 }
 
 /*********************** BROADCAST FUNCTIONS **********************/
