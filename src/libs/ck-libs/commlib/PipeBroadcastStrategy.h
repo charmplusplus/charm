@@ -76,6 +76,7 @@ class PipeBroadcastStrategy : public Strategy {
   PipeBroadcastStrategy(int _topology, int _pipeSize);
   PipeBroadcastStrategy(int _topology, CkArrayID _aid);
   PipeBroadcastStrategy(int _topology, CkArrayID _aid, int _pipeSize);
+  PipeBroadcastStrategy(CkGroupID _gid, int _topology=USE_HYPERCUBE, int _pipeSize=DEFAULT_PIPE);
   PipeBroadcastStrategy(CkMigrateMessage *){}
   void insertMessage(CharmMessageHolder *msg);
   void doneInserting();

@@ -96,55 +96,56 @@ void PipeBroadcastStrategy::deliverer(envelope *env_frag, int isFragmented) {
   envelope *env;
   int isFinished=0;
   ComlibPrintf("isArray = %d\n",isArray);
-  if (isArray) {
-    // check if the message is fragmented
-    if (isFragmented) {
-      // store the fragment in the hash table until completed
-      ComlibPrintf("[%d] deliverer: received fragmented message, storing\n",CkMyPe());
-      PipeBcastInfo *info = (PipeBcastInfo*)(((char*)env_frag)+CmiReservedHeaderSize);
 
-      PipeBcastHashKey key (info->bcastPe, info->seqNumber);
-      PipeBcastHashObj *position = fragments.get(key);
+  // check if the message is fragmented
+  if (isFragmented) {
+    // store the fragment in the hash table until completed
+    ComlibPrintf("[%d] deliverer: received fragmented message, storing\n",CkMyPe());
+    PipeBcastInfo *info = (PipeBcastInfo*)(((char*)env_frag)+CmiReservedHeaderSize);
 
-      char *incomingMsg;
-      if (position) {
-	// the message already exist, add to it
-	ComlibPrintf("[%d] adding to an existing message for id %d/%d (%d remaining)\n",CkMyPe(),info->bcastPe,info->seqNumber,position->remaining-1);
-	incomingMsg = position->message;
-	memcpy (incomingMsg+CmiReservedHeaderSize+((pipeSize-CmiReservedHeaderSize-sizeof(PipeBcastInfo))*info->chunkNumber), ((char*)env_frag)+CmiReservedHeaderSize+sizeof(PipeBcastInfo), info->chunkSize);
+    PipeBcastHashKey key (info->bcastPe, info->seqNumber);
+    PipeBcastHashObj *position = fragments.get(key);
 
-	if (--position->remaining == 0) {  // message completely received
-	  isFinished = 1;
-	  env = (envelope*)incomingMsg;
-	  // delete from the hash table
-	  fragments.remove(key);
-	}
+    char *incomingMsg;
+    if (position) {
+      // the message already exist, add to it
+      ComlibPrintf("[%d] adding to an existing message for id %d/%d (%d remaining)\n",CkMyPe(),info->bcastPe,info->seqNumber,position->remaining-1);
+      incomingMsg = position->message;
+      memcpy (incomingMsg+CmiReservedHeaderSize+((pipeSize-CmiReservedHeaderSize-sizeof(PipeBcastInfo))*info->chunkNumber), ((char*)env_frag)+CmiReservedHeaderSize+sizeof(PipeBcastInfo), info->chunkSize);
 
-      } else {
-	// the message doesn't exist, create it
-	ComlibPrintf("[%d] creating new message of size %d for id %d/%d; chunk=%d chunkSize=%d\n",CkMyPe(),info->messageSize,info->bcastPe,info->seqNumber,info->chunkNumber,info->chunkSize);
-	incomingMsg = (char*)CmiAlloc(info->messageSize);
-	memcpy (incomingMsg, env_frag, CmiReservedHeaderSize);
-	memcpy (incomingMsg+CmiReservedHeaderSize+((pipeSize-CmiReservedHeaderSize-sizeof(PipeBcastInfo))*info->chunkNumber), ((char*)env_frag)+CmiReservedHeaderSize+sizeof(PipeBcastInfo), info->chunkSize);
-	int remaining = (int)ceil((double)info->messageSize/(pipeSize-CmiReservedHeaderSize-sizeof(PipeBcastInfo)))-1;
-	if (remaining) {  // more than one chunk (it was not forced to be splitted)
-	  PipeBcastHashObj *object = new PipeBcastHashObj(info->messageSize, remaining, incomingMsg);
-	  fragments.put(key) = object;
-	} else {  // only one chunk, it was forces to be splitted
-	  isFinished = 1;
-	  env = (envelope*)incomingMsg;
-	  // nothing to delete from fragments since nothing has been added
-	}
+      if (--position->remaining == 0) {  // message completely received
+	isFinished = 1;
+	env = (envelope*)incomingMsg;
+	// delete from the hash table
+	fragments.remove(key);
       }
-      CmiFree(env_frag);
 
-    } else {  // message not fragmented
-      ComlibPrintf("[%d] deliverer: received message in single chunk\n",CkMyPe());
-      isFinished = 1;
-      env = env_frag;
+    } else {
+      // the message doesn't exist, create it
+      ComlibPrintf("[%d] creating new message of size %d for id %d/%d; chunk=%d chunkSize=%d\n",CkMyPe(),info->messageSize,info->bcastPe,info->seqNumber,info->chunkNumber,info->chunkSize);
+      incomingMsg = (char*)CmiAlloc(info->messageSize);
+      memcpy (incomingMsg, env_frag, CmiReservedHeaderSize);
+      memcpy (incomingMsg+CmiReservedHeaderSize+((pipeSize-CmiReservedHeaderSize-sizeof(PipeBcastInfo))*info->chunkNumber), ((char*)env_frag)+CmiReservedHeaderSize+sizeof(PipeBcastInfo), info->chunkSize);
+      int remaining = (int)ceil((double)info->messageSize/(pipeSize-CmiReservedHeaderSize-sizeof(PipeBcastInfo)))-1;
+      if (remaining) {  // more than one chunk (it was not forced to be splitted)
+	PipeBcastHashObj *object = new PipeBcastHashObj(info->messageSize, remaining, incomingMsg);
+	fragments.put(key) = object;
+      } else {  // only one chunk, it was forces to be splitted
+	isFinished = 1;
+	env = (envelope*)incomingMsg;
+	// nothing to delete from fragments since nothing has been added
+      }
     }
+    CmiFree(env_frag);
 
-    if (isFinished) {
+  } else {  // message not fragmented
+    ComlibPrintf("[%d] deliverer: received message in single chunk\n",CkMyPe());
+    isFinished = 1;
+    env = env_frag;
+  }
+
+  if (isFinished) {
+    if (isArray) {
       CkArray *dest_array = CkArrayID::CkLocalBranch(aid);
       localDest = new CkVec<CkArrayIndexMax>;
       dest_array->getComlibArrayListener()->getLocalIndices(*localDest);
@@ -167,6 +168,10 @@ void PipeBroadcastStrategy::deliverer(envelope *env_frag, int isFragmented) {
       delete localDest;
       // the envelope env should be deleted only if the message is delivered
       CmiFree(env);
+    }
+    if (isGroup) {
+      // deliver the message to the predifined group "gid"
+      CkSendMsgBranchInline(env->getEpIdx(), EnvToUsr(env), CkMyPe(), gid);
     }
   }
 }
@@ -201,6 +206,13 @@ PipeBroadcastStrategy::PipeBroadcastStrategy(int _topology, CkArrayID _aid, int 
   :topology(_topology), pipeSize(_pipeSize), Strategy() {
   isArray = 1;
   aid = _aid;
+  commonInit();
+}
+
+PipeBroadcastStrategy::PipeBroadcastStrategy(CkGroupID _gid, int _topology, int _pipeSize)
+  :topology(_topology), pipeSize(_pipeSize), Strategy() {
+  isGroup = 1;
+  gid = _gid;
   commonInit();
 }
 
