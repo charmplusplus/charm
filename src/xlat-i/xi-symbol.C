@@ -1500,11 +1500,13 @@ Readonly::genDefs(XStr& str)
   }
 
   if (!msg) { //Generate a pup for this readonly
+    str << "#ifndef CK_TEMPLATES_ONLY\n";
     str << "extern \"C\" void __xlater_roPup_"<<makeIdent(qName());
     str <<    "(void *_impl_pup_er) {\n";
     str << "  PUP::er &_impl_p=*(PUP::er *)_impl_pup_er;\n";
     str << "  _impl_p|"<<qName()<<";\n";
     str << "}\n";
+    str << "#endif\n";
   }
 
   if (fortranMode) {
