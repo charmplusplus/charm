@@ -128,13 +128,14 @@ not to seriously impact the load balance.
 */
 static LDObjid idx2LDObjid(const CkArrayIndex &idx)
 {
-	int i,len;
+	int i,len, lenInInts;
 	LDObjid r;
 	for (i=0;i<OBJ_ID_SZ;i++)
 		r.id[i]=0;
 	const unsigned char *data=idx.getKey(len);
 	const int *id=(const int *)data;
-	for (i=0;i<len/sizeof(int);i++)
+	lenInInts = len/sizeof(int);
+	for (i=0;i<lenInInts;i++)
 		r.id[i%OBJ_ID_SZ]^=id[i]+(id[i]<<(24+i/4));
 	return r;
 }
