@@ -244,7 +244,10 @@ class CharmStrategy : public Strategy {
     virtual void finalizeProcessing(){}
 
     //Called when a message is received in the strategy handler
-    virtual void handleMessage(void *msg) {}
+    virtual void handleMessage(void *msg) {
+        CkPrintf("Warning: In CharmStrategy::handleMessage\n");
+        CkPrintf("Did you corrupt the message ????\n");
+    }
     
     ComlibLearner *getLearner() {return learner;}
     void setLearner(ComlibLearner *l) {learner = l;}
