@@ -225,7 +225,7 @@ YYSTYPE yylval;
 short yyss[YYSTACKSIZE];
 YYSTYPE yyvs[YYSTACKSIZE];
 #define yystacksize YYSTACKSIZE
-#line 183 "xi-parse.bison"
+#line 182 "xi-parse.bison"
 
 int yyerror(char *mesg)
 {
@@ -374,15 +374,15 @@ yyreduce:
     switch (yyn)
     {
 case 12:
-#line 60 "xi-parse.bison"
+#line 59 "xi-parse.bison"
 { yyval.intval = FALSE; }
 break;
 case 13:
-#line 62 "xi-parse.bison"
+#line 61 "xi-parse.bison"
 { yyval.intval = TRUE; }
 break;
 case 14:
-#line 66 "xi-parse.bison"
+#line 65 "xi-parse.bison"
 {
 			Chare *c = new Chare(yyvsp[-1].strval, BOC, yyvsp[-3].intval) ;
 			delete yyvsp[-1].strval;
@@ -390,7 +390,7 @@ case 14:
 		}
 break;
 case 16:
-#line 75 "xi-parse.bison"
+#line 74 "xi-parse.bison"
 {
 			Chare *c = new Chare(yyvsp[-1].strval, CHARE, yyvsp[-3].intval) ;
 			delete yyvsp[-1].strval;
@@ -398,36 +398,36 @@ case 16:
 		}
 break;
 case 22:
-#line 95 "xi-parse.bison"
+#line 94 "xi-parse.bison"
 {
 			yyval.strval = NULL;
 		}
 break;
 case 24:
-#line 103 "xi-parse.bison"
+#line 102 "xi-parse.bison"
 { yyval.intval = FALSE; }
 break;
 case 25:
-#line 105 "xi-parse.bison"
+#line 104 "xi-parse.bison"
 { yyval.intval = TRUE; }
 break;
 case 26:
-#line 110 "xi-parse.bison"
+#line 109 "xi-parse.bison"
 { yyval.intval = 0; }
 break;
 case 27:
-#line 112 "xi-parse.bison"
+#line 111 "xi-parse.bison"
 { yyval.intval = yyvsp[0].intval; }
 break;
 case 28:
-#line 116 "xi-parse.bison"
+#line 115 "xi-parse.bison"
 {
 			thismodule->chares->AddEntry(yyvsp[-5].strval, yyvsp[-3].strval, yyvsp[-8].intval, yyvsp[-7].strval, yyvsp[-1].intval) ;
 			delete yyvsp[-5].strval; delete yyvsp[-3].strval;
 		}
 break;
 case 30:
-#line 126 "xi-parse.bison"
+#line 125 "xi-parse.bison"
 {
 			Message *m = new Message(yyvsp[-1].strval, 0, yyvsp[-3].intval) ;
 			delete yyvsp[-1].strval;
@@ -435,7 +435,7 @@ case 30:
 		}
 break;
 case 31:
-#line 134 "xi-parse.bison"
+#line 133 "xi-parse.bison"
 {
 			Message *m = new Message(yyvsp[-1].strval, 1, yyvsp[-3].intval) ;
 			delete yyvsp[-1].strval;
@@ -443,7 +443,7 @@ case 31:
 		}
 break;
 case 33:
-#line 145 "xi-parse.bison"
+#line 144 "xi-parse.bison"
 {
 			ReadOnly *r = new ReadOnly(yyvsp[-1].strval, yyvsp[-2].strval, 0) ;
 			delete yyvsp[-2].strval;
@@ -451,7 +451,7 @@ case 33:
 		}
 break;
 case 34:
-#line 151 "xi-parse.bison"
+#line 150 "xi-parse.bison"
 {
 			ReadOnly *r = new ReadOnly(yyvsp[-1].strval, yyvsp[-2].strval, 1) ;
 			delete yyvsp[-2].strval;
@@ -459,14 +459,14 @@ case 34:
 		}
 break;
 case 36:
-#line 162 "xi-parse.bison"
+#line 161 "xi-parse.bison"
 {
 			yyval.strval = strcat(strcpy(new char[2+strlen(yyvsp[-1].strval)], yyvsp[-1].strval), "*");
 			delete yyvsp[-1].strval;
 		}
 break;
 case 38:
-#line 172 "xi-parse.bison"
+#line 171 "xi-parse.bison"
 {
 			Table *t = new Table(yyvsp[-1].strval) ;
 			delete yyvsp[-1].strval;
