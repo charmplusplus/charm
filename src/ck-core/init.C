@@ -440,6 +440,8 @@ extern void _registerExternalModules(char **argv);
 extern void _ckModuleInit(void);
 extern void _loadbalancerInit();
 
+extern int flag;
+
 void _initCharm(int unused_argc, char **argv)
 { 
 	int inCommThread = (CmiMyRank() == CmiMyNodeSize());
@@ -568,8 +570,8 @@ void _initCharm(int unused_argc, char **argv)
 	if(_doRestart){
 		register int i;
 		_allStats = new Stats*[CkNumPes()];
+		flag = 0;
 		CkRestartMain(_restartDir);
-		//if(CkMyPe()==0)
 		_initDone();
 	}else if(CkMyPe()==0){
 		_allStats = new Stats*[CkNumPes()];

@@ -56,9 +56,9 @@ CmiBool CommLB::QueryBalanceNow(int _step)
 
 int CommLB::search(LDObjid oid, LDOMid mid){
     int id,hash;
-    
+
     hash = (oid.id[0] | oid.id[1]) % nobj;
-    
+
     for(id=0;id<nobj;id++){
 	int index = (id+hash)%nobj;
         if (LDObjIDEqual(translate[htable[index]].oid, oid) &&
@@ -188,13 +188,13 @@ LBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* stats, int count)
 	}
 	//    CkPrintf("LOAD on %d = %5.3lf\n",pe,load_pe);
     }
-    
+
     npe = count;
     translate = new obj_id[nobj];
     int objno=0;
-    
-    for(pe=0; pe < count; pe++) 
-	for(obj=0; obj < stats[pe].n_objs; obj++){ 
+
+    for(pe=0; pe < count; pe++)
+	for(obj=0; obj < stats[pe].n_objs; obj++){
 	    translate[objno].mid.id = stats[pe].objData[obj].omID().id;
 	    translate[objno].oid.id[0] = stats[pe].objData[obj].id().id[0];
 	    translate[objno].oid.id[1] = stats[pe].objData[obj].id().id[1];
@@ -202,28 +202,28 @@ LBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* stats, int count)
 	    translate[objno].oid.id[3] = stats[pe].objData[obj].id().id[3];
 	    objno++;
 	}
-    
+
     make_hash();
-    
+
     object_graph = new graph[nobj];
-    
+
     for(pe=0;pe <= count;pe++)
 	alloc_array[pe] = new double[nobj +1];
-    
+
     init(alloc_array,object_graph,npe,nobj);
-    
+
     int xcoord=0,ycoord=0;
-    
-    for(pe=0; pe < count; pe++) 
+
+    for(pe=0; pe < count; pe++)
 	for(com =0; com< stats[pe].n_comm;com++)
 	    if((!stats[pe].commData[com].from_proc())&&(!stats[pe].commData[com].to_proc())){
-		xcoord = search(stats[pe].commData[com].sender,stats[pe].commData[com].senderOM); 
+		xcoord = search(stats[pe].commData[com].sender,stats[pe].commData[com].senderOM);
 		ycoord = search(stats[pe].commData[com].receiver,stats[pe].commData[com].receiverOM);
 		if((xcoord == -1)||(ycoord == -1))
 		    CkAbort("Error in search\n");
-		add_graph(xcoord,ycoord,stats[pe].commData[com].bytes, stats[pe].commData[com].messages);	
+		add_graph(xcoord,ycoord,stats[pe].commData[com].bytes, stats[pe].commData[com].messages);
 	    }
-    
+
     int id,maxid,spe=0,minpe=0,mpos;
     double temp,total_time,min_temp;
     /*
@@ -233,9 +233,9 @@ LBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* stats, int count)
     for(pe=0;pe < count;pe++)
 	if(stats[pe].available == 1)
 	    break;
-    
+
     int first_avail_pe = pe;
-    
+
     x  = maxh.deleteMax();
     maxid = x->id;
     spe = x->pe;
@@ -251,11 +251,11 @@ LBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* stats, int count)
 	migrateMe->to_pe = pe;
 	migrateInfo.insertAtEnd(migrateMe);
     }
-    
-    
+
+
     for(id = 1;id<nobj;id++){
-	x  = maxh.deleteMax();   
-	
+	x  = maxh.deleteMax();
+
 	maxid = x->id;
 	spe = x->pe;
 	mpos = x->pos;

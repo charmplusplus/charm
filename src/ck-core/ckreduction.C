@@ -625,8 +625,8 @@ void CkReductionMgr::pup(PUP::er &p)
   if(p.isUnpacking()){
     thisProxy = thisgroup;
     lcount=0;
-    gcount=0;	
-    
+    gcount=0;
+
   }
 
 #ifdef DEBUGRED

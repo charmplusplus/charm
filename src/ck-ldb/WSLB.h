@@ -29,6 +29,7 @@ public:
   static void staticAtSync(void*);
   void AtSync(void); // Everything is at the PE barrier
 
+  int useDefCtor(void){ return 1; }
   void ReceiveStats(WSLBStatsMsg *); 		// Receive stats on PE 0
   void ResumeClients();
   void ReceiveMigration(LBMigrateMsg *); 	// Receive migration data

@@ -369,7 +369,6 @@ void LocalBarrier::CheckBarrier()
     cur_refcount++;
     CallReceivers();
   }
-
   if (at_count >= client_count) {
     CmiBool at_barrier = CmiFalse;
 
@@ -391,10 +390,10 @@ void LocalBarrier::CallReceivers(void)
 
 //  for(int i=0; i < max_receiver; i++)
     for (int i=max_receiver-1; i>=0; i--)
-    if (receivers[i] != 0) {
-      ((receiver*)receivers[i])->fn(((receiver*)receivers[i])->data);
-      called_receiver = CmiTrue;
-    }
+      if (receivers[i] != 0) {
+        ((receiver*)receivers[i])->fn(((receiver*)receivers[i])->data);
+        called_receiver = CmiTrue;
+      }
 
   if (!called_receiver)
     ResumeClients();

@@ -381,7 +381,7 @@ void CentralLB::MigrationDone(int balancing)
   	        lbName(), step(),end_lb_time);
     if (lb_debug) {
       double lbdbMemsize = LBDatabase::Object()->useMem()/1000;
-      CkPrintf("[%s] duration %f memUsage: LBManager:%dKB CentralLB:%dKB\n", 
+      CkPrintf("[%s] duration %f memUsage: LBManager:%dKB CentralLB:%dKB\n",
   	        lbName(), end_lb_time - start_lb_time,
 	        (int)lbdbMemsize, (int)(useMem()/1000));
     }

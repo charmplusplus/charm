@@ -39,6 +39,8 @@ public:
   CentralLB();
   ~CentralLB();
   CentralLB(CkMigrateMessage *m):CBase_CentralLB(m) {}
+
+  int useDefCtor(void){ return 1; }
   static void staticAtSync(void*);
   void AtSync(void); // Everything is at the PE barrier
   void ProcessAtSync(void); // Receive a message from AtSync to avoid

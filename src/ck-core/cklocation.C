@@ -507,6 +507,7 @@ void CkMigratable::pup(PUP::er &p) {
 	Chare::pup(p);
 	p|thisIndexMax;
 	p(usesAtSync);
+	if(p.isUnpacking()) barrierRegistered=CmiFalse;
 	ckFinishConstruction();
 }
 
@@ -556,7 +557,7 @@ void CkMigratable::ResumeFromSync(void)
 //	CkAbort("::ResumeFromSync() not defined for this array element!\n");
 }
 #if CMK_LBDB_ON  //For load balancing:
-void CkMigratable::ckFinishConstruction(void) 
+void CkMigratable::ckFinishConstruction(void)
 {
 //	if ((!usesAtSync) || barrierRegistered) return;
 	if (barrierRegistered) return;
@@ -571,7 +572,7 @@ void CkMigratable::ckFinishConstruction(void)
 }
 void CkMigratable::AtSync(void)
 {
-	if (!usesAtSync) 
+	if (!usesAtSync)
 		CkAbort("You must set usesAtSync=CmiTrue in your array element constructor to use AtSync!\n");
 	ckFinishConstruction();
 	DEBL((AA"Element %s going to sync\n"AB,idx2str(thisIndexMax)));
@@ -614,7 +615,7 @@ void CkMigratableList::put(CkMigratable *v,int atIdx) {
 void CkLocRec::weAreObsolete(const CkArrayIndex &idx) {}
 CkLocRec::~CkLocRec() { }
 void CkLocRec::beenReplaced(void)
-    {/*Default: ignore replacement*/}  
+    {/*Default: ignore replacement*/}
 
 //Return the represented array element; or NULL if there is none
 CkMigratable *CkLocRec::lookupElement(CkArrayID aid) {return NULL;}
@@ -623,9 +624,9 @@ CkMigratable *CkLocRec::lookupElement(CkArrayID aid) {return NULL;}
 int CkLocRec::lookupProcessor(void) {return -1;}
 
 
-/*----------------- Local: 
-Matches up the array index with the local index, and 
-interfaces with the load balancer on behalf of the 
+/*----------------- Local:
+Matches up the array index with the local index, and
+interfaces with the load balancer on behalf of the
 represented array elements.
 */
 CkLocRec_local::CkLocRec_local(CkLocMgr *mgr,CmiBool fromMigration,
@@ -662,7 +663,7 @@ void CkLocRec_local::migrateMe(int toPe) //Leaving this processor
 
 #if CMK_LBDB_ON
 void CkLocRec_local::startTiming(void) {
-  	running=CmiTrue; 
+  	running=CmiTrue;
 	DEBL((AA"Start timing for %s at %.3fs {\n"AB,idx2str(idx),CkWallTimer()));
   	the_lbdb->ObjectStart(ldHandle);
 }
@@ -676,7 +677,7 @@ void CkLocRec_local::stopTiming(void) {
 void CkLocRec_local::destroy(void) //User called destructor
 {
 	//Our destructor does all the needed work
-	delete this; 
+	delete this;
 }
 //Return the represented array element; or NULL if there is none
 CkMigratable *CkLocRec_local::lookupElement(CkArrayID aid) {
@@ -1040,7 +1041,9 @@ CkLocMgr::CkLocMgr(CkMigrateMessage* m)
 void CkLocMgr::pup(PUP::er &p){
 	IrrGroup::pup(p);
 	p|mapID;
+CkPrintf("CkLocMgr::pup before puping lbdbID=%d\n",lbdbID.idx);
 	p|lbdbID;
+CkPrintf("CkLocMgr::pup after puping lbdbID=%d\n",lbdbID.idx);
 	mapID = _RRMapID;
 	if(p.isUnpacking()){
 		thisProxy=thisgroup;
@@ -1052,6 +1055,7 @@ void CkLocMgr::pup(PUP::er &p){
 		mapHandle=map->registerArray(0,thisgroup);
 		// lbdb is the fixed global groupID
 		initLB(lbdbID);
+		doneInserting();
 	}
 }
 
@@ -1368,12 +1372,12 @@ void CkLocMgr::pupElementsFor(PUP::er &p,CkLocRec_local *rec,
 	p.comment("-------- Array Location --------");
 	register ManagerRec *m;
 	int localIdx=rec->getLocalIndex();
-	
+
 	//First pup the element types
 	// (A separate loop so ckLocal works even in element pup routines)
 	for (m=firstManager;m!=NULL;m=m->next) {
 		int elCType;
-		if (!p.isUnpacking()) 
+		if (!p.isUnpacking())
 		{ //Need to find the element's existing type
 			CkMigratable *elt=m->element(localIdx);
 			if (elt) elCType=elt->ckGetChareType();
@@ -1427,8 +1431,8 @@ void CkLocMgr::migrate(CkLocRec_local *rec,int toPe)
 
 //First pass: find size of migration message
 	int bufSize;
-	{ 
-		PUP::sizer p; 
+	{
+		PUP::sizer p;
 		p(nManagers);
 		pupElementsFor(p,rec,CkElementCreation_migrate);
 		bufSize=p.size(); 
@@ -1506,7 +1510,7 @@ void CkLocMgr::migrateIncoming(CkArrayElementMigrateMessage *msg)
 /// Insert and unpack this array element from this checkpoint (e.g., from CkLocation::pup)
 void CkLocMgr::resume(const CkArrayIndex &idx, PUP::er &p)
 {
-	CkLocRec_local *rec=createLocal(idx,CmiTrue,CmiTrue /* home doesn't know yet */ );
+	CkLocRec_local *rec=createLocal(idx,CmiFalse,CmiTrue /* home doesn't know yet */ );
 
 	//Create the new elements as we unpack the message
 	pupElementsFor(p,rec,CkElementCreation_resume);
@@ -1659,7 +1663,7 @@ void CkLocMgr::recvAtSync()
 	the_lbdb->RegisteringObjects(myLBHandle);
 }
 
-void CkLocMgr::doneInserting(void) 
+void CkLocMgr::doneInserting(void)
 {
 	the_lbdb->DoneRegisteringObjects(myLBHandle);
 }

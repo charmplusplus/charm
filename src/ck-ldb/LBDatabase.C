@@ -115,33 +115,35 @@ LBDBInit::LBDBInit(CkArgMsg *m)
 }
 
 LBDatabase::LBDatabase(CkMigrateMessage *m):IrrGroup(m) {
-    myLDHandle = LDCreate();
-    CkpvAccess(lbdatabaseInited) = 1;
-#if CMK_LBDB_ON
-    if (manualOn) TurnManualLBOn();
+#if 0
+CMK_LBDB_ON
+  if(CkMyPe()==0){
+    LBDefaultCreateFn lbFn = defaultCreate;
+    char *balancer = lbRegistry.defaultLB();
+    if (balancer) {
+      LBDefaultCreateFn fn = lbRegistry.search(balancer);
+      if (!fn) {
+        lbRegistry.displayLBs();
+        CmiPrintf("Abort: Unknown load balancer: '%s'!\n", balancer);
+        CkExit();
+      }else  // overwrite defaultCreate.
+        lbFn = fn;
+    }
+    // NullLB is the default
+    if (!lbFn) lbFn = CreateNullLB;
+    (lbFn)();
+    if (CkpvAccess(doSimulation)) {
+      CmiPrintf("Charm++> Entering Load Balancer Simulation Mode ... \n");
+      CProxy_LBDatabase(lbdb).ckLocalBranch()->StartLB();
+    }
+  }
 #endif
 
-/*
-  LBDefaultCreateFn lbFn = defaultCreate;
-  char *balancer = lbRegistry.defaultLB();
-  if (balancer) {
-    LBDefaultCreateFn fn = lbRegistry.search(balancer);
-    if (!fn) {
-      lbRegistry.displayLBs();
-      CmiPrintf("Abort: Unknown load balancer: '%s'!\n", balancer);
-      CkExit();
-    }
-    else  // overwrite defaultCreate.
-      lbFn = fn;
-  }
-  // NullLB is the default
-  if (!lbFn) lbFn = CreateNullLB;
-  (lbFn)();
-  if (CkpvAccess(doSimulation)) {
-    CmiPrintf("Charm++> Entering Load Balancer Simulation Mode ... \n");
-    CProxy_LBDatabase(lbdb).ckLocalBranch()->StartLB();
-  }
-*/
+  myLDHandle = LDCreate();
+  CkpvAccess(lbdatabaseInited) = 1;
+#if CMK_LBDB_ON
+  if (manualOn) TurnManualLBOn();
+#endif
 }
 
 

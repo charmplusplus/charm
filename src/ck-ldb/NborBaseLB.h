@@ -31,6 +31,8 @@ public:
   NborBaseLB();
   NborBaseLB(CkMigrateMessage *m):CBase_NborBaseLB(m) {}
   ~NborBaseLB();
+
+  int useDefCtor(void){ return 1; }
   static void staticAtSync(void*);
   void AtSync(void); // Everything is at the PE barrier
 

@@ -351,10 +351,10 @@ class IrrGroup : public Chare {
     // Silly run-time type information
     virtual int isNodeGroup() { return 0; };
     virtual bool isLocMgr(void){ return false; }
+    // "default constructor" vs "migration constructor+PUP'ing" in restarting
+    virtual int useDefCtor(void){ return 0; }
     static int isIrreducible(){ return 1;}
 };
-
-
 
 
 /*Macro implmentation of CBase_* */

@@ -22,8 +22,12 @@ CkGroupID _sysChkptMgr;
 
 typedef struct _GroupInfo{
 	CkGroupID gID;
-	int eIdx;
+	int MigCtor, DefCtor;
+	int useDefCtor;
+	char name[256];
 } GroupInfo;
+
+int flag;
 
 // Print out an array index to this string as decimal fields
 // separated by underscores.
@@ -36,9 +40,7 @@ void printIndex(const CkArrayIndex &idx,char *dest) {
 }
 ElementSaver::ElementSaver(const char *dirName_,const int locMgrIdx_) :dirName(dirName_),locMgrIdx(locMgrIdx_){
 	char indexName[1024];
-	//memset(indexName,0,1024);
 	sprintf(indexName,"%s/loc_%d_%d.idx",dirName,locMgrIdx,CkMyPe());
-	//indexName[strlen(\)]='\0';
 	indexFile=fopen(indexName,"w");
 	if (indexFile==NULL){
 		CkPrintf("Could not create index file %s\n",indexName);
@@ -77,7 +79,6 @@ void CkCheckpointMgr::Checkpoint(const char *dirname,CkCallback& cb){
 	int numGroups = CkpvAccess(_groupIDTable)->size();
 	for(int i=0;i<numGroups;i++) {
 		obj = CkpvAccess(_groupTable)->find((*CkpvAccess(_groupIDTable))[i]).getObj();
-		//DEBCHK("tmpInfo[%d]:gID = %d, eIdx = %d, obj->ckGetGroupID() = %d\n",i,(*CkpvAccess(_groupIDTable))[i].idx,CkpvAccess(_groupTable)->find((*CkpvAccess(_groupIDTable))[i]).getMigCtor(),obj->ckGetGroupID().idx);
 		if(obj->isLocMgr()){
 			DEBCHK("\tThis is a location manager!\n");
 			ElementSaver saver(dirname,obj->ckGetGroupID().idx);
@@ -114,26 +115,38 @@ void CkStartCheckpoint(char* dirname,const CkCallback& cb){
 	DEBCHK("[%d]CkStartCheckpoint: numGroups = %d\n",CkMyPe(),numGroups);
 
 	GroupInfo *tmpInfo = new GroupInfo [numGroups];
+	TableEntry ent;
 	for(i=0;i<numGroups;i++) {
-		int tmpCtor;
 		tmpInfo[i].gID = (*CkpvAccess(_groupIDTable))[i];
-		tmpCtor = (tmpInfo[i].eIdx = CkpvAccess(_groupTable)->find(tmpInfo[i].gID).getMigCtor());
-		//DEBCHK("[%d]tmpInfo[%d].gID:%d,migCtor:%d\n",CkMyPe(),i,tmpInfo[i].gID.idx,tmpCtor);
-		if(tmpCtor==-1) {
+		ent = CkpvAccess(_groupTable)->find(tmpInfo[i].gID);
+		tmpInfo[i].useDefCtor = ent.getObj()->useDefCtor();
+		tmpInfo[i].MigCtor = ent.getMigCtor();
+		tmpInfo[i].DefCtor = ent.getDefCtor();
+		strncpy(tmpInfo[i].name,ent.getName(),255);
+		DEBCHK("[%d]CkStartCheckpoint: group %s has useDefCtor=%d\n",CkMyPe(),
+			tmpInfo[i].name,tmpInfo[i].useDefCtor);
+
+		if(tmpInfo[i].useDefCtor==0 && tmpInfo[i].MigCtor==-1) {
 			char buf[512];
-			sprintf(buf,"Group %s either need a migration constructor and\n\
-				     declared as [migratable] in .ci to be able to checkpoint.",\
-				     CkpvAccess(_groupTable)->find(tmpInfo[i].gID).getName());
+			sprintf(buf,"Group %s needs a migration constructor and PUP'er routine for restart.\n",
+				     tmpInfo[i].name);
 			CkAbort(buf);
 		}
 	}
 	if(numGroups != fwrite(tmpInfo,sizeof(GroupInfo),numGroups,fGroups)) CkAbort("error writing groupinfo");
+
 	PUP::toDisk pGroups(fGroups);
-	for(i=0;i<numGroups;i++) {
-		CkpvAccess(_groupTable)->find(tmpInfo[i].gID).getObj()->pup(pGroups);
-		DEBCHK(" group just PUP'ed out: gid = %d, name = %s\n",\
-			CkpvAccess(_groupTable)->find(tmpInfo[i].gID).getObj()->ckGetGroupID().idx,\
-			CkpvAccess(_groupTable)->find(tmpInfo[i].gID).getName());
+	for(int i=0;i<numGroups;i++) {
+		if(!tmpInfo[i].useDefCtor){
+                        CkpvAccess(_groupTable)->find(tmpInfo[i].gID).getObj()->pup(pGroups);
+                        DEBCHK("Group PUP'ed in: gid = %d, name = %s\n",
+				CkpvAccess(_groupTable)->find(tmpInfo[i].gID).getObj()->ckGetGroupID().idx,
+				tmpInfo[i].name);
+		}else{
+                        DEBCHK("Group NOT PUP'ed in: gid = %d, name = %s\n",
+				CkpvAccess(_groupTable)->find(tmpInfo[i].gID).getObj()->ckGetGroupID().idx,
+				tmpInfo[i].name);
+		}
 	}
 	delete [] tmpInfo;
 	fclose(fGroups);
@@ -149,11 +162,10 @@ void CkStartCheckpoint(char* dirname,const CkCallback& cb){
 
 	GroupInfo *tmpInfo2 = new GroupInfo [numNodeGroups];
 	for(i=0;i<numNodeGroups;i++) {
-		int tmpCtor;
 		tmpInfo2[i].gID = CksvAccess(_nodeGroupIDTable)[i];
-		tmpCtor = (tmpInfo2[i].eIdx = CksvAccess(_nodeGroupTable)->find(tmpInfo2[i].gID).getMigCtor());
+		tmpInfo2[i].MigCtor = CksvAccess(_nodeGroupTable)->find(tmpInfo2[i].gID).getMigCtor();
 		//DEBCHK("[%d]tmpInfo2[%d].gID:%d,migCtor:%d\n",CkMyPe(),i,tmpInfo2[i].gID.idx,tmpCtor);
-		if(tmpCtor==-1) {
+		if(tmpInfo2[i].MigCtor==-1) {
 			char buf[512];
 			sprintf(buf,"NodeGroup %s either need a migration constructor and\n\
 				     declared as [migratable] in .ci to be able to checkpoint.",\
@@ -165,7 +177,9 @@ void CkStartCheckpoint(char* dirname,const CkCallback& cb){
 	PUP::toDisk pNodeGroups(fNodeGroups);
 	for(i=0;i<numNodeGroups;i++) {
 		CksvAccess(_nodeGroupTable)->find(tmpInfo2[i].gID).getObj()->pup(pNodeGroups);
-		DEBCHK(" nodegroup just PUP'ed out: gid = %d, name = %s\n",CksvAccess(_nodeGroupTable)->find(tmpInfo2[i].gID).getObj()->ckGetGroupID().idx,CksvAccess(_nodeGroupTable)->find(tmpInfo2[i].gID).getName());
+		DEBCHK("Nodegroup PUP'ed in: gid = %d, name = %s\n",
+			CksvAccess(_nodeGroupTable)->find(tmpInfo2[i].gID).getObj()->ckGetGroupID().idx,
+			CksvAccess(_nodeGroupTable)->find(tmpInfo2[i].gID).getName());
 	}
 	delete [] tmpInfo2;
 	fclose(fNodeGroups);
@@ -222,7 +236,6 @@ void CkRestartMain(const char* dirname){
 	char filename[1024];
 	CkCallback cb;
 	int numGroups,numNodeGroups;
-
 	// restore readonlys
 	sprintf(filename,"%s/RO.dat",dirname);
 	FILE* fRO = fopen(filename,"rb");
@@ -240,8 +253,8 @@ void CkRestartMain(const char* dirname){
 	FILE* fGroups = fopen(filename,"rb");
 	if(!fGroups) CkAbort("Failed to open checkpoint file for group table!");
 	fread(&numGroups,sizeof(UInt),1,fGroups);
-	if(CkMyPe()==0){ CkpvAccess(_numGroups) = numGroups+1; }
-	else { CkpvAccess(_numGroups) = 1; }
+	if(CkMyPe()==0) { CkpvAccess(_numGroups) = numGroups+1; }else{ CkpvAccess(_numGroups) = 1; }
+	//CkpvAccess(_numGroups) = 1;
 
 	GroupInfo *tmpInfo = new GroupInfo [numGroups];
 	if(numGroups != fread(tmpInfo,sizeof(GroupInfo),numGroups,fGroups)) CkAbort("error reading groupinfo");
@@ -249,16 +262,19 @@ void CkRestartMain(const char* dirname){
 	PUP::fromDisk pGroups(fGroups);
 	for(i=0;i<numGroups;i++) {
 		CkGroupID gID = tmpInfo[i].gID;
-		//DEBCHK("tmpInfo[%d]:gID = %d, eIdx = %d\n",i,gID.idx,tmpInfo[i].eIdx);
 		CkpvAccess(_groupIDTable)->push_back(gID);
-		int eIdx = tmpInfo[i].eIdx;
-		CkMigrateMessage m;
-		envelope* env = UsrToEnv(&m);
+		int eIdx = (tmpInfo[i].useDefCtor)?(tmpInfo[i].DefCtor):(tmpInfo[i].MigCtor);
+		void *m = CkAllocSysMsg();
+		envelope* env = UsrToEnv((CkMessage *)m);
 		CkCreateLocalGroup(gID, eIdx, env);
-		CkpvAccess(_groupTable)->find(gID).getObj()->pup(pGroups);
-		DEBCHK(" group just PUP'ed out: gid = %d, name = %s\n",\
-			CkpvAccess(_groupTable)->find(gID).getObj()->ckGetGroupID().idx,\
-			CkpvAccess(_groupTable)->find(gID).getName());
+		if (!tmpInfo[i].useDefCtor){
+			CkpvAccess(_groupTable)->find(gID).getObj()->pup(pGroups);
+			DEBCHK("Group PUP'ed out: gid = %d, name = %s\n",
+				CkpvAccess(_groupTable)->find(gID).getObj()->ckGetGroupID().idx,tmpInfo[i].name);
+		}else{
+			DEBCHK("Group NOT PUP'ed out: gid = %d, name = %s\n",
+				CkpvAccess(_groupTable)->find(gID).getObj()->ckGetGroupID().idx,tmpInfo[i].name);
+	    }
 	}
 	fclose(fGroups);
 
@@ -278,14 +294,13 @@ void CkRestartMain(const char* dirname){
 	PUP::fromDisk pNodeGroups(fNodeGroups);
 	for(i=0;i<numNodeGroups;i++) {
 		CkGroupID gID = tmpInfo2[i].gID;
-		//DEBCHK("tmpInfo2[%d]:gID = %d, eIdx = %d\n",i,gID.idx,tmpInfo2[i].eIdx);
 		CksvAccess(_nodeGroupIDTable).push_back(gID);
-		int eIdx = tmpInfo2[i].eIdx;
-		CkMigrateMessage m;
-		envelope* env = UsrToEnv(&m);
+		int eIdx = tmpInfo2[i].MigCtor;
+		void *m = CkAllocSysMsg();
+		envelope* env = UsrToEnv((CkMessage *)m);
 		CkCreateLocalNodeGroup(gID, eIdx, env);
 		CksvAccess(_nodeGroupTable)->find(gID).getObj()->pup(pNodeGroups);
-		DEBCHK(" nodegroup just PUP'ed out: gid = %d, name = %s\n",CksvAccess(_nodeGroupTable)->find(gID).getObj()->ckGetGroupID().idx,CksvAccess(_nodeGroupTable)->find(gID).getName());
+		DEBCHK("Nodegroup PUP'ed out: gid = %d, name = %s\n",CksvAccess(_nodeGroupTable)->find(gID).getObj()->ckGetGroupID().idx,CksvAccess(_nodeGroupTable)->find(gID).getName());
 	}
 	fclose(fNodeGroups);
 	delete [] tmpInfo2;
@@ -297,7 +312,6 @@ void CkRestartMain(const char* dirname){
 	for(i=0;i<numGroups;i++) {
 		CkGroupID gID = tmpInfo[i].gID;
 		obj = CkpvAccess(_groupTable)->find(gID).getObj();
-		//DEBCHK("tmpInfo[%d]:gID = %d, eIdx = %d, obj->ckGetGroupID() = %d\n",i,gID.idx,tmpInfo[i].eIdx, obj->ckGetGroupID().idx);
 		if(obj->isLocMgr()){
 			CkLocMgr *mgr = (CkLocMgr *)obj;
 			ElementRestorer restorer(dirname,mgr);
