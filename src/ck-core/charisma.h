@@ -192,6 +192,8 @@ class CharismaGraph
       curname->remove(name2);
       Port *oport = ports.get(oname);
       Port *iport = ports.get(iname);
+      if(strcmp(oport->getType(), iport->getType())!=0)
+        CkAbort("Types of connected ports do not match !!!\n");
       oport->setPeer(iport);
       iport->setPeer(oport);
       oport->getComp()->connectOutPort();
@@ -293,6 +295,10 @@ class CharismaInPort
 {
   public:
     virtual void send(void *msg, int len) = 0;
+    void _create(const char *name)
+    {
+      // todo: tell Charisma that the inport is created
+    }
 };
 
 class CharismaOutPort
@@ -304,12 +310,17 @@ class CharismaOutPort
     {
       inport->send(data, len);
     }
+    void _create(const char *name)
+    {
+      // todo: tell charisma that the outport is created
+    }
 };
 
 template <class d>
 class CkOutPort: public CharismaOutPort
 {
   public:
+    CkOutPort(const char *name) { _create(name); }
     void emit(d &_d)
     {
       emit((void *) &_d, sizeof(d));
@@ -323,18 +334,22 @@ class CkInPort : public CharismaInPort
     CkCallback cb;
     CkInPort() {} // prevent illegal inports
   public:
-    CkInPort(int ep,const CkChareID &id)
+    CkInPort(const char *name, int ep,const CkChareID &id)
     {
+      _create(name);
       CkCallback _cb(ep,id);
       cb = _cb;
     }
-    CkInPort(int ep,int onPE,const CkGroupID &id)
+    CkInPort(const char *name, int ep,int onPE,const CkGroupID &id)
     {
+      _create(name);
       CkCallback _cb(ep,onPE,id);
       cb = _cb;
     }
-    CkInPort(int ep,const CkArrayIndex &idx,const CkArrayID &id)
+    CkInPort(const char *name, int ep,const CkArrayIndex &idx,
+             const CkArrayID &id)
     {
+      _create(name);
       CkCallback _cb(ep,idx,id);
       cb = _cb;
     }
@@ -365,6 +380,7 @@ class CkInPort : public CharismaInPort
 class CkOutPortString : public CharismaOutPort
 {
   public:
+    CkOutPortString(const char *name) { _create(name); }
     void emit(char *str)
     {
       CharismaOutPort::emit((void *) str, (int) strlen(str)+1);
@@ -377,18 +393,22 @@ class CkInPortString : public CharismaInPort
     CkCallback cb;
     CkInPortString() {} // prevent illegal inports
   public:
-    CkInPortString(int ep,const CkChareID &id)
+    CkInPortString(const char *name, int ep,const CkChareID &id)
     {
+      _create(name);
       CkCallback _cb(ep,id);
       cb = _cb;
     }
-    CkInPortString(int ep,int onPE,const CkGroupID &id)
+    CkInPortString(const char *name, int ep,int onPE,const CkGroupID &id)
     {
+      _create(name);
       CkCallback _cb(ep,onPE,id);
       cb = _cb;
     }
-    CkInPortString(int ep,const CkArrayIndex &idx,const CkArrayID &id)
+    CkInPortString(const char *name, int ep,const CkArrayIndex &idx,
+                   const CkArrayID &id)
     {
+      _create(name);
       CkCallback _cb(ep,idx,id);
       cb = _cb;
     }
@@ -410,6 +430,7 @@ template <class d>
 class CkOutPortArray : public CharismaOutPort
 {
   public:
+    CkOutPortArray(const char *name) { _create(name); }
     void emit(int n, const d *a)
     {
       emit((void *)a, n*sizeof(d));
@@ -423,18 +444,22 @@ class CkInPortArray : public CharismaInPort
     CkCallback cb;
     CkInPortArray() {} // prevent illegal inports
   public:
-    CkInPortArray(int ep,const CkChareID &id)
+    CkInPortArray(const char *name, int ep,const CkChareID &id)
     {
+      _create(name);
       CkCallback _cb(ep,id);
       cb = _cb;
     }
-    CkInPortArray(int ep,int onPE,const CkGroupID &id)
+    CkInPortArray(const char *name, int ep,int onPE,const CkGroupID &id)
     {
+      _create(name);
       CkCallback _cb(ep,onPE,id);
       cb = _cb;
     }
-    CkInPortArray(int ep,const CkArrayIndex &idx,const CkArrayID &id)
+    CkInPortArray(const char *name, int ep,const CkArrayIndex &idx,
+                  const CkArrayID &id)
     {
+      _create(name);
       CkCallback _cb(ep,idx,id);
       cb = _cb;
     }
@@ -470,6 +495,7 @@ class CkInPortArray : public CharismaInPort
 class CkOutPortVoid : public CharismaOutPort
 {
   public:
+    CkOutPortVoid(const char *name) { _create(name); }
     void emit(void)
     {
       CharismaOutPort::emit((void*) 0, 0);
@@ -482,18 +508,22 @@ class CkInPortVoid : public CharismaInPort
     CkCallback cb;
     CkInPortVoid() {} // prevent illegal inports
   public:
-    CkInPortVoid(int ep,const CkChareID &id)
+    CkInPortVoid(const char *name, int ep,const CkChareID &id)
     {
+      _create(name);
       CkCallback _cb(ep,id);
       cb = _cb;
     }
-    CkInPortVoid(int ep,int onPE,const CkGroupID &id)
+    CkInPortVoid(const char *name, int ep,int onPE,const CkGroupID &id)
     {
+      _create(name);
       CkCallback _cb(ep,onPE,id);
       cb = _cb;
     }
-    CkInPortVoid(int ep,const CkArrayIndex &idx,const CkArrayID &id)
+    CkInPortVoid(const char *name, int ep,const CkArrayIndex &idx,
+                 const CkArrayID &id)
     {
+      _create(name);
       CkCallback _cb(ep,idx,id);
       cb = _cb;
     }
@@ -512,6 +542,7 @@ template <class d>
 class CkOutPortMsg : public CharismaOutPort
 {
   public:
+    CkOutPortMsg(const char *name) { _create(name); }
     void emit(d *data)
     {
       // TODO: do message packing, and get the actual buffer size
@@ -526,18 +557,22 @@ class CkInPortMsg : public CharismaInPort
     CkCallback cb;
     CkInPortMsg() {} // prevent illegal inports
   public:
-    CkInPortMsg(int ep,const CkChareID &id)
+    CkInPortMsg(const char *name, int ep,const CkChareID &id)
     {
+      _create(name);
       CkCallback _cb(ep,id);
       cb = _cb;
     }
-    CkInPortMsg(int ep,int onPE,const CkGroupID &id)
+    CkInPortMsg(const char *name, int ep,int onPE,const CkGroupID &id)
     {
+      _create(name);
       CkCallback _cb(ep,onPE,id);
       cb = _cb;
     }
-    CkInPortMsg(int ep,const CkArrayIndex &idx,const CkArrayID &id)
+    CkInPortMsg(const char *name, int ep,const CkArrayIndex &idx,
+                const CkArrayID &id)
     {
+      _create(name);
       CkCallback _cb(ep,idx,id);
       cb = _cb;
     }
