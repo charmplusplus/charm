@@ -5,10 +5,8 @@
 #define CMK_WEB_MODE                                       0
 
 #define CMK_CMIPRINTF_IS_A_BUILTIN                         0 
-#define CMK_CMIPRINTF_IS_JUST_PRINTF                       1 
 
 #define CMK_CMIDELIVERS_USE_COMMON_CODE                    1
-#define CMK_CMIDELIVERS_USE_SPECIAL_CODE                   0
 
 #define CMK_PERSISTENT_COMM                                0
 
@@ -29,17 +27,12 @@
 #define CMK_BROADCAST_SPANNING_TREE                        1
 #define CMK_SPANTREE_MAXSPAN                               4
 #define CMK_SPANTREE_USE_COMMON_CODE                       1
-#define CMK_SPANTREE_USE_SPECIAL_CODE                      0
 
 #define CMK_MSG_HEADER_BASIC  CMK_MSG_HEADER_EXT
 #define CMK_MSG_HEADER_EXT    { CmiUInt2 vmitype,tree_rank,tree_root,hdl,xhdl,info,stratid,root; }
 #define CMK_MSG_HEADER_BLUEGENE    { CmiUInt2 d0,d1,d2,d3,d4,d5,hdl,xhdl,info,stratid,root,padding3; int nd, n; double rt; CmiInt2 tID; CmiUInt2 hID; char t; int msgID; int srcPe;}
 
-#define CMK_REDUCTION_USES_COMMON_CODE                     1
-#define CMK_REDUCTION_USES_SPECIAL_CODE                    0
-
 #define CMK_VECTOR_SEND_USES_COMMON_CODE                   1
-#define CMK_VECTOR_SEND_USES_SPECIAL_CODE                  0
 
 #define CMK_IMMEDIATE_MSG                                  0
 

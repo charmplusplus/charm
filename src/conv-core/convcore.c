@@ -2365,7 +2365,7 @@ void ConverseCommonExit(void)
 
 }
 
-#if CMK_CMIPRINTF_IS_JUST_PRINTF
+#if ! CMK_CMIPRINTF_IS_A_BUILTIN
 
 void CmiPrintf(const char *format, ...)
 {

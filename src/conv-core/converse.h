@@ -602,13 +602,13 @@ int      CmiTimerIsSynchronized();
 #define CsdEmpty()            (CqsEmpty(CpvAccess(CsdSchedQueue)))
 #define CsdLength()           (CqsLength(CpvAccess(CsdSchedQueue)))
 
-#if CMK_CMIPRINTF_IS_A_BUILTIN
+#if CMK_CMIPRINTF_IS_A_BUILTIN /* these are implemented in machine.c */
 void  CmiPrintf(const char *, ...);
 void  CmiError(const char *, ...);
 int   CmiScanf(const char *, ...);
-#endif
 
-#if CMK_CMIPRINTF_IS_JUST_PRINTF
+#else /* standard definitions */
+
 #include <stdio.h>
 
 /*
@@ -713,9 +713,9 @@ extern void CsdSchedulePoll(void);
             if(_x<CST_NS(p)) (c)[_c++]=CST_NF(CST_ND(p))+_x; \
           }\
         } while(0)
-#endif
 
-#if CMK_SPANTREE_USE_SPECIAL_CODE
+#else
+
 int      CmiSpanTreeNumChildren(int) ;
 int      CmiSpanTreeParent(int) ;
 void     CmiSpanTreeChildren(int node, int *children);

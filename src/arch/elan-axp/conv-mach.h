@@ -48,10 +48,6 @@
 #define CMK_TYPEDEF_FLOAT4 float
 #define CMK_TYPEDEF_FLOAT8 double
 
-#define CMK_WAIT_NOT_NEEDED                                0
-#define CMK_WAIT_USES_SYS_WAIT_H                           1
-#define CMK_WAIT_USES_WAITFLAGS_H                          0
-
 #define CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT                   0
 #define CMK_WHEN_PROCESSOR_IDLE_USLEEP                     1
 

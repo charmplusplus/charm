@@ -1,9 +1,7 @@
 
 #define CMK_CMIDELIVERS_USE_COMMON_CODE                    1
-#define CMK_CMIDELIVERS_USE_SPECIAL_CODE                   0
 
 #define CMK_CMIPRINTF_IS_A_BUILTIN                         0
-#define CMK_CMIPRINTF_IS_JUST_PRINTF                       1
 
 #define CMK_HANDLE_SIGUSR                                  1
 
@@ -16,19 +14,14 @@
 #define CMK_MULTICAST_LIST_USE_COMMON_CODE                 1
 #define CMK_MULTICAST_GROUP_USE_COMMON_CODE                1
 
-#define CMK_REDUCTION_USES_COMMON_CODE                     1
-#define CMK_REDUCTION_USES_SPECIAL_CODE                    0
-
 #define CMK_RSH_IS_A_COMMAND                               0
 #define CMK_RSH_NOT_NEEDED                                 1
 #define CMK_RSH_USE_REMSH                                  0
 
 #define CMK_SPANTREE_MAXSPAN                               4
 #define CMK_SPANTREE_USE_COMMON_CODE                       1
-#define CMK_SPANTREE_USE_SPECIAL_CODE                      0
 
 #define CMK_VECTOR_SEND_USES_COMMON_CODE                   1
-#define CMK_VECTOR_SEND_USES_SPECIAL_CODE                  0
 
 #define CMK_CCS_AVAILABLE                                  1
 
