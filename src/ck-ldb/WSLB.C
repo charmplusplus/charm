@@ -42,8 +42,8 @@ NLBMigrateMsg* WSLB::Strategy(NeighborLB::LDStats* stats, int count)
   CkVector migrateInfo;
 
   if (myload > avgload) {
-    CkPrintf("[%d] OVERLOAD My load is %f, average load is %f\n",
-	     CkMyPe(),myload,avgload);
+    //    CkPrintf("[%d] OVERLOAD My load is %f, average load is %f\n",
+    //	     CkMyPe(),myload,avgload);
 
     // First, build heaps of other processors and my objects
     // Then assign objects to other processors until either
@@ -79,7 +79,7 @@ NLBMigrateMsg* WSLB::Strategy(NeighborLB::LDStats* stats, int count)
       // Get the lightest-loaded processor
       p = procs.deleteMin();
       if (p == 0) {
-	CkPrintf("[%d] No destination PE found!\n",CkMyPe());
+	//	CkPrintf("[%d] No destination PE found!\n",CkMyPe());
 	break;
       }
 
@@ -109,8 +109,8 @@ NLBMigrateMsg* WSLB::Strategy(NeighborLB::LDStats* stats, int count)
 
       const int me = CkMyPe();
       // Apparently we can give this object to this processor
-      CkPrintf("[%d] Obj %d of %d migrating from %d to %d\n",
-	       CkMyPe(),obj->Id,myStats.obj_data_sz,me,p->Id);
+      //      CkPrintf("[%d] Obj %d of %d migrating from %d to %d\n",
+      //	       CkMyPe(),obj->Id,myStats.obj_data_sz,me,p->Id);
 
       MigrateInfo* migrateMe = new MigrateInfo;
       migrateMe->obj = myStats.objData[obj->Id].handle;
@@ -140,6 +140,9 @@ NLBMigrateMsg* WSLB::Strategy(NeighborLB::LDStats* stats, int count)
 
   // Now build the message to actually perform the migrations
   int migrate_count=migrateInfo.size();
+  //  if (migrate_count > 0) {
+  //    CkPrintf("PE %d migrating %d elements\n",CkMyPe(),migrate_count);
+  //  }
   NLBMigrateMsg* msg = new(&migrate_count,1) NLBMigrateMsg;
   msg->n_moves = migrate_count;
   for(i=0; i < migrate_count; i++) {

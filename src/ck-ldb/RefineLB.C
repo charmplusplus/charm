@@ -222,7 +222,7 @@ CLBMigrateMsg* RefineLB::Strategy(CentralLB::LDStats* stats, int count)
          processors[pe].computeSet->iterator((Iterator *)&nextCompute);
     while(c) {
       if (c->oldProcessor != c->processor)  {
-	CkPrintf("Migrate: from %d to %d\n",c->oldProcessor, c->processor);
+	//	CkPrintf("Migrate: from %d to %d\n",c->oldProcessor, c->processor);
 	MigrateInfo* migrateMe = new MigrateInfo;
 	migrateMe->obj = c->handle;
 	migrateMe->from_pe = c->oldProcessor;
