@@ -1061,6 +1061,14 @@ done
 MakeSO() {
 	Debugf "Running ldro..."
 	DoNoErrCheck $RM $OBJECT
+	# convert to absolute path if required
+	if test -n "$CMK_LD_SHARED_ABSOLUTE_PATH"
+	then
+	dir=`dirname $OBJECT`
+	fname=`basename $OBJECT`
+	dir=`cd $dir; pwd`
+	OBJECT=$dir/$fname
+	fi
 	Warning "Warning: creating $OBJECT "
 	soCmd="$CMK_LD -o $OBJECT $OPTS_LD $OPTS_LDRO $OBJECTFILES $PRE_LIBRARIES $POST_LIBRARIES $CMK_LD_SHARED_LIBS"
 	DoNoErrCheck $soCmd
