@@ -67,7 +67,7 @@ LBMigrateMsg* GreedyRefLB::Strategy(CentralLB::LDStats* stats, int count)
       if (to_procs[obj] != frompe) {
   //  CkPrintf("[%d] Obj %d migrating from %d to %d\n",
   //     CkMyPe(),obj,pe,to_procs[pe][obj]);
-       CkPrintf("Refinement moved obj %d orig %d from %d to %d\n", obj,stats->from_proc[obj],from_procs[obj],to_procs[obj]);
+        //CkPrintf("Refinement moved obj %d orig %d from %d to %d\n", obj,stats->from_proc[obj],from_procs[obj],to_procs[obj]);
         MigrateInfo *migrateMe = new MigrateInfo;
         migrateMe->obj = stats->objData[obj].handle;
         migrateMe->from_pe = frompe;
