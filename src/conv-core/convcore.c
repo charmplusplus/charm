@@ -1859,6 +1859,7 @@ static void CmiMultiMsgHandler(char *msgWhole)
     CmiSyncSendAndFree(CmiMyPe(), sizes[i], ((char *)(msgWhole + offset))); 
     offset += sizes[i];
   }
+  CmiFree(msgWhole);
 }
 
 static void memChop(char *msgWhole)
