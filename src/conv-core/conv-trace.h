@@ -18,7 +18,9 @@ void traceUserEvent(int);
 int  traceRegisterUserEvent(const char*);
 void traceClose(void);
 
+#ifndef CMK_OPTIMIZE
 CpvExtern(int, traceOn);
+#endif
 CpvExtern(CthThread, curThread);
 
 #endif

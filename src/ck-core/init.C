@@ -2,8 +2,12 @@
 #include "trace.h"
 
 UChar _defaultQueueing = CK_QUEUEING_FIFO;
+
+#ifndef CMK_OPTIMIZE
 UInt  _printCS = 0;
 UInt  _printSS = 0;
+#endif
+
 UInt  _numGroups = 0;
 UInt  _numNodeGroups = 0;
 UInt  _numInitMsgs = 0;
@@ -26,7 +30,11 @@ CpvDeclare(int,         _currentGroup);
 CpvDeclare(int,         _currentNodeGroup);
 CpvDeclare(GroupTable*, _groupTable);
 GroupTable* _nodeGroupTable = 0;
+
+#ifndef CMK_OPTIMIZE
 CpvDeclare(Stats*, _myStats);
+#endif
+
 CpvDeclare(MsgPool*, _msgPool);
 
 CpvDeclare(_CkOutStream*, _ckout);
@@ -38,7 +46,11 @@ CpvStaticDeclare(PtrQ*, _bocInitQ);
 CpvStaticDeclare(PtrQ*, _nodeBocInitQ);
 
 static int    _exitHandlerIdx;
+
+#ifndef CMK_OPTIMIZE
 static Stats** _allStats = 0;
+#endif
+
 static UInt   _numStatsRecd = 0;
 static int    _exitStarted = 0;
 
@@ -48,9 +60,19 @@ static inline int _parseCommandLineOpts(int argc, char **argv)
   while(*argv) {
     found = 0;
     if(strcmp(*argv, "+cs")==0) {
-      _printCS = 1; found = 1;
+#ifndef CMK_OPTIMIZE
+      _printCS = 1; 
+#else
+      CmiPrintf("+cs is not enabled in this optimized version. ignoring...\n");
+#endif
+      found = 1;
     } else if(strcmp(*argv, "+ss")==0) {
-      _printSS = 1; found = 1;
+#ifndef CMK_OPTIMIZE
+      _printSS = 1; 
+#else
+      CmiPrintf("+ss is not enabled in this optimized version. ignoring...\n");
+#endif
+      found = 1;
     } else if(strcmp(*argv, "+fifo")==0) {
       _defaultQueueing = CK_QUEUEING_FIFO; found = 1;
     } else if(strcmp(*argv, "+lifo")==0) {
@@ -90,6 +112,7 @@ static void _discardHandler(envelope *env)
 }
 
 
+#ifndef CMK_OPTIMIZE
 static inline void _printStats(void)
 {
   int i;
@@ -126,10 +149,15 @@ static inline void _printStats(void)
     }
   }
 }
+#endif
 
 static inline void _sendStats(void)
 {
+#ifndef CMK_OPTIMIZE
   envelope *env = UsrToEnv(CpvAccess(_myStats));
+#else
+  envelope *env = _allocEnv(StatMsg);
+#endif
   env->setSrcPe(CkMyPe());
   CmiSetHandler(env, _exitHandlerIdx);
   CmiSyncSendAndFree(0, env->getTotalsize(), env);
@@ -164,10 +192,14 @@ static void _exitHandler(envelope *env)
       break;
     case StatMsg:
       assert(CkMyPe()==0);
+#ifndef CMK_OPTIMIZE
       _allStats[env->getSrcPe()] = (Stats*) EnvToUsr(env);
+#endif
       _numStatsRecd++;
       if(_numStatsRecd==CkNumPes()) {
+#ifndef CMK_OPTIMIZE
         _printStats();
+#endif
         CsdExitScheduler();
       }
       break;
@@ -182,11 +214,15 @@ static inline void _processBufferedBocInits(void)
   CmiNumberHandler(_bocHandlerIdx, (CmiHandler)_processHandler);
   while(env=(envelope *)CpvAccess(_bocInitQ)->deq()) {
     if(env->isPacked() && _msgTable[env->getMsgIdx()]->unpack) {
+#ifndef CMK_OPTIMIZE
       if(CpvAccess(traceOn))
         CpvAccess(_trace)->beginUnpack();
+#endif
       env = UsrToEnv(_msgTable[env->getMsgIdx()]->unpack(EnvToUsr(env)));
+#ifndef CMK_OPTIMIZE
       if(CpvAccess(traceOn))
         CpvAccess(_trace)->endUnpack();
+#endif
     }
     _processBocInitMsg(env);
   }
@@ -198,11 +234,15 @@ static inline void _processBufferedNodeBocInits(void)
   CmiNumberHandler(_nodeBocHandlerIdx, (CmiHandler)_processHandler);
   while(env=(envelope *)CpvAccess(_nodeBocInitQ)->deq()) {
     if(env->isPacked() && _msgTable[env->getMsgIdx()]->unpack) {
+#ifndef CMK_OPTIMIZE
       if(CpvAccess(traceOn))
         CpvAccess(_trace)->beginUnpack();
+#endif
       env = UsrToEnv(_msgTable[env->getMsgIdx()]->unpack(EnvToUsr(env)));
+#ifndef CMK_OPTIMIZE
       if(CpvAccess(traceOn))
         CpvAccess(_trace)->endUnpack();
+#endif
     }
     _processNodeBocInitMsg(env);
   }
@@ -401,7 +441,9 @@ void _initCharm(int argc, char **argv)
   CpvInitialize(_CkOutStream*, _ckout);
   CpvInitialize(_CkErrStream*, _ckerr);
 
+#ifndef CMK_OPTIMIZE
   CpvInitialize(Stats*, _myStats);
+#endif
 
   CpvAccess(_buffQ) = new PtrQ();
   CpvAccess(_bocInitQ) = new PtrQ();
@@ -443,13 +485,17 @@ void _initCharm(int argc, char **argv)
     _registerCkArray();
     CkRegisterMainModule();
   }
+#ifndef CMK_OPTIMIZE
   if(CpvAccess(traceOn))
     CpvAccess(_trace)->beginComputation();
-  CpvAccess(_msgPool) = new MsgPool();
   CpvAccess(_myStats) = new Stats();
+#endif
+  CpvAccess(_msgPool) = new MsgPool();
   CmiNodeBarrier();
   if(CmiMyPe()==0) {
+#ifndef CMK_OPTIMIZE
     _allStats = new Stats*[CkNumPes()];
+#endif
     register int i;
     for(i=0;i<_numMains;i++) {
       register int size = _chareTable[_mainTable[i]->chareIdx]->size;
@@ -460,8 +506,10 @@ void _initCharm(int argc, char **argv)
       msg->argv = argv;
       _entryTable[_mainTable[i]->entryIdx]->call(msg, obj);
     }
+#ifndef CMK_OPTIMIZE
     CpvAccess(_myStats)->recordCreateChare(_numMains);
     CpvAccess(_myStats)->recordProcessChare(_numMains);
+#endif
     for(i=0;i<_numReadonlyMsgs;i++) {
       register void *roMsg = (void *) *((char **)(_readonlyMsgs[i]->pMsg));
       if(roMsg==0)

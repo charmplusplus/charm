@@ -67,8 +67,10 @@ class GroupTable {
     }
 };
 
+#ifndef CMK_OPTIMIZE
 extern UInt    _printCS;
 extern UInt    _printSS;
+#endif
 
 extern UInt    _numGroups;
 extern UInt    _numNodeGroups;

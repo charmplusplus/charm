@@ -74,10 +74,15 @@ class envelope {
     void   setRef(const UShort r) { s2 = r; }
     UChar  getQueueing(void) const { return (attribs2 & QMASK); }
     void   setQueueing(const UChar q) { attribs2 = (attribs2 & PMASK) | q; }
+#ifndef CMK_OPTIMIZE
     UChar  getMsgtype(void) const { return (attribs1&0x7F); }
     void   setMsgtype(const UChar m) { attribs1 = (attribs1&0x80) | m; }
     UChar  isUsed(void) { return (attribs1&0x80); }
     void   setUsed(const UChar u) { attribs1 = (attribs1 & 0x7F) | (u<<7); }
+#else
+    UChar  getMsgtype(void) const { return attribs1; }
+    void   setMsgtype(const UChar m) { attribs1  = m; }
+#endif
     UChar  getMsgIdx(void) const { return msgIdx; }
     void   setMsgIdx(const UChar idx) { msgIdx = idx; }
     UInt   getTotalsize(void) const { return totalsize; }
@@ -104,7 +109,9 @@ class envelope {
       env->totalsize = tsize;
       env->priobits = prio;
       env->setPacked(0);
+#ifndef CMK_OPTIMIZE
       env->setUsed(0);
+#endif
       return env;
     }
     UShort getEpIdx(void) const {

@@ -578,8 +578,10 @@ void CthSuspend()
   if (CthCpvAccess(CthCurrent)->choosefn == 0) CthNoStrategy();
   next = CthCpvAccess(CthCurrent)->choosefn();
   /** addition for tracing */
+#ifndef CMK_OPTIMIZE
   if(CpvAccess(traceOn))
     traceSuspend();
+#endif
   /* end addition */
 #if CMK_WEB_MODE
   usageStop();
@@ -593,8 +595,10 @@ CthThread th;
   if (th->awakenfn == 0) CthNoStrategy();
   /** addition for tracing */
   CpvAccess(curThread) = th;
+#ifndef CMK_OPTIMIZE
   if(CpvAccess(traceOn))
     traceAwaken();
+#endif
   /* end addition */
   th->awakenfn(th);
 }

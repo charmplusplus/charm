@@ -153,7 +153,9 @@ char **argv;
 
   argc = 0; argv=origArgv;
   for(argc=0;argv[argc];argc++);
+#ifndef CMK_OPTIMIZE
   traceInit(&argc, argv);
+#endif
 
 #if CMK_WEB_MODE
   initUsage();
@@ -1393,8 +1395,10 @@ void CsdEndIdle()
     CpvAccess(CsdIdleDetectedFlag) = 0;
     if(!CpvAccess(CsdStopNotifyFlag)) {
       (CpvAccess(CsdNotifyBusy))();
+#ifndef CMK_OPTIMIZE
       if(CpvAccess(traceOn))
         traceEndIdle();
+#endif
     }
   }
 #if CMK_WEB_MODE
@@ -1408,8 +1412,10 @@ void CsdBeginIdle()
     CpvAccess(CsdIdleDetectedFlag) = 1;
     if(!CpvAccess(CsdStopNotifyFlag)) {
       (CpvAccess(CsdNotifyIdle))();
+#ifndef CMK_OPTIMIZE
       if(CpvAccess(traceOn))
         traceBeginIdle();
+#endif
     }
   }
 #if CMK_WEB_MODE
@@ -1746,8 +1752,10 @@ static void CthResumeNormalThread(CthThread t)
   CmiGrabBuffer((void**)&t);
   /** addition for tracing */
   CpvAccess(curThread) = t;
+#ifndef CMK_OPTIMIZE
   if(CpvAccess(traceOn))
     traceResume();
+#endif
   /* end addition */
 #if CMK_WEB_MODE
   usageStart();  
@@ -2591,7 +2599,9 @@ void ConverseCommonExit(void)
     }
   }
 #endif
+#ifndef CMK_OPTIMIZE
   traceClose();
+#endif
 }
 
 

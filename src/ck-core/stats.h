@@ -72,6 +72,8 @@ class Stats {
     UInt getNodeGroupMsgsProcessed(void) const { return nodeGroupMsgsProcessed; }
 };
 
+#ifndef CMK_OPTIMIZE
 CpvExtern(Stats*, _myStats);
+#endif
 
 #endif

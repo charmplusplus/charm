@@ -4,7 +4,10 @@
 #include <string.h>
 #include <stdlib.h>
 
+#ifdef CMK_OPTIMIZE
 #define NDEBUG
+#endif
+
 #include <assert.h>
 
 #include "charm.h"

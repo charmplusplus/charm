@@ -51,12 +51,16 @@ static void _processNewChareMsg(envelope *env)
   register void *obj = _allocNewChare(env);
   register void *msg = EnvToUsr(env);
   CpvAccess(_currentChare) = obj;
+#ifndef CMK_OPTIMIZE
   if(CpvAccess(traceOn))
     CpvAccess(_trace)->beginExecute(env);
   env->setUsed(0);
+#endif
   _entryTable[env->getEpIdx()]->call(msg, obj);
+#ifndef CMK_OPTIMIZE
   if(CpvAccess(traceOn))
     CpvAccess(_trace)->endExecute();
+#endif
 }
 
 static void _processNewVChareMsg(envelope *env)
@@ -75,12 +79,16 @@ static void _processNewVChareMsg(envelope *env)
   CpvAccess(_qd)->create();
   CpvAccess(_currentChare) = obj;
   register void *msg = EnvToUsr(env);
+#ifndef CMK_OPTIMIZE
   if(CpvAccess(traceOn))
     CpvAccess(_trace)->beginExecute(env);
   env->setUsed(0);
+#endif
   _entryTable[env->getEpIdx()]->call(msg, obj);
+#ifndef CMK_OPTIMIZE
   if(CpvAccess(traceOn))
     CpvAccess(_trace)->endExecute();
+#endif
 }
 
 static inline void _processForChareMsg(envelope *env)
@@ -89,12 +97,16 @@ static inline void _processForChareMsg(envelope *env)
   register int epIdx = env->getEpIdx();
   register void *obj = env->getObjPtr();
   CpvAccess(_currentChare) = obj;
+#ifndef CMK_OPTIMIZE
   if(CpvAccess(traceOn))
     CpvAccess(_trace)->beginExecute(env);
   env->setUsed(0);
+#endif
   _entryTable[epIdx]->call(msg, obj);
+#ifndef CMK_OPTIMIZE
   if(CpvAccess(traceOn))
     CpvAccess(_trace)->endExecute();
+#endif
 }
 
 static inline void _processForBocMsg(envelope *env)
@@ -131,7 +143,9 @@ static inline void _processFillVidMsg(envelope *env)
 static inline void _processForVidMsg(envelope *env)
 {
   VidBlock *vptr = (VidBlock *) env->getVidPtr();
+#ifndef CMK_OPTIMIZE
   env->setUsed(1);
+#endif
   vptr->send(env);
 }
 
@@ -203,13 +217,17 @@ void _processHandler(void *msg)
       CpvAccess(_qd)->process();
       if(env->isPacked()) _unpackFn((void **)&env);
       _processNewChareMsg(env);
+#ifndef CMK_OPTIMIZE
       CpvAccess(_myStats)->recordProcessChare();
+#endif
       break;
     case NewVChareMsg :
       CpvAccess(_qd)->process();
       if(env->isPacked()) _unpackFn((void **)&env);
       _processNewVChareMsg(env);
+#ifndef CMK_OPTIMIZE
       CpvAccess(_myStats)->recordProcessChare();
+#endif
       break;
     case BocInitMsg :
       CpvAccess(_qd)->process();
@@ -241,19 +259,25 @@ void _processHandler(void *msg)
       CpvAccess(_qd)->process();
       if(env->isPacked()) _unpackFn((void **)&env);
       _processForChareMsg(env);
+#ifndef CMK_OPTIMIZE
       CpvAccess(_myStats)->recordProcessMsg();
+#endif
       break;
     case ForBocMsg :
       CpvAccess(_qd)->process();
       if(env->isPacked()) _unpackFn((void **)&env);
       _processForBocMsg(env);
+#ifndef CMK_OPTIMIZE
       CpvAccess(_myStats)->recordProcessBranch();
+#endif
       break;
     case ForNodeBocMsg :
       CpvAccess(_qd)->process();
       if(env->isPacked()) _unpackFn((void **)&env);
       _processForNodeBocMsg(env);
+#ifndef CMK_OPTIMIZE
       CpvAccess(_myStats)->recordProcessNodeBranch();
+#endif
       break;
     case ForVidMsg   :
       CpvAccess(_qd)->process();
@@ -285,11 +309,15 @@ void _packFn(void **pEnv)
   register int msgIdx = env->getMsgIdx();
   if(!env->isPacked() && _msgTable[msgIdx]->pack) {
     register void *msg = EnvToUsr(env);
+#ifndef CMK_OPTIMIZE
     if(CpvAccess(traceOn))
       CpvAccess(_trace)->beginPack();
+#endif
     msg = _msgTable[msgIdx]->pack(msg);
+#ifndef CMK_OPTIMIZE
     if(CpvAccess(traceOn))
       CpvAccess(_trace)->endPack();
+#endif
     UsrToEnv(msg)->setPacked(1);
     *((envelope **)pEnv) = UsrToEnv(msg);
   }
@@ -301,11 +329,15 @@ void _unpackFn(void **pEnv)
   register int msgIdx = env->getMsgIdx();
   if(_msgTable[msgIdx]->unpack) {
     register void *msg = EnvToUsr(env);
+#ifndef CMK_OPTIMIZE
     if(CpvAccess(traceOn))
       CpvAccess(_trace)->beginUnpack();
+#endif
     msg = _msgTable[msgIdx]->unpack(msg);
+#ifndef CMK_OPTIMIZE
     if(CpvAccess(traceOn))
       CpvAccess(_trace)->endUnpack();
+#endif
     UsrToEnv(msg)->setPacked(0);
     *((envelope **)pEnv) = UsrToEnv(msg);
   }
@@ -315,13 +347,17 @@ extern "C"
 void CkSendMsg(int entryIdx, void *msg, CkChareID *pCid)
 {
   register envelope *env = UsrToEnv(msg);
+#ifndef CMK_OPTIMIZE
   if(env->isUsed()) {
     CmiAbort("Message being re-sent. Aborting...\n");
   }
+#endif
   env->setMsgtype(ForChareMsg);
   env->setEpIdx(entryIdx);
   CmiSetHandler(env, _charmHandlerIdx);
+#ifndef CMK_OPTIMIZE
   env->setUsed(1);
+#endif
   if(pCid->onPE < 0) {
     register int pe = -(pCid->onPE+1);
     if(pe==CkMyPe()) {
@@ -331,20 +367,26 @@ void CkSendMsg(int entryIdx, void *msg, CkChareID *pCid)
       env->setMsgtype(ForVidMsg);
       env->setSrcPe(CkMyPe());
       env->setVidPtr(pCid->objPtr);
+#ifndef CMK_OPTIMIZE
       if(CpvAccess(traceOn))
         CpvAccess(_trace)->creation(env);
+#endif
       CpvAccess(_qd)->create();
       CldEnqueue(pe, env, _infoIdx);
     }
   } else {
     env->setSrcPe(CkMyPe());
     env->setObjPtr(pCid->objPtr);
+#ifndef CMK_OPTIMIZE
     if(CpvAccess(traceOn))
       CpvAccess(_trace)->creation(env);
+#endif
     CpvAccess(_qd)->create();
     CldEnqueue(pCid->onPE, env, _infoIdx);
   }
+#ifndef CMK_OPTIMIZE
   CpvAccess(_myStats)->recordSendMsg();
+#endif
 }
 
 extern "C"
@@ -352,9 +394,11 @@ void CkCreateChare(int cIdx, int eIdx, void *msg, CkChareID *pCid, int destPE)
 {
   assert(cIdx == _entryTable[eIdx]->chareIdx);
   envelope *env = UsrToEnv(msg);
+#ifndef CMK_OPTIMIZE
   if(env->isUsed()) {
     CmiAbort("Message being re-sent. Aborting...\n");
   }
+#endif
   if(pCid == 0) {
     env->setMsgtype(NewChareMsg);
   } else {
@@ -366,11 +410,15 @@ void CkCreateChare(int cIdx, int eIdx, void *msg, CkChareID *pCid, int destPE)
   env->setEpIdx(eIdx);
   env->setSrcPe(CkMyPe());
   CmiSetHandler(env, _charmHandlerIdx);
+#ifndef CMK_OPTIMIZE
   if(CpvAccess(traceOn))
     CpvAccess(_trace)->creation(env);
+#endif
   CpvAccess(_qd)->create();
+#ifndef CMK_OPTIMIZE
   CpvAccess(_myStats)->recordCreateChare();
   env->setUsed(1);
+#endif
   CldEnqueue(destPE, env, _infoIdx);
 }
 
@@ -383,11 +431,15 @@ void _createGroupMember(int groupID, int eIdx, void *msg)
   CpvAccess(_currentChare) = obj;
   register int prevGrp = CpvAccess(_currentGroup);
   CpvAccess(_currentGroup) = groupID;
+#ifndef CMK_OPTIMIZE
   UsrToEnv(msg)->setUsed(0);
+#endif
   _entryTable[eIdx]->call(msg, obj);
   CpvAccess(_currentChare) = prev;
   CpvAccess(_currentGroup) = prevGrp;
+#ifndef CMK_OPTIMIZE
   CpvAccess(_myStats)->recordProcessGroup();
+#endif
 }
 
 void _createNodeGroupMember(int groupID, int eIdx, void *msg)
@@ -401,19 +453,25 @@ void _createNodeGroupMember(int groupID, int eIdx, void *msg)
   CpvAccess(_currentChare) = obj;
   register int prevGrp = CpvAccess(_currentNodeGroup);
   CpvAccess(_currentNodeGroup) = groupID;
+#ifndef CMK_OPTIMIZE
   UsrToEnv(msg)->setUsed(0);
+#endif
   _entryTable[eIdx]->call(msg, obj);
   CpvAccess(_currentChare) = prev;
   CpvAccess(_currentNodeGroup) = prevGrp;
+#ifndef CMK_OPTIMIZE
   CpvAccess(_myStats)->recordProcessNodeGroup();
+#endif
 }
 
 void _createGroup(int groupID, envelope *env, int retEp, CkChareID *retChare)
 {
+#ifndef CMK_OPTIMIZE
   if(env->isUsed()) {
     CmiAbort("Message being re-sent. Aborting...\n");
   }
   env->setUsed(1);
+#endif
   register int epIdx = env->getEpIdx();
   register int msgIdx = env->getMsgIdx();
   env->setGroupNum(groupID);
@@ -421,8 +479,16 @@ void _createGroup(int groupID, envelope *env, int retEp, CkChareID *retChare)
   register void *msg =  EnvToUsr(env);
   if(CkNumPes()>1) {
     if(!env->isPacked() && _msgTable[msgIdx]->pack) {
+#ifndef CMK_OPTIMIZE
+      if(CpvAccess(traceOn))
+        CpvAccess(_trace)->beginPack();
+#endif
       msg = _msgTable[msgIdx]->pack(msg);
       UsrToEnv(msg)->setPacked(1);
+#ifndef CMK_OPTIMIZE
+      if(CpvAccess(traceOn))
+        CpvAccess(_trace)->endPack();
+#endif
     }
     env = UsrToEnv(msg);
     CmiSetHandler(env, _bocHandlerIdx);
@@ -430,15 +496,21 @@ void _createGroup(int groupID, envelope *env, int retEp, CkChareID *retChare)
     CmiSyncBroadcast(env->getTotalsize(), env);
     CpvAccess(_qd)->create(CkNumPes()-1);
     if(env->isPacked() && _msgTable[msgIdx]->unpack) {
+#ifndef CMK_OPTIMIZE
       if(CpvAccess(traceOn))
         CpvAccess(_trace)->beginUnpack();
+#endif
       msg = _msgTable[msgIdx]->unpack(msg);
+      UsrToEnv(msg)->setPacked(0);
+#ifndef CMK_OPTIMIZE
       if(CpvAccess(traceOn))
         CpvAccess(_trace)->endUnpack();
-      UsrToEnv(msg)->setPacked(0);
+#endif
     }
   }
+#ifndef CMK_OPTIMIZE
   CpvAccess(_myStats)->recordCreateGroup();
+#endif
   _createGroupMember(groupID, epIdx, msg);
   if(retChare) {
     msg = CkAllocMsg(0, sizeof(int), 0); // 0 is a system msg of size int
@@ -449,10 +521,12 @@ void _createGroup(int groupID, envelope *env, int retEp, CkChareID *retChare)
 
 void _createNodeGroup(int groupID, envelope *env, int retEp, CkChareID *retChare)
 {
+#ifndef CMK_OPTIMIZE
   if(env->isUsed()) {
     CmiAbort("Message being re-sent. Aborting...\n");
   }
   env->setUsed(1);
+#endif
   register int epIdx = env->getEpIdx();
   register int msgIdx = env->getMsgIdx();
   env->setGroupNum(groupID);
@@ -460,8 +534,16 @@ void _createNodeGroup(int groupID, envelope *env, int retEp, CkChareID *retChare
   register void *msg =  EnvToUsr(env);
   if(CkNumNodes()>1) {
     if(!env->isPacked() && _msgTable[msgIdx]->pack) {
+#ifndef CMK_OPTIMIZE
+      if(CpvAccess(traceOn))
+        CpvAccess(_trace)->beginPack();
+#endif
       msg = _msgTable[msgIdx]->pack(msg);
       UsrToEnv(msg)->setPacked(1);
+#ifndef CMK_OPTIMIZE
+      if(CpvAccess(traceOn))
+        CpvAccess(_trace)->endPack();
+#endif
     }
     env = UsrToEnv(msg);
     CmiSetHandler(env, _bocHandlerIdx);
@@ -470,15 +552,21 @@ void _createNodeGroup(int groupID, envelope *env, int retEp, CkChareID *retChare
     CmiSyncNodeBroadcast(env->getTotalsize(), env);
     CpvAccess(_qd)->create(CkNumNodes()-1);
     if(env->isPacked() && _msgTable[msgIdx]->unpack) {
+#ifndef CMK_OPTIMIZE
       if(CpvAccess(traceOn))
         CpvAccess(_trace)->beginUnpack();
+#endif
       msg = _msgTable[msgIdx]->unpack(msg);
+      UsrToEnv(msg)->setPacked(0);
+#ifndef CMK_OPTIMIZE
       if(CpvAccess(traceOn))
         CpvAccess(_trace)->endUnpack();
-      UsrToEnv(msg)->setPacked(0);
+#endif
     }
   }
+#ifndef CMK_OPTIMIZE
   CpvAccess(_myStats)->recordCreateNodeGroup();
+#endif
   _createNodeGroupMember(groupID, epIdx, msg);
   if(retChare) {
     msg = CkAllocMsg(0, sizeof(int), 0); // 0 is a system msg of size int
@@ -496,10 +584,12 @@ static int _staticGroupCreate(envelope *env, int retEp, CkChareID *retChare)
 
 static void _dynamicGroupCreate(envelope *env, int retEp, CkChareID * retChare)
 {
+#ifndef CMK_OPTIMIZE
   if(env->isUsed()) {
     CmiAbort("Message being re-sent. Aborting...\n");
   }
   env->setUsed(1);
+#endif
   register CkChareID *msg = 
     (CkChareID*) _allocMsg(DBocReqMsg, sizeof(CkChareID));
   *msg = *retChare;
@@ -523,10 +613,12 @@ static int _staticNodeGroupCreate(envelope *env, int retEp, CkChareID *retChare)
 
 static void _dynamicNodeGroupCreate(envelope *env, int retEp, CkChareID * retChare)
 {
+#ifndef CMK_OPTIMIZE
   if(env->isUsed()) {
     CmiAbort("Message being re-sent. Aborting...\n");
   }
   env->setUsed(1);
+#endif
   register CkChareID *msg = 
     (CkChareID*) _allocMsg(DNodeBocReqMsg, sizeof(CkChareID));
   *msg = *retChare;
@@ -547,8 +639,10 @@ int CkCreateGroup(int cIdx, int eIdx, void *msg, int retEp,CkChareID *retChare)
   env->setMsgtype(BocInitMsg);
   env->setEpIdx(eIdx);
   env->setSrcPe(CkMyPe());
+#ifndef CMK_OPTIMIZE
   if(CpvAccess(traceOn))
     CpvAccess(_trace)->creation(env, CkNumPes());
+#endif
   if(CkMyPe()==0) {
     return _staticGroupCreate(env, retEp, retChare);
   } else {
@@ -565,8 +659,10 @@ int CkCreateNodeGroup(int cIdx, int eIdx, void *msg, int retEp,CkChareID *retCha
   env->setMsgtype(NodeBocInitMsg);
   env->setEpIdx(eIdx);
   env->setSrcPe(CkMyPe());
+#ifndef CMK_OPTIMIZE
   if(CpvAccess(traceOn))
     CpvAccess(_trace)->creation(env, CkNumNodes());
+#endif
   if(CkMyNode()==0) {
     return _staticNodeGroupCreate(env, retEp, retChare);
   } else {
@@ -594,10 +690,12 @@ static inline void _sendMsgBranch(int eIdx, void *msg, int gID,
                            int pe=CLD_BROADCAST_ALL)
 {
   register envelope *env = UsrToEnv(msg);
+#ifndef CMK_OPTIMIZE
   if(env->isUsed()) {
     CmiAbort("Message being re-sent. Aborting...\n");
   }
   env->setUsed(1);
+#endif
   env->setMsgtype(ForBocMsg);
   env->setEpIdx(eIdx);
   env->setGroupNum(gID);
@@ -609,20 +707,24 @@ static inline void _sendMsgBranch(int eIdx, void *msg, int gID,
 extern "C"
 void CkSendMsgBranch(int eIdx, void *msg, int pe, int gID)
 {
+#ifndef CMK_OPTIMIZE
   if(CpvAccess(traceOn))
     CpvAccess(_trace)->creation(UsrToEnv(msg));
-  _sendMsgBranch(eIdx, msg, gID, pe);
   CpvAccess(_myStats)->recordSendBranch();
+#endif
+  _sendMsgBranch(eIdx, msg, gID, pe);
   CpvAccess(_qd)->create();
 }
 
 extern "C"
 void CkBroadcastMsgBranch(int eIdx, void *msg, int gID)
 {
+#ifndef CMK_OPTIMIZE
   if(CpvAccess(traceOn))
     CpvAccess(_trace)->creation(UsrToEnv(msg), CkNumPes());
-  _sendMsgBranch(eIdx, msg, gID);
   CpvAccess(_myStats)->recordSendBranch(CkNumPes());
+#endif
+  _sendMsgBranch(eIdx, msg, gID);
   CpvAccess(_qd)->create(CkNumPes());
 }
 
@@ -630,10 +732,12 @@ static inline void _sendMsgNodeBranch(int eIdx, void *msg, int gID,
                            int node=CLD_BROADCAST_ALL)
 {
   register envelope *env = UsrToEnv(msg);
+#ifndef CMK_OPTIMIZE
   if(env->isUsed()) {
     CmiAbort("Message being re-sent. Aborting...\n");
   }
   env->setUsed(1);
+#endif
   env->setMsgtype(ForNodeBocMsg);
   env->setEpIdx(eIdx);
   env->setGroupNum(gID);
@@ -645,19 +749,23 @@ static inline void _sendMsgNodeBranch(int eIdx, void *msg, int gID,
 extern "C"
 void CkSendMsgNodeBranch(int eIdx, void *msg, int node, int gID)
 {
+#ifndef CMK_OPTIMIZE
   if(CpvAccess(traceOn))
     CpvAccess(_trace)->creation(UsrToEnv(msg));
-  _sendMsgNodeBranch(eIdx, msg, gID, node);
   CpvAccess(_myStats)->recordSendNodeBranch();
+#endif
+  _sendMsgNodeBranch(eIdx, msg, gID, node);
   CpvAccess(_qd)->create();
 }
 
 extern "C"
 void CkBroadcastMsgNodeBranch(int eIdx, void *msg, int gID)
 {
+#ifndef CMK_OPTIMIZE
   if(CpvAccess(traceOn))
     CpvAccess(_trace)->creation(UsrToEnv(msg), CkNumNodes());
-  _sendMsgNodeBranch(eIdx, msg, gID);
   CpvAccess(_myStats)->recordSendNodeBranch(CkNumNodes());
+#endif
+  _sendMsgNodeBranch(eIdx, msg, gID);
   CpvAccess(_qd)->create(CkNumNodes());
 }
