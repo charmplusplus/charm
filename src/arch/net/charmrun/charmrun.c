@@ -179,6 +179,17 @@ char *pathfix(char *path, pathfixlist fixes)
   return strdup(buffer);
 }
 
+char *pathextfix(char *path, pathfixlist fixes, char *ext)
+{
+  char *newpath = pathfix(path, fixes);
+  char *ret;
+  if (ext == NULL) return newpath;
+  ret = (char *)malloc(strlen(newpath)+strlen(ext)+2);
+  strcpy(ret, newpath);
+  strcat(ret, ext);
+  return ret;
+}
+
 /****************************************************************************
  *
  * Miscellaneous minor routines.
@@ -825,7 +836,7 @@ void nodetab_reset(nodetab_host *h)
   h->name="SET_H->NAME";
   h->ip=_skt_invalid_ip;
   h->pathfixes = 0;
-  h->ext = "*";
+  h->ext = NULL;
   h->speed = 1.0;
   h->cpus = 1;
   h->rank = 0;
@@ -892,8 +903,9 @@ char *nodetab_args(char *args,nodetab_host *h)
       char *b3 = skipblanks(e2), *e3 = skipstuff(b3);
       args = skipblanks(e3);
       h->pathfixes=pathfix_append(substr(b2,e2),substr(b3,e3),h->pathfixes);
+      e2 = e3;       /* for the skipblanks at the end */
     } 
-    else if (subeqs(b1,e1,"ext")) h->ext = substr(b2,e2);
+    else if (subeqs(b1,e1,"ext"))  h->ext = substr(b2,e2);
     else return args;
     args = skipblanks(e2);
   }
@@ -1711,8 +1723,6 @@ void start_nodes_daemon(void)
   int i,nodeNumber;
 
   /*Set the parts of the task structure that will be the same for all nodes*/
-  /*FIXME: The program path needs to come from the nodelist file*/
-  strcpy(task.pgm,arg_nodeprog_a);
   /*Figure out the command line arguments (same for all PEs)*/
   argBuffer[0]=0;
   for (i=0;arg_argv[i];i++) 
@@ -1721,8 +1731,6 @@ void start_nodes_daemon(void)
     strcat(argBuffer,arg_argv[i]);
   }
   task.argLength=ChMessageInt_new(strlen(argBuffer));
-  /*FIXME: The run directory needs to come from nodelist file*/
-  strcpy(task.cwd,arg_currdir_a);
   
   task.magic=ChMessageInt_new(DAEMON_MAGIC);
 
@@ -1730,12 +1738,19 @@ void start_nodes_daemon(void)
   to PE 0 on each node.*/
   for (nodeNumber=0;nodeNumber<nodetab_rank0_size;nodeNumber++)
   {
+    char* arg_nodeprog_r, *arg_currdir_r;
     char statusCode='N';/*Default error code-- network problem*/
     int fd;
     int pe0=nodetab_rank0_table[nodeNumber];
     
+    arg_currdir_r = pathfix(arg_currdir_a, nodetab_pathfixes(nodeNumber));
+    strcpy(task.cwd,arg_currdir_r);
+
+    arg_nodeprog_r = pathextfix(arg_nodeprog_a, nodetab_pathfixes(nodeNumber), nodetab_ext(nodeNumber));
+    strcpy(task.pgm,arg_nodeprog_r);
+
 	if (arg_verbose)
-	  printf("Charmrun> Starting node program %d on '%s'.\n",nodeNumber,nodetab_name(pe0));
+	  printf("Charmrun> Starting node program %d on '%s' as %s.\n",nodeNumber,nodetab_name(pe0), arg_nodeprog_r);
 
     sprintf(task.env,"NETSTART=%s",create_netstart(nodeNumber));
 
@@ -1934,7 +1949,7 @@ void nodetab_init_for_scyld()
     exit (1);
   }
   if (arg_verbose)
-    printf("Charmrun> There are %d slave nodes available.\n", nodetab_rank0_size-1);
+    printf("Charmrun> There are %d slave nodes available.\n", nodetab_rank0_size-(arg_skipmaster?0:1));
 
   /* expand node table to arg_requested_pes */
   if (arg_requested_pes > npes) {
@@ -2150,10 +2165,14 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv)
   	"/usr/X11R6/bin:/usr/openwin/bin\"\n");
   
   /* find the node-program */
-  arg_nodeprog_r = pathfix(arg_nodeprog_a, nodetab_pathfixes(nodeno));
+  arg_nodeprog_r = pathextfix(arg_nodeprog_a, nodetab_pathfixes(nodeno), nodetab_ext(nodeno));
   
   /* find the current directory, relative version */
   arg_currdir_r = pathfix(arg_currdir_a, nodetab_pathfixes(nodeno));
+
+  if (arg_verbose) {
+    printf("Charmrun> find the node program \"%s\" at \"%s\" for %d.\n", arg_nodeprog_r, arg_currdir_r, nodeno);
+  }
 
   if (arg_debug || arg_debug_no_pause || arg_in_xterm) {
     rsh_Find(f,nodetab_xterm(nodeno),"F_XTERM");
