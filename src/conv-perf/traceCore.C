@@ -31,13 +31,14 @@ inline double TraceCoreTimer(double t) { return t - CpvAccess(_traceCoreInitTime
 TraceCore::TraceCore(char** argv)
 {
 	int binary = CmiGetArgFlag(argv,"+binary-trace");
-	traceLogger = new TraceLogger(CpvAccess(_traceCoreRoot), binary);
+	
 
 	if(CpvAccess(_traceCoreOn) == 0){
 		traceCoreOn=0;
 		return;
 	}
 	traceCoreOn=1;
+	traceLogger = new TraceLogger(CpvAccess(_traceCoreRoot), binary);
 	//CmiPrintf("[%d]In TraceCore Constructor\n",CmiMyPe());
 	startPtc();
 	REGISTER_CONVERSE
@@ -269,6 +270,7 @@ void TraceEntry::write(FILE* fp, int prevLID, int prevSeek, int nextLID, int nex
 TraceLogger::TraceLogger(char* program, int b):
 	numLangs(1), numEntries(0), lastWriteFlag(0), prevLID(0), prevSeek(0)
 {
+//  CkPrintf("TraceLogger created\n");
   binary = b;
 
   
@@ -276,7 +278,7 @@ TraceLogger::TraceLogger(char* program, int b):
   poolSize = CkpvAccess(CtrLogBufSize);
   pool = new TraceEntry[poolSize+5];
 //  CmiPrintf("CtrLogBufSize %d \n",CkpvAccess(CtrLogBufSize));
-  CmiPrintf("PoolSize = %d \n",poolSize);
+ // CmiPrintf("PoolSize = %d \n",poolSize);
   for (int lID=0;lID<MAX_NUM_LANGUAGES;lID++) {
     lName[lID]=NULL;
     fName[lID]=NULL;
