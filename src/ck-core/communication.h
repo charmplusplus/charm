@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.12  1995-09-07 05:25:48  gursoy
+ * Revision 2.13  1995-09-20 14:24:27  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.12  1995/09/07  05:25:48  gursoy
  * added new macros related with HANDLE_INIT_MSg handler
  *
  * Revision 2.11  1995/07/25  00:29:31  jyelon
@@ -151,6 +154,19 @@
             CldFillLdb(PE, LDB_ELEMENT_PTR(env)); \
             PACK(env); \
             CmiSetHandler(env,CsvAccess(HANDLE_INCOMING_MSG_Index)); \
+            CmiSyncSend(PE,CmiSize(env),env); \
+            CmiFree(env); \
+        }\
+    }
+
+#define CkCheck_and_Send_Init(PE, env)\
+    {\
+        if (PE==CmiMyPe())\
+            { ClrEnv_LdbFull(env); HANDLE_INIT_MSG(env); }\
+        else {\
+            ClrEnv_LdbFull(env);\
+            PACK(env); \
+            CmiSetHandler(env,CsvAccess(HANDLE_INIT_MSG_Index)); \
             CmiSyncSend(PE,CmiSize(env),env); \
             CmiFree(env); \
         }\

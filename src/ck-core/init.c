@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.20  1995-09-19 17:59:26  sanjeev
+ * Revision 2.21  1995-09-20 14:24:27  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.20  1995/09/19  17:59:26  sanjeev
  * removed defaultmainmoduleinit....
  *
  * Revision 2.19  1995/09/19  17:57:02  sanjeev
@@ -148,6 +151,8 @@ ENVELOPE *DeQueueBocInitMsgs() ;
 CpvStaticDeclare(int,   userArgc);
 CpvStaticDeclare(char**,  userArgv);
 
+CpvStaticDeclare(int, NumChildrenDoneWithStartCharm);
+CpvStaticDeclare(FUNCTION_PTR, UserStartCharmDoneHandler);
 
 /* all these counts are incremented in register.c */
 CpvExtern(int,      fnCount);
@@ -168,10 +173,12 @@ extern CHARE_BLOCK *CreateChareBlock();
 
 
 extern void HANDLE_INCOMING_MSG() ;
+extern void HANDLE_INIT_MSG();
 extern void CkProcess_ForChareMsg();
 extern void CkProcess_DynamicBocInitMsg();
 extern void CkProcess_NewChareMsg();
 extern void CkProcess_VidSendOverMsg();
+
 
 void initModuleInit()
 {
@@ -181,7 +188,10 @@ void initModuleInit()
     CpvInitialize(int, userArgc);
     CpvInitialize(char**, userArgv);
     CpvInitialize(ENVELOPE*, readvarmsg);
+    CpvInitialize(int, NumChildrenDoneWithStartCharm);
+    CpvInitialize(FUNCTION_PTR, UserStartCharmDoneHandler);
 
+    CpvAccess(NumChildrenDoneWithStartCharm) = 0;
     CpvAccess(BocInitQueueHead) = NULL;
     if (CmiMyRank() == 0) CsvAccess(ReadBuffSize) = 0;
 }
@@ -231,12 +241,71 @@ char **argv;
 }
 
 
-StartCharm(argv)
+static void EndInitPhase()
+{
+  int i;
+  void  *buffMsg;
+  ENVELOPE *bocMsg;
+
+  /* initialization phase is done, set the flag to 0 */
+  CpvAccess(CkInitPhase) = 0;
+  
+  if (CpvAccess(UserStartCharmDoneHandler))
+    CpvAccess(UserStartCharmDoneHandler)();
+  
+  /* call all the CopyFromBuffer functions for ReadOnly variables.
+   * _CK_9_ReadMsgTable is passed as an arg because it is no longer
+   * global */
+  
+  if (CmiMyPe() != 0) {
+    if (CmiMyRank() == 0) {
+      for (i = 0; i < CsvAccess(sharedReadCount); i++)
+	(CsvAccess(ROCopyFromBufferTable)[i]) (CsvAccess(_CK_9_ReadMsgTable));
+    }
+    CmiFree(CpvAccess(readvarmsg));
+  
+    while ( (bocMsg=DeQueueBocInitMsgs()) != NULL )
+      ProcessBocInitMsg(bocMsg);
+  }
+  
+  
+  /* process all the non-init messages arrived during the 
+     initialization */
+  while ( !FIFO_Empty(CpvAccess(CkBuffQueue))  ) {
+    FIFO_DeQueue(CpvAccess(CkBuffQueue), &buffMsg); 
+    HANDLE_INCOMING_MSG(buffMsg); 
+  }
+}
+
+
+static void PropagateInitBarrier()
+{
+  if (CpvAccess(CkCountArrived) && CpvAccess(CkInitCount)==0
+      && CpvAccess(NumChildrenDoneWithStartCharm)==
+      CmiNumSpanTreeChildren(CmiMyPe())) {
+    int parent = CmiSpanTreeParent(CmiMyPe());
+    void *msg = (void *)CkAllocMsg(0);
+    ENVELOPE *henv = ENVELOPE_UPTR(msg);
+    if (parent == -1) {
+      SetEnv_msgType(henv, InitBarrierPhase2);
+      CkCheck_and_BcastInitNL(henv);
+      EndInitPhase();
+    } else {
+      SetEnv_msgType(henv, InitBarrierPhase1);
+      CkCheck_and_Send_Init(parent, henv);
+    }
+  }
+}
+
+
+StartCharm(argv, donehandler)
 char **argv;
+FUNCTION_PTR donehandler;
 {
 	int             i;
 	char           *ReadBufMsg;
 
+        CpvAccess(UserStartCharmDoneHandler) = donehandler;
         CpvAccess(userArgc) = ParseCommandOptions(CountArgs(argv), argv);
         CpvAccess(userArgv) = argv;
 
@@ -262,9 +331,7 @@ char **argv;
 
 	if (CmiMyPe() == 0)
 	{
-
-                /* processor 0 does not have a initialization phase */
-                CpvAccess(CkInitPhase) = 0;
+	        CpvAccess(CkCountArrived)=1;
 
 		CpvAccess(MsgCount) = 0; 
                                  /* count # of messages being sent to each
@@ -334,25 +401,20 @@ char **argv;
 		 * bocs
 		 */
 		BroadcastCount();
+		
+		PropagateInitBarrier();
 	}
 	else
 	{
-                /* for other nodes we are gonna create some buffering
-                   queues. No message must be received by the handlers
-                   before this point */
-               
-
                 /* create the boc init message queue */
                 CpvAccess(BocInitQueueHead) = (BOCINIT_QUEUE *) BocInitQueueCreate();
-
-                /* for other processors, create the queue for non-init
-                   messages arrived during initialization */
-                CpvAccess(CkBuffQueue) = (void *) FIFO_Create();	
 	}
 
-	SysPeriodicCheckInit();
+       /* create the queue for non-init messages arrived
+          during initialization */
+        CpvAccess(CkBuffQueue) = (void *) FIFO_Create();
 
-	/* Loop(); 	- Narain 11/16 */
+	SysPeriodicCheckInit();
 }
 
 
@@ -367,91 +429,68 @@ char **argv;
 void HANDLE_INIT_MSG(env)
 ENVELOPE *env;
 {
-    int          i;
-    int          id;
-    int          type;
-    void         *usrMsg;
-    void         *buffMsg;
-    ENVELOPE     *bocMsg;
-
-
-    if ((GetEnv_msgType(env) == BocInitMsg) ||
-          (GetEnv_msgType(env) == ReadMsgMsg))
-        UNPACK(env);
-    usrMsg = USER_MSG_PTR(env);
-    /* Have a valid message now. */
-    type = GetEnv_msgType(env);
-
-    switch (type)
+  int          i;
+  int          id;
+  int          type;
+  void         *usrMsg;
+  
+  
+  if ((GetEnv_msgType(env) == BocInitMsg) ||
+      (GetEnv_msgType(env) == ReadMsgMsg))
+    UNPACK(env);
+  usrMsg = USER_MSG_PTR(env);
+  /* Have a valid message now. */
+  type = GetEnv_msgType(env);
+  
+  switch (type)
     {
-        case BocInitMsg:
-              EnQueueBocInitMsgs(env);
-              CpvAccess(CkInitCount)++;
-              break;
- 
-        case InitCountMsg:
-              CpvAccess(CkCountArrived) = 1;
-              CpvAccess(CkInitCount) -= GetEnv_count(env);
-              CmiFree(env);
-              break;
-
-        case ReadMsgMsg:
-              id = GetEnv_other_id(env);
-              CsvAccess(_CK_9_ReadMsgTable)[id] = (void *) usrMsg;
-              CpvAccess(CkInitCount)++; 
-              break;
-
-        case ReadVarMsg:
-              CpvAccess(ReadFromBuffer) = usrMsg;
-              CpvAccess(CkInitCount)++; 
-         
-              /* get the information about the main chare */
-              CpvAccess(mainChareBlock) = (struct chare_block *)
-                                          GetEnv_chareBlockPtr(env);
-              CpvAccess(mainChare_magic_number) =
-                                          GetEnv_chare_magic_number(env);
-              if (CsvAccess(MainChareLanguage) == CHARMPLUSPLUS)
-                  CPlus_SetMainChareID();
-              CpvAccess(readvarmsg) = env;
-              break;
-
-        default:
-              CmiPrintf("** ERROR ** Unknown message type in initialization phase%d\n",type);
-    
-    } 
-
-    if ( CpvAccess(CkCountArrived) && CpvAccess(CkInitCount)==0 )
-    {
-         /* initialization phase is done, set the flag to 0 */
-         CpvAccess(CkInitPhase) = 0;
-
-         /* call all the CopyFromBuffer functions for ReadOnly variables.
-          * _CK_9_ReadMsgTable is passed as an arg because it is no longer
-          * global */
-
-         if (CmiMyRank() == 0) {
-            for (i = 0; i < CsvAccess(sharedReadCount); i++)
-                (CsvAccess(ROCopyFromBufferTable)[i]) (CsvAccess(_CK_9_ReadMsgTable));
-         }
-         CmiFree(CpvAccess(readvarmsg));
-
-
-         while ( (bocMsg=DeQueueBocInitMsgs()) != NULL )
-               ProcessBocInitMsg(bocMsg);
-
-
-         /* process all the non-init messages arrived during the 
-            initialization */
-         while ( !FIFO_Empty(CpvAccess(CkBuffQueue))  )
-         {
-               FIFO_DeQueue(CpvAccess(CkBuffQueue), &buffMsg); 
-               HANDLE_INCOMING_MSG(buffMsg); 
-         }
+    case BocInitMsg:
+      EnQueueBocInitMsgs(env);
+      CpvAccess(CkInitCount)++;
+      break;
+      
+    case InitCountMsg:
+      CpvAccess(CkCountArrived) = 1;
+      CpvAccess(CkInitCount) -= GetEnv_count(env);
+      CmiFree(env);
+      break;
+      
+    case ReadMsgMsg:
+      id = GetEnv_other_id(env);
+      CsvAccess(_CK_9_ReadMsgTable)[id] = (void *) usrMsg;
+      CpvAccess(CkInitCount)++; 
+      break;
+      
+    case ReadVarMsg:
+      CpvAccess(ReadFromBuffer) = usrMsg;
+      CpvAccess(CkInitCount)++; 
+      
+      /* get the information about the main chare */
+      CpvAccess(mainChareBlock) = (struct chare_block *)
+	GetEnv_chareBlockPtr(env);
+      CpvAccess(mainChare_magic_number) =
+	GetEnv_chare_magic_number(env);
+      if (CsvAccess(MainChareLanguage) == CHARMPLUSPLUS)
+	CPlus_SetMainChareID();
+      CpvAccess(readvarmsg) = env;
+      break;
+      
+    case InitBarrierPhase1:
+      CpvAccess(NumChildrenDoneWithStartCharm)++;
+      CmiFree(env);
+      break;
+      
+    case InitBarrierPhase2:
+      EndInitPhase();
+      CmiFree(env);
+      break;
+      
+    default:
+      CmiPrintf("** ERROR ** Unknown message type in initialization phase%d\n",type);
+      
     }
-
+  PropagateInitBarrier();
 }
-
-
 
 
 

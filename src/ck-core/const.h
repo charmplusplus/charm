@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.10  1995-09-01 02:13:17  jyelon
+ * Revision 2.11  1995-09-20 14:24:27  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.10  1995/09/01  02:13:17  jyelon
  * VID_BLOCK, CHARE_BLOCK, BOC_BLOCK consolidated.
  *
  * Revision 2.9  1995/07/27  20:29:34  jyelon
@@ -136,6 +139,7 @@
 #define QdBroadcastBocMsg	15
 #define ImmBocMsg               16
 #define ImmBroadcastBocMsg      17
-
+#define InitBarrierPhase1       18
+#define InitBarrierPhase2       19
 
 #endif
