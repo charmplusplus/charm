@@ -58,6 +58,8 @@ public:
   void migrate(int where);
   void finishMigration(void);
   void exit(ArrayElementExitMessage *msg);
+  int getIndex(void) { return thisIndex; }
+  int getSize(void)  { return numElements; }
 
 protected:
   virtual int packsize(void);

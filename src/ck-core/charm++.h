@@ -99,6 +99,13 @@ class CkQdMsg {
     void operator delete(void* ptr) { CkFreeMsg(ptr); }
 };
 
+class CkThrCallArg {
+  public:
+    void *msg;
+    void *obj;
+    CkThrCallArg(void *m, void *o) : msg(m), obj(o) {}
+};
+
 #include "ckstream.h"
 #include "CkFutures.decl.h"
 #include "CkArray.decl.h"
