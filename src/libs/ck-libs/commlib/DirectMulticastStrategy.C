@@ -226,6 +226,7 @@ void DirectMulticastStrategy::handleMulticastMessage(void *msg){
     }
 }
 
+#include "register.h"
 void DirectMulticastStrategy::localMulticast(CkVec<CkArrayIndexMax>*vec, 
                                                  envelope *env){
     
@@ -238,29 +239,20 @@ void DirectMulticastStrategy::localMulticast(CkVec<CkArrayIndexMax>*vec,
         return;
     }
     
-    void *newmsg;
-    envelope *newenv;
-    for(int count = 0; count < nelements; count ++){
-
+    int ep = env->array_ep();
+    CkUnpackMessage(&env);
+    for(int count = 0; count < nelements; count ++){        
         CkArrayIndexMax idx = (*vec)[count];
         
-        ComlibPrintf("[%d] Sending multicast message to ", CkMyPe());
+        ComlibPrintf("[%d] Sending multicast message to ", CkMyPe());        
         if(comm_debug) idx.print();     
         
-        if(count < nelements - 1) {
-            newmsg = CkCopyMsg(&msg); 
-            newenv = UsrToEnv(newmsg);
-        }
-        else {
-            newmsg = msg;
-            newenv = env;
-        }
-        
-        newenv->setUsed(0);        
-        //CkUnpackMessage(&newenv);
         CProxyElement_ArrayBase ap(destArrayID, idx);
-        ap.ckSend((CkArrayMessage *)newmsg, newenv->array_ep());
+        ArrayElement *elem = ap.ckLocal();
+        CkDeliverMessageReadonly(ep, msg, elem);        
     }
+    
+    CmiFree(env);
 }
 
 void DirectMulticastStrategy::initSectionID(CkSectionID *sid){
