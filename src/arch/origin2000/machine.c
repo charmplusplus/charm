@@ -157,7 +157,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     wait(0);
 }
 
-static void neighbour_init(int);
+/* static void neighbour_init(int); */
 
 void CmiTimerInit(void);
 
@@ -179,7 +179,7 @@ static void threadInit(void *arg)
   CthInit(usrparam->argv);
   CpvAccess(CmiLocalQueue) = (void *) FIFO_Create();
   CmiTimerInit();
-  neighbour_init(Cmi_mype);
+  /*  neighbour_init(Cmi_mype); */
   usadd(arena);
   ConverseCommonInit(usrparam->argv);
   if (usrparam->initret==0) {

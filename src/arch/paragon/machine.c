@@ -266,7 +266,7 @@ int usched, initret;
   CpvInitialize(void*, CmiLocalQueue);
   Cmi_mype = mynode();
   Cmi_numpes = numnodes();
-  neighbour_init(Cmi_mype);
+  /*  neighbour_init(Cmi_mype); */
   CpvAccess(CmiLocalQueue)= (void *) FIFO_Create();
   /*  CmiTimerInit(); */
   CthInit(argv);
