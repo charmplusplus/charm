@@ -27,7 +27,7 @@ double sparseSum[2];
 extern "C" void
 pupMyGlobals(pup_er p,void *ignored) 
 {
-	CkPrintf("pupMyGlobals on PE %d\n",CkMyPe());
+	// CkPrintf("pupMyGlobals on PE %d\n",CkMyPe());
 	pup_int(p,&tsteps);
 	if (reduceValues==NULL)
 		reduceValues=new double[tsteps];
@@ -166,6 +166,22 @@ init(void)
      FEM_Add_ghost_elem(0,4,quad2edge);
 */
     }
+    /* add a ghost stencil */
+    int *ends=new int[nelems];
+    int *adj=new int[dim];
+    int magicElt=nelems-2;
+    int curEnd=0;
+    for (int e=0;e<nelems;e++) {
+    	if (e==magicElt) 
+	{ /* Make this element have the whole first row as ghosts */
+		for (int i=0;i<dim;i++)
+			adj[curEnd++]=i;
+	}
+	ends[e]=curEnd;
+    }
+    FEM_Add_ghost_stencil(nelems,1,ends,adj);
+    delete []ends;
+    delete []adj;
   }
   delete[] conn;
   delete[] nodes;
@@ -253,9 +269,8 @@ driver(void)
   int nnodes,nelems,nnodeData,nelemData,np;
   int ngnodes, ngelems; //Counts including ghosts
 
-  FEM_Print("Starting driver...");
+ // FEM_Print("Starting driver...");
   FEM_Mesh_pup(FEM_Mesh_default_read(),0,pupMyGlobals,NULL);
-  printargs();
   FEM_Get_node(&nnodes,&nnodeData);
   double *nodeData=new double[nnodeData*nnodes];
   FEM_Get_node_data(nodeData);  
@@ -346,7 +361,7 @@ driver(void)
       
       IDXL_t sumComm=IDXL_Create();
       IDXL_Combine(sumComm,elComm, 0, nelems); //Shift ghosts down to nelems..ngelems
-      if (myId==0) IDXL_Print(sumComm);
+      // if (myId==0) IDXL_Print(sumComm);
       IDXL_Comm_sendrecv(0,sumComm, efid, elements);
       IDXL_Destroy(sumComm);
     }
@@ -483,13 +498,13 @@ extern "C" void
 mesh_updated(int param)
 {
   int nnodes,nelems,i,nodePer,dataPer;
-  CkPrintf("mesh_updated(%d) called.\n",param);
+  // CkPrintf("mesh_updated(%d) called.\n",param);
   testEqual(param,123,"mesh_updated param");
 
   tryPrint(FEM_Mesh_default_read());
   
   FEM_Get_node(&nnodes,&dataPer);
-  CkPrintf("Getting %d nodes (%d data per)\n",nnodes,dataPer);
+  // CkPrintf("Getting %d nodes (%d data per)\n",nnodes,dataPer);
   double *ndata=new double[nnodes*dataPer];
   FEM_Get_node_data(ndata);
   for (i=0;i<nnodes;i++) {
@@ -498,7 +513,7 @@ mesh_updated(int param)
   delete[] ndata;
   
   FEM_Get_elem(0,&nelems,&dataPer,&nodePer);
-  CkPrintf("Getting %d elems (%d data per)\n",nelems,dataPer);
+  // CkPrintf("Getting %d elems (%d data per)\n",nelems,dataPer);
   double *ldata=new double[nelems*dataPer];
   FEM_Get_elem_data(0,ldata);
   for (i=0;i<nelems;i++) {
