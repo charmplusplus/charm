@@ -12,7 +12,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 1.11  1999-07-27 21:04:39  jmwrght1
+# Revision 1.12  2000-06-22 14:31:02  milind
+# Made compatible with pdflatex as well.
+#
+# Revision 1.11  1999/07/27 21:04:39  jmwrght1
 # Filled in some of the CCS functions.  Changed Makefile and manual.tex to
 # generate the index.
 #
@@ -72,21 +75,27 @@ html:
 	latex manual.tex
 	latex2html manual.tex
 
+pdf:
+	latex manual.tex
+	latex manual.tex
+	makeindex -o index.tex manual.idx
+	pdflatex manual.tex
+
 install:
 	rm -f /expand1/groupMosaic/distrib/converse.manual.ps.gz
 	cp manual.ps /expand1/groupMosaic/distrib/converse.manual.ps
 	gzip /expand1/groupMosaic/distrib/converse.manual.ps
 	chmod 664 /expand1/groupMosaic/distrib/converse.manual.ps.gz
+	rm -f /expand1/groupMosaic/distrib/converse.manual.pdf
+	cp manual.pdf /expand1/groupMosaic/distrib/converse.manual.pdf
+	chmod 664 /expand1/groupMosaic/distrib/converse.manual.pdf
 	rm -f /expand1/groupMosaic/html-manuals/converse.manual/*
 	cp manual/* /expand1/groupMosaic/html-manuals/converse.manual/
 	chmod 664 /expand1/groupMosaic/html-manuals/converse.manual/*
 
-all: ps html install
-
-co:
-	co Makefile $(TEXFILES)
+all: ps html pdf install
 
 clean:	
-	rm -f *.aux *.log *.dvi *.ps *.idx *.toc *~ index.tex
+	rm -f *.ilg *.aux *.log *.dvi *.ps *.idx *.toc *~ index.tex *.pdf
 	rm -rf manual
 
