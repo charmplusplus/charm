@@ -433,7 +433,7 @@ foreach FILE ($FILES)
       if ($?VERBOSE) echo "$CMK_CXXPP $OPTS_CPP -I$CHARMINC $TMP.P.C > $TMP.cpp"
       $CMK_CXXPP $OPTS_CPP -I$CHARMINC $TMP.P.C > $TMP.cpp
       if ($?VERBOSE) echo "$CHARMBIN/charmfilter++ $TMP.cpp | $CMK_M4 > $TMP.space"
-      $CHARMBIN/charmfilter++ $TMP.cpp | $CMK_M4 > $TMP.space
+      $CHARMBIN/charmfilter++ $MACHTYPE $TMP.cpp | $CMK_M4 > $TMP.space
       if ($?VERBOSE) echo "$CHARMBIN/charmxlat++ $TMP.space $TMP.C"
       $CHARMBIN/charmxlat++ $TMP.space $TMP.C
       if ($status) goto failure
