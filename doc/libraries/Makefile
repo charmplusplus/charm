@@ -2,7 +2,7 @@
 FILE=manual
 TEX=$(FILE).tex barrier.tex ddt.tex intro.tex irecv.tex liveviz.tex tempo.tex
 
-DEST=charm++
+DEST=libraries
 LATEX2HTML=$(L2H) -split 5
 
 include ../Makefile.common

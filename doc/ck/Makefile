@@ -2,7 +2,7 @@
 FILE=manual
 TEX=$(FILE).tex ack.tex
 
-DEST=charm++
+DEST=ck
 LATEX2HTML=$(L2H) -split 5
 
 include ../Makefile.common
