@@ -1777,6 +1777,8 @@ struct rwtable rwtable[] = {
   "stacksize",	STACKSIZE,
   "threaded",	THREADED,
   "migratable",	MIGRATABLE,
+  "PUPable",	PUPABLE,
+  "pupable",	PUPABLE,
   "createhere",	CREATEHERE,
   "createhome",	CREATEHOME,
   "template",	TEMPLATE,

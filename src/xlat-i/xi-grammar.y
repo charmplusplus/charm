@@ -38,6 +38,7 @@ ModuleList *modlist;
   ValueList *vallist;
   MsgVar *mv;
   MsgVarList *mvlist;
+  PUPableClass *pupable;
   char *strval;
   int intval;
   Chare::attrib_t cattr;
@@ -48,6 +49,7 @@ ModuleList *modlist;
 %token EXTERN
 %token READONLY
 %token INITCALL
+%token PUPABLE
 %token <intval> CHARE MAINCHARE GROUP NODEGROUP ARRAY
 %token MESSAGE
 %token CLASS
@@ -89,6 +91,7 @@ ModuleList *modlist;
 %type <typelist>	BaseList OptBaseList
 %type <mbrlist>		MemberEList MemberList
 %type <member>		Member NonEntryMember InitCall
+%type <pupable>		PUPableClass
 %type <tvar>		TVar
 %type <tvarlist>	TVarList TemplateSpec
 %type <val>		ArrayDim Dim DefaultParameter
@@ -294,12 +297,6 @@ OptVoid		: /*Empty*/
 		{ $$ = 0;}
 		;
 
-InitCall	: INITCALL OptVoid QualName
-		{ $$ = new InitCall(lineno, $3); }
-		| INITCALL OptVoid QualName '(' OptVoid ')'
-		{ $$ = new InitCall(lineno, $3); }
-		;
-
 MAttribs	: /* Empty */
 		{ $$ = 0; }
 		| '[' MAttribList ']'
@@ -482,6 +479,20 @@ NonEntryMember  : Readonly ';'
 		{ $$ = $1; }
 		| InitCall ';'
 		{ $$ = $1; }
+		| PUPABLE PUPableClass ';'
+		{ $$ = $2; }
+		;
+
+InitCall	: INITCALL OptVoid QualName
+		{ $$ = new InitCall(lineno, $3); }
+		| INITCALL OptVoid QualName '(' OptVoid ')'
+		{ $$ = new InitCall(lineno, $3); }
+		;
+
+PUPableClass    : QualName
+		{ $$ = new PUPableClass(lineno,$1,0); } 
+		| QualName ',' PUPableClass
+		{ $$ = new PUPableClass(lineno,$1,$3); }
 		;
 
 Member		: Entry ';'

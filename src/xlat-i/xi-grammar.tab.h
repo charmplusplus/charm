@@ -25,6 +25,7 @@ typedef union {
   ValueList *vallist;
   MsgVar *mv;
   MsgVarList *mvlist;
+  PUPableClass *pupable;
   char *strval;
   int intval;
   Chare::attrib_t cattr;
@@ -34,39 +35,40 @@ typedef union {
 #define	EXTERN	259
 #define	READONLY	260
 #define	INITCALL	261
-#define	CHARE	262
-#define	MAINCHARE	263
-#define	GROUP	264
-#define	NODEGROUP	265
-#define	ARRAY	266
-#define	MESSAGE	267
-#define	CLASS	268
-#define	STACKSIZE	269
-#define	THREADED	270
-#define	TEMPLATE	271
-#define	SYNC	272
-#define	EXCLUSIVE	273
-#define	IMMEDIATE	274
-#define	VIRTUAL	275
-#define	MIGRATABLE	276
-#define	CREATEHERE	277
-#define	CREATEHOME	278
-#define	VOID	279
-#define	CONST	280
-#define	PACKED	281
-#define	VARSIZE	282
-#define	ENTRY	283
-#define	IDENT	284
-#define	NUMBER	285
-#define	LITERAL	286
-#define	CPROGRAM	287
-#define	INT	288
-#define	LONG	289
-#define	SHORT	290
-#define	CHAR	291
-#define	FLOAT	292
-#define	DOUBLE	293
-#define	UNSIGNED	294
+#define	PUPABLE	262
+#define	CHARE	263
+#define	MAINCHARE	264
+#define	GROUP	265
+#define	NODEGROUP	266
+#define	ARRAY	267
+#define	MESSAGE	268
+#define	CLASS	269
+#define	STACKSIZE	270
+#define	THREADED	271
+#define	TEMPLATE	272
+#define	SYNC	273
+#define	EXCLUSIVE	274
+#define	IMMEDIATE	275
+#define	VIRTUAL	276
+#define	MIGRATABLE	277
+#define	CREATEHERE	278
+#define	CREATEHOME	279
+#define	VOID	280
+#define	CONST	281
+#define	PACKED	282
+#define	VARSIZE	283
+#define	ENTRY	284
+#define	IDENT	285
+#define	NUMBER	286
+#define	LITERAL	287
+#define	CPROGRAM	288
+#define	INT	289
+#define	LONG	290
+#define	SHORT	291
+#define	CHAR	292
+#define	FLOAT	293
+#define	DOUBLE	294
+#define	UNSIGNED	295
 
 
 extern YYSTYPE yylval;

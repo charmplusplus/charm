@@ -2363,5 +2363,31 @@ void InitCall::genReg(XStr& str)
 	str<<name<<"();\n";
 }
 
+/***************** PUP::able support **************/
+PUPableClass::PUPableClass(int l, const char *n,PUPableClass *next_)
+	    : name(n), next(next_)
+{ 
+	line=l; setChare(0); 
+}
+void PUPableClass::print(XStr& str)
+{
+	str<<"  PUPable "<<name<<";\n";
+	if (next) next->print(str);
+}
+void PUPableClass::genDecls(XStr& str) {}
+void PUPableClass::genIndexDecls(XStr& str) {}
+void PUPableClass::genDefs(XStr& str) 
+{
+	str<<"  PUPable_def("<<name<<");\n";
+	if (next) next->genDefs(str);
+}
+void PUPableClass::genReg(XStr& str)
+{
+	str<<"      PUPable_reg("<<name<<");\n";
+	if (next) next->genReg(str);
+}
+
+
+
 /****************** Registration *****************/
 

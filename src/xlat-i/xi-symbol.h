@@ -744,9 +744,21 @@ class Readonly : public Member {
 };
 
 class InitCall : public Member {
-    const char *name;
+    const char *name; //Name of subroutine to call
 public:
     InitCall(int l, const char *n);
+    void print(XStr& str);
+    void genDecls(XStr& str);
+    void genIndexDecls(XStr& str);
+    void genDefs(XStr& str);
+    void genReg(XStr& str);
+};
+
+class PUPableClass : public Member {
+    const char *name; //Name of class that is PUP::able
+    PUPableClass *next; //Linked-list of PUPable classes
+public:
+    PUPableClass(int l, const char *name_, PUPableClass *next_);
     void print(XStr& str);
     void genDecls(XStr& str);
     void genIndexDecls(XStr& str);
