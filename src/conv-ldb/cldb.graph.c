@@ -108,7 +108,7 @@ void CldBalance()
   int avgload, i, j, overload, numToMove, numSent, infofn, packfn, *msgSizes;
   void **msgs;
 
-  int len, queueing, priobits; unsigned int *prioptr; CldField ldbfield;
+  int len, queueing, priobits; unsigned int *prioptr;
   CldInfoFn ifn;
   CldPackFn pfn;
 
@@ -266,13 +266,13 @@ void CldEnqueue(int pe, void *msg, int infofn, int packfn)
   if (pe == CLD_ANYWHERE)
     {
       ifn(msg, &len, &queueing, &priobits, &prioptr);
-      CmiSetInfo(infofn);
+      CmiSetInfo(msg,infofn);
       CldPutToken(msg);
     } 
   else if (pe == CmiMyPe())
     {
       ifn(msg, &len, &queueing, &priobits, &prioptr);
-      CmiSetInfo(infofn);
+      CmiSetInfo(msg,infofn);
       CsdEnqueueGeneral(msg, queueing, priobits, prioptr);
     }
   else
@@ -280,7 +280,7 @@ void CldEnqueue(int pe, void *msg, int infofn, int packfn)
       pfn(&msg);
       ifn(msg, &len, &queueing, &priobits, &prioptr);
       CldSwitchHandler(msg, CpvAccess(CldHandlerIndex));
-      CmiSetInfo(infofn);
+      CmiSetInfo(msg,infofn);
       if (pe==CLD_BROADCAST) 
 	CmiSyncBroadcastAndFree(len, msg);
       else if (pe==CLD_BROADCAST_ALL)

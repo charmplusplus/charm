@@ -55,23 +55,14 @@
  *
  */
 
-typedef struct CldField
-{
-  CLD_STANDARD_FIELD_STUFF
-  int infofn;
-}
-*CldField;
-
-int Cld_fieldsize = sizeof(struct CldField);
-
 void CldHandler(char *msg)
 {
-  int len, queueing, priobits; CldField ldbfield;
+  int len, queueing, priobits;
   unsigned int *prioptr; CldInfoFn ifn;
   CmiGrabBuffer((void **)&msg);
-  CldRestoreHandler(msg, &ldbfield);
-  ifn = (CldInfoFn)CmiHandlerToFunction(ldbfield->infofn);
-  ifn(msg, &len, &ldbfield, &queueing, &priobits, &prioptr);
+  CldRestoreHandler(msg);
+  ifn = (CldInfoFn)CmiHandlerToFunction(CmiGetInfo(msg));
+  ifn(msg, &len, &queueing, &priobits, &prioptr);
   CsdEnqueueGeneral(msg, queueing, priobits, prioptr);
 }
 
@@ -79,19 +70,19 @@ CpvDeclare(int, CldHandlerIndex);
 
 void CldEnqueue(int pe, void *msg, int infofn, int packfn)
 {
-  int len, queueing, priobits; unsigned int *prioptr; CldField ldbfield;
+  int len, queueing, priobits; unsigned int *prioptr;
   CldInfoFn ifn = (CldInfoFn)CmiHandlerToFunction(infofn);
   CldPackFn pfn = (CldPackFn)CmiHandlerToFunction(packfn);
   if (CmiGetHandler(msg) >= CpvAccess(CmiHandlerMax)) *((int*)0)=0;
   if (pe == CLD_ANYWHERE) pe = (((rand()+CmiMyPe())&0x7FFFFFFF)%CmiNumPes());
   if (pe == CmiMyPe()) {
-    ifn(msg, &len, &ldbfield, &queueing, &priobits, &prioptr);
+    ifn(msg, &len, &queueing, &priobits, &prioptr);
     CsdEnqueueGeneral(msg, queueing, priobits, prioptr);
   } else {
     pfn(&msg);
-    ifn(msg, &len, &ldbfield, &queueing, &priobits, &prioptr);
-    CldSwitchHandler(msg, ldbfield, CpvAccess(CldHandlerIndex));
-    ldbfield->infofn = infofn;
+    ifn(msg, &len, &queueing, &priobits, &prioptr);
+    CldSwitchHandler(msg, CpvAccess(CldHandlerIndex));
+    CmiSetInfo(msg,infofn);
     if (pe==CLD_BROADCAST) CmiSyncBroadcastAndFree(len, msg);
     else if (pe==CLD_BROADCAST_ALL) CmiSyncBroadcastAllAndFree(len, msg);
     else CmiSyncSendAndFree(pe, len, msg);
