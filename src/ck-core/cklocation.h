@@ -103,7 +103,7 @@ public:
   CkLocRec(CkLocMgr *mgr) :myLocMgr(mgr) { }
   virtual ~CkLocRec();
   inline CkLocMgr *getLocMgr(void) const {return myLocMgr;}
-  
+
   //Return the type of this ArrayRec:
   typedef enum {
     base=0,//Base class (invalid type)
@@ -427,6 +427,8 @@ private:
 	CkLocRec *elementRec(const CkArrayIndex &idx);
 	//Look up array element in hash table.  Return NULL if not there.
 	CkLocRec *elementNrec(const CkArrayIndex &idx);
+	//Remove this entry from the table (does not delete record)
+	void removeFromTable(const CkArrayIndex &idx);
 
 	void pupElementsFor(PUP::er &p,CkLocRec_local *rec);
 	CmiBool deliverUnknown(CkArrayMessage *msg);

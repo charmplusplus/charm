@@ -853,7 +853,7 @@ CkLocMgr::CkLocMgr(CkGroupID mapID_,CkGroupID lbdbID_,int numInitial)
 	firstFree=localLen=0;
 	duringMigration=CmiFalse;
 	nSprings=0;
-	CcdCallOnConditionKeepOnPE(CcdPERIODIC_1minute,staticSpringCleaning,(void *)this, CkMyPe());
+	CcdCallOnConditionKeepOnPE(CcdPERIODIC_100ms,staticSpringCleaning,(void *)this, CkMyPe());
 
 //Register with the map object
 	mapID=mapID_;
@@ -988,7 +988,9 @@ void CkLocMgr::reclaim(const CkArrayIndex &idx,int localIdx) {
 		delete m->elts.get(localIdx);
 		m->elts.empty(localIdx);
 	}
-	hash.remove(*(CkArrayIndexMax *)&idx);
+	
+	removeFromTable(idx);
+	
 	//Link local index into free list
 	freeList[localIdx]=firstFree;
 	firstFree=localIdx;
@@ -1001,12 +1003,27 @@ void CkLocMgr::reclaim(const CkArrayIndex &idx,int localIdx) {
 		insertRecN(new CkLocRec_dead(this),idx); */
 	}
 }
+
 void CkLocMgr::reclaimRemote(const CkArrayIndexMax &idx,int deletedOnPe) {
 	DEBC((AA"Our element %s died on PE %d\n"AB,idx2str(idx),deletedOnPe));
 	CkLocRec *rec=elementNrec(idx);
-	if (rec!=NULL)
-		if (rec->type()!=CkLocRec::local)
-			delete elementNrec(idx);
+	if (rec==NULL) return; //We never knew him
+	if (rec->type()==CkLocRec::local) return; //He's already been reborn
+	removeFromTable(idx);
+	delete rec;
+}
+void CkLocMgr::removeFromTable(const CkArrayIndex &idx) {
+#ifndef CMK_OPTIMIZE
+	//Make sure it's actually in the table before we delete it
+	if (NULL==elementNrec(idx))
+		CkAbort("CkLocMgr::removeFromTable called on invalid index!");
+#endif
+	hash.remove(*(CkArrayIndexMax *)&idx);
+#ifndef CMK_OPTIMIZE
+	//Make sure it's really gone
+	if (NULL!=elementNrec(idx))
+		CkAbort("CkLocMgr::removeFromTable called, but element still there!");
+#endif
 }
 
 /************************** LocMgr: MESSAGING *************************/
