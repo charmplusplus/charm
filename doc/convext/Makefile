@@ -14,7 +14,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 1.5  2000-02-24 07:06:29  milind
+# Revision 1.6  2000-06-22 14:39:33  milind
+# Made compatible with pdflatex as well.
+#
+# Revision 1.5  2000/02/24 07:06:29  milind
 # Added new Crn functionality descriptions. And added an index to the
 # manual.
 #
@@ -47,21 +50,27 @@ html:
 	latex manual.tex
 	latex2html -local_icons manual.tex
 
+pdf:
+	touch index.tex
+	latex manual.tex
+	makeindex -o index.tex manual.idx
+	pdflatex manual.tex
+
 install:
 	rm -f /expand1/groupMosaic/distrib/convext.manual.ps.gz
 	cp manual.ps /expand1/groupMosaic/distrib/convext.manual.ps
 	gzip /expand1/groupMosaic/distrib/convext.manual.ps
 	chmod 664 /expand1/groupMosaic/distrib/convext.manual.ps.gz
+	rm -f /expand1/groupMosaic/distrib/convext.manual.pdf
+	cp manual.pdf /expand1/groupMosaic/distrib/convext.manual.pdf
+	chmod 664 /expand1/groupMosaic/distrib/convext.manual.pdf
 	rm -f /expand1/groupMosaic/html-manuals/convext.manual/*
 	cp manual/* /expand1/groupMosaic/html-manuals/convext.manual/
 	chmod 664 /expand1/groupMosaic/html-manuals/convext.manual/*
 
-all: ps html install
-
-co:
-	co Makefile $(TEXFILES)
+all: ps html pdf install
 
 clean:	
-	rm -f *.aux *.log *.dvi *.ps *.idx *.toc *~ index.tex
+	rm -f *.ilg *.aux *.log *.dvi *.ps *.idx *.toc *~ index.tex *.pdf
 	rm -rf manual
 

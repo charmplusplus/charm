@@ -1,4 +1,18 @@
-\documentstyle[psfig,11pt,epsf]{report}
+\documentstyle[11pt]{report}
+
+\newif\ifpdf
+\ifx\pdfoutput\undefined
+  \pdffalse
+\else
+  \pdfoutput=1
+  \pdftrue
+\fi
+
+\ifpdf
+  \pdfcompresslevel=9
+\else
+\fi
+
 \setcounter{topnumber}{2}
 \def\topfraction{1}
 \setcounter{bottomnumber}{1}
