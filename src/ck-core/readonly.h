@@ -10,15 +10,25 @@
 
 extern int _mainDone;
 
-template <class dtype> class readonly
+class readonlybase {
+private:
+	//Don't use operator new
+	void *operator new(size_t sz) { return malloc(sz);}
+
+	//Don't use copy constructor, assign. operator, or destructor:
+	readonlybase(const readonlybase &);
+	readonlybase &operator=(const readonlybase &);
+public:
+	readonlybase() {}
+	~readonlybase()	{ }
+};
+
+
+template <class dtype> class readonly : public readonlybase
 {
   private:
     dtype data;
-    // operator new is private, because we dont want anyone to
-    // dynamically allocate readonly variables
-    // cannot return 0 in operator new
-    void *operator new(size_t sz) { return malloc(sz); }
-    
+
   public:
     readonly()
     {
@@ -38,16 +48,9 @@ template <class dtype> class readonly
       return *this;
     }
     operator dtype() { return data; }
-    ~readonly()
-    {
-      if(_mainDone==0) {
-        CkAbort("Destructor for readonly variable called.\n"
-                "Cannot have local readonly variables\n");
-      }
-    }
 };
 
-template <class dtype> class _roatom 
+template <class dtype> class _roatom : public readonlybase
 {
   private:
     dtype data;
@@ -62,14 +65,10 @@ template <class dtype> class _roatom
     operator dtype() { return data; }
 };
 
-template <class dtype, int len> class roarray 
+template <class dtype, int len> class roarray : public readonlybase 
 {
   private:
     _roatom<dtype> data[len];
-    // operator new is private, because we dont want anyone to
-    // dynamically allocate readonly variables
-    // cannot return 0 in operator new
-    void *operator new(size_t sz) { return malloc(sz); }
   public:
     roarray()
     {
@@ -86,23 +85,12 @@ template <class dtype, int len> class roarray
         CkAbort("Readonly array access bounds violation.\n");
       return data[idx]; 
     }
-    ~roarray()
-    {
-      if(_mainDone==0) {
-        CkAbort("Destructor for readonly variable called.\n"
-                "Cannot have local readonly variables\n");
-      }
-    }
 };
 
-template <class dtype> class romsg
+template <class dtype> class romsg : public readonlybase
 {
   private:
     dtype *msg;
-    // operator new is private, because we dont want anyone to
-    // dynamically allocate readonly variables
-    // cannot return 0 in operator new
-    void *operator new(size_t sz) { return malloc(sz); }
   public:
     romsg()
     {
@@ -124,13 +112,6 @@ template <class dtype> class romsg
     operator dtype*() { return msg; }
     dtype& operator*() { return *msg; }
     dtype* operator->() { return msg; }
-    ~romsg()
-    {
-      if(_mainDone==0) {
-        CkAbort("Destructor for readonly variable called.\n"
-                "Cannot have local readonly variables\n");
-      }
-    }
 };
 
 #endif
