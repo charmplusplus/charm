@@ -84,6 +84,8 @@ extern void CldModuleInit(char **);
 
 int cur_restart_phase = 1;      /* checkpointing/restarting phase counter */
 
+static int CsdLocalMax = CSD_LOCAL_MAX_DEFAULT;
+
 /*****************************************************************************
  *
  * Unix Stub Functions
@@ -1409,8 +1411,6 @@ void CthSchedInit()
 		 CthEnqueueSchedulingThread,
 		 CthSuspendSchedulingThread);
 }
-
-static int CsdLocalMax=CSD_LOCAL_MAX_DEFAULT;
 
 void CsdInit(argv)
   char **argv;
