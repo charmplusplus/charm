@@ -2,14 +2,13 @@
 
 {\sc Irecv} library provides asynchronous communication mode for chare array. The program breaks into two parts("split phase" structure): nonblocking send, receives and iwait, and callback functions. It provides a style that mpi programmers may find intuitive. 
 
-There are there functions in Irecv library.
+There are three functions in Irecv library.
 
 1. void send(void *buf, int size, int dest, int tag, int refno);
-"buf" is a message buffer containing the data to be sent; "size" is the total size of the message in byte; Like in MPI_send, the tag is a regular tag for matching message and dest in ;
-int refno: reference number, usually the iteration number.
+"buf" is a message buffer containing the data to be sent; "size" is the total size of the message in byte. 
+Like in MPI_send, the tag is used for matching message with dest. The integer "refno" is a reference number, usually the iteration number.
   
 
-2 void irecv(int tag, char *pointer, int size, int senderTag, int refno);
 2. void irecv(void *buf, int size, int source, int tag, int refno);
 irecv will register tags and pointer to the library, that it copy the matching message(with tags) into the location given by the "pointer".
 
