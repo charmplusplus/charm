@@ -225,9 +225,6 @@ libck-cplus-n.a: dummy.cplus.c $(CKHEADERS)
 libck-defmain.a: default-main.c $(CKHEADERS)
 	$(CHARMC) -cp ../lib/ -o $@ default-main.c
 
-libck-unimain.a: uni_user_main.c $(CKHEADERS)
-	$(CHARMC) -cp ../lib/ -o $@ uni_user_main.c
-
 ldbcfns.o: ldbcfns.c $(CKHEADERS)
 	$(CHARMC) -o ldbcfns.o ldbcfns.c
 
