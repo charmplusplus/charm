@@ -1705,12 +1705,12 @@ void CmiReleaseCommHandle(CmiCommHandle handle)
 }
 
 
+#if CMK_IMMEDIATE_MSG
 void CmiProbeImmediateMsg()
 {
-#if CMK_IMMEDIATE_MSG
   CommunicationServerThread(0);
-#endif
 }
+#endif
 
 /******************************************************************************
  *
