@@ -3,13 +3,13 @@ CHARMC=../../../bin/charmc $(OPTS)
 LIB = libirecv.a
 LIBOBJ = receiver.o
 
-HEADERS = ../../../include/receiver.decl.h ../../../include/receiver.def.h
+HEADERS = ../../../include/receiver.decl.h ../../../include/receiver.def.h \
+          ../../../include/receiver.h ../../../include/receiverf.h
 LIBDEST =  ../../../lib/libirecv.a
 
 all: $(LIBDEST) $(HEADERS)
-	echo 'Nothing to do here right now'
 
-../../../include/receiver.decl.h ../../../include/receiver.def.h: receiver.decl.h
+$(HEADERS): receiver.decl.h receiver.h receiverf.h
 	/bin/cp receiver.decl.h ../../../include/receiver.decl.h
 	/bin/cp receiver.def.h ../../../include/receiver.def.h
 	/bin/cp receiver.h ../../../include/receiver.h

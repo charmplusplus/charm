@@ -1,13 +1,9 @@
 module receiver {
 
-message [varsize] receiverMsg;
+  message [varsize] receiverMsg;
 
-array [1D] receiver
-{
-  entry receiver();
-  entry void generic(receiverMsg *);
-  entry [sync, threaded] void syncSend(receiverMsg *);
-  entry void ready2go(void);
-};
-
+  array [1D] receiver {
+    entry receiver(void);
+    entry void sendTo(receiverMsg *);
+  };
 };

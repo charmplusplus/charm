@@ -1,7 +1,3 @@
-#ifndef _RECEIVERF_H
-#define _RECEIVERF_H
-
-
   integer, parameter :: AMPI_DOUBLE_PRECISION=0
   integer, parameter :: AMPI_INTEGER=1
   integer, parameter :: AMPI_REAL=2
@@ -15,4 +11,3 @@
     DOUBLE PRECISION  FUNCTION IMPI_Wtime()
     END FUNCTION
   END INTERFACE
-#endif
