@@ -792,13 +792,6 @@ void nodetab_makehost(char *name,nodetab_host *h)
 
 char *nodetab_args(char *args,nodetab_host *h)
 {
-#if CMK_USE_GM
-  /*  host [hostname] [port] ...  */
-  char *b1, *e1;
-  b1 = skipblanks(args); e1 = skipstuff(b1);
-  h->dataport = atoi(b1);
-  args = e1;
-#endif
   while(*args != 0) {
     char *b1 = skipblanks(args), *e1 = skipstuff(b1);
     char *b2 = skipblanks(e1), *e2 = skipstuff(b2);
@@ -888,10 +881,17 @@ void nodetab_init()
 		char *b2 = skipblanks(e1), *e2 = skipstuff(b2);
 		char *b3 = skipblanks(e2);
 		if (subeqs(b1,e1,"host")) {
+#if CMK_USE_GM
+			/*  host [hostname] [port] ...  */
+                        char *b4 = b3;
+                        char *e4 = skipstuff(b3);
+                        b3 = skipblanks(e4);
+#endif
 			if (rightgroup) {
 				host=group;
 				nodetab_args(b3,&host);
 #if CMK_USE_GM
+				host.dataport = atoi(b4);
                                 if (host.dataport == 0) { fprintf(stderr, "Missing port number!\n"); exit(1); }
 #endif
 				for (host.rank=0; host.rank<host.cpus; host.rank++)
