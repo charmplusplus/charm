@@ -1,5 +1,5 @@
 CDIR=../../../..
-CHARMC=$(CDIR)/bin/charmc $(OPTS)
+CHARMC=$(CDIR)/bin/charmc  $(OPTS)
 
 HEADERS=liveViz.h liveViz.decl.h liveVizPoll.decl.h liveViz0.h colorScale.h
 HEADDEP=$(HEADERS) liveViz.def.h networkVar.h
