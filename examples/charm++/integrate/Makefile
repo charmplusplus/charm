@@ -8,3 +8,6 @@ pgm.o : pgm.C pgm.h pgm.ci
 
 clean:
 	rm -f pgm *.o conv-host *.decl.h *.def.h *~ charmrun
+
+test: pgm
+	./charmrun pgm +p4 100 5
