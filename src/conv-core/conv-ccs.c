@@ -646,7 +646,8 @@ static void CcsHandleRequest(CcsImplHeader *hdr,const char *reqData)
   char *cmsg;
   int reqLen=ChMessageInt(hdr->len);
 /*Look up handler's converse ID*/
-  void *hdlrPtr=CkHashtableGet(CpvAccess(ccsTab),(void *)&(hdr->handler));
+  char *handlerStr=hdr->handler;
+  void *hdlrPtr=CkHashtableGet(CpvAccess(ccsTab),(void *)&handlerStr);
   int hdlrID;
   if (hdlrPtr==NULL) {
     CmiPrintf("CCS: Unknown CCS handler name '%s' requested!\n",
