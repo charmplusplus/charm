@@ -78,7 +78,7 @@ trademarks or registered trademarks of Sun Microsystems, Inc.
 #include	<fcntl.h>
 
 #include	<unistd.h>		// POSIX standard types
-#include	<wait.h>		// POSIX definition of wait()
+#include	<sys/wait.h>		// POSIX definition of wait()
 
 #undef	MAX_ARGLIST
 #define	MAX_ARGLIST	128

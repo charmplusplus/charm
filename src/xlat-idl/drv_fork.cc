@@ -75,7 +75,7 @@ trademarks or registered trademarks of Sun Microsystems, Inc.
 #include	"drv_private.hh"
 
 #include	<unistd.h>		// POSIX standard types
-#include	<wait.h>		// POSIX definition of wait()
+#include	<sys/wait.h>		// POSIX definition of wait()
 
 /*
  * Fork off a process, wait for it to die
