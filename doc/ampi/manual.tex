@@ -237,14 +237,15 @@ END SUBROUTINE
 int myrank;
 double xyz[100];
 
-void main\{
-  int i,ierr;
-  ierr = MPI_Init();
-  ierr = MPI_Comm_rank(MPI_COMM_WORLD, myrank);
+void subA();
+int main(int argc, char** argv)\{
+  int i;
+  MPI_Init(&argc, &argv);
+  MPI_Comm_rank(MPI_COMM_WORLD, myrank);
   for(i=0;i<100;i++)
     xyz[i] = i + myrank;
   subA();
-  ierr = MPI_Finalize();
+  MPI_Finalize();
 \}
 
 void subA()\{
