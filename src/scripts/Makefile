@@ -112,6 +112,8 @@ CHARMC=../bin/charmc $(CHARMOPTS) $(OPTS)
 
 SEQCHARMC=../bin/charmc -seq $(CHARMOPTS)
 
+NATIVECHARMC=../bin/charmc -native $(CHARMOPTS)
+
 CHARMXI=../bin/charmc -intrinsic $(OPTS)
 
 DEPENDFILE = Make.depends
@@ -825,31 +827,31 @@ SDAGHEADERS= CToken.h EToken.h CParsedFile.h \
 charmxi: ../bin/charmxi
 
 ../bin/charmxi: $(CHARMXIOBJ) $(SDAGOBJ)
-	$(SEQCHARMC) -language c++ -cp ../bin/ -o charmxi $(CHARMXIOBJ) $(SDAGOBJ)
+	$(NATIVECHARMC) -language c++ -cp ../bin/ -o charmxi $(CHARMXIOBJ) $(SDAGOBJ)
 
 xi-main.o: xi-main.C $(XIHEADERS) $(SDAGHEADERS)
-	$(SEQCHARMC) xi-main.C
+	$(NATIVECHARMC) xi-main.C
 
 xi-symbol.o: xi-symbol.C $(XIHEADERS) $(SDAGHEADERS)
-	$(SEQCHARMC) xi-symbol.C
+	$(NATIVECHARMC) xi-symbol.C
 
 xi-util.o: xi-util.C $(XIHEADERS) $(SDAGHEADERS)
-	$(SEQCHARMC) xi-util.C
+	$(NATIVECHARMC) xi-util.C
 
 xi-grammar.tab.o: xi-grammar.tab.C $(XIHEADERS) $(SDAGHEADERS)
-	$(SEQCHARMC) xi-grammar.tab.C
+	$(NATIVECHARMC) xi-grammar.tab.C
 
 xi-scan.o: xi-scan.C $(XIHEADERS) $(SDAGHEADERS)
-	$(SEQCHARMC) -I. -DYY_NEVER_INTERACTIVE xi-scan.C
+	$(NATIVECHARMC) -I. -DYY_NEVER_INTERACTIVE xi-scan.C
 
 sdag-globals.o: sdag-globals.C $(XIHEADERS) $(SDAGHEADERS)
-	$(SEQCHARMC) -c sdag-globals.C
+	$(NATIVECHARMC) -c sdag-globals.C
 
 CSdagConstruct.o: CSdagConstruct.C $(XIHEADERS) $(SDAGHEADERS)
-	$(SEQCHARMC) -c CSdagConstruct.C
+	$(NATIVECHARMC) -c CSdagConstruct.C
 
 CEntry.o: CEntry.C $(XIHEADERS) $(SDAGHEADERS)
-	$(SEQCHARMC) -c CEntry.C
+	$(NATIVECHARMC) -c CEntry.C
 
 ###############################################################################
 #

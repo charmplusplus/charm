@@ -20,6 +20,7 @@ SED="sed"
 
 MACHTYPE=""
 SEQUENTIAL=""
+NATIVE=""
 LANGUAGE=""
 BALANCE="rand"
 TRACEMODE=""
@@ -86,7 +87,7 @@ printUsage() {
     echo "  flags:"
     echo "        -o <target> -g -O"
     echo "        -D<define> -I<include path> -L<lib path> -l<library> -s"
-    echo "        -machine <mach> -seq -langage <lang> "
+    echo "        -machine <mach> -seq -native -langage <lang> "
     echo "        -balance <mode> -tracemode <mode> -memory <mode>"
     echo "        -modules <comma-separated list of C++ modules>"
     echo "        -verbose -save -purify -cp <dest> -gen-cpm <package>"
@@ -277,6 +278,10 @@ do
 
 	"-seq")
 		SEQUENTIAL=true
+		;;
+
+	"-native")
+		NATIVE=true
 		;;
 
 	"-language")
@@ -729,6 +734,14 @@ then
     CMK_RANLIB="$CMK_SEQ_RANLIB"
 fi
 
+if [ -n "$NATIVE" ]
+then
+    CMK_CC="$CMK_NATIVE_CC " 
+    CMK_LD="$CMK_NATIVE_LD" 
+    CMK_CXX="$CMK_NATIVE_CXX " 
+    CMK_LDXX="$CMK_NATIVE_LDXX" 
+fi
+
 if [ -n "$OVERRIDE_CC" ]
 then
     CMK_CC="$OVERRIDE_CC $CMK_CC "
@@ -801,7 +814,7 @@ fi
 
 case "$LANGUAGE" in
 "c"|"C"|"c++"|"C++")
-	[ -z "$SEQUENTIAL" ] && Abort "Language $LANGUAGE is for sequential programs"
+	[ -z "$SEQUENTIAL" -a -z "$NATIVE" ] && Abort "Language $LANGUAGE is for sequential programs"
 	;;
 esac
 
@@ -1118,13 +1131,25 @@ fi
 # check if we're linking a sequential object
 case "$LANGUAGE" in
 "c"|"C"|"f90"|"f77")
-	Do $CMK_SEQ_LD $OPTS_LD -o $OBJECT $OBJECTFILES \
+        if [ -n "$NATIVE" ]
+ 	then
+	  Do $CMK_NATIVE_LD $OPTS_LD -o $OBJECT $OBJECTFILES \
+		-L$CHARMLIB $PRE_LIBRARIES $CMK_NATIVE_LIBS $POST_LIBRARIES
+  	else
+	  Do $CMK_SEQ_LD $OPTS_LD -o $OBJECT $OBJECTFILES \
 		-L$CHARMLIB $PRE_LIBRARIES $CMK_SEQ_LIBS $POST_LIBRARIES
+	fi
 	Copyobj
 	;;
 "c++"|"C++")
-	Do $CMK_SEQ_LDXX $OPTS_LD -o $OBJECT $OBJECTFILES \
+        if [ -n "$NATIVE" ]
+ 	then
+	  Do $CMK_NATIVE_LDXX $OPTS_LD -o $OBJECT $OBJECTFILES \
+		-L$CHARMLIB $PRE_LIBRARIES $CMK_NATIVE_LIBS $POST_LIBRARIES
+	else
+	  Do $CMK_SEQ_LDXX $OPTS_LD -o $OBJECT $OBJECTFILES \
 		-L$CHARMLIB $PRE_LIBRARIES $CMK_SEQ_LIBS $POST_LIBRARIES
+	fi
 	Copyobj
 	;;
 esac

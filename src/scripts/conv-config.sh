@@ -53,6 +53,12 @@ CMK_LD_SHARED="-shared"
 [ -z "$CMK_SEQ_AR" ] && CMK_SEQ_AR="$CMK_AR"
 [ -z "$CMK_SEQ_RANLIB" ] && CMK_SEQ_RANLIB="$CMK_RANLIB"
 
+[ -z "$CMK_NATIVE_CC" ] && CMK_NATIVE_CC="$CMK_SEQ_CC"
+[ -z "$CMK_NATIVE_LD" ] && CMK_NATIVE_LD="$CMK_SEQ_LD"
+[ -z "$CMK_NATIVE_CXX" ] && CMK_NATIVE_CXX="$CMK_SEQ_CXX"
+[ -z "$CMK_NATIVE_LDXX" ] && CMK_NATIVE_LDXX="$CMK_SEQ_LDXX"
+[ -z "$CMK_NATIVE_LIBS" ] && CMK_NATIVE_LIBS="$CMK_SEQ_LIBS"
+
 if [ -r $CHARMINC/conv-mach-opt.sh ]
 then
 . $CHARMINC/conv-mach-opt.sh
