@@ -287,8 +287,11 @@ void NodeMulticast::pup(PUP::er &p){
     if(p.isUnpacking()) {
         nodeMap = new int[numNodes];
 	
-	if(mode == ARRAY_MODE)
-	    indexVec = new CkVec<CkArrayIndexMax> [CkNumPes()];
+	if(mode == ARRAY_MODE) {
+	    typedef CkVec<CkArrayIndexMax> CkVecArrayIndex;
+	    CkVecArrayIndex *vec = new CkVecArrayIndex[CkNumPes()];
+	    indexVec = vec;
+	}
 
 	if(mode == PROCESSOR_MODE)
 	    pelist = new int[npes];
