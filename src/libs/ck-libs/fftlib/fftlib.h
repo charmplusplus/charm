@@ -186,6 +186,9 @@ class NormalSlabArray: public SlabArray {
 
 	void pup(PUP::er &p);
 
+ private:
+	void createPlans(NormalFFTinfo &info);
+
  protected:
 	fftwnd_plan fwd2DPlan, bwd2DPlan;
 	fftw_plan fwd1DPlan, bwd1DPlan;
@@ -220,6 +223,9 @@ class NormalRealSlabArray: public SlabArray {
 	void doIFFT(int src_id = 0, int dst_id = 0);
 
 	void pup(PUP::er &p);
+
+ private:
+	void createPlans(NormalFFTinfo &info);
 
  protected:
 	rfftw_plan rfwd1DXPlan, rbwd1DXPlan;
