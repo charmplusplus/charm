@@ -1,9 +1,9 @@
 #CMK_CFLAGS='-I/usr/local/gnu/include'
 #CMK_LDFLAGS='-L/usr/local/gnu/lib'
 CMK_CPP_CHARM='/lib/cpp -P'
-CMK_CPP_C="gcc3 -E $CMK_INCDIR"
-CMK_CC="gcc3 $CMK_INCDIR"
-CMK_CXX="g++3 $CMK_INCDIR"
+CMK_CPP_C="gcc -E $CMK_INCDIR"
+CMK_CC="gcc $CMK_INCDIR -Wno-deprecated "
+CMK_CXX="g++ $CMK_INCDIR -Wno-deprecated "
 CMK_CXXPP="$CMK_CC -x c++ -E "
 CMK_CF77='f77'
 CMK_CF90='f90'
