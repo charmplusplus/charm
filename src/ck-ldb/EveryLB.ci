@@ -15,5 +15,6 @@ module EveryLB {
    extern module NeighborLB;
    extern module NeighborCommLB;
    extern module WSLB;
+   extern module GridCommLB;
    initnode void initEveryLB(void);
 };

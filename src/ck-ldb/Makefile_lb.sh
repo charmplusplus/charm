@@ -1,5 +1,5 @@
 #!/bin/sh
-LOADBALANCERS="DummyLB ComboCentLB RandCentLB RefineLB RefineCommLB GreedyLB GreedyCommLB Comm1LB OrbLB RecBisectBfLB MetisLB RotateLB NeighborLB NeighborCommLB WSLB"
+LOADBALANCERS="DummyLB ComboCentLB RandCentLB RefineLB RefineCommLB GreedyLB GreedyCommLB Comm1LB OrbLB RecBisectBfLB MetisLB RotateLB NeighborLB NeighborCommLB WSLB GridCommLB"
 
 out="Make.lb"
 
@@ -21,6 +21,7 @@ do
 	[ -r libmodule$bal.dep ] && dep="cp libmodule$bal.dep "'$'"(L)/"
         manager=""
         [ $bal = 'GreedyCommLB' ] && manager="manager.o"
+        [ $bal = 'GridCommLB' ] && manager="manager.o"
 	cat >> $out << EOB 
 $bal.def.h: $bal.decl.h
 

@@ -1,0 +1,11 @@
+module GridCommLB
+{
+  extern module CentralLB;
+
+  initnode void lbinit (void);
+
+  group [migratable] GridCommLB : CentralLB
+  {
+    entry void GridCommLB (const CkLBOptions &);  
+  };
+};
