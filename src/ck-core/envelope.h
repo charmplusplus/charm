@@ -21,8 +21,8 @@
 #endif
 
 #define SVM1     (sizeof(double)-1)
-#define ALIGN(x) (((x)+SVM1)&(~(SVM1)))
-#define _AA(x)     ALIGN(x)
+#define _ALIGN(x) (((x)+SVM1)&(~(SVM1)))
+#define _AA(x)     _ALIGN(x)
 #define _DD(x)     (_AA(x)-(x))
 #define PW(x)    ((x+CINTBITS-1)/CINTBITS)
 
@@ -155,7 +155,7 @@ private:
     static envelope *alloc(const UChar type, const UInt size=0, const UShort prio=0)
     {
       CkAssert(type>=NewChareMsg && type<=ForNodeBocMsg);
-      register UInt tsize = sizeof(envelope)+ALIGN(size)+sizeof(int)*PW(prio);
+      register UInt tsize = sizeof(envelope)+_ALIGN(size)+sizeof(int)*PW(prio);
       register envelope *env = (envelope *)CmiAlloc(tsize);
       env->setMsgtype(type);
       env->totalsize = tsize;
