@@ -9,6 +9,7 @@ package jade;
 //class preamble
 import jade.JJ.J;
 import jade.JJ.ASTJ;
+import antlr.collections.ASTEnumeration;
 }
 
 /** Java 1.3 AST Recognizer Grammar
@@ -244,7 +245,7 @@ stat:	typeDefinition[null]
 			st:stat
             {
                 AST msa=null;
-                // @@ skip for analysis until it is ready for checkin
+                // @@ skip for-analysis until it is ready for checkin
                 if ( false && (msa=J.isMSAAccessAnywhere(fo))!=null) {
                     // assume we have "for(i = n0; i <= n1; i++) x += A[i];"
                     // need to know: i, n0, n1, A, typeof A
@@ -255,53 +256,122 @@ stat:	typeDefinition[null]
                     //     x += a[i];
                     // }
                     System.out.print("Found MSA loop: ");
-                    System.out.println(fo.toStringTree());
+                    System.out.println(fo.toStringTree(0));
 
                     J.Env e = new J.Env();
+                    e.put("arr", msa.getText());
                     J.analyzeFor(fo, e);
                     if (e.get("i2") != null) { // two-level loop
+
+                        // Set up some string variables to make code gen easier.
+                        String i = e.getStr("i1");
+                        String i0 = e.getStr("n01");  String iFinal = e.getStr("n11"); String iDelta = "1"; // @@
+                        String iOP = e.getStr("OP1");
+                        if (!iOP.equalsIgnoreCase("<="))
+                            J.fatalError(fo, "strip-mining only supports <= in for-condition");
+                        String j = e.getStr("i2");
+                        String j0 = e.getStr("n02");  String jFinal = e.getStr("n12"); String jDelta = "1"; // @@
+                        String jOP = e.getStr("OP2");
+                        if (!jOP.equalsIgnoreCase("<="))
+                            J.fatalError(fo, "strip-mining only supports <= in for-condition");
+                        String arr = e.getStr("arr");
+                        String arrType = "double"; // @@ hardcoded
+
+                        // Code generation
                         StringBuffer s = new StringBuffer("");
-                        s.append("{ int i1; int n01 = "+e.getStr("n01")+"; int n11 = "+e.getStr("n11")+";\n");
-                        s.append("int startPg1 = n01/pageSize; int endPg1 = n11/pageSize;\n");
-                        s.append("int i2; int n02 = "+e.getStr("n02")+"; int n12 = "+e.getStr("n12")+";\n");
-                        s.append("int startPg2 = n02/pageSize; int endPg2 = n12/pageSize;\n");
-                        s.append("for(p1=startPg1; p1<=endPg1; p1++)\n");
-                        s.append("for(p2=startPg2; p2<=endPg2; p2++) {\n");
-                        s.append("double newname[] = A.get(p1*pageSize, p2*pageSize);\n");
-                        s.append("for (i1=(p1==startPg1?(n01)%pageSize:0); i1" + e.get("OP1")
-                            + "(p1==endPg1?n11%pageSize:pageSize); i1++)\n");
-                        s.append("for (i2=(p2==startPg2?(n02)%pageSize:0); i2" + e.get("OP2")
-                            + "(p2==endPg2?n12%pageSize:pageSize); i2++)\n");
-                        s.append("{}}}\n");
+
+                        s.append("{\n");
+                        s.append("int accessMode=-1; int accessPattern=-1;\n");
+                        s.append("int COLS="+arr+".getCols();\n");
+                        s.append("int numEntriesPerPage="+arr+".getNumEntriesPerPage();\n");
+                        s.append("int i0="+i0+"; int iFinal="+iFinal+"; int iDelta="+iDelta+";\n");
+                        s.append("int j0="+j0+"; int jFinal="+jFinal+"; int jDelta="+jDelta+";\n");
+                        s.append("\n");
+                        s.append("int _i = i0; int _j = j0;\n");
+                        s.append("do {\n");
+                        s.append("int index = _i * COLS + _j;\n");
+                        s.append("int indexSt = (index/numEntriesPerPage)*numEntriesPerPage;\n");
+                        s.append(arrType+" pi = addressof("+arr+".getPageBottom(index,Write_Fault));\n"); // @@ pointer, addressof, accessMode
+                        s.append("int indexEnd = indexSt + numEntriesPerPage -1;\n");
+                        s.append("int iSt = indexSt/COLS;\n");
+                        s.append("int iN = indexEnd/COLS;\n");
+                        s.append("int jSt= indexSt % COLS;\n");
+                        s.append("int jN= indexEnd % COLS;\n");
+                        s.append("\n");
+                        s.append("for (; _i"+iOP+"_JADE_MIN(iFinal, iN); _i+="+iDelta+") {\n");
+                        s.append("int jEnd;\n");
+                        s.append("if (_i==iN) jEnd = _JADE_MIN(jFinal, jN); else jEnd = jFinal;\n");
+                        s.append("if (_j>jFinal) _j = j0;\n");
+                        s.append("\n");
+                        s.append("for(; _j"+jOP+"jEnd; _j+=jDelta) {\n");
+                        s.append(arrType+" newname = addressof(pi[((_i-iSt)*COLS+_j-jSt)]);\n"); // @@ pointer, addressof
+                        s.append(i+"=_i;"+j+"=_j;\n");
+                        s.append("{ body |= body; }\n"); // body of user loop
+                        s.append("}\n");
+                        s.append("if (_i==iN && _j>jN && _j<=jFinal)\n");
+                        s.append("break;\n");
+                        s.append("}\n");
+                        s.append("\n");
+                        s.append("if (_j>jFinal) _j = j0;\n");
+                        s.append("} while ( (_i<iFinal) || ( (_i==iFinal) && (_j<=jFinal) ));\n");
+                        s.append("}\n");
+
+//                         s.append("{ int i1; int n01 = "+e.getStr("n01")+"; int n11 = "+e.getStr("n11")+";\n");
+//                         s.append("int startPg1 = n01/pageSize; int endPg1 = n11/pageSize;\n");
+//                         s.append("int i2; int n02 = "+e.getStr("n02")+"; int n12 = "+e.getStr("n12")+";\n");
+//                         s.append("int startPg2 = n02/pageSize; int endPg2 = n12/pageSize;\n");
+//                         s.append("for(p1=startPg1; p1<=endPg1; p1++)\n");
+//                         s.append("for(p2=startPg2; p2<=endPg2; p2++) {\n");
+//                         s.append("double newname[] = A.get(p1*pageSize, p2*pageSize);\n");
+//                         s.append("for (i1=(p1==startPg1?(n01)%pageSize:0); i1" + e.get("OP1")
+//                             + "(p1==endPg1?n11%pageSize:pageSize); i1++)\n");
+//                         s.append("for (i2=(p2==startPg2?(n02)%pageSize:0); i2" + e.get("OP2")
+//                             + "(p2==endPg2?n12%pageSize:pageSize); i2++)\n");
+//                         s.append("{}}}\n");
+
                         System.out.println(s);
-                        msa.setText("newname");
-                        AST ttt = J.parseString(s.toString());
-                        System.out.println(ttt.toStringTree());
+                        if (true) {
+                        // Prepare the new strip-mined code
+                        ASTJ newCode = J.parseString(s.toString());
+                            newCode.setVerboseStringConversion(true, getTokenNames());
+                        System.out.println(newCode.toStringTree(0));
 
-                        AST lastChild = null;
-                        AST lastPointer = null;
-                        AST tmp3 = ttt.getFirstChild();
-                        while(tmp3!=null) {
-                            lastPointer = lastChild;
-                            lastChild = tmp3;
-                            tmp3 = tmp3.getNextSibling();
-                            if (tmp3 == null)
-                                tmp3 = lastChild.getFirstChild();
-                        }
-                        System.out.println("last child = " + lastChild.toStringTree());
-
+                        // Find the body of the original code
                         // For a two-level loop, we skip the inner loop
-                        AST body = st;
-                        tmp3 = st.getFirstChild();
+                        ASTJ origBody = st;
+                        AST tmp3 = st.getFirstChild();
                         while(tmp3 != null) {
-                            body = tmp3;
+                            origBody = (ASTJ) tmp3;
                             tmp3 = tmp3.getNextSibling();
                         }
 
-                        // @@ We assume here that there is a sibling relationship between lastPointer and lastChild,
-                        // which is true in this case since we generate the code.
-                        lastPointer.setNextSibling(astFactory.dupTree(body));
-                        stat_AST = (ASTJ) ttt;
+                        // Find the location of the body in the new code
+                        ASTJ findBody = J.parseString("{ body |= body; }");
+                        ASTEnumeration bb = newCode.findAll(findBody);
+                        ASTJ theEmptyBody = (ASTJ)bb.nextNode();
+
+                        // Change the original body to use the new array name
+                        msa.setText("newname");
+                        // Replace the empty new body with the original one
+                        theEmptyBody.setFirstChild(astFactory.dupTree(origBody));
+
+//                         AST lastChild = null;
+//                         AST lastPointer = null;
+//                         AST tmp3 = ttt.getFirstChild();
+//                         while(tmp3!=null) {
+//                             lastPointer = lastChild;
+//                             lastChild = tmp3;
+//                             tmp3 = tmp3.getNextSibling();
+//                             if (tmp3 == null)
+//                                 tmp3 = lastChild.getFirstChild();
+//                         }
+//                         System.out.println("last child = " + lastChild.toStringTree());
+
+//                         // @@ We assume here that there is a sibling relationship between lastPointer and lastChild,
+//                         // which is true in this case since we generate the code.
+//                         lastPointer.setNextSibling(astFactory.dupTree(body));
+                        stat_AST = newCode;
+                        }
                     } else {
                         System.out.println("reached " + fo.toStringTree());
                         stat_AST = fo;
