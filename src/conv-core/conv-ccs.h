@@ -10,6 +10,10 @@
 
 #include "converse.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /******* Converse Client Server *****/
 
 #define CMK_CCS_VERSION "1"
@@ -47,4 +51,7 @@ extern void CommunicationServer();
 extern unsigned int clientIP, clientPort, clientKillPort;
 #endif
 
+#ifdef __cplusplus
+}
+#endif
 #endif
