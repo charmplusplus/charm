@@ -1035,12 +1035,27 @@ char *CmiCopyMsg(char *msg, int len);
 CpvExtern(int, CmiImmediateMsgHandlerIdx);
 
 void CmiProbeImmediateMsg();
+
+/*
+   to immediate-fy a Converse message, change the Converse handler x
+   to -x. Note that the Converse handler is of type CmiUInt2, thus
+   the immediate-fied Converse handler should be in range of 32768 and 65535.
+*/
 #if CMK_IMMEDIATE_MSG
 void CmiDelayImmediate();
+#  define CmiBecomeImmediate(msg) do { \
+	CmiSetHandler(msg, (CmiUInt2)(-(CmiInt2)CmiGetHandler(msg))); \
+     } while (0)
+#  define CmiIsImmediate(msg)      ((CmiInt2)(CmiGetHandler(msg)) < 0) 
+#  define CmiImemdiateHandler(msg) (-(CmiInt2)(CmiGetHandler(msg)))
+/*
+#  define CmiIsImmediate(msg)   ((CmiGetHandler(msg) == CpvAccessOther(CmiImmediateMsgHandlerIdx,0)))
 #  define CmiBecomeImmediate(msg) do {\
 	CmiSetXHandler(msg,CmiGetHandler(msg)); \
 	CmiSetHandler(msg,CpvAccessOther(CmiImmediateMsgHandlerIdx,0)); \
      } while (0)
+#  define CmiImemdiateHandler(msg) (CmiGetXHandler(msg))
+*/
 /* 
   for non smp and non intr based version, it returns _immRunning
   for smp, this doesnot matter - CkMyPe() comparasion normaly fails and
@@ -1055,6 +1070,7 @@ extern int _immRunning;
 
 #else
 #  define CmiBecomeImmediate(msg) /* empty */
+#  define CmiIsImmediate(msg)   (0)
 #  define CmiImmIsRunning()       (0)
 #endif
 
