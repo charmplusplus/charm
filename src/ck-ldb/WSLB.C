@@ -10,6 +10,12 @@ CkGroupID wslb;
 
 #if CMK_LBDB_ON
 
+// Temporary vacating flags
+
+//#define VACATE_PROC (CkNumPes()/2)
+//#define VACATE_AFTER 30
+//#define UNVACATE_AFTER 15
+
 void CreateWSLB()
 {
   wslb = CProxy_WSLB::ckNew();
@@ -60,6 +66,8 @@ WSLB::WSLB()
   myStats.obj_data_sz = 0;
   myStats.comm_data_sz = 0;
   receive_stats_ready = 0;
+
+  vacate = CmiFalse;
 
   theLbdb->CollectStatsOn();
 }
@@ -151,6 +159,7 @@ WSLBStatsMsg* WSLB::AssembleStats()
   msg->bg_cputime = myStats.bg_cputime;
   msg->obj_walltime = myStats.obj_walltime;
   msg->obj_cputime = myStats.obj_cputime;
+  msg->vacate_me = vacate;
 
   //  CkPrintf(
   //    "Proc %d speed=%d Total(wall,cpu)=%f %f Idle=%f Bg=%f %f Obj=%f %f\n",
@@ -204,6 +213,7 @@ void WSLB::ReceiveStats(WSLBStatsMsg *m)
       statsDataList[peslot].proc_speed = m->proc_speed;
       statsDataList[peslot].obj_walltime = m->obj_walltime;
       statsDataList[peslot].obj_cputime = m->obj_cputime;
+      statsDataList[peslot].vacate_me = m->vacate_me;
       stats_msg_count++;
     }
   }
@@ -314,6 +324,26 @@ void WSLB::ResumeClients()
   theLbdb->ResumeClients();
 }
 
+CmiBool WSLB::QueryBalanceNow(int step)
+{
+  double now = CmiWallTimer();
+
+  if (step==0)
+    first_step_time = now;
+  else if (CkMyPe() == VACATE_PROC && now > VACATE_AFTER
+	   && now < (VACATE_AFTER+UNVACATE_AFTER)) {
+    if (vacate == CmiFalse)
+      CkPrintf("PE %d vacating at %f\n",CkMyPe(),now);
+    vacate = CmiTrue;
+  } else {
+    if (vacate == CmiTrue)
+      CkPrintf("PE %d unvacating at %f\n",CkMyPe(),now);
+    vacate = CmiFalse;
+  }
+
+  return CmiTrue;
+}
+
 WSLBMigrateMsg* WSLB::Strategy(WSLB::LDStats* stats, int count)
 {
   //  CkPrintf("[%d] Strategy starting\n",CkMyPe());
@@ -322,7 +352,12 @@ WSLBMigrateMsg* WSLB::Strategy(WSLB::LDStats* stats, int count)
   double myload = myStats.total_walltime - myStats.idletime;
   double avgload = myload;
   int i;
+  int unvacated_neighbors = 0;
   for(i=0; i < count; i++) {
+    // If the neighbor is vacating, skip him
+    if (stats[i].vacate_me)
+      continue;
+
     // Scale times we need appropriately for relative proc speeds
     const double scale =  ((double)myStats.proc_speed) 
       / stats[i].proc_speed;
@@ -331,12 +366,19 @@ WSLBMigrateMsg* WSLB::Strategy(WSLB::LDStats* stats, int count)
     stats[i].idletime *= scale;
 
     avgload += (stats[i].total_walltime - stats[i].idletime);
+    unvacated_neighbors++;
   }
-  avgload /= (count+1);
+  if (vacate && unvacated_neighbors == 0)
+    CkPrintf("[%d] ALL NEIGHBORS WANT TO VACATE!!!\n",CkMyPe());
+
+  avgload /= (unvacated_neighbors+1);
 
   CkVector migrateInfo;
 
-  if (myload > avgload) {
+  // If we want to vacate, we always dump our load, otherwise
+  // only if we are overloaded
+
+  if (vacate || myload > avgload) {
     //CkPrintf("[%d] OVERLOAD My load is %f, average load is %f\n",
     //    	     CkMyPe(),myload,avgload);
 
@@ -350,10 +392,14 @@ WSLBMigrateMsg* WSLB::Strategy(WSLB::LDStats* stats, int count)
     // Build heaps
     minHeap procs(count);
     for(i=0; i < count; i++) {
-      InfoRecord* item = new InfoRecord;
-      item->load = stats[i].total_walltime - stats[i].idletime;
-      item->Id =  stats[i].from_pe;
-      procs.insert(item);
+      // If all my neighbors vacate, I won't have anyone to give work 
+      // to
+      if (!stats[i].vacate_me) {
+	InfoRecord* item = new InfoRecord;
+	item->load = stats[i].total_walltime - stats[i].idletime;
+	item->Id =  stats[i].from_pe;
+	procs.insert(item);
+      }
     }
       
     maxHeap objs(myStats.obj_data_sz);
@@ -366,7 +412,7 @@ WSLBMigrateMsg* WSLB::Strategy(WSLB::LDStats* stats, int count)
 
     int objs_here = myStats.obj_data_sz;
     do {
-      if (objs_here <= 1) break;  // For now, always leave 1 object
+      //      if (objs_here <= 1) break;  // For now, always leave 1 object
 
       InfoRecord* p;
       InfoRecord* obj;
@@ -386,8 +432,10 @@ WSLBMigrateMsg* WSLB::Strategy(WSLB::LDStats* stats, int count)
 
 	double new_p_load = p->load + obj->load;
 	double my_new_load = myload - obj->load;
-	if (new_p_load < my_new_load) {
-//	if (new_p_load < avgload) {
+
+	// If we're vacating, the biggest object is always good.
+	// Otherwise, only take it if it doesn't produce overload
+	if (vacate || new_p_load < my_new_load) {
 	  objfound = CmiTrue;
 	} else {
 	  // This object is too big, so throw it away
@@ -424,7 +472,7 @@ WSLBMigrateMsg* WSLB::Strategy(WSLB::LDStats* stats, int count)
       // This object is assigned, so we delete it from the heap
       delete obj;
 
-    } while(myload > avgload);
+    } while(vacate || myload > avgload);
 
     // Now empty out the heaps
     while (InfoRecord* p=procs.deleteMin())
@@ -435,6 +483,11 @@ WSLBMigrateMsg* WSLB::Strategy(WSLB::LDStats* stats, int count)
 
   // Now build the message to actually perform the migrations
   int migrate_count=migrateInfo.size();
+  if (vacate) {
+    CkPrintf("PE %d vacating: Sent away %d of %d objects\n",
+	     CkMyPe(),migrate_count,myStats.obj_data_sz);
+  }
+
   //  if (migrate_count > 0) {
   //    CkPrintf("PE %d migrating %d elements\n",CkMyPe(),migrate_count);
   //  }

@@ -44,10 +44,11 @@ public:
     double obj_walltime;
     double obj_cputime;
     int proc_speed;
+    CmiBool vacate_me;
   };
 
 protected:
-  virtual CmiBool QueryBalanceNow(int) { return CmiTrue; };  
+  virtual CmiBool QueryBalanceNow(int);
   virtual WSLBMigrateMsg* Strategy(LDStats* stats,int count);
   virtual int num_neighbors() {
     return (CkNumPes() > 5) ? 4 : (CkNumPes()-1);
@@ -101,6 +102,8 @@ private:
   int* neighbor_pes;
   int receive_stats_ready;
   double start_lb_time;
+  double first_step_time;
+  CmiBool vacate;
 };
 
 class WSLBStatsMsg : public CMessage_WSLBStatsMsg {
@@ -115,6 +118,7 @@ public:
   double bg_cputime;
   double obj_walltime;
   double obj_cputime;
+  CmiBool vacate_me;
 }; 
 
 class WSLBMigrateMsg : public CMessage_WSLBMigrateMsg {
