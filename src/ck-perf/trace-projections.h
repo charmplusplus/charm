@@ -5,6 +5,11 @@
  * $Revision$
  *****************************************************************************/
 
+/**
+ * \addtogroup CkPerf
+*/
+/*@{*/
+
 #ifndef _PROJECTIONS_H
 #define _PROJECTIONS_H
 
@@ -30,8 +35,8 @@
 #define  BEGIN_UNPACK       18
 #define  END_UNPACK         19
 
-CpvExtern(int, CtrLogBufSize);
 
+/// a log entry in trace projection
 class LogEntry {
   public:
     void *operator new(size_t s) {void*ret=malloc(s);_MEMCHECK(ret);return ret;}
@@ -55,6 +60,7 @@ class LogEntry {
     void writeBinary(FILE *fp);
 };
 
+/// log pool in trace projection
 class LogPool {
   private:
     UInt poolSize;
@@ -75,6 +81,11 @@ class LogPool {
     void add(UChar type,UShort mIdx,UShort eIdx,double time,int event,int pe, int ml=0);
 };
 
+/// class for recording trace projections events 
+/**
+  TraceProjections will log Converse/Charm++ events and write into .log files;
+  events descriptions will be written into .sts file.
+*/
 class TraceProjections : public Trace {
     int curevent;
     int execEvent;
@@ -111,4 +122,7 @@ class TraceProjections : public Trace {
     void traceEnd();
 };
 
+
 #endif
+
+/*@}*/

@@ -5,6 +5,11 @@
  * $Revision$
  *****************************************************************************/
 
+/**
+ * \addtogroup CkPerf
+*/
+/*@{*/
+
 #ifndef _SUMMARY_H
 #define _SUMMARY_H
 
@@ -42,7 +47,8 @@
 
 CpvExtern(int, CtrLogBufSize);
 
-class SumLogEntry {
+/// Bin entry record CPU time in an interval
+class BinEntry {
   public:
     void *operator new(size_t s) {void*ret=malloc(s);_MEMCHECK(ret);return ret;}
     void *operator new(size_t, void *ptr) { return ptr; }
@@ -50,39 +56,33 @@ class SumLogEntry {
 #ifdef WIN32
     void operator delete(void *, void *) { }
 #endif
-    SumLogEntry() {}
-    SumLogEntry(double t, int p=0) { 
-      time = t; pe = p;
-    }
-    double getTime() { return time; }
+    BinEntry() {}
+    BinEntry(double t): time(t) {}
+    inline double getTime() { return time; }
     void setTime(double t) { time = t; }
-
-    double time;
-    int event;
-    int pe;
     void write(FILE *fp);
+  private:
+    double time;
 };
 
-typedef struct _MarkEntry {
-double time;
-struct _MarkEntry *next;
-} MarkEntry;
-
-typedef struct _LogMark {
-MarkEntry *marks;
-} LogMark;
-
+/// a phase entry for trace summary
 class PhaseEntry {
   private:
     int count[MAX_ENTRIES];
     double times[MAX_ENTRIES];
   public:
     PhaseEntry();
+    /// one entry is called for 'time' seconds.
     void setEp(int epidx, double time) {
 	if (epidx>=MAX_ENTRIES) CmiAbort("Too many entry functions!\n");
 	count[epidx]++;
 	times[epidx] += time;
     }
+    /**
+        write two lines for each phase:
+        1. number of calls for each entry;
+        2. time in us spent for each entry.
+    */
     void write(FILE *fp, int seq) {
 	int i;
 	fprintf(fp, "[%d] ", seq);
@@ -96,19 +96,29 @@ class PhaseEntry {
     }
 };
 
+/// table of PhaseEntry
 class PhaseTable {
   private:
     PhaseEntry **phases;
-    int numPhase;
-    int cur_phase;
-    int phaseCalled;
+    int numPhase;         /**< phase table size */
+    int cur_phase;	  /**< current phase */
+    int phaseCalled;      /**< total number of phases */
   public:
-    PhaseTable(int n); 
+    PhaseTable(int n): numPhase(n) {
+        phases = new PhaseEntry*[n];
+        _MEMCHECK(phases);
+        for (int i=0; i<n; i++) phases[i] = NULL;
+        cur_phase = -1;
+        phaseCalled = 0;
+    }
     ~PhaseTable() {
 	for (int i=0; i<numPhase; i++) delete phases[i];
 	delete [] phases;
     }
-    int numPhasesCalled() { return phaseCalled; };
+    inline int numPhasesCalled() { return phaseCalled; };
+    /**
+      start a phase. If new, create a new PhaseEntry
+    */
     void startPhase(int p) { 
 	if (p<0 && p>=numPhase) CmiAbort("Invalid Phase number. \n");
 	cur_phase = p; 
@@ -131,40 +141,30 @@ class PhaseTable {
     }
 };
 
+/// summary log pool
 class SumLogPool {
   private:
     UInt poolSize;
     UInt numEntries;
-    SumLogEntry *pool;
+    BinEntry *pool;	/**< bins */
     FILE *fp ;
 
     double  *epTime;
     int *epCount;
     int epSize;
 
-    // for marks
-    LogMark events[MAX_MARKS];
+    /// a mark entry for trace summary
+    typedef struct {
+      double time;
+    } MarkEntry;
+    CkVec<MarkEntry *> events[MAX_MARKS];
     int markcount;
 
-    // for phases
+    /// for phases
     PhaseTable phaseTab;
   public:
     SumLogPool(char *pgm);
-    ~SumLogPool() {
-      write();
-      fclose(fp);
-      // free memory for mark
-      if (markcount > 0)
-      for (int i=0; i<MAX_MARKS; i++) {
-          MarkEntry *e=events[i].marks, *t;
-          while (e) {
-	      t = e;
-	      e = e->next;
-              delete t;
-          }
-      }
-      delete[] pool;
-    }
+    ~SumLogPool();
     void write(void) ;
     void writeSts(void);
     void add(double time, int pe);
@@ -180,6 +180,11 @@ class SumLogPool {
     void startPhase(int phase) { phaseTab.startPhase(phase); }
 };
 
+/// class for recording trace summary events 
+/**
+  TraceSummary calculate CPU utilizations in bins, and will record
+  number of calls and total wall time for each entry. 
+*/
 class TraceSummary : public Trace {
     int curevent;
     int execEvent;
@@ -220,3 +225,5 @@ class TraceSummary : public Trace {
 };
 
 #endif
+
+/*@}*/

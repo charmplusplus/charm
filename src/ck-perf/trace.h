@@ -12,6 +12,11 @@
 
 class envelope;
 
+/**
+ \defgroup CkPerf  Charm++ Trace Module
+*/
+/*@{*/
+
 // An additional interface for summary data
 extern "C" void traceClearEps();
 extern "C" void traceCommonInit(char **argv);
@@ -131,4 +136,6 @@ inline double TraceTimer() { return CmiWallTimer() - CpvAccess(traceInitTime); }
 
 #endif
 
+
+/*@}*/
 

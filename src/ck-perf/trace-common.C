@@ -5,6 +5,11 @@
  * $Revision$
  *****************************************************************************/
 
+/**
+ * \addtogroup CkPerf
+*/
+/*@{*/
+
 #include <stdlib.h>
 #include "trace.h"
 #include "stdlib.h"
@@ -27,6 +32,7 @@ CpvDeclare(int, traceOn);
 CpvDeclare(int, CtrLogBufSize);
 CpvDeclare(char*, traceRoot);
 
+/// decide parameters from command line
 extern "C" 
 void traceCommonInit(char **argv)
 {
@@ -74,8 +80,10 @@ extern "C" void traceEnd(void) {
   CpvAccess(traceOn) = 0;
 }
 
+/// defined in moduleInit.C
 void _createTraces();
 
+/// initialize trace framework, also create the trace module(s).
 extern "C" void traceInit(char **argv) 
 {
   CpvInitialize(TraceArray *, _traces);
@@ -146,3 +154,5 @@ void traceClose(void)
   OPTIMIZE_WARNING
   CpvAccess(_traces)->traceClose();
 }
+
+/*@}*/

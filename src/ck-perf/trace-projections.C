@@ -5,6 +5,12 @@
  * $Revision$
  *****************************************************************************/
 
+
+/**
+ * \addtogroup CkPerf
+*/
+/*@{*/
+
 #include "trace-projections.h"
 
 #define DEBUGF(x)          // CmiPrintf x
@@ -418,3 +424,5 @@ void TraceProjections::endComputation(void)
 {
   CpvAccess(_logPool)->add(END_COMPUTATION, 0, 0, TraceTimer(), -1, -1);
 }
+
+/*@}*/

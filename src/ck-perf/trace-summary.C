@@ -5,6 +5,11 @@
  * $Revision$
  *****************************************************************************/
 
+/**
+ * \addtogroup CkPerf
+*/
+/*@{*/
+
 #include "trace-summary.h"
 
 #define DEBUGF(x)  // CmiPrintf x
@@ -30,6 +35,7 @@ void _createTracesummary()
 }
 
 
+/// function call for starting a phase in trace summary logs 
 extern "C" 
 void CkSummary_StartPhase(int phase)
 {
@@ -37,7 +43,7 @@ void CkSummary_StartPhase(int phase)
 }
 
 
-// for marks
+/// function call for adding an event mark
 extern "C" 
 void CkSummary_MarkEvent(int eventType)
 {
@@ -53,13 +59,17 @@ PhaseEntry::PhaseEntry()
   }
 }
 
-PhaseTable::PhaseTable(int n) : numPhase(n)
+SumLogPool::~SumLogPool() 
 {
-  phases = new PhaseEntry*[n];
-  _MEMCHECK(phases);
-  for (int i=0; i<n; i++) phases[i] = NULL;
-  cur_phase = -1;
-  phaseCalled = 0;
+  write();
+  fclose(fp);
+  // free memory for mark
+  if (markcount > 0)
+  for (int i=0; i<MAX_MARKS; i++) {
+    for (int j=0; j<events[i].length(); j++)
+      delete events[i][j];
+  }
+  delete[] pool;
 }
 
 void SumLogPool::addEventType(int eventType, double time)
@@ -70,8 +80,7 @@ void SumLogPool::addEventType(int eventType, double time)
    }
    MarkEntry *e = new MarkEntry;
    e->time = time;
-   e->next = events[eventType].marks;
-   events[eventType].marks = e;
+   events[eventType].push_back(e);
    markcount ++;
 }
 
@@ -80,7 +89,7 @@ SumLogPool::SumLogPool(char *pgm) : phaseTab(MAX_PHASES)
     int i;
     poolSize = CpvAccess(CtrLogBufSize);
     if (poolSize % 2) poolSize++;	// make sure it is even
-    pool = new SumLogEntry[poolSize];
+    pool = new BinEntry[poolSize];
     _MEMCHECK(pool);
     numEntries = 0;
     char pestr[10];
@@ -109,7 +118,6 @@ SumLogPool::SumLogPool(char *pgm) : phaseTab(MAX_PHASES)
     };
 
     // event
-    for (i=0; i<MAX_MARKS; i++) events[i].marks = NULL;
     markcount = 0;
 }
 
@@ -140,8 +148,8 @@ void SumLogPool::write(void)
   {
   fprintf(fp, "%d ", markcount);
   for (i=0; i<MAX_MARKS; i++) {
-    for(MarkEntry *e = events[i].marks; e; e=e->next)
-        fprintf(fp, "%d %f ", i, e->time);
+    for(int j=0; j<events[i].length(); j++)
+        fprintf(fp, "%d %f ", i, events[i][j]->time);
   }
   fprintf(fp, "\n");
   }
@@ -184,8 +192,7 @@ void SumLogPool::writeSts(void)
 
 void SumLogPool::add(double time, int pe) 
 {
-  new (&pool[numEntries++])
-  SumLogEntry(time, pe);
+  new (&pool[numEntries++]) BinEntry(time);
   if(poolSize==numEntries) shrink();
 }
 
@@ -214,7 +221,7 @@ void SumLogPool::shrink(void)
 //CkPrintf("Shrinked binsize: %f entries:%d!!!!\n", CpvAccess(binSize), numEntries);
 }
 
-void SumLogEntry::write(FILE* fp)
+void BinEntry::write(FILE* fp)
 {
   int per = (int)(time * 100.0 / CpvAccess(binSize));
   fprintf(fp, "%4d", per);
@@ -403,3 +410,4 @@ void TraceSummary::endComputation(void)
   }
 }
 
+/*@}*/
