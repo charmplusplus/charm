@@ -333,9 +333,9 @@ void* CLBStatsMsg::alloc(int msgnum, size_t size, int* array, int priobits)
   ret->objData = (LDObjData*)(((char*)(ret) + size));
   ret->commData = (LDCommData*)(ret->objData + array[0]);
 
-  ret->avail_vector = reinterpret_cast<char *>(ret->commData + array[1]);
+  ret->avail_vector = (char *)(ret->commData + array[1]);
 
-  return static_cast<void*>(ret);
+  return (void*)(ret);
 }
 
 void* CLBStatsMsg::pack(CLBStatsMsg* m)
@@ -343,13 +343,13 @@ void* CLBStatsMsg::pack(CLBStatsMsg* m)
   m->objData = 
     (LDObjData*)((char*)(m->objData) - (char*)(&m->objData));
   m->commData = 
-    reinterpret_cast<LDCommData*>(reinterpret_cast<char*>(m->commData)
-      - reinterpret_cast<char*>(&m->commData));
+    (LDCommData*)((char*)(m->commData)
+      - (char*)(&m->commData));
 
-  m->avail_vector =reinterpret_cast<char*>(m->avail_vector
-      - reinterpret_cast<char*>(&m->avail_vector));
+  m->avail_vector =(char*)(m->avail_vector
+      - (char*)(&m->avail_vector));
 
-  return static_cast<void*>(m);
+  return (void*)(m);
 }
 
 CLBStatsMsg* CLBStatsMsg::unpack(void *m)
@@ -359,12 +359,12 @@ CLBStatsMsg* CLBStatsMsg::unpack(void *m)
   ret_val->objData = 
     (LDObjData*)((char*)(&ret_val->objData) + (size_t)(ret_val->objData));
   ret_val->commData = 
-    reinterpret_cast<LDCommData*>(reinterpret_cast<char*>(&ret_val->commData)
-	     + reinterpret_cast<size_t>(ret_val->commData));
+    (LDCommData*)((char*)(&ret_val->commData)
+	     + (size_t)(ret_val->commData));
 
   ret_val->avail_vector =
-    reinterpret_cast<char*>(reinterpret_cast<char*>(&ret_val->avail_vector)
-			    +reinterpret_cast<size_t>(ret_val->avail_vector));
+    (char*)((char*)(&ret_val->avail_vector)
+			    +(size_t)(ret_val->avail_vector));
 
   return ret_val;
 }
@@ -379,17 +379,17 @@ void* CLBMigrateMsg::alloc(int msgnum, size_t size, int* array, int priobits)
 
   ret->moves = (CentralLB::MigrateInfo*) ((char*)(ret)+ size);
 
-  ret->avail_vector = reinterpret_cast<char *>(ret->moves + array[0]);
-  return static_cast<void*>(ret);
+  ret->avail_vector = (char *)(ret->moves + array[0]);
+  return (void*)(ret);
 }
 
 void* CLBMigrateMsg::pack(CLBMigrateMsg* m)
 {
-  m->moves = reinterpret_cast<CentralLB::MigrateInfo*>
-    (reinterpret_cast<char*>(m->moves) - reinterpret_cast<char*>(&m->moves));
+  m->moves = (CentralLB::MigrateInfo*)
+    ((char*)(m->moves) - (char*)(&m->moves));
 
-  m->avail_vector =reinterpret_cast<char*>(m->avail_vector
-      - reinterpret_cast<char*>(&m->avail_vector));
+  m->avail_vector =(char*)(m->avail_vector
+      - (char*)(&m->avail_vector));
 
   return (void*)(m);
 }
@@ -398,13 +398,13 @@ CLBMigrateMsg* CLBMigrateMsg::unpack(void *m)
 {
   CLBMigrateMsg* ret_val = (CLBMigrateMsg*)(m);
 
-  ret_val->moves = reinterpret_cast<CentralLB::MigrateInfo*>
-    (reinterpret_cast<char*>(&ret_val->moves) 
-     + reinterpret_cast<size_t>(ret_val->moves));
+  ret_val->moves = (CentralLB::MigrateInfo*)
+    ((char*)(&ret_val->moves) 
+     + (size_t)(ret_val->moves));
 
   ret_val->avail_vector =
-    reinterpret_cast<char*>(reinterpret_cast<char*>(&ret_val->avail_vector)
-			    +reinterpret_cast<size_t>(ret_val->avail_vector));
+    (char*)((char*)(&ret_val->avail_vector)
+			    +(size_t)(ret_val->avail_vector));
 
   return ret_val;
 }
