@@ -1,7 +1,11 @@
-CHARMC=$(CDIR)/bin/charmc -I../../.. $(OPTS)
-COMMLIBDIR=../../conv-libs/commlib
 CDIR=../../../..
+CHARMC=$(CDIR)/bin/charmc -I../../.. $(OPTS)
+CHARMINC=$(CDIR)/include
+CHARMBIN=$(CDIR)/bin
 LIBDIR=$(CDIR)/lib
+COMMLIBDIR=../../conv-libs/commlib
+
+DEPENDFILE = Make.depends
 
 LIB = libmodulecommlib.a
 
@@ -14,6 +18,8 @@ CONVERSE_COM_OBJS = $(COMMLIBDIR)/commlib.o $(COMMLIBDIR)/gridrouter.o \
 	$(COMMLIBDIR)/overlapper.o $(COMMLIBDIR)/rsend.o \
 	$(COMMLIBDIR)/bcast.o $(COMMLIBDIR)/3dgridrouter.o  \
 	$(COMMLIBDIR)/graphrouter.o  $(COMMLIBDIR)/hypercubetopology.o
+
+CIFILES = ComlibManager.ci
 
 OBJS = ComlibManager.o $(STRATEGY_OBJS) $(CONVERSE_COM_OBJS)
 
@@ -45,43 +51,12 @@ $(LIB): $(OBJS) $(STRATEGY_OBJS) $(CONVERSE_COM_OBJS)
 conversecom :
 	(cd ../../conv-libs/commlib; $(MAKE) )
 
-ComlibManager.o: ComlibManager.C ComlibManager.h
-	$(CHARMC) -c ComlibManager.C
+include $(DEPENDFILE)
 
-EachToManyStrategy.o: EachToManyStrategy.C EachToManyStrategy.h ComlibManager.h
-	$(CHARMC) -c EachToManyStrategy.C
+commlib.decl.h : commlib.def.h
 
-EachToManyMulticastStrategy.o: EachToManyMulticastStrategy.C EachToManyMulticastStrategy.h \
-	ComlibManager.h
-	$(CHARMC) -c EachToManyMulticastStrategy.C
-
-DirectMulticastStrategy.o: DirectMulticastStrategy.C DirectMulticastStrategy.h\
-	ComlibManager.h
-	$(CHARMC) -c DirectMulticastStrategy.C
-
-RingMulticastStrategy.o: RingMulticastStrategy.C RingMulticastStrategy.h\
-	ComlibManager.h
-	$(CHARMC) -c RingMulticastStrategy.C
-
-MPIStrategy.o: MPIStrategy.C MPIStrategy.h ComlibManager.h
-	$(CHARMC) -c MPIStrategy.C
-
-StreamingStrategy.o: StreamingStrategy.C StreamingStrategy.h ComlibManager.h
-	$(CHARMC) -c StreamingStrategy.C
-
-DummyStrategy.o: DummyStrategy.C DummyStrategy.h ComlibManager.h
-	$(CHARMC) -c DummyStrategy.C
-
-NodeMulticast.o: NodeMulticast.C NodeMulticast.h ComlibManager.h
-	$(CHARMC) -c NodeMulticast.C
-
-MsgPacker.o: MsgPacker.C MsgPacker.h
-	$(CHARMC) -c MsgPacker.C
-
-commlib.decl.h commlib.def.h: ComlibManager.ci
+commlib.def.h: ComlibManager.ci
 	$(CHARMC) ComlibManager.ci
-
-ComlibManager.h: commlib.decl.h
 
 clean:
 	rm -f *~ *.decl.h *.def.h *.o $(LIB) \
@@ -95,3 +70,19 @@ clean:
 	$(CDIR)/include/commlib.def.h        \
         $(CDIR)/lib/libcomm.a                \
 	$(CDIR)/lib/libmodulecomlib.a
+
+depends:  $(CIFILES)
+	echo "Creating " $(DEPENDFILE) " ..."; 
+	if [ -f $(DEPENDFILE) ]; then \
+           /bin/cp -f $(DEPENDFILE) $(DEPENDFILE).old; \
+        fi; \
+	echo > $(DEPENDFILE); \
+        for i in ComlibManager.o $(STRATEGY_OBJS) ; do \
+	      SRCFILE=`basename $$i .o`.C ; \
+              echo "checking dependencies for $$SRCFILE" ; \
+              g++ -MM  -I../../.. -I$(CHARMINC) $$SRCFILE | \
+              perl $(CHARMBIN)/dep.pl $(CHARMINC)  ../../.. /usr/include /usr/local >> $(DEPENDFILE); \
+              echo '	$$(CHARMC) -c -o '$$i $$SRCFILE >> $(DEPENDFILE) ; \
+	      echo '' >> $(DEPENDFILE) ; \
+        done; 
+

@@ -1,0 +1,83 @@
+
+ComlibManager.o: \
+	ComlibManager.C \
+	ComlibManager.h \
+	commlib.decl.h \
+	EachToManyStrategy.h \
+	EachToManyMulticastStrategy.h \
+	DirectMulticastStrategy.h \
+	StreamingStrategy.h \
+	DummyStrategy.h \
+	MPIStrategy.h \
+	NodeMulticast.h \
+	MsgPacker.h \
+	RingMulticastStrategy.h \
+	commlib.def.h
+	$(CHARMC) -c -o ComlibManager.o ComlibManager.C
+
+EachToManyStrategy.o: \
+	EachToManyStrategy.C \
+	EachToManyStrategy.h \
+	ComlibManager.h \
+	commlib.decl.h
+	$(CHARMC) -c -o EachToManyStrategy.o EachToManyStrategy.C
+
+MPIStrategy.o: \
+	MPIStrategy.C \
+	MPIStrategy.h \
+	ComlibManager.h \
+	commlib.decl.h
+	$(CHARMC) -c -o MPIStrategy.o MPIStrategy.C
+
+StreamingStrategy.o: \
+	StreamingStrategy.C \
+	StreamingStrategy.h \
+	ComlibManager.h \
+	commlib.decl.h \
+	MsgPacker.h
+	$(CHARMC) -c -o StreamingStrategy.o StreamingStrategy.C
+
+DummyStrategy.o: \
+	DummyStrategy.C \
+	DummyStrategy.h \
+	ComlibManager.h \
+	commlib.decl.h
+	$(CHARMC) -c -o DummyStrategy.o DummyStrategy.C
+
+NodeMulticast.o: \
+	NodeMulticast.C \
+	NodeMulticast.h \
+	ComlibManager.h \
+	commlib.decl.h
+	$(CHARMC) -c -o NodeMulticast.o NodeMulticast.C
+
+EachToManyMulticastStrategy.o: \
+	EachToManyMulticastStrategy.C \
+	EachToManyMulticastStrategy.h \
+	ComlibManager.h \
+	commlib.decl.h \
+	DirectMulticastStrategy.h
+	$(CHARMC) -c -o EachToManyMulticastStrategy.o EachToManyMulticastStrategy.C
+
+MsgPacker.o: \
+	MsgPacker.C \
+	MsgPacker.h \
+	ComlibManager.h \
+	commlib.decl.h
+	$(CHARMC) -c -o MsgPacker.o MsgPacker.C
+
+DirectMulticastStrategy.o: \
+	DirectMulticastStrategy.C \
+	DirectMulticastStrategy.h \
+	ComlibManager.h \
+	commlib.decl.h
+	$(CHARMC) -c -o DirectMulticastStrategy.o DirectMulticastStrategy.C
+
+RingMulticastStrategy.o: \
+	RingMulticastStrategy.C \
+	RingMulticastStrategy.h \
+	DirectMulticastStrategy.h \
+	ComlibManager.h \
+	commlib.decl.h
+	$(CHARMC) -c -o RingMulticastStrategy.o RingMulticastStrategy.C
+
