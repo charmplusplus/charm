@@ -1,6 +1,5 @@
       module tracemod
       implicit none
-      external fpup_int
       interface
         subroutine ftraceBegin()
         end subroutine
@@ -11,12 +10,10 @@
           integer, intent(in) :: ein
           integer, intent(out) :: eout
         end subroutine
-        subroutine ftraceuserbracketevent(ein, bt, et)
-          integer, intent(in) :: ein
+        subroutine ftraceuserbracketevent(ev, bt, et)
+          integer, intent(in) :: ev 
           double precision, intent(in) :: bt, et
         end subroutine
       end interface
       end module
-
-
 
