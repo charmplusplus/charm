@@ -9,8 +9,8 @@ extern "C" {
 #endif
 
 /* Trace Storage and associated Structure */
-CpvDeclare(int, _traceCoreOn);
-CpvDeclare(double, _traceCoreInitTime);
+CpvExtern(int, _traceCoreOn);
+CpvExtern(double, _traceCoreInitTime);
 
 /* Trace Timer */
 #define  TRACE_CORE_TIMER   CmiWallTimer

@@ -26,6 +26,9 @@ class TraceCore
 	void RegisterLanguage(int lID);
 	void RegisterEvent(int lID, int eID);
 	void LogEvent(int lID, int eID);
+	void LogEvent(int lID, int eID, int iLen, int* iData);
+	void LogEvent(int lID, int eID, int sLen, char* sData);
+	void LogEvent(int lID, int eID, int iLen, int* iData, int sLen, char* sData);
 };
 
 //TODO
