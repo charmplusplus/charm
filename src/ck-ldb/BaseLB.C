@@ -73,11 +73,6 @@ LBMigrateMsg* LBMigrateMsg::unpack(void *m)
   return ret_val;
 }
 
-void LBMigrateMsg::print(LBMigrateMsg* in)
-{
-	ckout << "number of migrations " << in->n_moves << endl;
-}
-
 #include "BaseLB.def.h"
 
 /*@}*/
