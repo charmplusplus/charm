@@ -31,6 +31,7 @@ set OBJECTFILES=()
 set LIBRARIES=()
 set DELETE=()
 set COPIES=()
+set MAINOBJ=()
 unset OBJECT
 unset SEQUENTIAL
 unset VERBOSE
@@ -544,9 +545,10 @@ endif
 # Create MODULES.TMP.o
 
 if ($?VERBOSE) echo "Creating MODULES.TMP.c"
-set DELETE=(MODULES.TMP.dat MODULES.TMP.c MODULES.TMP.o $DELETE)
-rm -f MODULES.TMP.DAT MODULES.TMP.c MODULES.TMP.o
-$CMK_NM $OBJECTFILES | csh -fc "$CMK_NM_FILTER" | awk '(/^_CK_.*_init$/&&(\!/^_CK_.*_struct_init$/)) { print substr($1, 5, length($1)-9); }' | sort | uniq > MODULES.TMP.dat
+set DELETE=(MODULES.TMP.nm MODULES.TMP.dat MODULES.TMP.c MODULES.TMP.o $DELETE)
+rm -f MODULES.TMP.nm MODULES.TMP.dat MODULES.TMP.c MODULES.TMP.o
+$CMK_NM $OBJECTFILES > MODULES.TMP.nm
+csh -fc "$CMK_NM_FILTER" < MODULES.TMP.nm | awk '(/^_CK_.*_init$/&&(\!/^_CK_.*_struct_init$/)) { print substr($1, 5, length($1)-9); }' | sort | uniq > MODULES.TMP.dat
 echo 'Modules: '`cat MODULES.TMP.dat`
 awk '{print "extern void _CK_"$1"_init();";}' < MODULES.TMP.dat >> MODULES.TMP.c
 echo '_CK_module_init_fn()' >> MODULES.TMP.c
@@ -559,11 +561,16 @@ $CMK_CC $OPTS_CC -c MODULES.TMP.c
 if ($status) goto failure
 set OBJECTFILES = ($OBJECTFILES MODULES.TMP.o)
 
+# Decide whether or not to add defmain.
+
+if (! { (grep charm_main MODULES.TMP.nm >& /dev/null) }) then
+	set MAINOBJ=$CHARMLIB/lib${LIBCLASS}-defmain.o
+endif
+
 # Identify the libraries to use
 
 switch ($LANGUAGE)
     case "charm"
-        if ($?MAINOBJ == 0) set MAINOBJ=$CHARMLIB/lib${LIBCLASS}-defmain.o
         set OBJECTFILES = ($OBJECTFILES \
         	$CHARMLIB/lib${LIBCLASS}-core-$EXECMODE.o \
         	$CHARMLIB/lib${LIBCLASS}-ldb-$BALANCE.o \
