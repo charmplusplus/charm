@@ -88,6 +88,7 @@ class ampi : public TempoArray {
     int nReductions;
     int nAllReductions;
     int niRecvs, niSends, biRecv, biSend;
+	DDT	*myDDT ;
 
     ampi(void);
     ampi(CkMigrateMessage *msg); 
