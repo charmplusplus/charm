@@ -245,6 +245,8 @@ CpvStaticDeclare(double, beginTime);
 CpvStaticDeclare(double, usedTime);
 CpvStaticDeclare(int, PROCESSING);
 
+void usageStart(void);
+
 /* Call this when the program is started
  -> Whenever traceModuleInit would be called
  -> -> see conv-core/convcore.c
@@ -258,6 +260,7 @@ void initUsage()
    CpvAccess(beginTime)  = CmiWallTimer();
    CpvAccess(usedTime)   = 0.;
    CpvAccess(PROCESSING) = 0;
+   usageStart();
 }
 
 /* Call this when a BEGIN_PROCESSING event occurs
