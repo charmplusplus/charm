@@ -98,6 +98,7 @@ class edge {
 	       int *local, int *first);
   void sanityCheck(chunk *c, edgeRef shouldRef);
   int nodeLockup(node n, edgeRef start, elemRef from, elemRef end, double l);
+  void nodeUnlock(node n, elemRef from, elemRef end);
   int nodeUpdate(node n, elemRef from, elemRef end, node newNode);
   int nodeDelete(node n, elemRef from, elemRef end, node ndReplace);
 };

@@ -30,6 +30,8 @@ module refine {
 	elemRef, double);
     entry [sync, threaded] intMsg *nodeLockupER(int, node, edgeRef, elemRef, 
 	elemRef, double);
+    entry [sync, threaded] void nodeUnlock(int, node, edgeRef, elemRef);
+    entry [sync, threaded] void nodeUnlockER(int, node, elemRef, elemRef);
     entry [sync, threaded] intMsg *nodeUpdate(int, node, edgeRef, elemRef, 
 	node);
     entry [sync, threaded] intMsg *nodeUpdateER(int, node, elemRef, elemRef, 

@@ -157,6 +157,7 @@ class element {  // triangular elements defined by three node references,
   void coarsen();
   void collapse(int shortEdge);
   int nodeLockup(node n, edgeRef from, edgeRef start, elemRef end, double l);
+  void nodeUnlock(node n, edgeRef from, elemRef end);
   int nodeUpdate(node n, edgeRef from, elemRef end, node newNode);
   int nodeDelete(node n, edgeRef from, elemRef end, node ndReplace);
   int findLongestEdge();

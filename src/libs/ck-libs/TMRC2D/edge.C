@@ -119,15 +119,13 @@ int edge::collapse(elemRef requester, node kNode, node dNode, elemRef kNbr,
 	     incidentNode.Y());
     // unlock opnode and oNode
     if (keepNbr.cid != -1)
-      im = mesh[keepNbr.cid].nodeUpdate(keepNbr.idx,opnode,keepEdge,delNbr,opnode);
-    else { im = new intMsg; im->anInt = -1; }
-    if ((im->anInt == -1) && (delNbr.cid != -1))
-      im = mesh[delNbr.cid].nodeUpdate(delNbr.idx,opnode,keepEdge,keepNbr,opnode);
+      mesh[keepNbr.cid].nodeUnlock(keepNbr.idx, opnode, keepEdge, delNbr);
+    if (delNbr.cid != -1)
+      mesh[delNbr.cid].nodeUnlock(delNbr.idx, opnode, keepEdge, keepNbr);
     if (kNbr.cid != -1)
-      im = mesh[kNbr.cid].nodeUpdate(kNbr.idx,oNode,kEdge,dNbr,oNode);
-    else { im = new intMsg; im->anInt = -1; }
-    if ((im->anInt == -1) && (dNbr.cid != -1))
-      im = mesh[dNbr.cid].nodeUpdate(dNbr.idx,oNode,dEdge,kNbr,oNode);
+      mesh[kNbr.cid].nodeUnlock(kNbr.idx, oNode, kEdge, dNbr);
+    if (dNbr.cid != -1)
+      mesh[dNbr.cid].nodeUnlock(dNbr.idx, oNode, dEdge, kNbr);
 
     if (dNode == incidentNode) { // incidence as planned
       CkPrintf("TMRC2D: moving node %f,%f to %f,%f\n", kNode.X(), kNode.Y(), 
@@ -255,6 +253,13 @@ int edge::nodeLockup(node n, edgeRef start, elemRef from, elemRef end,
   if (next.cid == -1) return -1;
   intMsg *im = mesh[next.cid].nodeLockup(next.idx, n, myRef, start, end, l);
   return im->anInt;
+}
+
+void edge::nodeUnlock(node n, elemRef from, elemRef end)
+{
+  elemRef next = getNot(from);
+  if (next.cid == -1) return;
+  mesh[next.cid].nodeUnlock(next.idx, n, myRef, end);
 }
 
 int edge::nodeUpdate(node n, elemRef from, elemRef end, node newNode)

@@ -18,10 +18,10 @@ void refineChunkInit(void) {
 chunk::chunk(chunkMsg *m)
   : TCharmClient1D(m->myThreads), sizeElements(0), sizeEdges(0), sizeNodes(0),
     firstFreeElement(0), firstFreeEdge(0), firstFreeNode(0),
-    elementSlots(0), edgeSlots(0), nodeSlots(0),
     additions(0), debug_counter(0), refineInProgress(0), coarsenInProgress(0),
     modified(0), meshLock(0), meshExpandFlag(0), 
-    numElements(0), numEdges(0), numNodes(0), numGhosts(0), theClient(NULL)
+    numElements(0), numEdges(0), numNodes(0), numGhosts(0), theClient(NULL),
+    elementSlots(0), edgeSlots(0), nodeSlots(0)
 {
   refineResultsStorage=NULL;
   cid = thisIndex;
@@ -182,6 +182,20 @@ intMsg *chunk::nodeLockupER(int idx, node n, edgeRef start, elemRef from,
   im->anInt = theEdges[idx].nodeLockup(n, start, from, end, l);
   releaseLock();
   return im;
+}
+
+void chunk::nodeUnlock(int idx, node n, edgeRef from, elemRef end)
+{
+  accessLock();
+  theElements[idx].nodeUnlock(n, from, end);
+  releaseLock();
+}
+
+void chunk::nodeUnlockER(int idx, node n, elemRef from, elemRef end)
+{
+  accessLock();
+  theEdges[idx].nodeUnlock(n, from, end);
+  releaseLock();
 }
 
 intMsg *chunk::nodeUpdate(int idx, node n, edgeRef from, elemRef end, 

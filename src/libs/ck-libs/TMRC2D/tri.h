@@ -61,9 +61,24 @@ public:
    *   -Update connectivity for source triangle
    *   -Add new triangle DBC.
    */
+  // OBSOLETE
   virtual void split(int triNo,int edgeOfTri,int movingNode,double frac) {};
+  // Split element triNo on edgeOfTri at frac; movingNode specifies
+  // which side new element is added to (it moves to the new location
+  // on edgeOfTri; frac indicates if this split is on the boundary and
+  // if it is the first or second half of the split operation
   virtual void split(int triNo,int edgeOfTri,int movingNode,double frac,int flag) {};
-  virtual void collapse(int elementID,int collapseEdge,int nodeToKeep,double nX,double nY,int flag) {};
+  // Collapse the edge between of elemId1 between endpoints nodeToKeep
+  // and nodeToDelete.  nodeToKeep's coordinates are updated to newX
+  // and newY, while nodeToDelete is removed and all references to it
+  // are replaced by references to nodeToKeep
+  virtual void collapse(int elemId, int nodeToKeep, int nodeToDelete, double newX, double newY, int flag) {};
+  // update nodeID with new coordinates newX and newY
+  virtual void nodeUpdate(int nodeID, double newX, double newY);
+  // replace oldNodeID with newNodeID on element elementID
+  virtual void nodeReplace(int elementID, int oldNodeID, int newNodeID);
+  // delete node entry at nodeID index
+  virtual void nodeDelete(int nodeID);
 };
 
 class refineResults; //Used by refinement API to store intermediate results
@@ -111,8 +126,6 @@ class chunk : public TCharmClient1D {
   // edges, and nodes located on this chunk; numGhosts is numElements
   // plus number of ghost elements surrounding this chunk
   int cid, numElements, numEdges, numNodes, numGhosts, numChunks;
-  // range of occupied slots in each mesh array
-  int elementSlots, edgeSlots, nodeSlots;
 
   refineResults *refineResultsStorage;
   coarsenResults *coarsenResultsStorage;
@@ -124,6 +137,9 @@ class chunk : public TCharmClient1D {
 
   // client to report refinement split information to
   refineClient *theClient;
+
+  // range of occupied slots in each mesh array
+  int elementSlots, edgeSlots, nodeSlots;
 
   // Basic constructors
   chunk(chunkMsg *);
@@ -163,6 +179,8 @@ class chunk : public TCharmClient1D {
 		     double l);
   intMsg *nodeLockupER(int idx, node n, edgeRef start, elemRef from, 
 		       elemRef end, double l);
+  void nodeUnlock(int idx, node n, edgeRef from, elemRef end);
+  void nodeUnlockER(int idx, node n, elemRef from, elemRef end);
   intMsg *nodeUpdate(int idx, node n, edgeRef from, elemRef end, node newNode);
   intMsg *nodeUpdateER(int idx, node n, elemRef from, elemRef end, node newNode);
   intMsg *nodeDelete(int idx, node n, edgeRef from, elemRef end, 
