@@ -52,9 +52,10 @@ static gm_alarm_t gmalarm;
 
 #if GM_STATS
 static FILE *gmf;			/* one file per processor */
-static int *gm_stats;			/* send count for each size */
-static int  possible_streamed = 0;	/* possible streaming counts */
-static int  defrag = 0;		/* number of defragment */
+static int  *gm_stats;			/* send count for each size */
+static int   possible_streamed = 0;	/* possible streaming counts */
+static int   defrag = 0;		/* number of defragment */
+static int   maxQueueLength = 0;	/* maximum send queue length */
 #endif
 
 /******************************************************************************
@@ -102,6 +103,9 @@ void enqueue_sending(char *msg, int length, OtherNode node, int size)
     sendtail = pm;
   }
   pendinglen ++;
+#if GM_STATS
+  if (pendinglen > maxQueueLength) maxQueueLength = pendinglen;
+#endif
 }
 
 #define peek_sending() (sendhead)
@@ -874,7 +878,7 @@ void CmiMachineExit()
   for (i=5; i<maxsize; i++)  {
     fprintf(gmf, "[%d] size:%d count:%d\n", mype, i, gm_stats[i]);
   }
-  fprintf(gmf, "[%d] possible streaming: %d  defrag: %d \n", mype, possible_streamed, defrag);
+  fprintf(gmf, "[%d] max quelen: %d possible streaming: %d  defrag: %d \n", mype, maxQueueLength, possible_streamed, defrag);
   fclose(gmf);
 #endif
 }
