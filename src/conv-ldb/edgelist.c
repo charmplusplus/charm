@@ -10,8 +10,10 @@ int E;
   EdgeListType * edgesRec;
 
   edgesRec = (EdgeListType *) malloc(sizeof(EdgeListType));
+  _MEMCHECK(edgesRec);
   edgesRec->next = 0;
   edgesRec->edges = (Edge *) malloc(E*sizeof(Edge));
+  _MEMCHECK(edgesRec->edges);
   return(edgesRec);
 }
 

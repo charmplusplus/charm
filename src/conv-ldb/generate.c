@@ -115,10 +115,13 @@ InitVertices(EdgeList, V,E)
   VerticesListType * vlist;
 
   vlist = (VerticesListType *) malloc(sizeof(VerticesListType));
+  _MEMCHECK(vlist);
   vlist->numVertices = V;
   vlist->vertexArray = (Vertex *) malloc(V*sizeof(Vertex));
+  _MEMCHECK(vlist->vertexArray);
   vlist->adjArray = (int *) malloc(2*E*sizeof(int)); 
                     /* as each edge is entered twice */
+  _MEMCHECK(vlist->adjArray);
   countDegrees(EdgeList->edges, vlist->vertexArray, V, E);
   fillAdjArray(EdgeList->edges, vlist, V, E);
   sortAdjArrays(vlist);
@@ -263,7 +266,9 @@ initGraph()
 { int i;
   graph.numVertices = V;
   graph.vertexArray = (Vertex *) malloc(V*sizeof(Vertex));
+  _MEMCHECK(graph.vertexArray);
   graph.adjArray = (int *) malloc(2*E*sizeof(int));
+  _MEMCHECK(graph.adjArray);
 
   for (i=0; i< V; i++) {
     graph.vertexArray[i].degree = 0;
@@ -328,10 +333,12 @@ diameter()
 Q * makeQueue()
 {
   Q *q = (Q *) malloc(sizeof(Q));
+  _MEMCHECK(q);
   q->size = VMAX;
   q->head = 1;
   q->tail = 0;
   q->buf = (int *) malloc(VMAX*sizeof(int));
+  _MEMCHECK(q->buf);
   return q;
 }
 

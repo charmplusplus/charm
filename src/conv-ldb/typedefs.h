@@ -1,3 +1,5 @@
+#include "converse.h"
+
 typedef struct {int node1, node2;} Edge;
 
 typedef struct {int next; 
