@@ -48,8 +48,12 @@ void CComlibEachToManyMulticast(comID id, int ep, void *msg, int bocnum, int npe
 }
 #endif
 
-void CComlibEachToManyMulticast(comID id, int ep, int msgSize, void *msg, int npe, int *pelist)
+void CComlibEachToManyMulticast(comID id, int ep, void *msg, int npe, int *pelist)
 {
+  int len, queueing, priobits; 
+  unsigned int *prioptr;
+  CldPackFn pfn;
+
   if (msg == NULL) {
   	EachToManyMulticast(id, 0, (void *)msg, npe, pelist);
 	return;
@@ -57,12 +61,17 @@ void CComlibEachToManyMulticast(comID id, int ep, int msgSize, void *msg, int np
 
   register envelope *env = UsrToEnv(msg);
   _CHECK_USED(env);
-  env->setMsgtype(ForChareMsg);
+  env->setMsgtype(ForBocMsg);
   env->setEpIdx(ep);
+
+  _infoFn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+  _packFn((void **)&env);
+  _infoFn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+
   CmiSetHandler(env, _charmHandlerIdx);
   _SET_USED(env, 1);
   env->setSrcPe(CkMyPe());
-  EachToManyMulticast(id, msgSize, (void *)env, npe, pelist);
+  EachToManyMulticast(id, len, (void *)env, npe, pelist);
 }
 
 
