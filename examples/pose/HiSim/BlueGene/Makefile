@@ -46,7 +46,7 @@ all:  sqtest
 	( cd $$i ; $(MAKE) $(MACHINE) MACHINE="../$(MACHINE)" ) || exit 1; \
 	done
 
-	make $(OBJDIR)/InitNetwork.o  $(OBJDIR)/util.o
+	$(MAKE) $(OBJDIR)/InitNetwork.o  $(OBJDIR)/util.o
 
 	cd ../tmp; /bin/rm -f moduleinit.o; $(CHARMC) *.o $(OTHER) $(LIBS) -o $(PGM) -module pose -ltrace-projections -language charm++ 
 
