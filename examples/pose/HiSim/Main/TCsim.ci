@@ -1,7 +1,8 @@
 message BGnodeMsg;
 message BGprocMsg;
 message TaskMsg;
-
+message TransMsg;
+ 
 poser BGnode : sim adapt2 chpt {
   entry BGnode(BGnodeMsg *);
   // Event methods
@@ -15,3 +16,8 @@ poser BGproc : sim adapt2 chpt {
   entry [event] void executeTask(TaskMsg *);
 };
 
+poser Transceiver : sim adapt2 chpt {
+  entry Transceiver(TransMsg *);
+  entry [event] void sendMessage(TransMsg *);
+  entry [event] void recvMessage(TransMsg *);
+};

@@ -18,7 +18,9 @@ void Config::readConfig(CkArgMsg *m) {
 
   netsim_on = atoi(m->argv[1]);
   skip_on = atoi(m->argv[2]);
-  
+
+  fscanf(fp,"USE_TRANSCEIVER %d\n",&use_transceiver);
+  fscanf(fp,"NUM_NODES %d\n",&numNodes);  
   fscanf(fp,"MAX_PACKET_SIZE %d\n",&maxpacksize);
   fscanf(fp,"SWITCH_VC %d\n",&switchVc);
   fscanf(fp,"SWITCH_PORT %d\n",&numP);  // Arrgh needed this for indirect networks ,  8 for quarternary fat-tree and so on
@@ -30,6 +32,7 @@ void Config::readConfig(CkArgMsg *m) {
   fscanf(fp,"DISPLAY_MESSAGE_DELAY %d\n",&msgstats_on);
   fscanf(fp,"RECEPTION_SERIAL %d\n",&receptionSerial);
   fscanf(fp,"INPUT_SPEEDUP %d\n",&inputSpeedup);
+ 
 /*
   fscanf(fp, "HEADER_SIZE %d\n", &headerSize);
   fscanf(fp, "CREDIT_SIZE %d\n", &creditSize);

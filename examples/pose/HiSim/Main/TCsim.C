@@ -773,3 +773,38 @@ void BGnode::recvIncomingMsg(TaskMsg *m)
   }
 }
 
+#define NUM_MSG 64
+#define MSG_SIZE 16384
+#define GAP 5
+
+Transceiver::Transceiver(TransMsg *copyM)
+{
+id = copyM->id;
+TransMsg *m;
+m = new TransMsg;
+POSE_local_invoke(sendMessage(m),0);
+}
+
+void Transceiver::sendMessage(TransMsg *copyM)
+{
+//  NodeMsg *m;
+  int i;
+
+  for(i=0;i<NUM_MSG;i++) {
+/*  m  = new NodeMsg;
+  m->dstNode = (id+i+1)%num_nodes;
+  if(m->dstNode == id) continue;
+  m->msgId = i;
+  m->msgsize = MSG_SIZE;
+  m->orig_msglen = MSG_SIZE;
+  m->msgtype = ENVELOPE;
+  CkPrintf("%d %d I sent Message %d -> %d  msgid %d !!! \n",ovt,id,id,m->dstNode,m->msgId);
+  POSE_invoke(genMessages(m), Node, nodeStart+id, i*GAP);
+*/
+  }
+}
+
+void Transceiver::recvMessage(TransMsg *m)
+{
+  CkPrintf("%d %d I received Message %d -> %d msgid %d !!! \n",ovt,id,m->origSrc,m->dstNode,m->msgId);
+}

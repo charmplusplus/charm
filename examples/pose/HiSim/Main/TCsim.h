@@ -307,3 +307,46 @@ class BGnode {
   inline void recvIncomingMsg_commit(TaskMsg *rm)  {}
 };
 
+class TransMsg {
+public:
+int id;
+int origSrc;
+int dstNode;
+int msgId;
+
+TransMsg(){}
+TransMsg(int s,int mid,int d):origSrc(s),dstNode(d),msgId(mid){}
+TransMsg & operator=(const TransMsg & obj) {
+eventMsg::operator=(obj);
+id = obj.id;
+origSrc = obj.origSrc;
+dstNode = obj.dstNode;
+msgId = obj.msgId;
+return *this;
+}
+};
+
+class Transceiver {
+public:
+int id;
+Transceiver(){}
+Transceiver(TransMsg *);
+~Transceiver(){}
+
+void sendMessage(TransMsg *);
+void sendMessage_anti(TransMsg *){restore(this);}
+void sendMessage_commit(TransMsg *){}
+void recvMessage(TransMsg *);
+void recvMessage_anti(TransMsg *){restore(this);}
+void recvMessage_commit(TransMsg *){}
+
+Transceiver& operator=(const Transceiver& obj) {
+        rep::operator=(obj);
+        id = obj.id;
+        return *this;
+}
+bool operator==(const Transceiver & obj) const {
+    return (id==obj.id);
+}
+
+};

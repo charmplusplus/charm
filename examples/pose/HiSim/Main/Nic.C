@@ -52,7 +52,7 @@ void NetInterface::storeMsgInAdvance(NicMsg *m) {
 }
 
 void NetInterface::recvPacket(Packet *p) {
-        int tmp,expected,extra,hops,remlen; TaskMsg *tm; Position src; MsgStore ms;
+        int tmp,expected,extra,hops,remlen; TaskMsg *tm; TransMsg *tr;Position src; MsgStore ms;
         remoteMsgId rmid(p->hdr.msgId,p->hdr.src);
         map<remoteMsgId,int>::iterator it2 = pktMap.find(rmid);
 
@@ -103,11 +103,15 @@ void NetInterface::recvPacket(Packet *p) {
         pktMap.erase(rmid);
         storeBuf.erase(rmid);
 
-        tm = new TaskMsg(ms.src,ms.msgId,ms.index,ms.recvTime,ms.totalLen,
-        (nicConsts->id-config.nicStart),ms.destNodeCode,ms.destTID);
-
-        POSE_invoke(recvIncomingMsg(tm), BGnode, config.origNodes + p->hdr.routeInfo.dst, 0);
-
+	if(config.use_transceiver) {
+                tr = new TransMsg(ms.src,ms.msgId,(nicConsts->id-config.nicStart)); 
+		// Be careful. Making assumption that nodeStart == 0
+                POSE_invoke(recvMessage(tr),Transceiver,nicConsts->id-config.nicStart,0); 
+	} else {	
+        	tm = new TaskMsg(ms.src,ms.msgId,ms.index,ms.recvTime,ms.totalLen,
+ 	       (nicConsts->id-config.nicStart),ms.destNodeCode,ms.destTID);
+       		POSE_invoke(recvIncomingMsg(tm), BGnode, config.origNodes + p->hdr.routeInfo.dst, 0);
+	}
         }
 }
 

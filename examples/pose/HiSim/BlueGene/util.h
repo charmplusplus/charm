@@ -26,6 +26,7 @@ public:
    int numP;
    int receptionSerial;
    int inputSpeedup;
+   int use_transceiver;
 
   int NodeStart;
   int HCAStart;
