@@ -1001,6 +1001,10 @@ void nodeinfo_add(const ChMessageInt_t *nodeInfo,SOCKET ctrlfd)
 #if CMK_USE_GM
         i.IP=nodeInfo[1];
         i.dataport=ChMessageInt_new(nodetab_dataport(nt));
+        if (ChMessageInt(i.IP) == 0) {
+          fprintf(stderr, "Error> Node %d:%s, cannot open GM gm_port %d!\n", nt, nodetab_name(nt), nodetab_dataport(nt));
+          exit(1);
+        }
 #else
 	i.IP=ChMessageInt_new(nodetab_ip(nt));
 	i.dataport=nodeInfo[1];

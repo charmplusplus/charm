@@ -2408,12 +2408,6 @@ static void ConverseRunPE(int everReturn)
   /* better to show the status here */
   if (Cmi_netpoll == 1 && CmiMyPe() == 0)
     CmiPrintf("Charm++: scheduler running in netpoll mode.\n");
-#if CMK_USE_GM
-  if(gmport == NULL) {
-    CmiPrintf("Error> Node %d cannot open port %d!\n", CmiMyPe(), dataport);
-    CmiAbort("Abort");
-  }
-#endif
 
   ConverseCommonInit(CmiMyArgv);
 
