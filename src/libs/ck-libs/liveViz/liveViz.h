@@ -10,6 +10,79 @@
 #include "ckimage.h"
 #include "colorScale.h"
 #include "ImageData.h"
+#include "pup_toNetwork.h"
+
+/********************** LiveViz ***********************/
+#include "liveViz.decl.h"
+
+extern CkReduction::reducerType sum_image_data;
+extern CkReduction::reducerType max_image_data;
+
+/*
+  Start liveViz.  This routine should be called once on processor 0
+  when you are ready to begin receiving image requests.
+
+  The arrayID is the array that will make deposits into liveViz.
+
+  The callback is signalled each time a client requests an image.
+  The image parameters are passed in as a "liveVizRequestMsg *" message.
+*/
+void liveVizInit(const liveVizConfig &cfg, CkArrayID a, CkCallback c);
+
+class liveVizRequestMsg : public CMessage_liveVizRequestMsg {
+public:
+	liveVizRequest req;
+	
+	/// Additional client request data: raw network bytes from client.
+	/// Use liveVizRequestUnpack to extract the data from this message.
+	char *data;
+	int dataLen;
+	
+	liveVizRequestMsg() {}
+	static liveVizRequestMsg *buildNew(const liveVizRequest &req,const void *data,int dataLen);
+};
+
+/// Unpack the extra client request data as network-byte-order ints,
+///  by calling pup on this class.
+template<class T>
+inline void liveVizRequestUnpack(const liveVizRequestMsg *src,T &dest)
+{
+	PUP_toNetwork_unpack p(src->data);
+	p|dest;
+	if (p.size()!=src->dataLen) {
+		CkError("liveVizRequestUnpack: client sent %d bytes, but you wanted %d bytes!\n",
+			p.size(), src->dataLen);
+		CkAbort("liveVizRequestUnpack size mismatch\n");
+	}
+}
+
+/*
+  Deposit a (sizex x sizey) pixel portion of the final image,
+  starting at pixel (startx,starty) in the final image.
+  The "client" pointer is used to perform reductions, it's
+  normally "this".  Each array element must call deposit, even
+  if it's just an empty deposit, like:
+  	liveVizDeposit(0,0, 0,0, NULL, this);
+*/
+void liveVizDeposit(const liveVizRequest &req,
+                    int startx, int starty,
+                    int sizex, int sizey, const byte * imageData,
+                    ArrayElement* client,
+                    CkReduction::reducerType reducer=sum_image_data);
+
+
+//As above, but taking a message instead of a request:
+inline void liveVizDeposit(liveVizRequestMsg *reqMsg,
+		    int startx, int starty,
+		    int sizex, int sizey, const byte * imageData,
+		    ArrayElement* client,
+                    CkReduction::reducerType reducer=sum_image_data)
+{
+	liveVizDeposit(reqMsg->req,startx,starty,sizex,sizey,imageData,client,
+                       reducer);
+	delete reqMsg;
+}
+
 
 /********************** LiveVizPoll **********************
 These declarations should probably live in a header named "liveVizPoll.h"
@@ -17,7 +90,7 @@ These declarations should probably live in a header named "liveVizPoll.h"
 #include "liveVizPoll.decl.h"
 
 
-// liveVizPollMode controls how the image is reassembled:
+/// liveVizPollMode controls how the image is reassembled:
 typedef enum {
 /* This mode responds to each request immediately, ignoring
 any differences between timesteps ("time skew").  This is the
@@ -33,7 +106,7 @@ This mode is not yet implemented.
 /* other modes may be added in the future */
 } liveVizPollMode;
 
-/*
+/**
 Initialize the poll mode of liveViz.  This routine should
 be called from main::main or just before creating the array
 you wish to make liveVizPoll calls from.  For example:
@@ -52,18 +125,10 @@ void liveVizPollInit(const liveVizConfig &cfg,
                      CkArrayOptions &opts,
                      liveVizPollMode mode=liveVizPollMode_skew);
 
-void liveVizPollSync(ArrayElement *from);
 
+typedef liveVizRequestMsg liveVizPollRequestMsg;
 
-class liveVizPollRequestMsg : public CMessage_liveVizPollRequestMsg {
-public:
-  liveVizRequest3d req;
-  liveVizPollRequestMsg() {}
-  liveVizPollRequestMsg(const liveVizRequest3d &req_) :req(req_) {}
-};
-
-
-/*
+/**
 Asks liveViz if there are any requests for images of this
 timestep.  If there are no requests, this routine returns NULL.
 There may be multiple requests for one timestep, so this routine
@@ -84,10 +149,10 @@ Timestep is double-precision to avoid integer overflow if the
 algorithm performs more than 2^32 steps (if each step takes
 1us, 2^32 steps would take 1 hour).
 */
-liveVizPollRequestMsg *liveVizPoll(ArrayElement *from,double timestep);
+liveVizRequestMsg *liveVizPoll(ArrayElement *from,double timestep);
 
 
-/*
+/**
 Responds to a previously poll'd request.  The latter parameters
 have exactly the same meaning as with liveVizDeposit.
 
@@ -116,65 +181,14 @@ void liveVizPollDeposit(ArrayElement *from,
 
 inline void liveVizPollDeposit(ArrayElement *from,
                         double timestep,
-			liveVizPollRequestMsg *reqMsg,
+			liveVizRequestMsg *reqMsg,
 			int startx, int starty,
 			int sizex, int sizey, const byte * imageData)
 {
-  if ( ! reqMsg ) CkError("LiveViz error: User passed a null message! Bad user!");
+  if ( ! reqMsg ) CkError("liveVizPollDeposit: User passed a null message!");
   liveVizPollDeposit(from, timestep, reqMsg->req, startx, starty, sizex, sizey, imageData);
   delete reqMsg;
 }
 
-
-/********************** LiveViz ***********************/
-#include "liveViz.decl.h"
-
-extern CkReduction::reducerType sum_image_data;
-extern CkReduction::reducerType max_image_data;
-
-/*
-  Start liveViz.  This routine should be called once on processor 0
-  when you are ready to begin receiving image requests.
-
-  The arrayID is the array that will make deposits into liveViz.
-
-  The callback is signalled each time a client requests an image.
-  The image parameters are passed in as a "liveVizRequestMsg *" message.
-*/
-void liveVizInit(const liveVizConfig &cfg, CkArrayID a, CkCallback c);
-
-class liveVizRequestMsg : public CMessage_liveVizRequestMsg {
-public:
-	liveVizRequest3d req;
-	liveVizRequestMsg() {}
-	liveVizRequestMsg(const liveVizRequest3d &req_) :req(req_) {}
-};
-
-/*
-  Deposit a (sizex x sizey) pixel portion of the final image,
-  starting at pixel (startx,starty) in the final image.
-  The "client" pointer is used to perform reductions, it's
-  normally "this".  Each array element must call deposit, even
-  if it's just an empty deposit, like:
-  	liveVizDeposit(0,0, 0,0, NULL, this);
-*/
-void liveVizDeposit(const liveVizRequest &req,
-                    int startx, int starty,
-                    int sizex, int sizey, const byte * imageData,
-                    ArrayElement* client,
-                    CkReduction::reducerType reducer=sum_image_data);
-
-
-//As above, but taking a message instead of a request:
-inline void liveVizDeposit(liveVizRequestMsg *reqMsg,
-		    int startx, int starty,
-		    int sizex, int sizey, const byte * imageData,
-		    ArrayElement* client,
-                    CkReduction::reducerType reducer=sum_image_data)
-{
-	liveVizDeposit(reqMsg->req,startx,starty,sizex,sizey,imageData,client,
-                       reducer);
-	delete reqMsg;
-}
 
 #endif /* def(thisHeader) */

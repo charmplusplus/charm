@@ -3,9 +3,8 @@ CHARMC=$(CDIR)/bin/charmc $(OPTS)
 FLAGS=-DEXTERIOR_BLACK_PIXEL_ELIMINATION
 
 HEADERS=liveViz.h liveViz.decl.h liveVizPoll.decl.h liveViz0.h colorScale.h ImageData.h
-HEADDEP=$(HEADERS) liveViz.def.h networkVar.h \
-	ImageData.h
-OBJS=liveViz0.o liveViz.o liveVizPoll.o networkVar.o colorScale.o ImageData.o
+HEADDEP=$(HEADERS) liveViz.def.h ImageData.h
+OBJS=liveViz0.o liveViz.o liveVizPoll.o colorScale.o ImageData.o
 DEST=$(CDIR)/lib/libmoduleliveViz.a
 
 all: $(DEST)

@@ -33,12 +33,21 @@ void liveVizInitComplete(void *rednMessage) {
   liveViz0Init(lv_config);
 }
 
+liveVizRequestMsg *liveVizRequestMsg::buildNew(const liveVizRequest &req,const void *data,int dataLen)
+{
+	liveVizRequestMsg *m=new (dataLen,0) liveVizRequestMsg();
+	m->req=req;
+	memcpy(m->data,data,dataLen);
+	m->dataLen=dataLen;
+	return m;
+}
+
 
 //Called by lower layers when an image request comes in on processor 0.
 //  Just forwards request on to user.
-void liveViz0Get(const liveVizRequest3d &req)
+void liveViz0Get(const liveVizRequest &req,void *data,int dataLen)
 {
-  clientGetImageCallback.send(new liveVizRequestMsg(req));
+  clientGetImageCallback.send(liveVizRequestMsg::buildNew(req,data,dataLen));
 }
 
 /*This array has 512 entries-- it's used to clip off large values

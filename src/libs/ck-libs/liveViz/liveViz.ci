@@ -1,6 +1,8 @@
 module liveViz {
+message liveVizRequestMsg {
+	char data[];
+};
 extern module liveVizPoll;
-message liveVizRequestMsg;
 
 initcall void liveVizNodeInit(void);
 

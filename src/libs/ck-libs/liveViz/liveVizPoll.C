@@ -6,26 +6,35 @@ Jonathan A. Booth, jbooth@uiuc.edu
 #include "liveViz.h"
 #include "liveViz_impl.h"
 
-CProxy_liveVizPollArray proxy;
-extern CProxy_liveVizPollArray proxy;
-void liveVizPoll0Get(liveVizRequestMsg *req);
+static CProxy_liveVizPollArray proxy;
+void liveVizPoll0Forward(liveVizRequestMsg *req);
 
-// A shadow array to handle reductions as well as to deal with image synch.
+/**
+ A shadow array to handle reductions as well as to deal with image synch.
+ 
+ Incoming requests are broadcast, queued up, then given to the user on demand.
+*/
 class liveVizPollArray : public ArrayElementMax {
 private:
-  CkMsgQ<liveVizPollRequestMsg> requests;
+  CkMsgQ<liveVizRequestMsg> requests;
+  void init(void) {
+    proxy=thisArrayID;
+  }
 public:
-  liveVizPollArray() : requests() { usesAtSync = CmiTrue; };
-  liveVizPollArray(CkMigrateMessage *m) : requests() { usesAtSync = CmiTrue; };
-  void isAtSync() { AtSync(); };
+  liveVizPollArray() { init(); }
+  liveVizPollArray(CkMigrateMessage *m) { init(); }
   void pup(PUP::er &p) {
     ArrayElementMax::pup(p);
     p|requests;
   }
-  void request(liveVizPollRequestMsg *msg) {
+  
+  /// Incoming request: queue it up.
+  void request(liveVizRequestMsg *msg) {
     requests.enq(msg);
   }
-  liveVizPollRequestMsg * poll(double timestep) {
+  
+  /// Hand any pending requests over to the user.
+  liveVizRequestMsg * poll(double timestep) {
     if ( ! requests.length() ) {
       return NULL;
     } else {
@@ -35,22 +44,28 @@ public:
 };
 
 
-// A listener to create a fully shadowed array. I have a feeling that this
-// should probably be globalized into a library somewhere eventually rather
-// than kept local to liveViz as it seems like a useful tool.
+/// A listener to create a fully shadowed array. I have a feeling that this
+/// should probably be globalized into a library somewhere eventually rather
+/// than kept local to liveViz as it seems like a useful tool.
 class liveVizArrayListener : public CkArrayListener {
+  CProxy_liveVizPollArray poll;
 public:
-  liveVizArrayListener() : CkArrayListener(0) {};
+  liveVizArrayListener(const CProxy_liveVizPollArray &poll_) 
+  	: CkArrayListener(0),poll(poll_) {}
   liveVizArrayListener(CkMigrateMessage *m) : CkArrayListener(m) {}
+  void pup(PUP::er &p) {
+     CkArrayListener::pup(p);
+     p|poll;
+  }
   PUPable_decl(liveVizArrayListener)
 
   void ckBeginInserting() {
   }
   void ckEndInserting() {
-    proxy.doneInserting();
+    poll.doneInserting();
   }
   void ckElementCreating(ArrayElement *elt) {
-    proxy(elt->thisIndexMax).insert();
+    poll(elt->thisIndexMax).insert();
   }
 };
 
@@ -64,42 +79,28 @@ void liveVizPollInit(const liveVizConfig &cfg,
 
   // Create our proxy array, who will buffer incoming requests and make them
   // available to the user's code. Tell the user's array to bindTo my proxy.
-  proxy = CProxy_liveVizPollArray::ckNew();
-  opts.bindTo(proxy);
+  CProxy_liveVizPollArray poll = CProxy_liveVizPollArray::ckNew();
+  opts.bindTo(poll);
 
-  // Now throw that all down onto the regular old liveViz
-  CkCallback myCB((void (*) (void *))liveVizPoll0Get);
-  liveVizInit(cfg, proxy, myCB);
+  // Incoming image requests get sent to the poll array
+  CkCallback myCB(CkIndex_liveVizPollArray::request(0), poll);
+  liveVizInit(cfg, poll, myCB);
 
   // Create our array listener object who'll manage our proxy array.
-  opts.addListener(new liveVizArrayListener());
+  opts.addListener(new liveVizArrayListener(poll));
 }
 
 // Called by clients to look and see if they need to do image work
-liveVizPollRequestMsg *liveVizPoll(ArrayElement *from, double timestep) {
+liveVizRequestMsg *liveVizPoll(ArrayElement *from, double timestep) {
   liveVizPollArray *p = proxy(from->thisIndexMax).ckLocal();
   if ( !p ) {
 #ifdef DEBUG
-    ckerr << "liveViz warning: liveVizPoll(): proxy at from->thisIndexMax is null!" << endl;
+    CkError("liveViz warning: liveVizPoll(): proxy at from->thisIndexMax is null!\n");
 #endif
     return NULL;
   } else {
     return p->poll(timestep);
   }
-}
-
-// Called to sync the polling element
-void liveVizPollSync(ArrayElement *from) {
-  liveVizPollArray *p = proxy(from->thisIndexMax).ckLocal();
-  if ( p ) { p->isAtSync(); }
-}
-
-
-//Called by lower layers when an image request comes in on processor 0.
-//  Just forwards request on to user.
-void liveVizPoll0Get(liveVizRequestMsg *msg) {
-  proxy.request(new liveVizPollRequestMsg(msg->req));
-  delete msg;
 }
 
 //Called by clients to deposit a piece of the final image

@@ -8,23 +8,37 @@ Orion Sky Lawlor, olawlor@acm.org, 6/2002
 #include "conv-ccs.h"
 #include <sys/types.h>
 #include "liveViz0.h"
-#include "networkVar.h"
+#include "pup_toNetwork.h"
 
 //Current liveViz application configuration.
 //  This is data that never changes during the course of a run.
 static liveVizConfig config; 
 
-void copy(const networkVector3d &src,CkVector3d &dest)
-{
-	dest.x=src.x;
-	dest.y=src.y;
-	dest.z=src.z;
+/*This pup routine defines the on-the-wire layout of the configuration response*/
+void liveVizConfig::pupNetwork(PUP::er &p) {
+	int version=1; // Server version number
+	p|version; 
+	p|isColor;
+	p|serverPush;
+	p|is3d;
+	if (is3d) {
+		p|box.min;
+		p|box.max;
+	}
 }
-void copy(const CkVector3d &src,networkVector3d &dest)
-{
-	dest.x=src.x;
-	dest.y=src.y;
-	dest.z=src.z;
+
+/* This pup routine defines the on-the-wire layout of the image request */
+void liveVizRequest::pupNetwork(PUP::er &p) {
+	int version=1; // Client version number
+	p|version; 
+	p|code;
+	p|wid;
+	p|ht;
+}
+	
+void liveVizRequest3d::pup(PUP::er &p) {
+	p|x; p|y; p|z; p|o;
+	p|minZ; p|maxZ;
 }
 
 /*
@@ -32,40 +46,19 @@ void copy(const CkVector3d &src,networkVector3d &dest)
  */
 extern "C" void getImageConfigHandler(char * msg)
 {
-  /*This class defines the on-the-wire layout of the configuration response*/
-  struct configInfo{
-    networkInt version; //Server version number (currently 1)
-    networkInt isColor;
-    networkInt isPush;
-    networkInt is3d;
-    networkVector3d min,max; //Bounding box, if 3d
-  };
-  configInfo ret;
-  ret.version=1; //Hardcoded server version
-  ret.isColor=config.getColor()?1:0;
-  ret.isPush=config.getPush()?1:0;
-  ret.is3d=config.get3d()?1:0;
-  CkBbox3d box; box.empty(); box.add(CkVector3d(0,0,0));
-  if (config.get3d()) box=config.getBox();
-  copy(box.min,ret.min); copy(box.max,ret.max);
+  PUP_toNetwork_sizer sp;
+  config.pupNetwork(sp);
+  int len=sp.size();
+  char *buf=new char[len];
+  PUP_toNetwork_pack pp(buf);
+  config.pupNetwork(pp);
+  if (len!=pp.size()) CkAbort("liveVizConfig get pup mismatch");
   if (config.getVerbose(1))
     CmiPrintf("CCS getImageConfig> Sending a new client my configuration\n");
-  CcsSendReply(sizeof(configInfo), &ret);
+  CcsSendReply(len,buf);
+  delete[] buf;
   CmiFree(msg); //Throw away the client's request
 }
-
-/*
-  This class defines the on-the-wire layout of an image request:
-*/
-class networkImageRequest {
-public:
-  networkInt version; //Client version number (currently 1)
-  networkInt code;//Request code-- application-defined
-  networkInt wid,ht;//Size (pixels) of requested image
-  //The following fields are only valid for 3d servers:
-  networkVector3d x,y,z,o;//Coordinate axes of screen (xScreen=(v-o).dot(x))
-  networkDouble minZ,maxZ;//range of allowable z values
-};
 
 //static double startTime;
 /*
@@ -73,25 +66,24 @@ public:
  */
 extern "C" void getImageHandler(char * msg)
 {
-  // startTime=CmiWallTimer();
-  networkImageRequest *r=(networkImageRequest *)(msg+CmiMsgHeaderSizeBytes);
-  int wid=r->wid,ht=r->ht;
+  int msgLen=CmiSize(msg);
+  char *buf=(char *)(msg+CmiMsgHeaderSizeBytes); msgLen-=CmiMsgHeaderSizeBytes;
+  liveVizRequest o;
+  PUP_toNetwork_unpack up(buf);
+  o.pupNetwork(up);
+  buf+=up.size(); msgLen-=up.size();
+  int wid=o.wid,ht=o.ht;
   
   if (config.getVerbose(2))
     CmiPrintf("CCS getImage> Request for (%d x %d) or (0x%x x 0x%x) pixel image.\n",
 	      wid,ht,wid,ht);
-  
-  liveVizRequest3d o;
-  o.replyToken = CcsDelayReply();
-  o.code=r->code;
-  o.wid=r->wid;
-  o.ht=r->ht;
-  if (config.get3d()) { /*Grab a 3d request*/
-    copy(r->x,o.x); copy(r->y,o.y); copy(r->z,o.z); copy(r->o,o.o);
-    o.minZ=r->minZ;
-    o.maxZ=r->maxZ;
+  if (msgLen<0) { 
+    CmiError("liveViz0 getImageHandler Rejecting too-short image request\n");
+    return;
   }
-  liveViz0Get(o);
+  
+  o.replyToken = CcsDelayReply();
+  liveViz0Get(o,buf,msgLen);
   CmiFree(msg); //Throw away the client's request
 }
 
