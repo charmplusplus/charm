@@ -90,6 +90,8 @@ driver(void)
 {
   int nnodes,nelems,nnodeData,nelemData,np;
 
+  FEM_Print("Starting driver...");
+
   FEM_Get_Node(&nnodes,&nnodeData);
   double *nodeData=new double[nnodeData*nnodes];
   FEM_Get_Node_Data(nodeData);  
@@ -103,7 +105,7 @@ driver(void)
   int tsteps=nnodeData;
 
   int myId = FEM_My_Partition();
-  FEM_Print_Partition();
+  //FEM_Print_Partition();
   Node *nodes = new Node[nnodes];
   Element *elements = new Element[nelems];
   int i;
