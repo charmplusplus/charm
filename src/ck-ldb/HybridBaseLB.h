@@ -76,6 +76,8 @@ public:
     if (level == 0) return 0;
     if (level == 1) return mymin(CkNumPes(), mype+span[0]) - mype;
     if (level == 2) return span[1];
+    CmiAssert(0);
+    return 0;
   }
   virtual void getChildren(int mype, int level, int *children, int &count) {
     CmiAssert(isroot(mype, level));
