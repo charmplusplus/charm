@@ -1,5 +1,5 @@
 module ComlibModule {
-  initcall void initComlibManager();
+  initnode void initComlibManager();
   message DummyMsg;
 
   group [migratable] ComlibManager {
