@@ -24,7 +24,7 @@ Orion Sky Lawlor, olawlor@acm.org, 1/16/2003
 #define __UIUC_CHARM_ILSI_H
 
 #include "charm-api.h"
-#include "ilsi_c.h"
+#include "ilsic.h"
 
 /**
  * An ILSI_Comm is an ILSI_Solver's interface to the 

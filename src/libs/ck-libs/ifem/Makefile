@@ -1,7 +1,7 @@
 CDIR=../../../..
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
-HEADERS=ilsi.h  ilsi_c.h ilsi_f.h  ifem_c.h ifem_f.h
+HEADERS=ilsi.h  ilsic.h ilsif.h  ifemc.h ifemf.h
 HEADDEP=$(HEADERS) ilsi_vec.h
 S_OBJS=ilsi.o cg.o
 OBJS=$(S_OBJS) ifem.o

@@ -6,7 +6,7 @@ Orion Sky Lawlor, olawlor@acm.org, 1/17/2003
 #ifndef __UIUC_CHARM_IFEM_C_H
 #define __UIUC_CHARM_IFEM_C_H
 
-#include "ilsi_c.h" /* For ILSI_Param, ILSI_Solver */
+#include "ilsic.h" /* For ILSI_Param, ILSI_Solver */
 
 #ifdef __cplusplus
 extern "C" {

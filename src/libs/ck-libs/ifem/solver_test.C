@@ -1,5 +1,7 @@
 /**
-Tiny serial test for linear solvers
+Tiny serial test for linear solvers.
+For a real parallel example program, see
+	charm/pgms/charm++/fem/matrix/
 
 Orion Sky Lawlor, olawlor@acm.org, 1/16/2003
 */

@@ -5,7 +5,7 @@ Orion Sky Lawlor, olawlor@acm.org, 1/17/2003
 */
 #include "charm++.h"
 #include "charm-api.h"
-#include "ifem_c.h"
+#include "ifemc.h"
 #include "ilsi.h"
 #include "fem.h"
 #include "idxlc.h"
