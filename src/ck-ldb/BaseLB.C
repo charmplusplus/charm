@@ -36,15 +36,16 @@ void BaseLB::unregister() {}
 
 void* LBMigrateMsg::alloc(int msgnum, size_t size, int* array, int priobits)
 {
-  int totalsize = size + array[0] * sizeof(MigrateInfo) 
-    + CkNumPes() * (sizeof(char)+sizeof(double));
+  int totalsize = ALIGN8(size) + ALIGN8(array[0] * sizeof(MigrateInfo)) 
+    + ALIGN8(CkNumPes() * sizeof(char))+
+    + ALIGN8(CkNumPes() * sizeof(double));
 
   LBMigrateMsg* ret =
     (LBMigrateMsg*)(CkAllocMsg(msgnum,totalsize,priobits));
 
-  ret->moves = (MigrateInfo*) ((char*)(ret)+ size);
+  ret->moves = (MigrateInfo*) ((char*)(ret)+ ALIGN8(size));
   ret->avail_vector = (char *)(ret->moves + array[0]);
-  ret->expectedLoad = (double *)(ret->avail_vector + CkNumPes()*sizeof(char));
+  ret->expectedLoad = (double *)(ret->avail_vector + ALIGN8(CkNumPes()*sizeof(char)));
   return (void*)(ret);
 }
 

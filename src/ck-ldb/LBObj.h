@@ -29,7 +29,7 @@ public:
     data.wallTime = 0.;
     userData = usr_ptr;
     parentDB = _parentDB;
-    migratable = _migratable;
+//    migratable = _migratable;
     registered = CmiTrue;
     lastCpuTime = lastWallTime = .0;
   }
@@ -74,16 +74,16 @@ public:
 private:
 
   LBDB* parentDB;
+  void *userData;
 //  LDOMHandle parentOM;
 //  LDObjHandle myhandle;
   LDObjData data;
-  void *userData;
+  CmiBool registered;
   double startWTime;
   double startCTime;
   double lastCpuTime;
   double lastWallTime;
-  CmiBool migratable;   // temp
-  CmiBool registered;
+//  CmiBool migratable;   // temp
 };
 
 #endif
