@@ -1099,6 +1099,7 @@ FEM_Mesh *FEM_Mesh_assemble(int nChunks,FEM_Mesh **chunks)
 		for(c=0; c<nChunks;c++) 
 		if (chunks[c]->elem.has(t)) {
 			FEM_Elem &src_e=chunks[c]->elem[t];
+			if (!m->elem.has(t)) m->elem.set(t).copyShape(src_e);
 			FEM_Elem &dest_e=m->elem[t];
 			for (int l=0;l<src_e.size();l++) {
 				int g=elemNum.add(src_e,l,dest_e);
@@ -1118,6 +1119,7 @@ FEM_Mesh *FEM_Mesh_assemble(int nChunks,FEM_Mesh **chunks)
 		for(c=0; c<nChunks;c++) 
 		if (chunks[c]->sparse.has(t)) {
 			FEM_Sparse &src_e=chunks[c]->sparse[t];
+			if (!m->sparse.has(t)) m->sparse.set(t).copyShape(src_e);
 			FEM_Sparse &dest_e=m->sparse[t];
 			for (int l=0;l<src_e.size();l++) {
 				int g=sparseNum.add(src_e,l,dest_e);

@@ -791,7 +791,10 @@ public:
 	}
 	
 	/// Return true if we have a type t, and false otherwise
-	bool has(int type) const { return types[type]!=NULL; }
+	bool has(int type) const { 
+		if (type>=types.size()) return false;
+		return types[type]!=NULL; 
+	}
 	
 	/// Return a writable copy of this type, calling new T(mesh) if it's not there
 	T &set(int type,const char *callingRoutine="") {
