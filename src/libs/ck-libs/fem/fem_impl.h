@@ -108,8 +108,6 @@ public:
 		return ret;
 	}
 	void pup(PUP::er &p);
-	void write(FILE *fp) const;
-	void read(FILE *fp);
 };
 
 /*This class describes all the shared items of a given chunk*/
@@ -139,8 +137,6 @@ public:
 	void add(int myChunk,int myLocalNo,
 		 int hisChunk,int hisLocalNo,commCounts &hisList);
 	
-	void write(FILE *fp) const;
-	void read(FILE *fp);
 	void print(const l2g_t &l2g);
 };
 
@@ -241,17 +237,8 @@ class MeshChunk : public CkNoncopyable {
         }
 	void pup(PUP::er &p); //For send/recv
 
-	void read(FILE *fp) 
-		{readNodes(fp); readElems(fp); readComm(fp); }
-	void write(FILE *fp) const 
-		{writeNodes(fp); writeElems(fp); writeComm(fp); }
-private:
-	void readNodes(FILE *fp);
-	void readElems(FILE *fp);
-	void readComm(FILE *fp);
-	void writeNodes(FILE *fp) const;
-	void writeElems(FILE *fp) const;
-	void writeComm(FILE *fp) const;
+	void read(FILE *fp);
+	void write(FILE *fp);
 };
 
 /* Unmarshall into a heap-allocated copy */

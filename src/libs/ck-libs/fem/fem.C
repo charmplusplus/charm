@@ -98,13 +98,13 @@ static void mesh_split(int _nchunks,MeshChunkOutput *out) {
     delete _meshptr; _meshptr=NULL;
 }
 
-static const char *meshFileNames="femdata.pe%d";
+static const char *meshFileNames="fem_mesh_vp%d_%d.dat";
 
-static FILE *openMeshFile(int chunkNo,bool forRead)
+static FILE *openMeshFile(int chunkNo,int nchunks,bool forRead)
 {
     char fname[256];
-    sprintf(fname, meshFileNames, chunkNo);
-    FILE *fp = fopen(fname, "w");
+    sprintf(fname, meshFileNames, nchunks, chunkNo);
+    FILE *fp = fopen(fname, forRead?"r":"w");
     CkPrintf("FEM> %s %s...\n",forRead?"Reading":"Writing",fname);  
     if(fp==0) {
       CkAbort(forRead?"FEM: unable to open input file"
@@ -114,15 +114,16 @@ static FILE *openMeshFile(int chunkNo,bool forRead)
 }
 
 class MeshChunkOutputWriter : public MeshChunkOutput {
+  int nchunks;
 public:
-	void accept(int chunkNo,MeshChunk *chk);
+  MeshChunkOutputWriter(int nc) :nchunks(nc) {}
+  void accept(int chunkNo,MeshChunk *chk);
 };
 
 void MeshChunkOutputWriter::accept(int chunkNo,MeshChunk *chk)
 {
-	FILE *fp=openMeshFile(chunkNo,false);
-	chk->write(fp);
-	fclose(fp);
+	FILE *fp=openMeshFile(chunkNo,nchunks,false);
+	chk->write(fp); /*closes file*/
 	delete chk;
 }
 
@@ -137,6 +138,15 @@ public:
 		delete chk;
 	}
 };
+
+static void RestoreTCharmGlobals(int _nchunks) {
+  PUP::fromTextFile pg(openMeshFile(_nchunks,_nchunks,true));
+  TCharmReadonlys::pupAllReadonlys(pg);
+}
+static void SaveTCharmGlobals(int _nchunks) {
+  PUP::toTextFile pg(openMeshFile(_nchunks,_nchunks,false));
+  TCharmReadonlys::pupAllReadonlys(pg);
+}
 
 FDECL void FTN_NAME(FEM_ATTACH,fem_attach)(int *flags) 
 {
@@ -153,10 +163,17 @@ CDECL void FEM_Attach(int flags)
 	int _nchunks=tc->getNumElements();
 	
 	if (flags&FEM_INIT_WRITE) 
-	{ //Just write out the mesh and exit
-		MeshChunkOutputWriter w;
+	{ //First save the user's globals (if any):
+		SaveTCharmGlobals(_nchunks);
+		
+		//Split the mesh and write it out
+		MeshChunkOutputWriter w(_nchunks);
 		mesh_split(_nchunks,&w);
-		return;
+		CkExit();
+	}
+	if (flags&FEM_INIT_READ)
+	{ //Restore the user's globals on PE 0-- they'll get copied elsewhere
+	  RestoreTCharmGlobals(_nchunks);
 	}
 	
 	//Create a new chunk array
@@ -294,9 +311,8 @@ public:
   }
   void useChunk(int i) {
     if (i<0 || i>=nchunks) CkAbort("Invalid index passed to FEM_Serial_Begin!");
-    FILE *fp=openMeshFile(i,false);
-    chks[i]->write(fp);
-    fclose(fp);
+    FILE *fp=openMeshFile(i,nchunks,false);
+    chks[i]->write(fp); /*closes file*/
     _meshptr=&chks[i]->m;
   }
 };
@@ -306,9 +322,12 @@ CDECL void FEM_Serial_Split(int npieces) {
   FEMAPI("FEM_Serial_Split");
   meshChunkStore=new MeshChunkOutputStorer(npieces);
   mesh_split(npieces,meshChunkStore);
+  SaveTCharmGlobals(npieces);
 }
 FDECL void FTN_NAME(FEM_SERIAL_SPLIT,fem_serial_split)(int *npieces)
-{ FEM_Serial_Split(*npieces); }
+{ 
+  FEM_Serial_Split(*npieces); 
+}
 
 CDECL void FEM_Serial_Begin(int chunkNo) {
   FEMAPI("FEM_Serial_Begin");
@@ -1254,115 +1273,15 @@ FEMchunk::readField(int fid, void *nodes, const char *fname)
 }
 
 //-------------------- chunk I/O ---------------------
-void MeshChunk::writeNodes(FILE *fp) const
+void MeshChunk::write(FILE *fp)
 {
-    fprintf(fp, "%d %d\n", m.node.n,m.node.dataPer);
-    for(int i=0;i<m.node.n;i++) {
-      fprintf(fp, "%d %d ", nodeNums[i], isPrimary[i]);
-      for(int d=0;d<m.node.dataPer;d++)
-	fprintf(fp, "%lf ", m.node.udata[i*m.node.dataPer+d]);
-      fprintf(fp,"\n");
-    }
+  PUP::toTextFile p(fp);
+  pup(p);
 }
-
-void MeshChunk::readNodes(FILE *fp)
+void MeshChunk::read(FILE *fp)
 {
-    fscanf(fp, "%d%d", &m.node.n,&m.node.dataPer);
-    nodeNums = new int[m.node.n]; CHK(nodeNums);
-    isPrimary = new int[m.node.n]; CHK(isPrimary);
-    m.node.allocUdata();
-    for(int i=0;i<m.node.n;i++) {
-      fscanf(fp, "%d%d", &nodeNums[i], &isPrimary[i]);
-      for(int d=0;d<m.node.dataPer;d++)
-	fscanf(fp, "%lf", &m.node.udata[i*m.node.dataPer+d]);
-    }
-}
-
-void MeshChunk::writeElems(FILE *fp) const
-{
-    fprintf(fp,"%d\n",m.nElemTypes);
-    int t;
-    for (t=0;t<m.nElemTypes;t++) {
-      fprintf(fp, "%d %d %d\n", m.elem[t].n, m.elem[t].nodesPer,m.elem[t].dataPer);
-    }
-    for (t=0;t<m.nElemTypes;t++) {
-      int start=m.nElems(t);
-      for(int i=0; i<m.elem[t].n; i++) {
-        fprintf(fp, "%d ", elemNums[start+i]);
-        for(int j=0;j<m.elem[t].nodesPer;j++)
-          fprintf(fp, "%d ", m.elem[t].conn[i*m.elem[t].nodesPer+j]);
-        for(int d=0;d<m.elem[t].dataPer;d++)
-          fprintf(fp, "%lf ", m.elem[t].udata[i*m.elem[t].dataPer+d]);
-	fprintf(fp,"\n");
-      }
-    }
-}
-
-void MeshChunk::readElems(FILE *fp)
-{
-    fscanf(fp,"%d",&m.nElemTypes);
-    int t;
-    for (t=0;t<m.nElemTypes;t++) {
-      fscanf(fp, "%d%d%d", &m.elem[t].n, &m.elem[t].nodesPer,&m.elem[t].dataPer);
-    }
-    elemNums = new int[m.nElems()]; CHK(elemNums);
-    for (t=0;t<m.nElemTypes;t++) {
-      m.elem[t].allocUdata();
-      m.elem[t].allocConn();
-      int start=m.nElems(t);
-      for(int i=0; i<m.elem[t].n; i++) {
-        fscanf(fp, "%d", &elemNums[start+i]);
-        for(int j=0;j<m.elem[t].nodesPer;j++)
-          fscanf(fp, "%d", &m.elem[t].conn[i*m.elem[t].nodesPer+j]);
-        for(int d=0;d<m.elem[t].dataPer;d++)
-          fscanf(fp, "%lf", &m.elem[t].udata[i*m.elem[t].dataPer+d]);
-      }
-    }
-}
-
-void commList::write(FILE *fp) const
-{
-	fprintf(fp, "%d %d %d\n", pe,us,size());
-	for(int j=0;j<size();j++)
-		fprintf(fp, "%d ", shared[j]);
-	fprintf(fp,"\n");
-}
-void commList::read(FILE *fp) 
-{
-	int len;
-	fscanf(fp,"%d %d %d",&pe, &us, &len);
-	for(int j=0;j<len;j++) {
-		int s;
-		fscanf(fp,"%d",&s);
-		shared.push_back(s);
-	}
-}
-
-void commCounts::write(FILE *fp) const
-{
-	fprintf(fp, "%d\n", size());
-	for(int p=0;p<size();p++) {
-		comm[p]->write(fp);
-	}
-}
-void commCounts::read(FILE *fp)
-{
-	int len;
-	fscanf(fp,"%d",&len);
-	for(int p=0;p<len;p++) {
-		commList *l=new commList;
-		l->read(fp);
-		comm.push_back(l);
-	}
-}
-
-void MeshChunk::writeComm(FILE *fp) const
-{
-	comm.write(fp);
-}
-void MeshChunk::readComm(FILE *fp)
-{
-	comm.read(fp);
+  PUP::fromTextFile p(fp);
+  pup(p);  
 }
 
 void
@@ -1371,9 +1290,8 @@ FEMchunk::setMesh(MeshChunk *msg)
   if (cur_mesh!=NULL) delete cur_mesh;
   if(msg==0) { /*Read mesh from file*/
     cur_mesh=new MeshChunk;
-    FILE *fp=openMeshFile(thisIndex,false);
-    cur_mesh->read(fp);
-    fclose(fp);
+    FILE *fp=openMeshFile(thisIndex,init.numElements,true);
+    cur_mesh->read(fp); /*closes file*/
   } else {
     cur_mesh=msg;
   }
@@ -2050,6 +1968,7 @@ commMap::commMap() { }
 void commMap::pup(PUP::er &p) 
 {
 	int keepGoing=1;
+	p.comment("Communication map object: maps item number to shared elements");
 	if (!p.isUnpacking()) 
 	{ //Pack the table, by iterating through its elements:
 		CkHashtableIterator *it=map.iterator();
@@ -2167,24 +2086,33 @@ FEM_Mesh::FEM_Mesh() {
 }
 void FEM_Mesh::pup(PUP::er &p)  //For migration
 {
+	p.comment(" ------------- Node Data ---------- ");
 	node.pup(p);
+
+	p.comment(" Number of element types:");
 	p(nElemTypes);
 	for (int t=0;t<nElemTypes;t++)
 		elem[t].pup(p);
 }
 void FEM_Mesh::count::pup(PUP::er &p) {
+	p.comment(" <number of items, including ghosts> <first ghost> <data per> ");
 	p(n);p(ghostStart);p(dataPer);
+	p.comment(" Ghosts to send out: ");
 	ghostSend.pup(p);
+	p.comment(" Ghosts to recv: ");
 	ghostRecv.pup(p);
 	if (dataPer!=0) {
 		if (udata==NULL) allocUdata();
+		p.comment(" User data array: ");
 		p(udata,udataCount());
 	}
 }
 void FEM_Mesh::elemCount::pup(PUP::er &p) {
+	p.comment(" ------------- Element data ---------- ");
 	count::pup(p);
-	p(nodesPer);
+	p.comment(" <nodesPer> "); p(nodesPer);
 	if (conn==NULL) allocConn();
+	p.comment(" element connectivity array: ");
 	p(conn,connCount());
 }
 FEM_Mesh::~FEM_Mesh()
@@ -2224,8 +2152,11 @@ MeshChunk::~MeshChunk()
 }
 
 void MeshChunk::pup(PUP::er &p) {
+	p.comment("v1.0, Charm++ Finite Element Mesh file");	
 	m.pup(p);
+	p.comment(" ----------- Shared nodes ------------ ");	
 	comm.pup(p);
+	p.comment(" ----------- Global numbers ------------ ");	
 	bool hasNums=(elemNums!=NULL);
 	p(hasNums);
 	if (hasNums) {
@@ -2234,6 +2165,7 @@ void MeshChunk::pup(PUP::er &p) {
 		p(nodeNums,m.node.n);
 		p(isPrimary,m.node.n);
 	}
+	p.comment(" Misc. data: ");	
 	p(updateCount); p(fromChunk);
 	p(callMeshUpdated); p(doRepartition);
 }
@@ -2266,7 +2198,6 @@ FEMchunk::pup(PUP::er &p)
   p(nRecd);
 
   p(doneCalled);
-  // fp is not valid, because it has been closed a long time ago
 }
 
 
