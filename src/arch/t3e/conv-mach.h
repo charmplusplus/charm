@@ -8,6 +8,8 @@
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
 
+#include "conv-common.h"
+
 #define CMK_CCS_AVAILABLE                                  1
 
 #define CMK_CMIDELIVERS_USE_COMMON_CODE                    1
@@ -102,6 +104,7 @@
 
 #define CMK_TRACE_LOGFILE_NUM_CONTROL                      1
 
+#include "conv-mach-opt.h"
 
 #endif
 
