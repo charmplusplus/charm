@@ -32,18 +32,19 @@ static McQueue **MsgQueue;
 
 
 CpvDeclare(void*, CmiLocalQueue);
-CpvDeclare(int, Cmi_mype);
-CpvDeclare(int, Cmi_numpes);
+int Cmi_mype;
+int Cmi_numpes;
+int Cmi_myrank;
 
 static int nthreads;
 static int requested_npe;
 
 static void threadInit(void *arg);
 
-CpvDeclare(int, membusy);
+int membusy;
 
-void CmiMemLock() {CpvAccess(membusy)=1;}
-void CmiMemUnlock() {CpvAccess(membusy)=0;}
+void CmiMemLock() {membusy=1;}
+void CmiMemUnlock() {membusy=0;}
 
 void *CmiAlloc(int size)
 {
@@ -68,6 +69,7 @@ void CmiFree(void *blk)
 }
 
 
+#if 0
 void *CmiSvAlloc(int size)
 {
   char *res;
@@ -85,7 +87,7 @@ char *blk;
 {
   usfree(blk-8, arena);
 }
-
+#endif
 
 int CmiAsyncMsgSent(CmiCommHandle msgid)
 {
@@ -171,19 +173,18 @@ static void threadInit(void *arg)
   USER_PARAMETERS *usrparam;
   usrparam = (USER_PARAMETERS *) arg;
 
-  CpvInitialize(int, Cmi_mype);
-  CpvInitialize(int, Cmi_numpes);
-  CpvInitialize(void*, CmiLocalQueue);
 
-  CpvAccess(Cmi_mype)  = usrparam->mype;
-  CpvAccess(Cmi_numpes) =  usrparam->npe;
+  CpvInitialize(void*, CmiLocalQueue);
+  Cmi_mype  = usrparam->mype;
+  Cmi_myrank = 0;
+  Cmi_numpes =  usrparam->npe;
 #ifdef DEBUG
   printf("thread %d/%d started \n", CmiMyPe(), CmiNumPes());
 #endif
 
   ConverseCommonInit(usrparam->argv);
   CthInit(usrparam->argv);
-  neighbour_init(CpvAccess(Cmi_mype));
+  neighbour_init(Cmi_mype);
   CpvAccess(CmiLocalQueue) = (void *) FIFO_Create();
   CmiSpanTreeInit();
   CmiTimerInit();
@@ -206,6 +207,10 @@ CmiDeclareArgs()
 {
 }
 
+
+void CmiNotifyIdle()
+{
+}
 
 void *CmiGetNonLocal()
 {
@@ -242,7 +247,7 @@ CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg)
 
 void CmiFreeSendFn(int destPE, int size, char *msg)
 {
-  if (CpvAccess(Cmi_mype)==destPE) {
+  if (Cmi_mype==destPE) {
     FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg);
   } else {
     CmiSyncSendFn(destPE, size, msg);
@@ -295,10 +300,12 @@ void CmiFreeBroadcastAllFn(int size, char *msg)
   FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg);
 }
 
+#if 0
 void CmiNodeBarrier()
 {
   barrier(barr,nthreads);
 }
+#endif
 
 /* ********************************************************************** */
 /* The following functions are required by the load balance modules       */

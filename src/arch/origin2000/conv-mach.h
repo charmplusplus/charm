@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.1  1997-03-28 17:38:23  milind
+ * Revision 1.2  1997-07-07 22:13:50  milind
+ * Made threads to work.
+ *
+ * Revision 1.1  1997/03/28 17:38:23  milind
  * Added Origin2000 version.
  *
  * Revision 1.2  1997/03/25 23:09:09  milind
@@ -85,6 +88,8 @@
 
 #define CMK_FIX_HP_CONNECT_BUG                             0
 
+#define CMK_GETPAGESIZE_AVAILABLE                          1
+
 #define CMK_IS_HETERO                                      0
 
 #define CMK_MACHINE_NAME                                   "origin2000"
@@ -105,9 +110,8 @@
 #define CMK_RSH_NOT_NEEDED                                 1
 #define CMK_RSH_USE_REMSH                                  0
 
-#define CMK_SHARED_VARS_ORIGIN                             1
 #define CMK_SHARED_VARS_EXEMPLAR                           0
-#define CMK_SHARED_VARS_UNAVAILABLE                        0
+#define CMK_SHARED_VARS_UNAVAILABLE                        1
 #define CMK_SHARED_VARS_UNIPROCESSOR                       0
 #define CMK_SHARED_VARS_SUN_THREADS                        0
 
