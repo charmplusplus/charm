@@ -15,6 +15,7 @@ void CpdInit(void);
 void CpdFreeze(void);  
 void CpdUnFreeze(void);
 void CpdFreezeModeScheduler(void);
+void CpdStartGdb(void);
 void Cpd_CmiHandleMessage(void *msg);
 
 /* C bindings for CpdList functions: */
