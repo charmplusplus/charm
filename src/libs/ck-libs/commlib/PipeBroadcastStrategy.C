@@ -61,6 +61,7 @@ void PipeBroadcastStrategy::propagate(envelope *env, int isFragmented){
       dest_pes[num_pes] = CmiMyPe() ^ (1<<k);
       if (dest_pes[num_pes] >= CmiNumPes()) {
 	dest_pes[num_pes] &= (-1)<<k;
+	if (CmiNumPes()>dest_pes[num_pes]) dest_pes[num_pes] += (CmiMyPe() - (CmiMyPe() & ((-1)<<k))) % (CmiNumPes() - dest_pes[num_pes]);
       }
       if (dest_pes[num_pes] < CmiNumPes()) {
 	ComlibPrintf("[%d] PipeBroadcast sending to %d\n",CmiMyPe(), dest_pes[num_pes]);
