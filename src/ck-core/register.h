@@ -210,6 +210,9 @@ public:
 	that all globals get.
 	*/
 	CkRegisteredInfo() :vec(CkSkipInitialization()) {}
+        ~CkRegisteredInfo() {
+        	for (int i=0; i<vec.size(); i++) if (vec[i]) delete vec[i];
+  	} 
 
 	/// Add a heap-allocated registration record,
 	///  returning the index used.
