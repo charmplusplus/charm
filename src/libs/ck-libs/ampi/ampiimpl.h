@@ -251,24 +251,107 @@ class BlockMap : public CkArrayMap {
 
 #define MyAlign8(x) (((x)+7)&(~7))
 
-class PersReq {
+/**
+Represents an MPI request that has been initiated
+using Isend, Irecv, Ialltoall, Send_init, etc.
+*/
+class AmpiRequest {
 public:
-    int sndrcv; // 1 if send , 2 if recv
-    void *buf;
-    int count;
-    int type;
-    int proc;
-    int tag;
-    int comm;
-    int nextfree, prevfree;
+	AmpiRequest(){ }
+	/// Close this request (used by free and cancel)
+	virtual ~AmpiRequest(){ }
+
+	/// Activate this persistent request.
+	///  Only meaningful for persistent requests,
+	///  other requests just abort.
+	virtual int start(void){ return -1; }
+
+	/// Return true if this request is finished (progress).
+	virtual CmiBool test(MPI_Status *sts) =0;
+
+	/// Completes the operation hanging on the request
+	virtual void complete(MPI_Status *sts) =0;
+
+	/// Block until this request is finished,
+	///  returning a valid MPI error code.
+	virtual int wait(MPI_Status *sts) =0;
+
+	/// Frees up the request
+	virtual int free(void){ /* mark it invalid? */ }
+
+	/// Returns the type of request: 1-PersReq, 2-IReq, 3-ATAReq
+	virtual int getType(void) =0;
 };
 
-class ATAReqs {
+class PersReq : public AmpiRequest {
+	void *buf;
+	int count;
+	int type;
+	int src;
+	int tag;
+	int comm;
+
+	int sndrcv; // 1 if send , 2 if recv
 public:
-  int count;
-  PersReq* reqs;
-  ATAReqs(int c_):count(c_) { reqs = new PersReq [c_]; }
-  ~ATAReqs(void) { if(reqs) delete [] reqs; }
+	PersReq(void *buf_, int count_, int type_, int src_, int tag_,
+		MPI_Comm comm_, int sndrcv_) :
+		buf(buf_), count(count_), type(type_), src(src_), tag(tag_),
+		comm(comm_), sndrcv(sndrcv_)
+		{ /* empty */ }
+	~PersReq(){ }
+	int start();
+	CmiBool test(MPI_Status *sts);
+	void complete(MPI_Status *sts);
+	int wait(MPI_Status *sts);
+	inline int getType(void){ return 1; }
+};
+
+class IReq : public AmpiRequest {
+	void *buf;
+	int count;
+	int type;
+	int src;
+	int tag;
+	int comm;
+public:
+	IReq(void *buf_, int count_, int type_, int src_, int tag_, MPI_Comm comm_):
+	     buf(buf_), count(count_), type(type_), src(src_), tag(tag_), comm(comm_)
+	     { /* empty */ }
+	~IReq(){ }
+	CmiBool test(MPI_Status *sts);
+	void complete(MPI_Status *sts);
+	int wait(MPI_Status *sts);
+	inline int getType(void){ return 2; }
+};
+
+class ATAReq : public AmpiRequest {
+	class Request {
+	protected:
+		void *buf;
+		int count;
+		int type;
+		int src;
+		int tag;
+		int comm;
+	friend class ATAReq;
+	};
+	Request *myreqs;
+	int count;
+	int idx;
+public:
+	ATAReq(int c_):count(c_),idx(0) { myreqs = new Request [c_]; }
+	~ATAReq(void) { if(myreqs) delete [] myreqs; }
+	int addReq(void *buf_, int count_, int type_, int src_, int tag_, MPI_Comm comm_){
+		myreqs[idx].buf=buf_;	myreqs[idx].count=count_;
+		myreqs[idx].type=type_;	myreqs[idx].src=src_;
+		myreqs[idx].tag=tag_;	myreqs[idx].comm=comm_;
+		return (++idx);
+	}
+	CmiBool test(MPI_Status *sts);
+	void complete(MPI_Status *sts);
+	int wait(MPI_Status *sts);
+	inline int getCount(void){ return count; }
+	inline int getType(void){ return 3; }
 };
 
 //A simple destructive-copy memory buffer
@@ -400,22 +483,6 @@ PUPmarshall(AmpiSeqQ);
 inline CProxy_ampi ampiCommStruct::getProxy(void) const {return ampiID;}
 const ampiCommStruct &universeComm2proxy(MPI_Comm universeNo);
 
-/* Manages persistent requests.  A hideous design-- rewrite it! */
-class ampiPersRequests {
-public:
-    ampiPersRequests();
-    void pup(PUP::er &p);
-
-    PersReq requests[100];
-    int nrequests;
-    PersReq irequests[100];
-    int nirequests;
-    int firstfree;
-    ATAReqs *atarequests[10];
-    int natarequests;
-};
-PUPmarshall(ampiPersRequests);
-
 /*
 An ampiParent holds all the communicators and the TCharm thread
 for its children, which are bound to it.
@@ -535,7 +602,7 @@ public:
 
     CkDDT myDDTsto;
     CkDDT *myDDT;
-    ampiPersRequests pers;
+    CkVec<AmpiRequest *> ampiReqs;
 };
 
 

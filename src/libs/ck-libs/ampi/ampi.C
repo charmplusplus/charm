@@ -417,7 +417,7 @@ void ampiParent::pup(PUP::er &p) {
   p|splitComm;
   p|groupComm;
   p|groups;
-  p|pers;
+  // FIXME: add p|ampiReqs
 }
 void ampiParent::prepareCtv(void) {
   thread=threads[thisIndex].ckLocal();
@@ -819,15 +819,16 @@ MSG_ORDER_DEBUG(
   waitingForGeneric=0;
   if(sts)
     ((MPI_Status*)sts)->MPI_LENGTH = msg->length;
-  if (msg->length > len) 
+  if (msg->length > len)
   { /* Received more data than we were expecting */
-    CkError("FATAL ERROR in rank %d MPI_Recv (tag=%d, source=%d)\n"
+    char einfo[1024];
+    sprintf(einfo, "FATAL ERROR in rank %d MPI_Recv (tag=%d, source=%d)\n"
     	"  Expecting only %d bytes (%d items of type %d), \n"
-	"  but received %d bytes from rank %d\n",
-            thisIndex,t,s, 
-	    len, count, type, 
+	"  but received %d bytes from rank %d\nAMPI> MPI_Send was longer than matching MPI_Recv.",
+            thisIndex,t,s,
+	    len, count, type,
 	    msg->length, msg->srcRank);
-    CkAbort("AMPI> MPI_Send was longer than matching MPI_Recv.");
+    CkAbort(einfo);
   }
   ddt->serialize((char*)buf, (char*)msg->data, msg->length/(ddt->getSize(1)), (-1));
   delete msg;
@@ -1317,50 +1318,67 @@ double MPI_Wtime(void)
 }
 
 
-/********************************
-  Persistent requests are handled in a hideous fashion.
-  They need to be rewritten in an object-oriented way to cut
-  down on the ridiculous code duplication here.
-*/
-ampiPersRequests::ampiPersRequests() {
-  nrequests = 0;
-  nirequests = 0;
-  firstfree = 0;
-  natarequests = 0;
-  int i;
-  for(i=0;i<100;i++) {
-    irequests[i].nextfree = (i+1)%100;
-    irequests[i].prevfree = ((i-1)+100)%100;
-  }
-}
-
-void ampiPersRequests::pup(PUP::er &p) {
+//void ampiPersRequests::pup(PUP::er &p) {
 //This was Milind's explanation for not pup'ing persistent requests (it's a lie):
   // persistent comm requests will have to be re-registered after
   // migration anyway, so no need to pup them
   // migrate is called only when all irequests are complete, so no need
   // to pup them as well.
+
+
+static CkVec<AmpiRequest *> *getReqs(void) {
+  return &(getAmpiParent()->ampiReqs);
 }
 
-static ampiPersRequests *getPers(void) {
-  return &getAmpiParent()->pers;
+int PersReq::start(){
+  if(sndrcv == 1) { // send request
+    ampi *aptr=getAmpiInstance(comm);
+    aptr->send(tag, aptr->getRank(), buf, count, type, src, comm);
+  }
+  return 0;
 }
 
 CDECL
-int MPI_Start(MPI_Request *reqnum)
+int MPI_Start(MPI_Request *request)
 {
   AMPIAPI("MPI_Start");
-  ampiPersRequests *ptr = getPers();
-  if(*reqnum >= ptr->nrequests) {
-    CkAbort("Invalid persistent Request..\n");
+  CkVec<AmpiRequest *> *reqs = getReqs();
+  if(-1==(*reqs)[*request]->start()){
+    CkAbort("MPI_Start could be used only on persistent communication requests!");
   }
-  PersReq *req = &(ptr->requests[*reqnum]);
-  &(ptr->requests[*reqnum]);
-  if(req->sndrcv == 1) { // send request
-    ampi *aptr=getAmpiInstance(req->comm);
-    aptr->send(req->tag, aptr->getRank(), req->buf, req->count, req->type,
-              req->proc, req->comm);
-  }
+  return 0;
+}
+
+int PersReq::wait(MPI_Status *sts){
+	if(sndrcv == 2) {
+		getAmpiInstance(comm)->recv(tag, src, buf, count,
+				type, comm, (int*)sts);
+	}
+	return 0;
+}
+int IReq::wait(MPI_Status *sts){
+	getAmpiInstance(comm)->recv(tag, src, buf, count,
+			type, comm, (int*)sts);
+	return 0;
+}
+int ATAReq::wait(MPI_Status *sts){
+	int i;
+	for(i=0;i<count;i++){
+		getAmpiInstance(myreqs[i].comm)->recv(myreqs[i].tag, myreqs[i].src, myreqs[i].buf,
+				myreqs[i].count, myreqs[i].type, myreqs[i].comm, (int *)sts);
+	}
+}
+
+CDECL
+int MPI_Wait(MPI_Request *request, MPI_Status *sts)
+{
+  AMPIAPI("MPI_Wait");
+  if(*request == MPI_REQUEST_NULL)
+    return 0;
+  CkVec<AmpiRequest *>* reqs = getReqs();
+  CkPrintf("MPI_Wait: request=%d, reqs.size=%d, &reqs=%d\n",*request,reqs->size(),reqs);
+  (*reqs)[*request]->wait(sts);
+  /* FIXME: free up the request here! */
   return 0;
 }
 
@@ -1368,33 +1386,8 @@ CDECL
 int MPI_Waitall(int count, MPI_Request *request, MPI_Status *sts)
 {
   AMPIAPI("MPI_Waitall");
-  ampiPersRequests *ptr = getPers();
-  int i;
-  for(i=0;i<count;i++) {
-    if(request[i] == MPI_REQUEST_NULL)
-      continue;
-    if(request[i] < 100) { // persistent request
-      PersReq *req = &(ptr->requests[request[i]]);
-      if(req->sndrcv == 2) { // recv request
-        getAmpiInstance(req->comm)->recv(req->tag, req->proc, req->buf, req->count,
-                  req->type, req->comm, (int*)(sts+i));
-      }
-    } else if(request[i] < 200){ // irecv request
-      int index = request[i] - 100;
-      PersReq *req = &(ptr->irequests[index]);
-      getAmpiInstance(req->comm)->recv(req->tag, req->proc, req->buf, req->count,
-                req->type, req->comm, (int*) (sts+i));
-      // now free the request
-      ptr->nirequests--;
-      PersReq *ireq = &(ptr->irequests[0]);
-      req->nextfree = ptr->firstfree;
-      req->prevfree = ireq[ptr->firstfree].prevfree;
-      ireq[req->prevfree].nextfree = index;
-      ireq[req->nextfree].prevfree = index;
-      ptr->firstfree = index;
-    } else {  // alltoall request
-      CmiAbort("MPI_Waitall cannot be used on MPI_Ialltoall request");
-    }
+  for(int i=0;i<count;i++) {
+    MPI_Wait(&request[i], sts+i);
   }
   return 0;
 }
@@ -1403,137 +1396,75 @@ CDECL
 int MPI_Waitany(int count, MPI_Request *request, int *idx, MPI_Status *sts)
 {
   AMPIAPI("MPI_Waitany");
-  ampiPersRequests *ptr = getPers();
-  while(1) {
-    for(*idx=0;(*idx)<count;(*idx)++) {
-      if(request[*idx] == MPI_REQUEST_NULL)
-        return 0;
-
-      if(request[*idx] < 100) { // persistent request
-        PersReq *req = &(ptr->requests[request[*idx]]);
-        if(req->sndrcv == 2) { // recv request
-          ampi *aptr=getAmpiInstance(req->comm);
-          if(aptr->iprobe(req->tag, req->proc, req->comm, (int*) sts)) {
-           aptr->recv(req->tag, req->proc, req->buf, req->count,
-                      req->type, req->comm, (int*)sts);
-            return 0;
-          }
-        }
-      } else if(request[*idx] < 200) { // irecv request
-        int index = request[*idx] - 100;
-        PersReq *req = &(ptr->irequests[index]);
-        ampi *aptr=getAmpiInstance(req->comm);
-        if(aptr->iprobe(req->tag, req->proc, req->comm, (int*) sts)) {
-          aptr->recv(req->tag, req->proc, req->buf, req->count,
-                    req->type, req->comm, (int*)sts);
-          // now free the request
-          ptr->nirequests--;
-          PersReq *ireq = &(ptr->irequests[0]);
-          req->nextfree = ptr->firstfree;
-          req->prevfree = ireq[ptr->firstfree].prevfree;
-          ireq[req->prevfree].nextfree = index;
-          ireq[req->nextfree].prevfree = index;
-          ptr->firstfree = index;
-          return 0;
-        }
-      } else {  // alltoall request
-        CmiAbort("MPI_Waitany cannot be used on MPI_Ialltoall request");
-      }
+  int flag=0;
+  while(1){
+    for(int i=0;i<count;i++) {
+      MPI_Test(&request[i], &flag, sts+i);
+      if(flag == 1)
+        return i;
     }
   }
-  // should never come here
-  return 0;
+  return MPI_UNDEFINED;
 }
 
-CDECL
-int MPI_Wait(MPI_Request *request, MPI_Status *sts)
-{
-  AMPIAPI("MPI_Wait");
-  ampiPersRequests *ptr = getPers();
-  if(*request == MPI_REQUEST_NULL)
-      return 0;
-  if(*request < 100) { // persistent request
-    PersReq *req = &(ptr->requests[*request]);
-    if(req->sndrcv == 2) { // recv request
-      getAmpiInstance(req->comm)->recv(req->tag, req->proc, req->buf, req->count,
-                req->type, req->comm, (int*)sts);
-    }
-  } else if(*request < 200) { // irecv request
-    int index = *request - 100;
-    PersReq *req = &(ptr->irequests[index]);
-    getAmpiInstance(req->comm)->recv(req->tag, req->proc, req->buf, req->count,
-              req->type, req->comm, (int*) sts);
-    // now free the request
-    ptr->nirequests--;
-    PersReq *ireq = &(ptr->irequests[0]);
-    req->nextfree = ptr->firstfree;
-    req->prevfree = ireq[ptr->firstfree].prevfree;
-    ireq[req->prevfree].nextfree = index;
-    ireq[req->nextfree].prevfree = index;
-    ptr->firstfree = index;
-  } else {  // alltoall request
-    int i;
-    int index = *request - 200;
-    ATAReqs *req = ptr->atarequests[index];
-    for(i=0;i<req->count;i++){
-      getAmpiInstance(req->reqs[i].comm)->recv(req->reqs[i].tag, req->reqs[i].proc, req->reqs[i].buf,
-                      req->reqs[i].count, req->reqs[i].type, req->reqs[i].comm, (int*)sts);
-    }
-  }
-  return 0;
+CmiBool PersReq::test(MPI_Status *sts){
+	if(sndrcv == 2) 	// recv request
+		return getAmpiInstance(comm)->iprobe(tag, src, comm, (int*)sts);
+	else			// send request
+		return 1;
+
+}
+void PersReq::complete(MPI_Status *sts){
+	getAmpiInstance(comm)->recv(tag, src, buf, count, type, comm, (int*)sts);
+}
+
+CmiBool IReq::test(MPI_Status *sts){
+	return getAmpiInstance(comm)->iprobe(tag, src, comm, (int*)sts);
+}
+void IReq::complete(MPI_Status *sts){
+	getAmpiInstance(comm)->recv(tag, src, buf, count, type, comm, (int*)sts);
+}
+
+CmiBool ATAReq::test(MPI_Status *sts){
+	int i, flag=1;
+	for(i=0;i<count;i++){
+		flag *= getAmpiInstance(myreqs[i].comm)->iprobe(myreqs[i].tag, myreqs[i].src,
+					myreqs[i].comm, (int*) sts);
+	}
+	return flag;
+}
+void ATAReq::complete(MPI_Status *sts){
+	int i;
+	for(i=0;i<count;i++){
+		getAmpiInstance(myreqs[i].comm)->recv(myreqs[i].tag, myreqs[i].src, myreqs[i].buf,
+				myreqs[i].count, myreqs[i].type, myreqs[i].comm, (int*)sts);
+	}
 }
 
 CDECL
 int MPI_Test(MPI_Request *request, int *flag, MPI_Status *sts)
 {
   AMPIAPI("MPI_Test");
-  ampiPersRequests *ptr = getPers();
   if(*request==MPI_REQUEST_NULL) {
     *flag = 1;
     return 0;
   }
-  if(*request < 100) { // persistent request
-    PersReq *req = &(ptr->requests[*request]);
-    if(req->sndrcv == 2){ // recv request
-      *flag = getAmpiInstance(req->comm)->iprobe(req->tag, req->proc, req->comm, (int*)sts);
-      if(*flag){
-        getAmpiInstance(req->comm)->recv(req->tag, req->proc, req->buf, req->count,
-                        req->type, req->comm, (int*)sts);
-      }
-    }else{
-      *flag = 1; // send request
-    }
-  } else if(*request < 200){ // irecv request
-    int index = *request - 100;
-    PersReq *req = &(ptr->irequests[index]);
-    *flag = getAmpiInstance(req->comm)->iprobe(req->tag, req->proc, req->comm, (int*) sts);
-    if( *flag )
-    {
-        getAmpiInstance(req->comm)->recv(req->tag, req->proc, req->buf, req->count,
-                                        req->type, req->comm, (int*) sts);
-        // now free the request
-        ptr->nirequests--;
-        PersReq *ireq = &(ptr->irequests[0]);
-        req->nextfree = ptr->firstfree;
-        req->prevfree = ireq[ptr->firstfree].prevfree;
-        ireq[req->prevfree].nextfree = index;
-        ireq[req->nextfree].prevfree = index;
-        ptr->firstfree = index;
-    }
- } else {  // alltoall request
-    int i;
-    int index = *request - 200;
-    ATAReqs *req = ptr->atarequests[index];
-    *flag = getAmpiInstance(req->reqs[0].comm)->iprobe(req->reqs[0].tag, req->reqs[0].proc, req->reqs[0].comm, (int*) sts);
-    for(i=1;i<req->count;i++){
-      *flag *= getAmpiInstance(req->reqs[i].comm)->iprobe(req->reqs[i].tag, req->reqs[i].proc, req->reqs[i].comm, (int*) sts);
-    }
-    if(*flag){
-      for(i=0;i<req->count;i++){
-        getAmpiInstance(req->reqs[i].comm)->recv(req->reqs[i].tag, req->reqs[i].proc, req->reqs[i].buf,
-                        req->reqs[i].count, req->reqs[i].type, req->reqs[i].comm, (int*)sts);
-      }
-    }
+  CkVec<AmpiRequest *>* reqs = getReqs();
+  if(1 == (*flag = (*reqs)[*request]->test(sts))){
+    (*reqs)[*request]->complete(sts);
+    /* FIXME: free up the request here! */
+  }
+  return 0;
+}
+
+CDECL
+int MPI_Testany(int count, MPI_Request *request, int *index, int *flag, MPI_Status *sts){
+  AMPIAPI("MPI_Testany");
+  *flag=0;
+  for(int i=0;i<count;i++)
+  {
+    MPI_Test(&request[i], flag, sts+i);
+    if(*flag==1) return 0;
   }
   return 0;
 }
@@ -1542,14 +1473,12 @@ CDECL
 int MPI_Testall(int count, MPI_Request *request, int *flag, MPI_Status *sts)
 {
   AMPIAPI("MPI_Testall");
-  int i;
   int tmpflag;
   *flag = 1;
-  for(i=0;i<count;i++)
+  for(int i=0;i<count;i++)
   {
-    if(request[i] >= 200) CmiAbort("MPI_Testall cannot be used on MPI_Ialltoall request");
     MPI_Test(&request[i], &tmpflag, sts+i);
-    *flag = *flag && tmpflag;
+    *flag *= tmpflag;
   }
   return 0;
 }
@@ -1557,22 +1486,10 @@ int MPI_Testall(int count, MPI_Request *request, int *flag, MPI_Status *sts)
 CDECL
 int MPI_Request_free(MPI_Request *request){
   AMPIAPI("MPI_Request_free");
-  ampiPersRequests *ptr = getPers();
-  if(*request==MPI_REQUEST_NULL) {
-    return 0;
-  }
-  if(*request < 100) { // persistent request, don't free
-  } else if(*request < 200){ // irecv request
-    int index = *request - 100;
-    PersReq *req = &(ptr->irequests[index]);
-    ptr->nirequests--;
-    PersReq *ireq = &(ptr->irequests[0]);
-    req->nextfree = ptr->firstfree;
-    req->prevfree = ireq[ptr->firstfree].prevfree;
-    ireq[req->prevfree].nextfree = index;
-    ireq[req->nextfree].prevfree = index;
-    ptr->firstfree = index;
-  } else {  // alltoall request, don't free for now
+  if(*request==MPI_REQUEST_NULL) return 0;
+  CkVec<AmpiRequest *>* reqs = getReqs();
+  if(-1==(*reqs)[*request]->free()){
+    CkAbort("MPI_Request_free failed!");
   }
   return 0;
 }
@@ -1582,21 +1499,10 @@ int MPI_Recv_init(void *buf, int count, int type, int src, int tag,
                    MPI_Comm comm, MPI_Request *req)
 {
   AMPIAPI("MPI_Recv_init");
-
-  ampiPersRequests *ptr = getPers();
-
-  if(ptr->nrequests == 100) {
-    CmiAbort("Too many persistent commrequests.\n");
-  }
-  ptr->requests[ptr->nrequests].sndrcv = 2;
-  ptr->requests[ptr->nrequests].buf = buf;
-  ptr->requests[ptr->nrequests].count = count;
-  ptr->requests[ptr->nrequests].type = type;
-  ptr->requests[ptr->nrequests].proc = src;
-  ptr->requests[ptr->nrequests].tag = tag;
-  ptr->requests[ptr->nrequests].comm = comm;
-  *req = ptr->nrequests;
-  ptr->nrequests ++;
+  CkVec<AmpiRequest *>* reqs = getReqs();
+  PersReq *newreq = new PersReq(buf,count,type,src,tag,comm,2);
+  *req = reqs->size();
+  reqs->push_back(newreq);
   return 0;
 }
 
@@ -1605,19 +1511,10 @@ int MPI_Send_init(void *buf, int count, int type, int dest, int tag,
                    MPI_Comm comm, MPI_Request *req)
 {
   AMPIAPI("MPI_Send_init");
-  ampiPersRequests *ptr = getPers();
-  if(ptr->nrequests == 100) {
-    CmiAbort("Too many persistent commrequests.\n");
-  }
-  ptr->requests[ptr->nrequests].sndrcv = 1;
-  ptr->requests[ptr->nrequests].buf = buf;
-  ptr->requests[ptr->nrequests].count = count;
-  ptr->requests[ptr->nrequests].type = type;
-  ptr->requests[ptr->nrequests].proc = dest;
-  ptr->requests[ptr->nrequests].tag = tag;
-  ptr->requests[ptr->nrequests].comm = comm;
-  *req = ptr->nrequests;
-  ptr->nrequests ++;
+  CkVec<AmpiRequest *>* reqs = getReqs();
+  PersReq *newreq = new PersReq(buf,count,type,dest,tag,comm,1);
+  *req = reqs->size();
+  reqs->push_back(newreq);
   return 0;
 }
 
@@ -1626,16 +1523,16 @@ static CkDDT *getDDT(void) {
 }
 
 CDECL
-int MPI_Type_contiguous(int count, MPI_Datatype oldtype, 
+int MPI_Type_contiguous(int count, MPI_Datatype oldtype,
                          MPI_Datatype *newtype)
 {
   AMPIAPI("MPI_Type_contiguous");
-  getDDT()->newContiguous(count, oldtype, newtype); 
+  getDDT()->newContiguous(count, oldtype, newtype);
   return 0;
 }
 
-extern  "C"  
-int MPI_Type_vector(int count, int blocklength, int stride, 
+extern  "C"
+int MPI_Type_vector(int count, int blocklength, int stride,
                      MPI_Datatype oldtype, MPI_Datatype*  newtype)
 {
   AMPIAPI("MPI_Type_vector");
@@ -1730,9 +1627,7 @@ int MPI_Issend(void *buf, int count, MPI_Datatype type, int dest,
 {
   AMPIAPI("MPI_Issend");
   ampi *ptr = getAmpiInstance(comm);
-
   ptr->send(tag, ptr->getRank(), buf, count, type, dest, comm);
-
   *request = MPI_REQUEST_NULL;
   return 0;
 }
@@ -1742,26 +1637,10 @@ int MPI_Irecv(void *buf, int count, MPI_Datatype type, int src,
               int tag, MPI_Comm comm, MPI_Request *request)
 {
   AMPIAPI("MPI_Irecv");
-  ampiPersRequests *ptr = getPers();
-  if(ptr->nirequests == 100) {
-    CmiAbort("Too many Irecv requests.\n");
-  }
-
-  PersReq *req = &(ptr->irequests[ptr->firstfree]);
-  req->sndrcv = 2;
-  req->buf = buf;
-  req->count = count;
-  req->type = type;
-  req->proc = src;
-  req->tag = tag;
-  req->comm = comm;
-  *request = ptr->firstfree + 100;
-  ptr->nirequests ++;
-  // remove this request from the free list
-  PersReq *ireq = &(ptr->irequests[0]);
-  ptr->firstfree = ireq[ptr->firstfree].nextfree;
-  ireq[req->nextfree].prevfree = req->prevfree;
-  ireq[req->prevfree].nextfree = req->nextfree;
+  CkVec<AmpiRequest *>* reqs = getReqs();
+  IReq *newreq = new IReq(buf,count,type,src,tag,comm);
+  *request = reqs->size();
+  reqs->push_back(newreq);
   return 0;
 }
 
@@ -1778,27 +1657,11 @@ int MPI_Ireduce(void *sendbuf, void *recvbuf, int count, int type, MPI_Op op, in
   ptr->contribute(msg);
 
   if (ptr->thisIndex == rootIdx){
-  ampiPersRequests *ptr = getPers();
-  if(ptr->nirequests == 100) {
-    CmiAbort("Too many Irecv requests in MPI_Ireduce.\n");
-  }
-
-  // using irecv instead recv to non-block the call and get request pointer
-  PersReq *req = &(ptr->irequests[ptr->firstfree]);
-    req->sndrcv = 2;
-    req->buf = recvbuf;
-    req->count = count;
-    req->type = type;
-    req->proc = 0;
-    req->tag = MPI_REDUCE_TAG;
-    req->comm = comm;//MPI_COMM_WORLD;
-    *request = ptr->firstfree + 100;
-    ptr->nirequests ++;
-    // remove this request from the free list
-    PersReq *ireq = &(ptr->irequests[0]);
-    ptr->firstfree = ireq[ptr->firstfree].nextfree;
-    ireq[req->nextfree].prevfree = req->prevfree;
-    ireq[req->prevfree].nextfree = req->nextfree;
+    // using irecv instead recv to non-block the call and get request pointer
+    CkVec<AmpiRequest *>* reqs = getReqs();
+    IReq *newreq = new IReq(recvbuf,count,type,0,MPI_REDUCE_TAG,comm);
+    *request = reqs->size();
+    reqs->push_back(newreq);
   }
   return 0;
 }
@@ -2073,24 +1936,15 @@ int MPI_Ialltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   (CProxy_ComlibManager(dmid).ckLocalBranch())->endIteration();
 
   // copy+paste from MPI_Irecv
-  ampiPersRequests *reqptr = getPers();
-  if(reqptr->natarequests >= 10) {
-    CmiAbort("Too many Alltoall requests.\n");
-  }
-  ATAReqs *req = new ATAReqs(size);
-  reqptr->atarequests[0] = req;
+  CkVec<AmpiRequest *>* reqs = getReqs();
+  ATAReq *newreq = new ATAReq(size);
   for(i=0;i<size;i++){
-    req->reqs[i].sndrcv = 2;
-    req->reqs[i].buf = ((char*)recvbuf)+(itemsize*i);
-    req->reqs[i].count = recvcount;
-    req->reqs[i].type = recvtype;
-    req->reqs[i].proc = i;
-    req->reqs[i].tag = MPI_GATHER_TAG;
-    req->reqs[i].comm = comm;
+    if(newreq->addReq(((char*)recvbuf)+(itemsize*i),recvcount,recvtype,i,MPI_GATHER_TAG,comm)!=(i+1))
+      CkAbort("Error adding requests into ATAReq!");
   }
-  *request = reqptr->natarequests + 200;
-  //ptr->natarequest++;
-
+  *request = reqs->size();
+  reqs->push_back(newreq);
+  CkPrintf("MPI_Ialltoall: request=%d, reqs.size=%d, &reqs=%d\n",*request,reqs->size(),reqs);
   return 0;
 }
 

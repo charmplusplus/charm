@@ -137,12 +137,13 @@ int MPI_Issend(void *buf, int count, MPI_Datatype datatype, int dest,
 int MPI_Irecv(void *buf, int count, MPI_Datatype datatype, int src,
               int tag, MPI_Comm comm, MPI_Request *request);
 int MPI_Wait(MPI_Request *request, MPI_Status *sts);
-int MPI_Waitany(int count, MPI_Request *request, int *index, MPI_Status *sts);
-int MPI_Waitall(int count, MPI_Request *request, MPI_Status *sts);
 int MPI_Test(MPI_Request *request, int *flag, MPI_Status *sts);
+int MPI_Waitany(int count, MPI_Request *request, int *index, MPI_Status *sts);
+int MPI_Testany(int count, MPI_Request *request, int *index, int *flag, MPI_Status *status);
+int MPI_Waitall(int count, MPI_Request *request, MPI_Status *sts);
 int MPI_Testall(int count, MPI_Request *request, int *flag, MPI_Status *sts);
+// int MPI_Waitsome(int incount, MPI_Request *array_of_requests, int *outcount, int *array_of_indices, MPI_Status *array_of_statuses)
 /* MPI_Testsome */
-/* MPI_Testany */
 int MPI_Request_free(MPI_Request *request);
 /* MPI_Cancel */
 /* MPI_Test_cancel */

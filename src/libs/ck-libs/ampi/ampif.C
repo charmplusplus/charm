@@ -22,11 +22,12 @@ FDECL {
 #define mpi_allreduce FTN_NAME( MPI_ALLREDUCE , mpi_allreduce )
 #define mpi_wtime FTN_NAME( MPI_WTIME , mpi_wtime )
 #define mpi_start FTN_NAME( MPI_START , mpi_start )
-#define mpi_waitall FTN_NAME( MPI_WAITALL , mpi_waitall )
-#define mpi_waitany FTN_NAME( MPI_WAITANY , mpi_waitany )
 #define mpi_wait FTN_NAME( MPI_WAIT , mpi_wait )
-#define mpi_testall FTN_NAME( MPI_TESTALL , mpi_testall )
 #define mpi_test FTN_NAME( MPI_TEST , mpi_test )
+#define mpi_waitany FTN_NAME( MPI_WAITANY , mpi_waitany )
+#define mpi_testany FTN_NAME( MPI_TESTANY , mpi_testany )
+#define mpi_waitall FTN_NAME( MPI_WAITALL , mpi_waitall )
+#define mpi_testall FTN_NAME( MPI_TESTALL , mpi_testall )
 #define mpi_request_free FTN_NAME( MPI_REQUEST_FREE , mpi_request_free )
 #define mpi_send_init FTN_NAME( MPI_SEND_INIT , mpi_send_init )
 #define mpi_recv_init FTN_NAME( MPI_RECV_INIT , mpi_recv_init )
@@ -181,7 +182,7 @@ void mpi_waitall(int *count, int *request, int *status, int *ierr)
 
 void mpi_waitany(int *count, int *request, int *index, int *status, int *ierr)
 {
-  *ierr = MPI_Waitany(*count, (MPI_Request*) request, index, 
+  *ierr = MPI_Waitany(*count, (MPI_Request*) request, index,
                        (MPI_Status*) status);
 }
 
@@ -192,7 +193,13 @@ void mpi_wait(int *request, int *status, int *ierr)
 
 void mpi_testall(int *count, int *request, int *flag, int *status, int *ierr)
 {
-  *ierr = MPI_Testall(*count, (MPI_Request*) request, flag, 
+  *ierr = MPI_Testall(*count, (MPI_Request*) request, flag,
+      (MPI_Status*) status);
+}
+
+void mpi_testany(int *count, int *request, int *index, int *flag, int *status, int *ierr)
+{
+  *ierr = MPI_Testany(*count, (MPI_Request*) request, index, flag,
       (MPI_Status*) status);
 }
 
