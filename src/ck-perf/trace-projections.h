@@ -61,6 +61,7 @@ class LogPool {
       delete[] fname;
       if(!fp)
         CmiAbort("Cannot open Projections Trace File for writing...\n");
+      fprintf(fp, "PROJECTIONS-RECORD\n");
     }
     ~LogPool() {
       write();
@@ -71,6 +72,7 @@ class LogPool {
       for(int i=0; i<numEntries; i++)
         pool[i].write(fp);
     }
+    void writeSts(void);
     void add(UChar type,UShort mIdx,UShort eIdx,double time,int event,int pe) {
       new (&pool[numEntries++])
         LogEntry(time, type, mIdx, eIdx, event, pe);
@@ -85,7 +87,9 @@ class LogPool {
 };
 
 class TraceProjections : public Trace {
+    int curevent;
   public:
+    TraceProjections() { curevent=0; }
     void userEvent(int e);
     void creation(envelope *e);
     void beginExecute(envelope *e);
