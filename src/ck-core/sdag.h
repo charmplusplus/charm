@@ -22,9 +22,9 @@ class CMsgBuffer {
     CMsgBuffer(int e, void *m, int r) : entry(e), msg(m), refnum(r), next(NULL) {}
     CMsgBuffer(): next(NULL) {}
     void pup(PUP::er& p) {
-      p(entry);
+      p|entry;
       CkPupMessage(p, &msg);
-      p(refnum);
+      p|refnum;
     }
 };
 
@@ -47,12 +47,12 @@ class CWhenTrigger {
        whenID(id), nArgs(na), nAnyEntries(nae), nEntries(ne), next(NULL) {}
     CWhenTrigger(): next(NULL) {}
     void pup(PUP::er& p) {
-      p(whenID);
-      p(nArgs);
+      p|whenID;
+      p|nArgs;
       p(args, MAXARG);
-      p(nAnyEntries);
+      p|nAnyEntries;
       p(anyEntries, MAXANY);
-      p(nEntries);
+      p|nEntries;
       p(entries, MAXREF);
       p(refnums, MAXREF);
     }
@@ -74,38 +74,26 @@ class TListCWhenTrigger
     TListCWhenTrigger(void) : first(0), last(0) {;}
 
     void pup(PUP::er& p) {
-      PUP::seekBlock s(p, 2);
-      int nEntries = 0;
+      int nEntries;
+      int cur=0;
       if (p.isUnpacking()) { 
-	s.seek(1);
-	p(nEntries);
-	DEBUGF(("      TListCWhenTrigger::numEntries %d\n", nEntries));
-	s.seek(0);
-	CWhenTrigger** unpackArray = new CWhenTrigger*[nEntries]; 
-	for (int i=0; i<nEntries; i++) {
-	  unpackArray[i] = new CWhenTrigger();
-	  unpackArray[i]->pup(p);
-	  if (i!=0) { unpackArray[i-1]->next = unpackArray[i]; }
-	}
-	if (nEntries > 0) {
-	  first = unpackArray[0];
-	  last = unpackArray[nEntries-1];
-	}
-	delete [] unpackArray;
+        nEntries = 0;
+        for (CWhenTrigger *tmp = first; tmp!=last; tmp=tmp->next, nEntries++)
+          if (current == tmp) cur = nEntries;
       }
-      else {
-	s.seek(0);
-	CWhenTrigger* temp = first;
-	while (temp != NULL) {
-	  temp->pup(p);
-	  temp = temp->next;
-	  nEntries++;
-	}
-	s.seek(1);
-	p(nEntries);
-	DEBUGF(("      TListCWhenTrigger::numEntries %d\n", nEntries));
+      p|nEntries;
+      p|cur;
+      if (p.isUnpacking()) { 
+        first = last = current = NULL;
+        if (nEntries) {
+	  CWhenTrigger** unpackArray = new CWhenTrigger*[nEntries]; 
+          first = unpackArray[0];
+          last = unpackArray[nEntries-1];
+          current = unpackArray[cur];
+          for (int i=0;i<nEntries-1;i++) unpackArray[i]->next=unpackArray[i+1];
+        }
       }
-      s.endBlock();
+      for (CWhenTrigger *tmp = first; tmp!=last; tmp=tmp->next) tmp->pup(p);
     }
 
     int empty(void) { return ! first; }
@@ -176,38 +164,28 @@ class TListCMsgBuffer
     TListCMsgBuffer(void) : first(0), last(0) {;}
 
     void pup(PUP::er& p) {
-      PUP::seekBlock s(p, 2);
-      int nEntries = 0;
-      if (p.isUnpacking()) { // unpack
-	s.seek(1);
-	p(nEntries);
-	DEBUGF(("      TListCMsgBuffer::numEntries %d\n", nEntries));
-	s.seek(0);
-	CMsgBuffer** unpackArray = new CMsgBuffer*[nEntries]; 
-	for (int i=0; i<nEntries; i++) {
-	  unpackArray[i] = new CMsgBuffer();
-	  unpackArray[i]->pup(p);
-	  if (i!=0) { unpackArray[i-1]->next = unpackArray[i]; }
-	}
-	if (nEntries > 0) {
-	  first = unpackArray[0];
-	  last = unpackArray[nEntries-1];
-	}
-	delete [] unpackArray;
+      int nEntries;
+      int cur;
+      if (p.isUnpacking()) { 
+        nEntries = 0;
+        for (CMsgBuffer *tmp = first; tmp!=last; tmp=tmp->next, nEntries++) {
+          if (current == tmp) cur = nEntries;
+        }
       }
-      else { // pack
-	s.seek(0);
-	CMsgBuffer* temp = first;
-	while (temp != NULL) {
-	  temp->pup(p);
-	  temp = temp->next;
-	  nEntries++;
-	}
-	s.seek(1);
-	p(nEntries);
-	DEBUGF(("      TListCMsgBuffer::numEntries %d\n", nEntries));
+      p|nEntries;
+      p|cur;
+      if (p.isUnpacking()) { 
+        first = last = current = NULL;
+        if (nEntries) {
+	  CMsgBuffer** unpackArray = new CMsgBuffer*[nEntries]; 
+          first = unpackArray[0];
+          last = unpackArray[nEntries-1];
+          for (int i=0; i<nEntries-1; i++)
+            unpackArray[i]->next = unpackArray[i+1];
+          current = unpackArray[cur];
+        }
       }
-      s.endBlock();
+      for (CMsgBuffer *tmp = first; tmp!=last; tmp=tmp->next) tmp->pup(p);
     }
 
     int empty(void) { return ! first; }
@@ -283,34 +261,57 @@ class CDep {
 
  public:
    void pup(PUP::er& p) {
-     if (p.isSizing()) { DEBUGF(("[%d] CDep::pup SIZING\n", CkMyPe())); }
-     else if (p.isPacking()) { DEBUGF(("[%d] CDep::pup PACK\n", CkMyPe())); }
-     else if (p.isUnpacking()) { DEBUGF(("[%d] CDep::pup UNPACK\n", CkMyPe())); }
-     else { DEBUGF(("[%d] CDep::pup UNKNOWN\n", CkMyPe())); }
+     /* 
+        no need for initMem() because __sdag_pup() will take care of 
+        allocating of CDep and call addDepends(), so we don't pup whenDepends
+        and entryDepends here.
+     */ 
+     int i, j;
 
-     int w, e;
+     for (i=0; i<numWhens; i++)    whens[i]->pup(p);
+     for (i=0; i<numEntries; i++)  buffers[i]->pup(p);
+
      p(numWhenDepends, numWhens);
      p(numEntryDepends, numEntries);
 
-     // print out contents
-     DEBUGF(("  numWhens %d numEntries %d\n    numWhensDepends ", 
-	     numEntries, numWhens));
-     for (w=0; w<numWhens; w++) { DEBUGF(("%d ", numWhenDepends[w])); }
-     DEBUGF(("\n    numEntryDepends "));
-     for (e=0; e<numEntries; e++) { DEBUGF(("%d ", numEntryDepends[e])); }
-     DEBUGF(("\n"));
+/*
+     for (i=0; i<numWhens; i++)
+       for (j=0; j<numWhenDepends[i]; j++) {
+         int which;
+         if (p.isPacking())  which = whenDepends[i][j] - buffers[0];
+         p|which;
+         if (p.isUnpacking()) whenDepends[i][j] = buffers[which];
+       }
 
-     for (w=0; w<numWhens; w++) {
-       DEBUGF(("  [%d] CDep::pup when %d\n", CkMyPe(), w));
-       whens[w]->pup(p);
+     for (i=0; i<numEntries; i++)
+       for (j=0; j<numEntryDepends[i]; j++) {
+         int which;
+         if (p.isPacking())  which = entryDepends[i][j] - whens[0];
+         p|which;
+         if (p.isUnpacking()) entryDepends[i][j] = whens[which];
      }
-     for (e=0; e<numEntries; e++) {
-       DEBUGF(("  [%d] CDep::pup entry %d\n", CkMyPe(), e));
-       buffers[e]->pup(p);
-     }
+*/
    }
 
    CDep(int ne, int nw) : numEntries(ne), numWhens(nw) { initMem(); }
+
+   ~CDep() {
+     int i;
+     delete [] numWhenDepends;
+     delete [] numEntryDepends;
+     for(i=0;i<numWhens;i++) {
+       delete whens[i];
+       delete [] whenDepends[i];
+     }
+     for(i=0;i<numEntries;i++) {
+       delete buffers[i];
+       delete [] entryDepends[i];
+     }
+     delete [] whens;
+     delete [] buffers;
+     delete [] whenDepends;
+     delete [] entryDepends;
+   }
 
  private:
    void initMem() {
