@@ -58,6 +58,7 @@ class LogPool {
     UInt numEntries;
     LogEntry *pool;
     FILE *fp;
+    FILE *stsfp;
     char *fname;
     char *pgmname;
     int binary;

@@ -141,6 +141,19 @@ void LogPool::init(void)
       fprintf(fp, "PROJECTIONS-RECORD\n");
   }
   CLOSE_LOG 
+
+  if (CkMyPe() == 0) 
+  {
+    char *fname = new char[strlen(CkpvAccess(traceRoot))+strlen(".sts")+1];
+    sprintf(fname, "%s.sts", CkpvAccess(traceRoot));
+    do
+    {
+      stsfp = fopen(fname, "w");
+    } while (!stsfp && (errno == EINTR || errno == EMFILE));
+    if(stsfp==0)
+      CmiAbort("Cannot open projections sts file for writing.\n");
+    delete[] fname;
+  }
 }
 
 LogPool::~LogPool() 
@@ -184,35 +197,25 @@ void LogPool::writeCompressed(void) {
 
 void LogPool::writeSts(void)
 {
-  char *fname = new char[strlen(CkpvAccess(traceRoot))+strlen(".sts")+1];
-  sprintf(fname, "%s.sts", CkpvAccess(traceRoot));
-  FILE *sts;
-  do
-  {
-    sts = fopen(fname, "w");
-  } while (!sts && (errno == EINTR || errno == EMFILE));
-  if(sts==0)
-    CmiAbort("Cannot open projections sts file for writing.\n");
-  delete[] fname;
-  fprintf(sts, "MACHINE %s\n",CMK_MACHINE_NAME);
-  fprintf(sts, "PROCESSORS %d\n", CkNumPes());
-  fprintf(sts, "TOTAL_CHARES %d\n", _numChares);
-  fprintf(sts, "TOTAL_EPS %d\n", _numEntries);
-  fprintf(sts, "TOTAL_MSGS %d\n", _numMsgs);
-  fprintf(sts, "TOTAL_PSEUDOS %d\n", 0);
-  fprintf(sts, "TOTAL_EVENTS %d\n", _numEvents);
+  fprintf(stsfp, "MACHINE %s\n",CMK_MACHINE_NAME);
+  fprintf(stsfp, "PROCESSORS %d\n", CkNumPes());
+  fprintf(stsfp, "TOTAL_CHARES %d\n", _numChares);
+  fprintf(stsfp, "TOTAL_EPS %d\n", _numEntries);
+  fprintf(stsfp, "TOTAL_MSGS %d\n", _numMsgs);
+  fprintf(stsfp, "TOTAL_PSEUDOS %d\n", 0);
+  fprintf(stsfp, "TOTAL_EVENTS %d\n", _numEvents);
   int i;
   for(i=0;i<_numChares;i++)
-    fprintf(sts, "CHARE %d %s\n", i, _chareTable[i]->name);
+    fprintf(stsfp, "CHARE %d %s\n", i, _chareTable[i]->name);
   for(i=0;i<_numEntries;i++)
-    fprintf(sts, "ENTRY CHARE %d %s %d %d\n", i, _entryTable[i]->name,
+    fprintf(stsfp, "ENTRY CHARE %d %s %d %d\n", i, _entryTable[i]->name,
                  _entryTable[i]->chareIdx, _entryTable[i]->msgIdx);
   for(i=0;i<_numMsgs;i++)
-    fprintf(sts, "MESSAGE %d %d\n", i, _msgTable[i]->size);
+    fprintf(stsfp, "MESSAGE %d %d\n", i, _msgTable[i]->size);
   for(i=0;i<_numEvents;i++)
-    fprintf(sts, "EVENT %d %s\n", i, CkpvAccess(usrEvents)[i]);
-  fprintf(sts, "END\n");
-  fclose(sts);
+    fprintf(stsfp, "EVENT %d %s\n", i, CkpvAccess(usrEvents)[i]);
+  fprintf(stsfp, "END\n");
+  fclose(stsfp);
 }
 
 void LogPool::add(UChar type,UShort mIdx,UShort eIdx,double time,int event,int pe, int ml) 
