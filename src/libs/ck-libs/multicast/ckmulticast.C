@@ -115,7 +115,6 @@ extern void CkPackMessage(envelope **pEnv);
 mCastEntry::mCastEntry (mCastEntry *old): 
 flag(COOKIE_NOTREADY), oldc(NULL), newc(NULL)
 {
-//  aid = old->aid;
   parentGrp = old->parentGrp;
   for (int i=0; i<old->allElem.length(); i++)
     allElem.push_back(old->allElem[i]);
@@ -152,17 +151,16 @@ void CkMulticastMgr::setSection(CkSectionCookie &id)
   mCastGrp[CmiMyPe()].init(id);
 }
 
-void CkMulticastMgr::setSection(CProxySection_ArrayElement *proxy)
+void CkMulticastMgr::setSection(CProxySection_ArrayElement &proxy)
 {
-  CkSectionCookie &_id = proxy->ckGetSectionID();
+  CkSectionCookie &_id = proxy.ckGetSectionCookie();
   mCastEntry *entry = new mCastEntry;
 
-  CkArrayIndexMax *al = proxy->ckGetArrayElements();
-  for (int i=0; i<proxy->ckGetNumElements(); i++) {
+  const CkArrayIndexMax *al = proxy.ckGetArrayElements();
+  for (int i=0; i<proxy.ckGetNumElements(); i++) {
     entry->allElem.push_back(al[i]);
   }
-//  entry->aid = aid;
-  _id.aid = proxy->ckGetArrayID();
+  _id.aid = proxy.ckGetArrayID();
   _id.val = entry;		// allocate table for this section
   CProxy_CkMulticastMgr  mCastGrp(thisgroup);
   mCastGrp[CmiMyPe()].init(_id);
@@ -313,6 +311,8 @@ void CkMulticastMgr::rebuild(CkSectionCookie &sectId)
 {
   // tear down old tree
   mCastEntry *curCookie = (mCastEntry*)sectId.val;
+  // make sure I am the newest one
+  while (curCookie->newc) curCookie = curCookie->newc;
   if (curCookie->flag == COOKIE_OLD) return;
 
   mCastEntry *newCookie = new mCastEntry(curCookie);  // allocate table for this section
@@ -349,17 +349,18 @@ void CkMulticastMgr::reset(CkSectionCookie s)
 
 void CkMulticastMgr::ArraySectionSend(int ep,void *m, CkArrayID a, CkSectionCookie &s)
 {
-//CmiPrintf("ArraySectionSend: %p\n", s);
+//CmiPrintf("ArraySectionSend\n");
   CkSectionCookie *thisSectId = &s;
 
-  if (thisSectId->pe != CmiMyPe()) {
-    CmiAbort("Section moved\n");
+  if (thisSectId->pe == CmiMyPe()) {
+    mCastEntry *entry = (mCastEntry *)thisSectId->val;   
+    // make sure I am the newest one
+    if (entry->newc) {
+      do { entry=entry->newc; } while (entry->newc);
+      s.val = entry;
+    }
+    if (entry->needRebuild) rebuild(s);
   }
-
-  mCastEntry *entry = (mCastEntry *)thisSectId->val;   
-  //while (entry->newc) entry=entry->newc;
-
-  if (entry->needRebuild) rebuild(s);
 
   register envelope *env = UsrToEnv(m);
   int msgSize = env->getTotalsize();
@@ -376,11 +377,9 @@ void CkMulticastMgr::ArraySectionSend(int ep,void *m, CkArrayID a, CkSectionCook
   memcpy(newmsg->msg, env, msgSize);
   CkFreeMsg(m);
 
-/*
-    mCastGrp[CmiMyPe()].recvMsg(newmsg);
-    return;
-*/
+  mCastGrp[thisSectId->pe].recvMsg(newmsg);
 
+/*
   if (entry->flag == COOKIE_NOTREADY) {
 //CmiPrintf("enq buffer %p\n", newmsg);
     entry->msgBuf.enq(newmsg);
@@ -388,6 +387,7 @@ void CkMulticastMgr::ArraySectionSend(int ep,void *m, CkArrayID a, CkSectionCook
   else {
     mCastGrp[CmiMyPe()].recvMsg(newmsg);
   }
+*/
 }
 
 
@@ -399,13 +399,11 @@ void CkMulticastMgr::recvMsg(multicastGrpMsg *msg)
 
   mCastEntry *entry = (mCastEntry *)msg->cookie.val;
 
-/*
   if (entry->flag == COOKIE_NOTREADY) {
 //CmiPrintf("enq buffer %p\n", msg);
     entry->msgBuf.enq(msg);
     return;
   }
-*/
 
   // send to spanning tree children
   CProxy_CkMulticastMgr  mCastGrp(thisgroup);
@@ -424,24 +422,28 @@ void CkMulticastMgr::recvMsg(multicastGrpMsg *msg)
     CProxyElement_ArrayBase ap(msg->aId, entry->localElem[i]);
     envelope *newm = (envelope *)CmiAlloc(msgSize);
     memcpy(newm, env, msgSize);
-    setSectionID(EnvToUsr(newm), msg->cookie);
+    setSectionCookie(EnvToUsr(newm), msg->cookie);
     ap.ckSend((CkArrayMessage *)EnvToUsr(newm), msg->ep);
   }
 
   delete msg;
 }
 
-void setSectionID(void *msg, CkSectionCookie sid)
+void setSectionCookie(void *msg, CkSectionCookie sid)
 {
   CkMcastBaseMsg *m = (CkMcastBaseMsg *)msg;
+  if (CkMcastBaseMsg::checkMagic(m) == 0) 
+    CmiAbort("Did you remember inherit multicast message from CkMcastBaseMsg?");
   m->gpe() = sid.pe;
   m->cookie() = sid.val;
   m->redno() = sid.redNo;
 }
 
-void CkGetSectionID(CkSectionCookie &id, void *msg)
+void CkGetSectionCookie(CkSectionCookie &id, void *msg)
 {
   CkMcastBaseMsg *m = (CkMcastBaseMsg *)msg;
+  if (CkMcastBaseMsg::checkMagic(m) == 0) 
+    CmiAbort("Did you remember inherit multicast message from CkMcastBaseMsg?");
   id.pe = m->gpe();
   id.val = m->cookie();
   // note: retain old redNo
@@ -461,16 +463,9 @@ ReductionMsg* ReductionMsg::buildNew(int NdataSize,void *srcData,
   return newmsg;
 }
 
-void CkMulticastMgr::setReductionClient(CProxySection_ArrayElement *proxy, redClientFn fn,void *param)
+void CkMulticastMgr::setReductionClient(CProxySection_ArrayElement &proxy, redClientFn fn,void *param)
 {
-  CkSectionCookie &id = proxy->ckGetSectionID();
-  mCastEntry *entry = (mCastEntry *)id.val;
-  entry->red.storedClient = fn;
-  entry->red.storedClientParam = param;
-}
-
-void CkMulticastMgr::setReductionClient(CkSectionCookie id, redClientFn fn,void *param)
-{
+  CkSectionCookie &id = proxy.ckGetSectionCookie();
   mCastEntry *entry = (mCastEntry *)id.val;
   entry->red.storedClient = fn;
   entry->red.storedClientParam = param;
@@ -586,9 +581,9 @@ void CkMulticastMgr::recvRedMsg(ReductionMsg *msg)
 	   newmsg->data);
       delete newmsg;
 
+//CmiPrintf("currentTreeUp: %d entry:%p oldc: %p\n", currentTreeUp, entry, entry->oldc);
       if (currentTreeUp && entry->oldc) {
 	// free old tree;
-//CmiPrintf("free up : %p\n", entry->oldc);
 	mCastGrp[CmiMyPe()].freeup(CkSectionCookie(id.pe, entry->oldc, 0));
 	entry->oldc = NULL;
       }
