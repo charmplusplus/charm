@@ -20,6 +20,7 @@ ComlibInstanceHandle dummy_inst;
 class Main : public Chare
 {
     double startTime;
+    int recv_count;
 public:
     Main(CkArgMsg* m)
     {
@@ -28,6 +29,8 @@ public:
 	if(m->argc >1 ) nElements=atoi(m->argv[1]);
 	delete m;
 	
+        recv_count = 0;
+
 	//Start the computation
 	CkPrintf("Running Hello on %d processors for %d elements\n",
 		 CkNumPes(),nElements);
@@ -58,9 +61,13 @@ public:
     
     void done(void)
     {
-        CkPrintf("All done: %d elements in %f seconds\n", nElements,
-                 CkWallTimer()-startTime);
-        CkExit();
+        recv_count ++;
+        
+        if(recv_count == CkNumPes()) {
+            CkPrintf("All done: %d elements in %f seconds\n", nElements,
+                     CkWallTimer()-startTime);
+            CkExit();
+        }
     };
 };
 
@@ -82,24 +89,12 @@ public:
     }
     
     void SayHi(int hiNo, int hcount) {
-        static int recv_count = 0;
         
         CkAssert(hiNo >= TEST_HI);
         
         // CkPrintf("Hi[%d] from element %d\n",hiNo,thisIndex);
         CProxy_Hello array_proxy = thisProxy;
         ComlibDelegateProxy(&array_proxy);
-        
-        /*
-          if (thisIndex < nElements-1)
-          //Pass the hello on:
-          array_proxy[thisIndex+1].SayHi(hiNo+1);
-          else if(recv_count == nElements-1)
-          //We've been around once-- we're done.
-          mainProxy.done();    
-          else
-          recv_count ++;
-        */
         
         int next = thisIndex+1;
         if(next >= nElements)
