@@ -51,12 +51,12 @@ void CmiMemoryInit(argv)
 #define memalign CmiMemory_Gnu_memalign
 #define valloc   CmiMemory_Gnu_valloc
 
-#ifndef _PAGESZ
-static int _PAGESZ;
-#endif
-
 #undef sun /* I don't care if it's a sun, dangit.  No special treatment. */
 #undef BSD /* I don't care if it's BSD.  Same thing. */
+#if CMK_GETPAGESIZE_AVAILABLE
+#define HAVE_GETPAGESIZE
+#endif
+
 #include "gnumalloc.c"
 
 #undef malloc
@@ -70,9 +70,6 @@ static int _PAGESZ;
 void CmiMemoryInit(argv)
 char **argv;
 {
-#ifndef _PAGESZ
-  _PAGESZ = getpagesize();
-#endif
 }
 
 char *malloc(size)
