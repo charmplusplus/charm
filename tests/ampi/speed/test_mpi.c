@@ -97,7 +97,7 @@ void startMPItest(MPI_Comm comm,int verbose)
   msg_comm_test(&c->b, "MPI Isend", c->myRank, verbose);
   while (!c->doneFlag) mpi_isend_poll(&c->b);
   
-  MPI_Buffer_detach(buf,bufSize);
+  MPI_Buffer_detach(buf,&bufSize);
   free(buf);
 }
 

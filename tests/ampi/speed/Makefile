@@ -24,3 +24,9 @@ msgspeed.o: msgspeed.c
 
 test: all
 	./charmrun hello +p2
+
+
+# Various stand-alone (non-charm) API calls:
+
+standalone_mpi: standalone_mpi.c test_mpi.c msgspeed.c
+	mpicc -o $@ standalone_mpi.c test_mpi.c msgspeed.c
