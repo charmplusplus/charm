@@ -66,6 +66,12 @@ public: short int index[4];
 	CkArrayIndex4D(short int i0,short int i1,short int i2,short int i3) {
 		index[0]=i0;index[1]=i1;index[2]=i2;index[3]=i3;nInts=2;
 	}
+	CkArrayIndex4D &operator=(const CkArrayIndex4D &that)  {
+		CmiAssert(that.nInts == 2);
+		nInts = that.nInts;
+		memcpy(index, that.index, sizeof(short int)*3);;
+		return *this;
+	}
 };
 class CkArrayIndex5D : public CkArrayIndex {
 public: short int index[5];
