@@ -5,7 +5,7 @@ module TraceSummary {
     entry TraceSummaryInit(CkArgMsg *m);
   };
 
-  initcall void initTraceSummaryBOC();
+  initnode void initTraceSummaryBOC();
   
   readonly CkGroupID traceSummaryGID;
 

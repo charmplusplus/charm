@@ -48,7 +48,7 @@ for bal in $LOADBALANCERS
 do
 	echo "   extern module $bal;" >> EveryLB.ci
 done
-echo "   initcall void initEveryLB(void);" >>EveryLB.ci
+echo "   initnode void initEveryLB(void);" >>EveryLB.ci
 echo "};" >> EveryLB.ci
 
 echo "LB_OBJ=EveryLB.o \\" >>$out
