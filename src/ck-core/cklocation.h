@@ -26,10 +26,10 @@ public:
 };
 
 /* Utility */
-#if CMK_LBDB_ON
+//#if CMK_LBDB_ON
 #include "LBDatabase.h"
 class LBDatabase;
-#endif
+//#endif
 
 //Forward declarations
 class CkArray;
