@@ -428,8 +428,10 @@ static char* fContent(char *msg)
   strcpy(temp, _contentStr);
   return(temp);
 }
-
 #endif
+
+extern void _registerLBDatabase(void);
+
 void _initCharm(int argc, char **argv)
 {
   CpvInitialize(PtrQ*,_buffQ);
