@@ -27,7 +27,8 @@ INC=../include
 
 all: charm++ bluegene LIBS AMPI f90charm TSM SM PVM doc
 
-charm++: converse $(L)/libck.a loadbalancers charmxi default_libs
+charm++: converse
+	$(MAKE) $(L)/libck.a loadbalancers charmxi default_libs
 
 bgampi: bluegene AMPI
 
@@ -52,7 +53,10 @@ MBLOCKC: charm++ LIBS
 
 MBLOCKF: MBLOCKC
 
-AMPI: charm++ CONVLIBS AMPIC AMPIF
+AMPI: 
+	$(MAKE) charm++ 
+	$(MAKE) CONVLIBS 
+	$(MAKE) AMPIC AMPIF
 
 AMPIC: charm++ LIBS
 
@@ -62,19 +66,19 @@ f90charm: charm++ $(L)/libf90charm.a
 
 default_libs: commlib multicast
 
-multicast: 
-	cd libs/ck-libs/multicast && make OPTS='$(OPTS)'
+multicast: $(L)/libck.a
+	cd libs/ck-libs/multicast && $(MAKE)
 
-commlib:
-	cd libs/ck-libs/commlib && make OPTS='$(OPTS)'
+commlib: $(L)/libck.a
+	cd libs/ck-libs/commlib && $(MAKE)
 
 translators: charmxi conv-cpm
 
 pose:
-	cd libs/ck-libs/pose && make OPTS='$(OPTS)'
+	cd libs/ck-libs/pose && $(MAKE) 
 
 LIBS: CONVLIBS CHARMLIBS
-	cd libs; make otherlibs OPTS='$(OPTS)'
+	cd libs; $(MAKE) otherlibs 
 
 test-all: test
 
@@ -215,6 +219,7 @@ dirs+sources:
 	./gatherflat ../../src/arch/`cat .vdir`      .
 	./gathertree ../../pgms ../pgms
 	rm -f ../bin/charmc ; cp charmc ../bin/
+	rm -f ../bin/dep.pl ; cp dep.pl ../bin/
 	chmod +x ../bin/charmc
 	rm -f .gdir
 	rm -rf ../include ; mkdir ../include
@@ -233,12 +238,16 @@ TRACELIBS=$(L)/libtrace-projections.a  $(L)/libtrace-summary.a \
           $(L)/libtrace-counter.a $(L)/libtrace-bluegene.a \
 	  $(L)/libtrace-projector.a $(L)/libtrace-all.a $(L)/libtrace-converse.a
 MEMLIBS=$(L)/libmemory-default.o $(L)/libmemory-os.o $(L)/libmemory-gnu.o \
-   $(L)/libmemory-gnuold.o \
-   $(L)/libmemory-verbose.o $(L)/libmemory-paranoid.o $(L)/libmemory-leak.o $(L)/libmemory-isomalloc.o
-THREADLIBS=$(L)/libthreads-default.o $(L)/libthreads-qt.o $(L)/libthreads-context.o $(L)/libthreads-pthreads.o $(L)/libthreads-fibers.o
+          $(L)/libmemory-gnuold.o $(L)/libmemory-verbose.o 	\
+	  $(L)/libmemory-paranoid.o \
+	  $(L)/libmemory-leak.o $(L)/libmemory-isomalloc.o
+THREADLIBS=$(L)/libthreads-default.o $(L)/libthreads-qt.o 	\
+ 	  $(L)/libthreads-context.o \
+	  $(L)/libthreads-pthreads.o $(L)/libthreads-fibers.o
 
 CVLIBS=$(L)/libconv-core.a \
-	$(L)/libconv-cplus-n.a $(L)/libconv-cplus-y.a $(L)/libconv-util.a $(L)/libconv-utilf.a \
+	$(L)/libconv-cplus-y.a $(L)/libconv-cplus-n.a \
+	$(L)/libconv-util.a $(L)/libconv-utilf.a \
 	$(CLBLIBS) $(TRACELIBS) $(MEMLIBS) $(THREADLIBS) \
 	$(L)/libccs-client.a
 
@@ -255,10 +264,13 @@ LIBCONV_UTIL=pup_util.o pup_xlater.o pup_c.o pup_paged.o\
 
 LIBCONV_UTILF=pup_f.o
 
-converse: basics QuickThreads/libqt.a $(CVLIBS) fmain-ok charmrun-target swapglobal-target conv-cpm
+converse: basics 
+	$(MAKE) converse-target
+
+converse-target: QuickThreads/libqt.a $(CVLIBS) fmain-ok charmrun-target swapglobal-target conv-cpm
 
 charmrun-target: daemon-target sockRoutines.c sockRoutines.h ccs-server.c ccs-server.h
-	if [ -d charmrun ] ; then ( cd charmrun ; make OPTS='$(OPTS)' ) ; fi
+	if [ -d charmrun ] ; then ( cd charmrun ; $(MAKE) OPTS='$(OPTS)' ) ; fi
 	if [ -f charmrun ] ; then ( cp charmrun ../bin ) ; fi
 
 daemon-target: sockRoutines-seq.o
@@ -273,32 +285,30 @@ fmain-ok: fmain.f90
 	-@cp fmain.o ../lib
 	-@touch fmain-ok
 
-QuickThreads/libqt.a:
+QuickThreads/libqt.a:  $(CVHEADERS)
 	cd QuickThreads;./configure
 	rm -f QuickThreads/libqt.a
-	cd QuickThreads ; make qt  OPTS='$(OPTS)'
+	cd QuickThreads ; $(MAKE) qt  OPTS='$(OPTS)'
 	cp QuickThreads/libqt.a ../lib/libckqt.a
 	-(CHARMINC=.; . ./conv-config.sh; \
 	  cp QuickThreads/libqt.$$CMK_SHARED_SUF ../lib_so && \
 	  cp QuickThreads/libqt.$$CMK_SHARED_SUF ../lib_so/libckqt.$$CMK_SHARED_SUF)
 
 METIS:  charm++
-	cd libs/conv-libs/metis; make OPTS='$(OPTS)'
+	cd libs/conv-libs/metis; $(MAKE) OPTS='$(OPTS)'
 
 CONVLIBS: converse
-	cd libs; make convlibs OPTS='$(OPTS)'
+	cd libs; $(MAKE) convlibs OPTS='$(OPTS)'
 
 $(L)/libconv-core.a: $(LIBCONV_CORE)
 	$(CHARMC) -o $@ $(LIBCONV_CORE)
 
-$(L)/libconv-cplus-y.a: machine.c $(CVHEADERS)
-	@-test -f $(INC)/mpi.h && mv -f $(INC)/mpi.h $(INC)/mpi.BAK || true
-	$(CHARMC) -o $@ -DFOR_CPLUS=1 machine.c
-	@-test -f $(INC)/mpi.BAK && mv -f $(INC)/mpi.BAK $(INC)/mpi.h || true
+$(L)/libconv-cplus-y.a: $(L)/libconv-cplus-n.a
 
 $(L)/libconv-cplus-n.a: machine.c $(CVHEADERS)
 	@-test -f $(INC)/mpi.h && mv -f $(INC)/mpi.h $(INC)/mpi.BAK || true
-	$(CHARMC) -o $@ -DFOR_CPLUS=0 machine.c
+	$(CHARMC) -o $(L)/libconv-cplus-y.a -DFOR_CPLUS=1 machine.c
+	$(CHARMC) -o $(L)/libconv-cplus-n.a -DFOR_CPLUS=0 machine.c
 	@-test -f $(INC)/mpi.BAK && mv -f $(INC)/mpi.BAK $(INC)/mpi.h || true
 
 $(L)/libconv-util.a: $(LIBCONV_UTIL)
@@ -325,7 +335,7 @@ conv-ccs.o: conv-ccs.c $(CVHEADERS)
 ccs-builtins.o: ccs-builtins.C $(CVHEADERS)
 	$(CHARMC) ccs-builtins.C
 
-ccs-client.o: ccs-client.c
+ccs-client.o: ccs-client.c $(CVHEADERS)
 	$(CHARMC) ccs-client.c
 
 sockRoutines.o: sockRoutines.c $(CVHEADERS) $(UTILHEADERS)
@@ -367,35 +377,35 @@ cldb.o: cldb.c cldb.h $(CVHEADERS)
 quiescence.o: quiescence.c $(CVHEADERS)
 	$(CHARMC) quiescence.c
 
-pup_util.o: pup_util.C $(UTILHEADERS)
+pup_util.o: pup_util.C $(CVHEADERS) $(UTILHEADERS)
 	$(CHARMC) -o pup_util.o pup_util.C
 
-pup_xlater.o: pup_xlater.C $(UTILHEADERS)
+pup_xlater.o: pup_xlater.C $(CVHEADERS) $(UTILHEADERS)
 	$(CHARMC) -o pup_xlater.o pup_xlater.C
 
-pup_c.o: pup_c.C $(UTILHEADERS)
+pup_c.o: pup_c.C $(CVHEADERS) $(UTILHEADERS)
 	$(CHARMC) -o pup_c.o pup_c.C
 
-pup_paged.o: pup_paged.C $(UTILHEADERS)
+pup_paged.o: pup_paged.C $(CVHEADERS) $(UTILHEADERS)
 	$(CHARMC) -o pup_paged.o pup_paged.C
 	
-pup_f.o: pup_f.f90
+pup_f.o: pup_f.f90 $(CVHEADERS)
 	-$(CHARMC) -c pup_f.f90
 	-$(CHARMC) -cpmod ../include pupmod.M
 
-ckhashtable.o: ckhashtable.C ckhashtable.h
+ckhashtable.o: ckhashtable.C ckhashtable.h $(CVHEADERS)
 	$(CHARMC) -o ckhashtable.o ckhashtable.C
 
-ckbitvector.o: ckbitvector.C ckbitvector.h
+ckbitvector.o: ckbitvector.C ckbitvector.h $(CVHEADERS)
 	$(CHARMC) -o ckbitvector.o ckbitvector.C
 
-ckdll.o: ckdll.C ckdll.h
+ckdll.o: ckdll.C ckdll.h $(CVHEADERS)
 	$(CHARMC) -o ckdll.o ckdll.C
 
-ckimage.o: ckimage.C ckimage.h
+ckimage.o: ckimage.C ckimage.h $(CVHEADERS)
 	$(CHARMC) -o ckimage.o ckimage.C
 
-conv-lists.o: conv-lists.C $(UTILHEADERS)
+conv-lists.o: conv-lists.C $(UTILHEADERS) $(CVHEADERS)
 	$(CHARMC) -o conv-lists.o conv-lists.C
 
 ## Converse load balancers (seed balancers, -balance)
@@ -415,7 +425,7 @@ $(L)/libldb-bluegene.o: cldb.bluegene.c $(CVHEADERS)
 	$(CHARMC) -o $@ cldb.bluegene.c
 
 ## Memory allocation libraries (-memory)
-MEM_DEPS=memory.c memory-gnu.c memory-gnuold.c converse.h conv-mach.h
+MEM_DEPS=memory.c memory-gnu.c memory-gnuold.c converse.h conv-mach.h $(CVHEADERS)
 $(L)/libmemory-default.o: $(MEM_DEPS)
 	$(CHARMC) -o $@ -DCMK_MEMORY_BUILD_DEFAULT memory.c
 
@@ -485,12 +495,13 @@ LIBCK_CORE=trace-common.o init.o register.o qd.o ck.o main.o msgalloc.o \
            tempo.o waitqd.o LBDatabase.o lbdb.o charisma.o ckcheckpoint.o\
            LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o \
 	   BaseLB.o CentralLB.o NborBaseLB.o WSLB.o ObjGraph.o graph.o  \
-           Refiner.o bitvecset.o Set.o heap.o CommLBHeap.o NullLB.o \
-	   LBSimulation.o ComlibStrategy.o ComlibArrayListener.o	\
+           Refiner.o bitvecset.o Set.o heap.o CommLBHeap.o \
+	   NullLB.o LBSimulation.o 	\
+	   ComlibStrategy.o ComlibArrayListener.o  \
 	   charmProjections.o
 
 CHARMLIBS: charm++
-	cd libs; make charmlibs OPTS='$(OPTS)'
+	cd libs; $(MAKE) charmlibs OPTS='$(OPTS)'
 
 $(L)/libck.a: $(LIBCK_CORE)
 	$(CHARMC) -o $@ $(LIBCK_CORE)
@@ -625,10 +636,10 @@ Refiner.o: Refiner.C $(CKHEADERS)
 ObjGraph.o: ObjGraph.C $(CKHEADERS)
 	$(CHARMC) -o ObjGraph.o ObjGraph.C
 
-graph.o: graph.c 
+graph.o: graph.c  $(CVHEADERS)
 	$(CHARMC) -o graph.o graph.c
 
-bitvecset.o: bitvecset.c bitvecset.h
+bitvecset.o: bitvecset.c bitvecset.h $(CVHEADERS)
 	$(CHARMC) -o bitvecset.o bitvecset.c
 
 Set.o: Set.C $(CKHEADERS) Set.h elements.h
@@ -652,14 +663,14 @@ NborBaseLB.o: NborBaseLB.C NborBaseLB.decl.h $(CKHEADERS)
 CommLBHeap.o: CommLBHeap.C $(CKHEADERS)
 	$(CHARMC) -c CommLBHeap.C
 
-LBSimulation.o : LBSimulation.h LBSimulation.C
+LBSimulation.o : LBSimulation.h LBSimulation.C $(CVHEADERS)
 	$(CHARMC) -c LBSimulation.C
 
 ## Communication Library array listener code
-ComlibArrayListener.o : ComlibArrayListener.C ComlibArrayListener.h 
+ComlibArrayListener.o : ComlibArrayListener.C ComlibArrayListener.h $(CVHEADERS)
 	$(CHARMC) -c ComlibArrayListener.C
 
-ComlibStrategy.o : ComlibStrategy.C ComlibStrategy.h
+ComlibStrategy.o : ComlibStrategy.C ComlibStrategy.h $(CVHEADERS)
 	$(CHARMC) -c ComlibStrategy.C
 
 
@@ -728,7 +739,7 @@ converseProjections.o: converseProjections.C $(CVHEADERS)
 machineProjections.o: machineProjections.C $(CVHEADERS)
 	$(CHARMC) machineProjections.C
 
-trace-all.o:trace-all.C 
+trace-all.o:trace-all.C $(CVHEADERS)
 	$(CHARMC) -o trace-all.o trace-all.C
 
 ###############################################################################
@@ -755,7 +766,7 @@ LOADBALANCERS=\
    $(L)/libmoduleWSLB.a \
    manager.o
 
-manager.o: manager.C manager.h
+manager.o: manager.C manager.h $(CVHEADERS)
 	$(CHARMC) -c manager.C
 
 DummyLB.decl.h: DummyLB.ci charmxi
@@ -903,10 +914,10 @@ LB_OBJ=EveryLB.o \
     WSLB.o \
     manager.o
 
-EveryLB.o: EveryLB.C EveryLB.decl.h
+EveryLB.o: EveryLB.C EveryLB.decl.h $(CVHEADERS)
 	$(CHARMC) -c EveryLB.C
 
-EveryLB.decl.h: EveryLB.ci
+EveryLB.decl.h: EveryLB.ci $(CVHEADERS)
 	$(CHARMC) EveryLB.ci
 
 $(L)/libmoduleEveryLB.a: $(LB_OBJ)
@@ -972,7 +983,7 @@ $(L)/libconv-bluegene-logs.a: $(BLUE_IO_OBJS)
 conv-cpm: conv-cpm.o
 	$(SEQCHARMC) -o conv-cpm -cp ../bin/ conv-cpm.o
 
-conv-cpm.o: conv-cpm.c
+conv-cpm.o: conv-cpm.c $(CVHEADERS)
 	$(SEQCHARMC) conv-cpm.c
 
 ###############################################################################
@@ -1106,4 +1117,4 @@ veryclean:
 
 
 configure: configure.in
-	-autoconf && autoheader 
+	-autoconf && autoheader
