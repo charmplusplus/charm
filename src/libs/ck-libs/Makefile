@@ -1,5 +1,5 @@
 DIRS=tcharm armci collide netfem fem ampi mblock barrier \
-	multicast irecv liveViz liveViz3d
+	multicast irecv liveViz liveViz3d taskGraph
 CHARMC=../../bin/charmc $(OPTS)
 
 all:
