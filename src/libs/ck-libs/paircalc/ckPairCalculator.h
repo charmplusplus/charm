@@ -6,15 +6,27 @@
 #include "PipeBroadcastStrategy.h"
 #include "BroadcastStrategy.h"
 
+
+#ifdef FUNDER
+#define ZGEMM zgemm_ 
+#define DCOPY dcopy_
+#define ZTODO ztodo_
+#else
+#define ZGEMM zgemm
+#define DCOPY dcopy
+#define ZTODO ztodo
+#endif
+
+
 #if USE_BLAS
-extern "C" complex zdotu_( const int *N,  complex *X, const int *incX, complex *Y, const int *incY);
+extern "C" complex ZTODO( const int *N,  complex *X, const int *incX, complex *Y, const int *incY);
 
 #endif
 #if USE_ZGEMM
-extern "C" void zgemm_(char *,char *, int *,int *, int *,complex *,complex *,int *,
+extern "C" void ZGEMM(char *,char *, int *,int *, int *,complex *,complex *,int *,
                        const complex *,int *,complex *,complex *,int *);
 
-extern "C" void dcopy_(int*,double *,int*, double *,int *);
+extern "C" void DCOPY(int*,double *,int*, double *,int *);
 
 #endif
 
