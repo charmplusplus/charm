@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 2.17  1996-07-16 17:23:37  jyelon
+ * Revision 2.18  1996-07-24 22:03:49  milind
+ * changed cmk_sixe_t to unsigned long from long.
+ *
+ * Revision 2.17  1996/07/16 17:23:37  jyelon
  * Renamed a flag.
  *
  * Revision 2.16  1996/07/16 05:20:41  milind
@@ -87,7 +90,7 @@
 #define CMK_SIGNAL_USE_SIGACTION                           0
 #define CMK_SIGNAL_USE_SIGACTION_WITH_RESTART              0
 
-#define CMK_SIZE_T                                         unsigned
+#define CMK_SIZE_T                                         unsigned long
 
 #define CMK_STATIC_PROTO_FAILS                             0
 #define CMK_STATIC_PROTO_WORKS                             1
