@@ -162,7 +162,7 @@ TRACELIBS=libtrace-none.a libtrace-projections.a libtrace-summary.a
 
 CVLIBS=libconv-core.a libconv-cplus-n.a libconv-cplus-y.a libldb-rand.o libldb-spray.o libldb-graph.o libldb-test.o $(TRACELIBS)
 
-LIBCONV_CORE=threads.o convcore.o conv-conds.o spantree.o queueing.o fifo.o msgmgr.o memory.o cpm.o cpthreads.o futures.o cldb.o random.o debug-message.o debug-object.o info.o generate.o edgelist.o conv-ccs.o quiescence.o
+LIBCONV_CORE=threads.o convcore.o conv-conds.o queueing.o fifo.o msgmgr.o memory.o cpm.o cpthreads.o futures.o cldb.o random.o debug-message.o debug-object.o info.o generate.o edgelist.o conv-ccs.o quiescence.o
 
 converse: basics QuickThreads/libckqt.a $(CVLIBS) conv-host-if-needed conv-cpm convlibs
 
@@ -202,9 +202,6 @@ fifo.o: fifo.c $(CVHEADERS)
 
 threads.o: threads.c $(CVHEADERS)
 	$(CHARMC) -IQuickThreads threads.c
-
-spantree.o: spantree.c $(CVHEADERS)
-	$(CHARMC) spantree.c
 
 convcore.o: convcore.c $(CVHEADERS)
 	$(CHARMC) convcore.c
