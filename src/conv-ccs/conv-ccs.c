@@ -309,6 +309,9 @@ int _isCcsHandlerIdx(int hIdx) {
 
 void CcsBuiltinsInit(char **argv);
 
+CpvDeclare(int, cmiArgDebugFlag);
+CpvDeclare(char *, displayArgument);
+
 void CcsInit(char **argv)
 {
   CpvInitialize(CkHashtable_c, ccsTab);
@@ -316,6 +319,10 @@ void CcsInit(char **argv)
   CpvInitialize(CcsImplHeader *, ccsReq);
   CpvAccess(ccsReq) = NULL;
   _ccsHandlerIdx = CmiRegisterHandler((CmiHandler)req_fw_handler);
+  CpvInitialize(int, cmiArgDebugFlag);
+  CpvInitialize(char *, displayArgument);
+  CpvAccess(cmiArgDebugFlag) = 0;
+  CpvAccess(displayArgument) = NULL;
 
   CcsBuiltinsInit(argv);
 
@@ -335,17 +342,24 @@ void CcsInit(char **argv)
     }
   }
 #endif
+  //if in parallel debug mode i.e ++cpd, freeze
+  //cmiArgDebugFlag = CmiGetArgFlagDesc(argv, "+cpd", "Used *only* in conjunction with parallel debugger");
+  if (CmiGetArgFlagDesc(argv, "+cpd", "Used *only* in conjunction with parallel debugger"))
+  {
+     //CmiPrintf("Running in parallel debug mode\n");
+     CpvAccess(cmiArgDebugFlag) = 1;
+     if (CmiGetArgStringDesc(argv, "+DebugDisplay",&(CpvAccess(displayArgument)), "X display for gdb used only in cpd mode"))
+     {
+        if (CpvAccess(displayArgument) == NULL)
+            CmiPrintf("WARNING> NULL parameter for +DebugDisplay\n***");
+     }
+     else
+     {
+            CmiPrintf("WARNING> x term for gdb needs to be specified as +DebugDisplay by debugger\n***");
+     }
+
+  }
 }
 
 #endif /*CMK_CCS_AVAILABLE*/
-
-
-
-
-
-
-
-
-
-
 
