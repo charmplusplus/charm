@@ -21,15 +21,16 @@
 
 /************ Charm++ Message PUP *****************/
 /* 
- fast_and_dirty = 0:  pup directly according to the size;
-                  1:  pup each field separately, allows for debugging;
+ pack_mode = 
+                  0:  pup each field separately, allows for debugging;
+                  1:  pup the message as a single array of bytes;
                   2:  try to handle the cross platform compatibility where
 		      Converse header sizes are different. Works same as 0, 
 		      but ignore the converse header. Cannot handle the case 
 		      in heterogeneous platforms where data type length is 
 		      different.
 */
-void CkPupMessage(PUP::er &p,void **atMsg,int fast_and_dirty) {
+void CkPupMessage(PUP::er &p,void **atMsg,int pack_mode) {
 	UChar type;
 	int size,prioBits,envSize;
 
@@ -58,11 +59,11 @@ void CkPupMessage(PUP::er &p,void **atMsg,int fast_and_dirty) {
 	int userSize=size-envSize-sizeof(int)*PW(prioBits);
 	if (p.isUnpacking())
 		env=_allocEnv(type,userSize,prioBits);
-	if (fast_and_dirty == 1) {
+	if (pack_mode == 1) {
 	  /*Pup entire header and message as raw bytes.*/
 	  p((void *)env,size);
 	} 
- 	else if (fast_and_dirty == 2) {
+ 	else if (pack_mode == 2) {
 	    /*Pup header in detail and message separately.*/
 	    /* note that it can be that sizeof(envelope) != envSize */
 	    env->pup(p);
