@@ -9,19 +9,8 @@
 
 #if CMK_LBDB_ON
 
-#include "cklists.h"
-
-
 #include "RecBisectBfLB.h"
 #include "RecBisectBfLB.def.h"
-
-extern "C" {
-IntQueue * fifoInt_create(int size);
-int fifoInt_enqueue(IntQueue *q, int value);
-int fifoInt_empty(IntQueue *q);
-int fifoInt_dequeue(IntQueue *q);
-void fifoInt_destroy(IntQueue* q);
-}
 
 extern "C" {
   Graph * initGraph(int v, int e);
@@ -215,11 +204,11 @@ void RecBisectBfLB::partitionInTwo(Graph *g, int nodes[], int numNodes,
   s1 = makeEmptySet(g->V);
   s2 = makeEmptySet(g->V);
 
-  q1 = fifoInt_create(g->V);
-  q2 = fifoInt_create(g->V);
+  q1 = new IntQueue(g->V);
+  q2 = new IntQueue(g->V);
 
-  fifoInt_enqueue(q1, r1);
-  fifoInt_enqueue(q2, r2);
+  q1->enq(r1);
+  q2->enq(r2);
   /*  printf("r1=%d, r2=%d\n", r1, r2);*/
 
   weight1 = 0; weight2 = 0;
@@ -237,8 +226,8 @@ void RecBisectBfLB::partitionInTwo(Graph *g, int nodes[], int numNodes,
   *pp2 = p2;
   destroySet(s1);
   destroySet(s2);
-  fifoInt_destroy(q1);
-  fifoInt_destroy(q2);
+  delete q1;
+  delete q2;
 /*  CmiPrintf("==exiting partitionInTwo, ratios: (%d, %d); weights: %f %f \n",
 	    ratio1, ratio2, weight1, weight2); */
 }
@@ -264,12 +253,12 @@ float RecBisectBfLB::addToQ(IntQueue * q, Graph *g, BV_Set * all,
 
   weightAdded = 0.0;
 
-  if (fifoInt_empty(q)) {
+  if (q->isEmpty()) {
     doneUpto = findNextUnassigned(g->V, all, s1, s2);
-    if (doneUpto < g->V) fifoInt_enqueue(q,doneUpto); 
+    if (doneUpto < g->V) q->enq(doneUpto); 
   }
-  if (!fifoInt_empty(q) ) {
-    t1 = fifoInt_dequeue(q);
+  if (!q->isEmpty() ) {
+    t1 = q->deq();
     if (bvset_find(all, t1)) /* t1 is a vertex of the given partition */
       if ( (!bvset_find(s1, t1)) && ( !bvset_find(s2, t1)) ) {
 	bvset_insert(s1, t1);
@@ -291,7 +280,7 @@ void RecBisectBfLB::enqChildren(IntQueue * q, Graph *g, BV_Set * all,
     j = getNeighbor(g, node, i);
     if (  (bvset_find(all,j)) && (!bvset_find(s1,j)) 
 	  && (!bvset_find(s2,j)) ) {
-      fifoInt_enqueue(q, j);
+      q->enq(j);
     }
   } 
 }

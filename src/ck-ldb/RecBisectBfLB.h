@@ -15,7 +15,9 @@
 #include "ObjGraph.h"
 #include "graph.h"
 #include "bitvecset.h"
-#include "fifoInt.h"
+#include "cklists.h"
+
+typedef CkQ<int> IntQueue;
 
 void CreateRecBisectBfLB();
 

@@ -119,7 +119,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 ALLHEADERS=$(CKHEADERS) \
     simplemsg.h sm.h pvmc.h pvm3.h sdag.h \
     CDep.h CCounter.h CMsgBuffer.h CWhenTrigger.h TList.h \
-	fifoInt.h graph.h bitvecset.h Set.h ampiimpl.h
+	graph.h bitvecset.h Set.h ampiimpl.h
 
 basics: headers
 	touch basics
@@ -311,7 +311,7 @@ LIBCK_CORE=init.o register.o qd.o ck.o main.o msgalloc.o ckfutures.o \
 	   LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o Refiner.o \
 	   ObjGraph.o \
 	   CentralLB.o RandCentLB.o \
-	   RecBisectBfLB.o graph.o bitvecset.o fifoInt.o \
+	   RecBisectBfLB.o graph.o bitvecset.o \
 	   MetisLB.o RefineLB.o Set.o CommLB.o Comm1LB.o\
            HeapCentLB.o heap.o NborBaseLB.o NeighborLB.o WSLB.o \
 	   GreedyRefLB.o RandRefLB.o CommLBHeap.o
@@ -451,14 +451,11 @@ CentralLB.o: CentralLB.C $(CKHEADERS)
 RandCentLB.o: RandCentLB.C $(CKHEADERS)
 	$(CHARMC) -o RandCentLB.o RandCentLB.C
 
-RecBisectBfLB.o: RecBisectBfLB.C $(CKHEADERS) graph.h fifoInt.h bitvecset.h
+RecBisectBfLB.o: RecBisectBfLB.C $(CKHEADERS) graph.h bitvecset.h
 	$(CHARMC) -o RecBisectBfLB.o RecBisectBfLB.C
 
 graph.o: graph.c 
 	$(CHARMC) -o graph.o graph.c
-
-fifoInt.o: fifoInt.c fifoInt.h
-	$(CHARMC) -o fifoInt.o fifoInt.c
 
 bitvecset.o: bitvecset.c bitvecset.h
 	$(CHARMC) -o bitvecset.o bitvecset.c

@@ -1,6 +1,7 @@
 #ifndef _CKLISTS_H
 #define _CKLISTS_H
 
+#include <converse.h> // for size_t
 #include <stdlib.h> // for size_t
 
 template <class T>
@@ -13,8 +14,12 @@ class CkQ {
     CkQ() :first(0),len(0) {
       block = new T[blklen=16];
     }
+    CkQ(int sz) :first(0),len(0) {
+      block = new T[blklen=sz];
+    }
     ~CkQ() { delete[] block; }
     int length(void) { return len; }
+    CmiBool isEmpty(void) { return (CmiBool)(len==0); }
     T deq(void) {
       if(len>0) {
         T &ret = block[first];
