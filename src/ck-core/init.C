@@ -512,8 +512,8 @@ void InitCallTable::enumerateInitCalls()
   for (i=0; i<initProcCalls.length(); i++) initProcCalls[i]();
 }
 
-CpvExtern(int, cmiArgDebugFlag);
-extern void CpdFreeze(void);
+CpvCExtern(int, cmiArgDebugFlag);
+extern "C" void CpdFreeze(void);
 
 void _initCharm(int unused_argc, char **argv)
 { 
