@@ -88,7 +88,7 @@ void
 PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromRow)
 {
 #ifdef _DEBUG_
-  CkPrintf("     pairCalc[%d %d %d %d] got from [%d %d] with size {%d}\n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z,  thisIndex.w, sender, size);
+  CkPrintf("     pairCalc[%d %d %d %d] got from [%d %d] with size {%d}, symm=%d, from=%d\n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z,  thisIndex.w, sender, size, symmetric, fromRow);
 #endif
   int offset = -1;
   complex **inData;
@@ -106,9 +106,10 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
   }
   N = size;                                                             
 
-  if (!inData[offset])
+  if (!inData[offset]) 
     inData[offset] = new complex[size];
   memcpy(inData[offset], points, size * sizeof(complex));
+
 
 #if 0
     CkPrintf("--------Partial Deposit----------\n");
@@ -119,7 +120,7 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
 #endif
   
   numRecd++; 
-  if (numRecd == numExpected * 2 || (symmetric && thisIndex.x==thisIndex.y && numRecd==numExpected )) {
+  if (numRecd == numExpected * 2 || (symmetric && thisIndex.x==thisIndex.y && numRecd==numExpected)) {
 #if 0
     CkPrintf("--------All Deposit----------\n");
     for (int j = 0; j < numExpected; j++)
@@ -139,25 +140,23 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
 #endif
   
 #ifdef _DEBUG_
-    CkPrintf("     pairCalc[%d %d %d %d] got expected \n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z);
+    CkPrintf("     pairCalc[%d %d %d %d] got expected %d\n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z,  numExpected);
 #endif
     numRecd = 0;
     int i, j, idxOffset;
     if(symmetric && thisIndex.x == thisIndex.y) {
       for (i = 0; i < grainSize; i++)
-	for (j = 0; j < grainSize; j++) {
+	for (j = 0; j < grainSize; j++) 
 	  outData[i * grainSize + j] = compute_entry(size, inDataLeft[i],
 						     inDataLeft[j], op1);
-	}                   
     }     
     else {                                                        
       // compute a square region of the matrix. The correct part of the
       // region will be used by the reduction.
       for (i = 0; i < grainSize; i++)
-	for (j = 0; j < grainSize; j++) {
+	for (j = 0; j < grainSize; j++) 
 	  outData[i * grainSize + j] = compute_entry(size, inDataLeft[i],
 						     inDataRight[j], op1);
-	}
     }
 
     // FIXME: should do 'op2' here!!!
@@ -173,7 +172,7 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
 	ptr[(i*S+j+thisIndex.y+thisIndex.x*S)*2+1] = outData[i*grainSize+j].im;
       }
     }
-#ifdef _DEBUG_
+#if 0
     CkPrintf("--------Partial Result----------\n");
     for (int i = 0; i < grainSize; i++){
       for (int j = 0; j < grainSize; j++)
@@ -275,7 +274,8 @@ PairCalculator::sumPartialResult(int size, complex *result, int offset, CkCallba
 {
 #ifdef _DEBUG_
   CkPrintf("[%d %d %d %d]: sum result from %d\n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z, offset);
-  
+
+#if 0  
   if(thisIndex.x==0 && thisIndex.y==0 && thisIndex.w==0){
     CkPrintf("partial sum (N=%d): \n", N);
     for(int i=0; i<N*grainSize; i++){
@@ -284,6 +284,7 @@ PairCalculator::sumPartialResult(int size, complex *result, int offset, CkCallba
     }
     CkPrintf("\n");
   }
+#endif
 #endif
 
   sumPartialCount++;
@@ -296,8 +297,8 @@ PairCalculator::sumPartialResult(int size, complex *result, int offset, CkCallba
   }
   if (sumPartialCount == (S/grainSize)*blkSize) {
     for(int j=0; j<grainSize; j++){
-      //CkCallback mycb(cb.d.array.ep, CkArrayIndex2D(thisIndex.y+j, thisIndex.w), cb.d.array.id);
-      CkCallback mycb(cb.d.array.ep, CkArrayIndex2D(thisIndex.x+j, thisIndex.w), cb.d.array.id);
+      CkCallback mycb(cb.d.array.ep, CkArrayIndex2D(thisIndex.y+j, thisIndex.w), cb.d.array.id);
+      //CkCallback mycb(cb.d.array.ep, CkArrayIndex2D(thisIndex.x+j, thisIndex.w), cb.d.array.id);
       mySendMsg *msg = new (N, 0)mySendMsg(N, newData+j*N); // msg with newData (size N)
       mycb.send(msg);
     }
