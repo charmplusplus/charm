@@ -155,16 +155,13 @@ overall load while simultaneously minimizing communication overhead.
 
 Currently all the MPI-1.1 Standard functions are supported in \ampi{}, with a
 collection of our extentions explained in detail in this manual. One-sided
-communication calls in MPI-2 are supported, but they are not taking advantage
-of RMA features yet.
+communication calls in MPI-2 are implemented, but they are not taking advantage
+of RMA features yet. Also ROMIO\footnote{http://www-unix.mcs.anl.gov/romio/} 
+has been integrated to support parallel I/O features. Link with {\tt -lampiromio}
+to take advantage of this library.
 
-\begin{alltt}
-MPI_Migrate	MPI_Checkpoint	MPI_Restart	MPI_Register	MPI_Get_userda	'
-MPI_Ialltoall	MPI_Iallgather	MPI_Iallreduce	MPI_Ireduce
-\end{alltt}
-
-Following MPI-1.1 basic datatypes are supported in \ampi{}. (Some are not available in
-Fortran binding. Refer to MPI-1.1 Standard for details.)
+Following MPI-1.1 basic datatypes are supported in \ampi{}. (Some are not 
+available in Fortran binding. Refer to MPI-1.1 Standard for details.)
 \begin{alltt}
 MPI_DATATYPE_NULL  MPI_BYTE            MPI_UNSIGNED_LONG MPI_LONG_DOUBLE_INT
 MPI_DOUBLE         MPI_PACKED          MPI_LONG_DOUBLE   MPI_2FLOAT
@@ -181,6 +178,14 @@ Following MPI-1.1 reduction operations are supported in \ampi{}.
 MPI_MAX   MPI_MIN   MPI_SUM   MPI_PROD  MPI_MAXLOC  MPI_MINLOC
 MPI_LAND  MPI_LOR   MPI_LXOR  MPI_BAND  MPI_BOR     MPI_BXOR
 \end{alltt}
+
+Following are AMPI extension calls, which will be explained in detail in this
+manual.
+\begin{alltt}
+MPI_Migrate     MPI_Checkpoint  MPI_Restart     MPI_Register    MPI_Get_userdata
+MPI_Ialltoall   MPI_Iallgather  MPI_Iallreduce  MPI_Ireduce
+\end{alltt}
+
 
 \subsection{From MPI to AMPI}
 

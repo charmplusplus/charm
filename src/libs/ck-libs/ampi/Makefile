@@ -21,6 +21,7 @@ COMPATLIB=$(LIBDIR)/libampi-compat.a
 	$(CHARMC) -c $<
 
 all: AMPI AMPIF $(COMPATLIB)
+	cd romio; ./installromio.sh
 
 AMPI: $(DEST) 
 	@echo "AMPI built successfully"
