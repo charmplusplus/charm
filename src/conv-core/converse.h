@@ -12,7 +12,12 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.57  1997-03-19 04:31:04  jyelon
+ * Revision 2.58  1997-03-25 23:09:00  milind
+ * Got threads to work on 64-bit irix. Had to add JB_TWEAKING_ORIGIN flag to
+ * all the conv-mach.h files. Also, _PAGESZ was undefined on irix. Added
+ * code to memory.c to make it a static variable.
+ *
+ * Revision 2.57  1997/03/19 04:31:04  jyelon
  * Redesigned ConverseInit
  *
  * Revision 2.56  1997/03/17 23:40:23  milind
@@ -650,6 +655,16 @@ extern int CthRegister CMK_PROTO((int));
 #define CtvAccess(v)            (*((CtvType##v *)(CthCpvAccess(CthData)+CsvAccess(CtvOffs##v))))
 #define CtvInitialize(t,v)      if (CmiMyRank()==0) (CsvAccess(CtvOffs##v)=CthRegister(sizeof(CtvType##v)));
 #endif /* CMK_THREADS_USE_JB_TWEAKING */
+
+#if CMK_THREADS_USE_JB_TWEAKING_ORIGIN
+CthCpvExtern(char *,CthData);
+extern int CthRegister CMK_PROTO((int));
+#define CtvDeclare(t,v)         typedef t CtvType##v; CsvDeclare(int,CtvOffs##v);
+#define CtvStaticDeclare(t,v)   typedef t CtvType##v; CsvDeclare(int,CtvOffs##v);
+#define CtvExtern(t,v)          typedef t CtvType##v; CsvDeclare(int,CtvOffs##v);
+#define CtvAccess(v)            (*((CtvType##v *)(CthCpvAccess(CthData)+CsvAccess(CtvOffs##v))))
+#define CtvInitialize(t,v)      if (CmiMyRank()==0) (CsvAccess(CtvOffs##v)=CthRegister(sizeof(CtvType##v)));
+#endif /* CMK_THREADS_USE_JB_TWEAKING_ORIGIN */
 
 #if CMK_THREADS_USE_JB_TWEAKING_EXEMPLAR
 CthCpvExtern(char*,CthData);

@@ -8,7 +8,12 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.3  1997-03-25 15:04:59  milind
+ * Revision 1.4  1997-03-25 23:09:28  milind
+ * Got threads to work on 64-bit irix. Had to add JB_TWEAKING_ORIGIN flag to
+ * all the conv-mach.h files. Also, _PAGESZ was undefined on irix. Added
+ * code to memory.c to make it a static variable.
+ *
+ * Revision 1.3  1997/03/25 15:04:59  milind
  * Made changes suggested by Ed Kornkven to fix bugs in Dagger.
  *
  * Revision 1.2  1997/03/24 23:24:43  milind
@@ -139,6 +144,7 @@
 #define CMK_THREADS_USE_ALLOCA                             1
 #define CMK_THREADS_USE_JB_TWEAKING                        0
 #define CMK_THREADS_USE_JB_TWEAKING_EXEMPLAR               0
+#define CMK_THREADS_USE_JB_TWEAKING_ORIGIN                 0
 
 #define CMK_TIMER_USE_GETRUSAGE                            0
 #define CMK_TIMER_USE_SPECIAL                              0

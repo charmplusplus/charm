@@ -8,7 +8,12 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.1  1997-03-19 21:45:27  milind
+ * Revision 1.2  1997-03-25 23:09:09  milind
+ * Got threads to work on 64-bit irix. Had to add JB_TWEAKING_ORIGIN flag to
+ * all the conv-mach.h files. Also, _PAGESZ was undefined on irix. Added
+ * code to memory.c to make it a static variable.
+ *
+ * Revision 1.1  1997/03/19 21:45:27  milind
  * net-irix-64 bit bersion. Not tested yet.
  *
  * Revision 1.3  1997/02/13 09:31:45  jyelon
@@ -126,10 +131,11 @@
 #define CMK_THREADS_REQUIRE_PRAGMA_ALLOCA                  0
 #define CMK_THREADS_REQUIRE_NO_CPV                         0
 
-#define CMK_THREADS_UNAVAILABLE                            1
+#define CMK_THREADS_UNAVAILABLE                            0
 #define CMK_THREADS_USE_ALLOCA                             0
 #define CMK_THREADS_USE_JB_TWEAKING                        0
 #define CMK_THREADS_USE_JB_TWEAKING_EXEMPLAR               0
+#define CMK_THREADS_USE_JB_TWEAKING_ORIGIN                 1
 
 #define CMK_TIMER_USE_GETRUSAGE                            0
 #define CMK_TIMER_USE_SPECIAL                              0
