@@ -1,4 +1,4 @@
-#include <string.h>
+#include <string.h> /* for memset */
 #include <charm++.h>
 #include "ckbitvector.h"
 
@@ -14,7 +14,7 @@ bool CkBitVector::growToFit(unsigned int n) {
     if ( newDataLength > dataLength ) {
       unsigned int *oldData = data;
       data = new unsigned int[newDataLength];
-      bzero(data, newDataLength * sizeof(unsigned int));
+      memset(data, 0, newDataLength * sizeof(unsigned int));
     
       // Copy the old data back into it in it's old place
       for ( int i = 0 ; i < dataLength ; i++ ) {
@@ -50,7 +50,7 @@ CkBitVector::CkBitVector(const CkBitVector &b) {
 CkBitVector::CkBitVector(unsigned int size) : usedBits(size) {
   dataLength = chunksForBits(usedBits);
   data = new unsigned int[dataLength];
-  bzero(data, dataLength*sizeof(unsigned int));
+  memset(data, 0, dataLength*sizeof(unsigned int));
 }
 
 // Here since we are passing in ints and storing things as ints we can't
@@ -206,7 +206,7 @@ CkBitVector & CkBitVector::ShiftUp(unsigned int n) {
     usedBits += integralN;
     dataLength += integralN/chunkSize();
     data = new unsigned int[dataLength];
-    bzero(data, dataLength*sizeof(unsigned int));
+    memset(data, 0, dataLength*sizeof(unsigned int));
     memcpy(data+(dataLength-oldDataLength), oldData, oldDataLength*sizeof(unsigned int));
 
     n -= integralN;
@@ -220,7 +220,7 @@ CkBitVector & CkBitVector::ShiftUp(unsigned int n) {
     usedBits += n;
     dataLength = chunksForBits(usedBits);
     data = new unsigned int[dataLength];
-    bzero(data, dataLength*sizeof(unsigned int));
+    memset(data, 0, dataLength*sizeof(unsigned int));
 
     // Now copy each chunk over, doing the shifts
     for ( int i = 0 ; i < oldDataLength ; i++ ) {
@@ -250,7 +250,7 @@ CkBitVector & CkBitVector::ShiftDown(unsigned int n) {
     usedBits -= integralN;
     dataLength -= integralN/chunkSize();
     data = new unsigned int[dataLength];
-    bzero(data, dataLength*sizeof(unsigned int));
+    memset(data, 0, dataLength*sizeof(unsigned int));
     memcpy(data, oldData+(oldDataLength-dataLength), dataLength*sizeof(unsigned int));
     delete [] oldData;
 
@@ -266,7 +266,7 @@ CkBitVector & CkBitVector::ShiftDown(unsigned int n) {
     usedBits -= n;
     dataLength = chunksForBits(usedBits);
     data = new unsigned int[dataLength];
-    bzero(data, dataLength*sizeof(unsigned int));
+    memset(data, 0, dataLength*sizeof(unsigned int));
 
     // Now copy each chunk over, doing the shifts
     for ( int i = 0 ; i < dataLength ; i++ ) {
