@@ -8,8 +8,8 @@
 #include "CommLB.h"
 #include "CommLB.def.h"
 
-#define alpha 30e-6
-#define beeta 3e-6
+#define alpha 35e-6
+#define beeta 8.5e-9
 
 void CreateCommLB()
 {
@@ -34,8 +34,8 @@ int CommLB::search(LDObjid oid, LDOMid mid){
   hash = (oid.id[0] | oid.id[1]) % nobj;
 
   for(id=0;id<nobj;id++){
-    if((translate[(id+hash)%nobj].oid.id[0] == oid.id[0])&&(translate[(id+hash)%nobj].oid.id[1] == oid.id[1])&&(translate[(id+hash)%nobj].oid.id[2] == oid.id[2])&&(translate[(id+hash)%nobj].oid.id[3] == oid.id[3])&&(translate[(id+hash)%nobj].mid.id == mid.id))
-      return (id + hash)%nobj;
+    if((translate[htable[(id+hash)%nobj]].oid.id[0] == oid.id[0])&&(translate[htable[(id+hash)%nobj]].oid.id[1] == oid.id[1])&&(translate[htable[(id+hash)%nobj]].oid.id[2] == oid.id[2])&&(translate[htable[(id+hash)%nobj]].oid.id[3] == oid.id[3])&&(translate[htable[(id+hash)%nobj]].mid.id == mid.id))
+      return htable[(id + hash)%nobj];
   }
   //  CkPrintf("not found \n");
   return -1;
@@ -150,12 +150,9 @@ CLBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* stats, int count)
   ObjectHeap maxh(nobj+1);
   nobj =0;
   for(pe=0; pe < count; pe++) {
-    //    CkPrintf("[%d] PE %d : %d Objects : %d Communication\n",
-    //	     CkMyPe(),pe,stats[pe].n_objs,stats[pe].n_comm);
     load_pe = 0.0;
     for(obj=0; obj < stats[pe].n_objs; obj++) {
       load_pe += stats[pe].objData[obj].wallTime;
-      //      CkPrintf("OBJ: %d , %d , %5.3lf\n",pe,stats[pe].objData[obj].id.id[0],stats[pe].objData[obj].wallTime);
       nobj++;
       x = new ObjectRecord;
       x->id = nobj -1;
@@ -197,11 +194,13 @@ CLBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* stats, int count)
       if((!stats[pe].commData[com].from_proc)&&(!stats[pe].commData[com].to_proc)){
 	xcoord = search(stats[pe].commData[com].sender,stats[pe].commData[com].senderOM); 
 	ycoord = search(stats[pe].commData[com].receiver,stats[pe].commData[com].receiverOM);
+	if((xcoord == -1)||(ycoord == -1))
+	  CkPrintf("Error in search\n");
 	add_graph(xcoord,ycoord,stats[pe].commData[com].bytes, stats[pe].commData[com].messages);	
       }
   
   unsigned int id,maxid,spe=0,minpe=0,mpos;
-  double temp,total_time;
+  double temp,total_time,min_temp;
 
   pe = 0;
   x  = maxh.deleteMax();
@@ -227,6 +226,7 @@ CLBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* stats, int count)
     spe = x->pe;
     mpos = x->pos;
     temp = compute_com(maxid,0);
+    min_temp = temp;
     total_time = temp + alloc_array[0][nobj];
     minpe = 0;
 
@@ -235,10 +235,11 @@ CLBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* stats, int count)
       if(total_time > (temp + alloc_array[pe][nobj])){
 	minpe = pe;
 	total_time = temp + alloc_array[pe][nobj];
+	min_temp = temp;
       }
     }
 
-    alloc(minpe,maxid,x->load + temp);
+    alloc(minpe,maxid,x->load + min_temp);
 
     if(minpe != spe){
       //      CkPrintf("**Moving from %d to %d\n",spe,minpe);
@@ -249,13 +250,7 @@ CLBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* stats, int count)
       migrateInfo.push_back((void *)migrateMe);
     }
   }
-  //  CkPrintf("OBJ: After\n"); 
-  /*
-  for(pe=0;pe<count;pe++)
-    for(obj=0;obj<nobj;obj++)
-      if(alloc_array[pe][obj] > 0)
-	CkPrintf("OBJ: %d , %d , %5.3lf\n",pe,translate[obj].oid.id[0],alloc_array[pe][obj]);
-  */
+
   int migrate_count = migrateInfo.size();
   CLBMigrateMsg* msg = new(&migrate_count,1) CLBMigrateMsg;
   msg->n_moves = migrate_count;
