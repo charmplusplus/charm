@@ -13,7 +13,7 @@ http://charm.cs.uiuc.edu/beta.html
 
 Please refer to "Charm++ Installation and Usage Manual" and also the README
 in the source code for detailed instruction on how to compile Charm++.
-In short, the "build" script is the main tool for compiling Charm++.
+In short, the "build" script is the main tool for compiling \charmpp{}.
 You need to provide target and platform options:
 \begin{verbatim}
 ./build <target> <platform> [options ...] [charmc-options ...]
@@ -24,27 +24,27 @@ For example, to compile on a Linux machine, type:
 ./build charm++ net-linux
 \end{verbatim}
 
-which builds basic Charm++ kernel using UDP as communication method, 
+which builds essential \charmpp{} kernel using UDP as communication method, 
 alternatively, you can build Charm++ kernel on MPI:
 \begin{verbatim}
 ./build charm++ mpi-linux
 \end{verbatim}
 
 For other platforms, change net-linux to whatever platform you are compiling 
-on.
+on. See the charm/README file for a complete list of supported platforms.
 
 However, those commands donot automatically compile for Blue Gene Simulator, 
-thus to compile both Charm++ kernel and Blue Gene Simulator, you need 
-to provide a special target and an extra option for "build" script, 
-for example:
+thus in order to compile both \charmpp{} kernel and Blue Gene Simulator, 
+you need to provide a special target "bluegene" and an extra option for 
+"build" script, for example:
 \begin{verbatim}
 ./build bluegene net-linux bluegene
 \end{verbatim}
 
 The first "bluegene" is the compilation target, it tells "build" to
-compile Blue Gene Simulator libraries as well as Charm++ basic kernel;
+compile Blue Gene Simulator libraries as well as \charmpp{} kernel;
 The second "bluegene" is an option to platform "net-linux", which tells
-"build" to compile the Charm++ kernel upon Blue Gene Emulator. 
+"build" to compile the Charm++ kernel itself upon Blue Gene Emulator. 
 To compile AMPI on Blue Gene, use "bgampi" as target, which subsumes target
 "bluegene":
 \begin{verbatim}
@@ -52,7 +52,8 @@ To compile AMPI on Blue Gene, use "bgampi" as target, which subsumes target
 \end{verbatim}
 
 For the above "build" command, it creates a directory named 
-"net-linux-bluegene" under charm. 
+"net-linux-bluegene" under charm, which contains all the header files and
+libraries needed for compiling a user application.
 
 \subsection{Compiling Blue Gene Applications}
 
@@ -62,7 +63,10 @@ There are three methods to write a Blue Gene applicaiton:
 
 \subsubsection{Writing a Blue Gene application using low level machine API}
 The low level machine API mimics the actual machine low level programming
-API. It is defined in section~\ref{bgemulator}.
+API. It is defined in section~\ref{bgemulator}. Writing a program in the 
+low level machine API, you just need to link \charmpp{}'s Blue Gene emulator
+library, which provides the emulation of the machine API using Converse as
+the communication layer.
 
 In order to link against the Blue Gene library, specify 
 \texttt{-language bluegene} as an argument to the {\tt charmc} linker, 
@@ -76,25 +80,40 @@ charm/pgms/converse/bluegene.
 
 \subsubsection{Writing a Blue Gene application using Charm++}
 
-One can also write a normal \charmpp{} application which can automatically
-run on the emulator after compilation. In order to link against the Blue Gene 
-library as well as \charmpp{} kernel libraries, specify 
-\texttt{-language charm++} as an argument to the {\tt charmc} linker:
+One can write a normal \charmpp{} application which can automatically 
+run on the emulator after compilation. \charmpp{} implements
+an object-based message-driven execution model. In \charmpp{} applications,
+there are collections of C++ objects, which communicate by remotely invoking
+methods on other objects by messages.
+
+In order to compile a program written in \charmpp{} on Blue Gene simulator, 
+specify \texttt{-language charm++} as an argument to the {\tt charmc} linker:
 \begin{verbatim}
 charmc -o hello hello.C -language charm++
 \end{verbatim}
+This will link both \charmpp{} runtime libraries and Blue Gene simulator 
+library.
 
 Sample applications in \charmpp{} can be found under directory
 charm/pgms/charm++, specifically charm/pgms/charm++/littleMD.
 
 \subsubsection{Writing a Blue Gene application using MPI}
 
-One can also write a MPI application to run on Blue Gene Simulator.
-The Adaptive MPI, or AMPI is implemented on top of Charm++.
+One can also write a MPI application for Blue Gene Simulator.
+The Adaptive MPI, or AMPI is implemented on top of Charm++ that supports
+dynamic load balancing and multithreading for MPI applications. This is based
+on the user-level migrating threads and load balancing capabilities provided
+by the \charmpp{} framework. This allows legacy MPI program to run 
+on top of Blue Gene \charmpp{} and take advantage of the \charmpp{}'s
+virtualization and adaptive load balancing capability.
 
-In order to link against the Blue Gene library as well as AMPI and \charmpp{} 
-kernel libraries, specify 
-\texttt{-language ampi} as an argument to the {\tt charmc} linker:
+Current AMPI implements most features in the MPI version 1.0, with a few
+extensions for migrating threads and asynchronous reduction.
+
+In order to compile an AMPI application on Blue Gene simulator, you need 
+to link against the AMPI library as well as Blue Gene \charmpp{} runtime
+libraries by specifying \texttt{-language ampi} as an argument to 
+the {\tt charmc} linker:
 \begin{verbatim}
 charmc -o hello hello.C -language ampi
 \end{verbatim}
@@ -105,20 +124,20 @@ charm/pgms/charm++/ampi, specifically charm/pgms/charm++/Cjacobi3D.
 \subsection{Running a Blue Gene Application}
 
 To run a parallel Blue Gene application, \charmpp{} provides a utility program
-{\tt charmrun} to start the parallel program. For detailed description on
-how to run a \charmpp{} application, refer to file charm/README in the
-source code distribution.
+called {\tt charmrun} to start the parallel program. 
+For detailed description on how to run a \charmpp{} application, 
+refer to file charm/README in the source code distribution.
 
-For Blue Gene applications, you need to provide these parameters to 
+To run a Blue Gene application, you need to specify these parameters to 
 {\tt charmrun} to define the simulated Blue Gene machine size:
 \begin{enumerate}
-\item {\tt +x, +y} and {\tt +z}:  define the size of of machine in three dimensions, these define the number of nodes of a machine;
-\item {\tt +wth} and {\tt +cth}:  For one node, these parameters define the number of worker processors({\tt +wth}) and the number of communication processors({\tt +cth}).
+\item {\tt +x, +y} and {\tt +z}:  define the size of of machine in three dimensions, these define the number of nodes along each dimension of the machine;
+\item {\tt +wth} and {\tt +cth}:  For one node, these two parameters define the number of worker processors({\tt +wth}) and the number of communication processors({\tt +cth}).
 \end{enumerate}
 
-For example, to simulate a Blue Gene/L machine of size 64K in 40X40X40, with 
-one worker processor and one I/O processor on each node, using 100 
-real processors:
+For example, to simulate a Blue Gene/L machine of size 64K in 40x40x40, with 
+one worker processor and one I/O processor on each node, and use 100 
+real processors to simulate:
 \begin{verbatim}
 ./charmrun +p100 ./hello +x40 +y40 +z40 +cth1 +wth1
 \end{verbatim}
