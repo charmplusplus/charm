@@ -1859,7 +1859,7 @@ void ParamList::marshall(XStr &str,int makeVoid)
 		str<<"    impl_off+=(impl_arrstart=CK_ALIGN(implP.size(),16));\n";
 		str<<"  }\n";
 		//Now that we know the size, allocate the packing buffer
-		str<<"  CkMarshallMsg *impl_msg=new (impl_off,0)CkMarshallMsg();\n";
+		str<<"  CkMarshallMsg *impl_msg=new (impl_off,0)CkMarshallMsg;\n";
 		//Second pass: write the data
 		str<<"  { //Copy over the PUP'd data\n";
 		str<<"    PUP::toMem implP((void *)impl_msg->msgBuf);\n";
