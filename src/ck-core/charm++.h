@@ -12,6 +12,11 @@
 #include <memory.h>
 #include "charm.h"
 
+class CMessage_CkArgMsg {
+public: static int __idx;
+};
+#define CK_ALIGN(val,to) (((val)+(to)-1)&~((to)-1))
+
 #if CMK_DEBUG_MODE
 #include <string.h>
 class Chare;

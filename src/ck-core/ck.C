@@ -10,6 +10,8 @@
 
 VidBlock::VidBlock() { state = UNFILLED; msgQ = new PtrQ(); _MEMCHECK(msgQ); }
 
+int CMessage_CkArgMsg::__idx=0;
+
 //Chare virtual functions: declaring these here results in a smaller executable
 #if CMK_DEBUG_MODE
 Chare::~Chare() 
