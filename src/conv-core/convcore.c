@@ -623,6 +623,17 @@ int maxmsgs;
   
   CpvAccess(CsdStopFlag) = 0 ;
   
+  if(maxmsgs == 0) {
+    maxmsgs = CmiDeliverMsgs(maxmsgs);
+    if (CpvAccess(CsdStopFlag)) return maxmsgs;
+    while( !CqsEmpty(CpvAccess(CsdSchedQueue)) ) {
+      CqsDequeue(CpvAccess(CsdSchedQueue),&msg);
+      (CmiGetHandlerFunction(msg))(msg);
+      if (CpvAccess(CsdStopFlag)) return maxmsgs;
+      maxmsgs--;
+    }
+    return maxmsgs;
+  }
   while (1) {
     maxmsgs = CmiDeliverMsgs(maxmsgs);
     if (maxmsgs == 0) return maxmsgs;
