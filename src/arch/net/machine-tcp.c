@@ -13,6 +13,12 @@
 
 */
 
+#include <netinet/tcp.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+
+#define NO_NAGLE_ALG		1
+
 void ReceiveDatagram(SOCKET fd);
 int TransmitDatagram(int pe);
 
@@ -162,19 +168,15 @@ int CheckSocketsReady(int withDelayMs)
   int nreadable,i;
 #if !CMK_USE_POLL
   struct timeval tmo;
-  
-  MACHSTATE(2,"CheckSocketsReady {")
-  CmiSetupSockets();
+  MACHSTATE(1,"CheckSocketsReady {")
   tmo.tv_sec = 0;
   tmo.tv_usec = withDelayMs*1000;
+  CmiSetupSockets();
   nreadable = select(FD_SETSIZE, &rfds, &wfds, NULL, &tmo);
 #else
-  int n = 0;
   MACHSTATE(1,"CheckSocketsReady {")
   CmiSetupSockets();
-  MACHSTATE2(2,"CheckSocketsReady %d, %d socks", withDelayMs, numSocks)
   nreadable = poll(fds, numSocks, withDelayMs);
-  MACHSTATE2(2,"CheckSocketsReady after poll %d %d", withDelayMs, nreadable)
 #endif
   ctrlskt_ready_read = 0;
   dataskt_ready_read = 0;
@@ -313,19 +315,23 @@ static void processMessage(char *msg, int len)
 
 void ReceiveDatagram(SOCKET fd)
 {
-  ChMessage msg;
-  int rank, srcpe, seqno, magic, i;
+  static int *buf = NULL;
   int size;
   int ok;
   double t;
 
+  if (!buf) buf = (int *)malloc(Cmi_dgram_max_data+DGRAM_HEADER_SIZE);
+/*
   if (-1==ChMessage_recv(fd,&msg))
     CmiAbort("Error in ReceiveDatagram.");
+*/
+  if (-1==skt_recvN(fd, &size, sizeof(int)))
+    CmiAbort("Error in ReceiveDatagram.");
+  buf[0] = size;
+  if (-1==skt_recvN(fd, buf+1, size-sizeof(int)))
+    CmiAbort("Error in ReceiveDatagram.");
 
-  processMessage(msg.data, msg.len);
-
-  ChMessage_free(&msg);
-
+  processMessage(buf, size);
 }
 
 
@@ -350,13 +356,19 @@ int TransmitImplicitDgram(ImplicitDgram dg)
   head = (DgramHeader *)(data - DGRAM_HEADER_SIZE);
   temp = *head;
   dest = dg->dest;
-  DgramHeaderMake(head, dg->rank, dg->srcpe, Cmi_charmrun_pid, dg->seqno);
+  /* first int is len of the packet */
+  DgramHeaderMake(head, dg->rank, dg->srcpe, Cmi_charmrun_pid, len);
   LOG(Cmi_clock, Cmi_nodestart, 'T', dest->nodestart, dg->seqno);
+  /*
   ChMessageHeader_new("data", len, &msg);
   if (-1==skt_sendN(dest->sock,(const char *)&msg,sizeof(msg))) 
     CmiAbort("EnqueueOutgoingDgram"); 
   if (-1==skt_sendN(dest->sock,head,len))
     CmiAbort("EnqueueOutgoingDgram"); 
+  */
+  if (-1==skt_sendN(dest->sock,(const char *)head,len)) 
+    CmiAbort("EnqueueOutgoingDgram"); 
+    
   *head = temp;
   dest->stat_send_pkt++;
   return 1;
@@ -439,7 +451,7 @@ void CmiMachineInit()
 
 static void open_tcp_sockets()
 {
-  int i, ok, pe;
+  int i, ok, pe, flag;
   int mype, numpes;
   SOCKET skt;
 
@@ -451,6 +463,10 @@ static void open_tcp_sockets()
     skt_ip_t clientIP;
     skt = skt_accept(dataskt, &clientIP,&clientPort);
     if (skt<0) KillEveryoneCode(98246554);
+#if NO_NAGLE_ALG
+    flag = 1;
+    ok = setsockopt(skt, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(int));
+#endif
     ok = skt_recvN(skt, &pe, sizeof(int));
     if (ok<0) KillEveryoneCode(98246556);
     nodes[pe].sock = skt;
@@ -458,6 +474,10 @@ static void open_tcp_sockets()
   for (pe=mype+1; pe<numpes; pe++) {
     skt = skt_connect(nodes[pe].IP, nodes[pe].dataport, 300);
     if (skt<0) KillEveryoneCode(894788843);
+#if NO_NAGLE_ALG
+    flag = 1;
+    ok = setsockopt(skt, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(int));
+#endif
     ok = skt_sendN(skt, &mype, sizeof(int));
     if (ok<0) KillEveryoneCode(98246556);
     nodes[pe].sock = skt;
