@@ -90,7 +90,7 @@ class TCharm: public ArrayElement1D
 		friend inline void operator|(PUP::er &p,UserData &d) {d.pup(p);}
 	};
 	//New interface for user data:
-	CkPupVec<UserData> sud;
+	CkVec<UserData> sud;
 	
 	//One-time initialization
 	static void nodeInit(void);

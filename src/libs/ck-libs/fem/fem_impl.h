@@ -82,29 +82,36 @@ public:
 
 /* Map (user-assigned) numbers to T's */
 template <class T>
-class NumberedVec : public CkPupPtrVec<T> {
-	typedef CkPupPtrVec<T> super;
+class NumberedVec {
+	CkPupPtrVec<T> vec;
 	
 public:
 	//Extend the vector to have up to this element
 	void makeLonger(int toHaveElement)
 	{
-		int oldSize=size(), newSize=toHaveElement+1;
+		int oldSize=vec.size(), newSize=toHaveElement+1;
 		if (oldSize>=newSize) return; //Nothing to do
-		setSize(newSize);
-		length()=newSize;
+		vec.setSize(newSize);
+		vec.length()=newSize;
 		for (int j=oldSize;j<newSize;j++)
-			(*(super *)this)[j]=new T;
+			vec[j]=new T;
 	}
 	//Reinitialize element i:
 	void reinit(int doomedEl) {
-		delete (*(super *)this)[doomedEl];
-		(*(super *)this)[doomedEl]=new T;
+		delete vec[doomedEl];
+		vec[doomedEl]=new T;
 	}
 	
+	int size(void) const {return vec.size();}
+	
 	//Same old bracket operators, but return the actual object, not a pointer:
-	T &operator[](int i) {return *( (*(super *)this)[i] );}
-	const T &operator[](int i) const {return *( (*(const super *)this)[i] );}
+	T &operator[](int i) {return *( vec[i] );}
+	const T &operator[](int i) const {return *( vec[i] );}
+	
+	void pup(PUP::er &p) {
+		vec.pup(p);
+	}
+	friend void operator|(PUP::er &p,NumberedVec<T> &v) {v.pup(p);}
 };
 
 
@@ -122,7 +129,7 @@ PUPmarshall(FEM_Comm_Share);
 /* List the chunks that share an item */
 class FEM_Comm_Rec {
 	int item; //Index of item we describe
-	CkPupVec<FEM_Comm_Share> shares;
+	CkVec<FEM_Comm_Share> shares;
 public:
 	FEM_Comm_Rec(int item_=-1);
 	~FEM_Comm_Rec();
@@ -175,6 +182,7 @@ public:
 	}
 	void pup(PUP::er &p);
 };
+PUPmarshall(FEM_Comm_List)
 
 /*This class describes all the shared items of a given chunk.
 It provides both item->chunks that share it (map)
@@ -418,6 +426,7 @@ public:
 	}
 	void setSymmetries(int r,FEM_Symmetries_t s);
 };
+PUPmarshall(FEM_Item);
 
 /* Describes one kind of FEM elements */
 class FEM_Elem:public FEM_Item {
@@ -440,6 +449,7 @@ public:
 	const int *connFor(int i) const {return conn.getRow(i);}
 	void connIs(int i,const int *src) {conn.setRow(i,src);}
 };
+PUPmarshall(FEM_Elem);
 
 /*Describes a set of records of sparse data that are all the
 same size and all associated with the same number of nodes.
@@ -450,7 +460,7 @@ use of sparse data is to describe boundary conditions.
 class FEM_Sparse : public CkNoncopyable {
 	AllocTable2d<int> nodes; //Each row is the nodes surrounding a tuple
 	AllocTable2d<char> data; //Each row is the user data for a tuple
-	intArrayPtr elem; //*OPTIONAL* partitioning based on elements (2*size() ints)
+	intArrayPtr elem; // *OPTIONAL* partitioning based on elements (2*size() ints)
 public:
 	void allocate(int n_); //Allocate storage for data and nodes of n tuples
 	
@@ -645,6 +655,7 @@ public:
 		if (ffn) { ffn(&val); }
 	}
 };
+PUPmarshallBytes(CallMeshUpdated);
 
 class UpdateMeshChunk : public MeshChunk {
 public:
