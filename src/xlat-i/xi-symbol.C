@@ -1047,7 +1047,15 @@ Readonly::genDefs(XStr& str)
     str << " "<<name;
     if(dims)
       dims->print(str);
-    str << ";";
+    str << ";\n";
+  }
+  if (fortranMode) {
+      str << "extern \"C\" void set_"
+          << fortranify(name)
+          << "_(int *n) { " << name << " = *n; }\n";
+      str << "extern \"C\" void get_"
+          << fortranify(name)
+          << "_(int *n) { *n = " << name << "; }\n";
   }
 }
 
