@@ -50,10 +50,10 @@ class TraceCore
 	void RegisterLanguage(int lID, char* lName);
 	void RegisterEvent(int lID, int eID);
 	void LogEvent(int lID, int eID);
-	void LogEvent(int lID, int eID, int iLen, int* iData);
-	void LogEvent(int lID, int eID, int iLen, int* iData,double t);
-	void LogEvent(int lID, int eID, int sLen, char* sData);
-	void LogEvent(int lID, int eID, int iLen, int* iData, int sLen, char* sData);
+	void LogEvent(int lID, int eID, int iLen, const int* iData);
+	void LogEvent(int lID, int eID, int iLen, const int* iData,double t);
+	void LogEvent(int lID, int eID, int sLen, const char* sData);
+	void LogEvent(int lID, int eID, int iLen, const int* iData, int sLen, const char* sData);
 
 };
 

@@ -19,7 +19,7 @@ extern "C" void closeAmpiProjections(){
 }
 
 extern "C" void ampi_beginProcessing(int tag,int src,int count){
-	int *iData = (int *)malloc(sizeof(int)*3);
+	int iData[3];
 	iData[0] = tag;
 	iData[1] = src;
 	iData[2] = count;
@@ -30,7 +30,7 @@ extern "C" void ampi_beginProcessing(int tag,int src,int count){
 }
 
 extern "C" void ampi_endProcessing(){
-	int *iData = (int *)malloc(sizeof(int)*3);
+	int iData[3];
 	iData[0] = current_tag;
 	iData[1] = current_src;
 	iData[2] = current_count;
@@ -38,7 +38,7 @@ extern "C" void ampi_endProcessing(){
 }
 
 extern "C" void ampi_msgSend(int tag,int dest,int count,int size){
-	int *iData = (int *)malloc(sizeof(int)*4);
+	int iData[4];
 	iData[0] = tag;
 	iData[1] = dest;
 	iData[2] = count;

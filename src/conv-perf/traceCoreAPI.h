@@ -5,16 +5,25 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
+CpvExtern(int,_traceCoreOn);
 /* Tracing API */
+#ifdef CMK_OPTIMIZE
+#define LOGCONDITIONAL(x) 
+#else 
+#define LOGCONDITIONAL(x) \
+		if(CpvAccess(_traceCoreOn)!=0){ \
+			x;\
+		}
+#endif
+
 void RegisterLanguage(int lID, char* ln);
 void RegisterEvent(int lID, int eID);
 /* TODO some cleanup required below */
 void LogEvent(int lID, int eID);
-void LogEvent1(int lID, int eID, int iLen, int* iData);
-void LogEvent2(int lID, int eID, int sLen, char* sData);
-void LogEvent3(int lID, int eID, int iLen, int* iData, int sLen, char* sData);
-void LogEvent4(int lID, int eID, int iLen, int* iData, double t);
+void LogEvent1(int lID, int eID, int iLen, const int* iData);
+void LogEvent2(int lID, int eID, int sLen, const char* sData);
+void LogEvent3(int lID, int eID, int iLen, const int* iData, int sLen, const char* sData);
+void LogEvent4(int lID, int eID, int iLen, const int* iData, double t);
 #ifdef __cplusplus
 }
 #endif

@@ -48,28 +48,28 @@
 	  RegisterEvent(_CHARM_LANG_ID, _E_USER_EVENT_PAIR  ); \
 	  \
 	}
-#define _LOG_E_CREATION_N(env, ep, n) 	{ charm_creation(env, ep, n); }
-#define _LOG_E_BEGIN_EXECUTE(env) 	{ charm_beginExecute(env); }
+#define _LOG_E_CREATION_N(env, ep, n) 	{ LOGCONDITIONAL(charm_creation(env, ep, n)); }
+#define _LOG_E_BEGIN_EXECUTE(env) 	{ LOGCONDITIONAL(charm_beginExecute(env)); }
 #define _LOG_E_BEGIN_EXECUTE_DETAILED(event, msgType, ep, srcPe, ml) \
-	{ charm_beginExecuteDetailed(event, msgType, ep, srcPe, ml); }
-#define _LOG_E_END_EXECUTE()	 	{ charm_endExecute(); }
+	{ LOGCONDITIONAL(charm_beginExecuteDetailed(event, msgType, ep, srcPe, ml)); }
+#define _LOG_E_END_EXECUTE()	 	{ LOGCONDITIONAL(charm_endExecute()); }
 //what is EXECUTE ? isn't it the same as processing --- schak
 //TODO#define _LOG_E_BEGIN_PROCESSING()
 //TODO#define _LOG_E_END_PROCESSING()
-#define _LOG_E_ENQUEUE(env) 		{ charm_enqueueMsg(env); }
-#define _LOG_E_DEQUEUE(env) 		{ charm_dequeueMsg(env); }
-#define _LOG_E_BEGIN_COMPUTATION() 	{ charm_beginComputation(); }
-#define _LOG_E_END_COMPUTATION() 	{ charm_endComputation(); }
+#define _LOG_E_ENQUEUE(env) 		{ LOGCONDITIONAL(charm_enqueueMsg(env)); }
+#define _LOG_E_DEQUEUE(env) 		{ LOGCONDITIONAL(charm_dequeueMsg(env)); }
+#define _LOG_E_BEGIN_COMPUTATION() 	{ LOGCONDITIONAL(charm_beginComputation()); }
+#define _LOG_E_END_COMPUTATION() 	{ LOGCONDITIONAL(charm_endComputation()); }
 //even projection actually doesn't use these  two
 #define _LOG_E_BEGIN_INTERRUPT()
 #define _LOG_E_END_INTERRUPT()
 
 
-#define _LOG_E_MSG_RECV_CHARM(env, pe) 	{ charm_messageRecv(env, pe); }
-#define _LOG_E_USER_EVENT_CHARM(x) 		{ charm_userEvent(x); }
-#define _LOG_E_BEGIN_PACK() 			{ charm_beginPack(); }
-#define _LOG_E_END_PACK() 				{ charm_endPack(); }
-#define _LOG_E_BEGIN_UNPACK() 			{ charm_beginUnpack(); }
-#define _LOG_E_END_UNPACK() 			{ charm_endUnpack(); }
-#define _LOG_E_USER_EVENT_PAIR_CHARM(x,bt,et)	{ charm_userPairEvent(x,bt,et);}
+#define _LOG_E_MSG_RECV_CHARM(env, pe) 	{ LOGCONDITIONAL(charm_messageRecv(env, pe)); }
+#define _LOG_E_USER_EVENT_CHARM(x) 		{ LOGCONDITIONAL(charm_userEvent(x)); }
+#define _LOG_E_BEGIN_PACK() 			{ LOGCONDITIONAL(charm_beginPack()); }
+#define _LOG_E_END_PACK() 				{ LOGCONDITIONAL(charm_endPack()); }
+#define _LOG_E_BEGIN_UNPACK() 			{ LOGCONDITIONAL(charm_beginUnpack()); }
+#define _LOG_E_END_UNPACK() 			{ LOGCONDITIONAL(charm_endUnpack()); }
+#define _LOG_E_USER_EVENT_PAIR_CHARM(x,bt,et)	{ LOGCONDITIONAL(charm_userPairEvent(x,bt,et));}
 #endif

@@ -26,15 +26,10 @@
 		\
 	}
 
-#ifdef CMK_OPTIMIZE
-#define _LOG_E_PROC_IDLE()
-#define _LOG_E_PROC_BUSY()
-#else
 #define _LOG_E_PROC_IDLE() \
-	{ machine_procIdle(); }
+	{ LOGCONDITIONAL(machine_procIdle()); }
 #define _LOG_E_PROC_BUSY() \
-	{ machine_procBusy(); }
-#endif
+	{ LOGCONDITIONAL(machine_procBusy()); }
 
 #endif
 

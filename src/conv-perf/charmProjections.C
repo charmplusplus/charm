@@ -33,7 +33,7 @@ extern "C" void charm_creation(envelope *e, int ep, int num)
 {
   if(e==0) {
     CtvAccess(curThreadEvent)=curEvent;
-	int* iData = (int*)malloc(sizeof(int)*4); 
+	int iData[4];
 	iData[0] = ForChareMsg;
 	iData[1] = ep;
 	iData[2] = curEvent++;
@@ -42,7 +42,7 @@ extern "C" void charm_creation(envelope *e, int ep, int num)
   } else {
     e->setEvent(curEvent);
     for(int i=0; i<num; i++) {
-		int* iData = (int*)malloc(sizeof(int)*5); 
+		int iData[5];
 		iData[0] = e->getMsgtype();
 		iData[1] = ep;
 		iData[2] = curEvent+i;
@@ -60,7 +60,7 @@ extern "C" void charm_beginExecute(envelope *e)
   if(e==0) {
     execEvent = CtvAccess(curThreadEvent);
     execEp = (-1);
-	int* iData = (int*)malloc(sizeof(int)*4); 
+	int iData[4];
 	iData[0] = ForChareMsg;
 	iData[1] = _threadEP;
 	iData[2] = execEvent;
@@ -77,7 +77,7 @@ extern "C" void charm_beginExecuteDetailed(int event,int msgType,int ep,int srcP
   execEvent=event;
   execEp=ep;
   execPe=srcPe;
-  int* iData = (int*)malloc(sizeof(int)*5); 
+  int iData[5];
   iData[0] = msgType;
   iData[1] = ep;
   iData[2] = event;
@@ -91,14 +91,14 @@ extern "C" void charm_endExecute(void)
 {
    
   if(execEp == (-1)) {
-	int* iData = (int*)malloc(sizeof(int)*4); 
+	int iData[4];
 	iData[0] = 0;
 	iData[1] = _threadEP;
 	iData[2] = execEvent;
 	iData[3] = CkMyPe();
 	LogEvent1(_CHARM_LANG_ID, _E_END_PROCESSING, 4, iData); 
   } else {
-	int* iData = (int*)malloc(sizeof(int)*4); 
+	int iData[4];
 	iData[0] = 0;
 	iData[1] = execEp;
 	iData[2] = execEvent;
@@ -112,7 +112,7 @@ extern "C" void charm_endExecute(void)
 
 extern "C" void charm_enqueueMsg(envelope *e) {
 	
-	int *iData = (int *)malloc(sizeof(int )*3);
+	int iData[3];
 	iData[0] = e->getMsgtype();
 	iData[1] = e->getEvent();
 	iData[2] = e->getSrcPe();
@@ -120,7 +120,7 @@ extern "C" void charm_enqueueMsg(envelope *e) {
 }	
 
 extern "C" void charm_dequeueMsg(envelope *e) {
-	int *iData = (int *)malloc(sizeof(int )*3);
+	int iData[3];
 	iData[0] = e->getMsgtype();
 	iData[1] = e->getEvent();
 	iData[2] = e->getSrcPe();
@@ -141,7 +141,7 @@ extern "C" void charm_endComputation(void)
 extern "C" void charm_messageRecv(char *env, int pe) {} //TODO
 
 extern "C" void charm_userEvent(int e) {
-	int *iData = (int *)malloc(sizeof(int)*3);
+	int iData[3];
 	iData[0] = e;
 	iData[1] = curevent;
 	iData[2] = CkMyPe();
@@ -151,8 +151,8 @@ extern "C" void charm_userEvent(int e) {
 
 
 extern "C" void charm_userPairEvent(int e,double bt,double et){
-	int *iData1 = (int *)malloc(sizeof(int)*3);
-	int *iData2 = (int *)malloc(sizeof(int)*3);
+	int iData1[3];
+	int iData2[3];
 	iData1[0] = iData2[0] = e;
 	iData1[1] = iData2[1] = curevent;
 	iData1[2] = iData2[2] = CkMyPe();
@@ -164,28 +164,28 @@ extern "C" void charm_userPairEvent(int e,double bt,double et){
 
 extern "C" void charm_beginPack(void)
 {
-	int* iData = (int*)malloc(sizeof(int)); 
+	int iData[1];
 	iData[0] = CkMyPe();
 	LogEvent1(_CHARM_LANG_ID, _E_BEGIN_PACK, 1, iData); 
 }
 
 extern "C" void charm_endPack(void)
 {
-	int* iData = (int*)malloc(sizeof(int)); 
+	int iData[1];
 	iData[0] = CkMyPe();
 	LogEvent1(_CHARM_LANG_ID, _E_END_PACK, 1, iData); 
 }
 
 extern "C" void charm_beginUnpack(void)
 {
-	int* iData = (int*)malloc(sizeof(int)); 
+	int iData[1];
 	iData[0] = CkMyPe();
 	LogEvent1(_CHARM_LANG_ID, _E_BEGIN_UNPACK, 1, iData); 
 }
 
 extern "C" void charm_endUnpack(void)
 {
-	int* iData = (int*)malloc(sizeof(int)); 
+	int iData[1];
 	iData[0] = CkMyPe();
 	LogEvent1(_CHARM_LANG_ID, _E_END_UNPACK, 1, iData); 
 }

@@ -8,7 +8,7 @@
 
 extern "C" void converse_msgSent(int destPE, int size)
 {
-	int* iData = (int*)malloc(sizeof(int)*2); 
+	int iData[2];
 	iData[0] = destPE;
 	iData[1] = size;
 	LogEvent1(_CONVERSE_LANG_ID, _E_MSG_SENT, 2, iData); 
@@ -23,7 +23,7 @@ extern "C" void converse_msgRecvSC();
 
 extern "C" void converse_handlerBegin(int handlerIdx)
 {		
-	int* iData = (int*)malloc(sizeof(int)*2); 
+	int iData[2];
 	iData[0] = handlerIdx;
 	iData[1] = CmiMyPe();
 	LogEvent1(_CONVERSE_LANG_ID, _E_HANDLER_BEGIN, 2, iData); 
@@ -31,7 +31,7 @@ extern "C" void converse_handlerBegin(int handlerIdx)
 
 extern "C" void converse_handlerEnd(int handlerIdx)
 {	
-	int* iData = (int*)malloc(sizeof(int)*2); 
+	int iData[2];
 	iData[0] = handlerIdx;
 	iData[1] = CmiMyPe();
 	LogEvent1(_CONVERSE_LANG_ID, _E_HANDLER_END, 2, iData); 

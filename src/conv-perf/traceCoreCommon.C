@@ -85,15 +85,15 @@ extern "C" void RegisterEvent(int lID, int eID)
 extern "C" void LogEvent(int lID, int eID)
 { CpvAccess(_traceCore)->LogEvent(lID, eID); }
 
-extern "C" void LogEvent1(int lID, int eID, int iLen, int* iData)
+extern "C" void LogEvent1(int lID, int eID, int iLen, const int* iData)
 { CpvAccess(_traceCore)->LogEvent(lID, eID, iLen, iData); }
 
-extern "C" void LogEvent2(int lID, int eID, int sLen, char* sData)
+extern "C" void LogEvent2(int lID, int eID, int sLen, const char* sData)
 { CpvAccess(_traceCore)->LogEvent(lID, eID, sLen, sData); }
 
-extern "C" void LogEvent3(int lID, int eID, int iLen, int* iData, int sLen, char* sData)
+extern "C" void LogEvent3(int lID, int eID, int iLen, const int* iData, int sLen, const char* sData)
 { CpvAccess(_traceCore)->LogEvent(lID, eID, iLen, iData, sLen, sData); }
 
-extern "C" void LogEvent4(int lID, int eID, int iLen, int* iData, double t)
+extern "C" void LogEvent4(int lID, int eID, int iLen, const int* iData, double t)
 { CpvAccess(_traceCore)->LogEvent(lID, eID, iLen, iData,t); }
 

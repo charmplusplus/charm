@@ -28,26 +28,17 @@
 	  \
 	}
 
-#ifdef CMK_OPTIMIZE
-#define _LOG_E_MSG_SENT(destPE, size)
-#define _LOG_E_MSG_QUEUED()
-#define _LOG_E_MSG_RECV_MC()
-#define _LOG_E_MSG_RECV_SC()
-#define _LOG_E_HANDLER_BEGIN(handlerIdx)
-#define _LOG_E_HANDLER_END(handlerIdx)
-#else
 #define _LOG_E_MSG_SENT(destPE, size) \
-	{ converse_msgSent(destPE, size); }
+	{ LOGCONDITIONAL (converse_msgSent(destPE, size)); }
 #define _LOG_E_MSG_QUEUED() \
-	{ LogEvent(_CONVERSE_LANG_ID, _E_MSG_QUEUED); }		//TODO
+	{ LOGCONDITIONAL (LogEvent(_CONVERSE_LANG_ID, _E_MSG_QUEUED)); }		//TODO
 #define _LOG_E_MSG_RECV_MC() \
-	{ LogEvent(_CONVERSE_LANG_ID, _E_MSG_RECV_MC); }	//TODO
+	{ LOGCONDITIONAL (LogEvent(_CONVERSE_LANG_ID, _E_MSG_RECV_MC)); }	//TODO
 #define _LOG_E_MSG_RECV_SC() \
-	{ LogEvent(_CONVERSE_LANG_ID, _E_MSG_RECV_SC); }	//TODO
+	{ LOGCONDITIONAL (LogEvent(_CONVERSE_LANG_ID, _E_MSG_RECV_SC)); }	//TODO
 #define _LOG_E_HANDLER_BEGIN(handlerIdx) \
-	{ converse_handlerBegin(handlerIdx); }
+	{ LOGCONDITIONAL (converse_handlerBegin(handlerIdx)); }
 #define _LOG_E_HANDLER_END(handlerIdx) \
-	{ converse_handlerEnd(handlerIdx); }
-#endif
+	{ LOGCONDITIONAL (converse_handlerEnd(handlerIdx)); }
 
 #endif

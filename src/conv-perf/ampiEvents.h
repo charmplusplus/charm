@@ -19,7 +19,7 @@
 	  RegisterEvent(_AMPI_LANG_ID,_E_AMPI_MSG_SEND); \
 	  \
 	}
-#define _LOG_E_BEGIN_AMPI_PROCESSING(tag,src,count) { ampi_beginProcessing(tag,src,count);}
-#define _LOG_E_END_AMPI_PROCESSING()		    { ampi_endProcessing();}
-#define _LOG_E_AMPI_MSG_SEND(tag,dest,count,size)   { ampi_msgSend(tag,dest,count,size);}
+#define _LOG_E_BEGIN_AMPI_PROCESSING(tag,src,count) { LOGCONDITIONAL(ampi_beginProcessing(tag,src,count));}
+#define _LOG_E_END_AMPI_PROCESSING()		    { LOGCONDITIONAL(ampi_endProcessing());}
+#define _LOG_E_AMPI_MSG_SEND(tag,dest,count,size)   { LOGCONDITIONAL(ampi_msgSend(tag,dest,count,size));}
 #endif

@@ -171,58 +171,71 @@ void TraceCore::LogEvent(int lID, int eID)
 	LogEvent(lID, eID, 0, NULL, 0, NULL); 
 }
 
-void TraceCore::LogEvent(int lID, int eID, int iLen, int* iData)
+void TraceCore::LogEvent(int lID, int eID, int iLen, const int* iData)
 { 
 	if(traceCoreOn == 0){
-		if(iData){
-			free(iData);			
-		}		
 		return;
 	}
 	LogEvent(lID, eID, iLen, iData, 0, NULL); 
 }
 
-void TraceCore::LogEvent(int lID, int eID, int iLen, int* iData,double t){
+void TraceCore::LogEvent(int lID, int eID, int iLen, const int* iData,double t){
 	if(traceCoreOn == 0){
-		if(iData){
-			free(iData);
-		}		
 		return;
 	}
 	CmiPrintf("TraceCore LogEvent called \n");
 #ifndef CMK_OPTIMIZE	
-	traceLogger->add(lID,eID,TraceCoreTimer(t),iLen,iData,0,NULL);
+	int *iDataalloc;
+	if(iLen != 0){
+		iDataalloc = (int *)malloc(iLen*sizeof(int));
+		for(int i=0;i<iLen;i++){
+			iDataalloc[i] = iData[i];
+		}
+	}else{
+		iDataalloc = NULL;
+	}
+	traceLogger->add(lID,eID,TraceCoreTimer(t),iLen,iDataalloc,0,NULL);
 #endif
 }
 
 
-void TraceCore::LogEvent(int lID, int eID, int sLen, char* sData)
+void TraceCore::LogEvent(int lID, int eID, int sLen, const char* sData)
 { 
 	if(traceCoreOn == 0){
-		if(sData){
-			free(sData);
-		}		
 		return;
 	}
 	LogEvent(lID, eID, 0, NULL, sLen, sData); 
 }
 
-void TraceCore::LogEvent(int lID, int eID, int iLen, int* iData, int sLen, char* sData)
+void TraceCore::LogEvent(int lID, int eID, int iLen, const int* iData, int sLen,const char* sData)
 {
 	//CmiPrintf("lID: %d, eID: %d", lID, eID);
 	if(traceCoreOn == 0){
-		if(iData){
-			free(iData);
-		}	
-		if(sData){
-			free(sData);
-		}			
 		return;
 	}
 		
 
 #ifndef CMK_OPTIMIZE
-	traceLogger->add(lID, eID, TraceCoreTimer(), iLen, iData, sLen, sData);
+	int *iDataalloc;
+	char *sDataalloc;
+	if(iLen != 0){
+		iDataalloc = (int *)malloc(iLen*sizeof(int));
+		for(int i=0;i<iLen;i++){
+			iDataalloc[i] = iData[i];
+		}
+	}else{
+		iDataalloc = NULL;
+	}
+	if(sLen != 0){
+		sDataalloc = (char *)malloc(sLen*sizeof(char));
+		for(int i=0;i<sLen;i++){
+			sDataalloc[i] = sData[i];
+		}
+	}else{
+		sDataalloc = NULL;
+	}
+
+	traceLogger->add(lID, eID, TraceCoreTimer(), iLen, iDataalloc, sLen, sDataalloc);
 #endif
 }
 
