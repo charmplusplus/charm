@@ -157,7 +157,7 @@ class chunk : public TCharmClient1D {
   intMsg *safeToMoveNode(int idx, double x, double y);
   splitOutMsg *split(int idx, elemRef e, node in, node fn);
   splitOutMsg *collapse(int idx, elemRef e, node kn, node dn, elemRef kNbr, 
-		   elemRef dNbr, edgeRef kEdge, edgeRef dEdge);
+		   elemRef dNbr, edgeRef kEdge, edgeRef dEdge, node opnode);
   void collapseHelp(int idx, edgeRef er, node n1, node n2);
   intMsg *nodeLockup(int idx, node n, edgeRef from, edgeRef start, elemRef end,
 		     double l);

@@ -11,7 +11,7 @@ class edge {
   int pending, newNodeIdx;
   double length;
   elemRef waitingFor, delNbr, keepNbr;
-  node newNode, incidentNode, fixNode;
+  node newNode, incidentNode, fixNode, opnode;
   edgeRef newEdgeRef; // half of this edge: from newNode to incidentNode
   chunk *C;
   edgeRef myRef, keepEdge, delEdge;
@@ -38,6 +38,7 @@ class edge {
     keepEdge = e.keepEdge;
     delEdge = e.delEdge;
     newNode = e.newNode;
+    opnode = e.opnode;
     incidentNode = e.incidentNode;
     fixNode = e.fixNode;
     newEdgeRef = e.newEdgeRef;
@@ -62,6 +63,7 @@ class edge {
     keepEdge = e.keepEdge;
     delEdge = e.delEdge;
     newNode = e.newNode;
+    opnode = e.opnode;
     incidentNode = e.incidentNode;
     fixNode = e.fixNode;
     newEdgeRef = e.newEdgeRef;
@@ -92,8 +94,8 @@ class edge {
   int split(int *m, edgeRef *e_prime, node iNode, node fNode,
 	    elemRef requester, int *local, int *first, int *nullNbr);
   int collapse(elemRef requester, node kNode, node dNode, elemRef kNbr,
-	       elemRef dNbr, edgeRef kEdge, edgeRef dEdge, int *local, 
-	       int *first);
+	       elemRef dNbr, edgeRef kEdge, edgeRef dEdge, node oNode,
+	       int *local, int *first);
   void sanityCheck(chunk *c, edgeRef shouldRef);
   int nodeLockup(node n, edgeRef start, elemRef from, elemRef end, double l);
   int nodeUpdate(node n, elemRef from, elemRef end, node newNode);

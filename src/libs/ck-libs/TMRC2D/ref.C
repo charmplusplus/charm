@@ -43,13 +43,13 @@ int edgeRef::split(int *m, edgeRef *e_prime, node iNode, node fNode,
 }
 
 int edgeRef::collapse(elemRef requester, node kNode, node dNode, elemRef kNbr, 
-		      elemRef dNbr, edgeRef kEdge, edgeRef dEdge, int *local, 
-		      int *first)
+		      elemRef dNbr, edgeRef kEdge, edgeRef dEdge, node opnode, 
+		      int *local, int *first)
 {
   splitOutMsg *som;
   int result;
   som = mesh[cid].collapse(idx, requester, kNode, dNode, kNbr, dNbr, kEdge, 
-			  dEdge);
+			  dEdge, opnode);
   *local = som->local;
   *first = som->first;
   result = som->result;

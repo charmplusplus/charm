@@ -207,15 +207,30 @@ void element::collapse(int shortEdge)
   delEdge = opnode;
   keepEdge = (shortEdge + 1) % 3;
   keepNode = keepEdge;
-  
   keepNbr = edges[keepEdge].getNbr(myRef);
   delNbr = edges[delEdge].getNbr(myRef);
+  
+  double length = 
+    C->theNodes[nodes[keepNode]].distance(C->theNodes[nodes[delNode]]);
+  CkPrintf("TMRC2D: LOCKing opnode=%d\n", nodes[opnode]);
+  int aResult = nodeLockup(C->theNodes[nodes[opnode]], edges[delEdge], edges[keepEdge], delNbr, length);
+  if (aResult == 0) return;
+  if ((aResult == -1) && (delNbr.cid != -1)) {
+    aResult = nodeLockup(C->theNodes[nodes[opnode]], edges[keepEdge], edges[delEdge], keepNbr, length);
+    if (aResult == 0) {
+      // unlock requester side of kNode
+      int junkResult = nodeUpdate(C->theNodes[nodes[opnode]],edges[keepEdge],delNbr,C->theNodes[nodes[opnode]]);
+      return;
+    }
+  }
+
   node newNode = 
     C->theNodes[nodes[keepNode]].midpoint(C->theNodes[nodes[delNode]]);
 
   result = edges[shortEdge].collapse(myRef, C->theNodes[nodes[keepNode]],
 				     C->theNodes[nodes[delNode]], keepNbr,
 				     delNbr, edges[keepEdge], edges[delEdge], 
+				     C->theNodes[nodes[opnode]], 
 				     &local, &first);
   if (result == 1) {
     // collapse successful; keepNode is node to keep
@@ -285,8 +300,7 @@ int element::nodeLockup(node n, edgeRef from, edgeRef start, elemRef end,
   if (myRef == end) return 1;
   if (nIdx == fIdx) nextIdx = (nIdx + 2) % 3;
   else nextIdx = nIdx;
-  CkPrintf("TMRC2D: In element[%d]::nodeLockup: from=%d nodes[nIdx]=%d fIdx=%d nextIdx=%d\n", 
-	   myRef.idx, from.idx, nodes[nIdx], fIdx, nextIdx);
+  //CkPrintf("TMRC2D: In element[%d]::nodeLockup: from=%d nodes[nIdx]=%d fIdx=%d nextIdx=%d\n", myRef.idx, from.idx, nodes[nIdx], fIdx, nextIdx);
   edgeRef nextRef = edges[nextIdx];
   intMsg *im = mesh[nextRef.cid].nodeLockupER(nextRef.idx, n, start, myRef, 
 					      end, l);
@@ -311,8 +325,7 @@ int element::nodeUpdate(node n, edgeRef from, elemRef end, node newNode)
   if (myRef == end) return 1;
   if (nIdx == fIdx) nextIdx = (nIdx + 2) % 3;
   else nextIdx = nIdx;
-  CkPrintf("TMRC2D: In element[%d]::nodeUpdate: from=%d nodes[nIdx]=%d fIdx=%d nextIdx=%d\n", 
-	   myRef.idx, from.idx, nodes[nIdx], fIdx, nextIdx);
+  //CkPrintf("TMRC2D: In element[%d]::nodeUpdate: from=%d nodes[nIdx]=%d fIdx=%d nextIdx=%d\n", myRef.idx, from.idx, nodes[nIdx], fIdx, nextIdx);
   edgeRef nextRef = edges[nextIdx];
   intMsg *im = mesh[nextRef.cid].nodeUpdateER(nextRef.idx, n, myRef, end, 
 					      newNode);
@@ -336,7 +349,7 @@ int element::nodeDelete(node n, edgeRef from, elemRef end, node ndReplace)
       }
       CkAssert((nIdx > -1) && (nIdx < 3));
       found = 1;
-      CkPrintf("TMRC2D: about to remove node %d\n", nodes[nIdx]);
+      //CkPrintf("TMRC2D: about to remove node %d\n", nodes[nIdx]);
       C->removeNode(nodes[nIdx]);
       nodes[nIdx] = j;
       break;
@@ -345,14 +358,13 @@ int element::nodeDelete(node n, edgeRef from, elemRef end, node ndReplace)
   CkAssert((fIdx > -1) && (fIdx < 3));
   C->theNodes[nodes[nIdx]].unlock();
   if (!found) {
-    CkPrintf("TMRC2D: about to replace node %d\n", nodes[nIdx]);
+    //CkPrintf("TMRC2D: about to replace node %d\n", nodes[nIdx]);
     C->theNodes[nodes[nIdx]] = ndReplace;
   }
   if (myRef == end) return 1;
   if (nIdx == fIdx) nextIdx = (nIdx + 2) % 3;
   else nextIdx = nIdx;
-  CkPrintf("TMRC2D: In element[%d]::nodeDelete: from=%d nodes[nIdx]=%d fIdx=%d nextIdx=%d\n", 
-	   myRef.idx, from.idx, nodes[nIdx], fIdx, nextIdx);
+  //CkPrintf("TMRC2D: In element[%d]::nodeDelete: from=%d nodes[nIdx]=%d fIdx=%d nextIdx=%d\n", myRef.idx, from.idx, nodes[nIdx], fIdx, nextIdx);
   edgeRef nextRef = edges[nextIdx];
   intMsg *im = mesh[nextRef.cid].nodeDeleteER(nextRef.idx, n, myRef, end, ndReplace);
   return im->anInt;

@@ -24,8 +24,8 @@ module refine {
     entry [sync] void setBorder(int);
     entry [sync] intMsg *safeToMoveNode(int, double, double);
     entry [sync, threaded] splitOutMsg *split(int, elemRef, node, node);
-    entry [sync, threaded] splitOutMsg *collapse(int, elemRef, node, node, elemRef,
-	elemRef, edgeRef, edgeRef);
+    entry [sync, threaded] splitOutMsg *collapse(int, elemRef, node, node, 
+	elemRef, elemRef, edgeRef, edgeRef, node);
     entry [sync, threaded] intMsg *nodeLockup(int, node, edgeRef, edgeRef, 
 	elemRef, double);
     entry [sync, threaded] intMsg *nodeLockupER(int, node, edgeRef, elemRef, 

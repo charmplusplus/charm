@@ -33,7 +33,8 @@ class edgeRef : public objRef {
   int split(int *m, edgeRef *e_prime, node iNode, node fNode,
 	    elemRef requester, int *local, int *first, int *nullNbr);
   int collapse(elemRef requester, node kNode, node dNode, elemRef kNbr, 
-	       elemRef dNbr, edgeRef kEdge, edgeRef dEdge, int *local, int *first);
+	       elemRef dNbr, edgeRef kEdge, edgeRef dEdge, node opnode,
+	       int *local, int *first);
   void resetEdge();
   int isPending(elemRef e);
   void checkPending(elemRef e);

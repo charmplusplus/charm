@@ -90,28 +90,31 @@ void chunk::coarsenElement(int idx, double area)
 
 void chunk::coarseningElements()
 {
-  int i;
+  int i, elCount, cCount;
   while (modified) { // try to coarsen elements until no changes occur
     i = 0;
     modified = 0;
+    elCount = cCount = 0;
     while (i < elementSlots) { // loop through the elements
-      if (theElements[i].isPresent())
-	CkPrintf("TMRC2D: Coarsen element %d: area=%f target=%f\n", i, 
-		 theElements[i].getArea(), theElements[i].getTargetArea());
+      if (theElements[i].isPresent()) elCount++;
       if (theElements[i].isPresent() && 
 	  (theElements[i].getTargetArea() > theElements[i].getArea()) && 
 	  (theElements[i].getTargetArea() >= 0.0)) {
 	// element i has higher target area -- needs coarsening
+	cCount++;
+	CkPrintf("TMRC2D: Coarsen element %d: area=%f target=%f\n", i, 
+		 theElements[i].getArea(), theElements[i].getTargetArea());
 	modified = 1; // something's bound to change
 	theElements[i].coarsen(); // coarsen the element
       }
       i++;
     }
+    CkPrintf("TMRC2D: |||||||||||  Chunk %d needs %d/%d coarsening...  ||||||||||\n", cid, cCount, elementSlots);
     CthYield(); // give other chunks on the same PE a chance
   }
   coarsenInProgress = 0;  // turn coarsen loop off
   sanityCheck(); // quietly make sure mesh is in shape
-  dump();
+  //dump();
 }
 
 // many remote access methods follow
@@ -145,12 +148,12 @@ splitOutMsg *chunk::split(int idx, elemRef e, node in, node fn)
 
 splitOutMsg *chunk::collapse(int idx, elemRef e, node kn, node dn, 
 			     elemRef kNbr, elemRef dNbr, edgeRef kEdge, 
-			     edgeRef dEdge)
+			     edgeRef dEdge, node opnode)
 {
   splitOutMsg *som = new splitOutMsg;
   accessLock();
   som->result = theEdges[idx].collapse(e, kn, dn, kNbr, dNbr, kEdge, dEdge,
-				       &(som->local), &(som->first));
+				       opnode, &(som->local), &(som->first));
   releaseLock();
   return som;
 }
@@ -632,16 +635,19 @@ void chunk::multipleRefine(double *desiredArea, refineClient *client)
 void chunk::multipleCoarsen(double *desiredArea, refineClient *client)
 {
   int i;
+  double precThrshld, area;
   CkPrintf("TMRC2D: multipleCoarsen....\n");
   theClient = client; // initialize refine client associated with this chunk
   //Uncomment this dump call to see TMRC2D's mesh config
-  dump();
+  //dump();
   sanityCheck(); // quietly make sure mesh is in shape
 
   for (i=0; i<elementSlots; i++) { // set desired areas for elements
-    CkPrintf("TMRC2D: desiredArea[%d]=%f present? %d area=%f\n", i, desiredArea[i], theElements[i].isPresent(), theElements[i].getArea());
+    area = theElements[i].getArea();
+    precThrshld = area * 1e-15;
+    //CkPrintf("TMRC2D: desiredArea[%d]=%f present? %d area=%f\n", i, desiredArea[i], theElements[i].isPresent(), area);
     if ((theElements[i].isPresent()) &&
-	(desiredArea[i] > theElements[i].getArea())) {
+	(desiredArea[i] > area+precThrshld)) {
       theElements[i].resetTargetArea(desiredArea[i]);
       CkPrintf("TMRC2D: Setting target on element %d to %f\n", i, desiredArea[i]);
     }
