@@ -8,7 +8,8 @@
 #define CMK_HANDLE_SIGUSR                                  1
 
 #define CMK_MSG_HEADER_BASIC  CMK_MSG_HEADER_EXT
-#define CMK_MSG_HEADER_EXT    { CmiUInt2 rank, root, hdl,xhdl,info,d3; }
+/* Type of the message tells whether it is a statically or dynamically allocated message, 0 for dynamic and 1 for static */
+#define CMK_MSG_HEADER_EXT    { unsigned char type, rank; CmiUInt2 root, hdl,xhdl,info,d3; }
 #define CMK_MSG_HEADER_BLUEGENE    { CmiUInt2 rank, root, hdl,xhdl,info,d3; int nd, n; double rt; CmiUInt2 tID, hID; char t; int msgID; int srcPe;}
 
 #define CMK_MULTICAST_GROUP_TYPE                struct { unsigned pe, id; }
@@ -33,4 +34,5 @@
 #define CMK_CCS_AVAILABLE                                  1
 
 #define NODE_0_IS_CONVHOST                                 1
+#define CONVERSE_VERSION_ELAN
 
