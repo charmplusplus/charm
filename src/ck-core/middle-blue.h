@@ -31,7 +31,11 @@
 #undef CmiSyncNodeBroadcastAllAndFree
 
 
-#define CkVTimer   BgGetTime
+#undef CkWallTimer
+#undef CkCpuTimer
+#define CkWallTimer     BgGetTime
+#define CkCpuTimer	BgGetTime
+#define CkVTimer	BgGetTime
 #define CkElapse   BgElapse
 
 #define CkRegisterHandler(x)        BgRegisterHandler((BgHandler)(x))
