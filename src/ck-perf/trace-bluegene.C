@@ -90,10 +90,10 @@ void TraceBluegene::tlineEnd(void** parentLogPtr){
     *parentLogPtr = NULL;
 }
 
-
 void TraceBluegene::bgDummyBeginExec(char* name,void** parentLogPtr)
 {
   if (!genTimeLog) return;
+  startVTimer();
   bgTimeLog* newLog = new bgTimeLog(_threadEP,name,BgGetCurTime());
   if(*parentLogPtr)
     newLog->addBackwardDep(*(bgTimeLog**)parentLogPtr);
@@ -101,11 +101,22 @@ void TraceBluegene::bgDummyBeginExec(char* name,void** parentLogPtr)
   *parentLogPtr = newLog;
 }
 
-void TraceBluegene::bgBeginExec(char* msg)
+void TraceBluegene::bgBeginExec(char* msg, char *name)
 {
   if (!genTimeLog) return;
-  bgTimeLog* newLog = new bgTimeLog(msg);
+  startVTimer();
+  bgTimeLog* newLog = new bgTimeLog(msg, name);
   tTIMELINEREC.logEntryStart(newLog);
+}
+
+void TraceBluegene::bgAmpiBeginExec(char *msg, char *name, void *log)
+{
+  if (!genTimeLog) return;
+  startVTimer();
+  bgTimeLog* newLog = new bgTimeLog(_threadEP,name,BgGetCurTime());
+  tTIMELINEREC.logEntryStart(newLog);
+  newLog->addBackwardDep((bgTimeLog*)log);
+  newLog->addMsgBackwardDep(tTIMELINEREC, msg);
 }
 
 void TraceBluegene::bgEndExec(int commit)
@@ -115,6 +126,7 @@ void TraceBluegene::bgEndExec(int commit)
     BgLogEntryCommit(tTIMELINEREC);
   else
     tTIMELINEREC.logEntryClose();
+  stopVTimer();
 }
 
 
