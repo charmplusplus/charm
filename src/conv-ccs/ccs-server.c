@@ -447,12 +447,13 @@ A CcsImplHeader len field equal to 0 means do not send any reply.
 void CcsServer_sendReply(CcsImplHeader *hdr,int repBytes,const void *repData)
 {
   int fd=ChMessageInt(hdr->replyFd);
+  skt_abortFn old;
   if (ChMessageInt(hdr->len)==0) {
     CCSDBG(("CCS Closing reply socket without a reply.\n"));
     skt_close(fd);
     return;
   }
-  skt_abortFn old=skt_set_abort(reply_abortFn);
+  old=skt_set_abort(reply_abortFn);
   CCSDBG(("CCS   Sending %d bytes of reply data\n",repBytes));
   CcsServer_writeReply(fd,security,&hdr->attr,repBytes,(char *)repData);
   skt_close(fd);
