@@ -666,7 +666,8 @@ LOADBALANCERS=\
    $(L)/libmoduleHeapCentLB.a \
    $(L)/libmoduleNeighborLB.a \
    $(L)/libmoduleGreedyRefLB.a \
-   $(L)/libmoduleRandRefLB.a 
+   $(L)/libmoduleRandRefLB.a \
+   $(L)/libmoduleWSLB.a \
 
 RandCentLB.decl.h: RandCentLB.ci charmxi
 	$(CHARMC) RandCentLB.ci
@@ -676,6 +677,7 @@ RandCentLB.o: RandCentLB.C RandCentLB.decl.h $(CKHEADERS)
 
 $(L)/libmoduleRandCentLB.a: RandCentLB.o
 	$(CHARMC) -o $(L)/libmoduleRandCentLB.a RandCentLB.o
+	
 
 RecBisectBfLB.decl.h: RecBisectBfLB.ci charmxi
 	$(CHARMC) RecBisectBfLB.ci
@@ -685,6 +687,7 @@ RecBisectBfLB.o: RecBisectBfLB.C RecBisectBfLB.decl.h $(CKHEADERS)
 
 $(L)/libmoduleRecBisectBfLB.a: RecBisectBfLB.o
 	$(CHARMC) -o $(L)/libmoduleRecBisectBfLB.a RecBisectBfLB.o
+	
 
 MetisLB.decl.h: MetisLB.ci charmxi
 	$(CHARMC) MetisLB.ci
@@ -694,6 +697,7 @@ MetisLB.o: MetisLB.C MetisLB.decl.h $(CKHEADERS)
 
 $(L)/libmoduleMetisLB.a: MetisLB.o
 	$(CHARMC) -o $(L)/libmoduleMetisLB.a MetisLB.o
+	cp libmoduleMetisLB.dep $(L)/
 
 RefineLB.decl.h: RefineLB.ci charmxi
 	$(CHARMC) RefineLB.ci
@@ -703,18 +707,17 @@ RefineLB.o: RefineLB.C RefineLB.decl.h $(CKHEADERS)
 
 $(L)/libmoduleRefineLB.a: RefineLB.o
 	$(CHARMC) -o $(L)/libmoduleRefineLB.a RefineLB.o
+	
 
 CommLB.decl.h: CommLB.ci charmxi
 	$(CHARMC) CommLB.ci
 
-CommLB.o: CommLB.C CommLB.decl.h manager.h $(CKHEADERS)
-	$(CHARMC) -c CommLB.C 
+CommLB.o: CommLB.C CommLB.decl.h $(CKHEADERS)
+	$(CHARMC) -c CommLB.C
 
-manager.o: manager.C manager.h 
-	$(CHARMC) -c manager.C
-
-$(L)/libmoduleCommLB.a: CommLB.o manager.o
-	$(CHARMC) -o $(L)/libmoduleCommLB.a CommLB.o manager.o
+$(L)/libmoduleCommLB.a: CommLB.o
+	$(CHARMC) -o $(L)/libmoduleCommLB.a CommLB.o
+	
 
 Comm1LB.decl.h: Comm1LB.ci charmxi
 	$(CHARMC) Comm1LB.ci
@@ -724,6 +727,7 @@ Comm1LB.o: Comm1LB.C Comm1LB.decl.h $(CKHEADERS)
 
 $(L)/libmoduleComm1LB.a: Comm1LB.o
 	$(CHARMC) -o $(L)/libmoduleComm1LB.a Comm1LB.o
+	
 
 HeapCentLB.decl.h: HeapCentLB.ci charmxi
 	$(CHARMC) HeapCentLB.ci
@@ -733,6 +737,7 @@ HeapCentLB.o: HeapCentLB.C HeapCentLB.decl.h $(CKHEADERS)
 
 $(L)/libmoduleHeapCentLB.a: HeapCentLB.o
 	$(CHARMC) -o $(L)/libmoduleHeapCentLB.a HeapCentLB.o
+	
 
 NeighborLB.decl.h: NeighborLB.ci charmxi
 	$(CHARMC) NeighborLB.ci
@@ -742,6 +747,7 @@ NeighborLB.o: NeighborLB.C NeighborLB.decl.h $(CKHEADERS)
 
 $(L)/libmoduleNeighborLB.a: NeighborLB.o
 	$(CHARMC) -o $(L)/libmoduleNeighborLB.a NeighborLB.o
+	
 
 GreedyRefLB.decl.h: GreedyRefLB.ci charmxi
 	$(CHARMC) GreedyRefLB.ci
@@ -751,6 +757,7 @@ GreedyRefLB.o: GreedyRefLB.C GreedyRefLB.decl.h $(CKHEADERS)
 
 $(L)/libmoduleGreedyRefLB.a: GreedyRefLB.o
 	$(CHARMC) -o $(L)/libmoduleGreedyRefLB.a GreedyRefLB.o
+	
 
 RandRefLB.decl.h: RandRefLB.ci charmxi
 	$(CHARMC) RandRefLB.ci
@@ -760,6 +767,17 @@ RandRefLB.o: RandRefLB.C RandRefLB.decl.h $(CKHEADERS)
 
 $(L)/libmoduleRandRefLB.a: RandRefLB.o
 	$(CHARMC) -o $(L)/libmoduleRandRefLB.a RandRefLB.o
+	
+
+WSLB.decl.h: WSLB.ci charmxi
+	$(CHARMC) WSLB.ci
+
+WSLB.o: WSLB.C WSLB.decl.h $(CKHEADERS)
+	$(CHARMC) -c WSLB.C
+
+$(L)/libmoduleWSLB.a: WSLB.o
+	$(CHARMC) -o $(L)/libmoduleWSLB.a WSLB.o
+	
 
 LB_OBJ=EveryLB.o \
     RandCentLB.o \
@@ -767,12 +785,12 @@ LB_OBJ=EveryLB.o \
     MetisLB.o \
     RefineLB.o \
     CommLB.o \
-    manager.o \
     Comm1LB.o \
     HeapCentLB.o \
     NeighborLB.o \
     GreedyRefLB.o \
-    RandRefLB.o 
+    RandRefLB.o \
+    WSLB.o \
 
 EveryLB.o: EveryLB.C EveryLB.decl.h
 	$(CHARMC) -c EveryLB.C
@@ -782,6 +800,7 @@ EveryLB.decl.h: EveryLB.ci
 
 $(L)/libmoduleEveryLB.a: $(LB_OBJ)
 	$(CHARMC) -o $(L)/libmoduleEveryLB.a $(LB_OBJ)
+	cp libmoduleEveryLB.dep $(L)/
 
 loadbalancers: $(LOADBALANCERS) $(L)/libmoduleEveryLB.a
 
