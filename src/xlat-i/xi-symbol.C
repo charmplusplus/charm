@@ -2387,10 +2387,10 @@ void Entry::genPythonDefs(XStr& str) {
     str << "PyObject *_Python_"<<container->baseName()<<"_"<<name<<"(PyObject *self, PyObject *arg) {\n";
     str << "  int pyNumber = PyInt_AsLong(PyDict_GetItemString(PyModule_GetDict(PyImport_AddModule(\"__main__\")),\"charmNumber\"));\n";
     str << "  CmiLock(CsvAccess(pyLock));\n";
-    str << "  "<<container->baseName()<<" *pyWorker = ("<<container->baseName()<<" *)(*CsvAccess(pyWorkers))[pyNumber];\n";
-    str << "  ((*CsvAccess(pyThread))[pyNumber]).arg=arg;\n";
-    str << "  ((*CsvAccess(pyThread))[pyNumber]).result=&CtvAccess(pythonReturnValue);\n";
-    str << "  ((*CsvAccess(pyThread))[pyNumber]).pythread=PyThreadState_Get();\n";
+    str << "  "<<container->baseName()<<" *pyWorker = ("<<container->baseName()<<" *)((*CsvAccess(pyWorkers))[pyNumber]).object;\n";
+    str << "  ((*CsvAccess(pyWorkers))[pyNumber]).arg=arg;\n";
+    str << "  ((*CsvAccess(pyWorkers))[pyNumber]).result=&CtvAccess(pythonReturnValue);\n";
+    str << "  ((*CsvAccess(pyWorkers))[pyNumber]).pythread=PyThreadState_Get();\n";
     str << "  CmiUnlock(CsvAccess(pyLock));\n";
 
     str << "  pyWorker->thisProxy."<<name<<"(pyNumber);\n";
