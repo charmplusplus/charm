@@ -245,6 +245,21 @@ void ArrayElement::pup(PUP::er &p)
 #if CMK_MEM_CHECKPOINT
   p(budPEs, 2);
 #endif
+  p.syncComment(PUP::sync_last_system,"ArrayElement");
+}
+
+char *ArrayElement::ckDebugChareName(void) {
+	char buf[200];
+	const char *className=_chareTable[ckGetChareType()]->name;
+	const int *d=thisIndexMax.data();
+	switch (thisIndexMax.nInts) {
+	case 0:	sprintf(buf,"%s",className); break;
+	case 1: sprintf(buf,"%s[%d]",className,d[0]); break;
+	case 2: sprintf(buf,"%s(%d,%d)",className,d[0],d[1]); break;
+	case 3: sprintf(buf,"%s(%d,%d,%d)",className,d[0],d[1],d[2]); break;
+	default: sprintf(buf,"%s(%d,%d,%d,%d..)",className,d[0],d[1],d[2],d[3]); break;
+	};
+	return strdup(buf);
 }
 
 /// A more verbose form of abort
@@ -849,10 +864,6 @@ void CkArray::recvBroadcast(CkMessage *m)
 }
 
 
-
 #include "CkArray.def.h"
-
-
-
 
 

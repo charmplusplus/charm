@@ -583,10 +583,6 @@ void CkMigratable::pup(PUP::er &p) {
 	ckFinishConstruction();
 }
 
-void CkMigratable::pupCpdData(PUP::er &p){
-        pup(p);
-}
-
 void CkMigratable::ckDestroy(void) {
 	DEBC((AA"In CkMigratable::ckDestroy %s\n"AB,idx2str(thisIndexMax)));
 	myRec->destroy();
@@ -1486,11 +1482,6 @@ void CkLocation::pup(PUP::er &p) {
 	mgr->pupElementsFor(p,rec,CkElementCreation_migrate);
 }
 
-void CkLocation::pupCpdData(PUP::er &p)
-{
-	mgr->pupElementsFor(p,rec,CkElementCreation_migrate,1);
-}
-
 CkLocIterator::~CkLocIterator() {}
 
 /// Iterate over our local elements:
@@ -1514,7 +1505,7 @@ void CkLocMgr::iterate(CkLocIterator &dest) {
 /************************** LocMgr: MIGRATION *************************/
 
 void CkLocMgr::pupElementsFor(PUP::er &p,CkLocRec_local *rec,
-		CkElementCreation_t type, int forCpd)
+		CkElementCreation_t type)
 {
 	p.comment("-------- Array Location --------");
 	register ManagerRec *m;
@@ -1544,9 +1535,6 @@ void CkLocMgr::pupElementsFor(PUP::er &p,CkLocRec_local *rec,
 		CkMigratable *elt=m->element(localIdx);
 		if (elt!=NULL) 
                 {
-                   if(forCpd)
-                       elt->pupCpdData(p); 
-                   else
                        elt->pup(p);
                 }
 	}

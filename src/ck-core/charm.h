@@ -81,20 +81,6 @@ extern void* CkCopyMsg(void **pMsg);
 extern void  CkSetQueueing(void *msg, int strategy);
 extern void* CkPriorityPtr(void *msg);
 
-/******************************************************************************
- *
- * Data Structures.
- *
- *****************************************************************************/
-
-typedef struct _ckargmsg {
-  int argc;
-  char **argv;
-#ifdef __cplusplus
-  void operator delete(void *ptr) { CkFreeMsg(ptr); }
-#endif
-} CkArgMsg;
-
 /*********************************************************/
 /**
 \addtogroup CkRegister
@@ -152,6 +138,13 @@ typedef int (*CkMarshallUnpackFn)(char *marshall_buf,void *object);
 extern void CkRegisterMarshallUnpackFn(int epIndex,CkMarshallUnpackFn m);
 /** Lookup the marshall unpack function, if any, for this entry point.*/
 extern CkMarshallUnpackFn CkLookupMarshallUnpackFn(int epIndex);
+
+#ifdef __cplusplus
+/** A "message pup" function: pups message data for debugger display. */
+typedef void (*CkMessagePupFn)(PUP::er &p,void *userMessage);
+/** Register this message pup function with this entry point.*/
+extern void CkRegisterMessagePupFn(int epIndex,CkMessagePupFn m);
+#endif
 /*@}*/
 
 /*********************************************************/
@@ -315,6 +308,7 @@ extern void CkWaitQD(void);
  *
  *****************************************************************************/
 
+extern int CkMessageToEpIdx(void *msg);
 extern void CkPrintEntryMethod(int epIdx);
 extern void CkPrintChareName(int chareIdx);
 extern void CkSummary_MarkEvent(int);

@@ -57,6 +57,22 @@ void Chare::pup(PUP::er &p)
   p(thishandle.onPE);
   thishandle.objPtr=(void *)this;
 }
+char *Chare::ckDebugChareName(void) {
+  char buf[100];
+  sprintf(buf,"Chare on pe %d at %p",CkMyPe(),this);
+  return strdup(buf);
+}
+void Chare::ckDebugPup(PUP::er &p) {
+  pup(p);
+}
+
+void CkMessage::ckDebugPup(PUP::er &p,void *msg) {
+  p.comment("Message has no debug pup routine.  Bytes:");
+  int ts=UsrToEnv(msg)->getTotalsize();
+  int msgLen=ts-sizeof(envelope);
+  if (msgLen>0)
+    p(msg,msgLen);
+}
 
 IrrGroup::IrrGroup(void) {
   thisgroup = CkpvAccess(_currentGroup);
@@ -1279,6 +1295,7 @@ void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
 		ck->watcher=new CkMessageReplay(openReplayFile("r"));
 }
 
+extern "C"
 int CkMessageToEpIdx(void *msg) {
         envelope *env=UsrToEnv(msg);
 	int ep=env->getEpIdx();

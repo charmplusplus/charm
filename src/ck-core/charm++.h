@@ -42,14 +42,26 @@ class CkMessage {
 public:
 	CkMessage() {}
 	void operator delete(void *ptr) { CkFreeMsg(ptr); }
+	
 	/* This pup routine only packs the message itself, *not* the
 	message header.  Use CkPupMessage instead of calling this directly. */
 	void pup(PUP::er &p);
+	
+	/// This is used to display message contents in the debugger.
+	static void ckDebugPup(PUP::er &p,void *msg);
+	
         void setImmediate(CmiBool i);
 };
 class CMessage_CkMessage {
- public:
+public:
 	static int __idx;
+};
+
+/// CkArgMsg is passed to the mainchare's constructor.
+class CkArgMsg : public CkMessage {
+public:
+  int argc;
+  char **argv;
 };
 
 class CkArray;
@@ -330,6 +342,10 @@ PUPmarshall(CkArrayID)
 // for object message queue
 #include "ckobjQ.h"
 
+/**
+  The base class of all parallel objects in Charm++,
+  including Array Elements, Groups, and NodeGroups.
+*/
 class Chare {
   protected:
     CkChareID thishandle;
@@ -349,6 +365,9 @@ class Chare {
     inline CkObjectMsgQ &CkGetObjQueue() { return objQ; }
 #endif
     CHARM_INPLACE_NEW
+    /// Return a strdup'd array containing this object's string name.
+    virtual char *ckDebugChareName(void);
+    virtual void ckDebugPup(PUP::er &p);
 };
 
 //Superclass of all Groups that cannot participate in reductions.
@@ -370,6 +389,7 @@ class IrrGroup : public Chare {
     // Silly run-time type information
     virtual int isNodeGroup() { return 0; };
     virtual CmiBool isLocMgr(void){ return CmiFalse; }
+    virtual CmiBool isArrMgr(void){ return CmiFalse; }
     virtual CmiBool isReductionMgr(void){ return CmiFalse; }
     static int isIrreducible(){ return 1;}
     virtual void flushStates() {}

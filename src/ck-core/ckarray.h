@@ -386,6 +386,7 @@ public:
   virtual void ckAboutToMigrate(void);
   virtual void ckJustMigrated(void);
   virtual void ckDestroy(void);
+  virtual char *ckDebugChareName(void);
 
   /// Synonym for ckMigrate
   inline void migrateMe(int toPe) {ckMigrate(toPe);}
@@ -602,6 +603,7 @@ public:
 
   ComlibArrayListener * calistener;
   ComlibArrayListener * getComlibArrayListener() {return calistener;}
+  virtual CmiBool isArrMgr(void) {return CmiTrue;}
 
 private:
   int numInitial;/// Number of 1D initial array elements
