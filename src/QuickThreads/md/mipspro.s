@@ -155,24 +155,28 @@ qt_start:
 	*/
         .ent qt_block
 qt_block:
-	daddiu $sp, $sp,-64		/* 6 8-byte regs, saved ret pc, aligned. */
-	swc1 $f20,  0($sp)
-	swc1 $f22,  8($sp)
-	swc1 $f24, 16($sp)
-	swc1 $f26, 24($sp)
-	swc1 $f28, 32($sp)
-	swc1 $f30, 40($sp)
-	sd $31, 48($sp)
+	daddiu $sp, $sp,-80		/* 6 8-byte regs, saved ret pc, aligned. */
+	sdc1 $f24,  0($sp)
+	sdc1 $f25,  8($sp)
+	sdc1 $f26, 16($sp)
+	sdc1 $f27, 24($sp)
+	sdc1 $f28, 32($sp)
+	sdc1 $f29, 40($sp)
+	sdc1 $f30, 48($sp)
+	sdc1 $f31, 56($sp)
+	sd $31, 64($sp)
 	jal qt_blocki
         nop
-	lwc1 $f20,  0($sp)
-	lwc1 $f22,  8($sp)
-	lwc1 $f24, 16($sp)
-	lwc1 $f26, 24($sp)
-	lwc1 $f28, 32($sp)
-	lwc1 $f30, 40($sp)
-	ld $31, 48($sp)
-	daddiu $sp, $sp,64
+	ldc1 $f24,  0($sp)
+	ldc1 $f25,  8($sp)
+	ldc1 $f26, 16($sp)
+	ldc1 $f27, 24($sp)
+	ldc1 $f28, 32($sp)
+	ldc1 $f29, 40($sp)
+	ldc1 $f30, 48($sp)
+	ldc1 $f31, 56($sp)
+	ld $31, 64($sp)
+	daddiu $sp, $sp,80
 	j $31
         nop
         .end qt_block

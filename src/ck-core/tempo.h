@@ -81,9 +81,10 @@ class TempoGroup : public Group, public Tempo
 
 class TempoArray : public ArrayElement, public Tempo
 {
+  int nGOps;
   public:
     TempoArray(ArrayElementCreateMessage *msg) : ArrayElement(msg)
-      { finishConstruction(); }
+      { nGOps=0; finishConstruction(); }
     TempoArray(ArrayElementMigrateMessage *msg) : ArrayElement(msg)
       { /*finishMigration();*/ }
     static void ckTempoSendElem(int tag1, int tag2, void *buffer, int buflen,

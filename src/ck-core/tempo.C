@@ -152,15 +152,16 @@ void
 TempoArray::ckTempoBarrier(void)
 {
   if(thisIndex) {
-    ckTempoSendElem(BARR_TAG, thisIndex, (void*) 0, 0, 0);
-    ckTempoRecv(BARR_TAG, 0, (void*) 0, 0);
+    ckTempoSendElem(BARR_TAG, nGOps, (void*) 0, 0, 0);
+    ckTempoRecv(BARR_TAG, nGOps, (void*) 0, 0);
   } else {
      int i;
      for(i=1;i<numElements;i++)
-       ckTempoRecv(BARR_TAG, (void *) 0, 0);
+       ckTempoRecv(BARR_TAG, nGOps, (void *) 0, 0);
      for(i=1;i<numElements;i++)
-       ckTempoSendElem(BARR_TAG, 0, (void *) 0, 0, i);
+       ckTempoSendElem(BARR_TAG, nGOps, (void *) 0, 0, i);
   }
+  nGOps++;
 }
 
 void
@@ -168,10 +169,11 @@ TempoArray::ckTempoBcast(int sender, int tag, void *buffer, int buflen)
 {
   if(sender) {
     int i;
-    for(i=1;i<numElements;i++)
-      ckTempoSendElem(tag, BCAST_TAG, buffer, buflen, i);
-  } else
-    ckTempoRecv(tag, BCAST_TAG, buffer, buflen);
+    for(i=0;i<numElements;i++)
+      ckTempoSendElem(tag, BCAST_TAG+nGOps, buffer, buflen, i);
+  }
+  ckTempoRecv(tag, BCAST_TAG+nGOps, buffer, buflen);
+  nGOps++;
 }
 
 static void doOp(int op, int type, int count, void *inbuf, void *outbuf)
@@ -240,13 +242,14 @@ TempoArray::ckTempoReduce(int root, int op, void *inbuf, void *outbuf,
     void *tbuf = malloc(size);
     _MEMCHECK(tbuf);
     for(int i=0; i<numElements-1; i++) {
-      ckTempoRecv(REDUCE_TAG, tbuf, size);
+      ckTempoRecv(REDUCE_TAG, nGOps, tbuf, size);
       doOp(op, type, count, tbuf, outbuf);
     }
     free(tbuf);
   } else {
-    ckTempoSendElem(REDUCE_TAG, inbuf, size, root);
+    ckTempoSendElem(REDUCE_TAG, nGOps, inbuf, size, root);
   }
+  nGOps++;
 }
 
 void 

@@ -52,7 +52,7 @@ void
 main::qd(void)
 {
   // CkWaitQD();
-  CkPrintf("Created Elements\n");
+  // CkPrintf("Created Elements\n");
   CProxy_ampi jarray(arr);
   for(int i=0; i<nblocks; i++)
     jarray[i].run();
@@ -92,6 +92,7 @@ ampi::ampi(ArrayElementCreateMessage *msg) : TempoArray(msg)
     irequests[i].nextfree = (i+1)%100;
     irequests[i].prevfree = ((i-1)+100)%100;
   }
+  nbcasts = 0;
   // delete msg;
 }
 
@@ -168,7 +169,7 @@ ampi::run(void)
   CtvAccess(ampiPtr) = this;
   CtvAccess(numMigrateCalls) = 0;
 
-  //CkPrintf("[%d] main_ called\n", getIndex());
+  // CkPrintf("[%d] main_ called\n", getIndex());
   main_();
   myThis = (ampi*) ampiArray->getElement(myIdx);
   //CkPrintf("[%d] main_ finished\n", myThis->getIndex());
@@ -358,9 +359,12 @@ extern "C" int MPI_Bcast(void *buf, int count, int type, int root,
 {
   ampi *ptr = CtvAccess(ampiPtr);
   int size = typesize(type, count, ptr);
-  //CkPrintf("[%d] Broadcast called size=%d\n", ptr->getIndex(), size);
-  ptr->ckTempoBcast(((root)==ptr->getIndex())?1:0, MPI_BCAST_TAG, buf, size);
-  //CkPrintf("[%d] Broadcast finished\n", ptr->getIndex());
+  ptr->nbcasts++;
+  // CkPrintf("[%d] %dth Broadcast called size=%d\n", ptr->getIndex(), 
+           // ptr->nbcasts, size);
+  ptr->ckTempoBcast(((root)==ptr->getIndex())?1:0, 
+                    MPI_BCAST_TAG+ptr->nbcasts, buf, size);
+  // CkPrintf("[%d] %dth Broadcast finished\n", ptr->getIndex(), ptr->nbcasts);
   return 0;
 }
 
@@ -463,6 +467,8 @@ extern "C" int MPI_Waitall(int count, MPI_Request *request, MPI_Status *sts)
   ampi *ptr = CtvAccess(ampiPtr);
   int i;
   for(i=0;i<count;i++) {
+    if(request[i] == (-1))
+      continue;
     if(request[i] < 100) { // persistent request
       PersReq *req = &(ptr->requests[request[i]]);
       if(req->sndrcv == 2) { // recv request
@@ -473,6 +479,8 @@ extern "C" int MPI_Waitall(int count, MPI_Request *request, MPI_Status *sts)
     } else { // irecv request
       int index = request[i] - 100;
       PersReq *req = &(ptr->irequests[index]);
+      // CkPrintf("[%d] waiting for size=%d, tag=%d from %d\n", 
+              // ptr->getIndex(), req->size, req->tag, req->proc);
       ptr->ckTempoRecv(req->tag, req->proc, req->buf, req->size);
       // CkPrintf("[%d] received buf=%p, size=%d, tag=%d from %d\n", 
               // ptr->getIndex(), req->buf, req->size, req->tag, req->proc);
@@ -589,6 +597,7 @@ extern "C" int MPI_Isend(void *buf, int count, MPI_Datatype datatype, int dest,
     ampi *ptr = CtvAccess(ampiPtr);
     ptr->ckTempoSendElem(tag, ptr->getIndex(), buf, 
                          typesize(datatype, count, ptr), dest);
+    *request = (-1);
     return 0;
 }
 

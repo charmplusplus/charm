@@ -65,6 +65,7 @@ class ampi : public TempoArray {
     PersReq irequests[100];
     int nirequests;
     int firstfree;
+    int nbcasts; // to keep bcasts from mixing up
     void *packedBlock;
 
     ampi(ArrayElementCreateMessage *msg);

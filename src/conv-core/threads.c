@@ -814,7 +814,7 @@ CthThread CthUnpackThread(void *buffer)
 
 #else
 
-#define STACKSIZE (32768)
+#define STACKSIZE (327680)
 
 #if CMK_MEMORY_PROTECTABLE
 
