@@ -27,7 +27,7 @@ all: charm++ bluegene LIBS ampi f90charm tsm sm pvm doc
 
 charm++: converse libck.a charmxi sdagx
 
-bluegene: charm++ libconv-bluegene.a libbluegene.a
+bluegene: charm++ libconv-bluegene.a
 
 for-namd: charm++ pvm AMPIC
 
