@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.18  1995-09-20 15:41:38  gursoy
+ * Revision 2.19  1995-09-20 16:36:26  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.18  1995/09/20  15:41:38  gursoy
  * removed the if form handle incoming message
  *
  * Revision 2.17  1995/09/20  14:24:27  jyelon
@@ -118,6 +121,7 @@ static char ident[] = "@(#)$Header$";
 CHARE_BLOCK *GetBocBlockPtr();
 
 extern void CkLdbSend();
+void HANDLE_INCOMING_MSG();
 
 void mainModuleInit()
 {
@@ -240,13 +244,12 @@ void CheckMagicNumber(CHARE_BLOCK *chare, ENVELOPE *env)
 /* This is the message handler for non-init messages during the
    initialization phase. It simply buffers the messafe */
 void BUFFER_INCOMING_MSG(env)
-ENVELOPE *ENV;
+ENVELOPE *env;
 {
-
    if (CpvAccess(CkInitPhase))
       FIFO_EnQueue(CpvAccess(CkBuffQueue),(void *)env);
    else
-      CmiPrintf("Error: BUFFER_INCOMING_MSG received an unexpected message\n");
+      HANDLE_INCOMING_MSG(env);
 }
 
 

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.17  1995-09-20 15:09:42  sanjeev
+ * Revision 2.18  1995-09-20 16:36:56  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.17  1995/09/20  15:09:42  sanjeev
  * fixed CmiFree, put int CmiSpanTree stuff
  *
  * Revision 2.16  1995/09/20  15:04:45  jyelon
@@ -238,7 +241,7 @@ void CmiSpanTreeChildren CMK_PROTO((int node, int *children)) ;
 
 /******** PROTOTYPES FOR CTH FUNCTIONS AND MACROS ********/
 
-typedef struct CthThread *CthThread;
+typedef struct StructCthThread *CthThread;
 
 typedef void        (*CthVoidFn)();
 typedef CthThread   (*CthThFn)();

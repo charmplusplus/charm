@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.22  1995-09-20 15:41:56  gursoy
+ * Revision 2.23  1995-09-20 16:36:26  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.22  1995/09/20  15:41:56  gursoy
  * added  a new handler index
  *
  * Revision 2.21  1995/09/20  14:24:27  jyelon
@@ -251,9 +254,6 @@ static void EndInitPhase()
   void  *buffMsg;
   ENVELOPE *bocMsg;
 
-  /* initialization phase is done, set the flag to 0 */
-  CpvAccess(CkInitPhase) = 0;
-
   /* set the main handler to the unbuffering one */
   CsvAccess(HANDLE_INCOMING_MSG_Index) = CsvAccess(MAIN_HANDLE_INCOMING_MSG_Index);
   
@@ -287,19 +287,22 @@ static void EndInitPhase()
 
 static void PropagateInitBarrier()
 {
-  if (CpvAccess(CkCountArrived) && CpvAccess(CkInitCount)==0
-      && CpvAccess(NumChildrenDoneWithStartCharm)==
-      CmiNumSpanTreeChildren(CmiMyPe())) {
-    int parent = CmiSpanTreeParent(CmiMyPe());
-    void *msg = (void *)CkAllocMsg(0);
-    ENVELOPE *henv = ENVELOPE_UPTR(msg);
-    if (parent == -1) {
-      SetEnv_msgType(henv, InitBarrierPhase2);
-      CkCheck_and_BcastInitNL(henv);
-      EndInitPhase();
-    } else {
-      SetEnv_msgType(henv, InitBarrierPhase1);
-      CkCheck_and_Send_Init(parent, henv);
+  if (CpvAccess(CkCountArrived) && CpvAccess(CkInitCount)==0) {
+    /* initialization phase is done, set the flag to 0 */
+    CpvAccess(CkInitPhase) = 0;
+    if (CpvAccess(NumChildrenDoneWithStartCharm)==
+        CmiNumSpanTreeChildren(CmiMyPe())) {
+      int parent = CmiSpanTreeParent(CmiMyPe());
+      void *msg = (void *)CkAllocMsg(0);
+      ENVELOPE *henv = ENVELOPE_UPTR(msg);
+      if (parent == -1) {
+	SetEnv_msgType(henv, InitBarrierPhase2);
+	CkCheck_and_BcastInitNL(henv);
+	EndInitPhase();
+      } else {
+	SetEnv_msgType(henv, InitBarrierPhase1);
+	CkCheck_and_Send_Init(parent, henv);
+      }
     }
   }
 }

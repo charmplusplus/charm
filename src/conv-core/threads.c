@@ -13,7 +13,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.4  1995-09-20 15:39:54  jyelon
+ * Revision 1.5  1995-09-20 16:36:56  jyelon
+ * *** empty log message ***
+ *
+ * Revision 1.4  1995/09/20  15:39:54  jyelon
  * Still ironing out initial bugs.
  *
  * Revision 1.3  1995/09/20  15:07:44  jyelon
@@ -180,7 +183,7 @@
 #define STACKSIZE (32768)
 #define SLACK     256
 
-struct CthThread
+struct StructCthThread
 {
   jmp_buf    jb;
   CthVoidFn  fn;
@@ -206,7 +209,7 @@ static void CthInit()
   char *sp2 = alloca(8);
   if (sp2<sp1) thread_growsdown = 1;
   else         thread_growsdown = 0;
-  thread_current = (CthThread)malloc(sizeof(struct CthThread));
+  thread_current = (CthThread)malloc(sizeof(struct StructCthThread));
   thread_current->fn=0;
   thread_current->arg=0;
   thread_current->data_count=0;
@@ -257,7 +260,7 @@ CthThread CthCreate(fn, arg, size)
   CthThread  result; char *oldsp, *newsp; int offs, erralloc;
   if (size==0) size = STACKSIZE;
   if (thread_current == 0) CthInit();
-  result = (CthThread)malloc(sizeof(struct CthThread) + size);
+  result = (CthThread)malloc(sizeof(struct StructCthThread) + size);
   oldsp = alloca(0);
   if (thread_growsdown) {
       newsp = ((char *)(result->stack)) + size - SLACK;
