@@ -200,21 +200,26 @@ public:
 	}
 	void remove(const KEY &key) {CkHashtable::remove((const void *)&key);}
 
-#if !CMK_TEMPLATE_MEMBERS_BROKEN	
+#if !CMK_TEMPLATE_MEMBERS_BROKEN
 	//Declare the HASH & COMPARE functions inline for a 
 	// completely inlined (very fast) hashtable lookup.
-	template <CkHashFunction HASH,CkHashCompare COMPARE>
+	// Be sure the hash and compare functions return the same
+	//  values as the non-inlined versions.
+	typedef CkHashCode (*CkHashFunction_fast)(const KEY &keyData);
+	typedef int (*CkHashCompare_fast)(const KEY &key1,const KEY &key2);
+	
+	template <CkHashFunction_fast HASH,CkHashCompare_fast COMPARE>
 	OBJ get_fast(const KEY &key) {
-		int i=HASH((const void *)&key,sizeof(KEY))%len;
-		int start=i;
-		do {
+		int i=HASH(key)%len;
+		while(true) {//Assumes key or empty slot will be found
 			entry_t *cur=table+i*(sizeof(KEY)+sizeof(OBJ));
-			
-			if (-17==*(int *)cur) return OBJ(0);
-			if (COMPARE((const void *)&key,(const void *)cur,sizeof(KEY)))
+			//Is this the key?
+			if (COMPARE(key,*(const KEY *)cur))
 				return *(OBJ *)(cur+sizeof(KEY));
-		} while (inc(i)!=start);
-		return OBJ(0);
+			//An empty slot indicates the key is not here
+			if (-17==*(int *)cur) return OBJ(0);
+			inc(i);
+		};
 	}
 #endif
 };
