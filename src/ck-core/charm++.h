@@ -139,4 +139,6 @@ static inline void _CHECK_CID(CkChareID, int){}
 #include "tempo.h"
 #include "waitqd.h"
 
+extern "C" void Ck_Summary_MarkEvent(int);
+
 #endif
