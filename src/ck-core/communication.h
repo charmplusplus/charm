@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.16  1997-03-14 20:23:47  milind
+ * Revision 2.17  1997-12-03 21:40:00  milind
+ * Fixed a bug in PACK macro that may have caused some leaks. It was freeing usrmsg instead of env.
+ *
+ * Revision 2.16  1997/03/14 20:23:47  milind
  * Made MAXLOGBUFSIZE in projections a commandline parameter.
  * One can now specify it as "+logsize 10000" on the program
  * command line.
@@ -152,7 +155,7 @@
                         (usermsg, &packedmsg, &size); \
                 if (usermsg != packedmsg) { \
                         /* Free the usermsg here. */ \
-                        CkFreeMsg(usermsg); \
+                        CkFreeMsg(env); \
                         env = ENVELOPE_UPTR(packedmsg); \
                 }\
         }\
