@@ -56,8 +56,6 @@ FDECL {
 #define mpi_register FTN_NAME( MPI_REGISTER , mpi_register )
 #define mpi_get_count FTN_NAME( MPI_GET_COUNT , mpi_get_count )
 
-extern int MPI_COMM_UNIVERSE[MPI_MAX_COMM];
-
 void mpi_init_universe(int *unicomm)
 {
   AMPIAPI("mpi_init_universe");

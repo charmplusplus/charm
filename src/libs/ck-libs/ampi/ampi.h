@@ -49,7 +49,6 @@ This is needed so we can call the routine as a new thread.
 #define MPI_UNSIGNED_LONG  13
 #define MPI_LONG_DOUBLE  14
 
-#define MPI_COMM_WORLD (0)
 #define MPI_ANY_SOURCE (-1)
 #define MPI_ANY_TAG (-1)
 #define MPI_REQUEST_NULL (-1)
@@ -63,11 +62,21 @@ This is needed so we can call the routine as a new thread.
 
 /* This is one less than the system-tags defined in ampiimpl.h.
  * This is so that the tags used by the system dont clash with user-tags.
- * Is this too small ?
+ * MPI standard requires this to be at least 2^15.
  */
-#define MPI_TAG_UB     1024
+#define MPI_TAG_UB  1073741824
+
 
 typedef int MPI_Comm;
+
+#define MPI_COMM_FIRST_SPLIT (MPI_Comm)(1000000) /*Communicator from a "split"*/
+#define MPI_COMM_FIRST_GROUP (MPI_Comm)(2000000) /*Communicator from a process group*/
+
+#define MPI_COMM_WORLD (MPI_Comm)(8000000) /*Start of universe*/
+#define MPI_MAX_COMM_WORLDS 8
+extern MPI_Comm MPI_COMM_UNIVERSE[MPI_MAX_COMM_WORLDS];
+
+
 typedef int MPI_Op;
 typedef int MPI_Request;
 typedef struct {
@@ -76,6 +85,7 @@ typedef struct {
 
 typedef int MPI_Datatype;
 typedef int MPI_Aint;
+
 
 #include "pup_c.h"
 

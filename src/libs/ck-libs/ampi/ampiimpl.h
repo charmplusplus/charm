@@ -11,20 +11,71 @@
 #include "ampi.h"
 #include "charm++.h"
 
-#define MPI_MAX_COMM 8
+class CProxy_ampi;
+class CProxyElement_ampi;
 
-struct mpi_comm_struct
-{
-  CkArrayID aid;
-  void (*mainfunc)(int, char **);
-  char *name;
-  int nobj;
-};
-class mpi_comm_structs {
-	mpi_comm_struct s[MPI_MAX_COMM];
+//Describes an AMPI communicator
+class ampiCommStruct {
+	MPI_Comm comm; //Communicator
+	CkArrayID ampiID; //ID of corresponding ampi array
+	int size; //Number of processes in communicator
+	int isWorld; //1 if ranks are 0..size-1?
+	//indices[r] gives the array index for rank r
+	CkPupBasicVec<int> indices; 
 public:
-	mpi_comm_struct &operator[](int i) {return s[i];}
+	ampiCommStruct(int ignored=0) {size=-1;isWorld=-1;}
+	ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_,int size_) 
+		:comm(comm_), ampiID(id_),size(size_), isWorld(1) {}
+	ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_,
+		int size_,const CkPupBasicVec<int> &indices_) 
+		:comm(comm_), ampiID(id_),size(size_), 
+		 isWorld(0), indices(indices_) {}
+	
+	void setArrayID(const CkArrayID &nID) {ampiID=nID;}
+	
+	MPI_Comm getComm(void) const {return comm;}
+	
+	//Get the proxy for the entire array
+	CProxy_ampi getProxy(void) const;
+	
+	//Get the array index for rank r in this communicator
+	int getIndexForRank(int r) const {
+		if (isWorld) return r;
+		else return indices[r];
+	}
+	//Get the rank for this array index (Warning: linear time)
+	int getRankForIndex(int i) const {
+		if (isWorld) return i;
+		else {
+		  for (int r=0;r<indices.size();r++)
+		    if (indices[r]==i) return r;
+		  return -1; /*That index isn't in this communicator*/
+		}
+	}
+	
+	int getSize(void) const {return size;}
+	
+	void pup(PUP::er &p) {
+		p|comm;
+		p|ampiID;
+		p|size;
+		p|isWorld;
+		p|indices;
+	}
 };
+PUPmarshall(ampiCommStruct);
+
+struct mpi_comm_world
+{
+  ampiCommStruct comm;
+  const char *name;
+};
+class mpi_comm_worlds {
+	mpi_comm_world s[MPI_MAX_COMM_WORLDS];
+public:
+	mpi_comm_world &operator[](int i) {return s[i];}
+};
+
 
 #include "tcharm.h"
 #include "tcharmc.h"
@@ -35,10 +86,10 @@ public:
 
 extern int mpi_ncomms;
 
-#define MPI_BCAST_TAG  1025
-#define MPI_BARR_TAG   1026
-#define MPI_REDUCE_TAG 1027
-#define MPI_GATHER_TAG 1028
+#define MPI_BCAST_TAG  MPI_TAG_UB+10
+#define MPI_BARR_TAG   MPI_TAG_UB+11
+#define MPI_REDUCE_TAG MPI_TAG_UB+12
+#define MPI_GATHER_TAG MPI_TAG_UB+13
 
 #if 0
 // This is currently not used.
@@ -117,7 +168,11 @@ inline void pupFromBuf(const void *data,T &t) {
 
 class AmpiMsg : public CMessage_AmpiMsg {
  public:
-  int seq, tag, src, comm, length;
+  int seq; //Sequence number (for message ordering)
+  int tag; //MPI tag
+  int src; //Array index of source
+  MPI_Comm comm; //Communicator for source
+  int length; //Number of bytes in message (for pup)
   void *data;
 
   AmpiMsg(void) { data = (char *)this + sizeof(AmpiMsg); }
@@ -175,6 +230,7 @@ class AmpiSeqQ : private CkNoncopyable {
       if(q[i]->seq > seq)
         break;
     }
+    if (i>1000) CkAbort("Logic error in AmpiSeqQ::put");
     q.insert(i, elt);
   }
   void pup(PUP::er &p) {
@@ -192,15 +248,113 @@ class AmpiSeqQ : private CkNoncopyable {
 
 PUPmarshall(AmpiSeqQ);
 
-class ampi : public ArrayElement1D {
-	//char str[128];    
-    CProxy_TCharm threads;
+inline CProxy_ampi ampiCommStruct::getProxy(void) const {return ampiID;}
+const ampiCommStruct &universeComm2proxy(MPI_Comm universeNo);
+
+
+/* Manages persistent requests.  A hideous design-- rewrite it! */
+class ampiPersRequests {
+public:
+    ampiPersRequests();
+    void pup(PUP::er &p);
+    
+    PersReq requests[100];
+    int nrequests;
+    PersReq irequests[100];
+    int nirequests;
+    int firstfree;
+};
+PUPmarshall(ampiPersRequests);
+
+/*
+An ampiParent holds all the communicators and the TCharm thread
+for its children, which are bound to it.
+*/
+class ampiParent : public ArrayElement1D {
+    CProxy_TCharm threads;  
     TCharm *thread;
-    int ampiBlockedThread;
     void prepareCtv(void);
+    
+    MPI_Comm worldNo; //My MPI_COMM_WORLD
+    ampi *worldPtr; //AMPI element corresponding to MPI_COMM_WORLD
+    ampiCommStruct worldStruct;
+    
+    CkPupPtrVec<ampiCommStruct> splitComm; //Communicators from MPI_Comm_split
+    inline int isSplit(MPI_Comm comm) const {
+      return (comm>=MPI_COMM_FIRST_SPLIT && comm<MPI_COMM_FIRST_GROUP);
+    }
+    const ampiCommStruct &getSplit(MPI_Comm comm) {
+      int idx=comm-MPI_COMM_FIRST_SPLIT;
+      if (idx>=splitComm.size()) CkAbort("Bad split communicator used");
+      return *splitComm[idx];
+    }
+    void splitChildRegister(const ampiCommStruct &s);
+    
+public:
+    ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_);
+    ampiParent(CkMigrateMessage *msg);
+    void ckJustMigrated(void);
+    ~ampiParent();
+    
+    ampi *lookupComm(MPI_Comm comm) {
+       if (comm!=worldStruct.getComm()) 
+          CkAbort("ampiParent::lookupComm> Bad communicator!");
+       return worldPtr;
+    }
+    
+    //Children call this when they are first created, or just migrated
+    TCharm *registerAmpi(ampi *ptr,ampiCommStruct s,bool forMigration);
+    
+    //Grab the next available split communicator
+    MPI_Comm getNextSplit(void) const {return MPI_COMM_FIRST_SPLIT+splitComm.size();}
+    
+    void pup(PUP::er &p);
+    
+    inline const ampiCommStruct &comm2proxy(MPI_Comm comm) {
+      if (comm==MPI_COMM_WORLD) return worldStruct;
+      if (comm==worldNo) return worldStruct;
+      if (isSplit(comm)) return getSplit(comm);
+      return universeComm2proxy(comm);
+    }
+    inline ampi *comm2ampi(MPI_Comm comm) {
+      if (comm==MPI_COMM_WORLD) return worldPtr;
+      if (comm==worldNo) return worldPtr;
+      if (isSplit(comm)) {
+         const ampiCommStruct &st=getSplit(comm);
+	 return st.getProxy()[thisIndex].ckLocal();
+      }
+      if (comm>MPI_COMM_WORLD) return worldPtr; //Use MPI_WORLD ampi for cross-world messages:
+      CkAbort("Invalid communicator used!");
+    }
+    
+    CkDDT myDDTsto ;
+    CkDDT *myDDT;
+    ampiPersRequests pers;
+};
+
+
+
+/*
+An ampi manages the communication of one thread over
+one MPI communicator.
+*/
+class ampi : public ArrayElement1D {
+    CProxy_ampiParent parentProxy;
+    void findParent(bool forMigration);
+    ampiParent *parent;
+    TCharm *thread;
+    int waitingForGeneric;
+    
+    ampiCommStruct myComm; 
+    int myRank;
+    
+    int seqEntries; //Number of elements in below arrays
+    int *nextseq;
+    AmpiSeqQ *oorder;
     void inorder(AmpiMsg *msg);
+    
   public: // entry methods
-    ampi(int commidx_,CProxy_TCharm threads_);
+    ampi(CkArrayID parent_,const ampiCommStruct &s);
     ampi(CkMigrateMessage *msg);
     void ckJustMigrated(void);
     ~ampi();
@@ -208,33 +362,41 @@ class ampi : public ArrayElement1D {
     virtual void pup(PUP::er &p);
     void generic(AmpiMsg *);
     void reduceResult(CkReductionMsg *m);
+    void splitPhase1(CkReductionMsg *msg);
     
   public: // to be used by MPI_* functions
-    void send(int t, int s, void* buf, int count, int type, int idx, int comm);
+  
+    inline const ampiCommStruct &comm2proxy(MPI_Comm comm) {
+      return parent->comm2proxy(comm);
+    }
+    
+    AmpiMsg *makeAmpiMsg(int t,int s,const void *buf,int count,int type,MPI_Comm destcomm,
+      int seqNo);
+    
+    void send(int t, int s, const void* buf, int count, int type,  int rank, MPI_Comm destcomm);
     static void sendraw(int t, int s, void* buf, int len, CkArrayID aid, 
                         int idx);
     void recv(int t,int s,void* buf,int count,int type,int comm,int *sts=0);
     void probe(int t,int s,int comm,int *sts);
     int iprobe(int t,int s,int comm,int *sts);
-    void barrier(void);
-    void bcast(int root, void* buf, int count, int type);
+    void bcast(int root, void* buf, int count, int type,MPI_Comm comm);
     static void bcastraw(void* buf, int len, CkArrayID aid);
+    void split(int color,int key,MPI_Comm *dest);
 
-    inline int getIndex(void) const {return thisIndex;}
-    inline int getArraySize(void) const {return numElements;}
+    inline int getRank(void) const {return myRank;}
+    inline int getSize(void) const {return myComm.getSize();}
+    inline CProxy_ampi getProxy(void) const {return thisArrayID;}
+    
+    CkDDT *getDDT(void) {return parent->myDDT;}
   public:
-    //These are directly used by , which is hideous
-    int commidx;
+    //These are directly used by API routines, which is hideous
+    /*
+    FIXME: CmmTable is only indexed by the tag, sender, and communicator.
+    It should also be indexed by the source data type and length (if any).
+    */
     CmmTable msgs;
     int nbcasts;
-    PersReq requests[100];
-    int nrequests;
-    PersReq irequests[100];
-    int nirequests;
-    int firstfree;
-    CkDDT *myDDT ;
-    int *nextseq;
-    AmpiSeqQ *oorder;
+    
 };
 
 //Use this to mark the start of AMPI interface routines:

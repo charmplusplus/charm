@@ -2,12 +2,16 @@ module ampi {
   message AmpiMsg;
  
   initcall void ampiNodeInit(void);
-  readonly mpi_comm_structs mpi_comms;
-  readonly int mpi_ncomms;
+  readonly mpi_comm_worlds mpi_worlds;
+  readonly int mpi_nworlds;
 
+  array[1D] ampiParent {
+    entry ampiParent(int universeNo,CProxy_TCharm threads_);
+  };
   array[1D] ampi {
-    entry ampi(int commidx,CProxy_TCharm threads_);
+    entry ampi(CkArrayID parent_,ampiCommStruct s);
     entry void generic(AmpiMsg *);
     entry void reduceResult(CkReductionMsg *m);
+    entry void splitPhase1(CkReductionMsg *msg);
   };
-}
+};

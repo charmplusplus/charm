@@ -20,7 +20,7 @@
        integer, parameter :: MPI_REQUEST_NULL = -1
        integer, parameter :: MPI_TYPE_NULL = -1
 
-       integer, parameter :: MPI_TAG_UB = 1024
+       integer, parameter :: MPI_TAG_UB = 1073741824
        
        integer, parameter :: MPI_STATUS_SIZE=4
        integer, parameter :: MPI_TAG=1
