@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.11  1995-10-31 20:38:39  jyelon
+ * Revision 2.12  1995-11-01 23:14:39  knauff
+ * Changed CMK_SIZE_T to unsigned long
+ *
+ * Revision 2.11  1995/10/31  20:38:39  jyelon
  * Added CMK_USLEEP_WHEN_PROCESSOR_IDLE
  *
  * Revision 2.10  1995/10/31  19:52:44  jyelon
@@ -98,6 +101,6 @@
 /* #define CMK_USLEEP_WHEN_PROCESSOR_IDLE */
 #define CMK_BUSYWAIT_WHEN_PROCESSOR_IDLE
 
-#define CMK_SIZE_T unsigned int
+#define CMK_SIZE_T unsigned long
 
 #endif
