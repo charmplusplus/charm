@@ -1358,7 +1358,8 @@ char *arg_currdir_a;
 char *arg_currdir_r;
 char *arg_mylogin;
 char *arg_shell;
-char *arg_debugger ;
+char *arg_debugger;
+char *arg_xterm;
 
 #if CMK_CCS_AVAILABLE
 int   arg_server;
@@ -1393,6 +1394,7 @@ void arg_init(int argc, char **argv)
   pparam_defstr ("nodegroup"     ,  "main");
   pparam_defstr ("remote-shell"  ,  0);
   pparam_defstr ("debugger"      ,  0);
+  pparam_defstr ("xterm"         ,  0);
   
   pparam_doc("p",             "number of processes to create");
   pparam_doc("timeout",       "seconds to wait per host connection");
@@ -1412,7 +1414,8 @@ void arg_init(int argc, char **argv)
   pparam_doc("nodelist",      "file containing list of nodes");
   pparam_doc("nodegroup",     "which group of nodes to use");
   pparam_doc("remote-shell",  "which remote shell to use");
-  pparam_doc("debugger",       "which debugger to use");
+  pparam_doc("debugger",      "which debugger to use");
+  pparam_doc("xterm",         "which xterm to use");
 
   if (pparam_parsecmd('+', argv) < 0) {
     fprintf(stderr,"ERROR> syntax: %s\n",pparam_error);
@@ -1442,6 +1445,7 @@ void arg_init(int argc, char **argv)
   arg_nodegroup      = pparam_getstr("nodegroup");
   arg_shell          = pparam_getstr("remote-shell");
   arg_debugger       = pparam_getstr("debugger");
+  arg_xterm          = pparam_getstr("xterm");
 
   arg_verbose = arg_verbose || arg_debug || arg_debug_no_pause;
   
@@ -1459,6 +1463,9 @@ void arg_init(int argc, char **argv)
   /* default debugger is gdb */
   if(!arg_debugger)
     arg_debugger = "gdb" ;
+  /* default xterm is xterm */
+  if(!arg_xterm)
+    arg_xterm = "xterm" ;
 
   /* find the current directory, absolute version */
   getcwd(buf, 1023);
@@ -1525,6 +1532,7 @@ typedef struct nodetab_host {
   unsigned int ip;
   char    *shell;
   char    *debugger ;
+  char    *xterm ;
 } *nodetab_host;
 
 nodetab_host *nodetab_table;
@@ -1545,6 +1553,7 @@ int          default_cpus;
 int          default_rank;
 char        *default_shell;
 char        *default_debugger;
+char        *default_xterm;
 
 char        *host_login;
 char        *host_group;
@@ -1557,6 +1566,7 @@ int          host_cpus;
 int          host_rank;
 char        *host_shell;
 char        *host_debugger;
+char        *host_xterm;
 
 void nodetab_reset()
 {
@@ -1571,6 +1581,7 @@ void nodetab_reset()
   default_rank = 0;
   default_shell = arg_shell;
   default_debugger = arg_debugger;
+  default_xterm = arg_xterm;
 }
 
 void host_reset()
@@ -1586,6 +1597,7 @@ void host_reset()
   host_rank = default_rank;
   host_shell = default_shell;
   host_debugger = default_debugger;
+  host_xterm = default_xterm;
 }
 
 void nodetab_add(nodetab_host res)
@@ -1620,6 +1632,7 @@ void nodetab_makehost(char *host)
   res->ip = ip;
   res->shell = host_shell;
   res->debugger = host_debugger;
+  res->xterm = host_xterm;
   nodetab_add(res);
 }
 
@@ -1633,6 +1646,7 @@ void setup_host_args(char *args)
     else if (subeqs(b1,e1,"++passwd")) host_passwd = substr(b2,e2);
     else if (subeqs(b1,e1,"++shell")) host_shell = substr(b2,e2);
     else if (subeqs(b1,e1,"++debugger")) host_debugger = substr(b2,e2);
+    else if (subeqs(b1,e1,"++xterm")) host_xterm = substr(b2,e2);
     else if (subeqs(b1,e1,"++speed")) host_speed = atof(b2);
     else if (subeqs(b1,e1,"++cpus")) host_cpus = atol(b2);
     else if (subeqs(b1,e1,"++pathfix")) {
@@ -1654,6 +1668,7 @@ void setup_group_args(char *args)
     else if (subeqs(b1,e1,"++passwd")) default_passwd = substr(b2,e2);
     else if (subeqs(b1,e1,"++shell")) default_shell = substr(b2,e2);
     else if (subeqs(b1,e1,"++debugger")) default_debugger = substr(b2,e2);
+    else if (subeqs(b1,e1,"++xterm")) default_xterm = substr(b2,e2);
     else if (subeqs(b1,e1,"++speed")) default_speed = atof(b2);
     else if (subeqs(b1,e1,"++cpus")) default_cpus = atol(b2);
     else if (subeqs(b1,e1,"++pathfix")) {
@@ -1705,7 +1720,8 @@ void nodetab_init()
     if      (subeqs(b1,e1,"login")&&(*b3==0))    default_login = substr(b2,e2);
     else if (subeqs(b1,e1,"passwd")&&(*b3==0))   default_passwd = substr(b2,e2);
     else if (subeqs(b1,e1,"shell")&&(*b3==0))   default_shell = substr(b2,e2);
-    else if (subeqs(b1,e1,"debugger")&&(*b3==0))   default_debugger = substr(b2,e2);
+    else if (subeqs(b1,e1,"debugger")&&(*b3==0)) default_debugger = substr(b2,e2);
+    else if (subeqs(b1,e1,"xterm")&&(*b3==0)) default_xterm = substr(b2,e2);
     else if (subeqs(b1,e1,"speed")&&(*b3==0))    default_speed = atof(b2);
     else if (subeqs(b1,e1,"cpus")&&(*b3==0))     default_cpus = atol(b2);
     else if (subeqs(b1,e1,"pathfix")) 
@@ -1770,6 +1786,7 @@ pathfixlist  nodetab_pathfixes(i) int i;{ return nodetab_getinfo(i)->pathfixes; 
 char        *nodetab_ext(i) int i;      { return nodetab_getinfo(i)->ext; }
 char        *nodetab_shell(i) int i;      { return nodetab_getinfo(i)->shell; }
 char        *nodetab_debugger(i) int i;      { return nodetab_getinfo(i)->debugger; }
+char        *nodetab_xterm(i) int i;      { return nodetab_getinfo(i)->xterm; }
 unsigned int nodetab_ip(i) int i;       { return nodetab_getinfo(i)->ip; }
 unsigned int nodetab_cpus(i) int i;     { return nodetab_getinfo(i)->cpus; }
 unsigned int nodetab_rank(i) int i;     { return nodetab_getinfo(i)->rank; }
@@ -2673,17 +2690,19 @@ int rsh_pump(p, nodeno, rank0no, argv)
 
   if (arg_debug || arg_debug_no_pause || arg_in_xterm) {
     xstr_printf(ibuf,"foreach dir ($path)\n");
-    xstr_printf(ibuf,"  if (-e $dir/xterm) setenv F_XTERM $dir/xterm\n");
+    xstr_printf(ibuf,"  if (-e $dir/%s) setenv F_XTERM $dir/%s\n", 
+                     nodetab_xterm(nodeno), nodetab_xterm(nodeno));
     xstr_printf(ibuf,"  if (-e $dir/xrdb) setenv F_XRDB $dir/xrdb\n");
     xstr_printf(ibuf,"end\n");
     xstr_printf(ibuf,"if ($?F_XTERM == 0) then\n");
-    xstr_printf(ibuf,"   echo 'xterm not in path --- set your path in your cshrc.'\n");
+    xstr_printf(ibuf,"   echo '%s not in path --- set your path in your cshrc.'\n", nodetab_xterm(nodeno));
     xstr_printf(ibuf,"   kill -9 $$\n");
     xstr_printf(ibuf,"endif\n");
     xstr_printf(ibuf,"if ($?F_XRDB == 0) then\n");
     xstr_printf(ibuf,"   echo 'xrdb not in path - set your path in your cshrc.'\n");
     xstr_printf(ibuf,"   kill -9 $$\n");
     xstr_printf(ibuf,"endif\n");
+    if(arg_verbose) xstr_printf(ibuf,"echo 'using xterm ' $F_XTERM\n");
     prog_flush(p);
   }
 
@@ -2771,8 +2790,7 @@ int rsh_pump(p, nodeno, rank0no, argv)
            xstr_printf(ibuf,"END_OF_SCRIPT\n");
            if( arg_debug || arg_debug_no_pause){
              xstr_printf(ibuf,"$F_XTERM");
-             xstr_printf(ibuf," -T 'Node %d (%s)' ",nodeno,nodetab_name(nodeno));
-             xstr_printf(ibuf," -n 'Node %d (%s)' ",nodeno,nodetab_name(nodeno));
+             xstr_printf(ibuf," -title 'Node %d (%s)' ",nodeno,nodetab_name(nodeno));
              xstr_printf(ibuf," -e $F_GDB %s -x /tmp/gdb%08x",arg_nodeprog_r,randno);
              xstr_printf(ibuf," < /dev/null >& /dev/null &");
              xstr_printf(ibuf,"\n");
@@ -2794,8 +2812,7 @@ int rsh_pump(p, nodeno, rank0no, argv)
           xstr_printf(ibuf,"END_OF_SCRIPT\n");
           if( arg_debug || arg_debug_no_pause){
             xstr_printf(ibuf,"$F_XTERM");
-            xstr_printf(ibuf," -T 'Node %d (%s)' ",nodeno,nodetab_name(nodeno));
-            xstr_printf(ibuf," -n 'Node %d (%s)' ",nodeno,nodetab_name(nodeno));
+            xstr_printf(ibuf," -title 'Node %d (%s)' ",nodeno,nodetab_name(nodeno));
             xstr_printf(ibuf," -e $F_DBX %s ",arg_debug_no_pause?"-r":"");
 	    if(arg_debug) {
               xstr_printf(ibuf,"-c \'runargs ");
@@ -2815,6 +2832,10 @@ int rsh_pump(p, nodeno, rank0no, argv)
 	  exit(1);
 	}
   } else if (arg_in_xterm) {
+    if(arg_verbose) {
+      fprintf(stderr, "INFO> node %d: xterm is %s\n", 
+              nodeno, nodetab_xterm(nodeno));
+    }
     xstr_printf(ibuf,"cat > /tmp/inx%08x << END_OF_SCRIPT\n", randno);
     xstr_printf(ibuf,"#!/bin/sh\n");
     xstr_printf(ibuf,"rm -f /tmp/inx%08x\n",randno);
@@ -2826,8 +2847,7 @@ int rsh_pump(p, nodeno, rank0no, argv)
     xstr_printf(ibuf,"END_OF_SCRIPT\n");
     xstr_printf(ibuf,"chmod 700 /tmp/inx%08x\n", randno);
     xstr_printf(ibuf,"$F_XTERM");
-    xstr_printf(ibuf," -T 'Node %d (%s)' ",nodeno,nodetab_name(nodeno));
-    xstr_printf(ibuf," -n 'Node %d (%s)' ",nodeno,nodetab_name(nodeno));
+    xstr_printf(ibuf," -title 'Node %d (%s)' ",nodeno,nodetab_name(nodeno));
     xstr_printf(ibuf," -sl 5000");
     xstr_printf(ibuf," -e /tmp/inx%08x", randno);
     xstr_printf(ibuf," < /dev/null >& /dev/null &");
