@@ -10,7 +10,6 @@
 #include <assert.h>
 #include <errno.h>
 #include "converse.h"
-//#include <mpi.h>
 
 #include <elan/elan.h>
 
@@ -92,7 +91,6 @@ static void ConverseRunPE(int everReturn);
 static void CommunicationServer(int sleepTime);
 
 typedef struct msg_list {
-    /*MPI_Request req;*/
     ELAN_EVENT *e;
     char *msg;
     struct msg_list *next;
@@ -838,7 +836,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   
   if (!(elan_port = elan_tportInit(elan_base->state,
                            (ELAN_QUEUE *)elan_q,
-                           /*elan_main2elan(elan_base->state, q),*/
+                           elan_main2elan(elan_base->state, elan_q),
                            elan_base->tport_nslots, 
                            elan_base->tport_smallmsg,
                            elan_base->tport_bigmsg,

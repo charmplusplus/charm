@@ -1,0 +1,43 @@
+#!/bin/sh
+#
+# Conv-host for Lemieux:
+#  Translates +pN-style charmrun options into prun options
+
+args=""
+pes=1
+
+while [ $# -gt 0 ]
+do
+	case $1 in
+	+p)
+		pes=$2
+		shift
+		;;
+	+p*)
+		pes=`echo $1 | awk '{print substr($1,3)}'`
+		;;
+	*) 
+		args=$args"$1 "
+		;;
+	esac
+	shift
+done
+
+# Try to guess the number of nodes
+nodes=$pes
+for i in 4 2 3
+do
+  if [ `expr $pes / $i '*' $i` -eq $pes ]
+  then
+	nodes=`expr $pes / $i`
+	break
+  fi
+done
+
+extra="-N $nodes -n $pes "
+
+# Prepend path to executable
+args=`pwd`/"$args"
+
+echo "Running> prun $extra $args"
+prun $extra $args
