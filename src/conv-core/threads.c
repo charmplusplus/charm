@@ -223,9 +223,6 @@ CthThread t;
   CthThread tc;
   tc = CthCpvAccess(CthCurrent);
   if (t == tc) return;
-  /** addition for tracing */
-  trace_begin_execute(0);
-  /* end addition */
   CthFixData(t);
   CthCpvAccess(CthCurrent) = t;
   CthCpvAccess(CthData) = t->data;
@@ -270,9 +267,7 @@ void CthSuspend()
   if (CthCpvAccess(CthCurrent)->choosefn == 0) CthNoStrategy();
   next = CthCpvAccess(CthCurrent)->choosefn();
   /** addition for tracing */
-  if(next != CthCpvAccess(CthCurrent)) {
-    trace_end_execute(0, -1, 0);
-  }
+  trace_end_execute(0, -1, 0);
   /* end addition */
   CthResume(next);
 }

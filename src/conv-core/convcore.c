@@ -639,6 +639,9 @@ static void CthSchedResume(t)
 CthThread t;
 {
   CpvAccess(CthSchedThreadVar) = CthSelf();
+  /** addition for tracing */
+  trace_begin_execute(0);
+  /* end addition */
   CthResume(t);
 }
 
