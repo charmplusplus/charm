@@ -1275,6 +1275,7 @@ ampi::sendraw(int t, int sRank, void* buf, int len, CkArrayID aid, int idx)
 void
 ampi::delesend(int t, int sRank, const void* buf, int count, int type,  int rank, MPI_Comm destcomm, CProxy_ampi arrproxy)
 {
+  if(rank==MPI_PROC_NULL) return;
   const ampiCommStruct &dest=comm2CommStruct(destcomm);
   int destIdx = dest.getIndexForRank(rank);
   if(isInter()){
@@ -1299,6 +1300,12 @@ ampi::delesend(int t, int sRank, const void* buf, int count, int type,  int rank
 int
 ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
 {
+  if(s==MPI_PROC_NULL) {
+    ((MPI_Status *)sts)->MPI_SOURCE = MPI_PROC_NULL;
+    ((MPI_Status *)sts)->MPI_TAG = MPI_ANY_TAG;
+    ((MPI_Status *)sts)->MPI_LENGTH = 0;
+    return 0;
+  }
   _LOG_E_END_AMPI_PROCESSING(thisIndex)
 #if CMK_BLUEGENE_CHARM
   void *curLog;		// store current log in timeline
@@ -1361,7 +1368,6 @@ void
 ampi::probe(int t, int s, int comm, int *sts)
 {
   int tags[3];
-
 #if CMK_BLUEGENE_CHARM
   void *curLog;		// store current log in timeline
   _TRACE_BG_TLINE_END(&curLog);
@@ -2514,6 +2520,7 @@ CDECL
 int AMPI_Irecv(void *buf, int count, MPI_Datatype type, int src,
               int tag, MPI_Comm comm, MPI_Request *request)
 {
+  if(src==MPI_PROC_NULL) { request = NULL; return 0; }
   AMPIAPI("AMPI_Irecv");
   USER_CALL_DEBUG("AMPI_Irecv("<<type<<","<<src<<","<<tag<<","<<comm<<")");
   AmpiRequestList* reqs = getReqs();
