@@ -4,6 +4,7 @@ module EveryLB {
    extern module ComboCentLB;
    extern module RandCentLB;
    extern module RefineLB;
+   extern module RefineKLB;
    extern module RefineCommLB;
    extern module GreedyLB;
    extern module GreedyCommLB;
