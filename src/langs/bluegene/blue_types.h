@@ -1,7 +1,11 @@
 #ifndef _BLUE_TYPES_H_
 #define _BLUE_TYPES_H_
 
+#ifndef CMK_OPTIMIZE
 #define ASSERT(x)	if (!(x)) { CmiPrintf("Assert failure at %s:%d\n", __FILE__,__LINE__); CmiAbort("Abort!"); }
+#else
+#define ASSERT(x)
+#endif
 
 /*****************************************************************************
    used internally, define Queue for scheduler and fixed size msgqueue
