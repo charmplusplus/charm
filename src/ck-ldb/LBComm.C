@@ -108,12 +108,16 @@ int LBCommData::compute_key()
 		     srcObj.id.id[2],srcObj.id.id[3]);
     kptr += pcount;
   }
-  pcount += sprintf(kptr,"%d%d%d%d%d",destOM.id,
+  pcount += sprintf(kptr,"%d%d%d%d%dXXXXXXXX",destOM.id,
 		    destObj.id[0],destObj.id[1],
 		    destObj.id[2],destObj.id[3]);
-  int k;
+  pcount -= 8;  /* The 'X's insure that the next few bytes are fixed */
+
+  int k=0x1234567887654321L;
   for(int i=0; i < (pcount+3)/4; i++)
     k ^= kstring[i];
+
+  // CmiPrintf("New key %d, %s\n",k,kstring);
 
   return k;
 }
