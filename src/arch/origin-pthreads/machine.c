@@ -130,8 +130,7 @@ typedef struct {
 
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 {
-  int i,j;
-  char **uargv;
+  int i;
   USER_PARAMETERS *usrparam;
   pthread_t *aThread;
  
@@ -141,16 +140,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   Cmi_startFn = fn;
   Cmi_argc = argc;
 
-  for(i=0;i<Cmi_argc;i++) {
-    if (strcmp(argv[i], "+p") == 0) {
-      sscanf(argv[i+1], "%d", &Cmi_numpes);
-      break;
-    } else {
-      if (sscanf(argv[i], "+p%d", &Cmi_numpes) == 1) 
-	break;
-    }
-  }
-
+  CmiGetArgInt(argv,"+p",&Cmi_numpes);
   if (Cmi_numpes <= 0)
   {
     CmiError("Error: requested number of processors is invalid %d\n",
@@ -179,24 +169,14 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 
   aThread = (pthread_t *) CmiAlloc(sizeof(pthread_t) * Cmi_numpes);
   for(i=1; i<Cmi_numpes; i++) {
-    uargv = (char **) CmiAlloc(sizeof(char *) * (Cmi_argc+1));
-
-    for (j=0;j<Cmi_argc;j++)
-      uargv[j] = argv[j];
-    uargv[j] = 0;
-
     usrparam = (USER_PARAMETERS *) CmiAlloc(sizeof(USER_PARAMETERS));
-    usrparam->argv = uargv;
+    usrparam->argv = CmiCopyArgs(argv);
     usrparam->mype = i;
 
     pthread_create(&aThread[i],(pthread_attr_t *)0,threadInit,(void *)usrparam);
   }
-  uargv = (char **) CmiAlloc(sizeof(char *) * (Cmi_argc+1));
-  for (j=0;j<Cmi_argc;j++)
-    uargv[j] = argv[j];
-  uargv[j] = 0;
   usrparam = (USER_PARAMETERS *) CmiAlloc(sizeof(USER_PARAMETERS));
-  usrparam->argv = uargv;
+  usrparam->argv = CmiCopyArgs(argv);
   usrparam->mype = 0;
   threadInit(usrparam);
 }

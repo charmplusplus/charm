@@ -1151,15 +1151,13 @@ char* getMsgContentsDebug(int index);
 
 #endif
 
-#if CMK_WEB_MODE
-
-#include "conv-ccs.h"
-
-void CWebInit (void);
-void CWebPlateRegisterCell (void);
-void CWebPlateDataDeposit (int timestep, int cellx, int celly, 
-                           int rows, int columns, int **data);
-#endif
+/* Command-Line-Argument handling */
+int CmiGetArgString(char **argv,const char *arg,char **optDest);
+int CmiGetArgInt(char **argv,const char *arg,int *optDest);
+int CmiGetArgFlag(char **argv,const char *arg);
+void CmiDeleteArgs(char **argv,int k);
+int CmiGetArgc(char **argv);
+char **CmiCopyArgs(char **argv);
 
 #if CMK_CMIDELIVERS_USE_COMMON_CODE
 CpvExtern(void*, CmiLocalQueue);

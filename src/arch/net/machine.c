@@ -329,35 +329,6 @@ char *CopyMsg(char *msg, int len)
   return copy;
 }
 
-static char *DeleteArg(argv)
-char **argv;
-{
-  char *res = argv[0];
-  if (res==0) KillEveryone("Illegal Arglist");
-  while (*argv) { argv[0]=argv[1]; argv++; }
-  return res;
-}
-
-static int CountArgs(char **argv)
-{
-  int count=0;
-  while (argv[0]) { count++; argv++; }
-  return count;
-}
-
-static char** CopyArgs(char **argv) 
-{
-	int  i, count;
-	char **tmp;
-	
-	count = CountArgs(argv);
-	tmp   = (char **) malloc(sizeof(char *)*(count+1));
-	for (i=0; i <= count; i++)
-		tmp[i] = argv[i];
-
-	return tmp;
-}
-
 /*****************************************************************************
  *
  * Producer-Consumer Queues
@@ -830,18 +801,12 @@ static void extract_args(argv)
 char **argv;
 {
   setspeed_eth();
-  while (*argv) {
-    if (strcmp(*argv,"++atm")==0) {
-      setspeed_atm();
-      DeleteArg(argv);
-    } else if (strcmp(*argv,"++eth")==0) {
-      setspeed_eth();
-      DeleteArg(argv);
-    } else if (strcmp(*argv,"++stats")==0) {
-      Cmi_print_stats = 1;
-      DeleteArg(argv);
-    } else argv++;
-  }
+  if (CmiGetArgFlag(argv,"++atm"))
+    setspeed_atm();
+  if (CmiGetArgFlag(argv,"++eth"))
+    setspeed_eth();
+  if (CmiGetArgFlag(argv,"++stats"))
+    Cmi_print_stats = 1;
   Cmi_dgram_max_data = Cmi_max_dgram_size - DGRAM_HEADER_SIZE;
   Cmi_half_window = Cmi_window_size >> 1;
   if ((Cmi_window_size * Cmi_max_dgram_size) > Cmi_os_buffer_size)
@@ -2745,25 +2710,26 @@ extern void ConverseCommonInit(char **);
 static char     **Cmi_argv;
 static CmiStartFn Cmi_startfn;   /* The start function */
 static int        Cmi_usrsched;  /* Continue after start function finishes? */
-CpvDeclare(char**, CmiMyArgv); /*Thread-private copy of args.*/
 
 static void ConverseRunPE(int everReturn)
 {
   CmiState cs;
+  char** CmiMyArgv;
   CmiNodeBarrier();
   cs = CmiGetState();
   CpvInitialize(char *, internal_printf_buffer);
-  CpvInitialize(char **,CmiMyArgv);
+  
+  CpvInitialize(char **,);
   CpvAccess(internal_printf_buffer) = (char *) malloc(PRINTBUFSIZE);
   _MEMCHECK(CpvAccess(internal_printf_buffer));
-  CpvAccess(CmiMyArgv) = CopyArgs(Cmi_argv);
-  CthInit(CpvAccess(CmiMyArgv));
-  ConverseCommonInit(CpvAccess(CmiMyArgv));
+  CmiMyArgv=CmiCopyArgs(Cmi_argv);
+  CthInit(CmiMyArgv);
+  ConverseCommonInit(CmiMyArgv);
   CpvInitialize(void *,CmiLocalQueue);
   CpvAccess(CmiLocalQueue) = cs->localqueue;
 
   if (!everReturn) {
-    Cmi_startfn(CountArgs(CpvAccess(CmiMyArgv)), CpvAccess(CmiMyArgv));
+    Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
     if (Cmi_usrsched==0) CsdScheduler(-1);
     ConverseExit();
   }
@@ -2836,7 +2802,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
 
   skt_set_idle(obtain_idleFn);
   dataskt=skt_datagram(&dataport, Cmi_os_buffer_size);
-  Cmi_host_fd = skt_connect(Cmi_host_IP, Cmi_host_port, 60);
+  Cmi_host_fd = skt_connect(Cmi_host_IP, Cmi_host_port, 600);
   node_addresses_obtain();
   skt_set_idle(CmiYield);
   Cmi_check_delay = 2.0+0.5*Cmi_numnodes;

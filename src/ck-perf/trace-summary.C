@@ -26,8 +26,9 @@ extern "C" void setEvent(CthThread t, int event);
 extern "C" int getEvent(CthThread t);
 
 extern "C" 
-void traceInit(int* argc, char **argv)
+void traceInit(char **argv)
 {
+  char *tmpStr;
   CpvInitialize(Trace*, _trace);
   CpvInitialize(LogPool*, _logPool);
   CpvInitialize(int, traceOn);
@@ -43,63 +44,13 @@ void traceInit(int* argc, char **argv)
   CpvAccess(CtrLogBufSize) = LogBufSize;
   CpvAccess(binSize) = BIN_SIZE;
   CpvAccess(version) = VER;
-  int i;
-  for(i=1;i<*argc;i++) {
-    if(strcmp(argv[i], "+logsize")==0) {
-      CpvAccess(CtrLogBufSize) = atoi(argv[i+1]);
-      break;
-    } 
-  }
-  if(i!=*argc) { // +logsize parameter was found, delete it and its arg
-    while((i+2)<= *argc) {
-      argv[i] = argv[i+2];
-      i++;
-    }
-    *argc -= 2;
-  }
-  for(i=1;i<*argc;i++) {
-    if(strcmp(argv[i], "+binsize")==0) {
-      double d;
-      sscanf(argv[i+1], "%le", &d);
-      CpvAccess(binSize) = d;
-      break;
-    }
-  }
-  if(i!=*argc) { // +binsize parameter was found, delete it and its arg
-    while((i+2)<= *argc) {
-      argv[i] = argv[i+2];
-      i++;
-    }
-    *argc -= 2;
-  }
-  for(i=1;i<*argc;i++) {
-    if(strcmp(argv[i], "+version")==0) {
-      int d;
-      sscanf(argv[i+1], "%d", &d);
-      CpvAccess(version) = d;
-      break;
-    }
-  }
-  if(i!=*argc) { // +version parameter was found, delete it and its arg
-    while((i+2)<= *argc) {
-      argv[i] = argv[i+2];
-      i++;
-    }
-    *argc -= 2;
-  }
-  for(i=1;i<*argc;i++) {
-    if(strcmp(argv[i], "+traceoff")==0) {
-      CpvAccess(traceOn) = 0;
-      break;
-    }
-  }
-  if(i!=*argc) { // +traceoff parameter was found, delete it
-    while((i+1)<= *argc) {
-      argv[i] = argv[i+2];
-      i++;
-    }
-    *argc -= 2;
-  }
+  CmiGetArgInt(argv,"+logsize",&CpvAccess(CtrLogBufSize));
+  if (CmiGetArgString(argv,"+binsize",&tmpStr))
+  	sscanf(tmpStr,"%lf",&CpvAccess(binSize));
+  if (CmiGetArgString(argv,"+version",&tmpStr))
+  	sscanf(tmpStr,"%lf",&CpvAccess(version));
+  if (CmiGetArgFlag(argv,"+traceoff"))
+     CpvAccess(traceOn) = 0;
   CpvAccess(_logPool) = new LogPool(CpvAccess(pgmName));
 }
 

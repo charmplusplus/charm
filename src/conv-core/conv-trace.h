@@ -15,7 +15,7 @@
  * by the tracing strategies.
  */
 
-void traceInit(int* argc, char **argv);
+void traceInit(char **argv);
 void traceBeginIdle(void);
 void traceEndIdle(void);
 void traceResume(void);

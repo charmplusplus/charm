@@ -20,7 +20,7 @@ extern "C" void setEvent(CthThread t, int event);
 extern "C" int getEvent(CthThread t);
 
 extern "C" 
-void traceInit(int* argc, char **argv)
+void traceInit(char **argv)
 {
   CpvInitialize(Trace*, _trace);
   CpvInitialize(LogPool*, _logPool);
@@ -33,47 +33,10 @@ void traceInit(int* argc, char **argv)
   _MEMCHECK(CpvAccess(pgmName));
   strcpy(CpvAccess(pgmName), argv[0]);
   CpvAccess(CtrLogBufSize) = 10000;
-  int i;
-  for(i=1;i<*argc;i++) {
-    if(strcmp(argv[i], "+logsize")==0) {
-      CpvAccess(CtrLogBufSize) = atoi(argv[i+1]);
-      break;
-    }
-  }
-  if(i!=*argc) { // +logsize parameter was found, delete it and its arg
-    while((i+2)<= *argc) {
-      argv[i] = argv[i+2];
-      i++;
-    }
-    *argc -= 2;
-  }
-  for(i=1;i<*argc;i++) {
-    if(strcmp(argv[i], "+traceoff")==0) {
-      CpvAccess(traceOn) = 0;
-      break;
-    }
-  }
-  if(i!=*argc) { // +traceoff parameter was found, delete it
-    while((i+1)<= *argc) {
-      argv[i] = argv[i+1];
-      i++;
-    }
-    *argc -= 1;
-  }
-  int binary = 0;
-  for(i=1;i<*argc;i++) {
-    if(strcmp(argv[i], "+binary-trace")==0) {
-      binary = 1;
-      break;
-    }
-  }
-  if(i!=*argc) { // +traceoff parameter was found, delete it
-    while((i+1)<= *argc) {
-      argv[i] = argv[i+1];
-      i++;
-    }
-    *argc -= 1;
-  }
+  CmiGetArgInt(argv,"+logsize",&CpvAccess(CtrLogBufSize));
+  if (CmiGetArgFlag(argv,"+traceoff"))
+    CpvAccess(traceOn) = 0;
+  int binary = CmiGetArgFlag(argv,"+binary-trace");
   CpvAccess(_logPool) = new LogPool(CpvAccess(pgmName),binary);
 }
 

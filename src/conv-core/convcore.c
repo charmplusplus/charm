@@ -101,19 +101,120 @@ CpvDeclare(int,   CsdStopFlag);
 
 /*****************************************************************************
  *
- * Some of the modules use this in their argument parsing.
+ * Argument parsing routines.
  *
  *****************************************************************************/
 
-static char *DeleteArg(argv)
-  char **argv;
+/*Count the number of non-NULL arguments in list*/
+int CmiGetArgc(char **argv)
 {
-  char *res = argv[0];
-  if (res==0) { CmiError("Bad arglist."); exit(1); }
-  while (*argv) { argv[0]=argv[1]; argv++; }
-  return res;
+	int i=0,argc=0;
+	while (argv[i++]!=NULL)
+		argc++;
+	return argc;
 }
 
+/*Return a new, heap-allocated copy of the argv array*/
+char **CmiCopyArgs(char **argv)
+{
+	int argc=CmiGetArgc(argv);
+	char **ret=(char **)malloc(sizeof(char *)*(argc+1));
+	int i;
+	for (i=0;i<=argc;i++)
+		ret[i]=argv[i];
+	return ret;
+}
+
+/*Delete the first k argument from the given list, shifting
+all other arguments down by k spaces.
+e.g., argv=={"a","b","c","d",NULL}, k==3 modifies
+argv={"d",NULL,"c","d",NULL}
+*/
+void CmiDeleteArgs(char **argv,int k)
+{
+	int i=0;
+	while ((argv[i]=argv[i+k])!=NULL)
+		i++;
+}
+
+/*Find the given argment and string option in argv.
+If the argument is present, set the string option and
+delete both from argv.  If not present, return NULL.
+e.g., arg=="-name" returns "bob" from
+argv=={"a.out","foo","-name","bob","bar"},
+and sets argv={"a.out","foo","bar"};
+*/
+int CmiGetArgString(char **argv,const char *arg,char **optDest)
+{
+	int i;
+	for (i=0;argv[i+1]!=NULL;i++)
+		if (0==strcmp(argv[i],arg))
+		{/*We found the argument*/
+			*optDest=argv[i+1];
+			CmiDeleteArgs(&argv[i],2);
+			return 1;
+		}
+	return 0;/*Didn't find the argument*/
+}
+
+/*Find the given argument and numeric option in argv.
+If the argument is present, parse and set the numeric option,
+delete both from argv, and return 1. If not present, return 0.
+e.g., arg=="-pack" matches argv=={...,"-pack","27",...},
+argv=={...,"-pack0xf8",...}, and argv=={...,"-pack=0777",...};
+but not argv=={...,"-packsize",...}.
+*/
+int CmiGetArgInt(char **argv,const char *arg,int *optDest)
+{
+	int i;
+	int argLen=strlen(arg);
+	for (i=0;argv[i]!=NULL;i++)
+		if (0==strncmp(argv[i],arg,argLen))
+		{/*We *may* have found the argument*/
+			const char *opt=NULL;
+			int nDel=0;
+			switch(argv[i][argLen]) {
+			case 0: /* like "-p","27" */
+				opt=argv[i+1]; nDel=2; break;
+			case '=': /* like "-p=27" */
+				opt=&argv[i][argLen+1]; nDel=1; break;
+			case '-':case '+':
+			case '0':case '1':case '2':case '3':case '4':
+			case '5':case '6':case '7':case '8':case '9':
+				/* like "-p27" */
+				opt=&argv[i][argLen]; nDel=1; break;
+			default:
+				continue; /*False alarm-- skip it*/
+			}
+			if (opt==NULL) continue; /*False alarm*/
+			if (sscanf(opt,"%i",optDest)<1) {
+			/*Bad command line argument-- die*/
+				fprintf(stderr,"Cannot parse %s option '%s' "
+					"as an integer.\n",arg,opt);
+				CmiAbort("Bad command-line argument\n");
+			}
+			CmiDeleteArgs(&argv[i],nDel);
+			return 1;
+		}
+	return 0;/*Didn't find the argument-- dest is unchanged*/	
+}
+
+/*Find the given argument in argv.  If present, delete
+it and return 1; if not present, return 0.
+e.g., arg=="-foo" matches argv=={...,"-foo",...} but not
+argv={...,"-foobar",...}.
+*/
+int CmiGetArgFlag(char **argv,const char *arg)
+{
+	int i;
+	for (i=0;argv[i]!=NULL;i++)
+		if (0==strcmp(argv[i],arg))
+		{/*We found the argument*/
+			CmiDeleteArgs(&argv[i],1);
+			return 1;
+		}
+	return 0;/*Didn't find the argument*/
+}
 
 /*****************************************************************************
  *
@@ -130,9 +231,6 @@ CpvStaticDeclare(int, CstatPrintMemStatsFlag);
 void CstatsInit(argv)
 char **argv;
 {
-  int argc;
-  char **origArgv = argv;
-
 #if CMK_WEB_MODE
   void initUsage();
 #endif
@@ -162,23 +260,13 @@ char **argv;
   CpvAccess(CstatPrintQueueStatsFlag) = 0;
   CpvAccess(CstatPrintMemStatsFlag) = 0;
 
-  while (*argv) {
-    if (strcmp(*argv, "+mems") == 0) {
-      CpvAccess(CstatPrintMemStatsFlag)=1;
-      DeleteArg(argv);
-    } else
-    if (strcmp(*argv, "+qs") == 0) {
-      CpvAccess(CstatPrintQueueStatsFlag)=1;
-      DeleteArg(argv);
-    } else
-    argv++;
-  }
+  if (CmiGetArgFlag(argv,"+mems"))
+    CpvAccess(CstatPrintMemStatsFlag)=1;
+  if (CmiGetArgFlag(argv,"+qs"))
+    CpvAccess(CstatPrintQueueStatsFlag)=1;
 
-  argc = 0; argv=origArgv;
-  for(argc=0;argv[argc];argc++);
-  /*CmiPrintf("argc = %d, argv[0] = %s\n", argc, argv[0]);*/
 #ifndef CMK_OPTIMIZE
-  traceInit(&argc, argv);
+  traceInit(argv);
 #endif
 
 #if CMK_WEB_MODE
@@ -1614,14 +1702,6 @@ static void on_busy(void *tmp)
   CpvAccess(call_cancel) = 1;
 }
 
-/*Delete the given argument from the list*/
-static void del_arg(char **argv,int doomed)
-{
-  int i;
-  for (i=doomed;argv[i];i++)
-    argv[i]=argv[i+1];
-}
-
 void ConverseCommonInit(char **argv)
 {
   int i;
@@ -1650,28 +1730,17 @@ void ConverseCommonInit(char **argv)
   CWebInit();
 #endif
 #if NODE_0_IS_CONVHOST
-  for(i=0;argv[i]!=NULL;i++)
-    if(strcmp(argv[i], "++server") == 0)
-    {
-      ccs_serverFlag = 1; 
-      del_arg(argv,i--); break; 
-    }
-    else if (strcmp(argv[i],"++server-port")==0) {
-      ccs_serverFlag=1;
-      sscanf(argv[i+1],"%d",&ccs_serverPort);
-      del_arg(argv,i--);del_arg(argv,i--);break;
-    }
+  if (CmiGetArgFlag(argv,"++server"))
+    ccs_serverFlag=1;
+  if (CmiGetArgInt(argv,"++server-port",&ccs_serverPort))
+    ccs_serverFlag=1;
   if ((CmiMyPe()==0)&&ccs_serverFlag)
     CHostInit(ccs_serverPort);
 #endif
 
   CldModuleInit();
   CrnInit();
-  for(i=0;argv[i]!=NULL;i++)
-    if(strcmp(argv[i], "+idle-timeout") == 0) {
-      sscanf(argv[i+1], "%u", &idle_timeout);
-      del_arg(argv,i--);del_arg(argv,i--);break;
-    }
+  CmiGetArgInt(argv,"+idle-timeout",&idle_timeout);
   if(idle_timeout != 0) {
     CcdCallOnCondition(CcdPROCESSORIDLE, on_idle, 0);
     CcdCallOnCondition(CcdPROCESSORBUSY, on_busy, 0);

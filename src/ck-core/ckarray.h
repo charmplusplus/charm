@@ -223,7 +223,7 @@ public:
 	
 //Register the given reduction client:
 	void setReductionClient(CkReductionMgr::clientFn fn,void *param=NULL);
-	virtual void pup(PUP::er &p);
+	void pup(PUP::er &p);
 };
 
 /************************* Array Map  ************************

@@ -336,15 +336,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
  /* CmiSpanTreeInit();*/
   i=0;
   request_max=MAX_QLEN;
-  while (argv[i] != 0) {
-    if (strncmp(argv[i], "+requestmax",11) == 0) {
-      if (strlen(argv[i]) > 11)
-	sscanf(argv[i], "+p%d", &request_max);
-      else
-	sscanf(argv[i+1], "%d", &request_max);
-    } 
-    i++;
-  }
+  CmiGetArgInt(argv,"+requestmax",&request_max);
   /*printf("request max=%d\n", request_max);*/
   CmiTimerInit();
   CpvInitialize(void *, CmiLocalQueue);
@@ -353,7 +345,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   CthInit(argv);
   ConverseCommonInit(argv);
   if (initret==0) {
-    fn(argc, argv);
+    fn(CmiGetArgc(argv), argv);
     if (usched==0) CsdScheduler(-1);
     ConverseExit();
   }

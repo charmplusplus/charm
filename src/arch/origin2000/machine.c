@@ -87,69 +87,12 @@ typedef struct {
 
 USER_PARAMETERS usrparam;
 
-static int CountArgs(char **argv)
-{
-  int count=0;
-  while (argv[0]) { count++; argv++; }
-  return count;
-}
-
-static void RemoveArgv(char** argv, int i, int *argc)
-{
-  int j;
-
-  for(j=i+1; argv[j] != 0; j++)
-    argv[j-1] = argv[j];
-  argv[j-1] = 0;
-  (*argc)--;
-}
-
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 {
-  int i;
- 
   requested_npe = 1; 
+  CmiGetArgInt(argv,"+p",&requested_npe);
   arena_size_meg = 16;
-
-  /* Parse Converse-specific arguments, stripping them out before
-   * passing to the user code.
-   * I thought this was already done elsewhere, but its not working,
-   * so I will do it again.
-   */
-  i =  0;
-  while (argv[i] != 0) {
-    if (strncmp(argv[i], "+p",2) == 0) {
-      if (strlen(argv[i]) > 2) {
-	sscanf(argv[i], "+p%d", &requested_npe);
-	RemoveArgv(argv,i,&argc);
-      } else {
-	RemoveArgv(argv,i,&argc);
-	if (argv[i]) {  
-	  /* Since we removed argv[i], argv[i] is now the
-	   * next argument 
-	   */
-	  sscanf(argv[i], "%d", &requested_npe);
-	  RemoveArgv(argv,i,&argc);
-	}
-      }
-    } else if (strncmp(argv[i], "+memsize",8) == 0) {
-      if (strlen(argv[i]) > 8 ) {
-	sscanf(argv[i], "+memsize%d", &arena_size_meg);
-	RemoveArgv(argv,i,&argc);
-      } else {
-	RemoveArgv(argv,i,&argc);
-	if (argv[i] != 0) {
-	  /* Since we removed argv[i], argv[i] is now the
-	   * next argument 
-	   */
-	  sscanf(argv[i], "%d", &arena_size_meg);
-	  RemoveArgv(argv,i,&argc);
-	}
-      }
-    } else i++;  /* If we didn't remove the argument(s), we need to
-		  * increment
-		  */
-  }
+  CmiGetArgInt(argv,"+memsize",&arena_size_meg);
 
   if (requested_npe <= 0)
   {
@@ -174,7 +117,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   nthreads = requested_npe;
 
   usrparam.argc = argc;
-  usrparam.argv = argv;
+  usrparam.argv = CmiCopyArgs(argv);
   usrparam.npe = requested_npe;
   usrparam.fn = fn;
   usrparam.initret = initret;
@@ -222,7 +165,7 @@ static void threadInit(void *arg)
   usadd(arena);
   ConverseCommonInit(usrparam->argv);
   if (usrparam->initret==0 || usrparam->mype) {
-    usrparam->fn(CountArgs(usrparam->argv), usrparam->argv);
+    usrparam->fn(CmiGetArgc(usrparam->argv), usrparam->argv);
     if (usrparam->usched==0) {
       CsdScheduler(-1);
     }

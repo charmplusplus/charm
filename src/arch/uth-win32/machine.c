@@ -10,23 +10,6 @@
 #include "converse.h"
 #include "fifo.h"
 
-static char *DeleteArg(argv)
-  char **argv;
-{
-  char *res = argv[0];
-  if (res==0) { CmiError("Bad arglist."); exit(1); }
-  while (*argv) { argv[0]=argv[1]; argv++; }
-  return res;
-}
-
-int CountArgs(argv)
-  char **argv;
-{
-  int n = 0;
-  while (*argv) { n++; argv++; }
-  return n;
-}
-
 /***********************************************************************
  *
  * Abort function:

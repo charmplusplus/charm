@@ -261,17 +261,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int initret)
   /* figure out number of processors required */
   
   i = 0; requested_npe = 0;
-  while (argv[i] != NULL) {
-    if (strcmp(argv[i], "+p") == 0) {
-      requested_npe = atoi(argv[i+1]);
-      break;
-    } else if (strncmp(argv[i], "+p", 2)==0) {
-      requested_npe = atoi(argv[i]+2);
-      break;
-    }
-    i++;
-  }
-
+  CmiGetArgInt(argv,"+p",&requested_npe);
   if (requested_npe <= 0) {
     printf("Error: requested number of processors is invalid %d\n",
 	   requested_npe);
@@ -292,6 +282,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int initret)
     CpvAccess(CmiLocalQueue) = (void *) FIFO_Create();
     CthInit(argv);
     ConverseCommonInit(argv);
+    argc=CmiGetArgc(argv);
     memcpy(argvec, argv, argc*sizeof(char*));
     fn(argc, argvec);
     CpvAccess(CsdStopFlag) = 0;

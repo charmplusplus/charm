@@ -1108,19 +1108,7 @@ void CthInit(char **argv)
 
   CpvInitialize(int, _stksize);
   CpvAccess(_stksize) = 0;
-
-  for(i=0;argv[i];i++) {
-    if(strncmp("+stacksize",argv[i],10)==0) {
-      if (strlen(argv[i]) > 10) {
-        sscanf(argv[i], "+stacksize%d", &CpvAccess(_stksize));
-      } else {
-        if (argv[i+1]) {
-          sscanf(argv[i+1], "%d", &CpvAccess(_stksize));
-        }
-      }
-    }
-  }
-
+  CmiGetArgInt(argv,"+stacksize",&CpvAccess(_stksize));
   CpvAccess(_stksize) = CpvAccess(_stksize) ? CpvAccess(_stksize) : STACKSIZE;
   CpvAccess(_stksize) = (CpvAccess(_stksize)+(CMK_MEMORY_PAGESIZE*2)-1) & 
                        ~(CMK_MEMORY_PAGESIZE-1);
@@ -1737,17 +1725,7 @@ void CthInit(char **argv)
   CthThread t;
   int i;
 
-  for(i=0;argv[i];i++) {
-    if(strncmp("+stacksize",argv[i],10)==0) {
-      if (strlen(argv[i]) > 10) {
-        sscanf(argv[i], "+stacksize%d", &_stksize);
-      } else {
-        if (argv[i+1]) {
-          sscanf(argv[i+1], "%d", &_stksize);
-        }
-      }
-    }
-  }
+  CmiGetArgInt(argv,"+stacksize",&_stksize);
   CpvInitialize(int, _numSwitches);
   CpvAccess(_numSwitches) = 0;
 

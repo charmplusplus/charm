@@ -12,7 +12,7 @@ CpvDeclare(Trace*, _trace);
 CpvDeclare(int, traceOn);
 
 extern "C"
-void traceInit(int*, char**)
+void traceInit(char**)
 {
   CpvInitialize(Trace*, _trace);
   CpvAccess(_trace) = 0;

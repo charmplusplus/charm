@@ -119,14 +119,7 @@ void ConverseInit(int argc, char** argv, CmiStartFn fn, int usched, int initret)
     /* figure out number of processors required */
     i =  0;
     Cmi_numpes = 0; 
-    for(i=1;i<argc;i++) {
-      if(strcmp(argv[i], "+p") == 0) {
-        sscanf(argv[i + 1], "%d", &Cmi_numpes);
-        break;
-      } else if(sscanf(argv[i], "+p%d", &Cmi_numpes) == 1) 
-          break;
-    }
-
+    CmiGetArgInt(argv,"+p",&Cmi_numpes);
     if (Cmi_numpes <= 0)
       CmiAbort("Invalid number of processors\n");
 
@@ -166,16 +159,16 @@ void ConverseExit(void)
 static void threadInit(arg)
 void *arg;
 {
+    char **argv=CmiCopyArgs(Cmi_argv);
     CpvInitialize(void*, CmiLocalQueue);
 
-    CthInit(Cmi_argv);
-    ConverseCommonInit(Cmi_argv);
+    ConverseCommonInit(argv);
     neighbour_init(CmiMyPe());
     CpvAccess(CmiLocalQueue) = (void *) FIFO_Create();
     CmiSpanTreeInit();
     CmiTimerInit();
     if (Cmi_initret==0) {
-      Cmi_fn(Cmi_argc, Cmi_argv);
+      Cmi_fn(CmiGetArgc(argv), argv);
       if (Cmi_usched==0) CsdScheduler(-1);
       ConverseExit();
     }

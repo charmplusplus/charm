@@ -67,41 +67,24 @@ static int    _exitStarted = 0;
           CmiPrintf("stats unavailable in optimized version. ignoring...\n"); 
 #endif
 
-static inline int _parseCommandLineOpts(int argc, char **argv)
+static inline void _parseCommandLineOpts(char **argv)
 {
-  int found;
-  while(*argv) {
-    found = 0;
-    if(strcmp(*argv, "+cs")==0) {
+  if (CmiGetArgFlag(argv,"+cs"))
       _STATS_ON(_printCS);
-      found = 1;
-    } else if(strcmp(*argv, "+ss")==0) {
+  if (CmiGetArgFlag(argv,"+ss"))
       _STATS_ON(_printSS);
-      found = 1;
-    } else if(strcmp(*argv, "+fifo")==0) {
-      _defaultQueueing = CK_QUEUEING_FIFO; found = 1;
-    } else if(strcmp(*argv, "+lifo")==0) {
-      _defaultQueueing = CK_QUEUEING_LIFO; found = 1;
-    } else if(strcmp(*argv, "+ififo")==0) {
-      _defaultQueueing = CK_QUEUEING_IFIFO; found = 1;
-    } else if(strcmp(*argv, "+ilifo")==0) {
-      _defaultQueueing = CK_QUEUEING_ILIFO; found = 1;
-    } else if(strcmp(*argv, "+bfifo")==0) {
-      _defaultQueueing = CK_QUEUEING_BFIFO; found = 1;
-    } else if(strcmp(*argv, "+blifo")==0) {
-      _defaultQueueing = CK_QUEUEING_BLIFO; found = 1;
-    }
-    if(found) {
-      argc--;
-      char **next = argv;
-      while(*next) {
-        *next = *(next+1);
-        next++;
-      }
-    } else
-      argv++;
-  }
-  return argc;
+  if (CmiGetArgFlag(argv,"+fifo"))
+      _defaultQueueing = CK_QUEUEING_FIFO;
+  if (CmiGetArgFlag(argv,"+lifo"))
+      _defaultQueueing = CK_QUEUEING_LIFO; 
+  if (CmiGetArgFlag(argv,"+ififo"))
+      _defaultQueueing = CK_QUEUEING_IFIFO; 
+  if (CmiGetArgFlag(argv,"+ilifo"))
+      _defaultQueueing = CK_QUEUEING_ILIFO;
+  if (CmiGetArgFlag(argv,"+bfifo"))
+      _defaultQueueing = CK_QUEUEING_BFIFO; 
+  if (CmiGetArgFlag(argv,"+blifo"))
+      _defaultQueueing = CK_QUEUEING_BLIFO;
 }
 
 static void _bufferHandler(void *msg)
@@ -548,7 +531,7 @@ void _initCharm(int argc, char **argv)
 	_futuresModuleInit(); // part of futures implementation is a converse module
 	if(CmiMyRank()==0) 
 	{
-		argc = _parseCommandLineOpts(argc, argv);
+		_parseCommandLineOpts(argv);
 		_registerInit();
 		CkRegisterMsg("System", 0, 0, 0, sizeof(int));
 		CkRegisterChare("null", 0);
@@ -581,7 +564,7 @@ void _initCharm(int argc, char **argv)
 			CpvAccess(_currentChare) = obj;
 			CpvAccess(_currentChareType) = _mainTable[i]->chareIdx;
 			register CkArgMsg *msg = (CkArgMsg *)CkAllocMsg(0, sizeof(CkArgMsg), 0);
-			msg->argc = argc;
+			msg->argc = CmiGetArgc(argv);
 			msg->argv = argv;
 			_entryTable[_mainTable[i]->entryIdx]->call(msg, obj);
 		}

@@ -10,23 +10,6 @@
 #include "converse.h"
 #include "fifo.h"
 
-static char *DeleteArg(argv)
-  char **argv;
-{
-  char *res = argv[0];
-  if (res==0) { CmiError("Bad arglist."); exit(1); }
-  while (*argv) { argv[0]=argv[1]; argv++; }
-  return res;
-}
-
-int CountArgs(argv)
-  char **argv;
-{
-  int n = 0;
-  while (*argv) { n++; argv++; }
-  return n;
-}
-
 /***********************************************************************
  *
  * Abort function:
@@ -255,40 +238,18 @@ char * msg;
 static void CmiParseArgs(argv)
 char **argv;
 {
-  char **argp;
-  
-  for (argp=argv; *argp; ) {
-    if ((strcmp(*argp,"++stacksize")==0)&&(argp[1])) {
-      DeleteArg(argp);
-      Cmi_stacksize = atoi(*argp);
-      DeleteArg(argp);
-    } else if ((strcmp(*argp,"+p")==0)&&(argp[1])) {
-      Cmi_numpes = atoi(argp[1]);
-      argp+=2;
-    } else if (sscanf(*argp, "+p%d", &CmiNumPes()) == 1) {
-      argp+=1;
-    } else argp++;
-  }
-  
+  CmiGetArgInt(argv,"++stacksize",&Cmi_stacksize);
+  CmiGetArgInt(argv,"+p",&Cmi_numpes);
   if (CmiNumPes()<1) {
     printf("Error: must specify number of processors to simulate with +pXXX\n",CmiNumPes());
     exit(1);
   }
 }
 
-static char **CopyArgvec(char **src)
-{
-  int argc; char **argv;
-  for (argc=0; src[argc]; argc++);
-  argv = (char **)malloc((argc+1)*sizeof(char *));
-  memcpy(argv, src, (argc+1)*sizeof(char *));
-  return argv;
-}
-
 char **CmiInitPE()
 {
   int argc; char **argv;
-  argv = CopyArgvec(CmiArgv);
+  argv = CmiCopyArgs(CmiArgv);
   CpvAccess(CmiLocalQueue) = CmiQueues[CmiMyPe()];
   CmiTimerInit();
   ConverseCommonInit(argv);
@@ -298,10 +259,8 @@ char **CmiInitPE()
 void CmiCallMain()
 {
   char **argv;
-  int argc;
   argv = CmiInitPE();
-  for (argc=0; argv[argc]; argc++);
-  CmiStart(argc, argv);
+  CmiStart(CmiGetArgc(argv), argv);
   if (CmiUsched==0) CsdScheduler(-1);
   ConverseExit();
 }
@@ -327,7 +286,7 @@ int usched, initret;
 #endif
 #endif
   
-  CmiArgv = CopyArgvec(argv);
+  CmiArgv = CmiCopyArgs(argv);
   CmiStart = fn;
   CmiUsched = usched;
   CmiParseArgs(argv);
@@ -347,7 +306,7 @@ int usched, initret;
   Cmi_mype = 0;
   argv = CmiInitPE();
   if (initret==0) {
-    fn(CountArgs(argv), argv);
+    fn(CmiGetArgc(argv), argv);
     if (usched==0) CsdScheduler(-1);
     ConverseExit();
   }
