@@ -206,7 +206,7 @@ void EachToManyMulticastStrategy::insertMessage(CharmMessageHolder *cmsg){
             }
             
             AAMLearner *alearner = new AAMLearner();
-            //setLearner(alearner);
+            setLearner(alearner);
             mflag = CmiTrue;
         }
 
@@ -327,7 +327,7 @@ void EachToManyMulticastStrategy::beginProcessing(int numElements){
     sinfo = ComlibSectionInfo(dest, myInstanceID);
     
     AAPLearner *alearner = new AAPLearner();
-    //setLearner(alearner);
+    setLearner(alearner);
 
     if(expectedDeposits > 0)
         return;

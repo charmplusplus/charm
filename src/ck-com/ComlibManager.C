@@ -288,6 +288,10 @@ void ComlibManager::receiveTable(StrategyWrapper &sw,
     ComlibPrintf("[%d] In receiveTable %d, ite=%d\n", CkMyPe(), sw.nstrats, 
                  clibIteration);
 
+    //Reset cached array element index. Location table may have changed
+    CkpvAccess(cache_index).nInts = -1;
+    CkpvAccess(cache_aid).setZero();
+
     clibIteration ++;
     receivedTable = 1;
 
@@ -450,11 +454,16 @@ extern int _charmHandlerIdx;
 void ComlibManager::ArraySend(CkDelegateData *pd,int ep, void *msg, 
                               const CkArrayIndexMax &idx, CkArrayID a){
     
+    if(pd != NULL) {
+        ComlibInstanceHandle *ci = (ComlibInstanceHandle *)pd;
+        setInstance(ci->_instid);
+    }
+    
     ComlibPrintf("[%d] In Array Send\n", CkMyPe());
-
+    
     CkArrayIndexMax myidx = idx;
     int dest_proc = getLastKnown(a, myidx); 
-    //CkArrayID::CkLocalBranch(a)->lastKnown(myidx);
+    int amgr_destpe = CkArrayID::CkLocalBranch(a)->lastKnown(myidx);
     
     //ComlibPrintf("Send Data %d %d %d %d\n", CkMyPe(), dest_proc, 
     //	 UsrToEnv(msg)->getTotalsize(), receivedTable);
@@ -481,14 +490,14 @@ void ComlibManager::ArraySend(CkDelegateData *pd,int ep, void *msg,
         remoteQ.enq(cmsg);
         return;
     }
-
+    
     //Any bug here? FOO BAR??
-    if(dest_proc == CkMyPe()){
+    if(amgr_destpe == CkMyPe()){
         CProxyElement_ArrayBase ap(a,idx);
         ap.ckSend((CkArrayMessage *)msg, ep);
         return;
     }
-
+    
     //totalMsgCount ++;
     //totalBytes += UsrToEnv(msg)->getTotalsize();
 
@@ -514,6 +523,12 @@ void ComlibManager::ArraySend(CkDelegateData *pd,int ep, void *msg,
 
 void ComlibManager::GroupSend(CkDelegateData *pd,int ep, void *msg, int onPE, CkGroupID gid){
     
+
+    if(pd != NULL) {
+        ComlibInstanceHandle *ci = (ComlibInstanceHandle *)pd;
+        setInstance(ci->_instid);
+    }
+
     int dest_proc = onPE;
     /*
     if(curStratID != prevStratID && prioEndIterationFlag) {        
@@ -565,6 +580,11 @@ void ComlibManager::GroupSend(CkDelegateData *pd,int ep, void *msg, int onPE, Ck
 void ComlibManager::ArrayBroadcast(CkDelegateData *pd,int ep,void *m,CkArrayID a){
     ComlibPrintf("[%d] Array Broadcast \n", CkMyPe());
 
+    if(pd != NULL) {
+        ComlibInstanceHandle *ci = (ComlibInstanceHandle *)pd;
+        setInstance(ci->_instid);
+    }
+    
     //Broken, add the processor list here.
 
     register envelope * env = UsrToEnv(m);
@@ -605,6 +625,11 @@ void ComlibManager::ArraySectionSend(CkDelegateData *pd,int ep, void *m,
     traceUserEvent(section_send_event);
 #endif
 
+    if(pd != NULL) {
+        ComlibInstanceHandle *ci = (ComlibInstanceHandle *)pd;
+        setInstance(ci->_instid);
+    }
+    
     ComlibPrintf("[%d] Array Section Send \n", CkMyPe());
 
     register envelope * env = UsrToEnv(m);
@@ -643,8 +668,14 @@ void ComlibManager::ArraySectionSend(CkDelegateData *pd,int ep, void *m,
 }
 
 void ComlibManager::GroupBroadcast(CkDelegateData *pd,int ep,void *m,CkGroupID g) {
+    
+    if(pd != NULL) {
+        ComlibInstanceHandle *ci = (ComlibInstanceHandle *)pd;
+        setInstance(ci->_instid);
+    }
+    
     register envelope * env = UsrToEnv(m);
-
+    
     CpvAccess(_qd)->create(1);
 
     env->setMsgtype(ForBocMsg);
@@ -921,6 +952,9 @@ CkDelegateData* ComlibManager::ckCopyDelegateData(CkDelegateData *data) {
 CkDelegateData * ComlibManager::DelegatePointerPup(PUP::er &p,
                                                    CkDelegateData *pd) {
 
+    if(pd == NULL)
+        return NULL;
+
     CmiBool to_pup = CmiFalse;
 
     ComlibInstanceHandle *inst; 
@@ -943,7 +977,7 @@ CkDelegateData * ComlibManager::DelegatePointerPup(PUP::er &p,
 
 void ComlibDelegateProxy(CProxy *proxy){
     CProxy_ComlibManager cgproxy(CkpvAccess(cmgrID));
-    proxy->ckDelegate(cgproxy.ckLocalBranch());
+    proxy->ckDelegate(cgproxy.ckLocalBranch(), NULL);
 }
 
 void ComlibAssociateProxy(CharmStrategy *strat, CProxy &proxy) {
