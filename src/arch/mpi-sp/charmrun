@@ -28,6 +28,14 @@ do
 	shift
 done
 
+# cu.ncsa
+if  hostname | grep  Cu >/dev/null 2>/dev/null 
+then 
+
+extra="-procs $pes"
+
+else
+
 # Try to guess the number of nodes and tasks per node to use
 nodes=$pes
 tp=1
@@ -42,6 +50,8 @@ do
 done
 
 extra="-nodes $nodes -tasks_per_node $tp -rmpool 1"
+
+fi
 
 # Prepend path to executable
 args=`pwd`/"$args"
