@@ -254,7 +254,7 @@ static void CmiPushPE(int pe,void *msg)
   CmiState cs = CmiGetStateN(pe);
   MACHSTATE2(3,"Pushing message into rank %d's queue %p{",pe, cs->recv);
 #if CMK_IMMEDIATE_MSG
-  if (CmiGetHandler(msg) == CpvAccessOther(CmiImmediateMsgHandlerIdx,pe)) {
+  if (CmiIsImmediate(msg)) {
 /*
 CmiPrintf("[node %d] Immediate Message hdl: %d rank: %d {{. \n", CmiMyNode(), CmiGetHandler(msg), pe);
     CmiHandleMessage(msg);
@@ -283,7 +283,7 @@ static void CmiPushNode(void *msg)
 {
   MACHSTATE(3,"Pushing message into NodeRecv queue");
 #if CMK_IMMEDIATE_MSG
-  if (CmiGetHandler(msg) == CpvAccessOther(CmiImmediateMsgHandlerIdx,0)) {
+  if (CmiIsImmediate(msg)) {
     CMI_DEST_RANK(msg) = 0;
     CmiPushImmediateMsg(msg);
     return;
@@ -643,6 +643,19 @@ void CmiProbeImmediateMsg()
 
 /********************* MESSAGE SEND FUNCTIONS ******************/
 
+static void CmiSendSelf(char *msg)
+{
+#if CMK_IMMEDIATE_MSG
+    if (CmiIsImmediate(msg)) {
+      /* CmiBecomeNonImmediate(msg); */
+      CmiHandleImmediateMessage(msg);
+      return;
+    }
+#endif
+    CQdCreate(CpvAccess(cQdState), 1);
+    CdsFifo_Enqueue(CpvAccess(CmiLocalQueue),msg);
+}
+
 void CmiSyncSendFn(int destPE, int size, char *msg)
 {
   CmiState cs = CmiGetState();
@@ -652,8 +665,7 @@ void CmiSyncSendFn(int destPE, int size, char *msg)
   CMI_SET_BROADCAST_ROOT(dupmsg, 0);
 
   if (cs->pe==destPE) {
-    CQdCreate(CpvAccess(cQdState), 1);
-    CdsFifo_Enqueue(CpvAccess(CmiLocalQueue),dupmsg);
+    CmiSendSelf(dupmsg);
   }
   else
     CmiAsyncSendFn(destPE, size, dupmsg);
@@ -736,13 +748,13 @@ CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg)
   SMSG_LIST *msg_tmp;
   CmiUInt2  rank, node;
      
-  CQdCreate(CpvAccess(cQdState), 1);
   if(destPE == cs->pe) {
     char *dupmsg = (char *) CmiAlloc(size);
     memcpy(dupmsg, msg, size);
-    CdsFifo_Enqueue(CpvAccess(CmiLocalQueue),dupmsg);
+    CmiSendSelf(dupmsg);
     return 0;
   }
+  CQdCreate(CpvAccess(cQdState), 1);
 #if CMK_SMP
   node = CmiNodeOf(destPE);
   rank = CmiRankOf(destPE);
@@ -782,8 +794,7 @@ void CmiFreeSendFn(int destPE, int size, char *msg)
   CMI_SET_BROADCAST_ROOT(msg, 0);
 
   if (cs->pe==destPE) {
-    CQdCreate(CpvAccess(cQdState), 1);
-    CdsFifo_Enqueue(CpvAccess(CmiLocalQueue),msg);
+    CmiSendSelf(msg);
   } else {
     CmiAsyncSendFn(destPE, size, msg);
   }
@@ -797,10 +808,8 @@ void CmiSyncSendFn1(int destPE, int size, char *msg)
   CmiState cs = CmiGetState();
   char *dupmsg = (char *) CmiAlloc(size);
   memcpy(dupmsg, msg, size);
-  if (cs->pe==destPE) {
-    CQdCreate(CpvAccess(cQdState), 1);
-    CdsFifo_Enqueue(CpvAccess(CmiLocalQueue),dupmsg);
-  }
+  if (cs->pe==destPE)
+    CmiSendSelf(dupmsg);
   else
     CmiAsyncSendFn(destPE, size, dupmsg);
 }
@@ -965,6 +974,20 @@ void CmiFreeBroadcastAllFn(int size, char *msg)  /* All including me */
 
 #if CMK_NODE_QUEUE_AVAILABLE
 
+static void CmiSendNodeSelf(char *msg)
+{
+#if CMK_IMMEDIATE_MSG
+    if (CmiIsImmediate(msg)) {
+      CmiHandleImmediateMessage(msg);
+      return;
+    }
+#endif
+    CQdCreate(CpvAccess(cQdState), 1);
+    CmiLock(CsvAccess(NodeState).CmiNodeRecvLock);
+    PCQueuePush(CsvAccess(NodeState).NodeRecv, msg);
+    CmiUnlock(CsvAccess(NodeState).CmiNodeRecvLock);
+}
+
 CmiCommHandle CmiAsyncNodeSendFn(int dstNode, int size, char *msg)
 {
   int i;
@@ -974,10 +997,7 @@ CmiCommHandle CmiAsyncNodeSendFn(int dstNode, int size, char *msg)
   CMI_DEST_RANK(msg) = DGRAM_NODEMESSAGE;
   switch (dstNode) {
   case NODE_BROADCAST_ALL:
-    CQdCreate(CpvAccess(cQdState), 1);
-    CmiLock(CsvAccess(NodeState).CmiNodeRecvLock);
-    PCQueuePush(CsvAccess(NodeState).NodeRecv,(char *)CopyMsg(msg,size));
-    CmiUnlock(CsvAccess(NodeState).CmiNodeRecvLock);
+    CmiSendNodeSelf((char *)CopyMsg(msg,size));
   case NODE_BROADCAST_OTHERS:
     CQdCreate(CpvAccess(cQdState), _Cmi_numnodes-1);
     for (i=0; i<_Cmi_numnodes; i++)
@@ -986,15 +1006,12 @@ CmiCommHandle CmiAsyncNodeSendFn(int dstNode, int size, char *msg)
       }
     break;
   default:
-    CQdCreate(CpvAccess(cQdState), 1);
     dupmsg = (char *)CopyMsg(msg,size);
     if(dstNode == _Cmi_mynode) {
-      CmiLock(CsvAccess(NodeState).CmiNodeRecvLock);
-      PCQueuePush(CsvAccess(NodeState).NodeRecv, dupmsg);
-      CmiUnlock(CsvAccess(NodeState).CmiNodeRecvLock);
-      return 0;
+      CmiSendNodeSelf(dupmsg);
     }
     else {
+      CQdCreate(CpvAccess(cQdState), 1);
       EnqueueMsg(dupmsg, size, dstNode);
     }
   }
@@ -1167,6 +1184,10 @@ static void ConverseRunPE(int everReturn)
     debugLog=fopen(ln,"w");
   }
 #endif
+
+  /* Converse initialization finishes, immediate messages can be processed.
+     node barrier previously should take care of the node synchronization */
+  _immediateReady = 1;
 
   /* communication thread */
   if (CmiMyRank() == CmiMyNodeSize()) {
