@@ -101,17 +101,17 @@ void NborBaseLB::AtSync()
 {
   //  CkPrintf("[%d] NborBaseLB At Sync step %d!!!!\n",CkMyPe(),mystep);
 
-  if (CkMyPe() == 0) {
-    start_lb_time = CmiWallTimer();
-    CkPrintf("Load balancing step %d starting at %f\n",
-	     step(),start_lb_time);
-  }
-
   if (neighbor_pes == 0) FindNeighbors();
 
   if (!QueryBalanceNow(step()) || num_neighbors() == 0) {
     MigrationDone();
     return;
+  }
+
+  if (CkMyPe() == 0) {
+    start_lb_time = CmiWallTimer();
+    CkPrintf("Load balancing step %d starting at %f\n",
+	     step(),start_lb_time);
   }
 
   NLBStatsMsg* msg = AssembleStats();
@@ -318,7 +318,7 @@ void NborBaseLB::ReceiveMigration(NLBMigrateMsg *msg)
 
 void NborBaseLB::MigrationDone()
 {
-  if (CkMyPe() == 0) {
+  if (CkMyPe() == 0 && migrates_completed) {
     double end_lb_time = CmiWallTimer();
     CkPrintf("Load balancing step %d finished at %f duration %f\n",
 	     step(),end_lb_time,end_lb_time - start_lb_time);
