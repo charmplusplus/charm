@@ -59,8 +59,9 @@ void GreedyRefLB::InsertObject(HeapData *objData, int index)
   objData[i+1] = key;
 }
 
-GreedyRefLB::HeapData* GreedyRefLB::BuildObjectArray(CentralLB::LDStats* stats, 
-                                       int count, int *objCount)
+GreedyRefLB::HeapData* 
+GreedyRefLB::BuildObjectArray(CentralLB::LDStats* stats, 
+															int count, int *objCount)
 {
   HeapData *objData;
 
@@ -68,7 +69,7 @@ GreedyRefLB::HeapData* GreedyRefLB::BuildObjectArray(CentralLB::LDStats* stats,
   int pe, obj;
   for (pe = 0; pe < count; pe++)
     for (obj = 0; obj < stats[pe].n_objs; obj++)
-      if (stats[pe].objData[obj].migratable == CmiTrue) *objCount++; 
+      if (stats[pe].objData[obj].migratable == CmiTrue) (*objCount)++; 
 
   objData  = new HeapData[*objCount];
   *objCount = 0; 
@@ -79,7 +80,7 @@ GreedyRefLB::HeapData* GreedyRefLB::BuildObjectArray(CentralLB::LDStats* stats,
           stats[pe].objData[obj].wallTime * stats[pe].pe_speed;
         objData[*objCount].pe = pe;
         objData[*objCount].id = obj;
-        InsertObject(objData, *objCount++);
+        InsertObject(objData, (*objCount)++);
       }
 
   return objData;
@@ -94,7 +95,7 @@ GreedyRefLB::HeapData* GreedyRefLB::BuildCpuArray(CentralLB::LDStats* stats,
   *peCount = 0;
   int pe, obj;
   for (pe = 0; pe < count; pe++)
-    if (stats[pe].available == CmiTrue) *peCount++;
+    if (stats[pe].available == CmiTrue) (*peCount)++;
 
   data = new HeapData[*peCount];
   
@@ -112,8 +113,7 @@ GreedyRefLB::HeapData* GreedyRefLB::BuildCpuArray(CentralLB::LDStats* stats,
       data[*peCount].load += 
         (peData->total_walltime - peData->bg_walltime) * peData->pe_speed;
       data[*peCount].pe = data[*peCount].id = pe;
-      InsertObject(data, *peCount);
-      *peCount++;
+      InsertObject(data, (*peCount)++);
     }
   }
   
