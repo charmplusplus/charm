@@ -21,18 +21,21 @@ typedef struct CpmDestinationSend
 }
 *CpmDestinationSend;
 
+typedef struct CpmDestinationSend DestinationSend;
+
 void CpmSend1(CpmDestinationSend ctrl, int len, void *msg)
 {
   CpmLSend(ctrl->pe, len, msg);
 }
 
+CpvStaticDeclare(DestinationSend, ctrlSend);
+
 CpmDestination CpmSend(int pe)
 {
-  static struct CpmDestinationSend ctrl;
-  ctrl.envsize = 0;
-  ctrl.sendfn = (CpmSender)CpmSend1;
-  ctrl.pe = pe;
-  return (CpmDestination)&ctrl;
+  CpvAccess(ctrlSend).envsize = 0;
+  CpvAccess(ctrlSend).sendfn = (CpmSender)CpmSend1;
+  CpvAccess(ctrlSend).pe = pe;
+  return (CpmDestination)&CpvAccess(ctrlSend);
 }
 
 /******************************************************************************
@@ -48,6 +51,10 @@ typedef struct CpmDestinationEnq
   int pe, qs, priobits, *prioptr;
 }
 *CpmDestinationEnq;
+
+typedef struct CpmDestinationEnq DestinationEnq;
+
+CpvStaticDeclare(DestinationEnq, ctrlEnq);
 
 CpvDeclare(int, CpmEnqueue2_Index);
 
@@ -76,27 +83,29 @@ void *CpmEnqueue1(CpmDestinationEnq ctrl, int len, void *msg)
 
 CpmDestination CpmEnqueue(int pe, int qs, int priobits, int *prioptr)
 {
-  static struct CpmDestinationEnq ctrl;
   int intbits = sizeof(int)*8;
   int prioints = (priobits+intbits-1) / intbits;
-  ctrl.envsize = (3+prioints)*sizeof(int);
-  ctrl.sendfn  = CpmEnqueue1;
-  ctrl.pe = pe; ctrl.qs = qs; ctrl.priobits = priobits; ctrl.prioptr = prioptr;
-  return (CpmDestination)&ctrl;
+  CpvAccess(ctrlEnq).envsize = (3+prioints)*sizeof(int);
+  CpvAccess(ctrlEnq).sendfn  = CpmEnqueue1;
+  CpvAccess(ctrlEnq).pe = pe; CpvAccess(ctrlEnq).qs = qs; 
+  CpvAccess(ctrlEnq).priobits = priobits; CpvAccess(ctrlEnq).prioptr = prioptr;
+  return (CpmDestination)&CpvAccess(ctrlEnq);
 }
+
+CpvStaticDeclare(int, fiprio);
 
 CpmDestination CpmEnqueueIFIFO(int pe, int prio)
 {
-  static int iprio;
-  iprio = prio;
-  return CpmEnqueue(pe, CQS_QUEUEING_IFIFO, sizeof(int)*8, &iprio);
+  CpvAccess(fiprio) = prio;
+  return CpmEnqueue(pe, CQS_QUEUEING_IFIFO, sizeof(int)*8, &CpvAccess(fiprio));
 }
+
+CpvStaticDeclare(int, liprio);
 
 CpmDestination CpmEnqueueILIFO(int pe, int prio)
 {
-  static int iprio;
-  iprio = prio;
-  return CpmEnqueue(pe, CQS_QUEUEING_ILIFO, sizeof(int)*8, &iprio);
+  CpvAccess(liprio) = prio;
+  return CpmEnqueue(pe, CQS_QUEUEING_ILIFO, sizeof(int)*8, &CpvAccess(liprio));
 }
 
 CpmDestination CpmEnqueueBFIFO(int pe, int priobits, int *prioptr)
@@ -134,13 +143,14 @@ void *CpmEnqueueFIFO1(CpmDestinationSend ctrl, int len, void *msg)
   CpmLSend(ctrl->pe, len, msg);
 }
 
+CpvStaticDeclare(DestinationSend, ctrlFIFO);
+
 CpmDestination CpmEnqueueFIFO(int pe)
 {
-  static struct CpmDestinationSend ctrl;
-  ctrl.envsize = sizeof(int);
-  ctrl.sendfn  = CpmEnqueueFIFO1;
-  ctrl.pe = pe;
-  return (CpmDestination)&ctrl;
+  CpvAccess(ctrlFIFO).envsize = sizeof(int);
+  CpvAccess(ctrlFIFO).sendfn  = CpmEnqueueFIFO1;
+  CpvAccess(ctrlFIFO).pe = pe;
+  return (CpmDestination)&CpvAccess(ctrlFIFO);
 }
 
 /******************************************************************************
@@ -168,13 +178,14 @@ void *CpmEnqueueLIFO1(CpmDestinationSend ctrl, int len, void *msg)
   CpmLSend(ctrl->pe, len, msg);
 }
 
+CpvStaticDeclare(DestinationSend, ctrlLIFO);
+
 CpmDestination CpmEnqueueLIFO(int pe)
 {
-  static struct CpmDestinationSend ctrl;
-  ctrl.envsize = sizeof(int);
-  ctrl.sendfn  = CpmEnqueueLIFO1;
-  ctrl.pe = pe;
-  return (CpmDestination)&ctrl;
+  CpvAccess(ctrlLIFO).envsize = sizeof(int);
+  CpvAccess(ctrlLIFO).sendfn  = CpmEnqueueLIFO1;
+  CpvAccess(ctrlLIFO).pe = pe;
+  return (CpmDestination)&CpvAccess(ctrlLIFO);
 }
 
 /******************************************************************************
@@ -189,6 +200,8 @@ void CpmThread3(void *msg)
 {
   int *env = (int *)CpmEnv(msg);
   CpvAccess(CmiHandlerTable)[env[0]](msg);
+  // Had to do Free here... milind
+  CmiFree(msg);
   CthFree(CthSelf()); CthSuspend();
 }
 
@@ -208,13 +221,62 @@ void CpmThread1(CpmDestinationSend ctrl, int len, void *msg)
   CpmLSend(ctrl->pe, len, msg);
 }
 
+CpvStaticDeclare(DestinationSend, ctrlThread);
+
 CpmDestination CpmMakeThread(int pe)
 {
-  static struct CpmDestinationSend ctrl;
-  ctrl.envsize = sizeof(int);
-  ctrl.sendfn = (CpmSender)CpmThread1;
-  ctrl.pe = pe;
-  return (CpmDestination)&ctrl;
+  CpvAccess(ctrlThread).envsize = sizeof(int);
+  CpvAccess(ctrlThread).sendfn = (CpmSender)CpmThread1;
+  CpvAccess(ctrlThread).pe = pe;
+  return (CpmDestination)&CpvAccess(ctrlThread);
+}
+
+/******************************************************************************
+ *
+ * Control for thread-creation with size parameter
+ *
+ *****************************************************************************/
+
+CpvDeclare(int, CpmThreadSize2_Index);
+
+typedef struct CpmDestinationThreadSize
+{ 
+  void *(*sendfn)();
+  int envsize;
+  int pe;
+  int size;
+}
+*CpmDestinationThreadSize;
+
+typedef struct CpmDestinationThreadSize DestinationThreadSize;
+
+void CpmThreadSize2(void *msg)
+{
+  int *env = (int *)CpmEnv(msg);
+  CthThread t;
+  CmiGrabBuffer(&msg);
+  t = CthCreate(CpmThread3, msg, env[1]);
+  CthSetStrategyDefault(t); CthAwaken(t);
+}
+
+void CpmThreadSize1(CpmDestinationThreadSize ctrl, int len, void *msg)
+{
+  int *env = (int *)CpmEnv(msg);
+  env[0] = CmiGetHandler(msg);
+  env[1] = ctrl->size;
+  CmiSetHandler(msg, CpvAccess(CpmThreadSize2_Index));
+  CpmLSend(ctrl->pe, len, msg);
+}
+
+CpvStaticDeclare(DestinationThreadSize, ctrlThreadSize);
+
+CpmDestination CpmMakeThreadSize(int pe, int size)
+{
+  CpvAccess(ctrlThreadSize).envsize = 2*sizeof(int);
+  CpvAccess(ctrlThreadSize).sendfn = (CpmSender)CpmThreadSize1;
+  CpvAccess(ctrlThreadSize).pe = pe;
+  CpvAccess(ctrlThreadSize).size = size;
+  return (CpmDestination)&CpvAccess(ctrlThreadSize);
 }
 
 /******************************************************************************
@@ -227,11 +289,21 @@ void CpmModuleInit()
 {
   CpvInitialize(int, CpmThread2_Index);
   CpvAccess(CpmThread2_Index) = CmiRegisterHandler(CpmThread2);
+  CpvInitialize(int, CpmThreadSize2_Index);
+  CpvAccess(CpmThreadSize2_Index) = CmiRegisterHandler(CpmThreadSize2);
   CpvInitialize(int, CpmEnqueueFIFO2_Index);
   CpvAccess(CpmEnqueueFIFO2_Index) = CmiRegisterHandler(CpmEnqueueFIFO2);
   CpvInitialize(int, CpmEnqueueLIFO2_Index);
   CpvAccess(CpmEnqueueLIFO2_Index) = CmiRegisterHandler(CpmEnqueueLIFO2);
   CpvInitialize(int, CpmEnqueue2_Index);
   CpvAccess(CpmEnqueue2_Index) = CmiRegisterHandler(CpmEnqueue2);
+  CpvInitialize(DestinationSend, ctrlSend);
+  CpvInitialize(DestinationEnq, ctrlEnq);
+  CpvInitialize(DestinationSend, ctrlFIFO);
+  CpvInitialize(DestinationSend, ctrlLIFO);
+  CpvInitialize(DestinationSend, ctrlThread);
+  CpvInitialize(DestinationThreadSize, ctrlThreadSize);
+  CpvInitialize(int, fiprio);
+  CpvInitialize(int, liprio);
 }
 

@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.50  1996-11-20 06:45:40  jyelon
+ * Revision 2.51  1996-11-23 02:25:33  milind
+ * Fixed several subtle bugs in the converse runtime for convex
+ * exemplar.
+ *
+ * Revision 2.50  1996/11/20 06:45:40  jyelon
  * Repaired rob's HP/C++ mods.
  *
  * Revision 2.49  1996/11/08 22:22:51  brunner
@@ -497,6 +501,19 @@ extern int CthRegister CMK_PROTO((int));
 #endif /* CMK_THREADS_USE_JB_TWEAKING */
 
 
+#if CMK_THREADS_USE_JB_TWEAKING_EXEMPLAR
+#if CMK_PREPROCESSOR_USES_ANSI_STANDARD_CONCATENATION
+CpvExtern(char*,CthData);
+extern int CthRegister CMK_PROTO((int));
+#define CtvDeclare(t,v)         typedef t CtvType##v; CsvDeclare(int,CtvOffs##v);
+#define CtvStaticDeclare(t,v)   typedef t CtvType##v; CsvDeclare(int,CtvOffs##v);
+#define CtvExtern(t,v)          typedef t CtvType##v; CsvDeclare(int,CtvOffs##v);
+#define CtvAccess(v)            (*((CtvType##v *)(CpvAccess(CthData)+CsvAccess(CtvOffs##v))))
+#define CtvInitialize(t,v)      if (CmiMyRank()==0) (CsvAccess(CtvOffs##v)=CthRegister(sizeof(CtvType##v)));
+#endif /* CMK_PREPROCESSOR_USES_ANSI_STANDARD_CONCATENATION */
+#endif /* CMK_THREADS_USE_JB_TWEAKING */
+
+
 
 #ifndef CtvDeclare
 error Barf.
@@ -529,6 +546,7 @@ struct CpmDestinationStruct
 
 CpmDestination CpmSend CMK_PROTO((int pe));
 CpmDestination CpmMakeThread CMK_PROTO((int pe));
+CpmDestination CpmMakeThreadSize CMK_PROTO((int pe, int size));
 CpmDestination CpmEnqueueFIFO CMK_PROTO((int pe));
 CpmDestination CpmEnqueueLIFO CMK_PROTO((int pe));
 CpmDestination CpmEnqueueIFIFO CMK_PROTO((int pe, int prio));

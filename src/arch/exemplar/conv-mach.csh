@@ -15,17 +15,17 @@
 ############################################################################
 
 set CMK_CPP_CHARM='/lib/cpp -P'
-set CMK_CPP_C='echo "Please set CMK_CPP_C" ; exit 1 ; echo '
+set CMK_CPP_C='cc -E '
 set CMK_CXXPP='echo "Convex doesnt support charm++" ; exit 1 ; echo '
 set CMK_LDRO='ld -r -o'
 set CMK_LDRO_WORKS=1
-set CMK_CC='cc'
+set CMK_CC='cc -or none'
 set CMK_CC_RELIABLE='cc'
 set CMK_CC_FASTEST='cc'
 set CMK_CXX='echo "Convex doesnt support charm++" ; exit 1 ; echo '
 set CMK_CF77=''
 set CMK_C_DEBUG='-no -cxdb'
-set CMK_C_OPTIMIZE='-O'
+set CMK_C_OPTIMIZE='-O2'
 set CMK_CXX_DEBUG=''
 set CMK_CXX_OPTIMIZE=''
 set CMK_LD='cc -Wl,+parallel'

@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.20  1996-07-15 20:59:22  jyelon
+ * Revision 2.21  1996-11-23 02:25:36  milind
+ * Fixed several subtle bugs in the converse runtime for convex
+ * exemplar.
+ *
+ * Revision 2.20  1996/07/15 20:59:22  jyelon
  * Moved much timer, signal, etc code into common.
  *
  * Revision 2.19  1995/11/09 22:00:55  gursoy
@@ -81,6 +85,7 @@ static char ident[] = "@(#)$Header$";
 #include <spp_prog_model.h>
 #include <memory.h>
 #include <cps.h>
+#include <math.h>
 #include "converse.h"
 
 
@@ -107,10 +112,10 @@ CpvDeclare(void*, CmiLocalQueue);
 CpvDeclare(int, Cmi_mype);
 CpvDeclare(int, Cmi_numpes);
 
-static barrier_t barrier;
-static barrier_t *barr;
-static int *nthreads;
-static int requested_npe;
+static node_private barrier_t barrier;
+static node_private barrier_t *barr;
+static node_private int *nthreads;
+static node_private int requested_npe;
 
 static void mycpy();
 static void threadInit();
@@ -118,40 +123,43 @@ static void threadInit();
 void *CmiAlloc(size)
 int size;
 {
-char *res;
-res =(char *) memory_class_malloc(size+8,THREAD_PRIVATE_MEM);
-if (res==0) printf("Memory allocation failed.");
-((int *)res)[0]=size;
-return (void *)(res+8);
+  char *res;
+  res =(char *) memory_class_malloc(size+8,THREAD_PRIVATE_MEM);
+  if (res==(char *)0) { memory_class_malloc(size+8,NODE_PRIVATE_MEM); }
+  if (res==(char *)0) { memory_class_malloc(size+8,NEAR_SHARED_MEM); }
+  if (res==(char *)0) { memory_class_malloc(size+8,FAR_SHARED_MEM); }
+  if (res==(char *)0) { CmiError("%d:Memory allocation failed.",CmiMyPe()); exit(1); }
+  ((int *)res)[0]=size;
+  return (void *)(res+8);
 }
 
 int CmiSize(blk)
 void *blk;
 {
-return ((int *)( ((char *) blk) - 8))[0];
+  return ((int *)( ((char *) blk) - 8))[0];
 }
 
 void CmiFree(blk)
 void *blk;
 {
-free( ((char *)blk) - 8);
+  free( ((char *)blk) - 8);
 }
 
 
 void *CmiSvAlloc(size)
 int size;
 {
-char *res;
-res =(char *)memory_class_malloc(size+8,NODE_PRIVATE_MEM);
-if (res==0) printf("Memory allocation failed.");
-((int *)res)[0]=size;
-return (void *)(res+8);
+  char *res;
+  res =(char *)memory_class_malloc(size+8,NEAR_SHARED_MEM);
+  if (res==0) CmiError("Memory allocation failed.");
+  ((int *)res)[0]=size;
+  return (void *)(res+8);
 }
 
 void CmiSvFree(blk)
 char *blk;
 {
-free(blk-8);
+  free(blk-8);
 }
 
 
@@ -201,7 +209,7 @@ char *argv[];
 
     if (requested_npe <= 0)
     {
-       printf("Error: requested number of processors is invalid %d\n",requested_npe);
+       CmiError("Error: requested number of processors is invalid %d\n",requested_npe);
        exit();
     }
 
@@ -221,9 +229,16 @@ char *argv[];
     cps_barrier_alloc(barr);
 
     MsgQueue=(McQueue **)g_malloc(requested_npe*sizeof(McQueue *));
+    if (MsgQueue == (McQueue **)0) {
+	CmiError("Cannot Allocate Memory...\n");
+	exit(1);
+    }
     for(i=0; i<requested_npe; i++) MsgQueue[i] = McQueueCreate();
 
-    cps_ppcall(&request, threadInit ,arg); 
+    if (cps_ppcall(&request, threadInit ,arg) != requested_npe) {
+	CmiError("Cannot created threads...\n");
+	exit(1);
+    } 
     cps_barrier_free(barr);
 
 }
@@ -283,14 +298,14 @@ char *msg;
         char *buf;
 
         buf=(void *)g_malloc(size+8);
+        if(buf==(void *)0)
+        {
+                CmiError("Cannot allocate memory!\n");
+                exit(1);
+        }
         ((int *)buf)[0]=size;
         buf += 8;
 
-        if(buf==(void *)0)
-        {
-                printf("Cannot allocate memory!\n");
-                exit(1);
-        }
 
         mycpy((double *)buf,(double *)msg,size);
         McQueueAddToBack(MsgQueue[destPE],buf); 
@@ -312,7 +327,7 @@ int destPE;
 int size;
 char  *msg;
 {
-    McQueueAddToBack(MsgQueue[destPE],msg);
+        McQueueAddToBack(MsgQueue[destPE],msg); 
 }
 
 void CmiSyncBroadcastFn(size, msg)
@@ -344,23 +359,8 @@ void CmiSyncBroadcastAllFn(size, msg)
 int  size;
 char *msg;
 {
-    void *env;
-    void *buf;
-
     int i;
-    for(i=0; i<CmiNumPes(); i++)
-       if (CmiMyPe() != i) CmiSyncSendFn(i,size,msg);
-
-    buf=(void *)CmiAlloc(size);
-
-    if(buf==(void *)0)
-        {
-                printf("Cannot allocate memory!\n");
-                exit(1);
-        }
-
-    mycpy((double *)buf,(double *)msg,size);
-    FIFO_EnQueue(CpvAccess(CmiLocalQueue),buf);
+    for(i=0; i<CmiNumPes(); i++) CmiSyncSendFn(i,size,msg);
 }
 
 
@@ -419,48 +419,6 @@ static void mycpy(double *dst, double *src, int bytes)
         }
 }
 
-
-
-
-
-/* ********************************************************************** */
-/* For backward compatibility some of the previous functionality retained */
-/* ********************************************************************** */
-
-McTimerInit()
-{
-}
-
-unsigned int McTimer()
-{
-}
-
-int McHostPeNum()
-{
-}
-
-int McMainPeNum()
-{
-        return 0;
-}
-
-McUTimerInit()
-{
-return 0;
-}
-
-unsigned int McUTimer()
-{
-return 0;
-}
-
-McHTimer()
-{
-return 0;
-}
-
-
-
 /* ********************************************************************** */
 /* The following functions are required by the load balance modules       */
 /* ********************************************************************** */
@@ -505,8 +463,9 @@ int p;
 {
     int a,b,n;
 
-    a = (int) floor(sqrt((double)CmiNumPes()));
-    b = (int) ceil( ((double)CmiNumPes() / (double)a) );
+    n = CmiNumPes();
+    a = (int)sqrt((double)n);
+    b = (int) ceil( ((double)n / (double)a) );
 
    
     _MC_numofneighbour = 0;
@@ -584,7 +543,7 @@ unsigned int len;
 	blk=(void **)g_malloc(len*sizeof(void *));
 	if(blk==(void **)0)
 	{
-		printf("Cannot Allocate Memory!\n");
+		CmiError("Cannot Allocate Memory!\n");
 		exit(1);
 	}
 	return blk;
@@ -608,7 +567,7 @@ McQueueCreate()
 	queue = (McQueue *) g_malloc(sizeof(McQueue));
 	if(queue==(McQueue *)0)
 	{
-		printf("Cannot Allocate Memory!\n");
+		CmiError("Cannot Allocate Memory!\n");
 		exit(1);
 	}
 	m_init32(&(queue->sema), &one);

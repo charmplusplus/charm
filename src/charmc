@@ -694,7 +694,7 @@ if (($LANGUAGE == charm) || ($LANGUAGE == charm++)) then
         ($ECHOCMD ; $CMK_LD $OPTS_LD -o CHARMC-PRE.TMP.xxx -L$CHARMLIB \
                       $BAL_OBJ $OBJECTFILES $LIBRARIES \
 		      CHARMC-MOD.TMP.o -lck-core-$EXECMODE \
-                      -lck-cplus-n -lconv-core -lconv-cplus-n -lck-defmain \
+                      -lck-cplus-n -lconv-cplus-n -lconv-core -lck-defmain \
 		      $CMK_LIBS -lm)
     else if ($LANGUAGE == charm++) then
 	echo '_CK_module_init_fn() {}' > CHARMC-MOD.TMP.c
@@ -702,7 +702,7 @@ if (($LANGUAGE == charm) || ($LANGUAGE == charm++)) then
         ($ECHOCMD ; $CMK_LDXX $OPTS_LDXX -o CHARMC-PRE.TMP.xxx -L$CHARMLIB \
 		      $BAL_OBJ $OBJECTFILES $LIBRARIES \
 		      CHARMC-MOD.TMP.o -lck-core-$EXECMODE \
-                      -lck-cplus-y -lconv-core -lconv-cplus-y -lck-defmain \
+                      -lck-cplus-y -lconv-cplus-y -lconv-core -lck-defmain \
 		      $CMK_LIBS -lm)
     endif
     $CMK_NM CHARMC-PRE.TMP.xxx | csh -fc "$CMK_NM_FILTER" > CHARMC-PRE.TMP.nm
@@ -730,24 +730,24 @@ switch ($LANGUAGE)
         ($ECHOCMD ; $CMK_LD $OPTS_LD -o $OBJECT -L$CHARMLIB \
                       CHARMC-MOD.TMP.o $BAL_OBJ $OBJECTFILES \
                       $LIBRARIES -lck-core-$EXECMODE \
-                      -lck-cplus-n -lconv-core -lconv-cplus-n -lck-defmain \
+                      -lck-cplus-n -lconv-cplus-n -lconv-core -lck-defmain \
 		      $CMK_LIBS -lm)
         breaksw
     case "charm++"
         ($ECHOCMD ; $CMK_LDXX $OPTS_LDXX -o $OBJECT -L$CHARMLIB \
 		      CHARMC-MOD.TMP.o $BAL_OBJ $OBJECTFILES \
                       $LIBRARIES -lck-core-$EXECMODE \
-                      -lck-cplus-y -lconv-core -lconv-cplus-y -lck-defmain \
+                      -lck-cplus-y -lconv-cplus-y -lconv-core -lck-defmain \
 		      $CMK_LIBS -lm)
         breaksw
     case "converse"
         ($ECHOCMD ; $CMK_LD $OPTS_LD -o $OBJECT -L$CHARMLIB \
-		      $OBJECTFILES $LIBRARIES -lconv-core -lconv-cplus-n \
+		      $OBJECTFILES $LIBRARIES -lconv-cplus-n -lconv-core\
 		      $CMK_LIBS -lm)
         breaksw
     case "converse++"
         ($ECHOCMD ; $CMK_LDXX $OPTS_LDXX -o $OBJECT -L$CHARMLIB \
-		      $OBJECTFILES $LIBRARIES -lconv-core -lconv-cplus-y \
+		      $OBJECTFILES $LIBRARIES -lconv-cplus-y -lconv-core \
 		      $CMK_LIBS -lm)
         breaksw
 endsw

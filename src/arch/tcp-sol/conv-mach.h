@@ -8,7 +8,11 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 2.27  1996-11-08 22:23:09  brunner
+ * Revision 2.28  1996-11-23 02:25:44  milind
+ * Fixed several subtle bugs in the converse runtime for convex
+ * exemplar.
+ *
+ * Revision 2.27  1996/11/08 22:23:09  brunner
  * Put _main in for HP-UX CC compilation.  It is ignored according to the
  * CMK_USE_HP_MAIN_FIX flag.
  *
@@ -118,6 +122,7 @@
 #define CMK_THREADS_USE_ALLOCA_WITH_HEADER_FILE            1
 #define CMK_THREADS_USE_ALLOCA_WITH_PRAGMA                 0
 #define CMK_THREADS_USE_JB_TWEAKING                        0
+#define CMK_THREADS_USE_JB_TWEAKING_EXEMPLAR               0
 
 #define CMK_TIMER_USE_GETRUSAGE                            0
 #define CMK_TIMER_USE_SPECIAL                              0

@@ -13,7 +13,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.24  1996-10-24 20:51:50  milind
+ * Revision 1.25  1996-11-23 02:25:34  milind
+ * Fixed several subtle bugs in the converse runtime for convex
+ * exemplar.
+ *
+ * Revision 1.24  1996/10/24 20:51:50  milind
  * Removed the additional token after one #endif.
  *
  * Revision 1.23  1996/07/15 21:00:49  jyelon
@@ -653,6 +657,240 @@ int size;
 
 #endif
 
+/*****************************************************************************
+ *
+ * threads: implementation CMK_THREADS_USE_JB_TWEAKING_EXEMPLAR
+ *
+ * This threads implementation saves and restores state using setjmp
+ * and longjmp, and it creates new states by doing a setjmp and then
+ * twiddling the contents of the jmp_buf.  It uses a heuristic to find
+ * the places in the jmp_buf it needs to adjust to change the stack
+ * pointer.  It sometimes works.  It has the advantage that it doesn't
+ * require alloca.
+ *
+ ****************************************************************************/
+
+#if CMK_THREADS_USE_JB_TWEAKING_EXEMPLAR
+
+#include <stdio.h>
+#include <setjmp.h>
+#include <sys/types.h>
+
+#define STACKSIZE (32768)
+#define SLACK     256
+
+CpvDeclare(char*,CthData);
+
+typedef struct { jmp_buf jb; } jmpb;
+
+typedef struct CthThreadStruct
+{
+  char cmicore[CmiMsgHeaderSizeBytes]; /* So we can enqueue them */
+  jmp_buf    jb;
+  CthVoidFn  fn;
+  void      *arg;
+  CthVoidFn  awakenfn;
+  CthThFn    choosefn;
+  char      *data;
+  int        datasize;
+  double     stack[1];
+}ThreadStruct;
+
+
+CpvStaticDeclare(jmp_buf,thread_launching);
+CpvStaticDeclare(CthThread,thread_current);
+CpvStaticDeclare(CthThread,thread_exiting);
+CpvStaticDeclare(int,thread_growsdown);
+CpvStaticDeclare(int,thread_datasize);
+CpvStaticDeclare(int,thread_jb_offsets)[10];
+CpvStaticDeclare(int,thread_jb_count);
+
+#define ABS(a) (((a) > 0)? (a) : -(a) )
+
+int CthImplemented()
+    { return 1; }
+
+static void CthInitSub1(jmpb *bufs, int *frames, int n)
+{
+  double d;
+  frames[n] = (int)(&d);
+  setjmp(bufs[n].jb);
+  if (n==0) return;
+  CthInitSub1(bufs, frames, n-1);
+}
+
+static void CthInitSub2()
+{
+  if (setjmp(CpvAccess(thread_launching))) {
+    (CpvAccess(thread_current)->fn)(CpvAccess(thread_current)->arg);
+    exit(1);
+  }
+}
+
+void CthInit()
+{
+  int frames[2];
+  jmpb bufs[2];
+  int i, j, delta, size, *p0, *p1;
+
+  CpvAccess(thread_datasize)=1;
+  CpvAccess(thread_current)=(CthThread)CmiAlloc(sizeof(struct CthThreadStruct));
+  CpvAccess(thread_current)->fn=0;
+  CpvAccess(thread_current)->arg=0;
+  CpvAccess(thread_current)->data=0;
+  CpvAccess(thread_current)->datasize=0;
+  CpvAccess(thread_current)->awakenfn = 0;
+  CpvAccess(thread_current)->choosefn = 0;
+
+  /* analyze the activation record. */
+  CthInitSub1(bufs, frames, 1);
+  CthInitSub2();
+  CpvAccess(thread_growsdown) = (frames[0] < frames[1]);
+  size = (sizeof(jmpb)/sizeof(int));
+  delta = frames[0]-frames[1];
+  p0 = (int *)(bufs+0);
+  p1 = (int *)(bufs+1);
+  CpvAccess(thread_jb_count) = 0;
+  for (i=0; i<size; i++) {
+    if (CpvAccess(thread_jb_count)==10) goto fail;
+    if ((p0[i]-p1[i])==delta) {
+      CpvAccess(thread_jb_offsets)[CpvAccess(thread_jb_count)++] = i;
+      ((int *)(&CpvAccess(thread_launching)))[i] -= (int)(frames[1]);
+    }
+  }
+  if (CpvAccess(thread_jb_count) == 0) goto fail;
+  return;
+fail:
+  CmiPrintf("Thread initialization failed.\n");
+  exit(1);
+}
+
+CthThread CthSelf()
+{
+  return CpvAccess(thread_current);
+}
+
+static void CthTransfer(t)
+CthThread t;
+{
+  CpvAccess(thread_current) = t;
+  CpvAccess(CthData) = t->data;
+  longjmp(t->jb, 1);
+}
+
+void CthFixData(t)
+CthThread t;
+{
+  if (t->data == 0) {
+    t->datasize = CpvAccess(thread_datasize);
+    t->data = (char *)malloc(CpvAccess(thread_datasize));
+    return;
+  }
+  if (t->datasize != CpvAccess(thread_datasize)) {
+    t->datasize = CpvAccess(thread_datasize);
+    t->data = (char *)realloc(t->data, t->datasize);
+    return;
+  }
+}
+
+static void CthFreeNow(t)
+CthThread t;
+{
+  if (t->data) free(t->data); 
+  CmiFree(t);
+}
+
+void CthResume(t)
+CthThread t;
+{
+  int i;
+  if (t == CpvAccess(thread_current)) return;
+  CthFixData(t);
+  if ((setjmp(CpvAccess(thread_current)->jb))==0)
+    CthTransfer(t);
+  if (CpvAccess(thread_exiting))
+    { CthFreeNow(CpvAccess(thread_exiting)); CpvAccess(thread_exiting)=0; }
+}
+
+CthThread CthCreate(fn, arg, size)
+CthVoidFn fn; void *arg; int size;
+{
+  CthThread  result; int i, sp;
+  if (size==0) size = STACKSIZE;
+  result = (CthThread)CmiAlloc(sizeof(struct CthThreadStruct) + size);
+  sp = ((int)(result->stack));
+  sp += (CpvAccess(thread_growsdown)) ? (size - SLACK) : SLACK;
+  result->fn = fn;
+  result->arg = arg;
+  result->awakenfn = 0;
+  result->choosefn = 0;
+  result->data = 0;
+  result->datasize = 0;
+  memcpy(&(result->jb), &CpvAccess(thread_launching), sizeof(CpvAccess(thread_launching)));
+  for (i=0; i<CpvAccess(thread_jb_count); i++)
+    ((int *)(&(result->jb)))[CpvAccess(thread_jb_offsets)[i]] += sp;
+  return result;
+}
+
+void CthFree(t)
+CthThread t;
+{
+  if (t==CpvAccess(thread_current)) {
+    CpvAccess(thread_exiting) = t;
+  } else CthFreeNow(t);
+}
+
+static void CthNoStrategy()
+{
+  CmiPrintf("Called CthAwaken or CthSuspend before calling CthSetStrategy.\n");
+  exit(1);
+}
+
+void CthSuspend()
+{
+  CthThread next;
+  if (CpvAccess(thread_current)->choosefn == 0) CthNoStrategy();
+  next = CpvAccess(thread_current)->choosefn();
+  CthResume(next);
+}
+
+void CthAwaken(th)
+CthThread th;
+{
+  if (th->awakenfn == 0) CthNoStrategy();
+  th->awakenfn(th);
+}
+
+void CthSetStrategy(t, awkfn, chsfn)
+CthThread t;
+CthVoidFn awkfn;
+CthThFn chsfn;
+{
+  t->awakenfn = awkfn;
+  t->choosefn = chsfn;
+}
+
+void CthYield()
+{
+  CthAwaken(CpvAccess(thread_current));
+  CthSuspend();
+}
+
+int CthRegister(size)
+int size;
+{
+  int result;
+  int align = 1;
+  while (size>align) align<<=1;
+  CpvAccess(thread_datasize) = (CpvAccess(thread_datasize)+align-1) & ~(align-1);
+  result = CpvAccess(thread_datasize);
+  CpvAccess(thread_datasize) += size;
+  CthFixData(CpvAccess(thread_current));
+  CpvAccess(CthData) = CpvAccess(thread_current)->data;
+  return result;
+}
+
+#endif
 /*****************************************************************************
  *
  * threads: implementation CMK_THREADS_USE_EATSTACK
