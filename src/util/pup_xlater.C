@@ -236,8 +236,8 @@ static dataConverterFn converterFloat(
 }
 
 /*Constructor (builds conversionFn table)*/
-PUP::xlater::xlater(const PUP::machineInfo &src,PUP::unpacker &fromData)
-	:myUnpacker(fromData)
+PUP::xlater::xlater(const PUP::machineInfo &src,PUP::er &fromData)
+	:er(fromData.PUP_er_state),myUnpacker(fromData)
 {
 	const machineInfo &cur=PUP::machineInfo::current();
 	if (src.intFormat>1) abort();//Unknown integer format

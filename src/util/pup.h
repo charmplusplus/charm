@@ -51,7 +51,12 @@ class bar {
 };
 */
 
-#include <stdio.h> //<- for FILE *
+#include <stdio.h> /*<- for "FILE *" */
+
+#ifndef __cplusplus
+#error "Use pup_c.h for C programs-- pup.h is for C++ programs"
+#endif
+
 #if 0
 #  include <converse.h> // <- for CmiBool
 #else
@@ -78,38 +83,64 @@ typedef enum {
 //This should be a 1-byte unsigned type
 typedef unsigned char myByte;
 
+//Forward declarations
+class er;
+class xlater;
+
+//Used for out-of-order unpacking
+class seekBlock {
+	enum {maxSections=3};
+	int secTab[maxSections+1];//The start of each seek section
+	int nSec;//Number of sections; current section #
+	int secTabOff;//Start of the section table, relative to the seek block
+	er &p;
+	CmiBool hasEnded;
+public:
+	//Constructor
+	seekBlock(er &Np,int nSections);
+	//Destructor
+	~seekBlock();
+
+	//Seek to the given section number (0-based, less than nSections)
+	void seek(int toSection);
+	//Finish with this seeker (must be called)
+	void endBlock(void);
+	
+	//An evil hack to avoid inheritance and virtual functions among seekers--
+	// stores the PUP::er specific block start information.
+	union {
+		int off;
+		long loff;
+		const myByte *cptr;
+		myByte *ptr;
+		void *vptr;
+	} data;
+};
 
 //The abstract base class:  PUP::er.
 class er {
  private:
   er(const er &p);//You don't want to copy PUP::er's.
  protected:
-  enum {IS_DELETING=8};
+  enum {IS_DELETING =0x0008};
+  enum {IS_SIZING   =0x0100,
+  	IS_PACKING  =0x0200,
+        IS_UNPACKING=0x0400,
+        TYPE_MASK   =0xFF00};
   unsigned int PUP_er_state;
-  er() {PUP_er_state=0;}//You don't want to create raw PUP::er's.
- protected:
-  //Generic bottleneck: pack/unpack n items of size itemSize 
-  // and data type t from p.  Desc describes the data item
-  virtual void bytes(void *p,int n,size_t itemSize,dataType t,const char *desc) =0;
-
+  er(unsigned int inType) //You don't want to create raw PUP::er's.
+    {PUP_er_state=inType;}
  public:
   virtual ~er();//<- does nothing, but might be needed by some child
   
   //State queries (exactly one of these will be true)
-  virtual CmiBool isSizing(void) const;
-  virtual CmiBool isPacking(void) const;//<- these all default to false
-  virtual CmiBool isUnpacking(void) const;
-
-  //State maintainance
-  unsigned int setState(unsigned int newState=0) {
-	unsigned int oldState=PUP_er_state;
-	PUP_er_state=newState;
-	return oldState;
-  }
+  CmiBool isSizing(void) const {return (PUP_er_state&IS_SIZING)!=0;}
+  CmiBool isPacking(void) const {return (PUP_er_state&IS_PACKING)!=0;}
+  CmiBool isUnpacking(void) const {return (PUP_er_state&IS_UNPACKING)!=0;}
 
   //This indicates that the pup routine should free memory during packing.
   void becomeDeleting(void) {PUP_er_state|=IS_DELETING;}
-  CmiBool isDeleting(void) const {return PUP_er_state&IS_DELETING;}
+  CmiBool isDeleting(void) const {return (PUP_er_state&IS_DELETING)!=0;}
   
 //For single elements, pretend it's an array containing one element
   void operator()(signed char &v,const char *desc=NULL)     {(*this)(&v,1,desc);}
@@ -161,22 +192,19 @@ class er {
   //For raw memory (n gives number of bytes)
   void operator()(void *a,int nBytes,const char *desc=NULL)
     {bytes((void *)a,nBytes,1,Tbyte,desc);}
-};
-
-//Superclass of packers
-class packer : public er {
- public:
-  virtual CmiBool isPacking(void) const;
-};
-
-//Superclass of unpackers
-class unpacker : public er {
- public://<- for some reason the xlator needs "bytes" to be public
+ 
+ protected:
   //Generic bottleneck: pack/unpack n items of size itemSize 
   // and data type t from p.  Desc describes the data item
+  friend class xlater;
   virtual void bytes(void *p,int n,size_t itemSize,dataType t,const char *desc) =0;
- public:
-  virtual CmiBool isUnpacking(void) const;
+   
+  //For seeking (pack/unpack in different orders)
+  friend class seekBlock;
+  virtual void impl_startSeek(seekBlock &s); /*Begin a seeking block*/
+  virtual int impl_tell(seekBlock &s); /*Give the current offset*/
+  virtual void impl_seek(seekBlock &s,int off); /*Seek to the given offset*/
+  virtual void impl_endSeek(seekBlock &s);/*End a seeking block*/
 };
 
 //For finding the number of bytes to pack (e.g., to preallocate a memory buffer)
@@ -187,61 +215,80 @@ class sizer : public er {
   virtual void bytes(void *p,int n,size_t itemSize,dataType t,const char *desc);
  public:
   //Write data to the given buffer
-  sizer(void) {nBytes=0;}
-  virtual CmiBool isSizing(void) const;
+  sizer(void):er(IS_PACKING) {nBytes=0;}
   
   //Return the current number of bytes to be packed
   int size(void) const {return nBytes;}
 };
 
-//For packing into a preallocated, presized memory buffer
-class toMem : public packer {
+/********** For binary memory buffer pack/unpack *********/
+class mem : public er { //Memory-buffer packers and unpackers
  protected:
-  myByte *buf;//destination buffer (stuff gets packed *in* here)
+  myByte *buf;//Memory buffer (stuff gets packed into/out of here)
+  mem(unsigned int type,myByte *Nbuf):er(type),buf(Nbuf) {}
+
+  //For seeking (pack/unpack in different orders)
+  virtual void impl_startSeek(seekBlock &s); /*Begin a seeking block*/
+  virtual int impl_tell(seekBlock &s); /*Give the current offset*/
+  virtual void impl_seek(seekBlock &s,int off); /*Seek to the given offset*/
+};
+
+//For packing into a preallocated, presized memory buffer
+class toMem : public mem {
+ protected:
   //Generic bottleneck: pack n items of size itemSize from p.
   virtual void bytes(void *p,int n,size_t itemSize,dataType t,const char *desc);
  public:
   //Write data to the given buffer
-  toMem(void *Nbuf) {buf=(myByte *)Nbuf;}
+  toMem(void *Nbuf):mem(IS_PACKING,(myByte *)Nbuf) {}
 };
 
 //For unpacking from a memory buffer
-class fromMem : public unpacker {
+class fromMem : public mem {
  protected:
-  const myByte *buf;//source buffer (stuff gets unpacked *from* here)
   //Generic bottleneck: unpack n items of size itemSize from p.
   virtual void bytes(void *p,int n,size_t itemSize,dataType t,const char *desc);
  public:
   //Read data from the given buffer
-  fromMem(const void *Nbuf) {buf=(const myByte *)Nbuf;}
+  fromMem(const void *Nbuf):mem(IS_UNPACKING,(myByte *)Nbuf) {}
+};
+
+/********** For binary disk file pack/unpack *********/
+class disk : public er {
+ protected:
+  FILE *F;//Disk file to read from/write to
+  disk(unsigned int type,FILE *f):er(type),F(f) {}
+  virtual ~disk();
+
+  //For seeking (pack/unpack in different orders)
+  virtual void impl_startSeek(seekBlock &s); /*Begin a seeking block*/
+  virtual int impl_tell(seekBlock &s); /*Give the current offset*/
+  virtual void impl_seek(seekBlock &s,int off); /*Seek to the given offset*/
 };
 
 //For packing to a disk file
-class toDisk : public packer {
+class toDisk : public disk {
  protected:
-  FILE *outF;
   //Generic bottleneck: pack n items of size itemSize from p.
   virtual void bytes(void *p,int n,size_t itemSize,dataType t,const char *desc);
  public:
   //Write data to the given file pointer 
   // (must be opened for binary write)
-  toDisk(FILE *f) {outF=f;}
+  toDisk(FILE *f):disk(IS_PACKING,f) {}
 };
 
 //For unpacking from a disk file
-class fromDisk : public unpacker {
+class fromDisk : public disk {
  protected:
-  FILE *inF;
   //Generic bottleneck: unpack n items of size itemSize from p.
   virtual void bytes(void *p,int n,size_t itemSize,dataType t,const char *desc);
  public:
   //Write data to the given file pointer 
   // (must be opened for binary read)
-  fromDisk(FILE *f) {inF=f;}
+  fromDisk(FILE *f):disk(IS_UNPACKING,f) {}
 };
 
-
-
+/********** For heterogenous machine pack/unpack *********/
 //This object describes the data representation of a machine.
 class machineInfo {
  public:
@@ -272,7 +319,7 @@ class machineInfo {
 //For translating some odd disk/memory representation into the 
 // current machine representation.  (We really only need to
 // translate during unpack-- "reader makes right".)
-class xlater : public unpacker {
+class xlater : public er {
  protected:
   typedef void (*dataConverterFn)(int N,const myByte *in,myByte *out,int nElem);
   
@@ -285,11 +332,18 @@ class xlater : public unpacker {
   void setConverterInt(const machineInfo &m,const machineInfo &cur,
     int isUnsigned,int intType,dataType dest);
   
-  unpacker &myUnpacker;//Raw data unpacker
+  er &myUnpacker;//Raw data unpacker
   //Generic bottleneck: unpack n items of size itemSize from p.
   virtual void bytes(void *p,int n,size_t itemSize,dataType t,const char *desc);
  public:
-  xlater(const machineInfo &fromMachine, unpacker &fromData);
+  xlater(const machineInfo &fromMachine, er &fromData);
+ protected:
+  //For seeking (pack/unpack in different orders)
+  friend class seekBlock;
+  virtual void impl_startSeek(seekBlock &s); /*Begin a seeking block*/
+  virtual int impl_tell(seekBlock &s); /*Give the current offset*/
+  virtual void impl_seek(seekBlock &s,int off); /*Seek to the given offset*/
+  virtual void impl_endSeek(seekBlock &s);/*End a seeking block*/
 };
 
 };//<- End "namespace" PUP
