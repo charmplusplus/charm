@@ -12,7 +12,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 1.6  1999-07-09 18:18:39  milind
+# Revision 1.7  2000-06-22 15:04:53  milind
+# Made compatible with pdflatex as well.
+#
+# Revision 1.6  1999/07/09 18:18:39  milind
 # Updated for new release 5.0.
 #
 # Revision 1.5  1997/08/18 18:37:34  jyelon
@@ -45,19 +48,26 @@ ps:
 
 html:
 	latex manual.tex
-	latex2html manual.tex
+	latex2html -local_icons manual.tex
+
+pdf:
+	pdflatex manual.tex
+	pdflatex manual.tex
 
 install:
 	rm -f /expand1/groupMosaic/distrib/install.manual.ps.gz
 	cp manual.ps /expand1/groupMosaic/distrib/install.manual.ps
 	gzip /expand1/groupMosaic/distrib/install.manual.ps
 	chmod 664 /expand1/groupMosaic/distrib/install.manual.ps.gz
+	rm -f /expand1/groupMosaic/distrib/install.manual.pdf
+	cp manual.pdf /expand1/groupMosaic/distrib/install.manual.pdf
+	chmod 664 /expand1/groupMosaic/distrib/install.manual.pdf
 	rm -f /expand1/groupMosaic/html-manuals/install.manual/*
 	cp manual/* /expand1/groupMosaic/html-manuals/install.manual/
 	chmod 664 /expand1/groupMosaic/html-manuals/install.manual/*
 
-all: ps html install
+all: ps pdf html install
 
 clean:	
-	rm -f *.aux *.log *.dvi *.ps *.idx *.toc *~
+	rm -f *.aux *.log *.dvi *.ps *.idx *.toc *~ *.pdf
 	rm -rf manual

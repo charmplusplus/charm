@@ -12,7 +12,10 @@
 % REVISION HISTORY:
 %
 % $Log$
-% Revision 1.7  1999-07-09 18:18:40  milind
+% Revision 1.8  2000-06-22 15:04:53  milind
+% Made compatible with pdflatex as well.
+%
+% Revision 1.7  1999/07/09 18:18:40  milind
 % Updated for new release 5.0.
 %
 % Revision 1.6  1998/11/03 19:24:48  milind
@@ -36,6 +39,20 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \documentstyle[11pt,fullpage]{article}
+
+\newif\ifpdf
+\ifx\pdfoutput\undefined
+  \pdffalse
+\else
+  \pdfoutput=1
+  \pdftrue
+\fi
+
+\ifpdf
+  \pdfcompresslevel=9
+\else
+\fi
+
 \pagestyle{empty}
 \setlength{\textwidth}{6.5in}
 \setlength{\textheight}{9in}
