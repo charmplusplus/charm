@@ -12,7 +12,7 @@
 #include "bench.decl.h"
 
 #define USELIB
-#define MAXPASS 100
+#define MAXPASS 10
 
 int MESSAGESIZE=128;
 /*readonly*/ CkChareID mid;
