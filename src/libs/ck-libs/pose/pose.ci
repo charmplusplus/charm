@@ -1,0 +1,21 @@
+// File: pose.ci
+// Last Modified: 06.19.01 by Terry L. Wilmarth
+
+
+module pose {
+//  extern module ComlibModule;
+//  readonly CkGroupID dmid;
+  readonly double busyWait;
+  readonly int POSE_endtime;
+  message callBack;
+  chare pose {
+    entry pose();
+    entry void QDon();
+    entry void IDon();
+    entry void start();
+    entry void registerCallBack(callBack *);
+    entry void stop();
+    entry void exit();
+    entry [threaded] void quiesce();
+  };
+};

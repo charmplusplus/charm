@@ -1,0 +1,23 @@
+// File: gvt.ci
+
+// Defines the Global Virtual Time (GVT) and the Processor Virtual Time (PVT)
+
+module gvt {
+  readonly CkGroupID ThePVT;
+  readonly CkGroupID TheGVT;
+  message UpdateMsg;
+  message GVTMsg;
+
+  group PVT {
+    entry PVT(void);
+    entry void startPhase(void);
+    entry void setGVT(GVTMsg *);
+  };
+
+  group GVT {
+    entry GVT(void);
+    entry void runGVT(void);
+    entry void runGVT(UpdateMsg *);
+    entry void computeGVT(UpdateMsg *);
+  };
+};

@@ -1,0 +1,19 @@
+// File: stats.ci
+// Modest statistics gathering facility.
+// Last Modified: 5.29.01 by Terry L. Wilmarth
+
+module stats {
+  readonly CkGroupID theLocalStats;
+  readonly CkChareID theGlobalStats;
+  message localStatSummary; 
+
+  group localStat {
+    entry localStat(void);
+    entry void SendStats(void);
+  };
+
+  chare globalStat {
+    entry globalStat(void);
+    entry void localStatReport(localStatSummary *);
+  };
+};

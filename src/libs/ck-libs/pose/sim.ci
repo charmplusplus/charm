@@ -1,0 +1,27 @@
+// File: sim.ci
+// Module for basic simulation object; incorporates all other modules
+// Last Modified: 06.04.01 by Terry L. Wilmarth
+
+module sim {
+  extern module ldbal;
+  extern module gvt;
+  extern module evmpool;
+  extern module stats;
+  readonly CProxy_sim POSE_Objects;
+  readonly CkChareID POSE_Coordinator_ID;
+  message eventMsg;
+  message cancelMsg;
+  message prioMsg;
+  message destMsg;
+
+  array [1D] sim {
+    entry sim(void);
+    entry void Step();
+    entry void Step(prioMsg *m);
+    entry void Status(void);
+    entry void Commit(void);	
+    entry void ReportLBdata(void);	
+    entry void Migrate(destMsg *);	
+    entry void Cancel(cancelMsg *);
+  };
+};

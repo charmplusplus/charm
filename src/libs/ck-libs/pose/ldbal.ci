@@ -1,0 +1,17 @@
+module ldbal {
+  readonly CProxy_LBgroup TheLBG;
+  readonly CProxy_LBstrategy TheLBstrategy;
+  message LoadReport;
+  message BalanceSpecs;
+
+  group LBgroup {
+    entry LBgroup(void);
+    entry void calculateLocalLoad(void);
+    entry void balance(BalanceSpecs *);
+  };
+
+  group LBstrategy {
+    entry LBstrategy(void);
+    entry void recvLoadReport(LoadReport *);
+  };
+};

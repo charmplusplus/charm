@@ -1,0 +1,12 @@
+// File: evmpool.ci
+// EventMsgPool: facility for reusing event messages
+// Last Modified: 5.29.01 by Terry L. Wilmarth
+
+module evmpool {
+  readonly CkGroupID EvmPoolID;
+  message PoolInitMsg;
+
+  group EventMsgPool {
+    entry EventMsgPool(PoolInitMsg *);
+  };
+};
