@@ -5,7 +5,7 @@
 void createPairCalculator(bool sym, int s, int grainSize, int numZ, int* z, int op1, 
                           FuncType f1, int op2, FuncType f2, CkCallback cb, 
                           PairCalcID* pcid, int cb_ep, CkArrayID cb_aid, 
-                          int comlib_flag, CkGroupID *mapid, int flag_dp, int conserveMemory) {
+                          int comlib_flag, CkGroupID *mapid, int flag_dp, bool conserveMemory) {
 
   //CkPrintf("create pair calculator %d, %d\n", s, grainSize);
 
