@@ -26,4 +26,4 @@ CMK_NM_FILTER="grep ^_CK_ | cut -f 1 -d ' '"
 CMK_QT='aix'
 CMK_XIOPTS=''
 CMK_MOD_EXT='mod'
-CMK_F90LIBS='-lxlf90_r -lhC'
+CMK_F90LIBS='-lxlf90_r -lxlopt -lhC'
