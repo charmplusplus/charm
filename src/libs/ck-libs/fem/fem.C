@@ -155,11 +155,8 @@ FDECL void FTN_NAME(FEM_ATTACH,fem_attach)(int *flags)
 CDECL void FEM_Attach(int flags)
 {
 	FEMAPI("FEM_Attach");
-	//Make sure the threads array exists
-	TCharmSetupCookie *tc=TCharmSetupCookie::get();
-	if (!tc->hasThreads())
-		CkAbort("You must create a thread array with TCharmCreate before calling FEM_Attach!\n");
-	int _nchunks=tc->getNumElements();
+	CkArrayID threadsAID; int _nchunks;
+	CkArrayOptions opts=TCharmAttachStart(&threadsAID,&_nchunks);
 	
 	if (flags&FEM_INIT_WRITE) 
 	{ //First save the user's globals (if any):
@@ -177,13 +174,12 @@ CDECL void FEM_Attach(int flags)
 	
 	//Create a new chunk array
 	CProxy_FEMcoordinator coord=CProxy_FEMcoordinator::ckNew(_nchunks);
-	FEMinit init(_nchunks,tc->getThreads(),flags,coord);
-	CkArrayOptions opts(_nchunks);
-	opts.bindTo(tc->getThreads());
+	FEMinit init(_nchunks,threadsAID,flags,coord);
+	
 	CProxy_FEMchunk chunks= CProxy_FEMchunk::ckNew(init,opts);
 	chunks.setReductionClient(_allReduceHandler, new CProxy_FEMchunk(chunks));
 	coord.setArray(chunks);
-	tc->addClient(chunks);
+	TCharmAttachFinish(chunks);
 	
 	//Send the mesh out to the chunks
 	if (_meshptr!=NULL) 
