@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.5  1997-02-13 09:31:57  jyelon
+ * Revision 1.6  1997-03-19 04:31:55  jyelon
+ * Redesigned ConverseInit
+ *
+ * Revision 1.5  1997/02/13 09:31:57  jyelon
  * Updated for new main/ConverseInit structure.
  *
  * Revision 1.4  1996/07/16 21:08:30  gursoy
@@ -356,9 +359,10 @@ char * msg;
 
 void ConverseExit()
 {
+  exit(0);
 }
 
-void ConverseStart(argc, argv, fn)
+void ConverseInit(argc, argv, fn, usched, initret)
 int argc;
 char *argv[];
 CmiStartFn fn;
@@ -378,15 +382,11 @@ CmiStartFn fn;
   FM_set_parameter(MSG_BUFFER_SIZE_FINC, 512);
   FM_initialize() ;
   CmiTimerInit();
-}
-
-void ConverseInit(argc, argv, fn)
-int argc;
-char *argv[];
-CmiStartFn fn;
-{
-  ConverseStart(argc, argv, fn);
-  fn(argc, argv);
+  if (initret==0) {
+    fn(argc, argv);
+    if (usched==0) CsdScheduler(-1);
+    ConverseExit();
+  }
 }
 
 /**********************  LOAD BALANCER NEEDS **********************/

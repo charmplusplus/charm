@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.11  1997-02-13 09:31:56  jyelon
+ * Revision 2.12  1997-03-19 04:31:52  jyelon
+ * Redesigned ConverseInit
+ *
+ * Revision 2.11  1997/02/13 09:31:56  jyelon
  * Updated for new main/ConverseInit structure.
  *
  * Revision 2.10  1997/02/02 07:33:56  milind
@@ -427,12 +430,14 @@ void ConverseExit()
 {
   int msgid = allmsg, nbytes;
   mpc_wait(&msgid, &nbytes);
+  exit(0);
 }
 
-ConverseStart(argc, argv, fn)
+ConverseInit(argc, argv, fn, usched, initret)
 int argc;
 char *argv[];
 CmiStartFn fn;
+int usched, initret;
 {
   int n ;
   int nbuf[4];
@@ -455,15 +460,11 @@ CmiStartFn fn;
   CpvAccess(CmiLocalQueue) = FIFO_Create();
   ConverseCommonInit(argv);
   CthInit(argv);
-}
-
-void ConverseInit(argc, argv, fn)
-int argc;
-char *argv[];
-CmiStartFn fn;
-{
-  ConverseStart(argc, argv, fn);
-  fn(argc, argv);
+  if (initret==0) {
+    fn(argc, argv);
+    if (usched==0) CsdScheduler(-1);
+    ConverseExit();
+  }
 }
 
 /*****************************************************************************

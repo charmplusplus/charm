@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.13  1997-02-13 09:31:40  jyelon
+ * Revision 2.14  1997-03-19 04:31:41  jyelon
+ * Redesigned ConverseInit
+ *
+ * Revision 2.13  1997/02/13 09:31:40  jyelon
  * Updated for new main/ConverseInit structure.
  *
  * Revision 2.12  1996/07/15 20:59:22  jyelon
@@ -456,12 +459,15 @@ int node, neighbour;
 /************************** MAIN ***********************************/
 
 void ConverseExit()
-{}
+{
+  exit(0);
+}
 
-void ConverseStart(argc, argv, fn)
+void ConverseInit(argc, argv, fn, usched, initret)
 int argc;
 char **argv;
 CmiStartFn fn;
+int usched, initret;
 {
   int n, i, j ;
   
@@ -509,17 +515,12 @@ CmiStartFn fn;
   CmiTimerInit();
   ConverseCommonInit(argv);
   CthInit(argv);
+  if (initret==0) {
+    fn(argc, argv);
+    if (usched==0) CsdScheduler(-1);
+    ConverseExit();
+  }
 }
-
-void ConverseInit(argc, argv, fn)
-int argc;
-char **argv;
-CmiStartFn fn;
-{
-  ConverseStart(argc, argv, fn);
-  fn(argc, argv);
-}
-
 
 /*****************************************************************************
  *

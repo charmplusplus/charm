@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.10  1996-07-24 21:42:32  gursoy
+ * Revision 1.11  1997-03-19 04:31:30  jyelon
+ * Redesigned ConverseInit
+ *
+ * Revision 1.10  1996/07/24 21:42:32  gursoy
  * fixed CmiTimer superinstall problems
  *
  * Revision 1.9  1996/07/15  20:59:22  jyelon
@@ -105,12 +108,6 @@ void CmiDeliverSpecificMsg(handler)
 int handler;
 {
 }
-
-
-
-
-
-
 
 CmiUniContextSwitch(i)
 int i;
@@ -333,94 +330,89 @@ int node, nbr;
 
 /************************** SETUP ***********************************/
 
-void CmiInitMc(argv)
-char *argv[];
+void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int initret)
 {
-    CpvAccess(CmiLocalQueue) = (void *) FIFO_Create();
-    CmiSpanTreeInit();
-    CsiTimerInit();
-}
-
-
-
-void CmiExit()
-{}
-
-
-void CmiDeclareArgs()
-{}
-
-
-main(argc,argv)
-int argc;
-char *argv[];
-{
-    int i, requested_npe;
-
-    /* figure out number of processors required */
- 
-    i =  0;
-    requested_npe = 1;
-    while (argv[i] != NULL)
-    {
-         if (strcmp(argv[i], "+p") == 0) 
-           {
-                 sscanf(argv[i + 1], "%d", &requested_npe);
-                 break;
-           }
-         else if (sscanf(argv[i], "+p%d", &requested_npe) == 1) break;
-         i++;
+  char *argvec[1000];
+  void simulate();
+  int i, requested_npe;
+  
+  if ((usc)||(initret)) {
+    fprintf(stderr,"ConverseInit in SIM version is limited:\n");
+    fprintf(stderr," 1. User-Calls-Scheduler mode is not supported.\n");
+    fprintf(stderr," 2. ConverseInit-Returns mode is not supported.\n");
+    exit(1);
+  }
+  
+  CthInit(argv);
+  
+  /* figure out number of processors required */
+  
+  i = 0; requested_npe = 0;
+  while (argv[i] != NULL) {
+    if (strcmp(argv[i], "+p") == 0) {
+      requested_npe = atoi(argv[i+1]);
+      break;
+    } else if (strncmp(argv[i], "+p", 2)==0) {
+      requested_npe = atoi(argv[i]+2);
+      break;
     }
+    i++;
+  }
 
+  if (requested_npe <= 0) {
+    printf("Error: requested number of processors is invalid %d\n",
+	   requested_npe);
+    exit(1);
+  }
 
-    if (requested_npe <= 0)
-    {
-       printf("Error: requested number of processors is invalid %d\n",requested_npe);
-       exit(1);
-    }
+  Cmi_numpes = requested_npe;
+  Cmi_mype   = 0;
 
-    Cmi_numpes = requested_npe;
-    Cmi_mype  = 0;
-
+  McQueue = (void **) malloc(requested_npe * sizeof(void *)); 
+  for(i=0; i<requested_npe; i++) McQueue[i] = (void *) FIFO_Create();
+  sim_initialize("sim.param",requested_npe);
+  
+  CsiTimerInit();
+  for(i=0; i<CmiNumPes(); i++) {
+    CmiUniContextSwitch(i);
     CpvInitialize(void*, CmiLocalQueue);
-   
-    McQueue = (void **) malloc(requested_npe * sizeof(void *)); 
-    for(i=0; i<requested_npe; i++) McQueue[i] = (void *) FIFO_Create();
-    sim_initialize("sim.param",requested_npe);
-    user_main(argc,argv);
+    CpvAccess(CmiLocalQueue) = (void *) FIFO_Create();
+    ConverseCommonInit(argv);
+    memcpy(argvec, argv, argc*sizeof(char*));
+    fn(argc, argvec);
+    CpvAccess(CsdStopFlag) = 0;
+  }
+  
+  CsvAccess(CsdStopCount) = CmiNumPes();
+  CmiUniContextSwitch(0);
+
+  while (CsvAccess(CsdStopCount)) simulate();
+
+  exit(0);
 }
 
 static void mycpy(dst, src, bytes)
 double *dst; double *src; int bytes;
 {
-        unsigned char *cdst, *csrc;
+  unsigned char *cdst, *csrc;
 
-        while(bytes>8)
-        {
-                *dst++ = *src++;
-                bytes -= 8;
-        }
-        cdst = (unsigned char *) dst;
-        csrc = (unsigned char *) src;
-        while(bytes)
-        {
-                *cdst++ = *csrc++;
-                bytes--;
-        }
+  while(bytes>8) {
+    *dst++ = *src++;
+    bytes -= 8;
+  }
+  cdst = (unsigned char *) dst;
+  csrc = (unsigned char *) src;
+  while(bytes) {
+    *cdst++ = *csrc++;
+    bytes--;
+  }
 }
-
-
-
-#define checkStopFlag() (CsvAccess(CsdStopCount) == 0)
 
 void CsdExitScheduler()
 {
-    CpvAccess(CsdStopFlag) = 1;
-    CsvAccess(CsdStopCount)--;
+  CpvAccess(CsdStopFlag) = 1;
+  CsvAccess(CsdStopCount)--;
 }
-
-
-
 
 
 
@@ -502,21 +494,6 @@ double CmiCpuTimer()
 {
   return (CsiTimer() - Csi_start_time  + Csi_global_time);
 }
-
-void CsdUniScheduler(count)
-int count;
-{
-    void simulate();
-
-    while (count--) {
-       if (checkStopFlag()) return;
-       simulate();
-    }
-}
-
-
-
-
 
 #include "ext_func.h"
 #include "sim.c"

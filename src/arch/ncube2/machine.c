@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.14  1997-02-13 09:31:43  jyelon
+ * Revision 2.15  1997-03-19 04:31:45  jyelon
+ * Redesigned ConverseInit
+ *
+ * Revision 2.14  1997/02/13 09:31:43  jyelon
  * Updated for new main/ConverseInit structure.
  *
  * Revision 2.13  1996/07/15 20:59:22  jyelon
@@ -333,12 +336,15 @@ int node, neighbour;
 /************************** SETUP ***********************************/
 
 void ConverseExit()
-{}
+{
+  exit(0);
+}
 
-void ConverseStart(argc, argv, fn)
+void ConverseInit(argc, argv, fn, usched, initret)
 int argc;
 char *argv[];
 CmiStartFn fn;
+int usched, initret;
 {
   CpvInitialize(int, Cmi_mype);
   CpvInitialize(int, Cmi_numpes);
@@ -350,18 +356,12 @@ CmiStartFn fn;
   CmiTimerInit();
   ConverseCommonInit(argv);
   CthInit(argv);
+  if (initret==0) {
+    fn(argc, argv);
+    if (usched==0) CsdScheduler(-1);
+    ConverseExit();
+  }
 }
 
-void ConverseInit(argc, argv, fn)
-int argc;
-char *argv[];
-CmiStartFn fn;
-{
-  ConverseStart(argc, argv, fn);
-  fn(argc, argv);
-}
-
-void CmiDeclareArgs()
-{}
 
 

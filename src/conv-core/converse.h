@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.56  1997-03-17 23:40:23  milind
+ * Revision 2.57  1997-03-19 04:31:04  jyelon
+ * Redesigned ConverseInit
+ *
+ * Revision 2.56  1997/03/17 23:40:23  milind
  * Added Idle Notification Functionality:
  * The new Macros in converse.h for this are:
  * CsdSetNotifyIdle(fn1, fn2)
@@ -791,7 +794,7 @@ void      *CmmFind CMK_PROTO((CmmTable t, int ntags, int *tags, int *returntags,
 
 typedef void (*CmiStartFn) CMK_PROTO((int argc, char **argv));
 
-void ConverseInit CMK_PROTO((int, char**, CmiStartFn fn));
+void ConverseInit CMK_PROTO((int, char**, CmiStartFn, int, int));
 void ConverseExit CMK_PROTO((void));
 
 /******** CONVCONDS ********/

@@ -408,21 +408,20 @@ static int wait_readable(fd, sec) int fd; int sec;
  *
  *****************************************************************************/
 
-typedef void (*startfn)(int argc, char **argv);
 
 int               Cmi_numpes;    /* Total number of processors */
 int               Cmi_nodesize;  /* Number of processors in my address space */
 static int        Cmi_numnodes;  /* Total number of address spaces */
 static int        Cmi_nodenum;   /* Which address space am I */
 static int        Cmi_nodestart; /* First processor in this address space */
-static CmiStartFn Cmi_startfn;   /* The function to call after main */
+static CmiStartFn Cmi_startfn;   /* The start function */
+static int        Cmi_usrsched;  /* Continue after start function finishes? */
 static char     **Cmi_argv;
 static int        Cmi_host_IP;
 static int        Cmi_self_IP;
 static int        Cmi_host_port;
 static char       Cmi_host_IP_str[16];
 static char       Cmi_self_IP_str[16];
-
 
 static int    Cmi_max_dgram_size   = 2048;
 static int    Cmi_os_buffer_size   = 50000;
@@ -1180,6 +1179,7 @@ static void *call_startfn(void *vindex)
   thr_setspecific(Cmi_state_key, state);
   ConverseInitPE();
   Cmi_startfn(CountArgs(Cmi_argv), Cmi_argv);
+  if (Cmi_usrsched == 0) CsdScheduler(-1);
   thr_exit(0);
 }
 
@@ -2045,7 +2045,7 @@ void ConverseExit()
   if (CmiMyRank()==0) log_done();
 }
 
-void ConverseStart(int argc, char **argv, startfn fn)
+void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int ret)
 {
 #if CMK_USE_HP_MAIN_FIX
 #if FOR_CPLUS
@@ -2054,6 +2054,7 @@ void ConverseStart(int argc, char **argv, startfn fn)
 #endif
   Cmi_argv = argv;
   Cmi_startfn = fn;
+  Cmi_usrsched = usc;
   parse_netstart();
   extract_args(argv);
   log_init();
@@ -2070,10 +2071,9 @@ void ConverseStart(int argc, char **argv, startfn fn)
   CmiTimerInit();
   CmiStartThreads();
   ConverseInitPE();
-}
-
-void ConverseInit(int argc, char **argv, CmiStartFn fn)
-{
-  ConverseStart(argc, argv, fn);
-  fn(argc, argv);
+  if (ret==0) {
+    fn(argc, argv);
+    if (usc==0) CsdScheduler(-1);
+    ConverseExit();
+  }
 }

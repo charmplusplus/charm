@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.20  1997-02-13 09:31:39  jyelon
+ * Revision 1.21  1997-03-19 04:31:36  jyelon
+ * Redesigned ConverseInit
+ *
+ * Revision 1.20  1997/02/13 09:31:39  jyelon
  * Updated for new main/ConverseInit structure.
  *
  * Revision 1.19  1997/01/17 15:49:57  jyelon
@@ -171,6 +174,7 @@ int        Cmi_nodesize;
 int        Cmi_stacksize = 64000;
 char     **CmiArgv;
 CmiStartFn CmiStart;
+int        CmiUsched;
 CthThread *CmiThreads;
 Fifo      *CmiQueues;
 int       *CmiBarred;
@@ -538,6 +542,7 @@ void CmiCallMain()
   memcpy(argv, CmiArgv, (argc+1)*sizeof(char *));
   CmiInitPE();
   CmiStart(argc, argv);
+  if (CmiUsched==0) CsdScheduler(-1);
   CmiThreads[CmiMyPe()] = 0;
   CmiNext();
 }
@@ -548,10 +553,11 @@ void ConverseExit()
   CmiNext();
 }
 
-void ConverseStart(argc,argv,fn)
+void ConverseInit(argc,argv,fn,usched,initret)
 int argc;
 char *argv[];
 CmiStartFn fn;
+int usched, initret;
 {
   CthThread t; int stacksize, i;
   
@@ -563,6 +569,7 @@ CmiStartFn fn;
   
   CmiArgv = argv;
   CmiStart = fn;
+  CmiUsched = usched;
   CmiParseArgs(argv);
   CthInit(argv);
   CpvInitialize(void*, CmiLocalQueue);
@@ -579,13 +586,10 @@ CmiStartFn fn;
   }
   Cmi_mype = 0;
   CmiInitPE();
+  if (initret==0) {
+    fn(argc, argv);
+    if (usched==0) CsdScheduler(-1);
+    ConverseExit();
+  }
 }
 
-void ConverseInit(argc,argv,fn)
-int argc;
-char *argv[];
-CmiStartFn fn;
-{
-  ConverseStart(argc, argv, fn);
-  fn(argc, argv);
-}

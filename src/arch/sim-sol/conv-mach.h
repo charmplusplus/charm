@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.17  1997-02-13 09:31:54  jyelon
+ * Revision 1.18  1997-03-19 04:31:49  jyelon
+ * Redesigned ConverseInit
+ *
+ * Revision 1.17  1997/02/13 09:31:54  jyelon
  * Updated for new main/ConverseInit structure.
  *
  * Revision 1.16  1997/02/08 14:10:26  jyelon
@@ -120,9 +123,9 @@
 #define CMK_STRINGS_USE_STRINGS_H                          0
 #define CMK_STRINGS_USE_STRING_H                           1
 
-#define CMK_THREADS_REQUIRE_ALLOCA_H                       1
+#define CMK_THREADS_REQUIRE_ALLOCA_H                       0
 #define CMK_THREADS_REQUIRE_PRAGMA_ALLOCA                  0
-#define CMK_THREADS_REQUIRE_NO_CPV                         0
+#define CMK_THREADS_REQUIRE_NO_CPV                         1
 
 #define CMK_THREADS_UNAVAILABLE                            0
 #define CMK_THREADS_USE_ALLOCA                             1
