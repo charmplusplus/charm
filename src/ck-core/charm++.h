@@ -9,8 +9,8 @@
 
 #if CMK_DEBUG_MODE
 class Chare;
-void putObject(Chare *);
-void removeObject(Chare *);
+extern void putObject(Chare *);
+extern void removeObject(Chare *);
 #endif
 
 class Chare {
