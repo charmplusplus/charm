@@ -79,6 +79,8 @@ public:
   }
 };
 
+#define BG_STARTSIM     0x1
+
 class BgTimeLineRec;
 /**
   one time log for an handler function;
@@ -90,19 +92,20 @@ public:
   int seqno;
   int srcnode;        // source bg node  (srcnode,msgID) is the source msg
   int msgID;
+
   double recvTime;	//Time at which the message was received in 'inbuffer'
   double startTime, endTime;
   double oldStartTime, execTime;
   double effRecvTime;
 
-  int index;		// by guna, need to verify, need to use sequence number
-  int threadNum;	// by guna, for seq load balancing  ???
+//  int threadNum;	// by guna, for seq load balancing  ???
 
   CkVec< bgMsgEntry * > msgs;
   CkVec< bgEvents * > evts;
   CkVec< bgTimeLog* > backwardDeps;
   CkVec< bgTimeLog* > forwardDeps;
   char doCorrect;
+  char flag;
   char name[20];
 
   friend class BgTimeLineRec;
@@ -116,11 +119,21 @@ public:
   bgTimeLog(int epc, char* name, double sTime);
   ~bgTimeLog();
 
-  void setExecTime();
+  inline void setExecTime() {
+           execTime = endTime - startTime;
+           if(execTime < EPSILON && execTime > -EPSILON)
+             execTime = 0.0;
+           CmiAssert(execTime >= 0.0);
+         }
+  inline void addMsg(char *msg, int node, int tid, int local) { 
+           msgs.push_back(new bgMsgEntry(msg, node, tid, local)); 
+         }
   void closeLog();
-  inline void addMsg(char *msg, int node, int tid, int local) { msgs.push_back(new bgMsgEntry(msg, node, tid, local)); }
   void print(int node, int th);
   void write(FILE *fp);
+
+  inline void setStartEvent() { flag |= BG_STARTSIM; }
+  inline int isStartEvent() { return (flag & BG_STARTSIM); }
 
   // add backward dep of the log corresponent to msg
   void addMsgBackwardDep(BgTimeLineRec &tlinerec, void* msg);
@@ -147,7 +160,7 @@ public:
     for (int i=0; i<evts.length(); i++)
       evts[i]->update(startTime ,recvTime, e);
   }
-  double key() { return effRecvTime; }
+  inline double key() { return effRecvTime; }
   inline int compareKey(bgTimeLog* otherLog){
     if(((isZero(effRecvTime-otherLog->effRecvTime))&&(seqno < otherLog->seqno))
        ||(isLess(effRecvTime,otherLog->effRecvTime)))
@@ -169,10 +182,13 @@ public:
 
 
 /**
-  an entry in a time log
-  it record a list of message sent events
+  Timeline for a VP
 */
 typedef CkQ< bgTimeLog *> BgTimeLine;
+
+/**
+  A wrapper for CkQ of BgTimeLine
+*/
 class BgTimeLineRec {
 public:
   BgTimeLine  timeline;
@@ -238,35 +254,12 @@ public:
   void logEntrySplit();
   bgTimeLog *getTimeLogOnThread(int srcnode, int msgID, int *index);
 
-  void pup(PUP::er &p){
-    int l=length();
-    p|l;
-    //    CmiPrintf("Puped len: %d\n",l);
-    if(!p.isUnpacking()){
-      for(int i=0;i<l;i++)
-        timeline[i]->index = i;
-    }
-    else{
-      //Timeline is empty when unpacking pup is called
-      //timeline.removeFrom(0);
-    }
-
-    for (int i=0;i<l;i++) {
-        if (p.isUnpacking()) {
-                bgTimeLog* t = new bgTimeLog();
-                t->pup(p);
-                timeline.enq(t);
-        }
-        else {
-          timeline[i]->pup(p);
-        }
-    }
-  }
+  void pup(PUP::er &p);
 };
 
+int BgLoadTraceSummary(char *fname, int &totalProcs, int &numX, int &numY, int &numZ, int &numCth, int &numWth, int &numPes);
 void BgReadProc(int procNum, int numWth ,int numPes, int totalProcs, int* allNodeOffsets, BgTimeLineRec& tlinerec);
 int* BgLoadOffsets(int totalProcs, int numPes);
-int BgLoadTraceSummary(char *fname, int &totalProcs, int &numX, int &numY, int &numZ, int &numCth, int &numWth, int &numPes);
 void BgWriteThreadTimeLine(char *fname, int x, int y, int z, int th, BgTimeLine &tline);
 
 #endif

@@ -157,7 +157,9 @@ int BGMach::read(char *file)
       continue;
     }
     if (!strcmp(parameterName, "timing")) {
-      if (!strcmp(parameterValue, "walltime"))
+      if (!strcmp(parameterValue, "bgelapse"))
+        timingMethod = BG_ELAPSE;
+      else if (!strcmp(parameterValue, "walltime"))
         timingMethod = BG_WALLTIME;
       else if (!strcmp(parameterValue, "counter"))
         timingMethod = BG_COUNTER;

@@ -60,6 +60,7 @@ bgTimeLog::bgTimeLog(bgTimeLog *log)
   seqno = 0;
   effRecvTime = recvTime;
   doCorrect = 1;
+  flag = 0;
 }
 
 bgTimeLog::bgTimeLog(int epc, char* namestr,double sTime)
@@ -77,6 +78,7 @@ bgTimeLog::bgTimeLog(int epc, char* namestr,double sTime)
   effRecvTime = -1.0;
   seqno = 0;
   doCorrect = 1;
+  flag = 0;
 }
 
 // for SDAG, somewhere else will set the effective recv time.
@@ -97,6 +99,7 @@ bgTimeLog::bgTimeLog(int epc, char* namestr, double sTime, double eTime)
   effRecvTime = -1.0;
   seqno = 0;
   doCorrect = 1;
+  flag = 0;
 }
 
 bgTimeLog::bgTimeLog(char *msg, char *str)
@@ -118,6 +121,7 @@ bgTimeLog::bgTimeLog(char *msg, char *str)
   seqno = 0;
 //  doCorrect = msg?CkMsgDoCorrect(msg):1;
   doCorrect = 1;
+  flag = 0;
 
   if (genTimeLog && !doCorrect) {
       recvTime = effRecvTime = startTime;
@@ -133,13 +137,6 @@ bgTimeLog::~bgTimeLog()
     delete evts[i];
 }
 
-
-void bgTimeLog::setExecTime(){
-  execTime = endTime - startTime;
-  if(execTime < EPSILON && execTime > -EPSILON)
-    execTime = 0.0;
-  CmiAssert(execTime >= 0.0);
-}
 
 void bgTimeLog::closeLog() 
 { 
@@ -168,11 +165,11 @@ void bgTimeLog::write(FILE *fp)
   // fprintf(fp,"\nbackwardDeps [%d]:\n",backwardDeps.length());
   fprintf(fp, "backward: ");
   for (i=0; i<backwardDeps.length(); i++)
-    fprintf(fp,"[%p %d] ",backwardDeps[i], backwardDeps[i]->index);
+    fprintf(fp,"[%p %d] ",backwardDeps[i], backwardDeps[i]->seqno);
   fprintf(fp, "\n");
   fprintf(fp, "forward: ");
   for (i=0; i<forwardDeps.length(); i++)
-    fprintf(fp,"[%p %d] ",forwardDeps[i], forwardDeps[i]->index);
+    fprintf(fp,"[%p %d] ",forwardDeps[i], forwardDeps[i]->seqno);
   fprintf(fp, "\n");
   fprintf(fp, "==>>\n");
 }
@@ -210,6 +207,75 @@ void bgTimeLog::addBackwardDeps(CkVec<void*> logs){
   /*put backward and forward dependents*/
   for(int i=0;i<logs.length();i++)
     addBackwardDep((bgTimeLog*)(logs[i]));
+}
+
+int bgTimeLog::bDepExists(bgTimeLog* log){
+
+  for(int i =0;i<backwardDeps.length();i++)
+    if(backwardDeps[i] == log)
+      return 1;
+  return 0;
+}
+
+void bgTimeLog::pup(PUP::er &p){
+    int l=0,idx;
+    int i;
+    p|ep; 
+    p|seqno; p|srcnode;p|msgID;
+    p|recvTime; p|effRecvTime;p|startTime; p|execTime; p|endTime; 
+    p|flag; p(name,20);
+    
+    /*    if(p.isUnpacking())
+      CmiPrintf("Puping: %d %d %d %d %e %e %e %e %e %s\n",ep,seqno,srcnode,msgID,recvTime,effRecvTime,startTime,execTime,endTime,name);
+    */
+
+/*
+    if(p.isUnpacking()){
+      threadNum = currTlineIdx;
+    }
+*/
+
+    // pup for bgMsgEntry
+    if(!p.isUnpacking()) l=msgs.length();
+    p|l;
+
+    for(i=0;i<l;i++) {
+      if (p.isUnpacking()) msgs.push_back(new bgMsgEntry);
+      msgs[i]->pup(p);
+    }
+
+    // pup events list for projections
+    if(!p.isUnpacking()) l=evts.length();
+    p|l;
+
+    for(i=0;i<l;i++) {
+      if (p.isUnpacking()) evts.push_back(new bgEvents);
+      evts[i]->pup(p);
+    }
+
+    // pup for backwardDeps
+    if(!p.isUnpacking()) l = backwardDeps.length();
+    p|l;    
+
+    for(i=0;i<l;i++){
+      if(p.isUnpacking()){
+	p|idx;
+	addBackwardDep(currTline->timeline[idx]);
+      }
+      else{
+	p|backwardDeps[i]->seqno;
+      }
+    }
+ 
+    if(!p.isUnpacking()) l=forwardDeps.length();
+    p|l;
+
+    for(i=0;i<l;i++){ 
+      if(p.isUnpacking())
+	p|idx;
+      else
+	p|forwardDeps[i]->seqno;
+    }
 }
 
 // create a log with msg and insert into timeline
@@ -277,69 +343,30 @@ BgTimeLineRec::getTimeLogOnThread(int srcnode, int msgID, int *index)
   return timeline[idxOld];
 }
 
-int bgTimeLog::bDepExists(bgTimeLog* log){
-
-  for(int i =0;i<backwardDeps.length();i++)
-    if(backwardDeps[i] == log)
-      return 1;
-  return 0;
-}
-
-void bgTimeLog::pup(PUP::er &p){
-    int l=0,idx;
-    int i;
-    p|ep; 
-    p|seqno; p|srcnode;p|msgID;
-    p|recvTime; p|effRecvTime;p|startTime; p|execTime; p|endTime;p|index;p(name,20);
-    
-    /*    if(p.isUnpacking())
-      CmiPrintf("Puping: %d %d %d %d %e %e %e %e %e %s\n",ep,seqno,srcnode,msgID,recvTime,effRecvTime,startTime,execTime,endTime,name);
-    */
-
-    if(p.isUnpacking()){
-      threadNum = currTlineIdx;
-    }
-
-    // pup for bgMsgEntry
-    if(!p.isUnpacking()) l=msgs.length();
+void BgTimeLineRec::pup(PUP::er &p)
+{
+    int l=length();
     p|l;
-
-    for(i=0;i<l;i++) {
-      if (p.isUnpacking()) msgs.push_back(new bgMsgEntry);
-      msgs[i]->pup(p);
+    //    CmiPrintf("Puped len: %d\n",l);
+    if(!p.isUnpacking()){
+      // reorder the seqno
+      for(int i=0;i<l;i++)
+        timeline[i]->seqno = i;
+    }
+    else{
+      //Timeline is empty when unpacking pup is called
+      //timeline.removeFrom(0);
     }
 
-    // pup events list for projections
-    if(!p.isUnpacking()) l=evts.length();
-    p|l;
-
-    for(i=0;i<l;i++) {
-      if (p.isUnpacking()) evts.push_back(new bgEvents);
-      evts[i]->pup(p);
-    }
-
-    // pup for backwardDeps
-    if(!p.isUnpacking()) l = backwardDeps.length();
-    p|l;    
-
-    for(i=0;i<l;i++){
-      if(p.isUnpacking()){
-	p|idx;
-	addBackwardDep(currTline->timeline[idx]);
-      }
-      else{
-	p|backwardDeps[i]->index;
-      }
-    }
- 
-    if(!p.isUnpacking()) l=forwardDeps.length();
-    p|l;
-
-    for(i=0;i<l;i++){ 
-      if(p.isUnpacking())
-	p|idx;
-      else
-	p|forwardDeps[i]->index;
+    for (int i=0;i<l;i++) {
+        if (p.isUnpacking()) {
+                bgTimeLog* t = new bgTimeLog();
+                t->pup(p);
+                timeline.enq(t);
+        }
+        else {
+          timeline[i]->pup(p);
+        }
     }
 }
 
