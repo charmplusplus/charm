@@ -433,12 +433,12 @@ double seconds(void);
 /* util.c */
 void errexit(char *,...);
 #ifndef DMALLOC
-int *imalloc(int, char *);
-idxtype *idxmalloc(int, char *);
-float *fmalloc(int, char *);
-int *ismalloc(int, int, char *);
-idxtype *idxsmalloc(int, idxtype, char *);
-void *GKmalloc(int, char *);
+int *imalloc(size_t, char *);
+idxtype *idxmalloc(size_t, char *);
+float *fmalloc(size_t, char *);
+int *ismalloc(size_t, int, char *);
+idxtype *idxsmalloc(size_t, idxtype, char *);
+void *GKmalloc(size_t, char *);
 #endif
 /*void GKfree(void **,...); */
 int *iset(int n, int val, int *x);

@@ -40,7 +40,7 @@ void errexit(char *f_str,...)
 /*************************************************************************
 * The following function allocates an array of integers
 **************************************************************************/
-int *imalloc(int n, char *msg)
+int *imalloc(size_t n, char *msg)
 {
   if (n == 0)
     return NULL;
@@ -52,7 +52,7 @@ int *imalloc(int n, char *msg)
 /*************************************************************************
 * The following function allocates an array of integers
 **************************************************************************/
-idxtype *idxmalloc(int n, char *msg)
+idxtype *idxmalloc(size_t n, char *msg)
 {
   if (n == 0)
     return NULL;
@@ -64,7 +64,7 @@ idxtype *idxmalloc(int n, char *msg)
 /*************************************************************************
 * The following function allocates an array of float 
 **************************************************************************/
-float *fmalloc(int n, char *msg)
+float *fmalloc(size_t n, char *msg)
 {
   if (n == 0)
     return NULL;
@@ -76,7 +76,7 @@ float *fmalloc(int n, char *msg)
 /*************************************************************************
 * The follwoing function allocates an array of integers
 **************************************************************************/
-int *ismalloc(int n, int ival, char *msg)
+int *ismalloc(size_t n, int ival, char *msg)
 {
   if (n == 0)
     return NULL;
@@ -89,7 +89,7 @@ int *ismalloc(int n, int ival, char *msg)
 /*************************************************************************
 * The follwoing function allocates an array of integers
 **************************************************************************/
-idxtype *idxsmalloc(int n, idxtype ival, char *msg)
+idxtype *idxsmalloc(size_t n, idxtype ival, char *msg)
 {
   if (n == 0)
     return NULL;
@@ -101,7 +101,7 @@ idxtype *idxsmalloc(int n, idxtype ival, char *msg)
 /*************************************************************************
 * This function is my wrapper around malloc
 **************************************************************************/
-void *GKmalloc(int nbytes, char *msg)
+void *GKmalloc(size_t nbytes, char *msg)
 {
   void *ptr;
 
