@@ -30,7 +30,7 @@
 #include "pcqueue.h"
 
 #define FLIPBIT(node,bitnumber) (node ^ (1 << bitnumber))
-#define MAX_QLEN 64
+#define MAX_QLEN 200
 
 /*
     To reduce the buffer used in broadcast and distribute the load from 
@@ -836,17 +836,20 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     exit (1);
   }
   
-  int nslots = 32 ; /* elan_base->tport_nslots;*/
+  int nslots = elan_base->tport_nslots;
   if(nslots < elan_base->state->nvp)
     nslots = elan_base->state->nvp;
-  if(nslots > 256)
-    nslots = 256;
+  //  if(nslots > 256)
+  //nslots = 256;
+  nslots += 16;
+
+  //  nslots = 256;
 
   if (!(elan_port = elan_tportInit(elan_base->state,
 				   (ELAN_QUEUE *)elan_q,
 				   /*elan_main2elan(elan_base->state, q),*/
 				   nslots /*elan_base->tport_nslots*/, 
-				   elan_base->tport_smallmsg,
+				   1024 /*elan_base->tport_smallmsg*/,
 				   elan_base->tport_bigmsg,
 				   elan_base->waitType, elan_base->retryCount,
 				   &(elan_base->shm_key),
