@@ -302,7 +302,8 @@ int n; CmiHandler h;
     int newmax = ((n<<1)+10);
     int bytes = max*sizeof(CmiHandler);
     int newbytes = newmax*sizeof(CmiHandler);
-    CmiHandler *new = (CmiHandler*)CmiAlloc(newbytes);
+    CmiHandler *new = (CmiHandler*)malloc(newbytes);
+    _MEMCHECK(new);
     memcpy(new, tab, bytes);
     memset(((char *)new)+bytes, 0, (newbytes-bytes));
     free(tab); tab=new;
@@ -1462,6 +1463,10 @@ static void on_busy(void *tmp)
   CpvAccess(call_cancel) = 1;
 }
 
+#if CMK_THREADS_USE_ISOMALLOC
+extern void CthHandlerInit(void);
+#endif
+
 void ConverseCommonInit(char **argv)
 {
   int i;
@@ -1472,6 +1477,9 @@ void ConverseCommonInit(char **argv)
   CstatsInit(argv);
   CcdModuleInit(argv);
   CmiHandlerInit();
+#if CMK_THREADS_USE_ISOMALLOC
+  CthHandlerInit();
+#endif
   CmiMemoryInit(argv);
   CmiDeliversInit();
   CsdInit(argv);

@@ -962,6 +962,7 @@ delete_slotset(slotset* ss)
   free(ss);
 }
 
+#if CMK_THREADS_DEBUG
 static void
 print_slots(slotset *ss)
 {
@@ -970,9 +971,11 @@ print_slots(slotset *ss)
   CmiPrintf("[%d] emptyslots = %d\n", CmiMyPe(), ss->emptyslots);
   for(i=0;i<ss->maxbuf;i++) {
     if(ss->buf[i].nslots)
-      CmiPrintf("[%d] (%d, %d) \n", CmiMyPe(), ss->buf[i].startslot, ss->buf[i].nslots);
+      CmiPrintf("[%d] (%d, %d) \n", CmiMyPe(), ss->buf[i].startslot, 
+          ss->buf[i].nslots);
   }
 }
+#endif
 
 /*
  * this message is used both as a request and a reply message.
@@ -1035,7 +1038,6 @@ CpvStaticDeclare(int, numslots);
 static void
 reqspecific(slotmsg *msg)
 {
-  CmiPrintf("[%d] req from %d for %d slots starting from %d\n", CmiMyPe(), msg->pe, msg->nslots, msg->slot);
   grab_slots(CpvAccess(myss),msg->slot,msg->nslots);
   CmiSetHandler(msg,CpvAccess(respSpecHdlr));
   CmiSyncSendAndFree(msg->pe, sizeof(slotmsg), msg);
@@ -1048,7 +1050,6 @@ static void
 respspecific(slotmsg *msg)
 {
   CthThread t = msg->t;
-  CmiPrintf("[%d] response for %d slots starting from %d\n", CmiMyPe(), msg->nslots, msg->slot);
   t->slotnum = msg->slot;
   if(t->awakened)
     CthAwaken(t);
@@ -1237,16 +1238,6 @@ void CthInit(char **argv)
   CpvInitialize(slotset *, myss);
   CpvAccess(myss) = new_slotset(CmiMyPe()*CpvAccess(numslots), CpvAccess(numslots));
 
-  CpvInitialize(int, reqHdlr);
-  CpvInitialize(int, respHdlr);
-  CpvInitialize(int, reqSpecHdlr);
-  CpvInitialize(int, respSpecHdlr);
-
-  CpvAccess(reqHdlr) = CmiRegisterHandler((CmiHandler)reqslots);
-  CpvAccess(respHdlr) = CmiRegisterHandler((CmiHandler)respslots);
-  CpvAccess(reqSpecHdlr) = CmiRegisterHandler((CmiHandler)reqspecific);
-  CpvAccess(respSpecHdlr) = CmiRegisterHandler((CmiHandler)respspecific);
-
   CpvInitialize(int, _numSwitches);
   CpvAccess(_numSwitches) = 0;
 
@@ -1265,25 +1256,41 @@ void CthInit(char **argv)
   CthSetStrategyDefault(t);
 }
 
+void CthHandlerInit(void)
+{
+  CpvInitialize(int, reqHdlr);
+  CpvInitialize(int, respHdlr);
+  CpvInitialize(int, reqSpecHdlr);
+  CpvInitialize(int, respSpecHdlr);
+
+  CpvAccess(reqHdlr) = CmiRegisterHandler((CmiHandler)reqslots);
+  CpvAccess(respHdlr) = CmiRegisterHandler((CmiHandler)respslots);
+  CpvAccess(reqSpecHdlr) = CmiRegisterHandler((CmiHandler)reqspecific);
+  CpvAccess(respSpecHdlr) = CmiRegisterHandler((CmiHandler)respspecific);
+}
+
 CthThread CthSelf()
 {
   return CthCpvAccess(CthCurrent);
 }
 
-void CthFree(t)
-CthThread t;
+static void
+CthFreeKeepSlots(CthThread t)
 {
   if (t==CthCpvAccess(CthCurrent)) {
     CthCpvAccess(CthExiting) = 1;
   } else {
     if (t->data) free(t->data);
-    if(t->slotnum >= 0)
-    {
-      free_slots(CpvAccess(myss), t->slotnum, t->nslots);
-      unmap_slots(t->slotnum, t->nslots);
-    }
+    if(t->slotnum >= 0) unmap_slots(t->slotnum, t->nslots);
     free(t);
   }
+}
+
+void CthFree(t)
+CthThread t;
+{
+  if(t->slotnum >= 0) free_slots(CpvAccess(myss), t->slotnum, t->nslots);
+  CthFreeKeepSlots(t);
 }
 
 static void *
@@ -1376,7 +1383,6 @@ CthVoidFn fn; void *arg; int size;
   else
   {
     grab_slots(CpvAccess(myss), slotnum, nslots);
-    print_slots(CpvAccess(myss));
     CthStackCreate(result, fn, arg, slotnum, nslots);
   }
   return result;
@@ -1491,22 +1497,22 @@ CthThread CthPup(pup_er p, CthThread t)
     _MEMCHECK(stack);
     if(stack != t->stack)
       CmiAbort("Stack pointers do not match after migration!!\n");  
-    if(homePe == CmiMyPe())
+    if(pup_isUserlevel(p)) 
     {
-      CmiPrintf("[%d] grabbing (%d, %d)\n", CmiMyPe(), t->slotnum, t->nslots);
-      grab_slots(CpvAccess(myss), t->slotnum, t->nslots);
-      print_slots(CpvAccess(myss));
-    } else {
-      slotmsg *msg = (slotmsg*) CmiAlloc(sizeof(slotmsg));
-      _MEMCHECK(msg);
-      msg->pe = CmiMyPe();
-      msg->slot = t->slotnum;
-      t->slotnum = (-2);
-      msg->nslots = t->nslots;
-      msg->t = t;
-      CmiPrintf("[%d] Sending request to %d for (%d,%d)\n", CmiMyPe(), homePe, msg->slot, msg->nslots);
-      CmiSetHandler(msg, CpvAccess(reqSpecHdlr));
-      CmiSyncSendAndFree(homePe, sizeof(slotmsg), msg);
+      if(homePe == CmiMyPe())
+      {
+        grab_slots(CpvAccess(myss), t->slotnum, t->nslots);
+      } else {
+        slotmsg *msg = (slotmsg*) CmiAlloc(sizeof(slotmsg));
+        _MEMCHECK(msg);
+        msg->pe = CmiMyPe();
+        msg->slot = t->slotnum;
+        t->slotnum = (-2);
+        msg->nslots = t->nslots;
+        msg->t = t;
+        CmiSetHandler(msg, CpvAccess(reqSpecHdlr));
+        CmiSyncSendAndFree(homePe, sizeof(slotmsg), msg);
+      }
     }
   }
   pup_bytes(p, (void*)t->data, t->datasize);
@@ -1522,7 +1528,7 @@ CthThread CthPup(pup_er p, CthThread t)
 
   if(pup_isDeleting(p))
   {
-    CthFree(t);
+    CthFreeKeepSlots(t);
     t = 0;
   }
   return t;
