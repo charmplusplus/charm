@@ -1,0 +1,8 @@
+Things to do for Charm++/Converse Release 5.5
+---------------------------------------------
+* Integrate projections in the distributed source.
+* Make RPMs. Both source and binary.
+* Move all the data structures headers and sources to util.
+* Check documentation for correctness (mainly see that all example
+  programs in the manual work.)
+* Test. Test. Test.
