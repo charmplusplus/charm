@@ -307,7 +307,6 @@ class CkComponentID {
 	int index; //Index to pass to group's ckLookupComponent method
  public:
 	CkComponentID() {index=-1;}
-	CkComponentID(int ignored) {index=-1;} //<- stupid; but needed by CkVec
 	CkComponentID(const CkGroupID &gid_,int index_)
 		:gid(gid_), index(index_) {}
 	CkComponent *ckLookup(void) const;

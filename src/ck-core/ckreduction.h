@@ -243,7 +243,7 @@ private:
 	public:
 		int gcount;//Adjustment to global count (applied at reduction end)
 		int lcount;//Adjustment to local count (applied continually)
-		countAdjustment(int ignored=0) {gcount=lcount=0;}
+		countAdjustment(void) {gcount=lcount=0;}
 	};
 	
 	//This vector of adjustments is indexed by redNo,
