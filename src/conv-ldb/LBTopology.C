@@ -166,14 +166,14 @@ LBTOPO_MACRO(LBTopo_graph);
 
 int LBTopo_graph::max_neighbors()
 {
-  return (int)(sqrt(CmiNumPes())+0.5);
+  return (int)(sqrt(1.0*CmiNumPes())+0.5);
 }
 
 extern "C" void gengraph(int, int, int, int *, int *, int);
 
 void LBTopo_graph::neighbors(int mype, int* na, int &nb)
 {
-  gengraph(CmiNumPes(), (int)(sqrt(CmiNumPes())+0.5), 234, na, &nb, 0);
+  gengraph(CmiNumPes(), (int)(sqrt(1.0*CmiNumPes())+0.5), 234, na, &nb, 0);
 }
 
 //
