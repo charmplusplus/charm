@@ -105,6 +105,7 @@ VERBOSE="no"
 DEBUG_SCRIPT=""
 SAVE=""
 
+DOCOMPILE="no"
 DOLINK="no"
 OUTPUT=""
 CL_OPTS=$CL_DEF
@@ -159,7 +160,8 @@ do
 		;;
 	-L*)
 		LIBDIR=`echo $arg | awk -F@ '{print substr($1,3)}'`
-		LINK=$LINK"	/LIBPATH:`cygpath -w $LIBDIR`"
+		LIBDIR="`cygpath -w $LIBDIR`"
+		LINK=$LINK"	/LIBPATH:$LIBDIR"
 		shift
 		;;
 	-l*)
@@ -193,7 +195,7 @@ do
 	
 #Object file or library-- add to link
 	*.o|*.a|*.lib)
-		LINK="$LINK $arg"
+		LINK="$LINK `cygpath -w $arg`"
 		DOLINK="yes"
 		;;
 #C source file
@@ -202,6 +204,7 @@ do
 		CL="$CL /Tc`cygpath -w $arg`"
 #		OUTPUT="/Fo$base.o"
 		LINK="$LINK $base.o"
+		DOCOMPILE="yes"
 		;;
 #C++ source file
 	*.C|*.cxx|*.cpp)
@@ -209,6 +212,7 @@ do
 		CL="$CL /Tp`cygpath -w $arg`"
 #		OUTPUT="/Fo$base.o"
 		LINK="$LINK $base.o"
+		DOCOMPILE="yes"
 		;;
 # Default
 	*)
@@ -217,7 +221,8 @@ do
 	esac
 done
 
-if [ "x$CL" != "x" ]
+#if [ "x$CL" != "x" ]
+if [ $DOCOMPILE = yes ]
 then
 	OPTS="$CL_OPTS $OUTPUT $CL"
 	[ $VERBOSE = yes ] && echo "unix2nt_cc> $CL_CMD" $OPTS
