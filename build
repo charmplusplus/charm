@@ -9,7 +9,7 @@ syntax() {
   echo '<versions>: ' 
   ( cd src ; ls -1 | egrep -v '(^Common)|(^CVS)|(^QuickThreads)|(^ccs-client)' | pr -3 -t )
 #  echo ''
-  echo '<options>:  gm'
+  echo '<options>:  vmi gm '
   echo '<charmc-options>: e.g. -g -save -verbose'
   echo 'Note: This script is trivial.  It'
   echo ' 1. Creates directories <version> and <version>/tmp';
@@ -36,12 +36,12 @@ do
           VERSION=$1 ; shift
           while [ ! $# -eq 0 ]
           do
-            if test "$1" = "gm"
+            if test "$1" = "gm" || test "$1" = "vmi"
             then
               if [ ! -f src/$VERSION/conv-mach-$1.h ]
               then
                 echo; 
-                echo "Error> option: $1 is not supported! in this version"; echo
+                echo "Error> option: $1 is not supported in this version!"; echo
                 exit 1
               fi
               MORE="$MORE $1"; shift;
@@ -84,7 +84,7 @@ chmod +x $VERSION/tmp/system_ln
 ln -s "../../src/Common/scripts/Makefile" $VERSION/tmp/Makefile
 
 #special options
-echo "Generating $VERSION/tmp/conv-mach-opt.h"
+echo "Generating $VERSION/tmp/conv-mach-opt.h, conv-mach-opt.sh"
 /bin/rm -f $VERSION/tmp/conv-mach-opt.h
 /bin/rm -f $VERSION/tmp/conv-mach-opt.sh
 touch $VERSION/tmp/conv-mach-opt.h
@@ -93,7 +93,10 @@ if test -n "$MORE"
 then
   for i in $MORE
   do
+    touch $VERSION/tmp/$i
+    echo '/* '"src/$VERSION/conv-mach-$i.h"' */' >> $VERSION/tmp/conv-mach-opt.h
     cat src/$VERSION/conv-mach-$i.h >> $VERSION/tmp/conv-mach-opt.h
+    echo '# '"src/$VERSION/conv-mach-$i.sh" >> $VERSION/tmp/conv-mach-opt.sh
     cat src/$VERSION/conv-mach-$i.sh >> $VERSION/tmp/conv-mach-opt.sh
   done
 fi
