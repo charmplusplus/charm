@@ -13,7 +13,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.18  1995-10-19 18:21:39  jyelon
+ * Revision 1.19  1995-10-20 17:29:10  jyelon
+ * *** empty log message ***
+ *
+ * Revision 1.18  1995/10/19  18:21:39  jyelon
  * moved CthSetStrategyDefault to convcore.c
  *
  * Revision 1.17  1995/10/19  04:19:47  jyelon
@@ -188,8 +191,8 @@
 
 #ifdef CMK_THREADS_USE_ALLOCA_WITH_HEADER_FILE
 #include <alloca.h>
-#define CMK_THREADS_USE_ALLOCA
 #endif
+
 
 #ifdef CMK_THREADS_USE_ALLOCA
 #include <stdio.h>
@@ -228,8 +231,8 @@ int CthImplemented()
 
 void CthInit()
 {
-  char *sp1 = alloca(8);
-  char *sp2 = alloca(8);
+  char *sp1 = (char *)alloca(8);
+  char *sp2 = (char *)alloca(8);
   if (sp2<sp1) thread_growsdown = 1;
   else         thread_growsdown = 0;
   thread_datasize=1;
@@ -256,7 +259,7 @@ CthThread t;
   /* the longjmp moves the stack pointer down (this way,  */
   /* the rs6000 doesn't complain about "longjmp to an     */
   /* inactive stack frame"                                */
-  oldsp = alloca(0);
+  oldsp = (char *)alloca(0);
   newsp = t->top;
   thread_current->top = oldsp;
   if (thread_growsdown) {
@@ -311,7 +314,7 @@ CthVoidFn fn; void *arg; int size;
   CthThread  result; char *oldsp, *newsp; int offs, erralloc;
   if (size==0) size = STACKSIZE;
   result = (CthThread)CmiAlloc(sizeof(struct CthThreadStruct) + size);
-  oldsp = alloca(0);
+  oldsp = (char *)alloca(0);
   if (thread_growsdown) {
       newsp = ((char *)(result->stack)) + size - SLACK;
       offs = oldsp - newsp;

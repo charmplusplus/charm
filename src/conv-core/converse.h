@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.30  1995-10-19 18:22:08  jyelon
+ * Revision 2.31  1995-10-20 17:29:10  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.30  1995/10/19  18:22:08  jyelon
  * *** empty log message ***
  *
  * Revision 2.29  1995/10/18  22:20:37  jyelon
@@ -345,6 +348,9 @@ void   CmiDeliverSpecificMsg   CMK_PROTO((int handler));
 
 /****** CTH: THE THREADS PACKAGE ******/
 
+#ifdef CMK_THREADS_USE_ALLOCA_WITH_HEADER_FILE
+#define CMK_THREADS_USE_ALLOCA
+#endif
 
 typedef struct CthThreadStruct *CthThread;
 
