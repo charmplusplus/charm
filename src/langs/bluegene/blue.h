@@ -108,6 +108,7 @@ int  BgMyRank();	/* node ID, this is local ID */
 int  BgMyNode();
 
 int BgNodeToPE(int node);         /* return a real processor number from a bg node */
+int BgTraceProjectionOn(int pe);    /* true if pe is on for trace projections */
 
 /**
    get and set number of worker and communication thread 

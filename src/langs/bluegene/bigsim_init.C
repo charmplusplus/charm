@@ -15,8 +15,6 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include "cklists.h"
-
 #define  DEBUGF(x)      //CmiPrintf x;
 
 #include "queueing.h"
@@ -111,6 +109,26 @@ CmiPrintf("\n\n\nBroadcast begin EXIT\n");
   }
 }
 
+int BGMach::traceProejctions(int pe)
+{
+  if (procList.isEmpty()) return 1;
+  return procList.includes(pe);
+}
+
+void BGMach::setNetworkModel(char *model)
+{
+  if (!strcmp(model, "lemieux"))
+        network = new LemieuxNetwork;
+  else if (!strcmp(model, "bluegenel"))
+        network = new BlueGeneLNetwork;
+  else if (!strcmp(model, "bluegene"))
+        network = new BlueGeneNetwork;
+  else if (!strcmp(model, "redstorm"))
+        network = new RedStormNetwork;
+  else
+        CmiAbort("BG> unknown network setup");
+}
+
 int BGMach::read(char *file)
 {
   ifstream configFile(file);
@@ -190,18 +208,15 @@ int BGMach::read(char *file)
       continue;
     }
     if (!strcmp(parameterName, "network")) {
-      if (!strcmp(parameterValue, "lemieux"))
-        network = new LemieuxNetwork;
-      else if (!strcmp(parameterValue, "bluegene"))
-        network = new BlueGeneNetwork;
-      else if (!strcmp(parameterValue, "redstorm"))
-        network = new RedStormNetwork;
-      else
-        CmiAbort("BG> unknown network setup");
+      setNetworkModel(parameterValue);
+      continue;
+    }
+    if (!strcmp(parameterName, "projections")) {
+      procList.set(strdup(parameterValue));
       continue;
     }
     if (CmiMyPe() == 0)
-      CmiPrintf("skip %s %s\n", parameterName, parameterValue);
+      CmiPrintf("skip %s '%s'\n", parameterName, parameterValue);
   }
 
   configFile.close();

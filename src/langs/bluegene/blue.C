@@ -567,6 +567,11 @@ void BgGetSize(int *sx, int *sy, int *sz)
   cva(bgMach).getSize(sx, sy, sz);
 }
 
+int BgTraceProjectionOn(int pe)
+{
+  return cva(bgMach).traceProejctions(pe);
+}
+
 /* return the total number of Blue gene nodes */
 int BgNumNodes()
 {
@@ -1014,7 +1019,14 @@ CmiStartFn bgMain(int argc, char **argv)
     init_counters();
   }
 #endif
+  CmiGetArgDoubleDesc(argv,"+bgcpufactor", &cva(bgMach).cpufactor, 
+		      "scale factor for wallclock time measured");
   
+  char *networkModel;
+  if (CmiGetArgStringDesc(argv, "+bgnetwork", &networkModel, "Network model")) {
+   cva(bgMach).setNetworkModel(networkModel);
+  }
+
   bgcorroff = 0;
   if(CmiGetArgFlagDesc(argv, "+bgcorroff", "Start with correction off")) 
     bgcorroff = 1;

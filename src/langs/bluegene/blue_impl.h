@@ -4,6 +4,8 @@
 #include "conv-mach.h"
 #include <stdlib.h>
 
+#include "ckliststring.h"
+
 #include "blue_types.h"
 #include "blue_timing.h"
 #include "blue_network.h"
@@ -30,6 +32,7 @@ public:
   double fpfactor;     /* fp time factor */
   char *traceroot;		/* bgTraceFile prefix */
   BigSimNetwork *network;	/* network setup */
+  CkListString procList;
 public:
   BGMach() {  nullify(); }
   ~BGMach() { if (network) delete network; }
@@ -53,6 +56,8 @@ public:
         p|x; p|y; p|z; p|numCth; p|numWth; 
 	p|stacksize; p|timingMethod; 
        }
+  int traceProejctions(int pe);
+  void setNetworkModel(char *model);
 };
 
 // simulation state
