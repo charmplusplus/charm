@@ -357,6 +357,14 @@ typedef struct CMK_MSG_HEADER_EXT   CmiMsgHeaderExt;
 #define CmiMsgHeaderSizeBytes (sizeof(CmiMsgHeaderBasic))
 #define CmiExtHeaderSizeBytes (sizeof(CmiMsgHeaderExt))
 
+#ifndef CmiReservedHeaderSize
+#if CMK_BLUEGENE_CHARM
+#  define CmiReservedHeaderSize   CmiBlueGeneMsgHeaderSizeBytes
+#else
+#  define CmiReservedHeaderSize   CmiExtHeaderSizeBytes
+#endif
+#endif
+
 /******** CMI, CSD: MANY LOW-LEVEL OPERATIONS ********/
 
 typedef struct {
