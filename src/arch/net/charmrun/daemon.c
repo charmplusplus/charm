@@ -137,6 +137,22 @@ int main()
     /*Add null terminator*/
     argLine[ChMessageInt(task.argLength)] = 0;
     
+    {
+    // converting between windows and unix directory name 
+    char c1, c2;
+#ifndef _WIN32
+    c1 = '\\'; c2 = '/';
+#else
+    c1 = '/'; c2 = '\\';
+#endif
+    int i;
+    /* modify \ to / in path */
+    for (i=0; task.pgm[i]!=0; i++) 
+      if (task.pgm[i]==c1) task.pgm[i]=c2;
+    for (i=0; task.cwd[i]!=0; i++) 
+      if (task.cwd[i]==c1) task.cwd[i]=c2;
+    }
+
     fprintf(logfile,"Invoking '%s'\n"
 	    "and argLine '%s'\n"
 	    "and environment '%s'\n"
