@@ -112,6 +112,7 @@ int *rtags;
   int headsize;
 
   while (1) {  
+    CsdScheduler(0);
     msg = (SMMessage)CmmGet(CpvAccess(SMMessages), ntags, tags, rtags);
     if (msg) break;
   }

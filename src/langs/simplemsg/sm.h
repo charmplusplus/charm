@@ -3,6 +3,13 @@
 
 #define SMWildCard CmmWildCard
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+extern void
+SMInit(char**);
+
 extern void 
 GeneralSend(int pe, int ntags, int *tags, void *buf, int buflen);
 
@@ -13,31 +20,31 @@ GeneralBroadcast(int rootpe, int ntags, int *tags,
 extern int 
 GeneralRecv(int ntags, int *tags, void *buf, int buflen, int *rtags);
 
-static void send(pe, tag, buf, buflen)
-int pe, buflen;
-int tag;
-void *buf;
+#ifdef __cplusplus
+}
+#endif
+
+static void send(int pe, int tag, int buflen, void *buf)
 { 
-  int CsmTag=(tag); 
-  GeneralSend(pe, 1, &CsmTag, buf, buflen); 
+  int tags[2];
+  tags[0] = CmiMyPe();
+  tags[1] = (tag); 
+  GeneralSend(pe, 2, tags, buf, buflen); 
 }
 
-static int broadcast(rootpe, tag, buf, buflen, rtag)
-int rootpe, buflen;
-int tag, *rtag;
-void *buf;
+static int broadcast(int rootpe, int tag, int buflen, void *buf, int *rtag)
 { 
   int CsmTag=(tag); 
   return GeneralBroadcast(rootpe, 1, &CsmTag, buf, buflen, rtag); 
 }
 
-static int recv(tag, buf, buflen, rtag)
-int tag, buflen;
-int *rtag;
-void *buf;
+static int recv(int pe, int tag, int buflen, void *buf)
 {
-  int CsmTag=(tag); 
-  return GeneralRecv(1, &CsmTag, buf, buflen, rtag); 
+  int tags[2];
+  int rtag;
+  tags[0] = pe;
+  tags[1] = tag;
+  return GeneralRecv(2, tags, buf, buflen, &rtag); 
 }
 
 #endif
