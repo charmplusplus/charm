@@ -52,11 +52,16 @@ void BaseLB::pup(PUP::er &p) {
   }
 }
 
+void BaseLB::flushStates() {
+  theLbdb->ClearLoads();
+}
+
 #else
 BaseLB::~BaseLB() {} 
 void BaseLB::initLB(const CkLBOptions &) {}
 void BaseLB::unregister() {}
 void BaseLB::pup(PUP::er &p) {}
+void BaseLB::flushStates() {}
 #endif
 
 #include "BaseLB.def.h"
