@@ -2,7 +2,7 @@
 #define _fftlib_h_
 
 #include <charm++.h>
-#include "util.h"
+#include "pairutil.h"
 
 
 #include "fftlib.decl.h"
@@ -226,7 +226,7 @@ class SparseSlabArray: public SlabArray {
 
 class NormalLineArray : public CBase_NormalLineArray {
  public:
-    static const short MAX_FFTS = 4;
+    static const short MAX_FFTS = 5;
     NormalLineArray (CkMigrateMessage *m) {}
     NormalLineArray () {
 	id = -1;

@@ -12,9 +12,9 @@ NormalLineArray::doFirstFFT(int fftid, int direction)
     int sPencilsPerSlab = fftinfo.sPencilsPerSlab;
 
     if(direction)
-	fftw(fwdplan, sPencilsPerSlab, line, 1, sizeX, NULL, 0, 0); // sPencilsPerSlab many 1-D fft's 
+	fftw(fwdplan, sPencilsPerSlab, (fftw_complex*)line, 1, sizeX, NULL, 0, 0); // sPencilsPerSlab many 1-D fft's 
     else
-	fftw_one(bwdplan, line, NULL);
+	fftw_one(bwdplan, (fftw_complex*)line, NULL);
     
     // thisIndex.x is y-coord
     int x, y, z;
@@ -76,9 +76,9 @@ NormalLineArray::doSecondFFT(int ypos, complex *val, int datasize, int fftid, in
 	count[fftid] = 0;
 	int y;
 	if(direction)
-	    fftw_one(fwdplan, line, NULL);
+	    fftw_one(fwdplan, (fftw_complex*)line, NULL);
 	else
-	    fftw_one(bwdplan, line, NULL);
+	    fftw_one(bwdplan, (fftw_complex*)line, NULL);
 	
 #ifdef VERBOSE
 	CkPrintf("Second FFT done at [%d %d]\n", thisIndex.x, thisIndex.y);
@@ -136,9 +136,9 @@ NormalLineArray::doThirdFFT(int zpos, int ypos, complex *val, int datasize, int 
     if (count[fftid] == sizeX* expectSize) {
 	count[fftid] = 0;
 	if(direction)
-	    fftw_one(fwdplan, line, NULL);
+	    fftw_one(fwdplan, (fftw_complex*)line, NULL);
 	else
-	    fftw(bwdplan, sPencilsPerSlab, line, 1, sizeX, NULL, 0, 0); // sPencilsPerSlab many 1-D fft's 
+	    fftw(bwdplan, sPencilsPerSlab, (fftw_complex*)line, 1, sizeX, NULL, 0, 0); // sPencilsPerSlab many 1-D fft's 
 #ifdef VERBOSE
 	CkPrintf("Third FFT done at [%d %d]\n", thisIndex.x, thisIndex.y);
 #endif

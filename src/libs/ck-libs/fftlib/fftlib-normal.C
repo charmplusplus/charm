@@ -17,7 +17,7 @@ NormalSlabArray::doFFT(int src_id, int dst_id)
     int p;
     if (fwd2DPlan)
 	for(p = 0; p < fftinfo.srcPlanesPerSlab; p++)
-	    fftwnd_one(fwd2DPlan, dataPtr + p * planeSize, NULL);
+	    fftwnd_one(fwd2DPlan, (fftw_complex*)dataPtr + p * planeSize, NULL);
     
     // allocating the data for sending to destination side
     complex *sendData = new complex[fftinfo.srcPlanesPerSlab * fftinfo.destPlanesPerSlab * lineSize];
@@ -68,7 +68,7 @@ NormalSlabArray::acceptDataForFFT(int numPoints, complex *points, int posn, int 
 	    for(p = 0; p < fftinfo.destPlanesPerSlab; p++) {
 		fftw(fwd1DPlan, 
 		     lineSize,
-		     dataPtr + p * planeSize,
+		     (fftw_complex*)dataPtr + p * planeSize,
 		     lineSize, 1, //stride, nextFFT
 		     NULL, 0, 0);
 	    }
@@ -91,7 +91,7 @@ NormalSlabArray::doIFFT(int src_id, int dst_id)
     if (bwd2DPlan)
 	for(p = 0; p < fftinfo.destPlanesPerSlab; p++)
 	    fftwnd_one(bwd2DPlan, 
-		       dataPtr + p * planeSize,
+		       (fftw_complex*)dataPtr + p * planeSize,
 		       NULL);
     
     complex *sendData = new complex[fftinfo.srcPlanesPerSlab * fftinfo.destPlanesPerSlab * lineSize];
@@ -138,7 +138,7 @@ NormalSlabArray::acceptDataForIFFT(int numPoints, complex *points, int posn, int
 	    for(p = 0; p < fftinfo.srcPlanesPerSlab; p++) {
 		fftw(bwd1DPlan,
 		     lineSize,
-		     dataPtr + p * planeSize,
+		     (fftw_complex*)dataPtr + p * planeSize,
 		     lineSize, 1, //stride, nextFFT
 		     NULL, 0, 0);
 	    }

@@ -17,16 +17,16 @@ INCDIR=$(CDIR)/include/fftlib
 HEADERS= $(INCDIR)/fftlib.h\
 	 $(INCDIR)/fftlib.decl.h\
 	 $(INCDIR)/fftlib.def.h\
-	 $(INCDIR)/util.h
+	 $(INCDIR)/fftutil.h
 
 all: $(LIBDEST) $(HEADERS)
 
-$(HEADERS): fftlib.h fftlib.decl.h util.h
+$(HEADERS): fftlib.h fftlib.decl.h fftutil.h
 	test ! -d $(INCDIR) && mkdir $(INCDIR) || true
 	/bin/cp fftlib.h $(INCDIR)
 	/bin/cp fftlib.decl.h $(INCDIR)
 	/bin/cp fftlib.def.h $(INCDIR)
-	/bin/cp util.h $(INCDIR)
+	/bin/cp fftutil.h $(INCDIR)
 
 $(LIBDEST): $(LIBOBJ)
 	$(CHARMC) -o $(LIBDEST) $(LIBOBJ)
