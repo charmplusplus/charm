@@ -885,9 +885,9 @@ conv-cpm.o: conv-cpm.c
 XIHEADERS=xi-symbol.h xi-util.h xi-grammar.tab.h
 CHARMXI=xi-main.o xi-symbol.o xi-grammar.tab.o xi-scan.o xi-util.o
 SDAGOBJ=sdag-main.o sdag-trans.o CLexer.o CParser.o CParsedFile.o CParseNode.o \
-	sdag-globals.o CParseNodeProcess.o CEntry.o
+	sdag-globals.o CParseNodeProcess.o CEntry.o COverlap.o
 SDAGHEADERS=CLexer.h CToken.h EToken.h CParser.h CParsedFile.h CParseNode.h \
-	sdag-globals.h CEntry.h
+	sdag-globals.h CEntry.h COverlap.h
 
 charmxi: $(CHARMXI) $(SDAGOBJ)
 	$(SEQCHARMC) -language c++ -cp ../bin/ -o charmxi $(CHARMXI) $(SDAGOBJ)
@@ -933,6 +933,9 @@ CParseNodeProcess.o: CParseNodeProcess.C $(XIHEADERS) $(SDAGHEADERS)
 
 CEntry.o: CEntry.C $(XIHEADERS) $(SDAGHEADERS)
 	$(SEQCHARMC) -c CEntry.C
+
+COverlap.o: COverlap.C $(XIHEADERS) $(SDAGHEADERS)
+	$(SEQCHARMC) -c COverlap.C
 
 ###############################################################################
 #
