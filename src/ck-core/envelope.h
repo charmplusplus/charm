@@ -253,6 +253,7 @@ extern void CkUnpackMessage(envelope **pEnv);
 class MsgPool: public SafePool<void *> {
 private:
     static void *_alloc(void) {
+      /* CkAllocSysMsg() called in .def.h is not thread of sigio safe */
       register envelope *env = _allocEnv(ForChareMsg,0,0);
       env->setQueueing(_defaultQueueing);
       env->setMsgIdx(0);

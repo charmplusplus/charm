@@ -26,13 +26,24 @@ extern int index_skipCldHandler;
 
 extern CkMigratable * CkArrayMessageObjectPtr(envelope *env);
 
+#define OBJQ_FIFO   1
+
 // turn on object queue
 void CkObjectMsgQ::create() { 
-  if (!objQ) objQ = (void *)CqsCreate(); 
+  if (!objQ) 
+#if OBJQ_FIFO
+    objQ = (void *)CdsFifo_Create();
+#else
+    objQ = (void *)CqsCreate(); 
+#endif
 }
 
 int CkObjectMsgQ::length() const { 
+#if OBJQ_FIFO
+  return objQ?CdsFifo_Length((CdsFifo)objQ):0; 
+#else
   return objQ?CqsLength((Queue)objQ):0; 
+#endif
 }
 
 CkObjectMsgQ::~CkObjectMsgQ() 
@@ -40,7 +51,11 @@ CkObjectMsgQ::~CkObjectMsgQ()
   if (objQ) {
     process();
     // delete objQ
+#if OBJQ_FIFO
+    CdsFifo_Destroy(objQ);
+#else
     CqsDelete((Queue)objQ);
+#endif
   }
 }
 
@@ -54,7 +69,11 @@ void CkObjectMsgQ::process()
   if (mlen == 0) return;
 
   ObjectToken *tok;
+#if OBJQ_FIFO
+  tok = (ObjectToken*)CdsFifo_Dequeue(objQ);
+#else
   CqsDequeue((Queue)objQ, (void **)&tok);
+#endif
   while (tok != NULL) {
     envelope *env = (envelope *)tok->message;
     if (env) {
@@ -70,7 +89,11 @@ void CkObjectMsgQ::process()
     }
     else
       CkpvAccess(_tokenPool)->put(tok);
+#if OBJQ_FIFO
+    tok = (ObjectToken*)CdsFifo_Dequeue(objQ);
+#else
     CqsDequeue((Queue)objQ, (void **)&tok);
+#endif
   }
 #endif
 }
@@ -125,9 +148,13 @@ void _enqObjQueue(Chare *obj, envelope *env)
   	token, env->getQueueing(),env->getPriobits(),
   	(unsigned int *)env->getPrioPtr());
     // also enq to object queue
+#if OBJQ_FIFO
+    CdsFifo_Enqueue(obj->CkGetObjQueue().queue(), token);
+#else
     CqsEnqueueGeneral((Queue)(obj->CkGetObjQueue().queue()),
   	token, env->getQueueing(),env->getPriobits(),
   	(unsigned int *)env->getPrioPtr());
+#endif
 }
 #endif
 
