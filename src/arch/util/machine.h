@@ -22,12 +22,15 @@ FILE *debugLog;
 	MACHSTATE_I(prio,(debugLog,"[%.3f]> "str"\n",CmiWallTimer(),a,b))
 # define MACHSTATE3(prio,str,a,b,c) \
 	MACHSTATE_I(prio,(debugLog,"[%.3f]> "str"\n",CmiWallTimer(),a,b,c))
+# define MACHSTATE4(prio,str,a,b,c,d) \
+	MACHSTATE_I(prio,(debugLog,"[%.3f]> "str"\n",CmiWallTimer(),a,b,c,d))
 #else
 # define MACHINE_DEBUG_LOG 0
 # define MACHSTATE(n,x) /*empty*/
 # define MACHSTATE1(n,x,a) /*empty*/
 # define MACHSTATE2(n,x,a,b) /*empty*/
 # define MACHSTATE3(n,x,a,b,c) /*empty*/
+# define MACHSTATE4(n,x,a,b,c,d) /*empty*/
 #endif
 
 
