@@ -1,5 +1,8 @@
 #include "ObjGraph.h"
 
+static const double alpha = 30.e-6;
+static const double beta = 3.e-9;
+
 ObjGraph::ObjGraph(int count, CentralLB::LDStats* _stats)
 {
   stats = _stats;
@@ -115,6 +118,11 @@ ObjGraph::~ObjGraph()
 {
   delete [] nodelist;
   delete [] edgelist;
+}
+
+double ObjGraph::EdgeWeight(Edge* e) {
+  LDCommData commData = stats[e->proc].commData[e->index];
+  return commData.messages * alpha + commData.bytes * beta;
 }
 
 int ObjGraph::calc_hashval(LDOMid omid, LDObjid id)

@@ -53,19 +53,21 @@ public:
     return stats[pe].objData[index].wallTime;
   };
 
+  double EdgeWeight(Edge* e);
+
 private:
   enum { hash_max = 256 };
 
   int calc_hashval(LDOMid, LDObjid);
   Node* find_node(LDOMid, LDObjid);
 
-  CentralLB::LDStats* stats;
   Edge* edgelist;
   Node* node_table[hash_max];
 
   int n_objs;
   int n_edges;
   Node* nodelist;
+  CentralLB::LDStats* stats;
 };
 
 #endif
