@@ -72,8 +72,9 @@ class mySendMsg : public CMessage_mySendMsg {
 
 class partialResultMsg : public CMessage_partialResultMsg {
  public:
-  int N;
   complex *result;
+  int N;
+  int myoffset;
   int priority;
   CkCallback cb;
 
@@ -88,8 +89,8 @@ class partialResultMsg : public CMessage_partialResultMsg {
 
 class priorSumMsg : public CMessage_priorSumMsg {
  public:
-  int N;
   complex *result;
+  int N;
   int priority;
   CkCallback cb;
 

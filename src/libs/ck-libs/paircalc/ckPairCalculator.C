@@ -661,6 +661,7 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
 	CkArrayIndex4D idx(thisIndex.w, segment*grainSize, thisIndex.y, thisIndex.z);
 	partialResultMsg *msg = new (N*blocksize, 8*sizeof(int) )partialResultMsg;
 	msg->N=N*blocksize;
+	msg->myoffset = segment*blocksize;
 	memcpy(msg->result,mynewData+segment*N*blocksize,msg->N*sizeof(complex));
 	msg->cb= cb;
 	*((int*)CkPriorityPtr(msg)) = priority;
@@ -717,7 +718,7 @@ PairCalculator::sumPartialResult(partialResultMsg *msg)
   CkPrintf("[%d %d %d %d]: sum result from grain %d  count %d\n", thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z,msg->N, sumPartialCount);
 #endif
 
-  sumPartialResult(N, msg->result, 0);
+  sumPartialResult(msg->N, msg->result, msg->myoffset);
 
   delete msg;
 }
@@ -731,7 +732,7 @@ PairCalculator::sumPartialResult(priorSumMsg *msg)
   CkPrintf("[%d %d %d %d]: sum result \n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z );
 #endif
 
-  sumPartialResult(N, msg->result, 0);
+  sumPartialResult(msg->N, msg->result, 0);
 
   delete msg;
 }
@@ -747,22 +748,32 @@ PairCalculator::sumPartialResult(int size, complex *result, int offset)
   sumPartialCount++;
 
   if(!newData){
-    newData = new complex[N*grainSize];
-    memset(newData,0,N*grainSize*sizeof(complex));
+    newData = new complex[size];
+    memset(newData,0,size*sizeof(complex));
   }  
-  for(int i=0; i<N*grainSize; i++){
-    newData[i] += result[i];  
+  for(int i=0; i<size; i++){
+    newData[i] += result[i];
   }
   if (sumPartialCount == (S/grainSize)*blkSize) {
+#ifndef _PAIRCALC_SECONDPHASE_LOADBAL_
     for(int j=0; j<grainSize; j++){
-      CkCallback mycb(cb_ep, CkArrayIndex2D(thisIndex.y+j, thisIndex.w), cb_aid);
+      CkCallback mycb(cb_ep, CkArrayIndex2D(thisIndex.y+j+offset, thisIndex.w), cb_aid);
       mySendMsg *msg = new (N, 0)mySendMsg; // msg with newData (size N)
       memcpy(msg->data, newData+j*N, N * sizeof(complex));
       msg->N=N;
       mycb.send(msg);
     }
+#else
+    for(int j=0; j<grainSize/(S/grainSize); j++){
+      CkCallback mycb(cb_ep, CkArrayIndex2D(thisIndex.y+j+offset, thisIndex.w), cb_aid);
+      mySendMsg *msg = new (N, 0)mySendMsg; // msg with newData (size N)
+      memcpy(msg->data, newData+j*N, N * sizeof(complex));
+      msg->N=N;
+      mycb.send(msg);
+    }
+#endif
     sumPartialCount = 0;
-    memset(newData,0,N*grainSize*sizeof(complex));
+    memset(newData,0,size*sizeof(complex));
   }
 }
 
@@ -863,6 +874,7 @@ PairCalcReducer::broadcastEntireResult(int size, double* matrix, bool symmtype){
 
 void
 PairCalcReducer::broadcastEntireResult(int size, double* matrix1, double* matrix2, bool symmtype){
+    CkPrintf("On Pe %d -- %d objects\n", CkMyPe(), localElements[symmtype].length());
   for (int i = 0; i < localElements[symmtype].length(); i++)
     (localElements[symmtype])[i]->acceptResult(size, matrix1, matrix2); 
 }
