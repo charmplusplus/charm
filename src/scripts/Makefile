@@ -705,6 +705,7 @@ libf90charm.a: f90main.ci f90main.h f90main.C charmf.h charmf.C futil.f90
 ###############################################################################
 
 clean:
+	rm -f conv-autoconfig.h config.cache
 	rm -f charmxi conv-cpm
 	rm -f TAGS basics cmk_extras core
 	rm -f core *.a
