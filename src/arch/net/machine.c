@@ -188,6 +188,20 @@
 #include <stdarg.h> /*<- was <varargs.h>*/
 #include <string.h>
 
+#define MACHINE_DEBUG 0
+#if MACHINE_DEBUG
+/*Controls amount of debug messages: 1 (the lowest priority) is 
+extremely verbose, 2 shows most procedure entrance/exits, 
+3 shows most communication, and 5 only shows rare or unexpected items.
+Displaying lower priority messages doesn't stop higher priority ones.
+*/
+#define MACHINE_DEBUG_PRIO 2
+
+# define MACHSTATE(prio,str) if ((prio)>=MACHINE_DEBUG_PRIO) {printf("[%d %.3f] machine.c> %s\n",CmiMyPe(),CmiWallTimer(),str); fflush(stdout); }
+#else
+# define MACHSTATE(n,x) /*empty*/
+#endif
+
 #if CMK_USE_POLL
 #include <poll.h>
 #endif
@@ -307,13 +321,6 @@ static void PerrorExit(const char *msg)
   perror(msg);
   machine_exit(1);
 }
-
-static void KillOnSIGPIPE(int dummy)
-{
-  fprintf(stderr,"charmrun exited, terminating.\n");
-  machine_exit(0);
-}
-
 
 /*****************************************************************************
  *
@@ -508,64 +515,9 @@ void CmiAbort(const char *message)
  *
  *****************************************************************************/
 
-#if CMK_ASYNC_USE_FIOASYNC_AND_FIOSETOWN
-#include <sys/filio.h>
-void CmiEnableAsyncIO(fd)
-int fd;
-{
-  int pid = getpid();
-  int async = 1;
-  if ( ioctl(fd, FIOSETOWN, &pid) < 0  ) {
-    CmiError("setting socket owner: %s\n", strerror(errno)) ;
-    exit(1);
-  }
-  if ( ioctl(fd, FIOASYNC, &async) < 0 ) {
-    CmiError("setting socket async: %s\n", strerror(errno)) ;
-    exit(1);
-  }
-}
-#endif
-
-#if CMK_ASYNC_USE_FIOASYNC_AND_SIOCSPGRP
-#include <sys/filio.h>
-void CmiEnableAsyncIO(fd)
-int fd;
-{
-  int pid = -getpid();
-  int async = 1;
-  if ( ioctl(fd, SIOCSPGRP, &pid) < 0  ) {
-    CmiError("setting socket owner: %s\n", strerror(errno)) ;
-    exit(1);
-  }
-  if ( ioctl(fd, FIOASYNC, &async) < 0 ) {
-    CmiError("setting socket async: %s\n", strerror(errno)) ;
-    exit(1);
-  }
-}
-#endif
-
-#if CMK_ASYNC_USE_FIOSSAIOSTAT_AND_FIOSSAIOOWN
-#include <sys/ioctl.h>
-void CmiEnableAsyncIO(fd)
-int fd;
-{
-  int pid = getpid();
-  int async = 1;
-  if ( ioctl(fd, FIOSSAIOOWN, &pid) < 0  ) {
-    CmiError("setting socket owner: %s\n", strerror(errno)) ;
-    exit(1);
-  }
-  if ( ioctl(fd, FIOSSAIOSTAT, &async) < 0 ) {
-    CmiError("setting socket async: %s\n", strerror(errno)) ;
-    exit(1);
-  }
-}
-#endif
-
 #if CMK_ASYNC_USE_F_SETFL_AND_F_SETOWN
 #include <fcntl.h>
-void CmiEnableAsyncIO(fd)
-int fd;
+void CmiEnableAsyncIO(int fd)
 {
   if ( fcntl(fd, F_SETOWN, getpid()) < 0 ) {
     CmiError("setting socket owner: %s\n", strerror(errno)) ;
@@ -576,143 +528,149 @@ int fd;
     exit(1);
   }
 }
+#else
+void CmiEnableAsyncIO(int fd) { }
 #endif
 
-/*****************************************************************************
+#if 0
+void CmiEnableNonblockingIO(int fd) {
+  int on=1;
+  if (fcntl(fd,F_SETFL,O_NONBLOCK,&on)<0) {
+    CmiError("setting nonblocking IO: %s\n", strerror(errno)) ;
+    exit(1);
+  }
+}
+#endif
+
+/***********************************************************
+ * SMP Idle Locking
+ *   In an SMP system, idle processors need to sleep on a
+ * lock so that if a message for them arrives, they can be
+ * woken up.
+ **********************************************************/
+
+#if CMK_SHARED_VARS_NT_THREADS
+typedef struct {
+  int hasMessages; /*Is there a message waiting?*/
+  volatile int isSleeping; /*Are we asleep in this cond?*/
+  HANDLE sem;
+} CmiIdleLock;
+
+static void CmiIdleLock_init(CmiIdleLock *l) {
+  l->hasMessages=0;
+  l->isSleeping=0;
+  l->sem=CreateSemaphore(NULL,0,1, NULL);
+}
+
+static void CmiIdleLock_sleep(CmiIdleLock *l,int msTimeout) {
+  if (l->hasMessages) return;
+  l->isSleeping=1;
+  WaitForSingleObject(l->sem,msTimeout);
+  l->isSleeping=0;
+}
+
+static void CmiIdleLock_addMessage(CmiIdleLock *l) {
+  l->hasMessages=1;
+  if (l->isSleeping) { /*The PE is sleeping on this lock-- wake him*/
+    ReleaseSemaphore(l->sem,1,NULL);
+  }
+}
+static void CmiIdleLock_checkMessage(CmiIdleLock *l) {
+  l->hasMessages=0;
+}
+
+#elif CMK_SHARED_VARS_POSIX_THREADS_SMP
+typedef struct {
+  volatile int hasMessages; /*Is there a message waiting?*/
+  volatile int isSleeping; /*Are we asleep in this cond?*/
+  pthread_mutex_t mutex;
+  pthread_cond_t cond;
+} CmiIdleLock;
+
+static void CmiIdleLock_init(CmiIdleLock *l) {
+  l->hasMessages=0;
+  l->isSleeping=0;
+  pthread_mutex_init(&l->mutex,NULL);
+  pthread_cond_init(&l->cond,NULL);
+}
+
+static void getTimespec(int msFromNow,struct timespec *dest) {
+  struct timeval cur;
+  int secFromNow;
+  /*Get the current time*/
+  gettimeofday(&cur,NULL);
+  TIMEVAL_TO_TIMESPEC(&cur,dest);
+  /*Add in the wait time*/
+  secFromNow=msFromNow/1000;
+  msFromNow-=secFromNow*1000;
+  dest->tv_sec+=secFromNow;
+  dest->tv_nsec+=1000*1000*msFromNow;
+  /*Wrap around if we overflowed the nsec field*/
+  while (dest->tv_nsec>1000000000u) {
+    dest->tv_nsec-=1000000000;
+    dest->tv_sec++;
+  }
+}
+
+static void CmiIdleLock_sleep(CmiIdleLock *l,int msTimeout) {
+  struct timespec wakeup;
+
+  if (l->hasMessages) return;
+  l->isSleeping=1;
+  pthread_mutex_lock(&l->mutex);
+  getTimespec(msTimeout,&wakeup);
+  while (!l->hasMessages)
+    if (ETIMEDOUT==pthread_cond_timedwait(&l->cond,&l->mutex,&wakeup))
+      break;
+  pthread_mutex_unlock(&l->mutex);
+  l->isSleeping=0;
+}
+static void CmiIdleLock_wakeup(CmiIdleLock *l) {
+  l->hasMessages=1;
+  /*The PE is sleeping on this condition variable-- wake him*/
+  pthread_mutex_lock(&l->mutex);
+  pthread_cond_signal(&l->cond);
+  pthread_mutex_unlock(&l->mutex);
+}
+
+static void CmiIdleLock_addMessage(CmiIdleLock *l) {
+  if (l->isSleeping) CmiIdleLock_wakeup(l);
+  l->hasMessages=1;
+}
+static void CmiIdleLock_checkMessage(CmiIdleLock *l) {
+  l->hasMessages=0;
+}
+
+#else /* Non-SMP version-- infinitely simpler */
+typedef struct {
+  int hasMessages;
+} CmiIdleLock;
+#define CmiIdleLock_sleep(x) /*empty*/
+
+static void CmiIdleLock_init(CmiIdleLock *l) {
+  l->hasMessages=0;
+}
+static void CmiIdleLock_addMessage(CmiIdleLock *l) {
+  l->hasMessages=1;
+}
+static void CmiIdleLock_checkMessage(CmiIdleLock *l) {
+  l->hasMessages=0;
+}
+
+#endif
+
+/************************************************************
+ * 
+ * Processor state structure
  *
- * Communication Structures
- *
- *****************************************************************************/
-
-#define DGRAM_HEADER_SIZE 8
-
-#define CmiMsgHeaderSetLength(msg, len) (((int*)(msg))[2] = (len))
-#define CmiMsgHeaderGetLength(msg)      (((int*)(msg))[2])
-#define CmiMsgNext(msg) (*((void**)(msg)))
-
-#define DGRAM_SRCPE_MASK    (0xFFFF)
-#define DGRAM_MAGIC_MASK    (0xFF)
-#define DGRAM_SEQNO_MASK    (0xFFFFFFFF)
-
-#if CMK_NODE_QUEUE_AVAILABLE
-#define DGRAM_NODEMESSAGE   (0xFB)
-#endif
-#define DGRAM_DSTRANK_MAX   (0xFC)
-#define DGRAM_SIMPLEKILL    (0xFD)
-#define DGRAM_BROADCAST     (0xFE)
-#define DGRAM_ACKNOWLEDGE   (0xFF)
-
-
-
-typedef struct { char data[DGRAM_HEADER_SIZE]; } DgramHeader;
-
-/* the window size needs to be Cmi_window_size + sizeof(unsigned int) bytes) */
-typedef struct { DgramHeader head; char window[1024]; } DgramAck;
-
-#define DgramHeaderMake(ptr, dstrank, srcpe, magic, seqno) { \
-   ((unsigned short *)ptr)[0] = srcpe; \
-   ((unsigned short *)ptr)[1] = ((magic & DGRAM_MAGIC_MASK)<<8) | dstrank; \
-   ((unsigned int *)ptr)[1] = seqno; \
-}
-
-#define DgramHeaderBreak(ptr, dstrank, srcpe, magic, seqno) { \
-   unsigned short tmp; \
-   srcpe = ((unsigned short *)ptr)[0]; \
-   tmp = ((unsigned short *)ptr)[1]; \
-   dstrank = (tmp&0xFF); magic = (tmp>>8); \
-   seqno = ((unsigned int *)ptr)[1]; \
-}
-
-#define PE_BROADCAST_OTHERS (-1)
-#define PE_BROADCAST_ALL    (-2)
-
-#if CMK_NODE_QUEUE_AVAILABLE
-#define NODE_BROADCAST_OTHERS (-1)
-#define NODE_BROADCAST_ALL    (-2)
-#endif
-
-typedef struct OutgoingMsgStruct
-{
-  struct OutgoingMsgStruct *next;
-  int   src, dst;
-  int   size;
-  char *data;
-  int   refcount;
-  int   freemode;
-}
-*OutgoingMsg;
-
-typedef struct ExplicitDgramStruct
-{
-  struct ExplicitDgramStruct *next;
-  int  srcpe, rank, seqno;
-  unsigned int len, dummy; /* dummy to fix bug in rs6k alignment */
-  double data[1];
-}
-*ExplicitDgram;
-
-typedef struct ImplicitDgramStruct
-{
-  struct ImplicitDgramStruct *next;
-  struct OtherNodeStruct *dest;
-  int srcpe, rank, seqno;
-  char  *dataptr;
-  int    datalen;
-  OutgoingMsg ogm;
-}
-*ImplicitDgram;
-
-typedef struct OtherNodeStruct
-{
-  int nodestart, nodesize;
-  unsigned int IP, dataport;
-  struct sockaddr_in addr;
-
-  double                   send_primer;  /* time to send primer packet */
-  unsigned int             send_last;    /* seqno of last dgram sent */
-  ImplicitDgram           *send_window;  /* datagrams sent, not acked */
-  ImplicitDgram            send_queue_h; /* head of send queue */
-  ImplicitDgram            send_queue_t; /* tail of send queue */
-  unsigned int             send_next;    /* next seqno to go into queue */
-  unsigned int             send_ack_seqno; /* next ack seqno to send */
-
-  int                      asm_rank;
-  int                      asm_total;
-  int                      asm_fill;
-  char                    *asm_msg;
-  
-  int                      recv_ack_cnt; /* number of unacked dgrams */
-  double                   recv_ack_time;/* time when ack should be sent */
-  unsigned int             recv_expect;  /* next dgram to expect */
-  ExplicitDgram           *recv_window;  /* Packets received, not integrated */
-  int                      recv_winsz;   /* Number of packets in recv window */
-  unsigned int             recv_next;    /* Seqno of first missing packet */
-  unsigned int             recv_ack_seqno; /* last ack seqno received */
-
-  unsigned int             stat_total_intr; /* Total Number of Interrupts */
-  unsigned int             stat_proc_intr;  /* Processed Interrupts */
-  unsigned int             stat_send_pkt;   /* number of packets sent */
-  unsigned int             stat_resend_pkt; /* number of packets resent */
-  unsigned int             stat_send_ack;   /* number of acks sent */
-  unsigned int             stat_recv_pkt;   /* number of packets received */
-  unsigned int             stat_recv_ack;   /* number of acks received */
-  unsigned int             stat_ack_pkts;   /* packets acked */
- 
-  int sent_msgs;
-  int recd_msgs;
-  int sent_bytes;
-  int recd_bytes;
-}
-*OtherNode;
-
-static OtherNode *nodes_by_pe;  /* OtherNodes indexed by processor number */
-static OtherNode  nodes;        /* Indexed only by ``node number'' */
+ ************************************************************/
 
 typedef struct CmiStateStruct
 {
   int pe, rank;
   PCQueue recv;
   void *localqueue;
+  CmiIdleLock idle;
 }
 *CmiState;
 
@@ -727,6 +685,7 @@ void CmiStateInit(int pe, int rank, CmiState state)
   state->rank = rank;
   state->recv = PCQueueCreate();
   state->localqueue = CdsFifo_Create();
+  CmiIdleLock_init(&state->idle);
 #if CMK_NODE_QUEUE_AVAILABLE
   CsvInitialize(CmiNodeLock, CmiNodeRecvLock);
   CsvInitialize(PCQueue, NodeRecv);
@@ -736,44 +695,6 @@ void CmiStateInit(int pe, int rank, CmiState state)
   }
 #endif
 }
-
-static ExplicitDgram Cmi_freelist_explicit;
-/*static OutgoingMsg   Cmi_freelist_outgoing;*/
-
-#define FreeImplicitDgram(dg) {\
-  ImplicitDgram d=(dg);\
-  d->next = Cmi_freelist_implicit;\
-  Cmi_freelist_implicit = d;\
-}
-
-#define MallocImplicitDgram(dg) {\
-  ImplicitDgram d = Cmi_freelist_implicit;\
-  if (d==0) {d = ((ImplicitDgram)malloc(sizeof(struct ImplicitDgramStruct)));\
-             _MEMCHECK(d);\
-  } else Cmi_freelist_implicit = d->next;\
-  dg = d;\
-}
-
-#define FreeExplicitDgram(dg) {\
-  ExplicitDgram d=(dg);\
-  d->next = Cmi_freelist_explicit;\
-  Cmi_freelist_explicit = d;\
-}
-
-#define MallocExplicitDgram(dg) {\
-  ExplicitDgram d = Cmi_freelist_explicit;\
-  if (d==0) { d = ((ExplicitDgram)malloc \
-		   (sizeof(struct ExplicitDgramStruct) + Cmi_max_dgram_size));\
-              _MEMCHECK(d);\
-  } else Cmi_freelist_explicit = d->next;\
-  dg = d;\
-}
-
-/* Careful with these next two, need concurrency control */
-
-#define FreeOutgoingMsg(m) (free(m))
-#define MallocOutgoingMsg(m)\
-    {(m=(OutgoingMsg)malloc(sizeof(struct OutgoingMsgStruct))); _MEMCHECK(m);}
 
 /******************************************************************************
  *
@@ -790,103 +711,16 @@ int               Cmi_mynodesize;/* Number of processors in my address space */
 int               Cmi_numnodes;  /* Total number of address spaces */
 int               Cmi_numpes;    /* Total number of processors */
 static int        Cmi_nodestart; /* First processor in this address space */
-static int        Cmi_self_IP;
-static int        Cmi_charmrun_IP; /*Address of charmrun machine*/
+static skt_ip_t   Cmi_self_IP;
+static skt_ip_t   Cmi_charmrun_IP; /*Address of charmrun machine*/
 static int        Cmi_charmrun_port;
 static int        Cmi_charmrun_pid;
 static int        Cmi_charmrun_fd;
-static int    Cmi_max_dgram_size;
-static int    Cmi_os_buffer_size;
-static int    Cmi_window_size;
-static int    Cmi_half_window;
-static double Cmi_delay_retransmit;
-static double Cmi_ack_delay;
-static int    Cmi_dgram_max_data;
-static int    Cmi_tickspeed;
+
 static int    Cmi_netpoll;
 static int    Cmi_idlepoll;
 static int    Cmi_syncprint;
-static int writeableAcks,writeableDgrams;/*Write-queue counts (to know when to sleep)*/
-
 static int Cmi_print_stats = 0;
-
-/**
- * Printing Net Statistics -- milind
- */
-static char statstr[10000];
-
-void printNetStatistics(void)
-{
-  char tmpstr[1024];
-  OtherNode myNode;
-  int i;
-  unsigned int send_pkt=0, resend_pkt=0, recv_pkt=0, send_ack=0;
-  unsigned int recv_ack=0, ack_pkts=0;
-
-  myNode = nodes+CmiMyNode();
-  sprintf(tmpstr, "***********************************\n");
-  strcpy(statstr, tmpstr);
-  sprintf(tmpstr, "Net Statistics For Node %u\n", CmiMyNode());
-  strcat(statstr, tmpstr);
-  sprintf(tmpstr, "Interrupts: %u \tProcessed: %u\n",
-                  myNode->stat_total_intr, myNode->stat_proc_intr);
-  strcat(statstr, tmpstr);
-  sprintf(tmpstr, "Total Msgs Sent: %u \tTotal Bytes Sent: %u\n",
-                  myNode->sent_msgs, myNode->sent_bytes);
-  strcat(statstr, tmpstr);
-  sprintf(tmpstr, "Total Msgs Recv: %u \tTotal Bytes Recv: %u\n",
-                  myNode->recd_msgs, myNode->recd_bytes);
-  strcat(statstr, tmpstr);
-  sprintf(tmpstr, "***********************************\n");
-  strcat(statstr, tmpstr);
-  sprintf(tmpstr, "[Num]\tSENDTO\tRESEND\tRECV\tACKSTO\tACKSFRM\tPKTACK\n");
-  strcat(statstr,tmpstr);
-  sprintf(tmpstr, "=====\t======\t======\t====\t======\t=======\t======\n");
-  strcat(statstr,tmpstr);
-  for(i=0;i<CmiNumNodes();i++) {
-    OtherNode node = nodes+i;
-    sprintf(tmpstr, "[%u]\t%u\t%u\t%u\t%u\t%u\t%u\n",
-                     i, node->stat_send_pkt, node->stat_resend_pkt,
-		     node->stat_recv_pkt, node->stat_send_ack,
-		     node->stat_recv_ack, node->stat_ack_pkts);
-    strcat(statstr, tmpstr);
-    send_pkt += node->stat_send_pkt;
-    recv_pkt += node->stat_recv_pkt;
-    resend_pkt += node->stat_resend_pkt;
-    send_ack += node->stat_send_ack;
-    recv_ack += node->stat_recv_ack;
-    ack_pkts += node->stat_ack_pkts;
-  }
-  sprintf(tmpstr, "[TOTAL]\t%u\t%u\t%u\t%u\t%u\t%u\n",
-                     send_pkt, resend_pkt,
-		     recv_pkt, send_ack,
-		     recv_ack, ack_pkts);
-  strcat(statstr, tmpstr);
-  sprintf(tmpstr, "***********************************\n");
-  strcat(statstr, tmpstr);
-  CmiPrintf(statstr);
-}
-
-static ImplicitDgram Cmi_freelist_implicit;
-static void setspeed_atm()
-{
-  Cmi_max_dgram_size   = 2048;
-  Cmi_os_buffer_size   = 50000;
-  Cmi_window_size      = 20;
-  Cmi_delay_retransmit = 0.0150;
-  Cmi_ack_delay        = 0.0035;
-  Cmi_tickspeed        = 10000;
-}
-
-static void setspeed_eth()
-{
-  Cmi_max_dgram_size   = 2048;
-  Cmi_os_buffer_size   = 50000;
-  Cmi_window_size      = 20;
-  Cmi_delay_retransmit = 0.0400;
-  Cmi_ack_delay        = 0.0100;
-  Cmi_tickspeed        = 10000;
-}
 
 static void parse_netstart()
 {
@@ -896,10 +730,12 @@ static void parse_netstart()
   ns = getenv("NETSTART");
   if (ns!=0) 
   {/*Read values set by Charmrun*/
-        nread = sscanf(ns, "%d%d%d%d%d",
+        char Cmi_charmrun_name[1024];
+        nread = sscanf(ns, "%d%s%d%d%d",
                  &Cmi_mynode,
-                 &Cmi_charmrun_IP, &Cmi_charmrun_port,
+                 Cmi_charmrun_name, &Cmi_charmrun_port,
                  &Cmi_charmrun_pid, &port);
+	Cmi_charmrun_IP=skt_lookup_ip(Cmi_charmrun_name);
 
         if (nread!=5) {
                 fprintf(stderr,"Error parsing NETSTART '%s'\n",ns);
@@ -912,7 +748,7 @@ static void parse_netstart()
   } else 
   {/*No charmrun-- set flag values for standalone operation*/
   	Cmi_mynode=0;
-  	Cmi_charmrun_IP=0;
+  	Cmi_charmrun_IP=skt_invalid_ip;
   	Cmi_charmrun_port=0;
   	Cmi_charmrun_pid=0;
 #if CMK_USE_GM
@@ -921,20 +757,10 @@ static void parse_netstart()
   }
 }
 
-static void extract_args(argv)
-char **argv;
+static void extract_common_args(char **argv)
 {
-  setspeed_eth();
-  if (CmiGetArgFlag(argv,"+atm"))
-    setspeed_atm();
-  if (CmiGetArgFlag(argv,"+eth"))
-    setspeed_eth();
   if (CmiGetArgFlag(argv,"+stats"))
     Cmi_print_stats = 1;
-  Cmi_dgram_max_data = Cmi_max_dgram_size - DGRAM_HEADER_SIZE;
-  Cmi_half_window = Cmi_window_size >> 1;
-  if ((Cmi_window_size * Cmi_max_dgram_size) > Cmi_os_buffer_size)
-    KillEveryone("Window size too big for OS buffer.");
 }
 
 /******************************************************************************
@@ -1040,86 +866,8 @@ void printLog(void)
 
 static CmiNodeLock    Cmi_scanf_mutex;
 static double         Cmi_clock;
-static double         Cmi_check_last = 0.0;
 static double         Cmi_check_delay = 3.0;
 
-/****************************************************************************
- *                                                                          
- * CheckSocketsReady
- *
- * Checks both sockets to see which are readable and which are writeable.
- * We check all these things at the same time since this can be done for
- * free with ``select.'' The result is stored in global variables, since
- * this is essentially global state information and several routines need it.
- *
- ***************************************************************************/
-
-static int ctrlskt_ready_read;
-static int dataskt_ready_read;
-static int dataskt_ready_write;
-
-int CheckSocketsReady(int withDelayMs)
-{
-#if !CMK_USE_POLL
-  static fd_set rfds; 
-  static fd_set wfds; 
-  struct timeval tmo;
-  int nreadable;
-  
-  FD_ZERO(&rfds);FD_ZERO(&wfds);
-  if (Cmi_charmrun_fd!=-1)
-  	FD_SET(Cmi_charmrun_fd, &rfds);
-  if (dataskt!=-1) {
-  	FD_SET(dataskt, &rfds);
-  	FD_SET(dataskt, &wfds);
-  }
-  tmo.tv_sec = 0;
-  tmo.tv_usec = withDelayMs*1000;
-  nreadable = select(FD_SETSIZE, &rfds, &wfds, NULL, &tmo);
-  if (nreadable <= 0) {
-    ctrlskt_ready_read = 0;
-    dataskt_ready_read = 0;
-    dataskt_ready_write = 0;
-    return nreadable;
-  }
-  if (Cmi_charmrun_fd!=-1)
-	ctrlskt_ready_read = (FD_ISSET(Cmi_charmrun_fd, &rfds));
-  if (dataskt!=-1) {
-  	dataskt_ready_read = (FD_ISSET(dataskt, &rfds));
-  	dataskt_ready_write = (FD_ISSET(dataskt, &wfds));
-  }
-#else
-  struct pollfd fds[3]; int n = 0;
-  int nreadable;
-  if (Cmi_charmrun_fd!=-1) {
-    fds[n].fd = Cmi_charmrun_fd;
-    fds[n].events = POLLIN;
-    n++;
-  }
-  if (dataskt!=-1) {
-    fds[n].fd = dataskt;
-    fds[n].events = POLLIN | POLLOUT;
-    n++;
-  }
-  nreadable = poll(fds, n, withDelayMs);
-  if (nreadable <= 0) {
-    ctrlskt_ready_read = 0;
-    dataskt_ready_read = 0;
-    dataskt_ready_write = 0;
-    return nreadable;
-  }
-  if (dataskt!=-1) {
-    n--;
-    dataskt_ready_read = fds[n].revents & POLLIN;
-    dataskt_ready_write = fds[n].revents & POLLOUT;
-  }
-  if (Cmi_charmrun_fd!=-1) {
-    n--;
-    ctrlskt_ready_read = fds[n].revents & POLLIN;
-  }
-#endif
-  return nreadable;
-}
 /******************************************************************************
  *
  * OS Threads
@@ -1177,52 +925,29 @@ int CheckSocketsReady(int withDelayMs)
 
  *****************************************************************************/
 
+/************************ Win32 kernel SMP threads **************/
 #if CMK_SHARED_VARS_NT_THREADS
 
-static HANDLE memmutex;
-void CmiMemLock() { WaitForSingleObject(memmutex, INFINITE); }
-void CmiMemUnlock() { ReleaseMutex(memmutex); }
+static CmiNodeLock CmiMemLock_lock;
+static HANDLE comm_mutex;
+#define CmiCommLockOrElse(x) /*empty*/
+#define CmiCommLock() (WaitForSingleObject(comm_mutex, INFINITE))
+#define CmiCommUnlock() (ReleaseMutex(comm_mutex))
 
 static DWORD Cmi_state_key = 0xFFFFFFFF;
 static CmiState     Cmi_state_vector = 0;
 
+#ifdef CMK_OPTIMIZE
+#  define CmiGetState() ((CmiState)TlsGetValue(Cmi_state_key))
+#else
 CmiState CmiGetState()
 {
-    CmiState result = 0;
-
-  if(Cmi_state_key == 0xFFFFFFFF) return 0;
-  
+  CmiState result;
   result = (CmiState)TlsGetValue(Cmi_state_key);
   if(result == 0) PerrorExit("CmiGetState: TlsGetValue");
   return result;
 }
-
-int CmiMyPe()
-{  
-  CmiState result = 0;
-
-  if(Cmi_state_key == 0xFFFFFFFF) return -1;
-  result = (CmiState)TlsGetValue(Cmi_state_key);
-
-  if(result == 0) PerrorExit("CmiMyPe: TlsGetValue");
-
-  return result->pe;
-}
-
-int CmiMyRank()
-{
-  CmiState result = 0;
-
-  if(Cmi_state_key == 0xFFFFFFFF) return 0;
-  result = (CmiState)TlsGetValue(Cmi_state_key);
-  if(result == 0) PerrorExit("CmiMyRank: TlsGetValue");
-  return result->rank;
-}
-
-int CmiNodeFirst(int node) { return nodes[node].nodestart; }
-int CmiNodeSize(int node)  { return nodes[node].nodesize; }
-int CmiNodeOf(int pe)      { return (nodes_by_pe[pe] - nodes); }
-int CmiRankOf(int pe)      { return pe - (nodes_by_pe[pe]->nodestart); }
+#endif
 
 CmiNodeLock CmiCreateLock()
 {
@@ -1242,13 +967,9 @@ void CmiYield()
 
 #define CmiGetStateN(n) (Cmi_state_vector+(n))
 
-static HANDLE comm_mutex;
-#define CmiCommLock() (WaitForSingleObject(comm_mutex, INFINITE))
-#define CmiCommUnlock() (ReleaseMutex(comm_mutex))
-
 static DWORD WINAPI comm_thread(LPVOID dummy)
 {  
-  while (1) CommunicationServer(500);
+  while (1) CommunicationServer(5);
   return 0;/*should never get here*/
 }
 
@@ -1293,15 +1014,15 @@ void  CmiNodeBarrier(void)
 		  sleep(0);/*<- could also just spin here*/
 }
 
-static void CmiStartThreads()
+static void CmiStartThreads(char **argv)
 {
   int     i;
   DWORD   threadID;
   HANDLE  thr;
   int     val = 0;
 
+  CmiMemLock_lock=CmiCreateLock();
   comm_mutex = CmiCreateLock();
-  memmutex = CmiCreateLock();
   barrier_mutex = CmiCreateLock();
 
   Cmi_state_key = TlsAlloc();
@@ -1328,150 +1049,14 @@ static void CmiStartThreads()
 }
 
 #endif
-
-#if CMK_SHARED_VARS_SUN_THREADS
-
-static mutex_t memmutex;
-void CmiMemLock() { mutex_lock(&memmutex); }
-void CmiMemUnlock() { mutex_unlock(&memmutex); }
-
-static thread_key_t Cmi_state_key;
-static CmiState     Cmi_state_vector;
-
-CmiState CmiGetState()
-{
-  CmiState result = 0;
-  thr_getspecific(Cmi_state_key, (void **)&result);
-  return result;
-}
-
-int CmiMyPe()
-{
-  CmiState result = 0;
-  thr_getspecific(Cmi_state_key, (void **)&result);
-  return result->pe;
-}
-
-int CmiMyRank()
-{
-  CmiState result = 0;
-  thr_getspecific(Cmi_state_key, (void **)&result);
-  return result->rank;
-}
-
-int CmiNodeFirst(int node) { return nodes[node].nodestart; }
-int CmiNodeSize(int node)  { return nodes[node].nodesize; }
-int CmiNodeOf(int pe)      { return (nodes_by_pe[pe] - nodes); }
-int CmiRankOf(int pe)      { return pe - (nodes_by_pe[pe]->nodestart); }
-
-CmiNodeLock CmiCreateLock()
-{
-  CmiNodeLock lk = (CmiNodeLock)malloc(sizeof(mutex_t));
-  _MEMCHECK(lk);
-  mutex_init(lk,0,0);
-  return lk;
-}
-
-void CmiDestroyLock(CmiNodeLock lk)
-{
-  mutex_destroy(lk);
-  free(lk);
-}
-
-void CmiYield() { thr_yield(); }
-
-int barrier = 0;
-cond_t barrier_cond = DEFAULTCV;
-mutex_t barrier_mutex = DEFAULTMUTEX;
-
-void CmiNodeBarrier(void)
-{
-  mutex_lock(&barrier_mutex);
-  barrier++;
-  if(barrier != CmiMyNodeSize())
-    cond_wait(&barrier_cond, &barrier_mutex);
-  else{
-    barrier = 0;
-    cond_broadcast(&barrier_cond);
-  }
-  mutex_unlock(&barrier_mutex);
-}
-
-#define CmiGetStateN(n) (Cmi_state_vector+(n))
-
-static mutex_t comm_mutex;
-#define CmiCommLock() (mutex_lock(&comm_mutex))
-#define CmiCommUnlock() (mutex_unlock(&comm_mutex))
-
-static void comm_thread(void)
-{
-  while (1) CommunicationServer(500);
-}
-
-static void *call_startfn(void *vindex)
-{
-  int index = (int)vindex;
-  CmiState state = Cmi_state_vector + index;
-  thr_setspecific(Cmi_state_key, state);
-  ConverseRunPE(0);
-}
-
-static void CmiStartThreads()
-{
-  int i, ok;
-  unsigned int pid;
-  
-  thr_setconcurrency(Cmi_mynodesize);
-  thr_keycreate(&Cmi_state_key, 0);
-  Cmi_state_vector =
-    (CmiState)calloc(Cmi_mynodesize, sizeof(struct CmiStateStruct));
-  for (i=0; i<Cmi_mynodesize; i++)
-    CmiStateInit(i+Cmi_nodestart, i, CmiGetStateN(i));
-  for (i=1; i<Cmi_mynodesize; i++) {
-    ok = thr_create(0, 256000, call_startfn, (void *)i, THR_DETACHED|THR_BOUND, &pid);
-    if (ok<0) PerrorExit("thr_create");
-  }
-  thr_setspecific(Cmi_state_key, Cmi_state_vector);
-  ok = thr_create(0, 256000, (void *(*)(void *))comm_thread, 0, 0, &pid);
-  if (ok<0) PerrorExit("thr_create comm");
-}
-
-#endif
-
+/***************** Pthreads kernel SMP threads ******************/
 #if CMK_SHARED_VARS_POSIX_THREADS_SMP
-
-static pthread_mutex_t memmutex;
-void CmiMemLock() { pthread_mutex_lock(&memmutex); }
-void CmiMemUnlock() { pthread_mutex_unlock(&memmutex); }
 
 static pthread_key_t Cmi_state_key;
 static CmiState     Cmi_state_vector;
+CmiNodeLock CmiMemLock_lock;
 
-CmiState CmiGetState()
-{
-  CmiState result = 0;
-  result = pthread_getspecific(Cmi_state_key);
-  return result;
-}
-
-int CmiMyPe()
-{
-  CmiState result = 0;
-  result = pthread_getspecific(Cmi_state_key);
-  return result->pe;
-}
-
-int CmiMyRank()
-{
-  CmiState result = 0;
-  result = pthread_getspecific(Cmi_state_key);
-  return result->rank;
-}
-
-int CmiNodeFirst(int node) { return nodes[node].nodestart; }
-int CmiNodeSize(int node)  { return nodes[node].nodesize; }
-int CmiNodeOf(int pe)      { return (nodes_by_pe[pe] - nodes); }
-int CmiRankOf(int pe)      { return pe - (nodes_by_pe[pe]->nodestart); }
+#define CmiGetState() ((CmiState)pthread_getspecific(Cmi_state_key))
 
 CmiNodeLock CmiCreateLock()
 {
@@ -1509,13 +1094,14 @@ void CmiNodeBarrier(void)
 
 #define CmiGetStateN(n) (Cmi_state_vector+(n))
 
-static pthread_mutex_t comm_mutex;
-#define CmiCommLock() (pthread_mutex_lock(&comm_mutex))
-#define CmiCommUnlock() (pthread_mutex_unlock(&comm_mutex))
+static CmiNodeLock comm_mutex;
+#define CmiCommLockOrElse(x) /*empty*/
+#define CmiCommLock() CmiLock(comm_mutex)
+#define CmiCommUnlock() CmiUnlock(comm_mutex)
 
 static void comm_thread(void)
 {
-  while (1) CommunicationServer(500);
+  while (1) CommunicationServer(5);
 }
 
 static void *call_startfn(void *vindex)
@@ -1527,12 +1113,26 @@ static void *call_startfn(void *vindex)
   return 0;
 }
 
-static void CmiStartThreads()
+static void CmiStartThreads(char **argv)
 {
   pthread_t pid;
   int i, ok;
   pthread_attr_t attr;
+
+#if CMK_LINUX_PTHREAD_HACK
+  /*HACK for LinuxThreads: to support our user-level threads
+    library, we use a slightly modified version of libpthread.a
+    with user-level threads support enabled via these flags.
+  */
+  extern int __pthread_find_self_with_pid;
+  extern int __pthread_nonstandard_stacks;
+  __pthread_find_self_with_pid=1;
+  __pthread_nonstandard_stacks=1;
+#endif
   
+  CmiMemLock_lock=CmiCreateLock();
+  comm_mutex=CmiCreateLock();
+
   pthread_key_create(&Cmi_state_key, 0);
   Cmi_state_vector =
     (CmiState)calloc(Cmi_mynodesize, sizeof(struct CmiStateStruct));
@@ -1552,11 +1152,24 @@ static void CmiStartThreads()
 
 #endif
 
+/************************ No kernel SMP threads ***************/
 #if CMK_SHARED_VARS_UNAVAILABLE
 
 static volatile int memflag=0;
 void CmiMemLock() { memflag++; }
 void CmiMemUnlock() { memflag--; }
+
+static volatile int comm_flag=0;
+#define CmiCommLockOrElse(dothis) if (comm_flag!=0) dothis
+#if 1
+#  define CmiCommLock() (comm_flag=1)
+#else
+void CmiCommLock(void) {
+  if (comm_flag!=0) CmiAbort("Comm lock *not* reentrant!\n");
+  comm_flag=1;
+}
+#endif
+#define CmiCommUnlock() (comm_flag=0)
 
 static struct CmiStateStruct Cmi_state;
 int Cmi_mype;
@@ -1564,49 +1177,20 @@ int Cmi_myrank;
 #define CmiGetState() (&Cmi_state)
 #define CmiGetStateN(n) (&Cmi_state)
 
-static int comm_flag=0;
-#define CmiCommLock() (comm_flag++)
-#define CmiCommUnlock() (comm_flag--)
-
 void CmiYield() { sleep(0); }
 
-int interruptFlag;
-
-static unsigned int terrupt;
-static void CommunicationInterrupt(int arg)
+static void CommunicationInterrupt(int ignored)
 {
-  nodes[CmiMyNode()].stat_total_intr++;
-  if (comm_flag) return;
   if (memflag) return;
-  nodes[CmiMyNode()].stat_proc_intr++;
+  MACHSTATE(2,"--BEGIN SIGIO--")
   CommunicationServer(0);
-}
-
-/* this will ensure that node program make sure charmrun is still there */
-static void ctrl_sendone_nolock(const char *type,
-				const char *data1,int dataLen1,
-				const char *data2,int dataLen2);
-static void alarmInterrupt(int arg)
-{
-  if (comm_flag) return;
-  if (memflag) return;
-
-  CmiCommLock();
-  Cmi_clock = GetClock();
-  if (Cmi_clock > Cmi_check_last + Cmi_check_delay) {
-    ctrl_sendone_nolock("ping",NULL,0,NULL,0);
-    Cmi_check_last = Cmi_clock;
-  }
-  CmiCommUnlock();
+  MACHSTATE(2,"--END SIGIO--")
 }
 
 extern void CmiSignal(int sig1, int sig2, int sig3, void (*handler)());
 
-static void CmiStartThreads()
+static void CmiStartThreads(char **argv)
 {
-  struct itimerval i;
-  int useAlarm = 1;
-  
   if ((Cmi_numpes != Cmi_numnodes) || (Cmi_mynodesize != 1))
     KillEveryone
       ("Multiple cpus unavailable, don't use cpus directive in nodesfile.\n");
@@ -1615,20 +1199,34 @@ static void CmiStartThreads()
   Cmi_mype = Cmi_nodestart;
   Cmi_myrank = 0;
   
-  if (!Cmi_netpoll) 
-  {
 #if !CMK_ASYNC_NOT_NEEDED
+  if (!Cmi_netpoll) {
     CmiSignal(SIGIO, 0, 0, CommunicationInterrupt);
     if (dataskt!=-1) CmiEnableAsyncIO(dataskt);
     if (Cmi_charmrun_fd!=-1) CmiEnableAsyncIO(Cmi_charmrun_fd);
-#endif
   }
+#endif
 }
 
 #endif
 
 CpvDeclare(void *, CmiLocalQueue);
 CpvStaticDeclare(char *, internal_printf_buffer);
+
+
+#ifndef CmiMyPe
+int CmiMyPe() 
+{ 
+  return CmiGetState()->pe; 
+}
+#endif
+#ifndef CmiMyRank
+int CmiMyRank()
+{
+  return CmiGetState()->rank;
+}
+#endif
+
 
 /****************************************************************************
  *
@@ -1690,6 +1288,13 @@ static void charmrun_abort(const char *s)
  *
  ****************************************************************************/
 
+/*Add a message to this processor's receive queue */
+static void CmiPushPE(int pe,void *msg)
+{
+  CmiState cs=CmiGetStateN(pe);
+  CmiIdleLock_addMessage(&cs->idle);
+  PCQueuePush(cs->recv,msg);
+}
 
 static void ctrl_getone()
 {
@@ -1711,8 +1316,8 @@ static void ctrl_getone()
 	any convenient processor's queue, though:  (OSL, 9/14/2000)
 	*/
 	int pe=0;/*<- node-local processor number. Any one will do.*/
-	char *cmsg=CcsImpl_ccs2converse(hdr,msg.data+sizeof(CcsImplHeader),NULL);
-	PCQueuePush(CmiGetStateN(pe)->recv,cmsg);
+	void *cmsg=(void *)CcsImpl_ccs2converse(hdr,msg.data+sizeof(CcsImplHeader),NULL);
+	CmiPushPE(pe,cmsg);
 #endif
   }  else {
   /* We do not use KillEveryOne here because it calls CmiMyPe(),
@@ -1728,161 +1333,12 @@ static void ctrl_getone()
 #if CMK_CCS_AVAILABLE
 /*Deliver this reply data to this reply socket.
   The data is forwarded to CCS server via charmrun.*/
-void CcsImpl_reply(SOCKET replFd,int repLen,const void *repData)
+void CcsImpl_reply(CcsImplHeader *hdr,int repLen,const void *repData)
 {
-  ChMessageInt_t skt=ChMessageInt_new(replFd);
-  ctrl_sendone_locking("reply_fw",(const char *)&skt,sizeof(skt),
+  ctrl_sendone_locking("reply_fw",(const char *)hdr,sizeof(CcsImplHeader),
 		       repData,repLen);  
 }
 #endif
-
-/*****************************************************************************
- *
- * node_addresses
- *
- *  These two functions fill the node-table.
- *
- *
- *   This node, like all others, first sends its own address to charmrun
- *   using this command:
- *
- *     Type: nodeinfo
- *     Data: Big-endian 4-byte ints
- *           <my-node #><Dataport>
- *
- *   When charmrun has all the addresses, he sends this table to me:
- *
- *     Type: nodes
- *     Data: Big-endian 4-byte ints
- *           <number of nodes n>
- *           <#PEs><IP><Dataport> Node 0
- *           <#PEs><IP><Dataport> Node 1
- *           ...
- *           <#PEs><IP><Dataport> Node n-1
- *
- *****************************************************************************/
-
-static void node_addresses_store(ChMessage *msg);
-
-/*Note: node_addresses_obtain is called before starting
-  threads, so no locks are needed (or valid!)*/
-static void node_addresses_obtain(char **argv)
-{
-  ChMessage nodetabmsg; /* info about all nodes*/
-  if (Cmi_charmrun_fd==-1) 
-  {/*Standalone-- fake a single-node nodetab message*/
-  	int npes=1;
-  	int fakeLen=4*sizeof(ChMessageInt_t);
-  	ChMessageInt_t *fakeTab=(ChMessageInt_t *)malloc(fakeLen);
-  	CmiGetArgInt(argv,"+p",&npes);
-#if CMK_SHARED_VARS_UNAVAILABLE
-	if (npes!=1) {
-		fprintf(stderr,
-			"To use multiple processors, you must run this program as:\n"
-			" > charmrun +p%d %s <args>\n"
-			"or build the %s-smp version of Charm++.\n",
-			npes,argv[0],CMK_MACHINE_NAME);
-		exit(1);
-	}
-#endif
-	fakeTab[0]=ChMessageInt_new(1);
-	fakeTab[1]=ChMessageInt_new(npes);
-	fakeTab[2]=fakeTab[3]=ChMessageInt_new(0);
- 	nodetabmsg.len=fakeLen;
- 	nodetabmsg.data=(char *)fakeTab;
-  }
-  else 
-  { /*Contact charmrun for machine info.*/
-  	ChMessageInt_t info[2]; /*Info. about my node for charmrun*/
-  	int infoLen=2*sizeof(ChMessageInt_t);
- 	
-  	info[0]=ChMessageInt_new(Cmi_mynode);
-#if !CMK_USE_GM
-  	info[1]=ChMessageInt_new(dataport);
-#else
-        {
-        /* get and send node id */
-        unsigned int nodeid;
-        if (gmport == NULL) nodeid = 0;
-        else {
-          gm_status_t status;
-          status = gm_get_node_id(gmport, &nodeid);
-          if (status != GM_SUCCESS) nodeid = 0;
-        }
-        info[1]=ChMessageInt_new(nodeid);
-        }
-#endif
-
-  	/*Send our node info. to charmrun.
-  	CommLock hasn't been initialized yet-- 
-  	use non-locking version*/  
-  	ctrl_sendone_nolock("initnode",(const char *)&info[0],infoLen,NULL,0);
-  
-  	/*We get the other node addresses from a message sent
-  	  back via the charmrun control port.*/
-  	if (!skt_select1(Cmi_charmrun_fd,600*1000)) CmiAbort("Timeout waiting for nodetab!\n");
-  	ChMessage_recv(Cmi_charmrun_fd,&nodetabmsg);
-  }
-  node_addresses_store(&nodetabmsg);
-  ChMessage_free(&nodetabmsg);
-}
-
-/* initnode node table reply format:
- +------------------------------------------------------- 
- | 4 bytes  |   Number of nodes n                       ^
- |          |   (big-endian binary integer)       4+12*n bytes
- +-------------------------------------------------     |
- ^  |        (one entry for each node)            ^     |
- |  | 4 bytes  |   Number of PEs for this node    |     |
- n  | 4 bytes  |   IP address of this node   12*n bytes |
- |  | 4 bytes  |   Data (UDP) port of this node   |     |
- v  |          |   (big-endian binary integers)   v     v
- ---+----------------------------------------------------
-*/
-static void node_addresses_store(ChMessage *msg)
-{
-  ChMessageInt_t *d=(ChMessageInt_t *)msg->data;
-  int nodestart;
-  int i,j;
-  OtherNode ntab, *bype;
-  Cmi_numnodes=ChMessageInt(*d++);
-  if (sizeof(ChMessageInt_t)*(1+3*Cmi_numnodes)!=(unsigned int)msg->len)
-    {printf("Node table has inconsistent length!");machine_exit(1);}
-  ntab = (OtherNode)calloc(Cmi_numnodes, sizeof(struct OtherNodeStruct));
-  nodestart=0;
-  for (i=0; i<Cmi_numnodes; i++) {
-    ntab[i].nodestart = nodestart;
-    ntab[i].nodesize  = ChMessageInt(*d++);
-    ntab[i].IP = ChMessageInt(*d++);;
-    if (i==Cmi_mynode) {
-      Cmi_nodestart=ntab[i].nodestart;
-      Cmi_mynodesize=ntab[i].nodesize;
-      Cmi_self_IP=ntab[i].IP;
-    }
-    ntab[i].dataport = ChMessageInt(*d++);
-    ntab[i].addr = skt_build_addr(ntab[i].IP,ntab[i].dataport);
-    nodestart+=ntab[i].nodesize;
-  }
-  Cmi_numpes=nodestart;
-  bype = (OtherNode*)malloc(Cmi_numpes * sizeof(OtherNode));
-  _MEMCHECK(bype);
-  for (i=0; i<Cmi_numnodes; i++) {
-    OtherNode node = ntab + i;
-    node->sent_msgs = 0;
-    node->recd_msgs = 0;
-    node->sent_bytes = 0;
-    node->recd_bytes = 0;
-    node->send_window =
-      (ImplicitDgram*)calloc(Cmi_window_size, sizeof(ImplicitDgram));
-    node->recv_window =
-      (ExplicitDgram*)calloc(Cmi_window_size, sizeof(ExplicitDgram));
-    for (j=0; j<node->nodesize; j++)
-      bype[j + node->nodestart] = node;
-  }
-  nodes_by_pe = bype;
-  nodes = ntab;
-}
-
 /*****************************************************************************
  *
  * CmiPrintf, CmiError, CmiScanf
@@ -1992,42 +1448,124 @@ int CmiScanf(const char *fmt, ...)
   return i;
 }
 
-/******************************************************************************
+
+/***************************************************************************
+ * Message Delivery:
  *
- * Transmission Code
+ ***************************************************************************/
+
+#include "machine-dgram.c"
+
+
+#ifndef CmiNodeFirst
+int CmiNodeFirst(int node) { return nodes[node].nodestart; }
+int CmiNodeSize(int node)  { return nodes[node].nodesize; }
+#endif
+
+#ifndef CmiNodeOf
+int CmiNodeOf(int pe)      { return (nodes_by_pe[pe] - nodes); }
+int CmiRankOf(int pe)      { return pe - (nodes_by_pe[pe]->nodestart); }
+#endif
+
+
+/*****************************************************************************
+ *
+ * node_addresses
+ *
+ *  These two functions fill the node-table.
+ *
+ *
+ *   This node, like all others, first sends its own address to charmrun
+ *   using this command:
+ *
+ *     Type: nodeinfo
+ *     Data: Big-endian 4-byte ints
+ *           <my-node #><Dataport>
+ *
+ *   When charmrun has all the addresses, he sends this table to me:
+ *
+ *     Type: nodes
+ *     Data: Big-endian 4-byte ints
+ *           <number of nodes n>
+ *           <#PEs><IP><Dataport> Node 0
+ *           <#PEs><IP><Dataport> Node 1
+ *           ...
+ *           <#PEs><IP><Dataport> Node n-1
  *
  *****************************************************************************/
 
-void GarbageCollectMsg(OutgoingMsg ogm)
+/*Note: node_addresses_obtain is called before starting
+  threads, so no locks are needed (or valid!)*/
+static void node_addresses_obtain(char **argv)
 {
-  if (ogm->refcount == 0) {
-    if (ogm->freemode == 'A') {
-      ogm->freemode = 'X';
-    } else {
-      CmiFree(ogm->data);
-      FreeOutgoingMsg(ogm);
-    }
-  }
-}
-
-void DiscardImplicitDgram(ImplicitDgram dg)
-{
-  OutgoingMsg ogm;
-  ogm = dg->ogm;
-  ogm->refcount--;
-  GarbageCollectMsg(ogm);
-  FreeImplicitDgram(dg);
-}
-
-#if !CMK_USE_GM
-
-#include "machine-eth.c"
-
-#else
-
-#include "machine-gm.c"
-
+  ChMessage nodetabmsg; /* info about all nodes*/
+  if (Cmi_charmrun_fd==-1) 
+  {/*Standalone-- fake a single-node nodetab message*/
+  	int npes=1;
+  	int fakeLen=sizeof(ChSingleNodeinfo);
+  	ChSingleNodeinfo *fakeTab;
+	ChMessage_new("nodeinfo",sizeof(ChSingleNodeinfo),&nodetabmsg);
+	fakeTab=(ChSingleNodeinfo *)(nodetabmsg.data);
+  	CmiGetArgInt(argv,"+p",&npes);
+#if CMK_SHARED_VARS_UNAVAILABLE
+	if (npes!=1) {
+		fprintf(stderr,
+			"To use multiple processors, you must run this program as:\n"
+			" > charmrun +p%d %s <args>\n"
+			"or build the %s-smp version of Charm++.\n",
+			npes,argv[0],CMK_MACHINE_NAME);
+		exit(1);
+	}
 #endif
+	/*This is a stupid hack: we expect the *number* of nodes
+	followed by ChNodeinfo structs; so we use a ChSingleNodeinfo
+	(which happens to have exactly that layout!) and stuff
+	a 1 into the "node number" slot
+	*/
+	fakeTab->nodeNo=ChMessageInt_new(1); /* <- hack */
+	fakeTab->info.nPE=ChMessageInt_new(npes);
+	fakeTab->info.dataport=ChMessageInt_new(0);
+	fakeTab->info.IP=skt_invalid_ip;
+  }
+  else 
+  { /*Contact charmrun for machine info.*/
+	ChSingleNodeinfo me;
+
+  	me.nodeNo=ChMessageInt_new(Cmi_mynode);
+	/*The nPE and IP fields are set by charmrun--
+	  these values don't matter.
+	*/
+	me.info.nPE=ChMessageInt_new(0);
+	me.info.IP=skt_invalid_ip;
+#if !CMK_USE_GM
+  	me.info.dataport=ChMessageInt_new(dataport);
+#else
+        {
+        /* get and send node id */
+        unsigned int nodeid;
+        if (gmport == NULL) nodeid = 0;
+        else {
+          gm_status_t status;
+          status = gm_get_node_id(gmport, &nodeid);
+          if (status != GM_SUCCESS) nodeid = 0;
+        }
+        me.info.dataport=ChMessageInt_new(nodeid);
+        }
+#endif
+
+  	/*Send our node info. to charmrun.
+  	CommLock hasn't been initialized yet-- 
+  	use non-locking version*/
+  	ctrl_sendone_nolock("initnode",(const char *)&me,sizeof(me),NULL,0);
+  
+  	/*We get the other node addresses from a message sent
+  	  back via the charmrun control port.*/
+  	if (!skt_select1(Cmi_charmrun_fd,600*1000)) CmiAbort("Timeout waiting for nodetab!\n");
+  	ChMessage_recv(Cmi_charmrun_fd,&nodetabmsg);
+  }
+  node_addresses_store(&nodetabmsg);
+  ChMessage_free(&nodetabmsg);
+}
 
 #if CMK_NODE_QUEUE_AVAILABLE
 
@@ -2098,7 +1636,7 @@ void DeliverOutgoingMessage(OutgoingMsg ogm)
   switch (dst) {
   case PE_BROADCAST_ALL:
     for (rank = 0; rank<Cmi_mynodesize; rank++) {
-      PCQueuePush(CmiGetStateN(rank)->recv,CopyMsg(ogm->data,ogm->size));
+      CmiPushPE(rank,CopyMsg(ogm->data,ogm->size));
     }
     for (i=0; i<Cmi_numnodes; i++)
       if (i!=Cmi_mynode)
@@ -2108,7 +1646,7 @@ void DeliverOutgoingMessage(OutgoingMsg ogm)
   case PE_BROADCAST_OTHERS:
     for (rank = 0; rank<Cmi_mynodesize; rank++)
       if (rank + Cmi_nodestart != ogm->src) {
-	PCQueuePush(CmiGetStateN(rank)->recv,CopyMsg(ogm->data,ogm->size));
+	CmiPushPE(rank,CopyMsg(ogm->data,ogm->size));
       }
     for (i = 0; i<Cmi_numnodes; i++)
       if (i!=Cmi_mynode)
@@ -2123,10 +1661,10 @@ void DeliverOutgoingMessage(OutgoingMsg ogm)
       GarbageCollectMsg(ogm);
     } else {
       if (ogm->freemode == 'A') {
-	PCQueuePush(CmiGetStateN(rank)->recv,CopyMsg(ogm->data,ogm->size));
+	CmiPushPE(rank,CopyMsg(ogm->data,ogm->size));
 	ogm->freemode = 'X';
       } else {
-	PCQueuePush(CmiGetStateN(rank)->recv, ogm->data);
+	CmiPushPE(rank, ogm->data);
 	FreeOutgoingMsg(ogm);
       }
     }
@@ -2151,7 +1689,6 @@ void DeliverOutgoingMessage(OutgoingMsg ogm)
 char *CmiGetNonLocalNodeQ()
 {
   char *result = 0;
-  if (Cmi_netpoll) CommunicationServer(0);
   if(!PCQueueEmpty(CsvAccess(NodeRecv))) {
     CmiLock(CsvAccess(CmiNodeRecvLock));
     result = (char *) PCQueuePop(CsvAccess(NodeRecv));
@@ -2164,6 +1701,7 @@ char *CmiGetNonLocalNodeQ()
 void *CmiGetNonLocal(void)
 {
   CmiState cs = CmiGetState();
+  CmiIdleLock_checkMessage(&cs->idle);
   return (void *) PCQueuePop(cs->recv);
 }
 
@@ -2205,7 +1743,9 @@ CmiCommHandle CmiGeneralNodeSend(int pe, int size, int freemode, char *data)
   CmiCommLock();
   DeliverOutgoingNodeMessage(ogm);
   CmiCommUnlock();
+#if CMK_SHARED_VARS_UNAVAILABLE
   CommunicationServer(0);
+#endif
   return (CmiCommHandle)ogm;
 }
 #endif
@@ -2254,7 +1794,9 @@ CmiCommHandle CmiGeneralSend(int pe, int size, int freemode, char *data)
   CmiCommLock();
   DeliverOutgoingMessage(ogm);
   CmiCommUnlock();
+#if CMK_SHARED_VARS_UNAVAILABLE
   CommunicationServer(0);
+#endif
   return (CmiCommHandle)ogm;
 }
 
@@ -2399,6 +1941,7 @@ static int        Cmi_usrsched;  /* Continue after start function finishes? */
 
 static void ConverseRunPE(int everReturn)
 {
+  CmiIdleState *s=CmiNotifyGetState();
   CmiState cs;
   char** CmiMyArgv;
   CmiNodeBarrier();
@@ -2420,12 +1963,16 @@ static void ConverseRunPE(int everReturn)
 #endif
 
   ConverseCommonInit(CmiMyArgv);
-
+  
+  CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,CmiNotifyBeginIdle,(void *)s);
+  CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,CmiNotifyStillIdle,(void *)s);
 #if CMK_SHARED_VARS_UNAVAILABLE
-  /*This occasional CommunicationsServer is for non-async-IO versions
-    and checking if Conv-host died.  This used to be SIGALRM.*/
-  CcdPeriodicCallKeep(CommunicationServer,NULL);
+  if (Cmi_netpoll)
+    CcdPeriodicCallKeep(CommunicationServer,NULL);
 #endif
+
+  if (CmiMyRank()==0 && Cmi_charmrun_fd!=-1)
+    CcdPeriodicCallKeep(CommunicationsClock,NULL);
 
   if (!everReturn) {
     Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
@@ -2441,16 +1988,16 @@ void ConverseExit()
       printNetStatistics();
     log_done();
     ConverseCommonExit();
+    if (Cmi_charmrun_fd==-1) exit(0); /*Standalone version-- just leave*/
   }
-  if (Cmi_charmrun_fd==-1)
-  	exit(0); /*Standalone version-- just leave*/
-  else {
+  if (Cmi_charmrun_fd!=-1) {
   	ctrl_sendone_locking("ending",NULL,0,NULL,0); /* this causes charmrun to go away */
- 	while (1) {
- 		if (Cmi_netpoll) CommunicationServer(500);
- 		CmiYield();/*Loop until charmrun dies, which will be caught by comm. thread*/
- 	}
+#if CMK_SHARED_VARS_UNAVAILABLE
+ 	while (1) CommunicationServer(500);
+#endif
   }
+/*Comm. thread will kill us.*/
+  while (1) CmiYield();
 }
 
 static void exitDelay(void)
@@ -2473,7 +2020,6 @@ static void set_signals(void)
 #   if !defined(_WIN32) || defined(__CYGWIN__) /*UNIX-only signals*/
     signal(SIGQUIT, KillOnAllSigs);
     signal(SIGBUS, KillOnAllSigs);
-    signal(SIGPIPE, KillOnSIGPIPE);
 #     if CMK_HANDLE_SIGUSR
     signal(SIGUSR1, HandleUserSignals);
     signal(SIGUSR2, HandleUserSignals);
@@ -2520,7 +2066,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
   Cmi_scanf_mutex = CmiCreateLock();
 
   skt_set_idle(obtain_idleFn);
-  if (Cmi_charmrun_IP!=0) {
+  if (!skt_ip_match(Cmi_charmrun_IP,skt_invalid_ip)) {
   	set_signals();
 #if !CMK_USE_GM
   	dataskt=skt_datagram(&dataport, Cmi_os_buffer_size);
@@ -2539,6 +2085,21 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
   node_addresses_obtain(argv);
   skt_set_idle(CmiYield);
   Cmi_check_delay = 2.0+0.5*Cmi_numnodes;
-  CmiStartThreads();
+  CmiStartThreads(argv);
   ConverseRunPE(everReturn);
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

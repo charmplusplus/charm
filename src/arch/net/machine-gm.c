@@ -109,10 +109,19 @@ static int maxMsgSize = 0;
  * CmiNotifyIdle()-- wait until a packet comes in
  *
  *****************************************************************************/
+typedef struct {
+  
+} CmiIdleState;
 
-void CmiNotifyIdle(void)
+static CmiIdleState *CmiNotifyGetState(void) { return NULL; }
+
+static void CmiNotifyBeginIdle(CmiIdleState *)
 {
-  struct timeval tv;
+  
+}
+
+static void CmiNotifyStillIdle(CmiIdleState *)
+{
 #if CMK_SHARED_VARS_UNAVAILABLE
   /*No comm. thread-- listen on sockets for incoming messages*/
   int nreadable;
@@ -137,12 +146,13 @@ void CmiNotifyIdle(void)
   if (Cmi_netpoll) CommunicationServer(5);
 #else
   /*Comm. thread will listen on sockets-- just sleep*/
-  tv.tv_sec=0; tv.tv_usec=1000;
-  select(0,NULL,NULL,NULL,&tv);
+  CmiIdleLock_sleep(&CmiGetState()->idle,5);
 #endif
 }
 
-static void alarmcallback (void *context) {}
+void CmiNotifyIdle(void) {
+  CmiNotifyStillIdle(NULL);
+}
 
 /***********************************************************************
  * CommunicationServer()
@@ -161,7 +171,6 @@ static void CommunicationServer(int withDelayMs)
   char *msg, *buf;
 
   LOG(GetClock(), Cmi_nodestart, 'I', 0, 0);
-  if (Cmi_charmrun_fd==-1) return; /*Standalone mode*/
 #if CMK_SHARED_VARS_UNAVAILABLE
   if (terrupt)
   {
@@ -169,16 +178,16 @@ static void CommunicationServer(int withDelayMs)
   }
   terrupt++;
 #endif
-  CmiCommLock();
 
   while (1) {
-    CheckSocketsReady(0);
+    CheckSocketsReady(withDelayMs,1);
+    CmiCommLock();
     if (ctrlskt_ready_read) { ctrl_getone(); }
     e = gm_receive(gmport);
     if (!processEvent(e)) break;
+    CmiCommUnlock();
   }
 
-  CmiCommUnlock();
 #if CMK_SHARED_VARS_UNAVAILABLE
   terrupt--;
 #endif
@@ -218,8 +227,8 @@ static void processMessage(char *msg, int len)
       if (node->asm_fill == node->asm_total) {
         if (rank == DGRAM_BROADCAST) {
           for (i=1; i<Cmi_mynodesize; i++)
-            PCQueuePush(CmiGetStateN(i)->recv, CopyMsg(newmsg, len));
-          PCQueuePush(CmiGetStateN(0)->recv, newmsg);
+            CmiPushPE(i, CopyMsg(newmsg, len));
+          CmiPushPE(0, newmsg);
         } else {
 #if CMK_NODE_QUEUE_AVAILABLE
            if (rank==DGRAM_NODEMESSAGE) {
@@ -227,7 +236,7 @@ static void processMessage(char *msg, int len)
            }
            else
 #endif
-             PCQueuePush(CmiGetStateN(rank)->recv, newmsg);
+             CmiPushPE(rank, newmsg);
         }
         node->asm_msg = 0;
       }
