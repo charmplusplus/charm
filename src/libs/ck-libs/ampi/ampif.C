@@ -66,6 +66,7 @@ FDECL {
 #define mpi_group_rank FTN_NAME( MPI_GROUP_RANK, mpi_group_rank)
 #define mpi_group_translate_ranks FTN_NAME(MPI_GROUP_TRANSLATE_RANKS, mpi_group_translate_ranks)
 #define mpi_group_compare FTN_NAME(MPI_GROUP_COMPARE, mpi_group_compare)
+
 #define mpi_comm_group FTN_NAME( MPI_COMM_GROUP, mpi_comm_group)
 #define mpi_group_union FTN_NAME(MPI_GROUP_UNION, mpi_group_union)
 #define mpi_group_intersection FTN_NAME(MPI_GROUP_INTERSECTION, mpi_group_intersection)
@@ -76,12 +77,22 @@ FDECL {
 #define mpi_group_range_excl FTN_NAME(MPI_GROUP_RANGE_EXCL, mpi_group_range_excl)
 #define mpi_group_free FTN_NAME(MPI_GROUP_FREE, mpi_group_free)
 #define mpi_comm_create FTN_NAME(MPI_COMM_CREATE, mpi_comm_create)
+
 #define mpi_comm_rank FTN_NAME( MPI_COMM_RANK , mpi_comm_rank )
 #define mpi_comm_size FTN_NAME( MPI_COMM_SIZE , mpi_comm_size )
 #define mpi_comm_dup FTN_NAME( MPI_COMM_DUP , mpi_comm_dup )
 #define mpi_comm_split FTN_NAME( MPI_COMM_SPLIT , mpi_comm_split )
 #define mpi_comm_free FTN_NAME( MPI_COMM_FREE , mpi_comm_free )
 #define mpi_comm_test_inter FTN_NAME( MPI_COMM_TEST_INTER , mpi_comm_test_inter )
+#define mpi_comm_remote_size FTN_NAME ( MPI_COMM_REMOTE_SIZE , mpi_comm_remote_size )
+#define mpi_comm_remote_group FTN_NAME ( MPI_COMM_REMOTE_GROUP , mpi_comm_remote_group )
+#define mpi_intercomm_create FTN_NAME ( MPI_INTERCOMM_CREATE , mpi_intercomm_create )
+#define mpi_intercomm_merge FTN_NAME ( MPI_INTERCOMM_MERGE , mpi_intercomm_merge )
+#define mpi_keyval_create FTN_NAME ( MPI_KEYVAL_CREATE , mpi_keyval_create )
+#define mpi_keyval_free FTN_NAME ( MPI_KEYVAL_FREE , mpi_keyval_free )
+#define mpi_attr_put FTN_NAME ( MPI_ATTR_PUT , mpi_attr_put )
+#define mpi_attr_get FTN_NAME ( MPI_ATTR_GET , mpi_attr_get )
+#define mpi_attr_delete FTN_NAME ( MPI_ATTR_DELETE , mpi_attr_delete )
 
 #define mpi_cart_create FTN_NAME ( MPI_CART_CREATE , mpi_cart_create )
 #define mpi_graph_create FTN_NAME ( MPI_GRAPH_CREATE , mpi_graph_create )
@@ -115,10 +126,36 @@ FDECL {
 #define mpi_finalize FTN_NAME( MPI_FINALIZE , mpi_finalize )
 #define mpi_abort FTN_NAME( MPI_ABORT , mpi_abort )
 
+#define mpi_yield FTN_NAME ( MPI_YIELD , mpi_yield )
+#define mpi_resume FTN_NAME ( MPI_RESUME, mpi_resume )
 #define mpi_print FTN_NAME( MPI_PRINT , mpi_print )
 #define mpi_register FTN_NAME( MPI_REGISTER , mpi_register )
 #define mpi_migrate FTN_NAME( MPI_MIGRATE , mpi_migrate )
+#define mpi_setmigratable FTN_NAME (MPI_SETMIGRATABLE , mpi_setmigratable )
 #define mpi_checkpoint FTN_NAME( MPI_CHECKPOINT , mpi_checkpoint )
+
+/* MPI-2 */
+#define mpi_type_get_envelope FTN_NAME ( MPI_TYPE_GET_ENVELOPE , mpi_type_get_envelope )
+#define mpi_type_get_contents FTN_NAME ( MPI_TYPE_GET_CONTENTS , mpi_type_get_contents )
+
+#define mpi_win_create FTN_NAME ( MPI_WIN_CREATE , mpi_win_create )
+#define mpi_win_free  FTN_NAME ( MPI_WIN_FREE  , mpi_win_free )
+#define mpi_win_delete_attr  FTN_NAME ( MPI_WIN_DELETE_ATTR  , mpi_win_delete_attr )
+#define mpi_win_get_group  FTN_NAME ( MPI_WIN_GET_GROUP  , mpi_win_get_group )
+#define mpi_win_set_name  FTN_NAME ( MPI_WIN_SET_NAME  , mpi_win_set_name )
+#define mpi_win_get_name  FTN_NAME ( MPI_WIN_GET_NAME  , mpi_win_get_name )
+#define mpi_win_fence  FTN_NAME ( MPI_WIN_FENCE  , mpi_win_fence )
+#define mpi_win_lock  FTN_NAME ( MPI_WIN_LOCK  , mpi_win_lock )
+#define mpi_win_unlock  FTN_NAME ( MPI_WIN_UNLOCK  , mpi_win_unlock )
+#define mpi_win_post  FTN_NAME ( MPI_WIN_POST  , mpi_win_post )
+#define mpi_win_wait  FTN_NAME ( MPI_WIN_WAIT  , mpi_win_wait )
+#define mpi_win_start  FTN_NAME ( MPI_WIN_START  , mpi_win_start )
+#define mpi_win_complete  FTN_NAME ( MPI_WIN_COMPLETE  , mpi_win_complete )
+#define mpi_alloc_mem  FTN_NAME ( MPI_ALLOC_MEM  , mpi_alloc_mem )
+#define mpi_free_mem  FTN_NAME ( MPI_FREE_MEM  , mpi_free_mem )
+#define mpi_put  FTN_NAME ( MPI_PUT  , mpi_put )
+#define mpi_get  FTN_NAME ( MPI_GET  , mpi_get )
+#define mpi_accumulate  FTN_NAME ( MPI_ACCUMULATE  , mpi_accumulate )
 
 void mpi_init_universe(int *unicomm)
 {
@@ -710,9 +747,9 @@ void mpi_migrate(void)
   MPI_Migrate();
 }
 
-int mpi_register(void *d, MPI_PupFn f)
+void mpi_register(void *d, MPI_PupFn f)
 {
-  return MPI_Register(d,f);
+  MPI_Register(d,f);
 }
 
 void mpi_get_userdata(int* dn, void *data)
@@ -724,5 +761,130 @@ void mpi_checkpoint(char *dname){
   MPI_Checkpoint(dname);
 }
 
+void mpi_comm_remote_size(int *comm, int *size, int *ierr){
+  *ierr = MPI_Comm_remote_size(*comm, size);
+}
+
+void mpi_comm_remote_group(int *comm, int *group, int *ierr){
+  *ierr = MPI_Comm_remote_group(*comm, group);
+}
+
+void mpi_intercomm_create(int *local_comm, int *local_leader, int *peer_comm, int *remote_leader, int *tag, int *newintercomm, int *ierr){
+  *ierr = MPI_Intercomm_create(*local_comm, *local_leader, *peer_comm, *remote_leader, *tag, newintercomm);
+}
+
+void mpi_intercomm_merge(int *intercomm, int *high, int *newintracomm, int *ierr){
+  *ierr = MPI_Intercomm_merge(*intercomm, *high, newintracomm);
+}
+
+void mpi_keyval_create(MPI_Copy_function *copy_fn, MPI_Delete_function *delete_fn, int *keyval, void* extra_state, int *ierr) {
+  *ierr = MPI_Keyval_create(copy_fn, delete_fn, keyval, extra_state);
+}
+
+void mpi_keyval_free(int *keyval, int *ierr){
+  *ierr = MPI_Keyval_free(keyval);
+}
+
+void mpi_attr_put(int *comm, int *keyval, void* attribute_val, int *ierr){
+  *ierr = MPI_Attr_put(*comm, *keyval, attribute_val);
+}
+
+void mpi_attr_get(int *comm, int *keyval, void *attribute_val, int *flag, int *ierr){
+  *ierr = MPI_Attr_get(*comm, *keyval, attribute_val, flag);
+}
+
+void mpi_attr_delete(int *comm, int *keyval, int *ierr) {
+  *ierr = MPI_Attr_delete(*comm, *keyval);
+}
+
+void mpi_type_get_envelope(int *datatype, int *num_integers, int *num_addresses,
+                          int *num_datatypes, int *combiner, int *ierr){
+ *ierr = MPI_Type_get_envelope(*datatype, num_integers, num_addresses, num_datatypes, combiner);
+}
+
+void mpi_type_get_contents(int *datatype, int *max_integers, int *max_addresses,
+			   int *max_datatypes, int array_of_integers[], int array_of_addresses[],
+			   int array_of_datatypes[], int *ierr){
+  *ierr = MPI_Type_get_contents(*datatype, *max_integers, *max_addresses, *max_datatypes, array_of_integers, 
+				array_of_addresses, array_of_datatypes);
+}
+
+
+void mpi_win_create(void *base, int *size, int *disp_unit,
+		   int *info, int *comm, MPI_Win *newwin, int *ierr) {
+  *ierr = MPI_Win_create(base, *size, *disp_unit, *info, *comm, newwin);
+}
+
+void mpi_win_free(int *win, int *ierr) {
+  *ierr = MPI_Win_free(win);
+}
+
+void mpi_win_delete_attr(int win, int *key, int *ierr){
+  *ierr = MPI_Win_delete_attr(win, *key);
+}
+
+void mpi_win_get_group(int win, int *group, int *ierr){
+  *ierr = MPI_Win_get_group(win, group);
+}
+
+void mpi_win_set_name(int win, char *name, int *ierr){
+  *ierr = MPI_Win_set_name(win, name);
+}
+
+void mpi_win_get_name(int win, char *name, int *length, int *ierr){
+  *ierr = MPI_Win_get_name(win, name, length);
+}
+
+void mpi_win_fence(int *assertion, int win, int *ierr){
+  *ierr = MPI_Win_fence(*assertion, win);
+}
+
+void mpi_win_lock(int *lock_type, int *rank, int *assert, int win, int *ierr){
+  *ierr = MPI_Win_lock(*lock_type, *rank, *assert, win);
+}
+
+void mpi_win_unlock(int *rank, int win, int *ierr){
+  *ierr = MPI_Win_unlock(*rank, win);
+}
+
+void mpi_win_post(int *group, int *assertion, int win, int *ierr){
+  *ierr = MPI_Win_post(*group, *assertion, win);
+}
+
+void mpi_win_wait(int win, int *ierr){
+  *ierr = MPI_Win_wait(win);
+}
+
+void mpi_win_start(int *group, int *assertion, int win, int *ierr){
+  *ierr = MPI_Win_start(*group, *assertion, win);
+}
+
+void mpi_win_complete(int win, int *ierr){
+  *ierr = MPI_Win_complete(win);
+}
+
+void mpi_alloc_mem(int *size, int *info, void *baseptr, int *ierr){
+  *ierr = MPI_Alloc_mem(*size, *info, baseptr);
+}
+
+void mpi_free_mem(void *base, int *ierr){
+  *ierr = MPI_Free_mem(base);
+}
+
+void mpi_put(void *orgaddr, int *orgcnt, int *orgtype, int *rank, 
+	    int *targdisp, int *targcnt, int *targtype, int win, int *ierr){
+  *ierr = MPI_Put(orgaddr, *orgcnt, *orgtype, *rank, *targdisp, *targcnt, *targtype, win);
+}
+
+void mpi_get(void *orgaddr, int *orgcnt, int *orgtype, int *rank, 
+	    int *targdisp, int *targcnt, int *targtype, int win, int *ierr){
+  *ierr = MPI_Get(orgaddr, *orgcnt, *orgtype, *rank, *targdisp, *targcnt, *targtype, win);
+}
+
+void mpi_accumulate(void *orgaddr, int *orgcnt, int *orgtype, int *rank,
+		   int *targdisp, int *targcnt, int *targtype, 
+		   int *op, int win, int *ierr){
+  *ierr = MPI_Accumulate(orgaddr, *orgcnt, *orgtype, *rank, *targdisp, *targcnt, *targtype, *op, win);
+}
 } // extern "C"
 

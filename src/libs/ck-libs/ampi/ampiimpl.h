@@ -14,18 +14,16 @@
 #include "EachToManyMulticastStrategy.h" /* for ComlibManager Strategy*/
 #include <string.h> /* for strlen */
 
-//------------------- added by YAN for one-sided communication -----------
-typedef int MPI_Info;
-
-/*************************************************************
- * Local flags used for Win_obj class: 
- *     WIN_ERROR -- the operation fails
- *     WIN_SUCCESS -- the operation succeeds
- *************************************************************/
-#define WIN_SUCCESS 	0
-#define WIN_ERROR 	1
-
 typedef struct mpiComplex_{ double re, im; } mpiComplex;
+
+//------------------- added by YAN for one-sided communication -----------
+/* the index is unique within a communicator */
+class WinStruct{
+public:
+  MPI_Comm comm;
+  int index;
+  WinStruct(MPI_Comm comm_, int index_):comm(comm_),index(index_){ }
+};
 
 class ampi;
 class lockQueueEntry {
@@ -39,7 +37,7 @@ public:
   lockQueueEntry () {}
 };
 
-typedef CkQ<lockQueueEntry> LockQueue;
+typedef CkQ<lockQueueEntry *> LockQueue;
 
 class win_obj {
  public:
@@ -53,7 +51,7 @@ class win_obj {
   MPI_Comm comm;
 
   int owner;   // Rank of owner of the lock, -1 if not locked
-  LockQueue *lockQueue;  // queue of waiting processors for the lock
+  LockQueue lockQueue;  // queue of waiting processors for the lock
                      // top of queue is the one holding the lock
                      // queue is empty if lock is not applied
 		         
@@ -612,7 +610,8 @@ class AmpiMsg : public CMessage_AmpiMsg {
     data = (char *)this + sizeof(AmpiMsg);
   }
   static void *alloc(int msgnum, size_t size, int *sizes, int pbits) {
-    return CkAllocMsg(msgnum, size+sizes[0], pbits);
+    if(sizes==NULL) return CkAllocMsg(msgnum, size, pbits);
+    else return CkAllocMsg(msgnum, size+sizes[0], pbits);
   }
   static void *pack(AmpiMsg *in) { return (void *) in; }
   static AmpiMsg *unpack(void *in) { return new (in) AmpiMsg; }
@@ -735,7 +734,8 @@ class ampiParent : public CBase_ampiParent {
     CkPupPtrVec<ampiCommStruct> intraComm; //Communicators from MPI_Intercomm_merge
 
     CkPupPtrVec<groupStruct> groups; // "Wild" groups that don't have a communicator
-
+    CkPupPtrVec<WinStruct> winStructList;   //List of windows for one-sided communication
+       
     inline int isSplit(MPI_Comm comm) const {
       return (comm>=MPI_COMM_FIRST_SPLIT && comm<MPI_COMM_FIRST_GROUP);
     }
@@ -941,6 +941,10 @@ public:
     CkDDT myDDTsto;
     CkDDT *myDDT;
     AmpiRequestList ampiReqs;
+    
+    int addWinStruct(WinStruct* win);
+    WinStruct getWinStruct(MPI_Win win);
+    void removeWinStruct(WinStruct win); 
 };
 
 /*
@@ -1061,15 +1065,15 @@ class ampi : public CBase_ampi {
  public:
     MPI_Win createWinInstance(void *base, MPI_Aint size, int disp_unit, MPI_Info info); 
 
-    int deleteWinInstance(win_obj *win);
+    int deleteWinInstance(MPI_Win win);
 
-    int winGetGroup(MPI_Win win, MPI_Group *group); 
+    int winGetGroup(WinStruct win, MPI_Group *group); 
 
     int winPut(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank, 
-	       MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Win win);
+	       MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, WinStruct win);
 
     int winGet(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank, 
-	       MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Win win);
+	       MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, WinStruct win);
 
 
     void winRemotePut(int orgcnt, char* orgaddr, MPI_Datatype orgtype,
@@ -1080,32 +1084,29 @@ class ampi : public CBase_ampi {
 		      int targcnt, MPI_Datatype targtype, 
     		      int winIndex, CkFutureID ftHandle, int pe_src);
 
-    int winLock(int lock_type, int rank, MPI_Win win);
-    int winUnlock(int rank, MPI_Win win);
+    int winLock(int lock_type, int rank, WinStruct win);
+    int winUnlock(int rank, WinStruct win);
     
     void winRemoteLock(int lock_type, int winIndex, CkFutureID ftHandle, int pe_src, int requestRank);
     void winRemoteUnlock(int winIndex, CkFutureID ftHandle, int pe_src, int requestRank);
     
     int winAccumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
 	    	      MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, 
-		      MPI_Op op, MPI_Win win);
+		      MPI_Op op, WinStruct win);
     
     void winRemoteAccumulate(int orgcnt, char* orgaddr, MPI_Datatype orgtype, MPI_Aint targdisp, 
 	  		    int targcnt, MPI_Datatype targtype, 
 		            MPI_Op op, int winIndex, CkFutureID ftHandle, 
 			    int pe_src);
 
-    void winSetName(MPI_Win win, char *name);
-    void winGetName(MPI_Win win, char *name, int *length);
+    void winSetName(WinStruct win, char *name);
+    void winGetName(WinStruct win, char *name, int *length);
 			    	      
-    win_obj* getWinObjInstance(MPI_Win win); 
+    win_obj* getWinObjInstance(WinStruct win); 
     int getNewSemaId(); 
 	
     //------------------------ End of code by YAN ---------------------
 };
-
-// ------------ Added by YAN --------------------------
-extern ampi *getAmpiInstance(MPI_Comm comm);
 
 //Use this to mark the start of AMPI interface routines:
 #define AMPIAPI(routineName) TCHARM_API_TRACE(routineName,"ampi")

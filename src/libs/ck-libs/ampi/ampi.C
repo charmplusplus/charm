@@ -762,11 +762,20 @@ ampi::~ampi()
 }
 
 // ----------------- Added by Yan for one-sided communication ---------
-static ampiParent *getAmpiParent(void);
+inline int ampiParent::addWinStruct(WinStruct* win) { 
+	winStructList.push_back(win);
+	return winStructList.size()-1;
+}
+
+inline WinStruct ampiParent::getWinStruct(MPI_Win win) {
+	return *(winStructList[(int)win]);
+}
+   
+inline void ampiParent::removeWinStruct(WinStruct win) {/*winStructList.remove(win);*/}
 
 int
 ampi::winPut(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank, 
-	     MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Win win){
+	     MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, WinStruct win){
   // Create a Future object 
   AmpiMsg *msg = new AmpiMsg();
   CkFutureID ftHandle = CkCreateAttachedFuture((void*)msg);
@@ -800,7 +809,7 @@ ampi::winRemotePut(int orgcnt, char* orgaddr, MPI_Datatype orgtype,
 
 int 
 ampi::winGet(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank, 
-	     MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Win win){
+	     MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, WinStruct win){
   // Create a Future object 
   AmpiMsg *msg = new AmpiMsg();
   CkFutureID ftHandle = CkCreateAttachedFuture((void*)msg);
@@ -846,7 +855,7 @@ ampi::winRemoteGet(int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp, int targ
 int 
 ampi::winAccumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
        	            MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, 
-		    MPI_Op op, MPI_Win win) {
+		    MPI_Op op, WinStruct win) {
   // Create a Future object 
   AmpiMsg *msg = new AmpiMsg();
   CkFutureID ftHandle = CkCreateAttachedFuture((void*)msg);
@@ -882,7 +891,7 @@ ampi::winRemoteAccumulate(int orgcnt, char* orgaddr, MPI_Datatype orgtype, MPI_A
 }
 
 int 
-ampi::winLock(int lock_type, int rank, MPI_Win win) {
+ampi::winLock(int lock_type, int rank, WinStruct win) {
   // Create a Future object 
   AmpiMsg *msg = new AmpiMsg();
   CkFutureID ftHandle = CkCreateAttachedFuture((void*)msg);
@@ -921,7 +930,7 @@ ampi::winRemoteLock(int lock_type, int winIndex, CkFutureID ftHandle, int pe_src
 }
 
 int 
-ampi::winUnlock(int rank, MPI_Win win) {
+ampi::winUnlock(int rank, WinStruct win) {
   // Create a Future object 
   AmpiMsg *msg = new AmpiMsg();
   CkFutureID ftHandle = CkCreateAttachedFuture((void*)msg);
@@ -959,40 +968,40 @@ ampi::createWinInstance(void *base, MPI_Aint size, int disp_unit, MPI_Info info)
   AMPI_DEBUG("     Creating win obj {%d, %p}\n ", myComm.getComm(), base);
   win_obj *newobj = new win_obj((char*)(NULL), base, size, disp_unit, myComm.getComm());
   winObjects.push_back(newobj);
-  MPI_Win newwin;
-  newwin.comm=myComm.getComm();
-  newwin.index=winObjects.size()-1;
+  WinStruct *newwin = new WinStruct(myComm.getComm(),winObjects.size()-1);
   AMPI_DEBUG("     Creating MPI_WIN at (%p) with {%d, %d}\n", &newwin, myComm.getComm(), winObjects.size()-1);
-  return newwin;
+  return (parent->addWinStruct(newwin));
 }
 
 int 
-ampi::deleteWinInstance(win_obj *win) {
-  // FIXME: delete from <Vec> 
-  win->free();
+ampi::deleteWinInstance(MPI_Win win) {
+  WinStruct winStruct = parent->getWinStruct(win);
+  win_obj *winobj = winObjects[winStruct.index];
+  parent->removeWinStruct(winStruct); // really it does nothing at all
+  winobj->free();
   return MPI_SUCCESS;
 }
 
 int 
-ampi::winGetGroup(MPI_Win win, MPI_Group *group){
-   *group = getAmpiParent()->comm2group(win.comm);
+ampi::winGetGroup(WinStruct win, MPI_Group *group){
+   *group = parent->comm2group(win.comm);
    return MPI_SUCCESS;
 }
 
 void 
-ampi::winSetName(MPI_Win win, char *name) {
+ampi::winSetName(WinStruct win, char *name) {
   win_obj *winobj = winObjects[win.index];
   winobj->setName((const char*)name, strlen(name));
 }
 
 void 
-ampi::winGetName(MPI_Win win, char *name, int *length) {
+ampi::winGetName(WinStruct win, char *name, int *length) {
   win_obj *winobj = winObjects[win.index];
   winobj->getName(name, length);
 }
 
 win_obj*
-ampi::getWinObjInstance(MPI_Win win) {
+ampi::getWinObjInstance(WinStruct win) {
   return winObjects[win.index];
 }
 //------------------------ End of Adding by YAN ---------------------
@@ -1590,8 +1599,7 @@ int MPI_null_delete_fn (MPI_Comm comm, int keyval, void *attr, void *extra_state
 }
 
 //------------------ External Interface -----------------
-
-static ampiParent *getAmpiParent(void) {
+ampiParent *getAmpiParent(void) {
   ampiParent *p = CtvAccess(ampiPtr);
 #ifndef CMK_OPTIMIZE
   if (p==NULL) CkAbort("Cannot call MPI routines before AMPI is initialized.\n");

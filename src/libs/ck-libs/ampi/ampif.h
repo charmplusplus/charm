@@ -1,4 +1,4 @@
-       integer, parameter :: MPI_SUCCESS = 0
+       integer, parameter :: MPI_SUCCESS                 =0
        integer, parameter :: MPI_ERR_BUFFER              =1
        integer, parameter :: MPI_ERR_COUNT               =2
        integer, parameter :: MPI_ERR_TYPE                =3
@@ -8,7 +8,7 @@
        integer, parameter :: MPI_ERR_REQUEST             =7
        integer, parameter :: MPI_ERR_ROOT                =8
        integer, parameter :: MPI_ERR_GROUP               =9
-       integer, parameter :: MPI_ERR_OP			 =10
+       integer, parameter :: MPI_ERR_OP                  =10
        integer, parameter :: MPI_ERR_TOPOLOGY            =11
        integer, parameter :: MPI_ERR_DIMS                =12
        integer, parameter :: MPI_ERR_ARG                 =13
@@ -17,7 +17,7 @@
        integer, parameter :: MPI_ERR_OTHER               =16
        integer, parameter :: MPI_ERR_INTERN              =17
        integer, parameter :: MPI_ERR_IN_STATUS           =18
-       integer, parameter :: MPI_ERR_PENDING		 =19
+       integer, parameter :: MPI_ERR_PENDING             =19
        integer, parameter :: MPI_ERR_ACCESS              =20
        integer, parameter :: MPI_ERR_AMODE               =21
        integer, parameter :: MPI_ERR_ASSERT              =22
@@ -51,7 +51,7 @@
        integer, parameter :: MPI_ERR_SPAWN               =50
        integer, parameter :: MPI_ERR_UNSUPPORTED_DATAREP =51
        integer, parameter :: MPI_ERR_UNSUPPORTED_OPERATION =52
-       integer, parameter :: MPI_ERR_WIN		 =53
+       integer, parameter :: MPI_ERR_WIN                 =53
        integer, parameter :: MPI_ERR_LASTCODE            =53
 
        integer, parameter :: MPI_MAX_PROCESSOR_NAME = 256
@@ -80,8 +80,9 @@
        integer, parameter :: MPI_TYPE_NULL = -1
        integer, parameter :: MPI_PROC_NULL = -1
        integer, parameter :: MPI_KEYVAL_INVALID = -1
-       integer, parameter :: MPI_BOTTOM = 0
+       integer, parameter :: MPI_INFO_NULL = -1
 
+       integer, parameter :: MPI_BOTTOM = 0
        integer, parameter :: MPI_UNDEFINED = -32766
 
        integer, parameter :: MPI_IDENT    = 0

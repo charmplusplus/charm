@@ -81,7 +81,16 @@ module MPIINCL
   external MPI_Comm_split
   external MPI_Comm_free
   external MPI_Comm_test_inter
-  
+  external MPI_Comm_remote_size
+  external MPI_Comm_remote_group
+  external MPI_Intercomm_create
+  external MPI_Intercomm_merge
+  external MPI_Keyval_create
+  external MPI_Keyval_free
+  external MPI_Attr_put
+  external MPI_Attr_get
+  external MPI_Attr_delete
+
   external MPI_Cart_create
   external MPI_Graph_create
   external MPI_Topo_test
@@ -112,10 +121,35 @@ module MPIINCL
   external MPI_Finalize
   external MPI_Abort
 
+  external MPI_Yield
+  external MPI_Resume
   external MPI_Print
   external MPI_Register_main
+  external MPI_Setmigratable
   external MPI_Migrate
   external MPI_Checkpoint
   external MPI_Get_userdata
+
+  external MPI_Type_get_envelope
+  external MPI_Type_get_contents
+
+  external MPI_Win_create
+  external MPI_Win_free
+  external MPI_Win_delete_attr
+  external MPI_Win_get_group
+  external MPI_Win_set_name
+  external MPI_Win_get_name
+  external MPI_Win_fence
+  external MPI_Win_lock
+  external MPI_Win_unlock
+  external MPI_Win_post
+  external MPI_Win_wait
+  external MPI_Win_start
+  external MPI_Win_complete
+  external  MPI_Alloc_mem
+  external MPI_Free_mem
+  external MPI_Put
+  external MPI_Get
+  external MPI_Accumulate
 
 end module MPIINCL

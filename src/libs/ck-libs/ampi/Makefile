@@ -5,7 +5,7 @@ HEADERS=ampi.h ampif.h ampiimpl.h ampiProjections.h ampiOOQ.h
 HEADDEP=$(HEADERS) ampiimpl.h ampi.decl.h ampiEvents.h 
 COMPAT=compat_ampius.o compat_ampifus.o \
        compat_ampim.o compat_ampifm.o compat_ampicm.o
-OBJS=ampi.o ampif.o ampiProjections.o win_obj.o MPI_Win.o
+OBJS=ampi.o ampif.o ampiProjections.o ampiOneSided.o
 
 LIB=libmoduleampi
 LIBDIR=$(CDIR)/lib
@@ -62,11 +62,8 @@ ampi.o: ampi.C $(HEADDEP)
 ampif.o: ampif.C $(HEADDEP)
 	$(CHARMC) -c ampif.C
 
-win_obj.o: win_obj.C ampiimpl.h $(HEADDEP)
-	$(CHARMC) -c win_obj.C
- 
-MPI_Win.o: MPI_Win.C ampiimpl.h $(HEADDEP)
-	$(CHARMC) -c MPI_Win.C
+ampiOneSided.o: ampiOneSided.C ampiimpl.h $(HEADDEP)
+	$(CHARMC) -c ampiOneSided.C
 
 ampi.decl.h ampi.def.h: ampi.ci
 	$(CHARMC) ampi.ci
