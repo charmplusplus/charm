@@ -49,7 +49,6 @@
 #else /*UNIX*/
 #include <pwd.h>   /*getcwd*/
 #include <unistd.h>
-#include <varargs.h>
 #define DIRSEP "/"
 #endif
 
