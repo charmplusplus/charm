@@ -17,15 +17,15 @@
 // plain old 'problem'.
 //
 // Of course that's sort of a pain with charm.
-#include "problem.h"
+#include "cklibs/problem.h"
 
 // The serial tree class priovides a way to do a full-tree search of a node
 // for a depth up to depth whatever. I use this both internally in each
 // interior chare, and at the leaves of the tree.
-#include "serialtree.h"
+#include "cklibs/serialtree.h"
 
 // Draw in the charm interface declarations.
-#include "search.decl.h"
+#include "cklibs/search.decl.h"
 
 // This class definition is used to pass around the solution and nodes and
 // chares when a search is done.
@@ -57,7 +57,7 @@ class searchResults : public CMessage_searchResults {
 // The idaStar search, as well as fakeing the astar search are included
 // here. In this file are all the definitions you need to run an astar
 // or idastar search.
-#include "idastar.h"
+#include "cklibs/idastar.h"
 
 // If I had another search type like branch and bound, you'd include
 // it's header file here. You'd write the code in branchandbound.C

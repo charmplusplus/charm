@@ -5,8 +5,8 @@
  * Fri Mar 28 19:00:04 CST 2003
  */
 
-#include "idastar.h"
-#include "search.h"
+#include "cklibs/idastar.h"
+#include "cklibs/search.h"
 
 #define min(a,b) (a<b?a:b)
 #define max(a,b) (a>b?a:b)

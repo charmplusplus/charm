@@ -9,7 +9,7 @@
 #define __UIUC_CHARM_SERIALTREE_H
 
 #include <charm++.h>
-#include "problem.h"
+#include "cklibs/problem.h"
 
 // The serial tree performs a serial, depth-first, depth-bounded search.
 // The reason it includes depth-bounded is because it shouldn't ever be

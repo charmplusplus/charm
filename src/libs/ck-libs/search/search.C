@@ -5,8 +5,8 @@
  * Fri Mar 28 19:01:25 CST 2003
  */
 
-#include "search.h"
-#include "search.decl.h"
+#include "cklibs/search.h"
+#include "cklibs/search.decl.h"
 
 /* ************************************************************************
  *
@@ -30,5 +30,5 @@ searchResults * searchResults::unpack(void *inbuf) {
   return me;
 }
 
-
+// search.def.h is a local file and not placed in cklibs.
 #include "search.def.h"

@@ -9,9 +9,9 @@
 #define __UIUC_CHARM_ASTAR_H
 
 #include <charm++.h>
-#include "problem.h"
-#include "serialtree.h"
-#include "search.decl.h"
+#include "cklibs/problem.h"
+#include "cklibs/serialtree.h"
+#include "cklibs/search.decl.h"
 
 // A function to fake aStar using the idaStar.
 void aStar(problem *issue,

@@ -2,7 +2,8 @@ CDIR=../../../..
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
 HEADERS=search.h problem.h serialtree.h idastar.h search.decl.h
-HEADDEP=$(HEADERS) search.def.h
+# Not only must the headers be present, they must be in the right place!
+HEADDEP=headers search.def.h
 OBJS=search.o problem.o serialtree.o idastar.o
 DEST=$(CDIR)/lib/libmodulesearch.a
 OPTS=-DRANDOM_STARTING_PROC
@@ -13,13 +14,14 @@ $(DEST): $(OBJS) $(COMPAT) headers
 	$(CHARMC) $(OBJS) $(COMPAT) -o $@
 
 headers: $(HEADERS)
-	cp $(HEADERS) $(CDIR)/include/
+	mkdir $(CDIR)/include/cklibs/
+	cp $(HEADERS) $(CDIR)/include/cklibs/
 	touch headers
 
 search.o: search.C $(HEADDEP)
 	$(CHARMC) -c search.C
 
-problem.o: problem.C $(HEADDEP)
+problem.o: problem.C $(HEADDEP) 
 	$(CHARMC) -c problem.C
 
 serialtree.o: serialtree.C $(HEADDEP)

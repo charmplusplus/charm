@@ -5,7 +5,7 @@
  * Sun Mar  2 22:39:32 CST 2003
  */
 
-#include "problem.h"
+#include "cklibs/problem.h"
 
 
 problem::problem()
