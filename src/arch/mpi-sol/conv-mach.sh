@@ -22,10 +22,8 @@ CMK_NATIVE_LDXX='CC'
 CMK_CF77='f77 -stackvar '
 CMK_CF90='f90 -stackvar '
 CMK_CF90_FIXED="$CMK_CF90 -fixed "
-#CMK_F90LIBS="-L/opt/SUNWspro/lib -lfsu -lsunmath -lfsumai -lfminlai -lfmaxlai -
-lfminvai -lfmaxvai -lfui -lfai"
-CMK_F90LIBS="-L/opt/SUNWspro/lib -lfui -lfai -lfai2 -lfsumai -lfprodai -lfminlai
- -lfmaxlai -lfminvai -lfmaxvai -lfsu -lsunmath -lm -lc -lrt"
+#CMK_F90LIBS="-L/opt/SUNWspro/lib -lfsu -lsunmath -lfsumai -lfminlai -lfmaxlai -lfminvai -lfmaxvai -lfui -lfai"
+CMK_F90LIBS="-L/opt/SUNWspro/lib -lfui -lfai -lfai2 -lfsumai -lfprodai -lfminlai -lfmaxlai -lfminvai -lfmaxvai -lfsu -lsunmath -lm -lc -lrt"
 
 CMK_AR='CC -xar -o'
 CMK_RANLIB='ranlib'
