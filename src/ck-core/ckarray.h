@@ -462,7 +462,7 @@ public:
 //Message: Remove the array element at the given index.
 class CkArrayRemoveMsg : public CMessage_CkArrayRemoveMsg 
 {public:
-	CkArrayRemoveMsg(const CkArrayIndex &idx) {array_index()=idx;}
+	CkArrayRemoveMsg(const CkArrayIndex &idx);	// move to ckarray.C
 };
 
 //Message: Direct future messages for this array element to this PE.

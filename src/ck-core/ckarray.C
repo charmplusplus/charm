@@ -1349,6 +1349,11 @@ void CkArray::queryLoad(LDOMHandle _h)
 
 /************************ Messages **********************/
 
+CkArrayRemoveMsg::CkArrayRemoveMsg(const CkArrayIndex &idx) 
+{
+  array_index()=idx;
+}
+
 CkArrayUpdateMsg::CkArrayUpdateMsg(const CkArrayIndex &idx) 
 {
 	array_index()=idx;
