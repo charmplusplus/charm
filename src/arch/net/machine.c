@@ -289,6 +289,7 @@ extern int CmemInsideMem();
 extern void CmemCallWhenMemAvail();
 
 void *FIFO_Create();
+int   FIFO_Fill(void *);
 void *FIFO_Peek(void *);
 void  FIFO_Pop(void *);
 void  FIFO_EnQueue(void *, void *);
@@ -377,6 +378,14 @@ char **argv;
   return res;
 }
 
+static int CountArgs(char **argv)
+{
+  int count=0;
+  while (argv[0]) { count++; argv++; }
+  return count;
+}
+
+
 static void jsleep(int sec, int usec)
 {
   struct timeval tm;
@@ -427,18 +436,21 @@ static int wait_readable(fd, sec) int fd; int sec;
  *
  *****************************************************************************/
 
-int           Cmi_numpes;    /* Total number of processors */
-int           Cmi_nodesize;  /* Number of processors in my address space */
-static int    Cmi_numnodes;  /* Total number of address spaces */
-static int    Cmi_nodenum;   /* Which address space am I */
-static int    Cmi_nodestart; /* First processor in this address space */
-static char **Cmi_argv;
-static int    Cmi_argc;
-static int    Cmi_host_IP;
-static int    Cmi_self_IP;
-static int    Cmi_host_port;
-static char   Cmi_host_IP_str[16];
-static char   Cmi_self_IP_str[16];
+typedef void (*startfn)(int argc, char **argv);
+
+int               Cmi_numpes;    /* Total number of processors */
+int               Cmi_nodesize;  /* Number of processors in my address space */
+static int        Cmi_numnodes;  /* Total number of address spaces */
+static int        Cmi_nodenum;   /* Which address space am I */
+static int        Cmi_nodestart; /* First processor in this address space */
+static CmiStartFn Cmi_startfn;   /* The function to call after main */
+static char     **Cmi_argv;
+static int        Cmi_host_IP;
+static int        Cmi_self_IP;
+static int        Cmi_host_port;
+static char       Cmi_host_IP_str[16];
+static char       Cmi_self_IP_str[16];
+
 
 static int    Cmi_max_dgram_size   = 2048;
 static int    Cmi_os_buffer_size   = 50000;
@@ -446,6 +458,7 @@ static int    Cmi_window_size      = 50;
 static double Cmi_delay_retransmit = 0.050;
 static double Cmi_ack_delay        = 0.025;
 static int    Cmi_dgram_max_data   = 2040;
+static int    Cmi_tickspeed        = 10000;
 
 static void parse_netstart()
 {
@@ -948,37 +961,39 @@ static OutgoingMsg   Cmi_freelist_outgoing;
 
 #if LOGGING
 
-char *log;
-int   log_size;
+typedef struct logent {
+  double time;
+  int seqno;
+  int srcpe;
+  int dstpe;
+  int kind;
+} *logent;
+
+
+logent log;
+int    log_size;
 
 static void log_init()
 {
-  log = (char *)malloc(10001000);
+  log = (logent)malloc(50000 * sizeof(struct logent));
   log_size = 0;
 }
 
 static void log_done()
 {
-  char buffer[1000]; int f;
-  sprintf(buffer, "log.%d", Cmi_nodenum);
-  f = open(buffer, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-  if (f<0) { perror("open"); exit(1); }
-  writeall(f, log, log_size);
-  close(f);
+  char logname[100]; FILE *f; int i;
+  sprintf(logname, "log.%d", Cmi_nodenum);
+  f = fopen(logname, "w");
+  if (f==0) { perror("fopen"); exit(1); }
+  for (i=0; i<log_size; i++) {
+    logent ent = log+i;
+    fprintf(f, "%1.4f %d %c %d %d\n",
+	    ent->time, ent->srcpe, ent->kind, ent->dstpe, ent->seqno);
+  }
+  fclose(f);
 }
 
-static int log_printf(va_alist) va_dcl
-{
-  char *f; int len;
-  va_list p;
-  va_start(p);
-  f = va_arg(p, char *);
-  if (log_size >= 1000000) return;
-  vsprintf(log+log_size, f, p);
-  log_size += strlen(log+log_size);
-}
-
-#define LOG(x) log_printf x
+#define LOG(t,s,k,d,q) { if (log_size<50000) { logent ent=log+log_size; ent->time=t; ent->srcpe=s; ent->kind=k; ent->dstpe=d; ent->seqno=q; log_size++; }}
 
 #endif
 
@@ -987,7 +1002,7 @@ static int log_printf(va_alist) va_dcl
 
 #define log_init() 0
 #define log_done() 0
-#define LOG(x) 0
+#define LOG(t,s,k,d,q) 0
 
 #endif
 
@@ -1071,16 +1086,17 @@ void CheckSocketsReady()
  * as a single PE, and simulates a communication thread using interrupts.
  *
  *
- * switch_to_multithreaded_mode()
+ * CmiStartThreads()
  *
  *    Allocates one CmiState structure per PE.  Initializes all of
  *    the CmiState structures using the function CmiStateInit.
- *    Then, starts all the threads: one per PE, plus a communication
- *    thread.  The communication thread must be an infinite loop
- *    that calls the function CommunicationServer over and over, with
- *    a short delay between each call (ideally, the delay should end
+ *    Starts processor threads 1..N (not 0, that's the one
+ *    that calls CmiStartThreads), as well as the communication
+ *    thread.  Each processor thread (other than 0) must call CmiInitPE
+ *    followed by Cmi_startfn.  The communication thread must be an infinite
+ *    loop that calls the function CommunicationServer over and over,
+ *    with a short delay between each call (ideally, the delay should end
  *    when a datagram arrives or when somebody notifies: see below).
- *    switch_to_multithreaded_mode never returns.
  *
  * NotifyCommunicationThread
  *
@@ -1148,36 +1164,33 @@ int CmiMyRank()
 
 #define CmiGetStateN(n) (Cmi_state_vector+(n))
 
-static void *call_user_main(void *vindex)
+static void NotifyCommunicationThread()
+{
+  struct sockaddr_in addr; double now;
+  if (dataskt_ready_write == 0) return;
+  addr.sin_family = AF_INET;
+  addr.sin_port = htons(dataport);
+  addr.sin_addr.s_addr = htonl(0x7F000001);
+  sendto(dataskt, "x", 1, 0, (struct sockaddr *)&addr, sizeof(addr));
+}
+
+static void *call_startfn(void *vindex)
 {
   int index = (int)vindex;
   CmiState state = Cmi_state_vector + index;
   thr_setspecific(Cmi_state_key, state);
-  state->pe = Cmi_nodestart + index;
-  state->rank = index;
-  user_main(Cmi_argc, Cmi_argv);
+  CmiInitPE();
+  Cmi_startfn(CountArgs(Cmi_argv), Cmi_argv);
   thr_exit(0);
 }
 
-static void switch_to_multithreaded_mode()
+static void comm_thread()
 {
-  int i, pid, ok; struct timeval tmo; fd_set rfds;
-  
-  thr_keycreate(&Cmi_state_key, 0);
-  Cmi_state_vector =
-    (CmiState)calloc(Cmi_nodesize, sizeof(struct CmiStateStruct));
-  for (i=0; i<Cmi_nodesize; i++)
-    CmiStateInit(i+Cmi_nodestart, i, CmiGetStateN(i));
-  for (i=0; i<Cmi_nodesize; i++) {
-    ok = thr_create(0, 256000, call_user_main, (void *)i,
-	       THR_DETACHED|THR_BOUND, &pid);
-    if (ok<0) { perror("thr_create"); exit(1); }
-  }
-  CmiSignal(SIGALRM, SIG_IGN);
+  struct timeval tmo; fd_set rfds;
   while (Cmi_shutdown_done == 0) {
     CommunicationServer();
     tmo.tv_sec = 0;
-    tmo.tv_usec = 10000;
+    tmo.tv_usec = Cmi_tickspeed;
     FD_ZERO(&rfds);
     FD_SET(dataskt, &rfds);
     FD_SET(ctrlskt, &rfds);
@@ -1186,18 +1199,23 @@ static void switch_to_multithreaded_mode()
   thr_exit(0);
 }
 
-static double last_notify;
-
-static void NotifyCommunicationThread()
+static void CmiStartThreads()
 {
-  struct sockaddr_in addr; double now;
-  if (dataskt_ready_write == 0) return;
-  now = GetClock();
-  if (now < last_notify + 0.005) return;
-  addr.sin_family = AF_INET;
-  addr.sin_port = htons(dataport);
-  addr.sin_addr.s_addr = htonl(0x7F000001);
-  sendto(dataskt, "x", 1, 0, (struct sockaddr *)&addr, sizeof(addr));
+  int i, pid, ok;
+  
+  thr_keycreate(&Cmi_state_key, 0);
+  Cmi_state_vector =
+    (CmiState)calloc(Cmi_nodesize, sizeof(struct CmiStateStruct));
+  for (i=0; i<Cmi_nodesize; i++)
+    CmiStateInit(i+Cmi_nodestart, i, CmiGetStateN(i));
+  for (i=0; i<Cmi_nodesize; i++) {
+    ok = thr_create(0, 256000, call_startfn, (void *)i,
+		    THR_DETACHED|THR_BOUND, &pid);
+    if (ok<0) { perror("thr_create"); exit(1); }
+  }
+  thr_setspecific(Cmi_state_key, Cmi_state_vector);
+  ok = thr_create(0, 256000, comm_thread, 0, THR_DETACHED, &pid);
+  if (ok<0) { perror("thr_create"); exit(1); }
 }
 
 #endif
@@ -1215,10 +1233,10 @@ int Cmi_myrank;
 #define CmiGetState() (&Cmi_state)
 #define CmiGetStateN(n) (&Cmi_state)
 
-static void switch_to_multithreaded_mode()
+static void CmiStartThreads()
 {
   struct itimerval i;
-
+  
   if ((Cmi_numpes != Cmi_numnodes) || (Cmi_nodesize != 1))
     KillEveryone
       ("Multiple cpus unavailable, don't use cpus directive in nodesfile.\n");
@@ -1227,27 +1245,24 @@ static void switch_to_multithreaded_mode()
   Cmi_mype = Cmi_nodestart;
   Cmi_myrank = 0;
   
-  CmiSignal(SIGALRM, CommunicationServer);
-  CmiSignal(SIGIO,   CommunicationServer);
+  CmiSignal(SIGALRM, SIGIO, 0, CommunicationServer);
   CmiEnableAsyncIO(dataskt);
   CmiEnableAsyncIO(ctrlskt);
   i.it_interval.tv_sec = 0;
-  i.it_interval.tv_usec = 10000;
+  i.it_interval.tv_usec = Cmi_tickspeed;
   i.it_value.tv_sec = 0;
-  i.it_value.tv_usec = 10000;
+  i.it_value.tv_usec = Cmi_tickspeed;
   setitimer(ITIMER_REAL, &i, NULL);
-  
-  user_main(Cmi_argc, Cmi_argv);
-  exit(0);
 }
 
 static void NotifyCommunicationThread()
 {
   struct itimerval value;
   if (dataskt_ready_write == 0) return;
-  getitimer(ITIMER_REAL, &value);
-  if (value.it_value.tv_usec > 9000) return;
-  value.it_value.tv_usec = 10000;
+  value.it_value.tv_sec = 0;
+  value.it_value.tv_usec = Cmi_tickspeed;
+  value.it_interval.tv_sec = 0;
+  value.it_interval.tv_usec = Cmi_tickspeed;
   setitimer(ITIMER_REAL, &value, 0);
   kill(0, SIGALRM);
 }
@@ -1335,21 +1350,21 @@ static void KillOnCrash()
 
 static void KillInit()
 {
-  CmiSignal(SIGSEGV, KillOnSegv);
-  CmiSignal(SIGBUS,  KillOnBus);
-  CmiSignal(SIGILL,  KillOnCrash);
-  CmiSignal(SIGABRT, KillOnCrash);
-  CmiSignal(SIGFPE,  KillOnCrash);
-  CmiSignal(SIGPIPE, KillOnCrash);
-  CmiSignal(SIGURG,  KillOnCrash);
+  CmiSignal(SIGSEGV, 0, 0, KillOnSegv);
+  CmiSignal(SIGBUS,  0, 0, KillOnBus);
+  CmiSignal(SIGILL,  0, 0, KillOnCrash);
+  CmiSignal(SIGABRT, 0, 0, KillOnCrash);
+  CmiSignal(SIGFPE,  0, 0, KillOnCrash);
+  CmiSignal(SIGPIPE, 0, 0, KillOnCrash);
+  CmiSignal(SIGURG,  0, 0, KillOnCrash);
 
 #ifdef SIGSYS
-  CmiSignal(SIGSYS,  KillOnCrash);
+  CmiSignal(SIGSYS,  0, 0, KillOnCrash);
 #endif
 
-  CmiSignal(SIGTERM, KillOnIntr);
-  CmiSignal(SIGQUIT, KillOnIntr);
-  CmiSignal(SIGINT,  KillOnIntr);
+  CmiSignal(SIGTERM, 0, 0, KillOnIntr);
+  CmiSignal(SIGQUIT, 0, 0, KillOnIntr);
+  CmiSignal(SIGINT,  0, 0, KillOnIntr);
 }
 
 /****************************************************************************
@@ -1608,12 +1623,7 @@ int TransmitAcknowledgement()
       extra++;
     }
   }
-  LOG(("%1.4f %d A %d %d",
-       Cmi_clock, Cmi_nodestart,node->nodestart,node->recv_next));
-  for (i=0; i<Cmi_window_size; i++)
-    if (node->recv_window[i])
-      LOG((" %d", node->recv_window[i]->seqno));
-  LOG(("\n"));
+  LOG(Cmi_clock, Cmi_nodestart, 'A', node->nodestart, node->recv_next);
   sendto(dataskt, (char *)&ack,
 	 DGRAM_HEADER_SIZE + extra * sizeof(int), 0,
 	 (struct sockaddr *)&(node->addr),
@@ -1659,8 +1669,7 @@ void TransmitImplicitDgram(ImplicitDgram dg)
   temp = *head;
   dest = dg->dest;
   DgramHeaderMake(head, dg->rank, dg->srcpe, DGRAM_MAGIC, dg->seqno);
-  LOG(("%1.4f %d T %d %d\n",
-       Cmi_clock, Cmi_nodestart,dest->nodestart,dg->seqno));
+  LOG(Cmi_clock, Cmi_nodestart, 'T', dest->nodestart, dg->seqno);
   ok = sendto(dataskt, (char *)head, len + DGRAM_HEADER_SIZE, 0,
 	      (struct sockaddr *)&(dest->addr), sizeof(struct sockaddr_in));
   *head = temp;
@@ -1795,7 +1804,7 @@ int CollectOutgoingMessages()
     cs = CmiGetStateN(rank);
     ogm = (OutgoingMsg)PCQueuePop(cs->send);
     if (ogm) {
-      LOG(("%1.4f %d O\n", Cmi_clock, Cmi_nodestart));
+      LOG(Cmi_clock, Cmi_nodestart, 'O', ogm->dst, 0);
       action = 1;
       DeliverOutgoingMessage(ogm);
     }
@@ -1853,7 +1862,7 @@ void IntegrateMessageDatagram(ExplicitDgram dg)
 {
   unsigned int seqno, slot; OtherNode node;
 
-  LOG(("%1.4f %d M %d %d\n", Cmi_clock, Cmi_nodestart, dg->srcpe, dg->seqno));
+  LOG(Cmi_clock, Cmi_nodestart, 'M', dg->srcpe, dg->seqno);
   node = nodes_by_pe[dg->srcpe];
   seqno = dg->seqno;
   ScheduleAcknowledgement(node);
@@ -1889,18 +1898,15 @@ void IntegrateAckDatagram(ExplicitDgram dg)
   node = nodes_by_pe[dg->srcpe];
   data = ((int*)(dg->data + DGRAM_HEADER_SIZE));
   count = (dg->len - DGRAM_HEADER_SIZE) / sizeof(int);
-  LOG(("%1.4f %d R %d %d", 
-       Cmi_clock, Cmi_nodestart, node->nodestart, dg->seqno));
+  LOG(Cmi_clock, Cmi_nodestart, 'R', node->nodestart, dg->seqno);
   for (i=1; i<=Cmi_window_size; i++) {
     seqno = (dg->seqno - i) & DGRAM_SEQNO_MASK;
     IntegrateAcknowledgement(node, seqno);
   }
   while (count) {
-    LOG((" %d", *data));
     IntegrateAcknowledgement(node, *data);
     count--; data++;
   }
-  LOG(("\n"));
   MoveDatagramsIntoSendWindow(node);
   FreeExplicitDgram(dg);
 }
@@ -1924,8 +1930,11 @@ void ReceiveDatagram()
 
 static void CommunicationServer()
 {
+  static int busy=0;
   if (CmiMemBusy()) return;
-  LOG(("%1.4f %d I\n", GetClock(), Cmi_nodestart));
+  if (busy) KillEveryoneCode(394778);
+  busy = 1;
+  LOG(GetClock(), Cmi_nodestart, 'I', 0, 0);
   while (1) {
     Cmi_clock = GetClock();
     CheckSocketsReady();
@@ -1938,6 +1947,7 @@ static void CommunicationServer()
     }
     break;
   }
+  busy = 0;
 }
 
 /******************************************************************************
@@ -1968,11 +1978,14 @@ char *CmiGetNonLocal()
  * work, to eliminate as many locking issues as possible.  This is the
  * only part of the code that happens in the sender-thread
  *
+ * Be careful, the FIFO_Fill here is on the brink of being wrong,
+ * because of concurrency control, but it's ok, just barely.
+ *
  *****************************************************************************/
 
 CmiCommHandle CmiGeneralSend(int pe, int size, int freemode, char *data)
 {
-  CmiState cs = CmiGetState(); OutgoingMsg ogm;
+  CmiState cs = CmiGetState(); OutgoingMsg ogm; int fill;
 
   if (pe > Cmi_numpes) *((int*)0)=0;
   if (freemode == 'S') {
@@ -1999,7 +2012,9 @@ CmiCommHandle CmiGeneralSend(int pe, int size, int freemode, char *data)
   ogm->freemode = freemode;
   ogm->refcount = 0;
   PCQueuePush(cs->send, (char *)ogm);
-  NotifyCommunicationThread();
+  fill = FIFO_Fill(retransmit_queue);
+  if (fill < (Cmi_window_size / 2))
+    NotifyCommunicationThread();
   return (CmiCommHandle)ogm;
 }
 
@@ -2052,15 +2067,16 @@ void CmiReleaseCommHandle(CmiCommHandle handle)
  *
  *****************************************************************************/
 
-CmiInitMc(argv)
-char **argv;
+void ConverseInitPE()
 {
   CmiState cs = CmiGetState();
+  ConverseCommonInit(Cmi_argv);
+  CthInit(Cmi_argv);
   CpvInitialize(void *,CmiLocalQueue);
   CpvAccess(CmiLocalQueue) = cs->localqueue;
 }
 
-CmiExit()
+void ConverseExit()
 {
   ctrl_sendone(120,"aset done %d TRUE\n",CmiMyPe());
   while (Cmi_shutdown_done == 0) jsleep(0, 250000);
@@ -2068,23 +2084,17 @@ CmiExit()
   if (CmiMyRank()==0) log_done();
 }
 
-main(argc, argv)
-int argc;
-char **argv;
+void ConverseStart(int argc, char **argv, startfn fn)
 {
-  int i, ok; struct timeval tv;
-
 #if CMK_USE_HP_MAIN_FIX
 #if FOR_CPLUS
   _main(argc,argv);
 #endif
 #endif
-
-  Cmi_argc = argc;
   Cmi_argv = argv;
+  Cmi_startfn = fn;
   parse_netstart();
   extract_args(argv);
-  
   log_init();
   transmit_queue = FIFO_Create();
   retransmit_queue = FIFO_Create();
@@ -2097,6 +2107,12 @@ char **argv;
 	       Cmi_self_IP_str,ctrlport,Cmi_numpes-1);
   node_addresses_obtain();
   CmiTimerInit();
-  switch_to_multithreaded_mode();
+  CmiStartThreads();
+  ConverseInitPE();
 }
 
+void ConverseInit(int argc, char **argv, CmiStartFn fn)
+{
+  ConverseStart(argc, argv, fn);
+  fn(argc, argv);
+}
