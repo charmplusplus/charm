@@ -362,6 +362,7 @@ bool CkArray::demandCreateElement(const CkArrayIndex &idx,int onPe,int ctor)
 {
 	CkArrayMessage *m=(CkArrayMessage *)CkAllocSysMsg();
 	prepareArrayCtorMsg(this,m,onPe,idx);
+	m->array_ep()=ctor;
 	
 	if (onPe==CkMyPe()) //Call local constructor directly
 		return insertElement(m);
