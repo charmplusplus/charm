@@ -1619,7 +1619,7 @@ void req_poll()
   for (i=0;i<req_nClients;i++)
 	if (FD_ISSET(req_clients[i],&rfds))
 	  {
-	    readcount=10;   //number of successive reads we serve per socket
+	    readcount=10;   /*number of successive reads we serve per socket*/
 	    /*This client is ready to read*/
 	    do { req_serve_client(req_clients[i]); readcount--;}
 	    while (1==skt_select1(req_clients[i],0) && readcount>0);
