@@ -373,20 +373,19 @@ void CkCreateLocalNodeGroup(CkGroupID groupID, int epIdx, envelope *env)
   register void *obj = malloc(objSize);
   _MEMCHECK(obj);
   CkpvAccess(_currentGroup) = groupID;
-  
+
 // Now that the NodeGroup is created, add it to the table.
 //  NodeGroups can be accessed by multiple processors, so 
-//  this is in the opposite order from groups.
+//  this is in the opposite order from groups - invoking the constructor
+//  before registering it.
+  _invokeEntryNoTrace(epIdx,env,obj);
+  _STATS_RECORD_PROCESS_NODE_GROUP_1();
+
   CmiLock(CksvAccess(_nodeLock));
   CksvAccess(_nodeGroupTable)->find(groupID).setObj(obj);
   CksvAccess(_nodeGroupTable)->find(groupID).setcIdx(gIdx);
   CksvAccess(_nodeGroupIDTable).push_back(groupID);
   CmiUnlock(CksvAccess(_nodeLock));
-
-// invoke nodegroup constructor after this object has been registered
-// so that ckLocalNodeBranch() can be called in the constructor
-  _invokeEntryNoTrace(epIdx,env,obj);
-  _STATS_RECORD_PROCESS_NODE_GROUP_1();
 
   PtrQ *ptrq = CksvAccess(_nodeGroupTable)->find(groupID).getPending();
   if(ptrq) {
