@@ -92,6 +92,12 @@ class Trace {
     // do any clean-up necessary for tracing
     virtual void traceClose() {}
 
+		//for tracing function calls
+		virtual void regFunc(char *name){}
+		virtual void beginFunc(char *name,char *file,int line){}
+		virtual void endFunc(char *name){}
+
+
     virtual ~Trace() {} /* for whining compilers */
 };
 
@@ -162,6 +168,17 @@ public:
     inline void endIdle(double curWallTime) {ALLDO(endIdle(curWallTime));}
     void traceBegin();
     void traceEnd();
+
+		/*Calls for tracing function begins and ends*/
+		inline void regFunc(char *name){
+			ALLDO(regFunc(name));
+		}
+		inline void beginFunc(char *name,char *file,int line){
+			ALLDO(beginFunc(name,file,line));
+		};
+		inline void endFunc(char *name){
+			ALLDO(endFunc(name));
+		}
 };
 
 CkpvExtern(TraceArray*, _traces);

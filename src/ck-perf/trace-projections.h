@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include "trace.h"
+#include "ckhashtable.h"
 
 #if CMK_PROJECTIONS_USE_ZLIB
 #include <zlib.h>
@@ -49,6 +50,8 @@ class LogEntry {
     int numpes;
     int *pes;
     unsigned char type; 
+		char *fName;
+		int flen;
   public:
     LogEntry() {}
     LogEntry(double tm, unsigned char t, unsigned short m=0, unsigned short e=0, int ev=0, int p=0, int ml=0, CmiObjId *d=NULL, double rt=0., double cputm=0.) {
@@ -56,16 +59,34 @@ class LogEntry {
       if (d) id = *d; else {id.id[0]=id.id[1]=id.id[2]=0; };
       recvTime = rt; cputime = cputm;
     }
+		LogEntry(double _time,unsigned char _type,unsigned short _funcID,int _lineNum,char *_fileName){
+			time = _time;
+			type = _type;
+			mIdx = _funcID;
+			event = _lineNum;
+			if(_fileName == NULL){
+				fName = NULL;
+				flen = 0;
+			}else{
+				fName = new char[strlen(_fileName)+2];
+				fName[0] = ' ';
+				memcpy(fName+1,_fileName,strlen(_fileName)+1);
+				flen = strlen(fName)+1;
+			}	
+		}
     // **CW** new constructor for multicast data
     LogEntry(double tm, unsigned short m, unsigned short e, int ev, int p,
 	     int ml, CmiObjId *d, double rt, int num, int *pelist);
     void *operator new(size_t s) {void*ret=malloc(s);_MEMCHECK(ret);return ret;}
     void *operator new(size_t, void *ptr) { return ptr; }
-    void operator delete(void *ptr) { free(ptr); }
+    void operator delete(void *ptr) {free(ptr); }
 #if defined(WIN32) || CMK_MULTIPLE_DELETE
     void operator delete(void *, void *) { }
 #endif
     void pup(PUP::er &p);
+		~LogEntry(){
+			delete [] fName;
+		}
 };
 
 /// log pool in trace projection
@@ -110,8 +131,58 @@ class LogPool {
     void write(int writedelta);
     void writeSts(void);
     void add(unsigned char type,unsigned short mIdx,unsigned short eIdx,double time,int event,int pe, int ml=0, CmiObjId* id=0, double recvT=0., double cpuT=0.0);
+		void add(unsigned char type,double time,unsigned short funcID,int lineNum,char *fileName);
     void addCreationMulticast(unsigned short mIdx,unsigned short eIdx,double time,int event,int pe, int ml=0, CmiObjId* id=0, double recvT=0., int num=0, int *pelist=NULL);
     void postProcessLog();
+};
+
+/*
+	class that represents a key in a CkHashtable with a string as a key
+*/
+class StrKey {
+	char *str;
+	int len;
+	unsigned int key;
+	public:
+	StrKey(char *_str,int _len){
+		str = _str;
+		len = _len;
+		key = 0;
+		for(int i=0;i<len;i++){
+			key += str[i];
+		}
+	}
+	static CkHashCode staticHash(const void *k,size_t){
+		return ((StrKey *)k)->key;
+	}
+	static int staticCompare(const void *a,const void *b,size_t){
+		StrKey *p,*q;
+		p = (StrKey *)a;
+		q = (StrKey *)b;
+		if(p->len != q->len){
+			return 0;
+		}
+		for(int i=0;i<p->len;i++){
+			if(p->str[i] != q->str[i]){
+				return 0;
+			}
+		}
+		return 1;
+	}
+	inline CkHashCode hash() const{
+		return key;
+	}
+	inline int compare(const StrKey &t) const {
+		if(len != t.len){
+			return 0;
+		}
+		for(int i=0;i<len;i++){
+			if(str[i] != t.str[i]){
+				return 0;
+			}	
+		}
+		return 1;
+	}
 };
 
 /// class for recording trace projections events 
@@ -127,6 +198,10 @@ class TraceProjections : public Trace {
     int execPe;
     int inEntry;
     int computationStarted;
+
+		int funcCount,fileCount;
+		CkHashtableT<StrKey,int> funcHashtable;
+		CkHashtableT<StrKey,int> fileHashtable;
   public:
     TraceProjections(char **argv);
     void userEvent(int e);
@@ -156,6 +231,10 @@ class TraceProjections : public Trace {
     void traceClose();
     void traceBegin();
     void traceEnd();
+		//functions that perform function tracing
+		void regFunc(char *name);
+		void beginFunc(char *name,char *file,int line);
+		void endFunc(char *name);
 };
 
 using namespace PUP;

@@ -11,6 +11,7 @@
 */
 /*@{*/
 
+#include <string.h>
 #include "charm++.h"
 #include "envelope.h"
 #include "trace-common.h"
@@ -341,8 +342,9 @@ void LogPool::writeSts(void)
 {
   fprintf(stsfp, "VERSION %s\n", PROJECTION_VERSION);
   traceWriteSTS(stsfp,CkpvAccess(usrEvents)->length());
-  for(int i=0;i<CkpvAccess(usrEvents)->length();i++)
+  for(int i=0;i<CkpvAccess(usrEvents)->length();i++){
     fprintf(stsfp, "EVENT %d %s\n", (*CkpvAccess(usrEvents))[i]->e, (*CkpvAccess(usrEvents))[i]->str);
+	}	
   fprintf(stsfp, "END\n");
   fclose(stsfp);
 }
@@ -391,6 +393,20 @@ void LogPool::add(UChar type,UShort mIdx,UShort eIdx,double time,int event,int p
       bgAddProjEvent(&pool[numEntries-1], numEntries-1, time, updateProjLog, &fp, BG_EVENT_PROJ);
   }
 #endif
+}
+
+void LogPool::add(UChar type,double time,UShort funcID,int lineNum,char *fileName){
+#ifndef CMK_BLUEGENE_CHARM
+	new (&pool[numEntries++])
+		LogEntry(time,type,funcID,lineNum,fileName);
+	if(poolSize == numEntries){
+    double writeTime = TraceTimer();		
+		writeLog();
+		numEntries=0;
+		new (&pool[numEntries++]) LogEntry(writeTime, BEGIN_INTERRUPT);
+    new (&pool[numEntries++]) LogEntry(TraceTimer(), END_INTERRUPT);
+	}
+#endif	
 }
 
 /* **CW** Not sure if this is the right thing to do. Feels more like
@@ -520,7 +536,18 @@ void LogEntry::pup(PUP::er &p)
     case END_TRACE:
       p|itime;
       break;
-
+		case BEGIN_FUNC:
+			p | itime;
+			p | mIdx;
+			p | event;
+			if(!p.isUnpacking()){
+				p(fName,flen-1);
+			}
+			break;
+		case END_FUNC:
+			p | itime;
+			p | mIdx;
+			break;
     default:
       CmiError("***Internal Error*** Wierd Event %d.\n", type);
       break;
@@ -560,6 +587,8 @@ curevent(0), inEntry(0), computationStarted(0)
   _logPool->setCompressed(compressed);
 #endif
   _logPool->creatFiles();
+	funcCount=1;
+	fileCount=1;
 }
 
 int TraceProjections::traceRegisterUserEvent(const char* evt, int e)
@@ -811,6 +840,40 @@ void TraceProjections::endComputation(void)
 {
   _logPool->add(END_COMPUTATION, 0, 0, TraceTimer(), -1, -1);
 }
+
+void TraceProjections::regFunc(char *name){
+	StrKey k(name,strlen(name));
+	int num = funcHashtable.get(k);
+	if(num == 0){
+		char *st = new char[strlen(name)+1];
+		memcpy(st,name,strlen(name)+1);
+		StrKey *newKey = new StrKey(st,strlen(st));
+		int &ref = funcHashtable.put(*newKey);
+		ref=funcCount;
+		funcCount++;
+	}
+
+}
+
+void TraceProjections::beginFunc(char *name,char *file,int line){
+	StrKey k(name,strlen(name));	
+	unsigned short  num = (unsigned short)funcHashtable.get(k);
+	if(num == 0){
+		CmiError("Unregistered function %s being used in %s:%d \n",name,file,line);
+	}
+	_logPool->add(BEGIN_FUNC,TraceTimer(),num,line,file);
+}
+
+void TraceProjections::endFunc(char *name){
+	StrKey k(name,strlen(name));	
+	int num = funcHashtable.get(k);
+	if(num == 0){
+		printf("endFunc without start :O\n");
+	}
+	_logPool->add(END_FUNC,TraceTimer(),num,0,NULL);	
+}
+
+
 
 // specialized PUP:ers for handling trace projections logs
 void toProjectionsFile::bytes(void *p,int n,size_t itemSize,dataType t)

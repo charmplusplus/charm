@@ -37,3 +37,10 @@ void traceBegin(void) {}
 void traceEnd(void) {}
 void traceWriteSts(void) {}
 int  traceAvailable() {return 0;}
+void registerFunction(char *name){
+}
+void beginFuncProj(char *name,char *file,int line){
+}
+void endFuncProj(char *name){
+}
+

@@ -373,4 +373,18 @@ void TraceArray::creationMulticast(envelope *env, int ep, int num,
     ALLDO(creationMulticast(env, ep, num, pelist));
 }
 
+extern "C" 
+void registerFunction(char *name){
+	_TRACE_ONLY(CkpvAccess(_traces)->regFunc(name));
+}
+
+extern "C" 
+void beginFuncProj(char *name,char *file,int line){
+	 _TRACE_ONLY(CkpvAccess(_traces)->beginFunc(name,file,line));
+}
+
+extern "C" 
+void endFuncProj(char *name){
+	 _TRACE_ONLY(CkpvAccess(_traces)->endFunc(name));
+}
 /*@}*/

@@ -35,6 +35,9 @@
 
 #define  CREATION_MULTICAST 21
 
+#define	 BEGIN_FUNC					22
+#define	 END_FUNC						23
+
 #define  USER_EVENT_PAIR    100
 
 CkpvExtern(int, CtrLogBufSize);
