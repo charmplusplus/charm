@@ -45,7 +45,7 @@ public:
 	void setArrayID(const CkArrayID &nID) {ampiID=nID;}
 
 	MPI_Comm getComm(void) const {return comm;}
-	CkPupBasicVec<int> getIndices(void) const {return indices;}
+	const CkPupBasicVec<int> &getIndices(void) const {return indices;}
 
 	//Get the proxy for the entire array
 	CProxy_ampi getProxy(void) const;
@@ -74,23 +74,21 @@ public:
 	   Hack -- fix this
 	*/
 	inline int getndims() {return ndims;}
-	inline CkPupBasicVec<int> getdims() {return dims;}
-	inline CkPupBasicVec<int> getperiods() {return periods;}
+	inline const CkPupBasicVec<int> &getdims() const {return dims;}
+	inline const CkPupBasicVec<int> &getperiods() const {return periods;}
 	
 	inline void setndims(int ndims_) {ndims = ndims_; }
-	inline void setdims(CkPupBasicVec<int> dims_) { dims = dims_; }
-	inline void setperiods(CkPupBasicVec<int> periods_) { periods = 
-								periods_; }
+	inline void setdims(const CkPupBasicVec<int> &dims_) { dims = dims_; }
+	inline void setperiods(const CkPupBasicVec<int> &periods_) { periods = periods_; }
 
 	/* Similar hack for graph vt */
 	inline int getnvertices() {return nvertices;}
-	inline CkPupBasicVec<int> getindex() {return index;}
-	inline CkPupBasicVec<int> getedges() {return edges;}
+	inline const CkPupBasicVec<int> &getindex() const {return index;}
+	inline const CkPupBasicVec<int> &getedges() const {return edges;}
 	
 	inline void setnvertices(int nvertices_) {nvertices = nvertices_; }
-	inline void setindex(CkPupBasicVec<int> index_) { index = index_; }
-	inline void setedges(CkPupBasicVec<int> edges_) { edges = 
-								edges_; }
+	inline void setindex(const CkPupBasicVec<int> &index_) { index = index_; }
+	inline void setedges(const CkPupBasicVec<int> &edges_) { edges = edges_; }
 	
 	void pup(PUP::er &p) {
 		p|comm;
@@ -757,7 +755,7 @@ class ampi : public CBase_ampi {
     void findParent(bool forMigration);
     ampiParent *parent;
     TCharm *thread;
-    int waitingForGeneric;
+    bool resumeOnRecv;
     bool comlibEnabled;
 
     ampiCommStruct myComm;

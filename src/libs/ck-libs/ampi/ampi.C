@@ -581,7 +581,7 @@ void ampi::init(void) {
   thread=NULL;
   parent=NULL;
   thread=NULL;
-  waitingForGeneric=0;
+  resumeOnRecv=false;
   comlibEnabled=AMPI_COMLIB;
 }
 
@@ -955,7 +955,7 @@ MSG_ORDER_DEBUG(
   } else { //Cross-world or system messages are unordered
     inorder(msg);
   }
-  if(waitingForGeneric){
+  if(resumeOnRecv){
     thread->resume();
   }	
 }
@@ -1034,14 +1034,14 @@ ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
 MSG_ORDER_DEBUG(
   CkPrintf("AMPI Rank %d blocking recv: tag=%d, src=%d, comm=%d\n",getRank(),t,s,comm);
 )
-  waitingForGeneric=1;
+  resumeOnRecv=true;
   while(1) {
     tags[0] = t; tags[1] = s; tags[2] = comm;
     msg = (AmpiMsg *) CmmGet(msgs, 3, tags, sts);
     if (msg) break;
     thread->suspend();
   }
-  waitingForGeneric=0;
+  resumeOnRecv=false;
   if(sts)
     ((MPI_Status*)sts)->MPI_LENGTH = msg->length;
   if (msg->length > len)
@@ -1066,12 +1066,14 @@ ampi::probe(int t, int s, int comm, int *sts)
 {
   int tags[3];
   AmpiMsg *msg = 0;
+  resumeOnRecv=true;
   while(1) {
     tags[0] = t; tags[1] = s; tags[2] = comm;
     msg = (AmpiMsg *) CmmProbe(msgs, 3, tags, sts);
     if (msg) break;
-    thread->schedule();
+    thread->suspend();
   }
+  resumeOnRecv=false;
   if(sts)
     ((MPI_Status*)sts)->MPI_LENGTH = msg->length;
 }
@@ -1651,7 +1653,7 @@ int MPI_Waitany(int count, MPI_Request *request, int *idx, MPI_Status *sts)
 {
   AMPIAPI("MPI_Waitany");
   int flag=0;
-  while(1){
+  while(count>0){
     for(int i=0;i<count;i++) {
       MPI_Test(&request[i], &flag, sts);
       if(flag == 1){
@@ -2354,6 +2356,7 @@ int MPI_Get_processor_name(char *name, int *resultlen){
   AMPIAPI("MPI_Get_processor_name");
   sprintf(name,"AMPI VP#%d\n",getAmpiParent()->thisIndex);
   *resultlen = strlen(name);
+  return 0;
 }
 
 /* Error handling */
@@ -2734,15 +2737,12 @@ int MPI_Cart_get(MPI_Comm comm, int maxdims, int *dims, int *periods,
 
   ampiCommStruct &c = getAmpiParent()->getCart(comm);
   ndims = c.getndims();
-
-  CkPupBasicVec<int> dims_, periods_;
-   
   int rank;
 
   MPI_Comm_rank(comm, &rank);
 
-  dims_ = c.getdims();
-  periods_ = c.getperiods();
+  const CkPupBasicVec<int> &dims_ = c.getdims();
+  const CkPupBasicVec<int> &periods_ = c.getperiods();
   
   for (int i = 0; i < maxdims; i++) {
     dims[i] = dims_[i];
@@ -2764,8 +2764,8 @@ int MPI_Cart_rank(MPI_Comm comm, int *coords, int *rank) {
 
   ampiCommStruct &c = getAmpiParent()->getCart(comm);
   int ndims = c.getndims();
-  CkPupBasicVec<int> dims = c.getdims();
-  CkPupBasicVec<int> periods = c.getperiods();
+  const CkPupBasicVec<int> &dims = c.getdims();
+  const CkPupBasicVec<int> &periods = c.getperiods();
 
   int prod = 1;
   int r = 0;
@@ -2792,7 +2792,7 @@ int MPI_Cart_coords(MPI_Comm comm, int rank, int maxdims, int *coords) {
 
   ampiCommStruct &c = getAmpiParent()->getCart(comm);
   int ndims = c.getndims();
-  CkPupBasicVec<int> dims = c.getdims();
+  const CkPupBasicVec<int> &dims = c.getdims();
 
   for (int i = ndims - 1; i >= 0; i--) {
     if (i < maxdims)
@@ -2810,8 +2810,8 @@ int MPI_Cart_shift(MPI_Comm comm, int direction, int disp, int *rank_source,
   
   ampiCommStruct &c = getAmpiParent()->getCart(comm);
   int ndims = c.getndims();
-  CkPupBasicVec<int> dims = c.getdims();
-  CkPupBasicVec<int> periods = c.getperiods();
+  const CkPupBasicVec<int> &dims = c.getdims();
+  const CkPupBasicVec<int> &periods = c.getperiods();
   int *coords = new int[ndims];
 
   MPI_Comm_rank(comm, rank_source);
@@ -2841,7 +2841,7 @@ int MPI_Graphdims_get(MPI_Comm comm, int *nnodes, int *nedges) {
 
   ampiCommStruct &c = getAmpiParent()->getGraph(comm);
   *nnodes = c.getnvertices();
-  CkPupBasicVec<int> index = c.getindex();
+  const CkPupBasicVec<int> &index = c.getindex();
   *nedges = index[(*nnodes) - 1];
   
   return 0;
@@ -2854,8 +2854,8 @@ int MPI_Graph_get(MPI_Comm comm, int maxindex, int maxedges, int *index,
 
   ampiCommStruct &c = getAmpiParent()->getGraph(comm);
 
-  CkPupBasicVec<int> index_ = c.getindex();
-  CkPupBasicVec<int> edges_ = c.getedges();
+  const CkPupBasicVec<int> &index_ = c.getindex();
+  const CkPupBasicVec<int> &edges_ = c.getedges();
 
   if (maxindex > index_.size())
     maxindex = index_.size();
@@ -2875,7 +2875,7 @@ int MPI_Graph_neighbors_count(MPI_Comm comm, int rank, int *nneighbors) {
 
   ampiCommStruct &c = getAmpiParent()->getGraph(comm);
 
-  CkPupBasicVec<int> index = c.getindex();
+  const CkPupBasicVec<int> &index = c.getindex();
 
   if ((rank >= index.size()) || (rank < 0))
     CkAbort("MPI_Graph_neighbors_count: rank not within range");
@@ -2894,8 +2894,8 @@ int MPI_Graph_neighbors(MPI_Comm comm, int rank, int maxneighbors,
   AMPIAPI("MPI_Graph_neighbors");
 
   ampiCommStruct &c = getAmpiParent()->getGraph(comm);
-  CkPupBasicVec<int> index = c.getindex();
-  CkPupBasicVec<int> edges = c.getedges();
+  const CkPupBasicVec<int> &index = c.getindex();
+  const CkPupBasicVec<int> &edges = c.getedges();
   
   int numneighbors = (rank == 0) ? index[rank] : index[rank] - index[rank - 1];
   if (maxneighbors > numneighbors)
@@ -3007,7 +3007,7 @@ int MPI_Cart_sub(MPI_Comm comm, int *remain_dims, MPI_Comm *newcomm) {
   MPI_Comm_rank(comm, &rank);
   ampiCommStruct &c = getAmpiParent()->getCart(comm);
   ndims = c.getndims();
-  CkPupBasicVec<int> dims = c.getdims();
+  const CkPupBasicVec<int> &dims = c.getdims();
   int num_remain_dims = 0;
 
   coords = new int [ndims];
@@ -3028,7 +3028,7 @@ int MPI_Cart_sub(MPI_Comm comm, int *remain_dims, MPI_Comm *newcomm) {
   ampiCommStruct &newc = getAmpiParent()->getCart(*newcomm);
   newc.setndims(num_remain_dims);
   CkPupBasicVec<int> dimsv;
-  CkPupBasicVec<int> periods = c.getperiods();
+  const CkPupBasicVec<int> &periods = c.getperiods();
   CkPupBasicVec<int> periodsv;
 
   for (int i = 0; i < ndims; i++)
