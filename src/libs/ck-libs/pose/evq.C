@@ -121,7 +121,7 @@ void eventQueue::CommitEvents(sim *obj, int ts)
     obj->ResolveCommitFn(commitPtr->fnIdx, commitPtr->msg); // commit fn
     if (commitPtr->commitBfrLen > 0)  { // print buffered I/O
       CkPrintf("%s", commitPtr->commitBfr);
-      free(commitPtr->commitBfr);
+      //free(commitPtr->commitBfr);
       if (commitPtr->commitErr) CmiAbort("Commit ERROR");
     }
     commitPtr = commitPtr->next;

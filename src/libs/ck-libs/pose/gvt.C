@@ -303,7 +303,26 @@ void GVT::computeGVT(UpdateMsg *m)
     }
 
     // STEP 2: Check if send/recv activity provides lower possible estimate
-    if (earliestMsg < 0) earliestMsg = estGVT;
+    // we have earliestMsg and the counts earlySends and earlyRecvs and
+    // also nextEarliest and nextSends and nextRecvs...
+
+    //CkPrintf("opt=%d con=%d lastGVT=%d earlyMsg=%d early#S=%d early#R=%d lastMsg=%d last#S=%d last#R=%d et=%d\n", optGVT, conGVT, lastGVT, earliestMsg, earlySends, earlyRecvs, lastEarliest, lastSends, lastRecvs, POSE_endtime);
+
+    CmiAssert((earliestMsg >= lastGVT) || (earliestMsg < 0));
+    if (earliestMsg >= 0) {
+      if (earliestMsg < estGVT) estGVT = earliestMsg;
+      if ((earliestMsg == lastEarliest) && (earlySends == lastSends) &&
+	  (earlyRecvs == lastRecvs) && (earlySends == earlyRecvs)) {
+	// no change to earliest S/R info from last GVT estimation
+	lastEarliest = earliestMsg++; 
+        lastSends = lastRecvs = 0;
+      }
+      else {
+	lastEarliest = earliestMsg; 
+        lastSends = earlySends; lastRecvs = earlyRecvs;
+      }
+    }
+    /*
     else {
       if ((earliestMsg == lastEarliest) && (earlySends == lastSends) &&
 	  (earlyRecvs == lastRecvs) && (earlySends == earlyRecvs)) {
@@ -327,13 +346,12 @@ void GVT::computeGVT(UpdateMsg *m)
       if ((earliestMsg > -1) && ((earliestMsg < estGVT) || (estGVT < 0)))
 	estGVT = earliestMsg;
     }
-
-    //CkPrintf("opt=%d con=%d lastGVT=%d earlyMsg=%d early#S=%d early#R=%d lastMsg=%d last#S=%d last#R=%d\n", optGVT, conGVT, lastGVT, earliestMsg, earlySends, earlyRecvs, lastEarliest, lastSends, lastRecvs);
+    */
     
     // STEP 3: In times of inactivity, GVT must be set to lastGVT
     if ((estGVT < 0) && (lastGVT < 0)) estGVT = 0;
     
-    if (estGVT < 0) {
+    if ((estGVT == lastGVT) || (estGVT < 0)) {
       inactive++; 
       estGVT = lastGVT;
       if (inactive == 1) inactiveTime = lastGVT;

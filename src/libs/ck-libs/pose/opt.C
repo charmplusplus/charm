@@ -238,14 +238,18 @@ int opt::SafeTime()
   if (!RBevent && (ec<0) && (worktime < 0) && (ovt <= gvt))  // idle object
     return -1;
   
-  if (worktime > theTime)                         // check queued events
+  if (worktime > theTime) {                        // check queued events
     theTime = worktime;
+    if (ovt > theTime) theTime = ovt;
+  }
   if (RBevent && ((RBevent->timestamp<theTime) || (theTime == -1))) //rollbacks
     theTime = RBevent->timestamp;
   if ((ec >= 0) && ((ec < theTime) || (theTime == -1))) // check cancellations
     theTime = ec;
-  if ((ovt < theTime) && (ovt > gvt))
-    theTime = ovt;
+  if ((theTime == -1) && (ovt > gvt)) theTime = ovt;
+  if (theTime == gvt) {
+    CkPrintf("ARG!");
+  }
   return theTime;
 }
 

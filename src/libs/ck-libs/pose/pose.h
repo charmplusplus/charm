@@ -31,9 +31,9 @@ extern int eventMsgsDiscarded;
 #define STORE_RATE 100           // default store rate: 1 for every n events
 #define SPEC_WINDOW 100         // speculative event window
 #define MIN_LEASH 10            // min spec window for adaptive strategy
-#define MAX_LEASH 500         // max  "     "     "     "        " 
+#define MAX_LEASH 200         // max  "     "     "     "        " 
 #define LEASH_FLEX 1           // leash increment
-#define GVT_WINDOW 500          // Maximum time GVT can advance
+#define GVT_WINDOW 200          // Maximum time GVT can advance
 
 // Load balancer variables
 #define LB_SKIP 51           // LB done 1/LB_SKIP times GVT iterations
@@ -117,8 +117,8 @@ class pose : public Chare {
  public:
   pose(void) { callBackSet = 0; useQD = useID = useET = 0; }
   pose(CkMigrateMessage *) { }
-  void QDon() { useQD = 1; if (!useET) POSE_endtime = -1; }
-  void IDon() { useID = 1; if (!useET) POSE_endtime = -1; }
+  void QDon() { useQD = 1; }
+  void IDon() { useID = 1; }
   void ETon() { useET = 1; }
   void start() { 
     if (useQD) {
