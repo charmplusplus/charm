@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.15  1995-10-27 21:31:25  jyelon
+ * Revision 2.16  1995-10-27 23:56:49  jyelon
+ * removed more ansi
+ *
+ * Revision 2.15  1995/10/27  21:31:25  jyelon
  * changed NumPe --> NumPes
  *
  * Revision 2.14  1995/10/27  09:09:31  jyelon
@@ -525,22 +528,22 @@ unsigned int delta;
   if (deltabits>padbits) dstptr[0] = (delta<<padbits);
 }
 
-int CkPrioSizeBitsFn(void *msg)
+int CkPrioSizeBitsFn(msg) void *msg;
 {
     return GetEnv_priosize(ENVELOPE_UPTR(msg));
 }
 
-int CkPrioSizeBytesFn(void *msg)
+int CkPrioSizeBytesFn(msg) void *msg;
 {
     return GetEnv_priobytes(ENVELOPE_UPTR(msg));
 }
 
-int CkPrioSizeWordsFn(void *msg)
+int CkPrioSizeWordsFn(msg) void *msg;
 {
     return GetEnv_priowords(ENVELOPE_UPTR(msg));
 }
 
-unsigned int *CkPrioPtrFn(void *msg)
+unsigned int *CkPrioPtrFn(msg) void *msg;
 {
     return GetEnv_priobgn(ENVELOPE_UPTR(msg));
 }
