@@ -78,7 +78,7 @@ extern void CldModuleInit(char **);
 
 #include "quiescence.h"
 
-int cur_restart_phase = 0;      /* checkpointing/restarting phase counter */
+int cur_restart_phase = 1;      /* checkpointing/restarting phase counter */
 
 /*****************************************************************************
  *
@@ -1024,7 +1024,7 @@ void CsdEndIdle(void)
 	{	\
           int phase = CmiGetRestartPhase(msg);	\
 	  if (phase < cur_restart_phase) {	\
-            CmiPrintf("[%d] discard message of phase %d cur_restart_phase:%d\n", CmiMyPe(), phase, cur_restart_phase);	\
+            /*CmiPrintf("[%d] discard message of phase %d cur_restart_phase:%d handler:%d. \n", CmiMyPe(), phase, cur_restart_phase, handler);*/	\
             CmiFree(msg);	\
 	    return;	\
           }	\
