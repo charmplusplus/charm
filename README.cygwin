@@ -6,13 +6,16 @@ To compile charm on cygwin:
    with inetutils, openssh and w32api packages. 
 
 2. before compiling, make sure you have /bin/sh correctly installed, otherwise
-   make a link from /bin/bash:  ln -s /bin/bash /bin/sh
+   make a link from /bin/bash:  ln -s /bin/bash.exe /bin/sh.exe
    compile charm++:    ./build charm++ net-cygwin
 
 3. setting up running environment:
-   There are two ways to do this, using rsh or ssh. 
+   There are several ways to do this, using rsh or ssh. 
    Under Windows2000/NT, ssh is recommended, I once had difficulty to have 
    inetd working.
+   Starting from Charm++ <version>, you no long need rshd or sshd to start
+   charm program on local machine. This is for testing purpose though, for 
+   best performance, launch one process per processor with daemons.
 
  ** RSH **
    setup /etc/inetd.conf and /etc/services to start rshd, 
@@ -35,5 +38,12 @@ shell     514/tcp    cmd
    run "/usr/bin/ssh-config" to setup all ssh config files.
    Setup ~/.shosts, or add your public key to your ~/.ssh/authorized_keys to 
    login without password authentication.
-   now you can start sshd before you run charm programs.
+   now you can start sshd and run charm programs.
+
+ ** run only on local machine **
+     This allow a user to run charm program on his desktop machine for testing 
+   purpose without the hassle of setting up rsh deamons. To launch a charm++
+   program on your local machine, use "++local" option via:
+  
+     charmrun +p4 ++local pgm
 
