@@ -16,6 +16,7 @@ class CpdListAccessor { /* Abstract superclass */
 protected:
   void beginItem(PUP::er &p,int itemNo);
 public:
+  virtual ~CpdListAccessor(); 
   virtual const char *getPath(void) const =0;
   virtual int getLength(void) const =0;
   virtual void pup(PUP::er &p,CpdListItemsRequest &req) =0;
@@ -34,6 +35,7 @@ private:
 public:
 	CpdSimpleListAccessor(const char *path_,int &length_,pupFn pfn_)
 		:path(path_),length(length_),pfn(pfn_) { }
+	virtual ~CpdSimpleListAccessor();
 	virtual const char *getPath(void) const;
 	virtual int getLength(void) const;
 	virtual void pup(PUP::er &p,CpdListItemsRequest &req);
