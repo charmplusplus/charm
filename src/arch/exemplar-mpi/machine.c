@@ -335,7 +335,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 void CmiAbort(char *message)
 {
   CmiError(message);
-  exit(1);
+  MPI_Abort(MPI_COMM_WORLD, 1);
 }
  
 /* ****************************************************************** */
