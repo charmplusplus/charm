@@ -1,0 +1,7 @@
+Hello World in Charm with a 3D Array.
+
+Demonstrates 3d chare array creation and sparse chare array element creation 
+and use.  The Hi message is passed along the array from 0th to Nth.
+Illustrates output nondeterminism as an interesting side effect.
+
+
