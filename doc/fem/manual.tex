@@ -17,7 +17,7 @@ Orion Lawlor.
 
 \maketitle
 
-\section{Motivation}
+\section{Introduction}
 
 The Finite Element Method (FEM) approach is used in many engineering
 applications with irregular domains, from elastic deformation problems to
@@ -34,7 +34,7 @@ effort. The FEM framework also combines naturally with other \charmpp
 frameworks built on TCHARM.
 
 
-\section{Introduction/Terminology}
+\subsection{Terminology}
 
 A FEM program manipulates elements and nodes. An element is a portion of
 the problem domain, typically in the shape of a triangle, square, or hexagon
@@ -44,7 +44,7 @@ table, which lists adjacent nodes.
 
 \begin{figure}[h]
 \begin{center}
-\includegraphics[width=4in]{simple_mesh}
+\includegraphics[width=4in]{fig/simple_mesh}
 \end{center}
 \caption{3-element, 5 node mesh.}
 \label{fig:simplemesh}
@@ -52,7 +52,7 @@ table, which lists adjacent nodes.
 
 \begin{table}[h]
 \begin{center}
-\begin{tabular}{||l||r|r|r||}\hline
+\begin{tabular}{||l||l|l|l||}\hline
 Element & \multicolumn{3}{c||}{Adjacent Nodes} \\\hline
 e1 & n1 & n3 & n4 \\
 e2 & n1 & n2 & n4 \\
@@ -85,7 +85,7 @@ and B.
 
 \begin{figure}[h]
 \begin{center}
-\includegraphics[width=4in]{partitioned_mesh}
+\includegraphics[width=4in]{fig/partitioned_mesh}
 \end{center}
 \caption{Partitioned mesh.}
 \label{fig:partitionedmesh}
@@ -93,7 +93,7 @@ and B.
 
 \begin{table}[h]
 \begin{center}
-\begin{tabular}{||l||r|r|r||}\hline
+\begin{tabular}{||l||l|l|l||}\hline
 Element & \multicolumn{3}{c||}{Adjacent Nodes} \\\hline
 e1 & n1 & n3 & n4 \\
 e2 & n1 & n2 & n4 \\
@@ -106,7 +106,7 @@ e2 & n1 & n2 & n4 \\
 
 \begin{table}[h]
 \begin{center}
-\begin{tabular}{||l||r|r|r||}\hline
+\begin{tabular}{||l||l|l|l||}\hline
 Element & \multicolumn{3}{c||}{Adjacent Nodes}\\\hline
 e1 & n1 & n2 & n3 \\
 \hline
@@ -142,7 +142,7 @@ the chunks to each processor, allow the user to run their time loop, and
 handle the node-updates.
 
 
-\section{Structure of a FEM Framework Program}
+\subsection{Structure of a FEM Framework Program}
 
 A FEM framework program consists of two subroutines: \kw{init()} and \kw{driver()}.
 \kw{init()} is called by the FEM framework
@@ -168,7 +168,7 @@ and \kw{driver()} runs in the parallel context.
      end subroutine
 \end{alltt}
 
-\section{Compilation and Execution}
+\subsection{Compilation and Execution}
 
 A FEM framework program is a \charmpp\ program, so you must begin by
 downloading the latest source version of \charmpp\ from
@@ -924,7 +924,7 @@ always equal to \kw{rec\_len} times the size of one item.
 
 \begin{figure}[h]
 \begin{center}
-\includegraphics[width=4in]{create_field}
+\includegraphics[width=4in]{fig/create_field}
 \end{center}
 \caption{Creating a complex Node Field.}
 \label{fig:createfield}
