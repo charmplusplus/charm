@@ -733,7 +733,7 @@ CmiBool CkLocRec_local::invokeEntry(CkMigratable *obj,void *msg,
 	//	CkPrintf("ckLocation.C beginExecuteDetailed %d %d \n",env->getEvent(),env->array_srcPe());
 		if (_entryTable[epIdx]->traceEnabled)
 			_TRACE_BEGIN_EXECUTE_DETAILED(env->getEvent(),
-		    		 ForChareMsg,epIdx,env->array_srcPe(), env->getTotalsize());
+		    		 ForChareMsg,epIdx,env->array_srcPe(), env->getTotalsize(), idx.getProjectionID());
 	}
 #endif
 	if (doFree) 

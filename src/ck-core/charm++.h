@@ -235,6 +235,7 @@ public:
 		p|nInts;
 		for (int i=0;i<nInts;i++) p|index.data[i];
 	}
+	CmiObjId *getProjectionID() { return (CmiObjId *)&index; }
 };
 PUPmarshall(CkArrayIndexMax)
 
