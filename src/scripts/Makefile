@@ -892,8 +892,11 @@ blue.o:  blue_impl.h blue_timing.h blue.C $(CVHEADERS)
 blue_timing.o:  blue_impl.h blue_timing.C blue_timing.h $(CVHEADERS)
 	$(CHARMC) -c blue_timing.C
 
-$(L)/libconv-bluegene.a:   blue.o blue_timing.o
-	$(CHARMC) -o $@ blue.o blue_timing.o
+blue_init.o:  blue_impl.h blue_init.C $(CVHEADERS)
+	$(CHARMC) -c blue_init.C
+
+$(L)/libconv-bluegene.a:   blue.o blue_init.o blue_timing.o
+	$(CHARMC) -o $@ blue.o blue_init.o blue_timing.o
 
 ###############################################################################
 #
