@@ -143,6 +143,10 @@ static inline int CkMyNode() { return BgMyNode(); }
 static inline int CkNumNodes() { return BgNumNodes(); }
 static inline int CkMyNodeSize() { return BgGetNumWorkThread(); }
 
+static inline void CksdScheduler(int ret) { BgScheduler(ret); }
+static inline void CksdExitScheduler() { BgExitScheduler(); }
+static inline void CkDeliverMsgs(int nmsg)	{ BgDeliverMsgs(nmsg); }
+
 }  /* end of namespace */
 
 #endif

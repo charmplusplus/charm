@@ -30,6 +30,10 @@
 #undef CmiSyncBroadcastAll
 #undef CmiSyncBroadcastAllAndFree
 
+#define CksdScheduler			CsdScheduler
+#define CksdExitScheduler		CsdExitScheduler
+#define CkDeliverMsgs			CmiDeliverMsgs
+
 #define CkVTimer(x)	      0
 #define CkElapse(x)   
 
