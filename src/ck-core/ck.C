@@ -14,6 +14,7 @@ clients, including the rest of Charm++, are actually C++.
 */
 #include "ck.h"
 #include "trace.h"
+#include "queueing.h"
 
 VidBlock::VidBlock() { state = UNFILLED; msgQ = new PtrQ(); _MEMCHECK(msgQ); }
 
@@ -23,15 +24,32 @@ int CkIndex_Chare::__idx;
 int CkIndex_Group::__idx;
 int CkIndex_ArrayBase::__idx=-1;
 
+extern int _defaultObjectQ;
+
 //Charm++ virtual functions: declaring these here results in a smaller executable
 Chare::Chare(void) {
   thishandle.onPE=CkMyPe();
   thishandle.objPtr=this;
+#if CMK_OBJECT_QUEUE_AVAILABLE
+  if (_defaultObjectQ) objQ.create();
+#endif
 }
+
 Chare::Chare(CkMigrateMessage* m) {
   thishandle.onPE=CkMyPe();
   thishandle.objPtr=this;
+#if CMK_OBJECT_QUEUE_AVAILABLE
+  if (_defaultObjectQ) objQ.create();
+#endif
 }
+
+void Chare::CkEnableObjQ()
+{
+#if CMK_OBJECT_QUEUE_AVAILABLE
+  objQ.create();
+#endif
+}
+
 Chare::~Chare() {}
 
 void Chare::pup(PUP::er &p)
@@ -773,9 +791,11 @@ void CkUnpackMessage(envelope **pEnv)
 //There's no reason for most messages to go through the Cld--
 // the PE can never be CLD_ANYWHERE; wasting _infoFn calls.
 // Thus these accellerated versions of the Cld calls.
-#include "queueing.h"
 
+int index_objectQHandler;
+int index_tokenHandler;
 static int index_skipCldHandler;
+
 static void _skipCldHandler(void *converseMsg)
 {
   register envelope *env = (envelope *)(converseMsg);
@@ -788,6 +808,13 @@ static void _skipCldHandler(void *converseMsg)
 static void _skipCldEnqueue(int pe,envelope *env, int infoFn)
 {
   if (pe == CkMyPe() && !CmiImmIsRunning()) {
+#if CMK_OBJECT_QUEUE_AVAILABLE
+    Chare *obj = CkFindObjectPtr(env);
+    if (obj && obj->CkGetObjQueue().queue()) {
+      _enqObjQueue(obj, env);
+    }
+    else
+#endif
     CqsEnqueueGeneral((Queue)CpvAccess(CsdSchedQueue),
   	env, env->getQueueing(),env->getPriobits(),
   	(unsigned int *)env->getPrioPtr());
@@ -795,7 +822,11 @@ static void _skipCldEnqueue(int pe,envelope *env, int infoFn)
     CkPackMessage(&env);
     int len=env->getTotalsize();
     CmiSetXHandler(env,CmiGetHandler(env));
+#if CMK_OBJECT_QUEUE_AVAILABLE
+    CmiSetHandler(env,index_objectQHandler);
+#else
     CmiSetHandler(env,index_skipCldHandler);
+#endif
     CmiSetInfo(env,infoFn);
     if (pe==CLD_BROADCAST) { CmiSyncBroadcastAndFree(len, (char *)env); }
     else if (pe==CLD_BROADCAST_ALL) { CmiSyncBroadcastAllAndFree(len, (char *)env); }
@@ -842,7 +873,11 @@ static inline int _prepareMsg(int eIdx,void *msg,const CkChareID *pCid)
   env->setMsgtype(ForChareMsg);
   env->setEpIdx(eIdx);
   env->setSrcPe(CkMyPe());
+#if CMK_OBJECT_QUEUE_AVAILABLE
+  CmiSetHandler(env, index_objectQHandler);
+#else
   CmiSetHandler(env, _charmHandlerIdx);
+#endif
   if (pCid->onPE < 0) { //Virtual chare ID (VID)
     register int pe = -(pCid->onPE+1);
     if(pe==CkMyPe()) {
@@ -1105,6 +1140,10 @@ void CkNodeGroupMsgPrep(int eIdx, void *msg, CkGroupID gID)
 
 void _ckModuleInit(void) {
 	index_skipCldHandler = CkRegisterHandler((CmiHandler)_skipCldHandler);
+	index_objectQHandler = CkRegisterHandler((CmiHandler)_ObjectQHandler);
+	index_tokenHandler = CkRegisterHandler((CmiHandler)_TokenHandler);
+	CkpvInitialize(TokenPool*, _tokenPool);
+	CkpvAccess(_tokenPool) = new TokenPool;
 }
 
 

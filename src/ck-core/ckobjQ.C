@@ -139,7 +139,9 @@ void _ObjectQHandler(void *converseMsg)
   register envelope *env = (envelope *)(converseMsg);
   Chare *obj = CkFindObjectPtr(env);
   // swap handler back
-  CmiSetHandler(env, CmiGetXHandler(env));
+//  CmiSetHandler(env, CmiGetXHandler(env));
+  // I can do this because this message is always a charm+ message
+  CmiSetHandler(env, _charmHandlerIdx);
   if (obj && obj->CkGetObjQueue().queue()) {  // queue enabled
     _enqObjQueue(obj, env);
   }
@@ -148,6 +150,8 @@ void _ObjectQHandler(void *converseMsg)
   	env, env->getQueueing(),env->getPriobits(),
   	(unsigned int *)env->getPrioPtr());
   }
+#else
+  CmiAbort("Invalide _ObjectQHandler called!");
 #endif
 }
 
@@ -165,5 +169,7 @@ void _TokenHandler(void *tokenMsg)
   }
   CkObjectMsgQ &objQ = obj->CkGetObjQueue();
   objQ.process();
+#else
+  CmiAbort("Invalide _TokenHandler called!");
 #endif
 }
