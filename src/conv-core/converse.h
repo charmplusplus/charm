@@ -1014,12 +1014,12 @@ void ConverseExit(void);
 
 void CmiAbort(const char *);
 
-#ifndef CMK_OPTIMIZE
+#if CMK_MEMCHECK_OFF
+#define _MEMCHECK(p) do{}while(0)
+#else
 #define _MEMCHECK(p) do { \
                          if ((p)==0) CmiAbort("Memory Allocation Failure.\n");\
                      } while(0)
-#else
-#define _MEMCHECK(p) do{}while(0)
 #endif
 
 /*********** CPATH ***********/
