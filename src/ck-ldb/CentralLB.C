@@ -152,7 +152,7 @@ void CentralLB::ProcessAtSync()
   theLbdb->GetObjData(msg->objData);
   msg->n_comm = csz;
   theLbdb->GetCommData(msg->commData);
-  theLbdb->ClearLoads();
+//  theLbdb->ClearLoads();
   DEBUGF(("PE %d sending %d to ReceiveStats %d objs, %d comm\n",
   	   CkMyPe(),msg->serial,msg->n_objs,msg->n_comm));
 
@@ -374,20 +374,19 @@ void CentralLB::ReceiveMigration(LBMigrateMsg *m)
 
 void CentralLB::MigrationDone(int balancing)
 {
-  if (balancing && CkMyPe() == cur_ld_balancer) {
+  if (balancing && lb_debug && CkMyPe() == cur_ld_balancer) {
     double end_lb_time = CmiWallTimer();
-    if (lb_debug)
       CkPrintf("[%s] Load balancing step %d finished at %f\n",
   	        lbName(), step(),end_lb_time);
-    if (lb_debug) {
       double lbdbMemsize = LBDatabase::Object()->useMem()/1000;
-      CkPrintf("[%s] duration %f memUsage: LBManager:%dKB CentralLB:%dKB\n",
+      CkPrintf("[%s] duration %f memUsage: LBManager:%dKB CentralLB:%dKB\n", 
   	        lbName(), end_lb_time - start_lb_time,
 	        (int)lbdbMemsize, (int)(useMem()/1000));
-    }
   }
   migrates_completed = 0;
   migrates_expected = -1;
+  // clear load stats
+  if (balancing) theLbdb->ClearLoads();
   // Increment to next step
   mystep++;
   thisProxy [CkMyPe()].ResumeClients();
@@ -502,6 +501,8 @@ void CentralLB::readStatsMsgs(const char* filename) {
   PUP::fromDisk p(f);
   p|stats_msg_count;
 
+  CmiPrintf("readStatsMsgs for %d pes starts ... \n", stats_msg_count);
+
   // now rebuild new structures
   statsMsgsList = new CLBStatsMsg*[stats_msg_count];
   statsDataList = new LDStats[stats_msg_count];
@@ -512,7 +513,10 @@ void CentralLB::readStatsMsgs(const char* filename) {
     envelope oldenv=*UsrToEnv(oldm);
     CkPupMessage(p, (void **)&m, 2);
     envelope *env=UsrToEnv(m);
+    // msgIdx can be different across different applictions
+    env->setMsgIdx(oldenv.getMsgIdx());
     CkUnpackMessage(&env); //UnPack it
+    CmiPrintf("CLBStatsMsg for pe %d retrieved.\n", i);
     m = (CLBStatsMsg *)EnvToUsr(env);
 
     statsMsgsList[i] = m;
