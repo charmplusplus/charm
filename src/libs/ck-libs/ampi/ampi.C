@@ -65,6 +65,10 @@ void MPI_MAX( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
     for(i=0;i<(*len);i++)
       if(((double *)invec)[i] > ((double *)inoutvec)[i]) ((double *)inoutvec)[i] = ((double *)invec)[i];
     break;
+  case MPI_LONG_LONG_INT:
+    for(i=0;i<(*len);i++)
+      if(((CMK_TYPEDEF_INT8 *)invec)[i] > ((CMK_TYPEDEF_INT8 *)inoutvec)[i]) ((CMK_TYPEDEF_INT8 *)inoutvec)[i] = ((CMK_TYPEDEF_INT8 *)invec)[i];
+    break;
   default:
     ckerr << "Type " << *datatype << " with Op MPI_MAX not supported." << endl;
     CmiAbort("exiting");
@@ -88,6 +92,10 @@ void MPI_MIN( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
   case MPI_DOUBLE:
     for(i=0;i<(*len);i++)
       if(((double *)invec)[i] < ((double *)inoutvec)[i]) ((double *)inoutvec)[i] = ((double *)invec)[i];
+    break;
+  case MPI_LONG_LONG_INT:
+    for(i=0;i<(*len);i++)
+      if(((CMK_TYPEDEF_INT8 *)invec)[i] < ((CMK_TYPEDEF_INT8 *)inoutvec)[i]) ((CMK_TYPEDEF_INT8 *)inoutvec)[i] = ((CMK_TYPEDEF_INT8 *)invec)[i];
     break;
   default:
     ckerr << "Type " << *datatype << " with Op MPI_MIN not supported." << endl;
@@ -118,6 +126,10 @@ void MPI_SUM( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
       ((AmpiComplex *)inoutvec)[i].re += ((AmpiComplex *)invec)[i].re;
       ((AmpiComplex *)inoutvec)[i].im += ((AmpiComplex *)invec)[i].im;
     }
+    break;
+  case MPI_LONG_LONG_INT:
+    for(i=0;i<(*len);i++)
+      ((CMK_TYPEDEF_INT8 *)inoutvec)[i] += ((CMK_TYPEDEF_INT8 *)invec)[i];
     break;
   default:
     ckerr << "Type " << *datatype << " with Op MPI_SUM not supported." << endl;
@@ -1376,11 +1388,11 @@ ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
   }else if(msg->length < len){ // only at rare case shall we reset count by using divide
     count = msg->length/(ddt->getSize(1));
   }
-  if(msg->length-len==sizeof(AmpiOpHeader))
+  if (msg->length-len==sizeof(AmpiOpHeader)) {
     ddt->serialize((char*)buf, (char*)msg->data+sizeof(AmpiOpHeader), count, (-1));
-  else
+  } else {
     ddt->serialize((char*)buf, (char*)msg->data, count, (-1));
-  
+  }
   _LOG_E_BEGIN_AMPI_PROCESSING(thisIndex,s,count)
 #if CMK_BLUEGENE_CHARM
   TRACE_BG_AMPI_RESUME(thread->getThread(), msg, "RECV_RESUME", curLog);
@@ -1780,6 +1792,7 @@ int AMPI_Reduce(void *inbuf, void *outbuf, int count, int type, MPI_Op op,
   if(comm==MPI_COMM_SELF) return copyDatatype(comm,type,count,inbuf,outbuf);
   ampi *ptr = getAmpiInstance(comm);
   CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type),inbuf,count,type,op);
+
   int rootIdx=ptr->comm2CommStruct(comm).getIndexForRank(root);
   CkCallback reduceCB(CkIndex_ampi::reduceResult(0),CkArrayIndex1D(rootIdx),ptr->getProxy(),true);
   msg->setCallback(reduceCB);
