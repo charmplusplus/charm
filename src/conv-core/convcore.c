@@ -148,7 +148,7 @@ char **argv;
   argc = 0; argv=origArgv;
   for(argc=0;argv[argc];argc++);
   traceModuleInit(&argc, argv);
-  CpvAccess(traceOn) = trace;
+  CpvAccess(traceOn) = (CpvAccess(traceOn) && trace);
   log_init();
 }
 
