@@ -98,7 +98,7 @@ void TreeRouter :: RecvManyMsg(comID id, char *msg)
 		int parent=(MyPe-1)/DEGREE;
 		parent=gmap(parent);
 		char *newmsg=SortBufferUp(id, 0, &len);
-		TREESENDFN(MyID, 0, newmsg, len, CkpvAccess(RecvHandle), parent);
+		TREESENDFN(MyID, 0, newmsg, len, CpvAccess(RecvHandle), parent);
 
 	}
 	else {
@@ -156,7 +156,7 @@ void TreeRouter :: DownStreamMsg(comID id)
     int child=MyPe*DEGREE+i+1;
     if (child >=NumPes || child==MyPe) break;
     child=gmap(child);
-    TREESENDFN(MyID, 0, newmsg, len, CkpvAccess(RecvHandle), child);
+    TREESENDFN(MyID, 0, newmsg, len, CpvAccess(RecvHandle), child);
   }
 
   LocalProcMsg(id);

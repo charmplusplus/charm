@@ -91,7 +91,7 @@ void CComlibEachToManyMulticast(comID id, int ep, void *msg,
   double sendT;
   _TRACE_ONLY(sendT = CmiTraceTimer());
 
-  CkpvAccess(_qd)->create();
+  CpvAccess(_qd)->create();
   EachToManyMulticast(id, len, (void *)env, npe, pelist);
 
   _STATS_RECORD_SEND_BRANCH_N(npe);

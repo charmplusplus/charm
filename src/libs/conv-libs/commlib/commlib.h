@@ -7,8 +7,11 @@
 
 #ifndef COMLIB_H
 #define COMLIB_H
+
 #include <converse.h>
-#include <charm++.h>
+#if CMK_BLUEGENE_CHARM
+#include <bgconverse.h>
+#endif
 #include <stdlib.h>
 
 #ifndef NULL
@@ -17,16 +20,6 @@
 
 #define ComlibPrintf if(comm_debug) CmiPrintf
 extern int comm_debug;
-
-#if CMK_BLUEGENE_CHARM
-#ifndef CmiReservedHeaderSize 
-#define CmiReservedHeaderSize   CmiBlueGeneMsgHeaderSizeBytes
-#endif
-#else
-#ifndef CmiReservedHeaderSize
-#define CmiReservedHeaderSize   CmiMsgHeaderSizeBytes
-#endif
-#endif
 
 enum{BCAST=0,TREE, GRID, HCUBE, RSEND};  
 #define MAXNUMMSGS 1000

@@ -29,6 +29,7 @@
 BcastRouter::BcastRouter(int n, int me)
 {
   //Initialize the no: of pes and my Pe number
+  CmiAssert(me >=0 && me < CmiNumPes());
   NumPes=n;
   MyPe=me;
   gpes=NULL;
@@ -70,12 +71,12 @@ void BcastRouter::EachToManyMulticast(comID id, int size, void *msg, int numpes,
   if (size) {
 
   int mask=~7;
-  int offset=(CmiReservedHeaderSize+sizeof(comID)+3*sizeof(int)+7)&mask;
+  int offset=(CmiMsgHeaderSizeBytes+sizeof(comID)+3*sizeof(int)+7)&mask;
   int totsize=offset+numpes*sizeof(int)+size;
   char *m=(char *)CmiAlloc(totsize);
-  char *p=m+CmiReservedHeaderSize;
+  char *p=m+CmiMsgHeaderSizeBytes;
 
-  CmiSetHandler(m, CkpvAccess(RecvHandle));
+  CmiSetHandler(m, CpvAccess(RecvHandle));
 
   int refno=KMyActiveRefno(id);
   memcpy(p, (char *)&refno, sizeof(int)); 
@@ -136,8 +137,8 @@ void BcastRouter::RecvManyMsg(comID, char *m)
   }
   Buffer *node;
   int mask=~7;
-  int offset=(CmiReservedHeaderSize+sizeof(comID)+3*sizeof(int)+7)&mask;
-  char *p=m+CmiReservedHeaderSize+sizeof(int)+sizeof(comID);
+  int offset=(CmiMsgHeaderSizeBytes+sizeof(comID)+3*sizeof(int)+7)&mask;
+  char *p=m+CmiMsgHeaderSizeBytes+sizeof(int)+sizeof(comID);
 
   int size;
   memcpy(&size, p, sizeof(int));
@@ -173,6 +174,7 @@ void BcastRouter::RecvManyMsg(comID, char *m)
   if (recvCount==NumPes) {
   	while (MsgBuffer) {
 		//CmiPrintf("%d Calling CmiSyncSend with size=%d\n", MyPe, MsgBuffer->size);
+		CmiAssert(MyPe>=0 && MyPe<CmiNumPes());
   		CmiSyncSendAndFree(MyPe, MsgBuffer->size, 
                                    (char *)MsgBuffer->msg);
 		node=MsgBuffer;

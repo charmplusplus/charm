@@ -21,19 +21,19 @@
 
 #define SWITCHCYCLE 1000000
 
-CkpvExtern(int, SwitchHandle);
+CpvExtern(int, SwitchHandle);
 extern Router * GetStrategyObject(int, int, int );
 
 Overlapper:: Overlapper(comID id)
 {
-  ComlibPrintf("%d ovl called with numMem=%d\n", CkMyPe(), id.NumMembers);
+  ComlibPrintf("%d ovl called with numMem=%d\n", CmiMyPe(), id.NumMembers);
   MyID=id;
   NoSwitch=1;
   gpes=NULL;
   gnpes=0;
   if (id.NumMembers > 0) {
   	NumPes=id.NumMembers;
-  	MyPe=CkMyPe();
+  	MyPe=CmiMyPe();
   	routerObj=GetStrategyObject(NumPes, MyPe, id.ImplType);
   	routerObj->SetID(MyID);
   	Active=RecvActive=0;
@@ -50,13 +50,14 @@ Overlapper:: Overlapper(comID id)
 		NumPes=gnpes;
 		int gg;
 		for (gg=0;gg<gnpes;gg++) { 
-                  if (gpes[gg]==CkMyPe()) {
+                  if (gpes[gg]==CmiMyPe()) {
                     MyPe=gg;
                     break;
                   }
 		}
 		ComlibPrintf("gg=%d, MyPe=%d, gnpes=%d\n",gg, MyPe, gnpes);
-  		if (MyPe <0) ComlibPrintf("%d Errorin mapping Pes\n", CkMyPe());
+		CmiAssert(gg < gnpes);
+  		if (MyPe <0) ComlibPrintf("%d Error in mapping Pes\n", CmiMyPe());
   		routerObj=GetStrategyObject(NumPes, MyPe, id.ImplType);
   		routerObj->SetID(MyID);
 		routerObj->SetMap(gpes);
@@ -132,17 +133,17 @@ void Overlapper::GroupMap(int npes, int *pes)
   NumPes=gnpes;
   MyPe=-1;
   for (int gg=0;gg<gnpes;gg++) { 
-	if (gpes[gg]==CkMyPe()) {
-		//ComlibPrintf("Groupmap %d to %d\n", CkMyPe(), gg);
+	if (gpes[gg]==CmiMyPe()) {
+		//ComlibPrintf("Groupmap %d to %d\n", CmiMyPe(), gg);
 		MyPe=gg;
 		break;
 	}
   }
-  if (MyPe <0) ComlibPrintf("%d Errorin mapping Pes\n", CkMyPe());
+  if (MyPe <0) ComlibPrintf("%d Errorin mapping Pes\n", CmiMyPe());
   routerObj=GetStrategyObject(NumPes, MyPe, MyID.ImplType);
   routerObj->SetID(MyID);
   routerObj->SetMap(gpes);
-  ComlibPrintf("%d:Setting Group Map\n", CkMyPe());
+  ComlibPrintf("%d:Setting Group Map\n", CmiMyPe());
   Active=RecvActive=0;
   Done();
 }
@@ -160,12 +161,12 @@ void Overlapper::NumDeposits(comID id, int n)
 void Overlapper::EachToAllMulticast(comID id, int size, void *msg)
 {
   int moredeps=1;
-  if (!NoSwitch && (id.srcpe==CkMyPe())) {
+  if (!NoSwitch && (id.srcpe==CmiMyPe())) {
 	CommAnalyzer(id);
   }
 
   if (Active) {
-        ComlibPrintf("%d buffering multicast\n", CkMyPe());
+        ComlibPrintf("%d buffering multicast\n", CmiMyPe());
 	//OverlapBuffer *ob=(OverlapBuffer*)CmiAlloc(sizeof(OverlapBuffer));
 	OverlapBuffer *ob;
 	OBAlloc(ob, sizeof(OverlapBuffer));
@@ -193,13 +194,13 @@ void Overlapper::EachToAllMulticast(comID id, int size, void *msg)
 
       MoreDeposits--;
       if (!MoreDeposits) {
-        ComlibPrintf("%d:Setting active to 1\n", CkMyPe());
+        ComlibPrintf("%d:Setting active to 1\n", CmiMyPe());
 	Active=1;
   	moredeps=0;
 	MoreDeposits=1;
       }
 
-      ComlibPrintf("%d Active Multicast refno %di MoreDeps=%d\n", CkMyPe(), ActiveRefno, MoreDeposits);
+      ComlibPrintf("%d Active Multicast refno %di MoreDeps=%d\n", CmiMyPe(), ActiveRefno, MoreDeposits);
       routerObj->EachToAllMulticast(id, size, msg, moredeps);
   }
 }
@@ -207,12 +208,12 @@ void Overlapper::EachToAllMulticast(comID id, int size, void *msg)
 void Overlapper::EachToManyMulticast(comID id, int size, void *msg, int npe, int *pelist)
 {
   int moredeps=1;
-  if (!NoSwitch && (id.srcpe==CkMyPe())) {
+  if (!NoSwitch && (id.srcpe==CmiMyPe())) {
 	CommAnalyzer(id);
   }
 
   if (Active) {
-        ComlibPrintf("%d buffering multicast %d, Active = %d\n", CkMyPe(), MoreDeposits, Active);
+        ComlibPrintf("%d buffering multicast %d, Active = %d\n", CmiMyPe(), MoreDeposits, Active);
 	//OverlapBuffer *ob=(OverlapBuffer*)CmiAlloc(sizeof(OverlapBuffer));
 	OverlapBuffer *ob;
 	OBAlloc(ob, sizeof(OverlapBuffer));
@@ -225,7 +226,7 @@ void Overlapper::EachToManyMulticast(comID id, int size, void *msg, int npe, int
 	ob->more=MoreDeposits;
 
         //if(MoreDeposits == 1)
-        //  ComlibPrintf("HERE HERE HERE %d\n", CkMyPe());
+        //  ComlibPrintf("HERE HERE HERE %d\n", CmiMyPe());
 
 	ob->next=NULL;
 	if (OBLast!=NULL) { 
@@ -246,24 +247,24 @@ void Overlapper::EachToManyMulticast(comID id, int size, void *msg, int npe, int
       MoreDeposits--;
       if (!MoreDeposits) { 
 	Active=1;
-        ComlibPrintf("%d:Setting Active to 1\n", CkMyPe());
+        ComlibPrintf("%d:Setting Active to 1\n", CmiMyPe());
   	moredeps=0;
 	MoreDeposits=1;
 	if (SwitchDecision)
           InsertSwitchMsgs(npe, pelist);
       }
       
-      ComlibPrintf("%d Active Multicast refno %d More=%d\n", CkMyPe(), ActiveRefno, MoreDeposits);
+      ComlibPrintf("%d Active Multicast refno %d More=%d\n", CmiMyPe(), ActiveRefno, MoreDeposits);
       routerObj->EachToManyMulticast(id, size, msg, npe, pelist, moredeps);
   }
 }
 
 void Overlapper :: RecvManyMsg(comID id, char *msg)
 {
-  int refno=*(int *)(msg+CmiReservedHeaderSize);
+  int refno=*(int *)(msg+CmiMsgHeaderSizeBytes);
   if (RecvActive) {
     if (ActiveRefno != refno) {
-	ComlibPrintf("%d buffering recv refno %d, Activerefno=%d\n", CkMyPe(), refno, ActiveRefno);
+	ComlibPrintf("%d buffering recv refno %d, Activerefno=%d\n", CmiMyPe(), refno, ActiveRefno);
 	//OverlapRecvBuffer *ovr=(OverlapRecvBuffer *)CmiAlloc(sizeof(OverlapRecvBuffer));
 	OverlapRecvBuffer *ovr;
 	ORAlloc(ovr, sizeof(OverlapRecvBuffer));
@@ -291,7 +292,7 @@ void Overlapper :: DummyEP(comID id, int magic, int refno)
 {
   if (RecvActive) {
     if (ActiveRefno != refno) {
-	ComlibPrintf("%d buffering dummy refno %d\n", CkMyPe(), refno);
+	ComlibPrintf("%d buffering dummy refno %d\n", CmiMyPe(), refno);
 	//OverlapDummyBuffer *ovr=(OverlapDummyBuffer *)CmiAlloc(sizeof(OverlapDummyBuffer));
 	OverlapDummyBuffer *ovr;
 	ODAlloc(ovr, sizeof(OverlapDummyBuffer));
@@ -317,11 +318,11 @@ void Overlapper :: DummyEP(comID id, int magic, int refno)
 
 void Overlapper :: ProcManyMsg(comID id, char *m)
 {
-  //ComlibPrintf("%d Procmanymsg in overlapper called\n", CkMyPe());
-  int refno=*(int *)(m+CmiReservedHeaderSize);
+  //ComlibPrintf("%d Procmanymsg in overlapper called\n", CmiMyPe());
+  int refno=*(int *)(m+CmiMsgHeaderSizeBytes);
   if (RecvActive) {
     if (ActiveRefno != refno) {
-	//ComlibPrintf("%d buffering proc msg refno %d\n", CkMyPe(), refno);
+	//ComlibPrintf("%d buffering proc msg refno %d\n", CmiMyPe(), refno);
 	//OverlapProcBuffer *op=(OverlapProcBuffer *)CmiAlloc(sizeof(OverlapProcBuffer));
 	OverlapProcBuffer *op;
 	OPAlloc(op, sizeof(OverlapProcBuffer));
@@ -353,7 +354,7 @@ void Overlapper :: StartNext()
   }
   if (OBFirst || ORFirst || ODFirst || OPFirst) {
       if(OBFirst) {
-          ComlibPrintf("%d:Setting Active to 1 in start next\n", CkMyPe());
+          ComlibPrintf("%d:Setting Active to 1 in start next\n", CmiMyPe());
           Active=1;
       }
       RecvActive=1;
@@ -373,7 +374,7 @@ void Overlapper :: StartNext()
 		InsertSwitchMsgs(ob->npe, ob->pelist);
 	while (moredeps && ob) {
 		moredeps--;
-		//ComlibPrintf("%d Start multicast refno %d more=%d %d\n", CkMyPe(), ActiveRefno, moredeps, MoreDeposits);
+		//ComlibPrintf("%d Start multicast refno %d more=%d %d\n", CmiMyPe(), ActiveRefno, moredeps, MoreDeposits);
       		if (ob->npe == -1) {
 			routerObj->EachToAllMulticast(ob->id, ob->msgsize, ob->msg, moredeps);
       		}
@@ -389,12 +390,12 @@ void Overlapper :: StartNext()
 	OBFirst=ob;
 	if (OBFirst == NULL) OBLast=NULL;
   	if (moredeps) {
-            //ComlibPrintf("%d more deps=%d expected:%d deactivating...\n",CkMyPe(), moredeps, ActiveRefno);
+            //ComlibPrintf("%d more deps=%d expected:%d deactivating...\n",CmiMyPe(), moredeps, ActiveRefno);
             Active=0;
 	}
   }	
   if (ORFirst) {
-        ComlibPrintf("%d Start recv refno %d\n", CkMyPe(), ActiveRefno);
+        ComlibPrintf("%d Start recv refno %d\n", CmiMyPe(), ActiveRefno);
 	OverlapRecvBuffer *ovr=ORFirst, *prev=NULL;
 	while (ORFirst && (ORFirst->refno == ActiveRefno)) { 
 		ovr=ORFirst;
@@ -423,7 +424,7 @@ void Overlapper :: StartNext()
   }
 
   if (ODFirst) {
-        ComlibPrintf("%d Start dummy refno %d\n", CkMyPe(), ActiveRefno);
+        ComlibPrintf("%d Start dummy refno %d\n", CmiMyPe(), ActiveRefno);
 	OverlapDummyBuffer *od, *prevd=NULL;
 	while (ODFirst && (ODFirst->refno == ActiveRefno)) { 
 		od=ODFirst;
@@ -452,7 +453,7 @@ void Overlapper :: StartNext()
   }
 
   if (OPFirst) {
-	ComlibPrintf("%d Start Proc refno %d\n", CkMyPe(), ActiveRefno);
+	ComlibPrintf("%d Start Proc refno %d\n", CmiMyPe(), ActiveRefno);
 	OverlapProcBuffer *op=OPFirst, *prev=NULL;
 	while (OPFirst && (OPFirst->refno == ActiveRefno)) { 
 		op=OPFirst;
@@ -479,7 +480,7 @@ void Overlapper :: StartNext()
 	  }
 	}
   }
-  ComlibPrintf("%d:StartNext done\n", CkMyPe());
+  ComlibPrintf("%d:StartNext done\n", CmiMyPe());
 }
 
 
@@ -487,7 +488,7 @@ void Overlapper::Done()
 {
   Active=0;
   RecvActive=0;
-  ComlibPrintf("%d DONE refno %d.......................\n", CkMyPe(), ActiveRefno);
+  ComlibPrintf("%d DONE refno %d.......................\n", CmiMyPe(), ActiveRefno);
   StartNext();
 }
   
@@ -500,10 +501,10 @@ void Overlapper::SetID(comID id)
 void Overlapper::SwitchStrategy()
 {
   delete routerObj;
-  routerObj=GetStrategyObject(MyID.NumMembers, CkMyPe(), MyID.ImplType);
+  routerObj=GetStrategyObject(MyID.NumMembers, CmiMyPe(), MyID.ImplType);
   MyID.SwitchVal=-1;
   routerObj->SetID(MyID);
-  //ComlibPrintf("%d Switching Strategy to %d refno=%d\n", CkMyPe(), MyID.ImplType, ActiveRefno);
+  //ComlibPrintf("%d Switching Strategy to %d refno=%d\n", CmiMyPe(), MyID.ImplType, ActiveRefno);
   SwitchDecision=0;
 }
 
@@ -515,7 +516,7 @@ void Overlapper::CommAnalyzer(comID)
   i++;
   //ComlibPrintf("i=%d\n", i);
   if ((i % SWITCHCYCLE)==1) {
-  	//ComlibPrintf("%d com to set switchval\n", CkMyPe());
+  	//ComlibPrintf("%d com to set switchval\n", CmiMyPe());
   	MyID.SwitchVal=3;
   	MyID.ImplType=3;
   	routerObj->SetID(MyID);
@@ -526,17 +527,17 @@ void Overlapper::CommAnalyzer(comID)
 void Overlapper :: InsertSwitchMsgs(int npe, int *pelist)
 {
   SwitchMsg *sm=(SwitchMsg *)CmiAlloc(sizeof(SwitchMsg));
-  int *templist=(int *)CmiAlloc(CkNumPes()*sizeof(int));
-  int *newlist=(int *)CmiAlloc((CkNumPes()-npe)*sizeof(int));
+  int *templist=(int *)CmiAlloc(CmiNumPes()*sizeof(int));
+  int *newlist=(int *)CmiAlloc((CmiNumPes()-npe)*sizeof(int));
   int i, j=0;
 
-  for (i=0;i<CkNumPes();i++) templist[i]=0;
+  for (i=0;i<CmiNumPes();i++) templist[i]=0;
   for (i=0;i<npe;i++) templist[pelist[i]]=1;
-  for (i=0;i<CkNumPes();i++) 
+  for (i=0;i<CmiNumPes();i++) 
 	if (templist[i]==0) newlist[j++]=i;
 
   sm->id=MyID;
-  CmiSetHandler(sm, CkpvAccess(SwitchHandle));
+  CmiSetHandler(sm, CpvAccess(SwitchHandle));
   if (j)
   	routerObj->EachToManyMulticast(MyID, sizeof(SwitchMsg), sm, j, newlist, 1);
   else
