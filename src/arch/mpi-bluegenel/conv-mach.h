@@ -52,6 +52,8 @@
 #define CMK_TIMER_USE_TIMES                                0
 #define CMK_TIMER_USE_BLUEGENEL				   1
 
+#define CMK_VERSION_BLUEGENE                               1
+
 #define CMK_TYPEDEF_INT2 short
 #define CMK_TYPEDEF_INT4 int
 #define CMK_TYPEDEF_INT8 long
