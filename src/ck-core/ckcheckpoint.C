@@ -136,7 +136,7 @@ void CkStartCheckpoint(char* dirname,const CkCallback& cb){
 	if(numGroups != fwrite(tmpInfo,sizeof(GroupInfo),numGroups,fGroups)) CkAbort("error writing groupinfo");
 
 	PUP::toDisk pGroups(fGroups);
-	for(int i=0;i<numGroups;i++) {
+	for(i=0;i<numGroups;i++) {
 		if(!tmpInfo[i].useDefCtor){
                         CkpvAccess(_groupTable)->find(tmpInfo[i].gID).getObj()->pup(pGroups);
                         DEBCHK("Group PUP'ed in: gid = %d, name = %s\n",
