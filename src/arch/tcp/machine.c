@@ -222,7 +222,7 @@ static char *strdupl(s) char *s;
 static int readall(fd, buff, len)
      int fd; char *buff; int len;
 {
-  int nread;
+  int nread, i;
   while (len>0) {
     nread = read(fd, buff, len);
     if (nread==0) return -1;
@@ -239,6 +239,8 @@ static void writeall(fd, buff, len)
   int nwrote;
   while (len > 0) {
     nwrote = write(fd, buff, len);
+    if (nwrote==0)
+      KillEveryoneCode(83794837);
     if ((nwrote<0)&&(errno!=EWOULDBLOCK)&&(errno!=EAGAIN))
       KillEveryoneCode(43491550);
     if (nwrote>0) { len -= nwrote; buff += nwrote; }
@@ -293,6 +295,7 @@ static void outlog_output(buf) char *buf;
     fflush(outlog_file);
   }
 }
+
 
 /**************************************************************************
  *
@@ -1023,8 +1026,12 @@ static void pump_icms(pe)
   int skt = ni->talk_skt;
   if (ni->icm_msg == 0) {
     ok = readall(skt, head, 8);
-    if (ok<0) exit(0);
+    if (ok<0) KillEveryoneCode(23323335);
     len = head[1];
+    if (len<8) {
+      CmiError("Error in message protocol: len=%d.\n",len);
+      KillEveryoneCode(87949839);
+    }
     ni->icm_msg = (char *)CmiAlloc(len);
     ni->icm_ptr = ni->icm_msg + 8;
     ni->icm_end = ni->icm_msg + len;
@@ -1127,6 +1134,8 @@ static commhandle netsend(autofree, destPE, size, msg)
   node_info *ni = node_table+destPE;
   commhandle h = (commhandle)CmiAllocCommHandle();
   int skt = ni->talk_skt;
+  if (size<CmiMsgHeaderSizeBytes)
+    KillEveryone("Message too short (no converse header!)");
   h->msg        = msg;
   h->ptr        = msg;
   h->end        = msg+size;
@@ -1175,6 +1184,75 @@ static void CmiSleep()
 
 /*****************************************************************************
  *
+ * The CmiDeliver routines.
+ *
+ * This version doesn't use the common CmiDelivers because it needs to
+ * wrap access to CmiLocalQueue in a interrupt-blocking section.
+ *
+ ****************************************************************************/
+
+CpvStaticDeclare(int, CmiBufferGrabbed);
+
+void CmiDeliversInit()
+{
+  CpvInitialize(int, CmiBufferGrabbed);
+  CpvAccess(CmiBufferGrabbed) = 0;
+}
+
+void CmiGrabBuffer()
+{
+  CpvAccess(CmiBufferGrabbed) = 1;
+}
+
+int CmiDeliverMsgs(maxmsgs)
+int maxmsgs;
+{
+  void *msg;
+  
+  while (1) {
+    CmiInterruptsBlock();
+    pumpmsgs();
+    FIFO_DeQueue(CpvAccess(CmiLocalQueue), &msg);
+    CmiInterruptsRelease();
+    if (msg==0) break;
+    CpvAccess(CmiBufferGrabbed)=0;
+    (CmiGetHandlerFunction(msg))(msg);
+    if (!CpvAccess(CmiBufferGrabbed)) CmiFree(msg);
+    maxmsgs--; if (maxmsgs==0) break;
+  }
+  return maxmsgs;
+}
+
+/*
+ * CmiDeliverSpecificMsg(lang)
+ *
+ * - waits till a message with the specified handler is received,
+ *   then delivers it.
+ *
+ */
+
+void CmiDeliverSpecificMsg(handler)
+int handler;
+{
+  void *msg;
+  CmiInterruptsBlock();
+  while (1) {
+    pumpmsgs();
+    FIFO_DeQueue(CpvAccess(CmiLocalQueue), &msg);
+    if (msg) {
+      if (CmiGetHandler(msg)==handler) {
+	CpvAccess(CmiBufferGrabbed)=0;
+	CmiInterruptsRelease();
+	(CmiGetHandlerFunction(msg))(msg);
+	if (!CpvAccess(CmiBufferGrabbed)) CmiFree(msg);
+	return;
+      } else FIFO_EnQueue(CpvAccess(CmiLocalQueue), msg);
+    }
+  }
+}
+
+/*****************************************************************************
+ *
  * High-Level Transmission and Reception routines
  *
  *****************************************************************************/
@@ -1188,7 +1266,9 @@ char *msg;
   if (CpvAccess(Cmi_mype)==destPE) {
     char *msg1 = (char *)CmiAlloc(size);
     memcpy(msg1,msg,size);
+    CmiInterruptsBlock();
     FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg1);
+    CmiInterruptsRelease();
   } else {
     commhandle h = netsend(0,destPE,size,msg);
     while (h->done == 0) CmiSleep();
@@ -1203,7 +1283,9 @@ CmiCommHandle CmiAsyncSendFn(destPE, size, msg)
   if (CpvAccess(Cmi_mype)==destPE) {
     char *msg1 = (char *)CmiAlloc(size);
     memcpy(msg1,msg,size);
+    CmiInterruptsBlock();
     FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg1);
+    CmiInterruptsRelease();
     return NULL;
   } else {
     commhandle h = netsend(0,destPE,size,msg);
@@ -1216,7 +1298,9 @@ void CmiFreeSendFn(destPE, size, msg)
      char *msg;
 {
   if (CpvAccess(Cmi_mype)==destPE) {
+    CmiInterruptsBlock();
     FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg);
+    CmiInterruptsRelease();
   } else {
     netsend(1,destPE,size,msg);
   }
@@ -1260,7 +1344,9 @@ void CmiSyncBroadcastAllFn(size,msg)
       CmiSyncSendFn(i,size,msg);
   msg1 = (char *)CmiAlloc(size);
   memcpy(msg1,msg,size);
+  CmiInterruptsBlock();
   FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg1);
+  CmiInterruptsRelease();
 }
 
 CmiCommHandle CmiAsyncBroadcastAllFn(size, msg)
@@ -1277,7 +1363,9 @@ void CmiFreeBroadcastAllFn(size,msg)
   for (i=0;i<CpvAccess(Cmi_numpes);i++)
     if (i != CpvAccess(Cmi_mype)) 
       CmiSyncSendFn(i,size,msg);
+  CmiInterruptsBlock();
   FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg);
+  CmiInterruptsRelease();
 }
 
 /******************************************************************************
