@@ -9,8 +9,6 @@
 
 #define MAX_MESSAGE_SIZE 32768
 
-
-
 class short_envelope {
  public:
     UShort epIdx;
@@ -40,13 +38,11 @@ inline short_envelope::~short_envelope(){
 }
 
 inline void short_envelope::pup(PUP::er &p){
-    p.pupCmiAllocBuf((void **)&data, size);
+    p | epIdx;
+    p | size;    
     p | idx;
     
-    int *data = (int *)this;
-    //p | epIdx;
-    //p | size;    
-    p(data, 2);
+    p.pupCmiAllocBuf((void **)&data, size);
 }
 
 struct CombinedMessage{
