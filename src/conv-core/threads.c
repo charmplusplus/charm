@@ -13,7 +13,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.11  1995-09-30 15:03:33  jyelon
+ * Revision 1.12  1995-10-10 06:15:23  jyelon
+ * Fixed a bug.
+ *
+ * Revision 1.11  1995/09/30  15:03:33  jyelon
  * Cleared up some confusion about 'private' variables in uniprocessor version.
  *
  * Revision 1.10  1995/09/30  11:48:15  jyelon
@@ -287,8 +290,8 @@ void CthInit()
   thread_current->fn=0;
   thread_current->arg=0;
   thread_current->data_count=0;
-  thread_current->awakenfn = CthSchedEnqueue;
-  thread_current->choosefn = CthSchedThread;
+  thread_current->awakenfn = 0;
+  thread_current->choosefn = 0;
 }
 
 CthThread CthSelf()
@@ -348,8 +351,8 @@ CthVoidFn fn; void *arg; int size;
   result->fn = fn;
   result->arg = arg;
   result->top = newsp;
-  result->awakenfn = CthSchedEnqueue;
-  result->choosefn = CthSchedThread;
+  result->awakenfn = 0;
+  result->choosefn = 0;
   result->data_count = 0;
   erralloc = (char *)alloca(offs) - newsp;
   if (ABS(erralloc) >= SLACK) 
@@ -501,7 +504,7 @@ void *CthGetVar(t, var)
     { CthFail(); }
 
 void CthInit()
-    { CthSchedInit(); }
+    {  }
 
 #endif /* CMK_THREADS_UNAVAILABLE */
 
