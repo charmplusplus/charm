@@ -71,22 +71,28 @@ void bgTimeLog::write(FILE *fp)
 void bgTimeLog::adjustTimeLog(double tAdjust)
 {
 	//arg tAdjust is a relative time
-	if(tAdjust == 0) return;
+	if(tAdjust == .0) return;
 
 	startTime += tAdjust;
 	endTime   += tAdjust;
 
 	for(int i=0; i<msgs.length(); i++) {
-		msgs[i]->sendtime += tAdjust;
-		bgCorrectionMsg *msg = (bgCorrectionMsg *)CmiAlloc(sizeof(bgCorrectionMsg));
-		msg->msgID = msgs[i]->msgID;
-		msg->tID = msgs[i]->tID;
-		//msg->tAdjust is absolute recvTime at destination node
-		msg->tAdjust = msgs[i]->recvTime + tAdjust;
-		msg->destNode = msgs[i]->dstPe;
+          if (msgs[i]->dstPe < 0) {
+            // FIXME broadcast here
+            continue;
+          }
+          else {
+	    msgs[i]->sendtime += tAdjust;
+	    bgCorrectionMsg *msg = (bgCorrectionMsg *)CmiAlloc(sizeof(bgCorrectionMsg));
+	    msg->msgID = msgs[i]->msgID;
+	    msg->tID = msgs[i]->tID;
+	    //msg->tAdjust is absolute recvTime at destination node
+	    msg->tAdjust = msgs[i]->recvTime + tAdjust;
+	    msg->destNode = msgs[i]->dstPe;
 		
-		CmiSetHandler(msg, CpvAccess(bgCorrectionHandler));
-		CmiSyncSendAndFree(BgNodeToPE(msgs[i]->dstPe), sizeof(bgCorrectionMsg), (char*)msg);
+	    CmiSetHandler(msg, CpvAccess(bgCorrectionHandler));
+	    CmiSyncSendAndFree(BgNodeToPE(msgs[i]->dstPe), sizeof(bgCorrectionMsg), (char*)msg);
+          }
 	}
 }
 
@@ -132,8 +138,8 @@ void BgAdjustTimeLineInsert(BgTimeLine &tline)
 	/* ASSUMPTION: no error testing needed */
 
 	/* check is 'bgTimingLog' is for an in-order message */
-	if(tline.length() == 1)
-		return;
+	if(tline.length() == 1) return;
+
 //	CmiPrintf("BgAdjustTimeLineInsert:: last %f secondlast %f\n", tline[tline.length()-1]->recvTime, tline[tline.length()-2]->recvTime); 
 	if(tline[tline.length()-1]->recvTime >= tline[tline.length()-2]->recvTime) {
 		return;
@@ -193,7 +199,7 @@ int BgAdjustTimeLineForward(int msgID, double tAdjustAbs, BgTimeLine &tline)
   tline.insert(idx, tlog);
   double tAdjust = startTime - tlog->startTime;
 
-  if(tAdjust==0) return 1;
+  if(tAdjust==0.) return 1;
 
   tline[idx]->adjustTimeLog(tAdjust);
 
@@ -268,5 +274,12 @@ void BgWriteThreadTimeLine(char **argv, int x, int y, int z, int th, BgTimeLine 
   free(fname);
 }
 
+
+// 
+void BgProjectionEvent(void *data)
+{
+  if (genTimeLog) {
+  }
+}
 
 

@@ -71,8 +71,8 @@ static char **arg_argv;
 int bgSize = 0;
 
 static int printTimeLog = 0;
-static int genTimeLog = 0;
-static int correctTimeLog = 0;
+int genTimeLog = 0;
+int correctTimeLog = 0;
 static int timingMethod = BG_ELAPSE;
 
 #define ASSERT(x)	if (!(x)) { CmiPrintf("Assert failure at %s:%d\n", __FILE__,__LINE__); CmiAbort("Abort!"); }
@@ -1223,15 +1223,16 @@ static inline int handleCorrectionMsg(BgTimeLine *logs, bgCorrectionMsg *m, int 
 	return 1;
 }
 
-// entry function for correction msgs
+// Converse handler for correction msgs
 void bgCorrectionFunc(char *msg)
 {
     int i, j;
+    static double lastCheck = .0;
+
     bgCorrectionMsg* m = (bgCorrectionMsg*)msg;
     int nodeidx = nodeInfo::Global2Local(m->destNode);	
-if (nodeidx < 0)
-CmiPrintf("destNode: %d ignored\n", m->destNode);
     if (nodeidx == BG_BROADCASTALL) {
+CmiPrintf("destNode: %d ignored\n", m->destNode);
       CmiFree(m);
       return;
       for (i=0; i<BgNumNodes(); i++) {
@@ -1262,6 +1263,12 @@ CmiPrintf("destNode: %d ignored\n", m->destNode);
     }
 
     cmsg.enq(m);
+
+    // only correct message every 0.2s
+    if (CmiWallTimer() - lastCheck < 0.2) {
+      return; 
+    }
+    lastCheck = CmiWallTimer();
     int len = cmsg.length();
     for (i=0; i<len; i++) {
       bgCorrectionMsg *cm = cmsg.deq();
@@ -1270,6 +1277,8 @@ CmiPrintf("destNode: %d ignored\n", m->destNode);
 }
 
 // update arrive time from buffer messages
+// before start an entry, check message time against buffered timing
+// correction message to update to the correct time.
 void correctTime(char *msg)
 {
    if (!correctTimeLog) return;

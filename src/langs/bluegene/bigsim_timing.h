@@ -39,6 +39,22 @@ public:
 
 };
 
+typedef void (*bgEventCallBackFn) (void *data, double adjust);
+
+/**
+  event for higher level of tracing like trace projections
+*/
+class bgEvents {
+private:
+  void*   data;         // can be for example trace projection log
+  double  rTime;	// relative time from the start entry
+public:
+  bgEvents(void *d): data(d) {}
+  inline void update(bgEventCallBackFn fn, double startTime) {
+    fn(data, startTime+rTime);
+  }
+};
+
 /**
   one time log for an handler function;
   it record a list of message sent events in an execution of handler
@@ -51,11 +67,13 @@ public:
   int srcpe;        // source bg node 
   int msgID;
   CkVec< bgMsgEntry * > msgs;
+  CkVec< bgEvents * > evts;
 public:
   bgTimeLog(int epc, char *msg);
   ~bgTimeLog();
   inline void closeLog() { endTime = BgGetCurTime(); }
   inline void addMsg(char *msg) { msgs.push_back(new bgMsgEntry(msg)); }
+  inline void addEvent(void *data) { evts.push_back(new bgEvents(data)); }
   void print(int node, int th);
   void write(FILE *fp);
 
@@ -114,5 +132,9 @@ extern int BgAdjustTimeLineForward(int msgID, double tAdjustAbs, BgTimeLine &tli
 #define BG_ENTRYEND()
 #define BG_ADDMSG(m)
 #endif
+
+extern int  genTimeLog;
+extern int  correctTimeLog;
+
 
 #endif
