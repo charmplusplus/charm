@@ -49,6 +49,7 @@ int TCharmGetNumChunks(void);
 /**** Routines you can call from the thread (driver) ****/
 int TCharmElement(void);
 int TCharmNumElements(void);
+void TCharmBarrier(void);
 
 typedef void (*TCharmPupFn)(pup_er p,void *data);
 int TCharmRegister(void *data,TCharmPupFn pfn);

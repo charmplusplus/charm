@@ -126,6 +126,9 @@ class TCharm: public ArrayElement1D
 	//One client is ready to run
 	void ready(void);
 
+	//Sleep till entire array is here
+	void barrier(void);
+
 	//Thread finished running
 	void done(void);
 
@@ -178,6 +181,7 @@ public:
 	~TCharmCoordinator();
 	void addClient(const CkArrayID &client);
 	void clientReady(void);
+	void clientBarrier(void);
 	void clientDone(void);
 	
 	static int getTotal(void) {

@@ -258,7 +258,7 @@ FDECL void FTN_NAME(TCHARM_READONLY_GLOBALS,tcharm_readonly_globals)
 
 /************* Startup/Shutdown Coordination Support ************/
 
-enum {TC_READY=23, TC_DONE=42};
+enum {TC_READY=23, TC_BARRIER=87, TC_DONE=42};
 
 //Called when a client is ready to run
 void TCharm::ready(void) {
@@ -267,6 +267,15 @@ void TCharm::ready(void) {
 	if (thisIndex==0) vals[0]=TC_READY;
 	//Contribute to a synchronizing reduction
 	contribute(sizeof(vals),&vals,CkReduction::sum_int);
+}
+
+//Called when we want to go to a barrier
+void TCharm::barrier(void) {
+	int vals[2]={0,1};
+	if (thisIndex==0) vals[0]=TC_BARRIER;
+	//Contribute to a synchronizing reduction
+	contribute(sizeof(vals),&vals,CkReduction::sum_int);
+	stop();
 }
 
 //Called when the thread is done running
@@ -289,6 +298,7 @@ static void coordinatorReduction(void *coord_,int dataLen,void *reductionData)
 	DBGX("Finished coordinator reduction: "<<vals[0]<<", "<<vals[1]);
 	switch (vals[0]) {
 	case TC_READY: coord->clientReady(); break;
+	case TC_BARRIER: coord->clientBarrier(); break;
 	case TC_DONE: coord->clientDone(); break;
 	default:
 		CkAbort("Unexpected value from TCharm array reduction!\n");
@@ -326,6 +336,11 @@ void TCharmCoordinator::clientReady(void)
 		DBGX("starting threads");
 		threads.run();
 	}
+}
+void TCharmCoordinator::clientBarrier(void)
+{
+	DBGX("clients all at barrier");
+	threads.run();
 }
 void TCharmCoordinator::clientDone(void)
 {
@@ -534,6 +549,15 @@ CDECL void TCharmMigrate(void)
 FDECL void FTN_NAME(TCHARM_MIGRATE,tcharm_migrate)(void)
 {
 	TCharm::get()->migrate();
+}
+
+CDECL void TCharmBarrier(void)
+{
+	TCharm::get()->barrier();
+}
+FDECL void FTN_NAME(TCHARM_BARRIER,tcharm_barrier)(void)
+{
+	TCharmBarrier();
 }
 
 CDECL void TCharmDone(void)

@@ -6,6 +6,8 @@
        integer, external :: tcharm_element
        integer, external :: tcharm_num_elements
        
+       external tcharm_barrier
+
        external tcharm_register
        external tcharm_migrate
        external tcharm_done
