@@ -23,12 +23,12 @@ void CreateHeapCentLB()
 {
   CkPrintf("[%d] creating HeapCentLB %d\n",CkMyPe(),loadbalancer);
   loadbalancer = CProxy_HeapCentLB::ckNew();
-  CkPrintf("[%d] created RandCentLB %d\n",CkMyPe(),loadbalancer);
+  CkPrintf("[%d] created HeapCentLB %d\n",CkMyPe(),loadbalancer);
 }
 
 HeapCentLB::HeapCentLB()
 {
-  CkPrintf("[%d] RandCentLB created\n",CkMyPe());
+  CkPrintf("[%d] HeapCentLB created\n",CkMyPe());
 }
 
 CmiBool HeapCentLB::QueryBalanceNow(int _step)
@@ -37,7 +37,7 @@ CmiBool HeapCentLB::QueryBalanceNow(int _step)
   return CmiTrue;
 }
 
-void Heapify(HeapData *heap, int node, int heapSize)
+void HeapCentLB::Heapify(HeapData *heap, int node, int heapSize)
 {
 	int left = 2*node+1;
 	int right = 2*node+2;

@@ -17,7 +17,7 @@ struct HeapData {
 public:
   HeapCentLB();
 private:
-	void    Heapify(HeapData *, int, int)
+  void    Heapify(HeapData *, int, int);
   CmiBool QueryBalanceNow(int step);
   CLBMigrateMsg* Strategy(CentralLB::LDStats* stats, int count);
 };
