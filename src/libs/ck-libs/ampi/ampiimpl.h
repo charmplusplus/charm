@@ -10,8 +10,9 @@
 
 #include "ampi.h"
 #include "charm++.h"
+#include "StreamingStrategy.h"
 #include "EachToManyMulticastStrategy.h" /* for ComlibManager Strategy*/
-#include "PipeBroadcastStrategy.h"
+#include "BroadcastStrategy.h"
 #include <string.h> /* for strlen */
 
 #if 0
@@ -20,7 +21,12 @@
 #define AMPI_DEBUG /* empty */
 #endif
 
+#ifndef AMPI_COMLIB
+#  define AMPI_COMLIB 0
+#endif
+
 #define AMPI_COUNTER 0
+
 #if AMPI_COUNTER
 class AmpiCounters{
 public:
@@ -29,9 +35,7 @@ public:
 		send=0;recv=0;isend=0;irecv=0;barrier=0;bcast=0;gather=0;scatter=0;allgather=0;alltoall=0;reduce=0;allreduce=0;scan=0;
 	}
 	void output(int idx){
-		FILE* f = fopen("ampi.counters","a+");
-		fprintf(f,"[%d]send=%d;recv=%d;isend=%d;irecv=%d;barrier=%d;bcast=%d;gather=%d;scatter=%d;allgather=%d;alltoall=%d;reduce=%d;allreduce=%d;scan=%d\n",send,recv,isend,irecv,barrier,bcast,gather,scatter,allgather,alltoall,reduce,allreduce,scan,idx);
-		fclose(f);
+		printf("[%d]send=%d;recv=%d;isend=%d;irecv=%d;barrier=%d;bcast=%d;gather=%d;scatter=%d;allgather=%d;alltoall=%d;reduce=%d;allreduce=%d;scan=%d\n",idx,send,recv,isend,irecv,barrier,bcast,gather,scatter,allgather,alltoall,reduce,allreduce,scan);
 	}
 };
 #endif
@@ -953,8 +957,6 @@ for its children, which are bound to it.
 */
 class ampiParent : public CBase_ampiParent {
     CProxy_TCharm threads;
-    ComlibInstanceHandle mcomlib;
-    ComlibInstanceHandle bcomlib;
     TCharm *thread;
     void prepareCtv(void);
 
@@ -1021,7 +1023,7 @@ class ampiParent : public CBase_ampiParent {
     CProxy_ampi tmpRProxy;
 
 public:
-    ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_,ComlibInstanceHandle mcomlib_,ComlibInstanceHandle bcomlib_);
+    ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_);
     ampiParent(CkMigrateMessage *msg);
     void ckJustMigrated(void);
     ~ampiParent();
@@ -1148,12 +1150,7 @@ public:
       groupStruct vec = group2vec(group);
       return getPosOp(thisIndex,vec);
     }
-    inline ComlibInstanceHandle getMcastComlib(void) {
-      return mcomlib;
-    }
-    inline ComlibInstanceHandle getBcastComlib(void) {
-      return bcomlib;
-    }
+    
     inline int getMyPe(void){
       return CkMyPe();
     }
@@ -1231,13 +1228,18 @@ class ampi : public CBase_ampi {
     ampiParent *parent;
     TCharm *thread;
     bool resumeOnRecv;
-    bool comlibEnabled;
 
     ampiCommStruct myComm;
     int myRank;
     groupStruct tmpVec; // stores temp group info
     CProxy_ampi remoteProxy; // valid only for intercommunicator
 
+    CProxy_ampi comlibProxy;
+    ComlibInstanceHandle ciStreaming;
+    ComlibInstanceHandle ciBcast;
+    ComlibInstanceHandle ciAllgather;
+    ComlibInstanceHandle ciAlltoall;
+    
     int seqEntries; //Number of elements in below arrays
     AmpiSeqQ oorder;
     void inorder(AmpiMsg *msg);
@@ -1248,6 +1250,8 @@ class ampi : public CBase_ampi {
 
     ampi();
     ampi(CkArrayID parent_,const ampiCommStruct &s);
+    ampi(CkArrayID parent_,const ampiCommStruct &s,ComlibInstanceHandle ciStreaming_,
+    	ComlibInstanceHandle ciBcast_,ComlibInstanceHandle ciAllgather_,ComlibInstanceHandle ciAlltoall_);
     ampi(CkMigrateMessage *msg);
     void ckJustMigrated(void);
     ~ampi();
@@ -1274,7 +1278,8 @@ class ampi : public CBase_ampi {
     AmpiMsg *makeAmpiMsg(int destIdx,int t,int sRank,const void *buf,int count,
                          int type,MPI_Comm destcomm);
 
-    void send(int t, int s, const void* buf, int count, int type,  int rank, MPI_Comm destcomm);
+    inline void comlibsend(int t, int s, const void* buf, int count, int type, int rank, MPI_Comm destcomm);
+    inline void send(int t, int s, const void* buf, int count, int type, int rank, MPI_Comm destcomm);
     static void sendraw(int t, int s, void* buf, int len, CkArrayID aid,
                         int idx);
     void delesend(int t, int s, const void* buf, int count, int type,  
@@ -1306,31 +1311,16 @@ class ampi : public CBase_ampi {
     inline MPI_Comm getComm(void) const {return myComm.getComm();}
     inline CkVec<int> getIndices(void) const { return myComm.getindices(); }
     inline const CProxy_ampi &getProxy(void) const {return thisProxy;}
+    inline const CProxy_ampi &getComlibProxy(void) const { return comlibProxy; }
     inline const CProxy_ampi &getRemoteProxy(void) const {return remoteProxy;}
     inline void setRemoteProxy(CProxy_ampi rproxy) { remoteProxy = rproxy; thread->resume(); }
     inline const int getIndexForRank(int r) const {return myComm.getIndexForRank(r);}
     inline const int getIndexForRemoteRank(int r) const {return myComm.getIndexForRemoteRank(r);}
+    inline ComlibInstanceHandle getStreaming(void) { return ciStreaming; }
+    inline ComlibInstanceHandle getBcast(void) { return ciBcast; }
+    inline ComlibInstanceHandle getAllgather(void) { return ciAllgather; }
+    inline ComlibInstanceHandle getAlltoall(void) { return ciAlltoall; }
 
-    inline CProxy_ampi mcomlibBegin(void) const {
-      CProxy_ampi p=getProxy();
-      if (comlibEnabled) {
-       	ComlibDelegateProxy(&p);
-	parent->getMcastComlib().beginIteration();
-      }
-      return p;
-    }
-    void mcomlibEnd(void) {
-       if (comlibEnabled) parent->getMcastComlib().endIteration();
-    }
-
-    inline CProxy_ampi bcomlibBegin(CProxy_ampi p) const {
-      if (comlibEnabled) {
-	ComlibDelegateProxy(&p);
-	parent->getBcastComlib().beginIteration();
-      }
-      return p;
-    }
-    
     CkDDT *getDDT(void) {return parent->myDDT;}
     CthThread getThread() { return thread->getThread(); }
 #if CMK_LBDB_ON
