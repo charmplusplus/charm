@@ -1149,8 +1149,7 @@ for trace in $TRACEMODE; do
 done
 if test -n "$BALANCER"
 then
-    echo "extern void LBSetDefaultCreate(void (*fn)(void));" >> $modInitSrc
-    echo "extern void Create$BALANCER();" >> $modInitSrc
+    echo "extern void LBDefaultCreate(const char *);" >> $modInitSrc
 fi
 echo "void _registerExternalModules(char **argv) {" >> $modInitSrc
 for module in $MODULES; do
@@ -1166,7 +1165,7 @@ done
 if test -n "$BALANCER"
 then
     [ -n "$VERBOSE" ] && echo "Adding load balancer for $BALANCER"
-    echo "  LBSetDefaultCreate(Create$BALANCER);" >> $modInitSrc
+    echo "  LBDefaultCreate(\"$BALANCER\");" >> $modInitSrc
 fi
 echo "}" >> $modInitSrc
 
