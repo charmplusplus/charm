@@ -2012,6 +2012,13 @@ int AMPI_Startall(int count, MPI_Request *requests){
  * each time multiple completion call loop over first elem of level 1
  * and move the matched to the NULL request slot.   
  * warning: this does not work with I-Alltoall requests */
+inline int areInactiveReqs(int count, MPI_Request* reqs){ // if count==0 then all inactive
+  for(int i=0;i<count;i++){
+    if(reqs[i]!=MPI_REQUEST_NULL)
+      return 0;
+  }
+  return 1;
+}
 inline int matchReq(MPI_Request ia, MPI_Request ib){
   AmpiRequestList* reqs = getReqs();
   AmpiRequest *a, *b;
@@ -2165,7 +2172,11 @@ CDECL
 int AMPI_Waitany(int count, MPI_Request *request, int *idx, MPI_Status *sts)
 {
   AMPIAPI("AMPI_Waitany");
-  if(count==0) return MPI_SUCCESS;
+  if(areInactiveReqs(count,request)){
+    *idx=MPI_UNDEFINED;
+    stsempty(*sts);
+    return MPI_SUCCESS;
+  }
   int flag=0;
   CkVec<CkVec<int> > reqvec = vecIndex(count,request);
   while(count>0){
@@ -2186,7 +2197,10 @@ int AMPI_Waitsome(int incount, MPI_Request *array_of_requests, int *outcount,
                  int *array_of_indices, MPI_Status *array_of_statuses)
 {
   AMPIAPI("AMPI_Waitsome");
-  if(incount==0) return MPI_SUCCESS;
+  if(areInactiveReqs(incount,array_of_requests)){
+    *outcount=MPI_UNDEFINED;
+    return MPI_SUCCESS;
+  }
   MPI_Status sts;
   int i;
   int flag=0, realflag=0;
@@ -2267,7 +2281,12 @@ int AMPI_Test(MPI_Request *request, int *flag, MPI_Status *sts)
 CDECL
 int AMPI_Testany(int count, MPI_Request *request, int *index, int *flag, MPI_Status *sts){
   AMPIAPI("AMPI_Testany");
-  if(count==0) return MPI_SUCCESS;
+  if(areInactiveReqs(count,request)){
+    *flag=1;
+    *index=MPI_UNDEFINED;
+    stsempty(*sts);
+    return MPI_SUCCESS;
+  }
   CkVec<CkVec<int> > reqvec = vecIndex(count,request);
   *flag=0;
   for(int i=0;i<reqvec.size();i++){
@@ -2309,7 +2328,10 @@ int AMPI_Testsome(int incount, MPI_Request *array_of_requests, int *outcount,
                  int *array_of_indices, MPI_Status *array_of_statuses)
 {
   AMPIAPI("AMPI_Testsome");
-  if(incount==0) return MPI_SUCCESS;
+  if(areInactiveReqs(incount,array_of_requests)){
+    *outcount=MPI_UNDEFINED;
+    return MPI_SUCCESS;
+  }
   MPI_Status sts;
   int flag;
   int i;
