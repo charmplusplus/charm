@@ -1,5 +1,8 @@
 #!/bin/sh
 
+# Silly shorthand, used for source reorganization
+src="src/arch"
+
 syntax() {
   echo ''
   echo 'Usage: build <target> <version> <options> [charmc-options ...]'
@@ -7,7 +10,7 @@ syntax() {
   echo '<targets>: converse, charm++ libs AMPI IDL tsm sm pvm sdag bluegene'
   echo '<targets>: doc ps-doc pdf-doc html-doc'
   echo '<versions>: ' 
-  ( cd src ; ls -1 | egrep -v '(^Common)|(^CVS)|(^QuickThreads)|(^ccs-client)' | pr -3 -t )
+  ( cd $src ; ls -1 | egrep -v '(^CVS)' | pr -3 -t )
   echo ''
   echo '<options>: help cc cc64 cxx kcc pgcc acc icc ecc gcc3 mpcc smp gm tcp vmi scyld bluegene'
   echo ''
@@ -22,12 +25,12 @@ syntax() {
 
 printOption() {
   echo
-  ( cd src/$BASEVERSION; 
+  ( cd $src/$BASEVERSION; 
     str=`ls conv-mach-*.h 2>/dev/null | sed 's/conv-mach-\([^.]*\).h/\1/'`;
     cd ../..
-    if [ -d src/Common.${ARCH} ]
+    if [ -d $src/${ARCH} ]
     then
-      cd src/Common.$ARCH
+      cd $src/$ARCH
       str="$str `ls conv-mach-*.h 2>/dev/null | sed 's/conv-mach-\([^.]*\).h/\1/'`";
     fi
     printf 'supported options: '
@@ -48,7 +51,7 @@ CheckDir() {
 }
 
 TestIfSupported() {
-  if [ ! -f src/$VERSION/conv-mach-$1.h ] && [ ! -f src/Common.$ARCH/conv-mach-$1.h ]
+  if [ ! -f $src/$VERSION/conv-mach-$1.h ] && [ ! -f $src/$ARCH/conv-mach-$1.h ]
   then
     echo; 
     echo "Error> option: $1 is not supported in this version!"; 
@@ -132,8 +135,7 @@ done
 
 [ "x$VERSION" = "x" ] && syntax
 	
-( echo $BASEVERSION | egrep -s '^Common' ) && syntax
-[ -d src/$BASEVERSION ] || syntax
+[ -d $src/$BASEVERSION ] || syntax
 
 #generate VERSION name combining all options.
 if test -n "$MORE"
@@ -156,7 +158,7 @@ fi
 [ -d $VERSION/tmp ] || echo "Creating dir: $VERSION/tmp" 
 [ -d $VERSION/tmp ] || mkdir $VERSION/tmp
 
-echo "Copying src/Common/scripts/Makefile to $VERSION/tmp"
+echo "Copying src/scripts/Makefile to $VERSION/tmp"
 rm -f $VERSION/tmp/Makefile
 
 if [ "x_`echo $VERSION | awk -F- '{print $2}'`" = "x_win32" ]
@@ -164,9 +166,9 @@ then
 #Win32 version needs special compilers and *copied* (not linked)
 # source files.
 	echo "Copying compilers for win32 into cygwin /bin directory"
-	cp src/Common.win32/unix2nt* /bin
-	cp src/Common.win32/system_ln $VERSION/tmp
-	cp src/Common.win32/unistd.h $VERSION/tmp
+	cp $src/win32/unix2nt* /bin
+	cp $src/win32/system_ln $VERSION/tmp
+	cp $src/win32/unistd.h $VERSION/tmp
 else
 	cat > $VERSION/tmp/system_ln <<EOF
 #!/bin/sh
@@ -184,7 +186,7 @@ EOF
 fi
 
 chmod +x $VERSION/tmp/system_ln
-ln -s "../../src/Common/scripts/Makefile" $VERSION/tmp/Makefile
+ln -s "../../src/scripts/Makefile" $VERSION/tmp/Makefile
 
 ConvUsr="$VERSION/tmp/conv-mach-pre.sh"
 echo "Generating $ConvUsr"
@@ -206,11 +208,11 @@ then
     for i in $MORE
     do
 #      touch $VERSION/tmp/$i
-      if [ -f src/$BASEVERSION/conv-mach-$i.h ]
+      if [ -f $src/$BASEVERSION/conv-mach-$i.h ]
       then
-        CONVFILEDIR="src/$BASEVERSION/"
+        CONVFILEDIR="$src/$BASEVERSION/"
       else
-        CONVFILEDIR="src/Common.$ARCH"
+        CONVFILEDIR="$src/$ARCH"
       fi
       echo '/* '"$CONVFILEDIR/conv-mach-$i.h"' */' >> $ConvHeader
       cat $CONVFILEDIR/conv-mach-$i.h >> $ConvHeader

@@ -168,26 +168,26 @@ dirs+sources:
 	rm -rf ../lib ; mkdir ../lib
 	rm -rf ../pgms
 	rm -rf ../doc ; ln -s ../doc ../doc
-	../../src/Common/scripts/gatherflat ../../src/Common/scripts .
-	./gatherflat ../../src/Common/conv-core        .
-	./gatherflat ../../src/Common/conv-ldb         .
-	./gatherflat ../../src/Common/conv-ccs         .
-	./gatherflat ../../src/Common/ck-core          .
-	./gatherflat ../../src/Common/util             .
-	./gatherflat ../../src/Common/ck-perf          .
-	./gatherflat ../../src/Common/ck-ldb           .
-	./gatherflat ../../src/Common/langs/simplemsg  .
-	./gatherflat ../../src/Common/langs/pvmc       .
-	./gatherflat ../../src/Common/langs/bluegene   .
-	./gatherflat ../../src/Common/langs/f90charm   .
-	./gatherflat ../../src/Common/xlat-i           .
-	./gatherflat ../../src/Common/xlatcpm          .
+	../../src/scripts/gatherflat ../../src/scripts .
+	./gatherflat ../../src/conv-core        .
+	./gatherflat ../../src/conv-ldb         .
+	./gatherflat ../../src/conv-ccs         .
+	./gatherflat ../../src/ck-core          .
+	./gatherflat ../../src/util             .
+	./gatherflat ../../src/ck-perf          .
+	./gatherflat ../../src/ck-ldb           .
+	./gatherflat ../../src/langs/simplemsg  .
+	./gatherflat ../../src/langs/pvmc       .
+	./gatherflat ../../src/langs/bluegene   .
+	./gatherflat ../../src/langs/f90charm   .
+	./gatherflat ../../src/xlat-i           .
+	./gatherflat ../../src/xlatcpm          .
 	./gathertree ../../src/QuickThreads QuickThreads
-	./gathertree ../../src/Common/libs libs
-	./gathertree ../../src/Common.util      .
-	./gathertree ../../src/Common/langs langs
-	./gathertree ../../src/Common.`cat .gdir`      .
-	./gatherflat ../../src/`cat .vdir`             .
+	./gathertree ../../src/libs libs
+	./gathertree ../../src/arch/util      .
+	./gathertree ../../src/langs langs
+	./gathertree ../../src/arch/`cat .gdir`      .
+	./gatherflat ../../src/arch/`cat .vdir`      .
 	./gathertree ../../pgms ../pgms
 	rm -f ../bin/charmc ; cp charmc ../bin/
 	chmod +x ../bin/charmc
@@ -317,14 +317,14 @@ cpthreads.o: cpthreads.c $(CVHEADERS)
 debug-conv.o: debug-conv.c $(CVHEADERS)
 	$(CHARMC) debug-conv.c
 
-edgelist.o : edgelist.c ../../src/Common/conv-ldb/typedefs.h $(CVHEADERS)
-	$(CHARMC) -I../../src/Common/conv-ldb/ edgelist.c
+edgelist.o : edgelist.c typedefs.h $(CVHEADERS)
+	$(CHARMC) edgelist.c
 
-generate.o : generate.c ../../src/Common/conv-ldb/typedefs.h $(CVHEADERS)
-	$(CHARMC) -I../../src/Common/conv-ldb/ generate.c
+generate.o : generate.c typedefs.h $(CVHEADERS)
+	$(CHARMC) generate.c
 
-cldb.o: cldb.c ../../src/Common/conv-ldb/cldb.h $(CVHEADERS)
-	$(CHARMC) -I../../src/Common/conv-ldb/ cldb.c
+cldb.o: cldb.c cldb.h $(CVHEADERS)
+	$(CHARMC) cldb.c
 
 quiescence.o: quiescence.c $(CVHEADERS)
 	$(CHARMC) quiescence.c
@@ -349,11 +349,11 @@ conv-lists.o: conv-lists.C $(UTILHEADERS)
 	$(CHARMC) -o conv-lists.o conv-lists.C
 
 ## Converse load balancers (seed balancers, -balance)
-$(L)/libldb-rand.o: cldb.rand.c ../../src/Common/conv-ldb/cldb.h $(CVHEADERS)
-	$(CHARMC) -I../../src/Common/conv-ldb/ -o $@ cldb.rand.c
+$(L)/libldb-rand.o: cldb.rand.c cldb.h $(CVHEADERS)
+	$(CHARMC) -o $@ cldb.rand.c
 
-$(L)/libldb-graph.o: cldb.graph.c ../../src/Common/conv-ldb/cldb.graph.h $(CVHEADERS)
-	$(CHARMC) -I../../src/Common/conv-ldb/ -o $@ cldb.graph.c 
+$(L)/libldb-graph.o: cldb.graph.c graph.h $(CVHEADERS)
+	$(CHARMC) -o $@ cldb.graph.c 
 
 $(L)/libldb-spray.o: cldb.spray.c $(CVHEADERS)
 	$(CHARMC) -o $@ cldb.spray.c
