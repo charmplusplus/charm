@@ -17,7 +17,7 @@
 set CMK_CPP='/usr/ccs/lib/cpp'
 set CMK_LDRO='ld -r -o'
 set CMK_CC='gcc'
-set CMK_CXX='g++'
+set CMK_CXX='g++ -x c++'
 set CMK_CF77=''
 set CMK_LD='gcc -s'
 set CMK_LDXX='g++'
