@@ -179,6 +179,10 @@ EOF
 	for newdir in `echo bin lib include tmp`
 	do
 		echo "Soft-linking over $newdir"
+    if [ -e $newdir ]
+    then
+      rm -f $newdir
+    fi
 		$VERSION/tmp/system_ln $VERSION/$newdir $newdir
 	done
 fi
