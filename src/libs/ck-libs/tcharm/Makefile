@@ -11,11 +11,19 @@ LIB=libmoduletcharm
 DEST=$(LIBDIR)/$(LIB).a
 COMPATLIB=$(LIBDIR)/libtcharm-compat.a
 
-all: $(DEST) $(COMPATLIB)
+OBJS2=tcharmmain.o
+LIB2=libmoduletcharmmain
+DEST2=$(LIBDIR)/$(LIB2).a
+
+all: $(DEST) $(COMPATLIB) $(DEST2)
 
 $(DEST): $(OBJS) headers
 	$(CHARMC) $(OBJS) -o $@
 	cp $(LIB).dep $(LIBDIR)/$(LIB).dep
+
+$(DEST2): $(OBJS2) headers
+	$(CHARMC) $(OBJS2) -o $@
+	cp $(LIB2).dep $(LIBDIR)/$(LIB2).dep
 
 $(COMPATLIB): $(COMPAT) 
 	$(CHARMC) $(COMPAT) -o $@
@@ -37,6 +45,12 @@ tcharm.o: tcharm.C $(HEADERS)
 
 tcharm.decl.h: tcharm.ci
 	$(CHARMC) tcharm.ci
+
+tcharmmain.o: tcharmmain.C tcharmmain.decl.h $(HEADERS)
+	$(CHARMC) -c tcharmmain.C
+
+tcharmmain.decl.h: tcharmmain.ci
+	$(CHARMC) tcharmmain.ci
 
 clean: 
 	-rm -fr *.o *~ *.decl.h *.def.h gmon.out headers $(DEST) $(COMPATLIB) conv-host charmrun

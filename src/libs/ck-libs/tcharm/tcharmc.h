@@ -16,6 +16,7 @@ extern "C" {
 void TCHARM_User_node_setup(void);
 void TCHARM_User_setup(void);
 
+void TCHARM_Call_fallback_setup(void);
 
 /**** Routines you can call from UserNodeSetup: ****/
 
@@ -28,6 +29,9 @@ void TCHARM_Readonly_globals(TCpupReadonlyGlobal fn);
 
 /*Set the size of the thread stack*/
 void TCHARM_Set_stack_size(int newStackSize);
+
+/*Exit the program when these threads are finished. */
+void TCHARM_Set_exit(void);
 
 /*Create a new array of threads, which will be bound to by subsequent libraries*/
 typedef void (*TCHARM_Thread_start_fn)(void);

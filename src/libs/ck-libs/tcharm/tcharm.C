@@ -55,22 +55,21 @@ public:
 static TCharmTraceLibList tcharm_tracelibs;
 static int tcharm_nomig=0, tcharm_nothreads=0;
 static int tcharm_stacksize=1*1024*1024; /*Default stack size is 1MB*/
+static int tcharm_initted=0;
 
 void TCharm::nodeInit(void)
 {
   CtvInitialize(TCharm *,_curTCharm);
   CtvAccess(_curTCharm)=NULL;
   CkpvInitialize(inState,_stateTCharm);
-
-  TCharm::setState(inNodeSetup);
-  TCHARM_User_node_setup();
-  FTN_NAME(TCHARM_USER_NODE_SETUP,tcharm_user_node_setup)();
   TCharm::setState(inInit);
+
+  tcharm_initted=1;
 }
 
 void TCharm::procInit(void)
 {
-  // called on every pe to east these arguments
+  // called on every pe to eat these arguments
   char **argv=CkGetArgv();
   tcharm_nomig=CmiGetArgFlagDesc(argv,"+tcharm_nomig","Disable migration support (debugging)");
   tcharm_nothreads=CmiGetArgFlagDesc(argv,"+tcharm_nothread","Disable thread support (debugging)");
@@ -83,6 +82,10 @@ void TCharm::procInit(void)
   	int ignored;
   	while (CmiGetArgIntDesc(argv,"-vp",&ignored,NULL)) {}
   	while (CmiGetArgIntDesc(argv,"+vp",&ignored,NULL)) {}
+  }
+  if (CkMyPe()==0) { // Echo various debugging options:
+    if (tcharm_nomig) CmiPrintf("TCHARM> Disabling migration support, for debugging\n");
+    if (tcharm_nothreads) CmiPrintf("TCHARM> Disabling thread support, for debugging\n");
   }
 }
 
@@ -119,9 +122,9 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
   else /*Create a thread normally*/
   {
     if (tcharm_nomig) { /*Nonmigratable version, for debugging*/
-      tid=CthCreate((CthVoidFn)startTCharmThread,initMsg,initMsg->stackSize);
+      tid=CthCreate((CthVoidFn)startTCharmThread,initMsg,initMsg->opts.stackSize);
     } else {
-      tid=CthCreateMigratable((CthVoidFn)startTCharmThread,initMsg,initMsg->stackSize);
+      tid=CthCreateMigratable((CthVoidFn)startTCharmThread,initMsg,initMsg->opts.stackSize);
     }
 #if CMK_BLUEGENE_CHARM
     BgAttach(tid);
@@ -131,13 +134,14 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
   TCharm::setState(inInit);
   isStopped=true;
   resumeAfterMigration=false;
+  exitWhenDone=initMsg->opts.exitWhenDone;
   threadInfo.tProxy=CProxy_TCharm(thisArrayID);
   threadInfo.thisElement=thisIndex;
   threadInfo.numElements=initMsg->numElements;
   heapBlocks=CmiIsomallocBlockListNew();
   nUd=0;
   usesAtSync=CmiTrue;
-  ready();
+  run();
 }
 
 TCharm::TCharm(CkMigrateMessage *msg)
@@ -145,7 +149,6 @@ TCharm::TCharm(CkMigrateMessage *msg)
 {
   initMsg=NULL;
   tid=NULL;
-  resumeAfterMigration=false;
   threadInfo.tProxy=CProxy_TCharm(thisArrayID);
 }
 
@@ -153,7 +156,7 @@ void TCharm::pup(PUP::er &p) {
 //Pup superclass
   ArrayElement1D::pup(p);
 
-  p(isStopped); p(resumeAfterMigration);
+  p(isStopped); p(resumeAfterMigration); p(exitWhenDone);
   p(threadInfo.thisElement);
   p(threadInfo.numElements);
   
@@ -340,22 +343,6 @@ void TCharm::check(void)
 }
 #endif
 
-static int propMapCreated=0;
-static CkGroupID propMapID;
-CkGroupID CkCreatePropMap(void);
-
-static void TCHARM_Build_threads(TCharmInitMsg *msg,TCharmSetupCookie &cook)
-{
-	CkArrayOptions opts(msg->numElements);
-	if (!propMapCreated) {
-		propMapCreated=1;
-		propMapID=CkCreatePropMap();
-	}
-	opts.setMap(propMapID);
-	int nElem=msg->numElements; //<- save it because msg will be deleted.
-	CkArrayID id=CProxy_TCharm::ckNew(msg,opts);
-	cook.setThreads(id,nElem);
-}
 
 /****** TcharmClient ******/
 void TCharmClient1D::ckJustMigrated(void) {
@@ -377,40 +364,99 @@ CkArrayID TCHARM_Get_threads(void) {
 }
 
 /****** Readonlys *****/
-CkVec<TCpupReadonlyGlobal> TCharmReadonlys::entries;
+static int tcharm_readonlygroup_created=0;
+static TCharmReadonlys initial_readonlies;
+CProxy_TCharmReadonlyGroup tcharm_readonlygroup;
+
+class TCharmReadonlyGroup : public CBase_TCharmReadonlyGroup {
+public:
+	TCharmReadonlys all;
+	
+	TCharmReadonlyGroup(TCharmReadonlys &r,int len,const char *data)
+	{
+		add(r,len,data);
+	}
+	
+	void add(TCharmReadonlys &r,int len,const char *data) {
+		// Unpack these readonlies:
+		PUP::fromMem p(data);
+		r.pupData(p);
+		// Add to our list:
+		all.add(r);
+	}
+	
+	void pup(PUP::er &p) {
+		all.pup(p);
+		all.pupData(p);
+	}
+};
+
+// Send out this set of readonlies to the readonly group:
+static void send_readonlies(TCharmReadonlys &r) {
+	int len; {PUP::sizer p; r.pupData(p); len=p.size();}
+	char *data=new char[len];
+	{PUP::toMem p(data); r.pupData(p);}
+	tcharm_readonlygroup.add(r,len,data);
+	delete[] data;
+}
+
+class TCharmReadonlyMain : public CBase_TCharmReadonlyMain {
+public:
+    TCharmReadonlyMain(void) {
+    	TCharmReadonlys &r=initial_readonlies;
+	int len; {PUP::sizer p; r.pupData(p); len=p.size();}
+	char *data=new char[len];
+	{PUP::toMem p(data); r.pupData(p);}
+        tcharm_readonlygroup=CProxy_TCharmReadonlyGroup::ckNew(r,len,data);
+	delete[] data;
+	tcharm_readonlygroup_created=1;
+    }
+};
+
 void TCharmReadonlys::add(TCpupReadonlyGlobal fn)
 {
 	entries.push_back(fn);
 }
+void TCharmReadonlys::add(const TCharmReadonlys &r) {
+	for (unsigned int i=0;i<r.entries.size();i++)
+		entries.push_back(r.entries[i]);
+}
 
-//Pups all registered readonlys
-void TCharmReadonlys::pupAllReadonlys(PUP::er &p) {
-	//Pup the globals for this node:
-	int i,n=entries.length();
-	p.comment("TCharm Readonly global variables:");
-	p(n);
-	if (n!=entries.length())
-		CkAbort("TCharmReadonly list length mismatch!\n");
-	for (i=0;i<n;i++)
+//Pup the readonly *functions* (for shipping)
+void TCharmReadonlys::pup(PUP::er &p) {
+	p|entries;
+}
+
+//Pups the readonly *data*
+void TCharmReadonlys::pupData(PUP::er &p) {
+	for (unsigned int i=0;i<entries.size();i++)
 		(entries[i])((pup_er)&p);
 }
 
-void TCharmReadonlys::pup(PUP::er &p) {
-	if (p.isUnpacking()) {
-		//HACK: Rather than sending this message only where its needed,
-		// we send it everywhere and just ignore it if it's not needed.
-		if (CkMyPe()==0) return; //Processor 0 is the source-- no unpacking needed
-		if (CkMyRank()!=0) return; //Some other processor will do the unpacking
-	}
-	pupAllReadonlys(p);
+//Pups all readonly data registered so far.
+void TCharmReadonlys::pupAll(PUP::er &p) {
+	if (!tcharm_readonlygroup_created)
+		CkAbort("TCharmReadonlys::pupAll can only be called after the TCHARM main");
+	TCharmReadonlys &all=tcharm_readonlygroup.ckLocalBranch()->all;
+	int n=all.size();
+	p|n;
+	if (n!=all.size())
+		CkAbort("TCharmReadonly list length mismatch!\n");
+	all.pupData(p);
 }
 
 CDECL void TCHARM_Readonly_globals(TCpupReadonlyGlobal fn)
 {
 	TCHARMAPI("TCHARM_Readonly_globals");
-	if (TCharm::getState()!=inNodeSetup)
-		CkAbort("Can only call TCHARM_ReadonlyGlobals from in TCHARM_UserNodeSetup!\n");
-	TCharmReadonlys::add(fn);
+	if (!tcharm_readonlygroup_created) 
+	{ // Readonly message hasn't gone out yet: just add to list
+		initial_readonlies.add(fn);
+	} 
+	else /* tcharm_readonlygroup_created */
+	{ // Late addition: Broadcast our copy of the readonly data:
+		TCharmReadonlys r; r.add(fn);
+		send_readonlies(r);
+	}
 }
 FDECL void FTN_NAME(TCHARM_READONLY_GLOBALS,tcharm_readonly_globals)
 	(TCpupReadonlyGlobal fn)
@@ -418,255 +464,66 @@ FDECL void FTN_NAME(TCHARM_READONLY_GLOBALS,tcharm_readonly_globals)
 	TCHARM_Readonly_globals(fn);
 }
 
+
 /************* Startup/Shutdown Coordination Support ************/
 
-enum {TC_READY=23, TC_BARRIER=87, TC_DONE=42};
-
-//Called when a client is ready to run
-void TCharm::ready(void) {
-	DBG("TCharm thread "<<thisIndex<<" ready")
-	int vals[2]={0,1};
-	if (thisIndex==0) vals[0]=TC_READY;
-	//Contribute to a synchronizing reduction
-	contribute(sizeof(vals),&vals,CkReduction::sum_int);
-}
+// Useless values to reduce over:
+int vals[2]={0,1};
 
 //Called when we want to go to a barrier
 void TCharm::barrier(void) {
-	int vals[2]={0,1};
-	if (thisIndex==0) vals[0]=TC_BARRIER;
 	//Contribute to a synchronizing reduction
-	contribute(sizeof(vals),&vals,CkReduction::sum_int);
+	CkCallback cb(index_t::atBarrier(0), thisProxy[0]);
+	contribute(sizeof(vals),&vals,CkReduction::sum_int,cb);
 	stop();
+}
+
+//Called when we've reached the barrier
+void TCharm::atBarrier(CkReductionMsg *m) {
+	DBGX("clients all at barrier");
+	delete m;
+	thisProxy.run(); //Just restart everybody
 }
 
 //Called when the thread is done running
 void TCharm::done(void) {
 	DBG("TCharm thread "<<thisIndex<<" done")
-	int vals[2]={0,1};
-	if (thisIndex==0) vals[0]=TC_DONE;
-	//Contribute to a synchronizing reduction
-	contribute(sizeof(vals),&vals,CkReduction::sum_int);
+	if (exitWhenDone) {
+		//Contribute to a synchronizing reduction
+		CkCallback cb(index_t::atExit(0), thisProxy[0]);
+		contribute(sizeof(vals),&vals,CkReduction::sum_int,cb);
+	}
 	stop();
 }
-
-//Called when an array reduction is complete
-static void coordinatorReduction(void *coord_,int dataLen,void *reductionData)
-{
-	TCharmCoordinator *coord=(TCharmCoordinator *)coord_;
-	int *vals=(int *)reductionData;
-	if (dataLen!=2*sizeof(int))
-		CkAbort("Unexpected length in TCharm array reduction!\n");
-	DBGX("Finished coordinator reduction: "<<vals[0]<<", "<<vals[1]);
-	switch (vals[0]) {
-	case TC_READY: coord->clientReady(); break;
-	case TC_BARRIER: coord->clientBarrier(); break;
-	case TC_DONE: coord->clientDone(); break;
-	default:
-		CkAbort("Unexpected value from TCharm array reduction!\n");
-	};
+//Called when all threads are done running
+void TCharm::atExit(CkReductionMsg *m) {
+	DBGX("TCharm::atExit> exiting");
+	delete m;
+	CkExit();
 }
 
-int TCharmCoordinator::nArrays=0; //Total number of running thread arrays
-TCharmCoordinator *TCharmCoordinator::head=NULL; //List of coordinators
-
-
-TCharmCoordinator::TCharmCoordinator(CkArrayID threads_,int nThreads_)
-	:threads(threads_), nThreads(nThreads_), nClients(0), nReady(0)
-{
-	nArrays++;
-	//Link into the coordinator list
-	next=head;
-	head=this;
-
-	threads.setReductionClient(coordinatorReduction,this);
-	nClients=1; //Thread array itself is a client
-}
-TCharmCoordinator::~TCharmCoordinator()
-{
-	//Coordinators never get deleted
-}
-void TCharmCoordinator::addClient(const CkArrayID &client)
-{
-	nClients++;
-}
-void TCharmCoordinator::clientReady(void)
-{
-	DBGX("client "<<nReady+1<<" of "<<nClients<<" ready");
-	nReady++;
-	if (nReady>=nClients) { //All client arrays are ready-- start threads
-		DBGX("starting threads");
-		threads.run();
-	}
-}
-void TCharmCoordinator::clientBarrier(void)
-{
-	DBGX("clients all at barrier");
-	threads.run();
-}
-void TCharmCoordinator::clientDone(void)
-{
-	DBGX("clientDone");	
-	nArrays--;
-	if (nArrays<=0) { //All arrays have exited
-		DBGX("done with computation");
-		CkExit();
-	}
-}
 
 /************* Setup **************/
 
-//Cookie used during setup
-TCharmSetupCookie *TCharmSetupCookie::theCookie;
-
 //Globals used to control setup process
-static int g_numDefaultSetups=0;
 static TCHARM_Fallback_setup_fn g_fallbackSetup=NULL;
 void TCHARM_Set_fallback_setup(TCHARM_Fallback_setup_fn f)
 {
 	g_fallbackSetup=f;
 }
-CDECL void TCharmInDefaultSetup(void) {
-	g_numDefaultSetups++;
+void TCHARM_Call_fallback_setup(void) {
+	if (g_fallbackSetup) 
+		(g_fallbackSetup)();
+	else
+		CkAbort("TCHARM: Unexpected fallback setup--missing TCHARM_User_setup routine?");
 }
-
-//Tiny simple main chare
-class TCharmMain : public Chare {
-public:
-  TCharmMain(CkArgMsg *msg) {
-    if (0!=tcharm_nomig)
-        CmiPrintf("TCHARM> Disabling migration support, for debugging\n");
-    if (0!=tcharm_nothreads)
-       CmiPrintf("TCHARM> Disabling thread support, for debugging\n");
-
-    TCharmSetupCookie cookie(msg->argv);
-    TCharmSetupCookie::theCookie=&cookie;
-    g_numDefaultSetups=0;
-    
-    /*Call user-overridable C setup*/
-    TCHARM_User_setup();
-    /*Call user-overridable Fortran setup*/
-    FTN_NAME(TCHARM_USER_SETUP,tcharm_user_setup)();
-    
-    if (g_numDefaultSetups==2) 
-    { //User didn't override either setup routine
-	    if (g_fallbackSetup)
-		    (g_fallbackSetup)();
-	    else
-		    CmiAbort("You need to override TCharmUserSetup to start your computation, or else link in a framework module\n");
-    }	    
-    
-    delete msg;
-    
-    if (0==TCharmCoordinator::getTotal())
-	    CkAbort("You didn't create any TCharm arrays in TCharmUserSetup!\n");
-
-    //Send out the readonly globals:
-    TCharmReadonlys r;
-    CProxy_TCharmReadonlyGroup::ckNew(r);
-  }
-};
-
-#ifndef CMK_OPTIMIZE
-/*The setup cookie, used to store global initialization state*/
-TCharmSetupCookie &TCharmSetupCookie::check(void)
-{
-	if (magic!=correctMagic)
-		CkAbort("TCharm setup cookie is damaged!\n");
-	return *this;
-}
-#endif
-
-void TCharmSetupCookie::setThreads(const CkArrayID &aid,int nel)
-{
-	coord=new TCharmCoordinator(aid,nel);
-	tc=aid; numElements=nel;
-}
-
-TCharmSetupCookie::TCharmSetupCookie(char **argv_)
-{
-	magic=correctMagic;
-	argv=argv_;
-	coord=NULL;
-	stackSize=tcharm_stacksize;
-}
-
-CkArrayOptions TCHARM_Attach_start(CkArrayID *retTCharmArray,int *retNumElts)
-{
-	TCharmSetupCookie *tc=TCharmSetupCookie::get();
-	if (!tc->hasThreads())
-		CkAbort("You must create a thread array with TCharmCreate before calling Attach!\n");
-	int nElts=tc->getNumElements();
-	if (retNumElts!=NULL) *retNumElts=nElts;
-	*retTCharmArray=tc->getThreads();
-	CkArrayOptions opts(nElts);
-	opts.bindTo(tc->getThreads());
-	return opts;
-}
-void TCHARM_Attach_finish(const CkArrayID &libraryArray)
-{
-	TCharmSetupCookie *tc=TCharmSetupCookie::get();
-	tc->addClient(libraryArray);
-}
-
 
 /************** User API ***************/
-
-#define cookie (*TCharmSetupCookie::get())
-
 /**********************************
 Callable from UserSetup:
 */
 
-/*Set the size of the thread stack*/
-CDECL void TCHARM_Set_stack_size(int newStackSize)
-{
-	TCHARMAPI("TCHARM_Set_stack_size");
-	if (TCharm::getState()!=inInit)
-		CkAbort("TCharm> Can only set stack size from in init!\n");
-	cookie.setStackSize(newStackSize);
-}
-FDECL void FTN_NAME(TCHARM_SET_STACK_SIZE,tcharm_set_stack_size)
-	(int *newSize)
-{ TCHARM_Set_stack_size(*newSize); }
-
-
-/*Create a new array of threads, which will be bound to by subsequent libraries*/
-CDECL void TCHARM_Create(int nThreads,
-			TCHARM_Thread_start_fn threadFn)
-{
-	TCHARMAPI("TCHARM_Create");
-	TCHARM_Create_data(nThreads,
-			 (TCHARM_Thread_data_start_fn)threadFn,NULL,0);
-}
-FDECL void FTN_NAME(TCHARM_CREATE,tcharm_create)
-	(int *nThreads,TCHARM_Thread_start_fn threadFn)
-{ TCHARM_Create(*nThreads,threadFn); }
-
-
-/*As above, but pass along (arbitrary) data to threads*/
-CDECL void TCHARM_Create_data(int nThreads,
-		  TCHARM_Thread_data_start_fn threadFn,
-		  void *threadData,int threadDataLen)
-{
-	TCHARMAPI("TCHARM_Create_data");
-	if (TCharm::getState()!=inInit)
-		CkAbort("TCharm> Can only create threads from in init!\n");
-	TCharmSetupCookie &cook=cookie;
-	TCharmInitMsg *msg=new (threadDataLen,0) TCharmInitMsg(
-		(CthVoidFn)threadFn,cook.getStackSize());
-	msg->numElements=nThreads;
-	memcpy(msg->data,threadData,threadDataLen);
-	TCHARM_Build_threads(msg,cook);
-}
-
-FDECL void FTN_NAME(TCHARM_CREATE_DATA,tcharm_create_data)
-	(int *nThreads,
-		  TCHARM_Thread_data_start_fn threadFn,
-		  void *threadData,int *threadDataLen)
-{ TCHARM_Create_data(*nThreads,threadFn,threadData,*threadDataLen); }
-
-
+// Read the command line to figure out how many threads to create:
 CDECL int TCHARM_Get_num_chunks(void)
 {
 	TCHARMAPI("TCHARM_Get_num_chunks");
@@ -683,6 +540,99 @@ FDECL int FTN_NAME(TCHARM_GET_NUM_CHUNKS,tcharm_get_num_chunks)(void)
 	return TCHARM_Get_num_chunks();
 }
 
+// Fill out the default thread options:
+TCHARM_Thread_options::TCHARM_Thread_options(int doDefault)
+{
+	stackSize=tcharm_stacksize; /* default stacksize */
+	exitWhenDone=0; /* don't exit when done by default. */
+}
+
+TCHARM_Thread_options g_tcharmOptions(1);
+
+/*Set the size of the thread stack*/
+CDECL void TCHARM_Set_stack_size(int newStackSize)
+{
+	TCHARMAPI("TCHARM_Set_stack_size");
+	g_tcharmOptions.stackSize=newStackSize;
+}
+FDECL void FTN_NAME(TCHARM_SET_STACK_SIZE,tcharm_set_stack_size)
+	(int *newSize)
+{ TCHARM_Set_stack_size(*newSize); }
+
+CDECL void TCHARM_Set_exit(void) { g_tcharmOptions.exitWhenDone=1; }
+
+/*Create a new array of threads, which will be bound to by subsequent libraries*/
+CDECL void TCHARM_Create(int nThreads,
+			TCHARM_Thread_start_fn threadFn)
+{
+	TCHARMAPI("TCHARM_Create");
+	TCHARM_Create_data(nThreads,
+			 (TCHARM_Thread_data_start_fn)threadFn,NULL,0);
+}
+FDECL void FTN_NAME(TCHARM_CREATE,tcharm_create)
+	(int *nThreads,TCHARM_Thread_start_fn threadFn)
+{ TCHARM_Create(*nThreads,threadFn); }
+
+static CProxy_TCharm TCHARM_Build_threads(TCharmInitMsg *msg);
+
+/*As above, but pass along (arbitrary) data to threads*/
+CDECL void TCHARM_Create_data(int nThreads,
+		  TCHARM_Thread_data_start_fn threadFn,
+		  void *threadData,int threadDataLen)
+{
+	TCHARMAPI("TCHARM_Create_data");
+	if (TCharm::getState()!=inInit)
+		CkAbort("TCharm> Can only create threads from in init!\n");
+	TCharmInitMsg *msg=new (threadDataLen,0) TCharmInitMsg(
+		(CthVoidFn)threadFn,g_tcharmOptions);
+	msg->numElements=nThreads;
+	memcpy(msg->data,threadData,threadDataLen);
+	TCHARM_Build_threads(msg);
+	
+	// Reset the thread options:
+	g_tcharmOptions=TCHARM_Thread_options(1);
+}
+
+FDECL void FTN_NAME(TCHARM_CREATE_DATA,tcharm_create_data)
+	(int *nThreads,
+		  TCHARM_Thread_data_start_fn threadFn,
+		  void *threadData,int *threadDataLen)
+{ TCHARM_Create_data(*nThreads,threadFn,threadData,*threadDataLen); }
+
+static int propMapCreated=0;
+static CkGroupID propMapID;
+CkGroupID CkCreatePropMap(void);
+
+static CProxy_TCharm TCHARM_Build_threads(TCharmInitMsg *msg)
+{
+	CkArrayOptions opts(msg->numElements);
+	if (!propMapCreated) {
+		propMapCreated=1;
+		propMapID=CkCreatePropMap();
+	}
+	opts.setMap(propMapID);
+	int nElem=msg->numElements; //<- save it because msg will be deleted.
+	return CProxy_TCharm::ckNew(msg,opts);
+}
+
+// Helper used when creating a new array bound to the TCHARM threads:
+CkArrayOptions TCHARM_Attach_start(CkArrayID *retTCharmArray,int *retNumElts)
+{
+	TCharm *tc=TCharm::get();
+	if (!tc)
+		CkAbort("You must call TCHARM initialization routines from a TCHARM thread!");
+	int nElts=tc->getNumElements();
+	if (retNumElts!=NULL) *retNumElts=nElts;
+	*retTCharmArray=tc->getProxy();
+	CkArrayOptions opts(nElts);
+	opts.bindTo(tc->getProxy());
+	return opts;
+}
+
+void TCHARM_Suspend(void) {
+	TCharm *tc=TCharm::get();
+	tc->suspend();
+}
 
 /***********************************
 Callable from worker thread
@@ -833,19 +783,28 @@ FDECL void FTN_NAME(TCHARM_GETARG,tcharm_getarg)
 //These silly routines are used for serial startup:
 extern void _initCharm(int argc, char **argv);
 CDECL void TCHARM_Init(int *argc,char ***argv) {
-	ConverseInit(*argc, *argv, (CmiStartFn) _initCharm,1,1);
-	_initCharm(*argc,*argv);
+	if (!tcharm_initted) {
+	  ConverseInit(*argc, *argv, (CmiStartFn) _initCharm,1,1);
+	  _initCharm(*argc,*argv);
+	}
 }
 
 FDECL void FTN_NAME(TCHARM_INIT,tcharm_init)(void)
 {
 	int argc=1;
-	char *argv[2]={"foo",NULL};
-	ConverseInit(argc,argv, (CmiStartFn) _initCharm,1,1);
-	_initCharm(argc,argv);
+	char *argv_sto[2]={"foo",NULL};
+	char **argv=argv_sto;
+	TCHARM_Init(&argc,&argv);
 }
 
-// TCHARM Semaphores
+/***********************************
+* TCHARM Semaphores:
+* The idea is one side "puts", the other side "gets"; 
+* but the calls can come in any order--
+* if the "get" comes first, it blocks until the put.
+* This makes a convenient, race-condition-free way to do
+* onetime initializations.  
+*/
 /// Find this semaphore, or insert if there isn't one:
 TCharm::TCharmSemaphore *TCharm::findSema(int id) {
 	for (int s=0;s<sema.size();s++)
@@ -866,20 +825,8 @@ void TCharm::freeSema(TCharmSemaphore *doomed) {
 	CkAbort("Tried to free nonexistent TCharm semaphore");
 }
 
-/// Store data at the semaphore "id".
-///  The put can come before or after the get.
-void TCharm::semaPut(int id,void *data) {
-	TCharmSemaphore *s=findSema(id);
-	if (s->data!=NULL) CkAbort("Duplicate calls to TCharm::semaPut!");
-	s->data=data;
-	if (s->thread!=NULL) //Awaken the thread
-		resume();
-}
-
-/// Retreive data from the semaphore "id".
-///  Blocks if the data is not immediately available.
-///  Consumes the data, so another put will be required for the next get.
-void *TCharm::semaGet(int id) {
+/// Block until this semaphore has data:
+TCharm::TCharmSemaphore *TCharm::getSema(int id) {
 	TCharmSemaphore *s=findSema(id);
 	if (s->data==NULL) 
 	{ //Semaphore isn't filled yet: wait until it is
@@ -889,10 +836,43 @@ void *TCharm::semaGet(int id) {
 		s=findSema(id);
 		if (s->data==NULL) CkAbort("TCharm::semaGet awoken too early!");
 	}
+	return s;
+}
+
+/// Store data at the semaphore "id".
+///  The put can come before or after the get.
+void TCharm::semaPut(int id,void *data) {
+	TCharmSemaphore *s=findSema(id);
+	if (s->data!=NULL) CkAbort("Duplicate calls to TCharm::semaPut!");
+	s->data=data;
+	if (s->thread!=NULL) {//Awaken the thread
+		s->thread=NULL;
+		resume();
+	}
+}
+
+/// Retreive data from the semaphore "id".
+///  Blocks if the data is not immediately available.
+///  Consumes the data, so another put will be required for the next get.
+void *TCharm::semaGet(int id) {
+	TCharmSemaphore *s=getSema(id);
 	void *ret=s->data;
 	// Now remove the semaphore from the list:
 	freeSema(s);
 	return ret;
+}
+
+/// Retreive data from the semaphore "id".
+///  Blocks if the data is not immediately available.
+void *TCharm::semaGets(int id) {
+	TCharmSemaphore *s=getSema(id);
+	return s->data;
+}
+
+/// Retreive data from the semaphore "id", or returns NULL.
+void *TCharm::semaPeek(int id) {
+	TCharmSemaphore *s=findSema(id);
+	return s->data;
 }
 
 #include "tcharm.def.h"

@@ -17,17 +17,25 @@ Orion Sky Lawlor, olawlor@acm.org, 11/19/2001
 #include "cklists.h"
 #include "memory-isomalloc.h"
 
+PUPbytes(TCpupReadonlyGlobal);
+
 //User's readonly global variables, set exactly once after initialization
 class TCharmReadonlys {
-	//There's only one (shared) list per node, so no CpvAccess here
-	static CkVec<TCpupReadonlyGlobal> entries;
+	CkVec<TCpupReadonlyGlobal> entries;
  public:
-	static void add(TCpupReadonlyGlobal fn);
-	//Pups all registered readonlys	
-	static void pupAllReadonlys(PUP::er &p);
-
-	//Used by parameter marshalling:
+	void add(TCpupReadonlyGlobal fn);
+	void add(const TCharmReadonlys &r);
+	
+	inline int size(void) const {return entries.size();}
+	
+	//Pup the readonly *functions* (for shipping)
 	void pup(PUP::er &p);
+
+	//Pups the readonly *data*
+	void pupData(PUP::er &p);
+	
+	//Pups all registered readonlys	
+	static void pupAll(PUP::er &p);
 };
 PUPmarshall(TCharmReadonlys);
 
@@ -35,27 +43,33 @@ class TCharmTraceLibList;
 
 #include "tcharm.decl.h"
 
-class TCharmReadonlyGroup : public Group {
- public:
-	//Just unpacking the parameter is enough:
-	TCharmReadonlyGroup(const TCharmReadonlys &r) { /*nothing needed*/ }
-};
-
 class TCharm;
+
+// This little class holds values between a call to TCHARM_Set_* 
+//   and the subsequent TCHARM_Create_*.  It should be moved
+//   into a parameter to TCHARM_Create.
+class TCHARM_Thread_options {
+public:
+	int stackSize; /* size of thread execution stack, in bytes */
+	int exitWhenDone; /* flag: call CkExit when thread is finished. */
+	// Fill out the default thread options:
+	TCHARM_Thread_options(int doDefault);
+	TCHARM_Thread_options() {}
+};
 
 class TCharmInitMsg : public CMessage_TCharmInitMsg {
  public:
 	//Function to start thread with:
 	CthVoidFn threadFn;
-	//Initial stack size, in bytes:
-	int stackSize;
+	//Initial thread parameters:
+	TCHARM_Thread_options opts;
 	//Array size (number of elements)
 	int numElements;
 	//Data to pass to thread:
 	char *data;
 
-	TCharmInitMsg(CthVoidFn threadFn_,int stackSize_)
-		:threadFn(threadFn_), stackSize(stackSize_) {}
+	TCharmInitMsg(CthVoidFn threadFn_,const TCHARM_Thread_options &opts_)
+		:threadFn(threadFn_), opts(opts_) {}
 };
 
 //Current computation location
@@ -72,7 +86,7 @@ class TCharm: public CBase_TCharm
 {
  public:
 
-	//User's heap-allocated/global data:
+//User's heap-allocated/global data:
 	class UserData {
 		void *data; //user data pointer
 		bool isC;
@@ -92,7 +106,7 @@ class TCharm: public CBase_TCharm
 	//New interface for user data:
 	CkVec<UserData> sud;
 	
-	//Tiny semaphore-like pointer producer/consumer
+//Tiny semaphore-like pointer producer/consumer
 	class TCharmSemaphore {
 	public:
 		int id; //User-defined identifier
@@ -105,17 +119,26 @@ class TCharm: public CBase_TCharm
 	/// Short, unordered list of waiting semaphores.
 	CkVec<TCharmSemaphore> sema;
 	TCharmSemaphore *findSema(int id);
+	TCharmSemaphore *getSema(int id);
 	void freeSema(TCharmSemaphore *);
 	
 	/// Store data at the semaphore "id".
 	///  The put can come before or after the get.
 	void semaPut(int id,void *data);
+
+	/// Retreive data from the semaphore "id", returning NULL if not there.
+	void *semaPeek(int id);
+	
+	/// Retreive data from the semaphore "id".
+	///  Blocks if the data is not immediately available.
+	void *semaGets(int id);
+	
 	/// Retreive data from the semaphore "id".
 	///  Blocks if the data is not immediately available.
 	///  Consumes the data, so another put will be required for the next get.
 	void *semaGet(int id);
 
-	//One-time initialization
+//One-time initialization
 	static void nodeInit(void);
 	static void procInit(void);
  private:
@@ -132,7 +155,7 @@ class TCharm: public CBase_TCharm
 	friend class TCharmAPIRoutine; //So he can get to heapBlocks:
 	CmiIsomallocBlockList *heapBlocks; //Migratable heap data
 
-	bool isStopped, resumeAfterMigration;
+	bool isStopped, resumeAfterMigration, exitWhenDone;
 	ThreadInfo threadInfo;
 	double timeOffset; //Value to add to CkWallTimer to get my clock
 
@@ -156,6 +179,8 @@ class TCharm: public CBase_TCharm
 	
 	virtual void ckJustMigrated(void);
 	void migrateDelayed(int destPE);
+	void atBarrier(CkReductionMsg *);
+	void atExit(CkReductionMsg *);
 
 	void clear();
 
@@ -168,9 +193,6 @@ class TCharm: public CBase_TCharm
 	inline double getTimeOffset(void) const { return timeOffset; }
 
 //Client-callable routines:
-	//One client is ready to run
-	void ready(void);
-
 	//Sleep till entire array is here
 	void barrier(void);
 	
@@ -223,69 +245,6 @@ class TCharm: public CBase_TCharm
 	}
 };
 
-
-
-//TCharm internal class: Controls array startup, ready, run and shutdown
-class TCharmCoordinator {
-	static int nArrays; //Total number of running thread arrays
-	static TCharmCoordinator *head; //List of coordinators
-
-	TCharmCoordinator *next; //Next coordinator in list
-	CProxy_TCharm threads;//The threads I coordinate
-	int nThreads;//Number of threads (array elements)
-	int nClients; //Number of bound client arrays
-	int nReady; //Number of ready clients
-public:
-	TCharmCoordinator(CkArrayID threads,int nThreads);
-	~TCharmCoordinator();
-	void addClient(const CkArrayID &client);
-	void clientReady(void);
-	void clientBarrier(void);
-	void clientDone(void);
-	
-	static int getTotal(void) {
-		return nArrays;
-	}
-};
-
-//Controls initial setup (main::main & init routines)
-class TCharmSetupCookie {
-	enum {correctMagic=0x5432abcd};
-	int magic; //To make sure this is actually a cookie
-	
-	int stackSize; //Thread stack size, in bytes
-	char **argv; //Command-line arguments
-	
-	CkArrayID tc; //Handle to last-created TCharm array
-	int numElements; //Number of elements in last-created TCharm
-	TCharmCoordinator *coord; 
-
-	//Points to the active cookie
-	static TCharmSetupCookie *theCookie;
-	friend class TCharmMain;
- public:
-	TCharmSetupCookie(char **argv_);
-	
-#ifdef CMK_OPTIMIZE //Skip check, for speed
-	inline TCharmSetupCookie &check(void) {return *this;}
-#else
-	TCharmSetupCookie &check(void);
-#endif
-	void setStackSize(int sz) {stackSize=sz;}
-	int getStackSize(void) const {return stackSize;}
-	char **getArgv(void) {return argv;}
-	
-	bool hasThreads(void) const {return 0!=coord;}
-	const CkArrayID &getThreads(void) const {return tc;}
-	TCharmCoordinator *getCoordinator(void) {return coord;}
-	int getNumElements(void) const {return numElements;}
-
-	void addClient(const CkArrayID &client) {coord->addClient(client);}
-	
-	void setThreads(const CkArrayID &aid,int nel);
-
-	static TCharmSetupCookie *get(void) {return theCookie;}
-};
 
 //Created in all API routines: disables/enables migratable malloc
 class TCharmAPIRoutine {

@@ -1,0 +1,6 @@
+module tcharmmain {
+  mainchare TCharmMain {
+    entry TCharmMain();
+    initnode void nodeInit();
+  };
+};
