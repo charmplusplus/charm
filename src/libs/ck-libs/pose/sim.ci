@@ -19,6 +19,6 @@ module sim {
     entry void Commit(void);	
     entry void ReportLBdata(void);	
     entry void Migrate(destMsg *);	
-    entry void Cancel(cancelMsg *);
+    entry [expedited] void Cancel(cancelMsg *);
   };
 };
