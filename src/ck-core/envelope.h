@@ -120,6 +120,8 @@ private:
 #ifndef CMK_OPTIMIZE
     UChar  isUsed(void) { return attribs.isUsed; }
     void   setUsed(const UChar u) { attribs.isUsed=u; }
+#else /* CMK_OPTIMIZE */
+    inline void setUsed(const UChar u) {}
 #endif
     UChar  isImmediate(void) { return attribs.isImmediate; }
     void   setImmediate(const UChar u) { attribs.isImmediate=u; }
