@@ -7,6 +7,13 @@
 #include "tcharm.h"
 #include "charm-api.h"
 
+// Constants to tell FEM interface whether node is on a boudary between chunks
+// and if it is the first of two split operations
+#define LOCAL_FIRST 0x4
+#define LOCAL_SECOND 0x0
+#define BOUND_FIRST 0x5
+#define BOUND_SECOND 0x1
+
 class node;
 class chunk;
 class elemRef;

@@ -450,7 +450,8 @@ void element::splitBorderLocal(int longEdge, int opnode, int othernode,
   C->theElements[newElemRef.idx].setTargetArea(targetArea);
   
   // tell the world outside about the split
-  if (C->theClient) C->theClient->split(myRef.idx, longEdge, othernode, 0.5);
+  if (C->theClient) C->theClient->split(myRef.idx, longEdge, othernode, 0.5, 
+					LOCAL_FIRST);
 
   tellDepend();  // tell dependent it can go now
 
@@ -608,8 +609,10 @@ void element::splitNeighborsLocal(int longEdge, int opnode, int othernode,
   C->theElements[nbr.idx].edges[nbrModEdge] = newNbrEdgeRef;
 
   // tell the world outside about the split
-  if (C->theClient) C->theClient->split(myRef.idx, longEdge, othernode, 0.5);
-  if (C->theClient) C->theClient->split(nbr.idx, nbrLongEdge, nbrOthernode, 0.5);
+  if (C->theClient) C->theClient->split(myRef.idx, longEdge, othernode, 0.5,
+					LOCAL_FIRST);
+  if (C->theClient) C->theClient->split(nbr.idx, nbrLongEdge, nbrOthernode, 
+					0.5, LOCAL_SECOND);
 
   // tell dependents they can go now
   tellDepend();
@@ -690,7 +693,8 @@ void element::splitHelp(int longEdge)
   edges[modEdge] = newEdgeRef;
 
   // tell the world outside about the split
-  if (C->theClient) C->theClient->split(myRef.idx, longEdge, othernode, 0.5);
+  if (C->theClient) C->theClient->split(myRef.idx, longEdge, othernode, 0.5,
+					BOUND_SECOND);
 
   tellDepend();  // tell dependent it can go now
   specialRequest = pendingRequest = requestResponse = 0; // reset flags
@@ -782,7 +786,8 @@ void element::splitResponse(int longEdge)
   C->theElements[newElemRef.idx].setTargetArea(targetArea);
 
   // tell the world outside about the split
-  if (C->theClient) C->theClient->split(myRef.idx, longEdge, othernode, 0.5);
+  if (C->theClient) C->theClient->split(myRef.idx, longEdge, othernode, 0.5,
+					BOUND_FIRST);
 
   specialRequest = pendingRequest = requestResponse = 0; // reset flags
   tellDepend();  // tell dependent it can go now
