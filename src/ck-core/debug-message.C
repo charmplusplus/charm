@@ -81,7 +81,7 @@ void handlerArrayRegister(int hndlrID, hndlrIDFunction fHeader,
 }
 
 static const char *HeaderUnknownFormat =
-"<HEADER>:Unknown # Format #"
+"<HEADER>:Unknown Format #"
 ;
 
 // type = 0 header required

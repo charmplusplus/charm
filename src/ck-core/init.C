@@ -287,7 +287,7 @@ char* getEnvInfo(envelope *env)
   
   returnInfo = (char *)malloc((size + 2) * sizeof(char));
   strcpy(returnInfo, _entryTable[epIndex]->name);
-  strcat(returnInfo, "#");
+  strcat(returnInfo, "%");
   strcat(returnInfo, _chareTable[chareIndex]->name);
   strcat(returnInfo, "#");
   return(returnInfo);
