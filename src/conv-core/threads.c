@@ -1019,6 +1019,7 @@ static CthThread CthCreateInner(CthVoidFn fn,void *arg,int size,int migratable)
   stack = result->base.stack;
 #if CMK_STACK_GROWDOWN
   stack = stack +  size - MINSIGSTKSZ;
+  stack=STP_STKALIGN(stack, sizeof(char*)*8);
   size = stack - (char *)result->base.stack;
 #endif
   if (0 != getcontext(&result->context))
