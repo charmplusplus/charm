@@ -21,16 +21,17 @@ LIBR = lib.exe
 LINK_FLAGS = /nologo 
 
 CHARMXI=$(XLATI_DIR)\charmxlati.exe
+CONV_CPM=$(XLATI_DIR)\conv-cpm.exe
 
 LINK_OTHER = kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib \
  advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib \
  odbccp32.lib /subsystem:console /incremental:no /machine:I386 
 
-ALL: CHARM++ AMPI
+ALL: CHARM++
 
-CHARM++ : CONVERSE TRANSLATORS LIBS
+CHARM++ : CONVERSE TRANSLATORS
 
-TRANSLATORS : $(CHARMXI) CONVCPM
+TRANSLATORS : $(CHARMXI) $(CONV_CPM)
 
 AMPI: CHARM++ $(LIBS_DIR)\libampi.lib $(LIBS_DIR)\libampif.lib
 
@@ -44,8 +45,8 @@ LIBS : CONVLIBS CHARMLIBS
 #
 ###############################################################################
 
-CVHEADERS=cpthreads.h converse.h conv-mach.h \
-      conv-trace.h trace.h conv-ccs.h sockRoutines.h \
+CVHEADERS=cpthreads.h converse.h conv-trace.h trace.h conv-ccs.h \
+      conv-autoconfig.h conv-mach.h conv-mach.sh \
       CkFutures.decl.h CkArray.decl.h CkReduction.decl.h \
       LBDatabase.decl.h CentralLB.decl.h \
       RandCentLB.decl.h RecBisectBfLB.decl.h \
@@ -54,26 +55,29 @@ CVHEADERS=cpthreads.h converse.h conv-mach.h \
       WSLB.decl.h GreedyRefLB.decl.h RandRefLB.decl.h \
       tempo.decl.h waitqd.decl.h \
 	  CommLB.decl.h Comm1LB.decl.h  \
-	  ampi.decl.h ampimain.decl.h
+	  ampi.decl.h ampimain.decl.h BlueGene.decl.h blue.h
 
-UTILHEADERS=pup.h pup_c.h ckhashtable.h \
-	sockRoutines.c sockRoutines.h
+# The .c files are there to be #included by clients whole
+# This is a bit unusual, but makes client linking simpler.
+UTILHEADERS=pup.h pup_c.h ckhashtable.h cklists.h conv-lists.h \
+	sockRoutines.h sockRoutines.c
 
 CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
-      ckfutures.h ckarray.h pup.h ckreduction.h $(UTILHEADERS) \
+	  ckfutures.h ckarray.h ckreduction.h $(UTILHEADERS) \
 	  tempo.h waitqd.h LBDatabase.h lbdb.h \
 	  LBDBManager.h LBComm.h LBOM.h LBObj.h LBMachineUtil.h \
 	  Refiner.h ObjGraph.h heap.h elements.h CommLBHeap.h \
 	  CentralLB.h RandCentLB.h RecBisectBfLB.h \
 	  RefineLB.h HeapCentLB.h CommLB.h Comm1LB.h \
 	  MetisLB.h NborBaseLB.h \
-	  NeighborLB.h WSLB.h GreedyRefLB.h RandRefLB.h CkLists.h \
-      ampi.h ampif.h \
+	  NeighborLB.h WSLB.h GreedyRefLB.h RandRefLB.h \
+	  ampi.h BlueGene.h \
 	  $(CVHEADERS)
 
 ALLHEADERS=$(CKHEADERS) \
-    fifoInt.h graph.h bitvecset.h Set.h ampiimpl.h \
-	sockRoutines.c
+    simplemsg.h sm.h pvmc.h pvm3.h sdag.h \
+    CDep.h CCounter.h CMsgBuffer.h CWhenTrigger.h TList.h \
+	graph.h bitvecset.h Set.h ampiimpl.h
 
 BASICS : DIRSSOURCES $(ALLHEADERS)
 	@if exist ..\include\nul rd /s /q ..\include
@@ -112,19 +116,15 @@ DIRSSOURCES :
 
 TRACELIBS=libtrace-none.lib libtrace-projections.lib libtrace-summary.lib
 
-CVLIBS=$(LIBS_DIR)\libconv-core.lib libconv-cplus-n.lib libconv-cplus-y.lib \
-libldb-rand.obj libldb-spray.obj libldb-graph.obj libldb-test.obj $(TRACELIBS)
+CVLIBS=$(LIBS_DIR)\libconv-core.lib $(LIBS_DIR)\libconv-cplus-n.lib $(LIBS_DIR)\libconv-cplus-y.lib $(LIBS_DIR)\libconv-util.lib libldb-rand.obj libldb-spray.obj libldb-graph.obj libldb-test.obj $(TRACELIBS)
 
+LIBCONV_CORE=threads.obj convcore.obj conv-conds.obj queueing.obj msgmgr.obj memory.obj cpm.obj cpthreads.obj futures.obj cldb.obj random.obj debug-message.obj debug-object.obj info.obj generate.obj edgelist.obj conv-ccs.obj quiescence.obj 
 
-LIBCONV_CORE=threads.obj convcore.obj conv-conds.obj queueing.obj fifo.obj msgmgr.obj memory.obj \
-cpm.obj cpthreads.obj futures.obj cldb.obj random.obj debug-message.obj debug-object.obj info.obj \
-generate.obj edgelist.obj conv-ccs.obj quiescence.obj sockRoutines.obj
+LIBCONV_UTIL=pup_util.obj pup_xlater.obj pup_c.obj ckhashtable.obj sockRoutines.obj conv-lists.obj
 
-LIBCONV_UTIL=pup_util.o pup_xlater.o pup_c.o ckhashtable.o
+LIBCONV_UTILF=pup_f.obj
 
-LIBCONV_UTILF=pup_f.o
-
-CONVERSE : BASICS $(CVLIBS) CONV-HOST-IF-NEEDED CONVLIBS DAEMON CONVCPM
+CONVERSE : BASICS $(CVLIBS) CHARMRUN-IF-NEEDED DAEMON $(CONV_CPM)
 
 DAEMON : daemon.c sockRoutines.c
 	$(CPP) $(CPP_PROJ) $(COMMON_SRC)\daemon.c
@@ -135,10 +135,10 @@ DAEMON : daemon.c sockRoutines.c
 	$(LINK) $(LINK_FLAGS) ws2_32.lib advapi32.lib $(LINK_OTHER) \
 	/out:"$(HOST_DIR)\daemon_background.exe" daemon.obj sockRoutines.obj
 
-CONV-HOST-IF-NEEDED : conv-host\conv-host.c sockRoutines.c
-	$(CPP) $(CPP_PROJ) $(COMMON_SRC)\conv-host\conv-host.c
+CHARMRUN-IF-NEEDED : charmrun\charmrun.c sockRoutines.c
+	$(CPP) $(CPP_PROJ) $(COMMON_SRC)\charmrun\charmrun.c
 	$(LINK) $(LINK_FLAGS) ws2_32.lib advapi32.lib $(LINK_OTHER) \
-	/out:"$(HOST_DIR)\conv-host.exe" conv-host.obj
+	/out:"$(HOST_DIR)\charmrun.exe" charmrun.obj
 
 CONVLIBS : MASTER-SLAVE PACKLIB COMMLIB UTIL
 
@@ -149,12 +149,11 @@ MASTER-SLAVE : $(CONVLIBS_SRC)\master-slave\cms.c
 	@copy $(CONVLIBS_SRC)\master-slave\cms.h ..\include\cms.h
 
 
-UTIL_OBJ=pup_util.obj pup_xlater.obj pup_c.obj ckhashtable.obj
 UTIL_SRC=pup_util.C pup_xlater.C pup_c.C ckhashtable.C
 UTIL: $(UTIL_SRC)
 	$(CPP) $(CPP_PROJ) /TP $(UTIL_SRC)
-	$(LIBR) $(LINK_FLAGS) /out:"$(LIBS_DIR)\libutil.lib" \
-	  $(UTIL_OBJ)
+	$(LIBR) $(LINK_FLAGS) /out:"$(LIBS_DIR)\libconv-util.lib" \
+	  $(LIBCONV_UTIL)
 
 COMMLIB_SRC=charm_bind.C commlib.C overlapper.C treerouter.C gridrouter.C \
 	de.C bcast.C rsend.C petable.C 
@@ -176,15 +175,19 @@ $(LIBS_DIR)\libconv-core.lib : $(LIBCONV_CORE)
 	$(LIBR) $(LINK_FLAGS) /out:"$(LIBS_DIR)\libconv-core.lib" \
 	$(LIBCONV_CORE)
 
-libconv-cplus-y.lib : machine.c $(CVHEADERS)
+$(LIBS_DIR)\libconv-cplus-y.lib : machine.c $(CVHEADERS)
 	$(CPP) $(CPP_PROJ) /D "_LIB" /D"FOR_CPLUS=1" machine.c
 	$(LINK) -lib $(LINK_FLAGS) /out:"$(LIBS_DIR)\libconv-cplus-y.lib" \
 	machine.obj
 
-libconv-cplus-n.lib : machine.c $(CVHEADERS)
+$(LIBS_DIR)\libconv-cplus-n.lib : machine.c $(CVHEADERS)
 	$(CPP) $(CPP_PROJ) /D"FOR_CPLUS=0" machine.c
 	$(LINK) -lib $(LINK_FLAGS) /out:"$(LIBS_DIR)\libconv-cplus-y.lib" \
 	machine.obj
+
+$(LIBS_DIR)\libconv-util.lib : $(LIBCONV_UTIL)
+	$(LINK) -lib $(LINK_FLAGS) /out:"$(LIBS_DIR)\libconv-util.lib" \
+	$(LIBCONV_UTIL)
 
 cpm.obj : cpm.c $(CVHEADERS)
 	$(CPP) $(CPP_PROJ) $(COMMON_SRC)\cpm.c
@@ -250,6 +253,21 @@ libldb-test.obj : cldb.test.c $(CVHEADERS)
 	$(CPP) $(CPP_PROJ) cldb.test.c
 	@copy cldb.test.obj ..\lib\libldb-test.obj
 
+pup_util.obj : pup_util.C $(UTILHEADERS)
+	$(CPP) $(CPP_PROJ) /TP pup_util.C
+
+pup_xlater.obj : pup_xlater.C $(UTILHEADERS)
+	$(CPP) $(CPP_PROJ) /TP pup_xlater.C
+
+pup_c.obj : pup_c.C $(UTILHEADERS)
+	$(CPP) $(CPP_PROJ) /TP pup_c.C
+
+ckhashtable.obj : ckhashtable.C $(UTILHEADERS)
+	$(CPP) $(CPP_PROJ) /TP ckhashtable.C
+
+conv-lists.obj : conv-lists.C $(UTILHEADERS)
+	$(CPP) $(CPP_PROJ) /TP conv-lists.C
+
 ########################################################################################################
 #
 # CHARM LIBRARIES
@@ -260,13 +278,15 @@ CK_LIBS_CORE=$(LIBS_DIR)\libck.lib
 
 LIBCK_CORE=init.obj register.obj qd.obj ck.obj main.obj msgalloc.obj ckfutures.obj \
            ckarray.obj ckreduction.obj \
-	   tempo.obj waitqd.obj \
-	   LBDatabase.obj lbdb.obj LBDBManager.obj LBComm.obj LBObj.obj CentralLB.obj \
-	   LBMachineUtil.obj Refiner.obj ObjGraph.obj RecBisectBfLB.obj graph.obj \
-	   bitvecset.obj fifoInt.obj \
-	   RandCentLB.obj MetisLB.obj RefineLB.obj Set.obj CommLB.obj Comm1LB.obj \
-	   HeapCentLB.obj heap.obj \
-	   NborBaseLB.obj NeighborLB.obj WSLB.obj GreedyRefLB.obj RandRefLB.obj CommLBHeap.obj
+           tempo.obj waitqd.obj LBDatabase.obj lbdb.obj \
+	   LBDBManager.obj LBComm.obj LBObj.obj LBMachineUtil.obj Refiner.obj \
+	   ObjGraph.obj \
+	   CentralLB.obj RandCentLB.obj \
+	   RecBisectBfLB.obj graph.obj bitvecset.obj \
+	   MetisLB.obj RefineLB.obj Set.obj CommLB.obj Comm1LB.obj\
+           HeapCentLB.obj heap.obj NborBaseLB.obj NeighborLB.obj WSLB.obj \
+	   GreedyRefLB.obj RandRefLB.obj CommLBHeap.obj
+
 
 CHARMLIBS : CONVERSE $(CK_LIBS_CORE)
 
@@ -409,7 +429,7 @@ CentralLB.obj: CentralLB.C $(CKHEADERS)
 RandCentLB.obj: RandCentLB.C $(CKHEADERS)
 	$(CPP) $(CPP_PROJ) /TP RandCentLB.C
 
-RecBisectBfLB.obj: RecBisectBfLB.C $(CKHEADERS) graph.h fifoInt.h bitvecset.h
+RecBisectBfLB.obj: RecBisectBfLB.C $(CKHEADERS) graph.h bitvecset.h
 	$(CPP) $(CPP_PROJ) /TP RecBisectBfLB.C
 
 graph.obj: graph.c 
@@ -496,7 +516,7 @@ trace-summary.obj : trace-summary.C trace-summary.h trace.h $(CKHEADERS)
 XIHEADERS=xi-symbol.h xi-grammar.tab.h xi-util.h
 CHARMXLATI=xi-main.obj xi-symbol.obj xi-grammar.tab.obj xi-scan.obj xi-util.obj
 
-CONVCPM: conv-cpm.c
+$(CONV_CPM): conv-cpm.c
 	$(CPP) $(SEQCPP_PROJ) conv-cpm.c
 	$(LINK) $(LINK_FLAGS) $(LINK_OTHER) /out:"$(XLATI_DIR)\conv-cpm.exe" conv-cpm.obj
 
