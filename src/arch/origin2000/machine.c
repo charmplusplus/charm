@@ -157,6 +157,7 @@ static void threadInit(void *arg)
 #ifdef DEBUG
   printf("thread %d/%d started \n", CmiMyPe(), CmiNumPes());
 #endif
+  prctl(PR_SETEXITSIG, SIGHUP,0);
 
   CthInit(usrparam->argv);
   ConverseCommonInit(usrparam->argv);
@@ -175,6 +176,7 @@ static void threadInit(void *arg)
 
 void ConverseExit(void)
 {
+  prctl(PR_SETEXITSIG,0,0);
   ConverseCommonExit();
   barrier(barr, nthreads);
 }
