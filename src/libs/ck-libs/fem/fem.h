@@ -48,15 +48,14 @@ extern "C" {
 
   /* Initialize the FEM framework (must have called MPI_Init) */
   void FEM_Init(FEM_Comm_t defaultCommunicator);
+  void FEM_Done(void);
 
   /*Utility*/
   int FEM_My_partition(void);
   int FEM_Num_partitions(void);
   double FEM_Timer(void);
-  void FEM_Done(void);
   void FEM_Print(const char *str);
   void FEM_Print_partition(void);
-  void FEM_Mesh_print(int fem_mesh);
 
 /* Mesh manipulation */
 #define FEM_MESH_FIRST 1650000000 /*This is the first mesh ID:*/
@@ -78,6 +77,7 @@ extern "C" {
   int FEM_Mesh_broadcast(int fem_mesh,int fromRank,FEM_Comm_t comm_context);
 
   void FEM_Mesh_copy_globalno(int src_mesh,int dest_mesh);
+  void FEM_Mesh_print(int fem_mesh);
   
 /* Mesh entity codes: (keep in sync with femf.h) */
 #define FEM_ENTITY_FIRST 1610000000 /*This is the first entity code:*/
@@ -108,7 +108,7 @@ extern "C" {
 #define FEM_NODE_PRIMARY (FEM_ATTRIB_FIRST+7) /* This chunk owns this node (nodes only; width=1, datatype=FEM_BYTE) */
 #define FEM_ATTRIB_LAST (FEM_ATTRIB_FIRST+10) /*This is the last valid attribute code*/
 
-  /* The basics: */
+  /* Specialized routines: */
   void FEM_Mesh_set_conn(int fem_mesh,int entity,
   	const int *conn, int firstItem, int length, int width);
   void FEM_Mesh_get_conn(int fem_mesh,int entity,
@@ -118,12 +118,12 @@ extern "C" {
   	const void *data, int firstItem, int length, int datatype,int width);
   void FEM_Mesh_get_data(int fem_mesh,int entity,int attr,
   	void *data, int firstItem, int length, int datatype,int width);
+  void FEM_Mesh_conn(int fem_mesh,int entity,
+  	int *conn, int firstItem, int length, int width);
   
   int FEM_Mesh_get_length(int fem_mesh,int entity);
   
-  /* Advanced/rarely used: */
-  void FEM_Mesh_conn(int fem_mesh,int entity,
-  	int *conn, int firstItem, int length, int width);
+  /* General purpose routines: */
   void FEM_Mesh_data(int fem_mesh,int entity,int attr,
   	void *data, int firstItem, int length, int datatype,int width);
   void FEM_Mesh_data_layout(int fem_mesh,int entity,int attr,
