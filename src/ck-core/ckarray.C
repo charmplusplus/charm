@@ -259,7 +259,9 @@ CkArrayOptions::CkArrayOptions(int ni) //With initial elements
 CkArrayOptions &CkArrayOptions::bindTo(const CkArrayID &b)
 {
 	CkArray *arr=CProxy_CkArray(b).ckLocalBranch();
-	setNumInitial(arr->getNumInitial());
+	//Stupid bug: need a way for arrays to stay the same size *FOREVER*,
+	// not just initially.
+	//setNumInitial(arr->getNumInitial());
 	return setLocationManager(arr->getLocMgr()->getGroupID());
 }
 CkArrayOptions &CkArrayOptions::addListener(const CkComponentID &id)
