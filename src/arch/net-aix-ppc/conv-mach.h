@@ -105,7 +105,7 @@
 
 
 
-#define CMK_DEBUG_MODE                                     1
+#define CMK_DEBUG_MODE                                     0
 #define CMK_WEB_MODE                                       1  
 
 #endif
