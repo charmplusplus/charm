@@ -54,12 +54,6 @@ while ($argindex <= $#argv)
             @ argindex = $argindex + 1
             breaksw
 
-        case "-cwd"
-            set CHARMBIN=.
-            set CHARMLIB=.
-            set CHARMINC=.
-            breaksw
-
         case "-seq"
 	    set SEQUENTIAL=yes
             breaksw
