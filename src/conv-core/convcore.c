@@ -1428,6 +1428,12 @@ void CmiGrabBuffer(void **bufptrptr)
   CtvAccess(CmiBufferGrabbed) = 1;
 }
 
+void CmiReleaseBuffer(void *buffer)
+{
+  CmiGrabBuffer(&buffer);
+  CmiFree(buffer);
+}
+
 void CmiHandleMessage(void *msg)
 {
 #if CMK_DEBUG_MODE
