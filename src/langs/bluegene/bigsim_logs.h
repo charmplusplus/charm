@@ -20,9 +20,11 @@ public:
 #endif
   CmiInt2 tID;		// destination worker thread ID
 //  double sendtime;
+  int msgsize;		// message size
+private:
+  bgMsgEntry(int destNode,int msgID,int msize, int tID,double rTime);
 public:
   bgMsgEntry(char *msg, int node, int tid, int local);
-  bgMsgEntry(int destNode,int msgID,int tID,double rTime);
   inline void print() {
     CmiPrintf("msgID:%d recvtime:%f dstPe:%d\n", msgID, recvTime, dstPe);
   }
@@ -32,6 +34,7 @@ public:
 #if DELAY_SEND
   void send();
 #endif
+  friend class bgTimeLog;
 };
 
 
