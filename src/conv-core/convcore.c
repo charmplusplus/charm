@@ -17,11 +17,11 @@
 #include "conv-ccs.h"
 #include "ccs-server.h"
 #include "memory-isomalloc.h"
-#include "converseEvents.h"             // projector
-#include "traceCoreCommon.h"    // projector
-#include "machineEvents.h"     //projector
+#include "converseEvents.h"             /* projector */
+#include "traceCoreCommon.h"    /* projector */
+#include "machineEvents.h"     /* projector */
 
-CpvExtern(int, _traceCoreOn);   // projector
+CpvExtern(int, _traceCoreOn);   /* projector */
 extern void CcdModuleInit(char **);
 extern void CmiMemoryInit(char **);
 extern void CldModuleInit(void);
@@ -850,7 +850,7 @@ void (*handler)();
 void CsdBeginIdle(void)
 {
   CcdCallBacks();
-  _LOG_E_PROC_IDLE(); 	// projector
+  _LOG_E_PROC_IDLE(); 	/* projector */
   CcdRaiseCondition(CcdPROCESSOR_BEGIN_IDLE) ;
 }
 
@@ -861,7 +861,7 @@ void CsdStillIdle(void)
 
 void CsdEndIdle(void)
 {
-  _LOG_E_PROC_BUSY(); 	// projector
+  _LOG_E_PROC_BUSY(); 	/* projector */
   CcdRaiseCondition(CcdPROCESSOR_BEGIN_BUSY) ;
 }
 
@@ -871,10 +871,10 @@ void CmiHandleMessage(void *msg)
  	CpvAccess(cQdState)->mProcessed++;
 */
 	 CmiHandlerInfo *h;
-	_LOG_E_HANDLER_BEGIN(CmiGetHandler(msg)); // projector
+	_LOG_E_HANDLER_BEGIN(CmiGetHandler(msg)); /* projector */
 	h=&CmiGetHandlerInfo(msg);
 	(h->hdlr)(msg,h->userPtr);
-	_LOG_E_HANDLER_END(CmiGetHandler(msg)); 	// projector
+	_LOG_E_HANDLER_END(CmiGetHandler(msg)); 	/* projector */
 }
 
 #if CMK_CMIDELIVERS_USE_COMMON_CODE
@@ -1090,11 +1090,9 @@ void CthResumeNormalThread(CthThread t)
 #ifndef CMK_OPTIMIZE
   if(CpvAccess(traceOn))
     CthTraceResume(t);
+/*    if(CpvAccess(_traceCoreOn)) 
+	        resumeTraceCore();*/
 #endif
-/*#ifndef CMK_OPTIMIZE    // projector
-    if(CpvAccess(_traceCoreOn))
-	        resumeTraceCore();
-#endif*/
     
   CthResume(t);
 }
@@ -1836,9 +1834,7 @@ void ConverseCommonInit(char **argv)
   
 #ifndef CMK_OPTIMIZE
   traceInit(argv);
-#endif
-/*#ifndef CMK_OPTIMIZE    // projector
-    initTraceCore(argv);
+/*initTraceCore(argv);*/ /* projector */
 #endif*/
 
 #if CMK_CCS_AVAILABLE
@@ -1867,10 +1863,8 @@ void ConverseCommonExit(void)
 
 #ifndef CMK_OPTIMIZE
   traceClose();
+/*closeTraceCore();*/ /* projector */
 #endif
-/*#ifndef CMK_OPTIMIZE    // projector
-    closeTraceCore();
-#endif*/
 
 }
 
