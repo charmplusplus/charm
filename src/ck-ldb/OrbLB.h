@@ -19,7 +19,7 @@
 void CreateOrbLB();
 
 class OrbLB : public CentralLB {
-private:
+public:/* <- Sun CC demands Partition be public for ComputeLoad to access it. */
 
   class Partition {
   public:
@@ -32,21 +32,22 @@ private:
   public:
     Partition(): refno(0), load(0.0), node(-1), mapped(0) {};
   };
-  
-  typedef struct {
+
+private:  
+  struct ComputeLoad {
     int id;
     int v[3];
     double load;
     int  refno;
     int  tv;
     Partition * partition;
-  } ComputeLoad;
+  };
   
   
-  typedef struct {
+  struct VecArray {
     int v;
     int id;
-  } VecArray;
+  };
   
   enum {XDIR=0, YDIR, ZDIR};
   
