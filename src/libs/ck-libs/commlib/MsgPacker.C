@@ -107,13 +107,16 @@ void MsgPacker::deliver(CombinedMessage *cmb_msg){
         }
         else {
             envelope *env = (envelope *)CmiAlloc(sizeof(envelope) + size);
+            void *data = EnvToUsr(env);
+            memcpy(data, senv.data, size);
+            
+            memcpy(env, senv, sizeof(envelope));
+
             env->getsetArrayMgr() = aid;
             env->getsetArrayIndex() = idx;
             env->getsetArrayEp() = ep;
             env->setPacked(0); //We have already unpakced it.
-            void *data = EnvToUsr(env);
-
-            memcpy(data, senv.data, size);
+            
             delete[] senv.data;
             
             //if(a_elem)
