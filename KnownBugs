@@ -3,7 +3,3 @@
 2       5/2/2000   sameerp    argv is not copied when it is passed by 
                               ConverseInit to threads causes deletion from 
                               argv to fail.
-3	8/31/2000  milind     When the thread that is created for a threaded
-                              entry method exits, after it has migrated,
-			      it tries to free the message arg, and that
-			      obviously causes problems, such as SIGBUS.
