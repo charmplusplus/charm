@@ -52,7 +52,7 @@ inline double TraceCpuTimer() { return TRACE_TIMER(); }
 inline double TraceCpuTimer(double t) { return t; }
 #else
 #define  TRACE_TIMER   CmiWallTimer
-#define  TRACE_CPUTIMER   CmiWallTimer
+#define  TRACE_CPUTIMER   CmiCpuTimer
 inline double TraceTimer() { return TRACE_TIMER() - CkpvAccess(traceInitTime); }
 inline double TraceTimer(double t) { return t - CkpvAccess(traceInitTime); }
 inline double TraceCpuTimer() { return TRACE_CPUTIMER() - CkpvAccess(traceInitCpuTime); }
