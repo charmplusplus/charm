@@ -33,13 +33,14 @@
 #define CkDDT_2DOUBLE         22
 #define CkDDT_LB              23
 #define CkDDT_UB              24
+#define CkDDT_LONG_LONG_INT   25
 
-#define CkDDT_CONTIGUOUS      25
-#define CkDDT_VECTOR          26
-#define CkDDT_HVECTOR         27
-#define CkDDT_INDEXED         28
-#define CkDDT_HINDEXED        29
-#define CkDDT_STRUCT          30
+#define CkDDT_CONTIGUOUS      44
+#define CkDDT_VECTOR          45
+#define CkDDT_HVECTOR         46
+#define CkDDT_INDEXED         47
+#define CkDDT_HINDEXED        48
+#define CkDDT_STRUCT          49
 
 /* for the datatype decoders */
 #define CkDDT_COMBINER_NAMED         1
@@ -372,7 +373,9 @@ class CkDDT {
     types[23] = CkDDT_LB;
     typeTable[24] = new CkDDT_DataType(CkDDT_UB);
     types[24] = CkDDT_UB;
-    num_types = 25;
+    typeTable[25] = new CkDDT_DataType(CkDDT_LONG_LONG_INT);
+    types[25] = CkDDT_LONG_LONG_INT;    
+    num_types = 26;
 
     int i;
     for(i=num_types ; i < max_types; i++)

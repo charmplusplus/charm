@@ -318,6 +318,8 @@ CkDDT_DataType::CkDDT_DataType(int type):datatype(type)
     case CkDDT_UB:
       size = 0;
       break;
+    case CkDDT_LONG_LONG_INT:
+      size = sizeof(long long int);
     default:
       size = 0;
   }
