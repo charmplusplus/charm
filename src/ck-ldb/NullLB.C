@@ -19,12 +19,34 @@ load balancer around.
 #include "NullLB.h"
 #include "ck.h"
 
+#define NULLLB_CONVERSE                     1
+
 void CreateNullLB(void) {
   CProxy_NullLB::ckNew(-1);
 }
 
+static CkGroupID  _theNullLB;
+
+#if NULLLB_CONVERSE
+static int _migDoneHandle;		// converse handler
+// converse handler 
+// send converse message to avoid QD detection
+static void migrationDone(envelope *env)
+{
+  NullLB *lb = (NullLB*)CkLocalBranch(_theNullLB);
+  lb->migrationsDone();
+  CkFreeSysMsg(EnvToUsr(env));
+}
+#endif
+
 static void lbinit(void) {
   LBRegisterBalancer("NullLB", CreateNullLB, NULL, "should not be shown", 0);
+}
+
+static void lbprocinit(void) {
+#if NULLLB_CONVERSE
+  _migDoneHandle = CkRegisterHandler((CmiHandler)migrationDone);
+#endif
 }
 
 #if CMK_LBDB_ON
@@ -43,6 +65,8 @@ void NullLB::init()
 			    (void*)(this));
   theLbdb->
     AddStartLBFn((LDStartLBFn)(staticStartLB),(void*)(this));
+
+  _theNullLB = thisgroup;
 }
 
 NullLB::~NullLB()
@@ -63,7 +87,7 @@ void NullLB::staticAtSync(void* data)
 
 void NullLB::AtSync()
 {
-  //Reset the database so it doesn't waste memory
+  // tried to reset the database so it doesn't waste memory
   // if nobody else is here, the stat collection is not even turned on
   // so I should not have to clear loads.
 //  theLbdb->ClearLoads();
@@ -71,18 +95,28 @@ void NullLB::AtSync()
   // disable the batsyncer if no balancer exists
   // theLbdb->SetLBPeriod(1e10);
 
-  // prevent this message from being traced by QD
+#if ! NULLLB_CONVERSE
+  // prevent this charm message from being seen by QD
   // so that the QD detection works
   CpvAccess(_qd)->create(-1);
-  //We don't *do* any migrations, so they're already done!
   thisProxy[CkMyPe()].migrationsDone();
+#else
+  // send converse message to escape the QD detection
+  envelope *env = UsrToEnv(CkAllocSysMsg());
+  CmiSetHandler(env, _migDoneHandle);
+  CmiSyncSendAndFree(CkMyPe(), env->getTotalsize(), (char *)env);
+#endif
 }
 
 void NullLB::migrationsDone(void)
 {
+#if ! NULLLB_CONVERSE
+  // prevent this charm message from being seen by QD
   CpvAccess(_qd)->process(-1);
+#endif
   theLbdb->ResumeClients();
 }
+
 #else
 /*No load balancer-- still need definitions to prevent linker errors.
 I sure wish we had #ifdefs in the .ci file-- then we could avoid all this.
