@@ -99,7 +99,7 @@ DIRSSOURCES :
 	@mkdir    ..\bin
 	@mkdir    ..\lib
 	@mkdir    ..\src
-	@xcopy    /q /i /e /s ..\..\src\Common\libs libs
+	@xcopy    /q /i /e /s /y ..\..\src\Common\libs libs
 	@xcopy /d /q  ..\..\src\Common\conv-core\* .
 	@xcopy /d /q  ..\..\src\Common\conv-ldb\* .
 	@xcopy /d /q  ..\..\src\Common\ck-core\* .
@@ -117,7 +117,7 @@ DIRSSOURCES :
 	@xcopy /d /q  ..\..\src\Common.win32\*.h .
 	@xcopy /d /q  ..\..\src\Common.net\* .
 	@xcopy /d /q  ..\..\src\$(VERSION)\* .
-	@xcopy    /q /i /e /s ..\..\src\Common.net\charmrun  charmrun  
+	@xcopy    /q /i /e /s /y ..\..\src\Common.net\charmrun  charmrun  
 	@xcopy /d /q $(CONVLIBS_SRC)\commlib\*.C .
 	@xcopy /d /q $(CONVLIBS_SRC)\commlib\*.h .
 	@xcopy /d /q  $(CONVLIBS_SRC)\packLib\*.C .
