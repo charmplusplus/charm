@@ -9,3 +9,6 @@ libcms.a: cms.o
 
 cms.o: cms.c
 	$(CHARMC) -c cms.c
+
+clean:
+	rm -f *.o libcms.a

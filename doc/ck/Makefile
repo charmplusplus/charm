@@ -1,40 +1,36 @@
+PSDIR=../../../doc/ps
+PDFDIR=../../../doc/pdf
+HDIR=../../../doc/html
 
-TEXFILES=manual.tex ack.tex
+all: ps pdf html
 
 ps:
 	make clean
+	touch index.tex
 	latex manual.tex
 	latex manual.tex
+	if [ -f manual.idx ] ; then makeindex -o index.tex manual.idx ; fi
 	latex manual.tex
 	dvips -o manual.ps manual.dvi
+	/bin/cp manual.ps $(PSDIR)/ck.ps
 
 html:
 	make clean
+	touch index.tex
 	latex manual.tex
 	latex2html -local_icons manual.tex
+	/bin/rm -rf $(HDIR)/ck
+	/bin/cp -R manual $(HDIR)/ck
 
 pdf:
 	make clean
+	touch index.tex
 	pdflatex manual.tex
+	if [ -f manual.idx ] ; then makeindex -o index.tex manual.idx ; fi
 	pdflatex manual.tex
-
-install:
-	rm -f /expand1/groupMosaic/distrib/kernel.manual.ps.gz
-	cp manual.ps /expand1/groupMosaic/distrib/kernel.manual.ps
-	gzip /expand1/groupMosaic/distrib/kernel.manual.ps
-	chmod 664 /expand1/groupMosaic/distrib/kernel.manual.ps.gz
-	rm -f /expand1/groupMosaic/distrib/kernel.manual.pdf
-	cp manual.pdf /expand1/groupMosaic/distrib/kernel.manual.pdf
-	chmod 664 /expand1/groupMosaic/distrib/kernel.manual.pdf
-	rm -f /expand1/groupMosaic/html-manuals/kernel.manual/*
-	cp manual/* /expand1/groupMosaic/html-manuals/kernel.manual/
-	chmod 664 /expand1/groupMosaic/html-manuals/kernel.manual/*
-
-all: ps pdf html install
+	/bin/cp manual.pdf $(PDFDIR)/ck.pdf
 
 clean:
-	rm -f *.ilg *.aux *.log *.dvi *.idx *.toc index.tex *.blg *.bbl
-
-veryclean: clean
-	rm -rf *.ps *.pdf manual/
-
+	/bin/rm -f *.ps *.pdf *.ilg *.aux *.log *.dvi *.idx *.toc 
+	/bin/rm -f index.tex *.blg *.bbl
+	/bin/rm -rf manual

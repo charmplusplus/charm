@@ -5,6 +5,7 @@ syntax() {
   echo 'Usage: SUPER-INSTALL <target> <version> [charmc-options ...]'
   echo ''
   echo 'targets: converse, charm++ libs ampi IDL tsm sm pvm sdag'
+  echo 'targets: doc ps-doc pdf-doc html-doc'
   echo ''
   echo 'versions: ' 
   echo `( cd src ; ls -1 | egrep -v '(^Common)|(^CVS)|(^QuickThreads)|(^ccs-client)' )`

@@ -8,6 +8,7 @@
 #     * ITC++ Translator
 #     * Charm++ IDL Translator
 #     * Languages
+#     * Documentation
 # 
 # This Makefile is common to all machines.  This works because the charmc
 # is smart enough to "conceal" the differences between machines.  charmc
@@ -23,7 +24,7 @@
 
 SHELL=/bin/sh
 
-all: charm++ libs ampi IDL tsm sm pvm sdag
+all: charm++ libs ampi IDL tsm sm pvm sdag doc
 
 charm++: converse libck.a charmxi
 
@@ -61,6 +62,18 @@ test-all: all
 
 test-converse: converse
 	cd ../pgms ; make test-converse  OPTS='$(OPTS)'
+
+ps-doc: basics
+	cd doc ; make ps
+
+pdf-doc: basics
+	cd doc ; make pdf
+
+html-doc: basics
+	cd doc ; make html
+
+doc: basics
+	cd doc ; make all
 
 CHARMC=../bin/charmc $(CHARMOPTS) $(OPTS)
 
@@ -109,6 +122,7 @@ dirs+sources:
 	rm -rf ../bin ; mkdir ../bin
 	rm -rf ../lib ; mkdir ../lib
 	rm -rf ../pgms
+	rm -rf ../doc ; mkdir ../doc
 	../../src/Common/scripts/gatherflat ../../src/Common/scripts .
 	./gatherflat ../../src/Common/conv-core        .
 	./gatherflat ../../src/Common/conv-ldb         .
@@ -128,6 +142,7 @@ dirs+sources:
 	./gatherflat ../../src/Common.`cat .gdir`      .
 	./gatherflat ../../src/`cat .vdir`             .
 	./gathertree ../../pgms ../pgms
+	./gathertree ../../doc doc
 	rm -f .vdir .gdir
 	touch dirs+sources
 
@@ -991,6 +1006,8 @@ clean:
 	rm -f core *.o
 	rm -f core #*#
 	rm -f core *~
+	( cd doc; make clean )
+	(cd libs; make clean )
 
 veryclean:
 	rm -rf ../bin
@@ -998,6 +1015,7 @@ veryclean:
 	rm -rf ../src
 	rm -rf ../pgms
 	rm -rf ../include
+	rm -rf ../doc
 	mv Makefile .Makefile
 	rm -rf [a-z]* [A-Z]*
 	mv .Makefile Makefile

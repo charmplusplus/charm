@@ -4,3 +4,9 @@ all:
 	cd barrier; make all OPTS='$(OPTS)'
 	cd irecv; make all OPTS='$(OPTS)'
 	cd fem; make all OPTS='$(OPTS)'
+
+clean:
+	cd barrier; make clean
+	cd irecv; make clean
+	cd fem; make clean
+

@@ -18,3 +18,5 @@ $(CDIR)/include/Barrier.decl.h: Barrier.decl.h
 $(CDIR)/include/barrier.h: barrier.h
 	/bin/cp barrier.h $(CDIR)/include
 
+clean:
+	rm -f *.decl.h *.def.h *.o libbarrier.a

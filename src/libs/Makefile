@@ -10,3 +10,8 @@ charmlibs:
 
 otherlibs:
 	cd other; make all OPTS='$(OPTS)'
+
+clean:
+	cd conv-libs; make clean
+	cd ck-libs; make clean
+	cd other; make clean

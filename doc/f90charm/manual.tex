@@ -1,13 +1,36 @@
-================================================================
-		       Fortran90 on Charm HOWTO
-================================================================
+\documentclass[11pt]{article}
+
+\newif\ifpdf
+\ifx\pdfoutput\undefined
+  \pdffalse
+\else
+  \pdfoutput=1
+  \pdftrue
+\fi
+
+\ifpdf
+  \pdfcompresslevel=9
+  \usepackage[pdftex,colorlinks=true,plainpages=false]{hyperref}
+\else
+\fi
+
+\pagestyle{headings}
+
+\title{Fortran90 Bindings for Charm++}
+\author{Jayant Desouza}
+
+\begin{document}
+
+\maketitle
 
 To interface Fortran90 to Charm and thus obtain a parallel version of
 your program you need to do the following things:
-1. Write your F90 program with some constraints
-2. Write a Charm Interface file (extension .ci)
-3. Compile and Link with Charm's Fortran library
-4. Run it !
+\begin{enumerate}
+\item Write your F90 program with some constraints
+\item Write a Charm Interface file (extension .ci)
+\item Compile and Link with Charm's Fortran library
+\item Run it !
+\end{enumerate}
 
 This is best explained with an example: the hello program.  It is a
 simple ring program.  When executed, an array of several parallel
@@ -18,9 +41,11 @@ chares are saying hello. :) The Fortran main() subroutine starts off
 the events.  And the SayHi() subroutine does the say-hello and
 forward.
 
-================ 1.1 ================
+\section{Writing F90 Program}
 To start, you need to create a Fortran Module to represent a chare,
 e.g. <ChareName>Mod.
+
+\begin{verbatim}
 
       ## Just replace Hello throughout with your chare's name. ##
       ## and add your chare's personal data below where indicated ##
@@ -38,10 +63,12 @@ e.g. <ChareName>Mod.
       END TYPE
 
       END MODULE
+\end{verbatim}
 
 In the Fortran file you must write an allocate funtion for this chare
-with the name: <ChareName>_allocate
+with the name: <ChareName>\_allocate
 
+\begin{verbatim}
       ## Just replace Hello throughout with your chare's name. ##
       ## Everything else remains the same ##
       SUBROUTINE Hello_allocate(objPtr, aid)
@@ -52,22 +79,24 @@ with the name: <ChareName>_allocate
       allocate(objPtr%obj)
       objPtr%aid = aid;
       END SUBROUTINE
+\end{verbatim}
 
 If you have written code for a chare array "Hello", as above, you will
 have the following subroutine available to you:
 
-  <ChareName>_CkNew(integer n, integer*8 aid)
+  \verb+<ChareName>\_CkNew(integer n, integer*8 aid)+
      This function creates a chare array at runtime
      where n is the number of items in the array, and
            aid is the array ID which is returned to you.
 
 We will see an example of using this function below.
 
-================ 1.2 ================
+\section{Writing Charm++ Interface File}
+
 Now that you have the chare, you need to write one or more ENTRY
 POINTs for it.  This is nothing but a Fortran subroutine that uses the
 above module.
-
+\begin{verbatim}
       ## p1, p2, etc represent user parameters
       ## the "objPtr, myIndex" stuff is required in every Entry Point.
       ## CkExit() must be called by the chare to terminate.
@@ -85,22 +114,23 @@ above module.
       else 
           call CkExit()
       endif
-
+\end{verbatim}
 Once you have written code for an Entry Point, you now have available
 to you the following subroutine:
-
+\begin{verbatim}
    SendTo_<ChareName>_<SubroutineName>(integer*8 aid, integer myIndex,
                           other parameters ....)
      where aid is the target chare array ID
            myIndex is the specific within the array
                    we wish to send a message to
            other parameters are the parameters in the above function.
+\end{verbatim}
 
-================ 1.3 ================
+\section{Compile and Link}
 You must have a Fortran main() subroutine where execution starts.
 Typically this main function will create a chare array and send a
 message to one of its members to get the computation started.
-
+\begin{verbatim}
       SUBROUTINE main()
       USE HelloMod
       integer i
@@ -113,15 +143,15 @@ message to one of its members to get the computation started.
       call SendTo_Hello_SayHi(aid, 0, 1);
 
       END
-
-================ 2 ================
+\end{verbatim}
+\section{Writing Charm++ Interface File}
 Now we move on to Step 2, the Charm Interface file.  This file must
 have a different name from the Fortran file, and must have an
 extension of .ci, e.g. if the above Fortran file is hellof.f90, this
 file could be called hello.ci.  Basically, its purpose is to tell
 Charm what you've done in the Fortran file, since Charm cannot read
 Fortran as of now.
-
+\begin{verbatim}
       ## Just replace Hello throughout with your chare's name. ##
       ## and add your chare's entry points below where indicated ##
       ## Everything else remains the same ##
@@ -143,18 +173,19 @@ Fortran as of now.
 
         };              
       };
-
+\end{verbatim}
 If the function has more parameters: e.g. A Fortran function FF(int,
 int, long) in module H, would be described in the .ci file as:
+\begin{verbatim}
   message MarshalParams { int, int, long };
   array H {
     entry H();
     entry void FF(MarshalParams *);
   }
+\end{verbatim}
 As mentioned above, the message must have a unique name.
 
-================ 3 ================
-
+\section{Compile and Link}
 Lastly, you need to compile and link the Fortran program with the
 Charm program as follows: (Let's say you have written hellof.f90, and
 hello.ci)
@@ -177,7 +208,7 @@ hello.ci)
     will link hellof.o, helloHelper.o and Charm's Fortran library
     to create your executable program 'hello'
 
-================ 4 ================
+\section{Run Program}
 
 Finally, to run the program, make sure you have a nodelist file called
 "nodelist" and containing, for example,
@@ -190,4 +221,4 @@ and then type
 ./conv-host +p2 hello
 
 which will run 'hello' on two virtual processors.
-
+\end{document}

@@ -7,3 +7,9 @@ all:
 	cd metis; make all OPTS='$(OPTS)'
 	cd ddt; make all OPTS='$(OPTS)'
 
+clean:
+	cd master-slave; make clean
+	cd commlib; make clean
+	cd packlib; make clean
+	cd metis; make clean
+	cd ddt; make clean

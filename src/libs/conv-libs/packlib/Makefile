@@ -16,3 +16,6 @@ packc.o: packc.C PackLib.h
 
 packf77.o: packf77.C PackLib.h
 	$(CHARMC) -c packf77.C
+
+clean:
+	rm -f *.o libpacklib.a 

@@ -1,46 +1,36 @@
-TEXFILES=manual.tex intro.tex irecv.tex
+PSDIR=../../../doc/ps
+PDFDIR=../../../doc/pdf
+HDIR=../../../doc/html
 
-ps: $(TEXFILES)
+all: ps pdf html
+
+ps:
 	make clean
 	touch index.tex
 	latex manual.tex
-	bibtex manual
-	makeindex -o index.tex manual.idx
 	latex manual.tex
+	if [ -f manual.idx ] ; then makeindex -o index.tex manual.idx ; fi
 	latex manual.tex
 	dvips -o manual.ps manual.dvi
+	/bin/cp manual.ps $(PSDIR)/libraries.ps
 
-html: $(TEXFILES)
+html:
 	make clean
+	touch index.tex
 	latex manual.tex
 	latex2html -local_icons manual.tex
+	/bin/rm -rf $(HDIR)/libraries
+	/bin/cp -R manual $(HDIR)/libraries
 
-pdf: $(TEXFILES)
+pdf:
 	make clean
 	touch index.tex
 	pdflatex manual.tex
-	bibtex manual
-	makeindex -o index.tex manual.idx
+	if [ -f manual.idx ] ; then makeindex -o index.tex manual.idx ; fi
 	pdflatex manual.tex
-	pdflatex manual.tex
-
-install:
-	rm -f /expand1/groupMosaic/distrib/libraries.manual.ps.gz
-	cp manual.ps /expand1/groupMosaic/distrib/libraries.manual.ps
-	gzip /expand1/groupMosaic/distrib/libraries.manual.ps
-	chmod 664 /expand1/groupMosaic/distrib/libraries.manual.ps.gz
-	rm -f /expand1/groupMosaic/distrib/libraries.manual.pdf
-	cp manual.pdf /expand1/groupMosaic/distrib/libraries.manual.pdf
-	chmod 664 /expand1/groupMosaic/distrib/libraries.manual.pdf
-	rm -f /expand1/groupMosaic/html-manuals/libraries.manual/*
-	cp manual/* /expand1/groupMosaic/html-manuals/libraries.manual/
-	chmod 664 /expand1/groupMosaic/html-manuals/libraries.manual/*
-
-all: ps pdf html install
+	/bin/cp manual.pdf $(PDFDIR)/libraries.pdf
 
 clean:
-	rm -f *.ilg *.aux *.log *.dvi *.idx *.toc index.tex *.blg *.bbl
-
-veryclean: clean
-	rm -rf *.ps *.pdf manual/
-
+	/bin/rm -f *.ps *.pdf *.ilg *.aux *.log *.dvi *.idx *.toc 
+	/bin/rm -f index.tex *.blg *.bbl
+	/bin/rm -rf manual
