@@ -958,6 +958,9 @@ CpvExtern(void*, CmiLocalQueue);
 CpvExtern(int, CmiImmediateMsgHandlerIdx);
 
 void CmiProbeImmediateMsg();
+#if CMK_IMMEDIATE_MSG
+void CmiDelayImmediate();
+#endif
 
 /******** Object ID ********/
 
