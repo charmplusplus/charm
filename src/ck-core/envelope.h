@@ -66,12 +66,6 @@ typedef unsigned char  UChar;
 
 #include <charm.h> // for CkGroupID
 
-#if CMK_BLUEGENE_CHARM
-#define CmiReservedHeaderSize   CmiBlueGeneMsgHeaderSizeBytes
-#else
-#define CmiReservedHeaderSize   CmiExtHeaderSizeBytes
-#endif
-
 /**
 The "envelope" sits at the start of every Charm++
 message. It stores information about the handler and
