@@ -211,11 +211,12 @@ void CldModuleGeneralInit(char **argv)
 
   CpvInitialize(CldProcInfo, CldProc);
   CpvInitialize(int, CldLoadOffset);
+  CpvInitialize(int, CldLoadNotify);
+  CpvAccess(CldLoadOffset) = 0;
   CpvInitialize(BitVector, CldPEBitVector);
   CpvAccess(CldPEBitVector) = (char *)malloc(CmiNumPes()*sizeof(char));
   for (i=0; i<CmiNumPes(); i++)
     CpvAccess(CldPEBitVector)[i] = 1;
-  CpvAccess(CldLoadOffset) = 0;
   CpvAccess(CldProc) = (CldProcInfo)CmiAlloc(sizeof(struct CldProcInfo_s));
   proc = CpvAccess(CldProc);
   proc->load = 0;

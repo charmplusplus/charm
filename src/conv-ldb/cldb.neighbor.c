@@ -430,6 +430,9 @@ void CldGraphModuleInit(char **argv)
   CpvAccess(CldAskLoadHandlerIndex) = 
     CmiRegisterHandler((CmiHandler)CldAskLoadHandler);
 
+  /* communication thread */
+  if (CmiMyRank() == CmiMyNodeSize())  return;
+
   CmiGetArgStringDesc(argv, "+LBTopo", &_lbtopo, "define load balancing topology");
   if (CmiMyPe() == 0) CmiPrintf("Seed LB> Topology %s\n", _lbtopo);
 
