@@ -42,7 +42,8 @@ int inside_comm = 0;
 double starttimer;
 
 void CmiAbort(const char *message);
-
+void CmiMemLock(void) {}
+void CmiMemUnlock(void) {}
 /**************************  TIMER FUNCTIONS **************************/
 
 void CmiTimerInit(void)
