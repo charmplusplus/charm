@@ -100,11 +100,11 @@ static void setspeed_eth()
 static void setspeed_gigabit()
 {
   /* for gigabit net */
-  Cmi_max_dgram_size   = 15000;
-  Cmi_window_size      = 10;
+  Cmi_max_dgram_size   = 9000;
+  Cmi_window_size      = 8;
   Cmi_os_buffer_size   = 200000;
-  Cmi_delay_retransmit = 0.0250;
-  Cmi_ack_delay        = 0.0040;
+  Cmi_delay_retransmit = 0.020;
+  Cmi_ack_delay        = 0.018;
 }
 
 static void extract_args(char **argv)
