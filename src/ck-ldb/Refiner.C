@@ -309,7 +309,7 @@ int Refiner::multirefine()
         minOverload = curOverload;
     }
   }
-
+  return 1;
 }
 
 void Refiner::Refine(int count, CentralLB::LDStats* stats, 
