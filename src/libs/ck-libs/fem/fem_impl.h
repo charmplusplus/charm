@@ -215,6 +215,9 @@ public:
 	  {delete [] udata;udata=NULL;}
 	void pup(PUP::er &p);
 	void print(const char *type,const l2g_t &l2g);
+	
+	int size(void) const {return n;}
+	int getDataPer(void) const {return dataPer;}
 
 	int isGhostIndex(int idx) const {
 		return idx>=ghostStart;
@@ -243,6 +246,9 @@ public:
 	FEM_Elem():FEM_Item() {nodesPer=-1;conn=NULL;}
 	~FEM_Elem() //Free all stored memory
 	  {delete [] conn;conn=NULL;}
+	
+	int getNodesPer(void) const {return nodesPer;}
+	
 	void allocConn(void)
 	{delete[] conn; conn=new int[connCount()];}
 	void pup(PUP::er &p);
@@ -410,7 +416,7 @@ public:
 	int nElems() const //Return total number of elements (of all types)
 	  {return nElems(elem.size());}
 	int nElems(int t) const;//Return total number of elements before type t
-	int getGlobalElem(int elType,int elNo) const {return nElems(elType)+elNo;}
+	int getGlobalElem(int elType,int elNo) const;
 	void pup(PUP::er &p); //For migration
 	void print(const l2g_t &l2g);//Write human-readable description to CkPrintf
 };

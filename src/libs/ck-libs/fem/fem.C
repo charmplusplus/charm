@@ -2232,9 +2232,27 @@ void FEM_Mesh::copyType(const FEM_Mesh &from)//Copies nElemTypes and *Per fields
 
 int FEM_Mesh::nElems(int t_max) const //Return total number of elements before type t_max
 {
+#ifndef CMK_OPTIMIZE
+	if (t_max<0 || t_max>elem.size()) {
+		CkPrintf("FEM> Invalid element type %d used!\n");
+		CkAbort("FEM> Invalid element type");
+	}
+#endif
 	int ret=0;
 	for (int t=0;t<t_max;t++) ret+=elem[t].n;
 	return ret;
+}
+
+int FEM_Mesh::getGlobalElem(int elType,int elNo) const
+{
+	int base=nElems(elType); //Global number of first element of this type
+#ifndef CMK_OPTIMIZE
+	if (elNo<0 || elNo>=elem[elType].size()) {
+		CkPrintf("FEM> Invalid element number %d used!\n");
+		CkAbort("FEM> Invalid element number");
+	}
+#endif
+	return base+elNo;
 }
 
 

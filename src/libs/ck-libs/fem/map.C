@@ -13,10 +13,10 @@ is a bit unusual-- it's a table that maps nodes to lists of processors
 the vast majority of nodes are not shared between processors; 
 this algorithm uses this to keep space and time costs low.
 
-Memory usage for the large temporary arrays is n*sizeof(peList)
-+p^2*sizeof(peList), all allocated contiguously.  Shared nodes
-will result in a few independently allocated peList entries,
-but shared nodes should be rare so this should not be expensive.
+Memory usage for the large temporary arrays is n*sizeof(peList),
+allocated contiguously.  Shared nodes will result in a few independently 
+allocated peList entries, but shared nodes should be rare so this should 
+not be expensive.
 
 Originally written by Orion Sky Lawlor, olawlor@acm.org, 9/28/2000
 */
@@ -488,8 +488,8 @@ static void checkArrayEntries(const int *arr,int nArr,int max,const char *what)
 	//Check the array for out-of-bounds values
 	for (int e=0;e<nArr;e++) {
 		if ((arr[e]<0)||(arr[e]>=max)) {
-			CkError("FEM Map Error> Entry %d of %s is %d--out of bounds!\n",
-				e,what,arr[e]);
+			CkError("FEM Map Error> Entry %d of %s is %d (but should be below %d)\n",
+				e,what,arr[e],max);
 			CkAbort("FEM Array element out of bounds");
 		} 
 	}
@@ -511,6 +511,15 @@ void fem_split(const FEM_Mesh *mesh,int nchunks,int *elem2chunk,
 	//Check the user's connectivity array
 		checkArrayEntries(mesh->elem[t].conn,mesh->elem[t].n,
 		     mesh->node.n, "element connectivity, from FEM_Set_Elem_Conn,");
+	}
+	for (int s=0;s<mesh->nSparse();s++) {
+	//Check the sparse data
+		const FEM_Sparse &src=mesh->getSparse(s);
+		checkArrayEntries(src.getNodes(0),src.size()*src.getNodesPer(),
+			mesh->node.n, "sparse data nodes, from FEM_Set_Sparse,");
+		if (src.getElem())
+		  checkArrayEntries(src.getElem(),src.size()*2,
+			mesh->nElems(),"sparse data elements, from FEM_Set_Sparse_Elem,");
 	}
 	
 	splitter s(mesh,elem2chunk,nchunks);
@@ -550,38 +559,6 @@ the first layer are equal to the shared nodes.  Each time
 a ghost layer is added, the set of interesting nodes grows.
 */
 
-//Add one layer of ghost elements
-void splitter::addGhosts(int nLayers,const ghostLayer *g)
-{
-	if (nLayers==0) return; //No ghost layers-- nothing to do
-	
-//Build initial ghostNode table-- just the shared nodes
-	ghostNode=new unsigned char[mesh->node.n];
-	int n,nNode=mesh->node.n;
-	for (n=0;n<nNode;n++) {
-		ghostNode[n]=(gNode[n].isShared());
-	}
-//Set up the ghostStart counts:
-	for (int c=0;c<nchunks;c++) {
-		msgs[c]->m.node.ghostStart=chunks[c].node.size();
-		for (int t=0;t<mesh->elem.size();t++) 
-			msgs[c]->m.elem[t].ghostStart=chunks[c].elem[t].size();
-	}
-
-//Add each layer
-	consistencyCheck();
-	for (int i=0;i<nLayers;i++) {
-		add(g[i]);
-		consistencyCheck();
-	}
-
-//Free up memory
-	delete[] ghostNode; ghostNode=NULL;
-	for (int t=0;t<mesh->elem.size();t++)
-	  {delete[] gElem[t];gElem[t]=NULL;}
-}
-
-
 //A linked list of elements surrounding a tuple.
 //ElemLists are allocated one at a time, and hence much simpler than pelists:
 class elemList {
@@ -591,9 +568,10 @@ public:
 	int type; //Kind of element
 	elemList *next;
 
-	elemList() {next=NULL;}
-	elemList(int pe_,int localNo_,int type_,elemList *next_=NULL)
-		:pe(pe_),localNo(localNo_),type(type_),next(next_) {}
+	elemList(int pe_,int localNo_,int type_)
+		:pe(pe_),localNo(localNo_),type(type_) { next=NULL; }
+	~elemList() {if (next) delete next;}
+	void setNext(elemList *n) {next=n;}
 };
 
 static CkHashCode CkHashFunction_ints(const void *keyData,size_t keyLen)
@@ -629,33 +607,15 @@ class tupleTable : public CkHashtable {
   static CkHashtableLayout makeLayout(int tupleLen) {
     int ks=tupleLen*sizeof(int);
     int oo=roundUp(ks+sizeof(char),sizeof(void *));
-    int os=sizeof(elemList);
+    int os=sizeof(elemList *);
     return CkHashtableLayout(ks,ks,oo,os,oo+os);
   }
-public:
-	enum {MAX_TUPLE=8};
-	tupleTable(int tupleLen_)
-		:CkHashtable(makeLayout(tupleLen_),
-			     137,0.75,
-			     CkHashFunction_ints,
-			     CkHashCompare_ints)
+  
+	//Make a canonical version of this tuple, so different
+	// orderings of the same nodes don't end up in different lists.
+	//I canonicalize by sorting:
+	void canonicalize(const int *tuple,int *can)
 	{
-		tupleLen=tupleLen_;
-		if (tupleLen>MAX_TUPLE) CkAbort("Cannot have that many shared nodes!\n");
-		it=NULL;
-	}
-	~tupleTable() {
-		beginLookup();
-		elemList *doomed;
-		while (NULL!=(doomed=(elemList *)lookupNext()))
-			delete doomed->next;
-	}
-	void addTuple(const int *tuple,int pe,int localNo,int type)
-	{
-		//Must make a canonical version of this tuple so different
-		// orderings of the same nodes don't end up in different lists.
-		//I canonicalize by sorting:
-		int can[MAX_TUPLE];
 		switch(tupleLen) {
 		case 1: //Short lists are easy to sort:
 			can[0]=tuple[0]; break;
@@ -669,16 +629,47 @@ public:
 			memcpy(can,tuple,tupleLen*sizeof(int));
 			qsort(can,tupleLen,sizeof(int),ck_fem_map_compare_int);
 		};
-		
+	}
+public:
+	enum {MAX_TUPLE=8};
+
+	tupleTable(int tupleLen_)
+		:CkHashtable(makeLayout(tupleLen_),
+			     137,0.5,
+			     CkHashFunction_ints,
+			     CkHashCompare_ints)
+	{
+		tupleLen=tupleLen_;
+		if (tupleLen>MAX_TUPLE) CkAbort("Cannot have that many shared nodes!\n");
+		it=NULL;
+	}
+	~tupleTable() {
+		beginLookup();
+		elemList *doomed;
+		while (NULL!=(doomed=(elemList *)lookupNext()))
+			delete doomed;
+	}
+	//Lookup the elemList associated with this tuple, or return NULL
+	elemList **lookupTuple(const int *tuple) {
+		int can[MAX_TUPLE];
+		canonicalize(tuple,can);
+		return (elemList **)get(can);
+	}	
+	
+	//Register this (new'd) element with this tuple
+	void addTuple(const int *tuple,elemList *nu)
+	{
+		int can[MAX_TUPLE];
+		canonicalize(tuple,can);
 		//First try for an existing list:
-		elemList *dest=(elemList *)get(can);
+		elemList **dest=(elemList **)get(can);
 		if (dest!=NULL) 
-		{ //A list already exists here-- add in the new record
-			dest->next=new elemList(pe,localNo,type,dest->next);
+		{ //A list already exists here-- link it into the new list
+			nu->setNext(*dest);
 		} else {//No pre-existing list-- initialize a new one.
-			dest=(elemList *)put(can);
-			*dest=elemList(pe,localNo,type);
+			dest=(elemList **)put(can);
 		}
+		*dest=nu;
 	}
 	//Return all registered elemLists:
 	void beginLookup(void) {
@@ -690,9 +681,43 @@ public:
 			delete it; 
 			return NULL;
 		}
-		return (elemList *)ret;
+		return *(elemList **)ret;
 	}
 };
+
+//Add all the layers of ghost elements
+void splitter::addGhosts(int nLayers,const ghostLayer *g)
+{
+	if (nLayers==0) return; //No ghost layers-- nothing to do
+	
+//Build initial ghostNode table-- just the shared nodes
+	ghostNode=new unsigned char[mesh->node.n];
+	int n,nNode=mesh->node.n;
+	for (n=0;n<nNode;n++) {
+		ghostNode[n]=(gNode[n].isShared());
+	}
+//Set up the ghostStart counts:
+	for (int c=0;c<nchunks;c++) {
+		msgs[c]->m.node.ghostStart=chunks[c].node.size();
+		for (int t=0;t<mesh->elem.size();t++) 
+			msgs[c]->m.elem[t].ghostStart=chunks[c].elem[t].size();
+	}
+
+//Mark the symmetry boundaries
+	
+
+//Add each layer
+	consistencyCheck();
+	for (int i=0;i<nLayers;i++) {
+		add(g[i]);
+		consistencyCheck();
+	}
+
+//Free up memory
+	delete[] ghostNode; ghostNode=NULL;
+	for (int t=0;t<mesh->elem.size();t++)
+	  {delete[] gElem[t];gElem[t]=NULL;}
+}
 
 //Add one layer of ghost elements
 void splitter::add(const ghostLayer &g)
@@ -726,7 +751,7 @@ void splitter::add(const ghostLayer &g)
 				}
 				if (i==g.nodesPerTuple) 
 				{ //This was a good tuple-- add it
-					table.addTuple(tuple,c,e,t);
+					table.addTuple(tuple,new elemList(c,e,t));
 					totTuples++;
 				}
 			  }
@@ -734,6 +759,9 @@ void splitter::add(const ghostLayer &g)
 	        }
 	   }
 	}
+	
+	//Add ghosts due to symmetries:
+	
        
 	//Loop over all the tuples, connecting adjacent elements
 	table.beginLookup();
