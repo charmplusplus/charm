@@ -1672,7 +1672,7 @@ int TransmitDatagram()
       for (count=0; count<Cmi_window_size; count++) {
 	dg = node->send_window[slot];
 	if (dg) break;
-	slot = ((slot-1) % Cmi_window_size);
+	slot = ((slot+Cmi_window_size-1) % Cmi_window_size);
       }
       if (dg) {
 	TransmitImplicitDgram1(node->send_window[slot]);
