@@ -1,0 +1,21 @@
+module parCollide {
+  message objListMsg;
+  readonly gridMapping gridMap;
+  
+  group syncReductionMgr {
+    entry syncReductionMgr();
+    entry void childProd(int stepCount);
+    entry void childDone(int stepCount);
+  };
+  group collideMgr : syncReductionMgr {
+    entry collideMgr(CkArrayID cells);
+    entry void voxelMessageRecvd(void);
+  };
+
+  array [3D] collideVoxel {
+    entry collideVoxel();
+    entry [createhere] void add(objListMsg *);
+//    entry [createhome] void add(objListMsg *);
+    entry void startCollision(void);
+  };
+};

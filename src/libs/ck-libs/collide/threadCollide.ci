@@ -1,0 +1,7 @@
+module threadCollide {
+  extern module parCollide;
+  group threadedCollideMgr : collideMgr {
+    entry threadedCollideMgr(CkArrayID cells);
+    entry void collisionList(int nColl,collision colls[nColl]);
+  };
+};
