@@ -822,10 +822,13 @@ extern CthThread CthUnpackThread(void *);
 
 CthCpvExtern(char *,CthData);
 extern int CthRegister(int);
+extern char *CthGetData(CthThread t);
+
 #define CtvDeclare(t,v)         typedef t CtvType##v; CsvDeclare(int,CtvOffs##v)=(-1)
 #define CtvStaticDeclare(t,v)   typedef t CtvType##v; CsvStaticDeclare(int,CtvOffs##v)=(-1)
 #define CtvExtern(t,v)          typedef t CtvType##v; CsvExtern(int,CtvOffs##v)
 #define CtvAccess(v)            (*((CtvType##v *)(CthCpvAccess(CthData)+CsvAccess(CtvOffs##v))))
+#define CtvAccessOther(t,v)            (*((CtvType##v *)(CthGetData(t)+CsvAccess(CtvOffs##v))))
 #define CtvInitialize(t,v)      do { if(CsvAccess(CtvOffs##v)==(-1)) CsvAccess(CtvOffs##v)=CthRegister(sizeof(CtvType##v)); } while(0)
 
 /************************************************************************

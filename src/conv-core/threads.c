@@ -145,6 +145,8 @@ typedef struct CthThreadStruct
   qt_t      *savedptr;   /* stack pointer */
 } CthThreadStruct;
 
+char *CthGetData(CthThread t) { return t->data; }
+
 int CthPackBufSize(CthThread t)
 {
 #ifndef CMK_OPTIMIZE
@@ -495,6 +497,8 @@ struct CthThreadStruct
   CthThread  qnext;
   LPVOID     fiber;
 };
+
+char *CthGetData(CthThread t) { return t->data; }
 
 CthCpvDeclare(char *,    CthData);
 CthCpvStatic(CthThread,  CthCurrent);
@@ -925,6 +929,8 @@ struct CthThreadStruct
   qt_t      *stack;
   qt_t      *stackp;
 };
+
+char *CthGetData(CthThread t) { return t->data; }
 
 #define STACKSIZE (32768)
 CpvStaticDeclare(int, _stksize);
@@ -1436,6 +1442,8 @@ struct CthThreadStruct
   qt_t      *stack;
   qt_t      *stackp;
 };
+
+char *CthGetData(CthThread t) { return t->data; }
 
 CthCpvDeclare(char *,    CthData);
 CthCpvStatic(CthThread,  CthCurrent);
