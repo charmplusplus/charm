@@ -25,6 +25,7 @@ class CkLBArgs
 private:
   double _autoLbPeriod;		// in seconds
   int _lb_debug;		// 1 or greater
+  int _lb_printsumamry;		// print summary
   int _lb_ignoreBgLoad;
   int _lb_migObjOnly;		// only consider migratable objs
   int _lb_syncResume;
@@ -39,12 +40,13 @@ public:
   CkLBArgs() {
     _autoLbPeriod = 0.5;	// 0.5 second default
     _lb_debug = _lb_ignoreBgLoad = _lb_syncResume = _lb_useCpuTime = 0;
-    _lb_migObjOnly = 0;
+    _lb_printsumamry = _lb_migObjOnly = 0;
     _lb_statson = _lb_traceComm = 1;
     _lb_version = LB_FORMAT_VERSION;
   }
   inline double & lbperiod() { return _autoLbPeriod; }
   inline int & debug() { return _lb_debug; }
+  inline int & printSummary() { return _lb_printsumamry; }
   inline int & lbversion() { return _lb_version; }
   inline int & ignoreBgLoad() { return _lb_ignoreBgLoad; }
   inline int & migObjOnly() { return _lb_migObjOnly; }

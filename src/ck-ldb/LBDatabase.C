@@ -235,6 +235,10 @@ void _loadbalancerInit()
     _lb_args.debug() = CmiGetArgFlagDesc(argv, "+LBDebug", 
   					     "Turn on LB debugging printouts");
 
+  // ask to print summary/quality of load balancer
+  _lb_args.printSummary() = CmiGetArgFlagDesc(argv, "+LBPrintSummary",
+		"Print load balancing result summary");
+
   // to ignore baclground load
   _lb_args.ignoreBgLoad() = CmiGetArgFlagDesc(argv, "+LBNoBackground", 
                       "Load balancer ignores the background load.");
@@ -270,6 +274,8 @@ void _loadbalancerInit()
       CmiPrintf("LB> Load balancer running with verbose mode level %d, period time: %gs, alpha: %es beta: %es.\n", _lb_args.debug(), _lb_args.lbperiod(), _lb_args.alpha(), _lb_args.beeta());
       CkPrintf("LB> Topology %s\n", _lbtopo);
     }
+    if (_lb_args.printSummary())
+      CmiPrintf("LB> Load balancer print summary of load balancing result.\n");
     if (_lb_args.ignoreBgLoad())
       CmiPrintf("LB> Load balancer ignores processor background load.\n");
     if (_lb_args.samePeSpeed())
