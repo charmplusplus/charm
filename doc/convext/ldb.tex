@@ -1,13 +1,13 @@
 \chapter{Load Balancing}
 
-Converse provides the programmer with a number of Load Balancing
+\converse{} provides the programmer with a number of Load Balancing
 strategies in order to distribute work among the processors in the
 system. The load balancing strategy to be used in the program can be
 specified at the link time. \note{In future versions, we will
 provide users with the ability to write their own load balancing
 strategies. However, in this version, the choice is limited to certain
 predefined load balancing strategies.} The following functions are provided
-for interfacing a Converse program with the load balancing module.
+for interfacing a \converse{} program with the load balancing module.
 
 \function{void CldNewSeedFromLocal(void *msg, void *ldb, void (*sendfn)(),int queueing, int priolen, int *prioptr)}
 \index{CldNewSeedFromLocal}
@@ -42,11 +42,11 @@ different use of the parameter \param{ldb}. Some of the currently
 implemented language specific load balancing strategies use this area
 in the message for sending the load information on local processor
 piggy-backed onto the message periodically; some of them may not need
-this area at all. \note{The only ldb strategy available to Converse
+this area at all. \note{The only ldb strategy available to \converse{}
 users currently, i.e. random, does not use this area and the user could
 specify \param{void * (0))} there.}
 
-Some of the parallel languages or libraries built on top of Converse
+Some of the parallel languages or libraries built on top of \converse{}
 may have the message packing mechanisms which have to be called before
 any message crosses address boundaries. Therefore the load balancing
 module cannot use built-in functions such as \param{CmiAsyncSend()}

@@ -1,6 +1,6 @@
-\chapter{Converse Pseudorandom Number Generator}
+\chapter{\converse{} Pseudorandom Number Generator}
 
-Converse provides three different Linear Congruential Random Number Generators.
+\converse{} provides three different Linear Congruential Random Number Generators.
 Each random number stream has a cycle length of $2^{64}$ as opposed to
 ANSI C standard's $2^{48}$.
 Also, each of the three random number streams can be split into a number of
@@ -10,16 +10,16 @@ section in the random number generator,and yet, this functionality is
 thread-safe, because all the state information is stored in the structure
 allocated by the programmer. Further, this state information is stored in a
 first class object, and can be passed to other processors through messages.
-This module of Converse is based on the public-domain 
+This module of \converse{} is based on the public-domain 
 SPRNG\footnote{URL:{\tt http://www.ncsa.uiuc.edu/Apps/SPRNG/www/}} 
 package developed
 by Ashok Srinivasan\footnote{Email:{\tt ashoks@ncsa.uiuc.edu}} at NCSA.
 
 For minimal change to programs already using C functions {\tt rand()},
-{\tt srand()}, and {\tt drand48()}, Converse also maintains a ``default''
+{\tt srand()}, and {\tt drand48()}, \converse{} also maintains a ``default''
 random number stream.
 
-Interface to the Converse Pseudorandom Number Generator module is as follows:
+Interface to the \converse{} Pseudorandom Number Generator module is as follows:
 
 \function{typedef ... CrnStream;}
 \index{CrnStream}

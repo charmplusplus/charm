@@ -1,6 +1,6 @@
 \chapter{Parallel Arrays of Threads}
 
-This module is CPath: Converse Parallel Array of Threads.  It makes it
+This module is CPath: \converse{} Parallel Array of Threads.  It makes it
 simple to create arrays of threads, where the threads are distributed
 across the processors.  It provides simple operations like sending a
 message to a thread, as well as group operations like multicasting to
@@ -77,14 +77,14 @@ described by a context-free grammar:
 \function{void CPathSend(dest-clause, tag-clause, data-clause, end-clause)}
 Where:
 
-\begin{verbatim}
+\begin{alltt}
     dest-clause :== CPATH_DEST ',' pathptr ',' index ',' index ',' ...
     tag-clause  :== CPATH_TAG ',' tag
     tag-clause  :== CPATH_TAGS ',' tag ',' tag ',' ... ',' 0
     tag-clause  :== CPATH_TAGVEC ',' numtags ',' tagvector
     data-clause :== CPATH_BYTES ',' numbytes ',' bufptr
     end-clause  :== CPATH_END
-\end{verbatim}
+\end{alltt}
 
 The symbols {\tt CPATH\_DEST}, {\tt CPATH\_TAG}, {\tt CPATH\_TAGS},
 {\tt CPATH\_TAGVEC}, {\tt CPATH\_BYTES}, {\tt CPATH\_END}, and the
@@ -107,7 +107,7 @@ using CPathMsgDecodeBytes, and finally discarded with CPathMsgFree:
 \function{void *CPathRecv(tag-clause, end-clause)}
 \desc{The tag-clause and end-clause match the grammar for CPathSend.
 The function will wait until a message with the same tags shows up (it
-waits using the thread-blocking primitives, see Converse threads).  If
+waits using the thread-blocking primitives, see \converse{} threads).  If
 any position in the CPathRecv tag-vector is {\tt CPATH\_WILD}, then
 that one position is ignored.  CPathRecv returns an ``opaque CPath
 message''.  The message contains the data somewhere inside it.  The
@@ -134,7 +134,7 @@ CPathReduce are most easily described by a context-free grammar:
 \function{void CPathReduce(over-clause, tag-clause, red-clause, data-clause, dest-clause, end-clause)}
 Where:
 
-\begin{verbatim}
+\begin{alltt}
     over-clause :== CPATH_OVER ',' pathptr ',' index ',' index ',' ...
     dest-clause :== CPATH_DEST ',' pathptr ',' index ',' index ',' ...
     tag-clause  :== CPATH_TAG ',' tag
@@ -143,7 +143,7 @@ Where:
     data-clause :== CPATH_BYTES ',' vecsize ',' eltsize ',' data
     red-clause  :== CPATH_REDUCER ',' redfn
     end-clause  :== CPATH_END
-\end{verbatim}
+\end{alltt}
 
 The over-clause specifies the set of threads participating in the
 reduction.  One or more of the indices should be {\tt CPATH\_ALL}, the

@@ -24,22 +24,22 @@ function is called.
 For example, if the CPM scanner sees the following function
 declaration
 
-\begin{verbatim}
-    CpmInvokable myfunc(int x, int y) { ... }
-\end{verbatim}
+\begin{alltt}
+    CpmInvokable myfunc(int x, int y) \{ ... \}
+\end{alltt}
 
 The scanner will generate a launcher named {\tt Cpm\_myfunc}.
 The launcher has this prototype:
 
-\begin{verbatim}
+\begin{alltt}
     void Cpm_myfunc(CpmDestination destination, int x, int y);
-\end{verbatim}
+\end{alltt}
 
 If one were to call {\tt Cpm\_myfunc} as follows:
 
-\begin{verbatim}
+\begin{alltt}
     Cpm_myfunc(CpmSend(3), 8, 9);
-\end{verbatim}
+\end{alltt}
 
 a message would be sent to processor 3 ordering it to call {\tt
 myfunc(8,9)}.  Notice that the {\it destination} argument isn't just an
@@ -71,29 +71,29 @@ mechanisms.
 We demonstrate the use of the CPM mechanisms using the following
 short program {\tt myprog.c}:
 
-\begin{verbatim}
+\begin{alltt}
  1:    #include "myprog.cpm.h"
  2:   
  3:    CpmInvokable print_integer(int n)
- 4:    {
- 5:      CmiPrintf("%d\n", n);
- 6:    }
+ 4:    \{
+ 5:      CmiPrintf("%d\verb+\+n", n);
+ 6:    \}
  7:    
  8:    user_main(int argc, char **argv)
- 9:    {
+ 9:    \{
 10:      int i;
 11:      CpmModuleInit();
 12:      CpmInitializeThisModule();
 13:      if (CmiMyPe()==0)
 14:        for (i=1; i<CmiNumPes(); i++)
 15:          Cpm_print_integer(CpmSend(i), rand());
-16:    }
+16:    \}
 17:    
 18:    main(int argc, char **argv)
-19:    {
+19:    \{
 20:      ConverseInit(argc, argv, user_main, 0, 0);
-21:    }
-\end{verbatim}
+21:    \}
+\end{alltt}
 
 Lines 3-6 of this program contain a simple C function that prints an
 integer.  The function is marked with the word {\tt CpmInvokable}.
@@ -167,9 +167,9 @@ Instead of supplying a processor number, one can also supply the
 special symbols CPM\_ALL or CPM\_OTHERS, causing a broadcast.  For
 example,
 
-\begin{verbatim}
+\begin{alltt}
 Cpm_print_integer(CpmMakeThread(CPM_ALL), 5);
-\end{verbatim}
+\end{alltt}
 
 would broadcast a message to all the processors causing each processor
 to create a thread, which would in turn invoke {\tt print\_integer}
@@ -182,10 +182,10 @@ argument lists.  In particular, the argument list of a CpmInvokable
 function can only contain cpm-single-arguments and cpm-array-arguments,
 as defined by this grammar:
 
-\begin{verbatim}
+\begin{alltt}
     cpm-single-argument :== typeword varname
     cpm-array-argument  :== typeword '*' varname
-\end{verbatim}
+\end{alltt}
 
 When CPM sees the cpm-array-argument notation, CPM interprets it as
 being a pointer to an array.  In this case, CPM attempts to pack an
@@ -202,37 +202,37 @@ array values as automatically as it handles single values.
 
 A second program, {\tt example2.c}, uses array arguments:
 
-\begin{verbatim}
+\begin{alltt}
  1:    #include "example2.cpm.h"
  2:   
  3:    CpmInvokable print_program_arguments(CpmDim argc, CpmStr *argv)
- 4:    {
+ 4:    \{
  5:      int i;
  6:      CmiPrintf("The program's arguments are: ");
  7:      for (i=0; i<argc; i++) CmiPrintf("%s ", argv[i]);
- 8:      CmiPrintf("\n");
- 9:    }
+ 8:      CmiPrintf("\verb+\+n");
+ 9:    \}
 10:
 11:    user_main(int argc, char **argv)
-12:    {
+12:    \{
 13:      CpmModuleInit();
 14:      CpmInitializeThisModule();
 15:      if (CmiMyPe()==0)
 16:        Cpm_print_program_arguments(CpmSend(1), argc, argv);
-17:    }
+17:    \}
 18:
 19:    main(int argc, char **argv)
-20:    {
+20:    \{
 21:      ConverseInit(argc, argv, user_main, 0, 0);
-22:    }
-\end{verbatim}
+22:    \}
+\end{alltt}
 
 The word {\tt CpmStr} is a CPM built-in type, it represents a
 null-terminated string:
 
-\begin{verbatim}
+\begin{alltt}
 	typedef char *CpmStr;
-\end{verbatim}
+\end{alltt}
 
 Therefore, the function {\tt print\_program\_arguments} takes exactly
 the same arguments as {\tt user\_main}.  In this example, the main
@@ -254,10 +254,10 @@ handle such types.
 
 CPM knows which type is which only through the following declarations:
 
-\begin{verbatim}
+\begin{alltt}
     CpmDeclareSimple(typeword);
     CpmDeclarePointer(typeword);
-\end{verbatim}
+\end{alltt}
 
 The user must supply such declarations for each type that must be sent
 via CPM.
@@ -289,22 +289,22 @@ routines.
 The following program fragment shows the declaration of two
 user-defined types:
 
-\begin{verbatim}
+\begin{alltt}
  1:
- 2:    typedef struct { double x,y; } coordinate;    
+ 2:    typedef struct \{ double x,y; \} coordinate;    
  3:    CpmDeclareSimple(coordinate);
  4:    
  5:    void CpmPack_coordinate(coordinate *p)
- 6:    {
+ 6:    \{
  7:      CpmPack_double(&(p->x));
  8:      CpmPack_double(&(p->y));
- 9:    }
+ 9:    \}
 10:
 11:    void CpmPack_coordinate(coordinate *p)
-12:    {
+12:    \{
 13:      CpmUnpack_double(&(p->x));
 14:      CpmUnpack_double(&(p->y));
-15:    }
+15:    \}
 16:
 17:    typedef int *intptr;
 18:    CpmDeclarePointer(intptr);
@@ -312,22 +312,22 @@ user-defined types:
 20:    #define CpmPtrSize_intptr(p) sizeof(int)
 21:    
 22:    void CpmPtrPack_intptr(void *p, intptr v)
-23:    {
+23:    \{
 24:      *(int *)p = *v;
 25:      CpmPack_int((int *)p);
-26:    }
+26:    \}
 27:
 28:    intptr CpmPtrUnpack_intptr(void *p)
-29:    {
+29:    \{
 30:      CpmUnpack_int((int *)p);
 31:      return (int *)p;
-32:    }
+32:    \}
 33:
 34:    #define CpmPtrFree_intptr(p) (0)
 35:
 36:    #include "example3.cpm.h"
 37:    ...
-\end{verbatim}
+\end{alltt}
 
 The first type declared in this file is the coordinate.  Line 2
 contains the C type declaration, and line 3 notifies CPM that it is a
@@ -385,7 +385,7 @@ launcher, there is a matching function called an {\it invoker}.  The
 launcher's job is to put the argument data in the message and send the
 message.  The {\it invoker}'s job is to extract the argument data from
 the message and call the user's function.  The launcher uses {\tt
-CmiSetHandler} to tell Converse to handle the message by calling the
+CmiSetHandler} to tell \converse{} to handle the message by calling the
 appropriate {\it invoker}.}
 
 \item[]{{\bf 5. The message is sent, received, and handled}. 
@@ -416,9 +416,9 @@ We now show an example CPM command, and describe the steps that are
 taken when the command is executed.  The command we will consider is
 this one:
 
-\begin{verbatim}
+\begin{alltt}
 Cpm_print_integer(CpmEnqueueFIFO(3), 12);
-\end{verbatim}
+\end{alltt}
 
 Which sends a message to processor 3, ordering it to call {\tt
 print\_integer(12)}.
@@ -428,24 +428,24 @@ CpmDestination.  The following is the code for CpmEnqueueFIFO:
 
 \pagebreak
 
-\begin{verbatim}
+\begin{alltt}
 typedef struct CpmDestinationSend
-{
+\{
   void *(*sendfn)();
   int envsize;
   int pe;
-}
+\}
 *CpmDestinationSend;
 
 CpmDestination CpmEnqueueFIFO(int pe)
-{
+\{
   static struct CpmDestinationSend ctrl;
   ctrl.envsize = sizeof(int);
   ctrl.sendfn  = CpmEnqueueFIFO1;
   ctrl.pe = pe;
   return (CpmDestination)&ctrl;
-}
-\end{verbatim}
+\}
+\end{alltt}
 
 Notice that the CpmDestination structure varies, depending upon which
 kind of destination is being used.  In this case, the destination
@@ -476,15 +476,15 @@ print\_integer.}
 
 The code for the send-function is here:
 
-\begin{verbatim}
+\begin{alltt}
 void *CpmEnqueueFIFO1(CpmDestinationSend dest, int len, void *msg)
-{
+\{
   int *env = (int *)CpmEnv(msg);
   env[0] = CmiGetHandler(msg);
   CmiSetHandler(msg, CpvAccess(CpmEnqueueFIFO2_Index));
   CmiSyncSendAndFree(dest->pe,len,msg);
-}
-\end{verbatim}
+\}
+\end{alltt}
 
 The send-function CpmEnqueueFIFO1 starts by switching the handler.
 The original handler is removed using using {\tt CmiGetHandler}.  It
@@ -504,18 +504,18 @@ its handler will be called.  The result will be that {\tt
 CpmEnqueueFIFO2} will be called on the destination processor.  Here is
 the code for {\tt CpmEnqueueFIFO2}:
 
-\begin{verbatim}
+\begin{alltt}
 void CpmEnqueueFIFO2(void *msg)
-{
+\{
   int *env;
   CmiGrabBuffer(&msg);
   env = (int *)CpmEnv(msg);
   CmiSetHandler(msg, env[0]);
   CsdEnqueueFIFO(msg);
-}
-\end{verbatim}
+\}
+\end{alltt}
 
-This function takes ownership of the message-buffer from Converse
+This function takes ownership of the message-buffer from \converse{}
 using {\tt CmiGrabBuffer}.  It extracts the original handler from the
 envelope (the handler that calls {\tt print\_integer}), and restores it
 using {\tt CmiSetHandler}.  Having done so, it enqueues the message
@@ -525,7 +525,7 @@ message from the queue, and {\tt print\_integer} is invoked.
 In summary, the procedure for implementing new kinds of destinations
 is to write one send-function, one function returning a CpmDestination
 (which contains a reference to the send-function), and one or more
-Converse handlers to manipulate the message.
+\converse{} handlers to manipulate the message.
 
 The destination-function must return a pointer to a
 ``destination-structure'', which can in fact be any structure matching
@@ -540,15 +540,15 @@ This pointer must be coerced to type CpmDestination.
 
 The send-function must have the following prototype:
 
-\begin{verbatim}
+\begin{alltt}
     void sendfunction(CpmDestination dest, int msglen, void *msgptr)
-\end{verbatim}
+\end{alltt}
 
 It can access the envelope of the message using CpmEnv:
 
-\begin{verbatim}
+\begin{alltt}
     int *CpmEnv(void *msg);
-\end{verbatim}
+\end{alltt}
 
 It can also access the data stored in the destination-structure
 by the destination-function.
