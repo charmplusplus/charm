@@ -339,8 +339,6 @@ converse: basics
 	$(MAKE) converse-target
 
 converse-target:  $(CVLIBS) fmain-ok charmrun-target swapglobal-target conv-cpm
-	$(CMK_CXXPP) -o check check.C
-	./check
 
 charmrun-target: sockRoutines.c sockRoutines.h ccs-server.c ccs-server.h sockRoutines-seq.o
 	if [ -d charmrun ] ; then ( cd charmrun ; $(MAKE) OPTS='$(OPTS)' ) ; fi
