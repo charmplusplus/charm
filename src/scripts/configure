@@ -1311,18 +1311,6 @@ echo $ECHO_N "checking \"$1\"... $ECHO_C" >&6
 	/bin/rm -f out
 }
 
-# Testlink_one: tries to compile and link a C++ file $t (described by $1) in one step.
-#  If successful, prints $2 and sets $pass/clears $fail
-#  If failure, prints $3 and sets $pass/clears $fail
-#  additional arguments to c++ compiler are passed as $4
-test_link_one() {
-        echo "$as_me:$LINENO: checking \"$1\"" >&5
-echo $ECHO_N "checking \"$1\"... $ECHO_C" >&6
-        $CMK_CXX -I../include -I. $CMK_INCDIR $CMK_LIBDIR $t -o testlink $4 > out 2>&1
-        test_result $? "$1" "$2" "$3"
-        /bin/rm -f out
-}
-
 # test_linkso $1 $2 $3 $4, where
 # $1: debug msg
 # $2: yes msg
@@ -1936,7 +1924,8 @@ int main() {
     PyCodeObject *program = PyNode_Compile(programNode, "");
 }
 EOT
-test_link_one "whether Python is installed" "yes" "no" "/usr/lib/python/config/libpython2.3.a -lpthread -lutil -ldl"
+PYTHON_VERSION=`python -V 2>&1 | awk {'print $2'} | awk -F. {'print $1"."$2'}`
+test_link "whether Python is installed" "yes" "no" "-lpython$PYTHON_VERSION -lpthread -lutil -ldl"
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_HAS_PYTHON $pass
@@ -1944,7 +1933,7 @@ _ACEOF
 
 if test $pass -eq 1
 then
-	add_flag 'CMK_BUILD_PYTHON=1' "python"
+	add_flag "CMK_BUILD_PYTHON=$PYTHON_VERSION" "python"
 fi
 
 #### test if it can build shared library ####
