@@ -5,7 +5,7 @@
 void adapt3::Step()
 {
   Event *ev;
-  static int lastGVT = -1;
+  static POSE_TimeType lastGVT = POSE_UnsetTS;
 
   lastGVT = localPVT->getGVT();
   if (!parent->cancels.IsEmpty()) { // Cancel as much as possible
@@ -13,7 +13,7 @@ void adapt3::Step()
     localStats->SwitchTimer(CAN_TIMER);      
 #endif
     //CkPrintf("Trying to cancel events...\n");
-    int ct = eq->currentPtr->timestamp;  // store time of next event
+    POSE_TimeType ct = eq->currentPtr->timestamp;  // store time of next event
     CancelEvents();
     // if cancellations of executed events occurred, adjust timeLeash
     if ((ct > -1) && (eq->currentPtr->timestamp < ct))

@@ -7,8 +7,11 @@
 #include <limits.h>
 /// Uncomment to gather and print POSE statistics set
 #define POSE_STATS_ON 1
+/// Insane level of analysis
 //#define POSE_DOP_ON 1
-#define PRIO_MSGS 1 // timestep type must be int
+// Set to 1 to use 64 bit timestamps
+#define USE_LONG_TIMESTAMPS 0
+// Uncomment to save time on memory allocation and freeing
 #define MSG_RECYCLING 1
 /// Uncomment to make use of the Streaming Communication Library optimizations
 //#define POSE_COMM_ON 1
@@ -41,7 +44,6 @@
 #define RECV 1
 #define OPTIMISTIC 0
 #define CONSERVATIVE 1
-#define USE_LONG_TIMESTAMPS 0
 
 #if USE_LONG_TIMESTAMPS 
 typedef CmiInt8 POSE_TimeType;
