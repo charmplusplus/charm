@@ -688,7 +688,7 @@ LB_OBJ=EveryLB.o \
     NeighborLB.o \
     WSLB.o \
     GreedyRefLB.o \
-    RandRefLB.o \
+    RandRefLB.o 
 
 EveryLB.o: EveryLB.C EveryLB.decl.h
 	$(CHARMC) -c EveryLB.C
