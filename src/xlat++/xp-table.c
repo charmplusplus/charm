@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.17  1995-11-09 16:28:23  sanjeev
+ * Revision 2.18  1996-08-01 21:07:30  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.17  1995/11/09 16:28:23  sanjeev
  * *** empty log message ***
  *
  * Revision 2.16  1995/11/07  23:29:54  sanjeev
@@ -65,8 +68,10 @@
  *
  ***************************************************************************/
 static char ident[] = "@(#)$Header$";
-#include "xp-ytab.h"
-#include "xp-t.h"
+
+#define YYSTYPE char *
+#include "xp-t.tab.h"
+#include "xp-lexer.h"
 #include "xp-extn.h"
 
 

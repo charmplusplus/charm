@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.2  1995-09-20 14:51:25  sanjeev
+ * Revision 2.3  1996-08-01 21:07:30  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.2  1995/09/20 14:51:25  sanjeev
  * *** empty log message ***
  *
  * Revision 2.0  1995/06/05  19:01:24  brunner
@@ -129,7 +132,8 @@ extern int foundargs ;
 extern int ErrVal ;
 extern int AddedScope ;
 extern int FoundGlobalScope ;
-
+extern int wchar_is_predefined;
+extern int ptrdiff_is_predefined;
 extern int InsideChareCode ;
 
 extern int NewOpType ;

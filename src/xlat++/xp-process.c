@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.7  1995-11-14 21:24:25  sanjeev
+ * Revision 2.8  1996-08-01 21:07:30  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.7  1995/11/14 21:24:25  sanjeev
  * fixed "_CK_ReadMsgTable not used" warning
  *
  * Revision 2.6  1995/11/04  00:10:56  sanjeev
@@ -68,12 +71,13 @@ static char ident[] = "@(#)$Header$";
 #include <string.h>
 #include <ctype.h>
 
-#include "xp-ytab.h"
-#include "xp-t.h"
+#include "xp-t.tab.h"
+#include "xp-lexer.h"
 #include "xp-extn.h"
 
 int foundMain = 0 ;
-
+int wchar_is_predefined = 0;
+int ptrdiff_is_predefined = 0;
 static int TotalEps=0 ;
 
 void GenerateStructsFns() ;
@@ -141,6 +145,11 @@ char *argv[] ;
 }
 
 
+void usage()
+{ 
+  fprintf(stderr,"Usage: charmxlat++ [options] <InFile> <OutFile>. Stop.\n");
+  exit(1); 
+}
 
 InitFiles(argc,argv)
 int argc ;
@@ -154,16 +163,22 @@ char *argv[] ;
 	char *envstring ;
 	char graphname[MAX_NAME_LENGTH] ;
 
-
-	if (argc!=3) { 
-		fprintf(stderr,"Usage: translate <InFile> <OutFile>. Stop.\n");
-		exit(1); 
+	argv++; argc--;
+	if (argc<2) usage();
+	while (argv[0][0]=='-') {
+	  if (strcmp(argv[0], "-w")==0) {
+	    wchar_is_predefined = 1;
+	    argv++; argc--;
+	  }
+	  if (strcmp(argv[0], "-p")==0) {
+	    ptrdiff_is_predefined = 1;
+	    argv++; argc--;
+	  }
 	}
-
-	strcpy(pgm,argv[1]);
-
-        bgn = strrchr(argv[1], '/');
-        if (bgn==0) bgn=argv[1];
+	if (argc!=2) usage();
+	strcpy(pgm,argv[0]);
+        bgn = strrchr(argv[0], '/');
+        if (bgn==0) bgn=argv[0];
         end = bgn;
         while (1)
             {
@@ -179,8 +194,8 @@ char *argv[] ;
 
 	sprintf(headername,"%s.headers",CoreName) ;
 
-	yyin = fopen(argv[1],"r") ;
-	outfile = fopen(argv[2],"w") ;
+	yyin = fopen(argv[0],"r") ;
+	outfile = fopen(argv[1],"w") ;
 	headerfile = fopen(headername,"w") ;
 
 	if ( yyin==NULL || outfile==NULL || headerfile==NULL ) {

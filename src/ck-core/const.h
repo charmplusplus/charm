@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.11  1995-09-20 14:24:27  jyelon
+ * Revision 2.12  1996-08-01 21:10:13  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.11  1995/09/20 14:24:27  jyelon
  * *** empty log message ***
  *
  * Revision 2.10  1995/09/01  02:13:17  jyelon
@@ -61,6 +64,7 @@
 
 /* constants for denoting illegal values (used as flags) */
 #define NULL_VID       NULL
+#define NULL_PE        NULL
 #define NULL_PACK_ID    0  
 
 /* Constant values for PE */

@@ -471,7 +471,7 @@ foreach FILE ($FILES)
       echo '#line 1 "'$BASE.P'"' >> $TMP.P.C
       /bin/cat $BASE.P >> $TMP.P.C
       ($ECHOCMD ; $CMK_CXXPP $OPTS_CPP -I$CHARMINC $TMP.P.C > $TMP.cpp)
-      ($ECHOCMD ; $CHARMBIN/charmxlat++ $TMP.cpp $TMP.xlat)
+      ($ECHOCMD ; $CHARMBIN/$CMK_XLATPP $TMP.cpp $TMP.xlat)
       if ($status) goto failure
       ($ECHOCMD ; /bin/cat $BASE.headers > $TMP.$CMK_CPP_SUFFIX)
       ($ECHOCMD ; /bin/cat $TMP.xlat >> $TMP.$CMK_CPP_SUFFIX)
