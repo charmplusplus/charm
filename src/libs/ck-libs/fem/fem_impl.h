@@ -501,6 +501,9 @@ public:
 	elemGhostInfo elem[FEM_MAX_ELEMTYPES];
 };
 
+//Declare this at the start of every API routine:
+#define FEMAPI(routineName) TCHARM_API_TRACE(routineName,"fem")
+
 /*A way to stream out partitioned chunks of a mesh.
   By streaming, we can send the chunks as they are built,
   dramatically reducing the memory needed by the framework.

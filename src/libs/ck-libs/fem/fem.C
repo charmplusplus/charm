@@ -143,6 +143,7 @@ FDECL void FTN_NAME(FEM_ATTACH,fem_attach)(int *flags)
 
 CDECL void FEM_Attach(int flags)
 {
+	FEMAPI("FEM_Attach");
 	//Make sure the threads array exists
 	TCharmSetupCookie *tc=TCharmSetupCookie::get();
 	if (!tc->hasThreads())
@@ -377,6 +378,7 @@ static void Set_Partition(int *elem2chunk,int indexBase) {
 
 //C bindings:
 CDECL void FEM_Set_Partition(int *elem2chunk) {
+	FEMAPI("FEM_Set_Partition");
 	Set_Partition(elem2chunk,0);
 }
 
@@ -384,20 +386,26 @@ CDECL void FEM_Set_Partition(int *elem2chunk) {
 FDECL void FTN_NAME(FEM_SET_PARTITION,fem_set_partition)
 	(int *elem2chunk) 
 {
+	FEMAPI("FEM_Set_Partition");
 	Set_Partition(elem2chunk,1);
 }
 
 /***** Mesh-Setting API: C bindings*/
 CDECL void FEM_Set_Node(int nNodes,int dataPer) 
 {
+	FEMAPI("FEM_Set_Node");
 	FEM_Mesh *m=setMesh();
 	m->node.dataPer=dataPer;
 	m->node.n=nNodes;
 }
 CDECL void FEM_Set_Node_Data(const double *data) 
-  {setMesh()->node.setUdata_r(data);}
+{
+	FEMAPI("FEM_Set_Node_Data");
+	setMesh()->node.setUdata_r(data);
+}
 
 CDECL void FEM_Set_Elem(int elType,int nElem,int dataPer,int nodePer) {
+	FEMAPI("FEM_Set_Elem");
 	FEM_Mesh *m=setMesh();
 	chkET(elType);
 	if (m->nElemTypes<=elType)
@@ -407,8 +415,12 @@ CDECL void FEM_Set_Elem(int elType,int nElem,int dataPer,int nodePer) {
 	m->elem[elType].nodesPer=nodePer;
 }
 CDECL void FEM_Set_Elem_Data(int elType,const double *data) 
-  {setMesh()->elem[chkET(elType)].setUdata_r(data);}
+{
+	FEMAPI("FEM_Set_Elem_Data");
+	setMesh()->elem[chkET(elType)].setUdata_r(data);
+}
 CDECL void FEM_Set_Elem_Conn(int elType,const int *conn) {
+	FEMAPI("FEM_Set_Elem_Conn");
 	FEM_Mesh::elemCount &c=setMesh()->elem[chkET(elType)];
 	c.allocConn();
 	memcpy(c.conn,conn,c.connCount()*sizeof(int));
@@ -418,6 +430,7 @@ CDECL void FEM_Set_Elem_Conn(int elType,const int *conn) {
 and no userdata.*/
 CDECL void FEM_Set_Mesh(int nelem, int nnodes, int ctype, int *conn)
 {
+	FEMAPI("FEM_Set_Mesh");
 	FEM_Set_Node(nnodes,0);
 	FEM_Set_Elem(0,nelem,0,ctype);
 	FEM_Set_Elem_Conn(0,conn);
@@ -425,27 +438,47 @@ CDECL void FEM_Set_Mesh(int nelem, int nnodes, int ctype, int *conn)
 
 FDECL void FTN_NAME(FEM_SET_NODE,fem_set_node)
 	(int *nNodes,int *dataPer) 
-  {FEM_Set_Node(*nNodes,*dataPer);}
+{
+	FEMAPI("FEM_Set_Node");
+	FEM_Set_Node(*nNodes,*dataPer);
+}
+
 FDECL void FTN_NAME(FEM_SET_NODE_DATA_R,fem_set_node_data_r)
 	(double *data) 
-  {setMesh()->node.setUdata_r(data);}
+{
+	FEMAPI("FEM_Set_Node_Data_r");
+	setMesh()->node.setUdata_r(data);
+}
 FDECL void FTN_NAME(FEM_SET_NODE_DATA_C,fem_set_node_data_c)
 	(double *data) 
-  {setMesh()->node.setUdata_c(data);}
+{
+	FEMAPI("FEM_Set_Node_Data_c");
+	setMesh()->node.setUdata_c(data);
+}
 
 FDECL void FTN_NAME(FEM_SET_ELEM,fem_set_elem)
 	(int *elType,int *nElem,int *dataPer,int *nodePer)  
-  {FEM_Set_Elem(*elType-1,*nElem,*dataPer,*nodePer);}
+{
+	FEMAPI("FEM_set_elem");
+	FEM_Set_Elem(*elType-1,*nElem,*dataPer,*nodePer);
+}
 FDECL void FTN_NAME(FEM_SET_ELEM_DATA_R,fem_set_elem_data_r)
 	(int *elType,double *data)
-  {setMesh()->elem[chkET(*elType-1)].setUdata_r(data);}
+{
+	FEMAPI("FEM_set_elem_data_r");
+	setMesh()->elem[chkET(*elType-1)].setUdata_r(data);
+}
 FDECL void FTN_NAME(FEM_SET_ELEM_DATA_C,fem_set_elem_data_c)
 	(int *elType,double *data)
-  {setMesh()->elem[chkET(*elType-1)].setUdata_c(data);}
+{
+	FEMAPI("FEM_set_elem_data_c");
+	setMesh()->elem[chkET(*elType-1)].setUdata_c(data);
+}
 
 FDECL void FTN_NAME(FEM_SET_ELEM_CONN_R,fem_set_elem_conn_r)
 	(int *elType,int *conn_r)
 {
+	FEMAPI("FEM_set_elem_conn_r");
 	FEM_Mesh::elemCount &c=setMesh()->elem[chkET(*elType-1)];
 	c.allocConn();
 	copyAdd(c.n,c.nodesPer,conn_r,-1,c.conn);
@@ -453,6 +486,7 @@ FDECL void FTN_NAME(FEM_SET_ELEM_CONN_R,fem_set_elem_conn_r)
 FDECL void FTN_NAME(FEM_SET_ELEM_CONN_C,fem_set_elem_conn_c)
 	(int *elType,int *conn_c)
 {
+	FEMAPI("FEM_set_elem_conn_c");
 	FEM_Mesh::elemCount &c=setMesh()->elem[chkET(*elType-1)];
 	c.allocConn();
 	transposeAdd(c.n,c.nodesPer,conn_c,-1,c.conn);
@@ -462,6 +496,7 @@ FDECL void FTN_NAME(FEM_SET_ELEM_CONN_C,fem_set_elem_conn_c)
 FDECL void FTN_NAME(FEM_SET_MESH,fem_set_mesh)
 	(int *nelem, int *nnodes, int *ctype, int *conn)
 {
+	FEMAPI("FEM_Set_Mesh");
 	int elType=1,zero=0;
 	FTN_NAME(FEM_SET_NODE,fem_set_node) (nnodes,&zero);
 	FTN_NAME(FEM_SET_ELEM,fem_set_elem) (&elType,nelem,&zero,ctype);
@@ -472,15 +507,20 @@ FDECL void FTN_NAME(FEM_SET_MESH,fem_set_mesh)
 
 CDECL void FEM_Get_Node(int *nNodes,int *dataPer) 
 {
+	FEMAPI("FEM_Get_Node");
 	const FEM_Mesh *m=getMesh();
 	if (nNodes!=NULL) *nNodes=m->node.n;
 	if (dataPer!=NULL) *dataPer=m->node.dataPer;
 }
 CDECL void FEM_Get_Node_Data(double *data) 
-  {getMesh()->node.getUdata_r(data);}
+{
+	FEMAPI("FEM_Get_Node_Data");
+	getMesh()->node.getUdata_r(data);
+}
 
 CDECL void FEM_Get_Elem(int elType,int *nElem,int *dataPer,int *nodePer) 
 {
+	FEMAPI("FEM_Get_Elem");
 	const FEM_Mesh *m=getMesh();
 	chkET(elType);
 	if (nElem!=NULL) *nElem=m->elem[elType].n;
@@ -488,41 +528,65 @@ CDECL void FEM_Get_Elem(int elType,int *nElem,int *dataPer,int *nodePer)
 	if (nodePer!=NULL) *nodePer=m->elem[elType].nodesPer;
 }
 CDECL void FEM_Get_Elem_Data(int elType,double *data) 
-  {getMesh()->elem[chkET(elType)].getUdata_r(data);}
+{
+	FEMAPI("FEM_Get_Elem_Data");
+	getMesh()->elem[chkET(elType)].getUdata_r(data);
+}
 CDECL void FEM_Get_Elem_Conn(int elType,int *conn) {
+	FEMAPI("FEM_Get_Elem_Conn");
 	const FEM_Mesh::elemCount &c=getMesh()->elem[chkET(elType)];
 	memcpy(conn,c.conn,c.n*c.nodesPer*sizeof(int));
 }
 
 FDECL void FTN_NAME(FEM_GET_NODE,fem_get_node)
 	(int *nNodes,int *dataPer) 
-  {FEM_Get_Node(nNodes,dataPer);}
+{
+	FEMAPI("FEM_Get_node");
+	FEM_Get_Node(nNodes,dataPer);
+}
 FDECL void FTN_NAME(FEM_GET_NODE_DATA_R,fem_get_node_data_r)
 	(double *data) 
-  {getMesh()->node.getUdata_r(data);}
+{
+	FEMAPI("FEM_Get_node_data_r");
+	getMesh()->node.getUdata_r(data);
+}
 FDECL void FTN_NAME(FEM_GET_NODE_DATA_C,fem_get_node_data_c)
 	(double *data) 
-  {getMesh()->node.getUdata_c(data);}
+{
+	FEMAPI("FEM_Get_node_data_c");
+	getMesh()->node.getUdata_c(data);
+}
 
 FDECL void FTN_NAME(FEM_GET_ELEM,fem_get_elem)
 	(int *elType,int *nElem,int *dataPer,int *nodePer)  
-  {FEM_Get_Elem(*elType-1,nElem,dataPer,nodePer);}
+{
+	FEMAPI("FEM_Get_elem");
+	FEM_Get_Elem(*elType-1,nElem,dataPer,nodePer);
+}
 FDECL void FTN_NAME(FEM_GET_ELEM_DATA_R,fem_get_elem_data_r)
 	(int *elType,double *data) 
-  {getMesh()->elem[chkET(*elType-1)].getUdata_r(data);}
+{
+	FEMAPI("FEM_Get_elem_data_r");
+	getMesh()->elem[chkET(*elType-1)].getUdata_r(data);
+}
 FDECL void FTN_NAME(FEM_GET_ELEM_DATA_C,fem_get_elem_data_c)
 	(int *elType,double *data) 
-  {getMesh()->elem[chkET(*elType-1)].getUdata_c(data);}
+{
+	FEMAPI("FEM_Get_elem_data_c");
+	getMesh()->elem[chkET(*elType-1)].getUdata_c(data);
+}
 
 FDECL void FTN_NAME(FEM_GET_ELEM_CONN_R,fem_get_elem_conn_r)
 	(int *elType,int *conn)
 {
+	FEMAPI("FEM_Get_elem_conn_r");
 	const FEM_Mesh::elemCount &c=getMesh()->elem[chkET(*elType-1)];
 	copyAdd(c.nodesPer,c.n,c.conn,+1,conn);
 }
 FDECL void FTN_NAME(FEM_GET_ELEM_CONN_C,fem_get_elem_conn_c)
 	(int *elType,int *conn)
 {
+	FEMAPI("FEM_Get_elem_conn_c");
 	const FEM_Mesh::elemCount &c=getMesh()->elem[chkET(*elType-1)];
 	transposeAdd(c.nodesPer,c.n,c.conn,+1,conn);
 }
@@ -1281,16 +1345,19 @@ static MeshChunk *getCurMesh(void)
 
 CDECL void FEM_Update_Mesh(int callMeshUpdated,int doRepartition) 
 { 
+  FEMAPI("FEM_Update_Mesh");
   getCurChunk()->updateMesh(callMeshUpdated,doRepartition); 
 }
 
 CDECL int FEM_Register(void *_ud,FEM_PupFn _pup_ud)
 {
+  FEMAPI("FEM_Register");
   return TCharmRegister(_ud,_pup_ud);
 }
 
 CDECL void *FEM_Get_Userdata(int n)
 {
+  FEMAPI("FEM_Get_Userdata");
   return TCharmGetUserdata(n);
 }
 
@@ -1306,18 +1373,21 @@ FEM_Migrate(void)
 CDECL int *
 FEM_Get_Node_Nums(void)
 {
+  FEMAPI("FEM_Get_Node_Nums");
   return getCurChunk()->getNodeNums();
 }
 
 CDECL int *
 FEM_Get_Elem_Nums(void)
 {
+  FEMAPI("FEM_Get_Elem_Nums");
   return getCurChunk()->getElemNums();
 }
 
 CDECL int *
 FEM_Get_Conn(int elemType)
 {
+  FEMAPI("FEM_Get_Conn");
   return getCurMesh()->m.elem[elemType].conn;
 }
 
@@ -1330,30 +1400,35 @@ FEM_Done(void)
 CDECL int 
 FEM_Create_Field(int base_type, int vec_len, int init_offset, int distance)
 {
+  FEMAPI("FEM_Create_Field");
   return getCurChunk()->new_DT(base_type, vec_len, init_offset, distance);
 }
 
 CDECL void
 FEM_Update_Field(int fid, void *nodes)
 {
+  FEMAPI("FEM_Update_Field");
   getCurChunk()->update(fid, nodes);
 }
 
 CDECL void
 FEM_Reduce_Field(int fid, const void *nodes, void *outbuf, int op)
 {
+  FEMAPI("FEM_Reduce_Field");
   getCurChunk()->reduce_field(fid, nodes, outbuf, op);
 }
 
 CDECL void
 FEM_Reduce(int fid, const void *inbuf, void *outbuf, int op)
 {
-    getCurChunk()->reduce(fid, inbuf, outbuf, op);
+  FEMAPI("FEM_Reduce");
+  getCurChunk()->reduce(fid, inbuf, outbuf, op);
 }
 
 CDECL void
 FEM_Read_Field(int fid, void *nodes, const char *fname)
 {
+  FEMAPI("FEM_Read_Field");
   getCurChunk()->readField(fid, nodes, fname);
 }
 
@@ -1372,12 +1447,14 @@ FEM_Num_Partitions(void)
 CDECL double
 FEM_Timer(void)
 {
+  FEMAPI("FEM_Timer");
   return CkTimer();
 }
 
 CDECL void 
 FEM_Print(const char *str)
 {
+  TCharmAPIRoutine apiRoutineSentry;
   if(TCharm::getState()==inDriver) {
     FEMchunk *cptr = getCurChunk();
     CkPrintf("[%d] %s\n", cptr->thisIndex, str);
@@ -1389,6 +1466,7 @@ FEM_Print(const char *str)
 CDECL void 
 FEM_Print_Partition(void)
 {
+  FEMAPI("FEM_Print_Partition");
   if(TCharm::getState()==inDriver) {
     FEMchunk *cptr = getCurChunk();
     cptr->print();
@@ -1402,18 +1480,22 @@ FEM_Print_Partition(void)
 
 CDECL int FEM_Get_Comm_Partners(void)
 {
+	FEMAPI("FEM_Get_Comm_Partners");
 	return getCurChunk()->getComm().size();
 }
 CDECL int FEM_Get_Comm_Partner(int partnerNo)
 {
+	FEMAPI("FEM_Get_Comm_Partner");
 	return getCurChunk()->getComm()[partnerNo].getDest();
 }
 CDECL int FEM_Get_Comm_Count(int partnerNo)
 {
+	FEMAPI("FEM_Get_Comm_Count");
 	return getCurChunk()->getComm()[partnerNo].size();
 }
 CDECL void FEM_Get_Comm_Nodes(int partnerNo,int *nodeNos)
 {
+	FEMAPI("FEM_Get_Comm_Nodes");
 	const int *nNo=getCurChunk()->getComm()[partnerNo].getVec();
 	int len=FEM_Get_Comm_Count(partnerNo);
 	for (int i=0;i<len;i++)
@@ -1488,7 +1570,7 @@ FDECL int FTN_NAME(FEM_NUM_PARTITIONS,fem_num_partitions)
 FDECL double FTN_NAME(FEM_TIMER,fem_timer)
   (void)
 {
-  return CkTimer();
+  return FEM_Timer();
 }
 
 // Utility functions for Fortran
@@ -1502,6 +1584,7 @@ FDECL int FTN_NAME(OFFSETOF,offsetof)
 FDECL void FTN_NAME(FEM_PRINT,fem_print)
   (char *str, int len)
 {
+  TCharmAPIRoutine apiRoutineSentry;
   char *tmpstr = new char[len+1]; CHK(tmpstr);
   memcpy(tmpstr,str,len);
   tmpstr[len] = '\0';
@@ -1549,6 +1632,7 @@ FDECL void FTN_NAME(FEM_GET_COMM_NODES,fem_get_comm_nodes)
 FDECL void FTN_NAME(FEM_GET_ELEM_NUMBERS,fem_get_elem_numbers)
 	(int *gNo)
 {
+	FEMAPI("FEM_Get_Elem_Numbers");
 	const int *no=getCurChunk()->getElemNums();
 	int n=getMesh()->nElems();
 	for (int i=0;i<n;i++) gNo[i]=no[i]+1;
@@ -1556,6 +1640,7 @@ FDECL void FTN_NAME(FEM_GET_ELEM_NUMBERS,fem_get_elem_numbers)
 FDECL void FTN_NAME(FEM_GET_NODE_NUMBERS,fem_get_node_numbers)
 	(int *gNo)
 {
+	FEMAPI("FEM_Get_Node_Numbers");
 	const int *no=getCurChunk()->getNodeNums();
 	int n=getMesh()->node.n;
 	for (int i=0;i<n;i++) gNo[i]=no[i]+1;
@@ -1564,6 +1649,7 @@ FDECL void FTN_NAME(FEM_GET_NODE_NUMBERS,fem_get_node_numbers)
 /******************** Ghost Layers *********************/
 CDECL void FEM_Add_Ghost_Layer(int nodesPerTuple,int doAddNodes)
 {
+	FEMAPI("FEM_Add_Ghost_Layer");
 	curGhostLayer=&ghostLayers[nGhostLayers++];
 	curGhostLayer->nodesPerTuple=nodesPerTuple;
 	curGhostLayer->addNodes=(doAddNodes!=0);
@@ -1582,6 +1668,7 @@ static int *copyArray(const int *src,int len,int indexBase)
 
 CDECL void FEM_Add_Ghost_Elem(int elType,int tuplesPerElem,const int *elem2tuple)
 {
+	FEMAPI("FEM_Add_Ghost_Elem");
 	if (curGhostLayer==NULL)
 		CkAbort("You must call FEM_Add_Ghost_Layer before calling FEM_Add_Ghost_Elem!\n");
 	chkET(elType);
@@ -1593,6 +1680,7 @@ CDECL void FEM_Add_Ghost_Elem(int elType,int tuplesPerElem,const int *elem2tuple
 FDECL void FTN_NAME(FEM_ADD_GHOST_ELEM,fem_add_ghost_elem)
 	(int *FelType,int *FtuplesPerElem,const int *elem2tuple)
 {
+	FEMAPI("FEM_add_ghost_elem");
 	int elType=*FelType-1;
 	int tuplesPerElem=*FtuplesPerElem;
 	if (curGhostLayer==NULL)
@@ -1605,11 +1693,17 @@ FDECL void FTN_NAME(FEM_ADD_GHOST_ELEM,fem_add_ghost_elem)
 }
 
 
-CDECL int FEM_Get_Node_Ghost(void) {return getMesh()->node.ghostStart;}
+CDECL int FEM_Get_Node_Ghost(void) {
+	FEMAPI("FEM_Get_Node_Ghost");
+	return getMesh()->node.ghostStart;
+}
 FDECL int FTN_NAME(FEM_GET_NODE_GHOST,fem_get_node_ghost)(void)
-{return 1+FEM_Get_Node_Ghost();}
+{
+	return 1+FEM_Get_Node_Ghost();
+}
 
 CDECL int FEM_Get_Elem_Ghost(int elType) {
+	FEMAPI("FEM_Get_Elem_Ghost");
 	return getMesh()->elem[chkET(elType)].ghostStart;
 }
 CDECL int FTN_NAME(FEM_GET_ELEM_GHOST,fem_get_elem_ghost)(int *elType) {
@@ -1618,12 +1712,13 @@ CDECL int FTN_NAME(FEM_GET_ELEM_GHOST,fem_get_elem_ghost)(int *elType) {
 
 CDECL void FEM_Update_Ghost_Field(int fid, int elemType, void *data)
 {
-  getCurChunk()->updateGhost(fid,elemType,data);
+	FEMAPI("FEM_Update_Ghost_Field");
+	getCurChunk()->updateGhost(fid,elemType,data);
 }
 FDECL void FTN_NAME(FEM_UPDATE_GHOST_FIELD,fem_update_ghost_field)
 	(int *fid, int *elemType, void *data)
 {
-  FEM_Update_Ghost_Field(*fid,*elemType-1,data);
+	FEM_Update_Ghost_Field(*fid,*elemType-1,data);
 }
 
 /*********** Mesh modification **********
@@ -1663,11 +1758,13 @@ static void addNode(int localIdx,int nBetween,int *betweenNodes,int idxbase)
 
 CDECL void FEM_Add_Node(int localIdx,int nBetween,int *betweenNodes)
 {
+	FEMAPI("FEM_Add_Node");
 	addNode(localIdx,nBetween,betweenNodes,0);
 }
 FDECL void FTN_NAME(FEM_ADD_NODE,fem_add_node)
 	(int *localIdx,int *nBetween,int *betweenNodes)
 {
+	FEMAPI("FEM_add_node");
 	addNode(*localIdx-1,*nBetween-1,betweenNodes,1);
 }
 
@@ -1729,15 +1826,18 @@ bool FEMchunk::finishListExchange(const commCounts &l)
 //List exchange API
 CDECL void FEM_Exchange_Ghost_Lists(int elemType,int nIdx,const int *localIdx)
 {
+	FEMAPI("FEM_Exchange_Ghost_Lists");
 	getCurChunk()->exchangeGhostLists(elemType,nIdx,localIdx,0);
 }
 FDECL void FTN_NAME(FEM_EXCHANGE_GHOST_LISTS,fem_exchange_ghost_lists)
 	(int *elemType,int *nIdx,const int *localIdx)
 {
+	FEMAPI("FEM_exchange_ghost_lists");
 	getCurChunk()->exchangeGhostLists(*elemType-1,*nIdx,localIdx,1);
 }
 CDECL int FEM_Get_Ghost_List_Length(void) 
 {
+	FEMAPI("FEM_Get_Ghost_List_Length");
 	return getCurChunk()->getList().size();
 }
 FDECL int FTN_NAME(FEM_GET_GHOST_LIST_LENGTH,fem_get_ghost_list_length)(void)
@@ -1745,6 +1845,7 @@ FDECL int FTN_NAME(FEM_GET_GHOST_LIST_LENGTH,fem_get_ghost_list_length)(void)
 
 CDECL void FEM_Get_Ghost_List(int *dest)
 {
+	FEMAPI("FEM_Get_Ghost_List");
 	int i,len=FEM_Get_Ghost_List_Length();
 	const int *src=getCurChunk()->getList().getVec();
 	for (i=0;i<len;i++) dest[i]=src[i];
@@ -1753,6 +1854,7 @@ CDECL void FEM_Get_Ghost_List(int *dest)
 FDECL void FTN_NAME(FEM_GET_GHOST_LIST,fem_get_ghost_list)
 	(int *dest)
 {
+	FEMAPI("FEM_get_ghost_list");
 	int i,len=FEM_Get_Ghost_List_Length();
 	const int *src=getCurChunk()->getList().getVec();
 	for (i=0;i<len;i++) dest[i]=src[i]+1;
