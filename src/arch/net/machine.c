@@ -287,7 +287,7 @@ int n;
 static void KillOnAllSigs(int dummy)
 {
   char _s[100];
-  sprintf(_s, "[%d] Node program recived signal\n", CmiMyPe());
+  sprintf(_s, "[%d] Node program received signal\n", CmiMyPe());
   host_abort(_s);
   exit(1);
 }
