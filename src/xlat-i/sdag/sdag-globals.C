@@ -28,6 +28,7 @@ int numWhiles=0;
 int numAtomics=0;
 int numForwards=0;
 int numForalls=0;
+int numConnects=0;
 
 void resetNumbers(void)
 {
@@ -44,5 +45,6 @@ void resetNumbers(void)
   numAtomics=0;
   numForwards=0;
   numForalls=0;
+  numConnects=0;
 }
 

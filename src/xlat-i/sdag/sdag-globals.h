@@ -26,6 +26,7 @@ extern int numWhiles;
 extern int numForwards;
 extern int numAtomics;
 extern int numForalls;
+extern int numConnects;
 
 extern FILE *fh;
 
