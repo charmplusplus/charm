@@ -30,7 +30,7 @@ class StatTable {
     StatTable(char** args, int argc);
     ~StatTable();
     //! one entry is called for 'time' seconds, value is counter reading 
-    void setEp(int epidx, int stat, UInt value, double time);
+    void setEp(int epidx, int stat, long long value, double time);
     //! write three lines for each stat:
     //!   1. number of calls for each entry
     //!   2. average count for each entry
@@ -60,7 +60,7 @@ class CountLogPool {
     ~CountLogPool();
     void write(void) ;
     void writeSts(void);
-    void setEp(int epidx, int count1, int count2, double time);
+    void setEp(int epidx, long long count1, long long count2, double time);
     void clearEps() { stats_.clear(); }
 
   private:
@@ -119,6 +119,10 @@ class TraceCounter : public Trace {
     CounterArg* firstArg_;     // pointer to start of linked list of args
     CounterArg* lastArg_;      // pointer to end of linked list of args
     int         argStrSize_;   // size of maximum arg string (formatted output)
+
+    int         genStart_;     // track value of start_counters
+    int         counter1_;     // 1st counter to track
+    int         counter2_;     // 2nd counter to track
 
     //! add the argument parameters to the linked list of args choices
     void registerArg(CounterArg* arg);

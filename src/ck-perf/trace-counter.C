@@ -10,6 +10,7 @@
 */
 /*@{*/
 
+#include "conv-mach.h"
 // #define CMK_ORIGIN2000
 #ifdef CMK_ORIGIN2000
 
@@ -17,6 +18,10 @@
 
 #define DEBUGF(x) CmiPrintf("%d/%d DEBUG: ", CkMyPe(), CkNumPes()); CmiPrintf x
 #define VER 1.0
+
+// for performance monitoring
+extern "C" int start_counters( int e0, int e1 );
+extern "C" int read_counters( int e0, long long *c0, int e1, long long *c1);
 
 CpvStaticDeclare(Trace*, _trace);
 CpvStaticDeclare(CountLogPool*, _logPool);
@@ -38,9 +43,8 @@ CpvDeclare(double, version);
 //! sure the CounterArg struct is registered via the registerArg call
 static TraceCounter::CounterArg arg0(0, "CYCLE",      "Cycles");
 static TraceCounter::CounterArg arg1(1, "INSTR",      "Issued instructions");
-static TraceCounter::CounterArg arg2(2, "STORE",      "Issued stores");
-// FIXME!!!
-static TraceCounter::CounterArg arg3(3, "FOO",        "foo");
+static TraceCounter::CounterArg arg2(2, "LOAD",       "Issued loads");
+static TraceCounter::CounterArg arg3(3, "STORE",      "Issued stores");
 static TraceCounter::CounterArg arg4(4, "STORE_COND", "Issued store conditionals");
 static TraceCounter::CounterArg arg5(5, "FAIL_COND",  "Failed store conditionals");
 static TraceCounter::CounterArg arg6(6, "DECODE_BR",  "Decoded branches.  (This changes meaning in 3.x versions of R10000.  It becomes resolved branches)");
@@ -102,7 +106,7 @@ StatTable::StatTable(char** args, int argc): stats_(NULL), numStats_(0)
 StatTable::~StatTable() { if (stats_ != NULL) { delete [] stats_; } }
 
 //! one entry is called for 'time' seconds, value is counter reading
-void StatTable::setEp(int epidx, int stat, UInt value, double time) 
+void StatTable::setEp(int epidx, int stat, long long value, double time) 
 {
   // CmiPrintf("StatTable::setEp %08x %d %d %d %f\n", 
   //           this, epidx, stat, value, time);
@@ -135,7 +139,7 @@ void StatTable::write(FILE* fp)
     // write average count for each 
     fprintf(fp, "[%s average_count] ", stats_[i].name);
     for (j=0; j<_numEntries; j++) { 
-      fprintf(fp, "%d ", stats_[i].average[j]); 
+      fprintf(fp, "%f ", stats_[i].average[j]); 
     }
     fprintf(fp, "\n");
     // write total time in us spent for each entry
@@ -165,7 +169,6 @@ CountLogPool::CountLogPool(char* pgm, char** args, int argc):
   DEBUGF(("CountLogPool::CountLogPool() %08x\n", this));
   for (int j=0; j<argc; j++) { DEBUGF(("  %d %s\n", j, args[j])); }
 
-  int i;
   char pestr[10];
   sprintf(pestr, "%d", CkMyPe());
   int len = strlen(pgm) + strlen(".count.") + strlen(pestr) + 1;
@@ -190,8 +193,6 @@ CountLogPool::~CountLogPool()
 
 void CountLogPool::write(void) 
 {
-  int i;
-  unsigned int j;
   fprintf(fp_, "ver:%3.1f %d/%d ep:%d\n", 
 	  CpvAccess(version), CmiMyPe(), CmiNumPes(), _numEntries);
   stats_.write(fp_);
@@ -221,14 +222,14 @@ void CountLogPool::writeSts(void)
     fprintf(sts, "ENTRY CHARE %d %s %d %d\n", i, _entryTable[i]->name,
                  _entryTable[i]->chareIdx, _entryTable[i]->msgIdx);
   for(i=0;i<_numMsgs;i++)
-    fprintf(sts, "MESSAGE %d %d\n", i, _msgTable[i]->size);
+    fprintf(sts, "MESSAGE %d %ld\n", i, _msgTable[i]->size);
   for(i=0;i<_numEvents;i++)
     fprintf(sts, "EVENT %d Event%d\n", i, i);
   fprintf(sts, "END\n");
   fclose(sts);
 }
 
-void CountLogPool::setEp(int epidx, int count1, int count2, double time) 
+void CountLogPool::setEp(int epidx, long long count1, long long count2, double time) 
 {
   // DEBUGF(("CountLogPool::setEp %08x %d %d %d %f\n", 
   //         this, epidx, count1, count2, time));
@@ -270,7 +271,6 @@ void TraceCounter::traceInit(char **argv)
   CpvAccess(version) = VER;
 
   // parse command line args
-  int arg1, arg2;
   CounterArg counterArg1(0,NULL,NULL);
   CounterArg counterArg2(0,NULL,NULL);
   bool arg1valid = false;
@@ -315,6 +315,8 @@ void TraceCounter::traceInit(char **argv)
 	      counterArg1.arg, counterArg1.desc, 
 	      counterArg2.arg, counterArg2.desc);
   }
+  counter1_ = counterArg1.code;
+  counter2_ = counterArg2.code;
   char* args[2];  // prepare arguments for creating log pool
   args[0] = counterArg1.arg;
   args[1] = counterArg2.arg;
@@ -360,34 +362,76 @@ void TraceCounter::beginExecute
   execEP_=ep;
   startEP_=TraceTimer();
   // DEBUGF(("start: %f \n", start));
+
+  if ((genStart_=start_counters(counter1_, counter2_)) < 0) {
+    CmiAbort("ERROR: start_counters()");
+  }
 }
 
 void TraceCounter::endExecute(void)
 {
-  // if (!flag) return;
+  long long value1 = 0, value2 = 0;
+  int genRead;
+  if ((genRead=read_counters(counter1_, &value1, counter2_, &value2)) < 0 ||
+      genRead != genStart_)
+  {
+    CmiAbort("ERROR: read_counters()");
+  }
   double t = TraceTimer();
 
-  int count1 = 0, count2 = 0;
-
+  DEBUGF(("EP %d Time %f counter1 %d counter2 %ld\n", 
+	  execEP_, t-startEP_, value1, value2));
   if (execEP_ != -1) { 
-    CpvAccess(_logPool)->setEp(execEP_, count1, count2, t-startEP_); 
+    CpvAccess(_logPool)->setEp(execEP_, value1, value2, t-startEP_); 
   }
 }
 
-void TraceCounter::beginPack(void) { startPack_ = CmiWallTimer(); }
-
-void TraceCounter::endPack(void) {
-  int count1 = 0, count2 = 0;
-  CpvAccess(_logPool)->setEp(_packEP, count1, count2, 
-			     CmiWallTimer() - startPack_);
+void TraceCounter::beginPack(void) 
+{ 
+  startPack_ = CmiWallTimer(); 
+  if ((genStart_=start_counters(counter1_, counter2_)) < 0) {
+    CmiAbort("ERROR: start_counters()");
+  }
 }
 
-void TraceCounter::beginUnpack(void) { startUnpack_ = CmiWallTimer(); }
+void TraceCounter::endPack(void) 
+{
+  long long value1 = 0, value2 = 0;
+  int genRead;
+  if ((genRead=read_counters(counter1_, &value1, counter2_, &value2)) < 0 ||
+      genRead != genStart_)
+  {
+    CmiAbort("ERROR: read_counters()");
+  }
+  double t = CmiWallTimer();
 
-void TraceCounter::endUnpack(void) {
-  int count1 = 0, count2 = 0;
-  CpvAccess(_logPool)->setEp(_unpackEP, count1, count2, 
-			     CmiWallTimer()-startUnpack_);
+  DEBUGF(("EP %d Time %f counter1 %d counter2 %ld\n", 
+	  _packEP, t-startPack_, value1, value2));
+  CpvAccess(_logPool)->setEp(_packEP, value1, value2, t - startPack_);
+}
+
+void TraceCounter::beginUnpack(void) 
+{ 
+  startUnpack_ = CmiWallTimer(); 
+  if ((genStart_=start_counters(counter1_, counter2_)) < 0) {
+    CmiAbort("ERROR: start_counters()");
+  }
+}
+
+void TraceCounter::endUnpack(void) 
+{
+  long long value1 = 0, value2 = 0;
+  int genRead;
+  if ((genRead=read_counters(counter1_, &value1, counter2_, &value2)) < 0 ||
+      genRead != genStart_)
+  {
+    CmiAbort("ERROR: read_counters()");
+  }
+  double t = CmiWallTimer();
+
+  DEBUGF(("EP %d Time %f counter1 %d counter2 %ld\n", 
+	  _unpackEP, t-startUnpack_, value1, value2));
+  CpvAccess(_logPool)->setEp(_unpackEP, value1, value2, t-startUnpack_);
 }
 
 void TraceCounter::beginComputation(void)
