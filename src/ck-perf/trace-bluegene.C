@@ -82,10 +82,7 @@ void TraceBluegene::bgDummyBeginExec(char* name,void** parentLogPtr)
 {
   if (!genTimeLog) return;
   startVTimer();
-  bgTimeLog* newLog = new bgTimeLog(_threadEP,name,BgGetCurTime());
-  if(*parentLogPtr)
-    newLog->addBackwardDep(*(bgTimeLog**)parentLogPtr);
-  tTIMELINEREC.logEntryStart(newLog);
+  bgTimeLog* newLog = BgStartLogByName(tTIMELINEREC, _threadEP, name, BgGetCurTime(), *(bgTimeLog**)parentLogPtr);
   *parentLogPtr = newLog;
 }
 
@@ -192,6 +189,16 @@ void TraceBluegene::bgPrint(char* str){
 extern "C" void BgPrintf(char *str)
 {
   BgPrint(str);
+}
+
+extern "C" void BgSetStartEvent()
+{
+  bgTimeLog* log;
+  if(genTimeLog)
+    log = tTIMELINE[tTIMELINE.length()-1];
+  else
+    return;
+  log->setStartEvent();
 }
 
 /*@}*/

@@ -100,6 +100,7 @@ extern int traceBluegeneLinked;
     	  _TRACE_BG_ADD_BACKWARD_DEP(log);	\
         }	\
 	}
+extern "C" void BgSetStartEvent();
 #else
 # define BgPrint(x)  
 # define _TRACE_BG_TLINE_END(x)
