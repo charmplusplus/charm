@@ -17,20 +17,19 @@ public: static int __idx;
 };
 #define CK_ALIGN(val,to) (((val)+(to)-1)&~((to)-1))
 
-#if CMK_DEBUG_MODE
-#include <string.h>
-class Chare;
-extern void putObject(Chare *);
-extern void removeObject(Chare *);
-#endif
-
 #include "cklists.h"
 #include "init.h"
 #include "pup.h"
+#include "debug-charm.h"
+
+void CkPupMessage(PUP::er &p,void **atMsg,int fast_and_dirty=1);
 
 class Message { //Superclass of all Charm++ messages
 public:
 	void operator delete(void *ptr) { CkFreeMsg(ptr); }
+	/* This pup routine only packs the message itself, *not* the
+	message header.  Use CkPupMessage instead of calling this directly. */
+	void pup(PUP::er &p);
 };
 
 class Chare { //Superclass of all Chares
@@ -44,15 +43,8 @@ class Chare { //Superclass of all Chares
 #endif
     void *operator new(size_t s) { return malloc(s); }
     void operator delete(void *ptr) { free(ptr); }
-#if CMK_DEBUG_MODE
-    Chare() { CkGetChareID(&thishandle); putObject(this); }
-    virtual ~Chare();
-    virtual char *showHeader(void);
-    virtual char *showContents(void);
-#else
     Chare() { CkGetChareID(&thishandle); }
     virtual ~Chare(); //<- needed for *any* child to have a virtual destructor
-#endif
     virtual void pup(PUP::er &p);//<- pack/unpack routine
 };
 
@@ -272,21 +264,10 @@ class CkThrCallArg {
     CkThrCallArg(void *m, void *o) : msg(m), obj(o) {}
 };
 
-extern unsigned int _primesTable[];
-
-extern int _GETIDX(int cidx);
 extern void _REGISTER_BASE(int didx, int bidx);
 extern void _REGISTER_DONE(void);
 
-#ifndef CMK_OPTIMIZE
-static inline void _CHECK_CID(CkChareID cid, int idx)
-{
-  if(cid.magic%_GETIDX(idx))
-    CkAbort("Illegal ChareID assignment to proxy.\n");
-}
-#else
 static inline void _CHECK_CID(CkChareID, int){}
-#endif
 
 #include "readonly.h"
 #include "ckarray.h"
