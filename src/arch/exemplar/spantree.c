@@ -12,14 +12,17 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-08 16:35:12  gursoy
+ * Revision 2.1  1995-06-09 21:22:00  gursoy
+ * Cpv macros moved to converse
+ *
+ * Revision 2.0  1995/06/08  16:35:12  gursoy
  * Reorganized directory structure
  *
  ***************************************************************************/
 static char ident[] = "@(#)$Header$";
 
 /* This file contains all the spanning tree functions */
-#include "machine.h"
+#include "converse.h"
 
 
 #define MAXSPAN    4          /* The maximum permitted span on 

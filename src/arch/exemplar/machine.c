@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1995-06-09 16:43:47  gursoy
+ * Revision 2.2  1995-06-09 21:22:00  gursoy
+ * Cpv macros moved to converse
+ *
+ * Revision 2.1  1995/06/09  16:43:47  gursoy
  * Initial implementation of CmiMyRank
  *
  * Revision 2.0  1995/06/08  16:35:12  gursoy
@@ -143,7 +146,8 @@ char *argv[];
  
     spawn_sym_t request;
      
-/* temporary */ 
+/* temporary  implementation for testing */
+/* numbers of processors must be extracted from argv */ 
     requested_npe = 2;
 printf("Enter requested_npe:");
 scanf("%d",&requested_npe);
@@ -178,11 +182,11 @@ void *arg;
     Cmi_mype  = my_thread();
     Cmi_numpe =  usrparam->npe;
 
-     default_main(usrparam->argc,usrparam->argv);
+    charm_main(usrparam->argc,usrparam->argv);
 }
 
 
-void CmiInit(argv)
+void CmiInitMc(argv)
 char *argv[];
 {
     program_name(argv[0],"Convex/Exemplar");

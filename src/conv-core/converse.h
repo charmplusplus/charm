@@ -45,6 +45,24 @@ typedef void  *CmiCommHandle;
 
 #endif
 
+
+#ifdef CMK_SHARED_VARS_EXEMPLAR
+#include <spp_prog_model.h>
+#include <memory.h>
+#define CpvDeclare(t,v) thread_private t v
+#define CpvExtern(t,v)  extern thread_private t v
+#define CpvStaticDeclare(t,v) static thread_private t v
+#define CpvInitialize(t,v)
+#define CpvAccess(v) v
+
+#define CsvDeclare(t,v) node_private t v
+#define CsvStaticDeclare(t,v) static node_private t v
+#define CsvExtern(t,v) extern node_private t v
+#define CsvInitialize(t,v)
+#define CsvAccess(v) v
+
+#endif
+
 /******** PROTOTYPES FOR CMI FUNCTIONS AND MACROS *******/
 
 
@@ -75,13 +93,13 @@ CpvExtern(int ,Cmi_numpe);
 #endif
 
 void *CmiAlloc  CMK_PROTO((int size));
-int   CmiSize   CMK_PROTO((...));
-void  CmiFree   CMK_PROTO((...));
+int   CmiSize   CMK_PROTO(());
+void  CmiFree   CMK_PROTO(());
 
 #ifdef CMK_CMIPRINTF_IS_A_BUILTIN
-void  CmiPrintf CMK_PROTO((...));
-void  CmiError  CMK_PROTO((...));
-int   CmiScanf  CMK_PROTO((...));
+void  CmiPrintf CMK_PROTO(());
+void  CmiError  CMK_PROTO(());
+int   CmiScanf  CMK_PROTO(());
 #endif
 
 #ifdef CMK_CMIPRINTF_IS_JUST_PRINTF

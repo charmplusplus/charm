@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-08 16:39:47  gursoy
+ * Revision 2.1  1995-06-09 21:23:01  gursoy
+ * Cpv macros moved to converse
+ *
+ * Revision 2.0  1995/06/08  16:39:47  gursoy
  * Reorganized directory structure
  *
  * Revision 1.3  1995/05/04  22:19:02  sanjeev
@@ -26,12 +29,14 @@
  *
  ***************************************************************************/
 static char ident[] = "@(#)$Header$";
+
 #include <stdio.h>
 #include "machine.h"
 #include "converse.h"
 
 #define FLIPBIT(node,bitnumber) (node ^ (1 << bitnumber))
-#define MC_PROBE() 
+
+
 
 int Cmi_mype;
 int Cmi_numpe;
@@ -40,7 +45,9 @@ void* CmiLocalQueue;
 
 static int process, host, cflag, source, type;
 static double uclockinitvalue;
-extern double amicclk() ;
+extern double amicclk();
+
+
 
 
 void *CmiAlloc(size)
@@ -135,7 +142,7 @@ void *CmiGetNonLocal()
         {
                env = (void *)  CmiAlloc(msglength); 
                if (env == NULL) 
-                  CkPrintf("*** ERROR *** Memory Allocation Failed.\n");
+                  CmiPrintf("*** ERROR *** Memory Allocation Failed.\n");
                McSyncReceive(msglength, env);
                return env;
         }
@@ -280,4 +287,12 @@ void CmiExit()
 
 void CmiDeclareArgs()
 {}
+
+
+main(argc,argv)
+int argc;
+charn *argv[];
+{
+    charm_main(argc,argv);
+}
 

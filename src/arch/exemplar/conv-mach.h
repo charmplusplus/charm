@@ -19,3 +19,7 @@
 
 /* #define CMK_CMIPRINTF_IS_A_BUILTIN */
    #define CMK_CMIPRINTF_IS_JUST_PRINTF
+
+
+   #define CMK_SHARED_VARS_EXEMPLAR
+

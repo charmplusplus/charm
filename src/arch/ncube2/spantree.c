@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-08 16:39:47  gursoy
+ * Revision 2.1  1995-06-09 21:23:01  gursoy
+ * Cpv macros moved to converse
+ *
+ * Revision 2.0  1995/06/08  16:39:47  gursoy
  * Reorganized directory structure
  *
  * Revision 1.2  1995/05/04  22:19:20  sanjeev
@@ -90,7 +93,7 @@ CmiSpanTreeInit()
 
     for (i = 0; i < numnodes; i++)  /* check */
 	if (!visited[i])
-	   CkError("node %d not part of spanning tree: initialization error!\n",i);
+	   CmiError("node %d not part of spanning tree: initialization error!\n",i);
 }
 
 
@@ -122,23 +125,6 @@ int CmiNumSpanTreeChildren(node)
 int node;
 {
     return SpanArray[node].noofchildren;
-}
-
-
-
-
-PrintSpanTree()
-{
-    int i,j;
-
-    for (i = 0; i < numnodes; i++)
-    {
-	CkPrintf("node: %d, parent: %d, numchildren: %d, children: ",
-		 i, SpanArray[i].parent, SpanArray[i].noofchildren); 
-	for (j = 0; j < SpanArray[i].noofchildren; j++)
-	     CkPrintf("%d ",SpanArray[i].children[j]);
-	CkPrintf("\n");
-    }
 }
 
 

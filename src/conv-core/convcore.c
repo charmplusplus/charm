@@ -96,9 +96,17 @@ void CmiInit(argv)
 char **argv;
 {
   void *FIFO_Create();
+
+  if (CmiMyRank() != 0) CmiNodeBarrier();
+
   convcoreModuleInit();
-  CsvAccess(CmiHandlerTable) =
-    (CmiHandler *)CmiSvAlloc((MAX_HANDLERS + 1) * sizeof(CmiHandler)) ;
+
+  if (CmiMyRank() == 0) 
+  {
+     CsvAccess(CmiHandlerTable) =
+        (CmiHandler *)CmiSvAlloc((MAX_HANDLERS + 1) * sizeof(CmiHandler)) ;
+     CmiNodeBarrier();
+  }
   CmiInitMc(argv);
 }
 
