@@ -34,7 +34,7 @@ void EachToManyStrategy::checkPeList(){
   int flag = 0, count , pos;
   for(count = 0; count < npes; count++){
     for(pos = 0; pos < npes; pos ++)
-      if(pelist[count] == pelist[pos]){
+      if(pelist[count] == pelist[pos] && count!=pos){
 	flag = 1;
 	break;
       }
@@ -43,6 +43,10 @@ void EachToManyStrategy::checkPeList(){
   }
 
   int *newpelist = new int[npes], newpos = 0;
+
+  for(count = 0; count < npes; count++)
+    newpelist[count] = -1;
+
   if( flag ) {
     for(count = 0; count < npes; count++){
       int flag1 = 0;

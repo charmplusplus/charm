@@ -59,7 +59,7 @@ Strategy* createStrategy(int s, int n){
 //An initialization routine which does prelimnary initialization of the 
 //communications library and registers the strategies with the PUP:able interface.
 void initComlibManager(void){
-    //    comm_debug = 1;
+    //comm_debug = 1;
     ComlibInit();
     ComlibPrintf("Init Call\n");
     //Called once on each processor 
@@ -280,6 +280,7 @@ void ComlibManager::ArraySend(int ep, void *msg,
     env->array_ep()=ep;
     env->array_hops()=0;
     env->array_index()=idx;
+    env->setUsed(0);
     CkPackMessage(&env);
     //    CmiSetHandler(env, _charmHandlerIdx);
     CmiSetHandler(env, CpvAccess(RecvmsgHandle));
@@ -325,7 +326,8 @@ void ComlibManager::GroupSend(int ep, void *msg, int onPE, CkGroupID gid){
     env->setEpIdx(ep);
     env->setGroupNum(gid);
     env->setSrcPe(CkMyPe());
-    
+    env->setUsed(0);
+
     CkPackMessage(&env);
     CmiSetHandler(env, _charmHandlerIdx);
 
