@@ -38,10 +38,6 @@ typedef void (*TCharmThreadDataStartFn)(void *threadData);
 void TCharmCreateData(int nThreads,TCharmThreadDataStartFn threadFn,
 		  void *threadData,int threadDataLen);
 
-/*Get the unconsumed command-line arguments (C only; no Fortran)*/
-char **TCharmArgv(void);
-int TCharmArgc(void);
-
 /*Get the number of chunks we expect based on the command line*/
 int TCharmGetNumChunks(void);
 
@@ -57,8 +53,11 @@ void *TCharmGetUserdata(int id);
 void TCharmMigrate(void);
 void TCharmDone(void);
 
-/*Get the local wall clock*/
+/*Get the local wall clock.  Unlike CkWalltimer, is
+  monotonically increasing, even with migration and 
+  unsynchronized clocks. */
 double TCharmWallTimer(void);
+
 
 /*Standalone startup routine*/
 void TCharmInit(int *argc,char ***argv);

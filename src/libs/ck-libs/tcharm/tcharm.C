@@ -582,27 +582,11 @@ FDECL void FTN_NAME(TCHARM_CREATE_DATA,tcharm_create_data)
 { TCharmCreateData(*nThreads,threadFn,threadData,*threadDataLen); }
 
 
-/*Get the unconsumed command-line arguments*/
-CDECL char **TCharmArgv(void)
-{
-	TCHARMAPI("TCharmArgv");
-	if (TCharm::getState()!=inInit)
-		CkAbort("TCharm> Can only get arguments from in init!\n");
-	return cookie.getArgv();
-}
-CDECL int TCharmArgc(void)
-{
-	TCHARMAPI("TCharmArgc");
-	if (TCharm::getState()!=inInit)
-		CkAbort("TCharm> Can only get arguments from in init!\n");
-	return CmiGetArgc(cookie.getArgv());
-}
-
 CDECL int TCharmGetNumChunks(void)
 {
 	TCHARMAPI("TCharmGetNumChunks");
 	int nChunks=CkNumPes();
-	char **argv=TCharmArgv();
+	char **argv=CkGetArgv();
 	CmiGetArgInt(argv,"-vp",&nChunks);
 	CmiGetArgInt(argv,"+vp",&nChunks);
 	lastNumChunks=nChunks;
@@ -707,6 +691,27 @@ CDECL double TCharmWallTimer(void)
     return CkWallTimer()+TCharm::get()->getTimeOffset();
   }
 }
+
+#if 1
+/*Include Fortran-style "iargc" and "getarg" routines.
+These are needed to get access to the command-line arguments from Fortran.
+*/
+FDECL int FTN_NAME(IARGC,iargc)(void) {
+  TCHARMAPI("iargc");
+  return CkGetArgc()-1;
+}
+
+FDECL void FTN_NAME(GETARG,getarg)(int *i_p,char *dest,int destLen) {
+  TCHARMAPI("getarg");
+  int i=*i_p;
+  if (i<0) CkAbort("getarg called with negative argument!");
+  if (i>=CkGetArgc()) CkAbort("getarg called with argument > iargc!");
+  const char *src=CkGetArgv()[i];
+  strcpy(dest,src);
+  for (i=strlen(dest);i<destLen;i++) dest[i]=' ';
+}
+
+#endif
 
 //These silly routines are used for serial startup:
 extern void _initCharm(int argc, char **argv);
