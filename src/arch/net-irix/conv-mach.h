@@ -8,8 +8,8 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.4  1997-03-19 04:58:03  jyelon
- * Removed the CMK_DEFAULT_MAIN_USES_SIMULATOR_CODE flag.
+ * Revision 1.5  1997-03-19 17:45:59  milind
+ * Switched to the SGI native compilers for better performance.
  *
  * Revision 1.3  1997/02/13 09:31:45  jyelon
  * Updated for new main/ConverseInit structure.
@@ -73,6 +73,8 @@
 #define CMK_CSDEXITSCHEDULER_IS_A_FUNCTION                 0
 #define CMK_CSDEXITSCHEDULER_SET_CSDSTOPFLAG               1
 
+#define CMK_DEFAULT_MAIN_USES_COMMON_CODE                  1
+
 #define CMK_FIX_HP_CONNECT_BUG                             0
 
 #define CMK_IS_HETERO                                      1
@@ -113,8 +115,8 @@
 #define CMK_STATIC_PROTO_FAILS                             0
 #define CMK_STATIC_PROTO_WORKS                             1
 
-#define CMK_STRERROR_IS_A_BUILTIN                          0
-#define CMK_STRERROR_USE_SYS_ERRLIST                       1
+#define CMK_STRERROR_IS_A_BUILTIN                          1
+#define CMK_STRERROR_USE_SYS_ERRLIST                       0
 
 #define CMK_STRINGS_USE_OWN_DECLARATIONS                   0
 #define CMK_STRINGS_USE_STRINGS_H                          0
