@@ -205,15 +205,25 @@ public:
     /// Synchronize reads and writes across the entire array.
     inline void sync(int single=0) { cache->SyncReq(single); }
 
+    /// Fetch the ENTRY at idx to be accumulated.
+    ///   You must perform the accumulation on 
+    ///     the return value before calling "sync".
+    ///   Never blocks.
+    inline ENTRY& accumulate(unsigned int idx)
+    {
+        unsigned int page = idx / ENTRIES_PER_PAGE;
+        unsigned int offset = idx % ENTRIES_PER_PAGE;
+        return cache->accumulate(page, offset);
+    }
+    
     /// Add ent to the element at idx.
     ///   Never blocks.
     ///   Merges together accumulates from different threads.
     inline void accumulate(unsigned int idx, const ENTRY& ent)
     {
-        unsigned int page = idx / ENTRIES_PER_PAGE;
-        unsigned int offset = idx % ENTRIES_PER_PAGE;
-        cache->accumulate(page, &ent, offset);
+        accumulate(idx)+=ent;
     }
+    
 
     inline void FreeMem()
     {

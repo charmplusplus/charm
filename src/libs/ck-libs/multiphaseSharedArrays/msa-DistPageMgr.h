@@ -653,14 +653,6 @@ protected:
         replacementPolicy->pageAccessed(page);
     }
 
-    // begin, end are indexes
-    //
-    // MSA_CacheGroup::
-    void combine(unsigned int page, const ENTRY_TYPE* entryPtr, unsigned int off)
-    {
-        entryOpsObject->accumulate(pageTable[page][off], *entryPtr);
-    }
-
     // MSA_CacheGroup::
     // Fill this page with identity values, to prepare for writes or 
     //  accumulates.
@@ -832,11 +824,11 @@ public:
     }
 
     // MSA_CacheGroup::
-    inline void accumulate(unsigned int page, const ENTRY_TYPE* entry, unsigned int offset)
+    inline ENTRY_TYPE &accumulate(unsigned int page, unsigned int offset)
     {
         accessPage(page,Accumulate_Fault);
         stateN(page)->write(offset);
-        combine(page, entry, offset);
+	return pageTable[page][offset];
     }
 
     /// A requested page has arrived from the network.
