@@ -20,3 +20,4 @@ CMK_NATIVE_LDXX='g++'
 CMK_F90LIBS=' '
 CMK_RANLIB=ranlib
 CMK_AR="ar rv"
+CMK_QT="aix"
