@@ -12,7 +12,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 2.23  1997-05-05 14:25:27  jyelon
+# Revision 2.24  1997-07-15 21:16:01  jyelon
+# Removed CMK_NM stuff once and for all!
+#
+# Revision 2.23  1997/05/05 14:25:27  jyelon
 # More quickthreads related changes.
 #
 # Revision 2.22  1997/05/05 13:56:09  jyelon
@@ -89,8 +92,6 @@
 
 set CMK_CPP_CHARM    = '/usr/lib/cpp -D_NO_PROTO '
 set CMK_CPP_C        = '/usr/lib/cpp -D_NO_PROTO '
-set CMK_LDRO         = 'ld -r -o '
-set CMK_LDRO_WORKS   = 1
 set CMK_CC           = 'mpcc '
 set CMK_CC_RELIABLE  = 'mpcc '
 set CMK_CC_FASTEST   = 'mpcc '
@@ -114,8 +115,6 @@ set CMK_SEQ_CC       = 'gcc'
 set CMK_SEQ_LD       = 'gcc'
 set CMK_SEQ_CXX      = 'g++'
 set CMK_SEQ_LDXX     = 'g++'
-set CMK_NM           = '/bin/nm'
-set CMK_NM_FILTER    = "grep '|extern|' | sed -e 's/ *|.*//'"
 set CMK_CPP_SUFFIX   = "i"
 set CMK_XLATPP       = 'charmxlat++ '
 set CMK_QT='ibm-sp1'

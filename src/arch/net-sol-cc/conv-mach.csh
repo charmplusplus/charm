@@ -16,8 +16,6 @@
 
 set CMK_CPP_CHARM='/usr/ccs/lib/cpp '
 set CMK_CPP_C='cc -E '
-set CMK_LDRO='ld -r -o'
-set CMK_LDRO_WORKS=0
 set CMK_CC='cc '
 set CMK_CC_RELIABLE='cc '
 set CMK_CC_FASTEST='cc '
@@ -41,8 +39,6 @@ set CMK_SEQ_CC='cc'
 set CMK_SEQ_LD='cc'
 set CMK_SEQ_CXX='CC'
 set CMK_SEQ_LDXX='CC'
-set CMK_NM='nm'
-set CMK_NM_FILTER='grep "|GLOB" | sed -e "s@.*|@@"'
 set CMK_CPP_SUFFIX="cc"
 set CMK_XLATPP='charmxlat++ -w -p '
 set CMK_QT='solaris-cc'
