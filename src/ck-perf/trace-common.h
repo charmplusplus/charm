@@ -30,11 +30,16 @@
 #define  BEGIN_UNPACK       18
 #define  END_UNPACK         19
 
-CpvExtern(int, CtrLogBufSize);
-CpvExtern(char*, traceRoot);
-CpvExtern(double, traceInitTime);
+CkpvExtern(int, CtrLogBufSize);
+CkpvExtern(char*, traceRoot);
+CkpvExtern(double, traceInitTime);
 
-inline double TraceTimer() { return CmiWallTimer() - CpvAccess(traceInitTime); }
+#if CMK_BLUEGENE_CHARM
+#define  TRACE_TIMER   BgGetTime
+#else
+#define  TRACE_TIMER   CmiWallTimer
+#endif
+inline double TraceTimer() { return TRACE_TIMER() - CkpvAccess(traceInitTime); }
 
 #endif
 

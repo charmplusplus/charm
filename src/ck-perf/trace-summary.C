@@ -16,14 +16,14 @@
 
 #define VER   3.0
 
-CpvStaticDeclare(TraceSummary*, _trace);
-CpvStaticDeclare(char*, pgmName);
+CkpvStaticDeclare(TraceSummary*, _trace);
+CkpvStaticDeclare(char*, pgmName);
 static int _numEvents = 0;
 static int _threadMsg, _threadChare, _threadEP;
 static int _packMsg, _packChare, _packEP;
 static int _unpackMsg, _unpackChare, _unpackEP;
-CpvDeclare(double, binSize);
-CpvDeclare(double, version);
+CkpvDeclare(double, binSize);
+CkpvDeclare(double, version);
 
 /**
   For each TraceFoo module, _createTraceFoo() must be defined.
@@ -32,9 +32,9 @@ CpvDeclare(double, version);
 void _createTracesummary(char **argv)
 {
   DEBUGF(("%d createTraceSummary\n", CkMyPe()));
-  CpvInitialize(TraceSummary*, _trace);
-  CpvAccess(_trace) = new  TraceSummary(argv);
-  CpvAccess(_traces)->addTrace(CpvAccess(_trace));
+  CkpvInitialize(TraceSummary*, _trace);
+  CkpvAccess(_trace) = new  TraceSummary(argv);
+  CkpvAccess(_traces)->addTrace(CkpvAccess(_trace));
 }
 
 
@@ -42,7 +42,7 @@ void _createTracesummary(char **argv)
 extern "C" 
 void CkSummary_StartPhase(int phase)
 {
-   CpvAccess(_trace)->startPhase(phase);
+   CkpvAccess(_trace)->startPhase(phase);
 }
 
 
@@ -50,7 +50,7 @@ void CkSummary_StartPhase(int phase)
 extern "C" 
 void CkSummary_MarkEvent(int eventType)
 {
-   CpvAccess(_trace)->addEventType(eventType);
+   CkpvAccess(_trace)->addEventType(eventType);
 }
 
 
@@ -90,7 +90,7 @@ void SumLogPool::addEventType(int eventType, double time)
 SumLogPool::SumLogPool(char *pgm) : phaseTab(MAX_PHASES) 
 {
     int i;
-    poolSize = CpvAccess(CtrLogBufSize);
+    poolSize = CkpvAccess(CtrLogBufSize);
     if (poolSize % 2) poolSize++;	// make sure it is even
     pool = new BinEntry[poolSize];
     _MEMCHECK(pool);
@@ -128,8 +128,8 @@ void SumLogPool::write(void)
 {
   int i;
   unsigned int j;
-  fprintf(fp, "ver:%3.1f %d/%d count:%d ep:%d interval:%e", CpvAccess(version), CmiMyPe(), CmiNumPes(), numEntries, _numEntries, CpvAccess(binSize));
-  if (CpvAccess(version)>=3.0)
+  fprintf(fp, "ver:%3.1f %d/%d count:%d ep:%d interval:%e", CkpvAccess(version), CmiMyPe(), CmiNumPes(), numEntries, _numEntries, CkpvAccess(binSize));
+  if (CkpvAccess(version)>=3.0)
   {
     fprintf(fp, " phases:%d", phaseTab.numPhasesCalled());
   }
@@ -147,7 +147,7 @@ void SumLogPool::write(void)
     fprintf(fp, "%d ", epCount[i]);
   fprintf(fp, "\n");
   // write marks
-  if (CpvAccess(version)>=2.0) 
+  if (CkpvAccess(version)>=2.0) 
   {
   fprintf(fp, "%d ", markcount);
   for (i=0; i<MAX_MARKS; i++) {
@@ -157,7 +157,7 @@ void SumLogPool::write(void)
   fprintf(fp, "\n");
   }
   // write phases
-  if (CpvAccess(version)>=3.0)
+  if (CkpvAccess(version)>=3.0)
   {
   phaseTab.write(fp);
   }
@@ -165,8 +165,8 @@ void SumLogPool::write(void)
 
 void SumLogPool::writeSts(void)
 {
-  char *fname = new char[strlen(CpvAccess(pgmName))+strlen(".sts")+1];
-  sprintf(fname, "%s.sum.sts", CpvAccess(pgmName));
+  char *fname = new char[strlen(CkpvAccess(pgmName))+strlen(".sts")+1];
+  sprintf(fname, "%s.sum.sts", CkpvAccess(pgmName));
   FILE *sts = fopen(fname, "w+");
   //CmiPrintf("File: %s \n", fname);
   if(sts==0)
@@ -219,33 +219,33 @@ void SumLogPool::shrink(void)
      pool[i].setTime(pool[i*2].getTime() + pool[i*2+1].getTime());
   }
   numEntries = entries;
-  CpvAccess(binSize) *= 2;
+  CkpvAccess(binSize) *= 2;
 
-//CkPrintf("Shrinked binsize: %f entries:%d!!!!\n", CpvAccess(binSize), numEntries);
+//CkPrintf("Shrinked binsize: %f entries:%d!!!!\n", CkpvAccess(binSize), numEntries);
 }
 
 void BinEntry::write(FILE* fp)
 {
-  int per = (int)(time * 100.0 / CpvAccess(binSize));
+  int per = (int)(time * 100.0 / CkpvAccess(binSize));
   fprintf(fp, "%4d", per);
 }
 
 TraceSummary::TraceSummary(char **argv):curevent(0),msgNum(0),binStart(0.0),bin(0.0)
 {
   char *tmpStr;
-  CpvInitialize(char*, pgmName);
-  CpvInitialize(double, binSize);
-  CpvInitialize(double, version);
-  CpvAccess(pgmName) = (char *) malloc(strlen(argv[0])+1);
-  _MEMCHECK(CpvAccess(pgmName));
-  strcpy(CpvAccess(pgmName), argv[0]);
-  CpvAccess(binSize) = BIN_SIZE;
-  CpvAccess(version) = VER;
+  CkpvInitialize(char*, pgmName);
+  CkpvInitialize(double, binSize);
+  CkpvInitialize(double, version);
+  CkpvAccess(pgmName) = (char *) malloc(strlen(argv[0])+1);
+  _MEMCHECK(CkpvAccess(pgmName));
+  strcpy(CkpvAccess(pgmName), argv[0]);
+  CkpvAccess(binSize) = BIN_SIZE;
+  CkpvAccess(version) = VER;
   if (CmiGetArgString(argv,"+binsize",&tmpStr))
-  	sscanf(tmpStr,"%lf",&CpvAccess(binSize));
+  	sscanf(tmpStr,"%lf",&CkpvAccess(binSize));
   if (CmiGetArgString(argv,"+version",&tmpStr))
-  	sscanf(tmpStr,"%lf",&CpvAccess(version));
-  _logPool = new SumLogPool(CpvAccess(pgmName));
+  	sscanf(tmpStr,"%lf",&CkpvAccess(version));
+  _logPool = new SumLogPool(CkpvAccess(pgmName));
 }
 
 int TraceSummary::traceRegisterUserEvent(const char*)
@@ -266,7 +266,7 @@ void TraceSummary::traceWriteSts(void)
 
 void TraceSummary::traceClose(void)
 {
-  CpvAccess(_trace)->endComputation();
+  CkpvAccess(_trace)->endComputation();
   if(CmiMyPe()==0)
       _logPool->writeSts();
   // destructor call the write()
@@ -309,7 +309,7 @@ void TraceSummary::beginExecute(int event,int msgType,int ep,int srcPe, int mlen
   start = t;
   double ts = binStart;
   // fill gaps
-  while ((ts = ts + CpvAccess(binSize)) < t)
+  while ((ts = ts + CkpvAccess(binSize)) < t)
   {
      _logPool->add(bin, CmiMyPe());
      bin=0.0;
@@ -329,7 +329,7 @@ void TraceSummary::endExecute(void)
     _logPool->setEp(execEp, t-ts);
   }
 
-  while ((nts = nts + CpvAccess(binSize)) < t)
+  while ((nts = nts + CkpvAccess(binSize)) < t)
   {
      bin += nts-ts;
      binStart  = nts;
@@ -400,14 +400,14 @@ void TraceSummary::endComputation(void)
      _logPool->add(bin, CmiMyPe());
      msgNum ++;
 
-     binStart  += CpvAccess(binSize);
+     binStart  += CkpvAccess(binSize);
      double t = TraceTimer();
      double ts = binStart;
      while (ts < t)
      {
        _logPool->add(bin, CmiMyPe());
        bin=0.0;
-       ts += CpvAccess(binSize);
+       ts += CkpvAccess(binSize);
      }
   }
 }

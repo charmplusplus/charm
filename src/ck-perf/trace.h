@@ -93,7 +93,7 @@ public:
     inline void traceEnd() {ALLDO(traceEnd());}
 };
 
-CpvExtern(TraceArray*, _traces);
+CkpvExtern(TraceArray*, _traces);
 
 extern "C" {
 #include "conv-trace.h"
@@ -105,25 +105,25 @@ extern "C" {
 #  define _TRACE_ONLY(code) /*empty*/
 #endif
 
-#define _TRACE_USER_EVENT(x) _TRACE_ONLY(CpvAccess(_traces)->userEvent(x))
-#define _TRACE_CREATION_1(env) _TRACE_ONLY(CpvAccess(_traces)->creation(env))
-#define _TRACE_CREATION_N(env, num) _TRACE_ONLY(CpvAccess(_traces)->creation(env, num))
-#define _TRACE_BEGIN_EXECUTE(env) _TRACE_ONLY(CpvAccess(_traces)->beginExecute(env))
+#define _TRACE_USER_EVENT(x) _TRACE_ONLY(CkpvAccess(_traces)->userEvent(x))
+#define _TRACE_CREATION_1(env) _TRACE_ONLY(CkpvAccess(_traces)->creation(env))
+#define _TRACE_CREATION_N(env, num) _TRACE_ONLY(CkpvAccess(_traces)->creation(env, num))
+#define _TRACE_BEGIN_EXECUTE(env) _TRACE_ONLY(CkpvAccess(_traces)->beginExecute(env))
 #define _TRACE_BEGIN_EXECUTE_DETAILED(evt,typ,ep,src,mlen) \
-	_TRACE_ONLY(CpvAccess(_traces)->beginExecute(evt,typ,ep,src,mlen))
-#define _TRACE_END_EXECUTE() _TRACE_ONLY(CpvAccess(_traces)->endExecute())
-#define _TRACE_BEGIN_IDLE() _TRACE_ONLY(CpvAccess(_traces)->beginIdle())
-#define _TRACE_END_IDLE() _TRACE_ONLY(CpvAccess(_traces)->endIdle())
-#define _TRACE_BEGIN_PACK() _TRACE_ONLY(CpvAccess(_traces)->beginPack())
-#define _TRACE_END_PACK() _TRACE_ONLY(CpvAccess(_traces)->endPack())
-#define _TRACE_BEGIN_UNPACK() _TRACE_ONLY(CpvAccess(_traces)->beginUnpack())
-#define _TRACE_END_UNPACK() _TRACE_ONLY(CpvAccess(_traces)->endUnpack())
-#define _TRACE_BEGIN_CHARMINIT() _TRACE_ONLY(CpvAccess(_traces)->beginCharmInit())
-#define _TRACE_END_CHARMINIT() _TRACE_ONLY(CpvAccess(_traces)->endCharmInit())
-#define _TRACE_BEGIN_COMPUTATION() _TRACE_ONLY(CpvAccess(_traces)->beginComputation())
-#define _TRACE_END_COMPUTATION() _TRACE_ONLY(CpvAccess(_traces)->endComputation())
-#define _TRACE_ENQUEUE(env) _TRACE_ONLY(CpvAccess(_traces)->enqueue(env))
-#define _TRACE_DEQUEUE(env) _TRACE_ONLY(CpvAccess(_traces)->dequeue(env))
+	_TRACE_ONLY(CkpvAccess(_traces)->beginExecute(evt,typ,ep,src,mlen))
+#define _TRACE_END_EXECUTE() _TRACE_ONLY(CkpvAccess(_traces)->endExecute())
+#define _TRACE_BEGIN_IDLE() _TRACE_ONLY(CkpvAccess(_traces)->beginIdle())
+#define _TRACE_END_IDLE() _TRACE_ONLY(CkpvAccess(_traces)->endIdle())
+#define _TRACE_BEGIN_PACK() _TRACE_ONLY(CkpvAccess(_traces)->beginPack())
+#define _TRACE_END_PACK() _TRACE_ONLY(CkpvAccess(_traces)->endPack())
+#define _TRACE_BEGIN_UNPACK() _TRACE_ONLY(CkpvAccess(_traces)->beginUnpack())
+#define _TRACE_END_UNPACK() _TRACE_ONLY(CkpvAccess(_traces)->endUnpack())
+#define _TRACE_BEGIN_CHARMINIT() _TRACE_ONLY(CkpvAccess(_traces)->beginCharmInit())
+#define _TRACE_END_CHARMINIT() _TRACE_ONLY(CkpvAccess(_traces)->endCharmInit())
+#define _TRACE_BEGIN_COMPUTATION() _TRACE_ONLY(CkpvAccess(_traces)->beginComputation())
+#define _TRACE_END_COMPUTATION() _TRACE_ONLY(CkpvAccess(_traces)->endComputation())
+#define _TRACE_ENQUEUE(env) _TRACE_ONLY(CkpvAccess(_traces)->enqueue(env))
+#define _TRACE_DEQUEUE(env) _TRACE_ONLY(CkpvAccess(_traces)->dequeue(env))
 
 #endif
 
