@@ -7,7 +7,7 @@ void adapt4::Step()
   Event *ev;
   POSE_TimeType lastGVT = localPVT->getGVT();
   static int itersAllowed=-1, iter=0, offset=-1, theMaxLeash=POSE_TimeMax/2, 
-    objUsage = MAX_USAGE/localPVT->getNumObjs() + STORE_RATE;
+    objUsage = MAX_USAGE * STORE_RATE;
   double critStart;
 
   rbFlag = 0;
