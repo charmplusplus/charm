@@ -169,7 +169,7 @@ For example, if you keep a dense array with 3 doubles of net force per node, you
 \function{integer function IDXL\_Layout\_offset(type,width,offsetBytes,distanceBytes,skewBytes)}
     \args{integer, intent(in) :: type,width,offsetBytes,distanceBytes,skewBytes}
 
-The most general data layout.  This routine expands on \kw{IDXL\_Layout\_offset} by adding: 
+The most general data layout.  This routine expands on \kw{IDXL\_Layout\_create} by adding: 
 
 \begin{itemize}
   \item \kw{offsetBytes} The number of bytes from the start of the array to the start of the data.

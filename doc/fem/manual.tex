@@ -524,6 +524,18 @@ identical values in \kw{outVal}.  Op has the same values and meaning as
      May only be called from driver, and to complete, must be called
      from every chunk's driver routine.
 
+\begin{alltt}
+! C example
+   double inArr[3], outArr[3];
+   int fid=IDXL_Layout_create(FEM_DOUBLE,3);
+   FEM_Reduce(fid,inArr,outArr,FEM_SUM);
+
+! f90 example
+   DOUBLE PRECISION :: inArr(3), outArr(3)
+   INTEGER fid
+   fid=IDXL_Layout_create(FEM_DOUBLE,3)
+   CALL FEM_Reduce(fid,inArr,outArr,FEM_SUM)
+\end{alltt}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
