@@ -27,6 +27,7 @@ typedef void  *CmiCommHandle;
 
 #ifdef CMK_NO_SHARED_VARS_AT_ALL
 
+#define SHARED_DECL
 #define CpvDeclare(t,v) t v
 #define CpvExtern(t,v)  extern t v
 #define CpvStaticDeclare(t,v) static t v
@@ -49,6 +50,8 @@ typedef void  *CmiCommHandle;
 #ifdef CMK_SHARED_VARS_EXEMPLAR
 #include <spp_prog_model.h>
 #include <memory.h>
+
+#define SHARED_DECL node_private
 #define CpvDeclare(t,v) thread_private t v
 #define CpvExtern(t,v)  extern thread_private t v
 #define CpvStaticDeclare(t,v) static thread_private t v
