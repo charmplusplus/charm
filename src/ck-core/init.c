@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.12  1995-09-01 02:13:17  jyelon
+ * Revision 2.13  1995-09-05 22:00:52  sanjeev
+ * modified StartCharm and ProcessBocInit to integrate Charm++.
+ *
+ * Revision 2.12  1995/09/01  02:13:17  jyelon
  * VID_BLOCK, CHARE_BLOCK, BOC_BLOCK consolidated.
  *
  * Revision 2.11  1995/07/27  20:29:34  jyelon
@@ -223,28 +226,33 @@ char **argv;
 		CpvAccess(InsideDataInit) = 0;
 
 		trace_begin_charminit();
-		if (CsvAccess(MainChareLanguage) == CHARMPLUSPLUS)
-		{
-			CPlus_CallCharmInit(CpvAccess(userArgc), CpvAccess(userArgv));
-		}
-		else
-		{
-			CpvAccess(MainDataSize) = 
-                                CsvAccess(ChareSizesTable)[CsvAccess(_CK_MainChareIndex)];
-			CpvAccess(mainChareBlock) = 
-                                CpvAccess(currentChareBlock) = (CHARE_BLOCK *) 
-                                CreateChareBlock(CpvAccess(MainDataSize),CHAREKIND_CHARE,rand());
+		 
+		CpvAccess(MainDataSize) = CsvAccess(ChareSizesTable)
+					      [CsvAccess(_CK_MainChareIndex)];
+		CpvAccess(mainChareBlock) = CpvAccess(currentChareBlock) = 
+					(CHARE_BLOCK *)CreateChareBlock(
+						CpvAccess(MainDataSize),
+						CHAREKIND_CHARE, rand());
 
-			/* Calling CharmInit entry point */
-			CpvAccess(NumReadMsg) = 0;
-			CpvAccess(InsideDataInit) = 1;
-
-			(CsvAccess(EpInfoTable)[CsvAccess(_CK_MainEpIndex)].function)
-			  (NULL, 
-			   CpvAccess(currentChareBlock) + 1,
-			   CpvAccess(userArgc), CpvAccess(userArgv));
-			CpvAccess(InsideDataInit) = 0;
+		if (CsvAccess(MainChareLanguage) != CHARMPLUSPLUS) 
+			mainChareBlock->chareptr = mainChareBlock + 1 ;
+		else {
+			mainChareBlock->chareptr = (CsvAccess(ChareFnTable)
+					      [CsvAccess(_CK_MainChareIndex)])
+							(mainChareBlock);
+			CPlus_SetMainChareID() ;  /* set mainhandle */
 		}
+
+
+		/* Calling CharmInit entry point */
+		CpvAccess(NumReadMsg) = 0;
+		CpvAccess(InsideDataInit) = 1;
+
+		(CsvAccess(EpInfoTable)[CsvAccess(_CK_MainEpIndex)].function)
+		  		(NULL, CpvAccess(currentChareBlock)->chareptr,
+				   CpvAccess(userArgc), CpvAccess(userArgv));
+		
+		CpvAccess(InsideDataInit) = 0;
 		trace_end_charminit();
 
 		/* create the buffer for the read only variables */
@@ -412,19 +420,18 @@ ENVELOPE       *envelope;
   int             current_chare = current_epinfo->chareindex;
   int             current_magic = rand();
 
-  if (current_epinfo->language == CHARMPLUSPLUS)
-    CPlus_ProcessBocInitMsg(envelope, usrMsg, current_bocnum, 
-			    current_msgType, current_ep);
+  bocBlock = CreateChareBlock(CsvAccess(ChareSizesTable)[current_chare], 
+					CHAREKIND_BOCNODE, current_magic);
+  bocBlock->x.boc_num = current_bocnum;
+  if ( current_epinfo->language != CHARMPLUSPLUS ) 
+    bocBlock->chareptr = (void *) (bocBlock + 1) ; 
   else
-    {
-      bocBlock = CreateChareBlock
-                    (CsvAccess(ChareSizesTable)[current_chare], CHAREKIND_BOCNODE, current_magic);
-      bocBlock->x.boc_num = current_bocnum;
-      SetBocDataPtr(current_bocnum, (void *) (bocBlock + 1));
-      trace_begin_execute(envelope);
-      (current_epinfo->function)(usrMsg, GetBocDataPtr(current_bocnum));
-      trace_end_execute(current_bocnum, current_msgType, current_ep);
-    }
+    bocBlock->chareptr = (CsvAccess(ChareFnTable)[current_chare]))
+						(bocBlock) ;
+  SetBocDataPtr(current_bocnum, bocBlock->chareptr);
+  trace_begin_execute(envelope);
+  (current_epinfo->function)(usrMsg, bocBlock->chareptr);
+  trace_end_execute(current_bocnum, current_msgType, current_ep);
 
   /* for dynamic BOC creation, used in node_main.c */
   return current_bocnum ;
