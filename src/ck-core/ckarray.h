@@ -530,10 +530,8 @@ public:
   inline int lastKnown(const CkArrayIndex &idx) const
 	  {return locMgr->lastKnown(idx);}
   /// Deliver message to this element (directly if local)
-  inline void deliver(CkMessage *m)
-	  {locMgr->deliver(m);}
-  inline void deliverViaQueue(CkMessage *m, CmiBool immediate=NOT_IMMEDIATE)
-	  {locMgr->deliverViaQueue(m, immediate);}
+  inline void deliver(CkMessage *m,CkDeliver_t type)
+	  {locMgr->deliver(m,type);}
   /// Fetch a local element via its index (return NULL if not local)
   inline ArrayElement *lookup(const CkArrayIndex &index)
 	  {return (ArrayElement *)locMgr->lookup(index,thisgroup);}
@@ -554,7 +552,8 @@ public:
   virtual CmiBool insertElement(CkMessage *);
 
 /// Demand-creation:
-  CmiBool demandCreateElement(const CkArrayIndex &idx,int onPe,int ctor);
+  CmiBool demandCreateElement(const CkArrayIndex &idx,
+  	int onPe,int ctor,CkDeliver_t type);
 
 /// Broadcast communication:
   void sendBroadcast(CkMessage *msg);

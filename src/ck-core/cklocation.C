@@ -698,7 +698,7 @@ void CkLocRec_local::addedElement(void)
 	//Push everything in the half-created queue into the system--
 	// anything not ready yet will be put back in.
 	while (!halfCreated.isEmpty())
-		myLocMgr->getLocalProxy().deliver(halfCreated.deq());
+		myLocMgr->getLocalProxy().deliverInline(halfCreated.deq());
 }
 
 CmiBool CkLocRec_local::isObsolete(int nSprings,const CkArrayIndex &idx_)
@@ -743,10 +743,10 @@ CmiBool CkLocRec_local::invokeEntry(CkMigratable *obj,void *msg,int epIdx) {
 	return CmiTrue;
 }
 
-CmiBool CkLocRec_local::deliver(CkArrayMessage *msg,CmiBool viaScheduler, CmiBool immediate)
+CmiBool CkLocRec_local::deliver(CkArrayMessage *msg,CkDeliver_t type)
 {
-	if (viaScheduler) {
-		myLocMgr->getLocalProxy().deliver(msg);
+	if (type==CkDeliver_queue) { /*Send via the message queue */
+		myLocMgr->getLocalProxy().deliverInline(msg);
 		return CmiTrue;
 	}
 	else
@@ -755,7 +755,7 @@ CmiBool CkLocRec_local::deliver(CkArrayMessage *msg,CmiBool viaScheduler, CmiBoo
 			UsrToEnv(msg)->array_mgr());
 		if (obj==NULL) {//That sibling of this object isn't created yet!
 			if (msg->array_ifNotThere()!=CkArray_IfNotThere_buffer) {
-				return myLocMgr->demandCreateElement(msg,CkMyPe());
+				return myLocMgr->demandCreateElement(msg,CkMyPe(),type);
 			}
 			else {
 				DEBS((AA"   BUFFERING message for nonexistent element %s!\n"AB,idx2str(this->idx)));
@@ -798,7 +798,7 @@ public:
   
 	virtual RecType type(void) {return dead;}
   
-	virtual CmiBool deliver(CkArrayMessage *msg,CmiBool viaScheduler, CmiBool imm) {
+	virtual CmiBool deliver(CkArrayMessage *msg,CkDeliver_t type) {
 		CkPrintf("Dead array element is %s.\n",idx2str(msg->array_index()));
 		CkAbort("Send to dead array element!\n");
 		return CmiFalse;
@@ -860,15 +860,15 @@ public:
 	virtual RecType type(void) {return remote;}
   
 	//Send a message for this element.
-	virtual CmiBool deliver(CkArrayMessage *msg,CmiBool viaScheduler, CmiBool immediate=CmiFalse) {
+	virtual CmiBool deliver(CkArrayMessage *msg,CkDeliver_t type) {
 		access();//Update our modification date
 		msg->array_hops()++;
 		DEBS((AA"   Forwarding message for element %s to %d (REMOTE)\n"AB,
 		      idx2str(msg->array_index()),onPe));
-		if (!immediate)
-		  myLocMgr->getProxy()[onPe].deliver(msg);
-		else
+		if (type==CkDeliver_immediate)
 		  myLocMgr->getProxy()[onPe].deliverImmediate(msg);
+		else /* normal message */
+		  myLocMgr->getProxy()[onPe].deliverInline(msg);
 		return CmiTrue;
 	}
 	//Return if this element is now obsolete
@@ -909,10 +909,8 @@ public:
   
 	virtual RecType type(void) {return buffering;}
   
-	//Send (or buffer) a message for this element.
-	//  If idx==NULL, the index is packed in the message.
-	//  If idx!=NULL, the index must be packed in the message.
-	virtual CmiBool deliver(CkArrayMessage *msg,CmiBool viaScheduler,CmiBool immed) {
+	//Buffer a message for this element.
+	virtual CmiBool deliver(CkArrayMessage *msg,CkDeliver_t type) {
 		DEBS((AA" Queued message for %s\n"AB,idx2str(msg->array_index())));
 		buffer.enq(msg);
 		return CmiTrue;
@@ -1022,7 +1020,7 @@ CkLocMgr::CkLocMgr(CkGroupID mapID_,CkGroupID lbdbID_,int numInitial)
 
 void _CkLocMgrInit(void) {
   /* Don't trace our deliver method--it does its own tracing */
-  CkDisableTracing(CkIndex_CkLocMgr::deliver(0));
+  CkDisableTracing(CkIndex_CkLocMgr::deliverInline(0));
   CkDisableTracing(CkIndex_CkLocMgr::deliverImmediate(0));
 }
 
@@ -1203,45 +1201,22 @@ void CkLocMgr::removeFromTable(const CkArrayIndex &idx) {
 
 /************************** LocMgr: MESSAGING *************************/
 /// Deliver message to this element, going via the scheduler if local
-void CkLocMgr::deliverViaQueue(CkMessage *m, CmiBool immediate) {
+void CkLocMgr::deliver(CkMessage *m,CkDeliver_t type) {
 	CK_MAGICNUMBER_CHECK
 	CkArrayMessage *msg=(CkArrayMessage *)m;
 	const CkArrayIndex &idx=msg->array_index();
-	DEBS((AA"deliverViaQueue %s\n"AB,idx2str(idx)));
+	DEBS((AA"deliver %s\n"AB,idx2str(idx)));
 #if CMK_LBDB_ON
-	the_lbdb->Send(myLBHandle,idx2LDObjid(idx),UsrToEnv(msg)->getTotalsize());
+	if (type==CkDeliver_queue)
+		the_lbdb->Send(myLBHandle,idx2LDObjid(idx),UsrToEnv(msg)->getTotalsize());
 #endif
 	CkLocRec *rec=elementNrec(idx);
-	if (rec!=NULL)
-		rec->deliver(msg,CmiTrue,immediate);
-	else deliverUnknown(msg, immediate);
-}
-/// Deliver message directly to this element
-CmiBool CkLocMgr::deliver(CkMessage *m) {
-	CK_MAGICNUMBER_CHECK
-	CkArrayMessage *msg=(CkArrayMessage *)m;
-	const CkArrayIndex &idx=msg->array_index();
-	DEBS((AA"deliver %s\n"AB,idx2str(idx)));
-	CkLocRec *rec=elementNrec(idx);
-	if (rec!=NULL)
-		return rec->deliver(msg,CmiFalse);
-	else 
-		return deliverUnknown(msg, NOT_IMMEDIATE);
-}
-CmiBool CkLocMgr::deliverImmediate(CkMessage *m) {	// entry
-	CK_MAGICNUMBER_CHECK
-	CkArrayMessage *msg=(CkArrayMessage *)m;
-	const CkArrayIndex &idx=msg->array_index();
-	DEBS((AA"deliver %s\n"AB,idx2str(idx)));
-	CkLocRec *rec=elementNrec(idx);
-	if (rec!=NULL)
-		return rec->deliver(msg,CmiFalse,IMMEDIATE);
-	else 
-		return deliverUnknown(msg, IMMEDIATE);
+	if (rec!=NULL) rec->deliver(msg,type);
+	else /* rec==NULL*/ deliverUnknown(msg,type);
 }
 
 /// This index is not hashed-- somehow figure out what to do.
-CmiBool CkLocMgr::deliverUnknown(CkArrayMessage *msg, CmiBool immediate)
+CmiBool CkLocMgr::deliverUnknown(CkArrayMessage *msg,CkDeliver_t type)
 {
 	CK_MAGICNUMBER_CHECK
 	const CkArrayIndex &idx=msg->array_index();
@@ -1250,28 +1225,29 @@ CmiBool CkLocMgr::deliverUnknown(CkArrayMessage *msg, CmiBool immediate)
 	{// Forward the message to its home processor
 		DEBM((AA"Forwarding message for unknown %s\n"AB,idx2str(idx)));
 		msg->array_hops()++;
-		if (immediate)
-		  thisProxy[onPe].deliverImmediate(msg);
+		if (type==CkDeliver_immediate) 
+			thisProxy[onPe].deliverImmediate(msg);
 		else
-		  thisProxy[onPe].deliver(msg);
+			thisProxy[onPe].deliverInline(msg);
 		return CmiTrue;
 	}
 	else
-	{// We *are* the home processor-- decide what to do
-	  int nt=msg->array_ifNotThere();
-	  if (nt==CkArray_IfNotThere_buffer)
-	  {//Just buffer the message
-		DEBC((AA"Adding buffer for unknown element %s\n"AB,idx2str(idx)));
-		CkLocRec *rec=new CkLocRec_buffering(this);
-		insertRecN(rec,idx);
-		return rec->deliver(msg,CmiTrue);	       
+	{// We *are* the home processor-- first buffer the message
+	  DEBC((AA"Adding buffer for unknown element %s\n"AB,idx2str(idx)));
+	  CkLocRec *rec=new CkLocRec_buffering(this);
+	  insertRecN(rec,idx);
+	  rec->deliver(msg,type);
+	  
+	  if (msg->array_ifNotThere()!=CkArray_IfNotThere_buffer) 
+	  { //Now demand-create the element:
+	    return demandCreateElement(msg,-1,type);
 	  }
-	  else 
-		return demandCreateElement(msg,-1);
+	  else
+	    return CmiTrue;
 	}
 }
 
-CmiBool CkLocMgr::demandCreateElement(CkArrayMessage *msg,int onPe)
+CmiBool CkLocMgr::demandCreateElement(CkArrayMessage *msg,int onPe,CkDeliver_t type)
 {
 	CK_MAGICNUMBER_CHECK
 	const CkArrayIndex &idx=msg->array_index();
@@ -1290,12 +1266,7 @@ CmiBool CkLocMgr::demandCreateElement(CkArrayMessage *msg,int onPe)
 	//Find the manager and build the element
 	DEBC((AA"Demand-creating element %s on pe %d\n"AB,idx2str(idx),onPe));
 	CkArrMgr *mgr=managers.find(UsrToEnv((void *)msg)->array_mgr()).mgr;
-	CmiBool created=mgr->demandCreateElement(idx,onPe,ctor);
-
-	//Try the delivery again-- it should succeed this time
-	deliver(msg);
-	
-	return created;
+	return mgr->demandCreateElement(idx,onPe,ctor,type);
 }
 
 //This message took several hops to reach us-- fix it

@@ -515,16 +515,21 @@ void CkArray::remoteDoneInserting(void)
   }
 }
 
-CmiBool CkArray::demandCreateElement(const CkArrayIndex &idx,int onPe,int ctor)
+CmiBool CkArray::demandCreateElement(const CkArrayIndex &idx,
+	int onPe,int ctor,CkDeliver_t type)
 {
 	CkArrayMessage *m=(CkArrayMessage *)CkAllocSysMsg();
 	prepareCtorMsg(m,onPe,idx);
 	m->array_ep()=ctor;
 	
-	if (onPe==CkMyPe()) //Call local constructor directly
-		return insertElement(m);
-	else
+	if ((onPe!=CkMyPe()) || (type==CkDeliver_queue)) {
+		DEBC((AA"Forwarding demand-creation request for %s to %d\n"AB,idx2str(idx),onPe));
 		thisProxy[onPe].insertElement(m);
+	} else /* local message, non-queued */ {
+		//Call local constructor directly
+		DEBC((AA"Demand-creating %s\n"AB,idx2str(idx)));
+		return insertElement(m);
+	}
 	return CmiTrue;
 }
 
@@ -576,7 +581,8 @@ void CProxyElement_ArrayBase::ckSend(CkArrayMessage *msg, int ep) const
 	  ckDelegatedTo()->ArraySend(ep,msg,_idx,ckGetArrayID());
 	else 
 	{ //Usual case: a direct send
-	  ckLocalBranch()->deliverViaQueue(msg, immediate);
+	  ckLocalBranch()->deliver(msg, 
+	  	immediate?CkDeliver_immediate:CkDeliver_queue);
 	}
 }
 
@@ -611,7 +617,7 @@ void CkSendMsgArray(int entryIndex, void *msg, CkArrayID aID, const CkArrayIndex
   m->array_index()=idx;
   msg_prepareSend(m,entryIndex,aID);
   CkArray *a=(CkArray *)_localBranch(aID);
-  a->deliverViaQueue(m);
+  a->deliver(m,CkDeliver_queue);
 }
 void CkSendMsgArrayInline(int entryIndex, void *msg, CkArrayID aID, const CkArrayIndex &idx)
 {
@@ -621,7 +627,7 @@ void CkSendMsgArrayInline(int entryIndex, void *msg, CkArrayID aID, const CkArra
   CkArray *a=(CkArray *)_localBranch(aID);
   // avoid nested tracing
   int oldStatus = CkDisableTracing(entryIndex);
-  a->deliver(m);
+  a->deliver(m,CkDeliver_inline);
   if (oldStatus) CkEnableTracing(entryIndex);
 }
 

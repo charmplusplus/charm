@@ -7,7 +7,7 @@ module CkLocation {
 
   group CkLocMgr {
 	entry CkLocMgr(CkGroupID map,CkGroupID lbdb,int numInitial);
-	entry void deliver(CkMessage *m);
+	entry void deliverInline(CkMessage *m);
 	entry [immediate] void deliverImmediate(CkMessage *m);
 	entry void migrateIncoming(CkArrayElementMigrateMessage *msg);
 	entry void updateLocation(CkArrayIndexMax idx,int nowOnPe);

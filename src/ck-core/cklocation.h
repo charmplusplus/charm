@@ -55,6 +55,13 @@ typedef enum {
 	CkArray_IfNotThere_createhome=2 //Make it on (a) home Pe
 } CkArray_IfNotThere;
 
+/// How to do a message delivery:
+typedef enum {
+	CkDeliver_queue=0, //Deliver via the scheduler's queue
+	CkDeliver_inline=1, //Deliver via a regular call
+	CkDeliver_immediate=2 //Deliver immediate message
+} CkDeliver_t;
+
 #include "CkLocation.decl.h"
 
 /************************** Array Messages ****************************/
@@ -130,7 +137,7 @@ public:
   virtual RecType type(void)=0;
   
   /// Accept a message for this element
-  virtual CmiBool deliver(CkArrayMessage *m,CmiBool viaScheduler,CmiBool immediate=CmiFalse)=0;
+  virtual CmiBool deliver(CkArrayMessage *m,CkDeliver_t type)=0;
   
   /// This is called when this ArrayRec is about to be replaced.
   /// It is only used to deliver buffered element messages.
@@ -170,7 +177,7 @@ public:
    *  Accept a message for this element.
    *  Returns false if the element died during the receive.
    */
-  virtual CmiBool deliver(CkArrayMessage *m,CmiBool viaScheduler, CmiBool immediate=CmiFalse);
+  virtual CmiBool deliver(CkArrayMessage *m,CkDeliver_t type);
   
   /** Invoke the given entry method on this element.
    *   Returns false if the element died during the receive.
@@ -413,7 +420,8 @@ public:
 	/// Demand-create an element at this index on this processor
 	///  Returns true if the element was successfully added;
 	///  false if the element migrated away or deleted itself.
-	virtual CmiBool demandCreateElement(const CkArrayIndex &idx,int onPe,int ctor) =0;
+	virtual CmiBool demandCreateElement(const CkArrayIndex &idx,
+		int onPe,int ctor,CkDeliver_t type) =0;
 };
 
 /**
@@ -448,9 +456,12 @@ public:
 	CmiBool addElement(CkArrayID aid,const CkArrayIndex &idx,
 		CkMigratable *elt,int ctorIdx,void *ctorMsg);
 	
-	///Deliver message to this element, going via the scheduler if local
-	void deliverViaQueue(CkMessage *m, CmiBool immediate=NOT_IMMEDIATE);
-
+	///Deliver message to this element:
+	inline void deliverViaQueue(CkMessage *m) {deliver(m,CkDeliver_queue);}
+	inline void deliverInline(CkMessage *m) {deliver(m,CkDeliver_inline);}
+	inline void deliverImmediate(CkMessage *m) {deliver(m,CkDeliver_immediate);}
+	void deliver(CkMessage *m, CkDeliver_t type);
+	
 	///Done inserting elements for now
 	void doneInserting(void);
 
@@ -487,7 +498,7 @@ public:
 
 	int getSpringCount(void) const { return nSprings; }
 
-	CmiBool demandCreateElement(CkArrayMessage *msg,int onPe);
+	CmiBool demandCreateElement(CkArrayMessage *msg,int onPe,CkDeliver_t type);
 	
 //Interface used by external users:
 	/// Home mapping
@@ -510,8 +521,6 @@ public:
 	
 
 //Communication:
-	CmiBool deliver(CkMessage *m);
-	CmiBool deliverImmediate(CkMessage *m);
 	void migrateIncoming(CkArrayElementMigrateMessage *msg);
 	void updateLocation(const CkArrayIndexMax &idx,int nowOnPe);
 	void reclaimRemote(const CkArrayIndexMax &idx,int deletedOnPe);
@@ -540,7 +549,7 @@ private:
 	typedef void (CkMigratable::* CkMigratable_voidfn_t)(void);
 	void callMethod(CkLocRec_local *rec,CkMigratable_voidfn_t fn);
 	
-	CmiBool deliverUnknown(CkArrayMessage *msg, CmiBool immediate);
+	CmiBool deliverUnknown(CkArrayMessage *msg,CkDeliver_t type);
 	
 	/// Create a new local record at this array index.
 	CkLocRec_local *createLocal(const CkArrayIndex &idx, CmiBool forMigration,
