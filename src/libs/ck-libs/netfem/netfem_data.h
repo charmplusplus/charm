@@ -182,6 +182,17 @@ public:
 	const int *getNodes(int elementNo) const {return &conn[elementNo*nodesPer];}
 	const char *getName(void) const {return name;}
 
+	// To make accessing conn easier:
+    // get the element connectivity information. dimension is zero indexed
+    // For a triangle, you will have dimensions 0,1,2 available
+    int getConnData(int elementNo, int dimension) const {
+      return conn[elementNo*bytesPer/sizeof(int)+dimension];
+    }
+	
+    int getConnWidth() const {
+      return bytesPer/sizeof(int);
+    }
+
 	virtual void copy(void);
 	
 	virtual void pup(PUP::er &p);
