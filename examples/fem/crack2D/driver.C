@@ -7,76 +7,41 @@ init(void)
 {
 }
 
-static int
-mypksz(GlobalData *gd)
-{
-  int size = sizeof(GlobalData);
-  size += gd->numProp*sizeof(int); // int *ts_proportion
-  size += gd->numProp*sizeof(double); // double *proportion
-  size += gd->numMatVol*sizeof(VolMaterial); // VolMaterial* volm
-  size += gd->numMatCoh*sizeof(CohMaterial); // CohMaterial* cohm
-  size += gd->nTime*sizeof(double); // double *itimes
-  size += gd->nn*sizeof(Node); // Node *nodes
-  size += gd->ne*sizeof(Element); // Element *elements
-  return size;
-}
-
-static void
-mypk(GlobalData *gd, void *buffer)
-{
-  char *buf = (char *) buffer;
-  memcpy((void*)buf, (void*) gd, sizeof(GlobalData)); buf += sizeof(GlobalData);
-  memcpy((void*)buf, (void*) gd->ts_proportion, gd->numProp*sizeof(int));
-  buf += gd->numProp*sizeof(int);
-  memcpy((void*)buf, (void*) gd->proportion, gd->numProp*sizeof(double));
-  buf += gd->numProp*sizeof(double);
-  memcpy((void*)buf, (void*) gd->volm, gd->numMatVol*sizeof(VolMaterial));
-  buf += gd->numMatVol*sizeof(VolMaterial);
-  memcpy((void*)buf, (void*) gd->cohm, gd->numMatCoh*sizeof(CohMaterial));
-  buf += gd->numMatCoh*sizeof(CohMaterial);
-  memcpy((void*)buf, (void*) gd->itimes, gd->nTime*sizeof(double));
-  buf += gd->nTime*sizeof(double);
-  memcpy((void*)buf, (void*) gd->nodes, gd->nn*sizeof(Node));
-  buf += gd->nn*sizeof(Node);
-  memcpy((void*)buf, (void*) gd->elements, gd->ne*sizeof(Element));
-  buf += gd->ne*sizeof(Element);
-  delete[] gd->ts_proportion;
-  delete[] gd->proportion;
-  delete[] gd->volm;
-  delete[] gd->cohm;
-  delete[] gd->itimes;
-  delete[] gd->nodes;
-  delete[] gd->elements;
-}
-
 static GlobalData *
-myupk(void *buffer)
+mypup(pup_er p, GlobalData *gd)
 {
-  char *buf = (char *) buffer;
-  GlobalData *gd = new GlobalData;
-  memcpy((void*) gd, (void*)buf, sizeof(GlobalData)); buf += sizeof(GlobalData);
-  gd->ts_proportion = new int[gd->numProp];
-  gd->proportion = new double[gd->numProp];
-  gd->volm = new VolMaterial[gd->numMatVol];
-  gd->cohm = new CohMaterial[gd->numMatCoh];
-  gd->itimes = new double[gd->nTime];
-  gd->nodes = new Node[gd->nn];
-  gd->elements = new Element[gd->ne];
-  memcpy((void*) gd->ts_proportion, (void*)buf, gd->numProp*sizeof(int));
-  buf += gd->numProp*sizeof(int);
-  memcpy((void*) gd->proportion, (void*)buf, gd->numProp*sizeof(double));
-  buf += gd->numProp*sizeof(double);
-  memcpy((void*) gd->volm, (void*)buf, gd->numMatVol*sizeof(VolMaterial));
-  buf += gd->numMatVol*sizeof(VolMaterial);
-  memcpy((void*) gd->cohm, (void*)buf, gd->numMatCoh*sizeof(CohMaterial));
-  buf += gd->numMatCoh*sizeof(CohMaterial);
-  memcpy((void*) gd->itimes, (void*)buf, gd->nTime*sizeof(double));
-  buf += gd->nTime*sizeof(double);
-  memcpy((void*) gd->nodes, (void*)buf, gd->nn*sizeof(Node));
-  buf += gd->nn*sizeof(Node);
-  memcpy((void*) gd->elements, (void*)buf, gd->ne*sizeof(Element));
-  buf += gd->ne*sizeof(Element);
-
+  if(pup_isUnpacking(p))
+    gd = new GlobalData;
+  pup_bytes(p, (void*)gd, sizeof(GlobalData));
+  if(pup_isUnpacking(p))
+  {
+    gd->ts_proportion = new int[gd->numProp];
+    gd->proportion = new double[gd->numProp];
+    gd->volm = new VolMaterial[gd->numMatVol];
+    gd->cohm = new CohMaterial[gd->numMatCoh];
+    gd->itimes = new double[gd->nTime];
+    gd->nodes = new Node[gd->nn];
+    gd->elements = new Element[gd->ne];
+  }
+  pup_ints(p, gd->ts_proportion, gd->numProp);
+  pup_doubles(p, gd->proportion, gd->numProp);
+  pup_bytes(p, (void*)gd->volm, gd->numMatVol*sizeof(VolMaterial));
+  pup_bytes(p, (void*) gd->cohm, gd->numMatCoh*sizeof(CohMaterial));
+  pup_doubles(p, gd->itimes, gd->nTime);
+  pup_bytes(p, (void*) gd->nodes, gd->nn*sizeof(Node));
+  pup_bytes(p, (void*) gd->elements, gd->ne*sizeof(Element));
+  if(pup_isPacking(p))
+  {
+    delete[] gd->ts_proportion;
+    delete[] gd->proportion;
+    delete[] gd->volm;
+    delete[] gd->cohm;
+    delete[] gd->itimes;
+    delete[] gd->nodes;
+    delete[] gd->elements;
+    delete gd;
+    gd = 0;
+  }
   return gd;
 }
 
@@ -144,8 +109,7 @@ driver(int nn, int *nnums, int ne, int *enums, int npere, int *conn)
   // CkPrintf("[%d] starting driver\n", myid);
   GlobalData *gd = new GlobalData;
   int uidx;
-  uidx = FEM_Register((void*)gd, (FEM_Packsize_Fn)mypksz, (FEM_Pack_Fn)mypk,
-                      (FEM_Unpack_Fn)myupk);
+  uidx = FEM_Register((void*)gd, (FEM_PupFn)mypup);
   Node *nodes = new Node[nn];
   Element *elements = new Element[ne];
   gd->myid = myid;
