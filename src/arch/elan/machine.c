@@ -38,7 +38,7 @@ ELAN_TPORT    *elan_port;
 ELAN_QUEUE    *elan_q;
 #define SMALL_MESSAGE_SIZE 8192       /* Message sizes greater will be 
 					  probe received adding 5us overhead*/
-#define SYNC_MESSAGE_SIZE 8192        /* Message sizes greater will be 
+#define SYNC_MESSAGE_SIZE 512        /* Message sizes greater will be 
 					  sent synchronously thus avoiding copying*/
 #define NON_BLOCKING_MSG 128           /* Message sizes greater 
 					  than this will be sent asynchronously*/
