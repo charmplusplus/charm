@@ -222,11 +222,11 @@ public:
 class ArrayElement : public Chare
 {
 	friend class CkArray;
+  void initBasics(void);
 public:
-  ArrayElement(void) {}
-  ArrayElement(CkMigrateMessage *m) {}
-
-  virtual ~ArrayElement();//Deletes heap-allocated array index
+  ArrayElement(void);
+  ArrayElement(CkMigrateMessage *m);
+  virtual ~ArrayElement();
   
   CkArrayIndexMax thisIndexMax;//Index of this element
   
@@ -252,6 +252,7 @@ protected:
   CmiBool usesAtSync;//You must set this in the constructor to use AtSync().
   LDObjHandle ldHandle;//Transient (not migrated)
 private: //Load balancer state:
+  CmiBool barrierRegistered;//True iff handle below is set
   LDBarrierClient ldBarrierHandle;//Transient (not migrated)  
   static void staticResumeFromSync(void* data);
   static void staticMigrate(LDObjHandle h, int dest);

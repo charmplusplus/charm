@@ -230,6 +230,19 @@ Unlike regular chares, array elements can migrate from one
 PE to another.  Each element has a unique index.
 */
 
+void ArrayElement::initBasics(void)
+{
+#if CMK_LBDB_ON
+  barrierRegistered=CmiFalse;
+#endif
+}
+
+ArrayElement::ArrayElement(void) 
+  {initBasics();}
+ArrayElement::ArrayElement(CkMigrateMessage *m) 
+  {initBasics();}
+
+
 //Remote method: calls destructor
 void ArrayElement::destroy(void)
 {
@@ -283,7 +296,7 @@ void ArrayElement::pup(PUP::er &p)
 #if CMK_LBDB_ON //Load balancer utilities:
 void ArrayElement::AtSync(void) 
 {
-  if (!usesAtSync)
+  if (!barrierRegistered)
     CkAbort("You must set usesAtSync=CmiTrue in your array element constructor to use AtSync!\n");
   DEBL((AA"Element %s at sync\n"AB,idx2str(this))); 
   thisArray->the_lbdb->AtLocalBarrier(ldBarrierHandle);
@@ -305,15 +318,12 @@ void ArrayElement::staticMigrate(LDObjHandle h, int dest)
 }
 void ArrayElement::lbRegister(void)//Connect to load balancer
 {
-  DEBL((AA"Registering element %s with load balancer (%s AtSync)\n"AB,idx2str(this),usesAtSync?"and":"without"));	
-  ldHandle = thisArray->the_lbdb->
-    RegisterObj(thisArray->myLBHandle,
-		idx2LDObjid(thisIndexMax),(void *)this,1);
-  
-  if (usesAtSync)
+  DEBL((AA"Registering element %s with load balancer (%s AtSync)\n"AB,idx2str(this),usesAtSync?"and":"without"));
+  if (usesAtSync) {
     ldBarrierHandle = thisArray->the_lbdb->AddLocalBarrierClient(
-								 (LDBarrierFn)staticResumeFromSync,
-								 (void*)(this));
+	(LDBarrierFn)staticResumeFromSync,(void*)(this));
+    barrierRegistered=CmiTrue;
+  }
 }
 
 void ArrayElement::lbUnregister(void)//Disconnect from load balancer
@@ -321,7 +331,7 @@ void ArrayElement::lbUnregister(void)//Disconnect from load balancer
   DEBL((AA"Unregistering element %s from load balancer (%s AtSync)\n"AB,idx2str(this),usesAtSync?"and":"without"));	
   thisArray->the_lbdb->ObjectStop(ldHandle);
   thisArray->the_lbdb->UnregisterObj(ldHandle);
-  if (usesAtSync)
+  if (barrierRegistered)
     thisArray->the_lbdb->RemoveLocalBarrierClient(ldBarrierHandle);
 }
 #else //not CMK_LDBD_ON
@@ -330,11 +340,12 @@ void ArrayElement::lbUnregister(void) {}//Disconnect from load balancer
 #endif
 
 
+
 ///// 1-D array element utility routines:
 ArrayElement1D::ArrayElement1D(void)
 {
   numElements=thisArray->numInitial;
-  thisIndex=thisIndexMax.data()[0];
+  thisIndex=thisIndexMax.data()[0];	
 }
 ArrayElement1D::ArrayElement1D(CkMigrateMessage *msg)
 {
@@ -876,6 +887,11 @@ ArrayElement *CkArray::allocateElement(int chareType,const CkArrayIndex &ind)
   el->thisArray=this;
   el->thisArrayID=thisgroup;
   el->thisChareType=chareType;
+#if CMK_LBDB_ON
+  el->usesAtSync=CmiFalse;
+  el->ldHandle = the_lbdb->
+    RegisterObj(myLBHandle,idx2LDObjid(ind),(void *)el,1);
+#endif
   return el;
 }
 
@@ -894,15 +910,12 @@ ArrayElement *CkArray::newElement(int ctor,
 	void *msg,const CkArrayIndex &idx)
 {
   ArrayElement *el=allocateElement(_entryTable[ctor]->chareIdx,idx);
-#if CMK_LBDB_ON //Load balancer utilities:
-  el->usesAtSync=CmiFalse;
-  el->lbRegister();// Register the object with the load balancer
-#endif
   el->bcastNo=bcastNo;
   contributorCreated(&el->reductionInfo);
   ctorElement(el,ctor,msg);
   if (!curElementIsDead) { 
     //<- element may have immediately migrated away or died.
+    el->lbRegister();// Register with lb now, *after* usesAtSync set
     insertRec(new CkArrayRec_local(this,el),el->thisIndexMax);
     DEBC((AA"  finished adding local element %s\n"AB,idx2str(el)));
     return el;
@@ -1035,7 +1048,6 @@ void CkArray::RecvMigratedElement(CkArrayElementMigrateMessage *msg)
   //Create the new element on this PE (passing on the msg)
   ArrayElement *el=allocateElement(_entryTable[msg->array_ep()]->chareIdx,idx);
   
-  el->lbRegister();// Register the object with the load balancer
 #if CMK_LBDB_ON
   the_lbdb->Migrated(el->ldHandle);
 #endif
@@ -1050,6 +1062,7 @@ void CkArray::RecvMigratedElement(CkArrayElementMigrateMessage *msg)
   if (el->bcastNo==-1) CkAbort("You forgot to call ArrayElement1D::pup from your array element's pup routine!\n");
   CkFreeMsg((void *)msg);//<- delete the old message
   contributorArriving(&el->reductionInfo);
+  el->lbRegister();// Register with lb now, after usesAtSync is set
   
   //Catch up on any missed broadcasts
   bringBroadcastUpToDate(el);		
