@@ -205,7 +205,7 @@ public:
 	{
 		if (rows>0) allocate(rows);
 	}
-	~AllocTable2d() {delete[] table;}
+	~AllocTable2d() {if(allocTable != NULL){delete[] allocTable;}}
 	/// Make room for this many rows
 	void allocate(int rows_) { 
 		allocate(width(),rows_);
@@ -1020,7 +1020,7 @@ void FEM_Mesh_data_layout(int fem_mesh,int entity,int attr,
   	void *data, int firstItem,int length, const IDXL_Layout &layout);
 
 //registration internal api
-void FEM_Register_array_layout(int fem_mesh,int entity,int attr,void *data,const IDXL_Layout &layout);
+void FEM_Register_array_layout(int fem_mesh,int entity,int attr,void *data,int firstItem,const IDXL_Layout &layout);
 void FEM_Register_entity_impl(int fem_mesh,int entity,void *args,int len,int max,FEM_Mesh_alloc_fn fn);
 /// Reassemble split chunks into a single mesh
 FEM_Mesh *FEM_Mesh_assemble(int nchunks,FEM_Mesh **chunks);

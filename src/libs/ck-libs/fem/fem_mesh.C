@@ -169,23 +169,41 @@ FORTRAN_AS_C(FEM_MESH_DATA_OFFSET,FEM_Mesh_data_offset,fem_mesh_data_offset,
 	 *type,*width,*offset,*distance,*skew)
 )
 
+void FEM_Register_array(int fem_mesh,int entity,int attr,
+	void *data, int datatype,int width,int firstItem){
+	IDXL_Layout lo(datatype,width);
+/*	if(attr == FEM_CONN){
+		printf("CONN width %d \n",width);
+		int len = FEM_Mesh_get_length(fem_mesh,entity);
+		int *connd = (int *)data;
+		for(int i=0;i<len;i++){
+			printf("%d -> (%d %d %d) \n",i+1,connd[3*i],connd[3*i+1],connd[3*i+2]);
+		}
+	}*/
+	printf("firstItem %d \n",firstItem);
+	FEM_Register_array_layout(fem_mesh,entity,attr,data,firstItem,lo);
+}
+
+void FEM_Register_array_layout(int fem_mesh,int entity,int attr, 	
+  	void *data, IDXL_Layout_t layout,int firstItem){
+	const char *caller="FEM_Register_array_layout";
+	FEM_Register_array_layout(fem_mesh,entity,attr,data,firstItem, 
+		IDXL_Layout_List::get().get(layout,caller));
+
+}
 
 /*registration api */
 CDECL void 
 FEM_Register_array(int fem_mesh,int entity,int attr,
 	void *data, int datatype,int width)
 {	
-	IDXL_Layout lo(datatype,width);
-	FEM_Register_array_layout(fem_mesh,entity,attr,data,lo);
+	FEM_Register_array(fem_mesh,entity,attr,data,datatype,width,0);
 }
 
 CDECL void
 FEM_Register_array_layout(int fem_mesh,int entity,int attr, 	
   	void *data, IDXL_Layout_t layout){
-	const char *caller="FEM_Register_array_layout";
-	FEM_Register_array_layout(fem_mesh,entity,attr,data, 
-		IDXL_Layout_List::get().get(layout,caller));
-
+	FEM_Register_array_layout(fem_mesh,entity,attr,data,layout,0);
 }
 
 
@@ -198,11 +216,11 @@ FEM_Register_entity(int fem_mesh,int entity,void *data,
 /**TODO: add the fortran api for registration*/
 
 FORTRAN_AS_C(FEM_REGISTER_ARRAY,FEM_Register_array,fem_register_array,
-	(int *fem_mesh,int *entity,int *attr,void *data,int *datatype,int *width),(*fem_mesh,*entity,*attr,data,*datatype,*width))
+	(int *fem_mesh,int *entity,int *attr,void *data,int *datatype,int *width),(*fem_mesh,*entity,*attr,data,*datatype,*width,1))
 
 
 FORTRAN_AS_C(FEM_REGISTER_ARRAY_LAYOUT,FEM_Register_array_layout,fem_register_array_layout,
-	(int *fem_mesh,int *entity,int *attr,void *data,int *layout),(*fem_mesh,*entity,*attr,data,*layout))
+	(int *fem_mesh,int *entity,int *attr,void *data,int *layout),(*fem_mesh,*entity,*attr,data,*layout,1))
 
 FORTRAN_AS_C(FEM_REGISTER_ENTITY,FEM_Register_entity,fem_register_entity,
 	(int *fem_mesh,int *entity,void *data,int *len,int *max,FEM_Mesh_alloc_fn fn),(*fem_mesh,*entity,data,*len,*max,fn))
@@ -360,8 +378,7 @@ void FEM_Mesh_data_layout(int fem_mesh,int entity,int attr,
 }
 
 /** the internal registration function */
-void FEM_Register_array_layout(int fem_mesh,int entity,int attr,void *data,const IDXL_Layout &layout){
-	int firstItem=0;
+void FEM_Register_array_layout(int fem_mesh,int entity,int attr,void *data,int firstItem,const IDXL_Layout &layout){
 	const char *caller="FEM_Register_array";
 	FEMAPI(caller);
 	FEM_Mesh *m=FEM_Mesh_lookup(fem_mesh,caller);
