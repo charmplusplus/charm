@@ -18,6 +18,7 @@ LOADBALANCERS=\
    $(L)/libmoduleNeighborLB.a \
    $(L)/libmoduleNeighborCommLB.a \
    $(L)/libmoduleWSLB.a \
+   $(L)/libmoduleGridCommLB.a \
    manager.o
 
 DummyLB.def.h: DummyLB.decl.h
@@ -153,6 +154,15 @@ WSLB.decl.h: WSLB.ci charmxi
 
 $(L)/libmoduleWSLB.a: WSLB.o 
 	$(CHARMC) -o $(L)/libmoduleWSLB.a WSLB.o 
+
+
+GridCommLB.def.h: GridCommLB.decl.h
+
+GridCommLB.decl.h: GridCommLB.ci charmxi
+	$(CHARMXI) GridCommLB.ci
+
+$(L)/libmoduleGridCommLB.a: GridCommLB.o 
+	$(CHARMC) -o $(L)/libmoduleGridCommLB.a GridCommLB.o 
 	
 
 # used for make dependes
@@ -172,6 +182,7 @@ LB_OBJ=EveryLB.o \
     NeighborLB.o \
     NeighborCommLB.o \
     WSLB.o \
+    GridCommLB.o \
     manager.o
 
 EveryLB.def.h: EveryLB.decl.h
