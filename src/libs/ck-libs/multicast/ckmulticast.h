@@ -13,8 +13,11 @@ typedef mCastEntry * mCastEntryPtr;
 
 #include "CkMulticast.decl.h"
 
-#define MAGIC 88
+#define MAGIC 88              /**< multicast magic number for error checking */
 
+/**
+ CkMcastBaseMsg is the base class for all multicast message.
+*/
 class CkMcastBaseMsg {
 public:
   char magic;
@@ -31,8 +34,26 @@ public:
 
 typedef void (*redClientFn)(CkSectionCookie sid, void *param,int dataSize,void *data);
 
+/**
+  multicast manager is a CkDelegateMgr. It is a Group that can manage
+  all sections of different chare arrays, so all functions need a 
+  CkSectionCookie parameter to tell CkMulticastMgr which array section
+  it should work on.
+*/
 class CkMulticastMgr: public CkDelegateMgr {
   private:
+    /// internal class for the pair of array index and its location.
+    class IndexPos {
+    public:
+      CkArrayIndexMax idx;
+      int  pe;
+    public:
+      IndexPos() {}
+      IndexPos(int i): idx(i), pe(i) {}
+      IndexPos(CkArrayIndexMax i, int p): idx(i), pe(p) {};
+    };
+    typedef CkVec<IndexPos>  arrayIndexPosList;
+
   public:
     CkMulticastMgr()  {};
     void setSection(CkSectionCookie &id, CkArrayID aid, CkArrayIndexMax *, int n);
@@ -40,9 +61,9 @@ class CkMulticastMgr: public CkDelegateMgr {
     void setSection(CProxySection_ArrayElement &proxy);
     void ArraySectionSend(int ep,void *m, CkArrayID a, CkSectionCookie &s);
     // entry
-    void teardown(CkSectionCookie s);
-    void freeup(CkSectionCookie s);
-    void setup(multicastSetupMsg *);
+    void teardown(CkSectionCookie s);  /**< entry: tear down the tree */
+    void freeup(CkSectionCookie s);    /**< entry: free old tree */
+    void setup(multicastSetupMsg *);  
     void recvCookie(CkSectionCookie sid, CkSectionCookie child);
     void childrenReady(mCastEntry *entry);
     void recvMsg(multicastGrpMsg *m);

@@ -7,53 +7,42 @@
 
 #define MAXMCASTCHILDREN  2
 
-class IndexPos;
-
 typedef CkQ<multicastGrpMsg *> multicastGrpMsgBuf;
 typedef CkVec<CkArrayIndexMax>  arrayIndexList;
 typedef CkVec<CkSectionCookie>  sectionIdList;
-typedef CkVec<IndexPos>  arrayIndexPosList;
 typedef CkVec<ReductionMsg *>  reductionMsgs;
 
-class IndexPos {
-public:
-  CkArrayIndexMax idx;
-  int  pe;
-public:
-  IndexPos() {}
-  IndexPos(int i): idx(i), pe(i) {}
-  IndexPos(CkArrayIndexMax i, int p): idx(i), pe(p) {};
-};
 
 class reductionInfo {
 public:
-  int lcounter;
-  int ccounter;
-  int gcounter;   // total elem collected
-  redClientFn storedClient;
-  void *storedClientParam;
-  int redNo;
-  reductionMsgs  msgs;
-  reductionMsgs  futureMsgs;
+  int lcounter;   /**< local elem collected */
+  int ccounter;   /**< children node collected */
+  int gcounter;   /**< total elem collected */
+  redClientFn storedClient;     /**< reduction client function */
+  void *storedClientParam;      /**< user provided data */
+  int redNo;                    /**< reduction sequence number */
+  reductionMsgs  msgs;          /**< messages for this reduction */
+  reductionMsgs  futureMsgs;    /**< messages of future reductions */
 public:
   reductionInfo(): lcounter(0), ccounter(0), gcounter(0), 
 		   storedClientParam(NULL), redNo(0) {}
 };
 
+/// cookie status
 #define COOKIE_NOTREADY 0
 #define COOKIE_READY    1
 #define COOKIE_OLD      2
 
-// BOC entry for one array section
+/// cookie for an array section 
 class mCastEntry {
 public:
-  CkSectionCookie parentGrp;	// spanning tree parent
-  sectionIdList children;
+  CkSectionCookie parentGrp;	/**< spanning tree parent */
+  sectionIdList children;       /**< children section list */
   int numChild;
   arrayIndexList allElem;	// only useful on root
   arrayIndexList localElem;
-  int pe;			// should always be mype
-  CkSectionCookie rootSid;
+  int pe;			/**< should always be mype */
+  CkSectionCookie rootSid;      /**< section ID of the root */
   multicastGrpMsgBuf msgBuf;
   mCastEntry *oldc, *newc;
   // for reduction
@@ -71,7 +60,11 @@ public:
   inline void setObsolete() { flag=COOKIE_OLD; }
   inline int notReady() { return (flag == COOKIE_NOTREADY); }
   inline void setReady() { flag=COOKIE_READY; }
-  inline void incReduceNo();
+  inline void incReduceNo() {
+                red.redNo ++;
+                for (mCastEntry *next = newc; next; next=next->newc) 
+                   next->red.redNo++;
+              }
 };
 
 class cookieMsg: public CMessage_cookieMsg {
@@ -83,7 +76,7 @@ public:
 };
 
 
-// setup message
+/// multicast tree setup message
 class multicastSetupMsg: public CMessage_multicastSetupMsg {
 public:
   int  nIdx;
@@ -94,7 +87,7 @@ public:
   int redNo;
 };
 
-// message send in spanning tree
+/// message send in spanning tree
 class multicastGrpMsg: public CkMcastBaseMsg, public CMessage_multicastGrpMsg {
 };
 
@@ -128,12 +121,6 @@ flag(COOKIE_NOTREADY), oldc(NULL), newc(NULL)
   red.storedClientParam = old->red.storedClientParam;
   red.redNo = old->red.redNo;
   needRebuild = 0;
-}
-
-inline void mCastEntry::incReduceNo()
-{
-  red.redNo ++;
-  for (mCastEntry *next = newc; next; next=next->newc) next->red.redNo++;
 }
 
 // call setup to return a sectionid.
