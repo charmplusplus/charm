@@ -982,7 +982,7 @@ sub posefuncparse
     my @segments;
     if ($line =~ /\)\s*;\s*$/) { #strip );
       my $foo=$MATCH;
-      $foo =~ tr/ //d;
+      $foo =~ tr/ \t//d;
       $line=$PREMATCH.$foo;
       chop $line;
       chop $line;
