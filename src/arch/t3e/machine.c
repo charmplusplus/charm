@@ -34,9 +34,9 @@ enum {list_empty = -1 };
  * Local declarations for Cmi, used by common code
  */
 CpvDeclare(void*, CmiLocalQueue);
-int Cmi_mype;
-int Cmi_numpes;
-int Cmi_myrank;
+int _Cmi_mype;
+int _Cmi_numpes;
+int _Cmi_myrank;
 
 /*
  * Local queue functions, used by common code to store messages 
@@ -178,7 +178,7 @@ void CmiSyncSendFn(int dest_pe, int size, char *msg)
 
   McRetrieveRemote();
 
-  if (dest_pe == Cmi_mype)
+  if (dest_pe == _Cmi_mype)
     CdsFifo_Enqueue(CpvAccess(CmiLocalQueue),dup_msg);
   else
   {
@@ -199,7 +199,7 @@ void CmiFreeSendFn(int dest_pe, int size, char *msg)
   McRetrieveRemote();
   ((McMsgHdr *)msg)->msg_type = Message;
 
-  if (dest_pe == Cmi_mype)
+  if (dest_pe == _Cmi_mype)
     CdsFifo_Enqueue(CpvAccess(CmiLocalQueue),msg);
   else
   {
@@ -221,9 +221,9 @@ void CmiSyncBroadcastFn(int size, char *msg)
    */
   dup_msg = (McMsgHdr *)CmiAlloc(ALIGN8(size));
   memcpy(dup_msg,msg,size);
-  dup_msg->bcast.count = Cmi_numpes - 1;
+  dup_msg->bcast.count = _Cmi_numpes - 1;
   /*
-  CmiPrintf("PE %d broadcast handler=%d\n",Cmi_mype,dup_msg->handler);
+  CmiPrintf("PE %d broadcast handler=%d\n",_Cmi_mype,dup_msg->handler);
   */
   /*
    * Make the broadcast token point to the copied message
@@ -238,8 +238,8 @@ void CmiSyncBroadcastFn(int size, char *msg)
    * Enqueue copies of the token message on other nodes.  This code should
    * be similar to CmiSyncSend
    */
-  for(i=0; i<Cmi_numpes; i++)
-    if (i != Cmi_mype)
+  for(i=0; i<_Cmi_numpes; i++)
+    if (i != _Cmi_mype)
     {
       dup_tok = (McMsgHdr *)CmiAlloc(ALIGN8(hdr_size));
       memcpy(dup_tok,&bcast_msg_tok,hdr_size);
@@ -251,7 +251,7 @@ void CmiSyncBroadcastFn(int size, char *msg)
    * garbage collection.
    */
   McQueueAddToBack(broadcast_queue,dup_msg);
-  CQdCreate(CpvAccess(cQdState), Cmi_numpes-1);
+  CQdCreate(CpvAccess(cQdState), _Cmi_numpes-1);
 }
 
 CmiCommHandle CmiAsyncBroadcastFn(int size, char *msg)
@@ -270,7 +270,7 @@ void CmiSyncBroadcastAllFn(int size, char *msg)
 {
   int i;
   CmiSyncBroadcastFn(size,msg);
-  CmiSyncSendFn(Cmi_mype, size, msg);
+  CmiSyncSendFn(_Cmi_mype, size, msg);
 }
 
 CmiCommHandle CmiAsyncBroadcastAllFn(int size, char *msg)
@@ -306,8 +306,8 @@ void CmiSyncListSendFn(int npes, int *pes, int size, char *msg)
   n_remote_pes = 0;
   for (i=0; i < npes; i++)
   {
-    if (pes[i] == Cmi_mype)
-      CmiSyncSendFn(Cmi_mype, size, msg);
+    if (pes[i] == _Cmi_mype)
+      CmiSyncSendFn(_Cmi_mype, size, msg);
     else
       n_remote_pes++;
   }
@@ -334,7 +334,7 @@ void CmiSyncListSendFn(int npes, int *pes, int size, char *msg)
    * be similar to CmiSyncSend
    */
   for(i=0; i<npes; i++)
-    if (pes[i] != Cmi_mype)
+    if (pes[i] != _Cmi_mype)
     {
       dup_tok = (McMsgHdr *)CmiAlloc(ALIGN8(hdr_size));
       memcpy(dup_tok,&bcast_msg_tok,hdr_size);
@@ -490,9 +490,9 @@ static void McInit(void)
 {
   CpvInitialize(void *, CmiLocalQueue);
   CpvAccess(CmiLocalQueue) = CdsFifo_Create();
-  Cmi_mype = _my_pe();
-  Cmi_numpes = _num_pes();
-  Cmi_myrank = 0;
+  _Cmi_mype = _my_pe();
+  _Cmi_numpes = _num_pes();
+  _Cmi_myrank = 0;
 
   McInitList();
 }
@@ -512,21 +512,21 @@ static void McInitList(void)
   head.nxt_node = list_empty;
   head.nxt_addr = NULL;
   head.msg_sz = 0;
-  if (Cmi_numpes > MAX_PES)
+  if (_Cmi_numpes > MAX_PES)
   {
     CmiPrintf("Not enough processors allocated in machine.c.\n");
     CmiPrintf("Change MAX_PES in t3e/machine.c to at least %d and recompile Converse\n",
-    Cmi_numpes);
+    _Cmi_numpes);
   }
-  for(i=0; i < Cmi_numpes; i++)
+  for(i=0; i < _Cmi_numpes; i++)
   {
     head_lock[i] = 0;
     bcast_lock[i] = 0;
   }
-  my_lock = &(head_lock[Cmi_mype]);
+  my_lock = &(head_lock[_Cmi_mype]);
   barrier();
   shmem_clear_lock(my_lock);
-  shmem_clear_lock(&bcast_lock[Cmi_mype]);
+  shmem_clear_lock(&bcast_lock[_Cmi_mype]);
 }
 
 static void McEnqueueRemote(void *msg, int msg_sz, int dst_pe)
@@ -545,7 +545,7 @@ static void McEnqueueRemote(void *msg, int msg_sz, int dst_pe)
   McDistList *msg_link;
 
   /*  CmiPrintf("PE %d outgoing msg = %d msg_type = %d size = %d\n",
-	    Cmi_mype,msg,((McMsgHdr *)msg)->msg_type,msg_sz);*/
+	    _Cmi_mype,msg,((McMsgHdr *)msg)->msg_type,msg_sz);*/
   /* 0. Free any delivered messages from the in_transit_queue list. */
   McCleanUpInTransit();
 
@@ -557,7 +557,7 @@ static void McEnqueueRemote(void *msg, int msg_sz, int dst_pe)
   ((McMsgHdr *)msg)->received_f = false;
 
   /* Set list fields to point back to this processor, this message.  */
-  tmp_link.nxt_node = Cmi_mype;
+  tmp_link.nxt_node = _Cmi_mype;
   tmp_link.nxt_addr = msg;
   tmp_link.msg_sz = msg_sz;
 
@@ -579,14 +579,14 @@ static void McEnqueueRemote(void *msg, int msg_sz, int dst_pe)
   shmem_put(&head, &tmp_link, sizeof(McDistList)/sizeof(int),dst_pe);
 
 #ifdef DEBUG
-  printf("[%d] Adding Message to pe %d\n",Cmi_mype,dst_pe);
-  printf("[%d]   nxt_node = %d\n",Cmi_mype,tmp_link.nxt_node);
-  printf("[%d]   nxt_addr = %x\n",Cmi_mype,tmp_link.nxt_addr);
-  printf("[%d]   msg_sz = %x\n",Cmi_mype,tmp_link.msg_sz);
-  printf("[%d] Old Message is now at %x\n",Cmi_mype,msg_link);
-  printf("[%d]   nxt_node = %d\n",Cmi_mype,msg_link->nxt_node);
-  printf("[%d]   nxt_addr = %x\n",Cmi_mype,msg_link->nxt_addr);
-  printf("[%d]   msg_sz = %x\n",Cmi_mype,msg_link->msg_sz);
+  printf("[%d] Adding Message to pe %d\n",_Cmi_mype,dst_pe);
+  printf("[%d]   nxt_node = %d\n",_Cmi_mype,tmp_link.nxt_node);
+  printf("[%d]   nxt_addr = %x\n",_Cmi_mype,tmp_link.nxt_addr);
+  printf("[%d]   msg_sz = %x\n",_Cmi_mype,tmp_link.msg_sz);
+  printf("[%d] Old Message is now at %x\n",_Cmi_mype,msg_link);
+  printf("[%d]   nxt_node = %d\n",_Cmi_mype,msg_link->nxt_node);
+  printf("[%d]   nxt_addr = %x\n",_Cmi_mype,msg_link->nxt_addr);
+  printf("[%d]   msg_sz = %x\n",_Cmi_mype,msg_link->msg_sz);
 #endif
 
   /* 5. Release lock */
@@ -647,7 +647,7 @@ static void McRetrieveRemote(void)
               ALIGN8(cur_node->msg_sz)/8, cur_node->nxt_node);
 
     /*    CmiPrintf("PE %d incoming msg = %d msg_type = %d, size = %d\n",
-	      Cmi_mype,cur_msg,cur_msg->msg_type,cur_node->msg_sz);*/
+	      _Cmi_mype,cur_msg,cur_msg->msg_type,cur_node->msg_sz);*/
 
     /* If it is a broadcast message, retrieve the actual message */
     if (cur_msg->msg_type == BcastMessage)
@@ -660,7 +660,7 @@ static void McRetrieveRemote(void)
       /*
       CmiPrintf(
 	"PE %d getting message from node %d at addr %d to %d, size=%d\n",
-	Cmi_mype,cur_node->nxt_node,cur_msg->bcast.ptr,bcast_ptr,
+	_Cmi_mype,cur_node->nxt_node,cur_msg->bcast.ptr,bcast_ptr,
 	cur_msg->bcast_msg_size
 	);
 	*/
@@ -671,7 +671,7 @@ static void McRetrieveRemote(void)
       /*
       CmiPrintf(
       "PE %d received broadcast message count=%d size=%d handler=%d\n",
-      Cmi_mype,bcast_ptr->bcast.count,
+      _Cmi_mype,bcast_ptr->bcast.count,
       cur_msg->bcast_msg_size,bcast_ptr->handler
       );
       */
@@ -726,7 +726,7 @@ static void McCleanUpInTransit(void)
     if (msg->bcast.count == 0)
     {
       /* 
-	 CmiPrintf("PE %d freeing broadcast message at %d\n",Cmi_mype,msg);
+	 CmiPrintf("PE %d freeing broadcast message at %d\n",_Cmi_mype,msg);
        */
       CmiFree(msg);
     }
@@ -768,7 +768,7 @@ static void McCleanUpInTransit(void)
   in_transit_queue = swap_ptr;
 #ifdef DEBUG
   CmiPrintf("[%d] done in_transit_queue = %d, tmp_queue = %d\n",
-	Cmi_mype,in_transit_queue->len,in_transit_tmp_queue->len);
+	_Cmi_mype,in_transit_queue->len,in_transit_tmp_queue->len);
 #endif
 }
 
@@ -830,7 +830,7 @@ static void McQueueAddToBack(McQueue *queue, void *element)
     queue->first = 0;
   }
 #ifdef DEBUG
-  CmiPrintf("[%d] Adding %x\n",Cmi_mype,element);
+  CmiPrintf("[%d] Adding %x\n",_Cmi_mype,element);
 #endif
   queue->blk[(queue->first+queue->len++)%queue->blk_len] = element;
   inside_comm = 0;
