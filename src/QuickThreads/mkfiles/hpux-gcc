@@ -7,7 +7,7 @@ qt: md/hppa.h qt.c  md/hppa.s
 	rm -f qtmd.h
 	ln -s md/hppa.h qtmd.h
 	$(CC) -pedantic -Wall -c -o qt.o qt.c
-	as -o qtmds.o md/hppa.s
+	/usr/ccs/bin/as -o qtmds.o md/hppa.s
 	ar q libqt.a qt.o qtmds.o
 
 stp:
