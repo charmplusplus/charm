@@ -16,7 +16,8 @@ void CreateMetisLB()
 
 MetisLB::MetisLB()
 {
-  // CkPrintf("[%d] MetisLB created\n",CkMyPe());
+  if (CkMyPe() == 0)
+    CkPrintf("[%d] MetisLB created\n",CkMyPe());
 }
 
 CmiBool MetisLB::QueryBalanceNow(int _step)
@@ -183,8 +184,8 @@ CLBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
     xadj[i+1] = count4all;
   }
 
-  CkPrintf("Pre-LDB Statistics step %d\n", step());
-  printStats(count, numobjs, objtime, comm, origmap);
+  //  CkPrintf("Pre-LDB Statistics step %d\n", step());
+  //  printStats(count, numobjs, objtime, comm, origmap);
 
   int wgtflag = 3; // Weights both on vertices and edges
   int numflag = 0; // C Style numbering
@@ -251,8 +252,8 @@ CLBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
       CkPrintf("multiple constraints not implemented yet.\n");
     }
   }
-  CkPrintf("Post-LDB Statistics step %d\n", step());
-  printStats(count, numobjs, objtime, comm, newmap);
+  //  CkPrintf("Post-LDB Statistics step %d\n", step());
+  //  printStats(count, numobjs, objtime, comm, newmap);
 
   for(i=0;i<numobjs;i++)
     delete[] comm[i];
@@ -280,7 +281,7 @@ CLBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
     delete[] newmap;
 
   int migrate_count=migrateInfo.size();
-  CkPrintf("Migration Count = %d\n", migrate_count);
+  //  CkPrintf("Migration Count = %d\n", migrate_count);
   CLBMigrateMsg* msg = new(&migrate_count,1) CLBMigrateMsg;
   msg->n_moves = migrate_count;
   for(i=0; i < migrate_count; i++) {

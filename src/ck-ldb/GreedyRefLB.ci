@@ -1,0 +1,9 @@
+module GreedyRefLB {
+
+extern module CentralLB;
+
+group GreedyRefLB : CentralLB {
+  entry void GreedyRefLB(void);  
+};
+
+};

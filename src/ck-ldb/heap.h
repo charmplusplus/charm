@@ -4,6 +4,9 @@
 ***  All rights reserved.
 **/
 
+#ifndef _HEAP_H_
+#define _HEAP_H_
+
 #include "elements.h"
 
 class heapRecord
@@ -62,3 +65,5 @@ public:
   InfoRecord *next(heapIterator *);
 };
 
+
+#endif /* _HEAP_H_ */

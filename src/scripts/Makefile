@@ -64,8 +64,9 @@ ALLHEADERS=charm++.h ckstream.h charm.h cpthreads.h converse.h \
 	pvm3.h sdag.h CDep.h CCounter.h CMsgBuffer.h CWhenTrigger.h \
 	TList.h idl.h ckarray.h tempo.h waitqd.h LBDatabase.h \
 	lbdb.h LBDBManager.h LBComm.h LBOM.h LBObj.h LBMachineUtil.h \
-	CentralLB.h RandCentLB.h RefineLB.h MetisLB.h HeapCentLB.h \
-	Set.h elements.h heap.h conv-ccs.h NeighborLB.h WSLB.h CkLists.h
+	Refiner.h CentralLB.h RandCentLB.h RefineLB.h MetisLB.h \
+	HeapCentLB.h Set.h elements.h heap.h conv-ccs.h NeighborLB.h \
+	WSLB.h CkLists.h GreedyRefLB.h
 
 ALLINTERFACES=idl.ci
 
@@ -140,6 +141,7 @@ CVHEADERS=converse.h conv-mach.h conv-mach.sh \
           ../include/HeapCentLB.decl.h HeapCentLB.def.h \
           ../include/NeighborLB.decl.h NeighborLB.def.h \
           ../include/WSLB.decl.h WSLB.def.h \
+          ../include/GreedyRefLB.decl.h GreedyRefLB.def.h \
           ../include/tempo.decl.h tempo.def.h \
           ../include/waitqd.decl.h waitqd.def.h
 
@@ -248,17 +250,17 @@ libldb-test.o: cldb.test.c $(CVHEADERS)
 CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h trace.h \
           ckfutures.h ckarray.h tempo.h waitqd.h LBDatabase.h lbdb.h \
 	  LBDBManager.h LBComm.h LBOM.h LBObj.h LBMachineUtil.h \
-	  CentralLB.h RandCentLB.h RefineLB.h HeapCentLB.h MetisLB.h \
-	  NeighborLB.h WSLB.h CkLists.h \
+	  Refiner.h CentralLB.h RandCentLB.h RefineLB.h HeapCentLB.h \
+	  MetisLB.h NeighborLB.h WSLB.h GreedyRefLB.h CkLists.h \
 	  $(CVHEADERS)
 
 CK_LIBS_CORE=libck.a
 
 LIBCK_CORE=init.o register.o qd.o ck.o main.o msgalloc.o ckfutures.o \
            ckarray.o tempo.o waitqd.o LBDatabase.o lbdb.o \
-	   LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o \
+	   LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o Refiner.o \
 	   CentralLB.o RandCentLB.o MetisLB.o RefineLB.o Set.o \
-           HeapCentLB.o heap.o NeighborLB.o WSLB.o
+           HeapCentLB.o heap.o NeighborLB.o WSLB.o GreedyRefLB.o
 
 charmlibs: converse $(CK_LIBS_CORE)
 	cd libs; make charmlibs OPTS='$(OPTS)'
@@ -305,6 +307,9 @@ libtrace-summary.a: $(LIBTRACE_SUMM)
 ../include/WSLB.decl.h : WSLB.decl.h
 	/bin/cp WSLB.decl.h ../include
 
+../include/GreedyRefLB.decl.h : GreedyRefLB.decl.h
+	/bin/cp GreedyRefLB.decl.h ../include
+
 ../include/CkFutures.decl.h : CkFutures.decl.h
 	/bin/cp CkFutures.decl.h ../include
 
@@ -350,6 +355,9 @@ NeighborLB.decl.h NeighborLB.def.h : NeighborLB.ci charmxi
 WSLB.decl.h WS.def.h : WSLB.ci charmxi
 	$(CHARMC) WSLB.ci
 
+GreedyRefLB.decl.h GreedyRefLB.def.h : GreedyRefLB.ci charmxi
+	$(CHARMC) GreedyRefLB.ci
+
 init.o: init.C $(CKHEADERS)
 	$(CHARMC) -o init.o init.C
 
@@ -389,6 +397,9 @@ LBMachineUtil.o: LBObj.C $(CKHEADERS)
 LBDatabase.o: LBDatabase.C $(CKHEADERS)
 	$(CHARMC) -o LBDatabase.o LBDatabase.C
 
+Refiner.o: Refiner.C $(CKHEADERS)
+	$(CHARMC) -o Refiner.o Refiner.C
+
 CentralLB.o: CentralLB.C $(CKHEADERS)
 	$(CHARMC) -o CentralLB.o CentralLB.C
 
@@ -415,6 +426,9 @@ NeighborLB.o: NeighborLB.C $(CKHEADERS)
 
 WSLB.o: WSLB.C $(CKHEADERS)
 	$(CHARMC) -o WSLB.o WSLB.C
+
+GreedyRefLB.o: GreedyRefLB.C $(CKHEADERS)
+	$(CHARMC) -o GreedyRefLB.o GreedyRefLB.C
 
 qd.o: qd.C $(CKHEADERS)
 	$(CHARMC) -o qd.o qd.C
