@@ -431,18 +431,68 @@ This will collect data on files data.dat.{2,3,4,5}. Then, we can use this data t
                +LBDumpFile dump.dat [+LBSimProcs 900]
 \end{verbatim}
 
+\subsubsection{Future load predictor}
+
+When objects do not follow the assumption that the future workload will be the
+same as the past, the load balancer might not have the correct information to do
+a correct rebalancing job. To prevent this the user can provide a transition
+function to the load balancer to predict what will be the future workload, given
+the past, instrumented one. As said, the user might provide a specific function
+which inherit from {\tt LBPredictorFunction} and implement its
+functions. Here is the class with all the methods to reimplement:
+\begin{verbatim}
+class LBPredictorFunction {
+public:
+  int num_params;
+ 
+  void initialize_params(double *x);
+
+  virtual double predict(double x, double *params) =0;
+  virtual void print(double *params) {PredictorPrintf("LB: unknown model\n");};
+  virtual void function(double x, double *param, double &y, double *dyda) =0;
+  virtual LBPredictorFunction* constructor() =0;
+};
+\end{verbatim}
+Otherwise the user can let the load balancer to use a predefined default
+function.
+As seen, the function can have several parameters which will be learned during
+the execution of the program. For this, two parameters can be setup at command
+line to specify the learning behaviour:
+\begin{enumerate}
+\item {\em +LBPredictorWindow size}\\
+This parameter will specify how many statistics the load balancer will keep for
+keeping updated the function parameters. The greater this number is, the best
+approximation of the workload will be, but more memory will be required to store
+the intermediate information. The default is 20.
+\item {\em +LBPredictorDelay steps}\\
+This will tell how many load balancer steps to wait before considering the
+function parameters learnt and start using the mode. The load balancer will
+collect statistics for a {\em +LBPredictorWindow} steps, but it will start using
+the model as soon as {\em +LBPredictorDelay} information are collected. The
+default is 10.
+\end{enumerate}
+Moreover another flag can be set to enable the predictor from command line: {\em
++LBPredictor}.\\
+Other than the command line options, there are some methods
+callable from user program to modify the predictor. These methods are:
+\begin{itemize}
+\item {\tt void PredictorOn(LBPredictorFunction *model);}
+\item {\tt void PredictorOn(LBPredictorFunction *model,int wind);}
+\item {\tt void PredictorOff();}
+\item {\tt void ChangePredictor(LBPredictorFunction *model);}
+\end{itemize}
+
 
 \subsubsection{Seed load balancers - load balancing Chares at creation time}
 \label{seedlb}
 
-Seed load balancing involves the movement of object creation messages, or 
-"seeds", to create a balance of work across a set of processors. 
-This load balancing scheme is used for load balancing 
-chares only at creation time. 
-When the chare is created on a processor, there is no movement of the chare
-due to the seed load balancer. The measurement based load balancer 
-described in previous subsection perform the task of moving chares during
-work to achieve load balance.
+Seed load balancing involves the movement of object creation messages, or
+"seeds", to create a balance of work across a set of processors. This load
+balancing scheme is used for load balancing chares only at creation time. When
+the chare is created on a processor, there is no movement of the chare due to
+the seed load balancer. The measurement based load balancer described in
+previous subsection perform the task of moving chares during work to achieve
+load balance.
 
 Several variations of strategies have been designed and analyzed. 
 \begin{enumerate}
