@@ -1,0 +1,18 @@
+module armci {
+	initcall void armciNodeInit(void);
+
+	readonly int armci_nproc;
+
+	message AddressMessage {
+		pointer addresses[];
+	};
+
+	array [1D] ArmciVirtualProcessor {
+		entry ArmciVirtualProcessor(CProxy_TCharm _thr_proxy);
+		entry void getAddresses(AddressMessage *msg);
+		entry void putData(int remote, int nbytes, char data[nbytes], int sourceVP);
+		entry void putAck(int sourceVP);
+		entry void putFromGet(int local, int remote, int nbytes, int sourceVP);
+		entry void putDataFromGet(int remote, int nbytes, char data[nbytes]);
+	};
+};
