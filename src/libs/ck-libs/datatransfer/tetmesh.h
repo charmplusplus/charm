@@ -9,7 +9,7 @@
 #include <stdio.h> // For FILE *
 #include "ckvector3d.h"
 
-#define OSL_TETMESH_DEBUG 1
+#define OSL_TETMESH_DEBUG 0
 
 /**
  * A 3d tetrahedral mesh.  Contains the connectivity only--no data.

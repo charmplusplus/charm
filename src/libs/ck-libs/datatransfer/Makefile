@@ -6,14 +6,14 @@ MGC=mgc
 MGCOBJS=$(MGC)/MgcIntr3DTetrTetr.o  $(MGC)/MgcMath.o  $(MGC)/MgcPlane.o \
 	$(MGC)/MgcTetrahedron.o  $(MGC)/MgcVector3.o
 
-HEADERS=
-# datatransfer.h
+HEADERS=paralleltransfer.h tetmesh.h
 HEADDEP=$(HEADERS) 
 TOBJS=$(MGCOBJS) transfer.o tetmesh.o tetmesh_noboite.o
-OBJS=$(TOBJS) tetmesh_fem.o paralleltransfer.o pgm.o
-DEST=pgm
-LIBS=-module collide -module fem -language ampi
-#$(CDIR)/lib/libmoduledatatransfer.a
+OBJS=$(TOBJS) tetmesh_fem.o paralleltransfer.o
+LIB=libdatatransfer
+
+LIBDIR=$(CDIR)/lib
+DEST=$(LIBDIR)/$(LIB).a
 
 test1=test_cg3d
 test1o=$(test1).C $(TOBJS) charm_standalone.o
@@ -23,10 +23,10 @@ test3=test_transfer
 test3o=$(test3).C $(TOBJS) charm_standalone.o
 tests=$(test1) $(test2) $(test3)
 
-all: $(DEST) test
+all: $(DEST)
 
-$(DEST): $(OBJS) $(COMPAT)
-	$(CHARMC) $(OBJS) $(COMPAT) -o $@ $(LIBS)
+$(DEST): $(OBJS) headers
+	$(CHARMC) $(OBJS) -o $@ $(LIBS)
 
 headers: $(HEADERS)
 	cp $(HEADERS) $(CDIR)/include/
@@ -43,7 +43,7 @@ $(test3): $(test3o) $(HEADDEP)
 
 test: $(tests)
 	./$(test1) 1 10000
-	./$(test2) test_noboite_dir/simple.noboite
+	./$(test2) test_transfer_dir/src.noboite
 	./$(test3) test_transfer_dir/src.noboite test_transfer_dir/src.noboite
 	./$(test3) test_transfer_dir/dest.noboite test_transfer_dir/dest.noboite
 	./$(test3) test_transfer_dir/src.noboite test_transfer_dir/dest.noboite

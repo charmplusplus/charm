@@ -3,9 +3,8 @@
  * Orion Sky Lawlor, olawlor@acm.org, 2003/3/24
  */
 #include "tetmesh.h"
-#include "collidec.h"
 #include "bbox.h"
-#include "mpi.h"
+#include "paralleltransfer.h"
 #include "charm++.h" /* for CmiAbort */
 
 #define OSL_COMM_DEBUG 0
@@ -13,7 +12,7 @@
 class progress_t {
 public:
 	virtual ~progress_t();
-	virtual void p(const char *where) =0;
+	virtual void p(const char *where) {}
 };
 
 class parallelTransfer_c {
@@ -28,29 +27,31 @@ class parallelTransfer_c {
 	/// Return true if this collision record describes a local intersection
 	inline bool isLocal(const int *coll) {return coll[1]==myRank;}
 
-	int valsPerTet;
+	int valsPerTet, valsPerPt;
 	const TetMesh &srcMesh;
-	const double *srcVals; // srcMesh.getTets()*valsPerTet source values
+	const xfer_t *srcTet; // srcMesh.getTets()*valsPerTet source values
+	const xfer_t *srcPt; // srcMesh.getPts()*valsPerTet source values
 	const TetMesh &destMesh;
-	double *destVals; // destMesh.getTets()*valsPerTet partial values
+	xfer_t *destTet; // destMesh.getTets()*valsPerTet partial values
+	xfer_t *destPt; // destMesh.getPts()*valsPerPt partial values
 	double *destVolumes; // destMesh.getTets() partial volumes
 	
 	/// A source cell, with values sVals, overlaps with this dest cell
-	///  with this shared volume.
-	void addValues(const double *sVals,int dest,double sharedVolume) {
+	///  with this much shared volume.
+	void addVolume(const xfer_t *sVals,int dest,double sharedVolume) {
 		for (int v=0;v<valsPerTet;v++) 
-			destVals[dest*valsPerTet+v]+=sharedVolume*sVals[v];
+			destTet[dest*valsPerTet+v]+=sharedVolume*sVals[v];
 		destVolumes[dest]+=sharedVolume;
 	}
 public:
 	parallelTransfer_c(collide_t voxels_,MPI_Comm mpi_comm_,
-		int valsPerTet_,
-		const double *srcVals_,const TetMesh &srcMesh_,
-		double *destVals_,const TetMesh &destMesh_)
+		int valsPerTet_,int valsPerPt_,
+		const xfer_t *srcTet_,const xfer_t *srcPt_,const TetMesh &srcMesh_,
+		xfer_t *destTet_,xfer_t *destPt_,const TetMesh &destMesh_)
 		:voxels(voxels_), mpi_comm(mpi_comm_), 
-		 valsPerTet(valsPerTet_), 
-		 srcVals(srcVals_),srcMesh(srcMesh_),
-		 destVals(destVals_),destMesh(destMesh_) 
+		 valsPerTet(valsPerTet_), valsPerPt(valsPerPt_),
+		 srcTet(srcTet_),srcPt(srcPt_),srcMesh(srcMesh_),
+		 destTet(destTet_),destPt(destPt_),destMesh(destMesh_) 
 	{
 		MPI_Comm_rank(mpi_comm,&myRank);
 		MPI_Comm_size(mpi_comm,&commSize);
@@ -58,7 +59,7 @@ public:
 		for (int d=0;d<destMesh.getTets();d++) {
 			destVolumes[d]=0;
 			for (int v=0;v<valsPerTet;v++) {
-				destVals[d*valsPerTet+v]=0;
+				destTet[d*valsPerTet+v]=(xfer_t)0;
 			}
 		}
 	}
@@ -80,9 +81,6 @@ static bbox3d getBox(int t,const TetMesh &mesh) {
 	return ret;
 }
 
-/// MPI Tag for data transfer:
-#define DATATRANSFER_TAG 0xDA7A
-
 /**
  The on-the-wire mesh format looks like this:
    list of points 0..nPoints-1
@@ -95,15 +93,15 @@ static bbox3d getBox(int t,const TetMesh &mesh) {
 #define POINT_PER_TET 4
 #define DOUBLES_PER_TET (COORD_PER_POINT*POINT_PER_TET+valsPerTet)
 
-// Return the number of doubles this many bytes corresponds to:
-inline int bytesToDoubles(int nBytes) {
-	return (nBytes+sizeof(double)-1)/sizeof(double);
+// Return the number of xfer_t this many bytes corresponds to:
+inline int bytesToXfer(int nBytes) {
+	return (nBytes+sizeof(xfer_t)-1)/sizeof(xfer_t);
 }
 
 // Copy n values from src to dest
-template <class T>
-inline void copy(T *dest,const T *src,int n) {
-	for (int i=0;i<n;i++) dest[i]=src[i];
+template <class D,class S>
+inline void copy(D *dest,const S *src,int n) {
+	for (int i=0;i<n;i++) dest[i]=(D)src[i];
 }
 
 /** Describes the amounts of user data associated with each entity in the mesh */
@@ -117,13 +115,13 @@ public:
 class sendState : public meshState {
 public:
 	const TetMesh &mesh; // Global source mesh
-	const double *tetVals; // User data doubles for each tet (tetVal * mesh->getTets())
-	const double *ptVals;  // User data doubles for each point (ptVal * mesh->getPoints())
+	const xfer_t *tetVals; // User data for each tet (tetVal * mesh->getTets())
+	const xfer_t *ptVals;  // User data for each point (ptVal * mesh->getPoints())
 	
-	const double *tetData(int t) const {return &tetVals[t*tetVal];}
-	const double * ptData(int p) const {return & ptVals[p* ptVal];}
+	const xfer_t *tetData(int t) const {return &tetVals[t*tetVal];}
+	const xfer_t * ptData(int p) const {return & ptVals[p* ptVal];}
 	
-	sendState(const TetMesh &m,int tv,int pv,const double *t,const double *p)
+	sendState(const TetMesh &m,int tv,int pv,const xfer_t *t,const xfer_t *p)
 		:meshState(tv,pv), mesh(m), tetVals(t), ptVals(p) {}
 };
 
@@ -164,30 +162,30 @@ public:
 
 /** On-the-wire mesh format when sending/receiving tet mesh chunks: */
 class tetMeshChunk {
-	double *buf; // Message buffer
+	xfer_t *buf; // Message buffer
 	
 	/* On-the-wire message header */
 	struct header_t {
-		int nDoubles; // Total length of message, in doubles
+		int nXfer; // Total length of message, in xfer_t's
 		int nSend; // Length of sendTets array, in ints
 		int nTet; // Number of rows of tetData, 
 		int nPt; // Number of rows of ptData
 	};
 	header_t *header; // Header of buffer
 	inline int headerSize() const // size in doubles
-		{return bytesToDoubles(sizeof(header_t));}
+		{return bytesToXfer(sizeof(header_t));}
 	
 	int *sendTets; // List of local numbers of tets, matching collision data
 	inline int sendTetsSize(const meshState &s,int nSend) const
-		{return bytesToDoubles(nSend*sizeof(int));}
+		{return bytesToXfer(nSend*sizeof(int));}
 	
-	double *tetData; // Tet connectivity and user data (local numbers)
+	xfer_t *tetData; // Tet connectivity and user data (local numbers)
 	inline int tetDataRecordSize(const meshState &s) const
-		{return bytesToDoubles(POINT_PER_TET)+s.tetVal;}
+		{return bytesToXfer(POINT_PER_TET)+s.tetVal;}
 	inline int tetDataSize(const meshState &s,int nTet) const
 		{return nTet*tetDataRecordSize(s); }
 	
-	double *ptData; // Point location and user data (local numbers)
+	xfer_t *ptData; // Point location and user data (local numbers)
 	inline int ptDataRecordSize(const meshState &s) const
 		{return COORD_PER_POINT+s.ptVal;}
 	inline int ptDataSize(const meshState &s,int nPt) const
@@ -200,9 +198,9 @@ public:
 	/// Allocate a new outgoing message with this size: 
 	void allocate(const meshState &s,int nSend,int nTet,int nPt) {
 		int msgLen=headerSize()+sendTetsSize(s,nSend)+tetDataSize(s,nTet)+ptDataSize(s,nPt);
-		buf=new double[msgLen];
+		buf=new xfer_t[msgLen];
 		header=(header_t *)buf;
-		header->nDoubles=msgLen;
+		header->nXfer=msgLen;
 		header->nSend=nSend;
 		header->nTet=nTet;
 		header->nPt=nPt;
@@ -210,13 +208,13 @@ public:
 	}
 	
 	/// Return the number of doubles in this message:
-	int messageSizeDoubles(void) const {return header->nDoubles;}
+	int messageSizeXfer(void) const {return header->nXfer;}
 	double *messageBuf(void) const {return buf;}
 	
 // Used by receive side:
 	/// Set up our pointers into this message, which
 	///  is then owned by and will be deleted by this object.
-	void receive(const meshState &s,double *buf_,int msgLen) {
+	void receive(const meshState &s,xfer_t *buf_,int msgLen) {
 		buf=buf_; 
 		setupPointers(s,msgLen);
 	}
@@ -233,31 +231,31 @@ public:
 		return (int *)&tetData[n*tetDataRecordSize(s)];
 	}
 	/// Return the user data associated with this tet:
-	inline double *getTetData(const meshState &s,int n) {
-		return &tetData[n*tetDataRecordSize(s)+bytesToDoubles(POINT_PER_TET)];
+	inline xfer_t *getTetData(const meshState &s,int n) {
+		return &tetData[n*tetDataRecordSize(s)+bytesToXfer(POINT_PER_TET)];
 	}
 	
 	/// Return the number of points included in this message:
 	inline int nPts(void) const {return header->nPt;}
 	/// Return the coordinate data for this point:
-	inline double *getPtLoc(const meshState &s,int n) {
+	inline xfer_t *getPtLoc(const meshState &s,int n) {
 		return &ptData[n*ptDataRecordSize(s)];
 	}
 	/// Return the user data for this point:
-	inline double *getPtData(const meshState &s,int n) {
+	inline xfer_t *getPtData(const meshState &s,int n) {
 		return &ptData[n*ptDataRecordSize(s)+COORD_PER_POINT];
 	}
 
 private:
 	// Point sendTets and the data arrays into message buffer:
 	void setupPointers(const meshState &s,int msgLen) {
-		double *b=buf; 
+		xfer_t *b=buf; 
 		header=(header_t *)b; b+=headerSize();
 		sendTets=(int *)b; b+=sendTetsSize(s,header->nSend);
 		tetData=b; b+=tetDataSize(s,header->nTet);
 		ptData=b; b+=ptDataSize(s,header->nPt);
 		int nRead=b-buf;
-		if (nRead!=header->nDoubles || nRead!=msgLen)
+		if (nRead!=header->nXfer || nRead!=msgLen)
 			CkAbort("Tet mesh header length mismatch!");
 	}
 	
@@ -319,8 +317,9 @@ public:
 #if OSL_COMM_DEBUG 
 		CkPrintf("%d sending %d records to %d\n", src,n,dest);
 #endif
-		MPI_Isend(ck.messageBuf(),ck.messageSizeDoubles(),MPI_DOUBLE,
-			dest,DATATRANSFER_TAG,comm,&sendReq);
+		MPI_Isend(ck.messageBuf(),ck.messageSizeXfer(),
+			PARALLELTRANSFER_MPI_DTYPE,
+			dest,PARALLELTRANSFER_MPI_TAG,comm,&sendReq);
 	}
 	/// Wait for sends to complete
 	void wait(void) {
@@ -350,12 +349,12 @@ public:
 		
 		// Figure out how long the message we're sending is:
 		MPI_Status sts;
-		MPI_Probe(src,DATATRANSFER_TAG,comm, &sts);
-		int msgLen; MPI_Get_count(&sts, MPI_DOUBLE, &msgLen);
+		MPI_Probe(src,PARALLELTRANSFER_MPI_TAG,comm, &sts);
+		int msgLen; MPI_Get_count(&sts, PARALLELTRANSFER_MPI_DTYPE, &msgLen);
 		
 		// Allocate and receive the message off the network
-		double *buf=new double[msgLen];
-		MPI_Recv(buf,msgLen,MPI_DOUBLE,src,DATATRANSFER_TAG,comm,&sts);
+		xfer_t *buf=new xfer_t[msgLen];
+		MPI_Recv(buf,msgLen,PARALLELTRANSFER_MPI_DTYPE,src,PARALLELTRANSFER_MPI_TAG,comm,&sts);
 		ck.receive(s,buf,msgLen);
 		
 		// Unpack the message into our mesh:
@@ -369,9 +368,10 @@ public:
 	
 	/// Extract the next tet (tet t of returned mesh) from the list.
 	///  Tets must be returned in the same order as presented in tetSender::putTet.
-	TetMesh *getTet(const meshState &s,int &t,const double* &vals) { 
+	TetMesh *getTet(const meshState &s,int &t,const xfer_t* &tets,const xfer_t* &pts) { 
 		t=ck.getSendTets()[outCount++]; // Local number of this tet
-		vals=ck.getTetData(s,t);
+		tets=ck.getTetData(s,t);
+		pts=ck.getPtData(s,0);
 		return &mesh; 
 	}
 };
@@ -411,7 +411,7 @@ void parallelTransfer_c::transfer(progress_t &progress) {
 	
 /* Figure out the communication sizes with each PE */
 	progress.p("Finding communication size");
-	sendState ss(srcMesh,valsPerTet,0, srcVals,0);
+	sendState ss(srcMesh,valsPerTet,valsPerPt, srcTet,srcPt);
 	tetReceiver *recv=new tetReceiver[commSize];
 	tetSender *send=new tetSender[commSize];
 	for (c=0;c<nColl;c++) {
@@ -423,7 +423,7 @@ void parallelTransfer_c::transfer(progress_t &progress) {
 		else /* collides our source cell, so send it */ 
 			send[cr[1]].countTet(ss,cr[0]);
 	}
-#if 1 //OSL_COMM_DEBUG /* print out the communication table */
+#if OSL_COMM_DEBUG /* print out the communication table */
 	printf("Rank %d: %d collisions, ",myRank,nColl);
 	for (p=0;p<commSize;p++) 
 		if (send[p].getCount() || recv[p].getCount())
@@ -457,24 +457,27 @@ void parallelTransfer_c::transfer(progress_t &progress) {
 	for (c=0;c<nColl;c++) {
 		const int *cr=&coll[3*c]; //Collision record:
 		int src,dest=-1; // Source and destination tets
-		const TetMesh *sMesh; // Source and destination meshes
-		const double *sVals; // Source and destination values
+		const TetMesh *sMesh; // Source mesh
+		const xfer_t *sTet, *sPt; // Source tet and point values
 		if (isLocal(cr)) { /* src and dest are local */
 			src=cr[0], dest=cr[2]-firstDest;
 			// Ordering *should* be maintained by voxels:
 			if (isDest(src) || dest<0) CmiAbort("Collision library did not respect local priority");
-			sMesh=&srcMesh; sVals=&srcVals[src*valsPerTet];
+			sMesh=&srcMesh; 
+			sTet=&srcTet[src*valsPerTet];
+			sPt=srcPt;
 		}
 		else if (isDest(cr[0])) { /* dest is local, src is remote */
 			src=-1, dest=cr[0]-firstDest;
-			sMesh=recv[cr[1]].getTet(ss,src,sVals);
+			sMesh=recv[cr[1]].getTet(ss,src,sTet,sPt);
 		}
 		/* else isSrc, so it's send-only */
 		
 		if  (dest!=-1) {
+			// FIXME: actually transfer point data from sPt to destPt
 			double sharedVolume=getSharedVolume(src,*sMesh,dest,destMesh);
 			if (sharedVolume>0) 
-				addValues(sVals,dest,sharedVolume);
+				addVolume(sTet,dest,sharedVolume);
 		}
 	}
 	delete[] recv;
@@ -487,15 +490,15 @@ void parallelTransfer_c::transfer(progress_t &progress) {
 		double volErr=fabs(destVolumes[d]-trueVolume);
 		double accumScale=1.0/destVolumes[d]; //Reverse volume weighting
 		double relErr=volErr*accumScale;
-		if (fabs(relErr)>1.0e-5 && volErr>1.0e-7) {
+#if OSL_CG3D_DEBUG
+		if (fabs(relErr)>1.0e-6 && volErr>1.0e-8) {
 			printf("WARNING: ------------- volume mismatch for cell %d -------------\n"
 				" True volume %g, but total is only %g (err %g)\n",
 				d,trueVolume,destVolumes[d],volErr);
-#if OSL_CG3D_DEBUG
 			// abort();
-#endif
 		}
-		for (int v=0;v<valsPerTet;v++) destVals[d*valsPerTet+v]*=accumScale;
+#endif
+		for (int v=0;v<valsPerTet;v++) destTet[d*valsPerTet+v]*=accumScale;
 	}
 }
 
@@ -511,8 +514,8 @@ class VerboseProgress_t : public progress_t {
 		t=MPI_Wtime();
 		double barrier=t-start; start=t;
 		if (myRank==0 && last)
-			CkPrintf("took %.6f s (+%.6f s imbalance)\n",
-				withoutBarrier,barrier);
+			CkPrintf("%s took %.6f s (+%.6f s imbalance)\n",
+				last,withoutBarrier,barrier);
 	}
 public:
 	VerboseProgress_t(MPI_Comm comm_) {
@@ -526,20 +529,19 @@ public:
 	virtual void p(const char *where) {
 		printLast();
 		last=where;
-		if (myRank==0) CkPrintf("%s ",where);
 	}
 };
 
 progress_t::~progress_t() {}
 
 
-void parallelTransfer(collide_t voxels,MPI_Comm mpi_comm,
-	int valsPerTet,
-	const double *srcVals,const TetMesh &srcMesh,
-	double *destVals,const TetMesh &destMesh)
+void ParallelTransfer(collide_t voxels,MPI_Comm mpi_comm,
+	int valsPerTet,int valsPerPt,
+	const xfer_t *srcTet,const xfer_t *srcPt,const TetMesh &srcMesh,
+	xfer_t *destTet,xfer_t *destPt,const TetMesh &destMesh)
 {
-	parallelTransfer_c t(voxels,mpi_comm,valsPerTet,
-		srcVals,srcMesh, destVals,destMesh);
+	parallelTransfer_c t(voxels,mpi_comm,valsPerTet,valsPerPt,
+		srcTet,srcPt,srcMesh, destTet,destPt,destMesh);
 	VerboseProgress_t p(mpi_comm);
 	t.transfer(p);
 }

@@ -1,3 +1,9 @@
+The cg3d.h and cg3d.C files were my attempt at creating a
+set of generic shape-intersection routines.  They've
+largely failed, due to the numerical difficulties outlined
+below; we now use the Magic Software routines in the "mgc" 
+directory.
+
 ------------------- Numerical Difficulties: ------------------
 
 src->src works fine (error identically 0)
