@@ -27,8 +27,9 @@ public:/* <- Sun CC demands Partition be public for ComputeLoad to access it. */
     double load;			// total load in this set
     int origin[3];			// box coordinates
     int corner[3];
-    int  count;
+    int  count;				// number of objects in this partition
     int node, mapped;
+    CkVec<int>   bkpes;			// background processors
   public:
     Partition(): refno(0), load(0.0), node(-1), mapped(0) {};
   };
@@ -51,6 +52,7 @@ private:
   
   enum {XDIR=0, YDIR, ZDIR};
   
+  LDStats* statsData;
   int P;
   ComputeLoad *computeLoad;
   int nObjs;
@@ -73,7 +75,7 @@ public:
 
 public:
   OrbLB(const CkLBOptions &);
-  OrbLB(CkMigrateMessage *m):CentralLB(m) {}
+  OrbLB(CkMigrateMessage *m):CentralLB(m) { lbname = "OrbLB"; }
 private:
   CmiBool QueryBalanceNow(int step);
   void work(CentralLB::LDStats* stats, int count);

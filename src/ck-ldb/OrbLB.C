@@ -10,6 +10,8 @@
    Load balancer that use Orthogonal Recursive Bisection(ORB) to partition
    objects and map to processors. In OrbLB, objects are treated to be enclosed 
    by a rectangular box using their LDObjid as coordinates.
+
+   ORB now takes background load into account
 */
 /*@{*/
 
@@ -50,11 +52,11 @@ void OrbLB::rec_divide(int n, Partition &p)
   int maxdir, count;
   Partition p1, p2;
 
-#ifdef DEBUG
-  CmiPrintf("rec_divide: partition n:%d count:%d load:%f (%d %d %d, %d %d %d)\n", n, p.count, p.load, p.origin[0], p.origin[1], p.origin[2], p.corner[0], p.corner[1], p.corner[2]);
-#endif
+  if (_lb_args.debug()>=2) {
+    CmiPrintf("rec_divide: partition n:%d count:%d load:%f (%d %d %d, %d %d %d)\n", n, p.count, p.load, p.origin[0], p.origin[1], p.origin[2], p.corner[0], p.corner[1], p.corner[2]);
+  }
 
-  if (n==1) {
+  if (n==1) {		// we are done in this branch
     partitions[currentp++] = p;
     return;
   }
@@ -63,18 +65,22 @@ void OrbLB::rec_divide(int n, Partition &p)
      NAMD_die("AlgRecBisection failed in recursion.\n"); 
 */
 
+  // divide into n1 and n2 two subpartitions
   n2 = n/2;
   n1 = n-n2;
 
+  // subpartition n1 should have this load
   load1 = (1.0*n1/n) * p.load;
-#ifdef DEBUG
-  CmiPrintf("divide goal: n1: %d load1: %f, n2: %d\n", n1, load1, n2);
-#endif
+  if (_lb_args.debug()>=2)
+    CmiPrintf("divide goal: n1: %d load1: %f, n2: %d, load2: %f\n", n1, load1, n2, p.load-load1);
 
   p1 = p;
   p1.refno = ++refno;
+  p1.bkpes.resize(0);
+
   p2 = p;
   p2.refno = ++refno;
+  p2.bkpes.resize(0);
 
   // determine the best division direction
   int maxSpan=-1;
@@ -92,6 +98,13 @@ void OrbLB::rec_divide(int n, Partition &p)
   int dir3 = (maxdir+2)%3;
 
   currentload = 0.0;
+  // counting background load
+  if (!_lb_args.ignoreBgLoad()) {
+    CmiAssert(p.bkpes.size() == n);
+    // first n1 processors
+    for (i=0; i<n1; i++) currentload += statsData->procs[p.bkpes[i]].bg_walltime;
+  }
+
   count = 0;
   midpos = p.origin[maxdir];
   for (i=0; i<nObjs; i++) {
@@ -130,6 +143,14 @@ void OrbLB::rec_divide(int n, Partition &p)
   p1.count = count;
   p2.load = p.load - p1.load;
   p2.count = p.count - p1.count;
+
+  // assign first n1 copy of background to p1, and rest to p2
+  if (!_lb_args.ignoreBgLoad()) {
+    for (i=0; i<n; i++)
+      if (i<n1) p1.bkpes.push_back(p.bkpes[i]);
+      else p2.bkpes.push_back(p.bkpes[i]);
+  }
+
 #ifdef DEBUG
   CmiPrintf("p1: n:%d count:%d load:%f\n", n1, p1.count, p1.load);
   CmiPrintf("p2: n:%d count:%d load:%f\n", n2, p2.count, p2.load);
@@ -208,7 +229,13 @@ void OrbLB::mapPartitionsToNodes()
 {
   int i,j;
 #if 1
-  for (i=0; i<P; i++) partitions[i].node = i;
+  if (!_lb_args.ignoreBgLoad()) {
+      // processor mapping has already been determined by the background load pe
+    for (i=0; i<P; i++) partitions[i].node = partitions[i].bkpes[0];
+  }
+  else {
+    for (i=0; i<P; i++) partitions[i].node = i;
+  }
 #else
   PatchMap *patchMap = PatchMap::Object();
 
@@ -255,6 +282,9 @@ void OrbLB::mapPartitionsToNodes()
 #endif
 
   if (_lb_args.debug()) {
+    CmiPrintf("partition load: ");
+    for (i=0; i<P; i++) CmiPrintf("%f ", partitions[i].load);
+    CmiPrintf("\n");
     CmiPrintf("partitions to nodes mapping: ");
     for (i=0; i<P; i++) CmiPrintf("%d ", partitions[i].node);
     CmiPrintf("\n");
@@ -266,7 +296,10 @@ void OrbLB::work(CentralLB::LDStats* stats, int count)
 #if CMK_LBDB_ON
   int i,j;
 
+  statsData = stats;
+
   P = count;
+
   // calculate total number of objects
   nObjs = stats->n_objs;
 #ifdef DEBUG
@@ -336,6 +369,22 @@ void OrbLB::work(CentralLB::LDStats* stats, int count)
   top_partition.refno = 0;
   top_partition.load = 0.0;
   top_partition.count = nObjs;
+
+  // if we take background load into account
+  if (!_lb_args.ignoreBgLoad()) {
+    top_partition.bkpes.resize(0);
+    for (i=0; i<P; i++) {
+      double bkload = stats->procs[i].bg_walltime;
+      totalLoad += bkload;
+      top_partition.bkpes.push_back(i);
+    }
+    if (_lb_args.debug()>=2) {
+      CkPrintf("BG load: ");
+      for (i=0; i<P; i++)  CkPrintf(" %f", stats->procs[i].bg_walltime);
+      CkPrintf("\n");
+    }
+  }
+
   top_partition.load = totalLoad;
 
   currentp = 0;
@@ -354,7 +403,7 @@ void OrbLB::work(CentralLB::LDStats* stats, int count)
   // mapping partitions to nodes
   mapPartitionsToNodes();
 
-  // this is for debugging
+  // this is for sanity check
   int *num = new int[P];
   for (i=0; i<P; i++) num[i] = 0;
 
@@ -377,19 +426,23 @@ void OrbLB::work(CentralLB::LDStats* stats, int count)
   // Save output
   for(int obj=0;obj<stats->n_objs;obj++) {
       int frompe = stats->from_proc[obj];
-      if (frompe != computeLoad[obj].partition->node) {
-        //      CkPrintf("[%d] Obj %d migrating from %d to %d\n",
-        //             CkMyPe(),obj,frompe,computeLoad[obj].partition->node);
-	CmiAssert(frompe == stats->from_proc[obj]);
-	stats->to_proc[obj] = computeLoad[obj].partition->node;
+      int tope = computeLoad[obj].partition->node;
+      if (frompe != tope) {
+        if (_lb_args.debug() >= 3) {
+              CkPrintf("[%d] Obj %d migrating from %d to %d\n",
+                     CkMyPe(),obj,frompe,tope);
+        }
+	stats->to_proc[obj] = tope;
       }
   }
 
+  // free memory
   delete [] computeLoad;
   for (i=0; i<3; i++) delete [] vArray[i];
   delete [] partitions;
 
-  CmiPrintf("OrbLB finished time: %f\n", CkWallTimer() - t);
+  if (_lb_args.debug() >= 1)
+    CkPrintf("OrbLB finished time: %fs\n", CkWallTimer() - t);
 #endif
 }
 
