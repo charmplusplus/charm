@@ -379,7 +379,7 @@ void CentralLB::MigrationDone(int balancing)
     double lbdbMemsize = LBDatabase::Object()->useMem()/1000;
     CkPrintf("[%s] duration %f memUsage: LBManager:%dKB CentralLB:%dKB\n", 
 	     lbName(), end_lb_time - start_lb_time,
-	     lbdbMemsize/1000, useMem()/1000);
+	     (int)lbdbMemsize, (int)(useMem()/1000));
   }
   migrates_completed = 0;
   migrates_expected = -1;
@@ -676,7 +676,7 @@ static int FindPEAfterMigration(LDObjid& id, CentralLB::LDStats* stats, int coun
 }
 
 int CentralLB::useMem() { 
-  return CkNumPes() * (sizeof(CentralLB::LDStats *)+sizeof(CLBStatsMsg *)) +
+  return CkNumPes() * (sizeof(CentralLB::LDStats)+sizeof(CLBStatsMsg *)) +
                         sizeof(CentralLB);
 }
 
