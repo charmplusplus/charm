@@ -1358,6 +1358,31 @@ void CmiMulticastInit()
  *
  ***************************************************************************/
 
+#define SIMPLE_CMIALLOC 0
+#if SIMPLE_CMIALLOC
+void *CmiAlloc(int size)
+{
+	return malloc(size);
+}
+
+void CmiReference(void *blk)
+{
+	CmiAbort("CmiReference not supported!\n");
+}
+
+int CmiSize(void *blk)
+{
+	CmiAbort("CmiSize not supported!\n");
+	return 0;
+}
+
+void CmiFree(void *blk)
+{
+	free(blk);
+}
+
+#else /*!SIMPLE_CMIALLOC*/
+
 #define SIZEFIELD(m) ((int *)((char *)(m)-2*sizeof(int)))[0]
 #define REFFIELD(m) ((int *)((char *)(m)-sizeof(int)))[0]
 #define BLKSTART(m) ((char *)m-2*sizeof(int))
@@ -1445,6 +1470,7 @@ void *blk;
   }
   REFFIELD(blk) = refCount;
 }
+#endif /*!SIMPLE_CMIALLOC*/
 
 /******************************************************************************
 
