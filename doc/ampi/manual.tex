@@ -810,6 +810,55 @@ example:
 tells the system to use MESH strategy for CommLib. By default USE\_DIRECT is
 used.
 
+\subsection{User Defined Initial Mapping}
+                                                                                
+You can define the initial mapping of virtual processors (vp) to physical 
+processors (p) as a runtime option. You can choose from predefined initial 
+mappings or define your own mappings. Following predefined mappings are 
+available:
+                                                                                
+\begin{description}
+
+\item[Round Robin]
+                                                                                
+This mapping scheme, maps virtual processor to physical processor in round-robin
+fashion, i.e. if there are 8 virtual processors and 2 physical processors then
+virtual processors indexed 0,2,4,6 will be mapped to physical processor 0 and 
+virtual processors indexed 1,3,5,7 will be mapped to physical processor 1. 
+Usage:
+                                                                                
+\begin{alltt}
+> ./charmrun ./hello +p2 +vp8 +mapping RR\_MAP
+\end{alltt}
+                                                                                
+\item[Block Mapping]
+                                                                                
+This mapping scheme, maps virtual processors to physical processor in chunks, 
+i.e. if there are 8 virtual processors and 2 physical processors then virtual 
+processors indexed 0,1,2,3 will be mapped to physical processor 0 and virtual 
+processors indexed 4,5,6,7 will be mapped to physical processor 1. Usage:
+                                                                                
+\begin{alltt}
+> ./charmrun ./hello +p2 +p8 +mapping BLOCK\_MAP
+\end{alltt}
+                                                                                
+\item[Proportional Mapping]
+                                                                                
+This scheme takes the processing capability of physical processors into account
+for mapping virtual processors to physical processors, i.e. if there are 2 
+processors with different processing power, then number of virtual processors 
+mapped to processors will be in proportion to their processing power. Usage:
+                                                                                
+\begin{alltt}
+> ./charmrun ./hello +p2 +p8 +mapping PROP\_MAP
+> ./charmrun ./hello +p2 +p8
+\end{alltt}
+
+\end{description}
+
+If you want to define your own mapping scheme, please contact us and we will be
+happy to help you with it.
+
 \subsection{Compiling AMPI Programs}
 
 \charmpp{} provides a cross-platform compile-and-link script called \charmc{}
