@@ -646,6 +646,9 @@ public:
 	friend inline void operator|(PUP::er &p,CkReference<T> &v) {v.pup(p);}
 };
 
+// For people that forget ::'s:
+typedef PUP::er PUPer;
+typedef PUP::able PUPable;
 
 /******** PUP via pipe: another way to access PUP::ers *****
 The parameter marshalling system pups each variable v using just:
