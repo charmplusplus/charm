@@ -35,6 +35,7 @@ install:
 	rm -f /expand1/groupMosaic/html-manuals/charm++5.0v2/*
 	cp manual/* /expand1/groupMosaic/html-manuals/charm++5.0v2/
 	chmod 664 /expand1/groupMosaic/html-manuals/charm++5.0v2/*
+	chmod 775 /expand1/groupMosaic/html-manuals/charm++5.0v2
 
 all: ps pdf html install
 
