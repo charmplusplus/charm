@@ -38,6 +38,7 @@ sm: converse libsm.a
 pvm: converse libpvmc.a
 
 AMR: charm++ LIBS
+	cd libs/ck-libs/amr; make all OPTS='$(OPTS)'
 
 FEM: FEMC FEMF
 

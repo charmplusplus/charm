@@ -33,31 +33,16 @@ C_CALLABLE int pup_isDeleting(const pup_er p)
 C_CALLABLE int pup_isUserlevel(const pup_er p)
   { return (mp.isUserlevel())?1:0;}
 
-#if CMK_FORTRAN_USES_ALLCAPS
-C_CALLABLE int PUP_ISPACKING(const pup_er p)
+C_CALLABLE int fpup_ispacking(const pup_er p)
   { return (mp.isPacking())?1:0;}
-C_CALLABLE int PUP_ISUNPACKING(const pup_er p)
+C_CALLABLE int fpup_isunpacking(const pup_er p)
   { return (mp.isUnpacking())?1:0;}
-C_CALLABLE int PUP_ISSIZING(const pup_er p)
+C_CALLABLE int fpup_issizing(const pup_er p)
   { return (mp.isSizing())?1:0;}
-C_CALLABLE int PUP_ISDELETING(const pup_er p)
+C_CALLABLE int fpup_isdeleting(const pup_er p)
   { return (mp.isDeleting())?1:0;}
-C_CALLABLE int PUP_ISUSERLEVEL(const pup_er p)
+C_CALLABLE int fpup_isuserlevel(const pup_er p)
   { return (mp.isUserlevel())?1:0;}
-
-#else
-C_CALLABLE int pup_ispacking_(const pup_er p)
-  { return (mp.isPacking())?1:0;}
-C_CALLABLE int pup_isunpacking_(const pup_er p)
-  { return (mp.isUnpacking())?1:0;}
-C_CALLABLE int pup_issizing_(const pup_er p)
-  { return (mp.isSizing())?1:0;}
-C_CALLABLE int pup_isdeleting_(const pup_er p)
-  { return (mp.isDeleting())?1:0;}
-C_CALLABLE int pup_isuserlevel_(const pup_er p)
-  { return (mp.isUserlevel())?1:0;}
-
-#endif
 
 #undef PUP_BASIC_DATATYPE /*from pup_c.h*/
 #undef PUP_BASIC_DATATYPEF /*from pup_c.h*/
@@ -77,9 +62,9 @@ void pup_ints(pup_er p,int *iarr,int nItems) <- array pack/unpack
 
 #if CMK_FORTRAN_USES_ALLCAPS
 #define PUP_BASIC_DATATYPEF(typeName,type) \
- C_CALLABLE void PUP_##typeName(pup_er p,type *v) \
+ C_CALLABLE void FPUP_##typeName(pup_er p,type *v) \
    {mp(*v);} \
- C_CALLABLE void PUP_##typeName##S(pup_er p,type *arr,int *nItems) \
+ C_CALLABLE void FPUP_##typeName##S(pup_er p,type *arr,int *nItems) \
    {mp(arr,*nItems);}
 PUP_BASIC_DATATYPEF(CHAR,char)
 PUP_BASIC_DATATYPEF(SHORT,short)
@@ -88,9 +73,9 @@ PUP_BASIC_DATATYPEF(REAL,float)
 PUP_BASIC_DATATYPEF(DOUBLE,double)
 #else
 #define PUP_BASIC_DATATYPEF(typeName,type) \
- C_CALLABLE void pup_##typeName##_(pup_er p,type *v) \
+ C_CALLABLE void FNAME(fpup_##typeName)(pup_er p,type *v) \
    {mp(*v);} \
- C_CALLABLE void pup_##typeName##s_(pup_er p,type *arr,int *nItems) \
+ C_CALLABLE void FNAME(fpup_##typeName##s)(pup_er p,type *arr,int *nItems) \
    {mp(arr,*nItems);}
 PUP_BASIC_DATATYPEF(char,char)
 PUP_BASIC_DATATYPEF(short,short)
@@ -116,15 +101,7 @@ C_CALLABLE void pup_bytes(pup_er p,void *ptr,int nBytes)
   mp(ptr,nBytes);
 }
 
-#if CMK_FORTRAN_USES_ALLCAPS
-C_CALLABLE void PUP_BYTES(pup_er p,void *ptr,int *nBytes)
+C_CALLABLE void fpup_bytes(pup_er p,void *ptr,int *nBytes)
 {
   mp(ptr,*nBytes);
 }
-#else
-C_CALLABLE void pup_bytes_(pup_er p,void *ptr,int *nBytes)
-{
-  mp(ptr,*nBytes);
-}
-#endif
-
