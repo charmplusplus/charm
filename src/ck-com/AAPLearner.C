@@ -38,7 +38,7 @@ Strategy *AAPLearner::optimizePattern(Strategy *strat,
     double hcost = computeHypercube(npes, msgsize, degree);
     double mincost = min4(dcost, mcost, gcost, hcost);
 
-    int minstrat = -1;
+    int minstrat = USE_MESH;
     if(dcost == mincost) 
         minstrat = USE_DIRECT;
     else if(mcost == mincost)                     
@@ -48,8 +48,8 @@ Strategy *AAPLearner::optimizePattern(Strategy *strat,
     else if(hcost == mincost) 
         minstrat = USE_HYPERCUBE;
 
-    CkPrintf("Choosing router %d, %g, %g, %g, : %g,%g,%g\n", minstrat, 
-             mcost, hcost, dcost, npes, msgsize, degree);
+    CkPrintf("Choosing router %d, %g, %g, %g, %g; %g : %g,%g,%g\n", minstrat, 
+             mcost, hcost, gcost, dcost, mincost, npes, msgsize, degree);
     
     if(in_strat->getType() == ARRAY_STRATEGY) {
         CkArrayID said, daid;
