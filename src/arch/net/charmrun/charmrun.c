@@ -1971,7 +1971,7 @@ void rsh_pump_sh(p, nodeno, rank0no, argv)
   
   xstr_printf(ibuf,"echo 'remote responding...'\n");
 
-  xstr_printf(ibuf,"test -f ~/.charmrunrc && . ~/.charmrunrc\n");
+  xstr_printf(ibuf,"test -f $HOME/.charmrunrc && . $HOME/.charmrunrc\n");
   if (arg_display)
     xstr_printf(ibuf,"DISPLAY=%s;export DISPLAY\n",arg_display);
   xstr_printf(ibuf,"NETSTART='%s';export NETSTART\n",create_netstart(rank0no));
