@@ -16,7 +16,7 @@ extern "C" void AMPIMAIN(int, char **);
 extern "C" int AMPI_COMM_UNIVERSE[AMPI_MAX_COMM];
 #else
 extern "C" void ampimain_(int, char **);
-extern "C" int ampi_comm_universe_[AMPI_MAX_MAX];
+extern "C" int ampi_comm_universe_[AMPI_MAX_COMM];
 #endif // CMK_FORTRAN_USES_ALLCAPS
 #else
 extern "C" void ampimain(int, char **);
