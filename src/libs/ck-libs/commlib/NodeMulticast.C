@@ -295,7 +295,8 @@ void NodeMulticast::pup(PUP::er &p){
 	
         nm_mgr = this;
 
-	validRank[0] =  validRank[1] = validRank[2] = validRank[3] = 0;
+	//validRank[0] =  validRank[1] = validRank[2] = validRank[3] = 0;
+        memset(validRank, 0, MAX_PES_PER_NODE * sizeof(int));
 	for(int count = 0; count < npes; count ++){
 	    if(CkMyPe()/pes_per_node == pelist[count] / pes_per_node)
 		validRank[pelist[count] % pes_per_node] = 1;

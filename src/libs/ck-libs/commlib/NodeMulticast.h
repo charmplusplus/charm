@@ -6,7 +6,7 @@
 #include "persistent.h"
 #endif
 
-#define MAX_PES_PER_NODE 4
+#define MAX_PES_PER_NODE 16
 #define PROCESSOR_MODE 0
 #define ARRAY_MODE 1
 
