@@ -570,13 +570,13 @@ $(L)/libtrace-counter.a: $(LIBTRACE_COUNT)
 trace-common.o: trace-common.C $(CKHEADERS)
 	$(CHARMC) trace-common.C
 
-trace-projections.o:trace-projections.C trace-projections.h trace.h trace-common.h $(CKHEADERS)
+trace-projections.o:trace-projections.C trace-projections.h trace-common.h $(CKHEADERS)
 	$(CHARMC) -o trace-projections.o trace-projections.C
 
-trace-summary.o:trace-summary.C trace-summary.h trace.h trace-common.h $(CKHEADERS)
+trace-summary.o:trace-summary.C trace-summary.h trace-common.h $(CKHEADERS)
 	$(CHARMC) -o trace-summary.o trace-summary.C
 
-trace-counter.o:trace-counter.C trace-counter.h trace.h trace-common.h $(CKHEADERS)
+trace-counter.o:trace-counter.C trace-counter.h trace-common.h $(CKHEADERS)
 	$(CHARMC) -o trace-counter.o trace-counter.C
 
 ###############################################################################
@@ -721,6 +721,7 @@ loadbalancers: $(LOADBALANCERS) $(L)/libmoduleEveryLB.a
 #
 ###############################################################################
 
+# old (Charm++) Blue Gene emulator
 BlueGene.decl.h BlueGene.def.h : BlueGene.ci charmxi
 	$(CHARMC) BlueGene.ci
 
@@ -728,10 +729,11 @@ libbluegene.a: BlueGene.C BlueGene.h BlueGene.decl.h BlueGene.def.h
 	$(CHARMC) -c BlueGene.C
 	$(CHARMC) -cp ../lib -o libbluegene.a BlueGene.o
 
-blue.o:  blue.h blue_impl.h blue_timing.h blue.C
+# (Converse) Blue Gene emulator
+blue.o:  blue_impl.h blue_timing.h blue.C $(CVHEADERS)
 	$(CHARMC) -c blue.C
 
-blue_timing.o:  blue.h blue_impl.h blue_timing.C blue_timing.h
+blue_timing.o:  blue_impl.h blue_timing.C blue_timing.h $(CVHEADERS)
 	$(CHARMC) -c blue_timing.C
 
 libconv-bluegene.a:   blue.o blue_timing.o
