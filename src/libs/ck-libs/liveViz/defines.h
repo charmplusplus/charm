@@ -1,6 +1,8 @@
 #ifndef _DEFINES
 #define _DEFINES
 
+#include <stdlib.h> /* for NULL */
+
 typedef unsigned char byte;
 
 struct point
@@ -18,7 +20,5 @@ struct imageRect
 };
 
 typedef struct imageRect Rect;
-
-#define NULL 0
 
 #endif
