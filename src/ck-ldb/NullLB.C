@@ -26,6 +26,11 @@ static void initNullLB(void) {
 }
 
 #if CMK_LBDB_ON
+static void staticStartLB(void* data)
+{
+  CmiPrintf("[%d] LB Info: StartLB called in NullLB.\n", CkMyPe());
+}
+
 void NullLB::init(void)
 {
   // if (CkMyPe() == 0) CkPrintf("[%d] NullLB created\n",CkMyPe());
@@ -34,12 +39,15 @@ void NullLB::init(void)
   receiver = theLbdb->
     AddLocalBarrierReceiver((LDBarrierFn)(staticAtSync),
 			    (void*)(this));
+  theLbdb->
+    AddStartLBFn((LDStartLBFn)(staticStartLB),(void*)(this));
 }
 
 NullLB::~NullLB()
 {
   theLbdb=CProxy_LBDatabase(lbdb).ckLocalBranch();
   theLbdb->RemoveLocalBarrierReceiver(receiver);
+  theLbdb->RemoveStartLBFn((LDStartLBFn)(staticStartLB));
 }
 
 void NullLB::staticAtSync(void* data)

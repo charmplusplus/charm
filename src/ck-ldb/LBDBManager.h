@@ -109,12 +109,8 @@ public:
   inline void TurnManualLBOn() { useBarrier = CmiFalse; }
   inline void TurnManualLBOff() { useBarrier = CmiTrue; }
   void AddStartLBFn(LDStartLBFn fn, void* data);
-  inline void StartLB() {
-    if (startLBFn == NULL) {
-      CmiAbort("StartLB is not supported in this LB");
-    }
-    startLBFn->fn(startLBFn->data);
-  }
+  void RemoveStartLBFn(LDStartLBFn fn);
+  void StartLB();
 
   inline void IdleTime(double* walltime) { 
     machineUtil.IdleTime(walltime); 
@@ -190,7 +186,7 @@ private:
   typedef CkVec<LBOM*> OMList;
   typedef CkVec<LBObj*> ObjList;
   typedef CkVec<MigrateCB*> MigrateCBList;
-  StartLBCB *            startLBFn;
+  typedef CkVec<StartLBCB*> StartLBCBList;
 
   LBCommTable* commTable;
   OMList oms;
@@ -214,6 +210,10 @@ private:
   LBMachineUtil machineUtil;
   double obj_walltime;
   double obj_cputime;
+
+  StartLBCBList  startLBFnList;
+  int            startLBFn_count;
+
 };
 
 #endif

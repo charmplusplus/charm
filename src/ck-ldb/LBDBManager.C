@@ -52,7 +52,7 @@ void LBDB::batsyncer::init(LBDB *_db,double initPeriod)
  * LBDB Code
  *************************************************************/
 
-LBDB::LBDB(): startLBFn(NULL), useBarrier(CmiTrue)
+LBDB::LBDB(): useBarrier(CmiTrue)
 {
     statsAreOn = CmiFalse;
     omCount = objCount = oms_registering = 0;
@@ -60,6 +60,7 @@ LBDB::LBDB(): startLBFn(NULL), useBarrier(CmiTrue)
     commTable = new LBCommTable;
     obj_walltime = obj_cputime = 0;
     batsync.init(this,1.0);
+    startLBFn_count = 0;
 }
 
 LDOMHandle LBDB::AddOM(LDOMid _userID, void* _userData, 
@@ -226,13 +227,35 @@ void LBDB::NotifyMigrated(LDMigratedFn fn, void* data)
 
 void LBDB::AddStartLBFn(LDStartLBFn fn, void* data)
 {
-  CkAssert(startLBFn == NULL);
   // Save startLB function
   StartLBCB* callbk = new StartLBCB;
 
   callbk->fn = fn;
   callbk->data = data;
-  startLBFn = callbk;
+  startLBFnList.push_back(callbk);
+  startLBFn_count++;
+}
+
+void LBDB::RemoveStartLBFn(LDStartLBFn fn)
+{
+  for (int i=0; i<startLBFnList.length(); i++) {
+    if (startLBFnList[i]->fn == fn) {
+      startLBFnList[i] = 0; 
+      startLBFn_count --;
+      break;
+    }
+  }
+}
+
+void LBDB::StartLB() 
+{
+  if (startLBFn_count == 0) {
+    CmiAbort("StartLB is not supported in this LB");
+  }
+  for (int i=0; i<startLBFnList.length(); i++) {
+    StartLBCB *startLBFn = startLBFnList[i];
+    if (startLBFn) startLBFn->fn(startLBFn->data);
+  }
 }
 
 void LBDB::BackgroundLoad(double* walltime, double* cputime)

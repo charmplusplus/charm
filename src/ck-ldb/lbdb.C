@@ -87,6 +87,12 @@ void LDAddStartLBFn(LDHandle _db, LDStartLBFn fn, void* data)
   db->AddStartLBFn(fn,data);
 }
 
+void LDRemoveStartLBFn(LDHandle _db, LDStartLBFn fn)
+{
+  LBDB *const db = (LBDB*)(_db.handle);
+  db->RemoveStartLBFn(fn);
+}
+
 void LDStartLB(LDHandle _db)
 {
   LBDB *const db = (LBDB*)(_db.handle);

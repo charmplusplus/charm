@@ -93,6 +93,11 @@ public:
     LDAddStartLBFn(myLDHandle,fn,data);
   };
 
+  inline void RemoveStartLBFn(LDStartLBFn fn) 
+  {
+    LDRemoveStartLBFn(myLDHandle,fn);
+  };
+
   inline void StartLB() { LDStartLB(myLDHandle); }
   inline void TurnManualLBOn() { LDTurnManualLBOn(myLDHandle); }
  

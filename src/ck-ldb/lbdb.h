@@ -149,6 +149,7 @@ void LDNotifyMigrated(LDHandle lbdb, LDMigratedFn fn, void* data);
 
 typedef void (*LDStartLBFn)(void *user_ptr);
 void LDAddStartLBFn(LDHandle lbdb, LDStartLBFn fn, void* data);
+void LDRemoveStartLBFn(LDHandle lbdb, LDStartLBFn fn);
 void LDStartLB(LDHandle _db);
 void LDTurnManualLBOn(LDHandle _db);
 

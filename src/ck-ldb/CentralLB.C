@@ -99,6 +99,8 @@ CentralLB::CentralLB()
 CentralLB::~CentralLB()
 {
   CkPrintf("Going away\n");
+  theLbdb->
+    RemoveStartLBFn((LDStartLBFn)(staticStartLB));
 }
 
 void CentralLB::AtSync()
