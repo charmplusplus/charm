@@ -239,7 +239,7 @@ LIBCONV_CORE= convcore.o conv-conds.o queueing.o msgmgr.o \
 	debug-conv.o generate.o edgelist.o conv-ccs.o ccs-builtins.o \
 	quiescence.o isomalloc.o
 
-LIBCONV_UTIL=pup_util.o pup_xlater.o pup_c.o \
+LIBCONV_UTIL=pup_util.o pup_xlater.o pup_c.o pup_paged.o\
 	ckimage.o ckdll.o ckhashtable.o ckbitvector.o sockRoutines.o \
 	conv-lists.o
 
@@ -366,6 +366,9 @@ pup_xlater.o: pup_xlater.C $(UTILHEADERS)
 pup_c.o: pup_c.C $(UTILHEADERS)
 	$(CHARMC) -o pup_c.o pup_c.C
 
+pup_paged.o: pup_paged.C $(UTILHEADERS)
+	$(CHARMC) -o pup_paged.o pup_paged.C
+	
 pup_f.o: pup_f.f90
 	-$(CHARMC) -c pup_f.f90
 	-$(CHARMC) -cpmod ../include pupmod.M
