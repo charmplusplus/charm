@@ -270,6 +270,8 @@ typedef ArrayElementT<CkIndex3D> ArrayElement3D;
 
 #include "CkArray.decl.h"
 
+void _ckArrayInit(void);
+
 class CkArray : public CkReductionMgr, public CkArrMgr {
   friend class ArrayElement;
   friend class CProxy_ArrayBase;

@@ -26,6 +26,7 @@ module CkLocation {
   };
 
   initcall void _propMapInit(void);
+  initcall void _CkMigratable_initInfoInit(void);
 
   group PropMap : CkArrayMap {
     entry PropMap(void);

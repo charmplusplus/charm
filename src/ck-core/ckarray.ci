@@ -15,6 +15,8 @@ module CkArray {
 	entry void recvBroadcast(CkMessage *);
   };
   
+  initcall void _ckArrayInit(void);
+
   array [none] ArrayElement {
     entry ArrayElement();
     //Calls destructor:

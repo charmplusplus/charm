@@ -377,7 +377,12 @@ public:
 	CkLocRec_local *locRec;  
 	int chareType;
 };
+
 CpvStaticDeclare(CkMigratable_initInfo,mig_initInfo);
+
+void _CkMigratable_initInfoInit(void) {
+  CpvInitialize(CkMigratable_initInfo,mig_initInfo);
+}
 
 void CkMigratable::commonInit(void) {
 	CkMigratable_initInfo &i=CpvAccess(mig_initInfo);
@@ -831,7 +836,8 @@ CkLocMgr::CkLocMgr(CkGroupID mapID_,CkGroupID lbdbID_,int numInitial)
 	 hash(17,0.3)
 {
 	DEBC((AA"Creating new location manager %d\n"AB,thisgroup));
-	CpvInitialize(CkMigratable_initInfo,mig_initInfo);
+// moved to _CkMigratable_initInfoInit()
+//	CpvInitialize(CkMigratable_initInfo,mig_initInfo);
 	
 	managers.init();
 	nManagers=0;

@@ -271,6 +271,11 @@ void CProxySection_ArrayBase::pup(PUP::er &p)
 }
 
 /*********************** CkArray Creation *************************/
+void _ckArrayInit(void)
+{
+  CpvInitialize(ArrayElement_initInfo,initInfo);
+}
+
 CkArray::CkArray(const CkArrayOptions &c,CkMarshalledMessage &initMsg)
         : CkReductionMgr(), 
 	locMgr(CProxy_CkLocMgr::ckLocalBranch(c.getLocationManager())),
@@ -278,7 +283,8 @@ CkArray::CkArray(const CkArrayOptions &c,CkMarshalledMessage &initMsg)
 {
   //Registration
   elements=(ArrayElementList *)locMgr->addManager(thisgroup,this);
-  CpvInitialize(ArrayElement_initInfo,initInfo);
+//  moved to _ckArrayInit()
+//  CpvInitialize(ArrayElement_initInfo,initInfo);
   CcdCallOnConditionKeep(CcdPERIODIC_1minute,staticSpringCleaning,(void *)this);
 
   //Set class variables
