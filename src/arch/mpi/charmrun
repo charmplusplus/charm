@@ -33,7 +33,7 @@ done
 
 echo "Running on $pes processors: $args"
 
-if [ x"$PBS_TEST" = x ]
+if [ x"$PBS_QUEUE" = x ]
 then
   mpirun -np $pes $args
 else
@@ -58,7 +58,7 @@ else
 #PBS -l mem=500mb
 
 # Queue name (see info about other queues in web documentation)
-#PBS -q standard
+#PBS -q $PBS_QUEUE
 #
 # Export all my environment variables to the job
 #PBS -V
