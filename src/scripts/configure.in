@@ -42,7 +42,7 @@ test_cxx() {
 
 test_finish() {
 	rm -f $t test.o	> /dev/null 2>&1
-	return $1
+	exit $1
 }
 
 cat > $t <<EOT
