@@ -250,11 +250,24 @@ public:
     connRec &newConn=g.conn[newTri];
     
   //Update the element connectivity:
+    int i;
     //Replace A by D in the old triangle
-    for (int i=0;i<3;i++)
+    for (i=0;i<3;i++)
       if (oldConn[i]==A) oldConn[i]=D;
     //Insert new triangle CAD
-    newConn[0]=C; newConn[1]=A; newConn[2]=D;
+    // OLD WAY: 
+    //newConn[0]=C; newConn[1]=A; newConn[2]=D;
+    // NEW WAY: preserves orientation and makes connectivity consistent
+    //          with what TMR framework has
+    for (i=0; i<3; i++) {
+      if (oldConn[i] == B)
+	newConn[i] = D;
+      else if (oldConn[i] == C)
+	newConn[i] = C;
+      else if (oldConn[i] == D)
+	newConn[i] = A;
+    }
+      
     
     checkTriangle(g,triNo);
     checkTriangle(g,newTri);
