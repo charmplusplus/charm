@@ -1,0 +1,14 @@
+CMK_CPP_C='cc -E -I/usr/opt/rms/include '
+CMK_CC='cc -pthread -I/usr/opt/rms/include '
+CMK_CC_RELIABLE="$CMK_CC"
+CMK_CC_FASTEST="$CMK_CC"
+CMK_CXX='cxx -pthread -D__USE_STD_IOSTREAM -I/usr/opt/rms/include '
+CMK_CXXPP="$CMK_CXX -x c++ -E "
+CMK_LD="$CMK_CC -expect_unresolved '*' "
+CMK_LDXX="$CMK_CXX"
+CMK_SEQ_CC="$CMK_CC"
+CMK_SEQ_LD="$CMK_CC"
+CMK_SEQ_CXX="$CMK_CXX"
+CMK_SEQ_LDXX="$CMK_CXX"
+CMK_CPP_SUFFIX="ii"
+CMK_QT='axp-osf1-cc'
