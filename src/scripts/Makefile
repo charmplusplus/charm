@@ -65,7 +65,7 @@ ALLHEADERS=charm++.h ckstream.h charm.h cpthreads.h converse.h \
 	TList.h idl.h ckarray.h tempo.h waitqd.h LBDatabase.h \
 	lbdb.h LBDBManager.h LBComm.h LBOM.h LBObj.h LBMachineUtil.h \
 	CentralLB.h RandCentLB.h RefineLB.h MetisLB.h HeapCentLB.h \
-	Set.h elements.h heap.h conv-ccs.h NeighborLB.h
+	Set.h elements.h heap.h conv-ccs.h NeighborLB.h WSLB.h
 
 ALLINTERFACES=idl.ci
 
@@ -139,6 +139,7 @@ CVHEADERS=converse.h conv-mach.h conv-mach.sh \
           ../include/RefineLB.decl.h RefineLB.def.h \
           ../include/HeapCentLB.decl.h HeapCentLB.def.h \
           ../include/NeighborLB.decl.h NeighborLB.def.h \
+          ../include/WSLB.decl.h WSLB.def.h \
           ../include/tempo.decl.h tempo.def.h \
           ../include/waitqd.decl.h waitqd.def.h
 
@@ -248,7 +249,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h trace.h \
           ckfutures.h ckarray.h tempo.h waitqd.h LBDatabase.h lbdb.h \
 	  LBDBManager.h LBComm.h LBOM.h LBObj.h LBMachineUtil.h \
 	  CentralLB.h RandCentLB.h RefineLB.h HeapCentLB.h MetisLB.h \
-	  NeighborLB.h \
+	  NeighborLB.h WSLB.h \
 	  $(CVHEADERS)
 
 CK_LIBS_CORE=libck.a
@@ -257,7 +258,7 @@ LIBCK_CORE=init.o register.o qd.o ck.o main.o msgalloc.o ckfutures.o \
            ckarray.o tempo.o waitqd.o LBDatabase.o lbdb.o \
 	   LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o \
 	   CentralLB.o RandCentLB.o MetisLB.o RefineLB.o Set.o \
-           HeapCentLB.o heap.o NeighborLB.o
+           HeapCentLB.o heap.o NeighborLB.o WSLB.o
 
 charmlibs: converse $(CK_LIBS_CORE)
 	cd libs; make charmlibs OPTS='$(OPTS)'
@@ -301,6 +302,9 @@ libtrace-summary.a: $(LIBTRACE_SUMM)
 ../include/NeighborLB.decl.h : NeighborLB.decl.h
 	/bin/cp NeighborLB.decl.h ../include
 
+../include/WSLB.decl.h : WSLB.decl.h
+	/bin/cp WSLB.decl.h ../include
+
 ../include/CkFutures.decl.h : CkFutures.decl.h
 	/bin/cp CkFutures.decl.h ../include
 
@@ -342,6 +346,9 @@ HeapCentLB.decl.h HeapCentLB.def.h : HeapCentLB.ci charmxi
 
 NeighborLB.decl.h NeighborLB.def.h : NeighborLB.ci charmxi
 	$(CHARMC) NeighborLB.ci
+
+WSLB.decl.h WS.def.h : WSLB.ci charmxi
+	$(CHARMC) WSLB.ci
 
 init.o: init.C $(CKHEADERS)
 	$(CHARMC) -o init.o init.C
@@ -405,6 +412,9 @@ heap.o: heap.C $(CKHEADERS) elements.h heap.h
 
 NeighborLB.o: NeighborLB.C $(CKHEADERS)
 	$(CHARMC) -o NeighborLB.o NeighborLB.C
+
+WSLB.o: WSLB.C $(CKHEADERS)
+	$(CHARMC) -o WSLB.o WSLB.C
 
 qd.o: qd.C $(CKHEADERS)
 	$(CHARMC) -o qd.o qd.C
