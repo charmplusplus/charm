@@ -842,7 +842,7 @@ clean:
 	rm -f core #*#
 	rm -f core *~
 	if [ -d charmrun ] ; then ( cd charmrun; make clean ) ; fi
-	( cd doc; make clean )
+	-( cd doc && make clean )
 	( cd libs; make clean )
 	( cd ../pgms; make clean )
 
