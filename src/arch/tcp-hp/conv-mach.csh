@@ -12,7 +12,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 2.14  1996-04-16 22:45:34  jyelon
+# Revision 2.15  1996-07-02 21:25:22  jyelon
+# *** empty log message ***
+#
+# Revision 2.14  1996/04/16 22:45:34  jyelon
 # *** empty log message ***
 #
 # Revision 2.13  1996/04/09 22:56:35  jyelon
@@ -63,7 +66,7 @@ set CMK_C_DEBUG='-g'
 set CMK_C_OPTIMIZE='-O'
 set CMK_CXX_DEBUG='-g'
 set CMK_CXX_OPTIMIZE='-O'
-set CMK_LD='gcc -s'
+set CMK_LD='gcc'
 set CMK_LDXX='g++'
 set CMK_LD77=''
 set CMK_M4='m4'

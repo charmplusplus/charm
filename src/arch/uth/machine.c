@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.13  1996-02-10 18:57:29  sanjeev
+ * Revision 1.14  1996-07-02 21:25:22  jyelon
+ * *** empty log message ***
+ *
+ * Revision 1.13  1996/02/10 18:57:29  sanjeev
  * fixed bugs in CmiGetNodeNeighbours, CmiNeighboursIndex
  *
  * Revision 1.12  1996/02/10 18:54:24  sanjeev
@@ -218,6 +221,7 @@ Fifo      *CmiQueues;
 int       *CmiBarred;
 int        CmiNumBarred=0;
 
+Fifo FIFO_Create();
 CpvDeclare(Fifo, CmiLocalQueue);
 
 /******************************************************************************
@@ -332,12 +336,126 @@ void CmiNodeBarrier()
   CmiYield();
 }
 
-/********************* MESSAGE RECEIVE FUNCTIONS ******************/
+/*****************************************************************************
+ *
+ * The following are the CmiDeliverXXX functions.
+ *
+ * void CmiDeliversInit()
+ *
+ *      - CmiInit promises to call this before calling CmiDeliverMsgs
+ *        or any of the other functions in this section.
+ *
+ * int CmiDeliverMsgs(int maxmsgs)
+ *
+ *      - CmiDeliverMsgs will retrieve up to maxmsgs that were transmitted
+ *        with the Cmi, and will invoke their handlers.  It does not wait
+ *        if no message is unavailable.  Instead, it returns the quantity
+ *        (maxmsgs-delivered), where delivered is the number of messages it
+ *        delivered.
+ *
+ * void CmiDeliverSpecificMsg(int handlerno)
+ *
+ *      - Waits for a message with the specified handler to show up, then
+ *        invokes the message's handler.  Note that unlike CmiDeliverMsgs,
+ *        This function _does_ wait.
+ *
+ * void CmiGrabBuffer(void **bufptrptr)
+ *
+ *      - When CmiDeliverMsgs or CmiDeliverSpecificMsgs calls a handler,
+ *        the handler receives a pointer to a buffer containing the message.
+ *        The buffer does not belong to the handler, eg, the handler may not
+ *        free the buffer.  Instead, the buffer will be automatically reused
+ *        or freed as soon as the handler returns.  If the handler wishes to
+ *        keep a copy of the data after the handler returns, it may do so by
+ *        calling CmiGrabBuffer and passing it a pointer to a variable which
+ *        in turn contains a pointer to the system buffer.  The variable will
+ *        be updated to contain a pointer to a handler-owned buffer containing
+ *        the same data as before.  The handler then has the responsibility of
+ *        making sure the buffer eventually gets freed.  Example:
+ *
+ * void myhandler(void *msg)
+ * {
+ *    CmiGrabBuffer(&msg);      // Claim ownership of the message buffer
+ *    ... rest of handler ...
+ *    CmiFree(msg);             // I have the right to free it or
+ *                              // keep it, as I wish.
+ * }
+ *
+ *
+ * For this common implementation to work, the machine layer must provide the
+ * following:
+ *
+ * void *CmiGetNonLocal()
+ *
+ *      - returns a message just retrieved from some other PE, not from
+ *        local.  If no such message exists, returns 0.
+ *
+ * CpvExtern(FIFO_Queue, CmiLocalQueue);
+ *
+ *      - a FIFO queue containing all messages from the local processor.
+ *
+ *****************************************************************************/
 
-void *CmiGetNonLocal()
+CpvStaticDeclare(int, CmiBufferGrabbed);
+CpvExtern(void*, CmiLocalQueue);
+
+void CmiDeliversInit()
 {
-  CmiYield();
-  return 0; /* Messages are always in local queue */
+  CpvInitialize(int, CmiBufferGrabbed);
+  CpvAccess(CmiBufferGrabbed) = 0;
+}
+
+void CmiGrabBuffer()
+{
+  CpvAccess(CmiBufferGrabbed) = 1;
+}
+
+int CmiDeliverMsgs(maxmsgs)
+int maxmsgs;
+{
+  void *msg;
+  
+  while (1) {
+    CmiYield();
+    FIFO_DeQueue(CpvAccess(CmiLocalQueue), &msg);
+    if (msg==0) break;
+    CpvAccess(CmiBufferGrabbed)=0;
+    (CmiGetHandlerFunction(msg))(msg);
+    if (!CpvAccess(CmiBufferGrabbed)) CmiFree(msg);
+    maxmsgs--; if (maxmsgs==0) break;
+  }
+  return maxmsgs;
+}
+
+/*
+ * CmiDeliverSpecificMsg(lang)
+ *
+ * - waits till a message with the specified handler is received,
+ *   then delivers it.
+ *
+ */
+
+void CmiDeliverSpecificMsg(handler)
+int handler;
+{
+  void *tmpqueue = FIFO_Create(); int *msg;
+  
+  while (1) {
+    FIFO_DeQueue(CpvAccess(CmiLocalQueue), &msg);
+    if (msg == 0) { CmiYield(); continue; }
+    if (CmiGetHandler(msg)==handler) {
+      CpvAccess(CmiBufferGrabbed)=0;
+      (CmiGetHandlerFunction(msg))(msg);
+      if (!CpvAccess(CmiBufferGrabbed)) CmiFree(msg);
+      break;
+    } else FIFO_EnQueue(tmpqueue, msg);
+  }
+  while (1) {
+    FIFO_DeQueue(tmpqueue, &msg);
+    if (msg==0) break;
+    FIFO_EnQueue(CpvAccess(CmiLocalQueue), msg);
+  }
+  FIFO_Destroy(tmpqueue);
 }
 
 /********************* MESSAGE SEND FUNCTIONS ******************/
@@ -490,7 +608,7 @@ char *argv[];
     t = (i==0) ? CthSelf() : CthCreate(CmiCallMain, 0, Cmi_stacksize);
     CmiThreads[i] = t;
     CmiBarred[i] = 0;
-    CmiQueues[i] = (Fifo)FIFO_Create();
+    CmiQueues[i] = FIFO_Create();
   }
   Cmi_mype = 0;
   CmiCallMain();
