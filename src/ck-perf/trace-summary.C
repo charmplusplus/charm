@@ -181,7 +181,7 @@ void SumLogPool::write(void)
   for (i=0; i<_numEntries; i++)
     fprintf(fp, "%ld ", (long)(epInfo[i].epMaxTime*1.0e6));
   fprintf(fp, "\n");
-  for (i=0; i<SumEntryInfo::SIZE; i++) {
+  for (i=0; i<SumEntryInfo::HIST_SIZE; i++) {
     for (j=0; j<_numEntries; j++) 
       fprintf(fp, "%d ", epInfo[j].hist[i]);
     fprintf(fp, "\n");

@@ -141,20 +141,20 @@ public:
   double epTime;
   double epMaxTime;
   int epCount;
-  static const int SIZE = 10;
-  int hist[SIZE];
+  enum {HIST_SIZE = 10};
+  int hist[HIST_SIZE];
 public:
   SumEntryInfo(): epTime(0.), epMaxTime(0.), epCount(0) {}
   void clear() {
     epTime = epMaxTime = 0.;
     epCount = 0;
-    for (int i=0; i<SIZE; i++) hist[i]=0;
+    for (int i=0; i<HIST_SIZE; i++) hist[i]=0;
   }
   void setTime(double t) {
     epTime += t;
     epCount ++;
     if (epMaxTime < t) epMaxTime = t;
-    for (int i=SIZE-1; i>=0; i--) {
+    for (int i=HIST_SIZE-1; i>=0; i--) {
       if (t>epThreshold+i*epInterval) {
         hist[i]++; break;
       }
