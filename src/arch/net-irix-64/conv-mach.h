@@ -28,6 +28,8 @@
 
 #define CMK_GETPAGESIZE_AVAILABLE                          1
 
+#define CMK_HANDLE_SIGUSR                                  1
+
 #define CMK_IS_HETERO                                      1
 
 #define CMK_MACHINE_NAME                                   "net-irix"

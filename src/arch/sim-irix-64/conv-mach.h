@@ -23,6 +23,8 @@
 
 #define CMK_FIX_HP_CONNECT_BUG                             0
 
+#define CMK_HANDLE_SIGUSR                                  1
+
 #define CMK_IS_HETERO                                      0
 
 #define CMK_MACHINE_NAME                                   "sim-irix-64"

@@ -26,6 +26,8 @@
 
 #define CMK_FIX_HP_CONNECT_BUG                             0
 
+#define CMK_HANDLE_SIGUSR                                  1
+
 #define CMK_IS_HETERO                                      1
 
 #define CMK_MACHINE_NAME                                   "uth-irix-64"

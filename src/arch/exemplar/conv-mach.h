@@ -25,6 +25,8 @@
 
 #define CMK_GETPAGESIZE_AVAILABLE                          0
 
+#define CMK_HANDLE_SIGUSR                                  1
+
 #define CMK_IS_HETERO                                      0
 
 #define CMK_MACHINE_NAME                                   "exemplar"

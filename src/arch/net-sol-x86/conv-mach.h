@@ -25,6 +25,8 @@
 
 #define CMK_GETPAGESIZE_AVAILABLE                          0
 
+#define CMK_HANDLE_SIGUSR                                  1
+
 #define CMK_MACHINE_NAME                                   "net-sol-x86"
 
 #define CMK_MALLOC_USE_GNU_MALLOC                          1
