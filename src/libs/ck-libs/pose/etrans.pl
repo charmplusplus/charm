@@ -708,6 +708,11 @@ foreach my $incfile ($inC,@otherfiles)
     } else {
     }
   }
+  #test incomplete block
+  if($blocklevel{$inChandle}>0 || $openblock{$inChandle}>0)
+    {
+      print STDERR "ERROR $incfile file terminated with open block\n";
+    }
   $outChandle->print("\n");
   $inChandle->close;
   if ($incfile eq $inC) {
