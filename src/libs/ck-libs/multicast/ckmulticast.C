@@ -3,7 +3,7 @@
 
 #include "ckmulticast.h"
 
-#define DEBUGF(x)   // CkPrintf x;
+#define DEBUGF(x)    // CkPrintf x;
 
 #define MAXMCASTCHILDREN  2
 
@@ -205,7 +205,7 @@ void CkMulticastMgr::freeup(CkSectionCookie cookie)
       mp[s.pe].freeup(s);
     }
     // free cookie
-CkPrintf("[%d] Free up on %p\n", CkMyPe(), sect);
+DEBUGF(("[%d] Free up on %p\n", CkMyPe(), sect));
     mCastEntry *oldc= sect->oldc;
     delete sect;
     sect = oldc;
@@ -317,6 +317,7 @@ void CkMulticastMgr::rebuild(CkSectionCookie &sectId)
 {
   // tear down old tree
   mCastEntry *curCookie = (mCastEntry*)sectId.val;
+  CkAssert(curCookie->pe == CkMyPe());
   // make sure I am the newest one
   while (curCookie->newc) curCookie = curCookie->newc;
   if (curCookie->isObsolete()) return;
