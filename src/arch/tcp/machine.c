@@ -725,7 +725,7 @@ static void ctrl_sendone(va_alist) va_dcl
   close(fd);
 }
 
-static char *scanf_data;
+static char *scanf_data = 0;
 static int all_done = 0;
 static void node_addresses_store();
 
@@ -738,7 +738,7 @@ static void ctrl_getone()
   while (fgets(line, 9999, f)) {
     if      (strncmp(line,"aval addr ",10)==0) node_addresses_store(line);
     else if (strncmp(line,"aval done ",10)==0) all_done = 1;
-    else if (strncmp(line,"scanf-data ",11)==0) scanf_data=strdup(line+11);
+    else if (strncmp(line,"scanf-data ",11)==0) scanf_data=strdupl(line+11);
     else if (strncmp(line,"die ",4)==0) {
       fprintf(stderr,"aborting: %s\n",line+4);
       exit(0);
