@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.2  1995-06-13 14:33:55  gursoy
+ * Revision 2.3  1995-06-13 19:19:07  gursoy
+ * CkAlloc and CkFree are added for backward compatibilty
+ *
+ * Revision 2.2  1995/06/13  14:33:55  gursoy
  * *** empty log message ***
  *
  * Revision 2.1  1995/06/08  17:09:41  gursoy
@@ -85,6 +88,9 @@
 #define CScanf                  CmiScanf
 #define CMyPeNum                CmiMyPe
 #define CharmExit               CkExit
+#define CkAlloc                 CmiAlloc
+#define CkFree                  CmiFree
+
 
 #define CMaxPeNum               CmiNumPe
 #define CNumSpanTreeChildren    CmiNumSpanTreeChildren
