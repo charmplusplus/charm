@@ -181,10 +181,8 @@ class ampi : public ArrayElement1D {
       sprintf(idxstr, "/%d.cpt", thisIndex);
       strcat(str, idxstr);
       delete msg;
-      if(thisIndex==0) {
-        CProxy_ampimain pm(ampimain::handle); 
-        pm.checkpoint(); 
-      }
+      CProxy_ampimain pm(ampimain::handle); 
+      pm.checkpoint(); 
     }
     void restart(DirMsg *);
     void restartThread(char *dname)

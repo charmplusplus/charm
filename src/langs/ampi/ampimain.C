@@ -93,10 +93,9 @@ ampimain::done(void)
 void
 ampimain::checkpoint(void)
 {
-  if(qwait==0)
+  qwait++;
+  if(qwait == nobjs)
   {
-    qwait = 1;
-    CkWaitQD();
     for(int i=0;i<ncomms;i++)
     {
       CProxy_ampi jarray(ampi_comms[i].aid);
