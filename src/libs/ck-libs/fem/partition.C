@@ -164,22 +164,22 @@ void Graph::toAdjList(int *&adjStart,int *&adjList)
 
 void mesh2graph(const FEM_Mesh *m, Graph *g)
 {
-  Nodes nl(m->node.n);
+  Nodes nl(m->node.size());
 
   //Build an inverse mapping, from node to list of surrounding elements
   int globalCount=0,t,e,n;
   for(t=0;t<m->elem.size();t++) {
     const FEM_Elem &k=m->elem[t];
-    for(e=0;e<k.n;e++,globalCount++)
-      for(n=0;n<k.nodesPer;n++)
-        nl.add(k.conn[e*k.nodesPer+n],globalCount);
+    for(e=0;e<k.size();e++,globalCount++)
+      for(n=0;n<k.getNodesPer();n++)
+        nl.add(k.getConn(e,n),globalCount);
   }
   
   //Convert nodelists to graph:
   // Elements become nodes of graph; nodes become edges of graph.
   // Metis can partition this graph.
   int i, j;    
-  for(i = 0; i < m->node.n; i++) {
+  for(i = 0; i < m->node.size(); i++) {
     int nn = nl.nelems(i);
     for(j = 0; j < nn; j++) {
       int e1 = nl.getelt(i, j);
@@ -224,14 +224,14 @@ void fem_partition(const FEM_Mesh *mesh,int nchunks,int *elem2chunk)
 	int wgtflag = 0; // no weights associated with elements or edges
 	int opts[5];
 	opts[0] = 0; //use default values
-	printf("calling metis partitioner...\n");
+	CmiPrintf("FEM> Calling metis partitioner...\n");
 	if (nchunks<8) /*Metis manual says recursive version is higher-quality here*/
 	  METIS_PartGraphRecursive(&nelems, adjStart, adjList, 0, 0, &wgtflag, &numflag, 
                         &nchunks, opts, &ecut, elem2chunk);
 	else /*For many chunks, Kway is supposedly faster */
 	  METIS_PartGraphKway(&nelems, adjStart, adjList, 0, 0, &wgtflag, &numflag, 
                         &nchunks, opts, &ecut, elem2chunk);
-	printf("metis partitioner returned...\n");
+	CmiPrintf("FEM> Metis partitioner returned.\n");
 	delete[] adjStart;
 	delete[] adjList;
 }

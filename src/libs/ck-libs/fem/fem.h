@@ -59,6 +59,7 @@ extern "C" {
   	const int *nodes,int nodesPerRec,
   	const void *data,int dataPerRec,int dataType);
   void FEM_Set_Sparse_Elem(int uniqueIdentifier,const int *rec2elem);
+  void FEM_Set_Sym_Nodes(const int *canon,const int *sym);
 
   void FEM_Get_Node(int *nNodes,int *doublePerNode);
   void FEM_Get_Node_Data(double *data);
@@ -67,6 +68,11 @@ extern "C" {
   void FEM_Get_Elem_Conn(int elType,int *conn);
   int  FEM_Get_Sparse_Length(int uniqueIdentifier); //Returns nRecords
   void FEM_Get_Sparse(int uniqueIdentifier,int *nodes,void *data);
+  void FEM_Get_Sym(int elTypeOrMinusOne,int *destSym);
+  
+  void FEM_Composite_Elem(int newElType);
+  void FEM_Combine_Elem(int srcElType,int destElType,
+	int newInteriorStartIdx,int newGhostStartIdx);
 
   void FEM_Update_Mesh(int callMeshUpdated,int doRepartition);
   

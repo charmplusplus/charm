@@ -342,38 +342,6 @@ FDECL void FTN_NAME(FEM_SERIAL_BEGIN,fem_serial_begin)(int *pieceNo)
 /********************** Mesh Creation ************************/
 /*Utility*/
 
-/*Transpose matrix in (which is nx by ny) to out (which is ny by nx).
-Equivalently, convert row-major in to column-major out (both nx by ny);
-or convert column-major in to row-major out (both ny by nx).
-in cannot be the same matrix as out.
-*/
-template <class dtype>
-void transpose(int nx, int ny,const dtype *in,dtype *out)
-{
-  for(int y=0;y<ny;y++)
-    for(int x=0;x<nx;x++)
-      out[x*ny+y] = in[y*nx+x];
-}
-
-/*As above, but add the given value to each matrix element.
-in cannot be the same matrix as out.
-*/
-static void transposeAdd(int nx, int ny,const int *in,int add,int *out)
-{
-  for(int y=0;y<ny;y++)
-    for(int x=0;x<nx;x++)
-      out[x*ny+y] = in[y*nx+x]+add;
-}
-/*Copy the given matrix, adding the given value to each element.
-in may equal out.
-*/
-static void copyAdd(int nx,int ny,const int *in,int add,int *out)
-{
-  int n=nx*ny;
-  for(int i=0;i<n;i++)
-    out[i] = in[i]+add;
-}
-
 //Make a heap-allocated copy of this (len-item) array, changing the index as spec'd
 static int *copyArray(const int *src,int len,int indexBase)
 {
@@ -382,24 +350,16 @@ static int *copyArray(const int *src,int len,int indexBase)
 	return ret;
 }
 
-void FEM_Item::setUdata_r(const double *Nudata)
+void FEM_Item::allocate(int nItems,int dataPer)
 {
-	allocUdata();
-	memcpy(udata,Nudata,udataCount()*sizeof(double));
-}
-void FEM_Item::setUdata_c(const double *Nudata)
-{
-	allocUdata();
-	transpose(n,dataPer,Nudata,udata);
+	udata.allocate(dataPer,nItems);
+	if (sym) sym->setSize(nItems);
 }
 
-void FEM_Item::getUdata_r(double *Nudata) const
+void FEM_Elem::allocate(int nItems,int dataPer,int nodesPer)
 {
-	memcpy(Nudata,udata,udataCount()*sizeof(double));
-}
-void FEM_Item::getUdata_c(double *Nudata) const
-{
-	transpose(dataPer,n,udata,Nudata);
+	FEM_Item::allocate(nItems,dataPer);
+	conn.allocate(nodesPer,nItems);
 }
 
 /***** Mesh getting and setting state ****/
@@ -432,10 +392,120 @@ static const FEM_Mesh *getMesh(void) {
 }
 
 /********** Symmetries **********/
+static FEM_Ghost &setGhost(void) {
+	if(TCharm::getState()==inDriver)
+		CkAbort("FEM: Cannot call ghost or symmetry routines from driver!");
+	return ghosts;
+}
+
+
+void FEM_Ghost::setSymmetries(int nNodes_,int *can,const int *sym_src)
+{
+	nodeCanon=can;
+	allocSym(nNodes_);
+	for (int i=0;i<nNodes;i++) 
+		nodeSymmetries[i]=(FEM_Symmetries_t)sym_src[i];
+}
+
+void FEM_Item::setSymmetries(int r,FEM_Symmetries_t s)
+{
+	if (!sym) {
+		if (s==0) return; //Don't bother allocating for nothing
+		sym=new sym_t;
+	}
+	sym->insert(r,s);
+}
+
+CDECL void FEM_Set_Sym_Nodes(const int *canon,const int *sym)
+{
+	FEMAPI("FEM_Set_Sym_Nodes");
+	int n=setMesh()->node.size();
+	setGhost().setSymmetries(n,copyArray(canon,n,0),sym);
+}
+FDECL void FTN_NAME(FEM_SET_SYM_NODES,fem_set_sym_nodes)
+	(const int *canon,const int *sym)
+{
+	FEMAPI("FEM_Set_Sym_Nodes");
+	int n=setMesh()->node.size();
+	setGhost().setSymmetries(n,copyArray(canon,n,1),sym);
+}
+
+CDECL void FEM_Get_Sym(int elTypeOrMinusOne,int *destSym)
+{
+	FEMAPI("FEM_Get_Sym");
+	const FEM_Item &l=getMesh()->getCount(elTypeOrMinusOne);
+	int n=l.size();
+	for (int i=0;i<n;i++) destSym[i]=l.getSymmetries(i);
+}
+FDECL void FTN_NAME(FEM_GET_SYM,fem_get_sym)
+	(int *elTypeOrZero,int *destSym)
+{
+	FEM_Get_Sym(*elTypeOrZero-1,destSym);
+}
+
 #if 0
-CDECL fixme:
-	int nNodes=getMesh()->node.n;
-	ghosts.setSymmetries(copyArray(inCanon,nNodes,0),...);
+/*
+ Build symmetries based on faces.
+ This is only useful once you have face-face correspondences,
+ which we don't immediately have.  Thus this is commented out for now...
+*/
+static FEM_Symmetries_t makeSym(int symNo) 
+{ //Convert a user-input symmetry number (0,1,2,3, ...) to a 
+  //  FEM_Symmetries_t (1,2,4,8,...)
+	if (symNo<0) CkAbort("FEM_Add_Sym_Faces> symmetry number is negative");
+	if (symNo>=(8*sizeof(FEM_Symmetries_t)))
+		CkAbort("FEM_Add_Sym_Faces> symmetry number is too large");
+	return FEM_Symmetries_t(1<<symNo);
+}
+
+static void combineCanon(int &a,int &b) 
+{ //Combine entries in canonicalization array by taking minimum	
+	if (a<b) {b=a;}
+	else /*a>=b*/ {a=b;}
+}
+
+void FEM_Ghost::addFaces(int nNodes_,int nFaces,int nodePerFace,
+		int symA,const int *fA,int symB,const int *fB,int idxBase)
+{
+	initSym(nNodes_);
+	FEM_Symmetries_t mA=makeSym(symA);
+	FEM_Symmetries_t mB=makeSym(symB);
+	
+	int nF=nFaces*nodePerFace;
+	for (int n=0;n<nF;n++) {
+		int a=nodeCheck(fA[n]-idxBase), b=nodeCheck(fB[n]-idxBase);
+		//Check for invalid nodes:
+		if (a==-1 || b==-1) 
+		{ //User marked this as an invalid node: skip it
+			break;
+		}
+		if (a==-2 || b==-2) { //nodeCheck marked as invalid: abort!
+			CkAbort("FEM_Add_Sym_Faces> Bad node index passed in faces array!");
+		}
+		
+		//a is same as b-- paste them together
+		combineCanon(nodeCanon[a],nodeCanon[b]);
+		//a belongs to symmetry mA, likewise b:
+		nodeSymmetries[a]=mA;
+		nodeSymmetries[b]=mB;
+	}
+}
+
+CDECL void FEM_Add_Sym_Faces(int nFaces,int nodePerFace,
+	int symA,const int *fA,int symB,const int *fB)
+{
+	FEMAPI("FEM_Add_Sym_Faces");
+	setGhost().addFaces(setMesh()->node.size(),nFaces,nodePerFace,
+		symA,fA,symB,fB,0);
+}
+FDECL void FTN_NAME(FEM_ADD_SYM_FACES,fem_add_sym_faces)
+	(int *nFaces,int *nodePerFace,
+	int *symA,const int *fA,int *symB,const int *fB)
+{
+	FEMAPI("FEM_Add_Sym_Faces");
+	setGhost().addFaces(setMesh()->node.size(),*nFaces,*nodePerFace,
+		*symA-1,fA,*symB-1,fB,1);
+}
 #endif
 
 /********** Sparse data ********/
@@ -466,22 +536,13 @@ void FEM_Mesh::setSparse(int uniqueID,FEM_Sparse *s)
 void FEM_Sparse::set(int rows,const int *n,int idxBase,const char *d)
 {
 	allocate(rows);
-	BasicTable2d<int> nSrc((int *)n,nodes.width(),rows);
-	BasicTable2d<char> dSrc((char *)d,data.width(),rows);
-	for (int i=0;i<rows;i++) {
-		nodes.setRow(i,nSrc.getRow(i),idxBase);
-		data.setRow(i,dSrc.getRow(i));
-	}
+	nodes.set(n,idxBase);
+	data.set(d);
 }
 void FEM_Sparse::get(int *n,int idxBase,char *d) const
 {
-	int rows=size();
-	BasicTable2d<int> nDest(n,nodes.width(),rows);
-	BasicTable2d<char> dDest(d,data.width(),rows);
-	for (int i=0;i<rows;i++) {
-		nDest.setRow(i,nodes.getRow(i),-idxBase);
-		dDest.setRow(i,data.getRow(i));
-	}
+	nodes.get(n,idxBase);
+	data.get(d);
 }
 
 CDECL void FEM_Set_Sparse(int uniqueID,int nTuples,
@@ -539,14 +600,74 @@ FDECL void FTN_NAME(FEM_GET_SPARSE,fem_get_sparse)(int *uniqueID,int *tuples,voi
 	getMesh()->getSparse(*uniqueID-1).get(tuples,1,(char *)data);
 }
 
+/****** Ghost Renumbering *******/
+#if 1
+static FEM_Mesh &getRenumber(void) {
+	if(TCharm::getState()!=inDriver)
+		CkAbort("FEM: Can only call renumbering routines from driver!");
+	FEMchunk *cptr = CtvAccess(_femptr);
+	return cptr->cur_mesh->m;
+}
+
+//Clear any previous binding for element type elType:
+CDECL void FEM_Composite_Elem(int elType) {
+	FEMAPI("FEM_Composite_Elem");
+	FEM_Mesh &m=getRenumber();
+	if (elType<m.elem.size())
+		m.elem.reinit(elType);
+	else
+		m.elem.makeLonger(elType);
+}
+FDECL void FTN_NAME(FEM_COMPOSITE_ELEM,fem_composite_elem)(int *elType) {
+	FEM_Composite_Elem(*elType-1);
+}
+
+
+//Add all of src's items into dest, shifting by idxShift
+static void combineList(const FEM_Comm &src,FEM_Comm &dest,
+	int idxShift)
+{
+	int sNo,sMax=src.size();
+	for (sNo=0;sNo<sMax;sNo++) {
+		const FEM_Comm_List &s=src.getLocalList(sNo);
+		FEM_Comm_List &d=dest.addList(s.getDest());
+		for (int i=0;i<s.size();i++) {
+			d.push_back(s[i]+idxShift);
+		}
+	}
+	//FIXME: Combine map hashtables as well (eventually)
+}
+
+//Combine the ghost records for srcType and destType,
+//  shifting srcType's interior elements to start at "startInt"
+//  and its ghost elements to start at "startGhost"
+CDECL void FEM_Combine_Elem(
+	int srcType,int destType,
+	int startInt,int startGhost) 
+{
+	FEMAPI("FEM_Combine_Elem");
+	FEM_Mesh &m=getRenumber();
+	const FEM_Item &src=m.getCount(srcType);
+	FEM_Item &dest=m.setCount(destType);
+	//Interior nodes are all sent off, shifted to startInt:
+	combineList(src.ghostSend,dest.ghostSend,startInt);
+	//Ghost nodes are all received:
+	//   First shift ghost nodes to zero, then to startGhost:
+	combineList(src.ghostRecv,dest.ghostRecv,
+		startGhost-src.getGhostStart());
+}
+FDECL void FTN_NAME(FEM_COMBINE_ELEM,fem_combine_elem)(
+	int *srcType,int *destType,int *startInt,int *startGhost) 
+{
+	FEM_Combine_Elem(*srcType-1,*destType-1,*startInt-1,*startGhost-1);
+}
+
+#endif
+
 /****** Custom Partitioning API *******/
 static void Set_Partition(int *elem2chunk,int indexBase) {
 	if (_elem2chunk!=NULL) delete[] _elem2chunk;
-	const FEM_Mesh *m=getMesh();
-	int nElem=m->nElems();
-	_elem2chunk=new int[nElem];
-	for (int i=0;i<nElem;i++)
-		_elem2chunk[i]=elem2chunk[i]-indexBase;
+	_elem2chunk=copyArray(elem2chunk,getMesh()->nElems(),indexBase);
 }
 
 //C bindings:
@@ -567,34 +688,28 @@ FDECL void FTN_NAME(FEM_SET_PARTITION,fem_set_partition)
 CDECL void FEM_Set_Node(int nNodes,int dataPer) 
 {
 	FEMAPI("FEM_Set_Node");
-	FEM_Mesh *m=setMesh();
-	m->node.dataPer=dataPer;
-	m->node.n=nNodes;
+	setMesh()->node.allocate(nNodes,dataPer);
 }
 CDECL void FEM_Set_Node_Data(const double *data) 
 {
 	FEMAPI("FEM_Set_Node_Data");
-	setMesh()->node.setUdata_r(data);
+	setMesh()->node.setUdata().set(data);
 }
 
 CDECL void FEM_Set_Elem(int elType,int nElem,int dataPer,int nodePer) {
 	FEMAPI("FEM_Set_Elem");
 	FEM_Mesh *m=setMesh();
 	m->elem.makeLonger(elType);
-	m->elem[elType].n=nElem;
-	m->elem[elType].dataPer=dataPer;
-	m->elem[elType].nodesPer=nodePer;
+	m->elem[elType].allocate(nElem,dataPer,nodePer);
 }
 CDECL void FEM_Set_Elem_Data(int elType,const double *data) 
 {
 	FEMAPI("FEM_Set_Elem_Data");
-	setMesh()->getElem(elType).setUdata_r(data);
+	setMesh()->setElem(elType).setUdata().set(data);
 }
 CDECL void FEM_Set_Elem_Conn(int elType,const int *conn) {
 	FEMAPI("FEM_Set_Elem_Conn");
-	FEM_Elem &c=setMesh()->getElem(elType);
-	c.allocConn();
-	memcpy(c.conn,conn,c.connCount()*sizeof(int));
+	setMesh()->setElem(elType).setConn().set(conn);
 }
 
 /*Convenience routine: for use when you only have one kind of element
@@ -618,13 +733,13 @@ FDECL void FTN_NAME(FEM_SET_NODE_DATA_R,fem_set_node_data_r)
 	(double *data) 
 {
 	FEMAPI("FEM_Set_Node_Data_r");
-	setMesh()->node.setUdata_r(data);
+	setMesh()->node.setUdata().set(data);
 }
 FDECL void FTN_NAME(FEM_SET_NODE_DATA_C,fem_set_node_data_c)
 	(double *data) 
 {
 	FEMAPI("FEM_Set_Node_Data_c");
-	setMesh()->node.setUdata_c(data);
+	setMesh()->node.setUdata().setTranspose(data);
 }
 
 FDECL void FTN_NAME(FEM_SET_ELEM,fem_set_elem)
@@ -637,30 +752,26 @@ FDECL void FTN_NAME(FEM_SET_ELEM_DATA_R,fem_set_elem_data_r)
 	(int *elType,double *data)
 {
 	FEMAPI("FEM_set_elem_data_r");
-	setMesh()->getCount(*elType-1).setUdata_r(data);
+	setMesh()->setCount(*elType-1).setUdata().set(data);
 }
 FDECL void FTN_NAME(FEM_SET_ELEM_DATA_C,fem_set_elem_data_c)
 	(int *elType,double *data)
 {
 	FEMAPI("FEM_set_elem_data_c");
-	setMesh()->getCount(*elType-1).setUdata_c(data);
+	setMesh()->setCount(*elType-1).setUdata().setTranspose(data);
 }
 
 FDECL void FTN_NAME(FEM_SET_ELEM_CONN_R,fem_set_elem_conn_r)
 	(int *elType,int *conn_r)
 {
 	FEMAPI("FEM_set_elem_conn_r");
-	FEM_Elem &c=setMesh()->getElem(*elType-1);
-	c.allocConn();
-	copyAdd(c.n,c.nodesPer,conn_r,-1,c.conn);
+	setMesh()->setElem(*elType-1).setConn().set(conn_r,1);
 }
 FDECL void FTN_NAME(FEM_SET_ELEM_CONN_C,fem_set_elem_conn_c)
 	(int *elType,int *conn_c)
 {
 	FEMAPI("FEM_set_elem_conn_c");
-	FEM_Elem &c=setMesh()->getElem(*elType-1);
-	c.allocConn();
-	transposeAdd(c.n,c.nodesPer,conn_c,-1,c.conn);
+	setMesh()->setElem(*elType-1).setConn().setTranspose(conn_c,1);
 }
 
 /*Convenience routine: for use when you only have one kind of element*/
@@ -680,13 +791,13 @@ CDECL void FEM_Get_Node(int *nNodes,int *dataPer)
 {
 	FEMAPI("FEM_Get_Node");
 	const FEM_Mesh *m=getMesh();
-	if (nNodes!=NULL) *nNodes=m->node.n;
-	if (dataPer!=NULL) *dataPer=m->node.dataPer;
+	if (nNodes!=NULL) *nNodes=m->node.size();
+	if (dataPer!=NULL) *dataPer=m->node.getDataPer();
 }
 CDECL void FEM_Get_Node_Data(double *data) 
 {
 	FEMAPI("FEM_Get_Node_Data");
-	getMesh()->node.getUdata_r(data);
+	getMesh()->node.getUdata().get(data);
 }
 
 CDECL void FEM_Get_Elem(int elType,int *nElem,int *dataPer,int *nodePer) 
@@ -694,19 +805,18 @@ CDECL void FEM_Get_Elem(int elType,int *nElem,int *dataPer,int *nodePer)
 	FEMAPI("FEM_Get_Elem");
 	const FEM_Mesh *m=getMesh();
 	m->chkET(elType);
-	if (nElem!=NULL) *nElem=m->elem[elType].n;
-	if (dataPer!=NULL) *dataPer=m->elem[elType].dataPer;
-	if (nodePer!=NULL) *nodePer=m->elem[elType].nodesPer;
+	if (nElem!=NULL) *nElem=m->elem[elType].size();
+	if (dataPer!=NULL) *dataPer=m->elem[elType].getDataPer();
+	if (nodePer!=NULL) *nodePer=m->elem[elType].getNodesPer();
 }
 CDECL void FEM_Get_Elem_Data(int elType,double *data) 
 {
 	FEMAPI("FEM_Get_Elem_Data");
-	getMesh()->getCount(elType).getUdata_r(data);
+	getMesh()->getCount(elType).getUdata().get(data);
 }
 CDECL void FEM_Get_Elem_Conn(int elType,int *conn) {
 	FEMAPI("FEM_Get_Elem_Conn");
-	const FEM_Elem &c=getMesh()->getElem(elType);
-	memcpy(conn,c.conn,c.n*c.nodesPer*sizeof(int));
+	getMesh()->getElem(elType).getConn().get(conn);
 }
 
 FDECL void FTN_NAME(FEM_GET_NODE,fem_get_node)
@@ -719,13 +829,13 @@ FDECL void FTN_NAME(FEM_GET_NODE_DATA_R,fem_get_node_data_r)
 	(double *data) 
 {
 	FEMAPI("FEM_Get_node_data_r");
-	getMesh()->node.getUdata_r(data);
+	getMesh()->node.getUdata().get(data);
 }
 FDECL void FTN_NAME(FEM_GET_NODE_DATA_C,fem_get_node_data_c)
 	(double *data) 
 {
 	FEMAPI("FEM_Get_node_data_c");
-	getMesh()->node.getUdata_c(data);
+	getMesh()->node.getUdata().getTranspose(data);
 }
 
 FDECL void FTN_NAME(FEM_GET_ELEM,fem_get_elem)
@@ -738,28 +848,26 @@ FDECL void FTN_NAME(FEM_GET_ELEM_DATA_R,fem_get_elem_data_r)
 	(int *elType,double *data) 
 {
 	FEMAPI("FEM_Get_elem_data_r");
-	getMesh()->getCount(*elType-1).getUdata_r(data);
+	getMesh()->getCount(*elType-1).getUdata().get(data);
 }
 FDECL void FTN_NAME(FEM_GET_ELEM_DATA_C,fem_get_elem_data_c)
 	(int *elType,double *data) 
 {
 	FEMAPI("FEM_Get_elem_data_c");
-	getMesh()->getCount(*elType-1).getUdata_c(data);
+	getMesh()->getCount(*elType-1).getUdata().getTranspose(data);
 }
 
 FDECL void FTN_NAME(FEM_GET_ELEM_CONN_R,fem_get_elem_conn_r)
 	(int *elType,int *conn)
 {
 	FEMAPI("FEM_Get_elem_conn_r");
-	const FEM_Elem &c=getMesh()->getElem(*elType-1);
-	copyAdd(c.nodesPer,c.n,c.conn,+1,conn);
+	getMesh()->getElem(*elType-1).getConn().get(conn,1);
 }
 FDECL void FTN_NAME(FEM_GET_ELEM_CONN_C,fem_get_elem_conn_c)
 	(int *elType,int *conn)
 {
 	FEMAPI("FEM_Get_elem_conn_c");
-	const FEM_Elem &c=getMesh()->getElem(*elType-1);
-	transposeAdd(c.nodesPer,c.n,c.conn,+1,conn);
+	getMesh()->getElem(*elType-1).getConn().getTranspose(conn,1);
 }
 
 /******************** Reduction Support **********************/
@@ -1106,7 +1214,7 @@ FEMchunk::run(void)
 void FEMchunk::update_node(FEM_DataMsg *msg)
 {
   const DType &dt=dtypes[msg->dtype];
-  const commList &l = (*updateComm)[msg->from];
+  const FEM_Comm_List &l = updateComm->getList(msg->from);
   if (l.size()*dt.length()!=msg->length)
 	  CkAbort("Wrong-length message recv'd by FEM update node!  Have communication lists been corrupted?\n");
   scatteradd(dt,l.size(),l.getVec(),msg->data,updateBuf);
@@ -1115,7 +1223,7 @@ void FEMchunk::update_node(FEM_DataMsg *msg)
 void FEMchunk::update_ghost(FEM_DataMsg *msg)
 {
   const DType &dt=dtypes[msg->dtype];
-  const commList &l = (*updateComm)[msg->from];
+  const FEM_Comm_List &l = updateComm->getList(msg->from);
   if (l.size()*dt.length()!=msg->length)
 	  CkAbort("Wrong-length message recv'd by FEM update ghost!  Have communication lists been corrupted?\n");
   scatter(dt,l.size(),l.getVec(),msg->data,updateBuf);
@@ -1151,7 +1259,7 @@ FEMchunk::recv(FEM_DataMsg *dm)
 
 void 
 FEMchunk::beginUpdate(void *buf,int fid,
-     commCounts *sendComm,commCounts *recvComm,updateType_t t)
+     const FEM_Comm *sendComm,const FEM_Comm *recvComm,updateType_t t)
 {
   updateBuf=buf;
   updateComm=recvComm;
@@ -1162,10 +1270,10 @@ FEMchunk::beginUpdate(void *buf,int fid,
   //Send off our values to those processors that need them:
   const DType &dt=dtypes[fid];
   for(int p=0;p<sendComm->size();p++) {
-    const commList &l=(*sendComm)[p];
+    const FEM_Comm_List &l=sendComm->getLocalList(p);
     int msgLen=l.size()*dt.length();
     FEM_DataMsg *msg = new (&msgLen, 0) FEM_DataMsg(updateSeqnum, 
-	      l.getOurName(), fid,msgLen); CHK(msg);
+	      thisIndex, fid,msgLen); CHK(msg);
     gather(dt,l.size(),l.getVec(),buf,msg->data);
     thisproxy[l.getDest()].recv(msg);
   }  
@@ -1194,7 +1302,7 @@ FEMchunk::update(int fid, void *nodes)
 void
 FEMchunk::updateGhost(int fid, int elemType, void *nodes)
 {
-  FEM_Item &cnt=cur_mesh->m.getCount(elemType);
+  const FEM_Item &cnt=cur_mesh->m.getCount(elemType);
   beginUpdate(nodes,fid,&cnt.ghostSend,&cnt.ghostRecv,GHOST_UPDATE);
   waitForUpdate();
 }
@@ -1209,7 +1317,7 @@ FEMchunk::reduce_field(int fid, const void *nodes, void *outbuf, int op)
   const void *src = (const void *) ((const char *) nodes + dt.init_offset);
   initialize(dt,outbuf,op);
   combineFn fn=combine(dt,op);
-  for(int i=0; i<cur_mesh->m.node.n; i++) {
+  for(int i=0; i<cur_mesh->m.node.size(); i++) {
     if(getPrimary(i)) {
       fn(dt.vec_len,outbuf, src);
     }
@@ -1278,8 +1386,8 @@ FEMchunk::updateMesh(int callMeshUpdated,int doRepartition) {
 
   int t,i;
   int newElemTot=updated_mesh->m.nElems();
-  int newNode=updated_mesh->m.node.n;
-  int oldNode=cur_mesh->m.node.n;
+  int newNode=updated_mesh->m.node.size();
+  int oldNode=cur_mesh->m.node.size();
   updated_mesh->elemNums=new int[newElemTot];
   updated_mesh->nodeNums=new int[newNode];
   updated_mesh->isPrimary=new int[newNode];
@@ -1298,8 +1406,8 @@ FEMchunk::updateMesh(int callMeshUpdated,int doRepartition) {
   for (t=0; t<cur_mesh->m.elem.size() && t<updated_mesh->m.elem.size() ;t++) {
     int oldElemStart=cur_mesh->m.nElems(t);
     int newElemStart=updated_mesh->m.nElems(t);
-    int oldElems=cur_mesh->m.elem[t].n;
-    int newElems=updated_mesh->m.elem[t].n;
+    int oldElems=cur_mesh->m.elem[t].size();
+    int newElems=updated_mesh->m.elem[t].size();
     int comElems=oldElems;
     if (comElems>newElems) comElems=newElems;
     memcpy(&updated_mesh->elemNums[newElemStart],
@@ -1353,7 +1461,7 @@ FEMchunk::readField(int fid, void *nodes, const char *fname)
     case FEM_REAL: fmt = "%f%n"; break;
     case FEM_DOUBLE: fmt = "%lf%n"; break;
   }
-  for(i=0;i<cur_mesh->m.node.n;i++) {
+  for(i=0;i<cur_mesh->m.node.size();i++) {
     // skip lines to the next local node
     for(j=curline;j<cur_mesh->nodeNums[i];j++)
       fgets(str,80,fp);
@@ -1452,13 +1560,6 @@ FEM_Get_Elem_Nums(void)
 {
   FEMAPI("FEM_Get_Elem_Nums");
   return getCurChunk()->getElemNums();
-}
-
-CDECL int *
-FEM_Get_Conn(int elemType)
-{
-  FEMAPI("FEM_Get_Conn");
-  return getCurMesh()->m.elem[elemType].conn;
 }
 
 CDECL void 
@@ -1562,17 +1663,17 @@ CDECL int FEM_Get_Comm_Partners(void)
 CDECL int FEM_Get_Comm_Partner(int partnerNo)
 {
 	FEMAPI("FEM_Get_Comm_Partner");
-	return getCurChunk()->getComm()[partnerNo].getDest();
+	return getCurChunk()->getComm().getLocalList(partnerNo).getDest();
 }
 CDECL int FEM_Get_Comm_Count(int partnerNo)
 {
 	FEMAPI("FEM_Get_Comm_Count");
-	return getCurChunk()->getComm()[partnerNo].size();
+	return getCurChunk()->getComm().getLocalList(partnerNo).size();
 }
 CDECL void FEM_Get_Comm_Nodes(int partnerNo,int *nodeNos)
 {
 	FEMAPI("FEM_Get_Comm_Nodes");
-	const int *nNo=getCurChunk()->getComm()[partnerNo].getVec();
+	const int *nNo=getCurChunk()->getComm().getLocalList(partnerNo).getVec();
 	int len=FEM_Get_Comm_Count(partnerNo);
 	for (int i=0;i<len;i++)
 		nodeNos[i]=nNo[i];
@@ -1704,7 +1805,7 @@ FDECL void FTN_NAME(FEM_GET_COMM_NODES,fem_get_comm_nodes)
 	(int *pNo,int *nodeNos)
 {
 	int partnerNo=*pNo-1;
-	const int *nNo=getCurChunk()->getComm()[partnerNo].getVec();
+	const int *nNo=getCurChunk()->getComm().getLocalList(partnerNo).getVec();
 	int len=FEM_Get_Comm_Count(partnerNo);
 	for (int i=0;i<len;i++)
 		nodeNos[i]=nNo[i]+1;
@@ -1723,7 +1824,7 @@ FDECL void FTN_NAME(FEM_GET_NODE_NUMBERS,fem_get_node_numbers)
 {
 	FEMAPI("FEM_Get_Node_Numbers");
 	const int *no=getCurChunk()->getNodeNums();
-	int n=getMesh()->node.n;
+	int n=getMesh()->node.size();
 	for (int i=0;i<n;i++) gNo[i]=no[i]+1;
 }
 
@@ -1731,7 +1832,7 @@ FDECL void FTN_NAME(FEM_GET_NODE_NUMBERS,fem_get_node_numbers)
 CDECL void FEM_Add_Ghost_Layer(int nodesPerTuple,int doAddNodes)
 {
 	FEMAPI("FEM_Add_Ghost_Layer");
-	curGhostLayer=ghosts.addLayer();
+	curGhostLayer=setGhost().addLayer();
 	curGhostLayer->nodesPerTuple=nodesPerTuple;
 	curGhostLayer->addNodes=(doAddNodes!=0);
 	curGhostLayer->elem.makeLonger(getMesh()->elem.size());
@@ -1768,7 +1869,7 @@ FDECL void FTN_NAME(FEM_ADD_GHOST_ELEM,fem_add_ghost_elem)
 
 CDECL int FEM_Get_Node_Ghost(void) {
 	FEMAPI("FEM_Get_Node_Ghost");
-	return getMesh()->node.ghostStart;
+	return getMesh()->node.getGhostStart();
 }
 FDECL int FTN_NAME(FEM_GET_NODE_GHOST,fem_get_node_ghost)(void) {
 	return 1+FEM_Get_Node_Ghost();
@@ -1776,7 +1877,7 @@ FDECL int FTN_NAME(FEM_GET_NODE_GHOST,fem_get_node_ghost)(void) {
 
 CDECL int FEM_Get_Elem_Ghost(int elType) {
 	FEMAPI("FEM_Get_Elem_Ghost");
-	return getMesh()->getCount(elType).ghostStart;
+	return getMesh()->getCount(elType).getGhostStart();
 }
 CDECL int FTN_NAME(FEM_GET_ELEM_GHOST,fem_get_elem_ghost)(int *elType) {
 	return 1+FEM_Get_Elem_Ghost(*elType-1);
@@ -1806,9 +1907,9 @@ in FEM_Barrier calls.
 static void addNode(int localIdx,int nBetween,int *betweenNodes,int idxbase)
 {
 	FEMchunk *chk=getCurChunk();
-	commCounts &c=chk->cur_mesh->comm;
+	FEM_Comm &c=chk->cur_mesh->comm;
 	//Find the commRecs for the surrounding nodes
-	const commRec *tween[20];
+	const FEM_Comm_Rec *tween[20];
 	int w;
 	for (w=0;w<nBetween;w++) {
 		tween[w]=c.getRec(betweenNodes[w]-idxbase);
@@ -1846,7 +1947,7 @@ FDECL void FTN_NAME(FEM_ADD_NODE,fem_add_node)
 void FEMchunk::exchangeGhostLists(int elemType,
 	     int inLen,const int *inList,int idxbase)
 {
-	commCounts &cnt=cur_mesh->m.getCount(elemType).ghostSend;
+	const FEM_Comm &cnt=cur_mesh->m.getCount(elemType).ghostSend;
 	
 //Send off a list to each neighbor
 	int nChk=cnt.size();
@@ -1854,16 +1955,18 @@ void FEMchunk::exchangeGhostLists(int elemType,
 	//Loop over (the shared entries in) the input list
 	for (int i=0;i<inLen;i++) {
 		int localNo=inList[i]-idxbase;
-		const commRec *rec=cnt.getRec(localNo);
+		const FEM_Comm_Rec *rec=cnt.getRec(localNo);
 		if (NULL==rec) continue; //This item isn't shared
 		//This item is shared-- add its comm. idx to each chk
-		for (int s=0;s<rec->getShared();s++)
-			outIdx[rec->getChk(s)].push_back(rec->getIdx(s));
+		for (int s=0;s<rec->getShared();s++) {
+			int localChk=cnt.findLocalList(rec->getChk(s));
+			outIdx[localChk].push_back(rec->getIdx(s));
+		}
 	}
 	//Send off the comm. idx list to each chk:
 	for (int chk=0;chk<nChk;chk++) {
-		thisproxy[cnt[chk].getDest()].recvList(
-			elemType,cnt[chk].getOurName(),
+		thisproxy[cnt.getLocalList(chk).getDest()].recvList(
+			elemType,thisIndex,
 			outIdx[chk].size(), outIdx[chk].getVec()
 		);
 	}
@@ -1881,13 +1984,14 @@ void FEMchunk::exchangeGhostLists(int elemType,
 void FEMchunk::recvList(int elemType,int fmChk,int nIdx,const int *idx)
 {
 	int i;
-	const commList &l=cur_mesh->m.getCount(elemType).ghostRecv[fmChk];
+	const FEM_Comm_List &l=cur_mesh->m.getCount(elemType).ghostRecv.
+		getList(fmChk);
 	for (i=0;i<nIdx;i++)
 		listTmp.push_back(l[idx[i]]);
 	listCount++;
 	finishListExchange(cur_mesh->m.getCount(elemType).ghostRecv);
 }
-bool FEMchunk::finishListExchange(const commCounts &l)
+bool FEMchunk::finishListExchange(const FEM_Comm &l)
 {
 	if (listCount<l.size()) return false; //Not finished yet!
 	if (listSuspended) {
@@ -1942,35 +2046,35 @@ FDECL void FTN_NAME(FEM_GET_GHOST_LIST,fem_get_ghost_list)
 
 void FEM_Item::print(const char *type,const l2g_t &l2g)
 {
-  CkPrintf("Number of %ss = %d\n", type, n);
-  CkPrintf("User data doubles per %s = %d\n", type, dataPer);
-  if (dataPer!=0)
-    for (int i=0;i<n;i++) {
+  CkPrintf("Number of %ss = %d\n", type, size());
+  CkPrintf("User data doubles per %s = %d\n", type, getDataPer());
+  if (getDataPer()!=0)
+    for (int i=0;i<size();i++) {
       CkPrintf("\t%s[%d]%s userdata:",type,l2g.no(i)+ARRSTART,
 	       isGhostIndex(i)?"(GHOST)":"");
-      for (int j=0;j<dataPer;j++)
-      	CkPrintf("\t%f",udata[i*dataPer+j]);
+      for (int j=0;j<getDataPer();j++)
+      	CkPrintf("\t%f",udata(i,j));
       CkPrintf("\n");
     }
 }
 
 void FEM_Elem::print(const char *type,const l2g_t &l2g)
 {
-  CkPrintf("Number of %ss = %d\n", type, n);
-  CkPrintf("User data doubles per %s = %d\n", type, dataPer);
-  if (dataPer!=0)
-    for (int i=0;i<n;i++) {
+  CkPrintf("Number of %ss = %d\n", type, size());
+  CkPrintf("User data doubles per %s = %d\n", type, getDataPer());
+  if (getDataPer()!=0)
+    for (int i=0;i<size();i++) {
       CkPrintf("\t%s[%d]%s userdata:",type,l2g.el(i)+ARRSTART,
 	       isGhostIndex(i)?"(GHOST)":"");
-      for (int j=0;j<dataPer;j++)
-      	CkPrintf("\t%f",udata[i*dataPer+j]);
+      for (int j=0;j<getDataPer();j++)
+      	CkPrintf("\t%f",udata(i,j));
       CkPrintf("\n");
     }
-  CkPrintf("Nodes per %s = %d\n", type, nodesPer);
-    for (int i=0;i<n;i++) {
+  CkPrintf("Nodes per %s = %d\n", type, getNodesPer());
+    for (int i=0;i<size();i++) {
       CkPrintf("\t%s[%d] nodes:",type,l2g.el(i)+ARRSTART);
-      for (int j=0;j<nodesPer;j++)
-      	CkPrintf("\t%d",l2g.no(conn[i*nodesPer+j])+ARRSTART);
+      for (int j=0;j<getNodesPer();j++)
+      	CkPrintf("\t%d",l2g.no(conn(i,j))+ARRSTART);
       CkPrintf("\n");
     }	
 }
@@ -1989,11 +2093,11 @@ void FEM_Mesh::print(const l2g_t &l2g)
   	}
 }
 
-void commCounts::print(const l2g_t &l2g)
+void FEM_Comm::print(const l2g_t &l2g)
 {
   CkPrintf("We communicate with %d other chunks:\n",size());
   for (int p=0;p<size();p++) {
-    const commList &l=(*this)[p];
+    const FEM_Comm_List &l=getLocalList(p);
     CkPrintf("  With chunk %d, we share %d nodes:\n",l.getDest(),l.size());
     for (int n=0;n<l.size();n++)
       CkPrintf("\t%d",l2g.no(l[n]));
@@ -2029,7 +2133,7 @@ FEMchunk::print(void)
   for(i=0;i<cur_mesh->m.nElems();i++) 
     CkPrintf("%d\t",cur_mesh->elemNums[i]);
   CkPrintf("\n[%d] Node global numbers (* is primary):\n",thisIndex);
-  for(i=0;i<cur_mesh->m.node.n;i++) 
+  for(i=0;i<cur_mesh->m.node.size();i++) 
     CkPrintf("%d%s\t",cur_mesh->nodeNums[i],getPrimary(i)?"*":"");
   CkPrintf("\n\n");
 }  
@@ -2048,38 +2152,38 @@ int FEM_Mesh::chkET(int elType) const {
 
 /*CommRec: lists the chunks that share a single item.
  */
-commRec::commRec(int item_) {
+FEM_Comm_Rec::FEM_Comm_Rec(int item_) {
 	item=item_; 
 }
-commRec::~commRec() {}
-void commRec::pup(PUP::er &p)
+FEM_Comm_Rec::~FEM_Comm_Rec() {}
+void FEM_Comm_Rec::pup(PUP::er &p)
 {
 	p(item); 
 	shares.pup(p);
 }
-void commRec::add(int chk,int idx) 
+void FEM_Comm_Rec::add(int chk,int idx) 
 {
 	int n=shares.size();
 #ifndef CMK_OPTIMIZE
 	if (chk<0 || chk>1000)
-		CkAbort("FEM commRec::add> Tried to add absurd chunk number!\n");
+		CkAbort("FEM FEM_Comm_Rec::add> Tried to add absurd chunk number!\n");
 #endif
 	shares.setSize(n+1); //Grow slowly, to save memory
-	shares.push_back(commShare(chk,idx));
+	shares.push_back(FEM_Comm_Share(chk,idx));
 }
 
-/*CommMap: map item number to commRec.  
+/*CommMap: map item number to FEM_Comm_Rec.  
  */
-commMap::commMap() { }
-void commMap::pup(PUP::er &p) 
+FEM_Comm_Map::FEM_Comm_Map() { }
+void FEM_Comm_Map::pup(PUP::er &p) 
 {
 	int keepGoing=1;
 	p.comment("Communication map object: maps item number to shared elements");
 	if (!p.isUnpacking()) 
 	{ //Pack the table, by iterating through its elements:
 		CkHashtableIterator *it=map.iterator();
-		commRec **rec;
-		while (NULL!=(rec=(commRec **)it->next())) {
+		FEM_Comm_Rec **rec;
+		while (NULL!=(rec=(FEM_Comm_Rec **)it->next())) {
 			p(keepGoing);
 			(*rec)->pup(p);
 		}
@@ -2091,99 +2195,83 @@ void commMap::pup(PUP::er &p)
 		while (1) {
 			p(keepGoing);
 			if (!keepGoing) break; //No more
-			commRec *rec=new commRec;
+			FEM_Comm_Rec *rec=new FEM_Comm_Rec;
 			rec->pup(p);
 			map.put(rec->getItem())=rec;
 		}
 	}
 }
-commMap::~commMap() {
+FEM_Comm_Map::~FEM_Comm_Map() {
 	CkHashtableIterator *it=map.iterator();
-	commRec **rec;
-	while (NULL!=(rec=(commRec **)it->next()))
+	FEM_Comm_Rec **rec;
+	while (NULL!=(rec=(FEM_Comm_Rec **)it->next()))
 		delete *rec;
 	delete it;
 }
 
 //Add a comm. entry for this item
-void commMap::add(int item,int chk,int idx)
+void FEM_Comm_Map::add(int item,int chk,int idx)
 {
-	commRec *rec;
+	FEM_Comm_Rec *rec;
 	if (NULL!=(rec=map.get(item))) 
 	{ //Already have a record in the table
 		rec->add(chk,idx);
 	}
 	else
 	{ //Make new record for this item
-		rec=new commRec(item);
+		rec=new FEM_Comm_Rec(item);
 		rec->add(chk,idx);
 		map.put(item)=rec;
 	}
 }
 
-//Look up this item's commRec.  Returns NULL if item is not shared.
-const commRec *commMap::get(int item)
+//Look up this item's FEM_Comm_Rec.  Returns NULL if item is not shared.
+const FEM_Comm_Rec *FEM_Comm_Map::get(int item) const
 {
 	return map.get(item);
 }
 
-commList::commList()
+FEM_Comm_List::FEM_Comm_List()
 {
-	pe=us=-1;
+	pe=-1;
 }
-commList::commList(int otherPe,int myPe)
+FEM_Comm_List::FEM_Comm_List(int otherPe)
 {
 	pe=otherPe;
-	us=myPe;
 }
-commList::~commList() {}
-void commList::pup(PUP::er &p)
+FEM_Comm_List::~FEM_Comm_List() {}
+void FEM_Comm_List::pup(PUP::er &p)
 {
-	p(pe); p(us);
+	p(pe);
 	shared.pup(p);
 }
 
-commCounts::commCounts(void) {}
-commCounts::~commCounts() {}
-void commCounts::pup(PUP::er &p)  //For migration
+FEM_Comm::FEM_Comm(void) {}
+FEM_Comm::~FEM_Comm() {}
+void FEM_Comm::pup(PUP::er &p)  //For migration
 {
 	comm.pup(p);
 	map.pup(p);
 }
 
-//Get the commList for this chunk, or NULL if none.
-// Optionally return his local chunk number (chk)
-commList *commCounts::getList(int forChunk,int *hisChk)
+void FEM_Comm::add(int myChunk,int myLocalNo,
+	 int hisChunk,int hisLocalNo,FEM_Comm &his)
 {
-	for (int i=0;i<comm.size();i++)
-		if (comm[i]->getDest()==forChunk) {
-			if (hisChk!=NULL) *hisChk=i;
-			return comm[i];
-		}
-	return NULL;
-}
-
-void commCounts::add(int myChunk,int myLocalNo,
-	 int hisChunk,int hisLocalNo,commCounts &his)
-{
-	int hisChk,myChk; //Indices into our arrays of lists
-	commList *myList=getList(hisChunk,&myChk);
+	FEM_Comm_List *myList=getListN(hisChunk);
 	if (myList==NULL) 
 	{//These two PEs have never communicated before-- must add to both lists
 		//Figure out our names in the other guy's table
-		int hisChk=his.comm.size();
-		myChk=comm.size();
-		myList=new commList(hisChunk,hisChk);
-		commList *hisList=new commList(myChunk,myChk);
+		myList=new FEM_Comm_List(hisChunk);
+		FEM_Comm_List *hisList=new FEM_Comm_List(myChunk);
 		comm.push_back(myList);
 		his.comm.push_back(hisList);
 	}
-	commList *hisList=his.getList(myChunk,&hisChk);
+	FEM_Comm_List *hisList=his.getListN(myChunk);
 	
 	//Add our local numbers to our maps and lists
-	map.add(myLocalNo,myChk,myList->size());
+	map.add(myLocalNo,hisChunk,myList->size());
 	myList->push_back(myLocalNo);
-	his.map.add(hisLocalNo,hisChk,hisList->size());
+	his.map.add(hisLocalNo,myChunk,hisList->size());
 	hisList->push_back(hisLocalNo);
 }
 
@@ -2201,39 +2289,30 @@ void FEM_Mesh::pup(PUP::er &p)  //For migration
 	sparse.pup(p);
 }
 void FEM_Item::pup(PUP::er &p) {
-	p.comment(" <number of items, including ghosts> <first ghost> <data per> ");
-	p(n);p(ghostStart);p(dataPer);
+	p.comment("<ghostStart>");
+	p|ghostStart;
 	p.comment(" Ghosts to send out: ");
 	ghostSend.pup(p);
 	p.comment(" Ghosts to recv: ");
 	ghostRecv.pup(p);
-	if (dataPer!=0) {
-		if (udata==NULL) allocUdata();
-		p.comment(" User data array: ");
-		p(udata,udataCount());
+	p.comment(" User data array: ");
+	udata.pup(p);
+	p.comment(" Symmetries array: ");
+	int hasSym=0; if (sym) hasSym=1; p|hasSym;
+	if (hasSym) {
+		if (p.isUnpacking()) sym=new sym_t;
+		sym->pup(p);
 	}
 }
 void FEM_Elem::pup(PUP::er &p) {
 	p.comment(" ------------- Element data ---------- ");
 	FEM_Item::pup(p);
-	p.comment(" <nodesPer> "); p(nodesPer);
-	if (conn==NULL) allocConn();
 	p.comment(" element connectivity array: ");
-	p(conn,connCount());
+	conn.pup(p);
 }
 FEM_Mesh::~FEM_Mesh()
 { 
 	//Node and element destructors get called automatically
-}
-
-void FEM_Mesh::copyType(const FEM_Mesh &from)//Copies nElemTypes and *Per fields
-{
-	node.dataPer=from.node.dataPer;
-	elem.makeLonger(from.elem.size()-1);
-	for (int t=0;t<from.elem.size();t++) {
-		elem[t].dataPer=from.elem[t].dataPer;
-		elem[t].nodesPer=from.elem[t].nodesPer;
-	}
 }
 
 int FEM_Mesh::nElems(int t_max) const //Return total number of elements before type t_max
@@ -2245,7 +2324,7 @@ int FEM_Mesh::nElems(int t_max) const //Return total number of elements before t
 	}
 #endif
 	int ret=0;
-	for (int t=0;t<t_max;t++) ret+=elem[t].n;
+	for (int t=0;t<t_max;t++) ret+=elem[t].size();
 	return ret;
 }
 
@@ -2277,7 +2356,7 @@ MeshChunk::~MeshChunk()
 }
 
 void MeshChunk::pup(PUP::er &p) {
-	p.comment("v1.0, Charm++ Finite Element Mesh file");	
+	p.comment("v1.1, Charm++ Finite Element Mesh file");	
 	m.pup(p);
 	p.comment(" ----------- Shared nodes ------------ ");	
 	comm.pup(p);
@@ -2287,8 +2366,8 @@ void MeshChunk::pup(PUP::er &p) {
 	if (hasNums) {
 		if(p.isUnpacking()) { allocate(); }
 		p(elemNums,m.nElems());
-		p(nodeNums,m.node.n);
-		p(isPrimary,m.node.n);
+		p(nodeNums,m.node.size());
+		p(isPrimary,m.node.size());
 	}
 	p.comment(" Misc. data: ");	
 	p(updateCount); p(fromChunk);

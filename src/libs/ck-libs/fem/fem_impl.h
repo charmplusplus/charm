@@ -46,6 +46,10 @@ struct DType {
   }
 };
 
+//This datatype is how the framework stores symmetries internally.
+//  Each bit of this type describes a different symmetry.
+//  There must be enough bits to accomidate several simulatanious symmetries.
+typedef unsigned char FEM_Symmetries_t;
 
 class FEMinit {
  public:
@@ -91,6 +95,11 @@ public:
 		for (int j=oldSize;j<newSize;j++)
 			(*(super *)this)[j]=new T;
 	}
+	//Reinitialize element i:
+	void reinit(int doomedEl) {
+		delete (*(super *)this)[doomedEl];
+		(*(super *)this)[doomedEl]=new T;
+	}
 	
 	//Same old bracket operators, but return the actual object, not a pointer:
 	T &operator[](int i) {return *( (*(super *)this)[i] );}
@@ -98,24 +107,24 @@ public:
 };
 
 
-/*Inner class used by commRec:*/
-class commShare {
+/*Inner class used by FEM_Comm_Rec:*/
+class FEM_Comm_Share {
  public:
-  int chk;  //Local number of chunk we're shared with
-  int idx; //Our index in the comm. list for that chunk
-  commShare(int x=0) {chk=idx=-1;}
-  commShare(int c,int i) :chk(c), idx(i) {}
+  int chk; //Chunk we're shared with
+  int idx; //Our index in the local comm. list for that chunk
+  FEM_Comm_Share(int x=0) {chk=idx=-1;}
+  FEM_Comm_Share(int c,int i) :chk(c), idx(i) {}
   void pup(PUP::er &p) {p(chk); p(idx);}
 };
-PUPmarshall(commShare);
+PUPmarshall(FEM_Comm_Share);
 
 /* List the chunks that share an item */
-class commRec {
+class FEM_Comm_Rec {
 	int item; //Index of item we describe
-	CkPupVec<commShare> shares;
+	CkPupVec<FEM_Comm_Share> shares;
 public:
-	commRec(int item_=-1);
-	~commRec();
+	FEM_Comm_Rec(int item_=-1);
+	~FEM_Comm_Rec();
 
 	void pup(PUP::er &p);
 	
@@ -131,32 +140,30 @@ public:
 	void add(int chk,int idx);
 };
 
-/* Map an item to its commRec (if any) */
-class commMap {
-	CkHashtableT<CkHashtableAdaptorT<int>,commRec *> map;
+/* Map an item to its FEM_Comm_Rec (if any) */
+class FEM_Comm_Map {
+	CkHashtableT<CkHashtableAdaptorT<int>,FEM_Comm_Rec *> map;
 public:
-	commMap();
+	FEM_Comm_Map();
 	void pup(PUP::er &p);
-	~commMap();
+	~FEM_Comm_Map();
 
-	//Add a comm. entry for this item
+	//Add a FEM_Comm_. entry for this item
 	void add(int item,int chk,int idx);
 	
-	//Look up this item's commRec.  Returns NULL if item is not shared.
-	const commRec *get(int item);
+	//Look up this item's FEM_Comm_Rec.  Returns NULL if item is not shared.
+	const FEM_Comm_Rec *get(int item) const;
 };
 
-/* Lists the items we share with one other chunk */
-class commList {
-	int pe; //Global number of other chunk
-	int us; //Other chunk's local number for our chunk	
+/* Lists the items we share with one other chunk. */
+class FEM_Comm_List {
+	int pe; //Global number of other chunk	
 	CkPupBasicVec<int> shared; //Local indices of shared items
 public:
-	commList();
-	commList(int otherPe,int myPe);
-	~commList();
+	FEM_Comm_List();
+	FEM_Comm_List(int otherPe);
+	~FEM_Comm_List();
 	int getDest(void) const {return pe;}
-	int getOurName(void) const {return us;}
 	int size(void) const {return shared.size();}
 	int operator[](int idx) const {return shared[idx]; }
 	const int *getVec(void) const {return &shared[0];}
@@ -168,22 +175,56 @@ public:
 	void pup(PUP::er &p);
 };
 
-/*This class describes all the shared items of a given chunk*/
-class commCounts : public CkNoncopyable {
-	commMap map;
-	CkPupPtrVec<commList> comm;
-	commList *getList(int forChunk,int *hisNum);
+/*This class describes all the shared items of a given chunk.
+It provides both item->chunks that share it (map)
+and chunk->items shared with it (comm)
+*/
+class FEM_Comm : public CkNoncopyable {
+	FEM_Comm_Map map; //Indexed by local item number
+	CkPupPtrVec<FEM_Comm_List> comm; //Indexed by (local) chunk number
+	
+	//Return the Comm_List associated with processor pe
+	FEM_Comm_List *getListN(int pe) { 
+		for (int i=0;i<comm.size();i++)
+			if (comm[i]->getDest()==pe)
+				return comm[i];
+		return NULL; 
+	}
 public:
-	commCounts(void);
-	~commCounts();
+	FEM_Comm(void);
+	~FEM_Comm();
 	int totalShared() const;//Return total number of shared nodes
 	void pup(PUP::er &p); //For migration
 	
 	int size(void) const {return comm.size();}
-	const commList &operator[](int idx) const {return *comm[idx];}
+	//Return the i'th (local) chunk we communicate with
+	const FEM_Comm_List &getLocalList(int idx) const { return *comm[idx]; }
+	int findLocalList(int pe) const {
+		for (int i=0;i<comm.size();i++) 
+			if (comm[i]->getDest()==pe)
+				return i;
+		return -1;
+	}
 	
-	//Look up an item's commRec
-	const commRec *getRec(int item) {return map.get(item);}
+	//Return the Comm_List associated with processor pe
+	const FEM_Comm_List &getList(int pe) const { 
+		const FEM_Comm_List *ret=((FEM_Comm *)this)->getListN(pe);
+		if (ret==NULL) CkAbort("FEM> Communication lists corrupted (unexpected message)");
+		return *ret; 
+	}
+	//Return the FEM_Comm_List for processor pe, adding if needed
+	FEM_Comm_List &addList(int pe) {
+		FEM_Comm_List *ret=getListN(pe);
+		if (ret==NULL) { //Have to add a new list:
+			ret=new FEM_Comm_List(pe);
+			comm.push_back(ret);
+		}
+		return *ret;
+	}
+	
+	//Look up an item's FEM_Comm_Rec
+	const FEM_Comm_Rec *getRec(int item) const {return map.get(item);}
+	
 	//This item is shared with the given (local) chunk
 	void addNode(int localNo,int sharedWithChk) {
 		map.add(localNo,sharedWithChk,
@@ -193,71 +234,11 @@ public:
 	//Used in creating comm. lists:
 	//Add this local number to both lists:
 	void add(int myChunk,int myLocalNo,
-		 int hisChunk,int hisLocalNo,commCounts &hisList);
+		 int hisChunk,int hisLocalNo,FEM_Comm &hisList);
 	
 	void print(const l2g_t &l2g);
 };
 
-/* Describes an FEM item-- a set of nodes or elements */
-class FEM_Item : public CkNoncopyable {
-public:
-	int n;//Number of objects
-	int dataPer;//Doubles of user data per object
-	double *udata;//User's data-- [dataPer x n]
-
-	int ghostStart; //Index of first ghost object
-	commCounts ghostSend; //Non-ghosts we send out
-	commCounts ghostRecv; //Ghosts we recv into
-	
-	FEM_Item() //Default constructor
-	  {n=dataPer=0;ghostStart=0;udata=NULL;}
-	~FEM_Item() 
-	  {delete [] udata;udata=NULL;}
-	void pup(PUP::er &p);
-	void print(const char *type,const l2g_t &l2g);
-	
-	int size(void) const {return n;}
-	int getDataPer(void) const {return dataPer;}
-
-	int isGhostIndex(int idx) const {
-		return idx>=ghostStart;
-	}
-		
-	void setUdata_r(const double *Nudata);
-	void setUdata_c(const double *NudataTranspose);
-	void getUdata_r(double *Nudata) const;
-	void getUdata_c(double *NudataTranspose) const;
-	void udataIs(int i,const double *src)
-	  {memcpy((void *)&udata[dataPer*i],(const void *)src,sizeof(double)*dataPer);}
-	const double *udataFor(int i) const {return &udata[dataPer*i];}
-	void allocUdata(void) //Create a new udata array
-	  {delete[] udata;udata=new double[udataCount()];}
-	int udataCount() const //Return total entries in user data array 
-	  {return n*dataPer;}
-};
-
-/* Describes one kind of FEM elements */
-class FEM_Elem:public FEM_Item {
-public:
-	//There's a separate elemCount for each kind of element
-	int nodesPer;//Number of nodes per element
-	int *conn;//Connectivity array-- [nodesPer x n]
-	
-	FEM_Elem():FEM_Item() {nodesPer=-1;conn=NULL;}
-	~FEM_Elem() //Free all stored memory
-	  {delete [] conn;conn=NULL;}
-	
-	int getNodesPer(void) const {return nodesPer;}
-	
-	void allocConn(void)
-	{delete[] conn; conn=new int[connCount()];}
-	void pup(PUP::er &p);
-	void print(const char *type,const l2g_t &l2g);
-	int *connFor(int i) {return &conn[nodesPer*i];}
-	const int *connFor(int i) const {return &conn[nodesPer*i];}
-	int connCount() const //Return total entries in connectivity array
-	  {return n*nodesPer;}
-};
 
 /*
 This is a simple 2D table.  The operations are mostly row-centric.
@@ -277,39 +258,81 @@ public:
 	//Width of the table is the number of columns:
 	inline int width(void) const {return cols;}
 	
+	T *getData(void) {return table;}
+	const T *getData(void) const {return table;}
+	
+//Element-by-element operations:
+	T operator() (int r,int c) const {return table[c+r*cols];}
+	T &operator() (int r,int c) {return table[c+r*cols];}
+	
+//Row-by-row operations
 	//Get a pointer to a row of the table:
 	inline T *getRow(int r) {return &table[r*cols];}
 	inline const T *getRow(int r) const {return &table[r*cols];}
 	inline T *operator[](int r) {return getRow(r);}
 	inline const T *operator[](int r) const {return getRow(r);}
-	void setRow(int r,const T *src) {
+	inline void setRow(int r,const T *src,T idxBase=0) {
 		T *dest=getRow(r);
-		for (int i=0;i<cols;i++) dest[i]=src[i];
+		for (int c=0;c<cols;c++) dest[c]=src[c]-idxBase;
 	}
-	//As above, but with an index shift
-	void setRow(int r,const T *src,T idxBase) {
+	inline void setRow(int r,T value) {
 		T *dest=getRow(r);
-		for (int i=0;i<cols;i++) dest[i]=src[i]-idxBase;
+		for (int c=0;c<cols;c++) dest[c]=value;
+	}
+	
+//These affect the entire table:
+	void set(const T *src,T idxBase=0) {
+		for (int r=0;r<rows;r++) 
+		for (int c=0;c<cols;c++)
+			table[c+r*cols]=src[c+r*cols]-idxBase;
+	}
+	void setTranspose(const T *srcT,int idxBase=0) {
+		for (int r=0;r<rows;r++) 
+		for (int c=0;c<cols;c++)
+			table[c+r*cols]=srcT[r+c*rows]-idxBase;
+	}
+	void get(T *dest,T idxBase=0) const {
+		for (int r=0;r<rows;r++) 
+		for (int c=0;c<cols;c++)
+			dest[c+r*cols]=table[c+r*cols]+idxBase;
+	}
+	void getTranspose(T *destT,int idxBase=0) const {
+		for (int r=0;r<rows;r++) 
+		for (int c=0;c<cols;c++)
+			destT[r+c*rows]=table[c+r*cols]+idxBase;
+	}
+	void set(T value) {
+		for (int r=0;r<rows;r++) setRow(r,value);
 	}
 };
 
-//As above, but heap-allocatable
+//As above, but heap-allocatable and resizable.
+// T must not require a copy constructor.
 template <class T>
 class AllocTable2d : public BasicTable2d<T> {
-	T *allocTable; //Heap-allocated table 
+	int max; //Maximum number of rows that can be used without reallocation
 public:
 	AllocTable2d(int cols_=0,int rows_=0) 
-		:BasicTable2d<T>(NULL,cols_,rows_)
+		:BasicTable2d<T>(NULL,cols_,rows_), max(0)
 	{
-		allocTable=NULL;
 		if (rows>0) allocate(rows);
 	}
-	~AllocTable2d() {delete[] allocTable;}
-	
-	void allocate(int rows_) { //Make room for n rows
-		if (allocTable!=NULL) delete[] allocTable;
+	~AllocTable2d() {delete[] table;}
+	void allocate(int rows_) { //Make room for this many rows
+		allocate(width(),rows_,rows_);
+	}
+	void allocate(int cols_,int rows_,int max_=0) { //Make room for this many cols & rows
+		int oldRows=rows;
+		T *oldTable=table;
+		if (max_==0) max_=rows_;
+		cols=cols_;
 		rows=rows_;
-		allocTable=table=new T[rows*cols];
+		max=max_;
+		table=new T[max*cols];
+		if (oldTable!=NULL) { //Preserve old table entries:
+			memcpy(table,oldTable,sizeof(T)*cols*oldRows);
+			delete[] oldTable;
+		}
 	}
 	
 	//Pup routine and operator|:
@@ -319,8 +342,18 @@ public:
 		p(table,rows*cols); //T better be a basic type, or this won't compile!
 	}
 	friend void operator|(PUP::er &p,AllocTable2d<T> &t) {t.pup(p);}
-};
 
+	//Add a row to the table (by analogy with std::vector):
+	T *push_back(void) {
+		if (rows>=max) 
+		{ //Not already enough room for the new row:
+			int newMax=max+(max/4)+16; //Grow 25% longer
+			allocate(cols,rows,newMax);
+		}
+		rows++;
+		return getRow(rows-1);
+	}
+};
 
 //Smart pointer-to-new[]'d array-of-T
 template <class T>
@@ -338,6 +371,70 @@ public:
 	operator const T *(void) const {return sto;}
 };
 typedef ArrayPtrT<int> intArrayPtr;
+
+
+/* Describes an FEM item-- a set of nodes or elements */
+class FEM_Item : public CkNoncopyable {
+public:
+	typedef AllocTable2d<double> udata_t;
+	typedef CkPupBasicVec<FEM_Symmetries_t> sym_t;
+protected:
+	int ghostStart; //Index of first ghost object
+	udata_t udata; //Uninterpreted item-associated user data (one row per item)
+	sym_t *sym; //Symmetries of each item (or NULL if all 0)
+public:
+	FEM_Comm ghostSend; //Non-ghosts we send out
+	FEM_Comm ghostRecv; //Ghosts we recv into
+	
+	FEM_Item() //Default constructor
+	  {ghostStart=0;sym=NULL;}
+	~FEM_Item() {if (sym) delete sym;}
+	void pup(PUP::er &p);
+	void print(const char *type,const l2g_t &l2g);
+	
+	//Manipulate the user data array:
+	void allocate(int nItems,int dataPer);
+	udata_t &setUdata(void) {return udata;}
+	const udata_t &getUdata(void) const {return udata;}
+	inline int size(void) const {return udata.size();}
+	inline int getDataPer(void) const {return udata.width();}
+	void udataIs(int r,const double *src) {udata.setRow(r,src);}
+	const double *udataFor(int r) const {return udata.getRow(r);}
+	
+	//Get ghost info:
+	void startGhosts(int atIndex) { ghostStart=atIndex; }
+	int getGhostStart(void) const {	return ghostStart; }
+	int isGhostIndex(int idx) const { return idx>=ghostStart; }
+	
+	//Symmetry array:
+	FEM_Symmetries_t getSymmetries(int r) const { 
+		if (sym==NULL) return FEM_Symmetries_t(0);
+		else return (*sym)[r]; 
+	}
+	void setSymmetries(int r,FEM_Symmetries_t s);
+};
+
+/* Describes one kind of FEM elements */
+class FEM_Elem:public FEM_Item {
+public:
+	typedef AllocTable2d<int> conn_t;
+private:
+	conn_t conn; //Connectivity data (one row per element)
+public:
+	FEM_Elem():FEM_Item() {}
+	
+	void pup(PUP::er &p);
+	void print(const char *type,const l2g_t &l2g);
+	
+	void allocate(int nItems,int dataPer,int nodesPer);
+	conn_t &setConn(void) {return conn;}
+	const conn_t &getConn(void) const {return conn;}
+	int getConn(int elem,int nodeNo) const {return conn(elem,nodeNo);}
+	int getNodesPer(void) const {return conn.width();}
+	int *connFor(int i) {return conn.getRow(i);}
+	const int *connFor(int i) const {return conn.getRow(i);}
+	void connIs(int i,const int *src) {conn.setRow(i,src);}
+};
 
 /*Describes a set of records of sparse data that are all the
 same size and all associated with the same number of nodes.
@@ -399,7 +496,7 @@ public:
 	NumberedVec<FEM_Elem> elem; //Describes the different types of elements in the mesh
 	
 	//Return this type of element, given an element type
-	FEM_Item &getCount(int elTypeOrMinusOne) {
+	FEM_Item &setCount(int elTypeOrMinusOne) {
 		if (elTypeOrMinusOne==-1) return node;
 		else return elem[chkET(elTypeOrMinusOne)];
 	}
@@ -407,13 +504,12 @@ public:
 		if (elTypeOrMinusOne==-1) return node;
 		else return elem[chkET(elTypeOrMinusOne)];
 	}
-	FEM_Elem &getElem(int elType) {return elem[chkET(elType)];}
+	FEM_Elem &setElem(int elType) {return elem[chkET(elType)];}
 	const FEM_Elem &getElem(int elType) const {return elem[chkET(elType)];}
 	int chkET(int elType) const; //Check this element type-- abort if it's bad
 	
 	FEM_Mesh();
 	~FEM_Mesh();
-	void copyType(const FEM_Mesh &from);//Copies nElemTypes and *Per fields
 	
 	int nElems() const //Return total number of elements (of all types)
 	  {return nElems(elem.size());}
@@ -427,7 +523,7 @@ public:
 class MeshChunk : public CkNoncopyable {
  public:
 	FEM_Mesh m; //The chunk mesh
-	commCounts comm; //Shared nodes
+	FEM_Comm comm; //Shared nodes
 	int *elemNums; // Maps local elem#-> global elem#  [m.nElems()]
 	int *nodeNums; // Maps local node#-> global node#  [m.node.n]
 	int *isPrimary; // Indicates us as owner of node  [m.node.n]
@@ -440,8 +536,8 @@ class MeshChunk : public CkNoncopyable {
 	//Allocates elemNums, nodeNums, and isPrimary
         void allocate() {
           elemNums=new int[m.nElems()];
-          nodeNums=new int[m.node.n];
-          isPrimary=new int[m.node.n];
+          nodeNums=new int[m.node.size()];
+          isPrimary=new int[m.node.size()];
         }
 	void pup(PUP::er &p); //For send/recv
 
@@ -475,7 +571,7 @@ PUPmarshall(marshallMeshChunk);
 class FEM_DataMsg : public CMessage_FEM_DataMsg
 {
  public:
-  int from; //Source's local chunk number on dest. chunk
+  int from; //Source's chunk number
   int dtype; //Field ID of data
   int length; //Length in bytes of below array
   int tag; //Sequence number
@@ -520,12 +616,12 @@ private:
   typedef enum {INVALID_UPDATE,NODE_UPDATE,GHOST_UPDATE} updateType_t;
   updateType_t updateType;
 
-  commCounts *updateComm; //Communicator we're blocked on
+  const FEM_Comm *updateComm; //Communicator we're blocked on
   int nRecd; //Number of messages received for this update
   void *updateBuf; //User data addr for current update
 
   void beginUpdate(void *buf,int fid,
-		   commCounts *sendComm,commCounts *recvComm,updateType_t t);
+		  const FEM_Comm *sendComm,const FEM_Comm *recvComm,updateType_t t);
   void recvUpdate(FEM_DataMsg *);
   void update_node(FEM_DataMsg *);
   void update_ghost(FEM_DataMsg *);
@@ -536,7 +632,7 @@ private:
   CkVec<int> listTmp;//List of local items 
   int listCount; //Number of lists received
   bool listSuspended;
-  bool finishListExchange(const commCounts &l);
+  bool finishListExchange(const FEM_Comm &l);
 
   void initFields(void);
   void setMesh(MeshChunk *msg=0);
@@ -585,7 +681,7 @@ private:
   int *getElemNums(void) { return cur_mesh->elemNums; }
   int getPrimary(int nodeNo) { return cur_mesh->isPrimary[nodeNo]; }
 
-  const commCounts &getComm(void) const {return cur_mesh->comm;}
+  const FEM_Comm &getComm(void) const {return cur_mesh->comm;}
 
   void pup(PUP::er &p);
 };
@@ -612,18 +708,33 @@ public:
 	NumberedVec<elemGhostInfo> elem;
 };
 
-//This datatype is how the framework stores symmetries internally.
-//  Each bit of this type describes a different symmetry.
-//  There must be enough bits to accomidate several simulatanious symmetries.
-typedef unsigned char FEM_Symmetries_t;
-
 //Describes all ghost elements
 class FEM_Ghost : public CkNoncopyable {
 	CkVec<ghostLayer *> layers;
+
+//Symmetries:
+	int nNodes;
+	void allocSym(int nNodes_) {
+		nNodes=nNodes_;
+		nodeSymmetries=new FEM_Symmetries_t[nNodes];
+	}
+	void initSym(int nNodes_) {
+		if (nodeCanon!=NULL) return; //Already initialized
+		allocSym(nNodes_);
+		nodeCanon=new int[nNodes];
+		int i;
+		for (i=0;i<nNodes;i++) nodeCanon[i]=i;
+		for (i=0;i<nNodes;i++) nodeSymmetries[i]=0;
+	}
+	int nodeCheck(int n) {
+		if (n<-1 || n>=nNodes) return -2;
+		return n;
+	}
 	intArrayPtr nodeCanon; //Map global node to canonical number
 	ArrayPtrT<FEM_Symmetries_t> nodeSymmetries; //Symmetries each node belongs to
+
 public:
-	FEM_Ghost() {}
+	FEM_Ghost() {nNodes=-1;}
 	~FEM_Ghost() {for (int i=0;i<getLayers();i++) delete layers[i];}
 	
 	int getLayers(void) const {return layers.size();}
@@ -634,10 +745,9 @@ public:
 	}
 	const ghostLayer &getLayer(int layerNo) const {return *layers[layerNo];}
 	
-	void setSymmetry(int *can,FEM_Symmetries_t *sym) {
-		nodeCanon=can;
-		nodeSymmetries=sym;
-	}
+	void setSymmetries(int nNodes_,int *can,const int *sym_src);
+	void addFaces(int nNodes_,int nFaces,int nodePerFace,
+		int symA,const int *fA,int symB,const int *fB,int idxBase);
 	const int *getCanon(void) const {return nodeCanon;}
 	const FEM_Symmetries_t *getSymmetries(void) const {return nodeSymmetries;}
 };
@@ -658,7 +768,7 @@ class MeshChunkOutput {
 /*After partitioning, create a sub-mesh for each chunk's elements,
 including communication lists between chunks.
 */
-void fem_split(const FEM_Mesh *mesh,int nchunks,const int *elem2chunk,
+void fem_split(FEM_Mesh *mesh,int nchunks,const int *elem2chunk,
 	       const FEM_Ghost &ghosts,MeshChunkOutput *out);
 
 /*The inverse of fem_split: reassemble split chunks into a single mesh*/

@@ -38,6 +38,9 @@
        external FEM_Set_Sparse_Elem
        external FEM_Get_Sparse
 
+       external FEM_Set_Sym_Nodes
+       external FEM_Get_Sym
+
        external FEM_Set_Partition
        external FEM_Serial_Split
        external FEM_Serial_Begin
@@ -77,7 +80,15 @@
        subroutine FEM_Add_Node(idx,nBetween,between)
          integer,intent (in) :: idx, nBetween
          integer, intent(in) :: between(nBetween)
-       end subroutine       
+       end subroutine     
+
+       subroutine FEM_Composite_Elem(newElemType)
+         integer,intent (in) :: newElemType
+       end subroutine    
+       subroutine FEM_Combine_Elem(srcEl,destEl,newInterior,newGhost)
+         integer,intent (in) :: oldEl,newEl
+	 integer,intent (in) :: newInterior,newGhost
+       end subroutine    
 
        subroutine FEM_Exchange_Ghost_Lists(elemType,nIdx,localIdx)
          integer,intent (in) :: elemType,nIdx
