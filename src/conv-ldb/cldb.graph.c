@@ -191,6 +191,10 @@ void CldNodeEnqueue(int node, void *msg, int infofn)
       CpvAccess(neighbors)[CpvAccess(Mindex)].load++;
       CpvAccess(CldRelocatedMessages)++;
       ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+      if (pfn) {
+	pfn(&msg);
+	ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+      }
       CmiSetInfo(msg,infofn);
       CldSwitchHandler(msg, CpvAccess(CldBalanceHandlerIndex));
       CmiSyncNodeSendAndFree(node, len, msg);
