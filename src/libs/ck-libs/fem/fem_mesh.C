@@ -1237,14 +1237,18 @@ FEM_Mesh *FEM_readMesh(const char *prefix,int chunkNo,int nChunks)
 {
 	FEM_Mesh *ret=new FEM_Mesh;
 	ret->becomeGetting();
-	PUP::fromTextFile p(FEM_openMeshFile(prefix,chunkNo,nChunks,true));
+        FILE *fp = FEM_openMeshFile(prefix,chunkNo,nChunks,true);
+	PUP::fromTextFile p(fp);
 	ret->pup(p);
+  	fclose(fp);
 	return ret;
 }
 void FEM_writeMesh(FEM_Mesh *m,const char *prefix,int chunkNo,int nChunks)
 {
-	PUP::toTextFile p(FEM_openMeshFile(prefix,chunkNo,nChunks,false));
+        FILE *fp = FEM_openMeshFile(prefix,chunkNo,nChunks,false);
+	PUP::toTextFile p(fp);
 	m->pup(p);
+	fclose(fp);
 }
 
 
