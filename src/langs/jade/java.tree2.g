@@ -46,7 +46,6 @@ typeDefinition[AST parent]
 	:	#(c:CLASS_DEF modifiers IDENT { J.tmp.push(#IDENT.getText()); } extendsClause implementsClause
             o:objBlock {
                 if ( ((ASTJ)o).hasMain() ) {
-                    System.out.println("pass2 reached has main");
                     ((ASTJ)c_AST).status = true; // is a mainchare
                     ((ASTJ)parent).status = true; // is a mainmodule
                 }
@@ -169,16 +168,14 @@ variableDef[boolean classVarq]
             {
                 String varName = J.printVariableDeclarator(vd);
                 if (!classVarq){
-                    J.localStack.push(varName);
-                    J.localStackShadow.push(v);
+                    J.localStackPush(varName, v);
                 }
             })
 	;
 
 parameterDef
 	:	#(p:PARAMETER_DEF modifiers typeSpec i:IDENT {
-                    J.localStack.push(i.getText());
-                    J.localStackShadow.push(p);
+                    J.localStackPush(i.getText(), p);
             })
 	;
 
@@ -240,14 +237,79 @@ stat:	typeDefinition[null]
 	|	expression
 	|	#(LABELED_STAT IDENT stat)
 	|	#("if" expression stat (stat)? )
-	|	#(	fo:"for"
+	|	!#(	fo:"for"
+			#(FOR_INIT (variableDef[false] | elist)?)
+			#(FOR_CONDITION (expression)?)
+			#(FOR_ITERATOR (elist)?)
+			st:stat
             {
-                if (J.isMSAAccessAnywhere(fo)) {
-                    System.out.println("Found a loop which accesses an MSA");
-                    String s = "{ int i = 0; for (i=0; i<10; i++) ; }";
-                    AST ttt = J.parseString(s);
-                    System.out.println(ttt.toStringTree());
-                    System.out.println();
+                AST msa=null;
+                // @@ skip for analysis until it is ready for checkin
+                if ( false && (msa=J.isMSAAccessAnywhere(fo))!=null) {
+                    // assume we have "for(i = n0; i <= n1; i++) x += A[i];"
+                    // need to know: i, n0, n1, A, typeof A
+                    // generate: p, pagesize, a
+                    // for (p = n0/pagesize; p <= n1/pagesize; p++) {
+                    //   double *a = (double*)GetPageBaseAddress(A, p);
+                    //   for (i= ((p==n0/pagesize)?n0%p:0); i <= ((p==n1/pagesize)?n1%pagesize:pagesize) )
+                    //     x += a[i];
+                    // }
+                    System.out.print("Found MSA loop: ");
+                    System.out.println(fo.toStringTree());
+
+                    J.Env e = new J.Env();
+                    J.analyzeFor(fo, e);
+                    if (e.get("i2") != null) { // two-level loop
+                        StringBuffer s = new StringBuffer("");
+                        s.append("{ int i1; int n01 = "+e.getStr("n01")+"; int n11 = "+e.getStr("n11")+";\n");
+                        s.append("int startPg1 = n01/pageSize; int endPg1 = n11/pageSize;\n");
+                        s.append("int i2; int n02 = "+e.getStr("n02")+"; int n12 = "+e.getStr("n12")+";\n");
+                        s.append("int startPg2 = n02/pageSize; int endPg2 = n12/pageSize;\n");
+                        s.append("for(p1=startPg1; p1<=endPg1; p1++)\n");
+                        s.append("for(p2=startPg2; p2<=endPg2; p2++) {\n");
+                        s.append("double newname[] = A.get(p1*pageSize, p2*pageSize);\n");
+                        s.append("for (i1=(p1==startPg1?(n01)%pageSize:0); i1" + e.get("OP1")
+                            + "(p1==endPg1?n11%pageSize:pageSize); i1++)\n");
+                        s.append("for (i2=(p2==startPg2?(n02)%pageSize:0); i2" + e.get("OP2")
+                            + "(p2==endPg2?n12%pageSize:pageSize); i2++)\n");
+                        s.append("{}}}\n");
+                        System.out.println(s);
+                        msa.setText("newname");
+                        AST ttt = J.parseString(s.toString());
+                        System.out.println(ttt.toStringTree());
+
+                        AST lastChild = null;
+                        AST lastPointer = null;
+                        AST tmp3 = ttt.getFirstChild();
+                        while(tmp3!=null) {
+                            lastPointer = lastChild;
+                            lastChild = tmp3;
+                            tmp3 = tmp3.getNextSibling();
+                            if (tmp3 == null)
+                                tmp3 = lastChild.getFirstChild();
+                        }
+                        System.out.println("last child = " + lastChild.toStringTree());
+
+                        // For a two-level loop, we skip the inner loop
+                        AST body = st;
+                        tmp3 = st.getFirstChild();
+                        while(tmp3 != null) {
+                            body = tmp3;
+                            tmp3 = tmp3.getNextSibling();
+                        }
+
+                        // @@ We assume here that there is a sibling relationship between lastPointer and lastChild,
+                        // which is true in this case since we generate the code.
+                        lastPointer.setNextSibling(astFactory.dupTree(body));
+                        stat_AST = (ASTJ) ttt;
+                    } else {
+                        System.out.println("reached " + fo.toStringTree());
+                        stat_AST = fo;
+                    }
+
+
+//                     String s = "{ int i = 0; for (i=0; i<10; i++) ; }";
+//                     AST ttt = J.parseString(s);
 
 //                     AST _e1 = #(#[LITERAL_for,"for"],
 //                             #(#[FOR_INIT,"FOR_INIT"], #[EXPR,"EXPR"]),
@@ -259,12 +321,12 @@ stat:	typeDefinition[null]
 //                     System.out.println(_e1.toStringTree());
 //                     System.out.println(_e1.toStringList());
 //                     System.out.println();
+                } else {
+                    // duplicate the tree, but not its nextChild
+                    stat_AST = (ASTJ) astFactory.dupTree(fo);
                 }
+
             }
-			#(FOR_INIT (variableDef[false] | elist)?)
-			#(FOR_CONDITION (expression)?)
-			#(FOR_ITERATOR (elist)?)
-			stat
 		)
 	|	#("while" expression stat)
 	|	#("do" stat expression)
