@@ -24,13 +24,15 @@ public:
 
   HeapCentLB();
 private:
-  void           Heapify(HeapData*, int, int);
-  void           HeapSort(HeapData*, int);
-	void           BuildHeap(HeapData*, int);
-  HeapData*      BuildCpuArray(CentralLB::LDStats*, int, int *);      
-  HeapData*      BuildObjectArray(CentralLB::LDStats*, int, int *);      
-  CmiBool        QueryBalanceNow(int step);
-  CLBMigrateMsg* Strategy(CentralLB::LDStats* stats, int count);
+	enum           HeapCmp {GT = '>', LT = '<'};
+    void           Heapify(HeapData*, int, int, HeapCmp);
+	void           HeapSort(HeapData*, int, HeapCmp);
+	void           BuildHeap(HeapData*, int, HeapCmp);
+	CmiBool        Compare(double, double, HeapCmp);
+	HeapData*      BuildCpuArray(CentralLB::LDStats*, int, int *);      
+	HeapData*      BuildObjectArray(CentralLB::LDStats*, int, int *);      
+	CmiBool        QueryBalanceNow(int step);
+	CLBMigrateMsg* Strategy(CentralLB::LDStats* stats, int count);
 };
 
 #endif /* _HEAPCENTLB_H_ */

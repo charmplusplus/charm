@@ -17,7 +17,7 @@ void CreateGreedyRefLB();
 class GreedyRefLB : public CentralLB {
 
 struct HeapData {
-	float load;
+	double load;
 	int   pe;
 	int   id;
 };
@@ -25,13 +25,15 @@ struct HeapData {
 public:
   GreedyRefLB();
 private:
-  void           Heapify(HeapData *, int, int);
-  void           HeapSort(HeapData*, int);
-	void           BuildHeap(HeapData*, int);
-  HeapData*      BuildCpuArray(CentralLB::LDStats*, int, int *);      
-  HeapData*      BuildObjectArray(CentralLB::LDStats*, int, int *);      
-  CmiBool        QueryBalanceNow(int step);
-  CLBMigrateMsg* Strategy(CentralLB::LDStats* stats, int count);
+	enum           GreedyCmp {GT = '>', LT = '<'};
+	CmiBool        Compare(double, double, GreedyCmp);
+    void           Heapify(HeapData *, int, int, GreedyCmp);
+	void           HeapSort(HeapData*, int, GreedyCmp);
+	void           BuildHeap(HeapData*, int, GreedyCmp);
+	HeapData*      BuildCpuArray(CentralLB::LDStats*, int, int *);      
+	HeapData*      BuildObjectArray(CentralLB::LDStats*, int, int *);      
+	CmiBool        QueryBalanceNow(int step);
+	CLBMigrateMsg* Strategy(CentralLB::LDStats* stats, int count);
 };
 
 #endif /* _GREEDYREFLB_H_ */
