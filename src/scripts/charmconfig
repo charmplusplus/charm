@@ -888,7 +888,18 @@ fi
       (cd ../lib; $LYNX -source $URL > libpthread.a)
     elif test -n "$TELNET" && test -n "$UUDECODE"
     then
-      (chmod +x ./get_libpthread; ./get_libpthread | $TELNET charm.cs.uiuc.edu 80 > .uulib ; $UUDECODE .uulib; rm -f .uulib; mv libpthread.a ../lib)
+      ( cat > get_libpthread <<EOT
+#! /bin/sh
+echo "GET /distrib/libpthread.uu 1.0"
+echo
+# exit normally when the telnet session closes.
+trap "exit 0" 13
+while : ; do
+ echo
+ sleep 1
+done
+EOT
+      /bin/sh ./get_libpthread | $TELNET charm.cs.uiuc.edu 80 > .uulib ; $UUDECODE .uulib; rm -f .uulib; mv libpthread.a ../lib)
     fi
     if test ! -f ../lib/libpthread.a
     then
@@ -898,7 +909,7 @@ fi
       echo "#####################################################################"
       exit 1
     else
-     echo "done"
+      echo "done"
     fi
   fi
 fi

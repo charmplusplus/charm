@@ -721,3 +721,5 @@ veryclean:
 	rm -rf .[a-z]* .[A-Z]*
 
 
+charmconfig: configure.in
+	autoconf && autoheader && /bin/mv -f configure charmconfig

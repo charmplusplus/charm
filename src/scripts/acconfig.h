@@ -1,4 +1,3 @@
-/* conv-autoconfig.h.in.  Generated automatically from configure.in by autoheader.  */
 
 #undef CMK_MACHINE_NAME
 
@@ -19,3 +18,4 @@
 #undef CMK_FORTRAN_USES_TWOSCORE
 #undef CMK_FORTRAN_USES_ONESCORE
 #undef CMK_FORTRAN_USES_NOSCORE
+
