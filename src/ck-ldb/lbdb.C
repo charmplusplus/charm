@@ -108,6 +108,31 @@ extern "C" void LDSend(LDOMHandle destOM, LDObjid destid, unsigned int bytes)
     db->Send(destOM,destid,bytes);
 }
 
+extern "C" void LDBackgroundLoad(LDHandle _db,
+				 double* walltime, double* cputime)
+{
+  LBDB *const db = static_cast<LBDB*>(_db.handle);
+  db->BackgroundLoad(walltime,cputime);
+
+  return;
+}
+
+extern "C" void LDIdleTime(LDHandle _db,double* walltime)
+{
+  LBDB *const db = static_cast<LBDB*>(_db.handle);
+  db->IdleTime(walltime);
+
+  return;
+}
+
+extern "C" void LDTotalTime(LDHandle _db,double* walltime, double* cputime)
+{
+  LBDB *const db = static_cast<LBDB*>(_db.handle);
+  db->TotalTime(walltime,cputime);
+
+  return;
+}
+
 extern "C" void LDClearLoads(LDHandle _db)
 {
   LBDB *const db = static_cast<LBDB*>(_db.handle);

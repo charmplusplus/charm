@@ -133,13 +133,13 @@ int LDGetCommDataSz(LDHandle lbdb);
 void LDGetCommData(LDHandle lbdb, LDCommData *data);
 
 void LDBackgroundLoad(LDHandle lbdb, double *walltime, double *cputime);
-void LDIdleTime(LDHandle lbdb, double *walltime, double *cputime);
+void LDIdleTime(LDHandle lbdb, double *walltime);
 void LDTotalTime(LDHandle lbdb, double *walltime, double *cputime);
 
 void LDClearLoads(LDHandle lbdb);
 void LDMigrate(LDObjHandle h, int dest);
 void LDMigrated(LDObjHandle h);
- 
+
 /*
  * Local Barrier calls
  */

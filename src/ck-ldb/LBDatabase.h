@@ -74,8 +74,8 @@ public:
     LDBackgroundLoad(myLDHandle,walltime,cputime);
   }
 
-  void IdleTime(double *walltime, double *cputime) {
-    LDIdleTime(myLDHandle,walltime,cputime);
+  void IdleTime(double *walltime) {
+    LDIdleTime(myLDHandle,walltime);
   };
 
   void TotalTime(double *walltime, double *cputime) {

@@ -138,6 +138,8 @@ void LBDB::ClearLoads(void)
     }
   delete commTable;
   commTable = new LBCommTable;
+  machineUtil.Clear();
+  obj_walltime = obj_cputime = 0;
 }
 
 int LBDB::ObjDataCount()
@@ -189,6 +191,19 @@ void LBDB::NotifyMigrated(LDMigratedFn fn, void* data)
   callbk->fn = fn;
   callbk->data = data;
   migrateCBList.push_back(callbk);
+}
+
+void LBDB::BackgroundLoad(double* walltime, double* cputime)
+{
+  double totalwall;
+  double totalcpu;
+  TotalTime(&totalwall,&totalcpu);
+
+  double idle;
+  IdleTime(&idle);
+  
+  *walltime = totalwall - idle - obj_walltime;
+  *cputime = totalcpu - obj_cputime;
 }
 
 void LBDB::DumpDatabase()

@@ -13,6 +13,7 @@
 #include "LBObj.h"
 #include "LBOM.h"
 #include "LBComm.h"
+#include "LBMachineUtil.h"
 
 class LocalBarrier {
 friend class LBDB;
@@ -67,6 +68,7 @@ public:
     omCount = objCount = oms_registering = 0;
     obj_running = CmiFalse;
     commTable = new LBCommTable;
+    obj_walltime = obj_cputime = 0;
   }
 
   ~LBDB() { }
@@ -85,8 +87,8 @@ public:
   LBOM *LbOM(LDOMHandle h) { return oms[h.handle]; };
   LBObj *LbObj(LDObjHandle h) { return objs[h.handle]; };
   void DumpDatabase(void);
-  void TurnStatsOn(void) { statsAreOn = CmiTrue; };
-  void TurnStatsOff(void) { statsAreOn = CmiFalse; };
+  void TurnStatsOn(void) { statsAreOn = CmiTrue; machineUtil.StatsOn(); };
+  void TurnStatsOff(void) { statsAreOn = CmiFalse; machineUtil.StatsOff(); };
   CmiBool StatsOn(void) { return statsAreOn; };
   void Send(LDOMHandle destOM, LDObjid destid, unsigned int bytes);
   int ObjDataCount();
@@ -103,6 +105,13 @@ public:
   void Migrate(LDObjHandle h, int dest);
   void Migrated(LDObjHandle h);
   void NotifyMigrated(LDMigratedFn fn, void* data);
+  void IdleTime(double* walltime) { 
+    machineUtil.IdleTime(walltime); 
+  };
+  void TotalTime(double* walltime, double* cputime) {
+    machineUtil.TotalTime(walltime,cputime);
+  };
+  void BackgroundLoad(double* walltime, double* cputime);
   void ClearLoads(void);
   void RunningObj(LDObjHandle _h) {
     runningObj = _h; obj_running = CmiTrue;
@@ -112,7 +121,6 @@ public:
   LDBarrierClient AddLocalBarrierClient(LDResumeFn fn, void* data) { 
     return localBarrier.AddClient(fn,data);
   };
-
   void RemoveLocalBarrierClient(LDBarrierClient h) {
     localBarrier.RemoveClient(h);
   };
@@ -127,6 +135,12 @@ public:
   };
   void ResumeClients() {
     localBarrier.ResumeClients();
+  };
+  void MeasuredObjTime(double wtime, double ctime) {
+    if (statsAreOn) {
+      obj_walltime += wtime;
+      obj_cputime += ctime;
+    }
   };
 
 private:
@@ -156,6 +170,9 @@ private:
   LDObjHandle runningObj;
 
   LocalBarrier localBarrier;
+  LBMachineUtil machineUtil;
+  double obj_walltime;
+  double obj_cputime;
 };
 
 #endif

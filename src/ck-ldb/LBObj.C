@@ -23,6 +23,7 @@ void LBObj::Clear(void)
 
 void LBObj::IncrementTime(double walltime, double cputime)
 {
+  parentDB->MeasuredObjTime(walltime,cputime);
   data.wallTime += walltime;
   data.cpuTime += cputime;
 }

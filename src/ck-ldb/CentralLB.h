@@ -35,6 +35,11 @@ public:
   };
 
   struct LDStats {  // Passed to Strategy
+    double total_walltime;
+    double total_cputime;
+    double idletime;
+    double bg_walltime;
+    double bg_cputime;
     int n_objs;
     LDObjData* objData;
     int n_comm;
@@ -59,6 +64,11 @@ class CLBStatsMsg : public CMessage_CLBStatsMsg {
 public:
   int from_pe;
   int serial;
+  double total_walltime;
+  double total_cputime;
+  double idletime;
+  double bg_walltime;
+  double bg_cputime;
   int n_objs;
   LDObjData *objData;
   int n_comm;
