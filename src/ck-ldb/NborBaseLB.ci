@@ -4,7 +4,11 @@ extern module LBDatabase;
 
 readonly CkGroupID nborBaselb;
 
-message NLBStatsMsg;
+message NLBStatsMsg {
+  LDObjData objData[];
+  LDCommData commData[];
+};
+
 message NLBMigrateMsg;
 
 group NborBaseLB {

@@ -114,7 +114,7 @@ void NborBaseLB::AtSync()
   NLBStatsMsg* msg = AssembleStats();
 
   int i;
-  for(i=1; i < num_neighbors(); i++) {
+  for(i=0; i < num_neighbors()-1; i++) {
     NLBStatsMsg* m2 = (NLBStatsMsg*) CkCopyMsg((void**)&msg);
     thisproxy [neighbor_pes[i]].ReceiveStats(m2);
   }
@@ -146,7 +146,9 @@ NLBStatsMsg* NborBaseLB::AssembleStats()
     myStats.obj_cputime += myStats.objData[i].cpuTime;
   }    
 
-  NLBStatsMsg* msg = new NLBStatsMsg;
+  const int osz = theLbdb->GetObjDataSz();
+  const int csz = theLbdb->GetCommDataSz();
+  NLBStatsMsg* msg = new(osz, csz, 0)  NLBStatsMsg;
 
   msg->from_pe = CkMyPe();
   // msg->serial = rand();
@@ -159,6 +161,10 @@ NLBStatsMsg* NborBaseLB::AssembleStats()
   msg->bg_cputime = myStats.bg_cputime;
   msg->obj_walltime = myStats.obj_walltime;
   msg->obj_cputime = myStats.obj_cputime;
+  msg->n_objs = osz;
+  theLbdb->GetObjData(msg->objData);
+  msg->n_comm = csz;
+  theLbdb->GetCommData(msg->commData);
 
   //  CkPrintf(
   //    "Proc %d speed=%d Total(wall,cpu)=%f %f Idle=%f Bg=%f %f Obj=%f %f\n",

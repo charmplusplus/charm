@@ -115,8 +115,12 @@ public:
   double idletime;
   double bg_walltime;
   double bg_cputime;
-  double obj_walltime;
-  double obj_cputime;
+  double obj_walltime;   // may not needed
+  double obj_cputime;   // may not needed
+  int n_objs;
+  LDObjData *objData;
+  int n_comm;
+  LDCommData *commData;
 }; 
 
 class NLBMigrateMsg : public CMessage_NLBMigrateMsg {
