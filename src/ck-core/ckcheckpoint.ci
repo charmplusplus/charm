@@ -2,7 +2,8 @@ module CkCheckpoint {
   readonly CkGroupID _sysChkptMgr;
   group [migratable] CkCheckpointMgr {
 	entry CkCheckpointMgr(void);
-	entry void Checkpoint(int len, char dirname[len],CkCallback cb);
+	entry void Checkpoint(char dirname[strlen(dirname)+1],
+		CkCallback cb);
   };
   mainchare CkCheckpointInit {
     entry CkCheckpointInit(CkArgMsg *m);

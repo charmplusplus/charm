@@ -52,7 +52,7 @@ private:
 public:
 	CkCheckpointMgr() { }
 	CkCheckpointMgr(CkMigrateMessage *m):IrrGroup(m) { }
-	void Checkpoint(int len, char dirname[],CkCallback& cb);
+	void Checkpoint(const char *dirname,CkCallback& cb);
 
 	void pup(PUP::er& p){ IrrGroup::pup(p); }
 };
