@@ -67,7 +67,8 @@ ALLHEADERS=charm++.h ckstream.h charm.h cpthreads.h converse.h \
 	Refiner.h ObjGraph.h CentralLB.h RandCentLB.h \
 	RecBisectBfLB.h graph.h fifoInt.h bitvecset.h \
 	RefineLB.h MetisLB.h  Comm1LB.h \
-	HeapCentLB.h Set.h elements.h heap.h conv-ccs.h NeighborLB.h \
+	HeapCentLB.h Set.h elements.h heap.h conv-ccs.h \
+	NborBaseLB.h NeighborLB.h \
 	WSLB.h CkLists.h GreedyRefLB.h RandRefLB.h CommLB.h CommLBHeap.h
 
 ALLINTERFACES=idl.ci
@@ -142,6 +143,7 @@ CVHEADERS=converse.h conv-mach.h conv-mach.sh \
           ../include/MetisLB.decl.h MetisLB.def.h \
           ../include/RefineLB.decl.h RefineLB.def.h \
           ../include/HeapCentLB.decl.h HeapCentLB.def.h \
+          ../include/NborBaseLB.decl.h NborBaseLB.def.h \
           ../include/NeighborLB.decl.h NeighborLB.def.h \
           ../include/WSLB.decl.h WSLB.def.h \
           ../include/GreedyRefLB.decl.h GreedyRefLB.def.h \
@@ -259,7 +261,8 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h trace.h \
 	  Refiner.h ObjGraph.h heap.h elements.h CommLBHeap.h\
 	  CentralLB.h RandCentLB.h RecBisectBfLB.h \
 	  RefineLB.h HeapCentLB.h CommLB.h Comm1LB.h\
-	  MetisLB.h NeighborLB.h WSLB.h GreedyRefLB.h RandRefLB.h CkLists.h \
+	  MetisLB.h NborBaseLB.h \
+	  NeighborLB.h WSLB.h GreedyRefLB.h RandRefLB.h CkLists.h \
 	  $(CVHEADERS)
 
 CK_LIBS_CORE=libck.a
@@ -268,10 +271,11 @@ LIBCK_CORE=init.o register.o qd.o ck.o main.o msgalloc.o ckfutures.o \
            ckarray.o tempo.o waitqd.o LBDatabase.o lbdb.o \
 	   LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o Refiner.o \
 	   ObjGraph.o \
-	   CentralLB.o RandCentLB.o RecBisectBfLB.o graph.o bitvecset.o fifoInt.o \
+	   CentralLB.o RandCentLB.o \
+	   RecBisectBfLB.o graph.o bitvecset.o fifoInt.o \
 	   MetisLB.o RefineLB.o Set.o CommLB.o Comm1LB.o\
-           HeapCentLB.o heap.o NeighborLB.o WSLB.o GreedyRefLB.o \
-	   RandRefLB.o CommLBHeap.o
+           HeapCentLB.o heap.o NborBaseLB.o NeighborLB.o WSLB.o \
+	   GreedyRefLB.o RandRefLB.o CommLBHeap.o
 
 charmlibs: converse $(CK_LIBS_CORE)
 	cd libs; make charmlibs OPTS='$(OPTS)'
@@ -320,6 +324,9 @@ libtrace-summary.a: $(LIBTRACE_SUMM)
 
 ../include/HeapCentLB.decl.h : HeapCentLB.decl.h
 	/bin/cp HeapCentLB.decl.h ../include
+
+../include/NborBaseLB.decl.h : NborBaseLB.decl.h
+	/bin/cp NborBaseLB.decl.h ../include
 
 ../include/NeighborLB.decl.h : NeighborLB.decl.h
 	/bin/cp NeighborLB.decl.h ../include
@@ -380,6 +387,9 @@ Comm1LB.decl.h Comm1LB.def.h : Comm1LB.ci charmxi
 
 HeapCentLB.decl.h HeapCentLB.def.h : HeapCentLB.ci charmxi
 	$(CHARMC) HeapCentLB.ci
+
+NborBaseLB.decl.h NborBaseLB.def.h : NborBaseLB.ci charmxi
+	$(CHARMC) NborBaseLB.ci
 
 NeighborLB.decl.h NeighborLB.def.h : NeighborLB.ci charmxi
 	$(CHARMC) NeighborLB.ci
@@ -479,6 +489,9 @@ heap.o: heap.C $(CKHEADERS) elements.h heap.h
 
 CommLBHeap.o: CommLBHeap.C $(CKHEADERS) CommLBHeap.h
 	$(CHARMC) -o CommLBHeap.o CommLBHeap.C
+
+NborBaseLB.o: NborBaseLB.C $(CKHEADERS)
+	$(CHARMC) -o NborBaseLB.o NborBaseLB.C
 
 NeighborLB.o: NeighborLB.C $(CKHEADERS)
 	$(CHARMC) -o NeighborLB.o NeighborLB.C

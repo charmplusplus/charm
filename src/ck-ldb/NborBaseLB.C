@@ -1,35 +1,33 @@
 #include <unistd.h>
 #include <charm++.h>
 #include <LBDatabase.h>
-#include <CkLists.h>
-#include "heap.h"
-#include "WSLB.h"
-#include "WSLB.def.h"
+#include "NborBaseLB.h"
+#include "NborBaseLB.def.h"
 
-CkGroupID wslb;
+CkGroupID nborBaselb;
 
 #if CMK_LBDB_ON
 
-void CreateWSLB()
+void CreateNborBaseLB()
 {
-  wslb = CProxy_WSLB::ckNew();
+  nborBaselb = CProxy_NborBaseLB::ckNew();
 }
 
-void WSLB::staticMigrated(void* data, LDObjHandle h)
+void NborBaseLB::staticMigrated(void* data, LDObjHandle h)
 {
-  WSLB *me = static_cast<WSLB*>(data);
+  NborBaseLB *me = static_cast<NborBaseLB*>(data);
 
   me->Migrated(h);
 }
 
-void WSLB::staticAtSync(void* data)
+void NborBaseLB::staticAtSync(void* data)
 {
-  WSLB *me = static_cast<WSLB*>(data);
+  NborBaseLB *me = static_cast<NborBaseLB*>(data);
 
   me->AtSync();
 }
 
-WSLB::WSLB()
+NborBaseLB::NborBaseLB()
 {
   mystep = 0;
   theLbdb = CProxy_LBDatabase(lbdb).ckLocalBranch();
@@ -64,17 +62,17 @@ WSLB::WSLB()
   theLbdb->CollectStatsOn();
 }
 
-WSLB::~WSLB()
+NborBaseLB::~NborBaseLB()
 {
   CkPrintf("Going away\n");
 }
 
-void WSLB::FindNeighbors()
+void NborBaseLB::FindNeighbors()
 {
   if (neighbor_pes == 0) { // Neighbors never initialized, so init them
                            // and other things that depend on the number
                            // of neighbors
-    statsMsgsList = new WSLBStatsMsg*[num_neighbors()];
+    statsMsgsList = new NLBStatsMsg*[num_neighbors()];
     for(int i=0; i < num_neighbors(); i++)
       statsMsgsList[i] = 0;
     statsDataList = new LDStats[num_neighbors()];
@@ -82,14 +80,14 @@ void WSLB::FindNeighbors()
     neighbor_pes = new int[num_neighbors()];
     neighbors(neighbor_pes);
     mig_msgs_expected = num_neighbors();
-    mig_msgs = new WSLBMigrateMsg*[num_neighbors()];
+    mig_msgs = new NLBMigrateMsg*[num_neighbors()];
   }
 
 }
 
-void WSLB::AtSync()
+void NborBaseLB::AtSync()
 {
-  //  CkPrintf("[%d] WSLB At Sync step %d!!!!\n",CkMyPe(),mystep);
+  //  CkPrintf("[%d] NborBaseLB At Sync step %d!!!!\n",CkMyPe(),mystep);
 
   if (CkMyPe() == 0) {
     start_lb_time = CmiWallTimer();
@@ -104,22 +102,22 @@ void WSLB::AtSync()
     return;
   }
 
-  WSLBStatsMsg* msg = AssembleStats();
+  NLBStatsMsg* msg = AssembleStats();
 
   int i;
   for(i=1; i < num_neighbors(); i++) {
-    WSLBStatsMsg* m2 = (WSLBStatsMsg*) CkCopyMsg((void**)&msg);
-    CProxy_WSLB(thisgroup).ReceiveStats(m2,neighbor_pes[i]);
+    NLBStatsMsg* m2 = (NLBStatsMsg*) CkCopyMsg((void**)&msg);
+    CProxy_NborBaseLB(thisgroup).ReceiveStats(m2,neighbor_pes[i]);
   }
   if (0 < num_neighbors()) {
-    CProxy_WSLB(thisgroup).ReceiveStats(msg,neighbor_pes[0]);
+    CProxy_NborBaseLB(thisgroup).ReceiveStats(msg,neighbor_pes[0]);
   } else delete msg;
 
   // Tell our own node that we are ready
-  ReceiveStats((WSLBStatsMsg*)0);
+  ReceiveStats((NLBStatsMsg*)0);
 }
 
-WSLBStatsMsg* WSLB::AssembleStats()
+NLBStatsMsg* NborBaseLB::AssembleStats()
 {
   // Get stats
   theLbdb->TotalTime(&myStats.total_walltime,&myStats.total_cputime);
@@ -139,7 +137,7 @@ WSLBStatsMsg* WSLB::AssembleStats()
     myStats.obj_cputime += myStats.objData[i].cpuTime;
   }    
 
-  WSLBStatsMsg* msg = new WSLBStatsMsg;
+  NLBStatsMsg* msg = new NLBStatsMsg;
 
   msg->from_pe = CkMyPe();
   msg->serial = rand();
@@ -163,7 +161,7 @@ WSLBStatsMsg* WSLB::AssembleStats()
   return msg;
 }
 
-void WSLB::Migrated(LDObjHandle h)
+void NborBaseLB::Migrated(LDObjHandle h)
 {
   migrates_completed++;
   //  CkPrintf("[%d] An object migrated! %d %d\n",
@@ -173,7 +171,7 @@ void WSLB::Migrated(LDObjHandle h)
   }
 }
 
-void WSLB::ReceiveStats(WSLBStatsMsg *m)
+void NborBaseLB::ReceiveStats(NLBStatsMsg *m)
 {
   if (neighbor_pes == 0) FindNeighbors();
 
@@ -191,7 +189,7 @@ void WSLB::ReceiveStats(WSLBStatsMsg *m)
       }
     }
     if (peslot == -1 || statsMsgsList[peslot] != 0) {
-      CkPrintf("*** Unexpected WSLBStatsMsg in ReceiveStats from PE %d ***\n",
+      CkPrintf("*** Unexpected NLBStatsMsg in ReceiveStats from PE %d ***\n",
 	       pe);
     } else {
       statsMsgsList[peslot] = m;
@@ -212,7 +210,7 @@ void WSLB::ReceiveStats(WSLBStatsMsg *m)
   if (stats_msg_count == clients && receive_stats_ready) {
     double strat_start_time = CmiWallTimer();
     receive_stats_ready = 0;
-    WSLBMigrateMsg* migrateMsg = Strategy(statsDataList,clients);
+    NLBMigrateMsg* migrateMsg = Strategy(statsDataList,clients);
 
     int i;
 
@@ -230,11 +228,11 @@ void WSLB::ReceiveStats(WSLBStatsMsg *m)
     
     // Now, send migrate messages to neighbors
     for(i=1; i < num_neighbors(); i++) {
-      WSLBMigrateMsg* m2 = (WSLBMigrateMsg*) CkCopyMsg((void**)&migrateMsg);
-      CProxy_WSLB(thisgroup).ReceiveMigration(m2,neighbor_pes[i]);
+      NLBMigrateMsg* m2 = (NLBMigrateMsg*) CkCopyMsg((void**)&migrateMsg);
+      CProxy_NborBaseLB(thisgroup).ReceiveMigration(m2,neighbor_pes[i]);
     }
     if (0 < num_neighbors())
-      CProxy_WSLB(thisgroup).ReceiveMigration(migrateMsg,
+      CProxy_NborBaseLB(thisgroup).ReceiveMigration(migrateMsg,
 						    neighbor_pes[0]);
     else delete migrateMsg;
     
@@ -254,7 +252,7 @@ void WSLB::ReceiveStats(WSLBStatsMsg *m)
   
 }
 
-void WSLB::ReceiveMigration(WSLBMigrateMsg *msg)
+void NborBaseLB::ReceiveMigration(NLBMigrateMsg *msg)
 {
   if (neighbor_pes == 0) FindNeighbors();
 
@@ -266,7 +264,7 @@ void WSLB::ReceiveMigration(WSLBMigrateMsg *msg)
   //	   CkMyPe(),mig_msgs_received,mig_msgs_expected);
 
   if (mig_msgs_received > mig_msgs_expected) {
-    CkPrintf("[%d] WSLB Error! Too many migration messages received\n",
+    CkPrintf("[%d] NeighborLB Error! Too many migration messages received\n",
 	     CkMyPe());
   }
 
@@ -276,7 +274,7 @@ void WSLB::ReceiveMigration(WSLBMigrateMsg *msg)
 
   //  CkPrintf("[%d] in ReceiveMigration %d moves\n",CkMyPe(),msg->n_moves);
   for(int neigh=0; neigh < mig_msgs_received;neigh++) {
-    WSLBMigrateMsg* m = mig_msgs[neigh];
+    NLBMigrateMsg* m = mig_msgs[neigh];
     for(int i=0; i < m->n_moves; i++) {
       MigrateInfo& move = m->moves[i];
       const int me = CkMyPe();
@@ -295,7 +293,7 @@ void WSLB::ReceiveMigration(WSLBMigrateMsg *msg)
 }
 
 
-void WSLB::MigrationDone()
+void NborBaseLB::MigrationDone()
 {
   if (CkMyPe() == 0) {
     double end_lb_time = CmiWallTimer();
@@ -306,176 +304,63 @@ void WSLB::MigrationDone()
   migrates_expected = -1;
   // Increment to next step
   mystep++;
-  CProxy_WSLB(thisgroup).ResumeClients(CkMyPe());
+  CProxy_NborBaseLB(thisgroup).ResumeClients(CkMyPe());
 }
 
-void WSLB::ResumeClients()
+void NborBaseLB::ResumeClients()
 {
   theLbdb->ResumeClients();
 }
 
-WSLBMigrateMsg* WSLB::Strategy(WSLB::LDStats* stats, int count)
+NLBMigrateMsg* NborBaseLB::Strategy(LDStats* stats,int count)
 {
-  //  CkPrintf("[%d] Strategy starting\n",CkMyPe());
-  // Compute the average load to see if we are overloaded relative
-  // to our neighbors
-  double myload = myStats.total_walltime - myStats.idletime;
-  double avgload = myload;
-  int i;
-  for(i=0; i < count; i++) {
-    // Scale times we need appropriately for relative proc speeds
-    const double scale =  ((double)myStats.proc_speed) 
-      / stats[i].proc_speed;
-
-    stats[i].total_walltime *= scale;
-    stats[i].idletime *= scale;
-
-    avgload += (stats[i].total_walltime - stats[i].idletime);
+  for(int j=0; j < count; j++) {
+    CkPrintf(
+    "[%d] Proc %d Speed %d Total(wall,cpu)=%f %f Idle=%f Bg=%f %f obj=%f %f\n",
+    CkMyPe(),stats[j].from_pe,stats[j].proc_speed,
+    stats[j].total_walltime,stats[j].total_cputime,
+    stats[j].idletime,stats[j].bg_walltime,stats[j].bg_cputime,
+    stats[j].obj_walltime,stats[j].obj_cputime);
   }
-  avgload /= (count+1);
 
-  CkVector migrateInfo;
+  delete [] myStats.objData;
+  myStats.obj_data_sz = 0;
+  delete [] myStats.commData;
+  myStats.comm_data_sz = 0;
 
-  if (myload > avgload) {
-    //CkPrintf("[%d] OVERLOAD My load is %f, average load is %f\n",
-    //    	     CkMyPe(),myload,avgload);
-
-    // First, build heaps of other processors and my objects
-    // Then assign objects to other processors until either
-    //   - The smallest remaining object would put me below average, or
-    //   - I only have 1 object left, or
-    //   - The smallest remaining object would put someone else 
-    //     above average
-
-    // Build heaps
-    minHeap procs(count);
-    for(i=0; i < count; i++) {
-      InfoRecord* item = new InfoRecord;
-      item->load = stats[i].total_walltime - stats[i].idletime;
-      item->Id =  stats[i].from_pe;
-      procs.insert(item);
-    }
-      
-    maxHeap objs(myStats.obj_data_sz);
-    for(i=0; i < myStats.obj_data_sz; i++) {
-      InfoRecord* item = new InfoRecord;
-      item->load = myStats.objData[i].wallTime;
-      item->Id = i;
-      objs.insert(item);
-    }
-
-    int objs_here = myStats.obj_data_sz;
-    do {
-      if (objs_here <= 1) break;  // For now, always leave 1 object
-
-      InfoRecord* p;
-      InfoRecord* obj;
-
-      // Get the lightest-loaded processor
-      p = procs.deleteMin();
-      if (p == 0) {
-	//	CkPrintf("[%d] No destination PE found!\n",CkMyPe());
-	break;
-      }
-
-      // Get the biggest object
-      CmiBool objfound = CmiFalse;
-      do {
-	obj = objs.deleteMax();
-	if (obj == 0) break;
-
-	double new_p_load = p->load + obj->load;
-	double my_new_load = myload - obj->load;
-	if (new_p_load < my_new_load) {
-//	if (new_p_load < avgload) {
-	  objfound = CmiTrue;
-	} else {
-	  // This object is too big, so throw it away
-//	  CkPrintf("[%d] Can't move object w/ load %f to proc %d load %f %f\n",
-//		   CkMyPe(),obj->load,p->Id,p->load,avgload);
-	  delete obj;
-	}
-      } while (!objfound);
-
-      if (!objfound) {
-	//	CkPrintf("[%d] No suitable object found!\n",CkMyPe());
-	break;
-      }
-
-      const int me = CkMyPe();
-      // Apparently we can give this object to this processor
-      //      CkPrintf("[%d] Obj %d of %d migrating from %d to %d\n",
-      //      	       CkMyPe(),obj->Id,myStats.obj_data_sz,me,p->Id);
-
-      MigrateInfo* migrateMe = new MigrateInfo;
-      migrateMe->obj = myStats.objData[obj->Id].handle;
-      migrateMe->from_pe = me;
-      migrateMe->to_pe = p->Id;
-      migrateInfo.push_back((void*)migrateMe);
-
-      objs_here--;
-      
-      // We may want to assign more to this processor, so lets
-      // update it and put it back in the heap
-      p->load += obj->load;
-      myload -= obj->load;
-      procs.insert(p);
-      
-      // This object is assigned, so we delete it from the heap
-      delete obj;
-
-    } while(myload > avgload);
-
-    // Now empty out the heaps
-    while (InfoRecord* p=procs.deleteMin())
-      delete p;
-    while (InfoRecord* obj=objs.deleteMax())
-      delete obj;
-  }  
-
-  // Now build the message to actually perform the migrations
-  int migrate_count=migrateInfo.size();
-  //  if (migrate_count > 0) {
-  //    CkPrintf("PE %d migrating %d elements\n",CkMyPe(),migrate_count);
-  //  }
-  WSLBMigrateMsg* msg = new(&migrate_count,1) WSLBMigrateMsg;
-  msg->n_moves = migrate_count;
-  for(i=0; i < migrate_count; i++) {
-    MigrateInfo* item = (MigrateInfo*) migrateInfo[i];
-    msg->moves[i] = *item;
-    delete item;
-    migrateInfo[i] = 0;
-  }
+  int sizes=0;
+  NLBMigrateMsg* msg = new(&sizes,1) NLBMigrateMsg;
+  msg->n_moves = 0;
 
   return msg;
-};
+}
 
-void* WSLBMigrateMsg::alloc(int msgnum, size_t size, int* array, int priobits)
+void* NLBMigrateMsg::alloc(int msgnum, size_t size, int* array, int priobits)
 {
-  int totalsize = size + array[0] * sizeof(WSLB::MigrateInfo);
+  int totalsize = size + array[0] * sizeof(NborBaseLB::MigrateInfo);
 
-  WSLBMigrateMsg* ret =
-    static_cast<WSLBMigrateMsg*>(CkAllocMsg(msgnum,totalsize,priobits));
+  NLBMigrateMsg* ret =
+    static_cast<NLBMigrateMsg*>(CkAllocMsg(msgnum,totalsize,priobits));
 
-  ret->moves = reinterpret_cast<WSLB::MigrateInfo*>
+  ret->moves = reinterpret_cast<NborBaseLB::MigrateInfo*>
     (reinterpret_cast<char*>(ret)+ size);
 
   return static_cast<void*>(ret);
 }
 
-void* WSLBMigrateMsg::pack(WSLBMigrateMsg* m)
+void* NLBMigrateMsg::pack(NLBMigrateMsg* m)
 {
-  m->moves = reinterpret_cast<WSLB::MigrateInfo*>
+  m->moves = reinterpret_cast<NborBaseLB::MigrateInfo*>
     (reinterpret_cast<char*>(m->moves) - reinterpret_cast<char*>(&m->moves));
 
   return static_cast<void*>(m);
 }
 
-WSLBMigrateMsg* WSLBMigrateMsg::unpack(void *m)
+NLBMigrateMsg* NLBMigrateMsg::unpack(void *m)
 {
-  WSLBMigrateMsg* ret_val = static_cast<WSLBMigrateMsg*>(m);
+  NLBMigrateMsg* ret_val = static_cast<NLBMigrateMsg*>(m);
 
-  ret_val->moves = reinterpret_cast<WSLB::MigrateInfo*>
+  ret_val->moves = reinterpret_cast<NborBaseLB::MigrateInfo*>
     (reinterpret_cast<char*>(&ret_val->moves) 
      + reinterpret_cast<size_t>(ret_val->moves));
 

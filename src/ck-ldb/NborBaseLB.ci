@@ -1,0 +1,17 @@
+module NborBaseLB {
+
+extern module LBDatabase;
+
+readonly CkGroupID nborBaselb;
+
+message NLBStatsMsg;
+message[varsize] NLBMigrateMsg;
+
+group NborBaseLB {
+  entry void NborBaseLB(void);  
+  entry void ReceiveStats(NLBStatsMsg*);
+  entry void ResumeClients(void);
+  entry void ReceiveMigration(NLBMigrateMsg*);	
+};
+
+};

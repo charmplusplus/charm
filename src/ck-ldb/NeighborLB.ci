@@ -1,17 +1,9 @@
 module NeighborLB {
 
-extern module LBDatabase;
+extern module NborBaseLB;
 
-readonly CkGroupID neighborlb;
-
-message NLBStatsMsg;
-message[varsize] NLBMigrateMsg;
-
-group NeighborLB {
+group NeighborLB : NborBaseLB {
   entry void NeighborLB(void);  
-  entry void ReceiveStats(NLBStatsMsg*);
-  entry void ResumeClients(void);
-  entry void ReceiveMigration(NLBMigrateMsg*);	
 };
 
 };

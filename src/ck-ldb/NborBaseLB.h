@@ -1,25 +1,26 @@
-#ifndef NEIGHBORLB_H
-#define NEIGHBORLB_H
+#ifndef NBORBASELB_H
+#define NBORBASELB_H
 
 #include <LBDatabase.h>
-#include "WSLB.decl.h"
+#include "NborBaseLB.decl.h"
 
-void CreateWSLB();
 
-class WSLBStatsMsg;
-class WSLBMigrateMsg;
+void CreateNborBaseLB();
 
-class WSLB : public Group
+class NLBStatsMsg;
+class NLBMigrateMsg;
+
+class NborBaseLB : public Group
 {
 public:
-  WSLB();
-  ~WSLB();
+  NborBaseLB();
+  ~NborBaseLB();
   static void staticAtSync(void*);
   void AtSync(void); // Everything is at the PE barrier
 
-  void ReceiveStats(WSLBStatsMsg *); 		// Receive stats on PE 0
+  void ReceiveStats(NLBStatsMsg *); 		// Receive stats on PE 0
   void ResumeClients();
-  void ReceiveMigration(WSLBMigrateMsg *); 	// Receive migration data
+  void ReceiveMigration(NLBMigrateMsg *); 	// Receive migration data
 
   // Migrated-element callback
   static void staticMigrated(void* me, LDObjHandle h);
@@ -28,7 +29,7 @@ public:
   void MigrationDone(void);  // Call when migration is complete
   int step() { return mystep; };
 
-  struct MigrateInfo {  // Used in WSLBMigrateMsg
+  struct MigrateInfo {  // Used in NLBMigrateMsg
     LDObjHandle obj;
     int from_pe;
     int to_pe;
@@ -48,25 +49,16 @@ public:
 
 protected:
   virtual CmiBool QueryBalanceNow(int) { return CmiTrue; };  
-  virtual WSLBMigrateMsg* Strategy(LDStats* stats,int count);
+  virtual NLBMigrateMsg* Strategy(LDStats* stats,int count);
+
   virtual int num_neighbors() {
-    return (CkNumPes() > 5) ? 4 : (CkNumPes()-1);
+    if (CmiNumPes() > 2) return 2;
+    else return (CmiNumPes()-1);
   };
+
   virtual void neighbors(int* _n) {
-    const int me = CkMyPe();
-    const int npe = CkNumPes();
-    if (npe > 1)
-      _n[0] = (me + npe - 1) % npe;
-    if (npe > 2)
-      _n[1] = (me + 1) % npe;
-
-    int bigstep = (npe - 1) / 3 + 1;
-    if (bigstep == 1) bigstep++;
-
-    if (npe > 3)
-      _n[2] = (me + bigstep) % npe;
-    if (npe > 4)
-      _n[3] = (me + npe - bigstep) % npe;
+    _n[0] = (CmiMyPe() + CmiNumPes() -1) % CmiNumPes();
+    _n[1] = (CmiMyPe() + 1) % CmiNumPes();
   };
 
   LBDatabase* theLbdb;
@@ -87,15 +79,15 @@ protected:
 
 private:
   void FindNeighbors();
-  WSLBStatsMsg* AssembleStats();
+  NLBStatsMsg* AssembleStats();
 
   int mystep;
   int stats_msg_count;
-  WSLBStatsMsg** statsMsgsList;
+  NLBStatsMsg** statsMsgsList;
   LDStats* statsDataList;
   int migrates_completed;
   int migrates_expected;
-  WSLBMigrateMsg** mig_msgs;
+  NLBMigrateMsg** mig_msgs;
   int mig_msgs_received;
   int mig_msgs_expected;
   int* neighbor_pes;
@@ -103,7 +95,7 @@ private:
   double start_lb_time;
 };
 
-class WSLBStatsMsg : public CMessage_WSLBStatsMsg {
+class NLBStatsMsg : public CMessage_NLBStatsMsg {
 public:
   int from_pe;
   int serial;
@@ -117,16 +109,16 @@ public:
   double obj_cputime;
 }; 
 
-class WSLBMigrateMsg : public CMessage_WSLBMigrateMsg {
+class NLBMigrateMsg : public CMessage_NLBMigrateMsg {
 public:
   int n_moves;
-  WSLB::MigrateInfo* moves;
+  NborBaseLB::MigrateInfo* moves;
 
   // Other methods & data members 
   
   static void* alloc(int msgnum, size_t size, int* array, int priobits); 
-  static void* pack(WSLBMigrateMsg* in); 
-  static WSLBMigrateMsg* unpack(void* in); 
+  static void* pack(NLBMigrateMsg* in); 
+  static NLBMigrateMsg* unpack(void* in); 
 }; 
 
-#endif /* NEIGHBORLB_H */
+#endif /* NBORBASELB_H */

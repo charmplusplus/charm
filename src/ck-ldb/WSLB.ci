@@ -1,9 +1,17 @@
 module WSLB {
 
-extern module NeighborLB;
+extern module LBDatabase;
 
-group WSLB : NeighborLB {
+readonly CkGroupID wslb;
+
+message WSLBStatsMsg;
+message[varsize] WSLBMigrateMsg;
+
+group WSLB {
   entry void WSLB(void);  
+  entry void ReceiveStats(WSLBStatsMsg*);
+  entry void ResumeClients(void);
+  entry void ReceiveMigration(WSLBMigrateMsg*);	
 };
 
 };
