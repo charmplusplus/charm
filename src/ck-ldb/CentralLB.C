@@ -25,6 +25,8 @@ int load_balancer_created;
 
 static void getPredictedLoad(CentralLB::LDStats* stats, int count, 
                              LBMigrateMsg* msg, double *peLoads);
+static int FindPEAfterMigration(LDObjid& id, CentralLB::LDStats* stats, int count,
+							 LBMigrateMsg* msg, int bCheckStats);
 
 void CreateCentralLB()
 {
@@ -417,7 +419,7 @@ LBMigrateMsg* CentralLB::Strategy(LDStats* stats,int count)
 	     j,csz);
     for(i=0; i < csz; i++) {
       CkPrintf("Link %d\n",i);
-      
+
       if (cdata[i].from_proc())
 	CkPrintf("    sender PE = %d\n",cdata[i].src_proc);
       else
@@ -533,35 +535,99 @@ void CentralLB::writeStatsMsgs(const char* filename) {
 
 static void getPredictedLoad(CentralLB::LDStats* stats, int count, LBMigrateMsg* msg, double *peLoads)
 {
-  for(int pe = 0; pe < count; pe++)
-  {
-    peLoads[pe] = stats[pe].bg_walltime;
-    for(int obj = 0; obj < stats[pe].n_objs; obj++)
-    {
-	peLoads[pe] += stats[pe].objData[obj].wallTime;
-    }
-  }
+	int* msgSentCount = new int[count]; // # of messages sent by each PE
+	int* msgRecvCount = new int[count]; // # of messages received by each PE
+	int* byteSentCount = new int[count];// # of bytes sent by each PE
+	int* byteRecvCount = new int[count];// # of bytes reeived by each PE
 
-  // now for each migration, substract the load of the migrating object from the source pe
-  // and add it to the destination pe
-  for(int mig = 0; mig < msg->n_moves; mig++)
-  {
-	int from = msg->moves[mig].from_pe;
-	int to = msg->moves[mig].to_pe;
-	double wallTime;
-	int oidx;
+	for(int i = 0; i < count; i++)
+		msgSentCount[i] = msgRecvCount[i] = byteSentCount[i] = byteRecvCount[i] = 0;
 
-	// find the cpu time for the object that is migrating
-	for(oidx = 0; oidx < stats[from].n_objs; oidx++)
-	  if(stats[from].objData[oidx].handle.id == msg->moves[mig].obj.id)
-	  {
-		wallTime = stats[from].objData[oidx].wallTime;
-		break;
-	  }
-	CkAssert(oidx != stats[from].n_objs);
-	peLoads[from] -= wallTime;
-	peLoads[to] += wallTime;
-  }
+	for(int pe = 0; pe < count; pe++)
+  	{
+    	peLoads[pe] = stats[pe].bg_walltime;
+
+    	for(int obj = 0; obj < stats[pe].n_objs; obj++)
+    	{
+			peLoads[pe] += stats[pe].objData[obj].wallTime;
+    	}
+	}
+
+	// now for each migration, substract the load of the migrating object from the source pe
+	// and add it to the destination pe
+	for(int mig = 0; mig < msg->n_moves; mig++)
+	{
+		int from = msg->moves[mig].from_pe;
+		int to = msg->moves[mig].to_pe;
+		double wallTime;
+		int oidx, cidx;
+
+		ckout << "Object " << msg->moves[mig].obj.id.id[0] << " migrating from " << from  << " to " << to << endl;
+
+		// find the cpu time for the object that is migrating
+		for(oidx = 0; oidx < stats[from].n_objs; oidx++)
+			if(stats[from].objData[oidx].handle.id == msg->moves[mig].obj.id)
+			{
+				wallTime = stats[from].objData[oidx].wallTime;
+				break;
+			}
+		CkAssert(oidx != stats[from].n_objs);
+		peLoads[from] -= wallTime;
+		peLoads[to] += wallTime;
+	}
+
+	// handling of the communication overheads. Here, for each "link" in the communication statistics,
+	// find the sender and receiver PE and if they are not the same, add the costs, else don't add
+	for(int pe = 0; pe < count; pe++)
+	{
+		// add the communication loads
+		LDCommData* cdata = stats[pe].commData;
+		const int csz = stats[pe].n_comm;
+
+		for(int cidx = 0; cidx < csz; cidx++)
+		{
+			// find the sender and receiver PE for this "link"
+			int senderPE, receiverPE;
+
+			if(cdata[cidx].from_proc())
+				senderPE = cdata[cidx].src_proc;
+			else
+			{
+				// for sender, check just the migration messages
+				senderPE = FindPEAfterMigration(cdata[cidx].sender, stats, count, msg, 0);
+				if(senderPE == -1)
+					senderPE = pe;
+			}
+
+			if(cdata[cidx].to_proc())
+				receiverPE = cdata[cidx].dest_proc;
+			else
+				receiverPE = FindPEAfterMigration(cdata[cidx].receiver, stats, count, msg, 1);
+
+			if(senderPE != receiverPE)
+			{
+				msgSentCount[senderPE] += cdata[cidx].messages;
+				byteSentCount[senderPE] += cdata[cidx].bytes;
+
+				msgRecvCount[receiverPE] += cdata[cidx].messages;
+				byteRecvCount[receiverPE] += cdata[cidx].bytes;
+			}
+		}
+	}
+
+	// now for each processor, add to its load the send and receive overheads
+	for(int i = 0; i < count; i++)
+	{
+		peLoads[i] += msgRecvCount[i]  * PER_MESSAGE_RECV_OVERHEAD +
+					  msgSentCount[i]  * PER_MESSAGE_SEND_OVERHEAD +
+					  byteRecvCount[i] * PER_BYTE_RECV_OVERHEAD +
+					  byteSentCount[i] * PER_BYTE_SEND_OVERHEAD;
+	}
+
+	delete msgRecvCount;
+	delete msgSentCount;
+	delete byteRecvCount;
+	delete byteSentCount;
 }
 
 void CentralLB::FindSimResults(LDStats* stats, int count, LBMigrateMsg* msg, CLBSimResults* simResults)
@@ -569,10 +635,34 @@ void CentralLB::FindSimResults(LDStats* stats, int count, LBMigrateMsg* msg, CLB
 	CkAssert(simResults != NULL && count == simResults->numPes);
 	// estimate the new loads of the processors. As a first approximation, this is the
 	// sum of the cpu times of the objects on that processor
-        getPredictedLoad(stats, count, msg, simResults->peLoads);
-
+    getPredictedLoad(stats, count, msg, simResults->peLoads);
 }
 
+// find the PE of an object after migration. The bCheckStats flag indicates whether the stats is to
+// be checked or not.
+static int FindPEAfterMigration(LDObjid& id, CentralLB::LDStats* stats, int count, LBMigrateMsg* msg, int bCheckStats)
+{
+	// first check in the migration messages
+	for(int i = 0; i < msg->n_moves; i++)
+		if(msg->moves[i].obj.id == id)
+			return msg->moves[i].to_pe;
+
+	if(!bCheckStats)
+		return -1;
+
+	// not a migrating object, so find in the stats if requires
+	for(int pe = 0; pe < count; pe++)
+	{
+		CmiBool found = CmiFalse;
+		for(int obj = 0; obj < stats[pe].n_objs; obj++)
+			if(stats[pe].objData[obj].handle.id == id)
+				{ found = CmiTrue; break;}
+		if(found)
+			return pe;
+	}
+	CkAssert(0);
+	return -1;
+}
 #endif
 
 /*@}*/
