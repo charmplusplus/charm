@@ -417,7 +417,7 @@ class toTextFile : public er {
   //Begin writing to this file, which should be opened for ascii write.
   // Closes file when deleted.
   toTextFile(FILE *f_) :er(IS_PACKING), f(f_) {}
-  ~toTextFile() {fclose(f);}
+  ~toTextFile() {}
   virtual void comment(const char *message);
 };
 class fromTextFile : public er {
@@ -433,7 +433,7 @@ class fromTextFile : public er {
   //Begin writing to this file, which should be opened for ascii read.
   // Closes file when deleted.
   fromTextFile(FILE *f_) :er(IS_UNPACKING), f(f_) {}
-  ~fromTextFile() {fclose(f);}
+  ~fromTextFile() {}
   virtual void comment(const char *message);
 };
 
