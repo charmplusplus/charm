@@ -32,6 +32,9 @@ void opt::Step()
   if (ev->timestamp > POSE_UnsetTS) {
     currentEvent = ev;
     ev->done = 2;
+    specEventCount++;
+    eventCount++;
+    stepCount++;
     parent->ResolveFn(ev->fnIdx, ev->msg); // execute it
     ev->done = 1; // complete the event execution
     eq->ShiftEvent(); // shift to next event
@@ -59,6 +62,8 @@ void opt::Rollback()
     return;
   }
 
+  rbCount++;
+  rbFlag = 1;
   // roll back over recovery point
 #ifdef POSE_STATS_ON
   localStats->Rollback();
@@ -85,6 +90,9 @@ void opt::Rollback()
   }
 
   eq->SetCurrentPtr(RBevent); // adjust currentPtr
+  avgRBoffset = 
+    (avgRBoffset*(rbCount-1)+(eq->currentPtr->timestamp-localPVT->getGVT()))/rbCount;
+  eq->FindLargest();
   RBevent = targetEvent = NULL; // reset RBevent & targetEvent
 }
 
@@ -93,12 +101,14 @@ void opt::UndoEvent(Event *e)
 {
   if (e->done == 1) {
     //CkPrintf("Undoing event "); e->evID.dump(); CkPrintf("...\n");
+    eq->eventCount++;
     currentEvent = e;
     CancelSpawn(e); // cancel spawned events
 #ifdef POSE_STATS_ON
     localStats->Undo();
 #endif
     parent->UNDOs++;
+    eventCount--;
     //CkPrintf("POSE_UNDO\n");
     parent->ResolveFn(((e->fnIdx) * -1), e->msg); // execute the anti-method
     if (e->commitBfrLen > 0) free(e->commitBfr); // clean up buffered output

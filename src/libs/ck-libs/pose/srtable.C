@@ -35,11 +35,9 @@ void SRtable::Insert(POSE_TimeType ts, int sr)
 #ifdef SR_SANITIZE
   sanitize();
 #endif
-  //SRentry *foo = new SRentry(0, 0, NULL);
   CmiAssert(ts >= offset);
   CmiAssert((sr == 0) || (sr == 1));
   int destBkt = (int)(((float)(ts-offset))/((float)size_b));  // which bucket?
-  //SRentry *foo = new SRentry(0, 0, NULL);
   SRentry *e;
   if (destBkt >= b) { // put in overflow bucket
     e = new SRentry(ts, sr, overflow);

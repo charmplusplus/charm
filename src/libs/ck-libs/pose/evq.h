@@ -17,6 +17,8 @@ class eventQueue {
   EqHeap *eqh;
   /// Largest unexecuted event timestamp in queue
   POSE_TimeType largest;
+  /// number of unexecuted events in the queue
+  unsigned int eventCount;
   /// Output file name for stats for DOP calculation
   char filename[20];
   /// Output file pointer for stats for DOP calculation

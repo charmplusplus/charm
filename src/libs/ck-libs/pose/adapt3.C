@@ -7,23 +7,24 @@ void adapt3::Step()
   Event *ev;
   static POSE_TimeType lastGVT = POSE_UnsetTS;
   static int advances=0;
-#ifdef POSE_STATS_ON
   int iter=0;
-#endif
 
   lastGVT = localPVT->getGVT();
+  rbFlag = 0;
   if (!parent->cancels.IsEmpty()) { // Cancel as much as possible
 #ifdef POSE_STATS_ON
     localStats->SwitchTimer(CAN_TIMER);      
 #endif
     //CkPrintf("Trying to cancel events...\n");
-    POSE_TimeType ct = eq->currentPtr->timestamp;  // store time of next event
+    //POSE_TimeType ct = eq->currentPtr->timestamp;  // store time of next event
     CancelEvents();
     // if cancellations of executed events occurred, adjust timeLeash
+    /*
     if ((ct > -1) && (eq->currentPtr->timestamp < ct)) {
       timeLeash = eq->currentPtr->timestamp - lastGVT;
       advances = 1;
     }
+    */
 #ifdef POSE_STATS_ON
     localStats->SwitchTimer(SIM_TIMER);      
 #endif
@@ -32,9 +33,9 @@ void adapt3::Step()
 #ifdef POSE_STATS_ON
     localStats->SwitchTimer(RB_TIMER);      
 #endif
-    timeLeash = RBevent->timestamp - lastGVT;
+    //timeLeash = RBevent->timestamp - lastGVT;
     Rollback(); 
-    advances = 1;
+    //advances = 1;
 #ifdef POSE_STATS_ON
     localStats->SwitchTimer(SIM_TIMER);      
 #endif
@@ -52,42 +53,61 @@ void adapt3::Step()
     currentEvent = ev;
     ev->done = 2;
     //CkPrintf("About to do event "); ev->evID.dump(); CkPrintf("...\n");
+    specEventCount++;
+    eventCount++;
     parent->ResolveFn(ev->fnIdx, ev->msg); // execute it
     ev->done = 1; // flag the event as executed
     eq->ShiftEvent(); // shift to next event
     ev = eq->currentPtr;
-#ifdef POSE_STATS_ON    
     iter++;
+  }
+  //if (ev->timestamp > POSE_UnsetTS) // work left undone
+  //timeLeash = (eq->largest - ev->timestamp)/2 + ev->timestamp - lastGVT;
+  // Calculate statistics for this run
+  if (iter > 0) {
+    avgTimeLeash = ((avgTimeLeash * stepCount) + timeLeash)/(stepCount+1);
+    stepCount++;
+#ifdef POSE_STATS_ON
+    localStats->Loop();
 #endif
   }
-  if (ev->timestamp > POSE_UnsetTS) // work left undone
-    timeLeash = (eq->largest - ev->timestamp)/2 + ev->timestamp - lastGVT;
-  //if (parent->thisIndex == 42)
-    CkPrintf("On %d: Time leash:%d  Next work:%d  Latest work:%d\n", 
-	     parent->thisIndex, timeLeash, ev->timestamp, eq->largest);
-  //if (ev->timestamp > -1) timeLeash = ev->timestamp - lastGVT + 1;
-  // Avoid wasting this iteration by expanding speculative window to
-  // include the earlier "half" of available work if there is any
+  avgEventsPerStep = specEventCount/stepCount;
   /*
-  if ((advances == 0) && (eq->largest > POSE_UnsetTS) && 
-      (ev->timestamp > lastGVT + timeLeash)) {
-    timeLeash = (eq->largest - ev->timestamp + 4)/4 + (ev->timestamp-lastGVT);
-    advances = 1;
+  if (ev->timestamp > -1) {
+    CkPrintf("%d BEFORE:timeLeash:%d nextWork:%d latestWork:%d iter:%d gvt:%d\n",
+	     parent->thisIndex, timeLeash, ev->timestamp, eq->largest, iter,
+	     lastGVT);
+    CkPrintf(" avgTimeLeash:%d avgEventsPerStep:%d avgRBoffset:%d\n", 
+	     avgTimeLeash, avgEventsPerStep, avgRBoffset);
   }
-  if ((advances == 0) && (ev->timestamp > lastGVT + timeLeash)) {
-    timeLeash = ev->timestamp - lastGVT + 1;
-    advances = 1;
-  }
-  else if (ev->timestamp <= lastGVT + timeLeash) advances = 0;
   */
-  // CkPrintf("largo=%d cur=%d leash=%d gvt=%d ad=%d\n", eq->largest, ev->timestamp, timeLeash, lastGVT, advances);
+  // Revise behavior for next run
+  // immediate reaction
+  if (rbFlag && (timeLeash > avgRBoffset))  // punish
+    timeLeash -= (timeLeash-avgRBoffset)/2;
+  if (!rbFlag && (iter < avgEventsPerStep) && (ev->timestamp > -1)
+      && (timeLeash < (eq->largest-lastGVT))) //speculate
+    timeLeash += (eq->largest - (timeLeash+lastGVT))/2;
+  // reaction to past
+  if ((avgRBoffset > POSE_UnsetTS) && (timeLeash > avgRBoffset)) // play safe
+    timeLeash -= (timeLeash-avgRBoffset)/2;
+  if (timeLeash < avgTimeLeash) // average out
+    timeLeash += (avgTimeLeash-timeLeash)/2;
+  else timeLeash -= (timeLeash-avgTimeLeash)/2;
+  // reaction to future
+  if (timeLeash < (eq->largest - lastGVT)) // speculate
+    timeLeash += (eq->largest - (timeLeash+lastGVT))/2;
 
-
-#ifdef POSE_STATS_ON
-  if (iter > 0) { 
-    localStats->Loop();
-    if (iter == MAX_ITERATIONS) CkPrintf("Touched MAX_ITERATIONS!\n");
+  rbFlag = 0;
+  /*
+  if (ev->timestamp > -1) {
+    CkPrintf("%d AFTER: timeLeash:%d nextWork:%d latestWork:%d iter:%d gvt:%d\n",
+	     parent->thisIndex, timeLeash, ev->timestamp, eq->largest, iter,
+	     lastGVT);
+    CkPrintf(" avgTimeLeash:%d avgEventsPerStep:%d avgRBoffset:%d\n", 
+	     avgTimeLeash, avgEventsPerStep, avgRBoffset);
   }
-#endif  
+  */
 }
+
 

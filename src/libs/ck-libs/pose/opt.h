@@ -28,8 +28,19 @@ public:
   /// Checkpoint rate
   /** Checkpoint once for every cpRate events */
   int cpRate;
+  // Set of variables for monitoring object behavior
+  unsigned int specEventCount, eventCount, stepCount, avgEventsPerStep;
+  unsigned int rbCount, jumpCount;
+  POSE_TimeType avgRBoffset, avgTimeLeash, avgJump;
+  unsigned short int rbFlag;
   /// Basic Constructor
-  opt() { STRAT_T = OPT_T; cpRate = STORE_RATE; }
+  opt() { 
+    STRAT_T = OPT_T; 
+    cpRate = STORE_RATE; 
+    specEventCount = eventCount = stepCount = avgEventsPerStep = rbCount = jumpCount = rbFlag = 0;
+    avgRBoffset = POSE_UnsetTS;
+    avgTimeLeash = avgJump = 0;
+  }
   /// Initialize the synchronization strategy type of the poser
   void initSync() { parent->sync = OPTIMISTIC; }
   /// Perform a single forward execution step

@@ -1,4 +1,3 @@
-
 /// POSE confgiuration parameters
 /** This code provides all the switches for control over adaptivity,
     communication, statistics gathering, load balancing, etc. */
