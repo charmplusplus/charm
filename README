@@ -42,6 +42,9 @@ compile Charm++. The command line syntax is:
 
 build <target> <version> [options ...] [--basedir=dir] [--libdir=dir] [--incdir=dir] [charmc-options ...]
 
+for detailed help messages, use -h or --help to the build script, i.e.
+./build --help
+
 REQUIRED:
 ---------
 <target> specifies the parts of Charm++ to compile.  The most often used 

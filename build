@@ -3,24 +3,61 @@
 # Silly shorthand, used for source reorganization
 src="src/arch"
 
+more=0
+
 syntax() {
   echo ''
   echo 'Usage: build <target> <version> <options> [charmc-options ...]'
   echo ''
-  echo '<targets>: converse, charm++ libs AMPI IDL tsm sm pvm sdag bluegene'
+  echo '<targets>: converse charm++ libs AMPI IDL TSM SM PVM bluegene'
   echo '<targets>: doc ps-doc pdf-doc html-doc'
   echo '<versions>: ' 
   ( cd $src ; ls -1 | egrep -v '(^CVS)|(^shmem$)|(^mpi$)|(^sim$)|(^net$)|(^elan$)|(^util$)|(^common$)|(^uth$)|(^conv-mach-fix.sh$)|(^win32$)|(^paragon$)' | pr -3 -t )
   echo ''
-  echo '<options>: help cc cc64 cxx kcc pgcc acc icc ecc gcc3 mpcc smp gm tcp vmi scyld bluegene'
+  echo '<options>: help cc cc64 cxx kcc pgcc acc icc ecc gcc3 mpcc smp gm tcp vmi scyld opteron bluegene --incdir --libdir --basedir --no-shared'
+  if test $more = 1
+  then
   echo ''
-  echo '<charmc-options>: e.g. -g -save -verbose'
+  echo 'Not all these options are supported by one version, use version based help:'
+  echo '  help		version based help message, e.g. ./build charm++ net-linux help'
+  echo ''
+  echo 'Choose a compiler (only one option is allowed from this section):'
+  echo '  cc, cc64	For Sun WorkShop C++ 32/64 bit compilers'
+  echo '  cxx		DIGITAL C++ compiler (DEC Alpha)'
+  echo '  kcc		KAI C++ compiler'
+  echo "  pgcc		Portland Group's C++ compiler"
+  echo '  acc		HP aCC compiler'
+  echo '  icc		Intel C/C++ compiler for Linux IA32'
+  echo '  ecc		Intel C/C++ compiler for Linux IA64'
+  echo '  gcc3		to use gcc3 - GNU GCC/G++ version 3'
+  echo '  mpcc		SUN Solaris C++ compiler for MPI'
+  echo ''
+  echo 'Platform specific options (choose multiple):'
+  echo '  opteron	compile for AMD Opteron'
+  echo '  smp		support for SMP, multithreaded charm on each node'
+  echo '  gm		use Myrinet for communication'
+  echo '  tcp		use TCP sockets for communication (ony for net version)'
+  echo "  vmi		use NCSA's VMI for communication"
+  echo '  scyld		compile for Scyld Beowulf cluster'
+  echo ''
+  echo 'Advanced options:'
+  echo '  bluegene	compile for BigSim (Blue Gene) simulator'
+  echo '  occ		compile with out of core support'
+  echo ''
+  echo 'Miscellaneous options:'
+  echo '  --incdir=DIR	specify additional include path for compilers'
+  echo '  --libdir=DIR	specify additional lib path for compilers'
+  echo '  --basedir=DIR	specify additional path at once - DIR/include and DIR/lib'
+  echo "  --no-shared	disable the compilation for Charm++'s shared libraries"
+  fi
+  echo ''
+  echo '<charmc-options>: normal compiler options e.g. -g -O -save -verbose'
   echo 'Note: This script:'
   echo ' 1. Creates directories <version> and <version>/tmp';
 #  echo ' 2. Copies src/Common/scripts/Makefile into <version>/tmp';
   echo ' 2. Does a "make <target> <version> OPTS=<charmc-options>" in <version>/tmp.'
 #  echo "That's all build does.  The rest is handled by the Makefile."
-  exit 1
+  [ $more = 0 ] && echo "To get more detailed help, run ./build --help"
 }
 
 printOption() {
@@ -83,7 +120,8 @@ INCDIR=
 ARCH=
 BUILD_SHARED="-build-shared"
 
-[ $# -lt 2 ] && syntax
+[ "$1" = '--help' -o "$1" = '-h' ] && more=1 && syntax | more && exit 1
+[ $# -lt 2 ] && syntax && exit 1
 PROGRAM=$1
 shift
 VERSION=$1; BASEVERSION=$1; ARCH=`echo $1 | sed -e 's@-.*@@'`
