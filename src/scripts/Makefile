@@ -397,25 +397,25 @@ $(L)/libmemory-os.o: $(MEM_DEPS)
 # If the system doesn't have sbrk, these compilations may fail.
 #  This is OK, but then we can't use "-memory gnu" or friends.
 $(L)/libmemory-gnu.o: $(MEM_DEPS)
-	-$(CHARMC) -o $@ -DCMK_MEMORY_BUILD_GNU memory.c
+	-$(CHARMC) -o $@ -DCMK_MEMORY_BUILD_GNU memory.c || touch $@
 
 $(L)/libmemory-gnuold.o: $(MEM_DEPS)
-	-$(CHARMC) -o $@ -DCMK_MEMORY_BUILD_GNUOLD memory.c
+	-$(CHARMC) -o $@ -DCMK_MEMORY_BUILD_GNUOLD memory.c || touch $@
 
 $(L)/libmemory-verbose.o: memory-verbose.c $(MEM_DEPS)
-	-$(CHARMC) -o $@ -DCMK_MEMORY_BUILD_VERBOSE memory.c
+	-$(CHARMC) -o $@ -DCMK_MEMORY_BUILD_VERBOSE memory.c || touch $@
 
 $(L)/libmemory-paranoid.o: memory-paranoid.c $(MEM_DEPS)
-	-$(CHARMC) -o $@ -DCMK_MEMORY_BUILD_PARANOID memory.c
+	-$(CHARMC) -o $@ -DCMK_MEMORY_BUILD_PARANOID memory.c || touch $@
 
 $(L)/libmemory-leak.o: memory-leak.c $(MEM_DEPS)
-	-$(CHARMC) -o $@ -DCMK_MEMORY_BUILD_LEAK memory.c
+	-$(CHARMC) -o $@ -DCMK_MEMORY_BUILD_LEAK memory.c || touch $@
 
 $(L)/libmemory-cache.o: memory-cache.c $(MEM_DEPS)
-	-$(CHARMC) -o $@ -DCMK_MEMORY_BUILD_CACHE memory.c
+	-$(CHARMC) -o $@ -DCMK_MEMORY_BUILD_CACHE memory.c || touch $@
 
 $(L)/libmemory-isomalloc.o: memory-isomalloc.c $(MEM_DEPS)
-	-$(CHARMC) -o $@ -DCMK_MEMORY_BUILD_ISOMALLOC memory.c
+	-$(CHARMC) -o $@ -DCMK_MEMORY_BUILD_ISOMALLOC memory.c || touch $@
 
 ## Thread libraries (-thread)
 $(L)/libthreads-default.o: threads.c $(CVHEADERS)

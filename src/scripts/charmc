@@ -1099,7 +1099,7 @@ fi
 if [ "$SWAPGLOBALS" = "1" ]
 then
 	swapo="$CHARMLIB/libglobal-swap.o"
-	if [ ! -r "$swapo" ]
+	if [ ! -r "$swapo" -o ! -s "$swapo" ]
 	then
 		echo "Global-swapping library $swapo missing--"
 		echo "  Is -swapglobals supported on this machine?"
@@ -1211,7 +1211,11 @@ fi
 
 MEM_OBJ="$CHARMLIB/libmemory-$MEMORY.o"
 
-[ ! -r $MEM_OBJ ] && Abort "charmc : No such memory mode $MEMORY"
+if [ ! -r $MEM_OBJ -o ! -s $MEM_OBJ ] 
+then
+  (cd $CHARMLIB ; for i in `ls libmemory-*`; do [ -s $i ] && ls -l $i; done )
+  Abort "charmc : No such memory mode $MEMORY"
+fi
 
 # Check for valid choice of THREAD
 
@@ -1221,7 +1225,11 @@ then
 fi
 THREAD_OBJ="$CHARMLIB/libthreads-$THREAD.o"
 
-[ ! -r $THREAD_OBJ ] && Abort "charmc : No such thread mode $THREAD"
+if [ ! -r $THREAD_OBJ -o ! -s $THREAD_OBJ ] 
+then
+  (cd $CHARMLIB ; for i in `ls libthreads-*`; do [ -s $i ] && ls -l $i; done )
+  Abort "charmc : No such thread mode $THREAD"
+fi
 
 ################# Build the module initialization function ##################
 modInitName="moduleinit"
