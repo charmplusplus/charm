@@ -1,0 +1,72 @@
+
+                              Charm++ 5.4 (Release 1)
+
+       Copyright (C) 1989-2000 Regents of the University of Illinois
+
+Now you can compile charm++ under Windows9x/2000/NT with VC++ plus Cygwin.
+Cygwin are ports of the popular GNU development tools and utilities for 
+Windows 9x/2K and NT, which emulates a UNIX environment under Windows.
+
+
+                       Setup and Compilation
+                    ===========================
+
+To compile charm with VC++:
+1. install cygwin from: http://sourceware.cygnus.com/cygwin
+   with inetutils, openssh, w32api packages and gcc. Remember to choose 
+   default file type as "unix" at the beginning of cygwin installation.
+
+2. Start a Cygwin's Bash Shell window, type "cl" to make sure VC++ compiler 
+   command line mode is correctly set. If it is not correctly set, you need to 
+   run the VCVARS32.BAT which comes from VC++ installation bin directory. 
+   However VCVARS32.BAT cannot be executed under Bash Shell terminal, you
+   have to: for Win8x, you need to put it into AUTOEXEC.BAT; for WinNT, you 
+   have to merge the settings in VCVARS32.BAT into your environment varaibles 
+   settings(the most important one is the PATH varaible)  
+
+3. Now you can compile Charm++ like Unix, for example:
+
+   ./build charm++ net-win32
+
+   this will build all Charm++ executables under net-win32/bin and all libs
+   under net-win32/lib
+
+
+
+                     Compile and Run Charm++ Programs
+                  ======================================
+
+1. After Charm++ compilation is complete, you can try some sample programs under
+   net-win32\pgms. For example, 
+   cd net-win32/pgms/charm++/megatest, and type "make",
+   it will invoke Charm++'s "charmc"(VC++ wrapper) to compile the test 
+   programs and generates an executable "pgm.exe" and a charm++ helper 
+   program - "charmrun.exe".
+   Now you have two choices of running the executable:
+   (1) locally on your desktop, using:
+       ./charmrun +p1 ./pgm ++local
+       this will fork one copy of node program on your local machine. You can 
+       choose using more than one virtual processors, using +p2 option.
+
+   (2) run in parallel across machines:
+       In this case, you need to write a .nodelist file under your home
+       directory(~) in bash terminal, here is an example:
+
+group main
+host hostname1
+host hostname2 
+
+       Next, you need to start charmd.exe, which is under net-win32/bin on
+       all the nodes as listed in the .nodelist file.
+       Now run the Charm++ program, for example:
+       ./charmrun +p2 ./pgm
+
+
+   For details of Charm++ compilation options and charmrun comman line options
+explanation, please check the manuals on charm.cs.uiuc.edu web site manual 
+section.
+   If you have any problem or suggestion, please let me know by sending
+email to (ppl@uiuc.edu).
+
+
+
