@@ -12,19 +12,17 @@ class QdMsg {
   private:
     int phase; // 0..2
     union {
-      struct { int ep; CkChareID cid; } p0;
       struct { /* none */ } p1;
       struct { int created; int processed; } p2;
       struct { /* none */ } p3;
       struct { int dirty; } p4;
     } u;
+	CkCallback cb;
   public:
     int getPhase(void) { return phase; }
     void setPhase(int p) { phase = p; }
-    int getEp(void) { CkAssert(phase==0); return u.p0.ep; }
-    void setEp(int e) { CkAssert(phase==0); u.p0.ep = e; }
-    CkChareID getCid(void) { CkAssert(phase==0); return u.p0.cid; }
-    void setCid(CkChareID c) { CkAssert(phase==0); u.p0.cid = c; }
+    CkCallback getCb(void) { CkAssert(phase==0); return cb; }
+    void setCb(CkCallback cb_) { CkAssert(phase==0); cb = cb_; }
     int getCreated(void) { CkAssert(phase==1); return u.p2.created; }
     void setCreated(int c) { CkAssert(phase==1); u.p2.created = c; }
     int getProcessed(void) { CkAssert(phase==1); return u.p2.processed; }
@@ -35,16 +33,17 @@ class QdMsg {
 
 class QdCallback {
   public:
-    int ep;
-    CkChareID cid;
+	CkCallback cb;
   public:
-    QdCallback(int e, CkChareID c) : ep(e), cid(c) {}
+    QdCallback(int e, CkChareID c) : cb(e, c) {}
+	QdCallback(CkCallback cb_) : cb(cb_) {}
 //    void send(void) { CkSendMsg(ep,CkAllocMsg(0,0,0),&cid); }
-    void send(void) { 
-      int old = CmiSwitchToPE(0);
-      CkSendMsg(ep,CkAllocMsg(0,0,0),&cid); 
-      CmiSwitchToPE(old);
-    } 
+    void send(void) {
+      //int old = CmiSwitchToPE(0);
+      //CkSendMsg(ep,CkAllocMsg(0,0,0),&cid);
+	  cb.send(NULL);
+      //CmiSwitchToPE(old);
+    }
 };
 
 class QdState {

@@ -48,7 +48,7 @@ static inline void _handlePhase0(QdState *state, QdMsg *msg)
 {
   CkAssert(CmiMyPe()==0 || state->getStage()==0);
   if(CmiMyPe()==0) {
-    QdCallback *qdcb = new QdCallback(msg->getEp(), msg->getCid());
+    QdCallback *qdcb = new QdCallback(msg->getCb());
     _MEMCHECK(qdcb);
     state->enq(qdcb);
   }
@@ -143,13 +143,12 @@ void _qdHandler(envelope *env)
   CcdCallOnCondition(CcdPROCESSOR_STILL_IDLE, (CcdVoidFn)_callWhenIdle, (void*) msg);
 }
 
-extern "C"
-void CkStartQD(int eIdx, const CkChareID *cid)
+
+void CkStartQD(const CkCallback& cb)
 {
   register QdMsg *msg = (QdMsg*) CkAllocMsg(0,sizeof(QdMsg),0);
   msg->setPhase(0);
-  msg->setEp(eIdx);
-  msg->setCid(*cid);
+  msg->setCb(cb);
   register envelope *env = UsrToEnv((void *)msg);
   CmiSetHandler(env, _qdHandlerIdx);
 #if CMK_BLUEGENE_CHARM
@@ -157,4 +156,10 @@ void CkStartQD(int eIdx, const CkChareID *cid)
 #else
   CldEnqueue(0, env, _infoIdx);
 #endif
+}
+
+extern "C"
+void CkStartQD(int eIdx, const CkChareID *cid)
+{
+  CkStartQD(CkCallback(eIdx, *cid));
 }
