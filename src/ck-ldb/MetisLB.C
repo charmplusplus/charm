@@ -12,8 +12,6 @@
 
 #include <charm++.h>
 
-#if CMK_LBDB_ON
-
 #include "cklists.h"
 
 #include "MetisLB.h"
@@ -22,7 +20,7 @@ CreateLBFunc_Def(MetisLB);
 
 static void lbinit(void) {
 //        LBSetDefaultCreate(CreateMetisLB);
-  LBRegisterBalancer("MetisLB", CreateMetisLB, "Use Metis(tm) to partition object graph");
+  LBRegisterBalancer("MetisLB", CreateMetisLB, AllocateMetisLB, "Use Metis(tm) to partition object graph");
 }
 
 #include "MetisLB.def.h"
@@ -32,12 +30,6 @@ MetisLB::MetisLB(const CkLBOptions &opt): CentralLB(opt)
   lbname = "MetisLB";
   if (CkMyPe() == 0)
     CkPrintf("[%d] MetisLB created\n",CkMyPe());
-}
-
-CmiBool MetisLB::QueryBalanceNow(int _step)
-{
-  // CkPrintf("[%d] Balancing on step %d\n",CkMyPe(),_step);
-  return CmiTrue;
 }
 
 static void printStats(int count, int numobjs, double *cputimes, 
@@ -98,10 +90,7 @@ extern "C" void METIS_mCPartGraphRecursive(int*, int*, int*, int*, int*, int*,
 extern "C" void METIS_mCPartGraphKway(int*, int*, int*, int*, int*, int*,
                                     int*, int*, int*, int*, int*,
                                     int*, int*);
-/*
-LBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count,
-				 int option=0)
-*/
+
 void MetisLB::work(CentralLB::LDStats* stats, int count)
 {
   // CkPrintf("entering MetisLB::Strategy...\n");
@@ -304,7 +293,5 @@ void MetisLB::work(CentralLB::LDStats* stats, int count)
   if(newmap != origmap)
     delete[] newmap;
 }
-
-#endif
 
 /*@}*/

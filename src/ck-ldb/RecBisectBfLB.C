@@ -22,8 +22,6 @@
 
 #include <charm++.h>
 
-#if CMK_LBDB_ON
-
 #include "RecBisectBfLB.h"
 
 extern "C" {
@@ -52,14 +50,14 @@ CreateLBFunc_Def(RecBisectBfLB);
 
 static void lbinit(void) {
 //        LBSetDefaultCreate(CreateRecBisectBfLB);
-  LBRegisterBalancer("RecBisectBfLB", CreateRecBisectBfLB, "Recursive partitioning with Breadth first enumeration");
+  LBRegisterBalancer("RecBisectBfLB", CreateRecBisectBfLB, AllocateRecBisectBfLB, "Recursive partitioning with Breadth first enumeration");
 }
 
 #include "RecBisectBfLB.def.h"
 
 RecBisectBfLB::RecBisectBfLB(const CkLBOptions &opt): CentralLB(opt)
 {
-  lbname = "RecBisectBfLB";
+  lbname = (char*)"RecBisectBfLB";
   if (CkMyPe() == 0)
     CkPrintf("[%d] RecBisectBfLB created\n",CkMyPe());
 }
@@ -333,8 +331,6 @@ void RecBisectBfLB::recursivePartition(int numParts, Graph *g,
     free(nodes);
   }  
 }
-
-#endif
 
 
 /*@}*/

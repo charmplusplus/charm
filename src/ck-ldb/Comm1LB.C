@@ -24,8 +24,6 @@
 #include <charm++.h>
 #include <stdio.h>
 
-#if CMK_LBDB_ON
-
 #include "cklists.h"
 
 #include "Comm1LB.h"
@@ -40,7 +38,10 @@
 CreateLBFunc_Def(Comm1LB);
 
 static void lbinit(void) {
-  LBRegisterBalancer("Comm1LB", CreateComm1LB, "another variation of CommLB");
+  LBRegisterBalancer("Comm1LB", 
+                     CreateComm1LB, 
+                     AllocateComm1LB, 
+		     "another variation of CommLB");
 }
 
 #include "Comm1LB.def.h"
@@ -269,8 +270,6 @@ void Comm1LB::work(CentralLB::LDStats* stats, int count)
   }
 }
 
-
-#endif
 
 /*@}*/
 

@@ -12,8 +12,6 @@
 
 #include <charm++.h>
 
-#if CMK_LBDB_ON
-
 #include "cklists.h"
 
 #include "RefineCommLB.h"
@@ -23,6 +21,7 @@ CreateLBFunc_Def(RefineCommLB);
 static void lbinit(void) {
   LBRegisterBalancer("RefineCommLB", 
                      CreateRefineCommLB, 
+                     AllocateRefineCommLB, 
                      "Average load among processors by moving objects away from overloaded processor, communication aware");
 }
 
@@ -30,7 +29,7 @@ static void lbinit(void) {
 
 RefineCommLB::RefineCommLB(const CkLBOptions &opt): RefineLB(opt)
 {
-  lbname = "RefineCommLB";
+  lbname = (char *)"RefineCommLB";
   if (CkMyPe() == 0)
     CkPrintf("[%d] RefineCommLB created\n",CkMyPe());
 }
@@ -42,6 +41,7 @@ CmiBool RefineCommLB::QueryBalanceNow(int _step)
 
 void RefineCommLB::work(CentralLB::LDStats* stats, int count)
 {
+#if CMK_LBDB_ON
   int obj;
   //  CkPrintf("[%d] RefineLB strategy\n",CkMyPe());
 
@@ -74,9 +74,8 @@ void RefineCommLB::work(CentralLB::LDStats* stats, int count)
   // Free the refine buffers
   RefinerComm::FreeProcs(from_procs);
   RefinerComm::FreeProcs(to_procs);
-};
-
 #endif
+};
 
 
 /*@}*/

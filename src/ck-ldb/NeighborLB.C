@@ -12,8 +12,6 @@
 
 #include <charm++.h>
 
-#if CMK_LBDB_ON
-
 #include "cklists.h"
 
 #include "heap.h"
@@ -23,7 +21,10 @@ CreateLBFunc_Def(NeighborLB);
 
 static void lbinit(void) {
 //  LBSetDefaultCreate(CreateNeighborLB);        
-  LBRegisterBalancer("NeighborLB", CreateNeighborLB, "The neighborhood load balancer");
+  LBRegisterBalancer("NeighborLB", 
+                     CreateNeighborLB, 
+                     AllocateNeighborLB, 
+                     "The neighborhood load balancer");
 }
 
 #include "NeighborLB.def.h"
@@ -37,6 +38,7 @@ NeighborLB::NeighborLB(const CkLBOptions &opt):NborBaseLB(opt)
 
 LBMigrateMsg* NeighborLB::Strategy(NborBaseLB::LDStats* stats, int count)
 {
+#if CMK_LBDB_ON
   //  CkPrintf("[%d] Strategy starting\n",CkMyPe());
   // Compute the average load to see if we are overloaded relative
   // to our neighbors
@@ -172,8 +174,10 @@ LBMigrateMsg* NeighborLB::Strategy(NborBaseLB::LDStats* stats, int count)
   }
 
   return msg;
+#else
+  return NULL;
+#endif
 };
 
-#endif
 
 /*@}*/

@@ -18,8 +18,6 @@ Status:
 
 #include <charm++.h>
 
-#if CMK_LBDB_ON
-
 #include "cklists.h"
 
 #include "RandCentLB.h"
@@ -27,8 +25,9 @@ Status:
 CreateLBFunc_Def(RandCentLB);
 
 static void lbinit(void) {
-  LBRegisterBalancer("RandCentLB", CreateRandCentLB, "Assign objects to processors randomly");
+  LBRegisterBalancer("RandCentLB", CreateRandCentLB, AllocateRandCentLB, "Assign objects to processors randomly");
 }
+
 #include "RandCentLB.def.h"
 
 RandCentLB::RandCentLB(const CkLBOptions &opt): CentralLB(opt)
@@ -58,8 +57,6 @@ void RandCentLB::work(CentralLB::LDStats* stats, int count)
       }
   }
 }
-
-#endif
 
 
 /*@}*/

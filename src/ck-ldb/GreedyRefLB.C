@@ -12,8 +12,6 @@
 
 #include <charm++.h>
 
-#if CMK_LBDB_ON
-
 #include "cklists.h"
 #include "GreedyRefLB.h"
 
@@ -21,14 +19,17 @@ CreateLBFunc_Def(GreedyRefLB);
 
 static void lbinit(void) {
 //        LBSetDefaultCreate(CreateGreedyRefLB);        
-  LBRegisterBalancer("GreedyRefLB", CreateGreedyRefLB, "Apply greedy, then refine");
+  LBRegisterBalancer("GreedyRefLB", 
+                     CreateGreedyRefLB, 
+                     AllocateGreedyRefLB, 
+                     "Apply greedy, then refine");
 }
 
 #include "GreedyRefLB.def.h"
 
 GreedyRefLB::GreedyRefLB(const CkLBOptions &opt): GreedyLB(opt)
 {
-  lbname = "GreedyRefLB";
+  lbname = (char*)"GreedyRefLB";
   if (CkMyPe()==0)
     CkPrintf("[%d] GreedyRefLB created\n",CkMyPe());
 }
@@ -62,6 +63,5 @@ void GreedyRefLB::work(CentralLB::LDStats* stats, int count)
   Refiner::FreeProcs(to_procs);
 }
 
-#endif
 
 /*@}*/

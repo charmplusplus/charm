@@ -25,9 +25,9 @@ class NullLB : public BaseLB
 {
 public:
   NullLB(const CkLBOptions &opt): BaseLB(opt) 
-	{init(); lbname="NullLB";}
+	{init(); lbname=(char*)"NullLB";}
   NullLB(CkMigrateMessage *m):BaseLB(m) 
-	{init(); lbname="NullLB";}
+	{init(); lbname=(char*)"NullLB";}
   ~NullLB();
 
   static void staticAtSync(void*);

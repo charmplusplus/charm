@@ -23,8 +23,6 @@ Status:
 #include <charm++.h>
 #include <stdio.h>
 
-#if CMK_LBDB_ON
-
 #include "cklists.h"
 
 #include "GreedyCommLB.h"
@@ -35,7 +33,10 @@ Status:
 CreateLBFunc_Def(GreedyCommLB);
 
 static void lbinit(void) {
-  LBRegisterBalancer("GreedyCommLB", CreateGreedyCommLB, "Greedy algorithm which takes communication graph into account");
+  LBRegisterBalancer("GreedyCommLB", 
+		     CreateGreedyCommLB, 
+		     AllocateGreedyCommLB, 
+		     "Greedy algorithm which takes communication graph into account");
 }
 
 #include "GreedyCommLB.def.h"
@@ -44,14 +45,14 @@ static void lbinit(void) {
 
 GreedyCommLB::GreedyCommLB(const CkLBOptions &opt): CentralLB(opt)
 {
-    lbname = "GreedyCommLB";
+    lbname = (char*)"GreedyCommLB";
     if (CkMyPe() == 0)
 	CkPrintf("[%d] GreedyCommLB created\n",CkMyPe());
     manager_init();
 }
 
 GreedyCommLB::GreedyCommLB(CkMigrateMessage *m):CentralLB(m) {
-    lbname = "GreedyCommLB";
+    lbname = (char*)"GreedyCommLB";
     manager_init();
 }
 
@@ -298,8 +299,6 @@ void GreedyCommLB::work(CentralLB::LDStats* _stats, int count)
     delete [] object_graph;
 }
 
-
-#endif
 
 /*@}*/
 

@@ -18,7 +18,6 @@
 
 #include <charm++.h>
 
-#if CMK_LBDB_ON
 
 #include "cklists.h"
 #include "GreedyLB.h"
@@ -26,7 +25,10 @@
 CreateLBFunc_Def(GreedyLB);
 
 static void lbinit(void) {
-  LBRegisterBalancer("GreedyLB", CreateGreedyLB, "always assign the heaviest obj onto lightest loaded processor.");
+  LBRegisterBalancer("GreedyLB", 
+                     CreateGreedyLB, 
+                     AllocateGreedyLB, 
+                     "always assign the heaviest obj onto lightest loaded processor.");
 }
 
 #include "GreedyLB.def.h"
@@ -196,7 +198,7 @@ void GreedyLB::work(CentralLB::LDStats* stats, int count)
   HeapData *cpuData = BuildCpuArray(stats, count, &heapSize);
   HeapData *objData = BuildObjectArray(stats, count, &objCount);
 
-  //  CkPrintf("[%d] GreedyLB strategy\n",CkMyPe());
+  if (_lb_debug) CkPrintf("In GreedyLB strategy\n",CkMyPe());
 
   heapSize--;
   for (obj=0; obj < objCount; obj++) {
@@ -236,8 +238,6 @@ void GreedyLB::work(CentralLB::LDStats* stats, int count)
   delete [] objData;
 }
 
-
-#endif
 
 
 /*@}*/

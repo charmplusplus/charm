@@ -63,11 +63,20 @@ public:
   double * expectedLoad;
 };
 
+#if CMK_LBDB_ON
 #define CreateLBFunc_Def(x)		\
 void Create##x(void) { 	\
   int seqno = LBDatabaseObj()->getLoadbalancerTicket();	\
   CProxy_##x::ckNew(CkLBOptions(seqno)); 	\
+}	\
+BaseLB *Allocate##x(void) { \
+  return new x((CkMigrateMessage*)NULL);	\
 }
+#else		/* CMK_LBDB_ON */
+#define CreateLBFunc_Def(x)	\
+void Create##x(void) {} 	\
+BaseLB *Allocate##x(void) { return NULL; }
+#endif
 
 #endif
 

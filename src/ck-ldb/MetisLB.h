@@ -23,7 +23,7 @@ public:
   MetisLB(const CkLBOptions &);
   MetisLB(CkMigrateMessage *m):CentralLB(m) {}
 private:
-  CmiBool QueryBalanceNow(int step);
+  CmiBool QueryBalanceNow(int step) { return CmiTrue; }
   void work(CentralLB::LDStats* stats, int count);
 };
 

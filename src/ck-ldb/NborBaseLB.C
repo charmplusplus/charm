@@ -18,8 +18,6 @@
 #include "NborBaseLB.h"
 #include "NborBaseLB.def.h"
 
-#if CMK_LBDB_ON
-
 //CreateLBFunc_Def(NborBaseLB);
 
 void NborBaseLB::staticMigrated(void* data, LDObjHandle h)
@@ -38,7 +36,8 @@ void NborBaseLB::staticAtSync(void* data)
 
 NborBaseLB::NborBaseLB(const CkLBOptions &opt): BaseLB(opt)
 {
-  lbname = "NborBaseLB";
+#if CMK_LBDB_ON
+  lbname = (char *)"NborBaseLB";
   mystep = 0;
   thisProxy = CProxy_NborBaseLB(thisgroup);
   theLbdb->
@@ -73,6 +72,7 @@ NborBaseLB::NborBaseLB(const CkLBOptions &opt): BaseLB(opt)
   receive_stats_ready = 0;
 
   theLbdb->CollectStatsOn();
+#endif
 }
 
 NborBaseLB::~NborBaseLB()
@@ -100,6 +100,7 @@ void NborBaseLB::FindNeighbors()
 
 void NborBaseLB::AtSync()
 {
+#if CMK_LBDB_ON
   //  CkPrintf("[%d] NborBaseLB At Sync step %d!!!!\n",CkMyPe(),mystep);
 
   if (neighbor_pes == 0) FindNeighbors();
@@ -131,10 +132,12 @@ void NborBaseLB::AtSync()
   // Tell our own node that we are ready
   CkMarshalledNLBStatsMessage mmsg(NULL);
   ReceiveStats(mmsg);
+#endif
 }
 
 NLBStatsMsg* NborBaseLB::AssembleStats()
 {
+#if CMK_LBDB_ON
   // Get stats
   theLbdb->TotalTime(&myStats.total_walltime,&myStats.total_cputime);
   theLbdb->IdleTime(&myStats.idletime);
@@ -187,6 +190,9 @@ NLBStatsMsg* NborBaseLB::AssembleStats()
   //  CkPrintf("PE %d sending %d to ReceiveStats %d objs, %d comm\n",
   //	   CkMyPe(),msg->serial,msg->n_objs,msg->n_comm);
   return msg;
+#else
+  return NULL;
+#endif
 }
 
 void NborBaseLB::Migrated(LDObjHandle h)
@@ -201,6 +207,7 @@ void NborBaseLB::Migrated(LDObjHandle h)
 
 void NborBaseLB::ReceiveStats(CkMarshalledNLBStatsMessage &data)
 {
+#if CMK_LBDB_ON
   NLBStatsMsg *m = data.getMessage();
   if (neighbor_pes == 0) FindNeighbors();
 
@@ -278,11 +285,12 @@ void NborBaseLB::ReceiveStats(CkMarshalledNLBStatsMessage &data)
         CkPrintf("Strat elapsed time %f\n",strat_end_time-strat_start_time);
     }
   }
-  
+#endif  
 }
 
 void NborBaseLB::ReceiveMigration(LBMigrateMsg *msg)
 {
+#if CMK_LBDB_ON
   if (neighbor_pes == 0) FindNeighbors();
 
   if (mig_msgs_received == 0) migrates_expected = 0;
@@ -319,11 +327,13 @@ void NborBaseLB::ReceiveMigration(LBMigrateMsg *msg)
   mig_msgs_received = 0;
   if (migrates_expected == 0 || migrates_expected == migrates_completed)
     MigrationDone();
+#endif
 }
 
 
 void NborBaseLB::MigrationDone()
 {
+#if CMK_LBDB_ON
   if (CkMyPe() == 0 && start_lb_time != 0.0) {
     double end_lb_time = CmiWallTimer();
     if (_lb_debug)
@@ -335,11 +345,14 @@ void NborBaseLB::MigrationDone()
   // Increment to next step
   mystep++;
   thisProxy [CkMyPe()].ResumeClients();
+#endif
 }
 
 void NborBaseLB::ResumeClients()
 {
+#if CMK_LBDB_ON
   theLbdb->ResumeClients();
+#endif
 }
 
 LBMigrateMsg* NborBaseLB::Strategy(LDStats* stats,int count)
@@ -418,8 +431,6 @@ void CkMarshalledNLBStatsMessage::pup(PUP::er &p)
   msg->pup(p);
 }
 
-
-#endif
 
 
 /*@{*/

@@ -15,8 +15,6 @@
 
 #include <charm++.h>
 
-#if CMK_LBDB_ON
-
 #include "cklists.h"
 
 #include "OrbLB.h"
@@ -26,7 +24,7 @@
 CreateLBFunc_Def(OrbLB);
 
 static void lbinit(void) {
-  LBRegisterBalancer("OrbLB", CreateOrbLB, "partition objects based on coordinates");
+  LBRegisterBalancer("OrbLB", CreateOrbLB, AllocateOrbLB, "partition objects based on coordinates");
 }
 
 #include "OrbLB.def.h"
@@ -265,6 +263,7 @@ void OrbLB::mapPartitionsToNodes()
 
 void OrbLB::work(CentralLB::LDStats* stats, int count)
 {
+#if CMK_LBDB_ON
   int i,j;
 
   P = count;
@@ -391,10 +390,10 @@ void OrbLB::work(CentralLB::LDStats* stats, int count)
   delete [] partitions;
 
   CmiPrintf("OrbLB finished time: %f\n", CmiWallTimer() - t);
+#endif
 }
 
 
-#endif
 
 
 /*@}*/

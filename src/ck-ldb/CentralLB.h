@@ -128,12 +128,12 @@ public:
   void readStatsMsgs(const char* filename);
   void writeStatsMsgs(const char* filename);
 
-protected:
-  virtual CmiBool QueryBalanceNow(int) { return CmiTrue; };  
-  virtual CmiBool QueryDumpData() { return CmiFalse; };  
   virtual LBMigrateMsg* Strategy(LDStats* stats,int count);
   virtual void work(LDStats* stats,int count);
   virtual LBMigrateMsg * createMigrateMsg(LDStats* stats,int count);
+protected:
+  virtual CmiBool QueryBalanceNow(int) { return CmiTrue; };  
+  virtual CmiBool QueryDumpData() { return CmiFalse; };  
 
   void simulationRead();
   void simulationWrite();

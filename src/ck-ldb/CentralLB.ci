@@ -9,6 +9,8 @@ readonly CkGroupID loadbalancer;
 
 //message CLBStatsMsg;
 
+initnode void lbinit(void);
+
 group [migratable] CentralLB : BaseLB {
   entry void CentralLB(const CkLBOptions &);  
   entry void ProcessAtSync(void);

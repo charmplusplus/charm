@@ -33,25 +33,28 @@ double _autoLbPeriod = 1.0;		// in seconds
 int _lb_debug=0;
 int _lb_ignoreBgLoad=0;
 
-class LBDBResgistry {
+// registry class stores all load balancers linked and created at runtime
+class LBDBRegistry {
 friend class LBDBInit;
+friend class LBDatabase;
 private:
   // table for all available LBs linked in
   struct LBDBEntry {
     const char *name;
-    LBCreateFn  fn;
+    LBCreateFn  cfn;
+    LBAllocFn   afn;
     const char *help;
     int 	shown;		// if 0, donot show in help page
-    LBDBEntry(): name(0), fn(0), help(0), shown(1) {}
+    LBDBEntry(): name(0), cfn(0), afn(0), help(0), shown(1) {}
     LBDBEntry(int) {}
-    LBDBEntry(const char *n, LBCreateFn f, const char *h, int show=1):
-      name(n), fn(f), help(h), shown(show) {};
+    LBDBEntry(const char *n, LBCreateFn cf, LBAllocFn af, const char *h, int show=1):
+      name(n), cfn(cf), afn(af), help(h), shown(show) {};
   };
   CkVec<LBDBEntry> lbtables;	 	// a list of available LBs linked
   CkVec<const char *>   compile_lbs;	// load balancers at compile time
   CkVec<const char *>   runtime_lbs;	// load balancers at run time
 public:
-  LBDBResgistry() {}
+  LBDBRegistry() {}
   void displayLBs()
   {
     CmiPrintf("\nAvailable load balancers:\n");
@@ -61,8 +64,8 @@ public:
     }
     CmiPrintf("\n");
   }
-  void addEntry(const char *name, LBCreateFn fn, const char *help, int shown) {
-    lbtables.push_back(LBDBEntry(name, fn, help, shown));
+  void addEntry(const char *name, LBCreateFn fn, LBAllocFn afn, const char *help, int shown) {
+    lbtables.push_back(LBDBEntry(name, fn, afn, help, shown));
   }
   void addCompiletimeBalancer(const char *name) {
     compile_lbs.push_back(name); 
@@ -71,13 +74,22 @@ public:
     runtime_lbs.push_back(name); 
   }
   LBCreateFn search(const char *name) {
+    char *ptr = strpbrk((char *)name, ":,");
+    int slen = ptr-name;
     for (int i=0; i<lbtables.length(); i++)
-      if (0==strcmp(name, lbtables[i].name)) return lbtables[i].fn;
+      if (0==strncmp(name, lbtables[i].name, slen)) return lbtables[i].cfn;
+    return NULL;
+  }
+  LBAllocFn getLBAllocFn(const char *name) {
+    char *ptr = strpbrk((char *)name, ":,");
+    int slen = ptr-name;
+    for (int i=0; i<lbtables.length(); i++)
+      if (0==strncmp(name, lbtables[i].name, slen)) return lbtables[i].afn;
     return NULL;
   }
 };
 
-static LBDBResgistry lbRegistry;
+static LBDBRegistry lbRegistry;
 
 void LBDefaultCreate(const char *lbname)
 {
@@ -85,9 +97,13 @@ void LBDefaultCreate(const char *lbname)
 }
 
 // default is to show the helper
-void LBRegisterBalancer(const char *name, LBCreateFn fn, const char *help, int shown)
+void LBRegisterBalancer(const char *name, LBCreateFn fn, LBAllocFn afn, const char *help, int shown)
 {
-  lbRegistry.addEntry(name, fn, help, shown);
+  lbRegistry.addEntry(name, fn, afn, help, shown);
+}
+
+LBAllocFn getLBAllocFn(char *lbname) {
+    return lbRegistry.getLBAllocFn(lbname);
 }
 
 // create a load balancer group using the strategy name
@@ -245,6 +261,9 @@ void LBDatabase::set_avail_vector(char * bitmap, int new_ld){
     }
 }
 
+// called in CreateFooLB() when multiple load balancers are created
+// on PE0, BaseLB of each load balancer applies a ticket number
+// and broadcast the ticket number to all processors
 int LBDatabase::getLoadbalancerTicket()  { 
   int seq = nloadbalancers;
   nloadbalancers ++;
@@ -277,6 +296,20 @@ void LBDatabase::nextLoadbalancer(int seq) {
   if (seq != next) {
     loadbalancers[seq]->turnOff();
     loadbalancers[next]->turnOn();
+  }
+}
+
+// return the seq-th load balancer string name of
+// it can be specified in either compile time or runtime
+// runtime has higher priority
+const char *LBDatabase::loadbalancer(int seq) {
+  if (lbRegistry.runtime_lbs.length()) {
+    CmiAssert(seq < lbRegistry.runtime_lbs.length());
+    return lbRegistry.runtime_lbs[seq];
+  }
+  else {
+    CmiAssert(seq < lbRegistry.compile_lbs.length());
+    return lbRegistry.compile_lbs[seq];
   }
 }
 

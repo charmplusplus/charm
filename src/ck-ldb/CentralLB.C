@@ -13,7 +13,6 @@
 #include <charm++.h>
 #include "envelope.h"
 #include "CentralLB.h"
-#include "CentralLB.def.h"
 #include "LBDBManager.h"
 #include "LBSimulation.h"
 
@@ -23,16 +22,22 @@ CkGroupID loadbalancer;
 int * lb_ptr;
 int load_balancer_created;
 
-#if CMK_LBDB_ON
+CreateLBFunc_Def(CentralLB);
+
+static void lbinit(void) {
+  LBRegisterBalancer("CentralLB", CreateCentralLB, AllocateCentralLB, "CentralLB base class");
+}
 
 static void getPredictedLoad(CentralLB::LDStats* stats, int count, 
 		             LBMigrateMsg *, double *peLoads, 
 			     double &, double &, int considerComm);
 
+/*
 void CreateCentralLB()
 {
   CProxy_CentralLB::ckNew(0);
 }
+*/
 
 void CentralLB::staticStartLB(void* data)
 {
@@ -54,6 +59,7 @@ void CentralLB::staticAtSync(void* data)
 
 CentralLB::CentralLB(const CkLBOptions &opt): BaseLB(opt)
 {
+#if CMK_LBDB_ON
   lbname = "CentralLB";
   thisProxy = CProxy_CentralLB(thisgroup);
   //  CkPrintf("Construct in %d\n",CkMyPe());
@@ -86,40 +92,48 @@ CentralLB::CentralLB(const CkLBOptions &opt): BaseLB(opt)
   theLbdb->CollectStatsOn();
 
   load_balancer_created = 1;
+#endif
 }
 
 CentralLB::~CentralLB()
 {
+#if CMK_LBDB_ON
   CkPrintf("Going away\n");
   delete [] statsMsgsList;
   theLbdb->getLBDB()->
     RemoveNotifyMigrated(notifier);
   theLbdb->
     RemoveStartLBFn((LDStartLBFn)(staticStartLB));
+#endif
 }
 
 void CentralLB::turnOn() 
 {
+#if CMK_LBDB_ON
   theLbdb->getLBDB()->
     TurnOnBarrierReceiver(receiver);
   theLbdb->getLBDB()->
     TurnOnNotifyMigrated(notifier);
   theLbdb->getLBDB()->
     TurnOnStartLBFn(startLbFnHdl);
+#endif
 }
 
 void CentralLB::turnOff() 
 {
+#if CMK_LBDB_ON
   theLbdb->getLBDB()->
     TurnOffBarrierReceiver(receiver);
   theLbdb->getLBDB()->
     TurnOffNotifyMigrated(notifier);
   theLbdb->getLBDB()->
     TurnOffStartLBFn(startLbFnHdl);
+#endif
 }
 
 void CentralLB::AtSync()
 {
+#if CMK_LBDB_ON
   DEBUGF(("[%d] CentralLB At Sync step %d!!!!\n",CkMyPe(),mystep));
 
   // if num of processor is only 1, nothing should happen
@@ -128,10 +142,12 @@ void CentralLB::AtSync()
     return;
   }
   thisProxy [CkMyPe()].ProcessAtSync();
+#endif
 }
 
 void CentralLB::ProcessAtSync()
 {
+#if CMK_LBDB_ON
   if (CkMyPe() == cur_ld_balancer) {
     start_lb_time = CmiWallTimer();
   }
@@ -170,16 +186,19 @@ void CentralLB::ProcessAtSync()
   }
 
   thisProxy[cur_ld_balancer].ReceiveStats(msg);
+#endif
 }
 
 void CentralLB::Migrated(LDObjHandle h)
 {
+#if CMK_LBDB_ON
   migrates_completed++;
   //  CkPrintf("[%d] An object migrated! %d %d\n",
   //  	   CkMyPe(),migrates_completed,migrates_expected);
   if (migrates_completed == migrates_expected) {
     MigrationDone(1);
   }
+#endif
 }
 
 // build data from buffered msg
@@ -219,6 +238,7 @@ void CentralLB::buildStats()
 
 void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
 {
+#if CMK_LBDB_ON
   CLBStatsMsg *m = (CLBStatsMsg *)msg.getMessage();
   int proc;
   const int pe = m->from_pe;
@@ -304,12 +324,13 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
 //    double strat_end_time = CmiWallTimer();
 //    CkPrintf("Strat elapsed time %f\n",strat_end_time-strat_start_time);
   }
-
+#endif
 }
 
 // test if sender and receiver in a commData is nonmigratable.
 static int isMigratable(LDObjData **objData, int *len, int count, const LDCommData &commData)
 {
+#if CMK_LBDB_ON
   for (int pe=0 ; pe<count; pe++)
   {
     for (int i=0; i<len[pe]; i++)
@@ -317,6 +338,7 @@ static int isMigratable(LDObjData **objData, int *len, int count, const LDCommDa
           LDObjIDEqual(objData[pe][i].objID(), commData.receiver.get_destObj().objID())) 
       return 0;
   }
+#endif
   return 1;
 }
 
@@ -374,10 +396,12 @@ void CentralLB::removeNonMigratable(LDStats* stats, int count)
   delete [] nonmig;
   delete [] lens;
 }
+
 #endif
 
 void CentralLB::ReceiveMigration(LBMigrateMsg *m)
 {
+#if CMK_LBDB_ON
   int i;
   for (i=0; i<CkNumPes(); i++) theLbdb->lastLBInfo.expectedLoad[i] = m->expectedLoad[i];
   
@@ -408,11 +432,13 @@ void CentralLB::ReceiveMigration(LBMigrateMsg *m)
   if (migrates_expected == 0 || migrates_completed == migrates_expected)
     MigrationDone(1);
   delete m;
+#endif
 }
 
 
 void CentralLB::MigrationDone(int balancing)
 {
+#if CMK_LBDB_ON
   if (balancing && _lb_debug && CkMyPe() == cur_ld_balancer) {
     double end_lb_time = CmiWallTimer();
       CkPrintf("[%s] Load balancing step %d finished at %f\n",
@@ -429,24 +455,33 @@ void CentralLB::MigrationDone(int balancing)
   // Increment to next step
   theLbdb->incStep();
   thisProxy [CkMyPe()].ResumeClients(balancing);
+#endif
 }
 
 void CentralLB::ResumeClients(int balancing)
 {
+#if CMK_LBDB_ON
   DEBUGF(("Resuming clients on PE %d\n",CkMyPe()));
   theLbdb->ResumeClients();
+  // switch to the next load balancer in the list
   if (balancing) theLbdb->nextLoadbalancer(seqno);
+#endif
 }
 
 // default load balancing strategy
 LBMigrateMsg* CentralLB::Strategy(LDStats* stats,int count)
 {
+#if CMK_LBDB_ON
   work(stats, count);
   return createMigrateMsg(stats, count);
+#else
+  return NULL;
+#endif
 }
 
 void CentralLB::work(LDStats* stats,int count)
 {
+#if CMK_LBDB_ON
   int i;
   for(int pe=0; pe < count; pe++) {
     struct ProcStats &proc = stats->procs[pe];
@@ -493,6 +528,7 @@ void CentralLB::work(LDStats* stats,int count)
       CkPrintf("     messages = %d\n",cdata[i].messages);
       CkPrintf("        bytes = %d\n",cdata[i].bytes);
     }
+#endif
 }
 
 // generate migrate message from stats->from_proc and to_proc
@@ -611,8 +647,9 @@ void CentralLB::simulationRead() {
   CkExit();
 }
 
-void CentralLB::readStatsMsgs(const char* filename) {
-
+void CentralLB::readStatsMsgs(const char* filename) 
+{
+#if CMK_LBDB_ON
   int i;
   FILE *f = fopen(filename, "r");
   if (f==NULL) {
@@ -649,10 +686,12 @@ void CentralLB::readStatsMsgs(const char* filename) {
 
   // file f is closed in the destructor of PUP::fromDisk
   CmiPrintf("ReadStatsMsg from %s completed\n", filename);
+#endif
 }
 
-void CentralLB::writeStatsMsgs(const char* filename) {
-
+void CentralLB::writeStatsMsgs(const char* filename) 
+{
+#if CMK_LBDB_ON
   FILE *f = fopen(filename, "w");
   if (f==NULL) {
     CmiPrintf("Fatal Error> writeStatsMsgs failed to open the output file %s!\n", filename);
@@ -669,6 +708,7 @@ void CentralLB::writeStatsMsgs(const char* filename) {
   fclose(f);
 
   CmiPrintf("WriteStatsMsgs to %s succeed!\n", filename);
+#endif
 }
 
 // calculate the predicted wallclock/cpu load for every processors
@@ -678,6 +718,7 @@ static void getPredictedLoad(CentralLB::LDStats* stats, int count,
                              double &minObjLoad, double &maxObjLoad,
 			     int considerComm)
 {
+#if CMK_LBDB_ON
         int i, pe;
 
         minObjLoad = 1.0e20;	// I suppose no object load is beyond this
@@ -758,6 +799,7 @@ static void getPredictedLoad(CentralLB::LDStats* stats, int count,
 	  delete [] byteRecvCount;
 	  delete [] byteSentCount;
 	}
+#endif
 }
 
 void CentralLB::findSimResults(LDStats* stats, int count, LBMigrateMsg* msg, LBSimulation* simResults)
@@ -816,6 +858,7 @@ void CentralLB::LDStats::deleteCommHash() {
 
 int CentralLB::LDStats::getHash(const LDObjid &oid, const LDOMid &mid)
 {
+#if CMK_LBDB_ON
     CmiAssert(hashSize > 0);
     int hash = ObjKey(oid, hashSize);
 
@@ -827,6 +870,7 @@ int CentralLB::LDStats::getHash(const LDObjid &oid, const LDOMid &mid)
             return objHash[index];
     }
     //  CkPrintf("not found \n");
+#endif
     return -1;
 }
 
@@ -948,6 +992,6 @@ void CkMarshalledCLBStatsMessage::pup(PUP::er &p)
   msg->pup(p);
 }
 
-#endif
+#include "CentralLB.def.h"
 
 /*@}*/

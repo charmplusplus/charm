@@ -24,7 +24,7 @@ void CreateNullLB(void) {
 }
 
 static void lbinit(void) {
-  LBRegisterBalancer("NullLB", CreateNullLB, "should not be shown", 0);
+  LBRegisterBalancer("NullLB", CreateNullLB, NULL, "should not be shown", 0);
 }
 
 #if CMK_LBDB_ON

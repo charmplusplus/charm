@@ -41,9 +41,10 @@ extern int _lb_debug;
 extern int _lb_ignoreBgLoad;
 
 typedef void (*LBCreateFn)();
+typedef BaseLB * (*LBAllocFn)();
 void LBDefaultCreate(LBCreateFn f);
 
-void LBRegisterBalancer(const char *, LBCreateFn, const char *, int shown=1);
+void LBRegisterBalancer(const char *, LBCreateFn, LBAllocFn, const char *, int shown=1);
 
 void _LBDBInit();
 
@@ -214,6 +215,7 @@ public:
   int getLoadbalancerTicket();
   void addLoadbalancer(BaseLB *lb, int seq);
   void nextLoadbalancer(int seq);
+  const char *loadbalancer(int seq);
 
   inline int step() { return mystep; }
   inline void incStep() { mystep++; }

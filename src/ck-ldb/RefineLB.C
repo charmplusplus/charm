@@ -12,8 +12,6 @@
 
 #include <charm++.h>
 
-#if CMK_LBDB_ON
-
 #include "cklists.h"
 
 #include "RefineLB.h"
@@ -21,21 +19,19 @@
 CreateLBFunc_Def(RefineLB);
 
 static void lbinit(void) {
-  LBRegisterBalancer("RefineLB", CreateRefineLB, "Move objects away from overloaded processor to reach average");
+  LBRegisterBalancer("RefineLB", 
+                     CreateRefineLB, 
+                     AllocateRefineLB, 
+                     "Move objects away from overloaded processor to reach average");
 }
 
 #include "RefineLB.def.h"
 
 RefineLB::RefineLB(const CkLBOptions &opt): CentralLB(opt)
 {
-  lbname = "RefineLB";
+  lbname = (char *)"RefineLB";
   if (CkMyPe() == 0)
     CkPrintf("[%d] RefineLB created\n",CkMyPe());
-}
-
-CmiBool RefineLB::QueryBalanceNow(int _step)
-{
-  return CmiTrue;
 }
 
 void RefineLB::work(CentralLB::LDStats* stats, int count)
@@ -73,8 +69,5 @@ void RefineLB::work(CentralLB::LDStats* stats, int count)
   Refiner::FreeProcs(from_procs);
   Refiner::FreeProcs(to_procs);
 };
-
-#endif
-
 
 /*@}*/

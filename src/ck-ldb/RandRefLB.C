@@ -12,8 +12,6 @@
 
 #include <charm++.h>
 
-#if CMK_LBDB_ON
-
 #include "cklists.h"
 #include "Refiner.h"
 
@@ -23,14 +21,14 @@ CreateLBFunc_Def(RandRefLB);
 
 static void lbinit(void) {
 //        LBSetDefaultCreate(CreateRandRefLB);
-  LBRegisterBalancer("RandRefLB", CreateRandRefLB, "Apply random, then refine");
+  LBRegisterBalancer("RandRefLB", CreateRandRefLB, AllocateRandRefLB, "Apply random, then refine");
 }
 
 #include "RandRefLB.def.h"
 
 RandRefLB::RandRefLB(const CkLBOptions &opt): RandCentLB(opt)
 {
-  lbname = "RandRefLB";
+  lbname = (char *)"RandRefLB";
   if (CkMyPe() == 0)
     CkPrintf("[%d] RandRefLB created\n",CkMyPe());
 }
@@ -65,8 +63,6 @@ void RandRefLB::work(CentralLB::LDStats* stats, int count)
   Refiner::FreeProcs(from_procs);
   Refiner::FreeProcs(to_procs);
 };
-
-#endif
 
 
 /*@}*/
