@@ -8,6 +8,8 @@ New Supported Platforms:
 
 2. Charm++ ported to Power Macintosh powerpc running Darwin;
 
+3. Charm++ ported to Myrinet networking with GM API;
+
 --------------------------------------------------------------------------------
 Summary of New Features:
 --------------------------------------------------------------------------------

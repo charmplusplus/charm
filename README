@@ -43,7 +43,8 @@ run ./build in charm top directory to check the latest versions.)
 
 Charm version          OS        Communication     Compiler  
 -------------       ---------    --------------   --------------------
-net-linux            PC Linux       UDP           GNU compiler
+net-linux            PC Linux       UDP/Myrinet   GNU compiler
+net-linux-ia64       IA64 Linux     UDP/Myrinet   GNU compiler
 net-linux-kcc        PC Linux       UDP           KAI C++ compiler
 net-linux-pgcc       PC Linux       UDP           Portland Group's C++ compiler
 net-linux-scyld      PC Linux     Scyld/UDP       GNU compiler
@@ -66,6 +67,7 @@ net-hp-cc            HP-UX          UDP           HP-UX C++ compiler
 net-hp-acc           HP-UX          UDP           HP-UX aC++ compiler
 mpi-sp               AIX            MPI           AIX xlC Compiler 
 t3e                  Cray T3E    shared-mem       Cray C++ compiler
+net-ppc-darwin       Mac            UDP           GNU C++ compiler
 
 
 Your choice is determined by three options:
