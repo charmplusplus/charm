@@ -13,17 +13,21 @@ void setReverseMap(int *procMap, int *pelist, int npes){
 }
 
 EachToManyStrategy::EachToManyStrategy(int substrategy){
+    ComlibPrintf("In constructor, %d\n", substrategy);
     routerID = substrategy;
-    messageBuf = NULL;
+    messageBuf = 0;
     messageCount = 0;
 
+    ComlibPrintf("Before instance\n");
     comid = ComlibInstance(routerID, CkNumPes());
     this->npes = npes;
-    
+    ComlibPrintf("After instance\n");
+
     procMap = new int[CkNumPes()];
     for(int count = 0; count < CkNumPes(); count ++){
         procMap[count] = count;
     }
+    ComlibPrintf("After Constructor\n");
 }
 
 EachToManyStrategy::EachToManyStrategy(int substrategy, int npes, int *pelist){
@@ -42,9 +46,7 @@ void EachToManyStrategy::insertMessage(CharmMessageHolder *cmsg){
 
     ComlibPrintf("EachToMany: insertMessage\n");
 
-    cmsg->next = messageBuf;
-    messageBuf = cmsg;    
-    messageCount ++;
+    messageBuf->enq(cmsg);
 }
 
 void EachToManyStrategy::doneInserting(){
@@ -59,14 +61,14 @@ void EachToManyStrategy::doneInserting(){
         CmiSetHandler(UsrToEnv(dummymsg), 
                       CpvAccess(RecvdummyHandle));
         
-        messageBuf = new CharmMessageHolder((char *)dummymsg, CkMyPe());
+        messageBuf->enq(new CharmMessageHolder((char *)dummymsg, CkMyPe()));
         messageCount ++;
     }
 
     NumDeposits(comid, messageCount);
     
-    CharmMessageHolder *cmsg = messageBuf;
-    for(int count = 0; count < messageCount; count ++) {
+    while(!messageBuf->isEmpty()) {
+	CharmMessageHolder *cmsg = messageBuf->deq();
         char * msg = cmsg->getCharmMessage();
         ComlibPrintf("Calling EachToMany %d %d %d procMap=%d\n", 
                      UsrToEnv(msg)->getTotalsize(), CkMyPe(), 
@@ -83,6 +85,9 @@ void EachToManyStrategy::doneInserting(){
 }
 
 void EachToManyStrategy::pup(PUP::er &p){
+
+  ComlibPrintf("Each To many :: pup\n");
+
     Strategy::pup(p);
     
     p | messageCount;
@@ -95,7 +100,10 @@ void EachToManyStrategy::pup(PUP::er &p){
         procMap = new int[CkNumPes()];
         
     p | procMap;
-    messageBuf = NULL;
+
+    if(p.isUnpacking()){
+      messageBuf = new CkQ<CharmMessageHolder *>;
+    }
 }
 
 PUPable_def(EachToManyStrategy); 

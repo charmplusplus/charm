@@ -59,6 +59,7 @@ Strategy* createStrategy(int s, int n){
 //An initialization routine which does prelimnary initialization of the 
 //communications library and registers the strategies with the PUP:able interface.
 void initComlibManager(void){
+  //    comm_debug = 1;
     ComlibInit();
     ComlibPrintf("Init Call\n");
     //Called once on each processor 
@@ -99,12 +100,13 @@ ComlibManager::ComlibManager(int s, int n){
 
 ComlibManager::ComlibManager(){
     init();
+    ComlibPrintf("In comlibmanager constructor\n");
 }
 
 void ComlibManager::init(){
-    
-    //comm_debug = 1;
 
+    //    comm_debug = 1;
+    
     npes = CkNumPes();
     pelist = NULL;
 
@@ -149,6 +151,7 @@ void ComlibManager::createId(int *pelist, int npes){
 }
 
 int ComlibManager::createInstance(Strategy *strat) {
+  
   ListOfStrategies.enq(strat);
   nstrats++;
   return nstrats - 1;

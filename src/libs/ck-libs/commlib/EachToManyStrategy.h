@@ -3,7 +3,7 @@
 #include "ComlibManager.h"
 
 class EachToManyStrategy : public Strategy {
-    CharmMessageHolder *messageBuf;
+    CkQ <CharmMessageHolder*> *messageBuf;
     int messageCount;
     int routerID;
     comID comid;
