@@ -1026,8 +1026,12 @@ void CmiMulticastDeliver(MultiMsg msg)
     msg->pos = child2;
     CmiSyncSend(pes[child2], nlen, msg);
   }
-  memcpy(msg, (((char*)msg)+olen), sizeof(struct MultiMsg));
-  CmiSyncSendAndFree(CmiMyPe(), nlen, msg);
+  if(olen < sizeof(struct MultiMsg)) {
+    memcpy(msg, msg+1, olen);
+  } else {
+    memcpy(msg, (((char*)msg)+olen), sizeof(struct MultiMsg));
+  }
+  CmiSyncSendAndFree(CmiMyPe(), olen, msg);
 }
 
 void CmiMulticastHandler(MultiMsg msg)
@@ -1039,11 +1043,14 @@ void CmiMulticastHandler(MultiMsg msg)
 void CmiSyncMulticastFn(CmiGroup grp, int len, char *msg)
 {
   int newlen; MultiMsg newmsg;
-  if (len < sizeof(struct MultiMsg)) len = sizeof(struct MultiMsg);
   newlen = len + sizeof(struct MultiMsg);
   newmsg = (MultiMsg)CmiAlloc(newlen);
-  memcpy(newmsg+1, msg+sizeof(struct MultiMsg), len-sizeof(struct MultiMsg));
-  memcpy((((char*)newmsg)+len), msg, sizeof(struct MultiMsg));
+  if(len < sizeof(struct MultiMsg)) {
+    memcpy(newmsg+1, msg, len);
+  } else {
+    memcpy(newmsg+1, msg+sizeof(struct MultiMsg), len-sizeof(struct MultiMsg));
+    memcpy(((char *)newmsg+len), msg, sizeof(struct MultiMsg));
+  }
   newmsg->group = grp;
   newmsg->origlen = len;
   newmsg->pos = -1;
