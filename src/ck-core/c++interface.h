@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.9  1995-09-07 21:21:38  jyelon
+ * Revision 2.10  1995-09-19 21:44:54  brunner
+ * Moved declaration of CmiTimer to converse.h from here.
+ *
+ * Revision 2.9  1995/09/07  21:21:38  jyelon
  * Added prefixes to Cpv and Csv macros, fixed bugs thereby revealed.
  *
  * Revision 2.8  1995/09/06  21:48:50  jyelon
@@ -210,7 +213,7 @@ extern "C" void GeneralBroadcastMsgBranch(int, void *, int, int) ;
 extern "C" void SendMsg(int, void *, ChareIDType *) ;
 extern "C" void *GetBocDataPtr(int) ;
 extern "C" void SetBocBlockPtr(int, CHARE_BLOCK *);
-extern "C" double CmiTimer() ;
+// extern "C" double CmiTimer() ;
 extern "C" int CmiSpanTreeRoot() ;
 extern "C" int CmiNumSpanTreeChildren(int) ;
 extern "C" int CmiSpanTreeParent(int) ;
