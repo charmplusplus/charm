@@ -67,16 +67,6 @@ CpvDeclare(int,AllocCount);
 CpvDeclare(int,BlocksAllocated);
 #endif
 
-#if CMK_SIGHOLD_USE_SIGMASK
-#include <signal.h>
-int sighold(sig) int sig;
-{ if (sigblock(sigmask(sig)) < 0) return -1;
-  else return 0; }
-int sigrelse(sig) int sig;
-{ if (sigsetmask(sigblock(0)&(~sigmask(sig))) < 0) return -1;
-  else return 0; }
-#endif
-
 #define MAX_HANDLERS 512
 
 #if CMK_NODE_QUEUE_AVAILABLE
