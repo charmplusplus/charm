@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1995-06-19 16:47:38  brunner
+ * Revision 2.2  1995-07-10 22:29:40  brunner
+ * Created perfModuleInit() to handle CPV macros
+ *
+ * Revision 2.1  1995/06/19  16:47:38  brunner
  * Added Cpv macros and modified to use chareCount instead of TotalChares,
  * pseudoCount instead of TotalPseudos, etc.
  * Doesn't work yet, but I need to get a new copy of the files, so I'm
@@ -73,6 +76,23 @@ CpvExtern(int,chareCount);
 CpvExtern(int,pseudoCount);
 CpvExtern(int,msgCount);
 
+perfModuleInit()
+{
+  CpvInitialize(char*,pgm);
+  CpvInitialize(char*,machine);
+  CpvInitialize(char*,log_file_name);
+  CpvInitialize(int,current_event);
+  CpvInitialize(LOGARR,logbuf);
+  CpvInitialize(int,logcnt);        /* no. of log entries 	*/
+  CpvInitialize(int,iteration);
+  CpvInitialize(int,store_event);
+  CpvInitialize(int,store_pe);
+  CpvInitialize(uint, store_time);  /* not used currently? */
+  CpvInitialize(int,begin_pe);
+  CpvInitialize(int,begin_event);
+  CpvInitialize(uint,begin_processing_time);
+  CpvInitialize(FILE*,state_file_fd);
+}
 
 void PrintStsFile(str)
 char *str ;
@@ -253,20 +273,6 @@ log_init()
 	int length;
 	FILE *log_file_desc;
 
-	CpvInitialize(char*,pgm);
-	CpvInitialize(char*,machine);
-	CpvInitialize(char*,log_file_name);
-	CpvInitialize(int,current_event);
-	CpvInitialize(LOGARR,logbuf);
-	CpvInitialize(int,logcnt);        /* no. of log entries 	*/
-	CpvInitialize(int,iteration);
-	CpvInitialize(int,store_event);
-	CpvInitialize(int,store_pe);
-	CpvInitialize(uint, store_time);  /* not used currently? */
-	CpvInitialize(int,begin_pe);
-	CpvInitialize(int,begin_event);
-	CpvInitialize(uint,begin_processing_time);
-	CpvInitialize(FILE*,state_file_fd);
 
 	CpvAccess(RecdPerfMsg)=1;
 	CpvAccess(current_event)=1;

@@ -11,8 +11,11 @@
  ***************************************************************************
  * REVISION HISTORY:
  *      $Log$
- *      Revision 2.2  1995-07-06 22:42:54  narain
- *      Corrected usage of LdbBocNum to StatisticBocNum
+ *      Revision 2.3  1995-07-10 22:29:40  brunner
+ *      Created perfModuleInit() to handle CPV macros
+ *
+ * Revision 2.2  1995/07/06  22:42:54  narain
+ * Corrected usage of LdbBocNum to StatisticBocNum
  *
  *
  ***************************************************************************/
@@ -45,7 +48,7 @@ CpvDeclare(int,start_processing_time);
 
 CpvExtern(int,RecdStatMsg);
 
-init_globals()
+perfModuleInit()
 {
   CpvInitialize(char*,pgm);
   CpvInitialize(int,RecdPerfMsg);
@@ -153,8 +156,6 @@ log_init()
 	int i, j;
 	CpvAccess(timestep) = INITIAL_TIMESTEP;
 
-
-	init_globals();
 	CpvAccess(RecdPerfMsg) = 0;
 	CpvAccess(init_time) = CkTimer();
 	CpvAccess(start_processing_time) = -1;
