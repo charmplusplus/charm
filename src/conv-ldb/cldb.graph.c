@@ -1,21 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
-#ifdef  WIN32
-#include "queueing.h"
-extern int CldLoad();
-extern int CldCountTokens();
-extern void CldSwitchHandler(char *, int);
-extern void CldRestoreHandler(char *);
-extern void CldPutToken(char *);
-extern void CqsEnqueueGeneral(Queue, void *, unsigned int, unsigned int, unsigned int*);
-extern void CldModuleGeneralInit();
-#endif
-
 #include "cldb.graph.h"
 #define PERIOD 20                /* default: 30 */
 #define MAXOVERLOAD 1
@@ -158,6 +140,10 @@ void CldEnqueue(int pe, void *msg, int infofn)
       CpvAccess(neighbors)[CpvAccess(Mindex)].load++;
       CpvAccess(CldRelocatedMessages)++;
       ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+      if (pfn) {
+	pfn(&msg);
+	ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+      }
       CmiSetInfo(msg,infofn);
       CldSwitchHandler(msg, CpvAccess(CldBalanceHandlerIndex));
       CmiSyncSendAndFree(pe, len, msg);
