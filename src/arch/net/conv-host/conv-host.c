@@ -1905,9 +1905,9 @@ void rsh_pump(p, nodeno, rank0no, argv)
 
   if (arg_debug || arg_debug_no_pause || arg_in_xterm) {
     xstr_printf(ibuf,"for dir in `echo $PATH | sed -e 's/:/ /g'`; do\n");
-    xstr_printf(ibuf,"  test -e $dir/%s && export F_XTERM=$dir/%s\n", 
+    xstr_printf(ibuf,"  test -f $dir/%s && export F_XTERM=$dir/%s\n", 
                      nodetab_xterm(nodeno), nodetab_xterm(nodeno));
-    xstr_printf(ibuf,"  test -e $dir/xrdb && export F_XRDB=$dir/xrdb\n");
+    xstr_printf(ibuf,"  test -f $dir/xrdb && export F_XRDB=$dir/xrdb\n");
     xstr_printf(ibuf,"done\n");
     xstr_printf(ibuf,"if test -z \"$F_XTERM\";  then\n");
     xstr_printf(ibuf,"   echo '%s not in path --- set your path in your profile.'\n", nodetab_xterm(nodeno));
@@ -1924,7 +1924,7 @@ void rsh_pump(p, nodeno, rank0no, argv)
   if (arg_debug || arg_debug_no_pause)
   	{
           xstr_printf(ibuf,"for dir in `echo $PATH | sed -e 's/:/ /g'`; do\n");
-          xstr_printf(ibuf,"  test -e $dir/%s && export F_DBG=$dir/%s\n",dbg,dbg);
+          xstr_printf(ibuf,"  test -f $dir/%s && export F_DBG=$dir/%s\n",dbg,dbg);
           xstr_printf(ibuf,"done\n");
           xstr_printf(ibuf,"if -z \"$F_DBG\"; then\n");
           xstr_printf(ibuf,"   echo '%s not in path - set your path in your cshrc.'\n",dbg);
