@@ -105,6 +105,11 @@ LBDBInit::LBDBInit(CkArgMsg *m)
   (lbFn)();
 #endif
   delete m;
+
+  if (CkpvAccess(doSimulation)) {
+    CmiPrintf("Charm++> Entering Load Balancer Simulation Mode ... \n");
+    CProxy_LBDatabase(lbdb).ckLocalBranch()->StartLB();
+  }
 }
 
 void _loadbalancerInit()
