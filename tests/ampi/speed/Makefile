@@ -1,4 +1,4 @@
-CHARMC=../../../../bin/charmc $(OPTS)
+CHARMC=../../../bin/charmc $(OPTS)
 
 OBJS = hello.o msgspeed.o test_mpi.o
 
