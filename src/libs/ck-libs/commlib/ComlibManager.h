@@ -6,7 +6,6 @@
 #include "envelope.h"
 #include "commlib.h"
 
-
 #define USE_STREAMING 0
 #define USE_TREE 1
 #define USE_MESH 2

@@ -8,7 +8,7 @@ MPI_Comm groupComm;
 MPI_Group group, groupWorld;
 #endif
 
-#define PERIOD 10
+int PERIOD = 10;
 
 void recv_msg(void *msg){
 
@@ -59,8 +59,11 @@ void ComlibManager::init(int s, int n){
     strategy = s;
     
     //currently pased by the user. Should discover it.
-    if(strategy == USE_STREAMING)
+    if(strategy == USE_STREAMING) {
         nelements = 1;
+        if(n > 0)
+            PERIOD = n;
+    }
     else 
         nelements = n;  //number of elements on that processor, 
 
