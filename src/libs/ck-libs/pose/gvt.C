@@ -22,7 +22,7 @@ PVT::PVT()
   gvtTurn = simdone = 0;
   SendsAndRecvs = new SRtable();
   SendsAndRecvs->Initialize();
-  waitForFirst = 0;
+  specEventCount = eventCount = waitForFirst = 0;
   iterMin = POSE_UnsetTS;
   int P=CkNumPes(), N=CkMyPe();
   if ((N < P-2) && (N%2 == 1)) {
