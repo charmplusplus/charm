@@ -895,18 +895,18 @@ void *CmiAlloc(size)
 int size;
 {
   char *res;
-  res =(char *)malloc(size+8);
+  res =(char *)malloc(size+2*sizeof(int));
   if (res==0) CmiAbort("Memory allocation failed.");
   ((int *)res)[0]=size;
-  ((int *)((char *)res + 4))[0]=-1;    /* Reference count value */
-  return (void *)(res+8);
+  ((int *)((char *)res + sizeof(int)))[0]=-1;    /* Reference count value */
+  return (void *)(res+2*sizeof(int));
 
 }
 
 int CmiSize(blk)
 void *blk;
 {
-  return ((int *)(((char *)blk)-8))[0];
+  return ((int *)(((char *)blk)-2*sizeof(int)))[0];
 }
 
 void CmiFree(blk)
@@ -915,43 +915,43 @@ void *blk;
   int offset;
   int refCount;
 
-  refCount = ((int *)((char *)blk - 4))[0];
+  refCount = ((int *)((char *)blk - sizeof(int)))[0];
 
   /* Check if the reference count is -1 */
   if(refCount == -1){
-    free(((char *)blk)-8);
+    free(((char *)blk)-2*sizeof(int));
   }
   else{
-    CmiPrintf("Calling CmiFree in special case :\n");
+    /* CmiPrintf("Calling CmiFree in special case :\n"); */
 
     /* if the value is positive then it is a header having the actual refernce count value */
     /* else it is the actual offset to go all the way back */
 
     if(refCount >= 0){ /* This is the Header for the Multiple messages */
 
-      CmiPrintf("in CmiFree (for header) : refCount = %d\n", refCount);
+      /* CmiPrintf("in CmiFree (for header) : refCount = %d\n", refCount); */
       
-      if(((int *)((char *)blk - 4))[0] == 0){
-	free(((char *)blk - 8));
+      if(((int *)((char *)blk - sizeof(int)))[0] == 0){
+	free(((char *)blk - 2*sizeof(int)));
 	return;
       }
-      ((int *)((char *)blk - 4))[0]--;
-      if(((int *)((char *)blk - 4))[0] == 0){
-	free(((char *)blk - 8));
+      ((int *)((char *)blk - sizeof(int)))[0]--;
+      if(((int *)((char *)blk - sizeof(int)))[0] == 0){
+	free(((char *)blk - 2*sizeof(int)));
       }
     }
     else {
       offset = refCount;
       
-      CmiPrintf("in CmiFree : offset = %d\n", offset);
-      CmiPrintf("in CmiFree : size = %d\n",((int *)((char *)blk - 8))[0]); 
+      /*      CmiPrintf("in CmiFree : offset = %d\n", offset); */
+      /*      CmiPrintf("in CmiFree : size = %d\n",((int *)((char *)blk - 8))[0]);  */
       
-      ((int *)((char *)blk + offset - 4))[0]--;
+      ((int *)((char *)blk + offset - sizeof(int)))[0]--;
       
-      CmiPrintf("in CmiFree : Ref Count : %d\n",((int *)((char *)blk + offset - 4))[0]);
+      /*      CmiPrintf("in CmiFree : Ref Count : %d\n",((int *)((char *)blk + offset - sizeof(int)))[0]);*/
 
-      if(((int *)((char *)blk + offset - 4))[0] == 0){
-	free(((char *)blk + offset - 8));
+      if(((int *)((char *)blk + offset - sizeof(int)))[0] == 0){
+	free(((char *)blk + offset - 2*sizeof(int)));
       }
     }
   }
@@ -995,12 +995,12 @@ void CmiMultipleSend(unsigned int destPE, int len, int sizes[], char *msgComps[]
 
   /* Construct the newSizes array from the old sizes array */
   newSizes[0] = (CmiMsgHeaderSizeBytes + (len + 1)*sizeof(int));
-  newSizes[1] = ((CmiMsgHeaderSizeBytes + (len + 1)*sizeof(int) + 7)&mask) - newSizes[0] + 8;
+  newSizes[1] = ((CmiMsgHeaderSizeBytes + (len + 1)*sizeof(int) + 7)&mask) - newSizes[0] + 2*sizeof(int);
                      /* To allow the extra 8 bytes for the CmiSize & the Ref Count */
 
   for(i = 1; i < len + 1; i++){
     newSizes[2*i] = (sizes[i - 1]);
-    newSizes[2*i + 1] = ((sizes[i -1] + 7)&mask) - newSizes[2*i] + 8; 
+    newSizes[2*i + 1] = ((sizes[i -1] + 7)&mask) - newSizes[2*i] + 2*sizeof(int); 
              /* To allow the extra 8 bytes for the CmiSize & the Ref Count */
   }
     
@@ -1073,7 +1073,7 @@ static CmiHandler CmiMultiMsgHandler(char *msgWhole)
   offset = (offset + 7)&mask;
 
   /* To cross the 8 bytes inserted in between */
-  offset += 8;
+  offset += 2*sizeof(int);
 
   /* Call memChop() */
   memChop(msgWhole);
@@ -1101,7 +1101,7 @@ static void memChop(char *msgWhole)
 
   /* Set Reference count in the CmiAlloc header*/
   /* Reference Count includes the header also, hence (len + 1) */
-  ((int *)(msgWhole - 4))[0] = len + 1;
+  ((int *)(msgWhole - sizeof(int)))[0] = len + 1;
 
   /* Allocate array to store sizes */
   sizes = (int *)(msgWhole + offset);
@@ -1111,15 +1111,15 @@ static void memChop(char *msgWhole)
   offset = (offset + 7)&mask;
 
   /* To cross the 8 bytes inserted in between */
-  offset += 8;
+  offset += 2*sizeof(int);
 
   /* update the sizes and offsets for all the chunks */
   for(i = 0; i < len; i++){
     /* put in the size value for that part */
-    ((int *)(msgWhole + offset - 8))[0] = sizes[i] - 8;
+    ((int *)(msgWhole + offset - 2*sizeof(int)))[0] = sizes[i] - 2*sizeof(int);
     
     /* now put in the offset (a negative value) to get right back to the begining */
-    ((int *)(msgWhole + offset - 4))[0] = (-1)*offset;
+    ((int *)(msgWhole + offset - sizeof(int)))[0] = (-1)*offset;
     
     offset += sizes[i];
   }
