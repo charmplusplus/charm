@@ -27,7 +27,7 @@ $(COMPAT):
 	done
 
 patch.o: patch.C patch.h
-	$(CHARMC) -c $<
+	$(CHARMC) -c patch.C
 
 mblock.o: mblock.C mblock.decl.h $(HEADDEP)
 	$(CHARMC) -c mblock.C

@@ -11,7 +11,7 @@ $(DEST): $(OBJS)
 	$(CHARMC) -o $(DEST) $(OBJS)
 
 netfem.o: netfem.C netfem.decl.h $(HEADERS)
-	$(CHARMC) -c $<
+	$(CHARMC) -c netfem.C
 
 netfem.decl.h: netfem.ci
 	$(CHARMC) netfem.ci
@@ -24,7 +24,7 @@ clean:
 
 # Text-only client
 textclient: textclient.o $(LIB)
-	$(CHARMC) $< $(LIB) -o $@ -lccs-client
+	$(CHARMC) textclient.o $(LIB) -o $@ -lccs-client
 
 textclient.o: textclient.C
-	$(CHARMC) $< -c
+	$(CHARMC) -c textclient.C

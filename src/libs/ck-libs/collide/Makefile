@@ -17,19 +17,19 @@ $(CDIR)/include/collision.h: $(HEADERS)
 	cp $(HEADERS) $(CDIR)/include/
 
 model_corr.o: model_corr.C $(HEADERS)
-	$(CHARMC) $(CFLAGS) -c $<
+	$(CHARMC) $(CFLAGS) -c model_corr.C
 
 collision.o: collision.C $(HEADERS)
-	$(CHARMC) $(CFLAGS) -c $<
+	$(CHARMC) $(CFLAGS) -c collision.C
 
 aggregate.o: aggregate.C $(HEADERS)
-	$(CHARMC) $(CFLAGS) -c $<
+	$(CHARMC) $(CFLAGS) -c aggregate.C
 
 parCollide.o: parCollide.C $(HEADERS)
-	$(CHARMC) $(CFLAGS) -c $<
+	$(CHARMC) $(CFLAGS) -c parCollide.C
 
 threadCollide.o: threadCollide.C $(HEADERS)
-	$(CHARMC) $(CFLAGS) -c $<
+	$(CHARMC) $(CFLAGS) -c threadCollide.C
 
 parCollide.decl.h: parCollide.ci
 	$(CHARMC) parCollide.ci
@@ -39,7 +39,7 @@ collide.decl.h: threadCollide.ci
 
 
 test_par.o: test_par.C $(HEADERS)
-	$(CHARMC) $(CFLAGS) -c $<
+	$(CHARMC) $(CFLAGS) -c test_par.C
 
 test_par.decl.h: test_par.ci
 	$(CHARMC) test_par.ci
