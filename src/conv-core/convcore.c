@@ -532,7 +532,7 @@ void CHostRegister(void)
   if (hostent == 0)
     ip = 0x7f000001;
   else
-    ip = htonl(*((CmiUInt4 *)(hostent->h_addr_list[0])));
+    ip = htonl(*((CmiInt4 *)(hostent->h_addr_list[0])));
 
   msg = (char *)CmiAlloc(msgSize * sizeof(char));
   ptr = (int *)(msg + CmiMsgHeaderSizeBytes);
@@ -615,7 +615,7 @@ void CHostGetOne()
 
         sscanf(rest, "%u%u", &clientIP, &clientPort);
       }
-      clientIP = (CmiUInt4) clientIP;
+      clientIP = (CmiInt4) clientIP;
       strcpy(pre, "info");
       reply[0] = 0;
       sprintf(ans, "%d ", nodetab_rank0_size);
@@ -624,7 +624,7 @@ void CHostGetOne()
         strcat(reply, "1 ");
       }
       for(i=0;i<nodetab_rank0_size;i++) {
-        sprintf(ans, "%d ", (CmiUInt4) nodeIPs[i]);
+        sprintf(ans, "%d ", (CmiInt4) nodeIPs[i]);
         strcat(reply, ans);
       }
       for(i=0;i<nodetab_rank0_size;i++) {
@@ -696,7 +696,7 @@ void CHostHandler(char *msg)
   numRegistered++;
  
   if(numRegistered == CmiNumPes()){
-    CmiPrintf("Server IP = %u, Server port = %u $\n",(CmiUInt4) nodeIPs[0], nodePorts[0]);
+    CmiPrintf("Server IP = %u, Server port = %u $\n",(CmiInt4) nodeIPs[0], nodePorts[0]);
   }
 }
 
