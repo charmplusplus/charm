@@ -52,8 +52,11 @@ static void CmiNotifyStillIdle(CmiIdleState *s)
     if (s->sleepMs>10) s->sleepMs=10;
   }
   /*Comm. thread will listen on sockets-- just sleep*/
-  if (s->sleepMs>0)
+  if (s->sleepMs>0) {
+    MACHSTATE1(3,"idle lock(%d) {",CmiMyPe())
     CmiIdleLock_sleep(&s->cs->idle,s->sleepMs);
+    MACHSTATE1(3,"} idle lock(%d)",CmiMyPe())
+  }
 #endif
 }
 
@@ -78,6 +81,7 @@ void TransmitAckDatagram(OtherNode node)
   int retval;
   
   seqno = node->recv_next;
+  MACHSTATE1(2,"  TransmitAckDgram [%d]",seqno)
   DgramHeaderMake(&ack, DGRAM_ACKNOWLEDGE, Cmi_nodestart, Cmi_charmrun_pid, seqno);
   LOG(Cmi_clock, Cmi_nodestart, 'A', node->nodestart, seqno);
   for (i=0; i<Cmi_window_size; i++) {
@@ -110,7 +114,8 @@ void TransmitImplicitDgram(ImplicitDgram dg)
   char *data; DgramHeader *head; int len; DgramHeader temp;
   OtherNode dest;
   int retval;
-
+  
+  MACHSTATE2(2,"  TransmitImplicitDgram (%d bytes) [%d]",dg->datalen,dg->seqno)
   len = dg->datalen;
   data = dg->dataptr;
   head = (DgramHeader *)(data - DGRAM_HEADER_SIZE);
@@ -132,6 +137,7 @@ void TransmitImplicitDgram1(ImplicitDgram dg)
   OtherNode dest;
   int retval;
 
+  MACHSTATE2(4,"  RETransmitImplicitDgram (%d bytes) [%d]",dg->datalen,dg->seqno)
   len = dg->datalen;
   data = dg->dataptr;
   head = (DgramHeader *)(data - DGRAM_HEADER_SIZE);
@@ -274,7 +280,8 @@ void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank)
 {
   int size; char *data;
   OtherNode myNode = nodes+CmiMyNode();
- 
+
+  MACHSTATE1(2,"DeliverViaNetwork %d-byte message",ogm->size);
   size = ogm->size - DGRAM_HEADER_SIZE;
   data = ogm->data + DGRAM_HEADER_SIZE;
   writeableDgrams++;
@@ -307,6 +314,7 @@ void AssembleDatagram(OtherNode node, ExplicitDgram dg)
   unsigned int size; char *msg;
   OtherNode myNode = nodes+CmiMyNode();
   
+  MACHSTATE1(2,"  AssembleDatagram [%d]",dg->seqno)
   LOG(Cmi_clock, Cmi_nodestart, 'X', dg->srcpe, dg->seqno);
   msg = node->asm_msg;
   if (msg == 0) {
@@ -331,8 +339,8 @@ void AssembleDatagram(OtherNode node, ExplicitDgram dg)
     if (node->asm_rank == DGRAM_BROADCAST) {
       int len = node->asm_total;
       for (i=1; i<Cmi_mynodesize; i++)
-	PCQueuePush(CmiGetStateN(i)->recv, CopyMsg(msg, len));
-      PCQueuePush(CmiGetStateN(0)->recv, msg);
+         CmiPushPE(i, CopyMsg(msg, len));
+      CmiPushPE(0, msg);
     } else {
 #if CMK_NODE_QUEUE_AVAILABLE
          if (node->asm_rank==DGRAM_NODEMESSAGE) {
@@ -340,7 +348,7 @@ void AssembleDatagram(OtherNode node, ExplicitDgram dg)
          }
 	 else
 #endif
-	   PCQueuePush(CmiGetStateN(node->asm_rank)->recv, msg);
+	   CmiPushPE(node->asm_rank, msg);
     }
     node->asm_msg = 0;
     myNode->recd_msgs++;
@@ -395,6 +403,7 @@ void IntegrateMessageDatagram(ExplicitDgram dg)
   unsigned int slot; OtherNode node;
 
   LOG(Cmi_clock, Cmi_nodestart, 'M', dg->srcpe, dg->seqno);
+  MACHSTATE1(2,"  IntegrateMessageDatagram [%d]",dg->seqno)
   node = nodes_by_pe[dg->srcpe];
   node->stat_recv_pkt++;
   seqno = dg->seqno;
@@ -601,12 +610,15 @@ static void CommunicationServer(int sleepTime)
     return;
   });
   LOG(GetClock(), Cmi_nodestart, 'I', 0, 0);
-  MACHSTATE1(sleepTime?3:2,"CommunicationsServer(%d)",sleepTime)  
+  MACHSTATE2(sleepTime?3:2,"CommunicationsServer(%d,%d)",
+	     sleepTime,writeableAcks||writeableDgrams)  
 #if !CMK_SHARED_VARS_UNAVAILABLE /*SMP mode: comm. lock is precious*/
-  if (sleepTime!=0) /*Sleep *without* holding the comm. lock*/
+  if (sleepTime!=0) {/*Sleep *without* holding the comm. lock*/
+    MACHSTATE(2,"CommServer going to sleep (NO LOCK)");
     if (CheckSocketsReady(sleepTime)<=0) {
       MACHSTATE(2,"CommServer finished without anything happening.");
     }
+  }
   sleepTime=0;
 #endif
   CmiCommLock();
@@ -616,14 +628,13 @@ static void CommunicationServer(int sleepTime)
   while (CheckSocketsReady(sleepTime)>0) {
     int again=0;
     sleepTime=0;
-    MACHSTATE(2," -> Sockets Readable") 
     if (ctrlskt_ready_read) {again=1;ctrl_getone();}
     if (dataskt_ready_read) {again=1;ReceiveDatagram();}
     if (dataskt_ready_write) {
-      if (writeableAcks)
+      if (writeableAcks) 
         if (0!=(writeableAcks=TransmitAcknowledgement())) again=1;
       if (writeableDgrams)
-        if (0!=(writeableDgrams=TransmitDatagram())) again=1;      
+        if (0!=(writeableDgrams=TransmitDatagram())) again=1; 
     }
     if (!again) break; /* Nothing more to do */
     if ((nTimes++ &16)==15) {
