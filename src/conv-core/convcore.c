@@ -381,6 +381,9 @@ int maxmsgs;
       tv.tv_usec=10000; tv.tv_sec=0;
       select(0,0,0,0,&tv);
 #endif
+#define CMK_USLEEP_WITH_CMISLEEP
+      CmiMilliSleep(10);
+#endif
       CcdRaiseCondition(CcdPROCESSORIDLE) ;
       if (CpvAccess(CsdStopFlag)) return maxmsgs;
     }
