@@ -955,6 +955,14 @@ double CmiTimer()
 
 #endif
 
+#ifndef CMK_USE_SPECIAL_MESSAGE_QUEUE_CHECK
+/** Return 1 if our outgoing message queue 
+   for this node is longer than this many bytes. */
+int CmiLongSendQueue(int forNode,int longerThanBytes) {
+  return 0;
+}
+#endif
+
 #if CMK_SIGNAL_USE_SIGACTION
 #include <signal.h>
 void CmiSignal(sig1, sig2, sig3, handler)

@@ -308,6 +308,23 @@ static void OtherNode_init(OtherNode node)
 static OtherNode *nodes_by_pe;  /* OtherNodes indexed by processor number */
 static OtherNode  nodes;        /* Indexed only by ``node number'' */
 
+#ifdef CMK_USE_SPECIAL_MESSAGE_QUEUE_CHECK
+/** Return 1 if our outgoing message queue 
+   for this node is longer than this many bytes. */
+int CmiLongSendQueue(int forNode,int longerThan) {
+	int ret=0;
+	ImplicitDgram dg;
+	CmiCommLock();
+	dg=nodes[forNode].send_queue_h;
+	while (longerThan>0 && dg) {
+		longerThan-=dg->datalen;
+		dg=dg->next;
+	}
+	CmiCommUnlock();
+	return ret;
+}
+#endif
+
 extern void CmiGmConvertMachineID(unsigned int *mach_id);
 
 /* initnode node table reply format:

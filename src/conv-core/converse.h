@@ -393,6 +393,10 @@ for each processor in the node.
 extern void CmiBarrier(void);
 extern void CmiBarrierZero(void);
 
+/** Return 1 if our outgoing message queue 
+   for this node is longer than this many bytes. */
+int CmiLongSendQueue(int forNode,int longerThanBytes);
+
 /******** CMI: TYPE DEFINITIONS ********/
 
 typedef CMK_TYPEDEF_INT2      CmiInt2;

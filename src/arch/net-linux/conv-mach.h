@@ -26,6 +26,7 @@
 #define CMK_MEMORY_PROTECTABLE                             1
 
 #define CMK_NODE_QUEUE_AVAILABLE                           0
+#define CMK_USE_SPECIAL_MESSAGE_QUEUE_CHECK                1
 
 #define CMK_RSH_IS_A_COMMAND                               1
 #define CMK_RSH_NOT_NEEDED                                 0
