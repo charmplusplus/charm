@@ -858,59 +858,6 @@ void CmiStateInit(int pe, int rank, CmiState state)
   state->localqueue = FIFO_Create();
 }
 
-/**
- * Printing Net Statistics -- milind
- */
-
-char statstr[10000];
-
-void printNetStatistics(void)
-{
-  char tmpstr[1024];
-  OtherNode myNode;
-  int i;
-  unsigned int send_pkt=0, resend_pkt=0, recv_pkt=0, send_ack=0;
-  unsigned int recv_ack=0, ack_pkts=0;
-
-  myNode = nodes+CmiMyNode();
-  sprintf(tmpstr, "***********************************\n");
-  strcpy(statstr, tmpstr);
-  sprintf(tmpstr, "Net Statistics For Node %u\n", CmiMyNode());
-  strcat(statstr, tmpstr);
-  sprintf(tmpstr, "Interrupts: %u \tProcessed: %u\n",
-                  myNode->stat_total_intr, myNode->stat_proc_intr);
-  strcat(statstr, tmpstr);
-  sprintf(tmpstr, "***********************************\n");
-  strcat(statstr, tmpstr);
-  sprintf(tmpstr, "[Num]\tSENDTO\tRESEND\tRECV\tACKSTO\tACKSFRM\tPKTACK\n");
-  strcat(statstr,tmpstr);
-  sprintf(tmpstr, "=====\t======\t======\t====\t======\t=======\t======\n");
-  strcat(statstr,tmpstr);
-  for(i=0;i<CmiNumNodes();i++) {
-    OtherNode node = nodes+i;
-    sprintf(tmpstr, "[%u]\t%u\t%u\t%u\t%u\t%u\t%u\n",
-                     i, node->stat_send_pkt, node->stat_resend_pkt,
-		     node->stat_recv_pkt, node->stat_send_ack,
-		     node->stat_recv_ack, node->stat_ack_pkts);
-    strcat(statstr, tmpstr);
-    send_pkt += node->stat_send_pkt;
-    recv_pkt += node->stat_recv_pkt;
-    resend_pkt += node->stat_resend_pkt;
-    send_ack += node->stat_send_ack;
-    recv_ack += node->stat_recv_ack;
-    ack_pkts += node->stat_ack_pkts;
-  }
-  sprintf(tmpstr, "[TOTAL]\t%u\t%u\t%u\t%u\t%u\t%u\n",
-                     send_pkt, resend_pkt,
-		     recv_pkt, send_ack,
-		     recv_ack, ack_pkts);
-  strcat(statstr, tmpstr);
-  sprintf(tmpstr, "***********************************\n");
-  strcat(statstr, tmpstr);
-  CmiPrintf(statstr);
-}
-
-static ImplicitDgram Cmi_freelist_implicit;
 static ExplicitDgram Cmi_freelist_explicit;
 static OutgoingMsg   Cmi_freelist_outgoing;
 
@@ -985,6 +932,88 @@ static int    Cmi_tickspeed;
 
 static int Cmi_print_stats = 0;
 
+/**
+ * Printing Net Statistics -- milind
+ */
+
+char statstr[10000];
+
+void printWindow(void)
+{
+  char tmpstr[1024];
+  OtherNode node;
+  int i, j;
+
+  sprintf(tmpstr, "***********************************\n");
+  strcpy(statstr, tmpstr);
+  sprintf(tmpstr, "Send Window For Node %u at time %lf\n", CmiMyNode(), GetClock());
+  strcat(statstr, tmpstr);
+  for(i=0;i<CmiNumNodes();i++) {
+    node = nodes+i;
+    sprintf(tmpstr, "[%d->%d] ", CmiMyNode(), i);
+    strcat(statstr, tmpstr);
+    for(j=0;j<Cmi_window_size;j++) {
+      if(node->send_window[j] == 0) {
+        sprintf(tmpstr, "     N ");
+      } else {
+        sprintf(tmpstr, "%6d ", node->send_window[j]->seqno);
+      }
+      strcat(statstr, tmpstr);
+    }
+    strcat(statstr, "\n");
+  }
+  sprintf(tmpstr, "***********************************\n");
+  strcat(statstr, tmpstr);
+  CmiPrintf(statstr);
+}
+
+void printNetStatistics(void)
+{
+  char tmpstr[1024];
+  OtherNode myNode;
+  int i;
+  unsigned int send_pkt=0, resend_pkt=0, recv_pkt=0, send_ack=0;
+  unsigned int recv_ack=0, ack_pkts=0;
+
+  myNode = nodes+CmiMyNode();
+  sprintf(tmpstr, "***********************************\n");
+  strcpy(statstr, tmpstr);
+  sprintf(tmpstr, "Net Statistics For Node %u\n", CmiMyNode());
+  strcat(statstr, tmpstr);
+  sprintf(tmpstr, "Interrupts: %u \tProcessed: %u\n",
+                  myNode->stat_total_intr, myNode->stat_proc_intr);
+  strcat(statstr, tmpstr);
+  sprintf(tmpstr, "***********************************\n");
+  strcat(statstr, tmpstr);
+  sprintf(tmpstr, "[Num]\tSENDTO\tRESEND\tRECV\tACKSTO\tACKSFRM\tPKTACK\n");
+  strcat(statstr,tmpstr);
+  sprintf(tmpstr, "=====\t======\t======\t====\t======\t=======\t======\n");
+  strcat(statstr,tmpstr);
+  for(i=0;i<CmiNumNodes();i++) {
+    OtherNode node = nodes+i;
+    sprintf(tmpstr, "[%u]\t%u\t%u\t%u\t%u\t%u\t%u\n",
+                     i, node->stat_send_pkt, node->stat_resend_pkt,
+		     node->stat_recv_pkt, node->stat_send_ack,
+		     node->stat_recv_ack, node->stat_ack_pkts);
+    strcat(statstr, tmpstr);
+    send_pkt += node->stat_send_pkt;
+    recv_pkt += node->stat_recv_pkt;
+    resend_pkt += node->stat_resend_pkt;
+    send_ack += node->stat_send_ack;
+    recv_ack += node->stat_recv_ack;
+    ack_pkts += node->stat_ack_pkts;
+  }
+  sprintf(tmpstr, "[TOTAL]\t%u\t%u\t%u\t%u\t%u\t%u\n",
+                     send_pkt, resend_pkt,
+		     recv_pkt, send_ack,
+		     recv_ack, ack_pkts);
+  strcat(statstr, tmpstr);
+  sprintf(tmpstr, "***********************************\n");
+  strcat(statstr, tmpstr);
+  CmiPrintf(statstr);
+}
+
+static ImplicitDgram Cmi_freelist_implicit;
 static void setspeed_atm()
 {
   Cmi_max_dgram_size   = 2048;
@@ -1344,9 +1373,13 @@ static int comm_flag;
 
 void CmiYield() { jsleep(0,100); }
 
+void printWindow(void);
+
 static void CommunicationInterrupt()
 {
   nodes[CmiMyNode()].stat_total_intr++;
+  if(!(nodes[CmiMyNode()].stat_total_intr%10000))
+    printWindow();
   if (comm_flag) return;
   if (memflag) return;
   nodes[CmiMyNode()].stat_proc_intr++;
