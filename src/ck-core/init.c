@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.48  1997-10-29 23:52:47  milind
+ * Revision 2.49  1997-12-12 05:03:41  jyelon
+ * Fixed bug, wasn't doing CmiGrabBuffer.
+ *
+ * Revision 2.48  1997/10/29 23:52:47  milind
  * Fixed CthInitialize bug on uth machines.
  *
  * Revision 2.47  1997/10/03 19:51:35  milind
@@ -277,10 +280,10 @@ extern CHARE_BLOCK *CreateChareBlock();
 extern void BUFFER_INCOMING_MSG() ;
 extern void HANDLE_INCOMING_MSG() ;
 extern void HANDLE_INIT_MSG();
-extern void CkProcess_ForChareMsg();
-extern void CkProcess_DynamicBocInitMsg();
-extern void CkProcess_NewChareMsg();
-extern void CkProcess_VidSendOverMsg();
+extern void CkGrabProcess_ForChareMsg();
+extern void CkGrabProcess_DynamicBocInitMsg();
+extern void CkGrabProcess_NewChareMsg();
+extern void CkGrabProcess_VidSendOverMsg();
 
 void SysPeriodicCheckInit(void);
 void CharmRegisterHandlers();
@@ -306,16 +309,12 @@ void initModuleInit()
 }
 
 
-
-
 /*Added By Milind 05/02/95 */
 
 void _CkNullFunc()
 {
 	CmiPrintf("[%d] In Null Function: Module Uninitialized\n", CmiMyPe());
 }
-
-
 
 
 void InitializeCharm(argc, argv)
@@ -752,13 +751,13 @@ void CharmRegisterHandlers()
   CsvAccess(HANDLE_INIT_MSG_Index)
     = CmiRegisterHandler(HANDLE_INIT_MSG);
   CsvAccess(CkProcIdx_ForChareMsg)
-    = CmiRegisterHandler(CkProcess_ForChareMsg);
+    = CmiRegisterHandler(CkGrabProcess_ForChareMsg);
   CsvAccess(CkProcIdx_DynamicBocInitMsg)
-    = CmiRegisterHandler(CkProcess_DynamicBocInitMsg);
+    = CmiRegisterHandler(CkGrabProcess_DynamicBocInitMsg);
   CsvAccess(CkProcIdx_NewChareMsg)
-    = CmiRegisterHandler(CkProcess_NewChareMsg);
+    = CmiRegisterHandler(CkGrabProcess_NewChareMsg);
   CsvAccess(CkProcIdx_VidSendOverMsg)
-    = CmiRegisterHandler(CkProcess_VidSendOverMsg);
+    = CmiRegisterHandler(CkGrabProcess_VidSendOverMsg);
 }
 
 void InitializeEPTables(void)
