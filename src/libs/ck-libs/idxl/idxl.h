@@ -63,11 +63,11 @@ public: //<- Sun CC demands these types be public for use from an inner class
 	};
 
 private:
-	enum {maxSto=20};
+	enum {maxSto=100};
 	sto_t sto[maxSto]; //Stuff to send/receive
 	int nSto;
 	
-	enum {maxMsg=50};
+	enum {maxMsg=150};
 	msg_t msg[maxMsg]; //Messages to each processor
 	MPI_Request msgReq[maxMsg];
 	int nMsg;

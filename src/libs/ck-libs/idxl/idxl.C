@@ -206,16 +206,19 @@ void IDXL_Comm::reset(int tag_,int context) {
 void IDXL_Comm::send(const IDXL_Side *idx,const IDXL_Layout *dtype,const void *src)
 {
 	if (isPost) CkAbort("Cannot call IDXL_Comm_send after IDXL_Comm_flush!");
+	if (nSto == maxSto) CkAbort("send buffer overflow!");
 	sto[nSto++]=sto_t(idx,dtype,(void *)src,send_t); 
 }
 void IDXL_Comm::recv(const IDXL_Side *idx,const IDXL_Layout *dtype,void *dest)
 { 
 	if (isPost) CkAbort("Cannot call IDXL_Comm_recv after IDXL_Comm_flush!");
+	if (nSto == maxSto) CkAbort("send buffer overflow!");
 	sto[nSto++]=sto_t(idx,dtype,dest,recv_t); 
 }
 void IDXL_Comm::sum(const IDXL_Side *idx,const IDXL_Layout *dtype,void *srcdest)
 { 
 	if (isPost) CkAbort("Cannot call IDXL_Comm_sum after IDXL_Comm_flush!");
+	if (nSto == maxSto) CkAbort("send buffer overflow!");
 	sto[nSto++]=sto_t(idx,dtype,srcdest,sum_t); 
 }
 
@@ -245,6 +248,7 @@ void IDXL_Comm::post(void) {
 				break;
 			};
 			nMsg++;
+			if (nMsg == maxMsg)CkAbort("Message buffers and MPI_Requests overflow!");
 		}
 	}
 }
