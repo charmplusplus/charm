@@ -104,6 +104,7 @@ class TCharm: public ArrayElement1D
 	
 	bool isStopped;
 	ThreadInfo threadInfo;
+	double timeOffset; //Value to add to CkWallTimer to get my clock
 
 	enum {maxUserData=16};
 	int nUd;
@@ -127,6 +128,8 @@ class TCharm: public ArrayElement1D
 
 	//Start running the thread for the first time
 	void run(void);
+
+	inline double getTimeOffset(void) const { return timeOffset; }
 
 //Client-callable routines:
 	//One client is ready to run

@@ -81,6 +81,7 @@ static void startTCharmThread(TCharmInitMsg *msg)
 TCharm::TCharm(TCharmInitMsg *initMsg_)
 {
   initMsg=initMsg_;
+  timeOffset=0.0;
   if (tcharm_nothreads) 
   { //Don't even make a new thread-- just use main thread
     tid=CthSelf();
@@ -138,6 +139,10 @@ void TCharm::pup(PUP::er &p) {
     tid = CthPup((pup_er) &p, tid);
     CtvAccessOther(tid,_curTCharm)=this;
     CmiIsomallocBlockListPup((pup_er) &p,&heapBlocks);
+    //Restart our clock: set it up so packTime==CkWallTimer+timeOffset
+    double packTime;
+    p(packTime);
+    timeOffset=packTime-CkWallTimer();
   }
   
   //Pack all user data
@@ -153,6 +158,9 @@ void TCharm::pup(PUP::er &p) {
     s.seek(1);
     tid = CthPup((pup_er) &p, tid);
     CmiIsomallocBlockListPup((pup_er) &p,&heapBlocks);
+    //Stop our clock:
+    double packTime=CkWallTimer()+timeOffset;
+    p(packTime);
   }
   s.endBlock(); //End of seeking block
 }
@@ -672,6 +680,14 @@ FDECL void FTN_NAME(TCHARM_DONE,tcharm_done)(void)
 	TCharmDone();
 }
 
+CDECL double TCharmWallTimer(void) 
+{
+  TCHARMAPI("TCharmWallTimer");
+  if(TCharm::getState()!=inDriver) return CkWallTimer();
+  else { //Have to apply current thread's time offset
+    return CkWallTimer()+TCharm::get()->getTimeOffset();
+  }
+}
 
 
 #include "tcharm.def.h"

@@ -57,6 +57,8 @@ void *TCharmGetUserdata(int id);
 void TCharmMigrate(void);
 void TCharmDone(void);
 
+/*Get the local wall clock*/
+double TCharmWallTimer(void);
 
 #ifdef __cplusplus
 };
