@@ -2,20 +2,38 @@
 #include <stdio.h>
 #include <math.h>
 #include "charm++.h"
+#include "tcharmc.h"
 #include "fem.h"
 
 //These values are the sum of the node values
 // after each timestep.
-//If you change the mesh size, initial conditions, etc.
-//  you'll have to update this array with the correct values,
-//  which are (conveniently) printed out by init.
-const double reduceValues[4]={512.00, 512.00, 465.00, -1};
+double *reduceValues=NULL;
+
+//Number of time steps to simulate
+int tsteps=0;
+
+extern "C" void
+pupMyGlobals(pup_er p) 
+{
+	CkPrintf("pupMyGlobals on PE %d\n",CkMyPe());
+	pup_int(p,&tsteps);
+	if (pup_isUnpacking(p))
+		reduceValues=new double[tsteps];
+	pup_doubles(p,reduceValues,tsteps);
+}
+
+extern "C" void
+TCharmUserNodeSetup(void)
+{
+	TCharmReadonlyGlobals(pupMyGlobals);
+}
 
 extern "C" void
 init(void)
 {
   CkPrintf("init called\n");
-  const int tsteps=3;//Number of time steps to simulate
+  tsteps=3;
+  reduceValues=new double[tsteps];
   const int dim=5;//Length of one side of the FEM mesh
   const int np=4; //Nodes per element
   int conn[dim*dim*np];
@@ -45,7 +63,6 @@ init(void)
 
   //Run the time loop over our serial mesh--
   // we'll use this data to check the parallel calculation.
-  CkPrintf("const double reduceValues[%d]={",tsteps+1);
   for (int t=0;t<tsteps;t++)
   {
     int i,j;
@@ -71,10 +88,9 @@ init(void)
 	//Compute the sum across all nodes
 	double reduceSum=0;
 	for (i=0;i<nnodes;i++) reduceSum+=nodes[i];
-    CkPrintf("%.2f, ",reduceSum);
+	reduceValues[t]=reduceSum;
   }
   FEM_Set_Node_Data(noData);
-  CkPrintf("-1};\n");
 }
 
 typedef struct _node {
@@ -84,6 +100,17 @@ typedef struct _node {
 typedef struct _element {
   double val;
 } Element;
+
+void testAssert(int shouldBe,const char *what) {
+	if (shouldBe)
+		CkPrintf("[chunk %d] %s test passed.\n",FEM_My_Partition(),what);
+	else /*test failed-- should not be*/
+	{
+		CkPrintf("[chunk %d] %s test FAILED! (pe %d)\n",
+			FEM_My_Partition(),what,CkMyPe());
+		CkAbort("FEM Test failed\n");
+	}
+}
 
 extern "C" void
 driver(void)
@@ -102,8 +129,6 @@ driver(void)
   double *elData=new double[nelemData*nelems];
   FEM_Get_Elem_Data(0,elData);
 
-  int tsteps=nnodeData;
-
   int myId = FEM_My_Partition();
   //FEM_Print_Partition();
   Node *nodes = new Node[nnodes];
@@ -116,6 +141,9 @@ driver(void)
   }
   for(i=0;i<nelems;i++) { elements[i].val = elData[i]; }
   int fid = FEM_Create_Field(FEM_DOUBLE, 1, 0, sizeof(Node));
+
+//Test readonly global
+  testAssert(tsteps==nnodeData,"readonly");
 
 //Time loop
   for (int t=0;t<tsteps;t++)
@@ -144,20 +172,11 @@ driver(void)
     for(i=0;i<nnodes;i++)
         if(nodes[i].val != nodeData[nnodeData*i+t]) 
 			 failed = 1;
-    
-    if(failed==0) {
-      CkPrintf("[chunk %d] update_field %d test passed.\n", myId, t);
-    } else {
-      CkPrintf("[chunk %d] update_field %d test failed.\n", myId, t);
-    }
+    testAssert(!failed,"update_field");
 
     double sum = 0.0;
     FEM_Reduce_Field(fid, nodes, &sum, FEM_SUM);
-    if(sum==reduceValues[t]) {
-      CkPrintf("[chunk %d] reduce_field test passed.\n", myId);
-    } else {
-      CkPrintf("[chunk %d] reduce_field test failed (sum=%f at %d).\n", myId, sum, t);
-    }
+    testAssert(sum==reduceValues[t],"reduce_field");
 
     FEM_Set_Node(nnodes,1);
     FEM_Set_Node_Data((double *)nodes);
@@ -166,11 +185,7 @@ driver(void)
 
   double localSum = 1.0,globalSum;
   FEM_Reduce(fid, &localSum, &globalSum, FEM_SUM);
-  if(globalSum==(double)FEM_Num_Partitions()) {
-    CkPrintf("[chunk %d] reduce test passed.\n", myId);
-  } else {
-    CkPrintf("[chunk %d] reduce test failed.\n", myId);
-  }
+  testAssert(globalSum==(double)FEM_Num_Partitions(),"reduce");
 
   FEM_Done();
 }
@@ -186,11 +201,7 @@ mesh_updated(int param)
   double sum=0;
   for (int i=0;i<nnodes;i++)
     sum+=ndata[i];
-  if (sum!=reduceValues[param-1])
-    CkPrintf("mesh_updated test FAILED! expected %f; got %f!\n",reduceValues[param-1],sum);
-  else
-    CkPrintf("mesh_updated test passed for %d\n",param);
-  delete[] ndata;
+  testAssert(sum==reduceValues[param-1],"mesh_updated");
 }
 
 extern "C" void
