@@ -5,6 +5,7 @@
   This code is #included by both ckdll.C and the configure script
   (which tests if it will work).
 */
+#include <stdlib.h> /* for exit */
 #include <unistd.h> /* for execv */
 #include <sys/wait.h> /* for sys/wait.h */
 #include <errno.h> 
