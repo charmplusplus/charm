@@ -1246,6 +1246,8 @@ void CkLocMgr::deliver(CkMessage *m,CkDeliver_t type) {
 	if (type==CkDeliver_queue)
 		the_lbdb->Send(myLBHandle,idx2LDObjid(idx),UsrToEnv(msg)->getTotalsize());
 #endif
+	if (type==CkDeliver_queue)
+		_TRACE_CREATION_DETAILED(UsrToEnv(m),msg->array_ep());
 	CkLocRec *rec=elementNrec(idx);
 	if (rec!=NULL) rec->deliver(msg,type);
 	else /* rec==NULL*/ deliverUnknown(msg,type);
@@ -1268,18 +1270,24 @@ CmiBool CkLocMgr::deliverUnknown(CkArrayMessage *msg,CkDeliver_t type)
 		return CmiTrue;
 	}
 	else
-	{// We *are* the home processor-- first buffer the message
-	  DEBC((AA"Adding buffer for unknown element %s\n"AB,idx2str(idx)));
-	  CkLocRec *rec=new CkLocRec_buffering(this);
-	  insertRecN(rec,idx);
-	  rec->deliver(msg,type);
-	  
-	  if (msg->array_ifNotThere()!=CkArray_IfNotThere_buffer) 
-	  { //Now demand-create the element:
-	    return demandCreateElement(msg,-1,type);
+	{ // We *are* the home processor:
+	//Check if the element's array manager has been registered yet:
+	  CkArrMgr *mgr=managers.find(UsrToEnv((void *)msg)->array_mgr()).mgr;
+	  if (!mgr) { //No manager yet-- postpone the message (stupidly)
+	    thisProxy[CkMyPe()].deliverInline(msg); 
 	  }
-	  else
-	    return CmiTrue;
+	  else { // Has a manager-- must buffer the message
+	    DEBC((AA"Adding buffer for unknown element %s\n"AB,idx2str(idx)));
+	    CkLocRec *rec=new CkLocRec_buffering(this);
+	    insertRecN(rec,idx);
+	    rec->deliver(msg,type);
+	  
+	    if (msg->array_ifNotThere()!=CkArray_IfNotThere_buffer) 
+	    { //Demand-create the element:
+	      return demandCreateElement(msg,-1,type);
+	    }
+	  }
+	  return CmiTrue;
 	}
 }
 
@@ -1302,6 +1310,7 @@ CmiBool CkLocMgr::demandCreateElement(CkArrayMessage *msg,int onPe,CkDeliver_t t
 	//Find the manager and build the element
 	DEBC((AA"Demand-creating element %s on pe %d\n"AB,idx2str(idx),onPe));
 	CkArrMgr *mgr=managers.find(UsrToEnv((void *)msg)->array_mgr()).mgr;
+	if (!mgr) CkAbort("Tried to demand-create for nonexistent arrMgr");
 	return mgr->demandCreateElement(idx,onPe,ctor,type);
 }
 
