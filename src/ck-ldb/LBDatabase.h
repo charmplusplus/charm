@@ -17,6 +17,8 @@
 #include "lbdb.h"
 #include "LBDBManager.h"
 
+#define LB_FORMAT_VERSION     1
+
 // command line options
 class CkLBArgs
 {
@@ -30,6 +32,7 @@ private:
   int _lb_useCpuTime;           // use cpu instead of wallclock time
   int _lb_statson;		// stats collection
   int _lb_traceComm;		// stats collection for comm
+  int _lb_version;		// data file version
   double _lb_alpha;		// per message send overhead
   double _lb_beeta;		// per byte send overhead
 public:
@@ -38,9 +41,11 @@ public:
     _lb_debug = _lb_ignoreBgLoad = _lb_syncResume = _lb_useCpuTime = 0;
     _lb_migObjOnly = 0;
     _lb_statson = _lb_traceComm = 1;
+    _lb_version = LB_FORMAT_VERSION;
   }
   inline double & lbperiod() { return _autoLbPeriod; }
   inline int & debug() { return _lb_debug; }
+  inline int & lbversion() { return _lb_version; }
   inline int & ignoreBgLoad() { return _lb_ignoreBgLoad; }
   inline int & migObjOnly() { return _lb_migObjOnly; }
   inline int & syncResume() { return _lb_syncResume; }
