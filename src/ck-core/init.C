@@ -385,6 +385,7 @@ static void _nullFn(void *, void *)
 }
 
 extern void _registerLBDatabase(void);
+extern void _registerExternalModules(void);
 extern void _ckModuleInit(void);
 
 void _initCharm(int argc, char **argv)
@@ -464,6 +465,7 @@ void _initCharm(int argc, char **argv)
 		_registertempo();
 		_registerwaitqd();
 		_registerLBDatabase();
+		_registerExternalModules();
 		CkRegisterMainModule();
 	}
 
