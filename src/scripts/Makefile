@@ -145,7 +145,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  RefineLB.h HeapCentLB.h CommLB.h Comm1LB.h manager.h \
 	  MetisLB.h NborBaseLB.h \
 	  NeighborLB.h WSLB.h GreedyRefLB.h RandRefLB.h \
-	  BlueGene.h middle.h middle-blue.h \
+	  BlueGene.h middle.h middle-conv.h middle-blue.h \
 	  $(CVHEADERS)
 
 ALLHEADERS=$(CKHEADERS) \
