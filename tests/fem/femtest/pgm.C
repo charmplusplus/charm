@@ -48,6 +48,27 @@ extern "C" void NONMANGLED_init(void) {init();}
 extern "C" void NONMANGLED_driver(void) {driver();}
 */
 
+void addGhostLayer(void) {
+    //Set up ghost layers:
+    if (0) 
+    { /*Match across single nodes*/
+     static const int quad2node[]={0,1,2,3};
+     FEM_Add_ghost_layer(1,1);
+     FEM_Add_ghost_elem(0,4,quad2node);
+    } else if (1) 
+    { /*Match edges*/
+#if 1 /*Include ignored "-1" nodes as a test*/
+     static const int quad2edge[]= {0,1,-1,  1,2,-1,  2,3,-1,  3,0,-1};
+     FEM_Add_ghost_layer(3,1);
+     FEM_Add_ghost_elem(0,4,quad2edge);
+#else
+     static const int quad2edge[]= {0,1,  1,2,  2,3,  3,0};
+     FEM_Add_ghost_layer(2,1);
+     FEM_Add_ghost_elem(0,4,quad2edge);
+#endif
+    }
+}
+
 extern "C" void
 init(void)
 {
@@ -142,28 +163,7 @@ init(void)
   FEM_Mesh_pup(FEM_Mesh_default_write(),0,pupMyGlobals,NULL);
 
   if (TEST_GHOST) {
-  //Set up ghost layers:
-    if (0) 
-    { /*Match across single nodes*/
-     static const int quad2node[]={0,1,2,3};
-     FEM_Add_ghost_layer(1,1);
-     FEM_Add_ghost_elem(0,4,quad2node);
-    } else if (1) 
-    { /*Match edges*/
-#if 1 /*Include ignored "-1" nodes as a test*/
-     static const int quad2edge[]= {0,1,-1,  1,2,-1,  2,3,-1,  3,0,-1};
-     FEM_Add_ghost_layer(3,1);
-     FEM_Add_ghost_elem(0,4,quad2edge);
-#else
-     static const int quad2edge[]= {0,1,  1,2,  2,3,  3,0};
-     FEM_Add_ghost_layer(2,1);
-     FEM_Add_ghost_elem(0,4,quad2edge);
-#endif
-/*Add a second layer
-     FEM_Add_ghost_layer(2,0);
-     FEM_Add_ghost_elem(0,4,quad2edge);
-*/
-    }
+    addGhostLayer();
     /* add a ghost stencil */
     int *ends=new int[nelems];
     int *adj=new int[dim];
@@ -180,6 +180,8 @@ init(void)
     FEM_Add_ghost_stencil(nelems,1,ends,adj);
     delete []ends;
     delete []adj;
+    /* Add another ghost layer */
+    addGhostLayer();
   }
   delete[] conn;
   delete[] nodes;
