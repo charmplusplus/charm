@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.11  1995-09-20 15:10:18  sanjeev
+ * Revision 2.12  1995-09-20 23:09:47  sanjeev
+ * added comm_object
+ *
+ * Revision 2.11  1995/09/20  15:10:18  sanjeev
  * removed externs for Cmi stuff
  *
  * Revision 2.10  1995/09/19  21:44:54  brunner
@@ -74,7 +77,38 @@ extern "C" void CollectValue(int, int, ChareIDType *) ;
 extern "C" void * MonoValue(int) ;
 
 
-class _CK_Object {  /* Top level chare class at root of chare hierarchy */
+/****** This is the top level class from which all message types inherit *****/
+
+class comm_object {
+	void operator delete(void *msg) {
+		CkFreeMsg(msg) ;
+	}
+
+	void *operator new(int size, int id) {
+		return (void *)GenericCkAlloc(id, size, 0) ;
+	}
+
+	void *operator new(int size, int id, int prio) {
+		return (void *)GenericCkAlloc(id, size, prio) ;
+	}
+
+	void *operator new(int size, int id, int* sizes) {
+		return (void *)((ALLOCFNPTR)(CsvAccess(MsgToStructTable)[id].alloc))(id, size, sizes, 0) ;
+	}
+
+	void *operator new(int size, int id, int prio, int* sizes) {
+		return (void *)((ALLOCFNPTR)(CsvAccess(MsgToStructTable)[id].alloc))(id, size, sizes, prio) ;
+	}
+}
+
+
+
+
+
+
+/******* Top level chare class at root of chare hierarchy ********/
+
+class _CK_Object {  
 public:
 	ChareIDType thishandle ;   
 
