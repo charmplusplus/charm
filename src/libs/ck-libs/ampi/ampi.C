@@ -436,6 +436,7 @@ static ampi *ampiInit(char **argv)
 
   // Parse command-line arguments (Commlib)
   int strat = USE_MESH;
+
   char *comlibStrat;
   if(0!=CmiGetArgString(argv, "+strategy", &comlibStrat)){
 		//CkPrintf("AMPI: Comlib initialized with %s\n",comlibStrat);
@@ -471,6 +472,7 @@ static ampi *ampiInit(char **argv)
 
 #if AMPI_COMLIB
 	cinst=CkGetComlibInstance();
+        cinst.setForwardingOnMigration();
 #endif
         
         //Create and attach the ampiParent array
@@ -479,13 +481,10 @@ static ampi *ampiInit(char **argv)
 	parent=CProxy_ampiParent::ckNew(new_world,threads,cinst, opts);
 	STARTUP_DEBUG("ampiInit> array size "<<_nchunks);
 #if AMPI_COMLIB
-        //CProxy_ComlibManager comlib = CProxy_ComlibManager::ckNew(strat, 1);
-	//comlib.ckLocalBranch()->createId();
+
 	EachToManyMulticastStrategy *strategy = new EachToManyMulticastStrategy(strat, parent.ckGetArrayID(), parent.ckGetArrayID());
         cinst.setStrategy(strategy);
 
-        //strategy->setSourceArray(parent.ckGetArrayID());
-        //strategy->setDestArray(parent.ckGetArrayID());
 #endif
   }
   int *barrier = (int *)TCharm::get()->semaGet(AMPI_BARRIER_SEMAID);
@@ -548,6 +547,8 @@ ampiParent::ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_, ComlibInstanceH
   worldPtr=NULL;
   myDDT=&myDDTsto;
   prepareCtv();
+  comlib.setSourcePe();
+
   thread->semaPut(AMPI_BARRIER_SEMAID,&barrier);
 }
 ampiParent::ampiParent(CkMigrateMessage *msg):CBase_ampiParent(msg) {
@@ -2566,13 +2567,20 @@ int AMPI_Allgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   int size = ptr->getSize(comm);
   int i;
 
-  // commlib support
-  CProxy_ampi arrproxy = ptr->comlibBegin();
-  for(i=0;i<size;i++) {
-    ptr->delesend(MPI_GATHER_TAG, ptr->getRank(comm), sendbuf, sendcount,
-                  sendtype, i, comm, arrproxy);
+  if(comm == MPI_COMM_WORLD) {
+      // commlib support
+      CProxy_ampi arrproxy = ptr->comlibBegin();
+      for(i=0;i<size;i++) {
+          ptr->delesend(MPI_GATHER_TAG, ptr->getRank(comm), sendbuf, sendcount,
+                        sendtype, i, comm, arrproxy);
+      }
+      ptr->comlibEnd();
   }
-  ptr->comlibEnd();
+  else 
+      for(i=0;i<size;i++) {
+          ptr->send(MPI_GATHER_TAG, ptr->getRank(comm), sendbuf, sendcount,
+                    sendtype, i, comm);
+      }
 
   MPI_Status status;
   CkDDT_DataType* dttype = ptr->getDDT()->getType(recvtype) ;
@@ -2597,13 +2605,20 @@ int AMPI_Iallgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   int size = ptr->getSize(comm);
   int i;
 
-  // commlib support
-  CProxy_ampi arrproxy = ptr->comlibBegin();
-  for(i=0;i<size;i++) {
-    ptr->delesend(MPI_GATHER_TAG, ptr->getRank(comm), sendbuf, sendcount,
-                  sendtype, i, comm, arrproxy);
+  if(comm == MPI_COMM_WORLD) {
+      // commlib support
+      CProxy_ampi arrproxy = ptr->comlibBegin();
+      for(i=0;i<size;i++) {
+          ptr->delesend(MPI_GATHER_TAG, ptr->getRank(comm), sendbuf, sendcount,
+                        sendtype, i, comm, arrproxy);
+      }
+      ptr->comlibEnd();
   }
-  ptr->comlibEnd();
+  else 
+      for(i=0;i<size;i++) {
+          ptr->send(MPI_GATHER_TAG, ptr->getRank(comm), sendbuf, sendcount,
+                    sendtype, i, comm);
+      }
 
   CkDDT_DataType* dttype = ptr->getDDT()->getType(recvtype) ;
   int itemsize = dttype->getSize(recvcount) ;
@@ -2633,13 +2648,20 @@ int AMPI_Allgatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   int size = ptr->getSize(comm);
   int i;
 
-  // commlib support
-  CProxy_ampi arrproxy = ptr->comlibBegin();
-  for(i=0;i<size;i++) {
-    ptr->delesend(MPI_GATHER_TAG, ptr->getRank(comm), sendbuf, sendcount,
-                  sendtype, i, comm, arrproxy);
+  if(comm == MPI_COMM_WORLD) {
+      // commlib support
+      CProxy_ampi arrproxy = ptr->comlibBegin();
+      for(i=0;i<size;i++) {
+          ptr->delesend(MPI_GATHER_TAG, ptr->getRank(comm), sendbuf, sendcount,
+                        sendtype, i, comm, arrproxy);
+      }
+      ptr->comlibEnd();
   }
-  ptr->comlibEnd();
+  else 
+      for(i=0;i<size;i++) {
+          ptr->send(MPI_GATHER_TAG, ptr->getRank(comm), sendbuf, sendcount,
+                    sendtype, i, comm);
+      }
 
   MPI_Status status;
   CkDDT_DataType* dttype = ptr->getDDT()->getType(recvtype) ;
@@ -2718,16 +2740,16 @@ int AMPI_Scatter(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   int i;
 
   if(ptr->getRank(comm)==root) {
-    CProxy_ampi arrproxy = ptr->comlibBegin();
-    CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
-    int itemsize = dttype->getSize(sendcount) ;
-    for(i=0;i<size;i++) {
-      ptr->delesend(MPI_SCATTER_TAG, ptr->getRank(comm), ((char*)sendbuf)+(itemsize*i),
-                    sendcount, sendtype, i, comm, arrproxy);
-    }
-    ptr->comlibEnd();
+      //CProxy_ampi arrproxy = ptr->comlibBegin();
+      CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
+      int itemsize = dttype->getSize(sendcount) ;
+      for(i=0;i<size;i++) {
+          ptr->send(MPI_SCATTER_TAG, ptr->getRank(comm), ((char*)sendbuf)+(itemsize*i),
+                    sendcount, sendtype, i, comm);
+      }
+      //ptr->comlibEnd();
   }
-
+  
   MPI_Status status;
   AMPI_Recv(recvbuf, recvcount, recvtype, root, MPI_SCATTER_TAG, comm, &status);
 
@@ -2747,19 +2769,19 @@ int AMPI_Scatterv(void *sendbuf, int *sendcounts, int *displs, MPI_Datatype send
   int i;
 
   if(ptr->getRank(comm) == root) {
-    CProxy_ampi arrproxy = ptr->comlibBegin();
-    CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
-    int itemsize = dttype->getSize() ;
-    for(i=0;i<size;i++) {
-      ptr->delesend(MPI_SCATTER_TAG, ptr->getRank(comm), ((char*)sendbuf)+(itemsize*displs[i]),
-                    sendcounts[i], sendtype, i, comm, arrproxy);
-    }
-    ptr->comlibEnd();
+      //CProxy_ampi arrproxy = ptr->comlibBegin();
+      CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
+      int itemsize = dttype->getSize() ;
+      for(i=0;i<size;i++) {
+          ptr->send(MPI_SCATTER_TAG, ptr->getRank(comm), ((char*)sendbuf)+(itemsize*displs[i]),
+                    sendcounts[i], sendtype, i, comm);
+      }
+      //ptr->comlibEnd();
   }
-
+  
   MPI_Status status;
   AMPI_Recv(recvbuf, recvcount, recvtype, root, MPI_SCATTER_TAG, comm, &status);
-
+  
   return 0;
 }
 
@@ -2777,14 +2799,21 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   int itemsize = dttype->getSize(sendcount) ;
   int i;
 
-  // commlib support
-  CProxy_ampi arrproxy = ptr->comlibBegin();
-  for(i=0;i<size;i++) {
-    ptr->delesend(MPI_ATA_TAG, ptr->getRank(comm), ((char*)sendbuf)+(itemsize*i), sendcount,
-                  sendtype, i, comm, arrproxy);
+  if(comm == MPI_COMM_WORLD) {
+      // commlib support
+      CProxy_ampi arrproxy = ptr->comlibBegin();
+      for(i=0;i<size;i++) {
+          ptr->delesend(MPI_ATA_TAG, ptr->getRank(comm), ((char*)sendbuf)+(itemsize*i), sendcount,
+                        sendtype, i, comm, arrproxy);
+      }
+      ptr->comlibEnd();
   }
-  ptr->comlibEnd();
-
+  else 
+      for(i=0;i<size;i++) {
+          ptr->send(MPI_ATA_TAG, ptr->getRank(comm), ((char*)sendbuf)+(itemsize*i), sendcount,
+                    sendtype, i, comm);
+      }
+  
   MPI_Status status;
   dttype = ptr->getDDT()->getType(recvtype) ;
   itemsize = dttype->getSize(recvcount) ;
@@ -2812,13 +2841,20 @@ int AMPI_Ialltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   int itemsize = dttype->getSize(sendcount) ;
   int i;
 
-  // commlib support
-  CProxy_ampi arrproxy = ptr->comlibBegin();
-  for(i=0;i<size;i++) {
-    ptr->delesend(MPI_ATA_TAG+reqsSize, ptr->getRank(comm), ((char*)sendbuf)+(itemsize*i), sendcount,
-                  sendtype, i, comm, arrproxy);
+  if(comm == MPI_COMM_WORLD) {
+      // commlib support
+      CProxy_ampi arrproxy = ptr->comlibBegin();
+      for(i=0;i<size;i++) {
+          ptr->delesend(MPI_ATA_TAG+reqsSize, ptr->getRank(comm), ((char*)sendbuf)+(itemsize*i), sendcount,
+                        sendtype, i, comm, arrproxy);
+      }
+      ptr->comlibEnd();
   }
-  ptr->comlibEnd();
+  else
+      for(i=0;i<size;i++) {
+          ptr->send(MPI_ATA_TAG+reqsSize, ptr->getRank(comm), ((char*)sendbuf)+(itemsize*i), sendcount,
+                        sendtype, i, comm);
+      }
 
   // copy+paste from MPI_Irecv
   ATAReq *newreq = new ATAReq(size);
@@ -2845,14 +2881,20 @@ int AMPI_Alltoallv(void *sendbuf, int *sendcounts, int *sdispls,
   int itemsize = dttype->getSize() ;
   int i;
 
-  // commlib support
-  CProxy_ampi arrproxy = ptr->comlibBegin();
-  for(i=0;i<size;i++) {
-    ptr->delesend(MPI_GATHER_TAG,ptr->getRank(comm),((char*)sendbuf)+(itemsize*sdispls[i]),sendcounts[i],
-                  sendtype, i, comm, arrproxy);
+  if(comm == MPI_COMM_WORLD) {
+      // commlib support
+      CProxy_ampi arrproxy = ptr->comlibBegin();
+      for(i=0;i<size;i++) {
+          ptr->delesend(MPI_GATHER_TAG,ptr->getRank(comm),((char*)sendbuf)+(itemsize*sdispls[i]),sendcounts[i],
+                        sendtype, i, comm, arrproxy);
+      }
+      ptr->comlibEnd();
   }
-  ptr->comlibEnd();
-
+  else
+      for(i=0;i<size;i++) 
+          ptr->send(MPI_GATHER_TAG,ptr->getRank(comm),((char*)sendbuf)+(itemsize*sdispls[i]),sendcounts[i],
+                    sendtype, i, comm);
+  
   MPI_Status status;
   dttype = ptr->getDDT()->getType(recvtype) ;
   itemsize = dttype->getSize() ;
