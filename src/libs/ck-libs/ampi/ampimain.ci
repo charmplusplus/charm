@@ -1,0 +1,12 @@
+mainmodule ampimain {
+  readonly int migHandle;
+  readonly CkChareID mainhandle;
+
+  extern module ampi;
+
+  mainchare ampimain {
+    entry ampimain();
+    entry void done(void);
+    entry [threaded] void qd(void);
+  };
+}

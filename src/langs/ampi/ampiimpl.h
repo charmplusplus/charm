@@ -13,18 +13,20 @@
 
 extern CkChareID mainhandle;
 
-class main : public Chare
+/*
+class ampimain : public Chare
 {
   int nblocks;
   int numDone;
   CkArrayID arr;
   public:
-    main(CkArgMsg *);
+    ampimain(CkArgMsg *);
     void done(void);
     void qd(void);
 };
 
-static inline void itersDone(void) { CProxy_main pm(mainhandle); pm.done(); }
+static inline void itersDone(void) { CProxy_ampimain pm(mainhandle); pm.done(); }
+*/
 
 class BlockMap : public CkArrayMap {
  public:
@@ -61,6 +63,13 @@ class PersReq {
     int nextfree, prevfree;
 };
 
+class ArgsInfo : public CMessage_ArgsInfo {
+  public:
+    int argc;
+    char **argv;
+    ArgsInfo(int c, char **v) { argc = c; argv = v; }
+};
+
 class ampi : public TempoArray {
   public:
     int csize, isize, rsize, fsize;
@@ -83,8 +92,10 @@ class ampi : public TempoArray {
     
     virtual void pup(PUP::er &p);
     
+    virtual void start(void);
     
-    void run(void);
+    void run(ArgsInfo *);
+    void run(void);		// for C++ inheirt
 };
 
 extern int migHandle;
@@ -97,4 +108,5 @@ class migrator : public Group {
       delete msg;
     }
 };
+
 #endif

@@ -7,6 +7,11 @@
 
 #include "ampiimpl.h"
 
+#ifdef AMPI_FORTRAN
+#include "ampimain.decl.h"
+#endif
+
+/*
 extern void _initCharm(int argc, char **argv);
 
 extern "C" void conversemain_(int *argc,char _argv[][80],int length[])
@@ -35,7 +40,7 @@ static void allReduceHandler(void *,int dataSize,void *data)
   TempoArray::ckTempoBcast(0, data, dataSize, _ampiAid);
 }
 
-main::main(CkArgMsg *m)
+ampimain::ampimain(CkArgMsg *m)
 {
   int i;
   nblocks = CkNumPes();
@@ -60,26 +65,29 @@ main::main(CkArgMsg *m)
   // CkRegisterArrayReductionHandler(_ampiAid,allReduceHandler,0);
   CProxy_ampi jarray(_ampiAid);
   jarray.setReductionClient(allReduceHandler,0);
-  for(i=0; i<nblocks; i++)
+  for(i=0; i<nblocks; i++) {
     jarray[i].run();
+  }
   mainhandle = thishandle;
 }
 
 void
-main::qd(void)
+ampimain::qd(void)
 {
   // CkWaitQD();
   // CkPrintf("Created Elements\n");
   CProxy_ampi jarray(arr);
-  for(int i=0; i<nblocks; i++)
-    jarray[i].run();
+  for(int i=0; i<nblocks; i++) {
+    ArgsInfo *argsinfo = new ArgsInfo(0, NULL);
+    jarray[i].run(argsinfo);
+  }
   return;
 }
 
 //CpvExtern(int, _numSwitches);
 
 void
-main::done(void)
+ampimain::done(void)
 {
   numDone++;
   if(numDone==nblocks) {
@@ -88,11 +96,13 @@ main::done(void)
   }
 }
 
+*/
+
 int migHandle;
 
 CtvDeclare(ampi *, ampiPtr);
 CtvDeclare(int, numMigrateCalls);
-extern "C" void main_(void);
+extern "C" void main_(int, char **);
 static CkArray *ampiArray;
 
 extern "C" void get_size_(int *, int *, int *, int *);
@@ -160,6 +170,33 @@ void ampi::pup(PUP::er &p)
 }
 
 void
+ampi::run(ArgsInfo *msg)
+{
+#ifdef AMPI_FORTRAN
+  static int initCtv = 0;
+
+  if(!initCtv) {
+    CtvInitialize(ampi *, ampiPtr);
+    CtvInitialize(int, numMigrateCalls);
+    initCtv = 1;
+  }
+
+  CtvAccess(ampiPtr) = this;
+  CtvAccess(numMigrateCalls) = 0;
+
+  main_(msg->argc, msg->argv);
+
+  // myThis = (ampi*) ampiArray->getElement(myIdx);
+
+  CProxy_ampimain mp(mainhandle);
+  mp.done();
+  CthSuspend();
+#else
+  CkPrintf("You should link ampi use -lampif\n");
+#endif
+}
+
+void
 ampi::run(void)
 {
   static int initCtv = 0;
@@ -173,12 +210,17 @@ ampi::run(void)
   CtvAccess(ampiPtr) = this;
   CtvAccess(numMigrateCalls) = 0;
 
-  main_();
+  start();
+
   // myThis = (ampi*) ampiArray->getElement(myIdx);
 
-  CProxy_main mp(mainhandle);
-  mp.done();
   CthSuspend();
+}
+
+void
+ampi::start(void)
+{
+  CkPrintf("You should write your own start(). \n");
 }
 
 extern "C" void migrate_(void *gptr)

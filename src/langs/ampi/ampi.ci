@@ -1,12 +1,12 @@
-mainmodule ampi {
-  readonly int migHandle;
-  readonly CkChareID mainhandle;
+module ampi {
+//  readonly int migHandle;
+//  readonly CkChareID mainhandle;
 
-  mainchare main {
-    entry main();
-    entry void done(void);
-    entry [threaded] void qd(void);
-  };
+//  mainchare ampimain {
+//    entry ampimain();
+//    entry void done(void);
+//    entry [threaded] void qd(void);
+//  };
   group BlockMap : CkArrayMap {
     entry BlockMap(void);
   };
@@ -18,8 +18,11 @@ mainmodule ampi {
     entry void migrateElement(MigrateInfo *);
   }
 
+  message ArgsInfo;
+
   array[1D] ampi : TempoArray {
     entry ampi();
-    entry [threaded] void run(void);
+    entry [threaded] void run(ArgsInfo *);
+    entry [threaded] void run();
   }
 }
