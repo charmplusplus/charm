@@ -431,6 +431,7 @@ void send_callback(struct gm_port *p, void *context, gm_status_t status)
 	out->retry_count ++;
 	if (out->retry_count > 4) CmiAbort("gm send_callback failed with too many timeouts");
  	CmiPrintf("gm send_callback timeout, send again (%d)\n", out->retry_count ++);
+  	gm_free_send_token (gmport, GM_LOW_PRIORITY);
         gm_send_with_callback(gmport, msg, out->size, out->length, 
                             GM_LOW_PRIORITY, out->mach_id, out->dataport, 
                             send_callback, out);
