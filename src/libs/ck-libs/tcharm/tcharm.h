@@ -15,7 +15,7 @@ Orion Sky Lawlor, olawlor@acm.org, 11/19/2001
 #include "charm-api.h"
 #include "tcharmc.h"
 #include "cklists.h"
-#include "isomalloc.h"
+#include "memory-isomalloc.h"
 
 //User's readonly global variables, set exactly once after initialization
 class TCharmReadonlys {
