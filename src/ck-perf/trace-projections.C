@@ -186,7 +186,7 @@ void LogEntry::write(FILE* fp)
 
 void TraceProjections::userEvent(int e)
 {
-  CpvAccess(_logPool)->add(USER_EVENT, e, -1, CmiTimer(),curevent++,CmiMyPe());
+  CpvAccess(_logPool)->add(USER_EVENT, e, 0, CmiTimer(),curevent++,CmiMyPe());
 }
 
 void TraceProjections::creation(envelope *e, int num)
@@ -281,10 +281,10 @@ void TraceProjections::beginComputation(void)
     _threadChare = CkRegisterChare("dummy_thread_chare", 0);
     _threadEP = CkRegisterEp("dummy_thread_ep", 0, _threadMsg,_threadChare);
   }
-  CpvAccess(_logPool)->add(BEGIN_COMPUTATION, -1, -1, CmiTimer(), -1, -1);
+  CpvAccess(_logPool)->add(BEGIN_COMPUTATION, 0, 0, CmiTimer(), -1, -1);
 }
 
 void TraceProjections::endComputation(void)
 {
-  CpvAccess(_logPool)->add(END_COMPUTATION, -1, -1, CmiTimer(), -1, -1);
+  CpvAccess(_logPool)->add(END_COMPUTATION, 0, 0, CmiTimer(), -1, -1);
 }
