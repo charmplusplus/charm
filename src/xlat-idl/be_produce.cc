@@ -337,7 +337,7 @@ const char *HiMethod1 =
 ;
 
 const char *HmMethod0 = // messagename
-"class \01 : public comm_object {\n"
+"class \01 : public CMessage_\01 {\n"
 "  public:\n"
 ;
 
@@ -361,17 +361,17 @@ const char *CiMethod0 = // returnType, classname, methodname
 const char *CiMethod1 = // msgName
 ")\n"
 "{\n"
-"  \01 *msg = new (MsgIndex(\01)) \01;\n"
+"  \01 *msg = new \01;\n"
 ;
 
 const char *CiMethod2 = // classname, methodname, messagename
 "  if(isChare()) {\n"
-"    ChareIDType cid = cih.ciCID();\n"
-"    CSendMsg(CC\01,\02,\03,msg,&cid);\n"
+"    CkChareID cid = cih.ciCID();\n"
+"    CkSendMsg(CProxy_CC\01::__idx_\02_\03,msg,&cid);\n"
 "  } else if(ciGetProc()==CI_PE_ALL) {\n"
-"    CBroadcastMsgBranch(CG\01,\02,\03,msg,cih.ciGID());\n"
+"    CkBroadcastMsgBranch(CProxy_CG\01::__idx_\02_\03,msg,cih.ciGID());\n"
 "  } else {\n"
-"    CSendMsgBranch(CG\01,\02,\03,msg,cih.ciGID(),ciGetProc());\n"
+"    CkSendMsgBranch(CProxy_CG\01::__idx_\02_\03,msg,cih.ciGID(),ciGetProc());\n"
 "  }\n"
 "}\n"
 "\n"
@@ -408,11 +408,11 @@ const char *CcgMethod2 =
 ;
 
 const char *IccMethod0 = // methodname, messagename
-"  entry \01(\02 *);\n"
+"  entry void \01(\02 *);\n"
 ;
 
 const char *IcgMethod0 = // methodname, messagename
-"  entry \01(\02 *);\n"
+"  entry void \01(\02 *);\n"
 ;
 
 const char *ImMethod0 = // messagename
@@ -492,8 +492,8 @@ const char *HiClass0 = // classname
 "    CI\01() {}\n"
 "    CI\01(CIHandle hndl) { cih = hndl; }\n"
 "    int isChare(void) { return cih.isChare(); }\n"
-"    ChareIDType ciCID(void) { return cih.ciCID(); }\n"
-"    GroupIdType ciGID(void) { return cih.ciGID(); }\n"
+"    CkChareID ciCID(void) { return cih.ciCID(); }\n"
+"    int ciGID(void) { return cih.ciGID(); }\n"
 "    int ciGetProc(void) { return cih.ciGetProc(); }\n"
 "    CI\01 & ciSetProc(int _proc) { \n"
 "      cih.ciSetProc(_proc); return *this; \n"
@@ -523,7 +523,7 @@ const char *HiClass1 =
 ;
 
 const char *HccClass0 = // classname
-"class CC\01 : public chare_object {\n"
+"class CC\01 : public Chare {\n"
 "  private:\n"
 "    \01 *obj;\n"
 "  public:\n"
@@ -537,7 +537,7 @@ const char *HccClass1 =
 ;
 
 const char *HcgClass0 = // classname
-"class CG\01 : public groupmember {\n"
+"class CG\01 : public Group {\n"
 "  private:\n"
 "    \01 *obj;\n"
 "  public:\n"
@@ -552,25 +552,25 @@ const char *HcgClass1 =
 
 const char *CiClass0 = // classname
 "void CI\01::ciDelete(void) {\n"
-"  CIMsgEmpty *msg = new (MsgIndex(CIMsgEmpty)) CIMsgEmpty;\n"
+"  CIMsgEmpty *msg = new CIMsgEmpty;\n"
 "  if(isChare()) {\n"
-"    ChareIDType cid = cih.ciCID();\n"
-"    CSendMsg(CC\01,ciDelete,CIMsgEmpty,msg,&cid);\n"
+"    CkChareID cid = cih.ciCID();\n"
+"    CkSendMsg(CProxy_CC\01::__idx_ciDelete_CIMsgEmpty,msg,&cid);\n"
 "  } else if(ciGetProc()==CI_PE_ALL) {\n"
-"    CBroadcastMsgBranch(CG\01,ciDelete,CIMsgEmpty,msg,cih.ciGID());\n"
+"    CkBroadcastMsgBranch(CProxy_CG\01::__idx_ciDelete_CIMsgEmpty,msg,cih.ciGID());\n"
 "  } else {\n"
-"    CSendMsgBranch(CG\01,ciDelete,CIMsgEmpty,msg,cih.ciGID(),ciGetProc());\n"
+"    CkSendMsgBranch(CProxy_CG\01::__idx_ciDelete_CIMsgEmpty,msg,cih.ciGID(),ciGetProc());\n"
 "  }\n"
 "}\n"
 "\n"
 "void CI\01::ciCreate(void) {\n"
-"  CIMsgEmpty *msg = new (MsgIndex(CIMsgEmpty)) CIMsgEmpty;\n"
+"  CIMsgEmpty *msg = new CIMsgEmpty;\n"
 "  if(isChare()) {\n"
-"    ChareIDType cid;\n"
-"    new_chare2(CC\01,CIMsgEmpty,msg,&cid,cih.ciGetProc());\n"
+"    CkChareIDType cid;\n"
+"    CProxy_CC\01::ckNew(msg,&cid,cih.ciGetProc());\n"
 "    cih.setCID(cid);\n"
 "  } else {\n"
-"    cih.setGID(new_group(CG\01,CIMsgEmpty,msg));\n"
+"    cih.setGID(CProxy_CG\01::ckNew(msg));\n"
 "  }\n"
 "}\n"
 "\n"
@@ -582,7 +582,6 @@ const char *CccClass0 = // classname
 "  obj->~\01();\n"
 "  char *orig = (char *) obj - sizeof(CIHandle);\n"
 "  delete[] orig;\n"
-"  ChareExit();\n"
 "}\n"
 "\n"
 "CC\01::CC\01(CIMsgEmpty *msg) {\n"
@@ -600,7 +599,6 @@ const char *CcgClass0 = // classname
 "  obj->~\01();\n"
 "  char *orig = (char *) obj - sizeof(CIHandle);\n"
 "  delete[] orig;\n"
-"  ChareExit();\n"
 "}\n"
 "\n"
 "CG\01::CG\01(CIMsgEmpty *msg) {\n"
@@ -615,7 +613,7 @@ const char *CcgClass0 = // classname
 const char *IccClass0 = // classname
 "chare CC\01 {\n"
 "  entry CC\01(CIMsgEmpty *);\n"
-"  entry ciDelete(CIMsgEmpty *);\n"
+"  entry void ciDelete(CIMsgEmpty *);\n"
 ;
 
 const char *IccClass1 = 
@@ -626,7 +624,7 @@ const char *IccClass1 =
 const char *IcgClass0 = // classname
 "group CG\01 {\n"
 "  entry CG\01(CIMsgEmpty *);\n"
-"  entry ciDelete(CIMsgEmpty *);\n"
+"  entry void ciDelete(CIMsgEmpty *);\n"
 ;
 
 const char *IcgClass1 = 
@@ -739,13 +737,18 @@ const char *CIhTop0 = // basename
 "#include \"charm++.h\"\n"
 "#include \"idl.h\"\n"
 "#include \"\01.h\"\n"
-"#include \"CI\01.top.h\"\n"
+"#include \"CI\01.decl.h\"\n"
 "\n"
 ;
 
 const char *CIhTop1 = // basename
 "\n"
 "#endif\n"
+;
+
+const char *CIiTop1 = // basename
+"\n"
+"}\n"
 ;
 
 const char *CIcTop0 = // basename
@@ -755,10 +758,11 @@ const char *CIcTop0 = // basename
 
 const char *CIcTop1 = // basename
 "\n"
-"#include \"CI\01.bot.h\"\n"
+"#include \"CI\01.def.h\"\n"
 ;
 
-const char *CIiTop0 =
+const char *CIiTop0 = // basename
+"mainmodule CI\01 {\n"
 "extern message CIMsgEmpty;\n"
 ;
 
@@ -794,7 +798,7 @@ initialize()
   delete createName;
   spew(CIh, CIhTop0, baseName);
   spew(CIc, CIcTop0, baseName);
-  spew(CIi, CIiTop0);
+  spew(CIi, CIiTop0, baseName);
 }
 
 // At the top level we can have modules, interfaces, constants or type
@@ -856,6 +860,7 @@ clean_up()
 
   spew(CIh, CIhTop1, baseName);
   spew(CIc, CIcTop1, baseName);
+  spew(CIc, CIiTop1, baseName);
 
   *FH << CIh->get_string();
   *FC << CIc->get_string();
