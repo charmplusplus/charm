@@ -1776,6 +1776,18 @@ void CmiFreeListSendFn(int npes, int *pes, int len, char *msg)
 }
 #endif 
 
+void CmiBarrier()
+{
+    elan_gsync(elan_base->allGroup);
+}
+
+/* a simple barrier - everyone sends a message to pe 0 and go on */
+/* it is ok here since we have real elan barrier */
+void CmiBarrierZero()
+{
+    elan_gsync(elan_base->allGroup);
+}
+
 #if CMK_PERSISTENT_COMM
 #include "persistent.c"
 #endif
