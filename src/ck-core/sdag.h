@@ -74,11 +74,10 @@ class TListCWhenTrigger
     TListCWhenTrigger(void) : first(0), last(0) {;}
 
     void pup(PUP::er& p) {
-      int nEntries;
+      int nEntries=0;
       int cur=0;
       if (p.isPacking()) { 
-        nEntries = 0;
-        for (CWhenTrigger *tmp = first; tmp!=last; tmp=tmp->next, nEntries++)
+        for (CWhenTrigger *tmp = first; tmp; tmp=tmp->next, nEntries++)
           if (current == tmp) cur = nEntries;
       }
       p|nEntries;
@@ -87,13 +86,17 @@ class TListCWhenTrigger
         first = last = current = NULL;
         if (nEntries) {
 	  CWhenTrigger** unpackArray = new CWhenTrigger*[nEntries]; 
+          for (int i=0; i<nEntries; i++)  {
+            unpackArray[i] = new CWhenTrigger;
+            if (i!=0) unpackArray[i-1]->next=unpackArray[i];
+          }
           first = unpackArray[0];
           last = unpackArray[nEntries-1];
           current = unpackArray[cur];
-          for (int i=0;i<nEntries-1;i++) unpackArray[i]->next=unpackArray[i+1];
+          delete [] unpackArray;
         }
       }
-      for (CWhenTrigger *tmp = first; tmp!=last; tmp=tmp->next) tmp->pup(p);
+      for (CWhenTrigger *tmp = first; tmp; tmp=tmp->next) tmp->pup(p);
     }
 
     int empty(void) { return ! first; }
@@ -161,14 +164,13 @@ class TListCMsgBuffer
 
   public:
 
-    TListCMsgBuffer(void) : first(0), last(0) {;}
+    TListCMsgBuffer(void) : first(0), last(0) {}
 
     void pup(PUP::er& p) {
-      int nEntries;
+      int nEntries=0;
       int cur=0;
       if (p.isPacking()) { 
-        nEntries = 0;
-        for (CMsgBuffer *tmp = first; tmp!=last; tmp=tmp->next, nEntries++) {
+        for (CMsgBuffer *tmp = first; tmp; tmp=tmp->next, nEntries++) {
           if (current == tmp) cur = nEntries;
         }
       }
@@ -178,14 +180,17 @@ class TListCMsgBuffer
         first = last = current = NULL;
         if (nEntries) {
 	  CMsgBuffer** unpackArray = new CMsgBuffer*[nEntries]; 
+          for (int i=0; i<nEntries; i++)  {
+            unpackArray[i] = new CMsgBuffer;
+            if (i!=0) unpackArray[i-1]->next=unpackArray[i];
+          }
           first = unpackArray[0];
           last = unpackArray[nEntries-1];
-          for (int i=0; i<nEntries-1; i++)
-            unpackArray[i]->next = unpackArray[i+1];
           current = unpackArray[cur];
+	  delete [] unpackArray;
         }
       }
-      for (CMsgBuffer *tmp = first; tmp!=last; tmp=tmp->next) tmp->pup(p);
+      for (CMsgBuffer *tmp = first; tmp; tmp=tmp->next) tmp->pup(p);
     }
 
     int empty(void) { return ! first; }
