@@ -23,7 +23,7 @@ addEdge(EdgeList, v,w)
   n = EdgeList->next;
   EdgeList->next++;
 
-  // printf("adding edge: (%d, %d)\n", v, w);
+  /* printf("adding edge: (%d, %d)\n", v, w); */
   ((EdgeList->edges)[n]).node1 = v;
   (EdgeList->edges[n]).node2 = w;
    index =  graph.vertexArray[v].next++;

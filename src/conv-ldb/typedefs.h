@@ -7,7 +7,7 @@ typedef struct {
   int degree; 
   int next; /* temporary count needed to tell where to insert the next entry */
   int adjListInd; /* where in the big array does its adj list begin */
-//  int available; /* number of connections still available. 12/2/97 */
+  /*  int available;*/ /* number of connections still available. 12/2/97 */
 } Vertex;
 
 typedef struct {

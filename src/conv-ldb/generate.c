@@ -9,6 +9,8 @@ Modified from the original: changed output format, and converted main to a param
 */
 
 #include "stdio.h"
+/* comment this out to test and change CmiPrintf to printf */
+#include "converse.h"
 #include "typedefs.h"
 
 #define VMAX 2050
@@ -21,6 +23,14 @@ VerticesListType graph;
 
 VerticesListType * InitVertices();
 
+
+/* For testing... 
+main(int argc, char **argv)
+{
+  gengraph(atoi(argv[1]), atoi(argv[2]), atoi(argv[3]));
+}
+*/
+
 gengraph(int V, int C, int seed)
 { int i;
   EdgeListType * EdgeList;
@@ -29,20 +39,21 @@ gengraph(int V, int C, int seed)
   extern addEdge();
   char dircmd[20], dirname[10];
 
-  for (i=0; i<seed; i++) rand();
-  if ((V*C %2) != 0) printf("V*C must be even\n");
-  E = V*C/2;
-
-  initGraph(V, E);
-  EdgeList = InitEdgeList(E);
-  AddEdges(EdgeList, V, E); 
-  /*  vertices = (VerticesListType *) InitVertices(EdgeList, V,E); */
+  CmiPrintf("for %d PEs, connectivity %d... ", V, C);
 
   /* make a directory */
   sprintf(dirname, "graph%d", V);
   sprintf(dircmd, "mkdir %s", dirname);
   system(dircmd);
   
+  for (i=0; i<seed; i++) rand();
+  if ((V*C %2) != 0) printf("V*C must be even\n");
+  E = V*C/2;
+  initGraph(V, E);
+  EdgeList = InitEdgeList(E);
+  AddEdges(EdgeList, V, E); 
+  /*  vertices = (VerticesListType *) InitVertices(EdgeList, V,E); */
+
   printOut(graph); 
   diameter();
 }
@@ -57,6 +68,7 @@ AddEdges(EdgeList, V, n)
 /* first add edges for a C-way spanning tree.*/
 int c1;
 c1 = C-1;
+
 for (i=0; i< V/c1; i++)
   for (j=0; j<c1; j++) {
     w = c1*i + j +1; 
@@ -72,11 +84,15 @@ n -= (V-1);
  for (i=0; i<n; i++) 
    {
      do {
-       do {x = rand() % V;} while (connections(x) >= C);
-       do {y = rand() % V; } while ((y == x) || connections(y) >= C);
+       do {
+	 x = rand() % V;
+       } while (connections(x) >= C);
+       do {
+	 y = rand() % V; 
+       } while ((y == x) || connections(y) >= C);
      } while (edgeExists(x,y));
-      addEdge(EdgeList, x, y);
-    }
+     addEdge(EdgeList, x, y);
+   }
 }
 
 VerticesListType * 
@@ -256,11 +272,14 @@ diameter()
 {
   Q * makeQueue();
   int i,j, k, v, w, start;
-  int distance[V];
-  int histogram[V];
+  int *distance;
+  int *histogram;
   Q * q;
   int dia;
   float average;
+
+  distance = (int *)calloc(V, sizeof(int));
+  histogram = (int *)calloc(V, sizeof(int));
 
   for (i=0; i<V; i++) {
     histogram[i] = 0; 
