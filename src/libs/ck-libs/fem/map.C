@@ -50,7 +50,7 @@ typedef struct _chunkMsg {
  * nelems: total number of elements
  * nnodes: total number of nodes
  * ctype: type of element
- * connmat: total connectivity matrix, in row major format [nelems][esize]
+ * connmat: total connectivity matrix, always row major[nelems][esize]
  * nparts: required number of partitions
  * epart: element partitioning by metis, epart[i] contains partition for elem i
  * npart: node partitioning by metis, npart[i] contains partition for node i

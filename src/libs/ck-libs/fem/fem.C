@@ -136,6 +136,28 @@ main::main(CkArgMsg *am)
   delete am;
 }
 
+static void c2r(int nx, int ny, int *mat)
+{
+  int i, j;
+  int *newmat =  new int[nx*ny]; CHK(newmat);
+  for(i=0;i<nx;i++)
+    for(j=0;j<ny;j++)
+      newmat[i*ny+j] = mat[j*nx+i];
+  for(i=0;i<(nx*ny);i++) mat[i] = newmat[i];
+  delete[] newmat;
+}
+
+static void r2c(int nx, int ny, int *mat)
+{
+  int i, j;
+  int *newmat =  new int[nx*ny]; CHK(newmat);
+  for(i=0;i<nx;i++)
+    for(j=0;j<ny;j++)
+      newmat[j*nx+i] = mat[i*ny+j];
+  for(i=0;i<(nx*ny);i++) mat[i] = newmat[i];
+  delete[] newmat;
+}
+
 extern "C" void
 METIS_PartMeshNodal(int*,int*,int*,int*,int*,int*,int*,int*,int*);
 
@@ -154,11 +176,11 @@ main::setMesh(int nelem, int nnodes, int ctype, int *connmat, int *xconn)
 #endif
   if(_nchunks==1) { // Metis cannot handle this case
     int i;
-    for(i=0;i<nelem;i++) { epart[i] = 0; }
-    for(i=0;i<nnodes;i++) { npart[i] = 0; }
+    for(i=0;i<nelem;i++) { epart[i] = numflag; }
+    for(i=0;i<nnodes;i++) { npart[i] = numflag; }
     ecut = 0;
   } else {
-    // pass mesh to metis to be partitioned
+    // pass mesh to metis to be partitioned. xconn is always in row order
     METIS_PartMeshNodal(&nelem, &nnodes, xconn, &ctype, &numflag, 
                        (int*)&_nchunks, &ecut, epart, npart);
   }
@@ -183,7 +205,18 @@ FEM_Set_Mesh(int nelem, int nnodes, int ctype, int *connmat)
   if(_mainptr == 0) {
     CkAbort("FEM_Set_Mesh can be called from within _init only.\n");
   }
+  int esize = (ctype==FEM_TRIANGULAR) ? 3:
+              (ctype==FEM_HEXAHEDRAL) ? 8:
+	      4;
+#if FEM_FORTRAN
+  // make the connmat row major
+  c2r(nelem, esize, connmat);
+#endif
   _mainptr->setMesh(nelem, nnodes, ctype, connmat, connmat);
+#if FEM_FORTRAN
+  // make the connmat column major
+  r2c(nelem, esize, connmat);
+#endif
 }
 
 extern "C" void 
@@ -196,6 +229,10 @@ FEM_Set_Mesh_Transform(int nelem, int nnodes, int ctype, int *connmat,
   int esize = (ctype==FEM_TRIANGULAR) ? 3:
               (ctype==FEM_HEXAHEDRAL) ? 8:
 	      4;
+#if FEM_FORTRAN
+  // make the connmat row major
+  c2r(nelem, esize, connmat);
+#endif
   // check if permute array is indeed a permutation
   // it is a permutation if the mapped indices are in the range 0..esize-1
   // and if every index occurs just once.
@@ -227,14 +264,14 @@ FEM_Set_Mesh_Transform(int nelem, int nnodes, int ctype, int *connmat,
   int *conn = new int[nelem*esize]; CHK(conn);
   for(i=0;i<nelem;i++) {
     for(j=0;j<esize;j++) {
-#if FEM_FORTRAN
-      conn[i*esize+j] = permute[connmat[i*esize+j]-1];
-#else
-      conn[i*esize+j] = permute[connmat[i*esize+j]];
-#endif
+      conn[i*esize+j] = connmat[i*esize+permute[j]];
     }
   }
   _mainptr->setMesh(nelem, nnodes, ctype, connmat, conn);
+#if FEM_FORTRAN
+  // make the connmat column major
+  r2c(nelem, esize, connmat);
+#endif
   delete[] conn;
 }
 
@@ -244,6 +281,7 @@ main::done(void)
   numdone++;
   if (numdone == _nchunks) {
     // call application-specific finalization
+    _mainptr = this;
 #if FEM_FORTRAN
 #if CMK_FORTRAN_USES_ALLCAPS
     FINALIZE();
@@ -253,6 +291,7 @@ main::done(void)
 #else // C/C++
     finalize();
 #endif // Fortran
+    _mainptr = 0;
     CkExit();
   }
 }
@@ -343,6 +382,7 @@ chunk::callDriver(void)
   // call the application-specific driver
   doneCalled = 0;
 #if FEM_FORTRAN
+  r2c(numElems, numNodesPerElem, conn);
 #if CMK_FORTRAN_USES_ALLCAPS
   DRIVER(&numNodes, gNodeNums, &numElems, gElemNums, &numNodesPerElem, conn);
 #else // fortran-uses-trailing-undescore
@@ -593,14 +633,7 @@ chunk::readElems(ChunkMsg *msg)
     for(int i=0; i<numElems; i++) {
       fscanf(fp, "%d", &gElemNums[i]);
       for(int j=0;j<numNodesPerElem;j++) {
-#if FEM_FORTRAN
-        fscanf(fp, "%d", &conn[j*numElems+i]);
-        // FIXME: This will go away once map is part of the library
-        // map will generate 1-based node numbers
-        conn[j*numElems+i]++;
-#else
         fscanf(fp, "%d", &conn[i*numNodesPerElem+j]);
-#endif
       }
     }
   } else {
@@ -703,7 +736,11 @@ chunk::print(void)
     sprintf(tmpstr, "  [%d] ", gElemNums[i]);
     strcat(str,tmpstr);
     for(j=0;j<numNodesPerElem;j++) {
+#if FEM_FORTRAN
+      sprintf(tmpstr, "%d ", gNodeNums[conn[j*numElems+i]-1]);
+#else
       sprintf(tmpstr, "%d ", gNodeNums[conn[i*numNodesPerElem+j]]);
+#endif
       strcat(str,tmpstr);
     }
     sprintf(tmpstr, "\n");
@@ -786,8 +823,12 @@ FEM_Num_Partitions(void)
 extern "C" void 
 FEM_Print(char *str)
 {
-  chunk *cptr = CtvAccess(_femptr);
-  CkPrintf("[%d] %s\n", cptr->thisIndex, str);
+  if(_mainptr) {
+    CkPrintf("%s\n", str);
+  } else {
+    chunk *cptr = CtvAccess(_femptr);
+    CkPrintf("[%d] %s\n", cptr->thisIndex, str);
+  }
 }
 
 extern "C" void 
@@ -901,7 +942,6 @@ fem_print_
 #endif
   (char *str, int len)
 {
-  chunk *ptr = CtvAccess(_femptr);
   char *tmpstr = new char[len+1]; CHK(tmpstr);
   memcpy(tmpstr,str,len);
   tmpstr[len] = '\0';
@@ -942,5 +982,19 @@ fem_set_mesh_transform_
 {
   FEM_Set_Mesh_Transform(*nelem, *nnodes, *ctype, connmat, permute);
 }
+
+extern "C" void
+#if CMK_FORTRAN_USES_ALLCAPS
+FEM_DONE
+#else
+fem_done_
 #endif
+  (void)
+{
+  FEM_Done();
+}
+
+
+#endif
+
 #include "fem.def.h"

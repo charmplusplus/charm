@@ -14,27 +14,20 @@
   integer, parameter :: FEM_QUADRILATERAL=4
 
 
+  external FEM_Set_Mesh
+  external FEM_Reduce_Field
+  external FEM_Reduce
+  external FEM_Update_Field
+  external FEM_Read_Field
+  external FEM_Set_Mesh_Transform
+  external FEM_Print_Partition
+  integer, external :: offsetof
+
   interface
   function FEM_Create_Field(base_type, vec_len, init_offset, distance)
      integer  :: base_type, vec_len, init_offset, distance
      integer  :: FEM_Create_Field
   end function FEM_Create_Field
-
-  subroutine FEM_Update_Field(fid, nodes)
-     integer  :: fid
-     double precision         :: nodes
-  end subroutine FEM_Update_Field
-
-  subroutine FEM_Reduce_Field(fid, nodes, outbuf, op)
-     integer  :: fid, op
-     double precision :: nodes
-     double precision :: outbut
-  end subroutine FEM_Reduce_Field
-
-  subroutine FEM_Reduce(fid, inbuf, outbuf, op)
-     integer  :: fid, op
-     double precision         :: inbuf, outbuf
-  end subroutine FEM_Reduce
 
   function FEM_My_Partition()
      integer  :: FEM_My_Partition
@@ -43,30 +36,5 @@
   function FEM_Num_Partitions()
     integer  :: FEM_Num_Partitions
   end function FEM_Num_Partitions
-
-  subroutine FEM_Read_Field(fid, nodes, fname)
-    integer  :: fid
-    character*20        :: fname
-    double precision        :: nodes
-  end subroutine FEM_Read_Field
-
-  function offsetof(first, second)
-     integer  :: offsetof
-     double precision        :: first, second
-  end function offsetof
-
-  subroutine FEM_Set_Mesh(nelem, nnodes, ctype, mesh)
-    integer :: nelem, nnodes, ctype
-    integer, dimension(:,:) :: mesh
-  end subroutine FEM_Set_Mesh
-
-  subroutine FEM_Set_Mesh_Transform(nelem, nnodes, ctype, mesh, permute)
-    integer :: nelem, nnodes, ctype
-    integer, dimension(:,:) :: mesh
-    integer, dimension(:) :: permute
-  end subroutine FEM_Set_Mesh_Transform
-
-  subroutine FEM_Print_Partition()
-  end subroutine FEM_Print_Partition
 
   end interface

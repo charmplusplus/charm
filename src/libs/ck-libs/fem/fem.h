@@ -194,6 +194,7 @@ extern "C" {
   void FEM_SET_MESH_TRANSFORM(int *nelem,int *nnodes,int *ctype,
                               int *connmat, int *permute);
   void FEM_PRINT_PARTITION(void);
+  void FEM_DONE(void);
   int OFFSETOF(void *, void *);
   // to be provided by the application
   void INIT(void);
@@ -212,6 +213,7 @@ extern "C" {
   void fem_set_mesh_transform_(int *nelem,int *nnodes,int *ctype,
                                int *connmat, int *permute);
   void fem_print_partition_(void);
+  void fem_done_(void);
   int offsetof_(void *, void *);
   // to be provided by the application
   void init_(void);
