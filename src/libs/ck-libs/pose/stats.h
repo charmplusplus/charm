@@ -7,8 +7,7 @@
 #ifndef STATS_H
 #define STATS_H
 #include "stats.decl.h"
-
-// #define POSE_STATS_ON 1  // turn this on in pose.h
+#include "pose_config.h"
 
 // Timer flags
 #define DO_TIMER 1
