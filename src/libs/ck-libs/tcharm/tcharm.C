@@ -18,6 +18,8 @@ Orion Sky Lawlor, olawlor@acm.org, 11/19/2001
 CtvDeclare(TCharm *,_curTCharm);
 CpvDeclare(inState,_stateTCharm);
 
+/*readonly*/ int tcharm_nomig=0, tcharm_nothreads=0;
+
 void TCharm::nodeInit(void)
 {
   CtvInitialize(TCharm *,_curTCharm);
@@ -39,7 +41,17 @@ static void startTCharmThread(TCharmInitMsg *msg)
 TCharm::TCharm(TCharmInitMsg *initMsg_)
 {
   initMsg=initMsg_;
-  tid=CthCreateMigratable((CthVoidFn)startTCharmThread,initMsg,initMsg->stackSize);
+  if (tcharm_nothreads) 
+  { //Don't even make a new thread-- just use main thread
+    tid=CthSelf();
+  } 
+  else /*Create a thread normally*/
+  {
+    if (tcharm_nomig) /*Nonmigratable version, for debugging*/ 
+      tid=CthCreate((CthVoidFn)startTCharmThread,initMsg,initMsg->stackSize);
+    else
+      tid=CthCreateMigratable((CthVoidFn)startTCharmThread,initMsg,initMsg->stackSize);
+  }
   CtvAccessOther(tid,_curTCharm)=this;
   TCharm::setState(inInit);
   isStopped=true;
@@ -71,6 +83,7 @@ void TCharm::pup(PUP::er &p) {
   DBG("Packing thread");
   if (!isStopped)
     CkAbort("Cannot pup a running thread.  You must suspend before migrating.\n");
+  if (tcharm_nomig) CkAbort("Cannot migrate with the +tcharm_nomig option!\n");
 #endif
 
 //Pup thread (EVIL & UGLY):
@@ -156,6 +169,8 @@ void TCharm::stop(void)
   DBG("suspending thread");
   if (tid != CthSelf())
     CkAbort("Called TCharm::stop from outside TCharm thread!\n");
+  if (tcharm_nothreads)
+    CkAbort("Cannot make blocking calls using +tcharm_nothreads!\n");
 #endif
   isStopped=true;
   stopTiming();
@@ -174,7 +189,10 @@ void TCharm::start(void)
   isStopped=false;
   TCharm::setState(inDriver);
   DBG("awakening thread");
-  CthAwaken(tid);
+  if (tcharm_nothreads) /*Call user routine directly*/
+	  startTCharmThread(initMsg);
+  else /*Jump to thread normally*/
+	  CthAwaken(tid);
 }
 
 //Go to sync, block, possibly migrate, and then resume
@@ -372,6 +390,13 @@ CDECL void TCharmInDefaultSetup(void) {
 class TCharmMain : public Chare {
 public:
   TCharmMain(CkArgMsg *msg) {
+    if (0!=(tcharm_nomig=CmiGetArgFlag(msg->argv,"+tcharm_nomig")))
+        CmiPrintf("TCHARM> Disabling migration support, for debugging\n");
+    tcharm_nothreads=CmiGetArgFlag(msg->argv,"+tcharm_nothread");
+    tcharm_nothreads|=CmiGetArgFlag(msg->argv,"+tcharm_nothreads");
+    if (0!=tcharm_nothreads)
+       CmiPrintf("TCHARM> Disabling thread support, for debugging\n");
+    
     TCharmSetupCookie cookie(msg->argv);
     TCharmSetupCookie::theCookie=&cookie;
     g_numDefaultSetups=0;
@@ -520,17 +545,23 @@ FDECL int FTN_NAME(TCHARM_ELEMENT,tcharm_element)(void)
 FDECL int FTN_NAME(TCHARM_NUM_ELEMENTS,tcharm_num_elements)(void) 
 { return TCharmNumElements();}
 
+//Make sure this address will migrate with us when we move:
+static void checkAddress(void *data)
+{
+	if (tcharm_nomig||tcharm_nothreads) return; //Stack is not isomalloc'd
+	if (!CmiIsomallocInRange(data))
+	    CkAbort("The UserData you register must be allocated on the stack!\n");
+}
+
 CDECL int TCharmRegister(void *data,TCharmPupFn pfn)
 { 
-	if (!CmiIsomallocInRange(data))
-		CkAbort("The UserData you register must be allocated on the stack!\n");
+	checkAddress(data);
 	return TCharm::get()->add(TCharm::UserData(pfn,data));
 }
 FDECL int FTN_NAME(TCHARM_REGISTER,tcharm_register)
 	(void *data,TCpupUserDataF pfn)
 { 
-	if (!CmiIsomallocInRange(data))
-		CkAbort("The UserData you register must be allocated on the stack!\n");
+	checkAddress(data);
 	return TCharm::get()->add(TCharm::UserData(
 		pfn,data,TCharm::UserData::isFortran()));
 }

@@ -1,4 +1,6 @@
 module tcharm {
+  readonly int tcharm_nomig;
+  readonly int tcharm_nothreads;
   message TCharmInitMsg {
 	char data[];
   };
