@@ -1,11 +1,8 @@
 CDIR=../../../..
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
-all: fem femf
-
-fem: libfem.a $(CDIR)/include/fem.h $(CDIR)/include/fem.decl.h
-
-femf: libfemf.a $(CDIR)/include/femf.h $(CDIR)/lib/fmain.o
+all: libfem.a libfemf.a $(CDIR)/include/fem.h $(CDIR)/include/fem.decl.h \
+     $(CDIR)/include/femf.h $(CDIR)/lib/fmain.o
 
 libfem.a: fem.C fem.h femf.h fem.decl.h fem.def.h
 	$(CHARMC) -DFEM_FORTRAN=0 -c fem.C
