@@ -466,6 +466,11 @@ fi
 Debug "About to read machine config script"
 . $CHARMINC/conv-mach.sh
 
+if [ -r $CHARMINC/conv-mach-opt.sh ]
+then
+. $CHARMINC/conv-mach-opt.sh
+fi
+
 Debug "Read config script, setting vars..."
 
 if [ -n "$USE_RELIABLE_CC" ]

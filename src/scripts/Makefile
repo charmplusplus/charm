@@ -95,7 +95,8 @@ SEQCHARMC=../bin/charmc -seq $(CHARMOPTS)
 ###############################################################################
 
 CVHEADERS=cpthreads.h converse.h conv-trace.h trace.h conv-ccs.h \
-      debug-conv.h conv-autoconfig.h conv-mach.h conv-mach.sh \
+      debug-conv.h conv-autoconfig.h \
+      conv-mach.h conv-mach-opt.h conv-mach.sh conv-mach-opt.sh\
       CkFutures.decl.h CkArray.decl.h CkReduction.decl.h \
       LBDatabase.decl.h CentralLB.decl.h \
       RandCentLB.decl.h RecBisectBfLB.decl.h \
@@ -177,6 +178,7 @@ dirs+sources:
 	rm -f .vdir .gdir
 	rm -rf ../include ; mkdir ../include
 	cp -f conv-mach.sh ../include
+	cp -f conv-mach-opt.sh ../include
 	touch dirs+sources
 
 
