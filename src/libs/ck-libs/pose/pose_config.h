@@ -7,6 +7,7 @@
 //#define POSE_STATS_ON 1
 //#define POSE_DOP_ON 1
 //#define PRIO_MSGS 1
+//#define MSG_RECYCLING 1
 /// Uncomment to make use of the Streaming Communication Library optimizations
 //#define POSE_COMM_ON 1
 /// Uncomment to turn on POSE load balancer

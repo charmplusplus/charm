@@ -514,12 +514,13 @@ while (@line=split(' ',($thisline=getcodeline($inChandle)))) {
       $outChandle->print("    e->fnIdx = $thefnidx;\n");
       $outChandle->print("    e->next = e->prev = NULL;\n");
       $outChandle->print("    e->spawnedList = NULL;\n");
-      $outChandle->print("    eq->InsertEvent(e);\n");
+      $outChandle->print("    int rb = eq->InsertEvent(e);\n");
       $outChandle->print("    if ((e->timestamp < eq->currentPtr->timestamp)\n");
       $outChandle->print("        || (eq->currentPtr == eq->backPtr)) {\n");
       $outChandle->print("      myStrat->ResetRBevent(e);\n");
       $outChandle->print("    }\n");
-      $outChandle->print("    if (active == 0) { active = 1; POSE_Objects[thisIndex].Step(); }\n");
+      $outChandle->print("    if (!rb) Step();\n");
+      $outChandle->print("    else if (active == 0) { active = 1; POSE_Objects[thisIndex].Step(); }\n");
       $outChandle->print("  }\n");
       $outChandle->print("  pvt->objUpdate($messagename->timestamp, RECV);\n");
       $outChandle->print("  srVector[$messagename->fromPE]++;\n");

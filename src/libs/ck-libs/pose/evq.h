@@ -27,12 +27,12 @@ class eventQueue {
   ~eventQueue();
   /// Insert e in the queue in timestamp order
   /** If executed events with same timestamp exist, insert e at the back of 
-      these. */
+      these, returns 0 if rollback necessary, 1 otherwise. */
+  int InsertEvent(Event *e);      
   /// Return front pointer
   Event *front() { return frontPtr; }
   /// Return back pointer
   Event *back() { return backPtr; }
-  void InsertEvent(Event *e);      
   /// Move currentPtr to next event in queue
   /** If no more events, take one from heap */
   void ShiftEvent();               

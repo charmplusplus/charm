@@ -69,10 +69,12 @@ public:
   /// Allocates event message with space for priority
   /** This can also handle event message recycling (currently off) */
   void *operator new (size_t size) {  
+#ifdef MSG_RECYCLING
     MemoryPool *localPool = (MemoryPool *)CkLocalBranch(MemPoolID);
-    if (0) //(localPool->CheckPool(size) > 0)
+    if (localPool->CheckPool(size) > 0)
       return localPool->GetBlock(size);
     else {
+#endif
 #ifdef PRIO_MSGS
       void *msg = CkAllocMsg(CMessage_eventMsg::__idx, size, 8*sizeof(int));
 #else
@@ -80,9 +82,12 @@ public:
 #endif
       ((eventMsg *)msg)->msgSize = size;
       return msg;
+#ifdef MSG_RECYCLING
     }
+#endif
   }
   void operator delete(void *p) { 
+#ifdef MSG_RECYCLING
     MemoryPool *localPool = (MemoryPool *)CkLocalBranch(MemPoolID);
     int ps = localPool->CheckPool(((eventMsg *)p)->msgSize);
     if (0) { // ((ps < MAX_POOL_SIZE) && (ps > -1)) {
@@ -92,6 +97,7 @@ public:
       localPool->PutBlock(msgSize, p);
     }
     else
+#endif
       CkFreeMsg(p);
   }
   /// Set priority field and queuing strategy
