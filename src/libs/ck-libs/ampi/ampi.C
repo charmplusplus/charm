@@ -9,52 +9,6 @@
 // for strlen
 #include <string.h>
 
-argvPupable::~argvPupable()
-{
-	if (!isSeparate) return;
-/* //This causes a crash if the thread migrates, so just leak it (!)
-	int argc=getArgc();
-	for (int i=0;i<argc;i++)
-		delete[] argv[i];
-	delete[] argv;
-*/
-}
-
-argvPupable::argvPupable(const argvPupable &p)
-{
-	isSeparate=true;
-	int argc=p.getArgc();
-	char **nu_argv=new char*[argc+1];
-	for (int i=0;i<argc;i++)
-	{
-		int len;
-		len=strlen(p.argv[i])+1;
-		nu_argv[i]=new char[len];
-		strcpy(nu_argv[i],p.argv[i]);
-	}
-	nu_argv[argc]=NULL;
-	argv=nu_argv;
-}
-
-void argvPupable::pup(PUP::er &p)
-{
-	int argc=0;
-	if (!p.isUnpacking()) argc=getArgc();
-	p(argc);
-	if (p.isUnpacking()) {
-		argv=new char*[argc+1];
-		isSeparate=true;
-	}
-	for (int i=0;i<argc;i++) {
-		int len;
-		if (!p.isUnpacking()) len=strlen(argv[i])+1;
-		p(len);
-		if (p.isUnpacking()) argv[i]=new char[len];
-		p(argv[i],len);
-	}
-	if (p.isUnpacking()) argv[argc]=NULL;
-}
-
 //------------- startup -------------
 static mpi_comm_structs mpi_comms;
 int mpi_ncomms;
@@ -93,18 +47,16 @@ void ampi::reduceResult(CkReductionMsg *msg)
 
 class MPI_threadstart_t {
 public:
-	argvPupable args;
 	MPI_MainFn fn;
 	MPI_threadstart_t() {}
-	MPI_threadstart_t(const argvPupable &args_,MPI_MainFn fn_)
-		:args(args_), fn(fn_) {}
+	MPI_threadstart_t(MPI_MainFn fn_)
+		:fn(fn_) {}
 	void start(void) {
-		char **argv=args.getArgv();
-		int argc=args.getArgc();
+		char **argv=CkGetArgv();
+		int argc=CkGetArgc();
 		(fn)(argc,argv);
 	}
 	void pup(PUP::er &p) {
-		p|args;
 		p|fn;
 	}
 };
@@ -124,8 +76,7 @@ void ampiCreateMain(MPI_MainFn mainFn)
 	int _nchunks=TCharmGetNumChunks();
 	
 	//Make a new threads array
-	argvPupable args(TCharmArgv());
-	MPI_threadstart_t s(args,mainFn);
+	MPI_threadstart_t s(mainFn);
 	memBuf b; pupIntoBuf(b,s);
 	TCharmCreateData( _nchunks,MPI_threadstart,
 			  b.getData(), b.getSize());

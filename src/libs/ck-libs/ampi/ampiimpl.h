@@ -73,20 +73,6 @@ class PersReq {
     int nextfree, prevfree;
 };
 
-class argvPupable {
-	bool isSeparate;//Separately allocated strings
-	char **argv;
- public:
-	char **getArgv(void) {return argv;}
-	int getArgc(void) const {return CmiGetArgc(argv);}
-	argvPupable() {argv=NULL;isSeparate=false;}
-	argvPupable(char **argv_) {argv=argv_; isSeparate=false;}
-	argvPupable(const argvPupable &p);
-	~argvPupable();
-	void pup(PUP::er &p);
-};
-PUPmarshall(argvPupable);
-
 //A simple destructive-copy memory buffer
 class memBuf {
 	int bufSize;
