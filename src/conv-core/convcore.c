@@ -232,20 +232,20 @@ static char *_implTrimParenthesis(char *str) {
 }
 
 /*
-Return the "type" of this trimmed routine name. 
+Return the text description of this trimmed routine name, if 
+it's a system-generated routine where we should stop printing. 
 This is probably overkill, but improves the appearance of callbacks.
-   0  ordinary user routine
-   1  automatically-generated proxy "_call_" method
-   2  automatically-generated proxy "_callthr_" method
 */
-static int _implGetBacktraceType(const char *name) {
+static const char* _implGetBacktraceSys(const char *name) {
   if (0==strncmp(name,"_call",5)) 
   { /*it might be something we're interested in*/
-    if (0==strncmp(name,"_call_",6)) return 1;
-    if (0==strncmp(name,"_callthr_",9)) return 2;
+    if (0==strncmp(name,"_call_",6)) return "Call Entry Method";
+    if (0==strncmp(name,"_callthr_",9)) return "Call Threaded Entry Method";
   }
+  if (0==strncmp(name,"CthResume",9)) return "Resumed thread";
+  if (0==strncmp(name,"qt_args",7)) return "Converse thread";
   
-  return 0;
+  return 0; /*ordinary user routine-- just print normally*/
 }
 
 void CmiPrintStackTrace(int nSkip) {
@@ -254,15 +254,17 @@ void CmiPrintStackTrace(int nSkip) {
   char **names=CmiBacktrace(&max);
   nSkip+=2; /*Since "CmiPrintStackTrace" and "CmiBacktrace" will be in list.*/
   if (max>nSkip) {
-    CmiError("Stack Traceback:\n");
+    CmiPrintf("Stack Traceback:\n");
     for (i=nSkip;i<max;i++) {
       const char *trimmed=_implTrimParenthesis(names[i]);
       const char *print=trimmed;
-      int type=_implGetBacktraceType(print);
-      if (type==1) print="Charm++ Runtime: Call Entry Method";
-      if (type==2) print="Charm++ Runtime: Call Threaded Entry Method";
-      CmiError("  [%d] %s\n",i-nSkip,print);
-      if (print!=trimmed) break; /*Stop if we hit Charm++ runtime.*/
+      const char *sys=_implGetBacktraceSys(print);
+      if (sys) {
+          CmiPrintf("  [%d] Charm++ Runtime: %s (%s)\n",i-nSkip,sys,print);
+          break; /*Stop when we hit Charm++ runtime.*/
+      } else {
+          CmiPrintf("  [%d] %s\n",i-nSkip,print);
+      }
     }
   }
   free(names);
