@@ -1,0 +1,14 @@
+message SchedulerData;
+message computeMsg;
+
+poser schedulerObject : sim adapt2 chpt {
+  entry schedulerObject(SchedulerData *);
+  entry [event] void receiveWork(computeMsg *);
+  entry [event] void recvLoad(computeMsg *);
+  entry [event] void startWork(computeMsg *);
+  entry [event] void sendData(computeMsg *);
+  void ldbalance();
+  void fibonacci(long int);
+  void ldminavg(int&);
+  void findneighbors();
+};
