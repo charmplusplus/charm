@@ -95,17 +95,16 @@ extern void BgNodeStart(int argc, char **argv);
 
 CpvExtern(int, inEmulatorInit);
 
-#define BnvDeclare(T, v)    CpvDeclare(T*, v); CpvDeclare(int, v##_flag_)
-#define BnvStaticDeclare(T, v)    CpvStaticDeclare(T*, v); CpvStaticDeclare(int, v##_flag_)
+#define BnvDeclare(T, v)    CpvDeclare(T*, v)=0; 
+#define BnvStaticDeclare(T, v)    CpvStaticDeclare(T*, v)=0; 
 #define BnvExtern(T, v)    CpvExtern(T*, v); CpvExtern(int, v##_flag_)
 #define BnvInitialize(T, v)    \
   do { 	\
     if (CpvAccess(inEmulatorInit)) CmiAbort("BnvInitialize cannot be in BgEmulator\n");	\
-    CpvInitialize(int, v##_flag_);	\
-    CpvInitialize(T*, v);	\
-    if (CpvAccess(v##_flag_)==0) {	\
-      CpvAccess(v##_flag_) = 1;	\
-      CpvAccess(v) = (T*)malloc(BgNumNodes()*sizeof(T)); } \
+    if (BgMyRank() == 0) { /* rank 0 must execute NodeStart() first */ 	\
+      CpvInitialize(T*, v); 	 \
+      CpvAccess(v) = (T*)malloc(BgNumNodes()*sizeof(T)); 	\
+    }\
   } while(0)
 #define BnvAccess(v)       CpvAccess(v)[BgMyRank()]
 
