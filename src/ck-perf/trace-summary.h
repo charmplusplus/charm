@@ -79,12 +79,7 @@ class PhaseEntry {
     int count[MAX_ENTRIES];
     double times[MAX_ENTRIES];
   public:
-    PhaseEntry() {
-	for (int i=0; i<MAX_ENTRIES; i++) {
-	    count[i] = 0;
-	    times[i] = 0.0;
-	}
-    }
+    PhaseEntry();
     void setEp(int epidx, double time) {
 	if (epidx>=MAX_ENTRIES) CmiAbort("Too many entry functions!\n");
 	count[epidx]++;
@@ -110,13 +105,7 @@ class PhaseTable {
     int cur_phase;
     int phaseCalled;
   public:
-    PhaseTable(int n) : numPhase(n){
-	phases = new PhaseEntry*[n];
-	_MEMCHECK(phases);
-	for (int i=0; i<n; i++) phases[i] = NULL;
-	cur_phase = -1;
-	phaseCalled = 0;
-    }
+    PhaseTable(int n); 
     ~PhaseTable() {
 	for (int i=0; i<numPhase; i++) delete phases[i];
 	delete [] phases;

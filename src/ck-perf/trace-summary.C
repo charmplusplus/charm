@@ -117,11 +117,30 @@ void CkSummary_StartPhase(int phase)
    CpvAccess(_logPool)->startPhase(phase);
 }
 
+
 // for marks
 extern "C" 
 void CkSummary_MarkEvent(int eventType)
 {
    CpvAccess(_logPool)->addEventType(eventType, CmiTimer());
+}
+
+
+PhaseEntry::PhaseEntry() 
+{
+  for (int i=0; i<MAX_ENTRIES; i++) {
+    count[i] = 0;
+    times[i] = 0.0;
+  }
+}
+
+PhaseTable::PhaseTable(int n) : numPhase(n)
+{
+  phases = new PhaseEntry*[n];
+  _MEMCHECK(phases);
+  for (int i=0; i<n; i++) phases[i] = NULL;
+  cur_phase = -1;
+  phaseCalled = 0;
 }
 
 void LogPool::addEventType(int eventType, double time)
