@@ -192,7 +192,7 @@ CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg)
     char *dupmsg = (char *) CmiAlloc(size);
     memcpy(dupmsg, msg, size);
     FIFO_EnQueue(CpvAccess(CmiLocalQueue),dupmsg);
-    return;
+    return 0;
   }
   msg_tmp = (SMSG_LIST *) CmiAlloc(sizeof(SMSG_LIST));
   msg_tmp->msg = msg;
@@ -203,6 +203,7 @@ CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg)
   else
     end_sent->next = msg_tmp;
   end_sent = msg_tmp;
+  return (CmiCommHandle) &(msg_tmp->req);
 }
 
 void CmiFreeSendFn(int destPE, int size, char *msg)

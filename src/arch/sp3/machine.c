@@ -188,6 +188,7 @@ CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg)
   else
     end_sent->next = msg_tmp;
   end_sent = msg_tmp;
+  return (CmiCommHandle) msgid;
 }
 
 void CmiFreeSendFn(int destPE, int size, char *msg)

@@ -227,6 +227,7 @@ char * msg;
   char *buf = (char *)CmiAlloc(size);
   memcpy(buf,msg,size);
   FIFO_EnQueue(CmiQueues[destPE],buf);
+  return 0;
 }
 
 void CmiFreeSendFn(destPE, size, msg)

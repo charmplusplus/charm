@@ -87,7 +87,7 @@ int CmiProbeLock(CmiNodeLock lock)
 int CmiAsyncMsgSent(msgid)
 CmiCommHandle msgid;
 {
-   return 0;
+   return 1;
 }
 
 typedef struct {

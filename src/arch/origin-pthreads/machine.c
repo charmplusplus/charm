@@ -117,7 +117,7 @@ void CmiAbort(char *message)
 
 int CmiAsyncMsgSent(CmiCommHandle msgid)
 {
-  return 0;
+  return 1;
 }
 
 

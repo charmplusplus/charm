@@ -185,7 +185,7 @@ void CmiSyncSendFn(int dest_pe, int size, char *msg)
 CmiCommHandle CmiAsyncSendFn(int dest_pe, int size, char *msg)
 {
   CmiSyncSendFn(dest_pe, size, msg);
-  return 1;
+  return 0;
 }
 
 void CmiFreeSendFn(int dest_pe, int size, char *msg)
@@ -250,7 +250,7 @@ void CmiSyncBroadcastFn(int size, char *msg)
 CmiCommHandle CmiAsyncBroadcastFn(int size, char *msg)
 {
   CmiSyncBroadcastFn(size,msg);
-  return 1;
+  return 0;
 }
 
 void CmiFreeBroadcastFn(int size, char *msg)
@@ -269,7 +269,7 @@ void CmiSyncBroadcastAllFn(int size, char *msg)
 CmiCommHandle CmiAsyncBroadcastAllFn(int size, char *msg)
 {
   CmiSyncBroadcastAllFn(size,msg);
-  return 1;
+  return 0;
 }
 
 void CmiFreeBroadcastAllFn(int size, char *msg)
@@ -344,7 +344,7 @@ void CmiSyncListSendFn(int npes, int *pes, int size, char *msg)
 CmiCommHandle CmiAsyncListSendFn(int npes, int *pes, int size, char *msg)
 {
   CmiSyncListSendFn(npes, pes, size, msg);
-  return 1;
+  return 0;
 }
 
 void CmiFreeListSendFn(int npes, int *pes, int size, char *msg)
@@ -404,7 +404,7 @@ void CmiMulticastInit(void)
 CmiCommHandle CmiAsyncMulticastFn(CmiGroup grp, int size, char *msg)
 {
   CmiSyncMulticastFn(grp, size, msg);
-  return 1;
+  return 0;
 }
 
 void CmiFreeMulticastFn(CmiGroup grp, int size, char *msg)
