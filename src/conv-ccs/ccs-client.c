@@ -131,17 +131,16 @@ static const char *CcsImpl_authInit(SOCKET fd,CcsServer *svr)
  */
 
 int CcsConnect(CcsServer *svr, char *host, int port,CcsSec_secretKey *key){
-    CcsConnectWithtimeout(svr, host, port, key, 120);
+    return CcsConnectWithtimeout(svr, host, port, key, 120);
 }
 
 int CcsConnectWithtimeout(CcsServer *svr, char *host, int port,CcsSec_secretKey *key, int timeout)
 {
-  skt_init();
-  return CcsConnectIpWithTimeout(svr,skt_lookup_ip(host),port,key, timeout);
+    return CcsConnectIpWithTimeout(svr,skt_lookup_ip(host),port,key, timeout);
 }
 
 int CcsConnectIp(CcsServer *svr, skt_ip_t ip, int port,CcsSec_secretKey *key){
-    CcsConnectIpWithTimeout(svr, ip, port, key, 120);
+    return CcsConnectIpWithTimeout(svr, ip, port, key, 120);
 }
 
 int CcsConnectIpWithTimeout(CcsServer *svr, skt_ip_t ip, int port,CcsSec_secretKey *key, int timeout)
@@ -164,6 +163,7 @@ int CcsConnectIpWithTimeout(CcsServer *svr, skt_ip_t ip, int port,CcsSec_secretK
     svr->key=*key;
     CCS_RAND_new(&svr->rand);
     fd=skt_connect(svr->hostIP, svr->hostPort,timeout);
+
     if (NULL!=(err=CcsImpl_authInit(fd,svr))) {
       fprintf(stderr,"CCS Client error> %s\n",err);
       skt_close(fd);
@@ -173,11 +173,14 @@ int CcsConnectIpWithTimeout(CcsServer *svr, skt_ip_t ip, int port,CcsSec_secretK
   }
 
   /*Request the parallel machine's node info*/
-  CcsSendRequest(svr,"ccs_getinfo",0,0,NULL);
+  if(CcsSendRequestWithTimeout(svr,"ccs_getinfo",0,0,NULL,timeout) == -1){
+      fprintf(stderr,"CCS Client Not Alive\n");
+      return -1;
+  }
   
   /*Wait for conv-host to get back to us*/
   DEBUGF(("Waiting for conv-host to call us back...\n"));
-  CcsRecvResponseMsg(svr,&msg_len,&msg_data,60);
+  CcsRecvResponseMsg(svr,&msg_len,&msg_data,timeout);
   parseInfo(svr,msg_data);
   free(msg_data);
   
