@@ -1145,7 +1145,7 @@ void CProxy_CkArrayBase::base_send(CkArrayMessage *msg, int entryIndex) const
 	msg->array_hops() = 0;
 #ifndef CMK_OPTIMIZE
 	if (_idx.nInts<0) CkAbort("Array index length is negative!\n");
-	if (_idx.nInts>=CK_ARRAYINDEX_MAXLEN)
+	if (_idx.nInts>CK_ARRAYINDEX_MAXLEN)
 		CkAbort("Array index length (nInts) is too long-- did you "
 			"use bytes instead of integers?\n");
 #endif
