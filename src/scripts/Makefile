@@ -165,7 +165,6 @@ dirs+sources:
 	./gatherflat ../../src/Common/langs/bluegene   .
 	./gatherflat ../../src/Common/langs/f90charm   .
 	./gatherflat ../../src/Common/xlat-i           .
-	./gatherflat ../../src/Common/xlat-i/sdag      .
 	./gatherflat ../../src/Common/xlatcpm          .
 	./gathertree ../../src/QuickThreads QuickThreads
 	./gathertree ../../src/Common/libs libs
