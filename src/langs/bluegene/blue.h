@@ -267,6 +267,7 @@ public:
   inline void init() {
     if (data == NULL) {
       data = new d*[CmiMyNodeSize()];
+      CmiAssert(data);
       for (int i=0; i<CmiMyNodeSize(); i++)
         data[i] = new d[BgNodeSize()];
     }
