@@ -112,6 +112,9 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
     inData[offset] = new complex[size];
   memcpy(inData[offset], points, size * sizeof(complex));
 
+
+  //compute ZDOT for this input row 
+
   numRecd++; 
   if (numRecd == numExpected * 2 || (symmetric && thisIndex.x==thisIndex.y && numRecd==numExpected)) {
   
@@ -248,7 +251,7 @@ PairCalculator::acceptResult(int size, double *matrix, int rowNum, CkCallback cb
    * add new message and entry method for sumPartial result
    * to avoid message copying.
    */
-  if(!symmetric){
+  /*  if(!symmetric){
     CkArrayIndexIndex4D idx(thisIndex.w, 0, thisIndex.y, thisIndex.z);
     thisProxy(idx).sumPartialResult(N*grainSize, mynewData, thisIndex.z, cb);
   }
@@ -260,18 +263,18 @@ PairCalculator::acceptResult(int size, double *matrix, int rowNum, CkCallback cb
       thisProxy(idx).sumPartialResult(N*grainSize, mynewData, thisIndex.z, cb);  
     }
   }
-
+  */
   // commenting the reduction split out since it doesn't work yet.
 
-  /*
+
   int segments=S/grainSize;
   if(S%grainSize!=0)
     segments+=1;
   int blocksize=grainSize/segments;
   for(int segment=0;segment < segments;segment++)
     {  
-      CkPrintf("[%d %d %d %d]: sending N %d segment %d of %d segments \n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z, N, segment,segments);
-      CkArrayIndexIndex4D idx(thisIndex.w,segment, thisIndex.y, thisIndex.z);
+      //      CkPrintf("[%d %d %d %d]: sending N %d segment %d of %d segments \n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z, N, segment,segments);
+      CkArrayIndexIndex4D idx(thisIndex.w,segment*grainSize, thisIndex.y, thisIndex.z);
       if(!symmetric){
 
 	partialResultMsg *msg = new (N*blocksize,0)partialResultMsg(N*blocksize, segment, cb, mynewData+segment*N*blocksize);
@@ -286,7 +289,7 @@ PairCalculator::acceptResult(int size, double *matrix, int rowNum, CkCallback cb
 	}
       }
     }
-  */
+
   delete [] mynewData;
 }
 
@@ -294,33 +297,33 @@ void
 PairCalculator::sumPartialResult(partialResultMsg *msg)
 {
 
-  CkPrintf("[%d %d %d %d]: sum result from grain %d  count %d\n", thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z,msg->grain, sumPartialCount);
+  //  CkPrintf("[%d %d %d %d]: sum result from grain %d  count %d\n", thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z,msg->grain, sumPartialCount);
 
   int segments=S/grainSize;
   if(S%grainSize!=0)
     segments+=1;
   segments*=blkSize;
-  int blocksize=grainSize/segments;
+  int psumblocksize=grainSize/segments;
 
   sumPartialCount++;
 
   if(!newData){
-    newData = new complex[N*blocksize];
+    newData = new complex[N*psumblocksize];
   }  
-  for(int i=0; i<N*blocksize; i++){
+  for(int i=0; i<N*psumblocksize; i++){
     newData[i] += msg->result[i];  // should be adjusted with offset
   }
   if (sumPartialCount == segments) {
-    CkPrintf("[%d %d %d %d]: sumPartialCount %d is grainSize %d segments %d, blocksize %d, calling back\n", thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z,sumPartialCount,grainSize,segments,blocksize);
-    for(int i=0;i<blocksize;i++)
+    //    CkPrintf("[%d %d %d %d]: sumPartialCount %d is grainSize %d segments %d, psumblocksize %d, calling back\n", thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z,sumPartialCount,grainSize,segments,psumblocksize);
+    for(int i=0;i<psumblocksize;i++)
       {
-	CkPrintf("N %d i %d \n");
-	CkCallback mycb(msg->cb.d.array.ep, CkArrayIndex2D(thisIndex.y+i+thisIndex.x*blocksize, thisIndex.w), msg->cb.d.array.id);
-	mySendMsg *outmsg = new (N*blocksize,0)mySendMsg(N*blocksize,  newData+i*blocksize); // msg with newData (size N)
+	//	CkPrintf("N %d i %d \n",N,i);
+	CkCallback mycb(msg->cb.d.array.ep, CkArrayIndex2D(thisIndex.y/grainSize+i+thisIndex.x/grainSize*psumblocksize, thisIndex.w), msg->cb.d.array.id);
+	mySendMsg *outmsg = new (N*psumblocksize,0)mySendMsg(N*psumblocksize,  newData+i*psumblocksize); // msg with newData (size N)
 	mycb.send(outmsg);
       }
     sumPartialCount = 0;
-    memset(newData,0,N*blocksize);
+    memset(newData,0,N*psumblocksize);
   }
   delete msg;
 }
