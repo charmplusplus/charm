@@ -1126,7 +1126,7 @@ void sendCCSReply(unsigned int ip, unsigned int port, int destProc, int size, vo
 
   fd = skt_connect(ip, port);
   if (fd<0) {
-    printf("client Exited\n");
+    printf("client Exited : %d %d\n", ip, port);
     return; /* maybe the requester exited */
   }
   sprintf(cmd, "reply %d %d\n", size, destProc);
@@ -1354,6 +1354,7 @@ int   arg_server;
 
 #if CMK_DEBUG_MODE
 int   arg_gdbinterface;
+int   arg_initial_bp;
 #endif
 
 void arg_init(int argc, char **argv)
@@ -1370,6 +1371,7 @@ void arg_init(int argc, char **argv)
 #endif
 #if CMK_DEBUG_MODE
   pparam_defflag("gdbinterface"      );
+  pparam_defflag("initial_bp"        );
 #endif
   pparam_defflag("in-xterm"          );
   pparam_defint ("maxrsh"        ,  16);
@@ -1388,6 +1390,7 @@ void arg_init(int argc, char **argv)
 #endif
 #if CMK_DEBUG_MODE
   pparam_doc("gdbinterface",  "Allow the gdb interface to be integrated");
+  pparam_doc("initial_bp"  ,  "Allow the program to break at the initial CsdScheduler call");
 #endif
   pparam_doc("maxrsh",        "Maximum number of rsh's to run at a time");
   pparam_doc("nodelist",      "file containing list of nodes");
@@ -1413,6 +1416,7 @@ void arg_init(int argc, char **argv)
 #endif
 #if CMK_DEBUG_MODE
   arg_gdbinterface   = pparam_getflag("gdbinterface");
+  arg_initial_bp     = pparam_getflag("initial_bp");
 #endif
   arg_maxrsh         = pparam_getint("maxrsh");
   arg_nodelist       = pparam_getstr("nodelist");
@@ -2030,6 +2034,12 @@ int req_handle_clientdata(line)
 
   nread = sscanf(line, "%s%d", cmd, &clientKillPort);
   /* printf("Client Kill Port = %d\n", clientKillPort); */
+  
+  if(arg_initial_bp == 1){
+    if(arg_gdbinterface == 1){
+      GDBActiveFlag = 1;
+    }
+  }
   return REQ_OK;
 }
 
@@ -2780,6 +2790,10 @@ int start_nodes()
         } else{
           if (strncmp(line, "(gdb)", 5) == 0) {
             xstr_printf(p->ibuf, "b dummyF\n");
+
+	    if(arg_initial_bp == 1)
+	      xstr_printf(p->ibuf, "b CsdScheduler\n");
+
             prog_flush(p);
             /* Flush out the initial output */
             nread = readUntilString(p->ofd, buffer, "(gdb) ");
@@ -2868,8 +2882,10 @@ main(argc, argv)
 #endif
 
 #if CMK_DEBUG_MODE
-  if(arg_gdbinterface == 1){
-    GDBActiveFlag = 1;
+  if(arg_initial_bp == 0){
+    if(arg_gdbinterface == 1){
+      GDBActiveFlag = 1;
+    }
   }
 #endif
 
