@@ -106,9 +106,10 @@ void MsgPacker::deliver(CombinedMessage *cmb_msg){
             delete [] senv.data;
         }
         else {
-            envelope *env = (envelope *)CmiAlloc(sizeof(envelope) + size);
-            memset(env, 0, sizeof(envelope) + size);
-            
+            //envelope *env = (envelope *)CmiAlloc(sizeof(envelope) + size);
+
+            envelope *env = _allocEnv(ForArrayEltMsg, sizeof(envelope) + size);
+
             void *data = EnvToUsr(env);
             memcpy(data, senv.data, size);
             
