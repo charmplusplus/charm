@@ -159,6 +159,7 @@ void PythonObject::iterate (CkCcsRequestMsg *msg) {
   while (more) {
     result = PyObject_CallObject(item, arg);
     more = nextIteratorUpdate(part, result, userIterator);
+    Py_DECREF(result);
   }
 
   // distroy map element in pyWorkers and terminate interpreter
