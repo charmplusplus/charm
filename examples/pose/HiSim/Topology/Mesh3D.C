@@ -13,14 +13,16 @@ inputVcSelect = new INPUT_VC_SELECTION;
 void Mesh3D::getNeighbours(int nodeid,int numP) {
         Position pos;
         pos.init(nodeid);
-        next = (int *) malloc(sizeof(int)*numP);
+        next = (int *) malloc(sizeof(int)*(numP+1));
         pos.getNeighbours(next); // Should generate a 3d torus. But the torus capability is just not used.
-	CkPrintf("Node %d  ",nodeid);
-	for(int i=0;i<6;i++) CkPrintf("next[%d] = %d ",i,next[i]); 
-	CkPrintf("\n");
+	next[numP]= nodeid;
+//	CkPrintf("Node %d  ",nodeid);
+//	for(int i=0;i<6;i++) CkPrintf("next[%d] = %d ",i,next[i]); 
+//	CkPrintf("\n");
 }
 
 int Mesh3D::getNext(int portid,int switchid,int numP) {
+//	CkPrintf("For port %d node %d next is %d \n",portid,switchid-config.switchStart,next[portid]);
 	if(portid == numP)
 		return(config.nicStart + next[portid]);
 	else

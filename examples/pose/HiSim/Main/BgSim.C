@@ -30,6 +30,8 @@ Switch::Switch(SwitchMsg *s) {
 
         getMyTopology(&topology);
         topology->getNeighbours(id-config.switchStart,numP);
+//	CkPrintf("Node id %d  ",id-config.switchStart);
+//	for(int i =0;i<6;i++) CkPrintf(" %d:%d  ",i,topology->next[i]);
 }
 
 void NetInterface::recvMsg(NicMsg *nic) {	
@@ -45,7 +47,7 @@ void NetInterface::recvMsg(NicMsg *nic) {
 		CkAssert(delay >= 0);  
 	
 		p->hdr.portId = topology->getStartPort(nicConsts->id-config.nicStart);
-		p->hdr.vcid = topology->getStartVc(nicConsts->id-config.nicStart);	
+		p->hdr.vcid = topology->getStartVc();	
 		p->hdr.prevId = nicConsts->id; 
 		p->hdr.prev_vcid = -1;
 		p->hdr.nextId = topology->getStartSwitch(nicConsts->id-config.nicStart);
@@ -59,6 +61,7 @@ void NetInterface::storeMsgInAdvance(NicMsg *m) {
 	MsgStore ms; ms = *m; 
 	remoteMsgId rmid(m->msgId,m->src);
 	storeBuf[rmid] = ms;
+//	CkPrintf("%d Stored src %d msgid %d\n",ovt,m->src,m->msgId);
 }
 
 void NetInterface::recvPacket(Packet *p) {
@@ -66,22 +69,25 @@ void NetInterface::recvPacket(Packet *p) {
 	remoteMsgId rmid(p->hdr.msgId,p->hdr.src); 
 	map<remoteMsgId,int>::iterator it2 = pktMap.find(rmid);
 
-	CkAssert(p->hdr.routeInfo.dst == (nicConsts->id-config.nicStart));
+	if(p->hdr.routeInfo.dst != nicConsts->id-config.nicStart) {
+//		CkPrintf("Current node %d \n",nicConsts->id-config.nicStart); p->hdr.dump();
+	}
+
+	CkAssert(p->hdr.routeInfo.dst == (nicConsts->id-config.nicStart));  // Use this for debugging
 	if(it2 == pktMap.end())  { 
 		remlen = p->hdr.totalLen - (p->hdr.routeInfo.datalen); pktMap[rmid] = remlen;
 	} else 
 		pktMap[rmid] -= p->hdr.routeInfo.datalen;
 
-//	CkPrintf("Time %d Dumping h in dst %d... ",ovt,nicConsts->id-config.nicStart); h->dump();
 	if(!pktMap[rmid])  {
 	map<remoteMsgId,MsgStore>::iterator it1 = storeBuf.find(rmid);
-	if(it1 == storeBuf.end()) {CkPrintf("Something wrong src %d dst %d msgid %d \n",
-	p->hdr.src,p->hdr.routeInfo.dst,p->hdr.msgId);parent->CommitError("message was not stored in advance");return;}
+	if(it1 == storeBuf.end()) {CkPrintf("%d Something wrong src %d dst %d msgid %d \n",
+	ovt,p->hdr.src,p->hdr.routeInfo.dst,p->hdr.msgId);parent->CommitError("message was not stored in advance");return;}
 
 	ms = storeBuf[rmid];
-	CkPrintf("id %d size %d time %d src %d msgid %d index %d recvTime %d totalLen %d 
-	destNodecode %d destTID %d\n", nicConsts->id-config.nicStart,storeBuf.size(),ovt,
-	ms.src,ms.msgId,ms.index,ms.recvTime,ms.totalLen,ms.destNodeCode,ms.destTID);	
+//	CkPrintf("id %d size %d time %d src %d msgid %d index %d recvTime %d totalLen %d 
+//	destNodecode %d destTID %d\n", nicConsts->id-config.nicStart,storeBuf.size(),ovt,
+//	ms.src,ms.msgId,ms.index,ms.recvTime,ms.totalLen,ms.destNodeCode,ms.destTID);	
 
 	if(config.msgstats_on) {
 	extra = 
@@ -99,7 +105,6 @@ void NetInterface::recvPacket(Packet *p) {
 	}
 	pktMap.erase(rmid);
 	storeBuf.erase(rmid);
-	
 
 	tm = new TaskMsg(ms.src,ms.msgId,ms.index,ms.recvTime,ms.totalLen,
 	(nicConsts->id-config.nicStart),ms.destNodeCode,ms.destTID);
@@ -115,12 +120,16 @@ void Switch::recvPacket(Packet *copyP) {
 	inPort = topology->routingAlgorithm->convertOutputToInputPort(p->hdr.portId); inVc = p->hdr.vcid;
 	outPort = topology->routingAlgorithm->selectRoute(id-config.switchStart,p->hdr.routeInfo.dst,numP,topology->next);
 
+	CkAssert(inPort <= numP);
 	p->hdr.portId = outPort; 
 	outVc = topology->outputVcSelect->selectOutputVc(Bufsize,p);	
 	outVcId = outPort*config.switchVc+outVc;
 	inVcId = inPort*config.switchVc+inVc;
 
-	if((outVc != NO_VC_AVAILABLE) && !requested[inVcId]) { sendPacket(p,outVcId,outPort,inVcId); } 
+	if((outVc != NO_VC_AVAILABLE) && !requested[inVcId]) { sendPacket(p,outVcId,outPort,inVcId); 
+//	CkPrintf("recvPacket: ovt %d portid %d supposed portid %d nextid is %d nicEnd is %d src %d dst %d\n",
+//	ovt,outPort,p->hdr.portId,p->hdr.nextId,config.nicStart+config.numNodes,p->hdr.src,p->hdr.routeInfo.dst);
+	}
 	else { inBuffer[inVcId].push_back(p->hdr); }
 }
 
@@ -129,6 +138,8 @@ void Switch::sendPacket(Packet *p,const int & outVcId,const int & outPort,const 
 	int nextChannel;
 	mapVc[outVcId] =  inVcId;
 	requested[inVcId] = 1;
+
+	CkAssert(outPort == p->hdr.portId);
 
 	p->hdr.nextId = topology->getNext(outPort,id,numP) ;  // Use this in channel
 
@@ -139,24 +150,28 @@ void Switch::sendPacket(Packet *p,const int & outVcId,const int & outPort,const 
 
 	nextChannel = topology->getNextChannel(outPort,id);
 
-	p->hdr.vcid = (outVcId%numP);
+	p->hdr.vcid = (outVcId%config.switchVc);
 	flowStart *f,*f2; f= new flowStart; f->vcid = p->hdr.prev_vcid; f->datalen = p->hdr.routeInfo.datalen; 
 	f2 = new flowStart; *f2 = *f; f2->vcid = inVcId;
 
 	POSE_local_invoke(checkNextPacketInVc(f2),f->datalen/config.switchC_BW);
-	if(!fromNic) POSE_invoke(updateCredits(f),Switch,p->hdr.prevId,f->datalen/config.switchC_BW); 
+	if(!fromNic) { 
+		POSE_invoke(updateCredits(f),Switch,p->hdr.prevId,f->datalen/config.switchC_BW);  
+	}
 	else delete f;
 
 	p->hdr.prev_vcid = outVcId;
 	p->hdr.prevId = id;
-	p->hdr.dump();
+//	p->hdr.dump(); CkPrintf("sendPacket: ovt %d portid %d supposed portid %d nextid is %d nicEnd is %d src %d dst %d\n",
+//			ovt,outPort,p->hdr.portId,p->hdr.nextId,config.nicStart+config.numNodes,p->hdr.src,p->hdr.routeInfo.dst);
+
 	POSE_invoke(recvPacket(p),Channel,nextChannel,0);
 }
 
 void Switch::checkNextPacketInVc(flowStart *f) {
 	int outVc; Packet p,*p2; 
 	vector<Header>::iterator headOfBuf;
-	p.hdr.routeInfo.datalen = f->datalen; p.hdr.portId = f->vcid/numP;
+	p.hdr.routeInfo.datalen = f->datalen; p.hdr.portId = f->vcid/config.switchVc;
 
 	requested[f->vcid] = 0;
 
@@ -167,7 +182,7 @@ void Switch::checkNextPacketInVc(flowStart *f) {
 		if((outVc != NO_VC_AVAILABLE) && !requested[outVc+config.switchVc*(headOfBuf->portId)]) {
 			p2 = new Packet; p2->hdr = *headOfBuf;
 			inBuffer[f->vcid].erase(headOfBuf);
-			sendPacket(p2,outVc+p2->hdr.portId*numP,p2->hdr.portId,f->vcid);
+			sendPacket(p2,outVc+p2->hdr.portId*config.switchVc,p2->hdr.portId,f->vcid);
 		}
 	}
 }
@@ -178,13 +193,14 @@ void Switch::updateCredits(flowStart *f) {
 	Bufsize[f->vcid] += f->datalen;
 	requested[mapVc[f->vcid]] = 0;	
 
-	vc = topology->inputVcSelect->selectInputVc(Bufsize,requested,inBuffer,mapVc[f->vcid]);  // Make sure vc is port*numVc+myvc
+	vc = topology->inputVcSelect->selectInputVc(Bufsize,requested,inBuffer,f->vcid);  // Make sure vc is port*numVc+myvc
 	mapVc[f->vcid] = IDLE;	
 	if(vc != NO_VC_AVAILABLE) {
 	outPort = f->vcid/config.switchVc; outVc = f->vcid % config.switchVc;
 	inPort = vc/config.switchVc; inVc = vc%config.switchVc;
 
 	p = new Packet; it = inBuffer[vc].begin(); p->hdr = *it;
+	inBuffer[vc].erase(it);
 	sendPacket(p,f->vcid,outPort,vc);
 	}
 }

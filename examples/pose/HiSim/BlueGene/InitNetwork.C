@@ -4,7 +4,7 @@
 
 void InitNetwork(MachineParams *mp) {
 
-        unsigned int mapPE,portid,switchP,counter;
+        unsigned int mapPE,portid,switchP;
 	int nodeid,i;
 
 	NetInterfaceMsg *nic;
@@ -23,7 +23,6 @@ void InitNetwork(MachineParams *mp) {
                 (*(CProxy_NetInterface *) &POSE_Objects)[i].insert(nic,mapPE);
         }
 
-	counter = mp->config->ChannelStart;
         for(i=mp->config->switchStart;i< mp->config->switchStart+mp->BGnodes;i++) {
                 sbuf = new SwitchMsg(i,switchP);
                 sbuf->Timestamp(0);
@@ -38,7 +37,6 @@ void InitNetwork(MachineParams *mp) {
                 mapPE = mp->procs*(i-mp->config->ChannelStart)/((switchP+1) * mp->BGnodes);
                 (*(CProxy_Channel *) &POSE_Objects)[i].insert(chan,mapPE);
         }
-
 }
 
 void getMyTopology(Topology **topology) 
