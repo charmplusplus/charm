@@ -609,7 +609,7 @@ sdag-main.o: sdag-main.C $(XIHEADERS) $(SDAGHEADERS)
 	$(SEQCHARMC) -c sdag-main.C
 
 trans.o: trans.c $(XIHEADERS) $(SDAGHEADERS)
-	$(SEQCHARMC) -c trans.c
+	$(SEQCHARMC) -I. -c trans.c
 
 CLexer.o: CLexer.C $(XIHEADERS) $(SDAGHEADERS)
 	$(SEQCHARMC) -c CLexer.C
