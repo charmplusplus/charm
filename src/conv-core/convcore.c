@@ -729,7 +729,7 @@ static CthThread CthSuspendSchedulingThread()
 
 static void CthResumeNormalThread(CthThread t)
 {
-  CmiGrabBuffer((void **)&t);
+  CmiGrabBuffer((void**)&t);
   /** addition for tracing */
   CpvAccess(cThread) = t;
   if(CpvAccess(traceOn))
@@ -741,7 +741,7 @@ static void CthResumeNormalThread(CthThread t)
 static void CthResumeSchedulingThread(CthThread t)
 {
   CthThread me = CthSelf();
-  CmiGrabBuffer((void **)&t);
+  CmiGrabBuffer((void**)&t);
   if (me == CpvAccess(CthMainThread)) {
     CthEnqueueSchedulingThread(me);
   } else {
@@ -755,13 +755,13 @@ static void CthResumeSchedulingThread(CthThread t)
 static void CthEnqueueNormalThread(CthThread t)
 {
   CmiSetHandler(t, CpvAccess(CthResumeNormalThreadIdx));
-  CsdEnqueueLifo(t);
+  CsdEnqueueFifo(t);
 }
 
 static void CthEnqueueSchedulingThread(CthThread t)
 {
   CmiSetHandler(t, CpvAccess(CthResumeSchedulingThreadIdx));
-  CsdEnqueueLifo(t);
+  CsdEnqueueFifo(t);
 }
 
 void CthSetStrategyDefault(CthThread t)
