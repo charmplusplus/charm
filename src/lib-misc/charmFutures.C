@@ -24,10 +24,10 @@ void* CharmBlockingCall( int ep, void *m, int group, int processor)
   ENVELOPE *env = ENVELOPE_UPTR(m);
   int i = createFuture();
   SetRefNumber(m,i);
-  CmiPrintf("GetRefnum=%d\n",   GetRefNumber(m));
+//  CmiPrintf("GetRefnum=%d\n",   GetRefNumber(m));
 SetEnv_pe(env, CmiMyPe());
   GeneralSendMsgBranch(ep, m, processor, -1, group);
-  CkPrintf("[%d]: waiting in blocking call for future# %d\n",CmiMyPe(), i);
+//  CkPrintf("[%d]: waiting in blocking call for future# %d\n",CmiMyPe(), i);
   result = waitFuture(i, 1);
 //   CkPrintf("[%d]: waited in blocking call\n",CmiMyPe());
   return (result);
@@ -46,7 +46,7 @@ public:
   { int key;
 
     key = GetRefNumber(m);
-    CPrintf("[%d]:Got new furture in : Future handler BOC. Key=%d\n",  CmiMyPe(),key);
+//    CPrintf("[%d]:Got new furture in : Future handler BOC. Key=%d\n",  CmiMyPe(),key);
     setFuture( key, m);
   }
 };
