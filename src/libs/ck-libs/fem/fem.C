@@ -781,7 +781,15 @@ void
 chunk::pup(PUP::er &p)
 {
   ArrayElement1D::pup(p);
-  messages = CmmPup((pup_er) &p, messages);
+  if(p.isPacking())
+  {
+    DataMsg *dm;
+    int snum = CmmWildCard;
+    CProxy_chunk cp(thisArrayID);
+    while (dm = (DataMsg*) CmmGet(messages, 1, &snum, 0))
+      cp[thisIndex].recv(dm);
+    CmmFree(messages);
+  }
   p(tsize);
   void *tbuf;
   // thread needs to be packed later than user data, but needs to be unpacked
@@ -812,6 +820,8 @@ chunk::pup(PUP::er &p)
   p(numNodesPerElem);
   if(p.isUnpacking())
   {
+    messages = CmmNew();
+    CtvAccessOther(tid,_femptr) = this;
     gNodeNums = new int[numNodes];
     isPrimary = new int[numNodes];
     gElemNums = new int[numElems];
@@ -850,15 +860,11 @@ chunk::pup(PUP::er &p)
   p(ntypes);
   p((void*)dtypes, MAXDT*sizeof(DType));
   p(wait_for);
-  if(p.isUnpacking())
-    CtvAccessOther(tid,_femptr) = this;
   p(seqnum);
   p(nRecd);
   // update should not be in progress when migrating, so curbuf is not valid
   p(doneCalled);
   // fp is not valid, because it has been closed a long time ago
-  if(p.isPacking())
-    CthFree(tid);
 }
 
 void
