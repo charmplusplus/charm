@@ -264,6 +264,12 @@ public:
 		for (int i=0;i<nInts;i++) p|index.data[i];
 	}
 	CmiObjId *getProjectionID() { return (CmiObjId *)&index; }
+        CmiBool operator==(const CkArrayIndexMax& idx) const {
+          if (nInts != idx.nInts) return CmiFalse;
+          for (int i=0; i<nInts; i++)
+                if (index.data[i] != idx.index.data[i]) return CmiFalse;
+          return CmiTrue;
+        }
 };
 PUPmarshall(CkArrayIndexMax)
 
@@ -353,6 +359,7 @@ class IrrGroup : public Chare {
     // Silly run-time type information
     virtual int isNodeGroup() { return 0; };
     virtual CmiBool isLocMgr(void){ return CmiFalse; }
+    virtual CmiBool isReductionMgr(void){ return CmiFalse; }
     // "default constructor" vs "migration constructor+PUP'ing" in restarting
     virtual int useDefCtor(void){ return 0; }
     static int isIrreducible(){ return 1;}
