@@ -262,8 +262,8 @@ void FEM_REFINE2D_Coarsen(int meshID,int nodeID,double *coord,int elemID,double 
 			connData[3*tri] = -1;
 			connData[3*tri+1] = -1;
 			connData[3*tri+2] = -1;
-			validElemData[tri] = 0;
 		}
+		validElemData[tri] = 0;
 	}
 	
 }  

@@ -303,15 +303,17 @@ void calcMasses(myGlobals &g) {
 	for (i=0;i<g.nnodes;i++) m_i[i]=0.0;
 	//Add mass from surrounding triangles:
 	for (i=0;i<g.nelems;i++) {
-		int n1=g.conn[3*i+0];
-		int n2=g.conn[3*i+1];
-		int n3=g.conn[3*i+2];
-		double area=calcArea(g,i);
-		if (1 || i%100==0) CkPrintf("Triangle %d (%d %d %d) has area %.3g\n",i,n1,n2,n3,area);
-		double mass=0.333*density*(thickness*area);
-		m_i[n1]+=mass;
-		m_i[n2]+=mass;
-		m_i[n3]+=mass;
+		if(g.validElem[i]){
+			int n1=g.conn[3*i+0];
+			int n2=g.conn[3*i+1];
+			int n3=g.conn[3*i+2];
+			double area=calcArea(g,i);
+			if (1 || i%100==0) CkPrintf("Triangle %d (%d %d %d) has area %.3g\n",i,n1,n2,n3,area);
+			double mass=0.333*density*(thickness*area);
+			m_i[n1]+=mass;
+			m_i[n2]+=mass;
+			m_i[n3]+=mass;
+		}
 	}
 	//Include mass from other processors
 	FEM_Update_field(g.m_i_fid,m_i);
@@ -527,7 +529,7 @@ driver(void)
     }
     
     //coarsen all steps but 0
-    if (t > 0) {
+    if (t > 0 ) {
       areas[z] *= 2.0;
       z += 7;
       CkPrintf("[%d] Starting coarsening step: %d nodes, %d elements to %.3g\n", myChunk,g.nnodes,g.nelems,curArea);
@@ -575,7 +577,7 @@ driver(void)
       delete [] vcoord;
       delete [] vconn;
       CkPrintf("Reported data to NetFEM!\n");
-      if (t==0) sleep(50);
+      if (t==0) sleep(5);
     }
   }
   
