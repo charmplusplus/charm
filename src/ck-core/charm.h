@@ -221,8 +221,8 @@ extern void CkSendMsgNodeBranch(int eIdx, void *msg, int destNode,
                                 CkGroupID gID, int opts CK_MSGOPTIONAL);
 extern void CkSendMsgNodeBranchInline(int eIdx, void *msg, int destNode, 
                                 CkGroupID gID);
-extern void CkBroadcastMsgBranch(int eIdx, void *msg, CkGroupID gID);
-extern void CkBroadcastMsgNodeBranch(int eIdx, void *msg, CkGroupID gID);
+extern void CkBroadcastMsgBranch(int eIdx, void *msg, CkGroupID gID, int opts CK_MSGOPTIONAL);
+extern void CkBroadcastMsgNodeBranch(int eIdx, void *msg, CkGroupID gID, int opts CK_MSGOPTIONAL);
 
 extern int  CkChareMsgPrep(int eIdx, void *msg,const CkChareID *pCid);
 extern void CkGroupMsgPrep(int eIdx, void *msg, CkGroupID gID);

@@ -820,13 +820,13 @@ void CkArrayBroadcaster::flushState()
   while (NULL!=(msg=oldBcasts.deq())) delete msg;
 }
 
-void CkBroadcastMsgArray(int entryIndex, void *msg, CkArrayID aID)
+void CkBroadcastMsgArray(int entryIndex, void *msg, CkArrayID aID, int opts)
 {
 	CProxy_ArrayBase ap(aID);
-	ap.ckBroadcast((CkArrayMessage *)msg,entryIndex);
+	ap.ckBroadcast((CkArrayMessage *)msg,entryIndex,opts);
 }
 
-void CProxy_ArrayBase::ckBroadcast(CkArrayMessage *msg, int ep) const
+void CProxy_ArrayBase::ckBroadcast(CkArrayMessage *msg, int ep, int opts) const
 {
 	msg->array_ep_bcast()=ep;
 	if (ckIsDelegated()) //Just call our delegateMgr
@@ -854,6 +854,12 @@ void CkArray::sendBroadcast(CkMessage *msg)
 	//Broadcast the message to all processors
 	thisProxy.recvBroadcast(msg);
 }
+void CkArray::sendImmediateBroadcast(CkMessage *msg)
+{
+	CK_MAGICNUMBER_CHECK
+	//Broadcast the message to all processors
+	thisProxy.recvImmediateBroadcast(msg);
+}
 
 /// Increment broadcast count; deliver to all local elements
 void CkArray::recvBroadcast(CkMessage *m)
@@ -872,6 +878,10 @@ void CkArray::recvBroadcast(CkMessage *m)
 	}
 }
 
+void CkArray::recvImmediateBroadcast(CkMessage *m)
+{
+  	recvBroadcast(m);
+}
 
 #include "CkArray.def.h"
 

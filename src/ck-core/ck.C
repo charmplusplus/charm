@@ -1117,15 +1117,15 @@ void CkSendMsgBranchMulti(int eIdx,void *msg,int npes,int *pes,CkGroupID gID)
 }
 
 extern "C"
-void CkBroadcastMsgBranch(int eIdx, void *msg, CkGroupID gID)
+void CkBroadcastMsgBranch(int eIdx, void *msg, CkGroupID gID, int opts)
 {
-  _sendMsgBranch(eIdx, msg, gID, CLD_BROADCAST_ALL);
+  _sendMsgBranch(eIdx, msg, gID, CLD_BROADCAST_ALL, opts);
   _STATS_RECORD_SEND_BRANCH_N(CkNumPes());
   CpvAccess(_qd)->create(CkNumPes());
 }
 
 static inline void _sendMsgNodeBranch(int eIdx, void *msg, CkGroupID gID,
-                int node=CLD_BROADCAST_ALL, int opts = 0)
+                int node=CLD_BROADCAST_ALL, int opts=0)
 {
   int numPes;
   register envelope *env = _prepareMsgBranch(eIdx,msg,gID,ForNodeBocMsg);
@@ -1200,9 +1200,9 @@ void CkSendMsgNodeBranch(int eIdx, void *msg, int node, CkGroupID gID, int opts)
 }
 
 extern "C"
-void CkBroadcastMsgNodeBranch(int eIdx, void *msg, CkGroupID gID)
+void CkBroadcastMsgNodeBranch(int eIdx, void *msg, CkGroupID gID, int opts)
 {
-  _sendMsgNodeBranch(eIdx, msg, gID);
+  _sendMsgNodeBranch(eIdx, msg, gID, CLD_BROADCAST_ALL, opts);
   _STATS_RECORD_SEND_NODE_BRANCH_N(CkNumNodes());
   CpvAccess(_qd)->create(CkNumNodes());
 }

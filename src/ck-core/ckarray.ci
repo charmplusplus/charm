@@ -11,6 +11,8 @@ module CkArray {
 	//Broadcast
 	entry void sendBroadcast(CkMessage *);
 	entry void recvBroadcast(CkMessage *);
+	entry [skipscheduler] void sendImmediateBroadcast(CkMessage *);
+	entry [skipscheduler] void recvImmediateBroadcast(CkMessage *);
   };
 
   PUPable CkVerboseListener;

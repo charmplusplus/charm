@@ -241,7 +241,7 @@ public:
 	static CkArrayID ckCreateArray(CkArrayMessage *m,int ctor,const CkArrayOptions &opts);
 
 	void ckInsertIdx(CkArrayMessage *m,int ctor,int onPe,const CkArrayIndex &idx);
-	void ckBroadcast(CkArrayMessage *m, int ep) const;
+	void ckBroadcast(CkArrayMessage *m, int ep, int opts=0) const;
 	CkArrayID ckGetArrayID(void) const { return _aid; }
 	CkArray *ckLocalBranch(void) const { return _aid.ckLocalBranch(); }
 	CkLocMgr *ckLocMgr(void) const;
@@ -264,8 +264,8 @@ PUPmarshall(CProxy_ArrayBase);
 	  { return super::ckCreateArray(m,ctor,opts); }\
 	inline void ckInsertIdx(CkArrayMessage *m,int ctor,int onPe,const CkArrayIndex &idx) \
 	  { super::ckInsertIdx(m,ctor,onPe,idx); }\
-	inline void ckBroadcast(CkArrayMessage *m, int ep) const \
-	  { super::ckBroadcast(m,ep); } \
+	inline void ckBroadcast(CkArrayMessage *m, int ep, int opts=0) const \
+	  { super::ckBroadcast(m,ep,opts); } \
 	inline CkArrayID ckGetArrayID(void) const \
 	  { return super::ckGetArrayID();} \
 	inline CkArray *ckLocalBranch(void) const \
@@ -357,7 +357,7 @@ PUPmarshall(CProxySection_ArrayBase);
 //Simple C-like API:
 void CkSendMsgArray(int entryIndex, void *msg, CkArrayID aID, const CkArrayIndex &idx, int opts=0);
 void CkSendMsgArrayInline(int entryIndex, void *msg, CkArrayID aID, const CkArrayIndex &idx, int opts=0);
-void CkBroadcastMsgArray(int entryIndex, void *msg, CkArrayID aID);
+void CkBroadcastMsgArray(int entryIndex, void *msg, CkArrayID aID, int opts=0);
 
 /************************ Array Element *********************/
 /**
@@ -598,6 +598,8 @@ public:
 /// Broadcast communication:
   void sendBroadcast(CkMessage *msg);
   void recvBroadcast(CkMessage *msg);
+  void sendImmediateBroadcast(CkMessage *msg);
+  void recvImmediateBroadcast(CkMessage *msg);
 
   void pup(PUP::er &p);
   void ckJustMigrated(void){ doneInserting(); }
