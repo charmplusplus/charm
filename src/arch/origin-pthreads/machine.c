@@ -5,6 +5,12 @@
  * $Revision$
  *****************************************************************************/
 
+/** @file
+ * Origin Pthreads machine layer
+ * @ingroup Machine
+ * @{
+ */
+
 #include <errno.h>
 #include <pthread.h>
 #include <sched.h>
@@ -413,3 +419,4 @@ double CmiTimer(void)
   return CmiCpuTimer();
 }
 
+/*@}*/

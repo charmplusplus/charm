@@ -1,3 +1,12 @@
+/** @file
+ * General implementation of persistent communication support
+ * @ingroup Machine
+ */
+
+/**
+ * \addtogroup Machine
+*/
+/*@{*/
 
 #define PERSIST_BUFFERS_NUM   2
 
@@ -32,4 +41,4 @@ int PumpPersistent();
 void swapSendSlotBuffers(PersistentSendsTable *slot);
 void swapRecvSlotBuffers(PersistentReceivesTable *slot);
 
-
+/*@}*/

@@ -5,10 +5,13 @@
  * $Revision$
  *****************************************************************************/
 
-/*
+/** @file
+ * T3E machine layer
+ * @ingroup Machine
  * This is a complete port, but could be made considerably more efficient
  * by handling asynchronous messages correctly, ie. without doing
  * an extra copy and synchronous send
+ * @{
  */
 
 #include <stdlib.h>
@@ -904,3 +907,5 @@ double CmiTimer()
 static volatile int memflag;
 void CmiMemLock() { memflag=1; }
 void CmiMemUnlock() { memflag=0; }
+
+/*@}*/

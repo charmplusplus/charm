@@ -5,6 +5,12 @@
  * $Revision$
  *****************************************************************************/
 
+/** @file
+ * Exemplar machine layer
+ * @ingroup Machine
+ */
+/*@{*/
+
 #include <spp_prog_model.h>
 #include <memory.h>
 #include <cps.h>
@@ -363,3 +369,5 @@ McQueue *queue;
 	m_unlock(&(queue->sema));
 	return element;
 }
+
+/*@}*/

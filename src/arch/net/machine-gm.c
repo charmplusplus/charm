@@ -1,10 +1,11 @@
-/*
-  Myrinet API GM implementation of Converse NET version
-  contains only GM API specific code for:
-  * CmiMachineInit()
-  * CmiNotifyIdle()
-  * DeliverViaNetwork()
-  * CommunicationServer()
+/** @file
+ * Myrinet API GM implementation of Converse NET version
+ * @ingroup NET
+ * contains only GM API specific code for:
+ * - CmiMachineInit()
+ * - CmiNotifyIdle()
+ * - DeliverViaNetwork()
+ * - CommunicationServer()
 
   written by 
   Gengbin Zheng, gzheng@uiuc.edu  4/22/2001
@@ -20,6 +21,11 @@
   TODO:
   1. DMAable buffer reuse;
 */
+
+/**
+ * @addtogroup NET
+ * @{
+ */
 
 #ifdef GM_API_VERSION_2_0
 #if GM_API_VERSION >= GM_API_VERSION_2_0
@@ -787,3 +793,5 @@ static char *getErrorMsg(gm_status_t status)
   }
   return errmsg;
 }
+
+/*@}*/

@@ -5,6 +5,12 @@
  * $Revision$
  *****************************************************************************/
 
+/** @file
+ * Origin2000 machine layer
+ * @ingroup Machine
+ * @{
+ */
+
 #include <sys/types.h>
 #include <sys/sysmp.h>
 #include <sys/sysinfo.h>
@@ -434,3 +440,4 @@ double CmiTimer(void)
   return CmiCpuTimer();
 }
 
+/*@}*/

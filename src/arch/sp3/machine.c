@@ -5,6 +5,12 @@
  * $Revision$
  *****************************************************************************/
 
+/** @file
+ * SP3 machine layer
+ * @ingroup Machine
+ * @{
+ */
+
 #include <stdio.h>
 #include <sys/time.h>
 #include "converse.h"
@@ -379,3 +385,4 @@ void * recdQueueRemoveFromFront(void)
   return 0;
 }
 
+/*@}*/

@@ -1,26 +1,6 @@
-
-/*
-for SMP versions:
-
-CmiStateInit
-CmiNodeStateInit
-CmiGetState
-CmiGetStateN
-CmiYield
-CmiStartThreads
-
-CmiIdleLock_init
-CmiIdleLock_sleep
-CmiIdleLock_addMessage
-CmiIdleLock_checkMessage
-*/
-
-#include "machine-smp.h"
-
-void CmiStateInit(int pe, int rank, CmiState state);
-void CommunicationServerInit();
-
-/******************************************************************************
+/** @file
+ * @brief Common function reimplementation for SMP machines
+ * @ingroup Machine
  *
  * OS Threads
  *
@@ -76,6 +56,32 @@ void CommunicationServerInit();
    both here and in converse.h.  It could be much shorter.  OSL 9/9/2000
 
  *****************************************************************************/
+
+/**
+ * \addtogroup Machine
+ * @{
+ */
+
+/*
+for SMP versions:
+
+CmiStateInit
+CmiNodeStateInit
+CmiGetState
+CmiGetStateN
+CmiYield
+CmiStartThreads
+
+CmiIdleLock_init
+CmiIdleLock_sleep
+CmiIdleLock_addMessage
+CmiIdleLock_checkMessage
+*/
+
+#include "machine-smp.h"
+
+void CmiStateInit(int pe, int rank, CmiState state);
+void CommunicationServerInit();
 
 /************************ Win32 kernel SMP threads **************/
 static struct CmiStateStruct Cmi_default_state; /* State structure to return during startup */
@@ -546,4 +552,4 @@ void CmiNodeStateInit(CmiNodeState *nodeState)
 #endif
 }
 
-
+/*@}*/

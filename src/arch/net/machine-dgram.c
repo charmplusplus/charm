@@ -1,17 +1,21 @@
-/*
-  Datagram implementation of Converse NET version
+/** @file
+ * Datagram implementation of Converse NET version
+ * @ingroup NET
+ * converse basic message header:<br>
+ * d0 d1 d2 d3:  DgramHeader<br>
+ * d4 d5:        msg length (32-bit number)<br>
+ * hdl:          handler<br>
+ * xhdl:         extended handler<br>
 
   moved from machine.c by 
   Orion Sky Lawlor, olawlor@acm.org, 7/25/2001
 */
 
 /**
-  converse basic message header:
-  d0 d1 d2 d3:  DgramHeader
-  d4 d5:        msg length (32-bit number)
-  hdl:          handler
-  xhdl:         extended handler
-*/
+ * @addtogroup NET
+ * @{
+ */
+
 #define DGRAM_HEADER_SIZE 8
 
 #define CmiMsgHeaderSetLength(msg, len) (((int*)(msg))[2] = (len))
@@ -585,3 +589,5 @@ void CmiBarrierZero()
 }
 
 #endif
+
+/*@}*/

@@ -2,6 +2,12 @@
 ** Greg Koenig (koenig@uiuc.edu)
 */
 
+/** @file
+ * VMI machine layer
+ * @ingroup Machine
+ * @{
+ */
+
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -477,3 +483,5 @@ BOOLEAN CRMParseMsg (PCRM_Msg msg, int rank, int *nodeIP,
 		     int *shutdownPort, int *nodePE);
 int CRMSend (SOCKET s, char *msg, int n);
 int CRMRecv (SOCKET s, char *msg, int n);
+
+/*@}*/

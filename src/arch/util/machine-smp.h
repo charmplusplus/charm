@@ -1,3 +1,12 @@
+/** @file
+ * \brief structures for the SMP versions
+ * \ingroup Machine
+ */
+
+/**
+ * \addtogroup Machine
+ * @{
+ */
 
 #ifndef MACHINE_SMP_H
 #define MACHINE_SMP_H
@@ -70,3 +79,5 @@ typedef struct CmiNodeStateStruct
 CmiNodeState;
 
 #endif
+
+/*@}*/

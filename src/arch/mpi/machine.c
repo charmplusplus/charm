@@ -5,6 +5,12 @@
  * $Revision$
  *****************************************************************************/
 
+/** @file
+ * MPI based machine layer
+ * @ingroup Machine
+ */
+/*@{*/
+
 #include <stdio.h>
 #include <errno.h>
 #include "converse.h"
@@ -1508,3 +1514,5 @@ void * recdQueueRemoveFromFront(void)
 }
 
 #endif
+
+/*@}*/

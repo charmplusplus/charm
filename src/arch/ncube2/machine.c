@@ -5,6 +5,12 @@
  * $Revision$
  *****************************************************************************/
 
+/** @file
+ * Ncube2 machine layer
+ * @ingroup Machine
+ */
+/*@{*/
+
 #include <stdio.h>
 #include "converse.h"
 
@@ -258,5 +264,4 @@ int usched, initret;
   }
 }
 
-
-
+/*@}*/

@@ -1,3 +1,13 @@
+/** @file
+ * \brief Immediate message implementation
+ * \ingroup Machine
+ */
+
+/**
+ * \addtogroup Machine
+*/
+/*@{*/
+
 /*
   support immediate message in Converse
 */
@@ -120,3 +130,5 @@ void CmiHandleImmediate()
 }
 
 #endif
+
+/*@}*/

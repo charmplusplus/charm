@@ -1,3 +1,12 @@
+/** @file
+ * Support for persistent communication setup
+ * @ingroup Machine
+ */
+
+/**
+ * \addtogroup Machine
+*/
+/*@{*/
 
 #include "converse.h"
 
@@ -383,3 +392,5 @@ void CmiUsePersistentHandle(PersistentHandle *p, int n)
 }
 
 #endif
+
+/*@}*/

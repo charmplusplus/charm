@@ -31,6 +31,12 @@
 **    * very cool, but very complicated
 */
 
+/** @file
+ * VMI machine layer
+ * @ingroup Machine
+ * @{
+ */
+
 #include "machine.h"
 
 /* The following are external variables used by the VMI core. */
@@ -4048,3 +4054,5 @@ int CRMRecv (SOCKET s, char *msg, int n)
 
   return recvd;
 }
+
+/*@}*/

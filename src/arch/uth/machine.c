@@ -5,6 +5,12 @@
  * $Revision$
  *****************************************************************************/
 
+/** @file
+ * User-level threads machine layer
+ * @ingroup Machine
+ * @{
+ */
+
 #include <stdio.h>
 #include <math.h>
 #include "converse.h"
@@ -335,4 +341,4 @@ int CmiSwitchToPE(int newpe)
 }
 #endif
 
-
+/*@}*/

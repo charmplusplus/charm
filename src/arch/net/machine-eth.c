@@ -1,14 +1,20 @@
-/*
-  UDP implementation of Converse NET version
-  contains only UDP specific code for:
-  * CmiMachineInit()
-  * CmiNotifyIdle()
-  * DeliverViaNetwork()
-  * CommunicationServer()
+/** @file
+ * UDP implementation of Converse NET version
+ * @ingroup NET
+ * contains only UDP specific code for:
+ * - CmiMachineInit()
+ * - CmiNotifyIdle()
+ * - DeliverViaNetwork()
+ * - CommunicationServer()
 
   moved from machine.c by 
   Gengbin Zheng, gzheng@uiuc.edu  4/22/2001
 */
+
+/**
+ * @addtogroup NET
+ * @{
+ */
 
 /******************************************************************************
  *

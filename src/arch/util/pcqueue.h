@@ -1,10 +1,6 @@
-
-#ifndef __PCQUEUE__
-#define __PCQUEUE__
-
-/*****************************************************************************
- *
- * Producer-Consumer Queues
+/** @file
+ * @brief Producer-Consumer Queues
+ * @ingroup Machine
  *
  * This queue implementation enables a producer and a consumer to
  * communicate via a queue.  The queues are optimized for this situation,
@@ -13,6 +9,14 @@
  * producer, and one consumer.  These queues cannot store null pointers.
  *
  ****************************************************************************/
+
+/**
+ * \addtogroup Machine
+ * @{
+ */
+
+#ifndef __PCQUEUE__
+#define __PCQUEUE__
 
 /*****************************************************************************
  * #define PCQUEUE_LOCK
@@ -170,3 +174,5 @@ void PCQueuePush(PCQueue Q, char *data)
 
 
 #endif
+
+/*@}*/

@@ -1,3 +1,8 @@
+/** @file
+ * Elan persistent communication
+ * @ingroup Machine
+*/
+
 /*
   included in machine.c
   common code for persistent communication now is moved to persist-comm.c

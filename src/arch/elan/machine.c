@@ -1,3 +1,8 @@
+/** @file
+ * Elan machine layer
+ * @ingroup Machine
+*/
+
 /* Charm++ Machine Layer for ELAN network interface 
 Developed by Sameer Kumar
 */

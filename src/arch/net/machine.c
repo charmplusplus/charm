@@ -5,8 +5,14 @@
  * $Revision$
  *****************************************************************************/
 
+/** @file
+ * Basic NET implementation of Converse machine layer
+ * @ingroup NET
+ */
 
-/******************************************************************************
+/** @defgroup NET
+ * NET implementation of machine layer, ethernet in particular
+ * @ingroup Machine
  *
  * THE DATAGRAM STREAM
  *
@@ -163,6 +169,11 @@
  * require extra copying.  I have no idea if this would be worthwhile.
  *
  *****************************************************************************/
+
+/**
+ * @addtogroup NET
+ * @{
+ */
 
 /*****************************************************************************
  *
@@ -2288,3 +2299,5 @@ void persist_machine_init()
 }
 
 #endif
+
+/*@}*/

@@ -1,11 +1,12 @@
-/*
-  TCP implementation of Converse NET version
-  contains only TCP specific code for:
-  * CmiMachineInit()
-  * CheckSocketsReady()
-  * CmiNotifyIdle()
-  * DeliverViaNetwork()
-  * CommunicationServer()
+/** @file
+ * TCP implementation of Converse NET version
+ * @ingroup NET
+ * contains only TCP specific code for:
+ * - CmiMachineInit()
+ * - CheckSocketsReady()
+ * - CmiNotifyIdle()
+ * - DeliverViaNetwork()
+ * - CommunicationServer()
 
   written by 
   Gengbin Zheng, 12/21/2001
@@ -13,6 +14,11 @@
 
   now also works with SMP version  //  Gengbin 6/18/2003
 */
+
+/**
+ * @addtogroup NET
+ * @{
+ */
 
 #if !defined(_WIN32) || defined(__CYGWIN__)
 #include <netinet/tcp.h>
@@ -615,4 +621,4 @@ static void open_tcp_sockets()
   }
 }
 
-
+/*@}*/
