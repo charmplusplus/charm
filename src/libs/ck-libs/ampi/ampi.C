@@ -759,7 +759,6 @@ void ampi::init(void) {
   thread=NULL;
   msgs=NULL;
   resumeOnRecv=false;
-  localResume=false;
 }
 
 ampi::ampi()
@@ -1252,8 +1251,6 @@ void ampi::yield(void){
 }
 
 void ampi::unblock(void){
-	if(localResume) 
-	  localResume=false;
 	thread->resume();
 }
 
@@ -1282,11 +1279,7 @@ MSG_ORDER_DEBUG(
   }
   
   if(resumeOnRecv){
-    if(!localResume){
-      localResume = true;
-      thisProxy[thisIndex].unblock();	// push a local msg to do resume;
-    }
-    //thread->resume();
+    thread->resume();
   }
 }
 

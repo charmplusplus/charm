@@ -1228,7 +1228,6 @@ class ampi : public CBase_ampi {
     ampiParent *parent;
     TCharm *thread;
     bool resumeOnRecv;
-    bool localResume;
 
     ampiCommStruct myComm;
     int myRank;
