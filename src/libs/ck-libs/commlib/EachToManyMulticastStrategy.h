@@ -8,6 +8,7 @@ class EachToManyMulticastStrategy: public Strategy {
     int routerID;
     comID comid;
     
+    int MyPe;
     int npes;
     int *pelist;
     
@@ -22,11 +23,15 @@ class EachToManyMulticastStrategy: public Strategy {
 
     EachToManyMulticastStrategy(CkMigrateMessage *m){}
 
-    ComlibMulticastHandler getHandler(){return (ComlibMulticastHandler)handler;};
+    ComlibMulticastHandler getHandler(){return 
+                                            (ComlibMulticastHandler)handler;};
     void insertMessage(CharmMessageHolder *msg);
     void doneInserting();
 
     virtual void pup(PUP::er &p);
+    
+    virtual void beginProcessing(int nelements);
+
     PUPable_decl(EachToManyMulticastStrategy);
 };
 #endif

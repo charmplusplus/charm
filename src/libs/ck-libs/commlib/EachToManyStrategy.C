@@ -106,8 +106,11 @@ void EachToManyStrategy::doneInserting(){
         
         CmiSetHandler(UsrToEnv(dummymsg), 
                       CpvAccess(RecvdummyHandle));
-        
-        messageBuf->enq(new CharmMessageHolder((char *)dummymsg, CkMyPe()));
+
+        CharmMessageHolder *cmsg = new CharmMessageHolder((char *)dummymsg, 
+                                                          CkMyPe());
+        cmsg->isDummy = 1;                
+        messageBuf->enq(cmsg);
         messageCount ++;
     }
 

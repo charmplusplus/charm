@@ -116,7 +116,7 @@ ComlibManager::ComlibManager(){
 
 void ComlibManager::init(){
 
-  //    comm_debug = 1;
+    //comm_debug = 1;
     
     npes = CkNumPes();
     pelist = NULL;
@@ -153,9 +153,9 @@ void ComlibManager::init(){
 
 void ComlibManager::barrier(){
   static int bcount = 0;
+  ComlibPrintf("In barrier %d\n", bcount);
   if(CkMyPe() == 0) {
     bcount ++;
-    ComlibPrintf("In barrier %d\n", bcount);
     if(bcount == CkNumPes()){
       barrierReached = 1;
       doneCreating();
@@ -279,6 +279,7 @@ void ComlibManager::endIteration(){
 	
         strategyTable[curStratID].elementCount = 0;
     }
+    ComlibPrintf("After EndIteration\n");
 }
 
 void ComlibManager::receiveTable(StrategyWrapper sw){
@@ -315,19 +316,29 @@ void ComlibManager::receiveTable(StrategyWrapper sw){
 
 void ComlibManager::resumeFromBarrier2(){
   barrier2Reached = 1;
-  if(flushTable) {
-    for (int count = 0; count < nstrats; count ++) {
-      if (!strategyTable[count].tmplist.isEmpty()) {
-	CharmMessageHolder *cptr;
-	while (!strategyTable[count].tmplist.isEmpty())
-	  strategyTable[count].strategy->insertMessage
-	    (strategyTable[count].tmplist.deq());
-      }
-      
-      if (strategyTable[count].call_doneInserting)
-	strategyTable[count].strategy->doneInserting();
-    }
+
+  ComlibPrintf("[%d] Barrier 2 reached\n", CkMyPe());
+
+  for (int count = 0; count < nstrats; count ++) {
+      strategyTable[count].strategy->beginProcessing
+          (strategyTable[count].numElements);
   }
+
+  if(flushTable) {
+      for (int count = 0; count < nstrats; count ++) {
+          if (!strategyTable[count].tmplist.isEmpty()) {
+              CharmMessageHolder *cptr;
+              while (!strategyTable[count].tmplist.isEmpty())
+                  strategyTable[count].strategy->insertMessage
+                      (strategyTable[count].tmplist.deq());
+          }
+          
+          if (strategyTable[count].call_doneInserting)
+              strategyTable[count].strategy->doneInserting();
+      }
+  }
+
+  ComlibPrintf("[%d] After Barrier2\n", CkMyPe());
 }
 
 extern int _charmHandlerIdx;
@@ -528,6 +539,7 @@ void ComlibManager::switchStrategy(int strat){
 CharmMessageHolder::CharmMessageHolder(char * msg, int proc) {
     data = (char *)UsrToEnv(msg);
     dest_proc = proc;
+    isDummy = 0;
 }
 
 void CharmMessageHolder::init(char * root_msg) {

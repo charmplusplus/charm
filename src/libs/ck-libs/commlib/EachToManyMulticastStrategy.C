@@ -4,11 +4,16 @@ CpvExtern(int, RecvdummyHandle);
 
 static EachToManyMulticastStrategy *nm_mgr;
 
+void *itrDoneHandler(void *msg){
+    ComlibPrintf("[%d] Iteration finished\n", CkMyPe());
+    nm_mgr->doneInserting();
+    return NULL;
+}
+
 void *E2MHandler(void *msg){
-  ComlibPrintf("[%d]:In Node MulticastCallbackHandler\n", CkMyPe());
+  ComlibPrintf("[%d]:In EachtoMany CallbackHandler\n", CkMyPe());
   register envelope *env = (envelope *)msg;
   CkUnpackMessage(&env);
-  //nm_mgr->getCallback().send(EnvToUsr(env));
   
   nm_mgr->getHandler()(env);
   return NULL;
@@ -89,8 +94,11 @@ EachToManyMulticastStrategy::EachToManyMulticastStrategy
 	comid = ComlibEstablishGroup(comid, this->npes, pelist);
 
     this->pelist = new int[npes];
-    for(int count =0; count < npes; count ++)
-	this->pelist[count] = count;
+    for(int count =0; count < npes; count ++) {
+	this->pelist[count] = pelist[count];
+        if(pelist[count] == CkMyPe())
+            MyPe = count;
+    }
 }
 
 void EachToManyMulticastStrategy::insertMessage(CharmMessageHolder *cmsg){
@@ -110,12 +118,15 @@ void EachToManyMulticastStrategy::doneInserting(){
     if((messageBuf->length() == 0) && (CkNumPes() > 0)) {
         DummyMsg * dummymsg = new DummyMsg;
         
-        ComlibPrintf("Creating a dummy message\n");
+        ComlibPrintf("[%d] Creating a dummy message\n", CkMyPe());
         
         CmiSetHandler(UsrToEnv(dummymsg), 
                       CpvAccess(RecvdummyHandle));
         
-        messageBuf->enq(new CharmMessageHolder((char *)dummymsg, CkMyPe()));
+        CharmMessageHolder *cmsg = new CharmMessageHolder((char *)dummymsg, 
+                                                          CkMyPe());
+        cmsg->isDummy = 1;
+        messageBuf->enq(cmsg);
     }
 
     NumDeposits(comid, messageBuf->length());
@@ -123,14 +134,20 @@ void EachToManyMulticastStrategy::doneInserting(){
     while(!messageBuf->isEmpty()) {
 	CharmMessageHolder *cmsg = messageBuf->deq();
         char *msg = cmsg->getCharmMessage();
-	
-	CmiSetHandler(UsrToEnv(msg), handlerId);
 
         ComlibPrintf("Calling EachToMany %d %d %d\n", 
                      UsrToEnv(msg)->getTotalsize(), CkMyPe(), 
                      cmsg->dest_proc);
-        EachToManyMulticast(comid, UsrToEnv(msg)->getTotalsize(), 
-                            UsrToEnv(msg), npes, pelist);
+        	
+        if(!cmsg->isDummy) {
+            CmiSetHandler(UsrToEnv(msg), handlerId);
+            EachToManyMulticast(comid, UsrToEnv(msg)->getTotalsize(), 
+                                UsrToEnv(msg), npes, pelist);
+        }
+        else
+            EachToManyMulticast(comid, UsrToEnv(msg)->getTotalsize(), 
+                                UsrToEnv(msg), 1, &MyPe);
+            
 	delete cmsg; 
     }
 }
@@ -154,7 +171,18 @@ void EachToManyMulticastStrategy::pup(PUP::er &p){
 	messageBuf = new CkQ<CharmMessageHolder *>;
 	handlerId = CmiRegisterHandler((CmiHandler)E2MHandler);
 	nm_mgr = this;
+        MyPe = CkMyPe();
     }
+    ComlibPrintf("End of pup\n");
 }
 
+void EachToManyMulticastStrategy::beginProcessing(int numElements){
+    int handler = CmiRegisterHandler((CmiHandler)itrDoneHandler);
+    if(numElements > 0)
+        return;
 
+    ComlibPrintf("[%d]Registering Callback Handler\n", CkMyPe());
+
+    comid.callbackHandler = handler;
+    doneInserting();
+}

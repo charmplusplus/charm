@@ -44,6 +44,7 @@ class CharmMessageHolder {
     //wants to send the data to.
     int npes;
     int *pelist;
+    int isDummy;
 
     CharmMessageHolder(char * msg, int dest_proc);
     char * getCharmMessage();
@@ -74,6 +75,9 @@ class Strategy : public PUP::able{
     virtual void pup(PUP::er &p){
         PUP::able::pup(p);
     }
+
+    virtual void beginProcessing(int nelements){};
+
     PUPable_decl(Strategy);
 };
 
