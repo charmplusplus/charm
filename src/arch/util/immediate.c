@@ -2,6 +2,7 @@
   support immediate message in Converse
 */
 
+int _immediateReady = 0;
 
 int _immRunning=0; /* if set, somebody's inside an immediate message */
 
@@ -55,8 +56,9 @@ void CmiDelayImmediate(void)
 
 SMP: This routine must be called holding immRecvLock
  */
-static void CmiHandleImmediateMessage(void *msg) {
-  int handlerNo=CmiGetXHandler(msg);
+void CmiHandleImmediateMessage(void *msg) {
+/*  int handlerNo=CmiGetXHandler(msg); */
+  int handlerNo=CmiImemdiateHandler(msg);
 /*  CmiHandlerInfo *h=&CpvAccessOther(CmiHandlerTable,0)[handlerNo]; */
   CmiHandlerInfo *h=&CpvAccess(CmiHandlerTable)[handlerNo];
   CmiAssert(h && h->hdlr);
@@ -80,6 +82,8 @@ void CmiHandleImmediate()
    /* If somebody else is checking the queue, we don't need to
    if (CmiTryLock(CsvAccess(NodeState).immRecvLock)!=0) return;
    */
+   /* converse init hasn't finish */
+   if (!_immediateReady) return;
    
    /* Make sure only one thread is running immediate messages: */
    CmiLock(CsvAccess(NodeState).immRecvLock);
