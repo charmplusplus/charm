@@ -485,6 +485,13 @@ virtual             {CPP_KEYWORD_RETURN(VIRTUAL);}
 					FLUSHBUF() ;
 				}
 
+"#"{TabSpace}?("ident").*	{ /* #ident used by G++: copy to output */
+					strcat(OutBuf,prevtoken) ;
+					strcpy(prevtoken,"") ;
+					strcat(OutBuf,yytext) ;
+					FLUSHBUF() ;
+				}
+
 "#"{TabSpace}?("file").*	{ /* #file stuff used in nCUBE CC */
 					strcat(OutBuf,prevtoken) ;
 					strcpy(prevtoken,"") ;
