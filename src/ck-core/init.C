@@ -39,7 +39,8 @@ CpvDeclare(_CkErrStream*, _ckerr);
 CpvStaticDeclare(UInt,  _numInitsRecd);
 CpvStaticDeclare(PtrQ*, _buffQ);
 CpvStaticDeclare(PtrVec*, _bocInitVec);
-CpvStaticDeclare(PtrVec*, _nodeBocInitVec);
+
+static PtrVec* _nodeBocInitVec;
 
 static int    _exitHandlerIdx;
 
@@ -228,8 +229,8 @@ static inline void _processBufferedNodeBocInits(void)
   register envelope *env;
   CmiNumberHandler(_nodeBocHandlerIdx, (CmiHandler)_processHandler);
   register int i = 0;
-  register int len = CpvAccess(_nodeBocInitVec)->length();
-  register void **vec = CpvAccess(_nodeBocInitVec)->getVec();
+  register int len = _nodeBocInitVec->length();
+  register void **vec = _nodeBocInitVec->getVec();
   for(i=0; i<len; i++) {
     env = (envelope *) vec[i];
     if(env==0) continue;
@@ -240,7 +241,7 @@ static inline void _processBufferedNodeBocInits(void)
     }
     _processNodeBocInitMsg(env);
   }
-  delete CpvAccess(_nodeBocInitVec);
+  delete _nodeBocInitVec;
 }
 
 static inline void _processBufferedMsgs(void)
@@ -268,7 +269,10 @@ static inline void _initDone(void)
 {
   CmiNumberHandler(_exitHandlerIdx, (CmiHandler)_exitHandler);
   _processBufferedBocInits();
-  _processBufferedNodeBocInits();
+  if(CmiMyRank() == 0) {
+    _processBufferedNodeBocInits();
+  }
+  CmiNodeBarrier();
   _processBufferedMsgs();
 }
 
@@ -302,9 +306,9 @@ static void _initHandler(void *msg)
     case NodeBocInitMsg:
       CmiLock(_nodeLock);
       _numInitNodeMsgs++;
+      _nodeBocInitVec->insert(env->getGroupNum(), msg);
       CmiUnlock(_nodeLock);
       CpvAccess(_qd)->process();
-      CpvAccess(_nodeBocInitVec)->insert(env->getGroupNum(), msg);
       break;
     case ROMsgMsg:
       CpvAccess(_numInitsRecd)++;
@@ -436,7 +440,6 @@ void _initCharm(int argc, char **argv)
 {
   CpvInitialize(PtrQ*,_buffQ);
   CpvInitialize(PtrVec*,_bocInitVec);
-  CpvInitialize(PtrVec*,_nodeBocInitVec);
   CpvInitialize(void*, _currentChare);
   CpvInitialize(int,   _currentChareType);
   CpvInitialize(CkGroupID, _currentGroup);
@@ -455,14 +458,14 @@ void _initCharm(int argc, char **argv)
   _MEMCHECK(CpvAccess(_buffQ));
   CpvAccess(_bocInitVec) = new PtrVec();
   _MEMCHECK(CpvAccess(_bocInitVec));
-  CpvAccess(_nodeBocInitVec) = new PtrVec();
-  _MEMCHECK(CpvAccess(_nodeBocInitVec));
   CpvAccess(_groupTable) = new GroupTable();
   _MEMCHECK(CpvAccess(_groupTable));
   if(CmiMyRank()==0) {
     _nodeLock = CmiCreateLock();
     _nodeGroupTable = new GroupTable();
     _MEMCHECK(_nodeGroupTable);
+    _nodeBocInitVec = new PtrVec();
+    _MEMCHECK(_nodeBocInitVec);
   }
   CmiNodeBarrier();
   CpvAccess(_qd) = new QdState();
