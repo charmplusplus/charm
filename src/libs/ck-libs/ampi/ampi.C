@@ -9,39 +9,31 @@
 // for strlen
 #include <string.h>
 
+int AMPI_COMM_UNIVERSE[AMPI_MAX_COMM];
+
+// Default ampi_setup
 #if AMPI_FORTRAN
 #include "ampimain.decl.h"
 #if CMK_FORTRAN_USES_ALLCAPS
-extern "C" void AMPIMAIN(int, char **);
-extern "C" int AMPI_COMM_UNIVERSE[AMPI_MAX_COMM];
+extern "C" void AMPI_MAIN(int, char **);
+extern "C" void AMPI_SETUP(void){AMPI_REGISTER_MAIN(AMPI_MAIN);}
 #else
-extern "C" void ampimain_(int, char **);
-extern "C" int ampi_comm_universe_[AMPI_MAX_COMM];
-#endif // CMK_FORTRAN_USES_ALLCAPS
-#else
-extern "C" void ampimain(int, char **);
-extern "C" int AMPI_COMM_UNIVERSE[AMPI_MAX_COMM];
-#endif
-
-// Default ampi_setup
-extern "C" void
-#if AMPI_FORTRAN
-#if CMK_FORTRAN_USES_ALLCAPS
-AMPI_SETUP(void){AMPI_REGISTER_MAIN(AMPIMAIN);}
-#else
-ampi_setup_(void){ampi_register_main_(ampimain_);}
+extern "C" void ampi_main_(int, char **);
+extern "C" void ampi_setup_(void){ampi_register_main_(ampi_main_);}
 #endif
 #else
-AMPI_Setup(void){AMPI_Register_main(ampimain);}
+extern "C" void AMPI_Main(int, char **);
+extern "C" void AMPI_Setup(void){AMPI_Register_main(AMPI_Main);}
 #endif
 
 void*
 ArgsInfo::pack(ArgsInfo* msg)
 {
   int argsize=0, i;
-  for(i=0;i<msg->argc;i++) {
+  for(i=0;msg->argv[i]!=0;i++) {
     argsize += (strlen(msg->argv[i])+1); // +1 for '\0'
   }
+  msg->argc = i;
   void *p = CkAllocBuffer(msg, sizeof(ArgsInfo) +
                                (msg->argc*sizeof(char*)) + 
                                 argsize);
@@ -93,15 +85,7 @@ ampi::ampi(AmpiStartMsg *msg)
   }
   for(i=0;i<ampimain::ncomms; i++)
   {
-#if AMPI_FORTRAN
-#if CMK_FORTRAN_USES_ALLCAPS
-    AMPI_COMM_UNIVERSE[i] = i;
-#else
-    ampi_comm_universe_[i] = i;
-#endif
-#else
-    AMPI_COMM_UNIVERSE[i] = i;
-#endif
+    AMPI_COMM_UNIVERSE[i] = i+1;
   }
 }
 
@@ -245,7 +229,7 @@ void ampi::pup(PUP::er &p)
     userdata[i] = pup_ud[i]((pup_er) &p, userdata[i]);
 #endif
   }
-  if (p.isPacking()) 
+  if (p.isPacking() || p.isSizing()) 
   {//In this case, pack the thread after the user data
   	s.seek(1);
   	thread_id = CthPup((pup_er) &p, thread_id);
@@ -523,8 +507,6 @@ int AMPI_Start(AMPI_Request *reqnum)
   if(req->sndrcv == 1) { // send request
     ptr->send(req->tag, ptr->getIndex(), req->buf, req->count, req->type, 
               req->proc, req->comm);
-  } else {
-    ptr->recv(req->tag, req->proc, req->buf, req->count, req->type, req->comm);
   }
   return 0;
 }
@@ -538,11 +520,11 @@ int AMPI_Waitall(int count, AMPI_Request *request, AMPI_Status *sts)
     if(request[i] == (-1))
       continue;
     if(request[i] < 100) { // persistent request
-      // PersReq *req = &(ptr->requests[request[i]]);
-      // if(req->sndrcv == 2) { // recv request
-        // ptr->recv(req->tag, req->proc, req->buf, req->count, 
-        //           req->type, req->comm);
-      // }
+      PersReq *req = &(ptr->requests[request[i]]);
+      if(req->sndrcv == 2) { // recv request
+        ptr->recv(req->tag, req->proc, req->buf, req->count, 
+                  req->type, req->comm);
+      }
     } else { // irecv request
       int index = request[i] - 100;
       PersReq *req = &(ptr->irequests[index]);

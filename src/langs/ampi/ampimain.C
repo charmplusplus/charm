@@ -60,7 +60,8 @@ ampimain::ampimain(CkArgMsg *m)
     jarray.setReductionClient(allReduceHandler,(void*)&ampi_comms[i]);
     int j;
     for(j=0; j<ampi_comms[i].nobj; j++) {
-      ArgsInfo *argsinfo = new ArgsInfo(m->argc, m->argv);
+      ArgsInfo *argsinfo = new ArgsInfo(CmiGetArgc(m->argv), 
+                                        CmiCopyArgs(m->argv));
       jarray[j].run(argsinfo);
     }
   }

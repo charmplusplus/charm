@@ -13,7 +13,7 @@ extern "C" {
 
 #if CMK_FORTRAN_USES_ALLCAPS
 
-#define ampi_init                    AMPI_INIT
+#define ampi_init_universe           AMPI_INIT_UNIVERSE
 #define ampi_comm_rank               AMPI_COMM_RANK
 #define ampi_comm_size               AMPI_COMM_SIZE
 #define ampi_finalize                AMPI_FINALIZE
@@ -56,7 +56,7 @@ extern "C" {
 
 #else
 
-#define ampi_init                    FNAME(ampi_init)
+#define ampi_init_universe           FNAME(ampi_init_universe)
 #define ampi_comm_rank               FNAME(ampi_comm_rank)
 #define ampi_comm_size               FNAME(ampi_comm_size)
 #define ampi_finalize                FNAME(ampi_finalize)
@@ -99,9 +99,14 @@ extern "C" {
 
 #endif
 
-void  ampi_init(int *ierr)
+extern int AMPI_COMM_UNIVERSE[AMPI_MAX_COMM];
+
+void  ampi_init_universe(int *unicomm)
 {
-  *ierr = AMPI_Init(0,0);
+  for(int i=0;i<ampimain::ncomms; i++)
+  {
+    unicomm[i] = AMPI_COMM_UNIVERSE[i];
+  }
 }
 
 void ampi_comm_rank(int *comm, int *rank, int *ierr)

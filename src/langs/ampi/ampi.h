@@ -31,7 +31,7 @@ extern "C" {
 #define AMPI_UNSIGNED_LONG  13
 #define AMPI_LONG_DOUBLE  14
 
-#define AMPI_COMM_WORLD (-1)
+#define AMPI_COMM_WORLD (0)
 #define AMPI_ANY_SOURCE (-1)
 #define AMPI_ANY_TAG (-1)
 #define AMPI_REQUEST_NULL (-1)
