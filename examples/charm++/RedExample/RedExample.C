@@ -1,4 +1,3 @@
-using namespace std;
 #include <stdio.h>
 #include "RedExample.decl.h"
 #include <math.h>
