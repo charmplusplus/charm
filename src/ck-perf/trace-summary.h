@@ -87,10 +87,15 @@ class PhaseEntry {
 	count[epidx]++;
 	times[epidx] += time;
     }
-    void write(FILE *fp) {
-	for (int i=0; i<_numEntries; i++) {
-	    fprintf(fp, "%d %ld ", count[i], (long)(times[i]*1.0e6) );
-	}
+    void write(FILE *fp, int seq) {
+	int i;
+	fprintf(fp, "[%d] ", seq);
+	for (i=0; i<_numEntries; i++) 
+	    fprintf(fp, "%d ", count[i]);
+	fprintf(fp, "\n");
+	fprintf(fp, "[%d] ", seq);
+	for (i=0; i<_numEntries; i++) 
+	    fprintf(fp, "%ld ", (long)(times[i]*1.0e6) );
 	fprintf(fp, "\n");
     }
 };
@@ -113,6 +118,7 @@ class PhaseTable {
 	for (int i=0; i<numPhase; i++) delete phases[i];
 	delete [] phases;
     }
+    int numPhasesCalled() { return phaseCalled; };
     void startPhase(int p) { 
 	if (p>=numPhase) CmiAbort("Too Many Phases. \n");
 	cur_phase = p; 
@@ -128,11 +134,9 @@ class PhaseTable {
 	phases[cur_phase]->setEp(epidx, time);
     }
     void write(FILE *fp) {
-	fprintf(fp, "phases: %d\n", phaseCalled);
 	for (int i=0; i<numPhase; i++ )
 	    if (phases[i]) { 
-	        fprintf(fp, "[%d] ", i);
-		phases[i]->write(fp);
+		phases[i]->write(fp, i);
             }
     }
 };

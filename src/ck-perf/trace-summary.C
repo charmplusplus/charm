@@ -7,7 +7,7 @@
 
 #include "trace-summary.h"
 
-#define VER   2.0
+#define VER   3.0
 
 CpvDeclare(Trace*, _trace);
 CpvDeclare(int, traceOn);
@@ -168,7 +168,7 @@ void LogPool::addEventType(int eventType, double time)
 void LogPool::write(void) 
 {
   int i;
-  fprintf(fp, "ver:%3.1f %d/%d count:%d ep:%d interval:%le\n", VER, CmiMyPe(), CmiNumPes(), numEntries, _numEntries, CpvAccess(binSize));
+  fprintf(fp, "ver:%3.1f %d/%d count:%d ep:%d interval:%le phases:%d\n", VER, CmiMyPe(), CmiNumPes(), numEntries, _numEntries, CpvAccess(binSize), phaseTab.numPhasesCalled());
   // write bin time
   for(i=0; i<numEntries; i++)
     pool[i].write(fp);
