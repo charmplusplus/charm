@@ -10,6 +10,7 @@
 */
 /*@{*/
 
+// #define CMK_ORIGIN2000
 #ifdef CMK_ORIGIN2000
 
 #include "trace-counter.h"
@@ -24,7 +25,6 @@ static int _numEvents = 0;
 static int _threadMsg, _threadChare, _threadEP;
 static int _packMsg, _packChare, _packEP;
 static int _unpackMsg, _unpackChare, _unpackEP;
-CpvDeclare(double, binSize);
 CpvDeclare(double, version);
 
 static char* helpString =
@@ -68,20 +68,79 @@ void _createTracecounter(char **argv)
 {
   DEBUGF(("%d createTraceCounter\n", CkMyPe()));
   CpvInitialize(Trace*, _trace);
-  CpvAccess(_trace) = new  TraceCounter();
+  TraceCounter* tc = new TraceCounter();
+  tc->traceInit(argv);
+  CpvAccess(_trace) = tc;
   CpvAccess(_traces)->addTrace(CpvAccess(_trace));
 }
 
 StatTable::StatTable(): stats_(NULL), numStats_(0) 
 {
+  CmiPrintf("StatTable::StatTable %08x\n", this);
+
   stats_ = new Statistics[2];
+  numStats_ = 2;
   _MEMCHECK(stats_);
 }
 
 StatTable::~StatTable() { if (stats_ != NULL) { delete [] stats_; } }
 
+// one entry is called for 'time' seconds, value is counter reading
+void StatTable::setEp(int epidx, int stat, UInt value, double time) 
+{
+  // CmiPrintf("StatTable::setEp %08x %d %d %d %f\n", 
+  //           this, epidx, stat, value, time);
+
+  CkAssert(epidx<MAX_ENTRIES);
+  CkAssert(stat<numStats_);
+  
+  int count = stats_[stat].count[epidx];
+  stats_[stat].count[epidx]++;
+  double avg = stats_[stat].average[epidx];
+  stats_[stat].average[epidx] = (avg * count + value) / (count + 1);
+  stats_[stat].totTime[epidx] += time;
+}
+
+void StatTable::write(FILE* fp) 
+{
+  int i, j;
+  for (i=0; i<numStats_; i++) {
+    // write number of calls for each entry
+    fprintf(fp, "[%s] ", stats_[i].name);
+    for (j=0; j<_numEntries; j++) { 
+      fprintf(fp, "%d ", stats_[i].count[j]); 
+    }
+    fprintf(fp, "\n");
+    // write average count for each 
+    fprintf(fp, "[%s] ", stats_[i].name);
+    for (j=0; j<_numEntries; j++) { 
+      fprintf(fp, "%d ", stats_[i].average[j]); 
+    }
+    fprintf(fp, "\n");
+    // write total time in us spent for each entry
+    fprintf(fp, "[%s] ", stats_[i].name);
+    for (j=0; j<_numEntries; j++) {
+      fprintf(fp, "%ld ", (long)(stats_[i].totTime[j]*1.0e6));
+    }
+    fprintf(fp, "\n");
+  }
+}
+
+void StatTable::clear() 
+{
+  for (int i=0; i<numStats_; i++) {
+    for (int j=0; j<MAX_ENTRIES; j++) {
+      stats_[i].count[j] = 0;
+      stats_[i].average[j] = 0.0;
+      stats_[i].totTime[j] = 0.0;
+    }
+  }
+}
+
 CountLogPool::CountLogPool(char* pgm)
 {
+  CmiPrintf("CountLogPool::CountLogPool() %08x\n", this);
+
   int i;
   char pestr[10];
   sprintf(pestr, "%d", CkMyPe());
@@ -89,12 +148,12 @@ CountLogPool::CountLogPool(char* pgm)
   char* fname = new char[len+1];
   sprintf(fname, "%s.%s.sum", pgm, pestr);
   fp_ = NULL;
-  // CmiPrintf("TRACE: %s:%d\n", fname, errno);
+  CmiPrintf("TRACE: %s:%d\n", fname, errno);
   do {
     fp_ = fopen(fname, "w+");
-  } while (!fp && errno == EINTR);
+  } while (!fp_ && errno == EINTR);
   delete[] fname;
-  if(!fp) {
+  if(!fp_) {
     CmiAbort("Cannot open Summary Trace File for writing...\n");
   }
 }
@@ -144,20 +203,21 @@ void CountLogPool::writeSts(void)
   fclose(sts);
 }
 
-void CountLogPool::setEp(int epidx, intdouble time) 
+void CountLogPool::setEp(int epidx, int count1, int count2, double time) 
 {
+  // CmiPrintf("CountLogPool::setEp %08x %d %d %d %f\n", 
+  //           this, epidx, count1, count2, time);
+
   if (epidx >= MAX_ENTRIES) {
     CmiAbort("CountLogPool::setEp too many entry points!\n");
   }
   // CmiPrintf("set EP: %d %e \n", epidx, time);
-  epTime[epidx] += time;
-  epCount[epidx] ++;
-  // set phase table counter
+  stats_.setEp(epidx, 0, count1, time);
+  stats_.setEp(epidx, 1, count2, time);
 }
 
 void TraceCounter::traceInit(char **argv)
 {
-  char* tmpStr;
   CpvInitialize(CountLogPool*, _logPool);
   CpvInitialize(char*, pgmName);
   CpvInitialize(double, version);
@@ -165,12 +225,31 @@ void TraceCounter::traceInit(char **argv)
   _MEMCHECK(CpvAccess(pgmName));
   strcpy(CpvAccess(pgmName), argv[0]);
   CpvAccess(version) = VER;
-  if (CmiGetArgString(argv,"+counter1",&tmpStr)) {
+
+  // parse command line args
+  int  arg1, arg2;
+  bool arg1valid = false;
+  bool arg2valid = false;
+  if (CmiGetArgInt(argv,"+counter1",&arg1)) {
+    CmiPrintf("arg1 is %d\n", arg1); 
   }
-  if (CmiGetArgString(argv,"+counter2",&tmpStr)) {
-    sscanf(tmpStr,"%lf",&CpvAccess(binSize));
+  if (CmiGetArgInt(argv,"+counter2",&arg2)) {
+    CmiPrintf("arg2 is %d\n", arg2); 
+  }
+  if (CmiGetArgFlag(argv,"+counter-help")) {
+    if (CkMyPe() == 0) { CmiPrintf("%s\n", helpString); }
+    ConverseExit();
+  }
+  if (!arg1valid || !arg2valid) {
+    if (CkMyPe() == 0) {
+      CmiPrintf("ERROR: When you've linked with '+tracemode counter', you\n"
+		"  must specify '+counter1 <arg1>' and '+counter2 <arg2>' to run.\n"
+		"  Type +counter-help to get list of counters.\n");
+    }
+    ConverseExit();
   }
   CpvAccess(_logPool) = new CountLogPool(CpvAccess(pgmName));
+  CmiPrintf("%d Created _logPool at %08x\n", CkMyPe(), CpvAccess(_logPool));
 }
 
 void TraceCounter::traceClearEps(void)
@@ -216,21 +295,28 @@ void TraceCounter::endExecute(void)
 {
   // if (!flag) return;
   double t = TraceTimer();
-  double ts = startTime_;
 
-  if (execEp != -1) { CpvAccess(_logPool)->setEp(execEp, t-ts); }
+  int count1, count2;
+
+  if (execEP_ != -1) { 
+    CpvAccess(_logPool)->setEp(execEP_, count1, count2, t-startEP_); 
+  }
 }
 
 void TraceCounter::beginPack(void) { startPack_ = CmiWallTimer(); }
 
 void TraceCounter::endPack(void) {
-  CpvAccess(_logPool)->setEp(_packEP, CmiWallTimer() - startPack_);
+  int count1, count2;
+  CpvAccess(_logPool)->setEp(_packEP, count1, count2, 
+			     CmiWallTimer() - startPack_);
 }
 
 void TraceCounter::beginUnpack(void) { startUnpack_ = CmiWallTimer(); }
 
 void TraceCounter::endUnpack(void) {
-  CpvAccess(_logPool)->setEp(_unpackEP, CmiWallTimer()-startUnpack_);
+  int count1, count2;
+  CpvAccess(_logPool)->setEp(_unpackEP, count1, count2, 
+			     CmiWallTimer()-startUnpack_);
 }
 
 void TraceCounter::beginComputation(void)

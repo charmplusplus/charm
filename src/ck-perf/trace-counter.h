@@ -10,6 +10,7 @@
 */
 /*@{*/
 
+// #define CMK_ORIGIN2000
 #ifdef CMK_ORIGIN2000
 
 #ifndef __trace_counter_h__
@@ -28,46 +29,16 @@ class StatTable {
   public:
     StatTable();
     ~StatTable();
-    // one entry is called for 'time' seconds, value is counter reading
-    void setEp(int epidx, int stat, UInt value, double time) {
-      CkAssert(epidx<MAX_ENTRIES);
-      CkAssert(stat<numStats_);
-
-      int count = stats_[stat].count[epidx];
-      stats_[stat].count[epidx]++;
-      double avg = stats_[stat].average[epidx];
-      stats_[stat].average[epidx] = (avg * count + value) / (count + 1);
-      stats_[stat].totTime[epidx] += time;
-    }
+    /** one entry is called for 'time' seconds, value is counter reading */
+    void setEp(int epidx, int stat, UInt value, double time);
     /**
        write three lines for each stat:
        1. number of calls for each entry
        2. average count for each entry
        3. total time in us spent for each entry
     */
-    void write(FILE* fp) {
-      int i, j;
-      for (i=0; i<numStats_; i++) {
-	// write number of calls for each entry
-	fprintf(fp, "[%s] ", stats_[i].name);
-	for (j=0; j<_numEntries; j++) { 
-	  fprintf(fp, "%d ", stats_[i].count[j]); 
-	}
-	fprintf(fp, "\n");
-	// write average count for each 
-	fprintf(fp, "[%s] ", stats_[i].name);
-	for (j=0; j<_numEntries; j++) { 
-	  fprintf(fp, "%d ", stats_[i].average[j]); 
-	}
-	fprintf(fp, "\n");
-	// write total time in us spent for each entry
-	fprintf(fp, "[%s] ", stats_[i].name);
-	for (j=0; j<_numEntries; j++) {
-	  fprintf(fp, "%ld ", (long)(stats_[i].totTime[j]*1.0e6));
-	}
-	fprintf(fp, "\n");
-      }
-    }
+    void write(FILE* fp);
+    void clear();
 
   private:
     // struct to maintain statistics
@@ -76,6 +47,9 @@ class StatTable {
       UInt   count[MAX_ENTRIES];    // total number times called
       double average[MAX_ENTRIES];  // track average of value
       double totTime[MAX_ENTRIES];  // total time associated with this counter
+
+      Statistics(): name(NULL) { }
+      ~Statistics() { if (name != NULL) { delete [] name; } }
     };
 
     Statistics* stats_;             // track stats for each entry point
@@ -89,7 +63,8 @@ class CountLogPool {
     ~CountLogPool();
     void write(void) ;
     void writeSts(void);
-    void setEp(int epidx, double time);
+    void setEp(int epidx, int count1, int count2, double time);
+    void clearEps() { stats_.clear(); }
 
   private:
     FILE*     fp_;
@@ -134,8 +109,6 @@ class TraceCounter : public Trace {
     double startEP_;      // start time of currently executing ep
     double startPack_;    // start time of pack operation
     double startUnpack_;  // start time of unpack operation
-
-    int    msgNum_;
 };
 
 #endif  // __trace_counter_h__
