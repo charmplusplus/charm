@@ -772,6 +772,7 @@ class CkThrCallArg {
 };
 
 extern void CkStartQD(const CkCallback& cb);
+#define CkExitAfterQuiescence() CkStartQD(CkCallback(CkCallback::ckExit))
 
 #include "ckmemcheckpoint.h"
 #include "readonly.h"
