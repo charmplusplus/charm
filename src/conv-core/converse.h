@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.13  1995-09-19 21:43:58  brunner
+ * Revision 2.14  1995-09-20 13:16:33  jyelon
+ * Added prototypes for Cth (thread) functions.
+ *
+ * Revision 2.13  1995/09/19  21:43:58  brunner
  * Moved declaration of CmiTimer here from c++interface.h
  *
  * Revision 2.12  1995/09/19  19:31:51  jyelon
@@ -217,6 +220,24 @@ int   CmiScanf  CMK_PROTO(());
 #define CQS_QUEUEING_ILIFO 3
 #define CQS_QUEUEING_BFIFO 4
 #define CQS_QUEUEING_BLIFO 5
+
+/******** PROTOTYPES FOR CTH FUNCTIONS AND MACROS ********/
+
+typedef struct CthThread *CthThread;
+
+typedef void        (*CthVoidFn)();
+typedef CthThread   (*CthThFn)();
+
+
+CthThread  CthCreate   CMK_PROTO((voidfn, void *, int, CthVoidFn, CthThFn));
+void       CthYield    CMK_PROTO((void));
+void       CthSuspend  CMK_PROTO((void));
+void       CthExit     CMK_PROTO((void));
+void       CthAwaken   CMK_PROTO((CthThread));
+CthThread  CthSelf     CMK_PROTO((void));
+void       CthSetVal   CMK_PROTO((CthThread, void **, void *));
+void      *CthGetVal   CMK_PROTO((CthThread, void **));
+
 
 /******** PROTOTYPES FOR CSD FUNCTIONS AND MACROS ********/
 
