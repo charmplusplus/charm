@@ -137,7 +137,7 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
       MetisLB.decl.h DummyLB.decl.h RefineLB.decl.h RefineCommLB.decl.h	\
       OrbLB.decl.h GreedyLB.decl.h NborBaseLB.decl.h NeighborLB.decl.h \
       WSLB.decl.h GreedyRefLB.decl.h RandRefLB.decl.h \
-      CommLB.decl.h Comm1LB.decl.h EveryLB.decl.h \
+      GreedyCommLB.decl.h Comm1LB.decl.h EveryLB.decl.h \
       charisma.decl.h \
       TraceSummary.decl.h	\
       BlueGene.decl.h blue.h
@@ -160,8 +160,8 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  LBDBManager.h LBComm.h LBOM.h LBObj.h LBMachineUtil.h \
 	  Refiner.h RefinerComm.h ObjGraph.h heap.h elements.h CommLBHeap.h \
 	  BaseLB.h CentralLB.h CentralLBMsg.h RandCentLB.h RecBisectBfLB.h \
-	  RefineLB.h RefineCommLB.h OrbLB.h GreedyLB.h CommLB.h Comm1LB.h \
-          manager.h MetisLB.h NborBaseLB.h \
+	  RefineLB.h RefineCommLB.h OrbLB.h GreedyLB.h GreedyCommLB.h \
+	  Comm1LB.h manager.h MetisLB.h NborBaseLB.h \
 	  NeighborLB.h WSLB.h GreedyRefLB.h RandRefLB.h \
           ComlibStrategy.h ComlibArrayListener.h \
 	  BlueGene.h middle.h middle-conv.h middle-blue.h \
@@ -595,7 +595,7 @@ LOADBALANCERS=\
    $(L)/libmoduleMetisLB.a \
    $(L)/libmoduleRefineLB.a \
    $(L)/libmoduleRefineCommLB.a \
-   $(L)/libmoduleCommLB.a \
+   $(L)/libmoduleGreedyCommLB.a \
    $(L)/libmoduleComm1LB.a \
    $(L)/libmoduleGreedyLB.a \
    $(L)/libmoduleNeighborLB.a \
@@ -659,13 +659,13 @@ $(L)/libmoduleRefineCommLB.a: RefineCommLB.o
 	$(CHARMC) -o $(L)/libmoduleRefineCommLB.a RefineCommLB.o 
 	
 
-CommLB.def.h: CommLB.decl.h
+GreedyCommLB.def.h: GreedyCommLB.decl.h
 
-CommLB.decl.h: CommLB.ci charmxi
-	$(CHARMC) CommLB.ci
+GreedyCommLB.decl.h: GreedyCommLB.ci charmxi
+	$(CHARMC) GreedyCommLB.ci
 
-$(L)/libmoduleCommLB.a: CommLB.o manager.o
-	$(CHARMC) -o $(L)/libmoduleCommLB.a CommLB.o manager.o
+$(L)/libmoduleGreedyCommLB.a: GreedyCommLB.o manager.o
+	$(CHARMC) -o $(L)/libmoduleGreedyCommLB.a GreedyCommLB.o manager.o
 	
 
 Comm1LB.def.h: Comm1LB.decl.h
@@ -739,7 +739,7 @@ LB_OBJ=EveryLB.o \
     MetisLB.o \
     RefineLB.o \
     RefineCommLB.o \
-    CommLB.o \
+    GreedyCommLB.o \
     Comm1LB.o \
     GreedyLB.o \
     NeighborLB.o \

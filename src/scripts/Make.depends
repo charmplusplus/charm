@@ -148,8 +148,7 @@ trace-projections.o: trace-projections.C charm++.h charm.h converse.h \
   ComlibArrayListener.h ComlibStrategy.h CkFutures.decl.h charisma.h \
   charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
   ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
-  trace-bluegene.h ck.h envelope.h qd.h register.h stats.h ckfutures.h \
-  trace-common.h trace-projections.h
+  trace-bluegene.h envelope.h trace-common.h trace-projections.h
 	$(CHARMC) -c -I. trace-projections.C
 
 trace-summary.o: trace-summary.C charm++.h charm.h converse.h \
@@ -164,9 +163,8 @@ trace-summary.o: trace-summary.C charm++.h charm.h converse.h \
   ComlibArrayListener.h ComlibStrategy.h CkFutures.decl.h charisma.h \
   charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
   ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
-  trace-bluegene.h trace-summary.h ck.h envelope.h qd.h register.h \
-  stats.h ckfutures.h trace-common.h trace-summaryBOC.h \
-  TraceSummary.decl.h TraceSummary.def.h
+  trace-bluegene.h trace-summary.h envelope.h register.h trace-common.h \
+  trace-summaryBOC.h TraceSummary.decl.h TraceSummary.def.h
 	$(CHARMC) -c -I. trace-summary.C
 
 trace-counter.o: trace-counter.C charm++.h charm.h converse.h \
@@ -801,7 +799,7 @@ EveryLB.o: EveryLB.C charm++.h charm.h converse.h conv-config.h \
   ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h EveryLB.decl.h DummyLB.decl.h CentralLB.decl.h \
   CentralLBMsg.h RandCentLB.decl.h RecBisectBfLB.decl.h MetisLB.decl.h \
-  RefineLB.decl.h RefineCommLB.decl.h CommLB.decl.h Comm1LB.decl.h \
+  RefineLB.decl.h RefineCommLB.decl.h GreedyCommLB.decl.h Comm1LB.decl.h \
   GreedyLB.decl.h NeighborLB.decl.h NborBaseLB.decl.h GreedyRefLB.decl.h \
   OrbLB.decl.h RandRefLB.decl.h WSLB.decl.h EveryLB.def.h
 	$(CHARMC) -c -I. EveryLB.C
@@ -906,7 +904,7 @@ RefineCommLB.o: RefineCommLB.C charm++.h charm.h converse.h conv-config.h \
   RefineCommLB.def.h
 	$(CHARMC) -c -I. RefineCommLB.C
 
-CommLB.o: CommLB.C charm++.h charm.h converse.h conv-config.h \
+GreedyCommLB.o: GreedyCommLB.C charm++.h charm.h converse.h conv-config.h \
   conv-common.h conv-mach.h conv-autoconfig.h conv-mach-opt.h pup_c.h \
   conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
   conv-trace.h persistent.h debug-conv.h pup.h middle.h middle-conv.h \
@@ -918,10 +916,10 @@ CommLB.o: CommLB.C charm++.h charm.h converse.h conv-config.h \
   ComlibArrayListener.h ComlibStrategy.h CkFutures.decl.h charisma.h \
   charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
   ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
-  trace-bluegene.h CommLB.h CentralLB.h BaseLB.h CentralLB.decl.h \
-  CentralLBMsg.h LBSimulation.h CommLB.decl.h CommLBHeap.h CommLB.def.h \
-  manager.h
-	$(CHARMC) -c -I. CommLB.C
+  trace-bluegene.h GreedyCommLB.h CentralLB.h BaseLB.h CentralLB.decl.h \
+  CentralLBMsg.h LBSimulation.h GreedyCommLB.decl.h CommLBHeap.h \
+  GreedyCommLB.def.h manager.h
+	$(CHARMC) -c -I. GreedyCommLB.C
 
 Comm1LB.o: Comm1LB.C charm++.h charm.h converse.h conv-config.h \
   conv-common.h conv-mach.h conv-autoconfig.h conv-mach-opt.h pup_c.h \
@@ -936,8 +934,8 @@ Comm1LB.o: Comm1LB.C charm++.h charm.h converse.h conv-config.h \
   charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
   ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h Comm1LB.h CentralLB.h BaseLB.h CentralLB.decl.h \
-  CentralLBMsg.h LBSimulation.h Comm1LB.decl.h CommLBHeap.h CommLB.h \
-  CommLB.decl.h Comm1LB.def.h
+  CentralLBMsg.h LBSimulation.h Comm1LB.decl.h CommLBHeap.h \
+  GreedyCommLB.h GreedyCommLB.decl.h Comm1LB.def.h
 	$(CHARMC) -c -I. Comm1LB.C
 
 GreedyLB.o: GreedyLB.C charm++.h charm.h converse.h conv-config.h \
