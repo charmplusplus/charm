@@ -979,21 +979,24 @@ typedef struct logent {
 
 
 logent log;
-int    log_size;
+int    log_pos;
+int    log_wrap;
 
 static void log_init()
 {
   log = (logent)malloc(50000 * sizeof(struct logent));
-  log_size = 0;
+  log_pos = 0;
+  log_wrap = 0;
 }
 
 static void log_done()
 {
-  char logname[100]; FILE *f; int i;
+  char logname[100]; FILE *f; int i, size;
   sprintf(logname, "log.%d", Cmi_nodenum);
   f = fopen(logname, "w");
   if (f==0) { perror("fopen"); exit(1); }
-  for (i=0; i<log_size; i++) {
+  if (log_wrap) size = 50000; else size=log_pos;
+  for (i=0; i<size; i++) {
     logent ent = log+i;
     fprintf(f, "%1.4f %d %c %d %d\n",
 	    ent->time, ent->srcpe, ent->kind, ent->dstpe, ent->seqno);
@@ -1001,7 +1004,7 @@ static void log_done()
   fclose(f);
 }
 
-#define LOG(t,s,k,d,q) { if (log_size<50000) { logent ent=log+log_size; ent->time=t; ent->srcpe=s; ent->kind=k; ent->dstpe=d; ent->seqno=q; log_size++; }}
+#define LOG(t,s,k,d,q) { if (log_pos==50000) {log_pos=0; log_wrap=1;} { logent ent=log+log_size; ent->time=t; ent->srcpe=s; ent->kind=k; ent->dstpe=d; ent->seqno=q; log_size++; }}
 
 #endif
 
