@@ -12,7 +12,7 @@
 #define CMK_REDUCTION_USES_COMMON_CODE                     1
 #define CMK_REDUCTION_USES_SPECIAL_CODE                    0
 
-#define CMK_NODE_QUEUE_AVAILABLE                           1
+#define CMK_NODE_QUEUE_AVAILABLE                           0
 
 #define CMK_CMIDELIVERS_USE_COMMON_CODE                    1
 #define CMK_CMIDELIVERS_USE_SPECIAL_CODE                   0

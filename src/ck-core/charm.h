@@ -27,6 +27,14 @@
 #define CUTimer()	((int)(CmiWallTimer() * 1000000.0))
 #define CHTimer()	((int)(CmiWallTimer() / 3600.0))
 
+/**************************************************
+  Parallel Debugger
+
+  **************************************************/		  
+#if CMK_DEBUG_MODE
+//void handlerArrayRegister(int);
+#endif
+
 /******************************************************************************
  *
  * Unclassified / Miscellaneous
@@ -41,8 +49,9 @@
 
 #define CHARRED(x) ((char *) (x))
 
+#ifndef CINTBITS
 #define CINTBITS (sizeof(int)*8)
-
+#endif
 
 /******************************************************************************
  *

@@ -623,7 +623,6 @@ int freeCount = 0;
   d->next = Cmi_freelist_circqueuestruct;\
   Cmi_freelist_circqueuestruct = d;\
   freeCount++;\
-  CmiPrintf("%d]count = %d\n", CmiMyPe(), freeCount);\
   CmiMemUnlock();\
 }
 
@@ -633,11 +632,9 @@ int freeCount = 0;
   d = Cmi_freelist_circqueuestruct;\
   if (d==(CircQueue)0){\
     d = ((CircQueue)calloc(1, sizeof(struct CircQueueStruct)));\
-    CmiPrintf("%d] Mallocing fresh\n", CmiMyPe());\
   }\
   else{\
     freeCount--;\
-    CmiPrintf("%d] in malloc, count = %d\n", CmiMyPe(), freeCount);\
     Cmi_freelist_circqueuestruct = d->next;\
     }\
   dg = d;\
@@ -819,8 +816,10 @@ typedef struct { DgramHeader head; char window[1024]; } DgramAck;
 #define PE_BROADCAST_OTHERS (-1)
 #define PE_BROADCAST_ALL    (-2)
 
+#if CMK_NODE_QUEUE_AVAILABLE
 #define NODE_BROADCAST_OTHERS (-1)
 #define NODE_BROADCAST_ALL    (-2)
+#endif
 
 typedef struct OutgoingMsgStruct
 {
@@ -1578,7 +1577,7 @@ static void CmiStartThreads()
 
 #if CMK_SHARED_VARS_UNAVAILABLE
 
-static int memflag;
+static volatile int memflag;
 void CmiMemLock() { memflag=1; }
 void CmiMemUnlock() { memflag=0; }
 
@@ -1698,8 +1697,8 @@ static void ctrl_getone()
       sscanf(line, "%s%d%d", cmd, &pe, &size);
       len = strlen(line);
       msg = (char *) CmiAlloc(len+size+CmiMsgHeaderSizeBytes);
-  if (!msg)
-      CmiPrintf("%d: Out of mem\n", Cmi_mynode);
+      if (!msg)
+        CmiPrintf("%d: Out of mem\n", Cmi_mynode);
       CmiSetHandler(msg, CpvAccess(strHandlerID));
       strcpy(msg+CmiMsgHeaderSizeBytes, line);
       fread(msg+CmiMsgHeaderSizeBytes+len, 1, size, f);
@@ -2687,59 +2686,62 @@ CmiCommHandle CmiGeneralSend(int pe, int size, int freemode, char *data)
   return (CmiCommHandle)ogm;
 }
 
-void CmiSyncNodeSendFn(int p, int s, char *m)
-{ CmiGeneralNodeSend(p,s,'S',m); }
-
 void CmiSyncSendFn(int p, int s, char *m)
 { CmiGeneralSend(p,s,'S',m); }
-
-CmiCommHandle CmiAsyncNodeSendFn(int p, int s, char *m)
-{ return CmiGeneralNodeSend(p,s,'A',m); }
 
 CmiCommHandle CmiAsyncSendFn(int p, int s, char *m)
 { return CmiGeneralSend(p,s,'A',m); }
 
-void CmiFreeNodeSendFn(int p, int s, char *m)
-{ CmiGeneralNodeSend(p,s,'F',m); }
-
 void CmiFreeSendFn(int p, int s, char *m)
 { CmiGeneralSend(p,s,'F',m); }
-
-void CmiSyncNodeBroadcastFn(int s, char *m)
-{ CmiGeneralNodeSend(NODE_BROADCAST_OTHERS,s,'S',m); }
 
 void CmiSyncBroadcastFn(int s, char *m)
 { CmiGeneralSend(PE_BROADCAST_OTHERS,s,'S',m); }
 
-CmiCommHandle CmiAsyncNodeBroadcastFn(int s, char *m)
-{ CmiGeneralNodeSend(NODE_BROADCAST_OTHERS,s,'A',m); }
-
 CmiCommHandle CmiAsyncBroadcastFn(int s, char *m)
 { return CmiGeneralSend(PE_BROADCAST_OTHERS,s,'A',m); }
-
-void CmiFreeNodeBroadcastFn(int s, char *m)
-{ CmiGeneralNodeSend(NODE_BROADCAST_OTHERS,s,'F',m); }
 
 void CmiFreeBroadcastFn(int s, char *m)
 { CmiGeneralSend(PE_BROADCAST_OTHERS,s,'F',m); }
 
-void CmiSyncNodeBroadcastAllFn(int s, char *m)
-{ CmiGeneralNodeSend(NODE_BROADCAST_ALL,s,'S',m); }
-
 void CmiSyncBroadcastAllFn(int s, char *m)
 { CmiGeneralSend(PE_BROADCAST_ALL,s,'S',m); }
-
-CmiCommHandle CmiAsyncNodeBroadcastAllFn(int s, char *m)
-{ CmiGeneralNodeSend(NODE_BROADCAST_ALL,s,'A',m); }
 
 CmiCommHandle CmiAsyncBroadcastAllFn(int s, char *m)
 { return CmiGeneralSend(PE_BROADCAST_ALL,s,'A',m); }
 
-void CmiFreeNodeBroadcastAllFn(int s, char *m)
-{ CmiGeneralNodeSend(NODE_BROADCAST_ALL,s,'F',m); }
-
 void CmiFreeBroadcastAllFn(int s, char *m)
 { CmiGeneralSend(PE_BROADCAST_ALL,s,'F',m); }
+
+#if CMK_NODE_QUEUE_AVAILABLE
+
+void CmiSyncNodeSendFn(int p, int s, char *m)
+{ CmiGeneralNodeSend(p,s,'S',m); }
+
+CmiCommHandle CmiAsyncNodeSendFn(int p, int s, char *m)
+{ return CmiGeneralNodeSend(p,s,'A',m); }
+
+void CmiFreeNodeSendFn(int p, int s, char *m)
+{ CmiGeneralNodeSend(p,s,'F',m); }
+
+void CmiSyncNodeBroadcastFn(int s, char *m)
+{ CmiGeneralNodeSend(NODE_BROADCAST_OTHERS,s,'S',m); }
+
+CmiCommHandle CmiAsyncNodeBroadcastFn(int s, char *m)
+{ CmiGeneralNodeSend(NODE_BROADCAST_OTHERS,s,'A',m); }
+
+void CmiFreeNodeBroadcastFn(int s, char *m)
+{ CmiGeneralNodeSend(NODE_BROADCAST_OTHERS,s,'F',m); }
+
+void CmiSyncNodeBroadcastAllFn(int s, char *m)
+{ CmiGeneralNodeSend(NODE_BROADCAST_ALL,s,'S',m); }
+
+CmiCommHandle CmiAsyncNodeBroadcastAllFn(int s, char *m)
+{ CmiGeneralNodeSend(NODE_BROADCAST_ALL,s,'A',m); }
+
+void CmiFreeNodeBroadcastAllFn(int s, char *m)
+{ CmiGeneralNodeSend(NODE_BROADCAST_ALL,s,'F',m); }
+#endif
 
 /******************************************************************************
  *

@@ -197,9 +197,14 @@ FUNCTION_PTR donehandler;
         
         CharmRegisterHandlers();
 
+#if CMK_DEBUG_MODE
+	handlerArrayRegister(CsvAccess(BUFFER_INCOMING_MSG_Index));
+	handlerArrayRegister(CsvAccess(MAIN_HANDLE_INCOMING_MSG_Index));
+#endif
+
        /* set the main message handler to buffering handler */
        /* after initialization phase, it will be assigned to regular handler */
-       CpvAccess(HANDLE_INCOMING_MSG_Index)
+	CpvAccess(HANDLE_INCOMING_MSG_Index)
              = CsvAccess(BUFFER_INCOMING_MSG_Index);
 
         if (CmiMyRank() == 0) InitializeEPTables();

@@ -56,7 +56,7 @@ SEQCHARMC=../bin/charmc -seq $(CHARMOPTS)
 #
 ###############################################################################
 
-ALLHEADERS=charm++.h charm.h charm++-inc.h charm-inc.h cpthreads.h converse.h conv-mach.h simplemsg.h trace.h pvmc.h pvm3.h sdag.h CDep.h CCounter.h CMsgBuffer.h CWhenTrigger.h TList.h idl.h
+ALLHEADERS=charm++.h charm.h charm++-inc.h charm-inc.h cpthreads.h converse.h conv-mach.h simplemsg.h trace.h pvmc.h pvm3.h sdag.h CDep.h CCounter.h CMsgBuffer.h CWhenTrigger.h TList.h idl.h objectData.h fifo.h queueing.h
 
 ALLINTERFACES=idl.ci
 
@@ -122,7 +122,7 @@ TRACELIBS=libtrace-none.a libtrace-summary.a libtrace-projections.a
 
 CVLIBS=libconv-core.a libconv-cplus-n.a libconv-cplus-y.a libldb-rand.o libldb-spray.o libldb-graph.o libldb-test.o $(TRACELIBS)
 
-LIBCONV_CORE=threads.o convcore.o conv-conds.o spantree.o queueing.o fifo.o msgmgr.o memory.o cpm.o cpthreads.o futures.o cldb.o random.o
+LIBCONV_CORE=threads.o convcore.o conv-conds.o spantree.o queueing.o fifo.o msgmgr.o memory.o cpm.o cpthreads.o futures.o cldb.o random.o messageData.o objectData.o info.o globals.o
 
 converse: basics QuickThreads/libqt.a $(CVLIBS) conv-host-if-needed conv-cpm
 
@@ -297,6 +297,15 @@ memstuff.o: memstuff.c $(CKHEADERS)
 
 main.o: main.c $(CKHEADERS)
 	$(CHARMC) -o main.o main.c
+
+objectData.o: objectData.h objectData.C $(CKHEADERS)
+	$(CHARMC) -o objectData.o objectData.C
+
+messageData.o: messageData.C $(CKHEADERS)
+	$(CHARMC) -o messageData.o messageData.C
+
+info.o:	info.c $(CKHEADERS)
+	$(CHARMC) -o info.o info.c
 
 ck.o: ck.c $(CKHEADERS)
 	$(CHARMC) -o ck.o ck.c

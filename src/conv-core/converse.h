@@ -380,8 +380,10 @@ typedef struct CMK_MSG_HEADER_EXT   CmiMsgHeaderExt;
 CpvExtern(CmiHandler*, CmiHandlerTable);
 CpvExtern(int,         CmiHandlerMax);
 CpvExtern(void*,       CsdSchedQueue);
+#if CMK_NODE_QUEUE_AVAILABLE
 CsvExtern(void*,       CsdNodeQueue);
 CsvExtern(CmiNodeLock, NodeQueueLock);
+#endif
 CpvExtern(int,         CsdStopFlag);
 CpvExtern(CmiHandler,  CsdNotifyIdle);
 CpvExtern(CmiHandler,  CsdNotifyBusy);
@@ -554,6 +556,7 @@ void          CmiSyncVectorSend         CMK_PROTO((int, int, int *, char **));
 CmiCommHandle CmiAsyncVectorSend        CMK_PROTO((int, int, int *, char **));
 void          CmiSyncVectorSendAndFree  CMK_PROTO((int, int, int *, char **));
 
+#if CMK_NODE_QUEUE_AVAILABLE
 void          CmiSyncNodeSendFn             CMK_PROTO((int, int, char *));
 CmiCommHandle CmiAsyncNodeSendFn            CMK_PROTO((int, int, char *));
 void          CmiFreeNodeSendFn             CMK_PROTO((int, int, char *));
@@ -565,27 +568,41 @@ void          CmiFreeNodeBroadcastFn        CMK_PROTO((int, char *));
 void          CmiSyncNodeBroadcastAllFn     CMK_PROTO((int, char *));
 CmiCommHandle CmiAsyncNodeBroadcastAllFn    CMK_PROTO((int, char *));
 void          CmiFreeNodeBroadcastAllFn     CMK_PROTO((int, char *));
+#endif
 
 #define CmiSyncSend(p,s,m)              (CmiSyncSendFn((p),(s),(char *)(m)))
-#define CmiSyncNodeSend(p,s,m)          (CmiSyncNodeSendFn((p),(s),(char *)(m)))
 #define CmiAsyncSend(p,s,m)             (CmiAsyncSendFn((p),(s),(char *)(m)))
-#define CmiAsyncNodeSend(p,s,m)             (CmiAsyncNodeSendFn((p),(s),(char *)(m)))
 #define CmiSyncSendAndFree(p,s,m)       (CmiFreeSendFn((p),(s),(char *)(m)))
-#define CmiSyncNodeSendAndFree(p,s,m)       (CmiFreeNodeSendFn((p),(s),(char *)(m)))
 
 #define CmiSyncBroadcast(s,m)           (CmiSyncBroadcastFn((s),(char *)(m)))
-#define CmiSyncNodeBroadcast(s,m)           (CmiSyncNodeBroadcastFn((s),(char *)(m)))
 #define CmiAsyncBroadcast(s,m)          (CmiAsyncBroadcastFn((s),(char *)(m)))
-#define CmiAsyncNodeBroadcast(s,m)          (CmiAsyncNodeBroadcastFn((s),(char *)(m)))
 #define CmiSyncBroadcastAndFree(s,m)    (CmiFreeBroadcastFn((s),(char *)(m)))
-#define CmiSyncNodeBroadcastAndFree(s,m)    (CmiFreeNodeBroadcastFn((s),(char *)(m)))
 
 #define CmiSyncBroadcastAll(s,m)        (CmiSyncBroadcastAllFn((s),(char *)(m)))
-#define CmiSyncNodeBroadcastAll(s,m)        (CmiSyncNodeBroadcastAllFn((s),(char *)(m)))
 #define CmiAsyncBroadcastAll(s,m)       (CmiAsyncBroadcastAllFn((s),(char *)(m)))
-#define CmiAsyncNodeBroadcastAll(s,m)       (CmiAsyncNodeBroadcastAllFn((s),(char *)(m)))
 #define CmiSyncBroadcastAllAndFree(s,m) (CmiFreeBroadcastAllFn((s),(char *)(m)))
+
+#if CMK_NODE_QUEUE_AVAILABLE
+#define CmiSyncNodeSend(p,s,m)          (CmiSyncNodeSendFn((p),(s),(char *)(m)))
+#define CmiAsyncNodeSend(p,s,m)             (CmiAsyncNodeSendFn((p),(s),(char *)(m)))
+#define CmiSyncNodeSendAndFree(p,s,m)       (CmiFreeNodeSendFn((p),(s),(char *)(m)))
+#define CmiSyncNodeBroadcast(s,m)           (CmiSyncNodeBroadcastFn((s),(char *)(m)))
+#define CmiAsyncNodeBroadcast(s,m)          (CmiAsyncNodeBroadcastFn((s),(char *)(m)))
+#define CmiSyncNodeBroadcastAndFree(s,m)    (CmiFreeNodeBroadcastFn((s),(char *)(m)))
+#define CmiSyncNodeBroadcastAll(s,m)        (CmiSyncNodeBroadcastAllFn((s),(char *)(m)))
+#define CmiAsyncNodeBroadcastAll(s,m)       (CmiAsyncNodeBroadcastAllFn((s),(char *)(m)))
 #define CmiSyncNodeBroadcastAllAndFree(s,m) (CmiFreeNodeBroadcastAllFn((s),(char *)(m)))
+#else
+#define CmiSyncNodeSend                CmiSyncSend
+#define CmiAsyncNodeSend               CmiAsyncSend
+#define CmiSyncNodeSendAndFree         CmiSyncNodeSendAndFree
+#define CmiSyncNodeBroadcast           CmiSyncNodeBroadcast
+#define CmiAsyncNodeBroadcast          CmiAsyncNodeBroadcast
+#define CmiSyncNodeBroadcastAndFree    CmiSyncNodeBroadcastAndFree
+#define CmiSyncNodeBroadcastAll        CmiSyncNodeBroadcastAll
+#define CmiAsyncNodeBroadcastAll       CmiAsyncNodeBroadcastAll
+#define CmiSyncNodeBroadcastAllAndFree CmiSyncNodeBroadcastAllAndFree
+#endif
 
 #define CmiSyncListSend(n,l,s,m)        (CmiSyncListSendFn((n),(l),(s),(char *)(m)))
 #define CmiAsyncListSend(n,l,s,m)       (CmiAsyncListSendFn((n),(l),(s),(char *)(m)))
@@ -907,19 +924,65 @@ void CcdCallOnCondition CMK_PROTO((int condnum, CcdVoidFn fnp, void *arg));
 
 void CcdCallBacks();
 
+/******** Parallel Debugger *********/
+
+#if CMK_DEBUG_MODE
+
+CpvExtern(void *, debugQueue);
+
+void CpdInit CMK_PROTO((void));
+void CpdFreeze CMK_PROTO((void));
+void CpdUnFreeze CMK_PROTO((void));
+
+void CpdInitializeObjectTable();
+void CpdInitializeHandlerArray();
+void CpdInitializeBreakPoints();
+
+void handlerArrayRegister(int);
+
+char* getSymbolTableInfo();
+int isBreakPoint(char *msg);
+int isEntryPoint(char *msg);
+void setBreakPoints(char *);
+char *getBreakPoints();
+
+char* getObjectList();
+char* getObjectContents();
+
+void msgListCache();
+void msgListCleanup();
+
+char* genericViewMsgFunction(char *msg, int type);
+char* getMsgListSched();
+char* getMsgListPCQueue();
+char* getMsgListFIFO();
+char* getMsgListDebug();
+char* getMsgContentsSched(int index);
+char* getMsgContentsPCQueue(int index);
+char* getMsgContentsFIFO(int index);
+char* getMsgContentsDebug(int index);
+
+#endif
+
+#if CMK_WEB_MODE
+void CWebInit CMK_PROTO((void));
+#endif
+
+#if CMK_CMIDELIVERS_USE_COMMON_CODE
+CpvExtern(void*, CmiLocalQueue);
+#endif
+
+
 /******* Converse Client Server *****/
 
 #if CMK_CCS_AVAILABLE
-
 void CcsUseHandler CMK_PROTO((char *id, int hdlr));
 int CcsRegisterHandler CMK_PROTO((char *id, CmiHandler fn));
 int CcsEnabled CMK_PROTO((void));
 int CcsIsRemoteRequest CMK_PROTO((void));
 void CcsCallerId CMK_PROTO((unsigned int *pip, unsigned int *pport));
 void CcsSendReply CMK_PROTO((unsigned int ip, unsigned int port, int size, void *reply));
-
 #else
-
 #define CcsInit()
 #define CcsUseHandler(x,y)
 #define CcsRegisterHandler(x,y) 0
@@ -927,7 +990,6 @@ void CcsSendReply CMK_PROTO((unsigned int ip, unsigned int port, int size, void 
 #define CcsIsRemoteRequest() 0
 #define CcsCallerId(x,y)
 #define CcsSendReply(i,p,s,r)
-
 #endif
 
 

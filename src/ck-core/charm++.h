@@ -114,7 +114,10 @@ extern "C" void*     CRemoteCallBranchFn(int ep, void * m, int g, int p);
 extern "C" void*     CRemoteCallFn(int ep, void *m, ChareIDType *id);
 extern "C" void      CSendToFuture(void *m, int processor);
 
-
+#if CMK_DEBUG_MODE
+void putObject(_CK_Object *);
+void removeObject(_CK_Object *);
+#endif
 
 /* These are messages which are created in C code in the runtime 
    and received by a Charm++ chare. So they cant inherit from 
@@ -210,6 +213,7 @@ public:
 	ChareIDType thishandle ;   
 
 	_CK_Object() ;
+	~_CK_Object();
 
         void * operator new(CMK_SIZE_T size) ;
  
@@ -219,6 +223,9 @@ public:
 		obj = obj ;	// to prevent CC from generating "obj unused"
 		ChareExit() ;
 	}
+	
+	virtual char* showHeader();
+	virtual char* showContents();
 } ;
 
 

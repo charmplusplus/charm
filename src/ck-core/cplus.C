@@ -1,6 +1,7 @@
 #include "charm++.h"
 #include "trace.h"
 #include <stdio.h>
+#include <stdlib.h>
 
 /* this is the handle of the main chare, used in place of MainChareID */
 /* If you make these Cpv or Csv, you have to change the charm++ xlator too */
@@ -54,6 +55,29 @@ _CK_Object::_CK_Object() {
         SetID_onPE(thishandle, CmiMyPe());
         SetID_chare_magic_number(thishandle,GetID_chare_magic_number(chareblock->selfID)) ;
         SetID_chareBlockPtr(thishandle, chareblock);
+#if CMK_DEBUG_MODE
+	putObject(this);
+#endif
+}
+
+_CK_Object::~_CK_Object() {
+#if CMK_DEBUG_MODE
+        removeObject(this);
+#endif
+}
+
+char *
+_CK_Object::showHeader(){
+  return("Default Header");  
+}
+
+char *
+_CK_Object::showContents(){
+  char *ret;
+
+  ret = (char *)malloc(sizeof(char) *15);
+  sprintf(ret, "Contents : %d", (int)this);
+  return(ret);
 }
 
 groupmember::groupmember()

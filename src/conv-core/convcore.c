@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 #include "converse.h"
 #include "trace.h"
 #include <errno.h>
@@ -52,15 +53,19 @@ int sigrelse(sig) int sig;
 
 #define MAX_HANDLERS 512
 
+#if CMK_NODE_QUEUE_AVAILABLE
 void  *CmiGetNonLocalNodeQ();
+#endif
 void  *CmiGetNonLocal();
 void   CmiNotifyIdle();
 
 CpvDeclare(int, disable_sys_msgs);
 CpvExtern(int,    CcdNumChecks) ;
 CpvDeclare(void*, CsdSchedQueue);
+#if CMK_NODE_QUEUE_AVAILABLE
 CsvDeclare(void*, CsdNodeQueue);
 CsvDeclare(CmiNodeLock, NodeQueueLock);
+#endif
 CpvDeclare(int,   CsdStopFlag);
 
 
@@ -484,6 +489,385 @@ void (*handler)();
 }
 #endif
 
+#if CMK_DEBUG_MODE
+
+CpvDeclare(int, freezeModeFlag);
+CpvDeclare(int, continueFlag);
+CpvDeclare(int, stepFlag);
+CpvDeclare(void *, debugQueue);
+unsigned int freezeIP;
+int freezePort;
+char* breakPointHeader;
+char* breakPointContents;
+
+static void CpdDebugHandler(char *msg)
+{
+  char *normMsg;
+  char *reply, *temp;
+  int index;
+  
+  if(CcsIsRemoteRequest()) {
+    char name[128];
+    unsigned int ip, port;
+    CcsCallerId(&ip, &port);
+    sscanf(msg+CmiMsgHeaderSizeBytes, "%s", name);
+    reply = NULL;
+
+    if (strcmp(name, "freeze") == 0) {
+      CpdFreeze();
+      msgListCleanup();
+      msgListCache();
+      CmiPrintf("freeze received\n");
+    }
+    else if (strcmp(name, "unfreeze") == 0) {
+      CpdUnFreeze();
+      msgListCleanup();
+      CmiPrintf("unfreeze received\n");
+    }
+    else if (strcmp(name, "getObjectList") == 0){
+      CmiPrintf("getObjectList received\n");
+      reply = getObjectList();
+      CmiPrintf("list obtained");
+      if(reply == NULL){
+	CmiPrintf("list empty");
+	CcsSendReply(ip, port, strlen("$") + 1, "$");
+      }
+      else{
+	CmiPrintf("list : %s\n", reply);
+	CcsSendReply(ip, port, strlen(reply) + 1, reply);
+	free(reply);
+      }
+    }
+    else if(strncmp(name,"getObjectContents",strlen("getObjectContents"))==0){
+      CmiPrintf("getObjectContents received\n");
+      temp = strstr(name, "#");
+      temp++;
+      sscanf(temp, "%d", &index);
+      reply = getObjectContents(index);
+      CmiPrintf("Object Contents : %s\n", reply);
+      CcsSendReply(ip, port, strlen(reply) + 1, reply);
+      free(reply);
+    }
+    else if (strcmp(name, "getMsgListSched") == 0){
+      CmiPrintf("getMsgListSched received\n");
+      reply = getMsgListSched();
+      if(reply == NULL)
+	CcsSendReply(ip, port, strlen("$") + 1, "$");
+      else{
+	CcsSendReply(ip, port, strlen(reply) + 1, reply);
+	free(reply);
+      }
+    }
+    else if (strcmp(name, "getMsgListFIFO") == 0){
+      CmiPrintf("getMsgListFIFO received\n");
+      reply = getMsgListFIFO();
+      if(reply == NULL)
+	CcsSendReply(ip, port, strlen("$") + 1, "$");
+      else{
+	CcsSendReply(ip, port, strlen(reply) + 1, reply);
+	free(reply);
+      }
+    }
+    else if (strcmp(name, "getMsgListPCQueue") == 0){
+      CmiPrintf("getMsgListPCQueue received\n");
+      reply = getMsgListPCQueue();
+      if(reply == NULL)
+	CcsSendReply(ip, port, strlen("$") + 1, "$");
+      else{
+	CcsSendReply(ip, port, strlen(reply) + 1, reply);
+	free(reply);
+      }
+    }
+    else if (strcmp(name, "getMsgListDebug") == 0){
+      CmiPrintf("getMsgListDebug received\n");
+      reply = getMsgListDebug();
+      if(reply == NULL)
+	CcsSendReply(ip, port, strlen("$") + 1, "$");
+      else{
+	CcsSendReply(ip, port, strlen(reply) + 1, reply);
+	free(reply);
+      }
+    }
+    else if(strncmp(name,"getMsgContentsSched",strlen("getMsgContentsSched"))==0){
+      CmiPrintf("getMsgContentsSched received\n");
+      temp = strstr(name, "#");
+      temp++;
+      sscanf(temp, "%d", &index);
+      reply = getMsgContentsSched(index);
+      CmiPrintf("Message Contents : %s\n", reply);
+      CcsSendReply(ip, port, strlen(reply) + 1, reply);
+      free(reply);
+    }
+    else if(strncmp(name,"getMsgContentsFIFO",strlen("getMsgContentsFIFO"))==0){
+      CmiPrintf("getMsgContentsFIFO received\n");
+      temp = strstr(name, "#");
+      temp++;
+      sscanf(temp, "%d", &index);
+      reply = getMsgContentsFIFO(index);
+      CmiPrintf("Message Contents : %s\n", reply);
+      CcsSendReply(ip, port, strlen(reply) + 1, reply);
+      free(reply);
+    }
+    else if (strncmp(name, "getMsgContentsPCQueue", strlen("getMsgContentsPCQueue")) == 0){
+      CmiPrintf("getMsgContentsPCQueue received\n");
+      temp = strstr(name, "#");
+      temp++;
+      sscanf(temp, "%d", &index);
+      reply = getMsgContentsPCQueue(index);
+      CmiPrintf("Message Contents : %s\n", reply);
+      CcsSendReply(ip, port, strlen(reply) + 1, reply);
+      free(reply);
+    }
+    else if (strncmp(name, "getMsgContentsDebug", strlen("getMsgContentsDebug")) == 0){
+      CmiPrintf("getMsgContentsDebug received\n");
+      temp = strstr(name, "#");
+      temp++;
+      sscanf(temp, "%d", &index);
+      reply = getMsgContentsDebug(index);
+      CmiPrintf("Message Contents : %s\n", reply);
+      CcsSendReply(ip, port, strlen(reply) + 1, reply);
+      free(reply);
+    } 
+    else if (strncmp(name, "step", strlen("step")) == 0){
+      CmiPrintf("step received\n");
+      CpvAccess(stepFlag) = 1;
+      temp = strstr(name, "#");
+      temp++;
+      sscanf(temp, "%d", &freezePort);
+      freezeIP = ip;
+      CpdUnFreeze();
+    }
+    else if (strncmp(name, "continue", strlen("continue")) == 0){
+      CmiPrintf("continue received\n");
+      CpvAccess(continueFlag) = 1;
+      temp = strstr(name, "#");
+      temp++;
+      sscanf(temp, "%d", &freezePort);
+      freezeIP = ip;
+      CpdUnFreeze();
+    }
+    else if (strcmp(name, "getBreakStepContents") == 0){
+      CmiPrintf("getBreakStepContents received\n");
+      if(breakPointHeader == 0){
+	CcsSendReply(ip, port, strlen("$") + 1, "$");
+      }
+      else{
+	reply = (char *)malloc(strlen(breakPointHeader) + strlen(breakPointContents) + 1);
+	strcpy(reply, breakPointHeader);
+	strcat(reply, "@");
+	strcat(reply, breakPointContents);
+	CcsSendReply(ip, port, strlen(reply) + 1, reply);
+	free(reply);
+      }
+    }
+    else if (strcmp(name, "getSymbolTableInfo") == 0){
+      CmiPrintf("getSymbolTableInfo received");
+      reply = getSymbolTableInfo();
+      CcsSendReply(ip, port, strlen(reply) + 1, reply);
+      reply = getBreakPoints();
+      CcsSendReply(ip, port, strlen(reply) + 1, reply);
+      free(reply);
+    }
+    else if (strncmp(name, "setBreakPoint", strlen("setBreakPoint")) == 0){
+      CmiPrintf("setBreakPoint received\n");
+      temp = strstr(name, "#");
+      temp++;
+      setBreakPoints(temp);
+    }
+    else if (strncmp(name, "backtrace", strlen("backtrace")) == 0){
+      CmiPrintf("backtrace received\n");
+      /*
+      call the necessary function (result goes into reply)
+      CcsSendReply(ip, port, strlen(reply) + 1, reply);
+      free(reply);
+      */
+    }
+    else if (strcmp(name, "quit") == 0){
+      CsdExitScheduler();
+    }
+    else{
+      CmiPrintf("incorrect command:%s received,len=%d\n",name,strlen(name));
+    }
+  }
+}
+
+void *FIFO_Create(void);
+
+void CpdInit(void)
+{
+  CpvInitialize(int, freezeModeFlag);
+  CpvAccess(freezeModeFlag) = 0;
+
+  CpvInitialize(int, continueFlag);
+  CpvInitialize(int, stepFlag);
+  CpvAccess(continueFlag) = 0;
+  CpvAccess(stepFlag) = 0;
+
+  CpvInitialize(void *, debugQueue);
+  CpvAccess(debugQueue) = FIFO_Create();
+    
+  CpdInitializeObjectTable();
+  CpdInitializeHandlerArray();
+  CpdInitializeBreakPoints();
+
+  CcsRegisterHandler("DebugHandler", CpdDebugHandler);
+}  
+
+void CpdFreeze(void)
+{
+  CpvAccess(freezeModeFlag) = 1;
+}  
+
+void CpdUnFreeze(void)
+{
+  CpvAccess(freezeModeFlag) = 0;
+}  
+
+#endif
+
+#if CMK_WEB_MODE
+
+unsigned int appletIP;
+unsigned int appletPort;
+
+int countMsgs;
+int *valueArray;
+CpvDeclare(int, CWebPerformanceDataCollectionHandlerIndex);
+CpvDeclare(int, CWebHandlerIndex);
+
+#define WEB_INTERVAL 2000
+
+void sendDataFunction(){
+  char *reply;
+  int i;
+  
+  /* NOTE : This needs to be made something BETTER */
+  reply = (char *)malloc(100 * sizeof(char));
+  strcpy(reply, "");
+  
+  /* create string to send */
+  for(i = 0; i < CmiNumPes(); i++)
+    sprintf(reply, "%s %d", reply, valueArray[i]);
+  
+  /* Do the CcsSendReply */
+  CcsSendReply(appletIP, appletPort, strlen(reply) + 1, reply);
+  CmiPrintf("reply = %s\n", reply);
+  free(reply);
+  
+  countMsgs = 0;
+}
+
+void CWebPerformanceDataCollectionHandler(char *msg){
+  int src;
+  int value;
+
+  if(CmiMyPe() != 0){
+    CmiError("Wrong processor....\n");
+    /* CmiAbort(); */
+  }
+  src = ((int *)(msg + CmiMsgHeaderSizeBytes))[0];
+  value = ((int *)(msg + CmiMsgHeaderSizeBytes))[1];
+  valueArray[src] = value;
+  countMsgs++;
+
+  CmiPrintf("In handler for message totalling..%d..\n", CmiMyPe());
+
+  if(countMsgs == CmiNumPes()){
+    CmiPrintf("Calling sendDataFunction...%d..\n", CmiMyPe());
+    sendDataFunction();
+  }
+}
+
+static void CWebPerformanceDataFunction(){
+  char *msg;
+  int randNum;
+  int i;
+  int msgSize;
+
+  /* some initialization of seed */
+  srand(CmiMyPe());
+
+  randNum = CqsLength(CpvAccess(CsdSchedQueue));
+  
+  msgSize = 2 * sizeof(int) + CmiMsgHeaderSizeBytes;
+  msg = (char *)CmiAlloc(msgSize);
+  ((int *)(msg + CmiMsgHeaderSizeBytes))[0] = CmiMyPe();
+  ((int *)(msg + CmiMsgHeaderSizeBytes))[1] = randNum;
+  CmiSetHandler(msg, CpvAccess(CWebPerformanceDataCollectionHandlerIndex));
+  CmiSyncSendAndFree(0, msgSize, msg);
+  
+  CcdCallFnAfter(CWebPerformanceDataFunction, 0, WEB_INTERVAL);
+}
+
+static void CWebHandlerOther(char *msg)
+{
+  /* Ordinary converse message */
+  CmiPrintf("getStuff in Processor %d\n", CmiMyPe());
+  CcdCallFnAfter(CWebPerformanceDataFunction, 0, WEB_INTERVAL);
+}
+
+static void CWebHandler(char *msg){
+  int msgSize;
+  char *getStuffMsg;
+  int i;
+
+  if(CcsIsRemoteRequest()) {
+    char name[32];
+    unsigned int ip, port;
+
+    CcsCallerId(&ip, &port);
+    sscanf(msg+CmiMsgHeaderSizeBytes, "%s", name);
+
+    if(strcmp(name, "getStuff") == 0){
+      appletIP = ip;
+      appletPort = port;
+      valueArray = (int *)malloc(sizeof(int) * CmiNumPes());
+      CcdCallFnAfter(CWebPerformanceDataFunction, 0, WEB_INTERVAL);
+
+      CmiPrintf("After setting the Ccd function..\n");
+
+      /*
+      reply = (char *)malloc(10 * sizeof(char));
+      randNum = random();
+      sprintf(reply, "%d", randNum);
+      CcsSendReply(ip, port, strlen(reply) + 1, reply);
+      free(reply);
+      */
+      
+      for(i = 1; i < CmiNumPes(); i++){
+	CmiPrintf("Forwarding message to processor %d\n", i);
+	msgSize = CmiMsgHeaderSizeBytes + sizeof(char);
+	getStuffMsg = (char *)CmiAlloc(msgSize);
+	CmiSetHandler(getStuffMsg, CpvAccess(CWebHandlerIndex));
+	CmiSyncSendAndFree(i, msgSize, getStuffMsg);
+      }
+    }
+    else{
+      CmiPrintf("incorrect command:%s received, len=%d\n",name,strlen(name));
+    }
+  }
+  else{
+    /* Ordinary converse message */
+    CmiPrintf("getStuff in Processor %d\n", CmiMyPe());
+    CcdCallFnAfter(CWebPerformanceDataFunction, 0, WEB_INTERVAL);
+  }
+}
+
+void CWebInit(void)
+{
+  CcsRegisterHandler("MonitorHandler", CWebHandler);
+
+  CpvInitialize(int, CWebHandlerIndex);
+  CpvAccess(CWebHandlerIndex) = CmiRegisterHandler(CWebHandler);
+
+  CpvInitialize(int, CWebPerformanceDataCollectionHandlerIndex);
+  CpvAccess(CWebPerformanceDataCollectionHandlerIndex) = 
+    CmiRegisterHandler(CWebPerformanceDataCollectionHandler);
+}
+    
+
+
+#endif
 
 /*****************************************************************************
  *
@@ -581,7 +965,6 @@ void CsdBeginIdle()
   
 #if CMK_CMIDELIVERS_USE_COMMON_CODE
 
-CpvExtern(void*, CmiLocalQueue);
 CtvStaticDeclare(int, CmiBufferGrabbed);
 
 void CmiGrabBuffer(void **bufptrptr)
@@ -591,7 +974,79 @@ void CmiGrabBuffer(void **bufptrptr)
 
 void CmiHandleMessage(void *msg)
 {
+#if CMK_DEBUG_MODE
+  char *freezeReply;
+  int fd;
+
+  extern int skt_connect(int, int, int);
+  extern void writeall(int, char *, int);
+#endif
+
   CtvAccess(CmiBufferGrabbed) = 0;
+
+#if CMK_DEBUG_MODE
+  
+  if(CpvAccess(continueFlag) && (isBreakPoint((char *)msg))) {
+
+    if(breakPointHeader != 0){
+      free(breakPointHeader);
+      breakPointHeader = 0;
+    }
+    if(breakPointContents != 0){
+      free(breakPointContents);
+      breakPointContents = 0;
+    }
+    
+    breakPointHeader = genericViewMsgFunction((char *)msg, 0);
+    breakPointContents = genericViewMsgFunction((char *)msg, 1);
+
+    CmiPrintf("BREAKPOINT REACHED :\n");
+    CmiPrintf("Header : %s\nContents : %s\n", breakPointHeader, breakPointContents);
+
+    /* Freeze and send a message back */
+    CpdFreeze();
+    freezeReply = (char *)malloc(strlen("freezing")+strlen(breakPointHeader)+1);
+    sprintf(freezeReply, "freezing@%s", breakPointHeader);
+    fd = skt_connect(freezeIP, freezePort, 120);
+    if(fd > 0){
+      writeall(fd, freezeReply, strlen(freezeReply) + 1);
+      close(fd);
+    } else {
+      CmiPrintf("unable to connect");
+    }
+    free(freezeReply);
+    CpvAccess(continueFlag) = 0;
+  } else if(CpvAccess(stepFlag) && (isEntryPoint((char *)msg))){
+    if(breakPointHeader != 0){
+      free(breakPointHeader);
+      breakPointHeader = 0;
+    }
+    if(breakPointContents != 0){
+      free(breakPointContents);
+      breakPointContents = 0;
+    }
+
+    breakPointHeader = genericViewMsgFunction((char *)msg, 0);
+    breakPointContents = genericViewMsgFunction((char *)msg, 1);
+
+    CmiPrintf("STEP POINT REACHED :\n");
+    CmiPrintf("Header:%s\nContents:%s\n",breakPointHeader,breakPointContents);
+
+    /* Freeze and send a message back */
+    CpdFreeze();
+    freezeReply = (char *)malloc(strlen("freezing")+strlen(breakPointHeader)+1);
+    sprintf(freezeReply, "freezing@%s", breakPointHeader);
+    fd = skt_connect(freezeIP, freezePort, 120);
+    if(fd > 0){
+      writeall(fd, freezeReply, strlen(freezeReply) + 1);
+      close(fd);
+    } else {
+      CmiPrintf("unable to connect");
+    }
+    free(freezeReply);
+    CpvAccess(stepFlag) = 0;
+  }
+#endif  
   (CmiGetHandlerFunction(msg))(msg);
   if (!CtvAccess(CmiBufferGrabbed)) CmiFree(msg);
 }
@@ -616,18 +1071,44 @@ int CsdScheduler(int maxmsgs)
   if(maxmsgs == 0) {
     while(1) {
       msg = CmiGetNonLocal();
-      if (msg==0) FIFO_DeQueue(localqueue, &msg);
+#if CMK_DEBUG_MODE
+      if(CpvAccess(freezeModeFlag)==1){
 
+        /* Check if the msg is an debug message to let it go
+           else, enqueue in the FIFO
+        */
+
+        if(msg != 0){
+          if(strncmp((char *)((char *)msg+CmiMsgHeaderSizeBytes),"req",3)!=0) {
+            CsdEndIdle();
+            FIFO_EnQueue(CpvAccess(debugQueue), msg);
+            continue;
+          }
+        } else {
+          continue;
+        }
+      } else {
+        /* If the debugQueue contains any messages, process them */
+        while(!FIFO_Empty(CpvAccess(debugQueue))){
+          char *queuedMsg;
+          FIFO_DeQueue(CpvAccess(debugQueue), &queuedMsg);
+          CmiHandleMessage(queuedMsg);
+          maxmsgs--; if (maxmsgs==0) return maxmsgs;
+        }
+      }
+#endif
+      if (msg==0) FIFO_DeQueue(localqueue, &msg);
 #if CMK_NODE_QUEUE_AVAILABLE
       if (msg==0) {
 	CmiLock(CsvAccess(NodeQueueLock));
       	msg = CmiGetNonLocalNodeQ();
-	if (msg==0 && !CqsPrioGT(CqsGetPriority(CsvAccess(CsdNodeQueue)), CqsGetPriority(CpvAccess(CsdSchedQueue)))) {
+	if (msg==0 && 
+            !CqsPrioGT(CqsGetPriority(CsvAccess(CsdNodeQueue)), 
+                       CqsGetPriority(CpvAccess(CsdSchedQueue)))) {
 	  CqsDequeue(CsvAccess(CsdNodeQueue),&msg);
 	}
 	CmiUnlock(CsvAccess(NodeQueueLock));
       }
-
 #endif
       if (msg==0) CqsDequeue(CpvAccess(CsdSchedQueue),&msg);
       if (msg) {
@@ -639,22 +1120,49 @@ int CsdScheduler(int maxmsgs)
       }
     }
   }
+
   while (1) {
     msg = CmiGetNonLocal();
-    if (msg==0) FIFO_DeQueue(localqueue, &msg);
+#if CMK_DEBUG_MODE
+    if(CpvAccess(freezeModeFlag) == 1){
+      
+      /* Check if the msg is an debug message to let it go
+	 else, enqueue in the FIFO 
+      */
 
+      if(msg != 0){
+	if(strncmp((char *)((char *)msg+CmiMsgHeaderSizeBytes),"req",3)!=0){
+	  CsdEndIdle();
+	  FIFO_EnQueue(CpvAccess(debugQueue), msg);
+	  continue;
+        }
+      } else {
+	continue;
+      }
+    } else {
+      /* If the debugQueue contains any messages, process them */
+      while(!FIFO_Empty(CpvAccess(debugQueue))){
+        char *queuedMsg;
+	FIFO_DeQueue(CpvAccess(debugQueue), &queuedMsg);
+	CmiHandleMessage(queuedMsg);
+	maxmsgs--; if (maxmsgs==0) return maxmsgs;	
+      }
+    }
+#endif
+    if (msg==0) FIFO_DeQueue(localqueue, &msg);
 #if CMK_NODE_QUEUE_AVAILABLE
     if (msg==0) {
-	CmiLock(CsvAccess(NodeQueueLock));
-      	msg = CmiGetNonLocalNodeQ();
-	if (msg==0 && !CqsPrioGT(CqsGetPriority(CsvAccess(CsdNodeQueue)), CqsGetPriority(CpvAccess(CsdSchedQueue)))) {
+      CmiLock(CsvAccess(NodeQueueLock));
+      msg = CmiGetNonLocalNodeQ();
+      if (msg==0 && 
+            !CqsPrioGT(CqsGetPriority(CsvAccess(CsdNodeQueue)), 
+                       CqsGetPriority(CpvAccess(CsdSchedQueue)))) {
 	  CqsDequeue(CsvAccess(CsdNodeQueue),&msg);
-	}
-	CmiUnlock(CsvAccess(NodeQueueLock));
+      }
+      CmiUnlock(CsvAccess(NodeQueueLock));
     }
 
 #endif
-
     if (msg==0) CqsDequeue(CpvAccess(CsdSchedQueue),&msg);
     if (msg) {
       CsdEndIdle();
@@ -834,8 +1342,10 @@ void CsdInit(argv)
 
   CpvInitialize(int,   disable_sys_msgs);
   CpvInitialize(void*, CsdSchedQueue);
+#if CMK_NODE_QUEUE_AVAILABLE
   CsvInitialize(void*, CsdNodeQueue);
   CsvInitialize(CmiNodeLock, NodeQueueLock);
+#endif
   CpvInitialize(int,   CsdStopFlag);
   CpvInitialize(int,   CsdStopNotifyFlag);
   CpvInitialize(int,   CsdIdleDetectedFlag);
@@ -851,7 +1361,6 @@ void CsdInit(argv)
 	CsvAccess(CsdNodeQueue) = CqsCreate();
   }
   CmiNodeBarrier();
-
 #endif
 
   CpvAccess(CsdStopFlag)  = 0;
@@ -1413,8 +1922,9 @@ static void CcsStringHandlerFn(char *msg)
   char cmd[10], hdlrName[32], *cmsg, *omsg=msg;
   int ip, port, pe, size, nread, hdlrID;
   CcsListNode *list = CpvAccess(ccsList);
-  CmiGrabBuffer((void **)&msg);
-  nread = sscanf(msg+CmiMsgHeaderSizeBytes, "%s%d%d%d%d%s", 
+
+  msg += CmiMsgHeaderSizeBytes;
+  nread = sscanf(msg, "%s%d%d%d%d%s", 
                  cmd, &pe, &size, &ip, &port, hdlrName);
   if(nread!=6) CmiAbort("Garbled message from client");
   while(list!=0) {
@@ -1429,11 +1939,13 @@ static void CcsStringHandlerFn(char *msg)
   msg++;
   cmsg = (char *) CmiAlloc(size+CmiMsgHeaderSizeBytes);
   memcpy(cmsg+CmiMsgHeaderSizeBytes, msg, size);
-  CmiFree(omsg);
+
   CmiSetHandler(cmsg, hdlrID);
   CpvAccess(callerIP) = ip;
   CpvAccess(callerPort) = port;
   CmiHandleMessage(cmsg);
+  CmiGrabBuffer((void **)&omsg);
+  CmiFree(omsg);
   CpvAccess(callerIP) = 0;
 }
 
@@ -1495,11 +2007,18 @@ extern void writeall(int, char *, int);
 void CcsSendReply(unsigned int ip, unsigned int port, int size, void *msg)
 {
   char cmd[100], c;
-  int fd = skt_connect(ip, port, 120);
-  if (fd<0) return; /* maybe the requester exited */
+  int fd;
+
+  fd = skt_connect(ip, port, 120);
+  
+  if (fd<0) {
+      CmiPrintf("client Exited\n");
+      return; /* maybe the requester exited */
+  }
   sprintf(cmd, "reply %d\n", size);
   writeall(fd, cmd, strlen(cmd));
   writeall(fd, msg, size);
+
 #if CMK_SYNCHRONIZE_ON_TCP_CLOSE
   shutdown(fd, 1);
   while (read(fd, &c, 1)==EINTR);
@@ -1510,7 +2029,6 @@ void CcsSendReply(unsigned int ip, unsigned int port, int size, void *msg)
 }
 
 #endif
-
 /*****************************************************************************
  *
  * Converse Initialization
@@ -1534,6 +2052,12 @@ void ConverseCommonInit(char **argv)
   CmiMulticastInit();
   CmiInitMultipleSend();
   CcsInit();
+#if CMK_DEBUG_MODE
+  CpdInit();
+#endif
+#if CMK_WEB_MODE
+  CWebInit();
+#endif
   CldModuleInit();
 }
 

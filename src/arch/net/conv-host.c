@@ -61,6 +61,17 @@ int CcsClientFd;
 int myFd;
 #endif
 
+#if CMK_DEBUG_MODE
+unsigned int clientIP = 0;
+int clientPort;
+int clientKillPort;
+int *clientFreezePort;
+int *clientStatePort;
+int *serverCCSPorts;
+#define MAX_GDBS 200
+#define MAXREADBYTES 2048
+#endif
+
 static void jsleep(int sec, int usec)
 {
   int ntimes,i;
@@ -1051,6 +1062,206 @@ prog prog_start(p, argv, useerr)
   return 0;
 }
 
+#if CMK_DEBUG_MODE
+
+/***********************************************************************
+ * PROG_GDB : This is an extension to prog, which allows the the debugger
+ * to interface with gdb, and allow the debugger client to have a gdb
+ * like environnment.
+ *
+ * typedef prog_gdb : an extension to prog, but additionally, the 'pe' 
+ * and the 'open' field (open = 0/1 depending on whether gdb has
+ * 'broken out' of execution.
+ *
+ * void checkForGDBActivitity() - scans all the prog_gdb instances,
+ * and sees if any activity (GDB break out) is present. If so, sets
+ * the openProcessingNeeded flag to 1.
+ *
+ * void processOnOpen() - Carries out processing on all the 'open'
+ * prog_gdb instances. This may involve executing a user command
+ * on the input buffer of a particular prog_gdb
+ *
+ * sendCCSReply(unsigned ip, unsigned port, int size, void *msg)
+ * Sends the message to the client in the CCS format.
+ *
+ * int readUntilString(int fd, char *buffer, char *match) - reads from 
+ * the specified file descriptor, until it finds the specified
+ * string. Stores the result in 'buffer'. It returns the number of 
+ * bytes read
+ *
+ ***********************************************************************/
+
+typedef struct prog_gdb {
+  prog p;
+  int pe;
+  int open;
+} prog_gdb;
+
+void writeall(int fd, char *buf, int size)
+{
+  int ok;
+  while (size) {
+  retry:
+    ok = write(fd, buf, size);
+    if ((ok<0)&&((errno==EBADF)||(errno==EINTR))) goto retry;
+    if (ok<=0) {
+      fprintf(stderr, "Write failed ..\n");
+      exit(1);
+    }
+    size-=ok; buf+=ok;
+  }
+}
+
+prog_gdb rsh_prog_gdb[MAX_GDBS];
+int numGDBs;
+int GDBActiveFlag = 0;
+int openProcessingNeeded = 0;
+char *command;
+int commandPresent = 0;
+int destProcessor = -1;
+
+void sendCCSReply(unsigned int ip, unsigned int port, int size, void
+		  *msg){
+  char cmd[100];
+  int fd;
+
+  fd = skt_connect(ip, port);
+  if (fd<0) {
+    printf("client Exited\n");
+    return; /* maybe the requester exited */
+  }
+  sprintf(cmd, "reply %d\n", size);
+  writeall(fd, cmd, strlen(cmd));
+  writeall(fd, msg, size);
+
+  close(fd);
+}
+
+int readUntilString(int fd, char *buffer, char *match){
+  int readBytes = 0, totalReadBytes = 0;
+  int found = 0;
+  char *str;
+  int junk;
+  
+  /* printf("Inside readUntilString()\n"); */
+  
+  while(!found){
+    readBytes = read(fd, buffer + totalReadBytes, MAXREADBYTES);
+    totalReadBytes += readBytes;
+    buffer[totalReadBytes] = 0; 
+	
+    str = strstr(buffer, match);
+    if(str != NULL){
+      found = 1;
+    }
+
+    /* printf("string read = %s: %d : %d\n", buffer, strlen(buffer), totalReadBytes); */
+    scanf("%d", &junk);
+  }
+  
+  return(totalReadBytes);
+}
+
+void checkForGDBActivity(){
+  fd_set rfds;
+  int maxfd,i;
+  int nreadable;
+  long diff;
+  struct timeval tmo, begin, current;
+
+  maxfd = 0;
+  FD_ZERO(&rfds);
+  for(i = 0; i < numGDBs; i++){
+    FD_SET((rsh_prog_gdb[i].p)->ofd, &rfds);
+    if ((rsh_prog_gdb[i].p)->ofd > maxfd) maxfd = (rsh_prog_gdb[i].p)->ofd;
+  }
+
+  tmo.tv_sec = 0;
+  tmo.tv_usec = 500000;
+  gettimeofday(&begin, NULL);
+  while(1){
+    nreadable = select(maxfd + 1, &rfds, NULL, NULL, &tmo);
+    if ((nreadable<0)&&((errno==EINTR)||(errno==EBADF))) {
+      gettimeofday(&current, NULL);
+      diff = (begin.tv_sec == current.tv_sec) ? current.tv_usec -
+	begin.tv_usec : (1000000 + current.tv_usec - begin.tv_usec);
+      if(diff < 0) break;
+      else tmo.tv_usec = diff;
+      continue;
+    }
+    break;
+  }
+  if(nreadable > 0) {
+    openProcessingNeeded = 1;
+    for(i = 0; i < numGDBs; i++){
+      if(FD_ISSET((rsh_prog_gdb[i].p)->ofd, &rfds)){
+	rsh_prog_gdb[i].open = 1;
+	/* printf("activity seen on : %d\n", i); */
+      }
+      else
+	rsh_prog_gdb[i].open = 0;
+    }
+  }
+  else{
+    openProcessingNeeded = 0;
+  }
+}
+
+void processOnOpen(){
+  int readBytes, writeBytes, i;
+  char buffer[MAXREADBYTES];
+  int fd;
+  char line[1024];
+  char gdbRequest[] = "gdbRequest";
+  int size = strlen(gdbRequest) + 1;
+  int junkIP = 1234;
+  int junkPort = 56789;
+  
+  unsigned int nodetab_ip(int);
+  
+  if(commandPresent == 1){
+    if(rsh_prog_gdb[destProcessor].open == 1){
+      rsh_prog_gdb[destProcessor].open = 0;
+      writeBytes = write((rsh_prog_gdb[destProcessor].p)->ifd, command,
+			 strlen(command));
+      if(writeBytes < 0){
+	printf("Error executing gdb command : %s : %d : proc %d\n",
+	       command, strlen(command), destProcessor);
+	exit(1);
+      }
+      sendCCSReply(clientIP, clientStatePort[destProcessor],
+		   strlen("unfreeze") + 1, "unfreeze");
+      free(command);
+      commandPresent = 0;
+      command = 0;
+      destProcessor = -1;
+    }
+    else{
+      fd = skt_connect(nodetab_ip(destProcessor), serverCCSPorts[destProcessor]);
+      sprintf(line, "req %d %d %d %d %s\n", destProcessor, size, junkIP, junkPort, "DebugHandler");
+      write(fd, line, strlen(line));
+      write(fd, gdbRequest, size);
+      close(fd);
+    }
+  }
+
+  for(i = 0; i < numGDBs; i++){
+    if(rsh_prog_gdb[i].open == 1){
+      readBytes = readUntilString((rsh_prog_gdb[i].p)->ofd, buffer,
+				  "(gdb) ");
+      if(readBytes < 0){
+	printf("Error reading gdb pipe %d", i);
+	exit(1);
+      }
+      sendCCSReply(clientIP, clientFreezePort[i], strlen(buffer) + 1, buffer);
+    }
+  }
+  
+  openProcessingNeeded = 0;
+}
+
+#endif
+
 /****************************************************************************
  * 
  * ARG
@@ -1085,8 +1296,15 @@ char *arg_currdir_a;
 char *arg_currdir_r;
 char *arg_mylogin;
 char *arg_myhome;
-int   arg_server;
 char *arg_shell;
+
+#if CMK_CCS_AVAILABLE
+int   arg_server;
+#endif
+
+#if CMK_DEBUG_MODE
+int   arg_gdbinterface;
+#endif
 
 void arg_init(int argc, char **argv)
 {
@@ -1097,7 +1315,12 @@ void arg_init(int argc, char **argv)
   pparam_defflag("verbose"           );
   pparam_defflag("debug"             );
   pparam_defflag("debug-no-pause"    );
+#if CMK_CCS_AVAILABLE
   pparam_defflag("server"            );
+#endif
+#if CMK_DEBUG_MODE
+  pparam_defflag("gdbinterface"      );
+#endif
   pparam_defflag("in-xterm"          );
   pparam_defint ("maxrsh"        ,  16);
   pparam_defstr ("nodelist"      ,  0);
@@ -1110,7 +1333,12 @@ void arg_init(int argc, char **argv)
   pparam_doc("verbose",       "Print diagnostic messages");
   pparam_doc("debug",         "Run each node under gdb in an xterm window");
   pparam_doc("debug-no-pause","Like debug, except doesn't pause at beginning");
+#if CMK_CCS_AVAILABLE
   pparam_doc("server",        "Enable client-server mode");
+#endif
+#if CMK_DEBUG_MODE
+  pparam_doc("gdbinterface",  "Allow the gdb interface to be integrated");
+#endif
   pparam_doc("maxrsh",        "Maximum number of rsh's to run at a time");
   pparam_doc("nodelist",      "file containing list of nodes");
   pparam_doc("nodegroup",     "which group of nodes to use");
@@ -1130,7 +1358,12 @@ void arg_init(int argc, char **argv)
   arg_verbose        = pparam_getflag("verbose");
   arg_debug          = pparam_getflag("debug");
   arg_debug_no_pause = pparam_getflag("debug-no-pause");
+#if CMK_CCS_AVAILABLE
   arg_server         = pparam_getflag("server");
+#endif
+#if CMK_DEBUG_MODE
+  arg_gdbinterface   = pparam_getflag("gdbinterface");
+#endif
   arg_maxrsh         = pparam_getint("maxrsh");
   arg_nodelist       = pparam_getstr("nodelist");
   arg_nodegroup      = pparam_getstr("nodegroup");
@@ -1693,9 +1926,20 @@ int req_handle_printerr(line)
 int req_handle_ending(line)
     char *line;
 {
+  int fd;
+
   req_ending++;
-  if (req_ending == nodetab_size)
+  if (req_ending == nodetab_size){
+#if CMK_DEBUG_MODE
+    printf("End of program\n");
+    if(clientIP != 0){
+      fd = skt_connect(clientIP, clientKillPort);
+      if (fd>0) 
+	write(fd, "die\n", strlen("die\n"));
+    }
+#endif
     exit(0);
+  }
   return REQ_OK;
 }
 
@@ -1727,6 +1971,45 @@ int req_handle_scanf(line)
   return REQ_OK;
 }
 
+#if CMK_DEBUG_MODE
+int req_handle_clientdata(line)
+     char *line;
+{
+  int nread;
+  char cmd[100];
+
+  nread = sscanf(line, "%s%d", cmd, &clientKillPort);
+  /* printf("Client Kill Port = %d\n", clientKillPort); */
+  return REQ_OK;
+}
+
+int req_handle_gdb_freezeport_data(line)
+     char *line;
+{
+
+  int nread;
+  char cmd[100];
+  int pe, statePort, freezePort;
+
+  nread = sscanf(line, "%s%d%d%d", cmd, &pe, &statePort, &freezePort);
+  clientStatePort[pe] = statePort;
+  clientFreezePort[pe] = freezePort;
+  return REQ_OK;
+}
+
+int req_handle_gdb_command(line)
+     char *line;
+{
+  int nread;
+  char cmd[100];
+
+  nread = sscanf(line, "%s%s", cmd, command);
+  commandPresent = 1;
+  /* printf("GDB command from client = %s\n", command); */
+  return REQ_OK;
+}
+#endif
+
 int req_handle_getinfo(line)
     char *line;
 {
@@ -1736,6 +2019,24 @@ int req_handle_getinfo(line)
   int ip;
 
   nread = sscanf(line, "%s%d%d", cmd, &ip, &port);
+
+#if CMK_DEBUG_MODE
+  clientIP = ip;
+  clientPort = port;
+
+  clientFreezePort = (int *)malloc(numGDBs * sizeof(int));
+  clientStatePort = (int *)malloc(numGDBs * sizeof(int));
+  serverCCSPorts = (int *)malloc(numGDBs * sizeof(int));
+  for(i = 0; i < numGDBs; i++){
+    clientFreezePort[i] = 0;
+    clientStatePort[i] = 0;
+  }
+#endif
+
+  /**** Debugging *****/
+  /* printf("%s\n", line); */
+
+
   if(nread != 3) return REQ_FAILED;
   origres = res = arvar_get("addr", 0, nodetab_rank0_size);
   if(res==0) return REQ_POSTPONE;
@@ -1762,6 +2063,11 @@ int req_handle_getinfo(line)
     res = parseint(res,&nodestart);
     res = parseint(res,&nodesize);
     sprintf(ans, "%d ", cport);
+
+#if CMK_DEBUG_MODE
+    serverCCSPorts[i] = cport;
+#endif
+
     strcat(reply, ans);
   }
   req_reply(ip, port, pre, reply);
@@ -1796,6 +2102,14 @@ int req_handle(line)
   else if (strcmp(cmd,"ending")==0)     return req_handle_ending(line);
   else if (strcmp(cmd,"abort")==0)      return req_handle_abort(line);
   else if (strcmp(cmd,"getinfo")==0)    return req_handle_getinfo(line);
+#if CMK_DEBUG_MODE
+  else if (strcmp(cmd,"clientdata")==0) return
+					  req_handle_clientdata(line);
+  else if (strcmp(cmd,"gdb_freezeport_data") == 0)
+    return req_handle_gdb_freezeport_data(line);
+  else if (strcmp(cmd, "gdb_command") == 0)
+    return req_handle_gdb_command(line);
+#endif
   else if (strcmp(cmd,"worker")==0)     return req_handle_worker(line);
   else return REQ_FAILED;
 }
@@ -1845,8 +2159,14 @@ void req_serve_client(int workerno)
     buffer = xstr_alloc();
     nread = xstr_read(buffer, CcsClientFd);
 
+    /*** debugging ***/
+    /* printf("Read the first part\n"); */
+
     /* read the rest */
     nread = xstr_read(buffer, CcsClientFd);
+
+    /*** debugging ***/
+    /* printf("Read the second part\n"); */
   }
   else{
     worker = req_pipes+workerno;
@@ -1902,10 +2222,24 @@ void req_poll()
     if (FD_ISSET(req_pipes[i].fd[0], &rfds))
       req_serve_client(i);
   if (arg_server ==1) {
-  	if(FD_ISSET(myFd, &rfds)){
-    		skt_accept(myFd, &clientIP, &clientPortNo, &CcsClientFd);
-    		req_serve_client(-1);
-  	}
+    if(FD_ISSET(myFd, &rfds)){
+      /* printf("Activity detected on client socket\n");   */
+      skt_accept(myFd, &clientIP, &clientPortNo, &CcsClientFd);
+      /* printf("Accept over\n"); */
+      req_serve_client(-1);
+    }
+#if CMK_DEBUG_MODE
+    if(GDBActiveFlag == 1){
+      /* printf("Entering gdb interface check\n"); */
+      fflush(stdout);
+      checkForGDBActivity();
+      if (openProcessingNeeded == 1){
+        /* printf("activity detected on the gdb pipes\n"); */
+        fflush(stdout);
+        processOnOpen();
+      }
+    }
+#endif
   }
 }
 
@@ -2019,6 +2353,7 @@ prog rsh_start(nodeno)
   rshargv[3]=nodetab_login(nodeno);
   rshargv[4]="exec /bin/csh -f";
   rshargv[5]=0;
+
   rsh = prog_start(nodetab_shell(nodeno), rshargv, 0);
   if ((rsh==0)&&(errno!=EMFILE)) { perror("ERROR> starting rsh"); exit(1); }
   if (rsh==0)
@@ -2039,7 +2374,10 @@ int rsh_pump(p, nodeno, rank0no, argv)
   xstr ibuf = p->ibuf;
   int randno = rand();
   
-  xstr_printf(ibuf,"echo 'remote responding...'\n");
+#if CMK_DEBUG_MODE
+  if(!arg_gdbinterface)
+#endif
+    xstr_printf(ibuf,"echo 'remote responding...'\n");
 
   if (arg_display)
     xstr_printf(ibuf,"setenv DISPLAY %s\n",arg_display);
@@ -2072,7 +2410,11 @@ int rsh_pump(p, nodeno, rank0no, argv)
     prog_flush(p);
   }
 
-  if (arg_debug || arg_debug_no_pause) {
+  if (arg_debug || arg_debug_no_pause 
+#if CMK_DEBUG_MODE
+      || arg_gdbinterface
+#endif
+     ) {
     xstr_printf(ibuf,"foreach dir ($path)\n");
     xstr_printf(ibuf,"  if (-e $dir/gdb) setenv F_GDB $dir/gdb\n");
     xstr_printf(ibuf,"end\n");
@@ -2118,7 +2460,11 @@ int rsh_pump(p, nodeno, rank0no, argv)
     xstr_printf(ibuf,"endif\n");
   }
   
-  if (arg_debug || arg_debug_no_pause) {
+  if (arg_debug || arg_debug_no_pause 
+#if CMK_DEBUG_MODE
+      || arg_gdbinterface
+#endif
+     ) {
     xstr_printf(ibuf,"cat > /tmp/gdb%08x << END_OF_SCRIPT\n",randno);
     xstr_printf(ibuf,"shell rm -f /tmp/gdb%08x\n",randno);
     xstr_printf(ibuf,"handle SIGPIPE nostop noprint\n");
@@ -2129,12 +2475,20 @@ int rsh_pump(p, nodeno, rank0no, argv)
     xstr_printf(ibuf,"\n");
     if (arg_debug_no_pause) xstr_printf(ibuf,"run\n");
     xstr_printf(ibuf,"END_OF_SCRIPT\n");
-    xstr_printf(ibuf,"$F_XTERM");
-    xstr_printf(ibuf," -T 'Node %d (%s)' ",nodeno,nodetab_name(nodeno));
-    xstr_printf(ibuf," -n 'Node %d (%s)' ",nodeno,nodetab_name(nodeno));
-    xstr_printf(ibuf," -e $F_GDB %s -x /tmp/gdb%08x",arg_nodeprog_r,randno);
-    xstr_printf(ibuf," < /dev/null >& /dev/null &");
-    xstr_printf(ibuf,"\n");
+    if( arg_debug || arg_debug_no_pause){
+      xstr_printf(ibuf,"$F_XTERM");
+      xstr_printf(ibuf," -T 'Node %d (%s)' ",nodeno,nodetab_name(nodeno));
+      xstr_printf(ibuf," -n 'Node %d (%s)' ",nodeno,nodetab_name(nodeno));
+      xstr_printf(ibuf," -e $F_GDB %s -x /tmp/gdb%08x",arg_nodeprog_r,randno);
+      xstr_printf(ibuf," < /dev/null >& /dev/null &");
+      xstr_printf(ibuf,"\n");
+    }
+#if CMK_DEBUG_MODE
+    else if( arg_gdbinterface){
+      xstr_printf(ibuf,"$F_GDB -silent %s -x /tmp/gdb%08x", arg_nodeprog_r,randno);
+      xstr_printf(ibuf,"\n");
+    }
+#endif
   } else if (arg_in_xterm) {
     xstr_printf(ibuf,"cat > /tmp/inx%08x << END_OF_SCRIPT\n", randno);
     xstr_printf(ibuf,"#!/bin/sh\n");
@@ -2160,11 +2514,16 @@ int rsh_pump(p, nodeno, rank0no, argv)
     xstr_printf(ibuf,"\n");
   }
   
-  xstr_printf(ibuf,"echo 'rsh phase successful.'\n");
-  xstr_printf(ibuf,"kill -9 $$\n");
-  
+#if CMK_DEBUG_MODE
+  if(!arg_gdbinterface){
+#endif
+    xstr_printf(ibuf,"echo 'rsh phase successful.'\n");
+    xstr_printf(ibuf,"kill -9 $$\n");
+#if CMK_DEBUG_MODE
+  }
+#endif
   prog_flush(p);
-  prog_iclose(p);
+  
 }
 
 
@@ -2196,6 +2555,12 @@ int start_nodes()
     rsh_pump(p, pe, i, arg_argv);
     rsh_prog[i] = p;
     rsh_node[i] = pe;
+#if CMK_DEBUG_MODE
+    rsh_prog_gdb[numGDBs].p = p;
+    rsh_prog_gdb[numGDBs].open = 0;
+    rsh_prog_gdb[numGDBs].pe = numGDBs;
+    numGDBs++;
+#endif
   }
   if (rsh_maxsim==0) { perror("ERROR> starting rsh"); exit(1); }
   rsh_nstarted = rsh_maxsim;
@@ -2233,16 +2598,24 @@ int start_nodes()
       while (1) {
 	line = xstr_gets(buffer, 999, p->obuf);
 	if (line==0) break;
-	if (strncmp(line,"[1] ",4)==0) continue;
-	if (arg_verbose ||
-	    (strcmp(line,"rsh phase successful.")
-	     &&strcmp(line,"remote responding...")))
-	  fprintf(stderr,"INFO> node %d: %s\n",rsh_node[i],line);
-	if (strcmp(line,"rsh phase successful.")==0) { done=1; break; }
+#if CMK_DEBUG_MODE
+	if(!arg_gdbinterface) {
+#endif
+	  if (strncmp(line,"[1] ",4)==0) continue;
+	  if (arg_verbose ||
+	      (strcmp(line,"rsh phase successful.")
+	       &&strcmp(line,"remote responding...")))
+	    fprintf(stderr,"INFO> node %d: %s\n",rsh_node[i],line);
+	  if (strcmp(line,"rsh phase successful.")==0) { done=1; break; }
+#if CMK_DEBUG_MODE
+	} else{
+	  if (strncmp(line, "(gdb)", 5) == 0) { done=1; break; }
+	}
+#endif
       }
       if (!done) continue;
       rsh_nfinished++;
-      prog_close(p);
+      
       rsh_prog[i] = 0;
       if (rsh_nstarted==nodetab_rank0_size) break;
       pe = nodetab_rank0_table[rsh_nstarted];
@@ -2251,6 +2624,12 @@ int start_nodes()
       rsh_pump(p, pe, rsh_nstarted, arg_argv);
       rsh_prog[i] = p;
       rsh_node[i] = pe;
+#if CMK_DEBUG_MODE
+      rsh_prog_gdb[numGDBs].p = p;
+      rsh_prog_gdb[numGDBs].open = 0;
+      rsh_prog_gdb[numGDBs].pe = numGDBs;
+      numGDBs++;
+#endif
       rsh_nstarted++;
     }
   }
@@ -2285,10 +2664,19 @@ main(argc, argv)
   /* start the node processes */
   start_nodes();
 
+#if CMK_CCS_AVAILABLE
   if(arg_server == 1){
     skt_server(&myIP, &myPortNo, &myFd);
-    printf("Server IP = %u, Server port = %u\n", myIP, myPortNo);
+    printf("Server IP = %u, Server port = %u $\n", myIP, myPortNo);
+    fflush(stdout);
   }
+#endif
+
+#if CMK_DEBUG_MODE
+  if(arg_gdbinterface == 1){
+    /* GDBActiveFlag = 1; */
+  }
+#endif
 
   /* enter request-service mode */
   while (1) req_poll();

@@ -1,53 +1,5 @@
 #include <converse.h>
-#define CINTBITS ((unsigned int) (sizeof(int)*8))
-
-typedef struct prio
-{
-  unsigned short bits;
-  unsigned short ints;
-  unsigned int data[1];
-}
-*prio;
-
-typedef struct deq
-{
-  /* Note: if head==tail, circ is empty */
-  void **bgn; /* Pointer to first slot in circular buffer */
-  void **end; /* Pointer past last slot in circular buffer */
-  void **head; /* Pointer to first used slot in circular buffer */
-  void **tail; /* Pointer to next available slot in circular buffer */
-  void *space[4]; /* Enough space for the first 4 entries */
-}
-*deq;
-
-typedef struct prioqelt
-{
-  struct deq data;
-  struct prioqelt *ht_next; /* Pointer to next bucket in hash table. */
-  struct prioqelt **ht_handle; /* Pointer to pointer that points to me (!) */
-  struct prio pri;
-}
-*prioqelt;
-
-#define PRIOQ_TABSIZE 1017
-typedef struct prioq
-{
-  int heapsize;
-  int heapnext;
-  prioqelt *heap;
-  prioqelt hashtab[PRIOQ_TABSIZE];
-}
-*prioq;
-
-typedef struct Queue
-{
-  unsigned int length;
-  unsigned int maxlen;
-  struct deq zeroprio;
-  struct prioq negprioq;
-  struct prioq posprioq;
-}
-*Queue;
+#include "queueing.h"
 
 void CqsDeqInit(d)
 deq d;
@@ -188,7 +140,7 @@ unsigned int priobits, *priodata;
 	return &(pe->data);
   
   /* If not present, allocate a bucket for specified priority */
-  pe = (prioqelt)CmiAlloc(sizeof(struct prioqelt)+((prioints-1)*sizeof(int)));
+  pe = (prioqelt)CmiAlloc(sizeof(struct prioqelt_struct)+((prioints-1)*sizeof(int)));
   pe->pri.bits = priobits;
   pe->pri.ints = prioints;
   memcpy(pe->pri.data, priodata, (prioints*sizeof(int)));
@@ -270,7 +222,7 @@ prioq pq;
 
 Queue CqsCreate()
 {
-  Queue q = (Queue)CmiAlloc(sizeof(struct Queue));
+  Queue q = (Queue)CmiAlloc(sizeof(struct Queue_struct));
   q->length = 0;
   q->maxlen = 0;
   CqsDeqInit(&(q->zeroprio));
@@ -377,8 +329,8 @@ void **resp;
   *resp = 0; return;
 }
 
-static struct prio kprio_zero = { 0, 0, {0} };
-static struct prio kprio_max  = { 32, 1, {((unsigned int)(-1))} };
+static struct prio_struct kprio_zero = { 0, 0, {0} };
+static struct prio_struct kprio_max  = { 32, 1, {((unsigned int)(-1))} };
 
 prio CqsGetPriority(q)
 Queue q;
@@ -393,5 +345,102 @@ prio CqsGetSecondPriority(q)
 Queue q;
 {
   return CqsGetPriority(q);
+}
+
+void** CqsEnumerateDeq(deq q, int *num){
+  void **head, **tail;
+  void **result;
+  int count = 0;
+  int i;
+
+  head = q->head;
+  tail = q->tail;
+
+  while(head != tail){
+    count++;
+    head++;
+    if(head == q->end)
+      head = q->bgn;
+  }
+
+  result = (void **)CmiAlloc(count * sizeof(void *));
+  i = 0;
+  head = q->head;
+  tail = q->tail;
+  while(head != tail){
+    result[i] = *head;
+    i++;
+    head++;
+    if(head == q->end)
+      head = q->bgn;
+  }
+  *num = count;
+  return(result);
+}
+
+void** CqsEnumeratePrioq(prioq q, int *num){
+  void **head, **tail;
+  void **result;
+  int i,j;
+  int count = 0;
+  prioqelt pe;
+
+  for(i = 1; i < q->heapnext; i++){
+    pe = (q->heap)[i];
+    head = pe->data.head;
+    tail = pe->data.tail;
+    while(head != tail){
+      count++;
+      head++;
+      if(head == (pe->data).end)
+	head = (pe->data).bgn;
+    }
+  }
+
+  result = (void **)CmiAlloc(count * sizeof(void *));
+  *num = count;
+  
+  j = 0;
+  for(i = 1; i < q->heapnext; i++){
+    pe = (q->heap)[i];
+    head = pe->data.head;
+    tail = pe->data.tail;
+    while(head != tail){
+      result[j] = *head;
+      j++;
+      head++;
+      if(head ==(pe->data).end)
+	head = (pe->data).bgn; 
+    }
+  }
+
+  return result;
+}
+
+void CqsEnumerateQueue(Queue q, void ***resp){
+  void **result;
+  int num;
+  int i,j;
+
+  *resp = (void **)CmiAlloc(q->length * sizeof(void *));
+  j = 0;
+
+  result = CqsEnumeratePrioq(&(q->negprioq), &num);
+  for(i = 0; i < num; i++){
+    (*resp)[j] = result[i];
+    j++;
+  }
+  
+  result = CqsEnumerateDeq(&(q->zeroprio), &num);
+  for(i = 0; i < num; i++){
+    (*resp)[j] = result[i];
+    j++;
+  }
+
+  result = CqsEnumeratePrioq(&(q->posprioq), &num);
+  for(i = 0; i < num; i++){
+    (*resp)[j] = result[i];
+    j++;
+  }
 }
 

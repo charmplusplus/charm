@@ -1,17 +1,8 @@
 
 #include <stdio.h>
 #include "converse.h"
+#include "fifo.h"
 
-typedef struct fifo_queue {
-  void **block;
-  unsigned int size;
-  unsigned int pull;
-  unsigned int push;
-  unsigned int fill;
-} FIFO_QUEUE;
-
-
-#define BLK_LEN 512
 
 void *FIFO_Create()
 {
@@ -101,6 +92,25 @@ void FIFO_DeQueue(queue, element)
     queue->pull = (queue->pull+1) % queue->size;
     queue->fill--;
   } else *element = 0;
+}
+
+
+/* This assumes the the caller has not allocated
+   memory for element 
+*/
+void FIFO_Enumerate(queue, element)
+     FIFO_QUEUE     *queue;
+     void      ***element;
+{
+  int i = 0;
+  int num = queue->fill;
+  int pull = queue->pull;
+  *element = (void **)malloc(num * sizeof(void *));
+  while(num > 0){
+    (*element)[i++] = queue->block[pull];
+    pull = (pull + 1) % queue->size;
+    num--;
+  }
 }
 
 void FIFO_Destroy(queue)
