@@ -161,7 +161,7 @@ CLBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* stats, int count)
       x->pe = pe;
       maxh.insert(x);
     }
-    CkPrintf("LOAD on %d = %5.3lf\n",pe,load_pe);
+//    CkPrintf("LOAD on %d = %5.3lf\n",pe,load_pe);
   }
 
   npe = count;
