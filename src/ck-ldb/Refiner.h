@@ -28,12 +28,12 @@ public:
   };
   ~Refiner() {}
 
-  static int* AllocProcs(int count, CentralLB::LDStats* stats);
+  static int* AllocProcs(int count, BaseLB::LDStats* stats);
   static void FreeProcs(int* bufs);
-  void Refine(int count, CentralLB::LDStats* stats, int* cur_p, int* new_p);
+  void Refine(int count, BaseLB::LDStats* stats, int* cur_p, int* new_p);
 
 protected:
-  void create(int count, CentralLB::LDStats* stats, int* cur_p);
+  void create(int count, BaseLB::LDStats* stats, int* cur_p);
   virtual int refine();
   int multirefine();
   void assign(computeInfo *c, int p);

@@ -24,7 +24,7 @@ public:
   RandCentLB(CkMigrateMessage *m):CentralLB(m) { lbname = "RandCentLB"; }
   void pup(PUP::er &p){ CentralLB::pup(p); }
 
-  void work(CentralLB::LDStats* stats, int count);
+  void work(BaseLB::LDStats* stats, int count);
 private:
   CmiBool QueryBalanceNow(int step);
 };

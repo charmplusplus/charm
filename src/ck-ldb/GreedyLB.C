@@ -101,7 +101,7 @@ void GreedyLB::HeapSort(HeapData *data, int heapSize, HeapCmp cmp)
 }
 
 GreedyLB::HeapData* 
-GreedyLB::BuildObjectArray(CentralLB::LDStats* stats, 
+GreedyLB::BuildObjectArray(BaseLB::LDStats* stats, 
                              int count, int *objCount)
 {
   HeapData *objData;
@@ -136,7 +136,7 @@ CmiPrintf("\n");
 }
 
 GreedyLB::HeapData* 
-GreedyLB::BuildCpuArray(CentralLB::LDStats* stats, 
+GreedyLB::BuildCpuArray(BaseLB::LDStats* stats, 
                           int count, int *peCount)
 {
   int pe;
@@ -184,7 +184,7 @@ GreedyLB::BuildCpuArray(CentralLB::LDStats* stats,
   return data;
 }
 
-void GreedyLB::work(CentralLB::LDStats* stats, int count)
+void GreedyLB::work(BaseLB::LDStats* stats, int count)
 {
   int  obj, heapSize, objCount;
   int *pemap = new int [count];

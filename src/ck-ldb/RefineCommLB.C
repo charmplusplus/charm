@@ -30,7 +30,7 @@ CmiBool RefineCommLB::QueryBalanceNow(int _step)
   return CmiTrue;
 }
 
-void RefineCommLB::work(CentralLB::LDStats* stats, int count)
+void RefineCommLB::work(BaseLB::LDStats* stats, int count)
 {
 #if CMK_LBDB_ON
   int obj;

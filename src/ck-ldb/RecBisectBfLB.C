@@ -61,7 +61,7 @@ CmiBool RecBisectBfLB::QueryBalanceNow(int _step)
   return CmiTrue;
 }
 
-void RecBisectBfLB::work(CentralLB::LDStats* stats, 
+void RecBisectBfLB::work(BaseLB::LDStats* stats, 
 				       int numPartitions)
 {
   int i;

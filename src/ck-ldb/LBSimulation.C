@@ -109,7 +109,7 @@ void LBSimulation::PrintSimulationResults()
   lbinfo.print();
 }
 
-void LBSimulation::PrintDifferences(LBSimulation *realSim, CentralLB::LDStats *stats)
+void LBSimulation::PrintDifferences(LBSimulation *realSim, BaseLB::LDStats *stats)
 {
   double *peLoads = lbinfo.peLoads;
   double *realPeLoads = realSim->lbinfo.peLoads;

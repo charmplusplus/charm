@@ -142,7 +142,7 @@ void init(alloc_struct **a, graph * object_graph, int l, int b){
   }
 }
 
-void Comm1LB::work(CentralLB::LDStats* stats, int count)
+void Comm1LB::work(BaseLB::LDStats* stats, int count)
 {
   int pe,obj,com;
   double mean_load =0.0;

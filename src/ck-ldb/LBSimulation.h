@@ -27,7 +27,7 @@ public:
   void reset();
   void SetProcessorLoad(int pe, double load, double bgload);
   void PrintSimulationResults();
-  void PrintDifferences(LBSimulation *realSim, CentralLB::LDStats *stats);
+  void PrintDifferences(LBSimulation *realSim, BaseLB::LDStats *stats);
 private:
   LBInfo  lbinfo;
   int numPes;

@@ -38,7 +38,7 @@ public:
   GreedyCommLB(CkMigrateMessage *m);
   void pup(PUP::er &p){ CentralLB::pup(p); }
   CmiBool QueryBalanceNow(int step);
-  void work(CentralLB::LDStats* stats, int count);
+  void work(BaseLB::LDStats* stats, int count);
 private:
   void init();
   void alloc(int pe, int id, double load);
@@ -46,7 +46,7 @@ private:
   void add_graph(int x, int y, int data, int nmsg);
   void update(int id, int pe);
 
-  CentralLB::LDStats* stats;
+  BaseLB::LDStats* stats;
   double alpha, beeta;
 };
 

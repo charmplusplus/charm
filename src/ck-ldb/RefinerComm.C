@@ -17,7 +17,7 @@
 #include "RefinerComm.h"
 
 
-void RefinerComm::create(int count, CentralLB::LDStats* _stats, int* procs)
+void RefinerComm::create(int count, BaseLB::LDStats* _stats, int* procs)
 {
   int i;
   stats = _stats;
@@ -398,7 +398,7 @@ int RefinerComm::refine()
   return finish;
 }
 
-void RefinerComm::Refine(int count, CentralLB::LDStats* stats, 
+void RefinerComm::Refine(int count, BaseLB::LDStats* stats, 
 		     int* cur_p, int* new_p)
 {
   //  CkPrintf("[%d] Refiner strategy\n",CkMyPe());

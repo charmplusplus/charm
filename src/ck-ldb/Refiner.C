@@ -16,7 +16,7 @@
 
 #include "Refiner.h"
 
-int* Refiner::AllocProcs(int count, CentralLB::LDStats* stats)
+int* Refiner::AllocProcs(int count, BaseLB::LDStats* stats)
 {
   return new int[stats->n_objs];
 }
@@ -26,7 +26,7 @@ void Refiner::FreeProcs(int* bufs)
   delete [] bufs;
 }
 
-void Refiner::create(int count, CentralLB::LDStats* stats, int* procs)
+void Refiner::create(int count, BaseLB::LDStats* stats, int* procs)
 {
   int i;
 
@@ -314,7 +314,7 @@ int Refiner::multirefine()
   return 1;
 }
 
-void Refiner::Refine(int count, CentralLB::LDStats* stats, 
+void Refiner::Refine(int count, BaseLB::LDStats* stats, 
 		     int* cur_p, int* new_p)
 {
   //  CkPrintf("[%d] Refiner strategy\n",CkMyPe());

@@ -303,7 +303,7 @@ void OrbLB::mapPartitionsToNodes()
 
 }
 
-void OrbLB::work(CentralLB::LDStats* stats, int count)
+void OrbLB::work(BaseLB::LDStats* stats, int count)
 {
 #if CMK_LBDB_ON
   int i,j;

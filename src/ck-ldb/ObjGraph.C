@@ -15,7 +15,7 @@
 static const double alpha = 30.e-6;
 static const double beta = 3.e-9;
 
-ObjGraph::ObjGraph(int count, CentralLB::LDStats* _stats)
+ObjGraph::ObjGraph(int count, BaseLB::LDStats* _stats)
 {
   stats = _stats;
   // First, we need to make a linked list of objects.

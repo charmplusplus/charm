@@ -44,7 +44,7 @@ public:
   RecBisectBfLB(CkMigrateMessage *m):CentralLB(m) {}
 private:
   CmiBool QueryBalanceNow(int step);
-  void work(CentralLB::LDStats* stats, int count);
+  void work(BaseLB::LDStats* stats, int count);
 
   Graph * convertGraph(ObjGraph *og);
   

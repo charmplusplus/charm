@@ -41,7 +41,7 @@ inline int chooseProc(int count)
   return (int)(CrnDrand()*(count-1) + 0.5);
 }
 
-void RandCentLB::work(CentralLB::LDStats* stats, int count)
+void RandCentLB::work(BaseLB::LDStats* stats, int count)
 {
   if (_lb_args.debug()) CkPrintf("Calling RandCentLB strategy\n",CkMyPe());
 

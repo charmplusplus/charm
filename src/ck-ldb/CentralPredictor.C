@@ -226,7 +226,7 @@ bool Marquardt_solver(CentralLB::FutureModel *mod, int object) {
 }
 
 // routine that update LDStats given a predictor model
-void CentralLB::FuturePredictor(CentralLB::LDStats* stats) {
+void CentralLB::FuturePredictor(BaseLB::LDStats* stats) {
 #if CMK_LBDB_ON
   bool model_done;
   int i;

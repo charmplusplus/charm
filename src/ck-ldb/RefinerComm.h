@@ -26,7 +26,7 @@ public:
   };
   ~RefinerComm() {}
 
-  void Refine(int count, CentralLB::LDStats* stats, int* cur_p, int* new_p);
+  void Refine(int count, BaseLB::LDStats* stats, int* cur_p, int* new_p);
 
 private:
   struct Messages {
@@ -55,10 +55,10 @@ private:
     void increase(bool issend, int pe, int msgs, int bytes);
     double overheadOnPe(int pe);
   };
-  CentralLB::LDStats* stats;
+  BaseLB::LDStats* stats;
   CommTable *commTable;
 
-  void create(int count, CentralLB::LDStats* , int* cur_p);
+  void create(int count, BaseLB::LDStats* , int* cur_p);
   void processorCommCost();
   void assign(computeInfo *c, int p);
   void assign(computeInfo *c, processorInfo *p);

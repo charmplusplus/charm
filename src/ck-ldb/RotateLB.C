@@ -44,7 +44,7 @@ CmiBool RotateLB::QueryBalanceNow (int _step)
 /**************************************************************************
 **
 */
-void RotateLB::work (CentralLB::LDStats *stats, int count)
+void RotateLB::work (BaseLB::LDStats *stats, int count)
 {
   int proc;
   int obj;

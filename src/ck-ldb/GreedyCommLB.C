@@ -146,7 +146,7 @@ static void init_data(double **a, graph * object_graph, int l, int b){
     }
 }
 
-void GreedyCommLB::work(CentralLB::LDStats* _stats, int count)
+void GreedyCommLB::work(BaseLB::LDStats* _stats, int count)
 {
     int pe,obj,com;
     ObjectRecord *x;

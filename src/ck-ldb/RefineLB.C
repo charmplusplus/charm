@@ -25,7 +25,7 @@ RefineLB::RefineLB(const CkLBOptions &opt): CentralLB(opt)
     CkPrintf("[%d] RefineLB created\n",CkMyPe());
 }
 
-void RefineLB::work(CentralLB::LDStats* stats, int count)
+void RefineLB::work(BaseLB::LDStats* stats, int count)
 {
   int obj;
   //  CkPrintf("[%d] RefineLB strategy\n",CkMyPe());

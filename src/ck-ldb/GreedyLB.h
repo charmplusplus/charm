@@ -37,8 +37,8 @@ private:
 	void           HeapSort(HeapData*, int, HeapCmp);
 	void           BuildHeap(HeapData*, int, HeapCmp);
 	CmiBool        Compare(double, double, HeapCmp);
-	HeapData*      BuildCpuArray(CentralLB::LDStats*, int, int *);  
-	HeapData*      BuildObjectArray(CentralLB::LDStats*, int, int *);      
+	HeapData*      BuildCpuArray(BaseLB::LDStats*, int, int *);  
+	HeapData*      BuildObjectArray(BaseLB::LDStats*, int, int *);      
 	CmiBool        QueryBalanceNow(int step);
 };
 

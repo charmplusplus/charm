@@ -49,7 +49,7 @@ public:
     Node* nxt_hash;
   };
 
-  ObjGraph(int count, CentralLB::LDStats* stats);
+  ObjGraph(int count, BaseLB::LDStats* stats);
   ~ObjGraph();
 
   int NodeCount() { return n_objs; };
@@ -77,7 +77,7 @@ private:
   int n_objs;
   int n_edges;
   Node* nodelist;
-  CentralLB::LDStats* stats;
+  BaseLB::LDStats* stats;
 };
 
 #endif

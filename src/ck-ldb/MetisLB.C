@@ -84,7 +84,7 @@ extern "C" void METIS_mCPartGraphKway(int*, int*, int*, int*, int*, int*,
                                     int*, int*, int*, int*, int*,
                                     int*, int*);
 
-void MetisLB::work(CentralLB::LDStats* stats, int count)
+void MetisLB::work(BaseLB::LDStats* stats, int count)
 {
   if (_lb_args.debug() >= 2) {
     CkPrintf("In MetisLB Strategy...\n");
