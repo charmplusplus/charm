@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 2.19  1996-07-16 05:20:41  milind
+ * Revision 2.20  1996-07-16 17:23:37  jyelon
+ * Renamed a flag.
+ *
+ * Revision 2.19  1996/07/16 05:20:41  milind
  * Added CMK_VECTOR_SEND
  *
  * Revision 2.18  1996/07/15  20:58:27  jyelon
@@ -106,8 +109,8 @@
 #define CMK_TIMER_USE_SPECIAL                              0
 #define CMK_TIMER_USE_TIMES                                1
 
-#define CMK_USE_GENERIC_VECTOR_SEND                        0
-#define CMK_USE_SPECIAL_VECTOR_SEND                        1
+#define CMK_VECTOR_SEND_USES_COMMON_CODE                        0
+#define CMK_VECTOR_SEND_USES_SPECIAL_CODE                        1
 
 #define CMK_WAIT_NOT_NEEDED                                0
 #define CMK_WAIT_USES_SYS_WAIT_H                           1
