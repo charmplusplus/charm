@@ -322,20 +322,22 @@ public:
 };
 
 
-//Smart pointer-to-new[]'d array-of-ints
-class intArrayPtr : public CkNoncopyable {
-	int *sto;
+//Smart pointer-to-new[]'d array-of-T
+template <class T>
+class ArrayPtrT : public CkNoncopyable {
+	T *sto;
 public:
-	intArrayPtr() {sto=NULL;}
-	intArrayPtr(int *src) {sto=src;}
-	~intArrayPtr() {if (sto) delete[] sto;}
-	void operator=(int *src) {
+	ArrayPtrT() {sto=NULL;}
+	ArrayPtrT(int *src) {sto=src;}
+	~ArrayPtrT() {if (sto) delete[] sto;}
+	void operator=(T *src) {
 		if (sto) delete[] sto;
 		sto=src;
 	}
-	operator int *(void) {return sto;}
-	operator const int *(void) const {return sto;}
+	operator T *(void) {return sto;}
+	operator const T *(void) const {return sto;}
 };
+typedef ArrayPtrT<int> intArrayPtr;
 
 /*Describes a set of records of sparse data that are all the
 same size and all associated with the same number of nodes.
@@ -476,10 +478,12 @@ class FEM_DataMsg : public CMessage_FEM_DataMsg
   int from; //Source's local chunk number on dest. chunk
   int dtype; //Field ID of data
   int length; //Length in bytes of below array
-  void *data;
   int tag; //Sequence number
+  void *data;
+  double alignPad; //Makes sure this structure is double-aligned
+  
   FEM_DataMsg(int t, int f, int d,int l) : 
-    from(f), dtype(d), tag(t), length(l) { data = (void*) (this+1); }
+    from(f), dtype(d), length(l), tag(t) { data = (void*) (this+1); }
   FEM_DataMsg(void) { data = (void*) (this+1); }
   static void *pack(FEM_DataMsg *);
   static FEM_DataMsg *unpack(void *);
@@ -608,6 +612,36 @@ public:
 	NumberedVec<elemGhostInfo> elem;
 };
 
+//This datatype is how the framework stores symmetries internally.
+//  Each bit of this type describes a different symmetry.
+//  There must be enough bits to accomidate several simulatanious symmetries.
+typedef unsigned char FEM_Symmetries_t;
+
+//Describes all ghost elements
+class FEM_Ghost : public CkNoncopyable {
+	CkVec<ghostLayer *> layers;
+	intArrayPtr nodeCanon; //Map global node to canonical number
+	ArrayPtrT<FEM_Symmetries_t> nodeSymmetries; //Symmetries each node belongs to
+public:
+	FEM_Ghost() {}
+	~FEM_Ghost() {for (int i=0;i<getLayers();i++) delete layers[i];}
+	
+	int getLayers(void) const {return layers.size();}
+	ghostLayer *addLayer(void) {
+		ghostLayer *l=new ghostLayer();
+		layers.push_back(l);
+		return l;
+	}
+	const ghostLayer &getLayer(int layerNo) const {return *layers[layerNo];}
+	
+	void setSymmetry(int *can,FEM_Symmetries_t *sym) {
+		nodeCanon=can;
+		nodeSymmetries=sym;
+	}
+	const int *getCanon(void) const {return nodeCanon;}
+	const FEM_Symmetries_t *getSymmetries(void) const {return nodeSymmetries;}
+};
+
 //Declare this at the start of every API routine:
 #define FEMAPI(routineName) TCHARM_API_TRACE(routineName,"fem")
 
@@ -624,8 +658,8 @@ class MeshChunkOutput {
 /*After partitioning, create a sub-mesh for each chunk's elements,
 including communication lists between chunks.
 */
-void fem_split(const FEM_Mesh *mesh,int nchunks,int *elem2chunk,
-	       int nGhostLayers,const ghostLayer *g,MeshChunkOutput *out);
+void fem_split(const FEM_Mesh *mesh,int nchunks,const int *elem2chunk,
+	       const FEM_Ghost &ghosts,MeshChunkOutput *out);
 
 /*The inverse of fem_split: reassemble split chunks into a single mesh*/
 FEM_Mesh *fem_assemble(int nchunks,MeshChunk **msgs);
