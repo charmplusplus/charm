@@ -1,5 +1,21 @@
 #include "DirectMulticastStrategy.h"
 
+int intCompare(void *a, void *b){
+    int a1 = *(int *) a;
+    int b1 = *(int *) b;
+
+    if(a1 < b1)
+        return -1;
+    
+    if(a1 == b1)
+        return 0;
+
+    if(a1 > b1)
+        return 1;
+
+    return 0;
+}    
+
 //ComlibSectionHashKey CODE
 int ComlibSectionHashKey::staticCompare(const void *k1,const void *k2,size_t ){
     return ((const ComlibSectionHashKey *)k1)->
@@ -92,8 +108,8 @@ void DirectMulticastStrategy::insertMessage(CharmMessageHolder *cmsg){
     }
     
     messageBuf->enq(cmsg);
-    //if(!isBracketed())
-    doneInserting();
+    if(!isBracketed())
+        doneInserting();
 }
 
 void DirectMulticastStrategy::doneInserting(){
@@ -231,15 +247,15 @@ void DirectMulticastStrategy::localMulticast(CkVec<CkArrayIndexMax>*vec,
                                                  envelope *env){
     
     //Multicast the messages to all elements in vec
-    void *msg = EnvToUsr(env);
     int nelements = vec->size();
-
     if(nelements == 0) {
         CmiFree(env);
         return;
     }
     
+    void *msg = EnvToUsr(env);
     int ep = env->getsetArrayEp();
+    
     CkUnpackMessage(&env);
     for(int count = 0; count < nelements; count ++){        
         CkArrayIndexMax idx = (*vec)[count];
@@ -249,7 +265,12 @@ void DirectMulticastStrategy::localMulticast(CkVec<CkArrayIndexMax>*vec,
         
         CProxyElement_ArrayBase ap(destArrayID, idx);
         ArrayElement *elem = ap.ckLocal();
-        CkDeliverMessageReadonly(ep, msg, elem);        
+        if(elem != NULL)
+            CkDeliverMessageReadonly(ep, msg, elem);        
+        else { //Element migrated away?
+            void *newmsg = CkCopyMsg(&msg);
+            ap.ckSend((CkArrayMessage *)newmsg, ep);            
+        }
     }
     
     CmiFree(env);

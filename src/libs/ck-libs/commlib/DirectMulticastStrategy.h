@@ -37,6 +37,9 @@ inline int ComlibSectionHashKey::compare(const ComlibSectionHashKey &k2) const
     return 0;
 }
 
+/*For calls to qsort*/
+int intCompare(void *a, void *b);
+
 class DirectMulticastStrategy: public Strategy {
  protected:
     CkQ <CharmMessageHolder*> *messageBuf;

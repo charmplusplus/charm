@@ -116,10 +116,10 @@ void MsgPacker::deliver(CombinedMessage *cmb_msg){
             memcpy(data, senv.data, size);
             delete[] senv.data;
             
-            if(a_elem)
-                CkDeliverMessageFree(ep, data, a_elem);           
-            else
-                ap.ckSend((CkArrayMessage *)data, ep);
+            //if(a_elem)
+            //  CkDeliverMessageFree(ep, data, a_elem);           
+            //else
+            ap.ckSend((CkArrayMessage *)data, ep);
         }        
     }      
         

@@ -9,6 +9,9 @@ StreamingStrategy::StreamingStrategy(int periodMs,int bufferMax_)
 }
 
 void StreamingStrategy::insertMessage(CharmMessageHolder *cmsg) {
+
+    ComlibPrintf("StramingStrategy: InsertMessage\n");
+
     int pe=cmsg->dest_proc;
     streamingMsgBuf[pe].enq(cmsg);
     streamingMsgCount[pe]++;
