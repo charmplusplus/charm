@@ -367,7 +367,6 @@ static void _initHandler(void *msg)
 extern "C"
 void CkExit(void) 
 {
-  _TRACE_END_EXECUTE();
   CkNumberHandler(_charmHandlerIdx,(CmiHandler)_discardHandler);
   CkNumberHandler(_bocHandlerIdx, (CmiHandler)_discardHandler);
   CkNumberHandler(_nodeBocHandlerIdx, (CmiHandler)_discardHandler);
@@ -385,9 +384,12 @@ void CkExit(void)
     CmiSetHandler(env, _exitHandlerIdx);
     CmiSyncSendAndFree(0, env->getTotalsize(), (char *)env);
   }
+#if ! CMK_BLUEGENE_THREAD
   // if CkExit is called inside main(), it will hang here.
-#if defined(__BLUEGENE__) && CMK_BLUEGENE_NODE
-  if (_mainDone == 1) CsdScheduler(-1);
+  if (_mainDone == 1) {
+    _TRACE_END_EXECUTE();
+    CsdScheduler(-1);
+  }
 #endif
 }
 
