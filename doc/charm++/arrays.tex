@@ -28,8 +28,9 @@ array [1D] A \{
 
 Just as every Chare inherits from the system class \kw{Chare}, every 
 array element inherits from the system class \kw{ArrayElement} (or one
-of its subclasses, \kw{ArrayElement1D}, \kw{ArrayElement2D}, or 
-\kw{ArrayElement3D}). Just as a Chare inherits ``thishandle'', each
+of its subclasses, \kw{ArrayElement1D}, \kw{ArrayElement2D}, 
+\kw{ArrayElement3D}, \kw{ArrayElement4D}, \kw{ArrayElement5D}, or
+\kw{ArrayElement6D}). Just as a Chare inherits ``thishandle'', each
 array element inherits ``thisArrayID'', the \kw{CkArrayID} of its array,
 and ``thisIndex'', the element's array index.
 
@@ -163,7 +164,7 @@ broadcasts, and reductions) are needed in almost every
 are not universally needed; but are still often useful.
 
 
-\subsubsection{Declaring 2D, 3D, or User-defined Index Arrays}
+\subsubsection{Declaring Multidimensional, or User-defined Index Arrays}
 
 \charmpp{} contains direct support for multidimensional and
 even user-defined index arrays.  These arrays can be declared as:
@@ -174,6 +175,9 @@ message MyMsg;
 array [1D] A1 \{ entry A1(); entry void e(\uw{parameters});\}
 array [2D] A2 \{ entry A2(); entry void e(\uw{parameters});\}
 array [3D] A3 \{ entry A3(); entry void e(\uw{parameters});\}
+array [4D] A4 \{ entry A4(); entry void e(\uw{parameters});\}
+array [5D] A5 \{ entry A5(); entry void e(\uw{parameters});\}
+array [6D] A6 \{ entry A6(); entry void e(\uw{parameters});\}
 array [Foo] AF \{ entry AF(); entry void e(\uw{parameters});\}
 \end{alltt}
 
@@ -186,13 +190,18 @@ which must be defined before including the \texttt{.decl.h} file
 class A1:public ArrayElement1D \{ public: A1()\{\} ...\};
 class A2:public ArrayElement2D \{ public: A2()\{\} ...\};
 class A3:public ArrayElement3D \{ public: A3()\{\} ...\};
+class A4:public ArrayElement4D \{ public: A4()\{\} ...\};
+class A5:public ArrayElement5D \{ public: A5()\{\} ...\};
+class A6:public ArrayElement6D \{ public: A6()\{\} ...\};
 class AF:public ArrayElementT<Foo> \{ public: AF()\{\} ...\};
 \end{alltt}
 
 A 1D array element can access its index via its inherited ``thisIndex''
 field; a 2D via ``thisIndex.x'' and ``thisIndex.y'', and a 3D via
-``thisIndex.x'', ``thisIndex.y'', and ``thisIndex.z''.  A user-defined
-index array can access its index as ``thisIndex''.
+``thisIndex.x'', ``thisIndex.y'', and ``thisIndex.z''. The subfields
+of 4D, 5D, and 6D are respectively \{w,x,y,z\}, \{v,w,x,y,z\}, and 
+\{x1,y1,z1,x2,y2,z2\}.
+A user-defined index array can access its index as ``thisIndex''.
 
 
 \subsubsection{Advanced Array Creation}
