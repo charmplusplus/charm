@@ -10,10 +10,11 @@ CpvExtern(int,_traceCoreOn);
 #ifdef CMK_OPTIMIZE
 #define LOGCONDITIONAL(x) 
 #else 
-#define LOGCONDITIONAL(x) \
+#define LOGCONDITIONAL(x) do { \
 		if(CpvAccess(_traceCoreOn)!=0){ \
 			x;\
 		}
+	} while(0);
 #endif
 
 void RegisterLanguage(int lID, char* ln);
