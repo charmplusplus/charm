@@ -14,6 +14,7 @@ ComlibManager.o: \
 	RingMulticastStrategy.h \
 	PipeBroadcastStrategy.h \
 	MeshStreamingStrategy.h \
+	PrioStreaming.h \
 	commlib.def.h
 	$(CHARMC) -c -o ComlibManager.o ComlibManager.C
 
@@ -63,9 +64,9 @@ EachToManyMulticastStrategy.o: \
 
 MsgPacker.o: \
 	MsgPacker.C \
-	MsgPacker.h \
 	ComlibManager.h \
-	commlib.decl.h
+	commlib.decl.h \
+	MsgPacker.h
 	$(CHARMC) -c -o MsgPacker.o MsgPacker.C
 
 DirectMulticastStrategy.o: \
@@ -84,24 +85,25 @@ RingMulticastStrategy.o: \
 	$(CHARMC) -c -o RingMulticastStrategy.o RingMulticastStrategy.C
 
 PipeBroadcastStrategy.o: \
-        PipeBroadcastStrategy.C \
-        PipeBroadcastStrategy.h \
-        DirectMulticastStrategy.h \
-        ComlibManager.h \
-        commlib.decl.h
+	PipeBroadcastStrategy.C \
+	PipeBroadcastStrategy.h \
+	ComlibManager.h \
+	commlib.decl.h
 	$(CHARMC) -c -o PipeBroadcastStrategy.o PipeBroadcastStrategy.C
 
 MeshStreamingStrategy.o: \
-        MeshStreamingStrategy.C \
-        MeshStreamingStrategy.h \
-        ComlibManager.h \
-        commlib.decl.h
+	MeshStreamingStrategy.C \
+	MeshStreamingStrategy.h \
+	ComlibManager.h \
+	commlib.decl.h
 	$(CHARMC) -c -o MeshStreamingStrategy.o MeshStreamingStrategy.C
 
-
 PrioStreaming.o: \
-        PrioStreaming.C \
-        PrioStreaming.h \
-        ComlibManager.h \
-        commlib.decl.h
+	PrioStreaming.C \
+	PrioStreaming.h \
+	ComlibManager.h \
+	commlib.decl.h \
+	StreamingStrategy.h \
+	MsgPacker.h
 	$(CHARMC) -c -o PrioStreaming.o PrioStreaming.C
+
