@@ -54,9 +54,8 @@ message.
 
 Each chare instance is identified by a {\it handle} \index{handle}
 which is essentially a global pointer, and is unique across all
-processors.  The handle of a chare has type \index{CkChareID}
-\keyword{CkChareID}.  The
-variable \kw{thishandle} \index{thishandle} holds the handle of the
+processors.  The handle of a chare has type \kw{CkChareID}.  The
+variable \kw{thishandle} holds the handle of the
 chare whose entry function or public function is currently executing.
 \kw{thishandle} is a public instance variable of the chare object
 (it is inherited from the system-defined superclass for chares, \kw{Chare}).
@@ -139,8 +138,7 @@ general, for good \index{load balancing}load balancing, the user should let
 Under unusual circumstances, however, the user may want to choose the
 destination processor.  If a process replicated on every processor is desired,
 then a \index{chare group}chare group should be used.  If no particular
-processor is required, the parameter can be omitted, or
-\index{CK\_PE\_ANY}\kw{CK\_PE\_ANY}.
+processor is required, the parameter can be omitted, or \kw{CK\_PE\_ANY}.
 
 \end{itemize}
 
@@ -196,8 +194,7 @@ Before sending a \index{message}message to a \index{chare}chare via an
 \index{entry method}entry method, we need to get a \index{proxy}{\it proxy} of
 that \index{chare}chare using either the chare identifier, or by creating the
 proxy directly from the \index{chare}chare creation (see Section~\ref{chare
-creation}. The following code creates a proxy from a
-\index{CkChareID}\kw{CkChareID}.
+creation}. The following code creates a proxy from a \kw{CkChareID}.
 
 \begin{tabbing} ~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~
 \=~~~~ \kill \> \kw{CProxy}\_\uw{chareType} {\it chareProxy}({\it chareID});
