@@ -74,7 +74,7 @@ commlib:
 
 translators: charmxi conv-cpm
 
-pose:
+pose:  charm++
 	cd libs/ck-libs/pose && $(MAKE) 
 
 LIBS: CONVLIBS CHARMLIBS
@@ -271,7 +271,8 @@ LIBCONV_UTILF=pup_f.o
 converse: basics 
 	$(MAKE) converse-target
 
-converse-target: QuickThreads/libqt.a $(CVLIBS) fmain-ok charmrun-target swapglobal-target conv-cpm
+converse-target: QuickThreads/libqt.a 
+	$(MAKE) $(CVLIBS) fmain-ok charmrun-target swapglobal-target conv-cpm
 
 charmrun-target: daemon-target sockRoutines.c sockRoutines.h ccs-server.c ccs-server.h
 	if [ -d charmrun ] ; then ( cd charmrun ; $(MAKE) OPTS='$(OPTS)' ) ; fi
@@ -766,7 +767,8 @@ loadbalancers: $(LOADBALANCERS) $(L)/libmoduleEveryLB.a
 #
 ###############################################################################
 
-bluegene: charm++ $(L)/libconv-bluegene.a $(L)/libconv-bluegene-logs.a METIS
+bluegene:  basics
+	$(MAKE) charm++ $(L)/libconv-bluegene.a $(L)/libconv-bluegene-logs.a METIS
 
 # old (Charm++) Blue Gene emulator
 BlueGene.decl.h BlueGene.def.h : BlueGene.ci charmxi
