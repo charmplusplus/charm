@@ -102,8 +102,8 @@ void CentralLB::ProcessAtSync()
 {
   if (CkMyPe() == cur_ld_balancer) {
     start_lb_time = CmiWallTimer();
-    // CkPrintf("Load balancing step %d starting at %f in %d\n",
-    	     // step(),start_lb_time, cur_ld_balancer);
+    CkPrintf("Load balancing step %d starting at %f in %d\n",
+    step(),start_lb_time, cur_ld_balancer);
   }
   // Send stats
   int sizes[2];

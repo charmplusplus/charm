@@ -29,10 +29,13 @@ static void lbinit(void) {
 
 #include "CommLB.def.h"
 
+#include "manager.h"
+
 CommLB::CommLB()
 {
     if (CkMyPe() == 0)
 	CkPrintf("[%d] CommLB created\n",CkMyPe());
+    manager_init();
 }
 
 CmiBool CommLB::QueryBalanceNow(int _step)

@@ -130,7 +130,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  LBDBManager.h LBComm.h LBOM.h LBObj.h LBMachineUtil.h \
 	  Refiner.h ObjGraph.h heap.h elements.h CommLBHeap.h \
 	  CentralLB.h RandCentLB.h RecBisectBfLB.h \
-	  RefineLB.h HeapCentLB.h CommLB.h Comm1LB.h \
+	  RefineLB.h HeapCentLB.h CommLB.h Comm1LB.h manager.h \
 	  MetisLB.h NborBaseLB.h \
 	  NeighborLB.h WSLB.h GreedyRefLB.h RandRefLB.h \
 	  BlueGene.h \
@@ -616,11 +616,14 @@ $(L)/libmoduleRefineLB.a: RefineLB.o
 CommLB.decl.h: CommLB.ci charmxi
 	$(CHARMC) CommLB.ci
 
-CommLB.o: CommLB.C CommLB.decl.h $(CKHEADERS)
-	$(CHARMC) -c CommLB.C
+CommLB.o: CommLB.C CommLB.decl.h manager.h $(CKHEADERS)
+	$(CHARMC) -c CommLB.C 
 
-$(L)/libmoduleCommLB.a: CommLB.o
-	$(CHARMC) -o $(L)/libmoduleCommLB.a CommLB.o
+manager.o: manager.C manager.h 
+	$(CHARMC) -c manager.C
+
+$(L)/libmoduleCommLB.a: CommLB.o manager.o
+	$(CHARMC) -o $(L)/libmoduleCommLB.a CommLB.o manager.o
 
 Comm1LB.decl.h: Comm1LB.ci charmxi
 	$(CHARMC) Comm1LB.ci
@@ -673,6 +676,7 @@ LB_OBJ=EveryLB.o \
     MetisLB.o \
     RefineLB.o \
     CommLB.o \
+    manager.o \
     Comm1LB.o \
     HeapCentLB.o \
     NeighborLB.o \
