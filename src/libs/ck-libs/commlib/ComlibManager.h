@@ -29,6 +29,9 @@
 
 PUPbytes(comID);
 
+//Handler for calling multicast messages on the receiver
+typedef void (*ComlibMulticastHandler)(void *msg);
+
 //An abstract data structure that holds a charm++ message 
 //and provides utility functions to manage it.
 class CharmMessageHolder {
@@ -98,20 +101,6 @@ struct StrategyTable {
     int elementCount;
     int call_doneInserting;
 };
-
-/*
-//A wrapper message for many charm++ messages.
-class ComlibMsg: public CMessage_ComlibMsg {
- public:
-    int nmessages;
-    int curSize;
-    int destPE;
-    char* data;
-    
-    void insert(CharmMessageHolder *msg);
-    CharmMessageHolder * next();
-};
-*/
 
 class ComlibManager: public CkDelegateMgr{
 

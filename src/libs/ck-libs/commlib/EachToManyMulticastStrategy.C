@@ -1,9 +1,21 @@
-#include "EachToManyMulticast.h"
+#include "EachToManyMulticastStrategy.h"
 
-CpvExtern(int, RecvmsgHandle);
 CpvExtern(int, RecvdummyHandle);
+EachToManyMulticastStrategy *nm_mgr;
 
-EachToManyMulticastStrategy::EachToManyMulticastStrategy(int substrategy){
+void *E2MHandler(void *msg){
+  ComlibPrintf("[%d]:In Node MulticastCallbackHandler\n", CkMyPe());
+  register envelope *env = (envelope *)msg;
+  CkUnpackMessage(&env);
+  //nm_mgr->getCallback().send(EnvToUsr(env));
+  
+  nm_mgr->getHandler()(env);
+  return NULL;
+}
+
+EachToManyMulticastStrategy::EachToManyMulticastStrategy
+(int substrategy,ComlibMulticastHandler h){
+
     ComlibPrintf("In constructor, %d\n", substrategy);
     routerID = substrategy;
     messageBuf = 0;
@@ -12,7 +24,14 @@ EachToManyMulticastStrategy::EachToManyMulticastStrategy(int substrategy){
     comid = ComlibInstance(routerID, CkNumPes());
     this->npes = CkNumPes();
     ComlibPrintf("After instance\n");
+
+    npes = CkNumPes();
+    this->pelist = new int[npes];
+    for(int count =0; count < npes; count ++)
+      this->pelist[count] = count;
     
+    handler = (long) h;
+
     //procMap = new int[CkNumPes()];
     //for(int count = 0; count < CkNumPes(); count ++){
     //  procMap[count] = count;
@@ -55,7 +74,9 @@ void EachToManyMulticastStrategy::checkPeList(){
     pelist = newpelist;
 }
 
-EachToManyMulticastStrategy::EachToManyMulticastStrategy(int substrategy, int npes,int *pelist){
+EachToManyMulticastStrategy::EachToManyMulticastStrategy
+(int substrategy, int npes,int *pelist, ComlibMulticastHandler h){
+  
     this->npes = npes;
     //checkPeList();
 
@@ -78,7 +99,7 @@ void EachToManyMulticastStrategy::insertMessage(CharmMessageHolder *cmsg){
 	return;
     }
     ComlibPrintf("EachToMany: insertMessage\n");
-    
+
     messageBuf->enq(cmsg);
 }
 
@@ -100,7 +121,10 @@ void EachToManyMulticastStrategy::doneInserting(){
     
     while(!messageBuf->isEmpty()) {
 	CharmMessageHolder *cmsg = messageBuf->deq();
-        char * msg = cmsg->getCharmMessage();
+        char *msg = cmsg->getCharmMessage();
+	
+	CmiSetHandler(UsrToEnv(msg), handlerId);
+
         ComlibPrintf("Calling EachToMany %d %d %d\n", 
                      UsrToEnv(msg)->getTotalsize(), CkMyPe(), 
                      cmsg->dest_proc);
@@ -119,13 +143,16 @@ void EachToManyMulticastStrategy::pup(PUP::er &p){
     p | routerID;
     p | comid;
     p | npes;
+    p | handler;
 
     if(p.isUnpacking()) 
-	pelist = new int[npes];
+      pelist = new int[npes];
     p(pelist, npes);
     
     if(p.isUnpacking()){
 	messageBuf = new CkQ<CharmMessageHolder *>;
+	handlerId = CmiRegisterHandler((CmiHandler)E2MHandler);
+	nm_mgr = this;
     }
 }
 

@@ -10,8 +10,6 @@
 #define PROCESSOR_MODE 0
 #define ARRAY_MODE 1
 
-typedef void (*ComlibMulticastHandler)(void *msg);
-
 class NodeMulticast : public Strategy {
     CkQ <CharmMessageHolder*> *messageBuf;
     int pes_per_node, *nodeMap, numNodes, myRank;

@@ -1,5 +1,6 @@
-#ifndef EACH_TO_MANY_MULTICAST
-#define EACH_TO_MANY_MULTICAST
+#ifndef EACH_TO_MANY_MULTICAST_STRATEGY
+#define EACH_TO_MANY_MULTICAST_STRATEGY
+
 #include "ComlibManager.h"
 
 class EachToManyMulticastStrategy: public Strategy {
@@ -10,14 +11,18 @@ class EachToManyMulticastStrategy: public Strategy {
     int npes;
     int *pelist;
     
+    long handler; //Multicast Handler to be called on the receiving processors.
+    int handlerId;
     void checkPeList();
 
  public:
-    EachToManyMulticastStrategy(int strategyId);
-    EachToManyMulticastStrategy(int strategyId, int npes, int *pelist);
+    EachToManyMulticastStrategy(int strategyId, ComlibMulticastHandler h);
+    EachToManyMulticastStrategy(int strategyId, int npes, int *pelist, 
+				ComlibMulticastHandler h);
 
     EachToManyMulticastStrategy(CkMigrateMessage *m){}
 
+    ComlibMulticastHandler getHandler(){return (ComlibMulticastHandler)handler;};
     void insertMessage(CharmMessageHolder *msg);
     void doneInserting();
 

@@ -9,9 +9,6 @@
 
 CpvDeclare(int, RecvmsgHandle);
 CpvDeclare(int, RecvdummyHandle);
-//int *procMap;
-
-//PUPable_def(Strategy);
 
 //handler to receive array messages
 void recv_msg(void *msg){
