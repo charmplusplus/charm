@@ -1,4 +1,4 @@
-module CkSparseReducer {
-
-	initcall void registerReducers(void);
+module CkSparseReducer
+{
+  initcall void registerReducers(void);
 };
