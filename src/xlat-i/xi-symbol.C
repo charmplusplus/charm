@@ -1583,7 +1583,7 @@ void Entry::genChareDefs(XStr& str)
     // entry method definition
     XStr retStr; retStr<<retType;
     str << makeDecl(retStr,1)<<"::"<<name<<"("<<paramType(0)<<")\n";
-    str << "{\n"<<marshallMsg();
+    str << "{\n  ckCheck();\n"<<marshallMsg();
     if(isSync()) {
       str << syncReturn() << "CkRemoteCall("<<params<<"));\n";
     } else {//Regular, non-sync message
@@ -1655,7 +1655,7 @@ void Entry::genArrayDefs(XStr& str)
     
     XStr retStr; retStr<<retType;
     str << makeDecl(retStr,1)<<"::"<<name<<"("<<paramType(0)<<") \n"; //no const
-    str << "{\n"<<marshallMsg();
+    str << "{\n  ckCheck();\n"<<marshallMsg();
     str << "  CkArrayMessage *impl_amsg=(CkArrayMessage *)impl_msg;\n";
     str << "  impl_amsg->array_setIfNotThere("<<ifNot<<");\n";
     if(isSync()) {
@@ -1718,7 +1718,7 @@ void Entry::genGroupDecl(XStr& str)
     if (isSync() && !container->isForElement()) return; //No sync broadcast
     
     str << "    "<<retType<<" "<<name<<"("<<paramType(1)<<")\n";
-    str << "    {\n"<<marshallMsg();
+    str << "    {\n    ckCheck();\n"<<marshallMsg();
 
     if(isSync()) {
       str << syncReturn() <<
