@@ -417,7 +417,7 @@ after 1 second since the last load balancing step.
 once all objects are received on that processor, even when other processors
 are still working on migrations.  If this turns out to be a problem, 
 that is when some processors start working on computation while the other 
-processors are still working on migration, then use this option to force 
+processors are still busy migrating objects, then use this option to force 
 a global barrier on all processors to make sure processors can only resume 
 computation after migrations finish on all processors.
 \end{itemize}
