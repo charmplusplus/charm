@@ -50,7 +50,7 @@ summary:    $(PGM).summary
 
 $(PGM):	$(SIM_OBJECTS) 
 	$(CHARMC) $(SIM_OBJECTS) $(OTHER) $(LIBS) -o $(PGM) \
-	-lpose -language charm++ -memory paranoid
+	-lpose -language charm++
 
 $(PGM).alt:	$(SIM_OBJECTS) 
 	$(CHARMC) $(SIM_OBJECTS) $(OTHER) $(LIBS) -o $(PGM).alt \
