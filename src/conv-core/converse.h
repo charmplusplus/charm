@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.45  1996-07-15 21:02:39  jyelon
+ * Revision 2.46  1996-07-16 09:26:46  milind
+ * Added vector send routines declarations.
+ *
+ * Revision 2.45  1996/07/15  21:02:39  jyelon
  * Changed mach-flags #ifdef to #if, added timer stuff.
  *
  * Revision 2.44  1996/07/02 21:01:55  jyelon
@@ -379,6 +382,24 @@ void          CmiFreeBroadcastAllFn   CMK_PROTO((int, char *));
 #define CmiSyncBroadcastAll(s,m)        (CmiSyncBroadcastAllFn((s),(char *)(m)))
 #define CmiAsyncBroadcastAll(s,m)       (CmiAsyncBroadcastAllFn((s),(char *)(m)))
 #define CmiSyncBroadcastAllAndFree(s,m) (CmiFreeBroadcastAllFn((s),(char *)(m)))
+
+/****** CMI VECTOR MESSAGE TRANSMISSION ******/
+
+void CmiGenericSyncVectorSend CMK_PROTO((int, int, int *, char **));
+CmiCommHandle CmiGenericAsyncVectorSend CMK_PROTO((int, int, int *, char **));
+void CmiGenericSyncVectorSendAndFree CMK_PROTO((int, int, int *, char **));
+
+#if CMK_USE_GENERIC_VECTOR_SEND
+#define CmiSyncVectorSend          CmiGenericSyncVectorSend
+#define CmiAsyncVectorSend         CmiGenericAsyncVectorSend
+#define CmiSyncVectorSendAndFree   CmiGenericSyncVectorSendAndFree
+#endif
+
+#if CMK_USE_SPECIAL_VECTOR_SEND
+void CmiSyncVectorSend CMK_PROTO((int, int, int *, char **));
+CmiCommHandle CmiAsyncVectorSend CMK_PROTO((int, int, int *, char **));
+void CmiSyncVectorSendAndFree CMK_PROTO((int, int, int *, char **));
+#endif
 
 /******** CMI MESSAGE RECEPTION ********/
 
