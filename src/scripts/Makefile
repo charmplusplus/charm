@@ -134,8 +134,7 @@ headerlinks: dirs+sources Makefile
 	chmod +x ../bin/charmc
 	rm -rf ../include ; mkdir ../include
 	cp conv-mach.sh ../include/
-	-for hdr in $(ALLHEADERS); do ln -fs "../tmp/$$hdr" ../include ; done
-	-for hdr in $(ALLINTERFACES); do ln -fs "../tmp/$$hdr" ../include ; done
+	-for hdr in $(ALLHEADERS) $(ALLINTERFACES); do test ! -L ../include/$$hdr && ln -fs "../tmp/$$hdr" ../include ; done
 	touch headerlinks	
 
 dirs+sources:
