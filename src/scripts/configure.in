@@ -149,8 +149,9 @@ EOF
           fortran_postfix=ALLCAPS
           AC_DEFINE_UNQUOTED(CMK_FORTRAN_USES_ALLCAPS, 1)
         else
+          echo "#################################################"
           echo "FORTRAN compiler generated name not supported yet"
-          exit 1
+          echo "#################################################"
         fi
       fi
     fi
