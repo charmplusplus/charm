@@ -1,6 +1,6 @@
-#!/bin/csh -f
-goto begin
-syntax:
+#!/bin/sh
+
+syntax() {
   echo ''
   echo 'Usage: SUPER-INSTALL <target> <version> [charmc-options ...]'
   echo ''
@@ -20,23 +20,22 @@ syntax:
   echo "That's all SUPER_INSTALL does.  The rest is handled by the Makefile."
   echo ''
   exit 1
+}
 
-begin:
+  [ $# -lt 2 ] && syntax
+  PROGRAM=$1 ; shift
+  VERSION=$1 ; shift
 
-  if ($#argv < 2) goto syntax
-  set PROGRAM=$1 ; shift
-  set VERSION=$1 ; shift
-
-  if ( x$VERSION == x ) goto syntax
-  if { ( echo $2 | egrep -s '^Common' ) } goto syntax
-  if ( ! -d src/$VERSION ) goto syntax
+  [ "x$VERSION" = "x" ] && syntax
+	
+  ( echo $2 | egrep -s '^Common' ) && syntax
+  [ -d src/$VERSION ] || goto syntax
 
   echo "Creating directories: $VERSION and $VERSION/tmp"
-  if (! -d $VERSION     ) mkdir $VERSION
-  if (! -d $VERSION/tmp ) mkdir $VERSION/tmp
+  [ -d $VERSION ] || mkdir $VERSION
+  [ -d $VERSION/tmp ] || mkdir $VERSION/tmp
   echo "Copying src/Common/scripts/Makefile to $VERSION/tmp"
   rm -f $VERSION/tmp/Makefile
-  ln -s ../../src/Common/scripts/Makefile $VERSION/tmp/Makefile
+  ln -s "../../src/Common/scripts/Makefile" $VERSION/tmp/Makefile
   echo "Performing 'make $PROGRAM OPTS="$*"' in $VERSION/tmp"
   cd $VERSION/tmp ; make $PROGRAM OPTS="$*"
-
