@@ -228,7 +228,7 @@ void GenerateStructsFns(ofstream& top, ofstream& bot)
     bot << str ;
     sprintf(str, "\tvoid *out;\n");
     bot << str;
-    sprintf(str,"\t(*out) = %s::alloc(msgno,size,array,prio);\n}\n",m->name) ;
+    sprintf(str,"\tout = %s::alloc(msgno,size,array,prio);\n}\n",m->name) ;
     bot << str ;
     sprintf(str, "\treturn out;\n}\n");
   }
