@@ -169,8 +169,26 @@ FDECL {
 #define mpi_info_dup FTN_NAME ( MPI_INFO_DUP , mpi_info_dup )
 #define mpi_info_free FTN_NAME ( MPI_INFO_FREE , mpi_info_free )
 
+#define REDUCERF(caps, nocaps) \
+void FTN_NAME(caps, nocaps)(void *iv, void *iov, int *len, MPI_Datatype *dt){ \
+  caps(iv, iov, len, dt); \
+}
+    
+#if !CMK_FORTRAN_USES_ALLCAPS
+REDUCERF(MPI_MAX    , mpi_max)
+REDUCERF(MPI_MIN    , mpi_min)
+REDUCERF(MPI_SUM    , mpi_sum)
+REDUCERF(MPI_PROD   , mpi_prod)
+REDUCERF(MPI_LAND   , mpi_land)
+REDUCERF(MPI_BAND   , mpi_band)
+REDUCERF(MPI_LOR    , mpi_lor)
+REDUCERF(MPI_BOR    , mpi_bor)
+REDUCERF(MPI_LXOR   , mpi_lxor)
+REDUCERF(MPI_BXOR   , mpi_bxor)
+REDUCERF(MPI_MAXLOC , mpi_maxloc)
+REDUCERF(MPI_MINLOC , mpi_minloc)
+#endif
 
- 
 void mpi_init_universe(int *unicomm)
 {
   AMPIAPI("mpi_init_universe");
