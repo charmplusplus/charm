@@ -549,7 +549,7 @@ void ComlibManager::GroupSend(CkDelegateData *pd,int ep, void *msg, int onPE, Ck
     }
     
     ((CmiMsgHeaderExt *)env)->stratid = curStratID;
-    CkpvAccess(_qd)->create(1);
+    CpvAccess(_qd)->create(1);
 
     env->setMsgtype(ForBocMsg);
     env->setEpIdx(ep);
@@ -656,7 +656,7 @@ void ComlibManager::GroupBroadcast(CkDelegateData *pd,int ep,void *m,CkGroupID g
     
     register envelope * env = UsrToEnv(m);
     
-    CkpvAccess(_qd)->create(1);
+    CpvAccess(_qd)->create(1);
 
     env->setMsgtype(ForBocMsg);
     env->setEpIdx(ep);
