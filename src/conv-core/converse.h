@@ -589,6 +589,7 @@ void          CmiFreeMulticastFn(CmiGroup, int, char*);
 void          CmiSyncVectorSend(int, int, int *, char **);
 CmiCommHandle CmiAsyncVectorSend(int, int, int *, char **);
 void          CmiSyncVectorSendAndFree(int, int, int *, char **);
+void	      CmiMultipleSend(unsigned int, int, int *, char **);
 
 #define CmiSyncSend(p,s,m)              (CmiSyncSendFn((p),(s),(char *)(m)))
 #define CmiAsyncSend(p,s,m)             (CmiAsyncSendFn((p),(s),(char *)(m)))
