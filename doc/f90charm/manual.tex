@@ -17,7 +17,7 @@
 \pagestyle{headings}
 
 \title{Fortran90 Bindings for Charm++}
-\author{Jayant Desouza}
+\author{Gengbin Zheng, Jayant Desouza}
 
 \begin{document}
 
@@ -26,24 +26,124 @@
 To interface Fortran90 to Charm and thus obtain a parallel version of
 your program you need to do the following things:
 \begin{enumerate}
-\item Write your F90 program with some constraints
 \item Write a Charm Interface file (extension .ci)
+\item Write your F90 program with some constraints
 \item Compile and Link with Charm's Fortran library
 \item Run it !
 \end{enumerate}
 
-This is best explained with an example: the hello program.  It is a
+\section{Overview}
+
+Here I suppose you've already known most concepts in charm++ and done some 
+charm++ programing.  \\
+Unlike in C++, we don't have class here in Fortran90. Thus, Chare is 
+represented as a fortran type structure. Here is an example:
+
+\begin{verbatim}
+
+      ## Just replace Hello throughout with your chare's name. ##
+      ## and add your chare's personal data below where indicated ##
+      ## Everything else remains the same ##
+      MODULE HelloMod
+
+      TYPE Hello
+      integer data
+      ## your chare's data goes here, the above integer is an example ##
+      END TYPE
+
+      TYPE HelloPtr
+      TYPE (Hello), POINTER ::  obj
+      integer*8 aid
+      END TYPE
+
+      END MODULE
+\end{verbatim}
+You can think of this module as a chare declaration. Type Hello defines 
+arbitary user private data and HelloPtr defines the Chare pointer which 
+fortran program will use later to communicate with the f90charm runtime 
+library. \\
+As same in C++ charm program, you need to write a .ci interface file
+so that charm translator will generate some helper functions. However, for
+Fortran90 charm, the syntax is a little different. First, it only support
+Chare array, you cannot define Chare and Group types. Second, for the 
+message declaration, you must list all the data fields explicitly.
+By this, the translator generated helper functions will know the contents
+of the messages and do the message marshalling and unmarshalling for 
+the fortran program. 
+
+For each Chare defined in the .ci file, you must define these functions
+for charm++ runtime use:
+
+  \verb+SUBROUTINE <ChareName>_allocate(objPtr, aid)+
+
+  this function will allocate the chare user data.
+And for each chare entry method, you should define the fortran90 subroutine
+for it:
+
+  \verb+SUBROUTINE entry(charePtr, myIndex, data1, data2 ... )+
+
+  Note, the first argument is the Chare pointer as you declared previously, the second argument is the array index which will be passed from charm runtime. And you need to enumerate all the message fields declared in .ci file in the 
+subroutine.
+
+On the other side, for each Chare declared, these subroutines are available
+for use in Fortran90 program:
+
+  \verb+<ChareName>_CkNew(integer n, integer*8 aid)+
+
+  This subroutine creates the chare array.
+
+And for each entry method, this function is available for use:
+
+  \verb+SendTo_<ChareName>_<Entry>(charePtr, myIndex, data1, data2 ... )+
+  This subroutine will send a message to the array element with the index
+as myIndex. Fortran90 charm runtime will pack the parameters into a message
+and sent to the chare array element.
+
+There are several others things you need to know.
+
+First, as same in C++ Charm, each .ci file will generate two header files:
+.decl.h and .def.h. However, in Fortran90 charm, you cannot use these C++
+files in Fortran90 code. Thus, currently, it is user's responsibility to 
+write a simple C++ code to include these two headers files. This is as simple
+as this:
+
+\begin{verbatim}
+#include "hello.decl.h"
+int chunkSize; 	// readonly variables define here
+#include "hello.def.h"
+\end{verbatim}
+
+Second, you can still use readonly variables as in Charm++. However, since
+fortran90 lacks the concepts of global variables as in C, you have to use it
+explicitly. Here are the two helper functions that translator generates:
+take the chunkSize as an example,
+\begin{verbatim}
+Set_Chunksize(chunkSize);
+Get_Chunksize(chunkSize);
+\end{verbatim}
+These two functions can be used in user's fortran program to set and get 
+readonly variables.
+
+Third, for user's convenience, several charm++ runtime library functions
+have their Fortran interface defined in f90charm library. These currently
+include:
+\begin{verbatim}
+CkExit()
+CkMyPe(integer mype)
+CkNumPes(integer pes)
+CkPrintf(...)    // note, the format string must terminated with '$$'
+\end{verbatim}
+
+All these are best explained with an example: the hello program.  It is a
 simple ring program.  When executed, an array of several parallel
 CHAREs is created.  Each chare "says" hello when it receives a
-message, and then sends a message to the next chare. (Currently,
-Fortran print is not working with Charm, so you'll have to imagine the
-chares are saying hello. :) The Fortran main() subroutine starts off
-the events.  And the SayHi() subroutine does the say-hello and
-forward.
+message, and then sends a message to the next chare.  The Fortran main() 
+subroutine starts off the events.  And the SayHi() subroutine does the 
+say-hello and forward.
 
 \section{Writing F90 Program}
 To start, you need to create a Fortran Module to represent a chare,
-e.g. <ChareName>Mod.
+e.g. \{ChareName\}Mod.
 
 \begin{verbatim}
 
@@ -66,7 +166,7 @@ e.g. <ChareName>Mod.
 \end{verbatim}
 
 In the Fortran file you must write an allocate funtion for this chare
-with the name: <ChareName>\_allocate
+with the name: \{ChareName\}\_allocate.
 
 \begin{verbatim}
       ## Just replace Hello throughout with your chare's name. ##
@@ -84,7 +184,7 @@ with the name: <ChareName>\_allocate
 If you have written code for a chare array "Hello", as above, you will
 have the following subroutine available to you:
 
-  \verb+<ChareName>\_CkNew(integer n, integer*8 aid)+
+  \verb+<ChareName>_CkNew(integer n, integer*8 aid)+
      This function creates a chare array at runtime
      where n is the number of items in the array, and
            aid is the array ID which is returned to you.
@@ -127,11 +227,11 @@ to you the following subroutine:
 \end{verbatim}
 
 \section{Compile and Link}
-You must have a Fortran main() subroutine where execution starts.
+You must have a Fortran f90charmmain() subroutine where execution starts.
 Typically this main function will create a chare array and send a
 message to one of its members to get the computation started.
 \begin{verbatim}
-      SUBROUTINE main()
+      SUBROUTINE f90charmmain()
       USE HelloMod
       integer i
       integer*8 aid
@@ -156,7 +256,6 @@ Fortran as of now.
       ## and add your chare's entry points below where indicated ##
       ## Everything else remains the same ##
       mainmodule hello {
-        extern module main;
       
         // Create some arbitrary message to hold your parameters
         // The message must have a unique name for each Entry Point.
@@ -187,26 +286,28 @@ As mentioned above, the message must have a unique name.
 
 \section{Compile and Link}
 Lastly, you need to compile and link the Fortran program with the
-Charm program as follows: (Let's say you have written hellof.f90, and
-hello.ci)
+Charm program as follows: (Let's say you have written hellof.f90, 
+hello.ci and hello.C)
+\begin{verbatim}
+  charmc hello.ci -language f90charm
+\end{verbatim}
+    will create hello.decl.h, hello.def.h
 
-  First, you will need the lib/ directory and its contents in your
-  program directory.  So copy it there.  Then:
+\begin{verbatim}
+  charmc -c hello.C
+\end{verbatim}
+    will compile the hello.decl.h, hello.def.h.
 
-  f90 -c hellof.f90
-    will create hellof.o
+\begin{verbatim}
+  charmc -c hellof.f90
+\end{verbatim}
+    charmc will invoke fotran compiler;
 
-  charmxi -f90 hello.ci
-    will create hello.decl.h, hello.def.h, and helloHelper.C
-    (helloHelper.C is not yet implemented, but in the interim
-     you can copy and edit the example.  Very simple.)
-
-  charmc -Ilib -c helloHelper.C
-    will create helloHelper.o
-
-  charmc -language charm++ -o hello hello.o hellof.o lib/libmain.a -lfsu  -lsunmath
-    will link hellof.o, helloHelper.o and Charm's Fortran library
-    to create your executable program 'hello'
+\begin{verbatim}
+  charmc -o hello hello.o hellof.o -language f90charm
+\end{verbatim}
+    will link hellof.o, hello.o and Charm's Fortran library
+    to create your executable program 'hello'.
 
 \section{Run Program}
 
@@ -218,7 +319,7 @@ host <computername>.cs.uiuc.edu <login>
 
 and then type
 
-./conv-host +p2 hello
+./charmrun +p2 hello
 
 which will run 'hello' on two virtual processors.
 \end{document}
