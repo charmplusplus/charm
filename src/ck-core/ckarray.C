@@ -293,7 +293,6 @@ ArrayElement::ArrayElement(ArrayElementCreateMessage *msg)
   thisAID.setAid(thisArray->ckGetGroupId());
   thisAID._elem = (-1);
   thisIndex = msg->index;
-  delete msg;
 }
 
 ArrayElement::ArrayElement(ArrayElementMigrateMessage *msg)
@@ -305,7 +304,6 @@ ArrayElement::ArrayElement(ArrayElementMigrateMessage *msg)
   thisAID.setAid(thisArray->ckGetGroupId());
   thisAID._elem = (-1);
   thisIndex = msg->index;
-  delete msg;
 }
 
 void ArrayElement::finishConstruction(void)
