@@ -1,4 +1,5 @@
-all: xi-grammar.tab.h xi-grammar.tab.C xi-scan.C sdag/sdag-trans.c
+all: xi-grammar.tab.h xi-grammar.tab.C xi-scan.C 
+#sdag/sdag-trans.c
 
 xi-grammar.tab.h xi-grammar.tab.C: xi-grammar.y
 	bison -y -d xi-grammar.y

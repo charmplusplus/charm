@@ -725,7 +725,8 @@ PublishesList	: IDENT
 		;
 
  SingleConstruct : ATOMIC ParamBraceStart CCode ParamBraceEnd OptPubList 
-		 { $$ = new SdagConstruct(SATOMIC, new XStr($3), $5, 0,0,0,0, 0 ); }
+		 { RemoveSdagComments($3);
+		   $$ = new SdagConstruct(SATOMIC, new XStr($3), $5, 0,0,0,0, 0 ); }
 		| CONNECT '(' IDENT EParameters ')' ParamBraceStart CCode '}'
 		{  
 		   in_braces = 0;

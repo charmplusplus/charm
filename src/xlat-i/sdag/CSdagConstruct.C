@@ -1378,3 +1378,13 @@ void SdagConstruct::setNext(SdagConstruct *n, int boe)
   }
 }
 
+void RemoveSdagComments(char *str)
+{
+  char *ptr = str;
+  while (ptr = strstr(ptr, "//")) {
+    char *lend = strstr(ptr, "\n");
+    if (lend==NULL) break;
+    while (ptr != lend) *ptr++=' ';
+  }
+}
+

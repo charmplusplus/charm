@@ -900,4 +900,6 @@ public:
   void setNext(SdagConstruct *, int);
 };
 
+extern void RemoveSdagComments(char *);
+
 #endif
