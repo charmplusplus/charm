@@ -22,6 +22,23 @@ class mySendMsg : public CMessage_mySendMsg {
   }
 };
 
+class partialResultMsg : public CMessage_partialResultMsg {
+ public:
+  int N;
+  int grain;
+  CkCallback cb;
+  complex *result;
+  friend class CMessage_partialResultMsg;
+  partialResultMsg(unsigned int iN, int igrain,  CkCallback icb,complex *iresult) : N(iN), grain(igrain), cb(icb)
+    {
+      memcpy(this->result,iresult,N*sizeof(complex));
+    }
+  partialResultMsg(unsigned int iN, complex *iresult) : N(iN)
+    {
+      memcpy(this->result,iresult,N*sizeof(complex));
+    }
+};
+
 class PairCalculator: public CBase_PairCalculator {
  public:
   PairCalculator(bool, int, int, int, int op1, FuncType fn1, int op2, FuncType fn2, CkCallback cb, CkGroupID gid);
@@ -32,6 +49,7 @@ class PairCalculator: public CBase_PairCalculator {
   void acceptEntireResult(int size, double *matrix, CkCallback cb);
   void acceptResult(int size, double *matrix, int rowNum, CkCallback cb);
   void sumPartialResult(int size, complex *result, int offset, CkCallback cb);
+  void sumPartialResult(partialResultMsg *msg);
   void pup(PUP::er &);
   inline double compute_entry(int n, complex *psi1, complex *psi2, int op) 
     {
@@ -81,6 +99,8 @@ class PairCalcReducer : public Group {
   int numRegistered[2];
   int acceptCount;
 }; 
+
+
 
 //#define  _DEBUG_
 
