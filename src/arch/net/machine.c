@@ -345,7 +345,7 @@ static void KillOnAllSigs(int sigNo)
   if (sigNo==SIGQUIT) sig="caught signal QUIT";
   if (sigNo==SIGTERM) sig="caught signal TERM";
   MACHSTATE1(5,"     Caught signal %s ",sig);
-//ifdef this part	
+/*ifdef this part*/
 #ifdef __FAULT__
   if(sigNo == SIGKILL || sigNo == SIGQUIT || sigNo == SIGTERM){
 		CmiPrintf("[%d] Caught but ignoring signal\n",CmiMyPe());
