@@ -1759,7 +1759,10 @@ void Entry::genDefs(XStr& str)
         msg_contents->genUnmarshalList1(str, param->getBaseName());
         str << ");\n";
       } else {
-        str << "  obj->"<<name<<"("<<cpType<<");\n"<<freeMsgVoid;
+        if(isThreaded()&&(param->isVoid()))
+          str << freeMsgVoid<<"  obj->"<<name<<"("<<cpType<<");\n";
+	else
+          str << "  obj->"<<name<<"("<<cpType<<");\n"<<freeMsgVoid;
       }
     }
     str << "}\n";
