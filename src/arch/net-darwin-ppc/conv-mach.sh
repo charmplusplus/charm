@@ -21,3 +21,4 @@ export MACOSX_DEPLOYMENT_TARGET=10.3
 CMK_SHARED_SUF="dylib"
 CMK_LD_SHARED=" -dynamic -dynamiclib -undefined dynamic_lookup "
 CMK_LD_SHARED_LIBS="-lstdc++"
+CMK_LD_SHARED_ABSOLUTE_PATH=true
