@@ -23,9 +23,7 @@ main::main(CkArgMsg *m)
   CkPrintf("asim run with: %d teams of %d workers", numTeams, numWorkers);
   CkPrintf("%d endtime\n", atoi(m->argv[3]));
 
-  POSE_init();
-  POSE_useET(atoi(m->argv[3]));
-  POSE_useID();
+  POSE_init(atoi(m->argv[3]));
   CkPrintf("POSE_endtime = %d\n", POSE_endtime);
 
   // create all the teams of workers
@@ -42,7 +40,6 @@ main::main(CkArgMsg *m)
     td->Timestamp(0);
     (*(CProxy_team *) &POSE_Objects)[k].insert(td, dest);
   }
-  POSE_start();
 }
 
 void main::buildMap(int numObjs, int dist)

@@ -1,7 +1,7 @@
 message TeamData;
 message WorkMsg;
 
-poser team : sim adapt2 chpt {
+poser team : sim opt chpt {
   entry team(TeamData *);
   // Event methods
   entry [event] void work(WorkMsg *);
