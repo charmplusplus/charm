@@ -1681,9 +1681,6 @@ CDECL int AMPI_Finalized(int *isFinalized)
 {
     AMPIAPI("AMPI_Initialized");     /* in case charm init not called */
     *isFinalized=CtvAccess(ampiFinalized);
-#if AMPI_COUNTER
-    getAmpiParent()->counters.output(getAmpiInstance(MPI_COMM_WORLD)->getRank(MPI_COMM_WORLD));
-#endif
     return 0;
 }
 
@@ -1736,6 +1733,9 @@ CDECL
 int AMPI_Finalize(void)
 {
   AMPIAPI("AMPI_Finalize");
+#if AMPI_COUNTER
+    getAmpiParent()->counters.output(getAmpiInstance(MPI_COMM_WORLD)->getRank(MPI_COMM_WORLD));
+#endif
   CtvAccess(ampiFinalized)=1;
 #if CMK_BLUEGENE_CHARM
   TRACE_BG_AMPI_SUSPEND();
