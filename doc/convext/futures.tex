@@ -24,12 +24,10 @@ processor where the future resides.
 
 Waits until the future has been filled, then returns a pointer to the
 contents of the future.  If the future has already been filled, this
-happens immediately (without blocking).  If the destroy flag is set,
-the future is destroyed (freed) in the process.  The pointer returned
-by CfutureWait must eventually be freed using CfutureDestroyValue
-below.  Caution: CfutureWait can only be done on the processor where
-the Cfuture resides.  A second caution: blocking operations (such as
-this one) can only be done in user-created threads.
+happens immediately (without blocking).  Caution: CfutureWait can only
+be done on the processor where the Cfuture resides.  A second caution:
+blocking operations (such as this one) can only be done in
+user-created threads.
 
 {\bf void CfutureDestroy(Cfuture f)}
 
@@ -40,9 +38,9 @@ on the processor where the Cfuture resides.
 {\bf void* CfutureCreateValue(int nbytes)}
 
 Allocates the specified amount of memory and returns a pointer to it.
-The memory can be freed by CfutureDestroyValue, just as if it had been
-extracted from a future.  It can also be filled with data and stored
-into a future, using CfutureStoreBuffer below.
+This buffer can be filled with data and stored into a future, using
+CfutureStoreBuffer below.  This combination is faster than using
+CfutureSet directly.
 
 {\bf void CfutureStoreValue(Cfuture fut, void *value)}
 
