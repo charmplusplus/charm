@@ -682,7 +682,7 @@ void _initCharm(int unused_argc, char **argv)
 
 	if (faultFunc) {
 		if (CkMyPe()==0) _allStats = new Stats*[CkNumPes()];
-		faultFunc(_restartDir);
+		if (!inCommThread) faultFunc(_restartDir);
 	}else if(CkMyPe()==0){
 		_allStats = new Stats*[CkNumPes()];
 		register int i, nMains=_mainTable.size();

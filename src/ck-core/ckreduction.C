@@ -1626,7 +1626,10 @@ void CkNodeReductionMgr::pup(PUP::er &p)
   p|msgs;
   p|futureMsgs;
   p|futureRemoteMsgs;
-  if(p.isUnpacking()) thisProxy = thisgroup;
+  if(p.isUnpacking()) {
+    thisProxy = thisgroup;
+    lockEverything = CmiCreateLock();
+  }
 }
 
 

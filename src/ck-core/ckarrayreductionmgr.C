@@ -135,6 +135,7 @@ void CkArrayReductionMgr::pup(PUP::er &p){
 	p(size);p(redNo);p(count);
 	p|my_msgs;
 	p|my_futureMsgs;
+	if(p.isUnpacking()) lockCount = CmiCreateLock();
 }
 
 #include "CkArrayReductionMgr.def.h"
