@@ -543,7 +543,6 @@ static const char *CIMsgClassAnsi =
 
 static const char *CIAllocDecl =
 "    void *operator new(size_t s, int *sz, int p);\n"
-"    void operator delete(void*,int*,int);\n"
 ;
 
 static const char *CIAllocDeclAnsi =
@@ -638,20 +637,22 @@ Message::genDefs(XStr& str)
       str << "::alloc(__idx, s, sz, p);\n";
       str << "}\n";
 
-      // Generate corresponding delete
-      if(templat) {
-        templat->genSpec(str);
-        str << " ";
+      if(compilemode==ansi) {
+        // Generate corresponding delete
+        if(templat) {
+          templat->genSpec(str);
+          str << " ";
+        }
+        str << "void ";
+        str << msg_prefix();
+        type->print(str);
+        if(templat)
+          templat->genVars(str);
+        str << "::operator delete(void *p, int *, int)\n";
+        str << "{\n";
+        str << "  CkFreeMsg(p);\n";
+        str << "}\n";
       }
-      str << "void ";
-      str << msg_prefix();
-      type->print(str);
-      if(templat)
-        templat->genVars(str);
-      str << "::operator delete(void *p, int *, int)\n";
-      str << "{\n";
-      str << "  CkFreeMsg(p);\n";
-      str << "}\n";
     }
   }
   if(!templat) {
