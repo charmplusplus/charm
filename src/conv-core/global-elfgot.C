@@ -37,19 +37,20 @@ A more readable summary is at:
  *  in the GOT. Pointers to remote function calls may be an exception
  *  to this.
  */
-#if CMK_HAS_ELF_H
 
 #include "converse.h"
 #include "cklists.h"
 #include <string.h>
 #include <stdio.h>
-#include <elf.h>
 #include <stdlib.h>
 #include <strings.h>
 #include <errno.h>
 
 #include "converse.h"
 #include "pup.h"
+
+#if CMK_HAS_ELF_H
+#include <elf.h>
 
 #if !CMK_SHARED_VARS_UNAVAILABLE
 #  error "Global-elfgot won't work properly under smp version: -swapglobals disabled"
