@@ -101,7 +101,10 @@ public:
 	CProxy_ArrayBase(const ArrayElement *e);
 
 #ifndef CMK_OPTIMIZE
-	void ckCheck(void) const; //Make sure this proxy has a value
+	inline void ckCheck(void) const{  //Make sure this proxy has a value
+	  if (_aid.isZero())
+		CkAbort("Error! This array proxy has not been initialized!");
+        }
 #else
 	inline void ckCheck(void) const {}
 #endif

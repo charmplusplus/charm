@@ -213,7 +213,10 @@ class CProxy_Chare : public CProxy {
 #endif
     }
 #ifndef CMK_OPTIMIZE
-    void ckCheck(void) const; //Make sure this proxy has a value
+    inline void ckCheck(void) const  {   //Make sure this proxy has a value
+	if (_ck_cid.objPtr==0)
+		CkAbort("Error! This chare proxy has not been initialized!");
+    }
 #else
     inline void ckCheck() const {}
 #endif
@@ -269,7 +272,10 @@ class CProxy_Group : public CProxy {
         :CProxy(), _ck_gid(g->ckGetGroupID()) {}
 
 #ifndef CMK_OPTIMIZE
-    void ckCheck(void) const; //Make sure this proxy has a value
+    inline void ckCheck(void) const {   //Make sure this proxy has a value
+	if (_ck_gid.isZero())
+		CkAbort("Error! This group proxy has not been initialized!");
+    }
 #else
     inline void ckCheck() const {}
 #endif
