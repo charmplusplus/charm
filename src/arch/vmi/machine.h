@@ -39,6 +39,9 @@
 #endif
 
 
+#define SIZEFIELD(m) (((CmiChunkHeader *)(m))[-1].size)
+
+
 #define CMI_VMI_MESSAGE_TYPE(msg) ((CmiMsgHeaderBasic *)msg)->vmitype
 #define CMI_VMI_MESSAGE_TYPE_STANDARD   1
 #define CMI_VMI_MESSAGE_TYPE_RENDEZVOUS 2

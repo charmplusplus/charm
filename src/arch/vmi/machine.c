@@ -1111,13 +1111,6 @@ VMI_RECV_STATUS CMI_VMI_Stream_Receive_Handler (PVMI_CONNECT connection,
   CMI_VMI_CHECK_SUCCESS (status, "VMI_Slab_Restore_State()");
 
   if (CMI_VMI_MESSAGE_TYPE (msg) == CMI_VMI_MESSAGE_TYPE_STANDARD) {
-#if CMK_BROADCAST_SPANNING_TREE
-    /* Send the message to our spanning children (if any). */
-    if (CMI_BROADCAST_ROOT (msg)) {
-      CMI_VMI_Send_Spanning_Children (size, msg);
-    }
-#endif
-
     /* Enqueue the message into the remote queue. */
     CdsFifo_Enqueue (CpvAccess (CMI_VMI_RemoteQueue), msg);
   } else {
@@ -1522,12 +1515,6 @@ void CMI_VMI_RDMA_Notification_Handler (PVMI_CONNECT connection,
     }
 
     if (handle->data.receive.data.rdma.bytes_received >= handle->msgsize) {
-#if CMK_BROADCAST_SPANNING_TREE
-      if (CMI_BROADCAST_ROOT (handle->msg)) {
-	CMI_VMI_Send_Spanning_Children (handle->msgsize, handle->msg);
-      }
-#endif
-
       CdsFifo_Enqueue (CpvAccess (CMI_VMI_RemoteQueue), handle->msg);
 
       handle->refcount = 0;
@@ -1767,17 +1754,40 @@ void CmiAbort (const char *message)
 
 
 /**************************************************************************
-** done
+** This code must call VMI_Poll() to ensure forward progress of the message
+** pumping loop.
+**
+** This code also passes the message to children in a spanning tree if
+** spanning tree broadcasts are being used.  It may seem like the message
+** should rather be forwarded directly within the stream receive handler
+** and the RDMA notification handler.  Down this road lies madness.  This
+** will seem to work until you discover that publish callbacks do not get
+** correctly invoked when using RDMA over Myrinet.  Nobody knows why. 
 */
 void *CmiGetNonLocal (void)
 {
   VMI_STATUS status;
 
+  char *msg;
+  int size;
+
 
   status = VMI_Poll ();
   CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
 
-  return (CdsFifo_Dequeue (CpvAccess (CMI_VMI_RemoteQueue)));
+  msg = (char *) CdsFifo_Dequeue (CpvAccess (CMI_VMI_RemoteQueue));
+
+#if CMK_BROADCAST_SPANNING_TREE
+  if (msg) {
+    size = SIZEFIELD (msg);
+
+    if (CMI_BROADCAST_ROOT (msg)) {
+      CMI_VMI_Send_Spanning_Children (size, msg);
+    }
+  }
+#endif
+
+  return ((void *) msg);
 }
 
 
