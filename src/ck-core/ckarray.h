@@ -493,7 +493,7 @@ public:
 
   void springCleaning(void);
 
-  void flushState() { bcastNo = oldBcastNo = -1; }
+  void flushState();
 private:
   int bcastNo;//Number of broadcasts received (also serial number)
   int oldBcastNo;//Above value last spring cleaning

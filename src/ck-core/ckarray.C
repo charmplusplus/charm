@@ -812,6 +812,13 @@ void CkArrayBroadcaster::springCleaning(void)
   oldBcastNo=bcastNo;
 }
 
+void CkArrayBroadcaster::flushState() 
+{ 
+  bcastNo = oldBcastNo = -1; 
+  CkArrayMessage *msg;
+  while (NULL!=(msg=oldBcasts.deq())) delete msg;
+}
+
 void CkBroadcastMsgArray(int entryIndex, void *msg, CkArrayID aID)
 {
 	CProxy_ArrayBase ap(aID);
