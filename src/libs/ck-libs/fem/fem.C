@@ -426,7 +426,7 @@ chunk::chunk(void)
   seqnum = 1;
   wait_for = 0;
   tid = 0;
-  valid_udata = 0;
+  nudata = 0;
 }
 
 void
@@ -853,13 +853,13 @@ chunk::pup(PUP::er &p)
   // update should not be in progress when migrating, so curbuf is not valid
   p(doneCalled);
   // fp is not valid, because it has been closed a long time ago
-  p(valid_udata);
-  if(valid_udata != 0)
-  {
-    p((void*)&pksz,sizeof(CkPacksizeFn));
-    p((void*)&pk,sizeof(CkPackFn));
-    p((void*)&upk,sizeof(CkUnpackFn));
-    userdata = pupOpaqueObject(p, userdata, usize, pksz, pk, upk);
+  p(nudata);
+  for(i=0;i<nudata;i++) {
+    p((void*)&(pksz[i]),sizeof(CkPacksizeFn));
+    p((void*)&(pk[i]),sizeof(CkPackFn));
+    p((void*)&(upk[i]),sizeof(CkUnpackFn));
+    userdata[i] = pupOpaqueObject(p, userdata[i], usize[i], pksz[i], 
+                                  pk[i], upk[i]);
   }
 }
 
@@ -915,12 +915,12 @@ chunk::print(void)
   CkPrintf("%s", str);
 }
 
-extern "C" void 
+extern "C" int 
 FEM_Register(void *_userdata, CkPacksizeFn _pksz, CkPackFn _pk,
                     CkUnpackFn _upk)
 {
   chunk *cptr = CtvAccess(_femptr);
-  cptr->register_userdata(_userdata,_pksz, _pk, _upk);
+  return cptr->register_userdata(_userdata,_pksz, _pk, _upk);
 }
 
 extern "C" int *
@@ -945,10 +945,10 @@ FEM_Get_Conn(void)
 }
 
 extern "C" void *
-FEM_Get_Userdata(void)
+FEM_Get_Userdata(int n)
 {
   chunk *cptr = CtvAccess(_femptr);
-  return cptr->get_userdata();
+  return cptr->get_userdata(n);
 }
 
 extern "C" void

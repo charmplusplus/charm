@@ -104,6 +104,7 @@ class ChunkMsg : public CMessage_ChunkMsg {
 };
 
 #define MAXDT 20
+#define MAXUDATA 20
 
 class chunk : public ArrayElement1D
 {
@@ -132,12 +133,12 @@ class chunk : public ArrayElement1D
   int nRecd; // number of messages received for this seqnum
   void *curbuf; // data addr for current update operation
 
-  int valid_udata;
-  void *userdata;
-  CkPacksizeFn pksz;
-  CkPackFn pk;
-  CkUnpackFn upk;
-  int usize; // cached size of user's data structure
+  int nudata;
+  void *userdata[MAXUDATA];
+  CkPacksizeFn pksz[MAXUDATA];
+  CkPackFn pk[MAXUDATA];
+  CkUnpackFn upk[MAXUDATA];
+  int usize[MAXUDATA]; // cached sizes of user's data structures
  public:
 
   CthThread tid; // waiting thread, 0 if no one is waiting
@@ -180,15 +181,16 @@ class chunk : public ArrayElement1D
   int *get_nodenums(void) { return gNodeNums; }
   int *get_elemnums(void) { return gElemNums; }
   int *get_conn(void) { return conn; }
-  void *get_userdata(void) { return userdata; }
-  void register_userdata(void *_userdata, CkPacksizeFn _pksz,
+  void *get_userdata(int n) { return userdata[n]; }
+  int register_userdata(void *_userdata, CkPacksizeFn _pksz,
                          CkPackFn _pk, CkUnpackFn _upk)
   {
-    userdata = _userdata;
-    pksz = _pksz;
-    pk = _pk;
-    upk = _upk;
-    valid_udata = 1;
+    userdata[nudata] = _userdata;
+    pksz[nudata] = _pksz;
+    pk[nudata] = _pk;
+    upk[nudata] = _upk;
+    nudata++;
+    return (nudata-1);
   }
   void pup(PUP::er &p);
   void ResumeFromSync(void)
@@ -224,12 +226,12 @@ extern "C" {
   void FEM_Set_Mesh_Transform(int nelem, int nnodes, int ctype, int* connmat, 
                               int *permute);
   void FEM_Print_Partition(void);
-  void FEM_Register(void *_userdata, CkPacksizeFn _pksz, CkPackFn _pk,
+  int FEM_Register(void *_userdata, CkPacksizeFn _pksz, CkPackFn _pk,
                     CkUnpackFn _upk);
   int *FEM_Get_Node_Nums(void);
   int *FEM_Get_Elem_Nums(void);
   int *FEM_Get_Conn(void);
-  void *FEM_Get_Userdata(void);
+  void *FEM_Get_Userdata(int n);
   void FEM_Migrate(void);
   // Fortran Bindings
 
