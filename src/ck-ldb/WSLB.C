@@ -13,7 +13,6 @@
 #include <cklists.h>
 #include "heap.h"
 #include "WSLB.h"
-#include "WSLB.def.h"
 
 CkGroupID wslb;
 
@@ -30,6 +29,10 @@ CkGroupID wslb;
 void CreateWSLB()
 {
   wslb = CProxy_WSLB::ckNew();
+}
+
+static void lbinit(void) {
+        LBSetDefaultCreate(CreateWSLB);        
 }
 
 void WSLB::staticMigrated(void* data, LDObjHandle h)
@@ -571,4 +574,7 @@ WSLBMigrateMsg* WSLBMigrateMsg::unpack(void *m)
   return ret_val;
 }
 
+#include "WSLB.def.h"
 #endif
+
+

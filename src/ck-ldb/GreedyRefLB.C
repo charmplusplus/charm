@@ -11,7 +11,6 @@
 
 #include "cklists.h"
 #include "GreedyRefLB.h"
-#include "GreedyRefLB.def.h"
 
 void CreateGreedyRefLB()
 {
@@ -19,6 +18,12 @@ void CreateGreedyRefLB()
   loadbalancer = CProxy_GreedyRefLB::ckNew();
   //  CkPrintf("[%d] created GreedyRefLB %d\n",CkMyPe(),loadbalancer);
 }
+
+static void lbinit(void) {
+        LBSetDefaultCreate(CreateGreedyRefLB);        
+}
+
+#include "GreedyRefLB.def.h"
 
 GreedyRefLB::GreedyRefLB()
 {

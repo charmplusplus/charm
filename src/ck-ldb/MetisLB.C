@@ -12,7 +12,6 @@
 #include "cklists.h"
 
 #include "MetisLB.h"
-#include "MetisLB.def.h"
 
 void CreateMetisLB()
 {
@@ -20,6 +19,12 @@ void CreateMetisLB()
   loadbalancer = CProxy_MetisLB::ckNew();
   // CkPrintf("[%d] created MetisLB %d\n",CkMyPe(),loadbalancer);
 }
+
+static void lbinit(void) {
+        LBSetDefaultCreate(CreateMetisLB);
+}
+
+#include "MetisLB.def.h"
 
 MetisLB::MetisLB()
 {

@@ -1,7 +1,7 @@
 module MetisLB {
 
 extern module CentralLB;
-
+initcall void lbinit(void);
 group MetisLB : CentralLB {
   entry void MetisLB(void);  
 };

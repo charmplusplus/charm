@@ -1,7 +1,7 @@
 module RecBisectBfLB {
 
 extern module CentralLB;
-
+initcall void lbinit(void);
 group RecBisectBfLB : CentralLB {
   entry void RecBisectBfLB(void);  
 };

@@ -12,7 +12,6 @@
 #include "cklists.h"
 
 #include "RandCentLB.h"
-#include "RandCentLB.def.h"
 
 void CreateRandCentLB()
 {
@@ -20,6 +19,11 @@ void CreateRandCentLB()
   loadbalancer = CProxy_RandCentLB::ckNew();
   //  CkPrintf("[%d] created RandCentLB %d\n",CkMyPe(),loadbalancer);
 }
+
+static void lbinit(void) {
+	LBSetDefaultCreate(CreateRandCentLB);
+}
+#include "RandCentLB.def.h"
 
 RandCentLB::RandCentLB()
 {

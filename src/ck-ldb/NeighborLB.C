@@ -13,12 +13,17 @@
 
 #include "heap.h"
 #include "NeighborLB.h"
-#include "NeighborLB.def.h"
 
 void CreateNeighborLB()
 {
   nborBaselb = CProxy_NeighborLB::ckNew();
 }
+
+static void lbinit(void) {
+        LBSetDefaultCreate(CreateNeighborLB);        
+}
+
+#include "NeighborLB.def.h"
 
 NeighborLB::NeighborLB()
 {

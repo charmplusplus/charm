@@ -13,7 +13,6 @@
 #include "cklists.h"
 
 #include "Comm1LB.h"
-#include "Comm1LB.def.h"
 
 #define alpha 35e-6
 #define beeta 8.5e-9
@@ -26,6 +25,12 @@ void CreateComm1LB()
 {
   loadbalancer = CProxy_Comm1LB::ckNew();
 }
+
+static void lbinit(void) {
+        LBSetDefaultCreate(CreateComm1LB);        
+}
+
+#include "Comm1LB.def.h"
 
 Comm1LB::Comm1LB()
 {

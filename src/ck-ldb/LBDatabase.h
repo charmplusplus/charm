@@ -13,6 +13,9 @@
 
 extern CkGroupID lbdb;
 
+typedef void (*LBDefaultCreateFn)(void);
+void LBSetDefaultCreate(LBDefaultCreateFn f);
+
 class LBDBInit : public Chare {
   public:
     LBDBInit(CkArgMsg*);

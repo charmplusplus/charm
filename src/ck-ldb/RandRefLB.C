@@ -13,7 +13,6 @@
 #include "Refiner.h"
 
 #include "RandRefLB.h"
-#include "RandRefLB.def.h"
 
 void CreateRandRefLB()
 {
@@ -21,6 +20,12 @@ void CreateRandRefLB()
   loadbalancer = CProxy_RandRefLB::ckNew();
   //  CkPrintf("[%d] created RandRefLB %d\n",CkMyPe(),loadbalancer);
 }
+
+static void lbinit(void) {
+        LBSetDefaultCreate(CreateRandRefLB);
+}
+
+#include "RandRefLB.def.h"
 
 RandRefLB::RandRefLB()
 {

@@ -10,7 +10,6 @@
 #if CMK_LBDB_ON
 
 #include "RecBisectBfLB.h"
-#include "RecBisectBfLB.def.h"
 
 extern "C" {
   Graph * initGraph(int v, int e);
@@ -40,6 +39,12 @@ void CreateRecBisectBfLB()
   loadbalancer = CProxy_RecBisectBfLB::ckNew();
   //  CkPrintf("[%d] created RecBisectBfLB %d\n",CkMyPe(),loadbalancer);
 }
+
+static void lbinit(void) {
+        LBSetDefaultCreate(CreateRecBisectBfLB);
+}
+
+#include "RecBisectBfLB.def.h"
 
 RecBisectBfLB::RecBisectBfLB()
 {

@@ -12,13 +12,18 @@
 #include "cklists.h"
 
 #include "RefineLB.h"
-#include "RefineLB.def.h"
 
 void CreateRefineLB()
 {
   loadbalancer = CProxy_RefineLB::ckNew();
   //  CkPrintf("[%d] created RefineLB %d\n",CkMyPe(),loadbalancer);
 }
+
+static void lbinit(void) {
+        LBSetDefaultCreate(CreateRefineLB);        
+}
+
+#include "RefineLB.def.h"
 
 RefineLB::RefineLB()
 {

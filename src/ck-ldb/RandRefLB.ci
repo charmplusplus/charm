@@ -1,7 +1,7 @@
 module RandRefLB {
 
 extern module CentralLB;
-
+initcall void lbinit(void);
 group RandRefLB : CentralLB {
   entry void RandRefLB(void);  
 };

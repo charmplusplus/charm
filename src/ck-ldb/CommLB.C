@@ -13,7 +13,6 @@
 #include "cklists.h"
 
 #include "CommLB.h"
-#include "CommLB.def.h"
 
 #define alpha 35e-6
 #define beeta 8.5e-9
@@ -22,6 +21,12 @@ void CreateCommLB()
 {
     loadbalancer = CProxy_CommLB::ckNew();
 }
+
+static void lbinit(void) {
+        LBSetDefaultCreate(CreateCommLB);        
+}
+
+#include "CommLB.def.h"
 
 CommLB::CommLB()
 {

@@ -1,7 +1,7 @@
 module CommLB {
 
 extern module CentralLB;
-
+initcall void lbinit(void);
 group CommLB : CentralLB {
   entry void CommLB(void);  
 };

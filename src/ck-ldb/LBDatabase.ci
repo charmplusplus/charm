@@ -1,4 +1,5 @@
 module LBDatabase {
+  extern module NullLB;
 
   readonly CkGroupID lbdb;
 

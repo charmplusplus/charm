@@ -11,7 +11,6 @@
 
 #include "cklists.h"
 #include "HeapCentLB.h"
-#include "HeapCentLB.def.h"
 
 void CreateHeapCentLB()
 {
@@ -19,6 +18,12 @@ void CreateHeapCentLB()
   loadbalancer = CProxy_HeapCentLB::ckNew();
   //  CkPrintf("[%d] created HeapCentLB %d\n",CkMyPe(),loadbalancer);
 }
+
+static void lbinit(void) {
+        LBSetDefaultCreate(CreateHeapCentLB);        
+}
+
+#include "HeapCentLB.def.h"
 
 HeapCentLB::HeapCentLB()
 {
