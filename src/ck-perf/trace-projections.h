@@ -57,7 +57,6 @@ class LogEntry {
 #if CMK_PROJECTIONS_USE_ZLIB
     void writeCompressed(gzFile fp);
 #endif
-    inline void adjustTime(double absT) {  time = absT; }
 };
 
 /// log pool in trace projection

@@ -172,9 +172,8 @@ LogPool::~LogPool()
 #if CMK_BLUEGENE_CHARM
   extern int correctTimeLog;
   if (correctTimeLog) {
-    postProcessLog();
     creatFiles("-bg.log", "-bg.sts");
-    writeLog();
+    postProcessLog();
   }
 #endif
 
@@ -255,6 +254,8 @@ void LogPool::add(UChar type,UShort mIdx,UShort eIdx,double time,int event,int p
   }
 #if CMK_BLUEGENE_CHARM
   switch (type) {
+    case BEGIN_COMPUTATION:
+    case END_COMPUTATION:
     case BEGIN_PROCESSING:
     case END_PROCESSING:
     case CREATION:
@@ -268,16 +269,20 @@ void LogPool::add(UChar type,UShort mIdx,UShort eIdx,double time,int event,int p
 }
 
 #if CMK_BLUEGENE_CHARM
-static void updateProjLog(void *data, double t)
+static void updateProjLog(void *data, double t, double recvT, void *ptr)
 {
-  ((LogEntry *)data)->adjustTime(t);
+  LogEntry *log = (LogEntry *)data;
+  FILE *fp = (FILE *)ptr;
+  log->time = t;
+  log->recvTime = recvT;
+  log->write(fp);
 }
 #endif
 
 void LogPool::postProcessLog()
 {
 #if CMK_BLUEGENE_CHARM
-  bgUpdateProj(updateProjLog);
+  bgUpdateProj(updateProjLog, fp);
 #endif
 }
 
