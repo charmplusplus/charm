@@ -143,8 +143,8 @@ headerlinks: dirs+sources Makefile $(ALLHEADERS)
 	touch headerlinks	
 
 dirs+sources:
-	rm -f .vdir .gdir
-	(cd .. ; basename `pwd`) 			> .vdir
+	rm -f .gdir
+#	(cd .. ; basename `pwd`) 			> .vdir
 	(cd .. ; basename `pwd` | sed -e 's@-.*@@') 	> .gdir
 	find . -type l -exec rm {} \;
 	rm -rf QuickThreads
@@ -175,7 +175,7 @@ dirs+sources:
 	./gathertree ../../doc doc
 	rm -f ../bin/charmc ; cp charmc ../bin/
 	chmod +x ../bin/charmc
-	rm -f .vdir .gdir
+	rm -f .gdir
 	rm -rf ../include ; mkdir ../include
 	./system_ln  ../tmp/conv-mach.sh ../include
 	./system_ln  ../tmp/conv-mach-opt.sh ../include
