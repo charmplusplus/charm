@@ -1,5 +1,6 @@
 # no action, empty
 
 qt: 
-	@true
+	touch libqt.so
+	touch libqt.a
 
