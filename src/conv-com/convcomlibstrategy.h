@@ -71,6 +71,7 @@ class Strategy : public PUP::able{
     int type;
     int isStrategyBracketed;
     int myInstanceID;
+    int destinationHandler;
 
     //Charm strategies for modularity may have converse strategies in
     //them.  For the code to work in both Charm and converse, this
@@ -100,6 +101,9 @@ class Strategy : public PUP::able{
     int getType() {return type;}
     void setType(int t) {type = t;}
 
+    void setDestination(int handler) {destinationHandler = handler;}
+    int getDestination() {return destinationHandler;}
+
     void setConverseStrategy(Strategy *s){
         converseStrategy = s;
     }
@@ -119,7 +123,7 @@ class Strategy : public PUP::able{
     //This method can be used to deliver a message through the correct class
     //when converse does not know if the message was originally sent from
     //converse itself of from a higher level language like charm
-    virtual void deliverer(char*) {CmiAbort("Strategy::deliverer: If used, should be first redefined\n");};
+    virtual void deliverer(char*, int) {CmiAbort("Strategy::deliverer: If used, should be first redefined\n");};
 
     //Each strategy must define his own Pup interface.
     virtual void pup(PUP::er &p);

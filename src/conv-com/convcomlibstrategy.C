@@ -15,6 +15,7 @@ Strategy::Strategy() : PUP::able() {
     converseStrategy = this;
     higherLevel = this;
     isStrategyBracketed = 0;
+    destinationHandler = 0;
 };
 
 //Each strategy must define his own Pup interface.
@@ -24,6 +25,7 @@ void Strategy::pup(PUP::er &p){
 
     p | isStrategyBracketed;
     p | type;
+    p | destinationHandler;
 
     if (p.isUnpacking()) {
       converseStrategy = this;

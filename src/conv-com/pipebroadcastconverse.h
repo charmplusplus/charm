@@ -67,7 +67,7 @@ class PipeBroadcastConverse : public Strategy {
 
   int pipeSize; // this is the size of the splitted messages, including the converse header
   int topology;
-  double log_of_2_inv;
+  //double log_of_2_inv;
   int seqNumber;
   CkQ <MessageHolder*> *messageBuf;
   CkHashtableT<PipeBcastHashKey, PipeBcastHashObj *> fragments;
@@ -79,7 +79,7 @@ class PipeBroadcastConverse : public Strategy {
   PipeBroadcastConverse(CkMigrateMessage *) {};
   int getPipeSize() { return pipeSize; };
   void commonInit();
-  void deliverer(char *msg);
+  void deliverer(char *msg, int dim);
   void storing(char *msg, int isFrag);
   void propagate(char *msg, int isFrag, int srcPeNumber, int totalSendingSize, setFunction setPeNumber);
 
