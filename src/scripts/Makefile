@@ -86,31 +86,55 @@ SEQCHARMC=../bin/charmc -seq $(CHARMOPTS)
 #
 ###############################################################################
 
-ALLHEADERS=charm++.h ckstream.h charm.h cpthreads.h converse.h \
-	conv-trace.h conv-mach.h simplemsg.h sm.h trace.h pvmc.h \
-	pvm3.h sdag.h CDep.h CCounter.h CMsgBuffer.h CWhenTrigger.h \
-	ckarray.h pup.h ckreduction.h ckhashtable.h \
-	TList.h idl.h tempo.h waitqd.h LBDatabase.h \
-	lbdb.h LBDBManager.h LBComm.h LBOM.h LBObj.h LBMachineUtil.h \
-	Refiner.h ObjGraph.h CentralLB.h RandCentLB.h \
-	RecBisectBfLB.h graph.h fifoInt.h bitvecset.h \
-	RefineLB.h MetisLB.h  Comm1LB.h \
-	HeapCentLB.h Set.h elements.h heap.h conv-ccs.h \
-	NborBaseLB.h NeighborLB.h \
-	WSLB.h CkLists.h GreedyRefLB.h RandRefLB.h CommLB.h CommLBHeap.h \
-	ampi.h ampif.h ampiimpl.h
+CVHEADERS=cpthreads.h converse.h conv-mach.h conv-mach.sh \
+      conv-trace.h trace.h conv-ccs.h \
+      CkFutures.decl.h CkArray.decl.h CkReduction.decl.h \
+      LBDatabase.decl.h CentralLB.decl.h \
+      RandCentLB.decl.h RecBisectBfLB.decl.h \
+      MetisLB.decl.h RefineLB.decl.h \
+      HeapCentLB.decl.h NborBaseLB.decl.h NeighborLB.decl.h \
+      WSLB.decl.h GreedyRefLB.decl.h RandRefLB.decl.h \
+      tempo.decl.h waitqd.decl.h \
+	  CommLB.decl.h Comm1LB.decl.h  \
+	  ampi.decl.h ampimain.decl.h
+
+UTILHEADERS=pup.h pup_c.h ckhashtable.h \
+	sockRoutines.c sockRoutines.h
+
+CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
+      ckfutures.h ckarray.h ckreduction.h $(UTILHEADERS) \
+	  tempo.h waitqd.h LBDatabase.h lbdb.h \
+	  LBDBManager.h LBComm.h LBOM.h LBObj.h LBMachineUtil.h \
+	  Refiner.h ObjGraph.h heap.h elements.h CommLBHeap.h \
+	  CentralLB.h RandCentLB.h RecBisectBfLB.h \
+	  RefineLB.h HeapCentLB.h CommLB.h Comm1LB.h \
+	  MetisLB.h NborBaseLB.h \
+	  NeighborLB.h WSLB.h GreedyRefLB.h RandRefLB.h CkLists.h \
+      ampi.h ampif.h \
+	  $(CVHEADERS)
+
+ALLHEADERS=$(CKHEADERS) \
+    simplemsg.h sm.h pvmc.h pvm3.h sdag.h idl.h \
+    CDep.h CCounter.h CMsgBuffer.h CWhenTrigger.h TList.h \
+	fifoInt.h graph.h bitvecset.h Set.h ampiimpl.h
 
 ALLINTERFACES=idl.ci
 
-basics: dirs+sources $(ALLHEADERS) $(ALLINTERFACES) charmc conv-mach.sh
-	rm -rf ../include
-	mkdir ../include
-	cp $(ALLHEADERS) ../include/
-	cp $(ALLINTERFACES) ../include/
-	rm -f ../bin/charmc ; cp charmc ../bin/
-	chmod 755 ../bin/charmc
-	cp conv-mach.sh ../include/
+basics: headers
 	touch basics
+
+# Headers is used only for the dependencies
+headers: dirs+sources headerlinks $(ALLHEADERS) $(ALLINTERFACES)
+
+
+headerlinks: dirs+sources Makefile
+	rm -f ../bin/charmc ; cp charmc ../bin/
+	chmod +x ../bin/charmc
+	rm -rf ../include ; mkdir ../include
+	cp conv-mach.sh ../include/
+	-for hdr in $(ALLHEADERS); do ln -fs "../tmp/$$hdr" ../include ; done
+	-for hdr in $(ALLINTERFACES); do ln -fs "../tmp/$$hdr" ../include ; done
+	touch headerlinks	
 
 dirs+sources:
 	rm -f .vdir .gdir
@@ -127,6 +151,7 @@ dirs+sources:
 	./gatherflat ../../src/Common/conv-core        .
 	./gatherflat ../../src/Common/conv-ldb         .
 	./gatherflat ../../src/Common/ck-core          .
+	./gatherflat ../../src/Common/util             .
 	./gatherflat ../../src/Common/ck-perf          .
 	./gatherflat ../../src/Common/ck-ldb           .
 	./gatherflat ../../src/Common/langs/simplemsg  .
@@ -153,38 +178,15 @@ dirs+sources:
 #
 ###############################################################################
 
-CVHEADERS=converse.h conv-mach.h conv-mach.sh \
-          ../include/CkFutures.decl.h CkFutures.def.h \
-          ../include/CkArray.decl.h CkArray.def.h \
-          ../include/CkReduction.decl.h CkReduction.def.h \
-          ../include/LBDatabase.decl.h LBDatabase.def.h \
-          ../include/CentralLB.decl.h CentralLB.def.h \
-          ../include/RandCentLB.decl.h RandCentLB.def.h \
-          ../include/RecBisectBfLB.decl.h RecBisectBfLB.def.h \
-          ../include/MetisLB.decl.h MetisLB.def.h \
-          ../include/RefineLB.decl.h RefineLB.def.h \
-          ../include/HeapCentLB.decl.h HeapCentLB.def.h \
-          ../include/NborBaseLB.decl.h NborBaseLB.def.h \
-          ../include/NeighborLB.decl.h NeighborLB.def.h \
-          ../include/WSLB.decl.h WSLB.def.h \
-          ../include/GreedyRefLB.decl.h GreedyRefLB.def.h \
-          ../include/RandRefLB.decl.h RandRefLB.def.h \
-          ../include/tempo.decl.h tempo.def.h \
-          ../include/waitqd.decl.h waitqd.def.h \
-	  ../include/CommLB.decl.h CommLB.def.h  \
-	  ../include/Comm1LB.decl.h Comm1LB.def.h  \
-	  ../include/ampi.decl.h ampi.def.h	\
-	  ../include/ampimain.decl.h ampimain.def.h
-
 TRACELIBS=libtrace-none.a libtrace-projections.a libtrace-summary.a
 
 CVLIBS=libconv-core.a libconv-cplus-n.a libconv-cplus-y.a libldb-rand.o libldb-spray.o libldb-graph.o libldb-test.o $(TRACELIBS)
 
-LIBCONV_CORE=threads.o convcore.o conv-conds.o queueing.o fifo.o msgmgr.o memory.o cpm.o cpthreads.o futures.o cldb.o random.o debug-message.o debug-object.o info.o generate.o edgelist.o conv-ccs.o quiescence.o
+LIBCONV_CORE=threads.o convcore.o conv-conds.o queueing.o fifo.o msgmgr.o memory.o cpm.o cpthreads.o futures.o cldb.o random.o debug-message.o debug-object.o info.o generate.o edgelist.o conv-ccs.o quiescence.o 
 
 converse: basics QuickThreads/libckqt.a $(CVLIBS) conv-host-if-needed conv-cpm
 
-conv-host-if-needed:
+conv-host-if-needed: 
 	if [ -d conv-host ] ; then ( cd conv-host ; make OPTS='$(OPTS)' ) ; fi
 
 QuickThreads/libckqt.a:
@@ -218,6 +220,9 @@ convcore.o: convcore.c $(CVHEADERS)
 
 conv-ccs.o: conv-ccs.c $(CVHEADERS)
 	$(CHARMC) conv-ccs.c
+
+sockRoutines.o: sockRoutines.c $(CVHEADERS)
+	$(CHARMC) sockRoutines.c
 
 random.o: random.c $(CVHEADERS)
 	$(CHARMC) random.c
@@ -270,18 +275,6 @@ libldb-test.o: cldb.test.c $(CVHEADERS)
 #
 ###############################################################################
 
-CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h trace.h \
-      ckfutures.h ckarray.h ckreduction.h ckhashtable.h \
-	  tempo.h waitqd.h LBDatabase.h lbdb.h \
-	  LBDBManager.h LBComm.h LBOM.h LBObj.h LBMachineUtil.h \
-	  Refiner.h ObjGraph.h heap.h elements.h CommLBHeap.h\
-	  CentralLB.h RandCentLB.h RecBisectBfLB.h \
-	  RefineLB.h HeapCentLB.h CommLB.h Comm1LB.h\
-	  MetisLB.h NborBaseLB.h \
-	  NeighborLB.h WSLB.h GreedyRefLB.h RandRefLB.h CkLists.h \
-          ampi.h ampif.h \
-	  $(CVHEADERS)
-
 CK_LIBS_CORE=libck.a
 
 LIBCK_CORE=init.o register.o qd.o ck.o main.o msgalloc.o ckfutures.o \
@@ -313,59 +306,8 @@ LIBTRACE_SUMM=trace-summary.o
 libtrace-summary.a: $(LIBTRACE_SUMM)
 	$(CHARMC) -cp ../lib/ -o $@ $(LIBTRACE_SUMM)
 
-../include/LBDatabase.decl.h : LBDatabase.decl.h
-	/bin/cp LBDatabase.decl.h ../include
-
-../include/CentralLB.decl.h : CentralLB.decl.h
-	/bin/cp CentralLB.decl.h ../include
-
-../include/RandCentLB.decl.h : RandCentLB.decl.h
-	/bin/cp RandCentLB.decl.h ../include
-
-../include/RecBisectBfLB.decl.h : RecBisectBfLB.decl.h
-	/bin/cp RecBisectBfLB.decl.h ../include
-
-../include/MetisLB.decl.h : MetisLB.decl.h
-	/bin/cp MetisLB.decl.h ../include
-
-../include/RefineLB.decl.h : RefineLB.decl.h
-	/bin/cp RefineLB.decl.h ../include
-
-../include/CommLB.decl.h : CommLB.decl.h
-	/bin/cp CommLB.decl.h ../include
-
-../include/Comm1LB.decl.h : Comm1LB.decl.h
-	/bin/cp Comm1LB.decl.h ../include
-
-../include/HeapCentLB.decl.h : HeapCentLB.decl.h
-	/bin/cp HeapCentLB.decl.h ../include
-
-../include/NborBaseLB.decl.h : NborBaseLB.decl.h
-	/bin/cp NborBaseLB.decl.h ../include
-
-../include/NeighborLB.decl.h : NeighborLB.decl.h
-	/bin/cp NeighborLB.decl.h ../include
-
-../include/WSLB.decl.h : WSLB.decl.h
-	/bin/cp WSLB.decl.h ../include
-
-../include/GreedyRefLB.decl.h : GreedyRefLB.decl.h
-	/bin/cp GreedyRefLB.decl.h ../include
-
-../include/RandRefLB.decl.h : RandRefLB.decl.h
-	/bin/cp RandRefLB.decl.h ../include
-
-../include/CkFutures.decl.h : CkFutures.decl.h
-	/bin/cp CkFutures.decl.h ../include
-
-../include/ampi.decl.h : ampi.decl.h
-	/bin/cp ampi.decl.h ../include
-
 ampi.decl.h ampi.def.h : ampi.ci charmxi
 	$(CHARMC) ampi.ci
-
-../include/ampimain.decl.h : ampimain.decl.h
-	/bin/cp ampimain.decl.h ../include
 
 ampimain.decl.h ampimain.def.h : ampimain.ci charmxi
 	$(CHARMC) ampimain.ci
@@ -373,25 +315,19 @@ ampimain.decl.h ampimain.def.h : ampimain.ci charmxi
 CkFutures.decl.h CkFutures.def.h : ckfutures.ci charmxi
 	$(CHARMC) ckfutures.ci
 
-../include/tempo.decl.h : tempo.decl.h
-	/bin/cp tempo.decl.h ../include
-
 tempo.decl.h tempo.def.h : tempo.ci charmxi
 	$(CHARMC) tempo.ci
-
-../include/waitqd.decl.h : waitqd.decl.h
-	/bin/cp waitqd.decl.h ../include
 
 waitqd.decl.h waitqd.def.h : waitqd.ci charmxi
 	$(CHARMC) waitqd.ci
 
-CentralLB.decl.h Central.def.h : CentralLB.ci charmxi
+CentralLB.decl.h CentralLB.def.h : CentralLB.ci charmxi
 	$(CHARMC) CentralLB.ci
 
 LBDatabase.decl.h LBDatabase.def.h : LBDatabase.ci charmxi
 	$(CHARMC) LBDatabase.ci
 
-RandCentLB.decl.h RandCent.def.h : RandCentLB.ci charmxi
+RandCentLB.decl.h RandCentLB.def.h : RandCentLB.ci charmxi
 	$(CHARMC) RandCentLB.ci
 
 RecBisectBfLB.decl.h RecBisectBfLB.def.h : RecBisectBfLB.ci charmxi
@@ -418,7 +354,7 @@ NborBaseLB.decl.h NborBaseLB.def.h : NborBaseLB.ci charmxi
 NeighborLB.decl.h NeighborLB.def.h : NeighborLB.ci charmxi
 	$(CHARMC) NeighborLB.ci
 
-WSLB.decl.h WS.def.h : WSLB.ci charmxi
+WSLB.decl.h WSLB.def.h : WSLB.ci charmxi
 	$(CHARMC) WSLB.ci
 
 GreedyRefLB.decl.h GreedyRefLB.def.h : GreedyRefLB.ci charmxi
@@ -445,11 +381,8 @@ tempo.o: tempo.C $(CKHEADERS)
 waitqd.o: waitqd.C $(CKHEADERS)
 	$(CHARMC) -o waitqd.o waitqd.C
 
-CkReduction.decl.h CkReduction.def.h : ckreduction.ci charmxi
+CkReduction.decl.h CkReduction.def.h: ckreduction.ci charmxi
 	$(CHARMC) ckreduction.ci
-
-../include/CkReduction.decl.h : CkReduction.decl.h
-	/bin/cp CkReduction.decl.h ../include
 
 ckreduction.o: ckreduction.C $(CKHEADERS)
 	$(CHARMC) -o ckreduction.o ckreduction.C
@@ -459,9 +392,6 @@ ckhashtable.o: ckhashtable.C $(CKHEADERS)
 
 CkArray.decl.h CkArray.def.h : ckarray.ci charmxi
 	$(CHARMC) ckarray.ci
-
-../include/CkArray.decl.h : CkArray.decl.h
-	/bin/cp CkArray.decl.h ../include
 
 ckarray.o: ckarray.C $(CKHEADERS)
 	$(CHARMC) -o ckarray.o ckarray.C
@@ -998,6 +928,7 @@ clean:
 	rm -f core *.o
 	rm -f core #*#
 	rm -f core *~
+	rm -f ../include/*
 	if [ -d conv-host ] ; then ( cd conv-host ; make clean ) ; fi
 	( cd doc; make clean )
 	( cd libs; make clean )
@@ -1013,3 +944,5 @@ veryclean:
 	rm -rf [a-z]* [A-Z]*
 	mv .Makefile Makefile
 	rm -rf .[a-z]* .[A-Z]*
+
+
