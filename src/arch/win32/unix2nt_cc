@@ -183,7 +183,7 @@ do
 		if [ "x`getExtention $out`" = "x.o" ]
 		then
 #It's a .o output filename-- tell CL
-			OUTPUT="/Fo$out"
+			OUTPUT="/Fo`cygpath -w $out`"
 		else
 #It's an exe filename-- tell LINK
 			LINK="$LINK /out:$out.exe"
@@ -199,15 +199,15 @@ do
 #C source file
 	*.c)
 		base=`stripExtention $arg`
-		CL="$CL /Tc$arg"
-		OUTPUT="/Fo$base.o"
+		CL="$CL /Tc`cygpath -w $arg`"
+#		OUTPUT="/Fo$base.o"
 		LINK="$LINK $base.o"
 		;;
 #C++ source file
 	*.C|*.cxx|*.cpp)
 		base=`stripExtention $arg`
-		CL="$CL /Tp$arg"
-		OUTPUT="/Fo$base.o"
+		CL="$CL /Tp`cygpath -w $arg`"
+#		OUTPUT="/Fo$base.o"
 		LINK="$LINK $base.o"
 		;;
 # Default
