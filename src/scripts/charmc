@@ -756,11 +756,11 @@ Debug "About to check TRACEMODE=$TRACEMODE and BALANCE=$BALANCE..."
 
 # Check for valid choice of TRACEMODE
 
-[ -e $CHARMLIB/libtrace-none.a ] || Abort "trace libraries not installed."
+[ -r $CHARMLIB/libtrace-none.a ] || Abort "trace libraries not installed."
 
 [ -z "$TRACEMODE" ] && TRACEMODE="none"
 
-[ ! -e $CHARMLIB/libtrace-$TRACEMODE.a ] && Abort "charmc : No such tracemode $TRACEMODE"
+[ ! -r $CHARMLIB/libtrace-$TRACEMODE.a ] && Abort "charmc : No such tracemode $TRACEMODE"
 
 
 # Check for valid choice of BALANCE
@@ -785,7 +785,7 @@ fi
 
 Debug "Finished with BAL_OBJ=$BAL_OBJ, TRACEMODE=$TRACEMODE..."
 
-if [ ! -e "$BAL_OBJ" ]
+if [ ! -r "$BAL_OBJ" ]
 then
 	if [ "$BALANCE" = "$BAL_OBJ" ]
 	then
@@ -832,7 +832,7 @@ esac
 #
 ########################################################################
 
-if [ -e $CHARMBIN/conv-host ]
+if [ -x $CHARMBIN/conv-host ]
 then
 	DoNoErrCheck $RM conv-host
 	Do $CP $CHARMBIN/conv-host conv-host
