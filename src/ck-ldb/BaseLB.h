@@ -53,6 +53,9 @@ public:
                  total_walltime(0.0), total_cputime(0.0), idletime(0.0),
 	   	 bg_walltime(0.0), bg_cputime(0.0), 
                  pe(-1), available(CmiTrue)  {}
+    inline void clearBgLoad() {
+    	idletime = bg_walltime = bg_cputime = 0.0;
+    }
     inline void pup(PUP::er &p) {
       p|total_walltime;  p|total_cputime; p|idletime;
       p|bg_walltime; p|bg_cputime; p|pe_speed;
@@ -94,6 +97,9 @@ public:
       from_proc.free();
       to_proc.free();
       deleteCommHash();
+    }
+    void clearBgLoad() {
+      for (int i=0; i<count; i++) procs[i].clearBgLoad();
     }
     void print();
     double computeAverageLoad();

@@ -54,8 +54,8 @@ public:
   ThreeLevelTree() {
     nLevels = 3;
     span[0] = CkNumPes()/8;
-    if (span[0] == 0) span[0] = CkNumPes()/4;
-    CmiAssert(span[0]>0);
+    if (span[0] < 2) span[0] = CkNumPes()/4;
+    CmiAssert(span[0]>1);
     span[1] = (CkNumPes()+span[0]-1)/span[0];
     toproot = 1;
   }

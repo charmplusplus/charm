@@ -40,8 +40,10 @@ public:
   LBInfo(double *pl, int count): peLoads(pl), objLoads(NULL), comLoads(NULL), bgLoads(NULL), numPes(count), minObjLoad(0.0), maxObjLoad(0.0) {}
   LBInfo(int count);
   ~LBInfo();
+  void getInfo(BaseLB::LDStats* stats, int count, int considerComm);
   void clear();
   void print();
+  void getSummary(double &maxLoad, double &totalLoad);
 };
 
 class CentralLB : public BaseLB

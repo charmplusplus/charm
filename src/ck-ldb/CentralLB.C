@@ -24,9 +24,6 @@ int load_balancer_created;
 
 CreateLBFunc_Def(CentralLB, "CentralLB base class");
 
-void getLoadInfo(BaseLB::LDStats* stats, int count, 
-		             LBInfo &info, int considerComm);
-
 static void getPredictedLoadWithMsg(BaseLB::LDStats* stats, int count, 
 		             LBMigrateMsg *, LBInfo &info, int considerComm);
 
@@ -375,9 +372,10 @@ void CentralLB::LoadBalance()
 
 //  calculate predicted load
 //  very time consuming though, so only happen when debugging is on
-  if (_lb_args.debug()>1) {
+  if (_lb_args.printSummary()) {
       LBInfo info(migrateMsg->expectedLoad, clients);
-      getPredictedLoadWithMsg(statsData, clients, migrateMsg, info, 1);
+        // not take comm data
+      getPredictedLoadWithMsg(statsData, clients, migrateMsg, info, 0);
   }
 
   //  CkPrintf("calling recv migration\n");
@@ -606,15 +604,8 @@ void CentralLB::CheckMigrationComplete()
 
 void CentralLB::preprocess(LDStats* stats,int count)
 {
-  for (int pe=0; pe<count; pe++)
-  {
-    struct ProcStats &procStat = statsData->procs[pe];
-    if (_lb_args.ignoreBgLoad()) {
-      procStat.idletime = 0.0;
-      procStat.bg_walltime = 0.0;
-      procStat.bg_cputime = 0.0;
-    }
-  }
+  if (_lb_args.ignoreBgLoad())
+    stats->clearBgLoad();
 
   // Call the predictor for the future
   if (_lb_predict) FuturePredictor(statsData);
@@ -851,133 +842,10 @@ void getPredictedLoadWithMsg(BaseLB::LDStats* stats, int count,
           stats->to_proc[idx] = mInfo.to_pe;
 	}
 
-	getLoadInfo(stats, count, info, considerComm);
-}
-
-
-void getLoadInfo(BaseLB::LDStats* stats, int count, 
-		             LBInfo &info, int considerComm)
-{
-	int i, pe;
-	double *peLoads = info.peLoads;
-	double *objLoads = info.objLoads;
-	double *comLoads = info.comLoads;
-	double *bgLoads = info.bgLoads;
-        double minObjLoad = 1.0e20;  // I suppose no object load is beyond this
-	double maxObjLoad = 0.0;
-	CmiAssert(peLoads);
-
-	double alpha = _lb_args.alpha();
-	double beeta = _lb_args.beeta();
-
-	stats->makeCommHash();
-
-	info.clear();
-
-        // get background load
-	if (bgLoads)
-    	  for(pe = 0; pe < count; pe++)
-    	   bgLoads[pe] = stats->procs[pe].bg_walltime;
-
-	for(pe = 0; pe < count; pe++)
-    	  peLoads[pe] = stats->procs[pe].bg_walltime;
-
-    	for(int obj = 0; obj < stats->n_objs; obj++)
-    	{
-		int pe = stats->to_proc[obj];
-		double &oload = stats->objData[obj].wallTime;
-		if (oload < minObjLoad) minObjLoad = oload;
-		if (oload > maxObjLoad) maxObjLoad = oload;
-		peLoads[pe] += oload;
-		if (objLoads) objLoads[pe] += oload;
-	}
-
-	// handling of the communication overheads. 
-	if (considerComm) {
-	  int* msgSentCount = new int[count]; // # of messages sent by each PE
-	  int* msgRecvCount = new int[count]; // # of messages received by each PE
-	  int* byteSentCount = new int[count];// # of bytes sent by each PE
-	  int* byteRecvCount = new int[count];// # of bytes reeived by each PE
-	  for(i = 0; i < count; i++)
-	    msgSentCount[i] = msgRecvCount[i] = byteSentCount[i] = byteRecvCount[i] = 0;
-
-	  int mcast_count = 0;
-          for (int cidx=0; cidx < stats->n_comm; cidx++) {
-	    LDCommData& cdata = stats->commData[cidx];
-	    int senderPE, receiverPE;
-	    if (cdata.from_proc())
-	      senderPE = cdata.src_proc;
-  	    else {
-	      int idx = stats->getHash(cdata.sender);
-	      if (idx == -1) continue;    // sender has just migrated?
-	      senderPE = stats->to_proc[idx];
-	      CmiAssert(senderPE != -1);
-	    }
-	    CmiAssert(senderPE < count && senderPE >= 0);
-
-            // find receiver: point-to-point and multicast two cases
-	    int receiver_type = cdata.receiver.get_type();
-	    if (receiver_type == LD_PROC_MSG || receiver_type == LD_OBJ_MSG) {
-              if (receiver_type == LD_PROC_MSG)
-	        receiverPE = cdata.receiver.proc();
-              else  {  // LD_OBJ_MSG
-	        int idx = stats->getHash(cdata.receiver.get_destObj());
-	        if (idx == -1) continue;    // receiver has just been removed?
-	        receiverPE = stats->to_proc[idx];
-	        CmiAssert(receiverPE != -1);
-              }
-              CmiAssert(receiverPE < count && receiverPE >= 0);
-	      if(senderPE != receiverPE)
-	      {
-	  	msgSentCount[senderPE] += cdata.messages;
-		byteSentCount[senderPE] += cdata.bytes;
-		msgRecvCount[receiverPE] += cdata.messages;
-		byteRecvCount[receiverPE] += cdata.bytes;
-	      }
-	    }
-            else if (receiver_type == LD_OBJLIST_MSG) {
-              int nobjs;
-              LDObjKey *objs = cdata.receiver.get_destObjs(nobjs);
-	      mcast_count ++;
-	      for (i=0; i<nobjs; i++) {
-	        int idx = stats->getHash(objs[i]);
-		CmiAssert(idx != -1);
-	        if (idx == -1) continue;    // receiver has just been removed?
-	        receiverPE = stats->to_proc[idx];
-		CmiAssert(receiverPE < count && receiverPE >= 0);
-	        if(senderPE != receiverPE)
-	        {
-	  	msgSentCount[senderPE] += cdata.messages;
-		byteSentCount[senderPE] += cdata.bytes;
-		msgRecvCount[receiverPE] += cdata.messages;
-		byteRecvCount[receiverPE] += cdata.bytes;
-	        }
-              }
-	    }
-	  }   // end of for
-          if (_lb_args.debug())
-             CkPrintf("Number of MULTICAST: %d\n", mcast_count);
-
-	  // now for each processor, add to its load the send and receive overheads
-	  for(i = 0; i < count; i++)
-	  {
-		double comload = msgRecvCount[i]  * PER_MESSAGE_RECV_OVERHEAD +
-			      msgSentCount[i]  * alpha +
-			      byteRecvCount[i] * PER_BYTE_RECV_OVERHEAD +
-			      byteSentCount[i] * beeta;
-		peLoads[i] += comload;
-		if (comLoads) comLoads[i] += comload;
-	  }
-	  delete [] msgRecvCount;
-	  delete [] msgSentCount;
-	  delete [] byteRecvCount;
-	  delete [] byteSentCount;
-	}
-
- 	info.minObjLoad = minObjLoad;
- 	info.maxObjLoad = maxObjLoad;
+	info.getInfo(stats, count, considerComm);
 #endif
 }
+
 
 void CentralLB::findSimResults(LDStats* stats, int count, LBMigrateMsg* msg, LBSimulation* simResults)
 {
