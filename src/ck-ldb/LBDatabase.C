@@ -18,6 +18,7 @@
 
 #include "LBDatabase.h"
 #include "LBDatabase.def.h"
+#include "LBSimulation.h"
 
 #include "NullLB.h"
 
@@ -26,10 +27,6 @@ CkGroupID lbdb;
 CkpvDeclare(int, numLoadBalancers);  /**< num of lb created */
 CkpvDeclare(int, hasNullLB);         /**< true if NullLB is created */
 CkpvDeclare(int, lbdatabaseInited);  /**< true if lbdatabase is inited */
-CkpvDeclare(int, dumpStep);			 /**< the load balancing step at which to dump data */
-CkpvDeclare(char*, dumpFile);		 /**< the name of the file in which the data will be dumped */
-CkpvDeclare(int, doSimulation);		 /**< true if the program is running under "simulation" mode for load balancing */
-const char defaultDumpFileName[] = "lbdata.dat";   //default fname for dumping
 
 int lb_debug=0;
 
@@ -106,7 +103,7 @@ LBDBInit::LBDBInit(CkArgMsg *m)
   if (!lbFn) lbFn = CreateNullLB;
   (lbFn)();
 
-  if (CkpvAccess(doSimulation)) {
+  if (LBSimulation::doSimulation) {
     CmiPrintf("Charm++> Entering Load Balancer Simulation Mode ... \n");
     CProxy_LBDatabase(lbdb).ckLocalBranch()->StartLB();
   }
@@ -155,12 +152,6 @@ void _loadbalancerInit()
   CkpvAccess(numLoadBalancers) = 0;
   CkpvInitialize(int, hasNullLB);
   CkpvAccess(hasNullLB) = 0;
-  CkpvInitialize(int, dumpStep);
-  CkpvAccess(dumpStep) = -1;
-  CkpvInitialize(char*, dumpFile);
-  CkpvAccess(dumpFile) = (char *)defaultDumpFileName;
-  CkpvInitialize(int, doSimulation);
-  CkpvAccess(doSimulation) = 0;
 
   char **argv = CkGetArgv();
   char *balancer = NULL;
@@ -169,12 +160,15 @@ void _loadbalancerInit()
     lbRegistry.defaultLB() = balancer;
   }
 
+  /******************* SIMULATION *******************/
   // get the step number at which to dump the LB database
-  CmiGetArgIntDesc(argv, "+LBDump", &CkpvAccess(dumpStep), "Dump the LB state at this step");
-  CmiGetArgStringDesc(argv, "+LBDumpFile", &CkpvAccess(dumpFile), "Set the LB state file name");
-
+  CmiGetArgIntDesc(argv, "+LBDump", &LBSimulation::dumpStep, "Dump the LB state at this step");
+  CmiGetArgStringDesc(argv, "+LBDumpFile", &LBSimulation::dumpFile, "Set the LB state file name");
   // get the simulation flag
-  CkpvAccess(doSimulation) = CmiGetArgFlagDesc(argv, "+LBSim", "Read LB state from LBDumpFile");
+  LBSimulation::doSimulation = CmiGetArgFlagDesc(argv, "+LBSim", "Read LB state from LBDumpFile");
+  LBSimulation::simProcs = 0;
+  CmiGetArgIntDesc(argv, "+LBSimProcs", &LBSimulation::simProcs, "Number of target processors.");
+
   lb_debug = CmiGetArgFlagDesc(argv, "+LBDebug", "Turn on LB debugging printouts");
 }
 

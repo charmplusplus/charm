@@ -4,9 +4,18 @@
  * $Date$
  * $Revision$
  */
-#include "SimResults.h"
+#include "LBSimulation.h"
 
-CLBSimResults::CLBSimResults(int numPes_) : numPes(numPes_)
+/*****************************************************************************
+		Sequentail Simulation 
+*****************************************************************************/
+
+int LBSimulation::dumpStep = -1;  	     /// step number to dump
+char* LBSimulation::dumpFile = "lbdata.dat";   /// dump file name
+int LBSimulation::doSimulation = 0; 	     /// flag if do simulation
+int LBSimulation::simProcs = 0; 	     /// simulation target procs
+
+LBSimulation::LBSimulation(int numPes_) : numPes(numPes_)
 {
 	peLoads = new double [numPes];
 	bgLoads = new double [numPes];
@@ -14,20 +23,20 @@ CLBSimResults::CLBSimResults(int numPes_) : numPes(numPes_)
 		peLoads[i] = bgLoads[i] = 0.0;
 }
 
-CLBSimResults::~CLBSimResults()
+LBSimulation::~LBSimulation()
 {
  	delete [] peLoads;
  	delete [] bgLoads;
 }
 
-void CLBSimResults::SetProcessorLoad(int pe, double load, double bgload)
+void LBSimulation::SetProcessorLoad(int pe, double load, double bgload)
 {
 	CkAssert(0 <= pe && pe < numPes);
 	peLoads[pe] = load;
 	bgLoads[pe] = bgload;
 }
 
-void CLBSimResults::PrintSimulationResults()
+void LBSimulation::PrintSimulationResults()
 {
   int i;
   double minLoad, maxLoad, sum, average;

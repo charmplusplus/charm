@@ -237,7 +237,11 @@ void CentralLB::ReceiveStats(CLBStatsMsg *m)
 	migrateMsg->avail_vector[proc] = avail_vector[proc];
     migrateMsg->next_lb = new_ld_balancer;
 
+//  very time consuming, only needed for step load balancing
+#if 0
     getPredictedLoad(statsDataList, clients, migrateMsg, migrateMsg->expectedLoad);
+#endif
+
 
 //  CkPrintf("calling recv migration\n");
     thisProxy.ReceiveMigration(migrateMsg);
@@ -453,27 +457,27 @@ LBMigrateMsg* CentralLB::Strategy(LDStats* stats,int count)
 }
 
 void CentralLB::simulation() {
-  if(step() == CkpvAccess(dumpStep))
+  if(step() == LBSimulation::dumpStep)
   {
     // here we are supposed to dump the database
-    writeStatsMsgs(CkpvAccess(dumpFile));
+    writeStatsMsgs(LBSimulation::dumpFile);
     CmiPrintf("LBDump: Dumped the load balancing data.\n");
     CmiPrintf("Charm++> Exiting...\n");
     CkExit();
     return;
   }
-  else if(CkpvAccess(doSimulation))
+  else if(LBSimulation::doSimulation)
   {
     // here we are supposed to read the data from the dump database
-    readStatsMsgs(CkpvAccess(dumpFile));
+    readStatsMsgs(LBSimulation::dumpFile);
 
-    CLBSimResults simResults(stats_msg_count);
+    LBSimulation simResults(LBSimulation::simProcs);
 
     // now pass it to the strategy routine
-    LBMigrateMsg* migrateMsg = Strategy(statsDataList, stats_msg_count);
+    LBMigrateMsg* migrateMsg = Strategy(statsDataList, LBSimulation::simProcs);
 
     // now calculate the results of the load balancing simulation
-    FindSimResults(statsDataList, stats_msg_count, migrateMsg, &simResults);
+    FindSimResults(statsDataList, LBSimulation::simProcs, migrateMsg, &simResults);
 
     // now we have the simulation data, so print it and exit
     CmiPrintf("Charm++> LBSim: Simulation of one load balancing step done.\n");
@@ -489,7 +493,7 @@ void CentralLB::readStatsMsgs(const char* filename) {
 
   int i;
   FILE *f = fopen(filename, "r");
-  if (f==NULL) CmiAbort("LB Dump file not exist!\n");
+  if (f==NULL) CmiAbort("Fatal Error> Cannot open LB Dump file!\n");
 
   // at this stage, we need to rebuild the statsMsgList and
   // statsDataList structures. For that first deallocate the
@@ -502,10 +506,13 @@ void CentralLB::readStatsMsgs(const char* filename) {
   p|stats_msg_count;
 
   CmiPrintf("readStatsMsgs for %d pes starts ... \n", stats_msg_count);
+  if (LBSimulation::simProcs == 0) LBSimulation::simProcs = stats_msg_count;
 
   // now rebuild new structures
+  int tableSize = stats_msg_count;
+  if (tableSize < LBSimulation::simProcs) tableSize = LBSimulation::simProcs;
   statsMsgsList = new CLBStatsMsg*[stats_msg_count];
-  statsDataList = new LDStats[stats_msg_count];
+  statsDataList = new LDStats[tableSize];
 
   for (i = 0; i < stats_msg_count; i++) {
     CLBStatsMsg* m = new CLBStatsMsg;
@@ -523,8 +530,13 @@ void CentralLB::readStatsMsgs(const char* filename) {
     statsDataList[i].total_walltime = m->total_walltime;
     statsDataList[i].total_cputime = m->total_cputime;
     statsDataList[i].idletime = m->idletime;
+#if 0
     statsDataList[i].bg_walltime = m->bg_walltime;
     statsDataList[i].bg_cputime = m->bg_cputime;
+#else
+    statsDataList[i].bg_walltime = 0.;
+    statsDataList[i].bg_cputime = 0.;
+#endif
     statsDataList[i].pe_speed = m->pe_speed;
     statsDataList[i].utilization = 1.0;
     statsDataList[i].available = CmiTrue;
@@ -538,6 +550,28 @@ void CentralLB::readStatsMsgs(const char* filename) {
     statsDataList[i].commData = (LDCommData*)((char *)m+(size_t)m->commData);
 #endif
 //CmiPrintf("i:%d bg_walltime: %f total_walltime: %f objData: %d %p comm: %d %p\n", i, m->bg_walltime, m->total_walltime, m->n_objs, m->objData, m->n_comm, m->commData);
+  }
+
+  CmiPrintf("Simulation for %d pes \n", LBSimulation::simProcs);
+
+  if (stats_msg_count < LBSimulation::simProcs) {
+    for (int i=stats_msg_count; i<LBSimulation::simProcs; i++) {
+      statsMsgsList[i] = NULL;
+      statsDataList[i].total_walltime = 0.0;
+      statsDataList[i].total_cputime = 0.0;
+      statsDataList[i].idletime = 0.0;
+      statsDataList[i].bg_walltime = 0.;
+      statsDataList[i].bg_cputime = 0.;
+      statsDataList[i].pe_speed = 1;
+      statsDataList[i].utilization = 1.0;
+      statsDataList[i].available = CmiTrue;
+
+      statsDataList[i].n_objs = 0;
+      statsDataList[i].objData = NULL;
+      statsDataList[i].n_comm = 0;
+      statsDataList[i].commData = NULL;
+      
+    }
   }
 
   // file f is closed in the destructor of PUP::fromDisk
@@ -663,7 +697,7 @@ static void getPredictedLoad(CentralLB::LDStats* stats, int count, LBMigrateMsg*
 	delete byteSentCount;
 }
 
-void CentralLB::FindSimResults(LDStats* stats, int count, LBMigrateMsg* msg, CLBSimResults* simResults)
+void CentralLB::FindSimResults(LDStats* stats, int count, LBMigrateMsg* msg, LBSimulation* simResults)
 {
     CkAssert(simResults != NULL && count == simResults->numPes);
     // estimate the new loads of the processors. As a first approximation, this is the

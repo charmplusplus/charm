@@ -23,9 +23,6 @@ class LBDB;
 CkpvExtern(int, numLoadBalancers);
 CkpvExtern(int, hasNullLB);
 CkpvExtern(int, lbdatabaseInited);
-CkpvExtern(int, dumpStep);
-CkpvExtern(char*, dumpFile);
-CkpvExtern(int, doSimulation);
 
 extern int lb_debug;
 
