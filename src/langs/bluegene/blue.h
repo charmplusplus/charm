@@ -93,6 +93,8 @@ int  BgNumNodes();      /* return the number of nodes on this emulator pe */
 int  BgMyRank();	/* node ID, this is local ID */
 int  BgMyNode();
 
+int BgNodeToPE(int node);         /* return a real processor number from a bg node */
+
 /**
    get and set number of worker and communication thread 
 */

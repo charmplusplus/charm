@@ -6,11 +6,25 @@
 #define BLUEGENE_TIMING     	1
 
 /**
+  timing correction message
+*/
+class bgCorrectionMsg
+{
+public:
+  char   core[CmiBlueGeneMsgHeaderSizeBytes];
+  int    msgID;	
+  int    tID;		// destination worker thread ID
+  double tAdjust;	// correction in recvTime at destPe
+  int 	 destNode;
+};
+
+/**
   a message sent event
 */
 class bgMsgEntry {
 public:
   int msgID;
+  int tID;		// destination worker thread ID
   double sendtime;
   int dstPe;
 public:
@@ -25,8 +39,9 @@ public:
 class bgTimeLog {
 public:
   int ep;
+  double recvTime;	//Time at which the message was received in 'inbuffer'
   double startTime, endTime;
-  int srcpe;                   // source bg node 
+  int srcpe;        // source bg node 
   int msgID;
   CkVec< bgMsgEntry * > msgs;
 public:
@@ -45,10 +60,13 @@ public:
 */
 typedef CkQ< bgTimeLog *> BgTimeLine;
 
+CpvExtern(int, bgCorrectionHandler);
+
 extern void BgInitTiming();
 extern void BgMsgSetTiming(char *msg);
 extern void BgPrintThreadTimeLine(int node, int th, BgTimeLine &tline);
-extern void BgAdjustTimeLineInit(bgTimeLog* tlog, BgTimeLine &tline);
+extern void BgGetMsgStartTime(double recvTime, BgTimeLine &tline, double* startTime, int index);
+extern void BgAdjustTimeLineInsert(bgTimeLog* tlog, BgTimeLine &tline);
 extern void BgAdjustTimeLineForward(int msgID, double tAdjust, BgTimeLine &tline);
 
 #if BLUEGENE_TIMING
@@ -60,6 +78,7 @@ extern void BgAdjustTimeLineForward(int msgID, double tAdjust, BgTimeLine &tline
 	if (tTHREADTYPE == WORK_THREAD) {	\
           BgTimeLine &log = tMYNODE->timelines[tMYID];	\
           log[log.length()-1]->closeLog();	\
+		  BgAdjustTimeLineInsert(log);	\
         }
 
 #define BG_ADDMSG(m)  	\

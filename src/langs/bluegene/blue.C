@@ -48,6 +48,7 @@ CpvStaticDeclare(CthThread, mainThread);
 CpvDeclare(int,msgHandler);
 CpvDeclare(int,nBcastMsgHandler);
 CpvDeclare(int,tBcastMsgHandler);
+CpvDeclare(int,bgCorrectionHandler);
 CpvDeclare(int,exitHandler);
 
 CmiHandler msgHandlerFunc(char *msg);
@@ -459,6 +460,14 @@ CmiHandler threadBCastMsgHandlerFunc(char *msg)
   return 0;
 }
 
+void bgCorrectionFunc(char *msg)
+{
+	bgCorrectionMsg* m = (bgCorrectionMsg*)msg;
+	int nodeidx = nodeInfo::Global2Local(m->destNode);	
+    BgTimeLine &log = cva(nodeinfo)[nodeidx].timelines[m->tID];	
+	BgAdjustTimeLineForward(m->msgID, m->tAdjust, log);
+}
+
 #define ABS(x) (((x)<0)? -(x) : (x))
 
 static double MSGTIME(int ox, int oy, int oz, int nx, int ny, int nz)
@@ -637,6 +646,11 @@ int BgMyNode()
   if (tMYNODE == NULL) CmiAbort("Calling BgMyNode in the main thread!");
 #endif
   return nodeInfo::XYZ2Global(tMYX, tMYY, tMYZ);
+}
+
+int BgNodeToPE(int node)         /* return a real processor number from a bg node */
+{
+  return nodeInfo::Global2PE(node);
 }
 
 int BgGetThreadID()
@@ -992,6 +1006,9 @@ CmiStartFn bgMain(int argc, char **argv)
   cva(nBcastMsgHandler) = CmiRegisterHandler((CmiHandler)nodeBCastMsgHandlerFunc);
   CpvInitialize(int,tBcastMsgHandler);
   cva(tBcastMsgHandler) = CmiRegisterHandler((CmiHandler)threadBCastMsgHandlerFunc);
+
+  CpvInitialize(int,bgCorrectionHandler);
+  cva(bgCorrectionHandler) = CmiRegisterHandler((CmiHandler) bgCorrectionFunc);
 
   CpvInitialize(int,exitHandler);
   cva(exitHandler) = CmiRegisterHandler((CmiHandler) exitHandlerFunc);
