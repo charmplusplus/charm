@@ -2966,6 +2966,8 @@ int AMPI_Intercomm_create(MPI_Comm lcomm, int lleader, MPI_Comm pcomm, int rlead
 
     if(rsize==0) CkAbort("MPI_Intercomm_create: remote size = 0!\n");
   }
+  
+  if(rvec.size()==0) CkAbort("AMPI> Abort: Does it really make sense to create an empty communicator?");
 
   ptr->intercommCreate(rvec,root,newintercomm);
   return 0;
@@ -3287,6 +3289,7 @@ int AMPI_Comm_create(MPI_Comm comm, MPI_Group group, MPI_Comm* newcomm)
 {
   AMPIAPI("AMPI_Comm_create");
   groupStruct vec = getAmpiParent()->group2vec(group);
+  if(vec.size()==0) CkAbort("AMPI> Abort: Does it really make sense to create an empty communicator?");
   getAmpiInstance(comm)->commCreate(vec, newcomm);
   return 0;
 }
