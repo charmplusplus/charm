@@ -181,7 +181,7 @@ public:
 	void *put(const void *key);
 	
 	//Look up the given object in this table.  Return NULL if not found.
-	void *get(const void *key) {
+	void *get(const void *key) const {
 		char *ent=findKey(key);
 		if (ent==NULL) return NULL;
 		else return layout.getObject(ent);
@@ -262,7 +262,7 @@ public:
 	 {}
 	
 	OBJ &put(const KEY &key) {return *(OBJ *)CkHashtable::put((const void *)&key);}
-	OBJ get(const KEY &key) {
+	OBJ get(const KEY &key) const {
 		void *r=CkHashtable::get((const void *)&key);
 		if (r==NULL) return OBJ(0);
 		else return *(OBJ *)r;
@@ -293,7 +293,7 @@ public:
 	 {}
 	
 	//Return the object, or "0" if it doesn't exist
-	OBJ get(const KEY &key) {
+	OBJ get(const KEY &key) const {
 		int i=key.hash()%len;
 		while(1) {//Assumes key or empty slot will be found
 			char *cur=entry(i);
