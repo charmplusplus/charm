@@ -94,28 +94,51 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
 #endif
   int offset = -1;
   complex **inData;
-
-  if (fromRow) {
+  if(fromRow || (symmetric && thisIndex.x == thisIndex.y)){
     offset = sender - thisIndex.x;
     inData = inDataLeft;
+    //    kLeftOffset[kLeftCount++]=offset;
   }
   else {
     offset = sender - thisIndex.y;
     inData = inDataRight;
+    //    kRighttOffset[kRightCount++]=offset;
   }
-  if(symmetric && thisIndex.x == thisIndex.y){
-    inData = inDataLeft;
-  }
+
   N = size;                                                             
 
   if (!inData[offset]) 
     inData[offset] = new complex[size];
   memcpy(inData[offset], points, size * sizeof(complex));
 
+  numRecd++;   
 
-  //compute ZDOT for this input row 
+  // once have K left and K right (or just K left if we're diagonal
+  // and symmetric) compute ZDOT for the inputs.
 
-  numRecd++; 
+  // Because the vectors are not guaranteed contiguous, record each
+  // offset so we can iterate through them
+  /*
+  if(kLefttCount > kUnits && ((kRightCount > kUnits) || (symmetric && thisIndex.x == thisIndex.y)))
+    {
+
+      // compute
+
+      // count down kUnits from leftCount starting at kUnit'th element
+      for(int i=kUnits;i>0;i--)
+	{
+	}
+
+      kLeftCount-=kUnits;
+      memcpy(kLeftOffset,kLeftOffset+kUnits,kLeftCount);
+      if(!symmetric || thisIndex.x != thisIndex.y)
+	{
+	  kRightCount-=kUnits;
+	  memcpy(kRighttOffset,kRightOffset+kUnits,kRightCount);
+	}
+    }
+
+  */
   if (numRecd == numExpected * 2 || (symmetric && thisIndex.x==thisIndex.y && numRecd==numExpected)) {
   
 #ifdef _DEBUG_
@@ -271,20 +294,28 @@ PairCalculator::acceptResult(int size, double *matrix, int rowNum, CkCallback cb
   if(S%grainSize!=0)
     segments+=1;
   int blocksize=grainSize/segments;
+  int priority=0xFFFFFFFF;
   for(int segment=0;segment < segments;segment++)
     {  
       //      CkPrintf("[%d %d %d %d]: sending N %d segment %d of %d segments \n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z, N, segment,segments);
       CkArrayIndexIndex4D idx(thisIndex.w,segment*grainSize, thisIndex.y, thisIndex.z);
+
       if(!symmetric){
 
-	partialResultMsg *msg = new (N*blocksize,0)partialResultMsg(N*blocksize, segment, cb, mynewData+segment*N*blocksize);
-	thisProxy(idx).sumPartialResult(msg);
+	partialResultMsg *msg = new (N*blocksize,8*sizeof(int))partialResultMsg(priority,N*blocksize, cb, mynewData+segment*N*blocksize);
+	*((int*)CkPriorityPtr(msg)) = priority;
+	CkSetQueueing(msg, CK_QUEUEING_IFIFO); 
+	thisProxy(idx).sumPartialResult(msg);  
       }
       else {
-	partialResultMsg *msg = new (N*blocksize,0)partialResultMsg(N*blocksize, segment,  cb, mynewData+segment*N*blocksize);
-	thisProxy(idx).sumPartialResult(msg);
+	partialResultMsg *msg = new (N*blocksize,8*sizeof(int))partialResultMsg(priority,N*blocksize,  cb, mynewData+segment*N*blocksize);
+	*((int*)CkPriorityPtr(msg)) = priority;
+	CkSetQueueing(msg, CK_QUEUEING_IFIFO); 
+	thisProxy(idx).sumPartialResult(msg);  
 	if (rowNum != thisIndex.x){
-	  partialResultMsg *msg = new (N*blocksize,0)partialResultMsg(N*blocksize, segment,  cb, mynewData+segment*N*blocksize);
+	  partialResultMsg *msg = new (N*blocksize,8*sizeof(int))partialResultMsg(priority,N*blocksize, cb, mynewData+segment*N*blocksize);
+	  *((int*)CkPriorityPtr(msg)) = priority;
+	  CkSetQueueing(msg, CK_QUEUEING_IFIFO); 
 	  thisProxy(idx).sumPartialResult(msg);  
 	}
       }

@@ -24,12 +24,12 @@ class mySendMsg : public CMessage_mySendMsg {
 
 class partialResultMsg : public CMessage_partialResultMsg {
  public:
+  int priority;
   int N;
-  int grain;
   CkCallback cb;
   complex *result;
   friend class CMessage_partialResultMsg;
-  partialResultMsg(unsigned int iN, int igrain,  CkCallback icb,complex *iresult) : N(iN), grain(igrain), cb(icb)
+  partialResultMsg(int ipriority,unsigned int iN,   CkCallback icb,complex *iresult) : priority(ipriority), N(iN), cb(icb)
     {
       memcpy(this->result,iresult,N*sizeof(complex));
     }
