@@ -156,13 +156,15 @@ void TraceProjector::creation(envelope *e, int num)
 void TraceProjector::beginExecute(envelope *e)
 {
 	//_LOG_E_BEGIN_EXECUTE(e);
-	//CmiPrintf("TraceProjector:iData in beginExecute %d %d \n",e->getEvent(),e->getSrcPe());
+	
 	charm_beginExecute(e);
 }
 
 void TraceProjector::beginExecute(CmiObjId  *tid)
 {
 	// FIXME-- log this
+	
+	_LOG_E_BEGIN_EXECUTE(0);
 }
 
 
