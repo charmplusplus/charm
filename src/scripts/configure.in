@@ -90,9 +90,11 @@ test_linkso() {
 # add_flag $1 $2
 # $2 is description
 add_flag() {
-	if ! grep "$1" conv-mach-opt.sh  > /dev/null 2>&1
+	if grep "$1" conv-mach-opt.sh  > /dev/null 2>&1
 	then
-	cat >> ./conv-mach-opt.sh << EOT
+	  true
+	else
+	  cat >> ./conv-mach-opt.sh << EOT
 
 # Option added by configure script's $2 section
 $1
