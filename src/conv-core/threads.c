@@ -584,8 +584,10 @@ void CthFiberBlock(CthThread t)
   
   SwitchToFiber(t->fiber);
   tp = CthCpvAccess(CthPrevious);
+#ifndef __CYGWIN__
   if (tp != 0 && tp->killed == 1)
     CthAbortHelp(tp);
+#endif
 }
 
 void CthResume(CthThread t)
