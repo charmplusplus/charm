@@ -1391,6 +1391,7 @@ void CParseNode::generateForall(XStr& op)
 
 void CParseNode::generateOlist(XStr& op)
 {
+  CParseNode *cn;
   // inlined start function
   op << "  void " << label->charstar() << "(";
   generatePrototype(op, *stateVars);
@@ -1398,7 +1399,7 @@ void CParseNode::generateOlist(XStr& op)
   // actual code here 
   op << "    CCounter *" << counter->charstar() << "= new CCounter(" <<
         constructs->length() << ");\n";
-  for(CParseNode *cn=constructs->begin(); 
+  for(cn=constructs->begin(); 
                      !constructs->end(); cn=constructs->next()) {
     op << "    " << cn->label->charstar() << "(";
     generateCall(op, *stateVarsChildren);
@@ -1415,7 +1416,6 @@ void CParseNode::generateOlist(XStr& op)
   op << "    if (" << counter->charstar() << "->isDone()) {\n";
   op << "      delete " << counter->charstar() << ";\n";
 /******************** BEGIN pup code ****************************/
-  CParseNode *cn;
   CParseNode *entryCN;
   CStateVar *sv;
   int paramMarshalling, lastWasVoid;
