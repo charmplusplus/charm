@@ -1,0 +1,14 @@
+module EveryLB {
+   extern module RandCentLB;
+   extern module RecBisectBfLB;
+   extern module MetisLB;
+   extern module RefineLB;
+   extern module CommLB;
+   extern module Comm1LB;
+   extern module HeapCentLB;
+   extern module NeighborLB;
+   extern module WSLB;
+   extern module GreedyRefLB;
+   extern module RandRefLB;
+   initcall void initEveryLB(void);
+};

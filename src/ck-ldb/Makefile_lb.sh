@@ -30,3 +30,30 @@ $bal.o: $bal.C $bal.decl.h \$(CKHEADERS)
 
 EOB
 done
+
+rm EveryLB.ci
+echo "module EveryLB {" >> EveryLB.ci
+for bal in $LOADBALANCERS
+do
+	echo "   extern module $bal;" >> EveryLB.ci
+done
+echo "   initcall void initEveryLB(void);" >>EveryLB.ci
+echo "};" >> EveryLB.ci
+
+echo "LB_OBJ=EveryLB.o \\" >>$out
+for bal in $LOADBALANCERS
+do
+	echo "    $bal.o \\" >>$out
+done
+cat >> $out <<EOB
+
+EveryLB.o: EveryLB.C EveryLB.decl.h
+	\$(CHARMC) -c EveryLB.C
+
+EveryLB.decl.h: EveryLB.ci
+	\$(CHARMC) EveryLB.ci
+
+\$(L)/libmoduleEveryLB.a: \$(LB_OBJ)
+	\$(CHARMC) -o \$(L)/libmoduleEveryLB.a \$(LB_OBJ)
+
+EOB
