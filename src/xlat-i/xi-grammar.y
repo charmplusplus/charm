@@ -69,7 +69,7 @@ ModuleList *modlist;
 %type <strval>		Name QualName CCode OptSdagCode OptNameInit
 %type <val>		OptStackSize
 %type <intval>		OptExtern OptSemiColon MAttribs MAttribList MAttrib
-%type <intval>		EAttribs EAttribList EAttrib OptPure OptVoid
+%type <intval>		EAttribs EAttribList EAttrib OptVoid
 %type <cattr>		CAttribs CAttribList CAttrib
 %type <tparam>		TParam
 %type <tparlist>	TParamList TParamEList OptTParams
@@ -489,9 +489,9 @@ Member		: Entry ';'
 		{ $$ = $1; }
 		;
 
-Entry		: ENTRY EAttribs EReturn Name EParameters OptPure OptStackSize OptSdagCode
-		{ $$ = new Entry(lineno, $2|$6, $3, $4, $5, $7); 
-		  $$->setSdagCode($8);
+Entry		: ENTRY EAttribs EReturn Name EParameters OptStackSize OptSdagCode
+		{ $$ = new Entry(lineno, $2, $3, $4, $5, $6); 
+		  $$->setSdagCode($7);
 		}
 		| ENTRY EAttribs Name EParameters OptSdagCode /*Constructor*/
 		{ $$ = new Entry(lineno, $2,     0, $3, $4,  0); 
@@ -523,8 +523,6 @@ EAttrib		: THREADED
 		{ $$ = SSYNC; }
 		| EXCLUSIVE
 		{ $$ = SLOCKED; }
-		| VIRTUAL
-		{ $$ = SVIRTUAL; }
 		| CREATEHERE
 		{ $$ = SCREATEHERE; }
 		| CREATEHOME
@@ -600,14 +598,6 @@ OptStackSize	: /* Empty */
 		{ $$ = 0; }
 		| STACKSIZE '=' NUMBER
 		{ $$ = new Value($3); }
-		;
-
-OptPure		: /* Empty */
-		{ $$ = 0; }
-		| '=' NUMBER
-		{ if(strcmp($2, "0")) { yyerror("pure virtual must '=0'"); exit(1); }
-		  $$ = SPURE; 
-		}
 		;
 
 OptSdagCode	: /* Empty */
