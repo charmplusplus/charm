@@ -66,6 +66,19 @@ void CmiNodeBarrier(void)
   pthread_mutex_unlock(&barrier_mutex);
 }
 
+void CmiNodeAllBarrier(void)
+{
+  pthread_mutex_lock(&barrier_mutex);
+  barrier++;
+  if(barrier!=CmiNumPes()+1)
+    pthread_cond_wait(&barrier_cond, &barrier_mutex);
+  else {
+    barrier = 0;
+    pthread_cond_broadcast(&barrier_cond);
+  }
+  pthread_mutex_unlock(&barrier_mutex);
+}
+
 CmiNodeLock CmiCreateLock(void)
 {
   pthread_mutex_t *lock;

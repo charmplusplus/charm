@@ -108,6 +108,18 @@ void CmiNodeBarrier()
   CmiGetNonLocal();
 }
 
+void CmiNodeAllBarrier()
+{
+  int i;
+  CmiNumBarred++;
+  CmiBarred[CmiMyPe()] = 1;
+  if (CmiNumBarred == CmiNumPes()) {
+    for (i=0; i<CmiNumPes(); i++) CmiBarred[i]=0;
+    CmiNumBarred=0;
+  }
+  CmiGetNonLocal();
+}
+
 CmiNodeLock CmiCreateLock()
 {
   CmiNodeLock lk = (CmiNodeLock)malloc(sizeof(int));

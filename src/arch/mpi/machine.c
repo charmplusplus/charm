@@ -718,12 +718,14 @@ static int SendMsgBuf()
 void EnqueueMsg(void *m, int size, int node)    
 {
   SMSG_LIST *msg_tmp = (SMSG_LIST *) CmiAlloc(sizeof(SMSG_LIST));
+  MACHSTATE1(3,"EnqueueMsg to node %d {{ ", node);
   msg_tmp->msg = m;
   msg_tmp->size = size;	
   msg_tmp->destpe = node;	
   CmiLock(sendMsgBufLock);
   PCQueuePush(sendMsgBuf,(char *)msg_tmp);
   CmiUnlock(sendMsgBufLock);
+  MACHSTATE3(3,"}} EnqueueMsg to %d finish with queue %p len: %d", node, sendMsgBuf, PCQueueLength(sendMsgBuf));
 }
 
 #endif
@@ -749,9 +751,7 @@ CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg)
     return 0;
   }
   CMI_DEST_RANK(msg) = rank;
-  MACHSTATE1(3,"EnqueueMsg to node %d {{ ", node);
   EnqueueMsg(msg, size, node);
-  MACHSTATE3(3,"}} EnqueueMsg to %d finish with queue %p len: %d", node, sendMsgBuf, PCQueueLength(sendMsgBuf));
   return 0;
 #else
   /* non smp */
@@ -1138,7 +1138,7 @@ static void ConverseRunPE(int everReturn)
   CmiIdleState *s=CmiNotifyGetState();
   CmiState cs;
   char** CmiMyArgv;
-  CmiNodeBarrier();
+  CmiNodeAllBarrier();
   cs = CmiGetState();
   CpvInitialize(void *,CmiLocalQueue);
   CpvAccess(CmiLocalQueue) = cs->localqueue;
@@ -1167,10 +1167,16 @@ static void ConverseRunPE(int everReturn)
   }
 #endif
 
+  Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
+  /* communication thread */
+  if (CmiMyRank() == CmiMyNodeSize()) {
+    while (1) CommunicationServerThread(5);
+  }
+  else {  /* worker thread */
   if (!everReturn) {
-    Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
     if (Cmi_usrsched==0) CsdScheduler(-1);
     ConverseExit();
+  }
   }
 }
 
@@ -1243,7 +1249,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   CmiNodeStateInit(&CsvAccess(NodeState));
 
   procState = (ProcState *)malloc(Cmi_mynodesize * sizeof(ProcState));
-  for (i=0; i<Cmi_mynodesize; i++) {
+  for (i=0; i<Cmi_mynodesize+1; i++) {
 /*    procState[i].sendMsgBuf = PCQueueCreate();   */
     procState[i].recvLock = CmiCreateLock();
   }

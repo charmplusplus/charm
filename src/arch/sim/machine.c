@@ -151,6 +151,9 @@ void CmiNodeBarrier()
 {
 }
 
+void CmiNodeAllBarrier()
+{
+}
 
 /********************* MESSAGE RECEIVE FUNCTIONS ******************/
 
