@@ -11,7 +11,7 @@ CHARMC=$(CHARMBIN)/charmc -I$(CHARMINC)/pose $(OPTS)
 POSEMODULE=-module pose
 
 ifeq ($(SEQUENTIAL),1)
-OPTS += -DSEQUENTIAL_POSE=1
+override OPTS += -DSEQUENTIAL_POSE=1
 ETRANS += "-s"
 POSEMODULE=-module seqpose
 endif
