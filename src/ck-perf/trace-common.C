@@ -6,6 +6,7 @@
  *****************************************************************************/
 
 #include "trace.h"
+#include "stdlib.h"
 
 #if CMK_OPTIMIZE
 static int warned = 0;
