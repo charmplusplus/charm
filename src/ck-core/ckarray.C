@@ -853,6 +853,20 @@ void CkArray::initAfterMap(void)
   CkReductionMgr::creatingContributors();
 }
 
+//Deliver this message to this array element
+inline void CkArray::invokeEntry(ArrayElement *el,int entryIdx,void *msg)
+{
+	curElementIsDead=CmiFalse;
+#if CMK_LBDB_ON
+	the_lbdb->ObjectStart(el->ldHandle);
+	_entryTable[entryIdx]->call(msg, el);
+	if (!curElementIsDead)
+		 the_lbdb->ObjectStop(el->ldHandle);
+#else
+	_entryTable[entryIdx]->call(msg, el);
+#endif
+}
+
 //Allocate a new, uninitialized array element of the given (chare) type
 // and owning the given index.
 ArrayElement *CkArray::allocateElement(int chareType,const CkArrayIndex &ind)
@@ -868,12 +882,10 @@ ArrayElement *CkArray::allocateElement(int chareType,const CkArrayIndex &ind)
 //Call the user's given constructor, passing the given message.
 void CkArray::ctorElement(ArrayElement *el,int ctor,void *msg)
 {
-  curElementIsDead=CmiFalse;
-  
   //Call the user's constructor
   CpvAccess(_currentChare) = (void*) el;
   CpvAccess(_currentChareType) = _entryTable[ctor]->chareIdx;
-  _entryTable[ctor]->call(msg, (void *)el);
+  invokeEntry(el,ctor,msg);
 }
 
 //Create a new element of the given chare type, 
@@ -884,13 +896,13 @@ ArrayElement *CkArray::newElement(int ctor,
   ArrayElement *el=allocateElement(_entryTable[ctor]->chareIdx,idx);
 #if CMK_LBDB_ON //Load balancer utilities:
   el->usesAtSync=CmiFalse;
+  el->lbRegister();// Register the object with the load balancer
 #endif
   el->bcastNo=bcastNo;
   contributorCreated(&el->reductionInfo);
   ctorElement(el,ctor,msg);
   if (!curElementIsDead) { 
     //<- element may have immediately migrated away or died.
-    el->lbRegister();// Register the object with the load balancer
     insertRec(new CkArrayRec_local(this,el),el->thisindex);
     DEBC((AA"  finished adding local element %s\n"AB,idx2str(el->thisindex)));
     return el;
@@ -1022,6 +1034,11 @@ void CkArray::RecvMigratedElement(CkArrayElementMigrateMessage *msg)
 
   //Create the new element on this PE (passing on the msg)
   ArrayElement *el=allocateElement(_entryTable[msg->array_ep()]->chareIdx,idx);
+  
+  el->lbRegister();// Register the object with the load balancer
+#if CMK_LBDB_ON
+  the_lbdb->Migrated(el->ldHandle);
+#endif
   ctorElement(el,msg->array_ep(),(CkMigrateMessage *)NULL);
   
   if (curElementIsDead) {CkFreeMsg((void *)msg);return;}
@@ -1034,11 +1051,6 @@ void CkArray::RecvMigratedElement(CkArrayElementMigrateMessage *msg)
   CkFreeMsg((void *)msg);//<- delete the old message
   contributorArriving(&el->reductionInfo);
   
-  el->lbRegister();// Register the object with the load balancer
-  
-#if CMK_LBDB_ON
-  the_lbdb->Migrated(el->ldHandle);
-#endif
   //Catch up on any missed broadcasts
   bringBroadcastUpToDate(el);		
   
@@ -1087,17 +1099,7 @@ inline void CkArray::deliverLocal(CkArrayMessage *msg,ArrayElement *el)
 			thisproxy.UpdateLocation(new CkArrayUpdateMsg(el->thisindex),srcPE);
 		}
 	}
-	curElementIsDead=CmiFalse;
-	
-	int entry=msg->array_ep();
-#if CMK_LBDB_ON
-	the_lbdb->ObjectStart(el->ldHandle);
-	_entryTable[entry]->call(msg, el);
-	if (!curElementIsDead)
-		 the_lbdb->ObjectStop(el->ldHandle);
-#else
-	_entryTable[entry]->call(msg, el);
-#endif
+	invokeEntry(el,msg->array_ep(),msg);
 }
 void CkArrayRec_local::recv(CkArrayMessage *msg) {
     arr->deliverLocal(msg,el);
