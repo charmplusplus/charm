@@ -512,6 +512,10 @@ foreach FILE ($FILES)
       ($ECHOCMD ; $CHARMBIN/charmxi $BASE.ci)
       if ($status) goto failure
       breaksw
+    case "*.sdag"
+      ($ECHOCMD ; $CHARMBIN/sdagx $BASE.sdag)
+      if ($status) goto failure
+      breaksw
     case "*.c"
       ($ECHOCMD ; $CMK_CC $OPTS_CC -I$CHARMINC -c $BASE.c -o $BASE.o)
       if ($status) goto failure

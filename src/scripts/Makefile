@@ -604,9 +604,6 @@ sdag-main.o: sdag-main.C CLexer.h CToken.h
 trans.o: trans.c EToken.h
 	$(SEQCHARMC) -c trans.c
 
-trans.c: trans.l
-	flex -otrans.c trans.l
-
 CLexer.o: CLexer.C CLexer.h
 	$(SEQCHARMC) -c CLexer.C
 
