@@ -417,17 +417,28 @@ void CmiMkdir(const char *dirName);
 
 double   CmiCpuTimer(void);
 
-#if CMK_TIMER_USE_RDTSC
+#if CMK_TIMER_USE_RDTSC 
+# if ! (CMK_GCC_X86_ASM || CMK_GCC_IA64_ASM)
+/* Can't use rdtsc unless we have x86 or ia64 assembly: */
+#  undef CMK_TIMER_USE_RDTSC
+#  undef CMK_TIMER_USE_GETRUSAGE
+#  define CMK_TIMER_USE_RDTSC 0
+#  define CMK_TIMER_USE_GETRUSAGE 1
+# endif
+#endif
 
+#if CMK_TIMER_USE_RDTSC 
 extern double _cpu_speed_factor;
 
 static __inline__ unsigned long long int rdtsc(void)
 {
         unsigned long long int x;
-#ifdef CMK_IA64
+#if CMK_GCC_IA64_ASM
 	__asm__ __volatile__("mov %0=ar.itc" : "=r"(x) :: "memory");
-#else
+#elif CMK_GCC_X86_ASM
         __asm__ volatile (".byte 0x0f, 0x31" : "=A" (x));
+#else
+#  error "Unknown assembly format-- can't use CMK_TIMER_USE_RDTSC."
 #endif
         return x;
 }
@@ -789,7 +800,7 @@ double     CthAutoYieldFreq(CthThread t);
 void       CthAutoYieldBlock(void);
 void       CthAutoYieldUnblock(void);
 
-/* Converse Thread Global (Ctg)/-swapglobals global variable manipulation */
+/* Converse Thread Global (Ctg) global variable manipulation */
 typedef struct CtgGlobalStruct *CtgGlobals;
 
 /** Initialize the globals support (called on each processor). */
