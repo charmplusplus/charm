@@ -82,8 +82,9 @@ ampi_sendrecv_
    int *rcvcount, int *rcvtype, int *src, 
    int *rcvtag, int *comm, int *status, int *ierr)
 {
-  ampi_send_(sndbuf, sndcount, sndtype, dest, sndtag, comm, ierr);
-  ampi_recv_(rcvbuf, rcvcount, rcvtype, src, rcvtag, comm, status, ierr);
+  *ierr = AMPI_Sendrecv(sndbuf, *sndcount, *sndtype, *dest, *sndtag,
+                        rcvbuf, *rcvcount, *rcvtype, *src, *rcvtag,
+			*comm, (AMPI_Status*) status);
 }
 
 extern "C" void 
