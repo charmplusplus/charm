@@ -146,6 +146,10 @@ void TransmitAckDatagram(OtherNode node)
           sizeof(unsigned int));
   node->send_ack_seqno = ((node->send_ack_seqno + 1) & DGRAM_SEQNO_MASK);
   retval = (-1);
+#ifdef CMK_USE_CHECKSUM
+  DgramHeader *head = (DgramHeader *)(&ack);
+  head->magic ^= computeCheckSum((unsigned char*)&ack, DGRAM_HEADER_SIZE + Cmi_window_size + sizeof(unsigned int));
+#endif
   while(retval==(-1))
     retval = sendto(dataskt, (char *)&ack,
 	 DGRAM_HEADER_SIZE + Cmi_window_size + sizeof(unsigned int), 0,
@@ -175,6 +179,9 @@ void TransmitImplicitDgram(ImplicitDgram dg)
   temp = *head;
   dest = dg->dest;
   DgramHeaderMake(head, dg->rank, dg->srcpe, Cmi_charmrun_pid, dg->seqno);
+#ifdef CMK_USE_CHECKSUM
+  head->magic ^= computeCheckSum((unsigned char*)head, len + DGRAM_HEADER_SIZE);
+#endif
   LOG(Cmi_clock, Cmi_nodestart, 'T', dest->nodestart, dg->seqno);
   retval = (-1);
   while(retval==(-1))
@@ -198,6 +205,9 @@ void TransmitImplicitDgram1(ImplicitDgram dg)
   temp = *head;
   dest = dg->dest;
   DgramHeaderMake(head, dg->rank, dg->srcpe, Cmi_charmrun_pid, dg->seqno);
+#ifdef CMK_USE_CHECKSUM
+  head->magic ^= computeCheckSum((unsigned char *)head, len + DGRAM_HEADER_SIZE);
+#endif
   LOG(Cmi_clock, Cmi_nodestart, 'P', dest->nodestart, dg->seqno);
   retval = (-1);
   while (retval == (-1))
@@ -351,6 +361,7 @@ void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank)
   myNode->sent_bytes += ogm->size;
   /*Try to immediately send the packets off*/
   writeableDgrams=1;
+
 }
 
 /***********************************************************************
@@ -646,11 +657,21 @@ void ReceiveDatagram()
     KillEveryoneCode(37489437);
   }
   dg->len = ok;
+#ifdef CMK_RANDOMLY_CORRUPT_MESSAGES
+  /* randomly corrupt data and ack datagrams */
+  randomCorrupt((char*)dg->data, dg->len);
+#endif
+
   if (ok >= DGRAM_HEADER_SIZE) {
     DgramHeaderBreak(dg->data, dg->rank, dg->srcpe, magic, dg->seqno);
     MACHSTATE3(2,"  recv dgram [seq %d, for rank %d, from pe %d]",
 	       dg->seqno,dg->rank,dg->srcpe)
-    if (magic == (Cmi_charmrun_pid&DGRAM_MAGIC_MASK)) {
+#ifdef CMK_USE_CHECKSUM
+    if (computeCheckSum((unsigned char*)dg->data, dg->len) == 0)
+#else
+    if (magic == (Cmi_charmrun_pid&DGRAM_MAGIC_MASK))
+#endif
+    {
       if (dg->rank == DGRAM_ACKNOWLEDGE)
 	IntegrateAckDatagram(dg);
       else IntegrateMessageDatagram(dg);

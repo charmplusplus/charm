@@ -43,6 +43,14 @@ typedef struct {
 /* the window size needs to be Cmi_window_size + sizeof(unsigned int) bytes) */
 typedef struct { DgramHeader head; char window[1024]; } DgramAck;
 
+static unsigned char computeCheckSum(unsigned char *data, int len)
+{
+  int i;
+  unsigned char ret = 0;
+  for (i=0; i<len; i++) ret ^= (unsigned char)data[i];
+  return ret;
+}
+
 #define DgramHeaderMake(ptr, dstrank_, srcpe_, magic_, seqno_) { \
    DgramHeader *header = (DgramHeader *)(ptr);	\
    header->seqno = seqno_; \
@@ -58,6 +66,18 @@ typedef struct { DgramHeader head; char window[1024]; } DgramAck;
    dstrank_ = header->dstrank; \
    magic_ = header->magic; \
 }
+
+#ifdef CMK_RANDOMLY_CORRUPT_MESSAGES
+static void randomCorrupt(char *data, int len)
+{
+  if (0==(rand()%CMK_RANDOMLY_CORRUPT_MESSAGES))
+  { /* insert one random bit flip into this message: */
+    int badByte=rand()%len;
+    int badBit=rand()%8;
+    data[badByte]^=(1<<badBit);
+  } 
+}
+#endif
 
 #define PE_BROADCAST_OTHERS (-101)
 #define PE_BROADCAST_ALL    (-102)
