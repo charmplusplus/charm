@@ -28,7 +28,6 @@ class HashTable{
   char* getObjectContents(int chareIndex);
  private:
   HashTableElement *array[PRIME];
-  int chareIndex;
 };
 
 #endif

@@ -264,10 +264,6 @@ static void _nullFn(void *, void *)
 }
 
 #if CMK_DEBUG_MODE
-extern void symbolTableFnArrayRegister(int hndlrID, int noOfBreakPoints,
-				       symbolTableFunction f, 
-				       indirectionFunction g);
-
 int getCharmMsgHandlers(int *handleArray)
 {
   *(handleArray) = _charmHandlerIdx;
@@ -298,19 +294,17 @@ char* makeCharmSymbolTableInfo(void)
   int i, chareIndex;
   int size;
   char *returnInfo;
-  char temp[10];
-  
+   
   size = _numEntries * 100;
   returnInfo = (char *)malloc(size * sizeof(char));
   strcpy(returnInfo, "");
   for(i = 0; i < _numEntries; i++){
+    strcat(returnInfo, "EP : ");
     strcat(returnInfo, _entryTable[i]->name);
-    strcat(returnInfo, "#");
+    strcat(returnInfo, " ");
+    strcat(returnInfo, "ChareName : ");
     chareIndex = _entryTable[i]->chareIdx;
     strcat(returnInfo, _chareTable[chareIndex]->name);
-    strcat(returnInfo, "#");
-    sprintf(temp, "%d", i);
-    strcat(returnInfo, temp);
     strcat(returnInfo, "#");
   }
 

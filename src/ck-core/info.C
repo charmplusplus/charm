@@ -126,6 +126,7 @@ int isBreakPoint(char *msg)
 
     f = CpvAccess(indirectionFnArray)[hndlrID];
     offset = CpvAccess(offsetArray)[hndlrID] + (*f)(msg);
+
     return(CsvAccess(BreakPoints)[offset]);
   } else {
     return 0;

@@ -32,7 +32,6 @@ char* getObjectContents(int chareIndex)
 
 HashTable::HashTable()
 {
-  chareIndex = 0;
   for(int i = 0; i < PRIME; i++)
     array[i] = 0;
 }
@@ -55,6 +54,7 @@ void HashTable::putObject(Chare* charePtr)
 {
   struct HashTableElement *node;
   int pigeonHole;
+  int chareIndex;
   
   chareIndex = (int)charePtr;
   node = (struct HashTableElement *)malloc(sizeof(struct HashTableElement));
@@ -69,8 +69,10 @@ void HashTable::removeObject(Chare* charePtr)
 {
   int pigeonHole;
   struct HashTableElement *node, *prev;
+  int chareIndex;
   
-  pigeonHole = (int)charePtr % PRIME;
+  chareIndex = (int)charePtr;
+  pigeonHole = chareIndex % PRIME;
   prev = 0;
   node = array[pigeonHole];
   while(node != 0){
@@ -86,7 +88,7 @@ void HashTable::removeObject(Chare* charePtr)
     prev = node;
     node = node -> next;
   }
-  CkError("Erroneous chareIndex supplied in getObjectCOntents()\n"); 
+  CkError("Erroneous chareIndex supplied in removeObject()\n"); 
 }
 
 char* HashTable::getObjectList(void)
