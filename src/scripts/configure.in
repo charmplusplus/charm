@@ -3,6 +3,7 @@ AC_INIT(./Makefile)
 
 AC_CONFIG_HEADER(conv-autoconfig.h)
 
+CHARMINC="."
 test -r ./conv-mach-pre.sh && . ./conv-mach-pre.sh
 
 if test ! -r ./conv-mach.sh 
