@@ -120,7 +120,7 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
 #endif
     numRecd = 0;
     int i, j, idxOffset;
-    
+
     if(symmetric && thisIndex.x == thisIndex.y) {
         int size1 = size%PARTITION_SIZE;
         if(size1 > 0) {
@@ -155,6 +155,12 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
                                                                inDataRight[j]+size1, op1);      
         }
     }
+#if 0
+    if(thisIndex.w != 0) {   // Adjusting for double packing of incoming data
+	for (i = 0; i < grainSize*grainSize; i++)
+	    outData[i] *= 2.0;
+    }
+#endif 
 
     // FIXME: should do 'op2' here!!!
 
@@ -188,7 +194,7 @@ PairCalculator::acceptResult(int size, double *matrix, int rowNum, CkCallback cb
   CkPrintf("[%d %d %d %d]: Accept Result with size %d\n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z, size);
 #endif
   complex *mynewData = new complex[N*grainSize];
-  //  memset(mynewData, 0, sizeof(complex)*N*grainSize);
+  memset(mynewData, 0, sizeof(complex)*N*grainSize);
 
   int offset = 0, index = thisIndex.y*S + thisIndex.x;
 
@@ -196,7 +202,7 @@ PairCalculator::acceptResult(int size, double *matrix, int rowNum, CkCallback cb
   register double m=0;  
   //  complex zero=complex(0,0);  
 
-  int size1 = 0;
+/*  int size1 = 0;
   for(size1 = 0; size1 + PARTITION_SIZE < N; size1 += PARTITION_SIZE) {
       for (int i = 0; i < grainSize; i++) {
 	  int iSindex=i*S+index;
@@ -227,8 +233,9 @@ PairCalculator::acceptResult(int size, double *matrix, int rowNum, CkCallback cb
 	    }
 	}
   }
+*/
 
-  /*  this one reads better but takes twice as long
+  //  this one reads better but takes twice as long
   for (int i = 0; i < grainSize; i++) {
     for (int j = 0; j < grainSize; j++){ 
       m = matrix[index + j + i*S];
@@ -236,7 +243,7 @@ PairCalculator::acceptResult(int size, double *matrix, int rowNum, CkCallback cb
 	mynewData[p + i*N] += inDataLeft[j][p] * m;
     }
   }
-  */
+  
   if(!symmetric){
     CkArrayIndexIndex4D idx(thisIndex.w, 0, thisIndex.y, thisIndex.z);
     thisProxy(idx).sumPartialResult(N*grainSize, mynewData, thisIndex.z, cb);
