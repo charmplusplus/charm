@@ -7,11 +7,11 @@
 
 die() {
 	echo $@
-	exit 1
+	exit 0
 }
 
-[ -x manual ] || die "Must run program with a manual/ directory"
-[ -x fig ] || die "Must run program with a fig/ directory"
+[ -x manual ] || die "fixpaths.sh requires a manual/ directory"
+[ -x fig ] || die "fixpaths.sh requires a fig/ directory"
 
 cp -r fig manual/
 

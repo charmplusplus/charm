@@ -52,7 +52,7 @@ $(FILE): $(TEX) $(FILE).aux
 	-@ln -s ../pplmanual.* .
 	-@rm -fr $(FILE)/*.html $(FILE)/*.aux
 	$(LATEX2HTML) $(FILE).tex
-	[ -x fig ] && ../latex2html_fixpaths.sh
+	../latex2html_fixpaths.sh
 
 # LaTeX Index and link support
 $(FILE).aux: $(TEX) index.tex
