@@ -55,9 +55,55 @@ void liveViz0Deposit(const liveVizRequest &req,byte * imageData);
   of 3d axes or be simply 2d.
 */
 class liveVizConfig {
-	/// If true, expect a color (3-byte/pixel) image
-	///  instead of a greyscale (1 byte/pixel) image
-	bool isColor; 
+public:
+	typedef enum {
+		/* Greyscale pixels: 1 byte (grey) per pixel */
+		pix_greyscale=0,
+		/* Color pixels: 3 bytes (RGB) per pixel */
+		pix_color=1,
+		/* Floating-point pixels, one float per pixel */
+		pix_float=2
+	} pixel_t;
+
+	liveVizConfig() { init(pix_greyscale); }
+	
+	/// 2D constructors:
+	liveVizConfig(bool isColor,bool serverPush_) {
+		init(isColor?pix_color:pix_greyscale,serverPush_);
+	}
+	liveVizConfig(pixel_t pix,bool serverPush_) {
+		init(pix,serverPush_);
+	}
+	
+	/// 3D constructors:
+	liveVizConfig(bool isColor,bool serverPush_,const CkBbox3d &box_) {
+		init(isColor?pix_color:pix_greyscale,serverPush_);
+		is3d=true; box=box_;
+	}
+	liveVizConfig(pixel_t pix,bool serverPush_,const CkBbox3d &box_) {
+		init(pix,serverPush_);
+		is3d=true; box=box_;
+	}
+	
+	/// Increment the verbosity level on the server.
+	void moreVerbose(void) {verbose++;}
+	
+	/// Extract configuration information:
+	bool getColor(void) const {return pixels==pix_color;}
+	/// Return the number of bytes per pixel used during assembly
+	int getBytesPerPixel(void) const {return bytesPerPixel;}
+	/// Return the number of bytes per pixel used on the wire
+	int getNetworkBytesPerPixel(void) const {return (pixels==pix_greyscale)?1:3;}
+	bool getPush(void) const {return serverPush;}
+	bool get3d(void) const {return is3d;}
+	const CkBbox3d &getBox(void) const {return box;}
+	bool getVerbose(int thanLevel) const {return verbose>=thanLevel;}
+	
+	void pupNetwork(PUP::er &p);
+	
+private:
+	pixel_t pixels;
+	int bytesPerPixel;
 	
 	/**
 	 If true, the server produces images regardless of whether the client
@@ -73,38 +119,8 @@ class liveVizConfig {
 	CkBbox3d box; ///< If 3d, the viewed object's bounding box, universe coords
 	
 	int verbose; ///< If nonzero, printf status info; higher numbers give more prints
-public:
-	liveVizConfig() {isColor=false; serverPush=false; is3d=false; verbose=1;}
 	
-	/// 2D constructor:
-	liveVizConfig(bool isColor_,bool serverPush_) {
-		isColor=isColor_;
-		serverPush=serverPush_;
-		is3d=false;
-		verbose=0;
-	}
-	
-	/// 3D constructor:
-	liveVizConfig(bool isColor_,bool serverPush_,const CkBbox3d &box_) {
-		isColor=isColor_;
-		serverPush=serverPush_;
-		is3d=true;
-		box=box_;
-		verbose=0;
-	}
-	
-	/// Increment the verbosity level on the server.
-	void moreVerbose(void) {verbose++;}
-	
-	/// Extract configuration information:
-	bool getColor(void) const {return isColor;}
-	int getBytesPerPixel(void) const {return isColor?3:1;}
-	bool getPush(void) const {return serverPush;}
-	bool get3d(void) const {return is3d;}
-	const CkBbox3d &getBox(void) const {return box;}
-	bool getVerbose(int thanLevel) const {return verbose>=thanLevel;}
-	
-	void pupNetwork(PUP::er &p);
+	void init(pixel_t pix,bool serverPush=false);
 };
 
 

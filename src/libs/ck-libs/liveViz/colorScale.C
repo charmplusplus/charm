@@ -50,8 +50,8 @@ void colorScale(double val,
       if ( rem <= 0.000001 ) {
 	intensity[0] = intensity[2] = (unsigned char) 255;
       } else {
-        ckerr << "colorScale error: value out of range."
-              << "Setting pixel color to white" << endl;
+        // ckerr << "colorScale error: value out of range."
+        //       << "Setting pixel color to white" << endl;
         intensity[0] = intensity[1] = intensity[2] = 255;
       }
       break;

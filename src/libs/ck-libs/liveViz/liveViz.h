@@ -9,14 +9,17 @@
 #include "liveViz0.h"
 #include "ckimage.h"
 #include "colorScale.h"
-#include "ImageData.h"
 #include "pup_toNetwork.h"
 
 /********************** LiveViz ***********************/
 #include "liveViz.decl.h"
 
-extern CkReduction::reducerType sum_image_data;
-extern CkReduction::reducerType max_image_data;
+typedef enum {
+  sum_image_data,
+  max_image_data,
+  sum_float_image_data,
+  max_float_image_data
+} liveVizCombine_t;
 
 /*
   Start liveViz.  This routine should be called once on processor 0
@@ -68,7 +71,7 @@ void liveVizDeposit(const liveVizRequest &req,
                     int startx, int starty,
                     int sizex, int sizey, const byte * imageData,
                     ArrayElement* client,
-                    CkReduction::reducerType reducer=sum_image_data);
+                    liveVizCombine_t combine=sum_image_data);
 
 
 //As above, but taking a message instead of a request:
@@ -76,13 +79,24 @@ inline void liveVizDeposit(liveVizRequestMsg *reqMsg,
 		    int startx, int starty,
 		    int sizex, int sizey, const byte * imageData,
 		    ArrayElement* client,
-                    CkReduction::reducerType reducer=sum_image_data)
+                   liveVizCombine_t combine=sum_image_data)
 {
 	liveVizDeposit(reqMsg->req,startx,starty,sizex,sizey,imageData,client,
-                       reducer);
+                       combine);
 	delete reqMsg;
 }
 
+/**
+  A user-written routine to convert floating-point pixels
+  (when initialized with liveVizConfig::pix_float) to 
+  RGB pixels, which are actually sent across the wire.
+  This routine will only be called on processor 0, at the
+  end of a liveViz image assembly, in pix_float mode.
+*/
+extern "C"
+void liveVizFloatToRGB(liveVizRequest &req, 
+	const float *floatSrc, unsigned char *destRgb,
+	int nPixels);
 
 /********************** LiveVizPoll **********************
 These declarations should probably live in a header named "liveVizPoll.h"

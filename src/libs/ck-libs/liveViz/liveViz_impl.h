@@ -19,13 +19,6 @@ public:
 		:req(req_), r(r_) {}
 };
 
-//Image combining reduction type: defined in liveViz.C.
-extern CkReductionMsg *imageCombineSum(int nMsg,CkReductionMsg **msgs);
-extern CkReduction::reducerType sum_image_data;
-
-extern CkReductionMsg *imageCombineMax(int nMsg,CkReductionMsg **msgs);
-extern CkReduction::reducerType max_image_data;
-
 extern void vizReductionHandler(void *r_msg);
 void liveVizInitComplete(void *rednMessage);
 extern CkCallback clientGetImageCallback;

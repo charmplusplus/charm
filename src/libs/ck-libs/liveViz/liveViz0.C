@@ -14,10 +14,26 @@ Orion Sky Lawlor, olawlor@acm.org, 6/2002
 //  This is data that never changes during the course of a run.
 static liveVizConfig config; 
 
+void liveVizConfig::init(pixel_t pix,bool push)
+{
+	pixels=pix;
+	switch(pixels) {
+	case pix_greyscale: bytesPerPixel=1; break;
+	case pix_color: bytesPerPixel=3; break;
+	case pix_float: bytesPerPixel=4; break;
+	default: CmiAbort("Unrecognized liveViz pixel code!\n");
+	};
+	serverPush=push;
+	is3d=false;
+	
+	verbose=0;
+}
+
 /*This pup routine defines the on-the-wire layout of the configuration response*/
 void liveVizConfig::pupNetwork(PUP::er &p) {
 	int version=1; // Server version number
 	p|version; 
+	bool isColor=(pixels!=pix_greyscale);
 	p|isColor;
 	p|serverPush;
 	p|is3d;
@@ -90,7 +106,7 @@ extern "C" void getImageHandler(char * msg)
 void liveViz0Deposit(const liveVizRequest &req,byte * imageData)
 {
   // CkPrintf("LiveViz: sending ccs back %.6f s\n",CmiWallTimer()-startTime);
-  int len=req.wid*req.ht*config.getBytesPerPixel();
+  int len=req.wid*req.ht*config.getNetworkBytesPerPixel();
   if (config.getVerbose(2))
     CmiPrintf("CCS getImage> Reply for (%d x %d) pixel or %d byte image.\n",
 	      req.wid,req.ht,len);

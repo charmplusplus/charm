@@ -4,7 +4,8 @@ FLAGS=-DEXTERIOR_BLACK_PIXEL_ELIMINATION
 
 HEADERS=liveViz.h liveViz.decl.h liveVizPoll.decl.h liveViz0.h colorScale.h ImageData.h
 HEADDEP=$(HEADERS) liveViz.def.h ImageData.h
-OBJS=liveViz0.o liveViz.o liveVizPoll.o colorScale.o ImageData.o
+OBJS=liveViz0.o liveViz.o liveVizPoll.o \
+	colorScale.o ImageData.o compat_float2rgb.o
 DEST=$(CDIR)/lib/libmoduleliveViz.a
 
 all: $(DEST)
@@ -19,6 +20,8 @@ headers: $(HEADERS)
 liveViz0.o: liveViz0.C $(HEADDEP)
 	$(CHARMC) -c $(FLAGS) liveViz0.C
 
+compat_float2rgb.o: compat_float2rgb.C $(HEADDEP)
+	$(CHARMC) -c $(FLAGS) compat_float2rgb.C
 liveViz.o: liveViz.C $(HEADDEP)
 	$(CHARMC) -c $(FLAGS) liveViz.C
 

@@ -1,19 +1,14 @@
+/*
+Vikas Mehta's utility routines for packing,
+unpacking, and compositing liveViz images.
+
+*/
 #ifndef __IMAGEDATA_H
 #define __IMAGEDATA_H
 
-#include "liveViz0.h"
-#include "liveViz.decl.h"
+#include "liveViz.h"
 
-typedef struct
-{
-    int m_pos;  // start position
-    int m_size; // size in pixels
-} Header;
-
-enum {
-  sum_image_pixels,
-  max_image_pixels
-};
+typedef liveVizCombine_t ImageDataCombine_t;
 
 class ImageData
 {
@@ -34,15 +29,6 @@ class ImageData
                          const byte* src);
 
         /*
-           This function returns the image data buffer holding image data in
-           lines format.
-        */
-        inline byte* GetImageData (void)
-        {
-            return m_imageData;
-        }
-
-        /*
            This function returns the pre-calculated size of image data buffer
            holding the image data in lines format. To calulate image buff size
            use GetBuffSize ().
@@ -52,9 +38,38 @@ class ImageData
             return m_size;
         }
 
+	/**
+	  This header is stored as the first thing in our buffer.
+	*/
+	class ImageHeader {
+	public:
+		/// Number of lines of data to follow.
+		int m_lines;
 		
+		/// Image combiner to use.
+		ImageDataCombine_t m_combine;
+		
+		/// Request this image came from
+		liveVizRequest m_req;
+		
+		// ... m_lines LineHeaders follow ...
+		// ... m_lines runs of pixel data follow ...
+	};
+	
+	/**
+	  Describes a row of image data.
+	*/
+	class LineHeader {
+	public:
+	    /// Start position of our row -- offset into image.
+	    ///   measured in pixels, e.g., pos = off_y * wid + off_x.
+	    int m_pos;  
+	    /// Length of our row, in pixels.
+	    int m_size;
+	};
+	
         /*
-           This function must be called once GerClippedImage() is called 
+           This function must be called once GetClippedImage() is called 
            (because GetClippedImage() initializes some member variables used 
            by this function). It has 2 roles, one when "dest == NULL", it 
            returns size of buffer needed to convert the input image (rectangle)
@@ -63,14 +78,20 @@ class ImageData
            "dest". Format of image data buffer:
     
            -------------------------------------------------------------------
-          |num  |              |  |  |   |  |          |          |   |       |
-          | of  |liveVIzRequest|h1|h2|...|hn|Line1 Data|Line2 Data|...|Line n |
-          |Lines|              |  |  |   |  |          |          |   |Data   |
+          |                    |LineHeaders:|          |          |   |       |
+          |    ImageHeader     |h1|h2|...|hn|Line1 Data|Line2 Data|...|Line n |
+          |                    |  |  |   |  |          |          |   |Data   |
            -------------------------------------------------------------------
-
         */
         int AddImage (const liveVizRequest* req,
                       byte* dest        = NULL);
+	
+	void WriteHeader(ImageDataCombine_t combine,
+                      const liveVizRequest* req,
+                      byte* dest);
+	void ReadHeader(ImageDataCombine_t &combine,
+                      liveVizRequest* req,
+                      const byte* src);
 				  
         /*
            This function calculates the size of buffer required to fit the
@@ -82,8 +103,7 @@ class ImageData
         /*
            This function copies image data from n-input msgs to 'dest' buffer. 
         */
-        void CombineImageData (int nMsg, CkReductionMsg **msgs, byte* dest,
-                               int reducer);
+        void CombineImageData (int nMsg, CkReductionMsg **msgs, byte* dest);
 
 
         /*
@@ -104,8 +124,8 @@ class ImageData
            "dest" buff. Here 'n' indicates, number of lines of data in 'dest'
            buff.
         */
-        int CopyImageData (byte* dest, int n, CkReductionMsg* msg,
-                           int reducer);
+        int CopyImageData (byte* dest, int n, const CkReductionMsg* msg,
+                           ImageDataCombine_t reducer);
 
 
         /*
@@ -186,39 +206,55 @@ class ImageData
             }
             return -1; 
         }
-
+	
 
         /*
-           number of bytes per pixel
+           Number of bytes per pixel of image data.
+	   Normally 1 (grayscale) or 3 (RGB).
         */
         int		   m_bytesPerPixel;
- 
-        /*
-           points to image data buffer holding image data in lines format.
-        */
-        byte*	  m_imageData;
        
         /*
-           size of image data buffer (m_imageData)
+           Total size of image data buffer, in bytes.
+	   Includes all headers and image data.
         */
         int		   m_size;
 
         /*
+           Total size of all our header data, in bytes.
+        */
+        int                m_headerSize;
+	
+        /*
            number of lines of image data
         */
         int		   m_numDataLines;
-
+	
+	
+	/// Make our image size be this many lines and pixels
+	void SetSize(int nLines,int nPixels) {
+		m_numDataLines = nLines;
+		m_headerSize=sizeof (ImageHeader) +
+		      (sizeof (LineHeader) * nLines);
+		m_size=m_headerSize +
+		      (m_bytesPerPixel * nPixels);
+	}
+	
+	/// Get the header for this line of this compressed image.
+	LineHeader *getHeader(void *src,int lineNo) {
+		return (LineHeader *)(((byte *)src)
+			+sizeof(ImageHeader)
+			+lineNo*sizeof(LineHeader)
+		);
+	}
+	
+	
         // members used while image combine operation
 
         /*
            points to buffer holding merged header
         */
         byte*   m_header;
-
-        /*
-           holds size of m_header buff in bytes
-        */
-        int     m_headerSize;
 
 
         // initialized by GetClippedImage ()

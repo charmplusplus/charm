@@ -5,12 +5,12 @@ Orion Sky Lawlor, olawlor@acm.org, 6/11/2002
 */
 #include "liveViz.h"
 #include "liveViz_impl.h"
+#include "ImageData.h"
 
 PUPbytes(liveVizConfig)
 
 liveVizConfig lv_config;
-CkReduction::reducerType sum_image_data;
-CkReduction::reducerType max_image_data;
+CkReduction::reducerType image_combine_reducer;
 CProxy_liveVizGroup lvG;
 CkCallback clientGetImageCallback;
 
@@ -56,11 +56,6 @@ a small cache, it may be better to use an "if" instead of this table.
 */
 static byte *overflowArray=CkImage::newClip();
 
-static void liveVizNodeInit(void) {
-  sum_image_data=CkReduction::addReducer(imageCombineSum);
-  max_image_data=CkReduction::addReducer(imageCombineMax);
-}
-
 #if 1
 /****************** Fast but complex image combining *****************
 
@@ -71,12 +66,13 @@ The contributed data looks like:
   a list of Images (lines) packed into a run of bytes
 **********************************************************************/
 
-//Called by clients to deposit a piece of the final image
+/// Called by clients to deposit a piece of the final image.
+///  Starts the reduction process.
 void liveVizDeposit(const liveVizRequest &req,
                     int startx, int starty,
                     int sizex, int sizey, const byte * src,
                     ArrayElement* client,
-                    CkReduction::reducerType reducer)
+                    liveVizCombine_t combine)
 {
   if (lv_config.getVerbose(2))
     CkPrintf("liveVizDeposit> Deposited image at (%d,%d), (%d x %d) pixels, on pe %d \n",startx,starty,sizex,sizey,CkMyPe());
@@ -88,7 +84,8 @@ void liveVizDeposit(const liveVizRequest &req,
                                                                         sizey,
                                                                         &req,
                                                                         src),
-                                                 NULL, reducer);
+                                                 NULL, image_combine_reducer);
+  imageData.WriteHeader(combine,&req,(byte*)(msg->getData()));
   imageData.AddImage (&req, (byte*)(msg->getData()));
 
   //Contribute this image to the reduction
@@ -97,16 +94,17 @@ void liveVizDeposit(const liveVizRequest &req,
   client->contribute(msg);
 }
 
-/*
+
+/**
 Called by the reduction manager to combine all the source images
 received on one processor. This function adds all the image on one
 processor to one list of non-overlapping images.
 */
-CkReductionMsg *imageCombineSum(int nMsg,CkReductionMsg **msgs)
+CkReductionMsg *imageCombineReducer(int nMsg,CkReductionMsg **msgs)
 {
   if (nMsg==1) { //Don't bother copying if there's only one source
     if (lv_config.getVerbose(2))
-      CkPrintf("imageCombineSum> Skipping combine on pe %d\n",CkMyPe());
+      CkPrintf("imageCombine> Skipping combine on pe %d\n",CkMyPe());
     
     CkReductionMsg *ret=msgs[0];
     msgs[0]=NULL; //Prevent reduction manager from double-delete
@@ -114,52 +112,20 @@ CkReductionMsg *imageCombineSum(int nMsg,CkReductionMsg **msgs)
   }
 
   if (lv_config.getVerbose(2))
-    CkPrintf("imageCombineSum> image combine on pe %d\n",CkMyPe());
+    CkPrintf("imageCombine> image combine on pe %d\n",CkMyPe());
 
   ImageData imageData (lv_config.getBytesPerPixel ());
 
   CkReductionMsg* msg = CkReductionMsg::buildNew(imageData.CombineImageDataSize (nMsg,
                                                                                  msgs),
-                                                 NULL, sum_image_data);
+                                                 NULL, image_combine_reducer);
 
-  imageData.CombineImageData (nMsg, msgs, (byte*)(msg->getData()), 
-                              sum_image_pixels);
-
+  imageData.CombineImageData (nMsg, msgs, (byte*)(msg->getData()));
   return msg;
 }
 
-/*
-Called by the reduction manager to combine all the source images
-received on one processor. This function adds all the image on one
-processor to one list of non-overlapping images.
-*/
-CkReductionMsg *imageCombineMax(int nMsg,CkReductionMsg **msgs)
-{
-  if (nMsg==1) { //Don't bother copying if there's only one source
-    if (lv_config.getVerbose(2))
-      CkPrintf("imageCombineMax> Skipping combine on pe %d\n",CkMyPe());
-    
-    CkReductionMsg *ret=msgs[0];
-    msgs[0]=NULL; //Prevent reduction manager from double-delete
-    return ret;
-  }
-
-  if (lv_config.getVerbose(2))
-    CkPrintf("imageCombineMax> image combine on pe %d\n",CkMyPe());
-
-  ImageData imageData (lv_config.getBytesPerPixel ());
-
-  CkReductionMsg* msg = CkReductionMsg::buildNew(imageData.CombineImageDataSize (nMsg,
-                                                                                 msgs),
-                                                 NULL, max_image_data);
-
-  imageData.CombineImageData (nMsg, msgs, (byte*)(msg->getData()), 
-                              max_image_pixels);
-
-  return msg;
-}
-
-/* Called once Unpacks images, combines them to form one image and passes it on to layer 0. */
+/* Called once at end of reduction:
+   Unpacks images, combines them to form one image and passes it on to layer 0. */
 void vizReductionHandler(void *r_msg)
 {
   CkReductionMsg *msg = (CkReductionMsg*)r_msg;
@@ -168,11 +134,27 @@ void vizReductionHandler(void *r_msg)
   byte *image = imageData.ConstructImage ((byte*)(msg->getData ()), req);
   
   if (lv_config.getVerbose(2))
-      CkPrintf("vizReductionHandler> pe %d \n", CkMyPe());
+      CkPrintf("vizReductionHandler> Assembled image on PE %d \n", CkMyPe());
+  
+  if (lv_config.getBytesPerPixel()!=lv_config.getNetworkBytesPerPixel())
+  { /* Reformat image for the wire: 
+      (only used by floating-point images for now) */
+	int row=req.wid*lv_config.getBytesPerPixel();
+	int netRow=req.wid*lv_config.getNetworkBytesPerPixel();
+  	byte *netImage=new byte[req.ht*netRow];
+	liveVizFloatToRGB(req, (float *)image, netImage, req.wid*req.ht);
+	delete[] image;
+	image=netImage;
+  }
 
   liveViz0Deposit(req,image);
 
+  delete[] image;
   delete msg;
+}
+
+static void liveVizNodeInit(void) {
+  image_combine_reducer=CkReduction::addReducer(imageCombineReducer);
 }
 
 #else
