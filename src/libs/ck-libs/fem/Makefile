@@ -4,8 +4,8 @@ CHARMC=$(CDIR)/bin/charmc $(OPTS)
 OBJS=partition.o map.o
 HEADERS=fem.h fem_impl.h fem.decl.h fem.def.h
 
-all: libfem.a libfemf.a $(CDIR)/include/fem.h \
-     $(CDIR)/include/femf.h $(CDIR)/lib/fmain.o
+all: $(CDIR)/include/fem.h $(CDIR)/include/femf.h \
+	libfem.a libfemf.a $(CDIR)/lib/fmain.o
 
 libfem.a: fem.C $(HEADERS) $(OBJS)
 	$(CHARMC) -DFEM_FORTRAN=0 -c fem.C
