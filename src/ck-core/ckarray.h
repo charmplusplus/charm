@@ -181,7 +181,7 @@ public:
 
 //	ArrayElement *ckLocal(void) const;
 	inline CkSectionCookie &ckGetSectionID() {return _sid.cookie;}
-        inline CkArrayIndexMax *ckGetArrayElements() const {return _sid._elems;}
+        inline const CkArrayIndexMax *ckGetArrayElements() const {return _sid._elems;}
 	inline int ckGetNumElements() const { return _sid._nElems; }
 	void pup(PUP::er &p);
 };
@@ -191,8 +191,13 @@ PUPmarshall(CProxySection_ArrayBase);
 	inline void ckInsert(CkArrayMessage *m,int ctor,int onPe) \
 	  { super::ckInsert(m,ctor,onPe); }\
 	inline void ckSend(CkArrayMessage *m, int ep) \
-	  { super::ckSend(m,ep); }\
-
+	  { super::ckSend(m,ep); } \
+	inline const CkSectionCookie &ckGetSectionID() \
+	  {return super::ckGetSectionID();} \
+	inline const CkArrayIndexMax *ckGetArrayElements() const \
+	  { return super::ckGetArrayElements(); } \
+	inline int ckGetNumElements() const \
+	  { return ckGetNumElements(); }
 
 /************************ Array Element *********************/
 
