@@ -404,7 +404,7 @@ static ampi *ampiInit(char **argv)
 
         //CProxy_ComlibManager comlib = CProxy_ComlibManager::ckNew(strat, 1);
 	//comlib.ckLocalBranch()->createId();
-	Strategy *strategy = new EachToManyMulticastStrategy(strat);
+	EachToManyMulticastStrategy *strategy = new EachToManyMulticastStrategy(strat);
         ComlibInstanceHandle cinst = ComlibRegisterStrategy(strategy); 
 
 	//Create and attach the ampiParent array
@@ -414,6 +414,7 @@ static ampi *ampiInit(char **argv)
 	parent=CProxy_ampiParent::ckNew(new_world,threads,cinst,opts);
         
         strategy->setSourceArray(parent.ckGetArrayID());
+        strategy->setDestArray(parent.ckGetArrayID());
 
 	//Make a new ampi array
 	CkArrayID empty;
