@@ -10,6 +10,7 @@
 #include "python/eval.h"
 #include "python/node.h"
 #include "PythonCCS.decl.h"
+#include "PythonCCS-client.h"
 #include "string"
 #include "map"
 
@@ -24,7 +25,7 @@ class PythonObject {
   static PyMethodDef CkPy_MethodsCustom[];
  public:
   void execute(CkCcsRequestMsg *msg);
-  void iterate(CkCcsRequestMsg *msg);
+  void cleanup(PythonExecute *pyMsg, PyThreadState *pts, CmiUInt4 pyVal);
   void getPrint(CkCcsRequestMsg *msg);
   static void _callthr_executeThread(CkThrCallArg *impl_arg);
   void executeThread(CkCcsRequestMsg *msg);
@@ -76,18 +77,26 @@ class PythonObject {
 
 typedef struct {
   PythonObject *object; /* The c++ object running the job */
+  bool inUse;
   PyObject *arg;
   PyObject **result;
   CthThread thread;       /* The charm thread running the python code */
   PyThreadState *pythread; /* The python interpreter interpreting the code */
-  CcsDelayedReply client; /* Where to send the printed data */
-  std::string printed; /* Union of all printed string and not shipped to the client */
+  int clientReady; /* whether or not a client has sent a request for print */
+  /* meanings of clientReady:
+     1  - there is a client wainting for data
+     0  - no client waiting for data
+     -1 - no client watiing, and the current structure is alive only because of
+     "KeepPrint". it has to be deleted when a client synchonizes
+  */
+  CcsDelayedReply client; /* Where to send the printed data when ready */
+  std::string printed; /* Union of all printed string and not yet shipped to the client */
 } PythonStruct;
-typedef std::map<int,PythonStruct> PythonTable;
+typedef std::map<CmiUInt4,PythonStruct> PythonTable;
 
 CsvExtern(CmiNodeLock, pyLock);
 CsvExtern(PythonTable *, pyWorkers);
-CsvExtern(int, pyNumber);
+CsvExtern(CmiUInt4, pyNumber);
 CtvExtern(PyObject *, pythonReturnValue);
 
 #endif //__CKPYTHON_H
