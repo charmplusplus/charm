@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 2.39  1997-07-28 19:01:02  jyelon
+ * Revision 2.40  1997-08-01 02:43:36  jyelon
+ * Changed speed-setting CMK_WHEN_PROCESSOR_IDLE_USLEEP.
+ *
+ * Revision 2.39  1997/07/28 19:01:02  jyelon
  * *** empty log message ***
  *
  * Revision 2.38  1997/07/26 16:41:56  jyelon
@@ -156,8 +159,7 @@
 #define CMK_WAIT_USES_WAITFLAGS_H                          0
 
 #define CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT                   0
-#define CMK_WHEN_PROCESSOR_IDLE_USLEEP                     0
-#define CMK_WHEN_PROCESSOR_IDLE_NOTIFY_CMI                 1
+#define CMK_WHEN_PROCESSOR_IDLE_USLEEP                     1
 
 #define CMK_USE_HP_MAIN_FIX                                0
 #define CMK_DONT_USE_HP_MAIN_FIX                           1
