@@ -16,7 +16,7 @@
 #include "BaseLB.h"
 #include "NborBaseLB.decl.h"
 
-#include "LBTopology.h"
+#include "topology.h"
 
 void CreateNborBaseLB();
 

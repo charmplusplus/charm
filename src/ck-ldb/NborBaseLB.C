@@ -130,7 +130,7 @@ void NborBaseLB::AtSync()
 
   if (mig_msgs_expected > 0) {
     CkMarshalledNLBStatsMessage marshmsg(msg);
-    thisProxy.ReceiveStats(marshmsg, mig_msgs_expected, neighbor_pes, NULL);
+    thisProxy.ReceiveStats(marshmsg, mig_msgs_expected, neighbor_pes);
   }
 
   // Tell our own node that we are ready
