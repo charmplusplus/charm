@@ -16,7 +16,7 @@ class pupPtrHolder {
 public:
 	pupPtrHolder(T *p_) :ptr(p_) {}
 	pupPtrHolder(void) :ptr(0) {}
-	pupPtrHolder(const pupPtrHolder<T> &p_) :ptr(p_.p) {}
+	pupPtrHolder(const pupPtrHolder<T> &p_) :ptr(p_.ptr) {}
 	
 	T *release(void) {
 		T *ret=ptr;
