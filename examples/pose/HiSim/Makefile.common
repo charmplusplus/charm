@@ -7,7 +7,10 @@ OBJDIR=../tmp
 
 CHARMC=$(CHARMBIN)/charmc -I$(CHARMINC)/pose $(OPTS)
 ETRANS=$(CHARMBIN)/etrans.pl
+POSEMODULE=-module pose
+
 ifeq ($(SEQUENTIAL),1)
 OPTS += "-DSEQUENTIAL_POSE"
 ETRANS += "-s"
+POSEMODULE=-module seqpose
 endif
