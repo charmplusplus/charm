@@ -15,8 +15,6 @@ UChar _defaultQueueing = CK_QUEUEING_FIFO;
 UInt  _printCS = 0;
 UInt  _printSS = 0;
 
-UInt  _numGroups = 1; //<- makes 0 an invalid group number
-UInt  _numNodeGroups = 1;
 UInt  _numInitMsgs = 0;
 UInt  _numInitNodeMsgs = 0;
 int   _infoIdx;
@@ -40,6 +38,8 @@ CpvDeclare(int,         _currentChareType);
 CpvDeclare(CkGroupID,   _currentGroup);
 CpvDeclare(CkGroupID,   _currentNodeGroup);
 CpvDeclare(GroupTable, _groupTable);
+CpvDeclare(UInt, _numGroups);
+UInt _numNodeGroups;
 GroupTable* _nodeGroupTable = 0;
 
 CpvDeclare(Stats*, _myStats);
@@ -325,12 +325,12 @@ static void _initHandler(void *msg)
     case BocInitMsg:
       CpvAccess(_numInitsRecd)++;
       CpvAccess(_qd)->process();
-      CpvAccess(_bocInitVec)->insert(env->getGroupNum(), msg);
+      CpvAccess(_bocInitVec)->insert(env->getGroupNum().idx, msg);
       break;
     case NodeBocInitMsg:
       CmiLock(_nodeLock);
       _numInitNodeMsgs++;
-      _nodeBocInitVec->insert(env->getGroupNum(), msg);
+      _nodeBocInitVec->insert(env->getGroupNum().idx, msg);
       CmiUnlock(_nodeLock);
       CpvAccess(_qd)->process();
       break;
@@ -396,6 +396,8 @@ void _initCharm(int argc, char **argv)
 	CpvInitialize(CkGroupID, _currentGroup);
 	CpvInitialize(CkGroupID, _currentNodeGroup);
 	CpvInitialize(GroupTable, _groupTable);
+	CpvInitialize(UInt, _numGroups);
+	CpvInitialize(UInt, _numNodeGroups);
 	CpvInitialize(int, _numInitsRecd);
 	CpvInitialize(QdState*, _qd);
 	CpvInitialize(MsgPool*, _msgPool);
@@ -406,6 +408,8 @@ void _initCharm(int argc, char **argv)
 	CpvInitialize(Stats*, _myStats);
 	
 	CpvAccess(_groupTable).init();
+	CpvAccess(_numGroups) = 1; // make 0 an invalid group number
+	_numNodeGroups = 1;
 	CpvAccess(_buffQ) = new PtrQ();
 	_MEMCHECK(CpvAccess(_buffQ));
 	CpvAccess(_bocInitVec) = new PtrVec();
@@ -530,22 +534,6 @@ void _initCharm(int argc, char **argv)
 	}
 
 }
-
-GroupTable::GroupTable() { }
-
-void GroupTable::enqmsg(CkGroupID n, void *msg)
-{
-	if (tab[n].pending==NULL)
-		tab[n].pending=new PtrQ();
-	tab[n].pending->enq(msg);
-}
-
-void GroupTable::add(CkGroupID n, void *obj)
-{
-	tab[n].obj=obj;
-}
-
-
 
 // this is needed because on o2k, f90 programs have to have main in
 // fortran90.

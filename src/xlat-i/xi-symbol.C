@@ -643,16 +643,22 @@ Group::genSubDecls(XStr& str)
   str << "    "<<ptype<<"(void) {}\n";
   if (forElement) 
   {//For a single element
-    str << "    "<<ptype<<"(CkGroupID _gid,int _onPE,CkGroupID dTo=-1) : ";
+    str << "    "<<ptype<<"(CkGroupID _gid,int _onPE,CkGroupID dTo) : ";
     genProxyNames(str, "", NULL,"(_gid,_onPE,dTo)", ", ");
+    str << "{  }\n";
+    str << "    "<<ptype<<"(CkGroupID _gid,int _onPE) : ";
+    genProxyNames(str, "", NULL,"(_gid,_onPE)", ", ");
     str << "{  }\n";
 
     str<<"   CK_DISAMBIG_GROUP_ELEMENT("<<super<<")\n";
   } 
   else 
   {//For whole group
-    str << "    "<<ptype<<"(CkGroupID _gid,CkGroupID dTo=-1) : ";
+    str << "    "<<ptype<<"(CkGroupID _gid,CkGroupID dTo) : ";
     genProxyNames(str, "", NULL,"(_gid,dTo)", ", ");
+    str << "{  }\n";      
+    str << "    "<<ptype<<"(CkGroupID _gid) : ";
+    genProxyNames(str, "", NULL,"(_gid)", ", ");
     str << "{  }\n";      
 
     //Group proxy can be indexed into an element proxy:
@@ -738,17 +744,20 @@ Array::genSubDecls(XStr& str)
     str << "      { return ("<<type<<tvars()<<" *)"<<super<<"::ckLocal(); }\n";  
     //This constructor is used for array indexing
     str <<
-         "    "<<ptype<<"(const CkArrayID &aid,const "<<indexType<<" &idx,CkGroupID dTo=-1)\n"
+         "    "<<ptype<<"(const CkArrayID &aid,const "<<indexType<<" &idx,CkGroupID dTo)\n"
          "        :";genProxyNames(str, "",NULL, "(aid,idx,dTo)", ", ");str<<" {}\n";  
+    str <<
+         "    "<<ptype<<"(const CkArrayID &aid,const "<<indexType<<" &idx)\n"
+         "        :";genProxyNames(str, "",NULL, "(aid,idx)", ", ");str<<" {}\n";  
   } 
   else 
   {/*Collective, indexible version*/    
     str << "    CK_DISAMBIG_ARRAY("<<super<<")\n";
 
     str<< //Build a simple, empty array
-      "    static CkArrayID ckNew(void) {return ckCreateArray(0,0,0);}\n"
-      "    static CkArrayID ckNew_mapped(CkGroupID mapID) {return ckCreateArray(0,mapID,0);}\n"
-      "    static CkArrayID ckNew_bound(CkArrayID toArray) {return ckCreateArray(0,0,toArray);}\n";
+      "    static CkArrayID ckNew(void) {return ckCreateArray(0,CkGroupID(),CkArrayID());}\n"
+      "    static CkArrayID ckNew_mapped(CkGroupID mapID) {return ckCreateArray(0,mapID,CkArrayID());}\n"
+      "    static CkArrayID ckNew_bound(CkArrayID toArray) {return ckCreateArray(0,CkGroupID(),toArray);}\n";
 
     XStr etype; etype<<Prefix::ProxyElement<<type;
     if (indexSuffix!=(const char*)"none")
@@ -778,8 +787,10 @@ Array::genSubDecls(XStr& str)
     "    "<<etype<<" operator () (int i0,int i1,int i2) const \n"
     "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex3D(i0,i1,i2), ckDelegatedIdx());}\n";
     }
-    str <<"    "<<ptype<<"(const CkArrayID &aid,CkGroupID dTo=-1) \n"
+    str <<"    "<<ptype<<"(const CkArrayID &aid,CkGroupID dTo) \n"
          "        :";genProxyNames(str, "",NULL, "(aid,dTo)", ", ");str<<" {}\n";
+    str <<"    "<<ptype<<"(const CkArrayID &aid) \n"
+         "        :";genProxyNames(str, "",NULL, "(aid)", ", ");str<<" {}\n";
   }
   
   if(list)
@@ -1639,7 +1650,6 @@ void Entry::genGroupStaticConstructorDecl(XStr& str)
   if (container->isForElement()) return;
   
   str << "    static CkGroupID ckNew("<<paramType(1)<<");\n";
-  str << "    static CkGroupID ckNewSync("<<paramType(1)<<");\n";
   if (!param->isVoid()) {
     str << "    "<<container->proxyName(0)<<"("<<paramType(1)<<");\n";
   }
@@ -1653,18 +1663,13 @@ void Entry::genGroupStaticConstructorDefs(XStr& str)
   char *node = (char *)(container->isNodeGroup()?"Node":"");
   str << makeDecl("CkGroupID",1)<<"::ckNew("<<paramType(0)<<")\n";
   str << "{\n"<<marshallMsg();
-  str << "  return CkCreate"<<node<<"Group("<<chareIdx()<<", "<<epIdx()<<", impl_msg, 0, 0);\n";
-  str << "}\n";
-
-  str << makeDecl("CkGroupID",1)<<"::ckNewSync("<<paramType(0)<<")\n";
-  str << "{\n"<<marshallMsg();
-  str << "  return CkCreate"<<node<<"GroupSync("<<chareIdx()<<", "<<epIdx()<<", impl_msg);\n";
+  str << "  return CkCreate"<<node<<"Group("<<chareIdx()<<", "<<epIdx()<<", impl_msg);\n";
   str << "}\n";
 
   if (!param->isVoid()) {
     str << makeDecl(" ",1)<<"::"<<container->proxyName(0)<<"("<<paramType(0)<<")\n";
     str << "{\n"<<marshallMsg();
-    str << "  ckSetGroupID(CkCreate"<<node<<"Group("<<chareIdx()<<", "<<epIdx()<<", impl_msg, 0, 0));\n";
+    str << "  ckSetGroupID(CkCreate"<<node<<"Group("<<chareIdx()<<", "<<epIdx()<<", impl_msg));\n";
     str << "}\n";
   }
 }

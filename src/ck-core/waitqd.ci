@@ -16,20 +16,10 @@ module waitqd {
 
   readonly CkChareID waitqd_qdhandle; 
 
-  message ckGroupIDMsg;
-  message ckGroupCreateMsg;
-
   mainchare waitqd_QDChare {
     entry waitqd_QDChare();
     entry [threaded, sync] void waitQD(void);
     entry void onQD(CkQdMsg *);
-  };
-
-  chare waitGC_chare {
-    entry waitGC_chare(void);
-    entry void recvGroupID(ckGroupIDMsg *);
-    entry [sync] ckGroupIDMsg *createGroup(ckGroupCreateMsg *);
-    entry [sync] ckGroupIDMsg *createNodeGroup(ckGroupCreateMsg *);
   };
 };
 

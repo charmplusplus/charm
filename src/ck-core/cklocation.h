@@ -449,10 +449,10 @@ public:
 	//Look up the object with this local index
 	inline CkMigratable *lookupLocal(int localIdx,CkArrayID arrayID) {
 #ifndef CMK_OPTIMIZE
-		if (managers[arrayID].mgr==NULL)
+		if (managers.find(arrayID).mgr==NULL)
 			CkAbort("CkLocMgr::lookupLocal called for unknown array!\n");
 #endif
-		return managers[arrayID].elts.get(localIdx);
+		return managers.find(arrayID).elts.get(localIdx);
 	}
 	
 	//Migrate us to another processor
@@ -507,7 +507,6 @@ private:
 
 //Data Members:
 	//Map array ID to manager and elements
-	enum {maxManagers=256};
 	class ManagerRec {
 	public:
 		ManagerRec *next; //next non-null array manager
@@ -517,11 +516,12 @@ private:
 			next=NULL;
 			mgr=NULL;
 		}
+		void init(void) { next=NULL; mgr=NULL; }
 		CkMigratable *element(int localIdx) {
 			return elts.get(localIdx);
 		}
 	};
-	ManagerRec managers[maxManagers];
+	GroupIdxArray<ManagerRec> managers;
 	ManagerRec *firstManager; //First non-null array manager
 
 	bool addElementToRec(CkLocRec_local *rec,ManagerRec *m,

@@ -144,7 +144,7 @@ static CpdListAccessor *CpdListLookup(const char *path)
 {
   CpdListAccessor *acc=CpvAccess(cpdListTable)->get(path);
   if (acc==NULL) {
-    CkError("CpdListAccessor> Unrecognized list path '%s'\n",path);
+    CmiError("CpdListAccessor> Unrecognized list path '%s'\n",path);
     return NULL;
   }
   return acc;
@@ -157,7 +157,7 @@ static CpdListAccessor *CpdListLookup(const ChMessageInt_t *lenAndPath)
   const char *path=(const char *)(lenAndPath+1);
   char pathBuf[CpdListMaxLen+1]; //Temporary null-termination buffer
   if ((len<0) || (len>CpdListMaxLen)) {
-    CkError("CpdListAccessor> Invalid list path length %d!\n",len);
+    CmiError("CpdListAccessor> Invalid list path length %d!\n",len);
     return NULL; //Character count makes no sense
   }
   strncpy(pathBuf,path,len);
@@ -219,7 +219,7 @@ static void CpdList_ccs_list_items_txt(char *msg)
       PUP::toText p(buf); 
       acc->pup(p,req); 
       if (p.size()!=bufLen)
-	CkError("ERROR! Sizing/packing length mismatch for %s list pup function!\n",
+	CmiError("ERROR! Sizing/packing length mismatch for %s list pup function!\n",
 		acc->getPath());
     }
     CcsSendReply(bufLen,(void *)buf);

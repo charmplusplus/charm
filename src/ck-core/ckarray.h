@@ -47,8 +47,10 @@ private:
 	CkArrayID _aid;
 public:
 	CProxy_ArrayBase() { }
-	CProxy_ArrayBase(const CkArrayID &aid,CkGroupID dTo=-1) 
+	CProxy_ArrayBase(const CkArrayID &aid,CkGroupID dTo) 
 		:CProxyBase_Delegatable(dTo), _aid(aid) { }
+	CProxy_ArrayBase(const CkArrayID &aid) 
+		:CProxyBase_Delegatable(), _aid(aid) { }
 
 	static CkGroupID ckCreateArray(int numInitial,CkGroupID mapID,CkArrayID boundToArray);
 	static CkGroupID ckCreateArray1D(int ctorIndex,CkArrayMessage *m,
@@ -92,8 +94,10 @@ private:
 public:
 	CProxyElement_ArrayBase() { }
 	CProxyElement_ArrayBase(const CkArrayID &aid,
-		const CkArrayIndex &idx,CkGroupID dTo=-1)
+		const CkArrayIndex &idx,CkGroupID dTo)
 		:CProxy_ArrayBase(aid,dTo), _idx(idx) { }
+	CProxyElement_ArrayBase(const CkArrayID &aid, const CkArrayIndex &idx)
+		:CProxy_ArrayBase(aid), _idx(idx) { }
 	
 	void ckInsert(CkArrayMessage *m,int ctor,int onPe);
 	void ckSend(CkArrayMessage *m, int ep) const;

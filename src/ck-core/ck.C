@@ -30,7 +30,7 @@ void Chare::pup(PUP::er &p)
 void Group::pup(PUP::er &p) 
 {
 	Chare::pup(p);
-	p(thisgroup);
+	p|thisgroup;
 } 
 CkDelegateMgr::~CkDelegateMgr() { }
 
@@ -104,7 +104,7 @@ CkGroupID CkGetNodeGroupID(void) {
 }
 
 extern "C"
-void *CkLocalBranch(int gID) {
+void *CkLocalBranch(CkGroupID gID) {
   return _localBranch(gID);
 }
 
@@ -112,7 +112,7 @@ extern "C"
 void *CkLocalNodeBranch(CkGroupID groupID)
 {
   CmiLock(_nodeLock);
-  void *retval = _nodeGroupTable->find(groupID);
+  void *retval = _nodeGroupTable->find(groupID).getObj();
   CmiUnlock(_nodeLock);
   return retval;
 }
@@ -172,8 +172,8 @@ void _createGroupMember(CkGroupID groupID, int eIdx, void *msg)
   register int gIdx = _entryTable[eIdx]->chareIdx;
   register void *obj = malloc(_chareTable[gIdx]->size);
   _MEMCHECK(obj);
-  CpvAccess(_groupTable).add(groupID, obj);
-  PtrQ *ptrq = CpvAccess(_groupTable).getPending(groupID);
+  CpvAccess(_groupTable).find(groupID).setObj(obj);
+  PtrQ *ptrq = CpvAccess(_groupTable).find(groupID).getPending();
   if(ptrq) {
     void *pending;
     while((pending=ptrq->deq())!=0)
@@ -184,7 +184,7 @@ void _createGroupMember(CkGroupID groupID, int eIdx, void *msg)
   register int prevtype = CpvAccess(_currentChareType);
   CpvAccess(_currentChare) = obj;
   CpvAccess(_currentChareType) = gIdx;
-  register int prevGrp = CpvAccess(_currentGroup);
+  register CkGroupID prevGrp = CpvAccess(_currentGroup);
   CpvAccess(_currentGroup) = groupID;
   _SET_USED(UsrToEnv(msg), 0);
   _entryTable[eIdx]->call(msg, obj);
@@ -200,9 +200,9 @@ void _createNodeGroupMember(CkGroupID groupID, int eIdx, void *msg)
   register void *obj = malloc(_chareTable[gIdx]->size);
   _MEMCHECK(obj);
   CmiLock(_nodeLock);
-  _nodeGroupTable->add(groupID, obj);
+  _nodeGroupTable->find(groupID).setObj(obj);
   CmiUnlock(_nodeLock);
-  PtrQ *ptrq = _nodeGroupTable->getPending(groupID);
+  PtrQ *ptrq = _nodeGroupTable->find(groupID).getPending();
   if(ptrq) {
     void *pending;
     while((pending=ptrq->deq())!=0)
@@ -213,7 +213,7 @@ void _createNodeGroupMember(CkGroupID groupID, int eIdx, void *msg)
   register int prevtype = CpvAccess(_currentChareType);
   CpvAccess(_currentChare) = obj;
   CpvAccess(_currentChareType) = gIdx;
-  register int prevGrp = CpvAccess(_currentNodeGroup);
+  register CkGroupID prevGrp = CpvAccess(_currentNodeGroup);
   CpvAccess(_currentNodeGroup) = groupID;
   _SET_USED(UsrToEnv(msg), 0);
   _entryTable[eIdx]->call(msg, obj);
@@ -223,7 +223,7 @@ void _createNodeGroupMember(CkGroupID groupID, int eIdx, void *msg)
   _STATS_RECORD_PROCESS_NODE_GROUP_1();
 }
 
-void _createGroup(CkGroupID groupID, envelope *env, int retEp, CkChareID *retChare)
+void _createGroup(CkGroupID groupID, envelope *env)
 {
   _CHECK_USED(env);
   _SET_USED(env, 1);
@@ -253,14 +253,9 @@ void _createGroup(CkGroupID groupID, envelope *env, int retEp, CkChareID *retCha
   }
   _STATS_RECORD_CREATE_GROUP_1();
   _createGroupMember(groupID, epIdx, msg);
-  if(retEp) {
-    msg = CkAllocMsg(0, sizeof(int), 0); // 0 is a system msg of size int
-    *((int *)msg) = groupID;
-    CkSendMsg(retEp, msg, retChare);
-  }
 }
 
-void _createNodeGroup(CkGroupID groupID, envelope *env, int retEp, CkChareID *retChare)
+void _createNodeGroup(CkGroupID groupID, envelope *env)
 {
   _CHECK_USED(env);
   _SET_USED(env, 1);
@@ -291,61 +286,30 @@ void _createNodeGroup(CkGroupID groupID, envelope *env, int retEp, CkChareID *re
   }
   _STATS_RECORD_CREATE_NODE_GROUP_1();
   _createNodeGroupMember(groupID, epIdx, msg);
-  if(retEp) {
-    msg = CkAllocMsg(0, sizeof(int), 0); // 0 is a system msg of size int
-    *((int *)msg) = groupID;
-    CkSendMsg(retEp, msg, retChare);
-  }
 }
 
-static CkGroupID _staticGroupCreate(envelope *env, int retEp, CkChareID *retChare)
+static CkGroupID _groupCreate(envelope *env)
 {
-  register CkGroupID groupNum = _numGroups++;
-  _createGroup(groupNum, env, retEp, retChare);
+  register CkGroupID groupNum;
+  groupNum.pe = CkMyPe();
+  groupNum.idx = CpvAccess(_numGroups)++;
+  _createGroup(groupNum, env);
   return groupNum;
 }
 
-static void _dynamicGroupCreate(envelope *env, int retEp, CkChareID * retChare)
+static CkGroupID _nodeGroupCreate(envelope *env)
 {
-  register CkChareID *msg = 
-    (CkChareID*) _allocMsg(DBocReqMsg, sizeof(CkChareID));
-  if(retChare)
-    *msg = *retChare;
-  register envelope *newenv = UsrToEnv((void *)msg);
-  newenv->setUsrMsg(env);
-  newenv->setSrcPe(CkMyPe());
-  newenv->setRetEp(retEp);
-  CmiSetHandler(newenv, _charmHandlerIdx);
-  CmiSyncSendAndFree(0, newenv->getTotalsize(), newenv); 
-  CpvAccess(_qd)->create();
-}
-
-static CkGroupID _staticNodeGroupCreate(envelope *env, int retEp, CkChareID *retChare)
-{
+  register CkGroupID groupNum;
+  groupNum.pe = CkMyNode();
   CmiLock(_nodeLock);
-  register CkGroupID groupNum = _numNodeGroups++;
+  groupNum.idx = _numNodeGroups++;
   CmiUnlock(_nodeLock);
-  _createNodeGroup(groupNum, env, retEp, retChare);
+  _createNodeGroup(groupNum, env);
   return groupNum;
-}
-
-static void _dynamicNodeGroupCreate(envelope *env, int retEp, CkChareID * retChare)
-{
-  register CkChareID *msg = 
-    (CkChareID*) _allocMsg(DNodeBocReqMsg, sizeof(CkChareID));
-  if(retChare)
-    *msg = *retChare;
-  register envelope *newenv = UsrToEnv((void *)msg);
-  newenv->setUsrMsg(env);
-  newenv->setSrcPe(CkMyPe());
-  newenv->setRetEp(retEp);
-  CmiSetHandler(newenv, _charmHandlerIdx);
-  CmiSyncNodeSendAndFree(0, newenv->getTotalsize(), newenv); 
-  CpvAccess(_qd)->create();
 }
 
 extern "C"
-CkGroupID CkCreateGroup(int cIdx, int eIdx, void *msg, int retEp,CkChareID *retChare)
+CkGroupID CkCreateGroup(int cIdx, int eIdx, void *msg)
 {
   CkAssert(cIdx == _entryTable[eIdx]->chareIdx);
   register envelope *env = UsrToEnv(msg);
@@ -353,20 +317,11 @@ CkGroupID CkCreateGroup(int cIdx, int eIdx, void *msg, int retEp,CkChareID *retC
   env->setEpIdx(eIdx);
   env->setSrcPe(CkMyPe());
   _TRACE_CREATION_N(env, CkNumPes());
-  if(CkMyPe()==0) {
-    return _staticGroupCreate(env, retEp, retChare);
-  } else {
-    if (retChare!=NULL)
-      _dynamicGroupCreate(env, retEp, retChare);
-    else
-      CkAbort("You must either create groups/arrays from PE 0, "
-	      "or else use the special return-entry syntax!");
-    return (-1);
-  }
+  return _groupCreate(env);
 }
 
 extern "C"
-CkGroupID CkCreateNodeGroup(int cIdx, int eIdx, void *msg, int retEp,CkChareID *retChare)
+CkGroupID CkCreateNodeGroup(int cIdx, int eIdx, void *msg)
 {
   CkAssert(cIdx == _entryTable[eIdx]->chareIdx);
   register envelope *env = UsrToEnv(msg);
@@ -374,12 +329,7 @@ CkGroupID CkCreateNodeGroup(int cIdx, int eIdx, void *msg, int retEp,CkChareID *
   env->setEpIdx(eIdx);
   env->setSrcPe(CkMyPe());
   _TRACE_CREATION_N(env, CkNumNodes());
-  if(CkMyNode()==0) {
-    return _staticNodeGroupCreate(env, retEp, retChare);
-  } else {
-    _dynamicNodeGroupCreate(env, retEp, retChare);
-    return (-1);
-  }
+  return _nodeGroupCreate(env);
 }
 
 
@@ -443,10 +393,10 @@ static inline void _processForChareMsg(envelope *env)
 
 static inline void _processForBocMsg(envelope *env)
 {
-  register CkGroupID groupID = env->getGroupNum();
+  register CkGroupID groupID =  env->getGroupNum();
   register void *obj = _localBranch(groupID);
   if(!obj) { // groupmember not yet created
-    CpvAccess(_groupTable).enqmsg(groupID, env);
+    CpvAccess(_groupTable).find(groupID).enqMsg(env);
     return;
   }
   CpvAccess(_qd)->process();
@@ -464,9 +414,9 @@ static inline void _processForNodeBocMsg(envelope *env)
   register CkGroupID groupID = env->getGroupNum();
   register void *obj;
   CmiLock(_nodeLock);
-  obj = _nodeGroupTable->find(groupID);
+  obj = _nodeGroupTable->find(groupID).getObj();
   if(!obj) { // groupmember not yet created
-    _nodeGroupTable->enqmsg(groupID, env);
+    _nodeGroupTable->find(groupID).enqMsg(env);
     CmiUnlock(_nodeLock);
     return;
   }
@@ -495,51 +445,6 @@ static inline void _processForVidMsg(envelope *env)
   _CHECK_VALID(vptr, "ForVidMsg: Not a valid VIdPtr\n");
   _SET_USED(env, 1);
   vptr->send(env);
-}
-
-static inline void _processDBocReqMsg(envelope *env)
-{
-  CkAssert(CkMyPe()==0);
-  register CkGroupID groupNum;
-  groupNum = _numGroups++;
-  env->setMsgtype(DBocNumMsg);
-  register int srcPe = env->getSrcPe();
-  env->setSrcPe(CkMyPe());
-  env->setGroupNum(groupNum);
-  CmiSyncSendAndFree(srcPe, env->getTotalsize(), env);
-  CpvAccess(_qd)->create();
-}
-
-static inline void _processDNodeBocReqMsg(envelope *env)
-{
-  CkAssert(CkMyNode()==0);
-  CmiLock(_nodeLock);
-  register CkGroupID groupNum = _numNodeGroups++;
-  CmiUnlock(_nodeLock);
-  env->setMsgtype(DNodeBocNumMsg);
-  register int srcNode = CmiNodeOf(env->getSrcPe());
-  env->setSrcPe(CkMyPe());
-  env->setGroupNum(groupNum);
-  CmiSyncNodeSendAndFree(srcNode, env->getTotalsize(), env);
-  CpvAccess(_qd)->create();
-}
-
-static inline void _processDBocNumMsg(envelope *env)
-{
-  register envelope *usrenv = (envelope *) env->getUsrMsg();
-  register int retEp = env->getRetEp();
-  register CkChareID *retChare = (CkChareID *) EnvToUsr(env);
-  register CkGroupID groupID = env->getGroupNum();
-  _createGroup(groupID, usrenv, retEp, retChare);
-}
-
-static inline void _processDNodeBocNumMsg(envelope *env)
-{
-  register envelope *usrenv = (envelope *) env->getUsrMsg();
-  register int retEp = env->getRetEp();
-  register CkChareID *retChare = (CkChareID *) EnvToUsr(env);
-  register CkGroupID groupID = env->getGroupNum();
-  _createNodeGroup(groupID, usrenv, retEp, retChare);
 }
 
 void _processBocInitMsg(envelope *env)
@@ -581,22 +486,6 @@ void _processHandler(void *msg)
       CpvAccess(_qd)->process();
       if(env->isPacked()) CkUnpackMessage(&env);
       _processNodeBocInitMsg(env);
-      break;
-    case DBocReqMsg:
-      CpvAccess(_qd)->process();
-      _processDBocReqMsg(env);
-      break;
-    case DNodeBocReqMsg:
-      CpvAccess(_qd)->process();
-      _processDNodeBocReqMsg(env);
-      break;
-    case DBocNumMsg:
-      CpvAccess(_qd)->process();
-      _processDBocNumMsg(env);
-      break;
-    case DNodeBocNumMsg:
-      CpvAccess(_qd)->process();
-      _processDNodeBocNumMsg(env);
       break;
     case ForChareMsg :
       CpvAccess(_qd)->process();

@@ -61,7 +61,7 @@ class bar {
 #endif
 
 #ifndef CHARM_H
-#  include <charm.h> // <- for CmiBool
+#  include <converse.h> // <- for CmiBool
 #endif
 
 

@@ -181,11 +181,11 @@ void CProxy_ArrayBase::setReductionClient(CkReductionMgr::clientFn fn,void *para
 CkGroupID CProxy_ArrayBase::ckCreateArray(int numInitial,CkGroupID mapID,CkArrayID boundTo)
 {
 	CkGroupID locMgr;
-	if (boundTo==0) 
+	if (CkGroupID(boundTo).isZero()) 
 	{ //Create a new location manager
-		if (mapID==0) mapID=_RRMapID;
+		if (mapID.isZero()) mapID=_RRMapID;
 #if !CMK_LBDB_ON
-		CkGroupID lbdb=0;
+		CkGroupID lbdb();
 #endif
 		locMgr=CProxy_CkLocMgr::ckNew(mapID,lbdb,numInitial);
 	} 
@@ -206,7 +206,7 @@ CkGroupID CProxy_ArrayBase::ckCreateArray1D(
 	    int numInitial,CkGroupID mapID)
 {
   //First build the array
-  CkArrayID id=ckCreateArray(numInitial,mapID,0);
+  CkArrayID id=ckCreateArray(numInitial,mapID,CkArrayID());
   CProxy_ArrayBase prox(id);
   DEBC(("In createInitial-- will build %d elements\n",numInitial));
   if (numInitial>0) {

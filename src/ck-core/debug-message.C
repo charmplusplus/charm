@@ -80,16 +80,11 @@ void envelope::pup(PUP::er &p) {
 		p(type.chare.forAnyPe);
 		break;
 	case BocInitMsg: case ForNodeBocMsg:
-		p(type.group.num);
-		break;
-	case DBocReqMsg: case DBocNumMsg: 
-	case DNodeBocReqMsg: case DNodeBocNumMsg:
-		p(type.dgroup.num);
-		p((void *)&(type.dgroup.usrMsg),sizeof(void *));
+		p|type.group.g;
 		break;
 	case ForBocMsg:
-		p(type.array.loc);
-		p(type.array.arr);
+		p|type.array.loc;
+		p|type.array.arr;
 		p(type.array.hopCount);		
 		p(type.array.epIdx);
 		p(type.array.index.nInts);

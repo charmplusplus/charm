@@ -86,20 +86,18 @@ class CProxyBase_Delegatable {
   private:
     CkGroupID delegatedTo;
   protected: //Never allocate CProxyBase_Delegatable's-- only subclass them.
-    CProxyBase_Delegatable()
-    	:delegatedTo(-1) { }
-    CProxyBase_Delegatable(CkGroupID dTo)
-    	:delegatedTo(dTo) { }
+    CProxyBase_Delegatable() { delegatedTo.pe = -1; }
+    CProxyBase_Delegatable(CkGroupID dTo) { delegatedTo = dTo; }
   public:
     void ckDelegate(CkGroupID to) {delegatedTo=to;}
-    void ckUndelegate(void) {delegatedTo=-1;}
-    int ckIsDelegated(void) const {return delegatedTo!=-1;}
+    void ckUndelegate(void) {delegatedTo.pe =-1;}
+    int ckIsDelegated(void) const {return (delegatedTo.pe != -1);}
     CkGroupID ckDelegatedIdx(void) const {return delegatedTo;}
     CkDelegateMgr *ckDelegatedTo(void) const {
     	return (CkDelegateMgr *)CkLocalBranch(delegatedTo);
     }
     void pup(PUP::er &p) {
-    	p(delegatedTo);
+      p|delegatedTo;
     }
 };
 PUPmarshall(CProxyBase_Delegatable)
@@ -154,7 +152,9 @@ class CProxy_Group : public CProxyBase_Delegatable {
     CkGroupID _ck_gid;
   public:
     CProxy_Group() { }
-    CProxy_Group(CkGroupID g,CkGroupID dTo=-1) 
+    CProxy_Group(CkGroupID g) 
+    	:CProxyBase_Delegatable(),_ck_gid(g) {}
+    CProxy_Group(CkGroupID g,CkGroupID dTo) 
     	:CProxyBase_Delegatable(dTo),_ck_gid(g) {}
     CkChareID ckGetChareID(void) const { 
     	CkChareID ret;
@@ -167,7 +167,7 @@ class CProxy_Group : public CProxyBase_Delegatable {
     void ckSetGroupID(CkGroupID g) {_ck_gid=g;}
     void pup(PUP::er &p) {
     	CProxyBase_Delegatable::pup(p);
-    	p(_ck_gid);
+	p | _ck_gid;
     }
 };
 PUPmarshall(CProxy_Group)
@@ -185,7 +185,9 @@ class CProxyElement_Group : public CProxy_Group {
     int _onPE;    
   public:
     CProxyElement_Group() { }
-    CProxyElement_Group(CkGroupID g,int onPE,CkGroupID dTo=-1)
+    CProxyElement_Group(CkGroupID g,int onPE)
+	: CProxy_Group(g),_onPE(onPE) {}
+    CProxyElement_Group(CkGroupID g,int onPE,CkGroupID dTo)
 	: CProxy_Group(g,dTo),_onPE(onPE) {}
     
     int ckGetGroupPe(void) const {return _onPE;}
@@ -225,14 +227,14 @@ class CkArrayIndexMax;
 class CkArrayID {
 	CkGroupID _gid;
 public:
-	CkArrayID() { }
+	CkArrayID() : _gid() { }
 	CkArrayID(CkGroupID g) :_gid(g) {}
 	operator CkGroupID() const {return _gid;}
 	CkArray *ckLocalBranch(void) const
 		{ return (CkArray *)CkLocalBranch(_gid); }
 	static CkArray *CkLocalBranch(CkArrayID id) 
 		{ return (CkArray *)::CkLocalBranch(id); }
-	void pup(PUP::er &p) {p(_gid);}
+	void pup(PUP::er &p) {p | _gid; }
 };
 PUPmarshall(CkArrayID)
 

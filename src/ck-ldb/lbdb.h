@@ -9,6 +9,7 @@
 #define LBDBH_H
 
 #include <converse.h>
+#include <charm.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -29,7 +30,7 @@ typedef int LDHandle;
 #endif
 
 typedef struct {
-  int id;
+  CkGroupID id;
 } LDOMid;
 
 typedef struct {

@@ -72,8 +72,6 @@ extern void CkPackMessage(envelope **pEnv);
 extern void CkUnpackMessage(envelope **pEnv);
 extern void _createGroupMember(CkGroupID groupID, int eIdx, void *env);
 extern void _createNodeGroupMember(CkGroupID groupID, int eIdx, void *env);
-extern void _createGroup(CkGroupID groupID, envelope *env, int retEp, 
-                         CkChareID *retChare);
-extern void _createNodeGroup(CkGroupID groupID, envelope *env, int retEp,
-                             CkChareID *retChare);
+extern void _createGroup(CkGroupID groupID, envelope *env);
+extern void _createNodeGroup(CkGroupID groupID, envelope *env);
 #endif

@@ -12,6 +12,7 @@
 #include <sys/types.h> /* for size_t */
 
 #ifdef __cplusplus
+#include "pup.h"
 extern "C" {
 #endif
 
@@ -92,7 +93,18 @@ typedef struct {
   void* objPtr;
 } CkChareID;
 
-typedef int CkGroupID;
+typedef struct _ckGroupID{
+  int pe;
+  int idx;
+#ifdef __cplusplus
+  void pup(PUP::er &p) { p(pe); p(idx); }
+  int isZero(void) { return (idx==0); }
+  CmiBool operator==(const struct _ckGroupID& gid) const { 
+    return ((gid.pe==pe) && (gid.idx==idx));
+  }
+#endif
+} CkGroupID;
+
 typedef int CkFutureID;
 
 /******************************************************************************
@@ -135,12 +147,8 @@ extern void CkRegisterMainModule(void);
 
 extern void CkCreateChare(int chareIdx, int constructorIdx, void *msg,
                           CkChareID *vid, int destPE);
-extern CkGroupID CkCreateGroup(int chareIdx, int constructorIdx, void *msg,
-                         int returnEpIdx, CkChareID *returnChare);
-extern CkGroupID CkCreateGroupSync(int cIdx, int consIdx, void *msg);
-extern CkGroupID CkCreateNodeGroup(int chareIdx, int constructorIdx, void *msg,
-                         int returnEpIdx, CkChareID *returnChare);
-extern CkGroupID CkCreateNodeGroupSync(int cIdx, int consIdx, void *msg);
+extern CkGroupID CkCreateGroup(int chareIdx, int constructorIdx, void *msg);
+extern CkGroupID CkCreateNodeGroup(int chareIdx, int constructorIdx, void *msg);
 
 /******************************************************************************
  *
@@ -197,8 +205,8 @@ extern void CkWaitQD(void);
  *
  *****************************************************************************/
 
-extern void *CkLocalBranch(int gID);
-extern void *CkLocalNodeBranch(int gID);
+extern void *CkLocalBranch(CkGroupID gID);
+extern void *CkLocalNodeBranch(CkGroupID gID);
 extern void *CkLocalChare(const CkChareID *chare);
 extern void  CkGetChareID(CkChareID *pcid);
 extern CkGroupID   CkGetGroupID(void);

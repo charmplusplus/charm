@@ -134,7 +134,7 @@ double ObjGraph::EdgeWeight(Edge* e) {
 
 int ObjGraph::calc_hashval(LDOMid omid, LDObjid id)
 {
-  int hashval = omid.id;
+  int hashval = omid.id.idx;
   for(int i=0; i < OBJ_ID_SZ; i++)
     hashval +=  id.id[i];
   hashval %= hash_max;

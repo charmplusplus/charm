@@ -33,21 +33,19 @@
 #define ForBocMsg      5
 #define ForVidMsg      6
 #define FillVidMsg     7
-#define DBocReqMsg     8
-#define DBocNumMsg     9
-#define RODataMsg      10
-#define ROMsgMsg       11
-#define ExitMsg        12
-#define ReqStatMsg     13
-#define StatMsg        14
-#define NodeBocInitMsg 15
-#define ForNodeBocMsg  16
-#define DNodeBocReqMsg 17
-#define DNodeBocNumMsg 18
+#define RODataMsg      8
+#define ROMsgMsg       9
+#define ExitMsg        10
+#define ReqStatMsg     11
+#define StatMsg        12
+#define NodeBocInitMsg 13
+#define ForNodeBocMsg  14
 
 typedef unsigned int   UInt;
 typedef unsigned short UShort;
 typedef unsigned char  UChar;
+
+#include <charm.h> // for CkGroupID
 
 class envelope {
   private:
@@ -61,15 +59,11 @@ public:
       	UInt forAnyPe; //Used by new-only
       } chare;
       struct s_group {
-	UChar num; //Group number
+	CkGroupID g; //GroupID
       } group;
-      struct s_dgroup{
-	UChar num; //Group number
-	void *usrMsg; //For DBoc only
-      } dgroup;
       struct s_array{ //For arrays only
-	UChar loc; //Location manager group number (overlays group number above)
-	UChar arr; //Array manager group number
+	CkGroupID loc; //Location manager GID
+	CkGroupID arr; //Array manager GID
 	UChar hopCount;//number of times message has been routed
 	UShort epIdx;//Array element entry point
 	UInt srcPe;//Original sender
@@ -133,13 +127,21 @@ private:
     void*  getPrioPtr(void) const { 
       return (void *)((char *)this + totalsize - getPrioBytes());
     }
-    UInt   getCount(void) const { CkAssert(getMsgtype()==RODataMsg); return type.roData.count; }
-    void   setCount(const UInt c) { CkAssert(getMsgtype()==RODataMsg); type.roData.count = c; }
-    UInt   getRoIdx(void) const { CkAssert(getMsgtype()==ROMsgMsg); return type.roMsg.roIdx; }
-    void   setRoIdx(const UInt r) { CkAssert(getMsgtype()==ROMsgMsg); type.roMsg.roIdx = r; }
+    UInt   getCount(void) const { 
+      CkAssert(getMsgtype()==RODataMsg); return type.roData.count; 
+    }
+    void   setCount(const UInt c) { 
+      CkAssert(getMsgtype()==RODataMsg); type.roData.count = c; 
+    }
+    UInt   getRoIdx(void) const { 
+      CkAssert(getMsgtype()==ROMsgMsg); return type.roMsg.roIdx; 
+    }
+    void   setRoIdx(const UInt r) { 
+      CkAssert(getMsgtype()==ROMsgMsg); type.roMsg.roIdx = r; 
+    }
     static envelope *alloc(const UChar type, const UInt size=0, const UShort prio=0)
     {
-      CkAssert(type>=NewChareMsg && type<=DNodeBocNumMsg);
+      CkAssert(type>=NewChareMsg && type<=ForNodeBocMsg);
       register UInt tsize = sizeof(envelope)+ALIGN(size)+sizeof(int)*PW(prio);
       register envelope *env = (envelope *)CmiAlloc(tsize);
       env->setMsgtype(type);
@@ -183,46 +185,28 @@ private:
     }
     UInt   getSrcPe(void) const { return pe; }
     void   setSrcPe(const UInt s) { pe = s; }
-    void*  getObjPtr(void) const { CkAssert(getMsgtype()==ForChareMsg); return type.chare.ptr; }
-    void   setObjPtr(void *p) { CkAssert(getMsgtype()==ForChareMsg); type.chare.ptr = p; }
-    UShort getRetEp(void) const {
-      CkAssert(getMsgtype()==DBocReqMsg || getMsgtype()==DNodeBocReqMsg
-          || getMsgtype()==DBocNumMsg || getMsgtype()==DNodeBocNumMsg); 
-      return epIdx; 
+    void*  getObjPtr(void) const { 
+      CkAssert(getMsgtype()==ForChareMsg); return type.chare.ptr; 
     }
-    void   setRetEp(const UShort e) {
-      CkAssert(getMsgtype()==DBocReqMsg || getMsgtype()==DNodeBocReqMsg
-          || getMsgtype()==DBocNumMsg || getMsgtype()==DNodeBocNumMsg); 
-      epIdx = e; 
+    void   setObjPtr(void *p) { 
+      CkAssert(getMsgtype()==ForChareMsg); type.chare.ptr = p; 
     }
-    void*  getUsrMsg(void) const { 
-      CkAssert(getMsgtype()==DBocReqMsg || getMsgtype()==DBocNumMsg
-          || getMsgtype()==DNodeBocReqMsg || getMsgtype()==DNodeBocNumMsg); 
-      return type.dgroup.usrMsg; 
-    }
-    void   setUsrMsg(void *p) { 
-      CkAssert(getMsgtype()==DBocReqMsg || getMsgtype()==DBocNumMsg
-          || getMsgtype()==DNodeBocReqMsg || getMsgtype()==DNodeBocNumMsg); 
-      type.dgroup.usrMsg = p; 
-    }
-    UInt   getGroupNum(void) const {
+    CkGroupID   getGroupNum(void) const {
       CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==ForBocMsg
-          || getMsgtype()==DBocNumMsg || getMsgtype()==NodeBocInitMsg
-          || getMsgtype()==ForNodeBocMsg || getMsgtype()==DNodeBocNumMsg);
-      return type.group.num;
+          || getMsgtype()==NodeBocInitMsg || getMsgtype()==ForNodeBocMsg);
+      return type.group.g;
     }
-    void   setGroupNum(const UInt g) {
+    void   setGroupNum(const CkGroupID g) {
       CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==ForBocMsg
-          || getMsgtype()==DBocNumMsg || getMsgtype()==NodeBocInitMsg
-          || getMsgtype()==ForNodeBocMsg || getMsgtype()==DNodeBocNumMsg);
-      type.group.num = g;
+          || getMsgtype()==NodeBocInitMsg || getMsgtype()==ForNodeBocMsg);
+      type.group.g = g;
     }
     CkArrayIndexMax &array_index(void) {return 
         *(CkArrayIndexMax *)&type.array.index;}
     
     unsigned short &array_ep(void) {return type.array.epIdx;}
     unsigned char &array_hops(void) {return type.array.hopCount;}
-    unsigned char &array_mgr(void) {return type.array.arr;}
+    CkGroupID &array_mgr(void) {return type.array.arr;}
     unsigned int &array_srcPe(void) {return type.array.srcPe;}
     UInt &array_broadcastCount(void) {return type.array.broadcastCount;}
 };

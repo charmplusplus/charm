@@ -819,6 +819,7 @@ CkLocMgr::CkLocMgr(CkGroupID mapID_,CkGroupID lbdbID_,int numInitial)
 	DEBC((AA"Creating new location manager %d\n"AB,thisgroup));
 	CpvInitialize(CkMigratable_initInfo,mig_initInfo);
 	
+	managers.init();
   	firstManager=NULL;
 	firstFree=localLen=0;
 	duringMigration=false;
@@ -841,7 +842,7 @@ CkMigratableList *CkLocMgr::addManager(CkArrayID id,CkArrMgr *mgr)
 {
 	magic.check();
 	DEBC((AA"Adding new array manager %d\n"AB,(int)id));
-	ManagerRec *n=&managers[id];
+	ManagerRec *n=&managers.find(id);
 	n->next=firstManager;
 	n->mgr=mgr;
 	n->elts.setSize(localLen);
@@ -919,7 +920,7 @@ bool CkLocMgr::addElement(CkArrayID id,const CkArrayIndex &idx,
 		rec=((CkLocRec_local *)oldRec);
 		rec->addedElement();
 	}
-	if (!addElementToRec(rec,&managers[id],elt,ctorIdx,ctorMsg)) return false;
+	if (!addElementToRec(rec,&managers.find(id),elt,ctorIdx,ctorMsg)) return false;
 	elt->ckFinishConstruction();
 	return true;
 }
@@ -934,7 +935,7 @@ bool CkLocMgr::addElementToRec(CkLocRec_local *rec,ManagerRec *m,
 	m->elts.put(elt,localIdx); //Local element table
 	
 //Call the element's constructor
-	DEBC((AA"Constructing element %s of array %d\n"AB,idx2str(idx),(int)(m-managers)));
+	DEBC((AA"Constructing element %s of array\n"AB,idx2str(idx)));
 	CkMigratable_initInfo &i=CpvAccess(mig_initInfo);
 	i.locRec=rec;
 	i.chareType=_entryTable[ctorIdx]->chareIdx;
@@ -1047,7 +1048,7 @@ bool CkLocMgr::demandCreateElement(CkArrayMessage *msg,int onPe)
 	
 	//Find the manager and build the element
 	DEBC((AA"Demand-creating element %s on pe %d\n"AB,idx2str(idx),onPe));
-	CkArrMgr *mgr=managers[UsrToEnv((void *)msg)->array_mgr()].mgr;
+	CkArrMgr *mgr=managers.find(UsrToEnv((void *)msg)->array_mgr()).mgr;
 	bool created=mgr->demandCreateElement(idx,onPe,ctor);
 
 	//Try the delivery again-- it should succeed this time
@@ -1289,7 +1290,7 @@ void CkLocMgr::initLB(CkGroupID lbdbID_)
 
 	// Register myself as an object manager
 	LDOMid myId;
-	myId.id = (int)thisgroup;
+	myId.id = thisgroup;
 	LDCallbacks myCallbacks;
 	myCallbacks.migrate = (LDMigrateFn)CkLocRec_local::staticMigrate;
 	myCallbacks.setStats = NULL;
