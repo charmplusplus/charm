@@ -334,6 +334,7 @@ void CentralLB::RemoveNonMigratable(LDStats* stats, int count)
       else 
         break;
     }
+    if (l==-1 && h==-1) h=0;
     stats[pe].n_comm = h;
     if (n_comm != h) CmiPrintf("Removed %d nonmigratable on pe:%d n_comm:%d migratable:%d\n", n_comm-h, pe, n_comm, h);
   }
