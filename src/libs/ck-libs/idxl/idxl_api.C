@@ -4,6 +4,7 @@
  */
 #include "charm-api.h"
 #include "idxl.h"
+#include "tcharm.h"
 
 /************************* IDXL itself ************************/
 
@@ -11,7 +12,7 @@
 CDECL IDXL_t 
 IDXL_Create(void) {
 	const char *callingRoutine="IDXL_Create";
-	IDXLAPI(callingRoutine); IDXL_Chunk *c=IDXL_Chunk::lookup(callingRoutine);
+	IDXLAPI(callingRoutine); IDXL_Chunk *c=IDXL_Chunk::get(callingRoutine);
 	return c->addDynamic();
 }
 FORTRAN_AS_C_RETURN(int, IDXL_CREATE,IDXL_Create,idxl_create,
@@ -22,7 +23,7 @@ FORTRAN_AS_C_RETURN(int, IDXL_CREATE,IDXL_Create,idxl_create,
 void IDXL_Print(IDXL_t l_t)
 {
 	const char *callingRoutine="IDXL_Print";
-	IDXLAPI(callingRoutine); IDXL_Chunk *c=IDXL_Chunk::lookup(callingRoutine);
+	IDXLAPI(callingRoutine); IDXL_Chunk *c=IDXL_Chunk::get(callingRoutine);
 	const IDXL &l=c->lookup(l_t,callingRoutine);
 	if (l.isSingle()) {
 		l.getSend().print();
@@ -59,7 +60,7 @@ static void shiftSide(IDXL_Side &dest,int idxShift)
 CDECL void 
 IDXL_Shift(IDXL_t l_t,int startSend,int startRecv) {
 	const char *callingRoutine="IDXL_Shift";
-	IDXLAPI(callingRoutine); IDXL_Chunk *c=IDXL_Chunk::lookup(callingRoutine);
+	IDXLAPI(callingRoutine); IDXL_Chunk *c=IDXL_Chunk::get(callingRoutine);
 	IDXL &l=c->lookup(l_t,callingRoutine);
 	if (l.isSingle()) {
 		if (startSend!=startRecv) //FIXME: handle this case, instead of aborting
@@ -100,7 +101,7 @@ CDECL void
 IDXL_Combine(IDXL_t dest_t,IDXL_t src_t,int startSend,int startRecv)
 {
 	const char *callingRoutine="IDXL_Combine";
-	IDXLAPI(callingRoutine); IDXL_Chunk *c=IDXL_Chunk::lookup(callingRoutine);
+	IDXLAPI(callingRoutine); IDXL_Chunk *c=IDXL_Chunk::get(callingRoutine);
 	const IDXL &src=c->lookup(src_t,callingRoutine);
 	IDXL &dest=c->lookup(dest_t,callingRoutine);
 	if (src.isSingle()!=dest.isSingle()) //FIXME: handle this case instead of aborting
@@ -165,7 +166,7 @@ static void splitEntity(IDXL &l,
 CDECL void IDXL_Add_entity(IDXL_t l_t,int localIdx,int nBetween,int *between)
 {
 	const char *callingRoutine="IDXL_Add_entity";
-	IDXLAPI(callingRoutine); IDXL_Chunk *c=IDXL_Chunk::lookup(callingRoutine);
+	IDXLAPI(callingRoutine); IDXL_Chunk *c=IDXL_Chunk::get(callingRoutine);
 	IDXL &l=c->lookup(l_t,callingRoutine);
 	splitEntity(l,localIdx,nBetween,between,0);
 }
@@ -173,7 +174,7 @@ FDECL void FTN_NAME(IDXL_ADD_ENTITY,idxl_add_entity)
 	(int *l_t,int *localIdx,int *nBetween,int *between)
 {
 	const char *callingRoutine="IDXL_Add_entity";
-	IDXLAPI(callingRoutine); IDXL_Chunk *c=IDXL_Chunk::lookup(callingRoutine);
+	IDXLAPI(callingRoutine); IDXL_Chunk *c=IDXL_Chunk::get(callingRoutine);
 	IDXL &l=c->lookup(*l_t,callingRoutine);
 	splitEntity(l,*localIdx-1,*nBetween,between,1);	
 }
@@ -183,7 +184,7 @@ FDECL void FTN_NAME(IDXL_ADD_ENTITY,idxl_add_entity)
 /** Throw away this index list */
 CDECL void IDXL_Destroy(IDXL_t l) {
 	const char *callingRoutine="IDXL_Destroy";
-	IDXLAPI(callingRoutine); IDXL_Chunk *c=IDXL_Chunk::lookup(callingRoutine);
+	IDXLAPI(callingRoutine); IDXL_Chunk *c=IDXL_Chunk::get(callingRoutine);
 	c->destroy(l);
 }
 FORTRAN_AS_C(IDXL_DESTROY,IDXL_Destroy,idxl_destroy,  (int *l), (*l));
@@ -192,7 +193,7 @@ FORTRAN_AS_C(IDXL_DESTROY,IDXL_Destroy,idxl_destroy,  (int *l), (*l));
 CDECL int IDXL_Get_source(IDXL_t l_t,int localNo) {
 	const char *callingRoutine="IDXL_Get_source";
 	IDXLAPI(callingRoutine); 
-	IDXL_Chunk *c=IDXL_Chunk::lookup(callingRoutine);
+	IDXL_Chunk *c=IDXL_Chunk::get(callingRoutine);
 	IDXL &l=c->lookup(l_t,callingRoutine);
 	const IDXL_Rec *rec=l.getRecv().getRec(localNo);
 	if (rec==NULL) CkAbort("IDXL_Get_source called on non-ghost entity!");
@@ -209,7 +210,7 @@ IDXL_Layout_create(int type, int width)
 {
 	const char *callingRoutine="IDXL_Create_simple_data";
 	IDXLAPI(callingRoutine);
-	return getLayouts().put(IDXL_Layout(type, width));
+	return IDXL_Layout_List::get().put(IDXL_Layout(type, width));
 }
 FORTRAN_AS_C_RETURN(int,
 	IDXL_LAYOUT_CREATE,IDXL_Layout_create,idxl_layout_create,
@@ -220,7 +221,7 @@ IDXL_Layout_offset(int type, int width, int offsetBytes, int distanceBytes,int s
 {
 	const char *callingRoutine="IDXL_Create_data";
 	IDXLAPI(callingRoutine);
-	return getLayouts().put(IDXL_Layout(type,width, offsetBytes,distanceBytes,skewBytes));
+	return IDXL_Layout_List::get().put(IDXL_Layout(type,width, offsetBytes,distanceBytes,skewBytes));
 }
 FORTRAN_AS_C_RETURN(int,
 	IDXL_LAYOUT_OFFSET,IDXL_Layout_offset,idxl_layout_offset,
@@ -230,7 +231,7 @@ FORTRAN_AS_C_RETURN(int,
 CDECL int Cname(IDXL_Layout_t d) \
 { \
 	IDXLAPI(#Cname); \
-	return getLayouts().get(d,#Cname).field;\
+	return IDXL_Layout_List::get().get(d,#Cname).field;\
 }\
 FORTRAN_AS_C_RETURN(int, IDXL_GET_LAYOUT_##CAPS,Cname,idxl_get_layout_##lowercase, \
 	(int *d), (*d))
@@ -243,7 +244,7 @@ CDECL void
 IDXL_Layout_destroy(IDXL_Layout_t l) {
 	const char *callingRoutine="IDXL_Layout_destroy";
 	IDXLAPI(callingRoutine);
-	getLayouts().destroy(l,callingRoutine);
+	IDXL_Layout_List::get().destroy(l,callingRoutine);
 }
 FORTRAN_AS_C(IDXL_LAYOUT_DESTROY,IDXL_Layout_destroy,idxl_layout_destroy,
 	(int *l), (*l) )
@@ -253,7 +254,7 @@ FORTRAN_AS_C(IDXL_LAYOUT_DESTROY,IDXL_Layout_destroy,idxl_layout_destroy,
 CDECL IDXL_Comm_t 
 IDXL_Comm_begin(int tag, int context) {
 	const char *callingRoutine="IDXL_Create_data";
-	IDXLAPI(callingRoutine); IDXL_Chunk *c=IDXL_Chunk::lookup(callingRoutine);
+	IDXLAPI(callingRoutine); IDXL_Chunk *c=IDXL_Chunk::get(callingRoutine);
 	return c->addComm(tag,context);
 }
 FORTRAN_AS_C_RETURN(int,
@@ -263,7 +264,7 @@ FORTRAN_AS_C_RETURN(int,
 // A bunch of useful locals for use in IDXL_Comm API routines:
 #define COMM_BROILERPLATE(routineName) \
 	const char *callingRoutine=routineName; \
-	IDXLAPI(callingRoutine); IDXL_Chunk *c=IDXL_Chunk::lookup(callingRoutine); \
+	IDXLAPI(callingRoutine); IDXL_Chunk *c=IDXL_Chunk::get(callingRoutine); \
 	const IDXL &list=c->lookup(dest,callingRoutine); \
 	const IDXL_Layout *dt=&c->layouts.get(type,callingRoutine);
 
@@ -328,14 +329,14 @@ FORTRAN_AS_C(IDXL_COMM_SUM,IDXL_Comm_sum,idxl_comm_sum,
 /** Send all outgoing data. */
 void IDXL_Comm_flush(IDXL_Comm_t m) {
 	const char *callingRoutine="IDXL_Comm_flush"; 
-	IDXLAPI(callingRoutine); IDXL_Chunk *c=IDXL_Chunk::lookup(callingRoutine); 
-	c->flushComm(c->lookupComm(m,callingRoutine));
+	IDXLAPI(callingRoutine); IDXL_Chunk *c=IDXL_Chunk::get(callingRoutine); 
+	c->lookupComm(m,callingRoutine)->post();
 }
 
 /** Block until all communication is complete. This destroys the IDXL_Comm. */
 void IDXL_Comm_wait(IDXL_Comm_t m) {
 	const char *callingRoutine="IDXL_Comm_flush"; 
-	IDXLAPI(callingRoutine); IDXL_Chunk *c=IDXL_Chunk::lookup(callingRoutine); 
+	IDXLAPI(callingRoutine); IDXL_Chunk *c=IDXL_Chunk::get(callingRoutine); 
 	c->waitComm(c->lookupComm(m,callingRoutine));
 }
 

@@ -9,9 +9,11 @@
   extern "C" {
 #endif
 
+/** Initialize the IDXL library.  Must have already called MPI_Init. */
+void IDXL_Init(void);
+
 /** An index list, the fundamental datatype of this library. */
 typedef int IDXL_t;
-
 
 /** Create a new, empty index list. Must eventually call IDXL_Destroy on this list. */
 IDXL_t IDXL_Create(void);

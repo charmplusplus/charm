@@ -24,7 +24,7 @@ void IDXL_Rec::add(int chk,int idx)
 	if (chk<0 || chk>1000000)
 		CkAbort("FEM IDXL_Rec::add> Tried to add absurd chunk number!\n");
 #endif
-	shares.setSize(n+1); //Grow slowly, to save memory
+	shares.reserve(n+1); //Grow slowly, to save memory
 	shares.push_back(IDXL_Share(chk,idx));
 }
 

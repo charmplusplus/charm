@@ -22,8 +22,9 @@
        
        
        interface
-       function IDXL_Create()
-         integer :: IDXL_Create
+       subroutine IDXL_Init()
+       end subroutine
+       integer function IDXL_Create()
        end function
        subroutine IDXL_Print(l)
          integer,intent (in) :: l
@@ -33,24 +34,24 @@
        end subroutine    
        subroutine IDXL_Shift(l,startSend,startRecv)
          integer, intent (in) :: l
-	 integer, intent(in) :: startSend, startRecv
+         integer, intent(in) :: startSend, startRecv
        end subroutine    
        subroutine IDXL_Combine(l,src,startSend,startRecv)
          integer, intent (in) :: l, src
-	 integer, intent(in) :: startSend, startRecv
+         integer, intent(in) :: startSend, startRecv
        end subroutine    
        subroutine IDXL_Add_entity(l,newIdx,nBetween,between)
          integer, intent (in) :: l
-	 integer, intent(in) :: newIdx, nBetween
-	 integer, intent(in) :: between(nBetween)
+         integer, intent(in) :: newIdx, nBetween
+         integer, intent(in) :: between(nBetween)
        end subroutine  
        subroutine IDXL_Sort_2d(l,coord2d)
          integer, intent (in) :: l
-	 double precision, intent(in) :: coord2d(:)
+         double precision, intent(in) :: coord2d(:)
        end subroutine    
        subroutine IDXL_Sort_3d(l,coord3d)
          integer, intent (in) :: l
-	 double precision, intent(in) :: coord3d(:)
+         double precision, intent(in) :: coord3d(:)
        end subroutine    
        subroutine IDXL_Destroy(l)
          integer,intent (in) :: l

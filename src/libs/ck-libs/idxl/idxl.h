@@ -15,8 +15,8 @@ Orion Sky Lawlor, olawlor@acm.org, 1/3/2003
 #ifndef __CHARM_IDXL_H
 #define __CHARM_IDXL_H
 
+#include "mpi.h"
 #include "pup.h"
-#include "tcharm.h"
 #include "idxlc.h" /* C interface */
 #include "idxl_comm.h" /* basic comm. data structures */
 #include "idxl_layout.h" /* user-data description */
@@ -38,7 +38,7 @@ void IDXL_Abort(const char *callingRoutine,const char *msg,int m0=0,int m1=0,int
  */
 class IDXL_Comm {
 public: //<- Sun CC demands op_t be public for use in inner class
-	typedef enum { add_t=17,recv_t,sum_t} op_t;
+	typedef enum { send_t=17,recv_t,sum_t} op_t;
 private:
 	class sto_t { public:
 		const IDXL_Side *idx; //Indices to read from/write to
@@ -48,40 +48,50 @@ private:
 		
 		sto_t(const IDXL_Side *idx_,const IDXL_Layout *dtype_,void *data_,op_t op_)
 			:idx(idx_), dtype(dtype_), data(data_), op(op_) {}
-		sto_t(void)
-			:idx(0), dtype(0), data(0), op((op_t)0) {}
+		sto_t(void) {}
 	};
 	enum {maxSto=20};
-	sto_t sto[maxSto]; //Stuff to put in each message
-	int nSto, nStoAdd, nStoRecv;
+	sto_t sto[maxSto]; //Stuff to send/receive
+	int nSto;
 	
-	int seqnum, tag, context;
-	int nRecv; //Number of messages remaining to be recv'd.
-	bool isSent; //If true, no more adds are allowed
-	bool beginRecv; //If true, no more recv or sums are allowed
+	class msg_t { public:
+		sto_t *sto; /* Indices to send/receive */
+		int ll; /* Local processor to communicate with */
+		char *buf; /* Send/receive buffer */
+		int bufLen; /* bytes in send/receive buffer */
+		void allocate(int len) {
+			if (buf) {delete[] buf;buf=NULL;}
+			buf=new char[len];
+			bufLen=len;
+		}
+		msg_t() :buf(NULL) {}
+		~msg_t() {if (buf) {delete[] buf;}}
+	};
+	enum {maxMsg=50};
+	msg_t msg[maxMsg]; //Messages to each processor
+	MPI_Request msgReq[maxMsg];
+	int nMsg;
+	
+	int tag; MPI_Comm comm;
+	bool isPost; //If true, no more adds are allowed
 public:
-	IDXL_Comm(int seqnum, int tag,int context);
-	IDXL_Comm(void) {nSto=nRecv=0; isSent=true; beginRecv=true;}
+	IDXL_Comm(int tag,int context);
 	
 	// prepare to write this field to the message:
 	void send(const IDXL_Side *idx,const IDXL_Layout *dtype,const void *src);
-	
-	// send off our added fields to their destinations in this array
-	void flush(int src,const CkArrayID &chunkArray);
 	
 	// prepare to recv and copy out this field
 	void recv(const IDXL_Side *idx,const IDXL_Layout *dtype,void *dest);
 	void sum(const IDXL_Side *idx,const IDXL_Layout *dtype,void *srcdest);
 	
-	// If this is one of our messages, copy out the user data out,
-	//  delete the message, and return true. Return false if not ours.
-	bool recv(IDXL_DataMsg *msg);
+	// send off our added fields to their destinations & post receives
+	void post(void);
+	
+	// wait until this communication is complete.
+	void wait(void);
 	
 	/// Return true if we've sent off our messages
-	bool isFlushed(void) { return isSent; }
-	
-	// Return true if we expect no more messages
-	bool isDone(void) const { return isSent && (nRecv<=0); }
+	bool isPosted(void) { return isPost; }
 };
 
 
@@ -93,8 +103,7 @@ public:
  *
  * For IDXL_Chunk to do its job, you're supposed to inherit from it.
  */
-class IDXL_Chunk : public TCharmClient1D {
-  typedef TCharmClient1D super;
+class IDXL_Chunk {
   
   // List of index lists: 
   // first has a static part for stuff we can't throw away (indices 0..STATIC_IDXL-1)
@@ -102,24 +111,17 @@ class IDXL_Chunk : public TCharmClient1D {
   enum {FIRST_IDXL=1550000000, STATIC_IDXL=32, LAST_IDXL=64};
   IDXL *idxls[LAST_IDXL];
 
-  // Lists ongoing communications
-  CkMsgQ<IDXL_DataMsg> messages; // update messages to be processed
-  int updateSeqnum; // sequence number for last update operation
-  IDXL_Comm currentComm; //The ongoing communicator
-  IDXL_Comm *blockedOnComm; //If non-null, we've blocked the thread on this comm.
+  // Lists ongoing communications (FIXME: add list here)
+  IDXL_Comm *currentComm; //The ongoing communicator
   
   void init(void);
-protected:
-	virtual void setupThreadPrivate(CthThread forThread);
 public:
-	IDXL_Chunk(const CkArrayID &threadArrayID);
+	IDXL_Chunk(void);
 	IDXL_Chunk(CkMigrateMessage *m);
 	void pup(PUP::er &p);
 	~IDXL_Chunk();
 	
-	static IDXL_Chunk *lookup(const char *callingRoutine);
-	
-	void idxl_recv(IDXL_DataMsg *m);
+  static IDXL_Chunk *get(const char *callingRoutine);
 	
 // Manipulate index lists (IDXL's):
   /// Dynamically create a new empty IDXL.  Must eventually call destroy.
@@ -138,19 +140,10 @@ public:
 // Manipulate ongoing communication:
   IDXL_Comm_t addComm(int tag,int context);
   IDXL_Comm *lookupComm(IDXL_Comm_t uc,const char *callingRoutine="");
-  inline void flushComm(IDXL_Comm *comm) {
-  	comm->flush(thisIndex,thisArrayID);
-  }
   void waitComm(IDXL_Comm *comm);
-  
 };
 
 #define IDXLAPI(routineName) TCHARM_API_TRACE(routineName,"IDXL");
-
-/// Get the currently active layout list.
-///  In driver, this is IDXL_Chunk's "layouts" member.
-///  Elsewhere (e.g., in init), this is a local member.
-IDXL_Layout_List &getLayouts(void);
 
 #endif
 

@@ -2,9 +2,9 @@ CDIR=../../../..
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
 HEADERS=idxlc.h idxlf.h idxl.h idxl_layout.h idxl_comm.h
-HEADDEP=$(HEADERS) idxl.decl.h idxl.def.h
+HEADDEP=$(HEADERS)
 OBJS=idxl.o idxl_layout.o idxl_comm.o idxl_api.o 
-DEST=$(CDIR)/lib/libmoduleidxl.a
+DEST=$(CDIR)/lib/libidxl.a
 
 all: $(DEST)
 
@@ -26,9 +26,6 @@ idxl_comm.o: idxl_comm.C $(HEADDEP)
 
 idxl_api.o: idxl_api.C $(HEADDEP)
 	$(CHARMC) -c idxl_api.C
-
-idxl.decl.h idxl.def.h: idxl.ci
-	$(CHARMC) idxl.ci
 
 clean:
 	rm -rf *.a *.def.h *.decl.h *.o SunWS_cache $(DEST) headers

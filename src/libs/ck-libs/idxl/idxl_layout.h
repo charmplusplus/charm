@@ -129,6 +129,8 @@ public:
 	
 	/// Clear all stored layouts:
 	void empty(void);
+	
+	static IDXL_Layout_List &get(void);
 };
 PUPmarshall(IDXL_Layout_List);
 
