@@ -801,6 +801,8 @@ void TraceProjections::dequeue(envelope *) {}
 void TraceProjections::beginComputation(void)
 {
   computationStarted = 1;
+//  CkpvAccess(traceInitTime) = TRACE_TIMER();
+//  CkpvAccess(traceInitCpuTime) = TRACE_CPUTIMER();
   _logPool->add(BEGIN_COMPUTATION, 0, 0, TraceTimer(), -1, -1);
 }
 
