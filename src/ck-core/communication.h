@@ -12,7 +12,12 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.2  1995-06-29 21:35:23  narain
+ * Revision 2.3  1995-07-06 04:44:55  gursoy
+ * fixed MsgToStructTable definition (it is a Csv type variable and
+ * secondly I included trans_defs.h to use MSG_STRUCT type because
+ * Csv macros cannot use struct xxx .
+ *
+ * Revision 2.2  1995/06/29  21:35:23  narain
  * Declared PACKED state macros, #define for LDBFillBlock and changed
  * members of MSG_STRUCT from pack and unpack to packfn and unpackfn
  *
@@ -66,8 +71,9 @@
 #define PACKED 2
 #endif
 
-CpvExtern(struct msg_struct*, MsgToStructTable);
+#include "trans_defs.h"
 
+CsvExtern(MSG_STRUCT*, MsgToStructTable);
 
 #define LdbFillBlock(env) LdbFillLDB(LDB_ELEMENT_PTR(env))
 
