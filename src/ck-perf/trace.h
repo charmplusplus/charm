@@ -12,6 +12,9 @@
 
 class envelope;
 
+// An additional interface for summary data
+extern "C" void traceClearEps();
+
 // Base class of all tracing strategies.
 
 class Trace {
