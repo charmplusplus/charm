@@ -48,8 +48,8 @@ private:
   double  rTime;	// relative time from the start entry
 public:
   bgEvents(void *d, double t): data(d), rTime(t) {}
-  inline void update(bgEventCallBackFn fn, double startTime) {
-    fn(data, startTime+rTime);
+  inline void update(bgEventCallBackFn fn, double startT, double recvT, void *usrPtr) {
+    fn(data, startT+rTime, recvT, usrPtr);
   }
 };
 
@@ -72,11 +72,15 @@ public:
   ~bgTimeLog();
   void closeLog();
   inline void addMsg(char *msg) { msgs.push_back(new bgMsgEntry(msg)); }
-  inline void addEvent(void *data, double absT) { evts.push_back(new bgEvents(data, absT-startTime)); }
   void print(int node, int th);
   void write(FILE *fp);
 
   void adjustTimeLog(double tAdjust);
+  inline void addEvent(void *data, double absT) { evts.push_back(new bgEvents(data, absT-startTime)); }
+  inline void updateEvents(bgEventCallBackFn fn, void *usrPtr) {
+    for (int i=0; i<evts.length(); i++)
+      evts[i]->update(fn, startTime, recvTime, usrPtr);
+  }
 };
 
 /**

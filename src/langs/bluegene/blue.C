@@ -1277,15 +1277,12 @@ void bgAddProjEvent(void *data, double t)
 
 // trace projections callback update projections with new timestamp after
 // timing correction
-void bgUpdateProj(bgEventCallBackFn fn)
+void bgUpdateProj(bgEventCallBackFn fn, void *usrPtr)
 {
   BgTimeLine &log = tTIMELINE;
   for (int i=0; i< log.length(); i++) {
-    for (int j=0; j<log[i]->evts.length(); j++)
-      log[i]->evts[j]->update(fn, log[i]->startTime);
+      log[i]->updateEvents(fn, usrPtr);
   }
 }
-
-
 
 
