@@ -1,6 +1,5 @@
 #!/bin/sh
-LOADBALANCERS="DummyLB RandCentLB RecBisectBfLB MetisLB RefineLB CommLB Comm1LB\
-           GreedyLB NeighborLB GreedyRefLB OrbLB RandRefLB WSLB"
+LOADBALANCERS="DummyLB RandCentLB RecBisectBfLB MetisLB RefineLB RefineCommLB CommLB Comm1LB GreedyLB NeighborLB GreedyRefLB OrbLB RandRefLB WSLB"
 
 out="Makefile_lb"
 
@@ -16,12 +15,6 @@ done
 echo "   manager.o" >> $out
 echo >> $out
 
-cat >> $out << EOB 
-manager.o: manager.C manager.h $(CVHEADERS)
-	\$(CHARMC) -c manager.C
-
-EOB
-
 for bal in $LOADBALANCERS 
 do 
 	dep=""
@@ -29,11 +22,10 @@ do
         manager=""
         [ $bal = 'CommLB' ] && manager="manager.o"
 	cat >> $out << EOB 
+$bal.def.h: $bal.decl.h
+
 $bal.decl.h: $bal.ci charmxi
 	\$(CHARMC) $bal.ci
-
-$bal.o: $bal.C $bal.decl.h \$(CKHEADERS)
-	\$(CHARMC) -c $bal.C
 
 \$(L)/libmodule$bal.a: $bal.o $manager
 	\$(CHARMC) -o \$(L)/libmodule$bal.a $bal.o $manager
@@ -51,6 +43,7 @@ done
 echo "   initnode void initEveryLB(void);" >>EveryLB.ci
 echo "};" >> EveryLB.ci
 
+echo "# used for make dependes" >>$out
 echo "LB_OBJ=EveryLB.o \\" >>$out
 for bal in $LOADBALANCERS
 do
@@ -59,10 +52,9 @@ done
 echo "    manager.o" >> $out
 cat >> $out <<EOB
 
-EveryLB.o: EveryLB.C EveryLB.decl.h $(CVHEADERS)
-	\$(CHARMC) -c EveryLB.C
+EveryLB.def.h: EveryLB.decl.h
 
-EveryLB.decl.h: EveryLB.ci $(CVHEADERS)
+EveryLB.decl.h: EveryLB.ci charmxi
 	\$(CHARMC) EveryLB.ci
 
 \$(L)/libmoduleEveryLB.a: \$(LB_OBJ)
