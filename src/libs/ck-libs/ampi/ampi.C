@@ -394,6 +394,8 @@ static void ampiAttach(const char *name,int namelen)
 			strat = USE_MESH;
 		} else if(0==strcmp(comlibStrat,"USE_GRID")){
 			strat = USE_GRID;
+		} else if(0==strcmp(comlibStrat,"USE_HYPERCUBE")){
+			strat = USE_HYPERCUBE;
 		}
 	}
 	dmid = CProxy_ComlibManager::ckNew(strat, 1);
