@@ -75,13 +75,17 @@ AC_DEFINE_UNQUOTED(CMK_CPP_CAST_ILLEGAL, $fail)
 
 cat > $t <<EOT
 typedef void (*func_t)(void);
-class foo {
+class foo_foo {
+protected:
+        int len;
+};
+class foo: public foo_foo {
 public:
 	template<func_t f> //Templated member function
-	void memb(void) {f();}
+	void memb(void) {f(); len++;}
 };
-inline void fn(void) {}
-void myfunc(void)
+inline void fn() {}
+void myfunc()
 {
   foo x;
   x.template memb<fn>();
