@@ -113,6 +113,10 @@ static void meta_init(char **argv) {}
 #include "memory-paranoid.c"
 #endif
 
+#if CMK_MEMORY_BUILD_LEAK
+#include "memory-leak.c"
+#endif
+
 #if CMK_MEMORY_BUILD_CACHE
 #include "memory-cache.c"
 #endif 
@@ -273,3 +277,9 @@ CmiIsomallocBlockList *CmiIsomallocBlockListActivate(CmiIsomallocBlockList *l)
    {return l;}
 #endif
 
+#ifndef CMI_MEMORY_ROUTINES
+void CmiMemoryMark(void) {}
+void CmiMemoryMarkBlock(void *blk) {}
+void CmiMemorySweep(const char *where) {}
+void CmiMemoryCheck(void) {}
+#endif

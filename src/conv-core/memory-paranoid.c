@@ -7,7 +7,7 @@
  *
  * Detects writes before allocated region, writes after allocated region,
  * double-deletes, uninitialized reads; i.e., most heap-related crashing errors.
- * Includes a "memory_check()" routine which can check the entire heap's
+ * Includes a "CmiMemoryCheck()" routine which can check the entire heap's
  * consistency on command.
  *
  * This version of malloc() should not be linked into production software,
@@ -160,6 +160,18 @@ void memory_check(void)
 		CmiMyPe(),nBlocks,nMegs,(int)(nKb*1000.0/1024.0)); 
 	}
 	memory_checkphase=0;
+}
+
+#define CMI_MEMORY_ROUTINES 1
+
+/* Mark all allocated memory as being OK */
+void CmiMemoryMark(void) { }
+void CmiMemoryMarkBlock(void *blk) { }
+void CmiMemorySweep(const char *where) { }
+
+void CmiMemoryCheck(void)
+{
+	memory_check();
 }
 
 /********** Allocation/Free ***********/
