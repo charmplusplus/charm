@@ -835,8 +835,6 @@ void CProxy_CkArrayBase::doInsert(int ctorIndex,int chareType,int onPE,CkArrayMe
 {
   if (_idx==NULL) CkAbort("Must use arrayProxy[index].insert()!\n"); 
   insertAtIdx(ctorIndex,chareType,onPE,*_idx,m);
-  delete _idx;//<- this lets us just blow away old element proxies.
-  _idx=NULL;
 }
 
 void CProxy_CkArrayBase::insertAtIdx(int ctorIndex,int chareType,int onPE,
@@ -1328,8 +1326,6 @@ void CProxy_CkArrayBase::send(CkArrayMessage *msg, int entryIndex)
 	msg->type.msg.hopCount = 0;
 	msg=msg->insert(*_idx);//Insert array index into message
 	CProxy_CkArray(_aid).ckLocalBranch()->Send(msg);
-	delete _idx;
-	_idx = NULL;
 }
 //Deliver given (pre-addressed) message 
 void CkArray::Send(CkArrayMessage *msg)
