@@ -47,7 +47,7 @@ void SRtable::Restructure(POSE_TimeType newGVTest, POSE_TimeType firstTS,
     keepBkt = 0;
   }
   else keepBkt = (newGVTest-offset)/size_b;
-  if ((keepBkt < b)
+  if (keepBkt < b)
     for (long_i=keepBkt; long_i<b; long_i++)
       CompressAndSortBucket(long_i, 0);
   CompressAndSortBucket(b, 1);
