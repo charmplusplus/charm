@@ -46,8 +46,6 @@ class XStr {
     //This operator allows us to use XStr's interchangably with char *'s:
     operator char *() {return get_string();}
     //Comparison operators
-    int operator==(const XStr &s2) {return 0==strcmp(s,s2.s);}
-    int operator!=(const XStr &s2) {return 0!=strcmp(s,s2.s);}
     int operator==(const char *s2) {return 0==strcmp(s,s2);}
     int operator!=(const char *s2) {return 0!=strcmp(s,s2);}
     //Addition operator
