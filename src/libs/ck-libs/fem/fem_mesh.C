@@ -453,7 +453,8 @@ void FEM_Attribute::setDatatype(int next,const char *caller) {
 
 void FEM_Attribute::copyShape(const FEM_Attribute &src) {
 	setWidth(src.getWidth());
-	setDatatype(src.getDatatype()); //Automatically calls tryAllocate
+	if (src.getDatatype()!=-1)
+	  setDatatype(src.getDatatype()); //Automatically calls tryAllocate
 }
 void FEM_Attribute::set(const void *src, int firstItem,int length, 
 		const IDXL_Layout &layout, const char *caller) 
