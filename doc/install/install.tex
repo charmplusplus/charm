@@ -12,7 +12,10 @@
 % REVISION HISTORY:
 %
 % $Log$
-% Revision 1.2  1995-11-01 19:53:54  jyelon
+% Revision 1.3  1995-11-01 20:18:51  jyelon
+% *** empty log message ***
+%
+% Revision 1.2  1995/11/01  19:53:54  jyelon
 % *** empty log message ***
 %
 % Revision 1.1  1995/10/31  22:27:53  milind
@@ -24,7 +27,7 @@
 
 The three programming systems are distributed as a single package ---
 one always installs all three.  They will all be installed in a single
-directory which, for lack of a better term, we will call the "charm"
+directory which, for lack of a better term, we will call the ``charm''
 directory.  It would be typical to choose {\tt /usr/local/charm} as
 the location for the charm directory, although any location will do.
 Our explanation of the installation process will assume that {\tt
@@ -111,8 +114,10 @@ situation, you may need to rebuild the charm and charm++ compilers:
 
 \end{verbatim}
 
-There are a few things to attend to before you start using them on a
-regular basis.  These are security issues and disk space consumption.
+This should complete the installation process.  You are ready to test
+converse, charm, and charm++.  However, there are a few things to
+attend to before you start using them on a regular basis.  These are
+security issues and disk space consumption.
 
 \subsection{Security Issues}
 
@@ -135,12 +140,10 @@ funding agencies to continue to support our work.)  To this end, we
 have inserted code in the network {\tt conv-host} program (described
 later) to notify us that our software is being used.
 Implementationally speaking, the {\tt conv-host} program sends a
-single {\tt UDP} packet to {\tt charm.cs.uiuc.edu}.  The packet
-contains no information other than the name of the machine on which it
-is being used, and a 16-bit user number to help us tell if more than
-one user is using it.  We simply gather this information into tables
-recording the number of different institutions and individuals using
-our software, and the frequency with which it is used.
+single {\tt UDP} packet to {\tt charm.cs.uiuc.edu}.  We simply gather
+these statistics packets into tables recording the number of different
+institutions and individuals using our software, and the frequency
+with which it is used.
 
 Please note that this notification code {\tt only} exists within the
 network version.  It does {\em not} exist within any other version.
@@ -160,7 +163,7 @@ charm {\tt bin} directory, you will find these programs:
 
 \end{verbatim}
 
-The program {\conv-host.silent} has the notification code removed.  To
+The program {\tt conv-host.silent} has the notification code removed.  To
 permanently deactivate notification, you may delete the version containing
 the notification code:
 
@@ -174,11 +177,38 @@ the notification code:
 
 \subsection{Reducing disk usage}
 
-This section describes how you may delete parts of the distribution
-to save disk space.
+This section describes how you may delete parts of the distribution to
+save disk space.  
 
 The charm directory contains a collection of example-programs and
-test-programs.  These may be deleted with no other effects.
+test-programs {\tt /usr/local/charm/pgms}.  These may be deleted with
+no other effects.
+
+The source code for the translators may be deleted, if you know the
+binaries are operational.  Simply delete {\tt /usr/local/charm/src}.
+
+If you are not using charm++, you may delete the charm++ compiler:
+remove {\tt /usr/local/charm/bin/charmxlat++} and {\tt
+/usr/local/charm/bin/charmfilter++}.
+
+Similarly, if you are not using charm, you may delete the charm compiler:
+remove {\tt /usr/local/charm/bin/charmxlat} and {\tt
+/usr/local/charm/bin/charmfilter}.
+
+If you are using neither charm nor charm++, you may delete the
+combined charm/charm++ runtime library: {\tt rm -f
+/usr/local/charm/lib/libck-*} and {\tt rm -f
+/usr/local/charm/lib/libcharm.a}.
+
+If you are using neither charm nor charm++, you may delete the charm
+and charm++ include files: everything in {\tt /usr/local/charm/include}
+which doesn't start with {\tt conv} (eg, converse) is charm-related.
+
+You may delete the programs {\tt conv-host.notify} and {\tt
+conv-host.silent}, although please read the section on security first.
+
+Finally, you may {\tt strip} all the binaries in {\tt
+/usr/local/charm/bin}, if we have not already done so.
 
 \subsection{Using more than one version of Charm on the same Machine}
 
