@@ -24,14 +24,14 @@ void CreateNborBaseLB()
 
 void NborBaseLB::staticMigrated(void* data, LDObjHandle h)
 {
-  NborBaseLB *me = static_cast<NborBaseLB*>(data);
+  NborBaseLB *me = (NborBaseLB*)(data);
 
   me->Migrated(h);
 }
 
 void NborBaseLB::staticAtSync(void* data)
 {
-  NborBaseLB *me = static_cast<NborBaseLB*>(data);
+  NborBaseLB *me = (NborBaseLB*)(data);
 
   me->AtSync();
 }
@@ -41,11 +41,11 @@ NborBaseLB::NborBaseLB()
   mystep = 0;
   theLbdb = CProxy_LBDatabase(lbdb).ckLocalBranch();
   theLbdb->
-    AddLocalBarrierReceiver(reinterpret_cast<LDBarrierFn>(staticAtSync),
-			    static_cast<void*>(this));
+    AddLocalBarrierReceiver((LDBarrierFn)(staticAtSync),
+			    (void*)(this));
   theLbdb->
-    NotifyMigrated(reinterpret_cast<LDMigratedFn>(staticMigrated),
-		   static_cast<void*>(this));
+    NotifyMigrated((LDMigratedFn)(staticMigrated),
+		   (void*)(this));
 
 
   // I had to move neighbor initialization outside the constructor
@@ -350,29 +350,27 @@ void* NLBMigrateMsg::alloc(int msgnum, size_t size, int* array, int priobits)
   int totalsize = size + array[0] * sizeof(NborBaseLB::MigrateInfo);
 
   NLBMigrateMsg* ret =
-    static_cast<NLBMigrateMsg*>(CkAllocMsg(msgnum,totalsize,priobits));
+    (NLBMigrateMsg*)(CkAllocMsg(msgnum,totalsize,priobits));
 
-  ret->moves = reinterpret_cast<NborBaseLB::MigrateInfo*>
-    (reinterpret_cast<char*>(ret)+ size);
+  ret->moves = (NborBaseLB::MigrateInfo*) ((char*)(ret)+ size);
 
-  return static_cast<void*>(ret);
+  return (void*)(ret);
 }
 
 void* NLBMigrateMsg::pack(NLBMigrateMsg* m)
 {
-  m->moves = reinterpret_cast<NborBaseLB::MigrateInfo*>
-    (reinterpret_cast<char*>(m->moves) - reinterpret_cast<char*>(&m->moves));
+  m->moves = (NborBaseLB::MigrateInfo*)
+    ((char*)(m->moves) - (char*)(&m->moves));
 
-  return static_cast<void*>(m);
+  return (void*)(m);
 }
 
 NLBMigrateMsg* NLBMigrateMsg::unpack(void *m)
 {
-  NLBMigrateMsg* ret_val = static_cast<NLBMigrateMsg*>(m);
+  NLBMigrateMsg* ret_val = (NLBMigrateMsg*)(m);
 
-  ret_val->moves = reinterpret_cast<NborBaseLB::MigrateInfo*>
-    (reinterpret_cast<char*>(&ret_val->moves) 
-     + reinterpret_cast<size_t>(ret_val->moves));
+  ret_val->moves = (NborBaseLB::MigrateInfo*)
+    ((char*)(&ret_val->moves) + (size_t)(ret_val->moves));
 
   return ret_val;
 }

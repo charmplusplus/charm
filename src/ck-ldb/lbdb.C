@@ -19,39 +19,39 @@
 extern "C" LDHandle LDCreate(void)
 {
   LDHandle h;
-  h.handle = static_cast<void*>(new LBDB);
+  h.handle = (void*)(new LBDB);
   return h;
 }
 
 extern "C" LDOMHandle LDRegisterOM(LDHandle _db, LDOMid _userID,
 				   void *_userptr, LDCallbacks _callbacks)
 {
-  LBDB *const db = static_cast<LBDB*>(_db.handle);
+  LBDB *const db = (LBDB*)(_db.handle);
   return db->AddOM(_userID, _userptr, _callbacks);
 }
 
 extern "C" void LDRegisteringObjects(LDOMHandle _h)
 {
-  LBDB *const db = static_cast<LBDB*>(_h.ldb.handle);
+  LBDB *const db = (LBDB*)(_h.ldb.handle);
   db->RegisteringObjects(_h);
 }
 
 extern "C" void LDDoneRegisteringObjects(LDOMHandle _h)
 {
-  LBDB *const db = static_cast<LBDB*>(_h.ldb.handle);
+  LBDB *const db = (LBDB*)(_h.ldb.handle);
   db->DoneRegisteringObjects(_h);
 }
 
 extern "C" LDObjHandle LDRegisterObj(LDOMHandle _h, LDObjid _id, 
 				       void *_userData, int _migratable)
 {
-  LBDB *const db = static_cast<LBDB*>(_h.ldb.handle);
-  return db->AddObj(_h, _id, _userData, static_cast<CmiBool>(_migratable));
+  LBDB *const db = (LBDB*)(_h.ldb.handle);
+  return db->AddObj(_h, _id, _userData, (CmiBool)(_migratable));
 }
 
 extern "C" void LDUnregisterObj(LDObjHandle _h)
 {
-  LBDB *const db = static_cast<LBDB*>(_h.omhandle.ldb.handle);
+  LBDB *const db = (LBDB*)(_h.omhandle.ldb.handle);
   db->UnregisterObj(_h);
   return;
 }
@@ -59,38 +59,38 @@ extern "C" void LDUnregisterObj(LDObjHandle _h)
 extern "C" void LDObjTime(LDObjHandle _h,
 			    double walltime, double cputime)
 {
-  LBDB *const db = static_cast<LBDB*>(_h.omhandle.ldb.handle);
+  LBDB *const db = (LBDB*)(_h.omhandle.ldb.handle);
   LBObj *const obj = db->LbObj(_h);
   obj->IncrementTime(walltime,cputime);
 }
   
 extern "C" void LDDumpDatabase(LDHandle _db)
 {
-  LBDB *const db = static_cast<LBDB*>(_db.handle);
+  LBDB *const db = (LBDB*)(_db.handle);
   db->DumpDatabase();
 }
 
 void LDNotifyMigrated(LDHandle _db, LDMigratedFn fn, void* data)
 {
-  LBDB *const db = static_cast<LBDB*>(_db.handle);
+  LBDB *const db = (LBDB*)(_db.handle);
   db->NotifyMigrated(fn,data);
 }
 
 extern "C" void LDCollectStatsOn(LDHandle _db)
 {
-  LBDB *const db = static_cast<LBDB*>(_db.handle);
+  LBDB *const db = (LBDB*)(_db.handle);
   db->TurnStatsOn();
 }
 
 extern "C" void LDCollectStatsOff(LDHandle _db)
 {
-  LBDB *const db = static_cast<LBDB*>(_db.handle);
+  LBDB *const db = (LBDB*)(_db.handle);
   db->TurnStatsOff();
 }
 
 extern "C" int LDRunningObject(LDHandle _h, LDObjHandle* _o)
 {
-  LBDB *const db = static_cast<LBDB*>(_h.handle);
+  LBDB *const db = (LBDB*)(_h.handle);
 
   if (db->ObjIsRunning()) {
     *_o = db->RunningObj();
@@ -100,7 +100,7 @@ extern "C" int LDRunningObject(LDHandle _h, LDObjHandle* _o)
 
 extern "C" void LDObjectStart(LDObjHandle _h)
 {
-  LBDB *const db = static_cast<LBDB*>(_h.omhandle.ldb.handle);
+  LBDB *const db = (LBDB*)(_h.omhandle.ldb.handle);
 
   if (db->ObjIsRunning()) LDObjectStop(db->RunningObj());
 
@@ -114,7 +114,7 @@ extern "C" void LDObjectStart(LDObjHandle _h)
 
 extern "C" void LDObjectStop(LDObjHandle _h)
 {
-  LBDB *const db = static_cast<LBDB*>(_h.omhandle.ldb.handle);
+  LBDB *const db = (LBDB*)(_h.omhandle.ldb.handle);
   LBObj *const obj = db->LbObj(_h);
 
   if (db->StatsOn()) {
@@ -127,7 +127,7 @@ extern "C" void LDObjectStop(LDObjHandle _h)
 
 extern "C" void LDSend(LDOMHandle destOM, LDObjid destid, unsigned int bytes)
 {
-  LBDB *const db = static_cast<LBDB*>(destOM.ldb.handle);
+  LBDB *const db = (LBDB*)(destOM.ldb.handle);
   if (db->StatsOn())
     db->Send(destOM,destid,bytes);
 }
@@ -135,7 +135,7 @@ extern "C" void LDSend(LDOMHandle destOM, LDObjid destid, unsigned int bytes)
 extern "C" void LDBackgroundLoad(LDHandle _db,
 				 double* walltime, double* cputime)
 {
-  LBDB *const db = static_cast<LBDB*>(_db.handle);
+  LBDB *const db = (LBDB*)(_db.handle);
   db->BackgroundLoad(walltime,cputime);
 
   return;
@@ -143,7 +143,7 @@ extern "C" void LDBackgroundLoad(LDHandle _db,
 
 extern "C" void LDIdleTime(LDHandle _db,double* walltime)
 {
-  LBDB *const db = static_cast<LBDB*>(_db.handle);
+  LBDB *const db = (LBDB*)(_db.handle);
   db->IdleTime(walltime);
 
   return;
@@ -151,7 +151,7 @@ extern "C" void LDIdleTime(LDHandle _db,double* walltime)
 
 extern "C" void LDTotalTime(LDHandle _db,double* walltime, double* cputime)
 {
-  LBDB *const db = static_cast<LBDB*>(_db.handle);
+  LBDB *const db = (LBDB*)(_db.handle);
   db->TotalTime(walltime,cputime);
 
   return;
@@ -159,35 +159,35 @@ extern "C" void LDTotalTime(LDHandle _db,double* walltime, double* cputime)
 
 extern "C" void LDClearLoads(LDHandle _db)
 {
-  LBDB *const db = static_cast<LBDB*>(_db.handle);
+  LBDB *const db = (LBDB*)(_db.handle);
 
   db->ClearLoads();
 }
 
 extern "C" int LDGetObjDataSz(LDHandle _db)
 {
-  LBDB *const db = static_cast<LBDB*>(_db.handle);
+  LBDB *const db = (LBDB*)(_db.handle);
 
   return db->ObjDataCount();
 }
 
 extern "C" void LDGetObjData(LDHandle _db, LDObjData *data)
 {
-  LBDB *const db = static_cast<LBDB*>(_db.handle);
+  LBDB *const db = (LBDB*)(_db.handle);
 
   db->GetObjData(data);
 }
 
 extern "C" int LDGetCommDataSz(LDHandle _db)
 {
-  LBDB *const db = static_cast<LBDB*>(_db.handle);
+  LBDB *const db = (LBDB*)(_db.handle);
 
   return db->CommDataCount();
 }
 
 extern "C" void LDGetCommData(LDHandle _db, LDCommData *data)
 {
-  LBDB *const db = static_cast<LBDB*>(_db.handle);
+  LBDB *const db = (LBDB*)(_db.handle);
 
   db->GetCommData(data);
   return;
@@ -195,14 +195,14 @@ extern "C" void LDGetCommData(LDHandle _db, LDCommData *data)
 
 extern "C" void LDMigrate(LDObjHandle _h, int dest)
 {
-  LBDB *const db = static_cast<LBDB*>(_h.omhandle.ldb.handle);
+  LBDB *const db = (LBDB*)(_h.omhandle.ldb.handle);
 
   db->Migrate(_h,dest);
 }
 
 extern "C" void LDMigrated(LDObjHandle _h)
 {
-  LBDB *const db = static_cast<LBDB*>(_h.omhandle.ldb.handle);
+  LBDB *const db = (LBDB*)(_h.omhandle.ldb.handle);
 
   db->Migrated(_h);
 }
@@ -210,14 +210,14 @@ extern "C" void LDMigrated(LDObjHandle _h)
 extern "C" LDBarrierClient 
 LDAddLocalBarrierClient(LDHandle _db, LDResumeFn fn, void* data)
 {
-  LBDB *const db = static_cast<LBDB*>(_db.handle);
+  LBDB *const db = (LBDB*)(_db.handle);
 
   return db->AddLocalBarrierClient(fn,data);
 }
 
 extern "C" void LDRemoveLocalBarrierClient(LDHandle _db, LDBarrierClient h)
 {
-  LBDB *const db = static_cast<LBDB*>(_db.handle);
+  LBDB *const db = (LBDB*)(_db.handle);
 
   db->RemoveLocalBarrierClient(h);
 }
@@ -225,7 +225,7 @@ extern "C" void LDRemoveLocalBarrierClient(LDHandle _db, LDBarrierClient h)
 extern "C" LDBarrierReceiver 
 LDAddLocalBarrierReceiver(LDHandle _db,LDBarrierFn fn, void* data)
 {
-  LBDB *const db = static_cast<LBDB*>(_db.handle);
+  LBDB *const db = (LBDB*)(_db.handle);
 
   return db->AddLocalBarrierReceiver(fn,data);
 }
@@ -233,21 +233,21 @@ LDAddLocalBarrierReceiver(LDHandle _db,LDBarrierFn fn, void* data)
 extern "C" void 
 LDRemoveLocalBarrierReceiver(LDHandle _db,LDBarrierReceiver h)
 {
-  LBDB *const db = static_cast<LBDB*>(_db.handle);
+  LBDB *const db = (LBDB*)(_db.handle);
 
   db->RemoveLocalBarrierReceiver(h);
 }
 
 extern "C" void LDAtLocalBarrier(LDHandle _db, LDBarrierClient h)
 {
-  LBDB *const db = static_cast<LBDB*>(_db.handle);
+  LBDB *const db = (LBDB*)(_db.handle);
 
   db->AtLocalBarrier(h);
 }
 
 extern "C" void LDResumeClients(LDHandle _db)
 {
-  LBDB *const db = static_cast<LBDB*>(_db.handle);
+  LBDB *const db = (LBDB*)(_db.handle);
 
   db->ResumeClients();
 }
@@ -300,12 +300,12 @@ extern "C" int LDProcessorSpeed()
 
 CmiBool LDOMidEqual(const LDOMid i1, const LDOMid i2)
 {
- return static_cast<CmiBool>(i1.id == i2.id);
+ return (CmiBool)(i1.id == i2.id);
 }
 
 CmiBool LDObjIDEqual(const LDObjid i1, const LDObjid i2)
 {
-  return static_cast<CmiBool>(i1.id[0] == i2.id[0] 
+  return (CmiBool)(i1.id[0] == i2.id[0] 
 	 && i1.id[1] == i2.id[1] && i1.id[2] == i2.id[2] 
 	 && i1.id[3] == i2.id[3]);
 }

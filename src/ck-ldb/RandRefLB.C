@@ -47,8 +47,7 @@ CLBMigrateMsg* RandRefLB::Strategy(CentralLB::LDStats* stats, int count)
     //    CkPrintf("[%d] PE %d : %d Objects : %d Communication\n",
     //	     CkMyPe(),pe,stats[pe].n_objs,stats[pe].n_comm);
     for(obj=0; obj < stats[pe].n_objs; obj++)
-      from_procs[pe][obj] = static_cast<int>(CrnDrand()*(CmiNumPes()-1) 
-					     + 0.5 );
+      from_procs[pe][obj] = (int)(CrnDrand()*(CmiNumPes()-1) + 0.5 );
   }
   int** to_procs = Refiner::AllocProcs(count,stats);
   Refiner refiner(1.02);

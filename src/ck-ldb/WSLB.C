@@ -34,14 +34,14 @@ void CreateWSLB()
 
 void WSLB::staticMigrated(void* data, LDObjHandle h)
 {
-  WSLB *me = static_cast<WSLB*>(data);
+  WSLB *me = (WSLB*)(data);
 
   me->Migrated(h);
 }
 
 void WSLB::staticAtSync(void* data)
 {
-  WSLB *me = static_cast<WSLB*>(data);
+  WSLB *me = (WSLB*)(data);
 
   me->AtSync();
 }
@@ -51,11 +51,9 @@ WSLB::WSLB()
   mystep = 0;
   theLbdb = CProxy_LBDatabase(lbdb).ckLocalBranch();
   theLbdb->
-    AddLocalBarrierReceiver(reinterpret_cast<LDBarrierFn>(staticAtSync),
-			    static_cast<void*>(this));
+    AddLocalBarrierReceiver((LDBarrierFn)(staticAtSync),(void*)(this));
   theLbdb->
-    NotifyMigrated(reinterpret_cast<LDMigratedFn>(staticMigrated),
-		   static_cast<void*>(this));
+    NotifyMigrated((LDMigratedFn)(staticMigrated),(void*)(this));
 
 
   // I had to move neighbor initialization outside the constructor
@@ -289,8 +287,7 @@ void WSLB::ReceiveStats(WSLBStatsMsg *m)
       CProxy_WSLB(thisgroup).ReceiveMigration(m2,neighbor_pes[i]);
     }
     if (0 < num_neighbors())
-      CProxy_WSLB(thisgroup).ReceiveMigration(migrateMsg,
-						    neighbor_pes[0]);
+      CProxy_WSLB(thisgroup).ReceiveMigration(migrateMsg,neighbor_pes[0]);
     else delete migrateMsg;
     
     // Zero out data structures for next cycle
@@ -563,29 +560,26 @@ void* WSLBMigrateMsg::alloc(int msgnum, size_t size, int* array, int priobits)
   int totalsize = size + array[0] * sizeof(WSLB::MigrateInfo);
 
   WSLBMigrateMsg* ret =
-    static_cast<WSLBMigrateMsg*>(CkAllocMsg(msgnum,totalsize,priobits));
+    (WSLBMigrateMsg*)(CkAllocMsg(msgnum,totalsize,priobits));
 
-  ret->moves = reinterpret_cast<WSLB::MigrateInfo*>
-    (reinterpret_cast<char*>(ret)+ size);
+  ret->moves = (WSLB::MigrateInfo*) ((char*)(ret)+ size);
 
-  return static_cast<void*>(ret);
+  return (void*)(ret);
 }
 
 void* WSLBMigrateMsg::pack(WSLBMigrateMsg* m)
 {
-  m->moves = reinterpret_cast<WSLB::MigrateInfo*>
-    (reinterpret_cast<char*>(m->moves) - reinterpret_cast<char*>(&m->moves));
+  m->moves = (WSLB::MigrateInfo*)((char*)(m->moves) - (char*)(&m->moves));
 
-  return static_cast<void*>(m);
+  return (void*)(m);
 }
 
 WSLBMigrateMsg* WSLBMigrateMsg::unpack(void *m)
 {
-  WSLBMigrateMsg* ret_val = static_cast<WSLBMigrateMsg*>(m);
+  WSLBMigrateMsg* ret_val = (WSLBMigrateMsg*)(m);
 
-  ret_val->moves = reinterpret_cast<WSLB::MigrateInfo*>
-    (reinterpret_cast<char*>(&ret_val->moves) 
-     + reinterpret_cast<size_t>(ret_val->moves));
+  ret_val->moves = (WSLB::MigrateInfo*)
+    ((char*)(&ret_val->moves) + (size_t)(ret_val->moves));
 
   return ret_val;
 }

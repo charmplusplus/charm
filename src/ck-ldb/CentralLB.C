@@ -21,14 +21,14 @@ void CreateCentralLB()
 
 void CentralLB::staticMigrated(void* data, LDObjHandle h)
 {
-  CentralLB *me = static_cast<CentralLB*>(data);
+  CentralLB *me = (CentralLB*)(data);
 
   me->Migrated(h);
 }
 
 void CentralLB::staticAtSync(void* data)
 {
-  CentralLB *me = static_cast<CentralLB*>(data);
+  CentralLB *me = (CentralLB*)(data);
 
   me->AtSync();
 }
@@ -38,11 +38,9 @@ CentralLB::CentralLB()
   mystep = 0;
   theLbdb = CProxy_LBDatabase(lbdb).ckLocalBranch();
   theLbdb->
-    AddLocalBarrierReceiver(reinterpret_cast<LDBarrierFn>(staticAtSync),
-			    static_cast<void*>(this));
+    AddLocalBarrierReceiver((LDBarrierFn)(staticAtSync),(void*)(this));
   theLbdb->
-    NotifyMigrated(reinterpret_cast<LDMigratedFn>(staticMigrated),
-		   static_cast<void*>(this));
+    NotifyMigrated((LDMigratedFn)(staticMigrated),(void*)(this));
 
   stats_msg_count = 0;
   statsMsgsList = new CLBStatsMsg*[CkNumPes()];
@@ -218,6 +216,7 @@ CLBMigrateMsg* CentralLB::Strategy(LDStats* stats,int count)
       CkPrintf("Object %d\n",i);
       CkPrintf("     id = %d\n",odata[i].id.id[0]);
       CkPrintf("  OM id = %d\n",odata[i].omID.id);
+      CkPrintf("   Mig. = %d\n",odata[i].migratable);
       CkPrintf("    CPU = %f\n",odata[i].cpuTime);
       CkPrintf("   Wall = %f\n",odata[i].wallTime);
     }
@@ -260,36 +259,31 @@ void* CLBStatsMsg::alloc(int msgnum, size_t size, int* array, int priobits)
     + array[1] * sizeof(LDCommData);
 
   CLBStatsMsg* ret =
-    static_cast<CLBStatsMsg*>(CkAllocMsg(msgnum,totalsize,priobits));
+    (CLBStatsMsg*)(CkAllocMsg(msgnum,totalsize,priobits));
 
-  ret->objData = reinterpret_cast<LDObjData*>((reinterpret_cast<char*>(ret) 
-					       + size));
-  ret->commData = reinterpret_cast<LDCommData*>(ret->objData + array[0]);
+  ret->objData = (LDObjData*)(((char*)(ret) + size));
+  ret->commData = (LDCommData*)(ret->objData + array[0]);
 
-  return static_cast<void*>(ret);
+  return (void*)(ret);
 }
 
 void* CLBStatsMsg::pack(CLBStatsMsg* m)
 {
   m->objData = 
-    reinterpret_cast<LDObjData*>(reinterpret_cast<char*>(m->objData)
-      - reinterpret_cast<char*>(&m->objData));
+    (LDObjData*)((char*)(m->objData) - (char*)(&m->objData));
   m->commData = 
-    reinterpret_cast<LDCommData*>(reinterpret_cast<char*>(m->commData)
-      - reinterpret_cast<char*>(&m->commData));
-  return static_cast<void*>(m);
+    (LDCommData*)((char*)(m->commData) - (char*)(&m->commData));
+  return (void*)(m);
 }
 
 CLBStatsMsg* CLBStatsMsg::unpack(void *m)
 {
-  CLBStatsMsg* ret_val = static_cast<CLBStatsMsg*>(m);
+  CLBStatsMsg* ret_val = (CLBStatsMsg*)(m);
 
   ret_val->objData = 
-    reinterpret_cast<LDObjData*>(reinterpret_cast<char*>(&ret_val->objData)
-      + reinterpret_cast<size_t>(ret_val->objData));
+    (LDObjData*)((char*)(&ret_val->objData) + (size_t)(ret_val->objData));
   ret_val->commData = 
-    reinterpret_cast<LDCommData*>(reinterpret_cast<char*>(&ret_val->commData)
-      + reinterpret_cast<size_t>(ret_val->commData));
+    (LDCommData*)((char*)(&ret_val->commData) + (size_t)(ret_val->commData));
   return ret_val;
 }
 
@@ -298,29 +292,27 @@ void* CLBMigrateMsg::alloc(int msgnum, size_t size, int* array, int priobits)
   int totalsize = size + array[0] * sizeof(CentralLB::MigrateInfo);
 
   CLBMigrateMsg* ret =
-    static_cast<CLBMigrateMsg*>(CkAllocMsg(msgnum,totalsize,priobits));
+    (CLBMigrateMsg*)(CkAllocMsg(msgnum,totalsize,priobits));
 
-  ret->moves = reinterpret_cast<CentralLB::MigrateInfo*>
-    (reinterpret_cast<char*>(ret)+ size);
+  ret->moves = (CentralLB::MigrateInfo*) ((char*)(ret)+ size);
 
-  return static_cast<void*>(ret);
+  return (void*)(ret);
 }
 
 void* CLBMigrateMsg::pack(CLBMigrateMsg* m)
 {
-  m->moves = reinterpret_cast<CentralLB::MigrateInfo*>
-    (reinterpret_cast<char*>(m->moves) - reinterpret_cast<char*>(&m->moves));
+  m->moves = (CentralLB::MigrateInfo*)
+    ((char*)(m->moves) - (char*)(&m->moves));
 
-  return static_cast<void*>(m);
+  return (void*)(m);
 }
 
 CLBMigrateMsg* CLBMigrateMsg::unpack(void *m)
 {
-  CLBMigrateMsg* ret_val = static_cast<CLBMigrateMsg*>(m);
+  CLBMigrateMsg* ret_val = (CLBMigrateMsg*)(m);
 
-  ret_val->moves = reinterpret_cast<CentralLB::MigrateInfo*>
-    (reinterpret_cast<char*>(&ret_val->moves) 
-     + reinterpret_cast<size_t>(ret_val->moves));
+  ret_val->moves = (CentralLB::MigrateInfo*)
+    ((char*)(&ret_val->moves) + (size_t)(ret_val->moves));
 
   return ret_val;
 }

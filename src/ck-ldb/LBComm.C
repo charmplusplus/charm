@@ -20,7 +20,7 @@
 
 // static inline CmiBool ObjIDEqual(const LDObjid i1, const LDObjid i2)
 // {
-//   return static_cast<CmiBool>(i1.id[0] == i2.id[0] 
+//   return (CmiBool)(i1.id[0] == i2.id[0] 
 // 	 && i1.id[1] == i2.id[1] && i1.id[2] == i2.id[2] 
 // 	 && i1.id[3] == i2.id[3]);
 // };
@@ -105,7 +105,7 @@ CmiBool LBCommData::equal(const LBCommData d2) const
 int LBCommData::compute_key()
 {
   int kstring[80];
-  char* kptr = static_cast<char*>(static_cast<void*>(&(kstring[0])));
+  char* kptr = (char*)((void*)(&(kstring[0])));
   int pcount;
 
   if (from_proc) {

@@ -23,7 +23,7 @@ LDOMHandle LBDB::AddOM(LDOMid _userID, void* _userData,
 {
   LDOMHandle newhandle;
 
-  newhandle.ldb.handle = static_cast<void *>(this);
+  newhandle.ldb.handle = (void*)(this);
   newhandle.user_ptr = _userData;
   newhandle.id = _userID;
 
