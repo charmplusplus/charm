@@ -64,6 +64,15 @@ test-all: all
 test-converse: converse
 	cd ../pgms ; make test-converse  OPTS='$(OPTS)'
 
+test-charm: charm++
+	cd ../pgms ; make test-charm  OPTS='$(OPTS)'
+
+test-ampi: AMPI
+	cd ../pgms ; make test-ampi  OPTS='$(OPTS)'
+
+test-fem: FEM
+	cd ../pgms ; make test-fem  OPTS='$(OPTS)'
+
 ps-doc: basics
 	cd doc ; make ps
 
@@ -697,6 +706,7 @@ clean:
 	if [ -d charmrun ] ; then ( cd charmrun; make clean ) ; fi
 	( cd doc; make clean )
 	( cd libs; make clean )
+	( cd ../pgms; make clean )
 
 veryclean:
 	rm -rf ../bin
