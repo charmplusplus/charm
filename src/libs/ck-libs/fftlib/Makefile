@@ -6,7 +6,6 @@ LIBDIR=$(CDIR)/lib
 FFTW_LIBDIR=$(FFTW_HOME)/lib
 
 OPTS=-g
-FLAGS=-Wno-deprecated
 
 INCLUDE=-I$(FFTW_HOME)/include
 COMPILER=$(CHARMC) $(INCLUDE)
@@ -14,21 +13,23 @@ COMPILER=$(CHARMC) $(INCLUDE)
 LIB=libfftlib.a
 LIBDEST=$(CDIR)/lib/$(LIB)
 LIBOBJ=fftlib-normal.o fftlib-sparse.o
-HEADERS= $(CDIR)/include/fftlib.h\
-	 $(CDIR)/include/fftlib.decl.h\
-	 $(CDIR)/include/fftlib.def.h\
-	 $(CDIR)/include/util.h\
+INCDIR=$(CDIR)/include/fftlib
+HEADERS= $(INCDIR)/fftlib.h\
+	 $(INCDIR)/fftlib.decl.h\
+	 $(INCDIR)/fftlib.def.h\
+	 $(INCDIR)/util.h
 
 all: $(LIBDEST) $(HEADERS)
 
-$(HEADERS): fftlib.h fftlib.decl.h
-	/bin/cp fftlib.h $(CDIR)/include
-	/bin/cp fftlib.decl.h $(CDIR)/include
-	/bin/cp fftlib.def.h $(CDIR)/include
-	/bin/cp util.h $(CDIR)/include
+$(HEADERS): fftlib.h fftlib.decl.h util.h
+	test ! -d $(INCDIR) && mkdir $(INCDIR) || true
+	/bin/cp fftlib.h $(INCDIR)
+	/bin/cp fftlib.decl.h $(INCDIR)
+	/bin/cp fftlib.def.h $(INCDIR)
+	/bin/cp util.h $(INCDIR)
 
 $(LIBDEST): $(LIBOBJ)
-	rm -f $(LIB); ar -qc $(LIBDEST) $(LIBOBJ)
+	$(CHARMC) -o $(LIBDEST) $(LIBOBJ)
 
 
 fftlib-normal.o: fftlib-normal.C fftlib.h fftlib.decl.h
@@ -36,6 +37,8 @@ fftlib-normal.o: fftlib-normal.C fftlib.h fftlib.decl.h
 
 fftlib-sparse.o: fftlib-sparse.C fftlib.h fftlib.decl.h
 	$(COMPILER) fftlib-sparse.C
+
+fftlib.def.h: fftlib.decl.h
 
 fftlib.decl.h: fftlib.ci
 	$(CHARMC) fftlib.ci
