@@ -1758,6 +1758,86 @@ static int netSend(destPE, size, msg)
   CmiInterruptsRelease();
 }
 
+static int netSendV(destPE, n, sizes, msgs) 
+     int destPE, n, *sizes; 
+     char **msgs; 
+{
+  DATA_HDR *hd;
+  unsigned int pktnum = 0;
+  unsigned int numfrag;
+  unsigned int size,cur,cursize;
+  unsigned int remfill;
+  char *tmpsrc, *tmpdst;
+
+  for(size=0,cur=0;cur<n;size += sizes[cur++]);
+  numfrag  = ((size-1)/MAXDSIZE) + 1;
+
+  CmiInterruptsBlock();
+  
+  if (!Communication_init) return -1;
+  
+  if (destPE==CpvAccess(Cmi_mype)) {
+    CmiPrintf("netSend to self illegal.\n");
+    exit(1);
+  } 
+  
+  cur = 0;
+  cursize = sizes[0];
+  tmpsrc = msgs[0];
+
+  for(;pktnum<(numfrag-1);pktnum++) {
+    hd = (DATA_HDR *)CmiAlloc(CMK_MAX_DGRAM_SIZE);
+    hd->pktidx = pktnum;
+    hd->rem_size = size;
+    hd->PeNum = CpvAccess(Cmi_mype);
+	remfill = MAXDSIZE;
+	tmpdst = (hd+1);
+	while(remfill>0){ /* fill the datagram here */
+		if(remfill > cursize) { /*entire msg to be copied */
+			memcpy(tmpdst, tmpsrc, cursize);
+			remfill -= cursize;
+			tmpdst += cursize;
+			cursize = sizes[++cur];
+			tmpsrc = msgs[cur];
+		}
+		else{ /*partial message to be copied*/
+			memcpy(tmpdst, tmpsrc, remfill);
+			tmpsrc += remfill;
+			cursize -= remfill;
+			remfill = 0;
+		}
+	}
+    InsertInTransmitQueue(hd, destPE);
+    size -= MAXDSIZE;
+  }
+  hd = (DATA_HDR *)CmiAlloc(sizeof(DATA_HDR)+size);
+  hd->pktidx = pktnum;
+  hd->rem_size = size;
+  hd->PeNum = CpvAccess(Cmi_mype);
+  remfill = size;
+  tmpdst = (hd+1);
+  while(remfill>0){ /* fill the datagram here */
+    if(remfill > cursize) { /*entire msg to be copied */
+      memcpy(tmpdst, tmpsrc, cursize);
+      remfill -= cursize;
+      tmpdst += cursize;
+      cursize = sizes[++cur];
+      tmpsrc = msgs[cur];
+    }
+    else{ /*partial message to be copied*/
+      memcpy(tmpdst, tmpsrc, remfill);
+      tmpsrc += remfill;
+      cursize -= remfill;
+      remfill = 0;
+    }
+  }
+  InsertInTransmitQueue(hd, destPE);
+  
+  SendPackets(destPE);
+  
+  CmiInterruptsRelease();
+}
+
 static int CmiProbe() 
 {
   int val;
@@ -1808,6 +1888,25 @@ char *msg;
     memcpy(msg1,msg,size);
     FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg1);
   } else netSend(destPE,size,msg);
+}
+
+void CmiVectorSend(destPE, n, sizes, msgs)
+int destPE, n;
+int *sizes;
+char **msgs;
+{
+  int total_size,i;
+
+  if (CpvAccess(Cmi_mype)==destPE) {
+    char *msg1,*tmp;
+	for(total_size=0,i=0;i<n;total_size += sizes[i++]);
+	tmp = msg1 = (char *)CmiAlloc(total_size);
+	for(i=0;i<n;i++) {
+    	memcpy(tmp,msgs[i],sizes[i]);
+		tmp += sizes[i];
+	}
+    FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg1);
+  } else netSendV(destPE,n,sizes,msgs);
 }
 
 CmiCommHandle CmiAsyncSendFn(destPE, size, msg)
