@@ -15,6 +15,9 @@ then
         . ./conv-mach-opt.sh
 fi
 
+VERSION=5.5
+AC_DEFINE_UNQUOTED(CHARM_VERSION, $VERSION)
+
 AC_MSG_CHECKING(machine name)
 version=`pwd | awk -F/ '{print $(NF-1)}'`
 AC_DEFINE_UNQUOTED(CMK_MACHINE_NAME, "$version")
