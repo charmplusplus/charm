@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.17  1998-02-13 23:55:14  pramacha
+ * Revision 1.18  1998-04-30 04:20:16  milind
+ * Fixed a number of bugs in the sim version.
+ *
+ * Revision 1.17  1998/02/13 23:55:14  pramacha
  * Removed CmiAlloc, CmiFree and CmiSize
  * Added CmiAbort
  *
@@ -176,11 +179,8 @@ char * msg;
 {
     char *buf;
 
-    buf              =  (char *)malloc(size+8);
-    ((int *)buf)[0]  =  size;
-    buf += 8;
+    buf =  (char *) CmiAlloc(size);
     memcpy(buf,msg,size);
-
     sim_send_message(Cmi_mype,buf,size,FALSE,destPE);
 }
 
@@ -269,9 +269,7 @@ char * msg;
      for(i=0; i<Cmi_numpes; i++)
         if (i!= Cmi_mype) CmiSyncSendFn(i,size,msg);
 
-     buf              =  (char *)malloc(size+8);
-     ((int *)buf)[0]  =  size; 
-     buf += 8;
+     buf =  (char *) CmiAlloc(size);
      memcpy(buf,msg,size);
      FIFO_EnQueue(CpvAccess(CmiLocalQueue),buf);
 }
@@ -369,7 +367,6 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int initret)
     exit(1);
   }
   
-  CthInit(argv);
   
   /* figure out number of processors required */
   
@@ -403,6 +400,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int initret)
     CmiUniContextSwitch(i);
     CpvInitialize(void*, CmiLocalQueue);
     CpvAccess(CmiLocalQueue) = (void *) FIFO_Create();
+    CthInit(argv);
     ConverseCommonInit(argv);
     memcpy(argvec, argv, argc*sizeof(char*));
     fn(argc, argvec);
