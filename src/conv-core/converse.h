@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.88  1998-06-15 22:10:48  jyelon
+ * Revision 2.89  1998-06-15 23:11:15  wilmarth
+ * Removed CLdField parameter from CldInfoFn.
+ *
+ * Revision 2.88  1998/06/15 22:10:48  jyelon
  * changed the way converse headers are done.
  *
  * Revision 2.87  1998/06/15 19:50:41  jyelon
@@ -796,7 +799,6 @@ extern int Cld_fieldsize;
 
 typedef void (*CldInfoFn)(void *msg, 
 			  int *len,
-			  void *ldbfield,
 			  int *queueing,
 			  int *priobits, 
 			  unsigned int **prioptr);
