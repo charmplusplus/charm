@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.10  1995-11-07 18:24:53  jyelon
+ * Revision 1.11  1995-11-07 23:20:32  jyelon
+ * removed neighbour_init residue.
+ *
+ * Revision 1.10  1995/11/07  18:24:53  jyelon
  * Corrected a bug in GetNodeNeighbours
  *
  * Revision 1.9  1995/11/07  18:16:45  jyelon
@@ -417,7 +420,6 @@ char * msg;
 void CmiInitMc(argv)
 char *argv[];
 {
-  neighbour_init(Cmi_mype);
   CpvAccess(CmiLocalQueue) = CmiQueues[Cmi_mype];
   CmiSpanTreeInit();
   CmiTimerInit();
