@@ -87,3 +87,14 @@ void      **element;
 		queue->length--;
 	}
 }
+
+FIFO_Destroy(queue)
+FIFO_QUEUE *queue;
+{
+  if (!FIFO_Empty(queue)) {
+    CmiError("Tried to FIFO_Destroy a non-empty queue.\n");
+    exit(1);
+  }
+  free(queue->block);
+  free(queue);
+}
