@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.10  1995-10-27 21:31:25  jyelon
+ * Revision 2.11  1995-11-06 22:59:01  sanjeev
+ * fixes for statistics collection
+ *
+ * Revision 2.10  1995/10/27  21:31:25  jyelon
  * changed NumPe --> NumPes
  *
  * Revision 2.9  1995/09/07  05:27:47  gursoy
@@ -125,11 +128,21 @@ TRACE(CmiPrintf("Node %d: Enter NodeCollectStatistics() \n", CmiMyPe()));
 	sPtr->forChareQueueLength = CpvAccess(CstatsMaxForChareQueueLength);
 	sPtr->fixedChareQueueLength = CpvAccess(CstatsMaxFixedChareQueueLength);
 	sPtr->charesCreated = CpvAccess(nodecharesCreated);
-	sPtr->charesProcessed = CpvAccess(nodecharesProcessed);
-	sPtr->forCharesCreated = CpvAccess(nodeforCharesCreated);
+	sPtr->charesProcessed = CpvAccess(nodecharesProcessed)
+					- CpvAccess(nodebocInitProcessed) - 1 ;
+	/* The -1 above is because counting for user-created chares starts
+	   from 1. The main-chare on proc 0 is hence not counted. */
+
+	sPtr->forCharesCreated = CpvAccess(nodeforCharesCreated) 
+					+ CpvAccess(nodebocMsgsCreated) ;
+	/* This count includes both messages to chares and messages to BOCs,
+	   because it is incremented in CkProcess_ForChareMsg() */
 	sPtr->forCharesProcessed = CpvAccess(nodeforCharesProcessed);
+
+	/* Messages to BOCs are not counted separately for now 
 	sPtr->bocMsgsCreated = CpvAccess(nodebocMsgsCreated);
 	sPtr->bocMsgsProcessed = CpvAccess(nodebocMsgsProcessed);
+	*/
 
 	for (i=0; i < MAXMEMSTAT; i++)
 		sPtr->nodeMemStat[i] = CstatMemory(i);
@@ -270,16 +283,21 @@ PrintOutStatistics()
 		for (k=0; k < CmiNumPes(); k++)
 			CmiPrintf("(%d)[%d, %d], ", k, 
                           CpvAccess(HostStat)[k][3], CpvAccess(HostStat)[k][4]);
-		CmiPrintf("\nFor Chare Messages: ");
+		CmiPrintf("\nNumber of Branch-Office Chares : %d\n",
+					CpvAccess(nodebocInitProcessed));
+
+		CmiPrintf("\nMessages: ");
 		for (k=0; k < CmiNumPes(); k++)
 			CmiPrintf("(%d)[%d, %d], ", k, 
                           CpvAccess(HostStat)[k][5],CpvAccess(HostStat)[k][6]);
-		CmiPrintf("\n");
 
+		/* Boc msgs not counted separately for now 
 		CmiPrintf("For Boc Messages: ");
 		for (k=0; k < CmiNumPes(); k++)
 			CmiPrintf("(%d)[%d, %d], ", k, 
                           CpvAccess(HostStat)[k][7], CpvAccess(HostStat)[k][8]);
+		*/
+		
 		CmiPrintf("\n\n");
 
 	}

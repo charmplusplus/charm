@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.10  1995-10-11 17:54:40  sanjeev
+ * Revision 2.11  1995-11-06 22:59:01  sanjeev
+ * fixes for statistics collection
+ *
+ * Revision 2.10  1995/10/11  17:54:40  sanjeev
  * fixed Charm++ chare creation
  *
  * Revision 2.9  1995/09/30  15:02:25  jyelon
@@ -113,6 +116,7 @@ CpvDeclare(int, nodecharesCreated);
 CpvDeclare(int, nodeforCharesCreated);
 CpvDeclare(int, nodebocMsgsCreated);
 CpvDeclare(int, nodecharesProcessed);
+CpvDeclare(int, nodebocInitProcessed);
 CpvDeclare(int, nodebocMsgsProcessed);
 CpvDeclare(int, nodeforCharesProcessed);
 
@@ -240,6 +244,7 @@ void globalsModuleInit()
    CpvInitialize(int, nodeforCharesCreated);
    CpvInitialize(int, nodebocMsgsCreated);
    CpvInitialize(int, nodecharesProcessed);
+   CpvInitialize(int, nodebocInitProcessed);
    CpvInitialize(int, nodebocMsgsProcessed);
    CpvInitialize(int, nodeforCharesProcessed);
    CpvInitialize(int, PrintChareStat);
@@ -265,6 +270,7 @@ void globalsModuleInit()
    CpvAccess(nodeforCharesCreated)   = 0;
    CpvAccess(nodebocMsgsCreated)     = 0;
    CpvAccess(nodecharesProcessed)    = 0;
+   CpvAccess(nodebocInitProcessed)   = 0;
    CpvAccess(nodebocMsgsProcessed)   = 0;
    CpvAccess(nodeforCharesProcessed) = 0;
    CpvAccess(PrintChareStat)         = 0;

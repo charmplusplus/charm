@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.32  1995-11-06 21:36:29  milind
+ * Revision 2.33  1995-11-06 22:59:01  sanjeev
+ * fixes for statistics collection
+ *
+ * Revision 2.32  1995/11/06  21:36:29  milind
  * Removed CldPeriodicCheckInit() call from SysPeriodicCheckInit().
  *
  * Revision 2.31  1995/11/06  00:17:42  sanjeev
@@ -549,6 +552,8 @@ ENVELOPE       *envelope;
   int             current_msgType = GetEnv_msgType(envelope);
   int             current_chare = current_epinfo->chareindex;
   int             current_magic = CpvAccess(nodecharesProcessed)++;
+
+  CpvAccess(nodebocInitProcessed)++ ;
 
   CpvAccess(currentChareBlock) = bocBlock = 
 		CreateChareBlock(CsvAccess(ChareSizesTable)[current_chare], 

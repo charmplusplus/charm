@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.13  1995-10-27 21:31:25  jyelon
+ * Revision 2.14  1995-11-06 22:59:01  sanjeev
+ * fixes for statistics collection
+ *
+ * Revision 2.13  1995/10/27  21:31:25  jyelon
  * changed NumPe --> NumPes
  *
  * Revision 2.12  1995/10/11  17:52:51  sanjeev
@@ -107,6 +110,7 @@ CpvExtern(int, msgs_created);
 
 CpvExtern(int, disable_sys_msgs);
 CpvExtern(int, nodecharesProcessed);
+CpvExtern(int, nodebocInitProcessed);
 CpvExtern(int, nodebocMsgsProcessed);
 CpvExtern(int, nodeforCharesProcessed);
 CpvExtern(int, nodecharesCreated);
