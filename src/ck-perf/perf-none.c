@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.2  1995-07-10 22:29:40  brunner
+ * Revision 2.3  1995-07-11 16:48:17  gursoy
+ * added void to perfModuleInit
+ *
+ * Revision 2.2  1995/07/10  22:29:40  brunner
  * Created perfModuleInit() to handle CPV macros
  *
  * Revision 2.1  1995/06/08  17:18:11  gursoy
@@ -32,7 +35,7 @@ static char ident[] = "@(#)$Header$";
 
 CpvExtern(int, RecdPerfMsg);
 
-perfModuleInit() {}
+void perfModuleInit() {}
 
 program_name(s,m) char *s, *m; {}
 
