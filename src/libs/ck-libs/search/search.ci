@@ -1,0 +1,23 @@
+module search {
+  message searchResults;
+
+  // idaStar search alg classes
+  chare idaStarWorker {
+    entry idaStarWorker(CkGroupID master, CkPointer<problem> issue,
+    		        int maxdepth, int charesize, int serialdist);
+
+    entry void ChildFinished(int dummy);
+  };
+  group idaStarGroup {
+    entry idaStarGroup(CkPointer<problem> issue,
+                       int startdepth, int maxdepth, int stride, int window,
+		       int charesize, int serialdist,
+		       CkCallback Finished);
+
+    // Worker called methods
+    entry void ChildFinished(int dummy);
+    entry void ReductionResults(CkReductionMsg *m);
+    entry void SolutionFound(CkPointer<problem> soln);
+    entry void Terminate();
+  };
+};
