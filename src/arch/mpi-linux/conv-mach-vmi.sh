@@ -10,7 +10,7 @@ esac
 
 #default vmi dir
 test -z "$CMK_INCDIR" && CMK_INCDIR='-I /usr/local/vmi/mpich/include'
-test -z "$CMK_LIBDIR" && CMK_LIBDIR='-L /usr/local/vmi/mpich/lib/$vmidir'
+test -z "$CMK_LIBDIR" && CMK_LIBDIR="-L /usr/local/vmi/mpich/lib/$vmidir"
 
 if test $override = 1
 then
