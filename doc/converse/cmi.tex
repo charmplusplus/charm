@@ -8,11 +8,11 @@ delivery of messages. First, we describe the machine model assumed by
 \section{Machine Model}
 \label{model}
 
-\converse{} treats the parallel machine as a collection of nodes, where
-each node is comprised of a number of processors that share memory 
+\converse{} treats the parallel machine as a collection of {\em nodes}, where
+each node is comprised of a number of {\em processors} that share memory 
 In some cases, the number of processors per node may be exactly one  
 (e.g. Distributed memory multicomputers such as IBM SP.)  
-In addition, each of the processors may have multiple threads running on
+In addition, each of the processors may have multiple {\em threads} running on
 them which share code and data but have different stacks.
 Functions and macros are provided for handling shared memory across
 processors and querying node information. These are discussed in section
@@ -23,7 +23,7 @@ processors and querying node information. These are discussed in section
 
 When a message arrives at a processor, it triggers the execution of a
 {\em handler function}, not unlike a UNIX signal handler.  The handler
-function receives, as an argument, a pointer to a copy of the message.
+function receives, as an argument, a pointer to the message.
 The message itself specifies which handler function is to be
 called when the message arrives.  Messages are contiguous sequences of
 bytes.  The message has two parts: the header, and the data.  The data
@@ -49,20 +49,20 @@ The following functions are provided to define the handler numbers:
 \index{CmiRegisterHandler}
 \desc{This represents the standard technique for associating numbers
 with functions.  To use this technique, the \converse{} user registers
-each of his functions, one by one, using CmiRegisterHandler.  One must
+each of his functions, one by one, using \kw{CmiRegisterHandler}.  One must
 register exactly the same functions in exactly the same order on all
 processors.  The system assigns monotonically increasing numbers to
 the functions, the same numbers on all processors.  This insures
-global consistency.  CmiRegisterHandler returns the number which was
+global consistency.  \kw{CmiRegisterHandler} returns the number which was
 chosen for the function being registered.}
 
 \function {int CmiRegisterHandlerGlobal(CmiHandler h)}
 \index{CmiRegisterHandlerLocal}
 \desc{This represents a second registration technique.   The \converse{}
 user registers his functions on processor zero, using
-CmiRegisterHandlerGlobal.  The \converse{} user is then responsible for
+\kw{CmiRegisterHandlerGlobal}.  The \converse{} user is then responsible for
 broadcasting those handler numbers to other processors, and installing
-them using CmiNumberHandler below.  The user should take care not to
+them using \kw{CmiNumberHandler} below.  The user should take care not to
 invoke those handlers until they are fully installed.}
 
 \function {int CmiRegisterHandlerLocal(CmiHandler h)}
@@ -74,22 +74,22 @@ locally.  No attempt is made to ensure consistency across processors.}
 
 \function {void CmiNumberHandler(int n, CmiHandler h)}
 \index{CmiNumberHandler}
-\desc{Forces the system to associate the specified handler number {\em n}
-with the specified handler function {\em h}.  If the function number
-{\em n} was previously mapped to some other function, that old mapping
+\desc{Forces the system to associate the specified handler number \uw{n}
+with the specified handler function \uw{h}.  If the function number
+\uw{n} was previously mapped to some other function, that old mapping
 is forgotten.  The mapping that this function creates is local to the
-current processor.  CmiNumberHandler can be useful in combination with
-CmiRegisterGlobalHandler.  It can also be used to implement
+current processor.  \kw{CmiNumberHandler} can be useful in combination with
+\kw{CmiRegisterGlobalHandler}.  It can also be used to implement
 user-defined numbering schemes: such schemes should keep in mind that
 the size of the table that holds the mapping is proportional to the
 largest handler number --- do not use big numbers!}
 
-Note: of the three registration methods, the CmiRegisterHandler method
+\note{Of the three registration methods, the \kw{CmiRegisterHandler} method
 is by far the simplest, and is strongly encouraged.  The others are
 primarily to ease the porting of systems that already use similar
 registration techniques.  One may use all three registration methods
 in a program.  The system guarantees that no numbering conflicts will
-occur as a result of this combination.
+occur as a result of this combination.}
 
 \section{Writing Handler Functions}
 \label{handler2}
@@ -98,7 +98,7 @@ A message handler function is just a C function that accepts a void
 pointer (to a message buffer) as an argument, and returns nothing.  The
 handler may use the message buffer until it returns, at which time
 \converse{} will automatically free the message buffer.  This behavior
-can be overrided using CmiGrabBuffer:
+can be overridden using \kw{CmiGrabBuffer}:
 
 \function{void CmiGrabBuffer(void **pbuf)}
 \index{CmiGrabBuffer}
@@ -106,12 +106,16 @@ can be overrided using CmiGrabBuffer:
 as an argument.  Normally, it is supposed to copy the data out of the
 message buffer before it returns, at which time \converse{} automatically
 frees the message buffer.  However, a handler function may use
-CmiGrabBuffer to claim ownership of the message buffer (and therefore
+\kw{CmiGrabBuffer} to claim ownership of the message buffer (and therefore
 prevent \converse{} from freeing it).  Assuming, for example, that the
-handler function called its argument {\tt msg}, it would call {\tt
-CmiGrabBuffer(\&msg)}.  Afterward, {\tt msg} contains a pointer to the
+handler function called its argument \uw{msg}, it would call 
+\begin{alltt}
+CmiGrabBuffer(\&msg)
+\end{alltt}
+Afterward, \uw{msg} contains a pointer to the
 message, or a copy of it.  From that point forward, it is the user's
-responsibility to free the message using \param{CmiFree.}}
+responsibility to free the message using \kw{CmiFree}.
+}
 
 \function{void CmiReleaseBuffer(void *buf)}
 \index{CmireleaseBuffer}
@@ -120,7 +124,7 @@ as an argument.  Normally, it is supposed to copy the data out of the
 message buffer before it returns, at which time \converse{} automatically
 frees the message buffer or may reuse it for further communication.  
 However, a handler function may use
-CmiReleaseBuffer to give up ownership of the message buffer in the
+\kw{CmiReleaseBuffer} to give up ownership of the message buffer in the
 middle of handler execution (and therefore allowing \converse{} to reuse it).}
 
 \section{Building Messages}
@@ -129,7 +133,7 @@ To send a message, one first creates a buffer to hold the message.
 The buffer must be large enough to hold the header and the data.
 The buffer can be in any kind of memory: it could be a local variable,
 it could be a global, it could be allocated with {\tt malloc}, and
-finally, it could be allocated with {\tt CmiAlloc}.  The \converse{} user
+finally, it could be allocated with \kw{CmiAlloc}.  The \converse{} user
 fills the buffer with the message data.  One puts a handler number
 in the message, thereby specifying which handler function the message
 should trigger when it arrives.  Finally, one uses a message-transmission
@@ -139,15 +143,15 @@ The following functions are provided to help build message buffers:
 
 \function{void *CmiAlloc(int size)}
 \index{CmiAlloc}
-\desc{Allocates memory of size \param{size} in heap and returns pointer to 
+\desc{Allocates memory of size \uw{size} in heap and returns pointer to 
 the usable space.  There are some message-sending functions that
-accept only message buffers that were allocated with CmiAlloc.  Thus,
+accept only message buffers that were allocated with \kw{CmiAlloc}.  Thus,
 this is the preferred way to allocate message buffers.}
 
 \function{void CmiFree(void *ptr)}
 \index{CmiFree}
-\desc{This function frees the memory pointed to by \param{ptr}. \param{ptr}
-should be a pointer that was previously returned by \param{CmiAlloc}.}
+\desc{This function frees the memory pointed to by \uw{ptr}. \uw{ptr}
+should be a pointer that was previously returned by \kw{CmiAlloc}.}
 
 \function {\#define CmiMsgHeaderSizeBytes}
 \index{CmiMsgHeaderSizeBytes}
@@ -157,7 +161,7 @@ and the data.  This macro helps you to do so.}
 
 \function {void CmiSetHandler(int *MessageBuffer, int HandlerId)}
 \index{CmiSetHandler}
-\desc{This macro sets the handler number of a message to \param{HandlerId}.}
+\desc{This macro sets the handler number of a message to \uw{HandlerId}.}
 
 \function {int CmiGetHandler(int *MessageBuffer)}
 \index{CmiGetHandler}
@@ -200,12 +204,13 @@ when it is done and you can then reuse the message buffer.}
 \item{{\bf sync and free}: a version that returns almost instantaneously,
 and then continues working in the background.  The background job
 transfers the data from the message buffer into the network.  When the
-background job finishes, it {\tt CmiFree}s the message buffer.  In
+background job finishes, it \kw{CmiFree}s the message buffer.  In
 this situation, you can't reuse the message buffer at all.  Of course,
 to use a function of this type, you must allocate the message buffer
-using {\tt CmiAlloc}.}
+using \kw{CmiAlloc}.}
 
-\item{{\bf node}: a version that send a message to a node instead of a
+\item{{\bf node}\experimental{}: a version that send a message to a node 
+instead of a
 specific processor. This means that when the message is received, any ``free''
 processor within than node can handle it.}
 
@@ -213,219 +218,214 @@ processor within than node can handle it.}
 
 \function{void CmiSyncSend(unsigned int destPE, unsigned int size, void *msg)}
 \index{CmiSyncSend}
-\desc{Sends \param{msg} of size \param{size} bytes to processor
-\param{destPE}.  When it returns, you may reuse the message buffer.}
+\desc{Sends \uw{msg} of size \uw{size} bytes to processor
+\uw{destPE}.  When it returns, you may reuse the message buffer.}
 
 \function{void CmiSyncNodeSend(unsigned int destNode, unsigned int size, void *msg)}
 \index{CmiSyncNodeSend}
-\desc{Sends \param{msg} of size \param{size} bytes to node
-\param{destNode}.  When it returns, you may reuse the message buffer.}
+\desc{Sends\experimental{} \uw{msg} of size \uw{size} bytes to node
+\uw{destNode}.  When it returns, you may reuse the message buffer.}
 
 \function{void CmiSyncSendAndFree(unsigned int destPE, unsigned int size, void *msg)}
 \index{CmiSyncSendAndFree}
-\desc{Sends \param{msg} of size \param{size} bytes to processor
-\param{destPE}.  When it returns, the message buffer has been freed
-using {\tt CmiFree}.}
+\desc{Sends \uw{msg} of size \uw{size} bytes to processor
+\uw{destPE}.  When it returns, the message buffer has been freed
+using \kw{CmiFree}.}
 
 \function{void CmiSyncNodeSendAndFree(unsigned int destNode, unsigned int size, void *msg)}
 \index{CmiSyncNodeSendAndFree}
-\desc{Sends \param{msg} of size \param{size} bytes to node
-\param{destNode}.  When it returns, the message buffer has been freed
-using {\tt CmiFree}.}
+\desc{Sends\experimental{} \uw{msg} of size \uw{size} bytes to node
+\uw{destNode}.  When it returns, the message buffer has been freed
+using \kw{CmiFree}.}
 
 \function{CmiCommHandle CmiAsyncSend(unsigned int destPE, unsigned int size, void *msg)}
 \index{CmiAsyncSend}
-\desc{Sends \param{msg} of size \param{size} bytes to processor
-\param{destPE}.  It returns a communication handle which can be
-tested using CmiAsyncMsgSent: when this returns true, you may reuse
+\desc{Sends \uw{msg} of size \uw{size} bytes to processor
+\uw{destPE}.  It returns a communication handle which can be
+tested using \kw{CmiAsyncMsgSent}: when this returns true, you may reuse
 the message buffer. If the returned communication handle is 0, message buffer
-can be reused immediately, thus saving a call to {\tt CmiAsyncMsgSent}.}
+can be reused immediately, thus saving a call to \kw{CmiAsyncMsgSent}.}
 
 \function{CmiCommHandle CmiAsyncNodeSend(unsigned int destNode, unsigned int size, void *msg)}
 \index{CmiAsyncNodeSend}
-\desc{Sends \param{msg} of size \param{size} bytes to node
-\param{destNode}.  It returns a communication handle which can be
-tested using CmiAsyncMsgSent: when this returns true, you may reuse
+\desc{Sends\experimental{} \uw{msg} of size \uw{size} bytes to node
+\uw{destNode}.  It returns a communication handle which can be
+tested using \kw{CmiAsyncMsgSent}: when this returns true, you may reuse
 the message buffer. If the returned communication handle is 0, message buffer
-can be reused immediately, thus saving a call to {\tt CmiAsyncMsgSent}.}
+can be reused immediately, thus saving a call to \kw{CmiAsyncMsgSent}.}
 
 \function{void CmiSyncVectorSend(int destPE, int len, int sizes[], char *msgComps[])}
 \desc{Concatenates several pieces of data and sends them to processor
-\param{destPE}.  The data consists of \param{len} pieces residing in
+\uw{destPE}.  The data consists of \uw{len} pieces residing in
 different areas of memory, which are logically concatenated.  The
-\param{msgComps} array contains pointers to the pieces; the size of
-\param{msgComps[i]} is taken from \param{sizes[i]}. 
-When it returns, \param{sizes}, \param{msgComps} and the message
-components specified in \param{msgComps} can be immediately reused.}
+\uw{msgComps} array contains pointers to the pieces; the size of
+\uw{msgComps[i]} is taken from \uw{sizes[i]}. 
+When it returns, \uw{sizes}, \uw{msgComps} and the message
+components specified in \uw{msgComps} can be immediately reused.}
 
 \function{void CmiSyncVectorSendAndFree(int destPE, int len, int sizes[], char *msgComps[])}
 \desc{Concatenates several pieces of data and sends them to processor
-\param{destPE}.  The data consists of \param{len} pieces residing in
+\uw{destPE}.  The data consists of \uw{len} pieces residing in
 different areas of memory, which are logically concatenated.  The
-\param{msgComps} array contains pointers to the pieces; the size of
-\param{msgComps[i]} is taken from \param{sizes[i]}. 
-The message components specified in \param{msgComps} are {\tt
-CmiFree}d by this function therefore, they should be dynamically
-allocated using \param{CmiAlloc()}.  However, the \param{sizes} and
-\param{msgComps} array themselves are not freed.}
+\uw{msgComps} array contains pointers to the pieces; the size of
+\uw{msgComps[i]} is taken from \uw{sizes[i]}. 
+The message components specified in \uw{msgComps} are \kw{CmiFree}d 
+by this function therefore, they should be dynamically
+allocated using \kw{CmiAlloc}.  However, the \uw{sizes} and
+\uw{msgComps} array themselves are not freed.}
 
 \function{CmiCommHandle CmiAsyncVectorSend(int destPE, int len, int sizes[], char *msgComps[])}
 \desc{Concatenates several pieces of data and sends them to processor
-\param{destPE}.  The data consists of \param{len} pieces residing in
+\uw{destPE}.  The data consists of \uw{len} pieces residing in
 different areas of memory, which are logically concatenated.  The
-\param{msgComps} array contains pointers to the pieces; the size of
-\param{msgComps[i]} is taken from \param{sizes[i]}. 
-The individual pieces of data as well as the arrays \param{sizes} and
-\param{msgComps} should not be overwritten or freed before the
+\uw{msgComps} array contains pointers to the pieces; the size of
+\uw{msgComps[i]} is taken from \uw{sizes[i]}. 
+The individual pieces of data as well as the arrays \uw{sizes} and
+\uw{msgComps} should not be overwritten or freed before the
 communication is complete.  This function returns a communication
-handle which can be tested using CmiAsyncMsgSent: when this returns
+handle which can be tested using \kw{CmiAsyncMsgSent}: when this returns
 true, the input parameters can be reused. If the returned communication 
 handle is 0, message buffer
-can be reused immediately, thus saving a call to CmiAsyncMsgSent.}
+can be reused immediately, thus saving a call to \kw{CmiAsyncMsgSent}.}
 
 \function{int CmiAsyncMsgSent(CmiCommHandle handle)}
 \index{CmiAsyncMsgSent}
 \desc{Returns true if the communication specified by the given
-CmiCommHandle has proceeded to the point where the message buffer can
+\kw{CmiCommHandle} has proceeded to the point where the message buffer can
 be reused.}
 
 \function{void CmiReleaseCommHandle(CmiCommHandle handle)}
 \index{CmiReleaseCommHandle}
-\desc{Releases the communication handle \param{handle} and
+\desc{Releases the communication handle \uw{handle} and
 associated resources. It does not free the message buffer.}
 
 \function{void CmiMultipleSend(unsigned int destPE, int len, int sizes[], char
 *msgComps[])}
 \index{CmiMultipleSend}
-\desc{This function allows the user to send many multiple messages that may be
+\desc{This function\experimental{} allows the user to send 
+multiple messages that may be
 destined for the SAME PE in one go. This is more efficient than sending
 each message to the destination node separately. This function assumes
 that the handlers that are to receive this message have already been set.
 If this is not done, the behavior of the function is undefined.
 
-In the function, The {\bf destPE} parameter identifies the destination
+In the function, The \uw{destPE} parameter identifies the destination
 processor.
-
-The {\bf len} argument identifies the {\it number} of messages that are to
+The \uw{len} argument identifies the {\it number} of messages that are to
 be sent in one go. 
-
-The {\bf sizes[]} array is an array of sizes of each of these messages.
-
-The {\bf msgComps[]} array is the array of the messages. 
-
+The \uw{sizes[]} array is an array of sizes of each of these messages.
+The \uw{msgComps[]} array is the array of the messages. 
 The indexing in each array is from 0 to len - 1.
-
 \note{
 Before calling this function, the program needs to initialise the system
 to be able to provide this service. This is done by calling the function
-{\bf void CmiInitMultipleSendRoutine(void) }. Unless this function is
-called, the system will not be able to provide the service to the user.
-}
+\kw{CmiInitMultipleSendRoutine}. Unless this function is
+called, the system will not be able to provide the service to the user.}
 }
 
 \section{Broadcasting Messages}
 
 \function{void CmiSyncBroadcast(unsigned int size, void *msg)}
 \index{CmiSyncBroadcast}
-\desc{Sends \param{msg} of length \param{size} bytes to all processors
+\desc{Sends \uw{msg} of length \uw{size} bytes to all processors
 excluding the processor on which the caller resides. }
 
 \function{void CmiSyncNodeBroadcast(unsigned int size, void *msg)}
 \index{CmiSyncNodeBroadcast}
-\desc{Sends \param{msg} of length \param{size} bytes to all nodes
+\desc{Sends \uw{msg} of length \uw{size} bytes to all nodes
 excluding the node on which the caller resides. }
 
 \function{void CmiSyncBroadcastAndFree(unsigned int size, void *msg)}
 \index{CmiSyncBroadcastAndFree}
-\desc{Sends \param{msg} of length \param{size} bytes to all processors
-excluding the processor on which the caller resides.  Uses {\tt
-CmiFree} to deallocate the message buffer for \param{msg} when the
-broadcast completes. Therefore \param{msg} must point to a buffer
-allocated with {\tt CmiAlloc}.}
+\desc{Sends \uw{msg} of length \uw{size} bytes to all processors
+excluding the processor on which the caller resides.  Uses \kw{CmiFree} to 
+deallocate the message buffer for \uw{msg} when the
+broadcast completes. Therefore \uw{msg} must point to a buffer
+allocated with \kw{CmiAlloc}.}
 
 \function{void CmiSyncNodeBroadcastAndFree(unsigned int size, void *msg)}
 \index{CmiSyncNodeBroadcastAndFree}
-\desc{Sends \param{msg} of length \param{size} bytes to all nodes
-excluding the node on which the caller resides.  Uses {\tt
-CmiFree} to deallocate the message buffer for \param{msg} when the
-broadcast completes. Therefore \param{msg} must point to a buffer
-allocated with {\tt CmiAlloc}.}
+\desc{Sends \uw{msg} of length \uw{size} bytes to all nodes
+excluding the node on which the caller resides.  Uses \kw{CmiFree} to 
+deallocate the message buffer for \uw{msg} when the
+broadcast completes. Therefore \uw{msg} must point to a buffer
+allocated with \kw{CmiAlloc}.}
 
 \function{void CmiSyncBroadcastAll(unsigned int size, void *msg)}
 \index{CmiSyncBroadcastAll}
-\desc{Sends \param{msg} of length \param{size} bytes to all processors
+\desc{Sends \uw{msg} of length \uw{size} bytes to all processors
 including the processor on which the caller resides. This function
-does not free the message buffer for \param{msg}.}
+does not free the message buffer for \uw{msg}.}
 
 \function{void CmiSyncNodeBroadcastAll(unsigned int size, void *msg)}
 \index{CmiSyncNodeBroadcastAll}
-\desc{Sends \param{msg} of length \param{size} bytes to all nodes
+\desc{Sends \uw{msg} of length \uw{size} bytes to all nodes
 including the node on which the caller resides. This function
-does not free the message buffer for \param{msg}.}
+does not free the message buffer for \uw{msg}.}
 
 \function{void CmiSyncBroadcastAllAndFree(unsigned int size, void *msg)}
 \index{CmiSyncBroadcastAllAndFree}
-\desc{Sends \param{msg} of length \param{size} bytes to all processors
+\desc{Sends \uw{msg} of length \uw{size} bytes to all processors
 including the processor on which the caller resides. This function
-frees the message buffer for \param{msg} before returning, so
-\param{msg} must point to a dynamically allocated buffer.}
+frees the message buffer for \uw{msg} before returning, so
+\uw{msg} must point to a dynamically allocated buffer.}
 
 \function{void CmiSyncNodeBroadcastAllAndFree(unsigned int size, void *msg)}
 \index{CmiSyncNodeBroadcastAllAndFree}
-\desc{Sends \param{msg} of length \param{size} bytes to all nodes
+\desc{Sends \uw{msg} of length \uw{size} bytes to all nodes
 including the node on which the caller resides. This function
-frees the message buffer for \param{msg} before returning, so
-\param{msg} must point to a dynamically allocated buffer.}
+frees the message buffer for \uw{msg} before returning, so
+\uw{msg} must point to a dynamically allocated buffer.}
 
 \function{CmiCommHandle CmiAsyncBroadcast(unsigned int size, void *msg)}
 \index{CmiAsyncBroadcast}
-\desc{Initiates asynchronous broadcast of message \param{msg} of
-length \param{size} bytes to all processors excluding the processor on
+\desc{Initiates asynchronous broadcast of message \uw{msg} of
+length \uw{size} bytes to all processors excluding the processor on
 which the caller resides. It returns a communication handle which
 could be used to check the status of this send using
-\param{CmiAsyncMsgSent()}. If the returned communication handle is 0, 
+\kw{CmiAsyncMsgSent}. If the returned communication handle is 0, 
 message buffer can be reused immediately, thus saving a call to 
-CmiAsyncMsgSent. \param{msg} should not be overwritten or
+\kw{CmiAsyncMsgSent}. \uw{msg} should not be overwritten or
 freed before the communication is complete.}
 
 \function{CmiCommHandle CmiAsyncNodeBroadcast(unsigned int size, void *msg)}
 \index{CmiAsyncNodeBroadcast}
-\desc{Initiates asynchronous broadcast of message \param{msg} of
-length \param{size} bytes to all nodes excluding the node on
+\desc{Initiates asynchronous broadcast of message \uw{msg} of
+length \uw{size} bytes to all nodes excluding the node on
 which the caller resides. It returns a communication handle which
 could be used to check the status of this send using
-\param{CmiAsyncMsgSent()}. If the returned communication handle is 0, 
+\kw{CmiAsyncMsgSent}. If the returned communication handle is 0, 
 message buffer can be reused immediately, thus saving a call to 
-CmiAsyncMsgSent. \param{msg} should not be overwritten or
+\kw{CmiAsyncMsgSent}. \uw{msg} should not be overwritten or
 freed before the communication is complete.}
 
 \function{CmiCommHandle CmiAsyncBroadcastAll(unsigned int size, void *msg)}
 \index{CmiAsyncBroadcastAll}
-\desc{Initiates asynchronous broadcast of message \param{msg} of
-length \param{size} bytes to all processors including the processor on
+\desc{Initiates asynchronous broadcast of message \uw{msg} of
+length \uw{size} bytes to all processors including the processor on
 which the caller resides. It returns a communication handle which
 could be used to check the status of this send using
-\param{CmiAsyncMsgSent()}. If the returned communication handle is 0, 
+\kw{CmiAsyncMsgSent}. If the returned communication handle is 0, 
 message buffer can be reused immediately, thus saving a call to 
-CmiAsyncMsgSent. \param{msg} should not be overwritten or
+\kw{CmiAsyncMsgSent}. \uw{msg} should not be overwritten or
 freed before the communication is complete.}
 
 \function{CmiCommHandle CmiAsyncNodeBroadcastAll(unsigned int size, void *msg)}
 \index{CmiAsyncNodeBroadcastAll}
-\desc{Initiates asynchronous broadcast of message \param{msg} of
-length \param{size} bytes to all nodes including the node on
+\desc{Initiates asynchronous broadcast of message \uw{msg} of
+length \uw{size} bytes to all nodes including the node on
 which the caller resides. It returns a communication handle which
 could be used to check the status of this send using
-\param{CmiAsyncMsgSent()}. If the returned communication handle is 0, 
+\kw{CmiAsyncMsgSent}. If the returned communication handle is 0, 
 message buffer can be reused immediately, thus saving a call to 
-CmiAsyncMsgSent. \param{msg} should not be overwritten or
+\kw{CmiAsyncMsgSent}. \uw{msg} should not be overwritten or
 freed before the communication is complete.}
 
 \section{Multicasting Messages}
 
 \function{typedef ... CmiGroup;}
 \index{CmiGroup}
-\desc{A CmiGroup represents a set of processors.  It is an opaque type.
+\desc{A \kw{CmiGroup} represents a set of processors.  It is an opaque type.
 Group IDs are useful for the multicast functions below.}
 
 \function{CmiGroup CmiEstablishGroup(int npes, int *pes);}
@@ -438,55 +438,55 @@ memory on all processors.}
 
 \function{void CmiSyncMulticast(CmiGroup grp, unsigned int size, void *msg)}
 \index{CmiSyncBroadcast}
-\desc{Sends \param{msg} of length \param{size} bytes to all members
+\desc{Sends \uw{msg} of length \uw{size} bytes to all members
 of the specified group.  Group IDs are created using
-\param{CmiEstablishGroup}.}
+\kw{CmiEstablishGroup}.}
 
 \function{void CmiSyncMulticastAndFree(CmiGroup grp, unsigned int size, void *msg)}
 \index{CmiSyncBroadcastAndFree}
-\desc{Sends \param{msg} of length \param{size} bytes to all members
-of the specified group.  Uses {\tt CmiFree} to deallocate the
-message buffer for \param{msg} when the broadcast completes. Therefore
-\param{msg} must point to a buffer allocated with {\tt CmiAlloc}.
-Group IDs are created using \param{CmiEstablishGroup}.}
+\desc{Sends \uw{msg} of length \uw{size} bytes to all members
+of the specified group.  Uses \kw{CmiFree} to deallocate the
+message buffer for \uw{msg} when the broadcast completes. Therefore
+\uw{msg} must point to a buffer allocated with \kw{CmiAlloc}.
+Group IDs are created using \kw{CmiEstablishGroup}.}
 
 \function{CmiCommHandle CmiAsyncMulticast(CmiGroup grp, unsigned int size, void *msg)}
 \index{CmiAsyncBroadcast}
-\desc{Not yet implemented. Initiates asynchronous broadcast of
-message \param{msg} of length \param{size} bytes to all members of
+\desc{\note{Not yet implemented.} Initiates asynchronous broadcast of
+message \uw{msg} of length \uw{size} bytes to all members of
 the specified group.  It returns a communication handle which could
 be used to check the status of this send using
-\param{CmiAsyncMsgSent()}. If the returned communication handle is 0, 
+\kw{CmiAsyncMsgSent}. If the returned communication handle is 0, 
 message buffer can be reused immediately, thus saving a call to 
-CmiAsyncMsgSent. \param{msg} should not be overwritten or
+\kw{CmiAsyncMsgSent}. \uw{msg} should not be overwritten or
 freed before the communication is complete.
-Group IDs are created using \param{CmiEstablishGroup}.}
+Group IDs are created using \kw{CmiEstablishGroup}.}
 
 \function{void CmiSyncListSend(int npes, int *pes, unsigned int size, void *msg)}
 \index{CmiSyncBroadcast}
-\desc{Not yet implemented. Sends \param{msg} of length \param{size} bytes
+\desc{\note{Not yet implemented.} Sends \uw{msg} of length \uw{size} bytes
 to all processors in the list.  Group IDs are created using
-\param{CmiEstablishGroup}.}
+\kw{CmiEstablishGroup}.}
 
 \function{void CmiSyncMulticastAndFree(int npes, int *pes, unsigned int size, void *msg)}
 \index{CmiSyncBroadcastAndFree}
-\desc{Not yet implemented. Sends \param{msg} of length \param{size}
-bytes to all processors in the list.  Uses {\tt CmiFree} to deallocate the
-message buffer for \param{msg} when the broadcast completes. Therefore
-\param{msg} must point to a buffer allocated with {\tt CmiAlloc}.
-Group IDs are created using \param{CmiEstablishGroup}.}
+\desc{\note{Not yet implemented.} Sends \uw{msg} of length \uw{size}
+bytes to all processors in the list.  Uses \kw{CmiFree} to deallocate the
+message buffer for \uw{msg} when the broadcast completes. Therefore
+\uw{msg} must point to a buffer allocated with \kw{CmiAlloc}.
+Group IDs are created using \kw{CmiEstablishGroup}.}
 
 \function{CmiCommHandle CmiAsyncMulticast(int npes, int *pes, unsigned int size, void *msg)}
 \index{CmiAsyncBroadcast}
-\desc{Not yet implemented. Initiates asynchronous broadcast of
-message \param{msg} of length \param{size} bytes to all processors
+\desc{\note{Not yet implemented.} Initiates asynchronous broadcast of
+message \uw{msg} of length \uw{size} bytes to all processors
 in the list.  It returns a communication handle which could
 be used to check the status of this send using
-\param{CmiAsyncMsgSent()}. If the returned communication handle is 0,
+\kw{CmiAsyncMsgSent}. If the returned communication handle is 0,
 message buffer can be reused immediately, thus saving a call to 
-CmiAsyncMsgSent. \param{msg} should not be overwritten or
+\kw{CmiAsyncMsgSent}. \uw{msg} should not be overwritten or
 freed before the communication is complete.
-Group IDs are created using \param{CmiEstablishGroup}.}
+Group IDs are created using \kw{CmiEstablishGroup}.}
 
 \section{Scheduling Messages}
 \label{schedqueue}
@@ -495,8 +495,8 @@ The scheduler queue is a powerful priority queue.  The following
 functions can be used to place messages into the scheduler queue.
 These messages are treated very much like newly-arrived messages: when
 they reach the front of the queue, they trigger handler functions,
-just like messages transmitted with Cmi functions.  Note that unlike
-the Cmi send functions, these cannot move messages across processors.
+just like messages transmitted with CMI functions.  Note that unlike
+the CMI send functions, these cannot move messages across processors.
 
 Every message inserted into the queue has a priority associated with
 it.  \converse{} priorities are arbitrary-precision numbers between 0 and
@@ -537,7 +537,8 @@ priority.
 Messages sent using the CMI functions take precedence over everything
 in the scheduler queue, regardless of priority.
 
-A recent addition to \converse{} scheduling mechanisms is the introduction of
+A recent addition\experimental{} to \converse{} scheduling mechanisms is 
+the introduction of
 node-level scheduling designed to support low-overhead programming for the
 SMP clusters. These functions have ``Node'' in their names. All processors
 within the node has access to the node-level scheduler's queue, and thus
@@ -552,26 +553,26 @@ messages from the node-level queue sorted according to priorities.
 \index{CsdEnqueueGeneral}
 \desc{This call enqueues a message to the processor's scheduler's queue, to
 be sorted according to its priority and the queueing \param{strategy}.
-The meaning of the \param{priobits} and \param{prioptr} fields depend
-on the value of \param{strategy}, which are explained below.}
+The meaning of the \uw{priobits} and \uw{prioptr} fields depend
+on the value of \uw{strategy}, which are explained below.}
 
 \function{void CsdNodeEnqueueGeneral(void *Message, int strategy, int priobits, int *prioptr)}
 \index{CsdNodeEnqueueGeneral}
 \desc{This call enqueues a message to the node-level scheduler's queue, to
-be sorted according to its priority and the queueing \param{strategy}.
-The meaning of the \param{priobits} and \param{prioptr} fields depend
-on the value of \param{strategy}, which can be any of the following:
+be sorted according to its priority and the queueing \uw{strategy}.
+The meaning of the \uw{priobits} and \uw{prioptr} fields depend
+on the value of \uw{strategy}, which can be any of the following:
 
 \begin{itemize}
-\item{{\tt CQS\_QUEUEING\_BFIFO}: the priobits and prioptr point to
+\item{\kw{CQS\_QUEUEING\_BFIFO}: the priobits and prioptr point to
 a bit-string representing an arbitrary-precision priority.  The message
 is pushed behind all other message of this priority.}
 
-\item{{\tt CQS\_QUEUEING\_BLIFO}: the priobits and prioptr point to
+\item{\kw{CQS\_QUEUEING\_BLIFO}: the priobits and prioptr point to
 a bit-string representing an arbitrary-precision priority.  The message
 is pushed in front all other message of this priority.}
 
-\item{{\tt CQS\_QUEUEING\_IFIFO}: the prioptr is a pointer to a
+\item{\kw{CQS\_QUEUEING\_IFIFO}: the prioptr is a pointer to a
 signed integer.  The integer is converted to a bit-string priority,
 normalizing so that the integer zero is converted to the bit-string
 ``1000...'' (the ``middle'' priority).  To be more specific, the
@@ -579,7 +580,7 @@ conversion is performed by adding 0x80000000 to the integer, and then
 treating the resulting 32-bit quantity as a 32-bit bitvector priority.
 The message is pushed behind all other messages of this priority.}
 
-\item{{\tt CQS\_QUEUEING\_ILIFO}: the prioptr is a pointer to a
+\item{\kw{CQS\_QUEUEING\_ILIFO}: the prioptr is a pointer to a
 signed integer.  The integer is converted to a bit-string priority,
 normalizing so that the integer zero is converted to the bit-string
 ``1000...'' (the ``middle'' priority).  To be more specific, the
@@ -588,11 +589,11 @@ treating the resulting 32-bit quantity as a 32-bit bitvector priority.
 The message is pushed in front of all other messages of this
 priority.}
 
-\item{{\tt CQS\_QUEUEING\_FIFO}: the prioptr and priobits are ignored.
+\item{\kw{CQS\_QUEUEING\_FIFO}: the prioptr and priobits are ignored.
 The message is enqueued with the middle priority ``1000...'', and is
 pushed behind all other messages with this priority.}
 
-\item{{\tt CQS\_QUEUEING\_LIFO}: the prioptr and priobits are ignored.
+\item{\kw{CQS\_QUEUEING\_LIFO}: the prioptr and priobits are ignored.
 The message is enqueued with the middle priority ``1000...'', and is
 pushed in front of all other messages with this priority.}
 
@@ -609,37 +610,49 @@ to actually arrange storage for the priority.
 \function {void CsdEnqueue(void *Message)}
 \index{CsdEnqueue}
 \desc{This macro is a shorthand for 
-{\tt CsdEnqueueGeneral(Message, CQS\_QUEUEING\_FIFO,0, NULL)} 
+\begin{alltt}
+CsdEnqueueGeneral(Message, CQS\_QUEUEING\_FIFO,0, NULL) 
+\end{alltt}
 provided here for backward compatibility.}
 
 \function {void CsdNodeEnqueue(void *Message)}
 \index{CsdNodeEnqueue}
 \desc{This macro is a shorthand for 
-{\tt CsdNodeEnqueueGeneral(Message, CQS\_QUEUEING\_FIFO,0, NULL)} 
+\begin{alltt}
+CsdNodeEnqueueGeneral(Message, CQS\_QUEUEING\_FIFO,0, NULL) 
+\end{alltt}
 provided here for backward compatibility.}
 
 \function{void CsdEnqueueFifo(void *Message)}
 \index{CsdEnqueueFifo}
 \desc{This macro is a shorthand for 
-{\tt CsdEnqueueGeneral(Message, CQS\_QUEUEING\_FIFO,0, NULL)} 
+\begin{alltt}
+CsdEnqueueGeneral(Message, CQS\_QUEUEING\_FIFO,0, NULL)
+\end{alltt}
 provided here for backward compatibility.}
 
 \function{void CsdNodeEnqueueFifo(void *Message)}
 \index{CsdNodeEnqueueFifo}
 \desc{This macro is a shorthand for 
-{\tt CsdNodeEnqueueGeneral(Message, CQS\_QUEUEING\_FIFO,0, NULL)} 
+\begin{alltt}
+CsdNodeEnqueueGeneral(Message, CQS\_QUEUEING\_FIFO,0, NULL)
+\end{alltt}
 provided here for backward compatibility.}
 
 \function{void CsdEnqueueLifo(void *Message)}
 \index{CsdEnqueueLifo}
 \desc{This macro is a shorthand for
-{\tt CsdEnqueueGeneral(Message, CQS\_QUEUEING\_LIFO,0, NULL)} 
+\begin{alltt}
+CsdEnqueueGeneral(Message, CQS\_QUEUEING\_LIFO,0, NULL)
+\end{alltt}
 provided here for backward compatibility.}
 
 \function{void CsdNodeEnqueueLifo(void *Message)}
 \index{CsdNodeEnqueueLifo}
 \desc{This macro is a shorthand for
-{\tt CsdNodeEnqueueGeneral(Message, CQS\_QUEUEING\_LIFO,0, NULL)} 
+\begin{alltt}
+CsdNodeEnqueueGeneral(Message, CQS\_QUEUEING\_LIFO,0, NULL) 
+\end{alltt}
 provided here for backward compatibility.}
 
 \function{int CsdEmpty()}
@@ -661,15 +674,15 @@ occasionally poll for messages.  When the user starts \converse{}, he can
 put it into one of several modes.  In the normal mode, the message
 polling happens automatically.  However {\em user-calls-scheduler}
 mode is designed to let the user poll manually.  To do this, the user
-must use one of two polling functions: CmiDeliverMsgs, or
-CsdScheduler.  CsdScheduler is more general, it will notice any
-\converse{} event.  CmiDeliverMsgs is a lower-level function that ignores
+must use one of two polling functions: \kw{CmiDeliverMsgs}, or
+\kw{CsdScheduler}.  \kw{CsdScheduler} is more general, it will notice any
+\converse{} event.  \kw{CmiDeliverMsgs} is a lower-level function that ignores
 all events except for recently-arrived messages.  (In particular, it
 ignores messages in the scheduler queue).  You can save a tiny amount
 of overhead by using the lower-level function.  We recommend the use
-of CsdScheduler for all applications except those that are using only
-the lowest level of \converse{}, the Cmi.  A third polling function,
-CmiDeliverSpecificMsg, is used when you know the exact event you want
+of \kw{CsdScheduler} for all applications except those that are using only
+the lowest level of \converse{}, the CMI.  A third polling function,
+\kw{CmiDeliverSpecificMsg}, is used when you know the exact event you want
 to wait for: it does not allow any other event to occur.
 
 \function {void CsdScheduler(int NumberOfMessages)}
@@ -679,27 +692,27 @@ delivers messages to their handlers (i.e. invokes the handler for each
 message it selects).  In each iteration, the scheduler first looks for
 any message that has arrived from another processor, and delivers it.
 If there isn't any, it selects a message from the locally enqueued
-messages, and delivers it.  The {\tt NumberOfMessages} parameter
+messages, and delivers it.  The \uw{NumberOfMessages} parameter
 specifies how many messages should be processed (i.e. delivered to
 their handlers). If set to -1, the scheduler continues delivering
-messages until CsdExitScheduler() is called from a message handler.
-if {\tt NumberOfMessages} is 0, the scheduler continues delivering
+messages until \kw{CsdExitScheduler} is called from a message handler.
+if \uw{NumberOfMessages} is 0, the scheduler continues delivering
 messages until it exhausts its supply of messages (i.e. becomes idle)
-or some handler calls CsdExitScheduler().}
+or some handler calls \kw{CsdExitScheduler}.}
 
 \function{int CmiDeliverMsgs(int MaxMsgs)}
 \index{CmiDeliverMsgs}
 \desc{Retrieves messages from the network message queue and invokes 
 corresponding handler functions for arrived messages. This function 
 returns after either the network message queue becomes empty or after
-\param{MaxMsgs} messages have been retrieved and their handlers called. 
-It returns the difference between total messages delivered and \param{MaxMsgs}.
+\uw{MaxMsgs} messages have been retrieved and their handlers called. 
+It returns the difference between total messages delivered and \uw{MaxMsgs}.
 The handler is given a pointer to the message as  its parameter.}
 
 \function{void CmiDeliverSpecificMsg(int HandlerId)}
 \index{CmiDeliverSpecificMsg}
 \desc{Retrieves messages from the network queue and delivers the first
-message with its handler field equal to \param{HandlerId}. This functions
+message with its handler field equal to \uw{HandlerId}. This functions
 leaves alone all other messages. It returns after the invoked handler
 function returns.}
 
@@ -723,20 +736,21 @@ controlling the scheduler callbacks.
 
 \function{void CsdStartNotifyIdle(void)}
 \index{CsdStartNotifyIdle}
-\desc{This call causes CsdScheduler to invoke callback functions for
+\desc{This call causes \kw{CsdScheduler} to invoke callback functions for
 idle and busy notifications. Initially, the scheduler does not call
 any callback functions.}
 
 \function{void CsdStopNotifyIdle(void)}
 \index{CsdStopNotifyIdle}
-\desc{This call causes CsdScheduler to stop invoking callback functions
+\desc{This call causes \kw{CsdScheduler} to stop invoking callback functions
 for idle and busy norifications.}
 
 \function{void CsdSetNotifyIdle(void (* fIdle)(void), void (* fBusy)(void))}
 \index{CsdSetNotifyIdle}
-\desc{This call registers the functions to be called when CsdScheduler becomes
-idle (\param{fIdle}) or busy (\param{fBusy}). These functions can be
-overridden with another call to CsdSetNotifyIdle.}
+\desc{This call registers the functions to be called when \kw{CsdScheduler} 
+becomes
+idle (\uw{fIdle}) or busy (\uw{fBusy}). These functions can be
+overridden with another call to \kw{CsdSetNotifyIdle}.}
 
 \zap{
 \section{Global Pointer}
@@ -780,7 +794,7 @@ which could be used to  enquire about the status of this operation.}
 \function{double CmiTimer(void)}
 \index{CmiTimer}
 \desc{Returns current value of the timer in seconds. This is
-typically the time spent since the \param{ConverseInit()} call.
+typically the time spent since the \kw{ConverseInit} call.
 The precision of this timer is the best available on the particular machine,
 and usually has at least microsecond accuracy.}
 
@@ -794,9 +808,10 @@ parallel program is being run.}
 \function{int CmiMyPe(void)}
 \index{CmiMyPe}
 \desc{Returns the logical processor identifier of processor on which the 
-caller resides. A processor Id is between \param{0} and \param{CmiNumPe()-1}.}
+caller resides. A processor Id is between \texttt{0} and 
+\texttt{\kw{CmiNumPe}()-1}.}
 
-Also see the calls in Section~\ref{utility}.  % put a ref here..??
+Also see the calls in Section~\ref{utility}.
 
 \input{cpvmacros}
 
@@ -804,20 +819,20 @@ Also see the calls in Section~\ref{utility}.  % put a ref here..??
 
 \function{void CmiPrintf(char *format, arg1, arg2, ...)}
 \index{CmiPrintf}
-\desc{This function does an atomic \param{printf()} on \param{stdout}. 
+\desc{This function does an atomic \texttt{printf()} on \texttt{stdout}. 
 On machine with host, this is implemented on top of the messaging 
 layer using asynchronous sends.}
 
 \function{int CmiScanf(char *format, void *arg1, void *arg2, ...)}
 \index{CmiScanf}
-\desc{This function performs an atomic \param{scanf} from \param{stdin}.
+\desc{This function performs an atomic \texttt{scanf} from \texttt{stdin}.
 The processor, on which the caller resides, blocks for input. On machines with
 host, this is implemented on top of the messaging layer using asynchronous
 send and blocking receive.}
 
 \function{void CmiError(char *format, arg1, arg2, ...)}
 \index{CmiError}
-\desc{This function does an atomic \param{printf()} on \param{stderr}. 
+\desc{This function does an atomic \texttt{printf()} on \texttt{stderr}. 
 On machines with host, this is implemented on top of the messaging 
 layer using asynchronous sends.}
 
@@ -871,33 +886,33 @@ provide functions to obtain the parent and children of each processor/node.  On
 those machines where the communication topology is relevant, we
 arrange the tree to optimize communication performance. The root of
 the spanning tree (processor based or node-based) is always 0, thus
-the {\tt CmiSpanTreeRoot} call has been eliminated.
+the \kw{CmiSpanTreeRoot} call has been eliminated.
 
 \function{int CmiSpanTreeParent(int procNum)}
 \index{CmiSpanTreeParent}
 \desc{This function returns the processor number of the parent of
-\param{procNum} in the spanning tree.}
+\uw{procNum} in the spanning tree.}
 
 \function{int CmiNumSpanTreeChildren(int procNum)}
 \index{CmiNumSpanTreeChildren}
-\desc{Returns the number of children of \param{procNum} in the spanning tree.}
+\desc{Returns the number of children of \uw{procNum} in the spanning tree.}
 
 \function{void CmiSpanTreeChildren(int procNum, int *children)}
 \index{CmiSpanTreeChildren}
-\desc{This function fills the array \param{children} with processor
-numbers of children of \param{procNum} in the spanning tree.}
+\desc{This function fills the array \uw{children} with processor
+numbers of children of \uw{procNum} in the spanning tree.}
 
 \function{int CmiNodeSpanTreeParent(int nodeNum)}
 \index{CmiNodeSpanTreeParent}
 \desc{This function returns the node number of the parent of
-\param{nodeNum} in the spanning tree.}
+\uw{nodeNum} in the spanning tree.}
 
 \function{int CmiNumNodeSpanTreeChildren(int nodeNum)}
 \index{CmiNumNodeSpanTreeChildren}
-\desc{Returns the number of children of \param{nodeNum} in the spanning tree.}
+\desc{Returns the number of children of \uw{nodeNum} in the spanning tree.}
 
 \function{void CmiNodeSpanTreeChildren(int nodeNum, int *children)}
 \index{CmiNodeSpanTreeChildren}
-\desc{This function fills the array \param{children} with node
-numbers of children of \param{nodeNum} in the spanning tree.}
+\desc{This function fills the array \uw{children} with node
+numbers of children of \uw{nodeNum} in the spanning tree.}
 

@@ -1,14 +1,15 @@
 \chapter{\converse{} Client-Server Interface}
 
-This note attempts at explaining the design of CCS module of \converse{}. This
+This note attempts at explaining the design of \converse{} client-server (CCS) 
+module. This
 module is responsible for enabling parallel servers to be written using
-\converse{}. Currently, this module will be implemented only on network of
-workstations. Other parallel architectures will follow.
+\converse{}. Currently, this module is implemented on most of the parallel
+machines supported by \converse{}.
 
 The CCS module is split into two parts. One part consists of functions that can
 be used in \converse{} programs which act as servers. The other part consists of
 functions that can be used with clients that try to connect to servers written
-using CCS. The following sections describe both these parts. {\tt conv-host} is
+using CCS. The following sections describe both these parts. \kw{charmrun} is
 sometimes also referred to as {\tt server-host} in order to distinguish it from
 the individual \converse{} processes which are sometimes referred to as {\tt
 server-processes}. Together, the {\tt server-host} and the {\tt
@@ -19,12 +20,14 @@ know the difference.
 \section{CCS: Server-Side}
 
 On the network of workstations, any \converse{} program is started using
-\begin{quotation} conv-host pgmname +pN conv-host-opts pgm-opts \end{quotation}
-In addition to the original options, now conv-host accepts one more option:
-{\tt ++server}.  Currently this option makes conv-host print out its own
+\begin{alltt}
+charmrun pgmname +pN charmrun-opts pgm-opts
+\end{alltt}
+In addition to the original options, now \kw{charmrun} accepts one more option:
+{\tt ++server}.  Currently this option makes \kw{charmrun} print out its own
 (randomly allocated) port number, which can then be used to connect to it from
 the client. Note that this is the same port number over which the processes
-belonging to the server contact conv-host (for {\tt CmiPrintf} etc.)
+belonging to the server contact \kw{charmrun} (for \kw{CmiPrintf} etc.)
 
 In addition to the usual commands (aset, aget etc.), conv-host now accepts one
 more command {\tt getinfo} over the abovementioned port. This command is issued
