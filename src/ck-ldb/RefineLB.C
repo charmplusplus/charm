@@ -50,7 +50,7 @@ LBMigrateMsg* RefineLB::Strategy(CentralLB::LDStats* stats, int count)
   //  CkPrintf("[%d] RefineLB strategy\n",CkMyPe());
 
   // remove non-migratable objects
-  RemoveNonMigratable(stats, count);
+  // RemoveNonMigratable(stats, count);
 
   // get original object mapping
   int** from_procs = Refiner::AllocProcs(count, stats);
