@@ -144,8 +144,6 @@ NamedType::print(XStr& str)
   str << name;
   if(tparams) {
     str << "<"<<tparams<<" >";
-  } else {
-    str << " ";
   }
 }
 
