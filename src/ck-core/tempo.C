@@ -45,7 +45,6 @@ void Tempo::ckTempoRecv(int tag1, int tag2, void *buffer, int buflen)
   int tags[2];
   TempoMessage *msg = 0;
   while(1) {
-    sleeping = 0;
     tags[0] = tag1; tags[1] = tag2;
     msg = (TempoMessage *) CmmGet(tempoMessages, 2, tags, 0);
     if (msg) break;
@@ -85,8 +84,10 @@ void Tempo::tempoGeneric(TempoMessage *themsg)
   int tags[2];
   tags[0] = themsg->tag1; tags[1] = themsg->tag2;
   CmmPut(tempoMessages, 2, tags, themsg); 
-  if (sleeping)
+  if (sleeping) {
+    sleeping = 0;
     CthAwaken(thread_id);
+  }
 }
 
 int Tempo::ckTempoProbe(int tag1, int tag2)
