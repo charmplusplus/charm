@@ -35,7 +35,7 @@ skt_abortFn skt_set_abort(skt_abortFn f)
 }
 
 
-#ifdef _WIN32 /*Windows systems:*/
+#if defined(_WIN32) && !defined(__CYGWIN__) /*Windows systems:*/
 static void doCleanup(void)
 { WSACleanup();}
 static int skt_inited=0;
@@ -69,7 +69,7 @@ by, e.g., an alarm and should be retried.
 static int skt_should_retry(void)
 {
 	int isinterrupt=0,istransient=0;
-#ifdef _WIN32 /*Windows systems-- check Windows Sockets Error*/
+#if defined(_WIN32) && !defined(__CYGWIN__) /*Windows systems-- check Windows Sockets Error*/
 	int err=WSAGetLastError();
 	if (err==WSAEINTR) isinterrupt=1;
 	if (err==WSATRY_AGAIN||err==WSAECONNREFUSED)

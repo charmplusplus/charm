@@ -86,7 +86,7 @@
 #else /*Use actual sockets*/
 
 /*Preliminaries*/
-#ifdef _WIN32
+#if defined(_WIN32) && ! defined(__CYGWIN__)
   /*For windows systems:*/
 #include <winsock.h>
 static void sleep(int secs) {Sleep(1000*secs);}
