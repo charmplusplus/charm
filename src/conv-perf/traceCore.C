@@ -267,6 +267,10 @@ TraceLogger::TraceLogger(char* program, int b):
  // pool = new TraceEntry[500];
   poolSize = CpvAccess(_traceCoreBufferSize);
   
+  for (int lID=0;lID<MAX_NUM_LANGUAGES;lID++) {
+    lName[lID]=NULL;
+    fName[lID]=NULL;
+  }
 
   pgm = new char[strlen(program)+1];
   sprintf(pgm, "%s", program);
@@ -289,8 +293,10 @@ TraceLogger::~TraceLogger()
   { lastWriteFlag = 1; writeBinary(); }
   else
   { lastWriteFlag = 1; write(); }
-  delete [] pool;
-  delete [] fName;
+  for (int lID=0;lID<MAX_NUM_LANGUAGES;lID++) {
+    delete[] lName[lID];
+    delete[] fName[lID];
+  }
 }
 
 void TraceLogger::RegisterLanguage(int lID, char* ln)
