@@ -267,6 +267,7 @@ QuickThreads/libqt.a:
 	cd QuickThreads ; make qt  OPTS='$(OPTS)'
 	cp QuickThreads/libqt.a ../lib/libckqt.a
 	-cp QuickThreads/libqt.so ../lib_so/libckqt.so
+	-ln -s ../lib_so/libckqt.so ../lib_so/libqt.so
 	-@ test -d ../lib/libckqt.a.dir && /bin/rm -rf ../lib/libckqt.a.dir
 	-@ cp -r QuickThreads/libqt.a.dir ../lib/libckqt.a.dir
 
