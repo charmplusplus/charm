@@ -36,7 +36,7 @@ class TableEntry {
 template <class dtype>
 class GroupIdxArray {
   // The initial size of the table for groups created on PE 0:
-  enum {INIT_BINS_PE0=16};
+  enum {INIT_BINS_PE0=32};
   
   dtype *tab;         // direct table for groups created on processor 0
   CkHashtable_c hashTab; // hashtable for groups created on processors >0
@@ -46,7 +46,7 @@ class GroupIdxArray {
   // common case to be inlined.
   dtype& nonInlineFind(CkGroupID n) {
 #ifndef CMK_OPTIMIZE
-      if (n.idx==0) {CkAbort("Group ID is zero-- invalid!\n"); return *(dtype *)0;}
+      if (n.idx==0) {CkAbort("Group ID is zero-- invalid!\n"); dtype *nul=NULL; return *nul;}
       else 
 #endif
       if (n.idx>=max) { /* Extend processor 0's group table */
@@ -56,7 +56,7 @@ class GroupIdxArray {
 	tab=new dtype[max];
 	for (i=0;i<oldmax;i++) tab[i]=oldtab[i];
 	for (i=oldmax;i<max;i++) tab[i]=dtype(0);
-	delete oldtab;
+	delete [] oldtab;
 	return tab[n.idx];
       }
       else /*n.idx < 0*/
