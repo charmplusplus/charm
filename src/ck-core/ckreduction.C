@@ -79,8 +79,6 @@ void CkGroupInitCallback::callMeBack(CkGroupInitCallbackMsg *m)
 
 
 ///////////////// Reduction Manager //////////////////
-#define thisproxy (CProxy_CkReductionMgr(thisgroup))
-
 class CkReductionNumberMsg:public CMessage_CkReductionNumberMsg {
 public:
   int num;
@@ -95,6 +93,7 @@ they're passed to the user's client function.
 */
 
 CkReductionMgr::CkReductionMgr()//Constructor
+  : thisproxy(thisgroup)
 {
   storedClient=NULL;
   storedClientParam=NULL;

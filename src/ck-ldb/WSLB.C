@@ -46,7 +46,7 @@ void WSLB::staticAtSync(void* data)
   me->AtSync();
 }
 
-WSLB::WSLB()
+WSLB::WSLB()  :thisproxy(thisgroup)
 {
   mystep = 0;
   theLbdb = CProxy_LBDatabase(lbdb).ckLocalBranch();
@@ -125,7 +125,7 @@ void WSLB::AtSync()
 
   WSLBStatsMsg* msg = AssembleStats();
 
-  CProxy_WSLB(thisgroup).ReceiveStats(msg,num_neighbors(),neighbor_pes);
+  thisproxy.ReceiveStats(msg,num_neighbors(),neighbor_pes);
 
   // Tell our own node that we are ready
   ReceiveStats((WSLBStatsMsg*)0);
@@ -275,7 +275,7 @@ void WSLB::ReceiveStats(WSLBStatsMsg *m)
     }
     
     // Now, send migrate messages to neighbors
-    CProxy_WSLB(thisgroup).ReceiveMigration(migrateMsg,
+    thisproxy.ReceiveMigration(migrateMsg,
     	num_neighbors(),neighbor_pes);
     
     // Zero out data structures for next cycle
@@ -346,7 +346,7 @@ void WSLB::MigrationDone()
   migrates_expected = -1;
   // Increment to next step
   mystep++;
-  (CProxy_WSLB(thisgroup))[CkMyPe()].ResumeClients();
+  thisproxy [CkMyPe()].ResumeClients();
 }
 
 void WSLB::ResumeClients()

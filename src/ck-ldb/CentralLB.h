@@ -21,10 +21,11 @@ class CLBMigrateMsg;
 
 class CentralLB : public Group
 {
+  CProxy_CentralLB thisproxy;
 public:
   CentralLB();
   ~CentralLB();
-  CentralLB(CkMigrateMessage *m) {}
+  CentralLB(CkMigrateMessage *m) :thisproxy(thisgroup) {}
   static void staticAtSync(void*);
   void AtSync(void); // Everything is at the PE barrier
   void ProcessAtSync(void); // Receive a message from AtSync to avoid

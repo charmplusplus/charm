@@ -137,6 +137,19 @@ public:
     }
   };
 
+  //This class controls the builtin-atsync frequency
+  class batsyncer {
+  private:
+    LBDB *db; //Enclosing LBDB object
+    double period;//Time (seconds) between builtin-atsyncs  
+    LDBarrierClient BH;//Handle for the builtin-atsync barrier 
+    static void gotoSync(void *bs);
+    static void resumeFromSync(void *bs);
+  public:
+    void init(LBDB *_db,double initPeriod);
+    void setPeriod(double p) {period=p;}
+  };
+
 private:
   struct MigrateCB {
     LDMigratedFn fn;
@@ -158,18 +171,6 @@ private:
   CmiBool obj_running;
   LDObjHandle runningObj;
 
-  //This class controls the builtin-atsync frequency
-  class batsyncer {
-  private:
-    LBDB *db; //Enclosing LBDB object
-    double period;//Time (seconds) between builtin-atsyncs  
-    LDBarrierClient BH;//Handle for the builtin-atsync barrier 
-    static void gotoSync(void *bs);
-    static void resumeFromSync(void *bs);
-  public:
-    void init(LBDB *_db,double initPeriod);
-    void setPeriod(double p) {period=p;}
-  };
   batsyncer batsync;
 
   LocalBarrier localBarrier;

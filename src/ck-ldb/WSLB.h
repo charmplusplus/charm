@@ -18,9 +18,10 @@ class WSLBMigrateMsg;
 
 class WSLB : public Group
 {
+  CProxy_WSLB thisproxy;
 public:
   WSLB();
-  WSLB(CkMigrateMessage *m) {}
+  WSLB(CkMigrateMessage *m) :thisproxy(thisgroup) {}
   ~WSLB();
   static void staticAtSync(void*);
   void AtSync(void); // Everything is at the PE barrier

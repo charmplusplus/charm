@@ -20,9 +20,10 @@ class NLBMigrateMsg;
 
 class NborBaseLB : public Group
 {
+  CProxy_NborBaseLB thisproxy;
 public:
   NborBaseLB();
-  NborBaseLB(CkMigrateMessage *m) {}
+  NborBaseLB(CkMigrateMessage *m) :thisproxy(thisgroup) {}
   ~NborBaseLB();
   static void staticAtSync(void*);
   void AtSync(void); // Everything is at the PE barrier
