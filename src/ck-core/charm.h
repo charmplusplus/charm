@@ -64,8 +64,8 @@
 #define MONOTONIC	1
 #define TABLE 		2
 
-#define NULL_VID       NULL
-#define NULL_PE        NULL
+#define NULL_VID        NULL
+#define NULL_PE         CK_PE_ANY
 #define NULL_PACK_ID    0  
 
 #define CK_PE_SPECIAL(x) ((x)>=0xFFF0)

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.90  1998-06-15 23:49:23  milind
+ * Revision 2.91  1998-07-02 02:52:18  jyelon
+ * Changed CldEnqueue to three parameters ( no pack function )
+ *
+ * Revision 2.90  1998/06/15 23:49:23  milind
  * Fixed charm++ message macros to adhere to the new LDB structure.
  *
  * Revision 2.89  1998/06/15 23:11:15  wilmarth
@@ -488,6 +491,7 @@ double   CmiCpuTimer   CMK_PROTO(());
 #define CsdEnqueueLifo(x)     (CqsEnqueueLifo(CpvAccess(CsdSchedQueue),(x)))
 #define CsdEnqueue(x)         (CqsEnqueueFifo(CpvAccess(CsdSchedQueue),(x)))
 #define CsdEmpty()            (CqsEmpty(CpvAccess(CsdSchedQueue)))
+#define CsdLength()           (CqsLength(CpvAccess(CsdSchedQueue)))
 
 #if CMK_CMIPRINTF_IS_A_BUILTIN
 void  CmiPrintf CMK_PROTO((char *, ...));
@@ -795,18 +799,19 @@ void CfutureInit();
 #define CLD_BROADCAST (-2)
 #define CLD_BROADCAST_ALL (-3)
 
+typedef void (*CldPackFn)(void *msg);
+
 typedef void (*CldInfoFn)(void *msg, 
+			  CldPackFn *packer,
 			  int *len,
 			  int *queueing,
 			  int *priobits, 
 			  unsigned int **prioptr);
 
-typedef void (*CldPackFn)(void **msg);
-
 int CldRegisterInfoFn(CldInfoFn fn);
 int CldRegisterPackFn(CldPackFn fn);
 
-void CldEnqueue(int pe, void *msg, int infofn, int packfn);
+void CldEnqueue(int pe, void *msg, int infofn);
 
 /****** CMM: THE MESSAGE MANAGER ******/
 

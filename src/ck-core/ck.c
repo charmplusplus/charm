@@ -7,7 +7,7 @@
 
 void CkUnpack(ENVELOPE **msg);
 void CkPack(ENVELOPE **msg);
-void CkInfo(void *msg, int *len, int *qs, int *pb, unsigned int **pp);
+void CkInfo(void *msg, CldPackFn *pfn, int *len, int *qs, int *pb, unsigned int **pp);
 
 extern void *FIFO_Create();
 extern CHARE_BLOCK *CreateChareBlock();
@@ -15,19 +15,16 @@ extern CHARE_BLOCK *CreateChareBlock();
 CpvStaticDeclare(int, num_exits);
 CpvStaticDeclare(int, num_endcharms);
 CpvDeclare(int, CkInfo_Index);
-CpvDeclare(int, CkPack_Index);
 
 void ckModuleInit()
 {
    CpvInitialize(int, num_exits);
    CpvInitialize(int, num_endcharms);
    CpvInitialize(int, CkInfo_Index);
-   CpvInitialize(int, CkPack_Index);
 
    CpvAccess(num_exits)=0;
    CpvAccess(num_endcharms)=0;
    CpvAccess(CkInfo_Index) = CldRegisterInfoFn(CkInfo);
-   CpvAccess(CkPack_Index) = CldRegisterPackFn((CldPackFn)CkPack);
 }
 
 
@@ -269,7 +266,7 @@ int destPE;
   SetEnv_msgType(env, NewChareMsg);
   if (destPE == CK_PE_ANY) destPE = CLD_ANYWHERE;
   CmiSetHandler(env, CpvAccess(HANDLE_INCOMING_MSG_Index));
-  CldEnqueue(destPE, env, CpvAccess(CkInfo_Index), CpvAccess(CkPack_Index));
+  CldEnqueue(destPE, env, CpvAccess(CkInfo_Index));
 }
 
 
@@ -291,7 +288,7 @@ ChareIDType * pChareID;
   if(CpvAccess(traceOn))
     trace_creation(GetEnv_msgType(env), Entry, env);
   CmiSetHandler(env, CpvAccess(HANDLE_INCOMING_MSG_Index));
-  CldEnqueue(destPE, env, CpvAccess(CkInfo_Index), CpvAccess(CkPack_Index));
+  CldEnqueue(destPE, env, CpvAccess(CkInfo_Index));
 }
 
 /*****************************************************************/
@@ -386,10 +383,11 @@ void CkPack(ENVELOPE **henv)
 }
 
 
-void CkInfo(void *msg, int *len,
+void CkInfo(void *msg, CldPackFn *pfn, int *len,
 	    int *queueing, int *priobits, unsigned int **prioptr)
 {
   ENVELOPE *env = (ENVELOPE *)msg;
+  *pfn = (CldPackFn)CkPack;
   *len = GetEnv_TotalSize(env);
   *queueing = GetEnv_queueing(env);
   *priobits = GetEnv_priosize(env);

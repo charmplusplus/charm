@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.15  1998-06-15 22:16:44  milind
+ * Revision 2.16  1998-07-02 02:52:03  jyelon
+ * Changed CldEnqueue to three parameters ( no pack function )
+ *
+ * Revision 2.15  1998/06/15 22:16:44  milind
  * Reduced Charm++ overhead by reducing variable accesses.
  *
  * Revision 2.14  1998/03/18 15:38:14  milind
@@ -126,8 +129,7 @@ ENVELOPE *env;
   SetEnv_chare_magic_number(env, GetID_chare_magic_number(vid->x.realID));
   if(CpvAccess(traceOn))
     trace_creation(GetEnv_msgType(env), GetEnv_EP(env), env);
-  CldEnqueue(GetID_onPE(vid->x.realID), env,
-	     CpvAccess(CkInfo_Index), CpvAccess(CkPack_Index));
+  CldEnqueue(GetID_onPE(vid->x.realID), env, CpvAccess(CkInfo_Index));
   QDCountThisCreation(1);
 }
 
@@ -171,8 +173,7 @@ void *data_area;
 	SetEnv_chare_magic_number(env, chare_magic);
         if(CpvAccess(traceOn))
 	  trace_creation(GetEnv_msgType(env), GetEnv_EP(env), env);
-	CldEnqueue(chare_pe, env,
-		   CpvAccess(CkInfo_Index), CpvAccess(CkPack_Index));
+	CldEnqueue(chare_pe, env, CpvAccess(CkInfo_Index));
 	QDCountThisCreation(1);
    }
    FIFO_Destroy(vidqueue);
@@ -207,6 +208,5 @@ CHARE_BLOCK *vidBlockPtr;
     if(CpvAccess(traceOn))
       trace_creation(GetEnv_msgType(env), GetEnv_EP(env), env);
     CmiSetHandler(env, CpvAccess(HANDLE_INCOMING_MSG_Index));
-    CldEnqueue(vidPE, env,
-	       CpvAccess(CkInfo_Index), CpvAccess(CkPack_Index));
+    CldEnqueue(vidPE, env, CpvAccess(CkInfo_Index));
 }

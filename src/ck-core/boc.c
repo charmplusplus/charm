@@ -356,7 +356,7 @@ ChareNumType bocnum;
     trace_creation(GetEnv_msgType(env), ep, env);
   
   CmiSetHandler(env, CpvAccess(HANDLE_INCOMING_MSG_Index));
-  CldEnqueue(destPE, env, CpvAccess(CkInfo_Index), CpvAccess(CkPack_Index));
+  CldEnqueue(destPE, env, CpvAccess(CkInfo_Index));
   if((type!=QdBocMsg)&&(type!=QdBroadcastBocMsg)&&(type!=LdbMsg))
     QDCountThisCreation(1);
 }
@@ -390,7 +390,7 @@ ChareNumType bocnum;
   if(CpvAccess(traceOn))
     trace_creation(GetEnv_msgType(env), ep, env);
   CmiSetHandler(env,CpvAccess(HANDLE_INCOMING_MSG_Index));
-  CldEnqueue(CLD_BROADCAST_ALL, env, CpvAccess(CkInfo_Index), CpvAccess(CkPack_Index));
+  CldEnqueue(CLD_BROADCAST_ALL, env, CpvAccess(CkInfo_Index));
   if((type!=QdBocMsg)&&(type!=QdBroadcastBocMsg)&&(type!=LdbMsg))
     QDCountThisCreation(CmiNumPes());
 }
@@ -451,7 +451,7 @@ char *mydata;
   if(CpvAccess(traceOn))
     trace_creation(GetEnv_msgType(env), ep, env);
   CmiSetHandler(env,CpvAccess(HANDLE_INCOMING_MSG_Index));
-  CldEnqueue(CLD_BROADCAST_ALL, env, CpvAccess(CkInfo_Index), CpvAccess(CkPack_Index));
+  CldEnqueue(CLD_BROADCAST_ALL, env, CpvAccess(CkInfo_Index));
   
   QDCountThisCreation(CmiNumPes());
 }

@@ -1,6 +1,6 @@
 #!/bin/sh
 
-if [ ! -f mkfiles/$1 ] ; then
+if [ ! -r mkfiles/$1 ] ; then
     echo "Usage: configure <version>"
     echo ""
     echo "Available versions are:"

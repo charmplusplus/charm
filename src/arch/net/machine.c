@@ -1508,11 +1508,11 @@ static int InternalScanf(fmt, l)
   CmiLock(Cmi_scanf_mutex);
   ctrl_sendone(120, "scanf %s %d %s", Cmi_self_IP_str, ctrlport, fmt);
   while (Cmi_scanf_data == 0) jsleep(0, 250000);
-  i = sscanf(Cmi_scanf_data, fmt,
+  i = sscanf((char*)Cmi_scanf_data, fmt,
 	     ptr[ 0], ptr[ 1], ptr[ 2], ptr[ 3], ptr[ 4], ptr[ 5],
 	     ptr[ 6], ptr[ 7], ptr[ 8], ptr[ 9], ptr[10], ptr[11],
 	     ptr[12], ptr[13], ptr[14], ptr[15], ptr[16], ptr[17]);
-  free(Cmi_scanf_data);
+  free((char*)Cmi_scanf_data);
   Cmi_scanf_data=0;
   CmiUnlock(Cmi_scanf_mutex);
   return i;

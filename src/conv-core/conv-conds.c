@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.10  1998-03-04 17:17:13  milind
+ * Revision 2.11  1998-07-02 02:52:16  jyelon
+ * Changed CldEnqueue to three parameters ( no pack function )
+ *
+ * Revision 2.10  1998/03/04 17:17:13  milind
  * Fixed the size_t errors.
  *
  * Revision 2.9  1997/07/22 14:22:33  kale
@@ -89,7 +92,7 @@ CpvStaticDeclare(int, numHeapEntries);
 
 CpvDeclare(int, CcdNumChecks);
 
-extern double CmiTimer();
+extern double CmiWallTimer();
 
 void CcdModuleInit()
 {
@@ -189,7 +192,7 @@ void CcdCallFnAfter(fnp, arg, deltaT)
     unsigned int deltaT;
 {
   double tPrime, currT;
-  currT  = CmiTimer();                    /* get current time */
+  currT  = CmiWallTimer();                /* get current time */
   tPrime = currT + (double)deltaT/1000.0; /* add delta to determine what time
 					    to actually execute fn */
   InsertInHeap(tPrime, fnp, arg); /* insert into tmr hp */
@@ -207,7 +210,7 @@ void CcdCallBacks()
   
 /* This was formerly TimerChecks() */
   if ( CpvAccess(numHeapEntries) > 0 ) {
-    currTime = CmiTimer();
+    currTime = CmiWallTimer();
   
     while ((CpvAccess(numHeapEntries) > 0) && CpvAccess(timerHeap)[1].timeVal < currTime)
     {
