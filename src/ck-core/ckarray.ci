@@ -1,0 +1,27 @@
+module CkArray {
+  message ArrayCreateMessage;
+  message ArrayMessage;
+  message ArrayElementAckMessage;
+  message [varsize] ArrayMigrateMessage;
+
+  group Array1D {
+    entry Array1D(ArrayCreateMessage *);
+    entry void RecvForElement(ArrayMessage *);
+    entry void RecvMigratedElement(ArrayMigrateMessage *);
+    entry void AckMigratedElement(ArrayElementAckMessage *);
+  };
+
+  message ArrayElementCreateMessage;
+  message ArrayElementMigrateMessage;
+  message ArrayElementExitMessage;
+
+  chare ArrayElement {
+    entry void exit(ArrayElementExitMessage *);
+  };
+
+  message ArrayMapCreateMessage;
+
+  group RRMap {
+    entry RRMap(ArrayMapCreateMessage *);
+  };
+};
