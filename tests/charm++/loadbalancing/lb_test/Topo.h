@@ -32,7 +32,6 @@ static const struct {
   { NULL, NULL, TopoError }
 };
 
-
 class Topo : public Group {
 public:
   struct MsgInfo {
@@ -72,10 +71,10 @@ private:
 
   TopoType topo;
   int elements;
-  Elem* elemlist;
   int seed;
   int min_us;
   int max_us;
+  static Elem* elemlist;
 };
 
 #endif

@@ -22,6 +22,8 @@ CkGroupID Topo::Create(const int _elem, const char* _topology,
   return topo_id;
 }
 
+Topo::Elem* Topo::elemlist = NULL;
+
 int Topo::Select(const char* _topo)
 {
   int i=0;
@@ -49,6 +51,9 @@ Topo::Topo(TopoInitMsg* _m)
 
   if (CkMyPe()==0)
     CkPrintf("Generating topology %d for %d elements\n",topo,elements);
+
+  if (elemlist) return;
+
   elemlist = new Elem[elements];
 
   FindComputeTimes();
