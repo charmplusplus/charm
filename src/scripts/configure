@@ -1013,10 +1013,10 @@ EOF
 cat > $t <<EOT
 #include <alloca.h>
 int main() { 
-  char *osp=(char *)alloca(0);
+//  char *osp=(char *)alloca(0);
 }
 EOT
-test_link "whether alloca works" "yes" "no" ""
+test_cxx "whether has alloca.h " "yes" "no" ""
 cat >> confdefs.h <<EOF
 #define CMK_HAS_ALLOCA $pass
 EOF
