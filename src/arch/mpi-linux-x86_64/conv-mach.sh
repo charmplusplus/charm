@@ -1,5 +1,5 @@
 
-CMK_REAL_COMPILER=`mpiCC -show | cut -d' ' -f1 >/dev/null 2>/dev/null`
+CMK_REAL_COMPILER=`mpiCC -show >/dev/null 2>/dev/null | cut -d' ' -f1 `
 case "$CMK_REAL_COMPILER" in
 g++) CMK_AMD64="-m64 -fPIC" ;;
 esac
