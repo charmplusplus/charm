@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-29 21:19:36  narain
+ * Revision 2.1  1995-07-10 07:04:16  narain
+ * Temp version.. compiles and links, but gets stuck in a loop during program.
+ *
+ * Revision 2.0  1995/06/29  21:19:36  narain
  * *** empty log message ***
  *
  ***************************************************************************/
@@ -42,6 +45,14 @@
 #define BOSS_STATUS_UPDATE_INTERVAL  	25
 #define BOSS_REDIST_UPDATE_INTERVAL	100
 
+#ifndef TRUE 
+#define TRUE 1
+#endif
+
+#ifndef FALSE
+#define FALSE 0
+#endif
+
 
 
 module ldb {
@@ -53,7 +64,7 @@ typedef struct ldb_element {
 } LDB_ELEMENT;
 
 message {
-    int dummy;
+    int srcPe;
 } DUMMYMSG;
 
 message {
@@ -67,10 +78,15 @@ typedef struct ldb_status {
   int statusMsgID;
 } LDB_STATUS;
 
+extern int CldAddToken();
+extern int CldPickSeedAndSend();
+extern int Cldbtokensinit();
 
-export_to_C setLdbSize()
+extern void *CqsCreate();
+
+export_to_C getLdbSize()
 {
-       CpvAccess(LDB_ELEM_SIZE) = sizeof(LDB_ELEMENT);
+       return sizeof(LDB_ELEMENT);
 }
 
 
@@ -82,52 +98,55 @@ export_to_C LdbCreateBoc()
 }
 
 
-export_to_C LdbFillLDB(ldb)
-  LDB_ELEMENT *ldb;
+export_to_C LdbFillLDB(destPe, ldb)
+  int destPe;
+  void *ldb;
 {
-  BranchCall(CpvAccess(LdbBocNum), LDB@FillLDB(ldb));
+  BranchCall(ReadValue(LdbBocNum), LDB@FillLDB(destPe, (LDB_ELEMENT *)ldb));
 }
 
 export_to_C LdbStripLDB(ldb)
-     LDB_ELEMENT *ldb;
+     void *ldb;
 {
-  BranchCall(CpvAccess(LdbBocNum), LDB@StripLDB(ldb));
+  BranchCall(ReadValue(LdbBocNum), LDB@StripLDB((LDB_ELEMENT *)ldb));
 }
 
 
 
-export_to_C Ldb_NewMsg_FromNet(msg) 
-     void *msg;
+export_to_C Ldb_NewSeed_FromNet(msgst, ldb, sendfn) 
+     void *msgst, *ldb;
+     void (*sendfn)();
 {
-  BranchCall(CpvAccess(LdbBocNum), LDB@NewMsg_FromNet(msg) );
+  BranchCall(ReadValue(LdbBocNum), LDB@NewMsg_FromNet(msgst, ldb, sendfn) );
 }
 
-export_to_C Ldb_NewMsg_FromLocal( msg)
-     void *msg;
+export_to_C Ldb_NewSeed_FromLocal( msgst, ldb, sendfn)
+     void *msgst, *ldb;
+     void (*sendfn)();
 {
-  BranchCall(CpvAccess(LdbBocNum), LDB@NewMsg_FromLocal(msg) );
+  BranchCall(ReadValue(LdbBocNum), LDB@NewMsg_FromLocal(msgst, ldb, sendfn) );
 }
 
 export_to_C LdbProcessMsg(msgPtr, localdataPtr)
      void *msgPtr, *localdataPtr;
 {
-  BranchCall(CpvAccess(LdbBocNum), LDB@ProcessMsg(msgPtr, localdataPtr));
+  BranchCall(ReadValue(LdbBocNum), LDB@ProcessMsg(msgPtr, localdataPtr));
 }
 
 export_to_C LdbProcessorIdle()
 {
-  BranchCall(CpvAccess(LdbBocNum), LDB@ProcessorIdle());
+  BranchCall(ReadValue(LdbBocNum), LDB@ProcessorIdle());
 }
 
 
 export_to_C LdbPeriodicCheckInit()
 {
-  BranchCall(CpvAccess(LdbBocNum), LDB@PeriodicCheckInit());
+  BranchCall(ReadValue(LdbBocNum), LDB@PeriodicCheckInit());
 }
 
 export_to_C void LdbPeriodicBossesRedist()
 {
-  BranchCall(CpvAccess(LdbBocNum), LDB@PeriodicBossesRedist());
+  BranchCall(ReadValue(LdbBocNum), LDB@PeriodicBossesRedist());
 }
 
 export_to_C void LdbPeriodicStatus()
@@ -139,7 +158,7 @@ export_to_C void LdbPeriodicKidStatus()
 
 export_to_C void LdbPeriodicBossStatus()
 {
-  BranchCall(CpvAccess(LdbBocNum), LDB@PeriodicBossStatus());
+  BranchCall(ReadValue(LdbBocNum), LDB@PeriodicBossStatus());
 }
 
 export_to_C void LdbPeriodicRedist()
@@ -147,16 +166,37 @@ export_to_C void LdbPeriodicRedist()
   /*
     LdbPeriodicBossesRedist(bocNum);
     */
-  BranchCall(CpvAccess(LdbBocNum), LDB@PeriodicKidsRedist());
-  CallBocAfter(LdbPeriodicRedist, CpvAccess(LdbBocNum), 
+  BranchCall(ReadValue(LdbBocNum), LDB@PeriodicKidsRedist());
+  CallBocAfter(LdbPeriodicRedist, ReadValue(LdbBocNum), 
 	       BOSS_REDIST_UPDATE_INTERVAL);
+}
+
+/* Use this structure to hold internal queues at the controllers */
+typedef struct msginfo {
+   void *msg;
+   void *ldb;
+   void (*sendfn)();
+} MSGINFO;
+
+MSGINFO *new_MSGINFO(msg, ldb, sendfn)
+void *msg, *ldb, (*sendfn)();
+{
+   MSGINFO *ret;
+   ret = (struct msginfo *)CmiAlloc(sizeof(MSGINFO));
+
+   ret->msg = msg;
+   ret->ldb = ldb;
+   ret->sendfn = sendfn;
+  
+   return ret;
 }
 
 BranchOffice LDB {
   
   
   int exchanges;
-  BOOLEAN controller;
+  int numPe;
+  int controller;
   int mycontroller;
   DUMMYMSG *statusMsg;
   int load_cluster[CLUSTER_SIZE];
@@ -268,32 +308,20 @@ BranchOffice LDB {
   
   private int MyLoad()
     {
-      return Qs_Length(LdbFreeChareQueue);
+      return CqsLength(LdbFreeChareQueue);
     }
 
-  private PickFreeChareMsg(msgPtr)
-    void ** msgPtr;
-  {
-    if ( !Qs_Empty(LdbFreeChareQueue))
-      {
-	Qs_DeQMsg(LdbFreeChareQueue,msgPtr);
-      }   /* Funny define  */
-    else 
-      *msgPtr = (void *) NULL;
-  }
-
-  private SendFreeChare(pe, fixed)
+  private SendFreeChare(pe)
     int pe;
-  BOOLEAN fixed;
   {	
-    void *msg; 
-    
-    PrivateCall(PickFreeChareMsg(&msg));
-    if (msg)
-      {
-	SEND_FIXED_TO(msg, fixed, pe);
-	return 1;
-      }	
+    MSGINFO *tempstr;
+
+    if(!CqsEmpty(LdbFreeChareQueue))
+	{
+           CqsDequeue(LdbFreeChareQueue, (void **)(&tempstr));
+	   (*(tempstr->sendfn))(tempstr->msg, pe);
+	   return 1;
+        }		
     return 0;
   }
   
@@ -319,7 +347,7 @@ BranchOffice LDB {
     if (number > MAX_EXCHANGES)
       number = MAX_EXCHANGES;
     for (i=0; i<number; i++)
-      PrivateCall(SendFreeChare(other, FALSE));
+      PrivateCall(SendFreeChare(other));
     TRACE(CkPrintf("[%d] do_redist: Finish\n", myPE));	
   }
   
@@ -389,18 +417,16 @@ BranchOffice LDB {
   
   private EmptyQueue()
     {
-      if (Qs_Empty(LdbFreeChareQueue))
-	return TRUE;
-      return FALSE;
+      return CqsEmpty(LdbFreeChareQueue);
     }
 
   
   
   
-  private EnqMsg(msg)
-    void *msg;
+  private EnqMsg(msg, ldb, sendfn)
+    void *msg, *ldb, (*sendfn)();
   {
-    Qs_EnQMsg(LdbFreeChareQueue, msg);
+    CqsEnqueue(LdbFreeChareQueue, new_MSGINFO(msg, ldb, sendfn));
   }
   
   public PeriodicCheckInit()
@@ -432,14 +458,12 @@ BranchOffice LDB {
   
   entry RecvStatus : (message DUMMYMSG *dmsg)
     {
-      LDB_ELEMENT *ldb;
       int index;
-      ldb = LDB_UPTR(dmsg);
       
-      if (CONTROLLER(ldb->srcPE))
+      if (CONTROLLER(dmsg->srcPe))
 	{
-	  index = PrivateCall(get_index(ldb->srcPE));
-	  PrivateCall(do_redistribution(ldb->srcPE, load_boss[index]));
+	  index = PrivateCall(get_index(dmsg->srcPe));
+	  PrivateCall(do_redistribution(dmsg->srcPe, load_boss[index]));
 	}
       CkFreeMsg(dmsg);
     }
@@ -452,9 +476,9 @@ BranchOffice LDB {
   
       TRACE(CkPrintf("Enter Node LdbInit()\n"));
       
-      CpvAccess(LDB_ELEM_SIZE) = sizeof(LDB_ELEMENT);
       LdbBoc = MyBocNum();
-      CpvAccess(LdbBocNum) = LdbBoc;
+      LdbBocNum = LdbBoc;
+      ReadInit(LdbBocNum);
       
       numPe = CmiNumPe();
       myPE = CmiMyPe();
@@ -463,7 +487,7 @@ BranchOffice LDB {
       exchanges = numBoss = 0;
       if (controller)
 	{
-	  LdbFreeChareQueue = Qs_Create();
+	  LdbFreeChareQueue = CqsCreate();
 	  for (i=0; i<CLUSTER_SIZE; i++)
 	    load_cluster[i] = 0;
 	  if (numPe%CLUSTER_SIZE == 0)
@@ -503,18 +527,18 @@ BranchOffice LDB {
   {
     /*possible Neighbour update status from piggyback info from Node only*/
     if ((numPe > 1) && (ldb->srcPE != myPE) 
-	&&  (ldb->srcPE != McHostPeNum()) && controller)
+	&&  (ldb->srcPE != CmiNumPe()) && controller)
       PrivateCall(RecvUpdateStatus(ldb));
   }
   
-  private Strategy(msg)
-    void *msg;
+  private Strategy(msg, ldbptr, sendfn)
+    void *msg, *ldbptr, (*sendfn)();
   {
     int load;
     LDB_ELEMENT *ldb;
     int least_loaded_pe, fixed;
     
-    ldb = LDB_UPTR(msg);
+    ldb = (LDB_ELEMENT *)ldbptr;
     if (CONTROLLER(ldb->srcPE))
       least_loaded_pe = PrivateCall(LeastLoadKids(&load));
     else
@@ -532,63 +556,65 @@ BranchOffice LDB {
 	    
 	    TRACE(CkPrintf("[%d] LdbStrategy: x = 0x%x, size = %d,dest = %d\n",
 			   myPE, x, CmiSize(x), x->destPE));
-	    SEND_FIXED_TO(msg, fixed, least_loaded_pe);
+	    (*sendfn)(msg, least_loaded_pe);
 	    PrivateCall(increment_load(least_loaded_pe));
 	  }
 	else
 #endif
 	  {
-	    PrivateCall(EnqMsg(msg));
-	    if (PrivateCall(SendFreeChare(least_loaded_pe, 
-					  !CONTROLLER(least_loaded_pe))))
+	    PrivateCall(EnqMsg(msg, ldbptr, sendfn));
+	    if (PrivateCall(SendFreeChare(least_loaded_pe)))
 	      PrivateCall(increment_load(least_loaded_pe));
 	  }
       }
     else
-      PrivateCall(EnqMsg(msg));
+      PrivateCall(EnqMsg(msg, ldbptr, sendfn));
   }
 
-  public NewMsg_FromNet(x)
-    void *x;
+  public NewMsg_FromNet(msgst, ldb, sendfn)
+    void *msgst, *ldb;
+    void (*sendfn)();
   {
     if (controller)
-      PrivateCall(Strategy(x));
+      PrivateCall(Strategy(msgst, ldb, sendfn));
     else
       { 
 	TRACE(CkPrintf("[%d] Ldb_NewChare_Net:: Message from outside. \n",
 		       myPE));
-	QsEnqUsrMsg(x);
+	CsdEnqueue(msgst);
       }
   }
   
 
-  public NewMsg_FromLocal(x)
-    void *x;
+  public NewMsg_FromLocal(msgst, ldb, sendfn)
+    void *msgst, *ldb;
+    void (*sendfn)();
   {
     if (controller)
       {
 	TRACE(CkPrintf("[%d] Ldb_NewChare_Local:: Queuing up.\n",
 		       myPE));
-      PrivateCall(EnqMsg(x));
+      PrivateCall(EnqMsg(msgst, ldb, sendfn));
       }
     else
       {
 	TRACE(CkPrintf("[%d] Ldb_NewChare_Local:: Send to control.\n",
 		       myPE));
-	SEND_TO(x, mycontroller);
+	(*sendfn)(msgst, mycontroller);
       }
   }
 
   
   
-  public FillLDB(ldb)
+  public FillLDB(destPe, ldb)
+    int destPe;
     LDB_ELEMENT *ldb;
   {
     ldb->srcPE = myPE;
     if (CONTROLLER(ldb->srcPE))
       ldb->piggybackLoad = PrivateCall(MyLoad());
     else	
-      ldb->piggybackLoad = QsMyLoad();
+      ldb->piggybackLoad = CldMyLoad();
   }
   
   
@@ -596,7 +622,8 @@ BranchOffice LDB {
   public void PeriodicKidStatus()
     {
       statusMsg = (DUMMYMSG *) CkAllocMsg(DUMMYMSG);
-      CkMemError(statusMsg);
+/*      CkMemError(statusMsg); */
+      statusMsg->srcPe = CmiMyPe();
       ImmSendMsgBranch(RecvStatus, statusMsg, mycontroller);
       CallBocAfter(LdbPeriodicKidStatus, LdbBoc,
 		   KID_STATUS_UPDATE_INTERVAL);
@@ -609,7 +636,8 @@ BranchOffice LDB {
       static int index = 0;
 
       boss_statusMsg = (DUMMYMSG *) CkAllocMsg(DUMMYMSG);
-      CkMemError(boss_statusMsg);
+/*      CkMemError(boss_statusMsg); */
+      boss_statusMsg->srcPe = CmiMyPe();
       ImmSendMsgBranch(RecvStatus, boss_statusMsg, nbr_boss[index]);
       index = (index+1) % exchanges;
       CallBocAfter(LdbPeriodicBossStatus, LdbBoc, 
@@ -623,7 +651,7 @@ BranchOffice LDB {
     {
       int i, j;
       int picked, index;
-      BOOLEAN done;
+      int done;
       int start_pe, end_pe;
       
       end_pe = myPE;
@@ -638,7 +666,7 @@ BranchOffice LDB {
 	      index = PrivateCall(get_index(i));
 	      if (load_cluster[index] < KID_SATURATION)
 		{
-		  if (PrivateCall(SendFreeChare(i, TRUE)))
+		  if (PrivateCall(SendFreeChare(i)))
 		    {
 		      picked++;
 		      load_cluster[index]++;
@@ -661,7 +689,7 @@ BranchOffice LDB {
       
       for (i=0; i<exchanges; i++)
 	if (load_boss[i] < BOSS_SATURATION)
-	  if (PrivateCall(SendFreeChare(nbr_boss[i], FALSE)))
+	  if (PrivateCall(SendFreeChare(nbr_boss[i])))
 	    load_boss[i]++;
 	  else
 	    break;
