@@ -175,7 +175,8 @@ private:
 public:
   struct LastLBInfo {
     double *expectedLoad;
-    LastLBInfo() { expectedLoad=new double[CkNumPes()]; }
+    LastLBInfo() { expectedLoad=new double[CkNumPes()]; 
+		   for (int i=0; i<CkNumPes(); i++) expectedLoad[i]=0.0;}
   };
   LastLBInfo lastLBInfo;
   inline double myExpectedLoad() { return lastLBInfo.expectedLoad[CkMyPe()]; }
