@@ -1283,6 +1283,13 @@ void
 ampi::probe(int t, int s, int comm, int *sts)
 {
   int tags[3];
+
+#if CMK_BLUEGENE_CHARM
+  void *curLog;		// store current log in timeline
+  _TRACE_BG_TLINE_END(&curLog);
+  TRACE_BG_AMPI_SUSPEND();
+#endif
+
   AmpiMsg *msg = 0;
   resumeOnRecv=true;
   while(1) {
@@ -1294,6 +1301,10 @@ ampi::probe(int t, int s, int comm, int *sts)
   resumeOnRecv=false;
   if(sts)
     ((MPI_Status*)sts)->MPI_LENGTH = msg->length;
+
+#if CMK_BLUEGENE_CHARM
+  TRACE_BG_AMPI_RESUME(thread->getThread(), msg, "PROBE_RESUME", curLog);
+#endif
 }
 
 int
@@ -2204,9 +2215,6 @@ int AMPI_Waitall(int count, MPI_Request request[], MPI_Status sts[])
 {
   int i;
   AMPIAPI("AMPI_Waitall");
-#if CMK_BLUEGENE_CHARM
-  TRACE_BG_AMPI_SUSPEND();       // end the current BG event
-#endif
   for(i=0;i<count;i++) {
     _AMPI_Wait(&request[i], sts+i, 0);    // delay the free of memory
   }
