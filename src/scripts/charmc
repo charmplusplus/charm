@@ -1,44 +1,167 @@
-#!/bin/csh -f
+#!/bin/sh
 ##############################################################################
+# charmc: Compiler for Converse/Charm/Charm++ programs
+#
+# Converted to Bourne Shell by Orion Sky Lawlor, 10/21/1999
 #
 # Initialize the main controlling variables, setup error handler
-#
 # ALL variables used by this script should be initialized here.
 #
 ##############################################################################
 
-unsetenv MACHTYPE
-unsetenv SEQUENTIAL
-unsetenv LANGUAGE
-unsetenv BALANCE
-unsetenv MEMORY
-unsetenv TRACEMODE
-unsetenv VERBOSE
-unsetenv SAVE
-unsetenv PURIFY
-unsetenv OVERRIDE_CC
-unsetenv OVERRIDE_CXX
-unsetenv OVERRIDE_LD
-unsetenv OVERRIDE_LDXX
-unsetenv OPTS_CPP       ; set OPTS_CPP = ()
-unsetenv OPTS_LDRO      ; set OPTS_LDRO = ()
-unsetenv OPTS_CC        ; set OPTS_CC = ()
-unsetenv OPTS_CXX       ; set OPTS_CXX = ()
-unsetenv OPTS_LD        ; set OPTS_LD = ()
-unsetenv OPTS_LDXX      ; set OPTS_LDXX = ()
-unsetenv OBJECT
-unsetenv COPIES         ; set COPIES = ()
-unsetenv LIBRARIES      ; set LIBRARIES = ()
-unsetenv FILES          ; set FILES = ()
-unsetenv OBJECTFILES    ; set OBJECTFILES = ()
-unsetenv DELETE         ; set DELETE = ()
-unsetenv MAINOBJ        ; set MAINOBJ = ()
-unsetenv GENCPM         ; set GENCPM = ()
-unsetenv DEBUG_MODE
-unsetenv OPTIMIZE_MODE
-unsetenv USE_RELIABLE_CC
-unsetenv USE_FASTEST_CC
-unsetenv ECHOCMD        ; set ECHOCMD=(unset echo)
+#Prepare aliases for the external commands we use--
+# Note that adding /bin/ to everything breaks Cygwin32.
+RM="rm -f"
+CP="cp"
+MV="mv"
+LN="ln"
+WC="wc"
+SED="sed"
+
+MACHTYPE=""
+SEQUENTIAL=""
+LANGUAGE=""
+BALANCE=""
+MEMORY=""
+TRACEMODE=""
+VERBOSE=""
+DEBUG_SCRIPT=""
+SAVE=""
+PURIFY=""
+OVERRIDE_CC=""
+OVERRIDE_CXX=""
+OVERRIDE_LD=""
+OVERRIDE_LDXX=""
+OPTS_CPP=""
+OPTS_LDRO="" 
+OPTS_CC=""
+OPTS_CXX="" 
+OPTS_LD=""  
+OPTS_LDXX=""  
+OBJECT=""
+COPIES=""        
+LIBRARIES=""    
+FILES=""       
+OBJECTFILES=""  
+DELETE=""    
+MAINOBJ=""   
+GENCPM=""     
+DEBUG_MODE=""
+OPTIMIZE_MODE=""
+USE_RELIABLE_CC=""
+USE_FASTEST_CC=""
+
+####################################################################
+#
+#  Utility routines used below
+#
+###################################################################
+
+# PrintUsage: prints a helpful command-line usage message and quits
+# Args: any additional messages
+printUsage() {
+    echo "Usage: charmc [ flags ] <files>"
+    echo
+    echo "  flags:"
+    echo "        -o <target> -g -O"
+    echo "        -D<define> -I<include path> -L<lib path> -l<library> -s"
+    echo "        -machine <mach> -seq -langage <lang> -balance"
+    echo "        -tracemode <mode> -verbose -save -purify -cp"
+    echo "        -use-reliable-cc -use-fastest-cc -gen-cpm <new gen>"
+    echo "        -cc <new cc> -c++ <new CC>  -ld <new ld> -ld++ <new LD>"
+    echo "        -cpp-option <opt> -ldro-option <opt> -cc-option <opt>"
+    echo "        -c++-option <opt> -ld-option <opt> -ld++-option <opt>"
+    echo "        -pg <opt>"
+    echo
+    echo "  Charmc compiles C, C++, f77, f90, Converse, Converse++, Charm, "
+    echo "and Charm++ programs.  The flags generally match those of cc or f77."
+    echo "Version 5.0, Parallel Programming Lab, UIUC, 1999"
+    echo $*
+    exit 1
+}
+
+# End blows away the temporary files (unless SAVE is true) and exits
+# Args: <exit code>
+End() {
+    if [ -z "$SAVE" ]
+	then
+        for FILE in `echo $FILES`
+        do
+			BASE=`stripExtention $FILE`
+			TMP=`basename $FILE`".TMP"
+            $RM $TMP.P.C $TMP.cpp $TMP.space $TMP.xlat $TMP.o
+            $RM $TMP.c $TMP.c.0.h $TMP.c.1.h $TMP.c.2.h
+            $RM $TMP.i $TMP.$CMK_CPP_SUFFIX
+        done
+        $RM core $DELETE
+    fi
+    exit $1
+}
+
+# This procedure prints an error message and exits.
+# ("1>&2" redirects the echo output to stderr).
+# Args: written to stderr
+Abort() {
+	echo "Fatal Error by charmc in directory "`pwd` 1>&2
+	echo "   $*" 1>&2
+	echo "charmc exiting..." 1>&2
+	End 1
+}
+
+# Instead of an ECHO_CMD variable, I define a procedure Do,
+# which (possibly) echos, runs, and tests the errors of the given command.
+# Args: executed as given
+DoNoErrCheck() {
+	[ -n "$VERBOSE" ] && echo "charmc: Executing $*" 1>&2
+	$*
+}
+Do() {
+	DoNoErrCheck $*
+	Do_res=$?
+# The UNIX result code better be zero, or we die
+	[ $Do_res -eq 0 ] || Abort "Command $* returned error code $Do_res"
+}
+
+# This procedure removes the extention (the ".c" in "./main.c") from
+# its first argument, and prints the result. Unlike the builtin command
+# basename, it keeps the directory path.
+# Args: <name to strip>
+stripExtention() {
+	se_base=`echo $1 | awk -F/ '{print $NF}'`
+	se_strip=`echo $se_base | awk -F. '{ORS="";print $1;for (i=2;i<NF;i++) print "."$i}'`
+	se_ret=`echo $1 | awk -F/ '{ORS="";for (i=1;i<NF;i++) print $i"/"}'`"$se_strip"
+	echo $se_ret
+}
+
+# GetExtention returns the extention on the given file name
+# or "" if none.  (e.g. "./bob/snack.c" returns ".c")
+# Args: <name to find extention of>
+getExtention() {
+	se_base=`echo $1 | awk -F/ '{print $NF}'`
+        se_ret=`echo $se_base | awk -F. '{if (NF<=1) print ""; else print "."$NF}'`
+	echo $se_ret
+}
+
+Debug() {
+    if [ -n "$DEBUG_SCRIPT" ]
+    then
+	echo 
+	echo "------- Charmc Debugging info: $* -------"
+#	echo "CHARMBIN=$CHARMBIN"
+#	echo "CHARMINC=$CHARMINC"
+#	echo "CHARMLIB=$CHARMLIB"
+#	echo "FILES=$FILES"
+#	echo "DELETE=$DELETE"
+#	echo "OBJECT=$OBJECT"
+#	echo "LANGUAGE=$LANGUAGE"
+#	echo "Working directory="`pwd`
+    fi
+}
+
+# TEMP_BASE is appended with this script's process ID (PID),
+# so multiple charmcs can run in parallel without overwriting
+# each other's temporary files.
+TEMP_BASE="/tmp/charmc_tmp.$$"
 
 ##############################################################################
 #
@@ -48,218 +171,216 @@ unsetenv ECHOCMD        ; set ECHOCMD=(unset echo)
 #
 ##############################################################################
 
+[ $# -eq 0 ] && printUsage "Error: No arguments given."
 
-set argindex=1
-while ($argindex <= $#argv)
-    set arg=$argv[$argindex]
-    @ argindex = $argindex + 1
+while [ ! $# -eq 0 ]
+do
+	arg="$1"
+	shift
 
-    switch ($arg)
-        case "-machine"
-            set MACHTYPE=$argv[$argindex]
-            @ argindex = $argindex + 1
-            breaksw
+	case "$arg" in
+	"-machine")
+		MACHTYPE="$1"
+		shift
+		;;
 
-        case "-seq"
-	    set SEQUENTIAL=yes
-            breaksw
+	"-seq")
+		SEQUENTIAL=true
+		;;
 
-        case "-language"
-            set LANGUAGE=$argv[$argindex]
-            @ argindex = $argindex + 1
-            breaksw
+	"-language")
+		LANGUAGE="$1"
+		shift
+		;;
 
-	case "-balance"
-            set BALANCE=$argv[$argindex]
-            @ argindex = $argindex + 1
-            breaksw
+	"-balance")
+		BALANCE="$1"
+		shift
+		;;
 
-        case "-queue"
-            echo "Warning: -queue currently being ignored."
-            @ argindex = $argindex + 1
-            breaksw
+	"-queue")
+		echo "Warning: -queue currently being ignored."
+		shift
+		;;
 
-        case "-memory"
-            echo "Warning: -memory currently being ignored."
-            @ argindex = $argindex + 1
-            breaksw
+	"-memory")
+		echo "Warning: -memory currently being ignored."
+		shift
+		;;
 
-	case "-tracemode"
-            set TRACEMODE=$argv[$argindex]
-            @ argindex = $argindex + 1
-            breaksw
+	"-tracemode")
+		TRACEMODE="$1"
+		shift
+		;;
 
-        case "-verbose"
-            set VERBOSE=1
-            set ECHOCMD=(set echo)
-            breaksw
+	"-verbose")
+		echo "Verbose mode set"
+		VERBOSE=true
+		;;
 
-        case "-save"
-            set SAVE=1
-            breaksw
+	"-debug-script")
+	        echo "Will give excessive charmc debugging output..."
+		DEBUG_SCRIPT=true
+		;;
 
-        case "-purify"
-            set PURIFY=1
-            breaksw
+	"-save")
+		SAVE=true
+		;;
 
-        case "-use-reliable-cc"
-	    set USE_RELIABLE_CC=1
-            breaksw
+	"-purify")
+		PURIFY=true
+		;;
 
-	case "-use-fastest-cc"
-	    set USE_FASTEST_CC=1
-            breaksw
- 
-        case "-cc"
-            set OVERRIDE_CC=( $argv[$argindex] )
-            @ argindex = $argindex + 1
-            breaksw
+	"-use-reliable-cc")
+		USE_RELIABLE_CC=1
+		;;
 
-        case "-c++"
-            set OVERRIDE_CXX=( $argv[$argindex] )
-            @ argindex = $argindex + 1
-            breaksw
+	"-use-fastest-cc")
+		USE_FASTEST_CC=1
+		;;
 
-        case "-ld"
-            set OVERRIDE_LD=( $argv[$argindex] )
-            @ argindex = $argindex + 1
-            breaksw
+	"-cc")
+		OVERRIDE_CC="$1"
+		shift
+		;;
 
-        case "-ld++"
-	    set OVERRIDE_LDXX=( $argv[$argindex] )
-            @ argindex = $argindex + 1
-            breaksw
+	"-c++")
+		OVERRIDE_CXX="$1"
+		shift
+		;;
 
-        case "-cpp-option"
-	    set OPTS_CPP=( $OPTS_CPP $argv[$argindex] )
-	    @ argindex = $argindex + 1
-	    breaksw
+	"-ld")
+		OVERRIDE_LD="$1"
+		shift
+		;;
 
-        case "-ldro-option"
-	    set OPTS_LDRO=( $OPTS_LDRO $argv[$argindex] )
-	    @ argindex = $argindex + 1
-            breaksw
+	"-ld++")
+		OVERRIDE_LDXX="$1"
+		shift
+		;;
 
-        case "-cc-option"
-            set OPTS_CC=( $OPTS_CC $argv[$argindex] )
-            @ argindex = $argindex + 1
-            breaksw
+	"-cpp-option")
+		OPTS_CPP="$OPTS_CPP $1"
+		shift
+		;;
 
-        case "-c++-option"
-            set OPTS_CXX=( $OPTS_CXX $argv[$argindex] )
-            @ argindex = $argindex + 1
-            breaksw
+	"-ldro-option")
+		OPTS_LDRO="$OPTS_LDRO $1"
+		shift
+		;;
 
-        case "-ld-option"
-            set OPTS_LD=( $OPTS_LD $argv[$argindex] )
-            @ argindex = $argindex + 1
-            breaksw
+	"-cc-option")
+		OPTS_CC="$OPTS_CC $1"
+		shift
+		;;
 
-        case "-ld++-option"
-	    set OPTS_LDXX=( $OPTS_LDXX $argv[$argindex] )
-            @ argindex = $argindex + 1
-            breaksw
-	    
-        case "-c":
-            # This is ignored.
-            breaksw
+	"-c++-option")
+		OPTS_CXX="$OPTS_CXX $1"
+		shift
+		;;
 
-	case "-o":
-            set OBJECT=$argv[$argindex]
-            @ argindex = $argindex + 1
-            breaksw
+	"-ld-option")
+		OPTS_LD="$OPTS_LD $1"
+		shift
+		;;
 
-	case "-cp"
-	    set COPIES=($argv[$argindex] $COPIES)
-	    @ argindex = $argindex + 1
-            breaksw
+	"-ld++-option")
+		OPTS_LDXX="$OPTS_LDXX $1"
+		shift
+		;;
 
-        case "-gen-cpm"
-            set GENCPM=($GENCPM $argv[$argindex])
-            @ argindex = $argindex + 1
-            breaksw
+	"-c")
+# This is ignored.
+		;;
 
-        case "-D*"
-            set OPTS_CPP=( $OPTS_CPP "$arg" )
-            set OPTS_CC= ( $OPTS_CC  "$arg" )
-            set OPTS_CXX=( $OPTS_CXX "$arg" )
-            breaksw
+	"-o")
+		OBJECT=$1
+		shift
+		;;
 
-        case "-I*"
-            set OPTS_CPP=( $OPTS_CPP "$arg" )
-            set OPTS_CC= ( $OPTS_CC  "$arg" )
-            set OPTS_CXX=( $OPTS_CXX "$arg" )
-            breaksw
+	"-cp")
+		COPIES="$1 $COPIES"
+		shift
+		;;
 
-        case "-L*"
-            set OPTS_LDRO=( $OPTS_LDRO "$arg" )
-            set OPTS_LD=  ( $OPTS_LD   "$arg" )
-            set OPTS_LDXX=( $OPTS_LDXX "$arg" )
-            breaksw
+	"-gen-cpm")
+		GENCPM="$GENCPM $1"
+		shift
+		;;
 
-        case "-g"
-	    set DEBUG_MODE=1
-            breaksw
+	-D*)
+		OPTS_CPP="$OPTS_CPP $arg"
+		OPTS_CC="$OPTS_CC  $arg"
+		OPTS_CXX="$OPTS_CXX $arg"
+		;;
 
-	case "-O"
-	    set OPTIMIZE_MODE=1
-            breaksw
+	-I*)
+		OPTS_CPP="$OPTS_CPP $arg"
+		OPTS_CC="$OPTS_CC  $arg"
+		OPTS_CXX="$OPTS_CXX $arg"
+		;;
 
-	case "-NO"
-	    unset OPTIMIZE_MODE
-            breaksw
+	-L*)
+		OPTS_LDRO="$OPTS_LDRO $arg"
+		OPTS_LD="$OPTS_LD   $arg"
+		OPTS_LDXX="$OPTS_LDXX $arg"
+		;;
 
-	case "-pg"
-	    set OPTS_CC= ( $OPTS_CC $arg )
-	    set OPTS_CXX= ( $OPTS_CC $arg )
-	    set OPTS_LD= ( $OPTS_CC $arg )
-	    set OPTS_LDXX= ( $OPTS_CC $arg )
-            breaksw
+	"-g")
+		DEBUG_MODE=true
+		;;
 
-        case "-O*"
-            set OPTS_CC= ( $OPTS_CC $arg )
-            set OPTS_CXX=( $OPTS_CXX $arg )
-            breaksw
+	"-O")
+		OPTIMIZE_MODE=true
+		;;
 
-        case "-l*"
-            set LIBRARIES=( $LIBRARIES $arg )
-            breaksw
+	"-NO")
+		OPTIMIZE_MODE=false
+		;;
 
-        case "-s"
-            set OPTS_LD=  ( $OPTS_LD   $arg )
-	    set OPTS_LDXX=( $OPTS_LDXX $arg )
-            breaksw
+	"-pg")
+		OPTS_CC="$OPTS_CC $arg"
+		OPTS_CXX="$OPTS_CXX $arg"
+		OPTS_LD="$OPTS_LD $arg"
+		OPTS_LDXX="$OPTS_LDXX $arg"
+		;;
 
-        case "-*"
-            echo "passing unrecognized option $arg to all compilers and linkers"
-	    set OPTS_CPP= ( $OPTS_CPP  $arg )
-            set OPTS_CC=  ( $OPTS_CC   $arg )
-            set OPTS_CXX= ( $OPTS_CXX  $arg )
-            set OPTS_LD=  ( $OPTS_LD   $arg )
-	    set OPTS_LDXX=( $OPTS_LDXX $arg )
-            set OPTS_LDRO=( $OPTS_LDRO $arg )
-            breaksw
+	-O*)
+		OPTS_CC="$OPTS_CC $arg"
+		OPTS_CXX="$OPTS_CXX $arg"
+		;;
 
-        case "+*"
-            echo "passing unrecognized option $arg to all compilers and linkers"
-	    set OPTS_CPP= ( $OPTS_CPP  $arg )
-            set OPTS_CC=  ( $OPTS_CC   $arg )
-            set OPTS_CXX= ( $OPTS_CXX  $arg )
-            set OPTS_LD=  ( $OPTS_LD   $arg )
-	    set OPTS_LDXX=( $OPTS_LDXX $arg )
-            set OPTS_LDRO=( $OPTS_LDRO $arg )
-            breaksw
+	-l*)
+		LIBRARIES="$LIBRARIES $arg"
+		;;
 
-        case "*.*"
-            set FILES=( $FILES "$arg" )
-            breaksw
-        
-        default:
-            echo "Unrecognized argument $arg"
-            exit 1
+	-s)
+		OPTS_LD="$OPTS_LD   $arg"
+		OPTS_LDXX="$OPTS_LDXX $arg"
+		;;
 
-    endsw
-end
+        -h|--help)
+	        printUsage
+		;;
+	-*|+*)
+		echo "passing unrecognized option $arg to all compilers and linkers"
+		OPTS_CPP="$OPTS_CPP  $arg"
+		OPTS_CC="$OPTS_CC   $arg"
+		OPTS_CXX="$OPTS_CXX  $arg"
+		OPTS_LD="$OPTS_LD   $arg"
+		OPTS_LDXX="$OPTS_LDXX $arg"
+		OPTS_LDRO="$OPTS_LDRO $arg"
+		;;
+	*.*)
+		[ -n "$VERBOSE" ] && echo "Adding file $arg..."
+		FILES="$FILES $arg"
+		;;
+# Default
+	*)
+		printUsage  "Error: Unrecognized argument $arg"
+		;;
+	esac
+done
 
 ##############################################################################
 #
@@ -267,71 +388,65 @@ end
 #
 ##############################################################################
 
-set ORIGDIR=`pwd`
+ORIGDIR=`pwd`
 
 # Try to find CHARMBIN by looking in directory where charmc is
 
-if ($?CHARMBIN == 0) then
-    set SCRIPT=$0
-    if ($SCRIPT:h != $SCRIPT:t) then
-        cd $SCRIPT:h
-        set SCRIPT=$SCRIPT:t
+if [ -z "$CHARMBIN" ]
+then
+	SCRIPT=$0
+	CHARMBIN=`dirname $SCRIPT`
+	cd $CHARMBIN
+	CHARMBIN=`pwd`
+# NOTE: this script no longer tries to follow soft links
+# to find the "original" charmc-- if this is bad, 
+# translate these lines to Bourne shell from C shell:
+# -------------------- Begin C Shell ------------------------->
+#    if ($SCRIPT:h != $SCRIPT:t) then
+#        cd $SCRIPT:h
+#        set SCRIPT=$SCRIPT:t
+#    else
+#        foreach dir ($path)
+#            if (-x $dir/$SCRIPT && ! -d $dir/$SCRIPT) then
+#                cd $dir
+#                break
+#            endif
+#        end
+#    endif
+#    while (x`find $SCRIPT -type l -print` == x$SCRIPT)
+#        set SCRIPT=`ls -al ./$SCRIPT:t | sed -e "s@.*-> @@"`
+#        if ($SCRIPT:h != $SCRIPT:t) then
+#            cd $SCRIPT:h
+#            set SCRIPT=$SCRIPT:t
+#        endif
+#    end
+#    set CHARMBIN=`pwd`
+# <------------------ End C Shell -----------------------------
+fi
+
+if [ -n "$MACHTYPE" ]
+then
+    if [ -d $CHARMBIN/../../$MACHTYPE/bin ]
+    then
+		cd $CHARMBIN/../../$MACHTYPE/bin
+		CHARMBIN=`pwd`
     else
-        foreach dir ($path)
-            if (-x $dir/$SCRIPT && ! -d $dir/$SCRIPT) then
-                cd $dir
-                break
-            endif
-        end
-    endif
-    while (x`find $SCRIPT -type l -print` == x$SCRIPT)
-        set SCRIPT=`ls -al ./$SCRIPT:t | sed -e "s@.*-> @@"`
-        if ($SCRIPT:h != $SCRIPT:t) then
-            cd $SCRIPT:h
-            set SCRIPT=$SCRIPT:t
-        endif
-    end
-    set CHARMBIN=`pwd`
-endif
+        Abort "there is no installed charm for $MACHTYPE in $CHARMBIN"
+    fi
+fi
 
-# Give an error message
+if [ -z "$CHARMLIB" ]
+then
+	cd $CHARMBIN/../lib
+	CHARMLIB=`pwd`
+fi
+if [ -z "$CHARMINC" ]
+then
+	cd $CHARMBIN/../include
+	CHARMINC=`pwd`
+fi
 
-if ($?CHARMBIN == 0) then
-    echo ''
-    echo 'Error - cannot find the charm binary directory.'
-    echo ''
-    echo 'Normally, charmc and the other charm scripts automatically'
-    echo 'locate the charm binary directory, using the following strategy:'
-    echo ''
-    echo '  Step 1. It looks in the directory specified in $CHARMBIN'
-    echo ''
-    echo '  Step 2. It looks in the directory from which charmc was run.'
-    echo ''
-    echo 'If it searches both these places, and doesnt find the charm'
-    echo 'files, it will give up.'
-    echo ''
-    exit 1
-    endif
-endif
-
-if ($?MACHTYPE) then
-    if (-d $CHARMBIN/../../$MACHTYPE/bin) then
-        cd $CHARMBIN/../../$MACHTYPE/bin
-	set CHARMBIN=`pwd`
-    else
-        echo 'error - there is no installed charm for "'$MACHTYPE'"'
-        exit 1
-    endif
-endif
-
-if ($?CHARMLIB == 0) then
-    cd $CHARMBIN/../lib
-    set CHARMLIB=`pwd`
-endif
-if ($?CHARMINC == 0) then
-    cd $CHARMBIN/../include
-    set CHARMINC=`pwd`
-endif
+cd $ORIGDIR
 
 ##############################################################################
 #
@@ -339,101 +454,132 @@ endif
 #
 ##############################################################################
 
-source $CHARMINC/conv-mach.csh
+if [ ! -r $CHARMINC/conv-mach.sh ]
+then
+	Abort "Can't find conv-mach.sh in $CHARMINC directory."
+fi
 
-if ( $?USE_RELIABLE_CC ) then
-    set CMK_CC=( $CMK_CC_RELIABLE )
-endif
+Debug "About to read machine config script"
+. $CHARMINC/conv-mach.sh
 
-if ( $?USE_FASTEST_CC ) then
-    set CMK_CC=( $CMK_CC_FASTEST )
-endif
+Debug "Read config script, setting vars..."
 
-if ($?SEQUENTIAL) then
-    set CMK_CC=( $CMK_SEQ_CC )
-    set CMK_LD=( $CMK_SEQ_LD )
-    set CMK_CXX=( $CMK_SEQ_CXX )
-    set CMK_LDXX=( $CMK_SEQ_LDXX )
-endif
+if [ -n "$USE_RELIABLE_CC" ]
+then
+	CMK_CC="$CMK_CC_RELIABLE"
+fi
 
-if ($?OVERRIDE_CC) then
-    set CMK_CC[1]=""
-    set CMK_CC = ( $OVERRIDE_CC $CMK_CC )
-endif
+if [ -n "$USE_FASTEST_CC" ]
+then
+    CMK_CC="$CMK_CC_FASTEST"
+fi
 
-if ($?OVERRIDE_CXX) then
-    set CMK_CXX[1]=""
-    set CMK_CXX = ( $OVERRIDE_CXX $CMK_CXX )
-endif
+if [ -n "$SEQUENTIAL" ]
+then
+    CMK_CC="$CMK_SEQ_CC"
+    CMK_LD="$CMK_SEQ_LD"
+    CMK_CXX="$CMK_SEQ_CXX" 
+    CMK_LDXX="$CMK_SEQ_LDXX" 
+fi
 
-if ($?OVERRIDE_LD) then
-    set CMK_LD[1]=""
-    set CMK_LD = ( $OVERRIDE_LD $CMK_LD )
-endif
+if [ -n "$OVERRIDE_CC" ]
+then
+    CMK_CC="$OVERRIDE_CC $CMK_CC "
+fi
+Debug "set 2"
+if [ -n "$OVERRIDE_CXX" ]
+then
+    CMK_CXX="$OVERRIDE_CXX $CMK_CXX "
+fi
 
-if ($?PURIFY == 1) then
-    set CMK_LD = ( purify $CMK_LD )
-    set CMK_LDXX = ( purify $CMK_LDXX )
-endif
+if [ -n "$OVERRIDE_LD" ]
+then
+    CMK_LD="$OVERRIDE_LD $CMK_LD"
+fi
 
-if ($?OVERRIDE_LDXX) then
-    set CMK_LDXX[1]=""
-    set CMK_LDXX = ( $OVERRIDE_LDXX $CMK_LDXX )
-endif
+if [ -n "$PURIFY" ]
+then
+    CMK_LD="purify $CMK_LD"
+    CMK_LDXX="purify $CMK_LDXX"
+fi
 
-if ($?DEBUG_MODE) then
-    set OPTS_CC  = ( $CMK_C_DEBUG $OPTS_CC )
-    set OPTS_CXX = ( $CMK_CXX_DEBUG $OPTS_CXX )
-    set OPTS_LD  = ( $CMK_C_DEBUG $OPTS_LD )
-    set OPTS_LDXX = ( $CMK_CXX_DEBUG $OPTS_LDXX )
-endif
+if [ -n "$OVERRIDE_LDXX" ]
+then
+    CMK_LDXX="$OVERRIDE_LDXX $CMK_LDXX"
+fi
+Debug "set 3"
+if [ -n "$DEBUG_MODE" ]
+then
+    OPTS_CC="$CMK_C_DEBUG $OPTS_CC"
+    OPTS_CXX="$CMK_CXX_DEBUG $OPTS_CXX"
+    OPTS_LD="$CMK_C_DEBUG $OPTS_LD"
+    OPTS_LDXX="$CMK_CXX_DEBUG $OPTS_LDXX"
+fi
+Debug "set 4"
+if [ -n "$OPTIMIZE_MODE" ]
+then
+    OPTS_CC="$CMK_C_OPTIMIZE $OPTS_CC"
+    OPTS_CXX="$CMK_CXX_OPTIMIZE $OPTS_CXX"
+    OPTS_LD="$CMK_C_OPTIMIZE $OPTS_LD"
+    OPTS_LDXX="$CMK_CXX_OPTIMIZE $OPTS_LDXX"
+fi
 
-if ($?OPTIMIZE_MODE) then
-    set OPTS_CC  = ( $CMK_C_OPTIMIZE $OPTS_CC )
-    set OPTS_CXX = ( $CMK_CXX_OPTIMIZE $OPTS_CXX )
-    set OPTS_LD  = ( $CMK_C_OPTIMIZE $OPTS_LD )
-    set OPTS_LDXX = ( $CMK_CXX_OPTIMIZE $OPTS_LDXX )
-endif
 
-onintr failure
+# There's really no analog for this in the Bourne shell: 
+#  -------- C Shell ------> onintr failure
+# Luckily, it's irrelevant as long as nobody sends us a ^Z.
 
 ##############################################################################
 #
 # Check for valid choice of LANGUAGE
 #
 ##############################################################################
+Debug "Checking language..."
 
-if ($?LANGUAGE == 0) then
-    set LANGUAGE=charm++
-    if ($?SEQUENTIAL) set LANGUAGE=c
-endif
+if [ -z "$LANGUAGE" ]
+then
+    LANGUAGE="charm++"
+    [ -n "$SEQUENTIAL" ] && LANGUAGE=c
+fi
 
-switch ($LANGUAGE)
-    case "c"
-    case "C"
-    case "c++"
-    case "C++"
-	if ($?SEQUENTIAL == 0) then
-	    echo "Language $LANGUAGE is for sequential programs"
-	    goto failure
-	endif
-	breaksw
-    case "charm" 
-    case "charm++" 
-    case "converse"
-    case "converse++"
-    case "idl"
-	if ($?SEQUENTIAL == 1) then
-	    echo "Language $LANGUAGE is for parallel programs"
-	    goto failure
-	endif
-        breaksw
-    default:
-        echo "charmc: Unrecognized choice of language $LANGUAGE"
-	goto failure
-endsw
+case "$LANGUAGE" in
+"c"|"C"|"c++"|"C++")
+	[ -z "$SEQUENTIAL" ] && Abort "Language $LANGUAGE is for sequential programs"
+	;;
+"charm"|"charm++"|"converse"|"converse++"|"idl")
+	[ -z "$SEQUENTIAL" ] || Abort "Language $LANGUAGE is for parallel programs"
+	;;
+*)
+	Abort "Unrecognized choice of language $LANGUAGE"
+	;;
+esac
 
-cd $ORIGDIR
+########################################################################
+#
+# We've parsed and verified the command-line parameters.
+# Now we prepare routines to clean up and exit.
+# None of these routines ever returns-- they all just exit.
+#
+########################################################################
+
+
+Copyobj() {
+	for COPY in `echo $COPIES`
+	do
+		if [ "a$COPY" != "a$OBJECT" ] 
+		then
+			[ -d $COPY ] && COPY="$COPY/$OBJECT"
+			DoNoErrCheck $RM $COPY 
+			Do $CP $OBJECT $COPY
+		fi
+	done
+	Success
+}
+
+Success() {
+	End 0
+}
+
 
 ##############################################################################
 #
@@ -441,18 +587,20 @@ cd $ORIGDIR
 #
 ##############################################################################
 
-foreach FILE ($GENCPM)
-    set BASE=$FILE:r
-    set TMP=$BASE:t.TMP
-    set DELETE=($DELETE $TMP.c $TMP.i)
-    ($ECHOCMD ; /bin/rm -f $BASE.cpm.h $TMP.c)
-    ($ECHOCMD ; touch $BASE.cpm.h)
-    ($ECHOCMD ; /bin/ln -s $FILE $TMP.c)
-    ($ECHOCMD ; $CMK_CPP_C $OPTS_CPP -I$CHARMINC $TMP.c > $TMP.i)
-    if ($status) goto failure
-    ($ECHOCMD ; $CHARMBIN/conv-cpm $TMP.i $BASE.cpm.h)
-    if ($status) goto failure
-end
+Debug "Preprocessing GEN-CPM files"
+
+for FILE in `echo $GENCPM`
+do
+# This used to be "$FILE:r", which strips the extention
+	BASE=`stripExtention $FILE`
+	TMP=`basename $FILE`".TMP"
+	DELETE="$DELETE $TMP.c $TMP.i"
+	DoNoErrCheck $RM $BASE.cpm.h $TMP.c
+	Do touch $BASE.cpm.h
+	Do $LN -s $FILE $TMP.c
+	Do $CMK_CPP_C $OPTS_CPP -I$CHARMINC $TMP.c > $TMP.i
+	Do $CHARMBIN/conv-cpm $TMP.i $BASE.cpm.h
+done
 
 ##############################################################################
 #
@@ -462,105 +610,63 @@ end
 #
 ##############################################################################
 
-foreach FILE ($FILES)
-  set BASE=$FILE:r
-  set TMP=$BASE:t.TMP
-  if (${BASE}.o != $FILE) then
-      if ($?VERBOSE) echo "compiling $FILE."
-      /bin/rm -f $BASE.o $BASE.f.o
-  endif
-  switch ($FILE)
-    case "*.ci"
-      ($ECHOCMD ; $CHARMBIN/charmxi $CMK_XIOPTS $BASE.ci)
-      if ($status) goto failure
-      breaksw
-    case "*.idl"
-      ($ECHOCMD ; $CHARMBIN/charmidl $BASE.idl)
-      if ($status) goto failure
-      breaksw
-    case "*.sdag"
-      ($ECHOCMD ; $CHARMBIN/sdagx $BASE.sdag)
-      if ($status) goto failure
-      breaksw
-    case "*.c"
-      ($ECHOCMD ; $CMK_CC $OPTS_CC -I$CHARMINC -c $BASE.c -o $BASE.o)
-      if ($status) goto failure
-      if ($?OBJECT) then
-	if ($OBJECT != $BASE.o) set DELETE=( $DELETE $BASE.o )
-        set OBJECTFILES=( $OBJECTFILES $BASE.o )
-      endif
-      breaksw
-    case "*.s"
-      ($ECHOCMD ; $CMK_CC $OPTS_CC -I$CHARMINC -c $BASE.s -o $BASE.o)
-      if ($status) goto failure
-      if ($?OBJECT) then
-	if ($OBJECT != $BASE.o) set DELETE=( $DELETE $BASE.o )
-        set OBJECTFILES=( $OBJECTFILES $BASE.o )
-      endif
-      breaksw
-    case "*.C"
-      ($ECHOCMD ; $CMK_CXX $OPTS_CXX -I$CHARMINC -c $BASE.C -o $BASE.o)
-      if ($status) goto failure
-      if ($?OBJECT) then
-	if ($OBJECT != $BASE.o) set DELETE=( $DELETE $BASE.o )
-        set OBJECTFILES=( $OBJECTFILES $BASE.o )
-      endif
-      breaksw
-    case "*.cc"
-      ($ECHOCMD ; $CMK_CXX $OPTS_CXX -I$CHARMINC -c $BASE.cc -o $BASE.o)
-      if ($status) goto failure
-      if ($?OBJECT) then
-	if ($OBJECT != $BASE.o) set DELETE=( $DELETE $BASE.o )
-        set OBJECTFILES=( $OBJECTFILES $BASE.o )
-      endif
-      breaksw
-    case "*.cxx"
-      ($ECHOCMD ; $CMK_CXX $OPTS_CXX -I$CHARMINC -c $BASE.cxx -o $BASE.o)
-      if ($status) goto failure
-      if ($?OBJECT) then
-	if ($OBJECT != $BASE.o) set DELETE=( $DELETE $BASE.o )
-        set OBJECTFILES=( $OBJECTFILES $BASE.o )
-      endif
-      breaksw
-    case "*.f"
-      ($ECHOCMD ; $CMK_CF77 -I$CHARMINC -c $BASE.f -o $BASE.o)
-      if ($status) goto failure
-      if ($?OBJECT) then
-	if ($OBJECT != $BASE.o) set DELETE=( $DELETE $BASE.o )
-        set OBJECTFILES=( $OBJECTFILES $BASE.o )
-      endif
-      breaksw
-    case "*.f90"
-      ($ECHOCMD ; $CMK_CF90 -I$CHARMINC -c $BASE.f90 -o $BASE.o)
-      if ($status) goto failure
-      if ($?OBJECT) then
-	if ($OBJECT != $BASE.o) set DELETE=( $DELETE $BASE.o )
-        set OBJECTFILES=( $OBJECTFILES $BASE.o )
-      endif
-      breaksw
-    case "*.F"
-      ($ECHOCMD ; $CMK_CF77 -I$CHARMINC -c $BASE.F -o $BASE.o)
-      if ($status) goto failure
-      if ($?OBJECT) then
-	if ($OBJECT != $BASE.o) set DELETE=( $DELETE $BASE.o )
-        set OBJECTFILES=( $OBJECTFILES $BASE.o )
-      endif
-      breaksw
-    case "*.fc"
-    case "*.FC"
-      echo "charmc: I'm not yet smart enough to compile $FILE"
-      goto failure
-    case "*.o"
-      set OBJECTFILES=( $OBJECTFILES $BASE.o )
-      breaksw
-    case "*.a"
-      set OBJECTFILES=( $OBJECTFILES $BASE.a )
-      breaksw
-    default:
-      echo "file with unrecognized extension $FILE"
-      goto failure
-  endsw
-end
+Debug "About to compile..."
+
+for FILE in `echo $FILES`
+do
+	BASE=`stripExtention $FILE`
+	TMP=`basename $FILE`".TMP"
+	FILE_EXT=`getExtention $FILE`
+	if [ "$FILE_EXT" != ".o" ]
+	then
+		[ $VERBOSE ] && echo "Compiling $FILE"
+		DoNoErrCheck $RM $BASE.o $BASE.f.o
+	fi
+	NU_OBJ=""
+	case "$FILE" in
+	*.ci)
+		Do $CHARMBIN/charmxi $CMK_XIOPTS $BASE.ci
+		;;
+	*.idl)
+		Do $CHARMBIN/charmidl $BASE.idl
+		;;
+	*.sdag)
+		Do $CHARMBIN/sdagx $BASE.sdag
+		;;
+	*.c|*.s)
+		Do $CMK_CC $OPTS_CC -I$CHARMINC -c $FILE -o $BASE.o
+		NU_OBJ=$BASE.o
+		;;
+	*.C|*.cc|*.cxx|*.cpp|*.c++)
+		Do $CMK_CXX $OPTS_CXX -I$CHARMINC -c $FILE -o $BASE.o
+		NU_OBJ=$BASE.o
+		;;
+	*.f|*.F)
+		Do $CMK_CF77 -I$CHARMINC -c $FILE -o $BASE.o
+		NU_OBJ=$BASE.o
+		;;
+	*.f90)
+		Do $CMK_CF90 -I$CHARMINC -c $BASE.f90 -o $BASE.o
+		;;
+	*.fc|*.FC)
+		Abort "I'm not yet smart enough to compile $FILE"
+		;;
+	*.o|*.a)
+		OBJECTFILES="$OBJECTFILES $FILE"
+		;;
+	*)
+		Abort "file with unrecognized extension $FILE"
+	esac
+# Handle new object files
+	if [ -n "$NU_OBJ" -a -n "$OBJECT" ] 
+	then
+		if [ "$OBJECT" != "$BASE.o" ]
+		then
+			DELETE="$DELETE $NU_OBJ"
+		fi
+		OBJECTFILES="$OBJECTFILES $NU_OBJ"
+	fi
+done
 
 ##############################################################################
 #
@@ -575,48 +681,51 @@ end
 #
 ##############################################################################
 
-if ($?OBJECT == 0) goto success
+if [ -z "$OBJECT" ] 
+then
+# We have no target object-- just end
+	Success
+fi
 
-switch ($OBJECT)
-  case "*.o":
-    if (($#FILES == 1)&&($#OBJECTFILES == 1)) then
-        if ($OBJECT != $OBJECTFILES) then
-            rm -f $OBJECT
-            ($ECHOCMD ; /bin/mv $OBJECTFILES $OBJECT)
-            if ($status) goto failure
-        endif
-    else
-        rm -f $OBJECT
-        ($ECHOCMD ; $CMK_LDRO $OBJECT $OPTS_LDRO $OBJECTFILES)
-        if ($status) goto failure
-    endif
-    goto copyobj
+Debug "About to link..."
 
-  case "*.a":
-    ($ECHOCMD ; rm -f $OBJECT)
-    ($ECHOCMD ; $CMK_AR $OBJECT $OBJECTFILES)
-    if ($status) goto failure
-    ($ECHOCMD ; $CMK_RANLIB $OBJECT)
-    if ($status) goto failure
-    goto copyobj
-endsw
+case "$OBJECT" in
+*.o)
+	nFiles=`echo $FILES | wc -w`
+	nObj=`echo $OBJECTFILES | wc -w`
+	if [ $nFiles -eq 1 -a $nObj -eq 1 ] 
+	then
+		if [ $OBJECT != $OBJECTFILES ]
+		then
+			DoNoErrCheck $RM $OBJECT
+			Do $MV $OBJECTFILES $OBJECT
+		fi
+	else
+		DoNoErrCheck $RM $OBJECT
+		Do $CMK_LDRO $OBJECT $OPTS_LDRO $OBJECTFILES
+	fi
+	Copyobj
+	;;
+*.a)
+	DoNoErrCheck $RM $OBJECT
+	Do $CMK_AR $OBJECT $OBJECTFILES
+	Do $CMK_RANLIB $OBJECT
+	Copyobj
+	;;
+esac
+# If the above case returns, we're not creating a .o or .a file--
+# check if we're linking a sequential object
 
-switch ($LANGUAGE)
-    case "c"
-    case "C"
-    case "f90"
-    case "f77"
-        ($ECHOCMD ; $CMK_SEQ_LD $OPTS_LD -o $OBJECT $OBJECTFILES -L$CHARMLIB $LIBRARIES $CMK_SEQ_LIBS)
-        if ($status) goto failure
-        goto copyobj
-        breaksw
-    case "c++"
-    case "C++"    
-        ($ECHOCMD ; $CMK_SEQ_LDXX $OPTS_LD -o $OBJECT $OBJECTFILES -L$CHARMLIB $LIBRARIES $CMK_SEQ_LIBS)
-        if ($status) goto failure
-        goto copyobj
-        breaksw
-endsw
+case "$LANGUAGE" in
+"c"|"C"|"f90"|"f77")
+	Do $CMK_SEQ_LD $OPTS_LD -o $OBJECT $OBJECTFILES -L$CHARMLIB $LIBRARIES $CMK_SEQ_LIBS
+	Copyobj
+	;;
+"c++"|"C++")
+	Do $CMK_SEQ_LDXX $OPTS_LD -o $OBJECT $OBJECTFILES -L$CHARMLIB $LIBRARIES $CMK_SEQ_LIBS
+	Copyobj
+	;;
+esac
 
 ##############################################################################
 #
@@ -628,52 +737,49 @@ endsw
 #
 ##############################################################################
 
+Debug "About to check TRACEMODE=$TRACEMODE and BALANCE=$BALANCE..."
+
 # Check for valid choice of TRACEMODE
 
-if (($LANGUAGE == charm) || ($LANGUAGE == charm++) || ($LANGUAGE == idl) || ($LANGUAGE == converse) || ($LANGUAGE == converse++) ) then
+[ -e $CHARMLIB/libtrace-none.a ] || Abort "trace libraries not installed."
 
-    if (! -e $CHARMLIB/libtrace-none.a) then
-        echo "charmc: trace libraries not installed."
-        goto failure
-    endif
-    
-    if ($?TRACEMODE == 0) set TRACEMODE=none
+[ -z "$TRACEMODE" ] && TRACEMODE="none"
 
-    if (! -e $CHARMLIB/libtrace-$TRACEMODE.a) then
-       echo "charmc : No such tracemode $TRACEMODE"
-       (cd $CHARMLIB ; ls -al libtrace-*)
-       goto failure
-    endif
+[ ! -e $CHARMLIB/libtrace-$TRACEMODE.a ] && Abort "charmc : No such tracemode $TRACEMODE"
 
-endif
 
 # Check for valid choice of BALANCE
 
-if ($?BALANCE == 0) set BALANCE=rand
+[ -z "$BALANCE" ] && BALANCE=rand
 
-if ($TRACEMODE == replay) then
-    if ($?BALANCE == 0) set BALANCE=replay
-    if ($BALANCE != replay) then
-        echo "Ignoring -balance $BALANCE, incompatible with -tracemode replay"
-    endif
-    set BALANCE=replay
-endif
+if [ "$TRACEMODE" = replay ]
+then
+	[ "$BALANCE" != replay ] && echo "Ignoring -balance $BALANCE, incompatible with -tracemode replay"
+    BALANCE=replay
+fi
 
-if ($BALANCE:h == $BALANCE) then
-   set BAL_OBJ = $CHARMLIB/libldb-$BALANCE.o
+BAL_EXT=`getExtention $BALANCE`
+if [ -z "$BAL_EXT" ]
+then
+# Balance has no extention-- is a library reference
+    BAL_OBJ="$CHARMLIB/libldb-$BALANCE.o"
 else
-   set BAL_OBJ = $BALANCE
-endif
-    
-if (! -e $BAL_OBJ) then
-    if ($BALANCE == $BAL_OBJ) then
-        echo "charmc : Could not find load balancer object $BAL_OBJ"
-    else
-	echo "charmc : Unknown load balancer $BALANCE"
-    	(cd $CHARMLIB ; ls -al libldb-*)
-    endif
-    goto failure
-endif
+# Balance has some extention-- must be a .o or .a file
+    BAL_OBJ="$BALANCE"
+fi
+
+Debug "Finished with BAL_OBJ=$BAL_OBJ, TRACEMODE=$TRACEMODE..."
+
+if [ ! -e "$BAL_OBJ" ]
+then
+	if [ "$BALANCE" = "$BAL_OBJ" ]
+	then
+		Abort "Could not find load balancer object $BAL_OBJ"
+	else
+		(cd $CHARMLIB ; ls -al libldb-*)
+		Abort "Unknown load balancer $BALANCE / $BAL_OBJ"
+	fi
+fi
 
 ###############################################################################
 #
@@ -681,35 +787,29 @@ endif
 #
 ###############################################################################
 
-switch ($LANGUAGE)
-    case "charm"
-    case "charm++"
-        ($ECHOCMD ; $CMK_LDXX $OPTS_LDXX -o $OBJECT -L$CHARMLIB -I$CHARMINC \
-		      $BAL_OBJ $OBJECTFILES \
-                      $LIBRARIES -lck \
-                      -lconv-cplus-y -lconv-core  -ltrace-$TRACEMODE \
-		      -lm $CMK_LIBS)
-        breaksw
-    case "idl"
-        ($ECHOCMD ; $CMK_LDXX $OPTS_LDXX -o $OBJECT -L$CHARMLIB \
-		      $BAL_OBJ $OBJECTFILES \
-                      $LIBRARIES -lck \
-                      -lconv-cplus-y -lconv-core -ltrace-$TRACEMODE \
-		      -lidl -lm $CMK_LIBS)
-        breaksw
-    case "converse"
-        ($ECHOCMD ; $CMK_LD $OPTS_LD -o $OBJECT -L$CHARMLIB $BAL_OBJ \
-		      $OBJECTFILES $LIBRARIES -lconv-cplus-n -lconv-core\
-		      -ltrace-$TRACEMODE \
-		      -lm $CMK_LIBS)
-        breaksw
-    case "converse++"
-        ($ECHOCMD ; $CMK_LDXX $OPTS_LDXX -o $OBJECT -L$CHARMLIB $BAL_OBJ \
-		      $OBJECTFILES $LIBRARIES -lconv-cplus-y -lconv-core \
-		      -ltrace-$TRACEMODE \
-		      -lm $CMK_LIBS)
-        breaksw
-endsw
+Debug "About to perform final link..."
+
+LANG_LIBS="-L$CHARMLIB -I$CHARMINC $BAL_OBJ $OBJECTFILES $LIBRARIES -lck"
+CORE_LIBS="-lconv-core -ltrace-$TRACEMODE"
+
+case "$LANGUAGE" in
+"charm"|"charm++")
+	Do $CMK_LDXX $OPTS_LDXX -o $OBJECT \
+		$LANG_LIBS -lconv-cplus-y $CORE_LIBS -lm $CMK_LIBS
+	;;
+"idl")
+	Do $CMK_LDXX $OPTS_LDXX -o $OBJECT \
+		$LANG_LIBS -lconv-cplus-y $CORE_LIBS -lidl -lm $CMK_LIBS
+	;;
+"converse")
+	Do $CMK_LD $OPTS_LD -o $OBJECT \
+		$LANG_LIBS -lconv-cplus-n $CORE_LIBS -lm $CMK_LIBS
+	;;
+"converse++")
+	Do $CMK_LDXX $OPTS_LDXX -o $OBJECT \
+		$LANG_LIBS -lconv-cplus-y $CORE_LIBS -lm $CMK_LIBS
+	;;
+esac
 
 ########################################################################
 #
@@ -717,56 +817,25 @@ endsw
 #
 ########################################################################
 
-if (-e $CHARMBIN/conv-host) then
-    /bin/rm -f conv-host
-    /bin/ln -s $CHARMBIN/conv-host conv-host
-endif
+if [ -e $CHARMBIN/conv-host ]
+then
+	DoNoErrCheck $RM conv-host
+	Do $CP $CHARMBIN/conv-host conv-host
+fi
 
-########################################################################
-#
-# copyobj: if -cp specified, copy the resulting output file.
-#
-########################################################################
+Copyobj
 
-copyobj:
 
-foreach x ($COPIES)
-    if ($x != $OBJECT) then
-	set COPY=$x
-	if (-d $COPY) set COPY=$COPY/$OBJECT
-        ($ECHOCMD ; /bin/rm -f $COPY ; /bin/cp $OBJECT $COPY)
-    endif
-end
 
-goto success
 
-########################################################################
-#
-# Clean up files and exit
-#
-########################################################################
 
-success:
 
-    set STATUS=0
-    goto end
 
-failure:
 
-    echo 'charmc: aborting.'
-    set STATUS=1
-    goto end
 
-end:
 
-    if ($?SAVE == 0) then
-        foreach FILE ($FILES)
-            set BASE=$FILE:r
-            set TMP=$BASE:t.TMP
-            /bin/rm -f $TMP.P.C $TMP.cpp $TMP.space $TMP.xlat $TMP.o
-            /bin/rm -f $TMP.c $TMP.c.0.h $TMP.c.1.h $TMP.c.2.h
-            /bin/rm -f $TMP.i $TMP.$CMK_CPP_SUFFIX
-        end
-        rm -f core $DELETE
-    endif
-    exit ($STATUS)
+
+
+
+
+
