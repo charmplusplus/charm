@@ -40,7 +40,7 @@ ELAN_TPORT    *elan_port;
 ELAN_QUEUE    *elan_q;
 #define SMALL_MESSAGE_SIZE 16384       /* Message sizes greater will be 
 					  probe received adding 5us overhead*/
-#define SYNC_MESSAGE_SIZE 16384        /* Message sizes greater will be 
+#define SYNC_MESSAGE_SIZE 256        /* Message sizes greater will be 
 					sent synchronously thus avoiding copying*/
 
 
@@ -807,7 +807,11 @@ static void ConverseRunPE(int everReturn)
   cs = CmiGetState();
   CpvInitialize(void *,CmiLocalQueue);
   CpvAccess(CmiLocalQueue) = cs->localqueue;
+  /*  since elan version is not a SMP version */
+  /*
   CmiMyArgv=CmiCopyArgs(Cmi_argv);
+  */
+  CmiMyArgv=Cmi_argv;
   CthInit(CmiMyArgv);
 #if MACHINE_DEBUG_LOG
   {
