@@ -59,7 +59,7 @@ void trace_creation(msg_type, entry, envelope)
 int msg_type, entry;
 ENVELOPE *envelope;
 {
-  CpvAccess(now) = CkTimer(); 
+  CpvAccess(now) = CkWallTimer(); 
   adjust_time_interval(CpvAccess(now));
   CpvAccess(display_index) = get_creation_display_index(msg_type); 
   if (CpvAccess(display_index) >=0)
@@ -75,7 +75,7 @@ ENVELOPE *envelope;
     (GetEnv_EP(envelope) < CsvAccess(NumSysBocEps)))
     return;
 
-  CpvAccess(now) = CkTimer(); 
+  CpvAccess(now) = CkWallTimer(); 
   adjust_time_interval(CpvAccess(now));
   CpvAccess(start_processing_time) = CpvAccess(now);
   CpvAccess(last_time_interval) = CpvAccess(current_time_interval);
@@ -87,7 +87,7 @@ int id, msg_type, entry;
 {
   if (CpvAccess(start_processing_time) == -1)
     return;
-  CpvAccess(now) = CkTimer(); 
+  CpvAccess(now) = CkWallTimer(); 
   adjust_time_interval(CpvAccess(now));
      CpvAccess(display_index) = get_processing_display_index(msg_type);
   compute_busy(CpvAccess(start_processing_time), CpvAccess(now), CpvAccess(last_time_interval), 
@@ -159,7 +159,7 @@ void log_init(void)
   CpvAccess(timestep) = INITIAL_TIMESTEP;
 
   CpvAccess(CtrRecdTraceMsg) = 0;
-  CpvAccess(init_time) = CkTimer();
+  CpvAccess(init_time) = CkWallTimer();
   CpvAccess(start_processing_time) = -1;
         for (i=0; i<NUMBER_DISPLAYS; i++)
         for (j=0; j<MAXLOGMSGSIZE; j++)
