@@ -1,0 +1,9 @@
+module HeapCentLB {
+
+extern module CentralLB;
+
+group HeapCentLB : CentralLB {
+  entry void HeapCentLB(void);  
+};
+
+};
