@@ -66,7 +66,7 @@ $(FILE).idx:
 
 # Clean out all TeX droppings:
 clean:
-	-rm -fr *.aux *.log *.dvi *.ps *.pdf $(FILE)
+	-rm -fr *.aux *.log *.dvi *.ps *.pdf *.out *.ilg $(FILE)
 	-rm -fr *.idx *.log *.bbl *.blg *.toc *~ fig/*.bak
 	-rm -fr index.tex
 
