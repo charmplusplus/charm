@@ -12,7 +12,11 @@
 
 /******************************************************************************
  *
- * The sequential future abstraction.
+ * The sequential future abstraction:
+ *  A "future" represents a thread of control that has been passed
+ * to another processor.  It provides a place for a (local) thread to
+ * block and the machinery for resuming control.  Futures are used to
+ * implement Charm++'s "[sync]" methods.
  *
  *****************************************************************************/
 
@@ -148,61 +152,59 @@ class  FutureMain : public Chare {
 extern "C" 
 CkFutureID CkRemoteBranchCallAsync(int ep, void *m, CkGroupID group, int PE)
 { 
-  envelope *env = UsrToEnv(m);
-  int i = createFuture();
-  env->setRef(i);
+  CkFutureID ret=CkCreateAttachedFuture(m);
   CkSendMsgBranch(ep, m, PE, group);
-  return i;
+  return ret;
 }
 
 extern "C" 
 void *CkRemoteBranchCall(int ep, void *m, CkGroupID group, int PE)
 { 
-  void * result;
-  int i = CkRemoteBranchCallAsync(ep, m, group, PE);
-  result = CkWaitFuture(i);
-  CkReleaseFuture(i);
-  return (result);
+  CkFutureID i = CkRemoteBranchCallAsync(ep, m, group, PE);  
+  return CkWaitReleaseFuture(i);
 }
 
 extern "C" 
 CkFutureID CkRemoteNodeBranchCallAsync(int ep, void *m, CkGroupID group, int node)
 { 
-  envelope *env = UsrToEnv(m);
-  int i = createFuture();
-  env->setRef(i);
+  CkFutureID ret=CkCreateAttachedFuture(m);
   CkSendMsgNodeBranch(ep, m, node, group);
-  return i;
+  return ret;
 }
 
 extern "C" 
 void *CkRemoteNodeBranchCall(int ep, void *m, CkGroupID group, int node)
 { 
-  void * result;
-  int i = CkRemoteNodeBranchCallAsync(ep, m, group, node);
-  result = CkWaitFuture(i);
-  CkReleaseFuture(i);
-  return (result);
+  CkFutureID i = CkRemoteNodeBranchCallAsync(ep, m, group, node);
+  return CkWaitReleaseFuture(i);
 }
 
 extern "C" 
 CkFutureID CkRemoteCallAsync(int ep, void *m, const CkChareID *ID)
 { 
-  envelope *env = UsrToEnv(m);
-  int i = createFuture();
-  env->setRef(i);
+  CkFutureID ret=CkCreateAttachedFuture(m);
   CkSendMsg(ep, m, ID);
-  return i;
+  return ret;
 }
 
 extern "C" 
 void *CkRemoteCall(int ep, void *m, const CkChareID *ID)
 { 
-  void * result;
-  int i = CkRemoteCallAsync(ep, m, ID);
-  result = CkWaitFuture(i);
-  CkReleaseFuture(i);
-  return (result);
+  CkFutureID i = CkRemoteCallAsync(ep, m, ID);
+  return CkWaitReleaseFuture(i);
+}
+
+extern "C" CkFutureID CkCreateAttachedFuture(void *msg)
+{
+	CkFutureID ret=createFuture();
+	UsrToEnv(msg)->setRef(ret);
+	return ret;
+}
+extern "C" void *CkWaitReleaseFuture(CkFutureID futNum)
+{
+	void *result=CkWaitFuture(futNum);
+	CkReleaseFuture(futNum);
+	return result;
 }
 
 class FutureBOC: public Group {
