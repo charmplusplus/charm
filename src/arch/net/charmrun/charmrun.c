@@ -1444,7 +1444,10 @@ void req_client_connect(void)
 void req_start_server(void)
 {
   skt_ip_t ip=skt_innode_my_ip();
-  if (arg_usehostname || skt_ip_match(ip,skt_lookup_ip("127.0.0.1")))
+  if (arg_local)
+    /* local execution, use localhost always */
+    strcpy(server_addr, "127.0.0.1");
+  else if (arg_usehostname || skt_ip_match(ip,skt_lookup_ip("127.0.0.1")))
     /*Use symbolic host name as charmrun address*/
     gethostname(server_addr,sizeof(server_addr));
   else
