@@ -277,7 +277,7 @@ public:
 	virtual int wait(MPI_Status *sts) =0;
 
 	/// Frees up the request
-	virtual int free(void){ /* mark it invalid? */ }
+	virtual int free(void){ /* mark it invalid? */ return 0; }
 
 	/// Returns the type of request: 1-PersReq, 2-IReq, 3-ATAReq
 	virtual int getType(void) =0;

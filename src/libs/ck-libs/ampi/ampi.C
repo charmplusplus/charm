@@ -1367,6 +1367,7 @@ int ATAReq::wait(MPI_Status *sts){
 		getAmpiInstance(myreqs[i].comm)->recv(myreqs[i].tag, myreqs[i].src, myreqs[i].buf,
 				myreqs[i].count, myreqs[i].type, myreqs[i].comm, (int *)sts);
 	}
+	return 0;
 }
 
 CDECL
