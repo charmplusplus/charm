@@ -301,7 +301,7 @@ void TraceProjections::traceClose(void)
     _logPool->writeSts();
   delete _logPool;		// will write
   delete CkpvAccess(_trace);
-  free(CkpvAccess(traceRoot));
+//  free(CkpvAccess(traceRoot));
 }
 
 void TraceProjections::traceBegin(void)

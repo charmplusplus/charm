@@ -17,7 +17,6 @@
 #define VER   3.0
 
 CkpvStaticDeclare(TraceSummary*, _trace);
-CkpvStaticDeclare(char*, pgmName);
 static int _numEvents = 0;
 static int _threadMsg, _threadChare, _threadEP;
 static int _packMsg, _packChare, _packEP;
@@ -165,8 +164,8 @@ void SumLogPool::write(void)
 
 void SumLogPool::writeSts(void)
 {
-  char *fname = new char[strlen(CkpvAccess(pgmName))+strlen(".sts")+1];
-  sprintf(fname, "%s.sum.sts", CkpvAccess(pgmName));
+  char *fname = new char[strlen(CkpvAccess(traceRoot))+strlen(".sum.sts")+1];
+  sprintf(fname, "%s.sum.sts", CkpvAccess(traceRoot));
   FILE *sts = fopen(fname, "w+");
   //CmiPrintf("File: %s \n", fname);
   if(sts==0)
@@ -233,19 +232,15 @@ void BinEntry::write(FILE* fp)
 TraceSummary::TraceSummary(char **argv):curevent(0),msgNum(0),binStart(0.0),bin(0.0)
 {
   char *tmpStr;
-  CkpvInitialize(char*, pgmName);
   CkpvInitialize(double, binSize);
   CkpvInitialize(double, version);
-  CkpvAccess(pgmName) = (char *) malloc(strlen(argv[0])+1);
-  _MEMCHECK(CkpvAccess(pgmName));
-  strcpy(CkpvAccess(pgmName), argv[0]);
   CkpvAccess(binSize) = BIN_SIZE;
   CkpvAccess(version) = VER;
   if (CmiGetArgString(argv,"+binsize",&tmpStr))
   	sscanf(tmpStr,"%lf",&CkpvAccess(binSize));
   if (CmiGetArgString(argv,"+version",&tmpStr))
   	sscanf(tmpStr,"%lf",&CkpvAccess(version));
-  _logPool = new SumLogPool(CkpvAccess(pgmName));
+  _logPool = new SumLogPool(CkpvAccess(traceRoot));
 }
 
 int TraceSummary::traceRegisterUserEvent(const char*)
