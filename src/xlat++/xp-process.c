@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.8  1996-08-01 21:07:30  jyelon
+ * Revision 2.9  1997-03-18 20:25:57  milind
+ * Changed another address to int conversion to address to size_t conversion.
+ *
+ * Revision 2.8  1996/08/01 21:07:30  jyelon
  * *** empty log message ***
  *
  * Revision 2.7  1995/11/14 21:24:25  sanjeev
@@ -298,7 +301,7 @@ void GenerateStructsFns()
                 		else {
 					/* next two statements to prevent CC from cribbing */
                                         fprintf(outfile,"\tchar *junk2=argv[0];\n") ;
-                                        fprintf(outfile,"\targc = (int)junk ;\n") ;
+                                        fprintf(outfile,"\targc = (size_t)junk ;\n") ;
                        		/*	fprintf(outfile,"\t((main *)obj)->_CKmain() ;\n") ; */
                                         fprintf(outfile,"\tnew (obj) main() ;\n}\n") ;
                 		}
