@@ -693,7 +693,7 @@ OPTS_CC="$OPTS $OPTS_CC"
 OPTS_CXX="$OPTS $OPTS_CXX"
 OPTS_F90="$OPTS $OPTS_F90"
 OPTS_LD="$OPTS $OPTS_LD"
-OPTS_LDXX="$OPTS $OPTS_LDXX"
+# OPTS_LDXX gets OPTS from OPTS_LD
 
 # There's really no analog for this in the Bourne shell: 
 #  -------- C Shell ------> onintr failure
@@ -1157,17 +1157,19 @@ then
 		Debug "    Found .o: $REPLACEOBJ"
 		ALL_LIBS="$ALL_LIBS $REPLACEOBJ"
 	else
+# It's probably not a charm library-- just keep it 
+		ALL_LIBS="$ALL_LIBS $l"
 # It's probably not a charm library-- just keep it (if it's not a duplicate!)
-		ALL_LIBS=`AddList $l $ALL_LIBS`
+#		ALL_LIBS=`AddList $l $ALL_LIBS`
 	fi
   done
   
   Debugf "Building shared library: final list of libraries: $ALL_LIBS"
-  [ "$MAKE_LDXX" = "1" ] && Do $CMK_LDXX $CMK_LD_SHARED $OPTS_LDXX -o $OBJECT $ALL_LIBS
+  [ "$MAKE_LDXX" = "1" ] && Do $CMK_LDXX $CMK_LD_SHARED $OPTS_LD $OPTS_LDXX -o $OBJECT $ALL_LIBS
   [ "$MAKE_LD" = "1" ] && Do $CMK_LD $CMK_LD_SHARED $OPTS_LD -o $OBJECT $ALL_LIBS
 else
 # Make a regular executable: call the appropriate linker
-  [ "$MAKE_LDXX" = "1" ] && Do $CMK_LDXX $OPTS_LDXX -o $OBJECT $ALL_LIBS
+  [ "$MAKE_LDXX" = "1" ] && Do $CMK_LDXX $OPTS_LD $OPTS_LDXX -o $OBJECT $ALL_LIBS
   [ "$MAKE_LD" = "1" ] && Do $CMK_LD $OPTS_LD -o $OBJECT $ALL_LIBS
 fi
 
