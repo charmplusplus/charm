@@ -5,7 +5,7 @@
 
 /* alway use handler table per node */
 #if ! defined(CMK_BLUEGENE_NODE) && ! defined(CMK_BLUEGENE_THREAD)
-#define CMK_BLUEGENE_NODE   1
+#define CMK_BLUEGENE_THREAD   1
 #endif
 
 /* define system parameters */

@@ -297,13 +297,13 @@ void BgNumberHandler(int idx, BgHandler h)
 {
   ASSERT(!cva(inEmulatorInit));
 #if CMK_BLUEGENE_NODE
-  return tMYNODE->handlerTable.numberHandler(idx,h);
+  tMYNODE->handlerTable.numberHandler(idx,h);
 #else
   if (tTHREADTYPE == COMM_THREAD) {
-    return tMYNODE->handlerTable.numberHandler(idx, h);
+    tMYNODE->handlerTable.numberHandler(idx, h);
   }
   else {
-    return tHANDLETAB.numberHandler(idx, h);
+    tHANDLETAB.numberHandler(idx, h);
   }
 #endif
 }
