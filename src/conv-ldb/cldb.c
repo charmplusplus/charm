@@ -108,6 +108,7 @@ static void CldTokenHandler(CldToken tok)
     CpvAccess(CldLoadOffset)--;
   if (CpvAccess(CldLoadNotify))
     LoadNotifyFn(CpvAccess(CldProc)->load);
+  CmiFree(tok);
 }
 
 int CldCountTokens(void)
