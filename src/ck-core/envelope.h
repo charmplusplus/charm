@@ -24,7 +24,7 @@ typedef unsigned int   UInt;
 typedef unsigned short UShort;
 typedef unsigned char  UChar;
 
-#define SVM1     (sizeof(void*)-1)
+#define SVM1     (sizeof(double)-1)
 #define ALIGN(x) (((x)+SVM1)&(~(SVM1)))
 #define A(x)     ALIGN(x)
 #define D(x)     (A(x)-(x))
