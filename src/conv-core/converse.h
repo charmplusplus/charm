@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.62  1997-07-07 23:03:38  rbrunner
+ * Revision 2.63  1997-07-21 21:00:05  jyelon
+ * added cpthreads.
+ *
+ * Revision 2.62  1997/07/07 23:03:38  rbrunner
  * Added stdio.h to CMI_PRINTF_IS_BUILTIN block
  *
  * Revision 2.61  1997/05/05 13:47:12  jyelon
@@ -601,7 +604,7 @@ void   CmiDeliverSpecificMsg   CMK_PROTO((int handler));
 #define CQS_QUEUEING_BFIFO 6
 #define CQS_QUEUEING_BLIFO 7
 
-/****** CTH: THE THREADS PACKAGE ******/
+/****** CTH: THE LOW-LEVEL THREADS PACKAGE ******/
 
 typedef struct CthThreadStruct *CthThread;
 
@@ -625,7 +628,61 @@ double     CthAutoYieldFreq       CMK_PROTO((CthThread t));
 void       CthAutoYieldBlock      CMK_PROTO((void));
 void       CthAutoYieldUnblock    CMK_PROTO((void));
 
-/****** CTH: THREAD-PRIVATE VARIABLES (Geez, I hate C) ******/
+/****** CPTHREAD: the posix threads package ******/
+
+#define CPTHREAD_ONCE_INIT 0
+
+typedef int                         Cpthread_once_t;
+typedef struct Cpthread_attr_s      Cpthread_attr_t;
+typedef struct Cpthread_key_s      *Cpthread_key_t;
+typedef struct Cpthread_cleanup_s  *Cpthread_cleanup_t;
+typedef struct Cpthread_mutexattr_s Cpthread_mutexattr_t;
+typedef struct Cpthread_condattr_s  Cpthread_condattr_t;
+typedef struct Cpthread_mutex_s     Cpthread_mutex_t;
+typedef struct Cpthread_cond_s      Cpthread_cond_t;
+typedef struct Cpthread_s          *Cpthread_t;
+
+Cpthread_t Cpthread_self();
+int   Cpthread_attr_init(Cpthread_attr_t *attr);
+int   Cpthread_attr_destroy(Cpthread_attr_t *attr);
+int   Cpthread_attr_getstacksize(Cpthread_attr_t *attr, size_t *size);
+int   Cpthread_attr_setstacksize(Cpthread_attr_t *attr, size_t size);
+int   Cpthread_attr_getdetachstate(Cpthread_attr_t *attr, int *state);
+int   Cpthread_attr_setdetachstate(Cpthread_attr_t *attr, int state);
+int   Cpthread_key_create(Cpthread_key_t *keyp, void (*destructo)(void *));
+int   Cpthread_key_delete(Cpthread_key_t key);
+int   Cpthread_setspecific(Cpthread_key_t key, void *val);
+void *Cpthread_getspecific(Cpthread_key_t key);
+void  Cpthread_cleanup_push(void (*routine)(void*), void *arg);
+void  Cpthread_cleanup_pop(int execute);
+void  Cpthread_exit(void *status);
+void  Cpthread_top(Cpthread_t pt);
+int   Cpthread_create(Cpthread_t *thread, Cpthread_attr_t *attr,
+		      void *(*fn)(void *), void *arg);
+int   Cpthread_equal(Cpthread_t t1, Cpthread_t t2);
+int   Cpthread_detach(Cpthread_t pt);
+int   Cpthread_join(Cpthread_t pt, void **status);
+int   Cpthread_mutexattr_init(Cpthread_mutexattr_t *mattr);
+int   Cpthread_mutexattr_destroy(Cpthread_mutexattr_t *mattr);
+int   Cpthread_mutexattr_getpshared(Cpthread_mutexattr_t *mattr,int *pshared);
+int   Cpthread_mutexattr_setpshared(Cpthread_mutexattr_t *mattr,int  pshared);
+int   Cpthread_mutex_init(Cpthread_mutex_t *mutex,Cpthread_mutexattr_t *mattr);
+int   Cpthread_mutex_destroy(Cpthread_mutex_t *mutex);
+int   Cpthread_mutex_lock(Cpthread_mutex_t *mutex);
+int   Cpthread_mutex_trylock(Cpthread_mutex_t *mutex);
+int   Cpthread_mutex_unlock(Cpthread_mutex_t *mutex);
+int   Cpthread_condattr_init(Cpthread_condattr_t *cattr);
+int   Cpthread_condattr_destroy(Cpthread_condattr_t *cattr);
+int   Cpthread_condattr_getpshared(Cpthread_condattr_t *cattr, int *pshared);
+int   Cpthread_condattr_setpshared(Cpthread_condattr_t *cattr, int pshared);
+int   Cpthread_cond_init(Cpthread_cond_t *cond, Cpthread_condattr_t *cattr);
+int   Cpthread_cond_destroy(Cpthread_cond_t *cond);
+int   Cpthread_cond_wait(Cpthread_cond_t *cond, Cpthread_mutex_t *mutex);
+int   Cpthread_cond_signal(Cpthread_cond_t *cond);
+int   Cpthread_cond_broadcast(Cpthread_cond_t *cond);
+int   Cpthread_once(Cpthread_once_t *once, void (*fn)(void));
+
+/****** CTH: THREAD-PRIVATE VARIABLES ******/
 
 #if CMK_THREADS_REQUIRE_NO_CPV
 

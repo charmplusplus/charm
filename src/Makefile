@@ -56,7 +56,7 @@ CHARMC=../bin/charmc $(CHARMOPTS) $(OPTS)
 #
 ###############################################################################
 
-ALLHEADERS=acc.h c++interface.h chare.h ckdefs.h common.h communication.h condsend.h const.h dagger.h dtable.h env_macros.h globals.h mono.h msg_macros.h prio_macros.h qd.h stat.h sys_macros.h table.h tbl.h trans_decls.h trans_defs.h trans_externs.h user_macros.h vid.h wrtone.h converse.h conv-mach.h internal.h quiescence.h trace.h dag.h generic_redn.h charmFuturesInclude.h # pglib.h
+ALLHEADERS=acc.h c++interface.h chare.h ckdefs.h common.h communication.h condsend.h const.h cpthreads.h dagger.h dtable.h env_macros.h globals.h mono.h msg_macros.h prio_macros.h qd.h stat.h sys_macros.h table.h tbl.h trans_decls.h trans_defs.h trans_externs.h user_macros.h vid.h wrtone.h converse.h conv-mach.h internal.h quiescence.h trace.h dag.h generic_redn.h charmFuturesInclude.h # pglib.h
 
 ALLINTERFACES=GENERIC-ACC.int GENERIC-HIST.int GENERIC-REDN.int barrier_redn.int cache.int dacc_count.int dacc_hist.int dcountredn.int dmaxredn.int dminredn.int dprodredn.int dsumredn.int facc_count.int facc_hist.int fcountredn.int fmaxredn.int fminredn.int fprodredn.int fsumredn.int iacc_count.int iacc_hist.int icountredn.int imaxredn.int iminredn.int iprodredn.int isumredn.int pg.int
 
@@ -123,7 +123,7 @@ CVHEADERS=converse.h conv-mach.h conv-mach.csh
 
 CVLIBS=libconv-core.a libconv-cplus-n.a libconv-cplus-y.a
 
-LIBCONV_CORE=threads.o convcore.o conv-conds.o spantree.o queueing.o fifo.o msgmgr.o memory.o cpm.o
+LIBCONV_CORE=threads.o convcore.o conv-conds.o spantree.o queueing.o fifo.o msgmgr.o memory.o cpm.o cpthreads.o
 
 converse: basics QuickThreads/libqt.a $(CVLIBS) conv-host-if-needed conv-cpm
 
@@ -173,6 +173,9 @@ conv-conds.o: conv-conds.c $(CVHEADERS)
 
 msgmgr.o: msgmgr.c $(CVHEADERS)
 	$(CHARMC) msgmgr.c
+
+cpthreads.o: cpthreads.c $(CVHEADERS)
+	$(CHARMC) cpthreads.c
 
 memory.o: memory.c $(CVHEADERS)
 	$(CHARMC) memory.c
