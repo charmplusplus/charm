@@ -82,10 +82,10 @@ public:
 //This class is as large as any CkArrayIndex
 class CkArrayIndexMax : public CkArrayIndex {
 	 void copyFrom(const CkArrayIndex &that)
-		  {*this=*(CkArrayIndexMax *)&that;}
-		  /*  nInts=that.nInts;
+	 {
+		  nInts=that.nInts;
 		  for (int i=0;i<nInts;i++) index[i]=that.data()[i];
-		  }*/
+	 }
 public:
 	int index[CK_ARRAYINDEX_MAXLEN];
 	CkArrayIndexMax() {}
