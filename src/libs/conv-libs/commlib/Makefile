@@ -1,6 +1,6 @@
 CHARMC= ../../../../bin/charmc $(OPTS)
 OBJS=commlib.o gridrouter.o de.o treerouter.o petable.o overlapper.o \
-     rsend.o bcast.o
+     rsend.o bcast.o charm_bind.o
 
 all: libcomm.a
 	rm -f ../../../../include/commlib.h

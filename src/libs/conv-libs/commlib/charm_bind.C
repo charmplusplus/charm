@@ -8,6 +8,12 @@
 #include "charm++.h"
 #include "commlib.h"
 
+#include "../../../ck.h"
+#include "../../../envelope.h"
+
+class envelope;
+
+#if 0
 //void CComlibEachToManyMulticast(id, ep, msg, bocnum, npe, pelist, ref)
 void CComlibEachToManyMulticast(comID id, int ep, void *msg, int bocnum, int npe, int *pelist)
 {
@@ -40,4 +46,23 @@ void CComlibEachToManyMulticast(comID id, int ep, void *msg, int bocnum, int npe
   if((type!=QdBocMsg)&&(type!=QdBroadcastBocMsg)&&(type!=LdbMsg))
     QDCountThisCreation(npe);
 }
+#endif
+
+void CComlibEachToManyMulticast(comID id, int ep, int msgSize, void *msg, int npe, int *pelist)
+{
+  if (msg == NULL) {
+  	EachToManyMulticast(id, 0, (void *)msg, npe, pelist);
+	return;
+  }
+
+  register envelope *env = UsrToEnv(msg);
+  _CHECK_USED(env);
+  env->setMsgtype(ForChareMsg);
+  env->setEpIdx(ep);
+  CmiSetHandler(env, _charmHandlerIdx);
+  _SET_USED(env, 1);
+  env->setSrcPe(CkMyPe());
+  EachToManyMulticast(id, msgSize, (void *)env, npe, pelist);
+}
+
 
