@@ -426,15 +426,15 @@ void CkMulticastMgr::recvMsg(multicastGrpMsg *msg)
   int nLocal = entry->localElem.length();
   DEBUGF(("send to local %d\n", nLocal));
   for (i=0; i<nLocal-1; i++) {
-    multicastGrpMsg *newm = (multicastGrpMsg *)CkCopyMsg((void **)&msg);
+    //multicastGrpMsg *newm = (multicastGrpMsg *)CkCopyMsg((void **)&msg);
 //    CProxyElement_ArrayBase ap(msg->aid, entry->localElem[i]);
 //    ap.ckSend((CkArrayMessage *)newm, msg->ep);
-    CkSendMsgArrayInline(msg->ep, newm, msg->aid, entry->localElem[i]);
+    CkSendMsgArrayInline(msg->ep, msg, msg->aid, entry->localElem[i], CmiFalse);
   }
   if (nLocal) {
 //    CProxyElement_ArrayBase ap(msg->aid, entry->localElem[nLocal-1]);
 //    ap.ckSend((CkArrayMessage *)msg, msg->ep);
-    CkSendMsgArrayInline(msg->ep, msg, msg->aid, entry->localElem[nLocal-1]);
+    CkSendMsgArrayInline(msg->ep, msg, msg->aid, entry->localElem[nLocal-1], CmiTrue);
   }
   else {
     CkAssert (entry->rootSid.get_pe() == CkMyPe());
@@ -443,6 +443,8 @@ void CkMulticastMgr::recvMsg(multicastGrpMsg *msg)
 
 }
 
+// user function
+// to retrieve section info from a multicast msg
 void CkGetSectionInfo(CkSectionInfo &id, void *msg)
 {
   CkMcastBaseMsg *m = (CkMcastBaseMsg *)msg;
