@@ -3,7 +3,9 @@
 #include <converse.h>
 #include <stdlib.h>
 
+#ifndef NULL
 #define NULL 0
+#endif
 
 enum{BCAST=0,TREE, GRID, HCUBE, RSEND};  
 #define MAXNUMMSGS 1000
