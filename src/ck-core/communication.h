@@ -12,8 +12,8 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-02 17:27:40  brunner
- * Reorganized directory structure
+ * Revision 2.1  1995-06-08 17:09:41  gursoy
+ * Cpv macro changes done
  *
  * Revision 1.10  1995/04/24  20:06:06  sanjeev
  * *** empty log message ***
@@ -47,11 +47,16 @@
  * Initial revision
  *
  ***************************************************************************/
+#ifndef COMMUNICATION_H
+#define COMMUNICATION_H
+
+
+
 #define UNPACK(envelope) if (GetEnv_isPACKED(envelope) == PACKED) \
 { \
         void *unpackedUsrMsg; \
         void *usrMsg = USER_MSG_PTR(envelope); \
-        (*(MsgToStructTable[GetEnv_packid(envelope)].unpack)) \
+        (*(CsvAccess(MsgToStructTable)[GetEnv_packid(envelope)].unpack)) \
                 (usrMsg, &unpackedUsrMsg); \
         if (usrMsg != unpackedUsrMsg) \
         /* else unpacked in place */ \
@@ -80,7 +85,7 @@
                 /* make it +ve to connote a packed msg */ \
                 SetEnv_isPACKED(env, PACKED); \
                 usermsg = USER_MSG_PTR(env); \
-                (*(MsgToStructTable[GetEnv_packid(env)].pack)) \
+                (*(CsvAccess(MsgToStructTable)[GetEnv_packid(env)].pack)) \
                         (usermsg, &packedmsg, &size); \
                 if (usermsg != packedmsg) \
                         env = ENVELOPE_UPTR(packedmsg); \
@@ -90,7 +95,7 @@
 
 #define CkCheck_and_Send(env,Entry) { \
 	if ( GetEnv_destPE(env) == CmiMyPe()) { \
-	        CmiSetHandler(env,CallProcessMsg_Index) ; \
+	        CmiSetHandler(env,CsvAccess(CallProcessMsg_Index)) ; \
                 CsdEnqueue(env); \
 	} \
         else \
@@ -104,7 +109,7 @@
 { \
 	LdbFillBlock(env); \
 	PACK(env); \
-	CmiSetHandler(env,HANDLE_INCOMING_MSG_Index); \
+	CmiSetHandler(env,CsvAccess(HANDLE_INCOMING_MSG_Index)); \
 	CmiSyncSend(pe,CmiSize(env),env); \
 	CmiFree(env) ; \
 }
@@ -112,19 +117,22 @@
 
 #define CkCheck_and_Broadcast(env,Entry) { \
         LdbFillBlock(env); PACK(env); \
-        CmiSetHandler(env,HANDLE_INCOMING_MSG_Index); \
+        CmiSetHandler(env,CsvAccess(HANDLE_INCOMING_MSG_Index)); \
 	CmiSyncBroadcast(CmiSize(env),env); \
 	CmiFree(env) ; \
         }
 
 #define CkCheck_and_BroadcastNoFree(env,Entry) { \
         LdbFillBlock(env); PACK(env); \
-        CmiSetHandler(env,HANDLE_INCOMING_MSG_Index); \
+        CmiSetHandler(env,CsvAccess(HANDLE_INCOMING_MSG_Index)); \
 	CmiSyncBroadcast(CmiSize(env),env); UNPACK(env);  \
         }
 
 #define CkCheck_and_BroadcastAll(env,Entry) { \
         LdbFillBlock(env); PACK(env); \
-        CmiSetHandler(env,HANDLE_INCOMING_MSG_Index); \
+        CmiSetHandler(env,CsvAccess(HANDLE_INCOMING_MSG_Index)); \
 	CmiSyncBroadcastAllAndFree(CmiSize(env),env);\
         }
+
+
+#endif

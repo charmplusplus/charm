@@ -12,8 +12,8 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-02 17:27:40  brunner
- * Reorganized directory structure
+ * Revision 2.1  1995-06-08 17:09:41  gursoy
+ * Cpv macro changes done
  *
  * Revision 1.3  1995/04/13  20:55:22  sanjeev
  * Changed Mc to Cmi
@@ -35,6 +35,19 @@ extern void * CPlus_CallAccInit() ;
 extern void * CPlus_GetAccMsgPtr() ;
 extern void CPlus_CallCombineFn() ;
 extern void CPlus_SetAccId() ;
+
+
+
+/* internal functions */
+static ACC_CollectFromNode_Fn();
+static ACC_LeafNodeCollect_Fn();
+static ACC_InteriorNodeCollect_Fn();
+static ACC_BranchInit_Fn();
+
+
+
+
+
 
 CollectValue(bocnum, EP, CID)
 int bocnum;
@@ -111,7 +124,7 @@ ACC_DATA *mydata;
 	if ( IsCharmPlusPseudo(mydata->id) ) 
 		CPlus_CallCombineFn(mydata->dataptr,msg) ;
 	else 
-		(*(PseudoTable[mydata->id].pseudo_type.acc.combinefn))(mydata->dataptr, msg);
+		(*(CsvAccess(PseudoTable)[mydata->id].pseudo_type.acc.combinefn))(mydata->dataptr, msg);
 	mydata->NumChildren--;
 	if (mydata->NumChildren <= 0)
 	{
@@ -169,7 +182,7 @@ TRACE(CmiPrintf("[%d] ACC_BranchInit : id = %d\n", CmiMyPe(), id));
 	    CPlus_SetAccId(mydata->dataptr,MyBocNum(mydata)) ;
 	}
 	else 
-	    mydata->dataptr = (void *) (*(PseudoTable[id].initfn))(NULL, msg);
+	    mydata->dataptr = (void *) (*(CsvAccess(PseudoTable)[id].initfn))(NULL, msg);
 
 TRACE(CmiPrintf("[%d] ACC_BranchInit : NumChildren = %d\n",
 	CmiMyPe(),  mydata->NumChildren));
@@ -177,10 +190,10 @@ TRACE(CmiPrintf("[%d] ACC_BranchInit : NumChildren = %d\n",
 
 AccAddSysBocEps()
 {
-	EpTable[ACC_CollectFromNode_EP] = ACC_CollectFromNode_Fn;
-	EpTable[ACC_LeafNodeCollect_EP] = ACC_LeafNodeCollect_Fn;
-	EpTable[ACC_InteriorNodeCollect_EP] = ACC_InteriorNodeCollect_Fn;
-	EpTable[ACC_BranchInit_EP] = ACC_BranchInit_Fn;
+	CsvAccess(EpTable)[ACC_CollectFromNode_EP] = ACC_CollectFromNode_Fn;
+	CsvAccess(EpTable)[ACC_LeafNodeCollect_EP] = ACC_LeafNodeCollect_Fn;
+	CsvAccess(EpTable)[ACC_InteriorNodeCollect_EP] = ACC_InteriorNodeCollect_Fn;
+	CsvAccess(EpTable)[ACC_BranchInit_EP] = ACC_BranchInit_Fn;
 }
 
 
@@ -194,7 +207,7 @@ ACC_DATA * accdata;
 FUNCTION_PTR _CK_9GetAccumulateFn(accdata)
 ACC_DATA * accdata; 
 {
-	return(PseudoTable[accdata->id].pseudo_type.acc.addfn);
+	return(CsvAccess(PseudoTable)[accdata->id].pseudo_type.acc.addfn);
 }
 
 

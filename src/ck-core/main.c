@@ -12,8 +12,8 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-02 17:27:40  brunner
- * Reorganized directory structure
+ * Revision 2.1  1995-06-08 17:07:12  gursoy
+ * Cpv macro changes done
  *
  * Revision 1.11  1995/05/03  20:57:07  sanjeev
  * bug fixes for finding uninitialized modules
@@ -66,10 +66,18 @@ static char ident[] = "@(#)$Header$";
 
 /* This is the "processMsg()" for Charm and Charm++ */
 int CallProcessMsg() ;
-int CallProcessMsg_Index ;
+CsvDeclare(int, CallProcessMsg_Index);
 /* This is the "handleMsg()" for Charm and Charm++ */
 int HANDLE_INCOMING_MSG() ;
-int HANDLE_INCOMING_MSG_Index ;
+CsvDeclare(int, HANDLE_INCOMING_MSG_Index);
+
+
+
+void mainModuleInit()
+{
+}
+
+
 
 
 #ifdef REPLAY_DEBUGGING
@@ -78,7 +86,7 @@ HANDLE_INCOMING_MSG(env)
 ENVELOPE *env;
 {
 	/* Fill in the language field in the message */
-	CmiSetHandler(env,CallProcessMsg_Index) ;
+	CmiSetHandler(env,CsvAccess(CallProcessMsg_Index)) ;
 	
 	CsdEnqueue(env);
 }
@@ -101,7 +109,7 @@ ENVELOPE *env;
 
 	case USERcat :
 		/* Fill in the language field in the message */
-		CmiSetHandler(env,CallProcessMsg_Index) ;
+		CmiSetHandler(env,CsvAccess(CallProcessMsg_Index)) ;
 
         	if (!GetEnv_destPeFixed(env)) { 
 			/* if destPeFixed==0, msg is always USERcat */
@@ -130,7 +138,7 @@ ENVELOPE *envelope;
 
 	UNPACK(envelope);
 
-	switch ( EpLanguageTable[current_ep] ) {
+	switch ( CsvAccess(EpLanguageTable)[current_ep] ) {
 	    case CHARM :
 		ProcessMsg(envelope) ;
 		break ;
@@ -170,24 +178,24 @@ ENVELOPE *envelope;
 		    CmiMyPe(), GetEnv_isVID(envelope), GetEnv_sizeData(envelope)));
 
 		/* allocate data area, and strart execution. */
-		currentChareBlock = (struct chare_block *)
+		CpvAccess(currentChareBlock) = (struct chare_block *)
 		    CreateChareBlock(GetEnv_sizeData(envelope));
-		SetID_chare_magic_number(currentChareBlock->selfID,
-		    nodecharesProcessed);
+		SetID_chare_magic_number(CpvAccess(currentChareBlock)->selfID,
+		    CpvAccess(nodecharesProcessed));
 
 		TRACE(CmiPrintf("[%d] Loop: currentChareBlock=0x%x, magic=%d\n",
-		    CmiMyPe(), currentChareBlock, 
-		    GetID_chare_magic_number(currentChareBlock->selfID)));
+		    CmiMyPe(), CpvAccess(currentChareBlock), 
+		    GetID_chare_magic_number(CpvAccess(currentChareBlock)->selfID)));
 
 		/* If virtual block exists, get all messages for this chare	*/
 		if (GetEnv_isVID(envelope))
-			VidSend(currentChareBlock, GetEnv_onPE(envelope),
+			VidSend(CpvAccess(currentChareBlock), GetEnv_onPE(envelope),
 			    GetEnv_vidBlockPtr(envelope));
 		trace_begin_execute(envelope);
-		(*(EpTable[current_ep])) (usrMsg, currentChareBlock + 1);
-		trace_end_execute(nodecharesProcessed, current_msgType, current_ep);
+		(*(CsvAccess(EpTable)[current_ep])) (usrMsg, CpvAccess(currentChareBlock) + 1);
+		trace_end_execute(CpvAccess(nodecharesProcessed), current_msgType, current_ep);
 
-		nodecharesProcessed++;
+		CpvAccess(nodecharesProcessed)++;
 		break;
 
 
@@ -195,26 +203,26 @@ ENVELOPE *envelope;
 		TRACE(CmiPrintf("[%d] Loop: Message type is ForChareMsg.\n",
 		    CmiMyPe()));
 
-		currentChareBlock = (void *) GetEnv_chareBlockPtr(envelope);
-		nodeforCharesProcessed++;
+		CpvAccess(currentChareBlock) = (void *) GetEnv_chareBlockPtr(envelope);
+		CpvAccess(nodeforCharesProcessed)++;
 
 		TRACE(CmiPrintf("[%d] Loop: currentChareBlock=0x%x\n",
-		    CmiMyPe(), currentChareBlock));
+		    CmiMyPe(), CpvAccess(currentChareBlock)));
 		TRACE(CmiPrintf("[%d] Loop: envelope_magic=%d, id_magic=%d\n",
 		    CmiMyPe(), GetEnv_chare_magic_number(envelope),
-		    GetID_chare_magic_number(currentChareBlock->selfID)));
+		    GetID_chare_magic_number(CpvAccess(currentChareBlock)->selfID)));
 
 		if (GetEnv_chare_magic_number(envelope) ==
-		    GetID_chare_magic_number(currentChareBlock->selfID))
+		    GetID_chare_magic_number(CpvAccess(currentChareBlock)->selfID))
 		{
 			id = GetEnv_chare_magic_number(envelope);
 			trace_begin_execute(envelope);
-			(*(EpTable[current_ep]))
-			    (usrMsg,currentChareBlock + 1);
+			(*(CsvAccess(EpTable)[current_ep]))
+			    (usrMsg,CpvAccess(currentChareBlock) + 1);
 			trace_end_execute(id, current_msgType, current_ep);
 		}
 		else 
-			CmiPrintf("[%d] *** ERROR *** Message to dead chare at entry point %d.\n", CmiMyPe(),  EpChareTable[current_ep]);
+			CmiPrintf("[%d] *** ERROR *** Message to dead chare at entry point %d.\n", CmiMyPe(),  CsvAccess(EpChareTable)[current_ep]);
 
 		break;
 
@@ -241,18 +249,18 @@ ENVELOPE *envelope;
 TRACE(CmiPrintf("[%d] ProcessMsg: Executing message for %d boc %d\n", 
 CmiMyPe(), current_ep, executing_boc_num));
 
-		(*(EpTable[current_ep]))(usrMsg, 
+		(*(CsvAccess(EpTable)[current_ep]))(usrMsg, 
 			    GetBocDataPtr(executing_boc_num));
 
 		trace_end_execute(executing_boc_num, current_msgType, current_ep);
-		nodebocMsgsProcessed++;
+		CpvAccess(nodebocMsgsProcessed)++;
 		break;
 
 
 	case VidMsg:
 		current_ep = GetEnv_vidEP(envelope);
 		trace_begin_execute(envelope);
-		(*(EpTable[current_ep])) (usrMsg, NULL);
+		(*(CsvAccess(EpTable)[current_ep])) (usrMsg, NULL);
 		trace_end_execute(VidBocNum, current_msgType, current_ep);
 		break;
 

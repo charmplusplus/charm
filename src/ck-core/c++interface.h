@@ -12,8 +12,8 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-02 17:27:40  brunner
- * Reorganized directory structure
+ * Revision 2.1  1995-06-08 17:09:41  gursoy
+ * Cpv macro changes done
  *
  * Revision 1.6  1995/05/04  22:11:15  jyelon
  * *** empty log message ***

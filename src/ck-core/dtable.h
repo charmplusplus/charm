@@ -12,8 +12,8 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-02 17:27:40  brunner
- * Reorganized directory structure
+ * Revision 2.1  1995-06-08 17:07:12  gursoy
+ * Cpv macro changes done
  *
  * Revision 1.4  1995/05/09  20:55:53  knauff
  * Added SetId method, plus surrounding #ifndef #define wrappers

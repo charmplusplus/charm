@@ -12,8 +12,8 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-02 17:27:40  brunner
- * Reorganized directory structure
+ * Revision 2.1  1995-06-08 17:09:41  gursoy
+ * Cpv macro changes done
  *
  * Revision 1.13  1995/05/04  22:02:40  jyelon
  * *** empty log message ***
@@ -67,7 +67,8 @@ static char ident[] = "@(#)$Header$";
 
 extern void *FIFO_Create();
 
-int num_exits =0;
+CpvStaticDeclare(int, num_exits);
+CpvStaticDeclare(int, done);
 
 /* 
   How does this work?
@@ -92,13 +93,27 @@ int num_exits =0;
 
 */
 
+
+
+void ckModuleInit()
+{
+   CpvInitialize(int, num_exits);
+   CpvInitialize(int, done);
+
+   CpvAccess(num_exits)=0;
+   CpvAccess(done)     =0;
+}
+
+
+
+
 CkExit()
 {
 	int *msg;
 
 	msg = (int *) CkAllocMsg(sizeof(int));
 	CkMemError(msg);
-	*msg = num_exits;
+	*msg = CpvAccess(num_exits);
 
 	GeneralSendMsgBranch(StatBroadcastExitMessage_EP,
 			msg, 0, USERcat,  BocMsg, StatisticBocNum);
@@ -132,7 +147,6 @@ void *usr, *data;
                  StatBroadcastExitMessage_EP
 */
 	int *msg;
-	static int done = 0;
 	
 TRACE(CmiPrintf("[%d] BroadcastExitMessage: sending out message to everybody.\n",
 CmiMyPe()))
@@ -140,16 +154,16 @@ CmiMyPe()))
 
 	if (*((int *)usr) == -1) /* For CkEndCharm */
         {
-              if(done) 
+              if(CpvAccess(done)) 
 	            return;
 	      else
-	            done = 1;
+	            CpvAccess(done) = 1;
 	}
 	else                     /* For CkExit */
         {
-	      if(*((int *)usr) < num_exits)
+	      if(*((int *)usr) < CpvAccess(num_exits))
                      return;
-	      num_exits++;
+	      CpvAccess(num_exits)++;
 	}
 	
 	msg = (int *) CkAllocMsg(sizeof(int));
@@ -157,7 +171,7 @@ CmiMyPe()))
 	*msg = *((int *)usr);
 	GeneralBroadcastMsgBranch(StatExitMessage_EP, msg, 
 			USERcat, BroadcastBocMsg, StatisticBocNum);
-	disable_sys_msgs = 1;
+	CpvAccess(disable_sys_msgs) = 1;
 }
 
 ExitMessage(usr, data)
@@ -170,13 +184,13 @@ void *usr, *data;
 	    */
 	    SendNodeStatistics();
 	    send_log();
-	    if (CmiMyPe() != 0 &&  (RecdPerfMsg && RecdStatMsg)) ExitNode();
+	    if (CmiMyPe() != 0 &&  (CpvAccess(RecdPerfMsg) && CpvAccess(RecdStatMsg))) ExitNode();
 	}
 	else /* If the user called CkExit */
 	{
 	      CsdExitScheduler();
 	      if(CmiMyPe())
-		   num_exits++;
+		   CpvAccess(num_exits)++;
 	}
 }
 
@@ -188,7 +202,7 @@ ExitNode()
 	ENVELOPE *env;
 
 TRACE(CmiPrintf("[%d] ExitNode: RecdPerfMsg=%d, RecdStatMsg=%d\n", CmiMyPe(),
-RecdPerfMsg, RecdStatMsg));
+CpvAccess(RecdPerfMsg), CpvAccess(RecdStatMsg)));
 	close_log();
 	if (CmiMyPe() == 0)
 	{
@@ -203,15 +217,15 @@ RecdPerfMsg, RecdStatMsg));
 
 ChareExit()
 {
-	SetID_chare_magic_number(currentChareBlock->selfID,-1) ;
-	CmiFree(currentChareBlock);
+	SetID_chare_magic_number(CpvAccess(currentChareBlock)->selfID,-1) ;
+	CmiFree(CpvAccess(currentChareBlock));
 }
 
 
 SendNodeStatistics()
 {
 	/*NodeCollectStatistics(NULL, NULL);*/
-	(*(EpTable[StatData_EP])) (NULL,NULL);
+	(*(CsvAccess(EpTable)[StatData_EP])) (NULL,NULL);
 }
 
 
@@ -248,16 +262,16 @@ ChareIDType * pChareID;
 	SetID_isBOC((*pChareID), 0);
 
 	SetID_chare_magic_number((*pChareID), 
-	    GetID_chare_magic_number(currentChareBlock->selfID));
-	SetID_chareBlockPtr((*pChareID), currentChareBlock);
+	    GetID_chare_magic_number(CpvAccess(currentChareBlock)->selfID));
+	SetID_chareBlockPtr((*pChareID), CpvAccess(currentChareBlock));
 
 	TRACE(CmiPrintf("[%d] MyChareID: onPE=%d, isBOC=%d, id_magic=%d, current_magic=%d, id_ptr=0x%x, current_ptr=0x%x\n",
 	    CmiMyPe(), GetID_onPE((*pChareID)),
 	    GetID_isBOC((*pChareID)), 
 	    GetID_chare_magic_number((*pChareID)),
-	    GetID_chare_magic_number(currentChareBlock->selfID),
+	    GetID_chare_magic_number(CpvAccess(currentChareBlock)->selfID),
 	    GetID_chareBlockPtr((*pChareID)),
-	    currentChareBlock));
+	    CpvAccess(currentChareBlock)));
 }
 
 
@@ -272,10 +286,10 @@ ChareIDType * pChareID;
 
 	if (CmiMyPe() == 0)
 		SetID_chare_magic_number((*pChareID),
-		    GetID_chare_magic_number(mainChareBlock->selfID));
+		    GetID_chare_magic_number(CpvAccess(mainChareBlock)->selfID));
 	else
-		SetID_chare_magic_number((*pChareID), mainChare_magic_number);
-	SetID_chareBlockPtr((*pChareID), mainChareBlock);
+		SetID_chare_magic_number((*pChareID), CpvAccess(mainChare_magic_number));
+	SetID_chareBlockPtr((*pChareID), CpvAccess(mainChareBlock));
 }
 
 
@@ -308,11 +322,11 @@ int DestPe;
 	if ( IsCharmPlus(Entry) )
 		DataSize = id ;
 	else
-		DataSize =  ChareSizesTable[id];
+		DataSize =  CsvAccess(ChareSizesTable)[id];
 
 	TRACE(CmiPrintf("[%d] CreateChare: Entry=%d\n", CmiMyPe(), Entry));
 
-	nodecharesCreated++;
+	CpvAccess(nodecharesCreated)++;
 	env = ENVELOPE_UPTR(Msg);
 
 	SetEnv_category(env, USERcat);
@@ -368,10 +382,10 @@ int DestPe;
 		/* Currently set to local PE, */
 		SetEnv_destPE(env, CmiMyPe());
 		SetEnv_destPeFixed(env, 0);
-		if (numPe > 1)
+		if (CmiNumPe() > 1)
 			Ldb_NewChare_FromLocal(env);
 		else {
-		        CmiSetHandler(env,CallProcessMsg_Index) ;
+		        CmiSetHandler(env,CsvAccess(CallProcessMsg_Index)) ;
 			CsdEnqueue(env);
 		}
 	}
@@ -404,7 +418,7 @@ ChareIDType * pChareID;
 		    GetID_onPE((*pChareID)), USERcat, BocMsg, GetID_boc_num((*pChareID)));
 	else
 	{
-		nodeforCharesCreated++;
+		CpvAccess(nodeforCharesCreated)++;
 		env = ENVELOPE_UPTR(Msg);
 		SetEnv_destPE(env,    GetID_onPE((*pChareID)));
 		SetEnv_msgType(env,   ForChareMsg);
@@ -439,7 +453,7 @@ ChareIDType * pChareID;
 		if ((GetID_isVID((*pChareID))) && (GetEnv_destPE(env) == CmiMyPe()))
 		{
 			trace_creation(VidMsg, GetEnv_vidEP(env), env);
-		        CmiSetHandler(env,CallProcessMsg_Index) ;
+		        CmiSetHandler(env,CsvAccess(CallProcessMsg_Index)) ;
 			CsdEnqueue(env);
 		}
 		else

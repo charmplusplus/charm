@@ -12,8 +12,8 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-02 17:27:40  brunner
- * Reorganized directory structure
+ * Revision 2.1  1995-06-08 17:09:41  gursoy
+ * Cpv macro changes done
  *
  * Revision 1.2  1994/11/11  05:24:27  brunner
  * Removed ident added by accident with RCS header
@@ -31,6 +31,9 @@
 /*                           All Rights Reserved                          */
 /*                                                                        */
 /**************************************************************************/
+
+#ifndef ACC_H
+#define ACC_H
 
 typedef int AccIDType;
 
@@ -51,3 +54,6 @@ typedef struct {
 
 FUNCTION_PTR _CK_9GetAccumulateFn();
 void * _CK_9_GetAccDataPtr();
+
+
+#endif

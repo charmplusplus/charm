@@ -12,8 +12,8 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-02 17:27:40  brunner
- * Reorganized directory structure
+ * Revision 2.1  1995-06-08 17:07:12  gursoy
+ * Cpv macro changes done
  *
  * Revision 1.8  1995/04/23  17:47:02  sanjeev
  * removed declaration of LanguageHandlerTable
@@ -43,61 +43,61 @@
 #include "trans_defs.h"
 #include "trans_decls.h"
 
-extern int numPe;
-extern int SysMem;
-extern int TotalEps;
-extern int TotalMsgs;
-extern int TotalPseudos;
-extern int NumReadMsg;
-extern int MsgCount; 		
+CsvExtern(int, TotalEps);
+CpvExtern(int, TotalMsgs);
+CpvExtern(int, TotalPseudos);
+CpvExtern(int, NumReadMsg);
+CpvExtern(int, MsgCount); 		
 
-extern int MainDataSize;  	/* size of dataarea for main chare 	*/
-extern int currentBocNum;
-extern int InsideDataInit;
-extern int mainChare_magic_number;
-extern struct chare_block * mainChareBlock;
-extern struct chare_block * currentChareBlock;
+CpvExtern(int, MainDataSize);  	/* size of dataarea for main chare 	*/
+CpvExtern(int, currentBocNum);
+CpvExtern(int, InsideDataInit);
+CpvExtern(int, mainChare_magic_number);
+typedef struct chare_block *CHARE_BLOCK_;
+CpvExtern(CHARE_BLOCK_, mainChareBlock);
+CpvExtern(CHARE_BLOCK_, currentChareBlock);
 
-extern int          * EpLanguageTable ;
-/* extern void **_CK_9_ReadMsgTable;  was in trans_decls.h, no longer global */
-extern FUNCTION_PTR *ROCopyFromBufferTable, *ROCopyToBufferTable ;
-extern int * EpIsImplicitTable;
-extern int * EpToMsgTable;
-extern int * EpChareTypeTable;
-extern FUNCTION_PTR * EpTable;
-extern MSG_STRUCT * MsgToStructTable; 
-extern int  * ChareSizesTable;
-extern FUNCTION_PTR * ChareFnTable ;
-extern PSEUDO_STRUCT * PseudoTable;
-extern char	     ** EpNameTable;
+CsvExtern(int*, EpLanguageTable);
+CsvExtern(FUNCTION_PTR*, ROCopyFromBufferTable);
+CsvExtern(FUNCTION_PTR*, ROCopyToBufferTable);
+CsvExtern(int*, EpIsImplicitTable);
+CsvExtern(int*, EpToMsgTable);
+CsvExtern(int*, EpChareTypeTable);
+CsvExtern(FUNCTION_PTR*,  EpTable);
+CsvExtern(MSG_STRUCT*, MsgToStructTable); 
+CsvExtern(int*,  ChareSizesTable);
+CsvExtern(FUNCTION_PTR*,  ChareFnTable);
+CsvExtern(PSEUDO_STRUCT*, PseudoTable);
+CsvExtern(char**, EpNameTable);
 
-extern char **ChareNamesTable;
-extern int *EpChareTable;
+CsvExtern(char**, ChareNamesTable);
+CsvExtern(int*, EpChareTable);
 
-extern int msgs_processed, msgs_created;
+CpvExtern(int, msgs_processed);
+CpvExtern(int, msgs_created);
 
-extern int disable_sys_msgs;
-extern int nodecharesProcessed;
-extern int nodebocMsgsProcessed;
-extern int nodeforCharesProcessed;
-extern int nodecharesCreated;
-extern int nodeforCharesCreated;
-extern int nodebocMsgsCreated;
+CpvExtern(int, disable_sys_msgs);
+CpvExtern(int, nodecharesProcessed);
+CpvExtern(int, nodebocMsgsProcessed);
+CpvExtern(int, nodeforCharesProcessed);
+CpvExtern(int, nodecharesCreated);
+CpvExtern(int, nodeforCharesCreated);
+CpvExtern(int, nodebocMsgsCreated);
 
-extern void *LocalQueueHead;
-extern void *SchedQueue;
 
-extern int PrintQueStat; 
-extern int PrintMemStat; 
-extern int PrintChareStat;
-extern int PrintSummaryStat;
+CpvExtern(int, PrintQueStat); 
+CpvExtern(int, PrintMemStat); 
+CpvExtern(int, PrintChareStat);
+CpvExtern(int, PrintSummaryStat);
 
-extern int RecdStatMsg;
-extern int RecdPerfMsg;
+CpvExtern(int, RecdStatMsg);
+CpvExtern(int, RecdPerfMsg);
 
-extern int numHeapEntries, numCondChkArryElts;
-extern int MainChareLanguage ;
+CpvExtern(int, numHeapEntries);
+CpvExtern(int, numCondChkArryElts);
 
-extern int CallProcessMsg_Index ;
-extern int HANDLE_INCOMING_MSG_Index ;
+CsvExtern(int, MainChareLanguage);
+
+CsvExtern(int, CallProcessMsg_Index);
+CsvExtern(int, HANDLE_INCOMING_MSG_Index);
 

@@ -12,8 +12,8 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-02 17:27:40  brunner
- * Reorganized directory structure
+ * Revision 2.1  1995-06-08 17:07:12  gursoy
+ * Cpv macro changes done
  *
  * Revision 1.7  1995/05/04  22:03:51  jyelon
  * *** empty log message ***
@@ -47,10 +47,12 @@ static char ident[] = "@(#)$Header$";
 reflected there. */
 /**********************************************************************/
 
-int PAD_SIZE, HEADER_SIZE ;
-int _CK_Env_To_Usr;
-int _CK_Ldb_To_Usr;
-int _CK_Usr_To_Env, _CK_Usr_To_Ldb ;
+CpvDeclare(int, PAD_SIZE);
+CpvDeclare(int, HEADER_SIZE);
+CpvDeclare(int, _CK_Env_To_Usr);
+CpvDeclare(int, _CK_Ldb_To_Usr);
+CpvDeclare(int, _CK_Usr_To_Env);
+CpvDeclare(int, _CK_Usr_To_Ldb);
 
 
 
@@ -58,66 +60,120 @@ int _CK_Usr_To_Env, _CK_Usr_To_Ldb ;
 /**********************************************************************/
 /* Other global variables. */
 /**********************************************************************/
-int TotalEps;
-int NumReadMsg =  0;
-int MsgCount; 			/* for the initial, pre-loop phase.
+CsvDeclare(int, TotalEps);
+CpvDeclare(int, NumReadMsg);
+CpvDeclare(int, MsgCount); 	/* for the initial, pre-loop phase.
 				to count up all the messages
 		 		being sent out to nodes 		*/
-int InsideDataInit = 0;
-int mainChare_magic_number;
-struct chare_block * mainChareBlock;
-struct chare_block * currentChareBlock;
-int currentBocNum = (NumSysBoc - 1); /* was set to  -1 */
-int MainDataSize;  		/* size of dataarea for main chare 	*/
+CpvDeclare(int, InsideDataInit);
+CpvDeclare(int, mainChare_magic_number);
+typedef struct chare_block *CHARE_BLOCK_;
+CpvDeclare(CHARE_BLOCK_,  mainChareBlock);
+CpvDeclare(CHARE_BLOCK_, currentChareBlock);
+CpvDeclare(int, currentBocNum);
+CpvDeclare(int, MainDataSize);  /* size of dataarea for main chare 	*/
 
 
-int 	     * EpLanguageTable ;
+CsvDeclare(int*, EpLanguageTable);
 
-/* void            ** _CK_9_ReadMsgTable;  no longer global */
-FUNCTION_PTR *ROCopyFromBufferTable, *ROCopyToBufferTable ;
 
-int          * EpIsImplicitTable;
-FUNCTION_PTR * EpTable; 	/* actual table to be allocated dynamically
-			     	depending on the number of entry-points */
-int 	     * EpToMsgTable ;  /* Table mapping EPs to associated 	
-				messages.				*/
-int 	     * EpChareTypeTable ;  /* Table mapping EPs to chare type 
+CsvDeclare(FUNCTION_PTR*, ROCopyFromBufferTable);
+CsvDeclare(FUNCTION_PTR*, ROCopyToBufferTable);
+CsvDeclare(int*, EpIsImplicitTable);
+CsvDeclare(FUNCTION_PTR*, EpTable); /* actual table to be allocated dynamically
+			     	    depending on the number of entry-points */
+CsvDeclare(int*, EpToMsgTable);  /* Table mapping EPs to associated messages.*/
+CsvDeclare(int*, EpChareTypeTable);  /* Table mapping EPs to chare type 
 				      (CHARE or BOC) */ 	
-MSG_STRUCT   * MsgToStructTable;/* Table mapping message to struct table*/
-PSEUDO_STRUCT * PseudoTable;
+CsvDeclare(MSG_STRUCT*, MsgToStructTable); /* Table mapping message to 
+                                           struct table*/
+CsvDeclare(PSEUDO_STRUCT*,  PseudoTable);
+CsvDeclare(int*, EpChareTable);
+CsvDeclare(char**, EpNameTable);
+CsvDeclare(int*, ChareSizesTable);
+CsvDeclare(FUNCTION_PTR*, ChareFnTable);
+CsvDeclare(char**, ChareNamesTable);
 
-int	     *EpChareTable ;
-char	     ** EpNameTable ;
+CpvDeclare(int, msgs_processed);
+CpvDeclare(int, msgs_created);
 
-int  	     * ChareSizesTable;
-FUNCTION_PTR * ChareFnTable ;
-char 	     ** ChareNamesTable;
-
-int msgs_processed, msgs_created;
-
-int nodecharesCreated=0;
-int nodeforCharesCreated=0;
-int nodebocMsgsCreated=0;
-int nodecharesProcessed = 0;
-int nodebocMsgsProcessed = 0;
-int nodeforCharesProcessed = 0;
-
-/* FIFO_QUEUE *LocalQueueHead; now in converse.c */
-
-int PrintChareStat = 0;
-int PrintSummaryStat = 0;
-
-int RecdStatMsg;
-int RecdPerfMsg;
-
-int numHeapEntries=0;	/* heap of tme-dep calls   */
-int numCondChkArryElts=0; /* arry hldng conditon check info */
+CpvDeclare(int, nodecharesCreated);
+CpvDeclare(int, nodeforCharesCreated);
+CpvDeclare(int, nodebocMsgsCreated);
+CpvDeclare(int, nodecharesProcessed);
+CpvDeclare(int, nodebocMsgsProcessed);
+CpvDeclare(int, nodeforCharesProcessed);
 
 
-int _CK_13PackOffset;
-int _CK_13PackMsgCount;
-int _CK_13ChareEPCount;
-int _CK_13TotalMsgCount;
-FUNCTION_PTR    * _CK_9_GlobalFunctionTable;
+CpvDeclare(int, PrintChareStat); 
+CpvDeclare(int, PrintSummaryStat);
 
-int MainChareLanguage = -1 ;
+CpvDeclare(int, RecdStatMsg);
+CpvDeclare(int, RecdPerfMsg);
+
+CpvDeclare(int, numHeapEntries);      /* heap of tme-dep calls   */
+CpvDeclare(int, numCondChkArryElts);  /* arry hldng conditon check info */
+
+
+CpvDeclare(int, _CK_13PackOffset);
+CpvDeclare(int, _CK_13PackMsgCount);
+CpvDeclare(int, _CK_13ChareEPCount);
+CpvDeclare(int, _CK_13TotalMsgCount);
+
+CsvDeclare(FUNCTION_PTR*,  _CK_9_GlobalFunctionTable);
+
+CsvDeclare(int, MainChareLanguage);
+
+
+void globalsModuleInit()
+{
+
+   CpvInitialize(int, PAD_SIZE);
+   CpvInitialize(int, HEADER_SIZE);
+   CpvInitialize(int, _CK_Env_To_Usr);
+   CpvInitialize(int, _CK_Ldb_To_Usr);
+   CpvInitialize(int, _CK_Usr_To_Env);
+   CpvInitialize(int, _CK_Usr_To_Ldb);
+   CpvInitialize(int, NumReadMsg);
+   CpvInitialize(int, MsgCount); 
+   CpvInitialize(int, InsideDataInit);
+   CpvInitialize(int, mainChare_magic_number);
+   CpvInitialize(CHARE_BLOCK_,  mainChareBlock);
+   CpvInitialize(CHARE_BLOCK_, currentChareBlock);
+   CpvInitialize(int, currentBocNum);
+   CpvInitialize(int, MainDataSize); 
+   CpvInitialize(int, msgs_processed);
+   CpvInitialize(int, msgs_created);
+   CpvInitialize(int, nodecharesCreated);
+   CpvInitialize(int, nodeforCharesCreated);
+   CpvInitialize(int, nodebocMsgsCreated);
+   CpvInitialize(int, nodecharesProcessed);
+   CpvInitialize(int, nodebocMsgsProcessed);
+   CpvInitialize(int, nodeforCharesProcessed);
+   CpvInitialize(int, PrintChareStat);
+   CpvInitialize(int, PrintSummaryStat);
+   CpvInitialize(int, RecdStatMsg);
+   CpvInitialize(int, RecdPerfMsg);
+   CpvInitialize(int, numHeapEntries);      
+   CpvInitialize(int, numCondChkArryElts); 
+   CpvInitialize(int, _CK_13PackOffset);
+   CpvInitialize(int, _CK_13PackMsgCount);
+   CpvInitialize(int, _CK_13ChareEPCount);
+   CpvInitialize(int, _CK_13TotalMsgCount);
+
+  
+   CpvAccess(NumReadMsg)             = 0; 
+   CpvAccess(InsideDataInit)         = 0;
+   CpvAccess(currentBocNum)          = (NumSysBoc - 1); /* was set to  -1 */
+   CpvAccess(nodecharesCreated)      = 0;
+   CpvAccess(nodeforCharesCreated)   = 0;
+   CpvAccess(nodebocMsgsCreated)     = 0;
+   CpvAccess(nodecharesProcessed)    = 0;
+   CpvAccess(nodebocMsgsProcessed)   = 0;
+   CpvAccess(nodeforCharesProcessed) = 0;
+   CpvAccess(PrintChareStat)         = 0;
+   CpvAccess(PrintSummaryStat)       = 0;
+   CpvAccess(numHeapEntries)         = 0;  
+   CpvAccess(numCondChkArryElts)     = 0; 
+   CsvAccess(MainChareLanguage)      = -1;
+}

@@ -12,8 +12,8 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-02 17:27:40  brunner
- * Reorganized directory structure
+ * Revision 2.1  1995-06-08 17:07:12  gursoy
+ * Cpv macro changes done
  *
  * Revision 1.2  1994/11/11  05:31:14  brunner
  * Removed ident added by accident with RCS header
@@ -31,6 +31,8 @@
 /*                           All Rights Reserved                          */
 /*                                                                        */
 /**************************************************************************/
+#ifndef TABLE_H
+#define TABLE_H
 
 #define TBL_WAITFORDATA 1
 #define TBL_NOWAITFORDATA 2
@@ -78,4 +80,4 @@ typedef struct {
 typedef struct {
 	int i;
 } DATA_MNGR_TBL;
-
+#endif

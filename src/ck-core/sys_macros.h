@@ -12,8 +12,8 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-02 17:27:40  brunner
- * Reorganized directory structure
+ * Revision 2.1  1995-06-08 17:07:12  gursoy
+ * Cpv macro changes done
  *
  * Revision 1.5  1995/04/23  20:55:17  sanjeev
  * Removed Core....
@@ -33,9 +33,9 @@
  ***************************************************************************/
 /* #define IsCharmPlus(Entry) (Entry & 0xffff8000)	*/
 
-#define IsCharmPlus(Entry) (EpLanguageTable[Entry]==CHARMPLUSPLUS)
+#define IsCharmPlus(Entry) (CsvAccess(EpLanguageTable)[Entry]==CHARMPLUSPLUS)
 
-#define IsCharmPlusPseudo(id) (PseudoTable[id].language==CHARMPLUSPLUS)
+#define IsCharmPlusPseudo(id) (CsvAccess(PseudoTable)[id].language==CHARMPLUSPLUS)
 
 
 #define CkMemError(ptr) if (ptr == NULL) \
@@ -43,23 +43,23 @@
 
 #define QDCountThisProcessing(msgType) \
          if ((msgType != QdBocMsg) && (msgType != QdBroadcastBocMsg) && \
-			(msgType != LdbMsg)) msgs_processed++; 
+			(msgType != LdbMsg)) CpvAccess(msgs_processed)++; 
 
 #define QDCountThisCreation(ep, category, type, x) \
          if ((type != QdBocMsg) && (type != QdBroadcastBocMsg) && \
-			(type != LdbMsg)) msgs_created += x;
+			(type != LdbMsg)) CpvAccess(msgs_created) += x;
 
 #ifdef DEBUGGING_MODE
 #define COPY_AND_SEND(env)  { \
 	ENVELOPE *new = (ENVELOPE *) CkCopyEnv(env); \
 	trace_creation(GetEnv_msgType(new), GetEnv_EP(new), new); \
-        CmiSetHandler(env,HANDLE_INCOMING_MSG_Index); \
+        CmiSetHandler(env,CsvAccess(HANDLE_INCOMING_MSG_Index)); \
         CkAsyncSend(GetEnv_destPE(new), \
         CmiSize(new), new); }
 #else
 #define COPY_AND_SEND(env)  { \
 	ENVELOPE *new = (ENVELOPE *) CkCopyEnv(env); \
-        CmiSetHandler(env,HANDLE_INCOMING_MSG_Index); \
+        CmiSetHandler(env,CsvAccess(HANDLE_INCOMING_MSG_Index)); \
         CkAsyncSend(GetEnv_destPE(new), \
         CmiSize(new), new); }
 #endif

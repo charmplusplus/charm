@@ -12,8 +12,8 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-02 17:27:40  brunner
- * Reorganized directory structure
+ * Revision 2.1  1995-06-08 17:07:12  gursoy
+ * Cpv macro changes done
  *
  * Revision 1.2  1994/11/11  05:25:13  brunner
  * Removed ident added by accident with RCS header
@@ -51,6 +51,8 @@
     the linked list (ie send a message or call a boc function).
 
 ***************************************************************************/
+#ifndef CONDSEND_H
+#define CONDSEND_H
 
 #define ITSABOC                   0
 #define ITSACHARE                 1
@@ -100,4 +102,4 @@ typedef struct {
     LinkRec        *dataListPtr;  /* We keep a linked list for each element in*/
     } IfCondArisesArrayEltType;   /* the array. Each element in the list is   */
                                   /* either ChareDataEntry or BocDataEntry    */
-
+#endif

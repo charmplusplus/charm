@@ -12,8 +12,8 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-02 17:27:40  brunner
- * Reorganized directory structure
+ * Revision 2.1  1995-06-08 17:07:12  gursoy
+ * Cpv macro changes done
  *
  * Revision 1.6  1995/05/03  20:58:09  sanjeev
  * *** empty log message ***
@@ -39,6 +39,8 @@
 /** that access it follow.					**/
 /** This file also contains access macros for the chare-id	**/
 /*****************************************************************/
+#ifndef ENV_MACROS_H
+#define ENV_MACROS_H
 
 #ifdef DEBUGGING_MODE
 typedef struct envelope {
@@ -341,3 +343,6 @@ typedef struct envelope {
 #define SetEnv_destPE(env,x) 		env->destPE=x
 #define SetEnv_pe(env,x)		env->pe=x
 #define SetEnv_event(env,x)		env->event=x
+
+
+#endif

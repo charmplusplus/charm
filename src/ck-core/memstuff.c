@@ -12,8 +12,8 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-02 17:27:40  brunner
- * Reorganized directory structure
+ * Revision 2.1  1995-06-08 17:07:12  gursoy
+ * Cpv macro changes done
  *
  * Revision 1.5  1995/04/25  04:32:43  narain
  * moved CKMEM_UNIT from mem_common.c to both memory managers
@@ -183,7 +183,7 @@ int prio_size;
     SetEnv_isPACKED(env, NO_PACK);
     SetEnv_packid(env, 0);
 
-    if (MsgToStructTable[msgno].pack != NULL)
+    if (CsvAccess(MsgToStructTable)[msgno].pack != NULL)
 #ifdef SHARED
 	{	
 	   env->needsPack = UNPACKED;

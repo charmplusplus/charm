@@ -12,8 +12,8 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-02 17:27:40  brunner
- * Reorganized directory structure
+ * Revision 2.1  1995-06-08 17:07:12  gursoy
+ * Cpv macro changes done
  *
  * Revision 1.4  1995/03/17  23:37:57  sanjeev
  * changes for better message format
@@ -63,23 +63,28 @@ be altered. The variables are initialized in InitializeMessageMacros()
 in main/common.c. Compile time constants are #defines. 
 All variables reflect sizes in BYTES.			
 ************************************************************************/
+#ifndef MSG_MACROS_H
+#define MSG_MACROS_H
 
-extern int PAD_SIZE, HEADER_SIZE;
-extern int LDB_ELEM_SIZE ;
+CpvExtern(int, PAD_SIZE);
+CpvExtern(int, HEADER_SIZE);
+CpvExtern(int, LDB_ELEM_SIZE);
+
 #define ENVELOPE_SIZE sizeof(ENVELOPE)
 
-extern int _CK_Env_To_Usr;
+CpvExtern(int, _CK_Env_To_Usr);
 #define _CK_Env_To_Ldb ENVELOPE_SIZE
 
-extern int _CK_Ldb_To_Usr;
+CpvExtern(int, _CK_Ldb_To_Usr);
 #define _CK_Ldb_To_Env (-ENVELOPE_SIZE)
 
-extern int _CK_Usr_To_Env, _CK_Usr_To_Ldb ;
+CpvExtern(int, _CK_Usr_To_Env);
+CpvExtern(int, _CK_Usr_To_Ldb);
 
 
 
 
-#define TOTAL_MSG_SIZE(usrsize, priosize) (HEADER_SIZE + priosize + usrsize)
+#define TOTAL_MSG_SIZE(usrsize, priosize) (CpvAccess(HEADER_SIZE) + priosize + usrsize)
 #define CHARRED(x) ((char *) (x))
 
 
@@ -91,7 +96,7 @@ extern int _CK_Usr_To_Env, _CK_Usr_To_Ldb ;
 	(LDB_ELEMENT *) (CHARRED(env) + _CK_Env_To_Ldb)
 
 #define USER_MSG_PTR(env)\
-    (CHARRED(env) + _CK_Env_To_Usr)
+    (CHARRED(env) + CpvAccess(_CK_Env_To_Usr))
 
 #define COPY_PRIORITY(env1, env2) {\
         if ( GetEnv_PrioType(env1) == 0 ) { \
@@ -114,7 +119,7 @@ extern int _CK_Usr_To_Env, _CK_Usr_To_Ldb ;
 {\
     if ( priosize > 4 ) { \
         SetEnv_PrioType(env,1) ; \
-        SetEnv_PrioOffset(env,usrsize+_CK_Env_To_Usr) ; \
+        SetEnv_PrioOffset(env,usrsize + CpvAccess(_CK_Env_To_Usr)) ; \
         SetEnv_PrioSize(env,priosize) ; \
     } \
     else \
@@ -131,7 +136,7 @@ extern int _CK_Usr_To_Env, _CK_Usr_To_Ldb ;
 	(ENVELOPE *) (CHARRED(ldbptr) + _CK_Ldb_To_Env)
 
 #define USR_MSG_LDBPTR(ldbptr) \
-	(CHARRED(ldbptr) + _CK_Ldb_To_Usr)
+	(CHARRED(ldbptr) + CpvAccess(_CK_Ldb_To_Usr))
 
 
 /**********************************************************************/
@@ -139,15 +144,15 @@ extern int _CK_Usr_To_Env, _CK_Usr_To_Ldb ;
    message */
 /**********************************************************************/
 #define ENVELOPE_UPTR(usrptr)\
-	(ENVELOPE *) (CHARRED(usrptr) + _CK_Usr_To_Env)
+	(ENVELOPE *) (CHARRED(usrptr) + CpvAccess(_CK_Usr_To_Env))
 
 #define LDB_UPTR(usrptr)\
-    (LDB_ELEMENT *) (CHARRED(usrptr) + _CK_Usr_To_Ldb)
+    (LDB_ELEMENT *) (CHARRED(usrptr) + CpvAccess(_CK_Usr_To_Ldb))
 
 #define PRIORITY_UPTR(usrptr) \
-    (PVECTOR *) ( ReturnEnv_PriorityPtr(CHARRED(usrptr) + _CK_Usr_To_Env) )
+    (PVECTOR *) ( ReturnEnv_PriorityPtr(CHARRED(usrptr) + CpvAccess(_CK_Usr_To_Env)) )
 
 #define MSG_PRIORITY_SIZE(usrptr) \
-		GetEnv_PrioSize(CHARRED(usrptr) + _CK_Usr_To_Env)
+		GetEnv_PrioSize(CHARRED(usrptr) + CpvAccess(_CK_Usr_To_Env))
 
-
+#endif

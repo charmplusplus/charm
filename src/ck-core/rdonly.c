@@ -12,8 +12,8 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-02 17:27:40  brunner
- * Reorganized directory structure
+ * Revision 2.1  1995-06-08 17:07:12  gursoy
+ * Cpv macro changes done
  *
  * Revision 1.3  1995/04/21  22:43:18  sanjeev
  * fixed mainchareid bug
@@ -31,8 +31,8 @@ static char ident[] = "@(#)$Header$";
 #include "performance.h"
 
 
-extern char * ReadBufIndex;
-extern char * ReadFromBuffer;
+CpvExtern(char, *ReadBufIndex);
+CpvExtern(char, *ReadFromBuffer);
 
 /************************************************************************/
 /* The following functions are used to copy the read-buffer out of and 	*/
@@ -45,7 +45,7 @@ int var_size;
   int i;
 
   for (i=0; i<var_size; i++) 
-    *ReadBufIndex++ = *srcptr++;
+    *CpvAccess(ReadBufIndex)++ = *srcptr++;
 }
 
 _CK_13CopyFromBuffer(destptr, var_size) 
@@ -55,7 +55,7 @@ int var_size;
   int i;
 
   for (i=0; i<var_size; i++) 
-    *destptr++ = *ReadFromBuffer++;
+    *destptr++ = *CpvAccess(ReadFromBuffer)++;
 }
 
 
@@ -75,7 +75,7 @@ struct chare_block * mainChareBlock;
 	/* this is where we add the information for the main chare
 	block */
 	SetEnv_chareBlockPtr(env, (int) mainChareBlock);
-	if ( MainChareLanguage == CHARMPLUSPLUS )
+	if ( CsvAccess(MainChareLanguage) == CHARMPLUSPLUS )
 		SetEnv_chare_magic_number(env, 
 			CPlus_GetMagicNumber(mainChareBlock));
 	else
@@ -94,7 +94,7 @@ int id;
 	ENVELOPE *env ;
 
 	env = ENVELOPE_UPTR(msg);
-	NumReadMsg++;
+	CpvAccess(NumReadMsg)++;
 	SetEnv_destPE(env, ALL_NODES_EXCEPT_ME);
 	SetEnv_category(env, USERcat);
 	SetEnv_msgType(env, ReadMsgMsg);

@@ -12,8 +12,8 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-02 17:27:40  brunner
- * Reorganized directory structure
+ * Revision 2.1  1995-06-08 17:09:41  gursoy
+ * Cpv macro changes done
  *
  * Revision 1.3  1995/04/02  00:46:58  sanjeev
  * changes for separating Converse
@@ -50,27 +50,27 @@ InitializeMessageMacros()
 #define ENVELOPE_SIZE sizeof(ENVELOPE)
 
 /* count everything except the padding, then add the padding if needed */ 
-	HEADER_SIZE = ENVELOPE_SIZE + LDB_ELEM_SIZE ;
+	CpvAccess(HEADER_SIZE) = ENVELOPE_SIZE + CpvAccess(LDB_ELEM_SIZE) ;
 
-	if (HEADER_SIZE%8 == 0)
-		PAD_SIZE = 0;
+	if (CpvAccess(HEADER_SIZE) % 8 == 0)
+		CpvAccess(PAD_SIZE) = 0;
 	else {
-       		PAD_SIZE = 8 - (HEADER_SIZE%8);
-	    	HEADER_SIZE += PAD_SIZE;
+       		CpvAccess(PAD_SIZE) = 8 - (CpvAccess(HEADER_SIZE) % 8);
+	    	CpvAccess(HEADER_SIZE) += CpvAccess(PAD_SIZE);
 	}
 
 	/********************* ENVELOPE **************************************/
 
-	_CK_Env_To_Usr = ENVELOPE_SIZE + LDB_ELEM_SIZE + PAD_SIZE ;
+	CpvAccess(_CK_Env_To_Usr) = ENVELOPE_SIZE + CpvAccess(LDB_ELEM_SIZE) + CpvAccess(PAD_SIZE) ;
 
 
 	/******************** LDB ********************************************/
 
- 	_CK_Ldb_To_Usr = LDB_ELEM_SIZE + PAD_SIZE ;
+ 	CpvAccess(_CK_Ldb_To_Usr) = CpvAccess(LDB_ELEM_SIZE) + CpvAccess(PAD_SIZE) ;
 
 
 	/******************* USR *********************************************/
 
- 	_CK_Usr_To_Env = -(ENVELOPE_SIZE + LDB_ELEM_SIZE + PAD_SIZE) ;
- 	_CK_Usr_To_Ldb = -(LDB_ELEM_SIZE + PAD_SIZE);
+ 	CpvAccess(_CK_Usr_To_Env) = -(ENVELOPE_SIZE + CpvAccess(LDB_ELEM_SIZE) + CpvAccess(PAD_SIZE)) ;
+ 	CpvAccess(_CK_Usr_To_Ldb) = -(CpvAccess(LDB_ELEM_SIZE) + CpvAccess(PAD_SIZE));
 }	

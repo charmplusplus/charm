@@ -12,8 +12,8 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-02 17:27:40  brunner
- * Reorganized directory structure
+ * Revision 2.1  1995-06-08 17:07:12  gursoy
+ * Cpv macro changes done
  *
  * Revision 1.3  1995/04/23  00:46:38  sanjeev
  * changed STATIC to static
@@ -60,10 +60,28 @@ unsigned int LowestTime();/* returns the lowest time in the heap            */
 
 
 /**** these variables are local to this file but are persistant *****/
-static int numRaiseCondArryElts = NUMSYSCONDARISEELTS;/* init to # of system cnds */
-static HeapIndexType         timerHeap[MAXTIMERHEAPENTRIES + 1];
-static CondArrayEltType         condChkArray[MAXCONDCHKARRAYELTS];
-static IfCondArisesArrayEltType ifCondArisesArray[MAXIFCONDARISESARRAYELTS];
+
+typedef HeapIndexType *HeapIndexType_;
+typedef CondArrayEltType *CondArrayEltType_;
+typedef IfCondArisesArrayEltType *IfCondArisesArrayEltType_;
+
+CpvStaticDeclare(int, numRaiseCondArryElts); /* init to # of system cnds */
+CpvStaticDeclare(HeapIndexType_,           timerHeap);
+CpvStaticDeclare(CondArrayEltType_,      condChkArray);
+CpvStaticDeclare(IfCondArisesArrayEltType_, ifCondArisesArray);
+
+
+
+
+void condsendModuleInit()
+{
+     CpvInitialize(int, numRaiseCondArryElts);
+     CpvInitialize(HeapIndexType_, timerHeap);
+     CpvInitialize(CondArrayEltType_, condChkArray);
+     CpvInitialize(IfCondArisesArrayEltType_, ifCondArisesArray);
+}
+
+
 
 
 /***************************************************************************
@@ -94,8 +112,8 @@ else {
     newEntry->msg       = msgToSend;
     newEntry->size      = size;
     newEntry->chareID   = *pChareID;
-    condChkArray[numCondChkArryElts].theData      = (void *) newEntry;
-    condChkArray[numCondChkArryElts++].bocOrChare = ITSACHARE;
+    CpvAccess(condChkArray)[CpvAccess(numCondChkArryElts)].theData     = (void *) newEntry;
+    CpvAccess(condChkArray)[CpvAccess(numCondChkArryElts)++].bocOrChare = ITSACHARE;
     }
 } 
 
@@ -121,8 +139,8 @@ else {
     newEntry->bocNum   = bocNum;
     newEntry->fn_ptr   = fn_ptr;;
 
-    condChkArray[numCondChkArryElts].theData      = (void *) newEntry;
-    condChkArray[numCondChkArryElts++].bocOrChare = ITSABOC;
+    CpvAccess(condChkArray)[CpvAccess(numCondChkArryElts)].theData     = (void *) newEntry;
+    CpvAccess(condChkArray)[CpvAccess(numCondChkArryElts)++].bocOrChare = ITSABOC;
     }
 }
 
@@ -166,9 +184,9 @@ newEntry->chareID   = *pChareID;        /* fill up our data structure   */
 theLink->theData    = (void *) newEntry;
 theLink->bocOrChare = ITSACHARE;
 theLink->next       = NULL;
-listPtr = ifCondArisesArray[condNum].dataListPtr; /* put entry into list */
+listPtr = CpvAccess(ifCondArisesArray)[condNum].dataListPtr; /* put entry into list */
 if(listPtr == NULL)
-    ifCondArisesArray[condNum].dataListPtr = theLink;
+    CpvAccess(ifCondArisesArray)[condNum].dataListPtr = theLink;
 else {
     lockStpPtr = listPtr->next;
     while(lockStpPtr != NULL) {
@@ -209,9 +227,9 @@ newEntry->bocNum    = bocNum;
 theLink->theData    = (void *) newEntry;    /* set up the linked list info */
 theLink->next       = NULL;
 theLink->bocOrChare = ITSABOC;
-listPtr = ifCondArisesArray[condNum].dataListPtr; /* put entry into list */
+listPtr = CpvAccess(ifCondArisesArray)[condNum].dataListPtr; /* put entry into list */
 if(listPtr == NULL)
-    ifCondArisesArray[condNum].dataListPtr = theLink;
+    CpvAccess(ifCondArisesArray)[condNum].dataListPtr = theLink;
 else {
     lockStpPtr = listPtr->next;
     while(lockStpPtr != NULL) {
@@ -230,7 +248,7 @@ Date:   1/20/90
 void RaiseCondition(condNum)
 int condNum;
 {
-ifCondArisesArray[condNum].isCondRaised = 1;
+CpvAccess(ifCondArisesArray)[condNum].isCondRaised = 1;
 }
 
 
@@ -332,22 +350,22 @@ BocDataEntry   *bocData;
 currTime = CkTimer();
 
 	/*TRACE(CmiPrintf("(TimerChecks nd[%d]), currT [%d] #in hp[%d]\n",
-             CmiMyPe(),currTime,numHeapEntries));*/
+             CmiMyPe(),currTime,CpvAccess(numHeapEntries)));*/
 
-while ((numHeapEntries > 0) && (LowestTime(&index) < currTime)) {
-    if(timerHeap[index].bocOrChare == ITSACHARE) {
+while ((CpvAccess(numHeapEntries) > 0) && (LowestTime(&index) < currTime)) {
+    if(CpvAccess(timerHeap)[index].bocOrChare == ITSACHARE) {
         TRACE(CmiPrintf("(TimerCheck nd[%d])Snding Msg ndx[%d] currT[%d] schedT[%d]\n",
                  CmiMyPe(),index, currTime, LowestTime(&index)));
-        chareData = (ChareDataEntry *) timerHeap[index].theData;
+        chareData = (ChareDataEntry *) CpvAccess(timerHeap)[index].theData;
         RemoveFromHeap(index); 
         SendMsg(chareData->entry, chareData->msg,      /* send the message */
                  &chareData->chareID);
 	CmiFree(chareData);
         } 
-    else if(timerHeap[index].bocOrChare == ITSABOC) {  /* call the boc fn */
+    else if(CpvAccess(timerHeap)[index].bocOrChare == ITSABOC) {  /* call the boc fn */
         TRACE(CmiPrintf("(TimerCheck nd[%d])Cllng Boc ndx[%d] currT[%d] schedT[%d]\n",
-                 CmiMyPe(),index, currTime, timerHeap[1].timeVal));
-        bocData = (BocDataEntry *) timerHeap[index].theData;
+                 CmiMyPe(),index, currTime, CpvAccess(timerHeap)[1].timeVal));
+        bocData = (BocDataEntry *) CpvAccess(timerHeap)[index].theData;
         RemoveFromHeap(index); 
         (*(bocData->fn_ptr)) (bocData->bocNum);
 	CmiFree(bocData);
@@ -367,11 +385,24 @@ Info:   Here we just initialize some of the data structures
 *****************************************************************************/
 void CondSendInit()
 {
-int i;
+    int i;
 
-for(i = 0; i < MAXIFCONDARISESARRAYELTS; i++) {
-    ifCondArisesArray[i].isCondRaised = 0;
-    ifCondArisesArray[i].dataListPtr  = NULL;
+    CpvAccess(numRaiseCondArryElts) = NUMSYSCONDARISEELTS;
+
+    CpvAccess(timerHeap) = (HeapIndexType *)
+          CmiAlloc((MAXTIMERHEAPENTRIES + 1)*sizeof(HeapIndexType));
+
+    CpvAccess(condChkArray) = (CondArrayEltType *)
+          CmiAlloc(MAXCONDCHKARRAYELTS*sizeof(CondArrayEltType));
+
+    CpvAccess(ifCondArisesArray) = (IfCondArisesArrayEltType *)
+          CmiAlloc(MAXIFCONDARISESARRAYELTS*sizeof(IfCondArisesArrayEltType));
+
+
+
+    for(i = 0; i < MAXIFCONDARISESARRAYELTS; i++) {
+       CpvAccess(ifCondArisesArray)[i].isCondRaised = 0;
+       CpvAccess(ifCondArisesArray)[i].dataListPtr  = NULL;
     }
 }
 
@@ -401,26 +432,26 @@ ChareDataEntry *chareData;
 BocDataEntry   *bocData;
 LinkRec        *listPtr,*oldPtr;
 
-for(i = 0; i < numCondChkArryElts; i++) {
-    if(condChkArray[i].bocOrChare == ITSACHARE) {
-        chareData = (ChareDataEntry *) condChkArray[i].theData;
+for(i = 0; i < CpvAccess(numCondChkArryElts); i++) {
+    if(CpvAccess(condChkArray)[i].bocOrChare == ITSACHARE) {
+        chareData = (ChareDataEntry *) CpvAccess(condChkArray)[i].theData;
         if((*chareData->cond_fn)()){
            SendMsg(chareData->entry, chareData->msg, &chareData->chareID);
-           CmiFree(condChkArray[i].theData);
-           for(j = i; j < numCondChkArryElts - 1; j++) /* fill in hole in arry*/
-               condChkArray[i] = condChkArray[i + 1];
+           CmiFree(CpvAccess(condChkArray)[i].theData);
+           for(j = i; j < CpvAccess(numCondChkArryElts) - 1; j++) /* fill in hole in arry*/
+               CpvAccess(condChkArray)[i] = CpvAccess(condChkArray)[i + 1];
            i--;                            /* keep checking where we left off */
-           numCondChkArryElts--;           /* but we have one fewer elt       */
+           CpvAccess(numCondChkArryElts)--;           /* but we have one fewer elt       */
            } 
         } 
-    else if(condChkArray[i].bocOrChare == ITSABOC) {
-        bocData = (BocDataEntry *) condChkArray[i].theData;
+    else if(CpvAccess(condChkArray)[i].bocOrChare == ITSABOC) {
+        bocData = (BocDataEntry *) CpvAccess(condChkArray)[i].theData;
         if((*(bocData->fn_ptr))(bocData->bocNum)) {
-            CmiFree(condChkArray[i].theData);
-            for(j = i; j < numCondChkArryElts - 1; j++)   /* fill in hole */
-                condChkArray[i] = condChkArray[i + 1];
+            CmiFree(CpvAccess(condChkArray)[i].theData);
+            for(j = i; j < CpvAccess(numCondChkArryElts) - 1; j++)   /* fill in hole */
+                CpvAccess(condChkArray)[i] = CpvAccess(condChkArray)[i + 1];
             i--;                       /* keep checking where we left off */
-            numCondChkArryElts--;      /* but we have one fewer elt       */
+            CpvAccess(numCondChkArryElts)--;      /* but we have one fewer elt       */
             }
         } 
     else {
@@ -430,9 +461,9 @@ for(i = 0; i < numCondChkArryElts; i++) {
     } 
 
        /* now we check the ifCondArisesArray to see if any have arisen */
-for(i = 0; i < numRaiseCondArryElts; i++) {
-    if(ifCondArisesArray[i].isCondRaised) {         /* if the condition is T */
-        listPtr = ifCondArisesArray[i].dataListPtr;
+for(i = 0; i < CpvAccess(numRaiseCondArryElts); i++) {
+    if(CpvAccess(ifCondArisesArray)[i].isCondRaised) {         /* if the condition is T */
+        listPtr = CpvAccess(ifCondArisesArray)[i].dataListPtr;
         while(listPtr != NULL) {                    /* traverse the list */
             if(listPtr->bocOrChare == ITSACHARE) {  /* and take care of tasks */
                 chareData = (ChareDataEntry *) listPtr->theData;
@@ -448,8 +479,8 @@ for(i = 0; i < numRaiseCondArryElts; i++) {
             CmiFree(oldPtr->theData);           /* free the task */
             CmiFree(oldPtr);                    /* free the link struct */
             }
-        ifCondArisesArray[i].isCondRaised = 0; /* now reset condition flg */
-        ifCondArisesArray[i].dataListPtr  = NULL;  /* as well as list head    */
+        CpvAccess(ifCondArisesArray)[i].isCondRaised = 0; /* now reset condition flg */
+        CpvAccess(ifCondArisesArray)[i].dataListPtr  = NULL;  /* as well as list head    */
         }
     }
 } 
@@ -467,19 +498,19 @@ void           *heapData;
 {
 int child, parent;
 
-if(numHeapEntries > MAXTIMERHEAPENTRIES) {
+if(CpvAccess(numHeapEntries) > MAXTIMERHEAPENTRIES) {
     CmiPrintf("Heap overflow (InsertInHeap), exiting...\n");
     CkExit();
     }
 else {
-    numHeapEntries++;
-    timerHeap[numHeapEntries].timeVal    = theTime;
-    timerHeap[numHeapEntries].bocOrChare = bocOrChare;
-    timerHeap[numHeapEntries].theData    = (void *) heapData;
-    child  = numHeapEntries;    
+    CpvAccess(numHeapEntries)++;
+    CpvAccess(timerHeap)[CpvAccess(numHeapEntries)].timeVal    = theTime;
+    CpvAccess(timerHeap)[CpvAccess(numHeapEntries)].bocOrChare = bocOrChare;
+    CpvAccess(timerHeap)[CpvAccess(numHeapEntries)].theData    = (void *) heapData;
+    child  = CpvAccess(numHeapEntries);
     parent = child / 2;
     while(parent > 0) {
-        if(timerHeap[child].timeVal < timerHeap[parent].timeVal)
+        if(CpvAccess(timerHeap)[child].timeVal < CpvAccess(timerHeap)[parent].timeVal)
             SwapHeapEntries(child,parent);
         child  = parent;
         parent = parent / 2;
@@ -502,21 +533,21 @@ int index;
 int parent,child;
 
 parent = index;
-if(!numHeapEntries || (index != 1)) {
+if(!CpvAccess(numHeapEntries) || (index != 1)) {
     CmiPrintf("Internal inconsistency (RemoveFromHeap), exiting ...\n");
     CkExit();
     } 
 else {
-    timerHeap[index].theData = NULL;
-    SwapHeapEntries(index,numHeapEntries); /* put value at end of heap */
-    numHeapEntries--;
-    if(numHeapEntries) {             /* if any left, then bubble up values */
+    CpvAccess(timerHeap)[index].theData = NULL;
+    SwapHeapEntries(index,CpvAccess(numHeapEntries)); /* put value at end of heap */
+    CpvAccess(numHeapEntries)--;
+    if(CpvAccess(numHeapEntries)) {             /* if any left, then bubble up values */
         child = 2 * parent;
-        while(child <= numHeapEntries) {
-            if(((child + 1) <= numHeapEntries)  &&
-               (timerHeap[child].timeVal > timerHeap[child + 1].timeVal))
+        while(child <= CpvAccess(numHeapEntries)) {
+            if(((child + 1) <= CpvAccess(numHeapEntries))  &&
+               (CpvAccess(timerHeap)[child].timeVal > CpvAccess(timerHeap)[child + 1].timeVal))
                 child++;              /* use the smaller of the two */
-            if(timerHeap[parent].timeVal > timerHeap[child].timeVal) {
+            if(CpvAccess(timerHeap)[parent].timeVal > CpvAccess(timerHeap)[child].timeVal) {
                 SwapHeapEntries(parent,child);
                 parent  = child;      /* go down the tree one more step */
                 child  = 2 * child;
@@ -527,7 +558,7 @@ else {
         }
     } 
 /*
-CmiPrintf("Removed from Heap ndx[%d] #HpEntries[%d]\n",index,numHeapEntries);
+CmiPrintf("Removed from Heap ndx[%d] #HpEntries[%d]\n",index,CpvAccess(numHeapEntries));
 */
 } 
 
@@ -543,9 +574,9 @@ int index1,index2;
 {
 HeapIndexType temp;
 
-temp              = timerHeap[index1];
-timerHeap[index1] = timerHeap[index2];
-timerHeap[index2] = temp;
+temp              = CpvAccess(timerHeap)[index1];
+CpvAccess(timerHeap)[index1] = CpvAccess(timerHeap)[index2];
+CpvAccess(timerHeap)[index2] = temp;
 } 
 
 
@@ -559,13 +590,13 @@ Info:   Just return the lowest value in the heap, which should always be
 unsigned int LowestTime(indexPtr)
 int *indexPtr;
 {
-if(!numHeapEntries) {
+if(!CpvAccess(numHeapEntries)) {
     CmiPrintf("Internal inconsistency (LowestTime), exiting...\n");
     CkExit();
     }
 else {
     *indexPtr = 1;
-    return(timerHeap[1].timeVal);
+    return(CpvAccess(timerHeap)[1].timeVal);
     }
 } 
 
@@ -582,18 +613,18 @@ int  NoDelayedMsgs()
 int i,cat;
 
 /*
-CmiPrintf("entering NoDelayedMsgs(), [%d] in heap\n",numHeapEntries);
+CmiPrintf("entering NoDelayedMsgs(), [%d] in heap\n",CpvAccess(numHeapEntries));
 */
-for(i = 1; i <= numHeapEntries; i++) {
-	if(timerHeap[i].bocOrChare == ITSABOC) {
-        if(((BocDataEntry *)timerHeap[i].theData)->bocNum >= NumSysBoc)
+for(i = 1; i <= CpvAccess(numHeapEntries); i++) {
+	if(CpvAccess(timerHeap)[i].bocOrChare == ITSABOC) {
+        if(((BocDataEntry *)CpvAccess(timerHeap)[i].theData)->bocNum >= NumSysBoc)
             return 0;      /* if there is a user level boc func call */
         }
-    else if(timerHeap[i].bocOrChare == ITSACHARE) {
+    else if(CpvAccess(timerHeap)[i].bocOrChare == ITSACHARE) {
 
 	ENVELOPE *env;
 
-	env = (ENVELOPE *) ENVELOPE_UPTR(((ChareDataEntry*)timerHeap[i].theData)->msg);
+	env = (ENVELOPE *) ENVELOPE_UPTR(((ChareDataEntry*)CpvAccess(timerHeap)[i].theData)->msg);
         cat = GetEnv_category(env);
         CmiPrintf("NoDelayedMsgs, category is[%d]\n",cat);
         if(cat == USERcat)
@@ -601,7 +632,7 @@ for(i = 1; i <= numHeapEntries; i++) {
         }
     else {
         CmiPrintf("Error, node[%d], (NoDelayedMsgs ndx[%d] boc[%d])\n",
-                 CmiMyPe(),i,timerHeap[i].bocOrChare);
+                 CmiMyPe(),i,CpvAccess(timerHeap)[i].bocOrChare);
         CkExit();
         break;
         }

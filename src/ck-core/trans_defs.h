@@ -12,8 +12,8 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-02 17:30:04  brunner
- * Reorganized directory structure
+ * Revision 2.1  1995-06-08 17:07:12  gursoy
+ * Cpv macro changes done
  *
  * Revision 1.5  1995/04/13  21:26:44  milind
  * Changed  definition of CkTimer.
@@ -31,6 +31,8 @@
  * Initial revision
  *
  ***************************************************************************/
+#ifndef TRANS_DEF_H
+#define TRANS_DEF_H
 
 /* used in EpChareTypeTable, for now this is used only in projections.c */
 #define CHARE 		53
@@ -111,3 +113,6 @@ typedef struct pseudo_struct {
 /* This causes problems in C++ so its now in trans_externs.h : SANJEEV 
 extern void * GenericCkAlloc();
 */
+
+
+#endif

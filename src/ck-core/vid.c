@@ -12,8 +12,8 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-02 17:27:40  brunner
- * Reorganized directory structure
+ * Revision 2.1  1995-06-08 17:07:12  gursoy
+ * Cpv macro changes done
  *
  * Revision 1.4  1995/04/13  20:55:50  sanjeev
  * Changed Mc to Cmi
@@ -125,8 +125,8 @@ void *data_area;
 
 VidAddSysBocEps()
 {
-   EpTable[VidQueueUpInVidBlock_EP] = VidQueueUpInVidBlock;
-   EpTable[VidSendOverMessages_EP] = VidSendOverMessages;
+   CsvAccess(EpTable)[VidQueueUpInVidBlock_EP] = VidQueueUpInVidBlock;
+   CsvAccess(EpTable)[VidSendOverMessages_EP] = VidSendOverMessages;
 }
 
 
@@ -157,7 +157,7 @@ VID_BLOCK *vidPtr;
 
     msg->dataPtr = chareblockPtr;
     msg->chare_magic_number =
-	GetID_chare_magic_number(currentChareBlock->selfID);
+	GetID_chare_magic_number(CpvAccess(currentChareBlock)->selfID);
 
     QDCountThisCreation(GetEnv_vidEP(env), IMMEDIATEcat, VidMsg, 1);
     trace_creation(GetEnv_msgType(env), GetEnv_EP(env), env);

@@ -12,8 +12,8 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-02 17:27:40  brunner
- * Reorganized directory structure
+ * Revision 2.1  1995-06-08 17:09:41  gursoy
+ * Cpv macro changes done
  *
  * Revision 1.5  1995/04/23  21:21:52  sanjeev
  * added #include converse.h
@@ -31,6 +31,10 @@
  * Initial revision
  *
  ***************************************************************************/
+
+#ifndef CKDEFS_H
+#define CKDEFS_H
+
 #include "converse.h"
 #include "conv-mach.h"
 #include "common.h"
@@ -61,7 +65,17 @@
 #define _CK_MyBranchID		MyBranchID
 #define _CK_MonoValue		MonoValue
 
-/* The rest are for use by the CHARM++ translator */ 
+/* The rest are for use by programs that use the old names */ 
+#define McMyPeNum() CmiMyPe()
+#define McMaxPeNum() CmiNumPe()
+#define McTotalNumPe() CmiNumPe()   
+#define McSpanTreeInit() CmiSpanTreeInit()
+#define McSpanTreeParent(node) CmiSpanTreeParent(node)
+#define McSpanTreeRoot() CmiSpanTreeRoot()
+#define McSpanTreeChild(node, children) CmiSpanTreeChildren(node, children)
+#define McNumSpanTreeChildren(node) CmiNumSpanTreeChildren(node)
+#define McSendToSpanTreeLeaves(size, msg) CmiSendToSpanTreeLeaves(size, msg)
+
 #define CPrintf                 CmiPrintf
 #define CScanf                  CmiScanf
 #define CMyPeNum                CmiMyPe
@@ -83,4 +97,8 @@
 
 #ifndef NULL
 #define NULL 0
+#endif
+
+
+
 #endif

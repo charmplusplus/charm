@@ -12,8 +12,8 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-02 17:27:40  brunner
- * Reorganized directory structure
+ * Revision 2.1  1995-06-08 17:07:12  gursoy
+ * Cpv macro changes done
  *
  * Revision 1.3  1995/05/04  22:11:10  jyelon
  * *** empty log message ***
@@ -25,13 +25,15 @@
  * Initial revision
  *
  ***************************************************************************/
+#ifndef STAT_H
+#define STAT_H
+
 #define MAXMEMSTAT 10 
 /* MAXMEMSTAT is also defined in memory management */
 
-extern int CstatsMaxChareQueueLength;
-extern int CstatsMaxForChareQueueLength;
-extern int CstatsMaxFixedChareQueueLength;
-extern int MemStatistics[];
+CpvExtern(int, CstatsMaxChareQueueLength);
+CpvExtern(int, CstatsMaxForChareQueueLength);
+CpvExtern(int, CstatsMaxFixedChareQueueLength);
 
 
 typedef struct message3 {
@@ -53,3 +55,4 @@ typedef struct dummy_message {
     int dummy;
 } DUMMY_STAT_MSG;
 
+#endif

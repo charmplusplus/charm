@@ -12,8 +12,8 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-02 17:30:04  brunner
- * Reorganized directory structure
+ * Revision 2.1  1995-06-08 17:07:12  gursoy
+ * Cpv macro changes done
  *
  * Revision 1.2  1994/11/11  05:25:19  brunner
  * Removed ident added by accident with RCS header
@@ -22,6 +22,9 @@
  * Initial revision
  *
  ***************************************************************************/
+#ifndef VID_H
+#define VID_H
+
 typedef struct data_brnch_vid {
 	int dummy;
 } DATA_BR_VID;
@@ -34,3 +37,4 @@ typedef struct vid_msg{
  	CHARE_BLOCK *dataPtr;
         int chare_magic_number;
 } CHARE_ID_MSG;
+#endif

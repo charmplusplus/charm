@@ -12,8 +12,8 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-02 17:27:40  brunner
- * Reorganized directory structure
+ * Revision 2.1  1995-06-08 17:07:12  gursoy
+ * Cpv macro changes done
  *
  * Revision 1.2  1994/11/11  05:24:34  brunner
  * Removed ident added by accident with RCS header
@@ -31,7 +31,8 @@
 /*                           All Rights Reserved                          */
 /*                                                                        */
 /**************************************************************************/
-
+#ifndef MONO_H
+#define MONO_H
 typedef int MonoIDType;
 
 #define UP_WAIT_TIME 200
@@ -44,5 +45,5 @@ typedef struct {
 	int ismodified;
 } MONO_DATA;
 
-/* void * _CK_9GetMonoDataPtr();  */
 FUNCTION_PTR _CK_9GetMonoCompareFn();
+#endif

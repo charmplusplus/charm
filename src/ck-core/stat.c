@@ -12,8 +12,8 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-02 17:27:40  brunner
- * Reorganized directory structure
+ * Revision 2.1  1995-06-08 17:07:12  gursoy
+ * Cpv macro changes done
  *
  * Revision 1.5  1995/05/04  22:05:47  jyelon
  * *** empty log message ***
@@ -39,11 +39,24 @@ static char ident[] = "@(#)$Header$";
 #include "performance.h"
 #include "stat.h"
 
-static int **HostStat;
-static int **HostMemStatistics;
-static int NumPe;
+typedef int **ARRAY_;
+CpvStaticDeclare(ARRAY_, HostStat);
+CpvStaticDeclare(ARRAY_, HostMemStatistics);
+CpvStaticDeclare(int, NumPe);
 
 extern CollectPerfFromNodes();
+
+
+
+void statModuleInit()
+{
+    CpvInitialize(ARRAY_, HostStat);
+    CpvInitialize(ARRAY_, HostMemStatistics);
+    CpvInitialize(int, NumPe);
+}
+
+
+
 
 
 StatInit()
@@ -51,10 +64,10 @@ StatInit()
 	BOC_BLOCK *bocBlock;
 	int i;
 
-	NumPe = CmiNumPe();
-	RecdStatMsg = 1;
+	CpvAccess(NumPe) = CmiNumPe();
+	CpvAccess(RecdStatMsg) = 1;
 	if (CmiMyPe() == 0)
-		RecdStatMsg = 0;
+		CpvAccess(RecdStatMsg) = 0;
 }
 
 StatisticBocInit()
@@ -83,12 +96,12 @@ TRACE(CmiPrintf("Node %d: Enter NodeCollectStatistics() \n", CmiMyPe()));
 	sPtr->chareQueueLength = CstatsMaxChareQueueLength;
 	sPtr->forChareQueueLength = CstatsMaxForChareQueueLength;
 	sPtr->fixedChareQueueLength = CstatsMaxFixedChareQueueLength;
-	sPtr->charesCreated = nodecharesCreated;
-	sPtr->charesProcessed = nodecharesProcessed;
-	sPtr->forCharesCreated = nodeforCharesCreated;
-	sPtr->forCharesProcessed = nodeforCharesProcessed;
-	sPtr->bocMsgsCreated = nodebocMsgsCreated;
-	sPtr->bocMsgsProcessed = nodebocMsgsProcessed;
+	sPtr->charesCreated = CpvAccess(nodecharesCreated);
+	sPtr->charesProcessed = CpvAccess(nodecharesProcessed);
+	sPtr->forCharesCreated = CpvAccess(nodeforCharesCreated);
+	sPtr->forCharesProcessed = CpvAccess(nodeforCharesProcessed);
+	sPtr->bocMsgsCreated = CpvAccess(nodebocMsgsCreated);
+	sPtr->bocMsgsProcessed = CpvAccess(nodebocMsgsProcessed);
 
 	for (i=0; i < MAXMEMSTAT; i++)
 		sPtr->nodeMemStat[i] = CstatMemory(i);
@@ -119,52 +132,54 @@ void *msgPtr, *localdataptr;
 	STAT_MSG *mPtr = (STAT_MSG *) msgPtr;
 
 TRACE(CmiPrintf("Host %d: Enter CollectFromNodes(): NumPe %d\n",
-	 CmiMyPe(), NumPe));
-	if (NumPe == CmiNumPe())
+	 CmiMyPe(), CpvAccess(NumPe)));
+	if (CpvAccess(NumPe) == CmiNumPe())
 	{
-		HostMemStatistics = (int **) CmiAlloc(sizeof(int)*NumPe);
-		CkMemError(HostMemStatistics);
-		for (i=0; i<NumPe; i++)
+	       CpvAccess(HostMemStatistics)=
+                              (int **) CmiAlloc(sizeof(int)*CpvAccess(NumPe));
+	       CkMemError(CpvAccess(HostMemStatistics));
+		for (i=0; i<CpvAccess(NumPe); i++)
 		{
-			HostMemStatistics[i] = 
+			CpvAccess(HostMemStatistics)[i] = 
                            (int *) CmiAlloc(sizeof(int)*MAXMEMSTAT);
-			CkMemError(HostMemStatistics[i]);
+			CkMemError(CpvAccess(HostMemStatistics)[i]);
 		}
-		HostStat = (int **) CmiAlloc(sizeof(int)*NumPe);
-		CkMemError(HostStat);
-		for (i=0; i<NumPe; i++)
+		CpvAccess(HostStat) = 
+                           (int **) CmiAlloc(sizeof(int)*CpvAccess(NumPe));
+		CkMemError(CpvAccess(HostStat));
+		for (i=0; i<CpvAccess(NumPe); i++)
 		{
-			HostStat[i] = (int *) CmiAlloc(sizeof(int)*10);
-			CkMemError(HostStat[i]);
+			CpvAccess(HostStat)[i]=(int *)CmiAlloc(sizeof(int)*10);
+			CkMemError(CpvAccess(HostStat)[i]);
 		}
-		for (i=0; i<NumPe; i++)
+		for (i=0; i<CpvAccess(NumPe); i++)
 		{
 			for (j=0; j<MAXMEMSTAT; j++)
-				HostMemStatistics[i][j] = 0;
+				CpvAccess(HostMemStatistics)[i][j] = 0;
 			for (j=0; j<10; j++)
-				HostStat[i][j] = 0;
+				CpvAccess(HostStat)[i][j] = 0;
 		}
 	}
-	NumPe--;
+	CpvAccess(NumPe)--;
 
-	HostStat[mPtr->srcPE][0] = mPtr->chareQueueLength;
-	HostStat[mPtr->srcPE][1] = mPtr->forChareQueueLength;
-	HostStat[mPtr->srcPE][2] = mPtr->fixedChareQueueLength;
-	HostStat[mPtr->srcPE][3] = mPtr->charesCreated;
-	HostStat[mPtr->srcPE][4] = mPtr->charesProcessed;
-	HostStat[mPtr->srcPE][5] = mPtr->forCharesCreated;
-	HostStat[mPtr->srcPE][6] = mPtr->forCharesProcessed;
-	HostStat[mPtr->srcPE][7] = mPtr->bocMsgsCreated;
-	HostStat[mPtr->srcPE][8] = mPtr->bocMsgsProcessed;
+	CpvAccess(HostStat)[mPtr->srcPE][0] = mPtr->chareQueueLength;
+	CpvAccess(HostStat)[mPtr->srcPE][1] = mPtr->forChareQueueLength;
+	CpvAccess(HostStat)[mPtr->srcPE][2] = mPtr->fixedChareQueueLength;
+	CpvAccess(HostStat)[mPtr->srcPE][3] = mPtr->charesCreated;
+	CpvAccess(HostStat)[mPtr->srcPE][4] = mPtr->charesProcessed;
+	CpvAccess(HostStat)[mPtr->srcPE][5] = mPtr->forCharesCreated;
+	CpvAccess(HostStat)[mPtr->srcPE][6] = mPtr->forCharesProcessed;
+	CpvAccess(HostStat)[mPtr->srcPE][7] = mPtr->bocMsgsCreated;
+	CpvAccess(HostStat)[mPtr->srcPE][8] = mPtr->bocMsgsProcessed;
 
 	for (k=0; k < MAXMEMSTAT; k++)
-		HostMemStatistics[mPtr->srcPE][k] = mPtr->nodeMemStat[k];
+	  CpvAccess(HostMemStatistics)[mPtr->srcPE][k] = mPtr->nodeMemStat[k];
 	
 	/* Exit when statistics from all the nodes have been received */
-	if (NumPe == 0)
+	if (CpvAccess(NumPe) == 0)
 	{
-		RecdStatMsg = 1;
-		if (RecdPerfMsg) ExitNode();
+		CpvAccess(RecdStatMsg) = 1;
+		if (CpvAccess(RecdPerfMsg)) ExitNode();
 	}
 }
 
@@ -188,27 +203,30 @@ PrintOutStatistics()
 		CmiPrintf("Queue Statistics: (NODE)[MaxChareQ, MaxForChareQ, MaxFixedChareQ]\n");
 		for (k=0; k < CmiNumPe(); k++)
 		{
-			totalChareQ += HostStat[k][0];
-			totalForChareQ += HostStat[k][1];
+			totalChareQ += CpvAccess(HostStat)[k][0];
+			totalForChareQ += CpvAccess(HostStat)[k][1];
 		}
 		CmiPrintf("Average Queue Sizes: [AvgMaxChareQ %d, AvgMaxForChareQ %d]\n",
 		    totalChareQ/CmiNumPe(), totalForChareQ/CmiNumPe());
 
 		for (k=0; k < CmiNumPe(); k++)
-			CmiPrintf("(%d)[%d, %d, %d], ", k, HostStat[k][0], HostStat[k][1], HostStat[k][2]);
+			CmiPrintf("(%d)[%d, %d, %d], ", k, 
+                                   CpvAccess(HostStat)[k][0], 
+                                   CpvAccess(HostStat)[k][1], 
+                                   CpvAccess(HostStat)[k][2]);
 		CmiPrintf("\n\n");
 	}
 
 
-        if (PrintChareStat || PrintSummaryStat)
+        if (CpvAccess(PrintChareStat) || CpvAccess(PrintSummaryStat))
 		for (k=0; k < CmiNumPe(); k++)
 		{
-			totalCharesCrea += HostStat[k][3];
-			totalCharesProc += HostStat[k][4];
+			totalCharesCrea += CpvAccess(HostStat)[k][3];
+			totalCharesProc += CpvAccess(HostStat)[k][4];
 		}
 
 
-	if (PrintSummaryStat)
+	if (CpvAccess(PrintSummaryStat))
 	{
 		CmiPrintf("\nPrinting Chare Summary Statistics:\n");
 		CmiPrintf("Total Chares: [Created %d, Processed %d]\n",
@@ -216,20 +234,23 @@ PrintOutStatistics()
 	}
 
 
-	if (PrintChareStat)
+	if (CpvAccess(PrintChareStat))
 	{
 		CmiPrintf("\nPrinting Chare Statistics:\n");
 		CmiPrintf("Individual Chare Info: (NODE)[Created, Processed]\n");
 		for (k=0; k < CmiNumPe(); k++)
-			CmiPrintf("(%d)[%d, %d], ", k, HostStat[k][3], HostStat[k][4]);
+			CmiPrintf("(%d)[%d, %d], ", k, 
+                          CpvAccess(HostStat)[k][3], CpvAccess(HostStat)[k][4]);
 		CmiPrintf("\nFor Chare Messages: ");
 		for (k=0; k < CmiNumPe(); k++)
-			CmiPrintf("(%d)[%d, %d], ", k, HostStat[k][5], HostStat[k][6]);
+			CmiPrintf("(%d)[%d, %d], ", k, 
+                          CpvAccess(HostStat)[k][5],CpvAccess(HostStat)[k][6]);
 		CmiPrintf("\n");
 
 		CmiPrintf("For Boc Messages: ");
 		for (k=0; k < CmiNumPe(); k++)
-			CmiPrintf("(%d)[%d, %d], ", k, HostStat[k][7], HostStat[k][8]);
+			CmiPrintf("(%d)[%d, %d], ", k, 
+                          CpvAccess(HostStat)[k][7], CpvAccess(HostStat)[k][8]);
 		CmiPrintf("\n\n");
 
 	}
@@ -238,15 +259,17 @@ PrintOutStatistics()
 	{
 		CmiPrintf("Printing Memory Statistics:\n\n");
                 CmiPrintf("Available Memory: %d (words)\n",
-                         HostMemStatistics[0][0]);
+                         CpvAccess(HostMemStatistics)[0][0]);
                 CmiPrintf(" Node     Unused         Allocated                   Freed\n");
                 CmiPrintf(" Node     (words)     (no.req, words)            (no.req, words)\n");
                 CmiPrintf("------   --------    ---------------------      ---------------------\n");
 		for (k=0; k < CmiNumPe(); k++)
                         CmiPrintf("%4d    %8d     [%8d,%10d]      [%8d,%10d]\n",
-                        k,HostMemStatistics[k][1],
-                        HostMemStatistics[k][2],HostMemStatistics[k][3]*2,
-                        HostMemStatistics[k][4],HostMemStatistics[k][5]*2);
+                        k,CpvAccess(HostMemStatistics)[k][1],
+                        CpvAccess(HostMemStatistics)[k][2],
+                        CpvAccess(HostMemStatistics)[k][3]*2,
+                        CpvAccess(HostMemStatistics)[k][4],
+                        CpvAccess(HostMemStatistics)[k][5]*2);
                 CmiPrintf("\n");
 	}
 }
@@ -257,9 +280,9 @@ StatAddSysBocEps()
 {
 	extern BroadcastExitMessage(), ExitMessage();
 
-	EpTable[StatCollectNodes_EP] = CollectFromNodes;
-	EpTable[StatData_EP] = NodeCollectStatistics;
-	EpTable[StatPerfCollectNodes_EP] = CollectPerfFromNodes;
-	EpTable[StatBroadcastExitMessage_EP] = BroadcastExitMessage;
-	EpTable[StatExitMessage_EP] = ExitMessage;
+	CsvAccess(EpTable)[StatCollectNodes_EP] = CollectFromNodes;
+	CsvAccess(EpTable)[StatData_EP] = NodeCollectStatistics;
+	CsvAccess(EpTable)[StatPerfCollectNodes_EP] = CollectPerfFromNodes;
+	CsvAccess(EpTable)[StatBroadcastExitMessage_EP] = BroadcastExitMessage;
+	CsvAccess(EpTable)[StatExitMessage_EP] = ExitMessage;
 }

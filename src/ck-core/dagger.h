@@ -12,8 +12,8 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-02 17:27:40  brunner
- * Reorganized directory structure
+ * Revision 2.1  1995-06-08 17:07:12  gursoy
+ * Cpv macro changes done
  *
  * Revision 1.2  1994/11/11  05:31:32  brunner
  * Removed ident added by accident with RCS header
@@ -22,6 +22,9 @@
  * Initial revision
  *
  ***************************************************************************/
+#ifndef DAGGER_H
+#define DAGGER_H
+
 /* _dag3_WLIMIT is defined in dag.c dag.h also */
 #define _dag3_WLIMIT 8
 
@@ -127,5 +130,8 @@ extern _dag_s_endsend();
 #define dag_mwset()   
 #define dag_mcset(c,v) 
 #define dag_endsend()  
+
+#endif
+
 
 #endif

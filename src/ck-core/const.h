@@ -12,8 +12,8 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-02 17:27:40  brunner
- * Reorganized directory structure
+ * Revision 2.1  1995-06-08 17:07:12  gursoy
+ * Cpv macro changes done
  *
  * Revision 1.3  1995/05/03  20:57:54  sanjeev
  * bug fixes for finding uninitialized modules
@@ -25,6 +25,9 @@
  * Initial revision
  *
  ***************************************************************************/
+#ifndef CONST_H
+#define CONST_H
+
 /* There is no shared declaration for nonshared machines */
 #define SHARED_DECL
 
@@ -147,3 +150,5 @@
 #define QdBocMsg		14
 #define QdBroadcastBocMsg	15
 
+
+#endif

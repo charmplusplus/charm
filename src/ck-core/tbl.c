@@ -12,8 +12,8 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-02 17:27:40  brunner
- * Reorganized directory structure
+ * Revision 2.1  1995-06-08 17:07:12  gursoy
+ * Cpv macro changes done
  *
  * Revision 1.3  1995/04/13  20:55:22  sanjeev
  * Changed Mc to Cmi
@@ -33,9 +33,19 @@ static char ident[] = "@(#)$Header$";
 
 #define SIZE_CHARE_ID sizeof(ChareIDType)
 
-int MaxPe;
-/* made static, July 9 */
-static struct tbl_element *table[MAX_TBL_SIZE];
+
+typedef struct tbl_element *TBL_ELEMENT_[MAX_TBL_SIZE];
+CpvStaticDeclare(TBL_ELEMENT_, table);
+
+
+void tblModuleInit()
+{
+    CpvInitialize(TBL_ELEMENT_, table);
+}
+
+
+
+
 
 TblBocInit()
 {
@@ -46,9 +56,9 @@ TblBocInit()
     	/*TRACE(CmiPrintf("Node %d: TblBocInit:created block with size %d\n",CmiMyPe(), sizeof(DATA_BR_VID))); */
 	bocBlock->boc_num = TblBocNum;
     	SetBocDataPtr(TblBocNum, (void *) (bocBlock + 1));
-	MaxPe = CmiNumPe();	
+
 	for (i=0; i<MAX_TBL_SIZE; i++)
-		table[i] = (TBL_ELEMENT *) NULL;
+		CpvAccess(table)[i] = (TBL_ELEMENT *) NULL;
     	TRACE(CmiPrintf("Node %d: TblBocInit: BocDataTbl entry filled.\n",CmiMyPe()));
 }
 
@@ -178,15 +188,15 @@ int tbl, key;
 	int p, i;
 	map *value;
 	
-	if (PseudoTable[tbl].pseudo_type.table.hashfn)
-		p = (*PseudoTable[tbl].pseudo_type.table.hashfn)(key);
+	if (CsvAccess(PseudoTable)[tbl].pseudo_type.table.hashfn)
+		p = (*CsvAccess(PseudoTable)[tbl].pseudo_type.table.hashfn)(key);
 	else
 		p = 13*key % MAX_TBL_SIZE; 
 		
 	i = 83*key;
 	value = (map *) CmiAlloc(sizeof(map));
 	CkMemError(value);
-	value->penum = absolute(p % MaxPe);
+	value->penum = absolute(p % CmiNumPe());
 	value->index = absolute(i % MAX_TBL_SIZE);
 	return(value);
 }
@@ -348,7 +358,7 @@ int option;
 	{
 		if (index == -1) index = place->index;
 TRACE(CmiPrintf("TblInsert :: key = %d, index = %d\n", key, index));
-		ptr = match(key, tbl, table[index]);
+		ptr = match(key, tbl, CpvAccess(table)[index]);
 		operation = 3;
 		if ( (ptr == NULL) ||  (! ptr->isDefined) )
 		{
@@ -359,8 +369,8 @@ TRACE(CmiPrintf("TblInsert :: key = %d, index = %d\n", key, index));
 				ptr->tbl = tbl;
 				ptr->key = key;
 				ptr->reply = (ADDRESS *) NULL;
-				ptr->next = table[index];
-				table[index] = ptr;
+				ptr->next = CpvAccess(table)[index];
+				CpvAccess(table)[index] = ptr;
 TRACE(CmiPrintf("TblInsert :: table entry created with key %d\n", key));
 			}		
 			ptr->data = (char *) CmiAlloc(size_data);
@@ -436,7 +446,7 @@ int option;
 	else
 	{
 		if (index == -1) index  = place->index;
-		ptr1 = table[index];
+		ptr1 = CpvAccess(table)[index];
 		ptr2 = (TBL_ELEMENT *) NULL;
 		while ( (ptr1 != NULL) &&
 			(  (ptr1->tbl != tbl) || 
@@ -458,11 +468,11 @@ int option;
 		if (ptr2 == NULL) 
 			if (ptr1 != NULL)
 			{
-				table[index] =  ptr1->next;
+				CpvAccess(table)[index] =  ptr1->next;
 				CmiFree(ptr1);
 			}
 			else
-				table[index] = (TBL_ELEMENT *) NULL;
+				CpvAccess(table)[index] = (TBL_ELEMENT *) NULL;
 		else
 			if (ptr1 != NULL)
 			{
@@ -515,7 +525,7 @@ int option;
 	else
 	{
 		if (index == -1) index = place->index;
-		ptr = match(key, tbl, table[index]);	
+		ptr = match(key, tbl, CpvAccess(table)[index]);	
 
 TRACE(CmiPrintf("[%d] TblFind: ptr=0x%x, entry=%d, option=%d, index=%d\n",
 		CmiMyPe(), ptr, entry, option, index));
@@ -564,8 +574,8 @@ TRACE(CmiPrintf("[%d] TblFind: Going to send message.\n"));
 			ptr->tbl = tbl;
 			ptr->key = key;
 			ptr->reply = (ADDRESS *) NULL;
-			ptr->next = table[index];
-			table[index] = ptr;
+			ptr->next = CpvAccess(table)[index];
+			CpvAccess(table)[index] = ptr;
 			ptr->isDefined = 0;
 			ptr->data = (char *) NULL;
 			ptr->size_data = 0;
@@ -596,5 +606,5 @@ TRACE(CmiPrintf("[%d] TblFind: Sent message.\n"));
 
 TblAddSysBocEps()
 {
-   	EpTable[TblUnpack_EP] = (FUNCTION_PTR) Unpack;
+   	CsvAccess(EpTable)[TblUnpack_EP] = (FUNCTION_PTR) Unpack;
 }

@@ -12,8 +12,8 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-02 17:27:40  brunner
- * Reorganized directory structure
+ * Revision 2.1  1995-06-08 17:07:12  gursoy
+ * Cpv macro changes done
  *
  * Revision 1.4  1995/04/13  20:54:18  sanjeev
  * Changed Mc to Cmi
@@ -32,15 +32,38 @@ static char ident[] = "@(#)$Header$";
 
 #include "converse.h"
 
-int          disable_sys_msgs=0;
-extern int   numHeapEntries;
-extern int   numCondChkArryElts;
-extern int   CsdStopFlag;
+CpvDeclare(int, disable_sys_msgs);
+
+CpvExtern(int, numHeapEntries);
+CpvExtern(int, numCondChkArryElts);
+CpvExtern(int, CsdStopFlag);
+
+
+void defaultmainModuleInit()
+{
+   CpvInitialize(int, disable_sys_msgs);
+   CpvAccess(disable_sys_msgs) = 0; 
+}
 
 main(argc, argv)
 int argc;
 char *argv[];
 {
+  defaultmainModuleInit();
+  bocModuleInit();
+  ckModuleInit();
+  condsendModuleInit();
+  globalsModuleInit();
+  initModuleInit();
+  mainModuleInit();
+  quiesModuleInit();
+  registerModuleInit();
+  statModuleInit();
+  tblModuleInit(); 
+  ldbModuleInit();
+
+
+
   ConverseInit(argv);
   StartCharm(argv);
   CsdStopFlag=0;
@@ -49,9 +72,9 @@ char *argv[];
     msg = CsdGetMsg();
     if (msg) (CmiGetHandlerFunction(msg))(msg);
     if (CsdStopFlag) break;
-    if (!disable_sys_msgs)
-        { if (numHeapEntries > 0) TimerChecks();
-          if (numCondChkArryElts > 0) PeriodicChecks(); }
+    if (!CpvAccess(disable_sys_msgs))
+        { if (CpvAccess(numHeapEntries) > 0) TimerChecks();
+          if (CpvAccess(numCondChkArryElts) > 0) PeriodicChecks(); }
   }
   EndCharm();
   ConverseExit() ;

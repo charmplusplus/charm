@@ -12,8 +12,8 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-02 17:27:40  brunner
- * Reorganized directory structure
+ * Revision 2.1  1995-06-08 17:07:12  gursoy
+ * Cpv macro changes done
  *
  * Revision 1.3  1995/04/13  20:55:22  sanjeev
  * Changed Mc to Cmi
@@ -260,9 +260,9 @@ ChareIDType    cid;
 
 WOVAddSysBocEps()
 {
-	EpTable[NodeAddWOV_EP] = (FUNCTION_PTR) NodeAddWriteOnceVar;
-	EpTable[NodeRcvAck_EP] = (FUNCTION_PTR) NodeReceiveAcknowledge;
-	EpTable[HostAddWOV_EP] = (FUNCTION_PTR) HostAddWriteOnceVar;
-	EpTable[HostRcvAck_EP] = (FUNCTION_PTR) HostReceiveAcknowledge;
+	CsvAccess(EpTable)[NodeAddWOV_EP] = (FUNCTION_PTR) NodeAddWriteOnceVar;
+	CsvAccess(EpTable)[NodeRcvAck_EP]=(FUNCTION_PTR) NodeReceiveAcknowledge;
+	CsvAccess(EpTable)[HostAddWOV_EP] = (FUNCTION_PTR) HostAddWriteOnceVar;
+	CsvAccess(EpTable)[HostRcvAck_EP]=(FUNCTION_PTR) HostReceiveAcknowledge;
 }
 

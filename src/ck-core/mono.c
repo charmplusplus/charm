@@ -12,8 +12,8 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-02 17:27:40  brunner
- * Reorganized directory structure
+ * Revision 2.1  1995-06-08 17:07:12  gursoy
+ * Cpv macro changes done
  *
  * Revision 1.3  1995/04/13  20:55:22  sanjeev
  * Changed Mc to Cmi
@@ -75,7 +75,7 @@ MONO_DATA *mydata;
             CPlus_SetMonoId(mydata->dataptr,MyBocNum(mydata)) ;
         }
         else
-            mydata->dataptr = (void *) (*(PseudoTable[mydata->id].initfn))
+            mydata->dataptr = (void *) (*(CsvAccess(PseudoTable)[mydata->id].initfn))
 					(NULL, msg);
 }
 
@@ -85,7 +85,7 @@ _CK_9MONO_BranchNewValue(mydata, x)
 MONO_DATA *mydata; 
 char *x;
 {
-	if ((*(PseudoTable[mydata->id].pseudo_type.mono.updatefn))
+	if ((*(CsvAccess(PseudoTable)[mydata->id].pseudo_type.mono.updatefn))
 		(mydata->dataptr, x))
 	{
 		_CK_BroadcastMono(GetMonoMsgPtr(mydata), ((BOC_BLOCK *)mydata-1)->boc_num) ;
@@ -100,7 +100,7 @@ MONO_DATA *mydata;
         if ( IsCharmPlusPseudo(mydata->id) )
                 CPlus_CallUpdateFn(mydata->dataptr,msg) ;
         else
-		(*(PseudoTable[mydata->id].pseudo_type.mono.updatefn))
+		(*(CsvAccess(PseudoTable)[mydata->id].pseudo_type.mono.updatefn))
 		(mydata->dataptr, msg);
 }
 
@@ -122,7 +122,7 @@ MONO_DATA *monodata;
 FUNCTION_PTR _CK_9GetMonoCompareFn(monodata)
 MONO_DATA *monodata;
 {
-	return(PseudoTable[monodata->id].pseudo_type.mono.updatefn);
+	return(CsvAccess(PseudoTable)[monodata->id].pseudo_type.mono.updatefn);
 }
 
 void * GetMonoMsgPtr(mydata)

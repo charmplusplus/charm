@@ -1,7 +1,6 @@
 
 #ifndef CONVERSE_H
 #define CONVERSE_H
-
 #ifndef _conv_mach_h
 #include "conv-mach.h"
 #endif
@@ -24,10 +23,32 @@ typedef void (*CmiHandler)();
 typedef void  *CmiCommHandle;
 
 
+/******** MACROS AND PROTOTYPES FOR CPV AND CSV *******/
+
+#ifdef CMK_NO_SHARED_VARS_AT_ALL
+
+#define CpvDeclare(t,v) t v
+#define CpvExtern(t,v)  extern t v
+#define CpvStaticDeclare(t,v) static t v
+#define CpvInitialize(t,v) 
+#define CpvAccess(v) v
+
+#define CsvDeclare(t,v) t v
+#define CsvStaticDeclare(t,v) static t v
+#define CsvInitialize(t,v) 
+#define CsvExtern(t,v) extern t v
+#define CsvAccess(v) v
+
+#define CmiMyRank() 0
+#define CmiNodeBarrier()
+#define CmiSvAlloc CmiAlloc
+
+#endif
+
 /******** PROTOTYPES FOR CMI FUNCTIONS AND MACROS *******/
 
 
-extern CmiHandler *CmiHandlerTable ;
+CsvExtern(CmiHandler*, CmiHandlerTable);
 
 #define CmiMsgHeaderSizeBytes 4
 
@@ -37,7 +58,7 @@ extern int CmiRegisterHandler CMK_PROTO((CmiHandler));
 
 #define CmiSetHandler(env,x)  (*((int *)(env)) = x)
 
-#define CmiGetHandlerFunction(env) (CmiHandlerTable[CmiGetHandler(env)])
+#define CmiGetHandlerFunction(env) (CsvAccess(CmiHandlerTable)[CmiGetHandler(env)])
 
 void *CmiGetMsg CMK_PROTO(());
 
@@ -47,10 +68,10 @@ int CmiNumPe CMK_PROTO((void));
 #endif
 
 #ifdef CMK_CMIMYPE_IS_A_VARIABLE
-extern int Cmi_mype;
-extern int Cmi_numpe;
-#define CmiMyPe() Cmi_mype
-#define CmiNumPe() Cmi_numpe
+CpvExtern(int, Cmi_mype);
+CpvExtern(int ,Cmi_numpe);
+#define CmiMyPe() CpvAccess(Cmi_mype)
+#define CmiNumPe() CpvAccess(Cmi_numpe)
 #endif
 
 void *CmiAlloc  CMK_PROTO((int size));
@@ -71,14 +92,14 @@ int   CmiScanf  CMK_PROTO((...));
 
 /******** PROTOTYPES FOR CSD FUNCTIONS AND MACROS ********/
 
-extern void   *CsdSchedQueue;
-extern int     CsdStopFlag;
+CpvExtern(void*, CsdSchedQueue);
+CpvExtern(int, CsdStopFlag);
 
-#define CsdExitScheduler()  (CsdStopFlag=1)
+#define CsdExitScheduler()  (CpvAccess(CsdStopFlag)=1)
 
-#define CsdEnqueue(x)  (CqsEnqueue(CsdSchedQueue,x))
+#define CsdEnqueue(x)  (CqsEnqueue(CpvAccess(CsdSchedQueue),x))
 
-#define CsdEmpty()     (CqsEmpty(CsdSchedQueue))
+#define CsdEmpty()     (CqsEmpty(CpvAccess(CsdSchedQueue)))
 
 extern  void  CsdScheduler CMK_PROTO((int));
 extern  void *CsdGetMsg CMK_PROTO(());

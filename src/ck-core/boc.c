@@ -12,8 +12,8 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-02 17:27:40  brunner
- * Reorganized directory structure
+ * Revision 2.1  1995-06-08 17:09:41  gursoy
+ * Cpv macro changes done
  *
  * Revision 1.8  1995/05/09  20:04:52  milind
  * Corrected the SP1 fboc bug.
@@ -69,14 +69,34 @@ typedef struct bocid_message_count {
 	struct bocid_message_count *next;
 } BOCID_MESSAGE_COUNT;
 
-int number_dynamic_boc = 1;
-MSG_ELEMENT * DynamicBocMsgList; 
-BOCDATA_QUEUE_ELEMENT *BocDataTable[MAXBOC];
-BOCID_MESSAGE_COUNT *BocIDMessageCountTable[MAXBOC];
+
+
+typedef MSG_ELEMENT *MSG_ELEMENT_;
+typedef BOCDATA_QUEUE_ELEMENT *BOCDATA_QUEUE_ELEMENT_[MAXBOC];
+typedef BOCID_MESSAGE_COUNT *BOCID_MESSAGE_COUNT_[MAXBOC];
+
+CpvStaticDeclare(int, number_dynamic_boc);
+CpvStaticDeclare(MSG_ELEMENT_, DynamicBocMsgList); 
+CpvStaticDeclare(BOCDATA_QUEUE_ELEMENT_, BocDataTable);
+CpvStaticDeclare(BOCID_MESSAGE_COUNT_, BocIDMessageCountTable);
+
+
+void bocModuleInit()
+{
+   CpvInitialize(int, number_dynamic_boc);
+   CpvInitialize(MSG_ELEMENT_, DynamicBocMsgList);
+   CpvInitialize(BOCDATA_QUEUE_ELEMENT_, BocDataTable);
+   CpvInitialize(BOCID_MESSAGE_COUNT_, BocIDMessageCountTable);
+
+   CpvAccess(number_dynamic_boc)=1;
+}
+
+
+
 
 InitializeDynamicBocMsgList()
 {
-	DynamicBocMsgList = (MSG_ELEMENT *) NULL;
+	CpvAccess(DynamicBocMsgList) = (MSG_ELEMENT *) NULL;
 }
 
 InitializeBocDataTable()
@@ -84,7 +104,7 @@ InitializeBocDataTable()
 	int i;
 
 	for (i=0; i<MAXBOC; i++)
-		BocDataTable[i] = (BOCDATA_QUEUE_ELEMENT *) NULL;
+	    CpvAccess(BocDataTable)[i] = (BOCDATA_QUEUE_ELEMENT *) NULL;
 }
 
 InitializeBocIDMessageCountTable()
@@ -92,7 +112,7 @@ InitializeBocIDMessageCountTable()
 	int i;
 
 	for (i=0; i<MAXBOC; i++)
-		BocIDMessageCountTable[i] = (BOCID_MESSAGE_COUNT *) NULL;
+	    CpvAccess(BocIDMessageCountTable)[i] = (BOCID_MESSAGE_COUNT *) NULL;
 }
 
 GetDynamicBocMsg(ref, msg, ep, size)
@@ -102,7 +122,9 @@ ChareNumType *ep;
 int *size;
 {
 	MSG_ELEMENT * previous = NULL;
-	MSG_ELEMENT * temp = DynamicBocMsgList; 
+	MSG_ELEMENT * temp; 
+
+        temp = CpvAccess(DynamicBocMsgList);
 	
 	while (temp != NULL)
 	{
@@ -116,7 +138,7 @@ TRACE(CmiPrintf("[%d] GetDynamicBocMsg: ref=%d, ep=%d, size=%d\n",
 		CmiMyPe(), ref, temp->ref, temp->size)); 
 	
 			if (previous == NULL)
-				DynamicBocMsgList = temp->next; 
+				CpvAccess(DynamicBocMsgList) = temp->next; 
 			else
 				previous->next = temp->next;
 			CmiFree(temp);
@@ -140,7 +162,7 @@ ChareNumType bocNum;
 
 
 	index = bocNum % MAXBOC;
-	element = BocDataTable[index];
+	element = CpvAccess(BocDataTable)[index];
 
 TRACE(CmiPrintf("[%d] GetBocDataPtr: bocNum=%d, index=%d, element=0x%x\n",
 		 CmiMyPe(), bocNum, index, element));
@@ -165,7 +187,7 @@ ChareNumType bocnum;
 	BOCID_MESSAGE_COUNT *element;
 
 	index = bocnum % MAXBOC;
-	element = BocIDMessageCountTable[index];
+	element = CpvAccess(BocIDMessageCountTable)[index];
 	while (element != NULL)
 	{
 		if (element->bocnum == bocnum)
@@ -186,12 +208,12 @@ int size;
 	MSG_ELEMENT * new; 
 	
 	new = (MSG_ELEMENT *) CmiAlloc(sizeof(MSG_ELEMENT));
-	new->ref = number_dynamic_boc++;
+	new->ref = CpvAccess(number_dynamic_boc)++;
 	new->msg = msg;
 	new->ep = ep;
 	new->size = size;
-	new->next = DynamicBocMsgList; 
-	DynamicBocMsgList = new; 
+	new->next = CpvAccess(DynamicBocMsgList); 
+	CpvAccess(DynamicBocMsgList) = new; 
 
 TRACE(CmiPrintf("[%d] SetDynamicBocMsg: ref=%d, ep=%d, size=%d\n",
 	CmiMyPe(), new->ref, new->ep, new->size));
@@ -213,9 +235,9 @@ void *ptr;
 	CkMemError(new);
 	new->bocNum = bocNum;
 	new->dataptr = ptr;
-	element = BocDataTable[index];
+	element = CpvAccess(BocDataTable)[index];
 	new->next = element;	
-	BocDataTable[index] = new;
+	CpvAccess(BocDataTable)[index] = new;
 
 TRACE(CmiPrintf("[%d] SetBocDataPtr: bocNum=%d, index=%d, new=0x%x\n",
 		 CmiMyPe(), bocNum, index, new));
@@ -239,9 +261,9 @@ ChareIDType *ReturnID;
 	new->ReturnEP = ReturnEP;
 	if (ReturnID != NULL) 
 		new->ReturnID = *ReturnID;
-	element = BocIDMessageCountTable[index];
+	element = CpvAccess(BocIDMessageCountTable)[index];
 	new->next = element;
-	BocIDMessageCountTable[index] = new;
+	CpvAccess(BocIDMessageCountTable)[index] = new;
 	return(new);
 }
 
@@ -277,13 +299,13 @@ TRACE(CmiPrintf("[%d] GeneralCreateBoc: SizeData=%d, Entry=%d, ReturnEP=%d\n",
 	SetEnv_destPeFixed(env, 1);
 	SetEnv_destPE(env, (ALL_NODES_EXCEPT_ME));
 
-	if ((CmiMyPe() == 0)  || InsideDataInit)
+	if ((CmiMyPe() == 0)  || CpvAccess(InsideDataInit))
 	{
 		SetEnv_sizeData(env, SizeData);
-		SetEnv_boc_num(env, ++currentBocNum);
+		SetEnv_boc_num(env, ++CpvAccess(currentBocNum));
 		SetEnv_EP(env, Entry);
 	}
-	if (InsideDataInit)
+	if (CpvAccess(InsideDataInit))
 	/* static boc creation */
 	{
 		int executing_boc_num; 
@@ -299,10 +321,10 @@ TRACE(CmiPrintf("[%d] GeneralCreateBoc: SizeData=%d, Entry=%d, ReturnEP=%d\n",
 
 			msg = (ChareNumType *)
 				 CkAllocMsg(sizeof(ChareNumType));
-			*msg = currentBocNum;
+			*msg = CpvAccess(currentBocNum);
 			SendMsg(ReturnEP, msg, ReturnID); 
 		}
-		return(currentBocNum);
+		return(CpvAccess(currentBocNum));
 	}
 	else
 	/* dynamic boc creation */
@@ -311,7 +333,7 @@ TRACE(CmiPrintf("[%d] GeneralCreateBoc: SizeData=%d, Entry=%d, ReturnEP=%d\n",
 		{
 			BOCID_MESSAGE_COUNT *element;
 
-			element = SetBocIDMessageCount(currentBocNum, 
+			element = SetBocIDMessageCount(CpvAccess(currentBocNum), 
 					CmiNumSpanTreeChildren(CmiMyPe()),
 					ReturnEP, ReturnID);
 			SetEnv_msgType(env, DynamicBocInitMsg);
@@ -319,7 +341,7 @@ TRACE(CmiPrintf("[%d] GeneralCreateBoc: SizeData=%d, Entry=%d, ReturnEP=%d\n",
 			trace_creation(GetEnv_msgType(env), Entry, env);
 			CkCheck_and_BroadcastNoFree(env, Entry);
 
-		        CmiSetHandler(env,CallProcessMsg_Index) ;
+		        CmiSetHandler(env,CsvAccess(CallProcessMsg_Index)) ;
 			CsdEnqueue(env);
 			QDCountThisCreation(Entry, USERcat, DynamicBocInitMsg, CmiNumPe());
 
@@ -383,7 +405,7 @@ TRACE(CmiPrintf("[%d] GeneralSend: type=%d, msgType=%d\n",
 		CmiMyPe(), type, GetEnv_msgType(env)));
 
 	if (bocnum >= NumSysBoc)
-        	nodebocMsgsCreated++;
+        	CpvAccess(nodebocMsgsCreated)++;
 
 
 	trace_creation(GetEnv_msgType(env), ep, env);
@@ -415,7 +437,7 @@ TRACE(CmiPrintf("[%d] GeneralBroadcast: type=%d, msgType=%d\n",
 		CmiMyPe(), type, GetEnv_msgType(env)));
 
 	if (bocnum >= NumSysBoc)
-        	nodebocMsgsCreated+=CmiNumPe();
+        	CpvAccess(nodebocMsgsCreated)+=CmiNumPe();
 
 	trace_creation(GetEnv_msgType(env), ep, env);
 	CkCheck_and_BroadcastAll(env, ep); /* Asynchronous broadcast */
@@ -464,11 +486,11 @@ char *mydata;
 	DYNAMIC_BOC_NUM_MSG *tmsg;
         BOCID_MESSAGE_COUNT *element;
 
-        element = SetBocIDMessageCount(++currentBocNum,
+        element = SetBocIDMessageCount(++CpvAccess(currentBocNum),
                                         CmiNumSpanTreeChildren(CmiMyPe()),
                                         msg->ep, &(msg->id));
 	tmsg = (DYNAMIC_BOC_NUM_MSG *) CkAllocMsg(sizeof(DYNAMIC_BOC_NUM_MSG)); 
-	tmsg->boc = currentBocNum;
+	tmsg->boc = CpvAccess(currentBocNum);
 	tmsg->ref = msg->ref;
 
 TRACE(CmiPrintf("[%d] OtherCreateBoc: boc=%d, ref=%d\n",
@@ -522,9 +544,9 @@ DynamicBocInit()
 
 DynamicAddSysBocEps()
 {
-   	EpTable[RegisterDynamicBocInitMsg_EP] = RegisterDynamicBocInitMsg;
-   	EpTable[OtherCreateBoc_EP] = OtherCreateBoc;
-	EpTable[InitiateDynamicBocBroadcast_EP] = 
+   	CsvAccess(EpTable)[RegisterDynamicBocInitMsg_EP] = RegisterDynamicBocInitMsg;
+   	CsvAccess(EpTable)[OtherCreateBoc_EP] = OtherCreateBoc;
+	CsvAccess(EpTable)[InitiateDynamicBocBroadcast_EP] = 
 				InitiateDynamicBocBroadcast;
 }
 
@@ -543,7 +565,7 @@ ChareIDType *ReturnID;
 	if ( IsCharmPlus(Entry) )
         	return GeneralCreateBoc(id, Entry, Msg, ReturnEP, ReturnID);
 	else
-        	return GeneralCreateBoc(ChareSizesTable[id], Entry, Msg,
+        	return GeneralCreateBoc(CsvAccess(ChareSizesTable)[id], Entry, Msg,
                                          		ReturnEP, ReturnID);
 }
 

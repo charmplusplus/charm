@@ -12,8 +12,8 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-02 17:30:04  brunner
- * Reorganized directory structure
+ * Revision 2.1  1995-06-08 17:07:12  gursoy
+ * Cpv macro changes done
  *
  * Revision 1.3  1995/04/13  20:53:46  sanjeev
  * Changed Mc to Cmi
@@ -30,6 +30,8 @@
    Types and stuff for write-once variables
 
 ****************************************************************************/
+#ifndef WRTONE_H
+#define WRTONE_H
 
 #define MAXWRITEONCEVARS  50         /* arbitrary maximum number */
 
@@ -74,3 +76,5 @@ typedef struct {            /* Final message returned to the user program.    */
     WriteOnceID    wovID;
     } Return_To_Origin_Msg;
 
+
+#endif

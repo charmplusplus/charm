@@ -12,8 +12,8 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-02 17:27:40  brunner
- * Reorganized directory structure
+ * Revision 2.1  1995-06-08 17:09:41  gursoy
+ * Cpv macro changes done
  *
  * Revision 1.8  1995/04/23  21:23:15  sanjeev
  * *** empty log message ***
@@ -40,6 +40,8 @@
  * Initial revision
  *
  ***************************************************************************/
+#ifndef CHARE_H
+#define CHARE_H
 
 #include "converse.h"
 #include "conv-mach.h"
@@ -98,3 +100,6 @@ typedef struct dummymsg {
 #include "prio_macros.h"
 #include "sys_macros.h"
 #include "communication.h"
+
+
+#endif

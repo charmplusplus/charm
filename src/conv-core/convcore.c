@@ -18,6 +18,17 @@ static char ident[] = "@(#)$Header$";
 #include "converse.h"
 #include "conv-mach.h"
 
+#define MAX_HANDLERS 512
+
+void        *CmiGetNonLocal();
+
+CsvDeclare(CmiHandler*, CmiHandlerTable);
+CpvExtern(void*, CmiLocalQueue);
+CpvStaticDeclare(int, handlerCount);
+CpvDeclare(void*, CsdSchedQueue);
+CpvDeclare(int,   CsdStopFlag);
+
+
 
 
 /*****************************************************************************
@@ -26,25 +37,51 @@ static char ident[] = "@(#)$Header$";
  *
  *****************************************************************************/
 
-int CstatsMaxChareQueueLength=0;
-int CstatsMaxForChareQueueLength=0;
-int CstatsMaxFixedChareQueueLength=0;
+CpvDeclare(int, CstatsMaxChareQueueLength);
+CpvDeclare(int, CstatsMaxForChareQueueLength);
+CpvDeclare(int, CstatsMaxFixedChareQueueLength);
+CpvStaticDeclare(int, CstatPrintQueueStatsFlag);
+CpvStaticDeclare(int, CstatPrintMemStatsFlag);
+
+
+
+
+void convcoreModuleInit()
+{
+     CpvInitialize(int, CstatsMaxChareQueueLength);
+     CpvInitialize(int, CstatsMaxForChareQueueLength);
+     CpvInitialize(int, CstatsMaxFixedChareQueueLength);
+     CpvInitialize(int, CstatPrintQueueStatsFlag);
+     CpvInitialize(int, CstatPrintMemStatsFlag);
+     CpvInitialize(int, handlerCount);
+     CpvInitialize(void*, CsdSchedQueue);
+     CpvInitialize(int,   CsdStopFlag);
+
+     CpvAccess(CstatsMaxChareQueueLength) = 0;
+     CpvAccess(CstatsMaxForChareQueueLength) = 0;
+     CpvAccess(CstatsMaxFixedChareQueueLength) = 0;
+     CpvAccess(handlerCount) = 0;
+     CpvAccess(CsdStopFlag)  = 0;
+}
+
+
+
 
 int CstatMemory(int i)
 {
   return 0;
 }
 
-static int CstatPrintQueueStatsFlag;
+
+
 int CstatPrintQueueStats()
 {
-  return CstatPrintQueueStatsFlag;
+  return CpvAccess(CstatPrintQueueStatsFlag);
 }
 
-static int CstatPrintMemStatsFlag;
 int CstatPrintMemStats()
 {
-  return CstatPrintMemStatsFlag;
+  return CpvAccess(CstatPrintMemStatsFlag);
 }
 
 /*****************************************************************************
@@ -54,25 +91,22 @@ int CstatPrintMemStats()
  *
  *****************************************************************************/
 
-#define MAX_HANDLERS 512
-CmiHandler *CmiHandlerTable;
-extern void *CmiLocalQueue;
-void        *CmiGetNonLocal();
 
 void CmiInit(argv)
 char **argv;
 {
   void *FIFO_Create();
-  CmiHandlerTable =
-    (CmiHandler *)CmiAlloc((MAX_HANDLERS + 1) * sizeof(CmiHandler)) ;
+  convcoreModuleInit();
+  CsvAccess(CmiHandlerTable) =
+    (CmiHandler *)CmiSvAlloc((MAX_HANDLERS + 1) * sizeof(CmiHandler)) ;
   CmiInitMc(argv);
 }
 
 void *CmiGetMsg()
 {
   void *msg;
-  if (!FIFO_Empty(CmiLocalQueue)) {
-    FIFO_DeQueue(CmiLocalQueue, &msg);
+  if (!FIFO_Empty(CpvAccess(CmiLocalQueue))) {
+    FIFO_DeQueue(CpvAccess(CmiLocalQueue), &msg);
     return msg;
   }
   msg=CmiGetNonLocal();
@@ -82,11 +116,9 @@ void *CmiGetMsg()
 int CmiRegisterHandler(handlerf)
 CmiHandler handlerf ;
 {
-  static int handlerCount=0 ;
-
-  CmiHandlerTable[handlerCount] = handlerf;
-  handlerCount++ ;
-  return handlerCount-1 ;
+  CsvAccess(CmiHandlerTable)[CpvAccess(handlerCount)] = handlerf;
+  CpvAccess(handlerCount)++ ;
+  return CpvAccess(handlerCount)-1 ;
 }
 
 void *CmiGetSpecificMsg(lang)
@@ -103,19 +135,19 @@ int lang;
      (ie. the PVM msg manager checks for a self message while sending
      and keeps it within itself instead of giving it to Converse)  */
   
-  if ( !FIFO_Empty(CmiLocalQueue) ) {
-    FIFO_DeQueue(CmiLocalQueue, &msg);
+  if ( !FIFO_Empty(CpvAccess(CmiLocalQueue)) ) {
+    FIFO_DeQueue(CpvAccess(CmiLocalQueue), &msg);
     first = msg;
     do {
       if ( CmiGetHandler(msg)==lang ) 
 	return (void *)msg ;
       else
-	FIFO_EnQueue(CmiLocalQueue, msg);
+	FIFO_EnQueue(CpvAccess(CmiLocalQueue), msg);
       
-      FIFO_DeQueue(CmiLocalQueue, &msg);
+      FIFO_DeQueue(CpvAccess(CmiLocalQueue), &msg);
     } while ( msg != first ) ;
     
-    FIFO_EnQueue(CmiLocalQueue, msg);
+    FIFO_EnQueue(CpvAccess(CmiLocalQueue), msg);
   }
   
   /* receive message from network */
@@ -127,7 +159,7 @@ int lang;
     if ( CmiGetHandler(msg)==lang ) 
       return (void *)msg ;
     else
-      FIFO_EnQueue(CmiLocalQueue, msg);
+      FIFO_EnQueue(CpvAccess(CmiLocalQueue), msg);
   }
   return NULL ;
 }
@@ -142,9 +174,9 @@ int lang;
 {
   int retval = 0;
   int *msg, *first ;
-  if ( !FIFO_Empty(CmiLocalQueue) ) {
+  if ( !FIFO_Empty(CpvAccess(CmiLocalQueue)) ) {
     
-    FIFO_DeQueue(CmiLocalQueue, &msg);
+    FIFO_DeQueue(CpvAccess(CmiLocalQueue), &msg);
     first = msg ;
     do {
       if ( CmiGetHandler(msg)==lang ) 
@@ -153,10 +185,10 @@ int lang;
 	  retval = 1;
 	}
       else
-	FIFO_EnQueue(CmiLocalQueue, msg);
-      FIFO_DeQueue(CmiLocalQueue, &msg);
+	FIFO_EnQueue(CpvAccess(CmiLocalQueue), msg);
+      FIFO_DeQueue(CpvAccess(CmiLocalQueue), &msg);
     } while ( msg != first ) ;
-    FIFO_EnQueue(CmiLocalQueue, msg);
+    FIFO_EnQueue(CpvAccess(CmiLocalQueue), msg);
   }
   
   while ( (msg = CmiGetNonLocal()) != NULL )
@@ -166,7 +198,7 @@ int lang;
 	retval = 1;
       }
     else
-      FIFO_EnQueue(CmiLocalQueue, msg);
+      FIFO_EnQueue(CpvAccess(CmiLocalQueue), msg);
   return retval;
 }
 
@@ -179,23 +211,23 @@ int lang;
 {
   int retval = 0;
   int *msg, *first ;
-  if ( !FIFO_Empty(CmiLocalQueue) ) {
+  if ( !FIFO_Empty(CpvAccess(CmiLocalQueue)) ) {
     
-    FIFO_DeQueue(CmiLocalQueue, &msg);
+    FIFO_DeQueue(CpvAccess(CmiLocalQueue), &msg);
     first = msg ;
     do {
       if ( CmiGetHandler(msg)==lang ) 
 	  retval = 1;
-      FIFO_EnQueue(CmiLocalQueue, msg);
-      FIFO_DeQueue(CmiLocalQueue, &msg);
+      FIFO_EnQueue(CpvAccess(CmiLocalQueue), msg);
+      FIFO_DeQueue(CpvAccess(CmiLocalQueue), &msg);
     } while ( msg != first ) ;
-    FIFO_EnQueue(CmiLocalQueue, msg);
+    FIFO_EnQueue(CpvAccess(CmiLocalQueue), msg);
   }
   while ( (msg = CmiGetNonLocal()) != NULL )
     {
       if ( CmiGetHandler(msg)==lang ) 
 	retval = 1;
-      FIFO_EnQueue(CmiLocalQueue, msg);
+      FIFO_EnQueue(CpvAccess(CmiLocalQueue), msg);
     }
   return retval;
 }
@@ -205,13 +237,11 @@ int lang;
  * 
  ***************************************************************************/
 
-void *CsdSchedQueue;
-int   CsdStopFlag=0;
 
 CsdInit(char **argv)
 {
   void *CqsCreate();
-  CsdSchedQueue = CqsCreate();
+  CpvAccess(CsdSchedQueue) = CqsCreate();
 }
 
 void *CsdGetMsg()
@@ -221,8 +251,8 @@ void *CsdGetMsg()
   if ((msg = CmiGetMsg()) != NULL)
     return msg;
   
-  if ( !CqsEmpty(CsdSchedQueue) ) {
-    CqsDequeue(CsdSchedQueue,&msg);
+  if ( !CqsEmpty(CpvAccess(CsdSchedQueue)) ) {
+    CqsDequeue(CpvAccess(CsdSchedQueue),&msg);
     return msg ;
   }
   
@@ -238,7 +268,7 @@ int counter;
     msg = CsdGetMsg();
     if (msg)
       (CmiGetHandlerFunction(msg))(msg);
-    if (CsdStopFlag) break;
+    if (CpvAccess(CsdStopFlag)) break;
     counter--;
     if (counter==0) break;
   }
@@ -287,11 +317,11 @@ static int ConverseParseOptions(argv)
       DeleteArg(argv);
     } else
     if (strcmp(*argv, "+mems") == 0) {
-      CstatPrintMemStatsFlag=1;
+      CpvAccess(CstatPrintMemStatsFlag)=1;
       DeleteArg(argv);
     } else
     if (strcmp(*argv, "+qs") == 0) {
-      CstatPrintQueueStatsFlag=1;
+      CpvAccess(CstatPrintQueueStatsFlag)=1;
       DeleteArg(argv);
     } else
     argv++;
