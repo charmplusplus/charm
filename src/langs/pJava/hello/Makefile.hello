@@ -1,0 +1,40 @@
+JITRANS=../jitrans/jitrans
+
+CLASSFILES=Proxy_Main.class \
+           Proxy_HelloNode.class \
+           Main.class \
+           HelloNode.class \
+           HelloMessage.class \
+           RegisterAll.class 
+
+all:$(CLASSFILES)
+
+Proxy_Main.java: Main.ji
+	$(JITRANS) Main
+
+Proxy_HelloNode.java: HelloNode.ji
+	$(JITRANS) HelloNode
+
+RegisterAll.java: Main.ji HelloNode.ji HelloMessage.java
+	$(JITRANS) -register -classes Main HelloNode -messages HelloMessage
+
+RegisterAll.class: RegisterAll.java
+	javac RegisterAll.java
+
+Proxy_Main.class: Proxy_Main.java
+	javac Proxy_Main.java
+
+Proxy_HelloNode.class: Proxy_HelloNode.java
+	javac Proxy_HelloNode.java
+
+HelloMessage.class: HelloMessage.java
+	javac HelloMessage.java
+
+Main.class: Main.java
+	javac Main.java
+
+HelloNode.class: HelloNode.java
+	javac HelloNode.java
+
+clean:
+	rm -f $(CLASSFILES) Proxy_*.java RegisterAll.java

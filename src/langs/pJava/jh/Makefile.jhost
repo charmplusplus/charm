@@ -1,0 +1,8 @@
+INCLUDES=-I/home/kale/milind/charm/include \
+         -I/expand1/software/jdk1.1/include \
+         -I/expand1/software/jdk1.1/include/solaris
+LIBS=-L/home/kale/milind/charm/lib \
+     -L/expand1/software/jdk1.1/lib/sparc/green_threads
+
+jhost: jhost.c
+	cc -g -o jhost jhost.c $(INCLUDES) $(LIBS) -Bstatic -lconv-cplus-n -lconv-core -lqt  -lsocket -lnsl -lc -Bdynamic -ldl -lintl -ljava

@@ -1,0 +1,48 @@
+JITRANS=../jitrans/jitrans
+
+CLASSFILES=Proxy_Main.class \
+           Proxy_A.class \
+           Main.class \
+           A.class \
+           InitMsg.class \
+           ExitMsg.class \
+           WorkMsg.class \
+           RegisterAll.class 
+
+all:$(CLASSFILES)
+
+Proxy_Main.java: Main.ji
+	$(JITRANS) Main
+
+Proxy_A.java: A.ji
+	$(JITRANS) A
+
+RegisterAll.java: Main.ji A.ji InitMsg.java ExitMsg.java WorkMsg.java
+	$(JITRANS) -register -classes Main A -messages InitMsg ExitMsg WorkMsg
+
+RegisterAll.class: RegisterAll.java
+	javac RegisterAll.java
+
+Proxy_Main.class: Proxy_Main.java
+	javac Proxy_Main.java
+
+Proxy_A.class: Proxy_A.java
+	javac Proxy_A.java
+
+InitMsg.class: InitMsg.java
+	javac InitMsg.java
+
+ExitMsg.class: ExitMsg.java
+	javac ExitMsg.java
+
+WorkMsg.class: WorkMsg.java
+	javac WorkMsg.java
+
+Main.class: Main.java
+	javac Main.java
+
+A.class: A.java
+	javac A.java
+
+clean:
+	rm -f $(CLASSFILES) Proxy_*.java RegisterAll.java

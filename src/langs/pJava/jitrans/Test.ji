@@ -1,0 +1,7 @@
+class Test {
+  entry Entry1(Message1);
+  entry Entry2(Message2);
+  entry Test(Message0);
+  entry Entry3(Message3);
+}
+

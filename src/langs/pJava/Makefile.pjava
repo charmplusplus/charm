@@ -1,0 +1,7 @@
+DOCOPTS=  "-author -version -d doc"
+
+all:
+	javadoc $(DOCOPTS) parallel
+
+clean:
+	rm -f doc/*.html
