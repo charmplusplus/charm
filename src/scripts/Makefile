@@ -382,7 +382,7 @@ CentralLB.decl.h Central.def.h : CentralLB.ci charmxi
 RandCentLB.decl.h RandCent.def.h : RandCentLB.ci charmxi
 	$(CHARMC) RandCentLB.ci
 
-RecBisectBfLB.decl.h RandCent.def.h : RecBisectBfLB.ci charmxi
+RecBisectBfLB.decl.h RecBisectBfLB.def.h : RecBisectBfLB.ci charmxi
 	$(CHARMC) RecBisectBfLB.ci
 
 MetisLB.decl.h MetisLB.def.h : MetisLB.ci charmxi
