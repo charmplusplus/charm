@@ -66,7 +66,7 @@ void POSE_init(int IDflag, int ET) // can specify both
   CkPrintf("Load balancing is ON.\n");
 #endif
   CkPrintf("POSE initialization complete.\n");
-  CProxy_pose::ckNew(&POSE_Coordinator_ID);
+  CProxy_pose::ckNew(&POSE_Coordinator_ID, 0);
   if (POSE_inactDetect) CkPrintf("Using Inactivity Detection for termination.\n");
   else CkPrintf("Using endTime of %d for termination.\n", POSE_endtime);
   CkPrintf("Starting simulation...\n"); 
@@ -145,7 +145,7 @@ void pose::stop(void)
   CProxy_localStat stats(theLocalStats);
 #endif
 #ifdef POSE_STATS_ON
-  CkPrintf("%d PE Simulation finished at %f.  Gathering stats...\n", 
+  CkPrintf("%d PE Simulation finished at %f. Gathering stats...\n", 
 	   CkNumPes(), CmiWallTimer() - sim_timer);
   stats.SendStats();
 #else
