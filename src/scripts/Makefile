@@ -274,16 +274,9 @@ converse: basics
 
 converse-target:  $(CVLIBS) fmain-ok charmrun-target swapglobal-target conv-cpm
 
-charmrun-target: daemon-target sockRoutines.c sockRoutines.h ccs-server.c ccs-server.h
+charmrun-target: sockRoutines.c sockRoutines.h ccs-server.c ccs-server.h sockRoutines-seq.o
 	if [ -d charmrun ] ; then ( cd charmrun ; $(MAKE) OPTS='$(OPTS)' ) ; fi
 	if [ -f charmrun ] ; then ( cp charmrun ../bin ) ; fi
-
-daemon-target: sockRoutines-seq.o
-	if test -f daemon.c ; then $(CHARMC) -seq daemon.c \
-		sockRoutines-seq.o -o ../bin/charmd; fi
-	if test -f daemon.c ; then $(CHARMC) -DFACELESS -seq daemon.c \
-		sockRoutines-seq.o -o ../bin/charmd_faceless; fi
-	touch daemon-target
 
 fmain-ok: fmain.f90
 	-@$(CHARMC) -c fmain.f90
