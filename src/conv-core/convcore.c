@@ -3,7 +3,7 @@
 #include "trace.h"
 #include <errno.h>
 
-/* #define MEMMONITOR */
+#define MEMMONITOR
 
 #if CMK_WHEN_PROCESSOR_IDLE_USLEEP
 #include <sys/types.h>
@@ -1492,11 +1492,11 @@ void ConverseCommonInit(char **argv)
   CmiDeliversInit();
   CsdInit(argv);
   CthSchedInit();
-  CldModuleInit();
   CmiGroupInit();
   CmiMulticastInit();
   CmiInitMultipleSend();
   CcsInit();
+  CldModuleInit();
 }
 
 void ConverseCommonExit(void)
