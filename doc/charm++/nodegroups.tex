@@ -64,3 +64,38 @@ group type, and each instance has a different group handle, and its own set of
 branches.
 
 
+\subsubsection{Method Invocation on Nodegroups}
+
+Methods can be invoked either on a particular \index{branch}branch
+of a \index{nodegroup}nodegroup by specifying a {\em node number} as a method
+parameter. In the absence of such a parameter, the call is treated as broadcast
+on a \index{nodegroup}nodegroup, i.e. executed by all nodes. When a method is
+invoked on a particular \index{branch}branch of a \index{nodegroup}nodegroup,
+it may be executed by {\em ANY} processor in that node. Thus two invocations of
+a specific method on a particular \index{branch}branch of a
+\index{nodegroup}nodegroup may be carried out {\em simultaneously} by two
+different processors of the node. If that method contains code that
+should be executed by only one processor at a time, the method should
+be flagged
+\index{exclusive}\kw{exclusive} in the interface file. If a method \uw{M} of a
+nodegroup \uw{NG} is marked exclusive, it means that while that method is being
+executed by any processor within a node, no other processor within the same
+node may execute any other {\em exclusive} method of that
+\index{nodegroup}nodegroup \index{branch}branch.  Other processors are free to
+execute other {\em non-exclusive} methods of that nodegroup
+\index{branch}branch, however.
+
+The local \index{branch}branch of a \index{nodegroup}\kw{nodegroup}
+can be accessed using \index{CkLocalNodeBranch}\kw{CkLocalNodeBranch()}
+function. Thus data members could be accessed/modified or methods could be
+invoked on a \index{branch}branch of a \kw{nodegroup} using this function. Note
+that such accesses are {\em not} thread-safe by default. Concurrent invocation
+of a method on a \index{nodegroup}nodegroup by different processors within a
+node may result in unpredictable runtime behavior.  One way to avoid this is to
+use node-level locks (described in Converse manual.)
+
+\index{CkLocalNodeBranch}\kw{CkLocalNodeBranch} returns a generic
+({\tt void *}) pointer, similar to \kw{CkLocalBranch}.  Also, the static
+method \kw{ckLocalNodeBranch} of the proxy class of appropriate
+\index{nodegroup}nodegroup can be called to get the correct type of
+pointer.
