@@ -1,7 +1,13 @@
 CHARMC=../../../bin/charmc $(OPTS)
 
+LIB = libirecv.a
+LIBOBJ = receiver.o
+
 all: 
 	echo 'Nothing to do here right now'
+
+$(LIB): $(LIBOBJ)
+	$(CHARMC) -o $(LIB) $(LIBOBJ) 
 
 receiver.o: receiver.C receiver.h receiver.decl.h
 	$(CHARMC) -c receiver.C
