@@ -34,3 +34,6 @@
 
 #define CMK_PERSISTENT_COMM				   0
 
+#define CMK_OBJECT_QUEUE_AVAILABLE		   	   0
+
+
