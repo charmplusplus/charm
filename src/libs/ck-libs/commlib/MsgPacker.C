@@ -55,8 +55,9 @@ MsgPacker::~MsgPacker(){
 }
 
 void MsgPacker::getMessage(CombinedMessage *&cmb_msg, int &total_size){
+    int count;
     PUP::sizer sp;
-    for(int count = 0; count < nShortMsgs; count ++)
+    for(count = 0; count < nShortMsgs; count ++)
         sp | msgList[count];
 
     int size = sp.size();  
@@ -68,7 +69,7 @@ void MsgPacker::getMessage(CombinedMessage *&cmb_msg, int &total_size){
     cmb_msg = (CombinedMessage *)CmiAlloc(total_size);
 
     PUP::toMem mp((char *)cmb_msg + ALIGN8(sizeof(CombinedMessage)));
-    for(int count = 0; count < nShortMsgs; count ++)
+    for(count = 0; count < nShortMsgs; count ++)
         mp | msgList[count];
 
     cmb_msg->aid = aid;
