@@ -189,11 +189,11 @@
  */
 
 
-/* About TRUECRASH:  When debugging Charm++/Converse, CmiAbort is your enemy.
+/* About CMK_TRUECRASH:  
+   When debugging Charm++/Converse, CmiAbort is your enemy.
    Uncommenting the define below will cause the program to crash where the 
    problem occurs instead of calling host_abort which lets the program 
    exit gracefully and lose all the debugging info... */
-/* #define TRUECRASH */
 
 #define CmiPrintf I_Hate_C_1
 #define CmiError  I_Hate_C_2
@@ -738,7 +738,7 @@ void PCQueuePush(PCQueue Q, char *data)
 void CmiAbort(const char *message)
 {
   int *i = 0;
-#ifdef TRUECRASH
+#if CMK_TRUECRASH
   CmiPrintf("%s", message);
   i[0] = 0;
 #else
@@ -2924,6 +2924,8 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int ret)
   ccs_request_q = FIFO_Create();
 #endif
   signal(SIGPIPE, KillOnSIGPIPE);
+#if CMK_TRUECRASH
+#else
   signal(SIGSEGV, KillOnAllSigs);
   signal(SIGBUS, KillOnAllSigs);
   signal(SIGFPE, KillOnAllSigs);
@@ -2932,6 +2934,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int ret)
   signal(SIGTERM, KillOnAllSigs);
   signal(SIGQUIT, KillOnAllSigs);
   signal(SIGABRT, KillOnAllSigs);
+#endif
 #if CMK_HANDLE_SIGUSR
   signal(SIGUSR1, HandleUserSignals);
   signal(SIGUSR2, HandleUserSignals);
