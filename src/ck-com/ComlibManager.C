@@ -734,12 +734,14 @@ ComlibInstanceHandle::ComlibInstanceHandle(){
     _instid = -1;
     _dmid.setZero();
     _srcPe = -1;
+    toForward = 0;
 }
 
 //Called by user code
 ComlibInstanceHandle::ComlibInstanceHandle(const ComlibInstanceHandle &h){
     _instid = h._instid;
     _dmid = h._dmid;
+    toForward = h.toForward;
 
     ComlibPrintf("In Copy Constructor\n");
 
@@ -758,6 +760,7 @@ ComlibInstanceHandle::ComlibInstanceHandle(int instid, CkGroupID dmid){
     _instid = instid;
     _dmid   = dmid;
     _srcPe  = -1;
+    toForward = 0;
 }
 
 void ComlibInstanceHandle::beginIteration() { 
@@ -765,7 +768,15 @@ void ComlibInstanceHandle::beginIteration() {
 
     ComlibPrintf("Instance Handle beginIteration %d, %d\n", CkMyPe(), _srcPe);
 
-    if(_srcPe != CkMyPe()) {
+    //User forgot to make the instance handle a readonly or pass it
+    //into the constructor of an array and is using it directly from
+    //Main :: main
+    if(_srcPe == -1) {
+        ComlibPrintf("Warning:Instance Handle needs to be a readonly or a private variable of an array element\n");
+        _srcPe = CkMyPe();
+    }
+
+    if(_srcPe != CkMyPe() && toForward) {
         (cgproxy.ckLocalBranch())->setRemote(_srcPe);
     }
 
@@ -779,6 +790,7 @@ void ComlibInstanceHandle::endIteration() {
 }
 
 void ComlibInstanceHandle::setStrategy(CharmStrategy *s) {
+    toForward = s->getForwardOnMigration();
     CProxy_ComlibManager cgproxy(_dmid);
     (cgproxy.ckLocalBranch())->registerStrategy(_instid, s);
 }

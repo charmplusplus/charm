@@ -67,6 +67,7 @@ class ComlibInstanceHandle {
     int _instid;
     CkGroupID _dmid;
     int _srcPe;
+    int toForward;
     
  public:
     ComlibInstanceHandle();
@@ -83,9 +84,18 @@ class ComlibInstanceHandle {
     int getSourcePe() {return _srcPe;}
 
     friend class ComlibManager;
-};
+    void pup(PUP::er &p) {
+        p | _instid;
+        p | _dmid;
+        p | _srcPe;
+        p | toForward;
 
-PUPbytes(ComlibInstanceHandle);
+        //Fresh instance handle, so set My processor
+        if(p.isUnpacking())
+            if(_srcPe == -1)
+                _srcPe = CkMyPe();
+    }
+};
 
 class ComlibManager: public CkDelegateMgr {
     friend class ComlibInstanceHandle;

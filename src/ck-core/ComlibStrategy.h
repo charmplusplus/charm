@@ -116,13 +116,14 @@ class ComlibArrayInfo {
    node groups, groups and arrays */
 
 class CharmStrategy : public Strategy {
+    int forwardOnMigration;
 
  public:
     ComlibGroupInfo ginfo;
     ComlibNodeGroupInfo nginfo;
     ComlibArrayInfo ainfo;    
 
-    CharmStrategy() : Strategy() {setType(GROUP_STRATEGY);}
+    CharmStrategy() : Strategy() {setType(GROUP_STRATEGY); forwardOnMigration = 0;}
     CharmStrategy(CkMigrateMessage *m) : Strategy(m){}
 
     //Called for each message
@@ -146,6 +147,14 @@ class CharmStrategy : public Strategy {
 
     virtual void pup(PUP::er &p);
     PUPable_decl(CharmStrategy);
+
+    void setForwardOnMigration(int f) {
+        forwardOnMigration = f;
+    }
+    
+    int getForwardOnMigration() {
+        return forwardOnMigration;
+    }
 };
 
 #endif
