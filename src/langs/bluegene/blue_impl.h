@@ -6,6 +6,7 @@
 
 #include "blue_types.h"
 #include "blue_timing.h"
+#include "blue_network.h"
 
 /* alway use handler table per node */
 #if ! defined(CMK_BLUEGENE_NODE) && ! defined(CMK_BLUEGENE_THREAD)
@@ -15,21 +16,6 @@
 /* define system parameters */
 #define INBUFFER_SIZE	32
 
-#define BLUEGENE_SETUP  1
-#define LEMIEUX_SETUP   0
-
-#if LEMIEUX_SETUP
-#define ALPHACOST          (8E-6)
-#define BANDWIDTH          (256E6)
-#elif BLUEGENE_SETUP
-#define CYCLES_PER_HOP     5
-#define CYCLES_PER_CORNER  75
-#define CYCLE_TIME_FACTOR  (0.001)  /* one cycle = nanosecond = 10^(-3) us */
-#define ALPHACOST          (0.1E-6)
-#define PACKETSIZE         1024
-#else
-#error "No default communication system setup!"
-#endif
 /* end of system parameters */
 
 #define MAX_HANDLERS	100
@@ -41,9 +27,11 @@ public:
   int stacksize;		/* bg thread stack size */
   int timingMethod;		/* timing method */
   char *traceroot;		/* bgTraceFile prefix */
+  BigSimNetwork *network;	/* network setup */
 public:
   BGMach() {  nullify(); }
-  void nullify() { x=y=z=0; numCth=numWth=0; stacksize=0; timingMethod = BG_ELAPSE; traceroot=NULL;}
+  ~BGMach() { if (network) delete network; }
+  void nullify() { x=y=z=0; numCth=numWth=0; stacksize=0; timingMethod = BG_ELAPSE; traceroot=NULL; network=new BlueGeneNetwork;}
   void setSize(int xx, int yy, int zz) 
 	{ x=xx; y=yy; z=zz; }
   void getSize(int *xx, int *yy, int *zz) 

@@ -358,19 +358,7 @@ void threadBCastMsgHandlerFunc(char *msg)
 
 static inline double MSGTIME(int ox, int oy, int oz, int nx, int ny, int nz, int bytes)
 {
-#if LEMIEUX_SETUP
-  return bytes/BANDWIDTH;
-#else
-  int numpackets;
-  int xd=ABS(ox-nx), yd=ABS(oy-ny), zd=ABS(oz-nz);
-  int ncorners = 2;
-  ncorners -= (xd?0:1 + yd?0:1 + zd?0:1);
-  ncorners = (ncorners<0)?0:ncorners;
-  double packetcost = (ncorners*CYCLES_PER_CORNER + (xd+yd+zd)*CYCLES_PER_HOP)*CYCLE_TIME_FACTOR*1E-6;
-  numpackets = bytes/PACKETSIZE;
-  if (bytes%PACKETSIZE) numpackets++;
-  return  packetcost * numpackets;
-#endif
+  return cva(bgMach).network->latency(ox, oy, oz, nx, ny, nz, bytes);
 }
 
 void CmiSendPacket(int x, int y, int z, int msgSize,char *msg)
@@ -394,7 +382,7 @@ void sendPacket_(int x, int y, int z, int threadID, int handlerID, WorkType type
   CmiBgMsgHandle(sendmsg) = handlerID;
   CmiBgMsgType(sendmsg) = type;
   CmiBgMsgLength(sendmsg) = numbytes;
-  BgElapse(ALPHACOST);
+  BgElapse(cva(bgMach).network->alphacost());
   double latency = MSGTIME(tMYX, tMYY, tMYZ, x,y,z, numbytes);
   CmiAssert(latency >= 0);
   CmiBgMsgRecvTime(sendmsg) = latency + BgGetTime();
@@ -448,7 +436,7 @@ static inline void threadBroadcastPacketExcept_(int node, CmiInt2 threadID, int 
   CmiBgMsgType(sendmsg) = type;	
   CmiBgMsgLength(sendmsg) = numbytes;
   /* FIXME */
-  BgElapse(ALPHACOST);
+  BgElapse(cva(bgMach).network->alphacost());
   CmiBgMsgRecvTime(sendmsg) = BgGetTime();	
 
   // timing
@@ -1026,6 +1014,8 @@ CmiStartFn bgMain(int argc, char **argv)
 
   if (CmiMyPe() == 0) {
     CmiPrintf("BG info> Simulating %dx%dx%d nodes with %d comm + %d work threads each.\n", cva(bgMach).x, cva(bgMach).y, cva(bgMach).z, cva(bgMach).numCth, cva(bgMach).numWth);
+    CmiPrintf("BG info> Network type: %s.\n", cva(bgMach).network->name());
+    cva(bgMach).network->print();
     if (cva(bgMach).stacksize)
       CmiPrintf("BG info> BG stack size: %d bytes. \n", cva(bgMach).stacksize);
     if (cva(bgMach).timingMethod == BG_ELAPSE) 

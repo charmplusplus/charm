@@ -161,7 +161,7 @@ int BGMach::read(char *file)
         timingMethod = BG_WALLTIME;
       else if (!strcmp(parameterValue, "counter"))
         timingMethod = BG_COUNTER;
-      else CmiAbort("BG> unkown timing method");
+      else CmiAbort("BG> unknown timing method");
       continue;
     }
     if (!strcmp(parameterName, "log")) {
@@ -176,6 +176,15 @@ int BGMach::read(char *file)
     }
     if (!strcmp(parameterName, "traceroot")) {
       traceroot = parameterValue;
+      continue;
+    }
+    if (!strcmp(parameterName, "network")) {
+      if (!strcmp(parameterValue, "lemieux"))
+        network = new LemieuxNetwork;
+      else if (!strcmp(parameterValue, "bluegene"))
+        network = new BlueGeneNetwork;
+      else
+        CmiAbort("BG> unknown network setup");
       continue;
     }
     CmiPrintf("skip %s %s\n", parameterName, parameterValue);

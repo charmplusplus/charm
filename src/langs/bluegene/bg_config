@@ -1,9 +1,11 @@
-x 2
-y 2
-z 2
+x 20
+y 10
+z 10
 cth 1
 wth 1
 stacksize  4000
 timing  walltime
-log    yes
+log    no
 correct  no
+traceroot     .
+network   bluegene
