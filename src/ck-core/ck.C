@@ -260,7 +260,6 @@ void CkCreateChare(int cIdx, int eIdx, void *msg, CkChareID *pCid, int destPE)
   CkAssert(cIdx == _entryTable[eIdx]->chareIdx);
   envelope *env = UsrToEnv(msg);
   _CHECK_USED(env);
-  _TRACE_CREATION_1(env);
   if(pCid == 0) {
     env->setMsgtype(NewChareMsg);
   } else {
@@ -274,6 +273,7 @@ void CkCreateChare(int cIdx, int eIdx, void *msg, CkChareID *pCid, int destPE)
   env->setEpIdx(eIdx);
   env->setSrcPe(CkMyPe());
   CmiSetHandler(env, _charmHandlerIdx);
+  _TRACE_CREATION_1(env);
   CpvAccess(_qd)->create();
   _STATS_RECORD_CREATE_CHARE_1();
   _SET_USED(env, 1);
@@ -432,10 +432,10 @@ CkGroupID CkCreateGroup(int cIdx, int eIdx, void *msg)
 {
   CkAssert(cIdx == _entryTable[eIdx]->chareIdx);
   register envelope *env = UsrToEnv(msg);
-  _TRACE_CREATION_N(env, CkNumPes());
   env->setMsgtype(BocInitMsg);
   env->setEpIdx(eIdx);
   env->setSrcPe(CkMyPe());
+  _TRACE_CREATION_N(env, CkNumPes());
   CkGroupID gid = _groupCreate(env);
   _TRACE_CREATION_DONE(CkNumPes());
   return gid;
@@ -446,10 +446,10 @@ CkGroupID CkCreateNodeGroup(int cIdx, int eIdx, void *msg)
 {
   CkAssert(cIdx == _entryTable[eIdx]->chareIdx);
   register envelope *env = UsrToEnv(msg);
-  _TRACE_CREATION_N(env, CkNumNodes());
   env->setMsgtype(NodeBocInitMsg);
   env->setEpIdx(eIdx);
   env->setSrcPe(CkMyPe());
+  _TRACE_CREATION_N(env, CkNumNodes());
   CkGroupID gid = _nodeGroupCreate(env);
   _TRACE_CREATION_DONE(CkNumNodes());
   return gid;
@@ -915,9 +915,9 @@ void CkSendMsgBranchInline(int eIdx, void *msg, int destPE, CkGroupID gID)
   if (env->isImmediate()) {
     int numPes;
     _TRACE_ONLY(numPes = (destPE==CLD_BROADCAST_ALL?CkNumPes():1));
-    _TRACE_CREATION_N(env, numPes);
     env->setImmediate(CmiFalse);
     env = _prepareImmediateMsgBranch(eIdx,msg,gID,ForBocMsg);
+    _TRACE_CREATION_N(env, numPes);
     _noCldEnqueue(destPE, env);
     _TRACE_CREATION_DONE(numPes);
     _STATS_RECORD_SEND_BRANCH_1();
@@ -990,9 +990,9 @@ void CkSendMsgNodeBranchInline(int eIdx, void *msg, int node, CkGroupID gID)
   if (env->isImmediate()) {
     int numPes;
     _TRACE_ONLY(numPes = (node==CLD_BROADCAST_ALL?CkNumNodes():1));
-    _TRACE_CREATION_N(env, numPes);
     env->setImmediate(CmiFalse);
     env = _prepareImmediateMsgBranch(eIdx,msg,gID,ForNodeBocMsg);
+    _TRACE_CREATION_N(env, numPes);
     _noCldNodeEnqueue(node, env);
     _STATS_RECORD_SEND_BRANCH_1();
     CpvAccess(_qd)->create();
