@@ -83,9 +83,11 @@ extern "C" void METIS_mCPartGraphRecursive(int*, int*, int*, int*, int*, int*,
 extern "C" void METIS_mCPartGraphKway(int*, int*, int*, int*, int*, int*,
                                     int*, int*, int*, int*, int*,
                                     int*, int*);
-
+/*
 CLBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count,
 				 int option=0)
+*/
+CLBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
 {
   // CkPrintf("[%d] MetisLB strategy\n",CkMyPe());
   CkVector migrateInfo;
