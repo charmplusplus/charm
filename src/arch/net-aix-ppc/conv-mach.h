@@ -41,8 +41,8 @@
 #define CMK_STACK_GROWUP                                   1
 
 #define CMK_SIGNAL_NOT_NEEDED                              0
-#define CMK_SIGNAL_USE_SIGACTION                           1
-#define CMK_SIGNAL_USE_SIGACTION_WITH_RESTART              0
+#define CMK_SIGNAL_USE_SIGACTION                           0
+#define CMK_SIGNAL_USE_SIGACTION_WITH_RESTART              1
 
 #define CMK_SYNCHRONIZE_ON_TCP_CLOSE                       0
 
@@ -64,8 +64,6 @@
 
 #define CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT                   0
 #define CMK_WHEN_PROCESSOR_IDLE_USLEEP                     1
-
-
 
 #define CMK_LBDB_ON					   1
 
