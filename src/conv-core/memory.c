@@ -47,12 +47,35 @@ or -1 if nobody has it.  Only set when malloc might be reentered.
 */
 static int rank_holding_CmiMemLock=-1;
 
+
+/**
+ * memory_lifeRaft is a very small heap-allocated region.
+ * The lifeRaft is supposed to be just big enough to provide 
+ * enough memory to cleanly shut down if we run out of memory.
+ */
+static char *memory_lifeRaft=NULL;
+
+void CmiOutOfMemoryInit(void) {
+  memory_lifeRaft=(char *)malloc(65536/2);
+}
+
+void CmiOutOfMemory(int nBytes) 
+{ //We're out of memory: free up the liferaft memory and abort
+  char errMsg[200];
+  if (memory_lifeRaft) free(memory_lifeRaft);
+  if (nBytes>0) sprintf(errMsg,"Could not malloc() %d bytes--are we out of memory?",nBytes);
+  else sprintf(errMsg,"Could not malloc()--are we out of memory?");
+  CmiAbort(errMsg);
+}
+
+
 #if CMK_MEMORY_BUILD_OS
 /* Just use the OS's built-in malloc.  All we provide is CmiMemoryInit.
 */
 void CmiMemoryInit(argv)
   char **argv;
 {
+  CmiOutOfMemoryInit();
 }
 void *malloc_reentrant(size_t size) { return malloc(size); }
 void free_reentrant(void *mem) { free(mem); }
@@ -133,9 +156,11 @@ static void *meta_valloc(size_t size)
 /*******************************************************************
 The locking code is common to all implementations except OS-builtin.
 */
+
 void CmiMemoryInit(char **argv)
 {
-  meta_init(argv);  
+  meta_init(argv);
+  CmiOutOfMemoryInit();
 }
 
 void *malloc(size_t size)
@@ -144,6 +169,7 @@ void *malloc(size_t size)
   CmiMemLock();
   result = meta_malloc(size);
   CmiMemUnlock();
+  if (result==NULL) CmiOutOfMemory(size);
   return result;
 }
 
@@ -160,6 +186,7 @@ void *calloc(size_t nelem, size_t size)
   CmiMemLock();
   result = meta_calloc(nelem, size);
   CmiMemUnlock();
+  if (result==NULL) CmiOutOfMemory(size);
   return result;
 }
 
@@ -185,6 +212,7 @@ void *memalign(size_t align, size_t size)
   CmiMemLock();
   result = meta_memalign(align, size);
   CmiMemUnlock();
+  if (result==NULL) CmiOutOfMemory(align*size);
   return result;    
 }
 
@@ -194,6 +222,7 @@ void *valloc(size_t size)
   CmiMemLock();
   result = meta_valloc(size);
   CmiMemUnlock();
+  if (result==NULL) CmiOutOfMemory(size);
   return result;
 }
 

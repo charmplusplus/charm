@@ -861,15 +861,15 @@ void ConverseInit(int, char**, CmiStartFn, int, int);
 void ConverseExit(void);
 
 void CmiAbort(const char *);
+void CmiOutOfMemory(int nBytes);
 
 #if CMK_MEMCHECK_OFF
 #define _MEMCHECK(p) do{}while(0)
 #else
 #define _MEMCHECK(p) do { \
-                         if ((p)==0) CmiAbort("Memory Allocation Failure.\n");\
+                         if ((p)==0) CmiOutOfMemory(-1);\
                      } while(0)
 #endif
-
 
 /******** CONVCONDS ********/
 
