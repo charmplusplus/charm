@@ -2,11 +2,18 @@
 #define STREAMING_STRATEGY
 #include "ComlibManager.h"
 
+#define MAX_STREAMING_MESSAGE_SIZE 2048
+
+
 class StreamingStrategy : public Strategy {
+ protected:
     CkQ<CharmMessageHolder *> *streamingMsgBuf;
     int *streamingMsgCount;
     int PERIOD, bufferMax;
-    CmiBool shortMsgPackingFlag;
+    CmiBool shortMsgPackingFlag, idleFlush;
+
+    /// Flush all messages destined for this processor:
+    void flushPE(int destPE);
     
  public:
     /**
@@ -20,21 +27,22 @@ class StreamingStrategy : public Strategy {
     StreamingStrategy(int periodMs=10,int bufferMax=1000);
     StreamingStrategy(CkMigrateMessage *){}
     
-    void insertMessage(CharmMessageHolder *msg);
-    void doneInserting();
-    /// Flush all pending messages:
-    void periodicFlush();
-    /// Flush all messages destined for this processor:
-    void flushPE(int destPE);
-
-    /// Register self to be flushed again after a delay.
-    void registerFlush(void);
+    virtual void insertMessage(CharmMessageHolder *msg);
+    virtual void doneInserting();
     
     virtual void beginProcessing(int ignored);
 
     virtual void pup(PUP::er &p);
-    void enableShortArrayMessagePacking(){shortMsgPackingFlag=CmiTrue;}
-    //Should be used only for array messages
+    virtual void enableShortArrayMessagePacking()
+        {shortMsgPackingFlag=CmiTrue;} //Should be used only for array
+                                       //messages
+
+    virtual void disableIdleFlush() { idleFlush = CmiFalse;}
+
+    /// Register self to be flushed again after a delay.
+    void registerFlush(void);
+    /// Flush all pending messages:
+    void periodicFlush();
 
     PUPable_decl(StreamingStrategy);
 };

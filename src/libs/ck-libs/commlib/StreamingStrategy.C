@@ -7,13 +7,23 @@ StreamingStrategy::StreamingStrategy(int periodMs,int bufferMax_)
     streamingMsgBuf=NULL;
     streamingMsgCount=NULL;
     shortMsgPackingFlag = CmiFalse;
+    idleFlush = CmiTrue;
 }
 
 void StreamingStrategy::insertMessage(CharmMessageHolder *cmsg) {
 
     ComlibPrintf("StramingStrategy: InsertMessage %d, %d\n",  PERIOD, bufferMax);
-
     int pe=cmsg->dest_proc;
+    char *msg = cmsg->getCharmMessage();
+    envelope *env = UsrToEnv(msg);
+    int size = env->getTotalsize();
+    
+    if(size > MAX_STREAMING_MESSAGE_SIZE) {//AVOID COPYING
+        CmiSyncSendAndFree(pe, size, (char *)env);
+        delete cmsg;
+        return;
+    }
+    
     streamingMsgBuf[pe].enq(cmsg);
     streamingMsgCount[pe]++;
     if (streamingMsgCount[pe] > bufferMax) flushPE(pe);
@@ -43,6 +53,19 @@ void StreamingStrategy::flushPE(int pe) {
     else {
         // Build a CmiMultipleSend list of messages to be sent off:
         int msg_count=streamingMsgCount[pe], msg_pe=0;
+
+        if(msg_count == 1) {
+            cmsg = streamingMsgBuf[pe].deq();
+            char *msg = cmsg->getCharmMessage();
+            envelope *env = UsrToEnv(msg);
+            int size = env->getTotalsize();
+            CmiSyncSendAndFree(pe, size, (char *)env);
+
+            delete cmsg;
+            streamingMsgCount[pe] = 0;
+            return;
+        }
+
         char **msgComps = new char*[msg_count];
         int *sizes = new int[msg_count];
         while (!streamingMsgBuf[pe].isEmpty()) {
@@ -104,14 +127,17 @@ static void call_idleFlush(void *arg,double curWallTime){
 // When we're finally ready to go, register for timeout and idle flush.
 void StreamingStrategy::beginProcessing(int ignored) {
     registerFlush();
-    //CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)call_idleFlush,
-    //                     (void *)this);
+    
+    if(idleFlush)
+        CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,
+                               (CcdVoidFn)call_idleFlush, (void *)this);
 }
 
 void StreamingStrategy::pup(PUP::er &p){
     p | PERIOD;
     p | bufferMax;
     p | shortMsgPackingFlag;
+    p | idleFlush;
 
     if(p.isUnpacking()) {
         streamingMsgBuf = new CkQ<CharmMessageHolder *>[CkNumPes()];
