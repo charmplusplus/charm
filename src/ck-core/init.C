@@ -463,6 +463,7 @@ static char* fContent(char *msg)
 #endif
 
 extern void _registerLBDatabase(void);
+extern void _registerf90main(void);
 
 void _initCharm(int argc, char **argv)
 {
@@ -541,6 +542,7 @@ void _initCharm(int argc, char **argv)
 		_registertempo();
 		_registerwaitqd();
 		_registerLBDatabase();
+		_registerf90main();
 		CkRegisterMainModule();
 	}
 
