@@ -47,7 +47,7 @@ public:
     }
     destObj = d.destObj;
     n_messages = d.n_messages;
-    n_bytes = d.n_messages;
+    n_bytes = d.n_bytes;
     mykey = d.mykey;
   };
 
@@ -61,7 +61,7 @@ public:
     }
     destObj = d.destObj;
     n_messages = d.n_messages;
-    n_bytes = d.n_messages;
+    n_bytes = d.n_bytes;
     mykey = d.mykey;
     return *this;
   };
