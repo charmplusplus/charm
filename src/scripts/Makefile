@@ -27,7 +27,7 @@ INC=../include
 
 all: charm++ bluegene LIBS AMPI f90charm TSM SM PVM doc
 
-charm++: converse $(L)/libck.a loadbalancers charmxi
+charm++: converse $(L)/libck.a loadbalancers charmxi default_libs
 
 bluegene: charm++ $(L)/libconv-bluegene.a METIS multicast
 
@@ -62,7 +62,9 @@ AMPIF: AMPIC
 
 f90charm: charm++ $(L)/libf90charm.a
 
-multicast: charm++
+default_libs: commlib multicast
+
+multicast: 
 	cd libs/ck-libs/multicast && make
 
 commlib:
