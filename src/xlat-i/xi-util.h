@@ -4,6 +4,7 @@
 #include <string.h>
 #include <iostream.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 #define SZ 1024
 
@@ -20,6 +21,12 @@ class XStr {
     char *get_string(void) { return s; }
     XStr& operator << (const char *_s) { append(_s); return *this;}
     XStr& operator << (char c) { append(c); return *this;}
+    XStr& operator << (int i) { 
+      char tmp[100]; 
+      sprintf(tmp, "%d", i); 
+      append(tmp); 
+      return *this;
+    }
     XStr& operator << (XStr& x) { append(x.get_string()); return *this; }
     void spew(const char*b, const char *a1 = 0, const char *a2 = 0, 
               const char *a3 = 0, const char *a4 = 0, const char *a5 = 0);

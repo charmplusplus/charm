@@ -13,10 +13,12 @@ extern CompileMode compilemode;
 
 class Value : public Printable {
   private:
+    int factor;
     char *val;
   public:
-    Value(char *s) : val(s) {}
+    Value(char *s);
     void print(XStr& str) { str << val; }
+    int getIntVal(void);
 };
 
 class ValueList : public Printable {
@@ -415,6 +417,7 @@ class Entry : public Member {
         abort();
       }
     }
+    int getStackSize(void) { return (stacksize ? stacksize->getIntVal() : 0); }
     int isThreaded(void) { return (attribs & STHREADED); }
     int isSync(void) { return (attribs & SSYNC); }
     int isConstructor(void) { return !strcmp(name, container->getBaseName());}

@@ -6,6 +6,30 @@
 
 CompileMode compilemode;
 
+Value::Value(char *s)
+{
+  factor = 1;
+  val = s;
+  if(val == 0 || strlen(val)==0 ) return;
+  int pos = strlen(val)-1;
+  if(val[pos]=='K' || val[pos]=='k') {
+    val[pos] = '\0';
+    factor = 1024;
+  }
+  if(val[pos]=='M' || val[pos]=='m') {
+    val[pos] = '\0';
+    factor = 1024*1024;
+  }
+}
+
+
+int
+Value::getIntVal(void)
+{
+  if(val==0 || strlen(val)==0) return 0;
+  return (atoi((const char *)val)*factor);
+}
+
 void 
 ConstructList::setExtern(int e) 
 {
@@ -1596,7 +1620,8 @@ void Entry::genDefs(XStr& str)
     str << "{\n";
     if(isThreaded()) {
       str << "  CthAwaken(CthCreate((CthVoidFn)_callthr_" << name;
-      str << "_ArrayElementCreateMessage, new CkThrCallArg(msg,obj), 0));\n}\n";
+      str << "_ArrayElementCreateMessage, new CkThrCallArg(msg,obj), ";
+      str << getStackSize() << "));\n}\n";
       if(container->isTemplated())
         container->genSpec(str);
       str << " void ";
@@ -1636,7 +1661,8 @@ void Entry::genDefs(XStr& str)
     str << "{\n";
     if(isThreaded()) {
       str << "  CthAwaken(CthCreate((CthVoidFn)_callthr_" << name;
-      str << "_ArrayElementMigrateMessage, new CkThrCallArg(msg,obj), 0));\n}\n";
+      str << "_ArrayElementMigrateMessage, new CkThrCallArg(msg,obj), ";
+      str << getStackSize() << "));\n}\n";
       if(container->isTemplated())
         container->genSpec(str);
       str << " void ";
@@ -1684,7 +1710,8 @@ void Entry::genDefs(XStr& str)
     if(isThreaded()) {
       str << "  CthAwaken(CthCreate((CthVoidFn)_callthr_";
       genEpIdx(str);
-      str << ", new CkThrCallArg(msg, obj), 0));\n}\n";
+      str << ", new CkThrCallArg(msg, obj), ";
+      str << getStackSize() << "));\n}\n";
       if(container->isTemplated())
         container->genSpec(str);
       str << " void ";
@@ -1760,7 +1787,8 @@ void Entry::genDefs(XStr& str)
     if(isThreaded()) {
       str << "  CthAwaken(CthCreate((CthVoidFn)_callthr_";
       genEpIdx(str);
-      str << ", new CkThrCallArg(msg, obj), 0));\n}\n";
+      str << ", new CkThrCallArg(msg, obj), ";
+      str << getStackSize() << "));\n}\n";
       if(container->isTemplated())
         container->genSpec(str);
       str << " void ";
@@ -1835,7 +1863,8 @@ void Entry::genDefs(XStr& str)
     if(isThreaded()) {
       str << "  CthAwaken(CthCreate((CthVoidFn)_callthr_";
       genEpIdx(str);
-      str << ", new CkThrCallArg(msg, obj), 0));\n}\n";
+      str << ", new CkThrCallArg(msg, obj), ";
+      str << getStackSize() << "));\n}\n";
       if(container->isTemplated())
         container->genSpec(str);
       str << " void ";
