@@ -641,31 +641,31 @@ NborBaseLB.decl.h: NborBaseLB.ci charmxi
 
 
 ## Tracing libraries (profiling, -tracemode)
-LIBTRACE_PROJ=trace-projections.o trace-common.o
+LIBTRACE_PROJ=trace-projections.o
 $(L)/libtrace-projections.a: $(LIBTRACE_PROJ)
 	$(CHARMC) -o $@ $(LIBTRACE_PROJ)
 
-LIBTRACE_SUMM=trace-summary.o trace-common.o
+LIBTRACE_SUMM=trace-summary.o
 $(L)/libtrace-summary.a: $(LIBTRACE_SUMM)
 	$(CHARMC) -o $@ $(LIBTRACE_SUMM)
 
-LIBTRACE_RECREP=trace-recordreplay.o trace-common.o
+LIBTRACE_RECREP=trace-recordreplay.o
 $(L)/libtrace-recordreplay.a: $(LIBTRACE_RECREP)
 	$(CHARMC) -o $@ $(LIBTRACE_RECREP)
 
-LIBTRACE_COUNT=trace-counter.o trace-common.o
+LIBTRACE_COUNT=trace-counter.o
 $(L)/libtrace-counter.a: $(LIBTRACE_COUNT)
 	$(CHARMC) -o $@ $(LIBTRACE_COUNT)
 
-LIBTRACE_BG=trace-bluegene.o trace-common.o
+LIBTRACE_BG=trace-bluegene.o
 $(L)/libtrace-bluegene.a:$(LIBTRACE_BG)
 	$(CHARMC) -o $@ $(LIBTRACE_BG)
 
-LIBTRACE_ALL=trace-all.o trace-projections.o trace-summary.o trace-recordreplay.o trace-common.o trace-projector.o traceCore.o traceCoreCommon.o charmProjections.o converseProjections.o machineProjections.o
+LIBTRACE_ALL=trace-all.o trace-projections.o trace-summary.o trace-recordreplay.o trace-projector.o traceCore.o traceCoreCommon.o charmProjections.o converseProjections.o machineProjections.o
 $(L)/libtrace-all.a: $(LIBTRACE_ALL)
 	$(CHARMC) -o $@ $(LIBTRACE_ALL)
 
-LIBTRACE_PROJECTOR=trace-projector.o trace-common.o traceCore.o traceCoreCommon.o charmProjections.o converseProjections.o machineProjections.o
+LIBTRACE_PROJECTOR=trace-projector.o traceCore.o traceCoreCommon.o charmProjections.o converseProjections.o machineProjections.o
 $(L)/libtrace-projector.a: $(LIBTRACE_PROJECTOR)
 	$(CHARMC) -o  $@ $(LIBTRACE_PROJECTOR)
 
