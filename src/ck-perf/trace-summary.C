@@ -166,8 +166,9 @@ void TraceProjections::creation(envelope *e, int num)
 void TraceProjections::beginExecute(envelope *e)
 {
   double t = CmiTimer();
+CmiPrintf("start: %f \n", start);
 /*
-//  msgNum++;
+  msgNum++;
   if (start == t) {
      return;
   }
@@ -181,15 +182,16 @@ void TraceProjections::beginExecute(envelope *e)
      bin=0.0;
      binStart = ts;
   }
-//CmiPrintf("start: %f \n", start);
 }
 
 void TraceProjections::endExecute(void)
 {
-//  msgNum --;
+/*
+  msgNum --;
   // duplicate messages
-//  if (msgNum != 0) return;
-//CmiPrintf("end:msgNum: %d bin:%f\n", msgNum, bin);
+  if (msgNum != 0) return;
+*/
+CmiPrintf("end:msgNum: %d bin:%f\n", msgNum, bin);
   double t = CmiTimer();
   double ts = start;
   double nts = binStart;

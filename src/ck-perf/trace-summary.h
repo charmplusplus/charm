@@ -59,13 +59,14 @@ class LogPool {
     FILE *fp;
   public:
     LogPool(char *pgm) {
-      pool = new LogEntry[CpvAccess(CtrLogBufSize)];
+      poolSize = CpvAccess(CtrLogBufSize);
+      if (poolSize % 2) poolSize++;	// make sure it is even
+      pool = new LogEntry[poolSize];
       if (pool == NULL) {
          CkPrintf("memory overflow!\n");
 	 exit(1);
       }
       numEntries = 0;
-      poolSize = CpvAccess(CtrLogBufSize);
       char pestr[10];
       sprintf(pestr, "%d", CkMyPe());
       int len = strlen(pgm) + strlen(".log.") + strlen(pestr) + 1;
