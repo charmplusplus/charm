@@ -30,8 +30,10 @@
 #endif
 #define CMK_DONT_USE_HP_MAIN_FIX  (!CMK_USE_HP_MAIN_FIX)
 
+/*
 #ifndef CMK_STACK_GROWDOWN
 # define CMK_STACK_GROWDOWN 1
 #endif
+*/
 
 #endif
