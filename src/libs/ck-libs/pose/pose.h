@@ -1,25 +1,15 @@
-// File: pose.h
-// Global POSE data and functions; includes and dependencies handled here
-// Last Modified: 5.29.01 by Terry L. Wilmarth
-
+/// Global POSE data and functions; includes and dependencies handled here
+/** This code provides all the major global data structures plus a 
+    coordination entity that handles initialization and termination of the
+    simulation. */
 #ifndef POSE_H
 #define POSE_H
-
-extern int cancelNodeCount;
-extern int heapNodeCount;
-extern int spawnedEventCount;
-extern int eventCount;
-extern int srEntryCount;
-extern int repCount;
-extern int eventMsgCount;
-extern int eventMsgsRecvd;
-extern int eventMsgsDiscarded;
-
-// Primary versions
+/// Uncomment to gather and print POSE statistics set
 #define POSE_STATS_ON 1
+/// Uncomment to make use of the Streaming Communication Library optimizations
 //#define POSE_COMM_ON 1
+/// Uncomment to turn on POSE load balancer
 //#define LB_ON 1
-
 #ifdef POSE_COMM_ON
 #include <StreamingStrategy.h>
 #define COMM_TIMEOUT 20
@@ -27,26 +17,23 @@ extern int eventMsgsDiscarded;
 #endif 
 #include "pose.decl.h"
 
-// Strategy variables
-#define STORE_RATE 100           // default store rate: 1 for every n events
-#define SPEC_WINDOW 50         // speculative event window
-#define MIN_LEASH 10            // min spec window for adaptive strategy
-#define MAX_LEASH 100         // max  "     "     "     "        " 
-#define LEASH_FLEX 1           // leash increment
-#define GVT_WINDOW 500          // Maximum time GVT can advance
+/// Synchronization strategy constants
+#define STORE_RATE 100      // default checkpoint rate: 1 for every n events
+#define SPEC_WINDOW 50      // speculative event window size
+#define MIN_LEASH 10        // min speculative window for adaptive strategy
+#define MAX_LEASH 100       // max  "     "     "     "        "     "
+#define LEASH_FLEX 1        // leash increment
+#define GVT_WINDOW 500      // Maximum time GVT can advance
 
-// Load balancer variables
-#define LB_SKIP 51           // LB done 1/LB_SKIP times GVT iterations
-#define LB_THRESHOLD 2000    // 20 heavy objects
-#define LB_DIFF 10000        // min diff between min and max load PEs
+/// Load balancer contants
+#define LB_SKIP 51          // LB done 1/LB_SKIP times GVT iterations
+#define LB_THRESHOLD 2000   // 20 heavy objects
+#define LB_DIFF 10000       // min diff between min and max load PEs
 
 // MISC
-#define MAX_POOL_SIZE 20     // maximum size of an eventMsg pool
-#define DEBUG_INDENT_INC 3   // debug indentation increment
-
+#define MAX_POOL_SIZE 20    // maximum size of an eventMsg pool
 #define SEND 0
 #define RECV 1
-
 #define OPTIMISTIC 0
 #define CONSERVATIVE 1
 
@@ -61,12 +48,12 @@ extern int eventMsgsDiscarded;
 #include "stats.h"
 #include "cancel.h"
 
-class eventMsg;  // defined later in sim.h
-class rep;       // defined later in rep.h
+class eventMsg; // defined later in sim.h
+class rep; // defined later in rep.h
 #include "event.h"
 #include "eqheap.h"
 
-class sim;  // defined later in sim.h
+class sim; // defined later in sim.h
 #include "pvtobj.h"
 #include "lbObject.h"
 #include "ldbal.h"
@@ -86,61 +73,88 @@ class strat; // defined later in strat.h
 #include "cons.h"
 #include "chpt.h"
 
-void POSE_init();  // Main initialization for all of POSE
-void POSE_start(); // start POSE simulation timer and other behaviors
-void POSE_useQD(); // use QD to terminate program
-void POSE_useID(); // use Inactivity Detection to terminate program
-void POSE_useET(int et); // use end time to terminate program
+/// Main initialization for all of POSE
+void POSE_init(); 
+/// Start POSE simulation timer and event processing
+void POSE_start(); 
+/// Use Inactivity Detection to terminate program
+void POSE_useID();
+/// Simulation end time
+extern int POSE_endtime;
+/// Use a user-specified end time to terminate program
+/** Also uses inactivity detection in conjunction with end time */
+void POSE_useET(int et); 
+/// Specify an optional callback to be called when simulation terminates
 void POSE_registerCallBack(CkCallback cb);
-void POSE_stop();  // stop POSE simulation timer
-void POSE_exit();  // exit program
+/// Stop POSE simulation
+/** Stops timer so statistics collection, callback, final output, etc. 
+    are not counted in simulation time. */
+void POSE_stop(); 
+/// Exit simulation program
+void POSE_exit(); 
 
+/// User specified busy wait time (for grainsize testing)
+extern double busyWait;
+/// Set busy wait time
 void POSE_set_busy_wait(double n);
+/// Busy wait for busyWait
 void POSE_busy_wait();
+/// Busy wait for n
 void POSE_busy_wait(double n);
 
+/// Flag to indicate how foward execution should proceed
+/** 0 for normal forward execution; 1 for state recovery only */
 CpvExtern(int, stateRecovery);
-extern double busyWait;
-extern int POSE_endtime;
+
 #ifdef POSE_COMM_ON
 extern int comm_debug;
 #endif
 
+/// Class for user-specified callback
 class callBack : public CMessage_callBack
 {
  public:
   CkCallback callback;
 };
 
+/// Coordinator of simulation initialization, start and termination
 class pose : public Chare {
  private:
+  /// The simulation timer
   double sim_timer;
+  /// A callback to execute on termination
+  /** If this is used, control is turned over to this at the very end of the
+      simulation. */
   CkCallback cb;
-  int callBackSet, useQD, useID, useET;
+  /// Flag to indicate if a callback will be used
+  int callBackSet;
+  /// Flag to indicate if inactivity detection will be used
+  int useID;
+  /// Flag to indicate if an end time will be used
+  int useET;
  public:
-  pose(void) { callBackSet = 0; useQD = useID = useET = 0; }
+  /// Basic Constructor
+  pose(void) { callBackSet = 0; useID = useET = 0; }
   pose(CkMigrateMessage *) { }
-  void QDon() { useQD = 1; }
+  /// Turn on inactivity detection
   void IDon() { useID = 1; }
+  /// Turn on end time termination
   void ETon() { useET = 1; }
+  /// Start the simulation timer
   void start() { 
-    if (useQD) {
-      CkPrintf("Using Quiescence Detection for termination.\n");
-      CkStartQD(CkIndex_pose::quiesce(), &thishandle);
-    }
-    else if (useID) {
-      CkPrintf("Using Inactivity Detection for termination.\n");
-    }
-    else {
-      CkPrintf("Using endTime of %d for termination.\n", POSE_endtime);
-    }
+    if (useID) CkPrintf("Using Inactivity Detection for termination.\n");
+    else CkPrintf("Using endTime of %d for termination.\n", POSE_endtime);
     CkPrintf("Starting simulation...\n"); 
     sim_timer = CmiWallTimer(); 
   }
+  /// Register the callback with POSE
   void registerCallBack(callBack *);
+  /// Stop the simulation
+  /** Stops timer and gathers POSE statistics and proceeds to exit. */
   void stop();
+  /// Exit the simulation
+  /** Executes callback before terminating program. */
   void exit();
-  void quiesce() { CkPrintf("Your program has quiesced!\n"); POSE_stop(); }
 };
 
 #endif

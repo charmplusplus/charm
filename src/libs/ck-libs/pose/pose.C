@@ -1,85 +1,60 @@
-// File: pose.C
-// Global POSE data and functions; includes and dependencies handled here
-// Last Modified: 25.11.03 by Terry L. Wilmarth
-
+/// Global POSE data and functions; includes and dependencies handled here
 #include "pose.h"
 #include "pose.def.h"
 
 CpvDeclare(int, stateRecovery);
+
 #ifdef POSE_COMM_ON
 CkGroupID dmid;
 #endif
 double busyWait;
 int POSE_endtime;
-int cancelNodeCount=0;
-int heapNodeCount=0;
-int spawnedEventCount=0;
-int eventCount=0;
-int srEntryCount=0;
-int repCount=0;
-int eventMsgCount=0;
-int eventMsgsRecvd=0;
-int eventMsgsDiscarded=0;
 
-// Main initialization function for all of POSE
+// Main initialization for all of POSE
 void POSE_init()
 {
   CkPrintf("Initializing POSE...  \n");
-
 #ifdef POSE_COMM_ON
   // Create the communication library for POSE
   ComlibInstanceHandle cinst = CkGetComlibInstance();
   // Create the communication strategy for POSE
-  StreamingStrategy *strategy = new StreamingStrategy(COMM_TIMEOUT,COMM_MAXMSG);
-  //strategy->enableShortArrayMessagePacking();
+  StreamingStrategy *strategy = new StreamingStrategy(COMM_TIMEOUT,COMM_MAXMSG);  //strategy->enableShortArrayMessagePacking();
   //Register the strategy
   cinst.setStrategy(strategy);
   CkPrintf("Simulation run with StreamingStrategy(%d,%d) for communication optimization...\n", COMM_TIMEOUT, COMM_MAXMSG);
 #endif
-
   // Create an EventMsgPool with global handle for message recycling 
   PoolInitMsg *m = new PoolInitMsg;
   m->numPools = 1; //MapSizeToIdx(-1);
   EvmPoolID = CProxy_EventMsgPool::ckNew(m);
-
-  POSE_Objects = CProxy_sim::ckNew();  // Create array to hold all POSE objects
+  // Create array to hold all POSE objects
+  POSE_Objects = CProxy_sim::ckNew(); 
 #ifdef POSE_COMM_ON
-  ComlibDelegateProxy(&POSE_Objects);  // Make POSE_Objects use the comm lib
+  // Make POSE_Objects use the comm lib
+  ComlibDelegateProxy(&POSE_Objects);
 #endif
   CProxy_pose::ckNew(&POSE_Coordinator_ID);
-  
   // Initialize statistics collection if desired
 #ifdef POSE_STATS_ON
   theLocalStats = CProxy_localStat::ckNew();
   CProxy_globalStat::ckNew(&theGlobalStats);
 #endif
-
   // Initialize global handles to GVT and PVT
   ThePVT = CProxy_PVT::ckNew(); 
   TheGVT = CProxy_GVT::ckNew();
-
+  // Start off using normal forward execution
   CpvInitialize(int, stateRecovery);
   CpvAccess(stateRecovery) = 0;
-
 #ifdef LB_ON
   // Initialize the load balancer
   TheLBG = CProxy_LBgroup::ckNew();
   TheLBstrategy = CProxy_LBstrategy::ckNew();
   CkPrintf("Load balancing is ON.\n");
 #endif
-
   CkPrintf("POSE initialization complete.\n");
 }
 
-// use QD to terminate program
-void POSE_useQD() 
-{
-  CProxy_pose POSE_Coordinator(POSE_Coordinator_ID);
-  POSE_Coordinator.QDon();
-  POSE_endtime = -1;
-}
-
-// use QD to terminate program
+/// Use Inactivity Detection to terminate program
 void POSE_useID() 
 {
   CProxy_pose POSE_Coordinator(POSE_Coordinator_ID);
@@ -87,7 +62,7 @@ void POSE_useID()
   POSE_endtime = -1;
 }
 
-// use end time to terminate program
+/// Use a user-specified end time to terminate program
 void POSE_useET(int et) 
 {
   CProxy_pose POSE_Coordinator(POSE_Coordinator_ID);
@@ -95,14 +70,14 @@ void POSE_useET(int et)
   POSE_endtime = et;
 }
 
-
-// start POSE simulation timer and other behaviors
+/// Start POSE simulation timer and event processing
 void POSE_start()
 {
   CProxy_pose POSE_Coordinator(POSE_Coordinator_ID);
   POSE_Coordinator.start();
 }
 
+/// Specify an optional callback to be called when simulation terminates
 void POSE_registerCallBack(CkCallback cb)
 {
   CProxy_pose POSE_Coordinator(POSE_Coordinator_ID);
@@ -111,49 +86,50 @@ void POSE_registerCallBack(CkCallback cb)
   POSE_Coordinator.registerCallBack(cbm);
 }
 
-// stop POSE simulation timer
+/// Stop POSE simulation
 void POSE_stop()
 {
   CProxy_pose POSE_Coordinator(POSE_Coordinator_ID);
   POSE_Coordinator.stop();
 }
 
-// stop POSE simulation timer
+/// Exit simulation program
 void POSE_exit()
 {
   CProxy_pose POSE_Coordinator(POSE_Coordinator_ID);
   POSE_Coordinator.exit();
 }
 
-void POSE_set_busy_wait(double n)
-{
-  busyWait = n;
-}
+/// Set busy wait time
+void POSE_set_busy_wait(double n) { busyWait = n; }
 
+/// Busy wait for busyWait
 void POSE_busy_wait()
 {
   double start = CmiWallTimer();
   while (CmiWallTimer() - start < busyWait) ;
 }
 
+/// Busy wait for n
 void POSE_busy_wait(double n)
 {
   double start = CmiWallTimer();
   while (CmiWallTimer() - start < n) ;
 }
 
+/// Register the callback with POSE
 void pose::registerCallBack(callBack *cbm) 
 {
   callBackSet = 1;
   cb = cbm->callback;
 }
 
+/// Stop the simulation
 void pose::stop(void) 
 { 
 #ifdef POSE_STATS_ON
   CProxy_localStat stats(theLocalStats);
 #endif
-  
 #ifdef POSE_STATS_ON
   CkPrintf("%d PE Simulation finished at %f.  Gathering stats...\n", 
 	   CkNumPes(), CmiWallTimer() - sim_timer);
@@ -165,6 +141,7 @@ void pose::stop(void)
 #endif  
 }
 
+/// Exit the simulation
 void pose::exit(void) 
 { 
   if (callBackSet)

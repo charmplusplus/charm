@@ -44,7 +44,7 @@ class CancelList {
   /// Return a pointer to a node in list
   /** Use current to cycle through nodes and give a different node each time
       GetItem is called */
-  CancelNode *GetItem(int eGVT);     
+  CancelNode *GetItem();
   /// Remove a specific cancellation from the list
   void RemoveItem(CancelNode *item);      
   /// Test if cancellations is empty

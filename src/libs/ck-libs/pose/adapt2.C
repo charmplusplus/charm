@@ -1,16 +1,14 @@
-// File: adapt2.C
+/// Adaptive Synchronization Strategy No. 2
 #include "pose.h"
 
-adapt2::adapt2() { timeLeash = SPEC_WINDOW; STRAT_T = ADAPT2_T; }
-
-// Single forward execution step
+/// Single forward execution step
 void adapt2::Step()
 {
   Event *ev;
   static int lastGVT = -1;
 
   lastGVT = localPVT->getGVT();
-  if (!parent->cancels.IsEmpty()) {             // Cancel as much as possible
+  if (!parent->cancels.IsEmpty()) { // Cancel as much as possible
 #ifdef POSE_STATS_ON
     localStats->SwitchTimer(CAN_TIMER);      
 #endif
@@ -47,12 +45,12 @@ void adapt2::Step()
     localStats->SwitchTimer(DO_TIMER);
 #endif
     parent->DOs++;
-    parent->ResolveFn(ev->fnIdx, ev->msg);  // execute it
+    parent->ResolveFn(ev->fnIdx, ev->msg); // execute it
 #ifdef POSE_STATS_ON
     localStats->SwitchTimer(SIM_TIMER);
 #endif
-    ev->done = 1;                           // complete the event execution
-    eq->ShiftEvent();                       // shift to next event
+    ev->done = 1; // complete the event execution
+    eq->ShiftEvent(); // shift to next event
     ev = eq->currentPtr;
   }
   if (timeLeash < MAX_LEASH) timeLeash += LEASH_FLEX;

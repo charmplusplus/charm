@@ -44,11 +44,11 @@ void con::CancelEvents()
   int found, eGVT = localPVT->getGVT();
   CancelNode *it, *last;
 
-  last = parent->cancels.GetItem(eGVT);     // make note of last item to be examined
+  last = parent->cancels.GetItem();     // make note of last item to be examined
   if (!last)  // none of the cancellations are early enough to bother with
     return;
   while (!parent->cancels.IsEmpty()) {      // loop through all cancellations
-    it = parent->cancels.GetItem(eGVT);     // it is the event to cancel
+    it = parent->cancels.GetItem();     // it is the event to cancel
     if (!it)  // none of the cancellations are early enough to bother with
       return;
     found = 0;                              // init the found flag to not found (0)
@@ -87,7 +87,7 @@ void con::CancelEvents()
 	  */
 	  return;
 	}
-	it = parent->cancels.GetItem(eGVT);
+	it = parent->cancels.GetItem();
 	if (!it)  // none of the cancellations are early enough to bother with
 	  return;
       }

@@ -1,7 +1,4 @@
-// File: pose.ci
-// Last Modified: 06.19.01 by Terry L. Wilmarth
-
-
+/// Global POSE data and functions; includes and dependencies handled here
 module pose {
 //  extern module ComlibModule;
 //  readonly CkGroupID dmid;
@@ -10,13 +7,11 @@ module pose {
   message callBack;
   chare pose {
     entry pose();
-    entry void QDon();
     entry void IDon();
     entry void ETon();
     entry void start();
     entry void registerCallBack(callBack *);
     entry void stop();
     entry void exit();
-    entry [threaded] void quiesce();
   };
 };

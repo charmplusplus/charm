@@ -16,7 +16,7 @@ void CancelList::Insert(int ts, eventID e)
 }
 
 /// Return a pointer to a node in list
-CancelNode *CancelList::GetItem(int eGVT) 
+CancelNode *CancelList::GetItem() 
 {
   CancelNode *result, *start = current;
   if (!current) CkPrintf("ERROR: CancelList::GetItem: CancelList is empty\n");

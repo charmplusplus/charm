@@ -1,16 +1,13 @@
-// File: opt3.C
+/// Optimistic Synchronization Strategy No. 3: Time window
 #include "pose.h"
 
-opt3::opt3() { timeLeash = SPEC_WINDOW; STRAT_T = OPT3_T; }
-
-// Single forward execution step
 void opt3::Step()
 {
   Event *ev;
   static int lastGVT = -1;
 
   lastGVT = localPVT->getGVT();
-  if (!parent->cancels.IsEmpty()) {             // Cancel as much as possible
+  if (!parent->cancels.IsEmpty()) { // Cancel as much as possible
 #ifdef POSE_STATS_ON
     localStats->SwitchTimer(CAN_TIMER);      
 #endif
@@ -46,13 +43,13 @@ void opt3::Step()
       localStats->SwitchTimer(DO_TIMER);
 #endif
       parent->DOs++;
-      parent->ResolveFn(ev->fnIdx, ev->msg);  // execute it
+      parent->ResolveFn(ev->fnIdx, ev->msg); // execute it
 #ifdef POSE_STATS_ON
       localStats->SwitchTimer(SIM_TIMER);
 #endif
-      ev->done = 1;                           // complete the event execution
-      eq->ShiftEvent();                       // shift to next event
-      ev = eq->currentPtr;                    // reset ev
+      ev->done = 1; // complete the event execution
+      eq->ShiftEvent(); // shift to next event
+      ev = eq->currentPtr; // reset ev
     }
     if (eq->currentPtr->timestamp >= 0) {
       // execute next event if there is one

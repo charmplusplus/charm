@@ -1,37 +1,77 @@
-// File: opt.h
+/// Basic Optimistic Synchronization Strategy
+/** Performs locally available events in strict timestamp order */
 #ifndef OPT_H
 #define OPT_H
 
 class opt : public strat {
 protected:
-  virtual void Rollback();              // rollback to predetermined RBevent
-  virtual void RecoverState(Event *ev); // recover state prior to ev
-  virtual void CancelEvents();          // cancel events in cancellation list
-  virtual void UndoEvent(Event *e);     // undo single event, cancelling spawn
+  /// Rollback to predetermined RBevent
+  virtual void Rollback();              
+  /// Recover checkpointed state prior to ev
+  /** Searches backward from recoveryPoint without undoing events or
+      cancelling their spawn, until a checkpoint is found. Then
+      restores the state from this found checkpoint, and uses
+      pseudo-re-execution to return back to recoveryPoint.  This means
+      that events are re-executed to reconstruct the state, but any
+      events they would have spawned are not respawned, since they
+      were never cancelled. */
+  virtual void RecoverState(Event *recoveryPoint); 
+  /// Cancel events in cancellation list that have arrived
+  /** This will go through all the cancellations and remove whatever has 
+      arrived already.  For events that have already been executed, a 
+      rollback is performed.  No forward execution happens until all the
+      cancellations have been examined. */
+  virtual void CancelEvents();          
+  /// Undo a single event, cancelling its spawned events
+  virtual void UndoEvent(Event *e);     
 public:
-  opt();
+  /// Basic Constructor
+  opt() { STRAT_T = OPT_T; }
+  /// Initialize the synchronization strategy type of the poser
   void initSync() { parent->sync = OPTIMISTIC; }
-  virtual void Step();              // single forward execution step
-  int SafeTime();
+  /// Perform a single forward execution step
+  /** Prior to the forward execution, cancellation and rollback are done if
+      necessary.  Derived strategies typically just reimplement this method */
+  virtual void Step();              
+  /// Compute safe time for object
+  /** Safe time is the earliest timestamp that this object can generate given
+      its current state (assuming no stragglers, cancellations or events
+      are subsequently received */
+  int SafeTime() {  
+    int ovt=userObj->OVT(), theTime=-1, ec=parent->cancels.getEarliest(),
+      gvt=localPVT->getGVT(), worktime = eq->currentPtr->timestamp;
+    // Object is idle; report -1
+    if (!RBevent && (ec<0) && (worktime < 0) && (ovt <= gvt))  return -1;
+    if (worktime > theTime) { // check queued events
+      theTime = worktime; // worktime is minimal
+      if (ovt > theTime) theTime = ovt; // pending work can't reduce OVT
+    }
+    if (RBevent && ((RBevent->timestamp<theTime) || (theTime == -1)))
+      theTime = RBevent->timestamp; // rollback time is minimal
+    if ((ec >= 0) && ((ec < theTime) || (theTime == -1))) 
+      theTime = ec; // earliest cancellation is minimal
+    if ((theTime == -1) && (ovt > gvt)) theTime = ovt;
+    return theTime;
+  }
+  /// Add spawned event to current event's spawned event list
   void AddSpawnedEvent(int AnObjIdx, eventID evID, int ts) { 
-    // note spawn in event
     eq->AddSpawnToCurrent(AnObjIdx, evID, ts);
   }
+  /// Send cancellation messages to all of event e's spawned events
   void CancelSpawn(Event *e) {  
-    // send cancel messages to all of event e's spawn
     cancelMsg *m;
     SpawnedEvent *ev = e->spawnedList;
     while (ev) {
-      e->spawnedList = ev->next;               // remove a spawn from the list
+      e->spawnedList = ev->next; // remove a spawn from the list
       ev->next = NULL;
-      m = new cancelMsg();                     // build a cancel message
+      m = new cancelMsg(); // build a cancel message
       m->evID = ev->evID;
       m->timestamp = ev->timestamp;
       m->setPriority(m->timestamp - INT_MAX);
       localPVT->objUpdate(ev->timestamp, SEND);
-      POSE_Objects[ev->objIdx].Cancel(m);      // send the cancellation
-      delete ev;                               // delete the spawn
-      ev = e->spawnedList;                     // move on to next in list
+      POSE_Objects[ev->objIdx].Cancel(m); // send the cancellation
+      delete ev; // delete the spawn
+      ev = e->spawnedList; // move on to next in list
     }
   }
 };

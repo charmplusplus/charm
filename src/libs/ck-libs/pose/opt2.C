@@ -1,16 +1,13 @@
-// File: opt2.C
+/// Optimistic Synchronization Strategy No. 2
 #include "pose.h"
 
-opt2::opt2() { STRAT_T = OPT2_T; }
-
-// Single forward execution step
 void opt2::Step()
 {
   Event *ev;
   static int lastGVT = -1;
 
   lastGVT = localPVT->getGVT();
-  if (!parent->cancels.IsEmpty()) {             // Cancel as much as possible
+  if (!parent->cancels.IsEmpty()) { // Cancel as much as possible
 #ifdef POSE_STATS_ON
     localStats->SwitchTimer(CAN_TIMER);      
 #endif
@@ -43,16 +40,15 @@ void opt2::Step()
       localStats->SwitchTimer(DO_TIMER);
 #endif
       parent->DOs++;
-      parent->ResolveFn(ev->fnIdx, ev->msg);  // execute it
+      parent->ResolveFn(ev->fnIdx, ev->msg); // execute it
 #ifdef POSE_STATS_ON
       localStats->SwitchTimer(SIM_TIMER);
 #endif
-      ev->done = 1;                           // complete the event execution
-      eq->ShiftEvent();                       // shift to next event
-      ev = eq->currentPtr;                    // reset ev
+      ev->done = 1; // complete the event execution
+      eq->ShiftEvent(); // shift to next event
+      ev = eq->currentPtr; // reset ev
     }
-    if (eq->currentPtr->timestamp >= 0) {
-      // execute next event if there is one
+    if (eq->currentPtr->timestamp >= 0) { // if more events, schedule the next
       prioMsg *pm = new prioMsg;
       pm->setPriority(eq->currentPtr->timestamp-INT_MAX);
       POSE_Objects[parent->thisIndex].Step(pm);
