@@ -1475,6 +1475,7 @@ void Entry::setChare(Chare *c) {
 	Member::setChare(c);
         // mainchare constructor parameter is not allowed
         if (isConstructor()&&container->isMainChare() && param != NULL)
+          if (!param->isCkArgMsgPtr())
            die("MainChare Constructor doesn't allow parameter!", line);
 	if (param==NULL) 
 	{//Fake a parameter list of the appropriate type
