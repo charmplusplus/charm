@@ -470,7 +470,7 @@ do
 	-charm-shared|-charmShared)
 		CHARM_SHARED=true
 		;;
-	-charm-so|-buildShared)
+	-build-shared|-buildShared)
 		# used internally when building Charm++ to create lib_so
 		BUILD_SHARE=true
 		;;
