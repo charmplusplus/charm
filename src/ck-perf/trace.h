@@ -97,10 +97,13 @@ CpvExtern(TraceArray*, _traces);
 
 CpvExtern(int, CtrLogBufSize);
 CpvExtern(char*, traceRoot);
+CpvExtern(double, traceInitTime);
 
 extern "C" {
 #include "conv-trace.h"
 }
+
+inline double TraceTimer() { return CmiWallTimer() - CpvAccess(traceInitTime); }
 
 #ifndef CMK_OPTIMIZE
 #  define _TRACE_ONLY(code) do{if(CpvAccess(traceOn)){ code; }} while(0)

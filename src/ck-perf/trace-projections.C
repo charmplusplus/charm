@@ -309,20 +309,20 @@ void TraceProjections::traceEnd(void)
 
 void TraceProjections::userEvent(int e)
 {
-  CpvAccess(_logPool)->add(USER_EVENT, e, 0, CmiWallTimer(),curevent++,CmiMyPe());
+  CpvAccess(_logPool)->add(USER_EVENT, e, 0, TraceTimer(),curevent++,CmiMyPe());
 }
 
 void TraceProjections::creation(envelope *e, int num)
 {
   if(e==0) {
     CtvAccess(curThreadEvent)=curevent;
-    CpvAccess(_logPool)->add(CREATION,ForChareMsg,_threadEP,CmiWallTimer(),
+    CpvAccess(_logPool)->add(CREATION,ForChareMsg,_threadEP,TraceTimer(),
                              curevent++,CmiMyPe());
   } else {
     int type=e->getMsgtype();
     e->setEvent(curevent);
     for(int i=0; i<num; i++) {
-      CpvAccess(_logPool)->add(CREATION,type,e->getEpIdx(),CmiWallTimer(),
+      CpvAccess(_logPool)->add(CREATION,type,e->getEpIdx(),TraceTimer(),
                                curevent+i,CmiMyPe(),e->getTotalsize());
     }
     curevent += num;
@@ -334,7 +334,7 @@ void TraceProjections::beginExecute(envelope *e)
   if(e==0) {
     execEvent = CtvAccess(curThreadEvent);
     execEp = (-1);
-    CpvAccess(_logPool)->add(BEGIN_PROCESSING,ForChareMsg,_threadEP,CmiWallTimer(),
+    CpvAccess(_logPool)->add(BEGIN_PROCESSING,ForChareMsg,_threadEP,TraceTimer(),
                              execEvent,CmiMyPe());
   } else {
     beginExecute(e->getEvent(),e->getMsgtype(),e->getEpIdx(),e->getSrcPe(),e->getTotalsize());
@@ -345,17 +345,17 @@ void TraceProjections::beginExecute(int event,int msgType,int ep,int srcPe, int 
   execEvent=event;
   execEp=ep;
   execPe=srcPe;
-  CpvAccess(_logPool)->add(BEGIN_PROCESSING,msgType,ep,CmiWallTimer(),
+  CpvAccess(_logPool)->add(BEGIN_PROCESSING,msgType,ep,TraceTimer(),
                              event,srcPe, mlen);
 }
 
 void TraceProjections::endExecute(void)
 {
   if(execEp == (-1)) {
-    CpvAccess(_logPool)->add(END_PROCESSING,0,_threadEP,CmiWallTimer(),
+    CpvAccess(_logPool)->add(END_PROCESSING,0,_threadEP,TraceTimer(),
                              execEvent,CmiMyPe());
   } else {
-    CpvAccess(_logPool)->add(END_PROCESSING,0,execEp,CmiWallTimer(),
+    CpvAccess(_logPool)->add(END_PROCESSING,0,execEp,TraceTimer(),
                              execEvent,execPe);
   }
 }
@@ -363,7 +363,7 @@ void TraceProjections::endExecute(void)
 void TraceProjections::beginIdle(void)
 {
   if (isIdle == 0) {
-    CpvAccess(_logPool)->add(BEGIN_IDLE, 0, 0, CmiWallTimer(), 0, CmiMyPe());
+    CpvAccess(_logPool)->add(BEGIN_IDLE, 0, 0, TraceTimer(), 0, CmiMyPe());
     isIdle = 1;
   }
 }
@@ -371,29 +371,29 @@ void TraceProjections::beginIdle(void)
 void TraceProjections::endIdle(void)
 {
   if (isIdle) {
-    CpvAccess(_logPool)->add(END_IDLE, 0, 0, CmiWallTimer(), 0, CmiMyPe());
+    CpvAccess(_logPool)->add(END_IDLE, 0, 0, TraceTimer(), 0, CmiMyPe());
     isIdle = 0;
   }
 }
 
 void TraceProjections::beginPack(void)
 {
-  CpvAccess(_logPool)->add(BEGIN_PACK, 0, 0, CmiWallTimer(), 0, CmiMyPe());
+  CpvAccess(_logPool)->add(BEGIN_PACK, 0, 0, TraceTimer(), 0, CmiMyPe());
 }
 
 void TraceProjections::endPack(void)
 {
-  CpvAccess(_logPool)->add(END_PACK, 0, 0, CmiWallTimer(), 0, CmiMyPe());
+  CpvAccess(_logPool)->add(END_PACK, 0, 0, TraceTimer(), 0, CmiMyPe());
 }
 
 void TraceProjections::beginUnpack(void)
 {
-  CpvAccess(_logPool)->add(BEGIN_UNPACK, 0, 0, CmiWallTimer(), 0, CmiMyPe());
+  CpvAccess(_logPool)->add(BEGIN_UNPACK, 0, 0, TraceTimer(), 0, CmiMyPe());
 }
 
 void TraceProjections::endUnpack(void)
 {
-  CpvAccess(_logPool)->add(END_UNPACK, 0, 0, CmiWallTimer(), 0, CmiMyPe());
+  CpvAccess(_logPool)->add(END_UNPACK, 0, 0, TraceTimer(), 0, CmiMyPe());
 }
 
 void TraceProjections::beginCharmInit(void) {}
@@ -411,10 +411,10 @@ void TraceProjections::beginComputation(void)
     _threadChare = CkRegisterChare("dummy_thread_chare", 0);
     _threadEP = CkRegisterEp("dummy_thread_ep", 0, _threadMsg,_threadChare);
   }
-  CpvAccess(_logPool)->add(BEGIN_COMPUTATION, 0, 0, CmiWallTimer(), -1, -1);
+  CpvAccess(_logPool)->add(BEGIN_COMPUTATION, 0, 0, TraceTimer(), -1, -1);
 }
 
 void TraceProjections::endComputation(void)
 {
-  CpvAccess(_logPool)->add(END_COMPUTATION, 0, 0, CmiWallTimer(), -1, -1);
+  CpvAccess(_logPool)->add(END_COMPUTATION, 0, 0, TraceTimer(), -1, -1);
 }

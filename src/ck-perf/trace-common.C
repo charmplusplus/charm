@@ -34,6 +34,8 @@ void traceCommonInit(char **argv)
   CpvInitialize(int, traceOn);
   CpvInitialize(int, CtrLogBufSize);
   CpvInitialize(char*, traceRoot);
+  CpvInitialize(double, traceInitTime);
+  CpvAccess(traceInitTime) = CmiWallTimer();
   CpvAccess(traceOn) = 0;
   CpvAccess(CtrLogBufSize) = LogBufSize;
   CmiGetArgInt(argv,"+logsize",&CpvAccess(CtrLogBufSize));

@@ -41,7 +41,7 @@ void CkSummary_StartPhase(int phase)
 extern "C" 
 void CkSummary_MarkEvent(int eventType)
 {
-   CpvAccess(_logPool)->addEventType(eventType, CmiWallTimer());
+   CpvAccess(_logPool)->addEventType(eventType, TraceTimer());
 }
 
 
@@ -294,7 +294,7 @@ void TraceSummary::beginExecute(envelope *e)
 void TraceSummary::beginExecute(int event,int msgType,int ep,int srcPe, int mlen)
 {
   execEp=ep;
-  double t = CmiWallTimer();
+  double t = TraceTimer();
 //CmiPrintf("start: %f \n", start);
 
   start = t;
@@ -311,7 +311,7 @@ void TraceSummary::beginExecute(int event,int msgType,int ep,int srcPe, int mlen
 void TraceSummary::endExecute(void)
 {
 //  if (!flag) return;
-  double t = CmiWallTimer();
+  double t = TraceTimer();
   double ts = start;
   double nts = binStart;
 
@@ -392,7 +392,7 @@ void TraceSummary::endComputation(void)
      msgNum ++;
 
      binStart  += CpvAccess(binSize);
-     double t = CmiWallTimer();
+     double t = TraceTimer();
      double ts = binStart;
      while (ts < t)
      {
