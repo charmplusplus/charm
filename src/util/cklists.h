@@ -110,6 +110,7 @@ class CkVec {
     CkVec<T> &operator=(const CkVec<T> &src) {
       delete[] block;
       copyFrom(src);
+      return *this;
     }
 
     int &length(void) { return len; }
