@@ -1,0 +1,11 @@
+module NullLB {
+
+extern module LBDatabase;
+initcall void initNullLB(void);
+
+group NullLB {
+  entry void NullLB(void);  
+  entry void migrationsDone(void);
+};
+
+};
