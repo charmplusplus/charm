@@ -2,26 +2,27 @@
 goto begin
 syntax:
   echo ''
-  echo 'Usage: SUPER-INSTALL <make-target> <version> [charmc-options ...]'
+  echo 'Usage: SUPER-INSTALL <target> <version> [charmc-options ...]'
   echo ''
-  echo 'example make-targets: converse, charm, charm++'
+  echo 'targets: converse, charm, charm++'
   echo ''
-  echo 'example versions: net-sun, net-sol, cm5, paragon, etc...'
+  echo 'versions: ' `( cd src ; ls -1 | egrep -v '^Common' )`
   echo ''
   echo 'example charmc-options: -g -save -verbose'
   echo ''
   echo ''
   echo 'Note: This script is trivial.  It'
   echo ''
-  echo '    1. Creates directories $VERSION and $VERSION/tmp'
-  echo '    2. Copies src/Common/Makefile into $VERSION/tmp'
-  echo '    3. Does a 'make $PROGRAM OPTS="$*"' in $VERSION/tmp.'
+  echo ' 1. Creates directories <version> and <version>/tmp'
+  echo ' 2. Copies src/Common/Makefile into <version>/tmp'
+  echo ' 3. Does a "make <target> <version> OPTS=<charmc-options>" in <version>/tmp.'
   echo ''
-  echo ' That's all SUPER_INSTALL does.  The rest is handled by the Makefile.'
+  echo "That's all SUPER_INSTALL does.  The rest is handled by the Makefile."
   echo ''
   exit 1
 
 begin:
+  if ($#argv < 2) goto syntax
   set PROGRAM=$1 ; shift
   set VERSION=$1 ; shift
 
