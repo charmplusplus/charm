@@ -566,6 +566,11 @@ void _processNodeBocInitMsg(CkCoreState *ck,envelope *env)
 void _processHandler(void *converseMsg,CkCoreState *ck)
 {
   register envelope *env = (envelope *) converseMsg;
+#if CMK_RECORD_REPLAY
+  if (ck->watcher!=NULL) {
+    if (!ck->watcher->processMessage(env,ck)) return;
+  }
+#endif
   switch(env->getMsgtype()) {
     case NewChareMsg :
       ck->process();
@@ -1001,6 +1006,113 @@ void CkNodeGroupMsgPrep(int eIdx, void *msg, CkGroupID gID)
 void _ckModuleInit(void) {
 	index_skipCldHandler = CkRegisterHandler((CmiHandler)_skipCldHandler);
 }
+
+//------------------- Message Watcher (record/replay) ----------------
+
+CkMessageWatcher::~CkMessageWatcher() {}
+
+class CkMessageRecorder : public CkMessageWatcher {
+	FILE *f;
+public:
+	CkMessageRecorder(FILE *f_) :f(f_) {}
+	~CkMessageRecorder() {
+		fprintf(f,"-1 -1 -1");
+		fclose(f);
+	}
+	
+	virtual bool processMessage(envelope *env,CkCoreState *ck) {
+		fprintf(f,"%d %d %d\n",env->getSrcPe(),env->getTotalsize(),env->getEvent());
+		return true;
+	}
+};
+
+// #define REPLAYDEBUG(args) ckout<<"["<<CkMyPe()<<"] "<< args <<endl;
+#define REPLAYDEBUG(args) /* empty */
+
+class CkMessageReplay : public CkMessageWatcher {
+	FILE *f;
+	int nextPE, nextSize, nextEvent; //Properties of next message we need:
+	/// Read the next message we need from the file:
+	void getNext(void) {
+		if (3!=fscanf(f,"%d%d%d",&nextPE,&nextSize,&nextEvent)) {
+			// CkAbort("CkMessageReplay> Syntax error reading replay file");
+			nextPE=nextSize=nextEvent=-1; //No destructor->record file just ends in the middle!
+		}
+	}
+	/// If this is the next message we need, advance and return true.
+	bool isNext(envelope *env) {
+		if (nextPE!=env->getSrcPe()) return false;
+		if (nextEvent!=env->getEvent()) return false;
+		if (nextSize!=env->getTotalsize())
+			CkAbort("CkMessageReplay> Message size changed during replay");
+		return true;
+	}
+	
+	/// This is a (short) list of messages we aren't yet ready for:
+	CkQ<envelope *> delayed; 
+	
+	/// Try to flush out any delayed messages
+	void flush(void) {
+		int len=delayed.length();
+		for (int i=0;i<len;i++) {
+			envelope *env=delayed.deq();
+			if (isNext(env)) { /* this is the next message: process it */
+				REPLAYDEBUG("Dequeueing message: "<<env->getSrcPe()<<" "<<env->getTotalsize()<<" "<<env->getEvent())
+				CmiSyncSendAndFree(CkMyPe(),env->getTotalsize(),(char *)env);
+				return;
+			}
+			else /* Not ready yet-- put it back in the queue */
+				delayed.enq(env);
+		}
+	}
+	
+public:
+	CkMessageReplay(FILE *f_) :f(f_) { getNext(); }
+	~CkMessageReplay() {fclose(f);}
+	
+	virtual bool processMessage(envelope *env,CkCoreState *ck) {
+		if (isNext(env)) { /* This is the message we were expecting */
+			REPLAYDEBUG("Executing message: "<<env->getSrcPe()<<" "<<env->getTotalsize()<<" "<<env->getEvent())
+			getNext(); /* Advance over this message */
+			flush(); /* try to process queued-up stuff */
+			return true;
+		}
+		else /*!isNext(env) */ {
+			REPLAYDEBUG("Queueing message: "<<env->getSrcPe()<<" "<<env->getTotalsize()<<" "<<env->getEvent()
+				<<" because we wanted "<<nextPE<<" "<<nextSize<<" "<<nextEvent)
+			delayed.enq(env);
+			return false;
+		}
+	}
+};
+
+static FILE *openReplayFile(const char *permissions) {
+	char fName[200];
+	sprintf(fName,"ckreplay_%06d.log",CkMyPe());
+	FILE *f=fopen(fName,permissions);
+	if (f==NULL) {
+		CkPrintf("[%d] Could not open replay file '%s' with permissions '%w'\n",
+			CkMyPe(),fName,permissions);
+		CkAbort("openReplayFile> Could not open replay file");
+	}
+	return f;
+}
+
+void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
+	if (CmiGetArgFlagDesc(argv,"+record","Record message processing order"))
+		ck->watcher=new CkMessageRecorder(openReplayFile("w"));
+	if (CmiGetArgFlagDesc(argv,"+replay","Re-play recorded message stream"))
+		ck->watcher=new CkMessageReplay(openReplayFile("r"));
+}
+
+
+
+
+
+
+
+
+
 
 #include "CkMarshall.def.h"
 

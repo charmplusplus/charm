@@ -25,6 +25,7 @@
 #define _CHECK_VALID(p, msg) do { } while(0)
 #endif
 
+/// A set of "Virtual ChareID"'s
 class VidBlock {
     enum VidState {FILLED, UNFILLED};
     VidState state;
@@ -63,15 +64,30 @@ class VidBlock {
     }
 };
 
+class CkCoreState;
 
-// All the state that's useful to have on the receive side in the Charm Core (ck.C)
+/// Message watcher: for record/replay support
+class CkMessageWatcher {
+public:
+	virtual ~CkMessageWatcher();
+	/**
+	 * This message is about to be processed by Charm.
+	 * If this function returns false, the message will not be processed.
+	 */
+	virtual bool processMessage(envelope *env,CkCoreState *ck) =0;
+};
+
+/// All the state that's useful to have on the receive side in the Charm Core (ck.C)
 class CkCoreState {
 	GroupTable *groupTable;
 	QdState *qd;
 public:
+	CkMessageWatcher *watcher;
+	
 	CkCoreState() 
 		:groupTable(CkpvAccess(_groupTable)), 
-		 qd(CpvAccess(_qd)) {}
+		 qd(CpvAccess(_qd)) { watcher=NULL; }
+	~CkCoreState() { delete watcher;}
 	
 	inline GroupTable *getGroupTable() {
  		return groupTable;
@@ -85,6 +101,8 @@ public:
 };
 
 CkpvExtern(CkCoreState *, _coreState);
+
+void CkMessageWatcherInit(char **argv,CkCoreState *ck);
 
 
 extern void _processHandler(void *converseMsg,CkCoreState *ck);
