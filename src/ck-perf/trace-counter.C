@@ -865,7 +865,8 @@ void TraceCounter::beginExecute
   int msgType,
   int ep,
   int srcPe, 
-  int mlen
+  int mlen,
+  CmiObjId *idx
 )
 {
   DEBUGF(("%d/%d DEBUG: beginExecute EP %d\n", CmiMyPe(), CmiNumPes(), ep));

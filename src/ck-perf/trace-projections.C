@@ -618,13 +618,13 @@ void TraceProjections::beginExecute(envelope *e)
   }
 }
 
-void TraceProjections::beginExecute(int event,int msgType,int ep,int srcPe, int mlen)
+void TraceProjections::beginExecute(int event,int msgType,int ep,int srcPe, int mlen,CmiObjId *idx)
 {
   execEvent=event;
   execEp=ep;
   execPe=srcPe;
   _logPool->add(BEGIN_PROCESSING,msgType,ep,TraceTimer(),
-                             event,srcPe, mlen);
+                             event,srcPe, mlen, idx);
 }
 
 void TraceProjections::endExecute(void)

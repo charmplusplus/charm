@@ -497,7 +497,7 @@ void TraceSummary::beginExecute(envelope *e)
   }  
 }
 
-void TraceSummary::beginExecute(int event,int msgType,int ep,int srcPe, int mlen)
+void TraceSummary::beginExecute(int event,int msgType,int ep,int srcPe, int mlen, CmiObjId *idx)
 {
   if (execEp != INVALIDEP) {
     CmiPrintf("Warning: TraceSummary two consecutive BEGIN_PROCESSING!\n");

@@ -129,7 +129,8 @@ class TraceCounter : public Trace {
       int msgType, //! message type
       int ep,      //! Charm++ entry point (will correspond to sts file) 
       int srcPe,   //! Which PE originated the call
-      int ml=0);   //! message size
+      int ml=0,   //! message size
+      CmiObjId *idx=0);   //! array idx
     void endExecute();
     //! begin/end idle time for this pe
     void beginIdle();

@@ -51,7 +51,8 @@ class Trace {
       int msgType, // message type
       int ep,      // Charm++ entry point (will correspond to sts file) 
       int srcPe,   // Which PE originated the call
-      int ml)      // message size
+      int ml,      // message size
+      CmiObjId* idx)    // index
     { }
     virtual void endExecute(void) {}
     // begin/end idle time for this pe
@@ -113,7 +114,7 @@ public:
     inline void creationDone(int num=1) { ALLDO(creationDone(num)); }
     inline void beginExecute(envelope *env) {ALLDO(beginExecute(env));}
     inline void beginExecute(CmiObjId *tid) {ALLDO(beginExecute(tid));}
-    inline void beginExecute(int event,int msgType,int ep,int srcPe, int mlen) {ALLDO(beginExecute(event, msgType, ep, srcPe, mlen));}
+    inline void beginExecute(int event,int msgType,int ep,int srcPe, int mlen,CmiObjId *idx=NULL) {ALLDO(beginExecute(event, msgType, ep, srcPe, mlen,idx));}
     inline void endExecute(void) {ALLDO(endExecute());}
     inline void messageRecv(char *env, int pe) {ALLDO(messageRecv(env, pe));}
     inline void beginIdle(void) {ALLDO(beginIdle());}
@@ -167,8 +168,8 @@ CkpvExtern(int, traceOnPe);
 #define _TRACE_CREATION_N(env, num) _TRACE_ONLY(CkpvAccess(_traces)->creation(env,env->getEpIdx(), num))
 #define _TRACE_CREATION_DONE(num) _TRACE_ONLY(CkpvAccess(_traces)->creationDone(num))
 #define _TRACE_BEGIN_EXECUTE(env) _TRACE_ONLY(CkpvAccess(_traces)->beginExecute(env))
-#define _TRACE_BEGIN_EXECUTE_DETAILED(evt,typ,ep,src,mlen) \
-	_TRACE_ONLY(CkpvAccess(_traces)->beginExecute(evt,typ,ep,src,mlen))
+#define _TRACE_BEGIN_EXECUTE_DETAILED(evt,typ,ep,src,mlen,idx) \
+	_TRACE_ONLY(CkpvAccess(_traces)->beginExecute(evt,typ,ep,src,mlen,idx))
 #define _TRACE_END_EXECUTE() _TRACE_ONLY(CkpvAccess(_traces)->endExecute())
 #define _TRACE_MESSAGE_RECV(env, pe) _TRACE_ONLY(CkpvAccess(_traces)->messageRecv(env, pe))
 #define _TRACE_BEGIN_IDLE() _TRACE_ONLY(CkpvAccess(_traces)->beginIdle())
