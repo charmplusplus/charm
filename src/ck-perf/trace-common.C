@@ -9,11 +9,7 @@
 
 #if CMK_OPTIMIZE
 static int warned = 0;
-#define OPTIMIZE_WARNING       \
-  if (!warned) { warned=1;        \
-    CmiPrintf("\n\n!!!! Warning: tracing not available with CMK_OPTIMIZE!\n");\
-    return;
-  }
+#define OPTIMIZE_WARNING if (!warned) { warned=1;  CmiPrintf("\n\n!!!! Warning: tracing not available with CMK_OPTIMIZE!\n");  return;  }
 #else
 #define OPTIMIZE_WARNING /*empty*/
 #endif
