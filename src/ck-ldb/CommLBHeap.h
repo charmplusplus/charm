@@ -54,6 +54,7 @@ private:
   
 public:  
   ObjectHeap(int size);
+  ~ObjectHeap()  { delete [] h; }
   int numElements();
   int insert(ObjectRecord *);
   ObjectRecord *deleteMax();
