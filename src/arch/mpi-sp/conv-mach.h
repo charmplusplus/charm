@@ -10,6 +10,15 @@
 
 #include "conv-common.h"
 
+/*MPI Machine option: clean out the send buffer each time through
+  the scheduler's loop.  This ensures sends actually leave, which
+  on the SP speeds things up more than the extra wait slows things down.
+  See TMS entry for task "Communication Performance", 
+  11/01/2002, Orion Lawlor.
+*/
+#define CMK_NO_OUTSTANDING_SENDS                        1
+
+
 #define CMK_GETPAGESIZE_AVAILABLE                          0
 
 #define CMK_IS_HETERO                                      0
