@@ -53,14 +53,7 @@ clean:
 	rm -rf *.a *.def.h *.decl.h *.o $(MGC)/*.o \
 		SunWS_cache $(DEST) $(tests) headers
 
-# Trick gmake into compiling .C's into .o's.
-%.o: %.C
-	$(CHARMC) -c $< -o $@
-
-%.o: %.cpp
-	$(CHARMC) -c $< -o $@
-
-# Trick other makes into compiling .C's into .o's.
+# Trick make into compiling .C's into .o's.
 .SUFFIXES: .C .cpp
 
 .C.o:
