@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include "ccs-client.h"
 #include "ccs-client.c"
+#include "PythonCCS-client.h"
 #include <string.h>
 #include <string>
 #include <iostream>
@@ -24,14 +25,27 @@ int main (int argc, char** argv) {
 
   CcsConnect (&server, host, port, NULL);
 
+  PythonExecute wrapper((char*)code.c_str());
+  wrapper.setHighLevel(true);
+  wrapper.setKeepPrint(true);
+
   // if there is a third argument means kill the server
   char buffer[10];
   if (argc>3) {
     CcsSendRequest (&server, "kill", 0, 1, code.c_str());
   }
   else {
-    CcsSendRequest (&server, "pyCode", 0, code.length()+1, code.c_str());
+    CcsSendRequest (&server, "pyCode", 0, wrapper.size(), wrapper.toString());
     CcsRecvResponse (&server, 10, buffer, 100);
     printf("buffer: %d\n",*(int*)buffer);
+    PythonPrint request(buffer);
+    sleep(2);
+    CcsSendRequest (&server, "pyCode", 0, sizeof(request), &request);
+    CcsRecvResponse (&server, 100, buffer, 100);
+    printf("responce: %s\n",buffer);
+    sleep(2);
+    CcsSendRequest (&server, "pyCode", 0, sizeof(request), &request);
+    CcsRecvResponse (&server, 100, buffer, 100);
+    printf("responce: %x\n",*buffer);
   }
 }

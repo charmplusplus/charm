@@ -16,8 +16,8 @@ server: $(OBJS)
 server.decl.h: server.ci $(PYMODULE) ../../../../bin/charmxi
 	$(CHARMC) $<
 
-client: client.C
-	g++ $(INCLC) -o $@ $<
+client: client.C ../../../../tmp/libs/ck-libs/pythonCCS/PythonCCS-client.C
+	g++ $(INCLC) -o $@ $^
 
 clean:
 	rm -f *.decl.h *.def.h *.o server client charmrun *~
