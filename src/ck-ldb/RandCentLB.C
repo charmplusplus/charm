@@ -40,7 +40,6 @@ RandCentLB::RandCentLB()
 
 CmiBool RandCentLB::QueryBalanceNow(int _step)
 {
-  //  CkPrintf("[%d] Balancing on step %d\n",CkMyPe(),_step);
   return CmiTrue;
 }
 
@@ -51,7 +50,8 @@ void RandCentLB::work(CentralLB::LDStats* stats, int count)
       if (odata.migratable) {
 	const int dest = (int)(CrnDrand()*(count-1) + 0.5);
 	if (dest != stats->from_proc[obj]) {
-	  // CkPrintf("[%d] Obj %d migrating from %d to %d\n", CkMyPe(),obj,stats->from_proc[obj],dest);
+	  if (lb_debug)
+	    CkPrintf("[%d] Obj %d migrating from %d to %d\n", CkMyPe(),obj,stats->from_proc[obj],dest);
 	  stats->to_proc[obj] = dest;
         }
       }
