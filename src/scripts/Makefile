@@ -161,7 +161,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  Refiner.h RefinerComm.h ObjGraph.h heap.h elements.h CommLBHeap.h \
 	  BaseLB.h CentralLB.h CentralLBMsg.h RandCentLB.h RecBisectBfLB.h \
 	  RefineLB.h RefineCommLB.h OrbLB.h GreedyLB.h GreedyCommLB.h \
-	  Comm1LB.h manager.h MetisLB.h NborBaseLB.h \
+	  Comm1LB.h manager.h MetisLB.h NborBaseLB.h LBTopology.h \
 	  NeighborLB.h NeighborLBMsg.h WSLB.h GreedyRefLB.h RandRefLB.h \
           ComlibStrategy.h ComlibArrayListener.h \
 	  BlueGene.h middle.h middle-conv.h middle-blue.h \
@@ -441,7 +441,7 @@ LIBCK_CORE=trace-common.o init.o register.o qd.o ck.o main.o msgalloc.o \
 	   cklocation.o ckarray.o ckreduction.o ckarrayreductionmgr.o\
            tempo.o waitqd.o LBDatabase.o lbdb.o charisma.o ckcheckpoint.o\
            LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o \
-	   BaseLB.o CentralLB.o NborBaseLB.o WSLB.o \
+	   BaseLB.o CentralLB.o NborBaseLB.o WSLB.o LBTopology.o \
            ObjGraph.o graph.o  \
            Refiner.o RefinerComm.o bitvecset.o Set.o heap.o CommLBHeap.o \
 	   NullLB.o LBSimulation.o 	\

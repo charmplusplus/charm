@@ -484,7 +484,7 @@ LBDatabase.o: LBDatabase.C converse.h conv-config.h conv-common.h \
   ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h NullLB.decl.h BaseLB.decl.h LBDatabase.def.h \
   LBSimulation.h CentralLB.h BaseLB.h CentralLB.decl.h CentralLBMsg.h \
-  NullLB.h
+  LBTopology.h NullLB.h
 	$(CHARMC) -c -I. LBDatabase.C
 
 lbdb.o: lbdb.C converse.h conv-config.h conv-common.h conv-mach.h \
@@ -604,7 +604,7 @@ NborBaseLB.o: NborBaseLB.C charm++.h charm.h converse.h conv-config.h \
   charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
   ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h BaseLB.h NborBaseLB.h NborBaseLB.decl.h \
-  NeighborLBMsg.h NborBaseLB.def.h
+  NeighborLBMsg.h LBTopology.h NborBaseLB.def.h
 	$(CHARMC) -c -I. NborBaseLB.C
 
 WSLB.o: WSLB.C charm++.h charm.h converse.h conv-config.h conv-common.h \
@@ -622,6 +622,21 @@ WSLB.o: WSLB.C charm++.h charm.h converse.h conv-config.h conv-common.h \
   trace-bluegene.h BaseLB.h heap.h elements.h Set.h WSLB.h WSLB.decl.h \
   WSLB.def.h
 	$(CHARMC) -c -I. WSLB.C
+
+LBTopology.o: LBTopology.C charm++.h charm.h converse.h conv-config.h \
+  conv-common.h conv-mach.h conv-autoconfig.h conv-mach-opt.h pup_c.h \
+  conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
+  conv-trace.h persistent.h debug-conv.h pup.h middle.h middle-conv.h \
+  cklists.h ckbitvector.h ckstream.h init.h ckhashtable.h debug-charm.h \
+  CkMarshall.decl.h cksection.h ckcallback.h ckreduction.h \
+  CkReduction.decl.h cknodegroupreduction.h CkArrayReductionMgr.decl.h \
+  readonly.h ckarray.h cklocation.h LBDatabase.h lbdb.h LBDatabase.decl.h \
+  NullLB.decl.h BaseLB.decl.h CkLocation.decl.h CkArray.decl.h \
+  ComlibArrayListener.h ComlibStrategy.h CkFutures.decl.h charisma.h \
+  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
+  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  trace-bluegene.h LBTopology.h
+	$(CHARMC) -c -I. LBTopology.C
 
 ObjGraph.o: ObjGraph.C ObjGraph.h lbdb.h converse.h conv-config.h \
   conv-common.h conv-mach.h conv-autoconfig.h conv-mach-opt.h pup_c.h \
@@ -983,8 +998,8 @@ NeighborLB.o: NeighborLB.C charm++.h charm.h converse.h conv-config.h \
   charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
   ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h heap.h elements.h Set.h NeighborLB.h NborBaseLB.h \
-  BaseLB.h NborBaseLB.decl.h NeighborLBMsg.h NeighborLB.decl.h \
-  NeighborLB.def.h
+  BaseLB.h NborBaseLB.decl.h NeighborLBMsg.h LBTopology.h \
+  NeighborLB.decl.h NeighborLB.def.h
 	$(CHARMC) -c -I. NeighborLB.C
 
 GreedyRefLB.o: GreedyRefLB.C charm++.h charm.h converse.h conv-config.h \
