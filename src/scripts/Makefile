@@ -114,7 +114,7 @@ CHARMC=../bin/charmc $(CHARMOPTS) $(OPTS)
 
 SEQCHARMC=../bin/charmc -seq $(CHARMOPTS)
 
-NATIVECHARMC=../bin/charmc -native $(CHARMOPTS)
+NATIVECHARMC=../bin/charmc -host $(CHARMOPTS)
 
 CHARMXI=../bin/charmc -intrinsic $(OPTS)
 
