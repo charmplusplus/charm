@@ -694,7 +694,8 @@ char *nodetab_file_find()
   /* Find a nodes-file by looking under 'nodelist' in the current directory */
   if (probefile("./nodelist")) return strdup("./nodelist");
 #if defined(_WIN32) && !defined(__CYGWIN__)
-  nodetab_tempName=tmpnam(buffer);
+  tmpnam(buffer);
+  nodetab_tempName=strdup(buffer);
 #else /*UNIX*/
   if (getenv("HOME")) {
     sprintf(buffer,"%s/.nodelist",getenv("HOME"));
