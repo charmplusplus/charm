@@ -504,7 +504,6 @@ void element::refineLF()
   	   myRef.idx, myRef.cid, currentVolume, targetVolume);
   if ((currentVolume < targetVolume) || (currentVolume == 0.0) 
       || (targetVolume == 0.0)) { 
-    targetVolume = -1.0;
     return;
   }
 
@@ -1162,6 +1161,7 @@ LEsplitResult *element::LEsplit(elemRef root, elemRef parent,
   C->theElements[myNewElem.idx].faceElements[2] = myRef;
   C->theElements[myNewElem.idx].faceElements[3] = faceElements[b+c+d-3];
   C->theElements[myNewElem.idx].calculateVolume();
+  C->theElements[myNewElem.idx].setTargetVolume(targetVolume);
   mesh[faceElements[b+c+d-3].cid].updateFace(faceElements[b+c+d-3].idx, myRef, 
 					     myNewElem);
   faceElements[b+c+d-3] = myNewElem;
@@ -1529,7 +1529,7 @@ void element::refineCP()
   faceElements[a+b+d-3] = newElem1;
   faceElements[a+c+d-3] = newElem2;
   faceElements[b+c+d-3] = newElem3;
-  // pass target volume on to the two new elements
+  // pass target volume on to the three new elements
   C->theElements[newElem1.idx].setTargetVolume(targetVolume);
   C->theElements[newElem2.idx].setTargetVolume(targetVolume);
   C->theElements[newElem3.idx].setTargetVolume(targetVolume);

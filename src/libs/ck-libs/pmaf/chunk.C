@@ -68,40 +68,17 @@ void chunk::refiningElements()
     // continue trying to refine elements until nothing changes
     i = 0;
     modified = 0;
-    /*
     CkPrintf("Chunk %d in refiningElements loop\n", cid);
     while (i < numElements) { // loop through the elements
       if ((theElements[i].getTargetVolume() <= theElements[i].getVolume()) 
-	    && (theElements[i].getTargetVolume() >= 0.0)
-	  && (theElements[i].LEtest())) {
-	// the element needs refining
-	modified = 1; // something's bound to change
-	theElements[i].refineLE(); // refine the element
-      }
-      i++;
-      adjustMesh();
-    }
-    */
-    i=0;
-    while (i < numElements) { // loop through the elements
-      if ((theElements[i].getTargetVolume() <= theElements[i].getVolume()) 
 	  && (theElements[i].getTargetVolume() >= 0.0)) {
-	//&& (theElements[i].LFtest())) {
 	// the element needs refining
 	modified = 1; // something's bound to change
-	theElements[i].refineLF(); // refine the element
-      }
-      i++;
-      adjustMesh();
-    }
-    i=0;
-    while (i < numElements) { // loop through the elements
-      if ((theElements[i].getTargetVolume() <= theElements[i].getVolume()) 
-	  && (theElements[i].getTargetVolume() >= 0.0)
-	&& (theElements[i].CPtest())) {
-	// the element needs refining
-	modified = 1; // something's bound to change
-	theElements[i].refineCP(); // refine the element
+	if (theElements[i].LEtest())
+	  theElements[i].refineLE(); // refine the element
+	else if (theElements[i].LFtest())
+	  theElements[i].refineLF(); // refine the element
+	else theElements[i].refineCP(); // refine the element
       }
       i++;
       adjustMesh();
@@ -979,7 +956,7 @@ void chunk::refine()
   // this happens on all chunks!
   //  if (cid == 0) {
   for (int i=0; i<numElements; i++) {
-    theElements[i].setTargetVolume(theElements[i].getVolume()/50.0);
+    theElements[i].setTargetVolume(theElements[i].getVolume()/100.0);
   }
   //  }
 }
@@ -1008,16 +985,9 @@ void chunk::checkRefine()
   double vol, tvol;
   for (int i=0; i<numElements; i++) {
     vol = theElements[i].getVolume();
-    tvol = theElements[i].getTargetVolume();
-    if (tvol == -1) {
-      return;
-    }
-    else if (vol >= tvol) {
-      CkPrintf("WARNING: On chunk %d element %d is not adequately refined: volume=%f target=%f\n",
-	       cid, i, vol, tvol);
-    }
-    else if (tvol > vol) {
-      return;
+    if (vol >= 0.000416) {
+      CkPrintf("WARNING: On chunk %d element %d is not adequately refined: volume=%f\n",
+	       cid, i, vol);
     }
   }
 }
