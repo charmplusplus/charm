@@ -175,7 +175,6 @@ void CkArrayMap::populateInitial(int arrayHdl,int numElements,void *ctorMsg,CkAr
 }
 
 CkGroupID _RRMapID;
-
 /**
  *The default map object-- round-robin homes.  This is 
  * almost always what you want.
@@ -188,7 +187,7 @@ public:
 	  DEBC((AA"Creating RRMap\n"AB));
   // CkPrintf("Pe %d creating RRMap\n",CkMyPe());
   }
-  RRMap(CkMigrateMessage *m) {}
+  RRMap(CkMigrateMessage *m):CkArrayMap(m){}
   int procNum(int /*arrayHdl*/, const CkArrayIndex &i)
   {
 #if 1
@@ -203,6 +202,30 @@ public:
 	unsigned int hash=(i.hash()+739)%1280107;
 	return (hash % CkNumPes());
       }
+  }
+};
+
+class BlockMap : public RRMap
+{
+public:
+  BlockMap(void){
+	DEBC((AA"Creating BlockMap\n"AB));
+  }
+  BlockMap(CkMigrateMessage *m):RRMap(m){ }
+  void populateInitial(int arrayHdl,int numElements,void *ctorMsg,CkArrMgr *mgr){
+	if (numElements==0) {
+          CkFreeMsg(ctorMsg);
+          return;
+        }
+	int thisPe=CkMyPe();
+	int numPes=CkNumPes();
+	for (int i=0;i<numElements;i++) {
+		int binSize = (int)ceil((double)numElements/(double)numPes);
+		if (i/binSize==thisPe)
+			mgr->insertInitial(CkArrayIndex1D(i),CkCopyMsg(&ctorMsg));
+	}
+	mgr->doneInserting();
+	CkFreeMsg(ctorMsg);
   }
 };
 
@@ -1032,9 +1055,7 @@ CkLocMgr::CkLocMgr(CkMigrateMessage* m)
 void CkLocMgr::pup(PUP::er &p){
 	IrrGroup::pup(p);
 	p|mapID;
-CkPrintf("CkLocMgr::pup before puping lbdbID=%d\n",lbdbID.idx);
 	p|lbdbID;
-CkPrintf("CkLocMgr::pup after puping lbdbID=%d\n",lbdbID.idx);
 	mapID = _RRMapID;
 	if(p.isUnpacking()){
 		thisProxy=thisgroup;

@@ -27,6 +27,9 @@ module CkLocation {
   group [migratable] RRMap : CkArrayMap {
     entry RRMap(void);
   };
+  group [migratable] BlockMap : RRMap {
+    entry BlockMap(void);
+  };
 
   initnode void _propMapInit(void);
   initnode void _CkMigratable_initInfoInit(void);

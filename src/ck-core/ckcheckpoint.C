@@ -12,7 +12,7 @@ More documentation goes here...
 #include "ck.h"
 //#include "ckcheckpoint.h"
 
-#if 1
+#if 0
 #define DEBCHK CkPrintf
 #else
 #define DEBCHK //CkPrintf
@@ -84,7 +84,7 @@ void CkCheckpointMgr::Checkpoint(const char *dirname,CkCallback& cb){
 	if(CkMyPe()!=0)
 		DEBCHK("[%d]CkCheckpointMgr::Checkpoint DONE.\n",CkMyPe());
 	else{
-		DEBCHK("[%d]CkCheckpointMgr::Checkpoint DONE. Invoking callback.\n",CkMyPe());
+		CkPrintf("[%d]CkCheckpointMgr::Checkpoint DONE. Invoking callback.\n",CkMyPe());
 		cb.send();
 	}
 }
@@ -92,7 +92,7 @@ void CkCheckpointMgr::Checkpoint(const char *dirname,CkCallback& cb){
 void CkStartCheckpoint(char* dirname,const CkCallback& cb){
 	int i;
 	char filename[1024];
-	CkPrintf("CkStartCheckpoint() making dir %s\n",dirname);
+	CkPrintf("Checkpoint starting in %s\n",dirname);
 	CmiMkdir(dirname);
 	
 	// save readonlys, and callback BTW
