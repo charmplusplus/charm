@@ -179,11 +179,13 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  ComlibLearner.h $(UTILHEADERS) \
 	  tempo.h waitqd.h LBDatabase.h lbdb.h LBProfit.h LBDBManager.h	\
 	  LBComm.h LBOM.h LBObj.h LBMachineUtil.h LBAgent.h \
-	  Refiner.h RefinerApprox.h RefinerComm.h ObjGraph.h heap.h elements.h CommLBHeap.h \
+	  Refiner.h RefinerApprox.h RefinerComm.h ObjGraph.h heap.h \
+          elements.h CommLBHeap.h topology.h manager.h \
 	  BaseLB.h CentralLB.h CentralLBMsg.h RandCentLB.h RecBisectBfLB.h \
-	  RefineLB.h RefineKLB.h RefineCommLB.h OrbLB.h GreedyLB.h GreedyCommLB.h \
-          GreedyAgentLB.h Comm1LB.h MetisLB.h RotateLB.h GridCommLB.h \
-          DummyLB.h NborBaseLB.h HybridLB.h HybridLBMsg.h topology.h manager.h \
+	  RefineLB.h RefineKLB.h RefineCommLB.h OrbLB.h \
+	  GreedyLB.h GreedyCommLB.h GreedyAgentLB.h Comm1LB.h MetisLB.h \
+          RotateLB.h GridCommLB.h DummyLB.h  \
+	  NborBaseLB.h HybridBaseLB.h HybridLB.h HybridLBMsg.h \
 	  NeighborLB.h NeighborCommLB.h NeighborLBMsg.h WSLB.h \
 	  BlueGene.h middle.h middle-conv.h middle-blue.h \
           CkMarshall.decl.h CkArray.decl.h CkLocation.decl.h 	\
@@ -191,12 +193,12 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
           tempo.decl.h waitqd.decl.h \
           CkFutures.decl.h CkCheckpoint.decl.h CkMemCheckpoint.decl.h \
           LBDatabase.decl.h CentralLB.decl.h ComboCentLB.decl.h NullLB.decl.h \
-          RandCentLB.decl.h RecBisectBfLB.decl.h BaseLB.decl.h \
-          MetisLB.decl.h DummyLB.decl.h RefineLB.decl.h RefineKLB.decl.h RefineCommLB.decl.h  \
-          OrbLB.decl.h GreedyLB.decl.h GreedyCommLB.decl.h Comm1LB.decl.h \
-          GreedyAgentLB.decl.h RotateLB.decl.h NborBaseLB.decl.h 	\
-	  NeighborLB.decl.h HybridLB.decl.h \
-	  NeighborCommLB.decl.h WSLB.decl.h GridCommLB.decl.h EveryLB.decl.h \
+          RandCentLB.decl.h RecBisectBfLB.decl.h BaseLB.decl.h MetisLB.decl.h \
+          DummyLB.decl.h RotateLB.decl.h RefineLB.decl.h RefineKLB.decl.h  \
+          RefineCommLB.decl.h OrbLB.decl.h GreedyLB.decl.h GreedyCommLB.decl.h \
+          Comm1LB.decl.h GreedyAgentLB.decl.h GridCommLB.decl.h \
+          NborBaseLB.decl.h NeighborLB.decl.h NeighborCommLB.decl.h \
+          HybridBaseLB.decl.h HybridLB.decl.h WSLB.decl.h EveryLB.decl.h \
           charisma.decl.h TraceSummary.decl.h BlueGene.decl.h \
 	  comlib.decl.h ComlibManager.h DummyStrategy.h	\
 	  DirectMulticastStrategy.h RingMulticastStrategy.h	\
@@ -534,10 +536,10 @@ LIBCK_CORE=trace-common.o tracef.o init.o register.o qd.o ck.o main.o 	\
 	   cklocation.o ckarray.o ckreduction.o ckarrayreductionmgr.o\
            tempo.o waitqd.o LBDatabase.o lbdb.o lbdbf.o charisma.o ckobjQ.o  \
 	   LBAgent.o LBProfit.o ckcheckpoint.o ckmemcheckpoint.o\
-           LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o \
-	   BaseLB.o CentralLB.o CentralPredictor.o NborBaseLB.o WSLB.o \
-           ObjGraph.o graph.o  \
-           Refiner.o RefinerApprox.o RefinerComm.o bitvecset.o Set.o heap.o CommLBHeap.o \
+           LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o CentralPredictor.o \
+	   BaseLB.o CentralLB.o HybridBaseLB.o NborBaseLB.o WSLB.o \
+           ObjGraph.o graph.o Refiner.o RefinerApprox.o  \
+           RefinerComm.o bitvecset.o Set.o heap.o CommLBHeap.o \
 	   NullLB.o LBSimulation.o $(COMLIB_CORE_OBJS) \
 	   charmProjections.o
 
@@ -640,6 +642,11 @@ NborBaseLB.def.h: NborBaseLB.decl.h
 
 NborBaseLB.decl.h: NborBaseLB.ci charmxi
 	$(CHARMXI) NborBaseLB.ci
+
+HybridBaseLB.def.h: HybridBaseLB.decl.h
+
+HybridBaseLB.decl.h: HybridBaseLB.ci charmxi
+	$(CHARMXI) HybridBaseLB.ci
 
 
 ## Tracing libraries (profiling, -tracemode)
