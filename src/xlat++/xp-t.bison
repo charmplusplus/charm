@@ -1673,7 +1673,7 @@ aggregate_name_elaboration:
 
 		fprintf(outfile,"\nvoid unpack() \n\t{\n") ;
 		for ( i=0; i<thismsg->numvarsize; i++ ) 
-			fprintf(outfile,"\n\t%s = (%s *) ((char *)(&%s) + (int)(%s));\n",vs[i].name,vs[i].type,vs[i].name,vs[i].name) ;
+			fprintf(outfile,"\n\t%s = (%s *) ((char *)(&%s) + (size_t)(%s));\n",vs[i].name,vs[i].type,vs[i].name,vs[i].name) ;
 		fprintf(outfile,"}\n") ;
 
 		/* Output the operator delete */
