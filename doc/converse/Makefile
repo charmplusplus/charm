@@ -12,7 +12,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 1.7  1995-11-15 18:01:22  brunner
+# Revision 1.8  1996-06-14 21:38:25  jyelon
+# This thing doesn't work at all.  Restructured.
+#
+# Revision 1.7  1995/11/15 18:01:22  brunner
 # Added cpvmacros.tex to Makefile so make co works.
 #
 # Revision 1.6  1995/11/01  22:04:21  milind
@@ -39,30 +42,24 @@
 #
 ############################################################################
 
-TEXFILES=manual.tex threads.tex queue.tex scheduler.tex ldb.tex cmi.tex thsync.tex msgmgr.tex cpvmacros.tex
+TEXFILES=cmi.tex cpm.tex cpvmacros.tex index.tex ldb.tex manual.tex\
+msgmgr.tex queue.tex scheduler.tex simulator.tex threads.tex\
+thsync.tex
 
-all: manual.ps manual/manual.html
-
-ps-preview: manual.ps
-	ghostview manual.ps
-
-html-preview: manual/manual.html
-	netscape manual/manual.html
-
-manual/manual.html: $(TEXFILES)
-	latex2html manual.tex
-
-manual.ps: manual.dvi
-	dvips -o manual.ps manual.dvi
-	cp manual.ps /charm/manuals-comp/converse.manual/
-
-manual.dvi: $(TEXFILES)
+all:
 	rm -f index.tex
 	echo > index.tex
 	latex manual.tex
-	texindex manual
-	mv manual.ind index.tex
-	latex manual.tex
+	#texindex manual
+	#mv manual.ind index.tex
+	dvips -o manual.ps manual.dvi
+	cp manual.ps /charm/manuals-comp/converse.manual/
+
+pre: all
+	ghostview manual.ps
+
+html: all
+	latex2html manual.tex
 
 co:
 	co Makefile $(TEXFILES)
@@ -70,3 +67,4 @@ co:
 clean:	
 	rm -f *.aux *.log *.dvi *.ps *.idx *.toc *~ index.tex
 	rm -rf manual
+
