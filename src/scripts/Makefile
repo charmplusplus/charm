@@ -179,9 +179,9 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  ComlibLearner.h $(UTILHEADERS) \
 	  tempo.h waitqd.h LBDatabase.h lbdb.h LBProfit.h LBDBManager.h	\
 	  LBComm.h LBOM.h LBObj.h LBMachineUtil.h LBAgent.h \
-	  Refiner.h RefinerComm.h ObjGraph.h heap.h elements.h CommLBHeap.h \
+	  Refiner.h RefinerApprox.h RefinerComm.h ObjGraph.h heap.h elements.h CommLBHeap.h \
 	  BaseLB.h CentralLB.h CentralLBMsg.h RandCentLB.h RecBisectBfLB.h \
-	  RefineLB.h RefineCommLB.h OrbLB.h GreedyLB.h GreedyCommLB.h \
+	  RefineLB.h RefineKLB.h RefineCommLB.h OrbLB.h GreedyLB.h GreedyCommLB.h \
           GreedyAgentLB.h Comm1LB.h MetisLB.h RotateLB.h GridCommLB.h \
           DummyLB.h NborBaseLB.h topology.h manager.h \
 	  NeighborLB.h NeighborCommLB.h NeighborLBMsg.h WSLB.h \
@@ -192,7 +192,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
           CkFutures.decl.h CkCheckpoint.decl.h CkMemCheckpoint.decl.h \
           LBDatabase.decl.h CentralLB.decl.h ComboCentLB.decl.h NullLB.decl.h \
           RandCentLB.decl.h RecBisectBfLB.decl.h BaseLB.decl.h \
-          MetisLB.decl.h DummyLB.decl.h RefineLB.decl.h RefineCommLB.decl.h  \
+          MetisLB.decl.h DummyLB.decl.h RefineLB.decl.h RefineKLB.decl.h RefineCommLB.decl.h  \
           OrbLB.decl.h GreedyLB.decl.h GreedyCommLB.decl.h Comm1LB.decl.h \
           GreedyAgentLB.decl.h		\
 	  RotateLB.decl.h NborBaseLB.decl.h NeighborLB.decl.h \
@@ -537,7 +537,7 @@ LIBCK_CORE=trace-common.o tracef.o init.o register.o qd.o ck.o main.o 	\
            LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o \
 	   BaseLB.o CentralLB.o CentralPredictor.o NborBaseLB.o WSLB.o \
            ObjGraph.o graph.o  \
-           Refiner.o RefinerComm.o bitvecset.o Set.o heap.o CommLBHeap.o \
+           Refiner.o RefinerApprox.o RefinerComm.o bitvecset.o Set.o heap.o CommLBHeap.o \
 	   NullLB.o LBSimulation.o $(COMLIB_CORE_OBJS) \
 	   charmProjections.o
 
