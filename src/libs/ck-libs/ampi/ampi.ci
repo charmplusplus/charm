@@ -1,15 +1,11 @@
 module ampi {
   extern module ComlibModule;
-  readonly CkGroupID dmid;
-  
   message AmpiMsg;
  
   initnode void ampiNodeInit(void);
-  readonly mpi_comm_worlds mpi_worlds;
-  readonly int mpi_nworlds;
 
   array[1D] ampiParent {
-    entry ampiParent(int universeNo,CProxy_TCharm threads_);
+    entry ampiParent(int universeNo,CProxy_TCharm threads_,CProxy_ComlibManager comlib_);
   };
   array[1D] ampi {
     entry ampi();
@@ -18,5 +14,9 @@ module ampi {
     entry void reduceResult(CkReductionMsg *m);
     entry void splitPhase1(CkReductionMsg *msg);
     entry void commCreatePhase1(CkReductionMsg *msg);
+  };
+  group ampiWorlds {
+    entry ampiWorlds(ampiCommStruct nextWorld);
+    entry void add(ampiCommStruct nextWorld);
   };
 };

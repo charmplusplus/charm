@@ -10,7 +10,8 @@
 
 #include "ampi.h"
 #include "charm++.h"
-#include <string.h> // for strlen
+#include "ComlibManager.h" /* for ComlibManager */
+#include <string.h> /* for strlen */
 
 class CProxy_ampi;
 class CProxyElement_ampi;
@@ -489,6 +490,7 @@ for its children, which are bound to it.
 */
 class ampiParent : public CBase_ampiParent {
     CProxy_TCharm threads;
+    CProxy_ComlibManager comlib;
     TCharm *thread;
     void prepareCtv(void);
 
@@ -526,7 +528,7 @@ class ampiParent : public CBase_ampiParent {
     }
 
 public:
-    ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_);
+    ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_,CProxy_ComlibManager comlib_);
     ampiParent(CkMigrateMessage *msg);
     void ckJustMigrated(void);
     ~ampiParent();
@@ -591,6 +593,13 @@ public:
     inline int getRank(const MPI_Group group){
       groupStruct vec = group2vec(group);
       return getPosOp(thisIndex,vec);
+    }
+    
+    inline ComlibManager *getComlib(void) { 
+    	return comlib.ckLocalBranch(); 
+    }
+    int hasWorld(void) const {
+        return worldPtr!=NULL;
     }
 
     /// this is assuming no inter-communicator
@@ -664,6 +673,7 @@ class ampi : public CBase_ampi {
     inline int getSize(void) const {return myComm.getSize();}
     inline MPI_Comm getComm(void) const {return myComm.getComm();}
     inline CProxy_ampi getProxy(void) const {return thisArrayID;}
+    inline ComlibManager *getComlib(void) { return parent->getComlib(); }
 
     CkDDT *getDDT(void) {return parent->myDDT;}
   public:

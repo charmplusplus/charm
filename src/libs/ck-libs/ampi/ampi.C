@@ -7,15 +7,13 @@
 
 #define exit exit /*Supress definition of exit in ampi.h*/
 #include <iostream.h>
-#include "ComlibManager.h"
 #include "ampiimpl.h"
+#include "tcharm.h"
 #include "../../../ampiEvents.h" /*** for trace generation for projector *****/
-
-CkGroupID dmid;
-char *comlibStrat;
 
 /* change this define to "x" to trace all send/recv's */
 #define MSG_ORDER_DEBUG(x) /* empty */
+#define STARTUP_DEBUG(x) ckout<<"[pe "<<CkMyPe()<<"] "<< x <<endl;
 
 //------------- startup -------------
 static mpi_comm_worlds mpi_worlds;
@@ -256,6 +254,7 @@ CDECL void MPI_Fallback_Main(int argc,char **argv)
   FTN_NAME(MPI_MAIN,mpi_main)();
 }
 
+void ampiCreateMain(MPI_MainFn mainFn, const char *name,int nameLen);
 /*Startup routine used if user *doesn't* write
   a TCHARM_User_setup routine.
  */
@@ -265,7 +264,7 @@ CDECL void MPI_Setup_Switch(void) {
   MPI_Setup();
   if (_ampi_fallback_setup_count==2)
   { //Missing MPI_Setup in both C and Fortran:
-    MPI_Register_main(MPI_Fallback_Main,"default");
+    ampiCreateMain(MPI_Fallback_Main,"default",strlen("default"));
   }
 }
 
@@ -326,59 +325,43 @@ PUPmarshall(MPI_threadstart_t);
 
 extern "C" void MPI_threadstart(void *data)
 {
+	STARTUP_DEBUG("MPI_threadstart")
 	MPI_threadstart_t t;
 	pupFromBuf(data,t);
 	t.start();
 }
 
-void ampiCreateMain(MPI_MainFn mainFn)
+void ampiCreateMain(MPI_MainFn mainFn, const char *name,int nameLen)
 {
+	STARTUP_DEBUG("ampiCreateMain")
 	int _nchunks=TCHARM_Get_num_chunks();
-	//Make a new threads array
+	//Make a new threads array:
 	MPI_threadstart_t s(mainFn);
 	memBuf b; pupIntoBuf(b,s);
 	TCHARM_Create_data( _nchunks,MPI_threadstart,
 			  b.getData(), b.getSize());
 }
 
-static void ampiAttach(const char *name,int namelen)
+/* TCharm Semaphore ID for AMPI startup */
+#define AMPI_TCHARM_SEMAID 0x00A34100 /* __AMPI__ */
+
+static CProxy_ampiWorlds ampiWorldsGroup;
+
+/*
+Called from MPI_Init, a collective initialization call:
+ creates a new AMPI array and attaches it to the current
+ set of TCHARM threads.
+*/
+static ampi *ampiInit(char **argv)
 {
-	TCharmSetupCookie *tc=TCharmSetupCookie::get();
-	if (!tc->hasThreads())
-		CkAbort("You must create a thread array with TCharmCreate before calling MPI_Attach!\n");
-	int _nchunks=tc->getNumElements();
-	CkArrayID threads=tc->getThreads();
-
-	//Allocate the next communicator
-	if(mpi_nworlds == MPI_MAX_COMM_WORLDS)
-	{
-		CkAbort("AMPI> Number of registered comm_worlds exceeded limit.\n");
-	}
-	int new_idx=mpi_nworlds++;
-	MPI_Comm new_world=MPI_COMM_WORLD+1+new_idx;
-
-	//Create and attach the ampiParent array
-        CkArrayOptions opts(_nchunks);
-        opts.bindTo(threads);
-	CProxy_ampiParent parent;
-	parent=CProxy_ampiParent::ckNew(new_world,threads,opts);
-	tc->addClient(parent);
-
-	//Make a new ampi array
-	CkArrayID empty;
-	CkPupBasicVec<int> _indices;
-	for(int i=0;i<_nchunks;i++) _indices.push_back(i);
-	ampiCommStruct emptyComm(new_world,empty,_nchunks,_indices);
-	CProxy_ampi arr;
-	arr=CProxy_ampi::ckNew(parent,emptyComm,opts);
-
-	//Record info. in the mpi_worlds array
-	mpi_worlds[new_idx].comm=ampiCommStruct(new_world,arr,_nchunks);
-	mpi_worlds[new_idx].setName(name,namelen);
-
-	// CommLib support
-	int strat = USE_DIRECT;
-	if(0!=CmiGetArgString(CkGetArgv(), "+strategy", &comlibStrat)){
+  STARTUP_DEBUG("ampiInit> begin")
+  ampi *ptr=(ampi *)TCharm::get()->semaPeek(AMPI_TCHARM_SEMAID);
+  if (ptr) return ptr; /* Already attached */
+  
+  // Parse command-line arguments (Commlib)
+  int strat = USE_DIRECT;
+  char *comlibStrat;
+  if(0!=CmiGetArgString(argv, "+strategy", &comlibStrat)){
 		//CkPrintf("AMPI: Comlib initialized with %s\n",comlibStrat);
 		if(0==strcmp(comlibStrat,"USE_DIRECT")){
 			strat = USE_DIRECT;
@@ -389,16 +372,75 @@ static void ampiAttach(const char *name,int namelen)
 		} else if(0==strcmp(comlibStrat,"USE_HYPERCUBE")){
 			strat = USE_HYPERCUBE;
 		}
+  }
+  
+  if (TCHARM_Element()==0) 
+  { /* I'm responsible for building the arrays: */
+	STARTUP_DEBUG("ampiInit> creating arrays")
+	
+// FIXME: Need to serialize global communicator allocation in one place.
+	//Allocate the next communicator
+	if(mpi_nworlds == MPI_MAX_COMM_WORLDS)
+	{
+		CkAbort("AMPI> Number of registered comm_worlds exceeded limit.\n");
 	}
-	dmid = CProxy_ComlibManager::ckNew(strat, 1);
-	CProxy_ComlibManager(dmid).ckLocalBranch()->createId();
+	int new_idx=mpi_nworlds;
+	MPI_Comm new_world=MPI_COMM_WORLD+1+new_idx;
+
+	CProxy_ComlibManager comlib = CProxy_ComlibManager::ckNew(strat, 1);
+	comlib.ckLocalBranch()->createId();
+	
+	//Create and attach the ampiParent array
+	CkArrayID threads; int _nchunks;
+        CkArrayOptions opts=TCHARM_Attach_start(&threads,&_nchunks);
+	CProxy_ampiParent parent;
+	parent=CProxy_ampiParent::ckNew(new_world,threads,comlib,opts);
+
+	//Make a new ampi array
+	CkArrayID empty;
+	CkPupBasicVec<int> _indices;
+	for(int i=0;i<_nchunks;i++) _indices.push_back(i);
+	ampiCommStruct emptyComm(new_world,empty,_nchunks,_indices);
+	CProxy_ampi arr;
+	arr=CProxy_ampi::ckNew(parent,emptyComm,opts);
+
+	//Broadcast info. to the mpi_worlds array
+	// FIXME: remove race condition from MPI_COMM_UNIVERSE broadcast
+	ampiCommStruct newComm(new_world,arr,_nchunks);
+	if (ampiWorldsGroup.ckGetGroupID().isZero())
+		ampiWorldsGroup=CProxy_ampiWorlds::ckNew(newComm);
+	else
+		ampiWorldsGroup.add(newComm);
+	STARTUP_DEBUG("ampiInit> arrays created")
+  }
+  
+  // Find our ampi object:
+  ptr=(ampi *)TCharm::get()->semaGets(AMPI_TCHARM_SEMAID);
+  STARTUP_DEBUG("ampiInit> complete")
+  
+  return ptr;
 }
 
+/// This group is used to broadcast the MPI_COMM_UNIVERSE communicators.
+class ampiWorlds : public CBase_ampiWorlds {
+public:
+    ampiWorlds(const ampiCommStruct &nextWorld) {
+        ampiWorldsGroup=thisgroup;
+        add(nextWorld);
+    }
+    void add(const ampiCommStruct &nextWorld) {
+        int new_idx=nextWorld.getComm()-(MPI_COMM_WORLD+1);
+        mpi_worlds[new_idx].comm=nextWorld;
+	if (mpi_nworlds<=new_idx) mpi_nworlds=new_idx+1;
+	STARTUP_DEBUG("ampiInit> listed MPI_COMM_UNIVERSE "<<new_idx)
+    }
+};
+
 //-------------------- ampiParent -------------------------
-ampiParent::ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_)
+ampiParent::ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_,CProxy_ComlibManager comlib_)
+	:threads(threads_), comlib(comlib_), worldNo(worldNo_)
 {
-  worldNo=worldNo_;
-  threads=threads_;
+  STARTUP_DEBUG("ampiParent> starting up")
   thread=NULL;
   worldPtr=NULL;
   myDDT=&myDDTsto;
@@ -412,6 +454,7 @@ ampiParent::ampiParent(CkMigrateMessage *msg):CBase_ampiParent(msg) {
 void ampiParent::pup(PUP::er &p) {
   ArrayElement1D::pup(p);
   p|threads;
+  p|comlib;
   p|worldStruct;
   myDDT->pup(p);
   p|splitComm;
@@ -423,6 +466,7 @@ void ampiParent::prepareCtv(void) {
   thread=threads[thisIndex].ckLocal();
   if (thread==NULL) CkAbort("AMPIParent cannot find its thread!\n");
   CtvAccessOther(thread->getThread(),ampiPtr) = this;
+  STARTUP_DEBUG("ampiParent> found TCharm")
 }
 
 void ampiParent::ckJustMigrated(void) {
@@ -451,12 +495,14 @@ TCharm *ampiParent::registerAmpi(ampi *ptr,ampiCommStruct s,bool forMigration)
      _indices.push_back(thisIndex);
      selfStruct = ampiCommStruct(MPI_COMM_SELF,s.getProxy(),1,_indices);
   }
-
+  
   if (!forMigration)
   { //Register the new communicator:
      MPI_Comm comm = s.getComm();
-     if (comm>=MPI_COMM_WORLD) { //We finally have our COMM_WORLD--start the thread
-       thread->ready();
+     STARTUP_DEBUG("ampiParent> registering new communicator "<<comm)
+     if (comm>=MPI_COMM_WORLD) { 
+       // Pass the new ampi to the waiting ampiInit
+       thread->semaPut(AMPI_TCHARM_SEMAID, ptr);
      } else if (isSplit(comm)) {
        splitChildRegister(s);
      } else if (isGroup(comm)) {
@@ -519,6 +565,7 @@ void ampi::ckJustMigrated(void)
 }
 
 void ampi::findParent(bool forMigration) {
+        STARTUP_DEBUG("ampi> finding my parent")
 	parent=parentProxy[thisIndex].ckLocal();
 	if (parent==NULL) CkAbort("AMPI can't find its parent!");
 	thread=parent->registerAmpi(this,myComm,forMigration);
@@ -894,12 +941,18 @@ ampi::bcastraw(void* buf, int len, CkArrayID aid)
 
 static ampiParent *getAmpiParent(void) {
   ampiParent *p = CtvAccess(ampiPtr);
+#ifndef CMK_OPTIMIZE
   if (p==NULL) CkAbort("Cannot call MPI routines before AMPI is initialized.\n");
+#endif
   return p;
 }
 
 static ampi *getAmpiInstance(MPI_Comm comm) {
-  return getAmpiParent()->comm2ampi(comm);
+  ampi *ptr=getAmpiParent()->comm2ampi(comm);
+#ifndef CMK_OPTIMIZE
+  if (ptr==NULL) CkAbort("AMPI's getAmpiInstance> null pointer\n");
+#endif
+  return ptr;
 }
 
 CDECL void MPI_Migrate(void)
@@ -908,22 +961,32 @@ CDECL void MPI_Migrate(void)
   TCHARM_Migrate();
 }
 
-CDECL int MPI_Init(int *argc, char*** argv)
+CDECL int MPI_Init(int *p_argc, char*** p_argv)
 {
   if (nodeinit_has_been_called) {
     AMPIAPI("MPI_Init");
-    return 0;
+    char **argv;
+    if (p_argv) argv=*p_argv;
+    else argv=CkGetArgv();
+    ampiInit(argv);
+    if (p_argc) *p_argc=CmiGetArgc(argv);
   }
   else
   { /* Charm hasn't been started yet! */
-    CkAbort("Charm Uninitialized!");
+    CkAbort("AMPI_Init> Charm is not initialized!");
   }
+  return 0;
 }
 
 CDECL int MPI_Initialized(int *isInit)
 {
   AMPIAPI("MPI_Initialized");
-  *isInit=nodeinit_has_been_called;
+  if (nodeinit_has_been_called) {
+  	*isInit=(NULL!=CtvAccess(ampiPtr));
+  } 
+  else /* !nodeinit_has_been_called */ {
+  	*isInit=nodeinit_has_been_called;
+  }
   return 0;
 }
 
@@ -1833,8 +1896,8 @@ int MPI_Alltoallv(void *sendbuf, int *sendcounts, int *sdispls,
 
   // commlib support
   CProxy_ampi arrproxy = ptr->getProxy();
-  arrproxy.ckDelegate(CProxy_ComlibManager(dmid).ckLocalBranch());
-  (CProxy_ComlibManager(dmid).ckLocalBranch())->beginIteration();
+  arrproxy.ckDelegate(ptr->getComlib());
+  ptr->getComlib()->beginIteration();
   for(i=0;i<size;i++) {
     ptr->delesend(MPI_GATHER_TAG,ptr->getRank(),((char*)sendbuf)+(itemsize*sdispls[i]),sendcounts[i],
                   sendtype, i, comm, arrproxy);
@@ -1844,7 +1907,7 @@ int MPI_Alltoallv(void *sendbuf, int *sendcounts, int *sdispls,
     _LOG_E_AMPI_MSG_SEND(MPI_GATHER_TAG,i,sendcounts[i],size)
 #endif
   }
-  (CProxy_ComlibManager(dmid).ckLocalBranch())->endIteration();
+  ptr->getComlib()->endIteration();
 
   MPI_Status status;
   dttype = ptr->getDDT()->getType(recvtype) ;
@@ -1878,8 +1941,8 @@ int MPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 
   // commlib support
   CProxy_ampi arrproxy = ptr->getProxy();
-  arrproxy.ckDelegate(CProxy_ComlibManager(dmid).ckLocalBranch());
-  (CProxy_ComlibManager(dmid).ckLocalBranch())->beginIteration();
+  arrproxy.ckDelegate(ptr->getComlib());
+  ptr->getComlib()->beginIteration();
   for(i=0;i<size;i++) {
     ptr->delesend(MPI_GATHER_TAG, ptr->getRank(), ((char*)sendbuf)+(itemsize*i), sendcount,
                   sendtype, i, comm, arrproxy);
@@ -1889,7 +1952,7 @@ int MPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
     _LOG_E_AMPI_MSG_SEND(MPI_GATHER_TAG,i,sendcount,size)
 #endif
   }
-  (CProxy_ComlibManager(dmid).ckLocalBranch())->endIteration();
+  ptr->getComlib()->endIteration();
 
   MPI_Status status;
   dttype = ptr->getDDT()->getType(recvtype) ;
@@ -1923,8 +1986,8 @@ int MPI_Ialltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 
   // commlib support
   CProxy_ampi arrproxy = ptr->getProxy();
-  arrproxy.ckDelegate(CProxy_ComlibManager(dmid).ckLocalBranch());
-  (CProxy_ComlibManager(dmid).ckLocalBranch())->beginIteration();
+  arrproxy.ckDelegate(ptr->getComlib());
+  ptr->getComlib()->beginIteration();
   for(i=0;i<size;i++) {
     ptr->delesend(MPI_GATHER_TAG, ptr->getRank(), ((char*)sendbuf)+(itemsize*i), sendcount,
                   sendtype, i, comm, arrproxy);
@@ -1934,7 +1997,7 @@ int MPI_Ialltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
     _LOG_E_AMPI_MSG_SEND(MPI_GATHER_TAG,i,sendcount,size)
 #endif
   }
-  (CProxy_ComlibManager(dmid).ckLocalBranch())->endIteration();
+  ptr->getComlib()->endIteration();
 
   // copy+paste from MPI_Irecv
   CkVec<AmpiRequest *>* reqs = getReqs();
@@ -2229,27 +2292,20 @@ CDECL
 void MPI_Register_main(MPI_MainFn mainFn,const char *name)
 {
   AMPIAPI("MPI_Register_main");
-  ampiCreateMain(mainFn);
-  ampiAttach(name,strlen(name));
+  if (TCHARM_Element()==0) 
+  { // I'm responsible for building the TCHARM threads:
+    ampiCreateMain(mainFn,name,strlen(name));
+  }
 }
 FDECL
 void FTN_NAME(MPI_REGISTER_MAIN,mpi_register_main)
   (MPI_MainFn mainFn,const char *name,int nameLen)
 {
   AMPIAPI("MPI_register_main");
-  ampiCreateMain(mainFn);
-  ampiAttach(name,nameLen);
-}
-
-CDECL void MPI_Attach(const char *name)
-{
-  AMPIAPI("MPI_Attach");
-  ampiAttach(name,strlen(name));
-}
-FDECL void FTN_NAME(MPI_ATTACH,mpi_attach)(const char *name,int nameLen)
-{
-  AMPIAPI("MPI_attach");
-  ampiAttach(name,nameLen);
+  if (TCHARM_Element()==0) 
+  { // I'm responsible for building the TCHARM threads:
+    ampiCreateMain(mainFn,name,nameLen);
+  }
 }
 
 void _registerampif(void)
