@@ -336,6 +336,9 @@ FDECL void FTN_NAME(FEM_REFINE2D_SPLIT,fem_refine2d_split)(int *meshID,int *node
 	FEM_REFINE2D_Split(*meshID,*nodeID,coord,*elemID,desiredAreas);
 }
 
+FDECL void FTN_NAME(FEM_REFINE2D_SPLIT_EDGE,fem_refine2d_split_edge)(int *meshID,int *nodeID,double *coord,int *elemID,double *desiredAreas,int *sparseID){
+	FEM_REFINE2D_Split(*meshID,*nodeID,coord,*elemID,desiredAreas,*sparseID);
+}
 
 
 
