@@ -166,7 +166,8 @@ public:
         if (accessMode==Read_Fault) {
             unsigned int page = idx / ENTRIES_PER_PAGE;
             return const_cast<ENTRY&>(readablePage(page)[0]);
-        } else if (accessMode==Write_Fault || accessMode==Accumulate_Fault) {
+        } else {
+            CkAssert(accessMode==Write_Fault || accessMode==Accumulate_Fault);
             unsigned int page = idx / ENTRIES_PER_PAGE;
             unsigned int offset = idx % ENTRIES_PER_PAGE;
             ENTRY* e=writeablePage(page, offset);
