@@ -271,7 +271,7 @@ void GVT::computeGVT(UpdateMsg *m)
     else inactive = 0;
 
     // check the estimate
-    //    CkPrintf("opt=%d con=%d lastGVT=%d early=%d lastSR=%d et=%d\n", 
+    //CkPrintf("opt=%d con=%d lastGVT=%d early=%d lastSR=%d et=%d\n", 
     //optGVT, conGVT, lastGVT, earliestMsg, lastSR, POSE_endtime);
     CmiAssert(estGVT >= lastGVT); 
     //if (estGVT % 100 == 0)

@@ -157,6 +157,8 @@ void eventQueue::DeleteEvent(Event *ev)
   //sanitize();
   CmiAssert(ev != currentPtr);
   CmiAssert(ev->spawnedList == NULL);
+  CmiAssert(ev != frontPtr);
+  CmiAssert(ev != backPtr);
   // first connect surrounding events
   ev->prev->next = ev->next;
   ev->next->prev = ev->prev;

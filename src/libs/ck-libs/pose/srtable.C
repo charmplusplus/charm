@@ -67,7 +67,7 @@ void SRtable::PurgeBelow(int ts)
 
 /// Free srs entries, reset counters and pointers
 void SRtable::FreeTable() {
-  //  sanitize();
+  //sanitize();
   SRentry *tmp = srs;
   while (tmp) { 
     srs = tmp->next();
