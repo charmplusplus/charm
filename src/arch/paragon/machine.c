@@ -32,7 +32,33 @@ void CmiAbort(char *message)
 }
 
 
+#if CMK_TIMER_USE_DCLOCK
+/**************************  TIMER FUNCTIONS **************************/
+extern double dclock(void);
+double initTime;
 
+double CmiTimer()
+{
+   return dclock()-initTime;
+}
+
+double CmiWallTimer()
+{
+   return dclock()-initTime;
+}
+
+double CmiCpuTimer()
+{
+   return dclock()-initTime;
+}
+
+void CmiTimerInit()
+{
+  initTime = dclock();
+}
+#endif
+
+#if CMK_TIMER_USE_SPECIAL
 /**************************  TIMER FUNCTIONS **************************/
 unsigned int utimerinit[2] ;
 
@@ -64,7 +90,7 @@ void CmiTimerInit()
 {
    hwclock(utimerinit) ;
 }
-
+#endif
 
 /********************* MESSAGE RECEIVE FUNCTIONS ******************/
 
@@ -241,7 +267,7 @@ int usched, initret;
   Cmi_numpes = numnodes();
   neighbour_init(Cmi_mype);
   CpvAccess(CmiLocalQueue)= (void *) FIFO_Create();
-  CmiTimerInit();
+  /*  CmiTimerInit(); */
   CthInit(argv);
   ConverseCommonInit(argv);
   if (initret==0) {
