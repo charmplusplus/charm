@@ -2056,6 +2056,7 @@ void ParamList::beginUnmarshall(XStr &str)
     		callEach(&Parameter::beginUnmarshall,str);
     		str<<"  impl_buf+=CK_ALIGN(implP.size(),16);\n";
     	}
+	else if (isVoid()) {str<<"  CkFreeSysMsg(impl_msg);\n";}
 }
 void Parameter::beginUnmarshall(XStr &str) 
 {
@@ -2103,8 +2104,7 @@ void Parameter::unmarshallAddress(XStr &str)
 }
 void ParamList::endUnmarshall(XStr &str) 
 {
-    	if (isVoid()) {str<<"  CkFreeSysMsg(impl_msg);\n";}
-    	else if (isMarshalled()) {
+    	if (isMarshalled()) {
     		str<<"  delete (CkMarshallMsg *)impl_msg;\n";
     	}
 }
