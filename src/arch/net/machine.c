@@ -170,12 +170,6 @@
  *
  ****************************************************************************/
 
-/* About +truecrash (Cmi_truecrash=1):  
-   When debugging Charm++/Converse, CmiAbort is your enemy.
-   +truecrash command-line option will cause the program to crash where the 
-   problem occurs instead of calling host_abort which lets the program 
-   exit gracefully and lose all the debugging info... */
-
 #include "converse.h"
 
 #include <stdio.h>
@@ -501,12 +495,12 @@ void PCQueuePush(PCQueue Q, char *data)
  *
  ************************************************************************/
 
-static int    Cmi_truecrash;
+static int  Cmi_truecrash;
 
 void CmiAbort(const char *message)
 {
   if(Cmi_truecrash) {
-    CmiPrintf("%s", message);
+    printf("CHARM++ FATAL ERROR: %s\n", message);
     *(int *)NULL = 0; /*Write to null, causing bus error*/
   } else {
     charmrun_abort(message);
@@ -2129,7 +2123,8 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
   Cmi_idlepoll = 1;
 #endif
   Cmi_truecrash = 0;
-  if (CmiGetArgFlag(argv,"+truecrash")) Cmi_truecrash = 1;
+  if (CmiGetArgFlag(argv,"+truecrash") ||
+      CmiGetArgFlag(argv,"++debug")) Cmi_truecrash = 1;
     /* netpoll disable signal */
   if (CmiGetArgFlag(argv,"+netpoll")) Cmi_netpoll = 1;
     /* idlepoll use poll instead if sleep when idle */

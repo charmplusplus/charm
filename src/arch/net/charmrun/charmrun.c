@@ -570,8 +570,8 @@ char *arg_currdir_a;
 char *arg_currdir_r;
 
 int   arg_server;
-int   arg_server_port;
-char *arg_server_auth;
+int   arg_server_port=0;
+char *arg_server_auth=NULL;
 
 void arg_init(int argc, char **argv)
 {
@@ -622,7 +622,13 @@ void arg_init(int argc, char **argv)
   }
   arg_argv++; arg_argc--;
 
-  arg_verbose = arg_verbose || arg_debug || arg_debug_no_pause;
+  if (arg_server_port || arg_server_auth) arg_server=1;
+
+  if (arg_debug || arg_debug_no_pause) {
+	arg_verbose=1;
+	/*Pass ++debug along to program (used by machine.c)*/
+	arg_argv[arg_argc++]="++debug";
+  }
 
 #if CMK_USE_RSH
   /* Find the current value of the CONV_RSH variable */
