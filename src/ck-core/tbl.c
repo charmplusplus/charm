@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1995-06-08 17:07:12  gursoy
+ * Revision 2.2  1995-06-29 22:00:56  narain
+ * Changed name of member in PSEDO_STRUCT to tbl
+ *
+ * Revision 2.1  1995/06/08  17:07:12  gursoy
  * Cpv macro changes done
  *
  * Revision 1.3  1995/04/13  20:55:22  sanjeev
@@ -188,8 +191,8 @@ int tbl, key;
 	int p, i;
 	map *value;
 	
-	if (CsvAccess(PseudoTable)[tbl].pseudo_type.table.hashfn)
-		p = (*CsvAccess(PseudoTable)[tbl].pseudo_type.table.hashfn)(key);
+	if (CsvAccess(PseudoTable)[tbl].pseudo_type.tbl.hashfn)
+		p = (*CsvAccess(PseudoTable)[tbl].pseudo_type.tbl.hashfn)(key);
 	else
 		p = 13*key % MAX_TBL_SIZE; 
 		
