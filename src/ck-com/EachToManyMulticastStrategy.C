@@ -239,6 +239,7 @@ void EachToManyMulticastStrategy::pup(PUP::er &p){
 	handlerId = CkRegisterHandler((CmiHandler)E2MHandler);
         int handler = CkRegisterHandler((CmiHandler)itrDoneHandler);
         
+        
         rstrat = new RouterStrategy(routerID, handler, npes, pelist);
         setConverseStrategy(rstrat);
         MyPe = rstrat->getProcMap()[CkMyPe()];
@@ -251,6 +252,8 @@ void EachToManyMulticastStrategy::beginProcessing(int numElements){
 
     int expectedDeposits = 0;
     MaxSectionID = 0;
+
+    rstrat->setInstance(getInstance());
 
     if(ainfo.isSourceArray()) 
         expectedDeposits = numElements;
