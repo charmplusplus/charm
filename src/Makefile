@@ -129,7 +129,7 @@ CKHEADERS=chare.h const.h msg_macros.h prio_macros.h env_macros.h globals.h\
 
 CK_LIBS_CORE=libck-core-notrace.o libck-core-summary.o
 
-CK_LIBS_LDB=libck-ldb-rand.o libck-ldb-acwn.o # libck-ldb-mngr.o libck-ldb-priomngr.o libck-ldb-recv.o libck-ldb-tok.o libck-ldb-btok.o
+CK_LIBS_LDB=libck-ldb-rand.o libck-ldb-acwn.o libck-ldb-mngr.o # libck-ldb-priomngr.o libck-ldb-recv.o libck-ldb-tok.o libck-ldb-btok.o
 
 CK_LIBS_CPLUS=libck-cplus-n.o
 
