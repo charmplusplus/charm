@@ -34,7 +34,7 @@ ampimain::ampimain(CkArgMsg *m)
   nblocks = CkNumPes();
   for(i=1;i<m->argc;i++) {
     if(strncmp(m->argv[i], "+vp", 3) == 0) {
-      if (strlen(m->argv[i]) > 2) {
+      if (strlen(m->argv[i]) > 3) {
         sscanf(m->argv[i], "+vp%d", &nblocks);
       } else {
         if (m->argv[i+1]) {

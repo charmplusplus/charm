@@ -100,7 +100,7 @@ main::main(CkArgMsg *am)
   _nchunks = CkNumPes();
   for(i=1;i<am->argc;i++) {
     if(strncmp(am->argv[i], "+vp", 3) == 0) {
-      if (strlen(am->argv[i]) > 2) {
+      if (strlen(am->argv[i]) > 3) {
         sscanf(am->argv[i], "+vp%d", &_nchunks);
       } else {
         if (am->argv[i+1]) {
