@@ -164,6 +164,11 @@ CthThread CthPup(pup_er p, CthThread t, int *psz)
     *psz += t->datasize;
     pup_bytes(p, (void*) t->savedstack, t->savedsize);
     *psz += t->savedsize;
+    if(pup_isPacking())
+    {
+      CthFree(t);
+      t = 0;
+    }
   }
   if(pup_isUnpacking(p))
   {
@@ -1348,6 +1353,11 @@ CthThread CthPup(pup_er p, CthThread t, int *psz)
     ssz = ((char*)(stackbase)-(char*)(t->stackp));
     pup_bytes(p, (void*)t->stackp, ssz);
     *psz += ssz;
+    if(pup_isPacking(p))
+    {
+      CthFree(t);
+      t = 0;
+    }
   }
   if(pup_isUnpacking(p))
   {
