@@ -14,9 +14,17 @@
 #define CMK_CMIDELIVERS_USE_COMMON_CODE                    1
 #define CMK_CMIDELIVERS_USE_SPECIAL_CODE                   0
 
+#define CMK_PERSISTENT_COMM                                1
+
+/*
+  CMK_MULTICAST_LIST_USE_SPECIAL_CODE builds code that is specific to
+  CMK_PERSISTENT_COMM above.  If you do not set CMK_PERSISTENT_COMM,
+  do not use CMK_MULTICAST_LIST_USE_SPECIAL_CODE.
+*/
 #define CMK_MULTICAST_GROUP_TYPE                struct { unsigned pe, id; }
 #define CMK_MULTICAST_DEF_USE_COMMON_CODE                  1
-#define CMK_MULTICAST_LIST_USE_COMMON_CODE                 1
+#define CMK_MULTICAST_LIST_USE_COMMON_CODE                 0
+#define CMK_MULTICAST_LIST_USE_SPECIAL_CODE                1
 #define CMK_MULTICAST_GROUP_USE_COMMON_CODE                1
 
 #define CMK_BROADCAST_SPANNING_TREE                        1

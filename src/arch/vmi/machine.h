@@ -191,6 +191,25 @@ typedef struct
 } CMI_VMI_Rendezvous_Message_T;
 
 
+typedef struct
+{
+  int rank;
+  int maxsize;
+  VMI_virt_addr_t context;
+} CMI_VMI_Persistent_Request_Message_T;
+
+
+typedef struct
+{
+  VMI_virt_addr_t context;
+  int rdmarecvindx;
+} CMI_VMI_Persistent_Grant_Message_T;
+
+
+typedef struct
+{
+  int rdmarecvindx;
+} CMI_VMI_Persistent_Destroy_Message_T;
 
 
 
@@ -243,12 +262,14 @@ typedef enum
   CMI_VMI_HANDLE_TYPE_ASYNC_SEND_RDMA,
 
   CMI_VMI_HANDLE_TYPE_SYNC_BROADCAST_RDMA,
-  CMI_VMI_HANDLE_TYPE_ASYNC_BROADCAST_RDMA
+  CMI_VMI_HANDLE_TYPE_ASYNC_BROADCAST_RDMA,
+
+  CMI_VMI_HANDLE_TYPE_PERSISTENT
 } CMI_VMI_Handle_Type_T;
 
 typedef struct
 {
-  PVMI_CACHE_ENTRY   cacheentry;
+  PVMI_CACHE_ENTRY cacheentry;
 } CMI_VMI_Handle_Stream_T;
 
 typedef struct
@@ -263,6 +284,18 @@ typedef struct
 
 typedef struct
 {
+  int ready;
+  PVMI_CONNECT connection;
+  int destrank;
+  int maxsize;
+  PVMI_REMOTE_BUFFER rbuf;
+  int bytes_sent;
+  int rdmarecvindx;
+  // void *next;     needed for the "delete all persistent" function
+} CMI_VMI_Handle_Persistent_T;
+
+typedef struct
+{
   int                      refcount;
   char                    *msg;
   int                      msgsize;
@@ -271,9 +304,10 @@ typedef struct
 
   union
   {
-    CMI_VMI_Handle_Stream_T    stream;
-    CMI_VMI_Handle_RDMA_T      rdma;
-    CMI_VMI_Handle_RDMABROAD_T rdmabroad;
+    CMI_VMI_Handle_Stream_T     stream;
+    CMI_VMI_Handle_RDMA_T       rdma;
+    CMI_VMI_Handle_RDMABROAD_T  rdmabroad;
+    CMI_VMI_Handle_Persistent_T persistent;
   } data;
 } CMI_VMI_Handle_T;
 
@@ -297,6 +331,7 @@ typedef struct
 typedef struct
 {
   BOOLEAN           allocated;
+  int               index;
   char             *msg;
   int               msgsize;
   int               bytes_pub;
@@ -306,6 +341,7 @@ typedef struct
   int               bytes_rec;
   PVMI_CACHE_ENTRY *cacheentry;
   VMI_virt_addr_t   rhandleaddr;
+  BOOLEAN           persistent_flag;
 } CMI_VMI_RDMA_Receive_Context_T;
 
 typedef struct
