@@ -238,14 +238,36 @@ class TCharm: public CBase_TCharm
 
 //Created in all API routines: disables/enables migratable malloc
 class TCharmAPIRoutine {
+	int state; //stores if the isomallocblockactivate and ctginstall need to be skipped
+							//during activate
+							//TODO: fix CtgInstall like CmiBlockListActivate
+	CmiIsomallocBlockList *oldHeapBlock; 
  public:
 	TCharmAPIRoutine() { //Entering Charm++ from user code
+		state = 0;
+		TCharm *tc=CtvAccess(_curTCharm);
+		if(CmiIsomallocBlockListCurrent() == NULL){
+			//if memory is not isomalloc or thread has already been deactivated
+			state |= 0x1; //skip isomallocblocklistactivate during activate
+		}
 		//Disable migratable memory allocation while in Charm++:
 		TCharm::deactivateThread();
 	}
 	~TCharmAPIRoutine() { //Returning to user code from Charm++:
+		TCharm *tc=CtvAccess(_curTCharm);
+		if(state & 0x1){
+			if(tc){
+				oldHeapBlock = tc->heapBlocks;
+				tc->heapBlocks = NULL;
+			}	
+		}
 		//Reenable migratable memory allocation
 		TCharm::activateThread();
+		if(state & 0x1){
+			if(tc){
+				tc->heapBlocks = oldHeapBlock;
+			}	
+		}	
 	}
 };
 

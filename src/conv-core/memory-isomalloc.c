@@ -129,6 +129,9 @@ CmiIsomallocBlockList *CmiIsomallocBlockListActivate(CmiIsomallocBlockList *l)
 	return ret;
 }
 
+CmiIsomallocBlockList *CmiIsomallocBlockListCurrent(){
+	return CpvAccess(isomalloc_blocklist);
+}
 
 
 

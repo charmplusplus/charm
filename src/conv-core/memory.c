@@ -302,6 +302,9 @@ void free_nomigrate(void *mem) { free(mem); }
 /*Not using isomalloc heaps, so forget about activating block list:*/
 CmiIsomallocBlockList *CmiIsomallocBlockListActivate(CmiIsomallocBlockList *l)
    {return l;}
+CmiIsomallocBlockList *CmiIsomallocBlockListCurrent(){
+	return NULL;
+}	 
 #endif
 
 #ifndef CMI_MEMORY_ROUTINES

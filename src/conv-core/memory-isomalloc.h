@@ -23,7 +23,7 @@ void free_reentrant(void *mem);
 
 /*Make this blockList active (returns the old blocklist).*/
 CmiIsomallocBlockList *CmiIsomallocBlockListActivate(CmiIsomallocBlockList *l);
-
+CmiIsomallocBlockList *CmiIsomallocBlockListCurrent();
 
 #ifdef __cplusplus
 };
