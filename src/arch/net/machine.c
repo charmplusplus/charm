@@ -355,7 +355,7 @@ static void jsleep(int sec, int usec)
   int ntimes,i;
   struct timeval tm;
 
-  ntimes = (sec*1000000+usec)/5000;
+  ntimes = sec*200 + usec/5000;
   for(i=0;i<ntimes;i++) {
     tm.tv_sec = 0;
     tm.tv_usec = 5000;
@@ -365,16 +365,6 @@ static void jsleep(int sec, int usec)
     }
   }
 }
-
-/* old jsleep - buggy
-static void jsleep(int sec, int usec)
-{
-  struct timeval tm;
-  tm.tv_sec = sec;
-  tm.tv_usec = usec;
-  select(0,NULL,NULL,NULL,&tm);
-}
-*/
 
 static void writeall(int fd, char *buf, int size)
 {
@@ -974,7 +964,7 @@ char **argv;
  *
  *****************************************************************************/
 
-#define LOGGING 0
+#define LOGGING 1
 
 #if LOGGING
 
@@ -1733,7 +1723,7 @@ int TransmitAcknowledgement()
 int TransmitDatagram()
 {
   ImplicitDgram dg; OtherNode node;
-  static int nextnode=0; unsigned int skip, slot, seqno;
+  static int nextnode=0; unsigned int skip, count, slot, seqno;
   
   for (skip=0; skip<Cmi_numnodes; skip++) {
     node = nodes+nextnode;
@@ -1752,12 +1742,18 @@ int TransmitDatagram()
 	return 1;
       }
     }
-    slot = (node->send_last % Cmi_window_size);
-    dg = node->send_window[slot];
-    if (dg && (Cmi_clock > node->send_primer)) {
-      TransmitImplicitDgram1(node->send_window[slot]);
-      node->send_primer = Cmi_clock + Cmi_delay_retransmit;
-      return 1;
+    if (Cmi_clock > node->send_primer) {
+      slot = (node->send_last % Cmi_window_size);
+      for (count=0; count<Cmi_window_size; count++) {
+	dg = node->send_window[slot];
+	if (dg) break;
+	slot = ((slot-1) % Cmi_window_size);
+      }
+      if (dg) {
+	TransmitImplicitDgram1(node->send_window[slot]);
+	node->send_primer = Cmi_clock + Cmi_delay_retransmit;
+	return 1;
+      }
     }
   }
   return 0;
