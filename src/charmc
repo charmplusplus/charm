@@ -53,6 +53,8 @@ unsetenv DELETE         ; set DELETE = ()
 unsetenv MAINOBJ        ; set MAINOBJ = ()
 unsetenv DEBUG_MODE
 unsetenv OPTIMIZE_MODE
+unsetenv USE_RELIABLE_CC
+unsetenv USE_FASTEST_CC
 
 ##############################################################################
 #
@@ -111,6 +113,14 @@ while ($argindex <= $#argv)
             set SAVE=1
             breaksw
 
+        case "-use-reliable-cc"
+	    set USE_RELIABLE_CC=1
+            breaksw
+
+	case "-use-fastest-cc"
+	    set USE_FASTEST_CC=1
+            breaksw
+ 
         case "-cc"
             set OVERRIDE_CC=( $argv[$argindex] )
             @ argindex = $argindex + 1
@@ -199,6 +209,10 @@ while ($argindex <= $#argv)
 
 	case "-O"
 	    set OPTIMIZE_MODE=1
+            breaksw
+
+	case "-NO"
+	    unset OPTIMIZE_MODE
             breaksw
 
         case "-O*"
@@ -316,6 +330,14 @@ endif
 
 source $CHARMINC/conv-mach.csh
 
+if ( $?USE_RELIABLE_CC ) then
+    set CMK_CC=( $CMK_CC_RELIABLE )
+endif
+
+if ( $?USE_FASTEST_CC ) then
+    set CMK_CC=( $CMK_CC_FASTEST )
+endif
+
 if ($?SEQUENTIAL) then
     set CMK_CC=( $CMK_SEQ_CC )
     set CMK_LD=( $CMK_SEQ_LD )
@@ -405,17 +427,14 @@ foreach FILE ($FILES)
       endif
       breaksw
     case "*.P"
-      echo 'extern "C" {' > $TMP.P.c
-      echo '#include <stdio.h>' >> $TMP.P.c
-      echo '}' >> $TMP.P.c
-      echo '#line 1 "'$BASE.P'"' >> $TMP.P.c
-      /bin/cat $BASE.P >> $TMP.P.c
-
+      echo '#include <stdio.h>' > $TMP.P.C
+      echo '#line 1 "'$BASE.P'"' >> $TMP.P.C
+      /bin/cat $BASE.P >> $TMP.P.C
 # For heavens sake, dont change CMK_CXX to CMK_CPP below ! The preprocessor
 # for Charm++ is "g++ -E", not "cpp". Ive fixed it before, but someone keeps
 # screwing it up again.  -- Sanjeev 8/30/95
-      if ($?VERBOSE) echo "$CMK_CXXPP $OPTS_CPP -I$CHARMINC $TMP.P.c > $TMP.cpp"
-      $CMK_CXXPP $OPTS_CPP -I$CHARMINC $TMP.P.c > $TMP.cpp
+      if ($?VERBOSE) echo "$CMK_CXXPP $OPTS_CPP -I$CHARMINC $TMP.P.C > $TMP.cpp"
+      $CMK_CXXPP $OPTS_CPP -I$CHARMINC $TMP.P.C > $TMP.cpp
       if ($?VERBOSE) echo "$CHARMBIN/charmfilter++ $TMP.cpp | $CMK_M4 > $TMP.space"
       $CHARMBIN/charmfilter++ $TMP.cpp | $CMK_M4 > $TMP.space
       if ($?VERBOSE) echo "$CHARMBIN/charmxlat++ $TMP.space $TMP.C"
@@ -731,7 +750,7 @@ end:
         foreach FILE ($FILES)
             set BASE=$FILE:r
             set TMP=$BASE:t.TMP
-            /bin/rm -f $TMP.P.c $TMP.C $TMP.cpp $TMP.space $TMP.o
+            /bin/rm -f $TMP.P.C $TMP.C $TMP.cpp $TMP.space $TMP.o
             /bin/rm -f $TMP.c $TMP.c.0.h $TMP.c.1.h $TMP.c.2.h $BASE:t.headers
         end
         rm -f core $DELETE
