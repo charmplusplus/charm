@@ -647,7 +647,17 @@ fi
 CHARMLIB="$CHARMBIN/../lib"
 CHARMINC="$CHARMBIN/../include"
 CHARMLIBSO=
-[ -d "$CHARMBIN/../lib_so" ] && CHARMLIBSO=`cd "$CHARMBIN/../lib_so"; pwd`
+if test -d "$CHARMBIN/../lib_so" 
+then
+  CHARMLIBSO=`cd $CHARMBIN/../lib_so && pwd`
+  # getting absolute path is harder than thought because of symbolic links
+  # ksh needs cd -P to resolve werid symbolic link, however -P is not portable
+  # csh is ok too if it exists 
+  test -z "$CHARMLIBSO" && CHARMLIBSO=`cd -P $CHARMBIN/../lib_so && pwd`
+  test -z "$CHARMLIBSO" && CHARMLIBSO=`csh -c "cd $CHARMBIN/../lib_so && pwd"`
+  test -z "$CHARMLIBSO" &&  exit 1
+fi
+
 
 
 ##############################################################################
