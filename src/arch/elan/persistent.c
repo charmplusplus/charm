@@ -51,6 +51,7 @@ typedef struct pmsg_list {
   struct pmsg_list *next;
   int size, destpe;
   PersistentHandle  h;
+  int sent;
 } PMSG_LIST;
 
 static PMSG_LIST *pending_persistent_msgs = NULL;
@@ -63,7 +64,8 @@ static PMSG_LIST *end_pending_persistent_msgs = NULL;
   msg_tmp->size = s;	\
   msg_tmp->next = NULL;	\
   msg_tmp->destpe = dest;	\
-  msg_tmp->h = ph;
+  msg_tmp->h = ph;		\
+  msg_tmp->sent = 0;
 
 #define APPEND_PMSG_LIST(msg_tmp)	\
   if (pending_persistent_msgs==0)	\
@@ -119,6 +121,7 @@ void persistentRequestHandler(void *env)
   slotIdx = getFreeRecvSlot();
   slot = &persistentReceivesTable[slotIdx];
   slot->messagePtr = CmiAlloc(msg->maxBytes);
+  _MEMCHECK(slot->messagePtr);
   slot->flag = RESET;
   slot->sizeMax = msg->maxBytes;
 
@@ -188,19 +191,27 @@ CmiPrintf("[%d] CmiSendPersistentMsg handle: %d\n", CmiMyPe(), h);
   }
 }
 
+// 1: finish the first put but still need to be in the queue for the second put.
+// 2: finish and should be removed from queue.
 static int remote_put_done(PMSG_LIST *smsg)
 {
   int flag = elan_poll(smsg->e, ELAN_POLL_EVENT);
   if (flag) {
-    PersistentSendsTable *slot = &persistentSendsTable[smsg->h];
-    ELAN_EVENT *e2 = elan_put(elan_base->state, &smsg->size, slot->destSlotFlagAddress, sizeof(int), smsg->destpe);
-    elan_wait(e2, ELAN_POLL_EVENT);
-    CmiFree(smsg->msg);
+    if (smsg->sent == 1) {
 /*
 CmiPrintf("remote_put_done on %d\n", CmiMyPe());
 */
+      return 2;
+    }
+    else {
+      smsg->sent = 1;
+      CmiFree(smsg->msg);
+      PersistentSendsTable *slot = &persistentSendsTable[smsg->h];
+      smsg->e = elan_put(elan_base->state, &smsg->size, slot->destSlotFlagAddress, sizeof(int), smsg->destpe);
+      return 1;
+    }
   }
-  return flag;
+  return 0;
 }
 
 /* called in CmiReleaseSentMessages */
@@ -210,7 +221,8 @@ void release_pmsg_list()
   PMSG_LIST *msg_tmp = pending_persistent_msgs;
 
   while (msg_tmp) {
-    if (remote_put_done(msg_tmp)) {
+    int status = remote_put_done(msg_tmp);
+    if (status == 2) {
       temp = msg_tmp->next;
       if (prev==0)
         pending_persistent_msgs = temp;
@@ -232,12 +244,10 @@ void PumpPersistent()
 {
   int i;
   for (i=1; i<= persistentReceivesTableCount; i++) {
-    if (persistentReceivesTable[i].flag != RESET) {
-/*
-CmiPrintf("PumpPersistent.\n");
-*/
-      int size = persistentReceivesTable[i].flag;
-      void *msg = persistentReceivesTable[i].messagePtr;
+    PersistentReceivesTable *slot = &persistentReceivesTable[i];
+    if (slot->flag != RESET) {
+      int size = slot->flag;
+      void *msg = slot->messagePtr;
 
 #if 1
       // should return messagePtr directly and make sure keep it.
@@ -245,13 +255,14 @@ CmiPrintf("PumpPersistent.\n");
       memcpy(dupmsg, msg, size);
       msg = dupmsg;
 #endif
+//CmiPrintf("[%d] %p size:%d rank:%d root:%d\n", CmiMyPe(), msg, size, CMI_DEST_RANK(msg), CMI_BROADCAST_ROOT(msg));
 
       CmiPushPE(CMI_DEST_RANK(msg), msg);
 #if CMK_BROADCAST_SPANNING_TREE
         if (CMI_BROADCAST_ROOT(msg))
           SendSpanningChildren(size, msg);
 #endif
-      persistentReceivesTable[i].flag = RESET;
+      slot->flag = RESET;
     }
   }
 }
