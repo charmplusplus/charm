@@ -5,6 +5,11 @@
  * $Revision$
  *****************************************************************************/
 
+/**
+ * \addtogroup CkLdb
+*/
+/*@{*/
+
 #ifndef NEIGHBORLB_H
 #define NEIGHBORLB_H
 
@@ -14,7 +19,6 @@
 void CreateWSLB();
 
 class WSLBStatsMsg;
-class WSLBMigrateMsg;
 
 class WSLB : public CBase_WSLB
 {
@@ -27,7 +31,7 @@ public:
 
   void ReceiveStats(WSLBStatsMsg *); 		// Receive stats on PE 0
   void ResumeClients();
-  void ReceiveMigration(WSLBMigrateMsg *); 	// Receive migration data
+  void ReceiveMigration(LBMigrateMsg *); 	// Receive migration data
 
   // Migrated-element callback
   static void staticMigrated(void* me, LDObjHandle h);
@@ -35,12 +39,6 @@ public:
 
   void MigrationDone(void);  // Call when migration is complete
   int step() { return mystep; };
-
-  struct MigrateInfo {  // Used in WSLBMigrateMsg
-    LDObjHandle obj;
-    int from_pe;
-    int to_pe;
-  };
 
   struct LDStats {  // Passed to Strategy
     int from_pe;
@@ -58,7 +56,7 @@ public:
 
 protected:
   virtual CmiBool QueryBalanceNow(int);
-  virtual WSLBMigrateMsg* Strategy(LDStats* stats,int count);
+  virtual LBMigrateMsg* Strategy(LDStats* stats,int count);
   virtual int num_neighbors() {
     return (CkNumPes() > 5) ? 4 : (CkNumPes()-1);
   };
@@ -104,7 +102,7 @@ private:
   LDStats* statsDataList;
   int migrates_completed;
   int migrates_expected;
-  WSLBMigrateMsg** mig_msgs;
+  LBMigrateMsg** mig_msgs;
   int mig_msgs_received;
   int mig_msgs_expected;
   int* neighbor_pes;
@@ -132,16 +130,8 @@ public:
   CmiBool vacate_me;
 }; 
 
-class WSLBMigrateMsg : public CMessage_WSLBMigrateMsg {
-public:
-  int n_moves;
-  WSLB::MigrateInfo* moves;
-
-  // Other methods & data members 
-  
-  static void* alloc(int msgnum, size_t size, int* array, int priobits); 
-  static void* pack(WSLBMigrateMsg* in); 
-  static WSLBMigrateMsg* unpack(void* in); 
-}; 
 
 #endif /* NEIGHBORLB_H */
+
+
+/*@}*/

@@ -5,6 +5,11 @@
  * $Revision$
  *****************************************************************************/
 
+/**
+ * \addtogroup CkLdb
+*/
+/*@{*/
+
 #include "ObjGraph.h"
 
 static const double alpha = 30.e-6;
@@ -165,4 +170,4 @@ ObjGraph::Node* ObjGraph::find_node(LDOMid edge_omid, LDObjid edge_id)
 
 
 
-
+/*@}*/

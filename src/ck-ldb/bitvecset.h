@@ -5,8 +5,13 @@
  * $Revision$
  *****************************************************************************/
 
-#ifndef _BITVECSET_H
+/**
+ * \addtogroup CkLdb
+*/
+/*@{*/
 
+
+#ifndef _BITVECSET_H
 #define  _BITVECSET_H
 
 typedef struct {
@@ -16,5 +21,6 @@ typedef struct {
 } BV_Set ;
 
 
-
 #endif
+
+/*@}*/

@@ -5,6 +5,11 @@
  * $Revision$
  *****************************************************************************/
 
+/**
+ * \addtogroup CkLdb
+*/
+/*@{*/
+
 #include <charm++.h>
 
 #if CMK_LBDB_ON
@@ -346,3 +351,5 @@ void LocalBarrier::ResumeClients(void)
 }
 
 #endif
+
+/*@}*/

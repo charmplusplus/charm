@@ -5,6 +5,11 @@
  * $Revision$
  *****************************************************************************/
 
+/**
+ * \addtogroup CkLdb
+*/
+/*@{*/
+
 #include <converse.h>
 
 #if CMK_LBDB_ON
@@ -314,3 +319,5 @@ CmiBool LDObjIDEqual(const LDObjid i1, const LDObjid i2)
 }
 
 #endif // CMK_LBDB_ON
+
+/*@}*/

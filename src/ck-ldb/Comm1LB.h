@@ -5,6 +5,11 @@
  * $Revision$
  *****************************************************************************/
 
+/**
+ * \addtogroup CkLdb
+*/
+/*@{*/
+
 #ifndef _Comm1LB_H_
 #define _Comm1LB_H_
 
@@ -35,7 +40,7 @@ public:
   Comm1LB(CkMigrateMessage *m) {}
 private:
   CmiBool QueryBalanceNow(int step);
-  CLBMigrateMsg* Strategy(CentralLB::LDStats* stats, int count);
+  LBMigrateMsg* Strategy(CentralLB::LDStats* stats, int count);
   void alloc(int pe, int id, double load, int nmsg, int nbyte);
   double compute_cost(int id, int pe, int n_alloc, int &out_msg, int &out_byte); 
   int search(LDObjid oid, LDOMid mid);
@@ -46,4 +51,5 @@ private:
 #endif
 
 
+/*@}*/
 

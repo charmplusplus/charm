@@ -5,6 +5,11 @@
  * $Revision$
  *****************************************************************************/
 
+/**
+ * \addtogroup CkLdb
+*/
+/*@{*/
+
 #include <converse.h>
 
 #if CMK_LBDB_ON
@@ -172,3 +177,5 @@ void LBCommTable::GetCommData(LDCommData* data)
 }
 
 #endif // CMK_LBDB_ON
+
+/*@}*/

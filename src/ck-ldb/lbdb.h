@@ -5,6 +5,11 @@
  * $Revision$
  *****************************************************************************/
 
+/**
+ * \addtogroup CkLdb
+*/
+/*@{*/
+
 #ifndef LBDBH_H
 #define LBDBH_H
 
@@ -191,3 +196,5 @@ CmiBool LDObjIDEqual(const LDObjid i1, const LDObjid i2);
 #endif /* _cplusplus */
 
 #endif /* LBDBH_H */
+
+/*@}*/

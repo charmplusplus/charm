@@ -5,6 +5,11 @@
  * $Revision$
  *****************************************************************************/
 
+/**
+ * \addtogroup CkLdb
+*/
+/*@{*/
+
 #include <charm++.h>
 
 #if CMK_LBDB_ON
@@ -32,7 +37,7 @@ NeighborLB::NeighborLB()
     CkPrintf("[%d] NeighborLB created\n",CkMyPe());
 }
 
-NLBMigrateMsg* NeighborLB::Strategy(NborBaseLB::LDStats* stats, int count)
+LBMigrateMsg* NeighborLB::Strategy(NborBaseLB::LDStats* stats, int count)
 {
   //  CkPrintf("[%d] Strategy starting\n",CkMyPe());
   // Compute the average load to see if we are overloaded relative
@@ -159,7 +164,7 @@ NLBMigrateMsg* NeighborLB::Strategy(NborBaseLB::LDStats* stats, int count)
   //  if (migrate_count > 0) {
   //    CkPrintf("PE %d migrating %d elements\n",CkMyPe(),migrate_count);
   //  }
-  NLBMigrateMsg* msg = new(&migrate_count,1) NLBMigrateMsg;
+  LBMigrateMsg* msg = new(&migrate_count,1) LBMigrateMsg;
   msg->n_moves = migrate_count;
   for(i=0; i < migrate_count; i++) {
     MigrateInfo* item = (MigrateInfo*) migrateInfo[i];
@@ -172,3 +177,5 @@ NLBMigrateMsg* NeighborLB::Strategy(NborBaseLB::LDStats* stats, int count)
 };
 
 #endif
+
+/*@}*/

@@ -11,6 +11,11 @@
 ***  All rights reserved.
 **/
 
+/**
+ * \addtogroup CkLdb
+*/
+/*@{*/
+
 #ifndef _HEAP_H_
 #define _HEAP_H_
 
@@ -74,3 +79,5 @@ public:
 
 
 #endif /* _HEAP_H_ */
+
+/*@}*/

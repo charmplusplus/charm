@@ -5,6 +5,11 @@
  * $Revision$
  *****************************************************************************/
 
+/**
+ * \addtogroup CkLdb
+*/
+/*@{*/
+
 #ifndef _REFINER_H_
 #define _REFINER_H_
 
@@ -49,3 +54,6 @@ private:
 };
 
 #endif /* _REFINER_H_ */
+
+
+/*@}*/

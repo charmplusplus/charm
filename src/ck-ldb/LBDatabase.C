@@ -5,8 +5,12 @@
  * $Revision$
  *****************************************************************************/
 
-#include <converse.h>
+/**
+ * \addtogroup CkLdb
+*/
+/*@{*/
 
+#include <converse.h>
 
 /*
  * This C++ file contains the Charm stub functions
@@ -90,3 +94,5 @@ LBDBInit::LBDBInit(CkArgMsg *m)
 #endif
   delete m;
 }
+
+/*@}*/

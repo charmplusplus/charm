@@ -5,6 +5,11 @@
  * $Revision$
  *****************************************************************************/
 
+/**
+ * \addtogroup CkLdb
+*/
+/*@{*/
+
 #ifndef CENTRALLB_H
 #define CENTRALLB_H
 
@@ -17,7 +22,9 @@ void CreateCentralLB();
 void set_avail_vector(char * bitmap);
 
 class CLBStatsMsg;
-class CLBMigrateMsg;
+
+/// for backward compatibility
+typedef LBMigrateMsg  CLBMigrateMsg;
 
 class CentralLB : public CBase_CentralLB
 {
@@ -33,7 +40,7 @@ public:
   void ReceiveStats(CLBStatsMsg *); 		// Receive stats on PE 0
   void ResumeClients(void);                     // Resuming clients needs
 	                                        // to be resumed via message
-  void ReceiveMigration(CLBMigrateMsg *); 	// Receive migration data
+  void ReceiveMigration(LBMigrateMsg *); 	// Receive migration data
 
   // Migrated-element callback
   static void staticMigrated(void* me, LDObjHandle h);
@@ -43,12 +50,6 @@ public:
   int step() { return mystep; };
 
   void set_avail_vector(char *new_vector);
-
-  struct MigrateInfo {  // Used in CLBMigrateMsg
-    LDObjHandle obj;
-    int from_pe;
-    int to_pe;
-  };
 
   struct LDStats {  // Passed to Strategy
     double total_walltime;
@@ -66,7 +67,7 @@ public:
     LDCommData* commData;
   };
 
-   CLBMigrateMsg* callStrategy(LDStats* stats,int count){
+   LBMigrateMsg* callStrategy(LDStats* stats,int count){
 	return Strategy(stats,count);
    };
 
@@ -77,7 +78,7 @@ public:
 
 protected:
   virtual CmiBool QueryBalanceNow(int) { return CmiTrue; };  
-  virtual CLBMigrateMsg* Strategy(LDStats* stats,int count);
+  virtual LBMigrateMsg* Strategy(LDStats* stats,int count);
 
 private:  
 
@@ -112,24 +113,8 @@ public:
   int next_lb;
 }; 
 
-class CLBMigrateMsg : public CMessage_CLBMigrateMsg {
-public:
-  int n_moves;
-  CentralLB::MigrateInfo* moves;
-  
-  char * avail_vector;
-  int next_lb;
-  
-  // Other methods & data members 
-
-  static void* alloc(int msgnum, size_t size, int* array, int priobits); 
-  static void* pack(CLBMigrateMsg* in); 
-  static CLBMigrateMsg* unpack(void* in); 
-}; 
-
 #endif /* CENTRALLB_H */
 
-
-
+/*@}*/
 
 

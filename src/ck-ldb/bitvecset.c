@@ -5,6 +5,12 @@
  * $Revision$
  *****************************************************************************/
 
+/**
+ * \addtogroup CkLdb
+*/
+/*@{*/
+
+
 #include <stdio.h>
 #include <stdlib.h>
 #include "bitvecset.h"
@@ -107,3 +113,5 @@ void bvset_enumerate(BV_Set * s, int **list, int *size)
       printf("%d ", (*list)[i]);
   }
 }
+
+/*@}*/

@@ -10,13 +10,11 @@ message NLBStatsMsg {
   LDCommData commData[];
 };
 
-message NLBMigrateMsg;
-
 group NborBaseLB: BaseLB {
   entry void NborBaseLB(void);  
   entry void ReceiveStats(NLBStatsMsg*);
   entry void ResumeClients(void);
-  entry void ReceiveMigration(NLBMigrateMsg*);	
+  entry void ReceiveMigration(LBMigrateMsg*);	
 };
 
 };

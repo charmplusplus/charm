@@ -2,6 +2,8 @@ module BaseLB {
 
 extern module LBDatabase;
 
+message LBMigrateMsg;
+
 group BaseLB {
   entry void BaseLB(void);  
   entry void unregister(void);

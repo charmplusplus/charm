@@ -5,6 +5,10 @@
  * $Revision$
  *****************************************************************************/
 
+/**
+ * \addtogroup CkLdb
+*/
+/*@{*/
 
 #ifndef _RECBISECTBFLB_H_
 #define _RECBISECTBFLB_H_
@@ -40,7 +44,7 @@ public:
   RecBisectBfLB(CkMigrateMessage *m) {}
 private:
   CmiBool QueryBalanceNow(int step);
-  CLBMigrateMsg* Strategy(CentralLB::LDStats* stats, int count);
+  LBMigrateMsg* Strategy(CentralLB::LDStats* stats, int count);
 
   Graph * convertGraph(ObjGraph *og);
   
@@ -63,3 +67,6 @@ private:
 
 
 #endif /* _RECBISECTBFLB_H_ */
+
+
+/*@}*/

@@ -5,6 +5,11 @@
  * $Revision$
  *****************************************************************************/
 
+/**
+ * \addtogroup CkLdb
+*/
+/*@{*/
+
 #include "LBMachineUtil.h"
 #include <stdlib.h>
 
@@ -108,3 +113,5 @@ void LBMachineUtil::TotalTime(double* walltime, double* cputime)
   *walltime = total_walltime;
   *cputime = total_cputime;
 }
+
+/*@}*/

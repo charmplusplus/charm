@@ -5,12 +5,18 @@
  * $Revision$
  *****************************************************************************/
 
+/**
+ * \addtogroup CkLdb
+*/
+/*@{*/
+
 #include <charm++.h>
 #include <BaseLB.h>
 
-CkpvDeclare(int, numLoadBalancers);
-CkpvDeclare(int, hasNullLB);
+CkpvDeclare(int, numLoadBalancers);  /**< num of lb created */
+CkpvDeclare(int, hasNullLB);         /**< true if NullLB is created */
 
+/// called in Charm Init to initialize Cpv variables.
 void _loadbalancerInit()
 {
 //CmiPrintf("[%d] initLBFrameWork()\n", CkMyPe());
@@ -34,9 +40,52 @@ void BaseLB::unregister() {
   theLbdb->RemoveLocalBarrierReceiver(receiver);
   CkpvAccess(numLoadBalancers) --;
 }
+
+void* LBMigrateMsg::alloc(int msgnum, size_t size, int* array, int priobits)
+{
+  int totalsize = size + array[0] * sizeof(MigrateInfo) 
+    + CkNumPes() * sizeof(char);
+
+  LBMigrateMsg* ret =
+    (LBMigrateMsg*)(CkAllocMsg(msgnum,totalsize,priobits));
+
+  ret->moves = (MigrateInfo*) ((char*)(ret)+ size);
+
+  ret->avail_vector = (char *)(ret->moves + array[0]);
+  return (void*)(ret);
+}
+
+void* LBMigrateMsg::pack(LBMigrateMsg* m)
+{
+  m->moves = (MigrateInfo*)
+    ((char*)(m->moves) - (char*)(&m->moves));
+
+  m->avail_vector =(char*)(m->avail_vector
+      - (char*)(&m->avail_vector));
+
+  return (void*)(m);
+}
+
+LBMigrateMsg* LBMigrateMsg::unpack(void *m)
+{
+  LBMigrateMsg* ret_val = (LBMigrateMsg*)(m);
+
+  ret_val->moves = (MigrateInfo*)
+    ((char*)(&ret_val->moves) 
+     + (size_t)(ret_val->moves));
+
+  ret_val->avail_vector =
+    (char*)((char*)(&ret_val->avail_vector)
+			    +(size_t)(ret_val->avail_vector));
+
+  return ret_val;
+}
+
 #else
 BaseLB::BaseLB() {}
 void BaseLB::unregister() {}
 #endif
 
 #include "BaseLB.def.h"
+
+/*@}*/

@@ -5,6 +5,11 @@
  * $Revision$
  *****************************************************************************/
 
+/**
+ * \addtogroup CkLdb
+*/
+/*@{*/
+
 #include <charm++.h>
 #include <stdio.h>
 
@@ -144,7 +149,7 @@ void init(double **a, graph * object_graph, int l, int b){
     }
 }
 
-CLBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* stats, int count)
+LBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* stats, int count)
 {
     int pe,obj,com;
     double load_pe=0.0;
@@ -283,7 +288,7 @@ CLBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* stats, int count)
     }
     
     int migrate_count = migrateInfo.length();
-    CLBMigrateMsg* msg = new(&migrate_count,1) CLBMigrateMsg;
+    LBMigrateMsg* msg = new(&migrate_count,1) LBMigrateMsg;
     msg->n_moves = migrate_count;
     for(int i=0; i < migrate_count; i++) {
 	MigrateInfo* item = (MigrateInfo*)migrateInfo[i];
@@ -317,5 +322,5 @@ CLBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* stats, int count)
 
 #endif
 
-
+/*@}*/
 

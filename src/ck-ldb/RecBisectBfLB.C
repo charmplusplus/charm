@@ -5,6 +5,11 @@
  * $Revision$
  *****************************************************************************/
 
+/**
+ * \addtogroup CkLdb
+*/
+/*@{*/
+
 #include <charm++.h>
 
 #if CMK_LBDB_ON
@@ -59,7 +64,7 @@ CmiBool RecBisectBfLB::QueryBalanceNow(int _step)
   return CmiTrue;
 }
 
-CLBMigrateMsg* RecBisectBfLB::Strategy(CentralLB::LDStats* stats, 
+LBMigrateMsg* RecBisectBfLB::Strategy(CentralLB::LDStats* stats, 
 				       int numPartitions)
 {
   int i;
@@ -122,7 +127,7 @@ CLBMigrateMsg* RecBisectBfLB::Strategy(CentralLB::LDStats* stats,
   free(partitions);
 
   int migrate_count=migrateInfo.length();
-  CLBMigrateMsg* msg = new(&migrate_count,1) CLBMigrateMsg;
+  LBMigrateMsg* msg = new(&migrate_count,1) LBMigrateMsg;
   msg->n_moves = migrate_count;
   CkPrintf("Moving %d elements\n",migrate_count);
   for(i=0; i < migrate_count; i++) {
@@ -339,3 +344,4 @@ void RecBisectBfLB::recursivePartition(int numParts, Graph *g,
 #endif
 
 
+/*@}*/

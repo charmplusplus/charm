@@ -1,12 +1,17 @@
+/**
+ * \addtogroup CkLdb
+*/
+/*@{*/
+
+/** Cluster Manager Code, 
+   Accpets external bit vectors and then feeds it into the 
+   loadbalancer so that programs can shrink and expand. 
+*/
+
 #include "manager.h"
 #include "CentralLB.h"
 #include "converse.h"
 #include "conv-ccs.h"
-
-/* Cluster Manager Code, 
-   Accpets external bit vectors and then feeds it into the 
-   loadbalancer so that programs can shrink and expand. 
-*/
 
 CkGroupID manager_group_id;
 extern int load_balancer_created;
@@ -31,5 +36,4 @@ void manager_init(){
 
 
 
-
-
+/*@}*/

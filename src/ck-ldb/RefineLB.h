@@ -5,6 +5,11 @@
  * $Revision$
  *****************************************************************************/
 
+/**
+ * \addtogroup CkLdb
+*/
+/*@{*/
+
 #ifndef _REFINELB_H_
 #define _REFINELB_H_
 
@@ -38,7 +43,7 @@ public:
   RefineLB(CkMigrateMessage *m) {}
 private:
   CmiBool QueryBalanceNow(int step);
-  CLBMigrateMsg* Strategy(CentralLB::LDStats* stats, int count);
+  LBMigrateMsg* Strategy(CentralLB::LDStats* stats, int count);
 
 protected:
 /*
@@ -53,3 +58,5 @@ protected:
 };
 
 #endif /* _REFINELB_H_ */
+
+/*@}*/

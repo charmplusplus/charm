@@ -5,6 +5,11 @@
  * $Revision$
  *****************************************************************************/
 
+/**
+ * \addtogroup CkLdb
+*/
+/*@{*/
+
 #ifndef LBDATABASE_H
 #define LBDATABASE_H
 
@@ -134,3 +139,5 @@ private:
 };
 
 #endif /* LDATABASE_H */
+
+/*@}*/

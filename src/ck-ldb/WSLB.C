@@ -5,6 +5,11 @@
  * $Revision$
  *****************************************************************************/
 
+/**
+ * \addtogroup CkLdb
+*/
+/*@{*/
+
 #ifndef  WIN32
 #include <unistd.h>
 #endif
@@ -103,7 +108,7 @@ void WSLB::FindNeighbors()
     neighbor_pes = new int[num_neighbors()];
     neighbors(neighbor_pes);
     mig_msgs_expected = num_neighbors();
-    mig_msgs = new WSLBMigrateMsg*[num_neighbors()];
+    mig_msgs = new LBMigrateMsg*[num_neighbors()];
   }
 
 }
@@ -260,7 +265,7 @@ void WSLB::ReceiveStats(WSLBStatsMsg *m)
   if (stats_msg_count == clients && receive_stats_ready) {
     double strat_start_time = CmiWallTimer();
     receive_stats_ready = 0;
-    WSLBMigrateMsg* migrateMsg = Strategy(statsDataList,clients);
+    LBMigrateMsg* migrateMsg = Strategy(statsDataList,clients);
 
     int i;
 
@@ -296,7 +301,7 @@ void WSLB::ReceiveStats(WSLBStatsMsg *m)
   
 }
 
-void WSLB::ReceiveMigration(WSLBMigrateMsg *msg)
+void WSLB::ReceiveMigration(LBMigrateMsg *msg)
 {
   if (neighbor_pes == 0) FindNeighbors();
 
@@ -318,7 +323,7 @@ void WSLB::ReceiveMigration(WSLBMigrateMsg *msg)
 
   //  CkPrintf("[%d] in ReceiveMigration %d moves\n",CkMyPe(),msg->n_moves);
   for(int neigh=0; neigh < mig_msgs_received;neigh++) {
-    WSLBMigrateMsg* m = mig_msgs[neigh];
+    LBMigrateMsg* m = mig_msgs[neigh];
     for(int i=0; i < m->n_moves; i++) {
       MigrateInfo& move = m->moves[i];
       const int me = CkMyPe();
@@ -376,7 +381,7 @@ CmiBool WSLB::QueryBalanceNow(int step)
   return CmiTrue;
 }
 
-WSLBMigrateMsg* WSLB::Strategy(WSLB::LDStats* stats, int count)
+LBMigrateMsg* WSLB::Strategy(WSLB::LDStats* stats, int count)
 {
   //  CkPrintf("[%d] Strategy starting\n",CkMyPe());
   // Compute the average load to see if we are overloaded relative
@@ -532,7 +537,7 @@ WSLBMigrateMsg* WSLB::Strategy(WSLB::LDStats* stats, int count)
   //    CkPrintf("PE %d: Sent away %d of %d objects\n",
   //	     CkMyPe(),migrate_count,myStats.obj_data_sz);
   //  }
-  WSLBMigrateMsg* msg = new(&migrate_count,1) WSLBMigrateMsg;
+  LBMigrateMsg* msg = new(&migrate_count,1) LBMigrateMsg;
   msg->n_moves = migrate_count;
   for(i=0; i < migrate_count; i++) {
     MigrateInfo* item = (MigrateInfo*) migrateInfo[i];
@@ -544,36 +549,8 @@ WSLBMigrateMsg* WSLB::Strategy(WSLB::LDStats* stats, int count)
   return msg;
 };
 
-void* WSLBMigrateMsg::alloc(int msgnum, size_t size, int* array, int priobits)
-{
-  int totalsize = size + array[0] * sizeof(WSLB::MigrateInfo);
-
-  WSLBMigrateMsg* ret =
-    (WSLBMigrateMsg*)(CkAllocMsg(msgnum,totalsize,priobits));
-
-  ret->moves = (WSLB::MigrateInfo*) ((char*)(ret)+ size);
-
-  return (void*)(ret);
-}
-
-void* WSLBMigrateMsg::pack(WSLBMigrateMsg* m)
-{
-  m->moves = (WSLB::MigrateInfo*)((char*)(m->moves) - (char*)(&m->moves));
-
-  return (void*)(m);
-}
-
-WSLBMigrateMsg* WSLBMigrateMsg::unpack(void *m)
-{
-  WSLBMigrateMsg* ret_val = (WSLBMigrateMsg*)(m);
-
-  ret_val->moves = (WSLB::MigrateInfo*)
-    ((char*)(&ret_val->moves) + (size_t)(ret_val->moves));
-
-  return ret_val;
-}
-
 #include "WSLB.def.h"
 #endif
 
 
+/*@}*/

@@ -5,6 +5,11 @@
  * $Revision$
  *****************************************************************************/
 
+/**
+ * \addtogroup CkLdb
+*/
+/*@{*/
+
 #ifndef NBORBASELB_H
 #define NBORBASELB_H
 
@@ -15,8 +20,10 @@ extern CkGroupID nborBaselb;
 
 void CreateNborBaseLB();
 
+/// for backward compatibility
+typedef LBMigrateMsg NLBMigrateMsg;
+
 class NLBStatsMsg;
-class NLBMigrateMsg;
 
 class NborBaseLB : public CBase_NborBaseLB
 {
@@ -29,7 +36,7 @@ public:
 
   void ReceiveStats(NLBStatsMsg *); 		// Receive stats on PE 0
   void ResumeClients();
-  void ReceiveMigration(NLBMigrateMsg *); 	// Receive migration data
+  void ReceiveMigration(LBMigrateMsg *); 	// Receive migration data
 
   // Migrated-element callback
   static void staticMigrated(void* me, LDObjHandle h);
@@ -37,12 +44,6 @@ public:
 
   void MigrationDone(void);  // Call when migration is complete
   int step() { return mystep; };
-
-  struct MigrateInfo {  // Used in NLBMigrateMsg
-    LDObjHandle obj;
-    int from_pe;
-    int to_pe;
-  };
 
   struct LDStats {  // Passed to Strategy
     int from_pe;
@@ -66,7 +67,7 @@ public:
 protected:
   virtual CmiBool QueryBalanceNow(int) { return CmiTrue; };  
   virtual CmiBool QueryMigrateStep(int) { return CmiTrue; };  
-  virtual NLBMigrateMsg* Strategy(LDStats* stats,int count);
+  virtual LBMigrateMsg* Strategy(LDStats* stats,int count);
 
   virtual int max_neighbors() {
     if (CkNumPes() > 2) return 2;
@@ -113,7 +114,7 @@ private:
   LDStats* statsDataList;
   int migrates_completed;
   int migrates_expected;
-  NLBMigrateMsg** mig_msgs;
+  LBMigrateMsg** mig_msgs;
   int mig_msgs_received;
   int mig_msgs_expected;
   int* neighbor_pes;
@@ -139,16 +140,6 @@ public:
   LDCommData *commData;
 }; 
 
-class NLBMigrateMsg : public CMessage_NLBMigrateMsg {
-public:
-  int n_moves;
-  NborBaseLB::MigrateInfo* moves;
-
-  // Other methods & data members 
-  
-  static void* alloc(int msgnum, size_t size, int* array, int priobits); 
-  static void* pack(NLBMigrateMsg* in); 
-  static NLBMigrateMsg* unpack(void* in); 
-}; 
-
 #endif /* NBORBASELB_H */
+
+/*@}*/

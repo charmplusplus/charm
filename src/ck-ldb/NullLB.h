@@ -5,6 +5,11 @@
  * $Revision$
  *****************************************************************************/
 
+/**
+ * \addtogroup CkLdb
+*/
+/*@{*/
+
 #ifndef __CK_NULLLB_H
 #define __CK_NULLLB_H
 
@@ -33,3 +38,6 @@ public:
 };
 
 #endif /* def(thisHeader) */
+
+
+/*@}*/

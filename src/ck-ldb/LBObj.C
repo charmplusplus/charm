@@ -5,8 +5,12 @@
  * $Revision$
  *****************************************************************************/
 
-#include <converse.h>
+/**
+ * \addtogroup CkLdb
+*/
+/*@{*/
 
+#include <converse.h>
 
 #if CMK_LBDB_ON
 
@@ -50,3 +54,5 @@ void LBObj::StopTimer(double* walltime, double* cputime)
 }
 
 #endif
+
+/*@}*/

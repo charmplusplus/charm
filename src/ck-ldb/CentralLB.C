@@ -5,6 +5,11 @@
  * $Revision$
  *****************************************************************************/
 
+/**
+ * \addtogroup CkLdb
+*/
+/*@{*/
+
 #include <charm++.h>
 #include "CentralLB.h"
 #include "CentralLB.def.h"
@@ -201,7 +206,7 @@ void CentralLB::ReceiveStats(CLBStatsMsg *m)
     
 //    CkPrintf("Before Calling Strategy\n");
 
-    CLBMigrateMsg* migrateMsg = Strategy(statsDataList,clients);
+    LBMigrateMsg* migrateMsg = Strategy(statsDataList,clients);
 
 //    CkPrintf("returned successfully\n");
     int num_proc = CkNumPes();
@@ -225,7 +230,7 @@ void CentralLB::ReceiveStats(CLBStatsMsg *m)
   
 }
 
-void CentralLB::ReceiveMigration(CLBMigrateMsg *m)
+void CentralLB::ReceiveMigration(LBMigrateMsg *m)
 {
   DEBUGF(("[%d] in ReceiveMigration %d moves\n",CkMyPe(),m->n_moves));
   migrates_expected = 0;
@@ -274,7 +279,7 @@ void CentralLB::ResumeClients()
   theLbdb->ResumeClients();
 }
 
-CLBMigrateMsg* CentralLB::Strategy(LDStats* stats,int count)
+LBMigrateMsg* CentralLB::Strategy(LDStats* stats,int count)
 {
   for(int j=0; j < count; j++) {
     int i;
@@ -322,51 +327,12 @@ CLBMigrateMsg* CentralLB::Strategy(LDStats* stats,int count)
   }
 
   int sizes=0;
-  CLBMigrateMsg* msg = new(&sizes,1) CLBMigrateMsg;
+  LBMigrateMsg* msg = new(&sizes,1) LBMigrateMsg;
   msg->n_moves = 0;
 
   return msg;
 }
 
-
-void* CLBMigrateMsg::alloc(int msgnum, size_t size, int* array, int priobits)
-{
-  int totalsize = size + array[0] * sizeof(CentralLB::MigrateInfo) 
-    + CkNumPes() * sizeof(char);
-
-  CLBMigrateMsg* ret =
-    (CLBMigrateMsg*)(CkAllocMsg(msgnum,totalsize,priobits));
-
-  ret->moves = (CentralLB::MigrateInfo*) ((char*)(ret)+ size);
-
-  ret->avail_vector = (char *)(ret->moves + array[0]);
-  return (void*)(ret);
-}
-
-void* CLBMigrateMsg::pack(CLBMigrateMsg* m)
-{
-  m->moves = (CentralLB::MigrateInfo*)
-    ((char*)(m->moves) - (char*)(&m->moves));
-
-  m->avail_vector =(char*)(m->avail_vector
-      - (char*)(&m->avail_vector));
-
-  return (void*)(m);
-}
-
-CLBMigrateMsg* CLBMigrateMsg::unpack(void *m)
-{
-  CLBMigrateMsg* ret_val = (CLBMigrateMsg*)(m);
-
-  ret_val->moves = (CentralLB::MigrateInfo*)
-    ((char*)(&ret_val->moves) 
-     + (size_t)(ret_val->moves));
-
-  ret_val->avail_vector =
-    (char*)((char*)(&ret_val->avail_vector)
-			    +(size_t)(ret_val->avail_vector));
-
-  return ret_val;
-}
-
 #endif
+
+/*@}*/

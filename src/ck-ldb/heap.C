@@ -11,6 +11,11 @@
 ***  All rights reserved.
 **/
 
+/**
+ * \addtogroup CkLdb
+*/
+/*@{*/
+
 class manheap;
 class maxHeap;
 #include "heap.h"
@@ -213,3 +218,5 @@ InfoRecord *maxHeap::next(heapIterator *iter){
   iter->next += 1;
   return h[iter->next - 1].info;
 }
+
+/*@}*/

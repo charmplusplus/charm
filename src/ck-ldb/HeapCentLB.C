@@ -5,6 +5,11 @@
  * $Revision$
  *****************************************************************************/
 
+/**
+ * \addtogroup CkLdb
+*/
+/*@{*/
+
 #include <charm++.h>
 
 #if CMK_LBDB_ON
@@ -161,7 +166,7 @@ HeapCentLB::BuildCpuArray(CentralLB::LDStats* stats,
   return data;
 }
 
-CLBMigrateMsg* HeapCentLB::Strategy(CentralLB::LDStats* stats, int count)
+LBMigrateMsg* HeapCentLB::Strategy(CentralLB::LDStats* stats, int count)
 {
   CkVec<MigrateInfo*> migrateInfo;
   int      obj, heapSize, objCount;
@@ -213,7 +218,7 @@ CLBMigrateMsg* HeapCentLB::Strategy(CentralLB::LDStats* stats, int count)
 
   int migrate_count=migrateInfo.length();
   CkPrintf("HeapCentLB migrating %d elements\n",migrate_count);
-  CLBMigrateMsg* msg = new(&migrate_count,1) CLBMigrateMsg;
+  LBMigrateMsg* msg = new(&migrate_count,1) LBMigrateMsg;
   msg->n_moves = migrate_count;
   for(int i=0; i < migrate_count; i++) {
     MigrateInfo* item = (MigrateInfo*) migrateInfo[i];
@@ -227,6 +232,7 @@ CLBMigrateMsg* HeapCentLB::Strategy(CentralLB::LDStats* stats, int count)
 #endif
 
 
+/*@}*/
 
 
 

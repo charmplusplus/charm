@@ -11,14 +11,12 @@ message CLBStatsMsg{
  char       avail_vector[];
 };
 
-message CLBMigrateMsg;
-
 group CentralLB : BaseLB {
   entry void CentralLB(void);  
   entry void ProcessAtSync(void);
   entry void ReceiveStats(CLBStatsMsg*);
   entry void ResumeClients(void);
-  entry void ReceiveMigration(CLBMigrateMsg*);	
+  entry void ReceiveMigration(LBMigrateMsg*);	
 };
 
 };

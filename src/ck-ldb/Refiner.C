@@ -5,8 +5,14 @@
  * $Revision$
  *****************************************************************************/
 
-// This code is derived from RefineLB.C, and RefineLB.C should
-// be rewritten to use this, so there is no code duplication
+/**
+ * \addtogroup CkLdb
+*/
+/*@{*/
+
+/** This code is derived from RefineLB.C, and RefineLB.C should
+ be rewritten to use this, so there is no code duplication
+*/
 
 #include "Refiner.h"
 
@@ -299,3 +305,6 @@ void Refiner::Refine(int count, CentralLB::LDStats* stats,
     }
   }
 };
+
+
+/*@}*/

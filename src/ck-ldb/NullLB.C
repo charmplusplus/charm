@@ -5,6 +5,11 @@
  * $Revision$
  *****************************************************************************/
 
+/**
+ * \addtogroup CkLdb
+*/
+/*@{*/
+
 #include <charm++.h>
 #include <BaseLB.h>
 #include "NullLB.h"
@@ -72,3 +77,6 @@ void NullLB::migrationsDone(void) {}
 #endif
 
 #include "NullLB.def.h"
+
+
+/*@}*/

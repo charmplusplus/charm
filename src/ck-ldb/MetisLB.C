@@ -5,6 +5,11 @@
  * $Revision$
  *****************************************************************************/
 
+/**
+ * \addtogroup CkLdb
+*/
+/*@{*/
+
 #include <charm++.h>
 
 #if CMK_LBDB_ON
@@ -98,10 +103,10 @@ extern "C" void METIS_mCPartGraphKway(int*, int*, int*, int*, int*, int*,
                                     int*, int*, int*, int*, int*,
                                     int*, int*);
 /*
-CLBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count,
+LBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count,
 				 int option=0)
 */
-CLBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
+LBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
 {
   // CkPrintf("entering MetisLB::Strategy...\n");
   // CkPrintf("[%d] MetisLB strategy\n",CkMyPe());
@@ -311,7 +316,7 @@ CLBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
 
   int migrate_count=migrateInfo.length();
   //  CkPrintf("Migration Count = %d\n", migrate_count);
-  CLBMigrateMsg* msg = new(&migrate_count,1) CLBMigrateMsg;
+  LBMigrateMsg* msg = new(&migrate_count,1) LBMigrateMsg;
   msg->n_moves = migrate_count;
   for(i=0; i < migrate_count; i++) {
     MigrateInfo* item = (MigrateInfo*)migrateInfo[i];
@@ -324,3 +329,5 @@ CLBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
 }
 
 #endif
+
+/*@}*/

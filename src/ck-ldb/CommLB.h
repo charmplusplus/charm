@@ -5,6 +5,11 @@
  * $Revision$
  *****************************************************************************/
 
+/**
+ * \addtogroup CkLdb
+*/
+/*@{*/
+
 #ifndef _COMMLB_H_
 #define _COMMLB_H_
 
@@ -36,9 +41,10 @@ public:
   obj_id * translate;
   int * htable;
   CommLB();
+  CommLB(CkMigrateMessage *m) {}
 private:
   CmiBool QueryBalanceNow(int step);
-  CLBMigrateMsg* Strategy(CentralLB::LDStats* stats, int count);
+  LBMigrateMsg* Strategy(CentralLB::LDStats* stats, int count);
   void alloc(int pe, int id, double load);
   double compute_com(int id,int pe); 
   int search(LDObjid oid, LDOMid mid);
@@ -50,7 +56,7 @@ private:
 
 
 
-
+/*@}*/
 
 
 

@@ -1,3 +1,8 @@
+/**
+ * \addtogroup CkLdb
+*/
+/*@{*/
+
 /*
  Startup routine for use when you include all the load balancers.
 */
@@ -17,3 +22,5 @@ void initEveryLB(void) {
 }
 
 #include "EveryLB.def.h"
+
+/*@}*/

@@ -5,6 +5,11 @@
  * $Revision$
  *****************************************************************************/
 
+/**
+ * \addtogroup CkLdb
+*/
+/*@{*/
+
 #ifndef _NEIGHBORLB_H_
 #define _NEIGHBORLB_H_
 
@@ -44,7 +49,9 @@ private:
       _n[3] = (me + npe - bigstep) % npe;
   };
 
-  NLBMigrateMsg* Strategy(NborBaseLB::LDStats* stats, int count);
+  LBMigrateMsg* Strategy(NborBaseLB::LDStats* stats, int count);
 };
 
 #endif /* _NeighborLB_H_ */
+
+/*@}*/

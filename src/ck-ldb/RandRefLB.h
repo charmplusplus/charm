@@ -5,6 +5,11 @@
  * $Revision$
  *****************************************************************************/
 
+/**
+ * \addtogroup CkLdb
+*/
+/*@{*/
+
 #ifndef _RANDREFLB_H_
 #define _RANDREFLB_H_
 
@@ -19,7 +24,10 @@ public:
   RandRefLB(CkMigrateMessage *m) {}
 private:
   CmiBool QueryBalanceNow(int step);
-  CLBMigrateMsg* Strategy(CentralLB::LDStats* stats, int count);
+  LBMigrateMsg* Strategy(CentralLB::LDStats* stats, int count);
 };
 
 #endif /* _RANDCENTLB_H_ */
+
+
+/*@}*/

@@ -11,6 +11,11 @@
 ***  All rights reserved.
 **/
 
+/**
+ * \addtogroup CkLdb
+*/
+/*@{*/
+
 #include "CommLBHeap.h"
 #include "charm++.h"
 
@@ -102,3 +107,5 @@ ObjectRecord *ObjectHeap::next(hIterator *iter){
   iter->next += 1;
   return h[iter->next - 1].info;
 }
+
+/*@}*/

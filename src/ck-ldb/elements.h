@@ -11,6 +11,11 @@
 ***  All rights reserved.
 **/
 
+/**
+ * \addtogroup CkLdb
+*/
+/*@{*/
+
 #ifndef ELEMENTS_DEFS_H
 #define ELEMENTS_DEFS_H
 
@@ -57,3 +62,5 @@ public:
 };
 
 #endif
+
+/*@}*/

@@ -5,6 +5,11 @@
  * $Revision$
  *****************************************************************************/
 
+/**
+ * \addtogroup CkLdb
+*/
+/*@{*/
+
 #include "converse.h"
 #include "graph.h"
 #include <stdlib.h>
@@ -167,3 +172,5 @@ float graph_weightof(Graph *g, int vertex) {
   return g->vertices[vertex].weight;
 
 }
+
+/*@}*/

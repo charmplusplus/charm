@@ -11,6 +11,11 @@
 ***  All rights reserved.
 **/
 
+/**
+ * \addtogroup CkLdb
+*/
+/*@{*/
+
 #include "Set.h"
 #include "elements.h"
 #include <iostream.h>
@@ -120,3 +125,6 @@ void Set::print()
     p = p->next;
   }
 }
+
+
+/*@}*/

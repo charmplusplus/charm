@@ -11,6 +11,11 @@
 ***  All rights reserved.
 **/
 
+/**
+ * \addtogroup CkLdb
+*/
+/*@{*/
+
 #ifndef __COMM_LB_HEAP
 #define __COMM_LB_HEAP
 
@@ -57,3 +62,5 @@ public:
 };
 
 #endif
+
+/*@}*/

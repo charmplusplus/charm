@@ -5,6 +5,11 @@
  * $Revision$
  *****************************************************************************/
 
+/**
+ * \addtogroup CkLdb
+*/
+/*@{*/
+
 #ifndef _OBJGRAPH_H_
 #define _OBJGRAPH_H_
 
@@ -78,3 +83,5 @@ private:
 };
 
 #endif
+
+/*@}*/

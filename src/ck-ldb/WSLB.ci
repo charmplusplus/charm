@@ -6,13 +6,12 @@ extern module BaseLB;
 readonly CkGroupID wslb;
 
 message WSLBStatsMsg;
-message WSLBMigrateMsg;
 
 group WSLB: BaseLB {
   entry void WSLB(void);  
   entry void ReceiveStats(WSLBStatsMsg*);
   entry void ResumeClients(void);
-  entry void ReceiveMigration(WSLBMigrateMsg*);	
+  entry void ReceiveMigration(LBMigrateMsg*);	
 };
 
 };

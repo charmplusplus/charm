@@ -5,6 +5,11 @@
  * $Revision$
  *****************************************************************************/
 
+/**
+ * \addtogroup CkLdb
+*/
+/*@{*/
+
 #ifndef  WIN32
 #include <unistd.h>
 #endif
@@ -92,7 +97,7 @@ void NborBaseLB::FindNeighbors()
     neighbor_pes = new int[max_neighbors()];
     neighbors(neighbor_pes);
     mig_msgs_expected = num_neighbors();
-    mig_msgs = new NLBMigrateMsg*[num_neighbors()];
+    mig_msgs = new LBMigrateMsg*[num_neighbors()];
   }
 
 }
@@ -235,7 +240,7 @@ void NborBaseLB::ReceiveStats(NLBStatsMsg *m)
   if (stats_msg_count == clients && receive_stats_ready) {
     double strat_start_time = CmiWallTimer();
     receive_stats_ready = 0;
-    NLBMigrateMsg* migrateMsg = Strategy(statsDataList,clients);
+    LBMigrateMsg* migrateMsg = Strategy(statsDataList,clients);
 
     int i;
 
@@ -253,7 +258,7 @@ void NborBaseLB::ReceiveStats(NLBStatsMsg *m)
     
     // Now, send migrate messages to neighbors
     for(i=1; i < num_neighbors(); i++) {
-      NLBMigrateMsg* m2 = (NLBMigrateMsg*) CkCopyMsg((void**)&migrateMsg);
+      LBMigrateMsg* m2 = (LBMigrateMsg*) CkCopyMsg((void**)&migrateMsg);
       thisProxy [neighbor_pes[i]].ReceiveMigration(m2);
     }
     if (0 < num_neighbors())
@@ -276,7 +281,7 @@ void NborBaseLB::ReceiveStats(NLBStatsMsg *m)
   
 }
 
-void NborBaseLB::ReceiveMigration(NLBMigrateMsg *msg)
+void NborBaseLB::ReceiveMigration(LBMigrateMsg *msg)
 {
   if (neighbor_pes == 0) FindNeighbors();
 
@@ -298,7 +303,7 @@ void NborBaseLB::ReceiveMigration(NLBMigrateMsg *msg)
 
   //  CkPrintf("[%d] in ReceiveMigration %d moves\n",CkMyPe(),msg->n_moves);
   for(int neigh=0; neigh < mig_msgs_received;neigh++) {
-    NLBMigrateMsg* m = mig_msgs[neigh];
+    LBMigrateMsg* m = mig_msgs[neigh];
     for(int i=0; i < m->n_moves; i++) {
       MigrateInfo& move = m->moves[i];
       const int me = CkMyPe();
@@ -336,7 +341,7 @@ void NborBaseLB::ResumeClients()
   theLbdb->ResumeClients();
 }
 
-NLBMigrateMsg* NborBaseLB::Strategy(LDStats* stats,int count)
+LBMigrateMsg* NborBaseLB::Strategy(LDStats* stats,int count)
 {
   for(int j=0; j < count; j++) {
     CkPrintf(
@@ -353,7 +358,7 @@ NLBMigrateMsg* NborBaseLB::Strategy(LDStats* stats,int count)
   myStats.n_comm = 0;
 
   int sizes=0;
-  NLBMigrateMsg* msg = new(&sizes,1) NLBMigrateMsg;
+  LBMigrateMsg* msg = new(&sizes,1) LBMigrateMsg;
   msg->n_moves = 0;
 
   return msg;
@@ -371,34 +376,7 @@ int NborBaseLB::NeighborIndex(int pe)
     return peslot;
 }
 
-void* NLBMigrateMsg::alloc(int msgnum, size_t size, int* array, int priobits)
-{
-  int totalsize = size + array[0] * sizeof(NborBaseLB::MigrateInfo);
-
-  NLBMigrateMsg* ret =
-    (NLBMigrateMsg*)(CkAllocMsg(msgnum,totalsize,priobits));
-
-  ret->moves = (NborBaseLB::MigrateInfo*) ((char*)(ret)+ size);
-
-  return (void*)(ret);
-}
-
-void* NLBMigrateMsg::pack(NLBMigrateMsg* m)
-{
-  m->moves = (NborBaseLB::MigrateInfo*)
-    ((char*)(m->moves) - (char*)(&m->moves));
-
-  return (void*)(m);
-}
-
-NLBMigrateMsg* NLBMigrateMsg::unpack(void *m)
-{
-  NLBMigrateMsg* ret_val = (NLBMigrateMsg*)(m);
-
-  ret_val->moves = (NborBaseLB::MigrateInfo*)
-    ((char*)(&ret_val->moves) + (size_t)(ret_val->moves));
-
-  return ret_val;
-}
-
 #endif
+
+
+/*@{*/

@@ -5,6 +5,11 @@
  * $Revision$
  *****************************************************************************/
 
+/**
+ * \addtogroup CkLdb
+*/
+/*@{*/
+
 #ifndef _LDMACHINEUTIL_H_
 #define _LDMACHINEUTIL_H_
 
@@ -34,3 +39,5 @@ private:
 };
 
 #endif  // _LDMACHINEUTIL_H_
+
+/*@}*/
