@@ -690,13 +690,27 @@ cat >> confdefs.h <<EOF
 EOF
 
 
+#test if we can have multiple delete like this
+cat > $t <<EOT
+class foo {
+public:
+  void operator delete(void*p){};
+  void operator delete(void*p,int*){};
+};
+EOT
+test_cxx "whether operator delete can be overloaded in same class" "ok" "no"
+cat >> confdefs.h <<EOF
+#define CMK_MULTIPLE_DELETE $pass
+EOF
+
+
 #test fortran subroutine name
 FCC=`echo $CMK_CF90 | cut -d' ' -f1`
 
 # Extract the first word of ""$FCC"", so it can be a program name with args.
 set dummy "$FCC"; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:700: checking for $ac_word" >&5
+echo "configure:714: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_FCL'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -725,7 +739,7 @@ fi
 if test -n "$FCL"
 then
   echo $ac_n "checking subroutine name used by Fortran compiler""... $ac_c" 1>&6
-echo "configure:729: checking subroutine name used by Fortran compiler" >&5
+echo "configure:743: checking subroutine name used by Fortran compiler" >&5
   if eval "test \"`echo '$''{'fortran_postfix'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -794,7 +808,7 @@ then
     # Extract the first word of "wget", so it can be a program name with args.
 set dummy wget; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:798: checking for $ac_word" >&5
+echo "configure:812: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_WGET'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -823,7 +837,7 @@ fi
     # Extract the first word of "lynx", so it can be a program name with args.
 set dummy lynx; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:827: checking for $ac_word" >&5
+echo "configure:841: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_LYNX'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -852,7 +866,7 @@ fi
     # Extract the first word of "telnet", so it can be a program name with args.
 set dummy telnet; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:856: checking for $ac_word" >&5
+echo "configure:870: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_TELNET'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -881,7 +895,7 @@ fi
     # Extract the first word of "uudecode", so it can be a program name with args.
 set dummy uudecode; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:885: checking for $ac_word" >&5
+echo "configure:899: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_UUDECODE'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else

@@ -134,6 +134,17 @@ EOT
 test_cxx "whether namespaces work" "ok" "no"
 AC_DEFINE_UNQUOTED(CMK_NAMESPACES_BROKEN, $fail)
 
+#test if we can have multiple delete like this
+cat > $t <<EOT
+class foo {
+public:
+  void operator delete(void*p){};
+  void operator delete(void*p,int*){};
+};
+EOT
+test_cxx "whether operator delete can be overloaded in same class" "ok" "no"
+AC_DEFINE_UNQUOTED(CMK_MULTIPLE_DELETE, $pass)
+
 #test fortran subroutine name
 FCC=`echo $CMK_CF90 | cut -d' ' -f1`
 
