@@ -1,0 +1,11 @@
+module f90main {
+//  extern module hello;
+
+  readonly CkChareID mainhandle;
+
+  mainchare f90main {
+    entry f90main();
+    entry void done(void);
+  };
+
+}
