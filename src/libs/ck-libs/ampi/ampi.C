@@ -275,6 +275,8 @@ void
 ampi::restart(DirMsg *m)
 {
   CkPrintf("[%d] restarting...\n", thisIndex);
+  CtvInitialize(ampi *, ampiPtr);
+  CtvAccess(ampiPtr) = this;
   restartThread(m->dname);
   delete m;
 }

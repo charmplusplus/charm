@@ -168,7 +168,6 @@ class ampi : public ArrayElement1D {
       if(fp!=0) {
         PUP::toDisk p(fp);
         pup(p);
-        fclose(fp);
       } else {
         CkError("Cannot checkpoint to file %s! Continuing...\n");
       }
@@ -188,7 +187,6 @@ class ampi : public ArrayElement1D {
       if(fp!=0) {
         PUP::fromDisk p(fp);
         pup(p);
-        fclose(fp);
         CthAwaken(thread_id);
         thread_id = 0;
       } else {
