@@ -96,7 +96,7 @@ ENVELOPE *envelope;
 /* Addition for threads tracing */
   if(envelope == 0) {
     setEvent(CpvAccess(cThread),CpvAccess(current_event));
-    add_to_buffer(CREATION, CpvAccess(threadMsg), CpvAccess(threadEp),
+    add_to_buffer(CREATION, ForChareMsg, CpvAccess(threadEp),
                             CkUTimer(), getEvent(CpvAccess(cThread)),
                             CmiMyPe());
     CpvAccess(current_event) += 1;
@@ -124,7 +124,7 @@ ENVELOPE *envelope;
 	int msg_type;
 /* Addition for threads tracing */
   if(envelope == 0) {
-    msg_type = CpvAccess(threadMsg);
+    msg_type = ForChareMsg;
     CpvAccess(begin_event) = getEvent(CpvAccess(cThread));
     CpvAccess(begin_pe) = CmiMyPe();
     add_to_buffer(BEGIN_PROCESSING, msg_type, CpvAccess(threadEp), CkUTimer(),
