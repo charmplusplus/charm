@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.6  1995-09-07 05:26:38  gursoy
+ * Revision 2.7  1995-09-14 20:47:38  jyelon
+ * Added +fifo +lifo +ififo +ilifo +bfifo +blifo command-line options.
+ *
+ * Revision 2.6  1995/09/07  05:26:38  gursoy
  * introduced new global variables used by HANDLE_INIT_MSG
  *
  * Revision 2.5  1995/09/06  21:48:50  jyelon
@@ -108,6 +111,7 @@ CpvDeclare(int, nodeforCharesProcessed);
 
 CpvDeclare(int, PrintChareStat); 
 CpvDeclare(int, PrintSummaryStat);
+CpvDeclare(int, QueueingDefault);
 
 CpvDeclare(int, RecdStatMsg);
 CpvDeclare(int, RecdPerfMsg);

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.17  1995-09-07 21:21:38  jyelon
+ * Revision 2.18  1995-09-14 20:49:17  jyelon
+ * Added +fifo +lifo +ififo +ilifo +bfifo +blifo command-line options.
+ *
+ * Revision 2.17  1995/09/07  21:21:38  jyelon
  * Added prefixes to Cpv and Csv macros, fixed bugs thereby revealed.
  *
  * Revision 2.16  1995/09/07  05:24:27  gursoy
@@ -468,69 +471,76 @@ ParseCommandOptions(argc, argv)
 int             argc;
 char          **argv;
 {
-/* Removed Converse options into ConverseParseCommandOptions. - Sanjeev */
-	/*
-	 * configure the chare kernel according to command line parameters.
-	 * by convention, chare kernel parameters begin with '+'.
-	 */
-	int             i, j, numSysOpts = 0, foundSysOpt = 0, end;
-	int             mainflag = 0, memflag = 0;
-        int             numPe;
-	if (argc < 1)
-	{
-		CmiPrintf("Too few arguments. Usage> host_prog node_prog [...]\n");
-		exit(1);
-	}
+  /* Removed Converse options into ConverseParseCommandOptions. - Sanjeev */
+  /*
+   * configure the chare kernel according to command line parameters.
+   * by convention, chare kernel parameters begin with '+'.
+   */
+  int             i, j, numSysOpts = 0, foundSysOpt = 0, end;
+  int             mainflag = 0, memflag = 0;
+  int             numPe;
+  if (argc < 1)
+    {
+      CmiPrintf("Too few arguments. Usage> host_prog node_prog [...]\n");
+      exit(1);
+    }
 
-	end = argc;
-	if (CmiMyPe() == 0)
-		mainflag = 1;
-
-	for (i = 1; i < end; i++)
-	{
-		foundSysOpt = 0;
-		if (strcmp(argv[i], "+cs") == 0)
-		{
-			CpvAccess(PrintChareStat) = 1;
-			/*
-			 * if (mainflag) CmiPrintf("Chare Statistics Turned
-			 * On\n");
-			 */
-			foundSysOpt = 1;
-		}
-		else if (strcmp(argv[i], "+ss") == 0)
-		{
-			CpvAccess(PrintSummaryStat) = 1;
-			/*
-			 * if(mainflag)CmiPrintf("Summary Statistics Turned
-			 * On\n");
-			 */
-			foundSysOpt = 1;
-		}
-                else if (strcmp(argv[i], "+p") == 0 && i + 1 < argc)
-                {
-                        sscanf(argv[i + 1], "%d", &numPe);
-                        foundSysOpt = 2;
-                }
-                else if (sscanf(argv[i], "+p%d", &numPe) == 1)
-                {
-                        foundSysOpt = 1;
-                }
-		if (foundSysOpt)
-		{
-			/* if system option, remove it. */
-			numSysOpts += foundSysOpt;
-			end -= foundSysOpt;
-			for (j = i; j < argc - foundSysOpt; j++)
-			{
-				argv[j] = argv[j + foundSysOpt];
-			}
-			/* reset i because we shuffled everything down one */
-			i--;
-		}
-
-	}
-	return (argc - numSysOpts);
+  end = argc;
+  if (CmiMyPe() == 0)
+    mainflag = 1;
+  
+  for (i = 1; i < end; i++) {
+    foundSysOpt = 0;
+    if (strcmp(argv[i], "+cs") == 0) {
+      CpvAccess(PrintChareStat) = 1;
+      /*
+       * if (mainflag) CmiPrintf("Chare Statistics Turned
+       * On\n");
+       */
+      foundSysOpt = 1;
+    } else if (strcmp(argv[i], "+ss") == 0) {
+      CpvAccess(PrintSummaryStat) = 1;
+      /*
+       * if(mainflag)CmiPrintf("Summary Statistics Turned
+       * On\n");
+       */
+      foundSysOpt = 1;
+    } else if (strcmp(argv[i],"+fifo")==0) {
+      CpvAccess(QueueingDefault) = CK_QUEUEING_FIFO;
+      foundSysOpt = 1;
+    } else if (strcmp(argv[i],"+lifo")==0) {
+      CpvAccess(QueueingDefault) = CK_QUEUEING_LIFO;
+      foundSysOpt = 1;
+    } else if (strcmp(argv[i],"+ififo")==0) {
+      CpvAccess(QueueingDefault) = CK_QUEUEING_IFIFO;
+      foundSysOpt = 1;
+    } else if (strcmp(argv[i],"+ilifo")==0) {
+      CpvAccess(QueueingDefault) = CK_QUEUEING_ILIFO;
+      foundSysOpt = 1;
+    } else if (strcmp(argv[i],"+bfifo")==0) {
+      CpvAccess(QueueingDefault) = CK_QUEUEING_BFIFO;
+      foundSysOpt = 1;
+    } else if (strcmp(argv[i],"+blifo")==0) {
+      CpvAccess(QueueingDefault) = CK_QUEUEING_BLIFO;
+      foundSysOpt = 1;
+    } else if (strcmp(argv[i], "+p") == 0 && i + 1 < argc) {
+      sscanf(argv[i + 1], "%d", &numPe);
+      foundSysOpt = 2;
+    } else if (sscanf(argv[i], "+p%d", &numPe) == 1) {
+      foundSysOpt = 1;
+    }
+    if (foundSysOpt) {
+      /* if system option, remove it. */
+      numSysOpts += foundSysOpt;
+      end -= foundSysOpt;
+      for (j = i; j < argc - foundSysOpt; j++) {
+	argv[j] = argv[j + foundSysOpt];
+      }
+      /* reset i because we shuffled everything down one */
+      i--;
+    }
+  }
+  return (argc - numSysOpts);
 }
 
 

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.10  1995-09-07 21:21:38  jyelon
+ * Revision 2.11  1995-09-14 20:49:17  jyelon
+ * Added +fifo +lifo +ififo +ilifo +bfifo +blifo command-line options.
+ *
+ * Revision 2.10  1995/09/07  21:21:38  jyelon
  * Added prefixes to Cpv and Csv macros, fixed bugs thereby revealed.
  *
  * Revision 2.9  1995/09/01  02:13:17  jyelon
@@ -116,7 +119,7 @@ unsigned int msgbytes;
   ClrEnv_LdbFull(envptr);
   SetEnv_TotalSize(envptr, totalsize);
   SetEnv_packid(envptr, 0);
-  SetEnv_queueing(envptr, CK_QUEUEING_FIFO);
+  SetEnv_queueing(envptr, CpvAccess(QueueingDefault));
   SetEnv_priosize(envptr, 0);
   return((void *)USER_MSG_PTR(envptr));
 }
@@ -213,7 +216,7 @@ unsigned int priobits;
     CkMemError(env);
 
     SetEnv_priosize(env, priobits);
-    SetEnv_queueing(env, CK_QUEUEING_BFIFO);
+    SetEnv_queueing(env, CpvAccess(QueueingDefault));
     ClrEnv_LdbFull(env);
 
     if (CsvAccess(MsgToStructTable)[msgno].packfn != NULL)

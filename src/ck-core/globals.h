@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.8  1995-09-07 05:26:14  gursoy
+ * Revision 2.9  1995-09-14 20:49:01  jyelon
+ * Added +fifo +lifo +ififo +ilifo +bfifo +blifo command-line options.
+ *
+ * Revision 2.8  1995/09/07  05:26:14  gursoy
  * introduced new global variables used by HANDLE_INIT_MSG
  *
  * Revision 2.7  1995/09/06  21:48:50  jyelon
@@ -104,6 +107,7 @@ CpvExtern(int, PrintQueStat);
 CpvExtern(int, PrintMemStat); 
 CpvExtern(int, PrintChareStat);
 CpvExtern(int, PrintSummaryStat);
+CpvExtern(int, QueueingDefault);
 
 CpvExtern(int, RecdStatMsg);
 CpvExtern(int, RecdPerfMsg);
