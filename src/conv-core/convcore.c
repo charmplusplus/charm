@@ -4,7 +4,22 @@
 #include "conv-trace.h"
 #include "conv-ccs.h"
 #include <errno.h>
+
+#ifndef WIN32
 #include <sys/file.h>
+#endif
+
+#ifdef WIN32
+#include "queueing.h"
+
+extern void CqsDequeue(Queue, void **);
+extern void CqsEnqueueFifo(Queue, void *);
+extern void CcdModuleInit(char **);
+extern void CmiMemoryInit(char **);
+extern void CldModuleInit(void);
+extern int  CqsPrioGT(prio, prio);
+extern prio CqsGetPriority(Queue);
+#endif
 
 /*
 #if NODE_0_IS_CONVHOST
@@ -30,6 +45,14 @@
 #if CMK_TIMER_USE_GETRUSAGE
 #include <sys/time.h>
 #include <sys/resource.h>
+#endif
+
+#ifdef CMK_TIMER_USE_WIN32API
+#include <stdlib.h>
+#include <malloc.h>
+#include <time.h>
+#include <sys/types.h>
+#include <sys/timeb.h>
 #endif
 
 #include "fifo.h"
@@ -374,6 +397,54 @@ double CmiWallTimer()
 double CmiTimer()
 {
   return CmiCpuTimer();
+}
+
+#endif
+
+#if CMK_TIMER_USE_WIN32API
+
+CpvStaticDeclare(double, inittime_wallclock);
+CpvStaticDeclare(double, inittime_virtual);
+
+void CmiTimerInit()
+{
+	struct _timeb tv;
+	clock_t       ru;
+
+	CpvInitialize(double, inittime_wallclock);
+	CpvInitialize(double, inittime_virtual);
+	_ftime(&tv);
+	CpvAccess(inittime_wallclock) = tv.time*1.0 + tv.millitm*0.001;
+	ru = clock();
+	CpvAccess(inittime_virtual) = ((double) ru)/CLOCKS_PER_SEC;
+}
+
+double CmiCpuTimer()
+{
+	clock_t ru;
+	double currenttime;
+
+	ru = clock();
+	currenttime = (double) ru/CLOCKS_PER_SEC;
+
+	return currenttime - CpvAccess(inittime_virtual);
+}
+
+double CmiWallTimer()
+{
+	struct _timeb tv;
+	double currenttime;
+
+	_ftime(&tv);
+	currenttime = tv.time*1.0 + tv.millitm*0.001;
+
+	return currenttime - CpvAccess(inittime_wallclock);
+}
+	
+
+double CmiTimer()
+{
+	return CmiCpuTimer();
 }
 
 #endif
