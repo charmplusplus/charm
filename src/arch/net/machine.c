@@ -529,10 +529,6 @@ void CmiEnableNonblockingIO(int fd) {
 void CmiEnableNonblockingIO(int fd) { }
 #endif
 
-#if CMK_NODE_QUEUE_AVAILABLE
-CsvStaticDeclare(CmiNodeLock, CmiNodeRecvLock);
-CsvStaticDeclare(PCQueue, NodeRecv);
-#endif
 
 /******************************************************************************
  *
@@ -597,6 +593,8 @@ static void extract_common_args(char **argv)
 
 /* for SMP */
 #include "machine-smp.c"
+
+CsvDeclare(CmiNodeState, NodeState);
 
 /******************************************************************************
  *
@@ -796,6 +794,15 @@ static void CmiPushPE(int pe,void *msg)
 {
   CmiState cs=CmiGetStateN(pe);
   MACHSTATE1(2,"Pushing message into %d's queue",pe);
+#if CMK_IMMEDIATE_MSG
+  if (CmiGetHandler(msg) == CpvAccessOther(CmiImmediateMsgHandlerIdx,0)) {
+//CmiPrintf("[node %d] Immediate Message %d %d {{. \n", CmiMyNode(), CmiGetHandler(msg), _ImmediateMsgHandlerIdx);
+//    CmiHandleMessage(msg);
+//CmiPrintf("[node %d] Immediate Message done.}} \n", CmiMyNode());
+    CdsFifo_Enqueue(CsvAccess(NodeState).imm, msg);
+    return;
+  }
+#endif
   PCQueuePush(cs->recv,msg);
   CmiIdleLock_addMessage(&cs->idle);
 }
@@ -808,7 +815,7 @@ static void CmiPushNode(void *msg)
 {
   CmiState cs=CmiGetStateN(0);
   MACHSTATE1(2,"Pushing message into node queue",pe);
-  PCQueuePush(CsvAccess(NodeRecv),msg);
+  PCQueuePush(CsvAccess(NodeState).NodeRecv,msg);
   /*Silly: always try to wake up processor 0, so at least *somebody*
     will be awake to handle the message*/
   CmiIdleLock_addMessage(&cs->idle);
@@ -1441,10 +1448,10 @@ void DeliverOutgoingMessage(OutgoingMsg ogm)
 char *CmiGetNonLocalNodeQ(void)
 {
   char *result = 0;
-  if(!PCQueueEmpty(CsvAccess(NodeRecv))) {
-    CmiLock(CsvAccess(CmiNodeRecvLock));
-    result = (char *) PCQueuePop(CsvAccess(NodeRecv));
-    CmiUnlock(CsvAccess(CmiNodeRecvLock));
+  if(!PCQueueEmpty(CsvAccess(NodeState).NodeRecv)) {
+    CmiLock(CsvAccess(NodeState).CmiNodeRecvLock);
+    result = (char *) PCQueuePop(CsvAccess(NodeState).NodeRecv);
+    CmiUnlock(CsvAccess(NodeState).CmiNodeRecvLock);
   }
   return result;
 }
@@ -1681,6 +1688,23 @@ void CmiReleaseCommHandle(CmiCommHandle handle)
   FreeOutgoingMsg(((OutgoingMsg)handle));
 }
 
+#if CMK_IMMEDIATE_MSG
+void CmiHandleImmediate()
+{
+   while (!CdsFifo_Empty(CsvAccess(NodeState).imm)) {
+     void *msg = CdsFifo_Dequeue(CsvAccess(NodeState).imm);
+//CmiPrintf("[%d] CmiHandleMessage\n", CmiMyNode());
+     CmiHandleMessage(msg);
+//CmiPrintf("[%d] CmiHandleMessage done\n", CmiMyNode());
+   }
+}
+
+void CmiPollImmediateMsg()
+{
+  CommunicationServer(0);
+}
+#endif
+
 /******************************************************************************
  *
  * Main code, Init, and Exit
@@ -1898,6 +1922,10 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
   Cmi_check_delay = 2.0+0.5*Cmi_numnodes;
   if (Cmi_charmrun_fd==-1) /*Don't bother with check in standalone mode*/
 	Cmi_check_delay=1.0e30;
+
+  CsvInitialize(CmiNodeState, NodeState);
+  CmiNodeStateInit(&CsvAccess(NodeState));
+
   CmiStartThreads(argv);
   ConverseRunPE(everReturn);
 }

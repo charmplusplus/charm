@@ -156,6 +156,8 @@ static PCQueue   msgBuf;
 
 #include "machine-smp.c"
 
+CsvDeclare(CmiNodeState, NodeState);
+
 static struct CmiStateStruct Cmi_state;
 int Cmi_mype;
 int Cmi_myrank;
@@ -178,6 +180,14 @@ static void CmiPushPE(int pe,void *msg)
 {
   CmiState cs=CmiGetStateN(pe);
   MACHSTATE1(2,"Pushing message into %d's queue",pe);
+#if CMK_IMMEDIATE_MSG
+  if (CmiGetHandler(msg) == CpvAccessOther(CmiImmediateMsgHandlerIdx,0)) {
+//CmiPrintf("[node %d] Immediate Message %d %d {{. \n", CmiMyNode(), CmiGetHandler(msg), _ImmediateMsgHandlerIdx);
+    CmiHandleMessage(msg);
+//CmiPrintf("[node %d] Immediate Message done.}} \n", CmiMyNode());
+    return;
+  }
+#endif
   CmiIdleLock_addMessage(&cs->idle); 
   PCQueuePush(cs->recv,msg);
 }
@@ -520,6 +530,12 @@ void CmiNotifyIdle(void)
 */
 }
  
+#if CMK_IMMEDIATE_MSG
+void CmiPollImmediateMsg()
+{
+  PumpMsgs(0);
+}
+#endif
 /********************* MESSAGE SEND FUNCTIONS ******************/
 
 void CmiSyncSendFn(int destPE, int size, char *msg)
@@ -956,6 +972,8 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   CmiTimerInit();
   msgBuf = PCQueueCreate();
 
+  CsvInitialize(CmiNodeState, NodeState);
+  CmiNodeStateInit(&CsvAccess(NodeState));
 
   CmiStartThreads(argv);
   ConverseRunPE(initret);

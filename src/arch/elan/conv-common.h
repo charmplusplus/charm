@@ -37,3 +37,5 @@
 #define CONVERSE_VERSION_ELAN
 
 #define  CMK_PERSISTENT_COMM                               1
+
+#define CMK_IMMEDIATE_MSG				   1

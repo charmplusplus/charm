@@ -661,6 +661,8 @@ void ReceiveDatagram()
  * are ready, the corresponding tasks are called
  *
  ***********************************************************************/
+void CmiHandleImmediate();
+
 static void CommunicationServer(int sleepTime)
 {
   unsigned int nTimes=0; /* Loop counter */
@@ -704,6 +706,9 @@ static void CommunicationServer(int sleepTime)
     }
   }
   CmiCommUnlock();
+#if CMK_IMMEDIATE_MSG
+  CmiHandleImmediate();
+#endif
   MACHSTATE(1,"} CommunicationServer") 
 }
 

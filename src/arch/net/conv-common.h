@@ -27,3 +27,6 @@
 
 #define CMK_VECTOR_SEND_USES_COMMON_CODE                   1
 #define CMK_VECTOR_SEND_USES_SPECIAL_CODE                  0
+
+#define CMK_IMMEDIATE_MSG				   1
+

@@ -3,6 +3,7 @@
 for SMP versions:
 
 CmiStateInit
+CmiNodeStateInit
 CmiGetState
 CmiGetStateN
 CmiYield
@@ -465,13 +466,16 @@ void CmiStateInit(int pe, int rank, CmiState state)
   state->recv = PCQueueCreate();
   state->localqueue = CdsFifo_Create();
   CmiIdleLock_init(&state->idle);
+}
+
+void CmiNodeStateInit(CmiNodeState *nodeState)
+{
+#if CMK_IMMEDIATE_MSG
+  nodeState->imm = CdsFifo_Create();
+#endif
 #if CMK_NODE_QUEUE_AVAILABLE
-  CsvInitialize(CmiNodeLock, CmiNodeRecvLock);
-  CsvInitialize(PCQueue, NodeRecv);
-  if (rank==0) {
-    CsvAccess(CmiNodeRecvLock) = CmiCreateLock();
-    CsvAccess(NodeRecv) = PCQueueCreate();
-  }
+  nodeState->CmiNodeRecvLock = CmiCreateLock();
+  nodeState->NodeRecv = PCQueueCreate();
 #endif
 }
 

@@ -176,14 +176,11 @@ static PCQueue  *msgBuf;
  *
  ************************************************************/
 
-#if CMK_NODE_QUEUE_AVAILABLE
-CsvStaticDeclare(CmiNodeLock, CmiNodeRecvLock);
-CsvStaticDeclare(PCQueue, NodeRecv);
-#endif
-
 /* fake Cmi_charmrun_fd */
 static int Cmi_charmrun_fd = 0;
 #include "machine-smp.c"
+
+CsvDeclare(CmiNodeState, NodeState);
 
 #if ! CMK_SMP
 /************ non SMP **************/
@@ -212,6 +209,14 @@ static void CmiPushPE(int pe,void *msg)
 {
   CmiState cs=CmiGetStateN(pe);
   MACHSTATE1(2,"Pushing message into %d's queue",pe);
+#if CMK_IMMEDIATE_MSG
+  if (CmiGetHandler(msg) == CpvAccessOther(CmiImmediateMsgHandlerIdx,0)) {
+//CmiPrintf("[node %d] Immediate Message {{. \n", CmiMyNode());
+    CmiHandleMessage(msg);
+//CmiPrintf("[node %d] Immediate Message done.}} \n", CmiMyNode());
+    return;
+  }
+#endif
   CmiIdleLock_addMessage(&cs->idle); 
   PCQueuePush(cs->recv,msg);
 }
@@ -281,6 +286,15 @@ void CmiReleaseCommHandle(CmiCommHandle c)
   return;
 }
 
+void CmiHandleImmediate()
+{
+   while (!CdsFifo_Empty(CsvAccess(NodeState).imm)) {
+     void *msg = CdsFifo_Dequeue(CsvAccess(NodeState).imm);
+CmiPrintf("[%d] CmiHandleMessage\n", CmiMyNode());
+     CmiHandleMessage(msg);
+CmiPrintf("[%d] CmiHandleMessage done\n", CmiMyNode());
+   }
+}
 
 static void CmiReleaseSentMessages(void)
 {
@@ -336,7 +350,7 @@ static int PumpMsgs(void)
 
 #if CMK_NODE_QUEUE_AVAILABLE
     if (CMI_DEST_RANK(msg)==DGRAM_NODEMESSAGE)
-      PCQueuePush(CsvAccess(NodeRecv), msg);
+      PCQueuePush(CsvAccess(NodeState).NodeRecv, msg);
     else
 #endif
       CmiPushPE(CMI_DEST_RANK(msg), msg);
@@ -380,7 +394,7 @@ static void PumpMsgsBlocking(void)
 
 #if CMK_NODE_QUEUE_AVAILABLE
    if (CMI_DEST_RANK(msg)==DGRAM_NODEMESSAGE)
-      PCQueuePush(CsvAccess(NodeRecv), msg);
+      PCQueuePush(CsvAccess(NodeState).NodeRecv, msg);
    else
 #endif
       CmiPushPE(CMI_DEST_RANK(msg), msg);
@@ -438,10 +452,10 @@ static void CommunicationServer(int sleepTime)
 char *CmiGetNonLocalNodeQ(void)
 {
   char *result = 0;
-  if(!PCQueueEmpty(CsvAccess(NodeRecv))) {
-    CmiLock(CsvAccess(CmiNodeRecvLock));
-    result = (char *) PCQueuePop(CsvAccess(NodeRecv));
-    CmiUnlock(CsvAccess(CmiNodeRecvLock));
+  if(!PCQueueEmpty(CsvAccess(NodeState).NodeRecv)) {
+    CmiLock(CsvAccess(NodeState).CmiNodeRecvLock);
+    result = (char *) PCQueuePop(CsvAccess(NodeState).NodeRecv);
+    CmiUnlock(CsvAccess(NodeState).CmiNodeRecvLock);
   }
   return result;
 }
@@ -471,6 +485,13 @@ void CmiNotifyIdle(void)
   if (!PumpMsgs() && idleblock) PumpMsgsBlocking();
 }
  
+#if CMK_IMMEDIATE_MSG
+void CmiPollImmediateMsg()
+{
+  PumpMsgs();
+}
+#endif
+
 /********************* MESSAGE SEND FUNCTIONS ******************/
 
 void CmiSyncSendFn(int destPE, int size, char *msg)
@@ -774,7 +795,7 @@ CmiCommHandle CmiAsyncNodeSendFn(int dstNode, int size, char *msg)
   switch (dstNode) {
   case NODE_BROADCAST_ALL:
     CQdCreate(CpvAccess(cQdState), 1);
-    PCQueuePush(CsvAccess(NodeRecv),(char *)CopyMsg(msg,size));
+    PCQueuePush(CsvAccess(NodeState).NodeRecv,(char *)CopyMsg(msg,size));
   case NODE_BROADCAST_OTHERS:
     CQdCreate(CpvAccess(cQdState), Cmi_mynode-1);
     for (i=0; i<Cmi_numnodes; i++)
@@ -787,7 +808,7 @@ CmiCommHandle CmiAsyncNodeSendFn(int dstNode, int size, char *msg)
     dupmsg = (char *) CmiAlloc(size);
     memcpy(dupmsg, msg, size);
     if(dstNode == Cmi_mynode) {
-      PCQueuePush(CsvAccess(NodeRecv), dupmsg);
+      PCQueuePush(CsvAccess(NodeState).NodeRecv, dupmsg);
       return 0;
     }
     else {
@@ -1020,6 +1041,10 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     ConverseExit();
   }
 #endif
+
+  CsvInitialize(CmiNodeState, NodeState);
+  CmiNodeStateInit(&CsvAccess(NodeState));
+
   CmiStartThreads(argv);
   ConverseRunPE(initret);
 }

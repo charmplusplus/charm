@@ -34,3 +34,4 @@
 
 #define NODE_0_IS_CONVHOST                                 1
 
+#define CMK_IMMEDIATE_MSG				   1
