@@ -392,7 +392,7 @@ void BGproc::enableGenTasks(TaskID* taskID, POSE_TimeType oldStartTime, POSE_Tim
 
   for (int i=0; i<numGenTasks; i++) {
     // time units offset in future at which task i is generated
-    int taskOffset = generatedTasks[i].receiveTime - oldStartTime;
+    POSE_TimeType taskOffset = generatedTasks[i].receiveTime - oldStartTime;
     int myNode = parent->thisIndex/numWth;
     int srcSwitch = myNode;
     
