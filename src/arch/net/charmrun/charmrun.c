@@ -676,6 +676,8 @@ void arg_init(int argc, char **argv)
     fprintf(stderr,"ERROR> DISPLAY must be set to use debugging mode\n");
     exit(1);
   }
+  if (arg_debug || arg_debug_no_pause) 
+    arg_timeout=8*60*60; /* Wait 8 hours for ++debug */
 
   /* default debugger is gdb */
   if(!arg_debugger)
@@ -1933,7 +1935,6 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv)
   char *arg_nodeprog_r,*arg_currdir_r;
   char *dbg=nodetab_debugger(nodeno);
   char *host=nodetab_name(nodeno);
-  int randno = rand();
 #define CLOSE_ALL " < /dev/null 1> /dev/null 2> /dev/null &"
 
   fprintf(f, /*Echo: prints out status message*/
@@ -2011,8 +2012,7 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv)
   }
   
   fprintf(f,"if test ! -x \"%s\"\nthen\n",arg_nodeprog_r);
-  fprintf(f,"  Echo 'Cannot locate this node-program:'\n");
-  fprintf(f,"  Echo '%s'\n",arg_nodeprog_r);
+  fprintf(f,"  Echo 'Cannot locate this node-program: %s'\n",arg_nodeprog_r);
   fprintf(f,"  Exit 1\n");
   fprintf(f,"fi\n");
   
@@ -2033,11 +2033,12 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv)
     fprintf(f,"fi\n");
   }
 
+  fprintf(f,"rm -f /tmp/charmrun_err.$$\n");
   if(arg_verbose) fprintf(f,"Echo 'starting node-program...'\n");  
   if (arg_debug || arg_debug_no_pause ) {
 	 if ( strcmp(dbg, "gdb") == 0 ) {
-           fprintf(f,"cat > /tmp/gdb%08x << END_OF_SCRIPT\n",randno);
-           fprintf(f,"shell /bin/rm -f /tmp/gdb%08x\n",randno);
+           fprintf(f,"cat > /tmp/charmrun_gdb.$$ << END_OF_SCRIPT\n");
+           fprintf(f,"shell /bin/rm -f /tmp/charmrun_gdb.$$\n");
            fprintf(f,"handle SIGPIPE nostop noprint\n");
            fprintf(f,"handle SIGWINCH nostop noprint\n");
            fprintf(f,"handle SIGWAITING nostop noprint\n");
@@ -2048,11 +2049,11 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv)
            fprintf(f,"END_OF_SCRIPT\n");
            fprintf(f,"$F_XTERM");
            fprintf(f," -title 'Node %d (%s)' ",nodeno,nodetab_name(nodeno));
-           fprintf(f," -e $F_DBG %s -x /tmp/gdb%08x"CLOSE_ALL"\n",
-           	arg_nodeprog_r,randno);
+           fprintf(f," -e $F_DBG %s -x /tmp/charmrun_gdb.$$"CLOSE_ALL"\n",
+           	arg_nodeprog_r);
          } else if ( strcmp(dbg, "dbx") == 0 ) {
-           fprintf(f,"cat > /tmp/dbx%08x << END_OF_SCRIPT\n",randno);
-           fprintf(f,"sh /bin/rm -f /tmp/dbx%08x\n",randno);
+           fprintf(f,"cat > /tmp/charmrun_dbx.$$ << END_OF_SCRIPT\n");
+           fprintf(f,"sh /bin/rm -f /tmp/charmrun_dbx.$$\n");
            fprintf(f,"dbxenv suppress_startup_message 5.0\n");
            fprintf(f,"ignore SIGPOLL\n");
            fprintf(f,"ignore SIGPIPE\n");
@@ -2067,7 +2068,7 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv)
               fprint_arg(f,argv);
               fprintf(f,"\' ");
 	   }
-	   fprintf(f, "-s/tmp/dbx%08x %s",randno,arg_nodeprog_r);
+	   fprintf(f, "-s/tmp/charmrun_dbx.$$ %s",arg_nodeprog_r);
 	   if(arg_debug_no_pause) 
               fprint_arg(f,argv);
            fprintf(f,CLOSE_ALL "\n");
@@ -2079,26 +2080,48 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv)
     if(arg_verbose)
       fprintf(stderr, "Charmrun> node %d: xterm is %s\n", 
               nodeno, nodetab_xterm(nodeno));
-    fprintf(f,"cat > /tmp/inx%08x << END_OF_SCRIPT\n", randno);
+    fprintf(f,"cat > /tmp/charmrun_inx.$$ << END_OF_SCRIPT\n");
     fprintf(f,"#!/bin/sh\n");
-    fprintf(f,"/bin/rm -f /tmp/inx%08x\n",randno);
+    fprintf(f,"/bin/rm -f /tmp/charmrun_inx.$$\n");
     fprintf(f,"%s", arg_nodeprog_r);
     fprint_arg(f,argv);
     fprintf(f,"\n");
     fprintf(f,"echo 'program exited with code '\\$?\n");
     fprintf(f,"read eoln\n");
     fprintf(f,"END_OF_SCRIPT\n");
-    fprintf(f,"chmod 700 /tmp/inx%08x\n", randno);
+    fprintf(f,"chmod 700 /tmp/charmrun_inx.$$\n");
     fprintf(f,"$F_XTERM -title 'Node %d (%s)' ",nodeno,nodetab_name(nodeno));
     fprintf(f," -sl 5000");
-    fprintf(f," -e /tmp/inx%08x", randno);
+    fprintf(f," -e /tmp/charmrun_inx.$$");
     fprintf(f,CLOSE_ALL "\n");
   } else {
-    fprintf(f,"\"%s\"",arg_nodeprog_r);
+    fprintf(f,"( \"%s\"",arg_nodeprog_r);
     fprint_arg(f,argv);
+    fprintf(f,"\n");
+    /* If shared libraries fail to load, the program dies without
+       calling charmrun back.  Since we *have* to close down stdin/out/err,
+       we have to smuggle this failure information out via a file, /tmp/charmrun_err. */
+    fprintf(f,
+    	"if [ $? -eq 127 ]\n"
+	"then\n"
+	"  ( \n" /* Run error generator in a subshell: */
+	"    \"%s\" \n"
+	"    ldd \"%s\"\n"
+	"  ) > /tmp/charmrun_err.$$ 2>&1 \n"
+	"fi\n",arg_nodeprog_r,arg_nodeprog_r);
+    fprintf(f,")");
     fprintf(f,CLOSE_ALL "\n");
+    
   }
   if (arg_verbose) fprintf(f,"Echo 'rsh phase successful.'\n");
+  fprintf(f, /* Check for startup errors: */
+     "sleep 1\n"
+     "if [ -r /tmp/charmrun_err.$$ ]\n"
+     "then\n"
+     "  cat /tmp/charmrun_err.$$ \n"
+     "  rm -f /tmp/charmrun_err.$$ \n"
+     "  Exit 1\n"
+     "fi\n");
   fprintf(f,"Exit 0\n");
 }
 
