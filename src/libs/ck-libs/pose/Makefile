@@ -114,7 +114,7 @@ depends:  $(CIFILES)
         for i in $(SEQOBJECTS) ; do \
 	      SRCFILE=`basename $$i .seq.o`.C ; \
               echo "checking dependencies for $$i : $$SRCFILE" ; \
-              g++ -M -MT $$i -Wno-deprecated -I$(CHARMINC) $$SRCFILE >> $(DEPENDFILE); \
+              g++ -MM -MT $$i -Wno-deprecated -I$(CHARMINC) $$SRCFILE >> $(DEPENDFILE); \
               echo '	$$(CHARMC) -o '$$i -DSEQUENTIAL_POSE=1 $$SRCFILE >> $(DEPENDFILE) ; \
         done; 
 
