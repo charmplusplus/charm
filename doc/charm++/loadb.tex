@@ -51,7 +51,7 @@ descriptions:
 \end{itemize}
 
 It is up to the users to choose which load balancing algorithm for the 
-application at compile or run-time. The compiler and run-time options 
+application at compile or run-time. The compiler and run-time options
 are described at section \ref{lbOption}.
 
 \subsubsection{Load Balancing Chare Arrays}
@@ -155,7 +155,7 @@ virtual function \kw{ArrayElement::ResumeFromSync()} for each of the
 array element.  
 
 Note that {\em AtSync()} is not a blocking call, it just suggests to load 
-balancing that it is time for load balancing. Between the calls to 
+balancing that it is time for load balancing. Between the calls to
 {\em AtSync} and {\em ResumeFromSync}, the object
 may be migrated. So the most commonly used approach is to stop sending
 messages after array elements call {\em AtSync()}, and start sending
@@ -207,7 +207,7 @@ configure the load balancer, etc. These functions are:
       is migratable or not\footnote{Currently not all load balancers 
       recognize this setting though.}.
 \item {\bf lbdb->SetLBPeriod(double s)}: this function can be called 
-      anywhere\footnote{except that it must be called after LBDatabase 
+      anywhere\footnote{except that it must be called after LBDatabase
       has been initialized in Charm++ init phase, so for example global 
       variable constructor is not a good place to call it.} to regulate 
       the load balancing period. It tells load balancer not to start next 
@@ -294,4 +294,32 @@ when non NULL LB is doing its job.
 
 \end{enumerate}
 
-
+\subsection{Load Balancing Simulation}
+The simulation feature of load balancing framework allows the users to collect information
+about the compute wall/cpu time and communication of the chares during a particular run of
+the program and use this information to later test different load balancing strategies to
+see which one is suitable for the programs behavious. Currently, this feature is supported only for
+the centralized load balancing strategies. For this, the load balancing framework
+accepts the following command line options:
+\begin{enumerate}
+\item {\em +LBDump StepNo}\\
+      This will dump the instrument/communication data collected by the load balancing framework
+	  during the load balancing step {\em StepNo} into a file on the disk. The name of the file
+	  is given by the {\em +LBDumpFile} option. After dumping the data, the program exists.
+\item {\em +LBDumpFile FileName}\\
+	This option specified the name of the file into which to dump the load balancing data. If this
+	option is not specified, the framework uses the default file lbdata.dat.
+\item {\em +LBSim} \\
+	This option instructs the framework to do the simulation during the first load balancing step.
+	When this option is specified, the load balancing data from the file specified in the {\em +LBDumpFile}
+	option will be read and this data will be used for the load balancing. The program will then print
+	the results of the load balancing and exit.
+\end{enumerate}
+As an example, we can collect tha data for a 1000 processor run if a program using:
+\begin{alltt}
+./charmrun pgm +p 1000 +balancer RandCentLB +LBDump 0 +LBDumpFile dump.dat
+\end{alltt}
+And then, we can use this data to observe various centralized strategies using:
+\begin{alltt}
+./charmrun pgm +balancer <Strategy to test> +LBSim +LBDumpFile
+\end{alltt}
