@@ -17,7 +17,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.5  1997-10-29 23:53:08  milind
+ * Revision 1.6  1998-01-13 17:03:25  milind
+ * Made charm++ to compile and run with Solaris 2.6.
+ * In particular, changed INTBITS to CINTBITS, and handled EALREADY.
+ *
+ * Revision 1.5  1997/10/29 23:53:08  milind
  * Fixed CthInitialize bug on uth machines.
  *
  * Revision 1.4  1996/04/24 22:44:16  jyelon
@@ -46,7 +50,7 @@
 static char ident[] = "@(#)$Header$";
 
 #include <converse.h>
-#define INTBITS ((unsigned int) (sizeof(int)*8))
+#define CINTBITS ((unsigned int) (sizeof(int)*8))
 
 typedef struct prio
 {
@@ -219,7 +223,7 @@ deq CqsPrioqGetDeq(pq, priobits, priodata)
 prioq pq;
 unsigned int priobits, *priodata;
 {
-  unsigned int prioints = (priobits+INTBITS-1)/INTBITS;
+  unsigned int prioints = (priobits+CINTBITS-1)/CINTBITS;
   unsigned int hashval;
   int heappos, i, j; 
   prioqelt *heap, pe, next;
@@ -356,17 +360,17 @@ Queue q; void *data; unsigned int strategy, priobits, *prioptr;
     CqsDeqEnqueueLifo(&(q->zeroprio), data); 
     break;
   case CQS_QUEUEING_IFIFO:
-    iprio=prioptr[0]+(1<<(INTBITS-1));
+    iprio=prioptr[0]+(1<<(CINTBITS-1));
     if ((int)iprio<0)
-      d=CqsPrioqGetDeq(&(q->posprioq), INTBITS, &iprio);
-    else d=CqsPrioqGetDeq(&(q->negprioq), INTBITS, &iprio);
+      d=CqsPrioqGetDeq(&(q->posprioq), CINTBITS, &iprio);
+    else d=CqsPrioqGetDeq(&(q->negprioq), CINTBITS, &iprio);
     CqsDeqEnqueueFifo(d, data);
     break;
   case CQS_QUEUEING_ILIFO:
-    iprio=prioptr[0]+(1<<(INTBITS-1));
+    iprio=prioptr[0]+(1<<(CINTBITS-1));
     if ((int)iprio<0)
-      d=CqsPrioqGetDeq(&(q->posprioq), INTBITS, &iprio);
-    else d=CqsPrioqGetDeq(&(q->negprioq), INTBITS, &iprio);
+      d=CqsPrioqGetDeq(&(q->posprioq), CINTBITS, &iprio);
+    else d=CqsPrioqGetDeq(&(q->negprioq), CINTBITS, &iprio);
     CqsDeqEnqueueLifo(d, data);
     break;
   case CQS_QUEUEING_BFIFO:

@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.15  1997-11-10 16:36:53  milind
+ * Revision 2.16  1998-01-13 17:03:22  milind
+ * Made charm++ to compile and run with Solaris 2.6.
+ * In particular, changed INTBITS to CINTBITS, and handled EALREADY.
+ *
+ * Revision 2.15  1997/11/10 16:36:53  milind
  * Changed size_t to CMK_SIZE_T.
  *
  * Revision 2.14  1997/10/29 23:52:46  milind
@@ -134,7 +138,7 @@ typedef struct envelope {
 } ENVELOPE;
 
 
-#define INTBITS (sizeof(int)*8)
+#define CINTBITS (sizeof(int)*8)
 
 /*********************************************************/
 /** Arrangement for i_tag2                              **/
@@ -210,7 +214,7 @@ typedef struct envelope {
 /* Navigating the priority field */
 /*********************************/
 
-#define GetEnv_priowords(e) ((GetEnv_priosize(e)+INTBITS-1)/INTBITS)
+#define GetEnv_priowords(e) ((GetEnv_priosize(e)+CINTBITS-1)/CINTBITS)
 #define GetEnv_priobytes(e) (GetEnv_priowords(e)*sizeof(int))
 #define GetEnv_prioend(e) ((unsigned int *)(((char *)(e))+GetEnv_TotalSize(e)))
 #define GetEnv_priobgn(e) ((unsigned int *)(((char *)(e))+GetEnv_TotalSize(e)-GetEnv_priobytes(e)))

@@ -8,7 +8,11 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.6  1997-12-22 21:58:06  jyelon
+ * Revision 1.7  1998-01-13 17:03:37  milind
+ * Made charm++ to compile and run with Solaris 2.6.
+ * In particular, changed INTBITS to CINTBITS, and handled EALREADY.
+ *
+ * Revision 1.6  1997/12/22 21:58:06  jyelon
  * Changed LDB initialization scheme.
  *
  * Revision 1.5  1997/08/06 20:35:58  jyelon
@@ -106,8 +110,8 @@
 
 #define CMK_MACHINE_NAME                                   "origin2000"
 
-#define CMK_MALLOC_USE_GNU_MALLOC                          1
-#define CMK_MALLOC_USE_OS_BUILTIN                          0
+#define CMK_MALLOC_USE_GNU_MALLOC                          0
+#define CMK_MALLOC_USE_OS_BUILTIN                          1
 
 #define CMK_MEMORY_PAGESIZE                                8192
 #define CMK_MEMORY_PROTECTABLE                             0

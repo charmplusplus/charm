@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.23  1997-10-03 19:51:31  milind
+ * Revision 2.24  1998-01-13 17:03:20  milind
+ * Made charm++ to compile and run with Solaris 2.6.
+ * In particular, changed INTBITS to CINTBITS, and handled EALREADY.
+ *
+ * Revision 2.23  1997/10/03 19:51:31  milind
  * Made charmc to work again, after inserting trace calls in converse part,
  * i.e. threads and user events.
  *
@@ -529,7 +533,7 @@ void *env;
  *
  ************************************************************************/
 
-#define INTBITS (sizeof(int)*8)
+#define CINTBITS (sizeof(int)*8)
 
 void CkPrioConcatFn(srcmsg, dstmsg, delta)
 void *srcmsg;
@@ -541,8 +545,8 @@ unsigned int delta;
   ENVELOPE *dstenv = ENVELOPE_UPTR(dstmsg);
   int srcbits = GetEnv_priosize(srcenv);
   int dstbits = GetEnv_priosize(dstenv);
-  int srcwords = (srcbits+INTBITS-1)/INTBITS;
-  int dstwords = (dstbits+INTBITS-1)/INTBITS;
+  int srcwords = (srcbits+CINTBITS-1)/CINTBITS;
+  int dstwords = (dstbits+CINTBITS-1)/CINTBITS;
   unsigned int *srcptr = GetEnv_prioend(srcenv) - srcwords;
   unsigned int *dstptr = GetEnv_prioend(dstenv) - dstwords;
   deltabits = dstbits - srcbits;
@@ -550,16 +554,16 @@ unsigned int delta;
     CmiPrintf("CkPrioConcat: prio-bits from source message don't fit in destination message.\n");
     exit(1);
   }
-  if (deltabits > INTBITS) {
+  if (deltabits > CINTBITS) {
     CmiPrintf("CkPrioConcat: prio-bits from source message plus bits of delta don't fill destination-message.\n");
     exit(1);
   }
-  while (srcbits>0) { *dstptr++ = *srcptr++; srcbits -= INTBITS; }
+  while (srcbits>0) { *dstptr++ = *srcptr++; srcbits -= CINTBITS; }
   padbits = -srcbits;
-  delta <<= (INTBITS-deltabits);
+  delta <<= (CINTBITS-deltabits);
   if (padbits) {
     dstptr[-1] &= (((unsigned int)(-1))<<padbits);
-    dstptr[-1] |= (delta>>(INTBITS-padbits));
+    dstptr[-1] |= (delta>>(CINTBITS-padbits));
   }
   if (deltabits>padbits) dstptr[0] = (delta<<padbits);
 }

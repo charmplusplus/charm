@@ -6,7 +6,7 @@ all: qt stp testpgm
 qt:
 	ln -s md/sparc.h qtmd.h
 	$(CC) -c -o qt.o qt.c
-	as -o qtmds.o md/sparc.s
+	$(CC) -c -o qtmds.o md/sparc.s
 	ar crv libqt.a qt.o qtmds.o
 
 stp:
@@ -15,6 +15,6 @@ stp:
 
 testpgm:
 	$(CC) -c meas.c
-	as -o qtmdb.o md/sparc_b.s
+	$(CC) -c -o qtmdb.o md/sparc_b.s
 	$(CC) -o run meas.o qtmdb.o libstp.a libqt.a
 	

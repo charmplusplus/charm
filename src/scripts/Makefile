@@ -49,6 +49,8 @@ test-charm++: charm++
 
 CHARMC=../bin/charmc $(CHARMOPTS) $(OPTS)
 
+SEQCHARMC=../bin/charmc $(CHARMOPTS)
+
 
 ###############################################################################
 #
@@ -120,7 +122,9 @@ dirs+sources:
 
 CVHEADERS=converse.h conv-mach.h conv-mach.csh
 
-CVLIBS=libconv-core.a libconv-cplus-n.a libconv-cplus-y.a libldb-rand.o libtrace-none.a libtrace-summary.a libtrace-projections.a
+TRACELIBS=libck-trace-none.a libck-trace-summary.a libck-trace-projections.a
+
+CVLIBS=libconv-core.a libconv-cplus-n.a libconv-cplus-y.a libldb-rand.o $(TRACELIBS)
 
 LIBCONV_CORE=threads.o convcore.o conv-conds.o spantree.o queueing.o fifo.o msgmgr.o memory.o cpm.o cpthreads.o futures.o ldbcfns.o
 
@@ -135,8 +139,10 @@ QuickThreads/libqt.a:
 	cp QuickThreads/libqt.a ../lib
 
 conv-host: conv-host.c
-	../bin/charmc -cp ../bin -seq -DNOTIFY -o conv-host-notify conv-host.c
-	../bin/charmc -cp ../bin -seq -DSILENT -o conv-host-silent conv-host.c
+	../bin/charmc $(OPTS) -c -seq -DSILENT conv-host.c
+	../bin/charmc $(OPTS) -cp ../bin -seq -o conv-host-silent conv-host.o
+	../bin/charmc $(OPTS) -c -seq -DNOTIFY conv-host.c
+	../bin/charmc $(OPTS) -cp ../bin -seq -o conv-host-notify conv-host.o
 	cp conv-host-notify conv-host
 	cp conv-host ../bin/conv-host
 
@@ -431,44 +437,44 @@ dcountredn.o: dcountredn.int $(GENERIC_REDN_H)
 CHARMXLAT=xl-main.o xl-yacc.tab.o xl-sym.o xl-str.o xl-lex.o xl-lexsp.o xl-rdtok.o xl-parse.o xl-outh.o xl-srch.o xl-dag.o
 
 charmxlat charmfilter: $(CHARMXLAT) xl-sfspec.o
-	$(CHARMC) -seq -o charmxlat   -cp ../bin/ $(CHARMXLAT)
-	$(CHARMC) -seq -o charmfilter -cp ../bin/ xl-sfspec.o
+	$(SEQCHARMC) -seq -o charmxlat   -cp ../bin/ $(CHARMXLAT)
+	$(SEQCHARMC) -seq -o charmfilter -cp ../bin/ xl-sfspec.o
 
 xl-main.o: xl-main.c
-	$(CHARMC) -seq xl-main.c
+	$(SEQCHARMC) -seq xl-main.c
 
 xl-sym.o: xl-sym.c xl-sym.h
-	$(CHARMC) -seq xl-sym.c
+	$(SEQCHARMC) -seq xl-sym.c
 
 xl-str.o: xl-str.c
-	$(CHARMC) -seq xl-str.c
+	$(SEQCHARMC) -seq xl-str.c
 
 xl-lex.o: xl-lex.c xl-lex.h xl-sym.h
-	$(CHARMC) -seq xl-lex.c
+	$(SEQCHARMC) -seq xl-lex.c
 
 xl-rdtok.o: xl-rdtok.c xl-lex.h xl-sym.h
-	$(CHARMC) -seq xl-rdtok.c
+	$(SEQCHARMC) -seq xl-rdtok.c
 
 xl-parse.o: xl-parse.c xl-lex.h xl-sym.h
-	$(CHARMC) -seq xl-parse.c
+	$(SEQCHARMC) -seq xl-parse.c
 
 xl-outh.o: xl-outh.c xl-lex.h xl-sym.h
-	$(CHARMC) -seq xl-outh.c
+	$(SEQCHARMC) -seq xl-outh.c
 
 xl-srch.o: xl-srch.c xl-lex.h xl-sym.h
-	$(CHARMC) -seq xl-srch.c
+	$(SEQCHARMC) -seq xl-srch.c
 
 xl-dag.o: xl-dag.c
-	$(CHARMC) -seq xl-dag.c
+	$(SEQCHARMC) -seq xl-dag.c
 
 xl-yacc.tab.o: xl-yacc.tab.c xl-lex.h xl-sym.h
-	$(CHARMC) -seq xl-yacc.tab.c
+	$(SEQCHARMC) -seq xl-yacc.tab.c
 
 xl-lexsp.o: xl-lexsp.c	
-	$(CHARMC) -seq xl-lexsp.c
+	$(SEQCHARMC) -seq xl-lexsp.c
 
 xl-sfspec.o: xl-sfspec.c
-	$(CHARMC) -seq xl-sfspec.c
+	$(SEQCHARMC) -seq xl-sfspec.c
 
 ###############################################################################
 #
@@ -481,23 +487,23 @@ XPHEADERS=xp-extn.h xp-t.tab.c
 CHARMXLATXX=xp-process.o xp-table.o xp-t.tab.o xp-lexer.o
 
 charmxlat++: $(CHARMXLATXX) xp-sfilter.o
-	$(CHARMC) -seq -o charmxlat++   -cp ../bin/ $(CHARMXLATXX)
-	$(CHARMC) -seq -o charmfilter++ -cp ../bin/ xp-sfilter.o
+	$(SEQCHARMC) -seq -o charmxlat++   -cp ../bin/ $(CHARMXLATXX)
+	$(SEQCHARMC) -seq -o charmfilter++ -cp ../bin/ xp-sfilter.o
 
 xp-process.o: xp-process.c $(XPHEADERS)
-	$(CHARMC) -seq xp-process.c
+	$(SEQCHARMC) -seq xp-process.c
 
 xp-table.o: xp-table.c $(XPHEADERS)
-	$(CHARMC) -seq xp-table.c
+	$(SEQCHARMC) -seq xp-table.c
 
 xp-t.tab.o: xp-t.tab.c $(XPHEADERS)
-	$(CHARMC) -seq -DYYDEBUG xp-t.tab.c
+	$(SEQCHARMC) -seq -DYYDEBUG xp-t.tab.c
 
 xp-lexer.o: xp-lexer.c $(XPHEADERS)
-	$(CHARMC) -seq xp-lexer.c
+	$(SEQCHARMC) -seq xp-lexer.c
 
 xp-sfilter.o: xp-sfilter.c $(XPHEADERS)
-	$(CHARMC) -seq xp-sfilter.c
+	$(SEQCHARMC) -seq xp-sfilter.c
 
 ###############################################################################
 #
@@ -506,10 +512,10 @@ xp-sfilter.o: xp-sfilter.c $(XPHEADERS)
 ###############################################################################
 
 conv-cpm: conv-cpm.o
-	$(CHARMC) -seq -o conv-cpm -cp ../bin/ conv-cpm.o
+	$(SEQCHARMC) -seq -o conv-cpm -cp ../bin/ conv-cpm.o
 
 conv-cpm.o: conv-cpm.c
-	$(CHARMC) -seq conv-cpm.c
+	$(SEQCHARMC) -seq conv-cpm.c
 
 ###############################################################################
 #
@@ -521,22 +527,22 @@ XIHEADERS=xi-symbol.h xi-parse.tab.C
 CHARMXI=xi-main.o xi-symbol.o xi-generate.o xi-parse.tab.o xi-scan.o
 
 charmxi: $(CHARMXI)
-	$(CHARMC) -seq -language c++ -cp ../bin/ -o charmxi $(CHARMXI)
+	$(SEQCHARMC) -seq -language c++ -cp ../bin/ -o charmxi $(CHARMXI)
 
 xi-main.o: xi-main.C $(XIHEADERS)
-	$(CHARMC) -seq xi-main.C
+	$(SEQCHARMC) -seq xi-main.C
 
 xi-symbol.o: xi-symbol.C $(XIHEADERS)
-	$(CHARMC) -seq xi-symbol.C
+	$(SEQCHARMC) -seq xi-symbol.C
 
 xi-generate.o: xi-generate.C $(XIHEADERS)
-	$(CHARMC) -seq xi-generate.C
+	$(SEQCHARMC) -seq xi-generate.C
 
 xi-parse.tab.o: xi-parse.tab.C $(XIHEADERS)
-	$(CHARMC) -seq xi-parse.tab.C
+	$(SEQCHARMC) -seq xi-parse.tab.C
 
 xi-scan.o: xi-scan.C $(XIHEADERS)
-	$(CHARMC) -seq xi-scan.C
+	$(SEQCHARMC) -seq xi-scan.C
 
 ###############################################################################
 #

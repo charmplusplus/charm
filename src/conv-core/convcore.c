@@ -559,7 +559,7 @@ void CsdBeginIdle()
 CpvExtern(void*, CmiLocalQueue);
 CtvStaticDeclare(int, CmiBufferGrabbed);
 
-void CmiGrabBuffer()
+void CmiGrabBuffer(void **bufptrptr)
 {
   CtvAccess(CmiBufferGrabbed) = 1;
 }
@@ -588,6 +588,20 @@ int CsdScheduler(int maxmsgs)
   void *localqueue = CpvAccess(CmiLocalQueue);
   int cycle = CpvAccess(CsdStopFlag);
   
+  if(maxmsgs == 0) {
+    while(1) {
+      msg = CmiGetNonLocal();
+      if (msg==0) FIFO_DeQueue(localqueue, &msg);
+      if (msg==0) CqsDequeue(CpvAccess(CsdSchedQueue),&msg);
+      if (msg) {
+        CmiHandleMessage(msg);
+        maxmsgs--;
+        if (CpvAccess(CsdStopFlag) != cycle) return maxmsgs;
+      } else {
+        return maxmsgs;
+      }
+    }
+  }
   while (1) {
     msg = CmiGetNonLocal();
     if (msg==0) FIFO_DeQueue(localqueue, &msg);
