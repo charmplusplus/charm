@@ -371,9 +371,19 @@ void FEM_Register_array_layout(int fem_mesh,int entity,int attr,void *data,const
 	int max = e->getMax();
 	FEM_Attribute *a = e->lookup(attr,caller);
 	
+	if(entity== FEM_NODE && attr == FEM_DATA){
+		double *d = (double *)data;
+		printf("in register_array %.6f %.6f \n",d[0],d[1]);
+	}
+	
 	if(m->isSetting()){
 	}else{
 		a->get(data,firstItem,length,layout,caller);
+	//	FEM_Mesh_data_layout(fem_mesh,entity,attr,data,firstItem,length,layout);
+	}
+	if(entity== FEM_NODE && attr == FEM_DATA){
+		double *d = (double *)data;
+		printf("in register_array %.6f %.6f \n",d[0],d[1]);
 	}
 	//replace the attribute's data array with the user's data
 	a->register_data(data,length,max,layout,caller);
@@ -381,10 +391,10 @@ void FEM_Register_array_layout(int fem_mesh,int entity,int attr,void *data,const
 void FEM_Register_entity_impl(int fem_mesh,int entity,void *args,int len,int max,FEM_Mesh_alloc_fn fn){
 	char *caller = "FEM_Register_entity";
 	FEM_Mesh *m=FEM_Mesh_lookup(fem_mesh,caller);
-	if(!m->isSetting()){
+/*	if(!m->isSetting()){
 		CmiAbort("Register entity called on mesh that can't be written into");
 	}
-
+*/
 	FEM_Entity *e = m->lookup(entity,caller);
 	e->setMaxLength(len,max,args,fn);
 }
@@ -645,6 +655,7 @@ template <class T>
 inline void getTableData(void *user, int firstItem, int length, 
 	IDXL_LAYOUT_PARAM, const AllocTable2d<T> *table) 
 {
+	printf("in get data starts at %p \n",table->getRow(0));
 	for (int r=0;r<length;r++) {
 		register const T *tableRow=table->getRow(firstItem+r);
 		for (int c=0;c<width;c++)
@@ -715,6 +726,38 @@ void FEM_DataAttribute::copyEntity(int dstEntity,const FEM_Attribute &src,int sr
 	case FEM_DOUBLE: double_data->setRow(dstEntity,dsrc->double_data->getRow(srcEntity)); break;
 	}
 }
+
+template<class T>
+inline void interpolateAttrs(AllocTable2d<T> *data,int A,int B,int D,double frac,int width){
+	T *rowA = data->getRow(A);
+	T *rowB = data->getRow(B);
+	T *rowD = data->getRow(D);
+	for(int i=0;i<width;i++){
+		double val = (double )rowA[i];
+		val *= (1.0-frac);
+		val += frac *((double )rowB[i]);
+		rowD[i] = (T )val;
+	}
+}
+
+void FEM_DataAttribute::interpolate(int A,int B,int D,double frac){
+	switch(getDatatype()){
+		case FEM_BYTE:
+			interpolateAttrs(char_data,A,B,D,frac,getWidth());		
+			break;
+		case FEM_INT:
+			interpolateAttrs(int_data,A,B,D,frac,getWidth());		
+			break;
+		case FEM_FLOAT:
+			interpolateAttrs(float_data,A,B,D,frac,getWidth());		
+			break;
+		case FEM_DOUBLE:
+			interpolateAttrs(double_data,A,B,D,frac,getWidth());		
+			break;
+	}
+}
+
+
 
 /*********************** FEM_IndexAttribute *******************/
 FEM_IndexAttribute::Checker::~Checker() {}
@@ -808,6 +851,7 @@ void FEM_IndexAttribute::copyEntity(int dstEntity,const FEM_Attribute &src,int s
 {
 	const FEM_IndexAttribute *csrc=(const FEM_IndexAttribute *)&src;
 	idx.setRow(dstEntity,csrc->idx.getRow(srcEntity));
+	printf("indexattribute copyEntity called %d %p %p \n",getAttr(),csrc->idx.getRow(srcEntity),idx.getRow(dstEntity));
 }
 
 /********************** Entity **************************/
@@ -916,9 +960,17 @@ void FEM_Entity::setLength(int newlen) {
 		length = newlen;
 		if(length > max){
 			printf("Resize to be called %d %d\n",length,max);
-			max = max + max >> 2;
+			if(max > 4){
+				max = max + (max >> 2);
+			}else{
+				max = max +10;
+			}
+			
 			for (int a=0;a<attributes.size();a++){
-				attributes[a]->reallocate();
+				int code = attributes[a]->getAttr();
+				if(!(code <= FEM_ATTRIB_TAG_MAX || code == FEM_CONN)){
+					attributes[a]->reallocate();
+				}
 			}	
 			//		call resize with args max n;
 			resize(args,&length,&max);
@@ -926,9 +978,10 @@ void FEM_Entity::setLength(int newlen) {
 	}
 }
 
-void FEM_Entity::setMaxLength(int newLen,int newMaxLen,void *args,FEM_Mesh_alloc_fn fn){
+void FEM_Entity::setMaxLength(int newLen,int newMaxLen,void *pargs,FEM_Mesh_alloc_fn fn){
 	max = newMaxLen;
 	resize = fn;
+	args = pargs;
 	setLength(newLen);
 };
 

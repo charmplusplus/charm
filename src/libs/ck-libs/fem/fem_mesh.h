@@ -18,6 +18,7 @@ Orion Sky Lawlor, olawlor@acm.org, 1/3/2003
 #  include "idxl_layout.h" /*for IDXL_Layout */
 #endif
 
+
 // Map the IDXL names to the old FEM names (FIXME: change all references, too)
 typedef IDXL_Side FEM_Comm;
 typedef IDXL_List FEM_Comm_List;
@@ -237,11 +238,13 @@ public:
 			if (copyRows>max) copyRows=max;
 			memcpy(table,allocTable,sizeof(T)*cols*copyRows);
 			delete[] allocTable;
+		}else{
+			for (int r=copyRows;r<max;r++)
+				setRow(r,fill);
+			printf("zeroed out data at %p \n",table);	
 		}
 		allocTable = table;
 		//Zero out new table entries:
-		for (int r=copyRows;r<max;r++)
-			setRow(r,fill);
 	}
 	
 	/// Pup routine and operator|:
@@ -273,6 +276,7 @@ public:
 			allocTable = NULL;
 		}	
 		table = user;
+		printf("table changed to %p \n",table);
 		rows = len;
 		max = max;
 	}
@@ -451,6 +455,9 @@ public:
 	
 	/// Copy src[srcEntity] into our dstEntity.
 	virtual void copyEntity(int dstEntity,const FEM_Attribute &src,int srcEntity);
+
+	/*used during refining to extrapolate the values of a node */
+	void interpolate(int A,int B,int D,double frac);
 };
 PUPmarshall(FEM_DataAttribute);
 
@@ -601,7 +608,6 @@ public:
 	 *  Set the current length and maximum length for this entity. 
 	 *  If the current length exceeds the maximum length a resize
 	 *  method is called .
-	 *  TODO: add the resize method to the api
 	*/
 	void setMaxLength(int newLen,int newMaxLen,void *args,FEM_Mesh_alloc_fn fn);
 	
@@ -619,6 +625,7 @@ public:
 	 * not found.
 	 */
 	FEM_Attribute *lookup(int attr,const char *caller);
+
 	
 	/**
 	 * Get a list of the attribute numbers for this entity.
@@ -629,6 +636,15 @@ public:
 			attrs[i]=attributes[i]->getAttr();
 		return len;
 	}
+	
+	/**expose the attribute vector for refining 
+		. breaks modularity but more efficient
+	*/
+	CkVec<FEM_Attribute *>* getAttrVec(){
+		return &attributes;
+	}
+	
+
 	
 	//Symmetry array access:
 	const FEM_Symmetries_t *getSymmetries(void) const {

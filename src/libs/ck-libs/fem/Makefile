@@ -1,8 +1,8 @@
 CDIR=../../../..
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
-HEADERS=fem.h femf.h
-HEADDEP=$(HEADERS) fem_impl.h fem_mesh.h
+HEADERS=fem.h femf.h fem_mesh.h
+HEADDEP=$(HEADERS) fem_impl.h 
 OBJS=fem.o fem_mesh.o symmetries.o \
 	partition.o map.o fem_compat.o call_init.o
 COMPAT=compat_init.o compat_finit.o compat_driver.o compat_fdriver.o 
