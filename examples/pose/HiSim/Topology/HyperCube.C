@@ -62,3 +62,28 @@ y++; i--;
         CkAssert(portid < numP);
         return(config.InputBufferStart + next[portid] + p + nextPort); // Add next[portid] to account for injection port
 }
+
+
+// Modify the functions below to work for hypercube, just flicked it from Mesh3D. 
+
+int HyperCube::getNextChannel(int portid,int switchid) {
+        int numP = 6;
+
+        if(portid < numP)
+                return(config.ChannelStart + (numP+1)*next[portid]+portid);
+        else
+                return(config.ChannelStart + (switchid-config.switchStart)*(numP+1)+numP);
+}
+
+int HyperCube::getStartPort(int id) {
+        return(6);  // There are 7 input ports
+}
+
+int HyperCube::getStartVc() { // Assume no end to end flow control
+        return 0;
+}
+
+int HyperCube::getStartSwitch(int id) {
+        return(config.switchStart +  id);
+}
+

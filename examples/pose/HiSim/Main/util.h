@@ -21,8 +21,9 @@ public:
    int nicStart;
    int ChannelStart;
    int numNodes;
+   int origNodes;
    int switchStart;
-   int fanout;
+   int numP;
  
  public:
 

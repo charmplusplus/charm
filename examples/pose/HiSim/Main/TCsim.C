@@ -488,7 +488,7 @@ void BGproc::NetSend(TaskMsg *inMsg, int myNode, int srcSwitch,
   //CkPrintf("%d BgSim : Sent %d -> %d msgid %d len %d \n",ovt,m->src,m->dst,m->msgId,m->totalLen);
   elapse(START_LATENCY);
   POSE_invoke(recvMsg(m), NetInterface, config.nicStart+m->src, taskOffset);
-  elapse(m->totalLen/10);
+  elapse(m->totalLen/10); // dumb dumb dumb !!!!!!!!!!!
 
   //CkPrintf("[NETWORK: BGproc:%d BGnode:%d srcSwitch:%d destSwitch:%d destNodeCode:%d destTID:%d]\n", parent->thisIndex, myNode, srcSwitch, destSwitch, destNodeCode, destTID);
   //parent->CommitPrintf("[NETWORK: BGproc:%d BGnode:%d srcSwitch:%d destSwitch:%d destNodeCode:%d destTID:%d]\n", parent->thisIndex, myNode, srcSwitch, destSwitch, destNodeCode, destTID);

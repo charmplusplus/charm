@@ -245,6 +245,10 @@ class flowStart {
 	datalen = obj.datalen;
         return *this;
         }
+	void dump() {
+	CkPrintf("nextId = %d vcid = %d prev_vcid = %d datalen = %d \n",
+		nextId,vcid,prev_vcid,datalen);
+	}
 };
 
 class remoteMsgId
@@ -339,6 +343,9 @@ class NicConsts {
 
 #ifndef compile
 #include "../Topology/MainTopology.h"
+#include "../Routing/MainRouting.h"
+#include "../OutputVcSelection/MainOutputVcSelection.h"
+#include "../InputVcSelection/MainInputVcSelection.h"
 
 class Switch {
 	public:
@@ -349,10 +356,12 @@ class Switch {
 
 	int id,numP;
         unsigned  char InputRoundRobin,RequestRoundRobin,AssignVCRoundRobin;
+	// Be careful not to put variable data in any of these. Rollback will kill the simulation
         Topology *topology;
-        InputVcSelection *inputVcSelect;
+        RoutingAlgorithm *routingAlgorithm;
         OutputVcSelection *outputVcSelect;
-		
+        InputVcSelection *inputVcSelect;
+
 	Switch(){}
 	Switch(SwitchMsg *m);
 
@@ -389,6 +398,8 @@ class NetInterface {
 	int numRecvd,roundRobin;
 	int prevIntervalStart,counter;
 	Topology *topology;
+	RoutingAlgorithm *routingAlgorithm;
+	
 	NicConsts *nicConsts;
 
 	NetInterface(){}
@@ -403,7 +414,7 @@ class NetInterface {
 	void storeMsgInAdvance(NicMsg *);
 	void storeMsgInAdvance_anti(NicMsg *){restore(this);}
 	void storeMsgInAdvance_commit(NicMsg *){}
-	~NetInterface(){}
+	~NetInterface(){} 
 
 	NetInterface& operator=(const NetInterface& obj) {
 	rep::operator=(obj);

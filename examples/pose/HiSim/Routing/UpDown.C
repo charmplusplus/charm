@@ -8,38 +8,46 @@ int isDirectionChanged(int & src,int & dst,int & nodeRangeStart,int & nodeRangeE
                 return 0;
 }
 
-int UpDown::selectRoute(int nodeRangeStart,int nodeRangeEnd,Packet *p) {
+int UpDown::selectRoute(int c,int d,int numP,Topology *top,Packet *p) {
 //Do Static Routing for now
-	int goDown,nextP,dstOffset,fanout=config.fanout;
-	goDown = isDirectionChanged(p->hdr.src,p->hdr.routeInfo.dst,nodeRangeStart,nodeRangeEnd);
+	int goDown,nextP,dstOffset,fanout=(config.numP/2),portId;
+	portId = p->hdr.portId;
+
+	goDown = isDirectionChanged(p->hdr.src,p->hdr.routeInfo.dst,top->nodeRangeStart,top->nodeRangeEnd);
 		
-	if(!goDown) 
-		return ((p->hdr.portId%fanout)+fanout);
+	if((!goDown) && (portId < fanout)) 
+		nextP = (portId%fanout)+fanout;
 	else {
-		dstOffset = p->hdr.routeInfo.dst-nodeRangeStart;
-		nextP = ((dstOffset*fanout)/(nodeRangeEnd-nodeRangeStart));
-		return nextP;
+		dstOffset = p->hdr.routeInfo.dst-top->nodeRangeStart;
+		nextP = ((dstOffset*fanout)/(top->nodeRangeEnd-top->nodeRangeStart));
 	}	
+		return nextP;
 }
 
 int UpDown::expectedTime(int s,int d,int ovt,int origovt,int len,int *hops) {
-      	int fanout = config.fanout; 
+      	int fanout = (config.numP/2),numhops=0; 
         int dimSize = config.numNodes/fanout,tmp=config.numNodes;
-	*hops = 0;
+	*hops = 0; 
 
-        while(tmp > 1) { hops+=2; tmp /= fanout; }
-        (*hops) --;
+        while(tmp > 1) { numhops+=2; tmp /= fanout; }
+        numhops --;
 
         while(dimSize > 1) {
                 if((s/dimSize) != (d/dimSize)) {
                         break;
                 }
-                dimSize /= config.fanout;
-                (*hops) -= 2;
+                dimSize /= fanout;
+                numhops -= 2;
         }
 
-        int expected = *hops * config.switchC_Delay + len/config.switchC_BW + START_LATENCY;
+        int expected = numhops * config.switchC_Delay + len/config.switchC_BW + START_LATENCY;
         int extra = (ovt-origovt) - expected;
         if(extra < 0) extra = 0;
+	*hops = numhops;
         return extra;
+}
+
+int UpDown::convertOutputToInputPort(int portid) {
+	int fanout = (config.numP/2);
+	return (((portid+fanout)%config.numP));    // Hehehe
 }

@@ -2,19 +2,12 @@
 #include "InitNetwork.h"
 #include "math.h"
 
-#include ROUTING_FILE
-#include OUTPUT_VC_FILE
-#include INPUT_VC_FILE
-
 FatTree::FatTree() {
-routingAlgorithm = new ROUTING_ALGORITHM;
-outputVcSelect = new OUTPUT_VC_SELECTION;
-inputVcSelect = new INPUT_VC_SELECTION;
 }
 
 void FatTree::getNeighbours(int switchId,int numP) {
-        int numNodes = config.numNodes,i,fanout=config.fanout;
-        int numLevelSwitches = numNodes/config.fanout;
+        int numNodes = config.numNodes,i,fanout=numP/2;
+        int numLevelSwitches = numNodes/fanout;
         int numDimSwitches,curDimOffset,curDim,upperDim,lowerDim;
         level = switchId/numLevelSwitches;
         curLevelId = switchId - (level * numLevelSwitches) ;
@@ -91,6 +84,28 @@ void FatTree::getNeighbours(int switchId,int numP) {
 
 int FatTree::getNext(int portid,int nodeid,int numP) {
         return(next[portid]);
+}
+
+int FatTree::getNextChannel(int portid,int switchid) {
+	// Offset for nodes to connect to switches ( if channels are added)
+	int offset = 0,startChan; 
+	startChan = config.numP * (switchid-config.switchStart) + portid;
+	return(config.ChannelStart + startChan + offset );
+}	
+
+int FatTree::getStartSwitch(int nodeid) {
+	return(nodeid/(config.numP/2));
+}
+
+int FatTree::getStartPort(int nodeid) {
+	int fanout;
+	fanout = (config.numP/2);
+	return((nodeid%fanout)+fanout);
+}
+
+int FatTree::getStartVc() {
+	// No flow/buffering control with the net interface
+	return 0;
 }
 
 int FatTree::getStartNode() {

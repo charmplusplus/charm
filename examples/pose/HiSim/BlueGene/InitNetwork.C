@@ -1,6 +1,9 @@
 //#include "InitNetwork.h"
 #include "BgSim_sim.h"
 #include "../Topology/Mesh3D.h"
+#include "../Routing/TorusRouting.h"
+#include "../OutputVcSelection/maxAvailBufferBubbleVc.h"
+#include "../InputVcSelection/SLQ.h"
 
 void InitNetwork(MachineParams *mp) {
 
@@ -39,7 +42,16 @@ void InitNetwork(MachineParams *mp) {
         }
 }
 
-void getMyTopology(Topology **topology) 
+void initializeNetwork(Topology **topology,RoutingAlgorithm **routing,InputVcSelection ** invc,OutputVcSelection **outvc) 
 {
    *topology = new Mesh3D;
+   *routing = new TorusRouting;
+   *invc = new SLQ;
+   *outvc = new maxAvailBufferBubbleVc;
+}
+
+void initializeNetwork(Topology **topology,RoutingAlgorithm **routing) 
+{
+   *topology = new Mesh3D;
+   *routing = new TorusRouting;
 }

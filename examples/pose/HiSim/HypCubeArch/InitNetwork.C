@@ -1,19 +1,23 @@
 //#include "InitNetwork.h"
 #include "BgSim_sim.h"
 #include "../Topology/HyperCube.h"
+#include "../Routing/HammingDistance.h"
+#include "../OutputVcSelection/maxAvailBuffer.h"
+#include "../InputVcSelection/SLQ.h"
 
 void InitNetwork(MachineParams *mp) {
 
         unsigned int diff,counter,firstBitPos,totalP,*ports,*portindex,nnodes,nextNode,k,i,mapPE,portid;
-	int nodeid;
+	int nodeid,nicStart,switchStart,chanStart;
 
-        Topology **topology;
 	NetInterfaceMsg *nic;
-	InputBufferMsg *inpbuf;
+	SwitchMsg *sbuf;
 	ChannelMsg *chan;
+	Topology **topology;
 
         totalP = 0;
-        mp->config->InputBufferStart = mp->config->nicStart+mp->BGnodes;
+	nicStart = mp->config->nicStart;
+        switchStart = mp->config->switchStart = mp->config->nicStart+mp->BGnodes;
         ports = (unsigned int *)malloc(sizeof(int)*mp->BGnodes);
         portindex = (unsigned int *)malloc(sizeof(int)*mp->BGnodes);
 
@@ -39,17 +43,13 @@ void InitNetwork(MachineParams *mp) {
         for(k=0;k<mp->BGnodes;k++)
                 topology[k] = new HyperCube;
 
+        chanStart = mp->config->ChannelStart = mp->config->switchStart +  ;
 
-        mp->config->ChannelStart = mp->config->InputBufferStart + totalP ;
-
-        counter = mp->config->InputBufferStart;
-        for(i=mp->config->nicStart;i< mp->config->InputBufferStart;i++) {
-                topology[i-mp->config->nicStart]->getNeighbours(i-mp->config->nicStart,ports[i
--mp->config->nicStart]);
-                nic = new NetInterfaceMsg(i,counter,ports[i-mp->config->nicStart]);
-                counter += (ports[i-mp->config->nicStart]+1);
+        for(i=nicStart;i< mp->switchStart;i++) {
+                topology[i-nicStart]->getNeighbours(i-nicStart,ports[i-nicStart]);
+                nic = new NetInterfaceMsg(i,config.switchStart+(i-nicStart),ports[i-nicStart]);
                 nic->Timestamp(0);
-                mapPE = mp->procs*(i-mp->config->nicStart)/mp->BGnodes;
+                mapPE = mp->procs*(i-nicStart)/mp->BGnodes;
 
                 (*(CProxy_NetInterface *) &POSE_Objects)[i].insert(nic,mapPE);
         }
@@ -57,15 +57,15 @@ void InitNetwork(MachineParams *mp) {
         counter = 0; nodeid = -1;
         int counter2 = mp->config->ChannelStart;
 
-        for(i=mp->config->InputBufferStart;i< mp->config->ChannelStart;i++) {
+        for(i=switchStart;i< mp->config->ChannelStart;i++) {
                 if(!counter) {
                 nodeid ++; counter = ports[nodeid]+1; portid = 0;
                 if(nodeid)
                 counter2 += (ports[nodeid-1]+1);
                 }  // Adding 1 to include injection port
 
-                inpbuf = new InputBufferMsg(i,portid,nodeid,ports[nodeid],counter2);
-                inpbuf->Timestamp(0);
+                sbuf = new SwitchMsg(i,ports[nodeid]);
+                sbuf->Timestamp(0);
                 mapPE = mp->procs*(nodeid-1)/mp->BGnodes;
                 (*(CProxy_InputBuffer *) &POSE_Objects)[i].insert(inpbuf,mapPE);
                 portid ++; counter--;
@@ -87,7 +87,16 @@ void InitNetwork(MachineParams *mp) {
         free(topology);
 }
 
-void getMyTopology(Topology **topology) 
+void initializeNetwork(Topology **topology,RoutingAlgorithm **routing,InputVcSelection ** invc,OutputVcSelection **outvc)
 {
    *topology = new HyperCube;
+   *routing = new HammingDistance;
+   *invc = new SLQ;
+   *outvc = new maxAvailBuffer;
+}
+
+void initializeNetwork(Topology **topology,RoutingAlgorithm **routing)
+{
+   *topology = new HyperCube;
+   *routing = new HammingDistance;
 }

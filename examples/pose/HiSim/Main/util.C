@@ -21,6 +21,7 @@ void Config::readConfig(CkArgMsg *m) {
   
   fscanf(fp,"MAX_PACKET_SIZE %d\n",&maxpacksize);
   fscanf(fp,"SWITCH_VC %d\n",&switchVc);
+  fscanf(fp,"SWITCH_PORT %d\n",&numP);  // Arrgh needed this for indirect networks ,  8 for quarternary fat-tree and so on
   fscanf(fp,"SWITCH_BUF %d\n",&switchBufsize);
   fscanf(fp,"CHANNELBW %d\n",&switchC_BW);
   fscanf(fp,"CHANNELDELAY %d\n",&switchC_Delay);

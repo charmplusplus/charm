@@ -1,6 +1,7 @@
 #include "TorusRouting.h"
 
-int TorusRouting::selectRoute(int c,int d,int numP,int *next) {
+int TorusRouting::selectRoute(int c,int d,int numP,Topology *top,Packet *p) {
+	int *next; next = top->next;
         int xdiff,ydiff,zdiff,xdiff2,ydiff2,zdiff2,nextPort,select_torus=0;
         Position dst,pos; dst.init(d); pos.init(c);
 

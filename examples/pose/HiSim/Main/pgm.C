@@ -32,6 +32,7 @@ main::main(CkArgMsg *m)
 
   int BGnodes = netLength*netWidth*netHeight, n=0,l,h,w,switchP;
   config.numNodes = BGnodes;
+  config.origNodes = BGnodes;
   Position pos,p;
 
   procs = CkNumPes();

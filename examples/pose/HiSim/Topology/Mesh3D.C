@@ -1,13 +1,7 @@
 #include "Mesh3D.h"
 #include "InitNetwork.h"
-#include ROUTING_FILE
-#include OUTPUT_VC_FILE
-#include INPUT_VC_FILE
 
 Mesh3D::Mesh3D() {
-routingAlgorithm = new ROUTING_ALGORITHM;
-outputVcSelect = new OUTPUT_VC_SELECTION;
-inputVcSelect = new INPUT_VC_SELECTION;
 }
 
 void Mesh3D::getNeighbours(int nodeid,int numP) {
