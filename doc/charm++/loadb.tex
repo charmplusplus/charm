@@ -444,22 +444,49 @@ a correct rebalancing job. To prevent this the user can provide a transition
 function to the load balancer to predict what will be the future workload, given
 the past, instrumented one. As said, the user might provide a specific function
 which inherit from {\tt LBPredictorFunction} and implement its
-functions. Here is the class with all the methods to reimplement:
+functions. Here is the abstract class:
 \begin{verbatim}
 class LBPredictorFunction {
 public:
   int num_params;
  
-  void initialize_params(double *x);
+  virtual void initialize_params(double *x);
 
   virtual double predict(double x, double *params) =0;
   virtual void print(double *params) {PredictorPrintf("LB: unknown model\n");};
   virtual void function(double x, double *param, double &y, double *dyda) =0;
-  virtual LBPredictorFunction* constructor() =0;
 };
 \end{verbatim}
-Otherwise the user can let the load balancer to use a predefined default
-function.
+\begin{itemize}
+\item {\tt initialize\_params} by default initializes the parameters randomly. If the user
+knows how they should be, this function can be reimplemented.
+\item {\tt predict} is the function the model implements. For example, if the function is
+$y=ax+b$, the method in the implemented class should be like:
+\begin{verbatim}
+double predict(double x, double *param) {return (param[0]*x + param[1]);}
+\end{verbatim}
+\item {\tt print} is a debugging function and it can be reimplemented to have a meaningful
+print of the learnt model
+\item {\tt function} is a function internally needed to learn the parameters, {\tt x} and
+{\tt param} are input, {\tt y} and {\tt dyda} are output (the computed function and
+all its derivatives with respect to the parameters, respectively).
+For the function in the example should look like:
+\begin{verbatim}
+void function(double x, double *param, double &y, double *dyda) {
+  y = predict(x, param);
+  dyda[0] = x;
+  dyda[1] = 1;
+}
+\end{verbatim}
+\end{itemize}
+Other than these function, the user should provide a constructor which must initialize
+{\tt num\_params} to the number of parameters the model has to learn. This number is
+the dimension of {\tt param} and {\tt dyda} in the previous functions. For the given
+example, the constructor is {\tt \{num\_params = 2;\}}.
+
+If the model behind the computation is not known, the user can leave the system to
+use a predefined default function.
+
 As seen, the function can have several parameters which will be learned during
 the execution of the program. For this, two parameters can be setup at command
 line to specify the learning behaviour:
