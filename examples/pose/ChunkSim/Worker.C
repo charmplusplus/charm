@@ -1,156 +1,73 @@
 #include <math.h>
 
-void worker::set(WorkerData *m)
+void worker::set(int wid)
 {
   int i;
-  workerID = m->workerID;
-  numWorkers = m->numWorkers;
-  numObjs = m->numObjs;
-  numMsgs = m->numMsgs;
-  msgSize = m->msgSize;
-  distribution = m->distribution;
-  connectivity = m->connectivity;
-  locality = m->locality;
-  offsetPattern = m->offsetPattern;
-  sendPattern = m->sendPattern;
-  for (i=0; i<100; i++) data[i] = 0;
-  for (i=0; i<5; i++) {
-    numSends[i] = m->numSends[i];
-    offsets[i] = m->offsets[i];
-  } 
-  numNbrs = m->numNbrs;
-  for (i=0; i<numNbrs; i++) neighbors[i] = m->neighbors[i];
-  sendIdx = nbrIdx = offsetIdx = msgIdx = 0;
+  workerID = wid;
+  for (i=0; i<WORKER_SZ; i++) data[i] = 0;
 }
 
-worker::worker()
-{
-  sendIdx = nbrIdx = offsetIdx = msgIdx = 0;
-}
+worker::worker() { for (int i=0; i<WORKER_SZ; i++) data[i] = 0; }
 
 worker& worker::operator=(const worker& obj)
 {
   int i;
   workerID = obj.workerID;
-  numWorkers = obj.numWorkers;
-  numObjs = obj.numObjs;
-  numMsgs = obj.numMsgs;
-  msgSize = obj.msgSize;
-  distribution = obj.distribution;
-  connectivity = obj.connectivity;
-  locality = obj.locality;
-  offsetPattern = obj.offsetPattern;
-  sendPattern = obj.sendPattern;
-  for (i=0; i<100; i++) data[i] = obj.data[i];
-  for (i=0; i<5; i++) {
-    numSends[i] = obj.numSends[i];
-    offsets[i] = obj.offsets[i];
-  }
-  for (i=0; i<100; i++) neighbors[i] = obj.neighbors[i];
-  numNbrs = obj.numNbrs;
-  sendIdx = obj.sendIdx;
-  nbrIdx = obj.nbrIdx;
-  offsetIdx = obj.offsetIdx;
-  msgIdx = obj.msgIdx;
+  for (i=0; i<WORKER_SZ; i++) data[i] = obj.data[i];
   return *this;
 }
 
 
 team::team(TeamData *m)
 {
-  workersRecvd = 0;
+  teamID = m->teamID;
   numTeams = m->numTeams;
   numWorkers = m->numWorkers;
-  numObjs = m->numObjs;
-  myWorkers = new worker[numWorkers];
-}
+  myWorkers = new worker[numWorkers/numTeams];
 
-void team::addWorker(WorkerData *wd) 
-{
-  eventMsg *em;
-  myWorkers[wd->workerID%numWorkers].set(wd);
-  CkFreeMsg(wd);
-  workersRecvd++;
-  if ((parent->thisIndex == numTeams-1) && (workersRecvd == numWorkers))
-    for (int i=0; i<numTeams; i++) {
-      em = new eventMsg;
-      POSE_invoke(start(em), team, i, 0);
-    }
-}
-
-void team::start(eventMsg *em)
-{
-  SmallWorkMsg *sm;
-
-  for (int i=0; i<numWorkers; i++) {
-    sm = new SmallWorkMsg;
-    sm->workerID = myWorkers[i].workerID;
-    memset(sm->data, 0, SM_MSG_SZ*sizeof(int));
-    POSE_local_invoke(workSmall(sm), 0);
+  WorkMsg *wm;
+  int offset = teamID * numWorkers/numTeams;
+  //CkPrintf("Team %d(%d) constructed.  Offset=%d\n", parent->thisIndex, teamID, offset);
+  for (int i=0; i<numWorkers/numTeams; i++) {
+    myWorkers[i].set(offset+i);
+    wm = new WorkMsg;
+    wm->workerID = offset+i;
+    memset(wm->data, 0, 10*sizeof(int));
+    //CkPrintf("Team %d(%d) generated initial work for worker %d\n", parent->thisIndex, teamID, wm->workerID);
+    POSE_local_invoke(work(wm), 0);
   }
 }
-void team::start_anti(eventMsg *em) {restore(this);}
-void team::start_commit(eventMsg *em) {}
 
-
-void team::workSmall(SmallWorkMsg *sm) 
+void team::work(WorkMsg *wm) 
 {
-  doWork(sm->workerID%numWorkers);
+  doWork(wm->workerID);
 }
-void team::workSmall_anti(SmallWorkMsg *sm) {restore(this);}
-void team::workSmall_commit(SmallWorkMsg *sm) {}
-
-void team::workMedium(MediumWorkMsg *mm) 
-{
-  doWork(mm->workerID%numWorkers);
-}
-void team::workMedium_anti(MediumWorkMsg *mm) {restore(this);}
-void team::workMedium_commit(MediumWorkMsg *mm) {}
-
-void team::workLarge(LargeWorkMsg *lm) 
-{
-  doWork(lm->workerID%numWorkers);
-}
-void team::workLarge_anti(LargeWorkMsg *lm) {restore(this);}
-void team::workLarge_commit(LargeWorkMsg *lm) {}
+void team::work_anti(WorkMsg *wm) {restore(this);}
+void team::work_commit(WorkMsg *wm) {}
 
 void team::doWork(int k)
 {
-  SmallWorkMsg *sm;
-  MediumWorkMsg *mm;
-  LargeWorkMsg *lm;
+  WorkMsg *wm;
   
   if ((POSE_endtime > -1) && (OVT() > POSE_endtime))  return;
+  for (int j=0; j<WORKER_SZ; j++) {
+    myWorkers[k%(numWorkers/numTeams)].data[j] += 
+      myWorkers[k%(numWorkers/numTeams)].data[99-j];
+  } 
 
   // generate some events
-  int actualMsgSize = myWorkers[k].msgSize;
-  for (int i=0; i<myWorkers[k].numSends[myWorkers[k].sendIdx]; i++) {
-    if (myWorkers[k].msgSize == MIX_MS) {
-      actualMsgSize = myWorkers[k].msgIdx+1;
-      myWorkers[k].msgIdx = (myWorkers[k].msgIdx + 1) % 3;
-    }
-    
-    if (actualMsgSize == SMALL) {
-      sm = new SmallWorkMsg;
-      sm->workerID = myWorkers[k].neighbors[myWorkers[k].nbrIdx];
-      memset(sm->data, 0, SM_MSG_SZ*sizeof(int));
-      POSE_invoke(workSmall(sm), team, myWorkers[k].neighbors[myWorkers[k].nbrIdx]/numWorkers, myWorkers[k].offsets[myWorkers[k].offsetIdx]);
-    }
-    else if (actualMsgSize == MEDIUM) {
-      mm = new MediumWorkMsg;
-      mm->workerID = myWorkers[k].neighbors[myWorkers[k].nbrIdx];
-      memset(mm->data, 0, MD_MSG_SZ*sizeof(int));
-      POSE_invoke(workMedium(mm), team, myWorkers[k].neighbors[myWorkers[k].nbrIdx]/numWorkers, myWorkers[k].offsets[myWorkers[k].offsetIdx]);
-    }
-    else if (actualMsgSize == LARGE) {
-      lm = new LargeWorkMsg;
-      lm->workerID = myWorkers[k].neighbors[myWorkers[k].nbrIdx];
-      memset(lm->data, 0, LG_MSG_SZ*sizeof(int));
-      POSE_invoke(workLarge(lm), team, myWorkers[k].neighbors[myWorkers[k].nbrIdx]/numWorkers, myWorkers[k].offsets[myWorkers[k].offsetIdx]);
-    }
-    myWorkers[k].nbrIdx = (myWorkers[k].nbrIdx + 1) % myWorkers[k].numNbrs;
-    myWorkers[k].offsetIdx = (myWorkers[k].offsetIdx + 1) % 5;
+  if (k%19!=0) {
+    wm = new WorkMsg;
+    wm->workerID = (k+20)%numWorkers;
+    memset(wm->data, 0, 10*sizeof(int));
+    //CkPrintf("At(%d): Team %d(%d) worker %d generated actual work for worker %d\n", ovt, parent->thisIndex, teamID, k, wm->workerID);
+    POSE_invoke(work(wm), team, (wm->workerID)/(numWorkers/numTeams), k%50+10);
   }
-  myWorkers[k].sendIdx = (myWorkers[k].sendIdx + 1) % 5;
+  if (k%4==0) {
+    wm = new WorkMsg;
+    wm->workerID = (k+1)%numWorkers;
+    memset(wm->data, 0, 10*sizeof(int));
+    //CkPrintf("At(%d): Team %d(%d) worker %d generated actual work for worker %d\n", ovt, parent->thisIndex, teamID, k, wm->workerID);
+    POSE_invoke(work(wm), team, (wm->workerID)/(numWorkers/numTeams), 100);
+  }
 }
-

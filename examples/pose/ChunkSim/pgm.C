@@ -10,129 +10,37 @@ main::main(CkArgMsg *m)
   CkGetChareID(&mainhandle);
   //  CProxy_main M(mainhandle);
 
-  int numTeams=-1, numWorkers=-1, numObjs=-1, numMsgs=-1, msgSize=-1, 
-    distribution=-1, connectivity=-1, locality=-1, offsetPattern=-1, 
-    sendPattern=-1, pattern=-1, i;
-  char *text;
+  int numTeams=-1, numWorkers=-1, i;
 
-  if(m->argc<11) {
-    CkPrintf("Usage: asim <numTeams> <numWorkers> <numObjs> <numMsgs> <msgSize> <distribution> <connectivitiy> <locality> <endTime> <pattern>\n");
+  if(m->argc!=4) {
+    CkPrintf("Usage: asim <numTeams> <numWorkers> <endTime>\n");
     CkExit();
   }
   numTeams = atoi(m->argv[1]);
   numWorkers = atoi(m->argv[2]);
-  numObjs = atoi(m->argv[3]);
   map = (int *)malloc(numTeams*sizeof(int));
-  numMsgs = atoi(m->argv[4]);
-  msgSize = atoi(m->argv[5]);
-  text = "";
-  if (msgSize == MIX_MS) { text = "MIXED"; }
-  else if (msgSize == SMALL) { text = "SMALL"; }
-  else if (msgSize == MEDIUM) { text = "MEDIUM"; }
-  else if (msgSize == LARGE) { text = "LARGE"; }
 
-  CkPrintf("asim run with: %d objects  %d messages  %s message size\n",
-	   numObjs, numMsgs, text);
-
-  if (strcmp(m->argv[6], "RANDOM") == 0)
-    distribution = RANDOM;
-  else if (strcmp(m->argv[6], "IMBALANCED") == 0)
-    distribution = IMBALANCED;
-  else if (strcmp(m->argv[6], "UNIFORM") == 0)
-    distribution = UNIFORM;
-  else {
-    CkPrintf("Invalid distribution type: %s\n", m->argv[4]);
-    CkExit();
-  }
-
-  if (strcmp(m->argv[7], "SPARSE") == 0)
-    connectivity = SPARSE;
-  else if (strcmp(m->argv[7], "HEAVY") == 0)
-    connectivity = HEAVY;
-  else if (strcmp(m->argv[7], "FULL") == 0)
-    connectivity = FULL;
-  else { 
-    CkPrintf("Invalid connectivity type: %s\n", m->argv[5]);
-    CkExit();
-  }
-
-  locality = atoi(m->argv[8]);
-  POSE_endtime = atoi(m->argv[9]);
-
-  CkPrintf("%s distribution  %s connectivity  %d%% locality  %d endtime\n",
-	   m->argv[6], m->argv[7], locality, POSE_endtime);
-
-  pattern = atoi(m->argv[10]);
-  offsetPattern = pattern / 10;
-  pattern -= offsetPattern*10;
-  sendPattern = pattern;
-
-  CkPrintf("  %d offsetPattern  %d sendPattern\n", offsetPattern, sendPattern);
+  CkPrintf("asim run with: %d teams of %d workers", numTeams, numWorkers);
+  CkPrintf("%d endtime\n", atoi(m->argv[3]));
 
   POSE_init();
-  POSE_useET(atoi(m->argv[7]));
+  POSE_useET(atoi(m->argv[3]));
   POSE_useID();
+  CkPrintf("POSE_endtime = %d\n", POSE_endtime);
 
   // create all the teams of workers
-  WorkerData *wd;
   TeamData *td;
   int dest, j, k, wid=0;
   srand48(42);
-  buildMap(numTeams, distribution);
+  buildMap(numTeams, RANDOM);
   for (k=0; k<numTeams; k++) { // create numTeams teams
     dest = map[k];
     td = new TeamData;
+    td->teamID = k;
     td->numTeams = numTeams;
-    td->numWorkers = numWorkers;
-    td->numObjs = numObjs;
+    td->numWorkers = numWorkers*numTeams;
     td->Timestamp(0);
     (*(CProxy_team *) &POSE_Objects)[k].insert(td, dest);
-  }
-  for (k=0; k<numTeams; k++) { // for each of the numTeams teams, 
-    for (i=0; i<numWorkers; i++) {  // create numWorkers workers
-      wd = new WorkerData;
-      wd->workerID = wid;
-      wid++;
-      wd->numWorkers = numWorkers;
-      wd->numObjs = numObjs;
-      wd->numMsgs = numMsgs;
-      wd->msgSize = msgSize;
-      wd->distribution = distribution;
-      wd->connectivity = connectivity;
-      wd->locality = locality;
-      wd->offsetPattern = offsetPattern;
-      wd->sendPattern = sendPattern;
-
-      // compute numSends, offsets, neighbors, numNbrs
-      if (connectivity == SPARSE) wd->numNbrs = 4; 
-      else if (connectivity == HEAVY) wd->numNbrs = 25;
-      else if (connectivity == FULL) wd->numNbrs = 100;
-    
-      if (offsetPattern == 1) 
-	for (j=0; j<5; j++) wd->offsets[j] = 5;
-      else if (offsetPattern == 2)
-	for (j=0; j<5; j++) wd->offsets[j] = lrand48() % 11;
-      else if (offsetPattern == 3)
-	for (j=0; j<5; j++) wd->offsets[j] = (lrand48() % 40) + 51;
-      else if (offsetPattern == 4)
-	for (j=0; j<5; j++) wd->offsets[j] = (lrand48() % 50) + 101;
-      else if (offsetPattern == 5)
-	for (j=0; j<5; j++) wd->offsets[j] = lrand48() % 201;
-      
-      if (sendPattern == 1) 
-	for (j=0; j<5; j++) wd->numSends[j] = (lrand48()%numMsgs) % 2;
-      else if (sendPattern == 2)
-	for (j=0; j<5; j++) wd->numSends[j] = (lrand48()%numMsgs) % (numMsgs+4/4) + 1;
-      else if (sendPattern == 3)
-	for (j=0; j<5; j++) wd->numSends[j] = (lrand48()%numMsgs) % (numMsgs+2/2) + 1;
-      else if (sendPattern == 4)
-	for (j=0; j<5; j++) wd->numSends[j] = (lrand48()%numMsgs) % numMsgs + 1;
-      
-      for (j=0; j<wd->numNbrs; j++) 
-	wd->neighbors[j] = getAnbr(numObjs, locality, dest);
-
-      (*(CProxy_team *) &POSE_Objects)[k].addWorker(wd);
-    }
   }
   POSE_start();
 }

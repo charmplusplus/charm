@@ -54,7 +54,7 @@ $(PGM):	$(SIM_OBJECTS)
 
 $(PGM).comm:	$(SIM_OBJECTS) 
 	$(CHARMC) $(SIM_OBJECTS) $(OTHER) $(LIBS) -o $(PGM).comm \
-	-lpose -language charm++ -module commlib
+	-lpose -language charm++ -module commlib -memory paranoid
 
 $(PGM).pure:	$(SIM_OBJECTS)
 	$(CHARMC) $(SIM_OBJECTS) $(OTHER) $(LIBS) -o $(PGM).pure \
