@@ -2,50 +2,66 @@ subroutine init()
 implicit none
 include 'femf.h'
 
-  integer :: i, j, nelems, nnodes, ctype, esize
+  integer :: i, j, nelems, nnodes, esize
   integer, dimension(:,:), allocatable:: conn
+  double precision, dimension(:,:), allocatable:: nodeData
 
   call FEM_Print('init called')
   open(20, file='fmesh.dat')
-  read(20,*) nelems, nnodes, ctype
-  if (ctype .eq. FEM_TRIANGULAR) then
-    esize = 3
-  else 
-    if(ctype .eq. FEM_HEXAHEDRAL) then
-      esize = 8
-    else
-      esize = 4
-    endif
-  endif
+  read(20,*) nelems, nnodes, esize
   allocate(conn(nelems, esize))
   do i=1,nelems
     read(20,*) (conn(i,j),j=1,esize)
   enddo
   close(20)
-  call FEM_Set_Mesh(nelems, nnodes, ctype, conn)
+  call FEM_Set_Elem(1,nelems,0,esize)
+  call FEM_Set_Elem_Conn_c(1,conn)
+  
+  allocate(nodeData(nnodes,2))
+  do i=1,nnodes
+     nodeData(i,1)=0
+     nodeData(i,2)=0
+  enddo
+  nodeData(1,1)=1
+  nodeData(1,2)=0.25
+  nodeData(2,2)=0.25
+  nodeData(4,2)=0.25
+  nodeData(5,2)=0.25
+  call FEM_Set_Node(nnodes,2)
+  call FEM_Set_Node_Data_c(nodeData)
 end subroutine init
 
-subroutine driver(nnodes, nnums, nelems, enums, npere, conn)
+subroutine driver()
 implicit none
 include 'femf.h'
 
-  integer  :: nnodes, nelems, npere
-  integer, dimension(nnodes) :: nnums
-  integer, dimension(nelems) :: enums
-  integer, dimension(nelems, npere) :: conn
-
+  integer  :: nnodes,nodeDataP, nelems, elemData,npere
+  integer, dimension(:,:), allocatable:: conn
+  double precision, dimension(:,:), allocatable:: nodeData
   integer :: i, j, fid
   logical :: failed
   double precision :: sum
-  double precision, dimension(nnodes) :: nodes
-  double precision, dimension(nelems) :: elements
+  double precision, dimension(:), allocatable:: nodes
+  double precision, dimension(:), allocatable:: elements
 
-  !call FEM_Print_Partition()
+
+  call FEM_Get_Elem(1,nelems,elemData,npere)
+  call FEM_Get_Node(nnodes,nodeDataP)
+
+  allocate(conn(nelems, npere))
+  call FEM_Get_Elem_Conn_c(1,conn)
+  allocate(nodeData(nnodes,nodeDataP))
+  call FEM_Get_Node_Data_c(nodeData);
+
+  allocate(nodes(nnodes))
+  allocate(elements(nelems))
+
+  call FEM_Print_Partition()
 
   nodes = 0.0
   elements = 0.0
   do i=1,nnodes
-    if (nnums(i) .eq. 1) nodes(i) = 1.0
+     nodes(i)=nodeData(i,1)
   enddo
   fid = FEM_Create_Field(FEM_DOUBLE, 1, 0, 8)
   do i=1,nelems
@@ -63,12 +79,7 @@ include 'femf.h'
   call FEM_Update_Field(fid, nodes(1))
   failed = .FALSE.
   do i=1,nnodes
-    if (nnums(i).eq.1 .or. nnums(i).eq.2 .or. &
-&       nnums(i).eq.4 .or. nnums(i).eq.5) then 
-      if(nodes(i) .ne. 0.25) failed = .TRUE.
-    else
-      if (nodes(i) .ne. 0.0) failed = .TRUE.
-    endif
+    if (nodes(i) .ne. nodeData(i,2)) failed= .TRUE.
   enddo
   if (failed) then
     call FEM_Print('update_field test failed.')
@@ -91,6 +102,13 @@ include 'femf.h'
   endif
   call FEM_Done()
 end subroutine driver
+
+subroutine mesh_updated(param)
+  implicit none
+  integer :: param
+  include 'femf.h'
+  call FEM_Print('mesh_updated called')
+end subroutine
 
 subroutine finalize()
 implicit none
