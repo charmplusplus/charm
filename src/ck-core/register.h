@@ -74,9 +74,22 @@ class EntryInfo {
       a whole set of combined messages.
     */
     CkMarshallUnpackFn marshallUnpack;
+    
+    /** 
+      A "message pup" function pups the message accepted by 
+      this entry point.  This is *only* used to display the 
+      message in the debugger, not for normal communication.
+      
+      This is registered with the entry point  
+      (not the message) because many entry points take the same
+      message type but store different data in it, like parameter
+      marshalled messages.
+    */
+    CkMessagePupFn messagePup;
 
     EntryInfo(const char *n, CkCallFnPtr c, int m, int ci) : 
-      name(n), call(c), msgIdx(m), chareIdx(ci), marshallUnpack(0)
+      name(n), call(c), msgIdx(m), chareIdx(ci), 
+      marshallUnpack(0), messagePup(0)
     { traceEnabled=CmiTrue; noKeep=CmiFalse; inCharm=CmiFalse;}
 };
 

@@ -18,6 +18,7 @@ fill out global tables, they are normally called exactly
 once per node at Charm startup time.
 */
 #include "ck.h"
+#include "debug-charm.h"
 
 CkRegisteredInfo<EntryInfo> _entryTable;
 CkRegisteredInfo<MsgInfo> _msgTable;
@@ -112,7 +113,11 @@ CkMarshallUnpackFn CkLookupMarshallUnpackFn(int epIndex)
 {
   return _entryTable[epIndex]->marshallUnpack;
 }
-
+extern "C"
+void CkRegisterMessagePupFn(int epIndex,CkMessagePupFn m)
+{
+	_entryTable[epIndex]->messagePup=m;
+}
 extern "C" 
 int CkDisableTracing(int epIdx) {
 	int oldStatus = _entryTable[epIdx]->traceEnabled;
@@ -125,19 +130,14 @@ void CkEnableTracing(int epIdx) {
 	_entryTable[epIdx]->traceEnabled=CmiTrue;
 }
 
-//These pup functions are used by the CpdList interface, below
-#define PCOM(field) p.comment(#field); p(c->field);
-#define PCOMS(field) p.comment(#field); p((char *)c->field,strlen(c->field));
+
 static void pupEntry(PUP::er &p,int i)
 {
   EntryInfo *c=_entryTable[i];
   PCOMS(name) 
   PCOM(msgIdx) 
   PCOM(chareIdx)
-  if (c->inCharm == CmiTrue)
-    p.comment("System Entry Point");
-  else
-    p.comment("User Entry Point");
+  PCOM(inCharm);
 }
 static void pupMsg(PUP::er &p,int i)
 {
@@ -173,55 +173,6 @@ static void pupReadonlyMsg(PUP::er &p,int i)
   CkPupMessage(p,c->pMsg,0);
 }
 
-class GroupIterator : public CkLocIterator {
-private:
-   PUP::er &p;
-public:
-   GroupIterator(PUP::er &_p) :p(_p){}
-   ~GroupIterator() {}
-   void addLocation (CkLocation & loc)
-   {
-     p.comment("Element details");
-     const CkArrayIndex &idx = loc.getIndex();
-     const int * idxData = idx.data();
-     char buf[128];
-     char * temp = buf;
-     for(int i=0; i < idx.nInts; i++)
-     {
-        sprintf(temp, "%s%d",i==0?"":":", idxData[i]);
-        temp += strlen(temp);
-     } 
-     p(buf, strlen(buf));
-     //loc.pup(p);
-   }
-};
-
-
-
-
-static void pupArray(PUP::er &p, int i)
-{
-  IrrGroup * c;
-  c = (CkpvAccess(_groupTable)->find((*CkpvAccess(_groupIDTable))[i])).getObj();
-  GroupIterator itr(p);
-  char buf[128];
-  if (c->isLocMgr())
-  {
-   //int groupID = (((CkLocMgr *)c)->getGroupID()).idx;
-   p.comment("Array");
-   p(i);
-   ((CkLocMgr*)(c))->iterate(itr);
-    
-  }
-  else
-  {
-    p.comment("Group");
-    p.comment("Not an Array Location Mgr");
-  }
-}
-
-CpvDeclare(int, groupTableSize);
-
 extern void CpdCharmInit(void);
 
 void _registerDone(void)
@@ -232,8 +183,6 @@ void _registerDone(void)
   CpdListRegister(new CpdSimpleListAccessor("charm/mains",_mainTable.size(),pupMain));
   CpdListRegister(new CpdSimpleListAccessor("charm/readonly",_readonlyTable.size(),pupReadonly));
   CpdListRegister(new CpdSimpleListAccessor("charm/readonlyMsg",_readonlyMsgs.size(),pupReadonlyMsg));
- 
-  CpdListRegister(new CpdSimpleListAccessor("charm/arrayelements", CkpvAccess(_groupIDTable)->length(), pupArray));
 #if CMK_CCS_AVAILABLE
   CpdCharmInit();
 #endif
