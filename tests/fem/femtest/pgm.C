@@ -213,6 +213,7 @@ void testAssert(int shouldBe,const char *what,int myPartition=-1)
 extern "C" void
 driver(void)
 {
+  int i,j;
   int nnodes,nelems,nnodeData,nelemData,np;
   int ngnodes, ngelems; //Counts including ghosts
 
@@ -237,7 +238,6 @@ printargs();
 	(char *)(&nodes[0].val)-(char *)nodes, sizeof(Node));
   int efid = FEM_Create_Field(FEM_DOUBLE, 1, 
 	(char *)(&elements[0].val)-(char *)elements, sizeof(Element));
-  int i;
   
 //Test out reduction
   double localSum = 1.0,globalSum;
@@ -299,8 +299,6 @@ printargs();
 //Time loop
   for (int t=0;t<tsteps;t++)
   {
-    int i,j;
-
 	//Nodes are sum of surrounding elements
     for(i=0;i<nnodes;i++) nodes[i].val = 0.0;
     for(i=0;i<nelems;i++)
@@ -406,7 +404,7 @@ mesh_updated(int param)
   CkPrintf("Getting %d nodes (%d data per)\n",nnodes,dataPer);
   double *ndata=new double[nnodes*dataPer];
   FEM_Get_Node_Data(ndata);
-  for (int i=0;i<nnodes;i++) {
+  for (i=0;i<nnodes;i++) {
     testEqual(ndata[i],0.1*i,"mesh_updated node values");
   }
   delete[] ndata;
@@ -415,7 +413,7 @@ mesh_updated(int param)
   CkPrintf("Getting %d elems (%d data per)\n",nelems,dataPer);
   double *ldata=new double[nelems*dataPer];
   FEM_Get_Elem_Data(0,ldata);
-  for (int i=0;i<nelems;i++) {
+  for (i=0;i<nelems;i++) {
     testEqual(ldata[i],0.1*i,"mesh_updated elem values");
   }
   delete[] ldata;
