@@ -914,8 +914,8 @@ void CmiMachineInit(char **argv)
   CmiGetArgIntDesc(argv,"+gm_maxsize",&maxsize,"maximum packet size in rank (2^maxsize)");
 
 #if GM_STATS
-  gm_stats = (int*)malloc(maxsize * sizeof(int));
-  for (i=0; i<maxsize; i++) gm_stats[i] = 0;
+  gm_stats = (int*)malloc((maxsize+1) * sizeof(int));
+  for (i=0; i<=maxsize; i++) gm_stats[i] = 0;
 #endif
 
   for (i=1; i<=maxsize; i++) {
