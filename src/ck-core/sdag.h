@@ -280,6 +280,8 @@ class CDep {
      p(numEntryDepends, numEntries);
 
 /*
+     // don't actually pack this info because it gets created once 
+     // the addDepends() in the initialization scheme are called for this class
      for (i=0; i<numWhens; i++)
        for (j=0; j<numWhenDepends[i]; j++) {
          int which;
