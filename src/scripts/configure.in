@@ -229,7 +229,7 @@ AC_DEFINE_UNQUOTED(CMK_TEMPLATE_MEMBERS_BROKEN, $fail)
 ##### check if the stl headers use .h #####
 cat > $t <<EOT
 #include <iostream>
-void foo(void) {}
+void foo(void) { std::cout<<"Hello, world"<<std::endl; }
 EOT
 test_cxx "whether including STL <foo> works" "ok" "no" ""
 AC_DEFINE_UNQUOTED(CMK_STL_USE_DOT_H, $fail)
