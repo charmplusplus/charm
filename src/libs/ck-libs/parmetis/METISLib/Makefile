@@ -20,8 +20,7 @@ OBJS = coarsen.o fm.o initpart.o match.o ccgraph.o \
 	$(CC) $(CFLAGS) -c $*.c
 
 ../libmetis.a: $(OBJS)
-	$(AR) $@ $(OBJS)
-	$(RANLIB) $@
+	$(CC) -o $@ $(OBJS)
 
 clean:
 	rm -f *.o 

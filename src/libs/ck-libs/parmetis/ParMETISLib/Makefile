@@ -23,8 +23,7 @@ OBJS = comm.o util.o debug.o setup.o grsetup.o timer.o \
 
 
 ../libparmetis.a: $(OBJS)
-	$(AR) $@ $(OBJS)
-	$(RANLIB) $@
+	$(CC) -o $@ $(OBJS)
 
 clean:
 	rm -f *.o 
