@@ -13,7 +13,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.2  1995-09-20 14:58:12  jyelon
+ * Revision 1.3  1995-09-20 15:07:44  jyelon
+ * *** empty log message ***
+ *
+ * Revision 1.2  1995/09/20  14:58:12  jyelon
  * Did some work on threads stuff.
  *
  * Revision 1.1  1995/09/20  13:16:33  jyelon
@@ -127,7 +130,7 @@
  *
  * it is intended that this function be used as follows:
  *
- *     struct th_info { /* any thread-private info desired */ }
+ *     struct th_info { any thread-private info desired }
  *     struct th_info *curr_info;
  *
  *     ...

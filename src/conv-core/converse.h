@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.15  1995-09-20 14:58:12  jyelon
+ * Revision 2.16  1995-09-20 15:04:45  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.15  1995/09/20  14:58:12  jyelon
  * Did some work on threads stuff.
  *
  * Revision 2.14  1995/09/20  13:16:33  jyelon
@@ -232,7 +235,7 @@ typedef void        (*CthVoidFn)();
 typedef CthThread   (*CthThFn)();
 
 CthThread  CthSelf     CMK_PROTO((void));
-CthThread  CthCreate   CMK_PROTO((voidfn, void *, int));
+CthThread  CthCreate   CMK_PROTO((CthVoidFn, void *, int));
 void       CthResume   CMK_PROTO((CthThread));
 void       CthFree     CMK_PROTO((CthThread));
 
