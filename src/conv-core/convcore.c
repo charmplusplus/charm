@@ -1792,7 +1792,7 @@ typedef struct {
   double pad; /* To align the first message, which follows this header */
 } CmiMultipleSendHeader;
 
-void CmiMultipleSend(unsigned int destPE, int len, int sizes[], char *msgComps[])
+void _CmiMultipleSend(unsigned int destPE, int len, int sizes[], char *msgComps[], int immed)
 {
   CmiMultipleSendHeader header;
   int m; /* Outgoing message */
@@ -1813,6 +1813,9 @@ void CmiMultipleSend(unsigned int destPE, int len, int sizes[], char *msgComps[]
   /* Build the header */
   header.nMessages=len;
   CmiSetHandler(&header, CpvAccess(CmiMainHandlerIDP));
+#if CMK_IMMEDIATE_MSG
+  if (immed) CmiBecomeImmediate(&header);
+#endif
   vecSizes[vec]=sizeof(header); vecPtrs[vec]=(char *)&header;
   vec++;
 
@@ -1842,6 +1845,16 @@ void CmiMultipleSend(unsigned int destPE, int len, int sizes[], char *msgComps[]
   CmiTmpFree(vecPtrs); /* CmiTmp: Be sure to throw away in opposite order of allocation */
   CmiTmpFree(vecSizes);
   CmiTmpFree(msgHdr);
+}
+
+void CmiMultipleSend(unsigned int destPE, int len, int sizes[], char *msgComps[])
+{
+  _CmiMultipleSend(destPE, len, sizes, msgComps, 0);
+}
+
+void CmiMultipleIsend(unsigned int destPE, int len, int sizes[], char *msgComps[])
+{
+  _CmiMultipleSend(destPE, len, sizes, msgComps, 1);
 }
 
 /****************************************************************************
