@@ -1050,6 +1050,8 @@ CpvExtern(void*, CmiLocalQueue);
 
 /******* Converse Client Server *****/
 
+#define CMK_CCS_VERSION "1"
+
 #if CMK_CCS_AVAILABLE
 void CcsUseHandler(char *id, int hdlr);
 int CcsRegisterHandler(char *id, CmiHandler fn);

@@ -56,6 +56,9 @@ extern char *sys_errlist[];
 #define RSH_CMD "remsh"
 #endif
 
+/* keep this value in sync with converse.h */
+#define CMK_CCS_VERSION "1"
+
 #if CMK_CCS_AVAILABLE
 int CcsClientFd;
 int myFd;
@@ -2876,7 +2879,8 @@ main(argc, argv)
 #if CMK_CCS_AVAILABLE
   if(arg_server == 1){
     skt_server(&myIP, &myPortNo, &myFd);
-    printf("Server IP = %u, Server port = %u $\n", myIP, myPortNo);
+    printf("%s\nServer IP = %u, Server port = %u $\n", 
+           CMK_CCS_VERSION, myIP, myPortNo);
     fflush(stdout);
   }
 #endif
