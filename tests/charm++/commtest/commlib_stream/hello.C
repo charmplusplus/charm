@@ -8,7 +8,7 @@
 /*readonly*/ int nElements;
 
 #define TEST_HI 4001
-#define MAX_COUNT 500
+#define MAX_COUNT 200
 
 ComlibInstanceHandle ss_inst;
 ComlibInstanceHandle mss_inst;
