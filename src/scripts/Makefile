@@ -279,10 +279,10 @@ conv-ccs.o: conv-ccs.c $(CVHEADERS)
 	$(CHARMC) conv-ccs.c
 
 ccs-builtins.o: ccs-builtins.C $(CVHEADERS)
-	$(CHARMC) $<
+	$(CHARMC) ccs-builtins.C
 
 ccs-client.o: ccs-client.c
-	$(CHARMC) $<
+	$(CHARMC) ccs-client.c
 
 sockRoutines.o: sockRoutines.c $(CVHEADERS) $(UTILHEADERS)
 	$(CHARMC) sockRoutines.c
