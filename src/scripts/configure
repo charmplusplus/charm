@@ -1828,6 +1828,10 @@ cat >>confdefs.h <<_ACEOF
 #define CMK_HAS_COUNTER_PAPI $pass
 _ACEOF
 
+if test $pass -eq 1
+then
+	add_flag 'CMK_LIBS="$CMK_LIBS -lpapi"' "papi"
+fi
 
 #### test if it can build shared library ####
 cat > $t <<EOT
