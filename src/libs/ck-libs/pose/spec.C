@@ -18,7 +18,8 @@ void spec::Step()
 
   // Prepare to execute an event
   ev = eq->currentPtr;
-  while ((ev->timestamp >= 0) && (ev->timestamp <= lastGVT + timeLeash)) {
+  while ((ev->timestamp > POSE_UnsetTS) && 
+	 (ev->timestamp <= lastGVT + timeLeash)) {
     // do all events within the speculative window
     iter++;
     currentEvent = ev;
