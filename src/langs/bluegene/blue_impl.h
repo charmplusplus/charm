@@ -220,9 +220,11 @@ public:
   inline int isEmpty() { return (count == 0); }
   void expand() {
     char **oldh = h;
-    h = new (char *)[size*2];
-    for (int i=0; i<count; i++) enq(oldh[i]);
+    int oldcount = count;
     size *=2;
+    h = new (char *)[size];
+    count = 0;
+    for (int i=0; i<oldcount; i++) enq(oldh[i]);
     delete [] oldh;
   }
   void enq(char *m) {

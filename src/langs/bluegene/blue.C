@@ -1175,6 +1175,11 @@ static inline int handleCorrectionMsg(BgTimeLine *logs, bgCorrectionMsg *m)
 	return 1;
 }
 
+static inline int handleCorrectionMsgInQueue(BgTimeLine *logs, bgCorrectionMsg *m)
+{
+  // search affinity queue
+}
+
 // entry function for correction msgs
 void bgCorrectionFunc(char *msg)
 {
@@ -1204,7 +1209,7 @@ void correctTime(char *msg)
      bgCorrectionMsg* m = cmsg[i-removed];
      if (msgID == m->msgID) {
 //CmiPrintf("correct: %d %f\n", msgID, m->tAdjust);
-	CmiBgMsgRecvTime(msg) += m->tAdjust;
+	CmiBgMsgRecvTime(msg) = m->tAdjust;
         cmsg.remove(i-removed);
 	removed++;
      }
