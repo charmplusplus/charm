@@ -1431,9 +1431,6 @@ CthThread CthPup(pup_er p, CthThread t)
 
 #elif CMK_THREADS_USE_PTHREADS
 
-#define STACKSIZE (32768)
-static int _stksize = 0;
-
 #define CthMemAlign(x,n) malloc(n)
 #define memalign(m, a) valloc(a)
 
@@ -1443,6 +1440,10 @@ struct CthThreadStruct
   CthAwkFn  awakenfn;
   CthThFn    choosefn;
   pthread_t  self;
+  pthread_cond_t cond;
+  pthread_cond_t *creator;
+  CthVoidFn  fn;
+  void      *arg;
   char      *data;
   int        datasize;
   int        suspendable;
@@ -1456,6 +1457,7 @@ CthCpvDeclare(char *,    CthData);
 CthCpvStatic(CthThread,  CthCurrent);
 CthCpvStatic(int,        CthExiting);
 CthCpvStatic(int,        CthDatasize);
+CthCpvStatic(pthread_mutex_t, sched_mutex);
 
 static void CthThreadInit(t)
 CthThread t;
@@ -1466,6 +1468,7 @@ CthThread t;
   t->datasize=0;
   t->qnext=0;
   t->suspendable = 1;
+  pthread_cond_init(&(t->cond) , (pthread_condattr_t *) 0);
 }
 
 void CthFixData(t)
@@ -1488,19 +1491,7 @@ CthThread t;
 void CthInit(char **argv)
 {
   CthThread t;
-  int i;
 
-  for(i=0;argv[i];i++) {
-    if(strncmp("+stacksize",argv[i],10)==0) {
-      if (strlen(argv[i]) > 10) {
-        sscanf(argv[i], "+stacksize%d", &_stksize);
-      } else {
-        if (argv[i+1]) {
-          sscanf(argv[i+1], "%d", &_stksize);
-        }
-      }
-    }
-  }
   CpvInitialize(int, _numSwitches);
   CpvAccess(_numSwitches) = 0;
 
@@ -1508,7 +1499,10 @@ void CthInit(char **argv)
   CthCpvInitialize(CthThread,  CthCurrent);
   CthCpvInitialize(int,        CthDatasize);
   CthCpvInitialize(int,        CthExiting);
+  CthCpvInitialize(pthread_mutex_t, sched_mutex);
 
+  pthread_mutex_init(&CthCpvAccess(sched_mutex), (pthread_mutexattr_t *) 0);
+  pthread_mutex_lock(&CthCpvAccess(sched_mutex));
   t = (CthThread)malloc(sizeof(struct CthThreadStruct));
   _MEMCHECK(t);
   CthThreadInit(t);
@@ -1536,8 +1530,7 @@ CthThread t;
   }
 }
 
-void CthResume(t)
-CthThread t;
+void CthResume(CthThread t)
 {
   CthThread tc;
   tc = CthCpvAccess(CthCurrent);
@@ -1546,53 +1539,58 @@ CthThread t;
   CthFixData(t);
   CthCpvAccess(CthCurrent) = t;
   CthCpvAccess(CthData) = t->data;
+  pthread_cond_signal(&(t->cond));
   if (CthCpvAccess(CthExiting)) {
-    //exit myself after awakening the next pthread
     CthCpvAccess(CthExiting)=0;
-    QT_ABORT((qt_helper_t*)CthAbortHelp, tc, 0, t->stackp);
+    pthread_mutex_unlock(&CthCpvAccess(sched_mutex));
+    pthread_exit(0);
   } else {
-    // continue myself
-    QT_BLOCK((qt_helper_t*)CthBlockHelp, tc, 0, t->stackp);
+    pthread_cond_signal(&(t->cond));
+    pthread_cond_wait(&(tc->cond), &CthCpvAccess(sched_mutex));
   }
   if (tc!=CthCpvAccess(CthCurrent)) { CmiAbort("Stack corrupted?\n"); }
 }
 
-static void CthOnly(void *arg, void *vt, qt_userf_t fn)
+static void *CthOnly(CthThread arg)
 {
-  fn(arg);
+  pthread_mutex_lock(&CthCpvAccess(sched_mutex));
+  pthread_cond_signal(arg->creator);
+  pthread_cond_wait(&(arg->cond), &CthCpvAccess(sched_mutex));
+  arg->fn(arg->arg);
   CthCpvAccess(CthExiting) = 1;
   CthSuspend();
+  return 0;
 }
 
-CthThread CthCreate(fn, arg, size)
-CthVoidFn fn; void *arg; int size;
+CthThread CthCreate(CthVoidFn fn, void *arg, int size)
 {
   CthThread result;
-  size = (size) ? size : ((_stksize) ? _stksize : STACKSIZE);
-  size = (size+(CMK_MEMORY_PAGESIZE*2)-1) & ~(CMK_MEMORY_PAGESIZE-1);
-  stack = (qt_t*)CthMemAlign(CMK_MEMORY_PAGESIZE, size);
-  _MEMCHECK(stack);
+  CthThread self = CthSelf();
+  /* size is ignored in this version */
   result = (CthThread)malloc(sizeof(struct CthThreadStruct));
   _MEMCHECK(result);
   CthThreadInit(result);
-  stackbase = QT_SP(stack, size);
-  stackp = QT_ARGS(stackbase, arg, result, (qt_userf_t *)fn, CthOnly);
-  result->stack = stack;
-  result->stackp = stackp;
   CthSetStrategyDefault(result);
+  result->fn = fn;
+  result->arg = arg;
+  result->creator = &(self->cond);
+  pthread_create(&(result->self), (pthread_attr_t *) 0, CthOnly, 
+                 (void*) result);
+  pthread_cond_wait(&(self->cond), &CthCpvAccess(sched_mutex));
   return result;
 }
 
 void CthSuspend()
 {
+  CthThread t = CthSelf();
   CthThread next;
 #if CMK_WEB_MODE
   void usageStop();
 #endif
-  if(!(CthCpvAccess(CthCurrent)->suspendable))
+  if(!(t->suspendable))
     CmiAbort("trying to suspend main thread!!\n");
-  if (CthCpvAccess(CthCurrent)->choosefn == 0) CthNoStrategy();
-  next = CthCpvAccess(CthCurrent)->choosefn();
+  if (t->choosefn == 0) CthNoStrategy();
+  next = t->choosefn();
 #ifndef CMK_OPTIMIZE
   if(CpvAccess(traceOn))
     traceSuspend();
