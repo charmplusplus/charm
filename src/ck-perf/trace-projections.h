@@ -61,7 +61,7 @@ class LogEntry {
       if (d) id = *d; else {id.id[0]=id.id[1]=id.id[2]=0; };
       recvTime = rt; cputime = cputm;
     }
-		LogEntry(double _time,unsigned char _type,unsigned short _funcID,int _lineNum,char *_fileName){
+    LogEntry(double _time,unsigned char _type,unsigned short _funcID,int _lineNum,char *_fileName){
 			time = _time;
 			type = _type;
 			mIdx = _funcID;
@@ -96,6 +96,8 @@ class LogEntry {
 			delete [] fName;
 		}
 };
+
+class TraceProjections;
 
 /// log pool in trace projection
 class LogPool {
@@ -138,7 +140,7 @@ class LogPool {
     void writeLog(void);
     void write(int writedelta);
     void writeSts(void);
-		void writeSts(TraceProjections *traceProj);
+    void writeSts(TraceProjections *traceProj);
 
     void add(unsigned char type,unsigned short mIdx,unsigned short eIdx,double time,int event,int pe, int ml=0, CmiObjId* id=0, double recvT=0., double cpuT=0.0, int numPap=0, LONG_LONG_PAPI *papVals=NULL);
     void add(unsigned char type,double time,unsigned short funcID,int lineNum,char *fileName);
@@ -243,12 +245,12 @@ class TraceProjections : public Trace {
     void traceClose();
     void traceBegin();
     void traceEnd();
-		//functions that perform function tracing
-		CkHashtableIterator *getfuncIterator(){return funcHashtable.iterator();};
-		int getFuncNumber(){return funcHashtable.numObjects();};
-		void regFunc(char *name);
-		void beginFunc(char *name,char *file,int line);
-		void endFunc(char *name);
+    //functions that perform function tracing
+    CkHashtableIterator *getfuncIterator(){return funcHashtable.iterator();};
+    int getFuncNumber(){return funcHashtable.numObjects();};
+    void regFunc(char *name);
+    void beginFunc(char *name,char *file,int line);
+    void endFunc(char *name);
 };
 
 using namespace PUP;
