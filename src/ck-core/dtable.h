@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.2  1995-07-25 00:29:31  jyelon
+ * Revision 2.3  1995-09-06 04:08:43  sanjeev
+ * added "message class"
+ *
+ * Revision 2.2  1995/07/25  00:29:31  jyelon
  * *** empty log message ***
  *
  * Revision 2.1  1995/06/08  17:07:12  gursoy
@@ -52,8 +55,8 @@
 #define TBL_NEVER_WAIT 2
 #define TBL_ALWAYS_WAIT 3
 
-message TBL_MSG {
-	int key;
+message class TBL_MSG {
+public:	int key;
 	char *data;
 } ;
 
