@@ -304,6 +304,69 @@ could be used to check the status of this send using
 \param{CmiAsyncMsgSent()}. \param{msg} should not be overwritten or
 freed before the communication is complete.}
 
+\section{Multicasting Messages}
+
+\function{typedef ... CmiGroup;}
+\index{CmiGroup}
+\desc{A CmiGroup represents a set of processors.  It is an opaque type.
+Group IDs are useful for the multicast functions below.}
+
+\function{CmiGroup CmiEstablishGroup(int npes, int *pes);}
+\index{CmiGroup}
+\desc{Converts an array of processor numbers into a group ID.  Group
+IDs are useful for the multicast functions below.  Caution: this call
+uses up some resources.  In particular, establishing a group uses 
+some network bandwidth (one broadcast's worth) and a small amount of
+memory on all processors.}
+
+\function{void CmiSyncMulticast(CmiGroup grp, unsigned int size, void *msg)}
+\index{CmiSyncBroadcast}
+\desc{Sends \param{msg} of length \param{size} bytes to all members
+of the specified group.  Group IDs are created using
+\param{CmiEstablishGroup}.}
+
+\function{void CmiSyncMulticastAndFree(CmiGroup grp, unsigned int size, void *msg)}
+\index{CmiSyncBroadcastAndFree}
+\desc{Sends \param{msg} of length \param{size} bytes to all members
+of the specified group.  Uses {\tt CmiFree} to deallocate the
+message buffer for \param{msg} when the broadcast completes. Therefore
+\param{msg} must point to a buffer allocated with {\tt CmiAlloc}.
+Group IDs are created using \param{CmiEstablishGroup}.}
+
+\function{CmiCommHandle CmiAsyncMulticast(CmiGroup grp, unsigned int size, void *msg)}
+\index{CmiAsyncBroadcast}
+\desc{Not yet implemented. Initiates asynchronous broadcast of
+message \param{msg} of length \param{size} bytes to all members of
+the specified group.  It returns a communication handle which could
+be used to check the status of this send using
+\param{CmiAsyncMsgSent()}. \param{msg} should not be overwritten or
+freed before the communication is complete.
+Group IDs are created using \param{CmiEstablishGroup}.}
+
+\function{void CmiSyncListSend(int npes, int *pes, unsigned int size, void *msg)}
+\index{CmiSyncBroadcast}
+\desc{Not yet implemented. Sends \param{msg} of length \param{size} bytes
+to all processors in the list.  Group IDs are created using
+\param{CmiEstablishGroup}.}
+
+\function{void CmiSyncMulticastAndFree(int npes, int *pes, unsigned int size, void *msg)}
+\index{CmiSyncBroadcastAndFree}
+\desc{Not yet implemented. Sends \param{msg} of length \param{size}
+bytes to all processors in the list.  Uses {\tt CmiFree} to deallocate the
+message buffer for \param{msg} when the broadcast completes. Therefore
+\param{msg} must point to a buffer allocated with {\tt CmiAlloc}.
+Group IDs are created using \param{CmiEstablishGroup}.}
+
+\function{CmiCommHandle CmiAsyncMulticast(int npes, int *pes, unsigned int size, void *msg)}
+\index{CmiAsyncBroadcast}
+\desc{Not yet implemented. Initiates asynchronous broadcast of
+message \param{msg} of length \param{size} bytes to all processors
+in the list.  It returns a communication handle which could
+be used to check the status of this send using
+\param{CmiAsyncMsgSent()}. \param{msg} should not be overwritten or
+freed before the communication is complete.
+Group IDs are created using \param{CmiEstablishGroup}.}
+
 \section{Scheduling Messages}
 \label{schedqueue}
 
