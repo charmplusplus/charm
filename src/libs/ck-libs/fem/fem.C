@@ -1160,6 +1160,7 @@ FDECL void FTN_NAME(FEM_GET_GHOST_LIST,fem_get_ghost_list)
 static void getRoccomPconn(IDXL_Side_t is,int bias,CkVec<int> &pconn)
 {
 	int p,np=IDXL_Get_partners(is);
+	pconn.push_back(np);
 	for (p=0;p<np;p++) {
 		pconn.push_back(IDXL_Get_partner(is,p)+1); /* paneID's are 1-based */
 		int n,nn=IDXL_Get_count(is,p);
@@ -1179,8 +1180,6 @@ static CkVec<int> getRoccomPconn(int fem_mesh,int *ghost_len)
 	
 	// Next come sent ghost nodes:
 	getRoccomPconn(IDXL_Get_send(FEM_Comm_ghost(fem_mesh,FEM_NODE)),0,pconn);
-	// Separator distinguishes ghost send from recv:
-	pconn.push_back(0); pconn.push_back(0);
 	// Now received ghost nodes (use bias to switch to Roccom ghost node numbering)
 	getRoccomPconn(IDXL_Get_recv(FEM_Comm_ghost(fem_mesh,FEM_NODE)),
 		FEM_Mesh_get_length(fem_mesh,FEM_NODE),pconn);
