@@ -251,7 +251,7 @@ CLBLIBS=$(L)/libldb-rand.o $(L)/libldb-spray.o $(L)/libldb-neighbor.o $(L)/libld
 TRACELIBS=$(L)/libtrace-projections.a  $(L)/libtrace-summary.a \
           $(L)/libtrace-counter.a $(L)/libtrace-bluegene.a \
 	  $(L)/libtrace-projector.a $(L)/libtrace-all.a $(L)/libtrace-converse.a \
-          $(L)/libtrace-recordreplay.a
+          $(L)/libtrace-recordreplay.a  $(L)/libtracef_f.a
 MEMLIBS=$(L)/libmemory-default.o $(L)/libmemory-os.o $(L)/libmemory-gnu.o \
           $(L)/libmemory-gnuold.o $(L)/libmemory-verbose.o 	\
 	  $(L)/libmemory-paranoid.o \
@@ -457,8 +457,8 @@ $(L)/libglobal-swap.o: global-elfgot.C $(CVHEADERS)
 
 CK_LIBS_CORE=$(L)/libck.a
 
-LIBCK_CORE=trace-common.o init.o register.o qd.o ck.o main.o msgalloc.o \
-	   ckfutures.o debug-message.o debug-charm.o ckcallback.o \
+LIBCK_CORE=trace-common.o tracef.o init.o register.o qd.o ck.o main.o 	\
+	   msgalloc.o ckfutures.o debug-message.o debug-charm.o ckcallback.o \
 	   cklocation.o ckarray.o ckreduction.o ckarrayreductionmgr.o\
            tempo.o waitqd.o LBDatabase.o lbdb.o charisma.o ckobjQ.o	\
 	   ckcheckpoint.o ckmemcheckpoint.o\
@@ -603,6 +603,13 @@ $(L)/libtrace-projector.a: $(LIBTRACE_PROJECTOR)
 LIBTRACE_CONVERSE=trace-converse.o
 $(L)/libtrace-converse.a: $(LIBTRACE_CONVERSE)
 	$(CHARMC) -o  $@ $(LIBTRACE_CONVERSE)
+
+LIBTRACE_FOR=tracef_f.o
+$(L)/libtracef_f.a: $(LIBTRACE_FOR)
+	-$(CHARMC) -o $@ $(LIBTRACE_FOR) || touch $@
+
+tracef_f.o: tracef_f.f90 
+	-$(CHARMC) -o $@ -c tracef_f.f90 && $(CHARMC) -cpmod ../include tracemod.M  || touch $@
 
 # used for make depends
 TRACE_OBJS =  trace-projections.o  trace-summary.o  trace-counter.o	\
