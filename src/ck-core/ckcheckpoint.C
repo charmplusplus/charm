@@ -108,21 +108,22 @@ void CkCheckpointMgr::SendRestartCB(CkReductionMsg *m){
 void CkPupROData(PUP::er &p)
 {
 	int _numReadonlies;
-	if (p.isPacking()) _numReadonlies=_readonlyTable.size();
+	if (!p.isUnpacking()) _numReadonlies=_readonlyTable.size();
         p|_numReadonlies;
 	if (p.isUnpacking()) {
 	  if (_numReadonlies != _readonlyTable.size())
-		CkAbort("You cannot add readonlies and restore from checkpoint...");
+	    CkAbort("You cannot add readonlies and restore from checkpoint...");
 	}
 	for(int i=0;i<_numReadonlies;i++) _readonlyTable[i]->pupData(p);
 }
 
+// handle main chare
 void CkPupMainChareData(PUP::er &p)
 {
 	int nMains=_mainTable.size();
 	for(int i=0;i<nMains;i++){  /* Create all mainchares */
 		int entryMigCtor = _chareTable[_mainTable[i]->chareIdx]->getMigCtor();
-		if(entryMigCtor!=-1){
+		if(entryMigCtor!=-1) {
 			Chare* obj = (Chare *)_mainTable[i]->getObj();
 			if (p.isUnpacking()) {
 				int size = _chareTable[_mainTable[i]->chareIdx]->size;
@@ -416,7 +417,7 @@ void CkRestartMain(const char* dirname){
 	delete [] tmpInfo;
 
 	if(CkMyPe()==0) {
-		DEBCHK("[%d]CkRestartMain done. sending out callback.\n",CkMyPe());
+		CmiPrintf("[%d]CkRestartMain done. sending out callback.\n",CkMyPe());
 		cb.send();
 	}
 	else {
@@ -431,7 +432,7 @@ public:
     _sysChkptMgr = CProxy_CkCheckpointMgr::ckNew();
     delete msg;
   }
-  CkCheckpointInit(CkMigrateMessage *m) {}
+  CkCheckpointInit(CkMigrateMessage *m) {delete m;}
 };
 
 #include "CkCheckpoint.def.h"
