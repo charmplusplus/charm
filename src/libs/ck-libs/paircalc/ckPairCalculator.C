@@ -564,15 +564,16 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
   complex *amatrix=new complex[matrixSize];
   int incx=1;
   int incy=2;
-  complex alpha=complex(1.0,0.0);//multiplicative identity 
-  complex beta=complex(0.0,0.0);
+  complex alpha(1.0,0.0);//multiplicative identity 
+  complex beta(0.0,0.0);
   char transform='N';
   char transformT='T';
 
   index = thisIndex.x*S + thisIndex.y;
   memset(amatrix, 0, matrixSize*sizeof(complex));
+
   double *localMatrix;
-  double * outMatrix;
+  double *outMatrix;
   
   for(int i=0;i<grainSize;i++){
     localMatrix = (matrix1+index+i*S);
@@ -582,43 +583,42 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
     for(incx=0,incy=0;incx<grainSize;incx++,incy+=2)
       outMatrix[incy]=localMatrix[incx];
   }
-
+#ifdef _PAIRCALC_DEBUG_
   for (int i = 0; i < grainSize; i++) {
     for (int j = 0; j < grainSize; j++){ 
       m = matrix1[index + j + i*S];
-#ifdef _PAIRCALC_DEBUG_
-      if(m!=amatrix[i*grainSize+j].re){CkPrintf("Dcopy broken in back path: %2.5g != %2.5g \n",
-       						m, amatrix[i*grainSize+j].re);}
-#endif _PAIRCALC_DEBUG_
+      if(m!=amatrix[i*grainSize+j].re){CkPrintf("Dcopy broken in back path: %2.5g != %2.5g \n", m, amatrix[i*grainSize+j].re);}
     }
   }
-
+#endif _PAIRCALC_DEBUG_
   ZGEMM(&transform, &transformT, &n_in, &m_in, &k_in, &alpha, inDataLeft, &n_in, 
         &(amatrix[0]), &k_in, &beta, &(mynewData[0]), &n_in);
 
   if(!unitcoef){
 
-  beta=complex(1.0,0.0);  // C = alpha*A*B + beta*C
+    beta=complex(1.0,0.0);  // C = alpha*A*B + beta*C
 
-  for(int i=0;i<grainSize;i++){
-    localMatrix = (matrix2+index+i*S);
-    outMatrix   = reinterpret_cast <double *> (amatrix+i*grainSize);
-    // DCOPY(&grainSize,localMatrix,&incx, outMatrix,&incy);
-    for(incx=0,incy=0;incx<grainSize;incx++,incy+=2)
-      outMatrix[incy]=localMatrix[incx];
-  }
-#ifdef _PAIRCALC_DEBUG_
-  for (int i = 0; i < grainSize; i++) {
-    for (int j = 0; j < grainSize; j++){ 
-      m = matrix2[index + j + i*S];
-
-      if(m!=amatrix[i*grainSize+j].re){CkPrintf("Dcopy broken in back path: %2.5g != %2.5g \n",
-						m, amatrix[i*grainSize+j]);}
+    for(int i=0;i<grainSize;i++){
+      localMatrix = (matrix2+index+i*S);
+      outMatrix   = reinterpret_cast <double *> (amatrix+i*grainSize);
+      // DCOPY(&grainSize,localMatrix,&incx, outMatrix,&incy);
+      for(incx=0,incy=0;incx<grainSize;incx++,incy+=2)
+	outMatrix[incy]=localMatrix[incx];
     }
-  }
+
+#ifdef _PAIRCALC_DEBUG_
+    for (int i = 0; i < grainSize; i++) {
+      for (int j = 0; j < grainSize; j++){ 
+	m = matrix2[index + j + i*S];
+
+	if(m!=amatrix[i*grainSize+j].re){CkPrintf("Dcopy broken in back path: %2.5g != %2.5g \n",
+						  m, amatrix[i*grainSize+j]);}
+      }
+    }
 #endif
-  ZGEMM(&transform, &transformT, &n_in, &m_in, &k_in, &alpha, inDataRight, &n_in, 
-        &(amatrix[0]), &k_in, &beta, &(mynewData[0]), &n_in);
+
+    ZGEMM(&transform, &transformT, &n_in, &m_in, &k_in, &alpha, inDataRight, &n_in, 
+	  &(amatrix[0]), &k_in, &beta, &(mynewData[0]), &n_in);
   }
 
   delete [] amatrix;
@@ -671,37 +671,6 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
       CkArrayIndex4D idx(thisIndex.w, 0, thisIndex.x, thisIndex.z);
       thisProxy(idx).sumPartialResult(N*grainSize, othernewData, thisIndex.z);
     }
-
-/*
-    int segmentsSymm[2];
-    findSegNumber(thisIndex.x, thisIndex.y, S, grainSize, segmentsSymm);
-    for(int segment=0;segment < segmentsSymm[0];segment++)
-      {
-	  CkArrayIndex4D idx(thisIndex.w, thisIndex.y, thisIndex.y + segment*grainSize, thisIndex.z);
-	  partialResultMsg *msg = new (N*blocksize, 8*sizeof(int) )partialResultMsg;
-	  msg->N=N*blocksize;
-	  msg->myoffset = segment*blocksize;
-	  memcpy(msg->result,mynewData+segment*N*blocksize,msg->N*sizeof(complex));
-	  msg->cb= cb;
-	  *((int*)CkPriorityPtr(msg)) = priority;
-	  CkSetQueueing(msg, CK_QUEUEING_IFIFO); 
-	  thisProxy(idx).sumPartialResult(msg);  
-      }
-    if (thisIndex.y != thisIndex.x){ 
-	for(int segment=0;segment < segmentsSymm[1];segment++)
-	{  
-	  CkArrayIndex4D idx(thisIndex.w, thisIndex.x, thisIndex.x + segment*grainSize, thisIndex.z);
-	  partialResultMsg *msg = new (N*blocksize, 8*sizeof(int) )partialResultMsg;
-	  msg->N=N*blocksize;
-	  msg->myoffset = segment*blocksize;
-	  memcpy(msg->result,mynewData+segment*N*blocksize,msg->N*sizeof(complex));
-	  msg->cb= cb;
-	  *((int*)CkPriorityPtr(msg)) = priority;
-	  CkSetQueueing(msg, CK_QUEUEING_IFIFO); 
-	  thisProxy(idx).sumPartialResult(msg);  
-	}
-    }
-*/
   }
 #endif
 
@@ -712,7 +681,6 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
   if(conserveMemory)
   {
       // clear the right and left they'll get reallocated on the next pass
-
       delete [] inDataLeft;
       inDataLeft=NULL;
       if(!symmetric || (symmetric&&thisIndex.x!=thisIndex.y)) {
