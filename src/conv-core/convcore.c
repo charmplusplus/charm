@@ -792,6 +792,39 @@ double CmiTimer()
 
 #endif
 
+#if CMK_TIMER_USE_RTC
+
+double clocktick;
+CpvStaticDeclare(long long, inittime_wallclock);
+
+void CmiTimerInit()
+{
+  CpvInitialize(double, clocktick);
+  CpvInitialize(long long, inittime_wallclock);
+  CpvAccess(inittime_wallclock) = _rtc();
+  clocktick = 1.0 / (double)(sysconf(_SC_SV2_USER_TIME_RATE));
+}
+
+double CmiWallTimer()
+{
+  long long now;
+
+  now = _rtc();
+  return (clocktick * (now - CpvAccess(inittime_wallclock)));
+}
+
+double CmiCpuTimer()
+{
+  return CmiWallTimer();
+}
+
+double CmiTimer()
+{
+  return CmiCpuTimer();
+}
+
+#endif
+
 #if CMK_SIGNAL_USE_SIGACTION
 #include <signal.h>
 void CmiSignal(sig1, sig2, sig3, handler)
