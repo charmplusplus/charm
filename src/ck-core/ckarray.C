@@ -297,9 +297,7 @@ void CkArrayListener::ckRegister(CkArray *arrMgr,int dataOffset_)
 CkArrayID CProxy_ArrayBase::ckCreateArray(CkArrayMessage *m,int ctor,
 					  const CkArrayOptions &opts_)
 {
-  /* HACK: cast away constness on array options, so we can change ldbd,
-     but not have to copy the vector of listeners (derived classes!). */
-  CkArrayOptions &opts=*(CkArrayOptions *)&opts_;
+  CkArrayOptions opts(opts_);
   if (opts.getLocationManager().isZero())
   { //Create a new location manager
 #if !CMK_LBDB_ON
