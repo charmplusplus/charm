@@ -59,6 +59,7 @@ module MPIINCL
   external MPI_Allreduce
   external MPI_Iallreduce
   external MPI_Reduce_scatter
+  external MPI_Scan
 
   external MPI_Group_size
   external MPI_Group_rank
@@ -79,7 +80,26 @@ module MPIINCL
   external MPI_Comm_dup
   external MPI_Comm_split
   external MPI_Comm_free
+  external MPI_Comm_test_inter
+  
+  external MPI_Cart_create
+  external MPI_Graph_create
+  external MPI_Topo_test
+  external MPI_Cart_map
+  external MPI_Graph_map
+  external MPI_Cartdim_get
+  external MPI_Cart_get
+  external MPI_Cart_rank
+  external MPI_Cart_coords
+  external MPI_Cart_shift
+  external MPI_Graphdims_get
+  external MPI_Graph_get
+  external MPI_Graph_neighbors_count
+  external MPI_Graph_neighbors
+  external MPI_Dims_create
+  external MPI_Cart_sub
 
+  external MPI_Get_processor_name
   external MPI_Errhandler_create
   external MPI_Errhandler_set
   external MPI_Errhandler_get

@@ -204,7 +204,6 @@ CkReductionMsg *BXOR(int nMsg,CkReductionMsg **msgs
 	return retmsg;
 }
 
-
 typedef long double longdouble;
 
 // This hideous little macro calls its argument for

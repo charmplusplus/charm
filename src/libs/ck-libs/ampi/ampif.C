@@ -60,6 +60,7 @@ FDECL {
 #define mpi_allreduce FTN_NAME( MPI_ALLREDUCE , mpi_allreduce )
 #define mpi_iallreduce FTN_NAME( MPI_IALLREDUCE , mpi_iallreduce )
 #define mpi_reduce_scatter FTN_NAME( MPI_REDUCE_SCATTER , mpi_reduce_scatter )
+#define mpi_scan FTN_NAME( MPI_SCAN , mpi_scan )
 
 #define mpi_group_size FTN_NAME( MPI_GROUP_SIZE, mpi_group_size)
 #define mpi_group_rank FTN_NAME( MPI_GROUP_RANK, mpi_group_rank)
@@ -80,7 +81,26 @@ FDECL {
 #define mpi_comm_dup FTN_NAME( MPI_COMM_DUP , mpi_comm_dup )
 #define mpi_comm_split FTN_NAME( MPI_COMM_SPLIT , mpi_comm_split )
 #define mpi_comm_free FTN_NAME( MPI_COMM_FREE , mpi_comm_free )
+#define mpi_comm_test_inter FTN_NAME( MPI_COMM_TEST_INTER , mpi_comm_test_inter )
 
+#define mpi_cart_create FTN_NAME ( MPI_CART_CREATE , mpi_cart_create )
+#define mpi_graph_create FTN_NAME ( MPI_GRAPH_CREATE , mpi_graph_create )
+#define mpi_topo_test FTN_NAME ( MPI_TOPO_TEST , mpi_topo_test )
+#define mpi_cart_map FTN_NAME ( MPI_CART_MAP , mpi_cart_map )
+#define mpi_graph_map FTN_NAME ( MPI_GRAPH_MAP , mpi_graph_map )
+#define mpi_cartdim_get FTN_NAME ( MPI_CARTDIM_GET , mpi_cartdim_get )
+#define mpi_cart_get FTN_NAME ( MPI_CART_GET , mpi_cart_get )
+#define mpi_cart_rank FTN_NAME ( MPI_CART_RANK , mpi_cart_rank )
+#define mpi_cart_coords FTN_NAME ( MPI_CART_COORDS , mpi_cart_coords )
+#define mpi_cart_shift FTN_NAME ( MPI_CART_SHIFT , mpi_cart_shift )
+#define mpi_graphdims_get FTN_NAME ( MPI_GRAPHDIMS_GET , mpi_graphdims_get )
+#define mpi_graph_get FTN_NAME ( MPI_GRAPH_GET , mpi_graph_get )
+#define mpi_graph_neighbors_count FTN_NAME ( MPI_GRAPH_NEIGHBORS_COUNT , mpi_graph_neighbors_count )
+#define mpi_graph_neighbors FTN_NAME ( MPI_GRAPH_NEIGHBORS , mpi_graph_neighbors )
+#define mpi_dims_create FTN_NAME ( MPI_DIMS_CREATE , mpi_dims_create )
+#define mpi_cart_sub FTN_NAME ( MPI_CART_SUB , mpi_cart_sub )
+
+#define mpi_get_processor_name FTN_NAME ( MPI_GET_PROCESSOR_NAME , mpi_get_processor_name )
 #define mpi_errhandler_create FTN_NAME( MPI_ERRHANDLER_CREATE , mpi_errhandler_create )
 #define mpi_errhandler_set FTN_NAME( MPI_ERRHANDLER_SET , mpi_errhandler_set )
 #define mpi_errhandler_get FTN_NAME( MPI_ERRHANDLER_GET , mpi_errhandler_get )
@@ -491,6 +511,11 @@ void mpi_reduce_scatter(void *sendbuf, void *recvbuf, int *recvcounts,
                              *datatype, *op, *comm);
 }
 
+void mpi_scan(void* sendbuf, void* recvbuf, int* count, int* datatype, int* op, int* comm, int* ierr)
+{
+  *ierr = MPI_Scan(sendbuf,recvbuf,*count,*datatype,*op,*comm );
+}
+
 void mpi_comm_dup(int *comm, int *newcomm, int *ierr)
 {
   *newcomm = *comm;
@@ -505,6 +530,104 @@ void mpi_comm_split(int* src, int* color, int* key, int *dest, int *ierr)
 void mpi_comm_free(int *comm, int *ierr)
 {
   *ierr = 0;
+}
+
+void mpi_comm_test_inter(int* comm, int* flag, int* ierr)
+{
+  *ierr = MPI_Comm_test_inter(*comm, flag);
+}
+
+void mpi_cart_create(int* comm_old, int* ndims, int *dims, int *periods,
+		    int* reorder, int* comm_cart, int* ierr)
+{
+  *ierr = MPI_Cart_create(*comm_old, *ndims, dims, periods, *reorder, comm_cart);
+}
+
+void mpi_graph_create(int* comm_old, int* nnodes, int *index, int *edges,
+		     int* reorder, int* comm_graph, int* ierr)
+{
+  *ierr = MPI_Graph_create(*comm_old, *nnodes, index, edges, *reorder, comm_graph);
+}
+
+void mpi_topo_test(int* comm, int *status, int* ierr)
+{
+  *ierr = MPI_Topo_test(*comm, status);
+}
+
+void mpi_cart_map(int* comm, int* ndims, int *dims, int *periods,
+                 int *newrank, int* ierr)
+{
+  *ierr = MPI_Cart_map(*comm, *ndims, dims, periods, newrank);
+}
+
+void mpi_graph_map(int* comm, int* nnodes, int *index, int *edges,
+		  int *newrank, int* ierr)
+{
+  *ierr = MPI_Graph_map(*comm, *nnodes, index, edges, newrank);
+}
+
+void mpi_cartdim_get(int* comm, int *ndims, int* ierr)
+{
+  *ierr = MPI_Cartdim_get(*comm, ndims);
+}
+
+void mpi_cart_get(int* comm, int* maxdims, int *dims, int *periods,
+		 int *coords, int* ierr)
+{
+  *ierr = MPI_Cart_get(*comm, *maxdims, dims, periods, coords);
+}
+
+void mpi_cart_rank(int* comm, int *coords, int *rank, int* ierr)
+{
+  *ierr = MPI_Cart_rank(*comm, coords, rank);
+}
+
+void mpi_cart_coords(int* comm, int* rank, int* maxdims, int *coords, int* ierr)
+{
+  *ierr = MPI_Cart_coords(*comm, *rank, *maxdims, coords);
+}
+
+void mpi_cart_shift(int* comm, int* direction, int* disp, int *rank_source,
+		   int *rank_dest, int* ierr)
+{
+  *ierr = MPI_Cart_shift(*comm, *direction, *disp, rank_source, rank_dest);
+}
+
+void mpi_graphdims_get(int* comm, int *nnodes, int *nedges, int* ierr)
+{
+  *ierr = MPI_Graphdims_get(*comm, nnodes, nedges);
+}
+
+void mpi_graph_get(int* comm, int *maxindex, int *maxedges, int *index,
+		  int *edges, int* ierr)
+{
+  *ierr = MPI_Graph_get(*comm, *maxindex, *maxedges, index, edges);
+}
+
+void mpi_graph_neighbors_count(int* comm, int *rank, int *nneighbors, int* ierr)
+{
+  *ierr = MPI_Graph_neighbors_count(*comm, *rank, nneighbors);
+}
+
+void mpi_graph_neighbors(int* comm, int *rank, int *maxneighbors,
+			int *neighbors, int* ierr)
+{
+  *ierr = MPI_Graph_neighbors(*comm, *rank, *maxneighbors, neighbors);
+}
+
+void mpi_dims_create(int *nnodes, int *ndims, int *dims, int* ierr)
+{
+  *ierr = MPI_Dims_create(*nnodes, *ndims, dims);
+}
+
+void mpi_cart_sub(int* comm, int *remain_dims, int* newcomm, int* ierr)
+{
+  *ierr = MPI_Cart_sub(*comm, remain_dims, newcomm);
+}
+
+void mpi_get_processor_name(char* name, int *resultlen, int *ierr)
+{
+  *ierr = MPI_Get_processor_name(name, resultlen);
 }
 
 void mpi_errhandler_create(int *function, int *errhandler, int *ierr){  *ierr = 0;  }
