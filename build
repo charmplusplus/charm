@@ -9,7 +9,7 @@ syntax() {
   echo '<versions>: ' 
   ( cd src ; ls -1 | egrep -v '(^Common)|(^CVS)|(^QuickThreads)|(^ccs-client)' | pr -3 -t )
 #  echo ''
-  echo '<options>:  vmi gm pgcc ecl'
+  echo '<options>:  vmi gm pgcc icc'
   echo '<charmc-options>: e.g. -g -save -verbose'
   echo 'Note: This script is trivial.  It'
   echo ' 1. Creates directories <version> and <version>/tmp';
@@ -47,7 +47,7 @@ do
           VERSION=$1; BASEVERSION=$1; shift
           while [ ! $# -eq 0 ]
           do
-            if test "$1" = "pgcc" || test "$1" = "ecl"
+            if test "$1" = "pgcc" || test "$1" = "icc"
             then
               if [ ! -f src/$VERSION/conv-mach-$1.h ]
               then
