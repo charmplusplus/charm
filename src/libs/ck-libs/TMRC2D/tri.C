@@ -40,8 +40,9 @@ void chunk::addRemoteEdge(int elem, int localEdge, edgeRef er)
   CkAssert(er.cid > -1);
   CkAssert(er.idx > -1);
   if ((theElements[elem].edges[localEdge].cid > -1) &&
-      (theElements[elem].edges[localEdge].idx > -1))
-    CkPrintf("TMRC2D: [%d] WARNING: addRemoteEdge replacing non-null edgeRef!\n", cid);
+      (theElements[elem].edges[localEdge].idx > -1)){
+    DEBUGREF(CkPrintf("TMRC2D: [%d] WARNING: addRemoteEdge replacing non-null edgeRef!\n", cid);)
+	}	
   theElements[elem].set(localEdge, er);
   DEBUGREF(CkPrintf("TMRC2D: [%d] addRemoteEdge on element %d", cid, elem);)
   edgesRecvd++;
