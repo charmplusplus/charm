@@ -6,7 +6,7 @@ Orion Sky Lawlor, olawlor@acm.org, 8/28/2002
 */
 #include "ckvector3d.h"
 #include "ckviewable.h"
-#include "charm++.h"
+#include "converse.h"
 
 CkReferenceCounted::~CkReferenceCounted() {}
 CkViewConsumer::~CkViewConsumer() {}
@@ -173,7 +173,7 @@ CkViewpoint CkInterestViewable::newViewpoint(const CkViewpoint &univ2screen) {
 		r.add((int)s.x,(int)s.y);
 	}
 	if (r.area()>4096*4096)
-		CkAbort("liveViz3d> Absurdly large projected screen rectangle!");
+		CmiAbort("liveViz3d> Absurdly large projected screen rectangle!");
 	
 	if (r.l==r.r) r.r++; /* enlarge vertical sliver */
 	if (r.t==r.b) r.b++; /* enlarge horizontal sliver */
@@ -199,7 +199,7 @@ CkViewpoint CkInterestViewable::newViewpoint(const CkViewpoint &univ2screen) {
 	double Xscale=perspectiveScale*r.wid()/(wid-2*inset);
 	double Yscale=perspectiveScale*r.ht()/(ht-2*inset);
 	if (Xscale ==0 || Yscale==0) 
-		CkAbort("liveViz3d> Illegal axis scaling");
+		CmiAbort("liveViz3d> Illegal axis scaling");
 	
 	CkVector3d X=univ2screen.getX()*Xscale;
 	CkVector3d Y=univ2screen.getY()*Yscale;

@@ -4,8 +4,12 @@ Describes a viewpoint in 3d space: a projection matrix.
 
 Orion Sky Lawlor, olawlor@acm.org, 2003/3/28
 */
-#include "charm++.h"
+#include <math.h> /* for M_PI*/
+#include "converse.h"
 #include "ckviewpoint.h"
+#ifndef M_PI
+#  define M_PI 3.14159265358979323
+#endif
 
 
 inline bool orthogonal(const CkVector3d &a,const CkVector3d &b) {
@@ -83,7 +87,7 @@ CkViewpoint::CkViewpoint(const CkVector3d &E_,const CkVector3d &R_,
 	:E(E_), R(R_), X(X_), Y(Y_), wid(w), ht(h)
 {
 	if (!orthogonal(X,Y))
-		CkAbort("Non-orthogonal X and Y passed to Camera::Camera");
+		CmiAbort("Non-orthogonal X and Y passed to Camera::Camera");
 	Z=X.cross(Y).dir();
 	buildM();
 }
@@ -105,7 +109,7 @@ void CkViewpoint::pup(PUP::er &p) {
 
 
 //Return an OpenGL-compatible projection matrix for this viewpoint:
-void CkViewpoint::makeOpenGL(double *dest,double near,double far) const {
+void CkViewpoint::makeOpenGL(double *dest,double z_near,double z_far) const {
 	CkMatrix3d g=m;
 	/// Step 1: convert X and Y from outputting pixels to outputting [0,2]:
 	g.scaleRow(0,2.0/wid);
@@ -114,9 +118,9 @@ void CkViewpoint::makeOpenGL(double *dest,double near,double far) const {
 	g.addRow(3,-1.0,0);
 	g.addRow(3,-1.0,1);
 	
-	/// Step 3: map output Z from [-far,-near] to [-1,1]
-	double a=-2.0*near*far/(far-near); // 1/z term
-	double b=(near+far)/(far-near); // constant term
+	/// Step 3: map output Z from [-z_far,-z_near] to [-1,1]
+	double a=-2.0*z_near*z_far/(z_far-z_near); // 1/z term
+	double b=(z_near+z_far)/(z_far-z_near); // constant term
 	g(2,2)=0; g(2,3)=a;
 	g.addRow(3,b,2);
 	

@@ -23,11 +23,11 @@ headers: $(HEADERS)
 liveViz3d.o: liveViz3d.C $(HEADDEP)
 	$(CHARMC) -c liveViz3d.C
 
-ckviewable.o: ckviewable.C $(HEADDEP)
-	$(CHARMC) -c ckviewable.C
+ckviewable.o: ckviewable.cpp $(HEADDEP)
+	$(CHARMC) -c ckviewable.cpp
 
-ckviewpoint.o: ckviewpoint.C $(HEADDEP)
-	$(CHARMC) -c ckviewpoint.C
+ckviewpoint.o: ckviewpoint.cpp $(HEADDEP)
+	$(CHARMC) -c ckviewpoint.cpp
 
 liveViz3d.decl.h liveViz3d.def.h: liveViz3d.ci
 	$(CHARMC) liveViz3d.ci
