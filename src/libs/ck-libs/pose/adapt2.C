@@ -1,10 +1,7 @@
 // File: adapt2.C
 #include "pose.h"
 
-adapt2::adapt2() { 
-  timeLeash = SPEC_WINDOW; 
-  STRAT_T = ADAPT2_T; 
-}
+adapt2::adapt2() { timeLeash = SPEC_WINDOW; STRAT_T = ADAPT2_T; }
 
 // Single forward execution step
 void adapt2::Step()
@@ -12,7 +9,6 @@ void adapt2::Step()
   Event *ev;
   static int lastGVT = -1;
 
-  CmiAssert(lastGVT <= localPVT->getGVT());
   lastGVT = localPVT->getGVT();
   if (!parent->cancels.IsEmpty()) {             // Cancel as much as possible
 #ifdef POSE_STATS_ON
@@ -27,7 +23,6 @@ void adapt2::Step()
 #ifdef POSE_STATS_ON
     localStats->SwitchTimer(RB_TIMER);      
 #endif
-    //CkPrintf("<ROLLBACK of %d:%d @ time %d (L_t:%d) OVT=%d GVT=%d\n", RBevent->evID.id, RBevent->evID.pe, RBevent->timestamp, timeLeash, userObj->OVT(), lastGVT);
     timeLeash = MIN_LEASH;
     Rollback(); 
 #ifdef POSE_STATS_ON

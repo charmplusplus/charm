@@ -7,7 +7,7 @@ opt3::opt3() { timeLeash = SPEC_WINDOW; STRAT_T = OPT3_T; }
 void opt3::Step()
 {
   Event *ev;
-  static int lastGVT = 0;
+  static int lastGVT = -1;
 
   lastGVT = localPVT->getGVT();
   if (!parent->cancels.IsEmpty()) {             // Cancel as much as possible
@@ -54,8 +54,12 @@ void opt3::Step()
       eq->ShiftEvent();                       // shift to next event
       ev = eq->currentPtr;                    // reset ev
     }
-    if (eq->currentPtr->timestamp >= 0)
-      parent->Step();             // execute next event if there is one
+    if (eq->currentPtr->timestamp >= 0) {
+      // execute next event if there is one
+      prioMsg *pm = new prioMsg;
+      pm->setPriority(eq->currentPtr->timestamp-INT_MAX);
+      POSE_Objects[parent->thisIndex].Step(pm);
+    }
   }
 }
 

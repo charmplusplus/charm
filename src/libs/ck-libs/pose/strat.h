@@ -26,10 +26,8 @@ class strat
   rep *userObj;     // pointer to the user's representation in parent sim obj
   sim *parent;      // pointer to the parent sim object
   int parentIdx;    // array index of parent
-  Event *RBevent;   // current rollback event
-  virtual void Rollback() { }      // strategy specific rollback function
-  virtual void CancelEvents() { }  // strategy specific event cancellation
  public:
+  Event *RBevent;   // current rollback event
   int STRAT_T;      // type of strategy; see defines above
   Event *targetEvent,   // checkpoint state target event
     *currentEvent;  // current event being executed
@@ -39,6 +37,8 @@ class strat
   void init(eventQueue *q, rep *obj, sim *p, int pIdx);  // init pointers
   virtual void initSync() { }
   virtual void Step(); // Strategy specific forward execution step.
+  virtual void Rollback() { }      // strategy specific rollback function
+  virtual void CancelEvents() { }  // strategy specific event cancellation
   virtual int SafeTime() { return userObj->OVT(); }  // strategy-specific
   void ResetRBevent(Event *e) { RBevent = e; }
   Event *getCurrentEvent() { return currentEvent; }

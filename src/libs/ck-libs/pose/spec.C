@@ -7,7 +7,7 @@ spec::spec() { timeLeash = SPEC_WINDOW; STRAT_T = SPEC_T; }
 void spec::Step()
 {
   Event *ev;
-  static int lastGVT = 0;
+  static int lastGVT = -1;
 
   lastGVT = localPVT->getGVT();
   if (!parent->cancels.IsEmpty()) {             // Cancel as much as possible

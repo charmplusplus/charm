@@ -148,7 +148,6 @@ void SRtable::FindEarliest(int *eTS, int *eS, int *eR, int *nTS, int *nS, int *n
 	  found2 = 1;  *nTS = offset+j; *nS = sends[j]; *nR = recvs[j];
 	  return;
 	}
-      return;
     }
   // 0 or 1 earliest timestamps found; look at residuals
   if (found1 && !found2) {

@@ -84,7 +84,6 @@ void POSE_useQD()
 {
   CProxy_pose POSE_Coordinator(POSE_Coordinator_ID);
   POSE_Coordinator.QDon();
-  POSE_endtime = -1;
 }
 
 // use QD to terminate program
@@ -92,8 +91,16 @@ void POSE_useID()
 {
   CProxy_pose POSE_Coordinator(POSE_Coordinator_ID);
   POSE_Coordinator.IDon();
-  POSE_endtime = -1;
 }
+
+// use end time to terminate program
+void POSE_useET(int et) 
+{
+  CProxy_pose POSE_Coordinator(POSE_Coordinator_ID);
+  POSE_Coordinator.ETon();
+  POSE_endtime = et;
+}
+
 
 // start POSE simulation timer and other behaviors
 void POSE_start()

@@ -21,3 +21,6 @@ adapt (Basic Adaptive): same as spec, only the size of the speculative window
 changes based on rollback behavior: it starts at a min size, and expands by
 one for every successful set of forward executions (up to a max size); when a
 rollback occurs, speculative window size is reset to the minimum
+
+adapt2 (Experimental Adaptive): changes to regular adapt reflecting what I'm
+currently experimenting with...

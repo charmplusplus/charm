@@ -48,8 +48,7 @@ void sim::Step()
   if (active < 0) return;  // object is migrating; deactivate it 
 #ifdef POSE_STATS_ON
   int tstat = localStats->TimerRunning();
-  if (!tstat)
-    localStats->TimerStart(SIM_TIMER);
+  if (!tstat)  localStats->TimerStart(SIM_TIMER);
   else localStats->SwitchTimer(SIM_TIMER);
 #endif
   prioMsg *pm = new prioMsg;
@@ -62,7 +61,7 @@ void sim::Step()
       pm->setPriority(eq->currentPtr->timestamp-INT_MAX);
       POSE_Objects[thisIndex].Step(pm);
     }
-    else myStrat->Step();
+    //else myStrat->Step();
     break;
   case SPEC_T:
   case ADAPT_T: // non-prioritized step
@@ -74,8 +73,7 @@ void sim::Step()
     break;
   }
 #ifdef POSE_STATS_ON
-  if (!tstat)
-    localStats->TimerStop();
+  if (!tstat)  localStats->TimerStop();
   else localStats->SwitchTimer(tstat);
 #endif
 }
@@ -110,12 +108,10 @@ void sim::Status()
 // Commit whatever can be committed according to new GVT value
 void sim::Commit()
 {
-  if (active < 0)
-    return;
+  if (active < 0)  return;
 #ifdef POSE_STATS_ON
   int tstat = localStats->TimerRunning();
-  if (!tstat)
-    localStats->TimerStart(MISC_TIMER);
+  if (!tstat)  localStats->TimerStart(MISC_TIMER);
   else localStats->SwitchTimer(MISC_TIMER);
 #endif
 
@@ -128,16 +124,12 @@ void sim::Commit()
     if (localPVT->done())
       objID->terminus();
   }
-  #ifdef POSE_STATS_ON
-    localStats->SwitchTimer(SIM_TIMER);
-  #endif
-  if (!localPVT->done() && 
-      ((eq->currentPtr->timestamp >= 0) || !cancels.IsEmpty())) {
-    Step();
-  }
 #ifdef POSE_STATS_ON
-  if (!tstat)
-    localStats->TimerStop();
+  localStats->SwitchTimer(SIM_TIMER);
+#endif
+  if (!localPVT->done())  Step();
+#ifdef POSE_STATS_ON
+  if (!tstat)  localStats->TimerStop();
   else localStats->SwitchTimer(tstat);
 #endif
 }
@@ -179,9 +171,11 @@ void sim::Cancel(cancelMsg *m)
 #endif
   cancels.Insert(m->timestamp, m->evID);    // add to cancellations list
   localPVT->objUpdate(m->timestamp, RECV);
-  if (eq->currentPtr->timestamp == -1)  // if no work, Step to handle cancel
-    Step();
   CkFreeMsg(m);
+#ifdef POSE_STATS_ON
+  localStats->SwitchTimer(SIM_TIMER);      
+#endif
+  myStrat->Step();
 #ifdef POSE_STATS_ON
   localStats->TimerStop();
 #endif

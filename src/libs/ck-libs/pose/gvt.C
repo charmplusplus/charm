@@ -223,14 +223,16 @@ void GVT::computeGVT(UpdateMsg *m)
   GVTMsg *gmsg = new GVTMsg;
   int lastGVT = 0;
   static int optGVT = -1, conGVT = -1, done=0;
-  static int earliestMsg, earlySends, earlyRecvs;
-  static int nextEarliest, nextSends, nextRecvs;
+  int earliestMsg=-1, earlySends, earlyRecvs;
+  int nextEarliest=-1, nextSends, nextRecvs;
 
   // process message
   if ((optGVT < 0) || ((m->optPVT >= 0) && (m->optPVT < optGVT)))
     optGVT = m->optPVT;
   if ((conGVT < 0) || ((m->conPVT >= 0) && (m->conPVT < conGVT)))
     conGVT = m->conPVT;
+  //CkPrintf("m:earlyMsg=%d early#S=%d early#R=%d nextMsg=%d next#S=%d next#R=%d\n", m->earlyTS, m->earlySends, m->earlyRecvs, m->nextTS, m->nextSends, m->nextRecvs);
+
   if (earliestMsg == -1) { // first set of data received
     earliestMsg = m->earlyTS;
     earlySends = m->earlySends;
@@ -280,6 +282,7 @@ void GVT::computeGVT(UpdateMsg *m)
     }
   }
   CkFreeMsg(m);
+  //CkPrintf("c:earlyMsg=%d early#S=%d early#R=%d nextMsg=%d next#S=%d next#R=%d\n", earliestMsg, earlySends, earlyRecvs, nextEarliest, nextSends, nextRecvs);
   done++;
 
   if (done == CkNumPes()) { // all PVT reports are in

@@ -27,7 +27,7 @@ extern int eventMsgsDiscarded;
 
 // Strategy variables
 #define STORE_RATE 10000           // default store rate: 1 for every n events
-#define SPEC_WINDOW 1000         // speculative event window
+#define SPEC_WINDOW 100         // speculative event window
 #define MIN_LEASH 10            // min spec window for adaptive strategy
 #define MAX_LEASH 2000         // max  "     "     "     "        " 
 #define LEASH_FLEX 1           // leash increment
@@ -85,6 +85,7 @@ void POSE_init();  // Main initialization for all of POSE
 void POSE_start(); // start POSE simulation timer and other behaviors
 void POSE_useQD(); // use QD to terminate program
 void POSE_useID(); // use Inactivity Detection to terminate program
+void POSE_useET(int et); // use end time to terminate program
 void POSE_registerCallBack(CkCallback cb);
 void POSE_stop();  // stop POSE simulation timer
 void POSE_exit();  // exit program
@@ -110,12 +111,13 @@ class pose : public Chare {
  private:
   double sim_timer;
   CkCallback cb;
-  int callBackSet, useQD, useID;
+  int callBackSet, useQD, useID, useET;
  public:
-  pose(void) { callBackSet = 0; useQD = useID = 0; }
+  pose(void) { callBackSet = 0; useQD = useID = useET = 0; }
   pose(CkMigrateMessage *) { }
-  void QDon() { useQD = 1; }
-  void IDon() { useID = 1; }
+  void QDon() { useQD = 1; if (!useET) POSE_endtime = -1; }
+  void IDon() { useID = 1; if (!useET) POSE_endtime = -1; }
+  void ETon() { useET = 1; }
   void start() { 
     if (useQD) {
       CkPrintf("Using Quiescence Detection for termination.\n");

@@ -516,8 +516,10 @@ while (@line=split(' ',($thisline=getcodeline($inChandle)))) {
       $outChandle->print("    e->spawnedList = NULL;\n");
       $outChandle->print("    eventMsgsRecvd++;\n");
       $outChandle->print("    eq->InsertEvent(e);\n");
-      $outChandle->print("    if (e->timestamp < objID->OVT())\n");
+      $outChandle->print("    if (e->timestamp < objID->OVT()) {\n");
       $outChandle->print("      myStrat->ResetRBevent(e);\n");
+#      $outChandle->print("      myStrat->Rollback();\n");
+      $outChandle->print("    }\n");
       $outChandle->print("    Step();\n");
       $outChandle->print("  }\n");
       $outChandle->print("  pvt->objUpdate($messagename->timestamp, RECV);\n");

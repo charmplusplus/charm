@@ -12,6 +12,7 @@ module pose {
     entry pose();
     entry void QDon();
     entry void IDon();
+    entry void ETon();
     entry void start();
     entry void registerCallBack(callBack *);
     entry void stop();
