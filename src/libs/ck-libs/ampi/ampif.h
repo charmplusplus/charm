@@ -1,5 +1,5 @@
        integer, parameter :: MPI_SUCCESS = 0
-       integer, parameter :: MPI_ERR_BUFFER  		 =1
+       integer, parameter :: MPI_ERR_BUFFER              =1
        integer, parameter :: MPI_ERR_COUNT               =2
        integer, parameter :: MPI_ERR_TYPE                =3
        integer, parameter :: MPI_ERR_TAG                 =4
