@@ -6,7 +6,7 @@
 #include "converse.h"
 #include "queueing.h"
 #include "cldb.h"
-#include "LBTopology.h"
+#include "topology.h"
 
 typedef struct CldProcInfo_s {
   double lastIdle;
