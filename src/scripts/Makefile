@@ -65,13 +65,10 @@ AMPIF: AMPIC
 
 f90charm: charm++ $(L)/libf90charm.a
 
-default_libs: commlib multicast
+default_libs: multicast
 
 multicast:
 	cd libs/ck-libs/multicast && $(MAKE)
-
-commlib:
-	cd libs/ck-libs/commlib && $(MAKE)
 
 translators: charmxi conv-cpm
 
@@ -97,9 +94,6 @@ jadeall: jade
 	cd langs/jade && $(MAKE) p
 #	make the jade.jar file
 	cd ../../java/charm/jade && $(MAKE)
-
-fftlib: charm++
-	cd libs//ck-libs/fftlib/ && $(MAKE)
 
 LIBS: CONVLIBS CHARMLIBS
 	cd libs; $(MAKE) otherlibs
@@ -158,7 +152,10 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
       ccs-server.h ccs-auth.c ccs-auth.h \
       memory-isomalloc.h debug-conv.h debug-charm.h conv-autoconfig.h \
       conv-common.h conv-config.sh conv-config.h conv-mach.h conv-mach.sh \
-      blue.h blue-conv.h bgconverse.h
+      blue.h blue-conv.h bgconverse.h \
+	convcomlibstrategy.h 3dgridrouter.h de.h hypercubetopology.h	\
+	routerstrategy.h comlib.h dummystrategy.h  treerouter.h \
+	convcomlibmanager.h graphrouter.h petable.h gridrouter.h router.h       
 
 # The .c files are there to be #included by clients whole
 # This is a bit unusual, but makes client linking simpler.
@@ -172,7 +169,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  ckcallback.h CkCallback.decl.h ckcallback-ccs.h 	\
 	  ckarrayreductionmgr.h cknodegroupreduction.h cksection.h \
 	  ckarray.h cklocation.h ckreduction.h ckcheckpoint.h ckmemcheckpoint.h\
-	  ckobjQ.h readonly.h charisma.h \
+	  ckobjQ.h readonly.h charisma.h ComlibArrayListener.h ComlibStrategy.h\
 	  $(UTILHEADERS) \
 	  tempo.h waitqd.h LBDatabase.h lbdb.h \
 	  LBDBManager.h LBComm.h LBOM.h LBObj.h LBMachineUtil.h \
@@ -181,7 +178,6 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  RefineLB.h RefineCommLB.h OrbLB.h GreedyLB.h GreedyCommLB.h \
 	  Comm1LB.h manager.h MetisLB.h NborBaseLB.h topology.h \
 	  NeighborLB.h NeighborCommLB.h NeighborLBMsg.h WSLB.h GreedyRefLB.h RandRefLB.h \
-          ComlibStrategy.h ComlibArrayListener.h \
 	  BlueGene.h middle.h middle-conv.h middle-blue.h \
           CkMarshall.decl.h CkArray.decl.h CkLocation.decl.h 	\
           CkReduction.decl.h CkArrayReductionMgr.decl.h\
@@ -194,6 +190,10 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
           WSLB.decl.h GreedyRefLB.decl.h RandRefLB.decl.h \
           GreedyCommLB.decl.h Comm1LB.decl.h EveryLB.decl.h \
           charisma.decl.h TraceSummary.decl.h BlueGene.decl.h \
+	  comlib.decl.h ComlibManager.h DirectMulticastStrategy.h DummyStrategy.h\
+	  EachToManyMulticastStrategy.h MsgPacker.h StreamingStrategy.h \
+	  NodeMulticast.h PipeBroadcastStrategy.h MeshStreamingStrategy.h \
+          PrioStreaming.h MPIStrategy.h MsgPacker.h StreamingStrategy.h \
 	  $(CVHEADERS)
 
 ALLHEADERS=$(CKHEADERS) \
@@ -237,6 +237,8 @@ dirs+sources:
 	./gatherflat ../../src/util             .
 	./gatherflat ../../src/ck-perf          .
 	./gatherflat ../../src/ck-ldb           .
+	./gatherflat ../../src/ck-com           .
+	./gatherflat ../../src/conv-com           .
 	./gatherflat ../../src/langs/simplemsg  .
 	./gatherflat ../../src/langs/pvmc       .
 	./gatherflat ../../src/langs/bluegene   .
@@ -296,12 +298,25 @@ LIBCONV_CORE= convcore.o conv-conds.o queueing.o msgmgr.o \
 	traceCore.o traceCoreCommon.o \
 	converseProjections.o machineProjections.o \
 	quiescence.o isomalloc.o \
-	global-nop.o
+	global-nop.o 
 
-LIBCONV_UTIL=pup_util.o pup_toNetwork.o pup_toNetwork4.o \
-	pup_xlater.o pup_c.o pup_paged.o\
-	ckimage.o ckdll.o ckhashtable.o ckbitvector.o sockRoutines.o \
-	conv-lists.o RTH.o persist-comm.o
+#############################################
+#
+#Comlib Core objects
+#
+#############################################
+#These go into libconv-util.a and are always linked
+CONVERSE_COM_CORE_OBJS = convcomlibstrategy.o
+
+#These go into libck.a
+COMLIB_CORE_OBJS = ComlibStrategy.o ComlibArrayListener.o
+##############################################
+
+LIBCONV_UTIL=pup_util.o pup_toNetwork.o pup_toNetwork4.o		\
+	pup_xlater.o pup_c.o pup_paged.o				\
+	ckimage.o ckdll.o ckhashtable.o sockRoutines.o			\
+	conv-lists.o RTH.o persist-comm.o $(CONVERSE_COM_CORE_OBJS) \
+	ckbitvector.o
 
 LIBCONV_UTILF=pup_f.o
 
@@ -500,11 +515,10 @@ LIBCK_CORE=trace-common.o tracef.o init.o register.o qd.o ck.o main.o 	\
 	   BaseLB.o CentralLB.o CentralPredictor.o NborBaseLB.o WSLB.o \
            ObjGraph.o graph.o  \
            Refiner.o RefinerComm.o bitvecset.o Set.o heap.o CommLBHeap.o \
-	   NullLB.o LBSimulation.o 	\
-	   ComlibStrategy.o ComlibArrayListener.o  \
+	   NullLB.o LBSimulation.o $(COMLIB_CORE_OBJS) \
 	   charmProjections.o
 
-charm-target: converse $(L)/libck.a loadbalancers default_libs
+charm-target: converse $(L)/libck.a loadbalancers default_libs comlib_objs
 
 CHARMLIBS: charm++
 	cd libs; $(MAKE) charmlibs OPTS='$(OPTS)'
@@ -853,6 +867,35 @@ $(L)/libmoduleEveryLB.a: $(LB_OBJ)
 # end of from script Makefile_lb.sh
 loadbalancers: $(LOADBALANCERS) $(L)/libmoduleEveryLB.a
 
+
+######################################################################
+#
+#Communication Optimization Library
+#
+######################################################################
+
+STRATEGY_OBJS = MPIStrategy.o StreamingStrategy.o \
+                DummyStrategy.o NodeMulticast.o \
+		EachToManyMulticastStrategy.o \
+                MsgPacker.o DirectMulticastStrategy.o \
+		RingMulticastStrategy.o \
+                PipeBroadcastStrategy.o MeshStreamingStrategy.o \
+                PrioStreaming.o BroadcastStrategy.o
+
+CONVERSE_COM_OBJS = gridrouter.o de.o treerouter.o petable.o \
+	3dgridrouter.o graphrouter.o hypercubetopology.o \
+	routerstrategy.o convcomlibmanager.o
+
+comlib.def.h: comlib.decl.h
+
+comlib.decl.h : ComlibManager.ci
+	$(CHARMC) -c ComlibManager.ci
+
+COMLIB_OBJS = ComlibManager.o $(STRATEGY_OBJS) $(CONVERSE_COM_OBJS)
+
+comlib_objs: $(COMLIB_OBJS)
+	$(CHARMC) -o $(L)/libmodulecomlib.a $(COMLIB_OBJS)
+
 ###############################################################################
 #
 # BlueGene Emulator
@@ -1038,7 +1081,7 @@ depends: basics
         fi; \
 	echo '#generated by make depends' > $(DEPENDFILE); \
 	processFiles=''; 	\
-        for i in $(LIBCONV_CORE) $(TRACE_OBJS) $(LIBCK_CORE) $(LB_OBJ) $(BLUE_OBJS) $(BLUE_IO_OBJS) ; do \
+        for i in $(LIBCONV_CORE) $(TRACE_OBJS) $(LIBCK_CORE) $(LB_OBJ) $(BLUE_OBJS) $(BLUE_IO_OBJS) $(CONVERSE_COM_CORE_OBJS) $(COMLIB_OBJS); do \
 	      processed='false';	\
 	      for f in $$processFiles; do 	\
 		if test $$i = $$f ; then	\
