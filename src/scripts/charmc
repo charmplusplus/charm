@@ -909,11 +909,11 @@ case "$LANGUAGE" in
 	Do $CMK_LDXX $OPTSL $OPTS_LDXX -o $OBJECT \
 		$LANG_LIBS -lck -lconv-cplus-y $CORE_LIBS -lm $CMK_LIBS $POST_LIBRARIES
 	;;
-"converse"|"bluegene")
+"converse")
 	Do $CMK_LD $OPTSL $OPTS_LD -o $OBJECT \
 		$LANG_LIBS -lconv-cplus-n $CORE_LIBS -lm $CMK_LIBS $POST_LIBRARIES
 	;;
-"converse++")
+"converse++"|"bluegene")
 	Do $CMK_LDXX $OPTSL $OPTS_LDXX -o $OBJECT \
 		$LANG_LIBS -lconv-cplus-y $CORE_LIBS -lm $CMK_LIBS $POST_LIBRARIES
 	;;
