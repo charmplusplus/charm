@@ -79,6 +79,9 @@ public:
   }
   /// Send cancellation messages to all of event e's spawned events
   void CancelSpawn(Event *e) {  
+#ifdef TRACE_DETAIL
+    double critStart = CmiWallTimer();
+#endif
     cancelMsg *m;
     SpawnedEvent *ev = e->spawnedList;
     while (ev) {
@@ -95,6 +98,9 @@ public:
       delete ev; // delete the spawn
       ev = e->spawnedList; // move on to next in list
     }
+#ifdef TRACE_DETAIL
+    traceUserBracketEvent(30, critStart, CmiWallTimer());
+#endif
   }
 };
 

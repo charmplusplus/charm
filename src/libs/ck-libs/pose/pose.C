@@ -29,6 +29,14 @@ void POSE_init(int IDflag, int ET) // can specify both
   CkPrintf("Initializing POSE...  \n");
   POSE_inactDetect = IDflag;
   POSE_endtime = ET;
+#ifdef TRACE_DETAIL
+  traceRegisterUserEvent("Forward Execution", 10);
+  traceRegisterUserEvent("Cancellation", 20);
+  traceRegisterUserEvent("Cancel Spawn", 30);
+  traceRegisterUserEvent("Rollback", 40);
+  traceRegisterUserEvent("Commit", 50);
+  traceRegisterUserEvent("OptSync", 60);
+#endif
 #ifndef SEQUENTIAL_POSE
 #ifdef POSE_COMM_ON
   // Create the communication library for POSE

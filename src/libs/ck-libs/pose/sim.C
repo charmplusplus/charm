@@ -46,6 +46,9 @@ sim::~sim()
 void sim::Step()
 {
   if (active < 0) return; // object is migrating; deactivate it 
+#ifdef TRACE_DETAIL
+  double critStart = CmiWallTimer();  // trace timing
+#endif
 #ifdef POSE_STATS_ON
   int tstat = localStats->TimerRunning();
   if (!tstat)  localStats->TimerStart(SIM_TIMER);
@@ -72,6 +75,9 @@ void sim::Step()
   if (!tstat)  localStats->TimerStop();
   else localStats->SwitchTimer(tstat);
 #endif
+#ifdef TRACE_DETAIL
+  traceUserBracketEvent(60, critStart, CmiWallTimer());
+#endif
 }
 
 /// Start a prioritized forward execution step on myStrat
@@ -97,6 +103,9 @@ void sim::Step(prioMsg *m)
 void sim::Commit()
 {
   if (active < 0)  return; // object is migrating
+#ifdef TRACE_DETAIL
+  double critStart = CmiWallTimer();  // trace timing
+#endif
 #ifdef POSE_STATS_ON
   int tstat = localStats->TimerRunning();
   if (!tstat)  localStats->TimerStart(SIM_TIMER);
@@ -114,6 +123,10 @@ void sim::Commit()
     }
     else eq->CommitEvents(this, lastGVT); // commit events up to GVT
   }
+#ifdef TRACE_DETAIL
+  traceUserBracketEvent(50, critStart, CmiWallTimer());
+  critStart = CmiWallTimer();
+#endif
 #ifdef POSE_STATS_ON
   localStats->SwitchTimer(SIM_TIMER);
 #endif
@@ -121,6 +134,9 @@ void sim::Commit()
 #ifdef POSE_STATS_ON
   if (!tstat)  localStats->TimerStop();
   else localStats->SwitchTimer(tstat);
+#endif
+#ifdef TRACE_DETAIL
+  traceUserBracketEvent(60, critStart, CmiWallTimer());
 #endif
 }
 
@@ -157,12 +173,18 @@ void sim::Cancel(cancelMsg *m)
   cancels.Insert(m->timestamp, m->evID); // add to cancellations list
   localPVT->objUpdate(m->timestamp, RECV); // tell PVT branch about recv
   CkFreeMsg(m);
+#ifdef TRACE_DETAIL
+  double critStart = CmiWallTimer();  // trace timing
+#endif
 #ifdef POSE_STATS_ON
   localStats->SwitchTimer(SIM_TIMER);      
 #endif
   myStrat->Step(); // call Step to handle cancellation
 #ifdef POSE_STATS_ON
   localStats->TimerStop();
+#endif
+#ifdef TRACE_DETAIL
+  traceUserBracketEvent(60, critStart, CmiWallTimer());
 #endif
 }
 

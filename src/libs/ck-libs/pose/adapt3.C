@@ -9,15 +9,39 @@ void adapt3::Step()
   static POSE_TimeType lastGVT = POSE_UnsetTS;
   static int advances=0;
   int iter=0;
+  double critStart;
 
   rbFlag = 0;
   lastGVT = localPVT->getGVT();
-  if (!parent->cancels.IsEmpty()) CancelUnexecutedEvents();
+
+  if (!parent->cancels.IsEmpty()) {
+#ifdef TRACE_DETAIL
+    critStart = CmiWallTimer();  // trace timing
+#endif
+    CancelUnexecutedEvents();
+#ifdef TRACE_DETAIL
+    traceUserBracketEvent(20, critStart, CmiWallTimer());
+#endif
+  }
   if (eq->RBevent) {
+#ifdef TRACE_DETAIL
+    critStart = CmiWallTimer();  // trace timing
+#endif
     timeLeash = eq->RBevent->timestamp - lastGVT;
     Rollback(); 
+#ifdef TRACE_DETAIL
+    traceUserBracketEvent(40, critStart, CmiWallTimer());
+#endif
   }
-  if (!parent->cancels.IsEmpty()) CancelEvents();
+  if (!parent->cancels.IsEmpty()) {
+#ifdef TRACE_DETAIL
+    critStart = CmiWallTimer();  // trace timing
+#endif
+    CancelEvents();
+#ifdef TRACE_DETAIL
+    traceUserBracketEvent(20, critStart, CmiWallTimer());
+#endif
+  }
 
   if (!rbFlag) timeLeash = (timeLeash + avgRBoffset)/2;
   // Prepare to execute an event
@@ -39,7 +63,13 @@ void adapt3::Step()
     ev->done = 2;
     specEventCount++;
     eventCount++;
+#ifdef TRACE_DETAIL
+    critStart = CmiWallTimer();  // trace timing
+#endif
     parent->ResolveFn(ev->fnIdx, ev->msg); // execute it
+#ifdef TRACE_DETAIL
+    traceUserBracketEvent(10, critStart, CmiWallTimer());
+#endif
     ev->done = 1; // flag the event as executed
     eq->mem_usage++;
     eq->ShiftEvent(); // shift to next event
