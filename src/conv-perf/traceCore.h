@@ -8,29 +8,52 @@
 
 #include "converse.h"
 
+#define	MAX_NUM_LANGUAGES  32			//NOTE: fixed temporarily
+
+
+
 /* Prototype Declarations */
-class TraceCore; 
-class TraceLogger; 
+class TraceCore;
+class TraceLogger;
 class TraceEntry;
 
+CpvExtern(int, _traceCoreOn);
+/*** structure of events ***/
+
+struct TraceCoreEvent {
+	int eID;
+	struct TraceCoreEvent *next;
+};
+
 /* Class Declarations */
-class TraceCore 
+class TraceCore
 {
   private:
 	TraceLogger* traceLogger;
-
+	void startPtc();
+	void closePtc();
+	FILE *fpPtc;	// File pointer for the ptc file
+	struct TraceCoreEvent  *eventLists[MAX_NUM_LANGUAGES];
+	int maxlID;
+	int maxeID[MAX_NUM_LANGUAGES];
+	int numLangs;
+	int numEvents[MAX_NUM_LANGUAGES];
+	int lIDList[MAX_NUM_LANGUAGES];
+	char *lNames[MAX_NUM_LANGUAGES];
+	int traceCoreOn;
   public:
 	TraceCore(char** argv);
 	~TraceCore();
 
 	//TODO: some of these methods are for temporary use only
-	void RegisterLanguage(int lID);	
+	void RegisterLanguage(int lID);
 	void RegisterLanguage(int lID, char* lName);
 	void RegisterEvent(int lID, int eID);
 	void LogEvent(int lID, int eID);
 	void LogEvent(int lID, int eID, int iLen, int* iData);
 	void LogEvent(int lID, int eID, int sLen, char* sData);
 	void LogEvent(int lID, int eID, int iLen, int* iData, int sLen, char* sData);
+
 };
 
 class TraceEntry
@@ -47,13 +70,13 @@ class TraceEntry
 	char*  sData;
 
 	TraceEntry() {}
-	TraceEntry(int lID, int eID, double ts, int el, int* e, 
-			 int il, int* i, int sl, char* s): 
-			 languageID(lID), eventID(eID), timestamp(ts), 
+	TraceEntry(int lID, int eID, double ts, int el, int* e,
+			 int il, int* i, int sl, char* s):
+			 languageID(lID), eventID(eID), timestamp(ts),
 			 eLen(el), entity(e), iLen(il), iData(i), sLen(sl), sData(s) {}
 	TraceEntry(int lID, int eID, double ts,
-			 int il, int* i, int sl, char* s): 
-			 languageID(lID), eventID(eID), timestamp(ts), 
+			 int il, int* i, int sl, char* s):
+			 languageID(lID), eventID(eID), timestamp(ts),
 			 eLen(0), entity(NULL), iLen(il), iData(i), sLen(sl), sData(s) {}
 	TraceEntry(TraceEntry& te);
 	~TraceEntry();
@@ -74,13 +97,12 @@ class TraceLogger
     int poolSize;
     int numEntries;
     TraceEntry *pool;
-	
-#define	MAX_NUM_LANGUAGES  10			//NOTE: fixed temporarily
 
 	int   numLangs;
-	char *lName[MAX_NUM_LANGUAGES];		// Language Name 
+ char *lName[MAX_NUM_LANGUAGES];		// Language Name
     char *fName[MAX_NUM_LANGUAGES];		// File name
     FILE *fptrs[MAX_NUM_LANGUAGES];		// File pointer
+
     int   binary;
 
 	int lastWriteFlag;		// set when writing log to file at end of program
@@ -97,10 +119,14 @@ class TraceLogger
 	void writeSts(void);
 
     void add(int lID, int eID, double timestamp, int iLen, int* iData, int sLen, char* sData);
+    void initlogfiles();
+
 
   private:
 	void openLogFiles();
 	void closeLogFiles();
+	void verifyFptrs();
+	void flushLogFiles();
 
 	char* pgm;
 };

@@ -1,4 +1,3 @@
-
 #ifndef __CHARM_PROJECTIONS_H__
 #define __CHARM_PROJECTIONS_H__
 
@@ -12,20 +11,20 @@ extern "C" {
 void initCharmProjections();
 //int  traceRegisterUserEvent(const char*);	//TODO
 
-void creation(envelope *e, int num=1);
-void beginExecute(envelope *e);
-void beginExecuteDetailed(int event,int msgType,int ep,int srcPe,int ml);
-void endExecute(void);
-void enqueue(envelope *e);
-void dequeue(envelope *e);
-void beginComputation(void);
-void endComputation(void);
-void messageRecv(char *env, int pe);
-void userEvent(int e);
-void beginPack(void);
-void endPack(void);
-void beginUnpack(void);
-void endUnpack(void);
+void charm_creation(envelope *e, int num=1);
+void charm_beginExecute(envelope *e);
+void charm_beginExecuteDetailed(int event,int msgType,int ep,int srcPe,int ml);
+void charm_endExecute(void);
+void charm_enqueueMsg(envelope *e);
+void charm_dequeueMsg(envelope *e);
+void charm_beginComputation(void);
+void charm_endComputation(void);
+void charm_messageRecv(char *env, int pe);
+void charm_userEvent(int e);
+void charm_beginPack(void);
+void charm_endPack(void);
+void charm_beginUnpack(void);
+void charm_endUnpack(void);
 
 #ifdef __cplusplus
 }

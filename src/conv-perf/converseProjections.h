@@ -6,14 +6,13 @@
 extern "C" {
 #endif
 
-void msgSent(int destPE, int size);
-void msgQueued();		//TODO
-void msgRecvMC();		//TODO
-void msgRecvSC();		//TODO
-void handlerBegin(int handlerIdx);
-void handlerEnd  (int handlerIdx);
-void procIdle();
-void procBusy();
+void converse_msgSent(int destPE, int size);
+void converse_msgQueued();		//TODO
+void converse_msgRecvMC();		//TODO
+void converse_msgRecvSC();		//TODO
+void converse_handlerBegin(int handlerIdx);
+void converse_handlerEnd  (int handlerIdx);
+
 
 #ifdef __cplusplus
 }

@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <string.h>
+#include <assert.h>
 
 #include "converse.h"
 #include "traceCore.h"
@@ -9,12 +11,13 @@
 
 #include "converseEvents.h"	//TODO: remove this hack for REGISTER_CONVESE
 #include "charmEvents.h"	//TODO: remove this hack for REGISTER_CHARM
+#include "machineEvents.h"	// for machine events
 
-CpvExtern(int, _traceCoreOn);
 CpvExtern(double, _traceCoreInitTime);
 CpvExtern(char*, _traceCoreRoot);
 CpvExtern(int, _traceCoreBufferSize);
 CpvExtern(TraceCore*, _traceCore);
+CpvStaticDeclare(int ,staticNumEntries);
 
 /* Trace Timer */
 #define  TRACE_CORE_TIMER   CmiWallTimer
@@ -25,45 +28,178 @@ TraceCore::TraceCore(char** argv)
 {
 	int binary = CmiGetArgFlag(argv,"+binary-trace");
 	traceLogger = new TraceLogger(CpvAccess(_traceCoreRoot), binary);
-
+	CpvInitialize(int ,staticNumEntries);
+	CpvAccess(staticNumEntries)=0;
+	if(CpvAccess(_traceCoreOn) == 0){
+		traceCoreOn=0;
+		return;
+	}
+	traceCoreOn=1;
+	//CmiPrintf("[%d]In TraceCore Constructor\n",CmiMyPe());
+	startPtc();
 	REGISTER_CONVERSE
 	REGISTER_CHARM
+	REGISTER_MACHINE
+	closePtc();
 }
 
 TraceCore::~TraceCore()
 { if(traceLogger) delete traceLogger; }
 
 void TraceCore::RegisterLanguage(int lID, char* ln)
-{ traceLogger->RegisterLanguage(lID, ln); }	
+{
+	//CmiPrintf("Register Language called for %s at %d \n",ln,lID);
+  if(traceCoreOn == 0){
+		return;
+  }
+  traceLogger->RegisterLanguage(lID, ln);
+
+  // code for ptc file generation
+  if(maxlID < lID){
+	maxlID = lID;
+  }
+  lIDList[numLangs] = lID;
+  lNames[numLangs] = new char[strlen(ln)+1];
+  sprintf(lNames[numLangs],"%s",ln);
+  numLangs++;
+
+ }
+
+struct TraceCoreEvent *insert_TraceCoreEvent(struct TraceCoreEvent *root,int eID){
+	struct TraceCoreEvent *p;
+	
+	if(root == NULL){
+		p = (struct TraceCoreEvent *)malloc(sizeof(struct TraceCoreEvent));
+		p->next = NULL;
+		p->eID = eID;
+		return p;
+	}
+	p = root;
+	while(p->next != NULL)
+		p = p->next;
+	p->next = (struct TraceCoreEvent *)malloc(sizeof(struct TraceCoreEvent));
+	p->next->next = NULL;
+	p->next->eID = eID;
+	return root;
+}
+
+
+void print_TraceCoreEvent(FILE *fpPtc,struct TraceCoreEvent *root,char *lang){
+	struct TraceCoreEvent *p;
+	
+	p = root;
+	while(p!=NULL){
+		fprintf(fpPtc,"%d %s%d ",p->eID,lang,p->eID);
+		p = p->next;
+
+	}
+}
 
 //TODO: currently these are dummy definitions
 void TraceCore::RegisterEvent(int lID, int eID)
-{ CmiPrintf("registering event (%d, %d)\n", lID, eID); }	
+{
+	//CmiPrintf("registering event (%d, %d)\n", lID, eID);
+	if(traceCoreOn == 0){
+		return;
+	}
+	// code for ptc file generation
+	for(int i=0;i<numLangs;i++){
+		if(lIDList[i] == lID){
+			if(maxeID[i] < eID){
+				maxeID[i] = eID;
+			}
+			numEvents[i]++;
+			eventLists[i] = insert_TraceCoreEvent(eventLists[i],eID);
+			break;
+		}
+	}
+}
+
+void TraceCore::startPtc(){
+	if(traceCoreOn ==0){
+		return;
+	}
+	char *str = new char[strlen(CpvAccess(_traceCoreRoot))+strlen(".ptc")+1];
+	sprintf(str,"%s.ptc",CpvAccess(_traceCoreRoot));
+	fpPtc = fopen(str,"w");
+	if(fpPtc == NULL){
+		CmiAbort("Can't generate Ptc file");
+	}
+	fprintf(fpPtc,"%d\n",CmiNumPes());
+	for(int i=0;i<MAX_NUM_LANGUAGES;i++){
+		eventLists[i] = NULL;
+		maxeID[i] = 0;
+		numEvents[i] = 0;
+	}
+	maxlID = 0;
+	numLangs = 0;
+}
+
+
+void TraceCore::closePtc(){
+	if(traceCoreOn ==0){
+		return;
+	}
+	fprintf(fpPtc,"%d %d ",maxlID,numLangs);
+	for(int i=0;i<numLangs;i++){
+		fprintf(fpPtc,"%d %s ",lIDList[i],lNames[i]);
+	}
+	fprintf(fpPtc,"\n");
+	for(int i=0;i<numLangs;i++){
+		fprintf(fpPtc,"%d %d %d ",lIDList[i],maxeID[i],numEvents[i]);
+		print_TraceCoreEvent(fpPtc,eventLists[i],lNames[i]);
+		fprintf(fpPtc,"\n");
+	}
+	fclose(fpPtc);
+}
+
+
+
 
 //TODO: only for compatibility with incomplete converse instrumentation
 void TraceCore::LogEvent(int lID, int eID)
-{ LogEvent(lID, eID, 0, NULL, 0, NULL); }
+{ 
+	if(traceCoreOn == 0){
+		return;
+	}
+	LogEvent(lID, eID, 0, NULL, 0, NULL); 
+}
 
 void TraceCore::LogEvent(int lID, int eID, int iLen, int* iData)
-{ LogEvent(lID, eID, iLen, iData, 0, NULL); }
+{ 
+	if(traceCoreOn == 0){
+		return;
+	}
+	LogEvent(lID, eID, iLen, iData, 0, NULL); 
+}
 
 void TraceCore::LogEvent(int lID, int eID, int sLen, char* sData)
-{ LogEvent(lID, eID, 0, NULL, sLen, sData); }
+{ 
+	if(traceCoreOn == 0){
+		return;
+	}
+	LogEvent(lID, eID, 0, NULL, sLen, sData); 
+}
 
 void TraceCore::LogEvent(int lID, int eID, int iLen, int* iData, int sLen, char* sData)
 {
-	CmiPrintf("lID: %d, eID: %d", lID, eID);
+	//CmiPrintf("lID: %d, eID: %d", lID, eID);
+	if(traceCoreOn == 0){
+		return;
+	}
 	if(iData != NULL) {
-		CmiPrintf(" iData: ");
-		for(int i=0; i<iLen; i++) { CmiPrintf("%d ", iData[i]); }
+	//	CmiPrintf(" iData(%d): ",iLen);
+		for(int i=0; i<iLen; i++) { //CmiPrintf("%d ", iData[i]);
+		}
 	}
 	if(sData != NULL) {
-		CmiPrintf("sData: %s", sData);
+//		CmiPrintf("sData: %s", sData);
 	}
-	CmiPrintf("\n");
+//	CmiPrintf("\n");
 
-
-	traceLogger->add(lID, eID, TraceCoreTimer(), iLen, iData, sLen, sData); 
+#ifndef CMK_OPTIMIZE
+	traceLogger->add(lID, eID, TraceCoreTimer(), iLen, iData, sLen, sData);
+#endif
 }
 
 /***************** Class TraceEntry Definition *****************/
@@ -91,48 +227,63 @@ void TraceEntry::write(FILE* fp, int prevLID, int prevSeek, int nextLID, int nex
 {
 	//NOTE: no need to write languageID to file
 	if(prevLID == 0 && nextLID ==0)
-		fprintf(fp, "%d %f %d %d", eventID, timestamp, 0, 0); 
+		fprintf(fp, "%d %f %d %d ", eventID, timestamp, 0, 0);
 	else if(prevLID == 0 && nextLID !=0)
-		fprintf(fp, "%d %f %d %d %d", eventID, timestamp, 0, nextLID, nextSeek); 
+		fprintf(fp, "%d %f %d %d %d", eventID, timestamp, 0, nextLID, nextSeek);
 	else if(prevLID != 0 && nextLID ==0)
-		fprintf(fp, "%d %f %d %d %d", eventID, timestamp, prevLID, prevSeek, 0); 
+		fprintf(fp, "%d %f %d %d %d", eventID, timestamp, prevLID, prevSeek, 0);
 	else // if(prevLID != 0 && nextLID !=0)
 		fprintf(fp, "%d %f %d %d %d %d", eventID, timestamp, prevLID, prevSeek, nextLID, nextSeek);
 
 	fprintf(fp, " %d", eLen);
 	if(eLen != 0) {
-	  for(int i=0; i<eLen; i++) fprintf(fp, " %d", entity[i]);  
+	  for(int i=0; i<eLen; i++) fprintf(fp, " %d", entity[i]);
 	}
 
 	fprintf(fp, " %d", iLen);
 	if(iLen != 0) {
-	  for(int i=0; i<iLen; i++) fprintf(fp, " %d", iData[i]);  
+	  for(int i=0; i<iLen; i++) fprintf(fp, " %d", iData[i]);
 	}
 
 	if(sLen !=0) fprintf(fp, " %s\n", sData);
 	else fprintf(fp, "\n");
 
-	// free memory 
-	if(entity) delete [] entity;
+	// free memory
+/*	if(entity) delete [] entity;
+	//entity = NULL;
 	if(iData)  delete [] iData;
-	if(sData)  delete [] sData;
+	//iData = NULL;
+	if(sData)  delete [] sData;*/
+	//sData=NULL;
 }
 
 /***************** Class TraceLogger Definition *****************/
-TraceLogger::TraceLogger(char* program, int b): 
-	numLangs(1), numEntries(0), lastWriteFlag(0), prevLID(0), prevSeek(0) 
+TraceLogger::TraceLogger(char* program, int b):
+	numLangs(1), numEntries(0), lastWriteFlag(0), prevLID(0), prevSeek(0)
 {
   binary = b;
-  pool = new TraceEntry[CpvAccess(_traceCoreBufferSize)];
+//  CmiPrintf("Size of the pool %d \n",CpvAccess(_traceCoreBufferSize));
+  pool = new TraceEntry[5*CpvAccess(_traceCoreBufferSize)];
+ // pool = new TraceEntry[500];
   poolSize = CpvAccess(_traceCoreBufferSize);
+  
 
-  pgm = new char[strlen(program)];
+  pgm = new char[strlen(program)+1];
   sprintf(pgm, "%s", program);
-  openLogFiles();
-  closeLogFiles();
+  numEntries = 0;
+
+  //CmiPrintf("In TraceLogger Constructor %s %d",pgm,strlen(program)+1);
+  //initlogfiles();
+
 }
 
-TraceLogger::~TraceLogger() 
+ void TraceLogger::initlogfiles(){
+	openLogFiles();
+  	closeLogFiles();
+}
+
+
+TraceLogger::~TraceLogger()
 {
   if(binary)
   { lastWriteFlag = 1; writeBinary(); }
@@ -146,13 +297,19 @@ void TraceLogger::RegisterLanguage(int lID, char* ln)
 {
 	numLangs++;
 
-	lName[lID] = new char[strlen(ln)];
+	lName[lID] = new char[strlen(ln)+1];
 	sprintf(lName[lID], "%s", ln);
 
-	char pestr[10]; sprintf(pestr, "%d", CmiMyPe());
-	fName[lID] = new char[strlen(pgm)+1+strlen(pestr)+1+strlen(ln)+strlen(".log")];
+	char pestr[10]; sprintf(pestr, "%d\0", CmiMyPe());
+	fName[lID] = new char[strlen(pgm)+1+strlen(pestr)+1+strlen(ln)+strlen(".log")+10];
 	sprintf(fName[lID], "%s.%s.%s.log", pgm, pestr, ln);
 
+	// my debug code - schak
+	//CmiPrintf("%s at %d in %d \n",fName[lID],lID,fName[lID]);
+	if(CpvAccess(_traceCoreOn) == 0){
+		CmiPrintf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1_traceCoreOn = 0 in RegisterLanguage \n");
+                return;
+	}
 	FILE* fp = NULL;
 	do
   	{
@@ -164,21 +321,36 @@ void TraceLogger::RegisterLanguage(int lID, char* ln)
   	if(!binary) {
     	fprintf(fp, "PROJECTOR-RECORD: %s.%s\n", pestr, lName[lID]);
   	}
-  	fclose(fp);
+  	//fclose(fp);
+	fptrs[lID] = fp;
+}
+
+void TraceLogger::verifyFptrs(){
+	
+  for(int i=1; i<numLangs; i++){
+		if(!fptrs[i]){
+			CmiPrintf("Null File Pointer Found after Open\n");
+		}
+  }
 }
 
 void TraceLogger::write(void)
 {
- 	openLogFiles();
-
+	if(CpvAccess(_traceCoreOn) == 0){
+		return;
+	}
+ 	//openLogFiles();
+	verifyFptrs();
 	int currLID=0, nextLID=0;
 	int pLID=0, nLID=0;
 	int currSeek=0, nextSeek=0;
 	int i;
-  	for(i=0; i<numEntries-1; i++) {
+  	for(i=0; i<CpvAccess(staticNumEntries)-1; i++) {
 		currLID  = pool[i].languageID;
 		FILE* fp = fptrs[currLID];
-		currSeek = ftell(fp); 
+		if(fp ==  NULL)
+			return;
+		currSeek = ftell(fp);
 		nextLID  = pool[i+1].languageID;
 		nextSeek = ftell(fptrs[nextLID]);
 
@@ -186,20 +358,24 @@ void TraceLogger::write(void)
 		nLID = ((nextLID==currLID)?0:nextLID);
 		pool[i].write(fp, pLID, prevSeek, nLID, nextSeek);
 
-		prevSeek = currSeek; prevLID = currLID; 
+		prevSeek = currSeek; prevLID = currLID;
+		flushLogFiles();
   	}
 	if(lastWriteFlag==1) {
 		currLID  = pool[i].languageID;
 		FILE* fp = fptrs[currLID];
-		currSeek = ftell(fp); 
+		if(fp == NULL)
+			return;
+		currSeek = ftell(fp);
 		nextLID  = nextSeek = 0;
 
 		pLID = ((prevLID==currLID)?0:prevLID);
 		nLID = ((nextLID==currLID)?0:nextLID);
 		pool[i].write(fp, pLID, prevSeek, nLID, nextSeek);
+		closeLogFiles();
 	}
 
-  	closeLogFiles();
+  	
 }
 
 //TODO
@@ -209,16 +385,23 @@ void TraceLogger::writeSts(void) {};
 
 void TraceLogger::add(int lID, int eID, double timestamp, int iLen, int* iData, int sLen, char* sData)
 {
-  new (&pool[numEntries++]) TraceEntry(lID, eID, timestamp, iLen, iData, sLen, sData); 
-  if(poolSize==numEntries) {
+  
+  new (&pool[CpvAccess(staticNumEntries)]) TraceEntry(lID, eID, timestamp, iLen, iData, sLen, sData);
+  CpvAccess(staticNumEntries) = CpvAccess(staticNumEntries)+1;
+if(CpvAccess(staticNumEntries)>= poolSize) {
+  //  if(numEntries>= poolSize) {
     double writeTime = TraceCoreTimer();
 
-    if(binary) writeBinary(); 
+    if(binary) writeBinary();
 	else 	   write();
 
 	// move the last entry of pool to first position
-    new (&pool[0]) TraceEntry(pool[numEntries-1]); 
-    numEntries = 1;
+ /*   for(int i=0;i<numEntries;i++){
+	    delete pool[i];
+    }*/
+    new (&pool[0]) TraceEntry(pool[CpvAccess(staticNumEntries-1)]);
+    //numEntries = 1;
+    CpvAccess(staticNumEntries)=1;
 	//TODO
     //new (&pool[numEntries++]) TraceEntry(0, BEGIN_INTERRUPT, writeTime);
     //new (&pool[numEntries++]) TraceEntry(0, END_INTERRUPT, TraceCoreTimer());
@@ -227,22 +410,58 @@ void TraceLogger::add(int lID, int eID, double timestamp, int iLen, int* iData, 
 
 void TraceLogger::openLogFiles()
 {
+  CmiPrintf("[%d]Entering openLogFile \n",CmiMyPe());
   for(int i=1; i<numLangs; i++) {
+
 	FILE* fp = NULL;
 	do
   	{
-    	fp = fopen(fName[i], "a");
+
+    			fp = fopen(fName[i], "a");
+
   	} while (!fp && (errno == EINTR || errno == EMFILE));
   	if(!fp) {
-    	CmiAbort("Cannot open Projector Trace File for writing ... \n");
+	//	CmiPrintf("FILE NAME %s at %d \n",fName[i],i);
+	    	CmiAbort("Cannot open Projector Trace File for writing ... \n");
   	}
+	CmiPrintf("[%d]Iteration %d : fp %d \n",CmiMyPe(),i,fp);
 	fptrs[i] = fp;
+
+	if(i == 1)
+		assert(fptrs[1]);
+	else if(i == 2)
+	{
+		assert(fptrs[1]);
+	        assert(fptrs[2]);
+	}
+	else if(i>= 3)
+	{
+		assert(fptrs[1]);
+	        assert(fptrs[2]);
+	        assert(fptrs[3]);
+	}
   }
+  CmiAssert(fptrs[1]);
+    CmiAssert(fptrs[2]);
+      CmiAssert(fptrs[3]);
+  CmiPrintf("[%d]In Open log files ........\n",CmiMyPe());
+  verifyFptrs();
+  CmiPrintf("[%d].....................\n",CmiMyPe());
 }
 
 void TraceLogger::closeLogFiles()
 {
-  for(int i=1; i<numLangs; i++)
-	fclose(fptrs[i]);
+  for(int i=1; i<numLangs; i++){
+		if(fptrs[i])
+			fclose(fptrs[i]);
+		fptrs[i]=NULL;
+		
+  }
+}
+
+void TraceLogger::flushLogFiles(){
+	for(int i=1;i<numLangs;i++){
+		fflush(fptrs[i]);
+	}
 }
 

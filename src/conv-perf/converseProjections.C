@@ -6,7 +6,7 @@
 #include "traceCoreCommon.h"
 #include "converseProjections.h"
 
-extern "C" void msgSent(int destPE, int size)
+extern "C" void converse_msgSent(int destPE, int size)
 {
 	int* iData = (int*)malloc(sizeof(int)*2); 
 	iData[0] = destPE;
@@ -15,13 +15,13 @@ extern "C" void msgSent(int destPE, int size)
 }
 
 //TODO
-extern "C" void msgQueued();
+extern "C" void converse_msgQueued();
 //TODO
-extern "C" void msgRecvMC();
+extern "C" void converse_msgRecvMC();
 //TODO
-extern "C" void msgRecvSC();
+extern "C" void converse_msgRecvSC();
 
-extern "C" void handlerBegin(int handlerIdx)
+extern "C" void converse_handlerBegin(int handlerIdx)
 {	
 	int* iData = (int*)malloc(sizeof(int)*2); 
 	iData[0] = handlerIdx;
@@ -29,7 +29,7 @@ extern "C" void handlerBegin(int handlerIdx)
 	LogEvent1(_CONVERSE_LANG_ID, _E_HANDLER_BEGIN, 2, iData); 
 }
 
-extern "C" void handlerEnd(int handlerIdx)
+extern "C" void converse_handlerEnd(int handlerIdx)
 {	
 	int* iData = (int*)malloc(sizeof(int)*2); 
 	iData[0] = handlerIdx;
@@ -37,16 +37,3 @@ extern "C" void handlerEnd(int handlerIdx)
 	LogEvent1(_CONVERSE_LANG_ID, _E_HANDLER_END, 2, iData); 
 }
 
-extern "C" void procIdle()
-{	
-	int* iData = (int*)malloc(sizeof(int)); 
-	iData[0] = CmiMyPe();
-	LogEvent1(_CONVERSE_LANG_ID, _E_PROC_IDLE, 1, iData); 
-}
-
-extern "C" void procBusy()
-{	
-	int* iData = (int*)malloc(sizeof(int)); 
-	iData[0] = CmiMyPe();
-	LogEvent1(_CONVERSE_LANG_ID, _E_PROC_BUSY, 1, iData); 
-}

@@ -1,7 +1,9 @@
 
 #include "traceCore.h"
 #include "traceCoreCommon.h"
+#include "charmProjections.h"
 #include "converse.h"
+
 
 /* Trace Module Constants (Default Values) */
 #define TRACE_CORE_BUFFER_SIZE 10
@@ -26,8 +28,8 @@ inline double TraceCoreTimer() { return TRACE_CORE_TIMER() - CpvAccess(_traceCor
 //TODO - trace-common.C
 extern "C" void initTraceCore(char** argv)
 {
-  CpvInitialize(int, _traceCoreOn);
-  	CpvAccess(_traceCoreOn) = 0;
+  /*CpvInitialize(int, _traceCoreOn);
+  	CpvAccess(_traceCoreOn) = 0;*/
 
   CpvInitialize(char*, _traceCoreRoot);
   	CpvAccess(_traceCoreRoot) = (char *) malloc(strlen(argv[0])+1);
@@ -42,6 +44,7 @@ extern "C" void initTraceCore(char** argv)
 
   CpvInitialize(TraceCore*, _traceCore);
   	CpvAccess(_traceCore) = new TraceCore(argv);
+  initCharmProjections();
 }
 
 /* End Core Trace Module */
