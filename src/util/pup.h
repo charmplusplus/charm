@@ -68,9 +68,7 @@ class bar {
 // constructor from all other constructors-- the type
 // itself has no meaningful fields.
 typedef struct {int is_only_a_name;} CkMigrateMessage;
-#include "pup_paged.h"
-CpvExtern(pup_pagetable *,_pagetable);
-CpvExtern(int,_openPagetableFile);
+void _pupModuleInit(); //declared in pup_paged.h and defined in pup_paged.C
 
 class PUP {//<- Should be "namespace", once all compilers support them
  public:
@@ -353,65 +351,6 @@ class fromDisk : public disk {
   fromDisk(FILE *f):disk(IS_UNPACKING,f) {}
 };
 
-/***** PUP::er -- Binary Paged disk pack/unpack *****/
-
-static void _pupModuleInit();
-class pagedDisk : public er {
-	protected:
-	void  *handle; // handle of the object to be restored
-	pagedDisk(unsigned int type,void *objhandle):er(type),handle(objhandle){
-		if(CpvAccess(_openPagetableFile) == 0){
-			CpvAccess(_pagetable)->fp = fopen(CpvAccess(_pagetable)->fName,"wb");
-			fclose(CpvAccess(_pagetable)->fp);
-			CpvAccess(_pagetable)->fp = fopen(CpvAccess(_pagetable)->fName,"r+b");
-			CpvAccess(_openPagetableFile) = 1;
-		}
-	};
-
-};
-
-class toPagedDisk : public pagedDisk{
-  protected:
-  virtual void bytes(void *p,int n,size_t itemSize,dataType t);
-	pup_pageentry *entry;
-	long current_block;
-	long bytes_left;
-	FILE *fp;
-	pup_list *tailblklist;
-	public:
-	toPagedDisk(void *objhandle):pagedDisk(IS_PACKING,objhandle){
-		addpageentry();
-		nextblock();
-		fp = CpvAccess(_pagetable)->fp;
-	}
-	
-	void addpageentry();
-	void nextblock();
-
-	
-};
-
-class fromPagedDisk : public pagedDisk{
-	protected:
-	virtual void bytes(void *p,int n,size_t itemSize,dataType );
-	pup_pageentry *entry;
-	long current_block;
-	long bytes_unread;
-	FILE *fp;
-	public:
-	fromPagedDisk(void *objhandle):pagedDisk(IS_UNPACKING,objhandle){
-		findpageentry();
-		current_block = -1;
-		nextblock();
-		fp = CpvAccess(_pagetable)->fp;
-	}
-	
-	~fromPagedDisk(){
-		nextblock();
-	}
-	void findpageentry();
-	void nextblock();
-};
 
 
 /************** PUP::er -- Text *****************/
