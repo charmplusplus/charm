@@ -12,4 +12,4 @@ test: check
 	./charmrun +p1 check
 
 clean:
-	rm -f conv-host *.o check.* *.bak *.log check.sts *~ charmrun
+	rm -f conv-host *.o *.bak *.log check.sts *~ charmrun
