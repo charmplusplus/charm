@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.3  1996-07-15 20:59:22  jyelon
+ * Revision 1.4  1996-07-16 21:08:30  gursoy
+ * added empty CmiDeliverSpecificMsg
+ *
+ * Revision 1.3  1996/07/15  20:59:22  jyelon
  * Moved much timer, signal, etc code into common.
  *
  * Revision 1.2  1996/06/28 20:30:51  gursoy
@@ -172,6 +175,24 @@ int maxmsgs;
 
     return remainingMsgCount;
 }
+
+
+
+
+/*
+ * CmiDeliverSpecificMsg(lang)
+ *
+ * - waits till a message with the specified handler is received,
+ *   then delivers it.
+ *
+ */
+
+void CmiDeliverSpecificMsg(handler)
+int handler;
+{
+  /* not implemented yet */
+}
+
 
 
 
