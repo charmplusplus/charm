@@ -75,8 +75,8 @@
 #define	ARROW	329
 #define	ICR	330
 #define	DECR	331
-#define	LS	332
-#define	RS	333
+#define	LSHIFT	332
+#define	RSHIFT	333
 #define	LE	334
 #define	GE	335
 #define	EQ	336

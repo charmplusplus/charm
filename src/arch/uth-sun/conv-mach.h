@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.15  1996-07-24 22:51:34  jyelon
+ * Revision 1.16  1996-08-05 15:28:49  jyelon
+ * *** empty log message ***
+ *
+ * Revision 1.15  1996/07/24  22:51:34  jyelon
  * Changed to 'times' not 'getrusage'
  *
  * Revision 1.14  1996/07/16  17:23:37  jyelon
@@ -90,7 +93,7 @@
 #define CMK_SIGNAL_USE_SIGACTION                           0
 #define CMK_SIGNAL_USE_SIGACTION_WITH_RESTART              0
 
-#define CMK_SIZE_T                                         long
+#define CMK_SIZE_T                                         long unsigned int
 
 #define CMK_STATIC_PROTO_FAILS                             0
 #define CMK_STATIC_PROTO_WORKS                             1

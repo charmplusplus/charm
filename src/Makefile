@@ -497,7 +497,7 @@ conv-cpm.o: conv-cpm.c
 #
 ###############################################################################
 
-XIHEADERS=xi-symbol.h xi-parse.tab.c
+XIHEADERS=xi-symbol.h xi-parse.tab.C
 CHARMXI=xi-main.o xi-symbol.o xi-generate.o xi-parse.tab.o xi-scan.o
 
 charmxi: $(CHARMXI)
@@ -512,8 +512,7 @@ xi-symbol.o: xi-symbol.C $(XIHEADERS)
 xi-generate.o: xi-generate.C $(XIHEADERS)
 	$(CHARMC) -seq xi-generate.C
 
-xi-parse.tab.o: xi-parse.tab.c $(XIHEADERS)
-	cp xi-parse.tab.c xi-parse.tab.C
+xi-parse.tab.o: xi-parse.tab.C $(XIHEADERS)
 	$(CHARMC) -seq xi-parse.tab.C
 
 xi-scan.o: xi-scan.C $(XIHEADERS)

@@ -12,7 +12,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 2.17  1996-08-04 04:19:50  jyelon
+# Revision 2.18  1996-08-05 15:28:49  jyelon
+# *** empty log message ***
+#
+# Revision 2.17  1996/08/04 04:19:50  jyelon
 # Added CMK_LDRO_WORKS
 #
 # Revision 2.16  1996/08/01 21:11:12  jyelon
@@ -62,7 +65,7 @@
 set CMK_CPP_CHARM='/lib/cpp -P'
 set CMK_CPP_C='gcc -E'
 set CMK_LDRO='ld -r -o'
-set CMK_LDRO_WORKS=1
+set CMK_LDRO_WORKS=0
 set CMK_CC='gcc '
 set CMK_CC_RELIABLE='gcc '
 set CMK_CC_FASTEST='gcc '
@@ -89,4 +92,4 @@ set CMK_SEQ_LDXX='g++'
 set CMK_NM='nm'
 set CMK_NM_FILTER="grep '|extern|' | sed -e 's@ *|.*@@'"
 set CMK_CPP_SUFFIX="ii"
-set CMK_XLATPP='charmxlat++ '
+set CMK_XLATPP='charmxlat++ -w'
