@@ -15,10 +15,15 @@
 /* change this define to "x" to trace all send/recv's */
 #define MSG_ORDER_DEBUG(x) /* empty */
 #define STARTUP_DEBUG(x) /* ckout<<"[pe "<<CkMyPe()<<"] "<< x <<endl; */
+
 #if 0
 #define AMPI_DEBUG CkPrintf
 #else
 #define AMPI_DEBUG /* empty */
+#endif
+
+#ifndef AMPI_COMLIB
+#  define AMPI_COMLIB 0
 #endif
 
 //------------- startup -------------
@@ -307,7 +312,6 @@ static void ampiNodeInit(void)
 {
   CtvInitialize(ampiParent*, ampiPtr);
   CtvInitialize(int,ampiInitDone);
-  CtvAccess(ampiInitDone)=0;
   mpi_nworlds=0;
   for(int i=0;i<MPI_MAX_COMM_WORLDS; i++)
   {
@@ -334,7 +338,7 @@ public:
 	MPI_threadstart_t(MPI_MainFn fn_)
 		:fn(fn_) {}
 	void start(void) {
-		char **argv=CkGetArgv();
+		char **argv=CmiCopyArgs(CkGetArgv());
 		int argc=CkGetArgc();
 		(fn)(argc,argv);
 	}
@@ -407,7 +411,11 @@ static ampi *ampiInit(char **argv)
 	int new_idx=mpi_nworlds;
 	MPI_Comm new_world=MPI_COMM_WORLD+1+new_idx;
 
-        ComlibInstanceHandle cinst = CkGetComlibInstance();
+        ComlibInstanceHandle cinst;
+
+#if AMPI_COMLIB	
+	cinst=CkGetComlibInstance()
+#endif
         
         //Create and attach the ampiParent array
 	CkArrayID threads; int _nchunks;
@@ -415,14 +423,16 @@ static ampi *ampiInit(char **argv)
 	CProxy_ampiParent parent;
 	parent=CProxy_ampiParent::ckNew(new_world,threads,cinst, opts);
 
-	EachToManyMulticastStrategy *strategy = new 
-            EachToManyMulticastStrategy(strat, parent.ckGetArrayID(),  
-                                        parent.ckGetArrayID());
+#if AMPI_COMLIB
+        //CProxy_ComlibManager comlib = CProxy_ComlibManager::ckNew(strat, 1);
+	//comlib.ckLocalBranch()->createId();
+	EachToManyMulticastStrategy *strategy = new EachToManyMulticastStrategy(strat, parent.ckGetArrayID(), parent.ckGetArrayID());
         cinst.setStrategy(strategy);
-        
+
         //strategy->setSourceArray(parent.ckGetArrayID());
         //strategy->setDestArray(parent.ckGetArrayID());
-
+#endif
+        
 	//Make a new ampi array
 	CkArrayID empty;
 	CkPupBasicVec<int> _indices;
@@ -560,20 +570,26 @@ void ampiParent::ResumeThread(void){
 }
 
 //----------------------- ampi -------------------------
-ampi::ampi()
-{
+void ampi::init(void) {
   parent=NULL;
   thread=NULL;
-  msgs=NULL;
+  parent=NULL;
+  thread=NULL;
   waitingForGeneric=0;
+  comlibEnabled=AMPI_COMLIB;
+}
+
+ampi::ampi()
+{
+  init();
+  msgs=NULL;
   seqEntries=-1;
 }
 
 ampi::ampi(CkArrayID parent_,const ampiCommStruct &s)
    :parentProxy(parent_)
 {
-  parent=NULL;
-  thread=NULL;
+  init();
 
   myComm=s; myComm.setArrayID(thisArrayID);
   myRank=myComm.getRankForIndex(thisIndex);
@@ -582,7 +598,6 @@ ampi::ampi(CkArrayID parent_,const ampiCommStruct &s)
 
   msgs = CmmNew();
   nbcasts = 0;
-  waitingForGeneric=0;
 
   seqEntries=parent->numElements;
   oorder = new AmpiSeqQ[seqEntries];
@@ -595,10 +610,7 @@ ampi::ampi(CkArrayID parent_,const ampiCommStruct &s)
 
 ampi::ampi(CkMigrateMessage *msg):CBase_ampi(msg)
 {
-  parent=NULL;
-  thread=NULL;
   msgs=NULL;
-  waitingForGeneric=0;
   seqEntries=-1;
 }
 
@@ -732,10 +744,7 @@ void ampi::splitPhase1(CkReductionMsg *msg)
 //...newly created array elements register with the parent, which calls:
 void ampiParent::splitChildRegister(const ampiCommStruct &s) {
 	int idx=s.getComm()-MPI_COMM_FIRST_SPLIT;
-	if (splitComm.size()<=idx) {
-		splitComm.setSize(idx+1);
-		splitComm.length()=idx+1;
-	}
+	if (splitComm.size()<=idx) splitComm.resize(idx+1);
 	splitComm[idx]=new ampiCommStruct(s);
 	thread->resume(); //Matches suspend at end of ampi::split
 }
@@ -792,10 +801,7 @@ void ampi::commCreatePhase1(CkReductionMsg *msg){
 
 void ampiParent::groupChildRegister(const ampiCommStruct &s) {
   int idx=s.getComm()-MPI_COMM_FIRST_GROUP;
-  if (groupComm.size()<=idx) {
-    groupComm.setSize(idx+1);
-    groupComm.length()=idx+1;
-  }
+  if (groupComm.size()<=idx) groupComm.resize(idx+1);
   groupComm[idx]=new ampiCommStruct(s);
   thread->resume(); //Matches suspend at end of ampi::split
 }
@@ -869,12 +875,7 @@ void
 ampi::send(int t, int sRank, const void* buf, int count, int type,  int rank, MPI_Comm destcomm)
 {
   const ampiCommStruct &dest=comm2proxy(destcomm);
-  int destIdx = dest.getIndexForRank(rank);
-MSG_ORDER_DEBUG(
-  CkPrintf("AMPI Rank %d send: tag=%d, src=%d, comm=%d (to %d)\n",
-  	getRank(),t,sRank,destcomm,destIdx);
-)
-  dest.getProxy()[destIdx].generic(makeAmpiMsg(destIdx, t,sRank,buf,count,type,destcomm));
+  delesend(t,sRank,buf,count,type,rank,destcomm,dest.getProxy());
 }
 
 void
@@ -891,7 +892,17 @@ ampi::delesend(int t, int sRank, const void* buf, int count, int type,  int rank
 {
   const ampiCommStruct &dest=comm2proxy(destcomm);
   int destIdx = dest.getIndexForRank(rank);
+MSG_ORDER_DEBUG(
+  CkPrintf("AMPI Rank %d send: tag=%d, src=%d, comm=%d (to %d)\n",
+  	getRank(),t,sRank,destcomm,destIdx);
+)
   arrproxy[destIdx].generic(makeAmpiMsg(destIdx,t,sRank,buf,count,type,destcomm));
+  
+#ifndef CMK_OPTIMIZE
+  int size=0;
+  MPI_Type_size(type,&size);
+  _LOG_E_AMPI_MSG_SEND(t,destIdx,count,size)
+#endif
 }
 
 void
@@ -1087,11 +1098,6 @@ static int common_send(void *msg, int count, MPI_Datatype type, int dest,
   	srcRank=0;
   }
   ptr->send(tag, srcRank, msg, count, type, dest, comm);
-#ifndef CMK_OPTIMIZE
-  int size=0;
-  MPI_Type_size(type,&size);
-  _LOG_E_AMPI_MSG_SEND(tag,dest,count,size)
-#endif
   return 0;
 }
 
@@ -1333,9 +1339,13 @@ static CkReductionMsg *makeRednMsg(CkDDT_DataType *ddt,const void *inbuf,int cou
   ddt->serialize((char*)inbuf, (char*)msg->getData(), count, 1);
   return msg;
 }
-static int copyRednData(CkDDT_DataType *ddt,const void *inbuf,void *outbuf,int count) {
+
+// Copy the MPI datatype "type" from inbuf to outbuf
+static int copyDatatype(MPI_Comm comm,MPI_Datatype type,int count,const void *inbuf,void *outbuf) {
   // ddts don't have "copy", so fake it by serializing into a temp buffer, then 
   //  deserializing into the output.
+  ampi *ptr = getAmpiInstance(comm);
+  CkDDT_DataType *ddt=ptr->getDDT()->getType(type);
   int len=ddt->getSize(count);
   char *serialized=new char[len];
   ddt->serialize((char*)inbuf,(char*)serialized,count,1);
@@ -1350,11 +1360,8 @@ int MPI_Reduce(void *inbuf, void *outbuf, int count, int type, MPI_Op op,
                int root, MPI_Comm comm)
 {
   AMPIAPI("MPI_Reduce");
+  if(comm==MPI_COMM_SELF) return copyDatatype(comm,type,count,inbuf,outbuf);
   ampi *ptr = getAmpiInstance(comm);
-  if(comm==MPI_COMM_SELF) {
-    // Just do a local copy: no need to do a reduction:
-    return copyRednData(ptr->getDDT()->getType(type),inbuf,outbuf,count);
-  }
   CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type),inbuf,count,type,op);
   int rootIdx=ptr->comm2proxy(comm).getIndexForRank(root);
   CkCallback reduceCB(CkIndex_ampi::reduceResult(0),CkArrayIndex1D(rootIdx),ptr->getProxy(),true);
@@ -1375,11 +1382,8 @@ int MPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
                   MPI_Op op, MPI_Comm comm)
 {
   AMPIAPI("MPI_Allreduce");
+  if(comm==MPI_COMM_SELF) return copyDatatype(comm,type,count,inbuf,outbuf);
   ampi *ptr = getAmpiInstance(comm);
-  if(comm==MPI_COMM_SELF) {
-    // Just do a local copy: no need to do a reduction:
-    return copyRednData(ptr->getDDT()->getType(type),inbuf,outbuf,count);
-  }
   CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type),inbuf,count,type,op);
   CkCallback allreduceCB(CkIndex_ampi::reduceResult(0),ptr->getProxy());
   msg->setCallback(allreduceCB);
@@ -1400,7 +1404,7 @@ int MPI_Iallreduce(void *inbuf, void *outbuf, int count, int type,
   ampi *ptr = getAmpiInstance(comm);
   if(comm==MPI_COMM_SELF) {
     // Just do a local copy: no need to do a reduction:
-    return copyRednData(ptr->getDDT()->getType(type),inbuf,outbuf,count);
+    return copyDatatype(comm,type,count,inbuf,outbuf);
   }
   CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type),inbuf,count,type,op);
   CkCallback allreduceCB(CkIndex_ampi::reduceResult(0),ptr->getProxy());
@@ -1419,11 +1423,8 @@ int MPI_Reduce_scatter(void* sendbuf, void* recvbuf, int *recvcounts,
                        MPI_Datatype datatype, MPI_Op op, MPI_Comm comm)
 {
   AMPIAPI("MPI_Reduce_scatter");
+  if(comm==MPI_COMM_SELF) return copyDatatype(comm,datatype,recvcounts[0],sendbuf,recvbuf);
   ampi *ptr = getAmpiInstance(comm);
-  if(comm==MPI_COMM_SELF) {
-    // Just do a local copy: no need to do a reduction:
-    return copyRednData(ptr->getDDT()->getType(datatype),sendbuf,recvbuf,recvcounts[0]);
-  }
   int size = ptr->getSize();
   int count=0;
   int *displs = new int [size];
@@ -1797,7 +1798,7 @@ int MPI_Ireduce(void *sendbuf, void *recvbuf, int count, int type, MPI_Op op,
                  int root, MPI_Comm comm, MPI_Request *request)
 {
   AMPIAPI("MPI_Ireduce");
-  if(comm==MPI_COMM_SELF) return 0;
+  if(comm==MPI_COMM_SELF) return copyDatatype(comm,type,count,sendbuf,recvbuf);
   ampi *ptr = getAmpiInstance(comm);
   CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type),sendbuf,count,type,op);
   int rootIdx=ptr->comm2proxy(comm).getIndexForRank(root);
@@ -1820,26 +1821,18 @@ int MPI_Allgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                   MPI_Comm comm)
 {
   AMPIAPI("MPI_Allgather");
-  if(comm==MPI_COMM_SELF) return 0;
+  if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize();
   int i;
 
   // commlib support
-  CProxy_ampi arrproxy = ptr->getProxy();
-  ComlibDelegateProxy(&arrproxy);
-
-  ptr->getComlib().beginIteration();
+  CProxy_ampi arrproxy = ptr->comlibBegin();
   for(i=0;i<size;i++) {
     ptr->delesend(MPI_GATHER_TAG, ptr->getRank(), sendbuf, sendcount,
                   sendtype, i, comm, arrproxy);
-#ifndef CMK_OPTIMIZE
-    int size=0;
-    MPI_Type_size(sendtype,&size);
-    _LOG_E_AMPI_MSG_SEND(MPI_GATHER_TAG,i,sendcount,size)
-#endif
   }
-  ptr->getComlib().endIteration();
+  ptr->comlibEnd();
 
   MPI_Status status;
   CkDDT_DataType* dttype = ptr->getDDT()->getType(recvtype) ;
@@ -1858,26 +1851,18 @@ int MPI_Iallgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                     MPI_Comm comm, MPI_Request* request)
 {
   AMPIAPI("MPI_Iallgather");
-  if(comm==MPI_COMM_SELF) return 0;
+  if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize();
   int i;
 
   // commlib support
-  CProxy_ampi arrproxy = ptr->getProxy();
-  ComlibDelegateProxy(&arrproxy);
-
-  ptr->getComlib().beginIteration();
+  CProxy_ampi arrproxy = ptr->comlibBegin();
   for(i=0;i<size;i++) {
     ptr->delesend(MPI_GATHER_TAG, ptr->getRank(), sendbuf, sendcount,
                   sendtype, i, comm, arrproxy);
-#ifndef CMK_OPTIMIZE
-    int size=0;
-    MPI_Type_size(sendtype,&size);
-    _LOG_E_AMPI_MSG_SEND(MPI_GATHER_TAG,i,sendcount,size)
-#endif
   }
-  ptr->getComlib().endIteration();
+  ptr->comlibEnd();
 
   CkDDT_DataType* dttype = ptr->getDDT()->getType(recvtype) ;
   int itemsize = dttype->getSize(recvcount) ;
@@ -1901,26 +1886,18 @@ int MPI_Allgatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                    MPI_Datatype recvtype, MPI_Comm comm)
 {
   AMPIAPI("MPI_Allgatherv");
-  if(comm==MPI_COMM_SELF) return 0;
+  if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize();
   int i;
 
   // commlib support
-  CProxy_ampi arrproxy = ptr->getProxy();
-  ComlibDelegateProxy(&arrproxy);
-
-  ptr->getComlib().beginIteration();
+  CProxy_ampi arrproxy = ptr->comlibBegin();
   for(i=0;i<size;i++) {
     ptr->delesend(MPI_GATHER_TAG, ptr->getRank(), sendbuf, sendcount,
                   sendtype, i, comm, arrproxy);
-#ifndef CMK_OPTIMIZE
-    int size=0;
-    MPI_Type_size(sendtype,&size);
-    _LOG_E_AMPI_MSG_SEND(MPI_GATHER_TAG,i,sendcount,size)
-#endif
   }
-  ptr->getComlib().endIteration();
+  ptr->comlibEnd();
 
   MPI_Status status;
   CkDDT_DataType* dttype = ptr->getDDT()->getType(recvtype) ;
@@ -1939,7 +1916,7 @@ int MPI_Gather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                int root, MPI_Comm comm)
 {
   AMPIAPI("MPI_Gather");
-  if(comm==MPI_COMM_SELF) return 0;
+  if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize();
   int i;
@@ -1964,7 +1941,7 @@ int MPI_Gatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                 MPI_Datatype recvtype, int root, MPI_Comm comm)
 {
   AMPIAPI("MPI_Gatherv");
-  if(comm==MPI_COMM_SELF) return 0;
+  if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize();
   int i;
@@ -1990,7 +1967,7 @@ int MPI_Scatter(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                 int root, MPI_Comm comm)
 {
   AMPIAPI("MPI_Scatter");
-  if(comm==MPI_COMM_SELF) return 0;
+  if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize();
   int i;
@@ -2015,7 +1992,7 @@ int MPI_Scatterv(void *sendbuf, int *sendcounts, int *displs, MPI_Datatype sendt
                  int root, MPI_Comm comm)
 {
   AMPIAPI("MPI_Scatterv");
-  if(comm==MPI_COMM_SELF) return 0;
+  if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcounts[0],sendbuf,recvbuf);
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize();
   int i;
@@ -2040,7 +2017,7 @@ int MPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                  MPI_Comm comm)
 {
   AMPIAPI("MPI_Alltoall");
-  if(comm==MPI_COMM_SELF) return 0;
+  if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize();
   CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
@@ -2048,20 +2025,12 @@ int MPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   int i;
 
   // commlib support
-  CProxy_ampi arrproxy = ptr->getProxy();
-  ComlibDelegateProxy(&arrproxy);
-
-  ptr->getComlib().beginIteration();
+  CProxy_ampi arrproxy = ptr->comlibBegin();
   for(i=0;i<size;i++) {
     ptr->delesend(MPI_GATHER_TAG, ptr->getRank(), ((char*)sendbuf)+(itemsize*i), sendcount,
                   sendtype, i, comm, arrproxy);
-#ifndef CMK_OPTIMIZE
-    int size=0;
-    MPI_Type_size(sendtype,&size);
-    _LOG_E_AMPI_MSG_SEND(MPI_GATHER_TAG,i,sendcount,size)
-#endif
   }
-  ptr->getComlib().endIteration();
+  ptr->comlibEnd();
 
   MPI_Status status;
   dttype = ptr->getDDT()->getType(recvtype) ;
@@ -2080,7 +2049,7 @@ int MPI_Ialltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                  MPI_Comm comm, MPI_Request *request)
 {
   AMPIAPI("MPI_Ialltoall");
-  if(comm==MPI_COMM_SELF) return 0;
+  if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize();
   CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
@@ -2088,20 +2057,12 @@ int MPI_Ialltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   int i;
 
   // commlib support
-  CProxy_ampi arrproxy = ptr->getProxy();
-  ComlibDelegateProxy(&arrproxy);
-
-  ptr->getComlib().beginIteration();
+  CProxy_ampi arrproxy = ptr->comlibBegin();
   for(i=0;i<size;i++) {
     ptr->delesend(MPI_GATHER_TAG, ptr->getRank(), ((char*)sendbuf)+(itemsize*i), sendcount,
                   sendtype, i, comm, arrproxy);
-#ifndef CMK_OPTIMIZE
-    int size=0;
-    MPI_Type_size(sendtype,&size);
-    _LOG_E_AMPI_MSG_SEND(MPI_GATHER_TAG,i,sendcount,size)
-#endif
   }
-  ptr->getComlib().endIteration();
+  ptr->comlibEnd();
 
   // copy+paste from MPI_Irecv
   AmpiRequestList* reqs = getReqs();
@@ -2129,20 +2090,12 @@ int MPI_Alltoallv(void *sendbuf, int *sendcounts, int *sdispls,
   int i;
 
   // commlib support
-  CProxy_ampi arrproxy = ptr->getProxy();
-  ComlibDelegateProxy(&arrproxy);
-
-  ptr->getComlib().beginIteration();
+  CProxy_ampi arrproxy = ptr->comlibBegin();
   for(i=0;i<size;i++) {
     ptr->delesend(MPI_GATHER_TAG,ptr->getRank(),((char*)sendbuf)+(itemsize*sdispls[i]),sendcounts[i],
                   sendtype, i, comm, arrproxy);
-#ifndef CMK_OPTIMIZE
-    int size=0;
-    MPI_Type_size(sendtype,&size);
-    _LOG_E_AMPI_MSG_SEND(MPI_GATHER_TAG,i,sendcounts[i],size)
-#endif
   }
-  ptr->getComlib().endIteration();
+  ptr->comlibEnd();
 
   MPI_Status status;
   dttype = ptr->getDDT()->getType(recvtype) ;

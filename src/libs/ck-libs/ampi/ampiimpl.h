@@ -424,34 +424,16 @@ class AmpiRequestList : private CkSTLHelper<AmpiRequest *> {
     void pup(PUP::er &p) { /* empty */ }
 };
 
-//A simple destructive-copy memory buffer
+//A simple memory buffer
 class memBuf {
-	int bufSize;
-	char *buf;
-	void make(int size=0) {
-		clear();
-		bufSize=size;
-		if (bufSize>0) buf=new char[bufSize];
-		else buf=NULL;
-	}
-	void steal(memBuf &b) {
-		bufSize=b.bufSize;
-		buf=b.buf;
-		b.bufSize=-1;
-		b.buf=NULL;
-	}
-	void clear(void) { if (buf!=NULL) {delete[] buf; buf=NULL;} }
-	//No copy semantics:
-	memBuf(memBuf &b);
-	memBuf &operator=(memBuf &b);
+	CkVec<char> buf;
 public:
-	memBuf() {buf=NULL; bufSize=0;}
-	memBuf(int size) {buf=NULL; make(size);}
-	~memBuf() {clear();}
-	void setSize(int s) {make(s);}
-	int getSize(void) const {return bufSize;}
-	const void *getData(void) const {return (const void *)buf;}
-	void *getData(void) {return (void *)buf;}
+	memBuf() { }
+	memBuf(int size) :buf(size) {}
+	void setSize(int s) {buf.resize(s);}
+	int getSize(void) const {return buf.size();}
+	const void *getData(void) const {return (const void *)&buf[0];}
+	void *getData(void) {return (void *)&buf[0];}
 };
 
 template <class T>
@@ -597,7 +579,7 @@ class ampiParent : public CBase_ampiParent {
     }
 
 public:
-    ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_, ComlibInstanceHandle comlib_);
+    ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_,ComlibInstanceHandle comlib_);
     ampiParent(CkMigrateMessage *msg);
     void ckJustMigrated(void);
     ~ampiParent();
@@ -658,8 +640,7 @@ public:
     }
     inline MPI_Group saveGroupStruct(groupStruct vec){
       int idx = groups.size();
-      groups.setSize(idx+1);
-      groups.length()=idx+1;
+      groups.resize(idx+1);
       groups[idx]=new groupStruct(vec);
       return (MPI_Group)idx;
     }
@@ -699,6 +680,7 @@ class ampi : public CBase_ampi {
     ampiParent *parent;
     TCharm *thread;
     int waitingForGeneric;
+    bool comlibEnabled;
 
     ampiCommStruct myComm;
     int myRank;
@@ -708,8 +690,11 @@ class ampi : public CBase_ampi {
     int *nextseq;
     AmpiSeqQ *oorder;
     void inorder(AmpiMsg *msg);
+    
+    void init(void);
 
   public: // entry methods
+    
     ampi();
     ampi(CkArrayID parent_,const ampiCommStruct &s);
     ampi(CkMigrateMessage *msg);
@@ -746,8 +731,19 @@ class ampi : public CBase_ampi {
     inline int getRank(void) const {return myRank;}
     inline int getSize(void) const {return myComm.getSize();}
     inline MPI_Comm getComm(void) const {return myComm.getComm();}
-    inline CProxy_ampi getProxy(void) const {return thisArrayID;}
-    ComlibInstanceHandle getComlib(void) { return parent->getComlib(); }
+    inline const CProxy_ampi &getProxy(void) const {return thisProxy;}
+    
+    inline CProxy_ampi comlibBegin(void) const {
+       CProxy_ampi p=getProxy();
+       if (comlibEnabled) {
+       	ComlibDelegateProxy(&p);
+	parent->getComlib().beginIteration();
+       }
+       return p;
+    }
+    void comlibEnd(void) {
+       if (comlibEnabled) parent->getComlib().endIteration();
+    }
 
     CkDDT *getDDT(void) {return parent->myDDT;}
   public:
