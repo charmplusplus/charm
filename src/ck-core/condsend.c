@@ -13,17 +13,22 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.2  1995-06-18 21:30:38  sanjeev
+ * Revision 2.3  1995-06-18 22:10:45  sanjeev
+ * Added Ccd
+ *
+ * Revision 2.2  1995/06/18  21:30:38  sanjeev
  * separated charm and converse condsends
  *
  ***************************************************************************/
 static char ident[] = "@(#)$Header$";
 
 
+#include "conv-conds.h"
+
 #include "const.h"
 #include "chare.h"
 #include "globals.h"
-#include "ch_conds.h"
+#include "condsend.h"
 
 CpvStaticDeclare(int, outstanding_sends);
 
@@ -84,7 +89,7 @@ static void SendMsgIfConditionArises(int condnum, int entry, void *msgToSend,
 
     CpvAccess(outstanding_sends)++;
     
-    CallOnCondition(condnum, SendMsgFn, (void *)newEntry);
+    CcdCallOnCondition(condnum, SendMsgFn, (void *)newEntry);
     }
 } 
 
@@ -105,7 +110,7 @@ void CallBocIfConditionArises(int condnum, FUNCTION_PTR fn_ptr, int bocNum)
   else {
     newEntry->bocNum   = bocNum;
     newEntry->fn_ptr   = fn_ptr;;
-    CallOnCondition(condnum, CallBocFn, (void *)newEntry);
+    CcdCallOnCondition(condnum, CallBocFn, (void *)newEntry);
     }
 }
 
@@ -131,7 +136,7 @@ void SendMsgAfter(unsigned int deltaT, int entry, void *msgToSend, int size,
       
       CpvAccess(outstanding_sends)++;
       
-      CallFnAfter(SendMsgFn, (void *)newEntry, deltaT);
+      CcdCallFnAfter(SendMsgFn, (void *)newEntry, deltaT);
     }
 } 
 
@@ -152,7 +157,7 @@ void CallBocAfter(FUNCTION_PTR fn_ptr, int bocNum, unsigned int deltaT)
     {
       newEntry->bocNum = bocNum;  
       newEntry->fn_ptr = fn_ptr;  
-      CallFnAfter(CallBocFn, (void *)newEntry, deltaT);
+      CcdCallFnAfter(CallBocFn, (void *)newEntry, deltaT);
     } 
 } 
 
@@ -173,7 +178,7 @@ void CallBocOnCondition(FUNCTION_PTR fn_ptr, int bocNum)
     {
       newEntry->bocNum = bocNum;  
       newEntry->fn_ptr = fn_ptr;  
-      PeriodicallyCall(CallBocFn, (void *)newEntry);
+      CcdPeriodicallyCall(CallBocFn, (void *)newEntry);
     } 
 } 
 
