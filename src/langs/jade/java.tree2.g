@@ -211,7 +211,7 @@ throwsClause
 	;
 
 templater
-    :  #( TEMPLATE (identifier)+ )
+    :  #( TEMPLATE (identifier|constant)+ )
     ;
 
 identifier

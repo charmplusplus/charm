@@ -226,7 +226,7 @@ builtInType
 	;
 
 templater
-    :    ( lt:LT^ {#lt.setType(TEMPLATE);} identifier ( COMMA! identifier )* GT! )
+    :    ( lt:LT^ {#lt.setType(TEMPLATE);} (identifier|constant) ( COMMA! (identifier|constant) )* GT! )
     ;
 
 // A (possibly-qualified) java identifier.  We start with the first IDENT

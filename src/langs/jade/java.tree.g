@@ -666,7 +666,7 @@ throwsClause
 	;
 
 templater
-    :  #( TEMPLATE (identifier)+ )
+    :  #( TEMPLATE (identifier|constant)+ )
     ;
 
 // done as part of printExpression
