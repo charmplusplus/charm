@@ -41,7 +41,6 @@ void problem::print() {
 }
 
 void problem::pup(PUP::er &p) {
-  PUP::able::pup(p);
   p|Parent;
   p|Root;
   p|Priority;
