@@ -12,8 +12,8 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-02 17:40:29  brunner
- * Reorganized directory structure
+ * Revision 2.1  1995-06-08 17:18:11  gursoy
+ * Cpv macro changes done
  *
  * Revision 1.2  1995/04/02  00:49:19  sanjeev
  * changes for separating Converse
@@ -24,15 +24,14 @@
  ***************************************************************************/
 static char ident[] = "@(#)$Header$";
 
-/*
-#include "chare.h"
-*/
 
-int RecdPerfMsg = 1;
+#include "chare.h"
+
+CpvExtern(int, RecdPerfMsg);
 
 program_name(s,m) char *s, *m; {}
 
-log_init(){}
+log_init(){CpvAccess(RecdPerfMsg) = 1;}
 
 trace_creation(msg_type,entry,envelope)
 int msg_type, entry;
