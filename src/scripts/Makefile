@@ -70,6 +70,9 @@ commlib:
 
 translators: charmxi conv-cpm
 
+pose:
+	cd libs/ck-libs/pose && make OPTS='$(OPTS)'
+
 LIBS: CONVLIBS CHARMLIBS
 	cd libs; make otherlibs OPTS='$(OPTS)'
 
