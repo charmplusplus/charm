@@ -659,10 +659,10 @@ static void getPredictedLoad(CentralLB::LDStats* stats, int count,
 			      byteRecvCount[i] * PER_BYTE_RECV_OVERHEAD +
 			      byteSentCount[i] * PER_BYTE_SEND_OVERHEAD;
 	  }
-	  delete msgRecvCount;
-	  delete msgSentCount;
-	  delete byteRecvCount;
-	  delete byteSentCount;
+	  delete [] msgRecvCount;
+	  delete [] msgSentCount;
+	  delete [] byteRecvCount;
+	  delete [] byteSentCount;
 	}
 }
 

@@ -67,7 +67,7 @@ typedef struct _LDObjKey {
 public:
 #ifdef __cplusplus
   CmiBool operator==(const _LDObjKey& obj) const {
-    return omId == obj.omId && objId == obj.objId;
+    return (CmiBool)(omId == obj.omId && objId == obj.objId);
   }
   inline LDOMid &omID() { return omId; }
   inline LDObjid &objID() { return objId; }
@@ -142,11 +142,11 @@ typedef struct _LDCommDesc {
   inline CmiBool operator==(const _LDCommDesc &obj) const {
     if (type != obj.type) return CmiFalse;
     switch (type) {
-    case LD_PROC_MSG: return dest.destProc == obj.dest.destProc;
-    case LD_OBJ_MSG:  return dest.destObj == obj.dest.destObj;
-    case LD_OBJLIST_MSG: return 0;             // fixme
+    case LD_PROC_MSG: return (CmiBool)(dest.destProc == obj.dest.destProc);
+    case LD_OBJ_MSG:  return (CmiBool)(dest.destObj == obj.dest.destObj);
+    case LD_OBJLIST_MSG: return CmiFalse;             // fixme
     }
-    return 0;
+    return CmiFalse;
   }
   inline void pup(PUP::er &p);
 #endif

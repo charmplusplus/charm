@@ -76,7 +76,7 @@ public:
     int   n_objs;
     ProcStats(): total_walltime(0.0), total_cputime(0.0), idletime(0.0),
 	   	 bg_walltime(0.0), bg_cputime(0.0), pe_speed(1),
-		 utilization(1.0), available(1), n_objs(0)  {}
+		 utilization(1.0), available(CmiTrue), n_objs(0)  {}
   };
 
   struct LDStats {  // Passed to Strategy

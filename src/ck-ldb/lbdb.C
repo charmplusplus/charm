@@ -217,7 +217,7 @@ extern "C" void LDNonMigratable(const LDObjHandle &h)
   LBDB *const db = (LBDB*)(h.omhandle.ldb.handle);
   LBObj *const obj = db->LbObj(h);
 
-  obj->SetMigratable(0);
+  obj->SetMigratable(CmiFalse);
 }
 
 extern "C" void LDMigratable(const LDObjHandle &h)
@@ -225,7 +225,7 @@ extern "C" void LDMigratable(const LDObjHandle &h)
   LBDB *const db = (LBDB*)(h.omhandle.ldb.handle);
   LBObj *const obj = db->LbObj(h);
 
-  obj->SetMigratable(1);
+  obj->SetMigratable(CmiTrue);
 }
 
 extern "C" void LDClearLoads(LDHandle _db)
