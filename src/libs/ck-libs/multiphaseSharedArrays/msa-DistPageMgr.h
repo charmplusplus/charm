@@ -1149,7 +1149,7 @@ public:
             accumInit = 1;
         }
 
-        double val;
+//         double val;
 
         for(unsigned int i = 0; i < runlength; i++)
         {
@@ -1162,12 +1162,12 @@ public:
 
             if(pageState == Write_Fault)
             {
-                val = *((double*)(buffer + offset));
+//                 val = *((double*)(buffer + offset));
                 set(buffer + offset, begin, end);
             }
             else
             {
-                val = *((double*)(buffer+offset));
+//                 val = *((double*)(buffer+offset));
                 combine(buffer + offset, begin, end);
             }
         }
