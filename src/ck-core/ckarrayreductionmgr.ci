@@ -1,0 +1,7 @@
+module CkArrayReductionMgr {
+	extern module CkReduction;
+nodegroup CkArrayReductionMgr {
+	entry CkArrayReductionMgr();
+//	entry  [immediate] void contributeArrayReduction(CkReductionMsg *);
+  };
+};

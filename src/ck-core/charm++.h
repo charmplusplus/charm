@@ -117,7 +117,7 @@ public:
 	}
 	
 	inline void setQueueing(int queueingtype_) {queueingtype=queueingtype_;}
-	
+
 	///These are used by CkAllocateMarshallMsg, below:
 	inline int getQueueing(void) const {return queueingtype;}
 	inline int getPriorityBits(void) const {return prioBits;}
@@ -354,16 +354,7 @@ class IrrGroup : public Chare {
     virtual CkComponent *ckLookupComponent(int userIndex);
 };
 
-class NodeGroup : public IrrGroup { //Superclass of all NodeGroups
-  public:
-    CmiNodeLock __nodelock;
-    NodeGroup();
-    ~NodeGroup();
-    inline const CkGroupID &ckGetGroupID(void) const {return thisgroup;}
-    inline CkGroupID CkGetNodeGroupID(void) const {return thisgroup;}
-    
-    virtual void pup(PUP::er &p);
-};
+
 
 
 /*Macro implmentation of CBase_* */
@@ -549,23 +540,37 @@ class CkReductionClientBundle : public CkCallback {
 	inline void ckSetReductionClient(CkCallback *cb) const \
 		{ super::ckSetReductionClient(cb); }\
 
+class CProxy_NodeGroup;
+typedef CkGroupID CkNodeGroupID;
+class CProxy_CkArrayReductionMgr;
 class CProxy_Group : public CProxy {
+
   private:
     CkGroupID _ck_gid;
+
   public:
-    CProxy_Group() { 
+    CProxy_Group() {
 #ifndef CMK_OPTIMIZE
 	_ck_gid.setZero();
 #endif
+	//CkPrintf(" In CProxy_Group Constructor\n");
+
     }
-    CProxy_Group(CkGroupID g) 
-    	:CProxy(),_ck_gid(g) {}
-    CProxy_Group(CkGroupID g,CkGroupID dTo) 
-    	:CProxy(dTo),_ck_gid(g) {}
-    CProxy_Group(const IrrGroup *g) 
-        :CProxy(), _ck_gid(g->ckGetGroupID()) {}
-    CProxy_Group(const NodeGroup *g)  //<- for compatability with NodeGroups
-        :CProxy(), _ck_gid(g->ckGetGroupID()) {}
+    CProxy_Group(CkGroupID g)
+    	:CProxy(),_ck_gid(g) {
+	//CkPrintf(" In CProxy_Group Constructor\n");
+
+	}
+    CProxy_Group(CkGroupID g,CkGroupID dTo)
+    	:CProxy(dTo),_ck_gid(g) {
+	//CkPrintf(" In CProxy_Group Constructor\n");
+	}
+    CProxy_Group(const IrrGroup *g)
+        :CProxy(), _ck_gid(g->ckGetGroupID()) {
+	//CkPrintf(" In CProxy_Group Constructor\n");
+	}
+/*    CProxy_Group(const NodeGroup *g)  //<- for compatability with NodeGroups
+        :CProxy(), _ck_gid(g->ckGetGroupID()) {}*/
 
 #ifndef CMK_OPTIMIZE
     inline void ckCheck(void) const {   //Make sure this proxy has a value
@@ -576,11 +581,11 @@ class CProxy_Group : public CProxy {
     inline void ckCheck() const {}
 #endif
 
-    CkChareID ckGetChareID(void) const { 
+    CkChareID ckGetChareID(void) const {
     	CkChareID ret;
     	ret.onPE=CkMyPe();
     	ret.objPtr=CkLocalBranch(_ck_gid);
-    	return ret; 
+    	return ret;
     }
     CkGroupID ckGetGroupID(void) const {return _ck_gid;}
     operator CkGroupID () const {return ckGetGroupID();}
@@ -605,18 +610,18 @@ PUPmarshall(CProxy_Group)
 
 class CProxyElement_Group : public CProxy_Group {
   private:
-    int _onPE;    
+    int _onPE;
   public:
     CProxyElement_Group() { }
     CProxyElement_Group(CkGroupID g,int onPE)
 	: CProxy_Group(g),_onPE(onPE) {}
     CProxyElement_Group(CkGroupID g,int onPE,CkGroupID dTo)
 	: CProxy_Group(g,dTo),_onPE(onPE) {}
-    CProxyElement_Group(const IrrGroup *g) 
+    CProxyElement_Group(const IrrGroup *g)
         :CProxy_Group(g), _onPE(CkMyPe()) {}
-    CProxyElement_Group(const NodeGroup *g)  //<- for compatability with NodeGroups
-        :CProxy_Group(g), _onPE(CkMyPe()) {}
-    
+    /*CProxyElement_Group(const NodeGroup *g)  //<- for compatability with NodeGroups
+        :CProxy_Group(g), _onPE(CkMyPe()) {}*/
+
     int ckGetGroupPe(void) const {return _onPE;}
     void pup(PUP::er &p) {
     	CProxy_Group::pup(p);
@@ -644,15 +649,63 @@ class CkIndex_Group { public:
 
 typedef CkIndex_Group CkIndex_NodeGroup;
 typedef CkIndex_Group CkIndex_IrrGroup;
-typedef CProxy_Group CProxy_NodeGroup;
+
+
+//typedef CProxy_Group CProxy_NodeGroup;
+class CProxy_NodeGroup : public CProxy{
+
+  private:
+    CkGroupID _ck_gid;
+  public:
+    CProxy_NodeGroup() {
+#ifndef CMK_OPTIMIZE
+	_ck_gid.setZero();
+#endif
+	//CkPrintf("In CProxy_NodeGroup0 Constructor %d\n",CkLocalNodeBranch(_ck_gid));
+    }
+    CProxy_NodeGroup(CkGroupID g)
+    	:CProxy(),_ck_gid(g) {/*CkPrintf("In CProxy_NodeGroup1 Constructor %d\n",CkLocalNodeBranch(_ck_gid));*/}
+    CProxy_NodeGroup(CkGroupID g,CkGroupID dTo)
+    	:CProxy(dTo),_ck_gid(g) {/*CkPrintf("In CProxy_NodeGroup2 Constructor %d\n",CkLocalNodeBranch(_ck_gid));*/}
+    CProxy_NodeGroup(const IrrGroup *g)
+        :CProxy(), _ck_gid(g->ckGetGroupID()) {/*CkPrintf("In CProxy_NodeGroup3 Constructor %d\n",CkLocalNodeBranch(_ck_gid));*/}
+/*    CProxy_Group(const NodeGroup *g)  //<- for compatability with NodeGroups
+        :CProxy(), _ck_gid(g->ckGetGroupID()) {}*/
+
+#ifndef CMK_OPTIMIZE
+    inline void ckCheck(void) const {   //Make sure this proxy has a value
+	if (_ck_gid.isZero())
+		CkAbort("Error! This group proxy has not been initialized!");
+    }
+#else
+    inline void ckCheck() const {}
+#endif
+
+    CkChareID ckGetChareID(void) const {
+    	CkChareID ret;
+    	ret.onPE=CkMyPe();
+    	ret.objPtr=CkLocalBranch(_ck_gid);
+    	return ret;
+    }
+    CkGroupID ckGetGroupID(void) const {return _ck_gid;}
+    operator CkGroupID () const {return ckGetGroupID();}
+    void ckSetGroupID(CkGroupID g) {_ck_gid=g;}
+    void pup(PUP::er &p) {
+    	CProxy::pup(p);
+	p | _ck_gid;
+    }
+    CK_REDUCTION_CLIENT_DECL
+
+};
+
 typedef CProxy_Group CProxy_IrrGroup;
 typedef CProxyElement_Group CProxyElement_NodeGroup;
 typedef CProxyElement_Group CProxyElement_IrrGroup;
-typedef CkGroupID CkNodeGroupID;
+
 
 //(CProxy_ArrayBase is defined in ckarray.h)
 
-//an "interface" class-- all delegated messages are routed via a DelegateMgr.  
+//an "interface" class-- all delegated messages are routed via a DelegateMgr.
 // The default action is to deliver the message directly.
 class CkDelegateMgr : public IrrGroup {
   public:
@@ -707,7 +760,7 @@ extern void CkStartQD(const CkCallback& cb);
 #include "tempo.h"
 #include "waitqd.h"
 #include "sdag.h"
-
+#include "ckarrayreductionmgr.h"
 #endif
 
 

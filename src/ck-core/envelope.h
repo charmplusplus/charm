@@ -66,6 +66,7 @@ public:
       } chare;
       struct s_group {
 	CkGroupID g; //GroupID
+	CkNodeGroupID rednMgr; //Reduction manager for this group (constructor only!)
       } group;
       struct s_array{ //For arrays only
 	CkGroupID loc; //Location manager GID
@@ -219,6 +220,13 @@ private:
     CkGroupID &array_mgr(void) {return type.array.arr;}
     unsigned int &array_srcPe(void) {return type.array.srcPe;}
     int *array_listenerData(void) {return type.array.listenerData;}
+
+    void setRednMgr(CkNodeGroupID r){
+	type.group.rednMgr = r;
+    }
+    CkNodeGroupID getRednMgr(){
+    	return type.group.rednMgr;
+    }
 };
 
 inline envelope *UsrToEnv(const void *const msg) {

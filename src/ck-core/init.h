@@ -102,7 +102,12 @@ CsvExtern(CmiNodeLock, _nodeLock);
 CsvExtern(unsigned int, _numNodeGroups);
 
 CkpvExtern(CkGroupID,_currentGroup);
+
+CkpvExtern(CkGroupID, _currentGroupRednMgr);
+
+
 CkpvExtern(GroupTable*, _groupTable);
+
 CkpvExtern(unsigned int, _numGroups);
 CpvExtern(char **,Ck_argv);
 

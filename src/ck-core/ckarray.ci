@@ -1,9 +1,10 @@
 module CkArray {
   extern module CkReduction;
   extern module CkLocation;
+  extern module CkArrayReductionMgr;
 
   group CkArray : CkReductionMgr {
-	entry CkArray(CkArrayOptions i,CkMarshalledMessage ctorMsg);
+	entry CkArray(CkArrayOptions i,CkMarshalledMessage ctorMsg,CkNodeGroupID nodereductionProxy);
 	//Insertion
 	entry void insertElement(CkMessage *);
 	entry void remoteDoneInserting(void);
@@ -18,7 +19,7 @@ module CkArray {
   group CkVerboseListenerCreator : Group {
         entry void CkVerboseListenerCreator(void);
   };
-  
+
   initcall void _ckArrayInit(void);
 
   array [none] ArrayElement {
@@ -26,4 +27,6 @@ module CkArray {
     //Calls destructor:
     entry void ckDestroy(void);
   };
+
+
 };

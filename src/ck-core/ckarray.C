@@ -186,7 +186,7 @@ void ArrayElement::ckJustMigrated(void) {
 }
 
 CK_REDUCTION_CONTRIBUTE_METHODS_DEF(ArrayElement,thisArray,
-   *(CkReductionMgr::contributorInfo *)&listenerData[thisArray->reducer.ckGetOffset()]);
+   *(contributorInfo *)&listenerData[thisArray->reducer.ckGetOffset()]);
 
 /// Remote method: calls destructor
 void ArrayElement::ckDestroy(void)
@@ -339,7 +339,8 @@ CkArrayID CProxy_ArrayBase::ckCreateArray(CkArrayMessage *m,int ctor,
   //Create the array manager
   m->array_ep()=ctor;
   CkMarshalledMessage marsh(m);
-  CkGroupID ag=CProxy_CkArray::ckNew(opts,marsh);
+  CProxy_CkArrayReductionMgr nodereductionProxy = CProxy_CkArrayReductionMgr::ckNew();
+  CkGroupID ag=CProxy_CkArray::ckNew(opts,marsh,nodereductionProxy);
   return (CkArrayID)ag;
 }
 CkArrayID CProxy_ArrayBase::ckCreateEmptyArray(void)
@@ -397,8 +398,8 @@ void _ckArrayInit(void)
   CkpvInitialize(ArrayElement_initInfo,initInfo);
 }
 
-CkArray::CkArray(const CkArrayOptions &c,CkMarshalledMessage &initMsg)
-  : CkReductionMgr(), 
+CkArray::CkArray(const CkArrayOptions &c,CkMarshalledMessage &initMsg,CkNodeGroupID nodereductionID)
+  : CkReductionMgr(),
   locMgr(CProxy_CkLocMgr::ckLocalBranch(c.getLocationManager())),
   thisProxy(thisgroup), reducer(this)
 {
@@ -425,9 +426,14 @@ CkArray::CkArray(const CkArrayOptions &c,CkMarshalledMessage &initMsg)
 "constant CK_ARRAYLISTENER_MAXLEN!\n");
 
   for (int l=0;l<listeners.size();l++) listeners[l]->ckBeginInserting();
-  
+
   //Set up initial elements (if any)
   locMgr->populateInitial(numInitial,initMsg.getMessage(),this);
+
+   ///adding code for Reduction using nodegroups
+  
+  nodeProxyPtr = new CProxy_CkArrayReductionMgr(nodereductionID);
+
 }
 
 //Called on send side to prepare array constructor message
@@ -447,7 +453,7 @@ void CkArray::prepareCtorMsg(CkMessage *m,int &onPe,const CkArrayIndex &idx)
   	getLocMgr()->inform(idx,onPe);
 }
 
-CkMigratable *CkArray::allocateMigrated(int elChareType,const CkArrayIndex &idx) 
+CkMigratable *CkArray::allocateMigrated(int elChareType,const CkArrayIndex &idx)
 {
 	return allocate(elChareType,idx,NULL,CmiTrue);
 }
@@ -618,8 +624,8 @@ void CkSendMsgArrayInline(int entryIndex, void *msg, CkArrayID aID, const CkArra
 
 /*********************** CkArray Reduction *******************/
 CkArrayReducer::CkArrayReducer(CkReductionMgr *mgr_) 
-  :CkArrayListener(sizeof(CkReductionMgr::contributorInfo)/sizeof(int)), 
-   mgr(mgr_) 
+  :CkArrayListener(sizeof(contributorInfo)/sizeof(int)), 
+   mgr(mgr_)
 {}
 CkArrayReducer::~CkArrayReducer() {}
 
@@ -742,6 +748,8 @@ void CkArray::recvBroadcast(CkMessage *m)
 	while (NULL!=(el=elements->next(idx)))
 		broadcaster.deliver(msg,el);
 }
+
+
 
 #include "CkArray.def.h"
 

@@ -30,30 +30,21 @@ void Chare::pup(PUP::er &p)
 } 
 
 IrrGroup::IrrGroup(void) {
-  thisgroup = CkpvAccess(_currentGroup); 
-  ckEnableTracing=CmiTrue; 
+  thisgroup = CkpvAccess(_currentGroup);
+  ckEnableTracing=CmiTrue;
 }
 IrrGroup::~IrrGroup() {}
 
-void IrrGroup::pup(PUP::er &p) 
+void IrrGroup::pup(PUP::er &p)
 {
   Chare::pup(p);
   p|thisgroup;
   p|ckEnableTracing;
 }
 
-NodeGroup::NodeGroup(void) {
-  __nodelock=CmiCreateLock();
-}
-NodeGroup::~NodeGroup() {
-  CmiDestroyLock(__nodelock);
-}
-void NodeGroup::pup(PUP::er &p)
-{
-  IrrGroup::pup(p);
-}
 
-void Group::pup(PUP::er &p) 
+
+void Group::pup(PUP::er &p)
 {
   CkReductionMgr::pup(p);
   reductionInfo.pup(p);
@@ -256,7 +247,9 @@ void _createGroupMember(CkGroupID groupID, int eIdx, void *msg)
       CldEnqueue(CkMyPe(), pending, _infoIdx);
     delete ptrq;
   }
+
   CkpvAccess(_currentGroup) = groupID;
+  CkpvAccess(_currentGroupRednMgr) = UsrToEnv(msg)->getRednMgr();
   _SET_USED(UsrToEnv(msg), 0);
   _entryTable[eIdx]->call(msg, obj);
   _STATS_RECORD_PROCESS_GROUP_1();
@@ -289,8 +282,11 @@ void _createGroup(CkGroupID groupID, envelope *env)
   _SET_USED(env, 1);
   register int epIdx = env->getEpIdx();
   register int msgIdx = env->getMsgIdx();
+  CkNodeGroupID rednMgr = CProxy_CkArrayReductionMgr::ckNew();
   env->setGroupNum(groupID);
   env->setSrcPe(CkMyPe());
+  env->setRednMgr(rednMgr);
+
   register void *msg =  EnvToUsr(env);
   if(CkNumPes()>1) {
     if(!env->isPacked() && _msgTable[msgIdx]->pack) {

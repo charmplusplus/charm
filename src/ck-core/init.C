@@ -37,6 +37,7 @@ CkInStream  ckin;
 CkpvDeclare(void*,       _currentChare);
 CkpvDeclare(int,         _currentChareType);
 CkpvDeclare(CkGroupID,   _currentGroup);
+CkpvDeclare(CkGroupID, _currentGroupRednMgr);
 CkpvDeclare(CkGroupID,   _currentNodeGroup);
 CkpvDeclare(GroupTable*, _groupTable);
 CkpvDeclare(UInt, _numGroups);
@@ -430,6 +431,7 @@ void _initCharm(int unused_argc, char **argv)
 	CkpvInitialize(void*, _currentChare);
 	CkpvInitialize(int,   _currentChareType);
 	CkpvInitialize(CkGroupID, _currentGroup);
+	CkpvInitialize(CkGroupID, _currentGroupRednMgr);
 	CkpvInitialize(CkGroupID, _currentNodeGroup);
 	CkpvInitialize(GroupTable*, _groupTable);
 	CkpvInitialize(UInt, _numGroups);

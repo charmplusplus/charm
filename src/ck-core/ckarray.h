@@ -1,20 +1,20 @@
 /* Generalized Chare Arrays
 
-These classes implement Chare Arrays.  
+These classes implement Chare Arrays.
 These are dynamic (i.e. allowing insertion
-and deletion) collections of ordinary Chares 
+and deletion) collections of ordinary Chares
 indexed by arbitrary runs of bytes.
 
 The general structure is:
 
-CkArray is the "array manager" Group, or BOC-- 
+CkArray is the "array manager" Group, or BOC--
 it creates, keeps track of, and cares for all the
-array elements on this PE (i.e.. "local" elements).  
+array elements on this PE (i.e.. "local" elements).
 It does so using a hashtable of CkArrayRec objects--
 there's an entry for each local, home-here, and recently
 communicated remote array elements.
 
-CkArrayElement is the type of the array 
+CkArrayElement is the type of the array
 elements (a subclass of Chare).
 
 CkArrayIndex is an arbitrary run of bytes,
@@ -439,6 +439,7 @@ typedef ArrayElementT<CkIndexMax> ArrayElementMax;
 /*********************** Array Manager BOC *******************/
 
 #include "CkArray.decl.h"
+#include "CkArrayReductionMgr.decl.h"
 
 void _ckArrayInit(void);
 
@@ -480,8 +481,8 @@ private:
 ///This arrayListener is in charge of performing reductions on the array.
 class CkArrayReducer : public CkArrayListener {
   CkReductionMgr *mgr;
-  typedef CkReductionMgr::contributorInfo *I;
-  inline CkReductionMgr::contributorInfo *getData(ArrayElement *el)
+  typedef  contributorInfo *I;
+  inline contributorInfo *getData(ArrayElement *el)
     {return (I)ckGetData(el);}
  public:
   CkArrayReducer(CkReductionMgr *mgr_);
@@ -492,14 +493,14 @@ class CkArrayReducer : public CkArrayListener {
 
   void ckElementStamp(int *eltInfo) {mgr->contributorStamped((I)eltInfo);}
 
-  void ckElementCreating(ArrayElement *elt) 
+  void ckElementCreating(ArrayElement *elt)
     {mgr->contributorCreated(getData(elt));}
-  void ckElementDied(ArrayElement *elt) 
+  void ckElementDied(ArrayElement *elt)
     {mgr->contributorDied(getData(elt));}
 
-  void ckElementLeaving(ArrayElement *elt) 
+  void ckElementLeaving(ArrayElement *elt)
     {mgr->contributorLeaving(getData(elt));}
-  CmiBool ckElementArriving(ArrayElement *elt) 
+  CmiBool ckElementArriving(ArrayElement *elt)
     {mgr->contributorArriving(getData(elt)); return CmiTrue; }
 };
 
@@ -516,7 +517,7 @@ class CkArray : public CkReductionMgr, public CkArrMgr {
 
 public:
 //Array Creation:
-  CkArray(const CkArrayOptions &c,CkMarshalledMessage &initMsg);
+  CkArray(const CkArrayOptions &c,CkMarshalledMessage &initMsg,CkNodeGroupID nodereductionProxy);
   CkGroupID &getGroupID(void) {return thisgroup;}
 
 //Access & information routines
@@ -593,6 +594,4 @@ private:
   CkArrayReducer reducer;
 
 };
-
-
 #endif
