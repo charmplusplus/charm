@@ -493,6 +493,8 @@ typedef void (*CmiStartFn)(int argc, char **argv);
 
 CpvExtern(int, _ccd_numchecks);
 extern void  CcdCallBacks();
+#define CsdPeriodic() do{ if (CpvAccess(_ccd_numchecks)-- <= 0) CcdCallBacks(); } while(0)
+
 extern void  CsdEndIdle(void);
 extern void  CsdStillIdle(void);
 extern void  CsdBeginIdle(void);
@@ -684,6 +686,17 @@ void   CmiHandleMessage(void *msg);
 #define CQS_QUEUEING_BFIFO 6
 #define CQS_QUEUEING_BLIFO 7
 
+/****** Isomalloc Memory Allocation ********/
+struct CmiIsomallocBlock {
+	int slot; /*First mapped slot*/
+	int nslots; /*Number of mapped slots*/
+};
+typedef struct CmiIsomallocBlock CmiIsomallocBlock;
+
+void *CmiIsomalloc(int size,CmiIsomallocBlock *b);
+void *CmiIsomallocPup(pup_er p,CmiIsomallocBlock *b);
+void  CmiIsomallocFree(CmiIsomallocBlock *b);
+
 /****** CTH: THE LOW-LEVEL THREADS PACKAGE ******/
 
 typedef struct CthThreadStruct *CthThread;
@@ -699,6 +712,7 @@ CthThread  CthPup(pup_er, CthThread);
 
 CthThread  CthSelf(void);
 CthThread  CthCreate(CthVoidFn, void *, int);
+CthThread  CthCreateMigratable(CthVoidFn, void *, int);
 void       CthResume(CthThread);
 void       CthFree(CthThread);
 
