@@ -5162,6 +5162,7 @@ int mALLOPt(param_number, value) int param_number; int value;
 {
   if(__malloc_initialized < 0)
     ptmalloc_init ();
+ {
   mstate av = &main_arena;
   int res = 1;
 
@@ -5211,6 +5212,7 @@ int mALLOPt(param_number, value) int param_number; int value;
   }
   (void)mutex_unlock(&av->mutex);
   return res;
+ }
 }
 
 
