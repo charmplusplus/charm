@@ -15,7 +15,7 @@ fi
 
 test -r ./conv-mach-opt.sh && . ./conv-mach-opt.sh
 
-VERSION=050606
+VERSION=050607
 AC_DEFINE_UNQUOTED(CHARM_VERSION, $VERSION)
 
 AC_MSG_CHECKING(machine name)
