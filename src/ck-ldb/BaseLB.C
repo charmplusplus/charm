@@ -23,6 +23,9 @@ void BaseLB::unregister() {
   theLbdb->RemoveLocalBarrierReceiver(receiver);
   numLoadBalancers --;
 }
+#else
+BaseLB::BaseLB() {}
+void BaseLB::unregister() {}
 #endif
 
 #include "BaseLB.def.h"

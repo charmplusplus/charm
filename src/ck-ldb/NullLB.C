@@ -64,6 +64,7 @@ void NullLB::migrationsDone(void)
 I sure wish we had #ifdefs in the .ci file-- then we could avoid all this.
 */
 void NullLB::init(void) {}
+NullLB::~NullLB() {}
 void NullLB::staticAtSync(void* data) {}
 void NullLB::AtSync() {}
 void NullLB::migrationsDone(void) {}
