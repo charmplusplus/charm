@@ -171,16 +171,18 @@ void SumLogPool::initMem()
    if (sumDetail) {
        cpuTime = new double[poolSize*epInfoSize];
        _MEMCHECK(cpuTime);
+       memset(cpuTime, 0, poolSize*epInfoSize*sizeof(double));
        numExecutions = new int[poolSize*epInfoSize];
        _MEMCHECK(numExecutions);
+       memset(numExecutions, 0, poolSize*epInfoSize*sizeof(int));
 
-        int i, e;
-        for(i=0; i<poolSize; i++) {
-            for(e=0; e< epInfoSize; e++) {
-                setCPUtime(i,e,0.0);
-                setNumExecutions(i,e,0);
-            }
-        }
+//         int i, e;
+//         for(i=0; i<poolSize; i++) {
+//             for(e=0; e< epInfoSize; e++) {
+//                 setCPUtime(i,e,0.0);
+//                 setNumExecutions(i,e,0);
+//             }
+//         }
    }
 }
 
@@ -268,55 +270,54 @@ void SumLogPool::write(void)
                 CkpvAccess(version), CkMyPe(), CkNumPes(),
                 numBins, _numEntries, CkpvAccess(binSize));
 
-        // Write out CPU Utilization based on cpuTime
+        // Write out cpuTime in microseconds
         // Run length encoding (RLE) along EP axis
-        fprintf(sdfp, "CPUutilizationPerEPperInterval\n");
+        fprintf(sdfp, "ExeTimePerEPperInterval ");
         unsigned int e, i;
+        long last= (long) (getCPUtime(0,0)*1.0e6);
+        int count=0;
+        fprintf(sdfp, "%ld", last);
         for(e=0; e<_numEntries; e++) {
-            int last=getUtilization(0, e);
-            fprintf(sdfp, "%4d", last);
-            int count=1;
-            for(i=1; i<numBins; i++) {
-                int u = getUtilization(i, e);
+            for(i=0; i<numBins; i++) {
+
+                long u= (long) (getCPUtime(i,e)*1.0e6);
                 if (last == u) {
                     count++;
-                }
-                else {
+                } else {
+
                     if (count > 1) fprintf(sdfp, "+%d", count);
-                    fprintf(sdfp, "%4d", u);
+                    fprintf(sdfp, " %ld", u);
                     last = u;
                     count = 1;
                 }
             }
-            if (count > 1) fprintf(sdfp, "+%d", count);
-            fprintf(sdfp, "\n");
         }
+        if (count > 1) fprintf(sdfp, "+%d", count);
         fprintf(sdfp, "\n");
 
         // Write out numExecutions
         // Run length encoding (RLE) along EP axis
-        fprintf(sdfp, "EPCallTimePerInterval\n");
+        fprintf(sdfp, "EPCallTimePerInterval ");
+        last= getNumExecutions(0,0);
+        count=0;
+        fprintf(sdfp, "%d", last);
         for(e=0; e<_numEntries; e++) {
-            int last=getNumExecutions(0, e);
-            fprintf(sdfp, "%4d", last);
-            int count=1;
-            for(i=1; i<numBins; i++) {
-                int u = getNumExecutions(i, e);
+            for(i=0; i<numBins; i++) {
+
+                long u= getNumExecutions(i, e);
                 if (last == u) {
                     count++;
-                }
-                else {
+                } else {
+
                     if (count > 1) fprintf(sdfp, "+%d", count);
-                    fprintf(sdfp, "%4d", u);
+                    fprintf(sdfp, " %d", u);
                     last = u;
                     count = 1;
                 }
             }
-            if (count > 1) fprintf(sdfp, "+%d", count);
-            fprintf(sdfp, "\n");
         }
+        if (count > 1) fprintf(sdfp, "+%d", count);
         fprintf(sdfp, "\n");
-
   }
 }
 
@@ -393,6 +394,8 @@ void SumLogPool::shrink(void)
 {
 //  double t = CmiWallTimer();
 
+  // We ensured earlier that poolSize is even; therefore now numBins
+  // == poolSize == even.
   int entries = numBins/2;
   for (int i=0; i<entries; i++)
   {
@@ -402,6 +405,9 @@ void SumLogPool::shrink(void)
          setNumExecutions(i, e, getNumExecutions(i*2, e) + getNumExecutions(i*2+1, e));
      }
   }
+  // zero out the remaining intervals
+  memset(&cpuTime[entries*epInfoSize], 0, (numBins-entries)*epInfoSize*sizeof(double));
+  memset(&numExecutions[entries*epInfoSize], 0, (numBins-entries)*epInfoSize*sizeof(int));
   numBins = entries;
   CkpvAccess(binSize) *= 2;
 
