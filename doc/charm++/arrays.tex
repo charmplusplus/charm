@@ -1,4 +1,4 @@
-\section{Chare Arrays}
+\subsection{Chare Arrays}
 
 Chare arrays \index{arrays} are arbitrarily-sized collections of chares.  The
 entire array is has a globally unique identifier of type \kw{CkArrayID}, and
@@ -13,7 +13,7 @@ Array elements can be migrated at any time, allowing arrays to be efficiently
 load balanced.  Array elements can also receive array broadcasts and
 contribute to array reductions.
 
-\subsection{Declaring a 1D Array}
+\subsubsection{Declaring a 1D Array}
 
 You can declare a one-dimentional \index{array}\index{chare array}chare array
 as:
@@ -63,7 +63,7 @@ Read the section ``Migratable Array Elements'' for more
 information on the \kw{CkMigrateMessage} constructor. 
 
 
-\subsection{Declaring 2D, 3D, or User-defined Index Arrays}
+\subsubsection{Declaring 2D, 3D, or User-defined Index Arrays}
 
 \charmpp{} contains direct support for 1D, 2D, 3D, and user-defined
 index arrays.  These arrays can be declared as:
@@ -101,7 +101,7 @@ field; a 2D via ``thisIndex.x'' and ``thisIndex.y'', and a 3D via
 index array can access its index as ``thisIndex''.
 
 
-\subsection{Creating an Array}
+\subsubsection{Creating an Array}
 
 You create an array using the \kw{CProxy\_Array::ckNew}
 routine.  This returns a proxy object, which can
@@ -191,7 +191,7 @@ a3(x,y,z).destroy();
 After destroying an element, you may insert a new element at
 its index.
 
-\subsection{Messages and Broadcasts}
+\subsubsection{Messages and Broadcasts}
 
 To send a \index{Array message} message to an array element, index the proxy 
 and call the method name, possibly passing a message:
@@ -223,7 +223,7 @@ element exactly once.  Broadcasts work properly even with ongoing
 migrations, insertions, and deletions.
 
 
-\subsection{Reductions on Chare Arrays}
+\subsubsection{Reductions on Chare Arrays}
 A \index{Array reduction}reduction applies a single operation (e.g. add,
 max, min, ...) to data items scattered across many processors and
 collects the result in one place.  \charmpp{} supports reductions on the
@@ -296,7 +296,7 @@ handler can use \uw{param}, \uw{dataSize}, and the data in any
 fashion; but the data will be deleted after the handler returns.
 
 
-\subsection{Built-in Array Reduction Types}
+\subsubsection{Built-in Array Reduction Types}
 
 \charmpp{} includes several built-in reduction types, used to combine the
 contributions from different array elements.  Any of them may be passed as an
@@ -371,7 +371,7 @@ if you need to know which array element gave a particular contribution.
 
 
 
-\subsection{User-defined array index type}
+\subsubsection{User-defined array index type}
 
 \index{Array index type, user-defined}
 \charmpp{} array indices are arbitrary collections of integers.
@@ -440,7 +440,7 @@ AF::AF()
 \end{alltt}
 
 
-\subsection{Migratable Array Elements}
+\subsubsection{Migratable Array Elements}
 Array objects can \index{migrate}migrate from one PE to another.
 For example, the load balancer (see section ``Load Balancing Chare Arrays'')
 might migrate array elements to better balance the load between
@@ -554,7 +554,7 @@ public:
 \end{alltt}
 
 
-\subsection{Load Balancing Chare Arrays}
+\subsubsection{Load Balancing Chare Arrays}
 \charmpp{} includes a run-time load balancer which works
 on array elements.  The idea is to run programs more efficiently
 by migrating array elements away from overloaded processors.
@@ -584,7 +584,7 @@ sent to an array element between its calls to \kw{AtSync} and
 a implemented as a global barrier.
 
 
-\subsection{Array Syntax Changes}
+\subsubsection{Array Syntax Changes}
 
 The syntax for arrays changed in April, 2000 in the following ways:
 

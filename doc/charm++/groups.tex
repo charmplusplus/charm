@@ -1,4 +1,4 @@
-\section{Group Objects}
+\subsection{Group Objects}
 
 A \kw{group}\footnote{Originally called {\em Branch Office Chare} or 
 {\em Branched Chare}} \index{group}is a collection of chares where 
@@ -38,7 +38,7 @@ messages to all branches of a group.  There can be many instances corresponding
 to a group type.  Each instance has a different group handle, and its own set
 of branches.
 
-\subsection{Group Creation}
+\subsubsection{Group Creation}
 
 Given a \texttt{.ci} file as follows:
 
@@ -71,7 +71,7 @@ CkGroupID gid = CProxy_G::ckNew(m1);
 CProxy_G g(gid);
 \end{alltt}
 
-\subsection{Method Invocation on Groups}
+\subsubsection{Method Invocation on Groups}
 
 Before sending a message to a \index{group}group via an entry
 method, we need to get a proxy of that group using the group identifier (a

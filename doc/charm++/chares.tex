@@ -1,4 +1,4 @@
-\section{Chare Objects}
+\subsection{Chare Objects}
 
 \index{chare}Chares are concurrent objects with methods that can be invoked
 remotely.  These methods are known as \index{entry method}entry methods, and 
@@ -60,7 +60,7 @@ chare whose entry function or public function is currently executing.
 \kw{thishandle} can be used to set fields in a message. This  
 mechanism allows chares to send their handles to other chares.
 
-\subsection{Chare Creation}
+\subsubsection{Chare Creation}
 \label{chare creation}
 
 First, a \index{chare}chare needs to be declared, both in \texttt{.ci} file and
@@ -183,7 +183,7 @@ then creates a new \index{chare}chare of type \uw{C} on processor \uw{destPE}:}
 
 \end{enumerate}
 
-\subsection{Method Invocation on Chares}
+\subsubsection{Method Invocation on Chares}
 
 Before sending a \index{message}message to a \index{chare}chare via an
 \index{entry method}entry method, we need to get a \index{proxy}{\it proxy} of

@@ -1,4 +1,4 @@
-\chapter{\charmpp{} Overview}
+\section{\charmpp{} Overview}
 
 We think that \charmpp\ is easy to use if you are familiar with object-based
 programming. (But of course that is our opinion, if your opinion differs, you
@@ -52,7 +52,7 @@ some differences among the features they support, but the basic syntax and
 semantics almost always remains the same, and that is of invoking methods on
 the remote object by invoking methods on proxies.
 
-\section{\charmpp\ Execution Model}
+\subsection{\charmpp\ Execution Model}
 
 A \charmpp\ program consists of a number of \charmpp\ objects distributed
 across the available number of processors. Thus, the basic unit of parallel
@@ -132,11 +132,11 @@ processed and no entry methods are called after the currently executing entry
 method completes. \kw{CkExit} need not be called on all processors; it is
 enough to call it from just one processor at the end of the computation.
 
-\section{Entities in \charmpp\ programs}
+\subsection{Entities in \charmpp\ programs}
 
 This section describes various entities in a typical \charmpp\ program.
 
-\subsection{Sequential Objects}
+\subsubsection{Sequential Objects}
 
 A \charmpp\ program typically contains a number of sequential objects. These
 objects are similar to the objects in \CC, except that they {\em should not
@@ -151,7 +151,7 @@ their methods could be synchronously invoked only from the local processor.
 These objects are not known to the \charmpp\ runtime system, and thus they need
 not be mentioned in the module interface files.
 
-\subsection{Messages}
+\subsubsection{Messages}
 
 Messages supply data arguments to the asynchronous remote method invocation.
 These objects are treated differently from other objects in \charmpp\ by the
@@ -168,7 +168,7 @@ Varsize messages is an effective optimization on conditionally packed messages,
 and have to be made known to the \charmpp\ runtime using a special keyword in
 the interface file.
 
-\subsection{Chares}
+\subsubsection{Chares}
 
 Chares are the most important entities in a \charmpp\ program. These concurrent
 objects are different from sequential \CC\ objects in many ways. Syntactically,
@@ -188,7 +188,7 @@ have its constuctors as entry methods (with at most one message pointer
 parameter). These chares and their entry methods have to be specified in the
 interface file.
 
-\subsection{Chare Groups}
+\subsubsection{Chare Groups}
 
 Chare Groups\footnote{ These were called Branch Office Chares (BOC) in earlier
 version of Charm.} are a special type of concurrent objects.  Each chare group
@@ -202,7 +202,7 @@ class called \kw{Group}. The Charm kernel has to be notified that these chares
 are semantically different, and therefore chare groups have a different
 declaration in the interface specification file.
 
-\subsection{Chare Nodegroups}
+\subsubsection{Chare Nodegroups}
 
 Chare nodegroups are very similar to chare groups except that instead of having
 one groupmember on each processor, the nodegroup has one member on each shared
@@ -224,7 +224,7 @@ problems by allowing the programmer to specify an entry method of a nodegroup
 to be {\em exclusive}, thus guaranteeing that no other {\em exclusive} method
 of that nodegroup member can execute simultaneously within the node.
 
-\subsection{Chare Arrays}
+\subsubsection{Chare Arrays}
 
 Chare arrays are collections of chares. However unlike chare groups or
 nodegroups, arrays are not constrained by characteristics of the underlying

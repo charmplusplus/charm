@@ -1,4 +1,4 @@
-\chapter{Structured Dagger}
+\section{Structured Dagger}
 
 \charmpp\ is based on the Message-Driven parallel programming paradigm.  The
 message-drivern programming style avoids the use of blocking receives and
@@ -167,9 +167,9 @@ interface file. The implementation of the entry methods that contain the
 when-block is written using the \sdag\ language. Grammar of \sdag\ is given in
 the EBNF form below.
 
-\section{Grammar}
+\subsection{Grammar}
 
-\subsection{Tokens}
+\subsubsection{Tokens}
 
 \begin{alltt}
   <ident> = Valid \CC{} identifier 
@@ -177,7 +177,7 @@ the EBNF form below.
   <\CC{}-code> = Valid \CC{} code 
 \end{alltt}
 
-\subsection{Grammar in EBNF Form}
+\subsubsection{Grammar in EBNF Form}
 
 \begin{alltt}
 <sdag> := <class-decl> <sdagentry>+ 
