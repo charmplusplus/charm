@@ -172,6 +172,9 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   pthread_cond_init(&barrier_cond, (pthread_condattr_t *) 0);
   pthread_mutex_init(&barrier_mutex, (pthread_mutexattr_t *) 0);
 
+  /* suggest to IRIX that we actually use the right number of processors */
+  pthread_setconcurrency(Cmi_numpes);
+
   aThread = (pthread_t *) CmiAlloc(sizeof(pthread_t) * Cmi_numpes);
   for(i=1; i<Cmi_numpes; i++) {
     uargv = (char **) CmiAlloc(sizeof(char *) * (Cmi_argc+1));
