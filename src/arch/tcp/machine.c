@@ -979,6 +979,7 @@ typedef struct DATA_HDR
   unsigned int seq_num;
   BYTE send_or_ack;		/* SEND or ACK (acknowledgment). */
   BYTE msg_type;		/* Currently, always 1. */
+  BYTE pad1, pad2;              /* Purify was driving me crazy. */
   unsigned int SourcePeNum;
   unsigned int DestPeNum;
   unsigned int numfrags;
@@ -1381,6 +1382,7 @@ static void fragment_send(destPE,size,msg,full_size,msg_type, numfrags)
     CmiPrintf("*** ERROR *** Memory Allocation Failed.\n");
     return ;
   }
+  hd->pad1 = hd->pad2 = 0;
   hd->DestPeNum = destPE;
   hd->size = size;
   hd->full_size = full_size;
