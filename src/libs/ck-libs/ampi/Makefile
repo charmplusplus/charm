@@ -62,6 +62,12 @@ ampi.o: ampi.C $(HEADDEP)
 ampif.o: ampif.C $(HEADDEP)
 	$(CHARMC) -c ampif.C
 
+win_obj.o: win_obj.C ampiimpl.h $(HEADDEP)
+	$(CHARMC) -c win_obj.C
+ 
+MPI_Win.o: MPI_Win.C ampiimpl.h $(HEADDEP)
+	$(CHARMC) -c MPI_Win.C
+
 ampi.decl.h ampi.def.h: ampi.ci
 	$(CHARMC) ampi.ci
 
