@@ -111,6 +111,9 @@ int traceRegisterUserEvent(const char*)
 extern "C"
 void traceClearEps(void)
 {
+  // In trace-summary, this zeros out the EP bins, to eliminate noise
+  // from startup.  Here, this isn't useful, since we can do that in
+  // post-processing
 }
 
 extern "C"
