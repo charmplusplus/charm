@@ -47,9 +47,9 @@ class Group : public Chare {
 
 class NodeGroup : public Chare {
   protected:
-    int thisnodegroup;
+    int thisgroup;
   public:
-    NodeGroup() { thisnodegroup = CkGetNodeGroupID(); }
+    NodeGroup() { thisgroup = CkGetNodeGroupID(); }
 };
 
 class _CK_CID {
