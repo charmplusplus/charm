@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.42  1996-04-17 18:54:36  jyelon
+ * Revision 2.43  1996-06-24 18:56:25  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.42  1996/04/17 18:54:36  jyelon
  * *** empty log message ***
  *
  * Revision 2.41  1996/04/16 22:44:42  jyelon
@@ -479,19 +482,19 @@ extern int CthRegister CMK_PROTO((int));
 
 /************************************************************************
  *
- * CpmControl
+ * CpmDestination
  *
- * A CpmControl structure enables the user of the Cpm module to tell
+ * A CpmDestination structure enables the user of the Cpm module to tell
  * the parameter-marshalling system what kind of envelope to put int the
  * message, and what to do with it after it has been filled.
  *
  ***********************************************************************/
 
-typedef struct CpmControlStruct *CpmControl;
+typedef struct CpmDestinationStruct *CpmDestination;
 
-typedef void *(*CpmSender) CMK_PROTO((CpmControl, int, void *));
+typedef void *(*CpmSender) CMK_PROTO((CpmDestination, int, void *));
 
-struct CpmControlStruct
+struct CpmDestinationStruct
 {
   CpmSender sendfn;
   int envsize;
@@ -501,15 +504,15 @@ struct CpmControlStruct
 #define CpmALL (-1)
 #define CpmOTHERS (-2)
 
-CpmControl CpmSend CMK_PROTO((int pe));
-CpmControl CpmMakeThread CMK_PROTO((int pe));
-CpmControl CpmEnqueue CMK_PROTO((int pe, int qs, int priobits, int *prioptr));
-CpmControl CpmEnqueueFIFO CMK_PROTO((int pe, int prio));
-CpmControl CpmEnqueueLIFO CMK_PROTO((int pe, int prio));
-CpmControl CpmEnqueueIFIFO CMK_PROTO((int pe, int prio));
-CpmControl CpmEnqueueILIFO CMK_PROTO((int pe, int prio));
-CpmControl CpmEnqueueBFIFO CMK_PROTO((int pe, int priobits, int *prioptr));
-CpmControl CpmEnqueueBLIFO CMK_PROTO((int pe, int priobits, int *prioptr));
+CpmDestination CpmSend CMK_PROTO((int pe));
+CpmDestination CpmMakeThread CMK_PROTO((int pe));
+CpmDestination CpmEnqueueFIFO CMK_PROTO((int pe));
+CpmDestination CpmEnqueueLIFO CMK_PROTO((int pe));
+CpmDestination CpmEnqueueIFIFO CMK_PROTO((int pe, int prio));
+CpmDestination CpmEnqueueILIFO CMK_PROTO((int pe, int prio));
+CpmDestination CpmEnqueueBFIFO CMK_PROTO((int pe, int priobits, int *prioptr));
+CpmDestination CpmEnqueueBLIFO CMK_PROTO((int pe, int priobits, int *prioptr));
+CpmDestination CpmEnqueue CMK_PROTO((int pe,int qs,int priobits,int *prioptr));
 
 /***********************************************************************
  *
@@ -519,10 +522,9 @@ CpmControl CpmEnqueueBLIFO CMK_PROTO((int pe, int priobits, int *prioptr));
  *      CpmDeclareSimple(x)
  *      CpmDeclarePointer(x)
  *
- * These macros supposedly expand into CPM ``declarations''.  In
- * actuality, they macroexpand into C code which has no effect.
- * However, when the CPM scanner sees the macroexpansions, it
- * recognizes them and understands them.
+ * These macros expand into CPM ``declarations''.  The CPM ``declarations''
+ * are actually C code that has no effect, but when the CPM scanner sees
+ * them, it recognizes them and understands them as declarations.
  *
  **********************************************************************/
 
