@@ -120,7 +120,7 @@
 
 #define NODE_0_IS_CONVHOST                                 1
 #define CMK_DEBUG_MODE                                     0
-#define CMK_WEB_MODE                                       0
+#define CMK_WEB_MODE                                       1
 #define CMK_USE_PERSISTENT_CCS                             0
 
 #define CMK_COMPILEMODE_ORIG                               1

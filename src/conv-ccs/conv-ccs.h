@@ -23,6 +23,7 @@ void CcsSendReplyFd(unsigned int ip, unsigned int port, int size, void *reply);
 #define CcsIsRemoteRequest() 0
 #define CcsCallerId(x,y)
 #define CcsSendReply(i,p,s,r)
+#define CcsSendReplyFd(i,p,s,r)
 #endif
 
 #if NODE_0_IS_CONVHOST
