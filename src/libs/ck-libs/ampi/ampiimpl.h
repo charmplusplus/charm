@@ -571,7 +571,7 @@ public:
 	int wait(MPI_Status *sts);
 	inline int getCount(void){ return elmcount; }
 	inline int getType(void){ return 3; }
-	inline void free(void){ isvalid=false; delete [] myreqs; }
+// 	inline void free(void){ isvalid=false; delete [] myreqs; }
 };
 
 /// Special CkVec<AmpiRequest*> for AMPI. Most code copied from cklist.h
@@ -641,6 +641,11 @@ class AmpiRequestList : private CkSTLHelper<AmpiRequest *> {
       } */
       push_back(elt);
       return len-1;
+    }
+    
+    inline void checkRequest(MPI_Request idx){
+      if(!(idx==-1 || (idx < this->len && (block[idx])->isValid())))
+        CkAbort("Invalide MPI_Request\n");
     }
 
     /// PUPer is empty because there shouldn't be any
@@ -1101,6 +1106,17 @@ public:
     inline int hasWorld(void) const {
       return worldPtr!=NULL;
     }
+    
+    inline void checkComm(MPI_Comm comm){
+      if ((comm > MPI_COMM_FIRST_RESVD && comm != MPI_COMM_SELF && comm != MPI_COMM_WORLD) 
+       || (isSplit(comm) && comm-MPI_COMM_FIRST_SPLIT >= splitComm.size())
+       || (isGroup(comm) && comm-MPI_COMM_FIRST_GROUP >= groupComm.size())
+       || (isCart(comm)  && comm-MPI_COMM_FIRST_CART  >=  cartComm.size())
+       || (isGraph(comm) && comm-MPI_COMM_FIRST_GRAPH >= graphComm.size())
+       || (isInter(comm) && comm-MPI_COMM_FIRST_INTER >= interComm.size())
+       || (isIntra(comm) && comm-MPI_COMM_FIRST_INTRA >= intraComm.size()) )
+          CkAbort("Invalide MPI_Comm\n");
+    }
 
     /// if intra-communicator, return comm, otherwise return null group
     inline MPI_Group comm2group(const MPI_Comm comm){
@@ -1292,6 +1308,8 @@ class ampi : public CBase_ampi {
 
 ampiParent *getAmpiParent(void);
 ampi *getAmpiInstance(MPI_Comm comm);
+void checkComm(MPI_Comm comm);
+void checkRequest(MPI_Request req);
 
 //Use this to mark the start of AMPI interface routines:
 #define AMPIAPI(routineName) TCHARM_API_TRACE(routineName,"ampi")

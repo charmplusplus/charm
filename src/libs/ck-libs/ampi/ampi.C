@@ -1546,8 +1546,28 @@ ampi *getAmpiInstance(MPI_Comm comm) {
   return ptr;
 }
 
-static AmpiRequestList *getReqs(void) {
+inline static AmpiRequestList *getReqs(void) {
   return &(getAmpiParent()->ampiReqs);
+}
+
+inline void checkComm(MPI_Comm comm){
+#ifndef CMK_OPTIMIZE
+  getAmpiParent()->checkComm(comm);
+#endif
+}
+
+inline void checkRequest(MPI_Request req){
+#ifndef CMK_OPTIMIZE
+  getReqs()->checkRequest(req);
+#endif
+}
+
+inline void checkRequests(int n, MPI_Request* reqs){
+#ifndef CMK_OPTIMIZE
+  AmpiRequestList* reqlist = getReqs();
+  for(int i=0;i<n;i++)
+    reqlist->checkRequest(reqs[i]);
+#endif
 }
 
 CDECL void AMPI_Migrate(void)
@@ -1830,6 +1850,7 @@ int AMPI_Iallreduce(void *inbuf, void *outbuf, int count, int type,
                    MPI_Op op, MPI_Comm comm, MPI_Request* request)
 {
   AMPIAPI("AMPI_Allreduce");
+  checkRequest(*request);
   if(op == MPI_OP_NULL) CkAbort("MPI_Iallreduce called with MPI_OP_NULL!!!");
   if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Iallreduce not allowed for Inter-communicator!");
   ampi *ptr = getAmpiInstance(comm);
@@ -1988,6 +2009,7 @@ CDECL
 int AMPI_Start(MPI_Request *request)
 {
   AMPIAPI("AMPI_Start");
+  checkRequest(*request);
   AmpiRequestList *reqs = getReqs();
   if(-1==(*reqs)[*request]->start()){
     CkAbort("MPI_Start could be used only on persistent communication requests!");
@@ -1998,6 +2020,7 @@ int AMPI_Start(MPI_Request *request)
 CDECL
 int AMPI_Startall(int count, MPI_Request *requests){
   AMPIAPI("AMPI_Startall");
+  checkRequests(count,requests);
   AmpiRequestList *reqs = getReqs();
   for(int i=0;i<count;i++){
     if(-1==(*reqs)[requests[i]]->start())
@@ -2020,6 +2043,8 @@ inline int areInactiveReqs(int count, MPI_Request* reqs){ // if count==0 then al
   return 1;
 }
 inline int matchReq(MPI_Request ia, MPI_Request ib){
+  checkRequest(ia);  
+  checkRequest(ib);
   AmpiRequestList* reqs = getReqs();
   AmpiRequest *a, *b;
   if(ia==MPI_REQUEST_NULL && ib==MPI_REQUEST_NULL) return 1;
@@ -2122,6 +2147,7 @@ CDECL
 int AMPI_Wait(MPI_Request *request, MPI_Status *sts)
 {
   AMPIAPI("AMPI_Wait");
+  checkRequest(*request);
   if(*request == MPI_REQUEST_NULL){
     stsempty(*sts);
     return 0;
@@ -2141,6 +2167,7 @@ int AMPI_Waitall(int count, MPI_Request request[], MPI_Status sts[])
 {
   AMPIAPI("AMPI_Waitall");
   if(count==0) return MPI_SUCCESS;
+  checkRequests(count,request);
   int i,j;
   AmpiRequestList* reqs = getReqs();
   CkVec<CkVec<int> > reqvec = vecIndex(count,request);
@@ -2172,6 +2199,7 @@ CDECL
 int AMPI_Waitany(int count, MPI_Request *request, int *idx, MPI_Status *sts)
 {
   AMPIAPI("AMPI_Waitany");
+  checkRequests(count,request);
   if(areInactiveReqs(count,request)){
     *idx=MPI_UNDEFINED;
     stsempty(*sts);
@@ -2197,6 +2225,7 @@ int AMPI_Waitsome(int incount, MPI_Request *array_of_requests, int *outcount,
                  int *array_of_indices, MPI_Status *array_of_statuses)
 {
   AMPIAPI("AMPI_Waitsome");
+  checkRequests(incount,array_of_requests);
   if(areInactiveReqs(incount,array_of_requests)){
     *outcount=MPI_UNDEFINED;
     return MPI_SUCCESS;
@@ -2262,6 +2291,7 @@ CDECL
 int AMPI_Test(MPI_Request *request, int *flag, MPI_Status *sts)
 {
   AMPIAPI("AMPI_Test");
+  checkRequest(*request);
   if(*request==MPI_REQUEST_NULL) {
     *flag = 1;
     stsempty(*sts);
@@ -2281,6 +2311,7 @@ int AMPI_Test(MPI_Request *request, int *flag, MPI_Status *sts)
 CDECL
 int AMPI_Testany(int count, MPI_Request *request, int *index, int *flag, MPI_Status *sts){
   AMPIAPI("AMPI_Testany");
+  checkRequests(count,request);
   if(areInactiveReqs(count,request)){
     *flag=1;
     *index=MPI_UNDEFINED;
@@ -2305,6 +2336,7 @@ int AMPI_Testall(int count, MPI_Request *request, int *flag, MPI_Status *sts)
 {
   AMPIAPI("AMPI_Testall");
   if(count==0) return MPI_SUCCESS;
+  checkRequests(count,request);
   int tmpflag;
   int i,j;
   AmpiRequestList* reqs = getReqs();
@@ -2328,6 +2360,7 @@ int AMPI_Testsome(int incount, MPI_Request *array_of_requests, int *outcount,
                  int *array_of_indices, MPI_Status *array_of_statuses)
 {
   AMPIAPI("AMPI_Testsome");
+  checkRequests(incount,array_of_requests);
   if(areInactiveReqs(incount,array_of_requests)){
     *outcount=MPI_UNDEFINED;
     return MPI_SUCCESS;
@@ -2350,6 +2383,7 @@ int AMPI_Testsome(int incount, MPI_Request *array_of_requests, int *outcount,
 CDECL
 int AMPI_Request_free(MPI_Request *request){
   AMPIAPI("AMPI_Request_free");
+  checkRequest(*request);
   if(*request==MPI_REQUEST_NULL) return 0;
   AmpiRequestList* reqs = getReqs();
   reqs->free(*request);
