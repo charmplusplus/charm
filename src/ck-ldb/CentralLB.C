@@ -263,8 +263,8 @@ void CentralLB::MigrationDone()
 {
   if (CkMyPe() == cur_ld_balancer) {
     double end_lb_time = CmiWallTimer();
-    // CkPrintf("Load balancing step %d finished at %f duration %f\n",
-	     // step(),end_lb_time,end_lb_time - start_lb_time);
+    CkPrintf("Load balancing step %d finished at %f duration %f\n",
+	     step(),end_lb_time,end_lb_time - start_lb_time);
   }
   migrates_completed = 0;
   migrates_expected = -1;
