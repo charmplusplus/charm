@@ -124,207 +124,17 @@ void BgMsgSetTiming(char *msg)
   CmiBgMsgSrcPe(msg) = BgMyNode();	// global serial number
 }
 
-// dstNode is the dest bg node, can be -1
-bgMsgEntry::bgMsgEntry(char *msg, int dstNode, int tid, int local)
+inline int adjustTimeLog(bgTimeLog* log, BgTimeLine& tline, 
+                         int mynode, int sendImmediately)
 {
-  msgID = CmiBgMsgID(msg);
-//  sendtime = BgGetCurTime();
-  recvTime = CmiBgMsgRecvTime(msg);
-  dstPe = dstNode;
-  tID = tid;                   // CmiBgMsgThreadID(msg);
-#if DELAY_SEND
-  sendMsg = NULL;
-  if (!local && correctTimeLog) sendMsg = msg;
-#endif
-}
-
-#if DELAY_SEND
-void bgMsgEntry::send() {
-  if (!sendMsg) return;
-  CmiBgMsgRecvTime(sendMsg) = recvTime;
-  if (dstPe >= 0) {
-    CmiSyncSendAndFree(nodeInfo::Global2PE(dstPe),CmiBgMsgLength(sendMsg),sendMsg);
-  }
-  else {
-    CmiSyncBroadcastAllAndFree(CmiBgMsgLength(sendMsg),sendMsg);
-  }
-  sendMsg = NULL;
-}
-#endif
-
-bgTimeLog::bgTimeLog(bgTimeLog *log)
-{
-  strncpy(name,log->name,20);
-  ep = log->ep;
-  startTime = log->startTime;
-  recvTime = log->recvTime;
-  endTime = 0.0;
-  execTime = 0.0;
-  srcnode = log->srcnode;
-  msgID = log->msgID;
-
-  seqno = 0;
-  effRecvTime = recvTime;
-  doCorrect = 1;
-}
-
-bgTimeLog::bgTimeLog(int epc, char* namestr,double sTime)
-{ 
-  if(namestr == NULL)
-    namestr = "dummyname";
-  strncpy(name,namestr,20);
-  ep = epc;
-  startTime = sTime;
-  recvTime = -1.0;//stime;
-  endTime = execTime = 0.0;
-  srcnode = msgID = -1;
-
-  oldStartTime= startTime;
-  effRecvTime = -1.0;
-  seqno = 0;
-  doCorrect = 1;
-}
-
-// for SDAG, somewhere else will set the effective recv time.
-bgTimeLog::bgTimeLog(int epc, char* namestr, double sTime, double eTime)
-{
-  if(namestr == NULL)
-    namestr = "dummyname";
-  strncpy(name,namestr, 20);
-  ep = epc;
-  startTime = sTime;
-  recvTime = -1.0; //sTime;
-  endTime = eTime;
-  setExecTime();
-  srcnode = -1;
-  msgID = -1;
-
-  oldStartTime = startTime;
-  effRecvTime = -1.0;
-  seqno = 0;
-  doCorrect = 1;
-}
-
-
-bgTimeLog::bgTimeLog(int epc, char *msg)
-{
-  strcpy(name,"msgep");
-  ep = epc;
-  startTime = BgGetCurTime();
-  recvTime = msg?CmiBgMsgRecvTime(msg):0;//startTime;
-  endTime = 0.0;
-  execTime = 0.0;
-  srcnode = msg?CmiBgMsgSrcPe(msg):-1;
-  msgID = msg?CmiBgMsgID(msg):-1;
-
-  oldStartTime=startTime;
-  effRecvTime = recvTime;
-  seqno = 0;
-//  doCorrect = msg?CkMsgDoCorrect(msg):1;
-  doCorrect = 1;
-
-  if (genTimeLog && !doCorrect) {
-//CmiPrintf("TIME: %f\n", startTime);
-      recvTime = effRecvTime = startTime;
-  }
-}
-
-
-bgTimeLog::~bgTimeLog()
-{
-  for (int i=0; i<msgs.length(); i++)
-    delete msgs[i];
-}
-
-
-void bgTimeLog::setExecTime(){
-  execTime = endTime - startTime;
-  if(execTime < EPSILON && execTime > -EPSILON)
-    execTime = 0.0;
-  CmiAssert(execTime >= 0.0);
-}
-
-void bgTimeLog::closeLog() 
-{ 
-    endTime = BgGetCurTime(); 
-    setExecTime();
-    
-//    if (correctTimeLog) BgAdjustTimeLineInsert(tTIMELINEREC);
-}
-
-
-void bgTimeLog::print(int node, int th)
-{
-  CmiPrintf("<<== [%d th:%d] ep:%d name:%s startTime:%f endTime:%f srcnode:%d msgID:%d\n", node, th, ep, name,startTime, endTime, srcnode, msgID);
-  for (int i=0; i<msgs.length(); i++)
-    msgs[i]->print();
-  CmiPrintf("==>>\n");
-}
-
-
-void bgTimeLog::write(FILE *fp)
-{ 
-  int i;
-  fprintf(fp,"<<==  %p ep:%d name:%s startTime:%f endTime:%f recvime:%f effRecvTime:%e srcnode:%d msgID:%d seqno:%d\n", this, ep, name,startTime, endTime, recvTime, effRecvTime, srcnode, msgID, seqno);
-  for (i=0; i<msgs.length(); i++)
-   msgs[i]->write(fp);
-  // fprintf(fp,"\nbackwardDeps [%d]:\n",backwardDeps.length());
-  fprintf(fp, "backward: ");
-  for (i=0; i<backwardDeps.length(); i++)
-    fprintf(fp,"[%p] ",backwardDeps[i]);
-  fprintf(fp, "\n");
-  fprintf(fp, "forward: ");
-  for (i=0; i<forwardDeps.length(); i++)
-    fprintf(fp,"[%p] ",forwardDeps[i]);
-  fprintf(fp, "\n");
-  fprintf(fp, "==>>\n");
-}
-
-
-void bgTimeLog::addBackwardDep(bgTimeLog* log){
-  
- CmiAssert(recvTime < 0.);
-  if(log != NULL){
-    backwardDeps.insertAtEnd(log);
-    log->forwardDeps.insertAtEnd(this);
-    effRecvTime = max(effRecvTime, log->effRecvTime);
-  }
-}
-
-void bgTimeLog::addBackwardDeps(CkVec<bgTimeLog*> logs){
-
-  /*put backward and forward dependents*/
-  for(int i=0;i<logs.length();i++)
-    addBackwardDep(logs[i]);
-}
-
-void bgTimeLog::addBackwardDeps(CkVec<void*> logs){
-
-  /*put backward and forward dependents*/
-  for(int i=0;i<logs.length();i++)
-    addBackwardDep((bgTimeLog*)(logs[i]));
-}
-
-// return the last eff recv time
-double bgTimeLog::getEndOfBackwardDeps(){
-  
-  double maxEndTime =0.0;
-  for(int i=0;i<backwardDeps.length();i++)
-//    maxEndTime = max(maxEndTime,backwardDeps[i]->endTime);
-    maxEndTime = max(maxEndTime,backwardDeps[i]->effRecvTime);
-      
-  return maxEndTime;
-}
-
-inline int bgTimeLog::adjustTimeLog(double tAdjust, BgTimeLine& tline, int mynode, int sendImmediately)
-{
+   	double tAdjust = log->startTime-log->oldStartTime;
 	//arg tAdjust is a relative time
 	if(isZero(tAdjust)) return 0;
-	oldStartTime = startTime;
+	log->oldStartTime = log->startTime;
 
-	for(int i=0; i<msgs.length(); i++) 
+	for(int i=0; i<log->msgs.length(); i++) 
 	{
-            bgMsgEntry *msgEntry = msgs[i];
+            bgMsgEntry *msgEntry = log->msgs[i];
 	    // update new msg send and recv time
 //	    msgEntry->sendtime += tAdjust;
 	    msgEntry->recvTime += tAdjust;
@@ -348,14 +158,14 @@ inline int bgTimeLog::adjustTimeLog(double tAdjust, BgTimeLine& tline, int mynod
 		
 	    CmiSetHandler(msg, CpvAccess(bgCorrectionHandler));
 #if ! USE_MULTISEND
-	    if (msgs[i]->dstPe < 0) {
+	    if (log->msgs[i]->dstPe < 0) {
 	      CmiSyncBroadcastAllAndFree(sizeof(bgCorrectionMsg),(char*)msg);
 	    }
 	    else{
-	      CmiSyncSendAndFree(BgNodeToPE(msgs[i]->dstPe),sizeof(bgCorrectionMsg),(char*)msg);
+	      CmiSyncSendAndFree(BgNodeToPE(log->msgs[i]->dstPe),sizeof(bgCorrectionMsg),(char*)msg);
 	    }  
 #else
-	    if (msgs[i]->dstPe < 0) {
+	    if (log->msgs[i]->dstPe < 0) {
 	      corrMsgBucket[0].push_back((char *)msg);
 	      for (int i=1; i<CmiNumPes(); i++)  {
 	        char *newmsg = CmiCopyMsg((char *)msg, sizeof(bgCorrectionMsg));
@@ -363,84 +173,11 @@ inline int bgTimeLog::adjustTimeLog(double tAdjust, BgTimeLine& tline, int mynod
 	      }
 	    }
 	    else {
-	      corrMsgBucket[BgNodeToPE(msgs[i]->dstPe)].push_back((char *)msg);
+	      corrMsgBucket[BgNodeToPE(log->msgs[i]->dstPe)].push_back((char *)msg);
 	    }
 #endif
 	}
 	return 1;
-}
-
-void BgTimeLineRec::logEntryStart(int handler, char *m) {
-  if (!genTimeLog) return;
-  if (tTHREADTYPE == WORK_THREAD) {
-      CmiAssert(bgCurLog == NULL);
-      bgCurLog = new bgTimeLog(handler, m);
-      enq(bgCurLog, 1);
-  }
-}
-
-void BgTimeLineRec::logEntryCommit() {
-  if (!genTimeLog) return;
-  if (tTHREADTYPE == WORK_THREAD) 
-  {
-      if(bgSkipEndFlag == 0)
-	timeline[timeline.length()-1]->closeLog();
-      else
-        bgSkipEndFlag=0;
-      if (correctTimeLog) {
-	BgAdjustTimeLineInsert(*this);
-	if (timeline.length()) 
-          tCURRTIME = timeline[timeline.length()-1]->endTime;
-	clearSendingLogs();
-      }
-      bgCurLog = NULL;
-  }
-}
-
-void BgTimeLineRec::logEntryInsert(bgTimeLog* log)
-{
-  CmiAssert(bgCurLog == NULL);
-  if(timeline[timeline.length()-1]->endTime == 0.0)
-    CmiPrintf("\nERROR tried to insert %s after %s\n",log->name,timeline[timeline.length()-1]->name);
-  enq(log, 1);
-}
-
-void BgTimeLineRec::logEntryStart(bgTimeLog* log)
-{
-  logEntryInsert(log);
-  bgCurLog = log;
-}
-
-void BgTimeLineRec::logEntryClose() {
-  if (!genTimeLog) return;
-  if (tTHREADTYPE == WORK_THREAD) 
-  {
-    bgTimeLog *lastlog = timeline[timeline.length()-1];
-    CmiAssert(bgCurLog == lastlog);
-    lastlog->closeLog();
-    bgCurLog = NULL;
-  }
-}
-
-void BgTimeLineRec::logEntrySplit()
-{
-  if (!genTimeLog) return;
-  CmiAssert(tTHREADTYPE == WORK_THREAD);
-  CmiAssert(bgCurLog != NULL);
-  bgTimeLog *rootLog = bgCurLog;
-  if (bgSkipEndFlag == 0) {
-    logEntryClose();
-  }
-  else {
-    bgCurLog=NULL;
-    bgSkipEndFlag = 0;
-  }
-
-  // make up a new bglog to start, setting up dependencies.
-  bgTimeLog *newLog = new bgTimeLog(-1, "broadcast", BgGetTime());
-  newLog->addBackwardDep(rootLog);
-  logEntryInsert(newLog);
-  bgCurLog = newLog;
 }
 
 int BgGetIndexFromTime(double effT, int seqno, BgTimeLineRec &tlinerec)
@@ -836,7 +573,7 @@ void BgFinishCorrection(BgTimeLineRec &tlinerec, int mynode, int tid, int idx, i
          if(log == tlinerec.sendingLogs[j])  { send = 0; }
      }
 #endif
-    c += log->adjustTimeLog(log->startTime-log->oldStartTime,tline,mynode,send);
+    c += adjustTimeLog(log,tline,mynode,send);
   }
 //if (c) CmiPrintf("[%d] BgFinishCorrection send %d corr msgs\n", CmiMyPe(), c);
 #else
@@ -863,7 +600,7 @@ void BgSendPendingCorrections(BgTimeLineRec &tlinerec, int mynode)
     if(tline[newSendIdx]->startTime>gvt+LEASH) break;
 #endif
     if(!isZero(diff)){
-      tline[newSendIdx]->adjustTimeLog(diff,tline,mynode,1);
+      adjustTimeLog(tline[newSendIdx],tline,mynode,1);
       count ++;
     }
     newSendIdx++;
@@ -1013,7 +750,7 @@ void bgAddProjEvent(void *data, double t, bgEventCallBackFn fn, void *uPtr, int 
   // if the last log is closed, this is a standalone event
   if (tlog->endTime != 0.0) {
     // ignore standalone event
-    return;
+    // return;
     double endT = tlog->endTime;
     tlog = new bgTimeLog(-1, "standalone", endT, endT);	
     tlog->recvTime = tlog->effRecvTime = endT;
