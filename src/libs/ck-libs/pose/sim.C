@@ -25,9 +25,6 @@ sim::sim()
 #ifdef POSE_STATS_ON
   localStats = (localStat *)CkLocalBranch(theLocalStats);
 #endif
-  sprintf(filename, "/scratch/terry/%don%d.log", thisIndex, CkMyPe());
-  //fp = fopen(filename, "a");
-  fp = NULL;
   lastGVT = active = DOs = UNDOs = 0;
   srVector = (int *)malloc(CkNumPes() * sizeof(int));
   for (int i=0; i<CkNumPes(); i++) srVector[i] = 0;
@@ -153,11 +150,8 @@ void sim::Cancel(cancelMsg *m)
 #ifdef POSE_STATS_ON
   localStats->TimerStart(CAN_TIMER);
 #endif
-  char str[20];
-  if (fp)
-    fprintf(fp, "[%d] RECV(Cancel) @ %d: Event=%s\n", thisIndex, m->timestamp,
-	    m->evID.sdump(str));
-  //CkPrintf("[%d] recv cancel %s at %d...\n", CkMyPe(), m->evID.sdump(str), m->timestamp);      
+  //  char str[20];
+  //  CkPrintf("[%d] RECV(cancel) %s at %d...\n", CkMyPe(), m->evID.sdump(str), m->timestamp);      
   localPVT = (PVT *)CkLocalBranch(ThePVT);
   cancels.Insert(m->timestamp, m->evID); // add to cancellations list
   localPVT->objUpdate(m->timestamp, RECV); // tell PVT branch about recv

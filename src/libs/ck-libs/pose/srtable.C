@@ -123,25 +123,36 @@ void SRtable::Restructure(POSE_TimeType newGVTest, POSE_TimeType firstTS,
 #endif
   register int i;
   // Backup the table to make new one in its place
+  int sumS_old=0, sumR_old=0, sumS=0, sumR=0;
   int keepBkt = (newGVTest-offset)/size_b;
+  if (keepBkt < b)
+    for (i=keepBkt; i<b; i++)
+      CompressAndSortBucket(i, 0);
+  CompressAndSortBucket(b, 1);
   int b_old = b, size_b_old = size_b, offset_old = offset;
   SRentry *buckets_old[MAX_B], *end_bucket_old[MAX_B], 
-    *overflow_old = overflow, *end_overflow_old = end_overflow, *tmp;
-  int sends_old[MAX_B], recvs_old[MAX_B];
-  int ofSends_old = ofSends, ofRecvs_old = ofRecvs;
+    *overflow_old, *end_overflow_old, *tmp;
+  int sends_old[MAX_B], recvs_old[MAX_B], ofSends_old, ofRecvs_old;
   for (i=0; i<b_old; i++) {
     buckets_old[i] = buckets[i];
     end_bucket_old[i] = end_bucket[i];
     sends_old[i] = sends[i];
     recvs_old[i] = recvs[i];
   }
+  overflow_old = overflow;
+  end_overflow_old = end_overflow;
+  ofSends_old = ofSends;
+  ofRecvs_old = ofRecvs;
+  for (i=0; i<b; i++) { sumS_old += sends_old[i]; sumR_old += recvs_old[i]; }
+  sumS_old += ofSends_old; sumR_old += ofRecvs_old;
+  // Build new table
   overflow = end_overflow = NULL;
   ofSends = ofRecvs = 0;
-  // Build new table
   offset = newGVTest;
-  b = firstTS - offset;
-  if ((b > MAX_B) || (b == 0)) b = MAX_B;
-  size_b = 1 + (firstTS - offset)/b;
+  POSE_TimeType d = firstTS - offset;
+  if (d < 0) d = 0;
+  if ((d > MAX_B) || (d == 0)) b = MAX_B;
+  size_b = 1 + d/b;
   for (i=0; i<b; i++) {
     buckets[i] = end_bucket[i] = NULL;
     sends[i] = recvs[i] = 0;
@@ -159,14 +170,19 @@ void SRtable::Restructure(POSE_TimeType newGVTest, POSE_TimeType firstTS,
 	delete tmp;
 	tmp = buckets_old[i];
       }
+      sumS_old -= sends_old[i];
+      sumR_old -= recvs_old[i];
+      sends_old[i] = recvs_old[i] = 0;
     }
 #ifdef SR_SANITIZE
-  sanitize();
+    sanitize();
 #endif
     // carefully sort through this bucket
     tmp = buckets_old[keepBkt];
     while (tmp && (tmp->timestamp < offset)) {
       buckets_old[keepBkt] = tmp->next;
+      sumS_old -= tmp->sends;
+      sumR_old -= tmp->recvs;
       sends_old[keepBkt] -= tmp->sends;
       recvs_old[keepBkt] -= tmp->recvs;
       delete tmp;
@@ -176,21 +192,21 @@ void SRtable::Restructure(POSE_TimeType newGVTest, POSE_TimeType firstTS,
       MapToBuckets(buckets_old[keepBkt], end_bucket_old[keepBkt], 
 		   &sends_old[keepBkt], &recvs_old[keepBkt]);
 #ifdef SR_SANITIZE
-  sanitize();
+    sanitize();
 #endif
     for (i=keepBkt+1; i<b_old; i++) { // keep all of these
       if (buckets_old[i])
 	MapToBuckets(buckets_old[i], end_bucket_old[i], 
-		   &sends_old[i], &recvs_old[i]);
+		     &sends_old[i], &recvs_old[i]);
     }
 #ifdef SR_SANITIZE
-  sanitize();
+    sanitize();
 #endif
     if (overflow_old)     // keep all of overflow
-	MapToBuckets(overflow_old, end_overflow_old, &ofSends_old, 
-		     &ofRecvs_old);
+      MapToBuckets(overflow_old, end_overflow_old, &ofSends_old, 
+		   &ofRecvs_old);
 #ifdef SR_SANITIZE
-  sanitize();
+    sanitize();
 #endif
   }
   else { // throw all buckets away
@@ -201,14 +217,19 @@ void SRtable::Restructure(POSE_TimeType newGVTest, POSE_TimeType firstTS,
 	delete tmp;
 	tmp = buckets_old[i];
       }
+      sumS_old -= sends_old[i];
+      sumR_old -= recvs_old[i];
+      sends_old[i] = recvs_old[i] = 0;
     }
 #ifdef SR_SANITIZE
-  sanitize();
+    sanitize();
 #endif
-    tmp = overflow_old;
     // carefully sort through overflow
+    tmp = overflow_old;
     while (tmp && (tmp->timestamp < offset)) {
       overflow_old = tmp->next;
+      sumS_old -= tmp->sends;
+      sumR_old -= tmp->recvs;
       ofSends_old -= tmp->sends;
       ofRecvs_old -= tmp->recvs;
       delete tmp;
@@ -217,9 +238,16 @@ void SRtable::Restructure(POSE_TimeType newGVTest, POSE_TimeType firstTS,
     if (overflow_old) 
       MapToBuckets(overflow_old, end_overflow_old, &ofSends_old, &ofRecvs_old);
 #ifdef SR_SANITIZE
-  sanitize();
+    sanitize();
 #endif
   }
+  
+  for (i=0; i<b; i++) { sumS += sends[i]; sumR += recvs[i]; }
+  sumS += ofSends; sumR += ofRecvs;
+
+  if ((sumS_old != sumS) || (sumR_old != sumR))
+    CkPrintf("Old sends=%d; old recvs=%d; new sends=%d, new recvs=%d\n", 
+	     sumS_old, sumR_old, sumS, sumR);
 
   if (firstSR != -1) Insert(firstTS, firstSR);
 #ifdef SR_SANITIZE
@@ -233,7 +261,9 @@ void SRtable::MapToBuckets(SRentry *bkt, SRentry *endBkt, int *s,
   int destBkt1 = (bkt->timestamp-offset)/size_b;  
   int destBkt2 = (endBkt->timestamp-offset)/size_b;
   SRentry *tmp = bkt;
+  CkAssert(destBkt1 <= destBkt2);
   while (destBkt1 != destBkt2) {
+    CkAssert(destBkt1 < destBkt2);
     if (destBkt1 >= b) break;
     bkt = tmp->next;
     (*s) -= tmp->sends;
@@ -328,8 +358,11 @@ UpdateMsg *SRtable::PackTable(POSE_TimeType pvt)
 #endif
   register int i;
   int packSize = 0, nEntries = 0, entryIdx = 0, nBkts = 0;
-  int destBkt = (pvt-offset)/size_b;  // which bucket?
+  int destBkt;  // which bucket?
   SRentry *tmp;
+
+  if (pvt == -1) destBkt = b-1;
+  else destBkt = (pvt-offset)/size_b;
 
   SortTable();
   nBkts = destBkt;
@@ -514,8 +547,7 @@ void SRtable::dump()
 {
   SRentry *tmp;
   CkPrintf("\nSRtable: offset=%d b=%d size_b=%d\n", offset, b, size_b);
-  //  for (int i=0; i<b; i++) {
-  for (int i=0; i<1; i++) {
+  for (int i=0; i<b; i++) {
     tmp = buckets[i];
     CkPrintf("... Bucket[%d]: ", i);
     while (tmp) { 
@@ -524,14 +556,12 @@ void SRtable::dump()
     }
     CkPrintf("\n");
   }
-/*
   tmp = overflow;
   CkPrintf("... Overflow: ");
   while (tmp) {
     tmp->dump();
     tmp = tmp->next;
   }
-*/
   CkPrintf("\n");
 }
 

@@ -186,10 +186,6 @@ class sim : public ArrayElement1D {
       during load balancing... */
   int active; 
  public:
-  /// Output file name for debugging logs
-  char filename[50];
-  /// Output file pointer for debugging logs
-  FILE *fp;
   /// This poser's event queue
   eventQueue *eq;
   /// This poser's synchronization strategy   

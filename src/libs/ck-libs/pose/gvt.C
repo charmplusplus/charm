@@ -76,7 +76,7 @@ void PVT::startPhase()
   um->conPVT = conPVT;
   um->runGVTflag = 0;
 
-  //CkPrintf("PVT %d reporting pvt=%d.\n", CkMyPe(), pvt);
+  //CkPrintf("[%d] PVT reporting pvt=%d.\n", CkMyPe(), pvt);
 
   // send data to GVT estimation
   if (simdone) // transmit final info to GVT on PE 0
@@ -274,8 +274,7 @@ void GVT::computeGVT(UpdateMsg *m)
       estGVT = lastSR;
 
     // check for inactivity
-    if ((optGVT == POSE_UnsetTS) && (earliestMsg == POSE_UnsetTS) && 
-	(lastSR == POSE_UnsetTS)) {
+    if ((optGVT == POSE_UnsetTS) && (earliestMsg == POSE_UnsetTS)) {
       inactive++; 
       estGVT = lastGVT;
       if (inactive == 1) inactiveTime = lastGVT;
