@@ -538,7 +538,11 @@ void CmiMachineInit()
   }
 
   status = gm_init();
-  if (status != GM_SUCCESS) { gm_perror("gm_init", status); return; }
+  if (status != GM_SUCCESS) { 
+  	printf("Cannot open GM library (does the machine have a GM card?)\n");
+  	gm_perror("gm_init", status); 
+	return; 
+  }
   
   device = 0;
   for (dataport=2;dataport<dataport_max;dataport++) {
