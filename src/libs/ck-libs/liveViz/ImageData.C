@@ -428,10 +428,11 @@ int ImageData::CombineImageDataSize (int nMsg, CkReductionMsg **msgs)
     Header* currHead        = NULL; // header of current data line
     Header* minHead         = NULL; // header of next data line to 
                                     // be added to buff
+    int     i;
 
 
     // find optimistic buffer size
-    for (int i=0; i<nMsg; i++)
+    for (i=0; i<nMsg; i++)
     {
         buffSize += (*((int*)((msgs [i])->getData ())))*sizeof (Header);
     }
@@ -464,7 +465,7 @@ int ImageData::CombineImageDataSize (int nMsg, CkReductionMsg **msgs)
               sizeof (liveVizRequest);
 
     // initialize 'pos' and 'size'
-    for (int i=0; i<nMsg; i++)
+    for (i=0; i<nMsg; i++)
     {
         size [i] = *((int*)((msgs[i])->getData ()));
         pos [i]  = 0;
