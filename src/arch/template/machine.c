@@ -43,6 +43,9 @@ void          CmiSyncBroadcastAllFn(int, char *);
 CmiCommHandle CmiAsyncBroadcastAllFn(int, char *);
 void          CmiFreeBroadcastAllFn(int, char *);
 
+int           CmiAsyncMsgSent(CmiCommHandle handle);
+void          CmiReleaseCommHandle(CmiCommHandle handle);
+
 void	      CmiMultipleSend(unsigned int, int, int *, char **);
 void	      CmiMultipleIsend(unsigned int, int, int *, char **);
 
@@ -313,11 +316,11 @@ int  CmiScanf(const char *, ...);
 
 #if ! CMK_SPANTREE_USE_COMMON_CODE
 
-int      CmiSpanTreeNumChildren(int) ;
+int      CmiNumSpanTreeChildren(int) ;
 int      CmiSpanTreeParent(int) ;
 void     CmiSpanTreeChildren(int node, int *children);
 
-int      CmiNodeSpanTreeNumChildren(int);
+int      CmiNumNodeSpanTreeChildren(int);
 int      CmiNodeSpanTreeParent(int) ;
 void     CmiNodeSpanTreeChildren(int node, int *children) ;
 

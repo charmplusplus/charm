@@ -721,10 +721,10 @@ extern void CsdSchedulePoll(void);
 
 #else
 
-int      CmiSpanTreeNumChildren(int) ;
+int      CmiNumSpanTreeChildren(int) ;
 int      CmiSpanTreeParent(int) ;
 void     CmiSpanTreeChildren(int node, int *children);
-int      CmiNodeSpanTreeNumChildren(int);
+int      CmiNumNodeSpanTreeChildren(int);
 int      CmiNodeSpanTreeParent(int) ;
 void     CmiNodeSpanTreeChildren(int node, int *children) ;
 #endif
@@ -764,6 +764,9 @@ CmiCommHandle CmiAsyncVectorSend(int, int, int *, char **);
 void          CmiSyncVectorSendAndFree(int, int, int *, char **);
 void	      CmiMultipleSend(unsigned int, int, int *, char **);
 void	      CmiMultipleIsend(unsigned int, int, int *, char **);
+
+int           CmiAsyncMsgSent(CmiCommHandle);
+void          CmiReleaseCommHandle(CmiCommHandle);
 
 #define CmiSyncSend(p,s,m)              (CmiSyncSendFn((p),(s),(char *)(m)))
 #define CmiAsyncSend(p,s,m)             (CmiAsyncSendFn((p),(s),(char *)(m)))
