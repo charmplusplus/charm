@@ -536,13 +536,23 @@ const char *CImessage = // msgType
 "};\n"
 ;
 
-const char *CIAsyncCreateProto = // charename, msgname
-"extern void CAsync_\01(\02 *m);\n"
+const char *CIAsyncChareCreateProto = // charename, msgname
+"extern void CAsync_\01(\02 *m, int onPE=CK_PE_ANY);\n"
 ;
 
-const char *CIAsyncCreateImpl = // charename, msgname
-"void CAsync_\01(\02 *m) {\n"
-"  new_chare(\01, \02, m);\n"
+const char *CIAsyncChareCreateImpl = // charename, msgname
+"void CAsync_\01(\02 *m, int onPE) {\n"
+"  new_chare2(\01, \02, m, (ChareIDType *)0, onPE);\n"
+"};\n"
+;
+
+const char *CIAsyncGroupCreateProto = // groupname, msgname
+"extern int CAsync_\01(\02 *m);\n"
+;
+
+const char *CIAsyncGroupCreateImpl = // groupname, msgname
+"int CAsync_\01(\02 *m) {\n"
+"  return new_group(\01, \02, m);\n"
 "};\n"
 ;
 
@@ -694,16 +704,18 @@ void GenerateProxies(ofstream& top, ofstream& bot)
 
   /* Output Async Creation Methods for chares */
   for(c=thismodule->chares; c!=NULL; c=c->next) {
-    // do not emit creation method for groups
-    if(c->chareboc != CHARE)
-      continue;
     // Do not emit creation method for main chare
     if(strcmp(c->name, "main")==0)
       continue;
     for(e=c->entries;e!=NULL;e=e->next) {
       if(strcmp(c->name, e->name)==0) {
-        spew(top, CIAsyncCreateProto, c->name, e->msgtype->name);
-        spew(bot, CIAsyncCreateImpl, c->name, e->msgtype->name);
+        if(c->chareboc == CHARE) {
+          spew(top, CIAsyncChareCreateProto, c->name, e->msgtype->name);
+          spew(bot, CIAsyncChareCreateImpl, c->name, e->msgtype->name);
+        } else {
+          spew(top, CIAsyncGroupCreateProto, c->name, e->msgtype->name);
+          spew(bot, CIAsyncGroupCreateImpl, c->name, e->msgtype->name);
+        }
       }
     }
   }
