@@ -83,7 +83,8 @@ syntax() {
   echo '4. compile Charm++ for Windows with VC++ (Cygwin required):'
   echo '  ./build charm++ net-win32 -O'
   echo '5. compile on IBM SP with MPI using parallel gmake, 4 jobs simultaneously:'
-  echo '  MAKE=gmake  ./build charm++ mpi-sp -j 4'
+  echo '  MAKE=gmake  ./build charm++ mpi-sp -j 4 -O            # sh'
+  echo '  setenv MAKE gmake;  ./build charm++ mpi-sp -j 4 -O    # csh'
   echo ''
   echo 'Note: This script:'
   echo ' 1. Creates directories <version> and <version>/tmp';
