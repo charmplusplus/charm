@@ -79,15 +79,18 @@ class TCharm: public ArrayElement1D
 		TCpupUserDataC cfn;
 		TCpupUserDataF ffn;
 	public:
-		UserData() {data=NULL; cfn=NULL; ffn=NULL;}
+		UserData(int i=0) {data=NULL; cfn=NULL; ffn=NULL;}
 		UserData(TCpupUserDataC cfn_,void *data_)
 			{cfn=cfn_; data=data_; isC=true;}
 		class isFortran{};
 		UserData(TCpupUserDataF ffn_,void *data_,isFortran tag)
 			{ffn=ffn_; data=data_; isC=false;}
-		void *getData(void) {return data;}
+		inline void *getData(void) const {return data;}
 		void pup(PUP::er &p);
+		friend inline void operator|(PUP::er &p,UserData &d) {d.pup(p);}
 	};
+	//New interface for user data:
+	CkPupVec<UserData> sud;
 	
 	//One-time initialization
 	static void nodeInit(void);
@@ -109,6 +112,7 @@ class TCharm: public ArrayElement1D
 	ThreadInfo threadInfo;
 	double timeOffset; //Value to add to CkWallTimer to get my clock
 
+	//Old interface for user data:
 	enum {maxUserData=16};
 	int nUd;
 	UserData ud[maxUserData];

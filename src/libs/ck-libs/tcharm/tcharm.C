@@ -172,6 +172,7 @@ void TCharm::pup(PUP::er &p) {
   p(nUd);
   for(int i=0;i<nUd;i++) 
     ud[i].pup(p);
+  sud.pup(p);
   TCharm::setState(inFramework);
 
   if (!p.isUnpacking()) 
@@ -196,14 +197,15 @@ void TCharm::UserData::pup(PUP::er &p)
   if (isC) { //C version
     //FIXME: function pointers may not be valid across processors
     p((void*)&cfn, sizeof(TCpupUserDataC));
-    cfn(pext,data);
+    if (cfn) cfn(pext,data);
   } 
   else { //Fortran version
     //FIXME: function pointers may not be valid across processors
     p((void*)&ffn, sizeof(TCpupUserDataF));        
-    ffn(pext,data);
+    if (ffn) ffn(pext,data);
   }
 }
+
 
 TCharm::~TCharm() 
 {
@@ -684,6 +686,27 @@ CDECL void *TCharmGetUserdata(int id)
 }
 FDECL void *FTN_NAME(TCHARM_GET_USERDATA,tcharm_get_userdata)(int *id)
 { return TCharmGetUserdata(*id); }
+
+CDECL void TCharmSetGlobal(int globalID,void *new_value,TCharmPupGlobalFn pup_or_NULL)
+{
+	TCHARMAPI("TCharmSetGlobal");
+	TCharm *tc=TCharm::get();
+	if (tc->sud.length()<=globalID) 
+	{ //We don't have room for this ID yet: make room
+		int newLen=2*globalID;
+		tc->sud.setSize(newLen);
+		tc->sud.length()=newLen;
+	}
+	tc->sud[globalID]=TCharm::UserData((TCharmPupFn) pup_or_NULL,new_value);
+}
+CDECL void *TCharmGetGlobal(int globalID)
+{
+	//Skip TCHARMAPI("TCharmGetGlobal") because there's no dynamic allocation here,
+	// and this routine should be as fast as possible.
+	CkVec<TCharm::UserData> &v=TCharm::get()->sud;
+	if (v.length()<=globalID) return NULL; //Uninitialized global
+	return v[globalID].getData();
+}
 
 CDECL void TCharmMigrate(void)
 {

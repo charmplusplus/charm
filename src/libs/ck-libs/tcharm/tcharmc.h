@@ -46,12 +46,19 @@ int TCharmGetNumChunks(void);
 int TCharmElement(void);
 int TCharmNumElements(void);
 void TCharmBarrier(void);
+void TCharmMigrate(void);
+void TCharmDone(void);
 
+/* Set/get thread-private ("thread global") data. */
 typedef void (*TCharmPupFn)(pup_er p,void *data);
 int TCharmRegister(void *data,TCharmPupFn pfn);
 void *TCharmGetUserdata(int id);
-void TCharmMigrate(void);
-void TCharmDone(void);
+
+/* Alternate API for Set/get thread-private ("thread global") data. */
+typedef void (*TCharmPupGlobalFn)(pup_er p);
+void TCharmSetGlobal(int globalID,void *new_value,TCharmPupGlobalFn pup_or_NULL);
+void *TCharmGetGlobal(int globalID);
+
 
 /*Get the local wall clock.  Unlike CkWalltimer, is
   monotonically increasing, even with migration and 
