@@ -115,7 +115,7 @@ void sim::Commit()
 #ifdef POSE_STATS_ON
   localStats->SwitchTimer(MISC_TIMER);
 #endif
-  if (localPVT->getGVT() > lastGVT) {
+  if (localPVT->getGVT() > lastGVT + 10) {
     lastGVT = localPVT->getGVT();
     if (localPVT->done()) { // simulation inactive
       eq->CommitEvents(this, -1); // commit all events in queue

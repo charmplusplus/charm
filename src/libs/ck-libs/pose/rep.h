@@ -35,9 +35,11 @@ class rep
   rep() { 
     ovt = 0; ort = 0.0; copy = 0; parent = NULL; myStrat = NULL; 
     anti_methods = 0;
+#ifndef SEQUENTIAL_POSE
 #ifdef POSE_COMM_ON    
     POSE_Objects = POSE_Objects_RO;
     ComlibDelegateProxy(&POSE_Objects);
+#endif
 #endif
   }
   /// Initializing Constructor

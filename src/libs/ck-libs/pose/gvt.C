@@ -274,7 +274,7 @@ void GVT::computeGVT(UpdateMsg *m)
     // Check if send/recv activity provides lower possible estimate
     SRentry *tmp = SRs;
     int lastSR = POSE_UnsetTS;
-    while (tmp && ((tmp->timestamp < estGVT) || (estGVT == POSE_UnsetTS))) {
+    while (tmp && ((tmp->timestamp <= estGVT) || (estGVT == POSE_UnsetTS))) {
       lastSR = tmp->timestamp;
       if (tmp->sends != tmp->recvs) {
 	earliestMsg = tmp->timestamp;

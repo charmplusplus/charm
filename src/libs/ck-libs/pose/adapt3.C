@@ -9,18 +9,33 @@ void adapt3::Step()
   int iter=0, offset;
   double critStart;
 
-  //rbFlag = 0;
+  rbFlag = 0;
   if (!parent->cancels.IsEmpty()) CancelUnexecutedEvents();
   if (eq->RBevent) Rollback();
   if (!parent->cancels.IsEmpty()) CancelEvents();
   parent->Status();
 
-  if (eq->currentPtr->timestamp > POSE_UnsetTS) {
-    timeLeash = eq->largest - lastGVT;
-    //if (rbFlag) timeLeash = (timeLeash + avgRBoffset)/2;
-    if (specEventCount > (specTol*eventCount)) 
-      timeLeash = 1; //eq->currentPtr->timestamp - lastGVT;
+  if (rbFlag) { 
+    timeLeash == avgRBoffset;
   }
+  if (specEventCount > (specTol*eventCount)) {
+    timeLeash--;
+    if (timeLeash == 0) timeLeash = 1;
+  }
+  else if (specEventCount < (specTol*eventCount)) {
+    timeLeash++;
+  }
+  /*
+  if (rbFlag) timeLeash = 1;
+  else if (eq->currentPtr->timestamp > POSE_UnsetTS)
+    timeLeash = (timeLeash + (eq->largest - lastGVT))/2;
+  else timeLeash = avgRBoffset;
+    else if (specEventCount > (specTol*eventCount)) 
+    timeLeash = 1;
+    else if (specEventCount > (specTol*eventCount)-0.1)
+    timeLeash = (timeLeash + avgRBoffset)/2;
+  */
+  
   // Shorten the leash as we near POSE_endtime
   if ((POSE_endtime > POSE_UnsetTS) && (lastGVT + timeLeash > POSE_endtime))
     timeLeash = POSE_endtime - lastGVT;
@@ -54,6 +69,7 @@ void adapt3::Step()
   }
 #ifdef POSE_STATS_ON
   if (iter > 0) localStats->Loop();
+  //if (iter > 5) CkPrintf("Executed %d events on this iteration; SE=%d E=%d\n", iter, specEventCount, eventCount);
 #endif
 }
  
