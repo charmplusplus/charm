@@ -167,7 +167,7 @@ public:
   EntryIndexType elementMigrateType;
 };
 
-class ArrayMessage : public CMessage_ArrayMessage
+class ArrayMessage
 {
 public:
   int destIndex;
