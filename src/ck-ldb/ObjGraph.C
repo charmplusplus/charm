@@ -39,6 +39,8 @@ ObjGraph::ObjGraph(int count, CentralLB::LDStats* _stats)
     int index;
     // initialize node array
     for(index = 0; index < stats[pe].n_objs; index++) {
+      if(cur_node >= n_objs)
+	CkPrintf("Error %d %d\n",cur_node,n_objs);
       Node* thisnode = nodelist + cur_node;
       thisnode->node_index = cur_node;
       thisnode->proc = pe;
@@ -53,7 +55,7 @@ ObjGraph::ObjGraph(int count, CentralLB::LDStats* _stats)
       thisnode->nxt_hash = node_table[hashval];
       node_table[hashval] = thisnode;
     }
-    
+
     // initialize edge array
     for(index=0; index < stats[pe].n_comm; index++) {
       const LDCommData newedgedata = stats[pe].commData[index];
@@ -61,6 +63,9 @@ ObjGraph::ObjGraph(int count, CentralLB::LDStats* _stats)
       // If this isn't an object-to-object message, ignore it
       if (newedgedata.from_proc || newedgedata.to_proc)
 	continue;
+
+      if(cur_edge >= n_edges)
+	CkPrintf("Error %d %d\n",cur_edge,n_edges);
 
       Edge* thisedge = edgelist + cur_edge;
       thisedge->edge_index = cur_edge;
@@ -73,6 +78,11 @@ ObjGraph::ObjGraph(int count, CentralLB::LDStats* _stats)
       cur_edge++;
     }
   }
+  if(cur_node != n_objs)
+      CkPrintf("did not fill table %d %d\n",cur_node,n_objs);
+
+  if(cur_edge != n_edges)
+    CkPrintf("did not fill edge table %d %d\n",cur_edge,n_edges);
 
   // Now go through the comm lists
   for(cur_edge = 0; cur_edge < n_edges; cur_edge++) {
