@@ -10,11 +10,9 @@
 #define VER   3.0
 
 CpvDeclare(Trace*, _trace);
-CpvDeclare(int, traceOn);
 CpvDeclare(int, CtrLogBufSize);
 CpvStaticDeclare(LogPool*, _logPool);
 CpvStaticDeclare(char*, pgmName);
-CpvExtern(CthThread, curThread);
 static int _numEvents = 0;
 static int _threadMsg, _threadChare, _threadEP;
 static int _packMsg, _packChare, _packEP;
@@ -22,22 +20,18 @@ static int _unpackMsg, _unpackChare, _unpackEP;
 CpvDeclare(double, binSize);
 CpvDeclare(double, version);
 
-extern "C" void setEvent(CthThread t, int event);
-extern "C" int getEvent(CthThread t);
-
 extern "C" 
 void traceInit(char **argv)
 {
   char *tmpStr;
+  traceCommonInit(argv,1);
   CpvInitialize(Trace*, _trace);
   CpvInitialize(LogPool*, _logPool);
-  CpvInitialize(int, traceOn);
   CpvInitialize(int, CtrLogBufSize);
   CpvInitialize(char*, pgmName);
   CpvInitialize(double, binSize);
   CpvInitialize(double, version);
   CpvAccess(_trace) = new TraceProjections();
-  CpvAccess(traceOn) = 1;
   CpvAccess(pgmName) = (char *) malloc(strlen(argv[0])+1);
   _MEMCHECK(CpvAccess(pgmName));
   strcpy(CpvAccess(pgmName), argv[0]);
@@ -49,8 +43,6 @@ void traceInit(char **argv)
   	sscanf(tmpStr,"%lf",&CpvAccess(binSize));
   if (CmiGetArgString(argv,"+version",&tmpStr))
   	sscanf(tmpStr,"%lf",&CpvAccess(version));
-  if (CmiGetArgFlag(argv,"+traceoff"))
-     CpvAccess(traceOn) = 0;
   CpvAccess(_logPool) = new LogPool(CpvAccess(pgmName));
 }
 
@@ -77,7 +69,7 @@ void traceSuspend(void)
 }
 
 extern "C"
-void traceAwaken(void)
+void traceAwaken(CthThread t)
 {
 }
 
@@ -102,9 +94,6 @@ void traceClose(void)
   delete CpvAccess(_logPool);
 }
 
-extern "C" void traceBegin(void) {CpvAccess(traceOn) = 1;}
-extern "C" void traceEnd(void) {CpvAccess(traceOn) = 0;}
-
 extern "C"
 void traceClearEps(void)
 {
@@ -122,7 +111,7 @@ void CkSummary_StartPhase(int phase)
 extern "C" 
 void CkSummary_MarkEvent(int eventType)
 {
-   CpvAccess(_logPool)->addEventType(eventType, CmiTimer());
+   CpvAccess(_logPool)->addEventType(eventType, CmiWallTimer());
 }
 
 
@@ -319,7 +308,7 @@ void TraceProjections::beginExecute(envelope *e)
   else {
     execEp = e->getEpIdx();
   }
-  double t = CmiTimer();
+  double t = CmiWallTimer();
 //CmiPrintf("start: %f \n", start);
 
   start = t;
@@ -336,7 +325,7 @@ void TraceProjections::beginExecute(envelope *e)
 void TraceProjections::endExecute(void)
 {
 //  if (!flag) return;
-  double t = CmiTimer();
+  double t = CmiWallTimer();
   double ts = start;
   double nts = binStart;
 
@@ -366,22 +355,22 @@ void TraceProjections::endIdle(void)
 
 void TraceProjections::beginPack(void)
 {
-    packstart = CmiTimer();
+    packstart = CmiWallTimer();
 }
 
 void TraceProjections::endPack(void)
 {
-    CpvAccess(_logPool)->setEp(_packEP, CmiTimer() - packstart);
+    CpvAccess(_logPool)->setEp(_packEP, CmiWallTimer() - packstart);
 }
 
 void TraceProjections::beginUnpack(void)
 {
-    unpackstart = CmiTimer();
+    unpackstart = CmiWallTimer();
 }
 
 void TraceProjections::endUnpack(void)
 {
-    CpvAccess(_logPool)->setEp(_unpackEP, CmiTimer()-unpackstart);
+    CpvAccess(_logPool)->setEp(_unpackEP, CmiWallTimer()-unpackstart);
 }
 
 void TraceProjections::beginCharmInit(void) {}
@@ -417,7 +406,7 @@ void TraceProjections::endComputation(void)
      msgNum ++;
 
      binStart  += CpvAccess(binSize);
-     double t = CmiTimer();
+     double t = CmiWallTimer();
      double ts = binStart;
      while (ts < t)
      {
