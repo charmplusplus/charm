@@ -830,7 +830,7 @@ SDAGHEADERS= CToken.h EToken.h CParsedFile.h \
 charmxi: ../bin/charmxi
 
 ../bin/charmxi: $(CHARMXIOBJ) $(SDAGOBJ)
-	$(NATIVECHARMC) -seq -language c++ -cp ../bin/ -o charmxi $(CHARMXIOBJ) $(SDAGOBJ)
+	$(NATIVECHARMC) -language c++ -cp ../bin/ -o charmxi $(CHARMXIOBJ) $(SDAGOBJ)
 
 xi-main.o: xi-main.C $(XIHEADERS) $(SDAGHEADERS)
 	$(NATIVECHARMC) xi-main.C
