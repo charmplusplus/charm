@@ -9,7 +9,7 @@ all: libpacklib.a
 	/bin/cp cpacklib.h $(MYINCPATH)
 
 libpacklib.a: $(OBJS)
-	$(CHARMC) -cp ../../../../lib -o libpacklib.a $(OBJS)
+	$(CHARMC) -o ../../../../lib/libpacklib.a $(OBJS)
 
 packc.o: packc.C PackLib.h
 	$(CHARMC) -c packc.C
