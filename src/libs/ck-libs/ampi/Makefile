@@ -13,6 +13,7 @@ DESTF=$(CDIR)/lib/libmoduleampif.a
 all: AMPI AMPIF
 
 AMPI: $(DEST) 
+	@echo "AMPI built successfully"
 
 AMPIF: $(DESTF)
 
