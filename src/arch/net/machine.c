@@ -1609,23 +1609,26 @@ CmiCommHandle CmiGeneralSend(int pe, int size, int freemode, char *data)
     data = copy; freemode = 'F';
   }
   
-  if (pe == cs->pe) 
-#if ! CMK_SMP
-  if (!_immRunning) /* CdsFifo_Enqueue, below, isn't SIGIO or thread safe.  
-                      The SMP comm thread never gets here, because of the pe test. */
-#endif
-  {
+  if (pe == cs->pe) {
+#if CMK_IMMEDIATE_MSG
       /* execute the immediate message right away */
     if (CmiIsImmediate(data)) {
       CmiHandleImmediateMessage(data);
       return 0;
     }
+#endif
+#if ! CMK_SMP
+    if (!_immRunning) /* CdsFifo_Enqueue, below, isn't SIGIO or thread safe.  
+                      The SMP comm thread never gets here, because of the pe test. */
+#endif
+    {
     CdsFifo_Enqueue(cs->localqueue, data);
     if (freemode == 'A') {
       MallocOutgoingMsg(ogm);
       ogm->freemode = 'X';
       return ogm;
     } else return 0;
+    }
   }
 
   ogm=PrepareOutgoing(cs,pe,size,freemode,data);
