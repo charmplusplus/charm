@@ -112,15 +112,28 @@ NormalSlabArray::doIFFT(int src_id, int dst_id)
     int i, pe;
     for (i = 0, pe = 0; i < fftinfo.destSize[0]; i += fftinfo.srcPlanesPerSlab, pe++) {
 	int ti;
+#ifdef IFFT_DUMP
+    char ofile[80];
+    snprintf(ofile,80,"fftlibSending%d_%d_%d.out",src_id,thisIndex,pe);
+    FILE *ifd=fopen(ofile,"w");
+#endif    
+
 	temp = sendData;
 	for (ti = i; ti < i + fftinfo.srcPlanesPerSlab; ti++)
 	    for (p = 0; p < fftinfo.destPlanesPerSlab; p++) {
 		memcpy(temp,
 		       dataPtr + p * planeSize + ti * lineSize,
 		       sizeof(complex) * lineSize);
+#ifdef IFFT_DUMP
+		for(int point=0;point<lineSize;point++)
+		  fprintf(ifd,"%d r %.10g i %.10g\n",point+(temp-sendData),((complex *) dataPtr + point + p * planeSize + ti * lineSize)->re,((complex *) dataPtr + point + p * planeSize + ti * lineSize)->im);
+#endif
 		temp += lineSize;
 	    }
 	((CProxy_NormalSlabArray)fftinfo.srcProxy)(pe).acceptDataForIFFT(lineSize * fftinfo.destPlanesPerSlab * fftinfo.srcPlanesPerSlab, sendData, thisIndex, dst_id);
+#ifdef IFFT_DUMP
+	fclose(ifd);
+#endif
     }
     delete [] sendData;
 }
@@ -141,12 +154,22 @@ NormalSlabArray::acceptDataForIFFT(int numPoints, complex *points, int posn, int
     
     counts[info_id]++;
     int p;
+#ifdef IFFT_DUMP
+    char ofile[80];
+    snprintf(ofile,80,"fftlibaccepted%d_%d.out",info_id,thisIndex);
+    FILE *ifd=fopen(ofile,"w");
+#endif    
     for(p = 0; p < fftinfo.srcPlanesPerSlab; p++) {
 	memcpy(dataPtr + p * planeSize + posn * lineSize * fftinfo.destPlanesPerSlab,
 	       points, 
 	       sizeof(complex) * lineSize * fftinfo.destPlanesPerSlab);
 	points += lineSize * fftinfo.destPlanesPerSlab;
+	for(int apoint=0;apoint<lineSize*fftinfo.destPlanesPerSlab;apoint++)
+	  fprintf(ifd,"r %.10g i %.10g\n", ((complex *) dataPtr +p *planeSize +posn*lineSize*fftinfo.destPlanesPerSlab+apoint)->re,((complex *) dataPtr +p *planeSize +posn*lineSize*fftinfo.destPlanesPerSlab+apoint)->im);
     }
+#ifdef IFFT_DUMP
+    fclose(ifd);
+#endif
     
     if (counts[info_id] == fftinfo.srcSize[0] / fftinfo.destPlanesPerSlab) {
 	counts[info_id] = 0;
