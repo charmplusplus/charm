@@ -10,7 +10,7 @@
 typedef CkQ<multicastGrpMsg *> multicastGrpMsgBuf;
 typedef CkVec<CkArrayIndexMax>  arrayIndexList;
 typedef CkVec<CkSectionCookie>  sectionIdList;
-typedef CkVec<CkSectionReductionMsg *>  reductionMsgs;
+typedef CkVec<CkMcastReductionMsg *>  reductionMsgs;
 
 
 class reductionInfo {
@@ -421,10 +421,10 @@ void CkGetSectionCookie(CkSectionCookie &id, void *msg)
 
 // Reduction
 
-CkSectionReductionMsg* CkSectionReductionMsg::buildNew(int NdataSize,void *srcData,
+CkMcastReductionMsg* CkMcastReductionMsg::buildNew(int NdataSize,void *srcData,
                   CkReduction::reducerType reducer)
 {
-  CkSectionReductionMsg *newmsg = new (NdataSize, 0) CkSectionReductionMsg;
+  CkMcastReductionMsg *newmsg = new (NdataSize, 0) CkMcastReductionMsg;
   newmsg->dataSize = NdataSize;
   memcpy(newmsg->data, srcData, NdataSize);
   newmsg->flag = 0;
@@ -448,9 +448,9 @@ void CkMulticastMgr::setReductionClient(CProxySection_ArrayElement &proxy, redCl
   entry->red.storedClientParam = param;
 }
 
-inline CkSectionReductionMsg *CkMulticastMgr::buildContributeMsg(int dataSize,void *data,CkReduction::reducerType type, CkSectionCookie &id, CkCallback &cb)
+inline CkMcastReductionMsg *CkMulticastMgr::buildContributeMsg(int dataSize,void *data,CkReduction::reducerType type, CkSectionCookie &id, CkCallback &cb)
 {
-  CkSectionReductionMsg *msg = CkSectionReductionMsg::buildNew(dataSize, data);
+  CkMcastReductionMsg *msg = CkMcastReductionMsg::buildNew(dataSize, data);
   msg->reducer = type;
   msg->sid = id;
   msg->flag = 1;   // from array element
@@ -472,7 +472,7 @@ void CkMulticastMgr::contribute(int dataSize,void *data,CkReduction::reducerType
   if (id.val == NULL || id.redNo == -1) 
     CmiAbort("contribute: SectionID is not initialized\n");
 
-  CkSectionReductionMsg *msg = CkSectionReductionMsg::buildNew(dataSize, data);
+  CkMcastReductionMsg *msg = CkMcastReductionMsg::buildNew(dataSize, data);
   msg->reducer = type;
   msg->sid = id;
   msg->flag = 1;   // from array element
@@ -487,7 +487,7 @@ void CkMulticastMgr::contribute(int dataSize,void *data,CkReduction::reducerType
   mCastGrp[id.pe].recvRedMsg(msg);
 }
 
-void CkMulticastMgr::recvRedMsg(CkSectionReductionMsg *msg)
+void CkMulticastMgr::recvRedMsg(CkMcastReductionMsg *msg)
 {
   int i;
   CkSectionCookie id = msg->sid;
@@ -565,7 +565,7 @@ void CkMulticastMgr::recvRedMsg(CkSectionReductionMsg *msg)
       if (redInfo.msgs[i]->rebuilt) rebuilt = 1;
       if (!redInfo.msgs[i]->callback.isInvalid()) msg_cb = redInfo.msgs[i]->callback;
     }
-    CkSectionReductionMsg *newmsg = (*f)(redInfo.msgs.length(), redInfo.msgs.getVec());
+    CkMcastReductionMsg *newmsg = (*f)(redInfo.msgs.length(), redInfo.msgs.getVec());
     // check if migration and free messages
     for (i=0; i<redInfo.msgs.length(); i++) {
       delete redInfo.msgs[i];
@@ -673,21 +673,21 @@ void CkMulticastMgr::updateRedNo(mCastEntryPtr entry, int red)
 ////////////////////////////////////////////////////////////////////////////////
 /////
 ///////////////// Builtin Reducer Functions //////////////
-static CkSectionReductionMsg *invalid_reducer(int nMsg,CkSectionReductionMsg **msg)
+static CkMcastReductionMsg *invalid_reducer(int nMsg,CkMcastReductionMsg **msg)
 {CkAbort("ERROR! Called the invalid reducer!\n");return NULL;}
 
 /* A simple reducer, like sum_int, looks like this:
-static CkSectionReductionMsg *sum_int(int nMsg,CkSectionReductionMsg **msg)
+static CkMcastReductionMsg *sum_int(int nMsg,CkMcastReductionMsg **msg)
 {
   int i,ret=0;
   for (i=0;i<nMsg;i++)
     ret+=*(int *)(msg[i]->data);
-  return CkSectionReductionMsg::buildNew(sizeof(int),(void *)&ret);
+  return CkMcastReductionMsg::buildNew(sizeof(int),(void *)&ret);
 }
 */
 
 #define SIMPLE_REDUCTION(name,dataType,typeStr,loop) \
-static CkSectionReductionMsg *name(int nMsg, CkSectionReductionMsg **msg)\
+static CkMcastReductionMsg *name(int nMsg, CkMcastReductionMsg **msg)\
 {\
   int m,i;\
   int nElem=msg[0]->getSize()/sizeof(dataType);\
@@ -700,7 +700,7 @@ static CkSectionReductionMsg *name(int nMsg, CkSectionReductionMsg **msg)\
       loop\
     }\
   }\
-  return CkSectionReductionMsg::buildNew(nElem*sizeof(dataType),(void *)ret);\
+  return CkMcastReductionMsg::buildNew(nElem*sizeof(dataType),(void *)ret);\
 }
 
 //Use this macro for reductions that have the same type for all inputs

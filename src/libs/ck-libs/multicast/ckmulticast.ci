@@ -6,7 +6,7 @@ module CkMulticast {
     int  lastKnown[];
   };
   message multicastGrpMsg;
-  message CkSectionReductionMsg {
+  message CkMcastReductionMsg {
     char data[];
   };
   
@@ -20,7 +20,7 @@ module CkMulticast {
     // multicast
     entry void recvMsg(multicastGrpMsg *m);
     // reduction
-    entry void recvRedMsg(CkSectionReductionMsg *msg);
+    entry void recvRedMsg(CkMcastReductionMsg *msg);
     entry void updateRedNo(mCastEntryPtr e, int no);
   };
 };

@@ -6,7 +6,7 @@ class mCastEntry;
 class multicastSetupMsg;
 class multicastGrpMsg;
 class cookieMsg;
-class CkSectionReductionMsg;
+class CkMcastReductionMsg;
 class CkMcastBaseMsg;
 
 typedef mCastEntry * mCastEntryPtr;
@@ -32,7 +32,7 @@ public:
   inline void *&cookie(void) { return _cookie.val; }
 };
 
-class CkSectionReductionMsg: public CMessage_CkSectionReductionMsg {
+class CkMcastReductionMsg: public CMessage_CkMcastReductionMsg {
 friend class CkMulticastMgr;
 public:
   int dataSize;
@@ -46,7 +46,7 @@ private:
   char rebuilt;
   CkCallback callback;   /**< user callback */
 public:
-  static CkSectionReductionMsg* buildNew(int NdataSize,void *srcData,
+  static CkMcastReductionMsg* buildNew(int NdataSize,void *srcData,
 		  CkReduction::reducerType reducer=CkReduction::invalid);
   void setCallback(CkCallback &cb) { callback = cb; }
   inline int getSize(void) const {return dataSize;}
@@ -95,10 +95,10 @@ class CkMulticastMgr: public CkDelegateMgr {
     void contribute(int dataSize,void *data,CkReduction::reducerType type, CkSectionCookie &sid, CkCallback &cb);
     void rebuild(CkSectionCookie &);
     // entry
-    void recvRedMsg(CkSectionReductionMsg *msg);
+    void recvRedMsg(CkMcastReductionMsg *msg);
     void updateRedNo(mCastEntryPtr, int red);
   public:
-    typedef CkSectionReductionMsg *(*reducerFn)(int nMsg,CkSectionReductionMsg **msgs);
+    typedef CkMcastReductionMsg *(*reducerFn)(int nMsg,CkMcastReductionMsg **msgs);
   private:
     void initCookie(CkSectionCookie sid);
     void resetCookie(CkSectionCookie sid);
@@ -106,7 +106,7 @@ class CkMulticastMgr: public CkDelegateMgr {
     static reducerFn reducerTable[MAXREDUCERS];
     void releaseFutureReduceMsgs(mCastEntryPtr entry);
     void releaseBufferedReduceMsgs(mCastEntryPtr entry);
-    inline CkSectionReductionMsg *buildContributeMsg(int dataSize,void *data,CkReduction::reducerType type, CkSectionCookie &id, CkCallback &cb);
+    inline CkMcastReductionMsg *buildContributeMsg(int dataSize,void *data,CkReduction::reducerType type, CkSectionCookie &id, CkCallback &cb);
 };
 
 
