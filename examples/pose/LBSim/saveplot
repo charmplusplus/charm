@@ -1,0 +1,9 @@
+  # File name: saveplot - saves a plot as a PostScript file 
+      # to save the current plot as a postscript file issue the commands:
+      #  gnuplot>   set out 'plotfile.ps'
+      #  gnuplot>   load 'saveplot'
+      set size 1.0, 0.8
+      set terminal postscript
+      replot
+      set terminal x11
+      set size 1,1
