@@ -22,8 +22,8 @@
 
 #define SVM1     (sizeof(double)-1)
 #define ALIGN(x) (((x)+SVM1)&(~(SVM1)))
-#define _A(x)     ALIGN(x)
-#define _D(x)     (_A(x)-(x))
+#define _AA(x)     ALIGN(x)
+#define _DD(x)     (_AA(x)-(x))
 #define PW(x)    ((x+CINTBITS-1)/CINTBITS)
 
 #define NewChareMsg    1
@@ -98,7 +98,7 @@ private:
     u_type type; //Depends on message type (attribs.mtype)
     UShort ref; //Used by futures
     s_attribs attribs;
-    UChar align[_D(CmiReservedHeaderSize+sizeof(u_type)+sizeof(UShort)+sizeof(s_attribs))];
+    UChar align[_DD(CmiReservedHeaderSize+sizeof(u_type)+sizeof(UShort)+sizeof(s_attribs))];
     
     //This struct should now be sizeof(void*) aligned.
     UShort priobits;
