@@ -7,6 +7,7 @@
 
 #include "fftlib.decl.h"
 
+#define MAX_FFTS 5
 
 class NormalFFTinfo {
  public:
@@ -139,9 +140,9 @@ class SlabArray: public CBase_SlabArray {
 /*
  * Normal, since the data is expected to be present all through the slab
  */
+
 class NormalSlabArray: public SlabArray {
  public:
-	 static const short MAX_FFTS = 4;
 	NormalSlabArray(CkMigrateMessage *m): SlabArray(m) {}
 	NormalSlabArray() {
 		int i;
@@ -226,7 +227,6 @@ class SparseSlabArray: public SlabArray {
 
 class NormalLineArray : public CBase_NormalLineArray {
  public:
-    static const short MAX_FFTS = 5;
     NormalLineArray (CkMigrateMessage *m) {}
     NormalLineArray () {
 	id = -1;
