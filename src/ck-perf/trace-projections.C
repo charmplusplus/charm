@@ -23,6 +23,7 @@ void traceInit(int* argc, char **argv)
   CpvAccess(_trace) = new TraceProjections();
   CpvAccess(traceOn) = 1;
   CpvAccess(pgmName) = (char *) malloc(strlen(argv[0])+1);
+  _MEMCHECK(CpvAccess(pgmName));
   strcpy(CpvAccess(pgmName), argv[0]);
   CpvAccess(CtrLogBufSize) = 10000;
   int i;
