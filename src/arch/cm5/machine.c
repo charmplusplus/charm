@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.7  1995-10-27 21:45:35  jyelon
+ * Revision 2.8  1995-11-08 23:32:31  sanjeev
+ * fixed bug in CmiFreeSendFn for msgs to myself
+ *
+ * Revision 2.7  1995/10/27  21:45:35  jyelon
  * Changed CmiNumPe --> CmiNumPes
  *
  * Revision 2.6  1995/10/10  06:10:58  jyelon
@@ -303,8 +306,13 @@ int destPE;
 int size;
 char * msg;
 {
-    CmiSyncSendFn(destPE, size, msg);
-    CmiFree(msg);
+	if (CpvAccess(Cmi_mype)==destPE) {
+		FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg);
+	} 
+	else {
+		CmiSyncSendFn(destPE, size, msg);
+		CmiFree(msg);
+	}
 }
 
 
