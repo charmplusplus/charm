@@ -10,7 +10,7 @@
 #include <stdlib.h>
 #include "charm++.h"
 #include "barrier.h"
-#include "Barrier.def.h"
+#include "barrier.def.h"
 
 barrier::barrier(void)
 {
@@ -74,9 +74,8 @@ void barrier::callFP(void)
   fnptr();
 }
 
-int barrierInit(void)
+CkGroupID barrierInit(void)
 {
-  int g = CProxy_barrier::ckNew();
-  return g;
+  return CProxy_barrier::ckNew();
 }
 

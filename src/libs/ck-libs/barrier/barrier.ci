@@ -1,5 +1,5 @@
 
-module Barrier 
+module barrier 
 {
   message FP;
 

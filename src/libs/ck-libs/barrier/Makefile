@@ -1,22 +1,23 @@
 CDIR=../../../..
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
+DEST=$(CDIR)/lib/libmodulebarrier.a
 
-all: libbarrier.a $(CDIR)/include/barrier.h $(CDIR)/include/Barrier.decl.h
+all: $(DEST) $(CDIR)/include/barrier.h $(CDIR)/include/barrier.decl.h
 
-libbarrier.a: barrier.o
-	$(CHARMC) -cp $(CDIR)/lib -o libbarrier.a barrier.o
+$(DEST): barrier.o
+	$(CHARMC) -o $(DEST) barrier.o
 
-barrier.o: barrier.C barrier.h Barrier.decl.h Barrier.def.h
+barrier.o: barrier.C barrier.h barrier.decl.h barrier.def.h
 	$(CHARMC) -c barrier.C
 
-Barrier.decl.h Barrier.def.h: barrier.ci
+barrier.decl.h barrier.def.h: barrier.ci
 	$(CHARMC) barrier.ci
 
-$(CDIR)/include/Barrier.decl.h: Barrier.decl.h
-	/bin/cp Barrier.decl.h $(CDIR)/include
+$(CDIR)/include/barrier.decl.h: barrier.decl.h
+	/bin/cp barrier.decl.h $(CDIR)/include
 
 $(CDIR)/include/barrier.h: barrier.h
 	/bin/cp barrier.h $(CDIR)/include
 
 clean:
-	rm -f *.decl.h *.def.h *.o libbarrier.a
+	rm -f *.decl.h *.def.h *.o $(DEST)

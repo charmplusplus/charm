@@ -5,10 +5,10 @@
  * $Revision$
  *****************************************************************************/
 
-#include "Barrier.decl.h"
+#include "barrier.decl.h"
 
 typedef void (*voidfn)();
-extern int barrierInit(void);
+extern CkGroupID barrierInit(void);
 
 class FP : public CMessage_FP
 {
@@ -18,7 +18,8 @@ public:
 
 class barrier : public Group 
 {
-  int myPe, myLeft, myRight, myParent, myGroup;
+  int myPe, myLeft, myRight, myParent;
+  CkGroupID myGroup;
   int kidscount;
   voidfn fnptr;
 
