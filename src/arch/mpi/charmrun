@@ -52,10 +52,15 @@ then
 	USE_LSF=0
 	queue_stat=qstat
 	queue_qsub=qsub
+	queue_kill=qdel
 	hostname=`hostname`
 	case "$hostname" in
-	turing*.turing.uiuc.edu|tg-login*) 
+	turing*.turing.uiuc.edu) 
 		ppn='#PBS -l nodes='$pes':ppn=1'
+		extra='-machinefile $PBS_NODEFILE'
+		;;
+	tg-login*)
+		ncpus="#PBS -l ncpus=$pes"
 		extra='-machinefile $PBS_NODEFILE'
 		;;
 	co-login*.ncsa.uiuc.edu)
@@ -66,6 +71,7 @@ then
 		USE_LSF=1
 		queue_stat=bjobs
 		queue_qsub=bsub
+		queue_kill=bkill
 		;;
 	*)
 		ncpus="#PBS -l ncpus=$pes"
@@ -78,7 +84,7 @@ then
 #!/bin/sh
 # This is a charmrun-generated PBS batch job script.
 # The lines starting with #PBS are queuing system flags:
-
+#
 # This determines the number of nodes and pes (here $nodes and $pes):
 $ppn
 #
@@ -131,6 +137,14 @@ status=\$?
 echo \$status > $result
 EOF
 	fi
+
+End() {
+	echo "Charmrun> $queue_kill $jobid ..."
+	$queue_kill $jobid
+	rm -f $script
+	exit $1
+}
+
         echo "Submitting batch job for> $mpirun -np $pes $args"
         echo " using the command> $queue_qsub $script"
         chmod 755 $script
@@ -140,6 +154,8 @@ EOF
 	  [ $USE_LSF = 1 ] && jobid=`$queue_qsub < $script|tail -1|sed -e 's/[^0-9]*//g'`
 	done
 	echo "Job enqueued under job ID $jobid"
+# kill job if interrupted
+	trap 'End 1' 2
 	retry=0
 # Wait for the job to complete, by checking its status
         while [ true ]
@@ -152,7 +168,7 @@ EOF
                         rm tmp.$$
 # When job hangs, result file does not exist
 			test -f $result && status=`cat $result` || status=1
-			test $status -eq 0 && status=`grep 'End of program' $output > /dev/null 2>/dev/null`
+			test $status -eq 0 && status=`grep 'End of program' $output > /dev/null 2>&1`
 			cat $output
 			rm -f $result
 			test -f $status && rm -f $script $output
