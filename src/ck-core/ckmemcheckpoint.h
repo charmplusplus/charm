@@ -88,10 +88,14 @@ private:
   void sendProcData();
 };
 
-// called by user applications
-//void CkRegisterRestartCallback(CkCallback *cb);
-void CkStartCheckPoint(CkCallback &cb);
+// called in initCharm
+void CkMemRestart(const char *);
 
-int CkInRestart();
+// called by user applications
+// to start a checkpointing
+void CkStartMemCheckpoint(CkCallback &cb);
+
+// true if inside a restarting phase
+int CkInRestarting(); 
 
 #endif

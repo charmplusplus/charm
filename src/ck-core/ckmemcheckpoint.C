@@ -475,7 +475,7 @@ void CkMemCheckPT::quiescence(CkCallback &cb)
 
 // function called by user to start a check point
 // callback cb is used to pass control back
-void CkStartCheckPoint(CkCallback &cb)
+void CkStartMemcheckPoint(CkCallback &cb)
 {
 #if CMK_MEM_CHECKPOINT
     // store user callback and user data
@@ -568,7 +568,8 @@ static void askProcDataHandler(char *msg)
     CpvAccess(procChkptBuf) = NULL;
 }
 
-void CkMemRestart(){
+void CkMemRestart(const char *dummy)
+{
    CmiPrintf("[%d] I am restarting  cur_restart_phase:%d \n",CmiMyPe(), cur_restart_phase);
    char msg[CmiMsgHeaderSizeBytes+sizeof(int)];
    *(int *)(&msg[CmiMsgHeaderSizeBytes]) = CkMyPe();
@@ -581,7 +582,7 @@ void CkMemRestart(){
 
 // can be called in other files
 // return true if it is in restarting
-int CkInRestart()
+int CkInRestarting()
 {
   return CProxy_CkMemCheckPT(ckCheckPTGroupID).ckLocalBranch()->inRestarting;
 }
