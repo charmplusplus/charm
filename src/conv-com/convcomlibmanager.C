@@ -53,12 +53,7 @@ void recv_dummy(void *msg){
 //Converse commlib manager. Currently also initialized krishnans code
 void initComlibManager(){ 
     CkpvInitialize(ConvComlibManager *, conv_comm_ptr);
-
-    if(CkpvAccess(conv_comm_ptr) != 0)
-       return;   
- 
     ConvComlibManager *conv_com = new ConvComlibManager();
-    
     CkpvAccess(conv_comm_ptr) = conv_com;
     
     //comm_debug = 1;
