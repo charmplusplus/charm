@@ -807,6 +807,23 @@ void CmiMachineInit(char **argv)
 
 }
 
+void CmiMachineExit()
+{
+#if GM_STATS
+  int i;
+  int mype;
+  char fname[128];
+  sprintf(fname, "gm-stats.%d", CmiMyPe());
+  gmf = fopen(fname, "w");
+  mype = CmiMyPe();
+  for (i=5; i<maxsize; i++)  {
+    fprintf(gmf, "[%d] size:%d count:%d\n", mype, i, gm_stats[i]);
+  }
+  fprintf(gmf, "[%d] max quelen: %d possible streaming: %d  defrag: %d \n", mype, maxQueueLength, possible_streamed, defrag);
+  fclose(gmf);
+#endif
+}
+
 void CmiGmConvertMachineID(unsigned int *mach_id)
 {
 #if CMK_USE_GM2 
@@ -861,26 +878,9 @@ static char *getErrorMsg(gm_status_t status)
   case GM_SEND_DROPPED:
     errmsg = "send dropped"; break;
   default:
-    errmsg = ""; break;
+    errmsg = "unknown error"; break;
   }
   return errmsg;
-}
-
-void CmiMachineExit()
-{
-#if GM_STATS
-  int i;
-  int mype;
-  char fname[128];
-  sprintf(fname, "gm-stats.%d", CmiMyPe());
-  gmf = fopen(fname, "w");
-  mype = CmiMyPe();
-  for (i=5; i<maxsize; i++)  {
-    fprintf(gmf, "[%d] size:%d count:%d\n", mype, i, gm_stats[i]);
-  }
-  fprintf(gmf, "[%d] max quelen: %d possible streaming: %d  defrag: %d \n", mype, maxQueueLength, possible_streamed, defrag);
-  fclose(gmf);
-#endif
 }
 
 /*@}*/
