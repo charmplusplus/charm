@@ -1037,7 +1037,7 @@ static int        ctrlport, dataport, ctrlskt, dataskt;
 static OtherNode *nodes_by_pe;  /* OtherNodes indexed by processor number */
 static OtherNode  nodes;        /* Indexed only by ``node number'' */
 
-static int          Cmi_shutdown_initiated;
+static volatile int          Cmi_shutdown_initiated;
 static CmiNodeLock  Cmi_scanf_mutex;
 static char        *Cmi_scanf_data;
 static double       Cmi_clock;
