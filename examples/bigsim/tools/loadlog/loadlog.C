@@ -11,18 +11,23 @@ int main()
   int totalProcs, numX, numY, numZ, numCth, numWth, numPes;
 
   // load bg trace summary file
-  BgLoadTraceSummary("bgTrace", totalProcs, numX, numY, numZ, numCth, numWth, numPes);
+  printf("Loading bgTrace ... \n");
+  int status = BgLoadTraceSummary("bgTrace", totalProcs, numX, numY, numZ, numCth, numWth, numPes);
+  if (status == -1) exit(1);
+  printf("Found %d (%dx%dx%d:%dw-%dc) simulated procs on %d real procs.\n", totalProcs, numX, numY, numZ, numWth, numCth, numPes);
                                                                                 
   int* allNodeOffsets = BgLoadOffsets(totalProcs,numPes);
 
   // load each individual trace file for each bg proc
-  for (int i=0; i<numPes; i++) 
+  for (int i=0; i<totalProcs; i++) 
   {
     BgTimeLineRec tline;
     int procNum = i;
     currTline = &tline;
     currTlineIdx = procNum;
-    BgReadProc(procNum,numWth,numPes,totalProcs,allNodeOffsets,tline);
+    int fileNum = BgReadProc(procNum,numWth,numPes,totalProcs,allNodeOffsets,tline);
+    CmiAssert(fileNum != -1);
+    printf("Load log of BG proc %d from bgTrace%d... \n", i, fileNum);
                                                                                 
     // dump bg timeline log to disk in asci format
     BgWriteThreadTimeLine("detail", 0, 0, 0, procNum, tline.timeline);
