@@ -50,9 +50,10 @@ static CkReductionMsg *name(int nMsg, CkReductionMsg ** msg){\
   CkDataSegHeader *headerArray;\
   int *size;\
   unsigned char *flag;\
+  int i;	\
 \
   /* find the total data segments in n input msgs */\
-  for(int i=0; i<nMsg; i++)\
+  for(i=0; i<nMsg; i++)\
     count += numDataSegs((unsigned char*)(msg[i]->getData()));\
 \
   headerArray = new CkDataSegHeader[count];\
@@ -62,7 +63,7 @@ static CkReductionMsg *name(int nMsg, CkReductionMsg ** msg){\
   count = 0;\
 \
   /* put all the unique data headers from input messages to the header-array */\
-  for(int i=0; i<nMsg; i++){\
+  for(i=0; i<nMsg; i++){\
 \
     unsigned char * data = (unsigned char*)(msg[i]->getData());\
     int numSegs = numDataSegs(data);\
@@ -73,7 +74,8 @@ static CkReductionMsg *name(int nMsg, CkReductionMsg ** msg){\
       CkDataSegHeader node = getDataSegHeader(j, data);\
 \
       /* to maintain x-sorted header array */\
-      for(int k=count-1; k >= 0; k--)\
+      int k;	\
+      for(k=count-1; k >= 0; k--)\
 	if(node < headerArray[k])\
           index = k;\
 	else\
@@ -82,7 +84,7 @@ static CkReductionMsg *name(int nMsg, CkReductionMsg ** msg){\
       if((index != 0) && (node == headerArray[index-1]))\
 	continue; /* overlap */\
 \
-      for(int k=count-1; k>=index; k--){\
+      for(k=count-1; k>=index; k--){\
 	headerArray[k+1] = headerArray[k];\
 	size[k+1] = size[k];\
       }\
@@ -105,7 +107,7 @@ static CkReductionMsg *name(int nMsg, CkReductionMsg ** msg){\
 \
   unsigned char *ptr = data + sizeof(int);\
   /* copy the data segment headers to packing buffer */\
-  for(int i=0; i<count; i++){\
+  for(i=0; i<count; i++){\
     memcpy(ptr, &(headerArray[i]), sizeof(CkDataSegHeader));\
     ptr += sizeof(CkDataSegHeader);\
     if(i != 0)\
@@ -113,7 +115,7 @@ static CkReductionMsg *name(int nMsg, CkReductionMsg ** msg){\
   }\
 \
  /* copy data from n-input messages to packing buffer */\
-  for(int i=0; i<nMsg; i++){\
+  for(i=0; i<nMsg; i++){\
     unsigned char *msgptr = (unsigned char*)(msg[i]->getData());\
     dataType *msgDataptr = (dataType *)getDataPtr(msgptr);\
     dataType *dataptr = (dataType *)ptr;\
@@ -274,11 +276,12 @@ dataType *decompressMsg(CkReductionMsg *m, CkDataSegHeader &h, dataType nullVal)
 \
   data = new dataType[sizeX*sizeY];\
 \
-  for(int i=0; i<sizeX*sizeY; i++)\
+  int i;	\
+  for(i=0; i<sizeX*sizeY; i++)\
       data[i] = nullVal;\
 \
   dataType *msgDataptr = (dataType *)getDataPtr(msg);\
-  for(int i=0; i<numSegs; i++){\
+  for(i=0; i<numSegs; i++){\
     head = getDataSegHeader(i, msg);\
     for(int y=(head.sy - h.sy); y<=(head.ey-h.sy); y++)\
       for(int x=(head.sx - h.sx); x<=(head.ex-h.sx); x++)\
