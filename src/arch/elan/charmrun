@@ -50,7 +50,8 @@ then
 else
 # Interactive mode: create, and submit a batch job
 	script="charmrun_script.$$.sh"
-	output=`pwd`"charmrun_script.$$.stdout"
+	indir=`pwd`
+	output="$indir/charmrun_script.$$.stdout"
 	echo "Submitting batch job for> prun $extra $args"
 	echo " using the command> qsub $script"
 	cat > $script << EOF
@@ -72,6 +73,9 @@ else
 
 # This specifies the file to write stdout information to:
 #PBS -o $output
+
+# Change to the directory where charmrun was run:
+cd $indir
 
 # This is the actual command to run the job:
 prun $extra $args
