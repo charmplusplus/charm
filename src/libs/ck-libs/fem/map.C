@@ -499,20 +499,27 @@ main (int argc, char **argv)
   fclose(fp);
   int ecut;
   int *epart = new int[nelems]; CHK(epart);
+  for(i=0;i<nelems;i++)
+  {
+    epart[i] = numflag;
+  }
+  if (nparts>1)
+  {
 #if MAP_GRAPH
-  int *xadj = new int[nelems+1]; CHK(xadj);
-  int *adjncy = mesh2graph(nelems, esize, conn, xadj);
-  int wgtflag = 0; // no weights associated with elements or edges
-  int opts[5];
-  opts[0] = 0; //use default values
-  METIS_PartGraphKway(&nelems, xadj, adjncy, 0, 0, &wgtflag, &numflag, &nparts,
-                      opts, &ecut, epart);
+    int *xadj = new int[nelems+1]; CHK(xadj);
+    int *adjncy = mesh2graph(nelems, esize, conn, xadj);
+    int wgtflag = 0; // no weights associated with elements or edges
+    int opts[5];
+    opts[0] = 0; //use default values
+    METIS_PartGraphKway(&nelems, xadj, adjncy, 0, 0, &wgtflag, &numflag, 
+                        &nparts, opts, &ecut, epart);
 #else
-  int *npart = new int[nnodes]; CHK(npart);
-  METIS_PartMeshNodal(&nelems, &nnodes, conn, &ctype, &numflag, 
-                      &nparts, &ecut, epart, npart);
-  delete[] npart;
+    int *npart = new int[nnodes]; CHK(npart);
+    METIS_PartMeshNodal(&nelems, &nnodes, conn, &ctype, &numflag, 
+                        &nparts, &ecut, epart, npart);
+    delete[] npart;
 #endif
+  }
   ChunkMsg **msgs = new ChunkMsg*[nparts]; CHK(msgs);
   fem_map(nelems, nnodes, esize, conn, nparts, epart, msgs);
   delete[] epart;
