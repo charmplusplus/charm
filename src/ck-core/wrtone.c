@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1995-06-08 17:07:12  gursoy
+ * Revision 2.2  1995-07-24 01:54:40  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.1  1995/06/08  17:07:12  gursoy
  * Cpv macro changes done
  *
  * Revision 1.3  1995/04/13  20:55:22  sanjeev
@@ -93,7 +96,7 @@ TRACE(CmiPrintf("[%d]:: NodeWrtOnceVar...Ack to Parent %d for wovID %d\n",
 			    ackMsg->wovID);)
 			GeneralSendMsgBranch(NodeRcvAck_EP, ackMsg, 
 				 CmiSpanTreeParent(CmiMyPe()), IMMEDIATEcat,
-				 BocMsg, WOVBocNum);
+				 ImmBocMsg, WOVBocNum);
 		}
 	}
 }
@@ -128,7 +131,7 @@ TRACE(CmiPrintf("[%d]:: NodeRecvAck...wovID = %d, kids left = %d\n",
 		else
 			    GeneralSendMsgBranch(NodeRcvAck_EP, ackMsg, 
 				CmiSpanTreeParent(CmiMyPe()), IMMEDIATEcat,
-				BocMsg, WOVBocNum);
+				ImmBocMsg, WOVBocNum);
 	}
 	else 
 		CkFreeMsg(msgptr_);
@@ -188,7 +191,7 @@ TRACE(CmiPrintf("Host::  HostAddWriteOnceVar...wovID %d, size %d\n",
 			msgForNodes->wovID, newWov->wovSize);)
 
 	GeneralBroadcastMsgBranch(NodeAddWOV_EP, msgForNodes,
-			IMMEDIATEcat, BroadcastBocMsg, WOVBocNum);
+			IMMEDIATEcat, ImmBroadcastBocMsg, WOVBocNum);
 
 	localBocData->numWOVs++;            /* weve got one more wov */
 }
@@ -254,7 +257,7 @@ ChareIDType    cid;
 		HostAddWriteOnceVar(newWov,GetBocDataPtr(WOVBocNum));
 	else
 		GeneralSendMsgBranch(HostAddWOV_EP, newWov,
-		    0, IMMEDIATEcat, BocMsg, WOVBocNum);
+		    0, IMMEDIATEcat, ImmBocMsg, WOVBocNum);
 }
 
 

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.4  1995-07-06 22:42:11  narain
+ * Revision 2.5  1995-07-24 01:54:40  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.4  1995/07/06  22:42:11  narain
  * Changes for LDB interface revision
  *
  * Revision 2.3  1995/06/29  21:53:35  narain
@@ -131,7 +134,8 @@ CollectStatistics()
 	mPtr = (DUMMY_STAT_MSG *) CkAllocMsg(sizeof(DUMMY_STAT_MSG));
 	CkMemError(mPtr);
 	GeneralBroadcastMsgBranch(StatData_EP, mPtr,
-				 IMMEDIATEcat, BroadcastBocMsg, StatisticBocNum);
+				 IMMEDIATEcat, ImmBroadcastBocMsg,
+                                 StatisticBocNum);
 }
 
 

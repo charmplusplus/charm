@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1995-06-08 17:07:12  gursoy
+ * Revision 2.2  1995-07-24 01:54:40  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.1  1995/06/08  17:07:12  gursoy
  * Cpv macro changes done
  *
  * Revision 1.3  1995/04/13  20:55:22  sanjeev
@@ -142,5 +145,5 @@ int bocnum ;
 
 	tmsg = (char *) CkCopyMsg(msg);
 	GeneralBroadcastMsgBranch(MONO_BranchUpdate_EP,
-			tmsg,	IMMEDIATEcat, BroadcastBocMsg, bocnum) ;
+			tmsg,	IMMEDIATEcat, ImmBroadcastBocMsg, bocnum) ;
 }

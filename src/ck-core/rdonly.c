@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.2  1995-07-22 23:45:15  jyelon
+ * Revision 2.3  1995-07-24 01:54:40  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.2  1995/07/22  23:45:15  jyelon
  * *** empty log message ***
  *
  * Revision 2.1  1995/06/08  17:07:12  gursoy
@@ -70,9 +73,7 @@ struct chare_block * mainChareBlock;
 	ENVELOPE * env;
 
 	env = ENVELOPE_UPTR(ReadBuffer);
-	SetEnv_category(env, USERcat);
 	SetEnv_msgType(env, ReadVarMsg);
-	SetEnv_destPeFixed(env, 1);
 	
 	/* this is where we add the information for the main chare
 	block */
@@ -97,9 +98,7 @@ int id;
 
 	env = ENVELOPE_UPTR(msg);
 	CpvAccess(NumReadMsg)++;
-	SetEnv_category(env, USERcat);
 	SetEnv_msgType(env, ReadMsgMsg);
-	SetEnv_destPeFixed(env, 1);
 	SetEnv_other_id(env, id);
 	if (GetEnv_isPACKED(env) == UNPACKED)
 		packed = 1;

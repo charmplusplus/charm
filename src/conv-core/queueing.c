@@ -17,7 +17,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.1  1995-07-18 19:31:34  jyelon
+ * Revision 1.2  1995-07-24 01:56:42  jyelon
+ * *** empty log message ***
+ *
+ * Revision 1.1  1995/07/18  19:31:34  jyelon
  * Initial revision
  *
  * Revision 1.3  1995/07/12  16:29:22  jyelon
@@ -297,7 +300,7 @@ prioq pq;
     heap[heappos]=pe;
     
     /* Free prio-bucket */
-    CmiFree(old->data.bgn);
+    if (old->data.bgn != old->data.space) CmiFree(old->data.bgn);
     CmiFree(old);
   }
   return data;

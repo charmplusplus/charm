@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.9  1995-07-22 23:44:13  jyelon
+ * Revision 2.10  1995-07-24 01:54:40  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.9  1995/07/22  23:44:13  jyelon
  * *** empty log message ***
  *
  * Revision 2.8  1995/07/19  22:15:26  jyelon
@@ -132,14 +135,13 @@ extern void CPlus_SetMainChareID();	/* in cplus_node_init.c */
 extern void *CreateChareBlock();
 
 
-/* This is the "processMsg()" for Charm and Charm++ */
-extern void CallProcessMsg() ;
-CsvExtern(int, CallProcessMsg_Index);
-
-/* This is the "handleMsg()" for Charm and Charm++ */
 extern void HANDLE_INCOMING_MSG() ;
-CsvExtern(int, HANDLE_INCOMING_MSG_Index);
-
+extern void CkProcess_ForChareMsg();
+extern void CkProcess_DynamicBocInitMsg();
+extern void CkProcess_NewChareMsg();
+extern void CkProcess_BocMsg();
+extern void CkProcess_VidEnqueueMsg();
+extern void CkProcess_VidSendOverMsg();
 
 void initModuleInit()
 {
@@ -291,79 +293,115 @@ char **argv;
  */
 CharmInitLoop()
 {
-	int             i, id;
-	void           *usrMsg;
-	int             countInit = 0;
-	extern void    *CmiGetMsg();
-	int         countArrived = 0;
-	ENVELOPE       *envelope, *readvarmsg;
-
-	CpvAccess(BocInitQueueHead) = (BOCINIT_QUEUE *) BocInitQueueCreate();
-
-	while ((!countArrived) || (countInit != 0))
+  int             i, id, type;
+  void           *usrMsg;
+  int             countInit = 0;
+  extern void    *CmiGetMsg();
+  int         countArrived = 0;
+  ENVELOPE       *envelope, *readvarmsg;
+  
+  CpvAccess(BocInitQueueHead) = (BOCINIT_QUEUE *) BocInitQueueCreate();
+  
+  while ((!countArrived) || (countInit != 0))
+    {
+      envelope = NULL;
+      while (envelope == NULL)
+	envelope = (ENVELOPE *) CmiGetMsg();
+      if ((GetEnv_msgType(envelope) == BocInitMsg) ||
+	  (GetEnv_msgType(envelope) == ReadMsgMsg))
+	UNPACK(envelope);
+      usrMsg = USER_MSG_PTR(envelope);
+      /* Have a valid message now. */
+      type = GetEnv_msgType(envelope);
+      switch (type)
 	{
-		envelope = NULL;
-		while (envelope == NULL)
-			envelope = (ENVELOPE *) CmiGetMsg();
-		if ((GetEnv_msgType(envelope) == BocInitMsg) ||
-		    (GetEnv_msgType(envelope) == ReadMsgMsg))
-			UNPACK(envelope);
-		usrMsg = USER_MSG_PTR(envelope);
-		/* Have a valid message now. */
-		switch (GetEnv_msgType(envelope))
-		{
+	  
+	case BocInitMsg:
+	  EnQueueBocInitMsgs(envelope);
+	  countInit++;
+	  break;
+	  
+	case InitCountMsg:
+	  countArrived = 1;
+	  countInit -= GetEnv_count(envelope);
+	  CmiFree(envelope);
+	  break;
+	  
+	case ReadMsgMsg:
+	  id = GetEnv_other_id(envelope);
+	  CsvAccess(_CK_9_ReadMsgTable)[id] = (void *) usrMsg;
+	  countInit++;
+	  break;
+	  
+	case ReadVarMsg:
+	  CpvAccess(ReadFromBuffer) = usrMsg;
+	  countInit++;
+	  
+	  /* get the information about the main chare */
+	  CpvAccess(mainChareBlock) = (struct chare_block *)
+	    GetEnv_chareBlockPtr(envelope);
+	  CpvAccess(mainChare_magic_number) =
+	    GetEnv_chare_magic_number(envelope);
+	  if (CsvAccess(MainChareLanguage) == CHARMPLUSPLUS)
+	    CPlus_SetMainChareID();
+	  readvarmsg = envelope;
+	  break;
+	  
+	case LdbMsg:
+	case BocMsg:
+	case ImmBocMsg:
+	case QdBocMsg:
+	case BroadcastBocMsg:
+	case ImmBroadcastBocMsg:
+	case QdBroadcastBocMsg:      
+	  CmiSetHandler(envelope,CsvAccess(CkProcess_BocMsg_Index));
+	  CkEnqueue(envelope);
+	  break;
 
-		case BocInitMsg:
-			EnQueueBocInitMsgs(envelope);
-			countInit++;
-			break;
-
-		case InitCountMsg:
-			countArrived = 1;
-			countInit -= GetEnv_count(envelope);
-			CmiFree(envelope);
-			break;
-
-		case ReadMsgMsg:
-			id = GetEnv_other_id(envelope);
-			CsvAccess(_CK_9_ReadMsgTable)[id] = (void *) usrMsg;
-			countInit++;
-			break;
-
-		case ReadVarMsg:
-			CpvAccess(ReadFromBuffer) = usrMsg;
-			countInit++;
-
-			/* get the information about the main chare */
-			CpvAccess(mainChareBlock) = (struct chare_block *)
-				GetEnv_chareBlockPtr(envelope);
-			CpvAccess(mainChare_magic_number) =
-				GetEnv_chare_magic_number(envelope);
-			if (CsvAccess(MainChareLanguage) == CHARMPLUSPLUS)
-				CPlus_SetMainChareID();
-			readvarmsg = envelope;
-			break;
-
-		default:
-		        CmiSetHandler(envelope,CsvAccess(CallProcessMsg_Index));
-			CkEnqueue(envelope);
-			break;
-		}
+	case NewChareNoBalanceMsg:
+	case NewChareMsg:
+	  CmiSetHandler(envelope,CsvAccess(CkProcess_NewChareMsg_Index));
+	  CkEnqueue(envelope);
+	  break;
+	  
+	case ForChareMsg:
+	  CmiSetHandler(envelope,CsvAccess(CkProcess_ForChareMsg_Index));
+	  CkEnqueue(envelope);
+	  break;
+	  
+	case DynamicBocInitMsg:
+	  CmiSetHandler(envelope,CsvAccess(CkProcess_DynamicBocInitMsg_Index));
+	  CkEnqueue(envelope);
+	  break;
+	  
+	case VidSendOverMsg:
+	  CmiSetHandler(envelope,CsvAccess(CkProcess_VidSendOverMsg_Index));
+	  CkEnqueue(envelope);
+	  break;
+	  
+	case VidEnqueueMsg:
+	  CmiSetHandler(envelope,CsvAccess(CkProcess_VidEnqueueMsg_Index));
+	  CkEnqueue(envelope);
+	  break;
+	  
+        default:
+          CmiPrintf("** ERROR ** Unknown message type %d\n",type);
 	}
+    }
 
-	/*
-	 * call all the CopyFromBuffer functions for ReadOnly variables.
-	 * _CK_9_ReadMsgTable is passed as an arg because it is no longer
-	 * global
-	 */
-        if (CmiMyRank() == 0) {
-	   for (i = 0; i < CsvAccess(sharedReadCount); i++)
-		(CsvAccess(ROCopyFromBufferTable)[i]) (CsvAccess(_CK_9_ReadMsgTable));
-        }
-	CmiFree(readvarmsg);
-
-	while ( (envelope=DeQueueBocInitMsgs()) != NULL ) 
-		ProcessBocInitMsg(envelope);
+  /*
+   * call all the CopyFromBuffer functions for ReadOnly variables.
+   * _CK_9_ReadMsgTable is passed as an arg because it is no longer
+   * global
+   */
+  if (CmiMyRank() == 0) {
+    for (i = 0; i < CsvAccess(sharedReadCount); i++)
+      (CsvAccess(ROCopyFromBufferTable)[i]) (CsvAccess(_CK_9_ReadMsgTable));
+  }
+  CmiFree(readvarmsg);
+  
+  while ( (envelope=DeQueueBocInitMsgs()) != NULL ) 
+    ProcessBocInitMsg(envelope);
 }
 
 ProcessBocInitMsg(envelope)
@@ -481,163 +519,173 @@ char          **argv;
 
 InitializeEPTables()
 {
-	int             i;
-	int             TotalFns;
-	int             TotalMsgs;
-	int             TotalChares;
-	int             TotalModules;
-	int             TotalReadMsgs;
-	int             TotalPseudos;
-
-
-	/*
-	 * TotalEps 	=  _CK_5mainChareEPCount(); TotalFns	=
-	 * _CK_5mainFunctionCount(); TotalMsgs	=  _CK_5mainMessageCount();
-	 * TotalChares 	=  _CK_5mainChareCount(); TotalBocEps 	=
-	 * NumSysBocEps + _CK_5mainBranchEPCount();
-	 */
-	TotalEps = TABLE_SIZE;
-	TotalFns = TABLE_SIZE;
-	TotalMsgs = TABLE_SIZE;
-	TotalChares = TABLE_SIZE;
-	TotalModules = TABLE_SIZE;
-	TotalReadMsgs = TABLE_SIZE;
-	TotalPseudos = TABLE_SIZE;
-
-	/*
-	 * this table is used to store all ReadOnly Messages on processors
-	 * other than proc 0. After they are received, they are put in the
-	 * actual variables in the user program in the ...CopyFromBuffer
-	 * functions
-	 */
-	CsvAccess(_CK_9_ReadMsgTable) = (void **) 
-                        CmiSvAlloc((TotalReadMsgs + 1) * sizeof(void *));
-	if (TotalReadMsgs > 0)
-		CkMemError(CsvAccess(_CK_9_ReadMsgTable));
-
-	CsvAccess(ROCopyFromBufferTable) = (FUNCTION_PTR *) 
-                        CmiSvAlloc((TotalModules + 1) * sizeof(FUNCTION_PTR));
-
-	CsvAccess(ROCopyToBufferTable) = (FUNCTION_PTR *) 
-                        CmiSvAlloc((TotalModules + 1) * sizeof(FUNCTION_PTR));
-
-	if (TotalModules > 0)
-	{
-		CkMemError(CsvAccess(ROCopyFromBufferTable));
-		CkMemError(CsvAccess(ROCopyToBufferTable));
-	}
-
-	CsvAccess(EpTable) = (FUNCTION_PTR *) 
-                         CmiSvAlloc((TotalEps + 1) * sizeof(FUNCTION_PTR));
-
-	CsvAccess(EpIsImplicitTable) = (int *) 
-                         CmiSvAlloc((TotalEps + 1) * sizeof(int));
-
-	CsvAccess(EpLanguageTable) = (int *) 
-                         CmiSvAlloc((TotalEps + 1) * sizeof(int));
-
-	for (i = 0; i < TotalEps + 1; i++)
-		CsvAccess(EpIsImplicitTable)[i] = 0;
-
-	CsvAccess(EpNameTable) = (char **) CmiSvAlloc((TotalEps + 1) * sizeof(char *));
-	CsvAccess(EpChareTable) = (int *) CmiSvAlloc((TotalEps + 1) * sizeof(int));
-	CsvAccess(EpToMsgTable) = (int *) CmiSvAlloc((TotalEps + 1) * sizeof(int));
-	CsvAccess(EpChareTypeTable) = (int *) CmiSvAlloc((TotalEps + 1) * sizeof(int));
-
-	if (TotalEps > 0)
-	{
-		CkMemError(CsvAccess(EpTable));
-		CkMemError(CsvAccess(EpIsImplicitTable));
-		CkMemError(CsvAccess(EpLanguageTable));
-		CkMemError(CsvAccess(EpNameTable));
-		CkMemError(CsvAccess(EpChareTable));
-		CkMemError(CsvAccess(EpToMsgTable));
-		CkMemError(CsvAccess(EpChareTypeTable));
-	}
-
-	/*
-	 * set all the system BOC EPs to be CHARM bocs because they dont get
-	 * registered in the normal way
-	 */
-	for (i = 0; i < CpvAccess(chareEpsCount); i++)
-		CsvAccess(EpLanguageTable)[i] = -1;
-
-
-	_CK_9_GlobalFunctionTable = (FUNCTION_PTR *) 
-                        CmiSvAlloc((TotalFns + 1) * sizeof(FUNCTION_PTR));
-
-	if (TotalFns > 0)
-		CkMemError(_CK_9_GlobalFunctionTable);
-
-
-	CsvAccess(MsgToStructTable) = (MSG_STRUCT *) 
-                       CmiSvAlloc((TotalMsgs + 1) * sizeof(MSG_STRUCT));
-
-	if (TotalMsgs > 0)
-		CkMemError(CsvAccess(MsgToStructTable));
-
-
-	CsvAccess(ChareSizesTable) = (int *) 
-                        CmiSvAlloc((TotalChares + 1) * sizeof(int));
-
-	CsvAccess(ChareNamesTable) = (char **) CmiSvAlloc(TotalChares * sizeof(char *));
-	CsvAccess(ChareFnTable) = (FUNCTION_PTR *) 
-                        CmiSvAlloc((TotalChares + 1) * sizeof(FUNCTION_PTR));
-
-	if (TotalChares > 0)
-	{
-		CkMemError(CsvAccess(ChareSizesTable));
-		CkMemError(CsvAccess(ChareNamesTable));
-		CkMemError(CsvAccess(ChareFnTable));
-	}
-
-	CsvAccess(PseudoTable) = (PSEUDO_STRUCT *) 
-                         CmiSvAlloc((TotalPseudos + 1) * sizeof(PSEUDO_STRUCT));
-
-	if (TotalPseudos > 0)
-		CkMemError(CsvAccess(PseudoTable));
-
-
-
-	/** end of table allocation **/
-
-	/* Register the NullFunction to detect uninitialized modules */
-	registerMsg("NULLMSG",_CkNullFunc,_CkNullFunc,_CkNullFunc,0) ;
-	registerEp("NULLEP",_CkNullFunc,0,0,0) ;
-	registerChare("NULLCHARE",0,_CkNullFunc) ;
-	registerFunction(_CkNullFunc) ;
-	registerMonotonic("NULLMONO",_CkNullFunc,_CkNullFunc,CHARM) ;
-	registerTable("NULLTABLE",_CkNullFunc,_CkNullFunc) ;
-	registerAccumulator("NULLACC",_CkNullFunc,_CkNullFunc,_CkNullFunc,CHARM) ;
-
-	CpvAccess(chareEpsCount) += AddSysBocEps();
-
-	/*
-	 * This is the top level call to all modules for initialization. It
-	 * is generated at link time by charmc, in module_init_fn.c
-	 */
-	_CK_module_init_fn();
-
-	if ( CsvAccess(MainChareLanguage) == -1 ) {
-		CmiPrintf("[%d] ERROR: registerMainChare() not called : uninitialized module exists\n",CmiMyPe()) ;
-	}
-
-	/* Register the Charm handlers with Converse */
-	CsvAccess(HANDLE_INCOMING_MSG_Index) = CmiRegisterHandler(HANDLE_INCOMING_MSG) ;
-	CsvAccess(CallProcessMsg_Index) = CmiRegisterHandler(CallProcessMsg) ;
-
-
-
-	/* set all the "Total" variables so that the rest of the modules work */
-	TotalEps = CpvAccess(chareEpsCount);
-	TotalFns = CpvAccess(fnCount);
-	TotalMsgs = CpvAccess(msgCount);
-	TotalChares = CpvAccess(chareCount);
-	TotalModules = CpvAccess(readCount);
-	TotalReadMsgs = CpvAccess(readMsgCount);
-	TotalPseudos = CpvAccess(pseudoCount);
-
-        CsvAccess(sharedReadCount) = CpvAccess(readCount);
+  int             i;
+  int             TotalFns;
+  int             TotalMsgs;
+  int             TotalChares;
+  int             TotalModules;
+  int             TotalReadMsgs;
+  int             TotalPseudos;
+  
+  
+  /*
+   * TotalEps 	=  _CK_5mainChareEPCount(); TotalFns	=
+   * _CK_5mainFunctionCount(); TotalMsgs	=  _CK_5mainMessageCount();
+   * TotalChares 	=  _CK_5mainChareCount(); TotalBocEps 	=
+   * NumSysBocEps + _CK_5mainBranchEPCount();
+   */
+  TotalEps = TABLE_SIZE;
+  TotalFns = TABLE_SIZE;
+  TotalMsgs = TABLE_SIZE;
+  TotalChares = TABLE_SIZE;
+  TotalModules = TABLE_SIZE;
+  TotalReadMsgs = TABLE_SIZE;
+  TotalPseudos = TABLE_SIZE;
+  
+  /*
+   * this table is used to store all ReadOnly Messages on processors
+   * other than proc 0. After they are received, they are put in the
+   * actual variables in the user program in the ...CopyFromBuffer
+   * functions
+   */
+  CsvAccess(_CK_9_ReadMsgTable) = (void **) 
+    CmiSvAlloc((TotalReadMsgs + 1) * sizeof(void *));
+  if (TotalReadMsgs > 0)
+    CkMemError(CsvAccess(_CK_9_ReadMsgTable));
+  
+  CsvAccess(ROCopyFromBufferTable) = (FUNCTION_PTR *) 
+    CmiSvAlloc((TotalModules + 1) * sizeof(FUNCTION_PTR));
+  
+  CsvAccess(ROCopyToBufferTable) = (FUNCTION_PTR *) 
+    CmiSvAlloc((TotalModules + 1) * sizeof(FUNCTION_PTR));
+  
+  if (TotalModules > 0)
+    {
+      CkMemError(CsvAccess(ROCopyFromBufferTable));
+      CkMemError(CsvAccess(ROCopyToBufferTable));
+    }
+  
+  CsvAccess(EpTable) = (FUNCTION_PTR *) 
+    CmiSvAlloc((TotalEps + 1) * sizeof(FUNCTION_PTR));
+  
+  CsvAccess(EpIsImplicitTable) = (int *) 
+    CmiSvAlloc((TotalEps + 1) * sizeof(int));
+  
+  CsvAccess(EpLanguageTable) = (int *) 
+    CmiSvAlloc((TotalEps + 1) * sizeof(int));
+  
+  for (i = 0; i < TotalEps + 1; i++)
+    CsvAccess(EpIsImplicitTable)[i] = 0;
+  
+  CsvAccess(EpNameTable) = (char **) CmiSvAlloc((TotalEps + 1) * sizeof(char *));
+  CsvAccess(EpChareTable) = (int *) CmiSvAlloc((TotalEps + 1) * sizeof(int));
+  CsvAccess(EpToMsgTable) = (int *) CmiSvAlloc((TotalEps + 1) * sizeof(int));
+  CsvAccess(EpChareTypeTable) = (int *) CmiSvAlloc((TotalEps + 1) * sizeof(int));
+  
+  if (TotalEps > 0)
+    {
+      CkMemError(CsvAccess(EpTable));
+      CkMemError(CsvAccess(EpIsImplicitTable));
+      CkMemError(CsvAccess(EpLanguageTable));
+      CkMemError(CsvAccess(EpNameTable));
+      CkMemError(CsvAccess(EpChareTable));
+      CkMemError(CsvAccess(EpToMsgTable));
+      CkMemError(CsvAccess(EpChareTypeTable));
+    }
+  
+  /*
+   * set all the system BOC EPs to be CHARM bocs because they dont get
+   * registered in the normal way
+   */
+  for (i = 0; i < CpvAccess(chareEpsCount); i++)
+    CsvAccess(EpLanguageTable)[i] = -1;
+  
+  
+  _CK_9_GlobalFunctionTable = (FUNCTION_PTR *) 
+    CmiSvAlloc((TotalFns + 1) * sizeof(FUNCTION_PTR));
+  
+  if (TotalFns > 0)
+    CkMemError(_CK_9_GlobalFunctionTable);
+  
+  
+  CsvAccess(MsgToStructTable) = (MSG_STRUCT *) 
+    CmiSvAlloc((TotalMsgs + 1) * sizeof(MSG_STRUCT));
+  
+  if (TotalMsgs > 0)
+    CkMemError(CsvAccess(MsgToStructTable));
+  
+  
+  CsvAccess(ChareSizesTable) = (int *) 
+    CmiSvAlloc((TotalChares + 1) * sizeof(int));
+  
+  CsvAccess(ChareNamesTable) = (char **) CmiSvAlloc(TotalChares * sizeof(char *));
+  CsvAccess(ChareFnTable) = (FUNCTION_PTR *) 
+    CmiSvAlloc((TotalChares + 1) * sizeof(FUNCTION_PTR));
+  
+  if (TotalChares > 0)
+    {
+      CkMemError(CsvAccess(ChareSizesTable));
+      CkMemError(CsvAccess(ChareNamesTable));
+      CkMemError(CsvAccess(ChareFnTable));
+    }
+  
+  CsvAccess(PseudoTable) = (PSEUDO_STRUCT *) 
+    CmiSvAlloc((TotalPseudos + 1) * sizeof(PSEUDO_STRUCT));
+  
+  if (TotalPseudos > 0)
+    CkMemError(CsvAccess(PseudoTable));
+  
+  
+  
+  /** end of table allocation **/
+  
+  /* Register the NullFunction to detect uninitialized modules */
+  registerMsg("NULLMSG",_CkNullFunc,_CkNullFunc,_CkNullFunc,0) ;
+  registerEp("NULLEP",_CkNullFunc,0,0,0) ;
+  registerChare("NULLCHARE",0,_CkNullFunc) ;
+  registerFunction(_CkNullFunc) ;
+  registerMonotonic("NULLMONO",_CkNullFunc,_CkNullFunc,CHARM) ;
+  registerTable("NULLTABLE",_CkNullFunc,_CkNullFunc) ;
+  registerAccumulator("NULLACC",_CkNullFunc,_CkNullFunc,_CkNullFunc,CHARM) ;
+  
+  CpvAccess(chareEpsCount) += AddSysBocEps();
+  
+  /*
+   * This is the top level call to all modules for initialization. It
+   * is generated at link time by charmc, in module_init_fn.c
+   */
+  _CK_module_init_fn();
+  
+  if ( CsvAccess(MainChareLanguage) == -1 ) {
+    CmiPrintf("[%d] ERROR: registerMainChare() not called : uninitialized module exists\n",CmiMyPe()) ;
+  }
+  
+  /* Register the Charm handlers with Converse */
+  CsvAccess(HANDLE_INCOMING_MSG_Index)
+    = CmiRegisterHandler(HANDLE_INCOMING_MSG) ;
+  CsvAccess(CkProcess_ForChareMsg_Index)
+    = CmiRegisterHandler(CkProcess_ForChareMsg);
+  CsvAccess(CkProcess_DynamicBocInitMsg_Index)
+    = CmiRegisterHandler(CkProcess_DynamicBocInitMsg);
+  CsvAccess(CkProcess_NewChareMsg_Index)
+    = CmiRegisterHandler(CkProcess_NewChareMsg);
+  CsvAccess(CkProcess_BocMsg_Index)
+    = CmiRegisterHandler(CkProcess_BocMsg);
+  CsvAccess(CkProcess_VidEnqueueMsg_Index)
+    = CmiRegisterHandler(CkProcess_VidEnqueueMsg);
+  CsvAccess(CkProcess_VidSendOverMsg_Index)
+    = CmiRegisterHandler(CkProcess_VidSendOverMsg);
+  
+  /* set all the "Total" variables so that the rest of the modules work */
+  TotalEps = CpvAccess(chareEpsCount);
+  TotalFns = CpvAccess(fnCount);
+  TotalMsgs = CpvAccess(msgCount);
+  TotalChares = CpvAccess(chareCount);
+  TotalModules = CpvAccess(readCount);
+  TotalReadMsgs = CpvAccess(readMsgCount);
+  TotalPseudos = CpvAccess(pseudoCount);
+  
+  CsvAccess(sharedReadCount) = CpvAccess(readCount);
 }
 
 /* Adding entry points for system branch office chares. */
@@ -665,9 +713,7 @@ BroadcastCount()
 	dummy_msg = (int *) CkAllocMsg(sizeof(int));
 	CkMemError(dummy_msg);
 	env = ENVELOPE_UPTR(dummy_msg);
-	SetEnv_category(env, USERcat);
 	SetEnv_msgType(env, InitCountMsg);
-	SetEnv_destPeFixed(env, 1);
 
 	SetEnv_count(env, CpvAccess(currentBocNum) - NumSysBoc + 2 + CpvAccess(NumReadMsg));
 

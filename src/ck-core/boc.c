@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.4  1995-07-22 23:44:13  jyelon
+ * Revision 2.5  1995-07-24 01:54:40  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.4  1995/07/22  23:44:13  jyelon
  * *** empty log message ***
  *
  * Revision 2.3  1995/07/12  16:28:45  jyelon
@@ -305,8 +308,6 @@ TRACE(CmiPrintf("[%d] GeneralCreateBoc: Entry=%d, ReturnEP=%d\n",
 		CmiMyPe(), Entry, ReturnEP));
 
 	env = (ENVELOPE *) ENVELOPE_UPTR(Msg);
-	SetEnv_category(env, USERcat);
-	SetEnv_destPeFixed(env, 1);
 
 	if ((CmiMyPe() == 0)  || CpvAccess(InsideDataInit))
 	{
@@ -350,7 +351,8 @@ TRACE(CmiPrintf("[%d] GeneralCreateBoc: Entry=%d, ReturnEP=%d\n",
 			trace_creation(GetEnv_msgType(env), Entry, env);
 			CkCheck_and_BroadcastNoFree(env);
 
-		        CmiSetHandler(env,CsvAccess(CallProcessMsg_Index)) ;
+		        CmiSetHandler(env,
+                            CsvAccess(CkProcess_DynamicBocInitMsg_Index));
 			CkEnqueue(env);
 			QDCountThisCreation(Entry, USERcat, DynamicBocInitMsg, CmiNumPe());
 
@@ -368,7 +370,7 @@ TRACE(CmiPrintf("[%d] GeneralCreateBoc: bocdata=0x%x\n", CmiMyPe(), element));
 			msg->ref = SetDynamicBocMsg(Msg, Entry, SizeData);
 
 			GeneralSendMsgBranch(OtherCreateBoc_EP, msg,
-			 	0, IMMEDIATEcat, BocMsg,
+			 	0, IMMEDIATEcat, ImmBocMsg,
 				DynamicBocNum);
 		}
 	}
@@ -402,9 +404,7 @@ ChareNumType bocnum;
 
 	env  = ENVELOPE_UPTR(msg);
 
-	SetEnv_category(env, category);
 	SetEnv_msgType(env, type);
-	SetEnv_destPeFixed(env, 1);
 	SetEnv_boc_num(env, bocnum);
 	SetEnv_EP(env, ep);
 
@@ -432,9 +432,7 @@ ChareNumType bocnum;
 
 	env = ENVELOPE_UPTR(msg);
 
-	SetEnv_category(env, category);
 	SetEnv_msgType(env, type);
-	SetEnv_destPeFixed(env, 1);
 	SetEnv_boc_num(env, bocnum);
 	SetEnv_EP(env, ep);
 
@@ -478,8 +476,8 @@ TRACE(CmiPrintf("[%d] RegisterDynamicBoc: bocnum=%d, bocdata=0x%x\n",
 		}
 		else
 			GeneralSendMsgBranch(RegisterDynamicBocInitMsg_EP, msg,
-				CmiSpanTreeParent(mype), IMMEDIATEcat, BocMsg,
-				DynamicBocNum);
+                           CmiSpanTreeParent(mype), IMMEDIATEcat, ImmBocMsg,
+			   DynamicBocNum);
 	}
 }
 
@@ -502,7 +500,7 @@ TRACE(CmiPrintf("[%d] OtherCreateBoc: boc=%d, ref=%d\n",
 	CmiMyPe(), tmsg->boc, tmsg->ref));
 
 	GeneralSendMsgBranch(InitiateDynamicBocBroadcast_EP, tmsg,
-                                msg->source, IMMEDIATEcat, BocMsg,
+                                msg->source, IMMEDIATEcat, ImmBocMsg,
                                 DynamicBocNum);
 }
 
@@ -522,8 +520,6 @@ TRACE(CmiPrintf("[%d] InitiateDynamicBocBroadcast: ref=%d, boc=%d, ep=%d\n",
 		CmiMyPe(), msg->ref, msg->boc, ep));
 
         env = (ENVELOPE *) ENVELOPE_UPTR(tmsg);
-        SetEnv_category(env, USERcat);
-        SetEnv_destPeFixed(env, 1);
         SetEnv_dataMag(env, dataMag);
         SetEnv_boc_num(env, msg->boc);
         SetEnv_EP(env, ep);

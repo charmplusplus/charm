@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.6  1995-07-22 23:45:15  jyelon
+ * Revision 2.7  1995-07-24 01:54:40  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.6  1995/07/22  23:45:15  jyelon
  * *** empty log message ***
  *
  * Revision 2.5  1995/07/19  22:15:30  jyelon
@@ -79,7 +82,8 @@ unsigned int bytespacked;
   envelope = ENVELOPE_UPTR(msg); 
   headersize = (msg - (char *) envelope);
   memcpy( ((char *) pack_envelope), ((char *) envelope), headersize);
-  SetEnv_TotalSize_packid(pack_envelope,totalsize,GetEnv_packid(envelope));
+  SetEnv_TotalSize(pack_envelope,totalsize);
+  SetEnv_packid(pack_envelope,GetEnv_packid(envelope));
   
   /*** Now we copy the priority field ***/
   ptr1 = GetEnv_prioend(envelope);
@@ -100,8 +104,10 @@ unsigned int msgbytes;
   envptr = (ENVELOPE *)CmiAlloc(totalsize);
   CkMemError(envptr);
   SetEnv_isPACKED(envptr, NO_PACK);
-  SetEnv_TotalSize_packid(envptr, totalsize, 0);
-  SetEnv_prioinfo(envptr, CK_QUEUEING_FIFO, 0);
+  SetEnv_TotalSize(envptr, totalsize);
+  SetEnv_packid(envptr, 0);
+  SetEnv_queueing(envptr, CK_QUEUEING_FIFO);
+  SetEnv_priosize(envptr, 0);
   return((void *)USER_MSG_PTR(envptr));
 }
 
@@ -196,17 +202,20 @@ unsigned int priobits;
     env = (ENVELOPE *)CmiAlloc(totalsize);
     CkMemError(env);
 
-    SetEnv_prioinfo(env, CK_QUEUEING_BFIFO, priobits);
+    SetEnv_priosize(env, priobits);
+    SetEnv_queueing(env, CK_QUEUEING_BFIFO);
 
     if (CsvAccess(MsgToStructTable)[msgno].packfn != NULL)
     {
         SetEnv_isPACKED(env, UNPACKED);
-        SetEnv_TotalSize_packid(env, totalsize, msgno);
+        SetEnv_TotalSize(env, totalsize);
+        SetEnv_packid(env, msgno);
     }
     else
     {
         SetEnv_isPACKED(env, NO_PACK);
-        SetEnv_TotalSize_packid(env, totalsize, 0);
+        SetEnv_TotalSize(env, totalsize);
+        SetEnv_packid(env, 0);
     }
     return ((void *)USER_MSG_PTR(env));
 }

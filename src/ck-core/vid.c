@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.4  1995-07-22 23:45:15  jyelon
+ * Revision 2.5  1995-07-24 01:54:40  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.4  1995/07/22  23:45:15  jyelon
  * *** empty log message ***
  *
  * Revision 2.3  1995/07/05  22:51:39  sanjeev
@@ -92,7 +95,6 @@ void *data_area;
 	FIFO_EnQueue(vidqueue, env);
     else
     {
-	SetEnv_category(env,USERcat);
 	SetEnv_msgType(env,ForChareMsg);
 	SetEnv_chareBlockPtr(env, (int) vidblock->info_block.chareBlockPtr);
 	SetEnv_chare_magic_number(env, vidblock->chare_magic_number);
@@ -126,14 +128,10 @@ void *data_area;
     int                 chare_pe    = GetID_onPE(ID);
     CHARE_BLOCK        *chare_block = GetID_chareBlockPtr(ID);
 
-    vidblock->vidPenum = chare_pe;
-    vidblock->chare_magic_number = chare_magic;
-    vidblock->info_block.chareBlockPtr = chare_block;
     vidqueue = vidblock->info_block.vid_queue;
     while (!FIFO_Empty(vidqueue))
     {
 	FIFO_DeQueue(vidqueue, &env);
-	SetEnv_category(env, USERcat);
 	SetEnv_msgType(env, ForChareMsg);
 	SetEnv_chareBlockPtr(env, chare_block);
 	SetEnv_chare_magic_number(env, chare_magic);
@@ -141,6 +139,9 @@ void *data_area;
 	CkCheck_and_Send(vidblock->vidPenum, env);
 	QDCountThisCreation(GetEnv_EP(env), USERcat, ForChareMsg, 1);
    }
+   vidblock->vidPenum = chare_pe;
+   vidblock->chare_magic_number = chare_magic;
+   vidblock->info_block.chareBlockPtr = chare_block;
 }
 
 
@@ -169,9 +170,7 @@ VID_BLOCK *vidPtr;
     msg->ID = CpvAccess(currentChareBlock)->selfID;
     CkMemError(msg);
     env = ENVELOPE_UPTR(msg);
-    SetEnv_category(env, IMMEDIATEcat);
     SetEnv_msgType(env, VidSendOverMsg);
-    SetEnv_destPeFixed(env, 1);
     SetEnv_vidBlockPtr(env, (int)  vidPtr);
     SetEnv_EP(env, 0);
 

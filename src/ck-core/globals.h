@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.3  1995-07-06 22:42:11  narain
+ * Revision 2.4  1995-07-24 01:54:40  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.3  1995/07/06  22:42:11  narain
  * Changes for LDB interface revision
  *
  * Revision 2.2  1995/06/29  21:32:35  narain
@@ -104,7 +107,13 @@ CpvExtern(int, numCondChkArryElts);
 
 CsvExtern(int, MainChareLanguage);
 
-CsvExtern(int, CallProcessMsg_Index);
-CsvExtern(int, HANDLE_INCOMING_MSG_Index);
-
 CpvExtern(int, LDB_ELEM_SIZE);
+
+CsvExtern(int, HANDLE_INCOMING_MSG_Index);
+CsvExtern(int, CkProcess_ForChareMsg_Index);
+CsvExtern(int, CkProcess_DynamicBocInitMsg_Index);
+CsvExtern(int, CkProcess_NewChareMsg_Index);
+CsvExtern(int, CkProcess_BocMsg_Index);
+CsvExtern(int, CkProcess_VidEnqueueMsg_Index);
+CsvExtern(int, CkProcess_VidSendOverMsg_Index);
+

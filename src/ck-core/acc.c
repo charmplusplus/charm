@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1995-06-08 17:09:41  gursoy
+ * Revision 2.2  1995-07-24 01:54:40  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.1  1995/06/08  17:09:41  gursoy
  * Cpv macro changes done
  *
  * Revision 1.3  1995/04/13  20:55:22  sanjeev
@@ -63,7 +66,7 @@ ChareIDType *CID;
 		ACC_CollectFromNode_Fn(msg, GetBocDataPtr(bocnum)); 
 	else
 		GeneralSendMsgBranch(ACC_CollectFromNode_EP, msg,
-			0, IMMEDIATEcat, BocMsg, bocnum);
+			0, IMMEDIATEcat, ImmBocMsg, bocnum);
 }
 
 
@@ -83,7 +86,7 @@ ACC_DATA *mydata;
 		tmsg = (DummyMsg *) CkAllocMsg(sizeof(DummyMsg));
 		mydata->AlreadyDone = 1;
 		GeneralBroadcastMsgBranch(ACC_LeafNodeCollect_EP, tmsg,
-			IMMEDIATEcat, BroadcastBocMsg,
+			IMMEDIATEcat, ImmBroadcastBocMsg,
 			((BOC_BLOCK *) mydata - 1)->boc_num);
 	}
 }
@@ -108,7 +111,7 @@ TRACE(CmiPrintf("[%d] ACC_NodeCollect : Sent message to parent\n",
 			mydata->Penum = CmiSpanTreeParent(mydata->Penum);
 			GeneralSendMsgBranch(ACC_InteriorNodeCollect_EP, 
 					GetAccMsgPtr(mydata), mydata->Penum,
-					IMMEDIATEcat, BocMsg,
+					IMMEDIATEcat, ImmBocMsg,
 					((BOC_BLOCK *) mydata - 1)->boc_num);
 		}
 	}
@@ -138,7 +141,7 @@ TRACE(CmiPrintf("[%d] ACC_NodeCollect : Sent message to parent\n",
 			mydata->Penum = CmiSpanTreeParent(mydata->Penum);
 			GeneralSendMsgBranch(ACC_InteriorNodeCollect_EP, 
 					GetAccMsgPtr(mydata), mydata->Penum,
-					IMMEDIATEcat, BocMsg,
+					IMMEDIATEcat, ImmBocMsg,
 					((BOC_BLOCK *) mydata - 1)->boc_num);
 		}
 	}

@@ -8,7 +8,6 @@
 #     * The CHARM++ libraries
 #     * The CHARM translator
 #     * The CHARM++ translator
-#     * The charmreplay program
 # 
 # This Makefile is common to all machines.  This works because the charmc
 # is smart enough to "conceal" the differences between machines.  charmc
@@ -28,7 +27,7 @@ all:
 	@echo '  make charm'
 	@echo '  make charm++'
 
-charm: converse charmxlat charmlibs libcharm charmreplay
+charm: converse charmxlat charmlibs libcharm
 
 charm++: charm charmxlat++ charm++libs
 
@@ -138,29 +137,21 @@ CK_LIBS_MAIN=libck-defmain.o libck-unimain.o
 
 CK_LIBS=$(CK_LIBS_CORE) $(CK_LIBS_LDB) $(CK_LIBS_CPLUS) $(CK_LIBS_MAIN)
 
-LIBCK_CORE=common.o globals.o init.o register.o boc.o condsend.o qd.o vid.o rdonly.o stat.o wrtone.o acc.o mono.o tbl.o memstuff.o ldbcfns.o ck.o
+LIBCK_CORE=common.o globals.o init.o register.o boc.o condsend.o qd.o vid.o rdonly.o stat.o wrtone.o acc.o mono.o tbl.o memstuff.o ldbcfns.o ck.o main.o
 
 charmlibs: converse $(CK_LIBS)
 
-LIBCK_CORE_NOTRACE=$(LIBCK_CORE) perf-none.o main.n.o
+LIBCK_CORE_NOTRACE=$(LIBCK_CORE) perf-none.o
 libck-core-notrace.o: $(LIBCK_CORE_NOTRACE)
 	$(CHARMC) -cp ../lib/ -o $@ $(LIBCK_CORE_NOTRACE)
 
-LIBCK_CORE_SUMMARY=$(LIBCK_CORE) perf-sum.o main.n.o
+LIBCK_CORE_SUMMARY=$(LIBCK_CORE) perf-sum.o
 libck-core-summary.o: $(LIBCK_CORE_SUMMARY)
 	$(CHARMC) -cp ../lib/ -o $@ $(LIBCK_CORE_SUMMARY)
 
-LIBCK_CORE_PROJ=$(LIBCK_CORE) perf-proj.o perfio.o main.n.o
+LIBCK_CORE_PROJ=$(LIBCK_CORE) perf-proj.o perfio.o
 libck-core-proj.o: $(LIBCK_CORE_PROJ)
 	$(CHARMC) -cp ../lib/ -o $@ $(LIBCK_CORE_PROJ)
-
-LIBCK_CORE_RECORD=$(LIBCK_CORE) perf-recd.o perfio.o main.n.o
-libck-core-record.o: $(LIBCK_CORE_RECORD)
-	$(CHARMC) -cp ../lib/ -o $@ $(LIBCK_CORE_RECORD)
-
-LIBCK_CORE_REPLAY=$(LIBCK_CORE) perf-repl.o perfio.o main.r.o
-libck-core-replay.o: $(LIBCK_CORE)
-	$(CHARMC) -cp ../lib/ -o $@ $(LIBCK_CORE)
 
 libck-ldb-acwn.o: ldb.acwn.p ldb.h
 	$(CHARMC) -cp ../lib/ -o $@ ldb.acwn.p
@@ -243,9 +234,8 @@ wrtone.o: wrtone.c wrtone.h $(CKHEADERS)
 memstuff.o: memstuff.c $(CKHEADERS)
 	$(CHARMC) -o memstuff.o memstuff.c
 
-main.n.o main.r.o: main.c $(CKHEADERS)
-	$(CHARMC) -o main.n.o main.c
-	$(CHARMC) -o main.r.o main.c -DREPLAY_DEBUGGING
+main.o: main.c $(CKHEADERS)
+	$(CHARMC) -o main.o main.c
 
 ck.o: ck.c $(CKHEADERS)
 	$(CHARMC) -o ck.o ck.c
@@ -295,15 +285,6 @@ acc.cplus.o: acc.cplus.C $(CKHEADERS) c++interface.h acc.h
 
 mono.cplus.o: mono.cplus.C $(CKHEADERS) c++interface.h mono.h
 	$(CHARMC) -o mono.cplus.o mono.cplus.C
-
-###############################################################################
-#
-# charmreplay
-#
-###############################################################################
-
-charmreplay: basics charmreplay.c perfio.c
-	$(CHARMC) -seq -o $@ -cp ../bin/ charmreplay.c perfio.c
 
 ###############################################################################
 #
@@ -414,7 +395,7 @@ charmxlat charmfilter: basics $(CHARMXLAT)
 	$(CHARMC) -seq -o charmxlat   -cp ../bin/ $(CHARMXLAT)
 	$(CHARMC) -seq -o charmfilter -cp ../bin/ xl-space.c
 
-xl-main.o: main.c
+xl-main.o: xl-main.c
 	$(CHARMC) -seq xl-main.c
 
 xl-ytab.o: xl-ytab.c xl-lex.h xl-sym.h
@@ -484,10 +465,13 @@ xp-space.o: xp-space.c $(XPHEADERS)
 ###############################################################################
 
 clean: cmk_clean
-	rm -f TAGS #*#
-	rm -f basics *.a
-	rm -f dirs+sources *.o
-	rm -f cmk_extras *~
+	rm -f charmreplay charmxlat charmfilter charm++xlat charm++filter
+	rm -f conv-host
+	rm -f TAGS basics dirs+sources cmk_extras core
+	rm -f core #*#
+	rm -f core *.a
+	rm -f core *.o
+	rm -f core *~
 	rm -rf ../bin
 	rm -rf ../lib
 	rm -rf ../include

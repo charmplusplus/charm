@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.3  1995-07-22 23:45:15  jyelon
+ * Revision 2.4  1995-07-24 01:54:40  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.3  1995/07/22  23:45:15  jyelon
  * *** empty log message ***
  *
  * Revision 2.2  1995/06/29  22:00:56  narain
@@ -314,7 +317,7 @@ TRACE(CmiPrintf("[%d] Pack:: size_chareid=%d, total_size=%d\n",
 	TRACE(CmiPrintf("Pack :: sending key %d to penum %d\n", 
 			*((int *) key), penum));
 		GeneralSendMsgBranch(TblUnpack_EP, original,
-				penum, IMMEDIATEcat, BocMsg, TblBocNum);
+				penum, IMMEDIATEcat, ImmBocMsg, TblBocNum);
 	}
 }
 

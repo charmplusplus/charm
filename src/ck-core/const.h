@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.6  1995-07-22 23:44:13  jyelon
+ * Revision 2.7  1995-07-24 01:54:40  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.6  1995/07/22  23:44:13  jyelon
  * *** empty log message ***
  *
  * Revision 2.5  1995/07/19  22:15:33  jyelon
@@ -156,23 +159,26 @@
 /* The performance tools use these also. */
 /**********		USERcat			*******/
 #define NewChareMsg  		0
-#define ForChareMsg  		1
-#define BocInitMsg   		2
-#define BocMsg       		3
-#define TerminateToZero 	4
-#define TerminateSys		5
-#define InitCountMsg 		6
-#define ReadVarMsg   		7
-#define ReadMsgMsg 		8
-#define BroadcastBocMsg 	9
-#define DynamicBocInitMsg 	10
+#define NewChareNoBalanceMsg    1
+#define ForChareMsg  		2
+#define BocInitMsg   		3
+#define BocMsg       		4
+#define TerminateToZero 	5   /* never used??? */
+#define TerminateSys		6   /* never used??? */
+#define InitCountMsg 		7
+#define ReadVarMsg   		8
+#define ReadMsgMsg 		9
+#define BroadcastBocMsg 	10
+#define DynamicBocInitMsg 	11
 
 /**********		IMMEDIATEcat		*******/
-#define LdbMsg			12
+#define LdbMsg			12  /* never used??? */
 #define VidEnqueueMsg   	13
 #define VidSendOverMsg          14
 #define QdBocMsg		15
 #define QdBroadcastBocMsg	16
+#define ImmBocMsg               17
+#define ImmBroadcastBocMsg      18
 
 
 #endif

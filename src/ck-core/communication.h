@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.9  1995-07-22 23:44:13  jyelon
+ * Revision 2.10  1995-07-24 01:54:40  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.9  1995/07/22  23:44:13  jyelon
  * *** empty log message ***
  *
  * Revision 2.8  1995/07/19  22:15:32  jyelon
@@ -135,16 +138,13 @@
 
 #define CkCheck_and_Send(PE, env)\
     {\
-	if (PE == CmiMyPe()) { \
-	        CmiSetHandler(env,CsvAccess(CallProcessMsg_Index)) ; \
-                CkEnqueue(env); \
-	} else { \
-        	CldFillLdb(PE, LDB_ELEMENT_PTR(env)); \
-        	PACK(env); \
-        	CmiSetHandler(env,CsvAccess(HANDLE_INCOMING_MSG_Index)); \
-        	CmiSyncSend(PE,CmiSize(env),env); \
-        	CmiFree(env); \
-	}\
+        if (PE==CmiMyPe()) HANDLE_LOCAL_MSG(env);\
+        else {\
+            PACK(env); CldFillLdb(PE, LDB_ELEMENT_PTR(env)); \
+            CmiSetHandler(env,CsvAccess(HANDLE_INCOMING_MSG_Index)); \
+            CmiSyncSend(PE,CmiSize(env),env); \
+            CmiFree(env); \
+        }\
     }
 
 #define CkCheck_and_Broadcast(env) { \

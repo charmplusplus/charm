@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.4  1995-07-22 23:44:13  jyelon
+ * Revision 2.5  1995-07-24 01:54:40  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.4  1995/07/22  23:44:13  jyelon
  * *** empty log message ***
  *
  * Revision 2.3  1995/07/19  22:15:35  jyelon
@@ -70,29 +73,18 @@
 #define SetID_vidBlockPtr(id,x)         ((id).i_tag1=((int)(x))|2)
 
 /*
+ * Current envelope size: 256 bits = 32 bytes = 4 doubles.
  *
- * 8 bits: pack queueing and msgType into an int.
- * 2 bits: get rid of category & destPeFixed (infer from msgType).
- * 
- * Fields used by most/all messages:
+ * Note: the user-data area is aligned to a 64-bit boundary.  Therefore,
+ * there is no point to trimming the envelope unless you can save 64 bits.
  *
- *   +totsize +event +pe +priosize
- *
- * During CreateChare/VID:
- *
- *   +vidBlockPtr +EP +vidPE +dataMag
- *
- * During CreateChare/no VID:
- *
- *   -vidBlockPtr +EP +vidPE +dataMag
- *
- * During SendMsg/dagger
- *
- *   +chareBlockPtr +EP +ref +magic
- *
- * During SendMsg/no dagger
- *
- *   +chareBlockPtr +EP -ref +magic
+ * save 32 bits: remove 'event'.  Easy with ifdefs, doubles SUPER_INSTALL time.
+ * save 16 bits: remove 'pe'.     Easy with ifdefs, doubles SUPER_INSTALL time.
+ * save 16 bits: change TotalSize to a magnitude.  Inefficient.
+ * save 16 bits: could eliminate priosize, by moving it into priority. Clumsy.
+ * save  8 bits: remove msgType by replacing HANDLE_X_MSG.  Hard.
+ * save 14 bits: turn isPACKED, msgType, queueing into bitfields.  Inefficient.
+ * save  2 bits: coalesce isPACKED with packid. Hard.
  *
  */
 
@@ -100,19 +92,20 @@ typedef struct envelope {
   unsigned int   core1;     /* first word of converse core. */
 
   unsigned int   event;   /* unknown meaning. Used only for logging.*/
+
   unsigned int   i_tag2;  /* Count OR vidBlockPtr OR chareBlockPtr OR boc_num*/
-  unsigned int   totsize; /* total size of message, in bytes */
+
+  unsigned int   TotalSize; /* total size of message, in bytes */
+
+  unsigned short s_tag1;  /* vidPE OR ref OR other_id */
+  unsigned short s_tag2;  /* dataMag OR chare_magic_number */
 
   unsigned short EP;      /* entry point to call */
-  unsigned short s_tag1;  /* other_id OR ref OR vidPE */
-
   unsigned short priosize;/* priority length, measured in bits */
+
   unsigned short pe;      /* unknown meaning. used only for logging. */
-
-  unsigned short magic;   /* dataMag or chare_magic_number */
-  unsigned char  c_tag1;  /* category, destPeFixed, isPACKED */
   unsigned char  msgType;
-
+  unsigned char  isPACKED;
   unsigned char  queueing;
   unsigned char  packid;
 
@@ -124,41 +117,21 @@ typedef struct envelope {
 
 /*********************************************************/
 /** Arrangement for i_tag2                              **/
-/** 	count=32bits					**/
-/**	vidBlockPtr=32bits				**/
-/** 	chareBlockPtr=32bits.				**/
-/**	boc_num=32bits.      				**/
 /*********************************************************/
 #define GetEnv_count(e)		        (env(e)->i_tag2)
-#define GetEnv_chareBlockPtr(e)	        (env(e)->i_tag2)
-#define GetEnv_vidBlockPtr(e)		(env(e)->i_tag2)
-#define GetEnv_boc_num(e) 		(env(e)->i_tag2)
-
 #define SetEnv_count(e,x)		(env(e)->i_tag2=(x))
+
+#define GetEnv_chareBlockPtr(e)	        ((CHARE_BLOCK *)(env(e)->i_tag2))
 #define SetEnv_chareBlockPtr(e,x)	(env(e)->i_tag2=((int)(x)))
+
 #define SetEnv_vidBlockPtr(e,x)	        (env(e)->i_tag2=((int)(x)))
+#define GetEnv_vidBlockPtr(e)		((VID_BLOCK *)(env(e)->i_tag2))
+
+#define GetEnv_boc_num(e) 		(env(e)->i_tag2)
 #define SetEnv_boc_num(e,x) 		(env(e)->i_tag2=(x))
 
-#define GetEnv_chare_magic_number(e)	(env(e)->magic)
-#define SetEnv_chare_magic_number(e,x)  (env(e)->magic=(x))
-
-#define GetEnv_dataMag(e)               (env(e)->magic)
-#define SetEnv_dataMag(e,x)             (env(e)->magic=(x))
-
 /*********************************************************/
-/** Arrangement for c_tag1				**/
-/**  category 1bit | destPeFixed 1bit | isPACKED 2bit   **/
-/*********************************************************/
-
-#define GetEnv_category(e)    (env(e)->c_tag1>>7)
-#define GetEnv_destPeFixed(e) ((env(e)->c_tag1>>6)&1)
-#define GetEnv_isPACKED(e)    ((env(e)->c_tag1>>4)&3)
-
-#define SetEnv_category(e,x)   (env(e)->c_tag1=(env(e)->c_tag1&0x7F)|((x)<<7))
-#define SetEnv_destPeFixed(e,x)(env(e)->c_tag1=(env(e)->c_tag1&0xBF)|((x)<<6))
-#define SetEnv_isPACKED(e,x)   (env(e)->c_tag1=(env(e)->c_tag1&0xCF)|((x)<<4))
-
-/*********************************************************/
+/* Arrangement for s_tag1                                */
 /* other_id is used only for acc, mono, init, tbl msgs   */
 /* vidPE is used only if msgType==VidSendOverMsg         */
 /* ref is for user messages only.                        */
@@ -173,35 +146,45 @@ typedef struct envelope {
 #define GetEnv_ref(e)        (env(e)->s_tag1)
 #define SetEnv_ref(e,x)      (env(e)->s_tag1=(x))
 
+#define GetEnv_chare_magic_number(e)	(env(e)->s_tag2)
+#define SetEnv_chare_magic_number(e,x)  (env(e)->s_tag2=(x))
+
+#define GetEnv_dataMag(e)               (env(e)->s_tag2)
+#define SetEnv_dataMag(e,x)             (env(e)->s_tag2=(x))
+
+#define GetEnv_chareIndex(e)            (env(e)->s_tag2)
+#define SetEnv_chareIndex(e,x)          (env(e)->s_tag2=(x))
+
 /*********************************************************/
 /** These fields are alone currently, and accessed	**/
 /** separately.						**/
 /*********************************************************/
-#define GetEnv_pe(e)			(env(e)->pe)
-#define GetEnv_event(e)	        	(env(e)->event)
-#define GetEnv_EP(e) 			(env(e)->EP)
+#define GetEnv_isPACKED(e)      (env(e)->isPACKED)
+#define SetEnv_isPACKED(e,x)    (env(e)->isPACKED=(x))
 
-#define SetEnv_pe(e,x)		        (env(e)->pe=(x))
-#define SetEnv_event(e,x)		(env(e)->event=(x))
-#define SetEnv_EP(e,x) 		        (env(e)->EP=(x))
+#define GetEnv_pe(e)		(env(e)->pe)
+#define SetEnv_pe(e,x)          (env(e)->pe=(x))
 
-#define GetEnv_queueing(e)    (env(e)->queueing)
-#define GetEnv_priosize(e)    (env(e)->priosize)
-#define SetEnv_queueing(e,x)  (env(e)->queueing=(x))
-#define SetEnv_priosize(e,x)  (env(e)->priosize=(x))
+#define GetEnv_event(e)	        (env(e)->event)
+#define SetEnv_event(e,x)	(env(e)->event=(x))
 
-#define SetEnv_prioinfo(e, q, p) (env(e)->queueing=(q),env(e)->priosize=(p))
+#define GetEnv_EP(e) 		(env(e)->EP)
+#define SetEnv_EP(e,x) 		(env(e)->EP=(x))
 
-#define GetEnv_TotalSize(e)             (env(e)->totsize)
-#define GetEnv_packid(e)                (env(e)->packid)
-#define SetEnv_TotalSize(e,x)           (env(e)->totsize=(x))
-#define SetEnv_packid(e,x)              (env(e)->packid=(x))
+#define GetEnv_queueing(e)      (env(e)->queueing)
+#define SetEnv_queueing(e,x)    (env(e)->queueing=(x))
 
-#define SetEnv_TotalSize_packid(e, sz, id)\
-	(env(e)->totsize=(sz),env(e)->packid=(id))
+#define GetEnv_priosize(e)      (env(e)->priosize)
+#define SetEnv_priosize(e,x)    (env(e)->priosize=(x))
 
-#define GetEnv_msgType(e)    (env(e)->msgType)
-#define SetEnv_msgType(e,x)  (env(e)->msgType=(x))
+#define GetEnv_TotalSize(e)     (env(e)->TotalSize)
+#define SetEnv_TotalSize(e,x)   (env(e)->TotalSize=(x))
+
+#define GetEnv_packid(e)        (env(e)->packid)
+#define SetEnv_packid(e,x)      (env(e)->packid=(x))
+
+#define GetEnv_msgType(e)       (env(e)->msgType)
+#define SetEnv_msgType(e,x)     (env(e)->msgType=(x))
 
 /*********************************/
 /* Navigating the priority field */

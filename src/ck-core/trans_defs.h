@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.3  1995-07-07 02:04:59  narain
+ * Revision 2.4  1995-07-24 01:54:40  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.3  1995/07/07  02:04:59  narain
  * Put in macro for immsendmsgbranch
  *
  * Revision 2.2  1995/06/29  21:47:29  narain
@@ -73,9 +76,9 @@
 
 #ifdef STRIP
 #define _CK_BroadcastMsgBranch(ep,msg,boc)  GeneralBroadcastMsgBranch(ep,msg,\
-					IMMEDIATEcat,BroadcastBocMsg,boc)
+					IMMEDIATEcat,ImmBroadcastBocMsg,boc)
 #define _CK_SendMsgBranch(ep,msg,boc,pe)	GeneralSendMsgBranch(ep,msg,pe,\
-					IMMEDIATEcat,BocMsg,boc)
+					IMMEDIATEcat,ImmBocMsg,boc)
 #else
 #define _CK_BroadcastMsgBranch(ep,msg,boc)  GeneralBroadcastMsgBranch(ep,msg,\
 					USERcat,BroadcastBocMsg,boc)
@@ -83,7 +86,7 @@
 					USERcat,BocMsg,boc)
 #endif
 #define _CK_ImmSendMsgBranch(ep,msg,boc,pe)	GeneralSendMsgBranch(ep,msg,pe,\
-					IMMEDIATEcat,BocMsg,boc)
+					IMMEDIATEcat,ImmBocMsg,boc)
 
 #define VOIDFNPTR			FUNCTION_PTR
 

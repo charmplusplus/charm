@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.6  1995-07-22 23:44:13  jyelon
+ * Revision 2.7  1995-07-24 01:54:40  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.6  1995/07/22  23:44:13  jyelon
  * *** empty log message ***
  *
  * Revision 2.5  1995/07/19  22:15:22  jyelon
@@ -315,78 +318,68 @@ void *Msg;
 ChareIDType *vid;
 int destPE;
 {
-	ENVELOPE * env;
-	VID_BLOCK * vidblock;
-	int DataMag ;
-
-	if ( IsCharmPlus(Entry) )
-		DataMag = bytes_to_magnitude(id);
-	else
-		DataMag = bytes_to_magnitude(CsvAccess(ChareSizesTable)[id]);
-
-	TRACE(CmiPrintf("[%d] CreateChare: Entry=%d\n", CmiMyPe(), Entry));
-
-	CpvAccess(nodecharesCreated)++;
-	env = ENVELOPE_UPTR(Msg);
-
-	SetEnv_category(env, USERcat);
-	SetEnv_msgType(env, NewChareMsg);
-	SetEnv_dataMag(env, DataMag);
-	SetEnv_EP(env, Entry);
-
-	if (vid != NULL_VID)
-	{
-		vidblock   = (VID_BLOCK *)  CmiAlloc(sizeof(VID_BLOCK));
-		CkMemError(vidblock);
-		vidblock->vidPenum = -1;
-		vidblock->info_block.vid_queue = (void *) FIFO_Create();
-		SetID_onPE((*vid), CmiMyPe());
-		SetID_vidBlockPtr((*vid),  (struct vid_block *) vidblock);
-                SetEnv_vidPE(env, CmiMyPe());
-		SetEnv_vidBlockPtr(env, (int) vidblock);
-	}
-	else
-	{
-                SetEnv_vidPE(env, -1);
-		SetEnv_vidBlockPtr(env, NULL);
-	}
-
-	TRACE(CmiPrintf("[%d] CreateChare: vid=0x%x\n",
-	    CmiMyPe(), vid));
-
-	TRACE(CmiPrintf("[%d] CreateChare: category=%d, msgType=%d, ep=%d\n",
-	    CmiMyPe(), GetEnv_category(env), 
-	    GetEnv_msgType(env), GetEnv_EP(env)));
-
-
-	QDCountThisCreation(Entry, USERcat, NewChareMsg, 1);
-
-
-	/********************  SANJEEV May 24, 93 **************************/
-	/* The CldNewChareFromLocal, FIFO_EnQueue, and CkCheck_and_Send
-   calls were moved inside this if-then-else  */
-
-	trace_creation(GetEnv_msgType(env), Entry, env);
-	if (destPE == NULL_PE)
-	{
-		/* Currently set to local PE, */
-		SetEnv_destPeFixed(env, 0);
-		CmiSetHandler(env,CsvAccess(CallProcessMsg_Index)) ;
-		if (CmiNumPe() > 1) 
-		  CldNewSeedFromLocal(env, LDB_ELEMENT_PTR(env),
-                    CkLdbSend,
-                    GetEnv_queueing(env),
-                    GetEnv_priosize(env),
-                    GetEnv_priobgn(env));
-		else 
-		  CkEnqueue(env);
-	      }
-	else
-	{
-		SetEnv_destPeFixed(env, 1);
-		CkCheck_and_Send(destPE, env);
-	}
-
+  ENVELOPE * env;
+  VID_BLOCK * vidblock;
+  int DataMag ;
+  
+  if ( IsCharmPlus(Entry) )
+    DataMag = bytes_to_magnitude(id);
+  else
+    DataMag = bytes_to_magnitude(CsvAccess(ChareSizesTable)[id]);
+  
+  TRACE(CmiPrintf("[%d] CreateChare: Entry=%d\n", CmiMyPe(), Entry));
+  
+  CpvAccess(nodecharesCreated)++;
+  env = ENVELOPE_UPTR(Msg);
+  
+  SetEnv_dataMag(env, DataMag);
+  SetEnv_EP(env, Entry);
+  
+  if (vid != NULL_VID)
+    {
+      vidblock   = (VID_BLOCK *)  CmiAlloc(sizeof(VID_BLOCK));
+      CkMemError(vidblock);
+      vidblock->vidPenum = -1;
+      vidblock->info_block.vid_queue = (void *) FIFO_Create();
+      SetID_onPE((*vid), CmiMyPe());
+      SetID_vidBlockPtr((*vid),  (struct vid_block *) vidblock);
+      SetEnv_vidPE(env, CmiMyPe());
+      SetEnv_vidBlockPtr(env, (int) vidblock);
+    }
+  else
+    {
+      SetEnv_vidPE(env, -1);
+      SetEnv_vidBlockPtr(env, NULL);
+    }
+  
+  TRACE(CmiPrintf("[%d] CreateChare: vid=0x%x\n",
+		  CmiMyPe(), vid));
+  
+  TRACE(CmiPrintf("[%d] CreateChare: category=%d, msgType=%d, ep=%d\n",
+		  CmiMyPe(), GetEnv_category(env), 
+		  GetEnv_msgType(env), GetEnv_EP(env)));
+  
+  
+  QDCountThisCreation(Entry, USERcat, NewChareMsg, 1);
+  
+  
+  /********************  SANJEEV May 24, 93 **************************/
+  /* The CldNewChareFromLocal, FIFO_EnQueue, and CkCheck_and_Send
+     calls were moved inside this if-then-else  */
+  
+  trace_creation(GetEnv_msgType(env), Entry, env);
+  if (destPE == NULL_PE) {
+    SetEnv_msgType(env, NewChareMsg);
+    CmiSetHandler(env,CsvAccess(CkProcess_NewChareMsg_Index)) ;
+    CldNewSeedFromLocal(env, LDB_ELEMENT_PTR(env),
+			CkLdbSend,
+			GetEnv_queueing(env),
+			GetEnv_priosize(env),
+			GetEnv_priobgn(env));
+  } else {
+    SetEnv_msgType(env, NewChareNoBalanceMsg);
+    CkCheck_and_Send(destPE, env);
+  }
 }
 
 
@@ -396,67 +389,37 @@ int Entry;
 void * Msg;
 ChareIDType * pChareID;
 {
-	ENVELOPE * env;
-
-	TRACE(CmiPrintf("[%d] SendMsg: onPE=%d, isBOC=%d\n",
-	    CmiMyPe(), GetID_onPE((*pChareID)),
-	    GetID_isBOC((*pChareID))));
-	TRACE(CmiPrintf("[%d] SendMsg: isVID=%d\n",
-	    CmiMyPe(), GetID_isVID((*pChareID))));
-
-	if (GetID_isBOC((*pChareID)))
-		GeneralSendMsgBranch(Entry, Msg, 
-		    GetID_onPE((*pChareID)), USERcat, BocMsg, GetID_boc_num((*pChareID)));
-	else
+  ENVELOPE * env;
+  
+  if (GetID_isBOC((*pChareID)))
+    GeneralSendMsgBranch(Entry, Msg, 
+			 GetID_onPE((*pChareID)), USERcat, BocMsg, GetID_boc_num((*pChareID)));
+  else
+    {
+      int destPE = GetID_onPE((*pChareID));
+      CpvAccess(nodeforCharesCreated)++;
+      env = ENVELOPE_UPTR(Msg);
+      SetEnv_msgType(env, ForChareMsg);
+      SetEnv_EP(env, Entry);
+      if (!GetID_isVID((*pChareID)))
 	{
-                int destPE = GetID_onPE((*pChareID));
-		CpvAccess(nodeforCharesCreated)++;
-		env = ENVELOPE_UPTR(Msg);
-		SetEnv_msgType(env,   ForChareMsg);
-		SetEnv_destPeFixed(env, 1);
-		if (!GetID_isVID((*pChareID)))
-		{
-			SetEnv_category(env, USERcat);
-			SetEnv_chareBlockPtr(env, (int)
-			    GetID_chareBlockPtr((*pChareID)));
-			SetEnv_chare_magic_number(env,
-			    GetID_chare_magic_number((*pChareID)));
-			QDCountThisCreation(Entry, USERcat, ForChareMsg, 1);
-		}
-		else 
-		{
-			SetEnv_category(env, IMMEDIATEcat);
-			SetEnv_msgType(env, VidEnqueueMsg);
-			SetEnv_vidBlockPtr(env, (int) GetID_vidBlockPtr((*pChareID)));
-			QDCountThisCreation(VidQueueUpInVidBlock_EP,
-					    IMMEDIATEcat, VidEnqueueMsg, 1);
-		}
-
-		SetEnv_EP(env, Entry);
-
-		TRACE(CmiPrintf("[%d] SendMsg: id_chareBlockPtr=0x%x, env_chareBlockPtr=0x%x\n",
-		    CmiMyPe(), GetID_chareBlockPtr((*pChareID)), GetEnv_chareBlockPtr(env)));
-
-		TRACE(CmiPrintf("[%d] SendMsg: magic=%d, category=%d, msgType=%d, EP=%d\n",
-		    CmiMyPe(), GetEnv_chare_magic_number(env),
-		    GetEnv_category(env), GetEnv_msgType(env), GetEnv_EP(env)));
-
-		if ((GetID_isVID((*pChareID))) && (destPE == CmiMyPe()))
-		{
-			trace_creation(VidEnqueueMsg,
-				       VidQueueUpInVidBlock_EP, env);
-		        CmiSetHandler(env,CsvAccess(CallProcessMsg_Index)) ;
-			CkEnqueue(env);
-		}
-		else
-		{
-			trace_creation(GetEnv_msgType(env), Entry, env);
-			CkCheck_and_Send(destPE, env);
-		}
-
-		TRACE(CmiPrintf("[%d] Done with SendMsg.\n", CmiMyPe()));
-
+	  SetEnv_chareBlockPtr(env, (int)
+			       GetID_chareBlockPtr((*pChareID)));
+	  SetEnv_chare_magic_number(env,
+				    GetID_chare_magic_number((*pChareID)));
+	  QDCountThisCreation(Entry, USERcat, ForChareMsg, 1);
+	  
 	}
+      else 
+	{
+	  SetEnv_msgType(env, VidEnqueueMsg);
+	  SetEnv_vidBlockPtr(env, (int) GetID_vidBlockPtr((*pChareID)));
+	  QDCountThisCreation(VidQueueUpInVidBlock_EP,
+			      IMMEDIATEcat, VidEnqueueMsg, 1);
+	}
+      trace_creation(GetEnv_msgType(env), Entry, env);
+      CkCheck_and_Send(destPE, env);
+    }
 }
 
 
@@ -527,3 +490,4 @@ void *env;
     GetEnv_priosize(env),
     GetEnv_priobgn(env));
 }
+
