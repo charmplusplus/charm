@@ -35,6 +35,7 @@ void traceCharmClose(void);          /* close trace in ck */
 void traceBegin(void);
 void traceEnd(void);
 void traceWriteSts(void);
+void traceFlushLog(void);
 
 #ifndef CMK_OPTIMIZE
 CpvExtern(int, traceOn);
