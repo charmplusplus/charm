@@ -96,12 +96,11 @@ void MsgPacker::deliver(CombinedMessage *cmb_msg){
 
         CProxyElement_ArrayBase ap(aid, idx);
         ArrayElement *a_elem = ap.ckLocal();
-
-        int msgIdx = _entryTable[ep]->msgIdx;
-        //Unpack the message
-        senv.data = (char *)_msgTable[msgIdx]->unpack(senv.data); 
         
         if(_entryTable[ep]->noKeep && a_elem != NULL) {
+            int msgIdx = _entryTable[ep]->msgIdx;
+            //Unpack the message
+            senv.data = (char *)_msgTable[msgIdx]->unpack(senv.data); 
             CkDeliverMessageReadonly(ep, senv.data, a_elem);
             delete [] senv.data;
         }
@@ -116,7 +115,7 @@ void MsgPacker::deliver(CombinedMessage *cmb_msg){
             env->getsetArrayMgr() = aid;
             env->getsetArrayIndex() = idx;
             env->getsetArrayEp() = ep;
-            env->setPacked(0); //We have already unpakced it.
+            env->setPacked(1); 
             env->getsetArraySrcPe()=CkMyPe();  //FOO Bar change later
             env->getsetArrayHops()=0;  //FOO BAR change later
             env->setQueueing(CK_QUEUEING_FIFO);            
