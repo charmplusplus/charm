@@ -628,8 +628,6 @@ extern void _REGISTER_DONE(void);
 
 static inline void _CHECK_CID(CkChareID, int){}
 
-extern int CkIsCharmMessage(char *msg);
-
 #include "readonly.h"
 #include "ckarray.h"
 #include "ckstream.h"
