@@ -836,7 +836,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   
   if (!(elan_port = elan_tportInit(elan_base->state,
                            (ELAN_QUEUE *)elan_q,
-                           elan_main2elan(elan_base->state, elan_q),
+                           /*elan_main2elan(elan_base->state, elan_q),*/
                            elan_base->tport_nslots, 
                            elan_base->tport_smallmsg,
                            elan_base->tport_bigmsg,
