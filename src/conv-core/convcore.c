@@ -1461,6 +1461,12 @@ int CsdScheduler(int maxmsgs)
   void *localqueue = CpvAccess(CmiLocalQueue);
   int cycle = CpvAccess(CsdStopFlag);
   
+#if CMK_DEBUG_MODE
+  /* To allow start in freeze state */
+  msgListCleanup();
+  msgListCache();
+#endif
+
   if(maxmsgs == 0) {
     while(1) {
       msg = CmiGetNonLocal();
@@ -2444,8 +2450,6 @@ void CcsSendReplyFd(unsigned int ip, unsigned int port, int size, void *msg)
   shutdown(fd, 1);
   while (read(fd, &c, 1)==EINTR);
 #endif
-
-  usleep(1);
 }
 
 #endif
