@@ -338,13 +338,13 @@ echo "Generating $ConvUsr"
 echo > $ConvUsr
 if test -n "$LIBDIR" 
 then
-  echo "OPTS_LD=\"$LIBDIR\"" >> $ConvUsr
-  echo "OPTS_LDXX=\"$LIBDIR\"" >> $ConvUsr
+  echo 'OPTS_LD="$OPTS_LD '$LIBDIR'"' >> $ConvUsr
+  echo 'OPTS_LDXX="$OPTS_LDXX '$LIBDIR'"' >> $ConvUsr
 fi
 if test -n "$INCDIR" 
 then
-  echo "OPTS_CC=\"$INCDIR\"" >> $ConvUsr
-  echo "OPTS_CXX=\"$INCDIR\"" >> $ConvUsr
+  echo 'OPTS_CC="$OPTS_CC '$INCDIR'"' >> $ConvUsr
+  echo 'OPTS_CXX="$OPTS_CXX '$INCDIR'"' >> $ConvUsr
 fi
 chmod +x $ConvUsr
 
