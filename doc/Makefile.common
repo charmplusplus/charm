@@ -17,6 +17,7 @@ WEBDIR=/expand8/www/ppl_manuals
 
 # Call to Latex2html
 L2H=latex2html -white -antialias -local_icons \
+	-long_titles 1 \
 	-show_section_numbers \
 	-address '<p align="right">'"`/bin/date +"%B %d, %Y"`"'<br> \
             '$(PROJECT_LINK)'<a href="http://charm.cs.uiuc.edu/">Charm Homepage</a>'
