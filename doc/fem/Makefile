@@ -1,5 +1,5 @@
 DOCDIR=..
-WEBDIR=/expand6/groupMosaic/ppl_manuals
+WEBDIR=/expand8/www/ppl_manuals
 
 all: ps pdf html
 

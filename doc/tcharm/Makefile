@@ -1,5 +1,5 @@
 DOCDIR=..
-WEBDIR=/expand6/groupMosaic/ppl_manuals
+WEBDIR=/expand8/www/ppl_manuals
 BASE=tcharm
 
 all: ps pdf html
