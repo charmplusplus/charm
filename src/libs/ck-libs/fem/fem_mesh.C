@@ -393,6 +393,11 @@ void FEM_Attribute::copyShape(const FEM_Attribute &src) {
 void FEM_Attribute::set(const void *src, int firstItem,int length, 
 		const IDXL_Layout &layout, const char *callingRoutine) 
 {
+	if (firstItem!=0) { /* If this isn't the start... */
+		if (length!=1) /* And we're not setting one at a time */
+			CmiAbort("FEM_Mesh_data: unexpected firstItem");
+	}
+
 	if (getLength()==-1) setLength(length);
 	else if (length!=1 && length!=getLength()) 
 		bad("length",false,getLength(),length, callingRoutine);
