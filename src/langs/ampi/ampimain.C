@@ -15,26 +15,6 @@ class ampimain : public Chare
 
 static inline void itersDone(void) { CProxy_ampimain pm(mainhandle); pm.done(); }
 
-extern void _initCharm(int argc, char **argv);
-
-extern "C" void conversemain_(int *argc,char _argv[][80],int length[])
-{
-  int i;
-  char **argv = new char*[*argc+2];
-
-  for(i=0;i <= *argc;i++) {
-    if (length[i] < 100) {
-      _argv[i][length[i]]='\0';
-      argv[i] = &(_argv[i][0]);
-    } else {
-      argv[i][0] = '\0';
-    }
-  }
-  argv[*argc+1]=0;
-  
-  ConverseInit(*argc, argv, _initCharm, 0, 0);
-}
-
 CkChareID mainhandle;
 CkArrayID _ampiAid;
 
