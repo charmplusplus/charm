@@ -308,7 +308,7 @@ FEM_Mesh *fem_assemble(int nchunks,ChunkMsg **msgs)
 					g-=minOld_n;
 				
 				//Copy over user data
-				m->node.udataIs(g-minOld_n,msg->m.node.udataFor(n));
+				m->node.udataIs(g,msg->m.node.udataFor(n));
 				msg->nodeNums[n]=g;
 			}
 	}
@@ -326,11 +326,11 @@ FEM_Mesh *fem_assemble(int nchunks,ChunkMsg **msgs)
 					g-=minOld_e[t];
 				
 				//Copy over user data
-				m->elem[t].udataIs(g-minOld_e[t],msg->m.elem[t].udataFor(i));
+				m->elem[t].udataIs(g,msg->m.elem[t].udataFor(e));
 				
 				//Copy over connectivity, translating from local to global
 				const int *srcConn=msg->m.elem[t].connFor(e);
-				int *dstConn=m->elem[t].connFor(g-minOld_e[t]);
+				int *dstConn=m->elem[t].connFor(g);
 				for (n=0;n<msg->m.elem[t].nodesPer;n++)
 					dstConn[n]=msg->nodeNums[srcConn[n]];
 			}
