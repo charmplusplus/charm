@@ -405,9 +405,6 @@ static ampi *ampiInit(char **argv)
   if (CtvAccess(ampiInitDone)) return NULL; /* Already called ampiInit */
   STARTUP_DEBUG("ampiInit> begin")
 
-#if CMK_BLUEGENE_CHARM
-  TRACE_BG_AMPI_START(NULL, "AMPI_INIT_START");
-#endif
   // Parse command-line arguments (Commlib)
   int strat = USE_MESH;
   char *comlibStrat;
@@ -462,9 +459,6 @@ static ampi *ampiInit(char **argv)
         //strategy->setDestArray(parent.ckGetArrayID());
 #endif
   }
-#if CMK_BLUEGENE_CHARM
-  TRACE_BG_AMPI_SUSPEND();
-#endif
   int *barrier = (int *)TCharm::get()->semaGet(AMPI_BARRIER_SEMAID);
   if (TCHARM_Element()==0)
   {
@@ -491,7 +485,7 @@ static ampi *ampiInit(char **argv)
   CtvAccess(ampiInitDone)=1;
   STARTUP_DEBUG("ampiInit> complete")
 #if CMK_BLUEGENE_CHARM
-  TRACE_BG_AMPI_START(ptr->getThread(), "AMPI_AMPI_START");
+  TRACE_BG_AMPI_START(ptr->getThread(), "AMPI_START");
 #endif
 
   return ptr;
