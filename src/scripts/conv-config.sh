@@ -53,7 +53,6 @@ CMK_LD_SHARED="-shared"
 [ -z "$CMK_NATIVE_LDXX" ] && CMK_NATIVE_LDXX="$CMK_LDXX"
 [ -z "$CMK_NATIVE_F90" ] && CMK_NATIVE_F90="$CMK_CF90"
 [ -z "$CMK_NATIVE_AR" ] && CMK_NATIVE_AR="$CMK_AR"
-[ -z "$CMK_NATIVE_LIBS" ] && CMK_NATIVE_LIBS="$CMK_LIBS"
 
 if [ -r $CHARMINC/conv-mach-opt.sh ]
 then
