@@ -16,9 +16,11 @@
 #define CMK_MULTICAST_LIST_USE_COMMON_CODE                 1
 #define CMK_MULTICAST_GROUP_USE_COMMON_CODE                1
 
-#define CMK_MSG_HEADER_BASIC  { CmiUInt2 d0,d1,d2,d3,d4,d5,hdl,d7; }
-#define CMK_MSG_HEADER_EXT    { CmiUInt2 d0,d1,d2,d3,d4,d5,hdl,xhdl,info,d9,da,db; }
-#define CMK_MSG_HEADER_BLUEGENE    { CmiUInt2 d0,d1,d2,d3,d4,d5,hdl,xhdl,info,d9,da,db; int nd, n; double rt; CmiInt2 tID; CmiUInt2 hID; char t; int msgID; int srcPe;}
+// the first 5 fields of the header are defined in machine-dgram.c
+// and are used for the udp retransmission protocol implementation
+#define CMK_MSG_HEADER_BASIC  { CmiUInt2 d0,d1,d2,d3,d4,d5,hdl; }
+#define CMK_MSG_HEADER_EXT    { CmiUInt2 d0,d1,d2,d3,d4,d5,hdl,xhdl,info; }
+#define CMK_MSG_HEADER_BLUEGENE    { CmiUInt2 d0,d1,d2,d3,d4,d5,hdl,xhdl,info; int nd, n; double rt; CmiInt2 tID; CmiUInt2 hID; char t; int msgID; int srcPe;}
 
 #define CMK_REDUCTION_USES_COMMON_CODE                     1
 #define CMK_REDUCTION_USES_SPECIAL_CODE                    0

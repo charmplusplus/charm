@@ -32,8 +32,8 @@
 #define CMK_SPANTREE_USE_SPECIAL_CODE                      0
 
 #define CMK_MSG_HEADER_BASIC  CMK_MSG_HEADER_EXT
-#define CMK_MSG_HEADER_EXT    { CmiUInt2 vmitype,rank,root,hdl,xhdl,info,d0,d1; }
-#define CMK_MSG_HEADER_BLUEGENE    { CmiUInt2 d0,d1,d2,d3,d4,d5,hdl,xhdl,info,d9,da,db; int nd, n; double rt; CmiInt2 tID; CmiUInt2 hID; char t; int msgID; int srcPe;}
+#define CMK_MSG_HEADER_EXT    { CmiUInt2 vmitype,rank,root,hdl,xhdl,info; }
+#define CMK_MSG_HEADER_BLUEGENE    { CmiUInt2 d0,d1,d2,d3,d4,d5,hdl,xhdl,info; int nd, n; double rt; CmiInt2 tID; CmiUInt2 hID; char t; int msgID; int srcPe;}
 
 #define CMK_REDUCTION_USES_COMMON_CODE                     1
 #define CMK_REDUCTION_USES_SPECIAL_CODE                    0
