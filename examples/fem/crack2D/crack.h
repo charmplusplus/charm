@@ -98,8 +98,15 @@ struct ConfigurationData {
   double delta;            //timestep
   double delta2;           //delta squared times 2????
   int numProp;             //number of proportionality constants
-  int *ts_proportion;      //time step to apply proportionality constant at
+  int *ts_proportion;      //1-based time step to apply proportionality constant at
   double *proportion;      //boundary load proportionality constant
+
+  /**
+   Return the fraction of the boundary conditions (prop) and time-rate of
+   change of boundary conditions (slope) to apply during this 0-based timestep.  
+   Applies linear interpolation to the ts_proportion and proportion arrays, above.
+  */
+  void getBoundaryConditionScale(int timestep,double *prop,double *slope) const;
 
   /// Material formulation
   int lin;                 //elastic formulation, 0=nl, 1=linear
@@ -153,7 +160,6 @@ extern "C" void pupMesh(pup_er p,MeshData *mesh); //For migration
 
 //Node physics: in node.C
 struct NodeSlope {
-  int kk; //Index into config.ts_proportion array
   double prop; //Proportion of boundary conditions to apply
   double slope; //Slope of prop
 };

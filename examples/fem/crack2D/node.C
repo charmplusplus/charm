@@ -6,7 +6,6 @@
 #include "crack.h"
 
 void nodeSetup(NodeSlope *sl) {
-  sl->kk=-1;
   sl->slope=sl->prop=0;
 }
 
@@ -21,24 +20,38 @@ void nodeBeginStep(MeshData *mesh)
   }
 }
 
+/**
+ Return the fraction of the boundary conditions (prop) and time-rate of
+ change of boundary conditions (slope) to apply during this 0-based timestep.  
+ Applies linear interpolation to the ts_proportion and proportion arrays, above.
+*/
+void ConfigurationData::getBoundaryConditionScale(int timestep,double *prop,double *slope) const
+{
+    timestep--; /* to 0-based */
+    /* Clamp out-of-bounds timesteps */
+    if (timestep<=ts_proportion[0]) {
+      *prop=proportion[0]; *slope=0; return;
+    }
+    if (timestep>=ts_proportion[numProp-1]) {
+      *prop=proportion[numProp-1]; *slope=0; return;
+    }
+    /* Otherwise linearly interpolate between proportion "cur" and "cur+1" */
+    int cur=0; /* index into ts_proportion and proportion arrays */
+    while (timestep>=ts_proportion[cur+1]) cur++;
+    /* assert: 0<=cur && cur<numProp 
+      and  ts_proportion[cur]<=timestep && timestep<ts_proportion[cur+1] */
+    
+    *prop = proportion[cur];
+    double timeSlope=1.0/(ts_proportion[cur+1]-ts_proportion[cur]);
+    *slope = 1/delta * (proportion[cur+1]-proportion[cur])*timeSlope;
+    *prop = proportion[cur]+(double)(timestep-ts_proportion[cur])*(*slope)*delta;
+}
+
+
 void nodeFinishStep(MeshData *mesh, NodeSlope *sl,int tstep)
 {
-  tstep++; /* subtle: timesteps are 1-based in the .inp file, so make tstep 1-based */
-  // Slowly ramp up boundary conditions:
-  if (config.ts_proportion[sl->kk+1] == tstep)
-  {
-      sl->kk++;
-      sl->prop = config.proportion[sl->kk];
-      sl->slope = (config.proportion[sl->kk+1]-sl->prop)/config.delta;
-      sl->slope /= (double) (config.ts_proportion[sl->kk+1]- config.ts_proportion[sl->kk]);
-  }
-  else
-  {
-      sl->prop = (double)(tstep - config.ts_proportion[sl->kk])*
-                    sl->slope*config.delta+config.proportion[sl->kk];
-  }
-  double slope=sl->slope;
-  double prop=sl->prop;
+  double prop,slope;
+  config.getBoundaryConditionScale(tstep,&prop,&slope);
 
   // Update each node:
   for(int idx=0; idx<mesh->nn; idx++) {
