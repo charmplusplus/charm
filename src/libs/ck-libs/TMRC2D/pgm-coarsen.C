@@ -487,7 +487,7 @@ driver(void)
     CkPrintf("Entering timeloop\n");
   }	
   //  int tSteps=0x70FF00FF;
-  int tSteps=13;
+  int tSteps=122;
   int z=13;
   calcMasses(g);
   double startTime=CkWallTimer();

@@ -51,8 +51,9 @@ CDECL void REFINE2D_NewMesh(int nEl,int nGhost,int nnodes,const int *conn,const 
   if (!CtvAccess(_refineChunk))
     CkAbort("Forgot to call REFINE_Attach!!\n");
 
-  MPI_Barrier(MPI_COMM_WORLD);
   CtvAccess(_refineChunk)->newMesh(nEl,nGhost,conn, gid, nnodes, boundaries,0);
+  MPI_Barrier(MPI_COMM_WORLD);
+  CkWaitQD();
 }
 FDECL void FTN_NAME(REFINE2D_NEWMESH,refine2d_newmesh)
 (int *nEl,int *nGhost,int nnodes,const int *conn,const int *gid,const int *boundaries)
@@ -61,8 +62,9 @@ FDECL void FTN_NAME(REFINE2D_NEWMESH,refine2d_newmesh)
   if (!CtvAccess(_refineChunk))
     CkAbort("Forgot to call REFINE_Attach!!\n"); 
   
-  MPI_Barrier(MPI_COMM_WORLD);
   CtvAccess(_refineChunk)->newMesh(*nEl, *nGhost,conn, gid, nnodes, boundaries, 1);
+  MPI_Barrier(MPI_COMM_WORLD);
+  CkWaitQD();
 }
 
 /********************** Splitting ******************/

@@ -35,6 +35,13 @@ chunk::chunk(chunkMsg *m)
 void chunk::addRemoteEdge(int elem, int localEdge, edgeRef er)
 {
   accessLock();
+  CkAssert(localEdge >=0);
+  CkAssert(localEdge < 3);
+  CkAssert(er.cid > -1);
+  CkAssert(er.idx > -1);
+  if ((theElements[elem].edges[localEdge].cid > -1) &&
+      (theElements[elem].edges[localEdge].idx > -1))
+    CkPrintf("TMRC2D: [%d] WARNING: addRemoteEdge replacing non-null edgeRef!\n", cid);
   theElements[elem].set(localEdge, er);
   CkPrintf("TMRC2D: [%d] addRemoteEdge on element %d", cid, elem);
   edgesRecvd++;
@@ -117,7 +124,6 @@ void chunk::coarseningElements()
     CthYield(); // give other chunks on the same PE a chance
   }
   coarsenInProgress = 0;  // turn coarsen loop off
-  sanityCheck(); // quietly make sure mesh is in shape
   //dump();
 }
 
@@ -175,6 +181,22 @@ intMsg *chunk::nodeLockup(node n, double l, edgeRef start)
   }
   releaseLock();
   return im;
+}
+
+intMsg *chunk::opnodeLockup(int elemID, double l, edgeRef e)
+{
+  intMsg *im = new intMsg;
+  accessLock();
+  im->anInt = theElements[elemID].lockOpNode(e, l);
+  releaseLock();
+  return im;
+}
+
+void chunk::opnodeUnlock(int elemID, edgeRef e)
+{
+  accessLock();
+  theElements[elemID].unlockOpNode(e);
+  releaseLock();
 }
 
 void chunk::nodeUnlock(node n)
@@ -636,7 +658,7 @@ void chunk::debug_print(int c)
   fp = fopen(filename, "w");
 
   fprintf(fp, "%d %d\n", cid, numElements);
-  for (i=0; i<numElements; i++) {
+  for (i=0; i<elementSlots; i++) {
     if (theElements[i].isPresent()) {
       for (j=0; j<3; j++) {
 	n = theNodes[theElements[i].getNode(j)];
@@ -689,12 +711,8 @@ void chunk::out_print()
 void chunk::updateNodeCoords(int nNode, double *coord, int nEl)
 {
   int i;
-  CkPrintf("TMRC2D: [%d] updateNodeCoords...\n", cid);
-  if (first) {
-    CkWaitQD();
-    first = 0;
-  }
-  CkPrintf("TMRC2D: [%d] In updateNodeCoords after CkWaitQD: edges sent=%d edge recvd=%d\n", cid, edgesSent, edgesRecvd);
+  CkPrintf("TMRC2D: [%d] updateNodeCoords: edges sent=%d edge recvd=%d\n", 
+	   cid, edgesSent, edgesRecvd);
   sanityCheck(); // quietly make sure mesh is in shape
   // do some error checking
   //CkAssert(nEl == numElements);
@@ -706,8 +724,6 @@ void chunk::updateNodeCoords(int nNode, double *coord, int nEl)
   // update node coordinates from coord
   for (i=0; i<nodeSlots; i++)
     if (theNodes[i].isPresent()) {
-      if ((theNodes[i].X() != coord[2*i]) || (theNodes[i].Y() != coord[2*i+1]))
-	//CkPrintf("TMRC2D: updateNodeCoords WARNING: coords changed for node %d on chunk %d: Were %f,%f; now %f,%f\n", i, cid, theNodes[i].X(), theNodes[i].Y(), coord[2*i], coord[2*i + 1]);
       theNodes[i].set(coord[2*i], coord[2*i + 1]);
     }
   // recalculate and cache new areas for each element
@@ -775,7 +791,6 @@ void chunk::newMesh(int nEl, int nGhost, const int *conn_, const int *gid_,
   numElements=nEl;
   numGhosts = nGhost;
   allocMesh(nEl);
-  MPI_Barrier(MPI_COMM_WORLD);
   int *conn = new int[3*numGhosts];
   int *gid = new int[2*numGhosts];
 
@@ -803,6 +818,7 @@ void chunk::newMesh(int nEl, int nGhost, const int *conn_, const int *gid_,
     gid[i*2+1] = gid_[i*2 + 1]-idxOffset;
   }
 
+  MPI_Barrier(MPI_COMM_WORLD);
   // derive edges from elements on this chunk
   deriveEdges(conn, gid);
   CkAssert(nnodes == numNodes);
@@ -829,24 +845,24 @@ void chunk::deriveEdges(int *conn, int *gid)
 
   deriveNodes(); // now numNodes and theNodes have values
   CkPrintf("TMRC2D: [%d] Deriving edges...\n", cid);
-  for (i=0; i<numElements; i++) {
-    //CkPrintf("TMRC2D: [%d] Deriving edges for element %d...\n", cid, i);
+  for (i=0; i<elementSlots; i++) {
+    CkPrintf("TMRC2D: [%d] Deriving edges for element %d...\n", cid, i);
     elemRef myRef(cid,i);
     for (j=0; j<3; j++) {
       n1localIdx = j;
       n2localIdx = (j+1) % 3;
-      //CkPrintf("TMRC2D: [%d] Deriving edges for element %d between %d,%d (real nodes %d,%d)...\n", cid, i, n1localIdx, n2localIdx, theElements[i].nodes[n1localIdx], theElements[i].nodes[n2localIdx]);
+      CkPrintf("TMRC2D: [%d] Deriving edges for element %d between %d,%d (real nodes %d,%d)...\n", cid, i, n1localIdx, n2localIdx, theElements[i].nodes[n1localIdx], theElements[i].nodes[n2localIdx]);
       // look for edge
       if (theElements[i].edges[j] == nullRef) { // the edge doesn't exist yet
 	// get nbr ref
-	//CkPrintf("TMRC2D: [%d] Edge between nodes %d,%d doesn't exist yet...\n", cid, theElements[i].nodes[n1localIdx], theElements[i].nodes[n2localIdx]);
+	CkPrintf("TMRC2D: [%d] Edge between nodes %d,%d doesn't exist yet...\n", cid, theElements[i].nodes[n1localIdx], theElements[i].nodes[n2localIdx]);
 	elemRef nbrRef;
 	int edgeIdx = getNbrRefOnEdge(theElements[i].nodes[n1localIdx], 
 				      theElements[i].nodes[n2localIdx], 
 				      conn, numGhosts, gid, i, &nbrRef); 
 	if (edgeLocal(myRef, nbrRef)) { // make edge here
 	  newEdge = addEdge();
-	  //CkPrintf("TMRC2D: [%d] New edge (%d,%d) added between nodes %d and %d and elements %d and %d\n", cid, newEdge.cid, newEdge.idx, theElements[i].nodes[n1localIdx], theElements[i].nodes[n2localIdx], i, nbrRef.idx);
+	  CkPrintf("TMRC2D: [%d] New edge (%d,%d) added between nodes %d and %d and elements %d and %d\n", cid, newEdge.cid, newEdge.idx, theElements[i].nodes[n1localIdx], theElements[i].nodes[n2localIdx], i, nbrRef.idx);
 	  // point edge to the two neighboring elements
 	  theEdges[newEdge.idx].update(nullRef, myRef);
 	  theEdges[newEdge.idx].update(nullRef, nbrRef);
@@ -861,9 +877,9 @@ void chunk::deriveEdges(int *conn, int *gid)
 	  }
 	}
 	// else edge will be made on a different chunk
-        //else CkPrintf("TMRC2D: [%d] Edge between nodes %d,%d to be created elsewhere...\n", cid, theElements[i].nodes[n1localIdx], theElements[i].nodes[n2localIdx]);
+        else CkPrintf("TMRC2D: [%d] Edge between nodes %d,%d to be created elsewhere...\n", cid, theElements[i].nodes[n1localIdx], theElements[i].nodes[n2localIdx]);
       }
-      //else CkPrintf("TMRC2D: [%d] Edge between nodes %d,%d exists at %d\n", cid, theElements[i].nodes[n1localIdx], theElements[i].nodes[n2localIdx], theElements[i].edges[j].idx);
+      else CkPrintf("TMRC2D: [%d] Edge between nodes %d,%d exists at %d\n", cid, theElements[i].nodes[n1localIdx], theElements[i].nodes[n2localIdx], theElements[i].edges[j].idx);
     }
   }
   nodeSlots = numNodes;
@@ -880,7 +896,7 @@ void chunk::deriveNodes()
 
   CkPrintf("TMRC2D: [%d] Deriving nodes...\n", cid);
   numNodes = 0;
-  for (i=0; i<numElements; i++) {
+  for (i=0; i<elementSlots; i++) {
     for (j=0; j<3; j++) {
       aNode = theElements[i].nodes[j];
       CkAssert(aNode > -1);

@@ -182,6 +182,8 @@ class chunk : public TCharmClient1D {
 			node opnode, node newN);
   void collapseHelp(int idx, edgeRef er, node n1, node n2);
   intMsg *nodeLockup(node n, double l, edgeRef start);
+  intMsg *opnodeLockup(int elemID, double l, edgeRef e);
+  void opnodeUnlock(int elemID, edgeRef e);
   void nodeUnlock(node n);
   void nodeUpdate(node n, node newNode);
   void nodeDelete(node n, node ndReplace);

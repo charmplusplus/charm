@@ -147,13 +147,17 @@ int edge::collapse(elemRef requester, node kNode, node dNode, elemRef kNbr,
     length = kNode.distance(dNode);
     *first = 1;
     CkPrintf("TMRC2D: LOCK start... edge=%d requester=%d nbr=%d\n", myRef.idx, requester.idx, nbr.idx);
-    // lock kNode
     intMsg *im;
+    // lock nbr's opnode
+    im = mesh[nbr.cid].opnodeLockup(nbr.idx, length, myRef);
+    if (im->anInt == 0) return -1;
+    // lock kNode
     for (int i=0; i<C->numChunks; i++) {
       im = mesh[i].nodeLockup(kNode, length, myRef);
       if (im->anInt == 0) {
 	for (int j=i-1; j>=0; j--)
 	  mesh[j].nodeUnlock(kNode);
+	mesh[nbr.cid].opnodeUnlock(nbr.idx, myRef);
 	return -1;
       }
     }
@@ -167,6 +171,7 @@ int edge::collapse(elemRef requester, node kNode, node dNode, elemRef kNbr,
 	for (int j=0; j<C->numChunks; j++) {
 	  mesh[j].nodeUnlock(kNode);
 	}
+	mesh[nbr.cid].opnodeUnlock(nbr.idx, myRef);
 	return -1;
       }
     }

@@ -133,7 +133,11 @@ class element {  // triangular elements defined by three node references,
   }
   /// Given an edge index on this element, get the neighboring elemRef 
   elemRef getElement(int edgeIdx) { return edges[edgeIdx].getNbr(myRef); }
-  
+  /// Given an edgeRef, lock the node opposite to the edge
+  int lockOpNode(edgeRef e, double l);
+  /// Given an edgeRef, unlock the node opposite to the edge
+  void unlockOpNode(edgeRef e);
+
   void clear() { present = 0; }
   int isPresent() { return present; }
 

@@ -184,7 +184,7 @@ class node {  // a 2D double coordinate
     if ((x == -1.0) && (y == -1.0))
       CkPrintf("TMRC2D: [%d] node::sanityCheck WARNING: node %d has default coordinate values.\n", cid, idx);
     if (theLock)
-      CkAbort("TMRC2D: node::sanityCheck ERROR: node is locked.\n");
+      CkAbort("TMRC2D: node::sanityCheck WARNING: node is locked.\n");
   }
 };
 

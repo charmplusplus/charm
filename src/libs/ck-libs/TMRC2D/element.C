@@ -1,6 +1,20 @@
 #include "element.h"
 #include "tri.h"
 
+int element::lockOpNode(edgeRef e, double l) 
+{
+  int edgeIdx = getEdgeIdx(e);
+  int opNode = (edgeIdx + 2) % 3;
+  return C->theNodes[nodes[opNode]].lock(l, e);
+}
+
+void element::unlockOpNode(edgeRef e) 
+{
+  int edgeIdx = getEdgeIdx(e);
+  int opNode = (edgeIdx + 2) % 3;
+  C->theNodes[nodes[opNode]].unlock();
+}
+
 void element::calculateArea()
 { // calulate area of triangle using Heron's formula:
   // Let a, b, c be the lengths of the three sides.
@@ -194,6 +208,7 @@ void element::collapse(int shortEdge)
   int local, first, flag, kBound, dBound, kCorner, dCorner, collapseFlag=-1;
   int orig_keep, orig_del;
 
+  // check if a different edge from the shortEdge is pending for coarsening
   if (edges[shortEdge].isPending(myRef)) {
   }
   else if (edges[(shortEdge+1)%3].isPending(myRef)) {
@@ -203,6 +218,7 @@ void element::collapse(int shortEdge)
     shortEdge = (shortEdge+2)%3;
   }
 
+  // set up all the variables
   opnode = (shortEdge + 2) % 3;
   delNode = shortEdge;
   delEdge = opnode;
@@ -220,47 +236,34 @@ void element::collapse(int shortEdge)
   orig_del = nodes[delNode];
 
   // check boundary conditions
-  if ((kBound == 0) && (dBound == 0)) { // both interior nodes
-    // collapse edge to midpoint
-  }
-  else if ((kBound == 0) || (dBound == 0)) { // one on boundary
+  if ((kBound == 0) && (dBound == 0)) ; // both interior; collapse to midpoint
+  else if ((kBound == 0) || (dBound == 0)) { // only one on boundary
     // collapse edge to boundary node
     if (kBound) collapseFlag = keepNode;
     else collapseFlag = delNode;
   }
   else if (kBound == dBound) { // both on same boundary
     // check corner status of both nodes
-    // if both corners don't refine
-    if (kCorner && dCorner) return;
-    // if one corner, collapse edge to corner
-    else if (kCorner || dCorner) {
+    if (kCorner && dCorner) return; // if both corners don't refine
+    else if (kCorner || dCorner) { // if one corner, collapse edge to corner
       if (kCorner) collapseFlag = keepNode;
       else collapseFlag = delNode;
     }
-    else { // if neither are corners, collapse edge to midpoint
-    }
+    // else if neither are corners, collapse edge to midpoint
   }
   else { // nodes on different boundary
-    // check if edge is internal
-    if (nbr.cid >= 0) {
-      // edge is internal; don't coarsen
-      return;
-    }
+    if (nbr.cid >= 0) return; // edge is internal; don't coarsen
     else { // if it isn't check if lower boundary node is a corner
       if (dBound > kBound) { // dBound is numbered higher
 	CkAssert(dCorner);
-	if (kCorner) { // if it is, don't coarsen
-	  return;
-	}
+	if (kCorner) return; // if it is, don't coarsen
 	else { // if it isn't, collapse edge to larger boundary node
 	  collapseFlag = delNode;
 	}
       }
       else { // kBound is numbered higher
 	CkAssert(kCorner);
-	if (dCorner) { // if it is, don't coarsen
-	  return;
-	}
+	if (dCorner) return; // if it is, don't coarsen
 	else { // if it isn't, collapse edge to larger boundary node
 	  collapseFlag = keepNode;
 	}
@@ -268,6 +271,7 @@ void element::collapse(int shortEdge)
     }
   }
 
+  // get length of shortEdge for prioritizing locks
   double length = 
     C->theNodes[nodes[keepNode]].distance(C->theNodes[nodes[delNode]]);
   CkPrintf("TMRC2D: LOCKing opnode=%d\n", nodes[opnode]);
@@ -281,7 +285,7 @@ void element::collapse(int shortEdge)
     }
   }
 
-
+  // find coords of node to collapse to based on boundary conditions
   node newNode;
   if (collapseFlag == -1)
     newNode=C->theNodes[nodes[keepNode]].midpoint(C->theNodes[nodes[delNode]]);
@@ -289,15 +293,18 @@ void element::collapse(int shortEdge)
     newNode = C->theNodes[nodes[delNode]];
   else
     newNode = C->theNodes[nodes[keepNode]];
+  // collapse the edge; takes care of neighbor element
   result = edges[shortEdge].collapse(myRef, C->theNodes[nodes[keepNode]],
 				     C->theNodes[nodes[delNode]], keepNbr,
 				     delNbr, edges[keepEdge], edges[delEdge], 
 				     C->theNodes[nodes[opnode]], 
 				     &local, &first, newNode);
+
+  // clean up based on result of edge collapse
   if (result == 1) {
     // collapse successful; keepNode is node to keep
+    CkPrintf("TMRC2D: [%d] In collapse[%d](a) shortEdge=%d delEdge=%d keepEdge=%d opnode=%d delNode=%d keepNode=%d delNbr=%d keepNbr=%d\n", myRef.cid, myRef.idx, edges[shortEdge].idx, edges[delEdge].idx, edges[keepEdge].idx, nodes[opnode], orig_del, orig_keep, delNbr.idx, keepNbr.idx);
     // tell delNbr to replace delEdge with keepEdge
-    CkPrintf("TMRC2D: [%d] In collapse[%d](a) shortEdge=%d delEdge=%d keepEdge=%d opnode=%d delNode=%d keepNode=%d delNbr=%d keepNbr=%d\n", myRef.cid, myRef.idx, edges[shortEdge].idx, edges[delEdge].idx, edges[keepEdge].idx, nodes[opnode], nodes[delNode], nodes[keepNode], delNbr.idx, keepNbr.idx);
     if (delNbr.cid != -1)
       mesh[delNbr.cid].updateElementEdge(delNbr.idx, edges[delEdge], 
 					 edges[keepEdge]);
@@ -306,7 +313,8 @@ void element::collapse(int shortEdge)
     // remove delEdge
     edges[delEdge].remove();
     // edge[shortEdge] handles removal of delNode and shortEdge, as well as
-    // update of keepNode
+    // update of keepNode; so nothing else to do here
+    // Notify FEM client of the collapse
     if (local && first) flag = LOCAL_FIRST;
     if (local && !first) flag = LOCAL_SECOND;
     if (!local && first) flag = BOUND_FIRST;
@@ -336,7 +344,7 @@ void element::collapse(int shortEdge)
     int mytmp = orig_del;
     orig_del = orig_keep;    
     orig_keep = mytmp;
-    CkPrintf("In collapse[%d](b) shortEdge=%d delEdge=%d keepEdge=%d opnode=%d delNode=%d keepNode=%d delNbr=%d keepNbr=%d\n", myRef.idx, edges[shortEdge].idx, edges[delEdge].idx, edges[keepEdge].idx, nodes[opnode], nodes[delNode], nodes[keepNode], delNbr.idx, keepNbr.idx);
+    CkPrintf("In collapse[%d](b) shortEdge=%d delEdge=%d keepEdge=%d opnode=%d delNode=%d keepNode=%d delNbr=%d keepNbr=%d\n", myRef.idx, edges[shortEdge].idx, edges[delEdge].idx, edges[keepEdge].idx, nodes[opnode], orig_del, orig_keep, delNbr.idx, keepNbr.idx);
     if (delNbr.cid != -1)
       mesh[delNbr.cid].updateElementEdge(delNbr.idx, edges[delEdge], 
 					 edges[keepEdge]);
@@ -345,7 +353,8 @@ void element::collapse(int shortEdge)
     // remove delEdge
     edges[delEdge].remove();
     // edge[shortEdge] handles removal of delNode and shortEdge, as well as
-    // update of keepNode
+    // update of keepNode; so nothing else to do here
+    // Notify FEM client of the collapse
     if (local && first) flag = LOCAL_FIRST;
     if (local && !first) flag = LOCAL_SECOND;
     if (!local && first) flag = BOUND_FIRST;

@@ -26,6 +26,8 @@ module refine {
     entry [sync, threaded] splitOutMsg *collapse(int, elemRef, node, node, 
 	elemRef, elemRef, edgeRef, edgeRef, node, node);
     entry [sync, threaded] intMsg *nodeLockup(node, double, edgeRef);
+    entry [sync, threaded] intMsg *opnodeLockup(int, double, edgeRef);
+    entry [sync, threaded] void opnodeUnlock(int, edgeRef);
     entry [sync, threaded] void nodeUnlock(node);
     entry [sync, threaded] void nodeUpdate(node, node);
     entry [sync, threaded] void nodeDelete(node, node);
