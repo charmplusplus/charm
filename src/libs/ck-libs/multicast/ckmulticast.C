@@ -401,7 +401,7 @@ void CkMulticastMgr::resetCookie(CkSectionInfo s)
   initCookie(s);
 }
 
-void CkMulticastMgr::ArraySectionSend(int ep,void *m, CkArrayID a, CkSectionID &sid)
+void CkMulticastMgr::ArraySectionSend(CkDelegateData *pd,int ep,void *m, CkArrayID a, CkSectionID &sid)
 {
   DEBUGF(("ArraySectionSend\n"));
 
