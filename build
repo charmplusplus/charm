@@ -246,7 +246,11 @@ done
 
 [ -z "$MAKE" ] && MAKE='make'
 
-[ -f $src/$BASEVERSION/conv-mach.h ] || echo "Error> build can not find arch: $BASEVERSION!" && exit 1
+if [ ! -f $src/$BASEVERSION/conv-mach.h ] 
+then
+  echo "Error> build can not find arch: $BASEVERSION!" 
+  exit 1
+fi
 
 #generate VERSION name combining all the build-time options.
 if [ -n "$BOPTS" -o -n "$COMPILER" ]
@@ -268,6 +272,7 @@ fi
 
 echo "Copying src/scripts/Makefile to $VERSION/tmp"
 rm -f $VERSION/tmp/Makefile
+rm -f $VERSION/tmp/Make.depends
 
 if [ "x_`echo $VERSION | awk -F- '{print $2}'`" = "x_win32" ]
 then
