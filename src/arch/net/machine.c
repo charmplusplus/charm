@@ -194,7 +194,8 @@
 
 #if CMK_USE_GM
 #include "gm.h"
-struct gm_port *gmport;
+struct gm_port *gmport = NULL;
+int  portFinish = 0;
 #endif
 
 #include "conv-ccs.h"
@@ -249,8 +250,11 @@ static SOCKET       dataskt;
 static void machine_exit(int status)
 {
 #if CMK_USE_GM
-  gm_finalize();
-  gm_exit(status);
+  if (gmport) { 
+    gm_close(gmport); gmport = 0;
+    gm_finalize();
+  }
+  exit(status);
 #else
   exit(status);
 #endif
@@ -300,13 +304,13 @@ static void HandleUserSignals(int signum)
 static void PerrorExit(const char *msg)
 {
   perror(msg);
-  exit(1);
+  machine_exit(1);
 }
 
 static void KillOnSIGPIPE(int dummy)
 {
   fprintf(stderr,"charmrun exited, terminating.\n");
-  exit(0);
+  machine_exit(0);
 }
 
 
@@ -1664,7 +1668,7 @@ static void ctrl_sendone_locking(const char *type,
   CmiCommUnlock();
 }
 
-static int ignore_further_errors(int c,const char *msg) {exit(2);return -1;}
+static int ignore_further_errors(int c,const char *msg) {machine_exit(2);return -1;}
 static void charmrun_abort(const char *s)
 {
   if (Cmi_charmrun_fd==-1) {/*Standalone*/
@@ -1713,7 +1717,7 @@ static void ctrl_getone()
    * which is not available to the communication thread on an SMP version.
    */
     charmrun_abort("ERROR> Unrecognized message from charmrun.\n");
-    exit(1);
+    machine_exit(1);
   }
   
   ChMessage_free(&msg);
@@ -1841,7 +1845,7 @@ static void node_addresses_store(ChMessage *msg)
   OtherNode ntab, *bype;
   Cmi_numnodes=ChMessageInt(*d++);
   if (sizeof(ChMessageInt_t)*(1+3*Cmi_numnodes)!=(unsigned int)msg->len)
-    {printf("Node table has inconsistent length!");abort();}
+    {printf("Node table has inconsistent length!");machine_exit(1);}
   ntab = (OtherNode)calloc(Cmi_numnodes, sizeof(struct OtherNodeStruct));
   nodestart=0;
   for (i=0; i<Cmi_numnodes; i++) {
@@ -2443,9 +2447,6 @@ static void exitDelay(void)
 #if 0
   fgetc(stdin);
 #endif
-#if CMK_USE_GM
-  gm_finalize();
-#endif
 }
 
 static void set_signals(void)
@@ -2522,6 +2523,9 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
   CmiMachineInit();
 
   node_addresses_obtain(argv);
+#if CMK_USE_GM
+  if (gmport == NULL) machine_exit(1);
+#endif
   skt_set_idle(CmiYield);
   Cmi_check_delay = 2.0+0.5*Cmi_numnodes;
   CmiStartThreads();

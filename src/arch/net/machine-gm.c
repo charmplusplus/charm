@@ -271,7 +271,20 @@ static void CommunicationServer(int withDelayMs)
 void send_callback(struct gm_port *p, void *msg, gm_status_t status)
 {
   if (status != GM_SUCCESS) { 
-    CmiPrintf("error in send. %d\n", status); 
+    int rank, srcpe, seqno, magic;
+    char *errmsg;
+    DgramHeaderBreak(msg, rank, srcpe, magic, seqno);
+    switch (status) {
+    case GM_SEND_TIMED_OUT:
+      errmsg = "send time out"; break;
+    case GM_SEND_REJECTED:
+      errmsg = "send rejected"; break;
+    case GM_SEND_TARGET_NODE_UNREACHABLE:
+      errmsg = "target node unreachable"; break;
+    default:
+      errmsg = ""; break;
+    }
+    CmiPrintf("GM Error> PE:%d send to %d failed to complete (error %d): %s\n", srcpe, rank, status, errmsg); 
     CmiAbort("");
   }
 

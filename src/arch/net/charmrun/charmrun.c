@@ -673,6 +673,7 @@ void arg_init(int argc, char **argv)
  *
  ****************************************************************************/
 
+static int portOk = 1;
 static const char *nodetab_tempName=NULL;
 char *nodetab_file_find()
 {
@@ -1003,7 +1004,7 @@ void nodeinfo_add(const ChMessageInt_t *nodeInfo,SOCKET ctrlfd)
         i.dataport=ChMessageInt_new(nodetab_dataport(nt));
         if (ChMessageInt(i.IP) == 0) {
           fprintf(stderr, "Error> Node %d:%s, cannot open GM gm_port %d!\n", nt, nodetab_name(nt), nodetab_dataport(nt));
-          exit(1);
+          portOk = 0;
         }
 #else
 	i.IP=ChMessageInt_new(nodetab_ip(nt));
@@ -1436,6 +1437,7 @@ void req_client_connect(void)
 			ChMessage_free(&msg);
 		}
 	}
+        if (portOk == 0) exit(1);
 	if (arg_verbose) printf("Charmrun> All clients connected.\n");
 	for (client=0;client<req_nClients;client++)
 	  req_handle_initnodetab(NULL,req_clients[client]);
