@@ -1,90 +1,28 @@
 IDIR=../../doc
 LNCMD=test ! -f pplmanual.sty && ln -f -s ../pplmanual.sty .
 RMCMD=rm -f ./pplmanual.sty
+DIRS=install converse convext charm++ libraries f90charm \
+	fem ifem ampi bluegene mblock projections tcharm
 
 all: ps pdf html
 
 ps:
-	if [ ! -d $(IDIR)/ps ] ; then mkdir $(IDIR)/ps ; fi
-	( cd install; $(LNCMD); $(MAKE) ps )
-	( cd converse; $(LNCMD); $(MAKE) ps )
-	( cd convext; $(LNCMD); $(MAKE) ps )
-	( cd charm++; $(LNCMD); $(MAKE) ps )
-	( cd libraries; $(LNCMD); $(MAKE) ps )
-	( cd f90charm; $(LNCMD); $(MAKE) ps )
-	( cd fem; $(LNCMD); $(MAKE) ps )
-	( cd ampi; $(LNCMD); $(MAKE) ps )
-	( cd bluegene; $(LNCMD); $(MAKE) ps )
-	( cd mblock; $(LNCMD); $(MAKE) ps )
-	( cd projections; $(LNCMD); $(MAKE) ps )
-	( cd tcharm; $(LNCMD); $(MAKE) ps )
+	[ -d $(IDIR)/ps ] || mkdir $(IDIR)/ps
+	for d in $(DIRS); do (cd $$d; $(LNCMD); $(MAKE) ps) || exit 1; done
 
 pdf:
-	if [ ! -d $(IDIR)/pdf ] ; then mkdir $(IDIR)/pdf ; fi
-	( cd install; $(LNCMD); $(MAKE) pdf )
-	( cd converse; $(LNCMD); $(MAKE) pdf )
-	( cd convext; $(LNCMD); $(MAKE) pdf )
-	( cd charm++; $(LNCMD); $(MAKE) pdf )
-	( cd libraries; $(LNCMD); $(MAKE) pdf )
-	( cd f90charm; $(LNCMD); $(MAKE) pdf )
-	( cd ampi; $(LNCMD); $(MAKE) pdf )
-	( cd bluegene; $(LNCMD); $(MAKE) pdf )
-	( cd projections; $(LNCMD); $(MAKE) pdf )
-	( cd tcharm; $(LNCMD); $(MAKE) pdf )
+	[ -d $(IDIR)/pdf ] || mkdir $(IDIR)/pdf
+	for d in $(DIRS); do (cd $$d; $(LNCMD); $(MAKE) pdf) || exit 1; done
 
 html:
-	if [ ! -d $(IDIR)/html ] ; then mkdir $(IDIR)/html ; fi
-	( cd install; $(LNCMD); $(MAKE) html )
-	( cd converse; $(LNCMD); $(MAKE) html )
-	( cd convext; $(LNCMD); $(MAKE) html )
-	( cd charm++; $(LNCMD); $(MAKE) html )
-	( cd libraries; $(LNCMD); $(MAKE) html )
-	( cd f90charm; $(LNCMD); $(MAKE) html )
-	( cd fem; $(LNCMD); $(MAKE) html )
-	( cd ampi; $(LNCMD); $(MAKE) html )
-	( cd bluegene; $(LNCMD); $(MAKE) html )
-	( cd mblock; $(LNCMD); $(MAKE) html )
-	( cd projections; $(LNCMD); $(MAKE) html )
-	( cd tcharm; $(LNCMD); $(MAKE) html )
+	[ -d $(IDIR)/html ] || mkdir $(IDIR)/html
+	for d in $(DIRS); do (cd $$d; $(LNCMD); $(MAKE) html) || exit 1; done
 
 doc:
-	( cd install; $(LNCMD); $(MAKE) doc )
-	( cd converse; $(LNCMD); $(MAKE) doc )
-	( cd convext; $(LNCMD); $(MAKE) doc )
-	( cd charm++; $(LNCMD); $(MAKE) doc )
-	( cd libraries; $(LNCMD); $(MAKE) doc )
-	( cd f90charm; $(LNCMD); $(MAKE) doc )
-	( cd fem; $(LNCMD); $(MAKE) doc )
-	( cd ampi; $(LNCMD); $(MAKE) doc )
-	( cd bluegene; $(LNCMD); $(MAKE) doc )
-	( cd mblock; $(LNCMD); $(MAKE) doc )
-	( cd projections; $(LNCMD); $(MAKE) doc )
-	( cd tcharm; $(LNCMD); $(MAKE) doc )
+	for d in $(DIRS); do (cd $$d; $(LNCMD); $(MAKE) doc) || exit 1; done
 
 web:
-	( cd install; $(LNCMD); $(MAKE) web )
-	( cd converse; $(LNCMD); $(MAKE) web )
-	( cd convext; $(LNCMD); $(MAKE) web )
-	( cd charm++; $(LNCMD); $(MAKE) web )
-	( cd ck; $(LNCMD); $(MAKE) web )
-	( cd libraries; $(LNCMD); $(MAKE) web )
-	( cd f90charm; $(LNCMD); $(MAKE) web )
-	( cd ampi; $(LNCMD); $(MAKE) web )
-	( cd bluegene; $(LNCMD); $(MAKE) web )
-	( cd projections; $(LNCMD); $(MAKE) web )
-	( cd tcharm; $(LNCMD); $(MAKE) web )
+	for d in $(DIRS); do (cd $$d; $(LNCMD); $(MAKE) web) || exit 1; done
 
 clean:
-	( cd install; $(RMCMD); $(MAKE) clean )
-	( cd converse; $(RMCMD); $(MAKE) clean )
-	( cd convext; $(RMCMD); $(MAKE) clean )
-	( cd charm++; $(RMCMD); $(MAKE) clean )
-	( cd ck; $(RMCMD); $(MAKE) clean )
-	( cd libraries; $(RMCMD); $(MAKE) clean )
-	( cd f90charm; $(RMCMD); $(MAKE) clean )
-	( cd fem; $(RMCMD); $(MAKE) clean )
-	( cd ampi; $(RMCMD); $(MAKE) clean )
-	( cd bluegene; $(RMCMD); $(MAKE) clean )
-	( cd mblock; $(RMCMD); $(MAKE) clean )
-	( cd projections; $(LNCMD); $(MAKE) clean )
-	( cd tcharm; $(LNCMD); $(MAKE) clean )
+	for d in $(DIRS); do (cd $$d; $(LNCMD); $(MAKE) clean) || exit 1; done
