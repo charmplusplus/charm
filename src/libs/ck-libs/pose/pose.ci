@@ -1,7 +1,5 @@
 /// Global POSE data and functions; includes and dependencies handled here
 module pose {
-//  extern module ComlibModule;
-//  readonly CkGroupID dmid;
   readonly double busyWait;
   readonly int POSE_endtime;
   message callBack;

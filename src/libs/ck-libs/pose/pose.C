@@ -5,7 +5,6 @@
 CpvDeclare(int, stateRecovery);
 
 #ifdef POSE_COMM_ON
-CkGroupID dmid;
 extern int comm_debug;
 #endif
 double busyWait;
@@ -19,12 +18,12 @@ void POSE_init()
   // Create the communication library for POSE
   ComlibInstanceHandle cinst = CkGetComlibInstance();
   // Create the communication strategy for POSE
-  DummyStrategy *strategy = new DummyStrategy();
-  //StreamingStrategy *strategy =new StreamingStrategy(COMM_TIMEOUT,COMM_MAXMSG);
-  //strategy->enableShortArrayMessagePacking();
+  //DummyStrategy *strategy = new DummyStrategy();
+  StreamingStrategy *strategy =new StreamingStrategy(COMM_TIMEOUT,COMM_MAXMSG);
+  strategy->enableShortArrayMessagePacking();
   //Register the strategy
   cinst.setStrategy(strategy);
-  //comm_debug=1;
+  comm_debug=1;
   CkPrintf("Simulation run with StreamingStrategy(%d,%d) for communication optimization...\n", COMM_TIMEOUT, COMM_MAXMSG);
 #endif
   // Create an EventMsgPool with global handle for message recycling 
