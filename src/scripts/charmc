@@ -835,10 +835,10 @@ Debug "About to perform final link..."
 
 case "$LANGUAGE" in
 "ampi")
-        PRE_LIBRARIES="$PRE_LIBRARIES -lampi"
+        PRE_LIBRARIES="$PRE_LIBRARIES -lampi -lddt"
 	;;
 "ampif")
-        PRE_LIBRARIES="$PRE_LIBRARIES -lampif"
+        PRE_LIBRARIES="$PRE_LIBRARIES -lampif -lddt"
         POST_LIBRARIES="$POST_LIBRARIES $CMK_F90LIBS"
 	;;
 "fem")
