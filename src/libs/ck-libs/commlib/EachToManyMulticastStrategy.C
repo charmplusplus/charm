@@ -585,6 +585,9 @@ ComlibMulticastMsg * EachToManyMulticastStrategy::getNewMulticastMessage
         newenv->getsetArrayEp() = env->getsetArrayEp();
         newenv->getsetArrayHops() = env->getsetArrayHops();
         newenv->getsetArrayIndex() = env->getsetArrayIndex();
+	// for trace projections
+        newenv->setEvent(env->getEvent());
+        newenv->setSrcPe(env->getSrcPe());
 
         CkPackMessage(&newenv);        
         return (ComlibMulticastMsg *)EnvToUsr(newenv);
