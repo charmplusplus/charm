@@ -33,7 +33,7 @@ do
 	  ;;
     *)
           PROGRAM=$1 ; shift
-          VERSION=$1 ; shift
+          VERSION=$1; BASEVERSION=$1; shift
           while [ ! $# -eq 0 ]
           do
             if test "$1" = "gm" || test "$1" = "vmi"
@@ -55,8 +55,16 @@ done
 
 [ "x$VERSION" = "x" ] && syntax
 	
-( echo $VERSION | egrep -s '^Common' ) && syntax
-[ -d src/$VERSION ] || syntax
+( echo $BASEVERSION | egrep -s '^Common' ) && syntax
+[ -d src/$BASEVERSION ] || syntax
+
+if test -n $MORE
+then
+  for i in $MORE
+  do
+    VERSION=$VERSION-$i
+  done
+fi
 
 [ -d $VERSION ] || echo "Creating dir: $VERSION" 
 [ -d $VERSION ] || mkdir $VERSION
@@ -94,12 +102,14 @@ then
   for i in $MORE
   do
     touch $VERSION/tmp/$i
-    echo '/* '"src/$VERSION/conv-mach-$i.h"' */' >> $VERSION/tmp/conv-mach-opt.h
-    cat src/$VERSION/conv-mach-$i.h >> $VERSION/tmp/conv-mach-opt.h
-    echo '# '"src/$VERSION/conv-mach-$i.sh" >> $VERSION/tmp/conv-mach-opt.sh
-    cat src/$VERSION/conv-mach-$i.sh >> $VERSION/tmp/conv-mach-opt.sh
+    echo '/* '"src/$BASEVERSION/conv-mach-$i.h"' */' >> $VERSION/tmp/conv-mach-opt.h
+    cat src/$BASEVERSION/conv-mach-$i.h >> $VERSION/tmp/conv-mach-opt.h
+    echo '# '"src/$BASEVERSION/conv-mach-$i.sh" >> $VERSION/tmp/conv-mach-opt.sh
+    cat src/$BASEVERSION/conv-mach-$i.sh >> $VERSION/tmp/conv-mach-opt.sh
   done
 fi
+
+echo $BASEVERSION > $VERSION/tmp/.vdir
 
 echo "Performing 'make $MAKEOPTS $PROGRAM OPTS="$OPTS"' in $VERSION/tmp"
 cd $VERSION/tmp ; make $MAKEOPTS $PROGRAM OPTS="$OPTS"
