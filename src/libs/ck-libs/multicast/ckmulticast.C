@@ -677,6 +677,7 @@ void CkMulticastMgr::contribute(int dataSize,void *data,CkReduction::reducerType
 CkReductionMsg* CkMulticastMgr::combineFrags (CkSectionInfo& id, 
                                               mCastEntry* entry,
                                               reductionInfo& redInfo) {
+  int i;
   int dataSize = 0;
   int nFrags   = redInfo.msgs[0][0]->nFrags;
 
@@ -690,7 +691,7 @@ CkReductionMsg* CkMulticastMgr::combineFrags (CkSectionInfo& id,
     return msg;
   }
 
-  for (int i=0; i<nFrags; i++) {
+  for (i=0; i<nFrags; i++) {
     dataSize += redInfo.msgs[i][0]->dataSize;
   }
 
@@ -708,7 +709,7 @@ CkReductionMsg* CkMulticastMgr::combineFrags (CkSectionInfo& id,
   msg->callback   = redInfo.msgs[0][0]->callback;
 
   byte* data = (byte*)msg->getData ();
-  for (int i=0; i<nFrags; i++) {
+  for (i=0; i<nFrags; i++) {
     // copy data from fragments to msg
     memcpy(data, redInfo.msgs[i][0]->getData(), redInfo.msgs[i][0]->dataSize);
     data += redInfo.msgs[i][0]->dataSize;
