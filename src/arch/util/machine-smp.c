@@ -152,6 +152,8 @@ static DWORD WINAPI call_startfn(LPVOID vindex)
   if(Cmi_state_key == 0xFFFFFFFF) PerrorExit("TlsAlloc");
   if(TlsSetValue(Cmi_state_key, (LPVOID)state) == 0) PerrorExit("TlsSetValue");
 
+  ConverseRunPE(0);
+#if 0
   if (index<Cmi_mynodesize)
 	  ConverseRunPE(0); /*Regular worker thread*/
   else { /*Communication thread*/
@@ -159,6 +161,7 @@ static DWORD WINAPI call_startfn(LPVOID vindex)
 	  if (Cmi_charmrun_fd!=-1)
 		  while (1) CommunicationServerThread(5);
   } 
+#endif
   return 0;
 }
 
@@ -276,6 +279,19 @@ void CmiNodeBarrier(void)
   pthread_mutex_unlock(&barrier_mutex);
 }
 
+void CmiNodeAllBarrier(void)
+{
+  pthread_mutex_lock(&barrier_mutex);
+  barrier++;
+  if(barrier != CmiMyNodeSize()+1)
+    pthread_cond_wait(&barrier_cond, &barrier_mutex);
+  else{
+    barrier = 0;
+    pthread_cond_broadcast(&barrier_cond);
+  }
+  pthread_mutex_unlock(&barrier_mutex);
+}
+
 
 #define CmiGetStateN(n) (Cmi_state_vector+(n))
 
@@ -326,6 +342,8 @@ static void *call_startfn(void *vindex)
   CmiState state = Cmi_state_vector + index;
   pthread_setspecific(Cmi_state_key, state);
 
+  ConverseRunPE(0);
+#if 0
   if (index<Cmi_mynodesize) 
 	  ConverseRunPE(0); /*Regular worker thread*/
   else 
@@ -334,7 +352,7 @@ static void *call_startfn(void *vindex)
 	  if (Cmi_charmrun_fd!=-1)
 		  while (1) CommunicationServerThread(5);
   }
-  
+#endif  
   return 0;
 }
 
