@@ -204,6 +204,74 @@ int CmiGetArgFlag(char **argv,const char *arg)
 
 /*****************************************************************************
  *
+ * Stack tracing routines.
+ *
+ *****************************************************************************/
+#include "cmibacktrace.c"
+
+/*
+Convert "X(Y) Z" to "Y Z"-- remove text prior to first '(', and supress
+the next parenthesis.  Operates in-place on the character data.
+*/
+static char *_implTrimParenthesis(char *str) {
+  char *lParen=str, *ret=NULL, *rParen=NULL;
+  while (*lParen!='(') {
+    if (*lParen==0) return str; /* No left parenthesis at all. */
+    lParen++;
+  }
+  /* now *lParen=='(', so trim it*/
+  ret=lParen+1;
+  rParen=ret;
+  while (*rParen!=')') {
+    if (*rParen==0) return ret; /* No right parenthesis at all. */
+    rParen++;
+  }
+  /* now *rParen==')', so trim it*/
+  *rParen=' ';
+  return ret;  
+}
+
+/*
+Return the "type" of this trimmed routine name. 
+This is probably overkill, but improves the appearance of callbacks.
+   0  ordinary user routine
+   1  automatically-generated proxy "_call_" method
+   2  automatically-generated proxy "_callthr_" method
+*/
+static int _implGetBacktraceType(const char *name) {
+  if (0==strncmp(name,"_call",5)) 
+  { /*it might be something we're interested in*/
+    if (0==strncmp(name,"_call_",6)) return 1;
+    if (0==strncmp(name,"_callthr_",9)) return 2;
+  }
+  
+  return 0;
+}
+
+void CmiPrintStackTrace(int nSkip) {
+#if CMK_USE_BACKTRACE
+  int i,max=0;
+  char **names=CmiBacktrace(&max);
+  nSkip+=2; /*Since "CmiPrintStackTrace" and "CmiBacktrace" will be in list.*/
+  if (max>nSkip) {
+    CmiError("Stack Traceback:\n");
+    for (i=nSkip;i<max;i++) {
+      const char *trimmed=_implTrimParenthesis(names[i]);
+      const char *print=trimmed;
+      int type=_implGetBacktraceType(print);
+      if (type==1) print="Charm++ Runtime: Call Entry Method";
+      if (type==2) print="Charm++ Runtime: Call Threaded Entry Method";
+      CmiError("  [%d] %s\n",i-nSkip,print);
+      if (print!=trimmed) break; /*Stop if we hit Charm++ runtime.*/
+    }
+  }
+  free(names);
+#endif
+}
+
+
+/*****************************************************************************
+ *
  * Statistics: currently, the following statistics are not updated by converse.
  *
  *****************************************************************************/

@@ -917,6 +917,14 @@ void CmiDeleteArgs(char **argv,int k);
 int CmiGetArgc(char **argv);
 char **CmiCopyArgs(char **argv);
 
+/* Return the names of the functions that have been called
+   up to this point in a malloc'd pointer array.*/
+char **CmiBacktrace(int *nStackLevels);
+/* Print (to stderr) the names of the functions that have been 
+   called up to this point. nSkip is the number of routines on the
+   top of the stack to *not* print out. */
+void CmiPrintStackTrace(int nSkip);
+
 #if CMK_CMIDELIVERS_USE_COMMON_CODE
 CpvExtern(void*, CmiLocalQueue);
 #endif
@@ -929,7 +937,6 @@ CpvExtern(void*, CmiLocalQueue);
 #include "conv-trace.h"
 #include "persistent.h"
 
-/**** DEAL WITH DIFFERENCES: KERNIGHAN-RITCHIE-C, ANSI-C, AND C++ ****/
 
 #if defined(__cplusplus)
 }
