@@ -2013,8 +2013,10 @@ extern void CmiIsomallocInit(char **argv);
 
 static void CmiProcessPriority(char **argv)
 {
-  int nicelevel=-100;      /* process priority */
+  int dummy, nicelevel=-100;      /* process priority */
   CmiGetArgIntDesc(argv,"+nice",&nicelevel,"Set the process priority level");
+  /* ignore others */
+  while (CmiGetArgIntDesc(argv,"+nice",&dummy,"Set the process priority level"));
   /* call setpriority once on each process to set process's priority */
   if (CmiMyRank() == 0 && nicelevel != -100)  {
 #ifndef _WIN32
