@@ -1227,7 +1227,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   /*printf("request max=%d\n", request_max);*/
   if (CmiGetArgFlag(argv,"++debug"))
   {   /*Pause so user has a chance to start and attach debugger*/
-    printf("CHARMDEBUG> Processor %d has PID %d\n",CmiMyNode(),getpid());
+    printf("CHARMDEBUG> Processor %d has PID %d\n",Cmi_mynode,getpid());
     if (!CmiGetArgFlag(argv,"++debug-no-pause"))
       sleep(10);
   }
