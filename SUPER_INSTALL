@@ -1,0 +1,143 @@
+#!/bin/csh -f
+#
+# The syntax of this script is:
+#
+#    SUPER-INSTALL program version <operation>
+#
+# Where program is: converse, charm, charm++
+# Where version is: net-sun, net-sol, cm5, paragon, etc...
+# Where operation can be: gather make install all (defaults to all)
+#
+# Some versions of charm are interrelated.  For example, net-sun, net-sol,
+# and net-hp all belong to a group of versions called the "net" group.
+# Likewise, uni-sun, uni-sol, and uni-hp belong to a group of versions
+# called the "uni" group.  The group name can always be found by truncating
+# the version name before the dash.
+#
+# Converse contains the following directories:
+#
+#    src/Common         - contains source common to all versions
+#    src/Common.$GROUP  - contains source common to a group of versions
+#    src/$VERSION       - contains source for a specific version
+#
+#    $VERSION/tmp       - used to build the specified version
+#    $VERSION/lib       - used to hold object files once compiled.
+#    $VERSION/bin       - used to hold binary files once compiled.
+#    $VERSION/make      - used to hold make-include files
+#    $VERSION/include   - used to hold include files
+#
+# To compile a version of Converse, SUPER_INSTALL performs the following
+# actions:
+#
+#    * Create directory $VERSION and its subdirectories.
+#
+#    * Copy all source files from src/Common          to $VERSION/tmp
+#    * Copy all source files from src/Common.$GROUP   to $VERSION/tmp
+#    * Copy all source files from src/$VERSION        to $VERSION/tmp
+#
+#    * Perform "make $PROGRAM" in $VERSION/tmp
+#
+#    * Copy the results to $VERSION/bin, $VERSION/lib, $VERSION/include.
+#
+#    * Rebuild central "bin" directory.
+#
+# That's all SUPER_INSTALL does.  The rest is handled by the Makefile.
+# 
+# Note: As SUPER_INSTALL copies files from the src directories to the
+# tmp directory, two of the files that happen to get copied are Makefile
+# and converse.mk.  Makefile comes from src/Common, and converse.mk comes
+# from src/$VERSION.  Together, these form the makefile that gets used in
+# the "make all".  The contents of converse.mk is fully specified: it
+# must define exactly the following symbols:
+#
+#   <put symbols here>
+#
+# It must also contain rules for making cmk_extras, cmk_clean, and
+# cmk_install.  Those three rules can be used to compile and install
+# any machine-specific utilities (eg, a host program or something like
+# that).  converse.mk must not define anything else (the intention is
+# that the converse-user, eg charm, can include converse.mk in his own
+# makefiles as well).
+#
+
+set PROGRAM=$1
+set VERSION=$2
+set OPERATION=$3
+
+if ( x$OPERATION == x ) set OPERATION=all
+
+if ( x$VERSION == x ) goto syntax
+if { ( echo $2 | egrep -s '^Common' ) } goto syntax
+if ( ! -d src/$VERSION ) goto syntax
+goto install
+
+syntax:
+
+    echo ''
+    echo 'Usage: SUPER-INSTALL program version'
+    echo ''
+    echo 'Where program can be: converse charm charm++'
+    echo 'Where the available versions are: '
+    echo ''
+    (cd src ; ls -1 | egrep -v '^Common')
+    echo ''
+    exit
+
+install:
+
+    #Compute what GROUP of versions we are using:
+    set GROUP=Common.`echo $VERSION | sed -e 's@-.*@@'`
+
+    if (( $OPERATION == gather ) || ( $OPERATION == all )) then
+       echo "Creating directories for $VERSION..."
+       if (! -d $VERSION        ) mkdir $VERSION
+       if (! -d $VERSION/bin    ) mkdir $VERSION/bin
+       if (! -d $VERSION/lib    ) mkdir $VERSION/lib
+       if (! -d $VERSION/include) mkdir $VERSION/include
+       if (! -d $VERSION/tmp    ) mkdir $VERSION/tmp
+       cd $VERSION/tmp
+       echo "Copying all files in src/Common to $VERSION/tmp..."
+       find ../../src/Common -type f \! -name "*,v" -exec ln -s {} . \;
+       if (-d ../../src/$GROUP) then
+          echo "Copying all files in src/$GROUP to $VERSION/tmp..."
+          find ../../src/$GROUP -type f \! -name "*,v" -exec ln -s {} . \;
+       endif
+       echo "Copying all files in src/$VERSION to $VERSION/tmp..."
+       find ../../src/$VERSION -type f \! -name "*,v" -exec ln -s {} . \;
+       cd ../..
+    endif
+
+    if (( $OPERATION == make ) || ( $OPERATION == all )) then
+       cd $VERSION/tmp
+       echo "Performing 'make $PROGRAM' in $VERSION/tmp"
+       make $PROGRAM
+       cd ../..
+    endif
+
+    if (( $OPERATION == install ) || ( $OPERATION == all )) then
+      echo "Copying libconv-*.a from $VERSION/tmp to $VERSION/lib"
+      find $VERSION/tmp -type f -name "libconv-*.a" -exec cp {} $VERSION/lib \;
+      echo "Copying libck?-*.a  from $VERSION/tmp to $VERSION/lib"
+      find $VERSION/tmp -type f -name "libck?-*.a"  -exec cp {} $VERSION/lib \;
+      echo "Copying *.h         from $VERSION/tmp to $VERSION/include"
+      find $VERSION/tmp -name "*.h"       -exec cp {} $VERSION/include \;
+      echo "Copying conv-*.mk   from $VERSION/tmp to $VERSION/include"
+      find $VERSION/tmp -name "conv-*.mk" -exec cp {} $VERSION/include \;
+      echo "Copying conv-*.sh   from $VERSION/tmp to $VERSION/include"
+      find $VERSION/tmp -name "conv-*.sh" -exec cp {} $VERSION/include \;
+      echo "Copying conv-*.csh  from $VERSION/tmp to $VERSION/include"
+      find $VERSION/tmp -name "conv-*.csh" -exec cp {} $VERSION/include \;
+      echo "Copying conv*       from $VERSION/tmp to $VERSION/bin"
+      find $VERSION/tmp -type f -name "conv*" -perm -500 -exec cp {} $VERSION/bin \;
+      echo "Copying charm*      from $VERSION/tmp to $VERSION/bin"
+      find $VERSION/tmp -type f -name "charm*" -perm -500 -exec cp {} $VERSION/bin \;
+      echo "Copying charmc      from $VERSION/tmp to $VERSION/bin"
+      cp $VERSION/tmp/charmc $VERSION/bin/charmc
+
+      echo "Relinking central bin directory."
+      rm -f bin 
+      ln -s $VERSION/bin bin
+    endif
+
+    exit
+
