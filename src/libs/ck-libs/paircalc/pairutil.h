@@ -6,6 +6,7 @@
 #include "charm++.h"
 #include "ckcomplex.h"
 
+/*
 struct Index4D {unsigned short w,x,y,z;};
 
 class CkArrayIndexIndex4D: public CkArrayIndex {
@@ -19,6 +20,7 @@ class CkArrayIndexIndex4D: public CkArrayIndex {
 };
 
 typedef ArrayElementT<Index4D> ArrayElement4D;
+*/
 
 // ComplexPoint: real and imaginary components and 3 coordinates
 struct ComplexPt {

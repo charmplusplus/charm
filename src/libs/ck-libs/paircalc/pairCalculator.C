@@ -49,7 +49,7 @@ void createPairCalculator(bool sym, int s, int grainSize, int numZ, int* z, int 
               for (int s1 = 0; s1 < s; s1 += grainSize) {
                   for (int s2 = s1; s2 < s; s2 += grainSize) {
                       for (int c = 0; c < blkSize; c++) {
-                          pairCalculatorProxy(CkArrayIndexIndex4D(z[numX],s1,s2,c)).
+                          pairCalculatorProxy(z[numX],s1,s2,c).
                               insert(sym, grainSize, s, blkSize, op1, f1, op2, f2, cb, pairCalcReducerProxy.ckGetGroupID(), cb_aid, cb_ep);
                           n_paircalc++;
                       }
@@ -62,7 +62,7 @@ void createPairCalculator(bool sym, int s, int grainSize, int numZ, int* z, int 
               for (int s1 = 0; s1 < s; s1 += grainSize) {
                   for (int s2 = 0; s2 < s; s2 += grainSize) {
                       for (int c = 0; c < blkSize; c++) {
-                          pairCalculatorProxy(CkArrayIndexIndex4D(z[numX],s1,s2,c)).
+                          pairCalculatorProxy(z[numX],s1,s2,c).
                               insert(sym, grainSize, s, blkSize, op1, f1, op2, f2, cb, pairCalcReducerProxy.ckGetGroupID(), cb_aid, cb_ep);
                           n_paircalc++;
                           proc++;
@@ -80,7 +80,7 @@ void createPairCalculator(bool sym, int s, int grainSize, int numZ, int* z, int 
               for (int s1 = 0; s1 < s; s1 += grainSize) {
                   for (int s2 = s1; s2 < s; s2 += grainSize) {
                       for (int c = 0; c < blkSize; c++) {
-                          pairCalculatorProxy(CkArrayIndexIndex4D(z[numX],s1,s2,c)).
+                          pairCalculatorProxy(z[numX],s1,s2,c).
                               insert(sym, grainSize, s, blkSize, op1, f1, op2, f2, cb, pairCalcReducerProxy.ckGetGroupID(), cb_aid, cb_ep, proc);
                           n_paircalc++;
                           proc++;
@@ -95,7 +95,7 @@ void createPairCalculator(bool sym, int s, int grainSize, int numZ, int* z, int 
               for (int s1 = 0; s1 < s; s1 += grainSize) {
                   for (int s2 = 0; s2 < s; s2 += grainSize) {
                       for (int c = 0; c < blkSize; c++) {
-                          pairCalculatorProxy(CkArrayIndexIndex4D(z[numX],s1,s2,c)).
+                          pairCalculatorProxy(z[numX],s1,s2,c).
                               insert(sym, grainSize, s, blkSize, op1, f1, op2, f2, cb, pairCalcReducerProxy.ckGetGroupID(), cb_aid, cb_ep, proc);
                           n_paircalc++;
                           proc++;
@@ -135,15 +135,15 @@ void startPairCalcLeft(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ){
     for (c = 0; c < blkSize; c++)
       for(s2 = 0; s2 < S; s2 += grainSize){
 	if(s1 <= s2)
-	  pairCalculatorProxy(CkArrayIndexIndex4D(x, s1, s2, c)).calculatePairs(n, ptr, myS, true, flag_dp);
+	  pairCalculatorProxy(x, s1, s2, c).calculatePairs(n, ptr, myS, true, flag_dp);
 	else
-	  pairCalculatorProxy(CkArrayIndexIndex4D(x, s2, s1, c)).calculatePairs(n, ptr, myS, false, flag_dp);
+	  pairCalculatorProxy(x, s2, s1, c).calculatePairs(n, ptr, myS, false, flag_dp);
       }
   }
   else {
     for (c = 0; c < blkSize; c++)
       for(s2 = 0; s2 < S; s2 += grainSize){
-	pairCalculatorProxy(CkArrayIndexIndex4D(x, s1, s2, c)).calculatePairs(n, ptr, myS, true, flag_dp);
+	pairCalculatorProxy(x, s1, s2, c).calculatePairs(n, ptr, myS, true, flag_dp);
       }
   }
 }
@@ -168,7 +168,7 @@ void startPairCalcRight(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ)
   s2 = (myS/grainSize) * grainSize;
   for (c = 0; c < blkSize; c++)
     for(s1 = 0; s1 < S; s1 += grainSize){
-      pairCalculatorProxy(CkArrayIndexIndex4D(x, s1, s2, c)).calculatePairs(n, ptr, myS, false, flag_dp);
+      pairCalculatorProxy(x, s1, s2, c).calculatePairs(n, ptr, myS, false, flag_dp);
     }
 }
 

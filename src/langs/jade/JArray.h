@@ -185,6 +185,24 @@ public:
 		return resize(3, d);
 	}
 
+	// resize
+	JArray& resize4D(const uint d1, const uint d2, const uint d3, const uint d4){
+		uint d[] = { d1, d2, d3, d4 };
+		return resize(4, d);
+	}
+
+	// resize
+	JArray& resize5D(const uint d1, const uint d2, const uint d3, const uint d4, const uint d5){
+		uint d[] = { d1, d2, d3, d4, d5 };
+		return resize(5, d);
+	}
+
+	// resize
+	JArray& resize6D(const uint d1, const uint d2, const uint d3, const uint d4, const uint d5, const uint d6){
+		uint d[] = { d1, d2, d3, d4, d5, d6 };
+		return resize(6, d);
+	}
+
 	// Get the size of the n'th dimension (1D, 2D ...)
 	int getDim(const uint n) {
 		assert(n>0 && n<=numDimensions);

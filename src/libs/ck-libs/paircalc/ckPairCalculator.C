@@ -565,14 +565,14 @@ PairCalculator::acceptResult(int size, double *matrix)
   //original version
 #ifndef _PAIRCALC_SECONDPHASE_LOADBAL_
   if(!symmetric){
-    CkArrayIndexIndex4D idx(thisIndex.w, 0, thisIndex.y, thisIndex.z);
+    CkArrayIndex4D idx(thisIndex.w, 0, thisIndex.y, thisIndex.z);
     thisProxy(idx).sumPartialResult(N*grainSize, mynewData, thisIndex.z);
   }
   else {
-    CkArrayIndexIndex4D idx(thisIndex.w, 0, thisIndex.y, thisIndex.z);
+    CkArrayIndex4D idx(thisIndex.w, 0, thisIndex.y, thisIndex.z);
     thisProxy(idx).sumPartialResult(N*grainSize, mynewData, thisIndex.z);
     if (thisIndex.y != thisIndex.x){   // FIXME: rowNum will alway == thisIndex.x
-      CkArrayIndexIndex4D idx(thisIndex.w, 0, thisIndex.x, thisIndex.z);
+      CkArrayIndex4D idx(thisIndex.w, 0, thisIndex.x, thisIndex.z);
       thisProxy(idx).sumPartialResult(N*grainSize, othernewData, thisIndex.z);
     }
   }
@@ -586,7 +586,7 @@ PairCalculator::acceptResult(int size, double *matrix)
   if(!symmetric){    // Not right in value given!!!
     for(int segment=0;segment < segments;segment++)
       {  
-	CkArrayIndexIndex4D idx(thisIndex.w, segment*grainSize, thisIndex.y, thisIndex.z);
+	CkArrayIndex4D idx(thisIndex.w, segment*grainSize, thisIndex.y, thisIndex.z);
 	partialResultMsg *msg = new (N*blocksize, 8*sizeof(int) )partialResultMsg;
 	msg->N=N*blocksize;
 	memcpy(msg->result,mynewData+segment*N*blocksize,msg->N*sizeof(complex));
@@ -598,7 +598,7 @@ PairCalculator::acceptResult(int size, double *matrix)
   }
   else { // else part is NOT load balanced yet!!!
 
-    CkArrayIndexIndex4D idx(thisIndex.w, 0, thisIndex.y, thisIndex.z);
+    CkArrayIndex4D idx(thisIndex.w, 0, thisIndex.y, thisIndex.z);
     priorSumMsg *pmsg = new (N*grainSize, 8*sizeof(int) )priorSumMsg();
     pmsg->N=N*grainSize;
     memcpy(pmsg->result,mynewData, pmsg->N*sizeof(complex));
@@ -607,7 +607,7 @@ PairCalculator::acceptResult(int size, double *matrix)
     CkSetQueueing(pmsg, CK_QUEUEING_IFIFO); 
     thisProxy(idx).sumPartialResult(pmsg);
     if (thisIndex.y != thisIndex.x){
-      CkArrayIndexIndex4D idx(thisIndex.w, 0, thisIndex.x, thisIndex.z);
+      CkArrayIndex4D idx(thisIndex.w, 0, thisIndex.x, thisIndex.z);
       priorSumMsg *pmsg = new (N*grainSize, 8*sizeof(int) )priorSumMsg();
       pmsg->N=N*grainSize;
       memcpy(pmsg->result,othernewData, pmsg->N*sizeof(complex));
