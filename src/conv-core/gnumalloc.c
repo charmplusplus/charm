@@ -6,15 +6,8 @@
 
 
 
-
-
-  Josh's note: the code in this file is ENTIRELY UNMODIFIED, OFF-THE-SHELF
-  GNU CODE. Please don't edit it - edit memory.c instead.
-
-
-
-
-
+   This code now contains a bugfix by Josh.
+   
 
 
 
@@ -422,11 +415,6 @@ typedef struct malloc_chunk* mchunkptr;
       & ~(MALLOC_ALIGN_MASK)
 
 
-/* Check if m has acceptable alignment */
-
-#define aligned_OK(m)    (((size_t)((m)) & (MALLOC_ALIGN_MASK)) == 0)
-
-
 /* Check if a chunk is immediately usable */
 
 #define exact_fit(ptr, req) ((unsigned long)((ptr)->size - (req)) < MINSIZE)
@@ -777,6 +765,7 @@ static mchunkptr malloc_from_sys(nb) size_t nb;
   mchunkptr p;            /* Will hold a usable chunk */
   size_t*   ip;           /* to traverse sbrk ptr in size_t units */
   char*     cp;           /* result of sbrk call */
+  int       offs;         /* bytes must add for alignment */
   
   /* Find a good size to ask sbrk for.  */
   /* Minimally, we need to pad with enough space */
@@ -788,17 +777,21 @@ static mchunkptr malloc_from_sys(nb) size_t nb;
   cp = (char*)(sbrk(sbrk_size));
   if (cp == (char*)(-1)) /* sbrk returns -1 on failure */
     return 0;
-
-  ip = (size_t*)cp;
   sbrked_mem += sbrk_size;
+
+  if (((int)cp) & MALLOC_ALIGN_MASK) {
+    offs = ((int)cp) & MALLOC_ALIGN_MASK;
+    cp += MALLOC_MIN_OVERHEAD - offs;
+    sbrk_size -= MALLOC_MIN_OVERHEAD;
+    sbrk(- offs);
+  }
+    
+  ip = (size_t*)cp;
 
   if (last_sbrk_end != &ip[-1]) /* Is this chunk continguous with last? */
   {                             
     /* It's either first time through or someone else called sbrk. */
     /* Arrange end-markers at front & back */
-
-    /* Shouldn't be necessary, but better to be safe */
-    while (!aligned_OK(ip)) { ++ip; sbrk_size -= SIZE_SZ; }
 
     /* Mark the front as in use to prevent merging. (End done below.) */
     /* Note we can get away with only 1 word, not MINSIZE overhead here */
