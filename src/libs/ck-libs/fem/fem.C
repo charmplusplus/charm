@@ -706,6 +706,10 @@ FEMchunk::updateMesh(int doWhat) {
   
   if (cur_mesh) {
      updated_mesh->m.copyOldGlobalno(*cur_mesh);
+     if (doWhat==FEM_MESH_UPDATE) { /* Get rid of the original mesh--we'll update it soon */
+       delete cur_mesh;
+       cur_mesh=NULL;
+     }
   }
   
   updated_mesh->doWhat=doWhat;
