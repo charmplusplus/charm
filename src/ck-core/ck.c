@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.9  1995-07-27 20:29:34  jyelon
+ * Revision 2.10  1995-08-24 15:48:26  gursoy
+ * worng cpv-macro usage for EpInfoTable (it is a Csv type not Cpv)
+ * fixed
+ *
+ * Revision 2.9  1995/07/27  20:29:34  jyelon
  * Improvements to runtime system, general cleanup.
  *
  * Revision 2.8  1995/07/25  00:29:31  jyelon
@@ -323,7 +327,7 @@ int destPE;
   ENVELOPE * env;
   VID_BLOCK * vidblock;
 
-  if (id!=CpvAccess(EpInfoTable)[Entry].chareindex) 
+  if (id!=CsvAccess(EpInfoTable)[Entry].chareindex) 
     CmiPrintf("** ERROR ** Illegal combination of CHAREINDEX/EP in CreateChare\n");
 
   TRACE(CmiPrintf("[%d] CreateChare: Entry=%d\n", CmiMyPe(), Entry));
