@@ -308,7 +308,9 @@ static void CmiReleaseSentMessages(void)
   if(cur_unsent == NULL)
     end_sent = prev;
 
+#if CMK_PERSISTENT_COMM
   release_pmsg_list();
+#endif
 
 #ifndef CMK_OPTIMIZE 
 #if ! CMK_TRACE_IN_CHARM
