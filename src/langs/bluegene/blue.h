@@ -203,6 +203,7 @@ void BgSetNodeData(char *data);
     }\
   } while(0)
 #define BnvAccess(v)       CpvAccess(v)[BgMyRank()]
+#define BnvAccessOther(v, r)       CpvAccess(v)[r]
 
 #else
 
@@ -226,6 +227,7 @@ public:
 #define BnvExtern(T,v)         extern Cpv<T> CMK_CONCAT(Bnv_Var, v);
 #define BnvInitialize(T,v)     CMK_CONCAT(Bnv_Var, v).init()
 #define BnvAccess(v)       CMK_CONCAT(Bnv_Var, v).data[CmiMyRank()][BgMyRank()]
+#define BnvAccessOther(v, r)       CMK_CONCAT(Bnv_Var, v).data[CmiMyRank()][r]
 #endif
 
 #endif
@@ -235,5 +237,6 @@ public:
 #define BpvExtern(T, v)             CtvExtern(T, v)
 #define BpvInitialize(T, v)         CtvInitialize(T, v)
 #define BpvAccess(v)                CtvAccess(v)
+#define BpvAccessOther(v, r)        CtvAccess(v, r)
 
 #endif
