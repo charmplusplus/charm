@@ -92,7 +92,7 @@ static CkReductionMsg *name(int nMsg, CkReductionMsg ** msg){\
  /* number of non-null data blocks and total number of elements in them is known.
     Now pack the input data into one buffer resolving the overlap.*/\
 \
-  unsigned char *data = new (unsigned char)[sizeof(int) +\
+  unsigned char *data = new unsigned char[sizeof(int) +\
        sizeof(CkDataSegHeader)*count + sizeof(dataType)*numElements];\
 \
   memset(flag, 0,count*sizeof(unsigned char));\
