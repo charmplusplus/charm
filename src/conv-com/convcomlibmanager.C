@@ -18,6 +18,8 @@ CkpvDeclare(ConvComlibManager, conv_com_object);
 CkpvDeclare(ConvComlibManager *, conv_com_ptr);
 CkpvDeclare(int, RecvdummyHandle);
 
+CkpvDeclare(int, strategy_handlerid);
+
 void *strategyHandler(void *msg) {
     CmiMsgHeaderBasic *conv_header = (CmiMsgHeaderBasic *) msg;
     int instid = conv_header->stratid;

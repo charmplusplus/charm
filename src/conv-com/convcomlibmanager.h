@@ -40,7 +40,7 @@ Strategy *ConvComlibGetStrategy(int loc);
 void ConvComlibRegisterStrategy(Strategy *s);
 void ConvComlibScheduleDoneInserting(int loc);
 
-CkpvDeclare(int, strategy_handlerid);
+CkpvExtern(int, strategy_handlerid);
 
 //Send a converse message to a remote strategy instance. On being
 //received the handleMessage method will be invoked.
