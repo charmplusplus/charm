@@ -80,12 +80,9 @@ PCQueue PCQueueCreate(void)
 
 int PCQueueEmpty(PCQueue Q)
 {
-/*
   CircQueue circ = Q->head;
   char *data = circ->data[circ->pull];
   return (data == 0);
-*/
-  return (Q->len == 0);
 }
 
 int PCQueueLength(PCQueue Q)
