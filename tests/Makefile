@@ -9,7 +9,7 @@ test-converse:
 	cd converse; $(MAKE) test OPTS='$(OPTS)'
 
 test-charm:
-	cd charm++; $(MAKE) test-charm OPTS='$(OPTS)'
+	cd charm++; $(MAKE) test OPTS='$(OPTS)'
 
 test-AMPI:
 	cd ampi; $(MAKE) test OPTS='$(OPTS)'
