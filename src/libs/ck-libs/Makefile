@@ -7,7 +7,7 @@ DIRS=sparseContiguousReducer tcharm ampi idxl parmetis multiphaseSharedArrays fe
 all:  
 	for d in $(DIRS); do (cd $$d && $(MAKE) all OPTS='$(OPTS)' || exit 1) || exit 1; done
 	-(CHARMINC=../../../include;. $$CHARMINC/conv-config.sh; \
-	if test "$$CMK_BUILD_PYTHON" = "1"; then (cd pythonCCS && $(MAKE) all OPTS='$(OPTS)' || exit 1); fi)
+	if test "$$CMK_BUILD_PYTHON" != ""; then (cd pythonCCS && $(MAKE) all OPTS='$(OPTS)' || exit 1); fi)
 
 idxl:
 	(cd idxl; $(MAKE) all OPTS='$(OPTS)')
