@@ -3,6 +3,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#if CMK_STRINGS_USE_STRING_H
+#include <string.h>
+#endif
+#if CMK_STRINGS_USE_STRING_H
+#include <strings.h>
+#endif
+
 /* this is the handle of the main chare, used in place of MainChareID */
 /* If you make these Cpv or Csv, you have to change the charm++ xlator too */
 ChareIDType mainhandle;
