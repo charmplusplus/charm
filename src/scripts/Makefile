@@ -35,6 +35,9 @@ pvm: converse libpvmc.a
 
 translators: charmxlat charmfilter charmxlat++ charmfilter++ charmxi conv-cpm
 
+test-all: all
+	(cd ../pgms ; make test-all)
+
 test-converse: converse
 	(cd ../pgms ; make test-converse)
 
