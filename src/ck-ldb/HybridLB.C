@@ -59,9 +59,6 @@ HybridLB::HybridLB(const CkLBOptions &opt): BaseLB(opt)
   currentLevel = 0;
 
   foundNeighbors = 0;
-//  loadbalancing = 0;
-//  mig_msgs_expected = 0;
-//  migrates_expected = -1;
 
   if (_lb_args.statsOn()) theLbdb->CollectStatsOn();
 
@@ -177,17 +174,6 @@ CLBStatsMsg* HybridLB::AssembleStats()
   theLbdb->GetObjData(msg->objData);
   msg->n_comm = csz;
   theLbdb->GetCommData(msg->commData);
-
-/*
-  // store local obj IDs
-  localObjs.resize(0);
-  for (int i=0; i<osz; i++) {
-    LDObjKey key;
-    key.omID() = msg->objData[i].omID();
-    key.objID() = msg->objData[i].objID();
-    localObjs.push_back(key);
-  }
-*/
 
   return msg;
 #else
@@ -371,7 +357,6 @@ CLBStatsMsg * HybridLB::buildCombinedLBStatsMessage(int atlevel)
 #endif
 }
 
-// TODO:
 //  LDStats data sent to parent contains real PE
 //  LDStats in parent should contain relative PE
 void HybridLB::Loadbalancing(int atlevel)
@@ -390,19 +375,11 @@ void HybridLB::Loadbalancing(int atlevel)
 
   // at this time, all objects processor location is relative, and 
   // all incoming objects from outside group belongs to the fake root proc.
-/*
-  // TODO:  outgoing objects pre-assigned to the fake processor
-  for (i=0; i<statsData->n_objs; i++) {
-    if (statsData->to_proc[i] == -1)  {
-    }
-  }
-*/
 
   CkPrintf("[%d] Calling Strategy ... \n", CkMyPe());
   currentLevel = atlevel;
   LBMigrateMsg* migrateMsg = Strategy(statsData, lData->nChildren);
 
-//  LBMigrateMsg *dupmsg = (LBMigrateMsg*)CkCopyMsg((void **)&migrateMsg);
   // send to children 
   thisProxy.ReceiveMigration(migrateMsg, lData->nChildren, lData->children);
 
@@ -441,10 +418,6 @@ void HybridLB::ReceiveMigration(LBMigrateMsg *msg)
   // only non NULL when level > 0
   LDStats *statsData = lData->statsData;
 
-  // TODO: need to modify my LDStats to reflect migration
-  // extend migration message to have obj load
-  //updateDatabase(msg);
-
   // do LDStats migration
   const int me = CkMyPe();
   lData->migrates_expected = 0;
@@ -454,12 +427,6 @@ void HybridLB::ReceiveMigration(LBMigrateMsg *msg)
     if (move.from_pe != me && move.to_pe == me) {
       // I can not be the parent node
       CkPrintf("[%d] expecting LDStats object from %d\n",me,move.from_pe);
-/*
-      LDObjKey key;
-      key.omID() = move.obj.omID();
-      key.objID() = move.obj.objID();
-      newObjs.push_back(Location(key, move.from_pe));
-*/
       // will receive a ObjData message
       lData->migrates_expected ++;
     }
@@ -479,9 +446,6 @@ void HybridLB::ReceiveMigration(LBMigrateMsg *msg)
             thisProxy[move.to_pe].ObjMigrated(statsData->objData[obj], atlevel);
             lData->outObjs.push_back(MigrationRecord(move.obj, lData->children[statsData->from_proc[obj]], -1));
             statsData->removeObject(obj);
-
-//          wasonpe = statsData->from_proc[obj];
-//            statsData->to_proc[obj] = -1;		// mark obj invalid
             break;
           }
         }
@@ -489,12 +453,6 @@ void HybridLB::ReceiveMigration(LBMigrateMsg *msg)
       }
       else {		// this is leave node
         if (move.to_pe == -1) {
-/*
-          LDObjKey key;
-          key.omID() = move.obj.omID();
-          key.objID() = move.obj.objID();
-          outObjs.push_back(Location(key, -1));
-*/
           lData->outObjs.push_back(MigrationRecord(move.obj, CkMyPe(), -1));
         }
         else {
@@ -504,14 +462,6 @@ void HybridLB::ReceiveMigration(LBMigrateMsg *msg)
       }
     }   // end if
   }
-
-/*
-  // broadcast LBMigrateMsg to children for migration
-  if (!loadbalancing && children.size()) {
-    CmiPrintf("[%d] passing ReceiveMigration to children. \n", CkMyPe());
-    thisProxy.ReceiveMigration(msg, children.size(), children.getVec());
-  }
-*/
 
   if (lData->migrationDone())
     StatsDone(atlevel);
@@ -523,14 +473,13 @@ void HybridLB::Migrated(LDObjHandle h, int waitBarrier)
   LevelData *lData = levelData[0];
 
   lData->migrates_completed++;
-  CkPrintf("[%d] An object migrated! %d %d\n",
-    	   CkMyPe(),lData->migrates_completed,lData->migrates_expected);
+  DEBUGF("[%d] An object migrated! %d %d\n", CkMyPe(),lData->migrates_completed,lData->migrates_expected);
   if (lData->migrationDone()) {
     if (!lData->resumeAfterMigration) {
       StatsDone(0);
     }
     else {
-      // TODO: migration done finally
+      // migration done finally
       MigrationDone(1);
     }
   }
@@ -682,6 +631,7 @@ void HybridLB::CollectInfo(Location *loc, int n, int fromlevel)
 
 void HybridLB::PropagateInfo(Location *loc, int n, int fromlevel)
 {
+#if CMK_LBDB_ON
   int i, obj;
   int atlevel = fromlevel - 1;
   LevelData *lData = levelData[atlevel];
@@ -719,11 +669,6 @@ void HybridLB::PropagateInfo(Location *loc, int n, int fromlevel)
     int migs = outObjs.size() + newObjs.size();
     for (i=0; i<outObjs.size(); i++) {
       if (outObjs[i].toPe == -1) {
-/*
-        for (obj=0; obj<matchedObjs.size(); obj++) {
-          if (matchedObjs[obj].key.omID() == outObjs[i].handle.omID() &&
-              matchedObjs[obj].key.objID() == outObjs[i].handle.objID()) {
-*/
         for (obj=0; obj<n; obj++) {
           if (loc[obj].key.omID() == outObjs[i].handle.omID() &&
               loc[obj].key.objID() == outObjs[i].handle.objID()) {
@@ -758,7 +703,7 @@ void HybridLB::PropagateInfo(Location *loc, int n, int fromlevel)
       MigrationDone(1);
     }
   }
-
+#endif
 }
 
 void HybridLB::MigrationDone(int balancing)
@@ -767,11 +712,6 @@ void HybridLB::MigrationDone(int balancing)
   LevelData *lData = levelData[0];
 
   CkPrintf("[%d] HybridLB::MigrationDone!\n", CkMyPe());
-
-  // cleanup all objects that has gone
-//  cleanupDatabase();
-
-//  thisProxy[CkMyPe()].NotifyMigrationDone(CkMyPe());
 
   if (CkMyPe() == 0 && start_lb_time != 0.0) {
     double end_lb_time = CkWallTimer();
@@ -787,7 +727,7 @@ void HybridLB::MigrationDone(int balancing)
     levelData[i]->clear();
   newObjs.free();
 
-  CmiPrintf("[%d] calling ResumeClients.\n", CkMyPe());
+  DEBUGF("[%d] calling ResumeClients.\n", CkMyPe());
   if (_lb_args.syncResume()) {
     CkCallback cb(CkIndex_HybridLB::ResumeClients((CkReductionMsg*)NULL),
                   thisProxy);
@@ -807,13 +747,9 @@ void HybridLB::ResumeClients(CkReductionMsg *msg)
 void HybridLB::ResumeClients()
 {
 #if CMK_LBDB_ON
-  CkPrintf("[%d] ResumeClients. \n", CkMyPe());
+  DEBUGF("[%d] ResumeClients. \n", CkMyPe());
   // zero out stats
   theLbdb->ClearLoads();
-
-  // recreate database
-  //delete statsData;
-  //statsData = new LDStats;
 
   theLbdb->ResumeClients();
 #endif
@@ -878,7 +814,7 @@ LBMigrateMsg* HybridLB::Strategy(LDStats* stats,int count)
     msg->moves[i] = *item;
     delete item;
     migrateInfo[i] = 0;
-    CkPrintf("[%d] obj (%d %d %d %d) migrate from %d to %d\n", CkMyPe(), item->obj.objID().id[0], item->obj.objID().id[1], item->obj.objID().id[2], item->obj.objID().id[3], item->from_pe, item->to_pe);
+    DEBUGF("[%d] obj (%d %d %d %d) migrate from %d to %d\n", CkMyPe(), item->obj.objID().id[0], item->obj.objID().id[1], item->obj.objID().id[2], item->obj.objID().id[3], item->from_pe, item->to_pe);
   }
 
   return msg;

@@ -53,7 +53,7 @@ private:
 public:
   ThreeLevelTree() {
     nLevels = 3;
-    span[0] = CkNumPes()/2;
+    span[0] = CkNumPes()/4;
     CmiAssert(span[0]>0);
     span[1] = (CkNumPes()+span[0]-1)/span[0];
     toproot = 1;
@@ -137,8 +137,6 @@ protected:
 
   int NeighborIndex(int pe, int atlevel);   // return the neighbor array index
 
-//  LDStats *statsData;
-
 private:
   void BuildHierarchy();
   void FindNeighbors();
@@ -146,19 +144,11 @@ private:
   void buildStats(int level);
   CLBStatsMsg * buildCombinedLBStatsMessage(int atlevel);
   void depositLBStatsMessage(CLBStatsMsg *msg, int atlevel);
-//  void updateDatabase(LBMigrateMsg *msg);
-//  void cleanupDatabase();
 
   int mystep;
-//  int stats_msg_count;
-//  CLBStatsMsg** statsMsgsList;
-//  int migrates_completed;
   int future_migrates_expected;
-//  int objinfo_completed;
-//  int objinfo_expected;
   LBMigrateMsg** mig_msgs;
   int mig_msgs_received;
-//  int mig_msgs_expected;
   int cur_ld_balancer;
   double start_lb_time;
 
