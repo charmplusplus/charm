@@ -1363,9 +1363,13 @@ CDECL void MPI_Migrate(void)
 }
 
 CDECL void MPI_Setmigratable(MPI_Comm comm, int mig){
+#if CMK_LBDB_ON
   AMPIAPI("MPI_Setmigratable");
   ampi *ptr=getAmpiInstance(comm);
   ptr->setMigratable(mig);
+#else
+  CkPrintf("Warning: MPI_Setmigratable and load balancing are not supported in this version.\n");
+#endif
 }
 
 

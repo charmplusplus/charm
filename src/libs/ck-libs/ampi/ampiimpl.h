@@ -957,10 +957,12 @@ class ampi : public CBase_ampi {
 
     CkDDT *getDDT(void) {return parent->myDDT;}
     CthThread getThread() { return thread->getThread(); }
+#if CMK_LBDB_ON
     void setMigratable(int mig) { 
       if(mig) thread->setMigratable(CmiTrue); 
       else thread->setMigratable(CmiFalse);
     }
+#endif
   public:
     //These are directly used by API routines, which is hideous
     /*
