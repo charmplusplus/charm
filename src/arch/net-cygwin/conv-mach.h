@@ -45,7 +45,9 @@
 
 #define CMK_THREADS_REQUIRE_NO_CPV                         0
 #define CMK_THREADS_COPY_STACK                             0
-#define CMK_THREADS_ARE_WIN32_FIBERS                       1
+#define CMK_THREADS_ARE_WIN32_FIBERS                       0
+#define CMK_THREADS_USE_CONTEXT                            0
+#define CMK_THREADS_USE_JCONTEXT                           0
 
 #define CMK_TIMER_USE_GETRUSAGE                            0
 #define CMK_TIMER_USE_SPECIAL                              0
@@ -68,6 +70,7 @@
 #define CMK_DEBUG_MODE					   0
 #define CMK_WEB_MODE                                       1
 
+#define CMK_NO_ISO_MALLOC				   1
 
 #define CMK_LBDB_ON					   1
 
