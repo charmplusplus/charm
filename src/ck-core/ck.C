@@ -1,4 +1,5 @@
 #include "ck.h"
+#include "trace.h"
 
 extern "C"
 void CkSetRefNum(void *msg, int ref)
@@ -39,7 +40,11 @@ static void _processNewChareMsg(envelope *env)
   register void *obj = _allocNewChare(env);
   register void *msg = EnvToUsr(env);
   CpvAccess(_currentChare) = obj;
+  if(CpvAccess(traceOn))
+    CpvAccess(_trace)->beginExecute(env);
   _entryTable[env->getEpIdx()]->call(msg, obj);
+  if(CpvAccess(traceOn))
+    CpvAccess(_trace)->endExecute();
 }
 
 static void _processNewVChareMsg(envelope *env)
@@ -58,7 +63,11 @@ static void _processNewVChareMsg(envelope *env)
   CpvAccess(_qd)->create();
   CpvAccess(_currentChare) = obj;
   register void *msg = EnvToUsr(env);
+  if(CpvAccess(traceOn))
+    CpvAccess(_trace)->beginExecute(env);
   _entryTable[env->getEpIdx()]->call(msg, obj);
+  if(CpvAccess(traceOn))
+    CpvAccess(_trace)->endExecute();
 }
 
 static inline void _processForChareMsg(envelope *env)
@@ -67,7 +76,11 @@ static inline void _processForChareMsg(envelope *env)
   register int epIdx = env->getEpIdx();
   register void *obj = env->getObjPtr();
   CpvAccess(_currentChare) = obj;
+  if(CpvAccess(traceOn))
+    CpvAccess(_trace)->beginExecute(env);
   _entryTable[epIdx]->call(msg, obj);
+  if(CpvAccess(traceOn))
+    CpvAccess(_trace)->endExecute();
 }
 
 static inline void _processForBocMsg(envelope *env)
@@ -194,7 +207,11 @@ void _packFn(void **pEnv)
   register int msgIdx = env->getMsgIdx();
   if(!env->isPacked() && _msgTable[msgIdx]->pack) {
     register void *msg = EnvToUsr(env);
+    if(CpvAccess(traceOn))
+      CpvAccess(_trace)->beginPack();
     msg = _msgTable[msgIdx]->pack(msg);
+    if(CpvAccess(traceOn))
+      CpvAccess(_trace)->endPack();
     UsrToEnv(msg)->setPacked(1);
     *((envelope **)pEnv) = UsrToEnv(msg);
   }
@@ -206,7 +223,11 @@ void _unpackFn(void **pEnv)
   register int msgIdx = env->getMsgIdx();
   if(_msgTable[msgIdx]->unpack) {
     register void *msg = EnvToUsr(env);
+    if(CpvAccess(traceOn))
+      CpvAccess(_trace)->beginUnpack();
     msg = _msgTable[msgIdx]->unpack(msg);
+    if(CpvAccess(traceOn))
+      CpvAccess(_trace)->endUnpack();
     UsrToEnv(msg)->setPacked(0);
     *((envelope **)pEnv) = UsrToEnv(msg);
   }
@@ -228,14 +249,18 @@ void CkSendMsg(int entryIdx, void *msg, CkChareID *pCid)
       env->setMsgtype(ForVidMsg);
       env->setSrcPe(CkMyPe());
       env->setVidPtr(pCid->objPtr);
-      CldEnqueue(pe, env, _infoIdx);
+      if(CpvAccess(traceOn))
+        CpvAccess(_trace)->creation(env);
       CpvAccess(_qd)->create();
+      CldEnqueue(pe, env, _infoIdx);
     }
   } else {
     env->setSrcPe(CkMyPe());
     env->setObjPtr(pCid->objPtr);
-    CldEnqueue(pCid->onPE, env, _infoIdx);
+    if(CpvAccess(traceOn))
+      CpvAccess(_trace)->creation(env);
     CpvAccess(_qd)->create();
+    CldEnqueue(pCid->onPE, env, _infoIdx);
   }
   CpvAccess(_myStats)->recordSendMsg();
 }
@@ -252,14 +277,15 @@ void CkCreateChare(int cIdx, int eIdx, void *msg, CkChareID *pCid, int destPE)
     pCid->objPtr = (void *) new VidBlock();
     env->setMsgtype(NewVChareMsg);
     env->setVidPtr(pCid->objPtr);
-    env->setSrcPe(CkMyPe());
   }
   env->setEpIdx(eIdx);
   env->setSrcPe(CkMyPe());
   CmiSetHandler(env, _charmHandlerIdx);
-  CldEnqueue(destPE, env, _infoIdx);
+  if(CpvAccess(traceOn))
+    CpvAccess(_trace)->creation(env);
   CpvAccess(_qd)->create();
   CpvAccess(_myStats)->recordCreateChare();
+  CldEnqueue(destPE, env, _infoIdx);
 }
 
 void _createGroupMember(int groupID, int eIdx, void *msg)
@@ -295,7 +321,11 @@ void _createGroup(int groupID, envelope *env, int retEp, CkChareID *retChare)
     CmiSyncBroadcast(env->getTotalsize(), env);
     CpvAccess(_qd)->create(CkNumPes()-1);
     if(env->isPacked() && _msgTable[msgIdx]->unpack) {
+      if(CpvAccess(traceOn))
+        CpvAccess(_trace)->beginUnpack();
       msg = _msgTable[msgIdx]->unpack(msg);
+      if(CpvAccess(traceOn))
+        CpvAccess(_trace)->endUnpack();
       UsrToEnv(msg)->setPacked(0);
     }
   }
@@ -336,6 +366,9 @@ int CkCreateGroup(int cIdx, int eIdx, void *msg, int retEp,CkChareID *retChare)
   register envelope *env = UsrToEnv(msg);
   env->setMsgtype(BocInitMsg);
   env->setEpIdx(eIdx);
+  env->setSrcPe(CkMyPe());
+  if(CpvAccess(traceOn))
+    CpvAccess(_trace)->creation(env, CkNumPes());
   if(CkMyPe()==0) {
     return _staticGroupCreate(env, retEp, retChare);
   } else {
@@ -365,6 +398,8 @@ static inline void _sendMsgBranch(int eIdx, void *msg, int gID,
 extern "C"
 void CkSendMsgBranch(int eIdx, void *msg, int pe, int gID)
 {
+  if(CpvAccess(traceOn))
+    CpvAccess(_trace)->creation(UsrToEnv(msg));
   _sendMsgBranch(eIdx, msg, gID, pe);
   CpvAccess(_myStats)->recordSendBranch();
   CpvAccess(_qd)->create();
@@ -373,6 +408,8 @@ void CkSendMsgBranch(int eIdx, void *msg, int pe, int gID)
 extern "C"
 void CkBroadcastMsgBranch(int eIdx, void *msg, int gID)
 {
+  if(CpvAccess(traceOn))
+    CpvAccess(_trace)->creation(UsrToEnv(msg), CkNumPes());
   _sendMsgBranch(eIdx, msg, gID);
   CpvAccess(_myStats)->recordSendBranch(CkNumPes());
   CpvAccess(_qd)->create(CkNumPes());

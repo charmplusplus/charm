@@ -1,4 +1,5 @@
 #include "ck.h"
+#include "trace.h"
 
 UChar _defaultQueueing = CK_QUEUEING_FIFO;
 UInt  _printCS = 0;
@@ -166,8 +167,13 @@ static inline void _processBufferedBocInits(void)
   register envelope *env;
   CmiNumberHandler(_bocHandlerIdx, (CmiHandler)_processHandler);
   while(env=(envelope *)CpvAccess(_bocInitQ)->deq()) {
-    if(env->isPacked() && _msgTable[env->getMsgIdx()]->unpack)
+    if(env->isPacked() && _msgTable[env->getMsgIdx()]->unpack) {
+      if(CpvAccess(traceOn))
+        CpvAccess(_trace)->beginUnpack();
       env = UsrToEnv(_msgTable[env->getMsgIdx()]->unpack(EnvToUsr(env)));
+      if(CpvAccess(traceOn))
+        CpvAccess(_trace)->endUnpack();
+    }
     _processBocInitMsg(env);
   }
 }
@@ -332,6 +338,8 @@ void _initCharm(int argc, char **argv)
     _registerCkArray();
     CkRegisterMainModule();
   }
+  if(CpvAccess(traceOn))
+    CpvAccess(_trace)->beginComputation();
   CpvAccess(_msgPool) = new MsgPool();
   CpvAccess(_myStats) = new Stats();
   CmiNodeBarrier();

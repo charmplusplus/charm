@@ -5,7 +5,12 @@ CpvDeclare(int, traceOn);
 CpvDeclare(int, CtrLogBufSize);
 CpvStaticDeclare(LogPool*, _logPool);
 CpvStaticDeclare(char*, pgmName);
+CpvExtern(CthThread, curThread);
 static int _numEvents = 0;
+static int _threadMsg, _threadChare, _threadEP;
+
+extern "C" void setEvent(CthThread t, int event);
+extern "C" int getEvent(CthThread t);
 
 extern "C" 
 void traceInit(int* argc, char **argv)
@@ -19,6 +24,7 @@ void traceInit(int* argc, char **argv)
   CpvAccess(traceOn) = 1;
   CpvAccess(pgmName) = (char *) malloc(strlen(argv[0])+1);
   strcpy(CpvAccess(pgmName), argv[0]);
+  CpvAccess(CtrLogBufSize) = 10000;
   int i;
   for(i=1;i<*argc;i++) {
     if(strcmp(argv[i], "+logsize")==0) {
@@ -46,6 +52,7 @@ void traceInit(int* argc, char **argv)
     }
     *argc -= 2;
   }
+  CpvAccess(_logPool) = new LogPool(CpvAccess(pgmName));
 }
 
 extern "C"
@@ -63,16 +70,19 @@ void traceEndIdle(void)
 extern "C"
 void traceResume(void)
 {
+  CpvAccess(_trace)->beginExecute(0);
 }
 
 extern "C"
 void traceSuspend(void)
 {
+  CpvAccess(_trace)->endExecute();
 }
 
 extern "C"
 void traceAwaken(void)
 {
+  CpvAccess(_trace)->creation(0);
 }
 
 extern "C"
@@ -93,6 +103,7 @@ int traceRegisterUserEvent(const char*)
 extern "C"
 void traceClose(void)
 {
+  CpvAccess(_trace)->endComputation();
   if(CmiMyPe()==0)
     CpvAccess(_logPool)->writeSts();
   delete CpvAccess(_logPool);
@@ -133,7 +144,7 @@ void LogEntry::write(FILE* fp)
 
   switch (type) {
     case USER_EVENT:
-      fprintf(fp, "%d %u %d %d", mIdx, (int) (time*1.0e6), event, pe);
+      fprintf(fp, "%d %u %d %d\n", mIdx, (UInt) (time*1.0e6), event, pe);
       break;
 
     case BEGIN_IDLE:
@@ -142,28 +153,28 @@ void LogEntry::write(FILE* fp)
     case END_PACK:
     case BEGIN_UNPACK:
     case END_UNPACK:
-      fprintf(fp, "%u %d", (int) (time*1.0e6), pe);
+      fprintf(fp, "%u %d\n", (UInt) (time*1.0e6), pe);
       break;
 
     case CREATION:
     case BEGIN_PROCESSING:
     case END_PROCESSING:
-      fprintf(fp, "%d %d %u %d %d", mIdx, eIdx, (int) (time*1.0e6), event, pe);
+      fprintf(fp, "%d %d %u %d %d\n", mIdx, eIdx, (UInt) (time*1.0e6), event, pe);
       break;
 
     case ENQUEUE:
     case DEQUEUE:
-      fprintf(fp, "%d %u %d %d", mIdx, (int) (time*1.0e6), event, pe);
+      fprintf(fp, "%d %u %d %d\n", mIdx, (UInt) (time*1.0e6), event, pe);
       break;
 
     case BEGIN_INTERRUPT:
     case END_INTERRUPT:
-      fprintf(fp, "%u %d %d", (int) (time*1.0e6), event, pe);
+      fprintf(fp, "%u %d %d\n", (UInt) (time*1.0e6), event, pe);
       break;
 
     case BEGIN_COMPUTATION:
     case END_COMPUTATION:
-    fprintf(fp, "%u", (int) (time*1.0e6));
+    fprintf(fp, "%u\n", (UInt) (time*1.0e6));
       break;
 
     default:
@@ -177,16 +188,51 @@ void TraceProjections::userEvent(int e)
   CpvAccess(_logPool)->add(USER_EVENT, e, -1, CmiTimer(),curevent++,CmiMyPe());
 }
 
-void TraceProjections::creation(envelope *e)
+void TraceProjections::creation(envelope *e, int num)
 {
+  if(e==0) {
+    setEvent(CpvAccess(curThread),curevent);
+    CpvAccess(_logPool)->add(CREATION,ForChareMsg,_threadEP,CmiTimer(),
+                             curevent++,CmiMyPe());
+  } else {
+    int type=e->getMsgtype();
+    e->setEvent(curevent);
+    for(int i=0; i<num; i++) {
+      CpvAccess(_logPool)->add(CREATION,type,e->getEpIdx(),CmiTimer(),
+                               curevent+i,CmiMyPe());
+    }
+    curevent += num;
+  }
 }
 
 void TraceProjections::beginExecute(envelope *e)
 {
+  if(e==0) {
+    execEvent = getEvent(CpvAccess(curThread));
+    execEp = (-1);
+    CpvAccess(_logPool)->add(BEGIN_PROCESSING,ForChareMsg,_threadEP,CmiTimer(),
+                             execEvent,CmiMyPe());
+  } else {
+    execEvent = e->getEvent();
+    int type=e->getMsgtype();
+    if(type==BocInitMsg)
+      execEvent += CmiMyPe();
+    execPe = e->getSrcPe();
+    execEp = e->getEpIdx();
+    CpvAccess(_logPool)->add(BEGIN_PROCESSING,type,execEp,CmiTimer(),
+                             execEvent,execPe);
+  }
 }
 
 void TraceProjections::endExecute(void)
 {
+  if(execEp == (-1)) {
+    CpvAccess(_logPool)->add(END_PROCESSING,0,_threadEP,CmiTimer(),
+                             execEvent,CmiMyPe());
+  } else {
+    CpvAccess(_logPool)->add(END_PROCESSING,0,execEp,CmiTimer(),
+                             execEvent,execPe);
+  }
 }
 
 void TraceProjections::beginIdle(void)
@@ -237,6 +283,11 @@ void TraceProjections::dequeue(envelope *e)
 
 void TraceProjections::beginComputation(void)
 {
+  if(CmiMyRank()==0) {
+    _threadMsg = CkRegisterMsg("dummy_thread_msg", 0, 0, 0, 0);
+    _threadChare = CkRegisterChare("dummy_thread_chare", 0);
+    _threadEP = CkRegisterEp("dummy_thread_ep", 0, _threadMsg,_threadChare);
+  }
   CpvAccess(_logPool)->add(BEGIN_COMPUTATION, -1, -1, CmiTimer(), -1, -1);
 }
 

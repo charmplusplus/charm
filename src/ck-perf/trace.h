@@ -10,7 +10,7 @@ class envelope;
 class Trace {
   public:
     virtual void userEvent(int e) {}
-    virtual void creation(envelope *e) {}
+    virtual void creation(envelope *e, int num=1) {}
     virtual void beginExecute(envelope *e) {}
     virtual void endExecute(void) {}
     virtual void beginIdle(void) {}

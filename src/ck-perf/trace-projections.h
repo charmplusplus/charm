@@ -89,10 +89,13 @@ class LogPool {
 
 class TraceProjections : public Trace {
     int curevent;
+    int execEvent;
+    int execEp;
+    int execPe;
   public:
     TraceProjections() { curevent=0; }
     void userEvent(int e);
-    void creation(envelope *e);
+    void creation(envelope *e, int num=1);
     void beginExecute(envelope *e);
     void endExecute(void);
     void beginIdle(void);
