@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.12  1995-09-06 21:48:50  jyelon
+ * Revision 2.13  1995-10-11 17:54:40  sanjeev
+ * fixed Charm++ chare creation
+ *
+ * Revision 2.12  1995/09/06  21:48:50  jyelon
  * Eliminated 'CkProcess_BocMsg', using 'CkProcess_ForChareMsg' instead.
  *
  * Revision 2.11  1995/09/01  02:13:17  jyelon
@@ -272,7 +275,9 @@ int sizeData, magic, kind;
   SetID_onPE(p->selfID, CmiMyPe());
   SetID_chareBlockPtr(p->selfID, p);
   p->charekind = kind;
-  p->chareptr = ((void *)(p->data));
+
+  /* the chare data area is just after the chare-block, by default */
+  p->chareptr = (void *)(p+1); 
   return((void *) p);
 }
 

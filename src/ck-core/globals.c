@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.9  1995-09-30 15:02:25  jyelon
+ * Revision 2.10  1995-10-11 17:54:40  sanjeev
+ * fixed Charm++ chare creation
+ *
+ * Revision 2.9  1995/09/30  15:02:25  jyelon
  * Fixed a missing CpvInitialize.
  *
  * Revision 2.8  1995/09/20  15:41:27  gursoy
@@ -101,7 +104,6 @@ CsvDeclare(EP_STRUCT*, EpInfoTable);
 CsvDeclare(MSG_STRUCT*, MsgToStructTable);
 CsvDeclare(PSEUDO_STRUCT*, PseudoTable);
 CsvDeclare(int*, ChareSizesTable);
-CsvDeclare(FUNCTION_PTR*, ChareFnTable);
 CsvDeclare(char**, ChareNamesTable);
 
 CpvDeclare(int, msgs_processed);

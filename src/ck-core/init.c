@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.27  1995-09-30 14:49:36  jyelon
+ * Revision 2.28  1995-10-11 17:52:51  sanjeev
+ * fixed Charm++ chare creation
+ *
+ * Revision 2.27  1995/09/30  14:49:36  jyelon
  * fixed bug: only PE's of rank 0 were registering their handlers.
  *
  * Revision 2.26  1995/09/29  09:51:12  jyelon
@@ -156,8 +159,6 @@ CsvStaticDeclare(void **, _CK_9_ReadMsgTable);	/* was previously global */
 
 CpvDeclare(char*, ReadBufIndex);
 CpvDeclare(char*, ReadFromBuffer);
-
-CsvExtern(FUNCTION_PTR*,  ChareFnTable);
 
 #define BLK_LEN 512
 CpvStaticDeclare(BOCINIT_QUEUE*, BocInitQueueHead);
@@ -382,13 +383,8 @@ FUNCTION_PTR donehandler;
 			CreateChareBlock(CpvAccess(MainDataSize),
 						CHAREKIND_CHARE, rand());
 
-		if (CsvAccess(MainChareLanguage) == CHARMPLUSPLUS) {
-			CpvAccess(mainChareBlock)->chareptr = (void *)
-						((CsvAccess(ChareFnTable)
-					      [CsvAccess(_CK_MainChareIndex)])
-						(CpvAccess(mainChareBlock)));
+		if (CsvAccess(MainChareLanguage) == CHARMPLUSPLUS) 
 			CPlus_SetMainChareID() ;  /* set mainhandle */
-		}
 
 
 		/* Calling CharmInit entry point */
@@ -533,14 +529,11 @@ ENVELOPE       *envelope;
   int             current_chare = current_epinfo->chareindex;
   int             current_magic = rand();
 
-  bocBlock = CreateChareBlock(CsvAccess(ChareSizesTable)[current_chare], 
+  CpvAccess(currentChareBlock) = bocBlock = 
+		CreateChareBlock(CsvAccess(ChareSizesTable)[current_chare], 
 					CHAREKIND_BOCNODE, current_magic);
   bocBlock->x.boc_num = current_bocnum;
-  if ( current_epinfo->language != CHARMPLUSPLUS ) 
-    bocBlock->chareptr = (void *) (bocBlock + 1) ; 
-  else
-    bocBlock->chareptr = (void *)((CsvAccess(ChareFnTable)[current_chare])
-						(bocBlock)) ;
+
   SetBocBlockPtr(current_bocnum, bocBlock);
   trace_begin_execute(envelope);
   (current_epinfo->function)(usrMsg, bocBlock->chareptr);
@@ -734,14 +727,11 @@ InitializeEPTables()
     CmiSvAlloc((TotalChares + 1) * sizeof(int));
   
   CsvAccess(ChareNamesTable) = (char **) CmiSvAlloc(TotalChares * sizeof(char *));
-  CsvAccess(ChareFnTable) = (FUNCTION_PTR *) 
-    CmiSvAlloc((TotalChares + 1) * sizeof(FUNCTION_PTR));
   
   if (TotalChares > 0)
     {
       CkMemError(CsvAccess(ChareSizesTable));
       CkMemError(CsvAccess(ChareNamesTable));
-      CkMemError(CsvAccess(ChareFnTable));
     }
   
   CsvAccess(PseudoTable) = (PSEUDO_STRUCT *) 

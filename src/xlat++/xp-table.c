@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.9  1995-10-03 19:53:33  sanjeev
+ * Revision 2.10  1995-10-11 17:55:49  sanjeev
+ * fixed Charm++ chare creation
+ *
+ * Revision 2.9  1995/10/03  19:53:33  sanjeev
  * new BOC syntax
  *
  * Revision 2.8  1995/09/26  22:39:17  sanjeev
@@ -1185,29 +1188,51 @@ int defined ;
 	char *begin ;
 
 	if ( CurrentAggType==CHARE || CurrentAggType==BRANCHED ) {
-                if ( CurrentAccess == ENTRY )
-                        ProcessEP(name,defined);
-                else if ( strcmp(CurrentChare,"main")==0 &&
-                          strcmp(name,"main")==0 )
-                {       /* replace main by _CK_main */
+                if (CurrentAccess == ENTRY  || 
+                    (strcmp(CurrentChare,"main")==0 && strcmp(name,"main")==0))
+		{
+			/**
                         char *sptr = Mystrstr(OutBuf,name) ;
 			char save[1024] ;
 			strcpy(save,sptr) ;
                         *sptr = '\0' ;
                         strcat(OutBuf,"void _CK") ;
 			strcat(OutBuf,save) ;
+			**/
+
+			/*** Insert calls to constructors for 
+			   groupmember/_CK_Object : not needed because
+			   the default constructors are called automatically 
+			if ( defined && CurrentAggType == CHARE ) {
+				int i = FoundInChareTable(ChareTable,
+						charecount+1,name) ;
+				ChareInfo *chare = ChareTable[i] ;
+				if ( chare->parents == NULL ) 
+					strcat(OutBuf," : _CK_Object() ") ;
+			}
+			else if ( defined ) {
+				int i = FoundInChareTable(BOCTable,
+						boccount+1,name) ;
+				ChareInfo *chare = BOCTable[i] ;
+				if ( chare->parents == NULL ) 
+					strcat(OutBuf," : groupmember() ") ;
+			}
+			***/
+
                         ProcessEP(name,defined);
                 }
         }
+
+/**** _CKmain not needed any longer  - Sanjeev 10/10/95
 	else if ( (begin=Mystrstr(OutBuf,"main::main")) != NULL ) {
-	/* constructor definition outside the chare body */
+	* constructor definition outside the chare body *
                 char save[1024] ;
 		strcpy(save,begin) ;
 		*begin = '\0' ;
 		strcat(OutBuf,"void main::_CKmain") ;
                 strcat(OutBuf,save+10) ;
 	}
-
+****/
 }
 
 

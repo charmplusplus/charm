@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.5  1995-10-02 20:43:11  knauff
+ * Revision 2.6  1995-10-11 17:54:40  sanjeev
+ * fixed Charm++ chare creation
+ *
+ * Revision 2.5  1995/10/02  20:43:11  knauff
  * Added return value to new operator.
  *
  * Revision 2.4  1995/09/26  19:46:35  sanjeev
@@ -75,6 +78,36 @@ comm_object::operator new(int size)
 	CmiPrintf("[%d] ERROR: wrong new operator for message allocation\n",CmiMyPe()) ;
 	return (void *)0;
 }
+
+void *
+_CK_Object::operator new(int size) 
+{
+	CmiPrintf("[%d] ERROR: wrong new operator for chare object allocation\n",CmiMyPe()) ;
+	return (void *)0;
+}
+
+void * 
+_CK_Object::operator new(int size, void *buf) 
+{
+        return buf ;
+}
+
+
+_CK_Object::_CK_Object() {
+        CHARE_BLOCK *chareblock = CpvAccess(currentChareBlock) ;
+        SetID_onPE(thishandle, CmiMyPe());
+        SetID_chare_magic_number(thishandle,GetID_chare_magic_number(chareblock->selfID)) ;
+        SetID_chareBlockPtr(thishandle, chareblock);
+}
+
+groupmember::groupmember()
+{
+        CHARE_BLOCK *cblock = CpvAccess(currentChareBlock) ;
+        thisgroup = cblock->x.boc_num ;
+}
+
+
+
 
 void CPlus_ChareExit()
 {

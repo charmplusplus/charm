@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.3  1995-10-03 19:53:33  sanjeev
+ * Revision 2.4  1995-10-11 17:55:49  sanjeev
+ * fixed Charm++ chare creation
+ *
+ * Revision 2.3  1995/10/03  19:53:33  sanjeev
  * new BOC syntax
  *
  * Revision 2.2  1995/09/07  18:58:15  sanjeev
@@ -267,23 +270,25 @@ void GenerateStructsFns()
 			fprintf(epfile,"\tint _CK_ep_%s_%s =0 ;\n",chare->name,ep->epname) ;
 			if (thisismain && strcmp(ep->epname,"main")==0) {
         			foundMain = 1 ;
-                		fprintf(outfile,"\nextern \"C\" void _CK_call_main_main(void *junk, _CK_Object *obj, int argc, char *argv[]) ;\n");
-                		fprintf(outfile,"\nvoid _CK_call_main_main(void *junk, _CK_Object *obj, int argc, char *argv[])\n{\n");
-                		if ( main_argc_argv )
-                       			fprintf(outfile,"\t((main *)obj)->_CKmain(argc,argv) ;\n") ;
+                		fprintf(outfile,"\nextern \"C\" void _CK_call_main_main(void *junk, void *obj, int argc, char *argv[]) ;\n");
+                		fprintf(outfile,"\nvoid _CK_call_main_main(void *junk, void *obj, int argc, char *argv[])\n{\n");
+                		if ( main_argc_argv ) {
+                       		/* 	fprintf(outfile,"\t((main *)obj)->_CKmain(argc,argv) ;\n") ;	*/
+                                        fprintf(outfile,"\tnew (obj) main(argc,argv) ;\n}\n") ;
+				}
                 		else {
                        			fprintf(outfile,"\targc = 0 ;\n") ;
                        			fprintf(outfile,"\targv = NULL ;\n") ;
-                       			fprintf(outfile,"\t((main *)obj)->_CKmain() ;\n") ;
+                       		/*	fprintf(outfile,"\t((main *)obj)->_CKmain() ;\n") ; */
+                                        fprintf(outfile,"\tnew (obj) main() ;\n}\n") ;
                 		}
-				fprintf(outfile,"}\n") ;
 			}
 			else {
-				fprintf(outfile,"extern \"C\" void _CK_call_%s_%s(void *m, _CK_Object *obj) ;\n",chare->name,ep->epname) ;
-				fprintf(outfile,"void _CK_call_%s_%s(void *m, _CK_Object *obj)\n{\n",chare->name,ep->epname) ;
-                                if ( strcmp(chare->name, ep->epname) == 0 )
-                                        /* CC cribs about calling the constructor, so we use it as a conversion function */
-                                        fprintf(outfile,"\t*((%s *)obj) = (%s *)m ;\n}\n",chare->name,ep->msgname) ;
+				fprintf(outfile,"extern \"C\" void _CK_call_%s_%s(void *m, void *obj) ;\n",chare->name,ep->epname) ;
+				fprintf(outfile,"void _CK_call_%s_%s(void *m, void *obj)\n{\n",chare->name,ep->epname) ;
+                                if ( strcmp(chare->name, ep->epname) == 0 ) 
+					/* This is the constructor EP */
+                                        fprintf(outfile,"\tnew (obj) %s((%s *)m) ;\n}\n",chare->name,ep->msgname) ;
                                 else
 					fprintf(outfile,"\t((%s *)obj)->%s((%s *)m) ;\n}\n",chare->name,ep->epname,ep->msgname) ;
 			}
@@ -294,11 +299,13 @@ void GenerateStructsFns()
 				fprintf(epfile,"\textern int _CK_ep_%s_%s ;\n",chare->name,ep->epname) ;
 		}
 
+		/****
 		if ( chare->eps->defined ) {
 	    	    fprintf(outfile,"extern \"C\" _CK_Object *_CK_create_%s(CHARE_BLOCK *c) ;\n",chare->name) ;
 	    	    fprintf(outfile,"_CK_Object *_CK_create_%s(CHARE_BLOCK *c) {\n",chare->name) ;
 	    	    fprintf(outfile,"\treturn(new %s(c)) ;\n}\n\n",chare->name);
 		}
+		****/
 	}
 
 
@@ -311,11 +318,12 @@ void GenerateStructsFns()
 			for  ( ep=chare->eps; ep!=NULL; ep=ep->next,TotalEps++)
 			{
 				fprintf(epfile,"\tint _CK_ep_%s_%s =0 ;\n",chare->name,ep->epname) ;
-				fprintf(outfile,"extern \"C\" void _CK_call_%s_%s(void *m, _CK_Object *obj) ;\n", chare->name,ep->epname) ;
-				fprintf(outfile,"void _CK_call_%s_%s(void *m, _CK_Object *obj)\n{\n", chare->name,ep->epname) ;
+				fprintf(outfile,"extern \"C\" void _CK_call_%s_%s(void *m, void *obj) ;\n", chare->name,ep->epname) ;
+				fprintf(outfile,"void _CK_call_%s_%s(void *m, void *obj)\n{\n", chare->name,ep->epname) ;
 
                                 if ( strcmp(chare->name, ep->epname) == 0 )
-                                        fprintf(outfile,"\t*((%s *)obj) = (%s *)m ;\n}\n",chare->name,ep->msgname) ;
+					/* Constructor EP */
+                                        fprintf(outfile,"\tnew (obj) %s((%s *)m) ;\n}\n",chare->name,ep->msgname) ;
                                 else
 					fprintf(outfile,"\t((%s *)obj)->%s((%s *)m) ;\n}\n", chare->name,ep->epname,ep->msgname) ;
 			}
@@ -325,11 +333,13 @@ void GenerateStructsFns()
 				fprintf(epfile,"\textern int _CK_ep_%s_%s ;\n",chare->name,ep->epname) ;
 		}
 
+		/****
 		if ( chare->eps->defined ) {
 	    	    fprintf(outfile,"extern \"C\" groupmember *_CK_create_%s(CHARE_BLOCK *c) ;\n",chare->name) ;
 	    	    fprintf(outfile,"groupmember *_CK_create_%s(CHARE_BLOCK *c) {\n",chare->name) ;
 	    	    fprintf(outfile,"\treturn(new %s(c)) ;\n}\n\n",chare->name) ;
 		}
+		****/
 	}
 
 /* Output all acc and mono names */
@@ -500,7 +510,8 @@ void GenerateRegisterCalls()
 			continue ;
 		if ( !chare->eps->defined ) 
 			continue ;
-		fprintf(outfile,"_CK_chare_%s = registerChare(\"%s\", 0, (FUNCTION_PTR)&_CK_create_%s) ;\n\n",chare->name,chare->name,chare->name) ;
+
+		fprintf(outfile,"_CK_chare_%s = registerChare(\"%s\", sizeof(%s), NULL) ;\n\n",chare->name,chare->name,chare->name) ;
 
                 for  ( ep=chare->eps; ep!=NULL; ep=ep->next ) {
 			if ( j == 0 ) 

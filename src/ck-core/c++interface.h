@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.15  1995-10-03 19:54:21  sanjeev
+ * Revision 2.16  1995-10-11 17:54:40  sanjeev
+ * fixed Charm++ chare creation
+ *
+ * Revision 2.15  1995/10/03  19:54:21  sanjeev
  * new BOC syntax
  *
  * Revision 2.14  1995/09/26  19:46:46  sanjeev
@@ -258,13 +261,11 @@ class _CK_Object {
 public:
 	ChareIDType thishandle ;   
 
-	_CK_Object() {}
+	_CK_Object() ;
 
-	_CK_Object(CHARE_BLOCK *chareblock) {
-        	SetID_onPE(thishandle, CmiMyPe());
-        	SetID_chare_magic_number(thishandle,GetID_chare_magic_number(chareblock->selfID)) ;
-        	SetID_chareBlockPtr(thishandle, chareblock);
-	}
+        void * operator new(int size) ;
+ 
+        void * operator new(int size, void *buf) ;
 } ;
 
 
@@ -273,12 +274,7 @@ class groupmember : public _CK_Object {  /* top level BOC object */
 public:
 	int thisgroup ;  /* stores BocNum */
 
-	groupmember() {}
-
-	groupmember(CHARE_BLOCK *cblock) : _CK_Object(cblock)
-	{
-		thisgroup = cblock->x.boc_num ;
-	}
+	groupmember() ;
 } ;
 
 

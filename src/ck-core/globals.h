@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.11  1995-09-20 16:07:56  jyelon
+ * Revision 2.12  1995-10-11 17:52:51  sanjeev
+ * fixed Charm++ chare creation
+ *
+ * Revision 2.11  1995/09/20  16:07:56  jyelon
  * fyab
  *
  * Revision 2.10  1995/09/20  15:40:58  gursoy
@@ -92,7 +95,6 @@ CsvExtern(FUNCTION_PTR*, ROCopyToBufferTable);
 CsvExtern(EP_STRUCT*, EpInfoTable);
 CsvExtern(MSG_STRUCT*, MsgToStructTable); 
 CsvExtern(int*,  ChareSizesTable);
-CsvExtern(FUNCTION_PTR*,  ChareFnTable);
 CsvExtern(PSEUDO_STRUCT*, PseudoTable);
 
 CsvExtern(char**, ChareNamesTable);

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.20  1995-09-29 09:51:12  jyelon
+ * Revision 2.21  1995-10-11 17:54:40  sanjeev
+ * fixed Charm++ chare creation
+ *
+ * Revision 2.20  1995/09/29  09:51:12  jyelon
  * Many small corrections.
  *
  * Revision 2.19  1995/09/20  16:36:26  jyelon
@@ -195,23 +198,24 @@ ENVELOPE *env;
   current_usr = USER_MSG_PTR(env);
   current_msgType = GetEnv_msgType(env);
   current_magic = CpvAccess(nodecharesProcessed)++;
-  current_block = CreateChareBlock(
-			CsvAccess(ChareSizesTable)[current_chare],
-			CHAREKIND_CHARE, current_magic);
-  if ( current_epinfo->language!=CHARMPLUSPLUS )
-    current_block->chareptr = current_block + 1 ;
-  else
-    current_block->chareptr = (void *)((CsvAccess(ChareFnTable)[current_chare])
-						(current_block));
-  CpvAccess(currentChareBlock) = current_block;
+  CpvAccess(currentChareBlock) = current_block = CreateChareBlock(
+				    CsvAccess(ChareSizesTable)[current_chare],
+				    CHAREKIND_CHARE, current_magic);
 
   /* If virtual block exists, get all messages for this chare	*/
   if (GetEnv_vidBlockPtr(env))
     VidRetrieveMessages(current_block,
 	    GetEnv_vidPE(env),
 	    GetEnv_vidBlockPtr(env));
-  
-  /* run the entry point */
+
+  /* Now call the entry point : For Charm, this is the actual call to the 
+     EP function. For Charm++, this is a call to the translator-generated
+     stub function which does "new ChareType(msg)". 
+     NOTE: CreateChareBlock sets current_block->chareptr to (current_block + 1)
+     because ChareSizesTable[] holds the correct size of the chare for both 
+     Charm and Charm++, so it allocates the correct amount of space.
+     - Sanjeev 10/10/95 */
+
   trace_begin_execute(env);
   (current_epinfo->function)(current_usr, current_block->chareptr);
   trace_end_execute(current_magic, current_msgType, current_ep);

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.6  1995-09-07 21:21:38  jyelon
+ * Revision 2.7  1995-10-11 17:52:51  sanjeev
+ * fixed Charm++ chare creation
+ *
+ * Revision 2.6  1995/09/07  21:21:38  jyelon
  * Added prefixes to Cpv and Csv macros, fixed bugs thereby revealed.
  *
  * Revision 2.5  1995/07/27  20:29:34  jyelon
@@ -150,7 +153,6 @@ FUNCTION_PTR createfn ;
 	CsvAccess(ChareSizesTable)[CpvAccess(chareCount)] = dataSz ;
 	CsvAccess(ChareNamesTable)[CpvAccess(chareCount)] = 
                              (char *)CmiSvAlloc(strlen(name)*sizeof(char)+1);
-	CsvAccess(ChareFnTable)[CpvAccess(chareCount)] = createfn ;
 
         strcpy(CsvAccess(ChareNamesTable)[CpvAccess(chareCount)], name) ;
 	CpvAccess(chareCount)++ ;
