@@ -1017,24 +1017,25 @@ void nodeinfo_add(const ChSingleNodeinfo *in,SOCKET ctrlfd)
 {
 	int node=ChMessageInt(in->nodeNo);
 	ChNodeinfo i=in->info;
-	int nt,pe;
+	int nt,pe,dataport;
 	if (node<0 || node>=nodetab_rank0_size)
 		{fprintf(stderr,"Unexpected node %d registered!\n",node);exit(1);}
 	nt=nodetab_rank0_table[node];/*Nodetable index for this node*/
 	i.nPE=ChMessageInt_new(nodetab_cpus(nt));
 	i.IP=nodetab_ip(nt);
-	if (0==ChMessageInt(i.dataport))
+        dataport = ChMessageInt(i.dataport);
+	if (0==dataport)
 		{fprintf(stderr,"Node %d could not initialize network!\n",node);exit(1);}
 	nodeinfo_arr[node]=i;
 	for (pe=0;pe<nodetab_cpus(nt);pe++)
 	  {
-	    nodetab_table[nt+pe]->dataport=ChMessageInt(i.dataport);
+	    nodetab_table[nt+pe]->dataport=dataport;
 	    nodetab_table[nt+pe]->ctrlfd=ctrlfd;
 	  }
         if (arg_verbose) {
 	  char ips[200];
 	  skt_print_ip(ips,nodetab_ip(nt));
-	  printf("Charmrun> client %d connected (IP=%s)\n", nt, ips);
+	  printf("Charmrun> client %d connected (IP=%s data_port=%d)\n", nt, ips, dataport);
 	}
 }
 
