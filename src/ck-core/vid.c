@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.13  1998-02-27 11:52:24  jyelon
+ * Revision 2.14  1998-03-18 15:38:14  milind
+ * Fixed a memory leak caused by vid_queue not being destroyed.
+ *
+ * Revision 2.13  1998/02/27 11:52:24  jyelon
  * Cleaned up header files, replaced load-balancer.
  *
  * Revision 2.12  1998/01/28 17:52:51  milind
@@ -169,6 +172,7 @@ void *data_area;
 		   CpvAccess(CkInfo_Index), CpvAccess(CkPack_Index));
 	QDCountThisCreation(GetEnv_EP(env), USERcat, ForChareMsg, 1);
    }
+   FIFO_Destroy(vidqueue);
    vidblock->charekind = CHAREKIND_FVID;
    vidblock->x.realID = ID;
 }
