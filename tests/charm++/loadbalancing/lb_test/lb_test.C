@@ -113,8 +113,11 @@ static const struct {
 static void programBegin(void *dummy,int size,void *data)
 {
   //Start everybody computing
+/*
   for (int i=0;i<element_count;i++)
     hproxy[i].ForwardMessages();
+*/
+  hproxy.ForwardMessages();
 }
 
 main::main(CkArgMsg *m) 
