@@ -133,7 +133,6 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   Cmi_usched = usched;
   Cmi_initret = initret;
   Cmi_startFn = fn;
-  Cmi_argc = argc;
 
   CmiGetArgInt(argv,"+p",&Cmi_numpes);
   if (Cmi_numpes <= 0)
@@ -158,6 +157,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   /* suggest to IRIX that we actually use the right number of processors */
   pthread_setconcurrency(Cmi_numpes);
 
+  Cmi_argc = CmiGetArgc(argv);
   aThread = (pthread_t *) CmiAlloc(sizeof(pthread_t) * Cmi_numpes);
   for(i=1; i<Cmi_numpes; i++) {
     usrparam = (USER_PARAMETERS *) CmiAlloc(sizeof(USER_PARAMETERS));
@@ -213,7 +213,7 @@ void CmiNotifyIdle()
   McQueue *queue = MsgQueue[CmiMyPe()];
   struct timespec ts;
   pthread_mutex_lock(&(queue->mutex));
-  if(!queue->len){
+  if(CdsFifo_Empty(queue->q)){
     queue->waiting++;
     ts.tv_sec = (time_t) 0;
     ts.tv_nsec = 10000000L;
