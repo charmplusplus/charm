@@ -2092,6 +2092,9 @@ int HypercubeGetBcastDestinations(int k, int *dest_pes) {
 *
 ****************************************************************************/
 
+int _immediateLock = 0; /* if locked, all immediate message handling will be delayed. */
+int _immediateFlag = 0; /* if set, there is delayed immediate message. */
+
 CpvDeclare(int, CmiImmediateMsgHandlerIdx); /* Main handler that is run on every node */
 
 /* xdl is the real handler */

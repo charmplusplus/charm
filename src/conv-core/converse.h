@@ -334,10 +334,14 @@ extern int _immediateLock;
 extern int _immediateFlag;
 #define CmiCreateImmediateLock() (0)
 #define CmiImmediateLock(ignored) { _immediateLock++; }
+#if CMK_IMMEDIATE_MSG
 #define CmiImmediateUnlock(ignored) \
   { _immediateLock--; \
     if(_immediateFlag) \
       CmiProbeImmediateMsg(); } 
+#else
+#define CmiImmediateUnlock(ignored) { _immediateLock--; }
+#endif
 #define CmiCheckImmediateLock(ignored) \
   ((_immediateLock)?((_immediateFlag=1),1):0)
 #define CmiClearImmediateFlag() { _immediateFlag=0; }

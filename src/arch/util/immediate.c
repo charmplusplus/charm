@@ -16,10 +16,8 @@ int _immediateReady = 0;
 
 int _immRunning=0; /* if set, somebody's inside an immediate message */
 
-#if CMK_SHARED_VARS_UNAVAILABLE /* SMP and all other weird versions */
-int _immediateLock = 0; /* if locked, all immediate message handling will be delayed. */
-int _immediateFlag = 0; /* if set, there is delayed immediate message. */
-#endif
+/* _immediateLock and _immediateFlag declared in convcore.c 
+   for machine layers with CMK_IMMEDIATE_MSG=0   */ 
 
 #if CMK_IMMEDIATE_MSG
 
