@@ -165,14 +165,16 @@ void GenerateStructsFns(ofstream& top, ofstream& bot)
 	} // endfor c =
 
 
+	ReadOnly *r;
 	/* Output ids for readonly messages */
-        for ( ReadOnly *r=thismodule->readonlys; r!=NULL; r=r->next ) 
+        for ( r=thismodule->readonlys; r!=NULL; r=r->next ) 
 		if ( r->ismsg )
 			top << "int _CK_index_" << r->name << ";" << endl ;
 
 
+	Message *m;
 	/* Output ids for message types */
-        for ( Message *m=thismodule->messages; m!=NULL; m=m->next ) 
+        for ( m=thismodule->messages; m!=NULL; m=m->next ) 
 		top << "int _CK_msg_" << m->name << "=0;" << endl ;
 
 
@@ -321,7 +323,8 @@ if (moduleHasMain)
 /* now register readonlies and readonli messages */
         sprintf(str,"int readonlysize=0 ;\n") ;
 	bot << str ;
-	for ( ReadOnly *r=thismodule->readonlys; r!=NULL; r=r->next ) {
+	ReadOnly *r;
+	for ( r=thismodule->readonlys; r!=NULL; r=r->next ) {
 		if ( r->ismsg )
 			continue ;
                 sprintf(str,"readonlysize += sizeof(%s) ;\n",r->name) ;
