@@ -44,10 +44,10 @@ importDefinition
 typeDefinition[AST parent]
 	:	#(c:CLASS_DEF modifiers IDENT { J.tmp.push(#IDENT.getText()); } extendsClause implementsClause
             o:objBlock {
-                if ( ((ASTJ)o).hasMain() ) {
-                    ((ASTJ)c).status = true; // is a mainchare
-                    ((ASTJ)parent).status = true; // is a mainmodule
-                }
+//                 if ( ((ASTJ)o).hasMain() ) {
+//                     ((ASTJ)c).status = true; // is a mainchare
+//                     ((ASTJ)parent).status = true; // is a mainmodule
+//                 }
             }
         ) { J.tmp.pop(); }
 	|	#(INTERFACE_DEF modifiers IDENT extendsClause interfaceBlock )
@@ -59,6 +59,7 @@ typeSpec
 
 typeSpecArray
 	:	#( ARRAY_DECLARATOR typeSpecArray )
+    |   #( TEMPLATE typeSpecArray )
 	|	type
 	;
 
@@ -93,7 +94,7 @@ modifier
     |   "native"
     |   "threadsafe"
     |   "synchronized"
-    |   "const"
+//     |   "const"
     |   "volatile"
 	|	"strictfp"
 	|	"threaded"
@@ -198,9 +199,13 @@ throwsClause
 	:	#( "throws" (identifier)* )
 	;
 
+templater
+    :  #( TEMPLATE (identifier)+ )
+    ;
+
 identifier
-	:	IDENT
-	|	#( DOT identifier IDENT )
+	:	#( IDENT (templater)? )
+	|	#( DOT identifier #( IDENT (templater)? ) )
 	;
 
 identifierStar

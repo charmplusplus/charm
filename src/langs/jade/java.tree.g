@@ -22,7 +22,7 @@ import java.io.FileWriter;
 
 class JavaTreeParser extends TreeParser;
 options {
-	importVocab = Java;
+	importVocab = JavaTreeParser2;
 }
 {
 // Class Members
@@ -103,6 +103,11 @@ typeDefinition
             m:modifiers
             IDENT { J.tmp.push(#IDENT.getText()); }
             e:extendsClause {
+
+                if (((ASTJ)c).status)
+                    System.out.println("pass3: " + #IDENT.getText() + "is main");
+                else
+                    System.out.println("pass3: " + #IDENT.getText() + "is NOT main");
 
                 //{ //((ASTJ)#IDENT).genID(J.h);
                 if (J.isX(m, "synchronized")) { // is a chare
@@ -662,16 +667,14 @@ throwsClause
 	:	#( "throws" (identifier)* )
 	;
 
-identifier // done as part of printExpression
-	:	IDENT {
-//             if (J.isChare()) J.ci.append(#IDENT.getText());
-//             J.c.append(#IDENT.getText());
-        }
-	|	#( DOT identifier IDENT {
-//             if (J.isChare()) J.ci.append("." + #IDENT.getText());
-//             J.c.append("." + #IDENT.getText());
-            }
-        )
+templater
+    :  #( TEMPLATE (identifier)+ )
+    ;
+
+// done as part of printExpression
+identifier
+	:	#( IDENT (templater)? )
+	|	#( DOT identifier #( IDENT (templater)? ) )
 	;
 
 identifierStar

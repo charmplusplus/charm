@@ -8,6 +8,7 @@ package jade;
 {
 //class preamble
 import jade.JJ.J;
+import jade.JJ.ASTJ;
 }
 
 /** Java 1.3 AST Recognizer Grammar
@@ -19,14 +20,15 @@ import jade.JJ.J;
 class JavaTreeParser2 extends TreeParser;
 
 options {
-	importVocab = Java;
+	importVocab = JavaTreeParser1;
     buildAST = true;
+    ASTLabelType = "ASTJ";
 }
 
 compilationUnit
 	:	(p:packageDefinition)?
 		(importDefinition)*
-		(typeDefinition[p])*
+		(typeDefinition[p_AST])*
         { if (p != null)
             J.tmp.pop();
         }
@@ -42,7 +44,14 @@ importDefinition
 
 typeDefinition[AST parent]
 	:	#(c:CLASS_DEF modifiers IDENT { J.tmp.push(#IDENT.getText()); } extendsClause implementsClause
-            o:objBlock) { J.tmp.pop(); }
+            o:objBlock {
+                if ( ((ASTJ)o).hasMain() ) {
+                    System.out.println("pass2 reached has main");
+                    ((ASTJ)c_AST).status = true; // is a mainchare
+                    ((ASTJ)parent).status = true; // is a mainmodule
+                }
+            }
+        ) { J.tmp.pop(); }
 	|	#(INTERFACE_DEF modifiers IDENT extendsClause interfaceBlock )
 	;
 
@@ -52,6 +61,7 @@ typeSpec
 
 typeSpecArray
 	:	#( ARRAY_DECLARATOR typeSpecArray )
+    |   #( TEMPLATE typeSpecArray )
 	|	type
 	;
 
@@ -86,7 +96,7 @@ modifier
     |   "native"
     |   "threadsafe"
     |   "synchronized"
-    |   "const"
+//     |   "const"
     |   "volatile"
 	|	"strictfp"
 	|	"threaded"
@@ -203,9 +213,13 @@ throwsClause
 	:	#( "throws" (identifier)* )
 	;
 
+templater
+    :  #( TEMPLATE (identifier)+ )
+    ;
+
 identifier
-	:	IDENT
-	|	#( DOT identifier IDENT )
+	:	#( IDENT (templater)? )
+	|	#( DOT identifier #( IDENT (templater)? ) )
 	;
 
 identifierStar
