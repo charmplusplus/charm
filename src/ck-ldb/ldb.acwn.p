@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.7  1995-11-06 21:44:19  milind
+ * Revision 2.8  1995-11-06 22:07:38  milind
+ * Moved ReadInit LdbBocNum from after CreateBoc to in BranchInit
+ *
+ * Revision 2.7  1995/11/06  21:44:19  milind
  * Fixed BranchInit to call CldPeriodicCheckInit().
  *
  * Revision 2.6  1995/11/06  17:55:09  milind
@@ -109,7 +112,6 @@ export_to_C CldCreateBoc()
   DUMMYMSG *msg;
   msg = (DUMMYMSG *)CkAllocMsg(DUMMYMSG);	
   LdbBocNum = CreateBoc(LDB, LDB@BranchInit, msg);
-  ReadInit(LdbBocNum);
 }
 
 export_to_C CldFillLdb(destPe, ldb)
@@ -368,7 +370,9 @@ entry BranchInit : (message DUMMYMSG * dmsg)
 	LDB_ELEMENT *ldb;
 
 	TRACE(CkPrintf("Enter Node LdbInit()\n"));
-	LdbBoc = MyBocNum();
+	LdbBocNum = LdbBoc = MyBocNum();
+	if(CkMyPe()==0)
+		ReadInit(LdbBocInit);
 	CldPeriodicCheckInit();
 	numPe = CkNumPes();
 	myPE = CkMyPe();
