@@ -81,6 +81,7 @@ void PipeBroadcastStrategy::doneInserting(){
     // modify the Handler to deliver the message to the propagator
     envelope *env = UsrToEnv(cmsg->getCharmMessage());
 
+    delete cmsg;
     conversePipeBcast(env, env->getTotalsize());
   }
 }
