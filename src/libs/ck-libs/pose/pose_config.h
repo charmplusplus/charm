@@ -26,7 +26,7 @@
 
 /// Synchronization strategy constants
 #define MAX_ITERATIONS 100  // maximum forward executions per Step call
-#define STORE_RATE 20      // default checkpoint rate: 1 for every n events
+#define STORE_RATE 10       // default checkpoint rate: 1 for every n events
 #define SPEC_WINDOW 50      // speculative event window size
 #define MIN_LEASH 10        // min speculative window for adaptive strategy
 #define MAX_LEASH 50        // max  "     "     "     "        "     "

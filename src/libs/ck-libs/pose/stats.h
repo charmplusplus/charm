@@ -1,5 +1,5 @@
 /// Modest statistics gathering facility for POSE
-/** Counters for: rollbacks, undos, computes, speculative computes,
+/** Counters for: rollbacks, undos, commits, computes, speculative computes,
     and checkpointed bytes; Timers for: rollback, speculative
     computation, total computation, checkpointing time, simulation
     overhead, and gvt overhead, checkpointing overhead and
@@ -29,7 +29,7 @@ public:
   double doTime, rbTime, gvtTime, simTime, cpTime, canTime, lbTime, miscTime, 
     maxDo, minDo, maxGRT;
   long cpBytes;
-  int pe, dos, undos, loops, gvts, maxChkPts, maxGVT;
+  int pe, dos, undos, commits, loops, gvts, maxChkPts, maxGVT;
 };
 
 /// Group to gather stats on a each PE separately
@@ -38,7 +38,7 @@ private:
   /// Current active timer
   short int whichStat;
   /// Counters for various occurrences
-  int rollbacks, dos, undos, loops, gvts, chkPts, maxChkPts;  
+  int rollbacks, dos, undos, commits, loops, gvts, chkPts, maxChkPts;  
   /// Count of bytes checkpointed
   long cpBytes;
   /// Timer start values
@@ -53,7 +53,7 @@ private:
 public:
   /// Basic Constructor
   localStat(void) {
-    whichStat=rollbacks=dos=undos=loops=gvts=cpBytes=chkPts=maxChkPts=
+    whichStat=rollbacks=dos=undos=commits=loops=gvts=cpBytes=chkPts=maxChkPts=
       maxGVT = 0;
     rollbackTime=totalTime=gvtTime=simTime=cpTime=canTime=lbTime=miscTime=
       maxGRT = 0.0;
@@ -70,6 +70,8 @@ public:
   void Do() { dos++; }         
   /// Increment event rollback count
   void Undo() { undos++; }    
+  /// Increment commit count
+  void Commit() { commits++; }    
   /// Increment event loop count
   void Loop() { loops++; }    
   /// Increment GVT estimation count     
@@ -100,8 +102,8 @@ private:
     cpAvg, cpMax, canAvg, canMax, lbAvg, lbMax, miscAvg, miscMax, maxTime;
   double minDo, maxDo, avgDo, GvtTime, maxGRT;
   long cpBytes;
-  int reporting, totalDos, totalUndos, totalLoops, totalGvts, maxChkPts, 
-    maxGVT;
+  int reporting, totalDos, totalUndos, totalCommits, totalLoops, totalGvts, 
+    maxChkPts, maxGVT;
 public:
   /// Basic Constructor
   globalStat(void);

@@ -107,36 +107,42 @@ void eventQueue::ShiftEvent() {
 void eventQueue::CommitEvents(sim *obj, POSE_TimeType ts)
 {
   //sanitize();
-#ifdef POSE_DOP_ON
+#ifdef POSE_STATS_ON
   fpos_t fptr;
   localStat *localStats = (localStat *)CkLocalBranch(theLocalStats);
 #endif
   Event *target = frontPtr->next, *commitPtr = frontPtr->next;
-  if (ts == POSE_UnsetTS) ts = currentPtr->timestamp;  
-  if (ts == POSE_UnsetTS) ts = currentPtr->prev->timestamp;  
+  if (ts == POSE_UnsetTS) {
+    CommitAll(obj);
+    return;
+  }
   ts++;
-
+  
   if (obj->objID->usesAntimethods()) {
     while ((commitPtr->timestamp < ts) && (commitPtr != backPtr) 
 	   && (commitPtr != currentPtr)) {
       obj->ResolveCommitFn(commitPtr->fnIdx, commitPtr->msg); // call commit fn
+#ifdef POSE_STATS_ON      
+      localStats->Commit();
+#endif
 #ifdef POSE_DOP_ON
       if (lastLoggedVT >= commitPtr->svt)
 	commitPtr->svt = commitPtr->evt = -1;
       else lastLoggedVT = commitPtr->evt;
 #if USE_LONG_TIMESTAMPS
-      while (!fprintf(fp, "%f %f %lld %lld\n", commitPtr->srt, commitPtr->ert,
-#else
-      while (!fprintf(fp, "%f %f %d %d\n", commitPtr->srt, commitPtr->ert,
-#endif
-		      commitPtr->svt, commitPtr->evt)) {
+      while (!fprintf(fp, "%f %f %lld %lld\n", commitPtr->srt, commitPtr->ert, commitPtr->svt, commitPtr->evt)) {
 	fsetpos(fp, &fptr);
       }
+#else
+      while (!fprintf(fp, "%f %f %d %d\n", commitPtr->srt, commitPtr->ert, commitPtr->svt, commitPtr->evt)) {
+	fsetpos(fp, &fptr);
+      }
+#endif
       fgetpos(fp, &fptr);
       localStats->SetMaximums(commitPtr->evt, commitPtr->ert);
 #endif
       if (commitPtr->commitBfrLen > 0)  { // print buffered output
-	CkPrintf("%s", commitPtr->commitBfr, ts, commitPtr->timestamp);
+	CkPrintf("%s", commitPtr->commitBfr);
 	if (commitPtr->commitErr) CmiAbort("Commit ERROR");
       }
       if (commitPtr->cpData) delete commitPtr->cpData;
@@ -151,20 +157,25 @@ void eventQueue::CommitEvents(sim *obj, POSE_TimeType ts)
 	   (target != currentPtr)) { // commit upto ts
       while (commitPtr != target) { // commit upto next checkpoint
 	CmiAssert(commitPtr->done == 1); // only commit executed events
+#ifdef POSE_STATS_ON      
+	localStats->Commit();
+#endif
 	obj->ResolveCommitFn(commitPtr->fnIdx, commitPtr->msg); // call commit fn
 #ifdef POSE_DOP_ON
 	if (lastLoggedVT >= commitPtr->svt)
 	  commitPtr->svt = commitPtr->evt = -1;
 	else lastLoggedVT = commitPtr->evt;
 #if USE_LONG_TIMESTAMPS
-	while (!fprintf(fp, "%f %f %lld %lld\n", commitPtr->srt, commitPtr->ert,
-#else	
-	while (!fprintf(fp, "%f %f %d %d\n", commitPtr->srt, commitPtr->ert,
-#endif
+	while (!fprintf(fp, "%f %f %lld %lld\n", commitPtr->srt,commitPtr->ert,
 			commitPtr->svt, commitPtr->evt)) {
-
 	  fsetpos(fp, &fptr);
 	}
+#else	
+	while (!fprintf(fp, "%f %f %d %d\n", commitPtr->srt, commitPtr->ert,
+			commitPtr->svt, commitPtr->evt)) {
+	  fsetpos(fp, &fptr);
+	}
+#endif
 	fgetpos(fp, &fptr);
 	localStats->SetMaximums(commitPtr->evt, commitPtr->ert);
 #endif
@@ -178,13 +189,55 @@ void eventQueue::CommitEvents(sim *obj, POSE_TimeType ts)
       }
       //find next target
       target = target->next;
-      while (!target->cpData && (target->timestamp < ts) && 
-	     (target != backPtr))
+      while (!target->cpData && (target->timestamp <ts) && (target != backPtr))
 	target = target->next;
     }
     commitPtr->prev = frontPtr; // reattach front sentinel node
     frontPtr->next = commitPtr;
   }
+  //  sanitize();
+}
+
+/// Commit (delete) all events
+void eventQueue::CommitAll(sim *obj)
+{
+  //sanitize();
+#ifdef POSE_STATS_ON
+  fpos_t fptr;
+  localStat *localStats = (localStat *)CkLocalBranch(theLocalStats);
+#endif
+  Event *commitPtr = frontPtr->next;
+  
+  while (commitPtr != backPtr) {
+    if (commitPtr->done) {
+      obj->ResolveCommitFn(commitPtr->fnIdx, commitPtr->msg);
+#ifdef POSE_STATS_ON      
+      localStats->Commit();
+#endif
+#ifdef POSE_DOP_ON
+      if (lastLoggedVT >= commitPtr->svt) commitPtr->svt=commitPtr->evt = -1;
+      else lastLoggedVT = commitPtr->evt;
+#if USE_LONG_TIMESTAMPS
+      while (!fprintf(fp, "%f %f %lld %lld\n", commitPtr->srt, commitPtr->ert, commitPtr->svt, commitPtr->evt)) 
+	fsetpos(fp, &fptr);
+#else
+      while (!fprintf(fp, "%f %f %d %d\n", commitPtr->srt, commitPtr->ert, commitPtr->svt, commitPtr->evt))
+	fsetpos(fp, &fptr);
+#endif
+      fgetpos(fp, &fptr);
+      localStats->SetMaximums(commitPtr->evt, commitPtr->ert);
+#endif
+      if (commitPtr->commitBfrLen > 0)  { // print buffered output
+	CkPrintf("%s", commitPtr->commitBfr);
+	if (commitPtr->commitErr) CmiAbort("Commit ERROR");
+      }
+      if (commitPtr->cpData) delete commitPtr->cpData;
+    }
+    commitPtr = commitPtr->next;
+    delete commitPtr->prev; // delete committed event
+  }
+  commitPtr->prev = frontPtr; // reattach front sentinel node
+  frontPtr->next = commitPtr;
   //  sanitize();
 }
 

@@ -40,6 +40,8 @@ class eventQueue {
   void ShiftEvent();               
   /// Commit (delete) events before target timestamp ts
   void CommitEvents(sim *obj, POSE_TimeType ts); 
+  /// Commit (delete) all events
+  void CommitAll(sim *obj); 
   /// Change currentPtr to point to event e
   /** Be very very careful with this -- avoid using if possible */
   void SetCurrentPtr(Event *e);

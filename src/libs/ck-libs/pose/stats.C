@@ -28,6 +28,7 @@ void localStat::SendStats()
   m->pe = CkMyPe();
   m->dos = dos;
   m->undos = undos;
+  m->commits = commits;
   m->loops = loops;
   m->gvts = gvts;
   m->maxChkPts = maxChkPts;
@@ -42,8 +43,8 @@ globalStat::globalStat(void)
   doAvg = doMax = rbAvg = rbMax = gvtAvg = gvtMax = simAvg = simMax = 
     cpAvg = cpMax = canAvg = canMax = lbAvg = lbMax = miscAvg = miscMax = 
     maxTime = maxDo = minDo = avgDo = GvtTime = maxGRT = 0.0; 
-  cpBytes = reporting = totalDos = totalUndos = totalLoops = totalGvts = 
-    maxChkPts = maxGVT = 0;
+  cpBytes = reporting = totalDos = totalUndos = totalCommits = totalLoops = 
+    totalGvts = maxChkPts = maxGVT = 0;
 }
 
 // Receive, calculate and print statistics
@@ -54,6 +55,7 @@ void globalStat::localStatReport(localStatSummary *m)
   // accumulate data from local stats collectors
   totalDos += m->dos;
   totalUndos += m->undos;
+  totalCommits += m->commits;
   totalLoops += m->loops;
   totalGvts += m->gvts;
   maxChkPts += m->maxChkPts;
@@ -108,8 +110,8 @@ void globalStat::localStatReport(localStatSummary *m)
     miscAvg /= CkNumPes();
     maxChkPts /= CkNumPes();
     // print stats table (all one print to avoid breaking up)
-    CkPrintf("----------------------------------------------------------------------------\n   | DO     | RB     | GVT    | SIM    | CP     | CAN    | LB     | MISC   |\n---|--------|--------|--------|--------|--------|--------|--------|--------|\nmax| %7.2f| %7.2f| %7.2f| %7.2f| %7.2f| %7.2f| %7.2f| %7.2f|\navg| %7.2f| %7.2f| %7.2f| %7.2f| %7.2f| %7.2f| %7.2f| %7.2f|\n----------------------------------------------------------------------------\nMax time on a PE: %7.2f,  Speculative Events: %d Actual Events: %d\nGRAINSIZE INFO: Avg: %10.6f Max: %10.6f Min: %10.6f\nGVT iterations=%d  Avg time per iteration=%f\ntotalLoops=%d effectiveGS=%10.6f\n", 
-	     doMax, rbMax, gvtMax, simMax, cpMax, canMax, lbMax, miscMax, doAvg, rbAvg, gvtAvg, simAvg, cpAvg, canAvg, lbAvg, miscAvg, maxTime, totalDos, totalDos-totalUndos, avgDo, maxDo, minDo, totalGvts, GvtTime, totalLoops, (doAvg*CkNumPes())/totalLoops);
+    CkPrintf("----------------------------------------------------------------------------\n   | DO     | RB     | GVT    | SIM    | CP     | CAN    | LB     | MISC   |\n---|--------|--------|--------|--------|--------|--------|--------|--------|\nmax| %7.2f| %7.2f| %7.2f| %7.2f| %7.2f| %7.2f| %7.2f| %7.2f|\navg| %7.2f| %7.2f| %7.2f| %7.2f| %7.2f| %7.2f| %7.2f| %7.2f|\n----------------------------------------------------------------------------\nMax time on a PE:%7.2f, Speculative Events:%d Actual Events:%d Commits:%d\nGRAINSIZE INFO: Avg: %10.6f Max: %10.6f Min: %10.6f\nGVT iterations=%d  Avg time per iteration=%f\ntotalLoops=%d effectiveGS=%10.6f\n", 
+	     doMax, rbMax, gvtMax, simMax, cpMax, canMax, lbMax, miscMax, doAvg, rbAvg, gvtAvg, simAvg, cpAvg, canAvg, lbAvg, miscAvg, maxTime, totalDos, totalDos-totalUndos, totalCommits, avgDo, maxDo, minDo, totalGvts, GvtTime, totalLoops, (doAvg*CkNumPes())/totalLoops);
     //CkPrintf("Avg. Max# Checkpoints=%d Bytes checkpointed=%d\n", maxChkPts, cpBytes);
 
 #ifdef POSE_DOP_ON
@@ -123,8 +125,8 @@ void globalStat::localStatReport(localStatSummary *m)
     doAvg = doMax = rbAvg = rbMax = gvtAvg = gvtMax = simAvg = simMax = 
       cpAvg = cpMax = canAvg = canMax = lbAvg = lbMax = miscAvg = miscMax = 
       maxTime = maxDo = minDo = avgDo = GvtTime = 0.0; 
-    cpBytes = reporting = totalDos = totalUndos = totalLoops = totalGvts = 
-      maxChkPts = 0;
+    cpBytes = reporting = totalDos = totalUndos = totalCommits = totalLoops = 
+      totalGvts = maxChkPts = 0;
   }
 }
 
