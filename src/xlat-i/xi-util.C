@@ -44,6 +44,13 @@ XStr::XStr(const char *_s)
   strcpy(s, _s);
 }
 
+XStr& XStr::operator << (int i) {
+      char tmp[100]; 
+      sprintf(tmp, "%d", i); 
+      append(tmp); 
+      return *this;
+};
+
 void 
 XStr::spew(const char*b, const char *a1, const char *a2, const char *a3, 
            const char *a4, const char *a5)
