@@ -69,7 +69,7 @@ public: short int index[4];
 	CkArrayIndex4D &operator=(const CkArrayIndex4D &that)  {
 		CmiAssert(that.nInts == 2);
 		nInts = that.nInts;
-		memcpy(index, that.index, sizeof(short int)*3);;
+		memcpy(index, that.index, sizeof(short int)*4);
 		return *this;
 	}
 };
