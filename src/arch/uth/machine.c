@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.9  1995-11-07 18:16:45  jyelon
+ * Revision 1.10  1995-11-07 18:24:53  jyelon
+ * Corrected a bug in GetNodeNeighbours
+ *
+ * Revision 1.9  1995/11/07  18:16:45  jyelon
  * Corrected 'neighbour' functions (they now make a hypercube).
  *
  * Revision 1.8  1995/10/27  21:45:35  jyelon
@@ -231,8 +234,7 @@ int node;
   return count;
 }
 
-
-CmiGetNodeNeighbours(node, neighbours)
+int CmiGetNodeNeighbours(node, neighbours)
 int node, *neighbours;
 {
   int bit, count=0;
@@ -242,9 +244,9 @@ int node, *neighbours;
     if (neighbour < Cmi_numpes) neighbours[count++] = neighbour;
     bit<<1; if (bit > Cmi_numpes) break;
   }
+  return count;
 }
-
-
+ 
 int CmiNeighboursIndex(node, nbr)
 int node, nbr;
 {
