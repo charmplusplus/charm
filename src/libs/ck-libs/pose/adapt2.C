@@ -41,7 +41,6 @@ void adapt2::Step()
     iter++;
     currentEvent = ev;
     ev->done = 2;
-    parent->DOs++;
     parent->ResolveFn(ev->fnIdx, ev->msg); // execute it
     ev->done = 1; // complete the event execution
     eq->ShiftEvent(); // shift to next event

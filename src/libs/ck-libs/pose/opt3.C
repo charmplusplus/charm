@@ -38,11 +38,7 @@ void opt3::Step()
       // do all events at the first available timestamp
       currentEvent = ev;
       ev->done = 2;
-      parent->DOs++;
       parent->ResolveFn(ev->fnIdx, ev->msg); // execute it
-#ifdef POSE_STATS_ON
-      localStats->SwitchTimer(SIM_TIMER);
-#endif
       ev->done = 1; // complete the event execution
       eq->ShiftEvent(); // shift to next event
       ev = eq->currentPtr; // reset ev

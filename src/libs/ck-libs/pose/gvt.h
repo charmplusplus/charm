@@ -44,6 +44,8 @@ public:
   int inactiveTime;
   /// Iterations of GVT since last LB (GVT only)
   int nextLB;
+  /// Flag used by runGVT to call computeGVT indicating readiness
+  int runGVTflag;
 };
 
 /// Message to send GVT estimate back to PVT

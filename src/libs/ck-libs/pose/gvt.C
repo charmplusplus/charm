@@ -31,19 +31,10 @@ void PVT::startPhase()
 #ifdef POSE_STATS_ON
   localStats->TimerStart(GVT_TIMER);
 #endif
-  CProxy_PVT p(ThePVT);
   CProxy_GVT g(TheGVT);
   static int gvtTurn = 0;
   UpdateMsg *umsg;
   int i;
-
-  if (waitingForGVT) { // haven't received previous GVT estimate
-    p[CkMyPe()].startPhase(); // start this later
-#ifdef POSE_STATS_ON
-  localStats->TimerStop();
-#endif
-    return;
-  }
 
   objs.Wake(); // wake objects to make sure all have reported
 
@@ -67,15 +58,18 @@ void PVT::startPhase()
 
   // pack PVT data
   umsg = new UpdateMsg;
-  for (i=0; i<GVT_WINDOW; i++) {
-    umsg->sends[i] = SendsAndRecvs->sends[i];
-    umsg->recvs[i] = SendsAndRecvs->recvs[i];
-  }
+  //for (i=0; i<GVT_WINDOW; i++) {
+  //  umsg->sends[i] = SendsAndRecvs->sends[i];
+  //  umsg->recvs[i] = SendsAndRecvs->recvs[i];
+  //}
+  memcpy(umsg->sends, SendsAndRecvs->sends, GVT_WINDOW*sizeof(int));
+  memcpy(umsg->recvs, SendsAndRecvs->recvs, GVT_WINDOW*sizeof(int));
   if (SendsAndRecvs->residuals)
     umsg->earlyTS = SendsAndRecvs->residuals->timestamp();
   else umsg->earlyTS = -1;
   umsg->optPVT = optPVT;
   umsg->conPVT = conPVT;
+  umsg->runGVTflag = 0;
 
   // send data to GVT estimation
   if (simdone) // transmit final info to GVT on PE 0
@@ -97,6 +91,7 @@ void PVT::setGVT(GVTMsg *m)
 #ifdef POSE_STATS_ON
   localStats->TimerStart(GVT_TIMER);
 #endif
+  CProxy_PVT p(ThePVT);
   estGVT = m->estGVT;
   simdone = m->done;
   CkFreeMsg(m);
@@ -104,6 +99,7 @@ void PVT::setGVT(GVTMsg *m)
   if (!simdone) SendsAndRecvs->FileResiduals();
   objs.Commit();
   waitingForGVT = 0;
+  p[CkMyPe()].startPhase();
 #ifdef POSE_STATS_ON
   localStats->TimerStop();
 #endif
@@ -180,15 +176,13 @@ void GVT::runGVT(UpdateMsg *m)
   localStats->TimerStart(GVT_TIMER);
 #endif
   estGVT = m->optPVT;
-  lastEarliest = m->earlyTS;
-  lastSends = m->earlySends;
-  lastRecvs = m->earlyRecvs;
   inactive = m->inactive;
   inactiveTime = m->inactiveTime;
   nextLBstart = m->nextLB;
-  CkFreeMsg(m);
   CProxy_PVT p(ThePVT);
-  p.startPhase();  // start the next PVT phase of the GVT algorithm
+  CProxy_GVT g(TheGVT);
+  m->runGVTflag = 1;
+  g[CkMyPe()].computeGVT(m);  // start the next PVT phase of the GVT algorithm
 #ifdef POSE_STATS_ON
   localStats->TimerStop();
 #endif
@@ -207,33 +201,37 @@ void GVT::computeGVT(UpdateMsg *m)
   static int optGVT = -1, conGVT = -1, done=0;
   static int earliestMsg=-1, earlySends=0, earlyRecvs=0, earlyResidual=-1;
   static int sends[GVT_WINDOW], recvs[GVT_WINDOW];
+  static int startOffset = 0;
 
-  
-  CmiAssert((m->optPVT >= estGVT) || (m->optPVT < 0) || (estGVT < 0));
-  CmiAssert((m->conPVT >= estGVT) || (m->conPVT < 0) || (estGVT < 0));
+  //CmiAssert((m->optPVT >= estGVT) || (m->optPVT < 0) || (estGVT < 0));
+  //CmiAssert((m->conPVT >= estGVT) || (m->conPVT < 0) || (estGVT < 0));
   if (done == 0) for (i=0; i<GVT_WINDOW; i++) sends[i] = recvs[i] = 0;
-
-  // see if message provides new min optGVT or conGVT
-  if ((optGVT < 0) || ((m->optPVT >= 0) && (m->optPVT < optGVT)))
-    optGVT = m->optPVT;
-  if ((conGVT < 0) || ((m->conPVT >= 0) && (m->conPVT < conGVT)))
-    conGVT = m->conPVT;
-  // add send/recv info to arrays
-  for (i=0; i<GVT_WINDOW; i++) {
-    sends[i] += m->sends[i];
-    recvs[i] += m->recvs[i];
+  if (CkMyPe() != 0) startOffset = 1;
+  if (m->runGVTflag == 1) done++;
+  else {
+    // see if message provides new min optGVT or conGVT
+    if ((optGVT < 0) || ((m->optPVT >= 0) && (m->optPVT < optGVT)))
+      optGVT = m->optPVT;
+    if ((conGVT < 0) || ((m->conPVT >= 0) && (m->conPVT < conGVT)))
+      conGVT = m->conPVT;
+    // add send/recv info to arrays
+    for (i=0; i<GVT_WINDOW; i++) {
+      sends[i] += m->sends[i];
+      recvs[i] += m->recvs[i];
+    }
+    if (((m->earlyTS < earlyResidual) && (m->earlyTS != -1)) 
+	|| (earlyResidual == -1))
+      earlyResidual = m->earlyTS;
+    done++;
   }
-  if (((m->earlyTS < earlyResidual) && (m->earlyTS != -1)) 
-      || (earlyResidual == -1))
-    earlyResidual = m->earlyTS;
   CkFreeMsg(m);
-  done++;
 
-  if (done == CkNumPes()) { // all PVT reports are in
+  if (done == CkNumPes()+startOffset) { // all PVT reports are in
 #ifdef POSE_STATS_ON
     localStats->GvtInc();
 #endif
     done = 0;
+    startOffset = 1;
     lastGVT = estGVT; // store previous estimate
     if (lastGVT < 0) lastGVT = 0;
     estGVT = -1;
@@ -276,8 +274,8 @@ void GVT::computeGVT(UpdateMsg *m)
     //optGVT, conGVT, lastGVT, earliestMsg, firstEarly, earlyResidual,
     //POSE_endtime);
     CmiAssert(estGVT >= lastGVT); 
-    //    if (estGVT % 10 == 0)
-    //CkPrintf("[%d] New GVT = %d\n", CkMyPe(), estGVT);
+    if (estGVT % 100 == 0)
+      CkPrintf("[%d] New GVT = %d\n", CkMyPe(), estGVT);
 
     // check for termination conditions
     int term = 0;
@@ -324,12 +322,10 @@ void GVT::computeGVT(UpdateMsg *m)
       // transmit data to start next GVT estimation on next GVT branch
       UpdateMsg *umsg = new UpdateMsg;
       umsg->optPVT = estGVT;
-      //      umsg->earlyTS = lastEarliest;
-      //      umsg->earlySends = lastSends;
-      //      umsg->earlyRecvs = lastRecvs;
       umsg->inactive = inactive;
       umsg->inactiveTime = inactiveTime;
       umsg->nextLB = nextLBstart;
+      umsg->runGVTflag = 0;
       g[(CkMyPe()+1) % CkNumPes()].runGVT(umsg);
     }
 

@@ -686,13 +686,13 @@ foreach $key (keys %methods) {
 	$outChandle->print("$count) {\n");
 	$first = 0;
 $outChandle->print("#ifdef POSE_STATS_ON\n");
-$outChandle->print("    localStats->Do();\n");
-$outChandle->print("    localStats->SwitchTimer(DO_TIMER);\n");
+$outChandle->print("    if (!CpvAccess(stateRecovery)) {localStats->Do();\n");
+$outChandle->print("    localStats->SwitchTimer(DO_TIMER);}\n");
 $outChandle->print("#endif\n");
 
 	$outChandle->print("    ((state_$key *) objID)->$i->[0](($i->[1] *)msg);\n");
 $outChandle->print("#ifdef POSE_STATS_ON\n");
-$outChandle->print("    localStats->SwitchTimer(SIM_TIMER);\n");
+$outChandle->print("    if (!CpvAccess(stateRecovery)) {localStats->SwitchTimer(SIM_TIMER);}\n");
 $outChandle->print("#endif\n");
 
 	$outChandle->print("  }\n");
