@@ -47,6 +47,7 @@ CCS Reply ----------------------------------
 #include <string.h>
 #include <stdlib.h>
 
+#ifndef CMK_NO_SOCKETS
 /*Include the socket and message interface routines
   here *whole*, which keeps client linking simple.*/
 #include "sockRoutines.c"
@@ -131,10 +132,10 @@ static const char *CcsImpl_authInit(SOCKET fd,CcsServer *svr)
  */
 
 int CcsConnect(CcsServer *svr, const char *host, int port,const CcsSec_secretKey *key){
-    return CcsConnectWithtimeout(svr, host, port, key, 120);
+    return CcsConnectWithTimeout(svr, host, port, key, 120);
 }
 
-int CcsConnectWithtimeout(CcsServer *svr, const char *host, int port,
+int CcsConnectWithTimeout(CcsServer *svr, const char *host, int port,
 	const CcsSec_secretKey *key, int timeout) 
 {
 	skt_init();
@@ -324,7 +325,7 @@ void CcsFinalize(CcsServer *svr)
   if (svr->replyFd!=-1) skt_close(svr->replyFd);
 }
 
-
+#endif
 
 
 
