@@ -24,7 +24,7 @@ char* fortranify(const char *s)
   retVal = new char[len+1];
   for(i = 0; i < len; i++)
     retVal[i] = tolower(s[i]);
-  retVal[len+1] = 0;
+  retVal[len] = 0;
 
   return retVal;
 }
