@@ -14,7 +14,7 @@ $(DEST): $(OBJS) $(COMPAT) headers
 	$(CHARMC) $(OBJS) $(COMPAT) -o $@
 
 headers: $(HEADERS)
-	mkdir $(CDIR)/include/cklibs/
+	test -d $(CDIR)/include/cklibs || mkdir $(CDIR)/include/cklibs/
 	cp $(HEADERS) $(CDIR)/include/cklibs/
 	touch headers
 
