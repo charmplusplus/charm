@@ -13,19 +13,12 @@
 
 #define MPI_MAX_COMM 8
 
-struct mpi_redn_spec
-{
-  int type;
-  int root;
-};
-
 struct mpi_comm_struct
 {
   CkArrayID aid;
   void (*mainfunc)(int, char **);
   char *name;
   int nobj;
-  mpi_redn_spec rspec;
 };
 class mpi_comm_structs {
 	mpi_comm_struct s[MPI_MAX_COMM];
@@ -228,6 +221,7 @@ class ampi : public ArrayElement1D {
     
     virtual void pup(PUP::er &p);
     void generic(AmpiMsg *);
+    void reduceResult(CkReductionMsg *m);
     
   public: // to be used by MPI_* functions
     void send(int t, int s, void* buf, int count, int type, int idx, int comm);

@@ -75,22 +75,18 @@ static void ampiNodeInit(void)
 }
 
 static void 
-ampiAllReduceHandler(void *arg, int dataSize, void *data)
+ampiAllReduceHandler(void *arg, void *r_msg)
 {
   mpi_comm_struct *commspec = (mpi_comm_struct *) arg;
-  int type = commspec->rspec.type;
-  if (type==-1)
-	  CkAbort("ERROR! Never set the AMPI reduction type-- is there an element on processor 0?\n");
+  CkReductionMsg *msg=(CkReductionMsg *)r_msg;
+  
+  ampi::bcastraw(msg->getData(), msg->getSize(), commspec->aid);
+}
 
-  if(type==0) 
-  { // allreduce
-    ampi::bcastraw(data, dataSize, commspec->aid);
-  } else 
-  { // reduce
-    ampi::sendraw(MPI_REDUCE_TAG, 0, data, dataSize, commspec->aid, 
-                  commspec->rspec.root);
-  }
-  commspec->rspec.type=-1;
+void ampi::reduceResult(CkReductionMsg *msg)
+{
+  ampi::sendraw(MPI_REDUCE_TAG, 0, msg->getData(), msg->getSize(), 
+             thisArrayID,thisIndex);
 }
 
 class MPI_threadstart_t {
@@ -152,15 +148,12 @@ static void ampiAttach(const char *name,int namelen)
 	memcpy(mpi_comms[commidx].name, name, namelen);
 	mpi_comms[commidx].name[namelen] = '\0';
 	mpi_comms[commidx].nobj=_nchunks;
-	mpi_comms[commidx].rspec.type=-1;
-	mpi_comms[commidx].rspec.root=-1;
         
         //Create and attach the new ampi array
         CkArrayOptions opts(_nchunks);
         opts.bindTo(threads);
         CProxy_ampi arr= CProxy_ampi::ckNew(commidx,threads,opts);
 	mpi_comms[commidx].aid=arr;
-        arr.setReductionClient(ampiAllReduceHandler, &mpi_comms[commidx]);
 
         tc->addClient(arr);        
 }
@@ -617,15 +610,13 @@ int MPI_Reduce(void *inbuf, void *outbuf, int count, int type, MPI_Op op,
     CkAbort("AMPI> Cannot have global operations across communicators.\n");
   }
   ampi *ptr = CtvAccess(ampiPtr);
-  if(CkMyPe()==0)
-  {
-    mpi_comms[ptr->commidx].rspec.type = 1;
-    mpi_comms[ptr->commidx].rspec.root = root;
-  }
   CkReduction::reducerType mytype = getReductionType(type,op);
   int size = ptr->myDDT->getType(type)->getSize(count) ;
-  ptr->contribute(size, inbuf, mytype);
-  if (ptr->thisIndex == root)
+  CkCallback reduceCB(CkIndex_ampi::reduceResult(0),CkArrayIndex1D(root),
+  	mpi_comms[ptr->commidx].aid,true);
+  ptr->contribute(size, inbuf, mytype, reduceCB); 
+  
+  if (ptr->thisIndex == root) /*HACK: Use recv() to block until reduction data comes back*/
     ptr->recv(MPI_REDUCE_TAG, 0, outbuf, count, type, comm);
   return 0;
 }
@@ -640,13 +631,11 @@ int MPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
     CkAbort("AMPI> Cannot have global operations across communicators.\n");
   }
   ampi *ptr = CtvAccess(ampiPtr);
-  if(CkMyPe()==0)
-  {
-    mpi_comms[ptr->commidx].rspec.type = 0;
-  }
   CkReduction::reducerType mytype = getReductionType(type,op);
   int size = ptr->myDDT->getType(type)->getSize(count) ;
-  ptr->contribute(size, inbuf, mytype);
+  CkCallback allreduceCB(ampiAllReduceHandler,(void *)&mpi_comms[ptr->commidx]);
+  ptr->contribute(size, inbuf, mytype, allreduceCB);
+  /*HACK: Use recv() to block until the reduction data comes back*/ 
   ptr->recv(MPI_BCAST_TAG, 0, outbuf, count, type, comm);
   return 0;
 }

@@ -8,5 +8,6 @@ module ampi {
   array[1D] ampi {
     entry ampi(int commidx,CProxy_TCharm threads_);
     entry void generic(AmpiMsg *);
+    entry void reduceResult(CkReductionMsg *m);
   };
 }
