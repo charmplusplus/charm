@@ -63,8 +63,8 @@ TParamList::print(XStr& str)
 void 
 Type::genProxyName(XStr &str) 
 {
-  cerr<<"This type has no proxy!!\n";
-  abort();
+  cerr<< getBaseName() << " type has no proxy!!\n";
+  exit(1);
 }
     
 void 
@@ -877,7 +877,7 @@ Readonly::genReg(XStr& str)
     return;
   if(msg) {
     if(dims) {
-      cerr<<"Readonly Message cannot be an array!!\n";
+      cerr<<"line "<<line<<":Readonly Message cannot be an array!!\n";
       exit(1);
     }
     str << "  CkRegisterReadonlyMsg((void **) &";
@@ -1160,7 +1160,7 @@ void Entry::genGroupDecl(XStr& str)
     // entry ptr declaration
     str << "    static int ckIdx_"<<name<<"(";
     if(param==0) {
-      cerr << "No entry parameter specified.\n";
+      cerr << "line "<<line<<":No entry parameter specified.\n";
       exit(1);
     }
     param->print(str);
@@ -1191,7 +1191,7 @@ void Entry::genDecls(XStr& str)
 {
   str << "/* DECLS: "; print(str); str << " */\n";
   if(retType==0 && !isConstructor()) {
-      cerr<<"Entry methods must specify a return type: ";
+      cerr<<"line "<<line<<":Entry methods must specify a return type. ";
       cerr<<"use void if necessary\n";
       exit(1);
   }
@@ -1223,7 +1223,7 @@ void Entry::genDecls(XStr& str)
       str << "void* msg, ";
     } else {
       if(!isConstructor()) {
-        cerr << "Only constructors allowed to have empty parameter list\n";
+        cerr <<"line "<<line<<" Only constructors allowed to have empty parameter list\n";
         exit(1);
       }
       str << "CkArgMsg* msg, ";
@@ -1427,7 +1427,7 @@ void Entry::genDefs(XStr& str)
   //A synchronous method can return a value, and must finish before
   // the caller can proceed.
     if(isConstructor()) {
-      cerr<<"Constructors cannot be sync methods."<<endl;
+      cerr<<"line "<<line<<":Constructors cannot be sync methods."<<endl;
       exit(1);
     }
     str << makeDecl("void")<<"::_call_"<<epIdx(0)<<"(void* msg, "<<containerType<<"* obj)\n";
@@ -1446,15 +1446,15 @@ void Entry::genDefs(XStr& str)
   } else if(isExclusive()) {
   //An exclusive method 
     if(!container->isNodeGroup()) {
-      cerr<<"Only entry methods of a nodegroup can be exclusive."<<endl;
+      cerr<<"line "<<line<<":Only entry methods of a nodegroup can be exclusive."<<endl;
       exit(1);
     }
     if(isConstructor()) {
-      cerr<<"Constructors cannot be exclusive methods."<<endl;
+      cerr<<"line "<<line<<":Constructors cannot be exclusive methods."<<endl;
       exit(1);
     }
     if(param==0) {
-      cerr<<"Entry methods must specify a message parameter: ";
+      cerr<<"line "<<line<<":Entry methods must specify a message parameter. ";
       cerr<<"use void if necessary\n";
       exit(1);
     }

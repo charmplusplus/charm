@@ -94,7 +94,7 @@ File		: ModuleEList
 ModuleEList	: /* Empty */
 		{ $$ = 0; }
 		| Module ModuleEList
-		{ $$ = new ModuleList($1, $2); }
+		{ $$ = new ModuleList(lineno, $1, $2); }
 		;
 
 OptExtern	: /* Empty */
@@ -114,9 +114,9 @@ Name		: IDENT
 		;
 
 Module		: MODULE Name ConstructEList
-		{ $$ = new Module($2, $3); }
+		{ $$ = new Module(lineno, $2, $3); }
 		| MAINMODULE Name ConstructEList
-		{ $$ = new Module($2, $3); $$->setMain(); }
+		{ $$ = new Module(lineno, $2, $3); $$->setMain(); }
 		;
 
 ConstructEList	: ';'
@@ -128,7 +128,7 @@ ConstructEList	: ';'
 ConstructList	: /* Empty */
 		{ $$ = 0; }
 		| Construct ConstructList
-		{ $$ = new ConstructList($1, $2); }
+		{ $$ = new ConstructList(lineno, $1, $2); }
 		;
 
 Construct	: OptExtern '{' ConstructList '}' OptSemiColon
@@ -272,11 +272,11 @@ DimList		: /* Empty */
 		;
 
 Readonly	: READONLY Type Name DimList
-		{ $$ = new Readonly($2, $3, $4); }
+		{ $$ = new Readonly(lineno, $2, $3, $4); }
 		;
 
 ReadonlyMsg	: READONLY MESSAGE SimpleType '*'  Name
-		{ $$ = new Readonly($3, $5, 0, 1); }
+		{ $$ = new Readonly(lineno, $3, $5, 0, 1); }
 		;
 
 MAttribs	: /* Empty */
@@ -298,7 +298,7 @@ MAttrib		: PACKED
 		;
 
 Message		: MESSAGE MAttribs NamedType
-		{ $$ = new Message($3, $2); }
+		{ $$ = new Message(lineno, $3, $2); }
 		;
 
 OptBaseList	: /* Empty */
@@ -314,22 +314,22 @@ BaseList	: NamedType
 		;
 
 Chare		: CHARE NamedType OptBaseList MemberEList
-		{ $$ = new Chare($2, $3, $4); 
+		{ $$ = new Chare(lineno, $2, $3, $4); 
 		  if($4) $4->setChare($$);
 		  if($4 && $4->isPure()) $$->setAbstract(1);}
 		| MAINCHARE NamedType OptBaseList MemberEList
-		{ $$ = new MainChare($2, $3, $4); 
+		{ $$ = new MainChare(lineno, $2, $3, $4); 
                   if($4) $4->setChare($$);
 		  if($4 && $4->isPure()) $$->setAbstract(1);}
 		;
 
 Group		: GROUP NamedType OptBaseList MemberEList
-		{ $$ = new Group($2, $3, $4); if($4) $4->setChare($$);
+		{ $$ = new Group(lineno, $2, $3, $4); if($4) $4->setChare($$);
 		  if($4 && $4->isPure()) $$->setAbstract(1);}
 		;
 
 NodeGroup	: NODEGROUP NamedType OptBaseList MemberEList
-		{ $$ = new NodeGroup($2, $3, $4); 
+		{ $$ = new NodeGroup(lineno, $2, $3, $4); 
 		  if($4) $4->setChare($$);
 		  if($4 && $4->isPure()) $$->setAbstract(1);}
 		;
@@ -337,28 +337,28 @@ NodeGroup	: NODEGROUP NamedType OptBaseList MemberEList
 Array		: ARRAY NamedType OptBaseList MemberEList
 		{ if(strcmp($2->getBaseName(), "ArrayElement"))
                     $3 = new TypeList(new NamedType("ArrayElement"), $3);
-                  $$ = new Array($2, $3, $4); if($4) $4->setChare($$);
+                  $$ = new Array(lineno, $2, $3, $4); if($4) $4->setChare($$);
 		  if($4 && $4->isPure()) $$->setAbstract(1);}
 		;
 
 TChare		: CHARE Name OptBaseList MemberEList
-		{ $$ = new Chare(new NamedType($2), $3, $4); 
+		{ $$ = new Chare(lineno, new NamedType($2), $3, $4); 
                   if($4) $4->setChare($$);
 		  if($4 && $4->isPure()) $$->setAbstract(1);}
 		| MAINCHARE Name OptBaseList MemberEList
-		{ $$ = new MainChare(new NamedType($2), $3, $4); 
+		{ $$ = new MainChare(lineno, new NamedType($2), $3, $4); 
                   if($4) $4->setChare($$);
 		  if($4 && $4->isPure()) $$->setAbstract(1);}
 		;
 
 TGroup		: GROUP Name OptBaseList MemberEList
-		{ $$ = new Group(new NamedType($2), $3, $4); 
+		{ $$ = new Group(lineno, new NamedType($2), $3, $4); 
                   if($4) $4->setChare($$);
 		  if($4 && $4->isPure()) $$->setAbstract(1);}
 		;
 
 TNodeGroup	: NODEGROUP Name OptBaseList MemberEList
-		{ $$ = new NodeGroup( new NamedType($2), $3, $4); 
+		{ $$ = new NodeGroup( lineno, new NamedType($2), $3, $4); 
                   if($4) $4->setChare($$);
 		  if($4 && $4->isPure()) $$->setAbstract(1);}
 		;
@@ -366,13 +366,13 @@ TNodeGroup	: NODEGROUP Name OptBaseList MemberEList
 TArray		: ARRAY Name OptBaseList MemberEList
 		{ if(strcmp($2, "ArrayElement"))
 		    $3 = new TypeList(new NamedType("ArrayElement"), $3);
-		  $$ = new Array( new NamedType($2), $3, $4); 
+		  $$ = new Array( lineno, new NamedType($2), $3, $4); 
                   if($4) $4->setChare($$);
 		  if($4 && $4->isPure()) $$->setAbstract(1);}
 		;
 
 TMessage	: MESSAGE MAttribs Name ';'
-		{ $$ = new Message(new NamedType($3), $2); }
+		{ $$ = new Message(lineno, new NamedType($3), $2); }
 		;
 
 OptTypeInit	: /* Empty */
@@ -440,11 +440,11 @@ Member		: Entry ';'
 		;
 
 Entry		: ENTRY EAttribs VOID Name EParam OptPure OptStackSize
-		{ $$ = new Entry($2|$6, new BuiltinType("void"), $4, $5, $7); }
+		{ $$ = new Entry(lineno, $2|$6, new BuiltinType("void"), $4, $5, $7); }
 		| ENTRY EAttribs OnePtrType Name EParam OptPure OptStackSize
-		{ $$ = new Entry($2|$6, $3, $4, $5, $7); }
+		{ $$ = new Entry(lineno, $2|$6, $3, $4, $5, $7); }
 		| ENTRY EAttribs Name EParam
-		{ $$ = new Entry($2, 0, $3, $4, 0); }
+		{ $$ = new Entry(lineno, $2, 0, $3, $4, 0); }
 		;
 
 EAttribs	: /* Empty */

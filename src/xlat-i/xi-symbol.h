@@ -40,6 +40,7 @@ class Construct : public Printable {
   protected:
     int external;
   public:
+    int line;
     void setExtern(int e) { external = e; }
     virtual void genDecls(XStr& str) = 0;
     virtual void genDefs(XStr& str) = 0;
@@ -50,7 +51,8 @@ class ConstructList : public Construct {
     Construct *construct;
     ConstructList *next;
   public:
-    ConstructList(Construct *c, ConstructList *n=0) : construct(c), next(n) {}
+    ConstructList(int l, Construct *c, ConstructList *n=0) :
+      construct(c), next(n) {line = l;}
     void setExtern(int e);
     void print(XStr& str);
     void genDecls(XStr& str);
@@ -122,8 +124,8 @@ class BuiltinType : public SimpleType , public EnType {
 };
 
 class Chare;//Forward declaration
-static char *msg_prefix(void) {return "CMessage_";}
-static char *chare_prefix(void) {return "CProxy_";}
+static char *msg_prefix(void) {return (char *) "CMessage_";}
+static char *chare_prefix(void) {return (char *) "CProxy_";}
 
 class NamedType : public SimpleType {
   private:
@@ -285,9 +287,10 @@ class Chare : public TEntity, public Construct {
     void genRegisterMethodDecl(XStr& str);
     void genRegisterMethodDef(XStr& str);
   public:
-    Chare(NamedType *t, TypeList *b=0, MemberList *l=0) : 
+    Chare(int ln, NamedType *t, TypeList *b=0, MemberList *l=0) : 
       type(t), list(l), bases(b) 
     {
+      line = ln;
       setTemplate(0); 
       abstract=0;
     }
@@ -321,38 +324,42 @@ class Chare : public TEntity, public Construct {
     void genReg(XStr& str);
     void genDecls(XStr &str);
     virtual void genSubDecls(XStr& str);
-    virtual char *chareTypeName(void) {return "chare";}
-    virtual char *proxyPrefix(void) {return "CProxy_";}
+    virtual char *chareTypeName(void) {return (char *)"chare";}
+    virtual char *proxyPrefix(void) {return (char *) "CProxy_";}
 };
 
 class MainChare : public Chare {
   public:
-    MainChare(NamedType *t, TypeList *b=0, MemberList *l=0):Chare(t,b,l) {}
+    MainChare(int ln, NamedType *t, TypeList *b=0, MemberList *l=0):
+	    Chare(ln, t,b,l) {}
     virtual int isMainChare(void) {return 1;}
-    virtual char *chareTypeName(void) {return "mainchare";}
+    virtual char *chareTypeName(void) {return (char *) "mainchare";}
 };
 
 class Array : public Chare {
   public:
-    Array(NamedType *t, TypeList *b=0, MemberList *l=0):Chare(t,b,l) {}
+    Array(int ln, NamedType *t, TypeList *b=0, MemberList *l=0):
+	    Chare(ln,t,b,l) {}
     virtual int isArray(void) {return 1;}
     virtual void genSubDecls(XStr& str);
-    virtual char *chareTypeName(void) {return "array";}
+    virtual char *chareTypeName(void) {return (char *) "array";}
 };
 
 class Group : public Chare {
   public:
-    Group(NamedType *t, TypeList *b=0, MemberList *l=0):Chare(t,b,l) {}
+    Group(int ln, NamedType *t, TypeList *b=0, MemberList *l=0):
+	    Chare(ln,t,b,l) {}
     virtual int isGroup(void) {return 1;}
     virtual void genSubDecls(XStr& str);
-    virtual char *chareTypeName(void) {return "group";}
+    virtual char *chareTypeName(void) {return (char *) "group";}
 };
 
 class NodeGroup : public Group {
   public:
-    NodeGroup(NamedType *t, TypeList *b=0, MemberList *l=0):Group(t,b,l) {}
+    NodeGroup(int ln, NamedType *t, TypeList *b=0, MemberList *l=0):
+	    Group(ln,t,b,l) {}
     virtual int isNodeGroup(void) {return 1;}
-    virtual char *chareTypeName(void) {return "nodegroup";}
+    virtual char *chareTypeName(void) {return (char *) "nodegroup";}
 };
 
 
@@ -363,7 +370,8 @@ class Message : public TEntity, public Construct {
     int attrib;
     NamedType *type;
   public:
-    Message(NamedType *t, int a) : attrib(a), type(t) { setTemplate(0); }
+    Message(int l, NamedType *t, int a) : attrib(a), type(t) 
+      { line=l; setTemplate(0); }
     void print(XStr& str);
     void genDecls(XStr& str);
     void genDefs(XStr& str);
@@ -440,6 +448,7 @@ class TVarList : public Printable {
 
 class Entry : public Member {
   private:
+    int line;
     int attribs;
     EnType *retType;
     char *name;
@@ -464,9 +473,9 @@ class Entry : public Member {
     XStr voidParamDecl(void);
     XStr callThread(const XStr &procName,int prependEntryName=0);
   public:
-    Entry(int a, EnType *r, char *n, EnType *p, Value *sz=0) :
+    Entry(int l, int a, EnType *r, char *n, EnType *p, Value *sz=0) :
       attribs(a), retType(r), name(n), param(p), stacksize(sz)
-    { setChare(0); 
+    { line=l; setChare(0); 
       if(!isVirtual() && isPure()) {
         cerr << "Non-virtual methods cannot be pure virtual!!\n";
         abort();
@@ -499,7 +508,10 @@ class Module : public Construct {
     char *name;
     ConstructList *clist;
   public:
-    Module(char *n, ConstructList *c) : name(n), clist(c) { _isMain=0; }
+    Module(int l, char *n, ConstructList *c) : name(n), clist(c) { 
+	    line = l;
+	    _isMain=0; 
+    }
     void print(XStr& str);
     void generate();
     void genDecls(XStr& str);
@@ -513,7 +525,8 @@ class ModuleList : public Printable {
     Module *module;
     ModuleList *next;
   public:
-    ModuleList(Module *m, ModuleList *n=0) : module(m), next(n) {}
+    int line;
+    ModuleList(int l, Module *m, ModuleList *n=0) : line(l),module(m),next(n) {}
     void print(XStr& str);
     void generate();
 };
@@ -524,8 +537,9 @@ class Readonly : public Construct, public Member {
     char *name;
     ValueList *dims;
   public:
-    Readonly(Type *t, char *n, ValueList* d, int m=0) : msg(m), type(t), name(n)
-    { dims=d; setChare(0); }
+    Readonly(int l, Type *t, char *n, ValueList* d, int m=0) 
+	    : msg(m), type(t), name(n)
+            { line=l; dims=d; setChare(0); }
     void print(XStr& str);
     void genDecls(XStr& str);
     void genDefs(XStr& str);
