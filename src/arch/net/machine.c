@@ -343,6 +343,20 @@ static char *strdupl(s) char *s;
   return res;
 }
 
+double GetClock()
+{
+  struct timeval tv;
+  gettimeofday(&tv);
+  return (tv.tv_sec * 1.0 + tv.tv_usec * 1.0E-6);
+}
+
+char *CopyMsg(char *msg, int len)
+{
+  char *copy = (char *)CmiAlloc(len);
+  memcpy(copy, msg, len);
+  return copy;
+}
+
 static char *parseint(p, value) char *p; int *value;
 {
   int val = 0;
@@ -1562,25 +1576,11 @@ int CmiScanf(va_alist) va_dcl
  *
  *****************************************************************************/
 
-double GetClock()
-{
-  struct timeval tv;
-  gettimeofday(&tv);
-  return (tv.tv_sec * 1.0 + tv.tv_usec * 1.0E-6);
-}
-
-char *CopyMsg(char *msg, int len)
-{
-  char *copy = (char *)CmiAlloc(len);
-  memcpy(copy, msg, len);
-  return copy;
-}
-
 int TransmitAcknowledgement()
 {
   OtherNode node; int i, extra;
   struct { DgramHeader head; int others[CMK_DGRAM_WINDOW_SIZE]; } ack;
-
+  
   node = (OtherNode)FIFO_Peek(ack_queue);
   if (node == 0) return 0;
   if (Cmi_clock < node->ack_time) return 0;
@@ -1604,6 +1604,15 @@ int TransmitAcknowledgement()
   node->ack_time = 0.0;
   node->ack_count = 0;
   return 1;
+}
+
+void ScheduleAcknowledgement(OtherNode node)
+{
+  node->ack_count++;
+  if (node->ack_count == 1) {
+    node->ack_time = Cmi_clock + CMK_DGRAM_ACK_DELAY;
+    FIFO_EnQueue(ack_queue, (void *)node);
+  }
 }
 
 void DiscardImplicitDgram(ImplicitDgram dg)
@@ -1662,6 +1671,7 @@ int TransmitDatagram()
     }
     if (dg->nextxmit > Cmi_clock) return 0;
     FIFO_Pop(retransmit_queue);
+    TransmitImplicitDgram(dg);
     dg->nextxmit = Cmi_clock + CMK_DGRAM_DELAY_RETRANSMIT;
     FIFO_EnQueue(retransmit_queue, (void *)dg);
     return 1;
@@ -1822,15 +1832,6 @@ void AssembleReceivedDatagrams(OtherNode node)
   node->recv_next = next;
 }
 
-void ScheduleAcknowledgement(OtherNode node)
-{
-  node->ack_count++;
-  if (node->ack_count == 1) {
-    node->ack_time = Cmi_clock + CMK_DGRAM_ACK_DELAY;
-    FIFO_EnQueue(ack_queue, (void *)node);
-  }
-}
-
 void IntegrateMessageDatagram(ExplicitDgram dg)
 {
   unsigned int seqno, slot; OtherNode node;
@@ -1858,7 +1859,6 @@ void IntegrateAcknowledgement(OtherNode node, unsigned int seqno)
 
   idg = node->send_window[slot];
   if ((idg)&&(idg->seqno == seqno)) {
-    if ((seqno % 100)==0) fprintf(stderr,"Ack %d\n", seqno);
     idg->acknowledged = 1;
     node->send_window[slot] = 0;
   }
