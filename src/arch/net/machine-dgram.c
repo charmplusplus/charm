@@ -106,7 +106,7 @@ static void setspeed_atm()
 {
   Cmi_max_dgram_size   = 2048;
   Cmi_os_buffer_size   = 50000;
-  Cmi_window_size      = 20;
+  Cmi_window_size      = 16;       /*20;*/
   Cmi_delay_retransmit = 0.0150;
   Cmi_ack_delay        = 0.0035;
 }
@@ -114,7 +114,7 @@ static void setspeed_atm()
 static void setspeed_eth()
 {
   Cmi_max_dgram_size   = 1400;
-  Cmi_window_size      = 40;
+  Cmi_window_size      = 32;	    /*40*/
   Cmi_os_buffer_size   = Cmi_window_size*Cmi_max_dgram_size;
   Cmi_delay_retransmit = 0.0400;
   Cmi_ack_delay        = 0.0050;
@@ -142,6 +142,9 @@ static void extract_args(char **argv)
     setspeed_gigabit();
   CmiGetArgIntDesc(argv,"+max_dgram_size",&Cmi_max_dgram_size,"Size of each UDP packet");
   CmiGetArgIntDesc(argv,"+window_size",&Cmi_window_size,"Number of unacknowledged packets");
+  /* must divide for window protocol to work */
+  if ( (DGRAM_SEQNO_MASK+1)%Cmi_window_size != 0)
+    CmiAbort("Invalid window size!");
   CmiGetArgIntDesc(argv,"+os_buffer_size",&Cmi_os_buffer_size, "UDP socket's SO_RCVBUF/SO_SNDBUF");
   if (CmiGetArgIntDesc(argv,"+delay_retransmit",&ms, "Milliseconds to wait before retransmit"))
 	  Cmi_delay_retransmit=0.001*ms;
