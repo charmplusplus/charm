@@ -960,6 +960,11 @@ case "$LANGUAGE" in
         POST_LIBRARIES="$POST_LIBRARIES -lconv-utilf $CMK_F90LIBS"
 	IS_F90="y"
 	;;
+"charm++f")
+        POST_LIBRARIES="$POST_LIBRARIES -lconv-utilf $CMK_F90LIBS"
+	LANGUAGE="charm++"
+	IS_F90="y"
+	;;
 "f90charm")
         PRE_LIBRARIES="$PRE_LIBRARIES -lf90charm "
         POST_LIBRARIES="$POST_LIBRARIES $CMK_F90LIBS"
