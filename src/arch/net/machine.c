@@ -2519,7 +2519,12 @@ void ReceiveDatagram()
   MallocExplicitDgram(dg);
   ok = recv(dataskt,(char*)(dg->data),Cmi_max_dgram_size,0);
   /*ok = recvfrom(dataskt,(char*)(dg->data),Cmi_max_dgram_size,0, 0, 0);*/
-  if (ok<0) { perror("recv"); KillEveryoneCode(37489437); }
+  /* if (ok<0) { perror("recv"); KillEveryoneCode(37489437); } */
+  if (ok < 0) {
+    if (errno == EINTR) return;          /* ignore the error.  G. Zheng */
+    CmiPrintf("ReceiveDatagram: recv: %s\n", strerror(errno)) ;
+    KillEveryoneCode(37489437);
+  }
   dg->len = ok;
   if (ok >= DGRAM_HEADER_SIZE) {
     DgramHeaderBreak(dg->data, dg->rank, dg->srcpe, magic, dg->seqno);
