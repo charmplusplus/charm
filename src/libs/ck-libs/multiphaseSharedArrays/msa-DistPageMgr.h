@@ -621,8 +621,8 @@ public:
     // CacheGroup::
     inline void accumulate(unsigned int page, const void* entry, unsigned int begin, unsigned int end)
     {
-        // Hat if multiple threads on pe access this page and it needs
-        // to be fetched.  See readablePage().  Actually, its OK,
+        // What if multiple threads on pe access this page and it needs
+        // to be fetched?  See readablePage().  Actually, its OK,
         // since for accumulate, no page is fetched.
         if(pageTable[page] == 0)
             pageFault(page, Accumulate_Fault);
