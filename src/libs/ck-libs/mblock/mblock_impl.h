@@ -15,7 +15,6 @@ Milind Bhandarkar
 
 extern CkChareID _mainhandle;
 extern CkArrayID _mblockaid;
-extern int _nchunks;
 
 #define CHK(p) do{if((p)==0)CkAbort("MBLK>Memory Allocation failure.");}while(0)
 
@@ -50,6 +49,14 @@ struct DType {
     }
     return blen * vec_len * nitems;
   }
+
+  void pup(PUP::er &p) {
+    p(base_type);
+    p(vec_len);
+    p(init_offset);
+    p(distance);
+  }
+
 };
 
 class DataMsg : public CMessage_DataMsg
@@ -57,11 +64,11 @@ class DataMsg : public CMessage_DataMsg
  public:
   int seqnum;
   int from;
-  int dtype;
+  int fid;
   void *data;
   int patchno;
-  DataMsg(int s, int f, int d, int p) : 
-    seqnum(s), from(f), dtype(d), patchno(p) { data = (void*) (this+1); }
+  DataMsg(int s, int f, int fid_, int p) : 
+    seqnum(s), from(f), fid(fid_), patchno(p) { data = (void*) (this+1); }
   DataMsg(void) { data = (void*) (this+1); }
   static void *pack(DataMsg *);
   static DataMsg *unpack(void *);
@@ -80,48 +87,74 @@ class ChunkMsg : public CMessage_ChunkMsg
 #define MBLK_MAXUDATA 20
 #define MBLK_MAXBC 20
 
+class field_t {
+ public:
+  DType dt; //Describes 1D data layout
+  blockDim dim; //User-allocated dimensions of field
+  int arrayBytes; //Bytes in user-allocated array
+  bool forVoxel; //Field is for a voxel, not a node attribute
+  field_t(const DType &dt_,const blockDim &dim_,bool forVoxel_)
+    :dt(dt_),dim(dim_),forVoxel(forVoxel_) {
+    arrayBytes=dim.getSize()*dt.distance;
+  }
+
+  field_t() { }
+  void pup(PUP::er &p) {
+    dt.pup(p);
+    dim.pup(p);
+    p(forVoxel);
+  }
+};
+
 class chunk: public ArrayElement1D
 {
 private:
-  DType dtypes[MBLK_MAXDT];
-  int ntypes;
-
-  CmmTable messages; // messages to be processed
+  int nfields;
+  field_t *fields[MBLK_MAXDT];
 
   int nudata;
   void *userdata[MBLK_MAXUDATA];
   MBLK_PupFn pup_ud[MBLK_MAXUDATA];
-  MBLK_BcFn bcfns[MBLK_MAXBC];
+
+  struct {
+    MBLK_BcFn fn;
+    extrudeMethod m;
+  } bcs[MBLK_MAXBC];
+
+  CmmTable messages; // messages for updates yet to be initiated
+  int seqnum; //Number of most recently initiated update
+  struct {
+    int nRecd; //Number of messages received so far
+    extrudeMethod m;
+    int wait_seqnum; // update # that we ar waiting for, -1 if not waiting
+    void *ogrid; // grid pointer for receiving updates
+  } update;
+  int nRecvPatches;  //Number of messages to expect (a constant)
+
+  void *reduce_output;//Result of reduction goes here
 
   void callDriver(void);
-
-  blockLoc sbc, ebc;
-  int seqnum;
-  int wait_seqnum; // update # that we ar waiting for, -1 if not waiting
-  int nRecvPatches;
-  int nRecd;
-  void *ogrid; // grid pointer for receiving updates
 
  public:
   block *b;
 
-  chunk(void);
+  chunk(ChunkMsg*);
   chunk(CkMigrateMessage *msg){}
   ~chunk();
   
   //entry methods
-  void run(ChunkMsg*);
+  void run(void);
   void recv(DataMsg *);
   void reductionResult(DataMsg *);
 
-  int new_DT(int base_type, int vec_len=1, int init_offset=0, int distance=0) {
-    if(ntypes==MBLK_MAXDT)
-      return (-1);
-    dtypes[ntypes] = DType(base_type, vec_len, init_offset, distance);
-    ntypes++;
-    return ntypes-1;
+  int add_field(field_t *f) {
+    if (nfields==MBLK_MAXDT) return -1;
+    fields[nfields]=f;
+    nfields++;
+    return nfields-1;
   }
-  void update(int fid, void *ingrid, void *outgrid);
+
+  void start_update(int fid,const extrudeMethod &m,void *ingrid, void *outgrid);
   int test_update(void);
   int wait_update(void);
   void reduce_field(int fid, const void *nodes, void *outbuf, int op);
@@ -130,47 +163,58 @@ private:
   int total(void) { return numElements; }
   void print(void);
 
-  int register_bc(const int bcnum, const MBLK_BcFn bcfn)
+  int register_bc(const int bcnum, const MBLK_BcFn bcfn,const extrudeMethod &m)
   {
     if(bcnum<0 || bcnum>=MBLK_MAXBC) {
       CkError("MBLK> BC index should be between 0 and %d!\n", MBLK_MAXBC-1);
       return MBLK_FAILURE;
     }
-    bcfns[bcnum] = bcfn;
+    bcs[bcnum].fn = bcfn;
+    bcs[bcnum].m=m;
     return MBLK_SUCCESS;
   }
-  
-  int apply_bc(const int bcnum, void *grid)
+
+  void apply_single_bc(patch *p,void *p1,void *p2) {
+    int bcNo=((externalBCpatch *)p)->bcNo;
+    blockSpan s=p->getExtents(bcs[bcNo].m,true);
+    int start[3],end[3];
+#if MBLK_FORTRAN
+    s.start=s.start+blockLoc(1,1,1);
+    s.end=s.end+blockLoc(1,1,1);
+#endif
+    s.getInt3(start,end);
+    (bcs[bcNo].fn)(p1,p2,start,end);
+  }
+
+  int apply_bc(const int bcnum, void *p1,void *p2)
   {
-    if(bcfns[bcnum] == 0) {
+    if(bcs[bcnum].fn == 0) {
       CkError("MBLK> BC handler not registered for bcnum %d!\n", bcnum);
       return MBLK_FAILURE;
     }
     int n = b->getPatches();
     for (int i=0; i< n; i++) {
       patch *p = b->getPatch(i);
-      if(p->type == patch::ext && ((externalBCpatch*)p)->bcNo == bcnum) {
-        sbc = p->start; ebc = p->end;
-        bcfns[bcnum](grid);
-      }
+      if(p->type == patch::ext && ((externalBCpatch*)p)->bcNo == bcnum) 
+	apply_single_bc(p,p1,p2);
     }
     return MBLK_SUCCESS;
   }
 
-  int apply_bc_all(void *grid)
+  int apply_bc_all(void *p1,void *p2)
   {
     int i;
-    for(i=0;i<MBLK_MAXBC;i++)
-      if(bcfns[i] != 0)
-        apply_bc(i, grid);
+    int n = b->getPatches();
+    for(i=0;i<n;i++) {
+      patch *p = b->getPatch(i);
+      if(p->type == patch::ext)
+	apply_single_bc(p,p1,p2);      
+    }
     return MBLK_SUCCESS;
   }
 
-  int get_boundary_extent(int *start, int *end)
-  {
-    start[0] = sbc[0]; start[1] = sbc[1]; start[2] = sbc[2];
-    end[0] = ebc[0]; end[1] = ebc[1]; end[2] = ebc[2];
-    return MBLK_SUCCESS;
+  static void copy(const blockLoc &src,int *dest,int shift=0) {
+    dest[0]=src[0]+shift; dest[1]=src[1]+shift; dest[2]=src[2]+shift;
   }
 
   int register_userdata(void *_userdata,MBLK_PupFn _pup_ud)
@@ -210,7 +254,7 @@ private:
   {
     thisArray->the_lbdb->ObjectStop(ldHandle);
   }
-  void send(int fid, const void *grid);
+  void send(int fid,const extrudeMethod &m,const void *grid);
   void update_field(DataMsg *m);
 };
 

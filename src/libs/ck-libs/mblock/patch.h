@@ -10,62 +10,52 @@ Orion Sky Lawlor, olawlor@acm.org, 6/13/2001
 #include <charm++.h>
 #include "gridutil.h"
 
+//Describes how to extrude a patch into a 3D block
+class extrudeMethod {
+ public:
+  int toWidth;//Number of cells to extrude
+  CmiBool withCorners;//If true, include diagonal cells
+  extrudeMethod(int ghostWidth) {
+	if (ghostWidth>=0) {
+	   toWidth=ghostWidth; withCorners=false;
+	} else {
+	   toWidth=-ghostWidth; withCorners=true;
+	}
+  }
+  extrudeMethod(int w,bool c) :toWidth(w),withCorners(c) { }
+  extrudeMethod(void) { }
+  void pup(PUP::er &p) {
+    p(toWidth);
+    p(withCorners);
+  }
+};
+
 //A rectangular portion of a face 
 class patch {
-public:
+ protected:
 	//Location in the source block:
-	/*Beginning and ending node+1 for this patch (0-based, c-style)*/
-	blockLoc start,end;
-	enum {ext,send,recv} type; 
-  virtual void print(void) = 0;
-  void pup(PUP::er &p)
-  {
-    start.pup(p);
-    end.pup(p);
-    p((int&)type);
-  }
-  // return the width of this patch in w.
-  // width is calculated in extremely ad-hoc way right now. 
-  // It is the narrowest dimension of the patch. 
-  // returns 0, 1, or 2
-  int getWidth(blockLoc &w)
-  {
-    int dx = end[0] - start[0];
-    int dy = end[1] - start[1];
-    int dz = end[2] - start[2];
-    int retval;
-    w[0] = w[1] = w[2] = 0;
-    if (dx < dy) {
-      if(dx < dz) {
-        // dx is minimum
-        w[0] = dx; retval = 1;
-      } else {
-        // dz is minimum
-        w[2] = dz;retval = 2;
-      }
-    } else {
-      if(dy < dz) {
-        // dy is minimum
-        w[1] = dy;retval = 1;
-      } else {
-        // dz is minimum
-        w[2] = dz;retval = 2;
-      }
-    }
-  }
-  // returns the position of the patch w.r.t the block in the dim dimension
-  // dim = 0, 1, 2 for x, y,and z respectively
-  // position = 1 or -1 depending on whether the patch lies near the start of
-  // the block or the end of the block respectively
-  int getPos(int dim)
-  {
-    return (start[dim] == 0) ? 1 : (-1);
-  }
+	blockSpan span;
 
+	int flatAxis; //Axis along which we're flat-- the normal axis
+	CmiBool isLow; //True if we're at zero along our flat axis
+public:
+	enum {ext=0,internal=1} type; 
+
+	//Get the extents of this patch, extruded to toWidth
+	blockSpan getExtents(const extrudeMethod &m,bool forVoxel,int dir=1);
+
+	virtual void print(void) = 0;
+	void pup(PUP::er &p)
+	{
+	  span.pup(p);
+	  p((int&)type);
+	  p(flatAxis);
+	  p(isLow);
+	}
+	
+	patch(void) { } /*Migration constructor*/
 protected:
-	patch(const blockLoc &start_,const blockLoc &end_)
-	  :start(start_),end(end_) { }
-  patch(void) {}
+	patch(const blockSpan &span_);
 };
 
 //A patch that faces the external world--
@@ -73,13 +63,12 @@ protected:
 class externalBCpatch : public patch {
 public:
 	//Gridgen boundary condition number
-	int bcNo;
-
-  externalBCpatch(void) {}
+        int bcNo;
+        externalBCpatch(void) {} /*Migration constructor*/
 	externalBCpatch(
-	     const blockLoc &srcStart_,const blockLoc &srcEnd_,
+	     const blockSpan &srcSpan_,
 	     int bcNo_)
-	  : patch(srcStart_,srcEnd_), bcNo(bcNo_) { type=ext; }
+	  : patch(srcSpan_), bcNo(bcNo_) { type=ext; }
   void pup(PUP::er &p)
   {
     patch::pup(p);
@@ -87,8 +76,8 @@ public:
   }
   void print(void)
   {
-    CkPrintf("Type=external, start=%d,%d,%d end=%d,%d,%d bc#=%d\n",
-        start[0],start[1],start[2],end[0],end[1],end[2],bcNo);
+    CkPrintf("Type=external, bc#=%d, ",bcNo); span.print();
+    CkPrintf("\n");
   }
 };
 
@@ -96,30 +85,44 @@ public:
 //Permutation of (i,j,k) from source to dest:
 //  Source axis i maps to dest. axis orient[i]. (zero-based)
 class orientation {
-  int orient[3];
-  int flip[3];
+  int s2d[3]; //Source to dest axis
+  int flip[3]; //Source axis i maps to a flipped dest.
  public:
   orientation(void) {}
   orientation(const int *codedOrient);
-  int operator[](int axis) const {return orient[axis];}
-  int isFlipped(int axis) const {return flip[axis];}
-  // this is an inverse of operator[]
-  int getMap(int axis)
+  int operator[](int sAxis) const {return s2d[sAxis];}
+  int dIsFlipped(int sAxis) const {return flip[sAxis];}
+  
+  //Map dest. axis to source axis
+  int dToS(int dAxis) 
   {
-    for(int i=0;i<3;i++)
-      if(axis == orient[i])
-        return i;
+    for(int sAxis=0;sAxis<3;sAxis++)
+      if(dAxis == s2d[sAxis])
+        return sAxis;
     // error if comes here
+    return -1;
+  }
+  
+  //Return the orientation, in source coordinates, of the given
+  // destination axis.
+  blockLoc destAxis(int dAxis) {
+    int sAxis=dToS(dAxis);
+    blockLoc ret(0,0,0);
+    if (dIsFlipped(sAxis))
+      ret[sAxis]=-1;
+    else
+      ret[sAxis]=1;
+    return ret;
   }
   void pup(PUP::er &p)
   {
-    p(orient[0]); p(orient[1]); p(orient[2]);
-    p(flip[0]); p(flip[1]); p(flip[2]);
+    p(s2d,3);
+    p(flip,3);
   }
   void print(void)
   {
-    CkPrintf("orient=%d,%d,%d flip=%d,%d,%d\n",
-        orient[0],orient[1],orient[2],flip[0],flip[1],flip[2]);
+    CkPrintf(" s2d=%d,%d,%d flip=%d,%d,%d\n",
+        s2d[0],s2d[1],s2d[2],flip[0],flip[1],flip[2]);
   }
 };
 
@@ -130,12 +133,12 @@ public:
 	int destPatch; //(0-based) index of our partner on the dest. block
 	orientation orient; //His orientation relative to us
 
-  internalBCpatch(void) {}
+  internalBCpatch(void) {} /*Migration constructor*/
 	internalBCpatch(int dest_,int destPatch_,const int *codedOrient,
-	     const blockLoc &srcStart_,const blockLoc &srcEnd_)
-	  : patch(srcStart_,srcEnd_), 
+	     const blockSpan &span_)
+	  : patch(span_), 
 	    dest(dest_),destPatch(destPatch_),
-	    orient(codedOrient) { }
+	    orient(codedOrient) { type=internal; }
   void pup(PUP::er &p)
   {
     patch::pup(p);
@@ -145,10 +148,10 @@ public:
   }
   void print(void)
   {
-    CkPrintf("Type=internal, start=%d,%d,%d end=%d,%d,%d ",
-        start[0],start[1],start[2],end[0],end[1],end[2]);
-    CkPrintf("dest=%d[%d] ",dest, destPatch);
+    CkPrintf("Type=internal (%d:%d) ",dest,destPatch); 
+    span.print();
     orient.print();
+    CkPrintf("\n");
   }
 };
 
@@ -190,7 +193,7 @@ public:
     p((void*)locs, n*sizeof(vector3d));
     p(nPatches);
     if(p.isUnpacking())
-      patches = new (patch*)[nPatches];
+      patches = new patch*[nPatches];
     for(int i=0;i<nPatches;i++) {
       if(p.isUnpacking()) {
         int type;
@@ -218,3 +221,10 @@ public:
 
 
 #endif
+
+
+
+
+
+
+

@@ -40,7 +40,6 @@
        external :: MBLK_Register_bc
        external :: MBLK_Aply_bc
        external :: MBLK_Apply_bc_all
-       external :: MBLK_Get_boundary_extent
 
        external :: MBLK_Register
        external :: MBLK_Migrate

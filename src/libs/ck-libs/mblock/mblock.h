@@ -31,32 +31,33 @@ typedef void (*MBLK_PupFn)(pup_er, void*);
 typedef void *(*MBLK_PupFn)(pup_er, void*);
 #endif
 
-typedef void (*MBLK_BcFn)(void *);
-
 #ifdef __cplusplus
 extern "C" {
 #endif
+  typedef void (*MBLK_BcFn)(void *p1,void *p2,int *start,int *end);
+
   /*Utility*/
   int MBLK_Get_nblocks(int *n);
   int MBLK_Get_myblock(int *m);
-  int MBLK_Get_blocksize(int *start, int *end);
-  int MBLK_Get_extent(int *start, int *end);
+  int MBLK_Get_blocksize(int *dims); /*Fetch interior dimensions, in voxels*/
   double MBLK_Timer(void);
   void MBLK_Print(const char *str);
   void MBLK_Print_block(void);
 
-  /* caled from init */
+  /* called from init */
   int MBLK_Set_prefix(const char *prefix);
   int MBLK_Set_nblocks(const int n);
   int MBLK_Set_dim(const int n);
 
   /* field creation */
-  int MBLK_Create_field(const int base_type, const int vec_len,
-      const int offset, const int dist, int *fid);
+  int MBLK_Create_field(int *dimensions,int isVoxel,
+      const int base_type, const int vec_len,
+      const int offset, const int dist, 
+      int *fid);
 
   /* field update */
-  int MBLK_Update_field(const int fid, void *ingrid, void *outgrid);
-  int MBLK_Iupdate_field(const int fid, void *ingrid, void *outgrid);
+  int MBLK_Update_field(const int fid, int ghostWidth, void *grid);
+  int MBLK_Iupdate_field(const int fid, int ghostWidth, void *ingrid, void *outgrid);
   int MBLK_Test_update(int *status);
   int MBLK_Wait_update(void);
 
@@ -65,10 +66,9 @@ extern "C" {
   int MBLK_Reduce(const int fid, void *in, void *out, const int op);
 
   /* boundary conditions */
-  int MBLK_Register_bc(const int bcnum, const MBLK_BcFn bcfn);
-  int MBLK_Apply_bc(const int bcnum, void *grid);
-  int MBLK_Apply_bc_all(void *grid);
-  int MBLK_Get_boundary_extent(int *start, int *end);
+  int MBLK_Register_bc(const int bcnum, int ghostWidth, const MBLK_BcFn bcfn);
+  int MBLK_Apply_bc(const int bcnum, void *p1,void *p2);
+  int MBLK_Apply_bc_all(void *p1,void *p2);
 
   /*Migration */
   int MBLK_Register(void *userData, MBLK_PupFn _pup_ud, int *rid);

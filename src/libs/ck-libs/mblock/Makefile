@@ -7,15 +7,16 @@ HEADERS=patch.h vector3d.h gridutil.h mblock.h mblock_impl.h \
 all: libmblock.a libmblockf.a $(CDIR)/include/mblock.h \
      $(CDIR)/include/mblockf.h $(CDIR)/lib/fmain.o
 
-libmblock.a: mblock.C patch.C $(HEADERS)
+libmblock.a: mblock.C patch.o $(HEADERS)
 	$(CHARMC) -DMBLK_FORTRAN=0 -c mblock.C
-	$(CHARMC) -DMBLK_FORTRAN=0 -c patch.C
-	$(CHARMC) -cp $(CDIR)/lib -o libmblock.a mblock.o patch.o $(OBJS)
+	$(CHARMC) -cp $(CDIR)/lib -o $@ mblock.o patch.o $(OBJS)
 
-libmblockf.a: mblock.C patch.C $(HEADERS)
+libmblockf.a: mblock.C patch.o $(HEADERS)
 	$(CHARMC) -DMBLK_FORTRAN=1 -c mblock.C
-	$(CHARMC) -DMBLK_FORTRAN=1 -c patch.C
-	$(CHARMC) -cp $(CDIR)/lib -o libmblockf.a mblock.o patch.o $(OBJS)
+	$(CHARMC) -cp $(CDIR)/lib -o $@ mblock.o patch.o $(OBJS)
+
+patch.o: patch.C patch.h
+	$(CHARMC) -c $<
 
 fmain.o: fmain.f90
 	$(CHARMC) -c fmain.f90

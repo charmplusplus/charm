@@ -9,6 +9,7 @@ Orion Sky Lawlor, olawlor@acm.org, 7/18/2001
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "charm++.h"
 #include "patch.h"
 
 static void abort(const char *why) {
@@ -24,14 +25,18 @@ class patchReader {
   int curChar; //Current character in the line
 
   void abort(const char *why) {
-    fprintf(stderr,"Fatal error reading patch description: %s\n",why);
-    fprintf(stderr," while parsing line %d of file '%s'.\n",lineCount,fName);
-    exit(1);
+    CkError("Fatal error reading patch description: %s\n",why);
+    CkError(" while parsing line %d of file '%s'.\n",lineCount,fName);
+    CkExit();
   }
 public:
   patchReader(const char *fileName) {
     lineCount=0; fName=fileName; //(Only used for error messages)
     f=fopen(fileName,"r");
+    if (f==NULL) {
+	CkError("Couldn't open patch file '%s'!\n",fileName);
+	CkExit();
+    }
     nextLine();
   }
   ~patchReader() {fclose(f);}
@@ -74,11 +79,13 @@ public:
     return ret;
   }
   //Return a block span from the file
-  void nextSpan(blockLoc &min,blockLoc &max) {
+  blockSpan nextSpan(void) {
+    blockSpan ret;
     for (int axis=0;axis<3;axis++) {
-      min[axis]=nextInt(); 
-      max[axis]=nextInt();
+      ret.start[axis]=nextInt(); 
+      ret.end[axis]=nextInt();
     }
+    return ret;
   }
 };
 
@@ -104,25 +111,20 @@ block::block(const char *filePrefix,int blockNo)
       for (int pc=0;pc<nP;pc++) 
       { //Read the next patch
 	int type=f.nextInt();
-	blockLoc start,end;
-	f.nextSpan(start,end);
+	blockSpan span=f.nextSpan();
 	f.nextLine();
 	patch *p;
-	if (type<0) { //Internal patch
+	if (type==-1) { //Internal patch
 	  int destBlock=f.nextInt();
 	  int destPatch=f.nextInt();
 	  int orient[3];
 	  for (int axis=0;axis<3;axis++)
 	    orient[axis]=f.nextInt();
 	  f.nextLine();
-	  p=new internalBCpatch(destBlock,destPatch,
-				orient, start,end);
-	  if (type==-10) p->type=patch::recv;
-	  else if (type==-11) p->type=patch::send;
-	  else abort("Unrecognized internal patch type!");
+	  p=new internalBCpatch(destBlock,destPatch,orient, span);
 	}
 	else
-	  p=new externalBCpatch(start,end,type);
+	  p=new externalBCpatch(span,type);
 	patches[curPatch++]=p;
       } 
     }
@@ -150,9 +152,48 @@ orientation::orientation(const int *codedOrient)
     int code=codedOrient[axis];
     flip[axis]=(code<0);
     if (flip[axis]) code=-code;
-    orient[axis]=code-1;
+    s2d[axis]=code-1;
   }
 }
 
+patch::patch(const blockSpan &span_)
+	  :span(span_) 
+{ 
+  flatAxis=span.getFlatAxis();
+  isLow=(span.start[flatAxis]==0);
+}
+
+//Get the extents of this patch, extruded to toWidth
+blockSpan patch::getExtents(const extrudeMethod &m,bool forVoxel,int dir)
+{
+  //Begin with our dimensions
+  blockLoc s=span.start; 
+  blockLoc e=span.end;
+
+  //Extrude along our normal axis
+  int w=m.toWidth*dir;
+  if (isLow) w=-w;
+  if (w<0) s[flatAxis]+=w;
+  else     e[flatAxis]+=w;
+  
+  //Add the corners if needed
+  if (w<0) w=-w;
+  if (m.withCorners) {
+    for (int axis=0;axis<3;axis++) 
+    if (axis!=flatAxis) {
+      s[axis]-=w;
+      e[axis]+=w;
+    }
+  }
+  
+  //Convert to voxel coordinates (from node coords)
+  if (forVoxel) {
+    e=e-blockLoc(1,1,1);
+  } else /*forNode*/ {
+    if (isLow) e[flatAxis]--;
+    else       s[flatAxis]++;
+  }
+  return blockSpan(s,e);
+}
 
 
