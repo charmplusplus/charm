@@ -1990,7 +1990,7 @@ void Entry::genDefs(XStr& str)
     if(isConstructor()) die("Constructors cannot be [exclusive]",line);
     preMarshall << "  if(CmiTryLock(impl_obj->__nodelock)) {\n"; /*Resend msg. if lock busy*/
     /******* DANGER-- RESEND CODE UNTESTED **********/
-    preMarshall << "    CkSendMsgNodeBranch("<<epIdx()<<",impl_msg,CkMyNode(),CkGetNodeGroupID());\n";
+    preMarshall << "    CkSendMsgNodeBranch("<<epIdx()<<",impl_msg,CkMyNode(),impl_obj->CkGetNodeGroupID());\n";
     preMarshall << "    return;\n";
     preMarshall << "  }\n";
     
