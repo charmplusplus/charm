@@ -1219,6 +1219,24 @@ int req_handle_printerr(ChMessage *msg,SOCKET fd)
 }
 
 
+int req_handle_printsync(ChMessage *msg,SOCKET fd)
+{
+  printf("%s",msg->data);
+  fflush(stdout);
+  req_reply(fd, "printdone", "", 1);
+  return REQ_OK;
+}
+
+
+int req_handle_printerrsync(ChMessage *msg,SOCKET fd)
+{
+  fprintf(stderr,"%s",msg->data);
+  fflush(stderr);
+  req_reply(fd, "printdone", "", 1);
+  return REQ_OK;
+}
+
+
 int req_handle_ending(ChMessage *msg,SOCKET fd)
 {  
   int i;
@@ -1267,6 +1285,8 @@ int req_handler_dispatch(ChMessage *msg,SOCKET replyFd)
 #endif
   else if (strcmp(cmd,"print")==0)      return req_handle_print(msg,replyFd);
   else if (strcmp(cmd,"printerr")==0)   return req_handle_printerr(msg,replyFd);
+  else if (strcmp(cmd,"printsync")==0)  return req_handle_printsync(msg,replyFd);
+  else if (strcmp(cmd,"printerrsync")==0) return req_handle_printerrsync(msg,replyFd);
   else if (strcmp(cmd,"scanf")==0)      return req_handle_scanf(msg,replyFd);
   else if (strcmp(cmd,"ending")==0)     return req_handle_ending(msg,replyFd);
   else if (strcmp(cmd,"abort")==0)      return req_handle_abort(msg,replyFd);

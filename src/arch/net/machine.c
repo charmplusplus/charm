@@ -1808,22 +1808,48 @@ static void node_addresses_store(ChMessage *msg)
 
 static void InternalPrintf(f, l) char *f; va_list l;
 {
+  ChMessage replymsg;
   char *buffer = CpvAccess(internal_printf_buffer);
   vsprintf(buffer, f, l);
-  if (Cmi_charmrun_fd!=-1)
+  if (Cmi_charmrun_fd!=-1) {
+#if CMK_SYNC_PRINTF
+  	ctrl_sendone_locking("printsync", buffer,strlen(buffer)+1,NULL,0);
+    CmiCommLock();
+  	ChMessage_recv(Cmi_charmrun_fd,&replymsg);
+  	ChMessage_free(&replymsg);
+    CmiCommUnlock();
+#else
   	ctrl_sendone_locking("print", buffer,strlen(buffer)+1,NULL,0);
-  else
+#endif
+  } else {
   	fprintf(stdout,"%s",buffer);
+#if CMK_SYNC_PRINTF
+    fflush(stdout);
+#endif
+  }
 }
 
 static void InternalError(f, l) char *f; va_list l;
 {
+  ChMessage replymsg;
   char *buffer = CpvAccess(internal_printf_buffer);
   vsprintf(buffer, f, l);
-  if (Cmi_charmrun_fd!=-1)
+  if (Cmi_charmrun_fd!=-1) {
+#if CMK_SYNC_PRINTF
+  	ctrl_sendone_locking("printerrsync", buffer,strlen(buffer)+1,NULL,0);
+    CmiCommLock();
+  	ChMessage_recv(Cmi_charmrun_fd,&replymsg);
+  	ChMessage_free(&replymsg);
+    CmiCommUnlock();
+#else
   	ctrl_sendone_locking("printerr", buffer,strlen(buffer)+1,NULL,0);
-  else
+#endif
+  } else {
   	fprintf(stderr,"%s",buffer);
+#if CMK_SYNC_PRINTF
+    fflush(stderr);
+#endif
+  }
 }
 
 static int InternalScanf(fmt, l)
