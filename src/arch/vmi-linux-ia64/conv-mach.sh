@@ -1,5 +1,6 @@
 VMI_INCDIR="-I/home/koenig/THESIS/VMI20-install/include" 
 VMI_LIBDIR="-L/home/koenig/THESIS/VMI20-install/lib"
+#
 CMK_CPP_CHARM="/lib/cpp -P"
 CMK_CPP_C="gcc -E $CMK_INCDIR $VMI_INCDIR "
 CMK_CC="gcc $CMK_INCDIR $VMI_INCDIR "
