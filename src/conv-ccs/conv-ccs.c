@@ -315,7 +315,7 @@ void CcsInit(char **argv)
   CpvAccess(ccsTab) = CkCreateHashtable_string(sizeof(CcsHandlerRec),5);
   CpvInitialize(CcsImplHeader *, ccsReq);
   CpvAccess(ccsReq) = NULL;
-  _ccsHandlerIdx = CmiRegisterHandler(req_fw_handler);
+  _ccsHandlerIdx = CmiRegisterHandler((CmiHandler)req_fw_handler);
 
   CcsBuiltinsInit(argv);
 
