@@ -795,6 +795,7 @@ void CentralLB::LDStats::pup(PUP::er &p)
   int i;
   p(count);  
   p(n_objs);
+  p(n_migrateobjs);
   p(n_comm);
   if (p.isUnpacking()) {
     // user can specify simulated processors other than the real # of procs.
@@ -857,7 +858,7 @@ void CLBStatsMsg::pup(PUP::er &p) {
   p|total_walltime; p|total_cputime;
   p|idletime;
   p|bg_walltime;   p|bg_cputime;
-  p|n_objs;        
+  p|n_objs;
   if (p.isUnpacking()) objData = new LDObjData[n_objs];
   for (i=0; i<n_objs; i++) p|objData[i];
   p|n_comm;

@@ -184,6 +184,7 @@ void LBCommTable::GetCommData(LDCommData* data)
         out->sender.omID() = curtable->srcObj.omID();
         out->sender.objID() = curtable->srcObj.objID();
       }
+      // so far, the receiver must be an object
       CmiAssert(curtable->destObj.get_type() == LD_OBJ_MSG);
       out->receiver = curtable->destObj;
       out->messages = curtable->n_messages;
