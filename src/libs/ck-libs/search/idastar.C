@@ -311,7 +311,7 @@ void idaStarGroup::SpawnIteration() {
 
     // Compute the unique priority lead to give to this iteration.
     child->Priority.Resize(0);
-    int k = CkBitVector::log2((CurrentDepth-StartDepth)/Stride+2)-1, i;
+    int k = CkBitVector::ilog2((CurrentDepth-StartDepth)/Stride+2)-1, i;
 
     // Set the first k bits to 1.
     for ( i = 0 ; i < k ; i++ ) {
