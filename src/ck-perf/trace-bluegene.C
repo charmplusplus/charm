@@ -43,6 +43,7 @@ static void writeData(void *data, double t, double recvT, void *ptr)
 void TraceBluegene::writePrint(char* str, double t){
   if (pfp == NULL)
     creatFiles();
+  fprintf(pfp,"[%d] ", CkMyPe());
   fprintf(pfp,str,t);
 }
 
