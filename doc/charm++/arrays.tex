@@ -260,13 +260,13 @@ the second parameter gives the length of the array (as with
 by calling the \kw{PUP::er} with a ``void *'' and number of bytes
 (packing bytes, however, prevents cross-platform pack/unpacking).
 
-The system uses your one pup routine to do both packing and
-unpacking by passing different types of \kw{PUP::er}s to it. 
-You can determine what type of \kw{PUP::er} has been passed to you 
-with the \kw{isPacking()}, \kw{isUnpacking()}, and \kw{isSizing()} calls.
+The system uses one pup routine to do both packing and unpacking by
+passing different types of \kw{PUP::er}s to it.  You can determine
+what type of \kw{PUP::er} has been passed to you with the
+\kw{isPacking()}, \kw{isUnpacking()}, and \kw{isSizing()} calls.
 
-An array element can migrate by calling the ``migrateMe(destination
-processor)'' member function-- this call must be the last action
+An array element can migrate by calling the \uw{migrateMe(destination
+processor)} member function-- this call must be the last action
 in an element entry point.  The system can also migrate array elements
 for load balancing (see the ``Load Balancing Chare Arrays'' chapter).
 
@@ -274,34 +274,32 @@ To migrate your array element to another processor, the \charmpp
 runtime will:
 
 \begin{itemize}
-\item Call your \kw{pup} method with a sizing \kw{PUP::er} to determine how 
+\item Call your \uw{pup} method with a sizing \kw{PUP::er} to determine how 
 big a message it needs to hold your element.
-\item Call your \kw{pup} method again with a packing \kw{PUP::er} to pack 
+\item Call your \uw{pup} method again with a packing \kw{PUP::er} to pack 
 your element into a message.
 \item Call your element's destructor (killing off the old copy).
 \item Send the message (containing your element) across the network.
 \item Call your element's migration constructor on the new processor.
-\item Call your \kw{pup} method on with an unpacking \kw{PUP::er} to unpack 
+\item Call your \uw{pup} method on with an unpacking \kw{PUP::er} to unpack 
 the element.
 \end{itemize}
 
-Migration constructors, then, are normally empty-- all the
-unpacking and allocation of the data items is done in the 
-element's \kw{pup} routine.  Deallocation is done in the
-element destructor as usual.
+Migration constructors, then, are normally empty-- all the unpacking
+and allocation of the data items is done in the element's \uw{pup} routine.
+Deallocation is done in the element destructor as usual.
 
-The \kw{PUP::er} overhead is very small-- one 
-virtual function call for each item to be packed/unpacked.
-The actual packing/unpacking is a simple memory-to-memory 
-binary copy.  In addition, the \kw{pup} routine may also be called to 
-pack your array 
-element to disk (e.g., for a ``checkpoint'' operation), and unpack 
-it from disk afterwards (e.g., for ``restart'' operation).  
-During unpacking, a ``translating'' \kw{PUP::er} can be used to perform binary
-format conversion if needed.
+The \kw{PUP::er} overhead is very small-- one virtual function call
+for each item to be packed/unpacked.  The actual packing/unpacking is
+a simple memory-to-memory binary copy.  In addition, the \uw{pup}
+routine may also be called to pack your array element to disk (e.g.,
+for a ``checkpoint'' operation), and unpack it from disk afterwards
+(e.g., for ``restart'' operation).  During unpacking, a
+``translating'' \kw{PUP::er} can be used to perform binary format
+conversion if needed.
 
 To easily pack user-defined types, we recommend adding
-a \kw{pup} method to the user-defined type:
+a \uw{pup} method to the user-defined type:
 
 \begin{verbatim}
 class myData 
@@ -358,20 +356,31 @@ call \kw{ArrayElement::AtSync}.  Once all elements have reached AtSync,
 the load balancer runs and may migrate elements.  Once
 all migrations are complete, the load balancer calls 
 \kw{ArrayElement::ResumeFromSync}.  You must ensure no messages are
-sent to an array element between its calls to AtSync and ResumeFromSync.
-AtSync/ResumeFromSync is currently a implemented as a global barrier.
+sent to an array element between its calls to \kw{AtSync} and
+\kw{ResumeFromSync}. \kw{AtSync}/\kw{ResumeFromSync} is currently
+a implemented as a global barrier.
 
 
 
 \subsubsection{Reductions on Chare Arrays}
-A \index{reduction}reduction applies a single operation (e.g. add, max, min, ...) to data items scattered across many processors and collects the result in one place.  \charmpp supports reductions on the elements of a Chare array.
+A \index{reduction}reduction applies a single operation (e.g. add,
+max, min, ...) to data items scattered across many processors and
+collects the result in one place.  \charmpp supports reductions on the
+elements of a Chare array.
 
 The data to be reduced comes from each array element, which must call the contribute method:
 \begin{verbatim}
 ArrayElement::contribute(int nBytes,void *data,ReducerType type);
 \end{verbatim}
 
-This call contributes \kw{nBytes} bytes starting at \kw{data} to the reduction \kw{type} (see reduction types, below).  Unlike sending a message, you may use \kw{data} after the call to \kw{contribute}.  All array elements must call contribute, and all must use the same reduction type.  When you create a new array element, it is expected to contribute to the next reduction not already in progress.  The reduction will complete properly even if array elements are migrated or deleted.
+This call contributes \kw{nBytes} bytes starting at \kw{data} to the
+reduction \kw{type} (see reduction types, below).  Unlike sending a
+message, you may use \kw{data} after the call to \kw{contribute}.  All
+array elements must call \kw{contribute}, and all must use the same
+reduction type.  When you create a new array element, it is expected
+to contribute to the next reduction not already in progress.  The
+reduction will complete properly even if array elements are migrated
+or deleted.
 
 If we want to sum each array element's single integer myInt, we would use:
 \begin{verbatim}
@@ -380,16 +389,22 @@ If we want to sum each array element's single integer myInt, we would use:
     contribute(sizeof(int),(void *)&myInt,CkReduction::sum_int);
 \end{verbatim}
 
-The built-in reduction types (see below) can also handle arrays of numbers.  For example, if each element of an array has a pair of doubles \kw{forces}[2] which need to be summed up (separately) across all array elements, from each array element call:
+The built-in reduction types (see below) can also handle arrays of
+numbers.  For example, if each element of an array has a pair of
+doubles \uw{forces}[2] which need to be summed up (separately) across
+all array elements, from each array element call:
 \begin{verbatim}
     //Inside any array element method
     double forces[2]=get_my_forces();
     contribute(2*sizeof(double),(void *)forces,CkReduction::sum_double);
 \end{verbatim}
-Note that since C++ arrays (like forces[2]) are already pointers, we don't use (void *)\&forces.
+Note that since C++ arrays (like \uw{forces}[2]) are already pointers, we don't use (void *)\&forces.
 
 
-After the data is reduced, it is passed to a ``client'' function on node zero.  This is an ordinary C or C++ function that you pass to \kw{CProxy\_Array::setReductionClient}.  Reduction clients are typically registered from your main Chare's constructor, as in:
+After the data is reduced, it is passed to a ``client'' function on
+node zero.  This is an ordinary C or C++ function that you pass to
+\kw{CProxy\_Array::setReductionClient}.  Reduction clients are
+typically registered from your main Chare's constructor, as in:
 
 \begin{verbatim}
 //Outside any class definition:
@@ -406,13 +421,21 @@ void myClient(void *param,int dataSize,void *data)
     a.setReductionClient(myClient,(void *)NULL);
 \end{verbatim}
 
-This simple client prints out the double values received, and does not use the \kw{param} value passed in (\kw{NULL}, in this case).  The handler can use param, dataSize, and the data in any fashion; but the data will be deleted after the handler returns.
+This simple client prints out the double values received, and does not
+use the \uw{param} value passed in (\kw{NULL}, in this case).  The
+handler can use \uw{param}, \uw{dataSize}, and the data in any
+fashion; but the data will be deleted after the handler returns.
 
 
 \subsubsection{Built-in Array Reduction Types}
 \charmpp includes several built-in reduction types, used to combine the contributions from different array elements.  Any of them may be passed as an \kw{ArrayReductionFn} type to \kw{ArrayElement::contribute}.
 
-The first four reductions (sum, product, max, and min) work on int, float, or double data as indicated by the suffix.  The logical reductions (and, or) only work on integer data.  All the built-in reductions work on single numbers (pass a pointer) or arrays-- just pass the correct number of bytes to \kw{ArrayElement}::\kw{contribute}.
+The first four reductions (sum, product, max, and min) work on int,
+float, or double data as indicated by the suffix.  The logical
+reductions (and, or) only work on integer data.  All the built-in
+reductions work on single numbers (pass a pointer) or arrays-- just
+pass the correct number of bytes to
+\kw{ArrayElement}::\kw{contribute}.
 
 \begin{enumerate}
 \item \kw{CkReduction::sum\_int}, \kw{\_float}, \kw{\_double}-- the result will be the sum of the given numbers.
@@ -442,7 +465,7 @@ public:
 };
 \end{verbatim}
 
-To extract the contribution of each array element from a reduction set, use the \kw{next} routine repeatedly:
+To extract the contribution of each array element from a reduction set, use the \uw{next} routine repeatedly:
 \begin{verbatim}
   //Inside a reduction handler-- 
   //  data is our reduced data from CkReduction_set
@@ -462,7 +485,7 @@ The reduction set order is undefined.  Add a source field to your contribution i
 To define a new array index, you create an ordinary C++ class 
 which inherits from \kw{CkArrayIndex} and overrides the \kw{getKey} method.  
 For example, if you have a structure or class named ``foo'', you 
-can use a foo object as an array index by defining the class:
+can use a \uw{foo} object as an array index by defining the class:
 
 \begin{verbatim}
 class CkArrayIndexFoo:public CkArrayIndex {
@@ -480,7 +503,7 @@ public:
 };
 \end{verbatim}
 
-You can then declare an array indexed by foo objects with
+You can then declare an array indexed by \uw{foo} objects with
 
 \begin{verbatim}
 //in the .ci file:
@@ -529,7 +552,7 @@ is more palatable and the compiler can do static type checking.
 e.g. ``array [1D] foo { ... }''.
 
 \item Messages sent to array elements need no longer inherit from 
-ArrayMessage.
+\kw{ArrayMessage}.
 
 \item Array elements for 1D arrays must inherit from ArrayElement1D
 to use a 1D thisIndex.  You may still inherit from ArrayElement, but you
@@ -537,23 +560,22 @@ won't have a thisIndex.
 
 \item You may have multiple array constructors; each can now take a user-defined message, or no message.  
 
-\item The ``ArrayElementCreateMessage'' constructor is obsolete;
-as are the finishConstruction and finishMigration calls. No constructor
-need explicitly call its superclass.  
+\item The \kw{ArrayElementCreateMessage} constructor is obsolete;
+as are the \kw{finishConstruction} and \kw{finishMigration} calls. No
+constructor need explicitly call its superclass.
 
-\item ``ArrayElementMigrateMessage'' is now depricated-- use 
-``CkMigrateMessage''
+\item \kw{ArrayElementMigrateMessage} is now depricated-- use 
+\kw{CkMigrateMessage}.
 
 \item For migration, the old packsize, pack, and unpacking portion of
 the migration constructor have been replaced by a unified pack/unpack 
 ``pup'' routine.
 
-\item For load balancing, the uses\_at\_sync variable is now called usesAtSync.
+\item For load balancing, the \kw{uses\_at\_sync} variable is now called \kw{usesAtSync}.
 
-\item CkReduction\_sum\_int is now an enumeration, not a function pointer, and
-now called CkReduction::sum\_int.
+\item \kw{CkReduction\_sum\_int} is now an enumeration, not a function pointer, and now called \kw{CkReduction::sum\_int}.
 
-\item CkRegisterArrayReductionHandler(proxy,fn,param)
+\item \function{CkRegisterArrayReductionHandler(proxy,fn,param)}
 is now proxy.setReductionClient(fn,param).
 \end{itemize}
 

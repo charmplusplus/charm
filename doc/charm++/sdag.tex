@@ -141,11 +141,11 @@ xx\=xx\=xx\=xx\=xx\=xx\=xx\kill
 
 Contrast the compute chare-object example in
 figure~\ref{figchareexample} with a thread-based implementation of the
-same scheme in figure~\ref{figthreadexample}. Functions {\tt
-getFirst}, and {\tt getSecond} send messages asynchronously to the
+same scheme in figure~\ref{figthreadexample}. Functions \uw{getFirst}, 
+and \uw{getSecond} send messages asynchronously to the
 PatchManager, requesting that the specified patches be sent to them,
 and return immediately. Since these messages with patches could arrive
-in any order, two threads, {\tt recvFirst} and {\tt recvSecond}, are
+in any order, two threads, \uw{recvFirst} and \uw{recvSecond}, are
 created. These threads block, waiting for messages to arrive. After
 each message arrives, each thread performs the filtering
 operation. The main thread waits for these two threads to complete,

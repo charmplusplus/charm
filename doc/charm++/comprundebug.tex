@@ -1,13 +1,17 @@
-\section{Compiling, Running and Debugging \charmpp/Converse Programs}
+\section{Compiling, Running and Debugging \charmpp/\converse Programs}
 
- In this section, we give a brief description on how to compile, run and debug a charm++/Converse programs. This is a quick start introduction, only most commonly used options will be mentioned. For more information, refer to Charm/Charm++/Converse Installation and Usage Manual.
+ In this section, we give a brief description on how to compile, run
+ and debug a \charmpp/\converse programs. This is a quick start
+ introduction, only most commonly used options will be mentioned. For
+ more information, refer to Charm/\charmpp/\converse Installation and
+ Usage Manual.
 
-\subsection{Compiling Converse, Charm, and Charm++ Programs}
+\subsection{Compiling \converse, Charm, and \charmpp\ Programs}
 
-The {\tt charmc} program standardizes compiling and linking procedures
+The \cmd{charmc} program standardizes compiling and linking procedures
 among various machines and operating systems.  
 
-Charmc can perform the following tasks.  The (simplified) syntax for
+\cmd{charmc} can perform the following tasks.  The (simplified) syntax for
 each of these modes is shown. The options are described next.
 
 \begin{verbatim}
@@ -20,13 +24,13 @@ each of these modes is shown. The options are described next.
  * Translate Charm++ Interface File charmc file.ci
 \end{verbatim}
 
-The following command-line options are most useful to users of charmc:
+The following command-line options are most useful to users of \cmd{charmc}:
 
 \begin{description}
 
 \item[{\tt -o} {\em output-file}:]
 
-Output file name.  Note: charmc only ever produces one output file at
+Output file name.  Note: \cmd{charmc} only ever produces one output file at
 a time.  Because of this, you cannot compile multiple source files at
 once, unless you then link or archive them into a single output-file.
 If exactly one source-file is specified, then an output file will be
@@ -75,28 +79,26 @@ All commands executed by charmc are echoed to stdout.
 
 \item[{\tt -language \{converse|charm++|sdag\}}:]
 
-When linking with charmc, one must specify the ``language''.  This
+When linking with \cmd{charmc}, one must specify the ``language''.  This
 is just a way to help charmc include the right libraries.  Pick the
 ``language'' according to this table:
 
 \begin{itemize}
-\item{{\bf Charm++} if your program includes Charm++, Charm, C++, and C.}
-\item{{\bf Converse} if your program includes C or C++.}
+\item{{\bf Charm++} if your program includes \charmpp, Charm, \CC, and C.}
+\item{{\bf Converse} if your program includes C or \CC.}
 \item{{\bf sdag} if your program includes structured dagger.}
 \end{itemize}
 
 \item[{\tt -tracemode} {\em tracing-mode}:]
 
-Selects the desired degree of tracing for Charm and Charm++ programs.
+Selects the desired degree of tracing for Charm and \charmpp\ programs.
 See the Charm manual and the Projections and SummaryTool manuals for
 more information.  Currently supported modes are {\tt none}, {\tt
 summary}, and {\tt projections}. Default is {\tt -tracemode none}.
 
-
 \end{description}
 
-
-\subsection[Executing Converse/Charm/Charm++ Programs]
+\subsection[Executing \converse/Charm/\charmpp\ Programs]
 	{Executing Converse/Charm/Charm++ Programs}
 \label{executing charm programs}
 
@@ -369,3 +371,7 @@ file, because {\fexec rsh} does not run the {\fexec .login} file.
 man pages for {\fexec xhost} and {\fexec xauth}).
 
 \end{enumerate}
+
+
+
+
