@@ -188,14 +188,18 @@ int BGMach::read(char *file)
         network = new LemieuxNetwork;
       else if (!strcmp(parameterValue, "bluegene"))
         network = new BlueGeneNetwork;
+      else if (!strcmp(parameterValue, "redstorm"))
+        network = new RedStormNetwork;
       else
         CmiAbort("BG> unknown network setup");
       continue;
     }
-    CmiPrintf("skip %s %s\n", parameterName, parameterValue);
+    if (CmiMyPe() == 0)
+      CmiPrintf("skip %s %s\n", parameterName, parameterValue);
   }
 
   configFile.close();
+  return 0;
 }
 
 int main(int argc,char *argv[])
