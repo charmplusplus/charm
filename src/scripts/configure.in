@@ -149,7 +149,7 @@ public:
 };
 EOT
 test_cxx "whether operator delete can be overloaded in same class" "ok" "no"
-AC_DEFINE_UNQUOTED(CMK_MULTIPLE_DELETE, $pass)
+AC_DEFINE_UNQUOTED(CMK_MULTIPLE_DELETE, 0)
 
 #test if has poll
 cat > $t <<EOT
