@@ -8,7 +8,11 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.23  1997-07-28 19:00:54  jyelon
+ * Revision 1.24  1997-07-28 20:13:26  milind
+ * Fixed bugs due to ckfutures declarations in c++interface.h
+ * Also, wrote macros for node numbering in exemplar.
+ *
+ * Revision 1.23  1997/07/28 19:00:54  jyelon
  * *** empty log message ***
  *
  * Revision 1.22  1997/07/26 16:41:50  jyelon
@@ -160,8 +164,8 @@
 #define CMK_WAIT_USES_SYS_WAIT_H                           1
 #define CMK_WAIT_USES_WAITFLAGS_H                          0
 
-#define CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT                   1
-#define CMK_WHEN_PROCESSOR_IDLE_USLEEP                     0
+#define CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT                   0
+#define CMK_WHEN_PROCESSOR_IDLE_USLEEP                     1
 
 #define CMK_USE_HP_MAIN_FIX                                1
 #define CMK_DONT_USE_HP_MAIN_FIX                           0

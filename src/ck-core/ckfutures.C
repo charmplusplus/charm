@@ -99,7 +99,7 @@ static void setFuture(int handle, void *pointer)
   fut->waiters = 0;
 }
 
-static void futuresModuleInit()
+extern "C" void futuresModuleInit()
 {
   int i; Future *array;
   CpvInitialize(FutureState, futurestate);
@@ -122,7 +122,7 @@ class FutureInitMsg : public comm_object
   public: int x ;
 };
 
-void *CRemoteCallBranchFn( int ep, void *m, int group, int processor)
+extern "C" void *CRemoteCallBranchFn( int ep, void *m, int group, int processor)
 { 
   void * result;
   ENVELOPE *env = ENVELOPE_UPTR(m);
@@ -134,7 +134,7 @@ void *CRemoteCallBranchFn( int ep, void *m, int group, int processor)
   return (result);
 }
 
-void *CRemoteCallFn(int ep, void *m, ChareIDType *ID)
+extern "C" void *CRemoteCallFn(int ep, void *m, ChareIDType *ID)
 { 
   void * result;
   ENVELOPE *env = ENVELOPE_UPTR(m);

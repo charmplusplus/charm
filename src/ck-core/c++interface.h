@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.30  1997-07-26 16:41:08  jyelon
+ * Revision 2.31  1997-07-28 20:13:20  milind
+ * Fixed bugs due to ckfutures declarations in c++interface.h
+ * Also, wrote macros for node numbering in exemplar.
+ *
+ * Revision 2.30  1997/07/26 16:41:08  jyelon
  * *** empty log message ***
  *
  * Revision 2.29  1996/03/22 16:07:02  sanjeev
@@ -237,9 +241,8 @@ extern "C" int   GetRefNumber(void *m);
 
 extern "C" void      futuresModuleInit();
 extern "C" void      futuresCreateBOC();
-extern "C" void*     CRemoteCallBranchFn(int entry, void * m, int g, int p);
-extern "C" void*     CRemoteCallFn(int entry, void *m, ChareIDType *id);
-extern "C" CthThread CthCreate(void (*)(...), void *, int);
+extern "C" void *     CRemoteCallBranchFn(int Entry, void * m, int g, int p);
+extern "C" void *     CRemoteCallFn(int Entry, void *m, ChareIDType *id);
 extern "C" void      CSendToFuture(void *m, int processor);
 
 

@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.69  1997-07-28 19:00:39  jyelon
+ * Revision 2.70  1997-07-28 20:13:23  milind
+ * Fixed bugs due to ckfutures declarations in c++interface.h
+ * Also, wrote macros for node numbering in exemplar.
+ *
+ * Revision 2.69  1997/07/28 19:00:39  jyelon
  * *** empty log message ***
  *
  * Revision 2.68  1997/07/26 16:41:16  jyelon
@@ -333,12 +337,12 @@ extern int Cmi_mynodesize;
 #define CmiMyRank()         (my_thread())
 #define CmiNumPes()         Cmi_numpes
 #define CmiMyNodeSize()     Cmi_mynodesize
-#define CmiMyNode()         ?
-#define CmiNumNodes()       ?
-#define CmiNodeFirst(node)  ?
-#define CmiNodeSize(node)   ?
-#define CmiNodeOf(pe)       ?
-#define CmiRankOf(pe)       ?
+#define CmiMyNode()         0
+#define CmiNumNodes()       Cmi_numpes
+#define CmiNodeFirst(node)  0
+#define CmiNodeSize(node)   Cmi_numpes
+#define CmiNodeOf(pe)       0
+#define CmiRankOf(pe)       (pe)
 
 #define SHARED_DECL
 #define CpvDeclare(t,v) t* CMK_CONCAT(Cpv_Var_,v)
