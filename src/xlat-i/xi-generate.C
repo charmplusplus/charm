@@ -61,8 +61,8 @@ void commonStuff(ofstream& top, ofstream& bot, Chare *c, Entry *e)
     sprintf(str, "\t%s *m2 = ((%s *)obj)->%s((%s *)m);",
       e->returnMsg->name, c->name, e->name, e->msgtype->name);
     bot << str << endl ;
-    bot << "\tSetRefNumber(m2, i);" << endl;
-    bot << "\tCSendToFuture(m2, j);" << endl;
+    bot << "\tSetRefNumber( (void*) m2, i);" << endl;
+    bot << "\tCSendToFuture( (void*) m2, j);" << endl;
 
   } else { // Regular EP
     sprintf(str,"\t((%s *)obj)->%s((%s *)m) ;",
@@ -155,7 +155,7 @@ void GenerateStructsFns(ofstream& top, ofstream& bot)
             << endl;
 
         sprintf(str,
-          "\tt = CthCreate(_CK_call_threaded_%s_%s, (void *) element,0);",
+          "\tt = CthCreate( (void (*)(...)) _CK_call_threaded_%s_%s, (void *) element,0);",
           c->name,e->name) ;
         bot << str << endl;
         bot << "\tCthSetStrategyDefault(t);" << endl;
