@@ -18,6 +18,8 @@
 extern CkReduction::reducerType sparse_sum_int;
 extern CkReduction::reducerType sparse_sum_float;
 extern CkReduction::reducerType sparse_sum_double;
+extern CkReduction::reducerType sparse_sum_TwoFloats;
+extern CkReduction::reducerType sparse_sum_TwoDoubles;
 
 extern CkReduction::reducerType sparse_product_int;
 extern CkReduction::reducerType sparse_product_float;
@@ -31,6 +33,21 @@ extern CkReduction::reducerType sparse_min_int;
 extern CkReduction::reducerType sparse_min_float;
 extern CkReduction::reducerType sparse_min_double;
 
+class CkTwoDoubles{
+ public:
+  double d1, d2;
+  CkTwoDoubles(){d1=0; d2=0;}
+  CkTwoDoubles(double _d1, double _d2){d1=_d1; d2=_d2;}
+  void operator+=(CkTwoDoubles d){d1+=d.d1; d2+=d.d2;}
+};
+
+class CkTwoFloats{
+ public:
+  float f1, f2;
+  CkTwoFloats(){f1=0; f2=0;}
+  CkTwoFloats(float _f1, float _f2){f1=_f1; f2=_f2;}
+  void operator+=(CkTwoFloats f){f1+=f.f1; f2+=f.f2;}
+};
 
 class CkDataSegHeader{
  public:

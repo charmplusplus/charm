@@ -152,6 +152,16 @@ static CkReductionMsg *name(int nMsg, CkReductionMsg ** msg){\
   SIMPLE_SPARSE_CONTIGUOUS_REDUCTION(nameBase##_float,float,"%f",loop) \
   SIMPLE_SPARSE_CONTIGUOUS_REDUCTION(nameBase##_double,double,"%f",loop)
 
+//Use this macro for reductions that have the same type for all inputs
+#define POLYMORPH_SPARSE_CONTIGUOUS_REDUCTION(nameBase,loop) \
+  SIMPLE_SPARSE_CONTIGUOUS_REDUCTION(nameBase##_TwoFloats,CkTwoFloats,"%d",loop) \
+  SIMPLE_SPARSE_CONTIGUOUS_REDUCTION(nameBase##_TwoDoubles,CkTwoDoubles,"%f",loop) \
+
+// Merge the sparse arrays passed by elements, summing the elements with same
+// indices.
+POLYMORPH_SPARSE_CONTIGUOUS_REDUCTION(_sparse_sum, *(dataptr + k) +=
+  *msgDataptr;)
+
 // Merge the sparse arrays passed by elements, summing the elements with same
 // indices.
 SIMPLE_POLYMORPH_SPARSE_CONTIGUOUS_REDUCTION(_sparse_sum, *(dataptr + k) +=
@@ -180,6 +190,8 @@ void registerReducers(void)
   sparse_sum_int = CkReduction::addReducer(_sparse_sum_int);
   sparse_sum_float = CkReduction::addReducer(_sparse_sum_float);
   sparse_sum_double = CkReduction::addReducer(_sparse_sum_double);
+  sparse_sum_TwoFloats = CkReduction::addReducer(_sparse_sum_TwoFloats);
+  sparse_sum_TwoDoubles = CkReduction::addReducer(_sparse_sum_TwoDoubles);
 
   sparse_product_int = CkReduction::addReducer(_sparse_product_int);
   sparse_product_float= CkReduction::addReducer(_sparse_product_float);
@@ -277,4 +289,9 @@ SIMPLE_DECOMPRESSOR(float);
 // define decompressor for 'double' data
 SIMPLE_DECOMPRESSOR(double);
 
+// define decompressor for 'CkTwoFloats' data
+SIMPLE_DECOMPRESSOR(CkTwoFloats);
+
+// define decompressor for 'CkTwoDoubles' data
+SIMPLE_DECOMPRESSOR(CkTwoDoubles);
 #include "CkSparseContiguousReducer.def.h"
