@@ -193,6 +193,7 @@ typedef struct
 
 typedef struct
 {
+  char header[CmiMsgHeaderSizeBytes];
   int rank;
   int maxsize;
   VMI_virt_addr_t context;
@@ -201,6 +202,7 @@ typedef struct
 
 typedef struct
 {
+  char header[CmiMsgHeaderSizeBytes];
   VMI_virt_addr_t context;
   int rdmarecvindx;
 } CMI_VMI_Persistent_Grant_Message_T;
@@ -208,6 +210,7 @@ typedef struct
 
 typedef struct
 {
+  char header[CmiMsgHeaderSizeBytes];
   int rdmarecvindx;
 } CMI_VMI_Persistent_Destroy_Message_T;
 
