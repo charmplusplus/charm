@@ -774,13 +774,13 @@ AMPI is powered by the \charmpp{} communication optimization support now!
 Currently the user needs to specify the communication pattern by command
 line option. In the future this can be done automatically by the system.
 
-Currently there are four strategies available: USE_DIRECT, USE_MESH,
-USE_HYPERCUBE and USE_GRID. USE_DIRECT sends the message directly. 
-USE_MESH imposes a 2d Mesh virtual topology on the processors so each 
+Currently there are four strategies available: USE\_DIRECT, USE\_MESH,
+USE\_HYPERCUBE and USE\_GRID. USE\_DIRECT sends the message directly. 
+USE\_MESH imposes a 2d Mesh virtual topology on the processors so each 
 processor sends messages to its neighbors in its row and column of the 
-mesh which forward the messages to their correct destinations. USE_HYPERCUBE 
-and USE_GRID impose a hypercube and a 3d Grid topologies on the processors. 
-USE_HYPERCUBE will do best for very small messages and small number of 
+mesh which forward the messages to their correct destinations. USE\_HYPERCUBE 
+and USE\_GRID impose a hypercube and a 3d Grid topologies on the processors. 
+USE\_HYPERCUBE will do best for very small messages and small number of 
 processors, 3d has better performance for slightly higher message sizes 
 and then Mesh starts performing best. The programmer is encouraged to try 
 out all the strategies. (Stolen from the CommLib manual by Sameer :)
@@ -792,9 +792,9 @@ http://finesse.cs.uiuc.edu/papers/CommLib.pdf}.
 Specifying the strategy is as simple as a command line option +strategy. For
 example:
 \begin{alltt}
-> ./charmrun +p64 alltoall +vp64 1000 100 +strategy USE_MESH
+> ./charmrun +p64 alltoall +vp64 1000 100 +strategy USE\_MESH
 \end{alltt}
-tells the system to use MESH strategy for CommLib. By default USE_DIRECT is
+tells the system to use MESH strategy for CommLib. By default USE\_DIRECT is
 used.
 
 \subsection{Compiling AMPI Programs}
