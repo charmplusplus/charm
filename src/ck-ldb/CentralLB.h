@@ -53,10 +53,12 @@ public:
                             // making projections output look funny
 
   void ReceiveStats(CkMarshalledCLBStatsMessage &msg);	// Receive stats on PE 0
+  void LoadBalance(void); 
   void ResumeClients(int);                      // Resuming clients needs
 	                                        // to be resumed via message
   void ResumeClients(CkReductionMsg *);
   void ReceiveMigration(LBMigrateMsg *); 	// Receive migration data
+  void MissMigrate(int waitForBarrier);
 
   // manual predictor start/stop
   static void staticPredictorOn(void* data, void* model);
@@ -69,10 +71,11 @@ public:
   static void staticStartLB(void* data);
 
   // Migrated-element callback
-  static void staticMigrated(void* me, LDObjHandle h);
-  void Migrated(LDObjHandle h);
+  static void staticMigrated(void* me, LDObjHandle h, int waitBarrier=1);
+  void Migrated(LDObjHandle h, int waitBarrier=1);
 
   void MigrationDone(int balancing);  // Call when migration is complete
+  void CheckMigrationComplete();      // Call when all migration is complete
 
   struct ProcStats {  // per processor data
     double total_walltime;
@@ -241,6 +244,9 @@ private:
   LDStats *statsData;
   int migrates_completed;
   int migrates_expected;
+  int future_migrates_completed;
+  int future_migrates_expected;
+  int lbdone;
   double start_lb_time;
 
   FutureModel *predicted_model;

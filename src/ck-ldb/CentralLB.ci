@@ -15,9 +15,11 @@ group [migratable] CentralLB : BaseLB {
   entry void CentralLB(const CkLBOptions &);  
   entry void ProcessAtSync(void);
   entry void ReceiveStats(CkMarshalledCLBStatsMessage data);
+  entry void LoadBalance(void);
   entry void ResumeClients(int);
   entry void ResumeClients(CkReductionMsg *);
   entry void ReceiveMigration(LBMigrateMsg*);	
+  entry void MissMigrate(int);
 };
 
 };

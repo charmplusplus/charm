@@ -16,7 +16,7 @@
 #include "LBDBManager.h"
 #include "LBSimulation.h"
 
-#define  DEBUGF(x)    // CmiPrintf x;
+#define  DEBUGF(x)      // CmiPrintf x;
 
 CkGroupID loadbalancer;
 int * lb_ptr;
@@ -45,10 +45,10 @@ void CentralLB::staticStartLB(void* data)
   me->StartLB();
 }
 
-void CentralLB::staticMigrated(void* data, LDObjHandle h)
+void CentralLB::staticMigrated(void* data, LDObjHandle h, int waitBarrier)
 {
   CentralLB *me = (CentralLB*)(data);
-  me->Migrated(h);
+  me->Migrated(h, waitBarrier);
 }
 
 void CentralLB::staticAtSync(void* data)
@@ -91,8 +91,11 @@ void CentralLB::initLB(const CkLBOptions &opt)
   myspeed = theLbdb->ProcessorSpeed();
 
   migrates_completed = 0;
+  future_migrates_completed = 0;
   migrates_expected = -1;
+  future_migrates_expected = -1;
   cur_ld_balancer = 0;
+  lbdone = 0;
   int num_proc = CkNumPes();
 
   theLbdb->CollectStatsOn();
@@ -143,7 +146,7 @@ void CentralLB::turnOff()
 void CentralLB::AtSync()
 {
 #if CMK_LBDB_ON
-  DEBUGF(("[%d] CentralLB At Sync step %d!!!!!\n",CkMyPe(),step()));
+  DEBUGF(("[%d] CentralLB AtSync step %d!!!!!\n",CkMyPe(),step()));
 
   // if num of processor is only 1, nothing should happen
   if (!QueryBalanceNow(step()) || CkNumPes() == 1) {
@@ -195,19 +198,42 @@ void CentralLB::ProcessAtSync()
   }
 
   thisProxy[cur_ld_balancer].ReceiveStats(msg);
+
+  {
+  // enfore the barrier to wait until centralLB says no
+  LDOMHandle h;
+  h.id.id.idx = 0;
+  theLbdb->getLBDB()->RegisteringObjects(h);
+  }
 #endif
 }
 
-void CentralLB::Migrated(LDObjHandle h)
+void CentralLB::Migrated(LDObjHandle h, int waitBarrier)
 {
 #if CMK_LBDB_ON
-  migrates_completed++;
-  //  CkPrintf("[%d] An object migrated! %d %d\n",
-  //  	   CkMyPe(),migrates_completed,migrates_expected);
-  if (migrates_completed == migrates_expected) {
-    MigrationDone(1);
+  if (waitBarrier) {
+    migrates_completed++;
+    //  CkPrintf("[%d] An object migrated! %d %d\n",
+    //  	   CkMyPe(),migrates_completed,migrates_expected);
+    if (migrates_completed == migrates_expected) {
+      MigrationDone(1);
+    }
+  }
+  else {
+    future_migrates_completed ++;
+    DEBUGF(("[%d] An object migrated with no barrier! %d %d\n",
+    	   CkMyPe(),future_migrates_completed,future_migrates_expected));
+    if (future_migrates_completed == future_migrates_expected)  {
+	CheckMigrationComplete();
+    }
   }
 #endif
+}
+
+void CentralLB::MissMigrate(int waitForBarrier)
+{
+  LDObjHandle h;
+  Migrated(h, waitForBarrier);
 }
 
 // build data from buffered msg
@@ -249,7 +275,6 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
 {
 #if CMK_LBDB_ON
   CLBStatsMsg *m = (CLBStatsMsg *)msg.getMessage();
-  int proc;
   const int pe = m->from_pe;
 //  CkPrintf("Stats msg received, %d %d %d %d %p\n",
 //  	   pe,stats_msg_count,m->n_objs,m->serial,m);
@@ -289,56 +314,65 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
 
   DEBUGF(("[0] ReceiveStats from %d step: %d count: %d\n", pe, step(), stats_msg_count));
   const int clients = CkNumPes();
+
   if (stats_msg_count == clients) {
-    if (_lb_args.debug()) 
-      CmiPrintf("[%s] Load balancing step %d starting at %f in PE%d\n",
-                 lbName(), step(),start_lb_time, cur_ld_balancer);
-//    double strat_start_time = CmiWallTimer();
-
-    // build data
-    buildStats();
-
-    // if we are in simulation mode read data
-    if (LBSimulation::doSimulation) simulationRead();
-
-    char *availVector = LBDatabaseObj()->availVector();
-    for(proc = 0; proc < clients; proc++)
-      statsData->procs[proc].available = (CmiBool)availVector[proc];
-
-    // Call the predictor for the future
-    if (_lb_predict) FuturePredictor(statsData);
-
-//    CkPrintf("Before Calling Strategy\n");
-    LBMigrateMsg* migrateMsg = Strategy(statsData, clients);
-
-//    CkPrintf("returned successfully\n");
-    LBDatabaseObj()->get_avail_vector(migrateMsg->avail_vector);
-    migrateMsg->next_lb = LBDatabaseObj()->new_lbbalancer();
-
-    // if this is the step at which we need to dump the database
-    simulationWrite();
-
-//  calculate predicted load
-//  very time consuming though, so only happen when debugging is on
-    if (_lb_args.debug()) {
-      double minObjLoad, maxObjLoad;
-      getPredictedLoad(statsData, clients, migrateMsg, migrateMsg->expectedLoad, minObjLoad, maxObjLoad, 1);
-    }
-
-//  CkPrintf("calling recv migration\n");
-    thisProxy.ReceiveMigration(migrateMsg);
-
-    // Zero out data structures for next cycle
-    // CkPrintf("zeroing out data\n");
-    statsData->clear();
-    stats_msg_count=0;
-
-//    double strat_end_time = CmiWallTimer();
-//    CkPrintf("Strat elapsed time %f\n",strat_end_time-strat_start_time);
+    thisProxy[CkMyPe()].LoadBalance();
   }
 #endif
 }
 
+void CentralLB::LoadBalance()
+{
+#if CMK_LBDB_ON
+  int proc;
+  if (_lb_args.debug()) 
+      CmiPrintf("[%s] Load balancing step %d starting at %f in PE%d\n",
+                 lbName(), step(),start_lb_time, cur_ld_balancer);
+//    double strat_start_time = CmiWallTimer();
+
+  // build data
+  buildStats();
+
+  // if we are in simulation mode read data
+  if (LBSimulation::doSimulation) simulationRead();
+
+  char *availVector = LBDatabaseObj()->availVector();
+  const int clients = CkNumPes();
+  for(proc = 0; proc < clients; proc++)
+      statsData->procs[proc].available = (CmiBool)availVector[proc];
+
+  // Call the predictor for the future
+  if (_lb_predict) FuturePredictor(statsData);
+
+//    CkPrintf("Before Calling Strategy\n");
+  LBMigrateMsg* migrateMsg = Strategy(statsData, clients);
+
+//    CkPrintf("returned successfully\n");
+  LBDatabaseObj()->get_avail_vector(migrateMsg->avail_vector);
+  migrateMsg->next_lb = LBDatabaseObj()->new_lbbalancer();
+
+  // if this is the step at which we need to dump the database
+  simulationWrite();
+
+//  calculate predicted load
+//  very time consuming though, so only happen when debugging is on
+  if (_lb_args.debug()) {
+      double minObjLoad, maxObjLoad;
+      getPredictedLoad(statsData, clients, migrateMsg, migrateMsg->expectedLoad, minObjLoad, maxObjLoad, 1);
+  }
+
+//  CkPrintf("calling recv migration\n");
+  thisProxy.ReceiveMigration(migrateMsg);
+
+  // Zero out data structures for next cycle
+  // CkPrintf("zeroing out data\n");
+  statsData->clear();
+  stats_msg_count=0;
+#endif
+}
+
+//    double strat_end_time = CmiWallTimer();
+//    CkPrintf("Strat elapsed time %f\n",strat_end_time-strat_start_time);
 // test if sender and receiver in a commData is nonmigratable.
 static int isMigratable(LDObjData **objData, int *len, int count, const LDCommData &commData)
 {
@@ -417,19 +451,23 @@ void CentralLB::ReceiveMigration(LBMigrateMsg *m)
   int i;
   for (i=0; i<CkNumPes(); i++) theLbdb->lastLBInfo.expectedLoad[i] = m->expectedLoad[i];
   
-  DEBUGF(("[%d] in ReceiveMigration %d moves\n",CkMyPe(),m->n_moves));
   migrates_expected = 0;
+  future_migrates_expected = 0;
   for(i=0; i < m->n_moves; i++) {
     MigrateInfo& move = m->moves[i];
     const int me = CkMyPe();
     if (move.from_pe == me && move.to_pe != me) {
       DEBUGF(("[%d] migrating object to %d\n",move.from_pe,move.to_pe));
-      theLbdb->Migrate(move.obj,move.to_pe);
+      // migrate object, in case it is already gone, inform toPe
+      if (theLbdb->Migrate(move.obj,move.to_pe) == 0) 
+         thisProxy[move.to_pe].MissMigrate(!move.async_arrival);
     } else if (move.from_pe != me && move.to_pe == me) {
       // CkPrintf("[%d] expecting object from %d\n",move.to_pe,move.from_pe);
-      if (!move.ignore_arrival) migrates_expected++;
+      if (!move.async_arrival) migrates_expected++;
+      else future_migrates_expected++;
     }
   }
+  DEBUGF(("[%d] in ReceiveMigration %d moves expected: %d future expected: %d\n",CkMyPe(),m->n_moves, migrates_expected, future_migrates_expected));
   // if (_lb_debug) CkPrintf("[%d] expecting %d objects migrating.\n", CkMyPe(), migrates_expected);
 #if 0
   if (m->n_moves ==0) {
@@ -478,11 +516,11 @@ void CentralLB::ResumeClients(CkReductionMsg *msg)
 void CentralLB::ResumeClients(int balancing)
 {
 #if CMK_LBDB_ON
-  DEBUGF(("Resuming clients on PE %d\n",CkMyPe()));
+  DEBUGF(("[%d] Resuming clients. balancing:%d.\n",CkMyPe(),balancing));
   if (balancing && _lb_args.debug() && CkMyPe() == cur_ld_balancer) {
     double end_lb_time = CmiWallTimer();
     CkPrintf("[%s] Load balancing step %d finished at %f\n",
-  	      lbName(), step(),end_lb_time);
+  	      lbName(), step()-1,end_lb_time);
     double lbdbMemsize = LBDatabase::Object()->useMem()/1000;
     CkPrintf("[%s] duration %fs memUsage: LBManager:%dKB CentralLB:%dKB\n", 
   	      lbName(), end_lb_time - start_lb_time,
@@ -490,8 +528,40 @@ void CentralLB::ResumeClients(int balancing)
   }
 
   theLbdb->ResumeClients();
-  // switch to the next load balancer in the list
-  if (balancing) theLbdb->nextLoadbalancer(seqno);
+  if (balancing)  {
+    CheckMigrationComplete();
+    if (future_migrates_expected == 0 || 
+            future_migrates_expected == future_migrates_completed) {
+      CheckMigrationComplete();
+    }
+  }
+#endif
+}
+
+/*
+  migration of objects contains two different kinds:
+  (1) objects want to make a barrier for migration completion
+      (waitForBarrier is true)
+      migrationDone() to finish and resumeClients
+  (2) objects don't need a barrier
+  However, next load balancing can only happen when both migrations complete
+*/ 
+void CentralLB::CheckMigrationComplete()
+{
+#if CMK_LBDB_ON
+  lbdone ++;
+  if (lbdone == 2) {
+    lbdone = 0;
+    future_migrates_expected = -1;
+    future_migrates_completed = 0;
+    DEBUGF(("[%d] MigrationComplete\n", CkMyPe()));
+    // release local barrier  so that the next load balancer can go
+    LDOMHandle h;
+    h.id.id.idx = 0;
+    theLbdb->getLBDB()->DoneRegisteringObjects(h);
+    // switch to the next load balancer in the list
+    theLbdb->nextLoadbalancer(seqno);
+  }
 #endif
 }
 
@@ -574,7 +644,7 @@ LBMigrateMsg * CentralLB::createMigrateMsg(LDStats* stats,int count)
       migrateMe->obj = objData.handle;
       migrateMe->from_pe = frompe;
       migrateMe->to_pe = tope;
-      migrateMe->ignore_arrival = objData.ignoreArrival;
+      migrateMe->async_arrival = objData.asyncArrival;
       migrateInfo.insertAtEnd(migrateMe);
     }
   }
