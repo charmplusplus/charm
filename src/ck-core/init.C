@@ -590,11 +590,12 @@ void _initCharm(int unused_argc, char **argv)
 
 	_futuresModuleInit(); // part of futures implementation is a converse module
 	_loadbalancerInit();
-
+	
 #if CMK_TRACE_IN_CHARM
         // initialize trace module in ck
         traceCharmInit(argv);
 #endif
+	PUP::_pupModuleInit();
 #if CMK_RECORD_REPLAY
 	CkMessageWatcherInit(argv,CkpvAccess(_coreState));
 #endif
