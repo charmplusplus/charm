@@ -104,6 +104,7 @@ RouterStrategy::RouterStrategy(int stratid, int handle, int _npes,
     pelist = _pelist;
     //memcpy(pelist, _pelist, sizeof(int) * npes);    
 
+    myPe = -1;
     procMap = new int[CkNumPes()];    
     setReverseMap();
 
@@ -114,7 +115,7 @@ RouterStrategy::RouterStrategy(int stratid, int handle, int _npes,
 
     if(myPe < 0) {
         //I am not part of this strategy
-
+        
         doneFlag = 0;
         router = NULL;
         bufferedDoneInserting = 0;
@@ -261,41 +262,6 @@ void RouterStrategy::doneInserting(){
         msgQ.push(cmsg);
     }
 
-    /*  // OLDER version which called an extra virtual method for each
-        //message 
-      int numToDeposit = msgQ.length();
-      
-      while(!msgQ.isEmpty()) {
-      MessageHolder *cmsg = msgQ.deq();
-      char *msg = cmsg->getMessage();
-      
-      if(!cmsg->isDummy)  {            
-      //Assuming list of processors to multicast to is in the
-      //order of relative processors numbering and NOT absolute
-      //processor numbering
-      
-      if(cmsg->dest_proc == IS_BROADCAST) {  
-      router->EachToManyMulticast(id, cmsg->size, msg, cmsg->npes, 
-      cmsg->pelist, 
-      numToDeposit > 1);
-      }            
-      else {                                
-      
-      ComlibPrintf("%d: Insert Pers. Message to %d\n", CkMyPe(), procMap[cmsg->dest_proc]);
-      router->EachToManyMulticast(id, cmsg->size, msg, 1,
-      &procMap[cmsg->dest_proc],
-      numToDeposit > 1);
-      }            
-      }   
-      else
-      router->EachToManyMulticast(id, cmsg->size, msg, 1, &myPe, 
-      numToDeposit > 1);
-      
-      numToDeposit --;
-      delete cmsg;        
-      }
-    */
-    
     router->EachToManyMulticastQ(id, msgQ);
 
     while(!recvQ.isEmpty()) {
