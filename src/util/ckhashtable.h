@@ -89,22 +89,28 @@ inline int CkHashCompare_int(const void *k1,const void *k2,size_t /*len*/)
 
 class CkHashtableIterator;
 
-/* Describes the in-memory layout of a hashtable entry.
+/**
+ Describes the in-memory layout of a hashtable entry.
+
+Nobody should ever use this class directly; use CkHashtableT
+or CkHashtableTslow instead.
+
 "key" is a user-defined type, used as the unique object identifier.
 The key is assumed to begin at the start of the entry.  
 "empty" is a character, set to 1 if this entry in the table 
-is unused, zero otherwise. "object" is the thing the table stores;
-it is of a user-defined type.
+is unused, zero otherwise; the "empty" field must not overlap 
+either of the other fields. "object" is the thing the table stores;
+it is of a user-defined type and may overlap "key".
 
      | key | empty | gap? | object | gap? |
 ==   | <------- hashtable entry --------> |
 
 */
 class CkHashtableLayout {
-  int size; //Size of entire table entry, at least ks+os.
-  int ko,ks; //Key byte offset (always zero) and size
-  int po,ps; //"empty bit" offset and size (always 1)
-  int oo,os; //Object byte offset and size
+  int size; ///< Size of entire table entry, at least ks+os.
+  int ko,ks; ///< Key byte offset (always zero) and size
+  int po,ps; ///< "empty bit" offset and size (always 1)
+  int oo,os; ///< Object byte offset and size
  public:
   CkHashtableLayout(int keySize,int emptyOffset,
 		    int objectOffset,int objectSize,int entryLength)
@@ -120,25 +126,30 @@ class CkHashtableLayout {
   inline int objectSize(void) const {return os;}
 
 //Utility functions:
-  //Given an entry pointer, return a pointer to the key
+  /// Given an entry pointer, return a pointer to the key
   inline char *getKey(char *entry) const {return entry+ko;}
-  //Given an entry pointer, return a pointer to the object
+  /// Given an entry pointer, return a pointer to the object
   inline char *getObject(char *entry) const {return entry+oo;}
   
-  //Is this entry empty?
+  /// Is this entry empty?
   inline char isEmpty(char *entry) const {return *(entry+po);}
-  //Mark this entry as empty
+  /// Mark this entry as empty
   inline void empty(char *entry) const {*(entry+po)=1;}  
-  //Mark this entry as full
+  /// Mark this entry as full
   inline void fill(char *entry) const {*(entry+po)=0;}
 
-  //Move to the next entry
+  /// Move to the next entry
   inline char *nextEntry(char *entry) const {return entry+size;}
 
-  //Get entry pointer from key pointer
+  /// Get entry pointer from key pointer
   inline char *entryFromKey(char *key) const {return key-ko;}
 };
 
+/**
+ A resize-on-demand extensible hashtable.  Users should probably
+use CkHashtableT or CkHashtableTslow instead of calling this class
+directly.
+*/
 class CkHashtable {
 private:
 	CkHashtable(const CkHashtable &); //Don't use these
@@ -234,14 +245,15 @@ public:
 
 
 /////////////////// Templated Hashtable /////////////////
-/*
+/**
 This class provides a thin typesafe layer over the (unsafe)
 CkHashtable above.  Via the magic of function inlining, this
 comes at zero time and space cost over the unsafe version.
-The unsafe version exists to avoid the code bloat associated
-with profligate use of templates.
-*/
 
+The unsafe version exists to avoid the code bloat associated
+with profligate use of templates; because the typeless layer
+handles the difficult parts, this templated class is very cheap.
+*/
 template <class KEY, class OBJ> 
 class CkHashtableTslow:public CkHashtable {
   //Return the layout for this hashtable:
@@ -289,8 +301,8 @@ public:
 
 //Declare the KEY.hash & KEY.compare functions inline for a 
 // completely inlined (very fast) hashtable lookup.	
-// Be sure the hash and compare functions return the same
-//  values as the non-inlined versions passed to the constructor.
+// You MUST be SURE the hash and compare functions return the same
+//  values as the staticHash and staticCompare functions.
 template <class KEY, class OBJ> 
 class CkHashtableT:public CkHashtableTslow<KEY,OBJ> {
 public:
@@ -360,9 +372,16 @@ public:
 	}
 };
 
-/*A useful adaptor class for using basic (memory only)
+/**
+A useful adaptor class for using basic (memory only)
   types like int, short, char, etc. as hashtable keys.
- */
+
+This class adds the hash, compare, staticHash, and staticCompare
+routines needed to be a CkHashtableT KEY; you can thus use ints
+as a fast key like this:
+	CkHashtableT<CkHashtableAdaptorT<int>, foo> bar;
+
+*/
 template <class T> class CkHashtableAdaptorT {
 	T val;
 public:
