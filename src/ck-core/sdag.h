@@ -76,7 +76,7 @@ class TListCWhenTrigger
     void pup(PUP::er& p) {
       int nEntries;
       int cur=0;
-      if (p.isUnpacking()) { 
+      if (p.isPacking()) { 
         nEntries = 0;
         for (CWhenTrigger *tmp = first; tmp!=last; tmp=tmp->next, nEntries++)
           if (current == tmp) cur = nEntries;
@@ -165,8 +165,8 @@ class TListCMsgBuffer
 
     void pup(PUP::er& p) {
       int nEntries;
-      int cur;
-      if (p.isUnpacking()) { 
+      int cur=0;
+      if (p.isPacking()) { 
         nEntries = 0;
         for (CMsgBuffer *tmp = first; tmp!=last; tmp=tmp->next, nEntries++) {
           if (current == tmp) cur = nEntries;
