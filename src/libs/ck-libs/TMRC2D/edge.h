@@ -117,7 +117,8 @@ class edge {
     newEdgeRef = e.newEdgeRef;
     return *this; 
   }
-  int split(nodeRef *m, edgeRef *e_prime, nodeRef othernode, elemRef eRef);
+  int split(nodeRef *m, edgeRef *e_prime, nodeRef othernode, elemRef eRef, 
+	    int *local);
   void sanityCheck(chunk *c,edgeRef shouldRef);
 };
 

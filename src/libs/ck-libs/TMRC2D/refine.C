@@ -55,7 +55,6 @@ CDECL void REFINE2D_NewMesh(int nEl,int nGhost,const int *conn,const int *gid)
   MPI_Barrier(MPI_COMM_WORLD);
   CtvAccess(_refineChunk)->newMesh(nEl,nGhost,conn, gid, 0);
   CkWaitQD(); //Wait for all edge numbering messages to finish
-  CtvAccess(_refineChunk)->sanityCheck();
 }
 FDECL void FTN_NAME(REFINE2D_NEWMESH,refine2d_newmesh)
 (int *nEl,int *nGhost,const int *conn,const int *gid)
@@ -75,8 +74,11 @@ class refineResults {
 	public:
 		int t,s,n;
 		double f;
+		int flag;
 		resRec(int t_,int s_,int n_,double f_) 
-			:t(t_), s(s_), n(n_), f(f_) {}
+			:t(t_), s(s_), n(n_), f(f_) {flag =0;}
+		resRec(int t_,int s_,int n_,double f_,int flag_) 
+			:t(t_), s(s_), n(n_), f(f_),flag(flag_) {}
 	};
 	std::vector<resRec> res;
 	
@@ -94,8 +96,13 @@ public:
 		nResults++;
 		res.push_back(resRec(tri_,side_,n_,frac_));
 	}
+	void add(int tri_,int side_,int n_,double frac_,int flag) {
+		nResults++;
+		res.push_back(resRec(tri_,side_,n_,frac_,flag));
+	}
+
 	int countResults(void) const {return nResults;}
-	void extract(int i,const int *conn,int *triDest,int *A,int *B,int *C,double *fracDest,int idxBase) {
+	void extract(int i,const int *conn,int *triDest,int *A,int *B,int *C,double *fracDest,int idxBase,int *flags) {
 		if ((i<0) || (i>=(int)res.size()))
 			CkAbort("Invalid index in REFINE2D_Get_Splits");
 		
@@ -104,12 +111,12 @@ public:
 		int edgeOfTri=res[i].s;
 		int movingNode=res[i].n;
 		
-		// TLW: changed this to reflect new numbering scheme in TMRC2D
-		int c=2-edgeOfTri; //==opnode
+		int c=(edgeOfTri+2)%3; //==opnode
 		*A=conn[3*tri+movingNode]; //==othernode
 		*B=conn[3*tri+otherThan(c,movingNode)];
 		*C=conn[3*tri+c];
 		*fracDest=res[i].f;
+		*flags = res[i].flag;
 		if (i==(int)res.size()-1) {
 		  delete this;
 		  chunk *C = CtvAccess(_refineChunk);
@@ -130,6 +137,10 @@ public:
   #endif
     res->add(tri, side, node, frac);
   }
+	void split(int tri, int side, int node, double frac,int flag) {
+    res->add(tri, side, node, frac,flag);
+  }
+
 };
 
 // this function should be called from a thread
@@ -173,18 +184,18 @@ FDECL int FTN_NAME(REFINE2D_GET_SPLIT_LENGTH,refine2d_get_split_length)(void)
 }
 
 CDECL void REFINE2D_Get_Split
-    (int splitNo,const int *conn,int *triDest,int *A,int *B,int *C,double *fracDest)
+    (int splitNo,const int *conn,int *triDest,int *A,int *B,int *C,double *fracDest,int *flags)
 {
   TCHARM_API_TRACE("REFINE2D_Get_Split", "refine");
   refineResults *r=getResults();
-  r->extract(splitNo,conn,triDest,A,B,C,fracDest,0);
+  r->extract(splitNo,conn,triDest,A,B,C,fracDest,0,flags);
 }
 FDECL void FTN_NAME(REFINE2D_GET_SPLIT,refine2d_get_split)
-    (int *splitNo,const int *conn,int *triDest,int *A,int *B,int *C,double *fracDest)
+    (int *splitNo,const int *conn,int *triDest,int *A,int *B,int *C,double *fracDest, int *flags)
 {
   TCHARM_API_TRACE("REFINE2D_Get_Split", "refine");
   refineResults *r=getResults();
-  r->extract(*splitNo-1,conn,triDest,A,B,C,fracDest,1);
+  r->extract(*splitNo-1,conn,triDest,A,B,C,fracDest,1,flags);
 }
 
 /********************* Check *****************/

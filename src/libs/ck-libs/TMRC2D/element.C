@@ -185,7 +185,7 @@ void element::split(int longEdge)
                     /         \
            fixnode @___________@ othernode
                       longEdge                         */
-  int opnode, othernode, fixnode, modEdge, otherEdge, result;
+  int opnode, othernode, fixnode, modEdge, otherEdge, result, local;
   edgeRef *e_prime, *newEdge;
   nodeRef *m;
   elemRef *newElem, nullRef;
@@ -199,15 +199,11 @@ void element::split(int longEdge)
   fixnode = (othernode + 1) % 3;
   modEdge = 2 - fixnode;
   otherEdge = 2 - othernode;
-  if ((result=edges[longEdge].split(m,e_prime,nodes[othernode],myRef)) == 1) {
+  if ((result=edges[longEdge].split(m,e_prime,nodes[othernode],myRef,&local)) == 1) {
     // e_prime successfully created incident on othernode
   CkPrintf("TMRC2D: Refining element %d, opnode=%d othernode=%d fixnode=%d longEdge=%d modEdge=%d otherEdge=%d\n", myRef.idx, nodes[opnode].idx, nodes[othernode].idx, nodes[fixnode].idx, edges[longEdge].idx, edges[modEdge].idx, edges[otherEdge].idx);
     newEdge = C->addEdge(nodes[opnode], *m);
 
-    /* old code disregards orientation
-    newElem = C->addElement(nodes[opnode], nodes[othernode], *m, 
-			    edges[modEdge], *newEdge, *e_prime);
-    */
     // add new element to preserve orientation
     if (opnode == 0) {
       if (othernode == 1)
@@ -246,18 +242,16 @@ void element::split(int longEdge)
     calculateArea(); // update cached area of original element
     C->theElements[newElem->idx].calculateArea(); // and of new element
     // tell the world outside about the split
-    if (C->theClient) C->theClient->split(myRef.idx, longEdge, othernode, 0.5);
+    int flag = BOUND_FIRST;
+    if (local) flag = LOCAL_FIRST;
+    if (C->theClient) C->theClient->split(myRef.idx, longEdge, othernode, 0.5, 
+					  flag);
     delete m; delete newEdge; delete e_prime; delete newElem;
   }
   else if (result == 0) { 
     // e_prime already incident on fixnode
   CkPrintf("TMRC2D: Refining element %d, opnode=%d othernode=%d fixnode=%d longEdge=%d modEdge=%d otherEdge=%d\n", myRef.idx, nodes[opnode].idx, nodes[othernode].idx, nodes[fixnode].idx, edges[longEdge].idx, edges[modEdge].idx, edges[otherEdge].idx);
     newEdge = C->addEdge(nodes[opnode], *m);
-
-    /* old code disregards orientation
-    newElem = C->addElement(nodes[opnode], nodes[fixnode], *m, 
-			    edges[otherEdge], *newEdge, *e_prime);
-    */
 
     // add new element to preserve orientation
     if (opnode == 0) {
@@ -297,7 +291,10 @@ void element::split(int longEdge)
     calculateArea(); // update cached area of original element
     C->theElements[newElem->idx].calculateArea(); // and of new element
     // tell the world outside about the split
-    if (C->theClient) C->theClient->split(myRef.idx, longEdge, fixnode, 0.5);
+    int flag = BOUND_SECOND;
+    if (local) flag = LOCAL_SECOND;
+    if (C->theClient) C->theClient->split(myRef.idx, longEdge, fixnode, 0.5, 
+					  flag);
     delete m; delete newEdge; delete e_prime; delete newElem;
   }
   else { // longEdge still trying to complete previous split; try later

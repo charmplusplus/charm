@@ -4,6 +4,13 @@
 #include "ref.h"
 #include "refine.decl.h"
 
+// Constants to tell FEM interface whether node is on a boudary between chunks
+// and if it is the first of two split operations
+#define LOCAL_FIRST 0x2
+#define LOCAL_SECOND 0x0
+#define BOUND_FIRST 0x3
+#define BOUND_SECOND 0x1
+ 
 extern CProxy_chunk mesh;
 
 class element {  // triangular elements defined by three node references,

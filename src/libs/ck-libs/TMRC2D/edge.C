@@ -36,7 +36,7 @@ void edge::checkPending(elemRef e, elemRef ne)
   }
 }
 
-int edge::split(nodeRef *m, edgeRef *e_prime, nodeRef othernode, elemRef eRef)
+int edge::split(nodeRef *m, edgeRef *e_prime, nodeRef othernode, elemRef eRef, int *local)
 {
   // element eRef has asked this edge to split and give back a new nodeRef
   // and new edgeRef on othernode; return value is 1 if successful, 0 if
@@ -71,6 +71,8 @@ int edge::split(nodeRef *m, edgeRef *e_prime, nodeRef othernode, elemRef eRef)
     *m = *newNodeRef;
     *e_prime = *newEdgeRef;
     if (!(nbr == nullRef)) { // refine the nbr
+      if (nbr.cid == eRef.cid) *local = 1;
+      else *local = 0;
       pending = 1;
       newEdgeRef->setPending();
       waitingFor = nbr;
@@ -81,6 +83,7 @@ int edge::split(nodeRef *m, edgeRef *e_prime, nodeRef othernode, elemRef eRef)
       mesh[nbr.cid].refineElement(rm);
     }
     else {
+      *local = 1;
       update(othernode, *newNodeRef);
       waitingFor.reset();
       newNodeRef->reset();

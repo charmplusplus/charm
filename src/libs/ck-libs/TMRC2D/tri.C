@@ -170,8 +170,9 @@ intMsg *chunk::safeToMoveNode(nodeMsg *nm)
 splitOutMsg *chunk::split(splitInMsg *sim)
 {
   splitOutMsg *som = new splitOutMsg;
+  int foo;
   som->result = theEdges[sim->idx].split(&(som->n), &(som->e), sim->n, 
-					   sim->e);
+					   sim->e, &foo);
   CkFreeMsg(sim);
   return som;
 }

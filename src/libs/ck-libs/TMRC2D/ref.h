@@ -57,7 +57,7 @@ class edgeRef : public objRef {
   void unsetPending();
   int isPending();
   void remove();
-  int split(nodeRef *m, edgeRef *e_prime, nodeRef othernode, elemRef eRef);
+  int split(nodeRef *m, edgeRef *e_prime, nodeRef othernode, elemRef eRef, int *local);
   void checkPending(elemRef e);
   void checkPending(elemRef e, elemRef ne);
 };

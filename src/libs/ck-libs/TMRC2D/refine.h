@@ -103,7 +103,7 @@ int REFINE2D_Get_Split_Length(void);
    *   -Add new triangle. 
    */
 void REFINE2D_Get_Split(int splitNo,const int *conn,
-	int *tri,int *A,int *B,int *C,double *frac);
+	int *tri,int *A,int *B,int *C,double *frac,int *flags);
 
 /**
  * Check to make sure our connectivity and the refine connectivity agree.

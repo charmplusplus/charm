@@ -181,7 +181,7 @@ void edgeRef::remove()
 }
 
 int edgeRef::split(nodeRef *m, edgeRef *e_prime, nodeRef othernode, 
-		   elemRef eRef)
+		   elemRef eRef, int *local)
 {
   splitOutMsg *som;
   int result;
