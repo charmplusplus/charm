@@ -11,6 +11,7 @@ double busyWait;
 double sim_timer;
 int POSE_inactDetect;
 POSE_TimeType POSE_endtime;
+POSE_TimeType POSE_GlobalClock;
 
 // Main initialization for all of POSE
 void POSE_init() // use inactivity detection by default
@@ -77,10 +78,16 @@ void POSE_init(int IDflag, int ET) // can specify both
   CkPrintf("NOTE: POSE running in sequential simulation mode!\n");
   int fnIdx = CkIndex_pose::stop();
   CkStartQD(fnIdx, &POSE_Coordinator_ID);
+  POSE_GlobalClock = 0;
 #endif  
   CkPrintf("POSE initialization complete.\n");
   if (POSE_inactDetect) CkPrintf("Using Inactivity Detection for termination.\n");
-  else CkPrintf("Using endTime of %d for termination.\n", POSE_endtime);
+  else 
+#if USE_LONG_TIMESTAMPS
+    CkPrintf("Using endTime of %lld for termination.\n", POSE_endtime);
+#else
+    CkPrintf("Using endTime of %d for termination.\n", POSE_endtime);
+#endif
   CkPrintf("Starting simulation...\n"); 
   sim_timer = CmiWallTimer(); 
 }
@@ -155,6 +162,13 @@ void pose::stop(void)
 { 
 #ifdef POSE_STATS_ON
   CProxy_localStat stats(theLocalStats);
+#endif
+#ifdef SEQUENTIAL_POSE
+#if USE_LONG_TIMESTAMPS
+  CkPrintf("Sequential Endtime Approximation: %lld\n", POSE_GlobalClock);
+#else
+  CkPrintf("Sequential Endtime Approximation: %d\n", POSE_GlobalClock);
+#endif
 #endif
 #ifdef POSE_STATS_ON
   CkPrintf("%d PE Simulation finished at %f. Gathering stats...\n", 

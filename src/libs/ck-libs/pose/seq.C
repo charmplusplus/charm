@@ -11,6 +11,8 @@ void seq::Step()
     currentEvent = ev;
     ev->done = 2;
     parent->ResolveFn(ev->fnIdx, ev->msg);  // execute it
+    if (userObj->OVT() > POSE_GlobalClock)
+      POSE_GlobalClock = userObj->OVT();
     ev->done = 1;
     eq->ShiftEvent();                       // move on to next event
     eq->CommitAll(parent);

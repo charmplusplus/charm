@@ -80,6 +80,9 @@ extern POSE_TimeType POSE_endtime;
 /// Inactivity detection flag
 extern int POSE_inactDetect;
 
+/// Global clock (for sequential simulation)
+extern POSE_TimeType POSE_GlobalClock;
+
 /// Set busy wait time
 void POSE_set_busy_wait(double n);
 /// Busy wait for busyWait
