@@ -132,8 +132,8 @@ public:
   inline void GetCommData(LDCommData *data) 
        { if (commTable) commTable->GetCommData(data); };
 
-  void Migrate(LDObjHandle h, int dest);
-  void Migrated(LDObjHandle h);
+  int  Migrate(LDObjHandle h, int dest);
+  void Migrated(LDObjHandle h, int waitBarrier=1);
   int  NotifyMigrated(LDMigratedFn fn, void* data);
   void TurnOnNotifyMigrated(int handle)
        { migrateCBList[handle]->on = 1; }

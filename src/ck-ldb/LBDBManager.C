@@ -122,6 +122,13 @@ void LBDB::UnregisterObj(LDObjHandle _h)
 
 void LBDB::RegisteringObjects(LDOMHandle _h)
 {
+  // for an unregistered anonymous OM to join and control the barrier
+  if (_h.id.id.idx == 0) {
+    if (oms_registering == 0)
+      localBarrier.TurnOff();
+    oms_registering++;
+  }
+  else {
   LBOM* om = oms[_h.handle];
   if (!om->RegisteringObjs()) {
     if (oms_registering == 0)
@@ -129,16 +136,25 @@ void LBDB::RegisteringObjects(LDOMHandle _h)
     oms_registering++;
     om->SetRegisteringObjs(CmiTrue);
   }
+  }
 }
 
 void LBDB::DoneRegisteringObjects(LDOMHandle _h)
 {
+  // for an unregistered anonymous OM to join and control the barrier
+  if (_h.id.id.idx == 0) {
+    oms_registering--;
+    if (oms_registering == 0)
+      localBarrier.TurnOn();
+  }
+  else {
   LBOM* om = oms[_h.handle];
   if (om->RegisteringObjs()) {
     oms_registering--;
     if (oms_registering == 0)
       localBarrier.TurnOn();
     om->SetRegisteringObjs(CmiFalse);
+  }
   }
 }
 
@@ -223,28 +239,29 @@ void LBDB::GetObjData(LDObjData *dp)
   }
 }
 
-void LBDB::Migrate(LDObjHandle h, int dest)
+int LBDB::Migrate(LDObjHandle h, int dest)
 {
   if (h.handle > objCount)
-    CmiPrintf("[%d] Handle %d out of range 0-%d\n",CkMyPe(),h.handle,objCount);
-  else if (!objs[h.handle])
-    CmiPrintf("[%d] Handle %d no longer registered, range 0-%d\n",
-	    CkMyPe(),h.handle,objCount);
+    CmiPrintf("[%d] LBDB::Migrate: Handle %d out of range 0-%d\n",CkMyPe(),h.handle,objCount);
+  else if (!objs[h.handle]) {
+    CmiPrintf("[%d] LBDB::Migrate: Handle %d no longer registered, range 0-%d\n", CkMyPe(),h.handle,objCount);
+    return 0;
+  }
 
   if ((h.handle < objCount) && objs[h.handle]) {
     LBOM *const om = oms[(objs[h.handle])->parentOM().handle];
     om->Migrate(h, dest);
   }
-  return;
+  return 1;
 }
 
-void LBDB::Migrated(LDObjHandle h)
+void LBDB::Migrated(LDObjHandle h, int waitBarrier)
 {
   // Object migrated, inform load balancers
 
   for(int i=0; i < migrateCBList.length(); i++) {
     MigrateCB* cb = (MigrateCB*)migrateCBList[i];
-    if (cb && cb->on) (cb->fn)(cb->data,h);
+    if (cb && cb->on) (cb->fn)(cb->data,h,waitBarrier);
   }
   
 }
