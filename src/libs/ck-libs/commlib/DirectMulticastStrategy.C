@@ -139,11 +139,11 @@ void DirectMulticastStrategy::doneInserting(){
             ComlibPrintf("[%d] Calling Direct Multicast %d %d %d\n", CkMyPe(),
                          UsrToEnv(msg)->getTotalsize(), cur_npes, 
                          cmsg->dest_proc);
-            /*
+            
             for(int i=0; i < cur_npes; i++)
-                CkPrintf("[%d] Sending to %d %d\n", CkMyPe(), 
-                         cur_map[i], cur_npes);
-            */
+                ComlibPrintf("[%d] Sending to %d %d\n", CkMyPe(), 
+                             cur_map[i], cur_npes);
+            
             CmiSyncListSendAndFree(cur_npes, cur_map, 
                                    UsrToEnv(msg)->getTotalsize(), 
                                    (char*)(UsrToEnv(msg)));            
@@ -165,8 +165,8 @@ void DirectMulticastStrategy::pup(PUP::er &p){
     p | ndestpes;
     p | destArrayID;
     p | isDestinationArray;
-    p | isDestinationGroup;
-        
+    p | isDestinationGroup;           
+
     if(p.isUnpacking())
         destpelist = new int[ndestpes];
     p(destpelist, ndestpes);        

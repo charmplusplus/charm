@@ -81,7 +81,9 @@ ComlibManager::ComlibManager(){
 void ComlibManager::init(){
 
     //comm_debug = 1;
-    
+  
+    section_send_event = traceRegisterUserEvent("ArraySectionMulticast");
+  
     npes = CkNumPes();
     pelist = NULL;
     nstrats = 0;
@@ -227,7 +229,8 @@ void ComlibManager::endIteration(){
     }        
     
     ComlibPrintf("[%d]:In End Iteration(%d) %d, %d\n", CkMyPe(), curStratID, 
-                 strategyTable[curStratID].elementCount, strategyTable[curStratID].numElements);
+                 strategyTable[curStratID].elementCount, 
+                 strategyTable[curStratID].numElements);
   
     strategyTable[curStratID].elementCount++;
     int count = 0;
@@ -235,7 +238,8 @@ void ComlibManager::endIteration(){
 
     if(strategyTable[curStratID].elementCount == strategyTable[curStratID].numElements) {
         
-        ComlibPrintf("[%d]:In End Iteration %d\n", CkMyPe(), strategyTable[curStratID].elementCount);
+        ComlibPrintf("[%d]:In End Iteration %d\n", CkMyPe(), 
+                     strategyTable[curStratID].elementCount);
         
         nIterations ++;
 
@@ -485,6 +489,11 @@ void ComlibManager::ArrayBroadcast(int ep,void *m,CkArrayID a){
 
 void ComlibManager::ArraySectionSend(int ep, void *m, CkArrayID a, 
                                      CkSectionID &s) {
+
+#ifndef CMK_OPTIMIZE
+    traceUserEvent(section_send_event);
+#endif
+
     ComlibPrintf("[%d] Array Section Send \n", CkMyPe());
 
     register envelope * env = UsrToEnv(m);

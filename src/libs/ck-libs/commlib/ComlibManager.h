@@ -78,6 +78,8 @@ PUPbytes(ComlibInstanceHandle);
 class ComlibManager: public CkDelegateMgr {
     friend class ComlibInstanceHandle;
 
+    int section_send_event;
+
     int npes;
     int *pelist;
 

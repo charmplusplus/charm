@@ -215,6 +215,8 @@ extern char *router;
 //Common initialization for both group and array constructors
 void EachToManyMulticastStrategy::commonInit() {
 
+    setBracketed();
+
     if(CkMyPe() == 0 && router != NULL){
         if(strcmp(router, "USE_MESH") == 0)
             routerID = USE_MESH;
