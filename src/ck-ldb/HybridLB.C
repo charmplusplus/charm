@@ -473,7 +473,7 @@ void HybridLB::Migrated(LDObjHandle h, int waitBarrier)
   LevelData *lData = levelData[0];
 
   lData->migrates_completed++;
-  DEBUGF("[%d] An object migrated! %d %d\n", CkMyPe(),lData->migrates_completed,lData->migrates_expected);
+  DEBUGF(("[%d] An object migrated! %d %d\n", CkMyPe(),lData->migrates_completed,lData->migrates_expected));
   if (lData->migrationDone()) {
     if (!lData->resumeAfterMigration) {
       StatsDone(0);
@@ -727,7 +727,7 @@ void HybridLB::MigrationDone(int balancing)
     levelData[i]->clear();
   newObjs.free();
 
-  DEBUGF("[%d] calling ResumeClients.\n", CkMyPe());
+  DEBUGF(("[%d] calling ResumeClients.\n", CkMyPe()));
   if (_lb_args.syncResume()) {
     CkCallback cb(CkIndex_HybridLB::ResumeClients((CkReductionMsg*)NULL),
                   thisProxy);
@@ -747,7 +747,7 @@ void HybridLB::ResumeClients(CkReductionMsg *msg)
 void HybridLB::ResumeClients()
 {
 #if CMK_LBDB_ON
-  DEBUGF("[%d] ResumeClients. \n", CkMyPe());
+  DEBUGF(("[%d] ResumeClients. \n", CkMyPe()));
   // zero out stats
   theLbdb->ClearLoads();
 
@@ -814,7 +814,7 @@ LBMigrateMsg* HybridLB::Strategy(LDStats* stats,int count)
     msg->moves[i] = *item;
     delete item;
     migrateInfo[i] = 0;
-    DEBUGF("[%d] obj (%d %d %d %d) migrate from %d to %d\n", CkMyPe(), item->obj.objID().id[0], item->obj.objID().id[1], item->obj.objID().id[2], item->obj.objID().id[3], item->from_pe, item->to_pe);
+    DEBUGF(("[%d] obj (%d %d %d %d) migrate from %d to %d\n", CkMyPe(), item->obj.objID().id[0], item->obj.objID().id[1], item->obj.objID().id[2], item->obj.objID().id[3], item->from_pe, item->to_pe));
   }
 
   return msg;
