@@ -2,7 +2,6 @@ mainmodule bench {
   readonly CkChareID mid;
   readonly CProxy_Bench arr;
   readonly int nElements;
-  readonly int fraction;
 
   message [varsize] BenchMessage;
 

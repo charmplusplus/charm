@@ -7,8 +7,8 @@
 #include <unistd.h>
 
 #include "ComlibManager.h"
-#include "EachToManyMulticastStrategy.h"
-#include "BroadcastStrategy.h"
+#include "RingMulticastStrategy.h"
+#include "DirectMulticastStrategy.h"
 #include "bench.decl.h"
 
 #define USELIB
@@ -19,14 +19,7 @@ int MESSAGESIZE=128;
 /*readonly*/ CProxy_Bench arr;
 /*readonly*/ int nElements;
 
-void callbackhandler(void *message){
-    //CkPrintf("[%d]In callback function\n", CkMyPe());
-    
-    BenchMessage *bm = (BenchMessage *)EnvToUsr((envelope *)message);
-    arr[CkMyPe()].receiveMessage(bm);
-}
-
-class BenchMessage : public CMessage_BenchMessage {
+class BenchMessage : public CkMcastBaseMsg, public CMessage_BenchMessage {
 public:
     int size;
     char *data;
@@ -81,22 +74,16 @@ public:
             elem_array[count] = CkArrayIndex1D(count);
         }
 
-        EachToManyMulticastStrategy *strat = new 
-            EachToManyMulticastStrategy(USE_MESH, arr.ckGetArrayID(), 
-                                        arr.ckGetArrayID(),
-                                        nElements, elem_array,
-                                        nElements, elem_array);
+        DirectMulticastStrategy *dstrat = new DirectMulticastStrategy
+            (arr.ckGetArrayID());
 
-        strat->setMulticast();
+	RingMulticastStrategy *rstrat = new RingMulticastStrategy(arr.ckGetArrayID());
 
-        BroadcastStrategy *bstrat = new BroadcastStrategy
-            (arr.ckGetArrayID(), USE_HYPERCUBE);
-        
         CkPrintf("After creating array\n");
 	CkArrayID aid = arr.ckGetArrayID();
 
         ComlibInstanceHandle cinst = CkGetComlibInstance();        
-        cinst.setStrategy(strat);
+        cinst.setStrategy(dstrat);
         ComlibPrintf("After register strategy\n");
 
         for(count = 0; count < nElements; count++)
@@ -137,29 +124,29 @@ public:
 	    if(superpass == 10)
 		CkExit();
 	    else {
-                if(superpass < 20)
-                    MESSAGESIZE += 50;
-                else if(superpass < 30)
-                    MESSAGESIZE += 100;
-                else if(superpass < 40)
-                    MESSAGESIZE += 200;
-                else if(superpass < 50)
-                    MESSAGESIZE += 500;
-                
-                arr.start(MESSAGESIZE);
+	      if(superpass < 20)
+		  MESSAGESIZE += 50;
+	      else if(superpass < 30)
+		  MESSAGESIZE += 100;
+	      else if(superpass < 40)
+		  MESSAGESIZE += 200;
+	      else if(superpass < 50)
+		  MESSAGESIZE += 500;
+	      
+	      arr.start(MESSAGESIZE);
 	    }
         }
     }
 };
 
 /*array [1D]*/
-class Bench : public CBase_Bench 
+class Bench : public CBase_Bench
 {
     int pass;
     int mcount;
     double time, startTime;
     int firstEntryFlag, sendFinishedFlag;
-    CProxy_Bench arrd;
+    CProxySection_Bench sproxy;
     ComlibInstanceHandle myinst;
 
 public:
@@ -175,8 +162,8 @@ public:
         p | startTime;
         p | firstEntryFlag ;
         p | sendFinishedFlag ;
+        p | sproxy ;
         p | myinst;
-        p | arrd;
     }
   
     Bench(ComlibInstanceHandle cinst)
@@ -188,13 +175,15 @@ public:
         firstEntryFlag = 0;
         sendFinishedFlag = 0;
 
-        arrd = thisProxy;
-        ComlibDelegateProxy(&arrd);
-
         CkArrayIndexMax *elem_array = new CkArrayIndexMax[nElements];
         for(int count = 0; count < nElements; count ++) 
             elem_array[count] = CkArrayIndex1D(count);
         
+        sproxy = CProxySection_Bench::ckNew
+            (thisProxy.ckGetArrayID(), elem_array, nElements); 
+        ComlibResetSectionProxy(&sproxy);
+        ComlibDelegateProxy(&sproxy);
+
         usesAtSync = CmiTrue;
         setMigratable(true);
         myinst = cinst;
@@ -211,21 +200,13 @@ public:
             return;
         }
 	
-#ifdef USELIB
-        myinst.beginIteration();
-#endif
-
 	int count = 0;
 	int size = MESSAGESIZE;
 	
 #ifdef USELIB
-        arrd.receiveMessage(new(&size, 0) BenchMessage);
+        sproxy.receiveMessage(new(&size, 0) BenchMessage);
 #else
 	arr[count].receiveMessage(new (&size, 0) BenchMessage);
-#endif
-
-#ifdef USELIB
-        myinst.endIteration();
 #endif
 
         sendFinishedFlag = 1;	
@@ -233,7 +214,7 @@ public:
     
     void receiveMessage(BenchMessage *bmsg){
         
-        ComlibPrintf("[%d][%d] In Receive Message \n", CkMyPe(), thisIndex);
+        //CkPrintf("[%d][%d] In Receive Message \n", CkMyPe(), thisIndex);
         
         if(!firstEntryFlag) {
             startTime = CkWallTimer();
@@ -262,6 +243,7 @@ public:
     }
 
     void ResumeFromSync() {
+        ComlibResetSectionProxy(&sproxy);
         myinst.setSourcePe();
         sendMessage();
     }

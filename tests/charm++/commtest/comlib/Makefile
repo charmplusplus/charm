@@ -1,6 +1,6 @@
-CHARMC=../../../../bin/charmc -module comlib $(OPTS)
+CHARMC=../../../../bin/charmc -module comlib -module RefineLB $(OPTS)
 
-all: hello bench benchmulti
+all: hello bench benchmulti benchsectionmulti
 
 hello: hello.o
 	$(CHARMC) -language charm++ -o hello hello.o
@@ -17,6 +17,10 @@ bench: bench.o
 benchmulti: benchmulti.o
 	$(CHARMC) -language charm++ -o benchmulti benchmulti.o 
 
+benchsectionmulti: benchsectionmulti.o
+	$(CHARMC) -language charm++ -o benchsectionmulti benchsectionmulti.o 
+
+
 bench.decl.h: bench.ci
 	$(CHARMC)  bench.ci
 
@@ -26,8 +30,11 @@ bench.o: bench.C bench.decl.h
 benchmulti.o: benchmulti.C bench.decl.h
 	$(CHARMC) -c benchmulti.C
 
+benchsectionmulti.o: benchsectionmulti.C bench.decl.h
+	$(CHARMC) -c benchsectionmulti.C
+
 clean:
-	rm -f *.decl.h *.def.h conv-host *.o hello bench benchmulti charmrun *~
+	rm -f *.decl.h *.def.h conv-host *.o hello bench benchmulti benchsectionmulti charmrun *~
 
 test_bench: all
 	./charmrun bench +p4 10
@@ -41,6 +48,32 @@ test: all
 	./charmrun hello +p4 10 4
 	./charmrun hello +p4 10 5
 	./charmrun hello +p2 1
+	./charmrun bench +p2 100 1 +balancer RefineLB
+	./charmrun bench +p2 100 2 +balancer RefineLB
+	./charmrun bench +p2 100 4 +balancer RefineLB
+	./charmrun bench +p4 100 2 +balancer RefineLB
+	./charmrun bench +p4 100 4 +balancer RefineLB
+	./charmrun bench +p2 100 1 +strategy USE_GRID +balancer RefineLB 
+	./charmrun bench +p2 100 2 +strategy USE_GRID +balancer RefineLB
+	./charmrun bench +p2 100 4 +strategy USE_GRID +balancer RefineLB
+	./charmrun bench +p2 100 1 +strategy USE_DIRECT +balancer RefineLB
+	./charmrun bench +p2 100 2 +strategy USE_DIRECT +balancer RefineLB
+	./charmrun bench +p2 100 4 +strategy USE_DIRECT +balancer RefineLB
+	./charmrun benchmulti +p2 100 1 +balancer RefineLB
+	./charmrun benchmulti +p2 100 2 +balancer RefineLB
+	./charmrun benchmulti +p2 100 4 +balancer RefineLB
+	./charmrun benchmulti +p4 100 2 +balancer RefineLB
+	./charmrun benchmulti +p4 100 4 +balancer RefineLB
+	./charmrun benchmulti +p2 100 1 +strategy USE_GRID +balancer RefineLB 
+	./charmrun benchmulti +p2 100 2 +strategy USE_GRID +balancer RefineLB
+	./charmrun benchmulti +p2 100 4 +strategy USE_GRID +balancer RefineLB
+	./charmrun benchmulti +p2 100 1 +strategy USE_DIRECT +balancer RefineLB
+	./charmrun benchmulti +p2 100 2 +strategy USE_DIRECT +balancer RefineLB
+	./charmrun benchmulti +p2 100 4 +strategy USE_DIRECT +balancer RefineLB
+	./charmrun benchsectionmulti +p2 100 1 +balancer RefineLB
+	./charmrun benchsectionmulti +p2 100 2 +balancer RefineLB
+	./charmrun benchsectionmulti +p2 100 4 +balancer RefineLB
+	./charmrun benchsectionmulti +p4 100 4 +balancer RefineLB
 
 bgtest: all
 	./charmrun hello +p1 1  +x1 +y1 +z1

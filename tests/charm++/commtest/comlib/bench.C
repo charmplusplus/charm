@@ -13,10 +13,9 @@
 #include "bench.decl.h"
 
 #define USELIB  1
-#define MAXITER 5000
+#define MAXITER 100
 #define NUMPASS 2
 
-int fraction = 1;  /* readonly */
 /*readonly*/ CkChareID mid;
 /*readonly*/ CProxy_Bench arr;
 /*readonly*/ int nElements;
@@ -44,10 +43,6 @@ public:
     }
 };
 
-void reductionClient(void *param, int dataSize, void *data){
-    arr.start(0);
-}
-
 /*mainchare*/
 class Main : public Chare
 {
@@ -69,9 +64,9 @@ public:
 
         size = 128;
         if(m->argc > 1 ) size = atoi(m->argv[1]);
-	if(m->argc > 2 ) //fraction=atoi(m->argv[2]);
+	if(m->argc > 2 ) 
             nElements = atoi(m->argv[2]);
-        //delete m;
+        delete m;
         
         //Start the computation
         CkPrintf("Running Bench on %d processors for %d elements with %d byte messages\n", CkNumPes(), nElements, size);
@@ -81,22 +76,25 @@ public:
         ComlibInstanceHandle cinst = CkGetComlibInstance();
 	
         arr = CProxy_Bench::ckNew();
-
-	DummyStrategy *dstrat = new DummyStrategy();
-        EachToManyMulticastStrategy *strat = new EachToManyMulticastStrategy(USE_MESH, arr.ckGetArrayID(), arr.ckGetArrayID());
         
-        StreamingStrategy *sstrat = new StreamingStrategy(10, 10);
-        //sstrat->enableShortArrayMessagePacking();
+        int count = 0;
+        CkArrayIndexMax *elem_array = new CkArrayIndexMax[nElements];
+        for(count = 0; count < nElements; count ++) {
+            elem_array[count] = CkArrayIndex1D(count);
+        }
 
+        EachToManyMulticastStrategy *strat = new 
+            EachToManyMulticastStrategy(USE_MESH, arr.ckGetArrayID(), 
+                                        arr.ckGetArrayID(), 
+                                        nElements, elem_array, 
+                                        nElements, elem_array);
+        
         cinst.setStrategy(strat);                
-        //tmpInstance.setStrategy(sstrat);
-        //cinst = tmpInstance;
 
-        for(int count =0; count < nElements; count++)
+        for(count =0; count < nElements; count++)
 	  arr[count].insert(cinst);
 
         arr.doneInserting();
-        arr.setReductionClient(reductionClient, NULL);
 
 	curTime = CkWallTimer();
         arr.start(size);
@@ -106,14 +104,13 @@ public:
         
       mcount ++;
       
-      //printf("Count = %d\n", count);
-      
       if (mcount == nElements){
 	
 	pass ++;
 	mcount = 0;
 	
-	CkPrintf("%d %5.4lf\n", size, (CmiWallTimer() - curTime)*1000/MAXITER);
+	CkPrintf("%d %5.4lf\n", size, (CmiWallTimer() - curTime)*1000/
+                 MAXITER);
 	curTime = CkWallTimer();
 	
 	if(pass == NUMPASS)
@@ -129,19 +126,19 @@ public:
       mcount = 0;
       pass = 0;
       
-      if(superpass == 20)
-	CkExit();
+      if(superpass == 10)
+          CkExit();
       else {
-	if(superpass < 20)
-	  size += 50;
-	else if(superpass < 30)
-	  size += 100;
-	else if(superpass < 40)
-	  size += 200;
-	else if(superpass < 50)
-	  size += 500;
-	
-	arr.start(size);
+          if(superpass < 20)
+              size += 50;
+          else if(superpass < 30)
+              size += 100;
+          else if(superpass < 40)
+              size += 200;
+          else if(superpass < 50)
+              size += 500;
+          
+          arr.start(size);
       }
     }
 };
@@ -187,15 +184,9 @@ public:
 #ifdef USELIB
         myInst.beginIteration();
 #endif        
-        //for(int count = 0; count < nElements; count ++){
-	for(int dest = thisIndex + 1; dest < thisIndex + nElements/fraction;
-	    dest ++){
+        for(int count = 0; count < nElements; count ++){
             
-	    int count = dest % nElements;
-            if(count == thisIndex)
-                continue;
-            
-            //CkPrintf("[%d] Sending Message from %d to %d\n", CkMyPe(), thisIndex, count);
+            ComlibPrintf("[%d] Sending Message from %d to %d\n", CkMyPe(), thisIndex, count);
 
 #ifdef USELIB
             arrd[count].receiveMessage(new (&msize, 0) BenchMessage); 
@@ -206,9 +197,7 @@ public:
 
 #ifdef USELIB
         myInst.endIteration();
-#endif
-
-        //CkPrintf("After SendMessage %d\n", thisIndex);
+#endif        
     }
     
     void receiveMessage(BenchMessage *bmsg){
@@ -216,41 +205,38 @@ public:
         delete bmsg;
         mcount ++;
         
-        ComlibPrintf("In Receive Message %d %d %d\n", thisIndex, CkMyPe(), pass);
+        ComlibPrintf("In Receive Message %d %d %d\n", thisIndex, CkMyPe(), 
+                     pass);
 
-        if(mcount == nElements/fraction - 1){
+        if(mcount == nElements){
             mcount = 0;            
             pass ++;            
             CProxy_Main mainProxy(mid);
             if(pass == MAXITER){
 		pass = 0;
-
+                
 		mainProxy.send();
             }
-            else {
+            else
                 sendMessage();
-                //int x = 0;
-                //contribute(sizeof(int), (void *)&x, CkReduction::sum_int);
-            }
         }
     }
-
+    
     void start(int messagesize){
         msize = messagesize;
-	/*
+
 	if(ite % NUMPASS == NUMPASS/2 || ite % NUMPASS == 1)  
-	  //Call atsync in the middle and in the end
-	  AtSync();
+            //Call atsync in the middle and in the end
+            AtSync();
         else
-	*/
-	  sendMessage();
+            sendMessage();
         
         //CkPrintf("In Start\n");
         ite ++;
     }
 
     void ResumeFromSync() {
-        //CkPrintf("%d: resuming\n", CkMyPe());
+        CkPrintf("%d: resuming\n", CkMyPe());
         myInst.setSourcePe();
 	sendMessage();
     }
