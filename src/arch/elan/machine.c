@@ -12,6 +12,7 @@
 #include "machine.h"
 #include "pcqueue.h"
 
+
 #define MAX_QLEN 100
 #define MAX_BYTES 1000000
 
@@ -432,7 +433,9 @@ int PumpMsgs(int retflag)
     }
     event_idx = ecount + 1;
 
+#if CMK_PERSISTENT_COMM
     PumpPersistent();
+#endif
 
     if(!flg) {
 #ifndef CMK_OPTIMIZE 
@@ -550,11 +553,13 @@ CmiCommHandle ElanSendFn(int destPE, int size, char *msg, int flag)
     return 0;
   }
 
+#if CMK_PERSISTENT_COMM
   if (phs) {
     CmiAssert(phsSize == 1);
     CmiSendPersistentMsg(*phs, destPE, size, msg);
     return NULL;
   }
+#endif
   
   msg_tmp = (SMSG_LIST *) CmiAlloc(sizeof(SMSG_LIST));
   msg_tmp->msg = msg;
@@ -985,35 +990,20 @@ CmiCommHandle CmiAsyncListSendFn(int npes, int *pes, int len, char *msg)
   return (CmiCommHandle) 0;
 }
 
-void CmiSyncSendPersistent(int destPE, int size, char *msg, PersistentHandle h)
-{
-  CmiState cs = CmiGetState();
-  char *dupmsg = (char *) CmiAlloc(size);
-  memcpy(dupmsg, msg, size);
-
-  //  CmiPrintf("Setting root to %d\n", 0);
-  CMI_SET_BROADCAST_ROOT(dupmsg, 0);
-
-  if (cs->pe==destPE) {
-    CQdCreate(CpvAccess(cQdState), 1);
-    CdsFifo_Enqueue(CpvAccess(CmiLocalQueue),dupmsg);
-  }
-  else
-    CmiSendPersistentMsg(h, destPE, size, dupmsg);
-}
-
 void CmiFreeListSendFn(int npes, int *pes, int len, char *msg)
 {
   //  CmiError("ListSend not implemented.");
 //CmiPrintf("[%d] CmiFreeListSendFn %d\n", CmiMyPe(), usePhs);
   
   int i;
+#if CMK_PERSISTENT_COMM
   if (phs) {
     CmiAssert(phsSize == npes);
     for(i=0;i<npes;i++) 
       CmiSyncSendPersistent(pes[i], len, msg, phs[i]);
   }
   else 
+#endif
     for(i=0;i<npes;i++)
       CmiSyncSend(pes[i], len, msg);
 
@@ -1026,4 +1016,6 @@ void CmiFreeListSendFn(int npes, int *pes, int len, char *msg)
 }
 
 
+#if CMK_PERSISTENT_COMM
 #include "persistent.c"
+#endif
