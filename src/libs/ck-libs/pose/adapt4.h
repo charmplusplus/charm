@@ -21,7 +21,8 @@ class adapt4 : public opt3 {
  public:
   adapt4() { 
     STRAT_T = ADAPT4_T; 
-    timeLeash = POSE_TimeMax/2;
+    //timeLeash = POSE_TimeMax/2;
+    timeLeash = 1;
     specTol = 0.01;
   }
   virtual void Step();
