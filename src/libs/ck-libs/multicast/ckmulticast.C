@@ -437,8 +437,7 @@ void CkMulticastMgr::recvMsg(multicastGrpMsg *msg)
 
 void setSectionID(void *msg, CkSectionID sid)
 {
-  envelope *env = UsrToEnv(msg);
-  CkMcastBaseMsg *m = (CkMcastBaseMsg *)env;
+  CkMcastBaseMsg *m = (CkMcastBaseMsg *)msg;
   m->gpe() = sid.pe;
   m->cookie() = sid.val;
   m->redno() = sid.redNo;
@@ -446,8 +445,7 @@ void setSectionID(void *msg, CkSectionID sid)
 
 void CkGetSectionID(CkSectionID &id, void *msg)
 {
-  envelope *env = UsrToEnv(msg);
-  CkMcastBaseMsg *m = (CkMcastBaseMsg *)env;
+  CkMcastBaseMsg *m = (CkMcastBaseMsg *)msg;
   id.pe = m->gpe();
   id.val = m->cookie();
   // note: retain old redNo
