@@ -177,6 +177,12 @@ static void _exitHandler(envelope *env)
       _sendStats();
       if(CkMyPe())
         CsdExitScheduler();
+      _mainDone = 1; // This is needed because the destructors for
+                     // readonly variables will be called when the program
+		     // exits. If the destructor is called while _mainDone
+		     // is 0, it will assume that the readonly variable was
+		     // declared locally. On all processors other than 0, 
+		     // _mainDone is never set to 1 before the program exits.
       break;
     case StatMsg:
       CkAssert(CkMyPe()==0);
