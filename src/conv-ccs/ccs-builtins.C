@@ -577,8 +577,18 @@ static int getSchedQlen(void)
   return(CqsLength((Queue)CpvAccess(CsdSchedQueue)));
 }
 
+#endif /*CMK_WEB_MODE*/
+
+#if ! CMK_WEB_MODE
+static void CWeb_Invalid(void)
+{
+  CmiAbort("Invalid web mode handler invoked!\n");
+}
+#endif
+
 void CWebInit(void)
 {
+#if CMK_WEB_MODE
   CcsRegisterHandler("perf_monitor", (CmiHandler)CWebHandler);
   
   CWeb_CollectIndex=CmiRegisterHandler((CmiHandler)CWeb_Collect);
@@ -587,19 +597,20 @@ void CWebInit(void)
   initUsage();
   CWebPerformanceRegisterFunction(getUsage);
   CWebPerformanceRegisterFunction(getSchedQlen);
-
+#else
+  /* always maintain the consistent CmiHandler table */
+  /* which is good for heterogeneous clusters */
+  CmiRegisterHandler((CmiHandler)CWeb_Invalid);
+  CmiRegisterHandler((CmiHandler)CWeb_Invalid);
+#endif
 }
-
-#endif /*CMK_WEB_MODE*/
 
 
 extern "C" void CcsBuiltinsInit(char **argv)
 {
   CcsRegisterHandler("ccs_getinfo",(CmiHandler)ccs_getinfo);
   CcsRegisterHandler("ccs_killport",(CmiHandler)ccs_killport);
-#if CMK_WEB_MODE
   CWebInit();
-#endif
   CpdListInit();
 }
 
