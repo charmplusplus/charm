@@ -168,7 +168,7 @@ When this routine returns, \uw{x} is the final value for the unknown vector, and
          myMatrixVectorProduct, &myData, b,x);
   
 ! F90 Example
-  include 'ifem\_f.h'
+  include 'ifemf.h'
   INTEGER :: mesh, nNodes,width
   DOUBLE PRECISION, ALLOCATABLE :: b(:,:), x(:,:)
   DOUBLE PRECISION :: solverParam(ILSI_PARAM)
@@ -214,6 +214,8 @@ After calling this routine, the framework will handle combining the overlapping 
 
 \begin{alltt}
 // C++ Example
+#include "ifemc.h"
+
 typedef struct \{
   int nElements; //Number of local elements
   int *conn; // Nodes adjacent to each element: 2*nElements entries
@@ -246,7 +248,7 @@ void myMatrixVectorProduct(void *ptr,int nNodes,int dofPerNode,
   END TYPE
   
 SUBROUTINE myMatrixVectorProduct(d,nNodes,dofPerNode,src,dest)
-  include 'ifem\_f.h'
+  include 'ifemf.h'
   TYPE(myProblemData), pointer :: d
   INTEGER :: nNodes,dofPerNode
   DOUBLE PRECISION :: src(dofPerNode,nNodes), dest(dofPerNode,nNodes)
