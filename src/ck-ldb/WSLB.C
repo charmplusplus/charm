@@ -143,7 +143,7 @@ void WSLB::AtSync()
   //  CkPrintf("[%d] WSLB At Sync step %d!!!!\n",CkMyPe(),mystep);
 
   if (CkMyPe() == 0) {
-    start_lb_time = CmiWallTimer();
+    start_lb_time = CkWallTimer();
     CkPrintf("Load balancing step %d starting at %f\n",
 	     step(),start_lb_time);
   }
@@ -298,7 +298,7 @@ void WSLB::ReceiveStats(WSLBStatsMsg *m)
 
   const int clients = mig_msgs_expected;
   if (stats_msg_count == clients && receive_stats_ready) {
-    double strat_start_time = CmiWallTimer();
+    double strat_start_time = CkWallTimer();
     receive_stats_ready = 0;
     LBMigrateMsg* migrateMsg = Strategy(statsDataList,clients);
 
@@ -328,7 +328,7 @@ void WSLB::ReceiveStats(WSLBStatsMsg *m)
 
     theLbdb->ClearLoads();
     if (CkMyPe() == 0) {
-      double strat_end_time = CmiWallTimer();
+      double strat_end_time = CkWallTimer();
       CkPrintf("Strat elapsed time %f\n",strat_end_time-strat_start_time);
     }
   }
@@ -382,7 +382,7 @@ void WSLB::MigrationDone()
 {
 #if CMK_LBDB_ON
   if (CkMyPe() == 0) {
-    double end_lb_time = CmiWallTimer();
+    double end_lb_time = CkWallTimer();
     CkPrintf("Load balancing step %d finished at %f duration %f\n",
 	     step(),end_lb_time,end_lb_time - start_lb_time);
   }
@@ -404,7 +404,7 @@ void WSLB::ResumeClients()
 CmiBool WSLB::QueryBalanceNow(int step)
 {
 #if CMK_LBDB_ON
-  double now = CmiWallTimer();
+  double now = CkWallTimer();
 
   if (step==0)
     first_step_time = now;

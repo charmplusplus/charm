@@ -299,13 +299,13 @@ void OrbLB::work(CentralLB::LDStats* stats, int count)
     objIdx ++;
   }
 
-  double t = CmiWallTimer();
+  double t = CkWallTimer();
 
   quicksort(XDIR);
   quicksort(YDIR);
   quicksort(ZDIR);
 #ifdef DEBUG
-  CmiPrintf("qsort time: %f\n", CmiWallTimer() - t);
+  CmiPrintf("qsort time: %f\n", CkWallTimer() - t);
 #endif
 
   npartition = P;
@@ -389,7 +389,7 @@ void OrbLB::work(CentralLB::LDStats* stats, int count)
   for (i=0; i<3; i++) delete [] vArray[i];
   delete [] partitions;
 
-  CmiPrintf("OrbLB finished time: %f\n", CmiWallTimer() - t);
+  CmiPrintf("OrbLB finished time: %f\n", CkWallTimer() - t);
 #endif
 }
 

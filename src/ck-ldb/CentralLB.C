@@ -161,7 +161,7 @@ void CentralLB::ProcessAtSync()
 {
 #if CMK_LBDB_ON
   if (CkMyPe() == cur_ld_balancer) {
-    start_lb_time = CmiWallTimer();
+    start_lb_time = CkWallTimer();
   }
   // build and send stats
   const int osz = theLbdb->GetObjDataSz();
@@ -328,7 +328,7 @@ void CentralLB::LoadBalance()
   if (_lb_args.debug()) 
       CmiPrintf("[%s] Load balancing step %d starting at %f in PE%d\n",
                  lbName(), step(),start_lb_time, cur_ld_balancer);
-//    double strat_start_time = CmiWallTimer();
+//    double strat_start_time = CkWallTimer();
 
   // build data
   buildStats();
@@ -371,7 +371,7 @@ void CentralLB::LoadBalance()
 #endif
 }
 
-//    double strat_end_time = CmiWallTimer();
+//    double strat_end_time = CkWallTimer();
 //    CkPrintf("Strat elapsed time %f\n",strat_end_time-strat_start_time);
 // test if sender and receiver in a commData is nonmigratable.
 static int isMigratable(LDObjData **objData, int *len, int count, const LDCommData &commData)
@@ -537,7 +537,7 @@ void CentralLB::ResumeClients(int balancing)
 #if CMK_LBDB_ON
   DEBUGF(("[%d] Resuming clients. balancing:%d.\n",CkMyPe(),balancing));
   if (balancing && _lb_args.debug() && CkMyPe() == cur_ld_balancer) {
-    double end_lb_time = CmiWallTimer();
+    double end_lb_time = CkWallTimer();
     CkPrintf("[%s] Load balancing step %d finished at %f\n",
   	      lbName(), step()-1,end_lb_time);
     double lbdbMemsize = LBDatabase::Object()->useMem()/1000;
@@ -743,11 +743,11 @@ void CentralLB::simulationRead() {
     }
 
     // now pass it to the strategy routine
-    double startT = CmiWallTimer();
+    double startT = CkWallTimer();
     CmiPrintf("%s> Strategy starts ... \n", lbname);
     LBMigrateMsg* migrateMsg = Strategy(statsData, LBSimulation::simProcs);
     CmiPrintf("%s> Strategy took %fs memory usage: CentralLB:%dKB. \n", 
-               lbname, CmiWallTimer()-startT, (int)(useMem()/1000));
+               lbname, CkWallTimer()-startT, (int)(useMem()/1000));
 
     // now calculate the results of the load balancing simulation
     findSimResults(statsData, LBSimulation::simProcs, migrateMsg, simResults);
@@ -929,10 +929,10 @@ void CentralLB::findSimResults(LDStats* stats, int count, LBMigrateMsg* msg, LBS
     for(int pe = 0; pe < count; pe++)
     	  simResults->bgLoads[pe] = stats->procs[pe].bg_walltime;
     // sum of the cpu times of the objects on that processor
-    double startT = CmiWallTimer();
+    double startT = CkWallTimer();
     getPredictedLoad(stats, count, msg, simResults->peLoads, 
 		     simResults->minObjLoad, simResults->maxObjLoad,1);
-    CmiPrintf("getPredictedLoad finished in %fs\n", CmiWallTimer()-startT);
+    CmiPrintf("getPredictedLoad finished in %fs\n", CkWallTimer()-startT);
 }
 
 void CentralLB::pup(PUP::er &p) { 

@@ -20,6 +20,7 @@ inline void LBMachineUtil::IdleStart(double curWallTime)
 
 inline void LBMachineUtil::IdleEnd(double curWallTime)
 {
+// skip counting idle time in BigSim
   if (state == on) {
     const double stop_idle = curWallTime;
     total_idletime += (stop_idle - start_idle);
@@ -46,14 +47,16 @@ LBMachineUtil::LBMachineUtil()
 
 void LBMachineUtil::StatsOn()
 {
-  const double cur_wall = CmiWallTimer();
-  const double cur_cpu = CmiCpuTimer();
+  const double cur_wall = CkWallTimer();
+  const double cur_cpu = CkCpuTimer();
 
   if (state == off) {
+#if ! CMK_BLUEGENE_CHARM
     cancel_idleStart=CcdCallOnConditionKeep(
 	 CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)staticIdleStart,(void *)this);
     cancel_idleEnd=CcdCallOnConditionKeep(
          CcdPROCESSOR_END_IDLE,(CcdVoidFn)staticIdleEnd,(void *)this);
+#endif
     state = on;
   }
 
@@ -68,14 +71,16 @@ void LBMachineUtil::StatsOn()
 void LBMachineUtil::StatsOff()
 {
   if (state == on) {
+#if ! CMK_BLUEGENE_CHARM
     CcdCancelCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,cancel_idleStart);
     CcdCancelCallOnConditionKeep(CcdPROCESSOR_END_IDLE,cancel_idleEnd);
+#endif
     state = off;
   }
 
   if (start_totalwall != -1.) {
-    const double cur_wall = CmiWallTimer();
-    const double cur_cpu = CmiCpuTimer();
+    const double cur_wall = CkWallTimer();
+    const double cur_cpu = CkCpuTimer();
     total_walltime += (cur_wall - start_totalwall);
     total_cputime += (cur_cpu - start_totalcpu);
   }
@@ -89,8 +94,8 @@ void LBMachineUtil::Clear()
   if (state == off) {
     start_totalwall = start_totalcpu = -1.;
   } else {
-    const double cur_wall = CmiWallTimer();
-    const double cur_cpu = CmiCpuTimer();
+    const double cur_wall = CkWallTimer();
+    const double cur_cpu = CkCpuTimer();
 
     start_totalwall = cur_wall;
     start_totalcpu = cur_cpu;
@@ -101,8 +106,8 @@ void LBMachineUtil::Clear()
 void LBMachineUtil::TotalTime(double* walltime, double* cputime)
 {
   if (state == on) {
-    const double cur_wall = CmiWallTimer();
-    const double cur_cpu = CmiCpuTimer();
+    const double cur_wall = CkWallTimer();
+    const double cur_cpu = CkCpuTimer();
     total_walltime += (cur_wall - start_totalwall);
     total_cputime += (cur_cpu - start_totalcpu);
     start_totalwall = cur_wall;

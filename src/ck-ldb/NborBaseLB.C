@@ -129,7 +129,7 @@ void NborBaseLB::AtSync()
   }
 
   if (CkMyPe() == 0) {
-    start_lb_time = CmiWallTimer();
+    start_lb_time = CkWallTimer();
     if (_lb_args.debug())
       CkPrintf("Load balancing step %d starting at %f\n",
 	       step(),start_lb_time);
@@ -257,7 +257,7 @@ void NborBaseLB::ReceiveStats(CkMarshalledNLBStatsMessage &data)
 
   const int clients = mig_msgs_expected;
   if (stats_msg_count == clients && receive_stats_ready) {
-    double strat_start_time = CmiWallTimer();
+    double strat_start_time = CkWallTimer();
     receive_stats_ready = 0;
     LBMigrateMsg* migrateMsg = Strategy(statsDataList,clients);
 
@@ -288,7 +288,7 @@ void NborBaseLB::ReceiveStats(CkMarshalledNLBStatsMessage &data)
 
     theLbdb->ClearLoads();
     if (CkMyPe() == 0) {
-      double strat_end_time = CmiWallTimer();
+      double strat_end_time = CkWallTimer();
       if (_lb_args.debug())
         CkPrintf("Strat elapsed time %f\n",strat_end_time-strat_start_time);
     }
@@ -343,7 +343,7 @@ void NborBaseLB::MigrationDone()
 {
 #if CMK_LBDB_ON
   if (CkMyPe() == 0 && start_lb_time != 0.0) {
-    double end_lb_time = CmiWallTimer();
+    double end_lb_time = CkWallTimer();
     if (_lb_args.debug())
       CkPrintf("Load balancing step %d finished at %f duration %f\n",
 	        step(),end_lb_time,end_lb_time - start_lb_time);

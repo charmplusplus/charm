@@ -13,7 +13,7 @@
 #ifndef _LDMACHINEUTIL_H_
 #define _LDMACHINEUTIL_H_
 
-#include "converse.h"
+#include "charm++.h"
 
 class LBMachineUtil {
 public:
