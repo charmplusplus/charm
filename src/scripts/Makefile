@@ -8,7 +8,7 @@
 #     * ITC++ Translator
 #     * Languages
 #     * Documentation
-# 
+#
 # This Makefile is common to all machines.  This works because the charmc
 # is smart enough to "conceal" the differences between machines.  charmc
 # gets its smarts by reading the conv-mach.sh configuration file.
@@ -41,8 +41,8 @@ PVM: converse $(L)/libpvmc.a
 AMR: charm++ LIBS
 	cd libs/ck-libs/amr; make all OPTS='$(OPTS)'
 
-FEM: charm++ 
-	$(MAKE) CONVLIBS 
+FEM: charm++
+	$(MAKE) CONVLIBS
 	$(MAKE) FEMC LIBS FEMF
 
 FEMC: charm++ LIBS
@@ -56,7 +56,7 @@ MBLOCKC: charm++ LIBS
 MBLOCKF: MBLOCKC
 
 AMPI:  charm++
-	$(MAKE) CONVLIBS 
+	$(MAKE) CONVLIBS
 	$(MAKE) AMPIC AMPIF
 
 AMPIC: charm++ LIBS
@@ -70,16 +70,16 @@ default_libs: commlib multicast
 multicast:
 	cd libs/ck-libs/multicast && $(MAKE)
 
-commlib: 
+commlib:
 	cd libs/ck-libs/commlib && $(MAKE)
 
 translators: charmxi conv-cpm
 
 pose:  charm++
-	cd libs/ck-libs/pose && $(MAKE) 
+	cd libs/ck-libs/pose && $(MAKE)
 
 LIBS: CONVLIBS CHARMLIBS
-	cd libs; $(MAKE) otherlibs 
+	cd libs; $(MAKE) otherlibs
 
 test-all: test
 
@@ -182,7 +182,7 @@ basics: headers
 	touch basics
 
 # Headers is used only for the dependencies
-headers: dirs+sources 
+headers: dirs+sources
 	$(MAKE) headerlinks
 
 conv-autoconfig.h: configure
@@ -257,7 +257,7 @@ MEMLIBS=$(L)/libmemory-default.o $(L)/libmemory-os.o $(L)/libmemory-gnu.o \
 	  $(L)/libmemory-paranoid.o \
 	  $(L)/libmemory-leak.o $(L)/libmemory-isomalloc.o
 THREADLIBS=$(L)/libthreads-default.o $(L)/libthreads-qt.o 	\
- 	  $(L)/libthreads-context.o \
+	  $(L)/libthreads-context.o \
 	  $(L)/libthreads-pthreads.o $(L)/libthreads-fibers.o
 
 CVLIBS=$(L)/libconv-core.a \
@@ -280,7 +280,7 @@ LIBCONV_UTIL=pup_util.o pup_xlater.o pup_c.o pup_paged.o\
 
 LIBCONV_UTILF=pup_f.o
 
-converse: basics 
+converse: basics
 	$(MAKE) QuickThreads/libqt.a
 	$(MAKE) converse-target
 
@@ -351,7 +351,7 @@ pup_c.o: pup_c.C $(CVHEADERS) $(UTILHEADERS)
 
 pup_paged.o: pup_paged.C $(CVHEADERS) $(UTILHEADERS)
 	$(CHARMC) -o pup_paged.o pup_paged.C
-	
+
 pup_f.o: pup_f.f90 $(CVHEADERS)
 	-$(CHARMC) -c pup_f.f90 && $(CHARMC) -cpmod ../include pupmod.M || touch pup_f.o
 
@@ -572,7 +572,7 @@ NborBaseLB.decl.h: NborBaseLB.ci charmxi
 
 
 ## Tracing libraries (profiling, -tracemode)
-LIBTRACE_PROJ=trace-projections.o trace-common.o 
+LIBTRACE_PROJ=trace-projections.o trace-common.o
 $(L)/libtrace-projections.a: $(LIBTRACE_PROJ)
 	$(CHARMC) -o $@ $(LIBTRACE_PROJ)
 
@@ -592,11 +592,11 @@ LIBTRACE_BG=trace-bluegene.o trace-common.o
 $(L)/libtrace-bluegene.a:$(LIBTRACE_BG)
 	$(CHARMC) -o $@ $(LIBTRACE_BG)
 
-LIBTRACE_ALL=trace-all.o trace-projections.o trace-summary.o trace-recordreplay.o trace-common.o trace-projector.o traceCore.o traceCoreCommon.o charmProjections.o converseProjections.o machineProjections.o 
+LIBTRACE_ALL=trace-all.o trace-projections.o trace-summary.o trace-recordreplay.o trace-common.o trace-projector.o traceCore.o traceCoreCommon.o charmProjections.o converseProjections.o machineProjections.o
 $(L)/libtrace-all.a: $(LIBTRACE_ALL)
 	$(CHARMC) -o $@ $(LIBTRACE_ALL)
-	
-LIBTRACE_PROJECTOR=trace-projector.o trace-common.o traceCore.o traceCoreCommon.o charmProjections.o converseProjections.o machineProjections.o 
+
+LIBTRACE_PROJECTOR=trace-projector.o trace-common.o traceCore.o traceCoreCommon.o charmProjections.o converseProjections.o machineProjections.o
 $(L)/libtrace-projector.a: $(LIBTRACE_PROJECTOR)
 	$(CHARMC) -o  $@ $(LIBTRACE_PROJECTOR)
 
@@ -608,7 +608,7 @@ LIBTRACE_FOR=tracef_f.o
 $(L)/libtracef_f.a: $(LIBTRACE_FOR)
 	-$(CHARMC) -o $@ $(LIBTRACE_FOR) || touch $@
 
-tracef_f.o: tracef_f.f90 
+tracef_f.o: tracef_f.f90
 	-$(CHARMC) -o $@ -c tracef_f.f90 && $(CHARMC) -cpmod ../include tracemod.M  || touch $@
 
 # used for make depends
@@ -649,35 +649,35 @@ DummyLB.def.h: DummyLB.decl.h
 DummyLB.decl.h: DummyLB.ci charmxi
 	$(CHARMXI) DummyLB.ci
 
-$(L)/libmoduleDummyLB.a: DummyLB.o 
-	$(CHARMC) -o $(L)/libmoduleDummyLB.a DummyLB.o 
-	
+$(L)/libmoduleDummyLB.a: DummyLB.o
+	$(CHARMC) -o $(L)/libmoduleDummyLB.a DummyLB.o
+
 
 ComboCentLB.def.h: ComboCentLB.decl.h
 
 ComboCentLB.decl.h: ComboCentLB.ci charmxi
 	$(CHARMXI) ComboCentLB.ci
 
-$(L)/libmoduleComboCentLB.a: ComboCentLB.o 
-	$(CHARMC) -o $(L)/libmoduleComboCentLB.a ComboCentLB.o 
-	
+$(L)/libmoduleComboCentLB.a: ComboCentLB.o
+	$(CHARMC) -o $(L)/libmoduleComboCentLB.a ComboCentLB.o
+
 
 RandCentLB.def.h: RandCentLB.decl.h
 
 RandCentLB.decl.h: RandCentLB.ci charmxi
 	$(CHARMXI) RandCentLB.ci
 
-$(L)/libmoduleRandCentLB.a: RandCentLB.o 
-	$(CHARMC) -o $(L)/libmoduleRandCentLB.a RandCentLB.o 
-	
+$(L)/libmoduleRandCentLB.a: RandCentLB.o
+	$(CHARMC) -o $(L)/libmoduleRandCentLB.a RandCentLB.o
+
 
 RandRefLB.def.h: RandRefLB.decl.h
 
 RandRefLB.decl.h: RandRefLB.ci charmxi
 	$(CHARMXI) RandRefLB.ci
 
-$(L)/libmoduleRandRefLB.a: RandRefLB.o 
-	$(CHARMC) -o $(L)/libmoduleRandRefLB.a RandRefLB.o 
+$(L)/libmoduleRandRefLB.a: RandRefLB.o
+	$(CHARMC) -o $(L)/libmoduleRandRefLB.a RandRefLB.o
 	cp libmoduleRandRefLB.dep $(L)/
 
 RefineLB.def.h: RefineLB.decl.h
@@ -685,17 +685,17 @@ RefineLB.def.h: RefineLB.decl.h
 RefineLB.decl.h: RefineLB.ci charmxi
 	$(CHARMXI) RefineLB.ci
 
-$(L)/libmoduleRefineLB.a: RefineLB.o 
-	$(CHARMC) -o $(L)/libmoduleRefineLB.a RefineLB.o 
-	
+$(L)/libmoduleRefineLB.a: RefineLB.o
+	$(CHARMC) -o $(L)/libmoduleRefineLB.a RefineLB.o
+
 
 RefineCommLB.def.h: RefineCommLB.decl.h
 
 RefineCommLB.decl.h: RefineCommLB.ci charmxi
 	$(CHARMXI) RefineCommLB.ci
 
-$(L)/libmoduleRefineCommLB.a: RefineCommLB.o 
-	$(CHARMC) -o $(L)/libmoduleRefineCommLB.a RefineCommLB.o 
+$(L)/libmoduleRefineCommLB.a: RefineCommLB.o
+	$(CHARMC) -o $(L)/libmoduleRefineCommLB.a RefineCommLB.o
 	cp libmoduleRefineCommLB.dep $(L)/
 
 GreedyLB.def.h: GreedyLB.decl.h
@@ -703,17 +703,17 @@ GreedyLB.def.h: GreedyLB.decl.h
 GreedyLB.decl.h: GreedyLB.ci charmxi
 	$(CHARMXI) GreedyLB.ci
 
-$(L)/libmoduleGreedyLB.a: GreedyLB.o 
-	$(CHARMC) -o $(L)/libmoduleGreedyLB.a GreedyLB.o 
-	
+$(L)/libmoduleGreedyLB.a: GreedyLB.o
+	$(CHARMC) -o $(L)/libmoduleGreedyLB.a GreedyLB.o
+
 
 GreedyRefLB.def.h: GreedyRefLB.decl.h
 
 GreedyRefLB.decl.h: GreedyRefLB.ci charmxi
 	$(CHARMXI) GreedyRefLB.ci
 
-$(L)/libmoduleGreedyRefLB.a: GreedyRefLB.o 
-	$(CHARMC) -o $(L)/libmoduleGreedyRefLB.a GreedyRefLB.o 
+$(L)/libmoduleGreedyRefLB.a: GreedyRefLB.o
+	$(CHARMC) -o $(L)/libmoduleGreedyRefLB.a GreedyRefLB.o
 	cp libmoduleGreedyRefLB.dep $(L)/
 
 GreedyCommLB.def.h: GreedyCommLB.decl.h
@@ -723,42 +723,42 @@ GreedyCommLB.decl.h: GreedyCommLB.ci charmxi
 
 $(L)/libmoduleGreedyCommLB.a: GreedyCommLB.o manager.o
 	$(CHARMC) -o $(L)/libmoduleGreedyCommLB.a GreedyCommLB.o manager.o
-	
+
 
 Comm1LB.def.h: Comm1LB.decl.h
 
 Comm1LB.decl.h: Comm1LB.ci charmxi
 	$(CHARMXI) Comm1LB.ci
 
-$(L)/libmoduleComm1LB.a: Comm1LB.o 
-	$(CHARMC) -o $(L)/libmoduleComm1LB.a Comm1LB.o 
-	
+$(L)/libmoduleComm1LB.a: Comm1LB.o
+	$(CHARMC) -o $(L)/libmoduleComm1LB.a Comm1LB.o
+
 
 OrbLB.def.h: OrbLB.decl.h
 
 OrbLB.decl.h: OrbLB.ci charmxi
 	$(CHARMXI) OrbLB.ci
 
-$(L)/libmoduleOrbLB.a: OrbLB.o 
-	$(CHARMC) -o $(L)/libmoduleOrbLB.a OrbLB.o 
-	
+$(L)/libmoduleOrbLB.a: OrbLB.o
+	$(CHARMC) -o $(L)/libmoduleOrbLB.a OrbLB.o
+
 
 RecBisectBfLB.def.h: RecBisectBfLB.decl.h
 
 RecBisectBfLB.decl.h: RecBisectBfLB.ci charmxi
 	$(CHARMXI) RecBisectBfLB.ci
 
-$(L)/libmoduleRecBisectBfLB.a: RecBisectBfLB.o 
-	$(CHARMC) -o $(L)/libmoduleRecBisectBfLB.a RecBisectBfLB.o 
-	
+$(L)/libmoduleRecBisectBfLB.a: RecBisectBfLB.o
+	$(CHARMC) -o $(L)/libmoduleRecBisectBfLB.a RecBisectBfLB.o
+
 
 MetisLB.def.h: MetisLB.decl.h
 
 MetisLB.decl.h: MetisLB.ci charmxi
 	$(CHARMXI) MetisLB.ci
 
-$(L)/libmoduleMetisLB.a: MetisLB.o 
-	$(CHARMC) -o $(L)/libmoduleMetisLB.a MetisLB.o 
+$(L)/libmoduleMetisLB.a: MetisLB.o
+	$(CHARMC) -o $(L)/libmoduleMetisLB.a MetisLB.o
 	cp libmoduleMetisLB.dep $(L)/
 
 NeighborLB.def.h: NeighborLB.decl.h
@@ -766,27 +766,27 @@ NeighborLB.def.h: NeighborLB.decl.h
 NeighborLB.decl.h: NeighborLB.ci charmxi
 	$(CHARMXI) NeighborLB.ci
 
-$(L)/libmoduleNeighborLB.a: NeighborLB.o 
-	$(CHARMC) -o $(L)/libmoduleNeighborLB.a NeighborLB.o 
-	
+$(L)/libmoduleNeighborLB.a: NeighborLB.o
+	$(CHARMC) -o $(L)/libmoduleNeighborLB.a NeighborLB.o
+
 
 NeighborCommLB.def.h: NeighborCommLB.decl.h
 
 NeighborCommLB.decl.h: NeighborCommLB.ci charmxi
 	$(CHARMXI) NeighborCommLB.ci
 
-$(L)/libmoduleNeighborCommLB.a: NeighborCommLB.o 
-	$(CHARMC) -o $(L)/libmoduleNeighborCommLB.a NeighborCommLB.o 
-	
+$(L)/libmoduleNeighborCommLB.a: NeighborCommLB.o
+	$(CHARMC) -o $(L)/libmoduleNeighborCommLB.a NeighborCommLB.o
+
 
 WSLB.def.h: WSLB.decl.h
 
 WSLB.decl.h: WSLB.ci charmxi
 	$(CHARMXI) WSLB.ci
 
-$(L)/libmoduleWSLB.a: WSLB.o 
-	$(CHARMC) -o $(L)/libmoduleWSLB.a WSLB.o 
-	
+$(L)/libmoduleWSLB.a: WSLB.o
+	$(CHARMC) -o $(L)/libmoduleWSLB.a WSLB.o
+
 
 # used for make dependes
 LB_OBJ=EveryLB.o \
@@ -871,7 +871,7 @@ XIHEADERS=conv-autoconfig.h xi-symbol.h xi-util.h xi-grammar.tab.h
 CHARMXIOBJ=xi-main.o xi-symbol.o xi-grammar.tab.o xi-scan.o xi-util.o
 SDAGOBJ=sdag-globals.o CSdagConstruct.o CEntry.o
 SDAGHEADERS= CToken.h EToken.h CParsedFile.h \
-	sdag-globals.h CEntry.h 
+	sdag-globals.h CEntry.h
 
 charmxi: ../bin/charmxi
 
@@ -997,8 +997,8 @@ veryclean:
 config: configure.in
 	autoconf && autoheader
 
-depends: basics 
-	echo "Creating " $(DEPENDFILE) " ..."; 
+depends: basics
+	echo "Creating " $(DEPENDFILE) " ...";
 	if [ -f $(DEPENDFILE) ]; then \
            /bin/cp -f $(DEPENDFILE) $(DEPENDFILE).old; \
         fi; \
@@ -1019,5 +1019,5 @@ depends: basics
               g++ -MM -Wno-deprecated -I. -I$(INC) $$SRCFILE  >> $(DEPENDFILE); \
               echo '	$$(CHARMC) -c -I. '$$SRCFILE >> $(DEPENDFILE) ; \
 	      echo '' >> $(DEPENDFILE) ; \
-        done; 
+        done;
 
