@@ -171,7 +171,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  ckarrayreductionmgr.h cknodegroupreduction.h cksection.h \
 	  ckarray.h cklocation.h ckreduction.h ckcheckpoint.h ckmemcheckpoint.h\
 	  ckobjQ.h readonly.h charisma.h ComlibArrayListener.h ComlibStrategy.h\
-	  $(UTILHEADERS) \
+	  ComlibLearner.h $(UTILHEADERS) \
 	  tempo.h waitqd.h LBDatabase.h lbdb.h \
 	  LBDBManager.h LBComm.h LBOM.h LBObj.h LBMachineUtil.h \
 	  Refiner.h RefinerComm.h ObjGraph.h heap.h elements.h CommLBHeap.h \
@@ -196,7 +196,9 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  EachToManyMulticastStrategy.h MsgPacker.h StreamingStrategy.h \
 	  NodeMulticast.h PipeBroadcastStrategy.h MeshStreamingStrategy.h \
           PrioStreaming.h MPIStrategy.h MsgPacker.h StreamingStrategy.h \
-	  BroadcastStrategy.h ComlibSectionInfo.h $(CVHEADERS)
+	  BroadcastStrategy.h ComlibSectionInfo.h AAPLearner.h \
+	  AAMLearner.h ComlibStats.h \
+	  $(CVHEADERS)
 
 ALLHEADERS=$(CKHEADERS) \
     simplemsg.h sm.h pvmc.h pvm3.h sdag.h \
@@ -698,6 +700,7 @@ loadbalancers: $(LOADBALANCERS) $(L)/libmoduleEveryLB.a
 STRATEGY_OBJS = MPIStrategy.o StreamingStrategy.o \
                 DummyStrategy.o NodeMulticast.o \
 		EachToManyMulticastStrategy.o ComlibSectionInfo.o \
+                AAPLearner.o ComlibStats.o AAMLearner.o \
                 MsgPacker.o DirectMulticastStrategy.o \
 		RingMulticastStrategy.o \
                 PipeBroadcastStrategy.o MeshStreamingStrategy.o \
