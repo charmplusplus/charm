@@ -941,7 +941,6 @@ static void _noCldNodeEnqueue(int node, envelope *env)
   }
 }
 
-
 static inline int _prepareMsg(int eIdx,void *msg,const CkChareID *pCid)
 {
   register envelope *env = UsrToEnv(msg);
@@ -992,14 +991,26 @@ static inline int _prepareImmediateMsg(int eIdx,void *msg,const CkChareID *pCid)
 }
 
 extern "C"
-void CkSendMsg(int entryIdx, void *msg,const CkChareID *pCid)
+void CkSendMsg(int entryIdx, void *msg,const CkChareID *pCid, int opts)
 {
+  if (opts & CK_MSG_INLINE) {
+    CkSendMsgInline(entryIdx, msg, pCid);
+    return;
+  }
+#ifndef CMK_OPTIMIZE
+  if (opts & CK_MSG_IMMEDIATE) {
+    CmiAbort("Immediate message is not allowed in Chare!");
+  }
+#endif
   register envelope *env = UsrToEnv(msg);
   int destPE=_prepareMsg(entryIdx,msg,pCid);
   if (destPE!=-1) {
     _TRACE_CREATION_1(env);
     CpvAccess(_qd)->create();
-    CldEnqueue(destPE, env, _infoIdx);
+    if (opts & CK_MSG_SKIPSCHEDULER)
+      _noCldEnqueue(destPE, env);
+    else
+      CldEnqueue(destPE, env, _infoIdx);
     _TRACE_CREATION_DONE(1);
   }
 }
@@ -1015,21 +1026,6 @@ void CkSendMsgInline(int entryIndex, void *msg, const CkChareID *pCid)
     _invokeEntryNoTrace(entryIndex,env,pCid->objPtr);
   }
   else {
-#if CMK_IMMEDIATE_MSG
-    register envelope *env = (envelope *) UsrToEnv(msg);
-    if (env->isImmediate()) {
-      env->setImmediate(CmiFalse);
-      int destPE=_prepareImmediateMsg(entryIndex,msg,pCid);
-      // go into VidBlock when destPE is -1
-      if (destPE!=-1) {
-        _TRACE_CREATION_1(env);
-        CpvAccess(_qd)->create();
-        _noCldEnqueue(destPE, env);
-        _TRACE_CREATION_DONE(1);
-      }
-    }
-    else
-#endif
     //No way to inline a cross-processor message:
     CkSendMsg(entryIndex,msg,pCid);
   }
@@ -1056,13 +1052,16 @@ static inline envelope *_prepareImmediateMsgBranch(int eIdx,void *msg,CkGroupID 
 }
 
 static inline void _sendMsgBranch(int eIdx, void *msg, CkGroupID gID,
-                           int pe=CLD_BROADCAST_ALL)
+                  int pe=CLD_BROADCAST_ALL, int opts = 0)
 {
   int numPes;
   register envelope *env = _prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
   _TRACE_ONLY(numPes = (pe==CLD_BROADCAST_ALL?CkNumPes():1));
   _TRACE_CREATION_N(env, numPes);
-  _skipCldEnqueue(pe, env, _infoIdx);
+  if (opts & CK_MSG_SKIPSCHEDULER)
+    _noCldEnqueue(pe, env);
+  else
+    _skipCldEnqueue(pe, env, _infoIdx);
   _TRACE_CREATION_DONE(numPes);
 }
 
@@ -1073,14 +1072,6 @@ static inline void _sendMsgBranchMulti(int eIdx, void *msg, CkGroupID gID,
   _TRACE_CREATION_MULTICAST(env, npes, pes);
   CldEnqueueMulti(npes, pes, env, _infoIdx);
   _TRACE_CREATION_DONE(1); 	// since it only creates one creation event.
-}
-
-extern "C"
-void CkSendMsgBranch(int eIdx, void *msg, int pe, CkGroupID gID)
-{
-  _sendMsgBranch(eIdx, msg, gID, pe);
-  _STATS_RECORD_SEND_BRANCH_1();
-  CkpvAccess(_coreState)->create();
 }
 
 extern "C"
@@ -1095,30 +1086,26 @@ void CkSendMsgBranchInline(int eIdx, void *msg, int destPE, CkGroupID gID)
       _deliverForBocMsg(CkpvAccess(_coreState),eIdx,env,obj);
       return;
     }
-#if CMK_IMMEDIATE_MSG
-    else {
-      envelope *env=UsrToEnv(msg);
-      env->setImmediate(CmiFalse);
-    }
-#endif
   }
   //Can't inline-- send the usual way
-#if CMK_IMMEDIATE_MSG
-  register envelope *env = UsrToEnv(msg);
-  if (env->isImmediate()) {
-    int numPes;
-    _TRACE_ONLY(numPes = (destPE==CLD_BROADCAST_ALL?CkNumPes():1));
-    env->setImmediate(CmiFalse);
-    env = _prepareImmediateMsgBranch(eIdx,msg,gID,ForBocMsg);
-    _TRACE_CREATION_N(env, numPes);
-    _noCldEnqueue(destPE, env);
-    _TRACE_CREATION_DONE(numPes);
-    _STATS_RECORD_SEND_BRANCH_1();
-    CkpvAccess(_coreState)->create();
-  }
-  else
-#endif
   CkSendMsgBranch(eIdx,msg,destPE,gID);
+}
+
+extern "C"
+void CkSendMsgBranch(int eIdx, void *msg, int pe, CkGroupID gID, int opts)
+{
+  if (opts & CK_MSG_INLINE) {
+    CkSendMsgBranchInline(eIdx, msg, pe, gID);
+    return;
+  }
+#ifndef CMK_OPTIMIZE
+  if (opts & CK_MSG_IMMEDIATE) {
+    CmiAbort("Immediate message is not allowed in Group!");
+  }
+#endif
+  _sendMsgBranch(eIdx, msg, gID, pe, opts);
+  _STATS_RECORD_SEND_BRANCH_1();
+  CkpvAccess(_coreState)->create();
 }
 
 extern "C"
@@ -1132,28 +1119,49 @@ void CkSendMsgBranchMulti(int eIdx,void *msg,int npes,int *pes,CkGroupID gID)
 extern "C"
 void CkBroadcastMsgBranch(int eIdx, void *msg, CkGroupID gID)
 {
-  _sendMsgBranch(eIdx, msg, gID);
+  _sendMsgBranch(eIdx, msg, gID, CLD_BROADCAST_ALL);
   _STATS_RECORD_SEND_BRANCH_N(CkNumPes());
   CpvAccess(_qd)->create(CkNumPes());
 }
 
 static inline void _sendMsgNodeBranch(int eIdx, void *msg, CkGroupID gID,
-                           int node=CLD_BROADCAST_ALL)
+                int node=CLD_BROADCAST_ALL, int opts = 0)
 {
   int numPes;
   register envelope *env = _prepareMsgBranch(eIdx,msg,gID,ForNodeBocMsg);
   _TRACE_ONLY(numPes = (node==CLD_BROADCAST_ALL?CkNumNodes():1));
   _TRACE_CREATION_N(env, numPes);
-  CldNodeEnqueue(node, env, _infoIdx);
+  if (opts & CK_MSG_SKIPSCHEDULER)
+    _noCldNodeEnqueue(node, env);
+  else
+    CldNodeEnqueue(node, env, _infoIdx);
   _TRACE_CREATION_DONE(numPes);
 }
 
 extern "C"
-void CkSendMsgNodeBranch(int eIdx, void *msg, int node, CkGroupID gID)
+void CkSendMsgNodeBranchImmediate(int eIdx, void *msg, int node, CkGroupID gID)
 {
-  _sendMsgNodeBranch(eIdx, msg, gID, node);
-  _STATS_RECORD_SEND_NODE_BRANCH_1();
+#if CMK_IMMEDIATE_MSG
+  if (node==CkMyNode()) 
+  { 
+    CkSendMsgNodeBranchInline(eIdx, msg, node, gID);
+    return;
+  }
+  //Can't inline-- send the usual way
+  register envelope *env = UsrToEnv(msg);
+  int numPes;
+  _TRACE_ONLY(numPes = (node==CLD_BROADCAST_ALL?CkNumNodes():1));
+  env->setImmediate(CmiFalse);
+  env = _prepareImmediateMsgBranch(eIdx,msg,gID,ForNodeBocMsg);
+  _TRACE_CREATION_N(env, numPes);
+  _noCldNodeEnqueue(node, env);
+  _STATS_RECORD_SEND_BRANCH_1();
   CkpvAccess(_coreState)->create();
+  _TRACE_CREATION_DONE(numPes);
+#else
+  // no support for immediate message, send inline
+  CkSendMsgNodeBranchInline(eIdx, msg, node, gID);
+#endif
 }
 
 extern "C"
@@ -1170,30 +1178,25 @@ void CkSendMsgNodeBranchInline(int eIdx, void *msg, int node, CkGroupID gID)
       _deliverForNodeBocMsg(CkpvAccess(_coreState),eIdx,env,obj);
       return;
     }
-#if CMK_IMMEDIATE_MSG
-    else {
-      envelope *env=UsrToEnv(msg);
-      env->setImmediate(CmiFalse);
-    }
-#endif
   }
   //Can't inline-- send the usual way
-#if CMK_IMMEDIATE_MSG
-  register envelope *env = UsrToEnv(msg);
-  if (env->isImmediate()) {
-    int numPes;
-    _TRACE_ONLY(numPes = (node==CLD_BROADCAST_ALL?CkNumNodes():1));
-    env->setImmediate(CmiFalse);
-    env = _prepareImmediateMsgBranch(eIdx,msg,gID,ForNodeBocMsg);
-    _TRACE_CREATION_N(env, numPes);
-    _noCldNodeEnqueue(node, env);
-    _STATS_RECORD_SEND_BRANCH_1();
-    CkpvAccess(_coreState)->create();
-    _TRACE_CREATION_DONE(numPes);
-  }
-  else
-#endif
   CkSendMsgNodeBranch(eIdx,msg,node,gID);
+}
+
+extern "C"
+void CkSendMsgNodeBranch(int eIdx, void *msg, int node, CkGroupID gID, int opts)
+{
+  if (opts & CK_MSG_INLINE) {
+    CkSendMsgNodeBranchInline(eIdx, msg, node, gID);
+    return;
+  }
+  if (opts & CK_MSG_IMMEDIATE) {
+    CkSendMsgNodeBranchImmediate(eIdx, msg, node, gID);
+    return;
+  }
+  _sendMsgNodeBranch(eIdx, msg, gID, node, opts);
+  _STATS_RECORD_SEND_NODE_BRANCH_1();
+  CkpvAccess(_coreState)->create();
 }
 
 extern "C"
@@ -1227,7 +1230,7 @@ void _ckModuleInit(void) {
 /************** Send: Arrays *************/
 
 extern void CkArrayManagerInsert(int onPe,void *msg);
-extern void CkArrayManagerDeliver(int onPe,void *msg);
+//extern void CkArrayManagerDeliver(int onPe,void *msg);
 
 static void _prepareOutgoingArrayMsg(envelope *env,int type)
 {
@@ -1245,11 +1248,15 @@ void CkArrayManagerInsert(int pe,void *msg,CkGroupID aID) {
   _prepareOutgoingArrayMsg(env,ArrayEltInitMsg);
   CldEnqueue(pe, env, _infoIdx);
 }
+
 extern "C"
-void CkArrayManagerDeliver(int pe,void *msg) {
+void CkArrayManagerDeliver(int pe,void *msg, int opts) {
   register envelope *env = UsrToEnv(msg);
   _prepareOutgoingArrayMsg(env,ForArrayEltMsg);
-  _skipCldEnqueue(pe, env, _infoIdx);
+  if (opts & CK_MSG_SKIPSCHEDULER)
+    _noCldEnqueue(pe, env);
+  else
+    _skipCldEnqueue(pe, env, _infoIdx);
 }
 
 void CkDeleteChares() {

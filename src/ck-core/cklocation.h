@@ -140,7 +140,7 @@ public:
   virtual RecType type(void)=0;
   
   /// Accept a message for this element
-  virtual CmiBool deliver(CkArrayMessage *m,CkDeliver_t type,CmiBool doFree=CmiTrue)=0;
+  virtual CmiBool deliver(CkArrayMessage *m,CkDeliver_t type,int opts=0)=0;
   
   /// This is called when this ArrayRec is about to be replaced.
   /// It is only used to deliver buffered element messages.
@@ -180,7 +180,7 @@ public:
    *  Accept a message for this element.
    *  Returns false if the element died during the receive.
    */
-  virtual CmiBool deliver(CkArrayMessage *m,CkDeliver_t type,CmiBool doFree=CmiTrue);
+  virtual CmiBool deliver(CkArrayMessage *m,CkDeliver_t type,int opts=0);
 
   /** Invoke the given entry method on this element.
    *   Returns false if the element died during the receive.
@@ -485,7 +485,7 @@ public:
 	///Deliver message to this element:
 	inline void deliverViaQueue(CkMessage *m) {deliver(m,CkDeliver_queue);}
 	inline void deliverInline(CkMessage *m) {deliver(m,CkDeliver_inline);}
-	void deliver(CkMessage *m, CkDeliver_t type,CmiBool doFree=CmiTrue);
+	void deliver(CkMessage *m, CkDeliver_t type, int opts=0);
 
 	///Done inserting elements for now
 	void doneInserting(void);

@@ -289,7 +289,7 @@ public:
 	CProxyElement_ArrayBase(const ArrayElement *e);
 
 	void ckInsert(CkArrayMessage *m,int ctor,int onPe);
-	void ckSend(CkArrayMessage *m, int ep) const;
+	void ckSend(CkArrayMessage *m, int ep, int opts = 0) const;
 	void *ckSendSync(CkArrayMessage *m, int ep) const;
 	const CkArrayIndex &ckGetIndex() const {return _idx;}
 
@@ -301,8 +301,8 @@ PUPmarshall(CProxyElement_ArrayBase);
 	CK_DISAMBIG_ARRAY(super) \
 	inline void ckInsert(CkArrayMessage *m,int ctor,int onPe) \
 	  { super::ckInsert(m,ctor,onPe); }\
-	inline void ckSend(CkArrayMessage *m, int ep) const \
-	  { super::ckSend(m,ep); }\
+	inline void ckSend(CkArrayMessage *m, int ep, int opts = 0) const \
+	  { super::ckSend(m,ep,opts); }\
 	inline void *ckSendSync(CkArrayMessage *m, int ep) const \
 	  { return super::ckSendSync(m,ep); }\
 	inline const CkArrayIndex &ckGetIndex() const \
@@ -331,7 +331,7 @@ public:
 	void ckSectionDelegate(CkDelegateMgr *d) 
 		{ ckDelegate(d); d->initDelegateMgr(this); }
 //	void ckInsert(CkArrayMessage *m,int ctor,int onPe);
-	void ckSend(CkArrayMessage *m, int ep) ;
+	void ckSend(CkArrayMessage *m, int ep, int opts = 0) ;
 
 //	ArrayElement *ckLocal(void) const;
 	inline CkSectionInfo &ckGetSectionInfo() {return _sid._cookie;}
@@ -343,8 +343,8 @@ public:
 PUPmarshall(CProxySection_ArrayBase);
 #define CK_DISAMBIG_ARRAY_SECTION(super) \
 	CK_DISAMBIG_ARRAY(super) \
-	inline void ckSend(CkArrayMessage *m, int ep) \
-	  { super::ckSend(m,ep); } \
+	inline void ckSend(CkArrayMessage *m, int ep, int opts = 0) \
+	  { super::ckSend(m,ep,opts); } \
         inline CkSectionInfo &ckGetSectionInfo() \
 	  { return super::ckGetSectionInfo(); } \
         inline CkSectionID &ckGetSectionID() \
@@ -355,8 +355,8 @@ PUPmarshall(CProxySection_ArrayBase);
 	  { return super::ckGetNumElements(); }  \
 
 //Simple C-like API:
-void CkSendMsgArray(int entryIndex, void *msg, CkArrayID aID, const CkArrayIndex &idx, CmiBool doFree=CmiTrue);
-void CkSendMsgArrayInline(int entryIndex, void *msg, CkArrayID aID, const CkArrayIndex &idx, CmiBool doFree=CmiTrue);
+void CkSendMsgArray(int entryIndex, void *msg, CkArrayID aID, const CkArrayIndex &idx, int opts=0);
+void CkSendMsgArrayInline(int entryIndex, void *msg, CkArrayID aID, const CkArrayIndex &idx, int opts=0);
 void CkBroadcastMsgArray(int entryIndex, void *msg, CkArrayID aID);
 
 /************************ Array Element *********************/
@@ -569,8 +569,8 @@ public:
 	  {return locMgr->lastKnown(idx);}
   /// Deliver message to this element (directly if local)
   /// doFree if is local
-  inline void deliver(CkMessage *m,CkDeliver_t type,CmiBool doFree=CmiTrue)
-	  {locMgr->deliver(m,type,doFree);}
+  inline void deliver(CkMessage *m,CkDeliver_t type,int opts=0)
+	  {locMgr->deliver(m,type,opts);}
   /// Fetch a local element via its index (return NULL if not local)
   inline ArrayElement *lookup(const CkArrayIndex &index)
 	  {return (ArrayElement *)locMgr->lookup(index,thisgroup);}

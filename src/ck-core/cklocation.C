@@ -841,12 +841,12 @@ CmiBool CkLocRec_local::invokeEntry(CkMigratable *obj,void *msg,
 	return CmiTrue;
 }
 
-CmiBool CkLocRec_local::deliver(CkArrayMessage *msg,CkDeliver_t type,CmiBool doFree)
+CmiBool CkLocRec_local::deliver(CkArrayMessage *msg,CkDeliver_t type,int opts)
 {
 	if (type==CkDeliver_queue) { /*Send via the message queue */
-		if (doFree == CmiFalse)
+		if (opts & CK_MSG_KEEP)
 			msg = (CkArrayMessage *)CkCopyMsg((void **)&msg);
-		CkArrayManagerDeliver(CkMyPe(),msg);
+		CkArrayManagerDeliver(CkMyPe(),msg,opts);
 		return CmiTrue;
 	}
 	else
@@ -854,7 +854,7 @@ CmiBool CkLocRec_local::deliver(CkArrayMessage *msg,CkDeliver_t type,CmiBool doF
 		CkMigratable *obj=myLocMgr->lookupLocal(localIdx,
 			UsrToEnv(msg)->getsetArrayMgr());
 		if (obj==NULL) {//That sibling of this object isn't created yet!
-			if (doFree == CmiFalse)
+			if (opts & CK_MSG_KEEP)
 				msg = (CkArrayMessage *)CkCopyMsg((void **)&msg);
 			if (msg->array_ifNotThere()!=CkArray_IfNotThere_buffer) {
 				return myLocMgr->demandCreateElement(msg,CkMyPe(),type);
@@ -868,6 +868,7 @@ CmiBool CkLocRec_local::deliver(CkArrayMessage *msg,CkDeliver_t type,CmiBool doF
 			
 		if (msg->array_hops()>1)
 			myLocMgr->multiHop(msg);
+		CmiBool doFree = (CmiBool)!(opts & CK_MSG_KEEP);
 		return invokeEntry(obj,(void *)msg,msg->array_ep(),doFree);
 	}
 }
@@ -936,7 +937,7 @@ public:
   
 	virtual RecType type(void) {return dead;}
   
-	virtual CmiBool deliver(CkArrayMessage *msg,CkDeliver_t type,CmiBool doFree=CmiTrue) {
+	virtual CmiBool deliver(CkArrayMessage *msg,CkDeliver_t type,int opts=0) {
 		CkPrintf("Dead array element is %s.\n",idx2str(msg->array_index()));
 		CkAbort("Send to dead array element!\n");
 		return CmiFalse;
@@ -998,14 +999,14 @@ public:
 	virtual RecType type(void) {return remote;}
   
 	//Send a message for this element.
-	virtual CmiBool deliver(CkArrayMessage *msg,CkDeliver_t type,CmiBool doFree=CmiTrue) {
+	virtual CmiBool deliver(CkArrayMessage *msg,CkDeliver_t type,int opts=0) {
 		access();//Update our modification date
 		msg->array_hops()++;
 		DEBS((AA"   Forwarding message for element %s to %d (REMOTE)\n"AB,
 		      idx2str(msg->array_index()),onPe));
-		if (doFree == CmiFalse)
+		if (opts & CK_MSG_KEEP)
 			msg = (CkArrayMessage *)CkCopyMsg((void **)&msg);
-		CkArrayManagerDeliver(onPe,msg);
+		CkArrayManagerDeliver(onPe,msg,opts);
 		return CmiTrue;
 	}
 	//Return if this element is now obsolete
@@ -1047,9 +1048,9 @@ public:
 	virtual RecType type(void) {return buffering;}
   
 	//Buffer a message for this element.
-	virtual CmiBool deliver(CkArrayMessage *msg,CkDeliver_t type,CmiBool doFree=CmiTrue) {
+	virtual CmiBool deliver(CkArrayMessage *msg,CkDeliver_t type,int opts=0) {
 		DEBS((AA" Queued message for %s\n"AB,idx2str(msg->array_index())));
-		if (doFree == CmiFalse)
+		if (opts & CK_MSG_KEEP)
 			msg = (CkArrayMessage *)CkCopyMsg((void **)&msg);
 		buffer.enq(msg);
 		return CmiTrue;
@@ -1397,7 +1398,7 @@ void CkLocMgr::removeFromTable(const CkArrayIndex &idx) {
 
 /************************** LocMgr: MESSAGING *************************/
 /// Deliver message to this element, going via the scheduler if local
-void CkLocMgr::deliver(CkMessage *m,CkDeliver_t type,CmiBool doFree) {
+void CkLocMgr::deliver(CkMessage *m,CkDeliver_t type,int opts) {
 	CK_MAGICNUMBER_CHECK
 	CkArrayMessage *msg=(CkArrayMessage *)m;
 	const CkArrayIndex &idx=msg->array_index();
@@ -1411,9 +1412,9 @@ void CkLocMgr::deliver(CkMessage *m,CkDeliver_t type,CmiBool doFree) {
 		else /*rec==NULL*/ the_lbdb->Send(myLBHandle,idx2LDObjid(idx),UsrToEnv(msg)->getTotalsize(),homePe(msg->array_index()));
 	}
 #endif
-	if (rec!=NULL) rec->deliver(msg,type,doFree);
+	if (rec!=NULL) rec->deliver(msg,type,opts);
 	else /* rec==NULL*/ {
-		if (doFree == CmiFalse)
+		if (opts & CK_MSG_KEEP)
 			msg = (CkArrayMessage *)CkCopyMsg((void **)&msg);
 		deliverUnknown(msg,type);
 	}
