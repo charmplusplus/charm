@@ -1,3 +1,5 @@
+VERSION = net-win32-smp
+
 COMMON_SRC = .
 CONVLIBS_SRC = .\libs\conv-libs
 
@@ -25,7 +27,7 @@ CONV_CPM=$(XLATI_DIR)\conv-cpm.exe
 
 LINK_OTHER = kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib \
  advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib \
- odbccp32.lib /subsystem:console /incremental:no /machine:IX86
+ odbccp32.lib /subsystem:console /incremental:no #/machine:IX86
 
 ALL: CHARM++
 
@@ -35,7 +37,8 @@ TRANSLATORS : $(CHARMXI) $(CONV_CPM)
 
 AMPI: CHARM++ $(LIBS_DIR)\libampi.lib $(LIBS_DIR)\libampif.lib
 
-.SILENT:
+#.SILENT:
+
 LIBS : CONVLIBS CHARMLIBS
 	 @echo Nothing to do here right now.
 
@@ -97,13 +100,28 @@ DIRSSOURCES :
 	@mkdir    ..\lib
 	@mkdir    ..\src
 	@xcopy    /q /i /e /s ..\..\src\Common\libs libs
-	@xcopy    /q /i /e /s ..\..\src\Common\libs ..\libsrc
+	@xcopy /d /q  ..\..\src\Common\conv-core\* .
+	@xcopy /d /q  ..\..\src\Common\conv-ldb\* .
+	@xcopy /d /q  ..\..\src\Common\ck-core\* .
+	@xcopy /d /q  ..\..\src\Common\ck-ldb\* .
+	@xcopy /d /q  ..\..\src\Common\ck-perf\* .
+	@xcopy /d /q  ..\..\src\Common\langs\ampi\* .
+	@xcopy /d /q  ..\..\src\Common\langs\bluegene\* .
+	@xcopy /d /q  ..\..\src\Common\langs\simplemsg\* .
+	@xcopy /d /q  ..\..\src\Common\langs\sdag\xlator\* .
+	@xcopy /d /q  ..\..\src\Common\langs\sdag\runtime\* .
+	@xcopy /d /q  ..\..\src\Common\langs\pvmc\* .
+	@xcopy /d /q  ..\..\src\Common\util\* .
+	@xcopy /d /q  ..\..\src\Common\xlat-i\* .
+	@xcopy /d /q  ..\..\src\Common\xlatcpm\*.c .
+	@xcopy /d /q  ..\..\src\Common.win32\*.h .
+	@xcopy /d /q  ..\..\src\Common.net\* .
+	@xcopy /d /q  ..\..\src\$(VERSION)\* .
+	@xcopy    /q /i /e /s ..\..\src\Common.net\charmrun  charmrun  
 	@xcopy /d /q $(CONVLIBS_SRC)\commlib\*.C .
 	@xcopy /d /q $(CONVLIBS_SRC)\commlib\*.h .
 	@xcopy /d /q  $(CONVLIBS_SRC)\packLib\*.C .
 	@xcopy /d /q  $(CONVLIBS_SRC)\packLib\*.h .
-	@xcopy /d /q  ..\..\src\Common\util\*.C .
-	@xcopy /d /q  ..\..\src\Common\util\*.h .
 	@if exist ..\pgms\nul    rd /s /q ..\pgms
 	@xcopy    /q /i /e /s ..\..\pgms  ..\pgms  
 	@mkdir    DIRSSOURCES
@@ -374,6 +392,9 @@ NeighborLB.decl.h NeighborLB.def.h : NeighborLB.ci $(CHARMXI)
 
 RandRefLB.decl.h RandRefLB.def.h : RandRefLB.ci $(CHARMXI)
 	$(CHARMXI) -ansi RandRefLB.ci
+
+BlueGene.decl.h BlueGene.def.h : BlueGene.ci $(CHARMXI)
+	$(CHARMXI) -ansi BlueGene.ci
 
 init.obj: init.C $(CKHEADERS)
 	$(CPP) $(CPP_PROJ) /TP init.C
