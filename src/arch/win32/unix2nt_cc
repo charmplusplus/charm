@@ -227,7 +227,8 @@ do
 		;;
 # Default
 	*)
-		printUsage  "Error: Unrecognized argument $arg"
+#		printUsage  "Error: Unrecognized argument $arg"
+		echo  "Ignored Unrecognized argument $arg"
 		;;
 	esac
 done
