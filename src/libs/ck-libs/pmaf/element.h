@@ -102,7 +102,8 @@ class element {
   void refineLE();
   LEsplitResult *LEsplit(elemRef root, elemRef parent, nodeRef newNodeRef, 
 			 node newNode, elemRef newRootElem, elemRef newElem, 
-			 elemRef targetElem, node aIn, node bIn);
+			 elemRef targetElem, double targetVol, 
+			 node aIn, node bIn);
   lockResult *lockArc(elemRef prioRef, elemRef parentRef, double prio,
 		      elemRef destRef, node aNode, node bNode);
   void unlockArc1(int prio, elemRef parentRef, elemRef destRef, node aNode, 
@@ -131,10 +132,10 @@ class element {
     f[2] = getArea(0,2,3);
     f[3] = getArea(1,2,3);
     for (int i=0; i<4; i++) if (f[i] > lf) { lf2 = lf; lf = f[i]; }
-    if (lf2 + (0.1*lf2) <= lf) return 1;
+    if (lf2 + (0.25*lf2) <= lf) return 1;
     return 0;
   }
-  int CPtest() { return 1; }
+  int CPtest();
 };
 
 #endif

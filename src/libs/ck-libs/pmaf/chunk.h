@@ -66,8 +66,9 @@ class chunk : public ArrayElement1D {
 
   int accessLock, adjustLock;
  public:
-  int lock, lockHolder;
+  int lock, lockHolder, lockCount;
   double lockPrio;
+  double smoothness;
   prioLockRequests lockList;
   // the chunk's components, left public for sanity's sake
   std::vector<element> theElements;

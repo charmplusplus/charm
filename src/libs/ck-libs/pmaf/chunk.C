@@ -19,8 +19,8 @@ static elemRef nullRef(-1,-1);
 chunk::chunk(int nChunks)
   : numElements(0), numNodes(0), sizeElements(0), sizeNodes(0),
     coordsRecvd(0), debug_counter(0), refineInProgress(0),
-    modified(0), accessLock(0), adjustLock(0), lock(0),
-    lockHolder(-1), lockPrio(-1.0), lockList(NULL), theClient(NULL)
+    modified(0), accessLock(0), adjustLock(0), lock(0), lockCount(0),
+    lockHolder(-1), lockPrio(-1.0), smoothness(0.25), lockList(NULL), theClient(NULL)
   //TCharmClient1D(m->myThreads), 
 {
   refineResultsStorage=NULL;
@@ -68,7 +68,7 @@ void chunk::refiningElements()
     // continue trying to refine elements until nothing changes
     i = 0;
     modified = 0;
-    CkPrintf("Chunk %d in refiningElements loop\n", cid);
+    //CkPrintf("Chunk %d in refiningElements loop\n", cid);
     while (i < numElements) { // loop through the elements
       if ((theElements[i].getTargetVolume() <= theElements[i].getVolume()) 
 	  && (theElements[i].getTargetVolume() >= 0.0)) {
@@ -86,9 +86,9 @@ void chunk::refiningElements()
       adjustMesh();
     }
     CthYield(); // give other chunks on the same PE a chance
-    if (CkMyPe() == 0) for (int j=0; j<numChunks; j++) mesh[j].print();
   }
   // nothing is in need of refinement; turn refine loop off
+  if (CkMyPe() == 0) for (int j=0; j<numChunks; j++) mesh[j].print();
   refineInProgress = 0;  
   CkPrintf("Chunk %d going inactive...\n", cid);
 }
@@ -166,50 +166,43 @@ int chunk::lockLocalChunk(int lh, double prio)
   // each chunk can have at most one lock reservation
   // if a chunk holds a lock, it cannot have a reservation
   if (!lock) { // this chunk is UNLOCKED
-    if (!lockList) { // no reservations waiting
-      CkPrintf("LOCK chunk %d by %d prio %f\n", cid, lh, prio);
-      lock = 1; lockHolder = lh; lockPrio = prio;
+    // remove previous lh reservation; insert this reservation
+    // then check first reservation
+    removeLock(lh);
+    insertLock(lh, prio);
+    if ((lockList->prio == prio) && (lockList->holder == lh)) {
+      prioLockStruct *tmp = lockList;
+      CkPrintf("[%d]LOCK chunk %d by %d prio %.10f LOCKED (was %d[%d:%.10f])\n", 
+	       CkMyPe(), cid, lh, prio, lock, lockHolder, lockPrio);
+      lock = 1; lockHolder = lh; lockPrio = prio; lockCount = 1;
+      lockList = lockList->next;
+      free(tmp);
       return 1;
     }
-    else { // there are reservations waiting in lockList
-      // remove previous lh reservation; insert this reservation
-      // then check first reservation
-      removeLock(lh);
-      insertLock(lh, prio);
-      if ((lockList->prio == prio) && (lockList->holder == lh)) {
-	prioLockStruct *tmp = lockList;
-	CkPrintf("LOCK chunk %d by %d prio %f\n", cid, lh, prio);
-	lock = 1; lockHolder = lh; lockPrio = prio;
-	lockList = lockList->next;
-	free(tmp);
-	return 1;
-      }
-      removeLock(lh);
-      return 0;
-    }
+    removeLock(lh);
+    //CkPrintf("[%d]LOCK chunk %d by %d prio %.10f REFUSED (was %d[%d:%.10f])\n", 
+    //     CkMyPe(), cid, lh, prio, lock, lockHolder, lockPrio);
+    return 0;
   }
   else { // this chunk is LOCKED
-    if ((prio == lockPrio) && (lh == lockHolder)) return 1;
-    if (!lockList) { // no reservations waiting
-      insertLock(lh, prio);
+    if ((prio == lockPrio) && (lh == lockHolder)) {
+      lockCount++;
+      return 1;
+    }
+    removeLock(lh);
+    insertLock(lh, prio);
+    if ((lockList->prio == prio) && (lockList->holder == lh)) {
       if ((prio > lockPrio) ||
-          ((prio == lockPrio) && (lh < lockHolder))) // lh might be next
+	  ((prio == lockPrio) && (lh < lockHolder))) { // lh might be next
+	//CkPrintf("[%d]LOCK chunk %d by %d prio %.10f RESERVED (was %d[%d:%.10f])\n",
+	//	 CkMyPe(), cid, lh, prio, lock, lockHolder, lockPrio);
 	return -1; 
-      removeLock(lh);
-      return 0;
-    }
-    else { // there are reservations waiting in lockList
-      removeLock(lh);
-      insertLock(lh, prio);
-      if ((lockList->prio == prio) && (lockList->holder == lh)) {
-	// this lock is at front of reservation list; test for priority
-	if ((prio > lockPrio) ||
-	    ((prio == lockPrio) && (lh < lockHolder))) // lh might be next
-	  return -1; 
       }
-      removeLock(lh);
-      return 0;
     }
+    removeLock(lh);
+    //CkPrintf("[%d]LOCK chunk %d by %d prio %.10f REFUSED (was %d[%d:%.10f])\n", 
+    //   CkMyPe(), cid, lh, prio, lock, lockHolder, lockPrio);
+    return 0;
   }
 }
 
@@ -229,11 +222,6 @@ void chunk::insertLock(int lh, double prio)
       newLock->next = lockList;
       lockList = newLock;
     }
-    else if ((prio == lockList->prio) && (lh == lockList->holder)) {
-      // don't insert duplicates
-      free(newLock);
-      return;
-    }
     else { 
       tmp = lockList;
       while (tmp->next) {
@@ -241,10 +229,6 @@ void chunk::insertLock(int lh, double prio)
 					 (lh > tmp->next->holder)))
 	  tmp = tmp->next;
 	else break;
-      }
-      if ((tmp->prio == prio) && (tmp->holder == lh)) { // lock already queued
-	free(newLock);
-	return;
       }
       newLock->next = tmp->next;
       tmp->next = newLock;
@@ -255,6 +239,7 @@ void chunk::insertLock(int lh, double prio)
 void chunk::removeLock(int lh) 
 {
   prioLockStruct *tmp = lockList, *del;
+  if (!lockList) return;
   if (tmp->holder == lh) {
     lockList = lockList->next;
     free(tmp);
@@ -278,10 +263,13 @@ void chunk::unlockChunk(int lh)
 void chunk::unlockLocalChunk(int lh)
 {
   if (lockHolder == lh) {
-    lock = 0; 
-    lockHolder = -1;
-    lockPrio = -1.0;
-    CkPrintf("UNLOCK chunk %d\n", cid);
+    lockCount--;
+    if (lockCount == 0) {
+      lock = 0; 
+      lockHolder = -1;
+      lockPrio = -1.0;
+      CkPrintf("[%d]UNLOCK chunk %d by holder %d\n", CkMyPe(), cid, lh);
+    }
   }
 }
 
@@ -440,11 +428,17 @@ void chunk::debug_print(int c)
   for (i=0; i<numNodes; i++) {
     fprintf(fp, "%lf %lf %lf  ", theNodes[i].getCoord(0), 
 	    theNodes[i].getCoord(1), theNodes[i].getCoord(2));
-    if (theNodes[i].isFixed())
+    /*    if (theNodes[i].isFixed())
       fprintf(fp, "1.0 0.5 0.75\n");
     else if (theNodes[i].onSurface())
       fprintf(fp, "1.0 1.0 0.5\n");
     else fprintf(fp, "0.5 0.75 1.0\n");
+    */
+    if (i % 3 == 0)
+      fprintf(fp, "1.0 1.0 1.0\n");
+    else if (i % 3 == 1)
+      fprintf(fp, "0.5 0.5 1.0\n");
+    else fprintf(fp, "0.0 0.0 1.0\n");
   }
   fprintf(fp, "foo\n");
   for (i=0; i<numElements; i++) {
@@ -558,7 +552,7 @@ LEsplitResult *chunk::LEsplit(LEsplitMsg *lsm)
   forcedGetAccessLock();
   LEsplitResult *lsr = theElements[lsm->idx].LEsplit(lsm->root, lsm->parent, 
     lsm->newNodeRef, lsm->newNode, lsm->newRootElem, lsm->newElem, 
-    lsm->targetElem, lsm->a, lsm->b);
+    lsm->targetElem, lsm->targetVol, lsm->a, lsm->b);
   CkFreeMsg(lsm);
   releaseAccessLock();
   return lsr;
@@ -756,20 +750,20 @@ void chunk::allocMesh(int nEl)
 
 void chunk::adjustMesh()
 {
-  if (numElements*numElements >= sizeElements) {
+  if (3*numElements >= sizeElements) {
     getAdjustLock();
     CkPrintf("[%d] Adjusting # elements...\n", cid);
-    sizeElements += numElements*numElements;
+    sizeElements += 3*numElements;
     theElements.resize(sizeElements);
     CkPrintf("[%d] Done adjusting # elements...\n", cid);
     for (int i=numElements; i<sizeElements; i++)
       theElements[i].set(cid, i, this); 
     releaseAdjustLock();
   }
-  if (numElements*numElements*3 >= sizeNodes) {
+  if (3*numElements >= sizeNodes) {
     getAdjustLock();
     CkPrintf("[%d] Adjusting # nodes...\n", cid);
-    sizeNodes += numElements*numElements*3;
+    sizeNodes += 3*numElements;
     theNodes.resize(sizeNodes);
     theSurface.resize(sizeNodes);
     CkPrintf("[%d] Done adjusting # nodes...\n", cid);
@@ -956,9 +950,9 @@ void chunk::refine()
   */
 
   // this happens on all chunks!
-  //  if (cid == 0) {
-  for (int i=0; i<numElements; i++) {
-    theElements[i].setTargetVolume(theElements[i].getVolume()/100.0);
+  if (cid == 0) {
+  //for (int i=0; i<numElements; i++) {
+    theElements[0].setTargetVolume(theElements[0].getVolume()/2000.0);
   }
   //  }
 }

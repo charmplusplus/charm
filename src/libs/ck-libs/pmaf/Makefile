@@ -1,6 +1,6 @@
 OPTS=-g -Wall #-O -DCMK_OPTIMIZE=1 -DCMK_MEMCHECKS_OFF=1
 OBJECTS=ref.o element.o chunk.o pgm.o
-CHARMC=../../../../bin/charmc $(OPTS)
+CHARMC=/expand8/home/wilmarth/charm/net-linux/bin/charmc $(OPTS)
 
 all:	$(OBJECTS)
 	$(CHARMC) $(OBJECTS) -o pgm -language charm++

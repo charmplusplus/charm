@@ -106,6 +106,7 @@ class flip32response : public CMessage_flip32response {
 class LEsplitMsg : public CMessage_LEsplitMsg {
  public:
   int idx;
+  double targetVol;
   elemRef root, parent, newRootElem, newElem, targetElem;
   nodeRef newNodeRef;
   node newNode, a, b;

@@ -160,10 +160,10 @@ void main::readMesh()
     mesh[i].print();
   CkWaitQD();
 
-  CkPrintf("Checking refined mesh... \n");
-  for (i=0; i<numChunks; i++) 
-    mesh[i].checkRefine();
-  CkWaitQD();
+  //  CkPrintf("Checking refined mesh... \n");
+  //  for (i=0; i<numChunks; i++) 
+  //    mesh[i].checkRefine();
+  //  CkWaitQD();
   
 
   /*
