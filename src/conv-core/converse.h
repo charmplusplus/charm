@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.41  1996-04-16 22:44:42  jyelon
+ * Revision 2.42  1996-04-17 18:54:36  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.41  1996/04/16 22:44:42  jyelon
  * *** empty log message ***
  *
  * Revision 2.40  1996/04/15 23:57:04  jyelon
@@ -526,8 +529,8 @@ CpmControl CpmEnqueueBLIFO CMK_PROTO((int pe, int priobits, int *prioptr));
 typedef void CpmInvokable;
 typedef int CpmDeclareSimple1;
 typedef int CpmDeclarePointer1;
-#define CpmDeclareSimple(c) typedef CpmDeclareSimple1 CpmType_##c;
-#define CpmDeclarePointer(c) typedef CpmDeclarePointer1 CpmType_##c;
+#define CpmDeclareSimple(c) typedef CpmDeclareSimple1 CpmType_##c
+#define CpmDeclarePointer(c) typedef CpmDeclarePointer1 CpmType_##c
 
 /***********************************************************************
  *
