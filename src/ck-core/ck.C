@@ -101,10 +101,12 @@ static inline void _processForBocMsg(envelope *env)
     CpvAccess(_groupTable)->enqmsg(groupID, env);
     return;
   }
+  CpvAccess(_qd)->process();
   env->setMsgtype(ForChareMsg);
   env->setObjPtr(obj);
   CpvAccess(_currentGroup) = groupID;
   _processForChareMsg(env);
+  _STATS_RECORD_PROCESS_BRANCH_1();
 }
 
 static inline void _processForNodeBocMsg(envelope *env)
@@ -119,10 +121,12 @@ static inline void _processForNodeBocMsg(envelope *env)
     return;
   }
   CmiUnlock(_nodeLock);
+  CpvAccess(_qd)->process();
   env->setMsgtype(ForChareMsg);
   env->setObjPtr(obj);
   CpvAccess(_currentNodeGroup) = groupID;
   _processForChareMsg(env);
+  _STATS_RECORD_PROCESS_NODE_BRANCH_1();
 }
 
 static inline void _processFillVidMsg(envelope *env)
@@ -252,16 +256,16 @@ void _processHandler(void *msg)
       _STATS_RECORD_PROCESS_MSG_1();
       break;
     case ForBocMsg :
-      CpvAccess(_qd)->process();
+      // QD processing moved inside _processForBocMsg because it is conditional
       if(env->isPacked()) _unpackFn((void **)&env);
       _processForBocMsg(env);
-      _STATS_RECORD_PROCESS_BRANCH_1();
+      // stats record moved inside _processForBocMsg because it is conditional
       break;
     case ForNodeBocMsg :
-      CpvAccess(_qd)->process();
+      // QD processing moved to _processForNodeBocMsg because it is conditional
       if(env->isPacked()) _unpackFn((void **)&env);
       _processForNodeBocMsg(env);
-      _STATS_RECORD_PROCESS_NODE_BRANCH_1();
+      // stats record moved to _processForNodeBocMsg because it is conditional
       break;
     case ForVidMsg   :
       CpvAccess(_qd)->process();
