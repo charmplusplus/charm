@@ -567,10 +567,10 @@ public:
 void A2::pup(PUP::er \&p)
 \{
     ArrayElement2D::pup(p); //<- MUST call superclass's pup routine
-    p(nt);
-    p(chr);
+    p|nt;
+    p|chr;
     p(flt,7);
-    p(numDbl);
+    p|numDbl;
     if (p.isUnpacking()) dbl=new double[numDbl];
     p(dbl,numDbl);
 \}

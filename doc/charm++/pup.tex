@@ -71,14 +71,25 @@ conditional blocks for
 \kw{p.isUnpacking()} where you perform the appropriate allocation and deallocation.  See Section~\ref{sec:pupdynalloc} for more
 information and examples.   
 
+\paragraph{PUP operator |}
 
+The easiest syntax to use for PUPs is the style developed for
+parameter marshalling ``p|a'' where p is the name of the \kw{PUP::er}
+and a is the object to be PUPed.  This is equivalent to ``p(a)'' in
+most cases.  It works wherever a is a simple type, or a is PUP::able
+(\ref{sec:pup::able}), or a has a \kw{PUP::er} defined, and \kw{operator |}
+is not overridden for a.  
+
+If you know that all your data fields can be handled by a simple byte
+to byte copy then
+\kw{\#define~CK\_DEFAULT\_BITWISE\_PUP=1} will default  \kw{operator |} for all user defined types to a bitwise copy operation.  We do not recommended it.  It creates a potential for difficult to trace errors to occur when new types are added which are not correctly handled bitwise and the programmer neglects to write a proper PUP.
 
 \paragraph{PUP overhead}
 \label{sec:pupoverhead}
 
-Note that the same data must be passed to the \kw{PUP::er} 
-in the same order regardless of the pack direction.
-This is the fundamental beauty of the \kw{PUP::er} framework.
+Note that the same data must be passed to the \kw{PUP::er} in the same
+order regardless of the pack direction.  This is the fundamental
+beauty of the \kw{PUP::er} framework.
 
 The \kw{PUP::er} overhead is very small-- one virtual function call
 for each item or array to be packed/unpacked.  The actual packing/unpacking is
@@ -197,6 +208,7 @@ public:
 
 
 \subsubsection{Automatic allocation via PUP::able}
+\label{sec:pup::able}
 If the class \uw{foo} above might have been a subclass, instead of
 simply using \uw{new foo} above we would have had to allocate 
 an object of the appropriate subclass.  Since determining the
