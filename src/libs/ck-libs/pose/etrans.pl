@@ -8,7 +8,10 @@
 use FileHandle;
 use English;
 use strict; 
-
+use Getopt::Std;
+my %opts;
+our($opt_s);
+my $result=getopts('s');
 my $infile = shift @ARGV;
 my @otherfiles = @ARGV;
 my $inci = "$infile.ci";
@@ -265,8 +268,18 @@ while (@line=split(' ',($thisline=getcodeline($inhhandle)))) {
       foreach (@body) {
 	#substitute state_$class for occurence of $class
 	s/(\b$class\b)/state_$1/g;
-	$outhhandle->print("$_");
-	$outhhandle->print("\n");
+	#ifdef wrap chpt<>
+	if(/chpt/)
+	  {
+	    $outhhandle->print("#ifndef SEQUENTIAL_POSE\n");
+	    $outhhandle->print("$_"."\n");
+	    $outhhandle->print("#endif\n");
+	  }
+	else
+	  {
+	    $outhhandle->print("$_");
+	    $outhhandle->print("\n");
+	  }
 	#look for the public declaration
 
 	if ((/public:/)&&(!$declout)) {
@@ -279,8 +292,17 @@ while (@line=split(' ',($thisline=getcodeline($inhhandle)))) {
 
     } else {			#dunno what this is, just pass it
       foreach (@body) {
-	$outhhandle->print("$_");
-	$outhhandle->print("\n");
+	if(/chpt/)
+	  {
+	    $outhhandle->print("#ifndef SEQUENTIAL_POSE\n");
+	    $outhhandle->print("$_"."\n");
+	    $outhhandle->print("#endif\n");
+	  }
+	else
+	  {
+	    $outhhandle->print("$_");
+	    $outhhandle->print("\n");
+	  }
       }
     }
     $inpup=0;
@@ -655,7 +677,16 @@ foreach my $incfile ($inC,@otherfiles)
       $outChandle->print("init($messagename);\n") if(length($messagename) && ($issim && $isconstructor));
       while ($_ =shift @body) {
 	s/\bthishandle\b/thisIndex/gm;
-	$outChandle->print($_."\n");
+	if(/chpt/)
+	  {
+	    $outChandle->print("#ifndef SEQUENTIAL_POSE\n");
+	    $outChandle->print("$_"."\n");
+	    $outChandle->print("#endif\n");
+	  }
+	else
+	  {
+	    $outChandle->print($_."\n");
+	  }
       }
       $inbody=0;
     } elsif (!$inbody) {	#regular line
@@ -894,24 +925,62 @@ sub poserdeal
     my $poser;
     my @line=@$lineref;
     my $class;
+    my $sim;
+    my $strat;
+    my $rep;
     if (($openblock{$inhandle}==1) && ($blocklevel{$inhandle}==1)) {
       if ($thisline =~ /^\s*(poser)\s+(\S+)\s+\:\s+(sim)\s+(\S+)\s+(\S+)\s*\{\s*$/) {
 
 	$line[0]="chare";
 	$class=$2;
+	$sim=$3;
+	$strat=$4;
+	$rep=$5;
+	if($opt_s)
+	{
+	    $strat='seq';
+	    $rep='rep'
+	}
 	print " poserdeal class $class \n";
-	push(@strategies, $4);
-	push(@representations , $5);
-	$base{$class}=$3;
-	$strat{$class}=$4;
-	$rep{$class}=$5;
+	push(@strategies, $strat);
+	push(@representations , $rep);
+	$base{$class}=$sim;
+	$strat{$class}=$strat;
+	$rep{$class}=$rep;
+	$events{$class}=[];
+	push(@{$poser->{outarr}}, "  @line\n");
+	push(@{$poser->{literal}}, "array [1D] ".$class." : ".$sim." \{");
+	print  "chare ".$class." : ".$sim."\{\n";
+	$needsopeq{$class}=1 if($strat{$class} eq "opt");
+	$needsopeq{$class}=1 if($rep{$class} eq "chpt");
+      }
+      elsif ($thisline =~ /^\s*(poser)\s+(\S+)\s+\:\s+(\S+)\s*\{\s*$/) 
+	{
+	$line[0]="chare";
+	$class=$2;
+	$sim='sim';
+	$strat='opt';
+	$rep='chpt';
+	if($opt_s)
+	{
+	    $strat='seq';
+	    $rep='rep'
+	}
+	print " poserdeal class $class \n";
+	push(@strategies, 'opt');
+	push(@representations , 'chpt');
+	$base{$class}='sim';
+	$strat{$class}='opt';
+	$rep{$class}='chpt';
 	$events{$class}=[];
 	push(@{$poser->{outarr}}, "  @line\n");
 	push(@{$poser->{literal}}, "array [1D] ".$class." : ".$3." \{");
 	print  "chare ".$class." : ".$3."\{\n";
 	$needsopeq{$class}=1 if($strat{$class} eq "opt");
 	$needsopeq{$class}=1 if($rep{$class} eq "chpt");
-      } else {
+
+	}
+      else {
 	print $thisline;
 	die "bad poser declaration";
       }
