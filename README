@@ -249,6 +249,24 @@ the run-time checking performed by Converse and Charm++ runtime. This option
 should be used only after the program has been debugged. Also, this option
 disables Converse/Charm++ tracing mechanisms such as projections and summary.
 
+When Charm++ is built successfully, the diretory structure under the
+target directory will look like:
+
+net-linux/
+   |
+   ---  bin/			# all executables
+   |
+   ---  doc/			# documentations
+   |
+   ---  include/		# header files
+   |
+   ---  lib/			# libraries
+   |
+   ---  lib_so/			# dynamic libraries
+   |
+   ---  pgms/			# all sample programs
+   |
+   ---  tmp/			# Charm++ build directory
 
 BUILDING A PROGRAM
 ==================
@@ -307,6 +325,32 @@ However, for best performance, you should launch one node program per processor.
 For more detailed information, please check the "INSTALLATION MANUAL" and "RUN MANUAL" 
 under doc/install.
 
+
+Build Charm++ in Dynamic libraries
+=============================
+
+In order to compile Charm++ into dynamic libraries, one need to specify
+"-build-shared" option as one of the Charm compiler script "charmc" 
+at link time. For example, to compile Charm++ under net-linux/tmp, run
+
+make charm++ OPTS='-O -build-shared'
+
+Charm++'s dynamic libraries are compiled into lib_so/ directory. 
+Typically, they are with ".so" suffix.
+
+Note, "-build-shared" option is automatically turned on when building 
+Charm++ using "build" script. So you don't need to pass "-build-shared" 
+option to "build".
+
+One can compile a Charm++ applicaiton linking against Charm++ dynamic 
+libraries, run charmc with "-charm-shared" as one of the link options.
+For example:
+
+charmc -o pgm pgm.o -charm-shared
+
+You can then run the program as usual.
+Note, linking against Charm++ dynamic libraries produces much smaller size
+binaries and takes much less linking time.
 
 FOR MORE INFORMATION
 ====================
