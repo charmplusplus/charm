@@ -691,7 +691,7 @@ void CkArrayThreadListener_free(struct CthThreadListener *l)
 
 void CkMigratable::CkAddThreadListeners(CthThread tid, void *msg)
 {
-        Chare::CkAddThreadListeners(tid, msg);
+        Chare::CkAddThreadListeners(tid, msg);   // for trace
         CthSetThreadID(tid, thisIndexMax.data()[0], thisIndexMax.data()[1], 
 		       thisIndexMax.data()[2]);
 	CkArrayThreadListener *a=new CkArrayThreadListener;
@@ -909,14 +909,14 @@ CmiBool CkLocRec_local::deliver(CkArrayMessage *msg,CkDeliver_t type,int opts)
 		// if there is a running obj being measured, stop it temporarily
 		LDObjHandle objHandle;
 		int objstopped = 0;
-		if (LBDatabaseObj()->RunningObject(&objHandle)) {
+		if (the_lbdb->RunningObject(&objHandle)) {
 			objstopped = 1;
-			LBDatabaseObj()->ObjectStop(objHandle);
+			the_lbdb->ObjectStop(objHandle);
 		}
 #endif
 		CmiBool status = invokeEntry(obj,(void *)msg,msg->array_ep(),doFree);
 #if CMK_LBDB_ON
-		if (objstopped) LBDatabaseObj()->ObjectStart(objHandle);
+		if (objstopped) the_lbdb->ObjectStart(objHandle);
 #endif
 		return status;
 	}
