@@ -775,8 +775,9 @@ void ampi::commCreate(const groupStruct vec,MPI_Comm* newcomm){
     thread->suspend(); //Resumed by ampiParent::groupChildRegister
     MPI_Comm retcomm = parent->getNextGroup()-1;
     *newcomm = retcomm;
-  }else
+  }else{
     *newcomm = MPI_COMM_NULL;
+  }
 }
 
 void ampi::commCreatePhase1(CkReductionMsg *msg){
@@ -2468,7 +2469,7 @@ CDECL
 void MPI_Register_main(MPI_MainFn mainFn,const char *name)
 {
   AMPIAPI("MPI_Register_main");
-  if (TCHARM_Element()==0) 
+  if (TCHARM_Element()==0)
   { // I'm responsible for building the TCHARM threads:
     ampiCreateMain(mainFn,name,strlen(name));
   }
@@ -2478,7 +2479,7 @@ void FTN_NAME(MPI_REGISTER_MAIN,mpi_register_main)
   (MPI_MainFn mainFn,const char *name,int nameLen)
 {
   AMPIAPI("MPI_register_main");
-  if (TCHARM_Element()==0) 
+  if (TCHARM_Element()==0)
   { // I'm responsible for building the TCHARM threads:
     ampiCreateMain(mainFn,name,nameLen);
   }
@@ -2489,13 +2490,17 @@ void _registerampif(void)
   _registerampi();
 }
 
+void MPI_Datatype_iscontig(MPI_Datatype datatype, int *flag){
+  *flag = getDDT()->iscontig(datatype);
+}
+
 // Hack for some weird MPIR_* functions
 int MPIR_Err_setmsg( int errclass, int errkind,
                      const char *routine_name,
                      const char *generic_string,
                      const char *default_string, ... )
-{ 
-  /* empty */ 
+{
+  /* empty */
   return 0;
 }
 

@@ -402,6 +402,7 @@ int MPI_Register(void *, MPI_PupFn);
 void MPI_Migrate(void);
 void MPI_Checkpoint(char *dname);
 void *MPI_Get_userdata(int);
+void MPI_Datatype_iscontig(MPI_Datatype datatype, int *flag);
 
 /*Create a new threads array and attach to it*/
 typedef void (*MPI_MainFn) (int,char**);
