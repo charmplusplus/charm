@@ -9,6 +9,10 @@ created by Sayantan Chakravorty, 03/22/2004
 #define _UIUC_CHARM_FEMREFINE_IMPL_H
 
 typedef void (*repeat_split_fn)(void *data);
+/*system attribute of an entity which marks whether a node is valid or not
+  node and element width = 1 and type = FEM_BYTE
+*/
+#define FEM_VALID FEM_ATTRIB_TAG_MAX-1 
 
 #ifdef __cplusplus
 extern "C" {

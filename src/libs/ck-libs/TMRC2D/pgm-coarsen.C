@@ -89,6 +89,12 @@ init(void)
 	}
 	double *td = new double[nPts];
 	FEM_Register_array(FEM_Mesh_default_write(),FEM_NODE,FEM_DATA+5,td,FEM_DOUBLE,1);
+	unsigned char *validNodes = new unsigned char[nPts];
+	for(int ii=0;ii<nPts;ii++){
+		validNodes[ii]=1;
+	}
+	FEM_Register_array(FEM_Mesh_default_write(),FEM_NODE,FEM_VALID,td,FEM_BYTE,1);
+
 
   int nEle=0;
   int *ele=NULL;
@@ -118,14 +124,19 @@ init(void)
   
   // Register the Element entity and its connectivity array. Register the
   // data arrays to set up the widths correctly at the beginning
-  FEM_Register_entity(FEM_Mesh_default_write(),FEM_ELEM,NULL,nEle,nEle,resize_nodes);
+  FEM_Register_entity(FEM_Mesh_default_write(),FEM_ELEM,NULL,nEle,nEle,resize_elems);
   FEM_Register_array(FEM_Mesh_default_write(),FEM_ELEM,FEM_CONN,ele,FEM_INDEX_0,3);
   
   for(int k=0;k<3;k++){
     void *t = new double[nEle];
     FEM_Register_array(FEM_Mesh_default_write(),FEM_ELEM,FEM_DATA+k,t,FEM_DOUBLE,1);
   }
-  
+  unsigned char *validElem = new unsigned char[nEle];
+  for(int ii=0;ii<nEle;ii++){
+  	validElem[ii]=1;
+  }
+  FEM_Register_array(FEM_Mesh_default_write(),FEM_ELEM,FEM_VALID,validElem,FEM_BYTE,1);
+
   /*Build the ghost layer for refinement border*/
   FEM_Add_ghost_layer(2,0); /*2 nodes/tuple, do not add ghost nodes*/
   //FEM_Add_ghost_layer(2,1); /*2 nodes/tuple, do not add ghost nodes*/
@@ -144,6 +155,7 @@ struct myGlobals {
   vector2d *R_net, *d, *v, *a; //Physical fields of each node
   double *m_i; //Inverse of mass at each node
   int m_i_fid; //Field ID for m_i
+  unsigned char *validNode,*validElem;
   
   double *S11, *S22, *S12; //Stresses for each element
 };
@@ -157,16 +169,18 @@ void pup_myGlobals(pup_er p,myGlobals *g)
   pup_int(p,&g->maxnodes);
   int nnodes=g->nnodes, nelems=g->nelems;
   if (pup_isUnpacking(p)) {
-    g->coord=new vector2d[g->maxnodes];
-    g->conn=new int[3*g->maxelems];
-    g->R_net=new vector2d[g->maxnodes]; //Net force
-    g->d=new vector2d[g->maxnodes];//Node displacement
-    g->v=new vector2d[g->maxnodes];//Node velocity
-    g->a=new vector2d[g->maxnodes];
-    g->m_i=new double[g->maxnodes];
-    g->S11=new double[g->maxelems];
-    g->S22=new double[g->maxelems];
-    g->S12=new double[g->maxelems];
+	g->coord=new vector2d[g->maxnodes];
+	g->conn=new int[3*g->maxelems];
+	g->R_net=new vector2d[g->maxnodes]; //Net force
+	g->d=new vector2d[g->maxnodes];//Node displacement
+	g->v=new vector2d[g->maxnodes];//Node velocity
+	g->a=new vector2d[g->maxnodes];
+	g->m_i=new double[g->maxnodes];
+	g->S11=new double[g->maxelems];
+	g->S22=new double[g->maxelems];
+	g->S12=new double[g->maxelems];
+	g->validNode = new unsigned char[g->maxnodes];
+	g->validElem = new unsigned char[g->maxelems];
   }
   pup_doubles(p,(double *)g->coord,2*nnodes);
   pup_ints(p,(int *)g->conn,3*nelems);
@@ -178,17 +192,21 @@ void pup_myGlobals(pup_er p,myGlobals *g)
   pup_doubles(p,(double *)g->S11,nelems);
   pup_doubles(p,(double *)g->S22,nelems);
   pup_doubles(p,(double *)g->S12,nelems);
+  pup_uchars(p,(unsigned char *)g->validNode,nnodes);
+  pup_uchars(p,(unsigned char *)g->validElem,nelems);
   if (pup_isDeleting(p)) {
-    delete[] g->coord;
-    delete[] g->conn;
-    delete[] g->R_net;
-    delete[] g->d;
-    delete[] g->v;
-    delete[] g->a;
-    delete[] g->m_i;
+	delete[] g->coord;
+	delete[] g->conn;
+	delete[] g->R_net;
+	delete[] g->d;
+	delete[] g->v;
+	delete[] g->a;
+	delete[] g->m_i;
 	delete[] g->S11;
 	delete[] g->S22;
 	delete[] g->S12;
+	delete[] g->validNode;
+	delete[] g->validElem;
   }
 }
 
@@ -320,6 +338,7 @@ void resize_nodes(void *data,int *len,int *max){
 
 	vector2d *coord=g->coord,*R_net=g->R_net,*d=g->d,*v=g->v,*a=g->a;
 	double *m_i=g->m_i;
+	unsigned char *validNode = g->validNode;
 	
 	
 	g->coord=new vector2d[*max];
@@ -331,6 +350,7 @@ void resize_nodes(void *data,int *len,int *max){
   g->v=new vector2d[g->maxnodes];//Node velocity
   g->a=new vector2d[g->maxnodes];//Node accelleration
   g->m_i=new double[g->maxnodes];//Node mass
+  g->validNode = new unsigned char[g->maxnodes]; //is the node valid
 	
 	if(coord != NULL){
 		for(int k=0;k<*len;k++){
@@ -344,6 +364,7 @@ void resize_nodes(void *data,int *len,int *max){
 	FEM_Register_array(FEM_Mesh_default_read(),FEM_NODE,FEM_DATA+3,(void *)g->v,FEM_DOUBLE,2);
 	FEM_Register_array(FEM_Mesh_default_read(),FEM_NODE,FEM_DATA+4,(void *)g->a,FEM_DOUBLE,2);
 	FEM_Register_array_layout(FEM_Mesh_default_read(),FEM_NODE,FEM_DATA+5,(void *)g->m_i,g->m_i_fid);
+	FEM_Register_array(FEM_Mesh_default_read(),FEM_NODE,FEM_VALID,(void *)g->validNode,FEM_BYTE,1);
 
 	for(int k=0;k<*len;k++){
 		printf("after resize node %d ( %.6f %.6f )\n",k,g->coord[k].x,g->coord[k].y);
@@ -357,7 +378,7 @@ void resize_nodes(void *data,int *len,int *max){
 		delete [] v;
 		delete [] a;
 		delete [] m_i;
-		
+		delete [] validNode;
 	}
 
 };
@@ -370,6 +391,7 @@ void resize_elems(void *data,int *len,int *max){
 	
 	int *conn=g->conn;
 	double *S11 = g->S11,*S22 = g->S22,*S12 = g->S12;
+	unsigned char *validElem = g->validElem;
 	
 	g->conn = new int[3*(*max)];
 	g->maxelems = *max;
@@ -377,18 +399,21 @@ void resize_elems(void *data,int *len,int *max){
  	g->S11=new double[g->maxelems];
   g->S22=new double[g->maxelems];
   g->S12=new double[g->maxelems];
+  g->validElem = new unsigned char[g->maxelems];
 	
 	FEM_Register_array(FEM_Mesh_default_read(),FEM_ELEM,FEM_CONN,(void *)g->conn,FEM_INDEX_0,3);	
 	CkPrintf("Connectivity array starts at %p \n",g->conn);
 	FEM_Register_array(FEM_Mesh_default_read(),FEM_ELEM,FEM_DATA,(void *)g->S11,FEM_DOUBLE,1);	
 	FEM_Register_array(FEM_Mesh_default_read(),FEM_ELEM,FEM_DATA+1,(void *)g->S22,FEM_DOUBLE,1);	
 	FEM_Register_array(FEM_Mesh_default_read(),FEM_ELEM,FEM_DATA+2,(void *)g->S12,FEM_DOUBLE,1);	
+	FEM_Register_array(FEM_Mesh_default_read(),FEM_ELEM,FEM_VALID,(void *)g->validElem,FEM_BYTE,1);	
 	
 	if(conn != NULL){
 		delete [] conn;
 		delete [] S11;
 		delete [] S22;
 		delete [] S12;
+		delete [] validElem;
 	}
 };
 
@@ -400,7 +425,9 @@ void repeat_after_split(void *data){
 	g->nelems = FEM_Mesh_get_length(FEM_Mesh_default_read(),FEM_ELEM);
 	g->nnodes = FEM_Mesh_get_length(FEM_Mesh_default_read(),FEM_NODE);
 	for(int k=0;k<g->nnodes;k++){
-		printf(" node %d ( %.6f %.6f )\n",k,g->coord[k].x,g->coord[k].y);
+		if(g->validNode[k]){
+			printf(" node %d ( %.6f %.6f )\n",k,g->coord[k].x,g->coord[k].y);
+		}	
 	}
 
 	calcMasses(*g);
@@ -516,7 +543,7 @@ CkPrintf("[%d] end init\n",myChunk);
 				CkPrintf("[%d] Starting coarsening step: %d nodes, %d elements to %.3g\n",
 		       myChunk,g.nnodes,g.nelems,curArea);
 			
-				FEM_REFINE2D_Coarsen(FEM_Mesh_default_read(),FEM_NODE,(double *)loc,FEM_ELEM,areas);
+				FEM_REFINE2D_Coarsen(FEM_Mesh_default_read(),FEM_NODE,(double *)g.coord,FEM_ELEM,areas);
 				repeat_after_split((void *)&g);
 
 			
@@ -526,35 +553,43 @@ CkPrintf("[%d] end init\n",myChunk);
 	      CkPrintf("[%d] Done with coarsening step: %d nodes, %d elements\n",
 	       myChunk,g.nnodes,g.nelems);
 
-	/*		}else{
-	      CkPrintf("[%d] Starting refinement step: %d nodes, %d elements to %.3g\n",
-		       myChunk,g.nnodes,g.nelems,curArea);
-			
-				FEM_REFINE2D_Split(FEM_Mesh_default_read(),FEM_NODE,(double *)loc,FEM_ELEM,areas);
-				repeat_after_split((void *)&g);
-
-			
-	      g.nelems = FEM_Mesh_get_length(FEM_Mesh_default_read(),FEM_ELEM);
-				g.nnodes = FEM_Mesh_get_length(FEM_Mesh_default_read(),FEM_NODE);
-             
-	      CkPrintf("[%d] Done with refinement step: %d nodes, %d elements\n",
-	       myChunk,g.nnodes,g.nelems);
-  		}*/
-			    
+	//}		    
     
     if (1) { //Publish data to the net
+    		
 	    NetFEM n=NetFEM_Begin(myChunk,t,2,NetFEM_POINTAT);
+	    int count=0;
+	    double *vcoord = new double[2*g.nnodes];
+	    for(int i=0;i<g.nnodes;i++){
+	    	if(g.validNode[i]){
+			vcoord[2*count] = ((double *)g.coord)[2*i];
+			vcoord[2*count+1] = ((double *)g.coord)[2*i+1];
+			count++;	
+		}
+	    }
+	    NetFEM_Nodes(n,count,(double *)vcoord,"Position (m)");
+	/*    NetFEM_Vector(n,(double *)g.d,"Displacement (m)");
+	    NetFEM_Vector(n,(double *)g.v,"Velocity (m/s)");*/
 	    
-	    NetFEM_Nodes(n,g.nnodes,(double *)g.coord,"Position (m)");
-	    NetFEM_Vector(n,(double *)g.d,"Displacement (m)");
-	    NetFEM_Vector(n,(double *)g.v,"Velocity (m/s)");
+	    count=0;
+	    int *vconn = new int[3*g.nelems];
+	    for(int i=0;i<g.nelems;i++){
+	    	if(g.validElem[i]){
+			vconn[3*count] = g.conn[3*i];
+			vconn[3*count+1] = g.conn[3*i+1];
+			vconn[3*count+2] = g.conn[3*i+2];
+			count++;	
+		}
+	    }
 	    
-	    NetFEM_Elements(n,g.nelems,3,(int *)g.conn,"Triangles");
-		NetFEM_Scalar(n,g.S11,1,"X Stress (pure)");
+	    NetFEM_Elements(n,count,3,(int *)vconn,"Triangles");
+	/*	NetFEM_Scalar(n,g.S11,1,"X Stress (pure)");
 		NetFEM_Scalar(n,g.S22,1,"Y Stress (pure)");
-		NetFEM_Scalar(n,g.S12,1,"Shear Stress (pure)");
+		NetFEM_Scalar(n,g.S12,1,"Shear Stress (pure)");*/
 	    
 	    NetFEM_End(n);
+	    delete [] vcoord;
+	    delete [] vconn;
     }
   }
 

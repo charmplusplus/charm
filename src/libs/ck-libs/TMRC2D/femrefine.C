@@ -231,16 +231,24 @@ void FEM_REFINE2D_Coarsen(int meshID,int nodeID,double *coord,int elemID,double 
 	
 	FEM_Entity *node=FEM_Entity_lookup(meshID,nodeID,"REFINE2D_Mesh");
 	CkVec<FEM_Attribute *> *attrs = node->getAttrVec();
+	FEM_Attribute *validNodeAttr = node->lookup(FEM_VALID,"FEM_COARSEN");
 	
 	FEM_Entity *elem = FEM_Entity_lookup(meshID,elemID,"REFIN2D_Mesh_elem");
 	CkVec<FEM_Attribute *> *elemattrs = elem->getAttrVec();
+	FEM_Attribute *validElemAttr = elem->lookup(FEM_VALID,"FEM_COARSEN");
 
 	FEM_Attribute *connAttr = elem->lookup(FEM_CONN,"REFINE2D_Mesh");
 	if(connAttr == NULL){
 		CkAbort("Grrrr element without connectivity \n");
 	}
 	AllocTable2d<int> &connTable = ((FEM_IndexAttribute *)connAttr)->get();
-	int *connData = connTable.getData();	
+	AllocTable2d<unsigned char>&validNodeTable = ((FEM_DataAttribute *)validNodeAttr)->getChar();
+	AllocTable2d<unsigned char>&validElemTable = ((FEM_DataAttribute *)validElemAttr)->getChar();
+
+	
+	int *connData = connTable.getData();
+	unsigned char *validNodeData = validNodeTable.getData();
+	unsigned char *validElemData = validElemTable.getData();
 	for(int collapseNo=0;collapseNo < nCollapses;collapseNo++){
 		int tri,nodeToThrow,nodeToKeep,flag,idxbase;
 		double nx,ny;
@@ -248,6 +256,13 @@ void FEM_REFINE2D_Coarsen(int meshID,int nodeID,double *coord,int elemID,double 
 		idxbase = 0;
 		REFINE2D_Get_Collapse(collapseNo,connData,&tri,&nodeToThrow,&nodeToKeep,&nx,&ny,&flag,idxbase);
 		if(flag & 0x1 || flag & 0x2){
+			coord[2*nodeToKeep]=nx;
+			coord[2*nodeToKeep+1] = ny;
+			validNodeData[nodeToThrow]=0;
+			connData[3*tri] = -1;
+			connData[3*tri+1] = -1;
+			connData[3*tri+2] = -1;
+			validElemData[tri] = 0;
 		}
 	}
 	
