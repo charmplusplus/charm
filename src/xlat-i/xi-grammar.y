@@ -416,6 +416,8 @@ TArray		: ARRAY ArrayIndexType Name OptBaseList MemberEList
 
 TMessage	: MESSAGE MAttribs Name ';'
 		{ $$ = new Message(lineno, new NamedType($3)); }
+		| MESSAGE MAttribs Name '{' VarList '}' ';'
+		{ $$ = new Message(lineno, new NamedType($3), $5); }
 		;
 
 OptTypeInit	: /* Empty */
