@@ -126,20 +126,21 @@ void CkStartCheckpoint(char* dirname,const CkCallback& cb){
 	fclose(fRO);
 
 	// save mainchares into MainChares.dat
-	sprintf(filename,"%s/MainChares.dat",dirname);
-	FILE* fMain = fopen(filename,"wb");
-	if(!fMain) CkAbort("Failed to open checkpoint file for mainchare data!");
-	PUP::toDisk pMain(fMain);
-	int nMains=_mainTable.size();
-	for(i=0;i<nMains;i++){  /* Create all mainchares */
-		int entryMigCtor = _chareTable[_mainTable[i]->chareIdx]->getMigCtor();
-		if(entryMigCtor!=-1){
-			Chare* obj = (Chare *)_mainTable[i]->getObj();
-			obj->pup(pMain);
+	if(CkMyPe()==0){
+		sprintf(filename,"%s/MainChares.dat",dirname);
+		FILE* fMain = fopen(filename,"wb");
+		if(!fMain) CkAbort("Failed to open checkpoint file for mainchare data!");
+		PUP::toDisk pMain(fMain);
+		int nMains=_mainTable.size();
+		for(i=0;i<nMains;i++){  /* Create all mainchares */
+			int entryMigCtor = _chareTable[_mainTable[i]->chareIdx]->getMigCtor();
+			if(entryMigCtor!=-1){
+				Chare* obj = (Chare *)_mainTable[i]->getObj();
+				obj->pup(pMain);
+			}
 		}
+		fclose(fMain);
 	}
-
-	fclose(fMain);
 	
 	// save groups into Groups.dat
 	// content of the file: numGroups, GroupInfo[numGroups], _groupTable(PUP'ed), groups(PUP'ed)
@@ -295,24 +296,25 @@ void CkRestartMain(const char* dirname){
 	// restore mainchares
 	sprintf(filename,"%s/MainChares.dat",dirname);
 	FILE* fMain = fopen(filename,"rb");
-	if(!fMain) CkAbort("Failed to open checkpoint file for readonly data!");
-	PUP::fromDisk pMain(fMain);
-	int nMains=_mainTable.size();
-	for(i=0;i<nMains;i++){  /* Create all mainchares */
-		int entryMigCtor = _chareTable[_mainTable[i]->chareIdx]->getMigCtor();
-		if(entryMigCtor!=-1){
-			int size = _chareTable[_mainTable[i]->chareIdx]->size;
-			void *obj = malloc(size);
-			_MEMCHECK(obj);
-			_mainTable[i]->setObj(obj);
-			void *m = CkAllocSysMsg();
-			_entryTable[entryMigCtor]->call(m, obj);
-			((Chare *)obj)->pup(pMain);
+	if(fMain && CkMyPe()==0){ // only main chares have been checkpointed, we restart on PE0
+		PUP::fromDisk pMain(fMain);
+		int nMains=_mainTable.size();
+		for(i=0;i<nMains;i++){  /* Create all mainchares */
+			int entryMigCtor = _chareTable[_mainTable[i]->chareIdx]->getMigCtor();
+			if(entryMigCtor!=-1){
+				int size = _chareTable[_mainTable[i]->chareIdx]->size;
+				void *obj = malloc(size);
+				_MEMCHECK(obj);
+				_mainTable[i]->setObj(obj);
+				void *m = CkAllocSysMsg();
+				_entryTable[entryMigCtor]->call(m, obj);
+				((Chare *)obj)->pup(pMain);
+			}
 		}
+		fclose(fMain);
+		DEBCHK("[%d]CkRestartMain: mainchares restored\n",CkMyPe());
+		bdcastRO(); // to update mainchare proxy	
 	}
-	fclose(fMain);
-	DEBCHK("[%d]CkRestartMain: mainchares restored\n",CkMyPe());
-	if(CkMyPe()==0) bdcastRO(); // to update mainchare proxy	
 	
 	// restore groups
 	// content of the file: numGroups, GroupInfo[numGroups], _groupTable(PUP'ed), groups(PUP'ed)
