@@ -163,6 +163,12 @@ public:
 	 * each call to render.
 	 */
 	virtual CkView *renderView(const CkViewpoint &univ2screen) =0;
+	
+	/// Return our onscreen size, in radians measured from the camera.
+	///  This routine is *only* called after a successful shouldRender
+	///   or a call to renderView, to set the priority of the resulting message.
+	/// The default implementation always returns 0.1.
+	virtual double getSize(const CkViewpoint &univ2screen);
 };
 
 /**
@@ -314,6 +320,12 @@ public:
 	void setPoints(int n) {nInterest=n;}
 	CkVector3d &operator[] (int i) {return loc[i];}
 	
+	CkBbox3d getBox(void) const {
+		CkBbox3d box; box.empty();
+		for (int i=0;i<nInterest;i++) box.add(loc[i]);
+		return box;
+	}
+	
 	/// Get our average location in space
 	CkVector3d getMean(void) const;
 	
@@ -380,12 +392,10 @@ public:
 class CkInterestViewable : public CkViewable {
 	CkInterestSet interest; ///< Our 3D interest points
 	CkVector3d center; ///< Our 3D "center point", through which our impostor plane must pass
+	CkVector3d boundCenter; double boundRadius;
 protected:
 	/// Subclasses MUST call this from their constructors or pup routines.
-	void setUnivPoints(const CkInterestSet &univPoints_) {
-		interest=univPoints_;
-		center=interest.getMean();
-	}
+	void setUnivPoints(const CkInterestSet &univPoints_);
 	void setCenter(const CkVector3d &center_) {center=center_;}
 public:
 	/// Be sure to set interest points from your constructor.
@@ -414,6 +424,9 @@ public:
 	 * To change the image format, call dest.setLayout.
 	 */
 	virtual void renderImage(const CkViewpoint &vp,CkImage &dest) =0;
+	
+	/** Returns size of bounding sphere */
+	virtual double getSize(const CkViewpoint &univ2screen);
 };
 
 #endif /*def(thisHeader)*/

@@ -33,6 +33,23 @@ void CkView::pup(PUP::er &p) {
 	p|prio;
 }
 
+double CkViewable::getSize(const CkViewpoint &univ2screen)
+{
+	return 0.1; /* dunno.  guess. */
+}
+
+void CkInterestViewable::setUnivPoints(const CkInterestSet &univPoints_) {
+	interest=univPoints_;
+	center=interest.getMean();
+	CkBbox3d b=interest.getBox();
+	boundCenter=0.5*(b.min+b.max);
+	boundRadius=boundCenter.dist(b.max);
+}
+double CkInterestViewable::getSize(const CkViewpoint &univ2screen) {
+	double camDist=univ2screen.getEye().dist(boundCenter);
+	return boundRadius/camDist;
+}
+
 /***************** CkImageCompressor *****************/
 
 /* Round up to nearest power of 2 */

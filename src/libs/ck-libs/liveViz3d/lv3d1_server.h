@@ -65,23 +65,11 @@ public:
 	int clientID; //Unique identifier for this client
 	int frameID; //0 is first frame, then incrementing
 	int viewableID; //Viewable to render
-	int prioAdj; // Priority adjustment
 	
 	/** Allocate a prioritized Render message for this viewpoint.
-	  prioAdj is a non-negative integer framenumber adjustment which 
-	  indicates the estimated importance of the rendering. 
-	  
-	  The actual priority computation is:
-	  	priority = frame - prioAdj;
-	  where the lowest priority gets rendered first. 
-	  
-	  This means the most ancient request (and hence the most glaring
-	  visual error) gets rendered first; and the highest "prioAdj"
-	  value gets rendered first.
-	  
-	FIXME: improve this prioritization algorithm.
+	  prioAdj is a double-precision scaling value for priority.
 	*/
-	static LV3D_RenderMsg *new_(int client,int frame,int viewable,int prioAdj);
+	static LV3D_RenderMsg *new_(int client,int frame,int viewable,double prioAdj);
 	static void delete_(LV3D_RenderMsg *m);
 };
 

@@ -12,6 +12,17 @@
 int LV3D_Disable_Render_Prio;
 int LV3D_Verbosity;
 
+/**
+  Return the priority for this object.
+  Charm priorities have lower numbers with higher priority.
+*/
+unsigned int LV3D_build_priority(int frameNo,double prioAdj) {
+	if (LV3D_Disable_Render_Prio) return 0;
+	const double prioMax=1.0;
+	if (!(prioAdj<prioMax)) prioAdj=prioMax; /* reset big & NaN values */
+	return 0xC0000000u+frameNo-(int)(1000*prioAdj);	
+}
+
 /************** LV3D_Array: client interface & render requests ************
 Represents the list of objects to be viewed in the scene.
 */
@@ -21,7 +32,10 @@ class impl_LV3D_Array {
 	CkViewable *viewable; // Should be array of viewables
 	
 // All this state should be per-client:
+
+	/// Last-rendered view for this viewable.
 	CkView *view; // Should be per-viewable
+	CkVector3d lastCamera; /// render position for last view
 	// Throw out old views, and allow new render request
 	void flush(void) {
 		if (view) view->unref();
@@ -93,9 +107,9 @@ public:
 	status("Reqesting rendering...\n");
 			renderRequested=true;
 			renderUpdate(m);
-			
+			double sizeAdjust=viewable->getSize(renderViewpoint);
 			LV3D_RenderMsg *rm= LV3D_RenderMsg::new_(
-				m->clientID,m->frameID,0,viewable->priorityAdjust);
+				m->clientID,m->frameID,0,sizeAdjust);
 			array->thisProxy[array->thisIndexMax].LV3D_Render(rm);
 		  }
 		}
@@ -112,8 +126,8 @@ public:
 			view=v;
 			view->id=makeViewableID(0);
 			
-#define BUILD_PRIO(adj,frame) (0xC0000000u-(adj)+(frame))
-			view->prio=BUILD_PRIO(viewable->priorityAdjust,renderFrameID);
+			double sizeAdjust=viewable->getSize(renderViewpoint);
+			view->prio=LV3D_build_priority(renderFrameID,sizeAdjust);
 			LV3D0_Deposit(view,m->clientID);
 		}
 		LV3D_RenderMsg::delete_(m);
@@ -284,16 +298,15 @@ void LV3D1_Attach(CkArrayOptions &opts)
 
 /// Make a prioritized LV3D_RenderMsg:
 LV3D_RenderMsg *LV3D_RenderMsg::new_(
-	int client,int frame,int viewable,int prioAdj) 
+	int client,int frame,int viewable,double prioAdj) 
 {
 	int prioBits=8*sizeof(prioAdj);
 	LV3D_RenderMsg *m=new (prioBits) LV3D_RenderMsg;
 	m->clientID=client;
 	m->frameID=frame;
 	m->viewableID=viewable;
-	m->prioAdj=prioAdj;
 	unsigned int *p=(unsigned int *)CkPriorityPtr(m);
-	p[0]=BUILD_PRIO(prioAdj,frame);
+	p[0]=LV3D_build_priority(frame,prioAdj);
 	if (LV3D_Disable_Render_Prio) p[0]=0;
 	CkSetQueueing(m,CK_QUEUEING_BFIFO);
 	return m;
