@@ -121,8 +121,7 @@ EOF
                 sleep 20
         done
 else
-	echo "Charmrun> failed."
-	exit 1
+  mpirun -np $pes $args
 fi
 
 
