@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.2  1995-09-07 21:22:53  jyelon
+ * Revision 2.3  1995-10-20 17:29:32  jyelon
+ * Corrected a warning message.
+ *
+ * Revision 2.2  1995/09/07  21:22:53  jyelon
  * Added prefixes to Cpv and Csv macros, fixed bugs thereby revealed.
  *
  * Revision 2.1  1995/06/15  20:57:00  jyelon
@@ -192,6 +195,31 @@ int             level;
 	}
 }
 
+void
+RecursiveGenerateProtos(table)
+SYMTABPTR       table;
+{
+	if (table == NULL)
+		return;
+	RecursiveGenerateProtos(table->left);
+	RecursiveGenerateProtos(table->right);
+	if (!strcmp(table->name, " ")) 
+	    return;
+	switch (table->idtype)
+	{
+	case PRIVATEFNNAME:
+		break;
+	case PUBLICFNNAME:
+		break;
+	case ENTRYNAME:
+		break;
+	case FNNAME:
+                break;
+	}
+}
+
+
+
 void 
 RecursiveInitializeStruct(table, level)
 SYMTABPTR       table;
@@ -305,6 +333,7 @@ CreateStructures(table)
 SYMTABPTR       table;
 {
 	GenerateStruct(ModuleDefined->name, ModuleDefined->type->table, 1, CkPrefix_, 0);
+        RecursiveGenerateProtos(ModuleDefined->type->table);
 	InitializeStruct(ModuleDefined->name, ModuleDefined->type->table, 1, CkPrefix_, 0);
 }
 
@@ -331,7 +360,7 @@ char           *module;
 		fprintf(outh, "  %s%s = ", temp, REFSUFFIX);
 		dummy = MyModulePrefix(module, table->name);
 		fprintf(outh, "%s%s;\n", dummy, REFSUFFIX);
-		fprintf(outh, "  %s = %s;\n", temp, dummy);
+		fprintf(outh, "  (%s) %s = (%s) %s;\n", FunctionType, temp, FunctionType, dummy);
 		dontfree(temp);
 		dontfree(dummy);
 		break;
@@ -377,7 +406,9 @@ CreateOwnImportInitFunction()
 	outh = outh2;
 	fprintf(outh, "void %s%s_struct_init()\n{\n", CkPrefix,
 		ModuleDefined->name);
+	fprintf(outh, "/* ImportStructInit */\n");
 	ImportStructInit(ImportModule, ModuleDefined->name);
+	fprintf(outh, "/* CreateImportModuleComponentFill */\n");
 	CreateImportModuleComponentFill(ImportModule, ModuleDefined->name, 
 					BOCNAME);
 	CreateImportModuleComponentFill(ImportModule, ModuleDefined->name, 
@@ -576,7 +607,7 @@ char           *module;
 		temp = MyModulePrefix(module, table->name);
 		fprintf(outh, "  %s%s = registerFunction(", temp, REFSUFFIX);
 		fprintf(outh, "(%s) %s);\n", FunctionType, table->name);
-		fprintf(outh, "  %s = (%s) %s;\n", temp, FunctionType,
+		fprintf(outh, "  (%s) %s = (%s) %s;\n", FunctionType, temp, FunctionType,
 			table->name);
 		dontfree(temp);
 	}
@@ -795,8 +826,10 @@ int             modcomponent;
 
 	if (table->idtype == modcomponent)
 	{
-		fprintf(outh, "  %s = %s;\n", temp1 = ModulePrefix(name, table->name),
-			temp2 = MyModulePrefix(name, table->name));
+                temp1 = ModulePrefix(name, table->name);
+		temp2 = MyModulePrefix(name, table->name);
+		fprintf(outh, " memcpy((void*)&%s,(void*)&%s,sizeof(%s));\n",
+			temp1, temp2, temp2);
 		dontfree(temp1);
 		dontfree(temp2);
 	}
