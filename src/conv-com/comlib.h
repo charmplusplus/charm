@@ -32,25 +32,15 @@ enum{BCAST=0,TREE, GRID, HCUBE};
 #define IS_MULTICAST -1
 
 #define MAXNUMMSGS 1000
-//#define MAXNUMSTRATEGY 10
 #define MSGSIZETHRESHOLD 5000000
 #define MAXBUFSIZE 65536
 #define PERSISTENT_BUFSIZE 131072
 
 typedef struct {
-    //int srcpe;
-    //short ImplType;
-    //short ImplIndex;
-    //int callbackHandler;
-    //short SwitchVal;
-    //int NumMembers;
-    //CmiGroup grp;
-
     int refno;
     int instanceID;  
     char isAllToAll;
 } comID;
-
 
 typedef struct {
   int msgsize;

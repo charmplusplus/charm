@@ -116,7 +116,7 @@ void PeTable :: ExtractAndDeliverLocalMsgs(int index)
 
 #undef PACK
 #undef PACKMSG
-#define PACKINT(data) {((int*)t)[0] = data; t+=sizeof(int);}
+//#define PACKINT(data) {((int*)t)[0] = data; t+=sizeof(int);}
 #define PACK(type,data) {junk=(char *)&(data); memcpy(t, junk, sizeof(type)); t+=sizeof(type);}
 #define PACKMSG(data, size) { memcpy(p+msg_offset, (data), size); msg_offset += size; }
 
@@ -260,10 +260,10 @@ char * PeTable ::ExtractAndPack(comID id, int ufield, int npe,
 
     int refno = id.refno;    
 
-    PACKINT(refno);
+    PACK(int, refno);
     PACK(comID, id);
-    PACKINT(ufield);
-    PACKINT(npe);
+    PACK(int, ufield);
+    PACK(int , npe);
     
     int lesspe=0;
     int npacked = 0;
@@ -279,7 +279,7 @@ char * PeTable ::ExtractAndPack(comID id, int ufield, int npe,
         
         ComlibPrintf("%d Packing pelist[%d]\n", CkMyPe(), index);
         register int newval=-1*pelist[i];
-        PACKINT(newval); 
+        PACK(int,newval); 
         for (j=0;j<msgnum[index];j++) {
             if (PeList[index][j]->magic == magic) {
                 offset=(PeList[index][j]->offset);
@@ -302,7 +302,7 @@ char * PeTable ::ExtractAndPack(comID id, int ufield, int npe,
             }
             
             //ComlibPrintf("%d Packing msg_offset=%d\n", CkMyPe(), offset);
-            PACKINT(offset); 
+            PACK(int,offset); 
 
             if (--(PeList[index][j]->refCount) <=0) {
                 CmiFree(PeList[index][j]->msg);
@@ -314,7 +314,7 @@ char * PeTable ::ExtractAndPack(comID id, int ufield, int npe,
         msgnum[index]=0;
     }
     offset=-1;
-    PACKINT(offset);
+    PACK(int, offset);
     
     if (lesspe) {
         t=p+CmiReservedHeaderSize+2*sizeof(int) + sizeof(comID);
