@@ -31,7 +31,7 @@ do
 	shift
 done
 
-echo "Running on $pes processors: $args"
+printf "\nRunning on $pes processors: $args\n"
 
 if [ -n "$PBS_NODEFILE" ]
 then
