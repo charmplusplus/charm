@@ -489,9 +489,16 @@ then
     CMK_CC="$CMK_CC_FASTEST"
 fi
 
+if [ -n "$CMK_F90_MODINC" ]
+then
+    CMK_CF90_MODINC="$CMK_F90_MODINC"
+else
+    CMK_CF90_MODINC="-M"
+fi
+
 if [ -n "$CMK_F90_USE_MODDIR" ]
 then
-    CMK_CF90="$CMK_CF90 -M$CHARMINC "
+    CMK_CF90="$CMK_CF90 $CMK_CF90_MODINC$CHARMINC "
 fi
 
 if [ -n "$SEQUENTIAL" ]
