@@ -1036,6 +1036,8 @@ void CmiMultipleSend(unsigned int destPE, int len, int sizes[], char *msgComps[]
 *
 ****************************************************************************/
 
+static CmiHandler CmiMultiMsgHandler(char *msgWhole);
+
 void CmiInitMultipleSendRoutine(void)
 {
   CpvInitialize(int,CmiMainHandlerIDP); 
@@ -1047,6 +1049,8 @@ void CmiInitMultipleSendRoutine(void)
 *               CmiMultipleSendP() function to work. 
 *
 ****************************************************************************/
+
+static void memChop(char *msgWhole);
 
 static CmiHandler CmiMultiMsgHandler(char *msgWhole)
 {

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.78  1998-02-13 23:54:19  pramacha
+ * Revision 2.79  1998-02-16 17:12:17  milind
+ * fixed a couple of declarations in converse.h.
+ *
+ * Revision 2.78  1998/02/13 23:54:19  pramacha
  * CmiAlloc, CmiFree, and CmiSize are now part of convcore.c.
  * CmiMultipleSend() has been added
  *
@@ -770,8 +773,3 @@ void CcdCallBacks();
 #endif
 
 #endif /* CONVERSE_H */
-
-/** Declarations for the Converse Multiple Send Routine */
-
-static CmiHandler CmiMultiMsgHandler(char *msgWhole);
-static void memChop(char *);
