@@ -944,7 +944,7 @@ static double         Cmi_check_delay = 3.0;
 /************************ Win32 kernel SMP threads **************/
 #if CMK_SHARED_VARS_NT_THREADS
 
-static CmiNodeLock CmiMemLock_lock;
+CmiNodeLock CmiMemLock_lock;
 static HANDLE comm_mutex;
 #define CmiCommLockOrElse(x) /*empty*/
 #define CmiCommLock() (WaitForSingleObject(comm_mutex, INFINITE))
