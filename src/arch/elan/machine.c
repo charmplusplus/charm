@@ -38,10 +38,11 @@
 ELAN_BASE     *elan_base;
 ELAN_TPORT    *elan_port;
 ELAN_QUEUE    *elan_q;
-#define SMALL_MESSAGE_SIZE 16384     /* for comm bench */
+#define SMALL_MESSAGE_SIZE 20000     /* for comm bench */
                                      /* Message sizes greater will be 
 					  probe received adding 5us overhead*/
-#define SYNC_MESSAGE_SIZE 16384        /* Message sizes greater will be 
+#define SYNC_MESSAGE_SIZE 20000
+                                       /* Message sizes greater will be 
 				       sent synchronously thus avoiding copying*/
 
 #define NON_BLOCKING_MSG  256          /* Message sizes greater 
@@ -74,8 +75,10 @@ static int request_bytes;
 Queue localMsgBuf;
 
 int outstandingMsgs[3000];
-int ppn_factor = 1;                    //The size affinity group for preventing stretches.
+int ppn_factor = 1;                    //The size affinity group for 
+                                       //preventing stretches.
 int stretchFlag = 0;
+int blockingReceiveFlag = 0;
 
 static void ConverseRunPE(int everReturn);
 
@@ -409,9 +412,10 @@ int PumpMsgs(int retflag)
     
     if(!step1 && (elan_tportRxDone(elarge) || retflag == 2)) {
       elan_tportRxWait(elarge, NULL, NULL, &size );
-      //      CmiPrintf("Received large Message in %d %d\n", CmiMyPe(), size);
-      //printf("%d, ", size);
       
+      if (blockingReceiveFlag)
+	CmiPrintf("Received large Message in %d %d\n", CmiMyPe(), size);
+
       lbuf = (char *) CmiAlloc(size);
       elarge = elan_tportRxStart(elan_port, 0, 0, 0, -1, TAG_LARGE, lbuf,size);
       step1 = 1;
@@ -441,9 +445,8 @@ int PumpMsgs(int retflag)
     ecount = 0;
     for(int rcount = 0; rcount < RECV_MSG_Q_SIZE; rcount ++){
       ecount = (rcount + event_idx) % RECV_MSG_Q_SIZE;
-      if(elan_tportRxDone(esmall[ecount])) {
+      if(elan_tportRxDone(esmall[ecount]) || retflag == 3) {
 	
-	//	if(CmiMyPe() == 0)
 	//CmiPrintf("%d:Receiving %d, %d\n", CmiMyPe(), ecount, event_idx);
 
 	elan_tportRxWait(esmall[ecount], NULL, NULL, &size );
@@ -459,6 +462,8 @@ int PumpMsgs(int retflag)
 	if (CMI_BROADCAST_ROOT(msg))
 	  SendSpanningChildren(size, msg);
 #endif
+	if(retflag == 3)
+	  retflag = 0;
       }
       else {
 	elan_deviceCheck(elan_base->state);
@@ -552,14 +557,33 @@ void CmiPing() {
   ElanSendQueuedMessages();
 }
 
+void enableBlockingReceives(){
+  blockingReceiveFlag = 1;
+}
+
 void CmiNotifyIdle(void)
 {
+  static int previousSleepTime = 0;
   CmiReleaseSentMessages();
-  PumpMsgs(0); // PumpMsgs(1)
   ElanSendQueuedMessages();
-/*
-  usleep(0);
-*/
+
+  if(!PumpMsgs(0) && blockingReceiveFlag /*&& (CmiMyPe() % 4 == 0)*/){
+    if (!PCQueueEmpty(CmiGetState()->recv)) return; 
+    if (!CdsFifo_Empty(CpvAccess(CmiLocalQueue))) return;
+    if (!CqsEmpty(CpvAccess(CsdSchedQueue))) return;
+    if (cur_unsent) return;
+    PumpMsgs(3); 
+  }
+  /*
+  else if(!PumpMsgs(0)){
+    int curTime = CmiWallTimer() * 1000;
+    if (((curTime - previousSleepTime > 10) && (CmiMyPe() % 4 == 0)) 
+	||((curTime - previousSleepTime > 20) && (CmiMyPe() % 4 != 0))){
+      usleep(0);
+      previousSleepTime = CmiWallTimer() * 1000;
+    }
+  }
+  */
 }
  
 #if CMK_IMMEDIATE_MSG
@@ -573,9 +597,19 @@ void CmiProbeImmediateMsg()
 void CmiSyncSendFn(int destPE, int size, char *msg)
 {
   CmiState cs = CmiGetState();
-  char *dupmsg = (char *) CmiAlloc(size);
+  char *dupmsg;
+  if(size <= SMALL_MESSAGE_SIZE){
+    if(!CqsEmpty(localMsgBuf)) 
+      CqsDequeue(localMsgBuf, (void **)&dupmsg);
+    else 
+      dupmsg = CmiAlloc(SMALL_MESSAGE_SIZE);
+    
+    CMI_MSG_TYPE(dupmsg) = 1;
+  }
+  else
+    dupmsg = (char *) CmiAlloc(size);
   memcpy(dupmsg, msg, size);
-
+  
   //  CmiPrintf("Setting root to %d\n", 0);
   CMI_SET_BROADCAST_ROOT(dupmsg, 0);
 
@@ -964,7 +998,9 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     exit(1);
   }
 
-  if ((elan_q = elan_allocQueue(elan_base->state)) == NULL) {
+  elan_gsync(elan_base->allGroup);
+  
+  if ((elan_q = elan_gallocQueue(elan_base, elan_base->allGroup)) == NULL) {
     
     perror( "elan_gallocQueue failed" );
     exit (1);
@@ -972,14 +1008,13 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   
   int nslots = elan_base->tport_nslots;
   
-  if(nslots < elan_base->state->nvp)
-    nslots = elan_base->state->nvp;
-  if(nslots > 256)
-    nslots = 256;
+  //if(nslots < elan_base->state->nvp)
+  //nslots = elan_base->state->nvp;
+  //if(nslots > 256)
+  //nslots = 256;
 
   if (!(elan_port = elan_tportInit(elan_base->state,
-				   (ELAN_QUEUE *)elan_q,
-				   /*elan_main2elan(elan_base->state, q),*/
+				   elan_q,
 				   nslots /*elan_base->tport_nslots*/, 
 				   elan_base->tport_smallmsg,
 				   elan_base->tport_bigmsg,
@@ -1042,8 +1077,8 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   if(ppn_factor == 0)   //debug
     ppn_factor = 1;
 
-  //ppn_factor = 1;
-
+  ppn_factor = 4;
+  
   //CmiPrintf("ppn_factor = %d\n", ppn_factor);
 
   CmiStartThreads(argv);
@@ -1085,7 +1120,7 @@ CmiCommHandle CmiAsyncListSendFn(int npes, int *pes, int len, char *msg)
 void CmiFreeListSendFn(int npes, int *pes, int len, char *msg)
 {
   //  CmiError("ListSend not implemented.");
-//CmiPrintf("[%d] CmiFreeListSendFn %d\n", CmiMyPe(), usePhs);
+  //CmiPrintf("[%d] CmiFreeListSendFn %d\n", CmiMyPe(), usePhs);
   
   int i;
 #if CMK_PERSISTENT_COMM
