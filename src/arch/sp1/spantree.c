@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-07-10 22:12:53  knauff
+ * Revision 2.1  1995-07-17 17:47:17  knauff
+ * Added '#include "converse.h"'
+ *
+ * Revision 2.0  1995/07/10  22:12:53  knauff
  * Initial revision
  *
  ***************************************************************************/
@@ -20,6 +23,8 @@ static char ident[] = "@(#)$Header$";
 
 /* This file contains all the spanning tree functions */
 #include "machine.h"
+#include "converse.h"
+
 #define MAXSPAN    4          /* The maximum permitted span on 
 				 each node of the spanning tree */
 #define MAXNODES   1024
