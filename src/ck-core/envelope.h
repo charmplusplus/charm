@@ -72,8 +72,7 @@ public:
 	CkGroupID arr; //Array manager GID
 	UChar hopCount;//number of times message has been routed
 	UShort epIdx;//Array element entry point
-	UInt broadcastCount;//For creations-- initial broadcast count
-	UInt reductionCount;//For creations-- initial reduction count
+	int listenerData[CK_ARRAYLISTENER_MAXLEN]; //For creation
 	UInt srcPe;//Original sender
 	CkArrayIndexStruct index;//Array element index
       } array;
@@ -215,8 +214,7 @@ private:
     unsigned char &array_hops(void) {return type.array.hopCount;}
     CkGroupID &array_mgr(void) {return type.array.arr;}
     unsigned int &array_srcPe(void) {return type.array.srcPe;}
-    UInt &array_broadcastCount(void) {return type.array.broadcastCount;}
-    UInt &array_reductionCount(void) {return type.array.reductionCount;}
+    int *array_listenerData(void) {return type.array.listenerData;}
 };
 
 inline envelope *UsrToEnv(const void *const msg) {

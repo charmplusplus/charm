@@ -85,12 +85,12 @@ void envelope::pup(PUP::er &p) {
 	case ForBocMsg:
 		p|type.array.loc;
 		p|type.array.arr;
-		p(type.array.hopCount);		
+		p(type.array.hopCount);
 		p(type.array.epIdx);
+		p(type.array.listenerData,CK_ARRAYLISTENER_MAXLEN);
+		p(type.array.srcPe);
 		p(type.array.index.nInts);
 		p(type.array.index.index,CK_ARRAYINDEX_MAXLEN);
-		p(type.array.srcPe);
-		p(type.array.broadcastCount);
 		break;
 	case RODataMsg:
 		p(type.roData.count);
