@@ -18,9 +18,13 @@ Any other Converse function should not be called after a call to this function.
 process. A separate call to \param{exit()} is needed after 
 \param{ConverseExit()} to achieve this.}}
 
-\function{void user_main(int argc, char **argv)}
+\function{void user\_main(int argc, char **argv)}
 \index{user_main}
 \desc{This function must be written by the Converse user.  When the
 converse program is loaded, this function will be called on ALL
-processors.}
-
+processors.  Typically, this function is structured as follows: first,
+one calls ConverseInit.  Second, adds some work to the work-pool by
+sending messages or creating threads.  Third, one performs all work in
+the work-pool by calling CsdScheduler.  Finally, when all work is done
+and CsdScheduler exits, one shuts down the system by calling
+ConverseExit.}

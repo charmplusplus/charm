@@ -25,62 +25,99 @@ process. A separate call to \param{exit()} is needed after
 
 \section{Converse Handlers and Handler Numbers}
 
-Prior to sending a message, the Converse user writes a function that
-the receiver of the message should use to {\em handle} the message.
-The Converse user puts a reference to that function in the message,
-and sends it to the destination processor.  The destination processor
-automatically calls the user's {\em handler} function, passing it the
-contents of the message.
+Prior to sending a message, the Converse user writes a {\em handler}
+function that should be called by the receiving processor.  The
+Converse user puts a reference to the {\em handler} function in the
+message, and sends it to the destination processor.  The destination
+processor automatically calls the user's {\em handler} function,
+passing it the contents of the message.
 
 Ideally, this would be achieved by putting a pointer to the
 handler-function in the message.  However, in parallel programs
-running on heterogeneous machines, sending a function-pointer in a
-message doesn't work.  As a substitute, we use function-numbers.
-During program initialization time, the handler-functions are assigned
-numbers, and messages contain handler-numbers to specify which handler
-should process the message.  
+running on heterogeneous machines, sending a function pointer in a
+message doesn't work.  As a substitute, we use {\em handler numbers}.
+To this end, Converse maintains a table mapping handler numbers to
+function pointers.  Each processor has its own copy of the mapping.
+There is a caution associated with this approach: it is the user's
+responsibility to ensure that all processors have identical mappings.
+This is easy to do, nonetheless, the user must be aware that this is
+(usually) required.
 
-The following set of facilities are provided to assign handler-numbers
-to handler-functions, and to store handler-numbers in messages.  Note
-that while they may be called ``handler-numbers'', they can be used as
-a general substitute for function-pointers in messages.  Of the
-registration functions, the one which is normally used in Converse
-programs is CmiRegisterHandler.
+Note that while they may be called {\em handler numbers}, they are
+essentially function numbers, and can be used as a general substitute
+for function pointers regardless of whether those functions are handler
+functions.
 
 \function{typedef void (*CmiHandler)(void *)}
 \index{CmiHandler}
 \desc{Functions that handle Converse messages must be of this type.}
 
-\function {\#define CmiMsgHeaderSizeBytes}
-\index{CmiMsgHeaderSizeBytes}
-\desc{Messages are stored in message buffers.  The first few bytes
-of the message-buffer is always the CMI header.  This constant,
-defined in {\tt converse.h}, denotes the size of the CMI message
-header in bytes.  Every message buffer must allocate these many bytes
-at its beginning for the header.}
-
 \function {int CmiRegisterHandler(CmiHandler h)}
 \index{CmiRegisterHandler}
-\desc{This call registers a message handler with the CMI and returns a
-handler index which can be subsequently used to specify the handler
-for a message. All processors must register the same handlers, in the
-same order, so that the handler-numbers remain consistent across
-processes. All handlers must be registered on a processor before any
-messages are received or sent by that processor.  For this purpose, it
-is useful to register all handlers at the initialization stage of an
-application.}
+\desc{This represents the standard technique for associating numbers
+with functions.  To use this technique, the Converse user registers
+each of his functions, one by one, using CmiRegisterHandler.  One must
+register exactly the same functions in exactly the same order on all
+processors.  The system assigns monotonically increasing numbers to
+the functions, the same numbers on all processors.  This insures
+global consistency.  CmiRegisterHandler returns the number which was
+chosen for the function being registered.}
+
+\function {void CmiRegisterHandlerGlobal(int n, CmiHandler h)}
+\index{CmiRegisterHandlerLocal}
+\desc{This represents a second registration technique.   The Converse
+user registers his functions on processor zero, using
+CmiRegisterHandlerGlobal.  The Converse user is then responsible for
+broadcasting those handler numbers to other processors, and installing
+them using CmiNumberHandler below.  The user should take care not to
+invoke those handlers until they are fully installed.}
+
+\function {void CmiRegisterHandlerLocal(int n, CmiHandler h)}
+\index{CmiRegisterHandlerLocal}
+\desc{This function is used when one wishes to register functions
+in a manner that is not consistent across processors.  This function
+chooses a locally-meaningful number for the function, and records it
+locally.  No attempt is made to ensure consistency across processors.}
+
+\function {void CmiNumberHandler(int n, CmiHandler h)}
+\index{CmiNumberHandler}
+\desc{Forces the system to associate the specified handler number {\em n}
+with the specified handler function {\em h}.  If the function number
+{\em n} was previously mapped to some other function, that old mapping
+is forgotten.  The mapping that this function creates is local to the
+current processor.  CmiNumberHandler can be useful in combination with
+CmiRegisterGlobalHandler.  It can also be used to implement
+user-defined numbering schemes: such schemes should keep in mind that
+the size of the table that holds the mapping is proportional to the
+largest handler number --- do not use big numbers!}
+
+Note: of the three registration methods, the CmiRegisterHandler method
+is by far the simplest, and is strongly encouraged.  The others are
+primarily to ease the porting of systems that already use similar
+registration techniques.  One may use all three registration methods
+in a program.  The system guarantees that no numbering conflicts will
+occur as a result of this combination.
+
+\function {\#define CmiMsgHeaderSizeBytes}
+\index{CmiMsgHeaderSizeBytes}
+\desc{Messages are continguous sequences of bytes.  The first few
+bytes bytes of the message is the {\em CMI header}.  The size of the
+header is defined by the preprocessor constant CmiMsgHeaderSizeBytes,
+which is found in in {\tt converse.h}.  When the user allocates a message,
+this number of bytes must be set aside at the front of the message for
+the {\em CMI header.}}
 
 \function {void CmiSetHandler(int *MessageBuffer, int HandlerId)}
 \index{CmiSetHandler}
-\desc{This macro sets the handler field of a message to \param{HandlerId}.}
+\desc{This macro sets the handler number of a message to \param{HandlerId}.}
  
 \function {int CmiGetHandler(int *MessageBuffer)}
 \index{CmiGetHandler}
-\desc{This call returns the handler field of a message \param{MessageBuffer}.}
+\desc{This call returns the handler of a message in the form of a handler number.}
  
 \function {CmiHandler CmiGetHandlerFunction(int *MessageBuffer)}
 \index{CmiGetHandlerFunction}
-\desc{This call returns the handler function pointer for a message.}
+\desc{This call returns the handler of a message in the form of a function pointer.}
 
 \section{Point-To-Point Communication}
 
