@@ -1,0 +1,12 @@
+extern message ArrayElementCreateMessage;
+extern message ArrayElementMigrateMessage;
+
+message HelloMessage;
+
+chare HelloRing
+{
+  entry HelloRing(ArrayElementCreateMessage *);
+  entry HelloRing(ArrayElementMigrateMessage *);
+  entry hello(HelloMessage *);
+};
+

@@ -1,0 +1,10 @@
+message ArrayElementCreateMessage;
+message ArrayElementMigrateMessage;
+message ArrayElementExitMessage;
+
+chare ArrayElement
+{
+  entry exit(ArrayElementExitMessage *);
+};
+
+

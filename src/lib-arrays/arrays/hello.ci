@@ -1,0 +1,7 @@
+message QuiescenceMessage;
+
+chare main
+{
+  entry main();
+  entry quiescenceDetected(QuiescenceMessage *);
+};
