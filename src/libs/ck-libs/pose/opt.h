@@ -41,17 +41,14 @@ public:
       its current state (assuming no stragglers, cancellations or events
       are subsequently received */
   int SafeTime() {  
-    int ovt=userObj->OVT(), theTime, ec=parent->cancels.getEarliest(),
+    int ovt=userObj->OVT(), theTime=-1, ec=parent->cancels.getEarliest(),
       gvt=localPVT->getGVT(), worktime = eq->currentPtr->timestamp;
     // Object is idle; report -1
-    if (!RBevent && (ec<0) && (worktime < 0) && (ovt <= gvt))  return -1;
-    theTime = ovt;
-    if (worktime > theTime) // check queued events
-      theTime = worktime; // worktime is minimal
-    if (RBevent && (RBevent->timestamp < theTime))
-      theTime = RBevent->timestamp; // rollback time is minimal
-    if ((ec > -1) && (ec < theTime)) 
-      theTime = ec; // earliest cancellation is minimal
+    if (!RBevent && (ec < 0) && (worktime < 0) && (ovt <= gvt))  return -1;
+    if (RBevent)  theTime = RBevent->timestamp;
+    if ((ec > -1) && ((ec < theTime) || (theTime == -1)))  theTime = ec;
+    if ((worktime < theTime) || (theTime == -1))  theTime = worktime;
+    if (ovt > gvt)  theTime = ovt;
     return theTime;
   }
   /// Add spawned event to current event's spawned event list
@@ -70,7 +67,7 @@ public:
       m->timestamp = ev->timestamp;
       m->setPriority(m->timestamp - INT_MAX);
       localPVT->objUpdate(ev->timestamp, SEND);
-      //CkPrintf("Cancelling a spawned event...\n");
+      //CkPrintf("Cancelling spawned event "); ev->evID.dump(); CkPrintf("\n");
       POSE_Objects[ev->objIdx].Cancel(m); // send the cancellation
       delete ev; // delete the spawn
       ev = e->spawnedList; // move on to next in list
