@@ -10,13 +10,22 @@
 
 #include "charm++.h"
 
+#define DEBUGF(x) // CmiPrintf x
+
 class CMsgBuffer {
   public:
     int entry;
     void *msg;
     int refnum;
     CMsgBuffer *next;
-    CMsgBuffer(int e, void *m, int r) : entry(e), msg(m), refnum(r) {}
+
+    CMsgBuffer(int e, void *m, int r) : entry(e), msg(m), refnum(r), next(NULL) {}
+    CMsgBuffer(): next(NULL) {}
+    void pup(PUP::er& p) {
+      p(entry);
+      CkPupMessage(p, &msg);
+      p(refnum);
+    }
 };
 
 #define MAXARG 8
@@ -32,9 +41,21 @@ class CWhenTrigger {
     int nEntries;
     int entries[MAXREF];
     int refnums[MAXREF];
+
     CWhenTrigger *next;
     CWhenTrigger(int id, int na, int ne, int nae) :
-       whenID(id), nArgs(na), nAnyEntries(nae), nEntries(ne){}
+       whenID(id), nArgs(na), nAnyEntries(nae), nEntries(ne), next(NULL) {}
+    CWhenTrigger(): next(NULL) {}
+    void pup(PUP::er& p) {
+      p(whenID);
+      p(nArgs);
+      p(args, MAXARG);
+      p(nAnyEntries);
+      p(anyEntries, MAXANY);
+      p(nEntries);
+      p(entries, MAXREF);
+      p(refnums, MAXREF);
+    }
 };
 
 // Quick and dirty List for small numbers of items.
@@ -51,6 +72,41 @@ class TListCWhenTrigger
   public:
 
     TListCWhenTrigger(void) : first(0), last(0) {;}
+
+    void pup(PUP::er& p) {
+      PUP::seekBlock s(p, 2);
+      int nEntries = 0;
+      if (p.isUnpacking()) { 
+	s.seek(1);
+	p(nEntries);
+	DEBUGF(("      TListCWhenTrigger::numEntries %d\n", nEntries));
+	s.seek(0);
+	CWhenTrigger** unpackArray = new CWhenTrigger*[nEntries]; 
+	for (int i=0; i<nEntries; i++) {
+	  unpackArray[i] = new CWhenTrigger();
+	  unpackArray[i]->pup(p);
+	  if (i!=0) { unpackArray[i-1]->next = unpackArray[i]; }
+	}
+	if (nEntries > 0) {
+	  first = unpackArray[0];
+	  last = unpackArray[nEntries-1];
+	}
+	delete [] unpackArray;
+      }
+      else {
+	s.seek(0);
+	CWhenTrigger* temp = first;
+	while (temp != NULL) {
+	  temp->pup(p);
+	  temp = temp->next;
+	  nEntries++;
+	}
+	s.seek(1);
+	p(nEntries);
+	DEBUGF(("      TListCWhenTrigger::numEntries %d\n", nEntries));
+      }
+      s.endBlock();
+    }
 
     int empty(void) { return ! first; }
     
@@ -118,6 +174,41 @@ class TListCMsgBuffer
   public:
 
     TListCMsgBuffer(void) : first(0), last(0) {;}
+
+    void pup(PUP::er& p) {
+      PUP::seekBlock s(p, 2);
+      int nEntries = 0;
+      if (p.isUnpacking()) { // unpack
+	s.seek(1);
+	p(nEntries);
+	DEBUGF(("      TListCMsgBuffer::numEntries %d\n", nEntries));
+	s.seek(0);
+	CMsgBuffer** unpackArray = new CMsgBuffer*[nEntries]; 
+	for (int i=0; i<nEntries; i++) {
+	  unpackArray[i] = new CMsgBuffer();
+	  unpackArray[i]->pup(p);
+	  if (i!=0) { unpackArray[i-1]->next = unpackArray[i]; }
+	}
+	if (nEntries > 0) {
+	  first = unpackArray[0];
+	  last = unpackArray[nEntries-1];
+	}
+	delete [] unpackArray;
+      }
+      else { // pack
+	s.seek(0);
+	CMsgBuffer* temp = first;
+	while (temp != NULL) {
+	  temp->pup(p);
+	  temp = temp->next;
+	  nEntries++;
+	}
+	s.seek(1);
+	p(nEntries);
+	DEBUGF(("      TListCMsgBuffer::numEntries %d\n", nEntries));
+      }
+      s.endBlock();
+    }
 
     int empty(void) { return ! first; }
     
@@ -189,9 +280,40 @@ class CDep {
    int *numEntryDepends;
    TListCMsgBuffer ***whenDepends;
    TListCWhenTrigger ***entryDepends;
+
  public:
-   CDep(int ne, int nw) : numEntries(ne), numWhens(nw)
-   {
+   void pup(PUP::er& p) {
+     if (p.isSizing()) { DEBUGF(("[%d] CDep::pup SIZING\n", CkMyPe())); }
+     else if (p.isPacking()) { DEBUGF(("[%d] CDep::pup PACK\n", CkMyPe())); }
+     else if (p.isUnpacking()) { DEBUGF(("[%d] CDep::pup UNPACK\n", CkMyPe())); }
+     else { DEBUGF(("[%d] CDep::pup UNKNOWN\n", CkMyPe())); }
+
+     int w, e;
+     p(numWhenDepends, numWhens);
+     p(numEntryDepends, numEntries);
+
+     // print out contents
+     DEBUGF(("  numWhens %d numEntries %d\n    numWhensDepends ", 
+	     numEntries, numWhens));
+     for (w=0; w<numWhens; w++) { DEBUGF(("%d ", numWhenDepends[w])); }
+     DEBUGF(("\n    numEntryDepends "));
+     for (e=0; e<numEntries; e++) { DEBUGF(("%d ", numEntryDepends[e])); }
+     DEBUGF(("\n"));
+
+     for (w=0; w<numWhens; w++) {
+       DEBUGF(("  [%d] CDep::pup when %d\n", CkMyPe(), w));
+       whens[w]->pup(p);
+     }
+     for (e=0; e<numEntries; e++) {
+       DEBUGF(("  [%d] CDep::pup entry %d\n", CkMyPe(), e));
+       buffers[e]->pup(p);
+     }
+   }
+
+   CDep(int ne, int nw) : numEntries(ne), numWhens(nw) { initMem(); }
+
+ private:
+   void initMem() {
      // initialize the internal data structures here
      whens = new TListCWhenTrigger *[numWhens];
      buffers = new TListCMsgBuffer *[numEntries];
@@ -212,6 +334,7 @@ class CDep {
      }
    }
 
+ public:
    // adds a dependency of whenID upon Entry
    // done only at initialization.
    void addDepends(int whenID, int entry) {
