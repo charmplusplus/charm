@@ -1,0 +1,1237 @@
+/*****************************************************************************
+ * $Source$
+ * $Author$
+ * $Date$
+ * $Revision$
+ *****************************************************************************/
+#include <string.h>
+#include <stdlib.h>
+#include "sdag-globals.h"
+#include "xi-symbol.h"
+//#include "CParsedFile.h"
+#include "EToken.h"
+
+void SdagConstruct::numberNodes(void)
+{
+  switch(type) {
+    case SSDAGENTRY: nodeNum = numSdagEntries++; break;
+    case SOVERLAP: nodeNum = numOverlaps++; break;
+    case SWHEN: nodeNum = numWhens++; break;
+    case SFOR: nodeNum = numFors++; break;
+    case SWHILE: nodeNum = numWhiles++; break;
+    case SIF: nodeNum = numIfs++; if(con2!=0) con2->numberNodes(); break;
+    case SELSE: nodeNum = numElses++; break;
+    case SFORALL: nodeNum = numForalls++; break;
+    case SSLIST: nodeNum = numSlists++; break;
+    case SOLIST: nodeNum = numOlists++; break;
+    case SATOMIC: nodeNum = numAtomics++; break;
+    case SFORWARD: nodeNum = numForwards++; break;
+    case SINT_EXPR:
+    case SIDENT: 
+    default:
+      break;
+  }
+  SdagConstruct *cn;
+  if (constructs != 0) {
+    for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
+      cn->numberNodes();
+    }
+  }
+}
+
+void SdagConstruct::labelNodes(void)
+{
+  char text[128];
+  switch(type) {
+    case SSDAGENTRY:
+      sprintf(text, "%s", con1->text->charstar());
+      label = new XStr(text);
+      break;
+    case SOVERLAP: 
+      sprintf(text, "_overlap_%d", nodeNum); 
+      label = new XStr(text);
+      break;
+    case SWHEN: 
+      sprintf(text, "_when_%d", nodeNum); 
+      label = new XStr(text);
+      EntryList *el;
+      el = elist;
+      while (el !=NULL) {
+        el->entry->label = new XStr(el->entry->name);
+        el=el->next; 
+      }
+      break;
+    case SFOR: 
+      sprintf(text, "_for_%d", nodeNum); 
+      label = new XStr(text);
+      break;
+    case SWHILE: 
+      sprintf(text, "_while_%d", nodeNum); 
+      label = new XStr(text);
+      break;
+    case SIF: 
+      sprintf(text, "_if_%d", nodeNum); 
+      label = new XStr(text);
+      if(con2!=0) con2->labelNodes();
+      break;
+    case SELSE: 
+      sprintf(text, "_else_%d", nodeNum); 
+      label = new XStr(text);
+      break;
+    case SFORALL: 
+      sprintf(text, "_forall_%d", nodeNum); 
+      label = new XStr(text);
+      break;
+    case SSLIST: 
+      sprintf(text, "_slist_%d", nodeNum); 
+      label = new XStr(text);
+      break;
+    case SOLIST: 
+      sprintf(text, "_olist_%d", nodeNum); 
+      label = new XStr(text);
+      break;
+    case SATOMIC: 
+      sprintf(text, "_atomic_%d", nodeNum); 
+      label = new XStr(text);
+      break;
+    case SFORWARD: 
+      sprintf(text, "_forward_%d", nodeNum); 
+      label = new XStr(text);
+      break;
+    case SINT_EXPR:
+    case SIDENT:
+    default:
+      break;
+  }
+  SdagConstruct *cn;
+  if (constructs != 0) {
+    for(cn=(SdagConstruct *)(constructs->begin()); !constructs->end(); cn=(SdagConstruct *)(constructs->next())) {
+      cn->labelNodes();
+    }
+  }
+}
+
+void EntryList::generateEntryList(TList<CEntry*>& CEntrylist, SdagConstruct *thisWhen)
+{
+   Entry *e;
+   EntryList *el;
+   el = this;
+   while (el != NULL)
+   {
+     el->entry->generateEntryList(CEntrylist, thisWhen);
+     el = el->next;
+   }
+}
+
+void Entry::generateEntryList(TList<CEntry*>& CEntrylist, SdagConstruct *thisWhen)
+{
+   // case SENTRY:
+   CEntry *entry;
+   int notfound=1;
+   
+   for(entry=CEntrylist.begin(); !CEntrylist.end(); entry=CEntrylist.next()) {
+     if(*(entry->entry) == name) 
+     {
+        ParamList *epl;
+	epl = entry->paramlist;
+        ParamList *pl;
+        pl = param;
+        notfound = 1;
+	if ((entry->paramlist->isVoid() == 1) && (pl->isVoid() == 1)) {
+	   notfound = 0;
+	}
+	while ((pl != NULL) && (epl != NULL))
+	{
+	   if (pl->isArray() && epl->isArray()) {
+	     if (strcmp(pl->getBaseName(), epl->getBaseName()) == 0)
+	        notfound = 0;
+	   }
+	   else if (pl->isBuiltin() && epl->isBuiltin()) {
+	     if (strcmp(pl->getBaseName(), epl->getBaseName()) == 0)
+	        notfound = 0;
+	   }
+	   else if (pl->isReference() && epl->isReference()) {
+	     if (strcmp(pl->getBaseName(), epl->getBaseName()) == 0)
+	        notfound = 0;
+	   }
+	   else if (pl->isMessage() && epl->isMessage()) {
+	     if (strcmp(pl->getBaseName(), epl->getBaseName()) == 0)
+	        notfound = 0;
+	   }
+	   else if (pl->isNamed() && epl->isNamed()) {
+	     if (strcmp(pl->getBaseName(), epl->getBaseName()) == 0)
+	        notfound = 0;
+	   }
+ 	   pl = pl->next;
+	   epl = epl->next;
+        }
+        if (((pl == NULL) && (epl != NULL)) ||
+           ((pl != NULL) && (epl == NULL)))
+  	     notfound = 1;
+	if (notfound == 0) {
+          // check to see if thisWhen is already in entry's whenList
+          int whenFound = 0;
+          TList<SdagConstruct*> *tmpList = &(entry->whenList);
+          SdagConstruct *tmpNode;
+          for(tmpNode = tmpList->begin(); !tmpList->end(); tmpNode = tmpList->next()) {
+            if(tmpNode->nodeNum == thisWhen->nodeNum)
+               whenFound = 1;
+          }
+          if(!whenFound)
+            entry->whenList.append(thisWhen);
+          entryPtr = entry;
+          if(intExpr != 0)
+            entry->refNumNeeded = 1; 
+	 } 
+     }
+   }
+   if(notfound == 1) {
+     CEntry *newEntry;
+     newEntry = new CEntry(new XStr(name), param, estateVars, paramIsMarshalled() );
+     CEntrylist.append(newEntry);
+     entryPtr = newEntry;
+     newEntry->whenList.append(thisWhen);
+     if(intExpr != 0)
+       newEntry->refNumNeeded = 1; 
+   }
+      //break;
+}
+
+void SdagConstruct::generateEntryList(TList<CEntry*>& CEntrylist, SdagConstruct *thisWhen)
+{
+  SdagConstruct *cn;
+  switch(type) {
+    case SWHEN:
+      elist->generateEntryList(CEntrylist, this);  /* con1 is the WHEN's ELIST */
+      break;
+    case SIF:
+	/* con2 is the ELSE corresponding to this IF */
+      if(con2!=0) con2->generateEntryList(CEntrylist, thisWhen); 
+      break;
+  }
+  if (constructs != 0) {
+    for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
+      cn->generateEntryList(CEntrylist,thisWhen);
+    }
+  }
+}
+
+void SdagConstruct::propagateState(int uniqueVarNum)
+{ 
+  CStateVar *sv; 
+  /*if(type != SSDAGENTRY) {
+    fprintf(stderr, "use of non-entry as the outermost construct..\n");
+    exit(1);
+  }*/
+  stateVars = new TList<CStateVar*>();
+  ParamList *pl = param;
+  if (pl->isVoid() == 1) {
+     sv = new CStateVar(1, NULL, 0, NULL, 0, NULL, 0);
+     stateVars->append(sv);
+  }
+  else if (pl->isMessage() == 1){
+     sv = new CStateVar(0, pl->getBaseName(), 1, pl->getGivenName(), 0, NULL, 1);
+     stateVars->append(sv);
+  }
+  else {
+    while(pl != NULL) {
+      if (pl->isPointer() == 1) {
+        sv = new CStateVar(0, pl->getBaseName(), pl->getNumStars(), pl->getGivenName(), 0, NULL, 0); 
+      }
+      else if (pl->isReference() == 1) {
+        sv = new CStateVar(0, pl->getBaseName(), 0, pl->getGivenName(), new XStr("&"), NULL, 0); 
+
+      }
+      else if (pl->isArray() == 1) {
+        sv = new CStateVar(0, pl->getBaseName(), 0, pl->getGivenName(), 0, pl->getArrayLen(), 0); 
+      }
+      else if (pl->isBuiltin() == 1) {
+        sv = new CStateVar(0, pl->getBaseName(), 0, pl->getGivenName(), 0, NULL, 0); 
+
+      }
+      else if (pl->isNamed()) {
+          sv = new CStateVar(0, pl->getBaseName(), 0, pl->getGivenName(), 0, NULL, 0); 
+      }
+      pl = pl->next;
+      stateVars->append(sv);
+    }
+  }
+  stateVarsChildren = stateVars; 
+  SdagConstruct *cn;
+  TList<CStateVar*> *whensEntryMethodStateVars; 
+  whensEntryMethodStateVars = new TList<CStateVar*>();
+  for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
+     cn->propagateState(*stateVarsChildren, *whensEntryMethodStateVars , uniqueVarNum);
+  }
+}
+
+
+void SdagConstruct::propagateState(TList<CStateVar*>& list, TList<CStateVar*>& wlist, int uniqueVarNum)
+{
+  CStateVar *sv;
+  int i;
+  TList <CStateVar*> *olistTempStateVars;
+  TList<CStateVar*> *whensEntryMethodStateVars; 
+  olistTempStateVars = new TList<CStateVar*>();
+  stateVars = new TList<CStateVar*>();
+  switch(type) {
+    case SFORALL:
+      stateVarsChildren = new TList<CStateVar*>();
+      for(sv=list.begin(); !list.end(); sv=list.next()) {
+        stateVars->append(sv);
+        stateVarsChildren->append(sv);
+      }
+      sv = new CStateVar(0,"int", 0, con1->text->charstar(), 0,NULL, 0);
+      stateVarsChildren->append(sv);
+      {
+        char txt[128];
+        sprintf(txt, "_cf%d", nodeNum);
+        counter = new XStr(txt);
+        sv = new CStateVar(0, "CCounter", 1, txt,0,NULL, 1);
+        stateVarsChildren->append(sv);
+      }
+      break;
+    case SWHEN:
+      whensEntryMethodStateVars = new TList<CStateVar*>();
+      stateVarsChildren = new TList<CStateVar*>();
+      int numParameters; 
+      int count;
+      int isMsg;
+      int stateVarsHasVoid;
+      int stateVarsChildrenHasVoid; 
+      numParameters=0; count=0; isMsg=0; 
+      stateVarsHasVoid = 0;
+      stateVarsChildrenHasVoid = 0;
+      for(sv = stateVars->begin(); ((!stateVars->end()) && (stateVarsHasVoid != 1)); sv=stateVars->next()) {
+         if (sv->isVoid == 1)
+	     stateVarsHasVoid == 1;
+      }
+      for(sv=list.begin(); !list.end(); sv=list.next()) {
+         if ((sv->isVoid == 1) && (stateVarsHasVoid != 1)) {
+	    stateVars->append(sv);
+	    stateVarsHasVoid == 1;
+	 }
+	 else if (sv->isVoid != 1)
+	    stateVars->append(sv);
+	 if ((sv->isVoid == 1) && (stateVarsChildrenHasVoid != 1)) {
+	    stateVarsChildren->append(sv);
+	    stateVarsChildrenHasVoid == 1;
+	 }
+	 else if (sv->isVoid != 1) {
+	    stateVarsChildren->append(sv);
+	 }
+      }
+
+     
+      {  
+        EntryList *el;
+	el = elist;
+        ParamList *pl;
+	while (el != NULL) {
+          pl = el->entry->param;
+	  el->entry->stateVars = new TList<CStateVar*>();
+          if (pl->isVoid()) {
+            sv = new CStateVar(1, NULL, 0, NULL, 0, NULL, 0);
+            //stateVars->append(sv);
+              stateVarsChildren->append(sv);
+              whensEntryMethodStateVars->append(sv); 
+ 	      el->entry->estateVars.append(sv);
+ 	      el->entry->stateVars->append(sv);
+          }
+          else if (pl->isMessage()){
+            sv = new CStateVar(0, pl->getBaseName(), 1, pl->getGivenName(), 0, NULL, 1);
+            //stateVars->append(sv);
+              stateVarsChildren->append(sv);
+              whensEntryMethodStateVars->append(sv); 
+ 	      el->entry->estateVars.append(sv);
+ 	      el->entry->stateVars->append(sv);
+          }
+          else {
+            while(pl != NULL) {
+              if (pl->isPointer()) {
+                sv = new CStateVar(0, pl->getBaseName(), pl->getNumStars(), pl->getGivenName(), 0, NULL, 0); 
+              }
+      	      else if (pl->isReference()) {
+       	        sv = new CStateVar(0, pl->getBaseName(), 0, pl->getGivenName(), new XStr("&"), NULL, 0); 
+              }
+              else if (pl->isArray()) {
+                sv = new CStateVar(0, pl->getBaseName(), 0, pl->getGivenName(), 0, pl->getArrayLen(), 0); 
+              }
+              else if (pl->isBuiltin()) {
+                sv = new CStateVar(0, pl->getBaseName(), 0, pl->getGivenName(), 0, NULL, 0); 
+              }
+	      else if (pl->isNamed()) {
+                sv = new CStateVar(0, pl->getBaseName(), 0, pl->getGivenName(), 0, NULL, 0); 
+	      }
+	      else
+	         printf("PROBLEM - I DON'T KNOW THE TYPE\n");
+              pl = pl->next;
+              stateVarsChildren->append(sv);
+              whensEntryMethodStateVars->append(sv); 
+ 	      el->entry->estateVars.append(sv);
+ 	      el->entry->stateVars->append(sv);
+	    }
+	  }
+	  el = el->next;
+
+	}
+      }
+      break;
+    case SIF:
+      for(sv=list.begin(); !list.end(); sv=list.next()) {
+        stateVars->append(sv);
+      }
+      stateVarsChildren = stateVars;
+      if(con2 != 0) con2->propagateState(list, wlist, uniqueVarNum);
+      break;
+    case SOLIST:
+      stateVarsChildren = new TList<CStateVar*>();
+      for(sv=list.begin(); !list.end(); sv=list.next()) {
+        stateVars->append(sv);
+        stateVarsChildren->append(sv);
+      }
+      {
+        char txt[128];
+        sprintf(txt, "_co%d", nodeNum);
+        counter = new XStr(txt);
+        sv = new CStateVar(0,"CCounter",1, txt,0, NULL, 1);
+        stateVarsChildren->append(sv);
+      }
+      break;
+    case SFOR:
+    case SWHILE:
+    case SELSE:
+    case SSLIST:
+    case SOVERLAP:
+    case SATOMIC:
+      for(sv=list.begin(); !list.end(); sv=list.next()) {
+        stateVars->append(sv);
+      }
+      stateVarsChildren = stateVars;
+      break;
+    case SFORWARD:
+      stateVarsChildren = new TList<CStateVar*>();
+      for(sv=list.begin(); !list.end(); sv=list.next()) { 
+        stateVars->append(sv);
+      }
+      for(sv=wlist.begin(); !wlist.end(); sv=wlist.next()) { 
+        stateVarsChildren->append(sv);
+      }
+
+      break;
+    case SINT_EXPR:
+    case SIDENT:
+    case SENTRY:
+    case SELIST:
+      break;
+    default:
+      fprintf(stderr, "internal error in sdag translator..\n");
+      exit(1);
+      break;
+  }
+  SdagConstruct *cn;
+  if (constructs != 0) {
+    for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
+      if (type == SWHEN)
+         cn->propagateState(*stateVarsChildren, *whensEntryMethodStateVars,  uniqueVarNum);
+      else
+         cn->propagateState(*stateVarsChildren, wlist,  uniqueVarNum);
+    }
+ } 
+}
+
+void SdagConstruct::generateCode(XStr& op)
+{
+  switch(type) {
+    case SSDAGENTRY:
+      generateSdagEntry(op);
+      break;
+    case SSLIST:
+      generateSlist(op);
+      break;
+    case SOLIST:
+      generateOlist(op);
+      break;
+    case SFORALL:
+      generateForall(op);
+      break;
+    case SATOMIC:
+      generateAtomic(op);
+      break;
+    case SIF:
+      generateIf(op);
+      if(con2 != 0)
+        con2->generateCode(op);
+      break;
+    case SELSE:
+      generateElse(op);
+      break;
+    case SWHILE:
+      generateWhile(op);
+      break;
+    case SFOR:
+      generateFor(op);
+      break;
+    case SOVERLAP:
+      generateOverlap(op);
+      break;
+    case SWHEN:
+      generateWhen(op);
+      break;
+    case SFORWARD:
+      generateForward(op);
+      break;
+    default:
+      break;
+  }
+  SdagConstruct *cn;
+  if (constructs != 0) {
+    for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
+      cn->generateCode(op);
+    }
+  }
+}
+
+void SdagConstruct::generateForward(XStr& op) {
+  SdagConstruct *cn;
+  op << "  void " << label->charstar() << "(";
+  generatePrototype(op, *stateVars);
+  op << ") {\n";
+  for (cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
+    op << "    { "<<cn->text->charstar()<<"(";
+    generateCall(op, *stateVarsChildren);
+    op<<"); }\n";
+  }
+  if(nextBeginOrEnd == 1)
+    op << "    " << next->label->charstar() << "(";
+  else
+    op << "    " << next->label->charstar() << "_end(";
+  generateCall(op, *stateVars);
+  op << ");\n";
+  op << "  }\n\n";
+}
+
+
+void SdagConstruct::generateWhen(XStr& op)
+{
+  op << "  int " << label->charstar() << "(";
+  generatePrototype(op, *stateVars);
+  op << ") {\n";
+
+  CStateVar *sv;
+
+  Entry *e;
+  EntryList *el;
+  el = elist;
+  while (el != NULL){
+    e = el->entry;
+    if (e->param->isVoid() == 1)
+        op << "    CMsgBuffer *"<<e->getEntryName()<<"_buf;\n";
+    else if (e->paramIsMarshalled() == 1) {
+
+        op << "    CMsgBuffer *"<<e->getEntryName()<<"_buf;\n";
+        op << "    CkMarshallMsg *" <<
+                        e->getEntryName() << "_msg;\n";
+    }
+    else {
+        for(sv=e->stateVars->begin(); !e->stateVars->end(); e->stateVars->next()) {
+          op << "    CMsgBuffer *"<<sv->name->charstar()<<"_buf;\n";
+          op << "    " << sv->type->charstar() << " *" <<
+                          sv->name->charstar() << ";\n";
+        } 
+    }
+    el = el->next;
+  }
+
+  op << "\n";
+  el = elist;
+  while (el != NULL) {
+     e = el->entry;
+     if ((e->paramIsMarshalled() == 1) || (e->param->isVoid() == 1)) {
+        if((e->intExpr == 0) || (e->param->isVoid() == 1)) {   // DOUBLE CHECK THIS LOGIC
+           op << "    " << e->getEntryName(); 
+           op << "_buf = __cDep->getMessage(" << e->entryPtr->entryNum << ");\n";
+        }	    
+        else {
+           op << "    " << e->getEntryName() << 
+                 "_buf = __cDep->getMessage(" << e->entryPtr->entryNum <<
+                 ", " << e->intExpr << ");\n";
+        }
+     }
+     else { // The parameter is a message
+        sv = e->stateVars->begin();
+        if(e->intExpr == 0) {
+           op << "    " << sv->name->charstar(); 
+           op << "_buf = __cDep->getMessage(" << e->entryPtr->entryNum << ");\n";
+        }	    
+        else {
+           op << "    " << sv->name->charstar() << 
+                 "_buf = __cDep->getMessage(" << e->entryPtr->entryNum <<
+                 ", " << e->intExpr << ");\n";
+        }
+     }  
+    el = el->next;
+  }
+
+  op << "\n";
+  op << "    if (";
+  el = elist;
+  while (el != NULL)  {
+     e = el->entry;
+     if ((e->paramIsMarshalled() == 1) || (e->param->isVoid() ==1)) {
+        op << "(" << e->getEntryName() << "_buf != 0)";
+     }
+     else {
+        sv = e->stateVars->begin();
+        op << "(" << sv->name->charstar() << "_buf != 0)";
+     }
+     el = el->next;
+     if (el != NULL)
+        op << "&&";
+  }
+  op << ") {\n";
+
+  el = elist;
+  while (el != NULL) {
+     e = el->entry;
+     if (e->param->isVoid() == 1) {
+        op <<"       CkFreeSysMsg((void *) "<<e->getEntryName() <<"_buf->msg);\n";
+        op << "       __cDep->removeMessage(" << e->getEntryName() <<
+              "_buf);\n";
+        op << "      delete " << e->getEntryName() << "_buf;\n";
+     }
+     else if (e->paramIsMarshalled() == 1) {
+        op << "       " << e->getEntryName() << "_msg = (CkMarshallMsg *)"  
+               << e->getEntryName() << "_buf->msg;\n";
+        op << "       char *"<<e->getEntryName() <<"_impl_buf=((CkMarshallMsg *)"
+	   <<e->getEntryName() <<"_msg)->msgBuf;\n";
+        op <<"       PUP::fromMem " <<e->getEntryName() <<"_implP(" 
+	   <<e->getEntryName() <<"_impl_buf);\n";
+
+        for(sv=e->stateVars->begin(); !e->stateVars->end(); sv=e->stateVars->next()) {
+           if (sv->arrayLength != NULL)
+              op <<"      int impl_off_"<<sv->name->charstar()
+	         <<"; "<<e->getEntryName() <<"_implP|impl_off_"
+		 <<sv->name->charstar()<<";\n";
+           else
+               op <<"       "<<sv->type->charstar()<<" "<<sv->name->charstar()
+	       <<"; " <<e->getEntryName() <<"_implP|"
+	       <<sv->name->charstar()<<";\n";
+	}
+        op << "       " <<e->getEntryName() <<"_impl_buf+=CK_ALIGN("
+	   <<e->getEntryName() <<"_implP.size(),16);\n";
+        for(sv=e->stateVars->begin(); !e->stateVars->end(); sv=e->stateVars->next()) {
+           if (sv->arrayLength != NULL)
+              op << "    "<<sv->type->charstar()<< " *" <<sv->name->charstar() <<"=(" <<sv->type->charstar()
+		 <<" *)(" <<e->getEntryName() <<"_impl_buf+" <<"impl_off_"
+		 <<sv->name->charstar()<<");\n";
+        }
+        op << "       __cDep->removeMessage(" << e->getEntryName() <<
+              "_buf);\n";
+        op << "       delete " << e->getEntryName() << "_buf;\n";
+     }
+     else {  // There was a message as the only parameter
+        sv = e->stateVars->begin();
+        op << "       " << sv->name->charstar() << " = (" << 
+              sv->type->charstar() << " *) " <<
+              sv->name->charstar() << "_buf->msg;\n";
+        op << "       __cDep->removeMessage(" << sv->name->charstar() <<
+              "_buf);\n";
+        op << "       delete " << sv->name->charstar() << "_buf;\n";
+     }
+     el = el->next;
+  }
+  if (constructs != 0) {
+    if (!constructs->empty() ) {
+       op << "       " << constructs->front()->label->charstar() << "(";
+       generateCall(op, *stateVarsChildren);
+       op << ");\n";
+    }
+  }
+  else {
+     op << "       " << label->charstar() << "_end(";
+     generateCall(op, *stateVarsChildren);
+     op << ");\n";
+  }
+  op << "       return 1;\n";
+  op << "    } else {\n";
+
+  int nRefs=0, nAny=0;
+  el = elist;
+  while (el != NULL) {
+    e = el->entry;
+    if(e->intExpr == 0)
+      nAny++;
+    else
+      nRefs++;
+    el = el->next;
+  }
+// keep these consts consistent with sdag.h in runtime
+
+#define MAXARG 8
+#define MAXANY 8
+#define MAXREF 8
+
+  if(stateVars->length() > MAXARG) {
+    fprintf(stderr, "numStateVars more that %d, contact developers.\n",
+		     MAXARG);
+    exit(1);
+  }
+  if(nRefs > MAXREF) {
+    fprintf(stderr, "numDepends more that %d, contact developers.\n",
+		     MAXREF);
+    exit(1);
+  }
+  if(nAny > MAXANY) {
+    fprintf(stderr, "numDepends more that %d, contact developers.\n",
+		     MAXANY);
+    exit(1);
+  }
+  op << "       CWhenTrigger *tr;\n";
+  op << "       tr = new CWhenTrigger(" << nodeNum << ", " <<
+        stateVars->length() << ", " << nRefs << ", " << nAny << ");\n";
+  int iArgs=0;
+ 
+//  op << "       int impl_off=0;\n";
+  int hasArray = 0;
+  int isVoid = 0;
+  int numParamsNeedingMarshalling = 0;
+  int paramIndex =0;
+  for(sv=stateVars->begin();!stateVars->end();sv=stateVars->next()) {
+    if (sv->isVoid == 1) {
+        isVoid = 1;
+       op <<"       tr->args[" <<iArgs++ <<"] = (size_t) CkAllocSysMsg();\n";
+    }
+    else {
+      if (sv->isMsg == 1) {
+         op << "       tr->args["<<iArgs++ <<"] = (size_t) " <<sv->name->charstar()<<";\n";
+      }
+      else {
+         numParamsNeedingMarshalling++;
+         if (numParamsNeedingMarshalling == 1) {
+           op << "       int impl_off=0;\n";
+           paramIndex = iArgs;
+           iArgs++;
+         }
+      }
+      if (sv->arrayLength !=NULL) {
+         hasArray++;
+         if (hasArray == 1)
+      	   op<< "       int impl_arrstart=0;\n";
+         op <<"       int impl_off_"<<sv->name->charstar()<<", impl_cnt_"<<sv->name->charstar()<<";\n";
+         op <<"       impl_off_"<<sv->name->charstar()<<"=impl_off=CK_ALIGN(impl_off,sizeof("<<sv->type->charstar()<<"));\n";
+         op <<"       impl_off+=(impl_cnt_"<<sv->name->charstar()<<"=sizeof("<<sv->type->charstar()<<")*("<<sv->arrayLength->charstar()<<"));\n";
+      }
+    }
+  }
+  if (numParamsNeedingMarshalling > 0) {
+     op << "       { \n";
+     op << "         PUP::sizer implP;\n";
+     for(sv=stateVars->begin();!stateVars->end();sv=stateVars->next()) {
+       if (sv->arrayLength !=NULL)
+         op << "         implP|impl_off_" <<sv->name->charstar() <<";\n";
+       else if ((sv->isMsg != 1) && (sv->isVoid !=1)) 
+         op << "         implP|" <<sv->name->charstar() <<";\n";
+     }
+     if (hasArray > 0) {
+        op <<"         impl_arrstart=CK_ALIGN(implP.size(),16);\n";
+        op <<"         impl_off+=impl_arrstart;\n";
+     }
+     else {
+        op << "         impl_off+=implP.size();\n";
+     }
+     op << "       }\n";
+     op << "       CkMarshallMsg *impl_msg;\n";
+     op << "       impl_msg = CkAllocateMarshallMsg(impl_off,NULL);\n";
+     op << "       {\n";
+     op << "         PUP::toMem implP((void *)impl_msg->msgBuf);\n";
+     for(sv=stateVars->begin();!stateVars->end();sv=stateVars->next()) {
+       if (sv->arrayLength !=NULL)
+          op << "         implP|impl_off_" <<sv->name->charstar() <<";\n";
+       else if ((sv->isMsg != 1) && (sv->isVoid != 1))  
+          op << "         implP|" <<sv->name->charstar() <<";\n";
+     }
+     op << "       }\n";
+     if (hasArray > 0) {
+        op <<"       char *impl_buf=impl_msg->msgBuf+impl_arrstart;\n";
+        for(sv=stateVars->begin();!stateVars->end();sv=stateVars->next()) {
+           if (sv->arrayLength !=NULL)
+              op << "       memcpy(impl_buf+impl_off_"<<sv->name->charstar()<<
+	                 ","<<sv->name->charstar()<<",impl_cnt_"<<sv->name->charstar()<<");\n";
+        }  
+     }
+  op << "       tr->args[" <<paramIndex <<"] = (size_t) impl_msg;\n";
+  }   
+  int iRef=0, iAny=0;
+
+  el = elist;
+  while (el != NULL) {
+    e = el->entry;
+    if(e->intExpr == 0) {
+      op << "       tr->anyEntries[" << iAny++ << "] = " <<
+            e->entryPtr->entryNum << ";\n";
+    } else {
+      op << "       tr->entries[" << iRef << "] = " << 
+            e->entryPtr->entryNum << ";\n";
+      op << "       tr->refnums[" << iRef++ << "] = " <<
+            e->intExpr << ";\n";
+    }
+    el = el->next;
+  }
+  op << "       __cDep->Register(tr);\n";
+  op << "       return 0;\n";
+  op << "    }\n";
+
+  // end actual code
+  op << "  }\n\n";
+  // end function
+  op << "  void " << label->charstar() << "_end(";
+  generatePrototype(op, *stateVarsChildren);
+  op << ") {\n";
+  // actual code here 
+  if(nextBeginOrEnd == 1)
+   op << "    " << next->label->charstar() << "(";
+  else 
+   op << "    " << next->label->charstar() << "_end(";
+
+  generateCall(op, *stateVars); 
+  
+  op << ");\n";
+  // end actual code
+  op << "  }\n\n";
+}
+
+void SdagConstruct::generateWhile(XStr& op)
+{
+  // inlined start function
+  op << "  void " << label->charstar() << "(";
+  generatePrototype(op, *stateVars);
+  op << ") {\n";
+  // actual code here 
+  op << "    if (" << con1->text->charstar() << ") {\n";
+  op << "      " << constructs->front()->label->charstar() << 
+        "(";
+  generateCall(op, *stateVarsChildren);
+  op << ");\n";
+  op << "    } else {\n";
+  if(nextBeginOrEnd == 1)
+   op << "      " << next->label->charstar() << "(";
+  else
+   op << "      " << next->label->charstar() << "_end(";
+  generateCall(op, *stateVars);
+  op << ");\n";
+  op << "    }\n";
+  // end actual code
+  op << "  }\n\n";
+  // inlined end function
+  op << "  void " << label->charstar() << "_end(";
+  generatePrototype(op, *stateVarsChildren);
+  op << ") {\n";
+  // actual code here 
+  op << "    if (" << con1->text->charstar() << ") {\n";
+  op << "      " << constructs->front()->label->charstar() <<
+        "(";
+  generateCall(op, *stateVarsChildren);
+  op << ");\n";
+  op << "    } else {\n";
+  if(nextBeginOrEnd == 1)
+   op << "      " <<  next->label->charstar() << "(";
+  else
+   op << "      " << next->label->charstar() << "_end(";
+  generateCall(op, *stateVars);
+  op << ");\n";
+  op << "    }\n";
+  // end actual code
+  op << "  }\n\n";
+}
+
+void SdagConstruct::generateFor(XStr& op)
+{
+  // inlined start function
+  op << "  void " << label->charstar() << "(";
+  generatePrototype(op, *stateVars);
+  op << ") {\n";
+  // actual code here 
+  op << "    " << con1->text->charstar() << ";\n";
+  op << "    if (" << con2->text->charstar() << ") {\n";
+  op << "      " << constructs->front()->label->charstar() <<
+        "(";
+  generateCall(op, *stateVarsChildren);
+  op << ");\n";
+  op << "    } else {\n";
+  if(nextBeginOrEnd == 1)
+   op << "      " << next->label->charstar() << "(";
+  else
+   op << "      " << next->label->charstar() << "_end(";
+  generateCall(op, *stateVars);
+  op << ");\n";
+  op << "    }\n";
+  // end actual code
+  op << "  }\n";
+  // inlined end function
+  op << "  void " << label->charstar() << "_end(";
+  generatePrototype(op, *stateVarsChildren);
+  op << ") {\n";
+  // actual code here 
+  op << con3->text->charstar() << ";\n";
+  op << "    if (" << con2->text->charstar() << ") {\n";
+  op << "      " << constructs->front()->label->charstar() <<
+        "(";
+  generateCall(op, *stateVarsChildren);
+  op << ");\n";
+  op << "    } else {\n";
+  if(nextBeginOrEnd == 1)
+   op << "      " << next->label->charstar() << "(";
+  else
+   op << "      " << next->label->charstar() << "_end(";
+   generateCall(op, *stateVars);
+  op << ");\n";
+  op << "    }\n";
+  // end actual code
+  op << "  }\n";
+}
+
+void SdagConstruct::generateIf(XStr& op)
+{
+  // inlined start function
+  op << "  void " << label->charstar() << "(";
+  generatePrototype(op, *stateVars);
+  op << ") {\n";
+  // actual code here 
+  op << "    if (" << con1->text->charstar() << ") {\n";
+  op << "      " << constructs->front()->label->charstar() <<
+        "(";
+  generateCall(op, *stateVarsChildren);
+  op << ");\n";
+  op << "    } else {\n";
+  if (con2 != 0) {
+    op << "      " << con2->label->charstar() << "(";
+    generateCall(op, *stateVarsChildren);
+    op << ");\n";
+  } else {
+    op << "      " << label->charstar() << "_end(";
+    generateCall(op, *stateVarsChildren);
+    op << ");\n";
+  }
+  op << "    }\n";
+  // end actual code
+  op << "  }\n\n";
+  // inlined end function
+  op << "  void " << label->charstar() << "_end(";
+  generatePrototype(op, *stateVarsChildren);
+  op << ") {\n";
+  // actual code here 
+  if(nextBeginOrEnd == 1)
+   op << "      " << next->label->charstar() << "(";
+  else
+   op << "      " << next->label->charstar() << "_end(";
+  generateCall(op, *stateVars);
+  op << ");\n";
+  // end actual code
+  op << "  }\n\n";
+}
+
+void SdagConstruct::generateElse(XStr& op)
+{
+  // inlined start function
+  op << "  void " << label->charstar() << "(";
+  generatePrototype(op, *stateVars);
+  op << ") {\n";
+  // actual code here 
+  op << "    " << constructs->front()->label->charstar() << 
+        "(";
+  generateCall(op, *stateVarsChildren);
+  op << ");\n";
+  // end actual code
+  op << "  }\n\n";
+  // inlined end function
+  op << "  void " << label->charstar() << "_end(";
+  generatePrototype(op, *stateVarsChildren);
+  op << ") {\n";
+  // actual code here 
+  if(nextBeginOrEnd == 1)
+   op << "      " << next->label->charstar() << "(";
+  else
+   op << "      " << next->label->charstar() << "_end(";
+  generateCall(op, *stateVars);
+  op << ");\n";
+  // end actual code
+  op << "  }\n\n";
+}
+
+void SdagConstruct::generateForall(XStr& op)
+{
+  // inlined start function
+  op << "  void " << label->charstar() << "(";
+  generatePrototype(op, *stateVars);
+  op << ") {\n";
+  // actual code here 
+  op << "    int __first = (" << con2->text->charstar() <<
+        "), __last = (" << con3->text->charstar() << 
+        "), __stride = (" << con4->text->charstar() << ");\n";
+  op << "    if (__first > __last) {\n";
+  op << "      int __tmp=__first; __first=__last; __last=__tmp;\n";
+  op << "      __stride = -__stride;\n";
+  op << "    }\n";
+  op << "    CCounter *" << counter->charstar() << 
+        " = new CCounter(__first,__last,__stride);\n"; 
+  op << "    for(int " << con1->text->charstar() << 
+        "=__first;" << con1->text->charstar() <<
+        "<=__last;" << con1->text->charstar() << "+=__stride) {\n";
+  op << "      " << constructs->front()->label->charstar() <<
+        "(";
+  generateCall(op, *stateVarsChildren);
+  op << ");\n";
+  op << "    }\n";
+  // end actual code
+  op << "  }\n\n";
+  // inlined end function
+  op << "  void " << label->charstar() << "_end(";
+  generatePrototype(op, *stateVarsChildren);
+  op << ") {\n";
+  // actual code here 
+  op << "    " << counter->charstar() << "->decrement();\n";
+  op << "    if (" << counter->charstar() << "->isDone()) {\n";
+  op << "      delete " << counter->charstar() << ";\n";
+  if(nextBeginOrEnd == 1)
+   op << "      " << next->label->charstar() << "(";
+  else
+   op << "      " << next->label->charstar() << "_end(";
+  generateCall(op, *stateVars);
+  op << ");\n";
+  // end actual code
+  op << "    }\n  }\n\n";
+}
+
+void SdagConstruct::generateOlist(XStr& op)
+{
+  SdagConstruct *cn;
+  // inlined start function
+  op << "  void " << label->charstar() << "(";
+  generatePrototype(op, *stateVars);
+  op << ") {\n";
+  // actual code here 
+  op << "    CCounter *" << counter->charstar() << "= new CCounter(" <<
+        constructs->length() << ");\n";
+  for(cn=constructs->begin(); 
+                     !constructs->end(); cn=constructs->next()) {
+    op << "    " << cn->label->charstar() << "(";
+    generateCall(op, *stateVarsChildren);
+    op << ");\n";
+  }
+  // end actual code
+  op << "  }\n";
+  // inlined end function
+  op << "  void " << label->charstar() << "_end(";
+  generatePrototype(op, *stateVarsChildren);
+  op << ") {\n";
+  // actual code here 
+  op << "    " << counter->charstar() << "->decrement();\n";
+  op << "    if (" << counter->charstar() << "->isDone()) {\n";
+  op << "      delete " << counter->charstar() << ";\n";
+
+  if(nextBeginOrEnd == 1)
+   op << "      " << next->label->charstar() << "(";
+  else
+   op << "      " << next->label->charstar() << "_end(";
+  generateCall(op, *stateVars);
+  op << ");\n";
+  // end actual code
+  op << "    }\n";
+  op << "  }\n";
+}
+
+void SdagConstruct::generateOverlap(XStr& op)
+{
+  // inlined start function
+  op << "  void " << label->charstar() << "(";
+  generatePrototype(op, *stateVars);
+  op << ") {\n";
+  // actual code here 
+  op << "    " << constructs->front()->label->charstar() <<
+        "(";
+  generateCall(op, *stateVarsChildren);
+  op << ");\n";
+  // end actual code
+  op << "  }\n";
+  // inlined end function
+  op << "  void " << label->charstar() << "_end(";
+  generatePrototype(op, *stateVarsChildren);
+  op << ") {\n";
+  // actual code here 
+  if(nextBeginOrEnd == 1)
+   op << "    " << next->label->charstar() << "(";
+  else
+   op << "    " << next->label->charstar() << "_end(";
+  generateCall(op, *stateVars);
+  op << ");\n";
+  // end actual code
+  op << "  }\n";
+}
+
+void SdagConstruct::generateSlist(XStr& op)
+{
+  // inlined start function
+  op << "  void " << label->charstar() << "(";
+  generatePrototype(op, *stateVars);
+  op << ") {\n";
+  // actual code here 
+  op << "    " << constructs->front()->label->charstar() <<
+        "(";
+  generateCall(op, *stateVarsChildren);
+  op << ");\n";
+  // end actual code
+  op << "  }\n";
+  // inlined end function
+  op << "  void " << label->charstar() << "_end(";
+  generatePrototype(op, *stateVarsChildren); 
+  op << ") {\n";
+  // actual code here 
+  if(nextBeginOrEnd == 1)
+   op << "    " << next->label->charstar() << "(";
+  else
+   op << "    " << next->label->charstar() << "_end(";
+  //generateCall(op, *stateVars);
+  generateCall(op, *stateVars);
+  op << ");\n";
+  // end actual code
+  op << "  }\n";
+}
+
+void SdagConstruct::generateSdagEntry(XStr& op)
+{
+  // header file
+  op << "public:\n";
+  op << "  void " << con1->text->charstar() << "(";
+  generatePrototype(op, *stateVars);
+  op << ") {\n";
+  // actual code here 
+  op << "    " << constructs->front()->label->charstar() <<
+        "(";
+  generateCall(op, *stateVarsChildren);
+  op << ");\n";
+  // end actual code
+  op << "  }\n\n";
+  op << "private:\n";
+  op << "  void " << con1->text->charstar() << "_end(";
+  generatePrototype(op, *stateVars);
+  op << ") {\n";
+  op << "  }\n\n";
+}
+
+void SdagConstruct::generateAtomic(XStr& op)
+{ 
+  op << "  void " << label->charstar() << "(";
+  generatePrototype(op, *stateVars);
+  op << ") {\n";
+  op << "    " << text->charstar() << "\n";
+  if(nextBeginOrEnd == 1)
+    op << "    " << next->label->charstar() << "(";
+  else
+    op << "    " << next->label->charstar() << "_end(";
+  generateCall(op, *stateVars);
+  op << ");\n";
+  op << "  }\n\n";
+}
+
+void SdagConstruct::generatePrototype(XStr& op, TList<CStateVar*>& list)
+{
+  CStateVar *sv;
+  int isVoid;
+  int count;
+  count = 0;
+  for(sv=list.begin(); !list.end(); ) {
+    isVoid = sv->isVoid;
+    if ((count != 0) && (isVoid != 1))
+       op << ", ";
+    if (sv->isVoid != 1) {
+      if (sv->type != 0) 
+         op <<sv->type->charstar() <<" ";
+      if (sv->byRef != 0)
+         op <<" &";
+      if (sv->arrayLength != NULL) 
+         op <<"*";
+      else if (sv->numPtrs != 0) {
+        for (int i=0; i<sv->numPtrs; i++) 
+	  op <<"*";
+         op <<" ";
+      }
+      if (sv->name != 0)
+         op <<sv->name->charstar();
+    }
+    if (sv->isVoid != 1)
+       count++;
+    sv = list.next();
+  }
+}
+
+void SdagConstruct::generateCall(XStr& op, TList<CStateVar*>& list) {
+  CStateVar *sv;
+  int isVoid;
+  int count;
+  count = 0;
+  for(sv=list.begin(); !list.end(); ) {
+     isVoid = sv->isVoid;
+     if ((count != 0) && (isVoid != 1))
+        op << ", ";
+     if (sv->name != 0) 
+       op << sv->name->charstar();
+    if (sv->isVoid != 1)
+       count++;
+    sv = list.next();
+  }
+}
+
+// boe = 1, if the next call is to begin construct
+// boe = 0, if the next call is to end a contruct
+void SdagConstruct::setNext(SdagConstruct *n, int boe)
+{
+  switch(type) {
+    case SSLIST:
+      next = n;
+      nextBeginOrEnd = boe;
+      {
+        SdagConstruct *cn=constructs->begin();
+        if (cn==0) // empty slist
+          return;
+        SdagConstruct *nextNode=constructs->next();
+        for(; nextNode != 0;) {
+          cn->setNext(nextNode, 1);
+          cn = nextNode;
+          nextNode = constructs->next();
+        }
+        cn->setNext(this, 0);
+      }
+      return;
+    case SSDAGENTRY:
+    case SOVERLAP:
+    case SOLIST:
+    case SFORALL:
+    case SWHEN:
+    case SFOR:
+    case SWHILE:
+    case SATOMIC:
+    case SFORWARD:
+    case SELSE:
+      next = n;
+      nextBeginOrEnd = boe;
+      n = this; boe = 0; break;
+    case SIF:
+      next = n;
+      nextBeginOrEnd = boe;
+      if(con2 != 0)
+        con2->setNext(n, boe);
+      n = this;
+      boe = 0;
+      break;
+    default:
+      break;
+  }
+  SdagConstruct *cn;
+  if (constructs != 0) {
+    for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
+      cn->setNext(n, boe);
+    }
+  }
+}
+
