@@ -43,7 +43,7 @@ done
 [ "x$VERSION" = "x" ] && syntax
 	
 ( echo $VERSION | egrep -s '^Common' ) && syntax
-[ -d src/$VERSION ] || goto syntax
+[ -d src/$VERSION ] || syntax
 
 [ -d $VERSION ] || echo "Creating dir: $VERSION" 
 [ -d $VERSION ] || mkdir $VERSION
