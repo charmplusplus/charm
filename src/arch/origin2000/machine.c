@@ -184,6 +184,11 @@ static void threadInit(void *arg)
 
 void ConverseExit(void)
 {
+#if (CMK_DEBUG_MODE || CMK_WEB_MODE || NODE_0_IS_CONVHOST)
+  if (CmiMyPe() == 0){
+    CmiPrintf("End of program\n");
+  }
+#endif
   prctl(PR_SETEXITSIG,0,0);
   ConverseCommonExit();
   barrier(barr, nthreads);

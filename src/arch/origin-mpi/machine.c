@@ -319,7 +319,11 @@ void ConverseExit(void)
 {
   ConverseCommonExit();
   MPI_Finalize();
-  if (CmiMyPe() == 0) CmiPrintf("End of program\n");
+#if (CMK_DEBUG_MODE || CMK_WEB_MODE || NODE_0_IS_CONVHOST)
+  if (CmiMyPe() == 0){
+    CmiPrintf("End of program\n");
+  }
+#endif
   exit(0);
 }
 

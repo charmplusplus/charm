@@ -459,6 +459,11 @@ ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 
 void ConverseExit()
 {
+#if (CMK_DEBUG_MODE || CMK_WEB_MODE || NODE_0_IS_CONVHOST)
+  if (CmiMyPe() == 0){
+    CmiPrintf("End of program\n");
+  }
+#endif
   ConverseCommonExit();
   globalexit(0);
 }
