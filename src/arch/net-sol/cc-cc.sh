@@ -22,7 +22,7 @@ CMK_SEQ_CXX='CC -library=Cstd'
 CMK_SEQ_LDXX='CC -library=Cstd'
 CMK_CPP_SUFFIX="cc"
 CMK_XLATPP='charmxlat++ -w -p '
-CMK_QT='solaris-cc'
+CMK_QT='generic_alloca'
 CMK_F90LIBS='-lfsu -lsunmath -lfsumai -lfminlai -lfmaxlai -lfminvai -lfmaxvai -lfui -lfai'
 CMK_MOD_EXT="mod"
 CMK_F90_USE_MODDIR=1
