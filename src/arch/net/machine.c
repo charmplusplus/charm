@@ -1067,7 +1067,7 @@ static void CmiStdoutInit(void) {
 #if 0 /*Keep writes from blocking.  This just drops excess output, which is bad.*/
 		CmiEnableNonblockingIO(srcFd);
 #endif
-#if CMK_SHARED_VARS_UNAVAILABLE 
+#if CMK_SHARED_VARS_UNAVAILABLE && !CMK_USE_GM
   /*No communication thread-- get a SIGIO on each write(), which keeps the buffer clean*/
 		CmiEnableAsyncIO(readStdout[i]);
 #endif
