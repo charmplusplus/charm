@@ -20,7 +20,7 @@
 #define STARTUP_DEBUG(x)  /* ckout<<"ampi[pe "<<CkMyPe()<<"] "<< x <<endl; */
 
 #ifndef AMPI_COMLIB
-#  define AMPI_COMLIB 1
+#  define AMPI_COMLIB 0
 #endif
 
 //------------- startup -------------
