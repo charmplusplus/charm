@@ -381,8 +381,10 @@ char * PeTable ::ExtractAndPack(comID id, int ufield, int npe, int *pelist, int 
 
   *length=actual_msgsize+headersize;
   //  ComlibPrintf("actual=%d, len=%d , %d\n", actual_msgsize+headersize, *length, nummsgs);
+#if 0 /*Sameer: what the heck is this?  It only compiles under mpi- versions */
   if (l1 < MAXBUFSIZE) 
       ((CmiMsgHeaderBasic *)p)->rank = 1000;
+#endif
   return(p);
 } 
 
