@@ -9,6 +9,7 @@ CProxy_Hello arr;
 CkGroupID mCastGrpId;
 CProxySection_Hello *mcast;
 int nElements;			// readonly
+int sectionSize;		// readonly
 
 #define SECTIONSIZE  5
 #define REDUCE_TIME  1000
@@ -47,6 +48,9 @@ public:
 	     CkNumPes(),nElements);
     mid = thishandle;
 
+    sectionSize = SECTIONSIZE;
+    if (sectionSize > nElements) sectionSize = nElements;
+
     arr = CProxy_Hello::ckNew(nElements);
 
     mCastGrpId = CProxy_CkMulticastMgr::ckNew();
@@ -73,7 +77,6 @@ private:
   int init;
   myReductionCounter cnt;
   CProxySection_Hello mcp;
-  int sectionSize;
 
 public:
   Hello()
@@ -89,8 +92,6 @@ public:
 CmiPrintf("start %d elements\n", nElements);
     CkMulticastMgr *mg = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
 
-    sectionSize = SECTIONSIZE;
-    if (sectionSize > nElements) sectionSize = nElements;
     CkArrayIndexMax *al = new CkArrayIndexMax[sectionSize];
     for (int i=0; i<sectionSize; i++) {
       al[i] = CkArrayIndex1D(i);
