@@ -124,6 +124,7 @@ static CkFtFn  faultFunc = NULL;
 static char* _restartDir;
 
 int _defaultObjectQ = 0;            // for obejct queue
+int _ringexit = 0;		    // for charm exit
 
 static inline void _parseCommandLineOpts(char **argv)
 {
@@ -163,6 +164,13 @@ static inline void _parseCommandLineOpts(char **argv)
       CmiPrintf("[%d] Restarting after crash \n",CmiMyPe());
   }
 #endif
+  // shut down program in ring fashion to allow projections output w/o IO error
+  if (CmiGetArgFlagDesc(argv,"+ringexit", "Program exits in a ring fashion"))
+  {
+    _ringexit = 1;
+    if (CkMyPe()==0)
+      CkPrintf("Charm++> Program shutdown in ring.\n");
+  }
 }
 
 static void _bufferHandler(void *msg)
@@ -254,14 +262,17 @@ static void _exitHandler(envelope *env)
       CkNumberHandler(_nodeBocHandlerIdx, (CmiHandler)_discardHandler);
       env->setMsgtype(ReqStatMsg);
       env->setSrcPe(CkMyPe());
-      CmiSyncBroadcastAllAndFree(env->getTotalsize(), (char *)env);
+      // if exit in ring, instead of broadcasting, send in ring
+      if (_ringexit)
+        CmiSyncSendAndFree(0, env->getTotalsize(), (char *)env);
+      else
+        CmiSyncBroadcastAllAndFree(env->getTotalsize(), (char *)env);
       break;
     case ReqStatMsg:
       DEBUGF(("ReqStatMsg on %d\n", CkMyPe()));
       CkNumberHandler(_charmHandlerIdx,(CmiHandler)_discardHandler);
       CkNumberHandler(_bocHandlerIdx, (CmiHandler)_discardHandler);
       CkNumberHandler(_nodeBocHandlerIdx, (CmiHandler)_discardHandler);
-      CmiFree(env);
       _sendStats();
       _mainDone = 1; // This is needed because the destructors for
                      // readonly variables will be called when the program
@@ -269,6 +280,13 @@ static void _exitHandler(envelope *env)
 		     // is 0, it will assume that the readonly variable was
 		     // declared locally. On all processors other than 0, 
 		     // _mainDone is never set to 1 before the program exits.
+#ifndef CMK_OPTIMIZE
+      if (_ringexit) traceClose();
+#endif
+      if (_ringexit && CkMyPe() != CkNumPes()-1)
+        CmiSyncSendAndFree(CkMyPe()+1, env->getTotalsize(), (char *)env);
+      else
+        CmiFree(env);
       if(CkMyPe())
         ConverseExit();
       break;
