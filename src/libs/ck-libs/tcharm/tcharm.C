@@ -147,6 +147,9 @@ void TCharm::pup(PUP::er &p) {
   p(isStopped); p(resumeAfterMigration);
   p(threadInfo.thisElement);
   p(threadInfo.numElements);
+  
+  if (sema.size()>0) 
+  	CkAbort("TCharm::pup> Cannot migrate with unconsumed semaphores!\n");
 
 #ifndef CMK_OPTIMIZE
   DBG("Packing thread");
@@ -178,7 +181,7 @@ void TCharm::pup(PUP::er &p) {
   p(nUd);
   for(int i=0;i<nUd;i++)
     ud[i].pup(p);
-  p|sud;
+  pupCkVec(p,sud);
   TCharm::setState(inFramework);
 
   if (!p.isUnpacking())
@@ -831,6 +834,56 @@ FDECL void FTN_NAME(TCHARM_INIT,tcharm_init)(void)
 	char *argv[2]={"foo",NULL};
 	ConverseInit(argc,argv, (CmiStartFn) _initCharm,1,1);
 	_initCharm(argc,argv);
+}
+
+// TCHARM Semaphores
+/// Find this semaphore, or insert if there isn't one:
+TCharm::TCharmSemaphore *TCharm::findSema(int id) {
+	for (int s=0;s<sema.size();s++)
+		if (sema[s].id==id) 
+			return &sema[s];
+	sema.push_back(TCharmSemaphore(id));
+	return &sema[sema.size()-1];
+}
+/// Remove this semaphore from the list
+void TCharm::freeSema(TCharmSemaphore *doomed) {
+	int id=doomed->id;
+	for (int s=0;s<sema.size();s++)
+		if (sema[s].id==id) {
+			sema[s]=sema[sema.length()-1];
+			sema.length()--;
+			return;
+		}
+	CkAbort("Tried to free nonexistent TCharm semaphore");
+}
+
+/// Store data at the semaphore "id".
+///  The put can come before or after the get.
+void TCharm::semaPut(int id,void *data) {
+	TCharmSemaphore *s=findSema(id);
+	if (s->data!=NULL) CkAbort("Duplicate calls to TCharm::semaPut!");
+	s->data=data;
+	if (s->thread!=NULL) //Awaken the thread
+		resume();
+}
+
+/// Retreive data from the semaphore "id".
+///  Blocks if the data is not immediately available.
+///  Consumes the data, so another put will be required for the next get.
+void *TCharm::semaGet(int id) {
+	TCharmSemaphore *s=findSema(id);
+	if (s->data==NULL) 
+	{ //Semaphore isn't filled yet: wait until it is
+		s->thread=CthSelf();
+		suspend(); //Will be woken by semaPut
+		// Semaphore may have moved-- find it again
+		s=findSema(id);
+		if (s->data==NULL) CkAbort("TCharm::semaGet awoken too early!");
+	}
+	void *ret=s->data;
+	// Now remove the semaphore from the list:
+	freeSema(s);
+	return ret;
 }
 
 #include "tcharm.def.h"

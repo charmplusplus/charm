@@ -91,6 +91,29 @@ class TCharm: public CBase_TCharm
 	};
 	//New interface for user data:
 	CkVec<UserData> sud;
+	
+	//Tiny semaphore-like pointer producer/consumer
+	class TCharmSemaphore {
+	public:
+		int id; //User-defined identifier
+		void *data; //User-defined data
+		CthThread thread; //Waiting thread, or 0 if none
+		
+		TCharmSemaphore() { id=-1; data=NULL; thread=NULL; }
+		TCharmSemaphore(int id_) { id=id_; data=NULL; thread=NULL; }
+	};
+	/// Short, unordered list of waiting semaphores.
+	CkVec<TCharmSemaphore> sema;
+	TCharmSemaphore *findSema(int id);
+	void freeSema(TCharmSemaphore *);
+	
+	/// Store data at the semaphore "id".
+	///  The put can come before or after the get.
+	void semaPut(int id,void *data);
+	/// Retreive data from the semaphore "id".
+	///  Blocks if the data is not immediately available.
+	///  Consumes the data, so another put will be required for the next get.
+	void *semaGet(int id);
 
 	//One-time initialization
 	static void nodeInit(void);
