@@ -1862,11 +1862,11 @@ int bproc_nodeisup(int node)
     if (arg_verbose)
       printf("Charmrun> node %d status: %s\n", node, status?"up":"down");
 #else
-    char status[128];
-    if (bproc_nodestatus(node, status, 128)) {
+    char nodestatus[128];
+    if (bproc_nodestatus(node, nodestatus, 128)) {
       if (arg_verbose)
-        printf("Charmrun> node %d status: %s\n", node, status);
-      if (strcmp(status, "up")==0) status = 1;
+        printf("Charmrun> node %d status: %s\n", node, nodestatus);
+      if (strcmp(nodestatus, "up")==0) status = 1;
     }
 #endif
   return status;
