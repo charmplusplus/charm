@@ -32,12 +32,12 @@ void CkGetChareID(CkChareID *pCid) {
 }
 
 extern "C"
-int CkGetGroupID(void) {
+CkGroupID CkGetGroupID(void) {
   return CpvAccess(_currentGroup);
 }
 
 extern "C"
-int CkGetNodeGroupID(void) {
+CkGroupID CkGetNodeGroupID(void) {
   return CpvAccess(_currentNodeGroup);
 }
 
@@ -111,7 +111,7 @@ static inline void _processForChareMsg(envelope *env)
 
 static inline void _processForBocMsg(envelope *env)
 {
-  register int groupID = env->getGroupNum();
+  register CkGroupID groupID = env->getGroupNum();
   register void *obj = CpvAccess(_groupTable)->find(groupID);
   env->setMsgtype(ForChareMsg);
   env->setObjPtr(obj);
@@ -121,7 +121,7 @@ static inline void _processForBocMsg(envelope *env)
 
 static inline void _processForNodeBocMsg(envelope *env)
 {
-  register int groupID = env->getGroupNum();
+  register CkGroupID groupID = env->getGroupNum();
   register void *obj;
   CmiLock(_nodeLock);
   obj = _nodeGroupTable->find(groupID);
@@ -152,7 +152,7 @@ static inline void _processForVidMsg(envelope *env)
 static inline void _processDBocReqMsg(envelope *env)
 {
   assert(CkMyPe()==0);
-  register int groupNum;
+  register CkGroupID groupNum;
   groupNum = _numGroups++;
   env->setMsgtype(DBocNumMsg);
   register int srcPe = env->getSrcPe();
@@ -166,7 +166,7 @@ static inline void _processDNodeBocReqMsg(envelope *env)
 {
   assert(CkMyNode()==0);
   CmiLock(_nodeLock);
-  register int groupNum = _numNodeGroups++;
+  register CkGroupID groupNum = _numNodeGroups++;
   CmiUnlock(_nodeLock);
   env->setMsgtype(DNodeBocNumMsg);
   register int srcNode = CmiNodeOf(env->getSrcPe());
@@ -181,7 +181,7 @@ static inline void _processDBocNumMsg(envelope *env)
   register envelope *usrenv = (envelope *) env->getUsrMsg();
   register int retEp = env->getRetEp();
   register CkChareID *retChare = (CkChareID *) EnvToUsr(env);
-  register int groupID = env->getGroupNum();
+  register CkGroupID groupID = env->getGroupNum();
   _createGroup(groupID, usrenv, retEp, retChare);
 }
 
@@ -190,20 +190,20 @@ static inline void _processDNodeBocNumMsg(envelope *env)
   register envelope *usrenv = (envelope *) env->getUsrMsg();
   register int retEp = env->getRetEp();
   register CkChareID *retChare = (CkChareID *) EnvToUsr(env);
-  register int groupID = env->getGroupNum();
+  register CkGroupID groupID = env->getGroupNum();
   _createNodeGroup(groupID, usrenv, retEp, retChare);
 }
 
 void _processBocInitMsg(envelope *env)
 {
-  register int groupID = env->getGroupNum();
+  register CkGroupID groupID = env->getGroupNum();
   register int epIdx = env->getEpIdx();
   _createGroupMember(groupID, epIdx, EnvToUsr(env));
 }
 
 void _processNodeBocInitMsg(envelope *env)
 {
-  register int groupID = env->getGroupNum();
+  register CkGroupID groupID = env->getGroupNum();
   register int epIdx = env->getEpIdx();
   _createNodeGroupMember(groupID, epIdx, EnvToUsr(env));
 }
@@ -426,7 +426,7 @@ void CkCreateChare(int cIdx, int eIdx, void *msg, CkChareID *pCid, int destPE)
   CldEnqueue(destPE, env, _infoIdx);
 }
 
-void _createGroupMember(int groupID, int eIdx, void *msg)
+void _createGroupMember(CkGroupID groupID, int eIdx, void *msg)
 {
   register int gIdx = _entryTable[eIdx]->chareIdx;
   register void *obj = malloc(_chareTable[gIdx]->size);
@@ -446,7 +446,7 @@ void _createGroupMember(int groupID, int eIdx, void *msg)
 #endif
 }
 
-void _createNodeGroupMember(int groupID, int eIdx, void *msg)
+void _createNodeGroupMember(CkGroupID groupID, int eIdx, void *msg)
 {
   register int gIdx = _entryTable[eIdx]->chareIdx;
   register void *obj = malloc(_chareTable[gIdx]->size);
@@ -468,7 +468,7 @@ void _createNodeGroupMember(int groupID, int eIdx, void *msg)
 #endif
 }
 
-void _createGroup(int groupID, envelope *env, int retEp, CkChareID *retChare)
+void _createGroup(CkGroupID groupID, envelope *env, int retEp, CkChareID *retChare)
 {
 #ifndef CMK_OPTIMIZE
   if(env->isUsed()) {
@@ -523,7 +523,7 @@ void _createGroup(int groupID, envelope *env, int retEp, CkChareID *retChare)
   }
 }
 
-void _createNodeGroup(int groupID, envelope *env, int retEp, CkChareID *retChare)
+void _createNodeGroup(CkGroupID groupID, envelope *env, int retEp, CkChareID *retChare)
 {
 #ifndef CMK_OPTIMIZE
   if(env->isUsed()) {
@@ -579,9 +579,9 @@ void _createNodeGroup(int groupID, envelope *env, int retEp, CkChareID *retChare
   }
 }
 
-static int _staticGroupCreate(envelope *env, int retEp, CkChareID *retChare)
+static CkGroupID _staticGroupCreate(envelope *env, int retEp, CkChareID *retChare)
 {
-  register int groupNum = _numGroups++;
+  register CkGroupID groupNum = _numGroups++;
   _createGroup(groupNum, env, retEp, retChare);
   return groupNum;
 }
@@ -601,10 +601,10 @@ static void _dynamicGroupCreate(envelope *env, int retEp, CkChareID * retChare)
   CpvAccess(_qd)->create();
 }
 
-static int _staticNodeGroupCreate(envelope *env, int retEp, CkChareID *retChare)
+static CkGroupID _staticNodeGroupCreate(envelope *env, int retEp, CkChareID *retChare)
 {
   CmiLock(_nodeLock);
-  register int groupNum = _numNodeGroups++;
+  register CkGroupID groupNum = _numNodeGroups++;
   CmiUnlock(_nodeLock);
   _createNodeGroup(groupNum, env, retEp, retChare);
   return groupNum;
@@ -626,7 +626,7 @@ static void _dynamicNodeGroupCreate(envelope *env, int retEp, CkChareID * retCha
 }
 
 extern "C"
-int CkCreateGroup(int cIdx, int eIdx, void *msg, int retEp,CkChareID *retChare)
+CkGroupID CkCreateGroup(int cIdx, int eIdx, void *msg, int retEp,CkChareID *retChare)
 {
   assert(cIdx == _entryTable[eIdx]->chareIdx);
   register envelope *env = UsrToEnv(msg);
@@ -646,7 +646,7 @@ int CkCreateGroup(int cIdx, int eIdx, void *msg, int retEp,CkChareID *retChare)
 }
 
 extern "C"
-int CkCreateNodeGroup(int cIdx, int eIdx, void *msg, int retEp,CkChareID *retChare)
+CkGroupID CkCreateNodeGroup(int cIdx, int eIdx, void *msg, int retEp,CkChareID *retChare)
 {
   assert(cIdx == _entryTable[eIdx]->chareIdx);
   register envelope *env = UsrToEnv(msg);
@@ -666,13 +666,13 @@ int CkCreateNodeGroup(int cIdx, int eIdx, void *msg, int retEp,CkChareID *retCha
 }
 
 extern "C"
-void *CkLocalBranch(int groupID)
+void *CkLocalBranch(CkGroupID groupID)
 {
   return CpvAccess(_groupTable)->find(groupID);
 }
 
 extern "C"
-void *CkLocalNodeBranch(int groupID)
+void *CkLocalNodeBranch(CkGroupID groupID)
 {
   CmiLock(_nodeLock);
   void *retval = _nodeGroupTable->find(groupID);
@@ -680,7 +680,7 @@ void *CkLocalNodeBranch(int groupID)
   return retval;
 }
 
-static inline void _sendMsgBranch(int eIdx, void *msg, int gID, 
+static inline void _sendMsgBranch(int eIdx, void *msg, CkGroupID gID, 
                            int pe=CLD_BROADCAST_ALL)
 {
   register envelope *env = UsrToEnv(msg);
@@ -699,7 +699,7 @@ static inline void _sendMsgBranch(int eIdx, void *msg, int gID,
 }
 
 extern "C"
-void CkSendMsgBranch(int eIdx, void *msg, int pe, int gID)
+void CkSendMsgBranch(int eIdx, void *msg, int pe, CkGroupID gID)
 {
 #ifndef CMK_OPTIMIZE
   if(CpvAccess(traceOn))
@@ -711,7 +711,7 @@ void CkSendMsgBranch(int eIdx, void *msg, int pe, int gID)
 }
 
 extern "C"
-void CkBroadcastMsgBranch(int eIdx, void *msg, int gID)
+void CkBroadcastMsgBranch(int eIdx, void *msg, CkGroupID gID)
 {
 #ifndef CMK_OPTIMIZE
   if(CpvAccess(traceOn))
@@ -722,7 +722,7 @@ void CkBroadcastMsgBranch(int eIdx, void *msg, int gID)
   CpvAccess(_qd)->create(CkNumPes());
 }
 
-static inline void _sendMsgNodeBranch(int eIdx, void *msg, int gID, 
+static inline void _sendMsgNodeBranch(int eIdx, void *msg, CkGroupID gID, 
                            int node=CLD_BROADCAST_ALL)
 {
   register envelope *env = UsrToEnv(msg);
@@ -741,7 +741,7 @@ static inline void _sendMsgNodeBranch(int eIdx, void *msg, int gID,
 }
 
 extern "C"
-void CkSendMsgNodeBranch(int eIdx, void *msg, int node, int gID)
+void CkSendMsgNodeBranch(int eIdx, void *msg, int node, CkGroupID gID)
 {
 #ifndef CMK_OPTIMIZE
   if(CpvAccess(traceOn))
@@ -753,7 +753,7 @@ void CkSendMsgNodeBranch(int eIdx, void *msg, int node, int gID)
 }
 
 extern "C"
-void CkBroadcastMsgNodeBranch(int eIdx, void *msg, int gID)
+void CkBroadcastMsgNodeBranch(int eIdx, void *msg, CkGroupID gID)
 {
 #ifndef CMK_OPTIMIZE
   if(CpvAccess(traceOn))

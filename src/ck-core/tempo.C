@@ -72,7 +72,7 @@ int Tempo::ckTempoProbe(int tag)
 
 // static
 void 
-TempoGroup::ckTempoBcast(int tag, void *buffer, int buflen, int bocid)
+TempoGroup::ckTempoBcast(int tag, void *buffer, int buflen, CkGroupID bocid)
 {
   TempoMessage *msg = new (&buflen,0) TempoMessage(tag,BCAST_TAG,buflen,buffer);
   CProxy_TempoGroup ptg(bocid);
@@ -82,7 +82,7 @@ TempoGroup::ckTempoBcast(int tag, void *buffer, int buflen, int bocid)
 // static
 void 
 TempoGroup::ckTempoSendBranch(int tag1, int tag2, void *buffer, int buflen, 
-                              int bocid, int processor)
+                              CkGroupID bocid, int processor)
 {
   TempoMessage *msg = new (&buflen, 0) TempoMessage(tag1, tag2, buflen, buffer);
   CProxy_TempoGroup ptg(bocid);
@@ -92,7 +92,7 @@ TempoGroup::ckTempoSendBranch(int tag1, int tag2, void *buffer, int buflen,
 // static
 void 
 TempoGroup::ckTempoSendBranch(int tag, void *buffer, int buflen, 
-                              int bocid, int processor)
+                              CkGroupID bocid, int processor)
 {
   ckTempoSendBranch(tag, TEMPO_ANY, buffer, buflen, bocid, processor);
 }

@@ -59,11 +59,11 @@ class TempoGroup : public Group, public Tempo
 {
   public :
     TempoGroup(void) {};
-    static void ckTempoBcast(int tag, void *buffer, int buflen, int bocid);
+    static void ckTempoBcast(int tag, void *buffer, int buflen, CkGroupID bocid);
     static void ckTempoSendBranch(int tag1, int tag2, void *buffer, int buflen,
-                                  int bocid, int processor);
+                                  CkGroupID bocid, int processor);
     static void ckTempoSendBranch(int tag, void *buffer, int buflen,
-                                  int bocid, int processor);
+                                  CkGroupID bocid, int processor);
     void ckTempoBcast(int sender, int tag, void *buffer, int buflen);
     void ckTempoSendBranch(int tag1, int tag2, void *buffer, int buflen, 
                            int processor);

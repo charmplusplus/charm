@@ -119,9 +119,9 @@ extern void CkRegisterReadonlyMsg(void** pMsg);
 
 extern void CkCreateChare(int chareIdx, int constructorIdx, void *msg,
                           CkChareID *vid, int destPE);
-extern int CkCreateGroup(int chareIdx, int constructorIdx, void *msg,
+extern CkGroupID CkCreateGroup(int chareIdx, int constructorIdx, void *msg,
                          int returnEpIdx, CkChareID *returnChare);
-extern int CkCreateNodeGroup(int chareIdx, int constructorIdx, void *msg,
+extern CkGroupID CkCreateNodeGroup(int chareIdx, int constructorIdx, void *msg,
                          int returnEpIdx, CkChareID *returnChare);
 
 /******************************************************************************
@@ -131,10 +131,10 @@ extern int CkCreateNodeGroup(int chareIdx, int constructorIdx, void *msg,
  *****************************************************************************/
 
 extern void CkSendMsg(int entryIndex, void *msg, CkChareID *chare);
-extern void CkSendMsgBranch(int entryIdx, void *msg, int destPE, int groupID);
-extern void CkSendMsgNodeBranch(int entryIdx, void *msg, int destNode, int groupID);
-extern void CkBroadcastMsgBranch(int entryIdx, void *msg, int groupID);
-extern void CkBroadcastMsgNodeBranch(int entryIdx, void *msg, int groupID);
+extern void CkSendMsgBranch(int eIdx, void *msg, int destPE, CkGroupID gID);
+extern void CkSendMsgNodeBranch(int eIdx, void *msg, int destNode, CkGroupID gID);
+extern void CkBroadcastMsgBranch(int eIdx, void *msg, CkGroupID gID);
+extern void CkBroadcastMsgNodeBranch(int eIdx, void *msg, CkGroupID gID);
 
 extern void CkSetRefNum(void *msg, int ref);
 extern int  CkGetRefNum(void *msg);
@@ -147,9 +147,15 @@ extern int  CkGetSrcNode(void *msg);
  *
  *****************************************************************************/
 
-extern void* CkRemoteCall(int entryIdx, void *msg, CkChareID *chare);
-extern void* CkRemoteBranchCall(int entryIdx, void *msg, int groupID, int pe);
-extern void* CkRemoteNodeBranchCall(int entryIdx, void *msg, int groupID, int node);
+extern void* CkRemoteCall(int eIdx, void *msg, CkChareID *chare);
+extern void* CkRemoteBranchCall(int eIdx, void *msg, CkGroupID gID, int pe);
+extern void* CkRemoteNodeBranchCall(int eIdx, void *msg, CkGroupID gID, int node);
+extern int CkRemoteCallAsync(int eIdx, void *msg, CkChareID *chare);
+extern int CkRemoteBranchCallAsync(int eIdx, void *msg, CkGroupID gID, int pe);
+extern int CkRemoteNodeBranchCallAsync(int eIdx, void *msg, CkGroupID gID, int node);
+extern void* CkWaitFuture(int futNum);
+extern void CkReleaseFuture(int futNum);
+extern int CkProbeFuture(int futNum);
 extern void  CkSendToFuture(int futNum, void *msg, int pe);
 
 /******************************************************************************
@@ -158,7 +164,7 @@ extern void  CkSendToFuture(int futNum, void *msg, int pe);
  *
  *****************************************************************************/
 
-extern void CkStartQD(int entryIdx, CkChareID *chare);
+extern void CkStartQD(int eIdx, CkChareID *chare);
 extern void CkWaitQD(void);
 
 /******************************************************************************
@@ -167,11 +173,11 @@ extern void CkWaitQD(void);
  *
  *****************************************************************************/
 
-extern void *CkLocalBranch(int groupID);
-extern void *CkLocalNodeBranch(int groupID);
+extern void *CkLocalBranch(int gID);
+extern void *CkLocalNodeBranch(int gID);
 extern void  CkGetChareID(CkChareID *pcid);
-extern int   CkGetGroupID(void);
-extern int   CkGetNodeGroupID(void);
+extern CkGroupID   CkGetGroupID(void);
+extern CkGroupID   CkGetNodeGroupID(void);
 extern void  CkExit(void);
 
 #ifdef __cplusplus

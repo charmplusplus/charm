@@ -44,14 +44,14 @@ class Chare {
 
 class Group : public Chare {
   protected:
-    int thisgroup;
+    CkGroupID thisgroup;
   public:
     Group() { thisgroup = CkGetGroupID(); }
 };
 
 class NodeGroup : public Chare {
   protected:
-    int thisgroup;
+    CkGroupID thisgroup;
   public:
     CmiNodeLock __nodelock;
     NodeGroup() { thisgroup=CkGetNodeGroupID(); __nodelock=CmiCreateLock();}
@@ -65,30 +65,30 @@ class _CK_CID {
 
 class _CK_GID : public _CK_CID {
   protected:
-    int _ck_gid;
+    CkGroupID _ck_gid;
 };
 
 class _CK_NGID : public _CK_CID {
   protected:
-    int _ck_ngid;
+    CkGroupID _ck_ngid;
 };
 
 class Array1D;
 
 class _CK_AID {
   public:
-    int _ck_aid;
+    CkGroupID _ck_aid;
     Array1D *_array;
     int _elem;
-    void setAid(int aid) {
+    void setAid(CkGroupID aid) {
       _ck_aid = aid;
       _array = (Array1D*) CkLocalBranch(aid);
     }
-    _CK_AID(int aid) {
+    _CK_AID(CkGroupID aid) {
       setAid(aid);
       _elem = -1;
     }
-    _CK_AID(int aid, int elem) {
+    _CK_AID(CkGroupID aid, int elem) {
       setAid(aid);
       _elem = elem;
     }

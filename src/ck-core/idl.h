@@ -17,7 +17,7 @@ class CIHandle {
     int proc;
     union {
       CkChareID cid;
-      int gid;
+      CkGroupID gid;
     } u;
   public:
    CIHandle() {
@@ -33,13 +33,13 @@ class CIHandle {
    int ciGetProc(void) { return proc; }
    // For ITC++ -> IDL Interoperability
    CIHandle(CkChareID _cid) : chare(1) { u.cid = _cid; }
-   CIHandle(int _gid) : chare(0) { u.gid = _gid; }
+   CIHandle(CkGroupID _gid) : chare(0) { u.gid = _gid; }
    void setCID(CkChareID _cid) { chare=1; u.cid = _cid; }
-   void setGID(int _gid) { chare=0; u.gid = _gid; }
+   void setGID(CkGroupID _gid) { chare=0; u.gid = _gid; }
    // For IDL -> ITC++ Interoperability
    int isChare(void) { return chare; }
    CkChareID ciCID(void) { return u.cid; }
-   int ciGID(void) { return u.gid; }
+   CkGroupID ciGID(void) { return u.gid; }
 };
 
 class CIMethodParams {

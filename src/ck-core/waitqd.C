@@ -21,7 +21,7 @@ extern "C" void CkWaitQD(void) {
 }
   
 
-waitqd_QDChare::waitqd_QDChare(CkArgMsg *ckam) {
+waitqd_QDChare::waitqd_QDChare(CkArgMsg *) {
   waitStarted = 0;
   threadList = 0;
   waitqd_qdhandle = thishandle;
@@ -48,6 +48,7 @@ void waitqd_QDChare::onQD(CkQdMsg *ckqm) {
   FIFO_Destroy((FIFO_QUEUE*) threadList);
   threadList = 0;
   waitStarted = 0;
+  delete ckqm;
 }
 
 #include "waitqd.def.h"

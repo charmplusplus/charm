@@ -11,7 +11,6 @@
 #define EntryIndex(ct,ep,mt)    CProxy_##ct##::ckIdx_##ep##((##mt##*)0)
 #define ConstructorIndex(ct,mt) EntryIndex(ct,ct,mt)
 
-typedef int CkGroupID;
 typedef int MessageIndexType;
 typedef int ChareIndexType;
 typedef int EntryIndexType;

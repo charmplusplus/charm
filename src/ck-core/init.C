@@ -26,8 +26,8 @@ CkErrStream ckerr;
 CkInStream  ckin;
 
 CpvDeclare(void*,       _currentChare);
-CpvDeclare(int,         _currentGroup);
-CpvDeclare(int,         _currentNodeGroup);
+CpvDeclare(CkGroupID,         _currentGroup);
+CpvDeclare(CkGroupID,         _currentNodeGroup);
 CpvDeclare(GroupTable*, _groupTable);
 GroupTable* _nodeGroupTable = 0;
 
@@ -438,8 +438,8 @@ void _initCharm(int argc, char **argv)
   CpvInitialize(PtrQ*,_bocInitQ);
   CpvInitialize(PtrQ*,_nodeBocInitQ);
   CpvInitialize(void*, _currentChare);
-  CpvInitialize(int, _currentGroup);
-  CpvInitialize(int, _currentNodeGroup);
+  CpvInitialize(CkGroupID, _currentGroup);
+  CpvInitialize(CkGroupID, _currentNodeGroup);
   CpvInitialize(GroupTable*, _groupTable);
   CpvInitialize(UInt, _numInitsRecd);
   CpvInitialize(QdState*, _qd);

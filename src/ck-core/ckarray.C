@@ -44,7 +44,7 @@ CkGroupID Array1D::CreateArray(int numElements,
                                EntryIndexType elementConstructor,
                                EntryIndexType elementMigrator)
 {
-  int group;
+  CkGroupID group;
 
   ArrayCreateMessage *msg = new ArrayCreateMessage;
 

@@ -37,7 +37,7 @@ static void addedFutures(int lo, int hi)
   fs->freelist = lo;
 }
 
-static int createFuture()
+static int createFuture(void)
 {
   FutureState *fs = &(CpvAccess(futurestate));
   Future *fut; int handle, origsize;
@@ -59,7 +59,8 @@ static int createFuture()
   return handle;
 }
 
-static void destroyFuture(int handle)
+extern "C"
+void CkReleaseFuture(int handle)
 {
   FutureState *fs = &(CpvAccess(futurestate));
   Future *fut = (fs->array)+handle;
@@ -67,7 +68,16 @@ static void destroyFuture(int handle)
   fs->freelist = handle;
 }
 
-static void *waitFuture(int handle, int destroy)
+extern "C"
+int CkProbeFuture(int handle)
+{
+  FutureState *fs = &(CpvAccess(futurestate));
+  Future *fut = (fs->array)+handle;
+  return (fut->ready);
+}
+
+extern "C"
+void *CkWaitFuture(int handle)
 {
   CthThread self = CthSelf();
   FutureState *fs = &(CpvAccess(futurestate));
@@ -80,7 +90,6 @@ static void *waitFuture(int handle, int destroy)
     CthSuspend();
   }
   value = fut->value;
-  if (destroy) destroyFuture(handle);
   return value;
 }
 
@@ -105,12 +114,6 @@ void _futuresModuleInit(void)
   addedFutures(0,10);
 }
 
-
-/******************************************************************************
- *
- *
- *****************************************************************************/
-
 CProxy_FutureBOC fBOC(0);
 
 class FutureInitMsg : public CMessage_FutureInitMsg {
@@ -126,38 +129,62 @@ class  FutureMain : public Chare {
 };
 
 extern "C" 
-void *CkRemoteBranchCall(int ep, void *m, int group, int PE)
+int CkRemoteBranchCallAsync(int ep, void *m, CkGroupID group, int PE)
 { 
-  void * result;
   envelope *env = UsrToEnv(m);
   int i = createFuture();
   env->setRef(i);
   CkSendMsgBranch(ep, m, PE, group);
-  result = waitFuture(i, 1);
+  return i;
+}
+
+extern "C" 
+void *CkRemoteBranchCall(int ep, void *m, CkGroupID group, int PE)
+{ 
+  void * result;
+  int i = CkRemoteBranchCallAsync(ep, m, group, PE);
+  result = CkWaitFuture(i);
+  CkReleaseFuture(i);
   return (result);
 }
 
 extern "C" 
-void *CkRemoteNodeBranchCall(int ep, void *m, int group, int node)
+int CkRemoteNodeBranchCallAsync(int ep, void *m, CkGroupID group, int node)
 { 
-  void * result;
   envelope *env = UsrToEnv(m);
   int i = createFuture();
   env->setRef(i);
   CkSendMsgNodeBranch(ep, m, node, group);
-  result = waitFuture(i, 1);
+  return i;
+}
+
+extern "C" 
+void *CkRemoteNodeBranchCall(int ep, void *m, CkGroupID group, int node)
+{ 
+  void * result;
+  int i = CkRemoteNodeBranchCallAsync(ep, m, group, node);
+  result = CkWaitFuture(i);
+  CkReleaseFuture(i);
   return (result);
+}
+
+extern "C" 
+int CkRemoteCallAsync(int ep, void *m, CkChareID *ID)
+{ 
+  envelope *env = UsrToEnv(m);
+  int i = createFuture();
+  env->setRef(i);
+  CkSendMsg(ep, m, ID);
+  return i;
 }
 
 extern "C" 
 void *CkRemoteCall(int ep, void *m, CkChareID *ID)
 { 
   void * result;
-  envelope *env = UsrToEnv(m);
-  int i = createFuture();
-  env->setRef(i);
-  CkSendMsg(ep, m, ID);
-  result = waitFuture(i, 1);
+  int i = CkRemoteCallAsync(ep, m, ID);
+  result = CkWaitFuture(i);
+  CkReleaseFuture(i);
   return (result);
 }
 

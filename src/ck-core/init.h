@@ -43,20 +43,20 @@ class PtrQ {
 class GroupTable {
   class TableEntry {
     public:
-      int num;
+      CkGroupID num;
       void *obj;
       TableEntry *next;
-      TableEntry(int _num, void *_obj, TableEntry* _next=0) :
+      TableEntry(CkGroupID _num, void *_obj, TableEntry* _next=0) :
         num(_num), obj(_obj), next(_next) {}
   };
   TableEntry *bins[MAXBINS];
   public:
     GroupTable();
-    void add(int n, void *obj) {
+    void add(CkGroupID n, void *obj) {
       int slot = n%MAXBINS;
       bins[slot] = new TableEntry(n, obj, bins[slot]);
     }
-    void *find(int n) {
+    void *find(CkGroupID n) {
       TableEntry *next = bins[n%MAXBINS];
       while(next!=0) {
         if(next->num == n)
@@ -85,8 +85,8 @@ extern int     _qdHandlerIdx;
 extern CmiNodeLock _nodeLock;
 
 CpvExtern(void*,       _currentChare);
-CpvExtern(int,         _currentGroup);
-CpvExtern(int,         _currentNodeGroup);
+CpvExtern(CkGroupID,         _currentGroup);
+CpvExtern(CkGroupID,         _currentNodeGroup);
 CpvExtern(GroupTable*, _groupTable);
 
 extern GroupTable*    _nodeGroupTable;
