@@ -363,10 +363,10 @@ void ComlibArrayInfo::localMulticast(CkVec<CkArrayIndexMax>*vec,
         
         CkArray *a=(CkArray *)_localBranch(dest_aid);
         if(_entryTable[ep]->noKeep)
-            a->deliver((CkArrayMessage *)msg, CkDeliver_inline, CmiFalse);
+            a->deliver((CkArrayMessage *)msg, CkDeliver_inline, CK_MSG_KEEP);
         else {
             void *newmsg = CkCopyMsg(&msg);
-            a->deliver((CkArrayMessage *)newmsg, CkDeliver_queue, CmiTrue);
+            a->deliver((CkArrayMessage *)newmsg, CkDeliver_queue);
         }
 
     }
@@ -383,5 +383,5 @@ void ComlibArrayInfo::deliver(envelope *env){
     CkUnpackMessage(&env);
     
     CkArray *a=(CkArray *)_localBranch(env->getsetArrayMgr());
-    a->deliver((CkArrayMessage *)EnvToUsr(env), CkDeliver_queue, CmiTrue);    
+    a->deliver((CkArrayMessage *)EnvToUsr(env), CkDeliver_queue);    
 }
