@@ -36,7 +36,7 @@
 	 integer, intent(in) :: startSend, startRecv
        end subroutine    
        subroutine IDXL_Combine(l,src,startSend,startRecv)
-         integer, intent (in) :: l
+         integer, intent (in) :: l, src
 	 integer, intent(in) :: startSend, startRecv
        end subroutine    
        subroutine IDXL_Add_entity(l,newIdx,nBetween,between)
