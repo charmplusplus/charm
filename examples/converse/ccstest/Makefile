@@ -7,13 +7,13 @@ server: server.o
 	$(CHARMC) -o $@ server.o -language converse++ 
 
 client: client.o
-	$(CHARMC) -o $@ client.o -seq -language c++ -lccs-client
+	g++ -o $@ client.o -I$(CHARMDIR)/include -L$(CHARMDIR)/lib -lccs-client
 
 server.o: server.C
 	$(CHARMC) -c server.C -language converse++
 
 client.o: client.C
-	$(CHARMC) -c client.C -seq -language c++ 
+	g++ -c client.C -I$(CHARMDIR)/include
 
 clean:
 	rm -f client server *.o conv-host charmrun
