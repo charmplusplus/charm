@@ -1,3 +1,69 @@
+/*
+  UDP implementation of Converse NET version
+  contains only UDP specific code for:
+  * CmiNotifyIdle()
+  * DeliverViaNetwork()
+  * CommunicationServer()
+
+  moved from machine.c by 
+  Gengbin Zheng, gzheng@uiuc.edu  4/22/2001
+*/
+
+/******************************************************************************
+ *
+ * CmiNotifyIdle()-- wait until a packet comes in
+ *
+ *****************************************************************************/
+
+void CmiNotifyIdle(void)
+{
+  struct timeval tv;
+#if CMK_SHARED_VARS_UNAVAILABLE
+  /*No comm. thread-- listen on sockets for incoming messages*/
+#if !CMK_USE_POLL
+  static fd_set rfds;
+  static fd_set wfds;
+  tv.tv_sec=0; tv.tv_usec=5000;
+  FD_ZERO(&rfds); FD_ZERO(&wfds);
+  if (Cmi_charmrun_fd!=-1)
+    FD_SET(Cmi_charmrun_fd, &rfds);
+  if (dataskt!=-1) {
+    FD_SET(dataskt, &rfds);
+    if (writeableDgrams || writeableAcks)
+      FD_SET(dataskt, &wfds); /*Outgoing queue is nonempty*/
+  }
+  select(FD_SETSIZE,&rfds,&wfds,0,&tv);
+#else
+  struct pollfd fds[2]; int n = 0;
+  int nreadable;
+  int pollMs = 5;
+#if CMK_USE_GM
+  if (gm_receive_pending(gmport)) {
+    if (Cmi_netpoll) CommunicationServer(5);
+    return;
+  }
+  pollMs = 0;
+#endif
+  if (Cmi_charmrun_fd!=-1) {
+    fds[n].fd = Cmi_charmrun_fd;
+    fds[n].events = POLLIN;
+    n++;
+  }
+  if (dataskt!=-1) {
+    fds[n].fd = dataskt;
+    fds[n].events = POLLIN;
+    if (writeableDgrams || writeableAcks)  fds[n].events |= POLLOUT;
+    n++;
+  }
+  poll(fds, n, pollMs);
+#endif
+  if (Cmi_netpoll) CommunicationServer(5);
+#else
+  /*Comm. thread will listen on sockets-- just sleep*/
+  tv.tv_sec=0; tv.tv_usec=1000;
+  select(0,NULL,NULL,NULL,&tv);
+#endif
+}
 
 /***********************************************************************
  * TransmitAckDatagram
@@ -246,7 +312,7 @@ void AssembleDatagram(OtherNode node, ExplicitDgram dg)
   if (msg == 0) {
     size = CmiMsgHeaderGetLength(dg->data);
     msg = (char *)CmiAlloc(size);
-  if (!msg)
+    if (!msg)
       fprintf(stderr, "%d: Out of mem\n", Cmi_mynode);
     if (size < dg->len) KillEveryoneCode(4559312);
     memcpy(msg, (char*)(dg->data), dg->len);
