@@ -24,6 +24,7 @@ class maxheap;
 #include "heap.h"
 
 void CreateRefineLB();
+BaseLB *AllocateRefineLB();
 
 class RefineLB : public CentralLB {
 protected:

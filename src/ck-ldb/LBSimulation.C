@@ -58,16 +58,16 @@ void LBInfo::clear()
 void LBInfo::print()
 {
   int i;
-  double minLoad, maxLoad, maxObjLoad, maxComLoad, sum, average;
+  double minLoad, maxLoad, maxProcObjLoad, maxComLoad, sum, average;
   sum = .0;
   sum = minLoad = maxLoad = peLoads[0];
-  maxObjLoad = objLoads[0];
+  maxProcObjLoad = objLoads[0];
   maxComLoad = comLoads[0];
   for (i = 1; i < numPes; i++) {
     double load = peLoads[i];
     if (load>maxLoad) maxLoad=load;
     else if (peLoads[i]<minLoad) minLoad=load;
-    if (objLoads[i]>maxObjLoad) maxObjLoad = objLoads[i];
+    if (objLoads[i]>maxProcObjLoad) maxProcObjLoad = objLoads[i];
     if (comLoads[i]>maxComLoad) maxComLoad = comLoads[i];
     sum += load;
   }
@@ -77,8 +77,9 @@ void LBInfo::print()
   for(i = 0; i < numPes; i++) {
     CmiPrintf("%-4d %10f %10f %10f %10f\n", i, peLoads[i], objLoads[i], comLoads[i], bgLoads[i]);
   }
-  CmiPrintf("max: %10f %10f %10f\n", maxLoad, maxObjLoad, maxComLoad);
+  CmiPrintf("max: %10f %10f %10f\n", maxLoad, maxProcObjLoad, maxComLoad);
   CmiPrintf("Min : %f	Max : %f	Average: %f\n", minLoad, maxLoad, average);
+    // the min and max object (calculated in getLoadInfo)
   CmiPrintf("MinObj : %f	MaxObj : %f\n", minObjLoad, maxObjLoad, average);
 }
 
