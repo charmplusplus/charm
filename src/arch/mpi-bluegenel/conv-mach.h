@@ -8,6 +8,8 @@
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
 
+#define CMK_NO_OUTSTANDING_SENDS			   1
+
 #define CMK_MEMORY_PREALLOCATE_HACK                        1
 
 #define CMK_CONVERSE_MPI                                   1
