@@ -17,7 +17,7 @@ SRtable::SRtable()
 /// Insert send/recv record at timestamp
 void SRtable::Insert(int timestamp, int srSt)
 {
-  sanitize();
+  //sanitize();
   CmiAssert(timestamp >= offset);
   CmiAssert((srSt == 0) || (srSt == 1));
   if (timestamp >= offset + GVT_WINDOW) // insert in residuals
@@ -26,13 +26,13 @@ void SRtable::Insert(int timestamp, int srSt)
     if (srSt == SEND) sends[timestamp - offset]++;
     else recvs[timestamp - offset]++;
   }
-  sanitize();
+  //sanitize();
 }
 
 /// Helper function to Insert
 void SRtable::listInsert(int timestamp, int srSt)
 {
-  sanitize();
+  //sanitize();
   SRentry *tmp;
   if (!residuals) // no residuals yet
     residuals = new SRentry(timestamp, srSt, NULL);
@@ -57,13 +57,13 @@ void SRtable::listInsert(int timestamp, int srSt)
 	tmp->setNext(new SRentry(timestamp, srSt, tmp->next()));
     }
   }
-  sanitize();
+  //sanitize();
 }
 
 /// Purge entries from table with timestamp below ts
 void SRtable::PurgeBelow(int ts)
 {
-  sanitize();
+  //sanitize();
   CmiAssert(ts >= offset);
   int i;
   if (ts >= offset + GVT_WINDOW) { // purge everything 
@@ -80,13 +80,13 @@ void SRtable::PurgeBelow(int ts)
     for (i=(GVT_WINDOW-start); i<GVT_WINDOW; i++) // purge high entries
       sends[i] = recvs[i] = 0;
   }
-  sanitize();
+  //sanitize();
 }
 
 /// Move entries to table from residuals if timestamp < offset+GVT_WINDOW
 void SRtable::FileResiduals()
 {
-  sanitize();
+  //sanitize();
   SRentry *tmp = residuals, *current;
   int end = offset+GVT_WINDOW;
   while (tmp && (tmp->timestamp() < end)) {
@@ -97,13 +97,13 @@ void SRtable::FileResiduals()
     delete current;
   }
   residuals = tmp;
-  sanitize();
+  //sanitize();
 }
 
 /// Find earliest timestamp in table and associated send/recv counts
 void SRtable::FindEarliest(int *eTS, int *eS, int *eR)
 {
-  sanitize();
+  //sanitize();
   // search in arrays for earliest timestamp
   for (int i=0; i<GVT_WINDOW; i++)
     if ((sends[i] > 0) || (recvs[i] > 0)) {
@@ -119,7 +119,7 @@ void SRtable::FindEarliest(int *eTS, int *eS, int *eR)
 
 /// Free residual entries, reset counters and pointers
 void SRtable::FreeTable() {
-  sanitize();
+  //  sanitize();
   SRentry *tmp = residuals;
   while (tmp) { 
     residuals = tmp->next();
