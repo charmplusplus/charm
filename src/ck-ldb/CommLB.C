@@ -69,6 +69,7 @@ int CommLB::search(LDObjid oid, LDOMid mid){
     return -1;
 }
 
+// assign id to processor pe, load including both computation and communication
 void CommLB::alloc(int pe,int id,double load){
     //  CkPrintf("alloc %d ,%d\n",pe,id);
     alloc_array[npe][id] = 1.0;
@@ -84,9 +85,10 @@ double CommLB::compute_com(int id, int pe){
     ptr = object_graph[id].next;
     
     for(j=0;(j<2*nobj)&&(ptr != NULL);j++,ptr=ptr->next){
-	if(alloc_array[npe][ptr->id] == 0.0)
+	int destObj = ptr->id;
+	if(alloc_array[npe][destObj] == 0.0)  // this obj has been assigned
 	    continue;
-	if(alloc_array[pe][ptr->id] > 0.0)
+	if(alloc_array[pe][destObj] > 0.0)    // this obj is assigned to same pe
 	    continue;
 	com_data += ptr->data;
 	com_msg += ptr->nmsg;
@@ -96,6 +98,7 @@ double CommLB::compute_com(int id, int pe){
     return total_time;
 }
 
+// add comm between obj x and y
 void CommLB::add_graph(int x, int y, int data, int nmsg){
     graph * ptr, *temp;
     
@@ -195,11 +198,15 @@ LBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* stats, int count)
 
     for(pe=0; pe < count; pe++)
 	for(obj=0; obj < stats[pe].n_objs; obj++){
-	    translate[objno].mid.id = stats[pe].objData[obj].omID().id;
-	    translate[objno].oid.id[0] = stats[pe].objData[obj].id().id[0];
-	    translate[objno].oid.id[1] = stats[pe].objData[obj].id().id[1];
-	    translate[objno].oid.id[2] = stats[pe].objData[obj].id().id[2];
-	    translate[objno].oid.id[3] = stats[pe].objData[obj].id().id[3];
+	    LDObjData &objData = stats[pe].objData[obj];
+	    translate[objno].mid.id = objData.omID().id;
+	    translate[objno].oid = objData.id();
+	    #if 0
+	    translate[objno].oid.id[0] = objData.id().id[0];
+	    translate[objno].oid.id[1] = objData.id().id[1];
+	    translate[objno].oid.id[2] = objData.id().id[2];
+	    translate[objno].oid.id[3] = objData.id().id[3];
+	    #endif
 	    objno++;
 	}
 
@@ -215,14 +222,16 @@ LBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* stats, int count)
     int xcoord=0,ycoord=0;
 
     for(pe=0; pe < count; pe++)
-	for(com =0; com< stats[pe].n_comm;com++)
-	    if((!stats[pe].commData[com].from_proc())&&(!stats[pe].commData[com].to_proc())){
-		xcoord = search(stats[pe].commData[com].sender,stats[pe].commData[com].senderOM);
-		ycoord = search(stats[pe].commData[com].receiver,stats[pe].commData[com].receiverOM);
+	for(com =0; com< stats[pe].n_comm;com++) {
+	    LDCommData &commData = stats[pe].commData[com];
+	    if((!commData.from_proc())&&(!commData.to_proc())){
+		xcoord = search(commData.sender, commData.senderOM);
+		ycoord = search(commData.receiver, commData.receiverOM);
 		if((xcoord == -1)||(ycoord == -1))
 		    CkAbort("Error in search\n");
-		add_graph(xcoord,ycoord,stats[pe].commData[com].bytes, stats[pe].commData[com].messages);
+		add_graph(xcoord,ycoord,commData.bytes, commData.messages);
 	    }
+        }
 
     int id,maxid,spe=0,minpe=0,mpos;
     double temp,total_time,min_temp;
@@ -269,8 +278,8 @@ LBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* stats, int count)
 		continue;
 	    
 	    temp = compute_com(maxid,pe);
-	    /*
-	      CkPrintf("check id = %d, processor = %d,com = %lf, pro = %lf, comp=%lf\n", maxid,pe,temp,alloc_array[pe][nobj],total_time); */
+	    
+	    /*  CkPrintf("check id = %d, processor = %d,com = %lf, pro = %lf, comp=%lf\n", maxid,pe,temp,alloc_array[pe][nobj],total_time); */
 	    
 	    if(total_time > (temp + alloc_array[pe][nobj])){
 		minpe = pe;
@@ -278,6 +287,7 @@ LBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* stats, int count)
 		min_temp = temp;
 	    }
 	}
+	/* CkPrintf("check id = %d, processor = %d, obj = %lf com = %lf, pro = %lf, comp=%lf\n", maxid,minpe,x->load,min_temp,alloc_array[minpe][nobj],total_time); */
 	
 	//    CkPrintf("before 2nd alloc\n");
 	alloc(minpe,maxid,x->load + min_temp);

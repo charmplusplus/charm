@@ -19,10 +19,10 @@
 
 extern CkGroupID loadbalancer;
 
-#define PER_MESSAGE_RECV_OVERHEAD 0.01
-#define PER_MESSAGE_SEND_OVERHEAD 0.01
-#define PER_BYTE_RECV_OVERHEAD 0.0001
-#define PER_BYTE_SEND_OVERHEAD 0.0001
+#define PER_MESSAGE_SEND_OVERHEAD   35e-6
+#define PER_BYTE_SEND_OVERHEAD      8.5e-9
+#define PER_MESSAGE_RECV_OVERHEAD   0.0
+#define PER_BYTE_RECV_OVERHEAD      0.0
 
 void CreateCentralLB();
 void set_avail_vector(char * bitmap);

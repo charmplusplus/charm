@@ -10,15 +10,15 @@
 */
 /*@{*/
 
-#ifndef _HEAPCENTLB_H_
-#define _HEAPCENTLB_H_
+#ifndef _GREEDYLB_H_
+#define _GREEDYLB_H_
 
 #include "CentralLB.h"
-#include "HeapCentLB.decl.h"
+#include "GreedyLB.decl.h"
 
-void CreateHeapCentLB();
+void CreateGreedyLB();
 
-class HeapCentLB : public CentralLB {
+class GreedyLB : public CentralLB {
 
 public:
   struct HeapData {
@@ -27,8 +27,8 @@ public:
     int    id;
   };
 
-  HeapCentLB();
-  HeapCentLB(CkMigrateMessage *m):CentralLB(m) {}
+  GreedyLB();
+  GreedyLB(CkMigrateMessage *m):CentralLB(m) {}
 private:
 	enum           HeapCmp {GT = '>', LT = '<'};
     void           Heapify(HeapData*, int, int, HeapCmp);

@@ -25,7 +25,7 @@ int load_balancer_created;
 #if CMK_LBDB_ON
 
 static void getPredictedLoad(CentralLB::LDStats* stats, int count, 
-                             LBMigrateMsg* msg, double *peLoads);
+                      LBMigrateMsg* msg, double *peLoads, double &, double &);
 static int FindPEAfterMigration(LDObjid& id, CentralLB::LDStats* stats, int count,
 							 LBMigrateMsg* msg, int bCheckStats);
 
@@ -525,7 +525,7 @@ void CentralLB::readStatsMsgs(const char* filename) {
     // msgIdx can be different across different applictions
     env->setMsgIdx(oldenv.getMsgIdx());
     CkUnpackMessage(&env); //UnPack it
-    CmiPrintf("CLBStatsMsg for pe %d retrieved.\n", i);
+//    CmiPrintf("CLBStatsMsg for pe %d retrieved.\n", i);
     m = (CLBStatsMsg *)EnvToUsr(env);
 
     statsMsgsList[i] = m;
@@ -603,7 +603,7 @@ void CentralLB::writeStatsMsgs(const char* filename) {
   CmiPrintf("WriteStatsMsgs to %s succeed!\n", filename);
 }
 
-static void getPredictedLoad(CentralLB::LDStats* stats, int count, LBMigrateMsg* msg, double *peLoads)
+static void getPredictedLoad(CentralLB::LDStats* stats, int count, LBMigrateMsg* msg, double *peLoads, double &minObjLoad, double &maxObjLoad)
 {
 	int* msgSentCount = new int[count]; // # of messages sent by each PE
 	int* msgRecvCount = new int[count]; // # of messages received by each PE
@@ -612,7 +612,9 @@ static void getPredictedLoad(CentralLB::LDStats* stats, int count, LBMigrateMsg*
         int i, pe;
 
 	for(i = 0; i < count; i++)
-		msgSentCount[i] = msgRecvCount[i] = byteSentCount[i] = byteRecvCount[i] = 0;
+	  msgSentCount[i] = msgRecvCount[i] = byteSentCount[i] = byteRecvCount[i] = 0;
+        minObjLoad = 1.0e20;	// I suppose no object load beyond this
+	maxObjLoad = 0.0;
 
 	for(pe = 0; pe < count; pe++)
   	{
@@ -620,7 +622,10 @@ static void getPredictedLoad(CentralLB::LDStats* stats, int count, LBMigrateMsg*
 
     	  for(int obj = 0; obj < stats[pe].n_objs; obj++)
     	  {
-		peLoads[pe] += stats[pe].objData[obj].wallTime;
+		double &oload = stats[pe].objData[obj].wallTime;
+		if (oload < minObjLoad) minObjLoad = oload;
+		if (oload > maxObjLoad) maxObjLoad = oload;
+		peLoads[pe] += oload;
     	  }
 	}
 
@@ -684,13 +689,13 @@ static void getPredictedLoad(CentralLB::LDStats* stats, int count, LBMigrateMsg*
 	}
 
 	// now for each processor, add to its load the send and receive overheads
-#if 0
+#if 1
 	for(i = 0; i < count; i++)
 	{
 		peLoads[i] += msgRecvCount[i]  * PER_MESSAGE_RECV_OVERHEAD +
-					  msgSentCount[i]  * PER_MESSAGE_SEND_OVERHEAD +
-					  byteRecvCount[i] * PER_BYTE_RECV_OVERHEAD +
-					  byteSentCount[i] * PER_BYTE_SEND_OVERHEAD;
+				  msgSentCount[i]  * PER_MESSAGE_SEND_OVERHEAD +
+				  byteRecvCount[i] * PER_BYTE_RECV_OVERHEAD +
+				  byteSentCount[i] * PER_BYTE_SEND_OVERHEAD;
 	}
 #endif
 	delete msgRecvCount;
@@ -707,7 +712,7 @@ void CentralLB::FindSimResults(LDStats* stats, int count, LBMigrateMsg* msg, LBS
     for(int pe = 0; pe < count; pe++)
     	  simResults->bgLoads[pe] = stats[pe].bg_walltime;
     // sum of the cpu times of the objects on that processor
-    getPredictedLoad(stats, count, msg, simResults->peLoads);
+    getPredictedLoad(stats, count, msg, simResults->peLoads, simResults->minObjLoad, simResults->maxObjLoad);
 }
 
 // find the PE of an object after migration. The bCheckStats flag indicates whether the stats is to

@@ -54,7 +54,8 @@ void LBSimulation::PrintSimulationResults()
     CmiPrintf("%-4d %10f %10f", i, peLoads[i], bgLoads[i]);
     CmiPrintf("\n");
   }
-  CmiPrintf("Max : %f	Min : %f	Average: %f\n", maxLoad, minLoad, average);
+  CmiPrintf("Min : %f	Max : %f	Average: %f\n", minLoad, maxLoad, average);
+  CmiPrintf("MinObj : %f	MaxObj : %f\n", minObjLoad, maxObjLoad, average);
 }
 
 

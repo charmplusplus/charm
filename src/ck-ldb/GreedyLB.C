@@ -15,36 +15,36 @@
 #if CMK_LBDB_ON
 
 #include "cklists.h"
-#include "HeapCentLB.h"
+#include "GreedyLB.h"
 
-void CreateHeapCentLB()
+void CreateGreedyLB()
 {
-  //  CkPrintf("[%d] creating HeapCentLB %d\n",CkMyPe(),loadbalancer);
-  loadbalancer = CProxy_HeapCentLB::ckNew();
-  //  CkPrintf("[%d] created HeapCentLB %d\n",CkMyPe(),loadbalancer);
+  //  CkPrintf("[%d] creating GreedyLB %d\n",CkMyPe(),loadbalancer);
+  loadbalancer = CProxy_GreedyLB::ckNew();
+  //  CkPrintf("[%d] created GreedyLB %d\n",CkMyPe(),loadbalancer);
 }
 
 static void lbinit(void) {
-//        LBSetDefaultCreate(CreateHeapCentLB);        
-  LBRegisterBalancer("HeapCentLB", CreateHeapCentLB, "Similar to RefineLB, but using heap to sort by load");
+//        LBSetDefaultCreate(CreateGreedyLB);        
+  LBRegisterBalancer("GreedyLB", CreateGreedyLB, "always assign the heaviest obj onto lightest loaded processor.");
 }
 
-#include "HeapCentLB.def.h"
+#include "GreedyLB.def.h"
 
-HeapCentLB::HeapCentLB()
+GreedyLB::GreedyLB()
 {
-  lbname = "HeapCentLB";
+  lbname = "GreedyLB";
   if (CkMyPe()==0)
-    CkPrintf("[%d] HeapCentLB created\n",CkMyPe());
+    CkPrintf("[%d] GreedyLB created\n",CkMyPe());
 }
 
-CmiBool HeapCentLB::QueryBalanceNow(int _step)
+CmiBool GreedyLB::QueryBalanceNow(int _step)
 {
   //  CkPrintf("[%d] Balancing on step %d\n",CkMyPe(),_step);
   return CmiTrue;
 }
 
-CmiBool  HeapCentLB::Compare(double x, double y, HeapCmp cmp)
+CmiBool  GreedyLB::Compare(double x, double y, HeapCmp cmp)
 {
   const int test =  ((cmp == GT) ? (x > y) : (x < y));
 
@@ -53,7 +53,7 @@ CmiBool  HeapCentLB::Compare(double x, double y, HeapCmp cmp)
 }
 
 
-void HeapCentLB::Heapify(HeapData *heap, int node, int heapSize, HeapCmp cmp)
+void GreedyLB::Heapify(HeapData *heap, int node, int heapSize, HeapCmp cmp)
 {
   int left = 2*node+1;
   int right = 2*node+2;
@@ -76,14 +76,14 @@ void HeapCentLB::Heapify(HeapData *heap, int node, int heapSize, HeapCmp cmp)
   }    
 }
 
-void HeapCentLB::BuildHeap(HeapData *data, int heapSize, HeapCmp cmp)
+void GreedyLB::BuildHeap(HeapData *data, int heapSize, HeapCmp cmp)
 {
 	int i;
 	for(i=heapSize/2; i >= 0; i--)
 		Heapify(data, i, heapSize, cmp);
 }
 
-void HeapCentLB::HeapSort(HeapData *data, int heapSize, HeapCmp cmp)
+void GreedyLB::HeapSort(HeapData *data, int heapSize, HeapCmp cmp)
 {
 	int i;
 	HeapData key;
@@ -98,8 +98,8 @@ void HeapCentLB::HeapSort(HeapData *data, int heapSize, HeapCmp cmp)
 	}
 }
 
-HeapCentLB::HeapData* 
-HeapCentLB::BuildObjectArray(CentralLB::LDStats* stats, 
+GreedyLB::HeapData* 
+GreedyLB::BuildObjectArray(CentralLB::LDStats* stats, 
                              int count, int *objCount)
 {
   HeapData *objData;
@@ -128,8 +128,8 @@ HeapCentLB::BuildObjectArray(CentralLB::LDStats* stats,
   return objData;
 }
 
-HeapCentLB::HeapData* 
-HeapCentLB::BuildCpuArray(CentralLB::LDStats* stats, 
+GreedyLB::HeapData* 
+GreedyLB::BuildCpuArray(CentralLB::LDStats* stats, 
                           int count, int *peCount)
 {
   HeapData           *data;
@@ -167,14 +167,14 @@ HeapCentLB::BuildCpuArray(CentralLB::LDStats* stats,
   return data;
 }
 
-LBMigrateMsg* HeapCentLB::Strategy(CentralLB::LDStats* stats, int count)
+LBMigrateMsg* GreedyLB::Strategy(CentralLB::LDStats* stats, int count)
 {
   CkVec<MigrateInfo*> migrateInfo;
   int      obj, heapSize, objCount;
   HeapData *cpuData = BuildCpuArray(stats, count, &heapSize);
   HeapData *objData = BuildObjectArray(stats, count, &objCount);
 
-  //  CkPrintf("[%d] HeapCentLB strategy\n",CkMyPe());
+  //  CkPrintf("[%d] GreedyLB strategy\n",CkMyPe());
 
   heapSize--;
   HeapData minCpu;  
@@ -218,7 +218,7 @@ LBMigrateMsg* HeapCentLB::Strategy(CentralLB::LDStats* stats, int count)
   delete [] objData;
 
   int migrate_count=migrateInfo.length();
-  CkPrintf("HeapCentLB migrating %d elements\n",migrate_count);
+  CkPrintf("GreedyLB migrating %d elements\n",migrate_count);
   LBMigrateMsg* msg = new(&migrate_count,1) LBMigrateMsg;
   msg->n_moves = migrate_count;
   for(int i=0; i < migrate_count; i++) {

@@ -6,7 +6,7 @@ module EveryLB {
    extern module RefineLB;
    extern module CommLB;
    extern module Comm1LB;
-   extern module HeapCentLB;
+   extern module GreedyLB;
    extern module NeighborLB;
    extern module GreedyRefLB;
    extern module OrbLB;
