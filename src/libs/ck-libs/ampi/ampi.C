@@ -777,10 +777,15 @@ ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
   waitingForGeneric=0;
   if(sts)
     ((MPI_Status*)sts)->MPI_LENGTH = msg->length;
-  if (msg->length > len) {
-    CkError("AMPI: (type=%d, count=%d) Expecting msg of len %d, received %d\n",
-            type, count, len, msg->length);
-    CkAbort("Exiting.\n");
+  if (msg->length > len) 
+  { /* Received more data than we were expecting */
+    CkError("FATAL ERROR in rank %d MPI_Recv (tag=%d, source=%d)\n"
+    	"  Expecting only %d bytes (%d items of type %d), \n"
+	"  but received %d bytes from rank %d\n",
+            thisIndex,t,s, 
+	    len, count, type, 
+	    msg->length, msg->src);
+    CkAbort("AMPI> MPI_Send was longer than matching MPI_Recv.");
   }
   ddt->serialize((char*)buf, (char*)msg->data, msg->length/(ddt->getSize(1)), (-1));
   delete msg;
