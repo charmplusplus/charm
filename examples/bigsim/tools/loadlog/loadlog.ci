@@ -1,0 +1,5 @@
+mainmodule loadlog {
+  mainchare Main {
+     entry Main(void);
+  };
+};
