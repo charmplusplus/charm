@@ -1,11 +1,11 @@
-CDIR=../../../..
+CDIR=$(HOME)/ampi/charm
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
 HEADERS=ampi.h ampif.h ampiimpl.h ampiProjections.h ampiOOQ.h
 HEADDEP=$(HEADERS) ampiimpl.h ampi.decl.h ampiEvents.h 
 COMPAT=compat_ampius.o compat_ampifus.o \
        compat_ampim.o compat_ampifm.o compat_ampicm.o
-OBJS=ampi.o ampif.o ampiProjections.o
+OBJS=ampi.o ampif.o ampiProjections.o win_obj.o MPI_Win.o
 
 LIB=libmoduleampi
 LIBDIR=$(CDIR)/lib
@@ -65,7 +65,7 @@ ampif.o: ampif.C $(HEADDEP)
 ampi.decl.h ampi.def.h: ampi.ci
 	$(CHARMC) ampi.ci
 
-ampiProjections.o: ampiProjections.C ampiEvents.h ampiProjections.h $(HEADDEP)
+ampiProjections.o: ampiProjections.C ampiEvents.h ampiProjections.h
 	$(CHARMC) -c ampiProjections.C
 
 clean: 

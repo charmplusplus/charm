@@ -442,6 +442,87 @@ int MPI_Type_get_contents(MPI_Datatype datatype, int max_integers, int max_addre
                           int max_datatypes, int array_of_integers[], MPI_Aint array_of_addresses[],
                           MPI_Datatype array_of_datatypes[]);
 
+//----------------------------ADDED by YAN---------------------------
+/*********************One sided communication routines *******************/			  
+
+/*************************************************************
+ *  MPI_Win : defined as the ID number(index) of this window object 
+ *    This ensures that MPI_Win is universal and can be passed around
+ *
+ *  Alternatively: can be defined as a stuct/class, 
+ *    The local window object contain infor to locate a remote window  
+ *************************************************************/
+typedef struct MPI_Win_{
+  MPI_Comm comm;
+  int index;
+} MPI_Win;
+
+#define MAXWINNUMBER 9
+ 
+typedef int MPI_Info;
+#define MPI_INFO_NULL 0
+#define MPI_MAX_OBJECT_NAME 100
+
+int
+MPI_Win_create(void *base, MPI_Aint size, int disp_unit,
+	       MPI_Info info, MPI_Comm comm, MPI_Win *newwin);
+	
+int
+MPI_Win_free(MPI_Win *win);
+
+int
+MPI_Win_delete_attr(MPI_Win win, int key);
+
+int 
+MPI_Win_get_group(MPI_Win win, MPI_Group *group);
+
+int
+MPI_Win_set_name(MPI_Win win, char *name);
+
+int
+MPI_Win_get_name(MPI_Win win, char *name, int *length);
+ 
+int
+MPI_Put(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank, 
+	MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Win win);
+
+int
+MPI_Get(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank, 
+	MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Win win);
+
+int 
+MPI_Accumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
+		   MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, 
+		   MPI_Op op, MPI_Win win);
+
+int
+MPI_Win_fence(int assertion, MPI_Win win);
+
+int 
+MPI_Win_lock(int lock_type, int rank, int assert, MPI_Win win);
+
+int 
+MPI_Win_unlock(int rank, MPI_Win win);
+
+
+int 
+MPI_Win_post(MPI_Group group, int assertion, MPI_Win win);
+
+int 
+MPI_Win_wait(MPI_Win win);
+
+int 
+MPI_Win_start(MPI_Group group, int assertion, MPI_Win win);
+
+int 
+MPI_Win_complete(MPI_Win win);
+
+void* 
+MPI_Alloc_mem(MPI_Aint size, MPI_Info info, void *baseptr);
+int 
+MPI_Free_mem(void *base);
+//----------------------------END OF ADDING by YAN---------------------------
+
 #include "ampiProjections.h"
 #ifdef __cplusplus
 }
