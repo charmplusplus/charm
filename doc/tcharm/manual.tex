@@ -207,7 +207,7 @@ long can address just 4GB ($2^32$ bytes) of virtual address space.  Additionally
 the operating system and conventional heap already use a significant amount 
 of this space; so the total virtual address space available is typically under 1GB.  
 With isomalloc, all processors share this space, so with just 20 processors
-processors the amount of memory per processor is limited to under 50MB!  This is an 
+the amount of memory per processor is limited to under 50MB!  This is an 
 inherent limitation of 32-bit machines; to run on more than a few processors you 
 must use 64-bit machines or avoid isomalloc.
 \end{itemize}
