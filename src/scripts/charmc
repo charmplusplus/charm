@@ -40,7 +40,9 @@ OVERRIDE_LDXX=""
 #Generic options, passed to everything
 OPTS=""
 #Specific options
-OPTS_CPP="-D__CHARMC__=1 "
+#charm internal flag, only pass to c and cxx, not f90
+OPTS_CPP_INTERNAL="-D__CHARMC__=1 "
+OPTS_CPP=
 OPTS_LDRO="" 
 OPTS_CC=""
 OPTS_CXX="" 
@@ -606,7 +608,9 @@ do
 		;;
 # Default
 	*)
-		printUsage  "Error: Unrecognized argument $arg"
+#		printUsage  "Error: Unrecognized argument $arg"
+#		Warning "passing unrecognized option $arg to all compilers and linkers"
+		OPTS="$OPTS  $arg"
 		;;
 	esac
 done
@@ -1000,11 +1004,11 @@ do
 		fi
 		;;
 	*.c|*.s)
-		Do $CMK_CC -I$CHARMINC $OPTS_CPP $OPTS_CC -c $FILE $DESTO
+		Do $CMK_CC -I$CHARMINC $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CC -c $FILE $DESTO
 		NU_OBJ=$BASEO
 		;;
 	*.C|*.cc|*.cxx|*.cpp|*.c++)
-		Do $CMK_CXX -I$CHARMINC $OPTS_CPP $OPTS_CXX -c $FILE $DESTO
+		Do $CMK_CXX -I$CHARMINC $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CXX -c $FILE $DESTO
 		NU_OBJ=$BASEO
 		;;
 	*.f|*.F)
@@ -1357,7 +1361,7 @@ for trace in $TRACEMODE; do
 done
 echo "}" >> $modInitSrc
 
-Do $CMK_CXX $OPTS_CPP $OPTS_CXX -c $modInitSrc -o $modInitObj
+Do $CMK_CXX $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CXX -c $modInitSrc -o $modInitObj
 
 ###############################################################################
 #
