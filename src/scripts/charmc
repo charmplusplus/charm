@@ -29,6 +29,7 @@ VERBOSE=""
 DEBUG_SCRIPT=""
 SAVE=""
 PURIFY=""
+SKIPLINK=""
 OVERRIDE_CC=""
 OVERRIDE_CXX=""
 OVERRIDE_F90=""
@@ -158,6 +159,10 @@ getExtention() {
 	se_base=`echo $1 | awk -F/ '{print $NF}'`
         se_ret=`echo $se_base | awk -F. '{if (NF<=1) print ""; else print "."$NF}'`
 	echo $se_ret
+}
+
+Debugf() {
+	[ -n "$VERBOSE" ] && echo "charmc>" $@
 }
 
 Debug() {
@@ -346,7 +351,11 @@ do
 		OPTS_LDXX="$OPTS_LDXX -rpath $1"
 		shift
 		;;
-
+	"-M"|"-E"|"-P"|"-S")
+# Run preprocessor/assembler only
+		SKIPLINK="yes"
+		OPTS="$OPTS $arg"
+		;;
 	"-c")
 # This is ignored.
 		;;
@@ -708,6 +717,12 @@ do
 		[ $VERBOSE ] && echo "Compiling $FILE"
 		DoNoErrCheck $RM $BASE.o $BASE.f.o
 	fi
+	BASEO="$BASE.o"
+	DESTO="-o $BASEO"
+	if [ ! -z "$SKIPLINK" ] 
+	then
+		DESTO=""
+	fi
 	NU_OBJ=""
 	case "$FILE" in
 	*.ci)
@@ -719,19 +734,20 @@ do
 		fi
 		;;
 	*.c|*.s)
-		Do $CMK_CC $OPTSC $OPTS_CC -I$CHARMINC -c $FILE -o $BASE.o
-		NU_OBJ=$BASE.o
+		Do $CMK_CC $OPTSC $OPTS_CC -I$CHARMINC -c $FILE $DESTO
+		NU_OBJ=$BASEO
 		;;
 	*.C|*.cc|*.cxx|*.cpp|*.c++)
-		Do $CMK_CXX $OPTSC $OPTS_CXX -I$CHARMINC -c $FILE -o $BASE.o
-		NU_OBJ=$BASE.o
+		Do $CMK_CXX $OPTSC $OPTS_CXX -I$CHARMINC -c $FILE $DESTO
+		NU_OBJ=$BASEO
 		;;
 	*.f|*.F)
-		Do $CMK_CF90 $OPTS_F90 -I$CHARMINC -c $FILE -o $BASE.o
-		NU_OBJ=$BASE.o
+		Do $CMK_CF90 $OPTS_F90 -I$CHARMINC -c $FILE $DESTO
+		NU_OBJ=$BASEO
 		;;
 	*.f90|*.F90)
-		Do $CMK_CF90 $OPTS_F90 -I$CHARMINC -c $FILE -o $BASE.o
+		Do $CMK_CF90 $OPTS_F90 -I$CHARMINC -c $FILE $DESTO
+		NU_OBJ=$BASEO
 		;;
 	*.fc|*.FC)
 		Abort "I'm not yet smart enough to compile $FILE"
@@ -771,9 +787,10 @@ done
 #
 ##############################################################################
 
-if [ -z "$OBJECT" ] 
+if [ -z "$OBJECT" -o ! -z "$SKIPLINK" ] 
 then
-# We have no target object-- just end
+# We have no target object, or are playing preprocessor tricks-- just end
+	Debugf "No target object-- finished"
 	Success
 fi
 
@@ -781,16 +798,21 @@ Debug "About to link..."
 
 case "$OBJECT" in
 *.o)
+	Debugf "Converting $FILES to $OBJECTFILES"
 	nFiles=`echo $FILES | wc -w`
 	nObj=`echo $OBJECTFILES | wc -w`
 	if [ $nFiles -eq 1 -a $nObj -eq 1 ] 
 	then
+# One source file, one .o: just move the .o
 		if [ $OBJECT != $OBJECTFILES ]
 		then
+			Debugf "Moving .o to destination"
 			DoNoErrCheck $RM $OBJECT
 			Do $MV $OBJECTFILES $OBJECT
 		fi
 	else
+# Multiple source files, one .o: make shared library
+		Debugf "Running ldro..."
 		DoNoErrCheck $RM $OBJECT
 		Do $CMK_LDRO $OBJECT $OPTSL $OPTS_LDRO $OBJECTFILES
 	fi
