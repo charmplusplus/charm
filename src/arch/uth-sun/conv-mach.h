@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.14  1996-07-16 17:23:37  jyelon
+ * Revision 1.15  1996-07-24 22:51:34  jyelon
+ * Changed to 'times' not 'getrusage'
+ *
+ * Revision 1.14  1996/07/16  17:23:37  jyelon
  * Renamed a flag.
  *
  * Revision 1.13  1996/07/16 05:20:41  milind
@@ -105,9 +108,9 @@
 #define CMK_THREADS_USE_ALLOCA_WITH_PRAGMA                 0
 #define CMK_THREADS_USE_JB_TWEAKING                        0
 
-#define CMK_TIMER_USE_GETRUSAGE                            1
+#define CMK_TIMER_USE_GETRUSAGE                            0
 #define CMK_TIMER_USE_SPECIAL                              0
-#define CMK_TIMER_USE_TIMES                                0
+#define CMK_TIMER_USE_TIMES                                1
 
 #define CMK_VECTOR_SEND_USES_COMMON_CODE                    1
 #define CMK_VECTOR_SEND_USES_SPECIAL_CODE                   0
