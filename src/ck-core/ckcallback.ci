@@ -3,6 +3,10 @@ module CkCallback {
 	message CkCcsRequestMsg {
 		char data[];
  	};
+	message CkDataMsg {
+		char data[];
+	};
+	
 	mainchare ckcallback_main {
 		entry ckcallback_main(CkArgMsg *m);
 	};

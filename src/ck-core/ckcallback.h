@@ -12,6 +12,8 @@ Initial version by Orion Sky Lawlor, olawlor@acm.org, 2/8/2002
 #ifndef _CKCALLBACK_H_
 #define _CKCALLBACK_H_
 
+#include "conv-ccs.h" /*for CcsDelayedReply struct*/
+
 typedef void (*CkCallbackFn)(void *param,void *message);
 typedef void (*Ck1CallbackFn)(void *message);
 
@@ -34,7 +36,8 @@ public:
 	isendGroup, //Inlined send to a group (d.group)
 	isendArray, //Inlined send to an array (d.array)
 	bcastGroup, //Broadcast to a group (d.group)
-	bcastArray //Broadcast to an array (d.array)
+	bcastArray, //Broadcast to an array (d.array)
+	replyCCS // Reply to a CCS message (d.ccsReply)
 	} callbackType;
 private:
 	union callbackData {
@@ -66,6 +69,9 @@ private:
 		CkGroupID id; //Array ID to call it on
 		CkArrayIndexStruct idx; //Index to send to (if any)
 	} array;
+	struct s_ccsReply {
+		CcsDelayedReply reply;
+	} ccsReply;
 	};
 	
 	callbackType type; 
@@ -106,6 +112,9 @@ public:
 		:type(doInline?isendArray:sendArray) 
 		{d.array.ep=ep; d.array.id=id; d.array.idx.asMax()=idx;}
 	CkCallback(int ep,const CProxyElement_ArrayBase &arrElt,CmiBool doInline=CmiFalse);
+	
+	CkCallback(const CcsDelayedReply &reply) 
+		:type(replyCCS) {d.ccsReply.reply=reply;}
 
 	int isInvalid(void) const {return type==invalid;}
 
@@ -122,11 +131,18 @@ public:
 	}
 
 /**
+ * Send this message back to the caller.
+ *
  * Libraries should call this from their "done" entry points.
  * It takes the given message and handles it appropriately.
  * After the send(), this callback is finished and cannot be reused.
  */
 	void send(void *msg=NULL) const;
+	
+/**
+ * Send this data, formatted as a CkDataMsg, back to the caller.
+ */
+	void send(int length,const void *data) const;
 };
 PUPbytes(CkCallback) //FIXME: write a real pup routine
 

@@ -86,6 +86,10 @@ CkCallback::CkCallback(int ep,const CProxyElement_ArrayBase &arrElt,CmiBool doIn
 	d.array.idx.asMax()=arrElt.ckGetIndex();
 }
 
+void CkCallback::send(int length,const void *data) const
+{
+	send(CkDataMsg::buildNew(length,data));
+}
 
 /*Libraries should call this from their "done" entry points.
   It takes the given message and handles it appropriately.
@@ -155,6 +159,18 @@ void CkCallback::send(void *msg) const
 		if (!msg) msg=CkAllocSysMsg();
 		CkBroadcastMsgArray(d.array.ep,msg,d.array.id);
 		break;
+	case replyCCS: { /* Send CkDataMsg as a CCS reply */
+		void *data=NULL;
+		int length=0;
+		if (msg) {
+			CkDataMsg *m=(CkDataMsg *)msg;
+			m->check();
+			data=m->getData();
+			length=m->getLength();
+		}
+		CcsSendDelayedReply(d.ccsReply.reply,length,data);
+		if (msg) CkFreeMsg(msg);
+		} break;
 	case invalid: //Uninitialized
 		CmiAbort("Called send on uninitialized callback");
 		break;
@@ -190,6 +206,20 @@ void CcsRegisterHandler(const char *ccs_handlername,const CkCallback &cb) {
 	_ckcallbackgroup.registerCcsCallback(ccs_handlername,cb);
 }
 
+enum {dataMsgTag=0x7ed2beef};
+CkDataMsg *CkDataMsg::buildNew(int length,const void *data)
+{
+	CkDataMsg *msg=new (&length,0) CkDataMsg;
+	msg->length=length;
+	memcpy(msg->data,data,length);
+	msg->checkTag=dataMsgTag;
+}
+
+void CkDataMsg::check(void)
+{
+	if (checkTag!=dataMsgTag)
+		CkAbort("CkDataMsg corrupted-- bad tag.");
+}
 
 #include "CkCallback.def.h"
 

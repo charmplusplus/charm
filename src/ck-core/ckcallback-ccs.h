@@ -11,9 +11,9 @@ Initial version by Orion Sky Lawlor, olawlor@acm.org, 2/8/2002
 #include "CkCallback.decl.h" /*for CMessage_CkCcsRequestMsg*/
 
 /**
- * Message sent to CCS callbacks.
+ * Message sent from CCS to callbacks.
  * You must eventually call CcsSendDelayedReply(msg->reply,...) 
- * for each CCS callback.
+ * for each CCS-called callback.
  */
 class CkCcsRequestMsg : public CMessage_CkCcsRequestMsg {
 public:
@@ -21,6 +21,26 @@ public:
 	int length; //Number of bytes of request data.
 	char *data; //Actual data sent along with request.
 };
+
+/**
+ * Very generic message type: contains a bunch of bytes.
+ */
+class CkDataMsg : public CMessage_CkDataMsg {
+public:
+	int length; //Number of bytes of data below.
+	char *data; //Message data.
+	int checkTag; // For detecting message corruption
+	
+	inline int getLength(void) const {return length;}
+        inline int getSize(void) const {return length;}
+        inline void *getData(void) const {return data;}
+	
+	/// This is how you must create a CkDataMsg
+	static CkDataMsg *buildNew(int length,const void *data);
+	
+	void check(void);
+};
+
 
 #ifdef CcsRegisterHandler /*pollution from C conv-ccs header*/
 # undef CcsRegisterHandler
