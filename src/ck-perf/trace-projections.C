@@ -402,7 +402,7 @@ double LogEntry::write(FILE* fp, double prevTime, double *timeErr)
 
   // **CW** Hopefully a correct time correction algorithm
   double timeDiff = (time-prevTime)*1.0e6;
-  unsigned int intTimeDiff = (UInt)timeDiff;
+  UInt intTimeDiff = (UInt)timeDiff;
   *timeErr += timeDiff - intTimeDiff; // timeErr is never >= 2.0
   if (*timeErr > 1.0) {
     *timeErr -= 1.0;
@@ -447,9 +447,12 @@ double LogEntry::write(FILE* fp, double prevTime, double *timeErr)
       fprintf(fp, "%u %d %d\n", intTimeDiff, event, pe);
       break;
 
+      // **CW** absolute timestamps are used here to support a quick
+      // way of determining the total time of a run in projections
+      // visualization.
     case BEGIN_COMPUTATION:
     case END_COMPUTATION:
-    fprintf(fp, "%u\n", intTimeDiff);
+      fprintf(fp, "%u\n", (UInt)(time*1.e6));
       break;
 
     default:
@@ -473,7 +476,7 @@ double LogEntry::writeCompressed(gzFile zfp, double prevTime, double *timeErr)
 
   // **CW** Hopefully a correct time correction algorithm
   double timeDiff = (time-prevTime)*1.0e6;
-  unsigned int intTimeDiff = (UInt)timeDiff;
+  UInt intTimeDiff = (UInt)timeDiff;
   *timeErr += timeDiff - intTimeDiff; // timeErr is never >= 2.0
   if (*timeErr > 1.0) {
     *timeErr -= 1.0;
@@ -517,9 +520,12 @@ double LogEntry::writeCompressed(gzFile zfp, double prevTime, double *timeErr)
       gzprintf(zfp, "%u %d %d\n", intTimeDiff, event, pe);
       break;
 
+      // **CW** absolute timestamps are used here to support a quick
+      // way of determining the total time of a run in projections
+      // visualization.
     case BEGIN_COMPUTATION:
     case END_COMPUTATION:
-      gzprintf(zfp, "%u\n", intTimeDiff);
+      gzprintf(zfp, "%u\n", (UInt)(time*1.e6));
       break;
 
     default:
