@@ -2508,7 +2508,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
 #endif
 #endif
   Cmi_argv = argv; Cmi_startfn = fn; Cmi_usrsched = usc;
-#if CMK_DISABLE_SIGNAL
+#if CMK_NETPOLL
   Cmi_netpoll = 1;      /* set as default, but still allow change next */
 #endif
 #if CMK_WHEN_PROCESSOR_IDLE_USLEEP
