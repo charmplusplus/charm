@@ -2165,16 +2165,26 @@ void removeEnv(const char *doomedEnv)
 
 int rsh_fork(int nodeno,const char *startScript)
 {
-  char *rshargv[6];
+  char **rshargv;
   int pid;
   int num=0;
   char *s, *e;
 
+  /* figure out size and dynamic allocate */
+  s=nodetab_shell(nodeno); e=skipstuff(s);
+  while (*s) {
+    num++;
+    s = skipblanks(e); e = skipstuff(s);
+  }
+  rshargv = (char **)malloc(sizeof(char *)*(num+6));
+
+  num = 0;
   s=nodetab_shell(nodeno); e=skipstuff(s);
   while (*s) {
     rshargv[num++]=substr(s, e);
     s = skipblanks(e); e = skipstuff(s);
   }
+
   rshargv[num++]=nodetab_name(nodeno);
   rshargv[num++]="-l";
   rshargv[num++]=nodetab_login(nodeno);
@@ -2197,6 +2207,7 @@ int rsh_fork(int nodeno,const char *startScript)
       fprintf(stderr,"Charmrun> Couldn't find rsh program '%s'!\n",rshargv[0]);
       exit(1);
   }
+  free(rshargv);
   if (arg_verbose)
     fprintf(stderr,"Charmrun> rsh (%s:%d) started\n",
     	nodetab_name(nodeno),nodeno);
