@@ -13,6 +13,7 @@ all: $(LIBDEST) $(HEADERS)
 	/bin/cp receiver.decl.h ../../../include/receiver.decl.h
 	/bin/cp receiver.def.h ../../../include/receiver.def.h
 	/bin/cp receiver.h ../../../include/receiver.h
+	/bin/cp receiverf.h ../../../include/receiverf.h
 
 $(LIBDEST) : $(LIB)
 	/bin/cp $(LIB) $(LIBDEST)
