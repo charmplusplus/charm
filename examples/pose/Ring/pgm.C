@@ -56,7 +56,6 @@ main::main(CkArgMsg *m)
 
   POSE_init();
 
-  /*
   WorkerData *wd;
   wd = new WorkerData;
   wd->numObjs = numObjs;
@@ -72,10 +71,8 @@ main::main(CkArgMsg *m)
   CkArrayOptions opts(totalObjs);
   opts.setMap(myMap);
   (*(CProxy_worker *) &POSE_Objects) = CProxy_worker::ckNew(wd, opts);
-  //(*(CProxy_worker *) &POSE_Objects) = CProxy_worker::ckNew(wd, totalObjs);
-  */
 
-
+  /*
   // create all the workers
   WorkerData *wd;
   int dest, j;
@@ -95,6 +92,7 @@ main::main(CkArgMsg *m)
     //wd->dump();
     (*(CProxy_worker *) &POSE_Objects)[i].insert(wd, dest);
   }
+  */
   /*
   SmallWorkMsg *sm = new SmallWorkMsg;
   memset(sm->data, 0, SM_MSG_SZ*sizeof(int));
