@@ -395,7 +395,7 @@ char *pparam_getdef(def)
     {
     case 'i': sprintf(result,"%d", *def->where.i); return result;
     case 'r': sprintf(result,"%f",*def->where.r); return result;
-    case 's': return *def->where.s;
+    case 's': return *def->where.s?*def->where.s:"";
     case 'f': sprintf(result,"%d", *def->where.f); return result;
     }
   return NULL;
