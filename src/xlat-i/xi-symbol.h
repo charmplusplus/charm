@@ -238,10 +238,26 @@ class Parameter {
     int isArray(void) const {return arrLen!=NULL;}
     Type *getType(void) {return type;}
     const char *getName(void) const {return name;}
+    void printSdagParam(XStr& str) {
+      if (type != NULL) {
+         type->print(str);
+      }
+      if(given_name!=0) {
+        str <<" " << given_name;
+      }
+      if (byReference !=0)
+         str <<" &";
+      if (arrLen != NULL) 
+        str <<"[" <<arrLen <<"]";
+      if (val != NULL) {
+        str <<" = ";
+        val->print(str);
+      }
+    }
     void printMsg(XStr& str) {
       type->print(str);
       if(given_name!=0)
-        str << given_name;
+        str <<given_name;
     }
 };
 class ParamList {
@@ -275,8 +291,31 @@ class ParamList {
     void genMsgProxyName(XStr &str) {
     	param->type->genMsgProxyName(str);
     }
+    void printSdagParam(XStr& str) {
+        ParamList *pl;
+        if (param != NULL) {
+          param->printSdagParam(str);
+        }
+        if (next != NULL) {
+          pl = next;
+          while (pl != NULL)
+          {
+             str <<", ";
+             pl->param->printSdagParam(str);
+             pl = pl->next;
+          }
+        } 
+    }
     void printMsg(XStr& str) {
+        ParamList *pl;
         param->printMsg(str);
+        pl = next;
+        while (pl != NULL)
+        {
+           str <<", ";
+           pl->param->printMsg(str);
+           pl = pl->next;
+        } 
     }
     void marshall(XStr &str);
     void beginUnmarshall(XStr &str);
@@ -674,11 +713,11 @@ class Entry : public Member {
     void genReg(XStr& str);
     void setSdagCode(char *str) {
       if(str!=0) {
-        if(!param->isMessage()) 
-          die("Marshalling or void methods unsupported in sdag yet", line);
         sdagCode = new XStr("sdagentry ");
 	*sdagCode << name << "(";
-        param->printMsg(*sdagCode);
+        if (param != NULL)
+          param->printSdagParam(*sdagCode);
+        //param->printMsg(*sdagCode);
         *sdagCode << ") ";
         *sdagCode << "{\n" << str << "\n}\n";
       }

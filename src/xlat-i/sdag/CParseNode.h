@@ -26,14 +26,20 @@ class CParseNode {
     XStr *counter;
     EToken type;
     XStr *text;
+    XStr *vartype;
+    int numPtrs;
+    int isVoid; 
+    int needsParamMarshalling;
     CParseNode *con1, *con2, *con3, *con4;
     TList<CParseNode*> *constructs;
+    TList<CStateVar*> estateVars;
     TList<CStateVar*> *stateVars;
     TList<CStateVar*> *stateVarsChildren;
     CParseNode *next;
     int nextBeginOrEnd;
     CEntry *entryPtr;
     CParseNode(EToken t, CLexer *cLexer, CParser *cParser);
+    CParseNode(EToken t, CLexer *cLexer, CParser *cParser, CToken *tokA, CToken *tokB, int pointers);
     CParseNode(EToken t, XStr *txt) : type(t), text(txt), con1(0), con2(0),
                                          con3(0), con4(0), constructs(0) {}
     void numberNodes(void);
