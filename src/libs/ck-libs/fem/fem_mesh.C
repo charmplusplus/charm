@@ -28,7 +28,7 @@ void FEM_Comm_Holder::registerIdx(IDXL_Chunk *c) {
 }
 void FEM_Comm_Holder::pup(PUP::er &p) {
 	p|idx;
-	if (p.isUnpacking() && idx!=1) 
+	if (p.isUnpacking() && idx!=-1) 
 	{ // Try to grab the same index we had on our old processor:
 		registerIdx(IDXL_Chunk::get("FEM_Comm_Holder::pup"));
 	}
