@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.18  1995-10-12 20:13:59  sanjeev
+ * Revision 2.19  1995-10-18 22:19:54  jyelon
+ * Still having problems with <stddef> and size_t
+ *
+ * Revision 2.18  1995/10/12  20:13:59  sanjeev
  * fixed problems while compiling with CC
  *
  * Revision 2.17  1995/10/11  19:30:33  sanjeev
@@ -89,10 +92,10 @@
 #ifndef C_PLUS_INTERFACE_H
 #define C_PLUS_INTERFACE_H
 
-#define NULL_EP -1
-
 /* This is to get size_t */
-typedef unsigned int size_t ;
+#include <stddef.h>
+
+#define NULL_EP -1
 
 class _CK_Object ;
 class groupmember ;
