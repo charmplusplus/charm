@@ -676,20 +676,6 @@ Debug "Read config script, setting defaults..."
 
 Debug "Setting vars..."
 
-# update charm to bgcharm
-if [ "$LANGUAGE" = "charm++" -a -n "$CMK_BLUEGENE" ]
-then
-        LANGUAGE="bgcharm++"
-fi
-if [ "$LANGUAGE" = "converse++" -a -n "$CMK_BLUEGENE" ]
-then
-        LANGUAGE="bgconverse++"
-fi
-if [ "$LANGUAGE" = "bgcharm++" ]
-then
-	TRACEMODE=`AddList $TRACEMODE bluegene`
-fi
-
 if [ "$BUILD_SHARE" = "1" ]
 then
 	if [ -n "$CMK_NO_BUILD_SHARED" -o -z "$CHARMLIBSO" ]
@@ -827,6 +813,20 @@ case "$LANGUAGE" in
 	[ -z "$SEQUENTIAL" -a -z "$NATIVE" ] && Abort "Language $LANGUAGE is for sequential programs"
 	;;
 esac
+
+# update charm to bgcharm
+if [ "$LANGUAGE" = "charm++" -a -n "$CMK_BLUEGENE" ]
+then
+        LANGUAGE="bgcharm++"
+fi
+if [ "$LANGUAGE" = "converse++" -a -n "$CMK_BLUEGENE" ]
+then
+        LANGUAGE="bgconverse++"
+fi
+if [ "$LANGUAGE" = "bgcharm++" ]
+then
+	TRACEMODE=`AddList $TRACEMODE bluegene`
+fi
 
 ########################################################################
 #
