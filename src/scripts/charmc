@@ -65,6 +65,10 @@ USE_RELIABLE_CC=""
 USE_FASTEST_CC=""
 PROG_EXT=""
 
+COPY_EXIT="true"
+CHARM_SHARED=""
+BUILD_SHARE=""
+
 MAKELIBCHARM="0"
 
 ####################################################################
@@ -457,10 +461,19 @@ do
 		Warning "passing unrecognized option $arg to all compilers and linkers"
 		OPTS="$OPTS $arg"
 		;;
+	-shared|-G)
+		BUILD_SHARE=true
+		;;
 	-L*|-shared|-G)
 		OPTS_LD="$OPTS_LD $arg"
 		;;
-
+	-charm-shared|-charmShared)
+		CHARM_SHARED=true
+		;;
+	-charm-so|-buildShared)
+		# used internally when building Charm++ to create lib_so
+		BUILD_SHARE=true
+		;;
 	"-O")
 		OPTIMIZE_MODE=true
 		;;
@@ -560,6 +573,7 @@ fi
 
 CHARMLIB="$CHARMBIN/../lib"
 CHARMINC="$CHARMBIN/../include"
+CHARMLIBSO="$CHARMBIN/../lib_so"
 
 
 ##############################################################################
@@ -627,16 +641,28 @@ Debugf "----------- Module dependency search complete ------------"
 Debug "About to read machine config script"
 Debug "Read config script, setting defaults..."
 
-# loading system configuration shell scripts
 [ ! -r $CHARMINC/conv-config.sh ] && Abort "Cannot find conv-config.sh in $CHARMINC"
 . $CHARMINC/conv-config.sh $CHARMINC
 
 Debug "Setting vars..."
 
 # update charm to bgcharm
-if [ "$LANGUAGE" = "charm++" -a -n "$CMK_BLUEGENE" ] 
+if [ "$LANGUAGE" = "charm++" -a -n "$CMK_BLUEGENE" ]
 then
-	LANGUAGE="bgcharm++"
+        LANGUAGE="bgcharm++"
+fi
+
+if [ -n "$BUILD_SHARE" ]
+then
+	# ignore BUILD_SHARE is the target is not .a or .so
+	case "$OBJECT" in
+	*.a|*.so)
+ 		OPTS_LD="$OPTS_LD $CMK_LD_SHARED $OPTS_LDRO -L$CHARMLIBSO"
+		;;
+	*)	
+		BUILD_SHARE=""
+		;;
+	esac
 fi
 
 if [ -n "$USE_RELIABLE_CC" ]
@@ -763,7 +789,7 @@ Copyobj() {
 		[ ! -d $COPYTO ] && DoNoErrCheck $RM $COPYTO 
 		Do $CP $OBJECT $COPYTO
 	fi
-	Success
+	test -n "$COPY_EXIT" && Success
 }
 
 Copymod() {
@@ -902,6 +928,14 @@ done
 #
 ##############################################################################
 
+MakeSO() {
+	Debugf "Running ldro..."
+	DoNoErrCheck $RM $OBJECT
+	Do $CMK_LD -o $OBJECT $OPTS_LD $OPTS_LDRO $OBJECTFILES \
+		$PRE_LIBRARIES $POST_LIBRARIES
+	Copyobj
+}
+
 if [ -z "$OBJECT" -o ! -z "$SKIPLINK" ] 
 then
 # We have no target object, or are playing preprocessor tricks-- just end
@@ -927,17 +961,32 @@ case "$OBJECT" in
 	;;
 *.so)
 # Make shared library
-	if [ "$MAKELIBCHARM" = 0 ]
+	if [ "$MAKELIBCHARM" = 0 -a -z "$CHARM_SHARED"  ]
 	then
-		Debugf "Running ldro..."
-		DoNoErrCheck $RM $OBJECT
-		Do $CMK_LD -o $OBJECT $OPTS_LD $OPTS_LDRO $OBJECTFILES \
-			$PRE_LIBRARIES $POST_LIBRARIES
-		Copyobj
+	  	MakeSO
 	fi
 	;;
 *.a)
 # Make regular (.a, non-shared) library
+	# in case building charm so, build .so under lib_so as well # Gengbin
+	if [ -n "$BUILD_SHARE" ]
+	then
+	  COPY_EXIT=""
+	  OBJECT_SAVE=$OBJECT
+	  COPYTO_SAVE=$COPYTO
+	  if [ -z "$COPYTO" ]
+	  then
+	    OBJECT=`echo $OBJECT | sed -e 's@lib/\([^/]*\)\.a$@lib_so/\1.a@'`
+	  else
+	    COPYTO=`echo $COPYTO | sed -e 's@lib[/]*$@lib_so@'`
+	  fi
+	  OBJECT=`echo $OBJECT | sed -e 's/\.a$/.so/'`
+	  MakeSO
+	  COPYTO=$COPYTO_SAVE
+	  OBJECT=$OBJECT_SAVE
+	  COPY_EXIT="true"
+	fi
+	# build normal .a
 	DoNoErrCheck $RM $OBJECT
 	Do $CMK_AR $OBJECT $OBJECTFILES
 	Do $CMK_RANLIB $OBJECT
@@ -1116,7 +1165,7 @@ Do $CMK_CXX $OPTS_CPP $OPTS_CXX -c $modInitSrc -o $modInitObj
 
 Debug "About to perform final link..."
 
-if [ "$MAKELIBCHARM" = "1" ]
+if [ "$MAKELIBCHARM" = "1" -o -n "$BUILD_SHARE" ]
 then
 CORE_LIBS="-lconv-core -lconv-util $TRACE_OBJ "
 else
@@ -1144,11 +1193,28 @@ case "$LANGUAGE" in
 	;;
 esac
 
+if [ -n "$CHARM_SHARED" ] 
+then
+  if [ -n "$BUILD_SHARE" ]
+  then
+    LANG_LIBS="-L$CHARMLIBSO -I$CHARMINC $OBJECTFILES $PRE_LIBRARIES"
+  else
+    LANG_LIBS="-L$CHARMLIBSO -I$CHARMINC $BAL_OBJ $OBJECTFILES $modInitObj $PRE_LIBRARIES"
+  fi
+else
 LANG_LIBS="-L$CHARMLIB -I$CHARMINC $BAL_OBJ $OBJECTFILES $modInitObj $PRE_LIBRARIES"
+fi
 ALL_LIBS="$LANG_LIBS $MIDDLE_LIBS $CMK_LIBS $POST_LIBRARIES"
 
-
-if [ "$MAKELIBCHARM" = "1" ]
+if [ -n "$BUILD_SHARE" -a -n "$CHARM_SHARED" ]
+then
+  OPTS_LD="$OPTS_LD $CMK_LD_SHARED $OPTS_LDRO -L$CHARMLIBSO"
+  Debugf "Running ldro..."
+  DoNoErrCheck $RM $OBJECT
+  [ "$MAKE_LDXX" = "1" ] && Do $CMK_LDXX $OPTS_LD $OPTS_LDXX -o $OBJECT $ALL_LIBS
+  [ "$MAKE_LD" = "1" ] && Do $CMK_LD $OPTS_LD -o $OBJECT $ALL_LIBS
+  Copyobj
+elif [ "$MAKELIBCHARM" = "1" ]
 then
 # Make a libCharm.so: replace all .a's with their constituent.o's, since 
 #   linkers will remove (for now!) unreferenced .o's from .a's.
