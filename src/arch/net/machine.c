@@ -866,6 +866,7 @@ static void CmiPushNode(void *msg)
   
 #if CMK_IMMEDIATE_MSG
   if (CmiIsImmediate(msg)) {
+  MACHSTATE(2,"Pushing Immediate message into queue");
     CmiPushImmediateMsg(msg);
     return;
   }
