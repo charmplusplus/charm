@@ -536,7 +536,7 @@ static void init_ranges(char **argv)
     memRange_t meg=1024*1024; /*One megabyte*/
     memRange_t gig=1024*meg; /*One gigabyte*/
     int i,nRegions=7;
-    memRegion_t regions[7]; /*used portions of address space*/
+    memRegion_t regions[10]; /*used portions of address space*/
     memRegion_t freeRegion; /*Largest unused block of address space*/
 
 /*Mark off regions of virtual address space as ususable*/
@@ -560,6 +560,12 @@ static void init_ranges(char **argv)
 
     regions[6].type="Program dynamically linked code";
     regions[6].start=codeDll; regions[6].len=256u*meg;    
+
+#ifdef CMK_BAD_MMAP_ADDRESS 
+    regions[nRegions].type="Region to skip from the conv-mach.h file";
+    regions[nRegions].start=(void *)CMK_BAD_MMAP_ADDRESS; regions[nRegions].len=0x10000000u;
+    nRegions++;
+#endif
 
     _MEMCHECK(heapBig); free(heapBig);
     _MEMCHECK(heapLil); free(heapLil); 
