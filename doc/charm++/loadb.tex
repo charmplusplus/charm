@@ -348,7 +348,7 @@ other runtime options.
    {\em -balancer GreedyCommLB -balancer RefineLB}   \\
    This will start first load balancing step with GreedyCommLB, and second load balancing step with RefineLB, and same RefineLB in the subsequent load balancing steps.
 \item {\em -balancer ComboCentLB:GreedyLB,RefineLB}  \\
-   One can choose to create a new combo load balancer made of multiple load balancers. The above example specifes {\em one} load balancer which first applies GreedyLB algorithm followed by RefineLB algorithm.
+   One can choose to create a new combo load balancer made of multiple load balancers. The above example specifies {\em one} load balancer which first applies GreedyLB algorithm followed by RefineLB algorithm.
 \end{itemize}
 
 The list of existing load balancers are in section \ref{lbStrategy}.
@@ -397,7 +397,7 @@ load balancer is created.
 
 \item {\bf Other Useful Run-time options}
 
-There are a few opther run-time options that may be useful:
+There are a few other run-time options that may be useful:
 
 \begin{itemize}
 \item {\em +LBDebug <verbose level>} \\
@@ -578,7 +578,7 @@ load balancer.
  dense graph.
 \item {\em spray}\\  
  a strategy which imposes a spanning tree organization on the processors,
- results in communication via global reduction amongst all processors 
+ results in communication via global reduction among all processors 
  to compute global average load via periodic reduction. 
  It uses averaging of loads to determine how seeds should be
 distributed.
@@ -600,9 +600,9 @@ module into binary as described below to override the default strategy.
 
 Seed load balancers can also be used for array elements in the same way 
 as they are used for individual chares.
-Chare array is a collection of individule Chares in Charm++.
-Since Chare Array has its internal strategy of static mapping of individule
-array elements to processors using {\em CkArrayMap}~\ref{array map}~\footnote{by default it always distributed array elements to procesors in Round-Robin fashion unless a different CkArrayMap is used}, 
+Chare array is a collection of individual Chares in Charm++.
+Since Chare Array has its internal strategy of static mapping of individual
+array elements to processors using {\em CkArrayMap}~\ref{array map}~\footnote{by default it always distributed array elements to processors in Round-Robin fashion unless a different CkArrayMap is used}, 
 a special CkArrayMap called {\em CldMap} must be created and passed into
 array creation calls to interface with seed load balancer.
 
