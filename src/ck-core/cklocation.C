@@ -634,6 +634,7 @@ CmiBool CkLocRec_local::invokeEntry(CkMigratable *obj,void *msg,int epIdx) {
 	startTiming();
 	if (msg) {
 		envelope *env=UsrToEnv(msg);
+	//	CkPrintf("ckLocation.C beginExecuteDetailed %d %d \n",env->getEvent(),env->array_srcPe());
 		_TRACE_BEGIN_EXECUTE_DETAILED(env->getEvent(),
 		     ForChareMsg,epIdx,env->array_srcPe(), env->getTotalsize());
 	}
