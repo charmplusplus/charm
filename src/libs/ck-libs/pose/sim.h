@@ -326,7 +326,7 @@ class sim : public ArrayElement1D {
   /// Used by buffered print functions
   void InternalCommitPrintf (const char *Fmt, va_list ap) {
     char *tmp;
-    size_t tmplen=myStrat->currentEvent->commitBfrLen + strlen(Fmt) + 1 +100;
+    size_t tmplen=myStrat->currentEvent->commitBfrLen + strlen(Fmt) + 1 +512;
     if (!(tmp = (char *)malloc(tmplen * sizeof(char)))) {
       CkPrintf("ERROR: sim::CommitPrintf: OUT OF MEMORY!\n");
       CkExit();
