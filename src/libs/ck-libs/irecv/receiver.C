@@ -7,25 +7,29 @@
 #include "receiver.h"
 
 
-receiver::receiver(void) 
+receiver::receiver() 
 {
   msgTbl = CmmNew();
   reqTbl = CmmNew();
 
-  callback = 0;
+  callback = NULL;
   counter = -1;
+  startwaiting = 0;
 }
 
-receiver::receiver(CkMigrateMessage *m)
+receiver::receiver(CkMigrateMessage *m) : ArrayElement1D(m)
 {
   msgTbl = CmmNew();
   reqTbl = CmmNew();
+
+  callback = NULL;
 }
 
 void receiver::pup(PUP::er &p)
 {
   ArrayElement1D::pup(p);
   p(counter);
+  p(startwaiting);
   // pack CmmTable: msgTbl, reqTbl
   pupCmmTable(msgTbl, p);
   pupCmmTable(reqTbl, p);
@@ -37,35 +41,46 @@ receiver::~receiver()
   CmmFree(reqTbl);
 }
 
-#define MIN(a,b) ((a)<(b)?(a):(b))
+#define MIN(a,b) (a)<(b)?(a):(b)
 
 // other receiver send message here (active send)
-void receiver::sendTo(receiverMsg *m)
+void receiver::sendTo(int tag, char *pointer, int size, int from, int refno)
 {
-  int tags[4], ret_tags[4];
-  int size = m->tags[3];
-  m->tags[3] = CmmWildCard;
+  int tags[3], ret_tags[3];
 
-  void *req = CmmGet(reqTbl, 4, m->tags, ret_tags);
+//CkPrintf("Sendto (msgTbl): tag:%d, from:%d, refno:%d size:%d. \n", tag, from, refno,size);
+  tags[0] = tag; tags[1] = from; tags[2] = refno;
+  tblEntry *req = (tblEntry *)CmmGet(reqTbl, 3, tags, ret_tags);
 
   if (req) {
     //  irecv called before; copy buffer
-    memcpy(req, m->buf, MIN(size, ret_tags[3])); 
-    delete m;
-    if (callback && m->tags[2]==counter) {
-      tags[0] = tags[1] = tags[3] = CmmWildCard; tags[2] = counter;
-      void *req1 = CmmProbe(reqTbl, 4, tags, ret_tags);
-      if (!req1) {
-        recvCallBack tmpfn = callback;
-        callback = 0;
-        tmpfn(cb_data);
-      }
-    }
-  } else {
-    // msg came before irecv called
-    m->tags[3] = size;
-    CmmPut(msgTbl, 4, m->tags, m);
+    memcpy(req->buf, pointer, MIN(size, req->size)); 
+    delete req;
+
+    recvAlready();
   }
+  else {
+    // msg come before irecv called
+    tags[0] = tag; tags[1] = from; tags[2] = refno;
+    req = new tblEntry;
+    req->buf = new char[size];
+    memcpy(req->buf, pointer, size); 
+    req->size = size;
+    CmmPut(msgTbl, 3, tags, req);
+  }
+
+}
+
+void receiver::generic(receiverMsg *msg)
+{
+  sendTo(msg->tag, msg->buf, msg->size, msg->sendFrom, msg->refno);
+  delete msg;
+}
+
+void receiver::syncSend(receiverMsg *msg)
+{
+  sendTo(msg->tag, msg->buf, msg->size, msg->sendFrom, msg->refno);
+  delete msg;
 }
 
 extern "C" int typesize(int type, int count)
@@ -76,137 +91,172 @@ extern "C" int typesize(int type, int count)
     case CMPI_REAL : return count*sizeof(float);
     case CMPI_COMPLEX: return 2*count*sizeof(double);
     case CMPI_LOGICAL: return 2*count*sizeof(int);
-    case CMPI_CHAR: return count;
-    case CMPI_BYTE: return count;
-    case CMPI_PACKED: return count;
+    case CMPI_CHARACTER:
+    case CMPI_BYTE:
+    case CMPI_PACKED:
     default:
-      CkAbort("Type not supported\n");
-      return 0;
+      return 2*count;
   }
 }
 
-void 
-receiver::isend(void *buf, int count, int datatype, int dest, int tag, 
-                int refno)
+void receiver::isend(void *buf, int count, int datatype, int dest, int tag, int refno)
 {
-  //CkPrintf("[%d] isend to %d with ref %d\n", thisIndex, dest, refno);
-  int size = typesize(datatype, count);
-  receiverMsg *d = new (&size, 0) receiverMsg;
-  d->tags[0] = tag;
-  d->tags[1] = thisIndex;
-  d->tags[2] = refno;
-  d->tags[3] = size;
-  memcpy(d->buf, buf, size);
-  CProxy_receiver B(thisArrayID);
-  B[dest].sendTo(d);
+ int size = typesize(datatype, count);
+ receiverMsg * d = new (&size, 0) receiverMsg;
+ d->tag = tag;
+ d->sendFrom = thisIndex;
+ d->refno = refno;
+ memcpy(d->buf, buf, size);
+ CProxy_receiver B(thisArrayID);
+ B[dest].generic(d);
 }
 
-void 
-receiver::irecv(void *buf, int count, int datatype, int source, int tag, 
-                int refno)
+void receiver::irecv(void *buf, int count, int datatype, int source, int tag, int refno)
 {
-  //CkPrintf("[%d] irecv from %d with ref %d\n", thisIndex, source, refno);
-  int tags[4], ret_tags[4];
+  int tags[3], ret_tags[3];
   int size = typesize(datatype, count);
 
-  tags[0] = tag; tags[1] = source; tags[2] = refno; tags[3] = CmmWildCard;
-  receiverMsg *msg = (receiverMsg *)CmmGet(msgTbl, 4, tags, ret_tags);
+  tags[0] = tag; tags[1] = source; tags[2] = refno;
+  tblEntry *req = (tblEntry *)CmmGet(msgTbl, 3, tags, ret_tags);
 
-  if (msg) {
+  if (req) {
     // send called before; copy buffer into
-    memcpy(buf, msg->buf, MIN(size, msg->tags[3]));
-    delete msg;
-  } else {
+    memcpy(buf, req->buf, MIN(size, req->size));
+    delete [] req->buf;
+    delete req;
+  }
+  else {
+//CkPrintf("irecv (reqtbl): tag:%d, senderTag:%d, refno:%d. \n", tag, senderTag, refno);
    // recv called before send
-    tags[3] = size;
-    CmmPut(reqTbl, 4, tags, buf);
+    tags[0] = tag; tags[1] = source; tags[2] = refno;
+    req = new tblEntry;
+    req->buf = (char *)buf;
+    req->size = size;
+    CmmPut(reqTbl, 3, tags, req);
   }
 }
 
-#define GATHER_TAG   65535;
-
-int 
-receiver::iAlltoAll(void *sendbuf, int sendcount, int sendtype, 
-	            void *recvbuf, int recvcount, int recvtype, int refno)
+int receiver::iAlltoAll(void *sendbuf, int sendcount, int sendtype, 
+	      void *recvbuf, int recvcount, int recvtype, int refno)
 {
   int nPe = getArraySize();  // should be number of elements in array1D
-  int tag = GATHER_TAG;	// special tag
+  int tag = 65535;	// special tag
   int i;
-  for (i=0; i<nPe; i++) {
-      isend(((char *)sendbuf)+i*typesize(sendtype, sendcount), 
-            sendcount, sendtype, i, tag, refno);
-  }
-  for (i=0; i<nPe; i++)  {
-      irecv(((char *)recvbuf)+i*typesize(recvtype, recvcount), 
-            recvcount, recvtype, i, tag, refno);
-  }
+  for (i=0; i<nPe; i++) 
+      isend(((char *)sendbuf)+i*typesize(sendtype, sendcount), sendcount, sendtype, i, tag, refno);
+  for (i=0; i<nPe; i++) 
+      irecv(((char *)recvbuf)+i*typesize(recvtype, recvcount), recvcount, recvtype, i, tag, refno);
   return 0;
 }
 
-int 
-receiver::iAlltoAllv(void *sendbuf, int *sendcount, int *sdispls, int sendtype,
-                     void *recvbuf, int *recvcount, int *rdispls, int recvtype,
-                     int refno)
+int receiver::iAlltoAllv(void *sendbuf, int *sendcount, int *sdispls, int sendtype, void *recvbuf, int *recvcount, int *rdispls, int recvtype, int refno)
 {
   int nPe = getArraySize();  // should be number of elements in array1D
-  int tag = GATHER_TAG;	// special tag
+  int tag = 65535;	// special tag
   int i;
-  for (i=0; i<nPe; i++) {
-      isend(((char *)sendbuf)+sdispls[i]*typesize(sendtype, 1), 
-            sendcount[i], sendtype, i, tag, refno);
-  }
-  for (i=0; i<nPe; i++)  {
-      irecv(((char *)recvbuf)+rdispls[i]*typesize(recvtype, 1), 
-            recvcount[i], recvtype, i, tag, refno);
-  }
+  for (i=0; i<nPe; i++) 
+      isend(((char *)sendbuf)+sdispls[i]*typesize(sendtype, 1), sendcount[i], sendtype, i, tag, refno);
+  for (i=0; i<nPe; i++) 
+      irecv(((char *)recvbuf)+rdispls[i]*typesize(recvtype, 1), recvcount[i], recvtype, i, tag, refno);
   return 0;
 }
 
 void receiver::iwaitAll(recvCallBack f, void *data, int ref)
 {
-  //CkPrintf("[%d] iwaitall with ref %d\n", thisIndex, ref);
-  int tags[4], ret_tags[4];
-  tags[0] = tags[1] = tags[3] = CmmWildCard; tags[2] = ref;
-  void *req1 = CmmProbe(reqTbl, 4, tags, ret_tags);
-  if (req1) { // some unsatisfied irecv requests exist
-    callback = f;
-    cb_data = data;
-    counter = ref;
-  } else { // all irecv requests for refnum ref satisfied
-    f(data);
+  if (callback != NULL) 
+  {
+    CkPrintf("iwaitAll wrong!\n");
+    CkExit();
   }
+  callback = f;
+  this->cb_data = data;
+  counter = ref;
+
+  startwaiting = 1;
+
+  recvAlready();
+}
+
+void receiver::iwaitAll(int ref)
+{
+  callback = NULL;
+  this->cb_data = NULL;
+  counter = ref;
+  startwaiting = 1;
+
+  recvAlready();
+}
+
+void receiver::recvAlready()
+{
+//   if (callback == NULL) return;
+   if (!startwaiting) return;
+
+   int tags[3], ret_tags[3];
+   tags[0] = CmmWildCard; tags[1] = CmmWildCard; tags[2] = counter;
+   tblEntry *req1 = (tblEntry *)CmmProbe(reqTbl, 3, tags, ret_tags);
+   tblEntry *req2 = (tblEntry *)CmmProbe(msgTbl, 3, tags, ret_tags);
+   if (req1 == NULL && req2 == NULL && startwaiting)  //  && callback != NULL) 
+   {
+      startwaiting = 0;
+      CProxy_receiver B(thisArrayID);
+      B[thisIndex].ready2go();
+//CkPrintf("[%d] ready to go on %d\n", thisIndex, counter);
+   }
+}
+
+void receiver::ready2go()
+{
+/*
+    if (callback == NULL) CkPrintf("Fatal error in Call back on [%d]. \n", thisIndex);
+
+    recvCallBack tmpfn = callback;
+    callback = NULL;
+    tmpfn(cb_data);
+*/
+    if (callback) {
+        recvCallBack tmpfn = callback;
+        callback = NULL;
+        tmpfn(cb_data);
+    }
+    else {
+//CkPrintf("[%d] resumeFromWait\n", CkMyPe());
+	resumeFromWait();
+    }
+}
+
+void receiver::resumeFromWait()
+{
+    CkPrintf("Please write your own resumeFromWait\n"); 
 }
 
 void receiver::pupCmmTable(CmmTable &t, PUP::er &p)
 {
-  void *msg;
-  int tags[4], rtags[4];
-  int num = CmmEntries(t);
-  p(num);
-  if (p.isPacking()) {
-    tags[0] = tags[1] = tags[2] = tags[3] = CmmWildCard;
-    while (msg = CmmProbe(t, 4, tags, rtags)) {
-      p(rtags, 4);
-      p(msg, rtags[3]);
+    tblEntry *msg;
+    int tags[3], rtags[3];
+    int num = CmmEntries(t);
+    p(num);
+    if (p.isPacking()) {
+	tags[0] = tags[1] = tags[2] = CmmWildCard;
+	tblEntry *msg = (tblEntry *)CmmProbe(t, 3, tags, rtags);
+	while (msg) {
+	    p(rtags, 3);
+	    p(msg->size);
+	    p(msg->buf, msg->size);
+	    msg = (tblEntry *)CmmProbe(t, 3, tags, rtags);
+	}
     }
-  } else {
-    for (int i=0; i<num; i++)  {
-      p(tags, 4);
-      msg = new char[tags[3]];
-      p(msg, tags[3]);
-      CmmPut(t, 4, tags, msg);
+    else {
+	int s;
+//	t = CmmNew();
+	for (int i=0; i<num; i++)  {
+	    p(rtags, 3);
+	    msg = new tblEntry;
+	    p(msg->size);
+	    msg->buf = new char[msg->size];
+	    p(msg->buf, msg->size);
+	}
     }
-  }
-}
-
-extern "C" double IMPI_Wtime(void)
-{
-  return CmiWallTimer();
-}
-
-extern "C" double impi_wtime_(void)
-{
-  return IMPI_Wtime();
 }
 
 #include "receiver.def.h"
