@@ -95,8 +95,16 @@
  *
  *****************************************************************************/
  
+#ifdef WIN32
+#include <stdio.h>
+#include <stdlib.h>
+#include <malloc.h>
+#endif
+
 #include "converse.h"
+#ifndef  WIN32
 #include "qt.h"
+#endif
 #include "conv-trace.h"
 #include <sys/types.h>
 
@@ -438,6 +446,370 @@ void CthSetNext(CthThread t, CthThread v)
 CthThread CthGetNext(CthThread t) 
 {
   return t->qnext;
+}
+
+#elif  CMK_THREADS_ARE_WIN32_FIBERS
+
+#define _WIN32_WINNT  0x0400
+
+#include <windows.h>
+#include <winbase.h>
+
+#if(_WIN32_WINNT >= 0x0400)
+typedef VOID (WINAPI *PFIBER_START_ROUTINE)(
+    LPVOID lpFiberParameter
+    );
+typedef PFIBER_START_ROUTINE LPFIBER_START_ROUTINE;
+#endif
+
+#if(_WIN32_WINNT >= 0x0400)
+WINBASEAPI
+LPVOID
+WINAPI
+CreateFiber(
+    DWORD dwStackSize,
+    LPFIBER_START_ROUTINE lpStartAddress,
+    LPVOID lpParameter
+    );
+
+WINBASEAPI
+VOID
+WINAPI
+DeleteFiber(
+    LPVOID lpFiber
+    );
+
+WINBASEAPI
+LPVOID
+WINAPI
+ConvertThreadToFiber(
+    LPVOID lpParameter
+    );
+
+WINBASEAPI
+VOID
+WINAPI
+SwitchToFiber(
+    LPVOID lpFiber
+    );
+
+WINBASEAPI
+BOOL
+WINAPI
+SwitchToThread(
+    VOID
+    );
+#endif /* _WIN32_WINNT >= 0x0400 */
+
+
+typedef void *(qt_userf_t)(void *pu);
+
+struct CthThreadStruct
+{
+	char cmicore[CmiMsgHeaderSizeBytes];
+	CthVoidFn  awakenfn;
+	CthThFn    choosefn;
+	int        autoyield_enable;
+	int        autoyield_blocks;
+	char      *data;
+	int        datasize;
+	int        suspendable;
+	int        killed;
+/** addition for tracing */
+	int        Event;
+/** End Addition */
+	CthThread  qnext;
+	LPVOID     fiber;
+};
+
+void CthSetSuspendable(CthThread t, int val)
+{
+	t->suspendable = val;
+}
+
+int CthIsSuspendable(CthThread t)
+{
+	return t->suspendable;
+}
+
+/** addition for tracing */
+void setEvent(CthThread t, int event)
+{
+	t->Event = event;
+}
+
+int getEvent(CthThread t)
+{
+	return t->Event;
+}
+/** End Addition */
+
+CthCpvDeclare(char *,    CthData);
+CthCpvStatic(CthThread,  CthCurrent);
+CthCpvStatic(CthThread,  CthPrevious);
+CthCpvStatic(int,        CthExiting);
+CthCpvStatic(int,        CthDatasize);
+
+int CthImplemented()
+{ 
+	return 1; 
+}
+
+static void CthNoStrategy()
+{
+	CmiPrintf("Called CthAwaken or CthSuspend before calling CthSetStrategy.\n");
+	exit(1);
+}
+
+static void CthThreadInit(CthThread t)
+{
+	t->awakenfn = 0;
+	t->choosefn = 0;
+	t->data=0;
+	t->datasize=0;
+	t->killed = 0;
+	t->qnext=0;
+	t->autoyield_enable = 0;
+	t->autoyield_blocks = 0;
+	t->suspendable = 1;
+}
+
+void CthFixData(CthThread t)
+{
+	int datasize = CthCpvAccess(CthDatasize);
+	
+	if (t->data == 0) 
+	{
+		t->datasize = datasize;
+		t->data = (char *)malloc(datasize);
+		_MEMCHECK(t->data);
+	}
+	
+	else if (t->datasize != datasize) 
+	{
+		t->datasize = datasize;
+		t->data = (char *)realloc(t->data, datasize);
+	}
+}
+
+void CthInit()
+{
+	CthThread t;
+	LPVOID    fiber;
+
+
+	CthCpvInitialize(char *,     CthData);
+	CthCpvInitialize(CthThread,  CthCurrent);
+	CthCpvInitialize(CthThread,  CthPrevious);
+	CthCpvInitialize(int,        CthDatasize);
+	CthCpvInitialize(int,        CthExiting);
+
+	t = (CthThread)malloc(sizeof(struct CthThreadStruct));
+	_MEMCHECK(t);
+	
+	CthThreadInit(t);
+	CthCpvAccess(CthData)=0;
+	CthCpvAccess(CthPrevious)=0;
+	CthCpvAccess(CthCurrent)=t;
+	CthCpvAccess(CthDatasize)=1;
+	CthCpvAccess(CthExiting)=0;
+	CthSetStrategyDefault(t);
+	fiber = ConvertThreadToFiber(t);
+	t->fiber = fiber;
+}
+
+CthThread CthSelf()
+{
+	return CthCpvAccess(CthCurrent);
+}
+
+void CthFree(CthThread t)
+{
+	if (t==CthCpvAccess(CthCurrent)) 
+	{
+		CthCpvAccess(CthExiting) = 1;
+	} 
+	else 
+	{
+		CmiError("Not implemented CthFree.\n");
+		exit(1);
+	}
+}
+
+static void *CthAbortHelp(CthThread old)
+{
+	if (old->data) free(old->data);
+	DeleteFiber(old->fiber);
+	free(old);
+	return (void *) 0;
+}
+
+
+static void CthFiberBlock(CthThread t)
+{
+	CthThread tp;
+	
+	SwitchToFiber(t->fiber);
+	tp = CthCpvAccess(CthPrevious);
+	if (tp != 0 && tp->killed == 1)
+		CthAbortHelp(tp);
+}
+
+void CthResume(CthThread t)
+{
+	CthThread tc;
+	tc = CthCpvAccess(CthCurrent);
+	if (t == tc) return;
+	CthFixData(t);
+	CthCpvAccess(CthCurrent) = t;
+	CthCpvAccess(CthData) = t->data;
+	CthCpvAccess(CthPrevious)=tc;
+	if (CthCpvAccess(CthExiting)) 
+	{
+		CthCpvAccess(CthExiting)=0;
+		tc->killed = 1;
+		SwitchToFiber(t->fiber);
+	} 
+	else 
+		CthFiberBlock(t);
+	
+}
+
+static void CthOnly(void *arg, void *vt, qt_userf_t fn)
+{
+  fn(arg);
+  CthCpvAccess(CthExiting) = 1;
+  CthSuspend();
+}
+
+VOID CALLBACK FiberSetUp(PVOID fiberData)
+{
+	void **ptr = (void **) fiberData;
+	CthOnly((void *)ptr[1], 0, ptr[0]);
+}
+
+CthThread CthCreate(CthVoidFn fn, void *arg, int size)
+{
+  CthThread result; 
+  void**    fiberData;
+  fiberData = (void *) malloc(2*sizeof(void *));
+  fiberData[0] = (void *)fn;
+  fiberData[1] = arg;
+  
+  result = (CthThread)malloc(sizeof(struct CthThreadStruct));
+  _MEMCHECK(result);
+  CthThreadInit(result);
+  result->fiber = CreateFiber(0, FiberSetUp, (PVOID) fiberData);
+  
+  CthSetStrategyDefault(result);
+  return result;
+}
+
+void CthSuspend()
+{
+  CthThread next;
+
+  if(!(CthCpvAccess(CthCurrent)->suspendable))
+		CmiAbort("trying to suspend main thread!!\n");
+  if (CthCpvAccess(CthCurrent)->choosefn == 0) CthNoStrategy();
+		next = CthCpvAccess(CthCurrent)->choosefn();
+  /** addition for tracing */
+#ifndef CMK_OPTIMIZE
+  if(CpvAccess(traceOn))
+		traceSuspend();
+#endif
+  /* end addition */
+  CthResume(next);
+}
+
+void CthAwaken(CthThread th)
+{
+	if (th->awakenfn == 0) CthNoStrategy();
+ /** addition for tracing */
+	CpvAccess(curThread) = th;
+#ifndef CMK_OPTIMIZE
+	if(CpvAccess(traceOn))
+		traceAwaken();
+#endif
+  /* end addition */
+	th->awakenfn(th);
+}
+
+void CthSetStrategy(CthThread t, CthVoidFn awkfn, CthThFn chsfn)
+{
+  t->awakenfn = awkfn;
+  t->choosefn = chsfn;
+}
+
+void CthYield()
+{
+	CthAwaken(CthCpvAccess(CthCurrent));
+	CthSuspend();
+}
+
+int CthRegister(int size)
+{
+	int result;
+	int align = 1;
+	while (size>align) align<<=1;
+	
+	CthCpvAccess(CthDatasize) = 
+		(CthCpvAccess(CthDatasize)+align-1) & ~(align-1);
+	result = CthCpvAccess(CthDatasize);
+	CthCpvAccess(CthDatasize) += size;
+	CthFixData(CthCpvAccess(CthCurrent));
+	CthCpvAccess(CthData) = CthCpvAccess(CthCurrent)->data;
+	return result;
+}
+
+
+void CthAutoYield(CthThread t, int flag)
+{
+	t->autoyield_enable = flag;
+}
+
+int CthAutoYielding(CthThread t)
+{
+	return t->autoyield_enable;
+}
+
+void CthAutoYieldBlock()
+{
+	CthCpvAccess(CthCurrent)->autoyield_blocks ++;
+}
+
+void CthAutoYieldUnblock()
+{
+	CthCpvAccess(CthCurrent)->autoyield_blocks --;
+}
+
+
+void CthSetNext(CthThread t, CthThread v)
+{
+	t->qnext = v;
+}
+
+
+CthThread CthGetNext(CthThread t) 
+{
+	return t->qnext;
+}
+
+int CthPackBufSize(CthThread t)
+{
+	CmiAbort("CthPackBufSize not implemented.\n");
+	return 0;
+}
+
+void CthPackThread(CthThread t, void *buffer)
+{
+	CmiAbort("CthPackThread not implemented.\n");
+}
+
+CthThread CthUnpackThread(void *buffer)
+{
+	CmiAbort("CthUnpackThread not implemented.\n");
+	return (CthThread) 0;
 }
 
 #else
