@@ -959,10 +959,14 @@ modInitName="moduleinit"
 modInitSrc="$modInitName.C"
 modInitObj="$modInitName.o"
 DoNoErrCheck $RM $modInitSrc $modInitObj > /dev/null 2>&1
-echo "#include \"charm++.h\"" >> $modInitSrc
 for module in $MODULES; do
     echo "extern void _register$module(void);" >> $modInitSrc
 done
+if test -n "$BALANCER"
+then
+    echo "extern void LBSetDefaultCreate(void (*fn)(void));" >> $modInitSrc
+    echo "extern void Create$BALANCER();" >> $modInitSrc
+fi
 echo "void _registerExternalModules(void) {" >> $modInitSrc
 for module in $MODULES; do
     [ -n "$VERBOSE" ] && echo "Adding registration for module $module"
@@ -971,11 +975,10 @@ done
 if test -n "$BALANCER"
 then
     [ -n "$VERBOSE" ] && echo "Adding load balancer for $BALANCER"
-    echo "  extern void Create$BALANCER();" >> $modInitSrc
     echo "  LBSetDefaultCreate(Create$BALANCER);" >> $modInitSrc
 fi
 echo "}" >> $modInitSrc
-Do $CMK_CXX $OPTSC -I$CHARMINC $OPTS_CXX -c $modInitSrc -o $modInitObj
+Do $CMK_CXX $OPTSC $OPTS_CXX -c $modInitSrc -o $modInitObj
 
 ###############################################################################
 #
