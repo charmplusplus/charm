@@ -1,113 +1,107 @@
-#ifndef __UIUC_CHARM_BITVECTOR_H
-#define __UIUC_CHARM_BITVECTOR_H
+#ifndef __UIUC_CS_CHARM_CKBITVECTOR_H
+#define __UIUC_CS_CHARM_CKBITVECTOR_H
 
-//#include <charm++.h>
 #include "ckstream.h"
 
-/* *********************************************************************
+/* ************************************************************************
  *
+ * 0 indicates the least important bit of the bitvector
+ * n indicates the most inportant bit of the bitvector
  *
- * ********************************************************************* */
+ * the n'th bit sits at the highest bit of the first integer.
+ * the 0'th bit sits at the lowest bit of the last integer.
+ *
+ * ************************************************************************ */
+
+typedef unsigned int prio_t;
+
 class CkBitVector {
  protected:
-  unsigned int usedBits;
-  unsigned int *data;
-  int dataLength;
+  prio_t usedBits;
+  prio_t *data;
 
-  bool growToFit(unsigned int n);
-  bool growToFit(const CkBitVector &b) { return growToFit(b.usedBits); }
-  static unsigned int chunkSize() { return sizeof(unsigned int)*8; }
-  static unsigned int chunksForBits(unsigned int n) {
-    return ( n + (chunkSize() - 1) ) / chunkSize();
+ protected:
+  static prio_t chunkBits() { return chunkSize()*8; }
+  static prio_t chunkSize() { return sizeof(prio_t); }
+  static prio_t chunks(prio_t n) { return (n + chunkBits()-1) / chunkBits(); }
+  prio_t offset(prio_t bit) const { return chunks(usedBits-bit)-1; }
+  prio_t mask(prio_t bit) const {
+    return (0x1<<(chunkBits()-(usedBits%chunkBits())+(bit%chunkBits()))); }
+
+ public:
+  static prio_t log2(prio_t val) {
+    prio_t log = 0;
+    if ( val != 0 ) {
+      while ( val > (1<<log) ) { log++; }
+    }
+    return log;
   }
+
+ protected:
+  void wipeData();
+
+ public:
+  int Length() const { return (int)usedBits; }
 
  public:
   CkBitVector();
   CkBitVector(const CkBitVector &b);
-  CkBitVector(unsigned int size);
-  CkBitVector(unsigned int value, unsigned int choices);
+  CkBitVector(prio_t bits);
+  CkBitVector(prio_t value, prio_t choices);
 
   ~CkBitVector();
 
   CkBitVector & operator=(const CkBitVector &b);
 
-  // Get the value at a bit, set the value of a bit to true, or
-  // clear the value of a bit (set to false)
-  CkBitVector & Clear(unsigned int n);
-  CkBitVector & Set(unsigned int n);
-  bool Test(unsigned int n) const;
-  CkBitVector & Complement();
+  // Bit operations. 0 is the least significant bit, and 32 (+) is the
+  // most significant bit.
+  CkBitVector & Zero();
+  CkBitVector & Invert();
+  CkBitVector & Clear(prio_t bit);
+  CkBitVector & Set(prio_t bit);
+  bool Test(prio_t bit) const;
 
-  // Perhaps these belong as union and intersection instead,
-  // as they are "bitwise and" and "bitwise or".
-  // Where does that leave + and - and * tho?
-  CkBitVector operator|(unsigned int n) { CkBitVector r = *this; return r.Set(n); }
-  CkBitVector & operator|=(unsigned int n) { return Set(n); }
-  CkBitVector operator&(unsigned int n) { CkBitVector r = *this; return r.Clear(n); }
-  CkBitVector & operator&=(unsigned int n) { return Clear(n); }
-  CkBitVector operator~() { CkBitVector r = *this; return r.Complement(); }
+  // Shift down and shift up shift the bits in the bit vector by bit
+  // bits around. The bits in the vector are moved up or down the
+  // specified amount. The size of the bit vector does not change
+  CkBitVector & ShiftDown(prio_t bits);
+  CkBitVector & ShiftUp(prio_t bits);
 
-  // union, intersect, difference, concat
-  CkBitVector & Union(const CkBitVector &b);
-  CkBitVector & Intersection(const CkBitVector &b);
-  CkBitVector & Difference(const CkBitVector &b);
-  CkBitVector & Concat(const CkBitVector &b);
+  // Change the size of the bit vector
+  CkBitVector & Resize(prio_t bits);
 
-  // These are aliases for union, intersect, and diff
-  CkBitVector operator+(const CkBitVector &b) { CkBitVector r = *this; return r.Union(b); }
-  CkBitVector & operator+=(const CkBitVector &b) { return Union(b); }
-  CkBitVector operator-(const CkBitVector &b) { CkBitVector r = *this; return r.Difference(b); }
-  CkBitVector & operator-=(const CkBitVector &b) { return Difference(b); }
-  CkBitVector operator*(const CkBitVector &b) { CkBitVector r = *this; return r.Intersection(b); }
-  CkBitVector & operator*=(const CkBitVector &b) { return Intersection(b); }
+  // Union, Intersection, Difference
+  CkBitVector & Union(CkBitVector const &b);
+  CkBitVector & Intersection(CkBitVector const &b);
+  CkBitVector & Difference(CkBitVector const &b);
 
-  // Expand and shrink the bitvector
-  CkBitVector & ShiftUp(unsigned int n);
-  CkBitVector & ShiftDown(unsigned int n);
+  // Concatenate two bit vectors together
+  CkBitVector & Concat(CkBitVector const &b);
 
-  // These make sense
-  CkBitVector operator<<(unsigned int n) { CkBitVector r = *this; return r.ShiftUp(n); }
-  CkBitVector & operator<<=(unsigned int n) { return ShiftUp(n); }
-  CkBitVector operator>>(unsigned int n) { CkBitVector r = *this; return r.ShiftDown(n); }
-  CkBitVector & operator>>=(unsigned int n) { return ShiftDown(n); }
+  // Comparison operators
+  bool operator==(const CkBitVector &b) const { return 0; } // HERE
+  bool operator!=(const CkBitVector &b) const { return !(*this==b); }
+  bool operator<(const CkBitVector &b) const { return 0; } // HERE
+  bool operator<=(const CkBitVector &b) const { return *this==b||*this>b; }
+  bool operator>(const CkBitVector &b) const { return 0; } // HERE
+  bool operator>=(const CkBitVector &b) const { return *this==b||*this<b; }
 
-  // These are fine
-  bool operator==(const CkBitVector &b) const;
-  bool operator!=(const CkBitVector &b) const { return !(*this == b); }
-  bool operator<(const CkBitVector &b) const;
-  bool operator<=(const CkBitVector &b) const { return *this==b || *this<b; }
-  bool operator>(const CkBitVector &b) const;
-  bool operator>=(const CkBitVector &b) const { return *this==b || *this>b; }
+  // Print the bit vector to either output stream type
+  friend CkOutStream & operator<< (CkOutStream &ckos, CkBitVector const b);
+  friend CkErrStream & operator<< (CkErrStream &ckes, CkBitVector const b);
 
+  // And for charm
+  void pup(PUP::er &p);
 
-  // I'd actually like to just be able to print it out directly to a
-  // iostream rather than bitvector->string() it. Should fix this.
-  char * string();
-
-  // This should probably be in CkEntryOptions not in here but until
-  // the class is put in the core it'll have to hold here.
-//  void setEO(CkEntryOptions *eo);
-
-  // This is an integer log base 2 function. Some glibcs have them,
-  // some don't. Not a very bright one, it just tests for less than
-  // 2^i for i = 0 .. sizeof(int)*4. It takes the ceiling of the
-  // true floating point result log2(x) would return.
-  //
-  // Aka, it takes a number and tells you how many bits you need to
-  // represent that number.
-  static unsigned int log2(unsigned int input);
-
-  static unsigned int maskBlock(unsigned int s);
-
+  // For debugging in megatest
 #ifdef DEBUGGING
-  unsigned int *getData() { return data; }
-  unsigned int getDataLength() { return dataLength; }
-  unsigned int getUsedBits() { return usedBits; }
+  unsigned int * getData() { return data; }
+  unsigned int getDataLength() { return chunks(usedBits); }
 #endif
 
-  friend CkOutStream & operator<< (CkOutStream& ckos, CkBitVector const b );
   friend class CkEntryOptions;
 };
 
+PUPmarshall(CkBitVector);
 
-#endif /* __UIUC_CHARM_BITVECTOR_H */
+#endif /* __UIUC_CS_CHARM_CKBITVECTOR_H */
