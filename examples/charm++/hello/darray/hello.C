@@ -18,11 +18,8 @@ public:
     //Start the computation
     CkPrintf("Running Hello on %d processors for %d elements\n",
 	     CkNumPes(),nElements);
-    if(CkNumPes()<2) {
-      CkAbort("This program should be run on at least 2 processors.\n");
-    }
     mainProxy = thisProxy;
-    CProxy_Other::ckNew(1);
+    CProxy_Other::ckNew(CkNumPes()-1);
   };
 
   void done(void)
