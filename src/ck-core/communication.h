@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.3  1995-07-06 04:44:55  gursoy
+ * Revision 2.4  1995-07-06 13:45:34  gursoy
+ * removed includ trans_defl.h
+ *
+ * Revision 2.3  1995/07/06  04:44:55  gursoy
  * fixed MsgToStructTable definition (it is a Csv type variable and
  * secondly I included trans_defs.h to use MSG_STRUCT type because
  * Csv macros cannot use struct xxx .
@@ -71,7 +74,6 @@
 #define PACKED 2
 #endif
 
-#include "trans_defs.h"
 
 CsvExtern(MSG_STRUCT*, MsgToStructTable);
 
