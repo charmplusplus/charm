@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.8  1995-11-08 23:32:31  sanjeev
+ * Revision 2.9  1996-03-05 16:25:32  sanjeev
+ * fixed spanning tree bugs
+ *
+ * Revision 2.8  1995/11/08 23:32:31  sanjeev
  * fixed bug in CmiFreeSendFn for msgs to myself
  *
  * Revision 2.7  1995/10/27  21:45:35  jyelon
@@ -488,7 +491,7 @@ char **argv;
 		exit(0) ;
 
 	/* find dim = log2(numpes), to pretend we are a hypercube */
-	for ( Cmi_dim=0,n=numpes; n>1; n/=2 )
+	for ( Cmi_dim=0,n=numpes-1; n>=1; n/=2 )
 		Cmi_dim++ ;
 
 	/* Initialize timers */

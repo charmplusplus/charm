@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.6  1995-10-25 19:56:05  jyelon
+ * Revision 2.7  1996-03-05 16:25:32  sanjeev
+ * fixed spanning tree bugs
+ *
+ * Revision 2.6  1995/10/25 19:56:05  jyelon
  * Changed CmiSyncSendFn --> CmiSyncSend
  *
  * Revision 2.5  1995/10/23  22:37:48  jyelon
@@ -65,6 +68,7 @@ CmiSpanTreeInit()
     int neighbours[MAXCUBEDIM];
 
     numnodes = (1 << Cmi_dim);
+
     SpanArray = (SpanTreeArray *)CmiAlloc(sizeof(SpanTreeArray) * numnodes);
     NodeStore = (int *) CmiAlloc(sizeof(int) * numnodes);
     visited[0] = 1;
@@ -74,7 +78,7 @@ CmiSpanTreeInit()
     for (i = 1; i < numnodes; i++)
         visited[i] = 0;
 
-    for (next = 1, i = 0; i < numnodes; i++)
+    for (next = 1, i = 0; i < CmiNumPes(); i++)
     {
 	currentnode = NodeStore[i];
 	CmiGetNodeNeighbours(currentnode, neighbours);
@@ -82,7 +86,7 @@ CmiSpanTreeInit()
 	for (j = 0; j < Cmi_dim && 
 	            SpanArray[currentnode].noofchildren < MAXSPAN; j++)
 	{
-	    if (!visited[neighbours[j]])
+	    if ( !visited[neighbours[j]] && neighbours[j] < CmiNumPes() )
 	    {
 		NodeStore[next + SpanArray[currentnode].noofchildren] = 
 								neighbours[j];
@@ -99,7 +103,7 @@ CmiSpanTreeInit()
 	}
     }
 
-    for (i = 0; i < numnodes; i++)  /* check */
+    for (i = 0; i < CmiNumPes(); i++)  /* check */
 	if (!visited[i])
 	   CmiError("node %d not part of spanning tree: initialization error!\n",i);
 }
