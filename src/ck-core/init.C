@@ -488,11 +488,16 @@ void _registerInitCall(CkInitCallFn fn, int isNodeCall)
 
 void InitCallTable::enumerateInitCalls()
 {
-  static int _done=0;
   int i;
-  if (!_done) for (i=0; i<initNodeCalls.length(); i++) initNodeCalls[i]();
+#ifdef __BLUEGENE__
+  if(BgNodeRank()==0) 
+#else
+  if(CkMyRank()==0) 
+#endif
+  {
+    for (i=0; i<initNodeCalls.length(); i++) initNodeCalls[i]();
+  }
   for (i=0; i<initProcCalls.length(); i++) initProcCalls[i]();
-  _done=1;
 }
 
 extern int flag;
@@ -617,10 +622,12 @@ void _initCharm(int unused_argc, char **argv)
 		CkRegisterMainModule();
 		_registerDone();
 	}
-        // enumerate call initcalls registered
-	_initCallTable.enumerateInitCalls();
-
-	if (!inCommThread) _TRACE_BEGIN_COMPUTATION();
+	CmiNodeAllBarrier();
+ 	if (!inCommThread) {
+          // enumerate call initcalls registered
+	  _initCallTable.enumerateInitCalls();
+	  _TRACE_BEGIN_COMPUTATION();
+	}
 	CkpvAccess(_myStats) = new Stats();
 	CkpvAccess(_msgPool) = new MsgPool();
 	CmiNodeAllBarrier();
