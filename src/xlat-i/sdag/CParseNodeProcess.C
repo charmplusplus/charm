@@ -8,7 +8,6 @@
 #include <stdlib.h>
 #include "sdag-globals.h"
 #include "CParseNode.h"
-
 void CParseNode::numberNodes(void)
 {
   switch(type) {
@@ -103,43 +102,72 @@ void CParseNode::generateEntryList(TList<CEntry*>& list, CParseNode *thisWhen)
 {
   switch(type) {
     case WHEN:
-      con1->generateEntryList(list, this);
+      con1->generateEntryList(list, this);  /* con1 is the WHEN's ELIST */
       break;
     case IF:
-      if(con2!=0) con2->generateEntryList(list,thisWhen);
+	/* con2 is the ELSE corresponding to this IF */
+      if(con2!=0) con2->generateEntryList(list,thisWhen); 
       break;
     case ENTRY:
       CEntry *entry;
-      int found=0;
+      int notfound=1;
       for(entry=list.begin(); !list.end(); entry=list.next()) {
-        if(*(entry->entry) == *(con1->text) &&
-           *(entry->msgType) == *(con3->text)) {
-           found = 1;
-           // check to see if thisWhen is already in entry's whenList
-           int whenFound = 0;
-           TList<CParseNode*> *tmpList = &(entry->whenList);
-           CParseNode *tmpNode;
-           for(tmpNode = tmpList->begin(); !tmpList->end();
-               tmpNode = tmpList->next()) {
-             if(tmpNode->nodeNum == thisWhen->nodeNum)
-               whenFound = 1;
+     	if(*(entry->entry) == *(con1->text)) 
+        {
+           CParseNode *param1;
+           CParseNode *param2;
+	   param1 = entry->paramlist->constructs->begin();
+           param2 = con3->constructs->begin();
+           notfound = 1;
+	   if ((entry->paramlist->isVoid == 1) && (con3->isVoid == 1)) {
+	      notfound = 0;
+	   }
+	   while ((notfound == 1) && (!entry->paramlist->constructs->end()) && (!con3->constructs->end()))
+	   {
+              if(*(param1->vartype) == *(param2->vartype)) {
+	        if ((param1->con3 != 0) && (param2->con3 != 0)) {
+		   if (*(param1->con3->text) == *(param2->con3->text)) {
+		      notfound = 0;
+		   }
+		}
+		else {
+                  notfound = 0;
+                }
+              }
+ 	      param1 = entry->paramlist->constructs->next(); 
+              param2 = con3->constructs->next();
            }
-           if(!whenFound)
-             entry->whenList.append(thisWhen);
-           entryPtr = entry;
-	   if(con2)
-	     entry->refNumNeeded = 1;
-           break;
+           if (((!con3->constructs->end()) && (entry->paramlist->constructs->end())) ||
+              ((con3->constructs->end()) && (!entry->paramlist->constructs->end())))
+           {
+		notfound = 1;
+	   }
+	   if (notfound == 0) {
+             // check to see if thisWhen is already in entry's whenList
+             int whenFound = 0;
+             TList<CParseNode*> *tmpList = &(entry->whenList);
+             CParseNode *tmpNode;
+             for(tmpNode = tmpList->begin(); !tmpList->end(); tmpNode = tmpList->next()) {
+               if(tmpNode->nodeNum == thisWhen->nodeNum)
+                  whenFound = 1;
+             }
+             if(!whenFound)
+               entry->whenList.append(thisWhen);
+             entryPtr = entry;
+             if(con2)
+               entry->refNumNeeded = 1;
+             break;
+	   } 
         }
       }
-      if(!found) {
+      if(notfound == 1) {
         CEntry *newEntry;
-        newEntry = new CEntry(new XStr(*(con1->text)), new XStr(*(con3->text)));
+        newEntry = new CEntry(new XStr(*(con1->text)), con3, estateVars, needsParamMarshalling );
         list.append(newEntry);
         entryPtr = newEntry;
         newEntry->whenList.append(thisWhen);
-	if(con2)
-	  newEntry->refNumNeeded = 1;
+        if(con2)
+          newEntry->refNumNeeded = 1;
       }
       break;
   }
@@ -149,23 +177,119 @@ void CParseNode::generateEntryList(TList<CEntry*>& list, CParseNode *thisWhen)
   }
 }
 
+
 void CParseNode::propagateState(void)
-{
-  CStateVar *sv;
+{ 
+  int count = 0;
+  int isMsg = 0;
+  int isVoidParameter = 0;
+  int numParameters = 0;
+  needsParamMarshalling = 0;
+  CStateVar *sv; 
   if(type != SDAGENTRY) {
     fprintf(stderr, "use of non-entry as the outermost construct..\n");
     exit(1);
   }
   stateVars = new TList<CStateVar*>();
-  XStr *vType = new XStr(*(con2->text));
-  vType->append(" *");
-  sv = new CStateVar(vType, new XStr(*(con3->text)));
-  stateVars->append(sv);
-  stateVarsChildren = stateVars;
+
+  CParseNode *parameter1;
+  CParseNode *vartype1;
+
+  if (con2->isVoid == 1) {
+     sv = new CStateVar(0, 1, 0, 0, 0, 0, 0, 0, 0, 0);
+     stateVars->append(sv);
+  }
+  else { 
+    // Traverses through the SDAGENTRY's parameter list 
+    for (parameter1=con2->constructs->begin(); !con2->constructs->end(); parameter1=con2->constructs->next()) { 
+        if ((numParameters == 1) && (isMsg == 1))
+           printf("ERROR: When you have a message as a parameter you can not have any other parameters\n");
+   	   
+        numParameters++;
+        XStr *vartype = new XStr("");
+        vartype1 = parameter1->con1;
+        XStr *constStr;
+        count = 0;
+        while (vartype1->con1 !=0) {
+           if (count == 0)
+	      constStr = new XStr("const ");
+	   else
+              constStr->append("const ");
+	   vartype1 = vartype1->con2;
+	   vartype->append("const ");
+	   count++;
+        }
+        XStr *byRef = 0;
+        if (parameter1->con1->con4 != 0) {
+          if (parameter1->con1->con4->type == AMPERESIGN) {
+	    byRef = new XStr("&");
+	  }
+          else
+             byRef = 0;
+        } 
+        if (count == 0)
+           constStr = 0;
+        if (vartype1->con3->type == SIMPLETYPE) {
+	   isMsg = 0;
+           needsParamMarshalling =1;
+	   XStr *vType1 = new XStr(*(vartype1->con3->con1->con1->text));
+	   vartype->append(*(vartype1->con3->con1->con1->text));
+           XStr *vType2;
+           if (vartype1->con3->con1->con2 != 0) {
+	      vType2 = new XStr(*(vartype1->con3->con1->con2->text));	
+	      vartype->append(" ");
+              vartype ->append(*(vartype1->con3->con1->con2->text)); 
+           }
+	   else 
+             vType2 = 0;
+           if ((parameter1->con2 == 0) && (parameter1->con3 == 0))   // Type
+               sv = new CStateVar(constStr, 0, vType1, vType2, 0, 0, 0, byRef, 0, isMsg);
+	   else if ((parameter1->con2 != 0) && (parameter1->con3 == 0))   // Type Name
+               sv = new CStateVar(constStr, 0,vType1, vType2, 0, 0, new XStr(*(parameter1->con2->text)),byRef,0, isMsg);
+	   else if ((parameter1->con2 != 0) && (parameter1->con3 != 0))   // Type Name [ArrayLength]
+	       sv = new CStateVar(constStr, 0,vType1, vType2, 0, 0, new XStr(*(parameter1->con2->text)), byRef,new XStr(*(parameter1->con3->text)), isMsg);
+           stateVars->append(sv);
+        }
+        else if (vartype1->con3->type == PTRTYPE) {
+           isMsg = 0;
+           XStr *vType1 = new XStr(*(vartype1->con3->con1->con1->con1->text));
+           vartype->append(*(vartype1->con3->con1->con1->con1->text));
+           XStr *vType2;
+           if (vartype1->con3->con1->con1->con2 != 0) {
+              vType2 = new XStr(*(vartype1->con3->con1->con1->con2->text));
+              vartype->append(" ");
+              vartype->append(*(vartype1->con3->con1->con1->con2->text));
+           }
+           else
+              vType2 = 0;
+           XStr *pt = new XStr("*");
+           for(count=1; count<vartype1->con3->numPtrs; count++)
+              pt->append("*");
+           vartype->append(*(pt));
+	   if ((numParameters == 1) && (vartype1->con3->numPtrs == 1))
+	      isMsg = 1;
+	       
+	   if ((parameter1->con2 == 0) && (parameter1->con3 == 0))
+              sv = new CStateVar(constStr, 0, vType1, vType2, pt, vartype1->con3->numPtrs, 0,byRef, 0, isMsg);
+	   else if ((parameter1->con2 != 0) && (parameter1->con3 == 0)) 
+              sv = new CStateVar(constStr,0, vType1, vType2, pt, vartype1->con3->numPtrs, new XStr(*(parameter1->con2->text)), byRef, 0, isMsg);
+	   else if ((parameter1->con2 != 0) && (parameter1->con3 != 0))
+              sv = new CStateVar(constStr, 0, vType1, vType2, pt, vartype1->con3->numPtrs, new XStr(*(parameter1->con2->text)), byRef, new XStr(*(parameter1->con3->text)), isMsg);
+           stateVars->append(sv);
+        }
+        if (byRef != 0) {
+           vartype->append(" &"); 
+	}
+	parameter1->vartype = vartype;
+    }
+
+  } 
+
+  stateVarsChildren = stateVars; 
   CParseNode *cn;
   for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
     cn->propagateState(*stateVarsChildren);
-  }
+  } 
 }
 
 void CParseNode::propagateState(TList<CStateVar*>& list)
@@ -179,32 +303,159 @@ void CParseNode::propagateState(TList<CStateVar*>& list)
         stateVars->append(sv);
         stateVarsChildren->append(sv);
       }
-      sv = new CStateVar(new XStr("int"), new XStr(*(con1->text)));
+      sv = new CStateVar(0,0, new XStr("int"), 0, 0, 0, new XStr(*(con1->text)), 0,0, 0);
       stateVarsChildren->append(sv);
       {
         char txt[128];
         sprintf(txt, "_cf%d", nodeNum);
         counter = new XStr(txt);
-        sv = new CStateVar(new XStr("CCounter *"), counter);
+        XStr *ptrs = new XStr("*");
+        sv = new CStateVar(0, 0, new XStr("CCounter" ), 0, ptrs, 1, counter,0,0, 1);
         stateVarsChildren->append(sv);
       }
       break;
     case WHEN:
       stateVarsChildren = new TList<CStateVar*>();
+      int numParameters; 
+      int count;
+      int isMsg;
+      int stateVarsHasVoid;
+      int stateVarsChildrenHasVoid; 
+      numParameters=0; count=0; isMsg=0; 
+      stateVarsHasVoid = 0;
+      stateVarsChildrenHasVoid = 0;
+      for(sv = stateVars->begin(); ((!stateVars->end()) && (stateVarsHasVoid != 1)); sv=stateVars->next()) {
+         if (sv->isVoid == 1)
+	     stateVarsHasVoid == 1;
+      }
       for(sv=list.begin(); !list.end(); sv=list.next()) {
-        stateVars->append(sv);
-        stateVarsChildren->append(sv);
+         if ((sv->isVoid == 1) && (stateVarsHasVoid != 1)) {
+	    stateVars->append(sv);
+	    stateVarsHasVoid == 1;
+	 }
+	 else if (sv->isVoid != 1)
+	    stateVars->append(sv);
+	 if ((sv->isVoid == 1) && (stateVarsChildrenHasVoid != 1)) {
+	    stateVarsChildren->append(sv);
+	    stateVarsChildrenHasVoid == 1;
+	 }
+	 else if (sv->isVoid != 1)
+	    stateVarsChildren->append(sv);
       }
-      {
+
+     
+      {  
         TList<CParseNode*> *elist = con1->constructs;
-        CParseNode *en;
-        for(en=elist->begin(); !elist->end(); en=elist->next()) {
-          XStr *vType = new XStr(*(en->con3->text));
-          vType->append(" *");
-          sv = new CStateVar(vType, new XStr(*(en->con4->text)));
-          stateVarsChildren->append(sv);
-        }
-      }
+        CParseNode *entry1;
+        CParseNode *parameter1;
+        CParseNode *type1;
+        CParseNode *type2;
+
+// Traverses the entry list 
+        for(entry1=elist->begin(); !elist->end(); entry1=elist->next()) { 
+ 
+// Traverses the parameters for each entry method 
+            entry1->stateVars = new TList<CStateVar*>();
+            numParameters = 0; entry1->needsParamMarshalling = 0;
+
+            if (entry1->con3->isVoid == 1) { 
+	       entry1->isVoid = 1;
+               sv = new CStateVar(0, 1, 0, 0, 0, 0, 0, 0, 0, 0);
+	       if (stateVarsChildrenHasVoid != 1)
+                  stateVarsChildren->append(sv);
+ 	       entry1->stateVars->append(sv);
+       	       entry1->estateVars.append(sv);
+            }
+            else { 
+  	      for (parameter1=entry1->con3->constructs->begin(); !entry1->con3->constructs->end(); 
+	  	  parameter1=entry1->con3->constructs->next()) { 
+		  if ((numParameters == 1) && (isMsg == 1))
+                     printf("ERROR: When you have a message as a parameter you can not have any other parameters in an entry function\n");
+		 
+                  numParameters++;
+                  XStr *vartype = new XStr("");
+		  XStr *byRef = 0;
+ 	          type1 = parameter1->con1;
+		  XStr *constStr= 0;
+                  count = 0;
+		  while (type1->con1 != 0) {
+		     if (count == 0)
+		        constStr = new XStr("const ");
+		     else
+		        constStr->append("const ");
+	             vartype->append("const ");
+		     count++;
+		     type1 = type1->con2;
+		  }
+                  if (parameter1->con1->con4 != 0) {
+                    if (parameter1->con1->con4->type == AMPERESIGN) {
+		      byRef = new XStr("&");
+		    }
+                    else
+                       byRef = 0; 
+                  }
+		  if (type1->con3->type == SIMPLETYPE) {
+		     isMsg = 0;
+                     entry1->needsParamMarshalling =1;
+	             XStr *vType1 = new XStr(*(type1->con3->con1->con1->text)); 
+	             vartype->append(*(type1->con3->con1->con1->text));
+     		     XStr *vType2;
+                     if (type1->con3->con1->con2 != 0) {
+		        vType2 = new XStr(*(type1->con3->con1->con2->text));	
+	                vartype->append(" ");
+                        vartype->append(*(type1->con3->con1->con2->text));
+		     }	
+		     else 
+		        vType2 = 0;
+	             if ((parameter1->con2 == 0) && (parameter1->con3 == 0))
+                        sv = new CStateVar(constStr, 0, vType1, vType2, 0, 0, 0, byRef, 0, isMsg);
+	             else if ((parameter1->con2 != 0) && (parameter1->con3 == 0)) 
+                        sv = new CStateVar(constStr, 0, vType1, vType2, 0, 0, new XStr(*(parameter1->con2->text)),byRef,0, isMsg);
+		     else if ((parameter1->con2 != 0) && (parameter1->con3 != 0))
+                        sv = new CStateVar(constStr, 0, vType1, vType2, 0,0 , new XStr(*(parameter1->con2->text)), byRef,new XStr(*(parameter1->con3->text)), isMsg);
+                     stateVarsChildren->append(sv);
+ 		     entry1->estateVars.append(sv);
+ 		     entry1->stateVars->append(sv);
+		  }
+		  else if (type1->con3->type == PTRTYPE) { 
+		     isMsg = 0;
+                     XStr *vType1 = new XStr(*(type1->con3->con1->con1->con1->text));
+                     vartype->append(*(type1->con3->con1->con1->con1->text));
+                     XStr *vType2;
+                     if (type1->con3->con1->con1->con2 != 0) {
+                        vType2 = new XStr(*(type1->con3->con1->con1->con2->text));
+                        vartype->append(" ");
+                        vartype->append(*(type1->con3->con1->con1->con2->text));
+		     }
+                     else
+                        vType2 = 0;
+                     XStr *pt = new XStr("*");
+                     for(int i=1; i<type1->con3->numPtrs; i++)
+                        pt->append("*");
+                     vartype->append(*(pt));
+	             if ((numParameters == 1) && (type1->con3->numPtrs == 1))
+	                isMsg = 1;
+	             if ((parameter1->con2 == 0) && (parameter1->con3 == 0))
+                        sv = new CStateVar(constStr, 0,  vType1, vType2, pt, type1->con3->numPtrs, 0,byRef, 0, isMsg);
+	             else if ((parameter1->con2 != 0) && (parameter1->con3 == 0)) 
+                        sv = new CStateVar(constStr, 0, vType1, vType2, pt, type1->con3->numPtrs, new XStr(*(parameter1->con2->text)),byRef,0, isMsg);
+		     else if ((parameter1->con2 != 0) && (parameter1->con3 != 0))
+                        sv = new CStateVar(constStr, 0, vType1, vType2, pt, type1->con3->numPtrs, new XStr(*(parameter1->con2->text)), byRef, new XStr(*(parameter1->con3->text)), isMsg);
+                     stateVarsChildren->append(sv);
+ 	             entry1->stateVars->append(sv);
+       	             entry1->estateVars.append(sv);
+		  }
+                  if (byRef != 0) {
+                    vartype->append(" &"); 
+		  }  
+                  parameter1->vartype = vartype;
+	      }
+	    } 
+
+          if ((entry1->needsParamMarshalling == 0) && (numParameters >1))
+	     printf("Error: There is a problem with the parameters of the entry list\n");  
+        } 
+      }  
       break;
     case IF:
       for(sv=list.begin(); !list.end(); sv=list.next()) {
@@ -223,7 +474,8 @@ void CParseNode::propagateState(TList<CStateVar*>& list)
         char txt[128];
         sprintf(txt, "_co%d", nodeNum);
         counter = new XStr(txt);
-        sv = new CStateVar(new XStr("CCounter *"), counter);
+	XStr *ptrs = new XStr("*");
+        sv = new CStateVar(0,0, new XStr("CCounter"), 0, ptrs, 1, counter,0, 0, 1);
         stateVarsChildren->append(sv);
       }
       break;
@@ -308,44 +560,127 @@ void CParseNode::generateWhen(XStr& op)
   op << ") {\n";
   TList<CParseNode*> *elist = con1->constructs;
   CParseNode *el;
+
+  CStateVar *sv;
   for(el=elist->begin(); !elist->end(); el=elist->next()) {
-    op << "    CMsgBuffer *"<<el->con4->text->charstar()<<"_buf;\n";
-    op << "    " << el->con3->text->charstar() << " *" <<
-                    el->con4->text->charstar() << ";\n";
+     if (el->isVoid == 1) {
+         op << "    CMsgBuffer *"<<el->con1->text->charstar()<<"_buf;\n";
+     }
+     else if (el->needsParamMarshalling == 1) {
+         op << "    CMsgBuffer *"<<el->con1->text->charstar()<<"_buf;\n";
+         op << "    CkMarshallMsg *" <<
+                         el->con1->text->charstar() << "_msg;\n";
+     }
+     else {
+       for(sv=el->stateVars->begin(); !el->stateVars->end(); el->stateVars->next()) {
+         op << "    CMsgBuffer *"<<sv->name->charstar()<<"_buf;\n";
+         op << "    " << sv->type1->charstar() << " *" <<
+                         sv->name->charstar() << ";\n";
+       } 
+     }
   }
+
+
   op << "\n";
   for(el=elist->begin(); !elist->end(); el=elist->next()) {
-    if(el->con2 == 0)
-      op << "    " << el->con4->text->charstar() << 
-            "_buf = __cDep->getMessage(" << el->entryPtr->entryNum << ");\n";
-    else
-      op << "    " << el->con4->text->charstar() << 
-            "_buf = __cDep->getMessage(" << el->entryPtr->entryNum <<
-            ", " << el->con2->text->charstar() << ");\n";
+     if ((el->needsParamMarshalling == 1) || (el->isVoid == 1)) {
+        if((el->con2 == 0) || (el->isVoid == 1)) {
+           op << "    " << el->con1->text->charstar(); 
+           op << "_buf = __cDep->getMessage(" << el->entryPtr->entryNum << ");\n";
+        }	    
+        else {
+           op << "    " << el->con1->text->charstar() << 
+                 "_buf = __cDep->getMessage(" << el->entryPtr->entryNum <<
+                 ", " << el->con2->text->charstar() << ");\n";
+        }
+     }
+     else { // The parameter is a message
+        sv = el->stateVars->begin();
+        if(el->con2 == 0) {
+           op << "    " << sv->name->charstar(); 
+           op << "_buf = __cDep->getMessage(" << el->entryPtr->entryNum << ");\n";
+        }	    
+        else {
+           op << "    " << sv->name->charstar() << 
+                 "_buf = __cDep->getMessage(" << el->entryPtr->entryNum <<
+                 ", " << el->con2->text->charstar() << ");\n";
+        }
+     }
   }
   op << "\n";
   op << "    if (";
   for(el=elist->begin(); !elist->end();) {
-    op << "(" << el->con4->text->charstar() << "_buf != 0)";
-    el = elist->next();
-    if(el != 0)
-      op << "&&";
+     if ((el->needsParamMarshalling == 1) || (el->isVoid ==1)) {
+        op << "(" << el->con1->text->charstar() << "_buf != 0)";
+     }
+     else {
+        sv = el->stateVars->begin();
+        op << "(" << sv->name->charstar() << "_buf != 0)";
+     }
+     el = elist->next();
+     if(el != 0)
+        op << "&&";
   }
   op << ") {\n";
   for(el=elist->begin(); !elist->end(); el=elist->next()) {
-    op << "      " << el->con4->text->charstar() << " = (" << 
-          el->con3->text->charstar() << " *) " <<
-          el->con4->text->charstar() << "_buf->msg;\n";
-    op << "      __cDep->removeMessage(" << el->con4->text->charstar() <<
-          "_buf);\n";
-    // gzheng
-    op << "      delete " << el->con4->text->charstar() << "_buf;\n";
+     if (el->isVoid == 1) {
+        op <<"       CkFreeSysMsg((void *) "<<el->con1->text->charstar() <<"_buf->msg);\n";
+        op << "      delete " << el->con1->text->charstar() << "_buf;\n";
+     }
+     else if (el->needsParamMarshalling == 1) {
+        op << "       " << el->con1->text->charstar() << "_msg = (CkMarshallMsg *)"  
+               << el->con1->text->charstar() << "_buf->msg;\n";
+        op << "       char *"<<el->con1->text->charstar() <<"_impl_buf=((CkMarshallMsg *)"
+	   <<el->con1->text->charstar() <<"_msg)->msgBuf;\n";
+        op <<"       PUP::fromMem " <<el->con1->text->charstar() <<"_implP(" 
+	   <<el->con1->text->charstar() <<"_impl_buf);\n";
+
+        for(sv=el->stateVars->begin(); !el->stateVars->end(); sv=el->stateVars->next()) {
+           if (sv->arrayLength != 0)
+              op <<"      int impl_off_"<<sv->name->charstar()
+	         <<"; "<<el->con1->text->charstar() <<"_implP|impl_off_"
+		 <<sv->name->charstar()<<";\n";
+           else
+               op <<"       "<<sv->type1->charstar()<<" "<<sv->name->charstar()
+	       <<"; " <<el->con1->text->charstar() <<"_implP|"
+	       <<sv->name->charstar()<<";\n";
+	}
+	
+        op << "       " <<el->con1->text->charstar() <<"_impl_buf+=CK_ALIGN("
+	   <<el->con1->text->charstar() <<"_implP.size(),16);\n";
+        for(sv=el->stateVars->begin(); !el->stateVars->end(); sv=el->stateVars->next()) {
+           if (sv->arrayLength != 0)
+              op << "    "<<sv->type1->charstar()<< " *" <<sv->name->charstar() <<"=(" <<sv->type1->charstar()
+		 <<" *)(" <<el->con1->text->charstar() <<"_impl_buf+" <<"impl_off_"
+		 <<sv->name->charstar()<<");\n";
+        }
+        op << "       __cDep->removeMessage(" << el->con1->text->charstar() <<
+              "_buf);\n";
+        op << "       delete " << el->con1->text->charstar() << "_buf;\n";
+
+     }
+     else {  // There was a message as the only parameter
+        sv = el->stateVars->begin();
+        op << "       " << sv->name->charstar() << " = (" << 
+              sv->type1->charstar() << " *) " <<
+              sv->name->charstar() << "_buf->msg;\n";
+        op << "       __cDep->removeMessage(" << sv->name->charstar() <<
+              "_buf);\n";
+        op << "       delete " << sv->name->charstar() << "_buf;\n";
+     }
   }
-  op << "      " << constructs->front()->label->charstar() << 
-        "(";
-  generateCall(op, *stateVarsChildren);
-  op << ");\n";
-  op << "      return 1;\n";
+  if (!constructs->empty() ) {
+     op << "       " << constructs->front()->label->charstar() << "(";
+     generateCall(op, *stateVarsChildren);
+     op << ");\n";
+  }
+  else {
+     op << "       " << label->charstar() << "_end(";
+     generateCall(op, *stateVarsChildren);
+     op << ");\n";
+  }
+  op << "       return 1;\n";
+
   op << "    } else {\n";
 
   int nRefs=0, nAny=0;
@@ -378,29 +713,90 @@ void CParseNode::generateWhen(XStr& op)
     exit(1);
   }
 
-  op << "      CWhenTrigger *tr;\n";
-  op << "      tr = new CWhenTrigger(" << nodeNum << ", " <<
+  op << "       CWhenTrigger *tr;\n";
+  op << "       tr = new CWhenTrigger(" << nodeNum << ", " <<
         stateVars->length() << ", " << nRefs << ", " << nAny << ");\n";
-  CStateVar *sv;
   int iArgs=0;
+ 
+  //op << "       int impl_off=0;\n";
+  int hasArray = 0;
+  int isVoid = 0;
+  int numParamsNeedingMarshalling =0;
   for(sv=stateVars->begin();!stateVars->end();sv=stateVars->next()) {
-    op << "      tr->args[" << iArgs++ << "] = (size_t) " <<
-          sv->name->charstar() << ";\n";
+    if (sv->isVoid == 1) {
+        isVoid = 1;
+       op <<"       tr->args[" <<iArgs++ <<"] = (size_t) CkAllocSysMsg();\n";
+    }
+    else {
+      if (sv->isMsg == 1) {
+         op << "       tr->args["<<iArgs++ <<"] = (size_t) " <<sv->name->charstar()<<";\n";
+      }
+      else 
+         numParamsNeedingMarshalling++;
+      if (numParamsNeedingMarshalling == 1) 
+         op << "       int impl_off=0;\n";
+      if (sv->arrayLength !=0) {
+         hasArray++;
+         if (hasArray == 1)
+      	   op<< "       int impl_arrstart=0;\n";
+         op <<"       int impl_off_"<<sv->name->charstar()<<", impl_cnt_"<<sv->name->charstar()<<";\n";
+         op <<"       impl_off_"<<sv->name->charstar()<<"=impl_off=CK_ALIGN(impl_off,sizeof("<<sv->type1->charstar()<<"));\n";
+         op <<"       impl_off+=(impl_cnt_"<<sv->name->charstar()<<"=sizeof("<<sv->type1->charstar()<<")*("<<sv->arrayLength->charstar()<<"));\n";
+      }
+    }
   }
+  if (numParamsNeedingMarshalling > 0) {
+     op << "       { \n";
+     op << "         PUP::sizer implP;\n";
+     for(sv=stateVars->begin();!stateVars->end();sv=stateVars->next()) {
+       if (sv->arrayLength !=0)
+         op << "         implP|impl_off_" <<sv->name->charstar() <<";\n";
+       else if ((sv->isMsg != 1) && (sv->isVoid !=1)) 
+         op << "         implP|" <<sv->name->charstar() <<";\n";
+     }
+     if (hasArray > 0) {
+        op <<"         impl_arrstart=CK_ALIGN(implP.size(),16);\n";
+        op <<"         impl_off+=impl_arrstart;\n";
+     }
+     else {
+        op << "         impl_off+=implP.size();\n";
+     }
+     op << "       }\n";
+     op << "       CkMarshallMsg *impl_msg;\n";
+     op << "       impl_msg = CkAllocateMarshallMsg(impl_off,NULL);\n";
+     op << "       {\n";
+     op << "         PUP::toMem implP((void *)impl_msg->msgBuf);\n";
+     for(sv=stateVars->begin();!stateVars->end();sv=stateVars->next()) {
+       if (sv->arrayLength !=0)
+          op << "         implP|impl_off_" <<sv->name->charstar() <<";\n";
+       else if ((sv->isMsg != 1) && (sv->isVoid != 1))  
+          op << "         implP|" <<sv->name->charstar() <<";\n";
+     }
+     op << "       }\n";
+     if (hasArray > 0) {
+        op <<"       char *impl_buf=impl_msg->msgBuf+impl_arrstart;\n";
+        for(sv=stateVars->begin();!stateVars->end();sv=stateVars->next()) {
+           if (sv->arrayLength !=0)
+              op << "       memcpy(impl_buf+impl_off_"<<sv->name->charstar()<<
+	                 ","<<sv->name->charstar()<<",impl_cnt_"<<sv->name->charstar()<<");\n";
+        }  
+     }
+  op << "       tr->args[" <<iArgs++ <<"] = (size_t) impl_msg;\n";
+  }   
   int iRef=0, iAny=0;
   for(el=elist->begin(); !elist->end(); el=elist->next()) {
     if(el->con2 == 0) {
-      op << "      tr->anyEntries[" << iAny++ << "] = " <<
+      op << "       tr->anyEntries[" << iAny++ << "] = " <<
             el->entryPtr->entryNum << ";\n";
     } else {
-      op << "      tr->entries[" << iRef << "] = " << 
+      op << "       tr->entries[" << iRef << "] = " << 
             el->entryPtr->entryNum << ";\n";
-      op << "      tr->refnums[" << iRef++ << "] = " <<
+      op << "       tr->refnums[" << iRef++ << "] = " <<
             el->con2->text->charstar() << ";\n";
     }
   }
-  op << "      __cDep->Register(tr);\n";
-  op << "      return 0;\n";
+  op << "       __cDep->Register(tr);\n";
+  op << "       return 0;\n";
   op << "    }\n";
   // end actual code
   op << "  }\n\n";
@@ -409,9 +805,6 @@ void CParseNode::generateWhen(XStr& op)
   generatePrototype(op, *stateVarsChildren);
   op << ") {\n";
   // actual code here 
-  for(el=elist->begin(); !elist->end(); el=elist->next()) {
-    // op << "    delete " <<  el->con4->text->charstar() << ";\n";
-  }
   if(nextBeginOrEnd == 1)
    op << "    " << next->label->charstar() << "(";
   else
@@ -734,14 +1127,11 @@ void CParseNode::generateSdagEntry(XStr& op)
   op << "  void " << con1->text->charstar() << "_end(";
   generatePrototype(op, *stateVars);
   op << ") {\n";
-  // actual code here 
-  // op << "    delete " << con3->text->charstar() << ";\n";
-  // end actual code
   op << "  }\n\n";
 }
 
 void CParseNode::generateAtomic(XStr& op)
-{
+{ 
   op << "  void " << label->charstar() << "(";
   generatePrototype(op, *stateVars);
   op << ") {\n";
@@ -758,21 +1148,49 @@ void CParseNode::generateAtomic(XStr& op)
 void CParseNode::generatePrototype(XStr& op, TList<CStateVar*>& list)
 {
   CStateVar *sv;
+  int isVoid;
+  int count;
+  count = 0;
   for(sv=list.begin(); !list.end(); ) {
-    op << sv->type->charstar() << " " << sv->name->charstar();
+    isVoid = sv->isVoid;
+    if ((count != 0) && (isVoid != 1))
+       op << ", ";
+    if (sv->isVoid != 1) {
+      if (sv->isconst != 0) 
+         op <<sv->isconst->charstar() <<" ";
+      if (sv->type1 != 0) 
+         op <<sv->type1->charstar() <<" ";
+      if (sv->type2 != 0) 
+         op <<sv->type2->charstar() <<" ";
+      if (sv->byRef != 0)
+         op <<" &";
+      if (sv->arrayLength != 0) 
+         op <<"*";
+      else if (sv->allPtrs != 0) 
+         op <<sv->allPtrs->charstar() <<" ";
+      if (sv->name != 0)
+         op <<sv->name->charstar();
+    }
+    if (sv->isVoid != 1)
+       count++;
     sv = list.next();
-    if (sv != 0)
-      op << ", ";
   }
 }
 
 void CParseNode::generateCall(XStr& op, TList<CStateVar*>& list) {
   CStateVar *sv;
+  int isVoid;
+  int count;
+  count = 0;
   for(sv=list.begin(); !list.end(); ) {
-    op << sv->name->charstar();
+     isVoid = sv->isVoid;
+     if ((count != 0) && (isVoid != 1))
+        op << ", ";
+     if (sv->name != 0) 
+       op << sv->name->charstar();
+    if (sv->isVoid != 1)
+       count++;
     sv = list.next();
-    if (sv != 0)
-      op << ", ";
   }
 }
 
