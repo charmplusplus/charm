@@ -5,6 +5,8 @@
 #include "charmProjections.h"
 #include "traceCoreCommon.h"
 #include "charmEvents.h"
+#include "ck.h"
+
 
 CtvStaticDeclare(int,curThreadEvent);
 
@@ -112,18 +114,12 @@ extern "C" void beginComputation(void)
     	//_threadChare = CkRegisterChare("dummy_thread_chare", 0);
     	//_threadEP = CkRegisterEp("dummy_thread_ep", 0, _threadMsg,_threadChare);
   	}
-	int* iData = (int*)malloc(sizeof(int)*4); 
-	iData[0] = iData[1] = 0;
-	iData[2] = iData[3] = -1;
-	LogEvent1(_CHARM_LANG_ID, _E_BEGIN_COMPUTATION, 4, iData); 
+	LogEvent1(_CHARM_LANG_ID, _E_BEGIN_COMPUTATION, 0, NULL); 
 }
 
 extern "C" void endComputation(void)
 {
-	int* iData = (int*)malloc(sizeof(int)*4); 
-	iData[0] = iData[1] = 0;
-	iData[2] = iData[3] = -1;
-	LogEvent1(_CHARM_LANG_ID, _E_END_COMPUTATION, 4, iData); 
+	LogEvent1(_CHARM_LANG_ID, _E_END_COMPUTATION, 0, NULL); 
 }
 
 extern "C" void messageRecv(char *env, int pe) {} //TODO
@@ -132,34 +128,30 @@ extern "C" void userEvent(int e) {}	//TODO
 
 extern "C" void beginPack(void)
 {
-	int* iData = (int*)malloc(sizeof(int)*4); 
-	iData[0] = iData[1] = iData[2] = 0;
-	iData[3] = CkMyPe();
-	LogEvent1(_CHARM_LANG_ID, _E_BEGIN_PACK, 4, iData); 
+	int* iData = (int*)malloc(sizeof(int)); 
+	iData[0] = CkMyPe();
+	LogEvent1(_CHARM_LANG_ID, _E_BEGIN_PACK, 1, iData); 
 }
 
 extern "C" void endPack(void)
 {
-	int* iData = (int*)malloc(sizeof(int)*4); 
-	iData[0] = iData[1] = iData[2] = 0;
-	iData[3] = CkMyPe();
-	LogEvent1(_CHARM_LANG_ID, _E_END_PACK, 4, iData); 
+	int* iData = (int*)malloc(sizeof(int)); 
+	iData[0] = CkMyPe();
+	LogEvent1(_CHARM_LANG_ID, _E_END_PACK, 1, iData); 
 }
 
 extern "C" void beginUnpack(void)
 {
-	int* iData = (int*)malloc(sizeof(int)*4); 
-	iData[0] = iData[1] = iData[2] = 0;
-	iData[3] = CkMyPe();
-	LogEvent1(_CHARM_LANG_ID, _E_BEGIN_UNPACK, 4, iData); 
+	int* iData = (int*)malloc(sizeof(int)); 
+	iData[0] = CkMyPe();
+	LogEvent1(_CHARM_LANG_ID, _E_BEGIN_UNPACK, 1, iData); 
 }
 
 extern "C" void endUnpack(void)
 {
-	int* iData = (int*)malloc(sizeof(int)*4); 
-	iData[0] = iData[1] = iData[2] = 0;
-	iData[3] = CkMyPe();
-	LogEvent1(_CHARM_LANG_ID, _E_END_UNPACK, 4, iData); 
+	int* iData = (int*)malloc(sizeof(int)); 
+	iData[0] = CkMyPe();
+	LogEvent1(_CHARM_LANG_ID, _E_END_UNPACK, 1, iData); 
 }
 
 

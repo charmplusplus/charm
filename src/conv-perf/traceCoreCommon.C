@@ -1,10 +1,10 @@
 
-#include "converse.h"
 #include "traceCore.h"
 #include "traceCoreCommon.h"
+#include "converse.h"
 
 /* Trace Module Constants (Default Values) */
-#define TRACE_CORE_BUFFER_SIZE 10000
+#define TRACE_CORE_BUFFER_SIZE 10
 
 /* Trace Storage and associated Structure */
 CpvDeclare(int, _traceCoreOn);
@@ -13,8 +13,17 @@ CpvDeclare(char*, _traceCoreRoot);
 CpvDeclare(int, _traceCoreBufferSize);
 CpvDeclare(TraceCore*, _traceCore);
 
+/* Trace Timer */
+#define  TRACE_CORE_TIMER   CmiWallTimer
+inline double TraceCoreTimer() { return TRACE_CORE_TIMER() - CpvAccess(_traceCoreInitTime); }
+
+/*****************************************************************/
+/* Tracing API 
+ * Implementation of functions declared in traceCoreCommon.h 
+ *****************************************************************/
 /* Initialize TraceCore Module */
 //TODO decide parameters from command line
+//TODO - trace-common.C
 extern "C" void initTraceCore(char** argv)
 {
   CpvInitialize(int, _traceCoreOn);
@@ -32,20 +41,35 @@ extern "C" void initTraceCore(char** argv)
   	CpvAccess(_traceCoreInitTime) = TRACE_CORE_TIMER();
 
   CpvInitialize(TraceCore*, _traceCore);
-  	CpvAccess(_traceCore) = new TraceCore();
+  	CpvAccess(_traceCore) = new TraceCore(argv);
 }
 
 /* End Core Trace Module */
-//TODO
+//TODO - trace-common.C
 extern "C" void closeTraceCore() {}
 
 /* Resume Core Trace Module */
-//TODO
+//TODO - trace-common.C
 extern "C" void resumeTraceCore() {}
 
-/* Tracing API */
-extern "C" void RegisterLanguage(int lID)
-{ CpvAccess(_traceCore)->RegisterLanguage(lID); }
+/* Suspend Core Trace Module */
+//TODO - trace-common.C
+extern "C" void suspendTraceCore() {}
+
+/*Install the beginIdle/endIdle condition handlers.*/
+//TODO - trace-common.C
+extern "C" void beginTraceCore(void) {}
+
+/*Cancel the beginIdle/endIdle condition handlers.*/
+//TODO - trace-common.C
+extern "C" void endTraceCore(void) {}
+
+/*****************************************************************/
+/* Tracing API 
+ * Implementation of functions declared in traceCoreAPI.h 
+ *****************************************************************/
+extern "C" void RegisterLanguage(int lID, char* ln)
+{ CpvAccess(_traceCore)->RegisterLanguage(lID, ln); }
 
 extern "C" void RegisterEvent(int lID, int eID)
 { CpvAccess(_traceCore)->RegisterEvent(lID, eID); }

@@ -2,7 +2,8 @@
 #ifndef __CHARM_PROJECTIONS_H__
 #define __CHARM_PROJECTIONS_H__
 
-#include "ck.h"	//NOTE: ck.h included for envelope
+// forward declaration
+class envelope;
 
 #ifdef __cplusplus
 extern "C" {

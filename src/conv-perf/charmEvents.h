@@ -3,6 +3,7 @@
 #define __CHARM_EVENTS_H__
 
 #include "charmProjections.h"
+#include "traceCoreAPI.h"
 
 /* Language ID */
 #define _CHARM_LANG_ID		2	// language ID for charm 
@@ -25,9 +26,8 @@
 #define  _E_END_UNPACK          19
 
 /* Trace Macros */
-// TODO Currently there is no EventDataPrototype for the purpose of testing
 #define REGISTER_CHARM \
-	{ RegisterLanguage(_CHARM_LANG_ID); \
+	{ RegisterLanguage(_CHARM_LANG_ID, "charm"); \
 	  RegisterEvent(_CHARM_LANG_ID, _E_CREATION         ); \
 	  RegisterEvent(_CHARM_LANG_ID, _E_BEGIN_PROCESSING ); \
 	  RegisterEvent(_CHARM_LANG_ID, _E_END_PROCESSING   ); \
@@ -50,8 +50,8 @@
 #define _LOG_E_BEGIN_EXECUTE_DETAILED(event, msgType, ep, srcPe, ml) \
 	{ beginExecuteDetailed(event, msgType, ep, srcPe, ml); }
 #define _LOG_E_END_EXECUTE()	 	{ endExecute(); }
-//#define _LOG_E_BEGIN_PROCESSING() 
-//#define _LOG_E_END_PROCESSING() 
+//TODO#define _LOG_E_BEGIN_PROCESSING() 
+//TODO#define _LOG_E_END_PROCESSING() 
 #define _LOG_E_ENQUEUE(env) 		{ enqueue(env); }
 #define _LOG_E_DEQUEUE(env) 		{ dequeue(env); }
 #define _LOG_E_BEGIN_COMPUTATION() 	{ beginComputation(); }

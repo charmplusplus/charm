@@ -5,7 +5,7 @@
 #include "traceCoreCommon.h"
 
 /* Language ID */
-#define _THREAD_LANG_ID		1	// language ID for threads 
+#define _THREAD_LANG_ID		3	// language ID for threads 
 
 /* Event IDs */
 #define _E_THREAD_CREATION	0
@@ -16,7 +16,7 @@
 /* Trace Macros */
 // TODO Currently there is no EventDataPrototype for the purpose of testing
 #define REGISTER_THREAD \
-	{ RegisterLanguage(_THREAD_LANG_ID); \
+	{ RegisterLanguage(_THREAD_LANG_ID, "thread"); \
 	  RegisterEvent(_THREAD_LANG_ID, _E_THREAD_CREATION); \
 	  RegisterEvent(_THREAD_LANG_ID, _E_THREAD_AWAKEN  ); \
 	  RegisterEvent(_THREAD_LANG_ID, _E_THREAD_RESUME  ); \
