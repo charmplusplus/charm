@@ -55,7 +55,6 @@ void team::doWork(int k)
     myWorkers[k%(numWorkers/numTeams)].data[j] += 
       myWorkers[k%(numWorkers/numTeams)].data[99-j];
   } 
-
   // generate some events
   if (k%19!=0) {
     wm = new WorkMsg;

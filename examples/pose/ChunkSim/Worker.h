@@ -8,7 +8,7 @@
 #define HEAVY 1
 #define FULL 2
 
-#define WORKER_SZ 100
+#define WORKER_SZ 1000
 
 class TeamData {
  public:

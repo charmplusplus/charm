@@ -30,7 +30,7 @@ main::main(CkArgMsg *m)
   TeamData *td;
   int dest, j, k, wid=0;
   srand48(42);
-  buildMap(numTeams, RANDOM);
+  buildMap(numTeams, UNIFORM);
   for (k=0; k<numTeams; k++) { // create numTeams teams
     dest = map[k];
     td = new TeamData;
@@ -47,8 +47,15 @@ void main::buildMap(int numObjs, int dist)
   int i, j=0, k;
   if (dist == RANDOM)
     for (i=0; i<numObjs; i++) map[i] = lrand48() % CkNumPes();
-  else if (dist == UNIFORM)
-    for (i=0; i<numObjs; i++) map[i] = i % CkNumPes();
+  else if (dist == UNIFORM) {
+    i=0;
+    for (j=0; j<CkNumPes(); j++)
+      for (k=0; k<numObjs/CkNumPes(); k++) {
+	map[i] = j; 
+	i++;
+      }
+    while (i< numObjs) map[i] = CkNumPes()-1;
+  }
   else if (dist == IMBALANCED) {
     int min = (numObjs/CkNumPes())/2;
     if (min < 1) min = 1;
