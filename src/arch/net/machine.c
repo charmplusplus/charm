@@ -1100,7 +1100,7 @@ typedef struct new_msg
 }
 NewMessage;
 
-#define WINDOW_SIZE 16             /* size of sliding window  */
+#define WINDOW_SIZE 3             /* size of sliding window  */
 
 #define MAX_SEQ_NUM 0xFFFFFFFF     /* 2^32 - 1 */
 
@@ -1139,6 +1139,7 @@ static MsgQueueElem *recd_msg_head, *recd_msg_tail;
 
 CpvDeclare(void *,CmiLocalQueue);
 
+static double CmiNow;
 
 /****************************************************************************/
 /* ROUTINES FOR SENDING/RECEIVING MESSAGES
@@ -1314,7 +1315,7 @@ int destpe;
 {
     send_window[destpe][last_window_index[destpe]].packet =  packet;
     send_window[destpe][last_window_index[destpe]].seq_num = next_seq_num[destpe];
-    send_window[destpe][last_window_index[destpe]].send_time = CmiTimerWallClock();
+    send_window[destpe][last_window_index[destpe]].send_time = CmiNow;
     packet->seq_num = next_seq_num[destpe];
     next_seq_num[destpe]++;
     last_window_index[destpe] = (last_window_index[destpe] + 1) % WINDOW_SIZE;
@@ -1331,6 +1332,7 @@ int destpe;
     int i;
     struct sockaddr_in addr;
 
+    CmiNow = CmiTimerWallClock();
     while (cur_window_size[destpe] < WINDOW_SIZE &&
 	   ((packet = GetTransmitPacket(destpe)) != NULL))
     {
@@ -1403,11 +1405,12 @@ static int RetransmitPackets()
   struct sockaddr_in addr;
   int sending=0;
 
+  CmiNow = CmiTimerWallClock();
   for (i = 0; i < CpvAccess(Cmi_numpes); i++) {
     index = first_window_index[i];
     if (cur_window_size[i] > 0) {
       sending = 1;
-      if ((CmiTimerWallClock() - send_window[i][index].send_time) > 
+      if ((CmiNow - send_window[i][index].send_time) > 
 	  (resend_wait * timeout_factor[i])) {
 	/* timeout_factor[i] *= 2 ;  for exponential backoff */
 	if (resend_wait * timeout_factor[i] > resend_fail) {
@@ -1422,7 +1425,7 @@ static int RetransmitPackets()
 	NumSends++;
 	my_sendto(data_skt, (char *)packet,
 		  packet->size + sizeof(DATA_HDR), 0, (struct sockaddr *)&addr, sizeof(addr)); 
-	send_window[i][index].send_time = CmiTimerWallClock();
+	send_window[i][index].send_time = CmiNow;
       }
     }
   }
@@ -1749,7 +1752,7 @@ static void InterruptHandler()
   NumIntrCalls++;
   NumOutsideMc++;
   sighold(SIGIO) ;
-
+  
   dgram_scan();
   RetransmitPackets();
 
