@@ -268,7 +268,5 @@ class MsgPool {
 };
 
 CkpvExtern(MsgPool*, _msgPool);
-extern void _processBocInitMsg(envelope *);
-extern void _processNodeBocInitMsg(envelope *);
 
 #endif

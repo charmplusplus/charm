@@ -425,7 +425,7 @@ static inline void *_allocNewChare(envelope *env)
   return tmp;
 }
  
-static void _processNewChareMsg(envelope *env)
+static void _processNewChareMsg(CkCoreState *ck,envelope *env)
 {
   register void *obj = _allocNewChare(env);
   register void *msg = EnvToUsr(env);
@@ -435,7 +435,7 @@ static void _processNewChareMsg(envelope *env)
   _TRACE_END_EXECUTE();
 }
 
-static void _processNewVChareMsg(envelope *env)
+static void _processNewVChareMsg(CkCoreState *ck,envelope *env)
 {
   register void *obj = _allocNewChare(env);
   register CkChareID *pCid = (CkChareID *) 
@@ -459,7 +459,7 @@ static void _processNewVChareMsg(envelope *env)
 
 /************** Message Receive ****************/
 
-static inline void _deliverForChareMsg(int epIdx,envelope *env,void *obj)
+static inline void _deliverForChareMsg(CkCoreState *ck,int epIdx,envelope *env,void *obj)
 {
   register void *msg = EnvToUsr(env);
   _TRACE_BEGIN_EXECUTE(env);
@@ -469,14 +469,14 @@ static inline void _deliverForChareMsg(int epIdx,envelope *env,void *obj)
 }
 
 
-static inline void _processForChareMsg(envelope *env)
+static inline void _processForChareMsg(CkCoreState *ck,envelope *env)
 {
   register int epIdx = env->getEpIdx();
   register void *obj = env->getObjPtr();
-  _deliverForChareMsg(epIdx,env,obj);
+  _deliverForChareMsg(ck,epIdx,env,obj);
 }
 
-static inline void _deliverForBocMsg(int epIdx,envelope *env,IrrGroup *obj)
+static inline void _deliverForBocMsg(CkCoreState *ck,int epIdx,envelope *env,IrrGroup *obj)
 {
   CmiBool tracingEnabled=obj->ckTracingEnabled();
   if (tracingEnabled) _TRACE_BEGIN_EXECUTE(env);
@@ -486,34 +486,34 @@ static inline void _deliverForBocMsg(int epIdx,envelope *env,IrrGroup *obj)
   _STATS_RECORD_PROCESS_BRANCH_1();  
 }
 
-static inline void _processForBocMsg(envelope *env)
+static inline void _processForBocMsg(CkCoreState *ck,envelope *env)
 {
   register CkGroupID groupID =  env->getGroupNum();
-  register IrrGroup *obj = _localBranch(groupID);
+  register IrrGroup *obj = ck->localBranch(groupID);
   if(!obj) { // groupmember not yet created
-    CkpvAccess(_groupTable).find(groupID).enqMsg(env);
+    ck->getGroupTable().find(groupID).enqMsg(env);
     return;
   }
-  CpvAccess(_qd)->process();
+  ck->process();
   register int epIdx = env->getEpIdx();
-  _deliverForBocMsg(epIdx,env,obj);
+  _deliverForBocMsg(ck,epIdx,env,obj);
 }
 
-static inline void _deliverForNodeBocMsg(envelope *env,void *obj)
+static inline void _deliverForNodeBocMsg(CkCoreState *ck,envelope *env,void *obj)
 {
   env->setMsgtype(ForChareMsg);
   env->setObjPtr(obj);
-  _processForChareMsg(env);
+  _processForChareMsg(ck,env);
   _STATS_RECORD_PROCESS_NODE_BRANCH_1();
 }
 
-static inline void _deliverForNodeBocMsg(int epIdx, envelope *env,void *obj)
+static inline void _deliverForNodeBocMsg(CkCoreState *ck,int epIdx, envelope *env,void *obj)
 {
   env->setEpIdx(epIdx);
-  _deliverForNodeBocMsg(env, obj);
+  _deliverForNodeBocMsg(ck,env, obj);
 }
 
-static inline void _processForNodeBocMsg(envelope *env)
+static inline void _processForNodeBocMsg(CkCoreState *ck,envelope *env)
 {
   register CkGroupID groupID = env->getGroupNum();
   register void *obj;
@@ -525,14 +525,14 @@ static inline void _processForNodeBocMsg(envelope *env)
     return;
   }
   CmiUnlock(_nodeLock);
-  CpvAccess(_qd)->process();
+  ck->process();
   env->setMsgtype(ForChareMsg);
   env->setObjPtr(obj);
-  _processForChareMsg(env);
+  _processForChareMsg(ck,env);
   _STATS_RECORD_PROCESS_NODE_BRANCH_1();
 }
 
-static inline void _processFillVidMsg(envelope *env)
+static inline void _processFillVidMsg(CkCoreState *ck,envelope *env)
 {
   register VidBlock *vptr = (VidBlock *) env->getVidPtr();
   _CHECK_VALID(vptr, "FillVidMsg: Not a valid VIdPtr\n");
@@ -542,7 +542,7 @@ static inline void _processFillVidMsg(envelope *env)
   CmiFree(env);
 }
 
-static inline void _processForVidMsg(envelope *env)
+static inline void _processForVidMsg(CkCoreState *ck,envelope *env)
 {
   VidBlock *vptr = (VidBlock *) env->getVidPtr();
   _CHECK_VALID(vptr, "ForVidMsg: Not a valid VIdPtr\n");
@@ -550,71 +550,74 @@ static inline void _processForVidMsg(envelope *env)
   vptr->send(env);
 }
 
-void _processBocInitMsg(envelope *env)
+void _processBocInitMsg(CkCoreState *ck,envelope *env)
 {
   register CkGroupID groupID = env->getGroupNum();
   register int epIdx = env->getEpIdx();
   _createGroupMember(groupID, epIdx, EnvToUsr(env));
 }
 
-void _processNodeBocInitMsg(envelope *env)
+void _processNodeBocInitMsg(CkCoreState *ck,envelope *env)
 {
   register CkGroupID groupID = env->getGroupNum();
   register int epIdx = env->getEpIdx();
   _createNodeGroupMember(groupID, epIdx, EnvToUsr(env));
 }
 
-void _processHandler(void *converseMsg)
+/**
+ * This is the main converse-level handler used by all of Charm++.
+ */
+void _processHandler(void *converseMsg,CkCoreState *ck)
 {
   register envelope *env = (envelope *) converseMsg;
   switch(env->getMsgtype()) {
     case NewChareMsg :
-      CpvAccess(_qd)->process();
+      ck->process();
       if(env->isPacked()) CkUnpackMessage(&env);
-      _processNewChareMsg(env);
+      _processNewChareMsg(ck,env);
       _STATS_RECORD_PROCESS_CHARE_1();
       break;
     case NewVChareMsg :
-      CpvAccess(_qd)->process();
+      ck->process();
       if(env->isPacked()) CkUnpackMessage(&env);
-      _processNewVChareMsg(env);
+      _processNewVChareMsg(ck,env);
       _STATS_RECORD_PROCESS_CHARE_1();
       break;
     case BocInitMsg :
-      CpvAccess(_qd)->process();
+      ck->process();
       if(env->isPacked()) CkUnpackMessage(&env);
-      _processBocInitMsg(env);
+      _processBocInitMsg(ck,env);
       break;
     case NodeBocInitMsg :
-      CpvAccess(_qd)->process();
+      ck->process();
       if(env->isPacked()) CkUnpackMessage(&env);
-      _processNodeBocInitMsg(env);
+      _processNodeBocInitMsg(ck,env);
       break;
     case ForChareMsg :
-      CpvAccess(_qd)->process();
+      ck->process();
       if(env->isPacked()) CkUnpackMessage(&env);
-      _processForChareMsg(env);
+      _processForChareMsg(ck,env);
       _STATS_RECORD_PROCESS_MSG_1();
       break;
     case ForBocMsg :
       // QD processing moved inside _processForBocMsg because it is conditional
       if(env->isPacked()) CkUnpackMessage(&env);
-      _processForBocMsg(env);
+      _processForBocMsg(ck,env);
       // stats record moved inside _processForBocMsg because it is conditional
       break;
     case ForNodeBocMsg :
       // QD processing moved to _processForNodeBocMsg because it is conditional
       if(env->isPacked()) CkUnpackMessage(&env);
-      _processForNodeBocMsg(env);
+      _processForNodeBocMsg(ck,env);
       // stats record moved to _processForNodeBocMsg because it is conditional
       break;
     case ForVidMsg   :
-      CpvAccess(_qd)->process();
-      _processForVidMsg(env);
+      ck->process();
+      _processForVidMsg(ck,env);
       break;
     case FillVidMsg  :
-      CpvAccess(_qd)->process();
-      _processFillVidMsg(env);
+      ck->process();
+      _processFillVidMsg(ck,env);
       break;
     default:
       CmiAbort("Internal Error: Unknown-msg-type. Contact Developers.\n");
@@ -794,7 +797,7 @@ void CkSendMsgInline(int entryIndex, void *msg, const CkChareID *pCid)
     register envelope *env = UsrToEnv(msg);
     if (env->isPacked()) CkUnpackMessage(&env);
     _STATS_RECORD_PROCESS_MSG_1();
-    _deliverForChareMsg(entryIndex,env,pCid->objPtr);
+    _deliverForChareMsg(CkpvAccess(_coreState),entryIndex,env,pCid->objPtr);
   }
   else {
 #if CMK_IMMEDIATE_MSG
@@ -874,7 +877,7 @@ void CkSendMsgBranchInline(int eIdx, void *msg, int destPE, CkGroupID gID)
     if (obj!=NULL) 
     { //Just directly call the group:
       envelope *env=UsrToEnv(msg);
-      _deliverForBocMsg(eIdx,env,obj);
+      _deliverForBocMsg(CkpvAccess(_coreState),eIdx,env,obj);
       return;
     }
 #if CMK_IMMEDIATE_MSG
@@ -951,7 +954,7 @@ void CkSendMsgNodeBranchInline(int eIdx, void *msg, int node, CkGroupID gID)
     if (obj!=NULL) 
     { //Just directly call the group:
       envelope *env=UsrToEnv(msg);
-      _deliverForNodeBocMsg(eIdx,env,obj);
+      _deliverForNodeBocMsg(CkpvAccess(_coreState),eIdx,env,obj);
       return;
     }
 #if CMK_IMMEDIATE_MSG

@@ -42,6 +42,7 @@ CkpvDeclare(GroupTable, _groupTable);
 CkpvDeclare(UInt, _numGroups);
 UInt _numNodeGroups;
 GroupTable* _nodeGroupTable = 0;
+CkpvDeclare(CkCoreState *, _coreState);
 
 CkpvDeclare(Stats*, _myStats);
 CkpvDeclare(MsgPool*, _msgPool);
@@ -215,7 +216,8 @@ static void _exitHandler(envelope *env)
 
 static inline void _processBufferedBocInits(void)
 {
-  CkNumberHandler(_bocHandlerIdx, (CmiHandler)_processHandler);
+  CmiNumberHandlerEx(_bocHandlerIdx,(CmiHandlerEx)_processHandler,
+  	CkpvAccess(_coreState));
   register int i = 0;
   PtrVec &inits=*CkpvAccess(_bocInitVec);
   register int len = inits.size();
@@ -224,14 +226,15 @@ static inline void _processBufferedBocInits(void)
     if(env==0) continue;
     if(env->isPacked()) 
       CkUnpackMessage(&env);
-    _processBocInitMsg(env);
+    _processBocInitMsg(CkpvAccess(_coreState),env);
   }
   delete &inits;
 }
 
 static inline void _processBufferedNodeBocInits(void)
 {
-  CkNumberHandler(_nodeBocHandlerIdx, (CmiHandler)_processHandler);
+  CmiNumberHandlerEx(_nodeBocHandlerIdx,(CmiHandlerEx)_processHandler,
+  	CkpvAccess(_coreState));
   register int i = 0;
   PtrVec &inits=*_nodeBocInitVec;
   register int len = inits.size();
@@ -240,14 +243,15 @@ static inline void _processBufferedNodeBocInits(void)
     if(env==0) continue;
     if(env->isPacked())
       CkUnpackMessage(&env);
-    _processNodeBocInitMsg(env);
+    _processNodeBocInitMsg(CkpvAccess(_coreState),env);
   }
   delete &inits;
 }
 
 static inline void _processBufferedMsgs(void)
 {
-  CkNumberHandler(_charmHandlerIdx,(CmiHandler)_processHandler);
+  CmiNumberHandlerEx(_charmHandlerIdx,(CmiHandlerEx)_processHandler,
+  	CkpvAccess(_coreState));
   envelope *env;
   while(NULL!=(env=(envelope*)CkpvAccess(_buffQ)->deq())) {
     if(env->getMsgtype()==NewChareMsg || env->getMsgtype()==NewVChareMsg) {
@@ -435,6 +439,7 @@ void _initCharm(int argc, char **argv)
 	CpvInitialize(QdState*, _qd);
 	CpvInitialize(char**, Ck_argv); CpvAccess(Ck_argv)=argv;
 	CkpvInitialize(MsgPool*, _msgPool);
+	CkpvInitialize(CkCoreState *, _coreState);
 
 	CkpvInitialize(_CkOutStream*, _ckout);
 	CkpvInitialize(_CkErrStream*, _ckerr);
@@ -445,18 +450,14 @@ void _initCharm(int argc, char **argv)
 	CkpvAccess(_numGroups) = 1; // make 0 an invalid group number
 	_numNodeGroups = 1;
 	CkpvAccess(_buffQ) = new PtrQ();
-	_MEMCHECK(CkpvAccess(_buffQ));
 	CkpvAccess(_bocInitVec) = new PtrVec();
-	_MEMCHECK(CkpvAccess(_bocInitVec));
 	
 	if(CkMyRank()==0) 
 	{
 		_nodeLock = CmiCreateLock();
 		_nodeGroupTable = new GroupTable();
-		_MEMCHECK(_nodeGroupTable);
 		_nodeGroupTable->init();
 		_nodeBocInitVec = new PtrVec();
-		_MEMCHECK(_nodeBocInitVec);
 	}
   
 	CmiNodeBarrier();
@@ -464,15 +465,14 @@ void _initCharm(int argc, char **argv)
 	if(CkMyRank()==0) 
 #endif
 	{
-	CpvAccess(_qd) = new QdState();
-	_MEMCHECK(CpvAccess(_qd));
+		CpvAccess(_qd) = new QdState();
         }
+	CkpvAccess(_coreState)=new CkCoreState();
+	
 	CkpvAccess(_numInitsRecd) = -1;  /*0;*/
 
 	CkpvAccess(_ckout) = new _CkOutStream();
-	_MEMCHECK(CkpvAccess(_ckout));
 	CkpvAccess(_ckerr) = new _CkErrStream();
-	_MEMCHECK(CkpvAccess(_ckerr));
 
 	_charmHandlerIdx = CkRegisterHandler((CmiHandler)_bufferHandler);
 	_initHandlerIdx = CkRegisterHandler((CmiHandler)_initHandler);
@@ -521,15 +521,12 @@ void _initCharm(int argc, char **argv)
 #endif
 	_TRACE_BEGIN_COMPUTATION();
 	CkpvAccess(_myStats) = new Stats();
-	_MEMCHECK(CkpvAccess(_myStats));
 	CkpvAccess(_msgPool) = new MsgPool();
-	_MEMCHECK(CkpvAccess(_msgPool));
 	CmiNodeBarrier();
 
 	if(CkMyPe()==0) 
 	{
 		_allStats = new Stats*[CkNumPes()];
-		_MEMCHECK(_allStats);
 		register int i;
 		for(i=0;i<_numMains;i++) 
 		{

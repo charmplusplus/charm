@@ -63,7 +63,31 @@ class VidBlock {
     }
 };
 
-extern void _processHandler(void *);
+
+// All the state that's useful to have on the receive side in the Charm Core (ck.C)
+class CkCoreState {
+	GroupTable &groupTable;
+	QdState *qd;
+public:
+	CkCoreState() 
+		:groupTable(CkpvAccess(_groupTable)), 
+		 qd(CpvAccess(_qd)) {}
+	
+	inline GroupTable &getGroupTable() {return groupTable;}
+	inline IrrGroup *localBranch(CkGroupID gID) {
+		return groupTable.find(gID).getObj();
+	}
+	
+	inline QdState *getQD() {return qd;}
+	inline void process(int n=1) {qd->process(n);}
+};
+
+CkpvExtern(CkCoreState *, _coreState);
+
+
+extern void _processHandler(void *converseMsg,CkCoreState *ck);
+extern void _processBocInitMsg(CkCoreState *ck,envelope *msg);
+extern void _processNodeBocInitMsg(CkCoreState *ck,envelope *msg);
 extern void _infoFn(void *msg, CldPackFn *pfn, int *len,
                     int *queueing, int *priobits, UInt **prioptr);
 extern void _createGroupMember(CkGroupID groupID, int eIdx, void *env);
