@@ -12,14 +12,14 @@ extern CProxy_sim POSE_Objects_RO;
 class rep 
 {
  protected:
-  /// Pointer to poser wrapper
-  sim *parent;             
   /// Pointer to synchronization strategy
   strat *myStrat;          
  public:
 #if POSE_COMM_ON
   CProxy_sim POSE_Objects;
 #endif
+  /// Pointer to poser wrapper
+  sim *parent;             
   /// the object's unique handle
   /** Initialized to index of poser wrapper in POSE_objects array */
   int myHandle;            
