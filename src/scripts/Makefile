@@ -23,9 +23,11 @@
 
 SHELL=/bin/sh
 
-all: charm++ LIBS ampi tsm sm pvm sdag doc
+all: charm++ bluegene LIBS ampi tsm sm pvm sdag doc
 
 charm++: converse libck.a charmxi
+
+bluegene: charm++ libbluegene.a
 
 for-namd: charm++ pvm AMPIC
 
@@ -93,7 +95,7 @@ CVHEADERS=cpthreads.h converse.h conv-mach.h conv-mach.sh \
       WSLB.decl.h GreedyRefLB.decl.h RandRefLB.decl.h \
       tempo.decl.h waitqd.decl.h \
 	  CommLB.decl.h Comm1LB.decl.h  \
-	  ampi.decl.h ampimain.decl.h
+	  ampi.decl.h ampimain.decl.h BlueGene.decl.h
 
 # The .c files are there to be #included by clients whole
 # This is a bit unusual, but makes client linking simpler.
@@ -109,7 +111,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  RefineLB.h HeapCentLB.h CommLB.h Comm1LB.h \
 	  MetisLB.h NborBaseLB.h \
 	  NeighborLB.h WSLB.h GreedyRefLB.h RandRefLB.h CkLists.h \
-      ampi.h ampif.h \
+      ampi.h ampif.h BlueGene.h \
 	  $(CVHEADERS)
 
 ALLHEADERS=$(CKHEADERS) \
@@ -152,6 +154,7 @@ dirs+sources:
 	./gatherflat ../../src/Common/langs/simplemsg  .
 	./gatherflat ../../src/Common/langs/pvmc       .
 	./gatherflat ../../src/Common/langs/ampi       .
+	./gatherflat ../../src/Common/langs/bluegene   .
 	./gatherflat ../../src/Common/langs/sdag/xlator       .
 	./gatherflat ../../src/Common/langs/sdag/runtime      .
 	./gatherflat ../../src/Common/xlat-i           .
@@ -522,6 +525,20 @@ trace-projections.o:trace-projections.C trace-projections.h trace.h $(CKHEADERS)
 
 trace-summary.o:trace-summary.C trace-summary.h trace.h $(CKHEADERS)
 	$(CHARMC) -o trace-summary.o trace-summary.C
+
+
+###############################################################################
+#
+# BlueGene Emulator
+#
+###############################################################################
+
+BlueGene.decl.h BlueGene.def.h : BlueGene.ci charmxi
+	$(CHARMC) BlueGene.ci
+
+libbluegene.a: BlueGene.C BlueGene.h BlueGene.decl.h BlueGene.def.h
+	$(CHARMC) -c BlueGene.C
+	$(CHARMC) -cp ../lib -o libbluegene.a BlueGene.o
 
 
 ###############################################################################

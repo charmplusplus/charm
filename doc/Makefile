@@ -14,6 +14,7 @@ ps:
 	( cd f90charm; $(LNCMD); make ps )
 	( cd fem; $(LNCMD); make ps )
 	( cd ampi; $(LNCMD); make ps )
+	( cd bluegene; $(LNCMD); make ps )
 
 pdf:
 	if [ ! -d $(IDIR)/pdf ] ; then mkdir $(IDIR)/pdf ; fi
@@ -26,6 +27,7 @@ pdf:
 	( cd f90charm; $(LNCMD); make pdf )
 	( cd fem; $(LNCMD); make pdf )
 	( cd ampi; $(LNCMD); make pdf )
+	( cd bluegene; $(LNCMD); make pdf )
 
 html:
 	if [ ! -d $(IDIR)/html ] ; then mkdir $(IDIR)/html ; fi
@@ -38,6 +40,7 @@ html:
 	( cd f90charm; $(LNCMD); make html )
 	( cd fem; $(LNCMD); make html )
 	( cd ampi; $(LNCMD); make html )
+	( cd bluegene; $(LNCMD); make html )
 
 clean:
 	( cd install; $(RMCMD); make clean )
@@ -49,3 +52,4 @@ clean:
 	( cd f90charm; $(RMCMD); make clean )
 	( cd fem; $(RMCMD); make clean )
 	( cd ampi; $(RMCMD); make clean )
+	( cd bluegene; $(RMCMD); make clean )
