@@ -227,8 +227,13 @@ int  CCS_AUTH_differ(const CcsSec_secretKey *key,unsigned int salt,
 Randomness routines: return a good 32-bit random number.
 */
 #include <stdlib.h>
+
+#if defined(_WIN32) && ! defined(__CYGWIN__)
+#include <sys/timeb.h>
+#else /*UNIX machine*/
 #include <sys/time.h>
 #include <fcntl.h>
+#endif
 
 void CCS_RAND_new(CCS_RAND_state *s)
 {
@@ -236,12 +241,17 @@ void CCS_RAND_new(CCS_RAND_state *s)
   static int newCount=0;
   byte8 tmp[sizeof(s->state)];
 
-/*Fill the state buffer with random noise*/
   /* State buffer starts out uninitialized. */
-
   /* XOR in a linear counter */
   s->state[32] ^= newCount++;
-  
+
+/*Fill the state buffer with random noise*/
+
+#if defined(_WIN32) && ! defined(__CYGWIN__)
+  _ftime((struct _timeb *)tmp);
+  for (i=0;i<sizeof(s->state);i++)
+    s->state[i]^=tmp[i];
+#else /*UNIX machine*/
   /* XOR the current time of day into the state buffer*/
   gettimeofday((struct timeval *)tmp,NULL);
   for (i=0;i<sizeof(s->state);i++)
@@ -255,6 +265,7 @@ void CCS_RAND_new(CCS_RAND_state *s)
 	s->state[i]^=tmp[i];
     close(randFD);
   }
+#endif
 }
 
 word32 CCS_RAND_next(CCS_RAND_state *s) {
