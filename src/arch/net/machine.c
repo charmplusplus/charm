@@ -1379,7 +1379,9 @@ static void comm_thread(void)
 {
   struct timeval tmo; fd_set rfds;
   while (1) {
+    CmiCommLock();
     CommunicationServer();
+    CmiCommUnlock();
     tmo.tv_sec = 0;
     tmo.tv_usec = Cmi_tickspeed;
     FD_ZERO(&rfds);
@@ -1501,7 +1503,9 @@ static void comm_thread(void)
 {
   struct timeval tmo; fd_set rfds;
   while (1) {
+    CmiCommLock();
     CommunicationServer();
+    CmiCommUnlock();
     tmo.tv_sec = 0;
     tmo.tv_usec = Cmi_tickspeed;
     FD_ZERO(&rfds);
