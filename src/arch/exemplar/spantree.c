@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1995-06-09 21:22:00  gursoy
+ * Revision 2.2  1995-09-20 15:12:09  sanjeev
+ * CmiSpanTreeChild -> CmiSpanTreeChildren
+ *
+ * Revision 2.1  1995/06/09  21:22:00  gursoy
  * Cpv macros moved to converse
  *
  * Revision 2.0  1995/06/08  16:35:12  gursoy
@@ -46,7 +49,7 @@ int CmiSpanTreeRoot()
     return 0;
 }
 
-void CmiSpanTreeChild(node, children)
+void CmiSpanTreeChildren(node, children)
 int node, *children;
 {
     int i;
