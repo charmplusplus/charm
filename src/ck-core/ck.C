@@ -516,7 +516,7 @@ void _createGroup(int groupID, envelope *env, int retEp, CkChareID *retChare)
   CpvAccess(_myStats)->recordCreateGroup();
 #endif
   _createGroupMember(groupID, epIdx, msg);
-  if(retChare) {
+  if(retEp) {
     msg = CkAllocMsg(0, sizeof(int), 0); // 0 is a system msg of size int
     *((int *)msg) = groupID;
     CkSendMsg(retEp, msg, retChare);
@@ -572,7 +572,7 @@ void _createNodeGroup(int groupID, envelope *env, int retEp, CkChareID *retChare
   CpvAccess(_myStats)->recordCreateNodeGroup();
 #endif
   _createNodeGroupMember(groupID, epIdx, msg);
-  if(retChare) {
+  if(retEp) {
     msg = CkAllocMsg(0, sizeof(int), 0); // 0 is a system msg of size int
     *((int *)msg) = groupID;
     CkSendMsg(retEp, msg, retChare);
@@ -588,19 +588,14 @@ static int _staticGroupCreate(envelope *env, int retEp, CkChareID *retChare)
 
 static void _dynamicGroupCreate(envelope *env, int retEp, CkChareID * retChare)
 {
-#ifndef CMK_OPTIMIZE
-  if(env->isUsed()) {
-    CmiAbort("Message being re-sent. Aborting...\n");
-  }
-  env->setUsed(1);
-#endif
   register CkChareID *msg = 
     (CkChareID*) _allocMsg(DBocReqMsg, sizeof(CkChareID));
-  *msg = *retChare;
+  if(retChare)
+    *msg = *retChare;
   register envelope *newenv = UsrToEnv((void *)msg);
   newenv->setUsrMsg(env);
   newenv->setSrcPe(CkMyPe());
-  newenv->setEpIdx(retEp);
+  newenv->setRetEp(retEp);
   CmiSetHandler(newenv, _charmHandlerIdx);
   CmiSyncSendAndFree(0, newenv->getTotalsize(), newenv); 
   CpvAccess(_qd)->create();
@@ -617,15 +612,10 @@ static int _staticNodeGroupCreate(envelope *env, int retEp, CkChareID *retChare)
 
 static void _dynamicNodeGroupCreate(envelope *env, int retEp, CkChareID * retChare)
 {
-#ifndef CMK_OPTIMIZE
-  if(env->isUsed()) {
-    CmiAbort("Message being re-sent. Aborting...\n");
-  }
-  env->setUsed(1);
-#endif
   register CkChareID *msg = 
     (CkChareID*) _allocMsg(DNodeBocReqMsg, sizeof(CkChareID));
-  *msg = *retChare;
+  if(retChare)
+    *msg = *retChare;
   register envelope *newenv = UsrToEnv((void *)msg);
   newenv->setUsrMsg(env);
   newenv->setSrcPe(CkMyPe());

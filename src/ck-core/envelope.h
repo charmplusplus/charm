@@ -151,11 +151,13 @@ class envelope {
     void*  getObjPtr(void) const { assert(getMsgtype()==ForChareMsg); return ptr; }
     void   setObjPtr(void *p) { assert(getMsgtype()==ForChareMsg); ptr = p; }
     UShort getRetEp(void) const {
-      assert(getMsgtype()==DBocReqMsg || getMsgtype()==DNodeBocReqMsg); 
+      assert(getMsgtype()==DBocReqMsg || getMsgtype()==DNodeBocReqMsg
+          || getMsgtype()==DBocNumMsg || getMsgtype()==DNodeBocNumMsg); 
       return s1; 
     }
     void   setRetEp(const UShort e) {
-      assert(getMsgtype()==DBocReqMsg || getMsgtype()==DNodeBocReqMsg); 
+      assert(getMsgtype()==DBocReqMsg || getMsgtype()==DNodeBocReqMsg
+          || getMsgtype()==DBocNumMsg || getMsgtype()==DNodeBocNumMsg); 
       s1 = e; 
     }
     void*  getUsrMsg(void) const { 
