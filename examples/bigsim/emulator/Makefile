@@ -1,7 +1,7 @@
 CHARMC=../../../bin/charmc $(OPTS)
 
 all: jacobi3D maxReduce prime ping octo line ring
-	cd littleMD; make
+	cd littleMD; $(MAKE)
 
 jacobi3D: jacobi3D.C
 	$(CHARMC) -language bluegene -o jacobi3D jacobi3D.C 
@@ -38,4 +38,4 @@ clean:
 	rm -f TAGS *.o
 	rm -f jacobi3D maxReduce prime ping octo line
 	rm -f conv-host charmrun
-	cd littleMD; make clean
+	cd littleMD; $(MAKE) clean
