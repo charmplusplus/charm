@@ -951,7 +951,7 @@ esac
 ########################################################################
 
 Postfix=
-test $OSTYPE = cygwin && Postfix='.exe'
+test "$OSTYPE" = cygwin && Postfix='.exe'
 
 if [ -x $CHARMBIN/conv-host${Postfix} ]
 then
