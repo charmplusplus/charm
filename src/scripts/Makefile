@@ -610,8 +610,8 @@ libampi.a: ampi.C ampi.h ampiimpl.h ampi.decl.h ampi.def.h ampimain.decl.h \
 libampif.a: ampi.C ampimain.C ampif.C ampi.h ampiimpl.h ampi.decl.h ampi.def.h \
             ampimain.decl.h ampimain.def.h
 	$(CHARMC) -DAMPI_FORTRAN=1 -c ampi.C
-	$(CHARMC) -c ampimain.C
-	$(CHARMC) -c ampif.C
+	$(CHARMC) -DAMPI_FORTRAN=1 -c ampimain.C
+	$(CHARMC) -DAMPI_FORTRAN=1 -c ampif.C
 	$(CHARMC) -cp ../lib -o libampif.a ampimain.o ampi.o ampif.o
 
 libsdag.a: CDep.o

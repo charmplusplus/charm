@@ -13,11 +13,14 @@
 #include "ampimain.decl.h"
 #if CMK_FORTRAN_USES_ALLCAPS
 extern "C" void AMPIMAIN(int, char **);
+extern "C" int AMPI_COMM_UNIVERSE[AMPI_MAX_COMM];
 #else
 extern "C" void ampimain_(int, char **);
+extern "C" int ampi_comm_universe_[AMPI_MAX_MAX];
 #endif // CMK_FORTRAN_USES_ALLCAPS
 #else
 extern "C" void ampimain(int, char **);
+extern "C" int AMPI_COMM_UNIVERSE[AMPI_MAX_COMM];
 #endif
 
 // Default ampi_setup
@@ -87,6 +90,18 @@ ampi::ampi(AmpiStartMsg *msg)
   for(i=0;i<100;i++) {
     irequests[i].nextfree = (i+1)%100;
     irequests[i].prevfree = ((i-1)+100)%100;
+  }
+  for(i=0;i<ampimain::ncomms; i++)
+  {
+#if AMPI_FORTRAN
+#if CMK_FORTRAN_USES_ALLCAPS
+    AMPI_COMM_UNIVERSE[i] = i;
+#else
+    ampi_comm_universe_[i] = i;
+#endif
+#else
+    AMPI_COMM_UNIVERSE[i] = i;
+#endif
   }
 }
 
