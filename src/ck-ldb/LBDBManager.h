@@ -113,7 +113,7 @@ public:
   };
   void BackgroundLoad(double* walltime, double* cputime);
   void ClearLoads(void);
-  void RunningObj(LDObjHandle _h) {
+  void SetRunningObj(LDObjHandle _h) {
     runningObj = _h; obj_running = CmiTrue;
   };
   void NoRunningObj() { obj_running = CmiFalse; };

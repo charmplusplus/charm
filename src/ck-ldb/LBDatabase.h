@@ -41,11 +41,13 @@ public:
     LDObjTime(h,walltime,cputime);
   };
 
+  int RunningObject(LDObjHandle* _o) { 
+    return LDRunningObject(myLDHandle,_o);
+  };
   void ObjectStart(LDObjHandle _h) { LDObjectStart(_h); };
   void ObjectStop(LDObjHandle _h) { LDObjectStop(_h); };
-
-  void Message(LDObjHandle from, LDOMid toOM, LDObjid *toID, int bytes) {
-    LDMessage(from,toOM,toID,bytes);
+  void Send(LDOMHandle _om, LDObjid _id, unsigned int _b) {
+    LDSend(_om, _id, _b);
   };
 
   void EstObjLoad(LDObjHandle h, double load) { LDEstObjLoad(h,load); };

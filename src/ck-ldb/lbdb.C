@@ -79,14 +79,25 @@ extern "C" void LDCollectStatsOff(LDHandle _db)
   db->TurnStatsOff();
 }
 
+extern "C" int LDRunningObject(LDHandle _h, LDObjHandle* _o)
+{
+  LBDB *const db = static_cast<LBDB*>(_h.handle);
+
+  if (db->ObjIsRunning()) {
+    *_o = db->RunningObj();
+    return 1;
+  } else return 0;
+}
+
 extern "C" void LDObjectStart(LDObjHandle _h)
 {
   LBDB *const db = static_cast<LBDB*>(_h.omhandle.ldb.handle);
 
   if (db->ObjIsRunning()) LDObjectStop(db->RunningObj());
 
+  db->SetRunningObj(_h);
+
   if (db->StatsOn()) {
-    db->RunningObj(_h);
     LBObj *const obj = db->LbObj(_h);
     obj->StartTimer();
   }
@@ -95,13 +106,14 @@ extern "C" void LDObjectStart(LDObjHandle _h)
 extern "C" void LDObjectStop(LDObjHandle _h)
 {
   LBDB *const db = static_cast<LBDB*>(_h.omhandle.ldb.handle);
+  LBObj *const obj = db->LbObj(_h);
+
   if (db->StatsOn()) {
-    LBObj *const obj = db->LbObj(_h);
     double walltime, cputime;
     obj->StopTimer(&walltime,&cputime);
     obj->IncrementTime(walltime,cputime);
-    db->NoRunningObj();
   }
+  db->NoRunningObj();
 }
 
 extern "C" void LDSend(LDOMHandle destOM, LDObjid destid, unsigned int bytes)

@@ -104,6 +104,7 @@ LDObjHandle LDRegisterObj(LDOMHandle h, LDObjid id, void *userptr,
 void LDUnregisterObj(LDObjHandle h);
 
 void LDObjTime(LDObjHandle h, double walltime, double cputime);
+int LDRunningObject(LDHandle _h, LDObjHandle* _o );
 void LDObjectStart(LDObjHandle _h);
 void LDObjectStop(LDObjHandle _h);
 void LDSend(LDOMHandle destOM, LDObjid destid, unsigned int bytes);
