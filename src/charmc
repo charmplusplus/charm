@@ -199,7 +199,7 @@ end
 #
 ##############################################################################
 
-set ORIGDIR=$cwd
+set ORIGDIR=`pwd`
 
 # Try to find CHARMBIN by looking in directory where charmc is
 
@@ -223,7 +223,7 @@ if ($?CHARMBIN == 0) then
             set SCRIPT=$SCRIPT:t
         endif
     end
-    set CHARMBIN=$cwd
+    set CHARMBIN=`pwd`
 endif
 
 # Give an error message
@@ -249,7 +249,7 @@ endif
 if ($?MACHTYPE) then
     if (-d $CHARMBIN/../../$MACHTYPE/bin) then
         cd $CHARMBIN/../../$MACHTYPE/bin
-	set CHARMBIN=$cwd
+	set CHARMBIN=`pwd`
     else
         echo 'error - there is no installed charm for "'$MACHTYPE'"'
         goto failure
@@ -258,11 +258,11 @@ endif
 
 if ($?CHARMLIB == 0) then
     cd $CHARMBIN/../lib
-    set CHARMLIB=$cwd
+    set CHARMLIB=`pwd`
 endif
 if ($?CHARMINC == 0) then
     cd $CHARMBIN/../include
-    set CHARMINC=$cwd
+    set CHARMINC=`pwd`
 endif
 
 ##############################################################################
@@ -547,21 +547,22 @@ endif
 
 # Create MODULES.TMP.o
 
+set DELETE=(MODULES.TMP.dat MODULES.TMP.c MODULES.TMP.o $DELETE)
 rm -f MODULES.TMP.dat MODULES.TMP.c MODULES.TMP.o
 touch MODULES.TMP.dat MODULES.TMP.c
 foreach x ($OBJECTFILES)
-    eval "$CMK_NM $x|$CMK_NM_FILTER"|egrep '^_CK_.*_init$' >> MODULES.TMP.dat
+    csh -fc "$CMK_NM $x|$CMK_NM_FILTER|egrep '^_CK_.*_init"'$'"'|egrep -v '^_CK_.*_struct_init"'$'"'|sed -e 's@_CK_@@' -e 's@_init"'$'"@@' >> MODULES.TMP.dat"
 end
-awk '{print "extern void "$1"();";}' < MODULES.TMP.dat >> MODULES.TMP.c
+echo 'Modules: '`cat MODULES.TMP.dat`
+awk '{print "extern void _CK_"$1"_init();";}' < MODULES.TMP.dat >> MODULES.TMP.c
 echo '_CK_module_init_fn()' >> MODULES.TMP.c
 echo '{' >> MODULES.TMP.c
-awk '{print $1"();";}" < MODULES.TMP.dat >> MODULES.TMP.c
+awk '{print "_CK_"$1"_init();";}' < MODULES.TMP.dat >> MODULES.TMP.c
 echo '}' >> MODULES.TMP.c
 
 $CMK_CC $OPTS_CC -c MODULES.TMP.c
 if ($status) goto failure
 set OBJECTFILES = ($OBJECTFILES MODULES.TMP.o)
-set DELETE=(MODULES.TMP.dat MODULES.TMP.c MODULES.TMP.o $DELETE)
 
 # Identify the libraries to use
 
@@ -637,6 +638,6 @@ end:
             /bin/rm -f $TMP.P.c $TMP.C $TMP.cpp $TMP.space $TMP.o
             /bin/rm -f $TMP.c $TMP.c.0.h $TMP.c.1.h $TMP.c.2.h $BASE:t.headers
         end
+        rm -f core $DELETE
     endif
-    rm -f core $DELETE
     exit ($STATUS)
