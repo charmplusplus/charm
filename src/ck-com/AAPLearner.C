@@ -132,11 +132,11 @@ double AAPLearner::computeHypercube(double P, double m, double d) {
     
     if(d >= P/2) {
       cost = log_2_P * alpha;
-      cost += (P/2) * log_2_P * m * (beta + GAMMA_NIC + GAMMA);
+      cost += (P/2) * log_2_P * m * (beta + GAMMA_NIC + GAMMA_MEM);
     }
     else {
       cost = log_2_P * alpha;
-      cost += log_2_P * d * m * (beta + GAMMA_NIC + GAMMA);
+      cost += log_2_P * d * m * (beta + GAMMA_NIC + GAMMA_MEM);
     }
     
     return cost + d * ALPHA_CHARM;
