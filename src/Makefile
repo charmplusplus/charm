@@ -88,7 +88,9 @@ dirs+sources:
 	@echo
 	rm -rf ../pgms
 	(cd ../.. ; find pgms -type d -print) | sed -e 's@^@mkdir ../@' | sh
-	rt=`(cd ../.. ; pwd)` ; (cd ../.. ; find pgms -type f -print) | awk '{ print "ln -s '$$rt'/"$$1" ../"$$1; }' | sh
+	rt=`(cd ../.. ; pwd)` ; (cd ../.. ; find pgms -type f -print) | awk '{ print "ln -s '$$rt'/"$$1" ../"$$1; }' > tmp.sh
+	sh tmp.sh
+	rm -f tmp.sh
 	@echo
 	@echo 'Gathering source-code in '`cat .vdir`'/src'
 	@echo
