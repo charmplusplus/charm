@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1995-06-08 17:09:41  gursoy
+ * Revision 2.2  1995-06-29 21:35:23  narain
+ * Declared PACKED state macros, #define for LDBFillBlock and changed
+ * members of MSG_STRUCT from pack and unpack to packfn and unpackfn
+ *
+ * Revision 2.1  1995/06/08  17:09:41  gursoy
  * Cpv macro changes done
  *
  * Revision 1.10  1995/04/24  20:06:06  sanjeev
@@ -50,13 +54,28 @@
 #ifndef COMMUNICATION_H
 #define COMMUNICATION_H
 
+#ifndef NO_PACK
+#define NO_PACK 0
+#endif
 
+#ifndef UNPACKED
+#define UNPACKED 1
+#endif
+
+#ifndef PACKED 
+#define PACKED 2
+#endif
+
+CpvExtern(struct msg_struct*, MsgToStructTable);
+
+
+#define LdbFillBlock(env) LdbFillLDB(LDB_ELEMENT_PTR(env))
 
 #define UNPACK(envelope) if (GetEnv_isPACKED(envelope) == PACKED) \
 { \
         void *unpackedUsrMsg; \
         void *usrMsg = USER_MSG_PTR(envelope); \
-        (*(CsvAccess(MsgToStructTable)[GetEnv_packid(envelope)].unpack)) \
+        (*(CsvAccess(MsgToStructTable)[GetEnv_packid(envelope)].unpackfn)) \
                 (usrMsg, &unpackedUsrMsg); \
         if (usrMsg != unpackedUsrMsg) \
         /* else unpacked in place */ \
@@ -85,7 +104,7 @@
                 /* make it +ve to connote a packed msg */ \
                 SetEnv_isPACKED(env, PACKED); \
                 usermsg = USER_MSG_PTR(env); \
-                (*(CsvAccess(MsgToStructTable)[GetEnv_packid(env)].pack)) \
+                (*(CsvAccess(MsgToStructTable)[GetEnv_packid(env)].packfn)) \
                         (usermsg, &packedmsg, &size); \
                 if (usermsg != packedmsg) \
                         env = ENVELOPE_UPTR(packedmsg); \
@@ -124,6 +143,12 @@
 
 #define CkCheck_and_BroadcastNoFree(env,Entry) { \
         LdbFillBlock(env); PACK(env); \
+        CmiSetHandler(env,CsvAccess(HANDLE_INCOMING_MSG_Index)); \
+	CmiSyncBroadcast(CmiSize(env),env); UNPACK(env);  \
+        }
+
+#define CkCheck_and_BroadcastNoFreeNoLdb(env,Entry) { \
+        PACK(env); \
         CmiSetHandler(env,CsvAccess(HANDLE_INCOMING_MSG_Index)); \
 	CmiSyncBroadcast(CmiSize(env),env); UNPACK(env);  \
         }
