@@ -1,9 +1,9 @@
 CMK_CPP_C="cmpicc -E"
 CMK_CC="cmpicc -icc -gm "
 CMK_CXX="cmpic++ -icc -gm "
-CMK_CXXPP="cmpicc -E "
+CMK_CXXPP="cmpi++ -E "
 CMK_LD="cmpicc -icc "
-CMK_LDXX="cmpicc -icc "
+CMK_LDXX="cmpic++ -icc "
 CMK_LIBS="-lckqt -lcmpi "
 
 # fortran compiler
