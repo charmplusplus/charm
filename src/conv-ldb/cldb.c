@@ -51,7 +51,6 @@ typedef struct CldProcInfo_s {
 } *CldProcInfo;
 
 CpvDeclare(CldProcInfo, CldProc);
-extern void CldNotify(int);
 
 static void CldTokenHandler(CldToken tok)
 {
@@ -62,7 +61,6 @@ static void CldTokenHandler(CldToken tok)
     tok->succ->pred = tok->pred;
     proc->load --;
     CmiHandleMessage(tok->msg);
-    CldNotify(proc->load);
   }
 }
 
