@@ -64,7 +64,7 @@ SEQCHARMC=../bin/charmc -seq $(CHARMOPTS)
 ALLHEADERS=charm++.h ckstream.h charm.h cpthreads.h converse.h \
 	conv-trace.h conv-mach.h simplemsg.h sm.h trace.h pvmc.h \
 	pvm3.h sdag.h CDep.h CCounter.h CMsgBuffer.h CWhenTrigger.h \
-	ckarray.h ckreduction.h ckhashtable.h \
+	ckarray.h pup.h ckreduction.h ckhashtable.h \
 	TList.h idl.h tempo.h waitqd.h LBDatabase.h \
 	lbdb.h LBDBManager.h LBComm.h LBOM.h LBObj.h LBMachineUtil.h \
 	Refiner.h ObjGraph.h CentralLB.h RandCentLB.h \
@@ -277,7 +277,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h trace.h \
 CK_LIBS_CORE=libck.a
 
 LIBCK_CORE=init.o register.o qd.o ck.o main.o msgalloc.o ckfutures.o \
-           ckarray.o ckreduction.o ckhashtable.o \
+           ckarray.o pup_util.o pup_xlater.o ckreduction.o ckhashtable.o \
            tempo.o waitqd.o LBDatabase.o lbdb.o \
 	   LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o Refiner.o \
 	   ObjGraph.o \
@@ -453,7 +453,11 @@ CkArray.decl.h CkArray.def.h : ckarray.ci charmxi
 ckarray.o: ckarray.C $(CKHEADERS)
 	$(CHARMC) -o ckarray.o ckarray.C
 
+pup_util.o: pup_util.C $(CKHEADERS)
+	$(CHARMC) -o pup_util.o pup_util.C
 
+pup_xlater.o: pup_xlater.C $(CKHEADERS)
+	$(CHARMC) -o pup_xlater.o pup_xlater.C
 
 lbdb.o: lbdb.C $(CKHEADERS)
 	$(CHARMC) -o lbdb.o lbdb.C
