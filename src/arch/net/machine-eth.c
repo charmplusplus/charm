@@ -84,10 +84,10 @@ int CheckSocketsReady(int withDelayMs)
   CMK_PIPE_DECL(withDelayMs);
   
   CmiStdoutAdd(CMK_PIPE_SUB);
-  if (Cmi_charmrun_fd!=-1) CMK_PIPE_ADDREAD(Cmi_charmrun_fd);
+  if (Cmi_charmrun_fd!=-1) { CMK_PIPE_ADDREAD(Cmi_charmrun_fd); }
   else return 0; /* If there's no charmrun, none of this matters. */
   if (dataskt!=-1) {
-	CMK_PIPE_ADDREAD(dataskt);
+	{ CMK_PIPE_ADDREAD(dataskt); }
   	if (dataWrite)
 	    CMK_PIPE_ADDWRITE(dataskt);
   }
