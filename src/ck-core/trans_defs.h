@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.6  1995-11-02 18:24:35  sanjeev
+ * Revision 2.7  1995-11-02 21:17:21  sanjeev
+ * removed CharmExit defn since its already there in ckdefs.h
+ *
+ * Revision 2.6  1995/11/02  18:24:35  sanjeev
  * modified Charm++ macros
  *
  * Revision 2.5  1995/07/27  20:29:34  jyelon
@@ -70,8 +73,6 @@
 #define CUTimer()			(int)(CmiTimer() * 1000000.0)
 #define CkHTimer()			(int)(CmiTimer() / 3600.0)
 #define CHTimer()			(int)(CmiTimer() / 3600.0)
-
-#define CharmExit()			CkExit()
 
 #define new_packbuffer			CkAllocPackBuffer
 
