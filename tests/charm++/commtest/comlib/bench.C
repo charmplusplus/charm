@@ -13,7 +13,7 @@
 #include "bench.decl.h"
 
 #define USELIB  1
-#define MAXITER 100
+#define MAXITER 10
 #define NUMPASS 2
 
 /*readonly*/ CkChareID mid;
