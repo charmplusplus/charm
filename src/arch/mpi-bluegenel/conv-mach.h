@@ -47,8 +47,9 @@
 #define CMK_THREADS_REQUIRE_NO_CPV                         0
 
 #define CMK_TIMER_USE_GETRUSAGE                            0
-#define CMK_TIMER_USE_SPECIAL                              1
+#define CMK_TIMER_USE_SPECIAL                              0
 #define CMK_TIMER_USE_TIMES                                0
+#define CMK_TIMER_USE_BLUEGENEL				   1
 
 #define CMK_TYPEDEF_INT2 short
 #define CMK_TYPEDEF_INT4 int
