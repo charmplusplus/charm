@@ -20,11 +20,14 @@
 class ConvComlibManager {
     
     StrategyTable strategyTable;
+    CmiBool init_flag;
 
  public:
     int nstrats;
 
     ConvComlibManager();
+    void setInitialized() {init_flag = CmiTrue;}
+    CmiBool getInitialized() {return init_flag;}
     void insertStrategy(Strategy *s);
     void insertStrategy(Strategy *s, int loc);
     Strategy * getStrategy(int loc) {return strategyTable[loc].strategy;}
