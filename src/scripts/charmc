@@ -523,7 +523,29 @@ foreach FILE ($FILES)
       endif
       breaksw
     case "*.f"
+      ($ECHOCMD ; $CMK_CF77 -I$CHARMINC -c $BASE.f -o $BASE.o)
+      if ($status) goto failure
+      if ($?OBJECT) then
+	if ($OBJECT != $BASE.o) set DELETE=( $DELETE $BASE.o )
+        set OBJECTFILES=( $OBJECTFILES $BASE.o )
+      endif
+      breaksw
+    case "*.f90"
+      ($ECHOCMD ; $CMK_CF90 -I$CHARMINC -c $BASE.f90 -o $BASE.o)
+      if ($status) goto failure
+      if ($?OBJECT) then
+	if ($OBJECT != $BASE.o) set DELETE=( $DELETE $BASE.o )
+        set OBJECTFILES=( $OBJECTFILES $BASE.o )
+      endif
+      breaksw
     case "*.F"
+      ($ECHOCMD ; $CMK_CF77 -I$CHARMINC -c $BASE.F -o $BASE.o)
+      if ($status) goto failure
+      if ($?OBJECT) then
+	if ($OBJECT != $BASE.o) set DELETE=( $DELETE $BASE.o )
+        set OBJECTFILES=( $OBJECTFILES $BASE.o )
+      endif
+      breaksw
     case "*.fc"
     case "*.FC"
       echo "charmc: I'm not yet smart enough to compile $FILE"
@@ -582,6 +604,8 @@ endsw
 switch ($LANGUAGE)
     case "c"
     case "C"
+    case "f90"
+    case "f77"
         ($ECHOCMD ; $CMK_SEQ_LD $OPTS_LD -o $OBJECT $OBJECTFILES -L$CHARMLIB $LIBRARIES $CMK_SEQ_LIBS)
         if ($status) goto failure
         goto copyobj

@@ -1,19 +1,3 @@
-############################################################################
-# RCS INFORMATION:
-#
-# 	$RCSfile$
-# 	$Author$	$Locker$		$State$
-#	$Revision$	$Date$
-#
-############################################################################
-# DESCRIPTION:
-#
-############################################################################
-# REVISION HISTORY:
-#
-#
-############################################################################
-
 set CMK_CPP_CHARM='/lib/cpp -P'
 set CMK_CPP_C='gcc -E'
 set CMK_CC='gcc '
@@ -21,7 +5,8 @@ set CMK_CC_RELIABLE='gcc '
 set CMK_CC_FASTEST='gcc '
 set CMK_CXX='g++ '
 set CMK_CXXPP='g++ -x c++ -E '
-set CMK_CF77=''
+set CMK_CF77='f77'
+set CMK_CF90='f90'
 set CMK_C_DEBUG='-g'
 set CMK_C_OPTIMIZE='-O'
 set CMK_CXX_DEBUG='-g'

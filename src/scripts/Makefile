@@ -116,7 +116,9 @@ dirs+sources:
 #
 ###############################################################################
 
-CVHEADERS=converse.h conv-mach.h conv-mach.csh
+CVHEADERS=converse.h conv-mach.h conv-mach.csh \
+          ../include/CkFutures.decl.h ../include/CkFutures.def.h \
+          ../include/CkArray.decl.h ../include/CkArray.def.h
 
 TRACELIBS=libtrace-none.a libtrace-projections.a
 
@@ -209,8 +211,7 @@ libldb-test.o: cldb.test.c $(CVHEADERS)
 ###############################################################################
 
 CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h trace.h \
-          CkFutures.decl.h CkFutures.def.h ckfutures.h ckarray.h \
-          CkArray.decl.h CkArray.def.h $(CVHEADERS)
+          ckfutures.h ckarray.h $(CVHEADERS)
 
 CK_LIBS_CORE=libck.a
 
@@ -231,13 +232,23 @@ LIBTRACE_PROJ=trace-projections.o
 libtrace-projections.a: $(LIBTRACE_PROJ)
 	$(CHARMC) -cp ../lib/ -o $@ $(LIBTRACE_PROJ)
 
+../include/CkArray.decl.h : CkArray.decl.h
+	/bin/cp CkArray.decl.h ../include
+
+../include/CkArray.def.h : CkArray.def.h
+	/bin/cp CkArray.def.h ../include
+
+../include/CkFutures.decl.h : CkFutures.decl.h
+	/bin/cp CkFutures.decl.h ../include
+
+../include/CkFutures.def.h : CkFutures.def.h
+	/bin/cp CkFutures.def.h ../include
+
 CkFutures.decl.h CkFutures.def.h : ckfutures.ci charmxi
 	$(CHARMC) ckfutures.ci
-	/bin/cp CkFutures.decl.h CkFutures.def.h ../include
 
 CkArray.decl.h CkArray.def.h : ckarray.ci charmxi
 	$(CHARMC) ckarray.ci
-	/bin/cp CkArray.decl.h CkArray.def.h ../include
 
 init.o: init.C $(CKHEADERS)
 	$(CHARMC) -o init.o init.C
