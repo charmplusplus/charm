@@ -259,6 +259,7 @@ PUP::xlater::xlater(const PUP::machineInfo &src,PUP::er &fromData)
 		convertFn[Tbool]=cvt_null;
 	
 	convertFn[Tbyte]=cvt_null;//Bytes are never converted at all
+	setConverterInt(src,cur,0,2,Tsync);
 	
 	//Finish out the size table (integer portion is done by setConverterInt)
 	convertSize[Tfloat]=src.floatBytes;
