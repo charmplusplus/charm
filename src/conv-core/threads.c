@@ -124,6 +124,8 @@
 #define CMK_THREADS_ARE_WIN32_FIBERS  1
 #elif  CMK_THREADS_BUILD_PTHREADS
 #define CMK_THREADS_USE_PTHREADS      1
+#elif  CMK_THREADS_BUILD_STACKCOPY
+#define CMK_THREADS_USE_STACKCOPY      1
 #endif
 
 #endif
@@ -175,7 +177,9 @@ typedef struct CthThreadBase
       running on.  The usual Charm approach of switching to the 
       (non-migratable) scheduler thread on context switch works fine.
 */
+#ifndef CMK_THREADS_ALIAS_STACK
 #define CMK_THREADS_ALIAS_STACK 0
+#endif
 
 /** Address to map all migratable thread stacks to. */
 #define CMK_THREADS_ALIAS_LOCATION ((void *)0xb0000000)
@@ -627,7 +631,7 @@ for threads with deep stacks) is extremely high.
 
 Written by Josh Yelon around May 1999
 */
-#if CMK_THREADS_COPY_STACK
+#if CMK_THREADS_USE_STACKCOPY
 
 #define SWITCHBUF_SIZE 16384
 
@@ -709,7 +713,7 @@ void CthInit(char **argv)
 
   CthCpvInitialize(CthProcInfo, CthProc);
 
-  CthBaseInit(argv,t);
+  CthBaseInit(argv);
   t = (CthThread)malloc(sizeof(struct CthThreadStruct));
   _MEMCHECK(t);
   CthCpvAccess(CthCurrent)=t;
@@ -1044,7 +1048,11 @@ struct CthThreadStruct
   char       inited;
 };
 
-
+/**
+  The sched_mutex is the current token of execution.
+  Only the running thread holds this lock; all other threads
+  have released the lock and are waiting on their condition variable.
+*/
 CthCpvStatic(pthread_mutex_t, sched_mutex);
 
 static void CthThreadInit(t)
@@ -1088,7 +1096,7 @@ void CthResume(CthThread t)
   CthThread tc = CthCpvAccess(CthCurrent);
   if (t == tc) return;
   CthBaseResume(t);
-  pthread_cond_signal(&(t->cond));
+  pthread_cond_signal(&(t->cond)); /* wake up the next thread */
   if (tc->base.exiting) {
     pthread_mutex_unlock(&CthCpvAccess(sched_mutex));
     pthread_exit(0);
@@ -1106,6 +1114,7 @@ static void *CthOnly(void * arg)
 {
   CthThread th = (CthThread)arg;
   th->inited = 1;
+  pthread_detach(pthread_self());
   pthread_mutex_lock(&CthCpvAccess(sched_mutex));
   pthread_cond_signal(th->creator);
   do {
@@ -1127,7 +1136,7 @@ CthThread CthCreate(CthVoidFn fn, void *arg, int size)
   result->fn = fn;
   result->arg = arg;
   result->creator = &(self->cond);
-  if (0 != pthread_create(&(result->self), (pthread_attr_t *) 0, CthOnly, (void*) result)) 
+  if (0 != pthread_create(&(result->self), 0, CthOnly, (void*) result)) 
     CmiAbort("CthCreate failed to created a new pthread\n");
   do {
   pthread_cond_wait(&(self->cond), &CthCpvAccess(sched_mutex));
