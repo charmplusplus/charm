@@ -11,6 +11,7 @@
 #include "ampi.h"
 #include "charm++.h"
 #include "EachToManyMulticastStrategy.h" /* for ComlibManager Strategy*/
+#include "PipeBroadcastStrategy.h"
 #include <string.h> /* for strlen */
 
 #if 0

@@ -20,7 +20,7 @@
 #define STARTUP_DEBUG(x)  /* ckout<<"ampi[pe "<<CkMyPe()<<"] "<< x <<endl; */
 
 #ifndef AMPI_COMLIB
-#  define AMPI_COMLIB 0
+#  define AMPI_COMLIB 0 
 #endif
 
 //------------- startup -------------
@@ -480,7 +480,7 @@ static ampi *ampiInit(char **argv)
 	cinst2=CkGetComlibInstance();
 	EachToManyMulticastStrategy *strategy1 = new EachToManyMulticastStrategy(strat, parent.ckGetArrayID(), parent.ckGetArrayID());
         cinst1.setStrategy(strategy1);
-	CharmStrategy *strategy2 = new PipeBroadcastStrategy(USE_HYPERCUBE, arr, 1048576);
+	CharmStrategy *strategy2 = new PipeBroadcastStrategy(USE_HYPERCUBE, parent.ckGetArrayID(), 1048576);
 	cinst2.setStrategy(strategy2);
 #endif
         
