@@ -4,7 +4,8 @@
 #define CMK_MACHINE_NAME "net-win32"
 
 #define CMK_BOOL_DEFINED 1
-#define CMK_BOOL_UNDEFINED 0
+#define CMK_LONG_LONG_DEFINED 0
+#define CMK___int64_DEFINED 1
 
 #define CMK_EXPLICIT 1
 
