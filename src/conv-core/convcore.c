@@ -109,6 +109,10 @@ CsvDeclare(CmiNodeLock, CsdNodeQueueLock);
 #endif
 CpvDeclare(int,   CsdStopFlag);
 
+#if CONVERSE_VERSION_VMI
+void *CMI_VMI_CmiAlloc (int size);
+void CMI_VMI_CmiFree (void *ptr);
+#endif
 
 /*****************************************************************************
  *
