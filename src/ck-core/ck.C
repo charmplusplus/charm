@@ -326,6 +326,7 @@ void _createGroup(CkGroupID groupID, envelope *env)
   env->setGroupNum(groupID);
   env->setSrcPe(CkMyPe());
   env->setRednMgr(rednMgr);
+  env->setGroupEpoch(CkpvAccess(_charmEpoch));
 
   if(CkNumPes()>1) {
     CkPackMessage(&env);
@@ -347,6 +348,7 @@ void _createNodeGroup(CkGroupID groupID, envelope *env)
   register int msgIdx = env->getMsgIdx();
   env->setGroupNum(groupID);
   env->setSrcPe(CkMyPe());
+  env->setGroupEpoch(CkpvAccess(_charmEpoch));
   register void *msg =  EnvToUsr(env);
   if(CkNumNodes()>1) {
     CkPackMessage(&env);

@@ -45,6 +45,7 @@ CksvDeclare(UInt, _numNodeGroups);
 CksvDeclare(GroupTable*, _nodeGroupTable);
 CksvDeclare(CmiNodeLock, _nodeLock);
 CksvStaticDeclare(PtrVec*,_nodeBocInitVec);
+CkpvDeclare(int, _charmEpoch);
 
 CkpvDeclare(Stats*, _myStats);
 CkpvDeclare(MsgPool*, _msgPool);
@@ -304,6 +305,7 @@ static inline void _initDone(void)
   CmiNodeBarrier();
   DEBUGF(("Crossed CmiNodeBarrier(), pe = %d, rank = %d\n", CkMyPe(), CkMyRank()));
   _processBufferedMsgs();
+  CkpvAccess(_charmEpoch)=1;
 }
 
 static void _triggerHandler(envelope *env)
@@ -335,13 +337,15 @@ static void _initHandler(void *msg)
   register envelope *env = (envelope *) msg;
   switch (env->getMsgtype()) {
     case BocInitMsg:
-      CkpvAccess(_numInitsRecd)++;
+      if (env->getGroupEpoch()==0)
+        CkpvAccess(_numInitsRecd)++;
       CpvAccess(_qd)->process();
       CkpvAccess(_bocInitVec)->insert(env->getGroupNum().idx, env);
       break;
     case NodeBocInitMsg:
       CmiLock(CksvAccess(_nodeLock));
-      CksvAccess(_numInitNodeMsgs)++;
+      if (env->getGroupEpoch()==0)
+        CksvAccess(_numInitNodeMsgs)++;
       CksvAccess(_nodeBocInitVec)->insert(env->getGroupNum().idx, env);
       CmiUnlock(CksvAccess(_nodeLock));
       CpvAccess(_qd)->process();
@@ -447,6 +451,8 @@ void _initCharm(int unused_argc, char **argv)
 	CksvInitialize(CmiNodeLock, _nodeLock);
 	CksvInitialize(PtrVec*,_nodeBocInitVec);
 	CksvInitialize(UInt,_numInitNodeMsgs);
+	CkpvInitialize(int,_charmEpoch);
+	CkpvAccess(_charmEpoch)=0;
 
 	CkpvInitialize(_CkOutStream*, _ckout);
 	CkpvInitialize(_CkErrStream*, _ckerr);

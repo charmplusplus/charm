@@ -100,6 +100,7 @@ CksvExtern(unsigned int,  _numInitNodeMsgs);
 CksvExtern(GroupTable*,  _nodeGroupTable);
 CksvExtern(CmiNodeLock, _nodeLock);
 CksvExtern(unsigned int, _numNodeGroups);
+CkpvExtern(int, _charmEpoch);
 
 CkpvExtern(CkGroupID,_currentGroup);
 

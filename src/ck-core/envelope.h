@@ -67,6 +67,7 @@ public:
       struct s_group {
 	CkGroupID g; //GroupID
 	CkNodeGroupID rednMgr; //Reduction manager for this group (constructor only!)
+	int epoch; //"epoch" this group was created during (0--mainchare, 1--later)
       } group;
       struct s_array{ //For arrays only
 	CkGroupID loc; //Location manager GID
@@ -227,6 +228,8 @@ private:
     CkNodeGroupID getRednMgr(){
     	return type.group.rednMgr;
     }
+    void setGroupEpoch(int epoch) { type.group.epoch=epoch; }
+    int getGroupEpoch(void) { return type.group.epoch; }
 };
 
 inline envelope *UsrToEnv(const void *const msg) {
