@@ -382,16 +382,20 @@ void CkMulticastMgr::ArraySectionSend(int ep,void *m, CkArrayID a, CkSectionID &
     if (entry->needRebuild) rebuild(s);
   }
 
+  // don't need packing here
+/*
   register envelope *env = UsrToEnv(m);
   CkPackMessage(&env);
   m = EnvToUsr(env);
+*/
   multicastGrpMsg *msg = (multicastGrpMsg *)m;
   msg->aid = a;
   msg->_cookie = s;
   msg->ep = ep;
 
-  if (s.get_pe() == CkMyPe())
+  if (s.get_pe() == CkMyPe()) {
     recvMsg(msg);
+  }
   else {
     CProxy_CkMulticastMgr  mCastGrp(thisgroup);
     mCastGrp[s.get_pe()].recvMsg(msg);
@@ -410,6 +414,7 @@ void CkMulticastMgr::recvMsg(multicastGrpMsg *msg)
   }
 
   // send to spanning tree children
+  // can not optimize using list send because the difference in cookie
   CProxy_CkMulticastMgr  mCastGrp(thisgroup);
   for (i=0; i<entry->children.length(); i++) {
     multicastGrpMsg *newmsg = (multicastGrpMsg *)CkCopyMsg((void **)&msg);
