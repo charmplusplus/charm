@@ -78,6 +78,7 @@ class ComlibInstanceHandle {
 PUPbytes(ComlibInstanceHandle);
 
 class ComlibManager: public CkDelegateMgr {
+    friend class ComlibInstanceHandle;
 
     int npes;
     int *pelist;
@@ -106,26 +107,25 @@ class ComlibManager: public CkDelegateMgr {
     void multicast(void *charm_msg); //charm_message here.
     void multicast(void *charm_msg, int npes, int *pelist);     
 
+    //The following funtions can be accessed only from ComlibInstanceHandle
+    void beginIteration();     //Notify begining of a bracket 
+                               //with strategy identifier
+    void endIteration();       //Notify end, endIteration must be called if 
+                               //a beginIteration is called. Otherwise 
+                               //end of the entry method is assumed to 
+                               //be the end of the bracket.
+    void setInstance(int id); 
+    //void prioEndIteration(PrioMsg *pmsg);
+    void registerStrategy(int pos, Strategy *s);
+    void doneCreating();             //Done creating instances
+
  public:
     ComlibManager();  //Receommended constructor
-
-    //ComlibManager(int strategyID, int eltPerPE=0);
-    //ComlibManager(Strategy *strat, int eltPerPE=0);
-
     ComlibManager::ComlibManager(CkMigrateMessage *m){ }
-    //int useDefCtor(void){ return 1; }
 
     void barrier(void);
     void barrier2(void);
     void resumeFromBarrier2(void);
-
-    //Depricated by the use of array listeners
-    //void localElement();
-    //void registerElement(int strat);   //Register a chare for an instance
-    //void unRegisterElement(int strat); //UnRegister a chare for an instance
-
-    void receiveID(comID id);                        //Depricated
-    void receiveID(int npes, int *pelist, comID id); //Depricated
     void receiveTable(StrategyWrapper sw);     //Receive table of strategies.
 
     void ArraySend(int ep, void *msg, const CkArrayIndexMax &idx, 
@@ -136,16 +136,6 @@ class ComlibManager: public CkDelegateMgr {
     virtual void GroupBroadcast(int ep,void *m,CkGroupID g);
     virtual void ArraySectionSend(int ep,void *m,CkArrayID a,CkSectionID &s);
 
-    void beginIteration();     //Notify begining of a bracket 
-                               //with strategy identifier
-    void endIteration();       //Notify end, endIteration must be called if 
-                               //a beginIteration is called. Otherwise 
-                               //end of the entry method is assumed to 
-                               //be the end of the bracket.
-
-    void setInstance(int id); 
-    //void prioEndIteration(PrioMsg *pmsg);
-
     Strategy *getStrategy(int instid)
         {return strategyTable[instid].strategy;}
     StrategyTable *getStrategyTableEntry(int instid)
@@ -153,9 +143,6 @@ class ComlibManager: public CkDelegateMgr {
 
     //To create a new strategy, returns handle to the strategy table;
     ComlibInstanceHandle createInstance();  
-    void registerStrategy(int pos, Strategy *s);
-
-    void doneCreating();             //Done creating instances
 
     //Learning functions
     void learnPattern(int totalMessageCount, int totalBytes);
@@ -165,9 +152,7 @@ class ComlibManager: public CkDelegateMgr {
         getPackedMulticastMessage(CharmMessageHolder *m);
 };
 
-ComlibInstanceHandle  ComlibRegisterStrategy(Strategy *);
-ComlibInstanceHandle  ComlibRegisterStrategy(Strategy *, CkArrayID aid);
-ComlibInstanceHandle  ComlibRegisterStrategy(Strategy *, CkGroupID gid);
-
 void ComlibDelegateProxy(CProxy *proxy);
+ComlibInstanceHandle CkGetComlibInstance();
+
 #endif

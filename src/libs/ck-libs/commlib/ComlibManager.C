@@ -688,6 +688,13 @@ void ComlibDelegateProxy(CProxy *proxy){
     proxy->ckDelegate(cgproxy.ckLocalBranch());
 }
 
+ComlibInstanceHandle CkGetComlibInstance() {
+    if(CkMyPe() != 0)
+        CkAbort("Comlib Instance can only be created on Processor 0");
+    CProxy_ComlibManager cgproxy(CpvAccess(cmgrID));    
+    return (cgproxy.ckLocalBranch())->createInstance();
+}
+
 class ComlibManagerMain {
 public:
     ComlibManagerMain(CkArgMsg *msg) {
