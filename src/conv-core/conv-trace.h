@@ -43,5 +43,6 @@ CpvExtern(int, traceOn);
 #define traceIsOn()  0
 #endif
 
+int  traceAvailable();
 
 #endif

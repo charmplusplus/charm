@@ -49,6 +49,13 @@ static void traceCommonInit(char **argv)
 #if CMK_TRACE_IN_CHARM
   CkpvInitialize(int, traceOnPe);
   CkpvAccess(traceOnPe) = 1;
+#if 0
+  // example for choosing subset of processors for tracing
+  CkpvAccess(traceOnPe) = 0;
+  if (CkMyPe() < 20 && CkMyPe() > 15) CkpvAccess(traceOnPe) = 1;
+  // must include pe 0
+  if (CkMyPe()==0) CkpvAccess(traceOnPe) = 1;
+#endif
 #endif
   CkpvAccess(CtrLogBufSize) = LogBufSize;
   if (CmiGetArgInt(argv,"+logsize",&CkpvAccess(CtrLogBufSize)))
@@ -240,5 +247,15 @@ int CkIsCharmMessage(char *msg)
   return 0;
 }
 #endif
+
+// return 1 if any one of tracing modules is linked.
+int  traceAvailable()
+{
+#ifdef CMK_OPTIMIZE
+  return 0;
+#else
+  return CkpvAccess(_traces)->length()>0;
+#endif
+}
 
 /*@}*/
