@@ -5,14 +5,17 @@ all: ps pdf html
 
 ps:
 	latex manual.tex
+	latex manual.tex
 	dvips -o manual.ps manual.dvi
 
 html:
 	-@ln -s ../pplmanual.* .
 	latex manual.tex
+	latex manual.tex
 	latex2html -local_icons manual.tex
 
 pdf:
+	pdflatex manual.tex
 	pdflatex manual.tex
 
 doc:
