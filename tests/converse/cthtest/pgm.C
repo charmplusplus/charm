@@ -75,9 +75,12 @@ void runThread(void *msg)
 
 void test_init(int argc, char **argv)
 {
-  timeStart=CmiWallTimer();
-  CthThread yielder = CthCreateMigratable((CthVoidFn)runThread, 0, 16000);
-  CthAwaken(yielder);
+  /* skip communication thread */
+  if (CmiMyRank() != CmiMyNodeSize()) {
+    timeStart=CmiWallTimer();
+    CthThread yielder = CthCreateMigratable((CthVoidFn)runThread, 0, 16000);
+    CthAwaken(yielder);
+  }
 }
 
 int main(int argc, char **argv)
