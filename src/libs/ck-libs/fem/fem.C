@@ -372,7 +372,11 @@ chunk::readElems(FILE* fp)
   for(int i=0; i<numElems; i++) {
     fscanf(fp, "%d", &gElemNums[i]);
     for(int j=0;j<numNodesPerElem;j++) {
+#if FEM_FORTRAN
+      fscanf(fp, "%d", &conn[j*numElems+i]);
+#else
       fscanf(fp, "%d", &conn[i*numNodesPerElem+j]);
+#endif
     }
   }
 }
