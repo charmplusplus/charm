@@ -1,345 +1,267 @@
 #include "ampi.h"
 #include "ampiimpl.h"
 
-CtvExtern(ampi *, ampiPtr);
+extern "C" {
 
-extern "C" void 
-#if CMK_FORTRAN_USES_ALLCAPS
-AMPI_INIT
+#if CMK_FORTRAN_USES_TWOSCORE
+#define FNAME(x) x##__
+#elif CMK_FORTRAN_USES_ONESCORE
+#define FNAME(x) x##_
 #else
-ampi_init_
+#define FNAME(x) x
 #endif
-  (int *ierr)
+
+#if CMK_FORTRAN_USES_ALLCAPS
+
+#define ampi_init                    AMPI_INIT
+#define ampi_comm_rank               AMPI_COMM_RANK
+#define ampi_comm_size               AMPI_COMM_SIZE
+#define ampi_finalize                AMPI_FINALIZE
+#define ampi_send                    AMPI_SEND
+#define ampi_recv                    AMPI_RECV
+#define ampi_isend                   AMPI_ISEND
+#define ampi_irecv                   AMPI_IRECV
+#define ampi_sendrecv                AMPI_SENDRECV
+#define ampi_barrier                 AMPI_BARRIER
+#define ampi_bcast                   AMPI_BCAST
+#define ampi_reduce                  AMPI_REDUCE
+#define ampi_allreduce               AMPI_ALLREDUCE
+#define ampi_wtime                   AMPI_WTIME
+#define ampi_start                   AMPI_START
+#define ampi_waitall                 AMPI_WAITALL
+#define ampi_send_init               AMPI_SEND_INIT
+#define ampi_recv_init               AMPI_RECV_INIT
+#define ampi_type_contiguous         AMPI_TYPE_CONTIGUOUS
+#define ampi_type_vector             AMPI_TYPE_VECTOR
+#define ampi_type_hvector            AMPI_TYPE_HVECTOR
+#define ampi_type_indexed            AMPI_TYPE_INDEXED
+#define ampi_type_hindexed           AMPI_TYPE_HINDEXED
+#define ampi_type_struct             AMPI_TYPE_STRUCT
+#define ampi_type_commit             AMPI_TYPE_COMMIT
+#define ampi_type_free               AMPI_TYPE_FREE
+#define ampi_type_extent             AMPI_TYPE_EXTENT
+#define ampi_type_size               AMPI_TYPE_SIZE
+#define ampi_allgatherv              AMPI_ALLGATHERV
+#define ampi_allgather               AMPI_ALLGATHER
+#define ampi_gatherv                 AMPI_GATHERV
+#define ampi_gather                  AMPI_GATHER
+#define ampi_alltoallv               AMPI_ALLTOALLV
+#define ampi_alltoall                AMPI_ALLTOALL
+#define ampi_comm_dup                AMPI_COMM_DUP
+#define ampi_comm_free               AMPI_COMM_FREE
+#define ampi_abort                   AMPI_ABORT
+#define ampi_print                   AMPI_PRINT
+#define ampi_migrate                 AMPI_MIGRATE
+#define ampi_register                AMPI_REGISTER
+
+#else
+
+#define ampi_init                    FNAME(ampi_init)
+#define ampi_comm_rank               FNAME(ampi_comm_rank)
+#define ampi_comm_size               FNAME(ampi_comm_size)
+#define ampi_finalize                FNAME(ampi_finalize)
+#define ampi_send                    FNAME(ampi_send)
+#define ampi_recv                    FNAME(ampi_recv)
+#define ampi_isend                   FNAME(ampi_isend)
+#define ampi_irecv                   FNAME(ampi_irecv)
+#define ampi_sendrecv                FNAME(ampi_sendrecv)
+#define ampi_barrier                 FNAME(ampi_barrier)
+#define ampi_bcast                   FNAME(ampi_bcast)
+#define ampi_reduce                  FNAME(ampi_reduce)
+#define ampi_allreduce               FNAME(ampi_allreduce)
+#define ampi_wtime                   FNAME(ampi_wtime)
+#define ampi_start                   FNAME(ampi_start)
+#define ampi_waitall                 FNAME(ampi_waitall)
+#define ampi_send_init               FNAME(ampi_send_init)
+#define ampi_recv_init               FNAME(ampi_recv_init)
+#define ampi_type_contiguous         FNAME(ampi_type_contiguous)
+#define ampi_type_vector             FNAME(ampi_type_vector)
+#define ampi_type_hvector            FNAME(ampi_type_hvector)
+#define ampi_type_indexed            FNAME(ampi_type_indexed)
+#define ampi_type_hindexed           FNAME(ampi_type_hindexed)
+#define ampi_type_struct             FNAME(ampi_type_struct)
+#define ampi_type_commit             FNAME(ampi_type_commit)
+#define ampi_type_free               FNAME(ampi_type_free)
+#define ampi_type_extent             FNAME(ampi_type_extent)
+#define ampi_type_size               FNAME(ampi_type_size)
+#define ampi_allgatherv              FNAME(ampi_allgatherv)
+#define ampi_allgather               FNAME(ampi_allgather)
+#define ampi_gatherv                 FNAME(ampi_gatherv)
+#define ampi_gather                  FNAME(ampi_gather)
+#define ampi_alltoallv               FNAME(ampi_alltoallv)
+#define ampi_alltoall                FNAME(ampi_alltoall)
+#define ampi_comm_dup                FNAME(ampi_comm_dup)
+#define ampi_comm_free               FNAME(ampi_comm_free)
+#define ampi_abort                   FNAME(ampi_abort)
+#define ampi_print                   FNAME(ampi_print)
+#define ampi_migrate                 FNAME(ampi_migrate)
+#define ampi_register                FNAME(ampi_register)
+
+#endif
+
+void  ampi_init(int *ierr)
 {
   *ierr = AMPI_Init(0,0);
 }
 
-extern "C" void 
-#if CMK_FORTRAN_USES_ALLCAPS
-AMPI_COMM_RANK
-#else
-ampi_comm_rank_
-#endif
-  (int *comm, int *rank, int *ierr)
+void ampi_comm_rank(int *comm, int *rank, int *ierr)
 {
   *ierr = AMPI_Comm_rank(*comm, rank);
 }
 
-extern "C" void 
-#if CMK_FORTRAN_USES_ALLCAPS
-AMPI_COMM_SIZE
-#else
-ampi_comm_size_
-#endif
-  (int *comm, int *size, int *ierr)
+void ampi_comm_size(int *comm, int *size, int *ierr)
 {
   *ierr = AMPI_Comm_size(*comm, size);
 }
 
-extern "C" void 
-#if CMK_FORTRAN_USES_ALLCAPS
-AMPI_FINALIZE
-#else
-ampi_finalize_
-#endif
-  (int *ierr)
+void ampi_finalize(int *ierr)
 {
   *ierr = AMPI_Finalize();
 }
 
-extern "C" void 
-#if CMK_FORTRAN_USES_ALLCAPS
-AMPI_SEND
-#else
-ampi_send_
-#endif
-  (void *msg, int *count, int *type, int *dest, int *tag, int *comm, int *ierr)
+void ampi_send(void *msg, int *count, int *type, int *dest, 
+  int *tag, int *comm, int *ierr)
 {
   *ierr = AMPI_Send(msg, *count, *type, *dest, *tag, *comm);
 }
 
-extern "C" void 
-#if CMK_FORTRAN_USES_ALLCAPS
-AMPI_RECV
-#else
-ampi_recv_
-#endif
-  (void *msg, int *count, int *type, int *src, int *tag, int *comm, 
-   int *status, int *ierr)
+void ampi_recv(void *msg, int *count, int *type, int *src, 
+  int *tag, int *comm, int *status, int *ierr)
 {
   *ierr = AMPI_Recv(msg, *count, *type, *src, *tag, *comm, 
                     (AMPI_Status*) status);
 }
 
-extern "C" void 
-#if CMK_FORTRAN_USES_ALLCAPS
-AMPI_SENDRECV
-#else
-ampi_sendrecv_
-#endif
-  (void *sndbuf, int *sndcount, int *sndtype, 
-   int *dest, int *sndtag, void *rcvbuf, 
-   int *rcvcount, int *rcvtype, int *src, 
-   int *rcvtag, int *comm, int *status, int *ierr)
+void ampi_sendrecv(void *sndbuf, int *sndcount, int *sndtype, 
+  int *dest, int *sndtag, void *rcvbuf, 
+  int *rcvcount, int *rcvtype, int *src, 
+  int *rcvtag, int *comm, int *status, int *ierr)
 {
   *ierr = AMPI_Sendrecv(sndbuf, *sndcount, *sndtype, *dest, *sndtag,
                         rcvbuf, *rcvcount, *rcvtype, *src, *rcvtag,
 			*comm, (AMPI_Status*) status);
 }
 
-extern "C" void 
-#if CMK_FORTRAN_USES_ALLCAPS
-AMPI_BARRIER
-#else
-ampi_barrier_
-#endif
-  (int *comm, int *ierr)
+void ampi_barrier(int *comm, int *ierr)
 {
   *ierr = AMPI_Barrier(*comm);
 }
 
-extern "C" void 
-#if CMK_FORTRAN_USES_ALLCAPS
-AMPI_BCAST
-#else
-ampi_bcast_
-#endif
-  (void *buf, int *count, int *type, int *root, int *comm, 
+void ampi_bcast(void *buf, int *count, int *type, int *root, int *comm, 
    int *ierr)
 {
   *ierr = AMPI_Bcast(buf, *count, *type, *root, *comm);
 }
 
-extern "C" void 
-#if CMK_FORTRAN_USES_ALLCAPS
-AMPI_REDUCE
-#else
-ampi_reduce_
-#endif
-  (void *inbuf, void *outbuf, int *count, int *type,
+void ampi_reduce(void *inbuf, void *outbuf, int *count, int *type,
    int *op, int *root, int *comm, int *ierr)
 {
   *ierr = AMPI_Reduce(inbuf, outbuf, *count, *type, *op, *root, *comm);
 }
 
-extern "C" void 
-#if CMK_FORTRAN_USES_ALLCAPS
-AMPI_ALLREDUCE
-#else
-ampi_allreduce_
-#endif
-  (void *inbuf,void *outbuf,int *count,int *type,
+void ampi_allreduce(void *inbuf,void *outbuf,int *count,int *type,
    int *op, int *comm, int *ierr)
 {
   *ierr = AMPI_Allreduce(inbuf, outbuf, *count, *type, *op, *comm);
 }
 
-extern "C" double 
-#if CMK_FORTRAN_USES_ALLCAPS
-AMPI_WTIME
-#else
-ampi_wtime_
-#endif
-  (void)
+double ampi_wtime(void)
 {
   return AMPI_Wtime();
 }
 
-extern "C" void 
-#if CMK_FORTRAN_USES_ALLCAPS
-AMPI_START
-#else
-ampi_start_
-#endif
-  (int *reqnum, int *ierr)
+void ampi_start(int *reqnum, int *ierr)
 {
   *ierr = AMPI_Start((AMPI_Request*) reqnum);
 }
 
-extern "C" void 
-#if CMK_FORTRAN_USES_ALLCAPS
-AMPI_WAITALL
-#else
-ampi_waitall_
-#endif
-  (int *count, int *request, int *status, int *ierr)
+void ampi_waitall(int *count, int *request, int *status, int *ierr)
 {
   *ierr = AMPI_Waitall(*count, (AMPI_Request*) request, (AMPI_Status*) status);
 }
 
-extern "C" void 
-#if CMK_FORTRAN_USES_ALLCAPS
-AMPI_RECV_INIT
-#else
-ampi_recv_init_
-#endif
-  (void *buf, int *count, int *type, int *srcpe,
+void ampi_recv_init(void *buf, int *count, int *type, int *srcpe,
    int *tag, int *comm, int *req, int *ierr)
 {
   *ierr = AMPI_Recv_init(buf,*count,*type,*srcpe,*tag,*comm,(AMPI_Request*)req);
 }
 
-extern "C" void 
-#if CMK_FORTRAN_USES_ALLCAPS
-AMPI_SEND_INIT
-#else
-ampi_send_init_
-#endif
-  (void *buf, int *count, int *type, int *destpe,
+void ampi_send_init(void *buf, int *count, int *type, int *destpe,
    int *tag, int *comm, int *req, int *ierr)
 {
   *ierr = AMPI_Send_init(buf,*count,*type,*destpe,*tag,*comm,
                          (AMPI_Request*)req);
 }
 
-extern "C" void 
-#if CMK_FORTRAN_USES_ALLCAPS
-AMPI_TYPE_CONTIGUOUS
-#else
-ampi_type_contiguous_
-#endif
-  (int *count, int *oldtype, int *newtype, 
-   int *ierr)
+void ampi_type_contiguous(int *count, int *oldtype, int *newtype, int *ierr)
 {
   *ierr = AMPI_Type_contiguous(*count, *oldtype, newtype);
 }
 
-extern  "C"  void 
-#if CMK_FORTRAN_USES_ALLCAPS
-AMPI_TYPE_VECTOR
-#else
-ampi_type_vector_
-#endif
-  (int *count, int *blocklength, int *stride, 
+void ampi_type_vector(int *count, int *blocklength, int *stride, 
    int *oldtype, int*  newtype, int *ierr)
 {
   *ierr = AMPI_Type_vector(*count, *blocklength, *stride, *oldtype, newtype);
 }
 
-extern  "C"  void 
-#if CMK_FORTRAN_USES_ALLCAPS
-AMPI_TYPE_HVECTOR
-#else
-ampi_type_hvector_
-#endif
-  (int *count, int *blocklength, int *stride, 
+void ampi_type_hvector(int *count, int *blocklength, int *stride, 
    int* oldtype, int* newtype, int* ierr)
 {
   *ierr = AMPI_Type_hvector(*count, *blocklength, *stride, *oldtype, newtype);
 }
 
-extern  "C"  void 
-#if CMK_FORTRAN_USES_ALLCAPS
-AMPI_TYPE_INDEXED
-#else
-ampi_type_indexed_
-#endif
-  (int *count, int* arrBlength, int* arrDisp, 
+void ampi_type_indexed(int *count, int* arrBlength, int* arrDisp, 
    int* oldtype, int*  newtype, int* ierr)
 {
   *ierr = AMPI_Type_indexed(*count, arrBlength, arrDisp, *oldtype, newtype);
 }
 
-extern  "C"  void 
-#if CMK_FORTRAN_USES_ALLCAPS
-AMPI_TYPE_HINDEXED
-#else
-ampi_type_hindexed_
-#endif
-  (int* count, int* arrBlength, int* arrDisp, 
+void ampi_type_hindexed(int* count, int* arrBlength, int* arrDisp, 
    int* oldtype, int* newtype, int* ierr)
 {
   *ierr = AMPI_Type_hindexed(*count, arrBlength, arrDisp, *oldtype, newtype);
 }
 
-extern  "C"  void 
-#if CMK_FORTRAN_USES_ALLCAPS
-AMPI_TYPE_STRUCT
-#else
-ampi_type_struct_
-#endif
-  (int* count, int* arrBlength, int* arrDisp, 
+void ampi_type_struct(int* count, int* arrBlength, int* arrDisp, 
    int* oldtype, int* newtype, int* ierr)
 {
   *ierr = AMPI_Type_struct(*count, arrBlength, arrDisp, oldtype, newtype);
 }
 
 
-extern "C" void 
-#if CMK_FORTRAN_USES_ALLCAPS
-AMPI_TYPE_COMMIT
-#else
-ampi_type_commit_
-#endif
-  (int *type, int *ierr)
+void ampi_type_commit(int *type, int *ierr)
 {
   *ierr = AMPI_Type_commit(type);
 }
 
-extern "C" void 
-#if CMK_FORTRAN_USES_ALLCAPS
-AMPI_TYPE_FREE
-#else
-ampi_type_free_
-#endif
-  (int *type, int *ierr)
+void ampi_type_free(int *type, int *ierr)
 {
   *ierr = AMPI_Type_free(type);
 }
 
-extern "C" void  
-#if CMK_FORTRAN_USES_ALLCAPS
-AMPI_TYPE_EXTENT
-#else
-ampi_type_extent_
-#endif
-  (int* type, int* extent, int* ierr)
+void  ampi_type_extent(int* type, int* extent, int* ierr)
 {
   *ierr = AMPI_Type_extent(*type, extent);
 }
 
-extern "C" void  
-#if CMK_FORTRAN_USES_ALLCAPS
-AMPI_TYPE_SIZE
-#else
-ampi_type_size_
-#endif
-  (int* type, int* size, int* ierr)
+void  ampi_type_size(int* type, int* size, int* ierr)
 {
   *ierr = AMPI_Type_size(*type, size);
 }
 
-extern "C" void 
-#if CMK_FORTRAN_USES_ALLCAPS
-AMPI_ISEND
-#else
-ampi_isend_
-#endif
-  (void *buf, int *count, int *datatype, int *dest,
+void ampi_isend(void *buf, int *count, int *datatype, int *dest,
    int *tag, int *comm, int *request, int *ierr)
 {
   *ierr = AMPI_Isend(buf, *count, *datatype, *dest, *tag, *comm, request);
 }
 
-extern "C" void 
-#if CMK_FORTRAN_USES_ALLCAPS
-AMPI_IRECV
-#else
-ampi_irecv_
-#endif
-  (void *buf, int *count, int *datatype, int *src,
+void ampi_irecv(void *buf, int *count, int *datatype, int *src,
    int *tag, int *comm, int *request, int *ierr)
 {
   *ierr = AMPI_Irecv(buf, *count, *datatype, *src, *tag, *comm, request);
 }
 
-extern "C" void 
-#if CMK_FORTRAN_USES_ALLCAPS
-AMPI_ALLGATHERV
-#else
-ampi_allgatherv_
-#endif
-  (void *sendbuf, int *sendcount, int *sendtype,
+void ampi_allgatherv(void *sendbuf, int *sendcount, int *sendtype,
    void *recvbuf, int *recvcounts, int *displs,
    int *recvtype, int *comm, int *ierr)
 {
@@ -347,13 +269,7 @@ ampi_allgatherv_
                           displs, *recvtype, *comm);
 }
 
-extern "C" void 
-#if CMK_FORTRAN_USES_ALLCAPS
-AMPI_ALLGATHER
-#else
-ampi_allgather_
-#endif
-  (void *sendbuf, int *sendcount, int *sendtype,
+void ampi_allgather(void *sendbuf, int *sendcount, int *sendtype,
    void *recvbuf, int *recvcount, int *recvtype,
    int *comm, int *ierr)
 {
@@ -361,13 +277,7 @@ ampi_allgather_
                          *recvtype, *comm);
 }
 
-extern "C" void 
-#if CMK_FORTRAN_USES_ALLCAPS
-AMPI_GATHERV
-#else
-ampi_gatherv_
-#endif
-  (void *sendbuf, int *sendcount, int *sendtype,
+void ampi_gatherv(void *sendbuf, int *sendcount, int *sendtype,
    void *recvbuf, int *recvcounts, int *displs,
    int *recvtype, int *root, int *comm, int *ierr)
 {
@@ -375,13 +285,7 @@ ampi_gatherv_
                        displs, *recvtype, *root, *comm);
 }
 
-extern "C" void 
-#if CMK_FORTRAN_USES_ALLCAPS
-AMPI_GATHER
-#else
-ampi_gather_
-#endif
-  (void *sendbuf, int *sendcount, int *sendtype,
+void ampi_gather(void *sendbuf, int *sendcount, int *sendtype,
    void *recvbuf, int *recvcount, int *recvtype,
    int *root, int *comm, int *ierr)
 {
@@ -389,13 +293,7 @@ ampi_gather_
                       *recvtype, *root, *comm);
 }
 
-extern "C" void 
-#if CMK_FORTRAN_USES_ALLCAPS
-AMPI_ALLTOALLV
-#else
-ampi_alltoallv_
-#endif
-  (void *sendbuf, int *sendcounts, int *sdispls,
+void ampi_alltoallv(void *sendbuf, int *sendcounts, int *sdispls,
    int *sendtype, void *recvbuf, int *recvcounts,
    int *rdispls, int *recvtype, int *comm, int *ierr)
 {
@@ -403,13 +301,7 @@ ampi_alltoallv_
                          recvcounts, rdispls, *recvtype, *comm);
 }
 
-extern "C" void 
-#if CMK_FORTRAN_USES_ALLCAPS
-AMPI_ALLTOALL
-#else
-ampi_alltoall_
-#endif
-  (void *sendbuf, int *sendcount, int *sendtype,
+void ampi_alltoall(void *sendbuf, int *sendcount, int *sendtype,
    void *recvbuf, int *recvcount, int *recvtype,
    int *comm, int *ierr)
 {
@@ -417,47 +309,23 @@ ampi_alltoall_
                         *recvtype, *comm);
 }
 
-extern "C" void 
-#if CMK_FORTRAN_USES_ALLCAPS
-AMPI_COMM_DUP
-#else
-ampi_comm_dup_
-#endif
-  (int *comm, int *newcomm, int *ierr)
+void ampi_comm_dup(int *comm, int *newcomm, int *ierr)
 {
   *newcomm = *comm;
   *ierr = 0;
 }
 
-extern "C" void 
-#if CMK_FORTRAN_USES_ALLCAPS
-AMPI_COMM_FREE
-#else
-ampi_comm_free_
-#endif
-  (int *comm, int *ierr)
+void ampi_comm_free(int *comm, int *ierr)
 {
   *ierr = 0;
 }
 
-extern "C" void 
-#if CMK_FORTRAN_USES_ALLCAPS
-AMPI_ABORT
-#else
-ampi_abort_
-#endif
-  (int *comm, int *errorcode, int *ierr)
+void ampi_abort(int *comm, int *errorcode, int *ierr)
 {
   *ierr = AMPI_Abort(*comm, *errorcode);
 }
 
-extern "C" void 
-#if CMK_FORTRAN_USES_ALLCAPS
-AMPI_PRINT
-#else
-ampi_print_
-#endif
-  (char *str, int len)
+void ampi_print(char *str, int len)
 {
   char *tmpstr = new char[len+1];
   memcpy(tmpstr,str,len);
@@ -466,24 +334,14 @@ ampi_print_
   delete[] tmpstr;
 }
 
-extern "C" void
-#if CMK_FORTRAN_USES_ALLCAPS
-AMPI_MIGRATE
-#else
-ampi_migrate_
-#endif
-  (void)
+void ampi_migrate(void)
 {
   AMPI_Migrate();
 }
 
-extern "C" int
-#if CMK_FORTRAN_USES_ALLCAPS
-AMPI_REGISTER
-#else
-ampi_register_
-#endif
-  (void *d, AMPI_PupFn f)
+int ampi_register(void *d, AMPI_PupFn f)
 {
   return AMPI_Register(d,f);
 }
+
+} // extern "C"
