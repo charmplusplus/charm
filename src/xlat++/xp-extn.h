@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-05 19:01:24  brunner
+ * Revision 2.1  1995-09-06 04:21:31  sanjeev
+ * new Charm++ syntax, CHARE_BLOCK changes
+ *
+ * Revision 2.0  1995/06/05  19:01:24  brunner
  * Reorganized directory structure
  *
  * Revision 1.3  1995/03/23  05:11:53  sanjeev
@@ -127,4 +130,7 @@ extern int AddedScope ;
 extern int FoundGlobalScope ;
 
 extern int InsideChareCode ;
+
+extern int NewOpType ;
+extern int FoundDeclarator ; 
 

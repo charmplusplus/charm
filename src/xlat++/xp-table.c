@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-05 19:01:24  brunner
+ * Revision 2.1  1995-09-06 04:20:54  sanjeev
+ * new Charm++ syntax, CHARE_BLOCK changes
+ *
+ * Revision 2.0  1995/06/05  19:01:24  brunner
  * Reorganized directory structure
  *
  * Revision 1.5  1995/05/02  22:06:51  sanjeev
@@ -1240,3 +1243,93 @@ char *b, *s ;
 	else
 		return(b+j-ls) ;
 }
+
+
+
+OutputNewChareMsg(char *name, char *arg, char *placement)
+{
+	char *sptr ;
+	int type ;
+
+	if ( FoundDeclarator ) { /* we have "new Msg *" or "new Msg [...]" */
+		FoundDeclarator = FALSE ;
+		return ;
+	}
+
+	/* First find whether name is a Chare, BOC or Message */	
+	if ( FoundInChareTable(ChareTable,charecount+1,name) != -1 )
+		type = CHARE ;
+	else if ( FoundInChareTable(BOCTable,boccount+1,name) != -1 )
+		type = BRANCHED ;
+	else if ( FoundInMsgTable(name) != -1 )
+		type = MESSAGE ;
+	else if ( FoundInAccTable(AccTable,TotalAccs,name) != -1 ) 
+		type = ACCUMULATOR ;
+	else if ( FoundInAccTable(MonoTable,TotalMonos,name) != -1 ) 
+		type = MONOTONIC ;
+	else
+		return ;
+
+	sptr = strstr(OutBuf, "new") ;
+
+	if ( sptr != NULL ) 
+		*sptr = '\0' ;
+	else 
+		fprintf(stderr,"TRANSLATOR ERROR : %s, line %d : couldnt discard new.\n",CurrentFileName,CurrentLine) ;
+	FLUSHBUF() ;
+
+
+	if ( type == CHARE || type == BRANCHED ) {
+		if ( strchr(arg,',') != NULL )
+			fprintf(stderr,"TRANSLATOR ERROR : %s, line %d : new chare has more than one arg.\n",CurrentFileName,CurrentLine) ;
+		
+		if ( type == CHARE ) {
+			if ( placement == NULL || *placement=='\0' ) 
+				fprintf(outfile,"_CK_CreateChare(_CK_chare_%s, _CK_ep_%s_%s, %s, NULL_VID, NULL_PE",name, name, name, arg) ;
+			else 
+				fprintf(outfile,"_CK_CreateChare(_CK_chare_%s, _CK_ep_%s_%s, %s, %s",name, name, name, arg, placement) ;
+		}
+		else {
+			if ( placement == NULL || *placement=='\0' ) 
+				fprintf(outfile,"_CK_CreateBoc(_CK_chare_%s, _CK_ep_%s_%s, %s, -1, NULL",name, name, name, arg) ;
+			else 
+				fprintf(outfile,"_CK_CreateBoc(_CK_chare_%s, _CK_ep_%s_%s, %s, %s",name, name, name, arg, placement) ;
+		}
+	}
+	else if ( type == ACCUMULATOR ) {
+		if ( strchr(arg,',') != NULL )
+			fprintf(stderr,"TRANSLATOR ERROR : %s, line %d : new accumulator has more than one arg.\n",CurrentFileName,CurrentLine) ;
+		
+		if ( placement == NULL || *placement=='\0' ) 
+			fprintf(outfile,"_CK_CreateAcc(_CK_acc_%s, %s, -1, NULL",name, arg) ;
+		else 
+			fprintf(outfile,"_CK_CreateAcc(_CK_acc_%s, %s, %s",name, arg, placement) ;
+	}
+	else if ( type == MONOTONIC ) {
+		if ( strchr(arg,',') != NULL )
+			fprintf(stderr,"TRANSLATOR ERROR : %s, line %d : new monotonic has more than one arg.\n",CurrentFileName,CurrentLine) ;
+		
+		if ( placement == NULL || *placement=='\0' ) 
+			fprintf(outfile,"_CK_CreateMono(_CK_mono_%s, %s, -1, NULL",name, arg) ;
+		else 
+			fprintf(outfile,"_CK_CreateMono(_CK_mono_%s, %s, %s",name, arg, placement) ;
+	}
+	else { /* type == MESSAGE */
+		if ( arg != NULL ) 
+			fprintf(stderr,"ERROR : %s, line %d : arguments not supported for message creation\n",CurrentFileName,CurrentLine) ;
+
+		if ( placement == NULL || *placement=='\0' ) {
+			fprintf(outfile,"(%s *)GenericCkAlloc(_CK_%s._CK_msg_%s,sizeof(%s),0)", name, CoreName, name, name) ;
+		}
+		else { /* handle placement = "sizes, prio" */
+			fprintf(outfile,"(%s *)((ALLOCFNPTR)(MsgToStructTable[_CK_%s._CK_msg_%s].alloc))(_CK_%s._CK_msg_%s,sizeof(%s),", name, CoreName, name, CoreName, name, name) ;
+
+			if ( strchr(placement,',') != NULL ) /* sizes, prio */
+				fprintf(outfile,"%s)",placement) ;
+			else /* only sizes */
+				fprintf(outfile,"%s,0)",placement) ;
+		}
+	}
+}
+
+

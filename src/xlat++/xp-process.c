@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-05 19:01:24  brunner
+ * Revision 2.1  1995-09-06 04:20:54  sanjeev
+ * new Charm++ syntax, CHARE_BLOCK changes
+ *
+ * Revision 2.0  1995/06/05  19:01:24  brunner
  * Reorganized directory structure
  *
  * Revision 1.7  1995/05/05  22:55:38  sanjeev
@@ -243,7 +246,8 @@ void GenerateStructsFns()
 			fprintf(epfile,"\tint _CK_ep_%s_%s =0 ;\n",chare->name,ep->epname) ;
 			if (thisismain && strcmp(ep->epname,"main")==0) {
         			foundMain = 1 ;
-                		fprintf(outfile,"\nvoid _CK_call_main_main(_CK_Object *obj, int argc, char *argv[])\n{\n");
+                		fprintf(outfile,"\nextern \"C\" void _CK_call_main_main(void *junk, _CK_Object *obj, int argc, char *argv[]) ;\n");
+                		fprintf(outfile,"\nvoid _CK_call_main_main(void *junk, _CK_Object *obj, int argc, char *argv[])\n{\n");
                 		if ( main_argc_argv )
                        			fprintf(outfile,"\t((main *)obj)->_CKmain(argc,argv) ;\n") ;
                 		else {
@@ -254,8 +258,13 @@ void GenerateStructsFns()
 				fprintf(outfile,"}\n") ;
 			}
 			else {
+				fprintf(outfile,"extern \"C\" void _CK_call_%s_%s(void *m, _CK_Object *obj) ;\n",chare->name,ep->epname) ;
 				fprintf(outfile,"void _CK_call_%s_%s(void *m, _CK_Object *obj)\n{\n",chare->name,ep->epname) ;
-				fprintf(outfile,"\t((%s *)obj)->%s((%s *)m) ;\n}\n",chare->name,ep->epname,ep->msgname) ;
+                                if ( strcmp(chare->name, ep->epname) == 0 )
+                                        /* CC cribs about calling the constructor, so we use it as a conversion function */
+                                        fprintf(outfile,"\t*((%s *)obj) = (%s *)m ;\n}\n",chare->name,ep->msgname) ;
+                                else
+					fprintf(outfile,"\t((%s *)obj)->%s((%s *)m) ;\n}\n",chare->name,ep->epname,ep->msgname) ;
 			}
 		    }
 		}
@@ -265,8 +274,9 @@ void GenerateStructsFns()
 		}
 
 		if ( chare->eps->defined ) {
-	    	    fprintf(outfile,"_CK_Object *_CK_create_%s(MAGIC_NUMBER_TYPE m) {\n",chare->name) ;
-	    	    fprintf(outfile,"\treturn(new %s(m)) ;\n}\n\n",chare->name);
+	    	    fprintf(outfile,"extern \"C\" _CK_Object *_CK_create_%s(CHARE_BLOCK *c) ;\n",chare->name) ;
+	    	    fprintf(outfile,"_CK_Object *_CK_create_%s(CHARE_BLOCK *c) {\n",chare->name) ;
+	    	    fprintf(outfile,"\treturn(new %s(c)) ;\n}\n\n",chare->name);
 		}
 	}
 
@@ -280,8 +290,13 @@ void GenerateStructsFns()
 			for  ( ep=chare->eps; ep!=NULL; ep=ep->next,TotalEps++)
 			{
 				fprintf(epfile,"\tint _CK_ep_%s_%s =0 ;\n",chare->name,ep->epname) ;
+				fprintf(outfile,"extern \"C\" void _CK_call_%s_%s(void *m, _CK_Object *obj) ;\n", chare->name,ep->epname) ;
 				fprintf(outfile,"void _CK_call_%s_%s(void *m, _CK_Object *obj)\n{\n", chare->name,ep->epname) ;
-				fprintf(outfile,"\t((%s *)obj)->%s((%s *)m) ;\n}\n", chare->name,ep->epname,ep->msgname) ;
+
+                                if ( strcmp(chare->name, ep->epname) == 0 )
+                                        fprintf(outfile,"\t*((%s *)obj) = (%s *)m ;\n}\n",chare->name,ep->msgname) ;
+                                else
+					fprintf(outfile,"\t((%s *)obj)->%s((%s *)m) ;\n}\n", chare->name,ep->epname,ep->msgname) ;
 			}
 		}
 		else {
@@ -290,8 +305,9 @@ void GenerateStructsFns()
 		}
 
 		if ( chare->eps->defined ) {
-	    	    fprintf(outfile,"_CK_BOC *_CK_create_%s() {\n",chare->name) ;
-	    	    fprintf(outfile,"\treturn(new %s()) ;\n}\n\n",chare->name) ;
+	    	    fprintf(outfile,"extern \"C\" _CK_BOC *_CK_create_%s(CHARE_BLOCK *c) ;\n",chare->name) ;
+	    	    fprintf(outfile,"_CK_BOC *_CK_create_%s(CHARE_BLOCK *c) {\n",chare->name) ;
+	    	    fprintf(outfile,"\treturn(new %s(c)) ;\n}\n\n",chare->name) ;
 		}
 	}
 
