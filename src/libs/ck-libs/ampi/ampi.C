@@ -9,7 +9,8 @@
 #include <iostream.h>
 #include "ampiimpl.h"
 #include "tcharm.h"
-#include "../../../ampiEvents.h" /*** for trace generation for projector *****/
+#include "ampiEvents.h" /*** for trace generation for projector *****/
+#include "ampiProjections.h"
 
 /* change this define to "x" to trace all send/recv's */
 #define MSG_ORDER_DEBUG(x) /* empty */
@@ -312,6 +313,11 @@ static void ampiNodeInit(void)
   ampiSetupReductions();
 
   nodeinit_has_been_called=1;
+}
+
+static void ampiProcInit(void){
+  REGISTER_AMPI
+  initAmpiProjections();
 }
 
 PUPbytes(MPI_MainFn);
@@ -802,6 +808,7 @@ MSG_ORDER_DEBUG(
   CkPrintf("AMPI Rank %d arrival: tag=%d, src=%d, comm=%d  (from %d, seq %d)\n",
   	getRank(),msg->tag,msg->srcRank,msg->comm, msg->srcIdx, msg->seq);
 )
+	AmpiMsg *msgcopy = msg;
   if(msg->seq != -1) {
     int srcIdx = msg->srcIdx;
     oorder[srcIdx].put(msg->seq, msg);
@@ -811,8 +818,12 @@ MSG_ORDER_DEBUG(
   } else { //Cross-world or system messages are unordered
     inorder(msg);
   }
-  if(waitingForGeneric)
+  if(waitingForGeneric){
     thread->resume();
+/*#ifndef CMK_OPTIMIZE
+	_LOG_E_BEGIN_AMPI_PROCESSING(getRank(),msgcopy->srcRank,msgcopy->srcIdx);
+#endif*/
+	}	
 }
 
 void
@@ -887,6 +898,9 @@ MSG_ORDER_DEBUG(
     tags[0] = t; tags[1] = s; tags[2] = comm;
     msg = (AmpiMsg *) CmmGet(msgs, 3, tags, sts);
     if (msg) break;
+/*#ifndef CMK_OPTIMIZE
+	_LOG_E_END_AMPI_PROCESSING(getRank());
+#endif*/
     thread->suspend();
   }
   waitingForGeneric=0;
@@ -973,7 +987,7 @@ static ampiParent *getAmpiParent(void) {
   return p;
 }
 
-static ampi *getAmpiInstance(MPI_Comm comm) {
+ampi *getAmpiInstance(MPI_Comm comm) {
   ampi *ptr=getAmpiParent()->comm2ampi(comm);
 #ifndef CMK_OPTIMIZE
   if (ptr==NULL) CkAbort("AMPI's getAmpiInstance> null pointer\n");
@@ -1089,14 +1103,14 @@ int MPI_Recv(void *msg, int count, MPI_Datatype type, int src, int tag,
 {
   AMPIAPI("MPI_Recv");
   ampi *ptr = getAmpiInstance(comm);
-#ifndef CMK_OPTIMIZE
-  _LOG_E_END_AMPI_PROCESSING()
-#endif
-  ptr->recv(tag,src,msg,count,type, comm, (int*) status);
-#ifndef CMK_OPTIMIZE
-  _LOG_E_BEGIN_AMPI_PROCESSING(tag,src,count)
-#endif
-  return 0;
+  
+	//CkPrintf("dedede%d[[",CpvAccess(_traceCoreOn));if(CpvAccess(_traceCoreOn) !=0) ampi_endProcessing(ptr->thisIndex); else CkPrintf("]]]] %ddededededededede\n",CpvAccess(_traceCoreOn)); 
+	
+	_LOG_E_END_AMPI_PROCESSING(ptr->thisIndex)
+	ptr->recv(tag,src,msg,count,type, comm, (int*) status);
+	_LOG_E_BEGIN_AMPI_PROCESSING(ptr->thisIndex,src,count)
+  
+	return 0;
 }
 
 CDECL
@@ -1342,10 +1356,14 @@ int MPI_Reduce(void *inbuf, void *outbuf, int count, int type, MPI_Op op,
   msg->setCallback(reduceCB);
   ptr->contribute(msg);
 
-  if (ptr->thisIndex == rootIdx)
+  if (ptr->thisIndex == rootIdx){
   /*HACK: Use recv() to block until reduction data comes back*/
-    ptr->recv(MPI_REDUCE_TAG, MPI_REDUCE_SOURCE, outbuf, count, type, MPI_REDUCE_COMM);
-  return 0;
+
+	_LOG_E_END_AMPI_PROCESSING(ptr->thisIndex)
+ 	ptr->recv(MPI_REDUCE_TAG, MPI_REDUCE_SOURCE, outbuf, count, type, MPI_REDUCE_COMM);
+  _LOG_E_BEGIN_AMPI_PROCESSING(ptr->thisIndex,-1,count)
+  }
+ return 0;
 }
 
 CDECL
@@ -1364,7 +1382,9 @@ int MPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
   ptr->contribute(msg);
 
   /*HACK: Use recv() to block until the reduction data comes back*/
+  _LOG_E_END_AMPI_PROCESSING(ptr->thisIndex)
   ptr->recv(MPI_REDUCE_TAG, MPI_REDUCE_SOURCE, outbuf, count, type, MPI_REDUCE_COMM);
+  _LOG_E_BEGIN_AMPI_PROCESSING(ptr->thisIndex,-1,count)
   return 0;
 }
 
@@ -1440,21 +1460,28 @@ int MPI_Start(MPI_Request *request)
 
 int PersReq::wait(MPI_Status *sts){
 	if(sndrcv == 2) {
+  _LOG_E_END_AMPI_PROCESSING(getAmpiInstance(comm)->thisIndex)
 		getAmpiInstance(comm)->recv(tag, src, buf, count,
 				type, comm, (int*)sts);
+  _LOG_E_BEGIN_AMPI_PROCESSING(getAmpiInstance(comm)->thisIndex,src,count)
 	}
 	return 0;
 }
 int IReq::wait(MPI_Status *sts){
+  _LOG_E_END_AMPI_PROCESSING(getAmpiInstance(comm)->thisIndex)
 	getAmpiInstance(comm)->recv(tag, src, buf, count,
 			type, comm, (int*)sts);
+  _LOG_E_BEGIN_AMPI_PROCESSING(getAmpiInstance(comm)->thisIndex,src,count)
+	
 	return 0;
 }
 int ATAReq::wait(MPI_Status *sts){
 	int i;
 	for(i=0;i<count;i++){
+  _LOG_E_END_AMPI_PROCESSING(getAmpiInstance(myreqs[i].comm)->thisIndex)
 		getAmpiInstance(myreqs[i].comm)->recv(myreqs[i].tag, myreqs[i].src, myreqs[i].buf,
 				myreqs[i].count, myreqs[i].type, myreqs[i].comm, (int *)sts);
+  _LOG_E_BEGIN_AMPI_PROCESSING(getAmpiInstance(myreqs[i].comm)->thisIndex,myreqs[i].src,myreqs[i].count)
 	}
 	return 0;
 }
@@ -1505,14 +1532,18 @@ CmiBool PersReq::test(MPI_Status *sts){
 
 }
 void PersReq::complete(MPI_Status *sts){
+  _LOG_E_END_AMPI_PROCESSING(getAmpiInstance(comm)->thisIndex)
 	getAmpiInstance(comm)->recv(tag, src, buf, count, type, comm, (int*)sts);
+  _LOG_E_BEGIN_AMPI_PROCESSING(getAmpiInstance(comm)->thisIndex,src,count)
 }
 
 CmiBool IReq::test(MPI_Status *sts){
 	return getAmpiInstance(comm)->iprobe(tag, src, comm, (int*)sts);
 }
 void IReq::complete(MPI_Status *sts){
+  _LOG_E_END_AMPI_PROCESSING(getAmpiInstance(comm)->thisIndex)
 	getAmpiInstance(comm)->recv(tag, src, buf, count, type, comm, (int*)sts);
+  _LOG_E_BEGIN_AMPI_PROCESSING(getAmpiInstance(comm)->thisIndex,src,count)
 }
 
 CmiBool ATAReq::test(MPI_Status *sts){
@@ -1526,8 +1557,10 @@ CmiBool ATAReq::test(MPI_Status *sts){
 void ATAReq::complete(MPI_Status *sts){
 	int i;
 	for(i=0;i<count;i++){
+  _LOG_E_END_AMPI_PROCESSING(getAmpiInstance(myreqs[i].comm)->thisIndex)
 		getAmpiInstance(myreqs[i].comm)->recv(myreqs[i].tag, myreqs[i].src, myreqs[i].buf,
 				myreqs[i].count, myreqs[i].type, myreqs[i].comm, (int*)sts);
+  _LOG_E_BEGIN_AMPI_PROCESSING(getAmpiInstance(myreqs[i].comm)->thisIndex,myreqs[i].src,myreqs[i].count)
 	}
 }
 
@@ -1934,14 +1967,10 @@ int MPI_Alltoallv(void *sendbuf, int *sendcounts, int *sdispls,
   itemsize = dttype->getSize() ;
 
   for(i=0;i<size;i++) {
-#ifndef CMK_OPTIMIZE
-    _LOG_E_END_AMPI_PROCESSING()
-#endif
+    _LOG_E_END_AMPI_PROCESSING(ptr->thisIndex)
     ptr->recv(MPI_GATHER_TAG,i,((char*)recvbuf)+(itemsize*rdispls[i]),
               recvcounts[i], recvtype, comm, (int*)&status);
-#ifndef CMK_OPTIMIZE
-    _LOG_E_BEGIN_AMPI_PROCESSING(MPI_GATHER_TAG,i,recvcounts[i])
-#endif
+    _LOG_E_BEGIN_AMPI_PROCESSING(ptr->thisIndex,i,recvcounts[i])
   }
   return 0;
 }
@@ -1979,14 +2008,10 @@ int MPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   itemsize = dttype->getSize(recvcount) ;
 
   for(i=0;i<size;i++) {
-#ifndef CMK_OPTIMIZE
-    _LOG_E_END_AMPI_PROCESSING()
-#endif
+    _LOG_E_END_AMPI_PROCESSING(ptr->thisIndex)
     ptr->recv(MPI_GATHER_TAG,i,((char*)recvbuf)+(itemsize*i),
               recvcount,recvtype, comm, (int*)&status);
-#ifndef CMK_OPTIMIZE
-    _LOG_E_BEGIN_AMPI_PROCESSING(MPI_GATHER_TAG,i,recvcount)
-#endif
+    _LOG_E_BEGIN_AMPI_PROCESSING(ptr->thisIndex,i,recvcount)
   }
   return 0;
 }

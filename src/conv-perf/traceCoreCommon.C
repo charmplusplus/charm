@@ -2,7 +2,7 @@
 #include "traceCore.h"
 #include "traceCoreCommon.h"
 #include "charmProjections.h"
-#include "ampiProjections.h"
+//#include "ampiProjections.h"
 #include "converse.h"
 
 
@@ -46,13 +46,13 @@ extern "C" void initTraceCore(char** argv)
   CpvInitialize(TraceCore*, _traceCore);
   	CpvAccess(_traceCore) = new TraceCore(argv);
   initCharmProjections();
-  initAmpiProjections();
+ // initAmpiProjections();
 }
 
 /* End Core Trace Module */
 //TODO - trace-common.C
 extern "C" void closeTraceCore() {
-	closeAmpiProjections();
+	//closeAmpiProjections();
 	delete CpvAccess(_traceCore);
 }
 

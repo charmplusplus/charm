@@ -372,6 +372,7 @@ void MPI_Attach(const char *name);
 
 int MPI_Ireduce(void *sendbuf, void *recvbuf, int count, int type, MPI_Op op, int root, MPI_Comm comm, MPI_Request *request);
 
+#include "ampiProjections.h"
 #ifdef __cplusplus
 }
 #endif
