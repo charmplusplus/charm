@@ -49,7 +49,8 @@ OPTS_LDXX=""
 OBJECT=""
 POST_LANGUAGE=""
 POST_LIBRARIES=""    
-PRE_LIBRARIES=""    
+PRE_LIBRARIES=""  
+USE_F90_LIBRARIES="0"  
 COPIES=""        
 MODCOPIES=""        
 MODULES=""
@@ -346,6 +347,9 @@ do
 	"-rpath")
 		OPTS_LDXX="$OPTS_LDXX -rpath $1"
 		shift
+		;;
+	"-fortran"|"-flib"|"-flibs")
+		USE_F90_LIBRARIES="1" 
 		;;
 	"-M"|"-E"|"-P"|"-S")
 # Run preprocessor/assembler only
@@ -957,13 +961,11 @@ case "$LANGUAGE" in
 	;;
 "tcharmf")
 	MODULES="$MODULES tcharm"
-        POST_LIBRARIES="$POST_LIBRARIES -lconv-utilf $CMK_F90LIBS"
-	IS_F90="y"
+	USE_F90_LIBRARIES="1"
 	;;
 "charm++f")
-        POST_LIBRARIES="$POST_LIBRARIES -lconv-utilf $CMK_F90LIBS"
 	LANGUAGE="charm++"
-	IS_F90="y"
+	USE_F90_LIBRARIES="1"
 	;;
 "f90charm")
         PRE_LIBRARIES="$PRE_LIBRARIES -lf90charm "
@@ -981,8 +983,9 @@ case "$LANGUAGE" in
 	;;
 esac
 
-if [ $IS_F90 = "y" ]
+if [ $USE_F90_LIBRARIES = "1" ]
 then
+	POST_LIBRARIES="$POST_LIBRARIES -lconv-utilf $CMK_F90LIBS"
         if [ ! -z "$CMK_F90OBJS" ] 
         then
           for f90obj in $CMK_F90OBJS
