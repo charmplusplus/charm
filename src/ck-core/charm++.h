@@ -145,7 +145,7 @@ class CkMsgQ : public CkQ<MSG *> {
 public:
 	~CkMsgQ() { //Delete the messages in the queue:
 		MSG *m;
-		while (NULL!=(m=deq())) delete m;
+		while (NULL!=(m=deq())) CkFreeMsg(m);
 	}
 	void pup(PUP::er &p) {
 		int l=length();
