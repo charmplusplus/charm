@@ -83,15 +83,15 @@ PUPmarshall(CkArrayOptions);
 //This class is a wrapper around a CkArrayIndex and ArrayID,
 // used by array element proxies.  This makes the translator's
 // job simpler, and the translated code smaller. 
-class CProxy_ArrayBase :public CProxyBase_Delegatable {
+class CProxy_ArrayBase :public CProxy {
 private:
 	CkArrayID _aid;
 public:
 	CProxy_ArrayBase() { }
 	CProxy_ArrayBase(const CkArrayID &aid,CkGroupID dTo) 
-		:CProxyBase_Delegatable(dTo), _aid(aid) { }
+		:CProxy(dTo), _aid(aid) { }
 	CProxy_ArrayBase(const CkArrayID &aid) 
-		:CProxyBase_Delegatable(), _aid(aid) { }
+		:CProxy(), _aid(aid) { }
 
 	static CkArrayID ckCreateEmptyArray(void);
 	static CkArrayID ckCreateArray(CkArrayMessage *m,int ctor,CkArrayOptions opts);
@@ -109,7 +109,7 @@ public:
 };
 PUPmarshall(CProxy_ArrayBase);
 #define CK_DISAMBIG_ARRAY(super) \
-	CK_DISAMBIG_DELEGATABLE(super) \
+	CK_DISAMBIG_CPROXY(super) \
 	inline operator CkArrayID () const {return ckGetArrayID();}\
 	inline static CkArrayID ckCreateEmptyArray(void)\
 	  { return super::ckCreateEmptyArray(); }\

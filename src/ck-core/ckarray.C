@@ -255,7 +255,7 @@ ArrayElement *CProxyElement_ArrayBase::ckLocal(void) const
 //pack-unpack method for CProxy_ArrayBase
 void CProxy_ArrayBase::pup(PUP::er &p)
 {
-  CProxyBase_Delegatable::pup(p);
+  CProxy::pup(p);
   _aid.pup(p);
 }
 void CProxyElement_ArrayBase::pup(PUP::er &p)
