@@ -1497,6 +1497,36 @@ void CmiInitMultipleSend(void)
 }
 
 /****************************************************************************
+* DESCRIPTION : This function initializes the main handler required for the
+*               Immediate message
+*	        
+*               This function should be called once in any Converse program
+*
+****************************************************************************/
+
+CpvDeclare(int, CmiImmediateMsgHandlerIdx); /* Main handler that is run on every node */
+
+/* xdl is the real handler */
+static void CmiImmediateMsgHandler(char *msg)
+{
+  CmiSetHandler(msg, CmiGetXHandler(msg));
+  CmiHandleMessage(msg);
+}
+
+void CmiInitImmediateMsg(void)
+{
+  CpvInitialize(int,CmiImmediateMsgHandlerIdx); 
+  CpvAccess(CmiImmediateMsgHandlerIdx) =
+    CmiRegisterHandler((CmiHandler)CmiImmediateMsgHandler);
+}
+
+#if !CMK_IMMEDIATE_MSG
+void CmiPollImmediateMsg()
+{
+}
+#endif 
+
+/****************************************************************************
 * DESCRIPTION : This function is the main handler required for the
 *               CmiMultipleSendP() function to work. 
 *
@@ -1657,6 +1687,8 @@ void ConverseCommonInit(char **argv)
   CldModuleInit();
   CrnInit();
   CIdleTimeoutInit(argv);
+
+  CmiInitImmediateMsg();
 }
 
 void ConverseCommonExit(void)

@@ -929,6 +929,14 @@ void CmiPrintStackTrace(int nSkip);
 CpvExtern(void*, CmiLocalQueue);
 #endif
 
+/******** Immediate Messages ********/
+
+CpvExtern(int, CmiImmediateMsgHandlerIdx);
+
+void CmiPollImmediateMsg();
+
+/******** Object ID ********/
+
 /* this is the type for thread ID, mainly used for projection. */
 typedef struct {
 int id[3];
