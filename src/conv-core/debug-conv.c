@@ -32,11 +32,9 @@ static void CpdDebugHandler(char *msg)
 
     if (strcmp(name, "freeze") == 0) {
       CpdFreeze();
-      //CmiPrintf("freeze received\n");
     }
     else if (strcmp(name, "unfreeze") == 0) {
       CpdUnFreeze();
-      //CmiPrintf("unfreeze received\n");
     }
     else if (strncmp(name, "step", strlen("step")) == 0){
       CmiPrintf("step received\n");
@@ -104,9 +102,7 @@ void CpdFreezeModeScheduler(void)
 	  if(_isCcsHandlerIdx(hIdx))
 	  /*A CCS request-- handle it immediately*/
           {
-            //CmiPrintf("Before handling ccs call in freeze mode\n"); 
 	    CmiHandleMessage(msg);
-            //CmiPrintf("After handling ccs call in freeze mode\n"); 
           }
 	  else
 	  /*An ordinary message-- queue it up*/
