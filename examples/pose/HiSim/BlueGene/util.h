@@ -128,7 +128,7 @@ public:
 class MachineParams {
 public:
 	Config *config;
-	int procs;
+	int procs;	// num of simulating processors
 	int BGnodes;
 	
 	MachineParams() {}
