@@ -449,27 +449,35 @@ Several variations of strategies have been designed and analyzed.
  A strategy that places seeds randomly when they are created and does
 no movement of seeds thereafter. This is used as the default seed 
 load balancer.
+\item {\em neighbor}\\  
+ a strategy which imposes a virtual topology on the processors,
+ load exchange happens to neighbors only. The overloaded processors
+ initiate the load balancing, where a processor send work to its neighbors
+ when it becomes overloaded. The default topology is mesh2D, one can use
+ command line option to choose other topology such as ring, mesh3D and 
+ dense graph.
 \item {\em spray}\\  
  a strategy which imposes a spanning tree organization on the processors,
  results in communication via global reduction amongst all processors 
  to compute global average load via periodic reduction. 
  It uses averaging of loads to determine how seeds should be
 distributed.
-\item {\em graph}\\  
- a strategy which imposes a dense graph organization on the processors,
- load exchange happens to neighbors only. The overloaded processors
- initiate the load balancing, where a processor send work to its neighbors
- when it becomes overloaded.
 \end{enumerate}
 
 Other strategies can also be explored follow the simple API of the 
 seed load balancer.
 
-\subsubsection{Compiler option}
+\subsubsection{Compile and run time options}
 
 To choose a seed load balancer other than the default {\em rand} strategy,
 use link time command line option {\bf -balance foo}. 
 
-All seed laod balaner modules should be compiled in the form of library
+When using {\rm neighbor} seed load balancer, one can also specify
+the virtual topology at runtime. Use {\bf +LBTopo topo}, where {\em topo}
+can be one of: (a) ring, (b) mesh2d, (c) mesh3d and (d) graph.
+
+To write a seed load balancer, name your file as {\em cldb.foo.c},
+where {\em foo} is the strategy name.  Compile it in the form of library
 under charm/lib, named as {\em libcldb-foo.a}, where {\em foo} is the strategy 
-name as is used in the link time option.
+name used above. Now one can use {\bf -balance foo} as compile time option
+to {\bf charmc} to link with the {\em foo} seed load balancer.
