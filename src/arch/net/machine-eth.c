@@ -534,7 +534,7 @@ int ReceiveDatagram()
 	if (errno == EWOULDBLOCK) return 0; /* No more messages on that socket. */
     if (errno == ECONNREFUSED) return 0;  /* A "Host unreachable" ICMP packet came in */
 #endif
-    CmiPrintf("ReceiveDatagram: recv: %s\n", strerror(errno)) ;
+    CmiPrintf("ReceiveDatagram: recv: %s(%d)\n", strerror(errno), errno) ;
     KillEveryoneCode(37489437);
   }
   dg->len = ok;
