@@ -20,10 +20,6 @@
 #define _CHECK_USED(env) do{}while(0)
 #endif
 
-typedef unsigned int   UInt;
-typedef unsigned short UShort;
-typedef unsigned char  UChar;
-
 #define SVM1     (sizeof(double)-1)
 #define ALIGN(x) (((x)+SVM1)&(~(SVM1)))
 #define _A(x)     ALIGN(x)
@@ -49,6 +45,10 @@ typedef unsigned char  UChar;
 #define DNodeBocReqMsg 17
 #define DNodeBocNumMsg 18
 
+typedef unsigned int   UInt;
+typedef unsigned short UShort;
+typedef unsigned char  UChar;
+
 class envelope {
   private:
     char   core[CmiExtHeaderSizeBytes];
@@ -68,12 +68,13 @@ public:
 	void *usrMsg; //For DBoc only
       } dgroup;
       struct s_array{ //For arrays only
-	UChar num; //Array manager group number
+	UChar loc; //Location manager group number (overlays group number above)
+	UChar arr; //Array manager group number
 	UChar hopCount;//number of times message has been routed
 	UShort epIdx;//Array element entry point
-	CkArrayIndexStruct index;//Array element index
 	UInt srcPe;//Original sender
 	UInt broadcastCount;//For creations-- initial broadcast count
+	CkArrayIndexStruct index;//Array element index
       } array;
       struct s_roData { //RODataMsg
       	UInt count;
@@ -218,8 +219,10 @@ private:
     }
     CkArrayIndexMax &array_index(void) {return 
         *(CkArrayIndexMax *)&type.array.index;}
+    
     unsigned short &array_ep(void) {return type.array.epIdx;}
     unsigned char &array_hops(void) {return type.array.hopCount;}
+    unsigned char &array_mgr(void) {return type.array.arr;}
     unsigned int &array_srcPe(void) {return type.array.srcPe;}
     UInt &array_broadcastCount(void) {return type.array.broadcastCount;}
 };

@@ -88,7 +88,8 @@ void envelope::pup(PUP::er &p) {
 		p((void *)&(type.dgroup.usrMsg),sizeof(void *));
 		break;
 	case ForBocMsg:
-		p(type.array.num);
+		p(type.array.loc);
+		p(type.array.arr);
 		p(type.array.hopCount);		
 		p(type.array.epIdx);
 		p(type.array.index.nInts);
