@@ -24,7 +24,9 @@ CpvDeclare(int *, binLengths);
 CpvDeclare(int, maxBin);
 CpvDeclare(int, numKallocs);
 CpvDeclare(int, numMallocs);
+CpvDeclare(int, numOallocs);
 CpvDeclare(int, numFrees);
+CpvDeclare(int, numOFrees);
 
 /* Each block has a 8 byte header.
    This contains the pointer to the next  block, when 
@@ -51,6 +53,7 @@ void CmiPoolAllocInit(int numBins)
   CpvInitialize(int, maxBin);
   CpvInitialize(int, numKallocs);
   CpvInitialize(int, numMallocs);
+  CpvInitialize(int, numOFrees);
   CpvInitialize(int, numFrees);
 
   CpvAccess(bins) = (char **) malloc_nomigrate(  numBins*sizeof(char *));
@@ -59,7 +62,7 @@ void CmiPoolAllocInit(int numBins)
   for (i=0; i<numBins; i++) CpvAccess(bins)[i] = NULL;
   for (i=0; i<numBins; i++) CpvAccess(binLengths)[i] = 0;
 
-    CpvAccess(numKallocs) =  CpvAccess(numMallocs) =  CpvAccess(numFrees) = 0;
+    CpvAccess(numKallocs) =  CpvAccess(numMallocs) =  CpvAccess(numFrees)=CpvAccess(numOFrees) = 0;
 }
 
 void * CmiPoolAlloc(unsigned int numBytes)
@@ -82,7 +85,9 @@ void * CmiPoolAlloc(unsigned int numBytes)
       if(CpvAccess(bins)[bin] != NULL) 
 	{
 	  /*	  CmiPrintf("p\n");*/
+#ifndef CMK_OPTIMIZE
 	  CpvAccess(numKallocs)++;
+#endif
 	  /* store some info in the header*/
 	  p = CpvAccess(bins)[bin];
 	  /*next pointer from the header*/
@@ -90,16 +95,21 @@ void * CmiPoolAlloc(unsigned int numBytes)
 	  /* this conditional should not be necessary
 	     as the header next pointer should contain NULL
 	     for us when there is nothing left in the pool */
+#ifndef CMK_OPTIMIZE
 	  if(--CpvAccess(binLengths)[bin])
 	      CpvAccess(bins)[bin] = (char *) *((char **)(p -CMI_POOL_HEADER_SIZE)); 
 	  else  /* there is no next */
 	      CpvAccess(bins)[bin] = NULL;
+#else
+      CpvAccess(bins)[bin] = (char *) *((char **)(p -CMI_POOL_HEADER_SIZE)); 
+#endif
 	}
       else
 	{
 	  /*  CmiPrintf("np %d\n",bin);*/
-
+#ifndef CMK_OPTIMIZE
 	  CpvAccess(numMallocs)++;
+#endif
 	  /* Round up the allocation to the max for this bin */
 	   p =(char *) malloc_nomigrate(1 << bin) + CMI_POOL_HEADER_SIZE;
 	}
@@ -108,6 +118,9 @@ void * CmiPoolAlloc(unsigned int numBytes)
     {
       /*  CmiPrintf("u b%d v %d\n",bin,CpvAccess(maxBin));  */
       /* just revert to malloc for big things and set bin 0 */
+#ifndef CMK_OPTIMIZE
+	  CpvAccess(numOallocs)++;
+#endif
       p = (char *) malloc_nomigrate(numBytes) + CMI_POOL_HEADER_SIZE;
       bin=0; 
     }
@@ -117,32 +130,49 @@ void * CmiPoolAlloc(unsigned int numBytes)
 }
 
 
- void * CmiPoolFree(char * p) 
+void * CmiPoolFree(char * p) 
 {
   char **header = (char **)( p - CMI_POOL_HEADER_SIZE);
   int bin = (int) *header;
   /*  CmiPrintf("f%d\n",bin,CpvAccess(maxBin));  */
   if(bin==0)
     {
+#ifndef CMK_OPTIMIZE
+      CpvAccess(numOFrees)++;
+#endif
       free_nomigrate(header);
     }
   else
     {
+#ifndef CMK_OPTIMIZE
       CpvAccess(numFrees)++;
+#endif
       /* add to the begining of the list at CpvAccess(bins)[bin]*/
       *header =  CpvAccess(bins)[bin]; 
       CpvAccess(bins)[bin] = p;
+#ifndef CMK_OPTIMIZE
       CpvAccess(binLengths)[bin]++;
+#endif
     }
 }
 
- void  CmiPoolAllocStats()
+void  CmiPoolAllocStats()
 {
   int i;
   CmiPrintf("numKallocs: %d\n", CpvAccess(numKallocs));
+  CmiPrintf("numMallocs: %d\n", CpvAccess(numMallocs));
+  CmiPrintf("numOallocs: %d\n", CpvAccess(numOallocs));
+  CmiPrintf("numOFrees: %d\n", CpvAccess(numOFrees));
   CmiPrintf("numFrees: %d\n", CpvAccess(numFrees));
-  /*  for (i=0; i<=CpvAccess(maxbin); i++) */
-  /*   { CmiPrintf("binLength[%d] : %d\n", i, CpvAccess(binLengths)[i]);}*/
+  CmiPrintf("Bin:");
+  for (i=0; i<=CpvAccess(maxBin); i++)
+    if(CpvAccess(binLengths)[i])
+      CmiPrintf("%d\t", i);
+  CmiPrintf("\nVal:");
+  for (i=0; i<=CpvAccess(maxBin); i++)
+    if(CpvAccess(binLengths)[i])
+      CmiPrintf("%d\t", CpvAccess(binLengths)[i]);
+  CmiPrintf("\n");
 }
 
 /* theoretically we should have a pool cleanup function in here */

@@ -2317,11 +2317,11 @@ void CommunicationServerInit()
 */
 void ConverseCommonInit(char **argv)
 {
+  CmiArgInit(argv);
+  CmiMemoryInit(argv);
 #if CONVERSE_POOL
   CmiPoolAllocInit(30);  
 #endif
-  CmiArgInit(argv);
-  CmiMemoryInit(argv);
   CmiTmpInit(argv);
   CmiTimerInit();
   CstatsInit(argv);
