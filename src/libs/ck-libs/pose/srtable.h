@@ -206,7 +206,7 @@ class SRtable {
   /// CompressAndSort all buckets
   void SortTable();
   /// Compress a bucket so all SRentries have unique timestamps and are sorted
-  void CompressAndSortBucket(int i, int is_overflow);
+  void CompressAndSortBucket(POSE_TimeType i, int is_overflow);
   /// Free all buckets and overflows, reset all counts
   void FreeTable();
   /// Dump data fields

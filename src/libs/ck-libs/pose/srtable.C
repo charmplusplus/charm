@@ -334,7 +334,7 @@ void SRtable::SortTable()
 }
 
 /// Compress a bucket so all SRentries have unique timestamps and are sorted
-void SRtable::CompressAndSortBucket(int i, int is_overflow)
+void SRtable::CompressAndSortBucket(POSE_TimeType i, int is_overflow)
 {
 #ifdef SR_SANITIZE
   sanitize();
