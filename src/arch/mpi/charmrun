@@ -10,6 +10,13 @@ pes=1
 while [ $# -gt 0 ]
 do
 	case $1 in
+	+ppn)
+		args=$args" +ppn "$2
+		shift
+		;;
+	+ppn*)
+		args=$args" "$1
+		;;
 	+p)
 		pes=$2
 		shift
