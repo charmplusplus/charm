@@ -75,15 +75,17 @@ syntax() {
   then
   echo ''
   echo 'Examples:'
-  echo '1. compile Charm++ on Linux with optimizations:'
+  echo "1. display all supported options for net-linux using 'help':"
+  echo '  ./build charm++ net-linux help'
+  echo '2. compile Charm++ on Linux with optimizations:'
   echo '  ./build charm++ net-linux -O -DCMK_OPTIMIZE'
-  echo '2. compile Charm++ for Linux clustermatic Beowulf cluster with Intel compiler:'
+  echo '3. compile Charm++ for Linux clustermatic Beowulf cluster with Intel compiler:'
   echo '  ./build charm++ net-linux clustermatic icc -O'
-  echo '3. compile Charm++ for IA64 Linux cluster with MPICH-GM:'
+  echo '4. compile Charm++ for IA64 Linux cluster with MPICH-GM:'
   echo '  ./build charm++ mpi-linux-ia64 gm -O'
-  echo '4. compile Charm++ for Windows with VC++ (Cygwin required):'
+  echo '5. compile Charm++ for Windows with VC++ (Cygwin required):'
   echo '  ./build charm++ net-win32 -O'
-  echo '5. compile on IBM SP with MPI using parallel gmake, 4 jobs simultaneously:'
+  echo '6. compile on IBM SP with MPI using parallel gmake, 4 jobs simultaneously:'
   echo '  MAKE=gmake  ./build charm++ mpi-sp -j4 -O            # sh'
   echo '  setenv MAKE gmake;  ./build charm++ mpi-sp -j4 -O    # csh'
   echo ''
@@ -93,7 +95,7 @@ syntax() {
   echo ' 3. Does a "make <target> <version> OPTS=<charmc-options>" in <version>/tmp.'
   echo "That's all build does.  The rest is handled by the Makefile."
   echo ''
-  echo 'Thank you for using Charm++, please send questions or comments to Parallel Programming Lab at University of Illinois at Urbana-Champaign at ppl@cs.uiuc.edu.'
+  echo 'Thank you for using Charm++, please send questions or comments to Parallel Programming Lab at University of Illinois at Urbana-Champaign(email: ppl@cs.uiuc.edu).'
   else
   echo ''
   echo "To get more detailed help, run ./build --help"
