@@ -16,17 +16,15 @@ LIBOBJ=fftlib-normal.o fftlib-sparse.o translines.o
 INCDIR=$(CDIR)/include/fftlib
 HEADERS= $(INCDIR)/fftlib.h\
 	 $(INCDIR)/fftlib.decl.h\
-	 $(INCDIR)/fftlib.def.h\
-	 $(INCDIR)/fftutil.h
+	 $(INCDIR)/fftlib.def.h
 
 all: $(LIBDEST) $(HEADERS)
 
-$(HEADERS): fftlib.h fftlib.decl.h fftutil.h
+$(HEADERS): fftlib.h fftlib.decl.h
 	test ! -d $(INCDIR) && mkdir $(INCDIR) || true
 	/bin/cp fftlib.h $(INCDIR)
 	/bin/cp fftlib.decl.h $(INCDIR)
 	/bin/cp fftlib.def.h $(INCDIR)
-	/bin/cp fftutil.h $(INCDIR)
 
 $(LIBDEST): $(LIBOBJ)
 	$(CHARMC) -o $(LIBDEST) $(LIBOBJ)
