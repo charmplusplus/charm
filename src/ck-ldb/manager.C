@@ -15,7 +15,7 @@
 
 extern int load_balancer_created;
 
-void handler(char *bit_map)
+static void handler(char *bit_map)
 {
     bit_map += CmiMsgHeaderSizeBytes;
     
