@@ -25,6 +25,7 @@ public:
   LBObj(LBDB *_parentDB, const LDObjHandle &_h, void *usr_ptr = NULL, CmiBool _migratable=CmiTrue) {
     data.handle = _h;
     data.migratable = _migratable;
+    data.ignoreArrival = CmiFalse;
     data.cpuTime = 0.;
     data.wallTime = 0.;
     userData = usr_ptr;
@@ -68,6 +69,7 @@ public:
   inline LDOMHandle &parentOM() { return data.handle.omhandle; }
   inline const LDObjHandle &GetLDObjHandle() const { return data.handle; }
   inline void SetMigratable(CmiBool mig) { data.migratable = mig; }
+  inline void SetReadyMigrate(CmiBool ready) { data.ignoreArrival = ready; }
   inline LDObjData &ObjData() { return data; };
   inline void lastKnownLoad(double *c, double *w) {*c=lastCpuTime; *w=lastWallTime; }
   inline void *getUserData() { return  userData; }

@@ -101,6 +101,7 @@ typedef struct {
   double cpuTime;
   double wallTime;
   CmiBool migratable;
+  CmiBool ignoreArrival;
 #ifdef __cplusplus
   inline const LDOMHandle &omHandle() const { return handle.omhandle; }
   inline const LDOMid &omID() const { return handle.omhandle.id; }
@@ -237,6 +238,7 @@ void LDMessage(LDObjHandle from,
 void LDEstObjLoad(LDObjHandle h, double load);
 void LDNonMigratable(const LDObjHandle &h);
 void LDMigratable(const LDObjHandle &h);
+void LDReadyMigrate(const LDObjHandle &h, CmiBool);
 void LDDumpDatabase(LDHandle _lbdb);
 
 /*
@@ -370,6 +372,7 @@ inline void LDObjData::pup(PUP::er &p) {
   p|cpuTime;
   p|wallTime;
   p|migratable;
+  p|ignoreArrival;
 }
 PUPmarshall(LDObjData);
 inline void LDCommDesc::pup(PUP::er &p) {

@@ -253,6 +253,14 @@ extern "C" void LDMigratable(const LDObjHandle &h)
   obj->SetMigratable(CmiTrue);
 }
 
+extern "C" void LDReadyMigrate(const LDObjHandle &h, CmiBool isReady)
+{
+  LBDB *const db = (LBDB*)(h.omhandle.ldb.handle);
+  LBObj *const obj = db->LbObj(h);
+
+  obj->SetReadyMigrate(isReady);
+}
+
 extern "C" void LDClearLoads(LDHandle _db)
 {
   LBDB *const db = (LBDB*)(_db.handle);

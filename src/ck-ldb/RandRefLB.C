@@ -36,8 +36,6 @@ RandRefLB::RandRefLB(const CkLBOptions &opt): RandCentLB(opt)
 void RandRefLB::work(CentralLB::LDStats* stats, int count)
 {
   //  CkPrintf("[%d] RandRefLB strategy\n",CkMyPe());
-
-  CkVec<MigrateInfo*> migrateInfo;
   int obj;
 
   RandCentLB::work(stats, count);

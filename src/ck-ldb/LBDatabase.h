@@ -168,6 +168,7 @@ public:
   inline void EstObjLoad(LDObjHandle h, double load) { LDEstObjLoad(h,load); };
   inline void NonMigratable(LDObjHandle h) { LDNonMigratable(h); };
   inline void Migratable(LDObjHandle h) { LDMigratable(h); };
+  inline void UseReadyMigrate(LDObjHandle h, CmiBool flag) { LDReadyMigrate(h, flag); };
   inline void DumpDatabase(void) { LDDumpDatabase(myLDHandle); };
 
   /*
