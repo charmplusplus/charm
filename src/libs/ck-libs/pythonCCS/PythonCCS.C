@@ -106,6 +106,7 @@ void PythonObject::execute (CkCcsRequestMsg *msg) {
   CmiLock(CsvAccess(pyLock));
   CsvAccess(pyWorkers)->erase(pyReference);
   CmiUnlock(CsvAccess(pyLock));
+  delete msg;
 }
 
 void PythonObject::iterate (CkCcsRequestMsg *msg) {
@@ -133,16 +134,34 @@ void PythonObject::iterate (CkCcsRequestMsg *msg) {
   // compile the program
   char *userCode = (char *)msg->data;
   struct _node* programNode = PyParser_SimpleParseString(userCode, Py_file_input);
-  if (programNode==NULL) { CkPrintf("Program error\n"); return; }
+  if (programNode==NULL) {
+    CkPrintf("Program error\n");
+    return;
+  }
   PyCodeObject *program = PyNode_Compile(programNode, "");
-  if (program==NULL) { CkPrintf("Program error\n"); return; }
+  if (program==NULL) {
+    CkPrintf("Program error\n");
+    PyNode_Free(programNode);
+    return;
+  }
   PyObject *code = PyEval_EvalCode(program, dict, dict);
-  if (code==NULL) { CkPrintf("Program error\n"); return; }
+  if (code==NULL) {
+    CkPrintf("Program error\n");
+    PyNode_Free(programNode);
+    Py_DECREF(program);
+    return;
+  }
 
   // load the user defined method
   char *userMethod = userCode + strlen(userCode) + 1;
   PyObject *item = PyDict_GetItemString(dict, userMethod);
-  if (item==NULL) { CkPrintf("Method not found\n"); return; }
+  if (item==NULL) {
+    CkPrintf("Method not found\n");
+    PyNode_Free(programNode);
+    Py_DECREF(program);
+    Py_DECREF(code);
+    return;
+  }
 
   // create the container for the data
   PyRun_String("class Particle:\n\tpass\n\n", Py_file_input, dict, dict);
@@ -162,12 +181,19 @@ void PythonObject::iterate (CkCcsRequestMsg *msg) {
     Py_DECREF(result);
   }
 
+  Py_DECREF(part);
+  Py_DECREF(arg);
+  PyNode_Free(programNode);
+  Py_DECREF(program);
+  Py_DECREF(code);
+
   // distroy map element in pyWorkers and terminate interpreter
   Py_EndInterpreter(pts);
   PyEval_ReleaseLock();
   CmiLock(CsvAccess(pyLock));
   CsvAccess(pyWorkers)->erase(pyReference);
   CmiUnlock(CsvAccess(pyLock));
+  delete msg;
 }
 
 static void initializePythonDefault(void) {

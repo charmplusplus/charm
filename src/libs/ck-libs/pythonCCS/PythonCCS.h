@@ -5,6 +5,7 @@
 #include "python/Python.h"
 #include "python/compile.h"
 #include "python/eval.h"
+#include "python/node.h"
 #include "PythonCCS.decl.h"
 #include "string"
 #include "map"
