@@ -24,14 +24,25 @@ static char ident[] = "@(#)$Header$";
 void        *CmiGetNonLocal();
 
 CpvDeclare(int, disable_sys_msgs);
-CsvDeclare(CmiHandler*, CmiHandlerTable);
-CpvExtern(void*, CmiLocalQueue);
 CpvExtern(int, CcdNumChecks) ;
-CpvStaticDeclare(int, handlerCount);
 CpvDeclare(void*, CsdSchedQueue);
 CpvDeclare(int,   CsdStopFlag);
 
 
+/*****************************************************************************
+ *
+ * Some of the modules use this in their argument parsing.
+ *
+ *****************************************************************************/
+
+static char *DeleteArg(argv)
+  char **argv;
+{
+  char *res = argv[0];
+  if (res==0) { CmiError("Bad arglist."); exit(1); }
+  while (*argv) { argv[0]=argv[1]; argv++; }
+  return res;
+}
 
 
 /*****************************************************************************
@@ -46,39 +57,40 @@ CpvDeclare(int, CstatsMaxFixedChareQueueLength);
 CpvStaticDeclare(int, CstatPrintQueueStatsFlag);
 CpvStaticDeclare(int, CstatPrintMemStatsFlag);
 
-
-
-
-void convcoreModuleInit()
+void CstatsInit(argv)
+char **argv;
 {
-     CpvInitialize(int, disable_sys_msgs);
-     CpvAccess(disable_sys_msgs) = 0;
+  CpvInitialize(int, CstatsMaxChareQueueLength);
+  CpvInitialize(int, CstatsMaxForChareQueueLength);
+  CpvInitialize(int, CstatsMaxFixedChareQueueLength);
+  CpvInitialize(int, CstatPrintQueueStatsFlag);
+  CpvInitialize(int, CstatPrintMemStatsFlag);
 
-     CpvInitialize(int, CstatsMaxChareQueueLength);
-     CpvInitialize(int, CstatsMaxForChareQueueLength);
-     CpvInitialize(int, CstatsMaxFixedChareQueueLength);
-     CpvInitialize(int, CstatPrintQueueStatsFlag);
-     CpvInitialize(int, CstatPrintMemStatsFlag);
-     CpvInitialize(int, handlerCount);
-     CpvInitialize(void*, CsdSchedQueue);
-     CpvInitialize(int,   CsdStopFlag);
+  CpvAccess(CstatsMaxChareQueueLength) = 0;
+  CpvAccess(CstatsMaxForChareQueueLength) = 0;
+  CpvAccess(CstatsMaxFixedChareQueueLength) = 0;
 
-     CpvAccess(CstatsMaxChareQueueLength) = 0;
-     CpvAccess(CstatsMaxForChareQueueLength) = 0;
-     CpvAccess(CstatsMaxFixedChareQueueLength) = 0;
-     CpvAccess(handlerCount) = 0;
-     CpvAccess(CsdStopFlag)  = 0;
+  while (*argv) {
+    if (strcmp(*argv, "+mems") == 0) {
+      CpvAccess(CstatPrintMemStatsFlag)=1;
+      DeleteArg(argv);
+    } else
+    if (strcmp(*argv, "+qs") == 0) {
+      CpvAccess(CstatPrintQueueStatsFlag)=1;
+      DeleteArg(argv);
+    } else
+    if (strcmp(*argv, "+qs") == 0) {
+      CpvAccess(CstatPrintQueueStatsFlag)=1;
+      DeleteArg(argv);
+    } else
+    argv++;
+  }
 }
-
-
-
 
 int CstatMemory(int i)
 {
   return 0;
 }
-
-
 
 int CstatPrintQueueStats()
 {
@@ -92,159 +104,132 @@ int CstatPrintMemStats()
 
 /*****************************************************************************
  *
+ * Cmi handler registration
+ *
+ *****************************************************************************/
+
+CpvDeclare(CmiHandler*, CmiHandlerTable);
+CpvStaticDeclare(int, CmiHandlerCount);
+
+int CmiRegisterHandler(handlerf)
+CmiHandler handlerf ;
+{
+  CpvAccess(CmiHandlerTable)[CpvAccess(CmiHandlerCount)] = handlerf;
+  CpvAccess(CmiHandlerCount)++ ;
+  return CpvAccess(CmiHandlerCount)-1 ;
+}
+
+static void CmiHandlerInit()
+{
+  CpvInitialize(int, CmiHandlerCount);
+  CpvInitialize(CmiHandler *, CmiHandlerTable);
+  CpvAccess(CmiHandlerCount) = 0;
+  CpvAccess(CmiHandlerTable) =
+    (CmiHandler *)CmiAlloc((MAX_HANDLERS + 1) * sizeof(CmiHandler)) ;
+}
+
+/*****************************************************************************
+ *
  * The following are some CMI functions.  Having this code here makes
  * the module boundaries for the Cmi quite blurry.
  *
  *****************************************************************************/
 
+#ifdef CMK_USES_COMMON_CMIDELIVERS
+
+CpvStaticDeclare(int, CmiBufferGrabbed);
+CpvExtern(void*,      CmiLocalQueue);
 
 void CmiInit(argv)
 char **argv;
 {
   void *FIFO_Create();
 
-  if (CmiMyRank() != 0) CmiNodeBarrier();
-
-
-  if (CmiMyRank() == 0) 
-  {
-     CsvAccess(CmiHandlerTable) =
-        (CmiHandler *)CmiSvAlloc((MAX_HANDLERS + 1) * sizeof(CmiHandler)) ;
-     CmiNodeBarrier();
-  }
+  CmiHandlerInit();
+  CpvInitialize(int, CmiBufferGrabbed);
+  CpvAccess(CmiBufferGrabbed) = 0;
   CmiInitMc(argv);
   CmiSpanTreeInit(argv);
 }
 
-void *CmiGetMsg()
+void CmiGrabBuffer()
 {
-  void *msg;
-  if (!FIFO_Empty(CpvAccess(CmiLocalQueue))) {
-    FIFO_DeQueue(CpvAccess(CmiLocalQueue), &msg);
-    return msg;
+  CpvAccess(CmiBufferGrabbed) = 1;
+}
+
+int CmiDeliverMsgs(maxmsgs)
+int maxmsgs;
+{
+  void *msg1, *msg2;
+  int counter;
+  
+  while (1) {
+    msg1 = CmiGetNonLocal();
+    if (msg1) {
+      CpvAccess(CmiBufferGrabbed)=0;
+      (CmiGetHandlerFunction(msg1))(msg1);
+      if (!CpvAccess(CmiBufferGrabbed)) CmiFree(msg1);
+      maxmsgs--; if (maxmsgs==0) break;
+    }
+    FIFO_DeQueue(CpvAccess(CmiLocalQueue), &msg2);
+    if (msg2) {
+      CpvAccess(CmiBufferGrabbed)=0;
+      (CmiGetHandlerFunction(msg2))(msg2);
+      if (!CpvAccess(CmiBufferGrabbed)) CmiFree(msg2);
+      maxmsgs--; if (maxmsgs==0) break;
+    }
+    if ((msg1==0)&&(msg2==0)) break;
   }
-  msg=CmiGetNonLocal();
-  return msg;
+  return maxmsgs;
 }
 
-int CmiRegisterHandler(handlerf)
-CmiHandler handlerf ;
-{
-  CsvAccess(CmiHandlerTable)[CpvAccess(handlerCount)] = handlerf;
-  CpvAccess(handlerCount)++ ;
-  return CpvAccess(handlerCount)-1 ;
-}
+/*
+ * CmiDeliverSpecificMsg(lang)
+ *
+ * - waits till a message with the specified handler is received,
+ *   then delivers it.
+ *
+ */
 
-void *CmiGetSpecificMsg(lang)
-int lang;
+void CmiDeliverSpecificMsg(handler)
+int handler;
 {
-/* loop till a message for lang is recvd, then return it */
   int msgType;
   int *msg, *first ;
-  
-  /* the LocalQueue-FIFO can have only thoses msgs enqueued at the
-     FIFO_EnQueues in this function */
-  /* We assume that there can be no self-messages (messages from my
-     processor to myself) for the PVM/MPI msg manager
-     (ie. the PVM msg manager checks for a self message while sending
-     and keeps it within itself instead of giving it to Converse)  */
   
   if ( !FIFO_Empty(CpvAccess(CmiLocalQueue)) ) {
     FIFO_DeQueue(CpvAccess(CmiLocalQueue), &msg);
     first = msg;
     do {
-      if ( CmiGetHandler(msg)==lang ) 
-	return (void *)msg ;
-      else
+      if (CmiGetHandler(msg)==handler) {
+	CpvAccess(CmiBufferGrabbed)=0;
+	(CmiGetHandlerFunction(msg))(msg);
+	if (!CpvAccess(CmiBufferGrabbed)) CmiFree(msg);
+	return;
+      } else {
 	FIFO_EnQueue(CpvAccess(CmiLocalQueue), msg);
-      
+      }
       FIFO_DeQueue(CpvAccess(CmiLocalQueue), &msg);
     } while ( msg != first ) ;
-    
     FIFO_EnQueue(CpvAccess(CmiLocalQueue), msg);
   }
   
   /* receive message from network */
   while ( 1 ) { /* Loop till proper message is received */
-    
     while ( (msg = CmiGetNonLocal()) == NULL )
-      ;
-    
-    if ( CmiGetHandler(msg)==lang ) 
-      return (void *)msg ;
-    else
-      FIFO_EnQueue(CpvAccess(CmiLocalQueue), msg);
-  }
-  return NULL ;
-}
-
-
-/* This function gets all outstanding messages out of the network, executing
-   their handlers if they are for this lang, else enqueing them in the FIFO 
-   queue */
-int
-CmiClearNetworkAndCallHandlers(lang)
-int lang;
-{
-  int retval = 0;
-  int *msg, *first ;
-  if ( !FIFO_Empty(CpvAccess(CmiLocalQueue)) ) {
-    
-    FIFO_DeQueue(CpvAccess(CmiLocalQueue), &msg);
-    first = msg ;
-    do {
-      if ( CmiGetHandler(msg)==lang ) 
-	{
-	  (CmiGetHandlerFunction(msg))(msg);
-	  retval = 1;
-	}
-      else
-	FIFO_EnQueue(CpvAccess(CmiLocalQueue), msg);
-      FIFO_DeQueue(CpvAccess(CmiLocalQueue), &msg);
-    } while ( msg != first ) ;
-    FIFO_EnQueue(CpvAccess(CmiLocalQueue), msg);
-  }
-  
-  while ( (msg = CmiGetNonLocal()) != NULL )
-    if ( CmiGetHandler(msg)==lang ) 
-      {
-	(CmiGetHandlerFunction(msg))(msg);
-	retval = 1;
-      }
-    else
-      FIFO_EnQueue(CpvAccess(CmiLocalQueue), msg);
-  return retval;
-}
-
-/* 
-  Same as above function except that it does not execute any handler functions
-*/
-int
-CmiClearNetwork(lang)
-int lang;
-{
-  int retval = 0;
-  int *msg, *first ;
-  if ( !FIFO_Empty(CpvAccess(CmiLocalQueue)) ) {
-    
-    FIFO_DeQueue(CpvAccess(CmiLocalQueue), &msg);
-    first = msg ;
-    do {
-      if ( CmiGetHandler(msg)==lang ) 
-	  retval = 1;
-      FIFO_EnQueue(CpvAccess(CmiLocalQueue), msg);
-      FIFO_DeQueue(CpvAccess(CmiLocalQueue), &msg);
-    } while ( msg != first ) ;
-    FIFO_EnQueue(CpvAccess(CmiLocalQueue), msg);
-  }
-  while ( (msg = CmiGetNonLocal()) != NULL )
-    {
-      if ( CmiGetHandler(msg)==lang ) 
-	retval = 1;
+        ;
+    if ( CmiGetHandler(msg)==handler ) {
+      CpvAccess(CmiBufferGrabbed)=0;
+      (CmiGetHandlerFunction(msg))(msg);
+      if (!CpvAccess(CmiBufferGrabbed)) CmiFree(msg);
+      return;
+    } else {
       FIFO_EnQueue(CpvAccess(CmiLocalQueue), msg);
     }
-  return retval;
+  }
 }
+
+#endif /* CMK_USES_COMMON_CMIDELIVERS */
 
 /***************************************************************************
  *
@@ -256,67 +241,56 @@ CsdInit(char **argv)
 {
   void *CqsCreate();
   CpvAccess(CsdSchedQueue) = CqsCreate();
+
+  CpvInitialize(int, disable_sys_msgs);
+  CpvAccess(disable_sys_msgs) = 0;
+  
+  CpvInitialize(int,   CmiHandlerCount);
+  CpvInitialize(void*, CsdSchedQueue);
+  CpvInitialize(int,   CsdStopFlag);
+  
+  CpvAccess(CsdStopFlag)  = 0;
 }
 
 
-void CsdScheduler(counter)
-int counter;
+int CsdScheduler(maxmsgs)
+int maxmsgs;
 {
-	int *msg;
-
-	CpvAccess(CsdStopFlag) = 0 ;
+  int *msg;
   
-	while (1) {
-		/* This is CmiDeliverMsgs */
-		while ( (msg = CmiGetMsg()) != NULL ) {
-			(CmiGetHandlerFunction(msg))(msg);
-
-			if (CpvAccess(CsdStopFlag)) return;
-			counter--;
-			if (counter==0) return;
-		}
-
-		/* Check Scheduler queue */
-  		if ( !CqsEmpty(CpvAccess(CsdSchedQueue)) ) {
-    			CqsDequeue(CpvAccess(CsdSchedQueue),&msg);
-			(CmiGetHandlerFunction(msg))(msg);
-
-			if (CpvAccess(CsdStopFlag)) return;
-			counter--;
-			if (counter==0) return;
-  		}
-		else { /* Processor is idle */
-			CcdRaiseCondition(CcdPROCESSORIDLE) ;
-			if (CpvAccess(CsdStopFlag)) return;
-		}
-
-		if (!CpvAccess(disable_sys_msgs)) {
-			if (CpvAccess(CcdNumChecks) > 0) {
-				CcdCallBacks();
-			}
-		}
-	}
+  CpvAccess(CsdStopFlag) = 0 ;
+  
+  while (1) {
+    maxmsgs = CmiDeliverMsgs(maxmsgs);
+    if (maxmsgs == 0) return maxmsgs;
+    
+    /* Check Scheduler queue */
+    if ( !CqsEmpty(CpvAccess(CsdSchedQueue)) ) {
+      CqsDequeue(CpvAccess(CsdSchedQueue),&msg);
+      (CmiGetHandlerFunction(msg))(msg);
+      if (CpvAccess(CsdStopFlag)) return maxmsgs;
+      maxmsgs--; if (maxmsgs==0) return maxmsgs;
+    } else { /* Processor is idle */
+      CcdRaiseCondition(CcdPROCESSORIDLE) ;
+      if (CpvAccess(CsdStopFlag)) return maxmsgs;
+    }
+    
+    if (!CpvAccess(disable_sys_msgs)) {
+      if (CpvAccess(CcdNumChecks) > 0) {
+	CcdCallBacks();
+      }
+    }
+  }
 }
  
 /*****************************************************************************
  *
- * Convenient initializer/deinitializer for "the whole shebang"
- *
- * Note: This module cannot parse arguments, in the long run.  Each
- * independent module must parse its own arguments.
+ * Initialization for the memory module.  Of course, there isn't any
+ * memory-module right now.
  *
  *****************************************************************************/
 
-static char *DeleteArg(argv)
-  char **argv;
-{
-  char *res = argv[0];
-  if (res==0) { CmiError("Bad arglist."); exit(1); }
-  while (*argv) { argv[0]=argv[1]; argv++; }
-  return res;
-}
-
-static int ConverseParseOptions(argv)
+static int CmemInit(argv)
     char **argv;
 {
   int sysmem;
@@ -340,14 +314,6 @@ static int ConverseParseOptions(argv)
       DeleteArg(argv);
       DeleteArg(argv);
     } else
-    if (strcmp(*argv, "+mems") == 0) {
-      CpvAccess(CstatPrintMemStatsFlag)=1;
-      DeleteArg(argv);
-    } else
-    if (strcmp(*argv, "+qs") == 0) {
-      CpvAccess(CstatPrintQueueStatsFlag)=1;
-      DeleteArg(argv);
-    } else
     argv++;
   }
 }
@@ -355,13 +321,12 @@ static int ConverseParseOptions(argv)
 ConverseInit(argv)
 char **argv;
 {
-  convcoreModuleInit();
-  conv_condsModuleInit() ;
-
-  ConverseParseOptions(argv);
+  CstatsInit(argv);
+  conv_condsModuleInit(argv);
+  CmemInit(argv);
   CmiInit(argv);
   CsdInit(argv);
-  CthInit();
+  CthInit(argv);
 }
 
 ConverseExit()

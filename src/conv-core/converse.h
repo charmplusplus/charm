@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.21  1995-09-27 22:23:15  jyelon
+ * Revision 2.22  1995-09-29 09:51:44  jyelon
+ * Many corrections, added protos, CmiGet-->CmiDeliver, etc.
+ *
+ * Revision 2.21  1995/09/27  22:23:15  jyelon
  * Many bug-fixes.  Added Cpv macros to threads package.
  *
  * Revision 2.20  1995/09/26  18:26:00  jyelon
@@ -142,6 +145,10 @@ extern "C" {
 #define CsvInitialize(t,v)
 #define CsvAccess(v) CMK_CONCAT(Csv_Var_,v)
 
+extern int CmiMyRank CMK_PROTO((void));
+extern void CmiNodeBarrier CMK_PROTO((void));
+extern void *CmiSvAlloc CMK_PROTO((int));
+
 #endif
 
 
@@ -167,17 +174,24 @@ extern "C" {
 
 #endif
 
+/******** CMI: TYPE DEFINITIONS ********/
+
+#ifdef CMK_COMMHANDLE_IS_A_POINTER
+typedef void  *CmiCommHandle;
+#endif
+
+#ifdef CMK_COMMHANDLE_IS_AN_INTEGER
+typedef int    CmiCommHandle;
+#endif
 
 
+typedef void (*CmiHandler)();
 
 /******** CMI, CSD: MANY LOW-LEVEL OPERATIONS ********/
 
 #define CmiMsgHeaderSizeBytes 4
 
-typedef void (*CmiHandler)();
-typedef void  *CmiCommHandle;
-
-CsvExtern(CmiHandler*, CmiHandlerTable);
+CpvExtern(CmiHandler*, CmiHandlerTable);
 CpvExtern(void*,       CsdSchedQueue);
 CpvExtern(int,         CsdStopFlag);
 
@@ -188,9 +202,7 @@ extern int CmiRegisterHandler CMK_PROTO((CmiHandler));
 #define CmiSetHandler(env,x)  (*((int *)(env)) = x)
 
 #define CmiGetHandlerFunction(env)\
-    (CsvAccess(CmiHandlerTable)[CmiGetHandler(env)])
-
-void    *CmiGetMsg CMK_PROTO(());
+    (CpvAccess(CmiHandlerTable)[CmiGetHandler(env)])
 
 void    *CmiAlloc  CMK_PROTO((int size));
 int      CmiSize   CMK_PROTO(());
@@ -198,26 +210,12 @@ void     CmiFree   CMK_PROTO((void *));
 
 double   CmiTimer  CMK_PROTO(());
 
-int      CmiSpanTreeRoot         CMK_PROTO(()) ;
-int      CmiNumSpanTreeChildren  CMK_PROTO((int)) ;
-int      CmiSpanTreeParent       CMK_PROTO((int)) ;
-void     CmiSpanTreeChildren     CMK_PROTO((int node, int *children)) ;
-
-
 #define CsdEnqueueGeneral(x,s,i,p)\
     (CqsEnqueueGeneral(CpvAccess(CsdSchedQueue),x,s,i,p))
 #define CsdEnqueueFifo(x)     (CqsEnqueueFifo(CpvAccess(CsdSchedQueue),x))
 #define CsdEnqueueLifo(x)     (CqsEnqueueLifo(CpvAccess(CsdSchedQueue),x))
 #define CsdEnqueue(x)         (CqsEnqueueFifo(CpvAccess(CsdSchedQueue),x))
 #define CsdEmpty()            (CqsEmpty(CpvAccess(CsdSchedQueue)))
-
-extern  void  CsdScheduler CMK_PROTO((int));
-extern  void *CsdGetMsg    CMK_PROTO(());
-
-/* for uniprocessor CsdExitScheduler() is a function in machine.c */
-#ifndef CMK_SHARED_VARS_UNIPROCESSOR
-#define CsdExitScheduler()  (CpvAccess(CsdStopFlag)=1)
-#endif 
 
 #ifdef CMK_CMIMYPE_IS_A_BUILTIN
 int CmiMyPe CMK_PROTO((void));
@@ -249,6 +247,55 @@ int   CmiScanf  CMK_PROTO(());
 #define CmiError  printf
 #define CmiScanf  scanf
 #endif
+
+/********* CSD - THE SCHEDULER ********/
+
+extern  int CsdScheduler CMK_PROTO((int));
+
+#ifdef CMK_CSDEXITSCHEDULER_IS_A_FUNCTION
+extern void CsdExitScheduler CMK_PROTO((void));
+#endif 
+
+#ifdef CMK_CSDEXITSCHEDULER_SET_CSDSTOPFLAG
+#define CsdExitScheduler()  (CpvAccess(CsdStopFlag)=1)
+#endif
+
+int      CmiSpanTreeRoot         CMK_PROTO(()) ;
+int      CmiNumSpanTreeChildren  CMK_PROTO((int)) ;
+int      CmiSpanTreeParent       CMK_PROTO((int)) ;
+void     CmiSpanTreeChildren     CMK_PROTO((int node, int *children)) ;
+
+/****** CMI MESSAGE TRANSMISSION ******/
+
+void          CmiSyncSendFn        CMK_PROTO((int, int, char *));
+CmiCommHandle CmiAsyncSendFn       CMK_PROTO((int, int, char *));
+void          CmiFreeSendFn        CMK_PROTO((int, int, char *));
+
+void          CmiSyncBroadcastFn      CMK_PROTO((int, char *));
+CmiCommHandle CmiAsyncBroadcastFn     CMK_PROTO((int, char *));
+void          CmiFreeBroadcastFn      CMK_PROTO((int, char *));
+
+void          CmiSyncBroadcastAllFn   CMK_PROTO((int, char *));
+CmiCommHandle CmiAsyncBroadcastAllFn  CMK_PROTO((int, char *));
+void          CmiFreeBroadcastAllFn   CMK_PROTO((int, char *));
+
+
+#define CmiSyncSend(p,s,m)              (CmiSyncSendFn(p,s,(char *)(m)))
+#define CmiAsyncSend(p,s,m)             (CmiAsyncSendFn(p,s,(char *)(m)))
+#define CmiSyncSendAndFree(p,s,m)       (CmiFreeSendFn(p,s,(char *)(m)))
+
+#define CmiSyncBroadcast(s,m)           (CmiSyncBroadcastFn(s,(char *)(m)))
+#define CmiAsyncBroadcast(s,m)          (CmiAsyncBroadcastFn(s,(char *)(m)))
+#define CmiSyncBroadcastAndFree(s,m)    (CmiFreeBroadcastFn(s,(char *)(m)))
+
+#define CmiSyncBroadcastAll(s,m)        (CmiSyncBroadcastAllFn(s,(char *)(m)))
+#define CmiASyncBroadcastAll(s,m)       (CmiAsyncBroadcastAllFn(s,(char *)(m)))
+#define CmiSyncBroadcastAllAndFree(s,m) (CmiFreeBroadcastAllFn(s,(char *)(m)))
+
+/******** CMI MESSAGE RECEPTION ********/
+
+int    CmiDeliverMsgs          CMK_PROTO((int maxmsgs));
+void   CmiDeliverSpecificMsg   CMK_PROTO((int handler));
 
 /******** CQS: THE QUEUEING SYSTEM ********/
 
