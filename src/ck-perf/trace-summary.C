@@ -585,7 +585,11 @@ void TraceSummary::endUnpack(void)
 
 void TraceSummary::beginComputation(void)
 {
+#ifdef __BLUEGENE__
+  if(BgNodeRank()==0) {
+#else
   if(CkMyRank()==0) {
+#endif
     _threadMsg = CkRegisterMsg("dummy_thread_msg", 0, 0, 0, 0);
     _threadChare = CkRegisterChare("dummy_thread_chare", 0);
     _threadEP = CkRegisterEp("dummy_thread_ep", 0, _threadMsg,_threadChare);
@@ -762,7 +766,11 @@ CmiPrintf("[%d] Sum Only start!\n", CkMyPe());
 
 void initTraceSummaryBOC()
 {
+#ifdef __BLUEGENE__
+  if(BgNodeRank()==0) {
+#else
   if (CkMyRank() == 0) {
+#endif
     registerExitFn(CombineSummary);
   }
 }

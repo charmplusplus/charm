@@ -28,7 +28,7 @@ public:
   char *str;
   UsrEvent(int _e, char* _s): e(_e),str(_s) {}
 };
-CkpvStaticDeclare(CkVec<UsrEvent *>, usrEvents);
+CkpvStaticDeclare(CkVec<UsrEvent *>*, usrEvents);
 
 #ifdef CMK_OPTIMIZE
 static int warned=0;
@@ -92,10 +92,11 @@ void _createTraceprojections(char **argv)
 {
   DEBUGF(("%d createTraceProjections\n", CkMyPe()));
   CkpvInitialize(CkVec<char *>, usrEventlist);
-  CkpvInitialize(CkVec<UsrEvent *>, usrEvents);
+  CkpvInitialize(CkVec<UsrEvent *>*, usrEvents);
+  CkpvAccess(usrEvents) = new CkVec<UsrEvent *>();
 #if CMK_BLUEGENE_CHARM
   // CthRegister does not call the constructor
-  CkpvAccess(usrEvents) = CkVec<UsrEvent *>();
+//  CkpvAccess(usrEvents) = CkVec<UsrEvent *>();
 #endif
   CkpvInitialize(Trace*, _trace);
   CkpvAccess(_trace) = new  TraceProjections(argv);
@@ -227,7 +228,7 @@ void LogPool::writeSts(void)
   fprintf(stsfp, "TOTAL_EPS %d\n", _numEntries);
   fprintf(stsfp, "TOTAL_MSGS %d\n", _numMsgs);
   fprintf(stsfp, "TOTAL_PSEUDOS %d\n", 0);
-  fprintf(stsfp, "TOTAL_EVENTS %d\n", CkpvAccess(usrEvents).length());
+  fprintf(stsfp, "TOTAL_EVENTS %d\n", CkpvAccess(usrEvents)->length());
   int i;
   for(i=0;i<_numChares;i++)
     fprintf(stsfp, "CHARE %d %s\n", i, _chareTable[i]->name);
@@ -236,8 +237,8 @@ void LogPool::writeSts(void)
                  _entryTable[i]->chareIdx, _entryTable[i]->msgIdx);
   for(i=0;i<_numMsgs;i++)
     fprintf(stsfp, "MESSAGE %d %d\n", i, _msgTable[i]->size);
-  for(i=0;i<CkpvAccess(usrEvents).length();i++)
-    fprintf(stsfp, "EVENT %d %s\n", CkpvAccess(usrEvents)[i]->e, CkpvAccess(usrEvents)[i]->str);
+  for(i=0;i<CkpvAccess(usrEvents)->length();i++)
+    fprintf(stsfp, "EVENT %d %s\n", (*CkpvAccess(usrEvents))[i]->e, (*CkpvAccess(usrEvents))[i]->str);
   fprintf(stsfp, "END\n");
   fclose(stsfp);
 }
@@ -471,7 +472,11 @@ void LogEntry::writeBinary(FILE* fp)
 
 TraceProjections::TraceProjections(char **argv): curevent(0), isIdle(0)
 {
+#ifdef __BLUEGENE__
+  if(BgNodeRank()==0) {
+#else
   if(CkMyRank()==0) {
+#endif
     _threadMsg = CkRegisterMsg("dummy_thread_msg", 0, 0, 0, 0);
     _threadChare = CkRegisterChare("dummy_thread_chare", 0);
     _threadEP = CkRegisterEp("dummy_thread_ep", 0, _threadMsg,_threadChare);
@@ -516,15 +521,15 @@ int TraceProjections::traceRegisterUserEvent(const char* evt, int e)
   CkAssert(evt != NULL);
   int event;
   int biggest = 0;
-  for (int i=0; i<CkpvAccess(usrEvents).length(); i++) {
-    int cur = CkpvAccess(usrEvents)[i]->e;
+  for (int i=0; i<CkpvAccess(usrEvents)->length(); i++) {
+    int cur = (*CkpvAccess(usrEvents))[i]->e;
     if (cur == e) 
       CmiAbort("UserEvent double registered!");
     if (cur > biggest) biggest = cur;
   }
   if (e==-1) event = biggest;
   else event = e;
-  CkpvAccess(usrEvents).push_back(new UsrEvent(event,(char *)evt));
+  CkpvAccess(usrEvents)->push_back(new UsrEvent(event,(char *)evt));
   return event;
 }
 
