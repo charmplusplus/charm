@@ -659,12 +659,12 @@ void chunk::multipleCoarsen(double *desiredArea, refineClient *client)
 
   for (i=0; i<elementSlots; i++) { // set desired areas for elements
     area = theElements[i].getArea();
-    precThrshld = area * 1e-10;
-    //CkPrintf("TMRC2D: desiredArea[%d]=%f present? %d area=%f\n", i, desiredArea[i], theElements[i].isPresent(), area);
+    precThrshld = area * 1e-8;
+    //CkPrintf("TMRC2D: desiredArea[%d]=%1.10e present? %d area=%1.10e\n", i, desiredArea[i], theElements[i].isPresent(), area);
     if ((theElements[i].isPresent()) &&
 	(desiredArea[i] > area+precThrshld)) {
       theElements[i].resetTargetArea(desiredArea[i]);
-      CkPrintf("TMRC2D: Setting target on element %d to %f\n", i, desiredArea[i]);
+      CkPrintf("TMRC2D: Setting target on element %d to %1.10e\n", i, desiredArea[i]);
     }
   }
 
