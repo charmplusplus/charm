@@ -164,6 +164,7 @@ executes {\tt \{ CthAwaken(CthSelf()); CthSuspend(); \} }.  This combination
 gives up control temporarily, but ensures that control will eventually
 return.}
 
+\internal{
 \function{void CthSetVar(CthThread t, void **var, void *val)}
 \desc{Specifies that the global variable pointed to by {\tt
 var} should be set to value {\tt val} whenever thread {\tt t} is
@@ -203,6 +204,7 @@ other.}
 \desc{This makes it possible to retrieve values previously stored with
 {\tt CthSetVar} when {\tt t} is {\it not} executing.  Returns the value
 that {\tt var} will be set to when {\tt t} is running.}
+}
 
 \function{void CthSetStrategyDefault(CthThread t)}
 \desc{This the simple scheduler provided to converse users as a
