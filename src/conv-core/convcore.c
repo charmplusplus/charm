@@ -1290,6 +1290,126 @@ static void memChop(char *msgWhole)
 
 /*****************************************************************************
  *
+ * Converse Client-Server Functions
+ *
+ *****************************************************************************/
+
+#if CMK_CCS_AVAILABLE
+
+typedef struct CcsListNode {
+  char name[32];
+  int hdlr;
+  struct CcsListNode *next;
+}CcsListNode;
+
+CpvStaticDeclare(CcsListNode*, ccsList);
+CpvStaticDeclare(int, callerIP);
+CpvStaticDeclare(int, callerPort);
+CpvDeclare(int, strHandlerID);
+
+static void CcsStringHandlerFn(char *msg)
+{
+  char cmd[10], hdlrName[32], *cmsg, *omsg=msg;
+  int ip, port, pe, size, nread, hdlrID;
+  CcsListNode *list = CpvAccess(ccsList);
+  CmiGrabBuffer((void **)&msg);
+  nread = sscanf(msg+CmiMsgHeaderSizeBytes, "%s%d%d%d%d%s", 
+                 cmd, &pe, &size, &ip, &port, hdlrName);
+  if(nread!=6) CmiAbort("Garbled message from client");
+  while(list!=0) {
+    if(strcmp(hdlrName, list->name)==0) {
+      hdlrID = list->hdlr;
+      break;
+    }
+  }
+  if(list==0) CmiAbort("Invalid Service Request\n");
+  while(*msg != '\n') msg++;
+  msg++;
+  cmsg = (char *) CmiAlloc(size+CmiMsgHeaderSizeBytes);
+  memcpy(cmsg+CmiMsgHeaderSizeBytes, msg, size);
+  CmiFree(omsg);
+  CmiSetHandler(cmsg, hdlrID);
+  CpvAccess(callerIP) = ip;
+  CpvAccess(callerPort) = port;
+  CmiHandleMessage(cmsg);
+  CpvAccess(callerIP) = 0;
+}
+
+static void CcsInit(void)
+{
+  CpvInitialize(CcsListNode*, ccsList);
+  CpvAccess(ccsList) = 0;
+  CpvInitialize(int, callerIP);
+  CpvAccess(callerIP) = 0;
+  CpvInitialize(int, callerPort);
+  CpvAccess(callerPort) = 0;
+  CpvInitialize(int, strHandlerID);
+  CpvAccess(strHandlerID) = CmiRegisterHandler(CcsStringHandlerFn);
+}
+
+void CcsUseHandler(char *name, int hdlr)
+{
+  CcsListNode *list=CpvAccess(ccsList);
+  if(list==0) {
+    list = (CcsListNode *)malloc(sizeof(CcsListNode));
+    CpvAccess(ccsList) = list;
+  } else {
+    while(list->next != 0) 
+      list = list->next;
+    list->next = (CcsListNode *)malloc(sizeof(CcsListNode));
+    list = list->next;
+  }
+  strcpy(list->name, name);
+  list->hdlr = hdlr;
+  list->next = 0;
+}
+
+int CcsRegisterHandler(char *name, CmiHandler fn)
+{
+  int hdlr = CmiRegisterHandlerLocal(fn);
+  CcsUseHandler(name, hdlr);
+  return hdlr;
+}
+
+int CcsEnabled(void)
+{
+  return 1;
+}
+
+int CcsIsRemoteRequest(void)
+{
+  return (CpvAccess(callerIP) != 0);
+}
+
+void CcsCallerId(unsigned int *pip, unsigned int *pport)
+{
+  *pip = CpvAccess(callerIP);
+  *pport = CpvAccess(callerPort);
+}
+
+extern int skt_connect(int, int, int);
+extern void writeall(int, char *, int);
+
+void CcsSendReply(unsigned int ip, unsigned int port, int size, void *msg)
+{
+  char cmd[100];
+  int fd = skt_connect(ip, port, 120);
+  if (fd<0) return; /* maybe the requester exited */
+  sprintf(cmd, "reply %d\n", size);
+  writeall(fd, cmd, strlen(cmd));
+  writeall(fd, msg, size);
+#if CMK_SYNCHRONIZE_ON_TCP_CLOSE
+  shutdown(fd, 1);
+  while (read(fd, &c, 1)==EINTR);
+  close(fd);
+#else
+  close(fd);
+#endif
+}
+
+#endif
+/*****************************************************************************
+ *
  * Converse Initialization
  *
  *****************************************************************************/
@@ -1308,6 +1428,7 @@ void ConverseCommonInit(char **argv)
   CmiMulticastInit();
   CmiGroupInit();
   CmiInitMultipleSend();
+  CcsInit();
 }
 
 void ConverseCommonExit(void)

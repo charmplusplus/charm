@@ -367,7 +367,7 @@ static void jsleep(int sec, int usec)
   }
 }
 
-static void writeall(int fd, char *buf, int size)
+void writeall(int fd, char *buf, int size)
 {
   int ok;
   while (size) {
@@ -513,7 +513,7 @@ unsigned int *pfd;
   *pfd=fd;
 }
 
-static int skt_connect(ip, port, seconds)
+int skt_connect(ip, port, seconds)
 unsigned int ip; int port; int seconds;
 {
   struct sockaddr_in remote; short sport=port;
@@ -1427,6 +1427,10 @@ static void ctrl_sendone(va_alist) va_dcl
 
 static void node_addresses_store();
 
+#if CMK_CCS_AVAILABLE
+CpvExtern(int, strHandlerID);
+#endif
+
 static void ctrl_getone()
 {
   char line[10000];
@@ -1442,6 +1446,18 @@ static void ctrl_getone()
     }
     else if (strncmp(line,"scanf-data ",11)==0) {
       Cmi_scanf_data=strdupl(line+11);
+#if CMK_CCS_AVAILABLE
+    } else if (strncmp(line, "req ", 4)==0) {
+      char cmd[5], *msg;
+      int pe, size, len;
+      sscanf(line, "%s%d%d", cmd, &pe, &size);
+      len = strlen(line);
+      msg = (char *) CmiAlloc(len+size+CmiMsgHeaderSizeBytes);
+      CmiSetHandler(msg, CpvAccess(strHandlerID));
+      strcpy(msg+CmiMsgHeaderSizeBytes, line);
+      fread(msg+CmiMsgHeaderSizeBytes+len, 1, size, f);
+      PCQueuePush(CmiGetStateN(pe)->recv, msg);
+#endif
     } else if (strncmp(line,"die ",4)==0) {
       fprintf(stderr,"aborting: %s\n",line+4);
       log_done();

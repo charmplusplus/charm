@@ -1118,6 +1118,7 @@ char *arg_currdir_a;
 char *arg_currdir_r;
 char *arg_mylogin;
 char *arg_myhome;
+int   arg_server;
 
 arg_init(argc, argv)
     int argc; char **argv;
@@ -1127,6 +1128,7 @@ arg_init(argc, argv)
   pparam_defint ("p"             ,  MAX_NODES);
   pparam_defflag("debug"             );
   pparam_defflag("debug-no-pause"    );
+  pparam_defflag("server"    );
   pparam_defflag("in-xterm"          );
   pparam_defint ("maxrsh"        ,  5);
   pparam_defstr ("nodelist"      ,  0);
@@ -1152,6 +1154,7 @@ arg_init(argc, argv)
   arg_in_xterm       = pparam_getflag("in-xterm");
   arg_debug          = pparam_getflag("debug");
   arg_debug_no_pause = pparam_getflag("debug-no-pause");
+  arg_server         = pparam_getflag("server");
   arg_maxrsh         = pparam_getint("maxrsh");
   arg_nodelist       = pparam_getstr("nodelist");
   arg_nodegroup      = pparam_getstr("nodegroup");
@@ -1719,6 +1722,56 @@ int req_handle_scanf(line)
   return REQ_OK;
 }
 
+static char *parseint(p, value) char *p; int *value;
+{
+  int val = 0;
+  while (((*p)==' ')||((*p)=='.')) p++;
+  if (((*p)<'0')||((*p)>'9')) notify_die_doit("badly-formed number");
+  while ((*p>='0')&&(*p<='9')) { val*=10; val+=(*p)-'0'; p++; }
+  *value = val;
+  return p;
+}
+
+int req_handle_getinfo(line)
+    char *line;
+{
+  char reply[1024], ans[1024], pre[100];
+  char cmd[100], *res, *origres;
+  int ip, port, nread, i;
+  nread = sscanf(line, "%s%d%d", cmd, &ip, &port);
+  if(nread != 3) return REQ_FAILED;
+  origres = res = arvar_get("addr", 0, nodetab_rank0_size);
+  if(res==0) return REQ_POSTPONE;
+  strcpy(pre, "info");
+  reply[0] = 0;
+  sprintf(ans, "%d ", nodetab_rank0_size);
+  strcat(reply, ans);
+  for(i=0;i<nodetab_rank0_size;i++) {
+    sprintf(ans, "%d ", nodetab_cpus(i));
+    strcat(reply, ans);
+  }
+  for(i=0;i<nodetab_rank0_size;i++) {
+    sprintf(ans, "%d ", nodetab_ip(i));
+    strcat(reply, ans);
+  }
+  for(i=0;i<nodetab_rank0_size;i++) {
+    unsigned int ip0,ip1,ip2,ip3,cport,dport,nodestart,nodesize;
+    res = parseint(res,&ip0);
+    res = parseint(res,&ip1);
+    res = parseint(res,&ip2);
+    res = parseint(res,&ip3);
+    res = parseint(res,&cport);
+    res = parseint(res,&dport);
+    res = parseint(res,&nodestart);
+    res = parseint(res,&nodesize);
+    sprintf(ans, "%d ", cport);
+    strcat(reply, ans);
+  }
+  req_reply(ip, port, pre, reply);
+  free(origres);
+  return REQ_OK;
+}
+
 int req_handle(line)
     char *line;
 {
@@ -1734,6 +1787,7 @@ int req_handle(line)
   else if (strcmp(cmd,"ending")==0)     return req_handle_ending(line);
   else if (strcmp(cmd,"notify-die")==0) return req_handle_notify_die(line);
   else if (strcmp(cmd,"die")==0)        return req_handle_die(line);
+  else if (strcmp(cmd,"getinfo")==0)    return req_handle_getinfo(line);
   else return REQ_FAILED;
 }
 
@@ -1760,6 +1814,9 @@ req_serve()
 {
   char line[1000]; int status; FILE *f;
   int client_ip, client_port, client_fd; req_node n;
+  if(arg_server) {
+    printf("Server Port: %d\n", req_port);
+  }
   while (1) {
     skt_accept(req_fd, &client_ip, &client_port, &client_fd);
     if (client_fd==0) {

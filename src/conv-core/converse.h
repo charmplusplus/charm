@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.83  1998-03-24 12:50:53  jyelon
+ * Revision 2.84  1998-04-21 17:32:42  milind
+ * Implemented Converse Client-Srver (CCS) module.
+ *
+ * Revision 2.83  1998/03/24 12:50:53  jyelon
  * *** empty log message ***
  *
  * Revision 2.82  1998/03/20 16:07:49  milind
@@ -872,6 +875,29 @@ void CcdRaiseCondition CMK_PROTO((int condnum));
 void CcdCallOnCondition CMK_PROTO((int condnum, CcdVoidFn fnp, void *arg));
 
 void CcdCallBacks();
+
+/******* Converse Client Server *****/
+
+#if CMK_CCS_AVAILABLE
+
+void CcsUseHandler CMK_PROTO((char *id, int hdlr));
+int CcsRegisterHandler CMK_PROTO((char *id, CmiHandler fn));
+int CcsEnabled CMK_PROTO((void));
+int CcsIsRemoteRequest CMK_PROTO((void));
+void CcsCallerId CMK_PROTO((unsigned int *pip, unsigned int *pport));
+void CcsSendReply CMK_PROTO((unsigned int ip, unsigned int port, int size, void *reply));
+
+#else
+
+#define CcsInit()
+#define CcsUseHandler(x,y)
+#define CcsRegisterHandler(x,y) 0
+#define CcsEnabled() 0
+#define CcsIsRemoteRequest() 0
+#define CcsCallerId(x,y)
+#define CcsSendReply(i,p,s,r)
+
+#endif
 
 /**** DEAL WITH DIFFERENCES: KERNIGHAN-RITCHIE-C, ANSI-C, AND C++ ****/
 
