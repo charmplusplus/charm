@@ -8,6 +8,7 @@ CMK_CF77='f77'
 CMK_CF90='f90'
 CMK_RANLIB='true'
 CMK_LIBS=' -lnsl -lsocket -lckqt'
+CMK_LD_SHARED="-G"
 CMK_SEQ_LIBS=' -lnsl -lsocket'
 CMK_QT='solaris-gcc'
 CMK_XIOPTS=''
