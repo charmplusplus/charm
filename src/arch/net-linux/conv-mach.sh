@@ -8,6 +8,7 @@ CMK_CF90='f90 '
 CMK_CF90_FIXED="$CMK_CF90 -W132 "
 CMK_RANLIB='ranlib'
 CMK_LIBS='-lckqt'
+CMK_LD_SHARED="-shared"
 CMK_XIOPTS=''
 CMK_F90LIBS='-L/usr/absoft/lib -L/opt/absoft/lib -lf90math -lfio -lU77 -lf77math '
 CMK_MOD_NAME_ALLCAPS=1
