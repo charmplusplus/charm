@@ -54,7 +54,7 @@ void CldMultipleSend(int pe, int numToSend)
       }
     }
     if (numSent > 1) {
-      CmiMultipleSend(pe, numSent, msgSizes, msgs);
+      CmiMultipleSend(pe, numSent, msgSizes, (char**) msgs);
       for (i=0; i<numSent; i++)
         CmiFree(msgs[i]);
       CpvAccess(CldRelocatedMessages) += numSent;

@@ -99,10 +99,11 @@ typedef void  (*CkCallFnPtr) (void *msg, void *obj);
  *
  *****************************************************************************/
 
-extern int CkRegisterMsg(char *name, CkPackFnPtr pack, CkUnpackFnPtr unpack, 
-                         CkCoerceFnPtr coerce, int size);
-extern int CkRegisterEp(char *name, CkCallFnPtr call, int msgIdx, int chareIdx);
-extern int CkRegisterChare(char *name, int dataSz);
+extern int CkRegisterMsg(const char *name, CkPackFnPtr pack, 
+                         CkUnpackFnPtr unpack, CkCoerceFnPtr coerce, int size);
+extern int CkRegisterEp(const char *name, CkCallFnPtr call, int msgIdx, 
+                        int chareIdx);
+extern int CkRegisterChare(const char *name, int dataSz);
 extern int CkRegisterMainChare(int chareIndex, int epIndex);
 extern void CkRegisterReadonly(int size, void *ptr);
 extern void CkRegisterReadonlyMsg(void** pMsg);

@@ -31,7 +31,7 @@ void _registerInit(void)
 }
 
 extern "C"
-int CkRegisterMsg(char *name, CkPackFnPtr pack, CkUnpackFnPtr unpack, 
+int CkRegisterMsg(const char *name, CkPackFnPtr pack, CkUnpackFnPtr unpack, 
                   CkCoerceFnPtr coerce, int size)
 {
   _msgTable[_numMsgs] = new MsgInfo(name, pack, unpack, coerce, size);
@@ -39,14 +39,14 @@ int CkRegisterMsg(char *name, CkPackFnPtr pack, CkUnpackFnPtr unpack,
 }
 
 extern "C"
-int CkRegisterEp(char *name, CkCallFnPtr call, int msgIdx, int chareIdx)
+int CkRegisterEp(const char *name, CkCallFnPtr call, int msgIdx, int chareIdx)
 {
   _entryTable[_numEntries] = new EntryInfo(name, call, msgIdx, chareIdx);
   return _numEntries++;
 }
 
 extern "C"
-int CkRegisterChare(char *name, int dataSz)
+int CkRegisterChare(const char *name, int dataSz)
 {
   _chareTable[_numChares] = new ChareInfo(name, dataSz);
   return _numChares++;

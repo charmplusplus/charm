@@ -3,34 +3,34 @@
 
 class EntryInfo {
   public:
-    char *name;
+    const char *name;
     CkCallFnPtr call;
     int msgIdx;
     int chareIdx;
 
-    EntryInfo(char *n, CkCallFnPtr c, int m, int ci) : 
+    EntryInfo(const char *n, CkCallFnPtr c, int m, int ci) : 
       name(n), call(c), msgIdx(m), chareIdx(ci)
     {}
 };
 
 class MsgInfo {
   public:
-    char *name;
+    const char *name;
     CkPackFnPtr pack;
     CkUnpackFnPtr unpack;
     CkCoerceFnPtr coerce;
     int size;
 
-    MsgInfo(char *n, CkPackFnPtr p, CkUnpackFnPtr u, CkCoerceFnPtr c, int s) : 
+    MsgInfo(const char *n,CkPackFnPtr p,CkUnpackFnPtr u,CkCoerceFnPtr c,int s):
       name(n), size(s), pack(p), unpack(u), coerce(c) 
     {}
 };
 
 class ChareInfo {
   public:
-    char *name;
+    const char *name;
     int size;
-    ChareInfo(char *n, int s) : name(n), size(s) {}
+    ChareInfo(const char *n, int s) : name(n), size(s) {}
 };
 
 class MainInfo {

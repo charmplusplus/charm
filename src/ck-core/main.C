@@ -2,6 +2,6 @@
 
 int main(int argc, char **argv)
 {
-  ConverseInit(argc, argv, _initCharm, 0, 0);
+  ConverseInit(argc, argv, (CmiStartFn) _initCharm, 0, 0);
   return 0;
 }

@@ -1586,7 +1586,7 @@ int main()
 
 
 struct rwtable {
-  char *res;	int tok;
+  const char *res;	int tok;
 };
 
 /* Reserved word table */

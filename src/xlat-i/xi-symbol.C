@@ -287,7 +287,7 @@ static const char *CIChareStart = // prefix, name
 "{\n"
 "  public:\n"
 "    static int __idx;\n"
-"    static void __register(char *s);\n"
+"    static void __register(const char *s);\n"
 ;
 
 static const char *CIChareEnd =
@@ -480,7 +480,7 @@ Chare::genDefs(XStr& str)
   type->print(str);
   if(templat)
     templat->genVars(str);
-  str << "::__register(char *s)\n";
+  str << "::__register(const char *s)\n";
   str << "{\n";
   str << "  __idx = CkRegisterChare(s, sizeof(";
   type->print(str);
@@ -518,7 +518,7 @@ static const char *CIMsgClass =
 "{\n"
 "  public:\n"
 "    static int __idx;\n"
-"    static void __register(char *s);\n"
+"    static void __register(const char *s);\n"
 "    void*operator new(size_t s){return CkAllocMsg(__idx,s,0);}\n"
 "    void operator delete(void *p){CkFreeMsg(p);}\n"
 "    void*operator new(size_t,void*p){return p;}\n"
@@ -568,7 +568,7 @@ Message::genDefs(XStr& str)
     type->print(str);
     if(templat)
       templat->genVars(str);
-    str << "::__register(char *s)\n";
+    str << "::__register(const char *s)\n";
     str << "{\n";
     str << "  __idx = CkRegisterMsg(s, ";
     if(isPacked()||isVarsize()) {
@@ -828,7 +828,8 @@ void TParamList::genSpec(XStr& str)
   }
 }
 
-void TypeList::genProxyNames(XStr& str, char *prefix, char *suffix, char *sep)
+void TypeList::genProxyNames(XStr& str, const char *prefix, 
+                             const char *suffix, const char *sep)
 {
   if(type) {
     str << prefix;

@@ -257,10 +257,9 @@ void CmiYield();
  *
  *****************************************************************************/
 
-static void host_abort(char*);
+static void host_abort(const char*);
 
-static void KillEveryone(msg)
-char *msg;
+static void KillEveryone(const char *msg)
 {
   host_abort(msg);
   exit(1);
@@ -719,7 +718,7 @@ void PCQueuePush(PCQueue Q, char *data)
  *
  ************************************************************************/
 
-void CmiAbort(char *message)
+void CmiAbort(const char *message)
 {
   host_abort(message);
 }
@@ -1678,7 +1677,7 @@ static void ctrl_sendone(va_alist) va_dcl
   CmiCommUnlock();
 }
 
-static void host_abort(char *s)
+static void host_abort(const char *s)
 {
   char *buffer = ctrl_sendone_buffer;
   sprintf(buffer, "abort %s", s);

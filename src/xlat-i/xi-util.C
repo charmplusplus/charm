@@ -1,7 +1,7 @@
 #include "xi-util.h"
 
 void 
-XStr::append(char *_s) 
+XStr::append(const char *_s) 
 {
   len += strlen(_s);
   if ( len >= blklen) {
@@ -33,7 +33,7 @@ XStr::XStr()
   blklen = SZ;
 }
 
-XStr::XStr(char *_s)
+XStr::XStr(const char *_s)
 {
   len = strlen(_s);
   blklen = SZ;
@@ -45,7 +45,8 @@ XStr::XStr(char *_s)
 }
 
 void 
-XStr::spew(const char*b, char *a1, char *a2, char *a3, char *a4, char *a5)
+XStr::spew(const char*b, const char *a1, const char *a2, const char *a3, 
+           const char *a4, const char *a5)
 {
   int i;
   for(i=0; i<strlen(b); i++){

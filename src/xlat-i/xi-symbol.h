@@ -75,7 +75,7 @@ class Type : public Printable {
   public:
     virtual void print(XStr&) = 0;
     virtual int isVoid(void) = 0;
-    virtual char *getBaseName(void) = 0;
+    virtual const char *getBaseName(void) = 0;
     virtual void genProxyName(XStr&) = 0;
 };
 
@@ -85,7 +85,7 @@ class TypeList : public Printable {
   public:
     TypeList(Type *t, TypeList *n=0) : type(t), next(n) {}
     void print(XStr& str);
-    void genProxyNames(XStr& str, char*, char*, char*);
+    void genProxyNames(XStr& str, const char*, const char*, const char*);
 };
 
 /* EnType is the type of an entry method parameter, 
@@ -102,12 +102,12 @@ class SimpleType : virtual public Type {
 
 class BuiltinType : public SimpleType , public EnType {
   private:
-    char *name;
+    const char *name;
   public:
-    BuiltinType(char *n) : name(n) {}
+    BuiltinType(const char *n) : name(n) {}
     void print(XStr& str) { str << name; }
     int isVoid(void) { return !strcmp(name, "void"); }
-    char *getBaseName(void) { return name; }
+    const char *getBaseName(void) { return name; }
     void genProxyName(XStr& str) { cerr << "Illegal Base Class ?\n"; abort(); }
     void genMsgProxyName(XStr& str) { 
       cerr << "Illegal Entry Param?\n"; 
@@ -117,13 +117,13 @@ class BuiltinType : public SimpleType , public EnType {
 
 class NamedType : public SimpleType {
   private:
-    char *name;
+    const char *name;
     TParamList *tparams;
   public:
-    NamedType(char* n, TParamList* t=0) : name(n), tparams(t) {}
+    NamedType(const char* n, TParamList* t=0) : name(n), tparams(t) {}
     void print(XStr& str) { str << name; }
     int isVoid(void) { return 0; }
-    char *getBaseName(void) { return name; }
+    const char *getBaseName(void) { return name; }
     int isTemplated(void) { return (tparams!=0); }
     void genProxyName(XStr& str) { genChareProxyName(str); }
     void genChareProxyName(XStr& str) { str << chare_prefix() << name; }
@@ -141,7 +141,7 @@ class PtrType : public EnType {
     void indirect(void) { numstars++; }
     void print(XStr& str);
     int isVoid(void) { return 0; }
-    char *getBaseName(void) { return type->getBaseName(); }
+    const char *getBaseName(void) { return type->getBaseName(); }
     void genProxyName(XStr& str) { cerr << "Illegal Base Class ?\n"; abort(); }
     void genMsgProxyName(XStr& str) { 
       if(numstars != 1) {
@@ -162,17 +162,17 @@ class ArrayType : public Type {
     ArrayType(Type* t, Value* d) : type(t), dim(d) {}
     void print(XStr& str){type->print(str);str<<"[";dim->print(str);str<<"]";}
     int isVoid(void) { return 0; }
-    char *getBaseName(void) { return type->getBaseName(); }
+    const char *getBaseName(void) { return type->getBaseName(); }
     void genProxyName(XStr& str) { cerr << "Illegal Base Class ?\n"; abort(); }
 };
 
 class FuncType : public Type {
   private:
     Type *rtype;
-    char *name;
+    const char *name;
     TypeList *tlist;
   public:
-    FuncType(Type* r, char* n, TypeList* t) : rtype(r), name(n), tlist(t) {}
+    FuncType(Type* r, const char* n, TypeList* t) :rtype(r),name(n),tlist(t) {}
     void print(XStr& str) { 
       rtype->print(str);
       str << "(*" << name << ")(";
@@ -180,7 +180,7 @@ class FuncType : public Type {
         tlist->print(str);
     }
     int isVoid(void) { return 0; }
-    char *getBaseName(void) { return name; }
+    const char *getBaseName(void) { return name; }
     void genProxyName(XStr& str) { cerr << "Illegal Base Class ?\n"; abort(); }
 };
 
@@ -283,10 +283,10 @@ class Chare : public TEntity, public Construct {
       chareType(c), type(t), bases(b), list(l) {setTemplate(0);}
     int  getChareType(void) { return chareType; }
     void genProxyName(XStr& str){type->genProxyName(str);}
-    void genProxyBases(XStr& str, char* p, char* s, char* sep) {
+    void genProxyBases(XStr& str,const char* p,const char* s,const char* sep) {
       bases->genProxyNames(str, p, s, sep);
     }
-    char *getBaseName(void) { return type->getBaseName(); }
+    const char *getBaseName(void) { return type->getBaseName(); }
     int  isTemplated(void) { return (templat!=0); }
     int  isDerived(void) { return (bases!=0); }
     void print(XStr& str);

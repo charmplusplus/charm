@@ -478,9 +478,9 @@ extern int CqsEmpty(void *);
 #define CsdLength()           (CqsLength(CpvAccess(CsdSchedQueue)))
 
 #if CMK_CMIPRINTF_IS_A_BUILTIN
-void  CmiPrintf(char *, ...);
-void  CmiError(char *, ...);
-int   CmiScanf(char *, ...);
+void  CmiPrintf(const char *, ...);
+void  CmiError(const char *, ...);
+int   CmiScanf(const char *, ...);
 #endif
 
 #if CMK_CMIPRINTF_IS_JUST_PRINTF
@@ -925,7 +925,7 @@ void      *CmmFind(CmmTable t, int ntags, int *tags, int *returntags, int del);
 void ConverseInit(int, char**, CmiStartFn, int, int);
 void ConverseExit(void);
 
-void CmiAbort(char *);
+void CmiAbort(const char *);
 
 /*********** CPATH ***********/
 

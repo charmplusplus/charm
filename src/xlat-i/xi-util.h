@@ -11,29 +11,29 @@ class XStr {
   private:
     char *s;
     unsigned int len, blklen;
-    void append(char *_s);
+    void append(const char *_s);
     void append(char c);
   public:
     XStr();
-    XStr(char *_s);
+    XStr(const char *_s);
     ~XStr() { delete[] s; }
     char *get_string(void) { return s; }
-    XStr& operator << (char *_s) { append(_s); return *this;}
+    XStr& operator << (const char *_s) { append(_s); return *this;}
     XStr& operator << (char c) { append(c); return *this;}
     XStr& operator << (XStr& x) { append(x.get_string()); return *this; }
-    void spew(const char*b, char *a1 = 0, char *a2 = 0, char *a3 = 0,
-              char *a4 = 0, char *a5 = 0);
+    void spew(const char*b, const char *a1 = 0, const char *a2 = 0, 
+              const char *a3 = 0, const char *a4 = 0, const char *a5 = 0);
 };
 
 #define endx "\n"
 
-static inline char *chare_prefix(void) { return "CProxy_"; }
+static inline const char *chare_prefix(void) { return "CProxy_"; }
 
-static inline char *group_prefix(void) { return "CProxy_"; }
+static inline const char *group_prefix(void) { return "CProxy_"; }
 
-static inline char *array_prefix(void) { return "CProxy_"; }
+static inline const char *array_prefix(void) { return "CProxy_"; }
 
-static inline char *msg_prefix(void) { return "CMessage_"; }
+static inline const char *msg_prefix(void) { return "CMessage_"; }
 
 class Printable {
   public:

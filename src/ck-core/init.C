@@ -473,12 +473,14 @@ void _initCharm(int argc, char **argv)
   _bocHandlerIdx = CmiRegisterHandler((CmiHandler)_initHandler);
   _nodeBocHandlerIdx = CmiRegisterHandler((CmiHandler)_initHandler);
   _qdHandlerIdx = CmiRegisterHandler((CmiHandler)_qdHandler);
-  _infoIdx = CldRegisterInfoFn(_infoFn);
-  CldRegisterEstimator(_charmLoadEstimator);
+  _infoIdx = CldRegisterInfoFn((CldInfoFn)_infoFn);
+  CldRegisterEstimator((CldEstimator)_charmLoadEstimator);
 
 #if CMK_DEBUG_MODE
-  handlerArrayRegister(_charmHandlerIdx, fHeader, fContent);
-  handlerArrayRegister(_initHandlerIdx, fHeader, fContent);
+  handlerArrayRegister(_charmHandlerIdx, (hndlrIDFunction)fHeader, 
+                       (hndlrIDFunction)fContent);
+  handlerArrayRegister(_initHandlerIdx, (hndlrIDFunction)fHeader, 
+                       (hndlrIDFunction)fContent);
 #endif
 
   _futuresModuleInit(); // part of futures implementation is a converse module
@@ -487,7 +489,7 @@ void _initCharm(int argc, char **argv)
     _registerInit();
     CkRegisterMsg("System", 0, 0, 0, sizeof(int));
     CkRegisterChare("null", 0);
-    CkRegisterEp("null", _nullFn, 0, 0);
+    CkRegisterEp("null", (CkCallFnPtr)_nullFn, 0, 0);
     _registerCkFutures();
     _registerCkArray();
     _registertempo();
@@ -550,8 +552,8 @@ void _initCharm(int argc, char **argv)
 
 #if CMK_DEBUG_MODE
   symbolTableFnArrayRegister(_charmHandlerIdx, _numEntries,
-			     makeCharmSymbolTableInfo,
-			     getEpIdx);
+			     (symbolTableFunction) makeCharmSymbolTableInfo,
+			     (indirectionFunction) getEpIdx);
 #endif
 }
 
