@@ -66,6 +66,13 @@ WSLB::WSLB(const CkLBOptions &opt) : BaseLB(opt)
     NotifyMigrated((LDMigratedFn)(staticMigrated),(void*)(this));
 
 
+   LBtopoFn topofn = LBTopoLookup(_lbtopo);
+  if (topofn == NULL) {
+    if (CkMyPe()==0) CmiPrintf("LB> Fatal error: Unknown topology: %s.\n", _lbtopo);
+    CmiAbort("");
+  }
+  topo = topofn();
+
   // I had to move neighbor initialization outside the constructor
   // in order to get the virtual functions of any derived classes
   // so I'll just set them to illegal values here.
@@ -104,15 +111,15 @@ void WSLB::FindNeighbors()
   if (neighbor_pes == 0) { // Neighbors never initialized, so init them
                            // and other things that depend on the number
                            // of neighbors
-    statsMsgsList = new WSLBStatsMsg*[num_neighbors()];
-    for(int i=0; i < num_neighbors(); i++)
+    int maxneighbors = topo->max_neighbors();
+    statsMsgsList = new WSLBStatsMsg*[maxneighbors];
+    for(int i=0; i < maxneighbors; i++)
       statsMsgsList[i] = 0;
-    statsDataList = new LDStats[num_neighbors()];
+    statsDataList = new LDStats[maxneighbors];
 
-    neighbor_pes = new int[num_neighbors()];
-    neighbors(neighbor_pes);
-    mig_msgs_expected = num_neighbors();
-    mig_msgs = new LBMigrateMsg*[num_neighbors()];
+    neighbor_pes = new int[maxneighbors];
+    topo->neighbors(CkMyPe(), neighbor_pes, mig_msgs_expected);
+    mig_msgs = new LBMigrateMsg*[mig_msgs_expected];
   }
 
 }
@@ -130,14 +137,14 @@ void WSLB::AtSync()
 
   if (neighbor_pes == 0) FindNeighbors();
 
-  if (!QueryBalanceNow(step()) || num_neighbors() == 0) {
+  if (!QueryBalanceNow(step()) || mig_msgs_expected == 0) {
     MigrationDone();
     return;
   }
 
   WSLBStatsMsg* msg = AssembleStats();
 
-  thisProxy.ReceiveStats(msg,num_neighbors(),neighbor_pes);
+  thisProxy.ReceiveStats(msg,mig_msgs_expected,neighbor_pes);
 
   // Tell our own node that we are ready
   ReceiveStats((WSLBStatsMsg*)0);
@@ -250,7 +257,7 @@ void WSLB::ReceiveStats(WSLBStatsMsg *m)
     //  CkPrintf("Stats msg received, %d %d %d %d %p\n",
     //  	   pe,stats_msg_count,m->n_objs,m->serial,m);
     int peslot = -1;
-    for(int i=0; i < num_neighbors(); i++) {
+    for(int i=0; i < mig_msgs_expected; i++) {
       if (pe == neighbor_pes[i]) {
 	peslot = i;
 	break;
@@ -276,7 +283,7 @@ void WSLB::ReceiveStats(WSLBStatsMsg *m)
     }
   }
 
-  const int clients = num_neighbors();
+  const int clients = mig_msgs_expected;
   if (stats_msg_count == clients && receive_stats_ready) {
     double strat_start_time = CmiWallTimer();
     receive_stats_ready = 0;
@@ -297,8 +304,7 @@ void WSLB::ReceiveStats(WSLBStatsMsg *m)
     }
     
     // Now, send migrate messages to neighbors
-    thisProxy.ReceiveMigration(migrateMsg,
-    	num_neighbors(),neighbor_pes);
+    thisProxy.ReceiveMigration(migrateMsg,mig_msgs_expected,neighbor_pes);
     
     // Zero out data structures for next cycle
     for(i=0; i < clients; i++) {
@@ -523,6 +529,7 @@ LBMigrateMsg* WSLB::Strategy(WSLB::LDStats* stats, int count)
 
       const int me = CkMyPe();
       // Apparently we can give this object to this processor
+      if (_lb_debug)
       CkPrintf("[%d] Obj %d of %d migrating from %d to %d\n",
 	       CkMyPe(),obj->Id,myStats.obj_data_sz,me,p->Id);
 

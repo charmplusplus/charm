@@ -13,8 +13,10 @@
 #ifndef NEIGHBORLB_H
 #define NEIGHBORLB_H
 
-#include <BaseLB.h>
+#include "BaseLB.h"
 #include "WSLB.decl.h"
+
+#include "topology.h"
 
 void CreateWSLB();
 
@@ -58,6 +60,7 @@ public:
 protected:
   virtual CmiBool QueryBalanceNow(int);
   virtual LBMigrateMsg* Strategy(LDStats* stats,int count);
+#if 0
   virtual int num_neighbors() {
     return (CkNumPes() > 5) ? 4 : (CkNumPes()-1);
   };
@@ -77,6 +80,7 @@ protected:
     if (npe > 4)
       _n[3] = (me + npe - bigstep) % npe;
   };
+#endif
 
   struct {
     int proc_speed;
@@ -98,6 +102,7 @@ private:
   WSLBStatsMsg* AssembleStats();
 
   CProxy_WSLB   thisProxy;
+  LBTopology    *topo;
   int mystep;
   int stats_msg_count;
   WSLBStatsMsg** statsMsgsList;
