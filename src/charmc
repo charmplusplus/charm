@@ -544,12 +544,6 @@ endif
 
 if ($?BALANCE == 0) set BALANCE=rand
 
-if (! -e $CHARMLIB/lib${LIBCLASS}-ldb-$BALANCE.o) then
-   echo "charmc : Unknown load balancer $BALANCE"
-   (cd $CHARMLIB ; ls -al lib${LIBCLASS}-ldb-*)
-   goto failure
-endif
-
 # Check that EXECMODE is compatible with QUEUE and BALANCE
 
 if ($EXECMODE == replay) then
@@ -573,14 +567,32 @@ if ( $BALANCE == btok ) then
     endif
 endif
 
+# Check that the BAL_OBJ exists
+
+if ($BALANCE:h == $BALANCE) then
+   set BAL_OBJ = $CHARMLIB/lib${LIBCLASS}-ldb-$BALANCE.o
+else
+   set BAL_OBJ = $BALANCE
+endif
+
+if (! -e $BAL_OBJ) then
+   if ($BALANCE == $BAL_OBJ) then
+	echo "charmc : Could not find load balancer object $BAL_OBJ"
+   else
+	echo "charmc : Unknown load balancer $BALANCE"
+	(cd $CHARMLIB ; ls -al lib${LIBCLASS}-ldb-*)
+   endif
+   goto failure
+endif
+
 # Bind together user-specified objects and libraries,
 # thereby creating CHARMC-USR.TMP.o and CHARMC-USR.TMP.nm
 
 echo "linking $OBJECT with -language $LANGUAGE"
 
 set DELETE=(CHARMC-USR.TMP.o CHARMC-USR.TMP.nm $DELETE)
-if ($?VERBOSE) echo $CMK_LDRO CHARMC-USR.TMP.o $OPTS_LDRO -L$CHARMLIB $OBJECTFILES $LIBRARIES
-$CMK_LDRO CHARMC-USR.TMP.o $OPTS_LDRO -L$CHARMLIB $OBJECTFILES $LIBRARIES
+if ($?VERBOSE) echo $CMK_LDRO CHARMC-USR.TMP.o $BAL_OBJ $OPTS_LDRO -L$CHARMLIB $OBJECTFILES $LIBRARIES
+$CMK_LDRO CHARMC-USR.TMP.o $BAL_OBJ $OPTS_LDRO -L$CHARMLIB $OBJECTFILES $LIBRARIES
 if ($status) goto failure
 $CMK_NM CHARMC-USR.TMP.o | csh -fc "$CMK_NM_FILTER" > CHARMC-USR.TMP.nm
 if ($status) goto failure
@@ -614,7 +626,8 @@ switch ($LANGUAGE)
 	set LOADER=($CMK_LD $OPTS_LD -o $OBJECT \
 		      CHARMC-USR.TMP.o CHARMC-MOD.TMP.o $MAINOBJ \
         	      $CHARMLIB/lib${LIBCLASS}-core-$EXECMODE.o \
-        	      $CHARMLIB/lib${LIBCLASS}-ldb-$BALANCE.o \
+#        	      $BAL_OBJ \
+        	      $CHARMLIB/lib${LIBCLASS}-ldbvars.o \
         	      $CHARMLIB/lib${LIBCLASS}-cplus-n.o \
         	      $CHARMLIB/libconv-core.o \
         	      $CHARMLIB/libconv-qs-$QUEUE.o \
@@ -624,7 +637,8 @@ switch ($LANGUAGE)
         set LOADER =($CMK_LDXX $OPTS_LD -o $OBJECT \
 		      CHARMC-USR.TMP.o CHARMC-MOD.TMP.o $MAINOBJ \
                       $CHARMLIB/lib${LIBCLASS}-core-$EXECMODE.o \
-        	      $CHARMLIB/lib${LIBCLASS}-ldb-$BALANCE.o \
+#        	      $BAL_OBJ \
+        	      $CHARMLIB/lib${LIBCLASS}-ldbvars.o \
         	      $CHARMLIB/lib${LIBCLASS}-cplus-y.o \
         	      $CHARMLIB/libconv-core.o \
         	      $CHARMLIB/libconv-qs-$QUEUE.o \
