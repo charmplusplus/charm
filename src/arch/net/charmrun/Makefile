@@ -1,7 +1,7 @@
 BIN=../../bin
 CHARMC=$(BIN)/charmc $(OPTS)
 
-SHELL=sh
+SHELL=/bin/sh
 
 $(BIN)/charmrun: charmrun.c 
 	$(CHARMC) -c -seq -DSILENT charmrun.c
