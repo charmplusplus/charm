@@ -1115,24 +1115,30 @@ void CsdSchedulerState_new(CsdSchedulerState_t *s)
 #endif
 	s->localQ=CpvAccess(CmiLocalQueue);
 	s->schedQ=CpvAccess(CsdSchedQueue);
+	s->localCounter=&(CpvAccess(CsdLocalCounter));
 #if CMK_NODE_QUEUE_AVAILABLE
 	s->nodeQ=CsvAccess(CsdNodeQueue);
 	s->nodeLock=CsvAccess(CsdNodeQueueLock);
 #endif
+	
 }
 
 void *CsdNextMessage(CsdSchedulerState_t *s) {
 	void *msg;
-	if((CpvAccess(CsdLocalCounter)--) >0)
+	if((*(s->localCounter))-- >0)
 	  {
               /* This avoids a race condition with migration detected by megatest*/
               msg=CdsFifo_Dequeue(s->localQ);
-              if (msg!=NULL) return msg;	    
+              if (msg!=NULL)
+		{
+		  CpvAccess(cQdState)->mProcessed++;
+		  return msg;	    
+		}
               CqsDequeue(s->schedQ,(void **)&msg);
               if (msg!=NULL) return msg;
 	  }
 	
-	CpvAccess(CsdLocalCounter)=CsdLocalMax;
+	*(s->localCounter)=CsdLocalMax;
 	if ( NULL!=(msg=CmiGetNonLocal()) || 
 	     NULL!=(msg=CdsFifo_Dequeue(s->localQ)) ) {
             CpvAccess(cQdState)->mProcessed++;
