@@ -153,13 +153,13 @@ do
 		CL="$CL /I`cygpath -w $path`"
 		;;
 	-L)
-		LIBDIR="$1"
+		LIBDIR="`cygpath -w $1`"
 		LINK=$LINK"	/LIBPATH:$LIBDIR"
 		shift
 		;;
 	-L*)
 		LIBDIR=`echo $arg | awk -F@ '{print substr($1,3)}'`
-		LINK=$LINK"	/LIBPATH:$LIBDIR"
+		LINK=$LINK"	/LIBPATH:`cygpath -w $LIBDIR`"
 		shift
 		;;
 	-l*)
