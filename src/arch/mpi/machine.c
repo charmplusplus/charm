@@ -6,6 +6,7 @@
  *****************************************************************************/
 
 #include <stdio.h>
+#include <errno.h>
 #include "converse.h"
 #include <mpi.h>
 
@@ -145,8 +146,6 @@ static int no_outstanding_sends=0; /*FLAG: consume outstanding Isends in schedul
 int inside_comm = 0;
 #endif
 
-double starttimer;
-
 void CmiAbort(const char *message);
 static void PerrorExit(const char *msg);
 
@@ -167,19 +166,60 @@ extern unsigned char computeCheckSum(unsigned char *data, int len);
 
 /* MPI calls are not threadsafe, even the timer on some machines */
 static CmiNodeLock  timerLock = 0;
+static int _is_global = 0;
+static double starttimer;
 
 void CmiTimerInit(void)
 {
-  starttimer = MPI_Wtime();
+  int  flag;
+  void *v;
+
+  /*  check if using synchronized timer */
+  if (MPI_SUCCESS != MPI_Attr_get(MPI_COMM_WORLD, MPI_WTIME_IS_GLOBAL, &v, &flag))
+    printf("MPI_WTIME_IS_GLOBAL not valid!\n");
+  if (flag) {
+    _is_global = *(int*)v;
+    if (_is_global && CmiMyPe() == 0) 
+      printf("Charm++> MPI timer is synchronized!\n", CmiMyPe());
+  }
+
+  if (CmiMyRank() == 0) {
+    if (_is_global) { 
+      double minTimer;
+      starttimer = MPI_Wtime();
+      MPI_Allreduce(&starttimer, &minTimer, 1, MPI_DOUBLE, MPI_MIN, 
+                                  MPI_COMM_WORLD );
+      starttimer = minTimer;
+    }
+    else {
+      /* we don't have a synchronous timer, set our own start time */
+      double t1, t2, t3;
+      if (MPI_SUCCESS != MPI_Barrier(MPI_COMM_WORLD))
+        CmiAbort("Timernit: MPI_Barrier failed!\n");
+      t1 = MPI_Wtime();
+      if (MPI_SUCCESS != MPI_Barrier(MPI_COMM_WORLD))
+        CmiAbort("Timernit: MPI_Barrier failed!\n");
+      t2 = MPI_Wtime();
+      if (MPI_SUCCESS != MPI_Barrier(MPI_COMM_WORLD))
+        CmiAbort("Timernit: MPI_Barrier failed!\n");
+      t3 = MPI_Wtime();
+      starttimer = t3; //t1 + (t3-t1)/2;
+    }
+  }
+  CmiNodeAllBarrier();          /* for smp */
 /*  timerLock = CmiCreateLock(); */
 }
 
 double CmiTimer(void)
 {
   double t;
+#if CMK_SMP
   if (timerLock) CmiLock(timerLock);
+#endif
   t = MPI_Wtime() - starttimer;
+#if CMK_SMP
   if (timerLock) CmiUnlock(timerLock);
+#endif
   return t;
 }
 
@@ -731,7 +771,7 @@ static int SendMsgBuf()
 	PumpMsgs();
       }
       MACHSTATE2(3,"MPI_send to node %d rank: %d{", node, CMI_DEST_RANK(msg));
-      CMI_SET_MAGIC(msg) = CHARM_MAGIC_NUMBER;
+      CMI_MAGIC(msg) = CHARM_MAGIC_NUMBER;
       CMI_SET_CHECKSUM(msg, size);
       if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,node,mpi_tag,MPI_COMM_WORLD,&(msg_tmp->req))) 
         CmiAbort("CmiAsyncSendFn: MPI_Isend failed!\n");
@@ -1302,7 +1342,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
       sleep(10);
   }
 
-  CmiTimerInit();
+  /* CmiTimerInit(); */
 
 #if 0
   CthInit(argv);
