@@ -2,7 +2,7 @@
 #define STREAMING_STRATEGY
 #include "ComlibManager.h"
 
-#define MAX_STREAMING_MESSAGE_SIZE 2048
+#define MAX_STREAMING_MESSAGE_SIZE 2048*2
 
 
 class StreamingStrategy : public Strategy {

@@ -9,11 +9,11 @@ DEPENDFILE = Make.depends
 
 LIB = $(LIBDIR)/libmodulecommlib.a
 
-STRATEGY_OBJS = EachToManyStrategy.o MPIStrategy.o StreamingStrategy.o \
+STRATEGY_OBJS = MPIStrategy.o StreamingStrategy.o \
 		DummyStrategy.o NodeMulticast.o EachToManyMulticastStrategy.o \
 		MsgPacker.o DirectMulticastStrategy.o RingMulticastStrategy.o \
 		PipeBroadcastStrategy.o MeshStreamingStrategy.o \
-		PrioStreaming.o
+		PrioStreaming.o BroadcastStrategy.o
 
 CONVERSE_COM_OBJS = $(COMMLIBDIR)/commlib.o $(COMMLIBDIR)/gridrouter.o \
 	$(COMMLIBDIR)/de.o $(COMMLIBDIR)/treerouter.o $(COMMLIBDIR)/petable.o\
@@ -35,6 +35,8 @@ $(LIB): $(OBJS) $(STRATEGY_OBJS) $(CONVERSE_COM_OBJS)
 	cp  ComlibManager.h $(CDIR)/include
 	rm -f $(CDIR)/include/EachToManyMulticastStrategy.h
 	cp  EachToManyMulticastStrategy.h $(CDIR)/include
+	rm -f $(CDIR)/include/BroadcastStrategy.h
+	cp  BroadcastStrategy.h $(CDIR)/include
 	rm -f $(CDIR)/include/DirectMulticastStrategy.h
 	cp  DirectMulticastStrategy.h $(CDIR)/include
 	rm -f $(CDIR)/include/RingMulticastStrategy.h
@@ -69,12 +71,12 @@ commlib.def.h: ComlibManager.ci
 clean:
 	rm -f *~ *.decl.h *.def.h *.o $(LIB) \
 	$(CDIR)/include/ComlibManager.h      \
-	$(CDIR)/include/EachToManyStrategy.h \
 	$(CDIR)/include/EachToManyMulticastStrategy.h \
 	$(CDIR)/include/DummyStrategy.h      \
 	$(CDIR)/include/NodeMulticast.h      \
 	$(CDIR)/include/StreamingStrategy.h  \
 	$(CDIR)/include/PipeBroadcastStrategy.h \
+	$(CDIR)/include/BroadcastStrategy.h \
 	$(CDIR)/include/MeshStreamingStrategy.h \
 	$(CDIR)/include/PrioStreaming.h \
 	$(CDIR)/include/commlib.decl.h       \

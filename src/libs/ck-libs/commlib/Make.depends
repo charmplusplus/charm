@@ -91,6 +91,14 @@ PipeBroadcastStrategy.o: \
 	commlib.decl.h
 	$(CHARMC) -c -o PipeBroadcastStrategy.o PipeBroadcastStrategy.C
 
+BroadcastStrategy.o: \
+	BroadcastStrategy.C \
+	BroadcastStrategy.h \
+	ComlibManager.h \
+	commlib.decl.h
+	$(CHARMC) -c -o BroadcastStrategy.o BroadcastStrategy.C
+
+
 MeshStreamingStrategy.o: \
 	MeshStreamingStrategy.C \
 	MeshStreamingStrategy.h \

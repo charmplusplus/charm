@@ -80,8 +80,8 @@ void MsgPacker::getMessage(CombinedMessage *&cmb_msg, int &total_size){
     int size = sp.size();  
     total_size = ALIGN8(sizeof(CombinedMessage)) + size;
     
-    ComlibPrintf("In MsgPacker with %d bytes and %d messages\n", total_size, 
-                 nShortMsgs);
+    //CkPrintf("In MsgPacker with %d bytes and %d messages\n", total_size, 
+    //           nShortMsgs);
 
     cmb_msg = (CombinedMessage *)CmiAlloc(total_size);
 

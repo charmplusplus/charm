@@ -1,6 +1,5 @@
 #include "ComlibManager.h"
 
-#include "EachToManyStrategy.h"
 #include "EachToManyMulticastStrategy.h"
 #include "DirectMulticastStrategy.h"
 #include "StreamingStrategy.h"
@@ -10,6 +9,7 @@
 #include "MsgPacker.h"
 #include "RingMulticastStrategy.h"
 #include "PipeBroadcastStrategy.h"
+#include "BroadcastStrategy.h"
 #include "MeshStreamingStrategy.h"
 #include "PrioStreaming.h"
 
@@ -391,7 +391,7 @@ void ComlibManager::ArraySend(int ep, void *msg,
     CharmMessageHolder *cmsg = new CharmMessageHolder((char *)msg, dest_proc);
     //get rid of the new.
 
-    //CmiPrintf("Before Insert\n");
+    ComlibPrintf("Before Insert\n");
 
     if (receivedTable)
       strategyTable[curStratID].strategy->insertMessage(cmsg);

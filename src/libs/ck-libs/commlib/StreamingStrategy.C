@@ -17,9 +17,10 @@ void StreamingStrategy::insertMessage(CharmMessageHolder *cmsg) {
     envelope *env = UsrToEnv(msg);
     int size = env->getTotalsize();
 
-    ComlibPrintf("StramingStrategy: InsertMessage %d, %d, %d\n",  PERIOD, bufferMax, size);
+    //CkPrintf("StramingStrategy: InsertMessage %d, %d, %d\n",  PERIOD, bufferMax, size);
     
     if(size > MAX_STREAMING_MESSAGE_SIZE) {//AVOID COPYING
+        //CkPrintf("Short circuiting messages \n");
         CmiSyncSendAndFree(pe, size, (char *)env);
         delete cmsg;
         return;
