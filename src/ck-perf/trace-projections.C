@@ -427,7 +427,7 @@ void TraceProjections::traceClose(void)
   if (TRACE_CHARM_PE()) {
     CkpvAccess(_trace)->endComputation();
     delete _logPool;		// will write
-    delete CkpvAccess(_trace);
+//    delete CkpvAccess(_trace);
   }
 //  free(CkpvAccess(traceRoot));
 }
