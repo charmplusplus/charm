@@ -16,7 +16,14 @@
 
        integer, parameter :: MPI_ANY_SOURCE = -1
        integer, parameter :: MPI_ANY_TAG = -1
+       integer, parameter :: MPI_GROUP_NULL = -1
+       integer, parameter :: MPI_COMM_NULL = -1
        integer, parameter :: MPI_REQUEST_NULL = -1
+       integer, parameter :: MPI_UNDEFINED = -32766
+
+       integer, parameter :: MPI_IDENT    = 0
+       integer, parameter :: MPI_SIMILAR  = 1
+       integer, parameter :: MPI_UNEQUAL  = 2
 
        integer, parameter :: MPI_TYPE_NULL = -1
 
@@ -29,7 +36,7 @@
 
        integer, parameter :: MPI_COMM_FIRST_SPLIT = 1000000
        integer, parameter :: MPI_COMM_FIRST_GROUP = 2000000
-       integer, parameter :: MPI_COMM_LAST_GROUP = 3000000
+       integer, parameter :: MPI_COMM_FIRST_RESVD = 3000000
        integer, parameter :: MPI_COMM_WORLD = 8000000
 
        integer, parameter :: MPI_MAX_COMM_WORLDS=8

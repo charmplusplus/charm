@@ -48,11 +48,18 @@ This is needed so we can call the routine as a new thread.
 #define MPI_UNSIGNED_LONG  13
 #define MPI_LONG_DOUBLE  14
 
-#define MPI_ANY_SOURCE (-1)
-#define MPI_ANY_TAG (-1)
+#define MPI_ANY_SOURCE   (-1)
+#define MPI_ANY_TAG      (-1)
 #define MPI_REQUEST_NULL (-1)
+#define MPI_GROUP_NULL   (-1)
+#define MPI_COMM_NULL    (-1)
+#define MPI_TYPE_NULL    (-1)
 
-#define MPI_TYPE_NULL  (-1)
+#define MPI_UNDEFINED    (-32766)
+
+#define MPI_IDENT	0
+#define MPI_SIMILAR	1
+#define MPI_UNEQUAL	2
 
 #define MPI_MAX 1
 #define MPI_MIN 2
@@ -65,13 +72,12 @@ This is needed so we can call the routine as a new thread.
  */
 #define MPI_TAG_UB  1073741824
 
-
 typedef int MPI_Comm;
 typedef int MPI_Group;
 
 #define MPI_COMM_FIRST_SPLIT (MPI_Comm)(1000000) /*Communicator from a "split"*/
 #define MPI_COMM_FIRST_GROUP (MPI_Comm)(2000000) /*Communicator from a process group*/
-#define MPI_COMM_LAST_GROUP (MPI_Comm)(3000000) /*Communicator from a process group*/
+#define MPI_COMM_FIRST_RESVD (MPI_Comm)(3000000) /*Communicator reserved for now*/
 
 #define MPI_COMM_WORLD (MPI_Comm)(8000000) /*Start of universe*/
 #define MPI_MAX_COMM_WORLDS 8
@@ -196,20 +202,23 @@ int MPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
 //MPI_Op_free
 
 /***groups,contexts and communicators***/
-//MPI_Comm_group
-//MPI_Group_size
-//MPI_Group_rank
-//MPI_Group_translate_ranks
-//MPI_Group_compare
-//MPI_Group_union
-//MPI_Group_intersection
-//MPI_Group_difference
-//MPI_Group_incl
-//MPI_Group_excl
-//MPI_Group_range_incl
-//MPI_Group_range_excl
-//MPI_Group_free
-//int MPI_Comm_create(MPI_Comm comm, MPI_Group group, MPI_Comm* newcomm);
+int MPI_Group_size(MPI_Group group, int *size);
+int MPI_Group_rank(MPI_Group group, int *rank);
+int MPI_Group_translate_ranks (MPI_Group group1, int n, int *ranks1, MPI_Group group2, int *ranks2);
+int MPI_Group_compare(MPI_Group group1,MPI_Group group2, int *result);
+
+int MPI_Comm_group(MPI_Comm comm, MPI_Group *group);
+int MPI_Group_union(MPI_Group group1, MPI_Group group2, MPI_Group *newgroup);
+int MPI_Group_intersection(MPI_Group group1, MPI_Group group2, MPI_Group *newgroup);
+int MPI_Group_difference(MPI_Group group1, MPI_Group group2, MPI_Group *newgroup);
+
+int MPI_Group_incl(MPI_Group group, int n, int *ranks, MPI_Group *newgroup);
+int MPI_Group_excl(MPI_Group group, int n, int *ranks, MPI_Group *newgroup);
+int MPI_Group_range_incl(MPI_Group group, int n, int ranges[][3], MPI_Group *newgroup);
+int MPI_Group_range_excl(MPI_Group group, int n, int ranges[][3], MPI_Group *newgroup);
+int MPI_Group_free(MPI_Group *group);
+int MPI_Comm_create(MPI_Comm comm, MPI_Group group, MPI_Comm* newcomm);
+
 int MPI_Comm_size(MPI_Comm comm, int *size);
 int MPI_Comm_rank(MPI_Comm comm, int *rank);
 int MPI_Comm_dup(MPI_Comm src, MPI_Comm *dest);

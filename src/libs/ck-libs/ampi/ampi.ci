@@ -6,7 +6,6 @@ module ampi {
   readonly int mpi_nworlds;
 
   array[1D] ampiParent {
-    entry ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_,int isRestart);
     entry ampiParent(int universeNo,CProxy_TCharm threads_);
     entry void checkpoint(int len, char dname[len]);
     entry void restart(int len, char dname[len]);
@@ -17,6 +16,7 @@ module ampi {
     entry void generic(AmpiMsg *);
     entry void reduceResult(CkReductionMsg *m);
     entry void splitPhase1(CkReductionMsg *msg);
+    entry void commCreatePhase1(CkReductionMsg *msg);
     entry void checkpoint(int len, char dname[len]);
     entry void restart(int len, char dname[len]);
     entry void checkpointthread(int len, char dname[len]);

@@ -40,10 +40,25 @@ module MPIINCL
    external MPI_Alltoall
    external MPI_Comm_dup
    external MPI_Comm_free
+   external MPI_Comm_group
+   external MPI_Group_size
+   external MPI_Group_rank
+   external MPI_Group_translate_ranks
+   external MPI_Group_compare
+   external MPI_Group_union
+   external MPI_Group_intersection
+   external MPI_Group_difference
+   external MPI_Group_incl
+   external MPI_Group_excl
+   external MPI_Group_range_incl
+   external MPI_Group_range_excl
+   external MPI_Group_free
+   external MPI_Comm_create
+   external MPI_Checkpoint
+   external MPI_Restart
    external MPI_Abort
    external MPI_Print
    external MPI_Migrate
-
    external MPI_Register_main
    external MPI_Attach
 

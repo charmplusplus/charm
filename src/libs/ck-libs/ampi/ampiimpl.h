@@ -20,8 +20,7 @@ class ampiCommStruct {
 	CkArrayID ampiID; //ID of corresponding ampi array
 	int size; //Number of processes in communicator
 	int isWorld; //1 if ranks are 0..size-1?
-	//indices[r] gives the array index for rank r
-	CkPupBasicVec<int> indices;
+	CkPupBasicVec<int> indices;  //indices[r] gives the array index for rank r
 public:
 	ampiCommStruct(int ignored=0) {size=-1;isWorld=-1;}
 	ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_,int size_)
@@ -34,6 +33,7 @@ public:
 	void setArrayID(const CkArrayID &nID) {ampiID=nID;}
 
 	MPI_Comm getComm(void) const {return comm;}
+	CkPupBasicVec<int> getIndices(void) const {return indices;}
 
 	//Get the proxy for the entire array
 	CProxy_ampi getProxy(void) const;
@@ -79,6 +79,109 @@ public:
 	mpi_comm_world &operator[](int i) {return s[i];}
 };
 
+typedef CkPupBasicVec<int> groupStruct;
+// groupStructure operations
+inline void outputOp(groupStruct vec){
+  CkPrintf("output vector: size=%d  {",vec.size());
+  for(int i=0;i<vec.size();i++)
+    CkPrintf(" %d ",vec[i]);
+  CkPrintf("}\n");
+}
+inline int getPosOp(int idx, groupStruct vec){
+  for (int r=0;r<vec.size();r++)
+    if (vec[r]==idx) return r;
+  return MPI_UNDEFINED;
+}
+inline groupStruct unionOp(groupStruct vec1, groupStruct vec2){
+  groupStruct newvec(vec1);
+  for(int i=0;i<vec2.size();i++){
+    if(getPosOp(vec2[i],vec1)==MPI_UNDEFINED)
+      newvec.push_back(vec2[i]);
+  }
+  return newvec;
+}
+inline groupStruct intersectOp(groupStruct vec1, groupStruct vec2){
+  groupStruct newvec;
+  for(int i=0;i<vec1.size();i++){
+    if(getPosOp(vec1[i],vec2)!=MPI_UNDEFINED)
+      newvec.push_back(vec1[i]);
+  }
+  return newvec;
+}
+inline groupStruct diffOp(groupStruct vec1, groupStruct vec2){
+  groupStruct newvec;
+  for(int i=0;i<vec1.size();i++){
+    if(getPosOp(vec1[i],vec2)==MPI_UNDEFINED)
+      newvec.push_back(vec1[i]);
+  }
+  return newvec;
+}
+inline int* translateRanksOp(int n,groupStruct vec1,int* ranks1,groupStruct vec2){
+  int* ret = new int[n];
+  for(int i=0;i<n;i++){
+    ret[i] = getPosOp(vec1[ranks1[i]],vec2);
+  }
+  return ret;
+}
+inline int compareVecOp(groupStruct vec1,groupStruct vec2){
+  int i,pos,ret = MPI_IDENT;
+  if(vec1.size() != vec2.size()) return MPI_UNEQUAL;
+  for(i=0;i<vec1.size();i++){
+    pos = getPosOp(vec1[i],vec2);
+    if(pos == MPI_UNDEFINED) return MPI_UNEQUAL;
+    if(pos != i)   ret = MPI_SIMILAR;
+  }
+  return ret;
+}
+inline groupStruct inclOp(int n,int* ranks,groupStruct vec){
+  groupStruct retvec;
+  for(int i=0;i<n;i++){
+    retvec.push_back(vec[ranks[i]]);
+  }
+  return retvec;
+}
+inline groupStruct exclOp(int n,int* ranks,groupStruct vec){
+  groupStruct retvec;
+  int add=1;
+  for(int j=0;j<vec.size();j++){
+    for(int i=0;i<n;i++)
+      if(j==ranks[i]){ add=0; break; }
+    if(add==1)  retvec.push_back(vec[j]);
+    else add=1;
+  }
+  return retvec;
+}
+inline groupStruct rangeInclOp(int n, int ranges[][3], groupStruct vec){
+  groupStruct retvec;
+  int first,last,stride;
+  for(int i=0;i<n;i++){
+    first = ranges[i][0];
+    last = ranges[i][1];
+    stride = ranges[i][2];
+    for(int j=0;j<=(last-first)/stride;j++)
+      retvec.push_back(vec[first+stride*j]);
+  }
+  return retvec;
+}
+inline groupStruct rangeExclOp(int n, int ranges[][3], groupStruct vec){
+  groupStruct retvec;
+  CkPupBasicVec<int> ranksvec;
+  int first,last,stride;
+  int *ranks,cnt;
+  int i,j;
+  for(i=0;i<n;i++){
+    first = ranges[i][0];
+    last = ranges[i][1];
+    stride = ranges[i][2];
+    for(j=0;j<=(last-first)/stride;j++)
+      ranksvec.push_back(first+stride*j);
+  }
+  cnt=ranksvec.size();
+  ranks=new int[cnt];
+  for(i=0;i<cnt;i++)
+    ranks[i]=ranksvec[i];
+  return exclOp(cnt,ranks,vec);
+}
 
 #include "tcharm.h"
 #include "tcharmc.h"
@@ -284,6 +387,8 @@ class ampiParent : public ArrayElement1D {
 
     CkPupPtrVec<ampiCommStruct> splitComm; //Communicators from MPI_Comm_split
     CkPupPtrVec<ampiCommStruct> groupComm; //Communicators from MPI_Comm_group
+    CkPupPtrVec<groupStruct> groups; // "Wild" groups that don't have a communicator
+
     inline int isSplit(MPI_Comm comm) const {
       return (comm>=MPI_COMM_FIRST_SPLIT && comm<MPI_COMM_FIRST_GROUP);
     }
@@ -294,8 +399,21 @@ class ampiParent : public ArrayElement1D {
     }
     void splitChildRegister(const ampiCommStruct &s);
 
+    inline int isGroup(MPI_Comm comm) const {
+      return (comm>=MPI_COMM_FIRST_GROUP && comm<MPI_COMM_FIRST_RESVD);
+    }
+    const ampiCommStruct &getGroup(MPI_Comm comm) {
+      int idx=comm-MPI_COMM_FIRST_GROUP;
+      if (idx>=groupComm.size()) CkAbort("Bad group communicator used");
+      return *groupComm[idx];
+    }
+    void groupChildRegister(const ampiCommStruct &s);
+
+    inline int isInGroups(MPI_Group group) const {
+      return (group>=0 && group<groups.size());
+    }
+
 public:
-    ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_,int isRestart);
     ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_);
     ampiParent(CkMigrateMessage *msg);
     void ckJustMigrated(void);
@@ -310,8 +428,9 @@ public:
     //Children call this when they are first created, or just migrated
     TCharm *registerAmpi(ampi *ptr,ampiCommStruct s,bool forMigration);
 
-    //Grab the next available split communicator
+    //Grab the next available split/group communicator
     MPI_Comm getNextSplit(void) const {return MPI_COMM_FIRST_SPLIT+splitComm.size();}
+    MPI_Comm getNextGroup(void) const {return MPI_COMM_FIRST_GROUP+groupComm.size();}
 
     void pup(PUP::er &p);
 
@@ -319,6 +438,7 @@ public:
       if (comm==MPI_COMM_WORLD) return worldStruct;
       if (comm==worldNo) return worldStruct;
       if (isSplit(comm)) return getSplit(comm);
+      if (isGroup(comm)) return getGroup(comm);
       return universeComm2proxy(comm);
     }
     inline ampi *comm2ampi(MPI_Comm comm) {
@@ -328,8 +448,42 @@ public:
          const ampiCommStruct &st=getSplit(comm);
 	 return st.getProxy()[thisIndex].ckLocal();
       }
+      if (isGroup(comm)) {
+         const ampiCommStruct &st=getGroup(comm);
+	 return st.getProxy()[thisIndex].ckLocal();
+      }
       if (comm>MPI_COMM_WORLD) return worldPtr; //Use MPI_WORLD ampi for cross-world messages:
       CkAbort("Invalid communicator used!");
+    }
+
+    inline int hasComm(const MPI_Group group){
+      MPI_Comm comm = (MPI_Comm)group;
+      return (comm==MPI_COMM_WORLD || comm==worldNo || isSplit(comm) || isGroup(comm));
+    }
+    inline const groupStruct group2vec(MPI_Group group){
+      if(hasComm(group))
+        return comm2proxy((MPI_Comm)group).getIndices();
+      if(isInGroups(group))
+        return *groups[group];
+      CkAbort("ampiParent::group2vec: Invalid group id!");
+    }
+    inline MPI_Group saveGroupStruct(groupStruct vec){
+      int idx = groups.size();
+      groups.setSize(idx+1);
+      groups.length()=idx+1;
+      groups[idx]=new groupStruct(vec);
+      return (MPI_Group)idx;
+    }
+    inline int getRank(const MPI_Group group){
+      groupStruct vec = group2vec(group);
+      return getPosOp(thisIndex,vec);
+    }
+
+    /// this is assuming no inter-communicator
+    inline MPI_Group comm2group(const MPI_Comm comm){
+      ampiCommStruct s = comm2proxy(comm);
+      if(comm!=MPI_COMM_WORLD && comm!=s.getComm()) CkAbort("Error in ampiParent::comm2group()");
+      return (MPI_Group)(s.getComm());
     }
 
     void checkpoint(int len, char dname[]);
@@ -339,7 +493,6 @@ public:
     CkDDT *myDDT;
     ampiPersRequests pers;
 };
-
 
 
 /*
@@ -355,6 +508,7 @@ class ampi : public ArrayElement1D {
 
     ampiCommStruct myComm;
     int myRank;
+    groupStruct tmpVec; // stores the group info temporarily
 
     int seqEntries; //Number of elements in below arrays
     int *nextseq;
@@ -372,6 +526,7 @@ class ampi : public ArrayElement1D {
     void generic(AmpiMsg *);
     void reduceResult(CkReductionMsg *m);
     void splitPhase1(CkReductionMsg *msg);
+    void commCreatePhase1(CkReductionMsg *msg);
 
   public: // to be used by MPI_* functions
 
@@ -391,6 +546,7 @@ class ampi : public ArrayElement1D {
     void bcast(int root, void* buf, int count, int type,MPI_Comm comm);
     static void bcastraw(void* buf, int len, CkArrayID aid);
     void split(int color,int key,MPI_Comm *dest);
+    void commCreate(const groupStruct vec,MPI_Comm *newcomm);
 
     void stopthread();
     void checkpoint(int len, char dname[]);
@@ -412,10 +568,10 @@ class ampi : public ArrayElement1D {
     */
     CmmTable msgs;
     int nbcasts;
-
 };
 
 //Use this to mark the start of AMPI interface routines:
 #define AMPIAPI(routineName) TCHARM_API_TRACE(routineName,"ampi")
 
 #endif
+

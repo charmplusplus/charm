@@ -11,8 +11,6 @@
 #include <string.h>
 
 //------------- startup -------------
-int isRestart;
-char *restartDir;
 static mpi_comm_worlds mpi_worlds;
 
 int mpi_nworlds; /*Accessed by ampif*/
@@ -89,7 +87,6 @@ extern "C" void MPI_threadstart(void *data)
 void ampiCreateMain(MPI_MainFn mainFn)
 {
 	int _nchunks=TCHARM_Get_num_chunks();
-	//isRestart = CmiGetArgString(CkGetArgv(), "+restart", &restartDir);
 	//Make a new threads array
 	MPI_threadstart_t s(mainFn);
 	memBuf b; pupIntoBuf(b,s);
@@ -130,7 +127,9 @@ static void ampiAttach(const char *name,int namelen)
 
 	//Make a new ampi array
 	CkArrayID empty;
-	ampiCommStruct emptyComm(new_world,empty,_nchunks);
+	CkPupBasicVec<int> _indices;
+	for(int i=0;i<_nchunks;i++) _indices.push_back(i);
+	ampiCommStruct emptyComm(new_world,empty,_nchunks,_indices);
 	CProxy_ampi arr;
 	arr=CProxy_ampi::ckNew(parent,emptyComm,opts);
 
@@ -140,14 +139,6 @@ static void ampiAttach(const char *name,int namelen)
 }
 
 //-------------------- ampiParent -------------------------
-ampiParent::ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_,int isRestart) {
-  worldNo=worldNo_;
-  //threads=threads_;
-  //thread=threads[thisIndex].ckLocal();
-  worldPtr=NULL;
-  myDDT=&myDDTsto;
-  //if (thread==NULL) CkAbort("AMPIParent cannot find its thread!\n");
-}
 ampiParent::ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_)
 {
   worldNo=worldNo_;
@@ -168,6 +159,8 @@ void ampiParent::pup(PUP::er &p) {
   p|worldStruct;
   myDDT->pup(p);
   p|splitComm;
+  p|groupComm;
+  p|groups;
   p|pers;
 }
 void ampiParent::prepareCtv(void) {
@@ -201,14 +194,14 @@ TCharm *ampiParent::registerAmpi(ampi *ptr,ampiCommStruct s,bool forMigration)
 
   if (!forMigration)
   { //Register the new communicator:
-     if (s.getComm()>=MPI_COMM_WORLD)
-     { //We finally have our COMM_WORLD--start the thread
+     MPI_Comm comm = s.getComm();
+     if (comm>=MPI_COMM_WORLD) { //We finally have our COMM_WORLD--start the thread
        thread->ready();
-     }
-     else if (isSplit(s.getComm())) {
+     } else if (isSplit(comm)) {
        splitChildRegister(s);
-     }
-     else
+     } else if (isGroup(comm)) {
+       groupChildRegister(s);
+     }else
        CkAbort("ampiParent recieved child with bad communicator");
   }
 
@@ -292,6 +285,7 @@ void ampi::pup(PUP::er &p)
   p|myRank;
   p|parentProxy;
   p|nbcasts;
+  p|tmpVec;
 
   msgs=CmmPup((pup_er)&p,msgs);
 
@@ -313,8 +307,6 @@ ampi::~ampi()
 }
 
 //------------------- maintainance -----------------
-#if 1
-//Need to figure out how to support checkpoint/restart properly
 void ampi::stopthread(){
   thread->stop();
 }
@@ -351,51 +343,29 @@ void ampi::restartthread(int len, char dname[]){
 //CkPrintf("[%d]ampi::restartthread end\n",thisIndex);
 }
 
-/*
-CDECL void MPI_Checkpoint(char *dirname)
-{
-  mkdir(dirname, 0777);
-  ampiParent *ptr = getAmpiParent();
-  ptr->cthread_id = CthSelf();
-  int idx = ptr->thisIndex;
-  CProxy_ampi aproxy(ampimain::mpi_comms[ptr->commidx].aid);
-  aproxy[idx].checkpoint(new DirMsg(dirname));
-  ptr->stop_running();
-  CthSuspend();
-  ptr = getAmpiParent();
-  if(ptr->cthread_id != 0)
-    CkAbort("cthread_id not 0 upon return !!\n");
-  ptr->start_running();
-}
-*/
-#endif
 
 //------------------------ Communicator Splitting ---------------------
-
 class ampiSplitKey {
 public:
+	int nextSplitComm;
 	int color; //New class of processes we'll belong to
 	int key; //To determine rank in new ordering
 	int rank; //Rank in old ordering
 	ampiSplitKey() {}
-	ampiSplitKey(int color_,int key_,int rank_)
-		:color(color_), key(key_), rank(rank_) {}
+	ampiSplitKey(int nextSplitComm_,int color_,int key_,int rank_)
+		:nextSplitComm(nextSplitComm_), color(color_), key(key_), rank(rank_) {}
 };
 
 void ampi::split(int color,int key,MPI_Comm *dest)
 {
-	ampiSplitKey splitKey(color,key,getRank());
+	ampiSplitKey splitKey(parent->getNextSplit(),color,key,getRank());
 	int rootIdx=myComm.getIndexForRank(0);
 	CkCallback cb(CkIndex_ampi::splitPhase1(0),CkArrayIndex1D(rootIdx),myComm.getProxy());
 	contribute(sizeof(splitKey),&splitKey,CkReduction::concat,cb);
 
-	//FIXME: assumes all the new communicators will have the same MPI_Comm
-	// value.  This need not be true anytime after the first split!
-	MPI_Comm newComm=parent->getNextSplit();
-	*dest=newComm;
-	//CkPrintf("[%d (%d)] Split (%d,%d) %d suspend\n",thisIndex,getRank(),color,key,newComm);
 	thread->suspend(); //Resumed by ampiParent::splitChildRegister
-	//CkPrintf("[%d (%d)] Split (%d,%d) %d resume\n",thisIndex,getRank(),color,key,newComm);
+	MPI_Comm newComm=parent->getNextSplit()-1;
+	*dest=newComm;
 }
 
 extern "C" int compareAmpiSplitKey(const void *a_, const void *b_) {
@@ -406,17 +376,18 @@ extern "C" int compareAmpiSplitKey(const void *a_, const void *b_) {
 	return a->rank-b->rank;
 }
 
-void ampi::splitPhase1(CkReductionMsg *msg) 
+void ampi::splitPhase1(CkReductionMsg *msg)
 {
 	//Order the keys, which orders the ranks properly:
 	int nKeys=msg->getSize()/sizeof(ampiSplitKey);
 	ampiSplitKey *keys=(ampiSplitKey *)msg->getData();
 	if (nKeys!=getSize()) CkAbort("ampi::splitReduce expected a split contribution from every rank!");
 	qsort(keys,nKeys,sizeof(ampiSplitKey),compareAmpiSplitKey);
-	
-	//FIXME: assumes all the new communicators will have the same MPI_Comm
-	// value.  This need not be true anytime after the first split! 
-	MPI_Comm newComm=parent->getNextSplit();
+
+	MPI_Comm newComm = -1;
+	for(int i=0;i<nKeys;i++)
+		if(keys[i].nextSplitComm>newComm)
+			newComm = keys[i].nextSplitComm;
 
 	//Loop over the sorted keys, which gives us the new arrays:
 	int lastColor=keys[0].color-1; //The color we're building an array for
@@ -424,7 +395,7 @@ void ampi::splitPhase1(CkReductionMsg *msg)
 	int lastRoot=0; //C value for new rank 0 process for latest color
 	ampiCommStruct lastComm; //Communicator info. for latest color
 	for (int c=0;c<nKeys;c++) {
-		if (keys[c].color!=lastColor) 
+		if (keys[c].color!=lastColor)
 		{ //Hit a new color-- need to build a new communicator and array
 			lastColor=keys[c].color;
 			lastRoot=c;
@@ -434,55 +405,111 @@ void ampi::splitPhase1(CkReductionMsg *msg)
 			CkArrayID unusedAID; ampiCommStruct unusedComm;
 			lastAmpi=CProxy_ampi::ckNew(unusedAID,unusedComm,opts);
 			lastAmpi.doneInserting(); //<- Meaning, I need to do my own creation race resolution
-			
+
 			CkPupBasicVec<int> indices; //Maps rank to array indices for new arrau
 			for (int i=c;i<nKeys;i++) {
 				if (keys[i].color!=lastColor) break; //Done with this color
 				int idx=myComm.getIndexForRank(keys[i].rank);
 				indices.push_back(idx);
 			}
-			
-			//FIXME: create a new communicator for each color, instead of 
+
+			//FIXME: create a new communicator for each color, instead of
 			// (confusingly) re-using the same MPI_Comm number for each.
 			lastComm=ampiCommStruct(newComm,lastAmpi,indices.size(),indices);
 		}
 		int oldRank=keys[c].rank;
 		int newRank=c-lastRoot;
 		int newIdx=lastComm.getIndexForRank(newRank);
-		
+
 		//CkPrintf("[%d (%d)] Split (%d,%d) %d insert\n",newIdx,newRank,keys[c].color,keys[c].key,newComm);
 		lastAmpi[newIdx].insert(parentProxy,lastComm);
 	}
-	
+
 	delete msg;
 }
 
 //...newly created array elements register with the parent, which calls:
 void ampiParent::splitChildRegister(const ampiCommStruct &s) {
 	int idx=s.getComm()-MPI_COMM_FIRST_SPLIT;
-	if (splitComm.size()>=idx) {
-		splitComm.setSize(idx+1); 
+	if (splitComm.size()<=idx) {
+		splitComm.setSize(idx+1);
 		splitComm.length()=idx+1;
 	}
 	splitComm[idx]=new ampiCommStruct(s);
 	thread->resume(); //Matches suspend at end of ampi::split
 }
 
+//-----------------create communicator from group--------------
+// The procedure is like that of comm_split very much,
+// so the code is shamelessly copied from above
+//   1. reduction to make sure all members have called
+//   2. the root in the old communicator create the new array
+//   3. ampiParent::register is called to register new array as new comm
+class vecStruct {
+public:
+  int nextgroup;
+  groupStruct vec;
+  vecStruct():nextgroup(-1){}
+  vecStruct(int nextgroup_, groupStruct vec_)
+    : nextgroup(nextgroup_), vec(vec_) { }
+};
+
+void ampi::commCreate(const groupStruct vec,MPI_Comm* newcomm){
+  int rootIdx=vec[0];
+  tmpVec = vec;
+  CkCallback cb(CkIndex_ampi::commCreatePhase1(NULL),CkArrayIndex1D(rootIdx),myComm.getProxy());
+  MPI_Comm nextgroup = parent->getNextGroup();
+  contribute(sizeof(nextgroup), &nextgroup,CkReduction::max_int,cb);
+
+  if(getPosOp(thisIndex,vec)>=0){
+    thread->suspend(); //Resumed by ampiParent::groupChildRegister
+    MPI_Comm retcomm = parent->getNextGroup()-1;
+    *newcomm = retcomm;
+  }else
+    *newcomm = MPI_COMM_NULL;
+}
+
+void ampi::commCreatePhase1(CkReductionMsg *msg){
+  MPI_Comm *nextGroupComm = (int *)msg->getData();
+
+  CkArrayOptions opts;
+  opts.bindTo(parentProxy);
+  opts.setNumInitial(0);
+  CkArrayID unusedAID;
+  ampiCommStruct unusedComm;
+  CProxy_ampi newAmpi=CProxy_ampi::ckNew(unusedAID,unusedComm,opts);
+  newAmpi.doneInserting(); //<- Meaning, I need to do my own creation race resolution
+
+  groupStruct indices = tmpVec;
+  ampiCommStruct newCommstruct = ampiCommStruct(*nextGroupComm,newAmpi,indices.size(),indices);
+  for(int i=0;i<indices.size();i++){
+    int newIdx=indices[i];
+    newAmpi[newIdx].insert(parentProxy,newCommstruct);
+  }
+  delete msg;
+}
+
+void ampiParent::groupChildRegister(const ampiCommStruct &s) {
+  int idx=s.getComm()-MPI_COMM_FIRST_GROUP;
+  if (groupComm.size()<=idx) {
+    groupComm.setSize(idx+1);
+    groupComm.length()=idx+1;
+  }
+  groupComm[idx]=new ampiCommStruct(s);
+  thread->resume(); //Matches suspend at end of ampi::split
+}
 
 //------------------------ communication -----------------------
-
 const ampiCommStruct &universeComm2proxy(MPI_Comm universeNo)
 {
   if (universeNo>MPI_COMM_WORLD) {
     int worldDex=universeNo-MPI_COMM_WORLD-1;
-    if (worldDex>=mpi_nworlds) 
+    if (worldDex>=mpi_nworlds)
       CkAbort("Bad world communicator passed to universeComm2proxy");
     return mpi_worlds[worldDex].comm;
   }
   CkAbort("Bad communicator passed to universeComm2proxy");
 }
-
-
 
 void
 ampi::generic(AmpiMsg* msg)
@@ -497,7 +524,7 @@ ampi::generic(AmpiMsg* msg)
     inorder(msg);
   }
   if(waitingForGeneric)
-	  thread->resume();
+    thread->resume();
 }
 
 void
@@ -675,12 +702,12 @@ int MPI_Comm_size(MPI_Comm comm, int *size)
 
 CDECL void MPI_Exit(int /*exitCode*/)
 {
-	AMPIAPI("MPI_Exit");
-	TCHARM_Done();
+  AMPIAPI("MPI_Exit");
+  TCHARM_Done();
 }
 FDECL void FTN_NAME(MPI_EXIT,mpi_exit)(int *exitCode)
 {
-	MPI_Exit(*exitCode);
+  MPI_Exit(*exitCode);
 }
 
 CDECL
@@ -972,7 +999,7 @@ int MPI_Waitany(int count, MPI_Request *request, int *idx, MPI_Status *sts)
       if(request[*idx] < 100) { // persistent request
         PersReq *req = &(ptr->requests[request[*idx]]);
         if(req->sndrcv == 2) { // recv request
-	  ampi *aptr=getAmpiInstance(req->comm);
+    ampi *aptr=getAmpiInstance(req->comm);
           if(aptr->iprobe(req->tag, req->proc, req->comm, (int*) sts)) {
            aptr->recv(req->tag, req->proc, req->buf, req->count,
                       req->type, req->comm, (int*)sts);
@@ -982,7 +1009,7 @@ int MPI_Waitany(int count, MPI_Request *request, int *idx, MPI_Status *sts)
       } else { // irecv request
         int index = request[*idx] - 100;
         PersReq *req = &(ptr->irequests[index]);
-	ampi *aptr=getAmpiInstance(req->comm);
+  ampi *aptr=getAmpiInstance(req->comm);
         if(aptr->iprobe(req->tag, req->proc, req->comm, (int*) sts)) {
           aptr->recv(req->tag, req->proc, req->buf, req->count,
                     req->type, req->comm, (int*)sts);
@@ -1527,16 +1554,163 @@ int MPI_Error_string(int errorcode, char *string, int *resultlen)
   const char *ret="";
   switch(errorcode) {
   case MPI_SUCCESS:
-	   ret="Success";
-	   break;
+     ret="Success";
+     break;
   default:
-	   return 1;/*LIE: should be MPI_ERR_something */
+     return 1;/*LIE: should be MPI_ERR_something */
   };
   *resultlen=strlen(ret);
   strcpy(string,ret);
   return MPI_SUCCESS;
 }
 
+/* Group operations */
+CDECL
+int MPI_Comm_group(MPI_Comm comm, MPI_Group *group)
+{
+  AMPIAPI("MPI_Comm_Group");
+  *group = getAmpiParent()->comm2group(comm);
+  return 0;
+}
+
+CDECL
+int MPI_Group_union(MPI_Group group1, MPI_Group group2, MPI_Group *newgroup)
+{
+  AMPIAPI("MPI_Group_union");
+  groupStruct vec1, vec2, newvec;
+  ampiParent *ptr = getAmpiParent();
+  vec1 = ptr->group2vec(group1);
+  vec2 = ptr->group2vec(group2);
+  newvec = unionOp(vec1,vec2);
+  *newgroup = ptr->saveGroupStruct(newvec);
+  return 0;
+}
+
+CDECL
+int MPI_Group_intersection(MPI_Group group1, MPI_Group group2, MPI_Group *newgroup)
+{
+  AMPIAPI("MPI_Group_intersection");
+  groupStruct vec1, vec2, newvec;
+  ampiParent *ptr = getAmpiParent();
+  vec1 = ptr->group2vec(group1);
+  vec2 = ptr->group2vec(group2);
+  newvec = intersectOp(vec1,vec2);
+  *newgroup = ptr->saveGroupStruct(newvec);
+  return 0;
+}
+
+CDECL
+int MPI_Group_difference(MPI_Group group1, MPI_Group group2, MPI_Group *newgroup)
+{
+  AMPIAPI("MPI_Group_difference");
+  groupStruct vec1, vec2, newvec;
+  ampiParent *ptr = getAmpiParent();
+  vec1 = ptr->group2vec(group1);
+  vec2 = ptr->group2vec(group2);
+  newvec = diffOp(vec1,vec2);
+  *newgroup = ptr->saveGroupStruct(newvec);
+  return 0;
+}
+
+CDECL
+int MPI_Group_size(MPI_Group group, int *size)
+{
+  AMPIAPI("MPI_Group_size");
+  *size = (getAmpiParent()->group2vec(group)).size();
+  return 0;
+}
+
+CDECL
+int MPI_Group_rank(MPI_Group group, int *rank)
+{
+  AMPIAPI("MPI_Group_rank");
+  *rank = getAmpiParent()->getRank(group);
+  return 0;
+}
+
+CDECL
+int MPI_Group_translate_ranks (MPI_Group group1, int n, int *ranks1, MPI_Group group2, int *ranks2)
+{
+  AMPIAPI("MPI_Group_translate_ranks");
+  ampiParent *ptr = getAmpiParent();
+  groupStruct vec1, vec2;
+  vec1 = ptr->group2vec(group1);
+  vec2 = ptr->group2vec(group2);
+  ranks2 = translateRanksOp(n, vec1, ranks1, vec2);
+  return 0;
+}
+
+CDECL
+int MPI_Group_compare(MPI_Group group1,MPI_Group group2, int *result)
+{
+  AMPIAPI("MPI_Group_compare");
+  ampiParent *ptr = getAmpiParent();
+  groupStruct vec1, vec2;
+  vec1 = ptr->group2vec(group1);
+  vec2 = ptr->group2vec(group2);
+  *result = compareVecOp(vec1, vec2);
+  return 0;
+}
+
+CDECL
+int MPI_Group_incl(MPI_Group group, int n, int *ranks, MPI_Group *newgroup)
+{
+  AMPIAPI("MPI_Group_incl");
+  groupStruct vec, newvec;
+  ampiParent *ptr = getAmpiParent();
+  vec = ptr->group2vec(group);
+  newvec = inclOp(n,ranks,vec);
+  *newgroup = ptr->saveGroupStruct(newvec);
+  return 0;
+}
+CDECL
+int MPI_Group_excl(MPI_Group group, int n, int *ranks, MPI_Group *newgroup)
+{
+  AMPIAPI("MPI_Group_excl");
+  groupStruct vec, newvec;
+  ampiParent *ptr = getAmpiParent();
+  vec = ptr->group2vec(group);
+  newvec = exclOp(n,ranks,vec);
+  *newgroup = ptr->saveGroupStruct(newvec);
+//outputOp(vec); outputOp(newvec);
+  return 0;
+}
+CDECL
+int MPI_Group_range_incl(MPI_Group group, int n, int ranges[][3], MPI_Group *newgroup)
+{
+  AMPIAPI("MPI_Group_range_incl");
+  groupStruct vec, newvec;
+  ampiParent *ptr = getAmpiParent();
+  vec = ptr->group2vec(group);
+  newvec = rangeInclOp(n,ranges,vec);
+  *newgroup = ptr->saveGroupStruct(newvec);
+  return 0;
+}
+CDECL
+int MPI_Group_range_excl(MPI_Group group, int n, int ranges[][3], MPI_Group *newgroup)
+{
+  AMPIAPI("MPI_Group_range_excl");
+  groupStruct vec, newvec;
+  ampiParent *ptr = getAmpiParent();
+  vec = ptr->group2vec(group);
+  newvec = rangeExclOp(n,ranges,vec);
+  *newgroup = ptr->saveGroupStruct(newvec);
+  return 0;
+}
+CDECL
+int MPI_Group_free(MPI_Group *group)
+{
+  AMPIAPI("MPI_Group_free");
+  return 0;
+}
+CDECL
+int MPI_Comm_create(MPI_Comm comm, MPI_Group group, MPI_Comm* newcomm)
+{
+  AMPIAPI("MPI_Comm_create");
+  groupStruct vec = getAmpiParent()->group2vec(group);
+  getAmpiInstance(comm)->commCreate(vec, newcomm);
+  return 0;
+}
 
 /* Charm++ Extentions to MPI standard: */
 CDECL
@@ -1598,40 +1772,42 @@ void MPI_Print(char *str)
 CDECL
 int MPI_Register(void *d, MPI_PupFn f)
 {
-	AMPIAPI("MPI_Register");
-	return TCHARM_Register(d,f);
+  AMPIAPI("MPI_Register");
+  return TCHARM_Register(d,f);
 }
 
 CDECL
 void *MPI_Get_userdata(int idx)
 {
-	AMPIAPI("MPI_Get_userdata");
-	return TCHARM_Get_userdata(idx);
+  AMPIAPI("MPI_Get_userdata");
+  return TCHARM_Get_userdata(idx);
 }
 
-CDECL void MPI_Register_main(MPI_MainFn mainFn,const char *name)
+CDECL
+void MPI_Register_main(MPI_MainFn mainFn,const char *name)
 {
-	AMPIAPI("MPI_Register_main");
-	ampiCreateMain(mainFn);
-	ampiAttach(name,strlen(name));
+  AMPIAPI("MPI_Register_main");
+  ampiCreateMain(mainFn);
+  ampiAttach(name,strlen(name));
 }
-FDECL void FTN_NAME(MPI_REGISTER_MAIN,mpi_register_main)
-	(MPI_MainFn mainFn,const char *name,int nameLen)
+FDECL
+void FTN_NAME(MPI_REGISTER_MAIN,mpi_register_main)
+  (MPI_MainFn mainFn,const char *name,int nameLen)
 {
-	AMPIAPI("MPI_register_main");
-	ampiCreateMain(mainFn);
-	ampiAttach(name,nameLen);
+  AMPIAPI("MPI_register_main");
+  ampiCreateMain(mainFn);
+  ampiAttach(name,nameLen);
 }
 
 CDECL void MPI_Attach(const char *name)
 {
-	AMPIAPI("MPI_Attach");
-	ampiAttach(name,strlen(name));
+  AMPIAPI("MPI_Attach");
+  ampiAttach(name,strlen(name));
 }
 FDECL void FTN_NAME(MPI_ATTACH,mpi_attach)(const char *name,int nameLen)
 {
-	AMPIAPI("MPI_attach");
-	ampiAttach(name,nameLen);
+  AMPIAPI("MPI_attach");
+  ampiAttach(name,nameLen);
 }
 
 void _registerampif(void)
