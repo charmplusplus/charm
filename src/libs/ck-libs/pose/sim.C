@@ -117,7 +117,7 @@ void sim::Commit()
   localStats->SwitchTimer(FC_TIMER);
 #endif
   if (localPVT->done()) { // simulation inactive
-    eq->CommitEvents(this, -1); // commit all events in queue
+    eq->CommitEvents(this, POSE_endtime); // commit all events in queue
     objID->terminus(); // call terminus on all posers
   }
   else if (localPVT->getGVT() > lastGVT + 10) {

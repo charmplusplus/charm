@@ -176,7 +176,7 @@ void eventQueue::CommitEvents(sim *obj, POSE_TimeType ts)
 #endif
   PVT *localPVT = (PVT *)CkLocalBranch(ThePVT);
   Event *target = frontPtr->next, *commitPtr = frontPtr->next;
-  if (ts == POSE_UnsetTS) {
+  if (ts == POSE_endtime) {
     CommitAll(obj);
     return;
   }
