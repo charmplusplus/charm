@@ -8,10 +8,19 @@
 #include "cldb.h"
 #include "LBTopology.h"
 
-extern char *_lbtopo;
+typedef struct CldProcInfo_s {
+  double lastIdle;
+  int    balanceEvt;		/* user event for balancing */
+  int    idleEvt;		/* user event for idle balancing */
+} *CldProcInfo;
+
+extern char *_lbtopo;			/* topology name string */
+
 void gengraph(int, int, int, int *, int *);
 
+CpvStaticDeclare(CldProcInfo, CldData);
 CpvDeclare(int, CldLoadResponseHandlerIndex);
+CpvDeclare(int, CldAskLoadHandlerIndex);
 CpvDeclare(int, MinLoad);
 CpvDeclare(int, MinProc);
 CpvDeclare(int, Mindex);
@@ -22,8 +31,69 @@ void LoadNotifyFn(int l)
 
 char *CldGetStrategy(void)
 {
-  return "graph";
+  return "neighbor";
 }
+
+/* since I am idle, ask for work from neighbors */
+static void CldBeginIdle(void *dummy)
+{
+  CpvAccess(CldData)->lastIdle = CmiWallTimer();
+}
+
+static void CldEndIdle(void *dummy)
+{
+  CpvAccess(CldData)->lastIdle = -1;
+}
+
+static void CldStillIdle(void *dummy)
+{
+  double startT;
+  loadmsg msg;
+  int myload;
+  CldProcInfo  cldData = CpvAccess(CldData);
+
+  double t = CmiWallTimer();
+  double lt = cldData->lastIdle;
+  cldData->lastIdle = t;
+  /* only ask for work every 5ms */
+  if (lt!=-1 && t-lt<0.005) {
+    return;
+  }
+
+#ifndef CMK_OPTIMIZE
+  startT = CmiWallTimer();
+#endif
+
+  myload = CldLoad();
+  CmiAssert(myload == 0);
+
+  msg.pe = CmiMyPe();
+  msg.load = myload;
+  CmiSetHandler(&msg, CpvAccess(CldAskLoadHandlerIndex));
+  CmiSyncMulticast(CpvAccess(neighborGroup), sizeof(loadmsg), &msg);
+
+#ifndef CMK_OPTIMIZE
+  traceUserBracketEvent(cldData->idleEvt, startT, CmiWallTimer());
+#endif
+}
+
+static void CldAskLoadHandler(loadmsg *msg)
+{
+  /* send some work to this proc */
+  int receiver = msg->pe;
+  int myload = CldLoad();
+
+  if (myload>1) {
+    int sendLoad = myload / CpvAccess(numNeighbors) / 2;
+    if (sendLoad < 1) sendLoad = 1;
+    sendLoad = 1;
+    CldMultipleSend(receiver, sendLoad);
+  }
+  CmiFree(msg);
+
+}
+
+/* balancing by exchanging load among neighbors */
 
 void CldSendLoad()
 {
@@ -71,6 +141,11 @@ void CldBalance()
   int i, j, overload, numToMove=0, avgLoad;
   int totalUnderAvg=0, numUnderAvg=0, maxUnderAvg=0;
 
+#ifndef CMK_OPTIMIZE
+  double startT = CmiWallTimer();
+#endif
+
+//CmiPrintf("[%d] CldBalance %f\n", CmiMyPe(), startT);
   avgLoad = CldMinAvg();
   overload = CldLoad() - avgLoad;
   if (overload > CldCountTokens())
@@ -98,7 +173,11 @@ void CldBalance()
       }
   }
   CldSendLoad();
+#ifndef CMK_OPTIMIZE
+  traceUserBracketEvent(CpvAccess(CldData)->balanceEvt, startT, CmiWallTimer());
+#endif
   CcdCallFnAfter((CcdVoidFn)CldBalance, NULL, PERIOD);
+  CcdCallBacksReset(0);
 }
 
 void CldLoadResponseHandler(loadmsg *msg)
@@ -300,7 +379,7 @@ static void CldComputeNeighborData()
   npe = getTopoMaxNeighbors(topo);
   pes = (int *)malloc(npe*sizeof(int));
   getTopoNeighbors(topo, CmiMyPe(), pes, &npe);
-#if 0
+#if 1
   CmiPrintf("Neighors (%d) for: %d\n", npe, CmiMyPe());
   for (i=0; i<npe; i++) {
     CmiAssert(pes[i] < CmiNumPes());
@@ -323,6 +402,7 @@ static void CldComputeNeighborData()
 
 void CldGraphModuleInit(char **argv)
 {
+  CpvInitialize(CldProcInfo, CldData);
   CpvInitialize(int, numNeighbors);
   CpvInitialize(int, MinLoad);
   CpvInitialize(int, Mindex);
@@ -331,6 +411,14 @@ void CldGraphModuleInit(char **argv)
   CpvInitialize(CldNeighborData, neighbors);
   CpvInitialize(int, CldBalanceHandlerIndex);
   CpvInitialize(int, CldLoadResponseHandlerIndex);
+  CpvInitialize(int, CldAskLoadHandlerIndex);
+
+  CpvAccess(CldData) = (CldProcInfo)CmiAlloc(sizeof(struct CldProcInfo_s));
+  CpvAccess(CldData)->lastIdle = -1;
+#ifndef CMK_OPTIMIZE
+  CpvAccess(CldData)->balanceEvt = traceRegisterUserEvent("CldBalance", -1);
+  CpvAccess(CldData)->idleEvt = traceRegisterUserEvent("CldBalanceIdle", -1);
+#endif
 
   CpvAccess(MinLoad) = 0;
   CpvAccess(Mindex) = 0;
@@ -339,6 +427,8 @@ void CldGraphModuleInit(char **argv)
     CmiRegisterHandler(CldBalanceHandler);
   CpvAccess(CldLoadResponseHandlerIndex) = 
     CmiRegisterHandler((CmiHandler)CldLoadResponseHandler);
+  CpvAccess(CldAskLoadHandlerIndex) = 
+    CmiRegisterHandler((CmiHandler)CldAskLoadHandler);
 
   CmiGetArgStringDesc(argv, "+LBTopo", &_lbtopo, "define load balancing topology");
   if (CmiMyPe() == 0) CmiPrintf("Seed LB> Topology %s\n", _lbtopo);
@@ -367,6 +457,24 @@ void CldGraphModuleInit(char **argv)
     CldComputeNeighborData();
     CldBalance();
   }
+
+#if 1
+  /* register an idle handler */
+/*
+  CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,
+      (CcdVoidFn) CldBeginIdle, NULL);
+  CcdCallOnConditionKeep(CcdPROCESSOR_END_IDLE,
+      (CcdVoidFn) CldEndIdle, NULL);
+  CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,
+      (CcdVoidFn) CldStillIdle, NULL);
+*/
+  CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,
+      (CcdVoidFn) CldStillIdle, NULL);
+#endif
+#if 0
+  /* periodic load balancing */
+  CcdCallOnConditionKeep(CcdPERIODIC_10ms, (CcdVoidFn) CldBalance, NULL);
+#endif
 }
 
 void CldModuleInit(char **argv)
@@ -377,7 +485,8 @@ void CldModuleInit(char **argv)
   CpvInitialize(int, CldMessageChunks);
   CpvAccess(CldHandlerIndex) = CmiRegisterHandler(CldHandler);
   CpvAccess(CldRelocatedMessages) = CpvAccess(CldLoadBalanceMessages) = 
-    CpvAccess(CldMessageChunks) = 0;
+  CpvAccess(CldMessageChunks) = 0;
+
   CldModuleGeneralInit(argv);
   CldGraphModuleInit(argv);
 }
