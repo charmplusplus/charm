@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 2.30  1997-02-06 20:20:36  jyelon
+ * Revision 2.31  1997-02-08 14:10:17  jyelon
+ * Correcting bugs in network version.
+ *
+ * Revision 2.30  1997/02/06 20:20:36  jyelon
  * Added BLANK_SPACE bla bla.
  *
  * Revision 2.29  1997/01/17 15:50:24  jyelon
@@ -46,8 +49,7 @@
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
 
-#define CMK_ASYNC_DOESNT_WORK_USE_TIMER_INSTEAD            1
-#define CMK_ASYNC_NOT_NEEDED                               0
+#define CMK_ASYNC_NOT_NEEDED                               1
 #define CMK_ASYNC_USE_FIOASYNC_AND_FIOSETOWN               0
 #define CMK_ASYNC_USE_FIOASYNC_AND_SIOCSPGRP               0
 #define CMK_ASYNC_USE_FIOSSAIOSTAT_AND_FIOSSAIOOWN         0
@@ -71,10 +73,6 @@
 #define CMK_DEFAULT_MAIN_USES_COMMON_CODE                  1
 #define CMK_DEFAULT_MAIN_USES_SIMULATOR_CODE               0
 
-#define CMK_DGRAM_BUF_SIZE                                 52000
-#define CMK_DGRAM_MAX_SIZE                                 2048
-#define CMK_DGRAM_WINDOW_SIZE                              20
-
 #define CMK_FIX_HP_CONNECT_BUG                             1
 
 #define CMK_IS_HETERO                                      1
@@ -84,8 +82,8 @@
 #define CMK_MALLOC_USE_GNU_MALLOC                          1
 #define CMK_MALLOC_USE_OS_BUILTIN                          0
 
-#define CMK_MSG_HEADER_SIZE_BYTES                          4
-#define CMK_MSG_HEADER_BLANK_SPACE                         0
+#define CMK_MSG_HEADER_SIZE_BYTES                         16
+#define CMK_MSG_HEADER_BLANK_SPACE                        12
 
 #define CMK_PREPROCESSOR_CANNOT_DO_CONCATENATION           0
 #define CMK_PREPROCESSOR_USES_ANSI_STANDARD_CONCATENATION  1
@@ -136,8 +134,8 @@
 #define CMK_TIMER_USE_SPECIAL                              0
 #define CMK_TIMER_USE_TIMES                                1
 
-#define CMK_VECTOR_SEND_USES_COMMON_CODE                        0
-#define CMK_VECTOR_SEND_USES_SPECIAL_CODE                        1
+#define CMK_VECTOR_SEND_USES_COMMON_CODE                   1
+#define CMK_VECTOR_SEND_USES_SPECIAL_CODE                  0
 
 #define CMK_WAIT_NOT_NEEDED                                0
 #define CMK_WAIT_USES_SYS_WAIT_H                           1

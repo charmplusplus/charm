@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 2.25  1997-02-06 20:20:33  jyelon
+ * Revision 2.26  1997-02-08 14:10:16  jyelon
+ * Correcting bugs in network version.
+ *
+ * Revision 2.25  1997/02/06 20:20:33  jyelon
  * Added BLANK_SPACE bla bla.
  *
  * Revision 2.24  1997/01/17 15:50:14  jyelon
@@ -43,7 +46,6 @@
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
 
-#define CMK_ASYNC_DOESNT_WORK_USE_TIMER_INSTEAD            0
 #define CMK_ASYNC_NOT_NEEDED                               1
 #define CMK_ASYNC_USE_FIOASYNC_AND_FIOSETOWN               0
 #define CMK_ASYNC_USE_FIOASYNC_AND_SIOCSPGRP               0
@@ -67,10 +69,6 @@
 
 #define CMK_DEFAULT_MAIN_USES_COMMON_CODE                  1
 #define CMK_DEFAULT_MAIN_USES_SIMULATOR_CODE               0
-
-#define CMK_DGRAM_BUF_SIZE                                 0
-#define CMK_DGRAM_MAX_SIZE                                 0
-#define CMK_DGRAM_WINDOW_SIZE                              0
 
 #define CMK_FIX_HP_CONNECT_BUG                             0
 

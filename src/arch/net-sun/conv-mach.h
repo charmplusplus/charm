@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 2.29  1997-02-07 02:16:42  jyelon
+ * Revision 2.30  1997-02-08 14:10:23  jyelon
+ * Correcting bugs in network version.
+ *
+ * Revision 2.29  1997/02/07 02:16:42  jyelon
  * Nothing major.
  *
  * Revision 2.28  1997/02/06 20:20:45  jyelon
@@ -52,7 +55,6 @@
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
 
-#define CMK_ASYNC_DOESNT_WORK_USE_TIMER_INSTEAD            0
 #define CMK_ASYNC_NOT_NEEDED                               0
 #define CMK_ASYNC_USE_FIOASYNC_AND_FIOSETOWN               0
 #define CMK_ASYNC_USE_FIOASYNC_AND_SIOCSPGRP               0
@@ -77,12 +79,6 @@
 #define CMK_DEFAULT_MAIN_USES_COMMON_CODE                  1
 #define CMK_DEFAULT_MAIN_USES_SIMULATOR_CODE               0
 
-#define CMK_DGRAM_MAX_SIZE                                 2048
-#define CMK_DGRAM_BUF_SIZE                                 50000
-#define CMK_DGRAM_WINDOW_SIZE                              50
-#define CMK_DGRAM_DELAY_RETRANSMIT                         (0.050)
-#define CMK_DGRAM_ACK_DELAY                                (0.025)
-
 #define CMK_FIX_HP_CONNECT_BUG                             0
 
 #define CMK_MACHINE_NAME                                   "net-sun"
@@ -90,8 +86,8 @@
 #define CMK_MALLOC_USE_GNU_MALLOC                          1
 #define CMK_MALLOC_USE_OS_BUILTIN                          0
 
-#define CMK_MSG_HEADER_SIZE_BYTES                          4
-#define CMK_MSG_HEADER_BLANK_SPACE                         0
+#define CMK_MSG_HEADER_SIZE_BYTES                         16
+#define CMK_MSG_HEADER_BLANK_SPACE                        12
 
 #define CMK_PREPROCESSOR_CANNOT_DO_CONCATENATION           0
 #define CMK_PREPROCESSOR_USES_ANSI_STANDARD_CONCATENATION  1

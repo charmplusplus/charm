@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.2  1997-02-06 20:00:03  jyelon
+ * Revision 1.3  1997-02-08 14:10:22  jyelon
+ * Correcting bugs in network version.
+ *
+ * Revision 1.2  1997/02/06 20:00:03  jyelon
  * Corrected.
  *
  * Revision 2.29  1997/02/06 19:55:19  jyelon
@@ -46,7 +49,6 @@
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
 
-#define CMK_ASYNC_DOESNT_WORK_USE_TIMER_INSTEAD            0
 #define CMK_ASYNC_NOT_NEEDED                               0
 #define CMK_ASYNC_USE_FIOASYNC_AND_FIOSETOWN               1
 #define CMK_ASYNC_USE_FIOASYNC_AND_SIOCSPGRP               0
@@ -70,13 +72,6 @@
 
 #define CMK_DEFAULT_MAIN_USES_COMMON_CODE                  1
 #define CMK_DEFAULT_MAIN_USES_SIMULATOR_CODE               0
-
-#define CMK_DGRAM_MAX_SIZE                                 2048
-#define CMK_DGRAM_BUF_SIZE                                 50000
-#define CMK_DGRAM_WINDOW_SIZE                              50
-#define CMK_DGRAM_DELAY_RETRANSMIT                         (0.050)
-#define CMK_DGRAM_ACK_DELAY                                (0.025)
-#define CMK_DGRAM_ACK_MAXGROUP                             999
 
 #define CMK_FIX_HP_CONNECT_BUG                             0
 
