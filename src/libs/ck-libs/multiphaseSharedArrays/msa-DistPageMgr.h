@@ -825,7 +825,7 @@ public:
     }
 
     // MSA_CacheGroup::
-    inline void accumulate(unsigned int page, const void* entry, unsigned int offset)
+    inline void accumulate(unsigned int page, const ENTRY_TYPE* entry, unsigned int offset)
     {
         accessPage(page,Accumulate_Fault);
 	stateN(page)->write(offset);
