@@ -498,7 +498,7 @@ void CkMulticastMgr::recvPacket(CkSectionInfo &_cookie, int n, char *data, int s
   entry->asm_fill += n;
   if (seqno + 1 == count) {
     CmiAssert(entry->asm_fill == totalsize);
-    CkUnpackMessage(&(envelope*)entry->asm_msg);
+    CkUnpackMessage((envelope **)&entry->asm_msg);
     multicastGrpMsg *msg = (multicastGrpMsg *)EnvToUsr((envelope*)entry->asm_msg);
     msg->_cookie = _cookie;
 //    mCastGrp[CkMyPe()].recvMsg(msg);
