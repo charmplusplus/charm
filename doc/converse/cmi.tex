@@ -207,7 +207,7 @@ could be used to check the status of this send using
 \param{CmiAsyncMsgSent()}. \param{msg} should not be overwritten or
 freed before the communication is complete.}
 
-\section{Timer Calls}
+\section{Timer}
 
 \function{double CmiTimer(void)}
 \desc{Returns current value of the timer in seconds. This is
@@ -243,6 +243,7 @@ send and blocking receive.}
 On machine with host, this is implemented on top of the messaging 
 layer using asynchronous sends.}
 
+\internal{
 \section{Processor Groups}
 
 \function{void CmiPgrpCreate(Pgrp *group)}
@@ -280,3 +281,4 @@ in the processor-group \param{group}.}
 \desc{Fills in array \param{children} with processor ids of all the
 children processor \param{node} in processor-group \param{group}. This
 array should atleast be of size \param{CmiNumChildren()}.}
+}
