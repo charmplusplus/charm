@@ -71,6 +71,7 @@ class LogPool {
   events descriptions will be written into .sts file.
 */
 class TraceProjections : public Trace {
+    LogPool* _logPool;        /**<  logpool for all events */
     int curevent;
     int execEvent;
     int execEp;
@@ -78,7 +79,7 @@ class TraceProjections : public Trace {
     int isIdle;
     int cancel_beginIdle, cancel_endIdle;
   public:
-    TraceProjections() { curevent=0; isIdle=0; }
+    TraceProjections(char **argv);
     void userEvent(int e);
     void creation(envelope *e, int num=1);
     void beginExecute(envelope *e);
@@ -97,7 +98,6 @@ class TraceProjections : public Trace {
     void beginComputation(void);
     void endComputation(void);
 
-    void traceInit(char **argv);
     int traceRegisterUserEvent(const char*);
     void traceClearEps();
     void traceWriteSts();

@@ -21,7 +21,7 @@
 
 #include "trace-common.h"
 
-// in second
+// time in seconds
 #define  BIN_SIZE	0.001
 
 #define  MAX_ENTRIES      500
@@ -169,6 +169,7 @@ class SumLogPool {
   number of calls and total wall time for each entry. 
 */
 class TraceSummary : public Trace {
+    SumLogPool*  _logPool;
     int curevent;
     int execEvent;
     int execEp;
@@ -179,7 +180,7 @@ class TraceSummary : public Trace {
     double bin;
     int msgNum;
   public:
-    TraceSummary() { curevent=0; msgNum=0; binStart=0.0; bin=0.0;}
+    TraceSummary(char **argv);
     void userEvent(int e);
     void creation(envelope *e, int num=1);
     void beginExecute(envelope *e);
@@ -198,13 +199,21 @@ class TraceSummary : public Trace {
     void beginComputation(void);
     void endComputation(void);
 
-    void traceInit(char **argv);
     int traceRegisterUserEvent(const char*);
     void traceClearEps();
     void traceWriteSts();
     void traceClose();
     void traceBegin();
     void traceEnd();
+
+    /**
+       for trace summary event mark
+    */
+    void addEventType(int eventType);
+    /** 
+       for starting a new phase
+    */
+    void startPhase(int phase);
 };
 
 #endif

@@ -16,8 +16,7 @@
 
 #define VER   3.0
 
-CpvStaticDeclare(Trace*, _trace);
-CpvStaticDeclare(SumLogPool*, _logPool);
+CpvStaticDeclare(TraceSummary*, _trace);
 CpvStaticDeclare(char*, pgmName);
 static int _numEvents = 0;
 static int _threadMsg, _threadChare, _threadEP;
@@ -26,11 +25,15 @@ static int _unpackMsg, _unpackChare, _unpackEP;
 CpvDeclare(double, binSize);
 CpvDeclare(double, version);
 
+/**
+  For each TraceFoo module, _createTraceFoo() must be defined.
+  This function is called in _createTraces() generated in moduleInit.C
+*/
 void _createTracesummary(char **argv)
 {
   DEBUGF(("%d createTraceSummary\n", CkMyPe()));
-  CpvInitialize(Trace*, _trace);
-  CpvAccess(_trace) = new  TraceSummary();
+  CpvInitialize(TraceSummary*, _trace);
+  CpvAccess(_trace) = new  TraceSummary(argv);
   CpvAccess(_traces)->addTrace(CpvAccess(_trace));
 }
 
@@ -39,7 +42,7 @@ void _createTracesummary(char **argv)
 extern "C" 
 void CkSummary_StartPhase(int phase)
 {
-   CpvAccess(_logPool)->startPhase(phase);
+   CpvAccess(_trace)->startPhase(phase);
 }
 
 
@@ -47,7 +50,7 @@ void CkSummary_StartPhase(int phase)
 extern "C" 
 void CkSummary_MarkEvent(int eventType)
 {
-   CpvAccess(_logPool)->addEventType(eventType, TraceTimer());
+   CpvAccess(_trace)->addEventType(eventType);
 }
 
 
@@ -227,10 +230,9 @@ void BinEntry::write(FILE* fp)
   fprintf(fp, "%4d", per);
 }
 
-void TraceSummary::traceInit(char **argv)
+TraceSummary::TraceSummary(char **argv):curevent(0),msgNum(0),binStart(0.0),bin(0.0)
 {
   char *tmpStr;
-  CpvInitialize(SumLogPool*, _logPool);
   CpvInitialize(char*, pgmName);
   CpvInitialize(double, binSize);
   CpvInitialize(double, version);
@@ -243,7 +245,7 @@ void TraceSummary::traceInit(char **argv)
   	sscanf(tmpStr,"%lf",&CpvAccess(binSize));
   if (CmiGetArgString(argv,"+version",&tmpStr))
   	sscanf(tmpStr,"%lf",&CpvAccess(version));
-  CpvAccess(_logPool) = new SumLogPool(CpvAccess(pgmName));
+  _logPool = new SumLogPool(CpvAccess(pgmName));
 }
 
 int TraceSummary::traceRegisterUserEvent(const char*)
@@ -253,22 +255,22 @@ int TraceSummary::traceRegisterUserEvent(const char*)
 
 void TraceSummary::traceClearEps(void)
 {
-  CpvAccess(_logPool)->clearEps();
+  _logPool->clearEps();
 }
 
 void TraceSummary::traceWriteSts(void)
 {
   if(CmiMyPe()==0)
-      CpvAccess(_logPool)->writeSts();
+      _logPool->writeSts();
 }
 
 void TraceSummary::traceClose(void)
 {
   CpvAccess(_trace)->endComputation();
   if(CmiMyPe()==0)
-      CpvAccess(_logPool)->writeSts();
+      _logPool->writeSts();
   // destructor call the write()
-  delete CpvAccess(_logPool);
+  delete _logPool;
 }
 
 void TraceSummary::traceBegin(void)
@@ -309,7 +311,7 @@ void TraceSummary::beginExecute(int event,int msgType,int ep,int srcPe, int mlen
   // fill gaps
   while ((ts = ts + CpvAccess(binSize)) < t)
   {
-     CpvAccess(_logPool)->add(bin, CmiMyPe());
+     _logPool->add(bin, CmiMyPe());
      bin=0.0;
      binStart = ts;
   }
@@ -324,14 +326,14 @@ void TraceSummary::endExecute(void)
 
   if (execEp != -1)
   {
-    CpvAccess(_logPool)->setEp(execEp, t-ts);
+    _logPool->setEp(execEp, t-ts);
   }
 
   while ((nts = nts + CpvAccess(binSize)) < t)
   {
      bin += nts-ts;
      binStart  = nts;
-     CpvAccess(_logPool)->add(bin, CmiMyPe());
+     _logPool->add(bin, CmiMyPe());
      bin = 0;
      ts = nts;
   }
@@ -353,7 +355,7 @@ void TraceSummary::beginPack(void)
 
 void TraceSummary::endPack(void)
 {
-    CpvAccess(_logPool)->setEp(_packEP, CmiWallTimer() - packstart);
+    _logPool->setEp(_packEP, CmiWallTimer() - packstart);
 }
 
 void TraceSummary::beginUnpack(void)
@@ -363,7 +365,7 @@ void TraceSummary::beginUnpack(void)
 
 void TraceSummary::endUnpack(void)
 {
-    CpvAccess(_logPool)->setEp(_unpackEP, CmiWallTimer()-unpackstart);
+    _logPool->setEp(_unpackEP, CmiWallTimer()-unpackstart);
 }
 
 void TraceSummary::beginCharmInit(void) {}
@@ -395,7 +397,7 @@ void TraceSummary::endComputation(void)
 {
   if (msgNum==0) {
 //CmiPrintf("Add at last: %d pe:%d time:%f msg:%d\n", index, CmiMyPe(), bin, msgNum);
-     CpvAccess(_logPool)->add(bin, CmiMyPe());
+     _logPool->add(bin, CmiMyPe());
      msgNum ++;
 
      binStart  += CpvAccess(binSize);
@@ -403,11 +405,23 @@ void TraceSummary::endComputation(void)
      double ts = binStart;
      while (ts < t)
      {
-       CpvAccess(_logPool)->add(bin, CmiMyPe());
+       _logPool->add(bin, CmiMyPe());
        bin=0.0;
        ts += CpvAccess(binSize);
      }
   }
 }
+
+void TraceSummary::addEventType(int eventType)
+{
+  _logPool->addEventType(eventType, TraceTimer());
+}
+
+void TraceSummary::startPhase(int phase)
+{
+   _logPool->startPhase(phase);
+}
+
+
 
 /*@}*/

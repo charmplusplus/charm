@@ -88,12 +88,13 @@ extern "C" void traceInit(char **argv)
 {
   CpvInitialize(TraceArray *, _traces);
   CpvAccess(_traces) = new TraceArray;
+
+  // common init
+  traceCommonInit(argv);
+
   // in moduleInit.C
   _createTraces(argv);
 
-  traceCommonInit(argv);
-  CpvAccess(_traces)->traceInit(argv);
-  
   if (CpvAccess(_traces)->length() && !CmiGetArgFlag(argv,"+traceoff"))
     traceBegin();
 }

@@ -42,7 +42,6 @@ class Trace {
     virtual void beginComputation(void) {}
     virtual void endComputation(void) {}
 
-    virtual void traceInit(char **argv) {}
     virtual int traceRegisterUserEvent(const char*) {return 0;}
     virtual void traceClearEps() {}
     virtual void traceWriteSts() {}
@@ -80,7 +79,6 @@ public:
     inline void dequeue(envelope *e) {ALLDO(dequeue(e));}
     inline void beginComputation(void) {ALLDO(beginComputation());}
     inline void endComputation(void) {ALLDO(endComputation());}
-    inline void traceInit(char **argv) {ALLDO(traceInit(argv));}
     inline int traceRegisterUserEvent(const char*x) {
 	  int eno = 0;
 	  for (int i=0; i<traces.length(); i++) {
