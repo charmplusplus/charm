@@ -208,19 +208,20 @@ PairCalculator::calculatePairs_gemm(int size, complex *points, int sender, bool 
    * Scheme 3: Collect everything and do it in one big zgemm.
    * Scheme 3 is implemented below.
    */
-  N = size; // N is init here with the size of the data chunk. 
   /* 
      NOTE: Assumes that data chunk of the same plane across all states are of the same size 
   */
-
+  
   if (inData[0]==NULL) 
   { // now that we know N we can allocate contiguous space
+    N = size; // N is init here with the size of the data chunk. 
     inData[0] = new complex[numExpected*N];
     for(int i=1;i<numExpected;i++)
       inData[i] = inData[i-1] + N;
   }
+  CkAssert(N==size);
   memcpy(inData[offset], points, size * sizeof(complex));
-
+  
   // In scheme 3 we'll have everything collected
 
   if (numRecd == numExpected * 2 || (symmetric && thisIndex.x==thisIndex.y && numRecd==numExpected)) {
@@ -238,6 +239,9 @@ PairCalculator::calculatePairs_gemm(int size, complex *points, int sender, bool 
     int n_in=numExpected;
     int k_in=N;
     int matrixSize=numExpected*numExpected;
+    // This distinction is left here because it was in the original pairCalc.
+    // But really I fail to see how these parameters are dependant on the _SPARSECONT_ flag.
+    //  
     /*  int m_in=S;
 	int n_in=N;
 	int k_in=S;
@@ -251,33 +255,23 @@ PairCalculator::calculatePairs_gemm(int size, complex *points, int sender, bool 
     int ldc=numExpected;   //leading dimension C
 
 
-#ifdef DGEMM_MADNESS
-    /* I do not understand how this scheme can possibly work.
-       If we treat the complex array as simply twice as many doubles
-       we are just doubling the size of N to 2N.
-       The multiplication is (numExpected X N) X (N X numExpected).
-       So we take the dot product of size N vectors.
-       Doubling N doesn't get us twice as many results.
-       We have numExpected X numExpected results independant of N.
-
-       In any case, casting to double seems to lead to segfault land.
-    */
+#ifdef _PAIRCALC_USE_DGEMM_
+    lda*=2;
+    ldb*=2;
+    k_in*=2;
     double alpha=double(1.0);//multiplicative identity 
     double beta=double(0.0);
-    double *ldata=(double *) inDataLeft[0];
-    double *rdata=(double *) inDataRight[0];
+    double *ldata= reinterpret_cast <double *> (inDataLeft[0]);
     // if we have everthing blast it in one big gemm
     if( numRecd == numExpected * 2) 
       {
+	double *rdata= reinterpret_cast <double *> (inDataRight[0]); 
 	DGEMM(&transformT, &transform, &m_in, &n_in, &k_in, &alpha, ldata, &lda, rdata, &ldb, &beta, outData, &ldc);
       }
     else if (symmetric && thisIndex.x==thisIndex.y && numRecd==numExpected)
       {
 	DGEMM(&transformT, &transform, &m_in, &n_in, &k_in, &alpha, ldata, &lda, ldata, &ldb, &beta, outData, &ldc);
       }
-    // Now crunch out the imaginary
-    //    DCOPY(&matrixSize,odata,&incx, outData,&incy);
-    //    delete [] odata;
 #else
     complex **outComplex= new complex*[numExpected];
     outComplex[0] = new complex[matrixSize];
@@ -294,7 +288,7 @@ PairCalculator::calculatePairs_gemm(int size, complex *points, int sender, bool 
 
       }
     // now crunch out the imaginary
-    double *inmatrix= (double *) outComplex[0];
+    double *inmatrix= reinterpret_cast <double *> (outComplex[0]);
     DCOPY(&matrixSize, inmatrix, &incx, outData, &incy);
     delete [] outComplex[0];
     delete [] outComplex;
