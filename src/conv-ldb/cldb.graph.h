@@ -1,4 +1,6 @@
 #include "cldb.h"
+/* for sqrt() */
+#include <math.h>
 
 typedef struct CldNeighborData
 {
