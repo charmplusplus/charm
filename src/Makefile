@@ -27,9 +27,9 @@ all:
 	@echo '  make charm'
 	@echo '  make charm++'
 
-charm: converse charmlibs libcharm charmxlat
+charm: converse charmxlat charmlibs libcharm
 
-charm++: converse charmlibs libcharm charmxlat libck-cplus-y.o charmxlat++
+charm++: converse charmxlat charmlibs charmxlat++ libcharm libck-cplus-y.o 
 
 CHARMC=../bin/charmc $(OPTS)
 
