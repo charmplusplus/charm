@@ -4,7 +4,15 @@
 #ifndef _conv_mach_h
 #include "conv-mach.h"
 #endif
+/*
+#if CMK_WEB_MODE
+#include "conv-ccs.h"
+#endif
 
+#if CMK_DEBUG_MODE
+#include "conv-ccs.h"
+#endif
+*/
 
 /**** DEAL WITH DIFFERENCES: KERNIGHAN-RITCHIE-C, ANSI-C, AND C++ ****/
 
@@ -1013,6 +1021,8 @@ void CcdCallBacks();
 
 #if CMK_DEBUG_MODE
 
+#include "conv-ccs.h"
+
 CpvExtern(void *, debugQueue);
 
 void CpdInit(void);
@@ -1061,6 +1071,9 @@ char* getMsgContentsDebug(int index);
 #endif
 
 #if CMK_WEB_MODE
+
+#include "conv-ccs.h"
+
 void CWebInit (void);
 void CWebPlateRegisterCell (void);
 void CWebPlateDataDeposit (int timestep, int cellx, int celly, 
@@ -1069,29 +1082,6 @@ void CWebPlateDataDeposit (int timestep, int cellx, int celly,
 
 #if CMK_CMIDELIVERS_USE_COMMON_CODE
 CpvExtern(void*, CmiLocalQueue);
-#endif
-
-
-/******* Converse Client Server *****/
-
-#define CMK_CCS_VERSION "1"
-
-#if CMK_CCS_AVAILABLE
-void CcsUseHandler(char *id, int hdlr);
-int CcsRegisterHandler(char *id, CmiHandler fn);
-int CcsEnabled(void);
-int CcsIsRemoteRequest(void);
-void CcsCallerId(unsigned int *pip, unsigned int *pport);
-void CcsSendReply(unsigned int ip, unsigned int port, int size, void *reply);
-void CcsSendReplyFd(unsigned int ip, unsigned int port, int size, void *reply);
-#else
-#define CcsInit()
-#define CcsUseHandler(x,y)
-#define CcsRegisterHandler(x,y) 0
-#define CcsEnabled() 0
-#define CcsIsRemoteRequest() 0
-#define CcsCallerId(x,y)
-#define CcsSendReply(i,p,s,r)
 #endif
 
 
