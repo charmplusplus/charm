@@ -28,7 +28,7 @@ syntax() {
   echo '<options>: compiler and platform specific options'
   echo 'cc cc64 cxx kcc pgcc acc icc ecc gcc3 mpcc'
   echo 'help smp gm tcp vmi scyld clustermatic opteron bluegene ooc syncft'
-  echo '--incdir --libdir --basedir --build-shared --no-shared -j'
+  echo '--incdir --libdir --basedir --no-build-shared -j'
   if test $more = 1
   then
   echo ''
@@ -61,8 +61,8 @@ syntax() {
   echo '  syncft	  compile with Charm++ fault tolerance support'
   echo ''
   echo "Charm++ dynamic libraries:"
-  echo "  --build-shared  build Charm++ dynamic libraries (.so), this is on by default"
-  echo "  --no-shared	  disable the compilation for Charm++'s shared libraries"
+  echo "  --build-shared     build Charm++ dynamic libraries (.so) (default)"
+  echo "  --no-build-shared  don't build Charm++'s shared libraries"
   echo ''
   echo 'Miscellaneous options:'
   echo '  --incdir=DIR	  specify additional include path for compiler'
@@ -168,7 +168,7 @@ BASEDIR=
 LIBDIR=
 INCDIR=
 ARCH=
-BUILD_SHARED="-build-shared"
+BUILD_SHARED=
 
 [ "$1" = '--help' -o "$1" = '-h' ] && more=1 && syntax | more && exit 1
 [ $# -lt 2 ] && syntax && exit 1
@@ -211,8 +211,13 @@ do
 		CheckDir $incdir
           	INCDIR="$INCDIR -I$incdir"; shift
  	  	;;
+	    --no-build-shared|-nobs|--build-shared|-bs)
+		# obsolete
+		BUILD_SHARED="$1"; shift
+		;;
 	    --no-shared)
-		BUILD_SHARED=""; shift
+		# obsolete
+		BUILD_SHARED="-nobs"; shift
 		;;
 	    -j*)
                 PMAKENUM=`echo $1 | awk -Fj '{print $2}'`
