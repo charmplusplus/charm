@@ -97,6 +97,7 @@ inline void PUP_stl_container(PUP::er &p,container &c) {
   int nElem=PUP_stl_container_size(p,c);
   if (p.isUnpacking()) 
   { //Unpacking: Extract each element and push_back:
+    c.resize(0);
     for (int i=0;i<nElem;i++) {
       p.syncComment(PUP::sync_item);
       dtype n;
