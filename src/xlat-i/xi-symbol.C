@@ -151,7 +151,8 @@ Module *Parse(char *interfacefile)
 	FILE * fp = fopen (interfacefile, "r") ;
 	if (fp) {
 		yyin = fp ;
-		yyparse() ;
+		if(yyparse())
+                  exit(1);
 		fclose(fp) ;
 	} else {
 		cout << "ERROR : could not open " << interfacefile << endl ;
