@@ -31,14 +31,23 @@ typedef struct CMK_MSG_HEADER_BLUEGENE   CmiBlueGeneMsgHeader;
 /**
   macros to access Blue Gene message header fields
 */
+  /* small or big work */
 #define CmiBgMsgType(m)  (((CmiBlueGeneMsgHeader*)m)->t)
 #define CmiBgMsgRecvTime(m)  (((CmiBlueGeneMsgHeader*)m)->rt)
 #define CmiBgMsgLength(m)  (((CmiBlueGeneMsgHeader*)m)->n)
 #define CmiBgMsgNodeID(m)  (((CmiBlueGeneMsgHeader*)m)->nd)
 #define CmiBgMsgThreadID(m)  (((CmiBlueGeneMsgHeader*)m)->tID)
 #define CmiBgMsgHandle(m)  (((CmiBlueGeneMsgHeader*)m)->hID)
+  /* msg id is local to the source pe */
 #define CmiBgMsgID(m)      (((CmiBlueGeneMsgHeader*)m)->msgID)
 #define CmiBgMsgSrcPe(m)   (((CmiBlueGeneMsgHeader*)m)->srcPe)
+  /* for future use */
+#define CmiBgMsgFlag(m)  (((CmiBlueGeneMsgHeader*)m)->flag)
+  /* reference counter */
+#define CmiBgMsgRefCount(m)  (((CmiBlueGeneMsgHeader*)m)->ref)
+
+  /* a msg is not a full message, with header and a pointer to the real msg */
+#define BG_CLONE	0x1
 
 /**
    indicate a message is for any thread;

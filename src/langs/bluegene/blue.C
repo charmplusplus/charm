@@ -486,6 +486,32 @@ void nodeBCastMsgHandlerFunc(char *msg)
   if (count == 0) CmiFree(msg);
 }
 
+// clone a msg, only has a valid header, plus a pointer to the real msg
+char *BgCloneMsg(char *msg)
+{
+  int size = CmiBlueGeneMsgHeaderSizeBytes + sizeof(char *);
+  char *dupmsg = (char *)CmiAlloc(size);
+  memcpy(dupmsg, msg, CmiBlueGeneMsgHeaderSizeBytes);
+  *(char **)(dupmsg + CmiBlueGeneMsgHeaderSizeBytes) = msg;
+  CmiBgMsgRefCount(msg) ++;
+  CmiBgMsgFlag(dupmsg) = BG_CLONE;
+  return dupmsg;
+}
+
+// expand the cloned msg to the full size msg
+char *BgExpandMsg(char *msg)
+{
+  char *origmsg = *(char **)(msg + CmiBlueGeneMsgHeaderSizeBytes);
+  int size = CmiBgMsgLength(origmsg);
+  char *dupmsg = (char *)CmiAlloc(size);
+  memcpy(dupmsg, msg, CmiBlueGeneMsgHeaderSizeBytes);
+  memcpy(dupmsg+CmiBlueGeneMsgHeaderSizeBytes, origmsg+CmiBlueGeneMsgHeaderSizeBytes, size-CmiBlueGeneMsgHeaderSizeBytes);
+  CmiFree(msg);
+  CmiBgMsgRefCount(origmsg) --;
+  if (CmiBgMsgRefCount(origmsg) == 0) CmiFree(origmsg);
+  return dupmsg;
+}
+
 /* Converse handler for thread level broadcast message */
 void threadBCastMsgHandlerFunc(char *msg)
 {
@@ -507,18 +533,23 @@ void threadBCastMsgHandlerFunc(char *msg)
   }
   // broadcast except nodeID:threadId
   int len = CmiBgMsgLength(msg);
+  // optimization needed if the message size is big
+  // making duplications can easily run out of memory
+  int bigOpt = (len > 4096);
   for (int i=0; i<cva(numNodes); i++)
   {
-    for (int j=0; j<cva(bgMach).numWth; j++) {
-      if (i==lnodeID && j==threadID) continue;
-      char *dupmsg = CmiCopyMsg(msg, len);
-      CmiBgMsgNodeID(dupmsg) = nodeInfo::Local2Global(i);
-      CmiBgMsgThreadID(dupmsg) = j;
-      DEBUGF(("[%d] addBgNodeInbuffer to %d tid:%d\n", CmiMyPe(), i, j));
-      addBgNodeInbuffer(dupmsg, i);
-    }
+      for (int j=0; j<cva(bgMach).numWth; j++) {
+        if (i==lnodeID && j==threadID) continue;
+        // for big message, clone a message token instead of a real msg
+        char *dupmsg = bigOpt? BgCloneMsg(msg) : CmiCopyMsg(msg, len);
+        CmiBgMsgNodeID(dupmsg) = nodeInfo::Local2Global(i);
+        CmiBgMsgThreadID(dupmsg) = j;
+        DEBUGF(("[%d] addBgNodeInbuffer to %d tid:%d\n", CmiMyPe(), i, j));
+        addBgNodeInbuffer(dupmsg, i);
+      }
   }
-  CmiFree(msg);
+  // for big message, will free after all tokens are done
+  if (!bigOpt) CmiFree(msg);
 }
 
 /**
@@ -544,12 +575,14 @@ public:
   char **streamingMsgs;
   int  *streamingMsgSizes;
   int count;
+  int totalWorker;
   int pe;
 public:
   BgStreaming() {
     streamingMsgs = NULL;
     streamingMsgSizes = NULL;
     count = 0;
+    totalWorker = 0;
     pe = -1;
   }
   ~BgStreaming() {
@@ -558,9 +591,10 @@ public:
       delete [] streamingMsgSizes;
     }
   }
-  void init(int c) {
-    streamingMsgs = new char *[c];
-    streamingMsgSizes = new int [c];
+  void init(int nNodes) {
+    totalWorker = nNodes * BgGetNumWorkThread();
+    streamingMsgs = new char *[totalWorker];
+    streamingMsgSizes = new int [totalWorker];
   }
   void depositMsg(int p, int size, char *m) {
     streamingMsgs[count] = m;
@@ -568,7 +602,7 @@ public:
     count ++;
     if (pe == -1) pe = p;
     else CmiAssert(pe == p);
-    if (count == cva(numNodes)) {
+    if (count == totalWorker) {
       // CkPrintf("streaming send\n");
       CmiMultipleSend(pe, count, streamingMsgSizes, streamingMsgs);
       for (int i=0; i<count; i++) CmiFree(streamingMsgs[i]);
@@ -590,21 +624,29 @@ void BgEndStreaming()
   bg_streaming = 0;
 }
 
+void CmiSendPacketWrapper(int pe, int msgSize,char *msg, int streaming)
+{
+  if (streaming && pe != CmiMyPe())
+    bgstreaming.depositMsg(pe, msgSize, msg);
+  else
+    CmiSyncSendAndFree(pe, msgSize, msg);
+}
+
 
 void CmiSendPacket(int x, int y, int z, int msgSize,char *msg)
 {
 //  CmiSyncSendAndFree(nodeInfo::XYZ2PE(x,y,z),msgSize,(char *)msg);
 #if !DELAY_SEND
   const int pe = nodeInfo::XYZ2PE(x,y,z);
-  CmiSyncSendAndFree(pe, msgSize, msg);
+  CmiSendPacketWrapper(pe, msgSize, msg, bg_streaming);
 #else
   if (!correctTimeLog) {
     const int pe = nodeInfo::XYZ2PE(x,y,z);
-    if (bg_streaming && pe != CmiMyPe())
-      bgstreaming.depositMsg(pe, msgSize, msg);
-    else
-      CmiSyncSendAndFree(pe, msgSize, msg);
+    CmiSendPacketWrapper(pe, msgSize, msg, bg_streaming);
   }
+  // else messages are kept in the log (MsgEntry), and only will be sent
+  // after timing correction has done on that log.
+  // TODO: streaming has no effect if time correction is on.
 #endif
 }
 
@@ -619,6 +661,8 @@ void sendPacket_(nodeInfo *myNode, int x, int y, int z, int threadID, int handle
   CmiBgMsgHandle(sendmsg) = handlerID;
   CmiBgMsgType(sendmsg) = type;
   CmiBgMsgLength(sendmsg) = numbytes;
+  CmiBgMsgFlag(sendmsg) = 0;
+  CmiBgMsgRefCount(sendmsg) = 0;
   if (local) {
     BgAdvance(cva(bgMach).network->charmcost());
     latency = 0.0;
@@ -655,6 +699,8 @@ static inline void nodeBroadcastPacketExcept_(int node, CmiInt2 threadID, int ha
   CmiBgMsgHandle(sendmsg) = handlerID;	
   CmiBgMsgType(sendmsg) = type;	
   CmiBgMsgLength(sendmsg) = numbytes;
+  CmiBgMsgFlag(sendmsg) = 0;
+  CmiBgMsgRefCount(sendmsg) = 0;
   /* FIXME */
   CmiBgMsgRecvTime(sendmsg) = MSGTIME(myNode->x, myNode->y, myNode->z, 0,0,0, numbytes) + BgGetTime();
 
@@ -683,6 +729,8 @@ static inline void threadBroadcastPacketExcept_(int node, CmiInt2 threadID, int 
   CmiBgMsgHandle(sendmsg) = handlerID;	
   CmiBgMsgType(sendmsg) = type;	
   CmiBgMsgLength(sendmsg) = numbytes;
+  CmiBgMsgFlag(sendmsg) = 0;
+  CmiBgMsgRefCount(sendmsg) = 0;
   /* FIXME */
   BgAdvance(cva(bgMach).network->alphacost());
   CmiBgMsgRecvTime(sendmsg) = BgGetTime();	
@@ -781,6 +829,8 @@ void BgSyncListSend(int npes, int *pes, int handlerID, WorkType type, int numbyt
   CmiBgMsgHandle(msg) = handlerID;
   CmiBgMsgType(msg) = type;
   CmiBgMsgLength(msg) = numbytes;
+  CmiBgMsgFlag(msg) = 0;
+  CmiBgMsgRefCount(msg) = 0;
 
   BgAdvance(cva(bgMach).network->alphacost());
 
@@ -961,13 +1011,13 @@ void BgSetWorkerThreadStart(BgStartHandler f)
   workStartFunc = f;
 }
 
+// kernel function for processing a bluegene message
 void BgProcessMessage(char *msg)
 {
   int handler = CmiBgMsgHandle(msg);
   DEBUGF(("[%d] call handler %d\n", BgMyNode(), handler));
 
   BgHandlerInfo *handInfo;
-  BgHandlerEx entryFunc;
 #if  CMK_BLUEGENE_NODE
   handInfo = tMYNODE->handlerTable.getHandle(handler);
 #else
@@ -977,15 +1027,23 @@ void BgProcessMessage(char *msg)
 
   if (handInfo == NULL) {
     CmiPrintf("[%d] invalid handler: %d. \n", tMYNODEID, handler);
-    CmiAbort("");
+    CmiAbort("BgProcessMessage Failed!");
   }
-  entryFunc = handInfo->fnPtr;
+  BgHandlerEx entryFunc = handInfo->fnPtr;
 
   CmiSetHandler(msg, CmiBgMsgHandle(msg));
 
+  // optimization for broadcast messages:
+  // if the msg is a broadcast token msg, expand it to a real msg
+  if (CmiBgMsgFlag(msg) == BG_CLONE) {
+    msg = BgExpandMsg(msg);
+  }
+
   // don't count thread overhead and timing overhead
   startVTimer();
+
   entryFunc(msg, handInfo->userPtr);
+
   stopVTimer();
 }
 
