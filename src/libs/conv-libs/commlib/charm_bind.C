@@ -82,10 +82,10 @@ void CComlibEachToManyMulticast(comID id, int ep, void *msg, int bocnum, int npe
 
   _TRACE_CREATION_N(env, npe);
 
+  CpvAccess(_qd)->create();
   EachToManyMulticast(id, len, (void *)env, npe, pelist);
 
   _STATS_RECORD_SEND_BRANCH_N(npe);
-  CpvAccess(_qd)->create();
      
 //CkPrintf("EachToManyMulticast: len:%d npe:%d done\n", len, npe);
 }
