@@ -588,7 +588,7 @@ case "$LANGUAGE" in
 "c"|"C"|"c++"|"C++")
 	[ -z "$SEQUENTIAL" ] && Abort "Language $LANGUAGE is for sequential programs"
 	;;
-"charm"|"charm++"|"converse"|"converse++"|"idl")
+"charm"|"charm++"|"converse"|"converse++")
 	[ -z "$SEQUENTIAL" ] || Abort "Language $LANGUAGE is for parallel programs"
 	;;
 "fem"|"femf"|"ampi"|"ampif"|"f90charm"|"bluegene")
@@ -700,9 +700,6 @@ do
 		else
 		    Do $CHARMBIN/charmxi $CMK_XIOPTS $BASE.ci
 		fi
-		;;
-	*.idl)
-		Do $CHARMBIN/charmidl $BASE.idl
 		;;
 	*.sdag)
 		Do $CHARMBIN/sdagx $BASE.sdag
@@ -915,33 +912,29 @@ case "$LANGUAGE" in
 	;;
 esac
 
-LANG_LIBS="-L$CHARMLIB -I$CHARMINC $BAL_OBJ $OBJECTFILES $PRE_LIBRARIES -lck $POST_LIBRARIES"
+LANG_LIBS="-L$CHARMLIB -I$CHARMINC $BAL_OBJ $OBJECTFILES $PRE_LIBRARIES"
 CORE_LIBS="-lconv-core -lconv-util -ltrace-$TRACEMODE"
 
 case "$LANGUAGE" in
 "charm"|"charm++")
 	Do $CMK_LDXX $OPTSL $OPTS_LDXX -o $OBJECT \
-		$LANG_LIBS -lconv-cplus-y $CORE_LIBS -lm $CMK_LIBS
+		$LANG_LIBS -lck -lconv-cplus-y $CORE_LIBS -lm $CMK_LIBS $POST_LIBRARIES
 	;;
 "f90charm")
 	Do $CMK_LDXX $OPTSL $OPTS_LDXX -o $OBJECT \
-		$LANG_LIBS -lconv-cplus-y $CORE_LIBS -lm $CMK_LIBS
-	;;
-"idl")
-	Do $CMK_LDXX $OPTSL $OPTS_LDXX -o $OBJECT \
-		$LANG_LIBS -lconv-cplus-y $CORE_LIBS -lidl -lm $CMK_LIBS
+		$LANG_LIBS -lck -lconv-cplus-y $CORE_LIBS -lm $CMK_LIBS $POST_LIBRARIES
 	;;
 "ampi"|"ampif"|"fem"|"femf"|"bluegene")
 	Do $CMK_LDXX $OPTSL $OPTS_LDXX -o $OBJECT \
-		$LANG_LIBS -lconv-cplus-y $CORE_LIBS -lm $CMK_LIBS
+		$LANG_LIBS -lck -lconv-cplus-y $CORE_LIBS -lm $CMK_LIBS $POST_LIBRARIES
 	;;
 "converse")
 	Do $CMK_LD $OPTSL $OPTS_LD -o $OBJECT \
-		$LANG_LIBS -lconv-cplus-n $CORE_LIBS -lm $CMK_LIBS
+		$LANG_LIBS -lconv-cplus-n $CORE_LIBS -lm $CMK_LIBS $POST_LIBRARIES
 	;;
 "converse++")
 	Do $CMK_LDXX $OPTSL $OPTS_LDXX -o $OBJECT \
-		$LANG_LIBS -lconv-cplus-y $CORE_LIBS -lm $CMK_LIBS
+		$LANG_LIBS -lconv-cplus-y $CORE_LIBS -lm $CMK_LIBS $POST_LIBRARIES
 	;;
 esac
 
