@@ -218,6 +218,7 @@ static void pupArray(PUP::er &p, int i)
 
 CpvDeclare(int, groupTableSize);
 
+extern void CpdCharmInit(void);
 
 void _registerDone(void)
 {
@@ -229,6 +230,7 @@ void _registerDone(void)
   CpdListRegister(new CpdSimpleListAccessor("charm/readonlyMsg",_readonlyMsgs.size(),pupReadonlyMsg));
  
   CpdListRegister(new CpdSimpleListAccessor("charm/arrayelements", CpvAccess(_groupIDTable)->length(), pupArray));
+  CpdCharmInit();
 }
 
 //Print a debugging version of this entry method index:
