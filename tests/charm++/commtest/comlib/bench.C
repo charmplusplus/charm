@@ -13,7 +13,7 @@
 #include "bench.decl.h"
 
 #define USELIB  1
-#define MAXPASS 100
+#define MAXPASS 200
 #define MESSAGESIZE CkpvAccess(msgSize)
 
 int fraction = 1;  /* readonly */
@@ -93,7 +93,7 @@ public:
         StreamingStrategy *sstrat = new StreamingStrategy(10, 10);
         //sstrat->enableShortArrayMessagePacking();
 
-        cinst.setStrategy(strat);        
+        cinst.setStrategy(strat);                
         //tmpInstance.setStrategy(sstrat);
         //cinst = tmpInstance;
 
@@ -179,6 +179,8 @@ public:
         doneFlag = 0;
         myInst = cinst;
 
+        myInst.setSourcePe();
+
         usesAtSync = CmiTrue;
         setMigratable(true);
 
@@ -242,7 +244,6 @@ public:
             if(pass == MAXPASS){
 		pass = 0;
 
-                //AtSync();
 		mainProxy.done();
             }
             else {
@@ -262,12 +263,12 @@ public:
         MESSAGESIZE = messagesize;
         //MESSAGESIZE = 128;
 
-        //if(ite == 0)
-        sendMessage();
-        //else {
-        //  CkPrintf("Calling AtSync()\n");
-        //    AtSync();
-        //}
+        if(ite == 0)
+            sendMessage();
+        else {
+            CkPrintf("Calling AtSync()\n");
+            AtSync();
+        }
         
         //CkPrintf("In Start\n");
         ite ++;

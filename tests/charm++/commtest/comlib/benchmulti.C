@@ -9,10 +9,11 @@
 #include "ComlibManager.h"
 #include "EachToManyMulticastStrategy.h"
 #include "RingMulticastStrategy.h"
+#include "BroadcastStrategy.h"
 #include "bench.decl.h"
 
 #define USELIB
-#define MAXPASS 10
+#define MAXPASS 100
 
 int MESSAGESIZE=128;
 int fraction = 1;
@@ -81,7 +82,7 @@ public:
 
 	arr = CProxy_Bench::ckNew();
 	arr.setReductionClient(reductionClient, NULL);
-        
+                
         int count = 0;
         CkArrayIndexMax *elem_array = new CkArrayIndexMax[nElements/fraction];
         for(count = 0; count < nElements/fraction; count ++) {
@@ -99,18 +100,21 @@ public:
 
 	RingMulticastStrategy *rstrat = new RingMulticastStrategy
             (arr.ckGetArrayID(), arr.ckGetArrayID());
+
+        BroadcastStrategy *bstrat = new BroadcastStrategy(arr.ckGetArrayID(),
+                                                          USE_HYPERCUBE);
         
         CkPrintf("After creating array\n");
 	CkArrayID aid = arr.ckGetArrayID();
 
         ComlibInstanceHandle cinst = CkGetComlibInstance();        
-        cinst.setStrategy(strat);
+        cinst.setStrategy(bstrat);
         ComlibPrintf("After register strategy\n");
 
         for(count = 0; count < nElements; count++)
             arr[count].insert(cinst);
         arr.doneInserting();
-
+        
 	curTime = CkWallTimer();
 	arr.sendMessage();
         CkPrintf("After Main\n");
@@ -235,8 +239,8 @@ public:
 	
 #ifdef USELIB
         //ComlibDelegateProxy(&arrd);
-        //arrd.receiveMessage(new(&size, 0) BenchMessage);
-        sproxy.receiveMessage(new(&size, 0) BenchMessage);
+        arrd.receiveMessage(new(&size, 0) BenchMessage);
+        //sproxy.receiveMessage(new(&size, 0) BenchMessage);
 #else
 	arr[count].receiveMessage(new (&size, 0) BenchMessage);
 #endif
@@ -251,7 +255,7 @@ public:
     void receiveMessage(BenchMessage *bmsg){
         
         ComlibPrintf("[%d][%d] In Receive Message \n", CkMyPe(), thisIndex);
-
+        
         if(!firstEntryFlag) {
             startTime = CkWallTimer();
             firstEntryFlag = 1;
