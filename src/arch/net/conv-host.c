@@ -1349,7 +1349,7 @@ void arg_init(int argc, char **argv)
 {
   static char buf[1024]; int len, i;
   
-  pparam_defint ("p"             ,  1);
+  pparam_defint ("p"             ,  MAX_NODES);
   pparam_defint ("timeout"       ,  2);
   pparam_defflag("verbose"           );
   pparam_defflag("debug"             );
