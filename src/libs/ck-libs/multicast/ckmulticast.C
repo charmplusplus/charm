@@ -91,13 +91,7 @@ public:
 };
 
 // message send in spanning tree
-class multicastGrpMsg: public CMessage_multicastGrpMsg {
-public:
-  CkSectionCookie cookie;
-  CkArrayID aId;
-  int ep;
-  int msgsize;
-  char *msg;
+class multicastGrpMsg: public CkMcastBaseMsg, public CMessage_multicastGrpMsg {
 };
 
 class ReductionMsg: public CMessage_ReductionMsg {
@@ -195,7 +189,7 @@ void CkMulticastMgr::init(CkSectionCookie s)
 
   // clear msg buffer
   while (!entry->msgBuf.isEmpty()) {
-    multicastGrpMsg *newmsg = entry->msgBuf.deq();
+     multicastGrpMsg *newmsg = entry->msgBuf.deq();
 //CmiPrintf("[%d] release buffer %p %d\n", CmiMyPe(), newmsg, newmsg->ep);
 //    newmsg->cookie.val = entry;
     mCastGrp[CmiMyPe()].recvMsg(newmsg);
@@ -372,29 +366,25 @@ void CkMulticastMgr::ArraySectionSend(int ep,void *m, CkArrayID a, CkSectionCook
     if (entry->needRebuild) rebuild(s);
   }
 
-  register envelope *env = UsrToEnv(m);
-  int msgSize = env->getTotalsize();
-
 //CmiPrintf("ArraySend send to myself: %d\n", msgSize);
+
   CProxy_CkMulticastMgr  mCastGrp(thisgroup);
-  multicastGrpMsg *newmsg = new (msgSize, 0) multicastGrpMsg;
-  newmsg->cookie = s;
-  newmsg->aId = a;
-  newmsg->ep = ep;
-  newmsg->msgsize = msgSize;
+
+  register envelope *env = UsrToEnv(m);
   CkPackMessage(&env);
-  memcpy(newmsg->msg, env, msgSize);
-  CkFreeMsg(m);
+  m = EnvToUsr(env);
+  multicastGrpMsg *msg = (multicastGrpMsg *)m;
+  msg->aid = a;
+  msg->_cookie = s;
+  msg->ep = ep;
 
-  mCastGrp[s.pe].recvMsg(newmsg);
+  mCastGrp[s.pe].recvMsg(msg);
 }
-
-extern void setSectionCookie(void *msg, CkSectionCookie sid);
 
 void CkMulticastMgr::recvMsg(multicastGrpMsg *msg)
 {
   int i;
-  mCastEntry *entry = (mCastEntry *)msg->cookie.val;
+  mCastEntry *entry = (mCastEntry *)msg->_cookie.val;
 
   if (entry->notReady()) {
 //CmiPrintf("enq buffer %p\n", msg);
@@ -406,35 +396,27 @@ void CkMulticastMgr::recvMsg(multicastGrpMsg *msg)
   CProxy_CkMulticastMgr  mCastGrp(thisgroup);
   for (i=0; i<entry->children.length(); i++) {
     multicastGrpMsg *newmsg = (multicastGrpMsg *)CkCopyMsg((void **)&msg);
-    newmsg->cookie = entry->children[i];
+    newmsg->_cookie = entry->children[i];
     mCastGrp[entry->children[i].pe].recvMsg(newmsg);
   }
 
-  envelope *env = (envelope *)msg->msg;
-  int msgSize = env->getTotalsize();
-
   // send to local
 //CmiPrintf("send to local %d\n", msgSize);
-  for (i=0; i<entry->localElem.length(); i++) {
-//CmiPrintf("local: %d %d\n", i, msg->ep);
-    CProxyElement_ArrayBase ap(msg->aId, entry->localElem[i]);
-    envelope *newm = (envelope *)CmiAlloc(msgSize);
-    memcpy(newm, env, msgSize);
-    setSectionCookie(EnvToUsr(newm), msg->cookie);
-    ap.ckSend((CkArrayMessage *)EnvToUsr(newm), msg->ep);
+  int nLocal = entry->localElem.length();
+  for (i=0; i<nLocal-1; i++) {
+    CProxyElement_ArrayBase ap(msg->aid, entry->localElem[i]);
+    multicastGrpMsg *newm = (multicastGrpMsg *)CkCopyMsg((void **)&msg);
+    ap.ckSend((CkArrayMessage *)newm, msg->ep);
+  }
+  if (nLocal) {
+    CProxyElement_ArrayBase ap(msg->aid, entry->localElem[nLocal-1]);
+    ap.ckSend((CkArrayMessage *)msg, msg->ep);
+  }
+  else {
+    CmiPrintf("no local elemented on %d\n", CmiMyPe());
+    delete msg;
   }
 
-  delete msg;
-}
-
-void setSectionCookie(void *msg, CkSectionCookie sid)
-{
-  CkMcastBaseMsg *m = (CkMcastBaseMsg *)msg;
-  if (CkMcastBaseMsg::checkMagic(m) == 0) 
-    CmiAbort("Did you remember inherit multicast message from CkMcastBaseMsg?");
-  m->gpe() = sid.pe;
-  m->cookie() = sid.val;
-  m->redno() = sid.redNo;
 }
 
 void CkGetSectionCookie(CkSectionCookie &id, void *msg)

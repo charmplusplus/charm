@@ -5,9 +5,7 @@ module CkMulticast {
     CkArrayIndexMax arrIdx[];
     int  lastKnown[];
   };
-  message multicastGrpMsg {
-    char msg[];
-  };
+  message multicastGrpMsg;
   message ReductionMsg {
     char data[];
   };

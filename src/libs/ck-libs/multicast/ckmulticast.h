@@ -7,6 +7,7 @@ class multicastSetupMsg;
 class multicastGrpMsg;
 class cookieMsg;
 class ReductionMsg;
+class CkMcastBaseMsg;
 
 typedef mCastEntry * mCastEntryPtr;
 
@@ -17,14 +18,15 @@ typedef mCastEntry * mCastEntryPtr;
 class CkMcastBaseMsg {
 public:
   char magic;
-  unsigned int _gpe, _redNo;
-  void *_cookie;
+  CkArrayID aid;
+  CkSectionCookie _cookie;
+  int ep;
 public:
-  CkMcastBaseMsg() { magic = MAGIC; }
+  CkMcastBaseMsg(): magic(MAGIC) {}
   static inline int checkMagic(CkMcastBaseMsg *m) { return m->magic == MAGIC; }
-  inline unsigned int &gpe(void) { return _gpe; }
-  inline unsigned int &redno(void) { return _redNo; }
-  inline void *&cookie(void) { return _cookie; }
+  inline int &gpe(void) { return _cookie.pe; }
+  inline int &redno(void) { return _cookie.redNo; }
+  inline void *&cookie(void) { return _cookie.val; }
 };
 
 typedef void (*redClientFn)(CkSectionCookie sid, void *param,int dataSize,void *data);
