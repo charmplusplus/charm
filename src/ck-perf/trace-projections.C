@@ -226,8 +226,10 @@ void LogPool::creatFiles(char *fix)
       if (deltaLog) {
 	gzprintf(deltazfp, "PROJECTIONS-RECORD\n");
       }
-    } else {
+    } 
+    else /* else clause is below... */
 #endif
+    /*... may hang over from else above */ {
       if (nonDeltaLog) {
 	fprintf(fp, "PROJECTIONS-RECORD\n");
       }
