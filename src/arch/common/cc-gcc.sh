@@ -1,5 +1,5 @@
 CMK_CPP_C="gcc -E "
-CMK_CC="gcc -fPIC -Wno-deprecated "
+CMK_CC="gcc -fPIC "
 CMK_LD="gcc "
 CMK_CXX="g++ -fPIC -Wno-deprecated "
 CMK_CXXPP="g++ -E "
