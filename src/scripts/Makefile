@@ -107,7 +107,7 @@ SEQCHARMC=../bin/charmc -seq $(CHARMOPTS)
 CVHEADERS=cpthreads.h converse.h conv-trace.h trace.h charm-api.h\
       conv-ccs.h ccs-client.c ccs-client.h ccs-auth.c ccs-auth.h CcsServer.java \
       debug-conv.h debug-charm.h conv-autoconfig.h \
-      conv-mach.h conv-mach-opt.h conv-mach.sh conv-mach-opt.sh conv-mach-pre.sh\
+      conv-mach.h conv-mach-opt.h conv-mach.sh conv-mach-opt.sh \
       CkMarshall.decl.h CkArray.decl.h CkLocation.decl.h CkReduction.decl.h \
       CkFutures.decl.h LBDatabase.decl.h CentralLB.decl.h NullLB.decl.h \
       RandCentLB.decl.h RecBisectBfLB.decl.h \
