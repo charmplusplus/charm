@@ -33,15 +33,18 @@ typedef LBMigrateMsg  CLBMigrateMsg;
 
 class CentralLB : public BaseLB
 {
+private:
+  void initLB(const CkLBOptions &);
 public:
-  CentralLB(const CkLBOptions &);
-  virtual ~CentralLB();
+  CentralLB(const CkLBOptions & opt):BaseLB(opt) { initLB(opt); } 
   CentralLB(CkMigrateMessage *m):BaseLB(m) {}
+  virtual ~CentralLB();
+
+  void pup(PUP::er &p);
 
   void turnOn();
   void turnOff();
   inline int step() { return theLbdb->step(); }
-  int useDefCtor(void){ return 1; }
 
   static void staticAtSync(void*);
   void AtSync(void); // Everything is at the PE barrier

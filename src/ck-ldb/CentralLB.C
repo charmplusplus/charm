@@ -57,7 +57,7 @@ void CentralLB::staticAtSync(void* data)
   me->AtSync();
 }
 
-CentralLB::CentralLB(const CkLBOptions &opt): BaseLB(opt)
+void CentralLB::initLB(const CkLBOptions &opt)
 {
 #if CMK_LBDB_ON
   lbname = "CentralLB";
@@ -134,7 +134,7 @@ void CentralLB::turnOff()
 void CentralLB::AtSync()
 {
 #if CMK_LBDB_ON
-  DEBUGF(("[%d] CentralLB At Sync step %d!!!!\n",CkMyPe(),mystep));
+  DEBUGF(("[%d] CentralLB At Sync step %d!!!!!\n",CkMyPe(),step()));
 
   // if num of processor is only 1, nothing should happen
   if (!QueryBalanceNow(step()) || CkNumPes() == 1) {
@@ -245,11 +245,10 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
 //  CkPrintf("Stats msg received, %d %d %d %d %p\n",
 //  	   pe,stats_msg_count,m->n_objs,m->serial,m);
 
-  if((pe == 0) && (CkMyPe() != 0)){
+  if (pe == cur_ld_balancer) {
       LBDatabaseObj()->set_avail_vector(m->avail_vector,  m->next_lb);
   }
 
-  DEBUGF(("ReceiveStats from %d step: %d\n", pe, mystep));
   if (statsMsgsList[pe] != 0) {
     CkPrintf("*** Unexpected CLBStatsMsg in ReceiveStats from PE %d ***\n",
 	     pe);
@@ -279,6 +278,7 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
     stats_msg_count++;
   }
 
+  DEBUGF(("[0] ReceiveStats from %d step: %d count: %d\n", pe, step(), stats_msg_count));
   const int clients = CkNumPes();
   if (stats_msg_count == clients) {
     if (_lb_debug) 
@@ -814,6 +814,13 @@ void CentralLB::findSimResults(LDStats* stats, int count, LBMigrateMsg* msg, LBS
     getPredictedLoad(stats, count, msg, simResults->peLoads, 
 		     simResults->minObjLoad, simResults->maxObjLoad,1);
     CmiPrintf("getPredictedLoad finished in %fs\n", CmiWallTimer()-startT);
+}
+
+void CentralLB::pup(PUP::er &p) { 
+  BaseLB::pup(p); 
+  if (p.isUnpacking())  {
+    initLB(CkLBOptions(seqno)); 
+  }
 }
 
 int CentralLB::useMem() { 
