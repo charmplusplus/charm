@@ -358,12 +358,12 @@ class IrrGroup : public Chare {
 
     // Silly run-time type information
     virtual int isNodeGroup() { return 0; };
-    virtual int isCkArray(void){ return 0; }
     virtual CmiBool isLocMgr(void){ return CmiFalse; }
     virtual CmiBool isReductionMgr(void){ return CmiFalse; }
     // "default constructor" vs "migration constructor+PUP'ing" in restarting
     virtual int useDefCtor(void){ return 0; }
     static int isIrreducible(){ return 1;}
+    virtual void flushStates() {}
 };
 
 #define CBASE_PROXY_MEMBERS(CProxy_Derived) \
