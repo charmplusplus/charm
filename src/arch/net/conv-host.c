@@ -83,84 +83,6 @@ int probefile(path)
   return 1;
 }
 
-/****************************************************************************
- *
- * Death-notification
- *
- ****************************************************************************/
-
-int *notify_ip;
-int *notify_port;
-int  notify_count;
-int  notify_max;
-
-void notify_die(ip, port)
-    int ip; int port;
-{
-  if (notify_count==notify_max) {
-    notify_max  = (notify_max*2)+100;
-    if (notify_ip  ==0) notify_ip   = (int *)malloc(sizeof(int));
-    if (notify_port==0) notify_port = (int *)malloc(sizeof(int));
-    notify_ip   = (int *)realloc(notify_ip,   notify_max*sizeof(int));
-    notify_port = (int *)realloc(notify_port, notify_max*sizeof(int));
-  }
-  notify_ip[notify_count] = ip;
-  notify_port[notify_count] = port;
-  notify_count++;
-}
-
-void notify_die_doit(msg)
-    char *msg;
-{
-  int skt_connect();
-  char buffer[1024];
-  int i, fd;
-  sprintf(buffer,"die %s\n",msg);
-  for (i=0; i<notify_count; i++) {
-    int ip = notify_ip[i];
-    int port = notify_port[i];
-    fd = skt_connect(ip, port);
-    if (fd>=0) { write(fd, buffer, strlen(buffer)); close(fd); }
-  }
-  fprintf(stderr,"ERROR> aborting: %s\n",msg);
-  exit(1);
-}
-
-void notify_abort()
-{
-  notify_die_doit("");
-}
-
-void notify_die_segv()
-{
-  notify_die_doit("host: seg fault.");
-}
-
-void notify_die_intr()
-{
-  notify_die_doit("host: interrupted.");
-}
-
-void notify_die_init()
-{
-  signal(SIGSEGV, notify_die_segv);
-  signal(SIGBUS,  notify_die_segv);
-  signal(SIGILL,  notify_die_segv);
-  signal(SIGABRT, notify_die_segv);
-  signal(SIGFPE,  notify_die_segv);
-
-#ifdef SIGSYS
-  signal(SIGSYS,  notify_die_segv);
-#endif
-  
-  signal(SIGPIPE, notify_die_segv);
-  signal(SIGURG,  notify_die_segv);
-
-  signal(SIGTERM, notify_die_intr);
-  signal(SIGQUIT, notify_die_intr);
-  signal(SIGINT,  notify_die_intr);
-}
-
 /**************************************************************************
  *
  * ping_developers
@@ -315,13 +237,12 @@ void skt_accept(src,pip,ppo,pfd)
   i = sizeof(remote);
  acc:
   fd = accept(src, (struct sockaddr *)&remote, &i);
-#if CMK_FIX_HP_CONNECT_BUG
-  jsleep(0,50000);
-#endif
   if ((fd<0)&&(errno==EINTR)) goto acc;
   if ((fd<0)&&(errno==EMFILE)) goto acc;
-  if ((fd<0)&&(errno==EPROTO)) goto acc;
-  if (fd<0) { perror("accept"); notify_abort(); }
+  if (fd<0) {
+    perror("accept"); 
+    exit(1);
+  }
   *pip=htonl(remote.sin_addr.s_addr);
   *ppo=htons(remote.sin_port);
   *pfd=fd;
@@ -361,16 +282,14 @@ int skt_connect(ip, port)
  *
  ****************************************************************************/
 
-zap_newline(s)
-    char *s;
+void zap_newline(char *s)
 {
   char *p;
   p = s + strlen(s)-1;
   if (*p == '\n') *p = '\0';
 }
 
-char *substr(lo, hi)
-    char *lo; char *hi;
+char *substr(char *lo, char *hi)
 {
   int len = hi-lo;
   char *res = (char *)malloc(1+len);
@@ -379,8 +298,7 @@ char *substr(lo, hi)
   return res;
 }
 
-int subeqs(lo, hi, str)
-     char *lo; char *hi; char *str;
+int subeqs(char *lo, char *hi, char *str)
 {
   int len = strlen(str);
   if (hi-lo != len) return 0;
@@ -389,23 +307,20 @@ int subeqs(lo, hi, str)
 }
 
 /* advance pointer over blank characters */
-char *skipblanks(p)
-    char *p;
+char *skipblanks(char *p)
 {
   while ((*p==' ')||(*p=='\t')) p++;
   return p;
 }
 
 /* advance pointer over nonblank characters */
-char *skipstuff(p)
-    char *p;
+char *skipstuff(char *p)
 {
   while ((*p)&&(*p!=' ')&&(*p!='\t')) p++;
   return p;
 }
 
-char *text_ip(ip)
-    unsigned int ip;
+char *text_ip(unsigned int ip)
 {
   static char buffer[100];
   sprintf(buffer,"%d.%d.%d.%d",
@@ -416,8 +331,7 @@ char *text_ip(ip)
   return buffer;
 }
 
-int readhex(f, len)
-    FILE *f; int len;
+int readhex(FILE *f, int len)
 {
   char buffer[100];
   char *p;
@@ -427,6 +341,19 @@ int readhex(f, len)
   res=strtol(buffer, &p, 16);
   if (p!=buffer+len) return -1;
   return res;
+}
+
+static char *parseint(char *p, int *value)
+{
+  int val = 0;
+  while (((*p)==' ')||((*p)=='.')) p++;
+  if (((*p)<'0')||((*p)>'9')) {
+    fprintf(stderr,"badly-formed number");
+    exit(1);
+  }
+  while ((*p>='0')&&(*p<='9')) { val*=10; val+=(*p)-'0'; p++; }
+  *value = val;
+  return p;
 }
 
 char *getenv_display()
@@ -454,8 +381,7 @@ char *mylogin()
   return self->pw_name;
 } 
 
-unsigned int lookup_ip(name)
-    char *name;
+unsigned int lookup_ip(char *name)
 {
   struct hostent *h;
   unsigned int ip1,ip2,ip3,ip4; int nread;
@@ -464,6 +390,14 @@ unsigned int lookup_ip(name)
   h = gethostbyname(name);
   if (h==0) return 0;
   return htonl(*((int *)(h->h_addr_list[0])));
+}
+
+void strsubst(char *str, char c1, char c2)
+{
+  while (*str) {
+    if (*str==c1) *str=c2;
+    str++;
+  }
 }
 
 /*****************************************************************************
@@ -820,6 +754,10 @@ int pparam_parsecmd(optchr, argv)
  *                                                                           
  *     - remove bytes from the left end of the string.                       
  *                                                                           
+ *  xstr_read(str, fd)
+ *
+ *     - read bytes from the specified FD into the right end of xstr.
+ *
  *  xstr_write(str, bytes, nbytes)                                           
  *                                                                           
  *     - append the specified bytes to the right end of the xstr.            
@@ -855,6 +793,7 @@ xstr xstr_alloc()
   res->lptr = res->lend + 128;
   res->rptr = res->lend + 128;
   res->rend = res->lend + 256;
+  *(res->rptr) = 0;
   return res;
 }
 
@@ -880,6 +819,7 @@ void xstr_rexpand(l, nbytes)
   l->lptr = nbuf + needed;
   l->rptr = nbuf + needed + uspace + nbytes;
   l->rend = nbuf + needed + needed + needed;
+  *(l->rptr) = 0;
 }
 
 void xstr_lexpand(l, nbytes)
@@ -897,6 +837,7 @@ void xstr_lexpand(l, nbytes)
   l->lptr = nbuf + needed;
   l->rptr = nbuf + needed + uspace + nbytes;
   l->rend = nbuf + needed + needed + needed;
+  *(l->rptr) = 0;
 }
 
 void xstr_rshrink(l, nbytes)
@@ -904,6 +845,7 @@ void xstr_rshrink(l, nbytes)
 {
   if (l->rptr - l->lptr < nbytes) { l->rptr=l->lptr; return; }
   l->rptr -= nbytes;
+  *(l->rptr) = 0;
 }
 
 void xstr_lshrink(l, nbytes)
@@ -918,6 +860,16 @@ void xstr_write(l, bytes, nbytes)
 {
   xstr_rexpand(l, nbytes);
   memcpy(xstr_lptr(l)+xstr_len(l)-nbytes, bytes, nbytes);
+}
+
+int xstr_read(xstr l, int fd)
+{
+  int nread;
+  xstr_rexpand(l, 1024);
+  nread = read(fd, xstr_rptr(l)-1024, 1024);
+  if (nread<0) xstr_rshrink(l, 1024);
+  else xstr_rshrink(l, 1024-nread);
+  return nread;
 }
 
 void xstr_printf(va_alist) va_dcl
@@ -1121,8 +1073,7 @@ char *arg_mylogin;
 char *arg_myhome;
 int   arg_server;
 
-arg_init(argc, argv)
-    int argc; char **argv;
+void arg_init(int argc, char **argv)
 {
   static char buf[1024]; int len, i;
   
@@ -1132,7 +1083,7 @@ arg_init(argc, argv)
   pparam_defflag("debug-no-pause"    );
   pparam_defflag("server"            );
   pparam_defflag("in-xterm"          );
-  pparam_defint ("maxrsh"        ,  5);
+  pparam_defint ("maxrsh"        ,  16);
   pparam_defstr ("nodelist"      ,  0);
   pparam_defstr ("nodegroup"     ,  "main");
   
@@ -1153,7 +1104,7 @@ arg_init(argc, argv)
   }
   arg_argv = argv+2;
   arg_argc = pparam_countargs(argv+2);
-
+  
   arg_requested_pes  = pparam_getint("p");
   arg_in_xterm       = pparam_getflag("in-xterm");
   arg_verbose        = pparam_getflag("verbose");
@@ -1227,7 +1178,6 @@ char *nodetab_file_find()
   exit(1);
 }
 
-
 typedef struct nodetab_host {
   char    *name;
   char    *login;
@@ -1244,6 +1194,7 @@ typedef struct nodetab_host {
 nodetab_host *nodetab_table;
 int           nodetab_max;
 int           nodetab_size;
+int          *nodetab_rank0_port;
 int          *nodetab_rank0_table;
 int           nodetab_rank0_size;
 
@@ -1306,7 +1257,7 @@ void nodetab_init()
   FILE *f,*fopen();
   char *nodesfile; nodetab_host node;
   char input_line[MAX_LINE_LENGTH];
-  int nread, rightgroup, basicsize, i;
+  int nread, rightgroup, basicsize, i, remain;
   char *b1, *e1, *b2, *e2, *b3, *e3;
   
   /* Open the NODES_FILE. */
@@ -1320,6 +1271,7 @@ void nodetab_init()
   
   nodetab_table=(nodetab_host*)malloc(arg_requested_pes*sizeof(nodetab_host));
   nodetab_rank0_table=(int*)malloc(arg_requested_pes*sizeof(int));
+  nodetab_rank0_port=(int*)malloc(arg_requested_pes*sizeof(int));
   nodetab_max=arg_requested_pes;
   
   nodetab_reset();
@@ -1366,6 +1318,12 @@ void nodetab_init()
     nodetab_host h = nodetab_table[nodetab_size-basicsize];
     nodetab_add(h);
   }
+  for (i=0; i<nodetab_size; i++) {
+    if (nodetab_table[i]->rank == 0)
+      remain = nodetab_size - i;
+    if (nodetab_table[i]->cpus > remain)
+      nodetab_table[i]->cpus = remain;
+  }
   fclose(f);
 }
 
@@ -1392,7 +1350,6 @@ char        *nodetab_ext(i) int i;      { return nodetab_getinfo(i)->ext; }
 unsigned int nodetab_ip(i) int i;       { return nodetab_getinfo(i)->ip; }
 unsigned int nodetab_cpus(i) int i;     { return nodetab_getinfo(i)->cpus; }
 unsigned int nodetab_rank(i) int i;     { return nodetab_getinfo(i)->rank; }
-
  
 /****************************************************************************
  *
@@ -1524,7 +1481,10 @@ void input_extend()
   char line[1024];
   int len = input_buffer?strlen(input_buffer):0;
   fflush(stdout);
-  if (fgets(line, 1023, stdin)==0) { notify_die_doit("end-of-file on stdin"); }
+  if (fgets(line, 1023, stdin)==0) { 
+    fprintf(stderr,"end-of-file on stdin");
+    exit(1);
+  }
   input_buffer = realloc(input_buffer, len + strlen(line) + 1);
   strcpy(input_buffer+len, line);
 }
@@ -1567,7 +1527,10 @@ char *input_scanf_chars(fmt)
   if (file==0) {
     unlink("/tmp/fnord");
     fd = open("/tmp/fnord",O_RDWR | O_CREAT | O_TRUNC);
-    if (fd<0) { notify_die_doit("cannot open temp file /tmp/fnord"); }
+    if (fd<0) { 
+      fprintf(stderr,"cannot open temp file /tmp/fnord");
+      exit(1);
+    }
     file = fdopen(fd, "r+");
     unlink("/tmp/fnord");
   }
@@ -1596,6 +1559,8 @@ char *input_scanf_chars(fmt)
  *
  ****************************************************************************/
 
+#define REQ_MAXFD 50 /* max file descriptors per process */
+
 typedef struct req_node
 {
   struct req_node *next;
@@ -1603,10 +1568,22 @@ typedef struct req_node
 }
 *req_node;
 
-unsigned int req_fd;
-unsigned int req_ip;
-unsigned int req_port;
-req_node     req_saved;
+typedef struct req_pipe
+{
+  int fd[2];
+  xstr buffer;
+  int pid;
+  unsigned int startnode, endnode;
+}
+*req_pipe;
+
+unsigned int    req_host_IP;
+struct req_pipe req_pipes[REQ_MAXFD];
+int             req_numworkers;
+int             req_workers_registered;
+req_node        req_saved;
+int             req_ending=0;
+
 
 #define REQ_OK 0
 #define REQ_POSTPONE -1
@@ -1623,6 +1600,19 @@ int req_handle_aset(line)
   return REQ_OK_AWAKEN;
 }
 
+void req_write_to_client(int fd, char *buf, int size)
+{
+  int ok;
+  while (size) {
+    ok = write(fd, buf, size);
+    if (ok<=0) {
+      fprintf(stderr,"failed to send data to client");
+      exit(1);
+    }
+    size-=ok; buf+=ok;
+  }
+}
+
 int req_reply(ip, port, pre, ans)
     int ip; int port; char *pre; char *ans;
 {
@@ -1631,7 +1621,6 @@ int req_reply(ip, port, pre, ans)
   write(fd, pre, strlen(pre));
   write(fd, " ", 1);
   write(fd, ans, strlen(ans));
-  write(fd, "\n", 1);
   close(fd);
   return REQ_OK;
 }
@@ -1656,14 +1645,6 @@ int req_handle_aget(line)
 int req_handle_print(line)
     char *line;
 {
-  printf("%s\n",line+6);
-  fflush(stdout);
-  return REQ_OK;
-}
-
-int req_handle_princ(line)
-    char *line;
-{
   printf("%s",line+6);
   fflush(stdout);
   return REQ_OK;
@@ -1673,43 +1654,15 @@ int req_handle_printerr(line)
     char *line;
 {
   fprintf(stderr,"%s\n",line+9);
-  fflush(stderr);
   return REQ_OK;
 }
-
-int req_handle_princerr(line)
-    char *line;
-{
-  fprintf(stderr,"%s",line+9);
-  fflush(stderr);
-  return REQ_OK;
-}
-
-int req_handle_notify_die(line)
-    char *line;
-{
-  char cmd[100], host[100]; int ip, port, nread;
-  nread = sscanf(line,"%s%s%d",cmd,host,&port);
-  if (nread != 3) return REQ_FAILED;
-  ip = lookup_ip(host);
-  if (ip==0) return REQ_FAILED;
-  notify_die(ip, port);
-  return REQ_OK;
-}
-
-int req_handle_die(line)
-    char *line;
-{
-  notify_die_doit(line+4);
-}
-
-int ending_count=0;
 
 int req_handle_ending(line)
     char *line;
 {
-  ending_count++;
-  if (ending_count == nodetab_size) exit(0);
+  req_ending++;
+  if (req_ending == nodetab_size)
+    exit(0);
   return REQ_OK;
 }
 
@@ -1732,16 +1685,6 @@ int req_handle_scanf(line)
   req_reply(ip, port, "scanf-data ", res);
   free(res);
   return REQ_OK;
-}
-
-static char *parseint(p, value) char *p; int *value;
-{
-  int val = 0;
-  while (((*p)==' ')||((*p)=='.')) p++;
-  if (((*p)<'0')||((*p)>'9')) notify_die_doit("badly-formed number");
-  while ((*p>='0')&&(*p<='9')) { val*=10; val+=(*p)-'0'; p++; }
-  *value = val;
-  return p;
 }
 
 int req_handle_getinfo(line)
@@ -1784,6 +1727,19 @@ int req_handle_getinfo(line)
   return REQ_OK;
 }
 
+int req_handle_worker(char *line)
+{
+  unsigned int workerno, ip, port, i, pe; req_pipe p;
+  sscanf(line+7,"%d%d%d",&workerno,&ip,&port);
+  p = req_pipes + workerno;
+  for (i=p->startnode; i<p->endnode; i++) {
+    nodetab_rank0_port[i] = port;
+    req_host_IP = ip;
+  }
+  req_workers_registered++;
+  return REQ_OK;
+};
+
 int req_handle(line)
     char *line;
 {
@@ -1792,14 +1748,12 @@ int req_handle(line)
   if      (strcmp(cmd,"aset")==0)       return req_handle_aset(line);
   else if (strcmp(cmd,"aget")==0)       return req_handle_aget(line);
   else if (strcmp(cmd,"scanf")==0)      return req_handle_scanf(line);
+  else if (strcmp(cmd,"ping")==0)       return REQ_OK;
   else if (strcmp(cmd,"print")==0)      return req_handle_print(line);
-  else if (strcmp(cmd,"princ")==0)      return req_handle_princ(line);
   else if (strcmp(cmd,"printerr")==0)   return req_handle_printerr(line);
-  else if (strcmp(cmd,"princerr")==0)   return req_handle_princerr(line);
   else if (strcmp(cmd,"ending")==0)     return req_handle_ending(line);
-  else if (strcmp(cmd,"notify-die")==0) return req_handle_notify_die(line);
-  else if (strcmp(cmd,"die")==0)        return req_handle_die(line);
   else if (strcmp(cmd,"getinfo")==0)    return req_handle_getinfo(line);
+  else if (strcmp(cmd,"worker")==0)     return req_handle_worker(line);
   else return REQ_FAILED;
 }
 
@@ -1822,44 +1776,150 @@ void req_run_saved()
   }
 }
 
-req_serve()
+void req_write_to_host(int fd, char *buf, int size)
 {
-  char line[1000]; int status; FILE *f;
-  int client_ip, client_port, client_fd; req_node n;
-  if(arg_server) {
-    printf("Server Port: %d\n", req_port);
-  }
-  while (1) {
-    skt_accept(req_fd, &client_ip, &client_port, &client_fd);
-    if (client_fd==0) {
-      perror("accept");
-      notify_abort();
+  int ok;
+  while (size) {
+    ok = write(fd, buf, size);
+    if ((ok<0)&&(errno==EPIPE)) exit(0);
+    if (ok<0) {
+      perror("worker writing to host");
+      exit(1);
     }
-    f = fdopen(client_fd, "r+");
-    line[0]=0;
-    fgets(line, 999, f);
-    fclose(f); close(client_fd);
-    if (line[0]==0) continue;
-    zap_newline(line);
-    status = req_handle(line);
-    switch (status) {
-    case REQ_OK: break;
-    case REQ_FAILED: fprintf(stderr,"bad request: %s\n",line); break;
-    case REQ_OK_AWAKEN: req_run_saved(); break;
-    case REQ_POSTPONE:
-      n = (req_node)malloc(sizeof(struct req_node)+strlen(line));
-      strcpy(n->request, line);
-      n->next = req_saved;
-      req_saved = n;
-    }
-    line[0]=0;
+    size-=ok; buf+=ok;
   }
 }
 
-req_init()
+void req_serve_client(int workerno)
 {
-  skt_server(&req_ip, &req_port, &req_fd);
-  req_saved = 0;
+  req_pipe worker = req_pipes+workerno;
+  xstr buffer = worker->buffer;
+  int status, nread, len; char *head;
+  req_node n;
+  
+  nread = xstr_read(buffer, worker->fd[0]);
+  if (nread<=0) {
+    fprintf(stderr,"aborting: node terminated abnormally.\n");
+    exit(1);
+  }
+  while (1) {
+    head = xstr_lptr(buffer);
+    len = strlen(head);
+    if (head+len == xstr_rptr(buffer)) break;
+    status = req_handle(head);
+    switch (status) {
+    case REQ_OK: break;
+    case REQ_FAILED: fprintf(stderr,"bad request: %s\n",head); break;
+    case REQ_OK_AWAKEN: req_run_saved(); break;
+    case REQ_POSTPONE:
+      n = (req_node)malloc(sizeof(struct req_node)+len);
+      strcpy(n->request, head);
+      n->next = req_saved;
+      req_saved = n;
+    }
+    xstr_lshrink(buffer, len+1);
+  }
+}
+
+void req_poll()
+{
+  fd_set rfds; int status, i;
+  FD_ZERO(&rfds);
+  for (i=0; i<req_numworkers; i++)
+    FD_SET(req_pipes[i].fd[0], &rfds);
+  status = select(FD_SETSIZE, &rfds, 0, 0, 0);
+  for (i=0; i<req_numworkers; i++)
+    if (FD_ISSET(req_pipes[i].fd[0], &rfds))
+      req_serve_client(i);
+}
+
+void req_worker(int workerno)
+{
+  int numclients;
+  int master_ip, master_port, master_fd;
+  int client_ip, client_port, client_fd;
+  int i, hostfd, status, nread, len, timeout;
+  int client[REQ_MAXFD];
+  xstr clientbuf[REQ_MAXFD];
+  fd_set rfds; xstr buffer;
+  struct timeval tv;
+  char reply[1024], *head;
+
+  hostfd = req_pipes[workerno].fd[1];
+  numclients = req_pipes[workerno].endnode - req_pipes[workerno].startnode;
+  for (i=3; i<512; i++) if (i!=hostfd) close(i);
+  skt_server(&master_ip, &master_port, &master_fd);
+  sprintf(reply,"worker %d %d %d", workerno, master_ip, master_port);
+  req_write_to_host(hostfd, reply, strlen(reply)+1);
+  timeout = (nodetab_rank0_size*2) + 60;
+  for (i=0; i<numclients; i++) {
+    while (1) {
+      if (timeout <= 0) {
+	fprintf(stderr,"timeout waiting for nodes to connect\n");
+	exit(1);
+      }
+      FD_ZERO(&rfds);
+      FD_SET(master_fd, &rfds);
+      tv.tv_sec = 1; tv.tv_usec = 0;
+      status = select(FD_SETSIZE, &rfds, 0, 0, &tv);
+      if (status==1) break;
+      if (status<0) { perror("accept"); exit(1); }
+      if (status==0) { timeout--; continue; }
+    }
+    skt_accept(master_fd, &client_ip, &client_port, &client_fd);
+    client[i] = client_fd;
+    clientbuf[i] = xstr_alloc();
+  }
+  while (1) {
+    /* probe all file descriptors */
+    FD_ZERO(&rfds);
+    for (i=0; i<numclients; i++)
+      FD_SET(client[i], &rfds);
+    status = select(FD_SETSIZE, &rfds, 0, 0, 0);
+    if (status < 0) {
+      perror("worker error of some sort");
+      exit(1);
+    }
+    for(i=0; i<numclients; i++) {
+      if (FD_ISSET(client[i], &rfds)) {
+	buffer = clientbuf[i];
+	nread = xstr_read(buffer, client[i]);
+	if (nread<=0) exit(1);
+	while (1) {
+	  head = xstr_lptr(buffer);
+	  len = strlen(head);
+	  if (head+len == xstr_rptr(buffer)) break;
+	  req_write_to_host(hostfd, head, len+1);
+	  xstr_lshrink(buffer, len+1);
+	}
+      }
+    }
+  }
+}
+
+void req_start_workers()
+{
+  int i, j, nodenum, nclients;
+  
+  req_numworkers = (nodetab_rank0_size+REQ_MAXFD-1) / REQ_MAXFD;
+  if (req_numworkers > REQ_MAXFD) {
+    fprintf(stderr,"Too many PEs, file descriptors exceeded.\n");
+    exit(1);
+  }
+  nodenum = 0;
+  for (i=0; i<req_numworkers; i++) {
+    nclients = REQ_MAXFD;
+    if (nclients > (nodetab_rank0_size-nodenum))
+      nclients = (nodetab_rank0_size-nodenum);
+    req_pipes[i].startnode = nodenum;
+    req_pipes[i].endnode = nodenum + nclients;
+    pipe(req_pipes[i].fd);
+    req_pipes[i].pid = fork();
+    if (req_pipes[i].pid==0) req_worker(i);
+    req_pipes[i].buffer = xstr_alloc();
+    close(req_pipes[i].fd[1]);
+    nodenum += nclients;
+  }
 }
 
 /****************************************************************************/
@@ -1909,7 +1969,8 @@ int rsh_pump(p, nodeno, rank0no, argv)
   xstr_printf(ibuf,"setenv NETSTART '%d %d %d %d %d %d %d %d %d'\n",
 	      nodetab_rank0_size, rank0no,
 	      nodeno, nodetab_cpus(nodeno), nodetab_size,
-	      nodetab_ip(nodeno), req_ip, req_port, (getpid()&0x7FFF));
+	      nodetab_ip(nodeno), req_host_IP,
+	      nodetab_rank0_port[rank0no], (getpid()&0x7FFF));
   prog_flush(p);
   
   /* find the node-program */
@@ -1983,6 +2044,7 @@ int rsh_pump(p, nodeno, rank0no, argv)
   if (arg_debug || arg_debug_no_pause) {
     xstr_printf(ibuf,"cat > /tmp/gdb%08x << END_OF_SCRIPT\n",randno);
     xstr_printf(ibuf,"shell rm -f /tmp/gdb%08x\n",randno);
+    xstr_printf(ibuf,"handle SIGPIPE nostop noprint\n");
     xstr_printf(ibuf,"handle SIGWINCH nostop noprint\n");
     xstr_printf(ibuf,"handle SIGWAITING nostop noprint\n");
     xstr_printf(ibuf,"set args");
@@ -2075,7 +2137,7 @@ int start_nodes()
     while ((ok<0)&&(errno==EINTR));
     if (ok<0) { perror("ERROR> select"); exit(1); }
     do ok = waitpid((pid_t)(-1), NULL, WNOHANG);
-    while (ok>=0);
+    while (ok>0);
     for (i=0; i<rsh_maxsim; i++) {
       char *line = 0;
       char buffer[1000];
@@ -2135,15 +2197,15 @@ main(argc, argv)
     fprintf(stderr, "INFO> conv-host started...\n");
   /* Initialize the node-table by reading nodesfile */
   nodetab_init();
-  /* Initialize the request-server */
-  req_init();
-  /* Initialize the kill-handler */
-  notify_die_init();
+  /* Start the worker processes */
+  req_start_workers();
+  /* Wait until the workers have registered */
+  while (req_workers_registered < req_numworkers) req_poll();
   /* Initialize the IO module */
   input_init();
   /* start the node processes */
   start_nodes();
   /* enter request-service mode */
-  req_serve();
+  while (1) req_poll();
 }
 

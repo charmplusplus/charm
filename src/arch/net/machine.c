@@ -155,7 +155,7 @@
  * treat them as if they were simply two datagrams.  This would
  * require extra copying.  I have no idea if this would be worthwhile.
  *
- *****************************************************************************/
+ *****************************************************************************
 
 /*****************************************************************************
  *
@@ -234,8 +234,6 @@ char *strchr(), *strrchr(), *strdup();
 #define RSH_CMD "remsh"
 #endif
 
-static void KillEveryone();
-static void KillEveryoneCode();
 static void CommunicationServer();
 extern int CmemInsideMem();
 extern void CmemCallWhenMemAvail();
@@ -247,6 +245,43 @@ void  FIFO_Pop(void *);
 void  FIFO_EnQueue(void *, void *);
 void  FIFO_EnQueue_Front(void *, void *);
 void CmiYield();
+
+/****************************************************************************
+ *
+ * Handling Errors
+ *
+ * Errors should be handled by printing a message on stderr and
+ * calling exit(1).  Nothing should be sent to the host, no attempt at
+ * communication should be made.  The other processes will notice the
+ * abnormal termination and will deal with it.
+ *
+ * Rationale: if an error triggers an attempt to send a message,
+ * the attempt to send a message is likely to trigger another error,
+ * leading to an infinite loop and a process that spins instead of
+ * shutting down.
+ *
+ *****************************************************************************/
+
+static void KillEveryone(msg)
+char *msg;
+{
+  fprintf(stderr,"Fatal error: %s\n", msg);
+  exit(1);
+}
+
+static void KillEveryoneCode(n)
+int n;
+{
+  fprintf(stderr,"Fatal error #%d\n", n);
+  exit(1);
+}
+
+static void KillOnSIGPIPE()
+{
+  fprintf(stderr,"host exited, terminating.\n");
+  exit(0);
+}
+
 
 /*****************************************************************************
  *
@@ -375,7 +410,7 @@ void writeall(int fd, char *buf, int size)
     CmiYield();
     ok = write(fd, buf, size);
     if ((ok<0)&&(errno==EBADF)) goto retry;
-    if (ok<=0) KillEveryone("write on tcp socket failed.");
+    if (ok<=0) KillOnSIGPIPE();
     size-=ok; buf+=ok;
   }
 }
@@ -530,7 +565,7 @@ unsigned int ip; int port; int seconds;
   sock:
     fd = socket(AF_INET, SOCK_STREAM, 0);
     if ((fd<0)&&((errno==EINTR)||(errno==EBADF))) goto sock;
-    if (fd < 0) { perror("socket 3"); exit(1); }
+    if (fd < 0) KillEveryone("skt_connect failure");
     
   conn:
     ok = connect(fd, (struct sockaddr *)&(remote), sizeof(remote));
@@ -540,7 +575,7 @@ unsigned int ip; int port; int seconds;
     case EINTR: case EBADF: case EALREADY: break;
     case ECONNREFUSED: jsleep(1,0); break;
     case EADDRINUSE: jsleep(1,0); break;
-    case EADDRNOTAVAIL: jsleep(5,0); break;
+    case EADDRNOTAVAIL: jsleep(1,0); break;
     default: return -1;
     }
   }
@@ -771,7 +806,6 @@ typedef struct OtherNodeStruct
   unsigned int IP, dataport, ctrlport;
   struct sockaddr_in addr;
 
-  double                   send_give_up; /* time to give up on retrying */
   double                   send_primer;  /* time to send primer packet */
   unsigned int             send_last;    /* seqno of last dgram sent */
   ImplicitDgram           *send_window;  /* datagrams sent, not acked */
@@ -872,6 +906,7 @@ static int        Cmi_host_port;
 static int        Cmi_host_pid;
 static char       Cmi_host_IP_str[16];
 static char       Cmi_self_IP_str[16];
+static int        Cmi_host_fd;
 
 static int    Cmi_max_dgram_size;
 static int    Cmi_os_buffer_size;
@@ -922,7 +957,6 @@ static void parse_netstart()
   return;
  abort:
   KillEveryone("program not started using 'conv-host' utility. aborting.\n");
-  exit(1);
 }
 
 static void extract_args(argv)
@@ -982,7 +1016,7 @@ static void log_done()
   char logname[100]; FILE *f; int i, size;
   sprintf(logname, "log.%d", Cmi_mynode);
   f = fopen(logname, "w");
-  if (f==0) { perror("fopen"); exit(1); }
+  if (f==0) KillEveryone("fopen problem");
   if (log_wrap) size = 50000; else size=log_pos;
   for (i=0; i<size; i++) {
     logent ent = log+i;
@@ -1016,10 +1050,11 @@ static int        ctrlport, dataport, ctrlskt, dataskt;
 static OtherNode *nodes_by_pe;  /* OtherNodes indexed by processor number */
 static OtherNode  nodes;        /* Indexed only by ``node number'' */
 
-static volatile int          Cmi_shutdown_initiated;
-static CmiNodeLock  Cmi_scanf_mutex;
-static volatile char        *Cmi_scanf_data;
-static double       Cmi_clock;
+static CmiNodeLock    Cmi_scanf_mutex;
+static volatile char *Cmi_scanf_data;
+static double         Cmi_clock;
+static double         Cmi_check_last = 0.0;
+static double         Cmi_check_delay = 3.0;
 
 /****************************************************************************
  *                                                                          
@@ -1176,7 +1211,7 @@ static mutex_t comm_mutex;
 static void comm_thread(void)
 {
   struct timeval tmo; fd_set rfds;
-  while (Cmi_shutdown_initiated == 0) {
+  while (1) {
     CmiCommLock();
     CommunicationServer();
     CmiCommUnlock();
@@ -1219,15 +1254,6 @@ static void CmiStartThreads()
   thr_setspecific(Cmi_state_key, Cmi_state_vector);
   ok = thr_create(0, 256000, (void *(*)(void *))comm_thread, 0, 0, &pid);
   if (ok<0) { perror("thr_create"); exit(1); }
-}
-
-static void CmiJoinThreads()
-{
-  int i, ok; void *status;
-  for(i=0; i<Cmi_mynodesize; i++) {
-    ok = thr_join(0, 0, &status);
-    if (ok<0) perror("thr_join");
-  }
 }
 
 #endif
@@ -1276,7 +1302,7 @@ static void CmiStartThreads()
   CmiEnableAsyncIO(dataskt);
   CmiEnableAsyncIO(ctrlskt);
 #endif
-
+  
   i.it_interval.tv_sec = 0;
   i.it_interval.tv_usec = Cmi_tickspeed;
   i.it_value.tv_sec = 0;
@@ -1284,115 +1310,16 @@ static void CmiStartThreads()
   setitimer(ITIMER_REAL, &i, NULL);
 }
 
-static void CmiJoinThreads() {}
-
 #endif
 
 CpvDeclare(void *, CmiLocalQueue);
 
 /****************************************************************************
- *                                                                          
- * Fast shutdown                                                            
- *                                                                          
- ****************************************************************************/
-
-static void KillIndividual(int ip,int port,int timeout,char *cmd,char *flag)
-{
-  int fd;
-  if (*flag) return;
-  fd = skt_connect(ip, port, timeout);
-  if (fd>=0) {
-    writeall(fd, cmd, strlen(cmd));
-    close(fd);
-    *flag = 1;
-  }
-}
-
-static void KillEveryone(msg)
-char *msg;
-{
-  char cmd[1024]; char *killed; char host=0; int i;
-  if (nodes == 0) {
-    fprintf(stderr,"%s\n", msg);
-    exit(1);
-  }
-  sprintf(cmd,"die %s",msg);
-  killed = (char *)calloc(1, Cmi_numnodes);
-  KillIndividual(Cmi_host_IP, Cmi_host_port, 2, cmd, &host);
-  for (i=0; i<Cmi_numnodes; i++)
-    KillIndividual(nodes[i].IP, nodes[i].ctrlport, 2, cmd, killed+i);
-  KillIndividual(Cmi_host_IP, Cmi_host_port, 10, cmd, &host);
-  for (i=0; i<Cmi_numnodes; i++)
-    KillIndividual(nodes[i].IP, nodes[i].ctrlport, 10, cmd, killed+i);
-  KillIndividual(Cmi_host_IP, Cmi_host_port, 30, cmd, &host);
-  for (i=0; i<Cmi_numnodes; i++)
-    KillIndividual(nodes[i].IP, nodes[i].ctrlport, 30, cmd, killed+i);
-  log_done();
-  ConverseCommonExit();
-  exit(1);
-}
-
-static void KillEveryoneCode(n)
-int n;
-{
-  char buffer[1024];
-  sprintf(buffer,"Internal error #%d (node %d)\n(Contact CHARM developers)\n",
-	  n,CmiMyPe());
-  KillEveryone(buffer);
-}
-
-static void KillOnSegv()
-{
-  char buffer[1024];
-  sprintf(buffer, "Node %d: Segmentation Fault.\n",CmiMyPe());
-  KillEveryone(buffer);
-}
-
-static void KillOnBus()
-{
-  char buffer[1024];
-  sprintf(buffer, "Node %d: Bus Error.\n",CmiMyPe());
-  KillEveryone(buffer);
-}
-
-static void KillOnIntr()
-{
-  char buffer[1024];
-  sprintf(buffer, "Node %d: Interrupted.\n",CmiMyPe());
-  KillEveryone(buffer);
-}
-
-static void KillOnCrash()
-{
-  char buffer[1024];
-  sprintf(buffer, "Node %d: Crashed.\n",CmiMyPe());
-  KillEveryone(buffer);
-}
-
-static void KillInit()
-{
-  CmiSignal(SIGSEGV, 0, 0, KillOnSegv);
-  CmiSignal(SIGBUS,  0, 0, KillOnBus);
-  CmiSignal(SIGILL,  0, 0, KillOnCrash);
-  CmiSignal(SIGABRT, 0, 0, KillOnCrash);
-  CmiSignal(SIGFPE,  0, 0, KillOnCrash);
-  CmiSignal(SIGPIPE, 0, 0, KillOnCrash);
-  CmiSignal(SIGURG,  0, 0, KillOnCrash);
-
-#ifdef SIGSYS
-  CmiSignal(SIGSYS,  0, 0, KillOnCrash);
-#endif
-
-  CmiSignal(SIGTERM, 0, 0, KillOnIntr);
-  CmiSignal(SIGQUIT, 0, 0, KillOnIntr);
-  CmiSignal(SIGINT,  0, 0, KillOnIntr);
-}
-
-/****************************************************************************
  *
  * ctrl_sendone
  *
- * Any thread can call this.  There's no need for concurrency control.
+ * Careful, don't call this from inside the communication thread,
+ * you'll mess up the communications mutex.
  *
  ****************************************************************************/
 
@@ -1405,16 +1332,9 @@ static void ctrl_sendone(va_alist) va_dcl
   delay = va_arg(p, int);
   f = va_arg(p, char *);
   vsprintf(buffer, f, p);
-  fd = skt_connect(Cmi_host_IP, Cmi_host_port, delay);
-  if (fd<0) KillEveryone("cannot contact host");
-  writeall(fd, buffer, strlen(buffer));
-#if CMK_SYNCHRONIZE_ON_TCP_CLOSE
-  shutdown(fd, 1);
-  while (read(fd, &c, 1)==EINTR);
-  close(fd);
-#else
-  close(fd);
-#endif
+  CmiCommLock();
+  writeall(Cmi_host_fd, buffer, strlen(buffer)+1);
+  CmiCommUnlock();
 }
 
 /****************************************************************************
@@ -1440,9 +1360,6 @@ static void ctrl_getone()
   while (fgets(line, 9999, f)) {
     if (strncmp(line,"aval addr ",10)==0) {
       node_addresses_store(line);
-    }
-    else if (strncmp(line,"aval done ",10)==0) {
-      Cmi_shutdown_initiated = 1;
     }
     else if (strncmp(line,"scanf-data ",11)==0) {
       Cmi_scanf_data=strdupl(line+11);
@@ -1494,14 +1411,14 @@ static void ctrl_getone()
 
 static void node_addresses_obtain()
 {
-  ctrl_sendone(120, "aset addr %d %s.%d.%d.%d.%d\n",
+  ctrl_sendone(120, "aset addr %d %s.%d.%d.%d.%d",
 	       Cmi_mynode, Cmi_self_IP_str, ctrlport, dataport,
 	       Cmi_nodestart, Cmi_mynodesize);
-  ctrl_sendone(120, "aget %s %d addr 0 %d\n",
+  ctrl_sendone(120, "aget %s %d addr 0 %d",
 	       Cmi_self_IP_str,ctrlport,Cmi_numnodes-1);
   while (nodes == 0) {
-    if (wait_readable(ctrlskt, 300)<0)
-      { perror("waiting for data"); KillEveryoneCode(21323); }
+    if (wait_readable(ctrlskt, 60)<0)
+      KillEveryoneCode(21323);
     ctrl_getone();
   }
 }
@@ -1560,38 +1477,16 @@ static void node_addresses_store(addrs) char *addrs;
 
 static void InternalPrintf(f, l) char *f; va_list l;
 {
-  char *p, *buf;
   char buffer[8192];
   vsprintf(buffer, f, l);
-  buf = buffer;
-  while (*buf) {
-    p = strchr(buf, '\n');
-    if (p) {
-      *p=0; ctrl_sendone(120, "print %s\n", buf);
-      *p='\n'; buf=p+1;
-    } else {
-      ctrl_sendone(120, "princ %s\n", buf);
-      break;
-    }
-  }
+  ctrl_sendone(120, "print %s", buffer);
 }
 
 static void InternalError(f, l) char *f; va_list l;
 {
-  char *p, *buf;
   char buffer[8192];
   vsprintf(buffer, f, l);
-  buf = buffer;
-  while (*buf) {
-    p = strchr(buf, '\n');
-    if (p) {
-      *p=0; ctrl_sendone(120, "printerr %s\n", buf);
-      *p='\n'; buf = p+1;
-    } else {
-      ctrl_sendone(120, "princerr %s\n", buf);
-      break;
-    }
-  }
+  ctrl_sendone(120, "printerr %s", buffer);
 }
 
 static int InternalScanf(fmt, l)
@@ -1765,9 +1660,7 @@ int TransmitDatagram()
 	TransmitImplicitDgram(dg);
 	if (seqno == ((node->send_last+1)&DGRAM_SEQNO_MASK))
 	  node->send_last = seqno;
-	node->send_give_up = Cmi_clock + 300; /* five minutes */
 	node->send_primer = Cmi_clock + Cmi_delay_retransmit;
-	/* Note --- give up delay is 5 min because I/O could stall node */
 	return 1;
       }
     }
@@ -1781,8 +1674,6 @@ int TransmitDatagram()
       if (dg) {
 	TransmitImplicitDgram1(node->send_window[slot]);
 	node->send_primer = Cmi_clock + Cmi_delay_retransmit;
-	if (Cmi_clock > node->send_give_up)
-	  KillEveryone("processor not responding");
 	return 1;
       }
     }
@@ -2009,6 +1900,10 @@ static void CommunicationServer()
   LOG(GetClock(), Cmi_nodestart, 'I', 0, 0);
   while (1) {
     Cmi_clock = GetClock();
+    if (Cmi_clock > Cmi_check_last + Cmi_check_delay) {
+      writeall(Cmi_host_fd, "ping", 5);
+      Cmi_check_last = Cmi_clock;
+    }
     CheckSocketsReady();
     if (ctrlskt_ready_read) { ctrl_getone(); continue; }
     if (dataskt_ready_write) { if (TransmitAcknowledgement()) continue; }
@@ -2157,14 +2052,15 @@ void ConverseInitPE()
 
 void ConverseExit()
 {
-  ctrl_sendone(120,"aset done %d TRUE\n",CmiMyPe());
-  while (Cmi_shutdown_initiated == 0) CmiYield();
-  ctrl_sendone(120,"ending\n");
   if (CmiMyRank()==0) {
+    CmiCommLock();
     log_done();
     ConverseCommonExit();
-    CmiJoinThreads();
+    CmiCommUnlock();
   }
+  ctrl_sendone(120,"ending"); /* this causes host to go away */
+  Cmi_check_delay = 2.0;
+  while (1) CmiYield(); /* loop until host disappearance causes exit */
 }
 
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int ret)
@@ -2180,13 +2076,12 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int ret)
   parse_netstart();
   extract_args(argv);
   log_init();
+  signal(SIGPIPE, KillOnSIGPIPE);
   skt_datagram(&dataport, &dataskt, Cmi_os_buffer_size);
   skt_server(&ctrlport, &ctrlskt);
-  KillInit();
-  ctrl_sendone(120,"notify-die %s %d\n",Cmi_self_IP_str,ctrlport);
-  ctrl_sendone(120,"aget %s %d done 0 %d\n",
-	       Cmi_self_IP_str,ctrlport,Cmi_numpes-1);
+  Cmi_host_fd = skt_connect(Cmi_host_IP, Cmi_host_port, 60);
   node_addresses_obtain();
+  Cmi_check_delay = Cmi_numnodes * 0.5;
   Cmi_scanf_mutex = CmiCreateLock();
   CmiStartThreads();
   ConverseInitPE();
