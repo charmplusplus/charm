@@ -3,7 +3,7 @@
 
 #define MAX_BUF_SIZE 165000
 
-NodeMulticast *nm_mgr;
+static NodeMulticast *nm_mgr;
 
 void* NodeMulticastHandler(void *msg){
     ComlibPrintf("In Node MulticastHandler\n");

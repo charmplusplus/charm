@@ -1,7 +1,8 @@
 #include "EachToManyMulticastStrategy.h"
 
 CpvExtern(int, RecvdummyHandle);
-EachToManyMulticastStrategy *nm_mgr;
+
+static EachToManyMulticastStrategy *nm_mgr;
 
 void *E2MHandler(void *msg){
   ComlibPrintf("[%d]:In Node MulticastCallbackHandler\n", CkMyPe());

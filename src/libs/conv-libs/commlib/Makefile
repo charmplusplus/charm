@@ -1,6 +1,6 @@
 CHARMC= ../../../../bin/charmc $(OPTS)
 OBJS=commlib.o gridrouter.o de.o treerouter.o petable.o overlapper.o \
-     rsend.o bcast.o charm_bind.o 3dgridrouter.o
+     rsend.o bcast.o 3dgridrouter.o
 
 all: libcomm.a
 	rm -f ../../../../include/commlib.h
@@ -9,8 +9,8 @@ all: libcomm.a
 libcomm.a: $(OBJS)
 	$(CHARMC) -cp ../../../../lib -o libcomm.a $(OBJS)
 
-charm_bind.o: charm_bind.C commlib.h
-	$(CHARMC)  -c -I../../.. charm_bind.C
+#charm_bind.o: charm_bind.C commlib.h
+#	$(CHARMC)  -c -I../../.. charm_bind.C
 
 commlib.o:  commlib.C commlib_pvt.h
 	$(CHARMC)  -c commlib.C

@@ -14,7 +14,6 @@
  *********************************************/
 #include "treerouter.h"
 #define DEGREE 4
-#define NULL 0
 #define gmap(pe) (gpes ? gpes[pe] : pe)
 
 
