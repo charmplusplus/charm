@@ -576,6 +576,30 @@ sent to an array element between its calls to \kw{AtSync} and
 a implemented as a global barrier.
 
 
+\subsubsection{Array Section}
+
+\charmpp{} now supports array section. Array section is a collection of array 
+elements. Multicast and reduction within the section is supported via a 
+ckmulticast library. 
+You can construct an array section using:
+
+\begin{alltt}
+  CkArrayIndexMax *elems;    // array indices
+  int numElems;
+  CProxySection_Hello proxy = CProxySection_Hello::ckNew(helloArrayID, elems, numElems);
+\end{alltt}
+
+Once you have the array section proxy, you can do a multicast to all the 
+elements in the section, or send messages to one element using the index that
+is local to the section, like these:
+
+\begin{alltt}
+  CProxySection_Hello proxy;
+  proxy.someEntry(...)		// multicast
+  proxy[0].someEntry(...)	// send to the first element in the section.
+\end{alltt}
+
+
 \subsubsection{Array Syntax Changes}
 
 The syntax for arrays changed in April, 2000 in the following ways:
