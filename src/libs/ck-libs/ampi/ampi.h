@@ -28,6 +28,7 @@ extern "C" {
 int AMPI_Main(int argc,char **argv); /* prototype for C main routine */
 typedef int MPI_Datatype;
 typedef int MPI_Aint;/* should be "long", but must be "int" for f90... */
+typedef int MPI_Fint;
 
 /********************** MPI-1.1 prototypes and defines ***************************/
 /* MPI-1 Errors */
@@ -640,6 +641,23 @@ int AMPI_Info_get_nthkey(MPI_Info info, int n, char *key);
 int AMPI_Info_dup(MPI_Info info, MPI_Info *newinfo);
 #define MPI_Info_free AMPI_Info_free
 int AMPI_Info_free(MPI_Info *info);
+
+#define MPI_Comm_c2f(comm) (MPI_Fint)(comm)
+#define MPI_Comm_f2c(comm) (MPI_Comm)(comm)
+#define MPI_Type_c2f(datatype) (MPI_Fint)(datatype)
+#define MPI_Type_f2c(datatype) (MPI_Datatype)(datatype)
+#define MPI_Group_c2f(group) (MPI_Fint)(group)
+#define MPI_Group_f2c(group) (MPI_Group)(group)
+#define MPI_Info_c2f(info) (MPI_Fint)(info)
+#define MPI_Info_f2c(info) (MPI_Info)(info)
+#define MPI_Request_f2c(request) (MPI_Request)(request)
+#define MPI_Request_c2f(request) (MPI_Fint)(request)
+#define MPI_Op_c2f(op) (MPI_Fint)(op)
+#define MPI_Op_f2c(op) (MPI_Op)(op)
+#define MPI_Errhandler_c2f(errhandler) (MPI_Fint)(errhandler)
+#define MPI_Errhandler_f2c(errhandler) (MPI_Errhandler)(errhandler)
+#define MPI_Win_c2f(win)   (MPI_Fint)(win)
+#define MPI_Win_f2c(win)   (MPI_Win)(win)
 
 #include "ampiProjections.h"
 #ifdef __cplusplus
