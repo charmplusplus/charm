@@ -83,7 +83,11 @@ void TraceBluegene::bgDummyBeginExec(char* name,void** parentLogPtr)
 {
   if (!genTimeLog) return;
   startVTimer();
-  BgTimeLog* newLog = BgStartLogByName(tTIMELINEREC, _threadEP, name, BgGetCurTime(), *(BgTimeLog**)parentLogPtr);
+  double startTime = BgGetCurTime();
+  BgTimeLog* newLog = BgStartLogByName(tTIMELINEREC, _threadEP, name, startTime, *(BgTimeLog**)parentLogPtr);
+  // if event's mesgID is (-1:-1) and there is no backward dependence
+  // to avoid timestamp correction, set a fake recv time so that it stays here
+  if (*parentLogPtr == NULL) newLog->recvTime = startTime;
   *parentLogPtr = newLog;
 }
 
