@@ -663,7 +663,7 @@ int ampiParent::getAttr(MPI_Comm comm, int keyval, void *attribute_val, int *fla
 	KeyvalNode* node = kvlist[keyval];
 	if(comm == node->comm) {
 		*flag = true;
-		attribute_val = node->value;
+		*(void **)attribute_val = node->value;
 	}else{
 		*flag = false;
 	}

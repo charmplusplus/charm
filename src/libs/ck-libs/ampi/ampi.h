@@ -448,6 +448,8 @@ int MPI_Type_get_contents(MPI_Datatype datatype, int max_integers, int max_addre
 /*  MPI_Win : an index into a list in ampiParent (just like MPI_Group) */
 #define MAXWINNUMBER 9 
 #define MPI_MAX_OBJECT_NAME 100
+#define MPI_MAX_INFO_KEY 255
+#define MPI_MAX_INFO_VAL 1024
 
 typedef int MPI_Info;
 typedef int MPI_Win;
