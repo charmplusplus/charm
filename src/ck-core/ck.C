@@ -620,6 +620,11 @@ static inline void _sendMsgBranch(int eIdx, void *msg, CkGroupID gID,
   env->setEpIdx(eIdx);
   env->setGroupNum(gID);
   env->setSrcPe(CkMyPe());
+  if(pe==CLD_BROADCAST_ALL) {
+    _TRACE_CREATION_N(env, CkNumPes());
+  } else {
+    _TRACE_CREATION_1(env);
+  }
   CmiSetHandler(env, _charmHandlerIdx);
   CldEnqueue(pe, env, _infoIdx);
 }
@@ -627,18 +632,16 @@ static inline void _sendMsgBranch(int eIdx, void *msg, CkGroupID gID,
 extern "C"
 void CkSendMsgBranch(int eIdx, void *msg, int pe, CkGroupID gID)
 {
-  _TRACE_CREATION_1(UsrToEnv(msg));
-  _STATS_RECORD_SEND_BRANCH_1();
   _sendMsgBranch(eIdx, msg, gID, pe);
+  _STATS_RECORD_SEND_BRANCH_1();
   CpvAccess(_qd)->create();
 }
 
 extern "C"
 void CkBroadcastMsgBranch(int eIdx, void *msg, CkGroupID gID)
 {
-  _TRACE_CREATION_N(UsrToEnv(msg), CkNumPes());
-  _STATS_RECORD_SEND_BRANCH_N(CkNumPes());
   _sendMsgBranch(eIdx, msg, gID);
+  _STATS_RECORD_SEND_BRANCH_N(CkNumPes());
   CpvAccess(_qd)->create(CkNumPes());
 }
 
@@ -652,6 +655,11 @@ static inline void _sendMsgNodeBranch(int eIdx, void *msg, CkGroupID gID,
   env->setEpIdx(eIdx);
   env->setGroupNum(gID);
   env->setSrcPe(CkMyPe());
+  if(node==CLD_BROADCAST_ALL) {
+    _TRACE_CREATION_N(env, CkNumNodes());
+  } else {
+    _TRACE_CREATION_1(env);
+  }
   CmiSetHandler(env, _charmHandlerIdx);
   CldNodeEnqueue(node, env, _infoIdx);
 }
@@ -659,17 +667,15 @@ static inline void _sendMsgNodeBranch(int eIdx, void *msg, CkGroupID gID,
 extern "C"
 void CkSendMsgNodeBranch(int eIdx, void *msg, int node, CkGroupID gID)
 {
-  _TRACE_CREATION_1(UsrToEnv(msg));
-  _STATS_RECORD_SEND_NODE_BRANCH_1();
   _sendMsgNodeBranch(eIdx, msg, gID, node);
+  _STATS_RECORD_SEND_NODE_BRANCH_1();
   CpvAccess(_qd)->create();
 }
 
 extern "C"
 void CkBroadcastMsgNodeBranch(int eIdx, void *msg, CkGroupID gID)
 {
-  _TRACE_CREATION_N(UsrToEnv(msg), CkNumNodes());
-  _STATS_RECORD_SEND_NODE_BRANCH_N(CkNumNodes());
   _sendMsgNodeBranch(eIdx, msg, gID);
+  _STATS_RECORD_SEND_NODE_BRANCH_N(CkNumNodes());
   CpvAccess(_qd)->create(CkNumNodes());
 }
