@@ -60,6 +60,9 @@ evmpool.def.h: evmpool.decl.h
 evmpool.decl.h: evmpool.ci
 	$(CHARMC) evmpool.ci
 
+docs: pose.doxy adapt2.C eventID.C lbObject.C spec.C adapt2.h eventID.h lbObject.h pose.C spec.h pose.ci adapt.C ldbal.C srtable.C adapt.h evmpool.C ldbal.ci srtable.h evmpool.ci pose.h cancel.C stats.C cancel.h ldbal.h pvtobj.C stats.ci evmpool.h pvtobj.h chpt.h cons.C evq.C rep.C stats.h cons.h evq.h opt2.C rep.h opt2.h strat.C eqheap.C gvt.C sim.C strat.h eqheap.h gvt.ci opt3.C sim.ci opt3.h event.C gvt.h opt.C sim.h event.h opt.h
+	doxygen pose.doxy
+
 # HOUSE-KEEPING RULES
 #********************
 clean:
