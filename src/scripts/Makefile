@@ -158,7 +158,8 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 
 ALLHEADERS=$(CKHEADERS) \
     simplemsg.h sm.h pvmc.h pvm3.h sdag.h \
-	graph.h bitvecset.h Set.h LBSimulation.h
+	graph.h bitvecset.h Set.h LBSimulation.h  \
+	$(BLUE_HEADERS)
 
 basics: headers
 	touch basics
