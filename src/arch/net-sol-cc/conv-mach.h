@@ -8,6 +8,8 @@
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
 
+#define CMK_SOLARIS                                        1
+
 #define CMK_ASYNC_NOT_NEEDED                               0
 #define CMK_ASYNC_USE_FIOASYNC_AND_FIOSETOWN               1
 #define CMK_ASYNC_USE_FIOASYNC_AND_SIOCSPGRP               0
@@ -55,8 +57,10 @@
 #define CMK_SHARED_VARS_UNAVAILABLE                        1
 #define CMK_SHARED_VARS_SUN_THREADS                        0
 #define CMK_SHARED_VARS_UNIPROCESSOR                       0
-#define CMK_THREADS_USE_PTHREADS                           0
+
 #define CMK_THREADS_ARE_WIN32_FIBERS                       0
+#define CMK_THREADS_USE_PTHREADS                           0
+#define CMK_THREADS_USE_CONTEXT                            0
 
 #define CMK_SIGNAL_NOT_NEEDED                              0
 #define CMK_SIGNAL_USE_SIGACTION                           0
