@@ -104,12 +104,12 @@ special delegateMgr group.
 */
 class CkDelegateMgr;
 
-class CProxyBase_Delegatable {
+class CProxy {
   private:
     CkGroupID delegatedTo;
-  protected: //Never allocate CProxyBase_Delegatable's-- only subclass them.
-    CProxyBase_Delegatable() { delegatedTo.pe = -1; }
-    CProxyBase_Delegatable(CkGroupID dTo) { delegatedTo = dTo; }
+  protected: //Never allocate CProxy's-- only subclass them.
+    CProxy() { delegatedTo.pe = -1; }
+    CProxy(CkGroupID dTo) { delegatedTo = dTo; }
   public:
     void ckDelegate(CkGroupID to) {delegatedTo=to;}
     void ckUndelegate(void) {delegatedTo.pe =-1;}
@@ -122,7 +122,7 @@ class CProxyBase_Delegatable {
       p|delegatedTo;
     }
 };
-PUPmarshall(CProxyBase_Delegatable)
+PUPmarshall(CProxy)
 
 /*These disambiguation macros are needed to support
   multiple inheritance in Chares (Groups, Arrays).
@@ -130,7 +130,7 @@ PUPmarshall(CProxyBase_Delegatable)
   Because mutator routines need to change *all* the base
   classes, mutators are generated in xi-symbol.C.
 */
-#define CK_DISAMBIG_DELEGATABLE(super) \
+#define CK_DISAMBIG_CPROXY(super) \
     int ckIsDelegated(void) const {return super::ckIsDelegated();}\
     CkGroupID ckDelegatedIdx(void) const {return super::ckDelegatedIdx();}\
     CkDelegateMgr *ckDelegatedTo(void) const {\
@@ -141,7 +141,7 @@ PUPmarshall(CProxyBase_Delegatable)
 
 /*The base classes of each proxy type
 */
-class CProxy_Chare : public CProxyBase_Delegatable {
+class CProxy_Chare : public CProxy {
   private:
     CkChareID _ck_cid;
   public:
@@ -155,7 +155,7 @@ class CProxy_Chare : public CProxyBase_Delegatable {
     operator const CkChareID &(void) const {return ckGetChareID();}
     void ckSetChareID(const CkChareID &c) {_ck_cid=c;}
     void pup(PUP::er &p) {
-    	CProxyBase_Delegatable::pup(p);
+    	CProxy::pup(p);
     	p(_ck_cid.onPE);
     	p(_ck_cid.magic);
     	//Copy the pointer as straight bytes
@@ -165,21 +165,21 @@ class CProxy_Chare : public CProxyBase_Delegatable {
 PUPmarshall(CProxy_Chare)
 
 #define CK_DISAMBIG_CHARE(super) \
-	CK_DISAMBIG_DELEGATABLE(super) \
+	CK_DISAMBIG_CPROXY(super) \
 	const CkChareID &ckGetChareID(void) const\
     	   {return super::ckGetChareID();} \
         operator const CkChareID &(void) const {return ckGetChareID();}
 
 
-class CProxy_Group : public CProxyBase_Delegatable {
+class CProxy_Group : public CProxy {
   private:
     CkGroupID _ck_gid;
   public:
     CProxy_Group() { }
     CProxy_Group(CkGroupID g) 
-    	:CProxyBase_Delegatable(),_ck_gid(g) {}
+    	:CProxy(),_ck_gid(g) {}
     CProxy_Group(CkGroupID g,CkGroupID dTo) 
-    	:CProxyBase_Delegatable(dTo),_ck_gid(g) {}
+    	:CProxy(dTo),_ck_gid(g) {}
     CkChareID ckGetChareID(void) const { 
     	CkChareID ret;
     	ret.onPE=CkMyPe();
@@ -190,13 +190,13 @@ class CProxy_Group : public CProxyBase_Delegatable {
     CkGroupID ckGetGroupID(void) const {return _ck_gid;}
     void ckSetGroupID(CkGroupID g) {_ck_gid=g;}
     void pup(PUP::er &p) {
-    	CProxyBase_Delegatable::pup(p);
+    	CProxy::pup(p);
 	p | _ck_gid;
     }
 };
 PUPmarshall(CProxy_Group)
 #define CK_DISAMBIG_GROUP(super) \
-	CK_DISAMBIG_DELEGATABLE(super) \
+	CK_DISAMBIG_CPROXY(super) \
 	CkChareID ckGetChareID(void) const\
     	   {return super::ckGetChareID();} \
 	CkGroupID ckGetGroupID(void) const\
@@ -295,11 +295,14 @@ public:
 class CkDelegateMgr : public Group {
   public:
     virtual ~CkDelegateMgr(); //<- so children can have virtual destructor
-    virtual void ChareSend(int ep,void *m,const CkChareID *c);
+    virtual void ChareSend(int ep,void *m,const CkChareID *c,int onPE);
+
     virtual void GroupSend(int ep,void *m,int onPE,CkGroupID g);
     virtual void GroupBroadcast(int ep,void *m,CkGroupID g);
+
     virtual void NodeGroupSend(int ep,void *m,int onNode,CkNodeGroupID g);
     virtual void NodeGroupBroadcast(int ep,void *m,CkNodeGroupID g);
+
     virtual void ArrayCreate(int ep,void *m,const CkArrayIndexMax &idx,int onPE,CkArrayID a);
     virtual void ArraySend(int ep,void *m,const CkArrayIndexMax &idx,CkArrayID a);
     virtual void ArrayBroadcast(int ep,void *m,CkArrayID a);
