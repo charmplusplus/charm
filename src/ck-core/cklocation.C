@@ -593,7 +593,10 @@ void CkMigratable::ckDestroy(void) {
 }
 
 void CkMigratable::ckAboutToMigrate(void) { }
-void CkMigratable::ckJustMigrated(void) { }
+void CkMigratable::ckJustMigrated(void) { 
+	// 
+	//if (usesReadyMigrate) ResumeFromSync();
+}
 
 CkMigratable::~CkMigratable() {
 	DEBC((AA"In CkMigratable::~CkMigratable %s\n"AB,idx2str(thisIndexMax)));

@@ -55,7 +55,7 @@ int CkRegisterEp(const char *name, CkCallFnPtr call, int msgIdx, int chareIdx,
   EntryInfo *e = new EntryInfo(name, call?call:ckInvalidCallFn, msgIdx, chareIdx);
   if (ck_ep_flags & CK_EP_NOKEEP) e->noKeep=CmiTrue;
   if (ck_ep_flags & CK_EP_INTRINSIC) e->inCharm=CmiTrue;
-  if (ck_ep_flags & CK_EP_TRACEDIABLE) e->traceEnabled=CmiFalse;
+  if (ck_ep_flags & CK_EP_TRACEDISABLE) e->traceEnabled=CmiFalse;
   return _entryTable.add(e);
 }
 

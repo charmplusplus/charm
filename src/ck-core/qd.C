@@ -142,7 +142,7 @@ static inline void _handlePhase2(QdState *state, QdMsg *msg)
 
 static void _callWhenIdle(QdMsg *msg)
 {
-  DEBUGP(("[%d] callWhenIdle\n", CmiMyPe()));
+  DEBUGP(("[%d] callWhenIdle msg:%p\n", CmiMyPe(), msg));
   QdState *state = CpvAccess(_qd);
   switch(msg->getPhase()) {
     case 0 : _handlePhase0(state, msg); break;
@@ -155,6 +155,7 @@ static void _callWhenIdle(QdMsg *msg)
 void _qdHandler(envelope *env)
 {
   register QdMsg *msg = (QdMsg*) EnvToUsr(env);
+  DEBUGP(("[%d] _qdHandler msg:%p\n", CmiMyPe(), msg));
   CcdCallOnCondition(CcdPROCESSOR_STILL_IDLE, (CcdVoidFn)_callWhenIdle, (void*) msg);
 }
 
