@@ -41,7 +41,6 @@ static void FEMfallbackSetup(void)
 {
 	int nChunks=TCHARM_Get_num_chunks();
 	char **argv=CkGetArgv();
-	int initFlags=0;
 	TCHARM_Create(nChunks,callDrivers);
 	if (!(initFlags&FEM_INIT_READ)) {
 		fem_impl_call_init(); // init();
