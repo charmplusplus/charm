@@ -89,6 +89,11 @@ class CkQ : private CkSTLHelper<T>, private CkNoncopyable {
       len--;
       return ret;
     }
+    // delete all elements from pos
+    void removeFrom(int pos) {
+      CmiAssert (pos < len && pos>=0);
+      len = pos;
+    }
     //Peek at the n'th item from the queue
     T& operator[](size_t n)
     {
