@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.2  1995-06-09 21:22:00  gursoy
+ * Revision 2.3  1995-06-16 21:42:10  gursoy
+ * fixed CmiSyncSend: size field is copied now
+ *
+ * Revision 2.2  1995/06/09  21:22:00  gursoy
  * Cpv macros moved to converse
  *
  * Revision 2.1  1995/06/09  16:43:47  gursoy
@@ -287,14 +290,20 @@ void         *msg;
        Return only after the message has been sent, i.e.,
        the buffer (msg) is free for re-use. */
         void *buf;
-        buf=(void *)g_malloc(size);
+        char *buf2;
+
+        buf=(void *)g_malloc(size+8);
+        buf2 = (char *)buf;
+        buf2 += 8;
+
         if(buf==(void *)0)
         {
                 printf("Cannot allocate memory!\n");
                 exit(1);
         }
-        mycpy((unsigned long long *)buf,(unsigned long long *)msg,size);
-        McQueueAddToBack(MsgQueue[destPE],buf); 
+        mycpy((unsigned long long *)buf2,(unsigned long long *)msg,size);
+        ((int *)buf)[0]=size;
+        McQueueAddToBack(MsgQueue[destPE],buf2); 
 }
 
 
