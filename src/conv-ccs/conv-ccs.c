@@ -226,7 +226,7 @@ void CHostGetOne()
       sscanf(line, "%s%d%d", cmd, &pe, &size);
 #endif
       /* DEBUGGING */
-      CmiPrintf("Line = %s\n", line);
+      /*CmiPrintf("Line = %s\n", line);*/
 
       sscanf(line, "%s%d%d", cmd, &pe, &size);
       len = strlen(line);
@@ -234,10 +234,10 @@ void CHostGetOne()
       if (!msg)
         CmiPrintf("%d: Out of mem\n", CmiMyPe());
       CmiSetHandler(msg, CpvAccess(strHandlerID));
-      CmiPrintf("hdlr ID = %d\n", CpvAccess(strHandlerID));
+      /*CmiPrintf("hdlr ID = %d\n", CpvAccess(strHandlerID));*/
       strcpy(msg+CmiMsgHeaderSizeBytes, line);
       ret = fread(msg+CmiMsgHeaderSizeBytes+len, 1, size, f);
-      CmiPrintf("size = %d, ret =%d\n", size, ret);
+      /*CmiPrintf("size = %d, ret =%d\n", size, ret);*/
       msg[CmiMsgHeaderSizeBytes+len+size] = '\0';
       CmiSyncSendAndFree(CmiMyPe(), CmiMsgHeaderSizeBytes+len+size+1, msg);
 
@@ -255,7 +255,7 @@ void CHostGetOne()
       int nodetab_rank0_size = CmiNumNodes();
 
       /* DEBUGGING */
-      CmiPrintf("Line = %s\n", line);
+      /*CmiPrintf("Line = %s\n", line);*/
       nscanfread = sscanf(line, "%s%u%u", cmd, &clientIP, &clientPort);
       if(nscanfread != 3){
 
@@ -316,11 +316,11 @@ void CHostGetOne()
       }
     }
     else {
-      CmiPrintf("Request: %s\n", line);
+      /*CmiPrintf("Request: %s\n", line);*/
       KillEveryoneCode(2933);
     }
   }
-  CmiPrintf("Out of fgets loop\n");
+  /*CmiPrintf("Out of fgets loop\n");*/
 #if CMK_WEB_MODE
   if(dont_close==0) {
 #endif
