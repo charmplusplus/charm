@@ -43,13 +43,13 @@ class PairCalcID {
   }
 };
 
-extern "C" void createPairCalculator(bool sym, int w, int grainSize, int numZ, int* z, int op1, FuncType f1, int op2, FuncType f2, const CkCallback cb, PairCalcID* aid, int flag=0, CkGroupID *gid = 0, int flag_dp=0);
+extern "C" void createPairCalculator(bool sym, int w, int grainSize, int numZ, int* z, int op1, FuncType f1, int op2, FuncType f2, CkCallback cb, PairCalcID* aid, int ep, CkArrayID cbid, int flag=0, CkGroupID *gid = 0, int flag_dp=0);
 
 void startPairCalcLeft(PairCalcID* aid, int n, complex* ptr, int myS, int myZ);
 
 void startPairCalcRight(PairCalcID* aid, int n, complex* ptr, int myS, int myZ);
 
-extern "C" void finishPairCalc(PairCalcID* aid, int n, double *ptr, const CkCallback cb);
+extern "C" void finishPairCalc(PairCalcID* aid, int n, double *ptr);
 
 void startPairCalcLeftAndFinish(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ);
 

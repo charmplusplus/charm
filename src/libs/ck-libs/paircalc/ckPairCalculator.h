@@ -7,7 +7,7 @@
 #include "BroadcastStrategy.h"
 
 #if USE_BLAS
-extern "C" complex zdotu_( const int *N,  complex *X, const int *incX,			       complex *Y, const int *incY);
+extern "C" complex zdotu_( const int *N,  complex *X, const int *incX, complex *Y, const int *incY);
 
 #endif
 
@@ -63,14 +63,14 @@ class priorSumMsg : public CMessage_priorSumMsg {
 
 class PairCalculator: public CBase_PairCalculator {
  public:
-  PairCalculator(bool, int, int, int, int op1, FuncType fn1, int op2, FuncType fn2, CkCallback cb, CkGroupID gid);
+    PairCalculator(bool, int, int, int, int op1, FuncType fn1, int op2, FuncType fn2, CkCallback cb, CkGroupID gid, CkArrayID final_callbackid, int final_callback_ep);
+    
   PairCalculator(CkMigrateMessage *);
   ~PairCalculator();
   void calculatePairs(int, complex *, int, bool, bool); 
   void acceptEntireResult(int size, double *matrix);
-  void acceptEntireResult(int size, double *matrix, CkCallback cb);
-  void acceptResult(int size, double *matrix, int rowNum, CkCallback cb);
-  void sumPartialResult(int size, complex *result, int offset, CkCallback cb);
+  void acceptResult(int size, double *matrix, int rowNum);
+  void sumPartialResult(int size, complex *result, int offset);
   void sumPartialResult(priorSumMsg *msg);
   void sumPartialResult(partialResultMsg *msg);
   void pup(PUP::er &);
@@ -117,22 +117,33 @@ class PairCalculator: public CBase_PairCalculator {
   int sumPartialCount;
   bool symmetric;
   CkCallback cb;
+  CkArrayID cb_aid;
+  int cb_ep;
+  CkGroupID reducer_id;
   CkSparseContiguousReducer<double> r;
 };
 
 class PairCalcReducer : public Group {
  public:
   PairCalcReducer(CkMigrateMessage *m) { }
-  PairCalcReducer(){ acceptCount = 0; numRegistered[0] = 0; numRegistered[1] = 0;}
+  PairCalcReducer(){ 
+      acceptCount = 0; numRegistered[0] = 0; numRegistered[1] = 0;
+      reduction_elementCount = 0;
+      tmp_matrix = NULL;
+  }
   ~PairCalcReducer() {}
-  void acceptPartialResult(int size, complex* matrix, int fromRow, int fromCol, CkCallback cb);
-  void broadcastEntireResult(int size, double* matrix, bool symmtype, CkCallback cb);
+  void acceptPartialResult(int size, complex* matrix, int fromRow, int fromCol);
+  void broadcastEntireResult(int size, double* matrix, bool symmtype);
   void doRegister(PairCalculator *, bool);
 
+  void acceptContribute(int size, double* matrix, CkCallback cb, bool isAllReduce, bool symmtype);
+  
  private:
   CkVec<PairCalculator *> localElements[2];
   int numRegistered[2];
   int acceptCount;
+  int reduction_elementCount;
+  double *tmp_matrix;
 }; 
 
 

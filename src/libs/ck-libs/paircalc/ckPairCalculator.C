@@ -2,11 +2,11 @@
 
 #define PARTITION_SIZE 500
 
-#define _SPARSECONT_ 
+//#define _SPARSECONT_ 
 
 PairCalculator::PairCalculator(CkMigrateMessage *m) { }
 	
-PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int op1,  FuncType fn1, int op2,  FuncType fn2, CkCallback cb, CkGroupID gid) 
+PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int op1,  FuncType fn1, int op2,  FuncType fn2, CkCallback cb, CkGroupID gid, CkArrayID cb_aid, int cb_ep) 
 {
     //CkPrintf("Create Pair Calculator\n");
 
@@ -20,6 +20,10 @@ PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int
   this->fn2 = fn2; 
   this->cb = cb;
   this->N = -1;
+  this->cb_aid = cb_aid;
+  this->cb_ep = cb_ep;
+  reducer_id = gid;
+
   numRecd = 0;
   numExpected = grainSize;
   kUnits=5;
@@ -52,7 +56,7 @@ PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int
   sumPartialCount = 0;
   setMigratable(false);
 
-  CProxy_PairCalcReducer pairCalcReducerProxy(gid); 
+  CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id); 
   pairCalcReducerProxy.ckLocalBranch()->doRegister(this, symmetric);
 
 #ifdef _DEBUG_
@@ -74,6 +78,11 @@ PairCalculator::pup(PUP::er &p)
   p|kRightCount;
   p|kLeftCount;
   p|kUnits;
+  p|cb_aid;
+  p|cb_ep;
+  p|reducer_id;
+  p|symmetric;
+
   int rdiff,ldiff;
   if(p.isPacking())
     {//store offset calculation
@@ -254,7 +263,15 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
       r.add((int)thisIndex.y, (int)thisIndex.x, (int)(thisIndex.y+grainSize-1), (int)(thisIndex.x+grainSize-1), outData);
       r.contribute(this, sparse_sum_double);
 #else
+#if 1 //!CONVERSE_VERSION_ELAN
       contribute(S * S *sizeof(double), outData, CkReduction::sum_double);
+#else
+
+      CkPrintf("ELAN VERSION\n");
+      CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id); 
+      pairCalcReducerProxy.ckLocalBranch()->acceptContribute(S * S, outData, cb,
+                                                             false, symmetric);
+#endif
 #endif
   }
   
@@ -316,23 +333,18 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
 }
 
 void
-PairCalculator::acceptEntireResult(int size, double *matrix){
-  acceptEntireResult(size, matrix, cb);
-}
-
-void
-PairCalculator::acceptEntireResult(int size, double *matrix, CkCallback cb)
+PairCalculator::acceptEntireResult(int size, double *matrix)
 {
 #ifdef _DEBUG_
   CkPrintf("[%d %d %d %d]: Accept EntireResult with size %d\n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z, size);
 #endif
   CkArrayIndexIndex4D myidx(thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z);
-  acceptResult(size, matrix, thisIndex.x, cb);
+  acceptResult(size, matrix, thisIndex.x);
 }
 
 
 void
-PairCalculator::acceptResult(int size, double *matrix, int rowNum, CkCallback cb)
+PairCalculator::acceptResult(int size, double *matrix, int rowNum)
 {
 #ifdef _DEBUG_
   CkPrintf("[%d %d %d %d]: Accept Result with size %d\n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z, size);
@@ -546,7 +558,8 @@ PairCalculator::sumPartialResult(partialResultMsg *msg)
     for(int i=0;i<psumblocksize;i++)
       {
 	  // CkPrintf("[%d %d %d %d]: sending to [%d %d]  \n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z,thisIndex.y+i+thisIndex.x/grainSize*psumblocksize,thisIndex.w);
-	  CkCallback mycb(msg->cb.d.array.ep, CkArrayIndex2D(/*thisIndex.y/grainSize+i+thisIndex.x/grainSize*psumblocksize*/thisIndex.y+i+thisIndex.x/grainSize*psumblocksize, thisIndex.w), msg->cb.d.array.id);
+
+	  CkCallback mycb(cb_ep, CkArrayIndex2D(/*thisIndex.y/grainSize+i+thisIndex.x/grainSize*psumblocksize*/thisIndex.y+i+thisIndex.x/grainSize*psumblocksize, thisIndex.w), cb_aid);
 	
           mySendMsg *outmsg = new (N,0)mySendMsg; // msg with newData (size N)
           memcpy(outmsg->data, newData+i*psumblocksize, N* sizeof(complex));
@@ -579,11 +592,11 @@ PairCalculator::sumPartialResult(priorSumMsg *msg)
   }
   if (sumPartialCount == (S/grainSize)*blkSize) {
     for(int j=0; j<grainSize; j++){
-      CkCallback mycb(msg->cb.d.array.ep, CkArrayIndex2D(thisIndex.y+j, thisIndex.w), msg->cb.d.array.id);
-      mySendMsg *outmsg = new (N, 0)mySendMsg; // msg with newData (size N)
-      memcpy(outmsg->data, newData+j*N, N * sizeof(complex));
-      outmsg->N = N;
-      
+        CkCallback mycb(cb_ep, CkArrayIndex2D(thisIndex.y+j, thisIndex.w), cb_aid);
+        mySendMsg *outmsg = new (N, 0)mySendMsg; // msg with newData (size N)
+        memcpy(outmsg->data, newData+j*N, N * sizeof(complex));
+        outmsg->N = N;
+        
       mycb.send(outmsg);
     }
     sumPartialCount = 0;
@@ -596,7 +609,7 @@ PairCalculator::sumPartialResult(priorSumMsg *msg)
 
 
 void 
-PairCalculator::sumPartialResult(int size, complex *result, int offset, CkCallback cb)
+PairCalculator::sumPartialResult(int size, complex *result, int offset)
 {
 #ifdef _DEBUG_
   CkPrintf("[%d %d %d %d]: sum result from %d\n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z, offset);
@@ -613,7 +626,7 @@ PairCalculator::sumPartialResult(int size, complex *result, int offset, CkCallba
   }
   if (sumPartialCount == (S/grainSize)*blkSize) {
     for(int j=0; j<grainSize; j++){
-      CkCallback mycb(cb.d.array.ep, CkArrayIndex2D(thisIndex.y+j, thisIndex.w), cb.d.array.id);
+      CkCallback mycb(cb_ep, CkArrayIndex2D(thisIndex.y+j, thisIndex.w), cb_aid);
       mySendMsg *msg = new (N, 0)mySendMsg; // msg with newData (size N)
       memcpy(msg->data, newData+j*N, N * sizeof(complex));
       msg->N=N;
@@ -628,15 +641,86 @@ PairCalculator::sumPartialResult(int size, complex *result, int offset, CkCallba
 
 
 void
-PairCalcReducer::acceptPartialResult(int size, complex* matrix, int fromRow, int fromCol, CkCallback cb){
-  
+PairCalcReducer::acceptPartialResult(int size, complex* matrix, int fromRow, int fromCol){
+}
 
+
+void add_double(void *in, void *inout, int *size, void *handle) {
+    double * matrix1 = (double *)in;
+    double * matrix2 = (double *)inout;
+
+    for(int i = 0; i < *size; i ++){
+        matrix2[i] += matrix1[i];
+    }
+}
+
+
+#if CONVERSE_VERSION_ELAN
+
+typedef void (* ELAN_REDUCER)(void *in, void *inout, int *count, void *handle);
+
+extern "C" void elan_machine_reduce(int nelem, int size, void * data, 
+                                    void *dest, ELAN_REDUCER fn, int root);
+extern "C" void elan_machine_allreduce(int nelem, int size, void * data, 
+                                       void *dest, ELAN_REDUCER fn);
+#endif
+
+void PairCalcReducer::acceptContribute(int size, double* matrix, CkCallback cb, 
+                                       bool isAllReduce, bool symmtype)
+{
+#if CONVERSE_VERSION_ELAN
+    reduction_elementCount ++;
+    
+    if(tmp_matrix == NULL) {
+        tmp_matrix = new double[size];
+        memset(matrix, 0, size * sizeof(double));
+    }
+    
+    add_double(matrix, tmp_matrix, &size, NULL);
+
+    if(reduction_elementCount == localElements[symmtype].length()) {
+        reduction_elementCount = 0;
+        double * dst_matrix =  NULL;
+        
+        if(isAllReduce) {
+            dst_matrix = new double[size];
+            memset(matrix, 0, size * sizeof(double));
+            elan_machine_allreduce(size, sizeof(double), tmp_matrix, dst_matrix, add_double);
+        }
+        else {     
+            CkPrintf("HERE\n");
+            int pe = CkNumPes()/2; //HACK FOO BAR, GET IT FROM CALLBACK cb
+            
+            if(pe == CkMyPe()) {
+                dst_matrix = new double[size];
+                memset(matrix, 0, size * sizeof(double));
+            }
+            
+            elan_machine_reduce(size, sizeof(double), tmp_matrix, dst_matrix, add_double, pe);
+        }
+        
+        if(isAllReduce) {
+            broadcastEntireResult(size, dst_matrix,  symmtype);
+            delete [] dst_matrix;
+        }
+        else {
+            cb.send(size *sizeof(double), dst_matrix);
+            if(dst_matrix)
+                delete [] dst_matrix;
+        }        
+        
+        delete [] tmp_matrix;
+        tmp_matrix = NULL;
+    }
+#else
+    CkAbort("Converse Version Is not ELAN, h/w reduction is not supported");
+#endif
 }
 
 void
-PairCalcReducer::broadcastEntireResult(int size, double* matrix, bool symmtype, CkCallback cb){
+PairCalcReducer::broadcastEntireResult(int size, double* matrix, bool symmtype){
   for (int i = 0; i < localElements[symmtype].length(); i++)
-    (localElements[symmtype])[i]->acceptEntireResult(size, matrix, cb); 
+    (localElements[symmtype])[i]->acceptEntireResult(size, matrix); 
 }
 
 void

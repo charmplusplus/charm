@@ -2,10 +2,12 @@
 #include "ckPairCalculator.h"
 #include "pairCalculator.h"
 
-void createPairCalculator(bool sym, int s, int grainSize, int numZ, int* z, int op1, FuncType f1, int op2, FuncType f2, CkCallback cb, PairCalcID* pcid, int comlib_flag, CkGroupID *mapid, int flag_dp) {
+void createPairCalculator(bool sym, int s, int grainSize, int numZ, int* z, int op1, 
+                          FuncType f1, int op2, FuncType f2, CkCallback cb, 
+                          PairCalcID* pcid, int cb_ep, CkArrayID cb_aid, 
+                          int comlib_flag, CkGroupID *mapid, int flag_dp) {
 
-    //CkPrintf("create pair calculator %d, %d\n", s, grainSize);
-
+  //CkPrintf("create pair calculator %d, %d\n", s, grainSize);
 
   CProxy_PairCalcReducer pairCalcReducerProxy = CProxy_PairCalcReducer::ckNew();
   pairCalcReducerProxy.ckSetReductionClient(&cb); 
@@ -20,7 +22,7 @@ void createPairCalculator(bool sym, int s, int grainSize, int numZ, int* z, int 
   }
   else {
       options.setMap(*mapid);
-      pairCalculatorProxy = CProxy_PairCalculator::ckNew(sym, grainSize, s, blkSize, op1, f1, op2, f2, cb, pairCalcReducerProxy.ckGetGroupID(), options);
+      pairCalculatorProxy = CProxy_PairCalculator::ckNew(sym, grainSize, s, blkSize, op1, f1, op2, f2, cb, pairCalcReducerProxy.ckGetGroupID(), cb_aid, cb_ep, options);
   }
 
   pairCalculatorProxy.ckSetReductionClient(&cb);  
@@ -44,7 +46,7 @@ void createPairCalculator(bool sym, int s, int grainSize, int numZ, int* z, int 
                   for (int s2 = s1; s2 < s; s2 += grainSize) {
                       for (int c = 0; c < blkSize; c++) {
                           pairCalculatorProxy(CkArrayIndexIndex4D(z[numX],s1,s2,c)).
-                              insert(sym, grainSize, s, blkSize, op1, f1, op2, f2, cb, pairCalcReducerProxy.ckGetGroupID());
+                              insert(sym, grainSize, s, blkSize, op1, f1, op2, f2, cb, pairCalcReducerProxy.ckGetGroupID(), cb_aid, cb_ep);
                           n_paircalc++;
                       }
                   }
@@ -57,7 +59,7 @@ void createPairCalculator(bool sym, int s, int grainSize, int numZ, int* z, int 
                   for (int s2 = 0; s2 < s; s2 += grainSize) {
                       for (int c = 0; c < blkSize; c++) {
                           pairCalculatorProxy(CkArrayIndexIndex4D(z[numX],s1,s2,c)).
-                              insert(sym, grainSize, s, blkSize, op1, f1, op2, f2, cb, pairCalcReducerProxy.ckGetGroupID());
+                              insert(sym, grainSize, s, blkSize, op1, f1, op2, f2, cb, pairCalcReducerProxy.ckGetGroupID(), cb_aid, cb_ep);
                           n_paircalc++;
                           proc++;
                           if (proc >= CkNumPes()) proc = 0;
@@ -75,7 +77,7 @@ void createPairCalculator(bool sym, int s, int grainSize, int numZ, int* z, int 
                   for (int s2 = s1; s2 < s; s2 += grainSize) {
                       for (int c = 0; c < blkSize; c++) {
                           pairCalculatorProxy(CkArrayIndexIndex4D(z[numX],s1,s2,c)).
-                              insert(sym, grainSize, s, blkSize, op1, f1, op2, f2, cb, pairCalcReducerProxy.ckGetGroupID(), proc);
+                              insert(sym, grainSize, s, blkSize, op1, f1, op2, f2, cb, pairCalcReducerProxy.ckGetGroupID(), cb_aid, cb_ep, proc);
                           n_paircalc++;
                           proc++;
                           if (proc >= CkNumPes()) proc = 0;
@@ -90,7 +92,7 @@ void createPairCalculator(bool sym, int s, int grainSize, int numZ, int* z, int 
                   for (int s2 = 0; s2 < s; s2 += grainSize) {
                       for (int c = 0; c < blkSize; c++) {
                           pairCalculatorProxy(CkArrayIndexIndex4D(z[numX],s1,s2,c)).
-                              insert(sym, grainSize, s, blkSize, op1, f1, op2, f2, cb, pairCalcReducerProxy.ckGetGroupID(), proc);
+                              insert(sym, grainSize, s, blkSize, op1, f1, op2, f2, cb, pairCalcReducerProxy.ckGetGroupID(), cb_aid, cb_ep, proc);
                           n_paircalc++;
                           proc++;
                           if (proc >= CkNumPes()) proc = 0;
@@ -166,7 +168,7 @@ void startPairCalcRight(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ)
     }
 }
 
-void finishPairCalc(PairCalcID* pcid, int n, double *ptr, CkCallback cb) {
+void finishPairCalc(PairCalcID* pcid, int n, double *ptr) {
 #ifdef _DEBUG_
   CkPrintf("     Calc Finish\n");
 #endif
@@ -181,7 +183,7 @@ void finishPairCalc(PairCalcID* pcid, int n, double *ptr, CkCallback cb) {
       bcastInstance.beginIteration();
   }
 
-  pairCalcReducerProxy.broadcastEntireResult(n, ptr, pcid->Symmetric, cb);
+  pairCalcReducerProxy.broadcastEntireResult(n, ptr, pcid->Symmetric);
   
   if(pcid->useComlib) {
       bcastInstance.endIteration();
