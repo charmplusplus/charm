@@ -7,10 +7,10 @@
 #include "CommLBHeap.h"
 #include "charm++.h"
 
-ObjectHeap::ObjectHeap(int size)
+ObjectHeap::ObjectHeap(int sz)
 {
-  this->size = size;
-  h = new hRecord[size];
+  size = sz;
+  h = new hRecord[sz];
   count = 0;
 }
 
