@@ -284,6 +284,9 @@ static void PerrorExit(const char *msg)
 
 static void KillOnSIGPIPE(int dummy)
 {
+#if CMK_SCYLD
+  if (CmiMyPe() == 0)
+#endif
   fprintf(stderr,"host exited, terminating.\n");
   exit(0);
 }
@@ -2755,6 +2758,9 @@ void ConverseExit()
 
 static void exitDelay(void)
 {
+#if CMK_SCYLD
+  if (CmiMyPe() == 0)
+#endif
   printf("Program finished.\n");
 #if 0
   fgetc(stdin);

@@ -21,6 +21,9 @@
 #include <signal.h>
 #include <fcntl.h>
 #include <time.h>
+#if CMK_SCYLD
+#include <sys/bproc.h>
+#endif
 
 #if defined(_WIN32) && !defined(__CYGWIN__)
 /*Win32 has screwy names for the standard UNIX calls:*/
@@ -1359,6 +1362,10 @@ void req_start_server(void)
  ****************************************************************************/
 void start_nodes_daemon(void);
 void start_nodes_rsh(void);
+#if CMK_SCYLD
+void nodetab_init_for_scyld(void);
+void start_nodes_scyld(void);
+#endif
 
 static void fast_idleFn(void) {sleep(0);}
 
@@ -1373,8 +1380,13 @@ int main(int argc, char **argv)
   /* Compute the values of all constants */
   arg_init(argc, argv);
   if(arg_verbose) fprintf(stderr, "Conv-host> conv-host started...\n");
+#if CMK_SCYLD
+  /* check scyld configuration */
+  nodetab_init_for_scyld();
+#else
   /* Initialize the node-table by reading nodesfile */
   nodetab_init();
+#endif
 
   /* Start the server port */
   req_start_server();
@@ -1386,7 +1398,11 @@ int main(int argc, char **argv)
   if (0!=getenv("CONV-DAEMON"))
     start_nodes_daemon();
   else
+#if CMK_SCYLD
+    start_nodes_scyld();
+#else
     start_nodes_rsh();
+#endif
 
   if(arg_verbose) fprintf(stderr, "Conv-host> node programs all started\n");
 
@@ -1475,6 +1491,85 @@ void start_nodes_daemon(void)
   different, so we can't use Rsh on win32 yet.  
   Fall back to the daemon.*/
 void start_nodes_rsh(void) {start_nodes_daemon();}
+
+#elif CMK_SCYLD
+
+void nodetab_init_for_scyld()
+{
+  int maxNodes, i, node;
+  nodetab_host group;
+  int tablesize;
+
+  tablesize = arg_requested_pes;
+  maxNodes = bproc_numnodes() + 1;
+  if (maxNodes > tablesize) tablesize = maxNodes;
+  nodetab_table=(nodetab_host**)malloc(tablesize*sizeof(nodetab_host*));
+  nodetab_rank0_table=(int*)malloc(tablesize*sizeof(int));
+  nodetab_max=tablesize;
+
+  nodetab_reset(&group);
+
+  /* check which slave nodes available */
+  for (i=-1; i<maxNodes; i++) {
+    char hostname[256];
+    if (bproc_nodestatus(i) != bproc_node_up) continue;
+    sprintf(hostname, "%d", i);
+    nodetab_makehost(hostname, &group);
+    if (nodetab_rank0_size == arg_requested_pes) break;
+  }
+  if (nodetab_rank0_size == 0) {
+    fprintf(stderr, "Conv-host> no slave node available!\n");
+    exit (1);
+  }
+  if (arg_verbose)
+    printf("Conv-host> There are %d slave nodes available.\n", nodetab_rank0_size);
+
+  /* expand node table to arg_requested_pes */
+  if (arg_requested_pes > nodetab_rank0_size) {
+    int node = 0;
+    int orig_size = nodetab_rank0_size;
+    while (nodetab_rank0_size < arg_requested_pes) {
+      nodetab_makehost(nodetab_name(node), &group);
+      node++; if (node == orig_size) node = 0;
+    }
+  }
+}
+
+void start_nodes_scyld(void)
+{
+  char *rshargv[6];
+  char *envp[2];
+  int i;
+
+  envp[0] = (char *)malloc(256);
+  envp[1] = 0;
+  for (i=0; i<arg_requested_pes; i++)
+  {
+    int status = 0;
+    int pid;
+    int nodeno = atoi(nodetab_name(i));
+
+    if (arg_verbose)
+      printf("Conv-host> start node program on slave node: %d.\n", nodeno);
+    sprintf(envp[0], "NETSTART=%s",  create_netstart(i));
+    pid = 0;
+    pid = fork();
+    if (pid < 0) exit(1);
+    if (pid == 0)
+    {
+      if (nodeno == -1) {
+        status = execve(pparam_argv[1], pparam_argv+1, envp);
+        printf("execle failed to start remote process %s status: %d\n", pparam_argv[1], status);
+      }
+      else {
+        status = bproc_execmove(nodeno, pparam_argv[1], pparam_argv+1, envp);
+        printf("bproc_execmove failed to start remote process %s status: %d\n", pparam_argv[1], status);
+      }
+      exit(1);
+    }
+  }
+  free(envp[0]);
+}
 
 #else
 /*Unix systems can use Rsh normally*/
