@@ -8,6 +8,7 @@ qt: md/setjmp_d.h qt.c md/setjmp.c
 	$(CC) -c -o qt.o qt.c
 	$(CC) -c -o qtmds.o md/setjmp.c
 	$(CC) -o libqt.a qt.o qtmds.o
+	$(CC) -shared -o libqt.so qt.o qtmds.o
 
 stp:
 	$(CC) -c stp.c
