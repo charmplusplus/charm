@@ -141,7 +141,7 @@ BgNode::BgNode(CreateBgNodeMsg *msg)
       proxies[i][j] = new CProxy_BgNode*[numBgZ];
       for(int k=0;k<numBgZ;k++) {
         proxies[i][j][k] = new CProxy_BgNode(bgArrayID, 
-                                             new CkArrayIndex3D(i,j,k));;
+                                             CkArrayIndex3D(i,j,k));;
       }
     }
   }
