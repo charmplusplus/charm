@@ -574,7 +574,10 @@ void CentralLB::readStatsMsgs(const char* filename) {
   	delete statsMsgsList[i];
   delete[] statsMsgsList;
 
-  PUP::fromDisk p(f);
+  PUP::fromDisk pd(f);
+  PUP::machineInfo machInfo;
+  PUP::xlater p(machInfo, pd);
+
   p|stats_msg_count;
 
   CmiPrintf("readStatsMsgs for %d pes starts ... \n", stats_msg_count);
@@ -595,7 +598,9 @@ void CentralLB::writeStatsMsgs(const char* filename) {
   if (f == NULL) 
     CmiAbort("writeStatsMsgs failed to open the output file!\n");
 
+  const PUP::machineInfo &machInfo = PUP::machineInfo::current();
   PUP::toDisk p(f);
+  p((char *)&machInfo, sizeof(machInfo));	// machine info
 
   p|stats_msg_count;
   statsData->pup(p);
