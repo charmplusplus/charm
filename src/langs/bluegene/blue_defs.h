@@ -91,9 +91,9 @@ inline int isEqual(double v1, double v2){
             }						\
 	    /* log[log.length()-1]->print(); */		\
           }	\
-	  if (timingMethod == BG_WALLTIME)\
+	  if (cva(bgMach).timingMethod == BG_WALLTIME)\
                 tSTARTTIME = CmiWallTimer();\
-          else if (timingMethod == BG_ELAPSE)\
+          else if (cva(bgMach).timingMethod == BG_ELAPSE)\
                 tSTARTTIME = tCURRTIME;	\
 	}
 #else

@@ -24,6 +24,15 @@
 #include "blue_impl.h"    	// implementation header file
 #include "blue_timing.h" 	// timing module
 
+#if CMK_STL_USE_DOT_H  /* Pre-standard C++ */
+#  include <fstream.h>
+#  include <iostream.h>
+#else /* ISO C++ */
+#  include <fstream>
+#  include <iostream>
+   using namespace std;
+#endif
+
 extern CmiStartFn bgMain(int argc, char **argv);
 
 /* called by a AMPI thread of certan rank to attatch itself */
@@ -100,6 +109,79 @@ CmiPrintf("\n\n\nBroadcast begin EXIT\n");
     ConverseExit();
 #endif
   }
+}
+
+int BGMach::read(char *file)
+{
+  ifstream configFile(file, ios::in);
+  if (configFile.fail()) {
+    cout << "Bad config file, trouble opening\n";
+    exit(1);
+  }
+
+  char parameterName  [1024];
+  char parameterValue [1024];
+                                                                                
+  if (CmiMyPe() == 0)
+  CmiPrintf("Reading Bluegene Config file %s ...\n", file);
+                                                                                
+  while (true) {
+    configFile >> parameterName >> parameterValue;
+    if (configFile.eof())
+      break;
+                                                                                
+    // CmiPrintf("%s %s\n", parameterName, parameterValue);
+
+    if (!strcmp(parameterName, "x")) {
+      x = atoi(parameterValue);
+      continue;
+    }
+    if (!strcmp(parameterName, "y")) {
+      y = atoi(parameterValue);
+      continue;
+    }
+    if (!strcmp(parameterName, "z")) {
+      z = atoi(parameterValue);
+      continue;
+    }
+    if (!strcmp(parameterName, "cth")) {
+      numCth = atoi(parameterValue);
+      continue;
+    }
+    if (!strcmp(parameterName, "wth")) {
+      numWth = atoi(parameterValue);
+      continue;
+    }
+    if (!strcmp(parameterName, "stacksize")) {
+      stacksize = atoi(parameterValue);
+      continue;
+    }
+    if (!strcmp(parameterName, "timing")) {
+      if (!strcmp(parameterValue, "walltime"))
+        timingMethod = BG_WALLTIME;
+      else if (!strcmp(parameterValue, "counter"))
+        timingMethod = BG_COUNTER;
+      else CmiAbort("BG> unkown timing method");
+      continue;
+    }
+    if (!strcmp(parameterName, "log")) {
+      if (!strcmp(parameterValue, "yes"))
+        genTimeLog = 1;
+      continue;
+    }
+    if (!strcmp(parameterName, "correct")) {
+      if (!strcmp(parameterValue, "yes"))
+        correctTimeLog = 1;
+      continue;
+    }
+    if (!strcmp(parameterName, "traceroot")) {
+      traceroot = parameterValue;
+      continue;
+    }
+    CmiPrintf("skip %s %s\n", parameterName, parameterValue);
+  }
+
+  configFile.close();
 }
 
 int main(int argc,char *argv[])

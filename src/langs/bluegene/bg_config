@@ -1,0 +1,9 @@
+x 2
+y 2
+z 2
+cth 1
+wth 1
+stacksize  4000
+timing  walltime
+log    yes
+correct  no

@@ -48,19 +48,15 @@ CpvDeclare(int, numNodes);        /* number of bg nodes on this PE */
 /* emulator node level variables */
 CpvDeclare(SimState, simState);
 
-static int bg_stacksize = 0;
 static int arg_argc;
 static char **arg_argv;
 
 int bgSize = 0;			// short cut of blue gene node size
-static int timingMethod = BG_ELAPSE;
 int delayCheckFlag = 1;          // when enabled, only check correction 
 					// messages after some interval
 int programExit = 0;
 
 static int bgstats_flag = 0;		// flag print stats at end of simulation
-
-char *bgtraceroot = NULL;          // bgTraceFile prefix
 
 // for debugging log
 FILE *bgDebugLog;			// for debugging
@@ -653,19 +649,19 @@ void startVTimer()
 {
   CmiAssert(tTIMERON == 0);
   tTIMERON = 1;
-  if (timingMethod == BG_WALLTIME) {
+  if (cva(bgMach).timingMethod == BG_WALLTIME) {
     tSTARTTIME = CmiWallTimer();
   }
-  else if (timingMethod == BG_ELAPSE)
+  else if (cva(bgMach).timingMethod == BG_ELAPSE)
     tSTARTTIME = tCURRTIME;
 #ifdef CMK_ORIGIN2000
-  else if (timingMethod == BG_COUNTER) {
+  else if (cva(bgMach).timingMethod == BG_COUNTER) {
     if (start_counters(0, 21) <0) {
       perror("start_counters");;
     }
   }
 #elif CMK_HAS_COUNTER_PAPI
-  else if (timingMethod == BG_COUNTER) {
+  else if (cva(bgMach).timingMethod == BG_COUNTER) {
     // do a fake read to reset the counters. It would be more efficient
     // to use the low level API, but that would be a lot more code to
     // write for now.
@@ -680,20 +676,20 @@ void stopVTimer()
 {
   CmiAssert(tTIMERON == 1);
   tTIMERON = 0;
-  if (timingMethod == BG_WALLTIME) {
+  if (cva(bgMach).timingMethod == BG_WALLTIME) {
     const double tp = CmiWallTimer();
     const double inc = tp-tSTARTTIME;
     tCURRTIME += inc;
     tSTARTTIME = tp;
   }
-  else if (timingMethod == BG_ELAPSE) {
+  else if (cva(bgMach).timingMethod == BG_ELAPSE) {
     // if no bgelapse called, assume it takes 1us
     if (tCURRTIME-tSTARTTIME < 1E-9) {
 //      tCURRTIME += 1e-6;
     }
   }
 #if CMK_ORIGIN2000 || CMK_HAS_COUNTER_PAPI
-  else if (timingMethod == BG_COUNTER)  {
+  else if (cva(bgMach).timingMethod == BG_COUNTER)  {
     long long c0, c1;
     if (read_counters(0, &c0, 21, &c1) < 0) perror("read_counters");
     tCURRTIME += Count2Time(c1);
@@ -704,7 +700,7 @@ void stopVTimer()
 double BgGetTime()
 {
 #if 1
-  if (timingMethod == BG_WALLTIME) {
+  if (cva(bgMach).timingMethod == BG_WALLTIME) {
     /* accumulate time since last starttime, and reset starttime */
     if (tTIMERON) {
       const double tp2= CmiWallTimer();
@@ -714,11 +710,11 @@ double BgGetTime()
     }
     return tCURRTIME;
   }
-  else if (timingMethod == BG_ELAPSE) {
+  else if (cva(bgMach).timingMethod == BG_ELAPSE) {
     return tCURRTIME;
   }
 #if CMK_ORIGIN2000 || CMK_HAS_COUNTER_PAPI
-  else if (timingMethod == BG_COUNTER) {
+  else if (cva(bgMach).timingMethod == BG_COUNTER) {
     if (tTIMERON) {
       long long c0, c1;
       if (read_counters(0, &c0, 21, &c1) <0) perror("read_counters");;
@@ -751,7 +747,7 @@ extern "C"
 void BgElapse(double t)
 {
 //  ASSERT(tTHREADTYPE == WORK_THREAD);
-  if (timingMethod == BG_ELAPSE)
+  if (cva(bgMach).timingMethod == BG_ELAPSE)
     tCURRTIME += t;
 }
 
@@ -825,7 +821,7 @@ void BgNodeInitialize(nodeInfo *ninfo)
   for (i=0; i< cva(bgMach).numWth; i++)
   {
     threadInfo *tinfo = ninfo->threadinfo[i];
-    t = CthCreate((CthVoidFn)run_thread, tinfo, bg_stacksize);
+    t = CthCreate((CthVoidFn)run_thread, tinfo, cva(bgMach).stacksize);
     if (t == NULL) CmiAbort("BG> Failed to create worker thread. \n");
     tinfo->setThread(t);
     /* put to thread table */
@@ -837,7 +833,7 @@ void BgNodeInitialize(nodeInfo *ninfo)
   for (i=0; i< cva(bgMach).numCth; i++)
   {
     threadInfo *tinfo = ninfo->threadinfo[i+cva(bgMach).numWth];
-    t = CthCreate((CthVoidFn)run_thread, tinfo, bg_stacksize);
+    t = CthCreate((CthVoidFn)run_thread, tinfo, cva(bgMach).stacksize);
     if (t == NULL) CmiAbort("BG> Failed to create communication thread. \n");
     tinfo->setThread(t);
     /* put to thread table */
@@ -933,12 +929,16 @@ static void sanityCheck()
 CmiStartFn bgMain(int argc, char **argv)
 {
   int i;
+  char *configFile = NULL;
 
   /* initialize all processor level data */
   CpvInitialize(BGMach,bgMach);
   cva(bgMach).nullify();
 
   CmiArgGroup("Charm++","BlueGene Simulator");
+  if (CmiGetArgStringDesc(argv, "+config", &configFile, "BlueGene machine config file")) {
+   cva(bgMach). read(configFile);
+  }
   CmiGetArgIntDesc(argv, "+x", &cva(bgMach).x, 
 		"The x size of the grid of nodes");
   CmiGetArgIntDesc(argv, "+y", &cva(bgMach).y, 
@@ -950,24 +950,25 @@ CmiStartFn bgMain(int argc, char **argv)
   CmiGetArgIntDesc(argv, "+wth", &cva(bgMach).numWth, 
 		"The number of simulated worker threads per node");
 
-  CmiGetArgIntDesc(argv, "+bgstacksize", &bg_stacksize, 
+  CmiGetArgIntDesc(argv, "+bgstacksize", &cva(bgMach).stacksize, 
 		"Blue Gene thread stack size");
 
-  genTimeLog = CmiGetArgFlagDesc(argv, "+bglog", "Write events to log file");
-  correctTimeLog = CmiGetArgFlagDesc(argv, "+bgcorrect", "Apply timestamp correction to logs");
+  if (CmiGetArgFlagDesc(argv, "+bglog", "Write events to log file"))
+     genTimeLog = 1;
+  if (CmiGetArgFlagDesc(argv, "+bgcorrect", "Apply timestamp correction to logs"))
+    correctTimeLog = 1;
   if (correctTimeLog) genTimeLog = 1;
 
   // for timing method, default using elapse calls.
-  timingMethod = BG_ELAPSE;
   if(CmiGetArgFlagDesc(argv, "+bgwalltime", 
                        "Use walltime, not estimated time, for time estimate")) 
-      timingMethod = BG_WALLTIME;
+      cva(bgMach).timingMethod = BG_WALLTIME;
 #ifdef CMK_ORIGIN2000
   if(CmiGetArgFlagDesc(argv, "+bgcounter", "Use performance counter")) 
-      timingMethod = BG_COUNTER;
+      cva(bgMach).timingMethod = BG_COUNTER;
 #elif CMK_HAS_COUNTER_PAPI
   if (CmiGetArgFlagDesc(argv, "+bgpapi", "Use PAPI Performance counters")) {
-    timingMethod = BG_COUNTER;
+    cva(bgMach).timingMethod = BG_COUNTER;
     // PAPI high level API does not require explicit library intialization
     if (PAPI_start_counters(papiEvents, 2) != PAPI_OK) {
       CmiAbort("Unable to start PAPI counters!\n");
@@ -983,10 +984,11 @@ CmiStartFn bgMain(int argc, char **argv)
   if(CmiGetArgFlagDesc(argv, "+bgstats", "Print correction statistics")) 
     bgstats_flag = 1;
 
-  char *root;
-  if (CmiGetArgStringDesc(argv, "+bgtraceroot", &root, "Directory to write bgTrace files to") && !bgtraceroot) {
-    bgtraceroot = (char*)malloc(strlen(root) + 10);
-    sprintf(bgtraceroot, "%s/", root);
+  CmiGetArgStringDesc(argv, "+bgtraceroot", &cva(bgMach).traceroot, "Directory to write bgTrace files to");
+  if (cva(bgMach).traceroot) {
+    char *root = (char*)malloc(strlen(cva(bgMach).traceroot) + 10);
+    sprintf(root, "%s/", cva(bgMach).traceroot);
+    cva(bgMach).traceroot = root;
   }
 
 #if BLUEGENE_DEBUG_LOG
@@ -1024,20 +1026,20 @@ CmiStartFn bgMain(int argc, char **argv)
 
   if (CmiMyPe() == 0) {
     CmiPrintf("BG info> Simulating %dx%dx%d nodes with %d comm + %d work threads each.\n", cva(bgMach).x, cva(bgMach).y, cva(bgMach).z, cva(bgMach).numCth, cva(bgMach).numWth);
-    if (bg_stacksize)
-      CmiPrintf("BG info> BG stack size: %d bytes. \n", bg_stacksize);
-    if (timingMethod == BG_ELAPSE) 
+    if (cva(bgMach).stacksize)
+      CmiPrintf("BG info> BG stack size: %d bytes. \n", cva(bgMach).stacksize);
+    if (cva(bgMach).timingMethod == BG_ELAPSE) 
       CmiPrintf("BG info> Using BgElapse calls for timing method. \n");
-    else if (timingMethod == BG_WALLTIME)
+    else if (cva(bgMach).timingMethod == BG_WALLTIME)
       CmiPrintf("BG info> Using WallTimer for timing method. \n");
-    else if (timingMethod == BG_COUNTER)
+    else if (cva(bgMach).timingMethod == BG_COUNTER)
       CmiPrintf("BG info> Using performance counter for timing method. \n");
     if (genTimeLog)
       CmiPrintf("BG info> Generating timing log. \n");
     if (correctTimeLog)
-      CmiPrintf("BG info> Perform timing log correction. \n");
-    if (bgtraceroot)
-      CmiPrintf("BG info> bgTrace root is %s. \n", bgtraceroot);
+      CmiPrintf("BG info> Perform timestamp correction. \n");
+    if (cva(bgMach).traceroot)
+      CmiPrintf("BG info> bgTrace root is %s. \n", cva(bgMach).traceroot);
   }
 
   CtvInitialize(threadInfo *, threadinfo);
@@ -1382,7 +1384,7 @@ static void writeToDisk()
   // write summary file on PE0
   if(CmiMyPe()==0){
     
-    sprintf(d, "%sbgTrace", bgtraceroot?bgtraceroot:""); 
+    sprintf(d, "%sbgTrace", cva(bgMach).traceroot?cva(bgMach).traceroot:""); 
     FILE *f2 = fopen(d,"w");
     //Total real and toal BG processors
     int numPes=CmiNumPes();
@@ -1402,7 +1404,7 @@ static void writeToDisk()
     fclose(f2);
   }
   
-  sprintf(d, "%sbgTrace%d", bgtraceroot?bgtraceroot:"", CmiMyPe()); 
+  sprintf(d, "%sbgTrace%d", cva(bgMach).traceroot?cva(bgMach).traceroot:"", CmiMyPe()); 
   FILE *f = fopen(d,"w");
  
   int *procOffsets = new int[numProcs];

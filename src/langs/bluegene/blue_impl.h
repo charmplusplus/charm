@@ -38,9 +38,12 @@ class BGMach {
 public:
   int x, y, z;         /* size of bluegene nodes in cube */
   int numCth, numWth;           /* number of threads */
+  int stacksize;		/* bg thread stack size */
+  int timingMethod;		/* timing method */
+  char *traceroot;		/* bgTraceFile prefix */
 public:
   BGMach() {  nullify(); }
-  void nullify() { x=y=z=0; numCth=numWth=0; }
+  void nullify() { x=y=z=0; numCth=numWth=0; stacksize=0; timingMethod = BG_ELAPSE; traceroot=NULL;}
   void setSize(int xx, int yy, int zz) 
 	{ x=xx; y=yy; z=zz; }
   void getSize(int *xx, int *yy, int *zz) 
@@ -49,8 +52,12 @@ public:
 	{ return numCth + numWth; }
   int getNodeSize()  { return x*y*z; }
   int isWorkThread(int tid) { return tid>=0 && tid<numWth; }
-  void pup(PUP::er &p) 
-	{ p|x; p|y; p|z; p|numCth; p|numWth; }
+  int read(char *file);
+  void pup(PUP::er &p) { 
+        p|x; p|y; p|z; p|numCth; p|numWth; 
+	p|stacksize; p|timingMethod;
+	if (traceroot) p(traceroot, strlen(traceroot)+1);
+       }
 };
 
 // simulation state
