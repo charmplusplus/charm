@@ -1,7 +1,14 @@
+/*****************************************************************************
+ * $Source$
+ * $Author$
+ * $Date$
+ * $Revision$
+ *****************************************************************************/
+
 #include "ck.h"
 #include "trace.h"
 
-#define   DEBUGF(x) /* printf x */
+#define  DEBUGF(x)   /* printf x */ 
 
 UChar _defaultQueueing = CK_QUEUEING_FIFO;
 
@@ -18,6 +25,8 @@ int   _initHandlerIdx;
 int   _bocHandlerIdx;
 int   _nodeBocHandlerIdx;
 int   _qdHandlerIdx;
+int   _triggerHandlerIdx;
+int   _triggersSent = 0;
 
 CmiNodeLock _nodeLock;
 
@@ -106,7 +115,6 @@ static void _discardHandler(envelope *env)
   CmiGrabBuffer((void **)&env);
   CmiFree(env);
 }
-
 
 #ifndef CMK_OPTIMIZE
 static inline void _printStats(void)
@@ -268,15 +276,50 @@ static int _charmLoadEstimator(void)
   return CpvAccess(_buffQ)->length();
 }
 
+static void _sendTriggers(void)
+{
+  int i, num, first;
+  CmiLock(_nodeLock);
+  if (_triggersSent == 0) 
+  {
+    _triggersSent++;
+    num = CmiMyNodeSize();
+    register envelope *env = _allocEnv(RODataMsg);
+    env->setSrcPe(CkMyPe());
+    CmiSetHandler(env, _triggerHandlerIdx);
+    first = CmiNodeFirst(CmiMyNode());
+    for (i=0; i < num; i++)
+      if(first+i != CkMyPe())
+	CmiSyncSend(first+i, env->getTotalsize(), env);
+    CmiFree(env);
+  }
+  CmiUnlock(_nodeLock);
+}
+
 static inline void _initDone(void)
 {
+  if (!_triggersSent) _sendTriggers(); 
+  CmiNumberHandler(_triggerHandlerIdx, (CmiHandler)_discardHandler); 
   CmiNumberHandler(_exitHandlerIdx, (CmiHandler)_exitHandler);
   _processBufferedBocInits();
   if(CmiMyRank() == 0) {
     _processBufferedNodeBocInits();
   }
+  DEBUGF(("Reached CmiNodeBarrier(), pe = %d, rank = %d\n", CmiMyPe(), CmiMyRank()));
   CmiNodeBarrier();
+  DEBUGF(("Crossed CmiNodeBarrier(), pe = %d, rank = %d\n", CmiMyPe(), CmiMyRank()));
   _processBufferedMsgs();
+}
+
+static void _triggerHandler(envelope *env)
+{
+  CmiGrabBuffer((void **) &env);
+  if (_numInitMsgs && CpvAccess(_numInitsRecd) + _numInitNodeMsgs == _numInitMsgs)
+  {
+    DEBUGF(("Calling Init Done from _triggerHandler\n"));
+	_initDone();
+  }
+  CmiFree(env);
 }
 
 static inline void _processROMsgMsg(envelope *env)
@@ -323,7 +366,7 @@ static void _initHandler(void *msg)
       CpvAccess(_numInitsRecd)+=2;  /*++;*/
       CpvAccess(_qd)->process();
       _numInitMsgs = env->getCount();
-	  _processRODataMsg(env);
+      _processRODataMsg(env);
       break;
     default:
       CmiAbort("Internal Error: Unknown-msg-type. Contact Developers.\n");
@@ -456,14 +499,14 @@ void _initCharm(int argc, char **argv)
 	CpvInitialize(_CkErrStream*, _ckerr);
 
 	CpvInitialize(Stats*, _myStats);
-
+	
 	CpvAccess(_buffQ) = new PtrQ();
 	_MEMCHECK(CpvAccess(_buffQ));
 	CpvAccess(_bocInitVec) = new PtrVec();
 	_MEMCHECK(CpvAccess(_bocInitVec));
 	CpvAccess(_groupTable) = new GroupTable();
 	_MEMCHECK(CpvAccess(_groupTable));
-
+	
 	if(CmiMyRank()==0) 
 	{
 		_nodeLock = CmiCreateLock();
@@ -490,6 +533,7 @@ void _initCharm(int argc, char **argv)
 	_nodeBocHandlerIdx = CmiRegisterHandler((CmiHandler)_initHandler);
 	_qdHandlerIdx = CmiRegisterHandler((CmiHandler)_qdHandler);
 	_infoIdx = CldRegisterInfoFn((CldInfoFn)_infoFn);
+	_triggerHandlerIdx = CmiRegisterHandler((CmiHandler)_triggerHandler);
 
 	CthSetSuspendable(CthSelf(), 0);
 
@@ -551,11 +595,16 @@ void _initCharm(int argc, char **argv)
 			if(roMsg==0)
 				continue;
 			register envelope *env = UsrToEnv(roMsg);
+			register int msgIdx = env->getMsgIdx();
 			env->setSrcPe(CkMyPe());
 			env->setMsgtype(ROMsgMsg);
 			env->setRoIdx(i);
 			CmiSetHandler(env, _initHandlerIdx);
-			CldEnqueue(CLD_BROADCAST, env, _infoIdx);
+			if (!env->isPacked() &&  _msgTable[msgIdx]->pack)
+				_packFn((void **) &env);
+			CmiSyncBroadcast(env->getTotalsize(), env);
+			if (env->isPacked() && _msgTable[msgIdx]->unpack)
+				_unpackFn((void **) &env);
 			CpvAccess(_qd)->create(CkNumPes()-1);
 			_numInitMsgs++;
 		}
@@ -591,4 +640,5 @@ GroupTable::GroupTable()
   for(int i=0;i<MAXBINS;i++) 
     bins[i] = 0;
 }
+
 
