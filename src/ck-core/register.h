@@ -64,15 +64,27 @@ class MainInfo {
 
 class ReadonlyInfo {
   public:
+    const char *name,*type;
     int size;
     void *ptr;
-    ReadonlyInfo(int s, void *p) : size(s), ptr(p) {}
+    CkPupReadonlyFnPtr pup;
+    void pupData(PUP::er &p) {
+      if (pup!=NULL)
+        (pup)((void *)&p);
+      else
+        p(ptr,size);
+    }
+    ReadonlyInfo(const char *n,const char *t,
+	 int s, void *p,CkPupReadonlyFnPtr pf) 
+	: name(n), type(t), size(s), ptr(p), pup(pf) {}
 };
 
 class ReadonlyMsgInfo {
   public:
+    const char *name, *type;
     void **pMsg;
-    ReadonlyMsgInfo(void **p) : pMsg(p) {}
+    ReadonlyMsgInfo(const char *n, const char *t,
+	void **p) : name(n), type(t), pMsg(p) {}
 };
 
 extern EntryInfo**        _entryTable;
