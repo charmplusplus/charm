@@ -929,6 +929,7 @@ int main(int argc,char *argv[])
 // for conv-conds:
 // if -2 untouch
 // if -1 main thread
+#undef CmiSwitchToPE
 extern "C" int CmiSwitchToPE(int pe)
 {
   if (pe == -2) return -2;
