@@ -1137,11 +1137,34 @@ static CkVec<int> getRoccomPconn(int fem_mesh,int *ghost_len)
 	getRoccomPconn(IDXL_Get_send(FEM_Comm_shared(fem_mesh,FEM_NODE)),0,pconn);
 	int realLen=pconn.size();
 	
-	// Next come sent ghost nodes:
+	// Sent ghost nodes:
 	getRoccomPconn(IDXL_Get_send(FEM_Comm_ghost(fem_mesh,FEM_NODE)),0,pconn);
-	// Now received ghost nodes (use bias to switch to Roccom ghost node numbering)
+	// Received ghost nodes (use bias to switch to Roccom ghost node numbering)
 	getRoccomPconn(IDXL_Get_recv(FEM_Comm_ghost(fem_mesh,FEM_NODE)),
 		FEM_Mesh_get_length(fem_mesh,FEM_NODE),pconn);
+	
+// Handle elements (much tougher!)
+	// Find list of element types
+	int elems[1024];
+	int e, ne=FEM_Mesh_get_entities(fem_mesh,elems);
+	for (e=0;e<ne;e++)
+		if (elems[e]<FEM_ELEM || elems[e]>=FEM_SPARSE)
+			elems[e--]=elems[--ne]; // swap out bad entity with the end
+	
+	// Make one output IDXL that combines all element types:
+	IDXL_t elghost=IDXL_Create();
+	int out_r=0, out_g=0; // output indices for real; ghost
+	for (e=0;e<ne;e++) {
+		IDXL_Combine(elghost,FEM_Comm_ghost(fem_mesh,elems[e]), out_r,out_g);
+		out_r+=FEM_Mesh_get_length(fem_mesh,elems[e]); 
+		out_g+=FEM_Mesh_get_length(fem_mesh,elems[e]+FEM_GHOST);
+	}
+	
+	// Sent ghost elements:
+	getRoccomPconn(IDXL_Get_send(elghost),0,pconn);
+	// Received ghost elements (shift all ghosts to start after real elements)
+	getRoccomPconn(IDXL_Get_recv(elghost),out_r,pconn);
+	IDXL_Destroy(elghost);
 	
 	if (ghost_len) *ghost_len=pconn.size()-realLen;
 	return pconn;
