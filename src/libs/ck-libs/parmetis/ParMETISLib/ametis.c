@@ -23,7 +23,7 @@
 ************************************************************************************/
 void ParMETIS_V3_AdaptiveRepart(idxtype *vtxdist, idxtype *xadj, idxtype *adjncy,
   idxtype *vwgt, idxtype *vsize, idxtype *adjwgt, int *wgtflag, int *numflag,
-  int *ncon, int *nparts, float *tpwgts, float *ubvec, float *ipc2redist,
+  int *ncon, int *nparts, floattype *tpwgts, floattype *ubvec, floattype *ipc2redist,
   int *options, int *edgecut, idxtype *part, MPI_Comm *comm)
 {
   int h, i;
@@ -32,10 +32,10 @@ void ParMETIS_V3_AdaptiveRepart(idxtype *vtxdist, idxtype *xadj, idxtype *adjncy
   WorkSpaceType wspace;
   GraphType *graph;
   int tewgt, tvsize, nmoved, maxin, maxout, vtx_factor;
-  float gtewgt, gtvsize, avg, maximb;
+  floattype gtewgt, gtvsize, avg, maximb;
   int ps_relation, seed, dbglvl = 0;
   int iwgtflag, inumflag, incon, inparts, ioptions[10];
-  float iipc2redist, *itpwgts, iubvec[MAXNCON];
+  floattype iipc2redist, *itpwgts, iubvec[MAXNCON];
 
   MPI_Comm_size(*comm, &npes);
   MPI_Comm_rank(*comm, &mype);
@@ -108,8 +108,8 @@ void ParMETIS_V3_AdaptiveRepart(idxtype *vtxdist, idxtype *xadj, idxtype *adjncy
 
   tewgt   = idxsum(graph->nedges, graph->adjwgt);
   tvsize  = idxsum(graph->nvtxs, graph->vsize);
-  gtewgt  = (float) GlobalSESum(&ctrl, tewgt) + 1.0/graph->gnvtxs;  /* The +1/graph->gnvtxs were added to remove any FPE */
-  gtvsize = (float) GlobalSESum(&ctrl, tvsize) + 1.0/graph->gnvtxs;
+  gtewgt  = (floattype) GlobalSESum(&ctrl, tewgt) + 1.0/graph->gnvtxs;  /* The +1/graph->gnvtxs were added to remove any FPE */
+  gtvsize = (floattype) GlobalSESum(&ctrl, tvsize) + 1.0/graph->gnvtxs;
   ctrl.edge_size_ratio = gtewgt/gtvsize;
   scopy(incon, iubvec, ctrl.ubvec);
 
@@ -179,8 +179,8 @@ void Adaptive_Partition(CtrlType *ctrl, GraphType *graph, WorkSpaceType *wspace)
 {
   int i;
   int tewgt, tvsize;
-  float gtewgt, gtvsize;
-  float ubavg, lbavg, lbvec[MAXNCON];
+  floattype gtewgt, gtvsize;
+  floattype ubavg, lbavg, lbvec[MAXNCON];
 
   /************************************/
   /* Set up important data structures */
@@ -190,8 +190,8 @@ void Adaptive_Partition(CtrlType *ctrl, GraphType *graph, WorkSpaceType *wspace)
   ubavg   = savg(graph->ncon, ctrl->ubvec);
   tewgt   = idxsum(graph->nedges, graph->adjwgt);
   tvsize  = idxsum(graph->nvtxs, graph->vsize);
-  gtewgt  = (float) GlobalSESum(ctrl, tewgt) + 1.0/graph->gnvtxs;  /* The +1/graph->gnvtxs were added to remove any FPE */
-  gtvsize = (float) GlobalSESum(ctrl, tvsize) + 1.0/graph->gnvtxs;
+  gtewgt  = (floattype) GlobalSESum(ctrl, tewgt) + 1.0/graph->gnvtxs;  /* The +1/graph->gnvtxs were added to remove any FPE */
+  gtvsize = (floattype) GlobalSESum(ctrl, tvsize) + 1.0/graph->gnvtxs;
   ctrl->redist_factor = ctrl->redist_base * ((gtewgt/gtvsize)/ ctrl->edge_size_ratio);
 
   IFSET(ctrl->dbglvl, DBG_PROGRESS, rprintf(ctrl, "[%6d %8d %5d %5d][%d]\n", 

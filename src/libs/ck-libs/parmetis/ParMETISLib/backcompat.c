@@ -23,12 +23,12 @@ void ParMETIS_PartKway(idxtype *vtxdist, idxtype *xadj, idxtype *adjncy, idxtype
 {
   int i;
   int ncon = 1;
-  float *tpwgts, ubvec[MAXNCON];
+  floattype *tpwgts, ubvec[MAXNCON];
   int myoptions[10];
 
   tpwgts = fmalloc(*nparts*ncon, "tpwgts");
   for (i=0; i<*nparts*ncon; i++)
-    tpwgts[i] = 1.0/(float)(*nparts);
+    tpwgts[i] = 1.0/(floattype)(*nparts);
   for (i=0; i<ncon; i++)
     ubvec[i] = UNBALANCE_FRACTION;
 
@@ -83,17 +83,17 @@ void PARKMETIS(idxtype *vtxdist, idxtype *xadj, idxtype *vwgt, idxtype *adjncy, 
 *  This function computes a partitioning using coordinate data.
 *****************************************************************************/
 void ParMETIS_PartGeomKway(idxtype *vtxdist, idxtype *xadj, idxtype *adjncy, idxtype *vwgt,
-       idxtype *adjwgt, int *wgtflag, int *numflag, int *ndims, float *xyz, int *nparts,
+       idxtype *adjwgt, int *wgtflag, int *numflag, int *ndims, floattype *xyz, int *nparts,
        int *options, int *edgecut, idxtype *part, MPI_Comm *comm)
 {
   int i;
   int ncon = 1;
-  float *tpwgts, ubvec[MAXNCON];
+  floattype *tpwgts, ubvec[MAXNCON];
   int myoptions[10];
 
   tpwgts = fmalloc(*nparts*ncon, "tpwgts");
   for (i=0; i<*nparts*ncon; i++)
-    tpwgts[i] = 1.0/(float)(*nparts);
+    tpwgts[i] = 1.0/(floattype)(*nparts);
   for (i=0; i<ncon; i++)
     ubvec[i] = UNBALANCE_FRACTION;
 
@@ -119,7 +119,7 @@ void ParMETIS_PartGeomKway(idxtype *vtxdist, idxtype *xadj, idxtype *adjncy, idx
 * This function assumes that the graph is already nice partitioned among the
 * processors and then proceeds to perform recursive bisection.
 ************************************************************************************/
-void ParMETIS_PartGeom(idxtype *vtxdist, int *ndims, float *xyz, idxtype *part, MPI_Comm *comm)
+void ParMETIS_PartGeom(idxtype *vtxdist, int *ndims, floattype *xyz, idxtype *part, MPI_Comm *comm)
 {
   ParMETIS_V3_PartGeom(vtxdist, ndims, xyz, part, comm);
 }
@@ -130,11 +130,11 @@ void ParMETIS_PartGeom(idxtype *vtxdist, int *ndims, float *xyz, idxtype *part, 
 *****************************************************************************/
 void ParMETIS_PartGeomRefine(idxtype *vtxdist, idxtype *xadj, idxtype *adjncy,
   idxtype *vwgt, idxtype *adjwgt, int *wgtflag, int *numflag, int *ndims,
-  float *xyz, int *options, int *edgecut, idxtype *part, MPI_Comm *comm)
+  floattype *xyz, int *options, int *edgecut, idxtype *part, MPI_Comm *comm)
 {
   int i;
   int npes, nparts, ncon = 1;
-  float *tpwgts, ubvec[MAXNCON];
+  floattype *tpwgts, ubvec[MAXNCON];
   int myoptions[10];
 
   MPI_Comm_size(*comm, &npes);
@@ -142,7 +142,7 @@ void ParMETIS_PartGeomRefine(idxtype *vtxdist, idxtype *xadj, idxtype *adjncy,
 
   tpwgts = fmalloc(nparts*ncon, "tpwgts");
   for (i=0; i<nparts*ncon; i++)
-    tpwgts[i] = 1.0/(float)(nparts);
+    tpwgts[i] = 1.0/(floattype)(nparts);
   for (i=0; i<ncon; i++)
     ubvec[i] = UNBALANCE_FRACTION;
 
@@ -168,7 +168,7 @@ void ParMETIS_PartGeomRefine(idxtype *vtxdist, idxtype *xadj, idxtype *adjncy,
 * coordinates to compute an initial graph distribution.
 ************************************************************************************/
 void PARGKMETIS(idxtype *vtxdist, idxtype *xadj, idxtype *vwgt, idxtype *adjncy, idxtype *adjwgt,
-                int ndims, float *xyz, idxtype *part, int *options, MPI_Comm comm)
+                int ndims, floattype *xyz, idxtype *part, int *options, MPI_Comm comm)
 {
   int npes, wgtflag, numflag, edgecut, newoptions[5];
 
@@ -195,7 +195,7 @@ void PARGKMETIS(idxtype *vtxdist, idxtype *xadj, idxtype *vwgt, idxtype *adjncy,
 * coordinates to compute an initial graph distribution.
 ************************************************************************************/
 void PARGRMETIS(idxtype *vtxdist, idxtype *xadj, idxtype *vwgt, idxtype *adjncy, idxtype *adjwgt,
-                int ndims, float *xyz, idxtype *part, int *options, MPI_Comm comm)
+                int ndims, floattype *xyz, idxtype *part, int *options, MPI_Comm comm)
 {
   int wgtflag, numflag, edgecut, newoptions[5];
 
@@ -219,7 +219,7 @@ void PARGRMETIS(idxtype *vtxdist, idxtype *xadj, idxtype *vwgt, idxtype *adjncy,
 * This function assumes that the graph is already nice partitioned among the
 * processors and then proceeds to perform recursive bisection.
 ************************************************************************************/
-void PARGMETIS(idxtype *vtxdist, idxtype *xadj, idxtype *adjncy, int ndims, float *xyz,
+void PARGMETIS(idxtype *vtxdist, idxtype *xadj, idxtype *adjncy, int ndims, floattype *xyz,
                idxtype *part, int *options, MPI_Comm comm)
 {
 
@@ -239,13 +239,13 @@ void ParMETIS_RefineKway(idxtype *vtxdist, idxtype *xadj, idxtype *adjncy,
   int i;
   int nparts;
   int ncon = 1;
-  float *tpwgts, ubvec[MAXNCON];
+  floattype *tpwgts, ubvec[MAXNCON];
   int myoptions[10];
 
   MPI_Comm_size(*comm, &nparts);
   tpwgts = fmalloc(nparts*ncon, "tpwgts");
   for (i=0; i<nparts*ncon; i++)
-    tpwgts[i] = 1.0/(float)(nparts);
+    tpwgts[i] = 1.0/(floattype)(nparts);
   for (i=0; i<ncon; i++)
     ubvec[i] = UNBALANCE_FRACTION;
 
@@ -302,14 +302,14 @@ void ParMETIS_RepartLDiffusion(idxtype *vtxdist, idxtype *xadj, idxtype *adjncy,
   int i;
   int nparts;
   int ncon = 1;
-  float *tpwgts, ubvec[MAXNCON];
-  float ipc_factor = 1.0;
+  floattype *tpwgts, ubvec[MAXNCON];
+  floattype ipc_factor = 1.0;
   int myoptions[10];
 
   MPI_Comm_size(*comm, &nparts);
   tpwgts = fmalloc(nparts*ncon, "tpwgts");
   for (i=0; i<nparts*ncon; i++)
-    tpwgts[i] = 1.0/(float)(nparts);
+    tpwgts[i] = 1.0/(floattype)(nparts);
   for (i=0; i<ncon; i++)
     ubvec[i] = UNBALANCE_FRACTION;
 
@@ -365,14 +365,14 @@ void ParMETIS_RepartGDiffusion(idxtype *vtxdist, idxtype *xadj, idxtype *adjncy,
   int i;
   int nparts;
   int ncon = 1;
-  float *tpwgts, ubvec[MAXNCON];
-  float ipc_factor = 100.0;
+  floattype *tpwgts, ubvec[MAXNCON];
+  floattype ipc_factor = 100.0;
   int myoptions[10];
 
   MPI_Comm_size(*comm, &nparts);
   tpwgts = fmalloc(nparts*ncon, "tpwgts");
   for (i=0; i<nparts*ncon; i++)
-    tpwgts[i] = 1.0/(float)(nparts);
+    tpwgts[i] = 1.0/(floattype)(nparts);
   for (i=0; i<ncon; i++)
     ubvec[i] = UNBALANCE_FRACTION;
 
@@ -427,14 +427,14 @@ void ParMETIS_RepartRemap(idxtype *vtxdist, idxtype *xadj, idxtype *adjncy,
   int i;
   int nparts;
   int ncon = 1;
-  float *tpwgts, ubvec[MAXNCON];
-  float ipc_factor = 1000.0;
+  floattype *tpwgts, ubvec[MAXNCON];
+  floattype ipc_factor = 1000.0;
   int myoptions[10];
 
   MPI_Comm_size(*comm, &nparts);
   tpwgts = fmalloc(nparts*ncon, "tpwgts");
   for (i=0; i<nparts*ncon; i++)
-    tpwgts[i] = 1.0/(float)(nparts);
+    tpwgts[i] = 1.0/(floattype)(nparts);
   for (i=0; i<ncon; i++)
     ubvec[i] = UNBALANCE_FRACTION;
 
@@ -465,14 +465,14 @@ void ParMETIS_RepartMLRemap(idxtype *vtxdist, idxtype *xadj, idxtype *adjncy,
   int i;
   int nparts;
   int ncon = 1;
-  float *tpwgts, ubvec[MAXNCON];
-  float ipc_factor = 1000.0;
+  floattype *tpwgts, ubvec[MAXNCON];
+  floattype ipc_factor = 1000.0;
   int myoptions[10];
 
   MPI_Comm_size(*comm, &nparts);
   tpwgts = fmalloc(nparts*ncon, "tpwgts");
   for (i=0; i<nparts*ncon; i++)
-    tpwgts[i] = 1.0/(float)(nparts);
+    tpwgts[i] = 1.0/(floattype)(nparts);
   for (i=0; i<ncon; i++)
     ubvec[i] = UNBALANCE_FRACTION;
 

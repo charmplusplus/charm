@@ -35,10 +35,10 @@ void Moc_InitPartition_RB(CtrlType *ctrl, GraphType *graph, WorkSpaceType *wspac
   GraphType *agraph;
   int lnparts, fpart, fpe, lnpes; 
   int twoparts=2, numflag = 0, wgtflag = 3, moptions[10], edgecut, max_cut;
-  float *mytpwgts, mytpwgts2[2], lbvec[MAXNCON], lbsum, min_lbsum, wsum;
+  floattype *mytpwgts, mytpwgts2[2], lbvec[MAXNCON], lbsum, min_lbsum, wsum;
   MPI_Comm ipcomm;
   struct {
-    float sum;
+    floattype sum;
     int rank;
   } lpesum, gpesum;
 
@@ -76,7 +76,7 @@ void Moc_InitPartition_RB(CtrlType *ctrl, GraphType *graph, WorkSpaceType *wspac
     for (j=0; j<ncon; j++)
       mytpwgts[i] += ctrl->tpwgts[i*ncon+j];
   for (i=0; i<ctrl->nparts; i++)
-    mytpwgts[i] /= (float)ncon;
+    mytpwgts[i] /= (floattype)ncon;
 
   /* Go into the recursive bisection */
   /* ADD: consider changing this to breadth-first type bisection */
@@ -163,18 +163,18 @@ void Moc_InitPartition_RB(CtrlType *ctrl, GraphType *graph, WorkSpaceType *wspac
 
     edgecut = ComputeSerialEdgeCut(agraph);
     MPI_Allreduce((void *)&edgecut, (void *)&max_cut, 1, MPI_INT, MPI_MAX, ctrl->gcomm);
-    MPI_Allreduce((void *)&lbsum, (void *)&min_lbsum, 1, MPI_FLOAT, MPI_MIN, ctrl->gcomm);
+    MPI_Allreduce((void *)&lbsum, (void *)&min_lbsum, 1, MPI_DOUBLE, MPI_MIN, ctrl->gcomm);
 
     lpesum.sum = lbsum;
-    if (min_lbsum < UNBALANCE_FRACTION * (float)(ncon)) {
-      if (lbsum < UNBALANCE_FRACTION * (float)(ncon))
-        lpesum.sum = (float) (edgecut);
+    if (min_lbsum < UNBALANCE_FRACTION * (floattype)(ncon)) {
+      if (lbsum < UNBALANCE_FRACTION * (floattype)(ncon))
+        lpesum.sum = (floattype) (edgecut);
       else
-        lpesum.sum = (float) (max_cut);
+        lpesum.sum = (floattype) (max_cut);
     } 
     
     MPI_Comm_rank(ctrl->gcomm, &(lpesum.rank));
-    MPI_Allreduce((void *)&lpesum, (void *)&gpesum, 1, MPI_FLOAT_INT, MPI_MINLOC, ctrl->gcomm);
+    MPI_Allreduce((void *)&lpesum, (void *)&gpesum, 1, MPI_DOUBLE_INT, MPI_MINLOC, ctrl->gcomm);
     MPI_Bcast((void *)gwhere1, gnvtxs, IDX_DATATYPE, gpesum.rank, ctrl->gcomm);
 
     agraph->xadj = tmpxadj;

@@ -72,7 +72,7 @@ int FPQueueGetSize(FPQueueType *queue)
 /*************************************************************************
 * This function adds a node of certain gain into a partition
 **************************************************************************/
-int FPQueueInsert(FPQueueType *queue, int node, float gain)
+int FPQueueInsert(FPQueueType *queue, int node, floattype gain)
 {
   int i, j;
   idxtype *locator;
@@ -114,7 +114,7 @@ int FPQueueInsert(FPQueueType *queue, int node, float gain)
 int FPQueueDelete(FPQueueType *queue, int node)
 {
   int i, j;
-  float newgain, oldgain;
+  floattype newgain, oldgain;
   idxtype *locator;
   FKeyValueType *heap;
 
@@ -184,7 +184,7 @@ int FPQueueDelete(FPQueueType *queue, int node)
 * This function deletes a node from a partition and reinserts it with
 * an updated gain
 **************************************************************************/
-int FPQueueUpdate(FPQueueType *queue, int node, float oldgain, float newgain)
+int FPQueueUpdate(FPQueueType *queue, int node, floattype oldgain, floattype newgain)
 {
   int i, j;
   idxtype *locator;
@@ -252,7 +252,7 @@ int FPQueueUpdate(FPQueueType *queue, int node, float oldgain, float newgain)
 * This function deletes a node from a partition and reinserts it with
 * an updated gain
 **************************************************************************/
-void FPQueueUpdateUp(FPQueueType *queue, int node, float oldgain, float newgain)
+void FPQueueUpdateUp(FPQueueType *queue, int node, floattype oldgain, floattype newgain)
 {
   int i, j;
   idxtype *locator;
@@ -299,7 +299,7 @@ void FPQueueUpdateUp(FPQueueType *queue, int node, float oldgain, float newgain)
 int FPQueueGetMax(FPQueueType *queue)
 {
   int vtx, i, j, node;
-  float gain;
+  floattype gain;
   idxtype *locator;
   FKeyValueType *heap;
 
@@ -365,9 +365,9 @@ int FPQueueSeeMaxVtx(FPQueueType *queue)
 /*************************************************************************
 * This function returns the vertex with the largest gain from a partition
 **************************************************************************/
-float FPQueueSeeMaxGain(FPQueueType *queue)
+floattype FPQueueSeeMaxGain(FPQueueType *queue)
 {
-  float gain;
+  floattype gain;
 
   if (queue->nnodes == 0)
     return 0.0;
@@ -381,7 +381,7 @@ float FPQueueSeeMaxGain(FPQueueType *queue)
 /*************************************************************************
 * This function returns the vertex with the largest gain from a partition
 **************************************************************************/
-float FPQueueGetKey(FPQueueType *queue)
+floattype FPQueueGetKey(FPQueueType *queue)
 {
   int key;
 

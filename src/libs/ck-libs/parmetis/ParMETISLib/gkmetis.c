@@ -24,7 +24,7 @@
 ************************************************************************************/
 void ParMETIS_V3_PartGeomKway(idxtype *vtxdist, idxtype *xadj, idxtype *adjncy,
               idxtype *vwgt, idxtype *adjwgt, int *wgtflag, int *numflag, int *ndims, 
-	      float *xyz, int *ncon, int *nparts, float *tpwgts, float *ubvec, 
+	      floattype *xyz, int *ncon, int *nparts, floattype *tpwgts, floattype *ubvec, 
 	      int *options, int *edgecut, idxtype *part, MPI_Comm *comm)
 {
   int h, i, j;
@@ -36,10 +36,10 @@ void ParMETIS_V3_PartGeomKway(idxtype *vtxdist, idxtype *xadj, idxtype *adjncy,
   idxtype *uvwgt;
   WorkSpaceType wspace;
   GraphType *graph, *mgraph;
-  float avg, maximb, balance, *mytpwgts;
+  floattype avg, maximb, balance, *mytpwgts;
   int seed, dbglvl = 0;
   int iwgtflag, inumflag, incon, inparts, ioptions[10];
-  float *itpwgts, iubvec[MAXNCON];
+  floattype *itpwgts, iubvec[MAXNCON];
 
   MPI_Comm_size(*comm, &npes);
   MPI_Comm_rank(*comm, &mype);
@@ -177,7 +177,7 @@ void ParMETIS_V3_PartGeomKway(idxtype *vtxdist, idxtype *xadj, idxtype *adjncy,
   mgraph->nvwgt = fmalloc(mgraph->nvtxs*incon, "mgraph->nvwgt");
   for (i=0; i<mgraph->nvtxs; i++)
     for (j=0; j<incon; j++)
-      mgraph->nvwgt[i*incon+j] = (float)(mgraph->vwgt[i*incon+j]) / (float)(ctrl.tvwgts[j]);
+      mgraph->nvwgt[i*incon+j] = (floattype)(mgraph->vwgt[i*incon+j]) / (floattype)(ctrl.tvwgts[j]);
 
 
   IFSET(ctrl.dbglvl, DBG_TIME, MPI_Barrier(ctrl.gcomm));
@@ -191,7 +191,7 @@ void ParMETIS_V3_PartGeomKway(idxtype *vtxdist, idxtype *xadj, idxtype *adjncy,
           cut += graph->adjwgt[j];
     gcut = GlobalSESum(&ctrl, cut)/2;
     maxnvtxs = GlobalSEMax(&ctrl, mgraph->nvtxs);
-    balance = (float)(maxnvtxs)/((float)(graph->gnvtxs)/(float)(npes));
+    balance = (floattype)(maxnvtxs)/((floattype)(graph->gnvtxs)/(floattype)(npes));
     rprintf(&ctrl, "XYZ Cut: %6d \tBalance: %6.3f [%d %d %d]\n",
       gcut, balance, maxnvtxs, graph->gnvtxs, npes);
 
@@ -244,7 +244,7 @@ void ParMETIS_V3_PartGeomKway(idxtype *vtxdist, idxtype *xadj, idxtype *adjncy,
       avg += maximb;
       rprintf(&ctrl, "%.3f ", maximb);
     }
-    rprintf(&ctrl, "  avg: %.3f\n", avg/(float)incon);
+    rprintf(&ctrl, "  avg: %.3f\n", avg/(floattype)incon);
   }
 
   GKfree((void **)&itpwgts, LTERM);
@@ -265,7 +265,7 @@ void ParMETIS_V3_PartGeomKway(idxtype *vtxdist, idxtype *xadj, idxtype *adjncy,
 * This function assumes that the graph is already nice partitioned among the
 * processors and then proceeds to perform recursive bisection.
 ************************************************************************************/
-void ParMETIS_V3_PartGeom(idxtype *vtxdist, int *ndims, float *xyz, idxtype *part, MPI_Comm *comm)
+void ParMETIS_V3_PartGeom(idxtype *vtxdist, int *ndims, floattype *xyz, idxtype *part, MPI_Comm *comm)
 {
   int i, npes, mype, nvtxs, firstvtx, dbglvl;
   idxtype *xadj, *adjncy;

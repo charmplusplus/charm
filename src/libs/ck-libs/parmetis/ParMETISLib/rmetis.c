@@ -23,7 +23,7 @@
 ************************************************************************************/
 void ParMETIS_V3_RefineKway(idxtype *vtxdist, idxtype *xadj, idxtype *adjncy,
               idxtype *vwgt, idxtype *adjwgt, int *wgtflag, int *numflag, int *ncon, 
-	      int *nparts, float *tpwgts, float *ubvec, int *options, int *edgecut, 
+	      int *nparts, floattype *tpwgts, floattype *ubvec, int *options, int *edgecut, 
 	      idxtype *part, MPI_Comm *comm)
 {
   int h, i;
@@ -32,10 +32,10 @@ void ParMETIS_V3_RefineKway(idxtype *vtxdist, idxtype *xadj, idxtype *adjncy,
   WorkSpaceType wspace;
   GraphType *graph;
   int tewgt, tvsize, nmoved, maxin, maxout;
-  float gtewgt, gtvsize, avg, maximb;
+  floattype gtewgt, gtvsize, avg, maximb;
   int ps_relation, seed, dbglvl = 0;
   int iwgtflag, inumflag, incon, inparts, ioptions[10];
-  float *itpwgts, iubvec[MAXNCON];
+  floattype *itpwgts, iubvec[MAXNCON];
 
   MPI_Comm_size(*comm, &npes);
   MPI_Comm_rank(*comm, &mype);
@@ -102,8 +102,8 @@ void ParMETIS_V3_RefineKway(idxtype *vtxdist, idxtype *xadj, idxtype *adjncy,
 
   tewgt   = idxsum(graph->nedges, graph->adjwgt);
   tvsize  = idxsum(graph->nvtxs, graph->vsize);
-  gtewgt  = (float) GlobalSESum(&ctrl, tewgt) + 1.0/graph->gnvtxs;
-  gtvsize = (float) GlobalSESum(&ctrl, tvsize) + 1.0/graph->gnvtxs;
+  gtewgt  = (floattype) GlobalSESum(&ctrl, tewgt) + 1.0/graph->gnvtxs;
+  gtvsize = (floattype) GlobalSESum(&ctrl, tvsize) + 1.0/graph->gnvtxs;
   ctrl.edge_size_ratio = gtewgt/gtvsize;
   scopy(incon, iubvec, ctrl.ubvec);
 

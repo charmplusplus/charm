@@ -18,8 +18,8 @@
 * This function performs an edge-based FM refinement
 **************************************************************************/
 int BalanceMyLink(CtrlType *ctrl, GraphType *graph, idxtype *home, int me,
-  int you, float *flows, float maxdiff, float *diff_cost, float *diff_lbavg,
-  float avgvwgt)
+  int you, floattype *flows, floattype maxdiff, floattype *diff_cost, floattype *diff_lbavg,
+  floattype avgvwgt)
 {
   int h, i, ii, j, k;
   int nvtxs, ncon;
@@ -28,10 +28,10 @@ int BalanceMyLink(CtrlType *ctrl, GraphType *graph, idxtype *home, int me,
   int pass, nswaps, nmoves, multiplier;
   idxtype *xadj, *vsize, *adjncy, *adjwgt, *where, *ed, *id;
   idxtype *hval, *nvpq, *inq, *map, *rmap, *ptr, *myqueue, *changes;
-  float *nvwgt, lbvec[MAXNCON], pwgts[MAXNCON*2], tpwgts[MAXNCON*2], my_wgt[MAXNCON];
-  float newgain, oldgain = 0.0;
-  float lbavg, bestflow, mycost;
-  float ipc_factor, redist_factor, ftmp;
+  floattype *nvwgt, lbvec[MAXNCON], pwgts[MAXNCON*2], tpwgts[MAXNCON*2], my_wgt[MAXNCON];
+  floattype newgain, oldgain = 0.0;
+  floattype lbavg, bestflow, mycost;
+  floattype ipc_factor, redist_factor, ftmp;
   FPQueueType *queues;
 int mype;
 MPI_Comm_rank(MPI_COMM_WORLD, &mype);
@@ -152,12 +152,12 @@ MPI_Comm_rank(MPI_COMM_WORLD, &mype);
     for (j=0; j<nvtxs; j++) {
       index = (where[j] == me) ? 0 : nqueues;
 
-      newgain = ipc_factor*(float)(ed[j]-id[j]);
+      newgain = ipc_factor*(floattype)(ed[j]-id[j]);
       if (home[j] == me || home[j] == you) {
         if (where[j] == home[j])
-          newgain -= redist_factor*(float)vsize[j];
+          newgain -= redist_factor*(floattype)vsize[j];
         else
-          newgain += redist_factor*(float)vsize[j];
+          newgain += redist_factor*(floattype)vsize[j];
       }
 
       FPQueueInsert(queues+hval[j]+index, map[j]-ptr[hval[j]], newgain);
@@ -238,12 +238,12 @@ MPI_Comm_rank(MPI_COMM_WORLD, &mype);
 
         /* must compute oldgain before changing id/ed */
         if (myqueue[edge] != -1) {
-          oldgain = ipc_factor*(float)(ed[edge]-id[edge]);
+          oldgain = ipc_factor*(floattype)(ed[edge]-id[edge]);
           if (home[edge] == me || home[edge] == you) {
             if (where[edge] == home[edge])
-              oldgain -= redist_factor*(float)vsize[edge];
+              oldgain -= redist_factor*(floattype)vsize[edge];
             else
-              oldgain += redist_factor*(float)vsize[edge];
+              oldgain += redist_factor*(floattype)vsize[edge];
           }
         }
 
@@ -251,12 +251,12 @@ MPI_Comm_rank(MPI_COMM_WORLD, &mype);
         INC_DEC(id[edge], ed[edge], tmp);
 
         if (myqueue[edge] != -1) {
-          newgain = ipc_factor*(float)(ed[edge]-id[edge]);
+          newgain = ipc_factor*(floattype)(ed[edge]-id[edge]);
           if (home[edge] == me || home[edge] == you) {
             if (where[edge] == home[edge])
-              newgain -= redist_factor*(float)vsize[edge];
+              newgain -= redist_factor*(floattype)vsize[edge];
             else
-              newgain += redist_factor*(float)vsize[edge];
+              newgain += redist_factor*(floattype)vsize[edge];
           }
 
           FPQueueUpdate(queues+hval[edge]+(nqueues*myqueue[edge]),

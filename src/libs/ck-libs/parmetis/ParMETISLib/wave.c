@@ -16,16 +16,16 @@
 /*************************************************************************
 * This function performs a k-way directed diffusion
 **************************************************************************/
-float WavefrontDiffusion(CtrlType *ctrl, GraphType *graph, idxtype *home)
+floattype WavefrontDiffusion(CtrlType *ctrl, GraphType *graph, idxtype *home)
 {
   int ii, i, j, k, l, nvtxs, nedges, nparts;
   int from, to, edge, done, nswaps, noswaps, totalv, wsize;
   int npasses, first, second, third, mind, maxd;
   idxtype *xadj, *adjncy, *adjwgt, *where, *perm;
   idxtype *rowptr, *colind, *ed, *psize;
-  float *transfer, *tmpvec;
-  float balance = -1.0, *load, *solution, *workspace;
-  float *nvwgt, *npwgts, flowFactor, cost, ubfactor;
+  floattype *transfer, *tmpvec;
+  floattype balance = -1.0, *load, *solution, *workspace;
+  floattype *nvwgt, *npwgts, flowFactor, cost, ubfactor;
   MatrixType matrix;
   KeyValueType *cand;
   int ndirty, nclean, dptr, clean;
@@ -60,8 +60,8 @@ float WavefrontDiffusion(CtrlType *ctrl, GraphType *graph, idxtype *home)
   rowptr = matrix.rowptr = perm + 2*nvtxs + nparts;
   colind = matrix.colind = perm + 2*nvtxs + 2*nparts + 1;
 
-  wsize     = amax(sizeof(float)*nparts*6, sizeof(idxtype)*(nvtxs+nparts*2+1));
-  workspace = (float *)GKmalloc(wsize, "WavefrontDiffusion: workspace");
+  wsize     = amax(sizeof(floattype)*nparts*6, sizeof(idxtype)*(nvtxs+nparts*2+1));
+  workspace = (floattype *)GKmalloc(wsize, "WavefrontDiffusion: workspace");
   cand      = (KeyValueType *)GKmalloc(nvtxs*sizeof(KeyValueType), "WavefrontDiffusion: cand");
 
 
@@ -109,7 +109,7 @@ float WavefrontDiffusion(CtrlType *ctrl, GraphType *graph, idxtype *home)
     /* check for disconnected subdomains */
     for(i=0; i<matrix.nrows; i++) {
       if (matrix.rowptr[i]+1 == matrix.rowptr[i+1]) {
-        cost = (float)(ctrl->mype); 
+        cost = (floattype)(ctrl->mype); 
 	goto CleanUpAndExit;
       }
     }
@@ -214,7 +214,7 @@ float WavefrontDiffusion(CtrlType *ctrl, GraphType *graph, idxtype *home)
     }
 
     if (l % 2 == 1) {
-      balance = npwgts[samax(nparts, npwgts)] * (float)nparts;
+      balance = npwgts[samax(nparts, npwgts)] * (floattype)nparts;
       if (balance < ubfactor + 0.035)
         done = 1;
 
@@ -230,7 +230,7 @@ float WavefrontDiffusion(CtrlType *ctrl, GraphType *graph, idxtype *home)
 
   graph->mincut = ComputeSerialEdgeCut(graph);
   totalv        = Mc_ComputeSerialTotalV(graph, home);
-  cost          = ctrl->ipc_factor * (float)graph->mincut + ctrl->redist_factor * (float)totalv;
+  cost          = ctrl->ipc_factor * (floattype)graph->mincut + ctrl->redist_factor * (floattype)totalv;
 
 
 CleanUpAndExit:

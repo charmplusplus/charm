@@ -38,7 +38,7 @@ typedef struct KeyValueType KeyValueType;
 **************************************************************************/
 struct KVType {
   int key;
-  float val;
+  floattype val;
 };
 
 typedef struct KVType KVType;
@@ -48,7 +48,7 @@ typedef struct KVType KVType;
 * The following data structure stores key-value pair
 **************************************************************************/
 struct FKeyValueType {
-  float key;
+  floattype key;
   idxtype val;
 };
 
@@ -159,8 +159,8 @@ struct matrixdef {
   int nrows, nnzs;		/* Number of rows and nonzeros in the matrix */
   idxtype *rowptr;
   idxtype *colind;
-  float *values;
-  float *transfer;
+  floattype *values;
+  floattype *transfer;
 };
 
 typedef struct matrixdef MatrixType;
@@ -173,7 +173,7 @@ struct graphdef {
   int gnvtxs, nvtxs, nedges, ncon, nobj;
   idxtype *xadj;		/* Pointers to the locally stored vertices */
   idxtype *vwgt;		/* Vertex weights */
-  float *nvwgt;		/* Vertex weights */
+  floattype *nvwgt;		/* Vertex weights */
   idxtype *vsize;		/* Vertex size */
   idxtype *adjncy;		/* Array that stores the adjacency lists of nvtxs */
   idxtype *adjwgt;		/* Array that stores the weights of the adjacency lists */
@@ -206,7 +206,7 @@ struct graphdef {
   /* Partition parameters */
   idxtype *where, *home;
   idxtype *lpwgts, *gpwgts;
-  float *lnpwgts, *gnpwgts;
+  floattype *lnpwgts, *gnpwgts;
   RInfoType *rinfo;
 
   /* Node refinement information */
@@ -245,14 +245,14 @@ struct controldef {
   int xyztype;			/* The type of coordinate indexing */
   int seed;			/* Random number seed */
   int sync;			/* Random number seed */
-  float *tpwgts;		/* Target subdomain weights */
+  floattype *tpwgts;		/* Target subdomain weights */
   int tvwgts[MAXNCON];
-  float ubvec[MAXNCON];
+  floattype ubvec[MAXNCON];
   int partType;
   int ps_relation;
 
-  float redist_factor, redist_base, ipc_factor;
-  float edge_size_ratio;
+  floattype redist_factor, redist_base, ipc_factor;
+  floattype edge_size_ratio;
   MatrixType *matrix;
 
   MPI_Comm gcomm;

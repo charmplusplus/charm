@@ -85,6 +85,6 @@ void PrintTimer(CtrlType *ctrl, timer tmr, char *msg)
 
   if (ctrl->mype == 0 && sum != 0.0)
     printf("%s: Max: %7.3f, Sum: %7.3f, Balance: %7.3f\n", 
-            msg, (float)max, (float)sum, (float)(max*ctrl->npes/sum));
+            msg, (floattype)max, (floattype)sum, (floattype)(max*ctrl->npes/sum));
 }
 

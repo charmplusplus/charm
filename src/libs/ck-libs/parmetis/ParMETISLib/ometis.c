@@ -44,7 +44,7 @@ void ParMETIS_V3_NodeND(idxtype *vtxdist, idxtype *xadj, idxtype *adjncy, int *n
     return;
   }
 
-  if (vtxdist[npes] < (int)((float)(npes*npes)*1.2)) {
+  if (vtxdist[npes] < (int)((floattype)(npes*npes)*1.2)) {
     if (mype == 0)
       printf("Error: Too many processors for this many vertices.\n");
     return;
@@ -54,7 +54,7 @@ void ParMETIS_V3_NodeND(idxtype *vtxdist, idxtype *xadj, idxtype *adjncy, int *n
   for (i=0; i<npes; i++)
     minnvtxs = (minnvtxs < vtxdist[i+1]-vtxdist[i]) ? minnvtxs : vtxdist[i+1]-vtxdist[i];
 
-  if (minnvtxs < (int)((float)npes*1.1)) {
+  if (minnvtxs < (int)((floattype)npes*1.1)) {
     if (mype == 0)
       printf("Error: vertices are not distributed equally.\n");
     return;
@@ -72,7 +72,7 @@ void ParMETIS_V3_NodeND(idxtype *vtxdist, idxtype *xadj, idxtype *adjncy, int *n
   ctrl.sync = seed;
   ctrl.partType = STATIC_PARTITION;
   ctrl.ps_relation = -1;
-  ctrl.tpwgts = fsmalloc(nparts, 1.0/(float)(nparts), "tpwgts");
+  ctrl.tpwgts = fsmalloc(nparts, 1.0/(floattype)(nparts), "tpwgts");
   ctrl.ubvec[0] = 1.03;
 
   graph = Moc_SetUpGraph(&ctrl, 1, vtxdist, xadj, NULL, adjncy, NULL, &wgtflag);
@@ -132,7 +132,7 @@ void ParMETIS_V3_NodeND(idxtype *vtxdist, idxtype *xadj, idxtype *adjncy, int *n
   mgraph->nvwgt = fmalloc(mgraph->nvtxs*mgraph->ncon, "mgraph->nvwgt");
   for (i=0; i<mgraph->nvtxs; i++)
     for (j=0; j<mgraph->ncon; j++)
-      mgraph->nvwgt[i*mgraph->ncon+j] = (float)(mgraph->vwgt[i*mgraph->ncon+j]) / (float)(ctrl.tvwgts[j]);
+      mgraph->nvwgt[i*mgraph->ncon+j] = (floattype)(mgraph->vwgt[i*mgraph->ncon+j]) / (floattype)(ctrl.tvwgts[j]);
 
 
   morder = idxmalloc(mgraph->nvtxs, "PAROMETIS: morder");

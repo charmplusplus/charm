@@ -22,7 +22,7 @@
 ************************************************************************************/
 void ParMETIS_V3_PartKway(idxtype *vtxdist, idxtype *xadj, idxtype *adjncy, idxtype *vwgt,
               idxtype *adjwgt, int *wgtflag, int *numflag, int *ncon, int *nparts, 
-	      float *tpwgts, float *ubvec, int *options, int *edgecut, idxtype *part, 
+	      floattype *tpwgts, floattype *ubvec, int *options, int *edgecut, idxtype *part, 
 	      MPI_Comm *comm)
 {
   int h, i;
@@ -30,11 +30,11 @@ void ParMETIS_V3_PartKway(idxtype *vtxdist, idxtype *xadj, idxtype *adjncy, idxt
   CtrlType ctrl;
   WorkSpaceType wspace;
   GraphType *graph;
-  float avg, maximb, *mytpwgts;
+  floattype avg, maximb, *mytpwgts;
   int moptions[10];
   int seed, dbglvl = 0;
   int iwgtflag, inumflag, incon, inparts, ioptions[10];
-  float *itpwgts, iubvec[MAXNCON];
+  floattype *itpwgts, iubvec[MAXNCON];
 
   MPI_Comm_size(*comm, &npes);
   MPI_Comm_rank(*comm, &mype);
@@ -160,7 +160,7 @@ void ParMETIS_V3_PartKway(idxtype *vtxdist, idxtype *xadj, idxtype *adjncy, idxt
       avg += maximb;
       rprintf(&ctrl, "%.3f ", maximb);
     }
-    rprintf(&ctrl, "  avg: %.3f\n", avg/(float)incon);
+    rprintf(&ctrl, "  avg: %.3f\n", avg/(floattype)incon);
   }
 
   GKfree((void **)&itpwgts, (void **)&graph->lnpwgts, (void **)&graph->gnpwgts, (void **)&graph->nvwgt, LTERM);
@@ -181,7 +181,7 @@ void ParMETIS_V3_PartKway(idxtype *vtxdist, idxtype *xadj, idxtype *adjncy, idxt
 void Moc_Global_Partition(CtrlType *ctrl, GraphType *graph, WorkSpaceType *wspace)
 {
   int i, ncon, nparts;
-  float ftmp, ubavg, lbavg, lbvec[MAXNCON];
+  floattype ftmp, ubavg, lbavg, lbvec[MAXNCON];
  
   ncon = graph->ncon;
   nparts = ctrl->nparts;
@@ -234,7 +234,7 @@ void Moc_Global_Partition(CtrlType *ctrl, GraphType *graph, WorkSpaceType *wspac
       for (i=0; i<ncon; i++) {
         ftmp = ssum_strd(nparts, graph->gnpwgts+i, ncon);
         if (ftmp != 0.0)
-          lbvec[i] = (float)(nparts) *
+          lbvec[i] = (floattype)(nparts) *
           graph->gnpwgts[samax_strd(nparts, graph->gnpwgts+i, ncon)*ncon+i]/ftmp;
         else
           lbvec[i] = 1.0;

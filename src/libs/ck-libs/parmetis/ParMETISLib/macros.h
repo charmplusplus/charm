@@ -33,7 +33,7 @@
 
 
 #define icopy(n, a, b) memcpy((b), (a), sizeof(int)*(n))
-#define scopy(n, a, b) memcpy((b), (a), sizeof(float)*(n))
+#define scopy(n, a, b) memcpy((b), (a), sizeof(floattype)*(n))
 #define idxcopy(n, a, b) memcpy((b), (a), sizeof(idxtype)*(n))
 
 #define HASHFCT(key, size) ((key)%(size))
@@ -58,7 +58,7 @@
 **************************************************************************/
 #ifdef DMALLOC
 #define imalloc(n, msg) (malloc(sizeof(int)*(n)))
-#define fmalloc(n, msg) (malloc(sizeof(float)*(n)))
+#define fmalloc(n, msg) (malloc(sizeof(floattype)*(n)))
 #define idxmalloc(n, msg) (malloc(sizeof(idxtype)*(n)))
 #define ismalloc(n, val, msg) (iset((n), (val), malloc(sizeof(int)*(n))))
 #define idxsmalloc(n, val, msg) (idxset((n), (val), malloc(sizeof(idxtype)*(n))))

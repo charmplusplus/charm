@@ -31,16 +31,16 @@ void Moc_KWayAdaptiveRefine(CtrlType *ctrl, GraphType *graph, WorkSpaceType *wsp
   int nlupd, nsupd, nnbrs, nchanged;
   idxtype *xadj, *ladjncy, *adjwgt, *vtxdist;
   idxtype *where, *tmp_where, *moved;
-  float *lnpwgts, *gnpwgts, *ognpwgts, *pgnpwgts, *movewgts, *overfill;
+  floattype *lnpwgts, *gnpwgts, *ognpwgts, *pgnpwgts, *movewgts, *overfill;
   idxtype *update, *supdate, *rupdate, *pe_updates;
   idxtype *changed, *perm, *pperm, *htable;
   idxtype *peind, *recvptr, *sendptr;
   KeyValueType *swchanges, *rwchanges;
   RInfoType *rinfo, *myrinfo, *tmp_myrinfo, *tmp_rinfo;
   EdgeType *tmp_edegrees, *my_edegrees, *your_edegrees;
-  float lbvec[MAXNCON], *nvwgt, *badmaxpwgt, *ubvec, *tpwgts, lbavg, ubavg;
-  float oldgain, gain;
-  float ipc_factor, redist_factor, vsize;
+  floattype lbvec[MAXNCON], *nvwgt, *badmaxpwgt, *ubvec, *tpwgts, lbavg, ubavg;
+  floattype oldgain, gain;
+  floattype ipc_factor, redist_factor, vsize;
   int *nupds_pe, ndirty, nclean, dptr;
   int better, worse;
 
@@ -169,7 +169,7 @@ void Moc_KWayAdaptiveRefine(CtrlType *ctrl, GraphType *graph, WorkSpaceType *wsp
         i     = perm[iii];
         from  = tmp_where[i];
         nvwgt = graph->nvwgt+i*ncon;
-        vsize = (float)(graph->vsize[i]);
+        vsize = (floattype)(graph->vsize[i]);
 
         for (h=0; h<ncon; h++) {
           if (fabs(nvwgt[h]-gnpwgts[from*ncon+h]) < SMALLFLOAT)
@@ -215,7 +215,7 @@ void Moc_KWayAdaptiveRefine(CtrlType *ctrl, GraphType *graph, WorkSpaceType *wsp
           /**************************/
           /**************************/
 
-          oldgain = ipc_factor * (float)(my_edegrees[k].ewgt-tmp_rinfo[i].id);
+          oldgain = ipc_factor * (floattype)(my_edegrees[k].ewgt-tmp_rinfo[i].id);
           if (better) oldgain += redist_factor * vsize;
           if (worse) oldgain -= redist_factor * vsize;
 
@@ -236,7 +236,7 @@ void Moc_KWayAdaptiveRefine(CtrlType *ctrl, GraphType *graph, WorkSpaceType *wsp
               /**************************/
               /**************************/
 
-              gain = ipc_factor * (float)(my_edegrees[j].ewgt-tmp_rinfo[i].id);
+              gain = ipc_factor * (floattype)(my_edegrees[j].ewgt-tmp_rinfo[i].id);
               if (better) gain += redist_factor * vsize;
               if (worse) gain -= redist_factor * vsize;
 
@@ -345,7 +345,7 @@ void Moc_KWayAdaptiveRefine(CtrlType *ctrl, GraphType *graph, WorkSpaceType *wsp
       /* Let processors know the subdomain wgts */
       /* if all proposed moves commit.          */
       /******************************************/
-      MPI_Allreduce((void *)lnpwgts, (void *)pgnpwgts, nparts*ncon, MPI_FLOAT, MPI_SUM, ctrl->comm);
+      MPI_Allreduce((void *)lnpwgts, (void *)pgnpwgts, nparts*ncon, MPI_DOUBLE, MPI_SUM, ctrl->comm);
 
       /**************************/
       /* compute overfill array */
@@ -610,7 +610,7 @@ void Moc_KWayAdaptiveRefine(CtrlType *ctrl, GraphType *graph, WorkSpaceType *wsp
       }
 
       /* finally, sum-up the partition weights */
-      MPI_Allreduce((void *)lnpwgts, (void *)gnpwgts, nparts*ncon, MPI_FLOAT, MPI_SUM, ctrl->comm);
+      MPI_Allreduce((void *)lnpwgts, (void *)gnpwgts, nparts*ncon, MPI_DOUBLE, MPI_SUM, ctrl->comm);
     }
     graph->mincut = GlobalSESum(ctrl, graph->lmincut)/2;
 

@@ -165,7 +165,7 @@ void ParallelTotalVReMap(CtrlType *ctrl, idxtype *lpwgts, idxtype *map,
 * This function computes the assignment using the the objective the
 * minimization of the total volume of data that needs to move
 **************************************************************************/
-int SimilarTpwgts(float *tpwgts, int ncon, int s1, int s2)
+int SimilarTpwgts(floattype *tpwgts, int ncon, int s1, int s2)
 {
   int i;
 

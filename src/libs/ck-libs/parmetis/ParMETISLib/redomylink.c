@@ -18,7 +18,7 @@
 * This function performs an edge-based FM refinement
 **************************************************************************/
 void RedoMyLink(CtrlType *ctrl, GraphType *graph, idxtype *home, int me,
-  int you, float *flows, float *sr_cost, float *sr_lbavg)
+  int you, floattype *flows, floattype *sr_cost, floattype *sr_lbavg)
 {
   int h, i, r;
   int nvtxs, nedges, ncon;
@@ -26,11 +26,11 @@ void RedoMyLink(CtrlType *ctrl, GraphType *graph, idxtype *home, int me,
   idxtype *xadj, *adjncy, *adjwgt, *where, *vsize;
   idxtype *costwhere, *lbwhere, *selectwhere;
   idxtype *rdata, *ed, *id, *bndptr, *bndind, *perm;
-  float *nvwgt, mycost;
-  float lbavg, lbvec[MAXNCON];
-  float best_lbavg, other_lbavg = -1.0, bestcost, othercost = -1.0;
-  float npwgts[2*MAXNCON], pwgts[MAXNCON*2], tpwgts[MAXNCON*2];
-  float ipc_factor, redist_factor, ftmp;
+  floattype *nvwgt, mycost;
+  floattype lbavg, lbvec[MAXNCON];
+  floattype best_lbavg, other_lbavg = -1.0, bestcost, othercost = -1.0;
+  floattype npwgts[2*MAXNCON], pwgts[MAXNCON*2], tpwgts[MAXNCON*2];
+  floattype ipc_factor, redist_factor, ftmp;
 int mype;
 MPI_Comm_rank(MPI_COMM_WORLD, &mype);
 
@@ -104,7 +104,7 @@ MPI_Comm_rank(MPI_COMM_WORLD, &mype);
   /*****************************/
   /* now compute new bisection */
   /*****************************/
-  bestcost = (float)idxsum(nedges, adjwgt)*ipc_factor + (float)idxsum(nvtxs, vsize)*redist_factor;
+  bestcost = (floattype)idxsum(nedges, adjwgt)*ipc_factor + (floattype)idxsum(nvtxs, vsize)*redist_factor;
   best_lbavg = 10.0;
 
   lastseed = 0;
@@ -141,7 +141,7 @@ MPI_Comm_rank(MPI_COMM_WORLD, &mype);
       if (where[i] != home[i])
         totalv += vsize[i];
 
-    mycost = (float)(graph->mincut)*ipc_factor + (float)totalv*redist_factor;
+    mycost = (floattype)(graph->mincut)*ipc_factor + (floattype)totalv*redist_factor;
 
     if (bestcost >= mycost) {
       bestcost = mycost;

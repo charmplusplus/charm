@@ -24,8 +24,8 @@ void Adaptive_Partition(CtrlType *ctrl, GraphType *graph, WorkSpaceType *wspace)
 {
   int i;
   int tewgt, tvsize;
-  float gtewgt, gtvsize;
-  float ubavg, lbavg, lbvec[MAXNCON];
+  floattype gtewgt, gtvsize;
+  floattype ubavg, lbavg, lbvec[MAXNCON];
 
   /************************************/
   /* Set up important data structures */
@@ -35,8 +35,8 @@ void Adaptive_Partition(CtrlType *ctrl, GraphType *graph, WorkSpaceType *wspace)
   ubavg   = savg(graph->ncon, ctrl->ubvec);
   tewgt   = idxsum(graph->nedges, graph->adjwgt);
   tvsize  = idxsum(graph->nvtxs, graph->vsize);
-  gtewgt  = (float) GlobalSESum(ctrl, tewgt) + 1.0;  /* The +1 were added to remove any FPE */
-  gtvsize = (float) GlobalSESum(ctrl, tvsize) + 1.0;
+  gtewgt  = (floattype) GlobalSESum(ctrl, tewgt) + 1.0;  /* The +1 were added to remove any FPE */
+  gtvsize = (floattype) GlobalSESum(ctrl, tvsize) + 1.0;
   ctrl->redist_factor = ctrl->redist_base * ((gtewgt/gtvsize)/ ctrl->edge_size_ratio);
 
   IFSET(ctrl->dbglvl, DBG_PROGRESS, rprintf(ctrl, "[%6d %8d %5d %5d][%d]\n", 

@@ -31,14 +31,14 @@ void Moc_KWayFM(CtrlType *ctrl, GraphType *graph, WorkSpaceType *wspace, int npa
   int nlupd, nsupd, nnbrs, nchanged;
   idxtype *xadj, *ladjncy, *adjwgt, *vtxdist;
   idxtype *where, *tmp_where, *moved;
-  float *lnpwgts, *gnpwgts, *ognpwgts, *pgnpwgts, *movewgts, *overfill;
+  floattype *lnpwgts, *gnpwgts, *ognpwgts, *pgnpwgts, *movewgts, *overfill;
   idxtype *update, *supdate, *rupdate, *pe_updates;
   idxtype *changed, *perm, *pperm, *htable;
   idxtype *peind, *recvptr, *sendptr;
   KeyValueType *swchanges, *rwchanges;
   RInfoType *rinfo, *myrinfo, *tmp_myrinfo, *tmp_rinfo;
   EdgeType *tmp_edegrees, *my_edegrees, *your_edegrees;
-  float lbvec[MAXNCON], *nvwgt, *badmaxpwgt, *ubvec, *tpwgts, lbavg, ubavg;
+  floattype lbvec[MAXNCON], *nvwgt, *badmaxpwgt, *ubvec, *tpwgts, lbavg, ubavg;
   int *nupds_pe;
 
   IFSET(ctrl->dbglvl, DBG_TIME, starttimer(ctrl->KWayTmr));
@@ -283,7 +283,7 @@ void Moc_KWayFM(CtrlType *ctrl, GraphType *graph, WorkSpaceType *wspace, int npa
       /* if all proposed moves commit.          */
       /******************************************/
       MPI_Allreduce((void *)lnpwgts, (void *)pgnpwgts, nparts*ncon,
-      MPI_FLOAT, MPI_SUM, ctrl->comm);
+      MPI_DOUBLE, MPI_SUM, ctrl->comm);
 
       /**************************/
       /* compute overfill array */
@@ -573,7 +573,7 @@ void Moc_KWayFM(CtrlType *ctrl, GraphType *graph, WorkSpaceType *wspace, int npa
 
       /* finally, sum-up the partition weights */
       MPI_Allreduce((void *)lnpwgts, (void *)gnpwgts, nparts*ncon,
-      MPI_FLOAT, MPI_SUM, ctrl->comm);
+      MPI_DOUBLE, MPI_SUM, ctrl->comm);
     }
     graph->mincut = GlobalSESum(ctrl, graph->lmincut)/2;
 

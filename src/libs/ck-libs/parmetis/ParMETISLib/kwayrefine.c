@@ -134,7 +134,7 @@ void Moc_ComputePartitionParams(CtrlType *ctrl, GraphType *graph, WorkSpaceType 
   int nvtxs, ncon;
   int firstvtx, lastvtx;
   idxtype *xadj, *ladjncy, *adjwgt, *vtxdist;
-  float *lnpwgts, *gnpwgts;
+  floattype *lnpwgts, *gnpwgts;
   idxtype *where, *swhere, *rwhere;
   RInfoType *rinfo, *myrinfo;
   EdgeType *edegrees;
@@ -226,7 +226,7 @@ void Moc_ComputePartitionParams(CtrlType *ctrl, GraphType *graph, WorkSpaceType 
 #endif
 
   /* Finally, sum-up the partition weights */
-  MPI_Allreduce((void *)lnpwgts, (void *)gnpwgts, ctrl->nparts*ncon, MPI_FLOAT, MPI_SUM, ctrl->comm);
+  MPI_Allreduce((void *)lnpwgts, (void *)gnpwgts, ctrl->nparts*ncon, MPI_DOUBLE, MPI_SUM, ctrl->comm);
 
   graph->mincut = GlobalSESum(ctrl, graph->lmincut)/2;
 

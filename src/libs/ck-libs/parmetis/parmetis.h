@@ -34,6 +34,8 @@ typedef int idxtype;
 typedef short idxtype;
 #endif
 
+typedef double floattype;
+
 
 /*************************************************************************
 * Constants 
@@ -55,22 +57,22 @@ extern "C" {
 void __cdecl ParMETIS_V3_AdaptiveRepart(
              idxtype *vtxdist, idxtype *xadj, idxtype *adjncy, idxtype *vwgt, 
 	     idxtype *vsize, idxtype *adjwgt, int *wgtflag, int *numflag, int *ncon, 
-	     int *nparts, float *tpwgts, float *ubvec, float *ipc2redist, 
+	     int *nparts, floattype *tpwgts, floattype *ubvec, floattype *ipc2redist, 
 	     int *options, int *edgecut, idxtype *part, MPI_Comm *comm);
 
 void __cdecl ParMETIS_V3_PartGeomKway(
              idxtype *vtxdist, idxtype *xadj, idxtype *adjncy, idxtype *vwgt, 
-	     idxtype *adjwgt, int *wgtflag, int *numflag, int *ndims, float *xyz, 
-	     int *ncon, int *nparts, float *tpwgts, float *ubvec, int *options, 
+	     idxtype *adjwgt, int *wgtflag, int *numflag, int *ndims, floattype *xyz, 
+	     int *ncon, int *nparts, floattype *tpwgts, floattype *ubvec, int *options, 
 	     int *edgecut, idxtype *part, MPI_Comm *comm);
 
 void __cdecl ParMETIS_V3_PartGeom(
-             idxtype *vtxdist, int *ndims, float *xyz, idxtype *part, MPI_Comm *comm);
+             idxtype *vtxdist, int *ndims, floattype *xyz, idxtype *part, MPI_Comm *comm);
 
 void __cdecl ParMETIS_V3_PartKway(
              idxtype *vtxdist, idxtype *xadj, idxtype *adjncy, idxtype *vwgt, 
 	     idxtype *adjwgt, int *wgtflag, int *numflag, int *ncon, int *nparts, 
-	     float *tpwgts, float *ubvec, int *options, int *edgecut, idxtype *part, 
+	     floattype *tpwgts, floattype *ubvec, int *options, int *edgecut, idxtype *part, 
 	     MPI_Comm *comm);
 
 void __cdecl ParMETIS_V3_Mesh2Dual(
@@ -80,7 +82,7 @@ void __cdecl ParMETIS_V3_Mesh2Dual(
 void __cdecl ParMETIS_V3_PartMeshKway(
              idxtype *elmdist, idxtype *eptr, idxtype *eind, idxtype *elmwgt, 
 	     int *wgtflag, int *numflag, int *ncon, int *ncommonnodes, int *nparts, 
-	     float *tpwgts, float *ubvec, int *options, int *edgecut, idxtype *part, 
+	     floattype *tpwgts, floattype *ubvec, int *options, int *edgecut, idxtype *part, 
 	     MPI_Comm *comm);
 
 void __cdecl ParMETIS_V3_NodeND(
@@ -90,7 +92,7 @@ void __cdecl ParMETIS_V3_NodeND(
 void __cdecl ParMETIS_V3_RefineKway(
              idxtype *vtxdist, idxtype *xadj, idxtype *adjncy, idxtype *vwgt, 
 	     idxtype *adjwgt, int *wgtflag, int *numflag, int *ncon, int *nparts, 
-	     float *tpwgts, float *ubvec, int *options, int *edgecut, 
+	     floattype *tpwgts, floattype *ubvec, int *options, int *edgecut, 
 	     idxtype *part, MPI_Comm *comm);
 
 
@@ -105,15 +107,15 @@ void __cdecl ParMETIS_PartKway(
 
 void __cdecl ParMETIS_PartGeomKway(
              idxtype *vtxdist, idxtype *xadj, idxtype *adjncy, idxtype *vwgt, idxtype *adjwgt, 
-	     int *wgtflag, int *numflag, int *ndims, float *xyz, int *nparts, int *options, 
+	     int *wgtflag, int *numflag, int *ndims, floattype *xyz, int *nparts, int *options, 
 	     int *edgecut, idxtype *part, MPI_Comm *comm);
 
 void __cdecl ParMETIS_PartGeom(
-             idxtype *vtxdist, int *ndims, float *xyz, idxtype *part, MPI_Comm *comm);
+             idxtype *vtxdist, int *ndims, floattype *xyz, idxtype *part, MPI_Comm *comm);
 
 void __cdecl ParMETIS_PartGeomRefine(
              idxtype *vtxdist, idxtype *xadj, idxtype *adjncy, idxtype *vwgt, 
-	     idxtype *adjwgt, int *wgtflag, int *numflag, int *ndims, float *xyz, 
+	     idxtype *adjwgt, int *wgtflag, int *numflag, int *ndims, floattype *xyz, 
 	     int *options, int *edgecut, idxtype *part, MPI_Comm *comm);
 
 void __cdecl ParMETIS_RefineKway(
@@ -161,14 +163,14 @@ void __cdecl PARKMETIS(
 
 void __cdecl PARGKMETIS(
              idxtype *vtxdist, idxtype *xadj, idxtype *vwgt, idxtype *adjncy, idxtype *adjwgt,
-             int ndims, float *xyz, idxtype *part, int *options, MPI_Comm comm);
+             int ndims, floattype *xyz, idxtype *part, int *options, MPI_Comm comm);
 
 void __cdecl PARGRMETIS(
              idxtype *vtxdist, idxtype *xadj, idxtype *vwgt, idxtype *adjncy, idxtype *adjwgt,
-             int ndims, float *xyz, idxtype *part, int *options, MPI_Comm comm);
+             int ndims, floattype *xyz, idxtype *part, int *options, MPI_Comm comm);
 
 void __cdecl PARGMETIS(
-             idxtype *vtxdist, idxtype *xadj, idxtype *adjncy, int ndims, float *xyz,
+             idxtype *vtxdist, idxtype *xadj, idxtype *adjncy, int ndims, floattype *xyz,
              idxtype *part, int *options, MPI_Comm comm);
 
 void __cdecl PARRMETIS(

@@ -23,7 +23,7 @@
 void Moc_Global_Partition(CtrlType *ctrl, GraphType *graph, WorkSpaceType *wspace)
 {
   int i, ncon, nparts;
-  float ftmp, ubavg, lbavg, lbvec[MAXNCON];
+  floattype ftmp, ubavg, lbavg, lbvec[MAXNCON];
  
   ncon = graph->ncon;
   nparts = ctrl->nparts;
@@ -76,7 +76,7 @@ void Moc_Global_Partition(CtrlType *ctrl, GraphType *graph, WorkSpaceType *wspac
       for (i=0; i<ncon; i++) {
         ftmp = ssum_strd(nparts, graph->gnpwgts+i, ncon);
         if (ftmp != 0.0)
-          lbvec[i] = (float)(nparts) *
+          lbvec[i] = (floattype)(nparts) *
           graph->gnpwgts[samax_strd(nparts, graph->gnpwgts+i, ncon)*ncon+i]/ftmp;
         else
           lbvec[i] = 1.0;

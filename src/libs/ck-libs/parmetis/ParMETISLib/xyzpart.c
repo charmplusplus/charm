@@ -18,12 +18,12 @@
 /*************************************************************************
 * This function implements a simple coordinate based partitioning
 **************************************************************************/
-void Coordinate_Partition(CtrlType *ctrl, GraphType *graph, int ndims, float *xyz, 
+void Coordinate_Partition(CtrlType *ctrl, GraphType *graph, int ndims, floattype *xyz, 
                           int setup, WorkSpaceType *wspace)
 {
   int i, j, k, nvtxs, firstvtx, icoord, coords[3];
   idxtype *vtxdist;
-  float max[3], min[3], gmin[3], gmax[3], shift[3], scale[3];
+  floattype max[3], min[3], gmin[3], gmax[3], shift[3], scale[3];
   KeyValueType *cand;
 
   if (setup)
@@ -53,8 +53,8 @@ void Coordinate_Partition(CtrlType *ctrl, GraphType *graph, int ndims, float *xy
   }
 
   /* Compute global min and max */
-  MPI_Allreduce((void *)min, (void *)gmin, ndims, MPI_FLOAT, MPI_MIN, ctrl->comm);
-  MPI_Allreduce((void *)max, (void *)gmax, ndims, MPI_FLOAT, MPI_MAX, ctrl->comm);
+  MPI_Allreduce((void *)min, (void *)gmin, ndims, MPI_DOUBLE, MPI_MIN, ctrl->comm);
+  MPI_Allreduce((void *)max, (void *)gmax, ndims, MPI_DOUBLE, MPI_MAX, ctrl->comm);
 
   /* myprintf(ctrl, "Coordinate Range: %e %e, Global %e %e\n", min[0], max[0], gmin[0], gmax[0]); */
 

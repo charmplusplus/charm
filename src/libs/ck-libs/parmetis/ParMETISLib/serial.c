@@ -17,7 +17,7 @@
 * This function performs k-way refinement
 **************************************************************************/
 void Moc_SerialKWayAdaptRefine(GraphType *graph, int nparts, idxtype *home,
-     float *orgubvec, int npasses)
+     floattype *orgubvec, int npasses)
 {
   int i, ii, iii, j, k;
   int nvtxs, ncon, pass, nmoves, myndegrees;
@@ -26,7 +26,7 @@ void Moc_SerialKWayAdaptRefine(GraphType *graph, int nparts, idxtype *home,
   idxtype *where;
   EdgeType *mydegrees;
   RInfoType *rinfo, *myrinfo;
-  float *npwgts, *nvwgt, *minwgt, *maxwgt, ubvec[MAXNCON];
+  floattype *npwgts, *nvwgt, *minwgt, *maxwgt, ubvec[MAXNCON];
   int gain_is_greater, gain_is_same, fit_in_to, fit_in_from, going_home;
   int zero_gain, better_balance_ft, better_balance_tt;
   KeyValueType *cand;
@@ -53,8 +53,8 @@ MPI_Comm_rank(MPI_COMM_WORLD, &mype);
 
   for (i=0; i<nparts; i++) {
     for (j=0; j<ncon; j++) {
-      maxwgt[i*ncon+j] = ubvec[j]/(float)nparts;
-      minwgt[i*ncon+j] = ubvec[j]*(float)nparts;
+      maxwgt[i*ncon+j] = ubvec[j]/(floattype)nparts;
+      minwgt[i*ncon+j] = ubvec[j]*(floattype)nparts;
     }
   }
 
@@ -237,7 +237,7 @@ void Moc_ComputeSerialPartitionParams(GraphType *graph, int nparts,
   idxtype *xadj, *adjncy, *adjwgt, *where;
   RInfoType *rinfo, *myrinfo;
   EdgeType *mydegrees;
-  float *nvwgt, *npwgts;
+  floattype *nvwgt, *npwgts;
 int mype;
 MPI_Comm_rank(MPI_COMM_WORLD, &mype);
 
@@ -309,7 +309,7 @@ MPI_Comm_rank(MPI_COMM_WORLD, &mype);
 * This function checks if the vertex weights of two vertices are below 
 * a given set of values
 **************************************************************************/
-int AreAllHVwgtsBelow(int ncon, float alpha, float *vwgt1, float beta, float *vwgt2, float *limit)
+int AreAllHVwgtsBelow(int ncon, floattype alpha, floattype *vwgt1, floattype beta, floattype *vwgt2, floattype *limit)
 {
   int i;
 
@@ -325,10 +325,10 @@ int AreAllHVwgtsBelow(int ncon, float alpha, float *vwgt1, float beta, float *vw
 * This function computes the load imbalance over all the constrains
 * For now assume that we just want balanced partitionings
 **************************************************************************/ 
-void ComputeHKWayLoadImbalance(int ncon, int nparts, float *npwgts, float *lbvec)
+void ComputeHKWayLoadImbalance(int ncon, int nparts, floattype *npwgts, floattype *lbvec)
 {
   int i, j;
-  float max;
+  floattype max;
 
   for (i=0; i<ncon; i++) {
     max = 0.0;
@@ -346,7 +346,7 @@ void ComputeHKWayLoadImbalance(int ncon, int nparts, float *npwgts, float *lbvec
 *  This subroutine remaps a partitioning on a single processor
 **************************************************************/
 void SerialRemap(GraphType *graph, int nparts, idxtype *base, idxtype *scratch,
-     idxtype *remap, float *tpwgts)
+     idxtype *remap, floattype *tpwgts)
 {
   int i, ii, j, k;
   int nvtxs, nmapped, max_mult;
@@ -507,16 +507,16 @@ int SSMIncKeyCmp(const void *fptr, const void *sptr)
 /*************************************************************************
 * This function performs an edge-based FM refinement
 **************************************************************************/
-void Moc_Serial_FM_2WayRefine(GraphType *graph, float *tpwgts, int npasses)
+void Moc_Serial_FM_2WayRefine(GraphType *graph, floattype *tpwgts, int npasses)
 {
   int i, ii, j, k;
   int kwgt, nvtxs, ncon, nbnd, nswaps, from, to, pass, limit, tmp, cnum;
   idxtype *xadj, *adjncy, *adjwgt, *where, *id, *ed, *bndptr, *bndind;
   idxtype *moved, *swaps, *qnum;
-  float *nvwgt, *npwgts, mindiff[MAXNCON], origbal, minbal, newbal;
+  floattype *nvwgt, *npwgts, mindiff[MAXNCON], origbal, minbal, newbal;
   FPQueueType parts[MAXNCON][2];
   int higain, oldgain, mincut, initcut, newcut, mincutorder;
-  float rtpwgts[MAXNCON*2];
+  floattype rtpwgts[MAXNCON*2];
   KeyValueType *cand;
 int mype;
 MPI_Comm_rank(MPI_COMM_WORLD, &mype);
@@ -580,7 +580,7 @@ MPI_Comm_rank(MPI_COMM_WORLD, &mype);
 
     for (ii=0; ii<nbnd; ii++) {
       i = bndind[cand[ii].val];
-      FPQueueInsert(&parts[qnum[i]][where[i]], i, (float)(ed[i]-id[i]));
+      FPQueueInsert(&parts[qnum[i]][where[i]], i, (floattype)(ed[i]-id[i]));
     }
 
     for (nswaps=0; nswaps<nvtxs; nswaps++) {
@@ -639,14 +639,14 @@ MPI_Comm_rank(MPI_COMM_WORLD, &mype);
           }
           else { /* If it has not been moved, update its position in the queue */
             if (moved[k] == -1)
-              FPQueueUpdate(&parts[qnum[k]][where[k]], k, (float)oldgain, (float)(ed[k]-id[k]));
+              FPQueueUpdate(&parts[qnum[k]][where[k]], k, (floattype)oldgain, (floattype)(ed[k]-id[k]));
           }
         }
         else {
           if (ed[k] > 0) {  /* It will now become a boundary vertex */
             BNDInsert(nbnd, bndind, bndptr, k);
             if (moved[k] == -1)
-              FPQueueInsert(&parts[qnum[k]][where[k]], k, (float)(ed[k]-id[k]));
+              FPQueueInsert(&parts[qnum[k]][where[k]], k, (floattype)(ed[k]-id[k]));
           }
         }
       }
@@ -702,12 +702,12 @@ MPI_Comm_rank(MPI_COMM_WORLD, &mype);
 * This function selects the partition number and the queue from which
 * we will move vertices out
 **************************************************************************/
-void Serial_SelectQueue(int ncon, float *npwgts, float *tpwgts, int *from, int *cnum,
+void Serial_SelectQueue(int ncon, floattype *npwgts, floattype *tpwgts, int *from, int *cnum,
      FPQueueType queues[MAXNCON][2])
 {
   int i, part;
-  float maxgain=0.0;
-  float max = -1.0, maxdiff=0.0;
+  floattype maxgain=0.0;
+  floattype max = -1.0, maxdiff=0.0;
 int mype;
 MPI_Comm_rank(MPI_COMM_WORLD, &mype);
 
@@ -767,10 +767,10 @@ MPI_Comm_rank(MPI_COMM_WORLD, &mype);
 * This function checks if the balance achieved is better than the diff
 * For now, it uses a 2-norm measure
 **************************************************************************/
-int Serial_BetterBalance(int ncon, float *npwgts, float *tpwgts, float *diff)
+int Serial_BetterBalance(int ncon, floattype *npwgts, floattype *tpwgts, floattype *diff)
 {
   int i;
-  float ndiff[MAXNCON];
+  floattype ndiff[MAXNCON];
 
   for (i=0; i<ncon; i++)
     ndiff[i] = fabs(tpwgts[i]-npwgts[i]);
@@ -783,10 +783,10 @@ int Serial_BetterBalance(int ncon, float *npwgts, float *tpwgts, float *diff)
 /*************************************************************************
 * This function computes the load imbalance over all the constrains
 **************************************************************************/
-float Serial_Compute2WayHLoadImbalance(int ncon, float *npwgts, float *tpwgts)
+floattype Serial_Compute2WayHLoadImbalance(int ncon, floattype *npwgts, floattype *tpwgts)
 {
   int i;
-  float max=0.0, temp;
+  floattype max=0.0, temp;
 
   for (i=0; i<ncon; i++) {
     if (tpwgts[i] == 0.0)
@@ -803,12 +803,12 @@ float Serial_Compute2WayHLoadImbalance(int ncon, float *npwgts, float *tpwgts)
 /*************************************************************************
 * This function performs an edge-based FM refinement
 **************************************************************************/
-void Moc_Serial_Balance2Way(GraphType *graph, float *tpwgts, float lbfactor)
+void Moc_Serial_Balance2Way(GraphType *graph, floattype *tpwgts, floattype lbfactor)
 {
   int i, ii, j, k, kwgt, nvtxs, ncon, nbnd, nswaps, from, to, limit, tmp, cnum;
   idxtype *xadj, *adjncy, *adjwgt, *where, *id, *ed, *bndptr, *bndind;
   idxtype *moved, *swaps, *qnum;
-  float *nvwgt, *npwgts, mindiff[MAXNCON], origbal, minbal, newbal;
+  floattype *nvwgt, *npwgts, mindiff[MAXNCON], origbal, minbal, newbal;
   FPQueueType parts[MAXNCON][2];
   int higain, oldgain, mincut, newcut, mincutorder;
   int qsizes[MAXNCON][2];
@@ -886,7 +886,7 @@ void Moc_Serial_Balance2Way(GraphType *graph, float *tpwgts, float lbfactor)
 
   for (ii=0; ii<nvtxs; ii++) {
     i = cand[ii].val;
-    FPQueueInsert(&parts[qnum[i]][where[i]], i, (float)(ed[i]-id[i]));
+    FPQueueInsert(&parts[qnum[i]][where[i]], i, (floattype)(ed[i]-id[i]));
   }
 
   for (nswaps=0; nswaps<nvtxs; nswaps++) {
@@ -942,7 +942,7 @@ void Moc_Serial_Balance2Way(GraphType *graph, float *tpwgts, float lbfactor)
 
       /* Update the queue position */
       if (moved[k] == -1)
-        FPQueueUpdate(&parts[qnum[k]][where[k]], k, (float)(oldgain), (float)(ed[k]-id[k]));
+        FPQueueUpdate(&parts[qnum[k]][where[k]], k, (floattype)(oldgain), (floattype)(ed[k]-id[k]));
 
       /* Update its boundary information */
       if (ed[k] == 0 && bndptr[k] != -1)
@@ -1002,13 +1002,13 @@ void Moc_Serial_Balance2Way(GraphType *graph, float *tpwgts, float lbfactor)
 * It moves vertices from the domain that is overweight to the one that
 * is underweight.
 **************************************************************************/
-void Moc_Serial_Init2WayBalance(GraphType *graph, float *tpwgts)
+void Moc_Serial_Init2WayBalance(GraphType *graph, floattype *tpwgts)
 {
   int i, ii, j, k;
   int kwgt, nvtxs, nbnd, ncon, nswaps, from, to, cnum, tmp;
   idxtype *xadj, *adjncy, *adjwgt, *where, *id, *ed, *bndptr, *bndind;
   idxtype *qnum;
-  float *nvwgt, *npwgts;
+  floattype *nvwgt, *npwgts;
   FPQueueType parts[MAXNCON][2];
   int higain, oldgain, mincut;
   KeyValueType *cand;
@@ -1053,9 +1053,9 @@ void Moc_Serial_Init2WayBalance(GraphType *graph, float *tpwgts)
     i = cand[ii].val;
     if (where[i] == from) {
       if (ed[i] > 0)
-        FPQueueInsert(&parts[qnum[i]][0], i, (float)(ed[i]-id[i]));
+        FPQueueInsert(&parts[qnum[i]][0], i, (floattype)(ed[i]-id[i]));
       else
-        FPQueueInsert(&parts[qnum[i]][1], i, (float)(ed[i]-id[i]));
+        FPQueueInsert(&parts[qnum[i]][1], i, (floattype)(ed[i]-id[i]));
     }
   }
 
@@ -1098,10 +1098,10 @@ void Moc_Serial_Init2WayBalance(GraphType *graph, float *tpwgts)
       if (where[k] == from) {
         if (ed[k] > 0 && bndptr[k] == -1) {  /* It moves in boundary */
           FPQueueDelete(&parts[qnum[k]][1], k);
-          FPQueueInsert(&parts[qnum[k]][0], k, (float)(ed[k]-id[k]));
+          FPQueueInsert(&parts[qnum[k]][0], k, (floattype)(ed[k]-id[k]));
         }
         else { /* It must be in the boundary already */
-          FPQueueUpdate(&parts[qnum[k]][0], k, (float)(oldgain), (float)(ed[k]-id[k]));
+          FPQueueUpdate(&parts[qnum[k]][0], k, (floattype)(oldgain), (floattype)(ed[k]-id[k]));
         }
       }
 
@@ -1129,11 +1129,11 @@ void Moc_Serial_Init2WayBalance(GraphType *graph, float *tpwgts)
 * This function selects the partition number and the queue from which
 * we will move vertices out
 **************************************************************************/
-int Serial_SelectQueueOneWay(int ncon, float *npwgts, float *tpwgts, int from,
+int Serial_SelectQueueOneWay(int ncon, floattype *npwgts, floattype *tpwgts, int from,
     FPQueueType queues[MAXNCON][2])
 {
   int i, cnum=-1;
-  float max=0.0;
+  floattype max=0.0;
 
   for (i=0; i<ncon; i++) {
     if (npwgts[from*ncon+i]-tpwgts[from*ncon+i] >= max &&
@@ -1154,7 +1154,7 @@ void Moc_Serial_Compute2WayPartitionParams(GraphType *graph)
 {
   int i, j, me, nvtxs, ncon, nbnd, mincut;
   idxtype *xadj, *adjncy, *adjwgt;
-  float *nvwgt, *npwgts;
+  floattype *nvwgt, *npwgts;
   idxtype *id, *ed, *where;
   idxtype *bndptr, *bndind;
 
@@ -1203,7 +1203,7 @@ void Moc_Serial_Compute2WayPartitionParams(GraphType *graph)
 * This function checks if the vertex weights of two vertices are below
 * a given set of values
 **************************************************************************/
-int Serial_AreAnyVwgtsBelow(int ncon, float alpha, float *vwgt1, float beta, float *vwgt2, float *limit)
+int Serial_AreAnyVwgtsBelow(int ncon, floattype alpha, floattype *vwgt1, floattype beta, floattype *vwgt2, floattype *limit)
 {
   int i;
 

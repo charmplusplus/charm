@@ -41,7 +41,7 @@ FRENAME(ParMETIS_V3_AdaptiveRepart,
 	parmetis_v3_adaptiverepart__,
 	(idxtype *vtxdist, idxtype *xadj, idxtype *adjncy, idxtype *vwgt,
 	 idxtype *vsize, idxtype *adjwgt, int *wgtflag, int *numflag, int *ncon,
-	 int *nparts, float *tpwgts, float *ubvec, float *ipc2redist,
+	 int *nparts, floattype *tpwgts, floattype *ubvec, floattype *ipc2redist,
 	 int *options, int *edgecut, idxtype *part, MPI_Comm *comm),
 	(vtxdist, xadj, adjncy, vwgt, vsize, adjwgt, wgtflag, numflag, ncon,
 	 nparts, tpwgts, ubvec, ipc2redist, options, edgecut, part, comm)
@@ -53,8 +53,8 @@ FRENAME(ParMETIS_V3_PartGeomKway,
 	parmetis_v3_partgeomkway_,
 	parmetis_v3_partgeomkway__,
         (idxtype *vtxdist, idxtype *xadj, idxtype *adjncy, idxtype *vwgt, 
-	 idxtype *adjwgt, int *wgtflag, int *numflag, int *ndims, float *xyz, 
-	 int *ncon, int *nparts, float *tpwgts, float *ubvec, int *options, 
+	 idxtype *adjwgt, int *wgtflag, int *numflag, int *ndims, floattype *xyz, 
+	 int *ncon, int *nparts, floattype *tpwgts, floattype *ubvec, int *options, 
 	 int *edgecut, idxtype *part, MPI_Comm *comm),
         (vtxdist, xadj, adjncy, vwgt, adjwgt, wgtflag, numflag, ndims, xyz, 
 	 ncon, nparts, tpwgts, ubvec, options, edgecut, part, comm)
@@ -65,7 +65,7 @@ FRENAME(ParMETIS_V3_PartGeom,
 	parmetis_v3_partgeom,
 	parmetis_v3_partgeom_,
 	parmetis_v3_partgeom__,
-	(idxtype *vtxdist, int *ndims, float *xyz, idxtype *part, MPI_Comm *comm),
+	(idxtype *vtxdist, int *ndims, floattype *xyz, idxtype *part, MPI_Comm *comm),
 	(vtxdist, ndims, xyz, part, comm)
 )
 
@@ -75,7 +75,7 @@ FRENAME(ParMETIS_V3_PartKway,
 	parmetis_v3_partkway_,
 	parmetis_v3_partkway__,
 	(idxtype *vtxdist, idxtype *xadj, idxtype *adjncy, idxtype *vwgt, idxtype *adjwgt, 
-	 int *wgtflag, int *numflag, int *ncon, int *nparts, float *tpwgts, float *ubvec, 
+	 int *wgtflag, int *numflag, int *ncon, int *nparts, floattype *tpwgts, floattype *ubvec, 
 	 int *options, int *edgecut, idxtype *part, MPI_Comm *comm),
 	(vtxdist, xadj, adjncy, vwgt, adjwgt, wgtflag, numflag, ncon, nparts, tpwgts, 
 	 ubvec, options, edgecut, part, comm)
@@ -97,8 +97,8 @@ FRENAME(ParMETIS_V3_PartMeshKway,
 	parmetis_v3_partmeshkway_,
 	parmetis_v3_partmeshkway__,
 	(idxtype *elmdist, idxtype *eptr, idxtype *eind, idxtype *elmwgt, int *wgtflag, 
-	 int *numflag, int *ncon, int *ncommonnodes, int *nparts, float *tpwgts, 
-	 float *ubvec, int *options, int *edgecut, idxtype *part, MPI_Comm *comm),
+	 int *numflag, int *ncon, int *ncommonnodes, int *nparts, floattype *tpwgts, 
+	 floattype *ubvec, int *options, int *edgecut, idxtype *part, MPI_Comm *comm),
 	(elmdist, eptr, eind, elmwgt, wgtflag, numflag, ncon, ncommonnodes, nparts, tpwgts, 
 	 ubvec, options, edgecut, part, comm)
 )
@@ -119,7 +119,7 @@ FRENAME(ParMETIS_V3_RefineKway,
         parmetis_v3_refinekway_,
         parmetis_v3_refinekway__,
         (idxtype *vtxdist, idxtype *xadj, idxtype *adjncy, idxtype *vwgt, idxtype *adjwgt, 
-	 int *wgtflag, int *numflag, int *ncon, int *nparts, float *tpwgts, float *ubvec, 
+	 int *wgtflag, int *numflag, int *ncon, int *nparts, floattype *tpwgts, floattype *ubvec, 
 	 int *options, int *edgecut, idxtype *part, MPI_Comm *comm),
         (vtxdist, xadj, adjncy, vwgt, adjwgt, wgtflag, numflag, ncon, nparts, tpwgts, 
 	 ubvec, options, edgecut, part, comm)
@@ -147,7 +147,7 @@ FRENAME(ParMETIS_PartGeomKway,
         parmetis_partgeomkway_,
         parmetis_partgeomkway__,
         (idxtype *vtxdist, idxtype *xadj, idxtype *adjncy, idxtype *vwgt, idxtype *adjwgt, 
-	 int *wgtflag, int *numflag, int *ndims, float *xyz, int *nparts, int *options, 
+	 int *wgtflag, int *numflag, int *ndims, floattype *xyz, int *nparts, int *options, 
 	 int *edgecut, idxtype *part, MPI_Comm *comm),
         (vtxdist, xadj, adjncy, vwgt, adjwgt, wgtflag, numflag, ndims, xyz, nparts, options, 
 	 edgecut, part, comm)
@@ -158,7 +158,7 @@ FRENAME(ParMETIS_PartGeom,
 	parmetis_partgeom,
 	parmetis_partgeom_,
 	parmetis_partgeom__,
-	(idxtype *vtxdist, int *ndims, float *xyz, idxtype *part, MPI_Comm *comm),
+	(idxtype *vtxdist, int *ndims, floattype *xyz, idxtype *part, MPI_Comm *comm),
 	(vtxdist, ndims, xyz, part, comm)
 )
 
@@ -168,7 +168,7 @@ FRENAME(ParMETIS_PartGeomRefine,
 	parmetis_partgeomrefine_,
 	parmetis_partgeomrefine__,
         (idxtype *vtxdist, idxtype *xadj, idxtype *adjncy, idxtype *vwgt, idxtype *adjwgt, 
-	 int *wgtflag, int *numflag, int *ndims, float *xyz, int *options, int *edgecut, 
+	 int *wgtflag, int *numflag, int *ndims, floattype *xyz, int *options, int *edgecut, 
 	 idxtype *part, MPI_Comm *comm),
         (vtxdist, xadj, adjncy, vwgt, adjwgt, wgtflag, numflag, ndims, xyz, options, 
 	 edgecut, part, comm)
@@ -266,7 +266,7 @@ FRENAME(PARGKMETIS,
         pargkmetis_,
         pargkmetis__,
         (idxtype *vtxdist, idxtype *xadj, idxtype *vwgt, idxtype *adjncy, idxtype *adjwgt,
-         int ndims, float *xyz, idxtype *part, int *options, MPI_Comm comm),
+         int ndims, floattype *xyz, idxtype *part, int *options, MPI_Comm comm),
         (vtxdist, xadj, vwgt, adjncy, adjwgt, ndims, xyz, part, options, comm)
 )	
 
@@ -276,7 +276,7 @@ FRENAME(PARGRMETIS,
 	pargrmetis_,
 	pargrmetis__,
         (idxtype *vtxdist, idxtype *xadj, idxtype *vwgt, idxtype *adjncy, idxtype *adjwgt,
-         int ndims, float *xyz, idxtype *part, int *options, MPI_Comm comm),
+         int ndims, floattype *xyz, idxtype *part, int *options, MPI_Comm comm),
         (vtxdist, xadj, vwgt, adjncy, adjwgt, ndims, xyz, part, options, comm)
 )
 
@@ -285,7 +285,7 @@ FRENAME(PARGMETIS,
 	pargmetis,
 	pargmetis_,
 	pargmetis__,
-	(idxtype *vtxdist, idxtype *xadj, idxtype *adjncy, int ndims, float *xyz,
+	(idxtype *vtxdist, idxtype *xadj, idxtype *adjncy, int ndims, floattype *xyz,
          idxtype *part, int *options, MPI_Comm comm),
 	(vtxdist, xadj, adjncy, ndims, xyz, part, options, comm)
 )

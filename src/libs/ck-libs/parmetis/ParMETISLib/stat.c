@@ -19,11 +19,11 @@
 /*************************************************************************
 * This function computes the balance of the partitioning
 **************************************************************************/
-void Moc_ComputeSerialBalance(CtrlType *ctrl, GraphType *graph, idxtype *where, float *ubvec)
+void Moc_ComputeSerialBalance(CtrlType *ctrl, GraphType *graph, idxtype *where, floattype *ubvec)
 {
   int i, j, nvtxs, ncon, nparts;
   idxtype *pwgts, *tvwgts, *vwgt;
-  float *tpwgts, maximb;
+  floattype *tpwgts, maximb;
 
   nvtxs  = graph->nvtxs;
   ncon   = graph->ncon;
@@ -45,7 +45,7 @@ void Moc_ComputeSerialBalance(CtrlType *ctrl, GraphType *graph, idxtype *where, 
   for (j=0; j<ncon; j++) {
     maximb = 0.0;
     for (i=0; i<nparts; i++)
-      maximb = amax(maximb, (1.0+(float)pwgts[i*ncon+j])/(1.0+(tpwgts[i*ncon+j]*(float)tvwgts[j])));
+      maximb = amax(maximb, (1.0+(floattype)pwgts[i*ncon+j])/(1.0+(tpwgts[i*ncon+j]*(floattype)tvwgts[j])));
     ubvec[j] = maximb;
   }
 
@@ -56,12 +56,12 @@ void Moc_ComputeSerialBalance(CtrlType *ctrl, GraphType *graph, idxtype *where, 
 /*************************************************************************
 * This function computes the balance of the partitioning
 **************************************************************************/
-void Moc_ComputeParallelBalance(CtrlType *ctrl, GraphType *graph, idxtype *where, float *ubvec)
+void Moc_ComputeParallelBalance(CtrlType *ctrl, GraphType *graph, idxtype *where, floattype *ubvec)
 {
   int i, j, nvtxs, ncon, nparts;
-  float *nvwgt, *lnpwgts, *gnpwgts;
-  float *tpwgts, maximb;
-  float lminvwgts[MAXNCON], gminvwgts[MAXNCON];
+  floattype *nvwgt, *lnpwgts, *gnpwgts;
+  floattype *tpwgts, maximb;
+  floattype lminvwgts[MAXNCON], gminvwgts[MAXNCON];
 
   ncon   = graph->ncon;
   nvtxs  = graph->nvtxs;
@@ -83,8 +83,8 @@ void Moc_ComputeParallelBalance(CtrlType *ctrl, GraphType *graph, idxtype *where
     }
   }
 
-  MPI_Allreduce((void *)(lnpwgts), (void *)(gnpwgts), nparts*ncon, MPI_FLOAT, MPI_SUM, ctrl->comm);
-  MPI_Allreduce((void *)(lminvwgts), (void *)(gminvwgts), ncon, MPI_FLOAT, MPI_MIN, ctrl->comm);
+  MPI_Allreduce((void *)(lnpwgts), (void *)(gnpwgts), nparts*ncon, MPI_DOUBLE, MPI_SUM, ctrl->comm);
+  MPI_Allreduce((void *)(lminvwgts), (void *)(gminvwgts), ncon, MPI_DOUBLE, MPI_MIN, ctrl->comm);
 
   /* The +gminvwgts[j] in the following code is to deal with bad cases of tpwgts[i*ncon+j] == 0 */
   for (j=0; j<ncon; j++) {
@@ -103,7 +103,7 @@ void Moc_ComputeParallelBalance(CtrlType *ctrl, GraphType *graph, idxtype *where
 /*************************************************************************
 * This function prints a matrix
 **************************************************************************/
-void Moc_PrintThrottleMatrix(CtrlType *ctrl, GraphType *graph, float *matrix)
+void Moc_PrintThrottleMatrix(CtrlType *ctrl, GraphType *graph, floattype *matrix)
 {
   int i, j;
 
@@ -130,19 +130,19 @@ void Moc_PrintThrottleMatrix(CtrlType *ctrl, GraphType *graph, float *matrix)
 /*************************************************************************
 *  This function computes stats for refinement
 **************************************************************************/
-void Moc_ComputeRefineStats(CtrlType *ctrl, GraphType *graph, float *ubvec)
+void Moc_ComputeRefineStats(CtrlType *ctrl, GraphType *graph, floattype *ubvec)
 {
   int h, i, j, k;
   int nvtxs, ncon;
   idxtype *xadj, *adjncy, *adjwgt, *where;
-  float *nvwgt, *lnpwgts, *gnpwgts;
+  floattype *nvwgt, *lnpwgts, *gnpwgts;
   RInfoType *rinfo;
   int mype = ctrl->mype, nparts = ctrl->nparts;
   idxtype *gborder, *border, *gfrom, *from, *gto, *to, *connect, *gconnect;
   idxtype gain[20] = {0}, ggain[20];
   int lnborders, gnborders;
   int bestgain, pmoves, gpmoves, other;
-  float tpwgts[MAXNCON], badmaxpwgt[MAXNCON];
+  floattype tpwgts[MAXNCON], badmaxpwgt[MAXNCON];
   int HIST_FACTOR = graph->level + 1;
 
   nvtxs = graph->nvtxs;
@@ -165,7 +165,7 @@ void Moc_ComputeRefineStats(CtrlType *ctrl, GraphType *graph, float *ubvec)
   gto = idxmalloc(nparts, "CRS: gto");
 
   for (h=0; h<ncon; h++) {
-    tpwgts[h] = ssum_strd(nparts, gnpwgts+h, ncon)/(float)(nparts);
+    tpwgts[h] = ssum_strd(nparts, gnpwgts+h, ncon)/(floattype)(nparts);
     badmaxpwgt[h] = ubvec[h]*tpwgts[h];
   }
 
@@ -188,7 +188,7 @@ void Moc_ComputeRefineStats(CtrlType *ctrl, GraphType *graph, float *ubvec)
     printf("subdomain imbalance:\n");
     for (h=0; h<ncon; h++) {
       for (i=0; i<nparts; i++)
-        printf("%9.3f ", gnpwgts[i*ncon+h] * (float)(nparts));
+        printf("%9.3f ", gnpwgts[i*ncon+h] * (floattype)(nparts));
       printf("\n");
     }
     printf("\n");

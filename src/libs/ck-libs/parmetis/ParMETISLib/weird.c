@@ -28,7 +28,7 @@ void PartitionSmallGraph(CtrlType *ctrl, GraphType *graph, WorkSpaceType *wspace
   int lpecut[2], gpecut[2];
   GraphType *agraph;
   int *sendcounts, *displs;
-  float *mytpwgts, *gnpwgts, *lnpwgts;
+  floattype *mytpwgts, *gnpwgts, *lnpwgts;
 
   ncon = graph->ncon;
   nparts = ctrl->nparts;
@@ -91,7 +91,7 @@ void PartitionSmallGraph(CtrlType *ctrl, GraphType *graph, WorkSpaceType *wspace
     for (h=0; h<ncon; h++)
       lnpwgts[me*ncon+h] += graph->nvwgt[i*ncon+h];
   }
-  MPI_Allreduce((void *)lnpwgts, (void *)gnpwgts, nparts*ncon, MPI_FLOAT, MPI_SUM, ctrl->comm);
+  MPI_Allreduce((void *)lnpwgts, (void *)gnpwgts, nparts*ncon, MPI_DOUBLE, MPI_SUM, ctrl->comm);
   GKfree((void**)&mypart, (void**)&sendcounts, (void**)&displs, LTERM);
   FreeGraph(agraph);
 
@@ -105,13 +105,13 @@ void PartitionSmallGraph(CtrlType *ctrl, GraphType *graph, WorkSpaceType *wspace
 **************************************************************************/
 void CheckInputs(int partType, int npes, int dbglvl, int *wgtflag, int *iwgtflag,
                  int *numflag, int *inumflag, int *ncon, int *incon, int *nparts, 
-		 int *inparts, float *tpwgts, float **itpwgts, float *ubvec, 
-		 float *iubvec, float *ipc2redist, float *iipc2redist, int *options, 
+		 int *inparts, floattype *tpwgts, floattype **itpwgts, floattype *ubvec, 
+		 floattype *iubvec, floattype *ipc2redist, floattype *iipc2redist, int *options, 
 		 int *ioptions, idxtype *part, MPI_Comm *comm)
 {
   int i, j;
   int doweabort, doiabort = 0;
-  float tsum, *myitpwgts;
+  floattype tsum, *myitpwgts;
   int mgcnums[5] = {-1, 2, 3, 4, 2};
 
   /**************************************/
@@ -187,8 +187,8 @@ void CheckInputs(int partType, int npes, int dbglvl, int *wgtflag, int *iwgtflag
   /**************************************/
   myitpwgts = *itpwgts = fmalloc((*inparts)*(*incon), "CheckInputs: itpwgts");
   if (tpwgts == NULL) {
-    sset((*inparts)*(*incon), 1.0/(float)(*inparts), myitpwgts);
-    IFSET(dbglvl, DBG_INFO, printf("WARNING: tpwgts is NULL.  Setting all array elements to %.3f.\n", 1.0/(float)(*inparts)));
+    sset((*inparts)*(*incon), 1.0/(floattype)(*inparts), myitpwgts);
+    IFSET(dbglvl, DBG_INFO, printf("WARNING: tpwgts is NULL.  Setting all array elements to %.3f.\n", 1.0/(floattype)(*inparts)));
   }
   else {
     for (i=0; i<*incon; i++) {
@@ -212,7 +212,7 @@ void CheckInputs(int partType, int npes, int dbglvl, int *wgtflag, int *iwgtflag
   }
   else {
     for (i=0; i<*incon; i++) {
-      if (ubvec[i] < 1.0 || ubvec[i] > (float)(*inparts)) {
+      if (ubvec[i] < 1.0 || ubvec[i] > (floattype)(*inparts)) {
         iubvec[i] = 1.05;
         IFSET(dbglvl, DBG_INFO, printf("WARNING: bad value for ubvec[%d]: %.3f.  Setting value to 1.05.[%d]\n", i, ubvec[i], *inparts));
       }

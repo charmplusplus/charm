@@ -25,7 +25,7 @@ void SetUpConnectGraph(GraphType *graph, MatrixType *matrix, idxtype *workspace)
   idxtype *xadj, *adjncy, *where;
   idxtype *rowptr, *colind;
   idxtype *pcounts, *perm, *marker;
-  float *values;
+  floattype *values;
 
   nvtxs = graph->nvtxs;
   xadj = graph->xadj;
@@ -71,7 +71,7 @@ void SetUpConnectGraph(GraphType *graph, MatrixType *matrix, idxtype *workspace)
         }
       }
     }
-    values[rowptr[ii]] = (float)(k-rowptr[ii]-1);
+    values[rowptr[ii]] = (floattype)(k-rowptr[ii]-1);
     rowptr[ii+1] = k;
   }
   matrix->nnzs = rowptr[nrows];
@@ -146,12 +146,12 @@ int Mc_ComputeSerialTotalV(GraphType *graph, idxtype *home)
 /*************************************************************************
 *  This function computes the load for each subdomain
 **************************************************************************/
-void ComputeLoad(GraphType *graph, int nparts, float *load, float *tpwgts, int index)
+void ComputeLoad(GraphType *graph, int nparts, floattype *load, floattype *tpwgts, int index)
 {
   int i;
   int nvtxs, ncon;
   idxtype *where;
-  float *nvwgt;
+  floattype *nvwgt;
 
   nvtxs = graph->nvtxs;
   ncon = graph->ncon;
@@ -176,13 +176,13 @@ void ComputeLoad(GraphType *graph, int nparts, float *load, float *tpwgts, int i
 /*************************************************************************
 * This function implements the CG solver used during the directed diffusion
 **************************************************************************/
-void ConjGrad2(MatrixType *A, float *b, float *x, float tol, float *workspace)
+void ConjGrad2(MatrixType *A, floattype *b, floattype *x, floattype tol, floattype *workspace)
 {
   int i, k, n;
-  float *p, *r, *q, *z, *M;
-  float alpha, beta, rho, rho_1 = -1.0, error, bnrm2, tmp;
+  floattype *p, *r, *q, *z, *M;
+  floattype alpha, beta, rho, rho_1 = -1.0, error, bnrm2, tmp;
   idxtype *rowptr, *colind;
-  float *values;
+  floattype *values;
 
   n = A->nrows;
   rowptr = A->rowptr;
@@ -255,7 +255,7 @@ void ConjGrad2(MatrixType *A, float *b, float *x, float tol, float *workspace)
 /*************************************************************************
 * This function performs Matrix-Vector multiplication
 **************************************************************************/
-void mvMult2(MatrixType *A, float *v, float *w)
+void mvMult2(MatrixType *A, floattype *v, floattype *w)
 {
   int i, j;
 
@@ -273,8 +273,8 @@ void mvMult2(MatrixType *A, float *v, float *w)
 /*************************************************************************
 * This function sets up the transfer vectors
 **************************************************************************/
-void ComputeTransferVector(int ncon, MatrixType *matrix, float *solution,
-  float *transfer, int index)
+void ComputeTransferVector(int ncon, MatrixType *matrix, floattype *solution,
+  floattype *transfer, int index)
 {
   int j, k;
   int nrows;

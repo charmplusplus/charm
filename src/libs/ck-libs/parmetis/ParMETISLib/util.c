@@ -102,14 +102,14 @@ idxtype *idxmalloc(int n, char *msg)
 
 
 /*************************************************************************
-* The following function allocates an array of float 
+* The following function allocates an array of floattype 
 **************************************************************************/
-float *fmalloc(int n, char *msg)
+floattype *fmalloc(int n, char *msg)
 {
   if (n == 0)
     return NULL;
 
-  return (float *)GKmalloc(sizeof(float)*n, msg);
+  return (floattype *)GKmalloc(sizeof(floattype)*n, msg);
 }
 
 
@@ -281,10 +281,10 @@ int isum(int n, int *x)
 /*************************************************************************
 * This function computes a 2-norm
 **************************************************************************/
-float snorm2(int n, float *v)
+floattype snorm2(int n, floattype *v)
 {
   int i;
-  float partial = 0;
+  floattype partial = 0;
  
   for (i = 0; i<n; i++)
     partial += v[i] * v[i];
@@ -297,10 +297,10 @@ float snorm2(int n, float *v)
 /*************************************************************************
 * This function computes a 2-norm
 **************************************************************************/
-float sdot(int n, float *x, float *y)
+floattype sdot(int n, floattype *x, floattype *y)
 {
   int i;
-  float partial = 0;
+  floattype partial = 0;
  
   for (i = 0; i<n; i++)
     partial += x[i] * y[i];
@@ -312,7 +312,7 @@ float sdot(int n, float *x, float *y)
 /*************************************************************************
 * This function computes a 2-norm
 **************************************************************************/
-void saxpy(int n, float alpha, float *x, float *y)
+void saxpy(int n, floattype alpha, floattype *x, floattype *y)
 {
   int i;
  
@@ -480,7 +480,7 @@ int log2Int(int a)
 /*************************************************************************
 * These functions set the values of a vector
 **************************************************************************/
-float *sset(int n, float val, float *x)
+floattype *sset(int n, floattype val, floattype *x)
 {
   int i;
 
@@ -509,7 +509,7 @@ int iamax(int n, int *x)
 /*************************************************************************
 * These functions return the index of the maximum element in a vector
 **************************************************************************/
-int samax_strd(int n, float *x, int incx)
+int samax_strd(int n, floattype *x, int incx)
 {
   int i;
   int max=0;
@@ -525,7 +525,7 @@ int samax_strd(int n, float *x, int incx)
 /*************************************************************************
 * These functions return the index of the maximum element in a vector
 **************************************************************************/
-int sfamax(int n, float *x)
+int sfamax(int n, floattype *x)
 {
   int i;
   int max=0;
@@ -541,7 +541,7 @@ int sfamax(int n, float *x)
 /*************************************************************************
 * These functions return the index of the maximum element in a vector
 **************************************************************************/
-int samin_strd(int n, float *x, int incx)
+int samin_strd(int n, floattype *x, int incx)
 {
   int i;
   int min=0;
@@ -587,37 +587,37 @@ int idxamin_strd(int n, idxtype *x, int incx)
 /*************************************************************************
 * This function returns the average value of an array
 **************************************************************************/
-float idxavg(int n, idxtype *x)
+floattype idxavg(int n, idxtype *x)
 {
   int i;
-  float retval = 0.0;
+  floattype retval = 0.0;
 
   for (i=0; i<n; i++)
-    retval += (float)(x[i]);
+    retval += (floattype)(x[i]);
 
-  return retval / (float)(n);
+  return retval / (floattype)(n);
 }
 
 
 /*************************************************************************
 * This function returns the average value of an array
 **************************************************************************/
-float savg(int n, float *x)
+floattype savg(int n, floattype *x)
 {
   int i;
-  float retval = 0.0;
+  floattype retval = 0.0;
 
   for (i=0; i<n; i++)
     retval += x[i];
 
-  return retval / (float)(n);
+  return retval / (floattype)(n);
 }
 
 
 /*************************************************************************
 * These functions return the index of the maximum element in a vector
 **************************************************************************/
-int samax(int n, float *x)
+int samax(int n, floattype *x)
 {
   int i, max=0;
 
@@ -631,10 +631,10 @@ int samax(int n, float *x)
 /*************************************************************************
 * These functions return the index of the maximum element in a vector
 **************************************************************************/
-int sfavg(int n, float *x)
+int sfavg(int n, floattype *x)
 {
   int i;
-  float total = 0.0;
+  floattype total = 0.0;
 
   if (n == 0)
     return 0.0;
@@ -642,14 +642,14 @@ int sfavg(int n, float *x)
   for (i=0; i<n; i++)
     total += fabs(x[i]);
 
-  return total / (float) n;
+  return total / (floattype) n;
 }
 
 
 /*************************************************************************
 * These functions return the index of the almost maximum element in a vector
 **************************************************************************/
-int samax2(int n, float *x)
+int samax2(int n, floattype *x)
 {
   int i, max1, max2;
 
@@ -678,7 +678,7 @@ int samax2(int n, float *x)
 /*************************************************************************
 * These functions return the index of the minimum element in a vector
 **************************************************************************/
-int samin(int n, float *x)
+int samin(int n, floattype *x)
 {
   int i, min=0;
 
@@ -717,10 +717,10 @@ void idxadd(int n, idxtype *x, idxtype *y)
 /*************************************************************************
 * This function sums the entries in an array
 **************************************************************************/
-float ssum(int n, float *x)
+floattype ssum(int n, floattype *x)
 {
   int i;
-  float sum = 0.0;
+  floattype sum = 0.0;
 
   for (i=0; i<n; i++)
     sum += x[i];
@@ -731,10 +731,10 @@ float ssum(int n, float *x)
 /*************************************************************************
 * This function sums the entries in an array
 **************************************************************************/
-float ssum_strd(int n, float *x, int incx)
+floattype ssum_strd(int n, floattype *x, int incx)
 {
   int i;
-  float sum = 0.0;
+  floattype sum = 0.0;
 
   for (i=0; i<n; i++, x+=incx)
     sum += *x;
@@ -745,7 +745,7 @@ float ssum_strd(int n, float *x, int incx)
 /*************************************************************************
 * This function sums the entries in an array
 **************************************************************************/
-void sscale(int n, float alpha, float *x)
+void sscale(int n, floattype alpha, floattype *x)
 {
   int i;
 
@@ -757,7 +757,7 @@ void sscale(int n, float alpha, float *x)
 /*************************************************************************
 * This function negates the entries in an array
 **************************************************************************/
-void saneg(int n, float *x)
+void saneg(int n, floattype *x)
 {
   int i;
 
@@ -771,10 +771,10 @@ void saneg(int n, float *x)
 * This function checks if v+u2 provides a better balance in the weight
 * vector that v+u1
 **************************************************************************/
-float BetterVBalance(int ncon, float *vwgt, float *u1wgt, float *u2wgt)
+floattype BetterVBalance(int ncon, floattype *vwgt, floattype *u1wgt, floattype *u2wgt)
 {
   int i;
-  float sum1, sum2, diff1, diff2;
+  floattype sum1, sum2, diff1, diff2;
 
   if (ncon == 1)
     return u1wgt[0] - u1wgt[0];
@@ -803,12 +803,12 @@ float BetterVBalance(int ncon, float *vwgt, float *u1wgt, float *u2wgt)
 * partitions will improve by moving the vertex v from pfrom to pto,
 * subject to the target partition weights of tfrom, and tto respectively
 **************************************************************************/
-int IsHBalanceBetterFT(int ncon, float *pfrom, float *pto, float *nvwgt, float *ubvec)
+int IsHBalanceBetterFT(int ncon, floattype *pfrom, floattype *pto, floattype *nvwgt, floattype *ubvec)
 {
   int i;
-  float blb1=0.0, alb1=0.0, sblb=0.0, salb=0.0;
-  float blb2=0.0, alb2=0.0;
-  float temp;
+  floattype blb1=0.0, alb1=0.0, sblb=0.0, salb=0.0;
+  floattype blb2=0.0, alb2=0.0;
+  floattype temp;
 
   for (i=0; i<ncon; i++) {
     temp = amax(pfrom[i], pto[i])/ubvec[i];
@@ -848,10 +848,10 @@ int IsHBalanceBetterFT(int ncon, float *pfrom, float *pto, float *nvwgt, float *
 * to pt1 subject to their target weights of tt1 and tt2, respectively
 * This routine takes into account the weight of the vertex in question
 **************************************************************************/
-int IsHBalanceBetterTT(int ncon, float *pt1, float *pt2, float *nvwgt, float *ubvec)
+int IsHBalanceBetterTT(int ncon, floattype *pt1, floattype *pt2, floattype *nvwgt, floattype *ubvec)
 {
   int i;
-  float m11=0.0, m12=0.0, m21=0.0, m22=0.0, sm1=0.0, sm2=0.0, temp;
+  floattype m11=0.0, m12=0.0, m21=0.0, m22=0.0, sm1=0.0, sm2=0.0, temp;
 
   for (i=0; i<ncon; i++) {
     temp = (pt1[i]+nvwgt[i])/ubvec[i];
@@ -923,21 +923,21 @@ int imyvalkeycompare(const void *fptr, const void *sptr)
 
 
 /*************************************************************************
-* The following function allocates and sets an array of floats
+* The following function allocates and sets an array of floattypes
 **************************************************************************/
-float *fsmalloc(int n, float fval, char *msg)
+floattype *fsmalloc(int n, floattype fval, char *msg)
 {
   if (n == 0)
     return NULL;
 
-  return sset(n, fval, (float *)GKmalloc(sizeof(float)*n, msg));
+  return sset(n, fval, (floattype *)GKmalloc(sizeof(floattype)*n, msg));
 }
 
 
 /*************************************************************************
 * This function computes a 2-norm
 **************************************************************************/
-void saxpy2(int n, float alpha, float *x, int incx, float *y, int incy)
+void saxpy2(int n, floattype alpha, floattype *x, int incx, floattype *y, int incy)
 {
   int i;
 
@@ -947,9 +947,9 @@ void saxpy2(int n, float alpha, float *x, int incx, float *y, int incy)
 
 
 /*************************************************************************
-* This function computes the top three values of a float array
+* This function computes the top three values of a floattype array
 **************************************************************************/
-void GetThreeMax(int n, float *x, int *first, int *second, int *third)
+void GetThreeMax(int n, floattype *x, int *first, int *second, int *third)
 {
   int i;
 

@@ -27,11 +27,11 @@ void Moc_GlobalMatch_Balance(CtrlType *ctrl, GraphType *graph, WorkSpaceType *ws
   idxtype *match, *rmatch, *smatch;
   idxtype *peind, *sendptr, *recvptr;
   idxtype *perm, *iperm, *nperm, *changed;
-  float *nvwgt, maxnvwgt;
+  floattype *nvwgt, maxnvwgt;
   int *nreqs_pe;
   KeyValueType *match_requests, *match_granted, *pe_requests;
 
-  maxnvwgt = 1.0/((float)(ctrl->nparts)*MAXNVWGT_FACTOR);
+  maxnvwgt = 1.0/((floattype)(ctrl->nparts)*MAXNVWGT_FACTOR);
 
   graph->match_type = MATCH_GLOBAL;
 

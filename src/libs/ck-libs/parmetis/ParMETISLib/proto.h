@@ -42,7 +42,7 @@ void Moc_KWayBalance(CtrlType *, GraphType *, WorkSpaceType *, int);
 /* remap.c */
 void ParallelReMapGraph(CtrlType *, GraphType *, WorkSpaceType *);
 void ParallelTotalVReMap(CtrlType *, idxtype *, idxtype *, WorkSpaceType *, int, int);
-int SimilarTpwgts(float *, int, int, int);
+int SimilarTpwgts(floattype *, int, int, int);
 
 /* move.c */
 GraphType *Moc_MoveGraph(CtrlType *, GraphType *, WorkSpaceType *);
@@ -72,13 +72,13 @@ void Mc_LocalMatch_HEM(CtrlType *, GraphType *, WorkSpaceType *);
 void Mc_Local_CreateCoarseGraph(CtrlType *, GraphType *, WorkSpaceType *, int);
 
 /* wave.c */
-float WavefrontDiffusion(CtrlType *, GraphType *, idxtype *);
+floattype WavefrontDiffusion(CtrlType *, GraphType *, idxtype *);
 
 /* balancemylink.c */
-int BalanceMyLink(CtrlType *, GraphType *, idxtype *, int, int, float *, float, float *, float *, float);
+int BalanceMyLink(CtrlType *, GraphType *, idxtype *, int, int, floattype *, floattype, floattype *, floattype *, floattype);
 
 /* redomylink.c */
-void RedoMyLink(CtrlType *, GraphType *, idxtype *, int, int, float *, float *, float *);
+void RedoMyLink(CtrlType *, GraphType *, idxtype *, int, int, floattype *, floattype *, floattype *);
 
 /* initbalance.c */
 void Balance_Partition(CtrlType *, GraphType *, WorkSpaceType *);
@@ -92,10 +92,10 @@ GraphType *ExtractGraph(CtrlType *, GraphType *, idxtype *, idxtype *, idxtype *
 void SetUpConnectGraph(GraphType *, MatrixType *, idxtype *);
 void Mc_ComputeMoveStatistics(CtrlType *, GraphType *, int *, int *, int *);
  int Mc_ComputeSerialTotalV(GraphType *, idxtype *);
-void ComputeLoad(GraphType *, int, float *, float *, int);
-void ConjGrad2(MatrixType *, float *, float *, float, float *);
-void mvMult2(MatrixType *, float *, float *);
-void ComputeTransferVector(int, MatrixType *, float *, float *, int);
+void ComputeLoad(GraphType *, int, floattype *, floattype *, int);
+void ConjGrad2(MatrixType *, floattype *, floattype *, floattype, floattype *);
+void mvMult2(MatrixType *, floattype *, floattype *);
+void ComputeTransferVector(int, MatrixType *, floattype *, floattype *, int);
 int ComputeSerialEdgeCut(GraphType *);
 int ComputeSerialTotalV(GraphType *, idxtype *);
 
@@ -103,8 +103,8 @@ int ComputeSerialTotalV(GraphType *, idxtype *);
 void Moc_KWayAdaptiveRefine(CtrlType *, GraphType *, WorkSpaceType *, int);
 
 /* selectq.c */
-void Moc_DynamicSelectQueue(int, int, int, int, idxtype *, float *, int *, int *, int, float, float);
-int Moc_HashVwgts(int, float *);
+void Moc_DynamicSelectQueue(int, int, int, int, idxtype *, floattype *, int *, int *, int, floattype, floattype);
+int Moc_HashVwgts(int, floattype *);
 int Moc_HashVRank(int, int *);
 
 
@@ -112,28 +112,28 @@ int Moc_HashVRank(int, int *);
 void CSR_Match_SHEM(MatrixType *, idxtype *, idxtype *, idxtype *, int);
 
 /* serial.c */
-void Moc_SerialKWayAdaptRefine(GraphType *, int, idxtype *, float *, int);
+void Moc_SerialKWayAdaptRefine(GraphType *, int, idxtype *, floattype *, int);
 void Moc_ComputeSerialPartitionParams(GraphType *, int, EdgeType *);
-int AreAllHVwgtsBelow(int, float, float *, float, float *, float *);
-void ComputeHKWayLoadImbalance(int, int, float *, float *);
-void SerialRemap(GraphType *, int, idxtype *, idxtype *, idxtype *, float *);
+int AreAllHVwgtsBelow(int, floattype, floattype *, floattype, floattype *, floattype *);
+void ComputeHKWayLoadImbalance(int, int, floattype *, floattype *);
+void SerialRemap(GraphType *, int, idxtype *, idxtype *, idxtype *, floattype *);
 int SSMIncKeyCmp(const void *, const void *);
-void Moc_Serial_FM_2WayRefine(GraphType *, float *, int);
-void Serial_SelectQueue(int, float *, float *, int *, int *, FPQueueType [MAXNCON][2]);
-int Serial_BetterBalance(int, float *, float *, float *);
-float Serial_Compute2WayHLoadImbalance(int, float *, float *);
-void Moc_Serial_Balance2Way(GraphType *, float *, float);
-void Moc_Serial_Init2WayBalance(GraphType *, float *);
-int Serial_SelectQueueOneWay(int, float *, float *, int, FPQueueType [MAXNCON][2]);
+void Moc_Serial_FM_2WayRefine(GraphType *, floattype *, int);
+void Serial_SelectQueue(int, floattype *, floattype *, int *, int *, FPQueueType [MAXNCON][2]);
+int Serial_BetterBalance(int, floattype *, floattype *, floattype *);
+floattype Serial_Compute2WayHLoadImbalance(int, floattype *, floattype *);
+void Moc_Serial_Balance2Way(GraphType *, floattype *, floattype);
+void Moc_Serial_Init2WayBalance(GraphType *, floattype *);
+int Serial_SelectQueueOneWay(int, floattype *, floattype *, int, FPQueueType [MAXNCON][2]);
 void Moc_Serial_Compute2WayPartitionParams(GraphType *);
-int Serial_AreAnyVwgtsBelow(int, float, float *, float, float *, float *);
+int Serial_AreAnyVwgtsBelow(int, floattype, floattype *, floattype, floattype *, floattype *);
 
 /* weird.c */
 void PartitionSmallGraph(CtrlType *, GraphType *, WorkSpaceType *);
 void CheckInputs(int partType, int npes, int dbglvl, int *wgtflag, int *iwgtflag,
                  int *numflag, int *inumflag, int *ncon, int *incon, int *nparts, 
-		 int *inparts, float *tpwgts, float **itpwgts, float *ubvec, 
-		 float *iubvec, float *ipc2redist, float *iipc2redist, int *options, 
+		 int *inparts, floattype *tpwgts, floattype **itpwgts, floattype *ubvec, 
+		 floattype *iubvec, floattype *ipc2redist, floattype *iipc2redist, int *options, 
 		 int *ioptions, idxtype *part, MPI_Comm *comm);
 
 /* mesh.c */
@@ -146,9 +146,9 @@ GraphType *AssembleEntireGraph(CtrlType *, idxtype *, idxtype *, idxtype *);
 /* node_refine.c */
 void ComputeNodePartitionParams0(CtrlType *, GraphType *, WorkSpaceType *);
 void ComputeNodePartitionParams(CtrlType *, GraphType *, WorkSpaceType *);
-void KWayNodeRefine0(CtrlType *, GraphType *, WorkSpaceType *, int, float);
-void KWayNodeRefine(CtrlType *, GraphType *, WorkSpaceType *, int, float);
-void KWayNodeRefine2(CtrlType *, GraphType *, WorkSpaceType *, int, float);
+void KWayNodeRefine0(CtrlType *, GraphType *, WorkSpaceType *, int, floattype);
+void KWayNodeRefine(CtrlType *, GraphType *, WorkSpaceType *, int, floattype);
+void KWayNodeRefine2(CtrlType *, GraphType *, WorkSpaceType *, int, floattype);
 void PrintNodeBalanceInfo(CtrlType *, int, idxtype *, idxtype *, idxtype *, int);
 
 /* initmsection.c */
@@ -164,7 +164,7 @@ void LocalNDOrder(CtrlType *, GraphType *, idxtype *, int, WorkSpaceType *);
 void Order_Partition(CtrlType *, GraphType *, WorkSpaceType *);
 
 /* xyzpart.c */
-void Coordinate_Partition(CtrlType *, GraphType *, int, float *, int, WorkSpaceType *);
+void Coordinate_Partition(CtrlType *, GraphType *, int, floattype *, int, WorkSpaceType *);
 void PartSort(CtrlType *, GraphType *, KeyValueType *, WorkSpaceType *);
 
 
@@ -173,22 +173,22 @@ void FPQueueInit(FPQueueType *, int);
 void FPQueueReset(FPQueueType *);
 void FPQueueFree(FPQueueType *);
 int FPQueueGetSize(FPQueueType *);
-int FPQueueInsert(FPQueueType *, int, float);
+int FPQueueInsert(FPQueueType *, int, floattype);
 int FPQueueDelete(FPQueueType *, int);
-int FPQueueUpdate(FPQueueType *, int, float, float);
-void FPQueueUpdateUp(FPQueueType *, int, float, float);
+int FPQueueUpdate(FPQueueType *, int, floattype, floattype);
+void FPQueueUpdateUp(FPQueueType *, int, floattype, floattype);
 int FPQueueGetMax(FPQueueType *);
 int FPQueueSeeMaxVtx(FPQueueType *);
-float FPQueueSeeMaxGain(FPQueueType *);
-float FPQueueGetKey(FPQueueType *);
+floattype FPQueueSeeMaxGain(FPQueueType *);
+floattype FPQueueGetKey(FPQueueType *);
 int FPQueueGetQSize(FPQueueType *);
 int CheckHeapFloat(FPQueueType *);
 
 /* stat.c */
-void Moc_ComputeSerialBalance(CtrlType *, GraphType *, idxtype *, float *);
-void Moc_ComputeParallelBalance(CtrlType *, GraphType *, idxtype *, float *);
-void Moc_PrintThrottleMatrix(CtrlType *, GraphType *, float *);
-void Moc_ComputeRefineStats(CtrlType *, GraphType *, float *);
+void Moc_ComputeSerialBalance(CtrlType *, GraphType *, idxtype *, floattype *);
+void Moc_ComputeParallelBalance(CtrlType *, GraphType *, idxtype *, floattype *);
+void Moc_PrintThrottleMatrix(CtrlType *, GraphType *, floattype *);
+void Moc_ComputeRefineStats(CtrlType *, GraphType *, floattype *);
 
 /* debug.c */
 void PrintVector(CtrlType *, int, int, idxtype *, char *);
@@ -207,9 +207,9 @@ int GlobalSEMax(CtrlType *, int);
 double GlobalSEMaxDouble(CtrlType *, double);
 int GlobalSEMin(CtrlType *, int);
 int GlobalSESum(CtrlType *, int);
-float GlobalSEMaxFloat(CtrlType *, float);
-float GlobalSEMinFloat(CtrlType *, float);
-float GlobalSESumFloat(CtrlType *, float);
+floattype GlobalSEMaxFloat(CtrlType *, floattype);
+floattype GlobalSEMinFloat(CtrlType *, floattype);
+floattype GlobalSESumFloat(CtrlType *, floattype);
 
 /* util.c */
 void errexit(char *,...);
@@ -218,7 +218,7 @@ void rprintf(CtrlType *, char *f_str,...);
 #ifndef DMALLOC
 int *imalloc(int, char *);
 idxtype *idxmalloc(int, char *);
-float *fmalloc(int, char *);
+floattype *fmalloc(int, char *);
 int *ismalloc(int, int, char *);
 idxtype *idxsmalloc(int, idxtype, char *);
 void *GKmalloc(int, char *);
@@ -229,9 +229,9 @@ idxtype * idxset(int n, idxtype val, idxtype *x);
 int idxamax(int n, idxtype *x);
 int idxamin(int n, idxtype *x);
 int idxasum(int n, idxtype *x);
-float snorm2(int, float *);
-float sdot(int n, float *, float *);
-void saxpy(int, float, float *, float *);
+floattype snorm2(int, floattype *);
+floattype sdot(int n, floattype *, floattype *);
+void saxpy(int, floattype, floattype *, floattype *);
 void ikeyvalsort_org(int, KeyValueType *);
 int IncKeyValueCmp(const void *, const void *);
 void dkeyvalsort(int, KeyValueType *);
@@ -242,34 +242,34 @@ void FastRandomPermute(int, idxtype *, int);
 int ispow2(int);
 int log2Int(int);
 void BucketSortKeysDec(int, int, idxtype *, idxtype *);
-float *sset(int n, float val, float *x);
+floattype *sset(int n, floattype val, floattype *x);
 int iamax(int, int *);
 int idxamax_strd(int, idxtype *, int);
 int idxamin_strd(int, idxtype *, int);
-int samax_strd(int, float *, int);
-int sfamax(int, float *);
-int samin_strd(int, float *, int);
-float idxavg(int, idxtype *);
-float savg(int, float *);
-int samax(int, float *);
-int sfavg(int n, float *x);
-int samax2(int, float *);
-int samin(int, float *);
+int samax_strd(int, floattype *, int);
+int sfamax(int, floattype *);
+int samin_strd(int, floattype *, int);
+floattype idxavg(int, idxtype *);
+floattype savg(int, floattype *);
+int samax(int, floattype *);
+int sfavg(int n, floattype *x);
+int samax2(int, floattype *);
+int samin(int, floattype *);
 int idxsum(int, idxtype *);
 int idxsum_strd(int, idxtype *, int);
 void idxadd(int, idxtype *, idxtype *);
-float ssum(int, float *);
-float ssum_strd(int, float *, int);
-void sscale(int, float, float *);
-void saneg(int, float *);
-float BetterVBalance(int, float *, float *, float *);
-int IsHBalanceBetterTT(int, float *, float *, float *, float *);
-int IsHBalanceBetterFT(int, float *, float *, float *, float *);
+floattype ssum(int, floattype *);
+floattype ssum_strd(int, floattype *, int);
+void sscale(int, floattype, floattype *);
+void saneg(int, floattype *);
+floattype BetterVBalance(int, floattype *, floattype *, floattype *);
+int IsHBalanceBetterTT(int, floattype *, floattype *, floattype *, floattype *);
+int IsHBalanceBetterFT(int, floattype *, floattype *, floattype *, floattype *);
 int myvalkeycompare(const void *, const void *);
 int imyvalkeycompare(const void *, const void *);
-float *fsmalloc(int, float, char *);
-void saxpy2(int, float, float *, int, float *, int);
-void GetThreeMax(int, float *, int *, int *, int *);
+floattype *fsmalloc(int, floattype, char *);
+void saxpy2(int, floattype, floattype *, int, floattype *, int);
+void GetThreeMax(int, floattype *, int *, int *, int *);
 
 /* qsort_special.c */
 void iidxsort(int, idxtype *);
@@ -301,11 +301,11 @@ int Home_PE(int, int, idxtype *, int);
 /*********************/
 /* METIS subroutines */
 /*********************/
-void METIS_WPartGraphKway2(int *, idxtype *, idxtype *, idxtype *, idxtype *, int *, int *, int *, float *, int *, int *, idxtype *);
-void METIS_mCPartGraphRecursive2(int *, int *, idxtype *, idxtype *, idxtype *, idxtype *, int *, int *, int *, float *, int *, int *, idxtype *);
-int MCMlevelRecursiveBisection2(CtrlType *, GraphType *, int, float *, idxtype *, float, int); 
+void METIS_WPartGraphKway2(int *, idxtype *, idxtype *, idxtype *, idxtype *, int *, int *, int *, floattype *, int *, int *, idxtype *);
+void METIS_mCPartGraphRecursive2(int *, int *, idxtype *, idxtype *, idxtype *, idxtype *, int *, int *, int *, floattype *, int *, int *, idxtype *);
+int MCMlevelRecursiveBisection2(CtrlType *, GraphType *, int, floattype *, idxtype *, floattype, int); 
 void METIS_PartGraphKway(int *, idxtype *, idxtype *, idxtype *, idxtype *, int *, int *, int *, int *, int *, idxtype *);
-void METIS_mCPartGraphKway(int *, int *, idxtype *, idxtype *, idxtype *, idxtype *, int *, int *, int *, float *, int *, int *, idxtype *);
+void METIS_mCPartGraphKway(int *, int *, idxtype *, idxtype *, idxtype *, idxtype *, int *, int *, int *, floattype *, int *, int *, idxtype *);
 void METIS_EdgeComputeSeparator(int *, idxtype *, idxtype *, idxtype *, idxtype *, int *, int *, idxtype *); 
 void METIS_NodeComputeSeparator(int *, idxtype *, idxtype *, idxtype *, idxtype *, int *, int *, idxtype *); 
 void METIS_NodeND(int *, idxtype *, idxtype *, int *, int *, idxtype *, idxtype *);
@@ -321,7 +321,7 @@ void METIS_NodeNDP(int, idxtype *, idxtype *, int, int *, idxtype *, idxtype *, 
 void ParallelReadGraph(GraphType *, char *, MPI_Comm);
 void Moc_ParallelWriteGraph(CtrlType *, GraphType *, char *, int, int);
 void ReadTestGraph(GraphType *, char *, MPI_Comm);
-float *ReadTestCoordinates(GraphType *, char *, int, MPI_Comm);
+floattype *ReadTestCoordinates(GraphType *, char *, int, MPI_Comm);
 void ReadMetisGraph(char *, int *, idxtype **, idxtype **);
 void Moc_SerialReadGraph(GraphType *, char *, int *, MPI_Comm);
 void Moc_SerialReadMetisGraph(char *, int *, int *, int *, int *, idxtype **, idxtype **, idxtype **, idxtype **, int *);

@@ -30,7 +30,7 @@ void Moc_Global_CreateCoarseGraph(CtrlType *ctrl, GraphType *graph,
   idxtype *cxadj, *cadjncy, *cadjwgt, *cvwgt, *cvsize = NULL, *chome = NULL, *cvtxdist;
   idxtype *rsizes, *ssizes, *rlens, *slens, *rgraph, *sgraph, *perm;
   idxtype *peind, *recvptr, *recvind;
-  float *nvwgt, *cnvwgt;
+  floattype *nvwgt, *cnvwgt;
   GraphType *cgraph;
   KeyValueType *scand, *rcand;
   int mask=(1<<13)-1, htable[8192], htableidx[8192];
@@ -467,7 +467,7 @@ void Moc_Global_CreateCoarseGraph(CtrlType *ctrl, GraphType *graph,
   /* ADD:  I kept vwgt array and recomputed nvwgt for each coarser graph */
   for (j=0; j<cnvtxs; j++)
     for (h=0; h<ncon; h++)
-      cgraph->nvwgt[j*ncon+h] = (float)(cvwgt[j*ncon+h])/(float)(ctrl->tvwgts[h]);
+      cgraph->nvwgt[j*ncon+h] = (floattype)(cvwgt[j*ncon+h])/(floattype)(ctrl->tvwgts[h]);
 
   cgraph->adjncy = idxmalloc(cnedges, "CreateCoarserGraph: cadjncy");
   cgraph->adjwgt = idxmalloc(cnedges, "CreateCoarserGraph: cadjwgt");

@@ -176,11 +176,11 @@ int GlobalSESum(CtrlType *ctrl, int value)
 /*************************************************************************
 * This function computes the max of a single element
 **************************************************************************/
-float GlobalSEMaxFloat(CtrlType *ctrl, float value)
+floattype GlobalSEMaxFloat(CtrlType *ctrl, floattype value)
 {
-  float max;
+  floattype max;
 
-  MPI_Allreduce((void *)&value, (void *)&max, 1, MPI_FLOAT, MPI_MAX, ctrl->comm);
+  MPI_Allreduce((void *)&value, (void *)&max, 1, MPI_DOUBLE, MPI_MAX, ctrl->comm);
 
   return max;
 }
@@ -190,11 +190,11 @@ float GlobalSEMaxFloat(CtrlType *ctrl, float value)
 /*************************************************************************
 * This function computes the max of a single element
 **************************************************************************/
-float GlobalSEMinFloat(CtrlType *ctrl, float value)
+floattype GlobalSEMinFloat(CtrlType *ctrl, floattype value)
 {
-  float min;
+  floattype min;
 
-  MPI_Allreduce((void *)&value, (void *)&min, 1, MPI_FLOAT, MPI_MIN, ctrl->comm);
+  MPI_Allreduce((void *)&value, (void *)&min, 1, MPI_DOUBLE, MPI_MIN, ctrl->comm);
 
   return min;
 }
@@ -202,11 +202,11 @@ float GlobalSEMinFloat(CtrlType *ctrl, float value)
 /*************************************************************************
 * This function computes the max of a single element
 **************************************************************************/
-float GlobalSESumFloat(CtrlType *ctrl, float value)
+floattype GlobalSESumFloat(CtrlType *ctrl, floattype value)
 {
-  float sum;
+  floattype sum;
 
-  MPI_Allreduce((void *)&value, (void *)&sum, 1, MPI_FLOAT, MPI_SUM, ctrl->comm);
+  MPI_Allreduce((void *)&value, (void *)&sum, 1, MPI_DOUBLE, MPI_SUM, ctrl->comm);
 
   return sum;
 }

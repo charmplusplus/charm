@@ -29,13 +29,13 @@ int Moc_Diffusion(CtrlType *ctrl, GraphType *graph, idxtype *vtxdist,
   idxtype *rowptr, *colind, *diff_where, *sr_where, *ehome, *map, *rmap;
   idxtype *pack, *unpack, *match, *proc2sub, *sub2proc;
   idxtype *visited, *gvisited;
-  float *transfer, *npwgts, maxdiff, minflow, maxflow;
-  float lbavg, oldlbavg, ubavg, lbvec[MAXNCON];
-  float diff_flows[MAXNCON], sr_flows[MAXNCON];
-  float diff_lbavg, sr_lbavg, diff_cost, sr_cost;
+  floattype *transfer, *npwgts, maxdiff, minflow, maxflow;
+  floattype lbavg, oldlbavg, ubavg, lbvec[MAXNCON];
+  floattype diff_flows[MAXNCON], sr_flows[MAXNCON];
+  floattype diff_lbavg, sr_lbavg, diff_cost, sr_cost;
   idxtype *rbuffer, *sbuffer; 
   int *rcount, *rdispl;
-  float *solution, *load, *workspace;
+  floattype *solution, *load, *workspace;
   EdgeType *degrees;
   MatrixType matrix;
   GraphType *egraph;
@@ -80,8 +80,8 @@ int Moc_Diffusion(CtrlType *ctrl, GraphType *graph, idxtype *vtxdist,
   diff_where = pack + 6*nvtxs;
   ehome =      pack + 7*nvtxs;
 
-  wsize = amax(sizeof(float)*nparts*6, sizeof(idxtype)*(nvtxs+nparts*2+1));
-  workspace = (float *)GKmalloc(wsize, "Moc_Diffusion: workspace");
+  wsize = amax(sizeof(floattype)*nparts*6, sizeof(idxtype)*(nvtxs+nparts*2+1));
+  workspace = (floattype *)GKmalloc(wsize, "Moc_Diffusion: workspace");
   degrees = GKmalloc(nedges*sizeof(EdgeType), "Mc_Diffusion: degrees");
   rinfo = graph->rinfo = GKmalloc(nvtxs*sizeof(RInfoType), "Mc_Diffusion: rinfo");
 
@@ -108,7 +108,7 @@ int Moc_Diffusion(CtrlType *ctrl, GraphType *graph, idxtype *vtxdist,
       sset(nparts, 0.0, solution);
       ComputeLoad(graph, nparts, load, ctrl->tpwgts, h);
 
-      lbvec[h] = (load[samax(nparts, load)]+1.0/(float)nparts) * (float)nparts;
+      lbvec[h] = (load[samax(nparts, load)]+1.0/(floattype)nparts) * (floattype)nparts;
 
       ConjGrad2(&matrix, load, solution, 0.001, workspace);
       ComputeTransferVector(ncon, &matrix, solution, transfer, h);
@@ -227,7 +227,7 @@ int Moc_Diffusion(CtrlType *ctrl, GraphType *graph, idxtype *vtxdist,
             sr_where = egraph->where;
             egraph->where = diff_where;
 
-            nswaps = BalanceMyLink(ctrl, egraph, ehome, me, you, diff_flows, maxdiff, &diff_cost, &diff_lbavg, 1.0/(float)nvtxs);
+            nswaps = BalanceMyLink(ctrl, egraph, ehome, me, you, diff_flows, maxdiff, &diff_cost, &diff_lbavg, 1.0/(floattype)nvtxs);
 
             if ((sr_lbavg < diff_lbavg &&
             (diff_lbavg >= ubavg-1.0 || sr_cost == diff_cost)) ||
@@ -300,7 +300,7 @@ int Moc_Diffusion(CtrlType *ctrl, GraphType *graph, idxtype *vtxdist,
     /* check for early breakout */
     /****************************/
     for (h=0; h<ncon; h++) {
-      lbvec[h] = (float)(nparts) *
+      lbvec[h] = (floattype)(nparts) *
         npwgts[samax_strd(nparts,npwgts+h,ncon)*ncon+h];
     }
     lbavg = savg(ncon, lbvec);
@@ -371,7 +371,7 @@ GraphType *ExtractGraph(CtrlType *ctrl, GraphType *graph, idxtype *indicator,
   int vtx, count;
   idxtype *xadj, *vsize, *adjncy, *adjwgt, *where;
   idxtype *exadj, *evsize, *eadjncy, *eadjwgt, *ewhere;
-  float *nvwgt, *envwgt;
+  floattype *nvwgt, *envwgt;
   GraphType *egraph;
 
   nvtxs = graph->nvtxs;

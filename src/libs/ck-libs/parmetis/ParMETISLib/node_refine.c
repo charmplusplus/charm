@@ -111,7 +111,7 @@ void ComputeNodePartitionParams(CtrlType *ctrl, GraphType *graph, WorkSpaceType 
 /*************************************************************************
 * This function performs k-way refinement
 **************************************************************************/
-void KWayNodeRefine(CtrlType *ctrl, GraphType *graph, WorkSpaceType *wspace, int npasses, float ubfraction)
+void KWayNodeRefine(CtrlType *ctrl, GraphType *graph, WorkSpaceType *wspace, int npasses, floattype ubfraction)
 {
   int i, ii, j, k, pass, nvtxs, firstvtx, lastvtx, otherlastvtx, c, nmoves, 
       nlupd, nsupd, nnbrs, nchanged, nsep;

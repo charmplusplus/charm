@@ -70,7 +70,7 @@ GraphType *Moc_SetUpGraph(CtrlType *ctrl, int ncon, idxtype *vtxdist, idxtype *x
   graph->nvwgt = fmalloc(graph->nvtxs*ncon, "graph->nvwgt");
   for (i=0; i<graph->nvtxs; i++) {
     for (j=0; j<ncon; j++)
-      graph->nvwgt[i*ncon+j] = (float)(graph->vwgt[i*ncon+j]) / (float)(ctrl->tvwgts[j]);
+      graph->nvwgt[i*ncon+j] = (floattype)(graph->vwgt[i*ncon+j]) / (floattype)(ctrl->tvwgts[j]);
   }
 
   srand(ctrl->seed);

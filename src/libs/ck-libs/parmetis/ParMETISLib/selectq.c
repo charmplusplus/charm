@@ -17,14 +17,14 @@
 *  This stuff is hardcoded for up to four constraints
 **************************************************************************/
 void Moc_DynamicSelectQueue(int nqueues, int ncon, int subdomain1, int subdomain2,
-     idxtype *currentq, float *flows, int *from, int *qnum, int minval, float avgvwgt,
-     float maxdiff)
+     idxtype *currentq, floattype *flows, int *from, int *qnum, int minval, floattype avgvwgt,
+     floattype maxdiff)
 {
   int i, j;
   int hash, index = -1, current;
   int cand[MAXNCON], rank[MAXNCON], dont_cares[MAXNCON];
   int nperms, perm[24][5];
-  float sign = 0.0;
+  floattype sign = 0.0;
   KVType array[MAXNCON];
 int mype;
 MPI_Comm_rank(MPI_COMM_WORLD, &mype);
@@ -290,7 +290,7 @@ MPI_Comm_rank(MPI_COMM_WORLD, &mype);
 /*************************************************************************
 *  This function sorts the nvwgts of a vertex and returns a hashed value
 **************************************************************************/
-int Moc_HashVwgts(int ncon, float *nvwgt)
+int Moc_HashVwgts(int ncon, floattype *nvwgt)
 {
   int i;
   int multiplier, retval;

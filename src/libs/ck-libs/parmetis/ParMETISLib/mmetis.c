@@ -22,7 +22,7 @@
 ************************************************************************************/
 void ParMETIS_V3_PartMeshKway(idxtype *elmdist, idxtype *eptr, idxtype *eind, idxtype *elmwgt, 
                  int *wgtflag, int *numflag, int *ncon, int *ncommonnodes, int *nparts, 
-		 float *tpwgts, float *ubvec, int *options, int *edgecut, idxtype *part, 
+		 floattype *tpwgts, floattype *ubvec, int *options, int *edgecut, idxtype *part, 
 		 MPI_Comm *comm)
 {
   int i, nvtxs, nedges, gnedges, npes, mype;

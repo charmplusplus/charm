@@ -29,13 +29,13 @@ void Balance_Partition(CtrlType *ctrl, GraphType *graph, WorkSpaceType *wspace)
   int lnparts, fpart, fpe, lnpes, ngroups, srnpes, srmype; 
   int twoparts=2, numflag = 0, wgtflag = 3, moptions[10], edgecut, max_cut;
   int sr_pe, gd_pe, sr, gd, who_wins, *rcounts, *rdispls;
-  float my_cut, my_totalv, my_cost = -1.0, my_balance = -1.0, wsum;
-  float rating, max_rating, your_cost = -1.0, your_balance = -1.0;
-  float lbvec[MAXNCON], lbsum, min_lbsum, *mytpwgts, mytpwgts2[2], buffer[2];
+  floattype my_cut, my_totalv, my_cost = -1.0, my_balance = -1.0, wsum;
+  floattype rating, max_rating, your_cost = -1.0, your_balance = -1.0;
+  floattype lbvec[MAXNCON], lbsum, min_lbsum, *mytpwgts, mytpwgts2[2], buffer[2];
   MPI_Status status;
   MPI_Comm ipcomm, srcomm;
   struct {
-    float cost;
+    floattype cost;
     int rank;
   } lpecost, gpecost;
 
@@ -63,7 +63,7 @@ void Balance_Partition(CtrlType *ctrl, GraphType *graph, WorkSpaceType *wspace)
     for (j=0; j<ncon; j++)
       mytpwgts[i] += ctrl->tpwgts[i*ncon+j];
   for (i=0; i<ctrl->nparts; i++)
-    mytpwgts[i] /= (float)ncon;
+    mytpwgts[i] /= (floattype)ncon;
 
   idxcopy(nvtxs+1, agraph->xadj, xadj);
   idxcopy(nvtxs*ncon, agraph->vwgt, vwgt);
@@ -227,16 +227,16 @@ void Balance_Partition(CtrlType *ctrl, GraphType *graph, WorkSpaceType *wspace)
     Moc_ComputeSerialBalance(ctrl, &cgraph, part, lbvec);
     lbsum = ssum(ncon, lbvec);
     MPI_Allreduce((void *)&edgecut, (void *)&max_cut, 1, MPI_INT, MPI_MAX, ipcomm);
-    MPI_Allreduce((void *)&lbsum, (void *)&min_lbsum, 1, MPI_FLOAT, MPI_MIN, ipcomm);
+    MPI_Allreduce((void *)&lbsum, (void *)&min_lbsum, 1, MPI_DOUBLE, MPI_MIN, ipcomm);
     lpecost.rank = ctrl->mype;
     lpecost.cost = lbsum;
-    if (min_lbsum < UNBALANCE_FRACTION * (float)(ncon)) {
-      if (lbsum < UNBALANCE_FRACTION * (float)(ncon))
-        lpecost.cost = (float)edgecut;
+    if (min_lbsum < UNBALANCE_FRACTION * (floattype)(ncon)) {
+      if (lbsum < UNBALANCE_FRACTION * (floattype)(ncon))
+        lpecost.cost = (floattype)edgecut;
       else
-        lpecost.cost = (float)max_cut + lbsum;
+        lpecost.cost = (floattype)max_cut + lbsum;
     }
-    MPI_Allreduce((void *)&lpecost, (void *)&gpecost, 1, MPI_FLOAT_INT, MPI_MINLOC, ipcomm);
+    MPI_Allreduce((void *)&lpecost, (void *)&gpecost, 1, MPI_DOUBLE_INT, MPI_MINLOC, ipcomm);
 
     if (ctrl->mype == gpecost.rank && ctrl->mype != sr_pe) {
       MPI_Send((void *)part, nvtxs, IDX_DATATYPE, sr_pe, 1, ctrl->comm);
@@ -268,19 +268,19 @@ void Balance_Partition(CtrlType *ctrl, GraphType *graph, WorkSpaceType *wspace)
       lbsum = ssum(ncon, lbvec);
 
       /* Determine which PE computed the best partitioning */
-      MPI_Allreduce((void *)&rating, (void *)&max_rating, 1, MPI_FLOAT, MPI_MAX, ipcomm);
-      MPI_Allreduce((void *)&lbsum, (void *)&min_lbsum, 1, MPI_FLOAT, MPI_MIN, ipcomm);
+      MPI_Allreduce((void *)&rating, (void *)&max_rating, 1, MPI_DOUBLE, MPI_MAX, ipcomm);
+      MPI_Allreduce((void *)&lbsum, (void *)&min_lbsum, 1, MPI_DOUBLE, MPI_MIN, ipcomm);
 
       lpecost.rank = ctrl->mype;
       lpecost.cost = lbsum;
-      if (min_lbsum < UNBALANCE_FRACTION * (float)(ncon)) {
-        if (lbsum < UNBALANCE_FRACTION * (float)(ncon))
+      if (min_lbsum < UNBALANCE_FRACTION * (floattype)(ncon)) {
+        if (lbsum < UNBALANCE_FRACTION * (floattype)(ncon))
           lpecost.cost = rating;
         else
           lpecost.cost = max_rating + lbsum;
       }
 
-      MPI_Allreduce((void *)&lpecost, (void *)&gpecost, 1, MPI_FLOAT_INT, MPI_MINLOC, ipcomm);
+      MPI_Allreduce((void *)&lpecost, (void *)&gpecost, 1, MPI_DOUBLE_INT, MPI_MINLOC, ipcomm);
 
       /* Now send this to the coordinating processor */
       if (ctrl->mype == gpecost.rank && ctrl->mype != gd_pe)
@@ -304,11 +304,11 @@ void Balance_Partition(CtrlType *ctrl, GraphType *graph, WorkSpaceType *wspace)
       /********************************************************************/
       /* The coordinators from each group decide on the best partitioning */
       /********************************************************************/
-      my_cut = (float) ComputeSerialEdgeCut(&cgraph);
-      my_totalv = (float) Mc_ComputeSerialTotalV(&cgraph, home);
+      my_cut = (floattype) ComputeSerialEdgeCut(&cgraph);
+      my_totalv = (floattype) Mc_ComputeSerialTotalV(&cgraph, home);
       Moc_ComputeSerialBalance(ctrl, &cgraph, part, lbvec);
       my_balance = ssum(cgraph.ncon, lbvec);
-      my_balance /= (float) cgraph.ncon;
+      my_balance /= (floattype) cgraph.ncon;
       my_cost = ctrl->ipc_factor * my_cut + REDIST_WGT * ctrl->redist_base * my_totalv;
 
       IFSET(ctrl->dbglvl, DBG_REFINEINFO, printf("%s initial cut: %.1f, totalv: %.1f, balance: %.3f\n",
@@ -317,10 +317,10 @@ void Balance_Partition(CtrlType *ctrl, GraphType *graph, WorkSpaceType *wspace)
       if (ctrl->mype == gd_pe) {
         buffer[0] = my_cost;
         buffer[1] = my_balance;
-        MPI_Send((void *)buffer, 2, MPI_FLOAT, sr_pe, 1, ctrl->comm);
+        MPI_Send((void *)buffer, 2, MPI_DOUBLE, sr_pe, 1, ctrl->comm);
       }
       else {
-        MPI_Recv((void *)buffer, 2, MPI_FLOAT, gd_pe, 1, ctrl->comm, &status);
+        MPI_Recv((void *)buffer, 2, MPI_DOUBLE, gd_pe, 1, ctrl->comm, &status);
         your_cost = buffer[0];
         your_balance = buffer[1];
       }
@@ -370,7 +370,7 @@ GraphType *Moc_AssembleAdaptiveGraph(CtrlType *ctrl, GraphType *graph, WorkSpace
   idxtype *axadj, *aadjncy, *aadjwgt, *avwgt, *avsize = NULL, *alabel;
   idxtype *mygraph, *ggraph;
   int *rcounts, *rdispls, mysize;
-  float *anvwgt;
+  floattype *anvwgt;
   GraphType *agraph;
 
   gnvtxs  = graph->gnvtxs;
@@ -484,7 +484,7 @@ GraphType *Moc_AssembleAdaptiveGraph(CtrlType *ctrl, GraphType *graph, WorkSpace
 
   for (i=0; i<gnvtxs; i++)
     for (j=0; j<ncon; j++)
-      anvwgt[i*ncon+j] = (float)(agraph->vwgt[i*ncon+j]) / (float)(ctrl->tvwgts[j]);
+      anvwgt[i*ncon+j] = (floattype)(agraph->vwgt[i*ncon+j]) / (floattype)(ctrl->tvwgts[j]);
 
   for (i=0; i<gnvtxs; i++)
     alabel[i] = i;

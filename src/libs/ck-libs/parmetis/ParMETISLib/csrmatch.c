@@ -25,9 +25,9 @@ void CSR_Match_SHEM(MatrixType *matrix, idxtype *match, idxtype *mlist,
 {
   int h, i, ii, j;
   int nrows, edge, maxidx, count;
-  float maxwgt;
+  floattype maxwgt;
   idxtype *rowptr, *colind;
-  float *transfer;
+  floattype *transfer;
   KVType *links;
 
   nrows = matrix->nrows;
