@@ -65,9 +65,12 @@ void CmiPoolAllocInit(int numBins)
     CpvAccess(numKallocs) =  CpvAccess(numMallocs) =  CpvAccess(numFrees)=CpvAccess(numOFrees) = 0;
 }
 
+#ifdef CMK_OPTIMIZE
+inline
+#endif
 void * CmiPoolAlloc(unsigned int numBytes)
 {
-  char *p, *next;
+  char *p;
   int bin=0;
   int n=numBytes+CMI_POOL_HEADER_SIZE;
   int *header;
@@ -101,7 +104,7 @@ void * CmiPoolAlloc(unsigned int numBytes)
 	  else  /* there is no next */
 	      CpvAccess(bins)[bin] = NULL;
 #else
-      CpvAccess(bins)[bin] = (char *) *((char **)(p -CMI_POOL_HEADER_SIZE)); 
+	  CpvAccess(bins)[bin] = (char *) *((char **)(p -CMI_POOL_HEADER_SIZE)); 
 #endif
 	}
       else
@@ -123,14 +126,18 @@ void * CmiPoolAlloc(unsigned int numBytes)
 #endif
       p = (char *) malloc_nomigrate(numBytes) + CMI_POOL_HEADER_SIZE;
       bin=0; 
+
     }
   header = (int *) (p-CMI_POOL_HEADER_SIZE);
+  CmiAssert(header !=NULL);
   *header = bin; /* stamp the bin number on the header.*/
   return p;
 }
 
-
-void * CmiPoolFree(char * p) 
+#ifdef CMK_OPTIMIZE
+inline
+#endif
+void CmiPoolFree(void * p) 
 {
   char **header = (char **)( p - CMI_POOL_HEADER_SIZE);
   int bin = (int) *header;
@@ -174,5 +181,19 @@ void  CmiPoolAllocStats()
       CmiPrintf("%d\t", CpvAccess(binLengths)[i]);
   CmiPrintf("\n");
 }
+
+void CmiPoolPrintList(char *p)
+{
+  CmiPrintf("Free list is: -----------\n");
+  while (p != 0) {
+    CmiPrintf("next ptr is %d. ", (int) p);
+    char ** header = (char **) p-CMI_POOL_HEADER_SIZE;
+    CmiPrintf("header is at: %d, and contains: %d \n", (int) header, (int) (*header));
+    p = *header;
+  }
+  CmiPrintf("End of Free list: -----------\n");
+ 
+}
+
 
 /* theoretically we should have a pool cleanup function in here */
