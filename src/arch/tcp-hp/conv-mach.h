@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-14 16:27:49  brunner
+ * Revision 2.1  1995-06-15 20:28:53  brunner
+ * Removed typedefs that I had added to make the HP cc compiler work.
+ * It works without them with gcc.
+ *
+ * Revision 2.0  1995/06/14  16:27:49  brunner
  * HP/gcc port for new directory structure
  *
  *
@@ -61,24 +65,5 @@
 
 #define CMK_NO_SHARED_VARS_AT_ALL
 /* #define CMK_SHARED_VARS_EXEMPLAR */
-
-#if 0
-   typedef unsigned char        u_char;    /* Try to avoid using these */
-   typedef unsigned short       u_short;   /* Try to avoid using these */
-   typedef unsigned int         u_int;     /* Try to avoid using these */
-   typedef unsigned long        u_long;    /* Try to avoid using these */
-   typedef unsigned int         uint;      /* Try to avoid using these */
-   typedef unsigned short       ushort;    /* Try to avoid using these */
-   typedef unsigned char  ubit8;
-   typedef unsigned short ubit16;
-   typedef unsigned long  ubit32;
-   typedef char           sbit8;
-   typedef short          sbit16;
-   typedef long           sbit32;
-
-#define enum_t int
-typedef char *caddr_t; /* same as in types.h */
-#define bool_t int
-#endif /* 0 */
 
 #endif
