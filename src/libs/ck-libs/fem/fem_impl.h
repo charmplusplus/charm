@@ -2,6 +2,9 @@
 C++ implementation file
 
 This is the main internal implementation file for FEM.
+It includes all the other headers, and contains quite
+a lot of assorted leftovers and utility routines.
+
 Orion Sky Lawlor, olawlor@acm.org, 9/28/00
 */
 #ifndef __CHARM_FEM_IMPL_H
@@ -183,17 +186,27 @@ public:
 
 #define CHK(p) do{if((p)==0)CkAbort("FEM>Memory Allocation failure.");}while(0)
 
+/**
+  FEM global data object.  Keeps track of the global
+  list of meshes, and the default read and write meshes.
+  
+  This class was once an array element, back when the 
+  FEM framework was built directly on Charm++.
+  
+  There's only one of this object per thread, and it's
+  kept in a thread-private variable.
+*/
 class FEMchunk 
 {
 public:
-  FEM_Mesh_list meshes;
-  int default_read;
-  int default_write;
+  FEM_Mesh_list meshes; ///< Global list of meshes.
+  int default_read; ///< Index of default read mesh.
+  int default_write; ///< Index of default write mesh.
   
-  // Default communicator to use
+  /// Default communicator to use
   FEM_Comm_t defaultComm;
 
-  // Global index in default communicator
+  /// Global index (rank) in default communicator
   int thisIndex;
 
 #ifdef CMK_OPTIMIZE /* Skip the check, for speed. */

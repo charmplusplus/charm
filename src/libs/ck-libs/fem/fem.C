@@ -2,22 +2,8 @@
 Finite Element Method (FEM) Framework for Charm++
 Parallel Programming Lab, Univ. of Illinois 2000
 
-This file implements a C, C++, or Fortran-callable
-library for parallel finite-element computations.
-
-The basic idea is to partition the serial mesh into
-"chunks", which do nearly independent computations;
-but occasionally neighboring mesh chunks must
-synchronize the values (called fields) at the shared 
-nodes.  For load balance, we create more chunks than
-processors and occasionally migrate chunks for better
-load balance.
-
-We run the user's (timeloop) driver routine in a 
-thread (in the style of AMPI), so communication looks
-blocking to the user.  Internally, we suspend the
-user's driver thread when communication is needed,
-then resume the thread when the results arrive.
+Main leftover implementation file.
+See README.txt for details.
  */
 #include "fem_impl.h"
 

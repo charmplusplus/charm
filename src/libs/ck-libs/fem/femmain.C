@@ -2,6 +2,17 @@
 This is a compatability main routine for FEM framework programs.
 It is an MPI main program that calls the old-style "init" routine 
 on processor 0, then runs driver on all processors.
+
+This routine need not get called-- an MPI program may choose
+to implement a main routine and call FEM_Init itself, in which 
+case there's no "init" or "driver" routines.
+
+This routine is only linked in if you link with
+	-language fem
+if you use
+	-language ampi -module fem
+this routine is not linked.
+
 Orion Sky Lawlor, olawlor@acm.org, 2003/7/13
 */
 #include "mpi.h"
