@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.4  1995-07-06 13:45:34  gursoy
+ * Revision 2.5  1995-07-06 13:59:12  gursoy
+ * well still modifying CsvAccess(... MsgStructTable)
+ *
+ * Revision 2.4  1995/07/06  13:45:34  gursoy
  * removed includ trans_defl.h
  *
  * Revision 2.3  1995/07/06  04:44:55  gursoy
@@ -75,7 +78,7 @@
 #endif
 
 
-CsvExtern(MSG_STRUCT*, MsgToStructTable);
+CsvExtern(struct msg_struct*, MsgToStructTable);
 
 #define LdbFillBlock(env) LdbFillLDB(LDB_ELEMENT_PTR(env))
 
