@@ -301,7 +301,7 @@ void DirectMulticastStrategy::handleNewMulticastMessage(envelope *env) {
     ComlibSectionHashObject *new_obj = createObjectOnIntermediatePe
         (idx_list.size(), idx_list_array, cbmsg->_cookie.pe);
 
-    delete idx_list_array;
+    delete [] idx_list_array;
     
     sec_ht.put(key) = new_obj;
 
