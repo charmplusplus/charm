@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.13  1996-02-22 21:36:18  sanjeev
+ * Revision 2.14  1996-02-22 21:38:20  sanjeev
+ * *** empty log message ***
+ *
+ * Revision 2.13  1996/02/22 21:36:18  sanjeev
  * added macros for non-translator version of Charm++
  *
  * Revision 2.12  1995/11/02 20:23:01  sanjeev
@@ -199,7 +202,7 @@
 
 /* These are macros for the non-translator version of Charm++.
    They work only for preprocessors with ANSI concatenation, e.g. g++
-   So they wont work with cpp or CC.	*/
+   So they wont work with cpp.	*/
 
 #define GetEntryPtr(ChareType,EP) 	_CK_ep_##ChareType##_##EP
 
