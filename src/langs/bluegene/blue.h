@@ -269,11 +269,13 @@ public:
         data[i] = new d[BgNodeSize()];
     }
   }
+  inline int inited() { return data != NULL; }
 };
 #define BnvDeclare(T,v)        Cnv<T> CMK_CONCAT(Bnv_Var, v); 
 #define BnvStaticDeclare(T,v)  static Cnv<T> CMK_CONCAT(Bnv_Var, v); 
 #define BnvExtern(T,v)         extern Cnv<T> CMK_CONCAT(Bnv_Var, v);
 #define BnvInitialize(T,v)     CMK_CONCAT(Bnv_Var, v).init()
+#define BnvInitialized(v)      CMK_CONCAT(Bnv_Var, v).inited()
 #define BnvAccess(v)           CMK_CONCAT(Bnv_Var, v).data[CmiMyRank()][BgMyRank()]
 #define BnvAccessOther(v, r)   CMK_CONCAT(Bnv_Var, v).data[CmiMyRank()][r]
 #endif
@@ -298,6 +300,7 @@ public:
       }
     }
   }
+  inline int inited() { return data != NULL; }
 /*
   inline d getThreadData() {
     ASSERT(tTHREADTYPE == WORK_THREAD || tTHREADTYPE == COMM_THREAD);
@@ -311,6 +314,7 @@ public:
 #define BpvStaticDeclare(T,v)  static Cpv<T> CMK_CONCAT(Bpv_Var, v); 
 #define BpvExtern(T,v)         extern Cpv<T> CMK_CONCAT(Bpv_Var, v);
 #define BpvInitialize(T,v)     CMK_CONCAT(Bpv_Var, v).init()
+#define BpvInitialized(v)      CMK_CONCAT(Bpv_Var, v).inited()
 #define BpvAccess(v)           CMK_CONCAT(Bpv_Var, v).data[CmiMyRank()][BgMyRank()][BgGetThreadID()]
 /*#define BpvAccess(v)           (CMK_CONCAT(Bpv_Var, v).getThreadData())*/
 #define BpvAccessOther(v, r)   CMK_CONCAT(Bpv_Var, v).data[CmiMyRank()][BgMyRank()][r]
