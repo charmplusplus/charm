@@ -353,10 +353,12 @@ extern "C" int LDProcessorSpeed()
   // we can skip the other processors by remember the number here
   static int thisProcessorSpeed = -1;
 
-  if (CmiNumPes() == 0)  // I think it is safe to assume that we can
+  if (CkNumPes() == 1)  // I think it is safe to assume that we can
     return 1;            // skip this if we are only using 1 PE
   
   if (thisProcessorSpeed != -1) return thisProcessorSpeed;
+
+  //if (CkMyPe()==0) CkPrintf("Measuring processor speeds...");
 
   static int result=0;  // I don't care what this is, its just for
 			// timing, so this is thread safe.
@@ -391,6 +393,9 @@ extern "C" int LDProcessorSpeed()
   //    CkPrintf("[%d] Work block size is %d %d %f\n",
   //	     thisIndex,wps,msec,1.e3*(end_time3-start_time3));
   thisProcessorSpeed = wps;
+
+  //if (CkMyPe()==0) CkPrintf(" Done.\n");
+
   return wps;
 }
 
