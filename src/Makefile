@@ -588,8 +588,8 @@ xp-space.o: xp-space.c $(XPHEADERS)
 clean: cmk_clean
 	rm -f TAGS #*#
 	rm -f basics *.a
-	rm -f basics *.o
-	rm -f basics *~
+	rm -f dirs+sources *.o
+	rm -f cmk_extras *~
 	rm -rf ../bin
 	rm -rf ../lib
 	rm -rf ../include
