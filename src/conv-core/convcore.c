@@ -2339,7 +2339,7 @@ void ConverseCommonInit(char **argv)
   CrnInit();
   CmiInitImmediateMsg();
   CldModuleInit(argv);
-
+  
   /* main thread is suspendable */
 /*
   CthSetSuspendable(CthSelf(), 0);
@@ -2356,7 +2356,6 @@ void ConverseCommonExit(void)
 #endif
 
 }
-
 
 #if CMK_CMIPRINTF_IS_JUST_PRINTF
 

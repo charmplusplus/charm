@@ -102,6 +102,24 @@ int del;
   }
 }
 
+// match the first ntags tags and return the last tag
+int CmmGetLastTag(t,ntags,tags)
+CmmTable t;
+int ntags;
+int* tags;
+{
+  CmmEntry *enth; CmmEntry ent;
+  enth = &(t->first);
+  while (1) {
+    ent = (*enth);
+    if (ent==0) return -1;
+    if (CmmTagsMatch(ntags, tags, ntags, ent->tags)) {
+      return (ent->tags[ent->ntags-1]);
+    }
+    enth = &(ent->next);
+  }
+}
+
 int CmmEntries(t)
 CmmTable t;
 {
@@ -130,7 +148,8 @@ CmmTable CmmPup(pup_er p, CmmTable t, CmmPupMessageFn msgpup)
       msgpup(p,&e->msg);
       doomed=e;
       e = e->next;
-      if (pup_isDeleting(p)) CmiFree(doomed);
+      if (pup_isDeleting(p)) 
+        CmiFree(doomed);
     }
     if(pup_isDeleting(p)) 
     { /* We've now deleted all the links */

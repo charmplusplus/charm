@@ -97,6 +97,7 @@ typedef int MPI_Fint;
 #define MPI_MAX_ERROR_STRING	256
 
 /* these values have to match values in ampif.h */
+/* base types */
 #define MPI_DATATYPE_NULL    -1
 #define MPI_DOUBLE            0
 #define MPI_INT               1
@@ -113,6 +114,7 @@ typedef int MPI_Fint;
 #define MPI_UNSIGNED          12
 #define MPI_UNSIGNED_LONG     13
 #define MPI_LONG_DOUBLE       14
+/* tuple types */
 #define MPI_FLOAT_INT         15
 #define MPI_DOUBLE_INT        16
 #define MPI_LONG_INT          17
@@ -121,6 +123,7 @@ typedef int MPI_Fint;
 #define MPI_LONG_DOUBLE_INT   20
 #define MPI_2FLOAT            21
 #define MPI_2DOUBLE           22
+/* special types */
 #define MPI_LB                23
 #define MPI_UB                24
 #define MPI_LONG_LONG_INT     25
@@ -201,7 +204,7 @@ extern MPI_Comm MPI_COMM_UNIVERSE[MPI_MAX_COMM_WORLDS];
 
 typedef int MPI_Request;
 typedef struct {
-  int MPI_TAG, MPI_SOURCE, MPI_COMM, MPI_LENGTH;
+  int MPI_TAG, MPI_SOURCE, MPI_COMM, MPI_LENGTH, dummy;  // dummy is for tags[5]
 } MPI_Status;
 #define stsempty(sts) (sts).MPI_TAG=(sts).MPI_SOURCE=(sts).MPI_COMM=(sts).MPI_LENGTH=0
 #define MPI_STATUS_IGNORE (MPI_Status *)0

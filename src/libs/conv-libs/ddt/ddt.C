@@ -374,7 +374,6 @@ CkDDT_DataType::serialize(char* userdata, char* buffer, int num, int dir)
   return size ;
 }
 
-
 int
 CkDDT_DataType::isContig()
 {

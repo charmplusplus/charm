@@ -75,7 +75,6 @@ typedef struct PCQueueStruct
   CmiMemUnlock();\
 }
 
-
 PCQueue PCQueueCreate(void)
 {
   CircQueue circ;
@@ -171,7 +170,6 @@ void PCQueuePush(PCQueue Q, char *data)
   CmiUnlock(Q->lock);
 #endif
 }
-
 
 #endif
 
