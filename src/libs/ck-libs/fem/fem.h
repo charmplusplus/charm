@@ -150,7 +150,7 @@ class chunk : public ArrayElement1D
   int doneCalled;
 
   chunk(void);
-  chunk(CkMigrateMessage *) {}
+  chunk(CkMigrateMessage *msg): ArrayElement1D(msg) {}
   void run(void);
   void run(ChunkMsg*);
   void recv(DataMsg *);

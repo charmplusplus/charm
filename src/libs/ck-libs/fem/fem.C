@@ -776,20 +776,22 @@ chunk::pup(PUP::er &p)
   }
   p(wait_for);
   if(p.isSizing())
+  {
     tsize = CthPackBufSize(tid);
+  }
   p(tsize);
   if(p.isPacking())
   {
     CthPackThread(tid,p.getBuf());
-    p.advance(tsize);
   }
   if(p.isUnpacking())
   {
     tid = CthUnpackThread(p.getBuf());
-    p.advance(tsize);
     CthAwaken(tid);
     CtvAccessOther(tid,_femptr) = this;
+    tid = 0;
   }
+  p.advance(tsize);
   p(seqnum);
   p(nRecd);
   // update should not be in progress when migrating, so curbuf is not valid
@@ -798,6 +800,9 @@ chunk::pup(PUP::er &p)
   p(valid_udata);
   if(valid_udata != 0)
   {
+    p((void*)&pksz,sizeof(FEM_Packsize_Fn));
+    p((void*)&pk,sizeof(FEM_Pack_Fn));
+    p((void*)&upk,sizeof(FEM_Unpack_Fn));
     if(p.isSizing())
       usize = pksz(userdata);
     p(usize);
@@ -908,7 +913,7 @@ FEM_Migrate(void)
   int npes = CkNumPes();
   int tope = (mype+1)%npes;
   CProxy_chunk cproxy(_femaid);
-  cproxy.migrate(new MigrateInfo(tope));
+  cproxy[idx].migrate(new MigrateInfo(tope));
   CthSuspend();
   if(CkMyPe()!=tope)
   {
