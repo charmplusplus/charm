@@ -35,6 +35,7 @@ public:
   graph * object_graph;
   GreedyCommLB(const CkLBOptions &);
   GreedyCommLB(CkMigrateMessage *m);
+  void pup(PUP::er &p){ CentralLB::pup(p); }
 private:
   CentralLB::LDStats* stats;
   CmiBool QueryBalanceNow(int step);
