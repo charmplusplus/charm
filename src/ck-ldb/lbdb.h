@@ -200,6 +200,12 @@ int LDProcessorSpeed();
 CmiBool LDOMidEqual(const LDOMid &i1, const LDOMid &i2);
 CmiBool LDObjIDEqual(const LDObjid &i1, const LDObjid &i2);
 
+/*
+ *  LBDB Configuration calls
+ */
+void LDSetLBPeriod(LDHandle _db, double s);
+double LDGetLBPeriod(LDHandle _db);
+
 #ifdef __cplusplus
 }
 #endif /* _cplusplus */

@@ -69,6 +69,7 @@ public:
   ~LBDB() { }
 
   void SetPeriod(double secs) {batsync.setPeriod(secs);}
+  double GetPeriod() {return batsync.getPeriod();}
 
   void insert(LBOM *om);
 
@@ -170,6 +171,7 @@ public:
   public:
     void init(LBDB *_db,double initPeriod);
     void setPeriod(double p) {period=p;}
+    double getPeriod() {return period;}
   };
 
 private:

@@ -386,6 +386,18 @@ CmiBool LDObjIDEqual(const LDObjid &i1, const LDObjid &i2)
 	 && i1.id[3] == i2.id[3]);
 }
 
+void LDSetLBPeriod(LDHandle _db, double s)   // s is in seconds
+{
+  LBDB *const db = (LBDB*)(_db.handle);
+  db->SetPeriod(s);
+}
+
+double LDGetLBPeriod(LDHandle _db)   // s is in seconds
+{
+  LBDB *const db = (LBDB*)(_db.handle);
+  return db->GetPeriod();
+}
+
 #endif // CMK_LBDB_ON
 
 /*@}*/

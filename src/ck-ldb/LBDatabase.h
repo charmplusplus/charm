@@ -160,6 +160,8 @@ public:
   inline void ResumeClients() { LDResumeClients(myLDHandle); }
 
   inline int ProcessorSpeed() { return LDProcessorSpeed(); };
+  inline void SetLBPeriod(double s) { LDSetLBPeriod(myLDHandle, s);}
+  inline double GetLBPeriod() { return LDGetLBPeriod(myLDHandle);}
 private:
   LDHandle myLDHandle;
 
