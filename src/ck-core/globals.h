@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1995-06-08 17:07:12  gursoy
+ * Revision 2.2  1995-06-29 21:32:35  narain
+ * Added Extern declarations for LdbBocNum, numPe and LDB_ELEM_SIZE
+ *
+ * Revision 2.1  1995/06/08  17:07:12  gursoy
  * Cpv macro changes done
  *
  * Revision 1.8  1995/04/23  17:47:02  sanjeev
@@ -101,3 +104,6 @@ CsvExtern(int, MainChareLanguage);
 CsvExtern(int, CallProcessMsg_Index);
 CsvExtern(int, HANDLE_INCOMING_MSG_Index);
 
+CpvExtern(int, LdbBocNum);
+CpvExtern(int, numPe);
+CpvExtern(int, LDB_ELEM_SIZE);
