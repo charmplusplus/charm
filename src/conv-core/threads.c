@@ -129,7 +129,6 @@ typedef struct CthThreadBase
   int        datasize;   /* size of thread-private data, in bytes */
 
   int isIsomalloc; /* thread stack was isomalloc'd*/
-  CmiIsomallocBlock isostack;
   void      *stack; /*Pointer to thread stack*/
   int        stacksize; /*Size of thread stack (bytes)*/
 } CthThreadBase;
@@ -220,7 +219,7 @@ static void *CthAllocateStack(CthThreadBase *th,int *stackSize,int useIsomalloc)
     ret=malloc(*stackSize); 
   } else {
     th->isIsomalloc=1;
-    ret=CmiIsomalloc(*stackSize,&th->isostack);
+    ret=CmiIsomalloc(*stackSize);
   }
   _MEMCHECK(ret);
   th->stack=ret;
@@ -230,12 +229,12 @@ static void CthThreadBaseFree(CthThreadBase *th)
 {
   free(th->data);
   if (th->isIsomalloc) {
-	  CmiIsomallocFree(&th->isostack);
+	  CmiIsomallocFree(th->stack);
   } 
   else if (th->stack!=NULL) {
 	  free(th->stack);
-	  th->stack=NULL;
   }
+  th->stack=NULL;
 }
 
 CpvDeclare(int, _numSwitches); /*Context switch count*/
@@ -283,10 +282,12 @@ void CthPupBase(pup_er p,CthThreadBase *t,int useIsomalloc)
 	pup_int(p,&t->isIsomalloc);
 	pup_int(p,&t->stacksize);	
 	if (t->isIsomalloc) {
-		t->stack=CmiIsomallocPup(p,&t->isostack);
+		CmiIsomallocPup(p,&t->stack);
 	} else {
 		if (useIsomalloc)
 			CmiAbort("You must use CthCreateMigratable to use CthPup!\n");
+		/*Pup the stack pointer as raw bytes*/
+		pup_bytes(p,&t->stack,sizeof(t->stack));
 	}
 }
 
@@ -1210,7 +1211,6 @@ CthThread CthPup(pup_er p, CthThread t)
   CthPupBase(p,&t->base,1);
   
   /*Pup the stack pointer as bytes-- this works because stack is isomalloc'd*/
-  pup_bytes(p,&t->stack,sizeof(t->stack));
   pup_bytes(p,&t->stackp,sizeof(t->stackp));
 
   /*Don't worry about stack protection on migration*/  

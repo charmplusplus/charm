@@ -23,6 +23,20 @@ generalized by Orion Lawlor November 2001.
 #include <stdio.h>
 #include <stdlib.h>
 
+struct CmiIsomallocBlock {
+      int slot; /*First mapped slot*/
+      int length; /*Length of (user portion of) mapping, in bytes*/
+};
+typedef struct CmiIsomallocBlock CmiIsomallocBlock;
+
+/*Convert a heap block pointer to/from a CmiIsomallocBlock header*/
+static void *block2pointer(CmiIsomallocBlock *blockHeader) {
+	return (void *)(blockHeader+1);
+}
+static CmiIsomallocBlock *pointer2block(void *heapBlock) {
+	return ((CmiIsomallocBlock *)heapBlock)-1;
+}
+
 /*Integral type to be used for pointer arithmetic:*/
 typedef unsigned long memRange_t;
 
@@ -39,9 +53,6 @@ static char *isomallocStart=NULL;
 static char *isomallocEnd=NULL;
 
 /*Utility conversion functions*/
-static int addr2slot(void *addr) {
-	return (((char *)addr)-isomallocStart)/(memRange_t)slotsize;
-}
 static void *slot2addr(int slot) {
 	return isomallocStart+((memRange_t)slotsize)*((memRange_t)slot);
 }
@@ -51,11 +62,9 @@ static int slot2pe(int slot) {
 static int pe2slot(int pe) {
 	return pe*numslots;
 }
+//Return the number of slots in a block with n user data bytes
 static int length2slots(int nBytes) {
-	return (nBytes+slotsize-1)/slotsize;
-}
-static int slots2length(int nSlots) {
-	return nSlots*slotsize;
+	return (sizeof(CmiIsomallocBlock)+nBytes+slotsize-1)/slotsize;
 }
 
 typedef struct _slotblock
@@ -235,27 +244,25 @@ print_slots(slotset *ss)
 /*This version of the allocate/deallocate calls are used if the 
 real mmap versions are disabled.*/
 static int disabled_map_warned=0;
-static void *disabled_map(CmiIsomallocBlock *bk,int nBytes) {
-	void *ret;
+static void *disabled_map(int nBytes) 
+{
 	if (!disabled_map_warned) {
 		disabled_map_warned=1;
 		if (CmiMyPe()==0)
 			CmiError("isomalloc.c> Warning: since mmap() doesn't work,"
 			" you won't be able to migrate threads\n");
 	}
-	ret=malloc(nBytes);
-	*(void **)bk=ret; /*HACK: Stash the malloc'd pointer in the "block" object*/
-	return ret;
+	return malloc(nBytes);
 }
-static void *disabled_unmap(CmiIsomallocBlock *bk) {
-	free(*(void **)bk);
-	*(void **)bk=NULL;
+static void disabled_unmap(void *bk) {
+	free(bk);
 }
 
 /*Turn off isomalloc memory, for the given reason*/
 static void disable_isomalloc(const char *why)
 {
     isomallocStart=NULL;
+    isomallocEnd=NULL;
 #if CMK_THREADS_DEBUG
     CmiPrintf("[%d] isomalloc.c> Disabling isomalloc because %s\n",CmiMyPe(),why);
 #endif
@@ -263,7 +270,7 @@ static void disable_isomalloc(const char *why)
 
 #if ! CMK_HAS_MMAP
 /****************** Manipulate memory map (Win32 non-version) *****************/
-static void *
+static CmiIsomallocBlock *
 map_slots(int slot, int nslots)
 {
 	CmiAbort("isomalloc.c: map_slots should never be called here.");
@@ -292,7 +299,7 @@ CpvStaticDeclare(int, zerofd); /*File descriptor for /dev/zero, for mmap*/
 /*
  * maps the virtual memory associated with slot using mmap
  */
-static void *
+static CmiIsomallocBlock *
 map_slots(int slot, int nslots)
 {
   void *pa;
@@ -325,7 +332,7 @@ map_slots(int slot, int nslots)
   CmiPrintf("[%d] mmap'd slots %d-%d to address %p\n",CmiMyPe(),
 	    slot,slot+nslots-1,addr);
 #endif
-  return pa;
+  return (CmiIsomallocBlock *)pa;
 }
 
 /*
@@ -505,7 +512,7 @@ static memRegion_t find_free_region(memRegion_t *used,int nUsed,int atLeast)
 static void init_ranges(char **argv)
 {
   /*Largest value a signed int can hold*/
-  memRange_t intMax=((memRange_t)1)<<(sizeof(int)*8-1)-1;
+  memRange_t intMax=(((memRange_t)1)<<(sizeof(int)*8-1))-1;
 
   /*Round slot size up to nearest page size*/
   slotsize=16*1024;
@@ -697,11 +704,11 @@ static void all_slotOP(const slotOP *op,int s,int n)
 }
 
 /************** External interface ***************/
-void *CmiIsomalloc(int size,CmiIsomallocBlock *b)
+void *CmiIsomalloc(int size)
 {
 	int s,n;
-	void *ret;
-	if (isomallocStart==NULL) return disabled_map(b,size);
+	CmiIsomallocBlock *blk;
+	if (isomallocStart==NULL) return disabled_map(size);
 	n=length2slots(size);
 	/*Always satisfy mallocs with local slots:*/
 	s=get_slots(CpvAccess(myss),n);
@@ -711,58 +718,75 @@ void *CmiIsomalloc(int size,CmiIsomallocBlock *b)
 		CmiAbort("Out of virtual address space for isomalloc");
 	}
 	grab_slots(CpvAccess(myss),s,n);
-	b->slot=s;
-	b->nslots=n;
-	ret=map_slots(s,n);
-	if (!ret) map_failed(s,n);
-	return ret;
+	blk=map_slots(s,n);
+	if (!blk) map_failed(s,n);
+	blk->slot=s;
+	blk->length=size;
+	return block2pointer(blk);
 }
 
-void *CmiIsomallocPup(pup_er p,CmiIsomallocBlock *b)
+void CmiIsomallocPup(pup_er p,void **blockPtrPtr)
 {
-	int s,n;
+	CmiIsomallocBlock *blk;
+	int s,n,length;
 	if (isomallocStart==NULL) CmiAbort("isomalloc is disabled-- cannot use IsomallocPup");
-	pup_int(p,&b->slot);
-	pup_int(p,&b->nslots);
-	s=b->slot, n=b->nslots;
+
+	if (!pup_isUnpacking(p)) 
+	{ /*We have an existing block-- unpack start slot & length*/
+		blk=pointer2block(*blockPtrPtr);
+		s=blk->slot;
+		length=blk->length;
+	}
+	
+	pup_int(p,&s);
+	pup_int(p,&length);
+	n=length2slots(length);
+	
 	if (pup_isUnpacking(p)) 
-	{ /*Allocate block in its old location*/
+	{ /*Must allocate a new block in its old location*/
 		if (pup_isUserlevel(p))
 			/*Checkpoint: must grab old slots (even remote!)*/
 			all_slotOP(&grabOP,s,n);
-		if (!map_slots(s,n)) map_failed(s,n);
+		blk=map_slots(s,n);
+		if (!blk) map_failed(s,n);
+		blk->slot=s;
+		blk->length=length;
+		*blockPtrPtr=block2pointer(blk);
 	}
 	
 	/*Pup the allocated data*/
-	pup_bytes(p,slot2addr(s),slots2length(n));
-
+	pup_bytes(p,*blockPtrPtr,length);
+	
 	if (pup_isDeleting(p)) 
 	{ /*Unmap old slots, but do not mark as free*/
 		unmap_slots(s,n);
-		b->nslots=0;/*Mark as unmapped*/
+		*blockPtrPtr=NULL; /*Zero out user's pointer*/
 	}
-	return slot2addr(s);
 }
 
-void CmiIsomallocFree(CmiIsomallocBlock *b)
+void CmiIsomallocFree(void *blockPtr)
 {
 	if (isomallocStart==NULL) {
-		disabled_unmap(b);
+		disabled_unmap(blockPtr);
 	}
-	else
+	else if (blockPtr!=NULL)
 	{
-		int s=b->slot, n=b->nslots;
-		if (n==0) return;
+		CmiIsomallocBlock *blk=pointer2block(blockPtr);
+		int s=blk->slot, n=length2slots(blk->length);
 		unmap_slots(s,n);
 		/*Mark used slots as free*/
 		all_slotOP(&freeOP,s,n);
 	}
 }
+int   CmiIsomallocLength(void *block)
+{
+	return pointer2block(block)->length;
+}
 
 /*Return true if this address is in the region managed by isomalloc*/
 int CmiIsomallocInRange(void *addr)
 {
-	if (isomallocStart==NULL) return 1;
+	if (isomallocStart==NULL) return 0; /* There is no range we manage! */
 	return pointer_ge((char *)addr,isomallocStart) && 
 	       pointer_lt((char*)addr,isomallocEnd);
 }
@@ -777,4 +801,110 @@ void CmiIsomallocInit(char **argv)
     init_ranges(argv);
   }
 }
+
+/***************** BlockList interface *********
+This was moved here from memory-isomalloc.c when it 
+was realized that a list-of-isomalloc'd-blocks is useful for
+more than just isomalloc heaps.
+*/
+
+typedef CmiIsomallocBlockList Slot;
+
+/*Convert a slot to a user address*/
+static char *Slot_toUser(Slot *s) {return (char *)(s+1);}
+static Slot *Slot_fmUser(void *s) {return ((Slot *)s)-1;}
+
+
+/*Build a new blockList.*/
+CmiIsomallocBlockList *CmiIsomallocBlockListNew(void)
+{
+	CmiIsomallocBlockList *ret;
+	ret=(CmiIsomallocBlockList *)CmiIsomalloc(sizeof(*ret));
+	ret->next=ret; /*1-entry circular linked list*/
+	ret->prev=ret;
+	return ret;
+}
+
+/*Pup all the blocks in this list.  This amounts to two circular
+list traversals.  Because everything's isomalloc'd, we don't even
+have to restore the pointers-- they'll be restored automatically!
+*/
+void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp)
+{
+	int i,nBlocks=0;
+	Slot *cur=NULL, *start=*lp;
+#if 0 /*#ifndef CMK_OPTIMIZE*/
+	if (CpvAccess(isomalloc_blocklist)!=NULL)
+		CmiAbort("Called CmiIsomallocBlockListPup while a blockList is active!\n"
+			"You should swap out the active blocklist before pupping.\n");
+#endif
+	/*Count the number of blocks in the list*/
+	if (!pup_isUnpacking(p)) {
+		nBlocks=1; /*<- Since we have to skip the start block*/
+		for (cur=start->next; cur!=start; cur=cur->next) 
+			nBlocks++;
+		/*Prepare for next trip around list:*/
+		cur=start;
+	}
+	pup_int(p,&nBlocks);
+	
+	/*Pup each block in the list*/
+	for (i=0;i<nBlocks;i++) {
+		void *newBlock=cur;
+		if (!pup_isUnpacking(p)) 
+		{ /*While packing, we traverse the list to find our blocks*/
+			cur=cur->next;
+		}
+		CmiIsomallocPup(p,&newBlock);
+		if (i==0 && pup_isUnpacking(p))
+			*lp=(Slot *)newBlock;
+	}
+	if (pup_isDeleting(p))
+		*lp=NULL;
+}
+
+/*Delete all the blocks in this list.*/
+void CmiIsomallocBlockListDelete(CmiIsomallocBlockList *l)
+{
+	Slot *start=l;
+	Slot *cur=start;
+	if (cur==NULL) return; /*Already deleted*/
+	do {
+		Slot *doomed=cur;
+		cur=cur->next; /*Have to stash next before deleting cur*/
+		CmiIsomallocFree(doomed);
+	} while (cur!=start);
+}
+
+/*Allocate a block from this blockList*/
+void *CmiIsomallocBlockListMalloc(CmiIsomallocBlockList *l,int nBytes)
+{
+	Slot *n; /*Newly created slot*/
+	n=(Slot *)CmiIsomalloc(sizeof(Slot)+nBytes);
+	/*Link the new block into the circular blocklist*/
+	n->prev=l;
+	n->next=l->next;
+	l->next->prev=n;
+	l->next=n;
+	return Slot_toUser(n);
+}
+
+/*Remove this block from its list and memory*/
+void CmiIsomallocBlockListFree(void *block)
+{
+	Slot *n=Slot_fmUser(block);
+#if DOHEAPCHECK
+	if (n->prev->next!=n || n->next->prev!=n) 
+		CmiAbort("Heap corruption detected in isomalloc block list header!\n"
+			"  Run with ++debug and look for writes to negative array indices");
+#endif
+	/*Link ourselves out of the blocklist*/
+	n->prev->next=n->next;
+	n->next->prev=n->prev;
+	CmiIsomallocFree(n);
+}
+
+
+
+
 

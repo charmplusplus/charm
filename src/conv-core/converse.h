@@ -676,17 +676,30 @@ void   CmiHandleMessage(void *msg);
 #define CQS_QUEUEING_BFIFO 6
 #define CQS_QUEUEING_BLIFO 7
 
-/****** Isomalloc Memory Allocation ********/
-struct CmiIsomallocBlock {
-	int slot; /*First mapped slot*/
-	int nslots; /*Number of mapped slots*/
-};
-typedef struct CmiIsomallocBlock CmiIsomallocBlock;
+/****** Isomalloc: Migratable Memory Allocation ********/
+/*Simple block-by-block interface:*/
+void *CmiIsomalloc(int sizeInBytes);
+void  CmiIsomallocPup(pup_er p,void **block);
+void  CmiIsomallocFree(void *block);
 
-void *CmiIsomalloc(int size,CmiIsomallocBlock *b);
-void *CmiIsomallocPup(pup_er p,CmiIsomallocBlock *b);
-void  CmiIsomallocFree(CmiIsomallocBlock *b);
+int   CmiIsomallocLength(void *block);
 int   CmiIsomallocInRange(void *addr);
+
+/*List-of-blocks interface:*/
+struct CmiIsomallocBlockList {/*Circular doubly-linked list of blocks:*/
+	struct CmiIsomallocBlockList *prev,*next;
+	/*actual data of block follows here...*/
+};
+typedef struct CmiIsomallocBlockList CmiIsomallocBlockList;
+
+/*Build/pup/destroy an entire blockList.*/
+CmiIsomallocBlockList *CmiIsomallocBlockListNew(void);
+void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **l);
+void CmiIsomallocBlockListDelete(CmiIsomallocBlockList *l);
+
+/*Allocate/free a block from this blockList*/
+void *CmiIsomallocBlockListMalloc(CmiIsomallocBlockList *l,int nBytes);
+void CmiIsomallocBlockListFree(void *doomedMallocedBlock);
 
 /****** CTH: THE LOW-LEVEL THREADS PACKAGE ******/
 

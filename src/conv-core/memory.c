@@ -23,6 +23,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h> /*For memset, memcpy*/
 #include "converse.h"
 
 /*Choose the proper default configuration*/
@@ -226,14 +227,8 @@ void free_nomigrate(void *mem) { free(mem); }
 
 #ifndef CMK_MEMORY_HAS_ISOMALLOC
 #include "memory-isomalloc.h"
-/*Empty implementations of the CmiIsomallocBlockList API*/
-CmiIsomallocBlockList *CmiIsomallocBlockListNew(void) 
-   {return NULL;}
+/*Not using isomalloc heaps, so forget about activating block list:*/
 CmiIsomallocBlockList *CmiIsomallocBlockListActivate(CmiIsomallocBlockList *l)
    {return l;}
-void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **l)
-   {}
-void CmiIsomallocBlockListFree(CmiIsomallocBlockList *l)
-   {}
 #endif
 

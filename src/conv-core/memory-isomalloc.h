@@ -21,21 +21,9 @@ void free_nomigrate(void *mem);
 void *malloc_reentrant(size_t size);
 void free_reentrant(void *mem);
 
-/*A linked list of allocated migratable memory blocks:*/
-struct CmiIsomallocBlockList_tag;
-typedef struct CmiIsomallocBlockList_tag CmiIsomallocBlockList;
-
-/*Build a new blockList.*/
-CmiIsomallocBlockList *CmiIsomallocBlockListNew(void);
-
 /*Make this blockList active (returns the old blocklist).*/
 CmiIsomallocBlockList *CmiIsomallocBlockListActivate(CmiIsomallocBlockList *l);
 
-/*Pup all the blocks in this list.*/
-void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **l);
-
-/*Delete all the blocks in this list.*/
-void CmiIsomallocBlockListFree(CmiIsomallocBlockList *l);
 
 #ifdef __cplusplus
 };
