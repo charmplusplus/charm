@@ -105,11 +105,22 @@ void CParseNode::generateEntryList(TList *list, CParseNode *thisWhen)
     case ENTRY:
       CEntry *entry;
       int found=0;
-      for(entry=(CEntry *)(list->begin()); !list->end(); entry=(CEntry *)(list->next())) {
+      for(entry=(CEntry *)(list->begin()); !list->end(); 
+          entry=(CEntry *)(list->next())) {
         if(entry->entry->equal(con1->text) &&
            entry->msgType->equal(con3->text)) {
            found = 1;
-           entry->whenList->append(thisWhen);
+           // check to see if thisWhen is already in entry's whenList
+           int whenFound = 0;
+           TList *tmpList = entry->whenList;
+           CParseNode *tmpNode;
+           for(tmpNode = (CParseNode *) tmpList->begin(); !tmpList->end();
+               tmpNode = (CParseNode *) tmpList->next()) {
+             if(tmpNode->nodeNum == thisWhen->nodeNum)
+               whenFound = 1;
+           }
+           if(!whenFound)
+             entry->whenList->append(thisWhen);
            entryPtr = entry;
 	   if(con2)
 	     entry->refNumNeeded = 1;
