@@ -157,6 +157,23 @@ public:
         return readablePage(page)[offset];
     }
 
+    // idx is the element to be read/written
+    //
+    // This function returns a reference to the first element on the
+    // page that contains idx.
+    inline ENTRY& getPageBottom(unsigned int idx, MSA_Page_Fault_t accessMode)
+    {
+        if (accessMode==Read_Fault) {
+            unsigned int page = idx / ENTRIES_PER_PAGE;
+            return const_cast<ENTRY&>(readablePage(page)[0]);
+        } else if (accessMode==Write_Fault || accessMode==Accumulate_Fault) {
+            unsigned int page = idx / ENTRIES_PER_PAGE;
+            unsigned int offset = idx % ENTRIES_PER_PAGE;
+            ENTRY* e=writeablePage(page, offset);
+            return e[0];
+        }
+    }
+
     /// Return a read-only copy of the element at idx;
     ///   ONLY WORKS WHEN ELEMENT IS ALREADY IN THE CACHE--
     ///   WILL SEGFAULT IF ELEMENT NOT ALREADY PRESENT.
