@@ -14,9 +14,29 @@
 using namespace Mgc;
 using namespace std;
 
+namespace Mgc {
+TetrahedronConsumer::~TetrahedronConsumer() {}
+
+/**
+  Split tets by this plane, keeping only the peices that are inside the plane.
+  A tet is considered inside the plane if all the points
+   of the tet have negative distance (rkPlane.DistanceTo).
+*/
+class PlaneSplitTetrahedronConsumer : public TetrahedronConsumer {
+	const Plane& rkPlane;
+	TetrahedronConsumer &dest;
+public:
+	PlaneSplitTetrahedronConsumer(const Plane& rkPlane_,TetrahedronConsumer &dest_)
+		:rkPlane(rkPlane_), dest(dest_) {}
+	
+	/// Pass to dest the fragments of this tet that like on our
+	///  side of the plane.
+	virtual void Add(const Tetrahedron& tet);
+};
+};
+
 //----------------------------------------------------------------------------
-static void SplitAndDecompose (const Tetrahedron &kTetraP, const Plane& rkPlane,
-    vector<Tetrahedron>& rkInside)
+void Mgc::PlaneSplitTetrahedronConsumer::Add(const Tetrahedron &kTetraP)
 {
     // determine on which side of the plane the points of the tetrahedron lie
     Real afC[4];
@@ -46,7 +66,7 @@ static void SplitAndDecompose (const Tetrahedron &kTetraP, const Plane& rkPlane,
     if ( iPositive == 0 )
     {
         // tetrahedron is completely on the negative side of plane
-        rkInside.push_back(kTetraP);
+        dest.Add(kTetraP);
         return;
     }
 
@@ -66,7 +86,7 @@ static void SplitAndDecompose (const Tetrahedron &kTetraP, const Plane& rkPlane,
             fW1 = +afC[aiP[i]]*fInvCDiff;
             kTetra[aiP[i]] = fW0*kTetra[aiP[i]] + fW1*kTetra[aiN[0]];
         }
-        rkInside.push_back(kTetra);
+        dest.Add(kTetra);
     }
     else if ( iPositive == 2 )
     {
@@ -90,12 +110,12 @@ static void SplitAndDecompose (const Tetrahedron &kTetraP, const Plane& rkPlane,
 
             kTetra[aiP[0]] = akIntp[2];
             kTetra[aiP[1]] = akIntp[1];
-            rkInside.push_back(kTetra);
+            dest.Add(kTetra);
 
-            rkInside.push_back(Tetrahedron(kTetra[aiN[1]],akIntp[3],akIntp[2],
+            dest.Add(Tetrahedron(kTetra[aiN[1]],akIntp[3],akIntp[2],
                 akIntp[1]));
 
-            rkInside.push_back(Tetrahedron(kTetra[aiN[0]],akIntp[0],akIntp[1],
+            dest.Add(Tetrahedron(kTetra[aiN[0]],akIntp[0],akIntp[1],
                 akIntp[2]));
         }
         else
@@ -108,7 +128,7 @@ static void SplitAndDecompose (const Tetrahedron &kTetraP, const Plane& rkPlane,
                 fW1 = +afC[aiP[i]]*fInvCDiff;
                 kTetra[aiP[i]] = fW0*kTetra[aiP[i]] + fW1*kTetra[aiN[0]];
             }
-            rkInside.push_back(kTetra);
+            dest.Add(kTetra);
         }
     }
     else if ( iPositive == 1 )
@@ -125,12 +145,12 @@ static void SplitAndDecompose (const Tetrahedron &kTetraP, const Plane& rkPlane,
             }
 
             kTetra[aiP[0]] = akIntp[0];
-            rkInside.push_back(kTetra);
+            dest.Add(kTetra);
 
-            rkInside.push_back(Tetrahedron(akIntp[0],kTetra[aiN[1]],
+            dest.Add(Tetrahedron(akIntp[0],kTetra[aiN[1]],
                 kTetra[aiN[2]],akIntp[1]));
 
-            rkInside.push_back(Tetrahedron(kTetra[aiN[2]],akIntp[1],akIntp[2],
+            dest.Add(Tetrahedron(kTetra[aiN[2]],akIntp[1],akIntp[2],
                 akIntp[0]));
         }
         else if ( iNegative == 2 )
@@ -145,9 +165,9 @@ static void SplitAndDecompose (const Tetrahedron &kTetraP, const Plane& rkPlane,
             }
 
             kTetra[aiP[0]] = akIntp[0];
-            rkInside.push_back(kTetra);
+            dest.Add(kTetra);
 
-            rkInside.push_back(Tetrahedron(akIntp[1],kTetra[aiZ[0]],
+            dest.Add(Tetrahedron(akIntp[1],kTetra[aiZ[0]],
                 kTetra[aiN[1]],akIntp[0]));
         }
         else
@@ -157,7 +177,7 @@ static void SplitAndDecompose (const Tetrahedron &kTetraP, const Plane& rkPlane,
             fW0 = -afC[aiN[0]]*fInvCDiff;
             fW1 = +afC[aiP[0]]*fInvCDiff;
             kTetra[aiP[0]] = fW0*kTetra[aiP[0]] + fW1*kTetra[aiN[0]];
-            rkInside.push_back(kTetra);
+            dest.Add(kTetra);
         }
     }
 }
@@ -182,15 +202,12 @@ bool allOutside(const Plane *p,int nPlane,const Tetrahedron& rk)
 
 //----------------------------------------------------------------------------
 void Mgc::FindIntersection (const Tetrahedron& rkT0, const Tetrahedron& rkT1,
-    vector<Tetrahedron>& rkIntr)
+    Mgc::TetrahedronConsumer& dest)
 {
     // build planar faces of T0
     const int planePer=4;
     Plane akPlane[planePer];
     rkT0.GetPlanes(akPlane);
-    
-    // Return set is initially empty
-    rkIntr.clear();
     
 /* early-exit test for non-overlapping tets */
     if (1) {
@@ -200,24 +217,16 @@ void Mgc::FindIntersection (const Tetrahedron& rkT0, const Tetrahedron& rkT1,
             return; /* tets do not overlap */
     }
     
-    // initial object to clip is T1
-    rkIntr.push_back(rkT1);
-    vector<Tetrahedron> rkTemp; // pour tets back and forth from here
-
-    // clip T1 against planes of T0
-    for (int iP = 0; iP < planePer; iP++)
-    {
-	vector<Tetrahedron> *src, *dest;
-	if ((iP%2)==0) { // Read from rkIntr, write to rkTemp
-		src=&rkIntr; dest=&rkTemp;
-	} else { // Vice versa: last loop writes to rkIntr
-		src=&rkTemp; dest=&rkIntr;
-	}
-	dest->clear();
-	if (src->size()==0) return; /* clipped away to nothing */
-	for (int iT = 0; iT < (int)src->size(); iT++)
-	    SplitAndDecompose((*src)[iT],akPlane[iP],*dest);
-    }
+  /* Build filter to successively clip tets by each plane of T0,
+      passing the final tets to the user's destination.
+   */
+    PlaneSplitTetrahedronConsumer cons0(akPlane[0],dest);
+    PlaneSplitTetrahedronConsumer cons1(akPlane[1],cons0);
+    PlaneSplitTetrahedronConsumer cons2(akPlane[2],cons1);
+    PlaneSplitTetrahedronConsumer cons3(akPlane[3],cons2);
+    
+  /* Pass T1 through the filter chain */
+    cons3.Add(rkT1);
 }
 //----------------------------------------------------------------------------
 

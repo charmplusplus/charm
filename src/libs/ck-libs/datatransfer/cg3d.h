@@ -207,7 +207,7 @@ public:
 		const CkVector3d &C_,const CkVector3d &D_);
 	/// Copy constructor
 	Tet3d(const Tet3d &t) 
-		:Shape3d(ps,4,4,h,p)
+		:Shape3d(t.ps,4,4,h,p)
 	{
 		for (int i=0;i<4;i++) { h[i]=t.h[i]; p[i]=t.p[i]; }
 	}

@@ -21,7 +21,11 @@ test2=test_noboite
 test2o=$(test2).C $(TOBJS) charm_standalone.o
 test3=test_transfer
 test3o=$(test3).C $(TOBJS) charm_standalone.o
-tests=$(test1) $(test2) $(test3)
+test4=test_vol
+test4o=$(test4).C cg3d.o \
+	test_vol_mgc.o $(MGCOBJS) \
+	test_vol_planes.o volume_planes.o
+tests=$(test1) $(test2) $(test3) $(test4)
 
 all: $(DEST)
 
@@ -40,6 +44,9 @@ $(test2): $(test2o) $(HEADDEP)
 
 $(test3): $(test3o) $(HEADDEP)
 	$(CHARMC) $(test3o) -o $(test3) -seq -language c++
+
+$(test4): $(test4o) $(HEADDEP)
+	$(CHARMC) $(test4o) -o $(test4) -language ampi
 
 test: $(tests)
 	./$(test1) 1 10000

@@ -11,35 +11,19 @@
 #include "MgcIntr3DTetrTetr.h"
 using namespace Mgc;
 
-/**
- * Return the volume of the tetrahedron with these vertices.
- */
-double tetVolume(const Mgc::Vector3 &A,const Mgc::Vector3 &B,
-		const Mgc::Vector3 &C,const Mgc::Vector3 &D) 
-{
-	const static double oneSixth=1.0/6.0;
-	return oneSixth*(B-A).Dot((D-A).Cross(C-A));
-}
-
 /// Compute the volume shared by elements A and B, which must be tets.
 double getSharedVolumeTets(const ConcreteElement &A,const ConcreteElement &B)
 {
 	Mgc::Tetrahedron kT0,kT1;
-	std::vector<Tetrahedron> kIntr;
 	for(int i=0;i<4;i++){
 		CkVector3d pts0 = A.getNodeLocation(i);
 		kT0[i] = Mgc::Vector3((double)pts0.x,(double)pts0.y,(double)pts0.z);
 		CkVector3d pts1 = B.getNodeLocation(i);
 		kT1[i] = Mgc::Vector3((double)pts1.x,(double)pts1.y,(double)pts1.z);
 	}
-	Mgc::FindIntersection(kT0,kT1,kIntr);
-	double sumVol = 0;
-	for (std::vector<Mgc::Tetrahedron>::iterator vIter = kIntr.begin();
-	     vIter != kIntr.end();
-	     vIter++) {
-		const Mgc::Tetrahedron &kT2 = (*vIter);
-		sumVol += fabs(tetVolume(kT2[0],kT2[1],kT2[2],kT2[3]));
-	}
+	Mgc::TetrahedronVolumeConsumer vol;
+	Mgc::FindIntersection(kT0,kT1,vol);
+	double sumVol = vol;
 	if(sumVol < 0){
 		printf("volume less than zero!\n");
 		abort();
