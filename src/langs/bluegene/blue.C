@@ -56,9 +56,9 @@ extern "C" int read_counters(int e0, long long *c0, int e1, long long *c1);
 inline double Count2Time(long long c) { return c*5.e-7; }
 #elif CMK_HAS_COUNTER_PAPI
 #include <papi.h>
-int papiEvents[2] = { PAPI_TOT_CYC, PAPI_FP_INS };
-long_long papiValues[2];
-inline double Count2Time(long long c) { return c*cva(bgMach).fpfactor; }
+int papiEvents[4];
+int numPapiEvents;
+long_long papiValues[4];
 #endif
 
 
@@ -82,18 +82,40 @@ int    BgGetArgc() { return arg_argc; }
 ****************************************************************************/
 
 #if CMK_HAS_COUNTER_PAPI
-int read_counters(int e0, long long *c0, int e1, long long *c1) {
+int init_counters()
+{
+    numPapiEvents = 0;
+    // PAPI high level API does not require explicit library intialization
+    papiEvents[numPapiEvents++] = PAPI_TOT_CYC;
+    if (PAPI_query_event(PAPI_FP_INS) == PAPI_OK) {
+      if (CmiMyPe()== 0) printf("PAPI_FP_INS used\n");
+      papiEvents[numPapiEvents++] = PAPI_FP_INS;
+    } else {
+      if (CmiMyPe()== 0) printf("PAPI_TOT_INS used\n");
+      papiEvents[numPapiEvents++] = PAPI_TOT_INS;
+    }
+    int status = PAPI_start_counters(papiEvents, numPapiEvents);
+    if (status != PAPI_OK) {
+      CmiPrintf("PAPI_start_counters error code: %d\n", status);
+      CmiAbort("Unable to start PAPI counters!\n");
+    }
+}
+
+int read_counters(long_long *papiValues, int n) 
+{
   // PAPI_read_counters resets the counter, hence it behaves like the perfctr
   // code for Origin2000
   int status;
-  status = PAPI_read_counters(papiValues, 2);
+  status = PAPI_read_counters(papiValues, n);
   if (status != PAPI_OK) {
-    CmiPrintf("PAPI error: %d\n", status);
+    CmiPrintf("PAPI_read_counters error: %d\n", status);
     CmiAbort("Failed to read PAPI counters!\n");
   }
-  *c0 = papiValues[0];
-  *c1 = papiValues[1];
   return 0;
+}
+
+inline double Count2Time(long_long *papiValues, int n) { 
+  return papiValues[1]*cva(bgMach).fpfactor; 
 }
 #endif
 
@@ -671,8 +693,7 @@ void startVTimer()
     // do a fake read to reset the counters. It would be more efficient
     // to use the low level API, but that would be a lot more code to
     // write for now.
-    long long c0, c1;
-    if (read_counters(0, &c0, 21, &c1) < 0) perror("read_counters");
+    if (read_counters(papiValues, numPapiEvents) < 0) perror("read_counters");
   }
 #endif
 }
@@ -700,13 +721,16 @@ void stopVTimer()
 //      tCURRTIME += 1e-6;
     }
   }
-#if CMK_ORIGIN2000 || CMK_HAS_COUNTER_PAPI
   else if (cva(bgMach).timingMethod == BG_COUNTER)  {
+#if CMK_ORIGIN2000
     long long c0, c1;
     if (read_counters(0, &c0, 21, &c1) < 0) perror("read_counters");
     tCURRTIME += Count2Time(c1);
-  }
+#elif CMK_HAS_COUNTER_PAPI
+    if (read_counters(papiValues, numPapiEvents) < 0) perror("read_counters");
+    tCURRTIME += Count2Time(papiValues, numPapiEvents);
 #endif
+  }
 }
 
 double BgGetTime()
@@ -726,20 +750,20 @@ double BgGetTime()
   else if (cva(bgMach).timingMethod == BG_ELAPSE) {
     return tCURRTIME;
   }
-#if CMK_ORIGIN2000 || CMK_HAS_COUNTER_PAPI
   else if (cva(bgMach).timingMethod == BG_COUNTER) {
     if (tTIMERON) {
+#if CMK_ORIGIN2000
       long long c0, c1;
       if (read_counters(0, &c0, 21, &c1) <0) perror("read_counters");;
       tCURRTIME += Count2Time(c1);
-      // origin 2000 only
-#ifdef CMK_ORIGIN2000
       if (start_counters(0, 21)<0) perror("start_counters");;
+#elif CMK_HAS_COUNTER_PAPI
+    if (read_counters(papiValues, numPapiEvents) < 0) perror("read_counters");
+    tCURRTIME += Count2Time(papiValues, numPapiEvents);
 #endif
     }
     return tCURRTIME;
   }
-#endif
   else 
     CmiAbort("Unknown Timing Method.");
   return -1;
@@ -987,19 +1011,7 @@ CmiStartFn bgMain(int argc, char **argv)
     cva(bgMach).timingMethod = BG_COUNTER;
   }
   if (cva(bgMach).timingMethod == BG_COUNTER) {
-    // PAPI high level API does not require explicit library intialization
-    papiEvents[0] = PAPI_TOT_CYC;
-    if (PAPI_query_event(PAPI_FP_INS) == PAPI_OK) {
-      printf("PAPI_FP_INS\n");
-      papiEvents[1] = PAPI_FP_INS;
-    } else {
-      printf("PAPI_TOT_INS\n");
-      papiEvents[1] = PAPI_TOT_INS;
-    }
-    int status = PAPI_start_counters(papiEvents, 2);
-    if (status != PAPI_OK) {
-      CmiAbort("Unable to start PAPI counters!\n");
-    }
+    init_counters();
   }
 #endif
   
