@@ -145,8 +145,8 @@ RecBisectBfLB::convertGraph(ObjGraph *og) {
 
   g = initGraph(V, E);
 
-  CkPrintf("[%d] RecBisectBfLB: convert (v=%d, e=%d, g=%d\n",
-	   CkMyPe(), V, E, (int) g);
+  CkPrintf("[%d] RecBisectBfLB: convert (v=%d, e=%d, g=%p\n",
+	   CkMyPe(), V, E, g);
 
   for (i =0; i<V; i++) {
     nextVertex(g, i, og->LoadOf(i));

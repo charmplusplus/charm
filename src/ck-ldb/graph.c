@@ -38,7 +38,7 @@ void nextVertex(Graph *g, int v, float weight)
   g->currentVertex++;
   current = g->currentVertex; 
   if(current >= g->V)
-    CkPrintf("current overflow\n");
+    printf("current overflow\n");
   g->vertices[current].index = v;
   g->vertices[current].weight = weight;
   g->vertices[current].firstEdge = g->currentEdge;
