@@ -1227,9 +1227,10 @@ CthThread CthPup(pup_er p, CthThread t)
   return t;
 }
 
+#endif
+
 void CthTraceResume(CthThread t)
 {
   traceResume(&t->base.tid);
 }
 
-#endif
