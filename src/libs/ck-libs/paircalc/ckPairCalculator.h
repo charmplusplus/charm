@@ -34,15 +34,24 @@ class PairCalculator: public CBase_PairCalculator {
   void pup(PUP::er &);
   inline complex compute_entry(int n, complex *psi1, complex *psi2, int op) 
     {
-      double re=0, im = 0;
-      double *ptr1 = (double*)psi1;
-      double *ptr2 = (double*)psi2;
-      for (int i = 0; i < 2*n; i+=2){
-	re += ptr1[i]*ptr2[i] - ptr1[i+1]*ptr2[i+1];
-	im += ptr1[i+1]*ptr2[i] + ptr1[i]*ptr2[i+1];
-      }
-      complex sum(re,im);
-      return sum;
+        /*
+          double re=0, im = 0;
+          double *ptr1 = (double*)psi1;
+          double *ptr2 = (double*)psi2;
+          for (int i = 0; i < 2*n; i+=2){
+          re += ptr1[i]*ptr2[i] - ptr1[i+1]*ptr2[i+1];
+          im += ptr1[i+1]*ptr2[i] + ptr1[i]*ptr2[i+1];
+          }
+          complex sum(re,im);
+        */
+        
+        int i;
+        complex sum(0,0);
+        for (i = 0; i < n; i++) {
+            sum += psi1[i] * psi2[i].conj();
+        }
+        
+        return sum;
   }
  private:
   int numRecd, numExpected, grainSize, S, blkSize, N;
