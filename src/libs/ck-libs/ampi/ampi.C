@@ -11,10 +11,39 @@
 
 //------------- startup -------------
 static mpi_comm_structs mpi_comms;
+static int nodeinit_has_been_called=0;
 int mpi_ncomms;
 int MPI_COMM_UNIVERSE[MPI_MAX_COMM];
 
-CDECL void MPI_Setup_Switch(void);
+int _ampi_fallback_setup_count;
+CDECL void MPI_Setup(void);
+FDECL void FTN_NAME(MPI_SETUP,mpi_setup)(void);
+
+int MPI_Main_cpp(int argc,char **argv);
+CDECL int MPI_Main(int argc,char **argv);
+FDECL void FTN_NAME(MPI_MAIN,mpi_main)(void);
+
+/*Main routine used when missing MPI_Setup routine*/
+CDECL void MPI_Fallback_Main(int argc,char **argv)
+{
+  MPI_Main_cpp(argc,argv);
+  MPI_Main(argc,argv);
+  FTN_NAME(MPI_MAIN,mpi_main)();
+}
+
+/*Startup routine used if user *doesn't* write
+  a TCHARM_User_setup routine.
+ */
+CDECL void MPI_Setup_Switch(void) {
+  _ampi_fallback_setup_count=0;
+  FTN_NAME(MPI_SETUP,mpi_setup)();
+  MPI_Setup();
+  if (_ampi_fallback_setup_count==2) 
+  { //Missing MPI_Setup in both C and Fortran:
+    MPI_Register_main(MPI_Fallback_Main,"default");
+  }
+}
+
 
 CtvDeclare(ampi*, ampiPtr);
 static void ampiNodeInit(void)
@@ -26,6 +55,7 @@ static void ampiNodeInit(void)
     MPI_COMM_UNIVERSE[i] = i+1;
   }
   TCharmSetFallbackSetup(MPI_Setup_Switch);
+  nodeinit_has_been_called=1;
 }
 
 static void 
@@ -116,7 +146,7 @@ ampi::ampi(int commidx_,CProxy_TCharm threads_)
   msgs = CmmNew();
   nbcasts = 0;
   nrequests = 0;
-  myDDT = new DDT() ;
+  myDDT = new CkDDT() ;
   nirequests = 0;
   firstfree = 0;
   ampiBlockedThread=0;
@@ -199,7 +229,7 @@ ampi::send(int t, int s, void* buf, int count, int type,  int idx, int comm)
       seq = nextseq[idx]++;
     }
   }
-  DDT_DataType *ddt = myDDT->getType(type);
+  CkDDT_DataType *ddt = myDDT->getType(type);
   int len = ddt->getSize(count);
   AmpiMsg *msg = new (&len, 0) AmpiMsg(seq, t, s, len, mycomm);
   ddt->serialize((char*)buf, (char*)msg->data, count, 1);
@@ -221,7 +251,7 @@ ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
 {
   int tags[3];
   AmpiMsg *msg = 0;
-  DDT_DataType *ddt = myDDT->getType(type);
+  CkDDT_DataType *ddt = myDDT->getType(type);
   int len = ddt->getSize(count);
   ampiBlockedThread=1;
   while(1) {
@@ -355,7 +385,7 @@ void ampi::pup(PUP::er &p)
   // to pup them as well.
   if(p.isUnpacking())
   {
-    myDDT = new DDT((void*)0);
+    myDDT = new CkDDT((void*)0);
     nrequests = 0;
     nirequests = 0;
     firstfree = 0;
@@ -389,7 +419,20 @@ CDECL void MPI_Migrate(void)
 
 CDECL int MPI_Init(int *argc, char*** argv)
 {
-  AMPIAPI("MPI_Init");
+  if (nodeinit_has_been_called) {
+    AMPIAPI("MPI_Init");
+    return 0;
+  }
+  else 
+  { /* Charm hasn't been started yet! */
+    CkAbort("Charm Uninitialized!");
+  }
+}
+
+CDECL int MPI_Initialized(int *isInit)
+{
+  AMPIAPI("MPI_Initialized");
+  *isInit=nodeinit_has_been_called;
   return 0;
 }
 
@@ -821,7 +864,7 @@ int MPI_Type_vector(int count, int blocklength, int stride,
 }
 
 extern  "C"  
-int MPI_Type_hvector(int count, int blocklength, int stride, 
+int MPI_Type_hvector(int count, int blocklength, MPI_Aint stride, 
                       MPI_Datatype oldtype, MPI_Datatype*  newtype)
 {
   AMPIAPI("MPI_Type_hvector");
@@ -841,7 +884,7 @@ int MPI_Type_indexed(int count, int* arrBlength, int* arrDisp,
 }
 
 extern  "C"  
-int MPI_Type_hindexed(int count, int* arrBlength, int* arrDisp, 
+int MPI_Type_hindexed(int count, int* arrBlength, MPI_Aint* arrDisp, 
                        MPI_Datatype oldtype, MPI_Datatype*  newtype)
 {
   AMPIAPI("MPI_Type_hindexed");
@@ -878,7 +921,7 @@ int MPI_Type_free(MPI_Datatype *datatype)
 
 
 CDECL
-int MPI_Type_extent(MPI_Datatype datatype, MPI_Aint extent)
+int MPI_Type_extent(MPI_Datatype datatype, MPI_Aint *extent)
 {
   AMPIAPI("MPI_Type_extent");
   ampi *ptr = getAmpiInstance() ;
@@ -887,7 +930,7 @@ int MPI_Type_extent(MPI_Datatype datatype, MPI_Aint extent)
 }
 
 CDECL
-int MPI_Type_size(MPI_Datatype datatype, MPI_Aint size)
+int MPI_Type_size(MPI_Datatype datatype, int *size)
 {
   AMPIAPI("MPI_Type_size");
   ampi *ptr = getAmpiInstance() ;
@@ -965,7 +1008,7 @@ int MPI_Allgatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   }
 
   MPI_Status status;
-  DDT_DataType* dttype = ptr->myDDT->getType(recvtype) ;
+  CkDDT_DataType* dttype = ptr->myDDT->getType(recvtype) ;
   int itemsize = dttype->getSize() ;
   
   for(i=0;i<size;i++) {
@@ -993,7 +1036,7 @@ int MPI_Allgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   }
 
   MPI_Status status;
-  DDT_DataType* dttype = ptr->myDDT->getType(recvtype) ;
+  CkDDT_DataType* dttype = ptr->myDDT->getType(recvtype) ;
   int itemsize = dttype->getSize(recvcount) ;
   
   for(i=0;i<size;i++) {
@@ -1021,7 +1064,7 @@ int MPI_Gatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 
   if(ptr->getIndex() == root) {
     MPI_Status status;
-    DDT_DataType* dttype = ptr->myDDT->getType(recvtype) ;
+    CkDDT_DataType* dttype = ptr->myDDT->getType(recvtype) ;
     int itemsize = dttype->getSize() ;
   
     for(i=0;i<size;i++) {
@@ -1049,7 +1092,7 @@ int MPI_Gather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 
   if(ptr->getIndex()==root) {
     MPI_Status status;
-    DDT_DataType* dttype = ptr->myDDT->getType(recvtype) ;
+    CkDDT_DataType* dttype = ptr->myDDT->getType(recvtype) ;
     int itemsize = dttype->getSize(recvcount) ;
   
     for(i=0;i<size;i++) {
@@ -1072,7 +1115,7 @@ int MPI_Alltoallv(void *sendbuf, int *sendcounts, int *sdispls,
   }
   ampi *ptr = getAmpiInstance();
   int size = ptr->getArraySize();
-  DDT_DataType* dttype = ptr->myDDT->getType(sendtype) ;
+  CkDDT_DataType* dttype = ptr->myDDT->getType(sendtype) ;
   int itemsize = dttype->getSize() ;
   int i;
   for(i=0;i<size;i++) {
@@ -1103,7 +1146,7 @@ int MPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   }
   ampi *ptr = getAmpiInstance();
   int size = ptr->getArraySize();
-  DDT_DataType* dttype = ptr->myDDT->getType(sendtype) ;
+  CkDDT_DataType* dttype = ptr->myDDT->getType(sendtype) ;
   int itemsize = dttype->getSize(sendcount) ;
   int i;
   for(i=0;i<size;i++) {
@@ -1131,6 +1174,15 @@ int MPI_Comm_dup(int comm, int *newcomm)
 }
 
 CDECL
+int MPI_Comm_split(int src,int color,int key,int *dest)
+{
+  AMPIAPI("MPI_Comm_split");
+  /*This version is just there so code that may call split will still link*/
+  CkAbort("MPI_Comm_split not implemented in AMPI yet!");
+  return 0;
+}
+
+CDECL
 int MPI_Comm_free(int *comm)
 {
   AMPIAPI("MPI_Comm_free");
@@ -1150,7 +1202,7 @@ int MPI_Get_count(MPI_Status *sts, MPI_Datatype dtype, int *count)
 {
   AMPIAPI("MPI_Get_count");
   ampi *ptr = getAmpiInstance();
-  DDT_DataType* dttype = ptr->myDDT->getType(dtype) ;
+  CkDDT_DataType* dttype = ptr->myDDT->getType(dtype) ;
   int itemsize = dttype->getSize() ;
   *count = sts->MPI_LENGTH/itemsize;
   return 0;
@@ -1162,7 +1214,7 @@ int MPI_Pack(void *inbuf, int incount, MPI_Datatype dtype, void *outbuf,
 {
   AMPIAPI("MPI_Pack");
   ampi *ptr = getAmpiInstance();
-  DDT_DataType* dttype = ptr->myDDT->getType(dtype) ;
+  CkDDT_DataType* dttype = ptr->myDDT->getType(dtype) ;
   int itemsize = dttype->getSize();
   dttype->serialize((char*)inbuf, ((char*)outbuf)+(*position), incount, 1);
   *position += (itemsize*incount);
@@ -1175,7 +1227,7 @@ int MPI_Unpack(void *inbuf, int insize, int *position, void *outbuf,
 {
   AMPIAPI("MPI_Unpack");
   ampi *ptr = getAmpiInstance();
-  DDT_DataType* dttype = ptr->myDDT->getType(dtype) ;
+  CkDDT_DataType* dttype = ptr->myDDT->getType(dtype) ;
   int itemsize = dttype->getSize();
   dttype->serialize(((char*)inbuf+(*position)), (char*)outbuf, outcount, 1);
   *position += (itemsize*outcount);
@@ -1187,7 +1239,7 @@ int MPI_Pack_size(int incount,MPI_Datatype datatype,MPI_Comm comm,int *sz)
 {
   AMPIAPI("MPI_Pack_size");
   ampi *ptr = getAmpiInstance();
-  DDT_DataType* dttype = ptr->myDDT->getType(datatype) ;
+  CkDDT_DataType* dttype = ptr->myDDT->getType(datatype) ;
   return incount*dttype->getSize() ;
 }
 

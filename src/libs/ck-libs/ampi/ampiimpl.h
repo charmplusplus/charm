@@ -232,7 +232,7 @@ class ampi : public ArrayElement1D {
     PersReq irequests[100];
     int nirequests;
     int firstfree;
-    DDT *myDDT ;
+    CkDDT *myDDT ;
     int *nextseq;
     AmpiSeqQ *oorder;
 };

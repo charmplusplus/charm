@@ -3,9 +3,9 @@ CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
 HEADERS=ampi.h ampif.h
 HEADDEP=$(HEADERS) ampiimpl.h ampi.decl.h
-COMPAT=compat_ampius.o compat_ampifus.o
-OBJS=ampi.o ampif.o compat_ampius.o
-OBJSF=ampi.o ampif.o compat_ampifus.o
+COMPAT=compat_ampius.o compat_ampifus.o \
+       compat_ampim.o compat_ampifm.o compat_ampicm.o
+OBJS=ampi.o ampif.o $(COMPAT)
 
 DEST=$(CDIR)/lib/libmoduleampi.a
 DESTF=$(CDIR)/lib/libmoduleampif.a
@@ -18,14 +18,12 @@ AMPI: $(DEST)
 AMPIF: $(DESTF)
 
 $(DEST): $(OBJS) headers
-	$(CHARMC) -DMPI_FORTRAN=0 -c ampisetup.C
-	$(CHARMC) $(OBJS) ampisetup.o -o $@
+	$(CHARMC) $(OBJS) -o $@
 
-$(DESTF): $(OBJSF) headers
-	$(CHARMC) -DMPI_FORTRAN=1 -c ampisetup.C
+$(DESTF): $(OBJS) headers
 	-$(CHARMC) -c ampimod.f90
-	-$(CHARMC) -cpmod ../../../../include ampi.M
-	-$(CHARMC) $(OBJSF) ampimod.o ampisetup.o -o $@
+	-$(CHARMC) -cpmod ../../../../include mpiincl.M
+	-$(CHARMC) $(OBJS) ampimod.o -o $@
 
 headers: $(HEADERS)
 	cp $(HEADERS) $(CDIR)/include/
@@ -37,7 +35,7 @@ headers: $(HEADERS)
 $(COMPAT):
 	@for o in $(COMPAT); \
 	do \
-		file=`echo $$o | sed -e "s/\.o/.c/g"`; \
+		file=`echo $$o | sed -e "s/\.o/.C/g"`; \
 		echo "$(CHARMC) -c $$file..."; \
 		$(CHARMC) -c $$file || exit 1; \
 	done

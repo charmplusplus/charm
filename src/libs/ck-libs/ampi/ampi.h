@@ -17,8 +17,15 @@ AMPI, e.g. for our bizarre MPI_Main.
 */
 #define AMPI
 
-/*Silently rename the user's main routine to "MPI_Main"*/
-#define main MPI_Main
+/*
+Silently rename the user's main routine to "MPI_Main" or "MPI_Main_cpp".
+This is needed so we can call the routine as a new thread.
+*/
+#ifdef __cplusplus
+#  define main MPI_Main_cpp
+#else
+#  define main MPI_Main
+#endif
 
 
 /* MPI prototypes and #defines here */
@@ -68,13 +75,14 @@ typedef struct {
 } MPI_Status;
 
 typedef int MPI_Datatype;
-typedef int*  MPI_Aint ;
+typedef int MPI_Aint;
 
 #include "pup_c.h"
 
 typedef void (*MPI_PupFn)(pup_er, void*);
 
-int MPI_Init(int *argc, char*** argv);
+int MPI_Init(int *argc, char*** argv); /* FORTRAN VERSION MISSING */
+int MPI_Initialized(int *isInit); /* FORTRAN VERSION MISSING */
 int MPI_Comm_rank(MPI_Comm comm, int *rank);
 int MPI_Comm_size(MPI_Comm comm, int *size);
 int MPI_Finalize(void);
@@ -119,18 +127,18 @@ int MPI_Type_contiguous(int count, MPI_Datatype oldtype,
                          MPI_Datatype *newtype);
 int MPI_Type_vector(int count, int blocklength, int stride, 
                      MPI_Datatype oldtype, MPI_Datatype *newtype);
-int MPI_Type_hvector(int count, int blocklength, int stride, 
+int MPI_Type_hvector(int count, int blocklength, MPI_Aint stride, 
                       MPI_Datatype oldtype, MPI_Datatype *newtype);
 int MPI_Type_indexed(int count, int* arrBlength, int* arrDisp, 
                       MPI_Datatype oldtype, MPI_Datatype *newtype);
-int MPI_Type_hindexed(int count, int* arrBlength, int* arrDisp, 
+int MPI_Type_hindexed(int count, int* arrBlength, MPI_Aint* arrDisp, 
                        MPI_Datatype oldtype, MPI_Datatype *newtype);
-int  MPI_Type_struct(int count, int* arrBLength, int* arrDisp, 
+int  MPI_Type_struct(int count, int* arrBLength, MPI_Aint* arrDisp, 
                       MPI_Datatype *oldType, MPI_Datatype *newType);
 int MPI_Type_commit(MPI_Datatype *datatype);
 int MPI_Type_free(MPI_Datatype *datatype);
-int  MPI_Type_extent(MPI_Datatype datatype, MPI_Aint extent);
-int  MPI_Type_size(MPI_Datatype datatype, MPI_Aint size);
+int  MPI_Type_extent(MPI_Datatype datatype, MPI_Aint *extent);
+int  MPI_Type_size(MPI_Datatype datatype, int *size);
 
 int MPI_Pack(void *inbuf, int incount, MPI_Datatype dtype, void *outbuf,
               int outsize, int *position, MPI_Comm comm);
@@ -162,7 +170,8 @@ int MPI_Alltoallv(void *sendbuf, int *sendcounts, int *sdispls,
 int MPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype, 
                  void *recvbuf, int recvcount, MPI_Datatype recvtype, 
                  MPI_Comm comm);
-int MPI_Comm_dup(MPI_Comm comm, MPI_Comm *newcomm);
+int MPI_Comm_dup(MPI_Comm src, MPI_Comm *dest);
+int MPI_Comm_split(MPI_Comm src, int color, int key, MPI_Comm *dest);
 int MPI_Comm_free(MPI_Comm *comm);
 int MPI_Abort(MPI_Comm comm, int errorcode);
 
