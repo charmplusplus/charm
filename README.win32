@@ -76,11 +76,11 @@ email to (ppl@uiuc.edu).
 			      ==============
 
 
- * I don't like Cygwin, what should I do?
+ 1. I don't like Cygwin, can I compile Charm++ without Cygwin?
 
-   There is an un-documented way to compile Charm++ under MS-DOS windows with
-   VC++ and nmake. This is occasionally maintained and not guarranteed to be
-   always working.
+   Yes, there is an un-documented way to compile Charm++ under MS-DOS windows 
+   with VC++ and nmake. This is occasionally maintained and not guarranteed 
+   to be always working.
    Follow this steps:
    1 open a MS-DOS windows, cd to Charm++ directory, and mkdir net-win32\tmp;
    2 cd to net-win32\tmp, copy Makefile.win32 from 
@@ -88,7 +88,19 @@ email to (ppl@uiuc.edu).
    3 type: nmake /f Makefile.win32
    4 To compile Charm++ programs, see the Makefile.win32 examples under
      net-win32\pgms\charm++\megatest\Makefile.win32
-     Basically you need to specify all the charm++ libraries to link against.
+     The command to use is: nmake /f Makefile.win32
+     Basically because the shell script compiler wrapper is not available,
+     you need to specify all the charm++ libraries to link against.
 
+ 2. I just downloaded Charm++ net-win binaries from your website, how to use it?
+
+   The recommended way to use windows binary package is still under Cygwin.
+   First, unzip the binary packages to desired location; Set PATH environment
+   varaible to include the charm bin/ directory. That's it, you can now cd 
+   to Charm++ testsuite directory, for example: pgms/charm++/megatest, to 
+   compile your first Charm++ program using "make".
+   If you don't want to use Cygwin, you have to use "nmake" to compile Charm++
+   programs, see the Makefile example under: 
+   pgms/charm++/megatest/Makefile.win32.
 
 
