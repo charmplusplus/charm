@@ -8,6 +8,11 @@ In place of C-style printf and scanf, \charmpp\ provides
 interfaces that are identical to their C counterparts, but there are some
 differences in their behavior that should be mentioned.
 
+A recent change to \charmpp\ is to also support all forms of printf,
+cout, etc. in addition to the special forms shown below.  The special
+forms below are still useful, however, since they obey well-defined
+(but still lax) ordering requirements.
+
 \function{int CkPrintf(format [, arg]*)} \index{CkPrintf} \index{input/output}
 \desc{This call is used for atomic terminal output. Its usage is similar to
 \texttt{printf} in C.  However, \kw{CkPrintf} has some special properties
@@ -36,12 +41,10 @@ blocks all execution on the processor it is called from, and returns
 only after all input has been retrieved.
 }
 
-For \CC\ style stream-based I/O, \charmpp\ offers \kw{ckin},
-\kw{ckout}, and \kw{ckerr} in the place of cin, cout, and cerr.  The
+For \CC\ style stream-based I/O, \charmpp\ offers 
+\kw{ckout} and \kw{ckerr} in the place of cout, and cerr.  The
 \CC\ streams and their \charmpp\ equivalents are related in the same
 manner as printf and scanf are to \kw{CkPrintf} and \kw{CkScanf}.  The
 \charmpp\ streams are all used through the same interface as the \CC\ 
 streams, and all behave in a slightly different way, just like C-style
-I/O. \kw{ckout} and \kw{ckerr} both have the same idiosyncratic
-behavior as \kw{CkPrintf}, and \kw{ckin} behaves in the same way as
-\kw{CkScanf}.
+I/O.
