@@ -9,7 +9,7 @@ syntax() {
   echo '<versions>: ' 
   ( cd src ; ls -1 | egrep -v '(^Common)|(^CVS)|(^QuickThreads)|(^ccs-client)' | pr -3 -t )
 #  echo ''
-  echo '<options>:  vmi gm '
+  echo '<options>:  vmi gm pgcc'
   echo '<charmc-options>: e.g. -g -save -verbose'
   echo 'Note: This script is trivial.  It'
   echo ' 1. Creates directories <version> and <version>/tmp';
@@ -24,6 +24,7 @@ syntax() {
 MAKEOPTS=""
 OPTS=""
 MORE=""
+COMPILER=""
 
 while [ ! $# -eq 0 ]
 do
@@ -36,7 +37,16 @@ do
           VERSION=$1; BASEVERSION=$1; shift
           while [ ! $# -eq 0 ]
           do
-            if test "$1" = "gm" || test "$1" = "vmi"
+            if test "$1" = "pgcc"
+            then
+              if [ ! -f src/$VERSION/conv-mach-$1.h ]
+              then
+                echo; 
+                echo "Error> option: $1 is not supported in this version!"; echo
+                exit 1
+              fi
+              COMPILER=$1; shift;
+            elif test "$1" = "gm" || test "$1" = "vmi"
             then
               if [ ! -f src/$VERSION/conv-mach-$1.h ]
               then
@@ -64,6 +74,12 @@ then
   do
     VERSION=$VERSION-$i
   done
+fi
+
+if test -n "$COMPILER"
+then
+  VERSION=$VERSION-$COMPILER
+  MORE="$MORE $COMPILER"
 fi
 
 [ -d $VERSION ] || echo "Creating dir: $VERSION" 
