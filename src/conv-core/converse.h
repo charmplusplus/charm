@@ -1115,7 +1115,32 @@ int HypercubeGetBcastDestinations(int k, int *dest_pes);
 
 CpvExtern(int, CmiImmediateMsgHandlerIdx);
 
-void CmiProbeImmediateMsg();
+#define CmiProbeImmediateMsg CmiMachineProgressImpl
+
+CpvExtern(int, networkProgressCount);
+extern int networkProgressPeriod;
+
+#if !CMK_MACHINE_PROGRESS_DEFINED
+#define CmiNetworkProgress() 
+#define CmiNetworkProgressAfter(p) 
+#else
+void CmiMachineProgressImpl();
+
+#define CmiNetworkProgress() {CpvAccess(networkProgressCount) ++; \
+      if(CpvAccess(networkProgressCount) ==  networkProgressPeriod) { \
+          CmiMachineProgressImpl(); \
+          CpvAccess(networkProgressCount) = 0; \
+      } \
+} \
+
+#define CmiNetworkProgressAfter(p) {CpvAccess(networkProgressCount) ++; \
+      if(CpvAccess(networkProgressCount) ==  p) { \
+          CmiMachineProgressImpl(); \
+          CpvAccess(networkProgressCount) = 0; \
+      } \
+} \
+
+#endif
 
 /*
    to immediate-fy a Converse message, set the most significant bit to 1
