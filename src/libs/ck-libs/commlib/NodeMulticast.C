@@ -208,7 +208,6 @@ void NodeMulticast::doneInserting(){
         //CmiPrintf("cursedtpes = %d, %d\n", cmsg->npes, numCurDestPes);
 
         if((mode != ARRAY_MODE) && cmsg->npes < numCurDestPes) {
-            while(1);
             numCurDestPes = cmsg->npes;
             for(count = 0; count < cmsg->npes; count++) 
                 nodeMap[(cmsg->pelist[count])/pes_per_node] = 1;        
