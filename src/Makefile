@@ -75,7 +75,7 @@ dirs+sources:
 #
 ###############################################################################
 
-CVHEADERS=converse.h conv-mach.h
+CVHEADERS=converse.h conv-conds.h conv-mach.h 
 
 CVLIBS_QS=libconv-qs-fifo.o libconv-qs-lifo.o # libconv-qs-bfifo.o libconv-qs-ififo.o libconv-qs-bstack.o libconv-qs-istack.o libconv-qs-newfifo.o libconv-qs-replay.o libconv-qs-rand.o libconv-qs-fifolifo.o
 
@@ -83,8 +83,8 @@ CVLIBS=libconv-core.o $(CVLIBS_QS)
 
 converse: basics $(CVLIBS) cmk_extras
 
-libconv-core.o: convcore.o machine.o spantree.o fifo.o
-	$(CHARMC) -cp ../lib/ -o $@ convcore.o machine.o spantree.o fifo.o
+libconv-core.o: convcore.o conv-conds.o machine.o spantree.o fifo.o
+	$(CHARMC) -cp ../lib/ -o $@ convcore.o conv-conds.o machine.o spantree.o fifo.o
 
 libconv-qs-fifo.o: qs.fifo.c
 	$(CHARMC) -cp ../lib/ -o $@ qs.fifo.c
@@ -127,6 +127,9 @@ machine.o: machine.c $(CVHEADERS)
 
 convcore.o: convcore.c $(CVHEADERS)
 	$(CHARMC) convcore.c
+
+conv-conds.o: conv-conds.c $(CVHEADERS)
+	$(CHARMC) conv-conds.c
 
 cmk_extras:
 	csh -fc 'source conv-mach.csh ; set echo ; $$CMK_EXTRAS'
