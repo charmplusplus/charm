@@ -203,6 +203,8 @@ class TCharm: public CBase_TCharm
 
 	//Go to sync, block, possibly migrate, and then resume
 	void migrate(void);
+	void async_migrate(void);
+	void allow_migrate(void);
 
 	//Entering thread context: turn stuff on
 	static void activateThread(void) {

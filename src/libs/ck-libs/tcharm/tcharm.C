@@ -380,6 +380,32 @@ void TCharm::migrate(void)
 #endif
 }
 
+//Go to sync, block, possibly migrate, and then resume
+void TCharm::async_migrate(void)
+{
+#if CMK_LBDB_ON
+  DBG("going to sync");
+  ReadyMigrate(false);
+  AtSync(0);
+  schedule();
+//  allow_migrate();
+#else
+  DBG("skipping sync, because there is no load balancer");
+#endif
+}
+
+void TCharm::allow_migrate(void)
+{
+#if CMK_LBDB_ON
+  int nextPe = MigrateToPe();
+  if (nextPe != -1) {
+    migrateTo(nextPe);
+  }
+#else
+  DBG("skipping sync, because there is no load balancer");
+#endif
+}
+
 //Resume from sync: start the thread again
 void TCharm::ResumeFromSync(void)
 {
@@ -669,6 +695,20 @@ CDECL void TCHARM_Migrate(void)
 	TCharm::get()->migrate();
 }
 FORTRAN_AS_C(TCHARM_MIGRATE,TCHARM_Migrate,tcharm_migrate,(void),())
+
+CDECL void TCHARM_Async_Migrate(void)
+{
+	TCHARMAPI("TCHARM_Async_Migrate");
+	TCharm::get()->async_migrate();
+}
+FORTRAN_AS_C(TCHARM_ASYNC_MIGRATE,TCHARM_Async_Migrate,tcharm_async_migrate,(void),())
+
+CDECL void TCHARM_Allow_Migrate(void)
+{
+	TCHARMAPI("TCHARM_Allow_Migrate");
+	TCharm::get()->allow_migrate();
+}
+FORTRAN_AS_C(TCHARM_ALLOW_MIGRATE,TCHARM_Allow_Migrate,tcharm_allow_migrate,(void),())
 
 CDECL void TCHARM_Migrate_to(int destPE)
 {
