@@ -5,6 +5,7 @@
 #include "ckhashtable.h"
 #include "convcomlibstrategy.h"
 #include "ComlibLearner.h"
+#include "envelope.h"
 
 CkpvExtern(int, migrationDoneHandlerID);
 
@@ -20,7 +21,9 @@ class CharmMessageHolder : public MessageHolder{
     CharmMessageHolder(char * msg, int dest_proc);
     ~CharmMessageHolder();
 
-    char * getCharmMessage();
+    inline char * getCharmMessage() {
+        return (char *)EnvToUsr((envelope *) data);
+    }
     
     virtual void pup(PUP::er &p);
     PUPable_decl(CharmMessageHolder);

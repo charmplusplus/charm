@@ -35,10 +35,6 @@ CharmMessageHolder::CharmMessageHolder(char * msg, int proc)
 CharmMessageHolder::~CharmMessageHolder() { 
 }
 
-char * CharmMessageHolder::getCharmMessage(){
-    return (char *)EnvToUsr((envelope *) data);
-}
-
 void CharmMessageHolder::pup(PUP::er &p) {
 
     //    CkPrintf("In CharmMessageHolder::pup \n"); 

@@ -16,7 +16,8 @@ MsgPacker::MsgPacker(CkQ<CharmMessageHolder *> &msgq, int n_msgs){
 
     for(int count = 0; count < n_msgs; count ++){
         CharmMessageHolder *cmsg = msgq.deq();
-        envelope *env = (envelope *)UsrToEnv(cmsg->getCharmMessage());
+        char *msg = cmsg->getCharmMessage();
+        envelope *env = (envelope *)UsrToEnv(msg);
         CkPackMessage(&env);
 
         if(count == 0) {
@@ -28,12 +29,39 @@ MsgPacker::MsgPacker(CkQ<CharmMessageHolder *> &msgq, int n_msgs){
         msgList[count].epIdx = env->getsetArrayEp();
         msgList[count].size = env->getTotalsize() - sizeof(envelope);
         msgList[count].idx = env->getsetArrayIndex();
-        msgList[count].data = cmsg->getCharmMessage();
+        msgList[count].data = msg;
 
-        if(msgList[count].size >= MAX_MESSAGE_SIZE-1)
-            CkAbort("Can't send messges larger than 64KB\n");
-
+        CkAssert(msgList[count].size < MAX_MESSAGE_SIZE);
         delete cmsg;
+    }
+}
+
+//Takes a queue of envelopes as char* ptrs and not charm message holders
+//Used by mesh streaming strategy
+MsgPacker::MsgPacker(CkQ<char *> &msgq, int n_msgs){
+    
+    CkAssert(n_msgs < 65536);  //16 bit field for num messages
+    
+    nShortMsgs = n_msgs;
+    msgList = new short_envelope[n_msgs];    
+    
+    for(int count = 0; count < n_msgs; count ++){
+        envelope *env = (envelope *)msgq.deq();
+        char *msg = (char *)EnvToUsr(env);
+        CkPackMessage(&env);
+
+        if(count == 0) {
+            aid = env->getsetArrayMgr();
+            if(aid.isZero()) 
+                CkAbort("Array packing set and ArrayID is zero");
+        }        
+        
+        msgList[count].epIdx = env->getsetArrayEp();
+        msgList[count].size = env->getTotalsize() - sizeof(envelope);
+        msgList[count].idx = env->getsetArrayIndex();
+        msgList[count].data = msg;
+        
+        CkAssert(msgList[count].size < MAX_MESSAGE_SIZE);
     }
 }
 

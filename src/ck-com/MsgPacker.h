@@ -37,11 +37,18 @@ inline short_envelope::~short_envelope(){
     */
 }
 
-inline void short_envelope::pup(PUP::er &p){
+inline void short_envelope::pup(PUP::er &p){    
+
     p | epIdx;
-    p | size;    
-    p | idx;
+    p | size;        
+    //p | idx;
     
+    if(p.isUnpacking())
+        idx.nInts = 0;
+
+    p((char *)&(idx.nInts), 1);
+    p((int *)(idx.data()), idx.nInts);
+
     p.pupCmiAllocBuf((void **)&data, size);
 }
 
@@ -63,7 +70,13 @@ class MsgPacker {
  public:
     MsgPacker();
     ~MsgPacker();    
+    
+    //Makes a message out of a queue of CharmMessageHolders
     MsgPacker(CkQ<CharmMessageHolder*> &cmsg_list, int n_msgs);
+    
+    //Takes a queue of envelopes as char* ptrs and not charm message holders
+    //Used by mesh streaming strategy
+    MsgPacker::MsgPacker(CkQ<char *> &msgq, int n_msgs);
     
     void getMessage(CombinedMessage *&msg, int &size);
     static void deliver(CombinedMessage *cmb_msg);
