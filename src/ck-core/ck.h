@@ -68,8 +68,8 @@ class VidBlock {
 extern void _processHandler(void *);
 extern void _infoFn(void *msg, CldPackFn *pfn, int *len,
                     int *queueing, int *priobits, UInt **prioptr);
-extern void _packFn(void **msg);
-extern void _unpackFn(void **msg);
+extern void CkPackMessage(envelope **pEnv);
+extern void CkUnpackMessage(envelope **pEnv);
 extern void _createGroupMember(CkGroupID groupID, int eIdx, void *env);
 extern void _createNodeGroupMember(CkGroupID groupID, int eIdx, void *env);
 extern void _createGroup(CkGroupID groupID, envelope *env, int retEp, 

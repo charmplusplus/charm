@@ -1506,17 +1506,10 @@ void CkArray::pupArrayMsgQ(CkQ<CkArrayMessage *> &q, PUP::er &p)
   if (p.isPacking()) nMsgs = q.length();
   p(nMsgs);
   for(int i = 0; i < nMsgs; i++) {
-    if (p.isPacking()) {
+    if (!p.isUnpacking())
       msg = q.deq();
-      env = UsrToEnv(msg);
-      _packFn((void **)&env);
-      size = env->getTotalsize();
-    }
-    p(size);
-    if (p.isUnpacking()) env = (envelope *) CmiAlloc(size);
-    p((void *) env, size);
-    _unpackFn((void **)&env);
-    q.enq((CkArrayMessage *)EnvToUsr(env));
+    CkPupMessage(p,(void **)&msg);
+    q.enq(msg);
   }
 }
 
@@ -1529,7 +1522,7 @@ CkArrayRec* CkArray::pupArrayRec(PUP::er &p, CkArrayRec *rec, CkArrayIndex *idx)
   
   rtypes = (char *) "0lrbmd";
   
-  if (p.isPacking()) {
+  if (!p.isUnpacking()) {
     type = rec->type();
     ch = rtypes[type];
   }

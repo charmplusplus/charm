@@ -11,33 +11,15 @@
 VidBlock::VidBlock() { state = UNFILLED; msgQ = new PtrQ(); _MEMCHECK(msgQ); }
 
 int CMessage_CkArgMsg::__idx=0;
-int CkIndex_Chare::__idx=-1;
-int CkIndex_Group::__idx=-1;
+int CkIndex_Chare::__idx;
+int CkIndex_Group::__idx;
 int CkIndex_ArrayBase::__idx=-1;
 
 Group::~Group() {}
 
 //Chare virtual functions: declaring these here results in a smaller executable
-#if CMK_DEBUG_MODE
-Chare::~Chare() 
-{ 
-  removeObject(this); 
-}
-char *Chare::showHeader(void) {
-  char *ret = (char *)malloc(strlen("Default Header")+1);
-  _MEMCHECK(ret);
-  strcpy(ret,"Default Header");
-  return ret;
-}
-char *Chare::showContents(void) {
-  char *ret = (char *)malloc(strlen("Default Content")+1);
-  _MEMCHECK(ret);
-  strcpy(ret,"Default Content");
-  return ret;
-}
-#else
 Chare::~Chare() {}
-#endif
+
 void Chare::pup(PUP::er &p) 
 {
 	 p(thishandle.onPE);
@@ -108,7 +90,7 @@ extern "C"
 void CkGetChareID(CkChareID *pCid) {
   pCid->onPE = CkMyPe();
   pCid->objPtr = CpvAccess(_currentChare);
-  pCid->magic = _GETIDX(CpvAccess(_currentChareType));
+  //  pCid->magic = _GETIDX(CpvAccess(_currentChareType));
 }
 
 extern "C"
@@ -165,7 +147,7 @@ void CkCreateChare(int cIdx, int eIdx, void *msg, CkChareID *pCid, int destPE)
     env->setMsgtype(NewChareMsg);
   } else {
     pCid->onPE = (-(CkMyPe()+1));
-    pCid->magic = _GETIDX(cIdx);
+    //  pCid->magic = _GETIDX(cIdx);
     pCid->objPtr = (void *) new VidBlock();
     _MEMCHECK(pCid->objPtr);
     env->setMsgtype(NewVChareMsg);
@@ -427,7 +409,7 @@ static void _processNewVChareMsg(envelope *env)
       _allocMsg(FillVidMsg, sizeof(CkChareID));
   pCid->onPE = CkMyPe();
   pCid->objPtr = obj;
-  pCid->magic = _GETIDX(_entryTable[env->getEpIdx()]->chareIdx);
+  // pCid->magic = _GETIDX(_entryTable[env->getEpIdx()]->chareIdx);
   register envelope *ret = UsrToEnv(pCid);
   ret->setVidPtr(env->getVidPtr());
   register int srcPe = env->getSrcPe();
@@ -580,24 +562,24 @@ void _processHandler(void *msg)
   switch(env->getMsgtype()) {
     case NewChareMsg :
       CpvAccess(_qd)->process();
-      if(env->isPacked()) _unpackFn((void **)&env);
+      if(env->isPacked()) CkUnpackMessage(&env);
       _processNewChareMsg(env);
       _STATS_RECORD_PROCESS_CHARE_1();
       break;
     case NewVChareMsg :
       CpvAccess(_qd)->process();
-      if(env->isPacked()) _unpackFn((void **)&env);
+      if(env->isPacked()) CkUnpackMessage(&env);
       _processNewVChareMsg(env);
       _STATS_RECORD_PROCESS_CHARE_1();
       break;
     case BocInitMsg :
       CpvAccess(_qd)->process();
-      if(env->isPacked()) _unpackFn((void **)&env);
+      if(env->isPacked()) CkUnpackMessage(&env);
       _processBocInitMsg(env);
       break;
     case NodeBocInitMsg :
       CpvAccess(_qd)->process();
-      if(env->isPacked()) _unpackFn((void **)&env);
+      if(env->isPacked()) CkUnpackMessage(&env);
       _processNodeBocInitMsg(env);
       break;
     case DBocReqMsg:
@@ -618,19 +600,19 @@ void _processHandler(void *msg)
       break;
     case ForChareMsg :
       CpvAccess(_qd)->process();
-      if(env->isPacked()) _unpackFn((void **)&env);
+      if(env->isPacked()) CkUnpackMessage(&env);
       _processForChareMsg(env);
       _STATS_RECORD_PROCESS_MSG_1();
       break;
     case ForBocMsg :
       // QD processing moved inside _processForBocMsg because it is conditional
-      if(env->isPacked()) _unpackFn((void **)&env);
+      if(env->isPacked()) CkUnpackMessage(&env);
       _processForBocMsg(env);
       // stats record moved inside _processForBocMsg because it is conditional
       break;
     case ForNodeBocMsg :
       // QD processing moved to _processForNodeBocMsg because it is conditional
-      if(env->isPacked()) _unpackFn((void **)&env);
+      if(env->isPacked()) CkUnpackMessage(&env);
       _processForNodeBocMsg(env);
       // stats record moved to _processForNodeBocMsg because it is conditional
       break;
@@ -654,42 +636,39 @@ void _infoFn(void *msg, CldPackFn *pfn, int *len,
              int *queueing, int *priobits, unsigned int **prioptr)
 {
   register envelope *env = (envelope *)msg;
-  *pfn = (CldPackFn)_packFn;
+  *pfn = (CldPackFn)CkPackMessage;
   *len = env->getTotalsize();
   *queueing = env->getQueueing();
   *priobits = env->getPriobits();
   *prioptr = (unsigned int *) env->getPrioPtr();
 }
 
-static inline envelope *_packMessage(envelope *env)
+void CkPackMessage(envelope **pEnv)
 {
+  register envelope *env = *pEnv;
+  if(!env->isPacked() && _msgTable[env->getMsgIdx()]->pack) {
     register void *msg = EnvToUsr(env);
     _TRACE_BEGIN_PACK();
     msg = _msgTable[env->getMsgIdx()]->pack(msg);
     _TRACE_END_PACK();
     env=UsrToEnv(msg);
     env->setPacked(1);
-    return env;
+    *pEnv = env;
+  }
 }
 
-void _packFn(void **pEnv)
+void CkUnpackMessage(envelope **pEnv)
 {
-  register envelope *env = *((envelope **)pEnv);
-  if(!env->isPacked() && _msgTable[env->getMsgIdx()]->pack)
-    *((envelope **)pEnv) = _packMessage(env);
-}
-
-void _unpackFn(void **pEnv)
-{
-  register envelope *env = *((envelope **)pEnv);
+  register envelope *env = *pEnv;
   register int msgIdx = env->getMsgIdx();
-  if(_msgTable[msgIdx]->unpack) {
+  if(env->isPacked()) {
     register void *msg = EnvToUsr(env);
     _TRACE_BEGIN_UNPACK();
     msg = _msgTable[msgIdx]->unpack(msg);
     _TRACE_END_UNPACK();
-    UsrToEnv(msg)->setPacked(0);
-    *((envelope **)pEnv) = UsrToEnv(msg);
+    env=UsrToEnv(msg);
+    env->setPacked(0);
+    *pEnv = env;
   }
 }
 
@@ -715,8 +694,7 @@ static void _skipCldEnqueue(int pe,envelope *env, int infoFn)
   	env, env->getQueueing(),env->getPriobits(),
   	(unsigned int *)env->getPrioPtr());
   } else {
-    if(!env->isPacked() && _msgTable[env->getMsgIdx()]->pack)
-      env = _packMessage(env);
+    CkPackMessage(&env);
     int len=env->getTotalsize();
     CmiSetXHandler(env,CmiGetHandler(env));
     CmiSetHandler(env,index_skipCldHandler);

@@ -75,7 +75,7 @@ void CComlibEachToManyMulticast(comID id, int ep, void *msg, int bocnum, int npe
   env->setSrcPe(CkMyPe());
 
 //  _infoFn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
-  _packFn((void **)&env);
+  CkPackMessage(&env);
   _infoFn(env, &pfn, &len, &queueing, &priobits, &prioptr);
 
   CmiSetHandler(env, _charmHandlerIdx);
