@@ -980,7 +980,7 @@ Do $CMK_CXX $OPTSC -I$CHARMINC $OPTS_CXX -c $modInitSrc -o $modInitObj
 
 Debug "About to perform final link..."
 
-LANG_LIBS="$modInitObj -L$CHARMLIB -I$CHARMINC $BAL_OBJ $OBJECTFILES $PRE_LIBRARIES"
+LANG_LIBS="-L$CHARMLIB -I$CHARMINC $BAL_OBJ $OBJECTFILES $modInitObj $PRE_LIBRARIES"
 CORE_LIBS="-lconv-core -lconv-util $TRACE_OBJ $MEM_OBJ "
 
 case "$LANGUAGE" in
