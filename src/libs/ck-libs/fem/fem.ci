@@ -1,0 +1,15 @@
+mainmodule fem {
+  readonly CkChareID _mainhandle;
+  readonly CkArrayID _femaid;
+  readonly unsigned int _nchunks;
+  message [varsize] DataMsg;
+  mainchare main {
+    entry main();
+    entry void done(void);
+  };
+  array [1D] chunk {
+    entry chunk(void);
+    entry [threaded] void run(void);
+    entry void recv(DataMsg *);
+  };
+};
