@@ -1,0 +1,105 @@
+\chapter{Converse Client-Server Interface}
+
+This note attempts at explaining the design of CCS module of
+Converse. This module is responsible for enabling parallel
+servers to be written using Converse. Currently, this module
+will be implemented only on network of workstations. Other
+parallel architectures will follow.
+
+CCS module is split into two parts. One part consists of
+functions that can be used in Converse programs which act as
+servers. The other part consists of functions that can be used
+with clients that try to connect to servers written using
+CCS. The following sections describe both these parts. {\tt conv-host} 
+is sometimes also referred to as {\tt server-host} 
+in order to distinguish it from the individual converse processes which 
+are sometimes referred to as {\tt server-processes}. Together, the 
+{\tt server-host} and the {\tt  server-processes} constitute a
+server. In general, the client does not need to know the
+difference.
+
+
+\section{CCS: Server-Side}
+
+
+On the network of workstations, any converse program is started using
+\begin{quotation} conv-host pgmname +pN conv-host-opts pgm-opts \end{quotation}
+In addition to the original options, now conv-host accepts one more option:
+{\tt ++server}. Currently this option makes conv-host print out its own
+(randomly allocated) port number, which can then be used to connect to it from
+the client. Note that this is the same port number over which the processes
+belonging to the server contact conv-host (for {\tt CmiPrintf} etc.)
+
+In addition to the usual commands (aset, aget etc.), conv-host now accepts one
+more command {\tt getinfo} over the abovementioned port. This command is issued
+only by the client and not by any of the constituent server processes. The
+response to {\tt getinfo} command is as follows:
+\["info" \, N \, P_{0} \,  P_{1} \, .. \, P_{N} \, IP_{0} \, IP_{1} \, .. \, 
+IP_{N} \, Port_{0} \, Port_{1} \, .. \, Port_{N} \]
+
+Where \(N\)  is the number of SMP nodes, \(P_{i}\)  are number of processors in
+node i, \(IP_{i}\) is the IP address as an integer for node i, \(Port_{i}\) is
+the control port number of the server process on node i.
+
+If this command is received before all the server processes report to {\tt
+conv-host}, the response is delayed. Internally, the server processes execute
+{\tt CcsInit()}, which makes {\tt CcsEnabled()} return {\tt  1}. On
+architectures that do not yet support CCS functionality, all the CCS functions
+do not do anything, and all the functions that return boolean values return
+{\tt  0}.
+
+In the server-processes, a new type of handler mechanism is introduced. These
+handlers have a character string associated with it that identifies the handler
+function. These handlers are registered using a {\tt  CcsRegisterHandler()}.
+The handler index returned by {\tt  CcsRegisterhandler() } can be used for
+normal remote invocation too. ({\tt CcsRegisterHandler} internally calls 
+{\tt CmiRegisterHandlerLocal}.)
+
+Handler functions responsible for remote requests have the same syntax and
+semantics as the normal Converse handlers. However, in the handler function
+invoked by a remote request, {\tt CcsIsRemoteRequest() } returns {\tt  1}.
+Also, in that case, {\tt  CcsCallerId() } returns meaningful values for IP
+address and Port of the caller. No message format conversion is actually done
+by the runtime system and is the responsibility of the handler and the client.
+Once the server process gets hold of IP and port of the caller, it can use that
+anytime for replying to the client using {\tt  CcsSendReply } function.
+
+\function{void CcsInit(void);} 
+\function{int CcsRegisterHandler(char *id, CmiHandlerFn fn);}
+\function{void CcsUseHandler(char *id, int hdlr);}
+\function{int CcsEnabled(void);}
+\function{int CcsIsRemoteRequest(void);}
+\function{int CcsCallerId(int *pip, int *pport);}
+\function{void CcsSendReply(int ip, int port, int size, void *msg);}
+
+\section{CCS: Client-Side}
+
+The client program calls {\tt  CcsConnect()} for contacting the server. This
+call will internally send the {\tt getinfo } command to the server-host and
+will wait for the server information to arrive. This information can be
+extracted using the calls such as {\tt  CcsNumNodes()}, {\tt CcsNumPes()}, {\tt
+CcsNodeFirst()}, and {\tt CcsNodeSize}. Requests can be made to individual
+server-processes of any node using {\tt CcsSendRequest()}, and response can be
+received using {\tt CcsRecvResponse()}. The latter is a blocking function. In
+addition to this, a {\tt CcsProbe} is available to check if the response is
+received, and {\tt CcsResponseHandler} is provided to invoke the specified
+function similar to an interrupt handler. No effort is made by the runtime to
+serialize multiple requests made to the server as well as responses received
+from the server. {\tt CcsFinalize()} could be used to terminate the
+request-response session with the server. Note that no assumption has been made
+about the persistence of the underlying connection, thus the implementation is
+free to choose whatever is appropriate. All functions return {\tt  -1 } on
+error.
+
+\function{int CcsConnect(CcsServer *svr);}
+\function{int CcsNumNodes(CcsServer *svr);}
+\function{int CcsNumPes(CcsServer *svr);}
+\function{int CcsNodeFirst(CcsServer *svr, int node);}
+\function{int CcsNodeSize(CcsServer *svr,int node);}
+\function{int CcsSendRequest(CcsServer *svr, char *hdlrID, int pe, uint size, void *msg);}
+\function{int CcsRecvResponse(CcsServer *svr, uint maxsize, void *recvBuffer);}
+\function{int CcsProbe(CcsServer *svr);}
+\function{int CcsResponseHandler(CcsServer *svr, CcsHandlerFn fn);}
+\function{int CcsFinalize(CcsServer *svr);}
+
+

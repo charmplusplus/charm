@@ -12,7 +12,13 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 1.9  1996-11-18 16:55:50  milind
+# Revision 1.10  1999-07-15 23:24:06  jmwrght1
+# Added the chapter on CCS to the Converse manual.  At this point, it is
+# basically copied verbatim from the html file in the tech notes function.
+# I need to fix some of the tex code (still learning this stuff) and elaborate
+# on the explanations of various things.
+#
+# Revision 1.9  1996/11/18 16:55:50  milind
 # Made changes to the scheduler section to reflect the semantics of
 # CsdScheduler(0). Also, changed the Makefile to have targets ps, html,
 # install and all.
@@ -49,7 +55,7 @@
 
 TEXFILES=cmi.tex cpm.tex cpvmacros.tex index.tex ldb.tex manual.tex\
 msgmgr.tex queue.tex scheduler.tex simulator.tex threads.tex\
-thsync.tex
+thsync.tex ccs.tex
 
 ps:
 	latex manual.tex
