@@ -12,8 +12,50 @@ RingMulticastStrategy::RingMulticastStrategy(CkArrayID dest_aid)
     commonRingInit();    
 }
 
+//Array Constructor
+RingMulticastStrategy::RingMulticastStrategy(CkArrayID src, CkArrayID dest)
+    : DirectMulticastStrategy(src, dest){
+    commonRingInit();    
+}
+
 void RingMulticastStrategy::commonRingInit(){
     //Sort destpelist
+}
+
+
+void RingMulticastStrategy::insertMessage(CharmMessageHolder *cmsg){
+    if(messageBuf == NULL) {
+	CkPrintf("ERROR MESSAGE BUF IS NULL\n");
+	return;
+    }
+    
+    ComlibPrintf("[%d] Comlib Direct Multicast: insertMessage \n", 
+                 CkMyPe());   
+    
+    if(cmsg->dest_proc == IS_SECTION_MULTICAST && cmsg->sec_id != NULL) { 
+        int cur_sec_id = ComlibSectionInfo::getSectionID(*cmsg->sec_id);
+
+        if(cur_sec_id > 0) {        
+            sinfo.processOldSectionMessage(cmsg);
+        }
+        else {
+            CkSectionID *sid = cmsg->sec_id;
+
+            //New sec id, so send it along with the message
+            void *newmsg = sinfo.getNewMulticastMessage(cmsg);
+            CkFreeMsg(cmsg->getCharmMessage());
+            delete cmsg;
+            
+            initSectionID(sid);
+            cmsg = new CharmMessageHolder((char *)newmsg, 
+                                          IS_SECTION_MULTICAST); 
+            cmsg->sec_id = sid;
+        }        
+    }
+    
+    messageBuf->enq(cmsg);
+    if(!isBracketed())
+        doneInserting();
 }
 
 extern int _charmHandlerIdx;
@@ -32,22 +74,22 @@ void RingMulticastStrategy::doneInserting(){
         ComlibPrintf("[%d] Calling Ring %d %d %d\n", CkMyPe(),
                      env->getTotalsize(), ndestpes, cmsg->dest_proc);
         	
-        if(cmsg->dest_proc == IS_MULTICAST) {      
+        if(cmsg->dest_proc == IS_SECTION_MULTICAST ||
+           cmsg->dest_proc == IS_BROADCAST) {      
+            
             CmiSetHandler(env, handlerId);
             
             int dest_pe = -1;
             RingMulticastHashObject *robj;
-
+            
             if(cmsg->sec_id == NULL)
                 dest_pe = nextPE;
             else {
                 robj = getHashObject(CkMyPe(), 
                                      cmsg->sec_id->_cookie.sInfo.cInfo.id);
-                                
-                ComlibPrintf("Gotten has obect %d\n",  robj);
-
-                CkAssert(robj != NULL);
-
+                
+                ComlibPrintf("Gotten has obect %d\n",  robj);                
+                CkAssert(robj != NULL);                
                 dest_pe = robj->nextPE;
             }
             
@@ -182,7 +224,7 @@ void RingMulticastStrategy::handleMulticastMessage(void *msg){
 
 void RingMulticastStrategy::initSectionID(CkSectionID *sid){
 
-    CkPrintf("Ring Init section ID\n");
+    ComlibPrintf("Ring Init section ID\n");
     sid->pelist = NULL;
     sid->npes = 0;
 
@@ -209,7 +251,8 @@ RingMulticastHashObject *RingMulticastStrategy::createHashObject
         CkArrayIndexMax *idx_list;        
         ainfo.getDestinationArray(dest, idx_list, nidx);
 
-        int p = CkArrayID::CkLocalBranch(dest)->lastKnown(elements[acount]);
+        int p = ComlibGetLastKnown(dest, elements[acount]);
+        //CkArrayID::CkLocalBranch(dest)->lastKnown(elements[acount]);
         
         if(p < min_dest)
             min_dest = p;

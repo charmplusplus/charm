@@ -1,4 +1,5 @@
 #include "DirectMulticastStrategy.h"
+#include "AAMLearner.h"
 
 CkpvExtern(CkGroupID, cmgrID);
 
@@ -12,7 +13,9 @@ void *DMHandler(void *msg){
     nm_mgr = (DirectMulticastStrategy *) 
         CProxy_ComlibManager(CkpvAccess(cmgrID)).
         ckLocalBranch()->getStrategy(instid);
-    
+
+    envelope *env = (envelope *) msg;
+    RECORD_RECV_STATS(instid, env->getTotalsize(), env->getSrcPe());
     nm_mgr->handleMulticastMessage(msg);
     return NULL;
 }
@@ -32,7 +35,19 @@ DirectMulticastStrategy::DirectMulticastStrategy(int ndest, int *pelist)
 DirectMulticastStrategy::DirectMulticastStrategy(CkArrayID aid)
     :  CharmStrategy() {
 
+    //ainfo.setSourceArray(aid);
     ainfo.setDestinationArray(aid);
+    setType(ARRAY_STRATEGY);
+    ndestpes = 0;
+    destpelist = 0;
+    commonInit();
+}
+
+DirectMulticastStrategy::DirectMulticastStrategy(CkArrayID said, CkArrayID daid)
+    :  CharmStrategy() {
+
+    ainfo.setSourceArray(said);
+    ainfo.setDestinationArray(daid);
     setType(ARRAY_STRATEGY);
     ndestpes = 0;
     destpelist = 0;
@@ -49,6 +64,24 @@ void DirectMulticastStrategy::commonInit(){
     }
 }
 
+DirectMulticastStrategy::~DirectMulticastStrategy() {
+    if(ndestpes > 0)
+        delete [] destpelist;
+
+    if(getLearner() != NULL)
+        delete getLearner();
+        
+    CkHashtableIterator *ht_iterator = sec_ht.iterator();
+    ht_iterator->seekStart();
+    while(ht_iterator->hasNext()){
+        void **data;
+        data = (void **)ht_iterator->next();        
+        CkVec<CkArrayIndexMax> *a_vec = (CkVec<CkArrayIndexMax> *) (* data);
+        if(a_vec != NULL)
+            delete a_vec;
+    }
+}
+
 void DirectMulticastStrategy::insertMessage(CharmMessageHolder *cmsg){
     if(messageBuf == NULL) {
 	CkPrintf("ERROR MESSAGE BUF IS NULL\n");
@@ -58,7 +91,7 @@ void DirectMulticastStrategy::insertMessage(CharmMessageHolder *cmsg){
     ComlibPrintf("[%d] Comlib Direct Multicast: insertMessage \n", 
                  CkMyPe());   
    
-    if(cmsg->dest_proc == IS_MULTICAST && cmsg->sec_id != NULL) {        
+    if(cmsg->dest_proc == IS_SECTION_MULTICAST && cmsg->sec_id != NULL) { 
         int cur_sec_id = ComlibSectionInfo::getSectionID(*cmsg->sec_id);
 
         if(cur_sec_id > 0) {        
@@ -74,11 +107,12 @@ void DirectMulticastStrategy::insertMessage(CharmMessageHolder *cmsg){
             
             sinfo.initSectionID(sid);
 
-            cmsg = new CharmMessageHolder((char *)newmsg, IS_MULTICAST); 
+            cmsg = new CharmMessageHolder((char *)newmsg, 
+                                          IS_SECTION_MULTICAST); 
             cmsg->sec_id = sid;
         }        
     }
-    
+   
     messageBuf->enq(cmsg);
     if(!isBracketed())
         doneInserting();
@@ -95,7 +129,9 @@ void DirectMulticastStrategy::doneInserting(){
 	CharmMessageHolder *cmsg = messageBuf->deq();
         char *msg = cmsg->getCharmMessage();
         	
-        if(cmsg->dest_proc == IS_MULTICAST) {      
+        if(cmsg->dest_proc == IS_SECTION_MULTICAST || 
+           cmsg->dest_proc == IS_BROADCAST) {      
+
             if(getType() == ARRAY_STRATEGY)
                 CmiSetHandler(UsrToEnv(msg), handlerId);
             
@@ -106,13 +142,20 @@ void DirectMulticastStrategy::doneInserting(){
                 cur_npes = cmsg->sec_id->npes;
             }
             
+            //Collect Multicast Statistics
+            RECORD_SENDM_STATS(getInstance(), 
+                               ((envelope *)cmsg->getMessage())->getTotalsize(), 
+                               cur_map, cur_npes);
+
+
             ComlibPrintf("[%d] Calling Direct Multicast %d %d %d\n", CkMyPe(),
                          UsrToEnv(msg)->getTotalsize(), cur_npes, 
                          cmsg->dest_proc);
+
             /*
-            for(int i=0; i < cur_npes; i++)
-                CkPrintf("[%d] Sending to %d %d\n", CkMyPe(), 
-                         cur_map[i], cur_npes);
+              for(int i=0; i < cur_npes; i++)
+              CkPrintf("[%d] Sending to %d %d\n", CkMyPe(), 
+              cur_map[i], cur_npes);
             */
 
             CmiSyncListSendAndFree(cur_npes, cur_map, 
@@ -135,10 +178,22 @@ void DirectMulticastStrategy::pup(PUP::er &p){
     CharmStrategy::pup(p);
 
     p | ndestpes;
-    if(p.isUnpacking())
+    if(p.isUnpacking() && ndestpes > 0)
         destpelist = new int[ndestpes];
     
     p(destpelist, ndestpes);        
+    
+    if(p.isUnpacking()) {
+        CkArrayID src;
+        int nidx;
+        CkArrayIndexMax *idx_list;     
+        ainfo.getSourceArray(src, idx_list, nidx);
+        
+        if(!src.isZero()) {
+            AAMLearner *l = new AAMLearner();
+            setLearner(l);
+        }
+    }
 }
 
 void DirectMulticastStrategy::beginProcessing(int numElements){

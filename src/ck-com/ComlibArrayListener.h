@@ -24,7 +24,17 @@ class ComlibArrayListener : public CkArrayListener{
     void ckElementLeaving(ArrayElement *elt);
     CmiBool ckElementArriving(ArrayElement *elt);
     
+    //Add strategy to listening list, strategy will get an the number
+    //of array elements lying on that processor
     void registerStrategy(StrategyTableEntry *);
+
+    //remove strategy from table, and now it will not get updates
+    //about this array
+    void unregisterStrategy(StrategyTableEntry *entry) {
+        for(int count = 0; count < strategyList.size(); count++)
+            if(strategyList[count] == entry)
+                strategyList.remove(count);
+    }
 
     void getLocalIndices(CkVec<CkArrayIndexMax> &vec);
 

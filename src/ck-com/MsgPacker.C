@@ -58,7 +58,7 @@ MsgPacker::MsgPacker(CkQ<CharmMessageHolder *> &msgq, int n_msgs){
         msgList[count].idx = env->getsetArrayIndex();
         msgList[count].data = cmsg->getCharmMessage();
 
-        if(msgList[count].size > MAX_MESSAGE_SIZE)
+        if(msgList[count].size >= MAX_MESSAGE_SIZE-1)
             CkAbort("Can't send messges larger than 64KB\n");
 
         delete cmsg;

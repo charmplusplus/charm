@@ -28,9 +28,29 @@ class RingMulticastStrategy: public DirectMulticastStrategy {
     
     //Array constructor
     RingMulticastStrategy(CkArrayID dest_id);    
+    RingMulticastStrategy(CkArrayID src, CkArrayID dest);    
     RingMulticastStrategy(CkMigrateMessage *m) {}
+
+    //Destructor
+    ~RingMulticastStrategy() { 
+        
+        CkHashtableIterator *ht_iterator = sec_ht.iterator();
+        ht_iterator->seekStart();
+        while(ht_iterator->hasNext()){
+            void **data;
+            data = (void **)ht_iterator->next();        
+            RingMulticastHashObject *robj = 
+                (RingMulticastHashObject*)(* data);
+
+            *data = NULL;
+            if(robj)
+                delete robj;
+        }
+
+        sec_ht.empty();
+    }
     
-    //void insertMessage(CharmMessageHolder *msg);
+    void insertMessage(CharmMessageHolder *msg);
     void doneInserting();
     void handleMulticastMessage(void *msg);
     

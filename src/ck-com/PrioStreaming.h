@@ -27,7 +27,7 @@ class PrioStreaming : public StreamingStrategy {
     */
 
     PrioStreaming(int periodMs=10, int bufferMax=1000, int prio=0);
-    PrioStreaming(CkMigrateMessage *){}
+    PrioStreaming(CkMigrateMessage *m) : StreamingStrategy(m) {}
     
     virtual void insertMessage(CharmMessageHolder *msg);
 

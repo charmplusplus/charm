@@ -55,13 +55,20 @@ ComlibMulticastMsg * ComlibSectionInfo::getNewMulticastMessage
 void ComlibSectionInfo::unpack(envelope *cb_env, 
                                CkVec<CkArrayIndexMax> *&dest_indices, 
                                envelope *&env) {
-    
-    dest_indices = new CkVec<CkArrayIndexMax>;
-    
+        
+    dest_indices = NULL;    
     ComlibMulticastMsg *ccmsg = (ComlibMulticastMsg *)EnvToUsr(cb_env);
+    
+    if(ccmsg->nIndices > 0)
+        dest_indices = new CkVec<CkArrayIndexMax>;
+
     for(int count = 0; count < ccmsg->nIndices; count++){
         CkArrayIndexMax idx = ccmsg->indices[count];
-        int dest_proc = CkArrayID::CkLocalBranch(destArrayID)->lastKnown(idx);
+        
+        //This will work because. lastknown always knows if I have the
+        //element of not
+        int dest_proc = ComlibGetLastKnown(destArrayID, idx);
+        //CkArrayID::CkLocalBranch(destArrayID)->lastKnown(idx);
         
         if(dest_proc == CkMyPe())
             dest_indices->insertAtEnd(idx);                        
@@ -74,6 +81,9 @@ void ComlibSectionInfo::unpack(envelope *cb_env,
 
 
 void ComlibSectionInfo::processOldSectionMessage(CharmMessageHolder *cmsg) {
+
+    ComlibPrintf("Process Old Section Message \n");
+
     int cur_sec_id = ComlibSectionInfo::getSectionID(*cmsg->sec_id);
 
     //Old section id, send the id with the message
@@ -93,8 +103,10 @@ void ComlibSectionInfo::initSectionID(CkSectionID *sid){
     int count = 0, acount = 0;
 
     for(acount = 0; acount < sid->_nElems; acount++){
-        int p = CkArrayID::CkLocalBranch(destArrayID)->
-            lastKnown(sid->_elems[acount]);
+
+        int p = ComlibGetLastKnown(destArrayID, sid->_elems[acount]);
+        //CkArrayID::CkLocalBranch(destArrayID)->
+        //lastKnown(sid->_elems[acount]);
         
         if(p == -1) CkAbort("Invalid Section\n");        
         for(count = 0; count < sid->npes; count ++)

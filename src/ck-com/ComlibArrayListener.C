@@ -35,7 +35,6 @@ CmiBool ComlibArrayListener::ckElementArriving(ArrayElement *elt){
     return CmiTrue;
 }
 
-
 void ComlibArrayListener::addElement(ArrayElement *elt, 
                                      CmiBool migration_flag){
     if(nElements == 0)

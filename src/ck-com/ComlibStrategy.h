@@ -2,7 +2,11 @@
 #define COMMLIBSTRATEGY_H
 
 #include "charm++.h"
+#include "ckhashtable.h"
 #include "convcomlibstrategy.h"
+#include "ComlibLearner.h"
+
+CkpvExtern(int, migrationDoneHandlerID);
 
 //Class managing Charm++ messages in the communication library.
 //It is aware of envelopes, arrays, etc
@@ -21,6 +25,56 @@ class CharmMessageHolder : public MessageHolder{
     virtual void pup(PUP::er &p);
     PUPable_decl(CharmMessageHolder);
 };
+
+
+//Struct to store the comlib location table info
+struct ClibGlobalArrayIndex {
+    CkArrayID aid;
+    CkArrayIndexMax idx;
+
+    //These routines allow ClibGlobalArrayIndex to be used in
+    //  a CkHashtableT
+    CkHashCode hash(void) const;
+    static CkHashCode staticHash(const void *a,size_t);
+    int compare(const ClibGlobalArrayIndex &ind) const;
+    static int staticCompare(const void *a,const void *b,size_t);
+};
+PUPbytes(ClibGlobalArrayIndex);
+
+/*********** CkHashTable functions ******************/
+inline CkHashCode ClibGlobalArrayIndex::hash(void) const
+{
+    register CkHashCode ret = idx.hash() | (CkGroupID(aid).idx << 16);
+    return ret;
+}
+
+inline int ClibGlobalArrayIndex::compare(const ClibGlobalArrayIndex &k2) const
+{
+    if(idx == k2.idx && aid == k2.aid)
+        return 1;
+    
+    return 0;
+}
+
+//ClibGlobalArrayIndex CODE
+inline int ClibGlobalArrayIndex::staticCompare(const void *k1, const void *k2, 
+                                                size_t ){
+    return ((const ClibGlobalArrayIndex *)k1)->
+                compare(*(const ClibGlobalArrayIndex *)k2);
+}
+
+inline CkHashCode ClibGlobalArrayIndex::staticHash(const void *v,size_t){
+    return ((const ClibGlobalArrayIndex *)v)->hash();
+}
+
+
+typedef CkHashtableT<ClibGlobalArrayIndex,int> ClibLocationTableType;
+    
+//Stores the location of many array elements used by the
+//strategies.  Since hash table returns a reference to the object
+//and for an int that will be 0, the actual value stored is pe +
+//CkNumPes so 0 would mean processor -CkNumPes which is invalid.
+CkpvExtern(ClibLocationTableType *, locationTable);
 
 //Info classes that help bracketed streategies manage objects
 //Each info class points to a list of source (or destination) objects
@@ -47,18 +101,28 @@ class ComlibNodeGroupInfo {
 
 class ComlibGroupInfo {
  protected:
-    CkGroupID gid;
+    CkGroupID sgid, dgid;
     int *srcpelist, nsrcpes; //src processors for the elements
-    int isGroup;   
+    int *destpelist, ndestpes;
+    int isSrcGroup;   
+    int isDestGroup;
 
  public:
     ComlibGroupInfo();
+    ~ComlibGroupInfo();
 
-    void setSourceGroup(CkGroupID gid, int *srcpelist=0, int nsrcpes=0);
-    int isSourceGroup(){return isGroup;}
+    int isSourceGroup(){return isSrcGroup;}
+    int isDestinationGroup(){return isDestGroup;}
+
+    void setSourceGroup(CkGroupID gid, int *srcpelist=0, int nsrcpes=0);    
     void getSourceGroup(CkGroupID &gid);
     void getSourceGroup(CkGroupID &gid, int *&pelist, int &npes);
-    
+
+    void setDestinationGroup(CkGroupID sgid,int *destpelist=0,int ndestpes=0);
+    void getDestinationGroup(CkGroupID &gid);
+    void getDestinationGroup(CkGroupID &dgid,int *&destpelist, int &ndestpes);
+
+    void getCombinedPeList(int *&pelist, int &npes);
     void pup(PUP::er &p);
 };
 
@@ -88,6 +152,7 @@ class ComlibArrayInfo {
     
  public:
     ComlibArrayInfo();
+    ~ComlibArrayInfo();
 
     void setSourceArray(CkArrayID aid, CkArrayIndexMax *e=0, int nind=0);
     int isSourceArray(){return isSrcArray;}
@@ -115,7 +180,9 @@ class ComlibArrayInfo {
    node groups, groups and arrays */
 
 class CharmStrategy : public Strategy {
+ protected:
     int forwardOnMigration;
+    ComlibLearner *learner;
 
  public:
     ComlibGroupInfo ginfo;
@@ -128,9 +195,12 @@ class CharmStrategy : public Strategy {
     CharmStrategy() : Strategy() {
         setType(GROUP_STRATEGY); 
         forwardOnMigration = 0;
+        learner = NULL;
     }
 
-    CharmStrategy(CkMigrateMessage *m) : Strategy(m){}
+    CharmStrategy(CkMigrateMessage *m) : Strategy(m){
+        learner = NULL;
+    }
 
     //Called for each message
     //Function inserts a Charm++ message
@@ -151,6 +221,15 @@ class CharmStrategy : public Strategy {
     //DOES NOT exist in Converse Strategies
     virtual void beginProcessing(int nelements){}
 
+    //Added a new call that is called after the strategy had be
+    //created on every processor.  DOES NOT exist in Converse
+    //Strategies. Called when the strategy is deactivated, possibly as
+    //a result of a learning decision
+    virtual void finalizeProcessing(){}
+
+    virtual ComlibLearner *getLearner() {return learner;}
+    virtual void setLearner(ComlibLearner *l) {learner = l;}
+
     virtual void pup(PUP::er &p);
     PUPable_decl(CharmStrategy);
 
@@ -162,5 +241,9 @@ class CharmStrategy : public Strategy {
         return forwardOnMigration;
     }
 };
+
+//API calls which will be valid when communication library is not linked
+int ComlibGetLastKnown(CkArrayID a, CkArrayIndexMax idx);
+void ComlibNotifyMigrationDone();
 
 #endif

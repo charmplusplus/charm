@@ -9,12 +9,12 @@ void *DMHandler(void *msg);
 class DirectMulticastStrategy: public CharmStrategy {
  protected:
     CkQ <CharmMessageHolder*> *messageBuf;
-
+    
     int ndestpes, *destpelist; //Destination processors
     int handlerId;
     
     ComlibSectionInfo sinfo;
-
+    
     //Array section support
     CkHashtableT<ComlibSectionHashKey, void *> sec_ht; 
     
@@ -26,12 +26,17 @@ class DirectMulticastStrategy: public CharmStrategy {
     
     //Group constructor
     DirectMulticastStrategy(int ndestpes = 0, int *destpelist = 0);    
-
+    DirectMulticastStrategy(CkMigrateMessage *m): CharmStrategy(m){}
+                
     //Array constructor
     DirectMulticastStrategy(CkArrayID aid);
 
-    DirectMulticastStrategy(CkMigrateMessage *m): CharmStrategy(m){}
-    
+    //Array constructor
+    DirectMulticastStrategy(CkArrayID said, CkArrayID dest);
+        
+    //Destuctor
+    ~DirectMulticastStrategy();
+        
     virtual void insertMessage(CharmMessageHolder *msg);
     virtual void doneInserting();
 

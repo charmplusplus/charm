@@ -24,12 +24,9 @@
                              //learning framework will discover 
                              //the appropriate strategy, not completely 
                              //implemented
-#define IS_MULTICAST -1
-
-#define ALPHA 5E-6
-#define BETA 3.33E-9
-
 PUPbytes(comID);
+
+#include "ComlibStats.h"
 
 #include "comlib.decl.h"
 
@@ -57,8 +54,6 @@ class ComlibMulticastMsg : public CkMcastBaseMsg,
 };
 
 class ComlibManager;
-
-extern CkGroupID cmgrID;
 
 //An Instance of the communication library.
 class ComlibInstanceHandle {
@@ -95,6 +90,8 @@ class ComlibInstanceHandle {
     }
 };
 
+class LBMigrateMsg;
+
 class ComlibManager: public CkDelegateMgr {
     friend class ComlibInstanceHandle;
 
@@ -104,6 +101,7 @@ class ComlibManager: public CkDelegateMgr {
 
     int remotePe;
     CmiBool isRemote;
+    CmiBool strategyCreated;
 
     int npes;
     int *pelist;
@@ -116,24 +114,35 @@ class ComlibManager: public CkDelegateMgr {
     //Pointer to the converse comm lib strategy table
     StrategyTable *strategyTable;
 
-    CkVec<CharmStrategy *> ListOfStrategies; //temporary list of strategies
+    CkQ<CharmStrategy *> ListOfStrategies; //temporary list of strategies
     
     CkQ<CharmMessageHolder *> remoteQ;  //list of remote messages
                                         //after the object has
                                         //migrated
 
     //The number of strategies created by the user
-    int nstrats; 
+    //int nstrats; //now part of conv comlib
     
     int curStratID, prevStratID;      
     //Number of strategies created by the user.
 
     //flags
     int receivedTable, flushTable, barrierReached, barrier2Reached;
-    int totalMsgCount, totalBytes, nIterations;
+    CmiBool lbUpdateReceived;
+
+    int bcount , b2count;
+    //int totalMsgCount, totalBytes, nIterations;
 
     ComlibArrayListener *alistener;
     int prioEndIterationFlag;
+
+    ComlibGlobalStats clib_gstats; 
+    int    numStatsReceived;
+
+    int curComlibController;   //Processor where strategies are  recreated
+    int clibIteration;         //Number of such learning iterations,
+                               //each of which is triggered by a
+                               //loadbalancing operation
 
     void init(); //initialization function
 
@@ -152,32 +161,42 @@ class ComlibManager: public CkDelegateMgr {
                                //the bracket.
     
     void setInstance(int id); 
+
     //void prioEndIteration(PrioMsg *pmsg);
     void registerStrategy(int pos, CharmStrategy *s);
 
  public:
+
+    ComlibLocalStats clib_stats;   //To store statistics of
+                                   //communication operations
+    
     ComlibManager();  //Recommended constructor
 
-    ComlibManager(CkMigrateMessage *m){ }
+    ComlibManager(CkMigrateMessage *m) { }
     int useDefCtor(void){ return 1; } //Use default constructor should
     //be pupped and store all the strategies.
     
     void barrier(void);
     void barrier2(void);
     void resumeFromBarrier2(void);
-    void receiveTable(StrategyWrapper sw); //Receive table of strategies.
 
-    void ArraySend(CkDelegateData *pd,int ep, void *msg, const CkArrayIndexMax &idx, 
-                   CkArrayID a);
+    //Receive table of strategies.
+    void receiveTable(StrategyWrapper &sw, 
+                      CkHashtableT <ClibGlobalArrayIndex, int>&); 
+
+    void ArraySend(CkDelegateData *pd,int ep, void *msg, 
+                   const CkArrayIndexMax &idx, CkArrayID a);
 
     void receiveRemoteSend(CkQ<CharmMessageHolder*> &rq, int id);
     void sendRemote();
 
-    void GroupSend(CkDelegateData *pd,int ep, void *msg, int onpe, CkGroupID gid);
+    void GroupSend(CkDelegateData *pd, int ep, void *msg, int onpe, 
+                   CkGroupID gid);
     
     virtual void ArrayBroadcast(CkDelegateData *pd,int ep,void *m,CkArrayID a);
     virtual void GroupBroadcast(CkDelegateData *pd,int ep,void *m,CkGroupID g);
-    virtual void ArraySectionSend(CkDelegateData *pd,int ep,void *m,CkArrayID a,CkSectionID &s);
+    virtual void ArraySectionSend(CkDelegateData *pd, int ep ,void *m, 
+                                  CkArrayID a, CkSectionID &s);
 
     CharmStrategy *getStrategy(int instid)
         {return (CharmStrategy *)(* strategyTable)[instid].strategy;}
@@ -187,13 +206,41 @@ class ComlibManager: public CkDelegateMgr {
 
     //To create a new strategy, returns handle to the strategy table;
     ComlibInstanceHandle createInstance();  
-    void doneCreating();             //Done creating instances
+    void broadcastStrategies();             //Done creating instances
+
+    void AtSync();           //User program called loadbalancer
+    void lbUpdate(LBMigrateMsg *); //loadbalancing updates
 
     //Learning functions
-    void learnPattern(int totalMessageCount, int totalBytes);
-    void switchStrategy(int strat);
+    //void learnPattern(int totalMessageCount, int totalBytes);
+    //void switchStrategy(int strat);
 
     void setRemote(int remotePe);
+
+    void collectStats(ComlibLocalStats &s, int src,CkVec<ClibGlobalArrayIndex>&);
+
+    //Returns the processor on which the comlib sees the array element
+    //belonging to
+    inline int getLastKnown(CkArrayID a, CkArrayIndexMax &idx) {
+        /*
+        ClibGlobalArrayIndex cidx;
+        cidx.aid = a;
+        cidx.idx = idx;
+        int pe = locationTable->get(cidx);
+
+        if(pe == 0) {
+            //Array element does not exist in the table
+
+            CkArray *array = CkArrayID::CkLocalBranch(a);
+            pe = array->lastKnown(idx) + CkNumPes();
+            locationTable->put(cidx) = pe;
+        }
+        //CkPrintf("last pe = %d \n", pe - CkNumPes());
+
+        return pe - CkNumPes();
+        */
+        return ComlibGetLastKnown(a, idx);
+    }
 };
 
 void ComlibDelegateProxy(CProxy *proxy);
@@ -201,11 +248,36 @@ void ComlibDelegateProxy(CProxy *proxy);
 ComlibInstanceHandle CkCreateComlibInstance();
 ComlibInstanceHandle CkGetComlibInstance();
 ComlibInstanceHandle CkGetComlibInstance(int id);
+void ComlibResetSectionProxy(CProxySection_ArrayBase *sproxy);
+
 
 //Only Called when the strategies are not being created in main::main
 void ComlibDoneCreating(); 
 
 void ComlibInitSectionID(CkSectionID &sid);
-void ComlibDeleteSection();
+
+void ComlibAtSync(void *msg);
+void ComlibNotifyMigrationDoneHandler(void *msg);
+void ComlibLBMigrationUpdate(LBMigrateMsg *);
+
+#define RECORD_SEND_STATS(sid, bytes, dest) {             \
+        CProxy_ComlibManager cgproxy(CkpvAccess(cmgrID));               \
+        cgproxy.ckLocalBranch()->clib_stats.recordSend(sid, bytes, dest); \
+}\
+
+#define RECORD_RECV_STATS(sid, bytes, src) { \
+        CProxy_ComlibManager cgproxy(CkpvAccess(cmgrID)); \
+        cgproxy.ckLocalBranch()->clib_stats.recordRecv(sid, bytes, src); \
+}\
+
+#define RECORD_SENDM_STATS(sid, bytes, dest_arr, ndest) {       \
+        CProxy_ComlibManager cgproxy(CkpvAccess(cmgrID)); \
+        cgproxy.ckLocalBranch()->clib_stats.recordSendM(sid, bytes, dest_arr, ndest); \
+}\
+
+#define RECORD_RECVM_STATS(sid, bytes, src_arr, nsrc) {        \
+        CProxy_ComlibManager cgproxy(CkpvAccess(cmgrID)); \
+        cgproxy.ckLocalBranch()->clib_stats.recordRecvM(sid, bytes, src_arr, nsrc); \
+}\
 
 #endif

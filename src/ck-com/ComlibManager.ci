@@ -14,15 +14,12 @@ module comlib {
     entry void barrier(void);
     entry void barrier2(void);
     entry void resumeFromBarrier2(void);
+    entry void receiveTable(StrategyWrapper sw, 
+	CkHashtableT<ClibGlobalArrayIndex, int>);
 
-    //entry void beginIteration();
-    //entry void endIteration();
-    //entry void prioEndIteration(PrioMsg *);
-
-    entry void receiveTable(StrategyWrapper sw);
     entry void receiveRemoteSend(CkQ<CharmMessageHolder *> &remoteQ, int id);
-
-    entry void learnPattern(int, int);
+    entry void collectStats(ComlibLocalStats s, int src, 
+	CkVec<ClibGlobalArrayIndex>);
   }
 
   mainchare ComlibManagerMain {
