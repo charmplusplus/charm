@@ -10,11 +10,9 @@ schedulers.
 
 \section{Basic Thread Calls}
 
-Note: in this section, we refer to the ready-queue.  By default, this
-means the central scheduler queue previously described in section
-\ref{schedqueue}.  There are hooks that enable you to change which
-ready-queue a thread uses, but unless you've taken explicit action,
-you can assume the threads are all using the main ready-queue.
+In this section, we refer to the ``scheduler queue''.  By this, we mean
+the priority queue described in section \ref{schedqueue}.
+
 
 \function{typedef struct CthThreadStruct *CthThread;}
 \index{CthThread}
@@ -43,7 +41,7 @@ object using {\tt CthSelf} and use it like any other.}
 \index{CthCreate}
 \desc{Creates a new thread object.  The thread is not given control
 yet.  To make the thread execute, you must push it into the
-ready-queue, using CthAwaken below.  When (and if) the thread
+scheduler queue, using CthAwaken below.  When (and if) the thread
 eventually receives control, it will begin executing the specified
 function {\tt fn} with the specified argument.  The {\tt size}
 parameter specifies the stack size in bytes, 0 means use the default
@@ -64,15 +62,18 @@ thread suspends.  This is how a thread terminates itself: it calls
 
 \function{void CthSuspend()}
 \index{CthSuspend}
-\desc{Causes the current thread to stop executing, and control to be
-transferred to some other thread in the ready-queue.  The suspended
-thread will not start executing again until somebody pushes it into 
-the ready queue again, using CthAwaken below.}
+\desc{Causes the current thread to stop executing.
+The suspended thread will not start executing again until somebody
+pushes it into the scheduler queue again, using CthAwaken below.  Control
+transfers to the thread running CsdScheduler.  This has the effect of
+polling for messages, and possibly transferring control to a
+thread in the scheduler queue.}
 
 \function{void CthAwaken(CthThread t)}
 \index{CthAwaken}
-\desc{Pushes a thread into the ready queue.  Caution: a thread must only
-be in the ready-queue once.  Pushing it in twice is a crashable error.}
+\desc{Pushes a thread into the scheduler queue.  Caution: a thread
+must only be in the queue once.  Pushing it in twice is a crashable
+error.}
 
 \function{void CthYield()}
 \index{CthYield}
