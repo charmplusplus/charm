@@ -375,8 +375,8 @@ static const char *CIChareEnd =
 "};\n"
 ;
 
-Chare::Chare(int ln, NamedType *t, TypeList *b, MemberList *l)
-	 : type(t), list(l), bases(b) 
+Chare::Chare(int ln, NamedType *t, TypeList *b, MemberList *l, int mig)
+	 : type(t), list(l), bases(b), migratable(mig) 
 {
 	line = ln;
 	setTemplate(0); 
@@ -387,7 +387,7 @@ Chare::Chare(int ln, NamedType *t, TypeList *b, MemberList *l)
 		if (list->isPure()) abstract=1;
 		else /*not at abstract class--*/
       		//Add migration constructor to MemberList
-		  if(!t->isTemplated()) {
+		  if(!t->isTemplated() && migratable) {
 			Entry *e=new Entry(ln,SMIGRATE,NULL,
 			(char *)type->getBaseName(),
 			new PtrType(new NamedType("CkMigrateMessage")));
@@ -425,8 +425,10 @@ Chare::genRegisterMethodDef(XStr& str)
     bases->genProxyNames(str, "  _REGISTER_BASE(__idx, ", "::__idx);\n", "");
   if(list)
     list->genReg(str);
-  str <<  
-  "      CkRegisterMigCtor(__idx, __idx_"<<type->getBaseName()<<"_CkMigrateMessage);\n";
+  if(migratable) {
+    str << "      CkRegisterMigCtor(__idx, " << 
+	            "__idx_"<<type->getBaseName()<<"_CkMigrateMessage);\n";
+  }
   str << "    }\n";
   str << "#endif\n";
 }
@@ -547,7 +549,7 @@ Group::genSubDecls(XStr& str)
 //Array Constructor
 Array::Array(int ln, NamedType *index,
 	NamedType *t, TypeList *b, MemberList *l)  
-    : Chare(ln,t,b,l) 
+    : Chare(ln,t,b,l,0x01) 
 {
 	index->print(indexSuffix);
 	if (indexSuffix!=(const char*)"none")

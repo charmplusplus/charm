@@ -76,6 +76,7 @@ struct rwtable rwtable[] = {
   "readonly",	READONLY,
   "stacksize",	STACKSIZE,
   "threaded",	THREADED,
+  "migratable",	MIGRATABLE,
   "template",	TEMPLATE,
   "class",	CLASS,
   "sync",	SYNC,

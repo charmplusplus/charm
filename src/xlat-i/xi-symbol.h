@@ -299,11 +299,12 @@ class Chare : public TEntity, public Construct {
     MemberList *list;
     TypeList *bases;
     int abstract;
+    int migratable;
 
     void genRegisterMethodDecl(XStr& str);
     void genRegisterMethodDef(XStr& str);
   public:
-    Chare(int ln, NamedType *t, TypeList *b=0, MemberList *l=0);
+    Chare(int ln, NamedType *t, TypeList *b=0, MemberList *l=0, int mig=0);
     void genProxyBases(XStr& str,const char* p,const char* s,const char* sep) {
       bases->genProxyNames(str, p, s, sep);
     }
@@ -324,6 +325,7 @@ class Chare : public TEntity, public Construct {
     int  isTemplated(void) { return (templat!=0); }
     int  isDerived(void) { return (bases!=0); }
     int  isAbstract(void) { return abstract; }
+    int  isMigratable(void) { return migratable; }
     virtual int isMainChare(void) {return 0;}
     virtual int isArray(void) {return 0;}
     virtual int isGroup(void) {return 0;}
@@ -340,8 +342,8 @@ class Chare : public TEntity, public Construct {
 
 class MainChare : public Chare {
   public:
-    MainChare(int ln, NamedType *t, TypeList *b=0, MemberList *l=0):
-	    Chare(ln, t,b,l) {}
+    MainChare(int ln, NamedType *t, TypeList *b=0, MemberList *l=0, int mig=0):
+	    Chare(ln, t,b,l,mig) {}
     virtual int isMainChare(void) {return 1;}
     virtual char *chareTypeName(void) {return (char *) "mainchare";}
 };
@@ -361,8 +363,8 @@ class Array : public Chare {
 
 class Group : public Chare {
   public:
-    Group(int ln, NamedType *t, TypeList *b=0, MemberList *l=0):
-	    Chare(ln,t,b,l) {}
+    Group(int ln, NamedType *t, TypeList *b=0, MemberList *l=0, int mig=0):
+	    Chare(ln,t,b,l,mig) {}
     virtual int isGroup(void) {return 1;}
     virtual void genSubDecls(XStr& str);
     virtual char *chareTypeName(void) {return (char *) "group";}
@@ -370,8 +372,8 @@ class Group : public Chare {
 
 class NodeGroup : public Group {
   public:
-    NodeGroup(int ln, NamedType *t, TypeList *b=0, MemberList *l=0):
-	    Group(ln,t,b,l) {}
+    NodeGroup(int ln, NamedType *t, TypeList *b=0, MemberList *l=0,int mig=0):
+	    Group(ln,t,b,l,mig) {}
     virtual int isNodeGroup(void) {return 1;}
     virtual char *chareTypeName(void) {return (char *) "nodegroup";}
 };

@@ -64,6 +64,7 @@ ModuleList *modlist;
 %type <val>		OptStackSize
 %type <intval>		OptExtern OptSemiColon MAttribs MAttribList MAttrib
 %type <intval>		EAttribs EAttribList EAttrib OptPure
+%type <intval>		CAttribs CAttribList CAttrib
 %type <tparam>		TParam
 %type <tparlist>	TParamList TParamEList OptTParams
 %type <type>		Type SimpleType OptTypeInit 
@@ -297,6 +298,22 @@ MAttrib		: PACKED
 		{ $$ = SVARSIZE; }
 		;
 
+CAttribs	: /* Empty */
+		{ $$ = 0; }
+		| '[' CAttribList ']'
+		{ $$ = $2; }
+		;
+
+CAttribList	: CAttrib
+		{ $$ = $1; }
+		| CAttrib ',' CAttribList
+		{ $$ = $1 | $3; }
+		;
+
+CAttrib		: MIGRATABLE
+		{ $$ = 0x01; }
+		;
+
 Message		: MESSAGE MAttribs NamedType
 		{ $$ = new Message(lineno, $3, $2); }
 		| MESSAGE MAttribs NamedType '{' TypeList '}'
@@ -315,18 +332,18 @@ BaseList	: NamedType
 		{ $$ = new TypeList($1, $3); }
 		;
 
-Chare		: CHARE NamedType OptBaseList MemberEList
-		{ $$ = new Chare(lineno, $2, $3, $4); }
-		| MAINCHARE NamedType OptBaseList MemberEList
-		{ $$ = new MainChare(lineno, $2, $3, $4); }
+Chare		: CHARE CAttribs NamedType OptBaseList MemberEList
+		{ $$ = new Chare(lineno, $3, $4, $5, $2); }
+		| MAINCHARE CAttribs NamedType OptBaseList MemberEList
+		{ $$ = new MainChare(lineno, $3, $4, $5, $2); }
 		;
 
-Group		: GROUP NamedType OptBaseList MemberEList
-		{ $$ = new Group(lineno, $2, $3, $4); }
+Group		: GROUP CAttribs NamedType OptBaseList MemberEList
+		{ $$ = new Group(lineno, $3, $4, $5, $2); }
 		;
 
-NodeGroup	: NODEGROUP NamedType OptBaseList MemberEList
-		{ $$ = new NodeGroup(lineno, $2, $3, $4); }
+NodeGroup	: NODEGROUP CAttribs NamedType OptBaseList MemberEList
+		{ $$ = new NodeGroup(lineno, $3, $4, $5, $2); }
 		;
 
 ArrayIndexType	: '[' NUMBER Name ']'
@@ -343,18 +360,18 @@ Array		: ARRAY ArrayIndexType NamedType OptBaseList MemberEList
 		{ $$ = new Array(lineno, $2, $3, $4, $5); }
 		;
 
-TChare		: CHARE Name OptBaseList MemberEList
-		{ $$ = new Chare(lineno, new NamedType($2), $3, $4);}
-		| MAINCHARE Name OptBaseList MemberEList
-		{ $$ = new MainChare(lineno, new NamedType($2), $3, $4); }
+TChare		: CHARE CAttribs Name OptBaseList MemberEList
+		{ $$ = new Chare(lineno, new NamedType($3), $4, $5, $2);}
+		| MAINCHARE CAttribs Name OptBaseList MemberEList
+		{ $$ = new MainChare(lineno, new NamedType($3), $4, $5, $2); }
 		;
 
-TGroup		: GROUP Name OptBaseList MemberEList
-		{ $$ = new Group(lineno, new NamedType($2), $3, $4); }
+TGroup		: GROUP CAttribs Name OptBaseList MemberEList
+		{ $$ = new Group(lineno, new NamedType($3), $4, $5, $2); }
 		;
 
-TNodeGroup	: NODEGROUP Name OptBaseList MemberEList
-		{ $$ = new NodeGroup( lineno, new NamedType($2), $3, $4); }
+TNodeGroup	: NODEGROUP CAttribs Name OptBaseList MemberEList
+		{ $$ = new NodeGroup( lineno, new NamedType($3), $4, $5, $2); }
 		;
 
 TArray		: ARRAY ArrayIndexType Name OptBaseList MemberEList
