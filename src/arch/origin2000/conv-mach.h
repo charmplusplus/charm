@@ -69,12 +69,6 @@
 #define CMK_THREADS_REQUIRE_NO_CPV                         0
 #define CMK_THREADS_COPY_STACK                             0
 
-#define CMK_THREADS_UNAVAILABLE                            0
-#define CMK_THREADS_USE_ALLOCA                             0
-#define CMK_THREADS_USE_JB_TWEAKING                        0
-#define CMK_THREADS_USE_JB_TWEAKING_EXEMPLAR               0
-#define CMK_THREADS_USE_JB_TWEAKING_ORIGIN                 1
-
 #define CMK_TIMER_USE_GETRUSAGE                            0
 #define CMK_TIMER_USE_SPECIAL                              0
 #define CMK_TIMER_USE_TIMES                                0
