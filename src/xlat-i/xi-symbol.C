@@ -219,6 +219,9 @@ Module::generate()
   declstr<<"#include \"charm++.h\""<<endx;
   clist->genDecls(declstr);
   declstr<<"extern void _register"<<name<<"(void);"<<endx;
+  if(isMain()) {
+    defstr << "extern void CkRegisterMainModule(void);" << endx;
+  }
   declstr<<"#endif"<<endx;
   defstr<<"#ifndef _DEFS_" << name << "_H_"<<endx;
   defstr<<"#define _DEFS_" << name << "_H_"<<endx;
@@ -384,13 +387,13 @@ Chare::genGroupDecls(XStr& str)
   str<<group_prefix();
   type->print(str);
   if(chareType==SGROUP) {
-    str << "(int _gid) { _ck_gid = _gid; }\n";
-    str << "    int ckGetGroupId(void) { return _ck_gid; }\n";
-    str << "    void ckSetGroupId(int _gid) { _ck_gid = _gid; }\n";
+    str << "(CkGroupID _gid) { _ck_gid = _gid; }\n";
+    str << "    CkGroupID ckGetGroupId(void) { return _ck_gid; }\n";
+    str << "    void ckSetGroupId(CkGroupID _gid) { _ck_gid = _gid; }\n";
   } else {
-    str << "(int _gid) { _ck_ngid = _gid; }\n";
-    str << "    int ckGetGroupId(void) { return _ck_ngid; }\n";
-    str << "    void ckSetGroupId(int _gid) { _ck_ngid = _gid; }\n";
+    str << "(CkGroupID _gid) { _ck_ngid = _gid; }\n";
+    str << "    CkGroupID ckGetGroupId(void) { return _ck_ngid; }\n";
+    str << "    void ckSetGroupId(CkGroupID _gid) { _ck_ngid = _gid; }\n";
   }
   str << "    ";
   type->print(str);
@@ -413,7 +416,7 @@ Chare::genGroupDecls(XStr& str)
   if(templat) {
     templat->genVars(str);
   }
-  str << "* ckLocalBranch(int gID) {\n";
+  str << "* ckLocalBranch(CkGroupID gID) {\n";
   str << "      return (";
   type->print(str);
   if(templat) {
@@ -813,7 +816,6 @@ void TName::genShort(XStr& str)
 
 static const char *CIExternModule = // modulename
 "#include \"\1.decl.h\"\n"
-"extern void _register\1(void);\n"
 ;
 
 void
@@ -829,10 +831,8 @@ Module::genDecls(XStr& str)
 void
 Module::genDefs(XStr& str)
 {
-  if(external) {
-  } else {
+  if(!external)
     clist->genDefs(str);
-  }
 }
 
 void
@@ -1017,7 +1017,7 @@ void Entry::genChareStaticConstructorDecl(XStr& str)
 
 void Entry::genGroupStaticConstructorDecl(XStr& str)
 {
-  str << "    static int ckNew(";
+  str << "    static CkGroupID ckNew(";
   if(param) {
     param->print(str);
     if(!param->isVoid())
@@ -1451,7 +1451,7 @@ void Entry::genGroupStaticConstructorDefs(XStr& str)
 {
   if(container->isTemplated())
     container->genSpec(str);
-  str << "int ";
+  str << "CkGroupID ";
   container->genProxyName(str);
   if(container->isTemplated())
     container->genVars(str);
