@@ -204,7 +204,9 @@ public:
 	int size = MESSAGESIZE;
 	
 #ifdef USELIB
-        sproxy.receiveMessage(new(&size, 0) BenchMessage);
+        BenchMessage *bmsg = new(&size, 0) BenchMessage;
+        bmsg->src = thisIndex;
+        sproxy.receiveMessage(bmsg);
 #else
 	arr[count].receiveMessage(new (&size, 0) BenchMessage);
 #endif
@@ -216,6 +218,8 @@ public:
         
         //CkPrintf("[%d][%d] In Receive Message \n", CkMyPe(), thisIndex);
         
+        CkAssert (bmsg->src >= 0 && bmsg->src < nElements);
+
         if(!firstEntryFlag) {
             startTime = CkWallTimer();
             firstEntryFlag = 1;
