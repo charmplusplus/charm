@@ -8,7 +8,7 @@ Developed by Sameer Kumar
 #include <errno.h>
 #include "converse.h"
 #include <elan/elan.h>
-#include <elan3/elan3.h>
+/*#include <elan3/elan3.h>*/
 
 /*Support for ++debug: */
 #include <unistd.h> /*For getpid()*/
@@ -24,13 +24,11 @@ Developed by Sameer Kumar
 /* copy from elan/version.h */
 #ifndef QSNETLIBS_VERSION_CODE
 #define QSNETLIBS_VERSION(a,b,c)        (((a) << 16) + ((b) << 8) + (c))
-#else   /* fake one */
-#define QSNETLIBS_VERSION(a,b,c)        (((a) << 16) + ((b) << 8) + (c))
-#define QSNETLIBS_VERSION_CODE          QSNETLIBS_VERSION(1,2,0)
+#define QSNETLIBS_VERSION_CODE          QSNETLIBS_VERSION(1,3,0)
 #endif
 
-#define MAX_QLEN 1000
-#define MAX_BYTES 10000000
+#define MAX_QLEN 16
+#define MAX_BYTES 1000000
 
 #define USE_SHM 1
 
@@ -58,15 +56,14 @@ ELAN_BASE     *elan_base;
 ELAN_TPORT    *elan_port;
 ELAN_QUEUE    *elan_q;
 
-const int SMALL_MESSAGE_SIZE=16384;  /* Smallest message size queue 
+const int SMALL_MESSAGE_SIZE=8192;  /* Smallest message size queue 
                                        used for receiving short messages */
                                      
 const int MID_MESSAGE_SIZE=65536;     /* Queue for larger messages 
                                           which need pre posted receives
                                           Message sizes greater will be 
                                           probe received adding 5us overhead*/
-
-#define SYNC_MESSAGE_SIZE MID_MESSAGE_SIZE  
+#define SYNC_MESSAGE_SIZE 65536    //MID_MESSAGE_SIZE  
                              /* Message sizes greater will be 
                                 sent synchronously thus avoiding copying*/
 
@@ -215,7 +212,7 @@ double CmiWallTimer(void)
     double cur_time;
     getclock(TIMEOFDAY, &tp);
     cur_time = tp.tv_nsec;
-    cur_time  /= 1e9;
+    cur_time  *= 0.000000001; // converting to seconds 1/1e9;
     cur_time += tp.tv_sec;
     return cur_time - starttimer;
 
@@ -228,7 +225,7 @@ double CmiCpuTimer(void)
     double cur_time;
     getclock(TIMEOFDAY, &tp);
     cur_time = tp.tv_nsec;
-    cur_time  /= 1e9;
+    cur_time  *= 0.000000001; //1e9;
     cur_time += tp.tv_sec;
     return cur_time - starttimer;
 
@@ -521,7 +518,11 @@ int PumpMsgs(int retflag)
     char *msg = 0;
     
     int recd=0;
+#if QSNETLIBS_VERSION_CODE > QSNETLIBS_VERSION(1,4,0)
+    unsigned long size= 0;
+#else
     int size= 0;
+#endif
     int tag=0;
     int src=-1;
     
@@ -556,7 +557,6 @@ int PumpMsgs(int retflag)
         }
         post_idx = ecount + 1;
 
-#if 1
         emcount = 0;
         for(mcount = 0; mcount < MID_MSG_Q_SIZE; mcount ++){
             emcount = (mcount + post_m_idx) % MID_MSG_Q_SIZE;
@@ -582,7 +582,6 @@ int PumpMsgs(int retflag)
         }
     
         if(!step1 && elan_tportRxDone(elarge)) {
-            //elan_deviceCheck(elan_base->state);                            
             elan_tportRxWait(elarge, NULL, NULL, &size );
       
             lbuf = (char *) CmiAlloc(size);
@@ -592,7 +591,6 @@ int PumpMsgs(int retflag)
         }
         
         if(step1 && elan_tportRxDone(elarge)) {
-            //elan_deviceCheck(elan_base->state);
             elan_tportRxWait(elarge, NULL, NULL, &size);
             
             msg = lbuf;
@@ -614,7 +612,6 @@ int PumpMsgs(int retflag)
         for(mcount = 0; mcount < MID_MSG_Q_SIZE; mcount ++){
             emcount = (mcount + event_m_idx) % MID_MSG_Q_SIZE;
             if(elan_tportRxDone(emid[emcount])) {
-                //elan_deviceCheck(elan_base->state);
                 elan_tportRxWait(emid[emcount], NULL, NULL, &size);
                 
                 msg = mbuf[emcount];
@@ -643,7 +640,6 @@ int PumpMsgs(int retflag)
             }
         }
         event_m_idx = emcount + 1;
-#endif
         
         ecount = 0;
         for(rcount = 0; rcount < RECV_MSG_Q_SIZE; rcount ++){
@@ -866,8 +862,8 @@ void ElanBasicSendFn(SMSG_LIST * ptr){
         tag = TAG_LARGE;
     }
 
-    if(ptr->size > SYNC_MESSAGE_SIZE)
-        sync_mode = ELAN_TPORT_TXSYNC;
+    //if(ptr->size > SYNC_MESSAGE_SIZE)
+    //  sync_mode = ELAN_TPORT_TXSYNC;
     
     tiny_msg = 0; //A sizeof(int) byte message 
     //sent to wake up a blocked process
@@ -1304,6 +1300,7 @@ static void ConverseRunPE(int everReturn)
   ConverseCommonInit(CmiMyArgv);
 
   CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiNotifyIdle,NULL);
+  CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)CmiNotifyIdle,NULL);
   
   PumpMsgs(0);
   elan_gsync(elan_base->allGroup);
@@ -1336,6 +1333,7 @@ void *elan_CmiAlloc(int size){
 #if CMK_PERSISTENT_COMM
     size += sizeof(int)*2;
 #endif
+
     if(size <= SMALL_MESSAGE_SIZE + 2 * sizeof(int)) {
         size = SMALL_MESSAGE_SIZE + 4 * sizeof(int);
         if(!PCQueueEmpty(localSmallBufferQueue))
@@ -1343,7 +1341,7 @@ void *elan_CmiAlloc(int size){
         else
             buf = (char *)malloc_nomigrate(size);
     }
-    else if(size <= MID_MESSAGE_SIZE + 2 * sizeof(int)) {
+    else if(size < MID_MESSAGE_SIZE + 2 * sizeof(int)) {
         size = MID_MESSAGE_SIZE + 4 * sizeof(int);
         if(!PCQueueEmpty(localMidBufferQueue))
             buf = PCQueuePop(localMidBufferQueue);
@@ -1455,7 +1453,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   localMidBufferQueue = PCQueueCreate();
 
   if (!(elan_base = 
-#if QSNETLIBS_VERSION_CODE > QSNETLIBS_VERSION(1,4,11)
+#if QSNETLIBS_VERSION_CODE > QSNETLIBS_VERSION(1,4,0)
 	elan_baseInit(0)
 #else
 	elan_baseInit()
@@ -1474,7 +1472,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     exit (1);
   }
   
-  nslots = 32; //elan_base->tport_nslots * 2;
+  nslots = 16; //elan_base->tport_nslots * 2;
   
   //if(nslots < elan_base->state->nvp)
   //  nslots = elan_base->state->nvp;
@@ -1483,16 +1481,22 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   
   if (!(elan_port = elan_tportInit(elan_base->state,
 				   elan_q,
-				   nslots /*elan_base->tport_nslots*/, 
+                                   nslots,
+				   //elan_base->tport_nslots, 
 				   elan_base->tport_smallmsg,
-				   MID_MESSAGE_SIZE, //elan_base->tport_bigmsg,
-#if QSNETLIBS_VERSION_CODE > QSNETLIBS_VERSION(1,4,11)
+				   //MID_MESSAGE_SIZE, 
+                                   elan_base->tport_bigmsg,
+#if QSNETLIBS_VERSION_CODE > QSNETLIBS_VERSION(1,4,1)
 	 			   elan_base->tport_stripemsg,
 #endif
 				   elan_base->waitType, elan_base->retryCount,
 				   &(elan_base->shm_key),
 				   elan_base->shm_fifodepth, 
-				   elan_base->shm_fragsize))) {
+				   elan_base->shm_fragsize
+#if QSNETLIBS_VERSION_CODE > QSNETLIBS_VERSION(1,4,11)
+	 			   ,0
+#endif
+))) {
     
     perror("Failed to to initialise TPORT");
     exit(1);
@@ -1694,9 +1698,9 @@ void CmiFreeListSendFn(int npes, int *pes, int len, char *msg)
         }        
     }
 }
-#endif
 
-#if 0
+#else
+
 void CmiFreeListSendFn(int npes, int *pes, int len, char *msg)
 {
     int i;
