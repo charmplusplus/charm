@@ -50,6 +50,10 @@ struct _Slot {
 #define SLOTMAGIC_VALLOC 0x7402a5f5
 #define SLOTMAGIC_FREED 0xDEADBEEF
 	int  magic;
+	
+/* Controls the number of stack frames to print out */
+#define STACK_LEN 4
+	void *from[STACK_LEN];
 
 /*Padding to detect writes before and after buffer*/
 #define PADLEN 32 /*Bytes of padding at start and end of buffer*/
@@ -86,7 +90,6 @@ static char *Slot_toUser(Slot *s) {
 	return ((char *)s)+sizeof(Slot);
 }
 
-
 /*Head of the circular slot list*/
 Slot slot_first={&slot_first,&slot_first};
 
@@ -97,11 +100,20 @@ int memory_checkfreq=100; /*Check entire heap every this many malloc/frees*/
 int memory_checkphase=0; /*malloc/free counter*/
 int memory_verbose=0; /*Print out every time we check the heap*/
 
+static void slotAbort(const char *why,Slot *s) {
+	memory_checkfreq=100000;
+	CmiPrintf("[%d] Error in block of %d bytes at %p, allocated from:\n",
+		CmiMyPe(), s->userSize, Slot_toUser(s));
+	CmiBacktracePrint(s->from,STACK_LEN);
+	memAbort(why,Slot_toUser(s));
+}
+
 /*Check these padding bytes*/
-static void checkPad(char *pad,char *errMsg,void *ptr) {
+static void checkPad(char *pad,char *errMsg,void *ptr,Slot *s) {
 	int i;
 	for (i=0;i<PADLEN;i++)
 		if (pad[i]!=PADFN(i)) {
+			memory_checkfreq=100000;
 			fprintf(stderr,"Corrupted data:");
 			for (i=0;i<PADLEN;i++) 
 				if (pad[i]!=PADFN(i))
@@ -109,7 +121,7 @@ static void checkPad(char *pad,char *errMsg,void *ptr) {
 int)(unsigned char)pad[i]);
 				else fprintf(stderr," -");
 			fprintf(stderr,"\n");
-			memAbort(errMsg,ptr);
+			slotAbort(errMsg,s);
 		}
 }
 
@@ -125,20 +137,20 @@ static int badPointer(Slot *p) {
 static void checkSlot(Slot *s) {
 	char *user=Slot_toUser(s);
 	if (badPointer(s))
-		memAbort("Non-heap pointer passed to checkSlot",user);
+		slotAbort("Non-heap pointer passed to checkSlot",s);
 	if (s->magic!=SLOTMAGIC && s->magic!=SLOTMAGIC_VALLOC)
-		memAbort("Corrupted slot magic number",user);
+		slotAbort("Corrupted slot magic number",s);
 	if (s->userSize<0)
-		memAbort("Corrupted (negative) user size field",user);
+		slotAbort("Corrupted (negative) user size field",s);
 	if (s->userSize>=MAX_BLOCKSIZE)
-		memAbort("Corrupted (huge) user size field",user);
+		slotAbort("Corrupted (huge) user size field",s);
 	if (badPointer(s->prev) || (s->prev->next!=s))
-		memAbort("Corrupted back link",user);
+		slotAbort("Corrupted back link",s);
 	if (badPointer(s->next) || (s->next->prev!=s))
-		memAbort("Corrupted forward link",user);
+		slotAbort("Corrupted forward link",s);
 
-	checkPad(s->pad,"Corruption before start of block",user);
-	checkPad(user+s->userSize,"Corruption after block",user);	
+	checkPad(s->pad,"Corruption before start of block",user,s);
+	checkPad(user+s->userSize,"Corruption after block",user,s);	
 }
 
 /*Check the entire heap for consistency*/
@@ -146,6 +158,7 @@ void memory_check(void)
 {
 	Slot *cur=slot_first.next;
 	int nBlocks=0, nBytes=0;
+	memory_checkphase=0;
 	while (cur!=&slot_first) {
 		checkSlot(cur);
 		nBlocks++;
@@ -159,7 +172,6 @@ void memory_check(void)
 	  CmiPrintf("[%d] Heap checked-- clean. %d blocks / %d.%03d megs\n",
 		CmiMyPe(),nBlocks,nMegs,(int)(nKb*1000.0/1024.0)); 
 	}
-	memory_checkphase=0;
 }
 
 #define CMI_MEMORY_ROUTINES 1
@@ -190,6 +202,10 @@ static void *setSlot(Slot *s,int userSize) {
 	s->prev->next=s;
 	
 	s->magic=SLOTMAGIC;
+	{
+		int n=STACK_LEN;
+		CmiBacktraceRecord(s->from,3,&n);
+	}
 	s->userSize=userSize;
 	setPad(s->pad); /*Padding before block*/
 	fill_uninit(user,s->userSize); /*Block*/	
