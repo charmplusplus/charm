@@ -312,7 +312,7 @@ void CpmModuleInit()
   CpvInitialize(DestinationSend, ctrlLIFO);
   CpvInitialize(DestinationSend, ctrlThread);
   CpvInitialize(DestinationThreadSize, ctrlThreadSize);
-  CpvInitialize(int, fiprio);
-  CpvInitialize(int, liprio);
+  CpvInitialize(unsigned int, fiprio);
+  CpvInitialize(unsigned int, liprio);
 }
 

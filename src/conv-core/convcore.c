@@ -570,7 +570,7 @@ CmiHandler h;
 
 static void CmiHandlerInit()
 {
-  CpvInitialize(CmiHandler *, CmiHandlerTable);
+  CpvInitialize(CmiHandlerInfo *, CmiHandlerTable);
   CpvInitialize(int         , CmiHandlerCount);
   CpvInitialize(int         , CmiHandlerLocal);
   CpvInitialize(int         , CmiHandlerGlobal);
