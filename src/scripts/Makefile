@@ -229,6 +229,7 @@ TRACELIBS=$(L)/libtrace-projections.a  $(L)/libtrace-summary.a \
           $(L)/libtrace-counter.a $(L)/libtrace-bluegene.a \
 	  $(L)/libtrace-projector.a $(L)/libtrace-all.a $(L)/libtrace-converse.a
 MEMLIBS=$(L)/libmemory-default.o $(L)/libmemory-os.o $(L)/libmemory-gnu.o \
+   $(L)/libmemory-gnuold.o \
    $(L)/libmemory-verbose.o $(L)/libmemory-paranoid.o $(L)/libmemory-isomalloc.o
 THREADLIBS=$(L)/libthreads-default.o $(L)/libthreads-qt.o $(L)/libthreads-context.o $(L)/libthreads-pthreads.o $(L)/libthreads-fibers.o
 
@@ -409,7 +410,7 @@ $(L)/libldb-bluegene.o: cldb.bluegene.c $(CVHEADERS)
 	$(CHARMC) -o $@ cldb.bluegene.c
 
 ## Memory allocation libraries (-memory)
-MEM_DEPS=memory.c memory-gnu.c converse.h conv-mach.h
+MEM_DEPS=memory.c memory-gnu.c memory-gnuold.c converse.h conv-mach.h
 $(L)/libmemory-default.o: $(MEM_DEPS)
 	$(CHARMC) -o $@ -DCMK_MEMORY_BUILD_DEFAULT memory.c
 
@@ -420,6 +421,9 @@ $(L)/libmemory-os.o: $(MEM_DEPS)
 #  This is OK, but then we can't use "-memory gnu" or friends.
 $(L)/libmemory-gnu.o: $(MEM_DEPS)
 	-$(CHARMC) -o $@ -DCMK_MEMORY_BUILD_GNU memory.c
+
+$(L)/libmemory-gnuold.o: $(MEM_DEPS)
+	-$(CHARMC) -o $@ -DCMK_MEMORY_BUILD_GNUOLD memory.c
 
 $(L)/libmemory-verbose.o: memory-verbose.c $(MEM_DEPS)
 	-$(CHARMC) -o $@ -DCMK_MEMORY_BUILD_VERBOSE memory.c
