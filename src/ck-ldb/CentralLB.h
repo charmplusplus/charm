@@ -42,6 +42,7 @@ public:
     double idletime;
     double bg_walltime;
     double bg_cputime;
+    int pe_speed;
     int n_objs;
     LDObjData* objData;
     int n_comm;
@@ -55,6 +56,7 @@ protected:
 
 private:  
   int mystep;
+  int myspeed;
   int stats_msg_count;
   CLBStatsMsg** statsMsgsList;
   LDStats* statsDataList;
@@ -66,6 +68,7 @@ class CLBStatsMsg : public CMessage_CLBStatsMsg {
 public:
   int from_pe;
   int serial;
+  int pe_speed;
   double total_walltime;
   double total_cputime;
   double idletime;

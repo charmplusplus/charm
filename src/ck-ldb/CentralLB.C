@@ -43,6 +43,7 @@ CentralLB::CentralLB()
     statsMsgsList[i] = 0;
 
   statsDataList = new LDStats[CkNumPes()];
+  myspeed = theLbdb->ProcessorSpeed();
   theLbdb->CollectStatsOn();
   migrates_completed = 0;
   migrates_expected = -1;
@@ -74,6 +75,7 @@ void CentralLB::AtSync()
   theLbdb->TotalTime(&msg->total_walltime,&msg->total_cputime);
   theLbdb->IdleTime(&msg->idletime);
   theLbdb->BackgroundLoad(&msg->bg_walltime,&msg->bg_cputime);
+  msg->pe_speed = myspeed;
   //  CkPrintf(
   //    "Processors %d Total time (wall,cpu) = %f %f Idle = %f Bg = %f %f\n",
   //    CkMyPe(),msg->total_walltime,msg->total_cputime,
@@ -114,6 +116,7 @@ void CentralLB::ReceiveStats(CLBStatsMsg *m)
     statsDataList[pe].idletime = m->idletime;
     statsDataList[pe].bg_walltime = m->bg_walltime;
     statsDataList[pe].bg_cputime = m->bg_cputime;
+    statsDataList[pe].pe_speed = m->pe_speed;
     statsDataList[pe].n_objs = m->n_objs;
     statsDataList[pe].n_objs = m->n_objs;
     statsDataList[pe].objData = m->objData;
@@ -182,8 +185,8 @@ CLBMigrateMsg* CentralLB::Strategy(LDStats* stats,int count)
     const int osz = stats[j].n_objs;
 
     CkPrintf(
-      "Processors %d Total time (wall,cpu) = %f %f Idle = %f Bg = %f %f\n",
-      j,stats[j].total_walltime,stats[j].total_cputime,
+      "Proc %d Sp %d Total time (wall,cpu) = %f %f Idle = %f Bg = %f %f\n",
+      j,stats[j].pe_speed,stats[j].total_walltime,stats[j].total_cputime,
       stats[j].idletime,stats[j].bg_walltime,stats[j].bg_cputime);
     CkPrintf("------------- Object Data: PE %d: %d objects -------------\n",
 	     j,osz);
