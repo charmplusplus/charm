@@ -534,7 +534,7 @@ trace-summary.obj : trace-summary.C trace-summary.h trace.h $(CKHEADERS)
 
 XIHEADERS=xi-symbol.h xi-grammar.tab.h xi-util.h
 CHARMXLATI=xi-main.obj xi-symbol.obj xi-grammar.tab.obj xi-scan.obj xi-util.obj
-SDAGOBJ=sdag-main.obj trans.obj CLexer.obj CParser.obj CParsedFile.obj \
+SDAGOBJ=sdag-main.obj sdag-trans.obj CLexer.obj CParser.obj CParsedFile.obj \
 	CParseNode.obj sdag-globals.obj CParseNodeProcess.obj CEntry.obj
 SDAGHEADERS=CLexer.h CToken.h EToken.h CParser.h CParsedFile.h CParseNode.h \
 	sdag-globals.h CEntry.h
@@ -565,8 +565,8 @@ xi-scan.obj :
 sdag-main.obj:
 	$(CPP) $(SEQCPP_PROJ) /TP $(COMMON_SRC)\sdag-main.C
 
-trans.obj:
-	$(CPP) $(SEQCPP_PROJ) $(COMMON_SRC)\trans.c
+sdag-trans.obj:
+	$(CPP) $(SEQCPP_PROJ) $(COMMON_SRC)\sdag-trans.c
 
 CLexer.obj:
 	$(CPP) $(SEQCPP_PROJ) /TP $(COMMON_SRC)\CLexer.C

@@ -584,7 +584,7 @@ conv-cpm.o: conv-cpm.c
 
 XIHEADERS=xi-symbol.h xi-util.h xi-grammar.tab.h
 CHARMXI=xi-main.o xi-symbol.o xi-grammar.tab.o xi-scan.o xi-util.o
-SDAGOBJ=sdag-main.o trans.o CLexer.o CParser.o CParsedFile.o CParseNode.o \
+SDAGOBJ=sdag-main.o sdag-trans.o CLexer.o CParser.o CParsedFile.o CParseNode.o \
 	sdag-globals.o CParseNodeProcess.o CEntry.o
 SDAGHEADERS=CLexer.h CToken.h EToken.h CParser.h CParsedFile.h CParseNode.h \
 	sdag-globals.h CEntry.h
@@ -610,8 +610,8 @@ xi-scan.o: xi-scan.C $(XIHEADERS) $(SDAGHEADERS)
 sdag-main.o: sdag-main.C $(XIHEADERS) $(SDAGHEADERS)
 	$(SEQCHARMC) -c sdag-main.C
 
-trans.o: trans.c $(XIHEADERS) $(SDAGHEADERS)
-	$(SEQCHARMC) -I. -c trans.c
+sdag-trans.o: sdag-trans.c $(XIHEADERS) $(SDAGHEADERS)
+	$(SEQCHARMC) -I. -c sdag-trans.c
 
 CLexer.o: CLexer.C $(XIHEADERS) $(SDAGHEADERS)
 	$(SEQCHARMC) -c CLexer.C
