@@ -182,9 +182,7 @@ void Comm1LB::work(CentralLB::LDStats* stats, int count)
       x->load = objData.wallTime;
       x->pe = onpe;
       maxh.insert(x);
-  }
-  for(pe=0; pe < count; pe++) {
-     mean_load += stats->procs[pe].total_walltime;
+      mean_load += objData.wallTime;
   }
   mean_load /= count;
 
@@ -240,6 +238,7 @@ void Comm1LB::work(CentralLB::LDStats* stats, int count)
     for(pe =0; pe < count; pe++)
       if((alloc_array[pe][nobj].load <= mean_load)||(id >= UPPER_FACTOR*nobj))
 	break;
+    CmiAssert(pe < count);
 
     temp_cost = compute_cost(maxid,pe,id,out_msg,out_byte);
     min_cost = temp_cost;
@@ -258,6 +257,7 @@ void Comm1LB::work(CentralLB::LDStats* stats, int count)
 	min_byte = out_byte;
       }
     }
+    CmiAssert(minpe < npe);
 
     alloc(minpe,maxid,x->load,min_msg,min_byte);
 
