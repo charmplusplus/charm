@@ -37,11 +37,17 @@ void RingMulticastStrategy::doneInserting(){
             
             int dest_pe = -1;
             RingMulticastHashObject *robj;
+
             if(cmsg->sec_id == NULL)
                 dest_pe = nextPE;
             else {
                 robj = getHashObject(CkMyPe(), 
                                      cmsg->sec_id->_cookie.sInfo.cInfo.id);
+                                
+                ComlibPrintf("Gotten has obect %d\n",  robj);
+
+                CkAssert(robj != NULL);
+
                 dest_pe = robj->nextPE;
             }
             

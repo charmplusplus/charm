@@ -514,6 +514,8 @@ void ComlibManager::ArraySectionSend(int ep, void *m, CkArrayID a,
     minfo.sInfo.cInfo.id = 0; 
     minfo.pe = CkMyPe();
     ((CkMcastBaseMsg *)m)->_cookie = minfo;    
+    s.npes = 0;
+    s.pelist = NULL;
 
     multicast(cmsg);
 }
@@ -761,7 +763,7 @@ void ComlibInstanceHandle::setStrategy(Strategy *s) {
 CkGroupID ComlibInstanceHandle::getComlibManagerID() {return _dmid;}    
 
 void ComlibInitSection(CkSectionInfo &id){
-    id.sInfo.cInfo.id = 0;
+    id.sInfo.cInfo.id = 0;    
     id.type = COMLIB_MULTICAST_MESSAGE;
     id.pe = CkMyPe();
 }

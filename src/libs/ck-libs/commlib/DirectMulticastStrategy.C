@@ -95,11 +95,12 @@ void DirectMulticastStrategy::insertMessage(CharmMessageHolder *cmsg){
             cbmsg->_cookie.sInfo.cInfo.status = COMLIB_MULTICAST_OLD_SECTION;
         }
         else {
+            CkSectionID *sid = cmsg->sec_id;
+            initSectionID(sid);
+            
             //New sec id, so send it along with the message
             void *newmsg = (void *)getNewMulticastMessage(cmsg);
             CkFreeMsg(cmsg->getCharmMessage());
-            CkSectionID *sid = cmsg->sec_id;
-            initSectionID(sid);
             delete cmsg;
             
             cmsg = new CharmMessageHolder((char *)newmsg, IS_MULTICAST); 
@@ -135,13 +136,19 @@ void DirectMulticastStrategy::doneInserting(){
             }
             
             ComlibPrintf("[%d] Calling Direct Multicast %d %d %d\n", CkMyPe(),
-                         UsrToEnv(msg)->getTotalsize(), cur_npes, cmsg->dest_proc);
-
+                         UsrToEnv(msg)->getTotalsize(), cur_npes, 
+                         cmsg->dest_proc);
+            /*
+            for(int i=0; i < cur_npes; i++)
+                CkPrintf("[%d] Sending to %d %d\n", CkMyPe(), 
+                         cur_map[i], cur_npes);
+            */
             CmiSyncListSendAndFree(cur_npes, cur_map, 
                                    UsrToEnv(msg)->getTotalsize(), 
                                    (char*)(UsrToEnv(msg)));            
         }
         else {
+            //CkPrintf("SHOULD NOT BE HERE\n");
             CmiSyncSendAndFree(cmsg->dest_proc, UsrToEnv(msg)->getTotalsize(), 
                                (char *)UsrToEnv(msg));
         }        
@@ -281,6 +288,8 @@ void DirectMulticastStrategy::initSectionID(CkSectionID *sid){
     if(sid->npes > 0) 
         return;
     
+    //CkPrintf("NDESTPES = %d\n", ndestpes);
+
     sid->pelist = new int[ndestpes];
     sid->npes = 0;
     
