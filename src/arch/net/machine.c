@@ -1661,7 +1661,7 @@ static int netSendV(destPE, n, sizes, msgs)
     hd->rem_size = size;
     hd->PeNum = CpvAccess(Cmi_mype);
 	remfill = MAXDSIZE;
-	tmpdst = (hd+1);
+	tmpdst = (char *) (hd+1);
 	while(remfill>0){ /* fill the datagram here */
 		if(remfill > cursize) { /*entire msg to be copied */
 			memcpy(tmpdst, tmpsrc, cursize);
@@ -1685,7 +1685,7 @@ static int netSendV(destPE, n, sizes, msgs)
   hd->rem_size = size;
   hd->PeNum = CpvAccess(Cmi_mype);
   remfill = size;
-  tmpdst = (hd+1);
+  tmpdst = (char *) (hd+1);
   while(remfill>0){ /* fill the datagram here */
     if(remfill > cursize) { /*entire msg to be copied */
       memcpy(tmpdst, tmpsrc, cursize);
@@ -1760,7 +1760,7 @@ char *msg;
   } else netSend(destPE,size,msg);
 }
 
-void CmiVectorSend(destPE, n, sizes, msgs)
+void CmiSyncVectorSend(destPE, n, sizes, msgs)
 int destPE, n;
 int *sizes;
 char **msgs;
@@ -1777,6 +1777,27 @@ char **msgs;
 	}
     FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg1);
   } else netSendV(destPE,n,sizes,msgs);
+}
+
+CmiCommHandle CmiAsyncVectorSend(destPE, n, sizes, msgs)
+int destPE, n;
+int *sizes;
+char **msgs;
+{
+  CmiSyncVectorSend(destPE,n,sizes,msgs);
+  return NULL;
+}
+
+void CmiSyncVectorSendAndFree(destPE, n, sizes, msgs)
+int destPE, n;
+int *sizes;
+char **msgs;
+{
+  int i;
+  CmiSyncVectorSend(destPE,n,sizes,msgs);
+  for(i=0;i<n;i++) CmiFree(msgs[i]);
+  CmiFree(sizes);
+  CmiFree(msgs);
 }
 
 CmiCommHandle CmiAsyncSendFn(destPE, size, msg)
