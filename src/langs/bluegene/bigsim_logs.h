@@ -123,8 +123,8 @@ public:
 public:
   BgTimeLog(BgTimeLog *);
   BgTimeLog(char *msg, char *str=NULL);
-  BgTimeLog(): ep(-1), recvTime(.0), startTime(.0), endTime(.0),
-	       execTime(.0), effRecvTime(INVALIDTIME), seqno(0), doCorrect(1) 
+  BgTimeLog(): ep(-1), recvTime(.0), startTime(.0), endTime(.0), execTime(.0), 
+	       effRecvTime(INVALIDTIME), seqno(0), doCorrect(1), flag(0) 
     {strcpy(name,"dummyname");}
   BgTimeLog(int epc, char* name, double sTime, double eTime);
   BgTimeLog(int epc, char* name, double sTime);
