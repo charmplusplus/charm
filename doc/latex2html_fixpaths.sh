@@ -11,9 +11,8 @@ die() {
 }
 
 [ -x manual ] || die "fixpaths.sh requires a manual/ directory"
-[ -x fig ] || die "fixpaths.sh requires a fig/ directory"
 
-cp -r fig manual/
+cp -r fig figs manual/
 
 for f in `echo manual/*.html`
 do
