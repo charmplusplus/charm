@@ -70,6 +70,7 @@ int* BgLoadOffsets(int totalProcs, int numPes){
 
 int BgLoadTraceSummary(char *fname, int &totalProcs, int &numX, int &numY, int &numZ, int &numCth, int &numWth, int &numPes)
 {
+  BGMach  bgMach ;
   PUP::machineInfo machInfo;
 
   FILE* f = fopen(fname,"r");
@@ -79,8 +80,12 @@ int BgLoadTraceSummary(char *fname, int &totalProcs, int &numX, int &numY, int &
   if (!machInfo.valid()) CmiAbort("Invalid machineInfo on disk file!\n");
   PUP::xlater p(machInfo, pd);
   p|totalProcs;
-  p|numX; p|numY; p|numZ;
-  p|numCth;p|numWth;
+  p|bgMach;
+  numX = bgMach.x;
+  numY = bgMach.y;
+  numZ = bgMach.z;
+  numCth = bgMach.numCth;
+  numWth = bgMach.numWth;
   p|numPes;
   fclose(f);
   return 0;

@@ -44,7 +44,6 @@ public:
   void pup(PUP::er &p) { 
         p|x; p|y; p|z; p|numCth; p|numWth; 
 	p|stacksize; p|timingMethod;
-	if (traceroot) p(traceroot, strlen(traceroot)+1);
        }
 };
 
