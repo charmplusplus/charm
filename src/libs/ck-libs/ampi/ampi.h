@@ -160,7 +160,7 @@ typedef int MPI_Group;
 #define MPI_COMM_FIRST_SPLIT (MPI_Comm)(1000000) /*Communicator from a "split"*/
 #define MPI_COMM_FIRST_GROUP (MPI_Comm)(2000000) /*Communicator from a process group*/
 #define MPI_COMM_FIRST_RESVD (MPI_Comm)(3000000) /*Communicator reserved for now*/
-#define MPI_COMM_SELF (MPI_Comm)(4000000)
+#define MPI_COMM_SELF (MPI_Comm)(7000000)
 
 #define MPI_COMM_WORLD (MPI_Comm)(8000000) /*Start of universe*/
 #define MPI_MAX_COMM_WORLDS 8
@@ -222,8 +222,7 @@ int MPI_Get_count(MPI_Status *sts, MPI_Datatype dtype, int *count);
 int MPI_Isend(void *buf, int count, MPI_Datatype datatype, int dest,
               int tag, MPI_Comm comm, MPI_Request *request);
 #define MPI_Ibsend MPI_Isend
-int MPI_Issend(void *buf, int count, MPI_Datatype datatype, int dest,
-              int tag, MPI_Comm comm, MPI_Request *request);
+#define MPI_Issend MPI_Isend	// FIXME: see MPI_Ssend
 int MPI_Irecv(void *buf, int count, MPI_Datatype datatype, int src,
               int tag, MPI_Comm comm, MPI_Request *request);
 int MPI_Wait(MPI_Request *request, MPI_Status *sts);
@@ -270,12 +269,10 @@ int MPI_Type_commit(MPI_Datatype *datatype);
 int MPI_Type_free(MPI_Datatype *datatype);
 int MPI_Type_extent(MPI_Datatype datatype, MPI_Aint *extent);
 int MPI_Type_size(MPI_Datatype datatype, int *size);
-
 int MPI_Type_lb(MPI_Datatype datatype, MPI_Aint* displacement);
 int MPI_Type_ub(MPI_Datatype datatype, MPI_Aint* displacement);
 int MPI_Address(void* location, MPI_Aint *address);
 int MPI_Get_elements(MPI_Status *status, MPI_Datatype datatype, int *count);
-
 int MPI_Pack(void *inbuf, int incount, MPI_Datatype dtype, void *outbuf,
               int outsize, int *position, MPI_Comm comm);
 int MPI_Unpack(void *inbuf, int insize, int *position, void *outbuf,
@@ -326,7 +323,6 @@ int MPI_Iallreduce(void *inbuf, void *outbuf, int count, int type,
                   MPI_Op op, MPI_Comm comm, MPI_Request *request);
 int MPI_Reduce_scatter(void* sendbuf, void* recvbuf, int *recvcounts,
                        MPI_Datatype datatype, MPI_Op op, MPI_Comm comm);
-
 /* MPI_Scan */
 /* MPI_Op_create */
 /* MPI_Op_free */
@@ -341,7 +337,6 @@ int MPI_Comm_group(MPI_Comm comm, MPI_Group *group);
 int MPI_Group_union(MPI_Group group1, MPI_Group group2, MPI_Group *newgroup);
 int MPI_Group_intersection(MPI_Group group1, MPI_Group group2, MPI_Group *newgroup);
 int MPI_Group_difference(MPI_Group group1, MPI_Group group2, MPI_Group *newgroup);
-
 int MPI_Group_incl(MPI_Group group, int n, int *ranks, MPI_Group *newgroup);
 int MPI_Group_excl(MPI_Group group, int n, int *ranks, MPI_Group *newgroup);
 int MPI_Group_range_incl(MPI_Group group, int n, int ranges[][3], MPI_Group *newgroup);
@@ -391,13 +386,15 @@ int MPI_Errhandler_get(MPI_Comm comm, MPI_Errhandler *errhandler);
 int MPI_Errhandler_free(MPI_Errhandler *errhandler);
 int MPI_Error_string(int errorcode, char *string, int *resultlen);
 int MPI_Error_class(int errorcode, int *errorclass);
-
 double MPI_Wtime(void);
 double MPI_Wtick(void);
-int MPI_Init(int *argc, char*** argv); /* FORTRAN VERSION MISSING */
-int MPI_Initialized(int *isInit); /* FORTRAN VERSION MISSING */
+int MPI_Init(int *argc, char*** argv);
+int MPI_Initialized(int *isInit);
 int MPI_Finalize(void);
 int MPI_Abort(MPI_Comm comm, int errorcode);
+
+/*** Profiling ***/
+/* int MPI_Pcontrol(const int level, ...); */
 
 /***extras***/
 void MPI_Print(char *str);
@@ -409,9 +406,6 @@ void *MPI_Get_userdata(int);
 /*Create a new threads array and attach to it*/
 typedef void (*MPI_MainFn) (int,char**);
 void MPI_Register_main(MPI_MainFn mainFn, const char *name);
-
-/*Attach a new AMPI to each existing threads array element*/
-void MPI_Attach(const char *name);
 
 #include "ampiProjections.h"
 #ifdef __cplusplus

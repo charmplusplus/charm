@@ -2,35 +2,29 @@
 #include "ampiimpl.h"
 
 FDECL {
-#define mpi_init FTN_NAME( MPI_INIT , mpi_init )
-#define mpi_init_universe FTN_NAME( MPI_INIT_UNIVERSE , mpi_init_universe )
-#define mpi_comm_rank FTN_NAME( MPI_COMM_RANK , mpi_comm_rank )
-#define mpi_comm_size FTN_NAME( MPI_COMM_SIZE , mpi_comm_size )
-#define mpi_finalize FTN_NAME( MPI_FINALIZE , mpi_finalize )
 #define mpi_send FTN_NAME( MPI_SEND , mpi_send )
-#define mpi_ssend FTN_NAME( MPI_SSEND , mpi_ssend )
 #define mpi_recv FTN_NAME( MPI_RECV , mpi_recv )
-#define mpi_probe FTN_NAME( MPI_PROBE , mpi_probe )
-#define mpi_iprobe FTN_NAME( MPI_IPROBE , mpi_iprobe )
+#define mpi_get_count FTN_NAME( MPI_GET_COUNT , mpi_get_count )
 #define mpi_isend FTN_NAME( MPI_ISEND , mpi_isend )
-#define mpi_issend FTN_NAME( MPI_ISSEND , mpi_issend )
 #define mpi_irecv FTN_NAME( MPI_IRECV , mpi_irecv )
-#define mpi_sendrecv FTN_NAME( MPI_SENDRECV , mpi_sendrecv )
-#define mpi_barrier FTN_NAME( MPI_BARRIER , mpi_barrier )
-#define mpi_bcast FTN_NAME( MPI_BCAST , mpi_bcast )
-#define mpi_reduce FTN_NAME( MPI_REDUCE , mpi_reduce )
-#define mpi_allreduce FTN_NAME( MPI_ALLREDUCE , mpi_allreduce )
-#define mpi_wtime FTN_NAME( MPI_WTIME , mpi_wtime )
-#define mpi_start FTN_NAME( MPI_START , mpi_start )
 #define mpi_wait FTN_NAME( MPI_WAIT , mpi_wait )
 #define mpi_test FTN_NAME( MPI_TEST , mpi_test )
 #define mpi_waitany FTN_NAME( MPI_WAITANY , mpi_waitany )
 #define mpi_testany FTN_NAME( MPI_TESTANY , mpi_testany )
 #define mpi_waitall FTN_NAME( MPI_WAITALL , mpi_waitall )
 #define mpi_testall FTN_NAME( MPI_TESTALL , mpi_testall )
-#define mpi_request_free FTN_NAME( MPI_REQUEST_FREE , mpi_request_free )
+#define mpi_waitsome FTN_NAME( MPI_WAITSOME , mpi_waitsome )
+#define mpi_testsome FTN_NAME( MPI_TESTSOME , mpi_testsome )
+#define mpi_request_free FTN_NAME(MPI_REQUEST_FREE , mpi_request_free)
+#define mpi_cancel FTN_NAME(MPI_CANCEL, mpi_cancel)
+#define mpi_iprobe FTN_NAME( MPI_IPROBE , mpi_iprobe )
+#define mpi_probe FTN_NAME( MPI_PROBE , mpi_probe )
 #define mpi_send_init FTN_NAME( MPI_SEND_INIT , mpi_send_init )
 #define mpi_recv_init FTN_NAME( MPI_RECV_INIT , mpi_recv_init )
+#define mpi_start FTN_NAME( MPI_START , mpi_start )
+#define mpi_startall FTN_NAME( MPI_STARTALL , mpi_startall )
+#define mpi_sendrecv FTN_NAME( MPI_SENDRECV , mpi_sendrecv )
+#define mpi_sendrecv_replace FTN_NAME( MPI_SENDRECV_REPLACE , mpi_sendrecv_replace )
 #define mpi_type_contiguous FTN_NAME( MPI_TYPE_CONTIGUOUS , mpi_type_contiguous )
 #define mpi_type_vector FTN_NAME( MPI_TYPE_VECTOR , mpi_type_vector )
 #define mpi_type_hvector FTN_NAME( MPI_TYPE_HVECTOR , mpi_type_hvector )
@@ -41,24 +35,37 @@ FDECL {
 #define mpi_type_free FTN_NAME( MPI_TYPE_FREE , mpi_type_free )
 #define mpi_type_extent FTN_NAME( MPI_TYPE_EXTENT , mpi_type_extent )
 #define mpi_type_size FTN_NAME( MPI_TYPE_SIZE , mpi_type_size )
+#define mpi_type_lb FTN_NAME( MPI_TYPE_LB , mpi_type_lb )
+#define mpi_type_ub FTN_NAME( MPI_TYPE_UB , mpi_type_ub )
+#define mpi_address FTN_NAME( MPI_ADDRESS , mpi_address )
+#define mpi_get_element FTN_NAME( MPI_GET_ELEMENT , mpi_get_element )
 #define mpi_pack FTN_NAME( MPI_PACK , mpi_pack )
 #define mpi_unpack FTN_NAME( MPI_UNPACK , mpi_unpack )
 #define mpi_pack_size FTN_NAME( MPI_PACK_SIZE , mpi_pack_size )
-#define mpi_allgatherv FTN_NAME( MPI_ALLGATHERV , mpi_allgatherv )
-#define mpi_allgather FTN_NAME( MPI_ALLGATHER , mpi_allgather )
-#define mpi_gatherv FTN_NAME( MPI_GATHERV , mpi_gatherv )
+
+#define mpi_barrier FTN_NAME( MPI_BARRIER , mpi_barrier )
+#define mpi_bcast FTN_NAME( MPI_BCAST , mpi_bcast )
 #define mpi_gather FTN_NAME( MPI_GATHER , mpi_gather )
-#define mpi_scatterv FTN_NAME( MPI_SCATTERV , mpi_scatterv )
+#define mpi_gatherv FTN_NAME( MPI_GATHERV , mpi_gatherv )
 #define mpi_scatter FTN_NAME( MPI_SCATTER , mpi_scatter )
-#define mpi_alltoallv FTN_NAME( MPI_ALLTOALLV , mpi_alltoallv )
+#define mpi_scatterv FTN_NAME( MPI_SCATTERV , mpi_scatterv )
+#define mpi_allgather FTN_NAME( MPI_ALLGATHER , mpi_allgather )
+#define mpi_iallgather FTN_NAME( MPI_IALLGATHER , mpi_iallgather )
+#define mpi_allgatherv FTN_NAME( MPI_ALLGATHERV , mpi_allgatherv )
 #define mpi_alltoall FTN_NAME( MPI_ALLTOALL , mpi_alltoall )
-#define mpi_comm_dup FTN_NAME( MPI_COMM_DUP , mpi_comm_dup )
-#define mpi_comm_free FTN_NAME( MPI_COMM_FREE , mpi_comm_free )
-#define mpi_comm_group FTN_NAME( MPI_COMM_GROUP, mpi_comm_group)
+#define mpi_ialltoall FTN_NAME( MPI_IALLTOALL , mpi_ialltoall )
+#define mpi_alltoallv FTN_NAME( MPI_ALLTOALLV , mpi_alltoallv )
+#define mpi_reduce FTN_NAME( MPI_REDUCE , mpi_reduce )
+#define mpi_ireduce FTN_NAME( MPI_IREDUCE , mpi_ireduce )
+#define mpi_allreduce FTN_NAME( MPI_ALLREDUCE , mpi_allreduce )
+#define mpi_iallreduce FTN_NAME( MPI_IALLREDUCE , mpi_iallreduce )
+#define mpi_reduce_scatter FTN_NAME( MPI_REDUCE_SCATTER , mpi_reduce_scatter )
+
 #define mpi_group_size FTN_NAME( MPI_GROUP_SIZE, mpi_group_size)
 #define mpi_group_rank FTN_NAME( MPI_GROUP_RANK, mpi_group_rank)
 #define mpi_group_translate_ranks FTN_NAME(MPI_GROUP_TRANSLATE_RANKS, mpi_group_translate_ranks)
 #define mpi_group_compare FTN_NAME(MPI_GROUP_COMPARE, mpi_group_compare)
+#define mpi_comm_group FTN_NAME( MPI_COMM_GROUP, mpi_comm_group)
 #define mpi_group_union FTN_NAME(MPI_GROUP_UNION, mpi_group_union)
 #define mpi_group_intersection FTN_NAME(MPI_GROUP_INTERSECTION, mpi_group_intersection)
 #define mpi_group_difference FTN_NAME(MPI_GROUP_DIFFERENCE, mpi_group_difference)
@@ -68,11 +75,30 @@ FDECL {
 #define mpi_group_range_excl FTN_NAME(MPI_GROUP_RANGE_EXCL, mpi_group_range_excl)
 #define mpi_group_free FTN_NAME(MPI_GROUP_FREE, mpi_group_free)
 #define mpi_comm_create FTN_NAME(MPI_COMM_CREATE, mpi_comm_create)
+#define mpi_comm_rank FTN_NAME( MPI_COMM_RANK , mpi_comm_rank )
+#define mpi_comm_size FTN_NAME( MPI_COMM_SIZE , mpi_comm_size )
+#define mpi_comm_dup FTN_NAME( MPI_COMM_DUP , mpi_comm_dup )
+#define mpi_comm_split FTN_NAME( MPI_COMM_SPLIT , mpi_comm_split )
+#define mpi_comm_free FTN_NAME( MPI_COMM_FREE , mpi_comm_free )
+
+#define mpi_errhandler_create FTN_NAME( MPI_ERRHANDLER_CREATE , mpi_errhandler_create )
+#define mpi_errhandler_set FTN_NAME( MPI_ERRHANDLER_SET , mpi_errhandler_set )
+#define mpi_errhandler_get FTN_NAME( MPI_ERRHANDLER_GET , mpi_errhandler_get )
+#define mpi_errhandler_free FTN_NAME( MPI_ERRHANDLER_FREE , mpi_errhandler_free )
+#define mpi_error_string FTN_NAME( MPI_ERROR_STRING , mpi_error_string )
+#define mpi_error_class FTN_NAME( MPI_ERROR_CLASS , mpi_error_class )
+#define mpi_wtime FTN_NAME( MPI_WTIME , mpi_wtime )
+#define mpi_wtick FTN_NAME( MPI_WTICK , mpi_wtick )
+#define mpi_init FTN_NAME( MPI_INIT , mpi_init )
+#define mpi_initialized FTN_NAME( MPI_INITIALIZED , mpi_initialized )
+#define mpi_init_universe FTN_NAME( MPI_INIT_UNIVERSE , mpi_init_universe )
+#define mpi_finalize FTN_NAME( MPI_FINALIZE , mpi_finalize )
 #define mpi_abort FTN_NAME( MPI_ABORT , mpi_abort )
+
 #define mpi_print FTN_NAME( MPI_PRINT , mpi_print )
-#define mpi_migrate FTN_NAME( MPI_MIGRATE , mpi_migrate )
 #define mpi_register FTN_NAME( MPI_REGISTER , mpi_register )
-#define mpi_get_count FTN_NAME( MPI_GET_COUNT , mpi_get_count )
+#define mpi_migrate FTN_NAME( MPI_MIGRATE , mpi_migrate )
+#define mpi_checkpoint FTN_NAME( MPI_CHECKPOINT , mpi_checkpoint )
 
 void mpi_init_universe(int *unicomm)
 {
@@ -84,8 +110,12 @@ void mpi_init_universe(int *unicomm)
 }
 
 void mpi_init(int *ierr){
-  //mpi_init_universe(MPI_COMM_UNIVERSE);
   *ierr = MPI_Init(NULL,NULL);
+}
+
+void mpi_initialized(int *isInit, int* ierr)
+{
+  *ierr = MPI_Initialized(isInit);
 }
 
 void mpi_comm_rank(int *comm, int *rank, int *ierr)
@@ -103,22 +133,16 @@ void mpi_finalize(int *ierr)
   *ierr = MPI_Finalize();
 }
 
-void mpi_send(void *msg, int *count, int *type, int *dest, 
+void mpi_send(void *msg, int *count, int *type, int *dest,
   int *tag, int *comm, int *ierr)
 {
   *ierr = MPI_Send(msg, *count, *type, *dest, *tag, *comm);
 }
 
-void mpi_ssend(void *msg, int *count, int *type, int *dest, 
-  int *tag, int *comm, int *ierr)
-{
-  *ierr = MPI_Ssend(msg, *count, *type, *dest, *tag, *comm);
-}
-
 void mpi_recv(void *msg, int *count, int *type, int *src,
   int *tag, int *comm, int *status, int *ierr)
 {
-  *ierr = MPI_Recv(msg, *count, *type, *src, *tag, *comm, 
+  *ierr = MPI_Recv(msg, *count, *type, *src, *tag, *comm,
                     (MPI_Status*) status);
 }
 
@@ -132,14 +156,22 @@ void mpi_iprobe(int *src,int *tag,int *comm,int *flag,int *status,int *ierr)
   *ierr = MPI_Iprobe(*src, *tag, *comm, flag, (MPI_Status*) status);
 }
 
-void mpi_sendrecv(void *sndbuf, int *sndcount, int *sndtype, 
-  int *dest, int *sndtag, void *rcvbuf, 
-  int *rcvcount, int *rcvtype, int *src, 
+void mpi_sendrecv(void *sndbuf, int *sndcount, int *sndtype,
+  int *dest, int *sndtag, void *rcvbuf,
+  int *rcvcount, int *rcvtype, int *src,
   int *rcvtag, int *comm, int *status, int *ierr)
 {
   *ierr = MPI_Sendrecv(sndbuf, *sndcount, *sndtype, *dest, *sndtag,
                         rcvbuf, *rcvcount, *rcvtype, *src, *rcvtag,
 			*comm, (MPI_Status*) status);
+}
+
+void mpi_sendrecv_replace(void *buf, int* count, int* datatype,
+                          int* dest, int* sendtag, int* source, int* recvtag,
+                          int* comm, int* status, int *ierr)
+{
+  *ierr = MPI_Sendrecv_replace(buf, *count, *datatype, *dest, *sendtag,
+                               *source, *recvtag, *comm, (MPI_Status*) status);
 }
 
 void mpi_barrier(int *comm, int *ierr)
@@ -170,9 +202,19 @@ double mpi_wtime(void)
   return MPI_Wtime();
 }
 
+double mpi_wtick(void)
+{
+  return MPI_Wtick();
+}
+
 void mpi_start(int *reqnum, int *ierr)
 {
   *ierr = MPI_Start((MPI_Request*) reqnum);
+}
+
+void mpi_startall(int *count, int *reqnum, int *ierr)
+{
+  *ierr = MPI_Startall(*count, (MPI_Request*) reqnum);
 }
 
 void mpi_waitall(int *count, int *request, int *status, int *ierr)
@@ -197,6 +239,16 @@ void mpi_testall(int *count, int *request, int *flag, int *status, int *ierr)
       (MPI_Status*) status);
 }
 
+void mpi_waitsome(int *incount, int *array_of_requests, int *outcount, int *array_of_indices, int *array_of_statuses, int *ierr)
+{
+  *ierr = MPI_Waitsome(*incount, (MPI_Request *)array_of_requests, outcount, array_of_indices, (MPI_Status*) array_of_statuses);
+}
+
+void mpi_testsome(int *incount, int *array_of_requests, int *outcount, int *array_of_indices, int *array_of_statuses, int *ierr)
+{
+  *ierr = MPI_Testsome(*incount, (MPI_Request *)array_of_requests, outcount, array_of_indices, (MPI_Status*) array_of_statuses);
+}
+
 void mpi_testany(int *count, int *request, int *index, int *flag, int *status, int *ierr)
 {
   *ierr = MPI_Testany(*count, (MPI_Request*) request, index, flag,
@@ -210,7 +262,12 @@ void mpi_test(int *request, int *flag, int *status, int *ierr)
 
 void mpi_request_free(int *request, int *ierr)
 {
-  *ierr = MPI_Request_free(request);
+  *ierr = MPI_Request_free((MPI_Request *)request);
+}
+
+void mpi_cancel(int *request, int *ierr)
+{
+  *ierr = MPI_Cancel((MPI_Request *)request);
 }
 
 void mpi_recv_init(void *buf, int *count, int *type, int *srcpe,
@@ -282,6 +339,26 @@ void  mpi_type_size(int* type, int* size, int* ierr)
   *ierr = MPI_Type_size(*type, size);
 }
 
+void mpi_type_lb(int* datatype, int* displacement, int* ierr)
+{
+  *ierr = MPI_Type_lb(*datatype, displacement);
+}
+
+void mpi_type_ub(int* datatype, int* displacement, int* ierr)
+{
+  *ierr = MPI_Type_ub(*datatype, displacement);
+}
+
+void mpi_address(int* location, int *address, int* ierr)
+{
+  *ierr = MPI_Address(location, address);
+}
+
+void mpi_get_elements(int *status, int* datatype, int *count, int* ierr)
+{
+  *ierr = MPI_Get_elements((MPI_Status*) status, *datatype, count);
+}
+
 void mpi_pack(void *inbuf, int *incount, int *datatype, void *outbuf,
     int *outsize, int *position, int *comm, int *ierr)
 {
@@ -304,19 +381,13 @@ void mpi_pack_size(int *incount, int *datatype, int *comm, int *size, int *ierr)
 void mpi_isend(void *buf, int *count, int *datatype, int *dest,
    int *tag, int *comm, int *request, int *ierr)
 {
-  *ierr = MPI_Isend(buf, *count, *datatype, *dest, *tag, *comm, request);
-}
-
-void mpi_issend(void *buf, int *count, int *datatype, int *dest,
-   int *tag, int *comm, int *request, int *ierr)
-{
-  *ierr = MPI_Issend(buf, *count, *datatype, *dest, *tag, *comm, request);
+  *ierr = MPI_Isend(buf, *count, *datatype, *dest, *tag, *comm, (MPI_Request *)request);
 }
 
 void mpi_irecv(void *buf, int *count, int *datatype, int *src,
    int *tag, int *comm, int *request, int *ierr)
 {
-  *ierr = MPI_Irecv(buf, *count, *datatype, *src, *tag, *comm, request);
+  *ierr = MPI_Irecv(buf, *count, *datatype, *src, *tag, *comm, (MPI_Request *)request);
 }
 
 void mpi_allgatherv(void *sendbuf, int *sendcount, int *sendtype,
@@ -379,20 +450,74 @@ void mpi_alltoall(void *sendbuf, int *sendcount, int *sendtype,
    int *comm, int *ierr)
 {
   *ierr = MPI_Alltoall(sendbuf, *sendcount, *sendtype, recvbuf, *recvcount,
-                        *recvtype, *comm);
+                       *recvtype, *comm);
+}
+
+void mpi_iallgather(void *sendbuf, int* sendcount, int* sendtype,
+                    void *recvbuf, int* recvcount, int* recvtype,
+                    int* comm, int* request, int* ierr)
+{
+  *ierr = MPI_Iallgather(sendbuf, *sendcount, *sendtype, recvbuf, *recvcount,
+                         *recvtype, *comm, (MPI_Request *)request);
+
+}
+
+void mpi_ialltoall(void *sendbuf, int* sendcount, int* sendtype,
+                 void *recvbuf, int* recvcount, int* recvtype,
+                 int* comm, int *request, int* ierr)
+{
+  *ierr = MPI_Ialltoall(sendbuf, *sendcount, *sendtype,
+                        recvbuf, *recvcount, *recvtype,
+                        *comm, (MPI_Request *)request);
+}
+
+void mpi_ireduce(void *sendbuf, void *recvbuf, int* count, int* type,
+                int* op, int* root, int* comm, int *request, int* ierr)
+{
+  *ierr = MPI_Ireduce(sendbuf, recvbuf, *count, *type,
+                      *op, *root, *comm, (MPI_Request*) request);
+}
+
+void mpi_iallreduce(void *inbuf, void *outbuf, int* count, int* type,
+                   int* op, int* comm, int *request, int* ierr)
+{
+  *ierr = MPI_Iallreduce(inbuf, outbuf, *count, *type,
+                         *op, *comm, (MPI_Request*) request);
+}
+void mpi_reduce_scatter(void *sendbuf, void *recvbuf, int *recvcounts,
+                       int* datatype, int* op, int* comm, int* ierr)
+{
+  *ierr = MPI_Reduce_scatter(sendbuf, recvbuf, recvcounts,
+                             *datatype, *op, *comm);
 }
 
 void mpi_comm_dup(int *comm, int *newcomm, int *ierr)
 {
-  AMPIAPI("ampi_com_dup");
   *newcomm = *comm;
   *ierr = 0;
 }
 
+void mpi_comm_split(int* src, int* color, int* key, int *dest, int *ierr)
+{
+  *ierr = MPI_Comm_split(*src, *color, *key, dest);
+}
+
 void mpi_comm_free(int *comm, int *ierr)
 {
-  AMPIAPI("ampi_comm_free");
   *ierr = 0;
+}
+
+void mpi_errhandler_create(int *function, int *errhandler, int *ierr){  *ierr = 0;  }
+void mpi_errhandler_set(int* comm, int* errhandler, int *ierr){  *ierr = 0;  }
+void mpi_errhandler_get(int* comm, int *errhandler, int *ierr){  *ierr = 0;  }
+void mpi_errhandler_free(int *errhandler, int *ierr){  *ierr = 0;  }
+void mpi_error_string(int* errorcode, char *string, int *resultlen, int *ierr)
+{
+  *ierr = MPI_Error_string(*errorcode, string, resultlen);
+}
+void mpi_error_class(int* errorcode, int *errorclass, int *ierr)
+{
+  *ierr = MPI_Error_class(*errorcode, errorclass);
 }
 
 void mpi_group_size(int* group, int* size, int* ierror){
@@ -465,6 +590,10 @@ void mpi_migrate(void)
 int mpi_register(void *d, MPI_PupFn f)
 {
   return MPI_Register(d,f);
+}
+
+void mpi_checkpoint(char *dname){
+  MPI_Checkpoint(dname);
 }
 
 } // extern "C"

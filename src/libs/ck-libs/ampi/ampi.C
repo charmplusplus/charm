@@ -1796,19 +1796,6 @@ int MPI_Isend(void *buf, int count, MPI_Datatype type, int dest,
 {
   AMPIAPI("MPI_Isend");
   ampi *ptr = getAmpiInstance(comm);
-
-  ptr->send(tag, ptr->getRank(), buf, count, type, dest, comm);
-
-  *request = MPI_REQUEST_NULL;
-  return 0;
-}
-
-CDECL
-int MPI_Issend(void *buf, int count, MPI_Datatype type, int dest,
-              int tag, MPI_Comm comm, MPI_Request *request)
-{
-  AMPIAPI("MPI_Issend");
-  ampi *ptr = getAmpiInstance(comm);
   ptr->send(tag, ptr->getRank(), buf, count, type, dest, comm);
   *request = MPI_REQUEST_NULL;
   return 0;
