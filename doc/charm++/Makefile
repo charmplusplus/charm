@@ -1,4 +1,4 @@
-TEXFILES= groups.tex related.tex ack.tex nodegroups.tex sdag.tex arrays.tex idl.tex seqobjs.tex inhertmplt.tex othercalls.tex intro.tex syntaxchange.tex chares.tex keywords.tex tools.tex contacts.tex manual.tex messages.tex quiesce.tex further.tex readonly.tex modules.tex overview.tex comprundebug.tex
+TEXFILES= groups.tex ack.tex nodegroups.tex sdag.tex arrays.tex idl.tex seqobjs.tex inhertmplt.tex othercalls.tex intro.tex syntaxchange.tex chares.tex keywords.tex manual.tex messages.tex quiesce.tex further.tex readonly.tex modules.tex overview.tex comprundebug.tex
 
 ps: $(TEXFILES)
 	touch index.tex

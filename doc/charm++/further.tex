@@ -1,2 +1,319 @@
 \section{Further Information}
 
+\subsection{Related Publications}
+\label{publications}
+
+For starters, see the publications and reports as well
+as related manuals that can be found on the Parallel Programming
+Laboratory website: {\tt http://charm.cs.uiuc.edu/}. 
+
+Some \charmpp\ related papers:
+\cite{CharmppPPWCPP96},\cite{CharmppOOPSLA93}.  Papers on {\sc Converse}:
+\cite{ConverseRTSPP98}, \cite{InterOpIPPS96}. Some
+{\sc Charm} related papers that formed the early foundation for \charmpp:
+\cite{CharmSys1TPDS94}, \cite{CharmSys2TPDS94},
+\cite{CharmOverviewINTL93}.  Papers on Structured Dagger and Dagger: 
+\cite{DaggerSyncIPPS94}, \cite{StructDaggerEURO96}.  Projections
+papers: \cite{ProjectionsIPPS93}, \cite{Projections}.
+
+\subsection{Associated Tools and Libraries}
+
+Several tools and libraries are provided for \charmpp. {\bf
+Projections} is an automatic performance analysis tool which provides
+the user with information about the parallel behavior of \charmpp\ programs. The purpose of implementing \charmpp standard
+libraries is to reduce the time needed to develop parallel
+applications with the help of a set of efficient and re-usable modules.
+
+\subsubsection{Projections}
+{\bf Projections} \cite{ProjectionsIPPS93}, \cite{Projections} is a
+performance visualization and feedback tool. The system has a much
+more refined understanding of user computation than is possible in
+traditional tools.
+
+Projections displays information about the request for creation and
+the actual creation of tasks in \charmpp\ programs. Projections also
+provides the function of post-mortem clock
+synchronization. Additionally, it can also automatically partition
+the execution of the running program into logically separate units,
+and automatically analyzes each individual partition. 
+
+Future versions will be able to provide recommendations/suggestions
+for improving performance as well.
+
+\subsubsection{TeMPO}
+
+{\bf TeMPO} (Threaded Message Passing Objects) provides a simple way
+to communicate between threaded methods of objects. Using TeMPO,
+chares, groups, and arrays can have threads associated with
+them. Any \charmpp\ object can send a tagged message to a TeMPO Object,
+and a threaded method in a TeMPO Object can block on a specific tagged
+message.
+
+In order to use TeMPO functionalities, chares, groups, and arrays need
+to inherit from TeMPO objects called \kw{TempoChare}, \kw{TempoGroup}\footnote{
+Currently, a nodegroup variety of TeMPO object does not exist, thoug it will
+be added in future.},
+and \kw{TempoArray} respectively. This inheritance also needs to be
+specified in the \charmpp\ interface file. Thus, a chare C in module M
+that needs to receive a tagged message directed to it in entry E, 
+needs to inherit from \kw{TempoChare} as shown below:
+
+\begin{verbatim}
+// file.ci
+module M {
+ ...
+ chare C : TempoChare {
+   entry C(void);
+   entry [threaded] void E(Msg *); // note use of threaded
+ };
+ ...
+}
+
+// file.h
+#include "file.decl.h"
+...
+class C : public TempoChare { // TempoChare inherits from Chare already
+ public:
+  C(void);
+  E(Msg *);
+};
+...
+\end{verbatim}
+
+The code for entry method \uw{E} can contain a call to \kw{ckTempoRecv}
+to block for a tagged message. Any ordinary chare can send a tagged
+message to a TeMPO object using \kw{ckTempoSend} static method of 
+\kw{TempoChare}.
+
+\kw{TempoGroup} and \kw{TempoArray} provide additional static methods to
+send tagged messages to individual elements, as well as broadcast. In
+addition, \kw{TempoArray} provides methods to perform ``reduction''
+over all the elements of an array. Currently supported reduction operations
+are max, min, sum, and product over datatypes float, int, and double.
+The signatures of these methods are given below:
+
+\begin{verbatim}
+class TempoChare : public Chare, public ... {
+  void ckTempoRecv(int tag, void *buffer, int buflen);
+  void ckTempoRecv(int tag1, int tag2, void *buffer, int buflen);
+  static void ckTempoSend(int tag1, int tag2, void *buffer,int buflen,
+                          CkChareID cid);
+  static void ckTempoSend(int tag, void *buffer,int buflen, CkChareID cid);
+  int ckTempoProbe(int tag1, int tag2);
+  int ckTempoProbe(int tag);
+};
+
+// TempoGroup includes all the TempoChare methods
+
+class TempoGroup : public Group, public ... {
+  static void ckTempoBcast(int tag, void *buffer, int buflen, CkGroupID grpid);
+  static void ckTempoSendBranch(int tag1, int tag2, void *buffer, int buflen,
+                                CkGroupID grpid, int processor);
+  static void ckTempoSendBranch(int tag, void *buffer, int buflen,
+                                CkGroupID grpid, int processor);
+  void ckTempoBcast(int sender, int tag, void *buffer, int buflen);
+  void ckTempoSendBranch(int tag1, int tag2, void *buffer, int buflen,
+                         int processor);
+  void ckTempoSendBranch(int tag, void *buffer, int buflen, int processor);
+};
+
+// TempoArray includes all the TempoChare methods
+
+class TempoArray : public ArrayElement, public Tempo
+{
+  static void ckTempoSendElem(int tag1, int tag2, void *buffer, int buflen,
+                              CkArrayID aid, int idx);
+  static void ckTempoSendElem(int tag, void *buffer, int buflen,
+                              CkArrayID aid, int idx);
+  void ckTempoSendElem(int tag1, int tag2, void *buffer, int buflen, int idx);
+  void ckTempoSendElem(int tag, void *buffer, int buflen, int idx);
+  void ckTempoBarrier(void);
+  void ckTempoBcast(int sender, int tag, void *buffer, int buflen);
+  void ckTempoReduce(int root, int op, void *inbuf, void *outbuf, int count,
+                     int type);
+  void ckTempoAllReduce(int op,void *inbuf,void *outbuf,int count,int type);
+};
+\end{verbatim}
+
+All the {\tt ckSend*} methods have versions that send messages with one tag or
+with two tags. A wild card tag (\kw{TEMPO\_ANY} may be in specified in \kw{ckTempoRecv}
+that matches with any tag. All the tags must range between 0 and 1024. All the other
+tags have other uses in the system. Reduction operations are indicated by integer constants.
+They are: \kw{TEMPO\_MAX}, \kw{TEMPO\_MIN}, \kw{TEMPO\_SUM}, and \kw{TEMPO\_PROD}.
+Reduction data types can be specified using integer constants: \kw{TEMPO\_FLOAT},
+\kw{TEMPO\_INT}, and \kw{TEMPO\_DOUBLE}. The \uw{root} parameter in \kw{ckTempoReduce},
+and the \uw{sender} parameter in \kw{ckTempoBcast} indicate whether the calling element
+is the root of the collective operation or not. In case of a reduction,
+the root element is returned the result of the reduction operation in
+\uw{outbuf}\footnote{\uw{outbuf} and \uw{inbuf} can be the same.} In case of a
+broadcast, \uw{buffer} on the sender contains the message to be sent to other elements.
+For each of the send methods, the specified message buffer could be reused once
+the method returns.
+
+All the TeMPO include files are automatically includes from {\tt charm++.h}.
+There is no need to include any other file to use TeMPO.
+
+\subsubsection{Communication}
+Communication optimizations tend to be specific to a particular
+architecture or an application. To improve portability and to reduce the
+cost of developing parallel applications a mechanism to integrate these
+different optimizations should exist. Moreover, it should be possible to
+automatically adapt the strategy to the situation at hand. The
+communication library integrates the different strategies to perform
+each-to-many multicast, including tree-based multicast, grid -based
+multicast and hypercube-based (dimensional exchange) schemes. The
+framework provided is flexible enough to absorb new strategies and
+communication patterns. It also provides the capability to do dynamic
+switching of strategies. This helps the library to adapt itself to the
+existing environment.
+
+\subsubsection{Barrier}
+We needed a way to synchronise a subset of tasks in \charmpp\
+programs. Quiescence detection is one way this can be done, if we want
+to synchronize {\bf all} tasks, but barriers provide a more flexible
+option with less overhead. 
+
+To make use of barriers, the user initializes a {\sl barrier group} in
+the main function. A virtual binary tree structure is imposed on the
+PEs, with PE 0 at the root.  PEs perform computations and then execute
+{\tt atBarrier} when they want to synchronize.  {\tt atBarrier} takes
+a single parameter of type {\tt FP *}.  The user must declare and
+initialize some variable {\it fnptr} as follows:
+
+\begin{verbatim}
+  FP *fnptr = new FP;
+
+  fnptr->fp = theFn;
+\end{verbatim}
+
+The variable {\it theFn} above is the void function to be executed when all
+PEs have synchronized.
+
+The barrier keeps track of child PEs, and when a given PE has heard
+from all its children, it then notifies the parent.  When the root
+hears from both children, all PEs are accounted for, and the
+respective void function is executed on each PE. 
+
+What follows is a very simple test program illustrating the usage of a
+barrier.
+
+{\tt test.ci}:
+
+\begin{verbatim}
+mainmodule Test {
+  extern module Barrier;
+  readonly CkChareID mainhandle;
+  readonly int barrierGroup;
+  
+  mainchare main {
+    entry main();
+    entry void Quiescence1(void);
+  };
+  
+  group busy {
+    entry busy(void);
+  };
+};
+\end{verbatim}
+
+{\tt test.h}:
+
+\begin{verbatim}
+#include "Test.decl.h"
+int barrierGroup;
+CkChareID mainhandle;
+
+class main : public Chare {
+public:
+  main(CkArgMsg *m);
+  void Quiescence1(void);
+};
+
+class busy : public Group {
+public:
+  busy(void);
+}
+\end{verbatim}
+
+{\tt test.C}:
+
+\begin{verbatim}
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+
+#include "charm++.h"
+
+#include "test.h"
+#include "Test.def.h"
+
+#include "barrier.h"
+
+main::main(CkArgMsg *m)
+{
+  barrierGroup = barrierInit();
+  CProxy_busy::ckNew();
+  CkStartQD(CProxy_main::ckIdx_Quiescence1(), &mainhandle);
+}
+
+void main::Quiescence1() 
+{ 
+  CkPrintf("All done... Exiting.\n");
+  CkExit();
+}
+
+void theFn();
+
+busy::busy()
+{
+  int i, j=0;
+  FP *fnptr = new FP;
+
+  for (i=0; i<(CkMyPe()+1)*1000000; i++)
+    j = j + i;
+  CkPrintf("[%d] going to barrier with j=%d\n", CkMyPe(), j);
+  fnptr->fp = theFn;
+  CProxy_barrier(barrierGroup).ckLocalBranch()->atBarrier(fnptr);
+}
+
+void theFn()
+{
+  CkPrintf("[%d] fnptr executing!\n", CkMyPe());
+}
+\end{verbatim}
+
+\subsection{Contacts}
+\label{Distribution}
+
+While we can promise neither bug-free software nor immediate solutions   
+to all problems, \charmpp\ is a stable system and it is our intention to
+keep it as up-to-date and usable as our resources will allow
+by responding quickly to questions and bug reports.  To that
+end, there are mechanisms in place for contacting Charm users
+and developers. 
+
+Our software is made available for research use and evaluation.
+For the latest software distribution, further information about {\sc
+Charm}/\charmpp\ and information on how to contact the Parallel
+Programming laboratory, see our website at {\it
+http://charm.cs.uiuc.edu/}.  The software is also available by
+anonymous ftp, from a.cs.uiuc.edu, under the directory
+pub/research-groups/CHARM.  
+
+If retrieval of a publication via these channels is not possible,
+please send electronic mail to {\tt kale@cs.uiuc.edu} or postal mail to:
+
+{\bf 
+\begin{tabbing}
+\hspace{0.5in}\=\hspace{0.3in}\=\hspace{0.3in}\=\hspace{0.3in}\= \kill
+\> Laxmikant Kale \\
+\> Department of Computer Science \\
+\> University of Illinois \\
+\> 1304 West Springfield Avenue \\
+\> Urbana, IL 61801 \\
+\end{tabbing}
+}
+
+A mailing list exists for announcements about software releases and
+updates relating to \charmpp/{\sc Converse}.  To subscribe, send
+e-mail to: ???????.
