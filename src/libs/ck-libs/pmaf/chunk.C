@@ -78,7 +78,9 @@ void chunk::refiningElements()
 	  theElements[i].refineLE(); // refine the element
 	else if (theElements[i].LFtest())
 	  theElements[i].refineLF(); // refine the element
-	else theElements[i].refineCP(); // refine the element
+	else if (theElements[i].CPtest())
+	  theElements[i].refineCP(); // refine the element
+	else theElements[i].refineLE(); // refine the element
       }
       i++;
       adjustMesh();

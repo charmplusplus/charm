@@ -687,10 +687,10 @@ void element::refineLF()
       // tell remote elems about their new faces
       //CkPrintf("      -> Updating remote faces [%d,%d] and [%d,%d]...\n",
       //theResult->ance, abc.cid, theResult->bnce, abc.cid);
-      mesh[abc.cid].updateFace(theResult->ance, newElem3.cid, 
-			       newElem3.idx);
-      mesh[abc.cid].updateFace(theResult->bnce, newElem4.cid, 
-			       newElem4.idx);
+      if (abc.cid != -1) {
+	mesh[abc.cid].updateFace(theResult->ance, newElem3.cid, newElem3.idx);
+	mesh[abc.cid].updateFace(theResult->bnce, newElem4.cid, newElem4.idx);
+      }
     }
     else if (theResult->success == 0) { // wait for split
       CkPrintf("    -> Refine: %d on %d: Large face (%d,%d) split failed.\n",
@@ -816,10 +816,8 @@ splitResponse *element::splitLF(node in1, node in2, node in3, node in4, elemRef 
   elemRef newElem2 = C->addElement(newRef, nodes[b], nodes[c], nodes[d]);
   // need to updateFace on elements on acd and bcd faces: abd face
   // still on this element so no changes needed
-  if (acd.cid != -1)
-    mesh[acd.cid].updateFace(acd.idx, myRef, newElem1);
-  if (bcd.cid != -1)
-    mesh[bcd.cid].updateFace(bcd.idx, myRef, newElem2);
+  if (acd.cid != -1) mesh[acd.cid].updateFace(acd.idx, myRef, newElem1);
+  if (bcd.cid != -1) mesh[bcd.cid].updateFace(bcd.idx, myRef, newElem2);
   // update this element's c node
   nodes[c] = newRef;
   // set faces of the two new elements
@@ -1010,7 +1008,7 @@ void element::refineLE()
   if (C->edgeOnSurface(nodes[a].idx, nodes[b].idx))
     mid.setSurface();
   else mid.notSurface();
-  if (C->theNodes[nodes[a].idx].isFixed() && 
+  if (C->theNodes[nodes[a].idx].isFixed() &&
       C->theNodes[nodes[b].idx].isFixed())
     mid.fix();
   else mid.notFixed();
@@ -1026,8 +1024,9 @@ void element::refineLE()
   C->theElements[newElem.idx].faceElements[3] = faceElements[b+c+d-3];
   C->theElements[newElem.idx].calculateVolume();
   C->theElements[newElem.idx].setTargetVolume(targetVolume);
-  mesh[faceElements[b+c+d-3].cid].updateFace(faceElements[b+c+d-3].idx, myRef, 
-					     newElem);
+  if (faceElements[b+c+d-3].cid != -1)
+    mesh[faceElements[b+c+d-3].cid].updateFace(faceElements[b+c+d-3].idx, 
+					       myRef, newElem);
   faceElements[b+c+d-3] = newElem;
   oldNode = nodes[b]; 
   nodes[b] = newNode;
@@ -1162,8 +1161,9 @@ LEsplitResult *element::LEsplit(elemRef root, elemRef parent,
   C->theElements[myNewElem.idx].faceElements[3] = faceElements[b+c+d-3];
   C->theElements[myNewElem.idx].calculateVolume();
   C->theElements[myNewElem.idx].setTargetVolume(targetVolume);
-  mesh[faceElements[b+c+d-3].cid].updateFace(faceElements[b+c+d-3].idx, myRef, 
-					     myNewElem);
+  if (faceElements[b+c+d-3].cid != -1)
+    mesh[faceElements[b+c+d-3].cid].updateFace(faceElements[b+c+d-3].idx, 
+					       myRef, myNewElem);
   faceElements[b+c+d-3] = myNewElem;
   oldNode = nodes[b];
   nodes[b] = newNodeRef;
