@@ -1614,12 +1614,13 @@ _ACEOF
 
 #### check if dlopen works ####
 skip_dl=0
-#for pgcc 4.0, -ldl crash linking, so skip it here.
-case "$CMK_CXX" in
-pgCC*) skip_dl=1 ;;
-esac
 # for bproc, ignore -ldl
 test -n "$CMK_BPROC" && skip_dl=1
+dl_opt='-ldl'
+#workaround for pgcc 4.0, -ldl crash linking, so use -Wl,-ldl to skip the prelinker.
+case "$CMK_CXX" in
+pgCC*) dl_opt='-Wl,-ldl' ;;
+esac
 
 if test $skip_dl -eq 0
 then
@@ -1633,11 +1634,11 @@ int main() {
 EOT
 test_link "whether dlopen links without -ldl" "yes" "no" ""
 noldl=$pass
-test_link "whether dlopen links with -ldl" "yes" "no" "-ldl"
+test_link "whether dlopen links with -ldl" "yes" "no" "$dl_opt"
 if test $pass -eq 1
 then
 #dlopen requires -ldl: add it to our link line
-	add_flag 'CMK_LIBS="$CMK_LIBS -ldl"' "dlopen"
+	add_flag CMK_LIBS='"$CMK_LIBS '$dl_opt'"' "dlopen"
 fi
 
 if test $pass -eq 1 -o $noldl -eq 1
