@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.4  1995-09-07 22:51:52  gursoy
+ * Revision 2.5  1995-09-07 22:59:57  gursoy
+ * added CpvInitialize calls for Cmi_mype etc for the sake of compleeteness
+ *
+ * Revision 2.4  1995/09/07  22:51:52  gursoy
  * Cmi_mype Cmi_numpe and CmiLocalQueue are accessed thru macros now
  *
  * Revision 2.3  1995/07/03  17:58:04  gursoy
@@ -278,6 +281,10 @@ void CmiInitMc(argv)
 char *argv[];
 {
     program_name(argv[0], "NCUBE2");
+
+    CpvInitialize(int, Cmi_mype);
+    CpvInitialize(int, Cmi_numpe);
+    CpvInitialize(void*, CmiLocalQueue);
 
     whoami(&CpvAccess(Cmi_mype), &process, &host, &Cmi_dim);
     CpvAccess(Cmi_numpe) = (1 << Cmi_dim) ;
