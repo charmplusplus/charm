@@ -9,14 +9,13 @@
 #include "liveViz0.h"
 #include "ckimage.h"
 #include "colorScale.h"
-#include "xSortedImageList.h"
+#include "ImageData.h"
 
 /********************** LiveVizPoll **********************
 These declarations should probably live in a header named "liveVizPoll.h"
 */
 #include "liveVizPoll.decl.h"
 
-typedef XSortedImageList LiveVizImageList;
 
 // liveVizPollMode controls how the image is reassembled:
 typedef enum {
@@ -170,16 +169,6 @@ inline void liveVizDeposit(liveVizRequestMsg *reqMsg,
 {
 	liveVizDeposit(reqMsg->req,startx,starty,sizex,sizey,imageData,client);
 	delete reqMsg;
-}
-
-// deposited list should be deleted once liveVizDeposit() returns
-void liveVizDeposit(const liveVizRequest &req, LiveVizImageList &list, ArrayElement* client);
-
-//As above, but taking a message instead of a request:
-inline void liveVizDeposit(liveVizRequestMsg *reqMsg,LiveVizImageList &list, ArrayElement* client)
-{
-        liveVizDeposit(reqMsg->req,list,client);
-        delete reqMsg;
 }
 
 #endif /* def(thisHeader) */

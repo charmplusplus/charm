@@ -3,7 +3,6 @@
 
 Orion Sky Lawlor, olawlor@acm.org, 6/11/2002
 */
-#include "image.h"
 #include "liveViz.h"
 #include "liveViz_impl.h"
 
@@ -54,11 +53,11 @@ static void liveVizNodeInit(void) {
 #if 1
 /****************** Fast but complex image combining *****************
 
-Here I create a list of non-overlapping images and contribute the list of images rather than the combined images.
+Here I create a list of non-overlapping images (lines) and contribute the list of images rather than the combined images.
 
 The contributed data looks like:
-	a list of Images packed into a run of bytes
-*/
+	a list of Images (lines) packed into a run of bytes
+**********************************************************************/
 
 //Called by clients to deposit a piece of the final image
 void liveVizDeposit(const liveVizRequest &req,
@@ -68,42 +67,25 @@ void liveVizDeposit(const liveVizRequest &req,
 {
 
   if (lv_config.getVerbose(2))
-    CkPrintf("liveVizDeposit> Deposited image at (%d,%d), (%d x %d) pixels, on pe %d\n",startx,starty,sizex,sizey,CkMyPe());
-  // Implement image clipping -- to do
+    CkPrintf("liveVizDeposit> Deposited image at (%d,%d), (%d x %d) pixels, on pe %d at time %.6f\n",startx,starty,sizex,sizey,CkMyPe(), CmiWallTimer ());
 
-  XSortedImageList list(lv_config.getBytesPerPixel());
-  if(src != NULL)
-  {
-     Point ulc, lrc;
+  ImageData imageData (lv_config.getBytesPerPixel ());
 
-     ulc.x = startx;
-     ulc.y = starty;
-     lrc.x = startx + sizex-1;
-     lrc.y = starty + sizey-1;
-
-     Image *img = new Image(ulc,lrc,NULL);
-     img->setData((byte *)src,false);
-     list.add(img, req);
-  }
-
-  CkReductionMsg* msg = CkReductionMsg::buildNew(list.packedDataSize(),NULL, imageCombineReducer);
-  list.pack(&req,msg->getData());
+  CkReductionMsg* msg = CkReductionMsg::buildNew(imageData.GetBuffSize (startx,
+						                                                starty,
+																	    sizex,
+																	    sizey,
+																	    &req,
+																	    src),
+				                                 NULL,
+												 imageCombineReducer);
+  imageData.AddImage (&req,
+					  (byte*)(msg->getData()));
 
   //Contribute this image to the reduction
   msg->setCallback(CkCallback(vizReductionHandler));
   client->contribute(msg);
 }
-
-void liveVizDeposit(const liveVizRequest &req, LiveVizImageList &list, ArrayElement* client)
-{
-  CkReductionMsg* msg = CkReductionMsg::buildNew(list.packedDataSize(),NULL, imageCombineReducer);
-  list.pack(&req,msg->getData());
-
-  // Contribute this list of images to the reduction
-  msg->setCallback(CkCallback(vizReductionHandler));
-  client->contribute(msg);
-}
-
 
 /*
 Called by the reduction manager to combine all the source images
@@ -113,8 +95,8 @@ processor to one list of non-overlapping images.
 CkReductionMsg *imageCombine(int nMsg,CkReductionMsg **msgs)
 {
   if (nMsg==1) { //Don't bother copying if there's only one source
-        if (lv_config.getVerbose(2))
-	    CkPrintf("imageCombine> Skipping combine on pe %d\n",CkMyPe());
+    if (lv_config.getVerbose(2))
+      CkPrintf("imageCombine> Skipping combine on pe %d\n",CkMyPe());
   	CkReductionMsg *ret=msgs[0];
 	msgs[0]=NULL; //Prevent reduction manager from double-delete
 	return ret;
@@ -122,16 +104,14 @@ CkReductionMsg *imageCombine(int nMsg,CkReductionMsg **msgs)
 
   if (lv_config.getVerbose(2))
     CkPrintf("imageCombine> image combine on pe %d\n",CkMyPe());
-// double startTime=CmiWallTimer();
-  XSortedImageList list(lv_config.getBytesPerPixel());
-  const liveVizRequest *req = list.unPack((void *)msgs[0]->getData());
 
-  for(int i=1; i<nMsg; i++)
-     list.unPack(msgs[i]->getData());
+  ImageData imageData (lv_config.getBytesPerPixel ());
+  imageData.CombineImageData (nMsg, msgs);
 
-  CkReductionMsg* msg = CkReductionMsg::buildNew(list.packedDataSize(),NULL, imageCombineReducer);
-  list.pack(req,msg->getData());
-// CkPrintf("Combining %d messages on PE %d took %.6fs\n", nMsg, CkMyPe(), CmiWallTimer()-startTime);
+  CkReductionMsg* msg = CkReductionMsg::buildNew(imageData.GetImageDataSize(),
+				                                 imageData.GetImageData (),
+												 imageCombineReducer);
+  //CkPrintf("Combining %d messages on PE %d took %.6fs\n", nMsg, CkMyPe(), CmiWallTimer()-startTime);
 
   return msg;
 }
@@ -140,15 +120,14 @@ CkReductionMsg *imageCombine(int nMsg,CkReductionMsg **msgs)
 void vizReductionHandler(void *r_msg)
 {
   CkReductionMsg *msg = (CkReductionMsg*)r_msg;
-  XSortedImageList list(lv_config.getBytesPerPixel());
-  const liveVizRequest * req = list.unPack(msg->getData());
-  Image *image = list.combineImage(req);
-
-  if (lv_config.getVerbose(2))
-      CkPrintf("vizReductionHandler> pe %d image is (%d,%d, %d,%d)\n", CkMyPe(), image->m_ulc.x, image->m_ulc.y, image->m_lrc.x, image->m_lrc.y);
+  ImageData imageData (lv_config.getBytesPerPixel ());
+  liveVizRequest req;
+  byte *image = imageData.ConstructImage ((byte*)(msg->getData ()), req);
   
-  liveViz0Deposit(*req,image->m_imgData);
-  delete image;
+  if (lv_config.getVerbose(2))
+      CkPrintf("vizReductionHandler> pe %d \n", CkMyPe());
+  
+  liveViz0Deposit(req,image);
   delete msg;
 }
 

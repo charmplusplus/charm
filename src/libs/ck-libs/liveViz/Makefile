@@ -1,10 +1,11 @@
 CDIR=../../../..
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
+FLAGS=-DEXTERIOR_BLACK_PIXEL_ELIMINATION
 
-HEADERS=liveViz.h liveViz.decl.h liveVizPoll.decl.h liveViz0.h colorScale.h xSortedImageList.h imagelist.h imagenode.h image.h defines.h
+HEADERS=liveViz.h liveViz.decl.h liveVizPoll.decl.h liveViz0.h colorScale.h ImageData.h
 HEADDEP=$(HEADERS) liveViz.def.h networkVar.h \
-	image.h imagelist.h imagenode.h xSortedImageList.h
-OBJS=liveViz0.o liveViz.o liveVizPoll.o networkVar.o colorScale.o image.o imagenode.o imagelist.o xSortedImageList.o
+	ImageData.h
+OBJS=liveViz0.o liveViz.o liveVizPoll.o networkVar.o colorScale.o ImageData.o
 DEST=$(CDIR)/lib/libmoduleliveViz.a
 
 all: $(DEST)
@@ -17,31 +18,22 @@ headers: $(HEADERS)
 	touch headers
 
 liveViz0.o: liveViz0.C $(HEADDEP)
-	$(CHARMC) -c liveViz0.C
+	$(CHARMC) -c $(FLAGS) liveViz0.C
 
 liveViz.o: liveViz.C $(HEADDEP)
-	$(CHARMC) -c liveViz.C
+	$(CHARMC) -c $(FLAGS) liveViz.C
 
 liveVizPoll.o: liveVizPoll.C $(HEADDEP)
-	$(CHARMC) -c liveVizPoll.C
+	$(CHARMC) -c $(FLAGS) liveVizPoll.C
 
 networkVar.o: networkVar.C $(HEADDEP)
-	$(CHARMC) -c networkVar.C
+	$(CHARMC) -c $(FLAGS) networkVar.C
 
 colorScale.o: colorScale.C $(HEADDEP)
-	$(CHARMC) -c colorScale.C
+	$(CHARMC) -c $(FLAGS) colorScale.C
 
-image.o : image.C $(HEADDEP)
-	$(CHARMC) -c image.C
-
-imagenode.o : imagenode.C $(HEADDEP)
-	$(CHARMC) -c imagenode.C
-
-imagelist.o : imagelist.C $(HEADDEP)
-	$(CHARMC) -c imagelist.C
-
-xSortedImageList.o : xSortedImageList.C $(HEADDEP)
-	$(CHARMC) -c xSortedImageList.C
+ImageData.o : ImageData.C $(HEADDEP)
+	$(CHARMC) -c $(FLAGS) ImageData.C
 
 liveViz.decl.h liveViz.def.h: liveViz.ci
 	$(CHARMC) liveViz.ci
