@@ -75,7 +75,7 @@ test_link() {
         then
           test_result 1 "$1" "$2" "$3"
         else
-          $CMK_LDXX -o testlink test.o $CMK_LIBDIR $4 >> out 2>&1
+          $CMK_LDXX -o testlink test.o $CMK_LIBDIR $4 > out 2>&1
           test_result $? "$1" "$2" "$3"
         fi
 	/bin/rm -f out
@@ -331,7 +331,7 @@ AC_DEFINE_UNQUOTED(CMK_GCC_IA64_ASM, $strictpass, [Allows gcc IA64 assembly.])
 cat > $t <<EOT
 #include <stdlib.h>
 #include <string.h>
-int main() { 
+int main() {
   char fname[[128]];
   strcpy(fname, "/tmp/fdXXX.XXX");
   mkstemp(fname);
@@ -501,7 +501,7 @@ AC_DEFINE_UNQUOTED(CMK_HAS_VALUES_H, $pass, [whether has values.h])
 #### test if has alloca.h ####
 cat > $t <<EOT
 #include <alloca.h>
-int main() { 
+int main() {
   double *s=(double *)alloca(sizeof(double));
   *s=1.0;
   return 0;
@@ -531,7 +531,7 @@ test_cxx "whether has stdint.h " "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_STDINT_H, $pass, [whether has stdint.h])
 
 #### check if PAPI exists ####
-if [[ -n "$CMK_USE_PAPI" ]]
+if test -n "$CMK_USE_PAPI"
 then
 cat > $t <<EOT
 #include <stdio.h>
