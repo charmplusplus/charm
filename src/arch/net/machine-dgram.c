@@ -31,24 +31,32 @@
 #define DGRAM_BROADCAST     (0xFE)
 #define DGRAM_ACKNOWLEDGE   (0xFF)
 
-typedef struct { char data[DGRAM_HEADER_SIZE]; } DgramHeader;
+/*typedef struct { char data[DGRAM_HEADER_SIZE]; } DgramHeader;*/
+typedef struct {
+        unsigned int seqno:32;  /* seq number in send window */
+        unsigned int srcpe:16;  /* CmiMyPe of the sender */
+        unsigned char dstrank;  /* rank of destination processor */
+        unsigned char magic;    /* Low 8 bits of charmrun PID */
+} DgramHeader;
+
 
 /* the window size needs to be Cmi_window_size + sizeof(unsigned int) bytes) */
 typedef struct { DgramHeader head; char window[1024]; } DgramAck;
 
-#define DgramHeaderMake(ptr, dstrank, srcpe, magic, seqno) { \
-   unsigned char tmp = (magic) & DGRAM_MAGIC_MASK; \
-   ((unsigned int *)ptr)[0] = seqno; \
-   ((unsigned short *)ptr)[2] = srcpe; \
-   ((unsigned short *)ptr)[3] = dstrank | (tmp<<8); \
+#define DgramHeaderMake(ptr, dstrank_, srcpe_, magic_, seqno_) { \
+   DgramHeader *header = (DgramHeader *)(ptr);	\
+   header->seqno = seqno_; \
+   header->srcpe = srcpe_; \
+   header->dstrank = dstrank_; \
+   header->magic = magic_ & DGRAM_MAGIC_MASK; \
 }
 
-#define DgramHeaderBreak(ptr, dstrank, srcpe, magic, seqno) { \
-   unsigned short tmp; \
-   seqno = ((unsigned int *)ptr)[0]; \
-   srcpe = ((unsigned short *)ptr)[2]; \
-   tmp = ((unsigned short *)ptr)[3]; \
-   dstrank = (tmp&0xFF); magic = (tmp>>8); \
+#define DgramHeaderBreak(ptr, dstrank_, srcpe_, magic_, seqno_) { \
+   DgramHeader *header = (DgramHeader *)(ptr);	\
+   seqno_ = header->seqno; \
+   srcpe_ = header->srcpe; \
+   dstrank_ = header->dstrank; \
+   magic_ = header->magic; \
 }
 
 #define PE_BROADCAST_OTHERS (-101)
