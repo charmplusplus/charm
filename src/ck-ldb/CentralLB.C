@@ -291,6 +291,7 @@ void CentralLB::RemoveNonMigratable(LDStats* stats, int count)
   int   *lens = new int[count];
   for (pe=0; pe<count; pe++) {
     int n_objs = stats[pe].n_objs;
+    if (n_objs == 0) continue;
     LDObjData *objData = stats[pe].objData; 
     int l=-1, h=n_objs;
     while (l<h) {
@@ -319,6 +320,7 @@ void CentralLB::RemoveNonMigratable(LDStats* stats, int count)
   // modify comm data
   for (pe=0; pe<count; pe++) {
     int n_comm = stats[pe].n_comm;
+    if (n_comm == 0) continue;
     LDCommData *commData = stats[pe].commData;
     int l=-1, h=n_comm;
     while (l<h) {
