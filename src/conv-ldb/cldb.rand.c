@@ -83,7 +83,7 @@ void CldEnqueue(int pe, void *msg, int infofn, int packfn)
   CldInfoFn ifn = (CldInfoFn)CmiHandlerToFunction(infofn);
   CldPackFn pfn = (CldPackFn)CmiHandlerToFunction(packfn);
   if (CmiGetHandler(msg) >= CpvAccess(CmiHandlerMax)) *((int*)0)=0;
-  if (pe == CLD_ANYWHERE) pe = ((rand()&0x7FFFFFFF)%CmiNumPes());
+  if (pe == CLD_ANYWHERE) pe = (((rand()+CmiMyPe())&0x7FFFFFFF)%CmiNumPes());
   if (pe == CmiMyPe()) {
     ifn(msg, &len, &ldbfield, &queueing, &priobits, &prioptr);
     CsdEnqueueGeneral(msg, queueing, priobits, prioptr);
