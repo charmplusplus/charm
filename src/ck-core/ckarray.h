@@ -423,8 +423,26 @@ Orion Sky Lawlor, 11/13/1999, olawlor@acm.org
 
 */
 
-//Compute the sum the integers passed by each element.
+//Compute the sum the numbers passed by each element.
 ArrayReductionMessage *CkReduction_sum_int(int nMsg,ArrayReductionMessage **msg);
+ArrayReductionMessage *CkReduction_sum_float(int nMsg,ArrayReductionMessage **msg);
+ArrayReductionMessage *CkReduction_sum_double(int nMsg,ArrayReductionMessage **msg);
+
+//Compute the product the numbers passed by each element.
+ArrayReductionMessage *CkReduction_product_int(int nMsg,ArrayReductionMessage **msg);
+ArrayReductionMessage *CkReduction_product_float(int nMsg,ArrayReductionMessage **msg);
+ArrayReductionMessage *CkReduction_product_double(int nMsg,ArrayReductionMessage **msg);
+
+//Compute the largest number passed by any element.
+ArrayReductionMessage *CkReduction_max_int(int nMsg,ArrayReductionMessage **msg);
+ArrayReductionMessage *CkReduction_max_float(int nMsg,ArrayReductionMessage **msg);
+ArrayReductionMessage *CkReduction_max_double(int nMsg,ArrayReductionMessage **msg);
+
+//Compute the smallest number passed by any element.
+ArrayReductionMessage *CkReduction_min_int(int nMsg,ArrayReductionMessage **msg);
+ArrayReductionMessage *CkReduction_min_float(int nMsg,ArrayReductionMessage **msg);
+ArrayReductionMessage *CkReduction_min_double(int nMsg,ArrayReductionMessage **msg);
+
 
 //Compute the logical AND of the integers passed by each element.
 // The resulting integer will be zero if any source integer is zero.
@@ -433,22 +451,6 @@ ArrayReductionMessage *CkReduction_and(int nMsg,ArrayReductionMessage **msg);
 //Compute the logical OR of the integers passed by each element.
 // The resulting integer will be 1 if any source integer is nonzero.
 ArrayReductionMessage *CkReduction_or(int nMsg,ArrayReductionMessage **msg);
-
-//Compute the largest integer passed by any element.
-ArrayReductionMessage *CkReduction_max_int(int nMsg,ArrayReductionMessage **msg);
-
-//Compute the smallest integer passed by any element.
-ArrayReductionMessage *CkReduction_min_int(int nMsg,ArrayReductionMessage **msg);
-
-
-//Compute the sum the doubles passed by each element.
-ArrayReductionMessage *CkReduction_sum_double(int nMsg,ArrayReductionMessage **msg);
-
-//Compute the largest double passed by any element.
-ArrayReductionMessage *CkReduction_max_double(int nMsg,ArrayReductionMessage **msg);
-
-//Compute the smallest double passed by any element.
-ArrayReductionMessage *CkReduction_min_double(int nMsg,ArrayReductionMessage **msg);
 
 
 //This structure contains the contribution of one array element.
