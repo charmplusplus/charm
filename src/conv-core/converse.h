@@ -767,6 +767,7 @@ void   CmiDeliverSpecificMsg(int handler);
 typedef struct CthThreadStruct *CthThread;
 
 typedef void        (*CthVoidFn)();
+typedef void        (*CthAwkFn)(CthThread,int,int,int*);
 typedef CthThread   (*CthThFn)();
 
 int        CthImplemented(void);
@@ -781,9 +782,11 @@ int        CthIsSuspendable(CthThread);
 
 void       CthSuspend(void);
 void       CthAwaken(CthThread);
-void       CthSetStrategy(CthThread, CthVoidFn, CthThFn);
+void       CthAwakenPrio(CthThread, int, int, int *);
+void       CthSetStrategy(CthThread, CthAwkFn, CthThFn);
 void       CthSetStrategyDefault(CthThread);
 void       CthYield(void);
+void       CthYieldPrio(int,int,int*);
 
 void       CthSetNext(CthThread t, CthThread next);
 CthThread  CthGetNext(CthThread t);

@@ -947,7 +947,7 @@ static CthThread CthSuspendNormalThread()
   return CpvAccess(CthSchedulingThread);
 }
 
-static void CthEnqueueSchedulingThread(CthThread t);
+static void CthEnqueueSchedulingThread(CthThread t, int, int, int*);
 static CthThread CthSuspendSchedulingThread();
 
 static CthThread CthSuspendSchedulingThread()
@@ -989,7 +989,7 @@ static void CthResumeSchedulingThread(CthThread t)
   CthThread me = CthSelf();
   CmiGrabBuffer((void**)&t);
   if (me == CpvAccess(CthMainThread)) {
-    CthEnqueueSchedulingThread(me);
+    CthEnqueueSchedulingThread(me,CQS_QUEUEING_FIFO, 0, 0);
   } else {
     CthSetNext(me, CpvAccess(CthSleepingStandins));
     CpvAccess(CthSleepingStandins) = me;
@@ -998,16 +998,16 @@ static void CthResumeSchedulingThread(CthThread t)
   CthResume(t);
 }
 
-static void CthEnqueueNormalThread(CthThread t)
+static void CthEnqueueNormalThread(CthThread t, int s, int pb, int *prio)
 {
   CmiSetHandler(t, CpvAccess(CthResumeNormalThreadIdx));
-  CsdEnqueueFifo(t);
+  CsdEnqueueGeneral(t, s, pb, prio);
 }
 
-static void CthEnqueueSchedulingThread(CthThread t)
+static void CthEnqueueSchedulingThread(CthThread t, int s, int pb, int *prio)
 {
   CmiSetHandler(t, CpvAccess(CthResumeSchedulingThreadIdx));
-  CsdEnqueueFifo(t);
+  CsdEnqueueGeneral(t, s, pb, prio);
 }
 
 void CthSetStrategyDefault(CthThread t)

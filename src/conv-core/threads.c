@@ -71,7 +71,7 @@
  *     scheduler's awaken-function to awaken thread t.  This probably causes
  *     the thread t to be inserted in the ready-pool.
  *
- * void CthSetStrategy(CthThread t, CthVoidFn awakenfn, CthThFn choosefn)
+ * void CthSetStrategy(CthThread t, CthAwkFn awakenfn, CthThFn choosefn)
  *
  *     This specifies the scheduling functions to be used for thread 't'.
  *     The scheduling functions must have the following prototypes:
@@ -128,7 +128,7 @@ typedef struct CthProcInfo *CthProcInfo;
 typedef struct CthThreadStruct
 {
   char cmicore[CmiMsgHeaderSizeBytes];
-  CthVoidFn  awakenfn;
+  CthAwkFn  awakenfn;
   CthThFn    choosefn;
   CthVoidFn  startfn;    /* function that thread will execute */
   void      *startarg;   /* argument that start function will be passed */
@@ -387,13 +387,27 @@ CthThread th;
 {
   if (th->awakenfn == 0) CthNoStrategy();
   if (th->insched) CmiAbort("CthAwaken: thread already awake.\n");
-  th->awakenfn(th);
+  th->awakenfn(th, CQS_QUEUEING_FIFO, 0, 0);
+  th->insched = 1;
+}
+
+void CthAwakenPrio(CthThread th, int s, int pb, int *prio)
+{
+  if (th->awakenfn == 0) CthNoStrategy();
+  if (th->insched) CmiAbort("CthAwaken: thread already awake.\n");
+  th->awakenfn(th, s, pb, prio);
   th->insched = 1;
 }
 
 void CthYield()
 {
   CthAwaken(CthCpvAccess(CthProc)->current);
+  CthSuspend();
+}
+
+void CthYieldPrio(int s, int pb, int *prio)
+{
+  CthAwakenPrio(CthCpvAccess(CthProc)->current, s, pb, prio);
   CthSuspend();
 }
 
@@ -469,7 +483,7 @@ typedef void *(qt_userf_t)(void *pu);
 struct CthThreadStruct
 {
   char cmicore[CmiMsgHeaderSizeBytes];
-  CthVoidFn  awakenfn;
+  CthAwkFn  awakenfn;
   CthThFn    choosefn;
   int        autoyield_enable;
   int        autoyield_blocks;
@@ -658,12 +672,29 @@ void CthAwaken(CthThread th)
   if(CpvAccess(traceOn))
     traceAwaken();
 #endif
-  th->awakenfn(th);
+  th->awakenfn(th, CQS_QUEUEING_FIFO, 0, 0);
 }
 
 void CthYield()
 {
   CthAwaken(CthCpvAccess(CthCurrent));
+  CthSuspend();
+}
+
+void CthAwakenPrio(CthThread th, int s, int pb, int *prio)
+{
+  if (th->awakenfn == 0) CthNoStrategy();
+  CpvAccess(curThread) = th;
+#ifndef CMK_OPTIMIZE
+  if(CpvAccess(traceOn))
+    traceAwaken();
+#endif
+  th->awakenfn(th, s, pb, prio);
+}
+
+void CthYieldPrio(int s, int pb, int *prio)
+{
+  CthAwakenPrio(CthCpvAccess(CthCurrent), s, pb, prio);
   CthSuspend();
 }
 
@@ -743,7 +774,7 @@ CthThread CthUnpackThread(void *buffer)
 struct CthThreadStruct
 {
   char cmicore[CmiMsgHeaderSizeBytes];
-  CthVoidFn  awakenfn;
+  CthAwkFn  awakenfn;
   CthThFn    choosefn;
   int        autoyield_enable;
   int        autoyield_blocks;
@@ -930,12 +961,29 @@ CthThread th;
   if(CpvAccess(traceOn))
     traceAwaken();
 #endif
-  th->awakenfn(th);
+  th->awakenfn(th, CQS_QUEUEING_FIFO, 0, 0);
 }
 
 void CthYield()
 {
   CthAwaken(CthCpvAccess(CthCurrent));
+  CthSuspend();
+}
+
+void CthAwakenPrio(CthThread th, int s, int pb, int *prio)
+{
+  if (th->awakenfn == 0) CthNoStrategy();
+  CpvAccess(curThread) = th;
+#ifndef CMK_OPTIMIZE
+  if(CpvAccess(traceOn))
+    traceAwaken();
+#endif
+  th->awakenfn(th, s, pb, prio);
+}
+
+void CthYieldPrio(int s, int pb, int *prio)
+{
+  CthAwakenPrio(CthCpvAccess(CthCurrent), s, pb, prio);
   CthSuspend();
 }
 
@@ -990,7 +1038,7 @@ static void CthNoStrategy(void)
 
 int CthImplemented() { return 1; } 
 
-void CthSetStrategy(CthThread t, CthVoidFn awkfn, CthThFn chsfn)
+void CthSetStrategy(CthThread t, CthAwkFn awkfn, CthThFn chsfn)
 {
   t->awakenfn = awkfn;
   t->choosefn = chsfn;
