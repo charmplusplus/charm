@@ -1617,38 +1617,11 @@ static void CmiStartThreads()
   
   if (!Cmi_netpoll) 
   {
-#if CMK_ASYNC_NOT_NEEDED
-    CmiSignal(SIGALRM, 0, 0, CommunicationInterrupt);
-#else
-    CmiSignal(SIGALRM, SIGIO, 0, CommunicationInterrupt);
+#if !CMK_ASYNC_NOT_NEEDED
+    CmiSignal(SIGIO, 0, 0, CommunicationInterrupt);
     if (dataskt!=-1) CmiEnableAsyncIO(dataskt);
     if (Cmi_charmrun_fd!=-1) CmiEnableAsyncIO(Cmi_charmrun_fd);
 #endif
-  }
-  else {
-#if !CMK_ASYNC_NOT_NEEDED
-    /* in netpoll mode, we still need to ping charmrun periodically */
-    CmiSignal(SIGALRM, 0, 0, alarmInterrupt);
-#else
-    useAlarm = 0;
-#endif
-  }
-  
-  /* if running on only one node, the only thing an interrupt
-  is used for is to check if charmrun has been killed. And this is
-  done only Cmi_check_delay seconds, so no need to have tickspeed
-  any faster than that. */
-
-  if(Cmi_numnodes==1) Cmi_tickspeed = (int)(Cmi_check_delay*1000000.0);
-
-  /*This will send us a SIGALRM every Cmi_tickspeed microseconds,
-    which will call the CommunicationInterrupt routine above.*/
-  if (useAlarm) {
-    i.it_interval.tv_sec = 0;
-    i.it_interval.tv_usec = Cmi_tickspeed;
-    i.it_value.tv_sec = 0;
-    i.it_value.tv_usec = Cmi_tickspeed;
-    setitimer(ITIMER_REAL, &i, NULL);
   }
 }
 
@@ -2447,6 +2420,12 @@ static void ConverseRunPE(int everReturn)
 #endif
 
   ConverseCommonInit(CmiMyArgv);
+
+#if CMK_SHARED_VARS_UNAVAILABLE
+  /*This occasional CommunicationsServer is for non-async-IO versions
+    and checking if Conv-host died.  This used to be SIGALRM.*/
+  CcdPeriodicCallKeep(CommunicationServer,NULL);
+#endif
 
   if (!everReturn) {
     Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
