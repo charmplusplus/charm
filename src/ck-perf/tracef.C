@@ -22,6 +22,7 @@ FDECL {
 #define ftraceend		 FTN_NAME(FTRACEEND, ftraceend)
 #define ftraceregisteruserevent  FTN_NAME(FTRACEREGISTERUSEREVENT, ftraceregisteruserevent)
 #define ftraceuserbracketevent   FTN_NAME(FTRACEUSERBRACKETEVENT, ftraceuserbracketevent)
+#define ftraceUserEvent   	 FTN_NAME(FTRACEUSEREVENT, ftraceuserevent)
 
 void ftracebegin()
 {
@@ -61,6 +62,11 @@ void ftraceregisteruserevent(char *x, int *ein, int *eout, int len)
 void ftraceuserbracketevent(int *e, double *begint, double *endt)
 {
   traceUserBracketEvent(*e, *begint, *endt);
+}
+
+void ftraceUserEvent(int *e)
+{
+  traceUserEvent(*e);
 }
 
 }  // FDECL

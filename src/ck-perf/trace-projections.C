@@ -606,6 +606,7 @@ void TraceProjections::traceClose(void)
 
 void TraceProjections::traceBegin(void)
 {
+  if (!computationStarted) return;
   _logPool->add(BEGIN_TRACE, 0, 0, TraceTimer(), curevent++, CkMyPe());
 }
 

@@ -5,14 +5,17 @@
         end subroutine
         subroutine ftraceEnd()
         end subroutine
-        subroutine ftraceregisteruserevent(str, ein, eout)
+        subroutine ftraceRegisterUserevent(str, ein, eout)
           character(*), intent(in) :: str
           integer, intent(in) :: ein
           integer, intent(out) :: eout
         end subroutine
-        subroutine ftraceuserbracketevent(ev, bt, et)
+        subroutine ftraceUserBracketEvent(ev, bt, et)
           integer, intent(in) :: ev 
           double precision, intent(in) :: bt, et
+        end subroutine
+        subroutine ftraceUserEvent(ev)
+          integer, intent(in) :: ev 
         end subroutine
       end interface
       end module
