@@ -12,6 +12,9 @@ Strategy::Strategy() {
     isArray = 0;
     nIndices = -1;
     elements = NULL;
+    nsrcpes = 0;
+    srcpelist = NULL;
+    myInstanceID = 0;
 };
 
 void Strategy::setSourceArray(CkArrayID aid, CkArrayIndexMax *e, int nind){
@@ -75,7 +78,7 @@ void Strategy::pup(PUP::er &p){
     if(nIndices > 0)
         p((char *)elements, nIndices * sizeof(CkArrayIndexMax));    
 
-    if(nsrcpes >0) 
+    if(nsrcpes > 0) 
         p(srcpelist, nsrcpes);
 }
 
