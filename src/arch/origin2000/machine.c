@@ -194,8 +194,6 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   }
   usrparam.mype = 0;
   threadInit(&usrparam);
-  for(i=1;i<requested_npe;i++)
-    wait(0);
 }
 
 /* static void neighbour_init(int); */
@@ -223,10 +221,16 @@ static void threadInit(void *arg)
   /*  neighbour_init(Cmi_mype); */
   usadd(arena);
   ConverseCommonInit(usrparam->argv);
-  if (usrparam->initret==0) {
+  if (usrparam->initret==0 || usrparam->mype) {
     usrparam->fn(CountArgs(usrparam->argv), usrparam->argv);
-    if (usrparam->usched==0) CsdScheduler(-1);
-    ConverseExit();
+    if (usrparam->usched==0 || usrparam->mype ) {
+      CsdScheduler(-1);
+      ConverseExit();
+      if(usrparam->mype==0) {
+        for(int i=1;i<usrparam->npe;i++)
+          wait(0);
+      }
+    }
   }
 }
 
