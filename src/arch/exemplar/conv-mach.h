@@ -16,6 +16,10 @@
 
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
+
+/* #define CMK_USE_GNU_MALLOC */
+/* #define CMK_USE_GNU_MALLOC_WITH_INTERRUPT_SUPPORT */
+#define CMK_USE_OS_MALLOC
  
 /* #define CMK_CTHINIT_IS_IN_MAIN */
 #define CMK_CTHINIT_IS_IN_CONVERSEINIT

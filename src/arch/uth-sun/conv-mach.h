@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.1  1995-09-30 14:58:49  jyelon
+ * Revision 1.2  1995-10-11 00:35:06  jyelon
+ * Added MALLOC options.
+ *
+ * Revision 1.1  1995/09/30  14:58:49  jyelon
  * Initial revision
  *
  * Revision 2.7  1995/09/29  09:50:07  jyelon
@@ -34,6 +37,10 @@
 
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
+
+/* #define CMK_USE_GNU_MALLOC */
+/* #define CMK_USE_GNU_MALLOC_WITH_INTERRUPT_SUPPORT */
+#define CMK_USE_OS_MALLOC
  
 /* #define CMK_CTHINIT_IS_IN_CONVERSEINIT */
 #define CMK_CTHINIT_IS_IN_MAIN
