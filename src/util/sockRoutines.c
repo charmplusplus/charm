@@ -160,7 +160,7 @@ int skt_select1(SOCKET fd,int msec)
     tmo.tv_sec=secLeft;
     tmo.tv_usec = (msec-1000*sec)*1000;
     skt_ignore_SIGPIPE=1;
-    nreadable = select(FD_SETSIZE, &rfds, NULL, NULL, &tmo);
+    nreadable = select(1+fd, &rfds, NULL, NULL, &tmo);
     skt_ignore_SIGPIPE=0;
     
     if (nreadable < 0) {
@@ -169,7 +169,7 @@ int skt_select1(SOCKET fd,int msec)
 	}
     if (nreadable >0) return 1; /*We gotta good socket*/
   }
-  while(msec>0 && (secLeft = sec - (time(0) - begin)));
+  while(msec>0 && ((secLeft = sec - (time(0) - begin))>0));
 
   return 0;/*Timed out*/
 }
