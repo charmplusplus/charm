@@ -25,6 +25,7 @@ const char *Prefix::ProxyElement="CProxyElement_";
 const char *Prefix::ProxySection="CProxySection_";
 const char *Prefix::Message="CMessage_";
 const char *Prefix::Index="CkIndex_";
+const char *Prefix::Python="CkPython_";
 
 
 //Fatal error function
@@ -458,6 +459,7 @@ static const char *forWhomStr(forWhom w)
   case forIndividual: return Prefix::ProxyElement;
   case forSection: return Prefix::ProxySection;
   case forIndex: return Prefix::Index;
+  case forPython: return "";
   default: return NULL;
   };
 }
@@ -607,7 +609,23 @@ Chare::genDecls(XStr& str)
   if(type->isTemplated())
     return;
   str << "/* DECLS: "; print(str); str << " */\n";
- //Forward declaration of the user-defined implementation class*/
+
+  // include python header and add two methods called execute and iterate.
+  // these cannot be added to the .ci file of the PythonCCS interface since
+  // different charm object require different definitions...
+  if (isPython()) {
+    str << "#include \"PythonCCS.h\"\n";
+    if (list) {
+      Entry *etemp = new Entry(0,0,new BuiltinType("void"),"execute",new ParamList(new Parameter(0,new PtrType(new NamedType("CkCcsRequestMsg",0)),"msg")),0,0,0,0);
+      list->appendMember(etemp);
+      etemp->setChare(this);
+      etemp = new Entry(0,0,new BuiltinType("void"),"iterate",new ParamList(new Parameter(0,new PtrType(new NamedType("CkCcsRequestMsg",0)),"msg")),0,0,0,0);
+      list->appendMember(etemp);
+      etemp->setChare(this);
+    }
+  }
+
+  //Forward declaration of the user-defined implementation class*/
   str << tspec()<<" class "<<type<<";\n";
   str << tspec()<<" class "<<Prefix::Index<<type<<";\n";
   str << tspec()<<" class "<<Prefix::Proxy<<type<<";\n";
@@ -615,7 +633,9 @@ Chare::genDecls(XStr& str)
     str << tspec()<<" class "<<Prefix::ProxyElement<<type<<";\n";
   if (hasSection)
     str << tspec()<<" class "<<Prefix::ProxySection<<type<<";\n";
-  
+  if (isPython())
+    str << tspec()<<" class "<<Prefix::Python<<type<<";\n";
+
  //Generate index class
   str << "/* --------------- index object ------------------ */\n";
   str << tspec()<< "class "<<Prefix::Index<<type;
@@ -645,6 +665,10 @@ Chare::genDecls(XStr& str)
     str << "/* ---------------- section proxy -------------- */\n";
     forElement=forSection; genSubDecls(str); forElement=forIndividual;
   }
+  if (isPython()) {
+    str << "/* ---------------- python wrapper -------------- */\n";
+    genPythonDecls(str);
+  }
   
   if(list) {
     //handle the case that some of the entries may be sdag Entries
@@ -667,18 +691,23 @@ Chare::genDecls(XStr& str)
   { //Generate a CBase typedef:
     TypeList *b=bases_CBase;
     if (b==NULL) b=bases; //Fall back to normal bases list if no CBase available
-    switch(b->length()) {
-    case 1: //Just one base class: typedef CBaseT<parent,CProxy_me> CBase_me;
-	    str << "typedef CBaseT<"<<b->getFirst()<<",CProxy_"<<type<<"> "
-		<<" CBase_"<<type<<";\n"; 
-	    break;
-    case 2: //Two base classes: typedef CBaseT2<parent1,parent2,CProxy_me> CBase_me;
-	    str << "typedef CBaseT2<"<<b->getFirst()<<","<<b->getSecond()<<","
-		<<"CProxy_"<<type<<"> "<<" CBase_"<<type<<";\n"; 
-	    break;
-    default: //No base class, or several: give up, don't generate a CBase_me.
-	    break;
-    };
+    if (isPython()) { //Generate a python base: typedef CBaseT<Python_me,CProxy_me> CBase_me;
+      str << "typedef CBaseT<"<<Prefix::Python<<type<<",CProxy_"<<type<<"> "
+	  <<" CBase_"<<type<<";\n";
+    } else { //Generate normal CBase_me definition
+      switch(b->length()) {
+      case 1: //Just one base class: typedef CBaseT<parent,CProxy_me> CBase_me;
+	str << "typedef CBaseT<"<<b->getFirst()<<",CProxy_"<<type<<"> "
+	    <<" CBase_"<<type<<";\n"; 
+	break;
+      case 2: //Two base classes: typedef CBaseT2<parent1,parent2,CProxy_me> CBase_me;
+	str << "typedef CBaseT2<"<<b->getFirst()<<","<<b->getSecond()<<","
+	    <<"CProxy_"<<type<<"> "<<" CBase_"<<type<<";\n"; 
+	break;
+      default: //No base class, or several: give up, don't generate a CBase_me.
+	break;
+      };
+    }
   }
 }
 
@@ -727,6 +756,64 @@ Chare::genSubDecls(XStr& str)
     list->genDecls(str);
   str << CIClassEnd;
   if (!isTemplated()) str << "PUPmarshall("<<ptype<<");\n";
+}
+
+void Chare::genPythonDecls(XStr& str) {
+
+  XStr ptype;
+  ptype<<Prefix::Python<<type;
+
+  // Class declaration
+  str << tspec()<< "class "<<ptype;
+  if(external || type->isTemplated()) {
+    str << ";";
+    return;
+  }
+  str << ":";
+  TypeList *b=bases_CBase;
+  if (b==NULL) b=bases; //Fall back to normal bases list if no CBase available
+  b->genProxyNames(str,"public ",NULL,"",", ",forPython);
+  str << ", public PythonObject ";
+  str << CIClassStart;
+
+  // default constructor methods
+  str << "    "<<ptype<<"(void) {}\n";
+  str << "    "<<ptype<<"(CkMigrateMessage *msg): ";
+  b->genProxyNames(str,"",NULL,"(msg)",", ",forPython);
+  str << " {}\n";
+
+  // define pupper
+  str << "    void pup(PUP::er &p) {\n";
+  b->genProxyNames(str,"      ",NULL,"::pup(p);","\n",forPython);
+  str << "\n    }\n";
+
+  // define the python custom methods
+  str << "    static PyMethodDef CkPy_MethodsCustom[];\n";
+  str << "    PyMethodDef *getMethods(void) {return CkPy_MethodsCustom;}\n";
+
+  str << CIClassEnd;
+
+  // declare all static python methods and CkPy_MethodsCustom
+  if (list)
+    list->genPythonDecls(str);
+  str << "\n";
+
+  if (!isTemplated()) str << "PUPmarshall("<<ptype<<");\n";
+}
+
+void Chare::genPythonDefs(XStr& str) {
+
+  XStr ptype;
+  ptype<<Prefix::Python<<type;
+
+  str << "PyMethodDef "<<ptype<<"::CkPy_MethodsCustom[] = {\n";
+  if (list)
+    list->genPythonStaticDefs(str);
+  str << "  {NULL, NULL}\n};\n\n";
+
+  if (list)
+    list->genPythonDefs(str);
+
 }
 
 Group::Group(int ln, attrib_t Nattr,
@@ -1094,6 +1181,20 @@ Chare::genDefs(XStr& str)
     }
     str << "#endif /*CK_TEMPLATES_ONLY*/\n";
   }
+  // define the python routines
+  if (isPython()) {
+    if(isTemplated())
+      str << "#ifdef CK_TEMPLATES_ONLY\n";
+    else
+      str << "#ifndef CK_TEMPLATES_ONLY\n";
+    str << "/* ---------------- python wrapper -------------- */\n";
+
+    // write CkPy_MethodsCustom
+    genPythonDefs(str);
+
+    str << "#endif /*CK_TEMPLATES_ONLY*/\n";
+  }
+
   if(!external && !type->isTemplated())
     genRegisterMethodDef(str);
   if (hasSdagEntry) {
@@ -1616,6 +1717,32 @@ void MemberList::lookforCEntry(CEntry *centry)
   if(next) {
     //str << endx;
     next->lookforCEntry(centry);
+  }
+}
+
+void MemberList::genPythonDecls(XStr& str) {
+  if(member)
+    member->genPythonDecls(str);
+  if(next) {
+    str << endx;
+    next->genPythonDecls(str);
+  }
+}
+
+void MemberList::genPythonDefs(XStr& str) {
+  if(member)
+    member->genPythonDefs(str);
+  if(next) {
+    str << endx;
+    next->genPythonDefs(str);
+  }
+}
+
+void MemberList::genPythonStaticDefs(XStr& str) {
+  if(member)
+    member->genPythonStaticDefs(str);
+  if(next) {
+    next->genPythonStaticDefs(str);
   }
 }
 
@@ -2237,6 +2364,52 @@ void Entry::genGroupStaticConstructorDefs(XStr& str)
     str << "{\n"<<marshallMsg();
     str << "  ckSetGroupID(CkCreate"<<node<<"Group("<<chareIdx()<<", "<<epIdx()<<", impl_msg));\n";
     str << "}\n";
+  }
+}
+
+/******************* Python Entry Point Code **************************/
+void Entry::genPythonDecls(XStr& str) {
+  str <<"/* STATIC DECLS: "; print(str); str << " */\n";
+  if (isPython()) {
+    // check the parameter passed to the function, it must be only an integer
+    if (!param || param->next || !param->param->getType()->isBuiltin() || !((BuiltinType*)param->param->getType())->isInt()) {
+      die("A python entry method must accept only one parameter of type `int`");
+    }
+
+    str << "static PyObject *_Python_"<<container->baseName()<<"_"<<name<<"(PyObject *self, PyObject *arg);\n";
+  }
+}
+
+void Entry::genPythonDefs(XStr& str) {
+  str <<"/* DEFS: "; print(str); str << " */\n";
+  if (isPython()) {
+
+    str << "PyObject *_Python_"<<container->baseName()<<"_"<<name<<"(PyObject *self, PyObject *arg) {\n";
+    str << "  int pyNumber = PyInt_AsLong(PyDict_GetItemString(PyModule_GetDict(PyImport_AddModule(\"__main__\")),\"charmNumber\"));\n";
+    str << "  CmiLock(CsvAccess(pyLock));\n";
+    str << "  "<<container->baseName()<<" *pyWorker = ("<<container->baseName()<<" *)(*CsvAccess(pyWorkers))[pyNumber];\n";
+    str << "  ((*CsvAccess(pyThread))[pyNumber]).arg=arg;\n";
+    str << "  ((*CsvAccess(pyThread))[pyNumber]).result=&CtvAccess(pythonReturnValue);\n";
+    str << "  ((*CsvAccess(pyThread))[pyNumber]).pythread=PyThreadState_Get();\n";
+    str << "  CmiUnlock(CsvAccess(pyLock));\n";
+
+    str << "  pyWorker->thisProxy."<<name<<"(pyNumber);\n";
+
+    str << "  PyEval_ReleaseLock();\n";
+    str << "  CthSuspend();\n";
+
+    str << "  if (CtvAccess(pythonReturnValue)) {\n";
+    str << "    return CtvAccess(pythonReturnValue);\n";
+    str << "  } else {\n";
+    str << "    Py_INCREF(Py_None); return Py_None;\n";
+    str << "  }\n";
+    str << "}\n";
+  }
+}
+
+void Entry::genPythonStaticDefs(XStr& str) {
+  if (isPython()) {
+    str << "  {\""<<name<<"\",_Python_"<<container->baseName()<<"_"<<name<<",METH_VARARGS},\n";
   }
 }
 

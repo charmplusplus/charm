@@ -2013,6 +2013,7 @@ struct rwtable rwtable[] = {
   "overlap", 	OVERLAP,
   "connect",    CONNECT,
   "publishes",  PUBLISHES,
+  "python",     PYTHON,
   "",		0
 };
 

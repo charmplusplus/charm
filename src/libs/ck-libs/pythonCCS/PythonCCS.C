@@ -1,16 +1,10 @@
 #include "PythonCCS.h"
 
-//CProxy_PythonGroup python;
-
-PythonMain::PythonMain (CkArgMsg *msg) {
-  //CProxy_PythonGroup python = CProxy_PythonGroup::ckNew();
-
-  //CcsRegisterHandler("pyCode", CkCallback(CkIndex_PythonGroup::execute(0),python));
-}
-
-CsvStaticDeclare(CmiNodeLock, pyLock);
-CsvStaticDeclare(PythonTable *, pyWorkers);
-CsvStaticDeclare(int, pyNumber);
+CsvDeclare(CmiNodeLock, pyLock);
+CsvDeclare(PythonTable *, pyWorkers);
+CsvDeclare(PythonThread *, pyThread);
+CsvDeclare(int, pyNumber);
+CtvDeclare(PyObject *, pythonReturnValue);
 
 // One-time per-processor setup routine
 // main interface for python to access common charm methods
@@ -32,16 +26,18 @@ static PyObject *CkPy_numpes(PyObject *self, PyObject *args) {
   return Py_BuildValue("i", CkNumPes());
 }
 
+/*
 static PyObject *CkPy_myindex(PyObject *self, PyObject *args) {
   if (!PyArg_ParseTuple(args, ":myindex")) return NULL;
   int pyNumber = PyInt_AsLong(PyDict_GetItemString(PyModule_GetDict(PyImport_AddModule("__main__")),"charmNumber"));
   CmiLock(CsvAccess(pyLock));
-  PythonArray1D *pyArray = dynamic_cast<PythonArray1D*>((*CsvAccess(pyWorkers))[pyNumber]);
+  ArrayElement1D *pyArray = dynamic_cast<ArrayElement1D>((*CsvAccess(pyWorkers))[pyNumber]);
   CmiUnlock(CsvAccess(pyLock));
   if (pyArray) return Py_BuildValue("i", pyArray->thisIndex);
   else { Py_INCREF(Py_None);return Py_None;}
   //return Py_BuildValue("i", (*CsvAccess(pyWorkers))[0]->thisIndex);
 }
+*/
 
 // method to read a variable and convert it to a python object
 static PyObject *CkPy_read(PyObject *self, PyObject *args) {
@@ -65,61 +61,104 @@ static PyObject *CkPy_write(PyObject *self, PyObject *args) {
   Py_INCREF(Py_None);return Py_None;
 }
 
-static PyMethodDef CkPy_MethodsDefault[] = {
+PyMethodDef PythonObject::CkPy_MethodsCustom[] = {
+  {NULL,      NULL}        /* Sentinel */
+};
+
+PyMethodDef CkPy_MethodsDefault[] = {
   {"printstr", CkPy_printstr , METH_VARARGS},
   {"mype", CkPy_mype, METH_VARARGS},
   {"numpes", CkPy_numpes, METH_VARARGS},
-  {"myindex", CkPy_myindex, METH_VARARGS},
   {"read", CkPy_read, METH_VARARGS},
   {"write", CkPy_write, METH_VARARGS},
   {NULL,      NULL}        /* Sentinel */
 };
 
 void PythonObject::execute (CkCcsRequestMsg *msg) {
-  char pyString[25];
 
   // update the reference number, used to access the current chare
   CmiLock(CsvAccess(pyLock));
   int pyReference = CsvAccess(pyNumber)++;
   CsvAccess(pyNumber) &= ~(1<<31);
   (*CsvAccess(pyWorkers))[pyReference] = this;
-  //printf("map number:%d\n",CsvAccess(pyWorkers)->size());
   CmiUnlock(CsvAccess(pyLock));
-  sprintf(pyString, "charmNumber=%d", pyReference);
 
   // create the new interpreter
   PyEval_AcquireLock();
   PyThreadState *pts = Py_NewInterpreter();
+
   Py_InitModule("ck", CkPy_MethodsDefault);
+  Py_InitModule("charm", getMethods());
 
   // insert into the dictionary a variable with the reference number
   PyObject *mod = PyImport_AddModule("__main__");
   PyObject *dict = PyModule_GetDict(mod);
-  PyRun_String(pyString,Py_file_input,dict,dict);
+
+  PyDict_SetItemString(dict,"charmNumber",PyInt_FromLong(pyReference));
+  PyRun_String("import ck",Py_file_input,dict,dict);
+  PyRun_String("import charm",Py_file_input,dict,dict);
 
   // run the program
-  PyRun_SimpleString((char *)msg->data);
+  //PythonArray1D *pyArray = dynamic_cast<PythonArray1D*>(this);
+  CthResume(CthCreate((CthVoidFn)_callthr_executeThread, new CkThrCallArg(msg,this), 0));
+  //CkIndex_PythonArray1D::_call_executeThread_CkCcsRequestMsg(msg,pyArray);
+  //getMyHandle()[pyArray->thisIndex].executeThread(msg);
+  //getMyHandle().executeThread(msg);
+  //PyRun_SimpleString((char *)msg->data);
 
   // distroy map element in pyWorkers and terminate interpreter
+  /*
   Py_EndInterpreter(pts);
   PyEval_ReleaseLock();
+
   CmiLock(CsvAccess(pyLock));
   CsvAccess(pyWorkers)->erase(pyReference);
+  CsvAccess(pyThread)->erase(pyReference);
   CmiUnlock(CsvAccess(pyLock));
   delete msg;
+  */
+}
+
+void PythonObject::_callthr_executeThread(CkThrCallArg *impl_arg) {
+  void *impl_msg = impl_arg->msg;
+  PythonObject *impl_obj = (PythonObject *) impl_arg->obj;
+  delete impl_arg;
+  impl_obj->executeThread((CkCcsRequestMsg*)impl_msg);
+}
+
+void PythonObject::executeThread(CkCcsRequestMsg *msg) {
+  // get the information about the running python thread and my reference number
+  PyThreadState *mine = PyThreadState_Get();
+  int pyReference = PyInt_AsLong(PyDict_GetItemString(PyModule_GetDict(PyImport_AddModule("__main__")),"charmNumber"));
+
+  // store the self thread for future suspention
+  CmiLock(CsvAccess(pyLock));
+  ((*CsvAccess(pyThread))[pyReference]).thread=CthSelf();
+  CmiUnlock(CsvAccess(pyLock));
+
+  PyRun_SimpleString((char *)msg->data);
+
+  Py_EndInterpreter(mine);
+  PyEval_ReleaseLock();
+
+  CmiLock(CsvAccess(pyLock));
+  CsvAccess(pyWorkers)->erase(pyReference);
+  CsvAccess(pyThread)->erase(pyReference);
+  CmiUnlock(CsvAccess(pyLock));
+  delete msg;
+  // since this function should always be executed in a different thread,
+  // when it is done, destroy the current thread
+  CthFree(CthSelf());
 }
 
 void PythonObject::iterate (CkCcsRequestMsg *msg) {
-  char pyString[25];
 
   // update the reference number, used to access the current chare
   CmiLock(CsvAccess(pyLock));
   int pyReference = CsvAccess(pyNumber)++;
   CsvAccess(pyNumber) &= ~(1<<31);
   (*CsvAccess(pyWorkers))[pyReference] = this;
-  //printf("map number:%d\n",CsvAccess(pyWorkers)->size());
   CmiUnlock(CsvAccess(pyLock));
-  sprintf(pyString, "charmNumber=%d", pyReference);
 
   // create the new interpreter
   PyEval_AcquireLock();
@@ -129,7 +168,8 @@ void PythonObject::iterate (CkCcsRequestMsg *msg) {
   // insert into the dictionary a variable with the reference number
   PyObject *mod = PyImport_AddModule("__main__");
   PyObject *dict = PyModule_GetDict(mod);
-  PyRun_String(pyString,Py_file_input,dict,dict);
+
+  PyDict_SetItemString(dict,"charmNumber",PyInt_FromLong(pyReference));
 
   // compile the program
   char *userCode = (char *)msg->data;
@@ -201,12 +241,14 @@ static void initializePythonDefault(void) {
   CsvAccess(pyNumber) = 0;
   CsvInitialize(PythonTable *,pyWorkers);
   CsvAccess(pyWorkers) = new PythonTable();
+  CsvInitialize(PythonThread *,pyThread);
+  CsvAccess(pyThread) = new PythonThread();
   CsvInitialize(CmiNodeLock, pyLock);
   CsvAccess(pyLock) = CmiCreateLock();
+  CtvInitialize(PyObject *,pythonReturnValue);
 
   Py_Initialize();
   PyEval_InitThreads();
-  PyObject *ck = Py_InitModule("ck", CkPy_MethodsDefault);
 
   PyEval_ReleaseLock();
 }
@@ -301,6 +343,44 @@ void PythonObject::pythonGetComplex(PyObject *arg, char *descr, double *real, do
   *real = PyComplex_RealAsDouble(tmp);
   *imag = PyComplex_ImagAsDouble(tmp);
   Py_DECREF(tmp);
+}
+
+PyObject *PythonObject::pythonGetArg(int handle) {
+  CmiLock(CsvAccess(pyLock));
+  PyObject *result = ((*CsvAccess(pyThread))[handle]).arg;
+  CmiUnlock(CsvAccess(pyLock));
+  return result;
+}
+
+void PythonObject::pythonPrepareReturn(int handle) {
+  pythonAwake(handle);
+}
+
+void PythonObject::pythonReturn(int handle) {
+  CmiLock(CsvAccess(pyLock));
+  CthThread handleThread = ((*CsvAccess(pyThread))[handle]).thread;
+  CmiUnlock(CsvAccess(pyLock));
+  CthAwaken(handleThread);
+}
+
+void PythonObject::pythonReturn(int handle, PyObject* data) {
+  CmiLock(CsvAccess(pyLock));
+  CthThread handleThread = ((*CsvAccess(pyThread))[handle]).thread;
+  *((*CsvAccess(pyThread))[handle]).result = data;
+  CmiUnlock(CsvAccess(pyLock));
+  CthAwaken(handleThread);
+}
+
+void PythonObject::pythonAwake(int handle) {
+  CmiLock(CsvAccess(pyLock));
+  PyThreadState *handleThread = ((*CsvAccess(pyThread))[handle]).pythread;
+  CmiUnlock(CsvAccess(pyLock));
+  PyEval_AcquireLock();
+  PyThreadState_Swap(handleThread);
+}
+
+void PythonObject::pythonSleep(int handle) {
+  PyEval_ReleaseLock();
 }
 
 #include "PythonCCS.def.h"

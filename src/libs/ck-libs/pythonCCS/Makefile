@@ -8,11 +8,11 @@ DEST=$(CDIR)/lib/libmodulePythonCCS.a
 
 all: $(DEST)
 
-$(DEST): $(OBJS) $(COMPAT) headers
+$(DEST): $(OBJS) $(COMPAT)
 	$(CHARMC) $(OBJS) $(COMPAT) -o $@
 
 headers: $(HEADERS)
-	cp $(HEADERS) $(CDIR)/include/
+	ln -s $(HEADERS) $(CDIR)/include/
 	touch headers
 
 PythonCCS.o: PythonCCS.C $(HEADDEP)

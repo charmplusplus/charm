@@ -1,6 +1,9 @@
 // README: in order for this library to work, there should be a link
 // from /usr/include/python to the current python include version
 
+#ifndef __CKPYTHON_H
+#define __CKPYTHON_H
+
 #include "ckcallback-ccs.h"
 #include "python/Python.h"
 #include "python/compile.h"
@@ -10,15 +13,29 @@
 #include "string"
 #include "map"
 
-class PythonMain : public Chare {
- public:
-  PythonMain(CkArgMsg *msg);
-};
+#define PYTHON_ENABLE_HIGH  private: \
+  static PyMethodDef CkPy_MethodsCustom[]; \
+ public: \
+  PyMethodDef *getMethods() {return CkPy_MethodsCustom;}
+
+typedef struct {
+  PyObject *arg;
+  PyObject **result;
+  CthThread thread;
+  PyThreadState *pythread;
+} PythonHigh;
+typedef std::map<int,PythonHigh> PythonThread;
+
+extern PyMethodDef CkPy_MethodsDefault[];
 
 class PythonObject {
+  static PyMethodDef CkPy_MethodsCustom[];
  public:
   void execute(CkCcsRequestMsg *msg);
   void iterate(CkCcsRequestMsg *msg);
+  static void _callthr_executeThread(CkThrCallArg *impl_arg);
+  void executeThread(CkCcsRequestMsg *msg);
+  virtual PyMethodDef *getMethods() {return CkPy_MethodsCustom;}
 
   // utility functions to manipulate python objects
   // in order to use Dictionaries, Lists, Tuples, refer to
@@ -40,6 +57,14 @@ class PythonObject {
   void pythonGetFloat(PyObject*, char*, double*);
   void pythonGetComplex(PyObject*, char*, double*, double*);
 
+  // utility functions to deal with threads
+  PyObject *pythonGetArg(int);
+  void pythonPrepareReturn(int);
+  void pythonReturn(int);
+  void pythonReturn(int, PyObject*);
+  void pythonAwake(int);
+  void pythonSleep(int);
+
   // the following methods should be overwritten by the user if used
 
   // methods for accessing charm varibles from inside python
@@ -54,43 +79,14 @@ class PythonObject {
   virtual int buildIterator(PyObject*, void*) {CkAbort("PythonCCS: Method buildIterator should be reimplemented");};
   virtual int nextIteratorUpdate(PyObject*, PyObject*, void*) {CkAbort("PythonCCS: Method nextIteratorUpdate should be reimplemented");};
 
-  //virtual void registerPython();
 };
 
 typedef std::map<int,PythonObject*>  PythonTable;
 
-class PythonChare : public Chare, public PythonObject {
- public:
-  PythonChare() {}
-  PythonChare(CkMigrateMessage *msg) {}
-};
+CsvExtern(CmiNodeLock, pyLock);
+CsvExtern(PythonTable *, pyWorkers);
+CsvExtern(PythonThread *, pyThread);
+CsvExtern(int, pyNumber);
+CtvExtern(PyObject *, pythonReturnValue);
 
-class PythonGroup : public Group, public PythonObject {
- public:
-  PythonGroup() {}
-  PythonGroup(CkMigrateMessage *msg) {}
-};
-
-class PythonNodeGroup : public NodeGroup, public PythonObject {
- public:
-  PythonNodeGroup() {}
-  PythonNodeGroup(CkMigrateMessage *msg) {}
-};
-
-class PythonArray1D : public CBase_PythonArray1D, public PythonObject {
- public:
-  PythonArray1D() {}
-  PythonArray1D(CkMigrateMessage *msg) {}
-};
-
-class PythonArray2D : public CBase_PythonArray2D, public PythonObject {
- public:
-  PythonArray2D() {}
-  PythonArray2D(CkMigrateMessage *msg) {}
-};
-
-class PythonArray3D : public CBase_PythonArray3D, public PythonObject {
- public:
-  PythonArray3D() {}
-  PythonArray3D(CkMigrateMessage *msg) {}
-};
+#endif //__CKPYTHON_H

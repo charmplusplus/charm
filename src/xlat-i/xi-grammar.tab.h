@@ -74,19 +74,20 @@
      ELSE = 300,
      CONNECT = 301,
      PUBLISHES = 302,
-     IDENT = 303,
-     NUMBER = 304,
-     LITERAL = 305,
-     CPROGRAM = 306,
-     HASHIF = 307,
-     HASHIFDEF = 308,
-     INT = 309,
-     LONG = 310,
-     SHORT = 311,
-     CHAR = 312,
-     FLOAT = 313,
-     DOUBLE = 314,
-     UNSIGNED = 315
+     PYTHON = 303,
+     IDENT = 304,
+     NUMBER = 305,
+     LITERAL = 306,
+     CPROGRAM = 307,
+     HASHIF = 308,
+     HASHIFDEF = 309,
+     INT = 310,
+     LONG = 311,
+     SHORT = 312,
+     CHAR = 313,
+     FLOAT = 314,
+     DOUBLE = 315,
+     UNSIGNED = 316
    };
 #endif
 #define MODULE 258
@@ -134,19 +135,20 @@
 #define ELSE 300
 #define CONNECT 301
 #define PUBLISHES 302
-#define IDENT 303
-#define NUMBER 304
-#define LITERAL 305
-#define CPROGRAM 306
-#define HASHIF 307
-#define HASHIFDEF 308
-#define INT 309
-#define LONG 310
-#define SHORT 311
-#define CHAR 312
-#define FLOAT 313
-#define DOUBLE 314
-#define UNSIGNED 315
+#define PYTHON 303
+#define IDENT 304
+#define NUMBER 305
+#define LITERAL 306
+#define CPROGRAM 307
+#define HASHIF 308
+#define HASHIFDEF 309
+#define INT 310
+#define LONG 311
+#define SHORT 312
+#define CHAR 313
+#define FLOAT 314
+#define DOUBLE 315
+#define UNSIGNED 316
 
 
 
@@ -189,7 +191,7 @@ typedef union YYSTYPE {
   SdagConstruct *sc;
 } YYSTYPE;
 /* Line 1249 of yacc.c.  */
-#line 192 "y.tab.h"
+#line 194 "y.tab.h"
 # define yystype YYSTYPE /* obsolescent; will be withdrawn */
 # define YYSTYPE_IS_DECLARED 1
 # define YYSTYPE_IS_TRIVIAL 1

@@ -29,10 +29,11 @@ public:
   static const char *ProxySection;
   static const char *Message;
   static const char *Index;
+  static const char *Python;
 };
 
 typedef enum {
-	forAll=0,forIndividual=1,forSection=2,forIndex=-1
+  forAll=0,forIndividual=1,forSection=2,forPython=3,forIndex=-1
 } forWhom;
 
 class Chare;//Forward declaration
@@ -136,6 +137,7 @@ class BuiltinType : public Type {
     int isBuiltin(void) const {return 1;}
     void print(XStr& str) { str << name; }
     int isVoid(void) const { return !strcmp(name, "void"); }
+    int isInt(void) const { return !strcmp(name, "int"); }
     char *getBaseName(void) const { return name; }
 };
 
@@ -484,7 +486,10 @@ class Member : public Construct {
     virtual int isSdag(void) { return 0; }
     virtual void collectSdagCode(CParsedFile *pf, int& sdagPresent) { return; }
     XStr makeDecl(const XStr &returnType,int forProxy=0);
+    virtual void genPythonDecls(XStr& str) {}
     virtual void genIndexDecls(XStr& str)=0;
+    virtual void genPythonDefs(XStr& str) {}
+    virtual void genPythonStaticDefs(XStr& str) {}
     virtual void lookforCEntry(CEntry *centry)  {}
 };
 
@@ -515,8 +520,11 @@ class MemberList : public Printable {
     void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent);
     void genDecls(XStr& str);
     void genIndexDecls(XStr& str);
+    void genPythonDecls(XStr& str);
     void genDefs(XStr& str);
     void genReg(XStr& str);
+    void genPythonDefs(XStr& str);
+    void genPythonStaticDefs(XStr& str);
     void collectSdagCode(CParsedFile *pf, int& sdagPresent);
     virtual void lookforCEntry(CEntry *centry);
 };
@@ -526,6 +534,7 @@ class Chare : public TEntity {
   public:
     enum { //Set these attribute bits in "attrib"
     	CMIGRATABLE=1<<2,
+	CPYTHON=1<<3,
     	CMAINCHARE=1<<10,
     	CARRAY=1<<11,
     	CGROUP=1<<12,
@@ -567,6 +576,7 @@ class Chare : public TEntity {
     }
     int  isTemplated(void) { return (templat!=0); }
     int  isMigratable(void) { return attrib&CMIGRATABLE; }
+    int  isPython(void) { return attrib&CPYTHON; }
     int  isMainChare(void) {return attrib&CMAINCHARE;}
     int  isArray(void) {return attrib&CARRAY;}
     int  isGroup(void) {return attrib&CGROUP;}
@@ -583,6 +593,8 @@ class Chare : public TEntity {
     void genDecls(XStr &str);
     int nextEntry(void) {return entryCount++;}
     virtual void genSubDecls(XStr& str);
+    void genPythonDecls(XStr& str);
+    void genPythonDefs(XStr& str);
     virtual char *chareTypeName(void) {return (char *)"chare";}
     virtual char *proxyPrefix(void);
     virtual void genSubRegisterMethodDef(XStr& str);
@@ -694,6 +706,7 @@ class Message : public TEntity {
 #define SNOKEEP       0x200
 #define SNOTRACE      0x400
 #define SSKIPSCHED    0x800 //<- is a message skipping charm scheduler
+#define SPYTHON       0x1000
 
 /* An entry construct */
 class Entry : public Member {
@@ -731,6 +744,10 @@ class Entry : public Member {
     void genGroupStaticConstructorDefs(XStr& str);
     void genGroupDefs(XStr& str);
     
+    void genPythonDecls(XStr& str);
+    void genPythonDefs(XStr& str);
+    void genPythonStaticDefs(XStr& str);
+    
     XStr paramType(int withDefaultVals,int withEO=0);
     XStr paramComma(int withDefaultVals,int withEO=0);
     XStr eo(int withDefaultVals,int priorComma=1);
@@ -764,6 +781,7 @@ class Entry : public Member {
     int isCreate(void) { return (attribs & SCREATEHERE)||(attribs & SCREATEHOME); }
     int isCreateHome(void) { return (attribs & SCREATEHOME); }
     int isCreateHere(void) { return (attribs & SCREATEHERE); }
+    int isPython(void) { return (attribs & SPYTHON); }
     int isSdag(void) { return (sdagCon!=0); }
     void print(XStr& str);
     void genIndexDecls(XStr& str);

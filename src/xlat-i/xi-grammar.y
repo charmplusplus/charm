@@ -1,4 +1,4 @@
-%expect 4 
+%expect 5 
 %{
 #include "xi-symbol.h"
 #include "EToken.h"
@@ -82,6 +82,7 @@ extern int macroDefined(char *str, int istrue);
 %token ELSE
 %token CONNECT
 %token PUBLISHES 
+%token PYTHON
 %token <strval> IDENT NUMBER LITERAL CPROGRAM HASHIF HASHIFDEF
 %token <intval> INT LONG SHORT CHAR FLOAT DOUBLE UNSIGNED
 
@@ -95,6 +96,7 @@ extern int macroDefined(char *str, int istrue);
 %type <intval>		OptExtern OptSemiColon MAttribs MAttribList MAttrib
 %type <intval>		EAttribs EAttribList EAttrib OptVoid
 %type <cattr>		CAttribs CAttribList CAttrib
+%type <cattr>		ArrayAttribs ArrayAttribList ArrayAttrib
 %type <tparam>		TParam
 %type <tparlist>	TParamList TParamEList OptTParams
 %type <type>		BaseType Type SimpleType OptTypeInit EReturn
@@ -376,8 +378,26 @@ CAttribList	: CAttrib
 		{ $$ = $1 | $3; }
 		;
 
+ArrayAttrib	: PYTHON
+		{ $$ = Chare::CPYTHON; }
+		;
+
+ArrayAttribs	: /* Empty */
+		{ $$ = 0; }
+		| '[' ArrayAttribList ']'
+		{ $$ = $2; }
+		;
+
+ArrayAttribList	: ArrayAttrib
+		{ $$ = $1; }
+		| ArrayAttrib ',' ArrayAttribList
+		{ $$ = $1 | $3; }
+		;
+
 CAttrib		: MIGRATABLE
 		{ $$ = Chare::CMIGRATABLE; }
+		| PYTHON
+		{ $$ = Chare::CPYTHON; }
 		;
 
 Var		: Type Name '[' ']' ';'
@@ -432,8 +452,10 @@ ArrayIndexType	: '[' NUMBER Name ']'
 		{ $$ = new NamedType($2); }
 		;
 
-Array		: ARRAY ArrayIndexType NamedType OptBaseList MemberEList
-		{  $$ = new Array(lineno, 0, $2, $3, $4, $5); }
+Array		: ARRAY ArrayAttribs ArrayIndexType NamedType OptBaseList MemberEList
+		{  $$ = new Array(lineno, $2, $3, $4, $5, $6); }
+		| ARRAY ArrayIndexType ArrayAttribs NamedType OptBaseList MemberEList
+		{  $$ = new Array(lineno, $3, $2, $4, $5, $6); }
 		;
 
 TChare		: CHARE CAttribs Name OptBaseList MemberEList
@@ -640,6 +662,8 @@ EAttrib		: THREADED
                 { $$ = SIMMEDIATE; }
 		| SKIPSCHED
                 { $$ = SSKIPSCHED; }
+		| PYTHON
+                { $$ = SPYTHON; }
 		;
 
 DefaultParameter: LITERAL

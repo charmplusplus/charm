@@ -1,7 +1,7 @@
 module PythonCCS {
 
 	//readonly CProxy_PythonGroup python;
-
+/*
 	mainchare PythonMain {
 		entry PythonMain(CkArgMsg *msg);
 	}
@@ -41,6 +41,6 @@ module PythonCCS {
 		entry void execute (CkCcsRequestMsg *msg);
 		entry void iterate (CkCcsRequestMsg *msg);
 	}
-
+*/
 	initnode void initializePythonDefault(void);
 }
