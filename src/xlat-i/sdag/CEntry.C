@@ -18,7 +18,6 @@ void CEntry::generateDeps(XStr& op)
 
 void CEntry::generateCode(XStr& op)
 {
-  SdagConstruct *cn;
   CStateVar *sv;
   int i;
   int isVoid = 1;
@@ -56,8 +55,10 @@ void CEntry::generateCode(XStr& op)
   op <<  ") {\n";
   op << "    CWhenTrigger *tr;\n";
   op<<  "    void* _bgParentLog = NULL;\n";
+#if CMK_BLUEGENE_CHARM
   op<<  "    CkElapse(0.01e-6);\n";
-  cn->generateTlineEndCall(op);
+  SdagConstruct::generateTlineEndCall(op);
+#endif
 
   op << "    CMsgBuffer* cmsgbuf;\n";
 
@@ -168,12 +169,15 @@ void CEntry::generateCode(XStr& op)
   op << "    if (tr == 0)\n";
   op << "      return;\n"; 
 
-  cn->generateTraceEndCall(op);
-  cn->generateEndExec(op);
+  SdagConstruct::generateTraceEndCall(op);
+#if CMK_BLUEGENE_CHARM
+  SdagConstruct::generateEndExec(op);
+#endif
 
   XStr *whenParams; 
   int iArgs = 0;
   if(whenList.length() == 1) {
+    SdagConstruct *cn;
     cn = whenList.begin();
     whenParams = new XStr("");
     sv = (CStateVar *)cn->stateVars->begin();
@@ -184,11 +188,10 @@ void CEntry::generateCode(XStr& op)
     paramMarshalling = 0;
     lastWasVoid = 0;
 
-    //Guna begin
-   
+#if CMK_BLUEGENE_CHARM
     op <<"    cmsgbuf->bgLog2 = (void*)tr->args[1];\n";
     //op << "    " << cn->label->charstar() << "(";    
-    //Guna end
+#endif
 
     for( i=0; i<(cn->stateVars->length());i++, sv=(CStateVar *)cn->stateVars->next()) {
       if ((sv->isMsg == 0) && (paramMarshalling == 0) && (sv->isVoid ==0)){
@@ -201,12 +204,14 @@ void CEntry::generateCode(XStr& op)
       if (sv->isMsg == 1) {
 	  if((i!=0) && (lastWasVoid == 0))
 	     whenParams->append(", ");
+#if CMK_BLUEGENE_CHARM
 	  if(i==1){   
-	   whenParams->append("NULL");
-	   lastWasVoid=0;
-	   iArgs++;
-	   continue;
+	    whenParams->append("NULL");
+	    lastWasVoid=0;
+	    iArgs++;
+	    continue;
 	  }
+#endif
 	  whenParams->append("(");
 	  whenParams->append(sv->type->charstar());
 	  whenParams->append(" *) tr->args[");
@@ -243,13 +248,16 @@ void CEntry::generateCode(XStr& op)
     op << ");\n";
   
     op << "    delete tr;\n";
+#if CMK_BLUEGENE_CHARM
     cn->generateBeginExec(op, "dummy");
+#endif
     cn->generateDummyBeginExecute(op);
     op << "    return;\n";
   }
   else {   
     op << "    switch(tr->whenID) {\n";
-    for(cn=whenList.begin(); !whenList.end(); cn=whenList.next()) {
+    for(SdagConstruct *cn=whenList.begin(); !whenList.end(); cn=whenList.next())
+    {
       whenParams = new XStr("");
       i = 0; iArgs = 0;
       op << "      case " << cn->nodeNum << ":\n";
@@ -272,11 +280,13 @@ void CEntry::generateCode(XStr& op)
          if (sv->isMsg == 1) {
 	    if((i!=0) && (lastWasVoid == 0))
 	      whenParams->append(", ");
-	    if(i==1){
+#if CMK_BLUEGENE_CHARM
+	    if(i==1) {
 	       whenParams->append(" NULL ");
 	       lastWasVoid=0;
 	       continue;
 	    }
+#endif
 	    whenParams->append("(");
 	    whenParams->append(sv->type->charstar());
 	    whenParams->append(" *) tr->args[");
@@ -314,7 +324,9 @@ void CEntry::generateCode(XStr& op)
       op << ");\n";
       op << "        delete tr;\n";
 
+#if CMK_BLUEGENE_CHARM
       cn->generateBeginExec(op, "dummy");
+#endif
       cn->generateDummyBeginExecute(op);
 
       op << "        return;\n";

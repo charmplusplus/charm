@@ -942,12 +942,12 @@ public:
   void generateRegisterEp(XStr& output);          
   void generateTraceEpDecl(XStr& output);         
   void generateTraceEpDef(XStr& output);          
-  void generateTraceEndCall(XStr& op);            
-  void generateTlineEndCall(XStr& op);
-  void generateBeginExec(XStr& op, char *name);
-  void generateEndExec(XStr& op);
-  void generateEndSeq(XStr& op);
-  void generateDummyBeginExecute(XStr& op);
+  static void generateTraceEndCall(XStr& op);            
+  static void generateTlineEndCall(XStr& op);
+  static void generateBeginExec(XStr& op, char *name);
+  static void generateEndExec(XStr& op);
+  static void generateEndSeq(XStr& op);
+  static void generateDummyBeginExecute(XStr& op);
 
 };
 
