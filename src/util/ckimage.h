@@ -65,53 +65,84 @@ PUPmarshall(CkRect);
 
 /**
 This class describes an image, represented as a flat byte array.
-Pixels are stored first by color (r,g,b), then by row in the usual
+Pixels are stored first by color (e.g., r,g,b), then by row in the usual
 raster order.  
 */
 class CkImage {
 public:
-	//This is actually the data type of a color channel, not a pixel
-	typedef unsigned char pixel_t;
-private:
-	int row,colors; //pixel_ts per line, pixel_ts per pixel
-	int wid,ht; //Image size: cols and rows
-	pixel_t *data; //Image pixel data
+	//This is the data type of a color channel, such as the red channel.
+	typedef unsigned char channel_t;
+	/// This is the maximum value of a color channel
+	enum {channel_max=255};
 	
-	CkImage(const CkImage &im) ; //DO NOT USE
+	/// This describes the various data layouts used by image pixels:
+	typedef enum {
+		/**
+		  The default layout: ARGB.
+		    With one color, pure luminance.
+		    With 3 colors, [0]=R, [1]=G, [2]=B.
+		    With 4 colors, [0]=A, [1]=R, [2]=G, [3]=B.
+		*/
+		layout_default=0,
+		/**
+		  The "reversed" layout: BGRA.
+		    With one color, pure luminance.
+		    With 3 colors, [0]=B, [1]=G, [2]=R.
+		    With 4 colors, [0]=B, [1]=G, [2]=R, [3]=A.
+		*/
+		layout_reversed=1
+	} layout_t;
+private:
+	int row,colors; ///< channel_ts per line, channel_ts per pixel
+	int layout; ///< Image pixel format.
+	int wid,ht; ///< Image size: cols and rows
+	channel_t *data; ///< Image pixel data
+	
+	CkImage(const CkImage &im) ; ///< DO NOT USE
 	void operator=(const CkImage &im);
 public:
-	CkImage() {row=colors=wid=ht=-1; data=NULL;}
-	CkImage(int w_,int h_,int colors_,pixel_t *data_)
-		:row(w_*colors_), colors(colors_), wid(w_), ht(h_), data(data_) {}
+	CkImage() {row=colors=wid=ht=-1; setLayout(layout_default); data=NULL;}
+	CkImage(int w_,int h_,int colors_,channel_t *data_)
+		:row(w_*colors_), colors(colors_),
+		wid(w_), ht(h_), data(data_) { setLayout(layout_default); }
 	
-	pixel_t *getData(void) {return data;}
-	void setData(pixel_t *d) {data=d;}
+	/// Get/set the whole image's data
+	channel_t *getData(void) {return data;}
+	void setData(channel_t *d) {data=d;}
 	
 	CkRect getRect(void) const {return CkRect(0,0,wid,ht);}
+	/// Return the number of channel_t's per row of the image
 	int getRow(void) const {return row;}
+	/// Return the number of colors (channel_t's) per pixel
 	int getColors(void) const {return colors;}
 	
+	/// Get/set the pixel format.
+	layout_t getLayout(void) const {return (layout_t)layout;}
+	void setLayout(layout_t a) {layout=(layout_t)a;}
+	
+	/// Return the number of pixels per row of the image
 	int getWidth(void) const {return wid;}
+	/// Return the number of pixels per column of the image
 	int getHeight(void) const {return ht;}
 	
 	//Copy the pixel at src onto the one at dest
-	inline void copyPixel(const pixel_t *src,pixel_t *dest) {
+	inline void copyPixel(const channel_t *src,channel_t *dest) {
 		for (int i=0;i<colors;i++)
 			dest[i]=src[i];
 	}
 	//Set this pixel to this value
-	inline void setPixel(const pixel_t src,pixel_t *dest) {
+	inline void setPixel(const channel_t src,channel_t *dest) {
 		for (int i=0;i<colors;i++)
 			dest[i]=src;
 	}
 	//Add the pixel at src to the one at dest, ignoring overflow
-	inline void addPixel(const pixel_t *src,pixel_t *dest) {
+	inline void addPixel(const channel_t *src,channel_t *dest) {
 		for (int i=0;i<colors;i++)
 			dest[i]+=src[i];
 	}
 	//Add the pixel at src to the one at dest, clipping instead of overflowing
-	inline void addPixelClip(const pixel_t *src,pixel_t *dest,
-		const pixel_t *clip) 
+	inline void addPixelClip(const channel_t *src,channel_t *dest,
+		const channel_t *clip) 
 	{
 		for (int i=0;i<colors;i++)
 			dest[i]=clip[(int)dest[i]+(int)src[i]];
@@ -119,8 +150,8 @@ public:
 	
 	
 	//Get a pixel
-	inline pixel_t *getPixel(int x,int y) {return data+x*colors+y*row;}
-	inline const pixel_t *getPixel(int x,int y) const {return data+x*colors+y*row;}
+	inline channel_t *getPixel(int x,int y) {return data+x*colors+y*row;}
+	inline const channel_t *getPixel(int x,int y) const {return data+x*colors+y*row;}
 	
 	
 	/*
@@ -149,14 +180,14 @@ public:
 	 Add all of src onto this image starting at (x,y), clipping
          values instead of overflowing.
 	 */
-	void addClip(int sx,int sy,const CkImage &src,const pixel_t *clip);
+	void addClip(int sx,int sy,const CkImage &src,const channel_t *clip);
 	
 	//Allocate clipping array for above routine
-	static pixel_t *newClip(void);
+	static channel_t *newClip(void);
 	
 	//Pup only the image *size*, not the image *data*.
 	void pup(PUP::er &p) {
-		p|wid; p|ht; p|colors; p|row;
+		p|wid; p|ht; p|colors; p|layout; p|row;
 	}
 };
 PUPmarshall(CkImage);
@@ -164,11 +195,11 @@ PUPmarshall(CkImage);
 
 //A heap-allocated image
 class CkAllocImage : public CkImage {
-	pixel_t *allocData;
+	channel_t *allocData;
 public:
 	CkAllocImage() {allocData=NULL;}
 	CkAllocImage(int w,int h,int c)
-		:CkImage(w,h,c,new pixel_t[w*h*c]) 
+		:CkImage(w,h,c,new channel_t[w*h*c]) 
 	{
 		allocData=getData();
 	}
@@ -177,7 +208,7 @@ public:
 	// Allocate the image with its current size.
 	void allocate(void) {
 		int len=getRect().area()*getColors();
-		allocData=new pixel_t[len];
+		allocData=new channel_t[len];
 		setData(allocData);
 	}
 	

@@ -38,7 +38,7 @@ void CkImage::clear(void) {
 	 Add all of src onto this image starting at (x,y), clipping
          values instead of overflowing.
 	 */
-	void CkImage::addClip(int sx,int sy,const CkImage &src,const pixel_t *clip) {
+	void CkImage::addClip(int sx,int sy,const CkImage &src,const channel_t *clip) {
 		for (int y=0;y<src.ht;y++)
 		for (int x=0;x<src.wid;x++)
 			addPixelClip(src.getPixel(x,y),getPixel(x+sx,y+sy),clip);
@@ -50,13 +50,12 @@ void CkImage::clear(void) {
 	when summing bytes (like image values) together.  On a machine with
 	a small cache, it may be better to use an "if" instead of this table.
 	*/
-	CkImage::pixel_t *CkImage::newClip(void){
-		const int pixelMax=255;
-		const int tableLen=2*pixelMax+1; //subtle: 2*pixelMax is last valid index
-		pixel_t *ret=new pixel_t[tableLen];
+	CkImage::channel_t *CkImage::newClip(void){
+		const int tableLen=2*channel_max+1; //subtle: 2*channel_max is last valid index
+		channel_t *ret=new channel_t[tableLen];
 		int i;
-		for (i=0;i<pixelMax;i++) ret[i]=(pixel_t)i;
-		for (i=pixelMax;i<tableLen;i++) ret[i]=(pixel_t)pixelMax;
+		for (i=0;i<channel_max;i++) ret[i]=(channel_t)i;
+		for (i=channel_max;i<tableLen;i++) ret[i]=(channel_t)channel_max;
 		return ret;
 	}
 
