@@ -589,10 +589,10 @@ void arg_init(int argc, char **argv)
   pparam_flag(&arg_server,       0, "server",        "Enable client-server (CCS) mode");
   pparam_int(&arg_server_port,   0, "server-port",   "Port to listen for CCS requests");
 #endif
+  pparam_flag(&arg_local,	0, "local", "Start node programs locally without daemon");
 #if CMK_USE_RSH
   pparam_flag(&arg_debug,         0, "debug",         "Run each node under gdb in an xterm window");
   pparam_flag(&arg_debug_no_pause,0, "debug-no-pause","Like debug, except doesn't pause at beginning");
-  pparam_flag(&arg_local,	0, "local", "Start node programs locally without daemon");
   pparam_int(&arg_maxrsh,        16, "maxrsh",        "Maximum number of rsh's to run at a time");
   pparam_str(&arg_shell,          0, "remote-shell",  "which remote shell to use");
   pparam_str(&arg_debugger,       0, "debugger",      "which debugger to use");
@@ -1389,11 +1389,12 @@ void req_start_server(void)
  *
  ****************************************************************************/
 void start_nodes_daemon(void);
-void start_nodes_rsh(char **envp);
+void start_nodes_rsh(void);
 #if CMK_SCYLD
 void nodetab_init_for_scyld(void);
 void start_nodes_scyld(void);
 #endif
+void start_nodes_local(char **envp);
 
 static void fast_idleFn(void) {sleep(0);}
 
@@ -1429,7 +1430,10 @@ int main(int argc, char **argv, char **envp)
 #if CMK_SCYLD
     start_nodes_scyld();
 #else
-    start_nodes_rsh(envp);
+    if (!arg_local)
+      start_nodes_rsh();
+    else
+      start_nodes_local(envp);
 #endif
 
   if(arg_verbose) fprintf(stderr, "Charmrun> node programs all started\n");
@@ -1518,7 +1522,94 @@ void start_nodes_daemon(void)
 /*Sadly, interprocess communication on Win32 is quite
   different, so we can't use Rsh on win32 yet.  
   Fall back to the daemon.*/
-void start_nodes_rsh(char **envp) {start_nodes_daemon();}
+void start_nodes_rsh() {start_nodes_daemon();}
+
+void envCat(char *dest,LPTSTR oldEnv)
+{
+  char *src=oldEnv;
+  dest+=strlen(dest);//Advance to end of dest
+  dest++;//Advance past terminating NULL character
+  while ((*src)!='\0') {
+    int adv=strlen(src)+1;//Length of newly-copied string plus NULL
+    strcpy(dest,src);//Copy another environment string
+    dest+=adv;//Advance past newly-copied string and NULL
+    src+=adv;//Ditto for src
+  }
+  *dest='\0';//Paste on final terminating NULL character
+  FreeEnvironmentStrings(oldEnv);
+}
+
+
+/* simple version of charmrun that avoids the rshd or charmd,   */
+/* it spawn the node program just on local machine using exec. */
+void start_nodes_local(char ** env)
+{
+  int ret, i;
+  PROCESS_INFORMATION pi;     /* process Information for the process spawned */
+  char **p;
+
+  char environment[10000];/*Doubly-null terminated environment strings*/
+  char cmdLine[10000];/*Program command line, including executable name*/
+/*Command line too long.*/
+/*
+  if (strlen(pparam_argv[1])+strlen(args) > 10000) 
+	return 0; 
+*/
+  strcpy(cmdLine,pparam_argv[1]);
+  p = pparam_argv+2;
+  while ((*p)!='\0') {
+    strcat(cmdLine," ");
+    strcat(cmdLine,*p);
+    p++;
+  }
+
+  for (i=0; i<arg_requested_pes; i++)
+  {
+    STARTUPINFO si={0};         /* startup info for the process spawned */
+
+    sprintf(environment, "NETSTART=%s",  create_netstart(i));
+    /*Paste all system environment strings */
+    envCat(environment,GetEnvironmentStrings());
+  
+    /* Initialise the security attributes for the process 
+     to be spawned */
+    si.cb = sizeof(si);   
+    if (arg_verbose)
+      printf("Charmrun> start %d node program on localhost.\n", i);
+    ret = CreateProcess(NULL,	/* application name */
+		    cmdLine,	/* command line */
+		    NULL,/*&sa,*/		/* process SA */
+		    NULL,/*&sa,*/		/* thread SA */
+		    FALSE,	/* inherit flag */
+#if 1
+		    CREATE_NEW_PROCESS_GROUP|DETACHED_PROCESS, 
+#else
+		    CREATE_NEW_PROCESS_GROUP|CREATE_NEW_CONSOLE,
+#endif
+			/* creation flags */
+		    environment,		/* environment block */
+		    ".",			/* working directory */
+		    &si,			/* startup info */
+		    &pi);
+ 
+    if (ret==0)
+    {
+      /*Something went wrong!  Look up the Windows error code*/
+/*
+      int error=GetLastError();
+      char statusCode=daemon_err2status(error);
+      fprintf(logfile,"******************* ERROR *****************\n"
+	      "Error in creating process!\n"
+	      "Error code = %ld-- %s\n\n\n", error,
+	      daemon_status2msg(statusCode));
+	  fflush(logfile);
+*/
+      int error=GetLastError();
+      printf("startProcess failed to start process \"%s\" with status: %d\n", pparam_argv[1], error);
+      exit(1) ;
+    } 
+  }
+}
 
 #elif CMK_SCYLD
 
@@ -2361,9 +2452,7 @@ void rsh_pump(p, nodeno, rank0no, argv)
 #endif
 }
 
-void start_nodes_local(char ** envp);
-
-void start_nodes_rsh(char **envp)
+void start_nodes_rsh()
 {
   prog        rsh_prog[200];
   int         rsh_node[200];
@@ -2372,11 +2461,6 @@ void start_nodes_rsh(char **envp)
   int         rsh_maxsim;
   fd_set rfds; int i; prog p; int pe;
 
-  /* ++local start node program locally */
-  if (arg_local) {
-    start_nodes_local(envp);
-    return;
-  }
 
   /* Return immediately.  That way, the nodes which are starting */
   /* Will be able to establish communication with the host */
@@ -2456,6 +2540,7 @@ void start_nodes_rsh(char **envp)
     }
   }
 }
+
 
 /* simple version of charmrun that avoids the rshd or charmd,   */
 /* it spawn the node program just on local machine using exec. */
