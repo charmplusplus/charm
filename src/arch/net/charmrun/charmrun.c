@@ -2586,9 +2586,9 @@ void start_nodes_rsh()
 
 void finish_one_node(int rank0no)
 {
-  if (!rsh_pids) return; /*nothing to do*/
   const char *host=nodetab_name(nodetab_rank0_table[rank0no]);
   int status=0;
+  if (!rsh_pids) return; /*nothing to do*/
   if (arg_verbose) printf("Charmrun> waiting for rsh (%s:%d), pid %d\n",
 		host,rank0no,rsh_pids[rank0no]);
   do {
