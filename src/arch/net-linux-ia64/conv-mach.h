@@ -57,6 +57,7 @@
 #define CMK_SHARED_VARS_UNIPROCESSOR                       0
 
 #define CMK_THREADS_USE_CONTEXT                            1
+#define CMK_STACK_GROWUP                                   1
 #define CMK_THREADS_USE_PTHREADS                           0
 #define CMK_THREADS_ARE_WIN32_FIBERS                       0
 
@@ -87,8 +88,8 @@
 #define CMK_VECTOR_SEND_USES_COMMON_CODE                   1
 #define CMK_VECTOR_SEND_USES_SPECIAL_CODE                  0
 
-#define CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT                   0
-#define CMK_WHEN_PROCESSOR_IDLE_USLEEP                     1
+#define CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT                   1
+#define CMK_WHEN_PROCESSOR_IDLE_USLEEP                     0
 
 #define CMK_USE_HP_MAIN_FIX                                0
 #define CMK_DONT_USE_HP_MAIN_FIX                           1
