@@ -79,7 +79,7 @@ bool _lb_debug2=0;
         sprintf(str, "NeighborCommLB> Fatal error: Unknown topology: %s", _lbtopo);
         CmiAbort(str);
       }
-      topo = topofn();
+      topo = topofn(CkNumPes());
     }
     int dimension = topo->get_dimension();
     if (_lb_debug2) 

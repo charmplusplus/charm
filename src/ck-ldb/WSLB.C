@@ -64,7 +64,7 @@ WSLB::WSLB(const CkLBOptions &opt) : BaseLB(opt)
     if (CkMyPe()==0) CmiPrintf("LB> Fatal error: Unknown topology: %s.\n", _lbtopo);
     CmiAbort("");
   }
-  topo = topofn();
+  topo = topofn(CkNumPes());
 
   // I had to move neighbor initialization outside the constructor
   // in order to get the virtual functions of any derived classes

@@ -53,7 +53,7 @@ NborBaseLB::NborBaseLB(const CkLBOptions &opt): BaseLB(opt)
     if (CkMyPe()==0) CmiPrintf("LB> Fatal error: Unknown topology: %s.\n", _lbtopo);
     CmiAbort("");
   }
-  topo = topofn();
+  topo = topofn(CkNumPes());
 
   mig_msgs_expected = 0;
   neighbor_pes = NULL;
