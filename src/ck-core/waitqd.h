@@ -17,9 +17,19 @@
 
 extern "C" void CkWaitQD(void);
 
-class ckGroupMsg : public CMessage_ckGroupMsg {
+class ckGroupIDMsg : public CMessage_ckGroupIDMsg {
   public:
     CkGroupID gid;
+    ckGroupIDMsg(CkGroupID _g) : gid(_g) {}
+};
+
+class ckGroupCreateMsg : public CMessage_ckGroupCreateMsg {
+  public:
+    int cidx;
+    int consIdx;
+    void *msg;
+    ckGroupCreateMsg(int _c, int _cc, void *_m) :
+      cidx(_c), consIdx(_cc), msg(_m) {}
 };
 
 class waitqd_QDChare : public Chare {
@@ -32,32 +42,34 @@ class waitqd_QDChare : public Chare {
    void onQD(CkQdMsg *ckqm);
 };
 
-extern CkGroupID waitGC_gchandle;
-
-class waitGC_group : public Group {
+class waitGC_chare : public Chare {
   private:
     CthThread thr;
-    CkGroupID gid;
+    ckGroupIDMsg *mgid;
     int retEP;
   public:
-    waitGC_group(void) { 
-      thr=0; 
-      retEP = CProxy_waitGC_group::ckIdx_recvGroupID((ckGroupMsg *)0);
+    waitGC_chare(void) { 
+      thr=0; mgid=0;
+      retEP = CProxy_waitGC_chare::ckIdx_recvGroupID((ckGroupIDMsg *)0);
     }
-    CkGroupID createGroup(int cidx, int consIdx, void *msg) {
-      CkCreateGroup(cidx, consIdx, msg, retEP, &thishandle);
+    ckGroupIDMsg *createGroup(ckGroupCreateMsg *msg) {
+      mgid = 0;
+      CkCreateGroup(msg->cidx, msg->consIdx, msg->msg, retEP, &thishandle);
+      delete msg;
       thr = CthSelf();
       CthSuspend();
-      return gid;
+      return mgid;
     }
-    CkGroupID createNodeGroup(int cidx, int consIdx, void *msg) {
-      CkCreateNodeGroup(cidx, consIdx, msg, retEP, &thishandle);
+    ckGroupIDMsg *createNodeGroup(ckGroupCreateMsg *msg) {
+      mgid = 0;
+      CkCreateNodeGroup(msg->cidx, msg->consIdx, msg->msg, retEP, &thishandle);
+      delete msg;
       thr = CthSelf();
       CthSuspend();
-      return gid;
+      return mgid;
     }
-    void recvGroupID(ckGroupMsg *msg) {
-      gid = msg->gid;
+    void recvGroupID(ckGroupIDMsg *msg) {
+      mgid = msg;
       CthAwaken(thr);
       thr=0;
     }

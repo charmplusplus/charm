@@ -14,7 +14,6 @@
 
 /* readonly */ 
 CkChareID waitqd_qdhandle;
-CkGroupID waitGC_gchandle;
 
 extern "C" void CkWaitQD(void) {
   CProxy_waitqd_QDChare qdchareproxy(waitqd_qdhandle);
@@ -26,8 +25,12 @@ extern "C" CkGroupID CkCreateGroupSync(int cidx, int considx, void *msg)
   if(CkMyPe()==0) {
     return CkCreateGroup(cidx, considx, msg, 0, 0);
   } else {
-    waitGC_group *local = (waitGC_group *) CkLocalBranch(waitGC_gchandle);
-    return local->createGroup(cidx, considx, msg);
+    CProxy_waitGC_chare waitChare(CkMyPe());
+    ckGroupCreateMsg *inmsg = new ckGroupCreateMsg(cidx, considx, msg);
+    ckGroupIDMsg *retmsg = waitChare.createGroup(inmsg);
+    CkGroupID gid = retmsg->gid;
+    delete retmsg;
+    return gid;
   }
 }
                                        
@@ -36,8 +39,12 @@ extern "C" CkGroupID CkCreateNodeGroupSync(int cidx, int considx, void *msg)
   if(CkMyPe()==0) {
     return CkCreateNodeGroup(cidx, considx, msg, 0, 0);
   } else {
-    waitGC_group *local = (waitGC_group *) CkLocalBranch(waitGC_gchandle);
-    return local->createNodeGroup(cidx, considx, msg);
+    CProxy_waitGC_chare waitChare(CkMyPe());
+    ckGroupCreateMsg *inmsg = new ckGroupCreateMsg(cidx, considx, msg);
+    ckGroupIDMsg *retmsg = waitChare.createNodeGroup(inmsg);
+    CkGroupID gid = retmsg->gid;
+    delete retmsg;
+    return gid;
   }
 }
                                        
@@ -46,7 +53,6 @@ waitqd_QDChare::waitqd_QDChare(CkArgMsg *m) {
   threadList = 0;
   waitqd_qdhandle = thishandle;
   delete m;
-  waitGC_gchandle = CProxy_waitGC_group::ckNew();
 }
 
 void waitqd_QDChare::waitQD(void) {
