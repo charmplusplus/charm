@@ -1395,7 +1395,7 @@ int main(int argc, char **argv)
   input_init();
   
   /* start the node processes */
-  if (0!=getenv("CONV-DAEMON"))
+  if (0!=getenv("CONV_DAEMON"))
     start_nodes_daemon();
   else
 #if CMK_SCYLD
