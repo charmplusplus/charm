@@ -282,7 +282,7 @@ void
 Module::generate()
 {
   XStr declstr, defstr;
-  
+  XStr pubDeclStr, pubDefStr, pubDefConstr; 
   declstr << 
   "#ifndef _DECL_"<<name<<"_H_\n"
   "#define _DECL_"<<name<<"_H_\n"
@@ -294,6 +294,13 @@ Module::generate()
     declstr << "extern \"C\" void CkRegisterMainModule(void);\n";
   }
   declstr << "#endif"<<endx;
+  // Generate the publish class if there are structured dagger connect entries
+  int connectPresent = 0;
+  if (clist) clist->genPub(pubDeclStr, pubDefStr, pubDefConstr, connectPresent);
+  if (connectPresent == 1) {
+     pubDeclStr << "};\n\n";
+     pubDefConstr <<"}\n\n";
+  }
   // defstr << "#ifndef _DEFS_"<<name<<"_H_"<<endx;
   // defstr << "#define _DEFS_"<<name<<"_H_"<<endx;
   if (clist) clist->genDefs(defstr);
@@ -313,6 +320,7 @@ Module::generate()
     }
     defstr << 
     "  _register"<<name<<"();\n"
+   // "  _REGISTER_DONE();\n"
     "}\n";
   }
   defstr << "#endif\n";
@@ -328,6 +336,11 @@ Module::generate()
   }
   decl<<declstr.get_string();
   def<<defstr.get_string();
+  if (connectPresent == 1) {
+    decl << pubDeclStr.charstar();
+    def << pubDefConstr.charstar();
+    def << pubDefStr.charstar();
+  }
 }
 
 void 
@@ -340,7 +353,7 @@ ModuleList::print(XStr& str)
 
 void 
 ModuleList::generate()
-{
+{ 
   module->generate();
   if(next)
     next->generate();
@@ -371,6 +384,17 @@ MemberList::setChare(Chare *c)
   member->setChare(c);
   if(next)
     next->setChare(c);
+}
+
+void
+ConstructList::genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent)
+{
+  if(construct) {
+    construct->genPub(declstr, defstr, defconstr, connectPresent);
+    declstr << endx;
+  }
+  if(next)
+    next->genPub(declstr, defstr, defconstr, connectPresent);
 }
 
 void
@@ -516,8 +540,7 @@ Chare::Chare(int ln, attrib_t Nattr, NamedType *t, TypeList *b, MemberList *l)
 			Entry *e=new Entry(ln,SMIGRATE,NULL,
 			  (char *)type->getBaseName(),
 			  new ParamList(new Parameter(line,
-				new PtrType(new NamedType("CkMigrateMessage"))
-			  )));
+				new PtrType(new NamedType("CkMigrateMessage")))),0,0,0);
 			e->setChare(this);
 			list=new MemberList(e,list);
 		}
@@ -540,6 +563,7 @@ Chare::genRegisterMethodDef(XStr& str)
   "void "<<indexName()<<"::__register(const char *s, size_t size) {\n"
   "  __idx = CkRegisterChare(s, size);\n";
   // register all bases
+  //genIndexNames(str, "  _REGISTER_BASE(__idx, ",NULL, "::__idx);\n", "");
   genIndexNames(str, "  CkRegisterBase(__idx, ",NULL, "::__idx);\n", "");
   genSubRegisterMethodDef(str);
   if(list)
@@ -548,11 +572,26 @@ Chare::genRegisterMethodDef(XStr& str)
   str << "#endif\n";
 }
 
+//extern void sdag_trans(XStr& classname, CParsedFile *input, XStr& output);
+
+
+
+
+void
+Chare::genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent)
+{
+  if(type->isTemplated())
+    return;
+  else 
+  {
+    if(list)
+      list->genPub(declstr, defstr, defconstr, connectPresent);
+  }  
+}
+
 void
 Chare::genSubRegisterMethodDef(XStr& str) {
 }
-
-extern void sdag_trans(XStr& classname, XStr& input, XStr& output);
 
 void
 Chare::genDecls(XStr& str)
@@ -595,14 +634,18 @@ Chare::genDecls(XStr& str)
   }
   
   if(list) {
+    //handle the case that some of the entries may be sdag Entries
     int sdagPresent = 0;
     XStr sdagStr;
-    list->collectSdagCode(sdagStr, sdagPresent);
+    CParsedFile *myParsedFile = new CParsedFile();
+    list->collectSdagCode(myParsedFile, sdagPresent);
     if(sdagPresent) {
       XStr classname;
       XStr sdag_output;
       classname << baseName(0);
-      sdag_trans(classname, sdagStr, sdag_output);
+      resetNumbers();
+      myParsedFile->doProcess(classname, sdag_output);
+     // sdag_trans(classname, myParsedFile, sdag_output);
       str << sdag_output;
     }
   }
@@ -683,14 +726,12 @@ Group::Group(int ln, attrib_t Nattr,
 	}
 }
 
-
-void
-Group::genSubRegisterMethodDef(XStr& str) {	
-	if(!isTemplated()){
-		str << "   CkRegisterGroupIrr(__idx,"<<type<<"::isIrreducible());\n";
-	}else{
-		str << "   CkRegisterGroupIrr(__idx," <<type<<tvars() <<"::isIrreducible());\n";
-	}	
+void Group::genSubRegisterMethodDef(XStr& str) {
+        if(!isTemplated()){
+                str << "   CkRegisterGroupIrr(__idx,"<<type<<"::isIrreducible());\n";
+        }else{
+                str << "   CkRegisterGroupIrr(__idx," <<type<<tvars() <<"::isIrreducible());\n";
+        }
 }
 
 void
@@ -783,6 +824,7 @@ Array::Array(int ln, attrib_t Nattr, NamedType *index,
 	forElement=forIndividual;
 	hasSection=1;
 	index->print(indexSuffix);
+      //printf("indexSuffix = %s\n", indexSuffix.charstar());
 	if (indexSuffix!=(const char*)"none")
 		indexType<<"CkArrayIndex"<<indexSuffix;
 	else indexType<<"CkArrayIndex";
@@ -796,7 +838,7 @@ Array::Array(int ln, attrib_t Nattr, NamedType *index,
 			XStr indexObject(indexSuffix2object(indexSuffix));
 			XStr parentClass;
 			parentClass<<"ArrayElementT<"<<indexObject<<">";
-			const char *parentClassName=strdup(parentClass);
+			char *parentClassName=strdup(parentClass);
 			bases_CBase = new TypeList(new NamedType(parentClassName), NULL);
 		}
 	}
@@ -1234,6 +1276,14 @@ Template::genSpec(XStr& str)
 }
 
 void
+Template::genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent)
+{
+  if(!external && entity) {
+    entity->genPub(declstr, defstr, defconstr, connectPresent);
+  }
+}
+
+void
 Template::genDecls(XStr& str)
 {
   if(!external && entity) {
@@ -1306,6 +1356,15 @@ void TName::genShort(XStr& str)
 {
   str << name;
 }
+
+void
+Module::genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent)
+{
+  if(!external) {
+    if (clist) clist->genPub(declstr, defstr, defconstr, connectPresent);
+  }
+}
+
 
 void
 Module::genDecls(XStr& str)
@@ -1446,6 +1505,15 @@ void MemberList::genIndexDecls(XStr& str)
     next->genIndexDecls(str);
   }
 }
+void MemberList::genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent)
+{
+  if(member)
+    member->genPub(declstr, defstr, defconstr, connectPresent);
+  if(next) {
+    declstr << endx;
+    next->genPub(declstr, defstr, defconstr, connectPresent);
+  }
+}
 
 void MemberList::genDecls(XStr& str)
 {
@@ -1457,13 +1525,14 @@ void MemberList::genDecls(XStr& str)
   }
 }
 
-void MemberList::collectSdagCode(XStr& str, int& sdagPresent)
+void MemberList::collectSdagCode(CParsedFile *pf, int& sdagPresent)
 {
-  if(member)
-    member->collectSdagCode(str, sdagPresent);
+  if(member){
+    member->collectSdagCode(pf, sdagPresent);
+  }
   if(next) {
-    str << endx;
-    next->collectSdagCode(str, sdagPresent);
+    //str << endx;
+    next->collectSdagCode(pf, sdagPresent);
   }
 }
 
@@ -1487,15 +1556,158 @@ void MemberList::genReg(XStr& str)
   }
 }
 
+///////////////////////////// CPARSEDFILE //////////////////////
+/*void CParsedFile::print(int indent)
+{
+  for(CEntry *ce=entryList.begin(); !entryList.end(); ce=entryList.next())
+  {
+    ce->print(indent);
+    printf("\n");
+  }
+  for(SdagConstruct *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next())
+  {
+    cn->print(indent);
+    printf("\n");
+  }
+}
+*/
+void CParsedFile::numberNodes(void)
+{
+  for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
+    if (cn->sdagCon != 0) {
+      cn->sdagCon->numberNodes();
+    }
+  }
+}
+
+void CParsedFile::labelNodes(void)
+{
+  for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
+    if (cn->sdagCon != 0) 
+      cn->sdagCon->labelNodes();
+  }
+}
+
+void CParsedFile::propagateState(void)
+{
+  for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
+    cn->sdagCon->propagateState(0);
+  }
+}
+
+void CParsedFile::generateEntryList(void)
+{
+  for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
+    cn->sdagCon->generateEntryList(entryList, 0);
+  }
+}
+
+void CParsedFile::generateConnectEntryList(void)
+{
+  for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
+    cn->sdagCon->generateConnectEntryList(connectEntryList);
+  }
+}
+
+void CParsedFile::generateCode(XStr& op)
+{
+  for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
+    cn->sdagCon->setNext(0,0);
+    cn->sdagCon->generateCode(op);
+  }
+}
+
+void CParsedFile::generateEntries(XStr& op)
+{
+  CEntry *en;
+  SdagConstruct *sc;
+  op << "public:\n";
+  for(sc=connectEntryList.begin(); !connectEntryList.end(); sc=connectEntryList.next())
+     sc->generateConnectEntries(op);
+  for(en=entryList.begin(); !entryList.end(); en=entryList.next()) {
+    en->generateCode(op);
+  }
+}
+
+void CParsedFile::generateInitFunction(XStr& op)
+{
+  op << "private:\n";
+  op << "  CDep *__cDep;\n";
+  op << "  void __sdag_init(void) {\n";
+  op << "    __cDep = new CDep("<<numEntries<<","<<numWhens<<");\n";
+  CEntry *en;
+  for(en=entryList.begin(); !entryList.end(); en=entryList.next()) {
+    en->generateDeps(op);
+  }
+  op << "  }\n";
+}
+
+void CParsedFile::generatePupFunction(XStr& op)
+{
+  op << "public:\n";
+  op << "  void __sdag_pup(PUP::er& p) {\n";
+  op << "    if (__cDep) { __cDep->pup(p); }\n";
+  op << "  }\n";
+}
+
+////////////////////////// SDAGCONSTRUCT ///////////////////////
+SdagConstruct::SdagConstruct(EToken t, SdagConstruct *construct1)
+{
+  con1 = 0;  con2 = 0; con3 = 0; con4 = 0;
+  type = t;
+  publishesList = new TList<SdagConstruct*>();
+  constructs = new TList<SdagConstruct*>();
+  constructs->append(construct1);
+}
+
+SdagConstruct::SdagConstruct(EToken t, SdagConstruct *construct1, SdagConstruct *aList)
+{
+  con1=0; con2=0; con3=0; con4=0;
+  type = t;
+  publishesList = new TList<SdagConstruct*>();
+  constructs = new TList<SdagConstruct*>();
+  constructs->append(construct1);
+  SdagConstruct *sc;
+  for(sc = aList->constructs->begin(); !aList->constructs->end(); sc=aList->constructs->next())
+    constructs->append(sc);
+}
+
+SdagConstruct::SdagConstruct(EToken t, XStr *txt, SdagConstruct *c1, SdagConstruct *c2, SdagConstruct *c3, 
+			     SdagConstruct *c4, SdagConstruct *constructAppend, EntryList *el)
+{
+  text = txt;
+  type = t; 
+  con1 = c1; con2 = c2; con3 = c3; con4 = c4;
+  publishesList = new TList<SdagConstruct*>();
+  constructs = new TList<SdagConstruct*>();
+  if (constructAppend != 0) {
+    constructs->append(constructAppend);
+  }
+  else
+    constructAppend = 0;
+  elist = el;
+}
+
+SdagConstruct::SdagConstruct(EToken t, const char *entryStr, const char *codeStr, ParamList *pl)
+{
+  type = t;
+  text = new XStr(codeStr);
+  connectEntry = new XStr(entryStr);
+  con1 = 0; con2 = 0; con3 = 0; con4 =0; 
+  publishesList = new TList<SdagConstruct*>();
+  constructs = new TList<SdagConstruct*>();
+  param = pl;
+
+}
+
 ///////////////////////////// ENTRY ////////////////////////////
 
 
-Entry::Entry(int l, int a, Type *r, char *n, ParamList *p, Value *sz) :
-      attribs(a), retType(r), name(n), param(p), stacksize(sz)
+Entry::Entry(int l, int a, Type *r, char *n, ParamList *p, Value *sz, SdagConstruct *sc, char *e, int connect, ParamList *connectPList) :
+      attribs(a), retType(r), name(n), param(p), stacksize(sz), sdagCon(sc), intExpr(e), isConnect(connect), connectParam(connectPList)
 { 
   line=l; container=NULL; 
   entryCount=-1;
-  sdagCode = 0;
   if (param && param->isMarshalled()) attribs|=SNOKEEP;
 
   if(!isThreaded() && stacksize) die("Non-Threaded methods cannot have stacksize",line);
@@ -1557,6 +1769,14 @@ XStr Entry::eo(int withDefaultVals,int priorComma) {
     if (withDefaultVals) str<<"=NULL";
   }
   return str;
+}
+
+void Entry::collectSdagCode(CParsedFile *pf, int& sdagPresent)
+{
+  if (isSdag()) {
+    sdagPresent = 1;
+    pf->nodeList.append(this);
+  }
 }
 
 XStr Entry::marshallMsg(void)
@@ -1902,6 +2122,120 @@ void Entry::genDecls(XStr& str)
       genChareDecl(str);
   }
 }
+
+
+void Entry::genPub(XStr &declstr, XStr& defstr, XStr& defconstr, int& connectPresent)
+{ 
+/*  if (isConnect == 1)
+     printf("Entry is Connected %s\n", name);
+  else 
+     printf("Entry is not Connected %s\n", name);
+*/
+  if ((isConnect == 1) && (connectPresent == 0)) {
+     connectPresent = 1;
+     declstr << "class publish\n";
+     declstr << "{\n";
+     declstr << "   public:\n";
+     declstr << "      publish();\n";
+     defconstr << "publish::publish()\n"  << "{\n"; 
+  }
+  if (isConnect == 1) {
+     defconstr << "   publishflag_" <<getEntryName() << " = 0;\n";
+     defconstr << "   getflag_" <<getEntryName() << " = 0;\n";
+     declstr << "      void " <<getEntryName() <<"(";
+     defstr << "void publish::" << getEntryName() <<"(";
+     ParamList *pl = connectParam;
+     XStr *parameters = new XStr("");
+     int count = 0;
+     int i, numStars;
+     if (pl->isVoid() == 1) {
+	declstr << "void);\n";
+	defstr << "void);\n";
+     }
+     else if (pl->isMessage() == 1){
+	declstr << pl->getBaseName() <<"* " << pl->getGivenName() <<");\n";
+	defstr << pl->getBaseName() <<"* " << pl->getGivenName() <<");\n";
+	defconstr << "   " << pl->getGivenName() <<" = new " << pl->getBaseName() <<"();\n";
+	parameters->append("      "); 
+	parameters->append(pl->getBaseName());
+	parameters->append("* ");
+	parameters->append(pl->getGivenName());
+	parameters->append("_msg;\n ");
+     }
+     else {
+	defconstr << "   " << getEntryName() <<"_msg = new CkMarshallMsg();\n";
+	parameters->append("      CkMarshallMsg *"); 
+	parameters->append(getEntryName());
+	parameters->append("_msg;\n");
+        while(pl != NULL) {
+	  if (count > 0) {
+	    declstr << ", ";
+	    defstr << ", ";
+	  }
+	  if (pl->isPointer() == 1) {
+	  // FIX THE FOLLOWING - I think there could be problems if the original passed in value is deleted
+	    declstr << pl->getBaseName();
+	    defstr << pl->getBaseName();
+	    numStars = pl->getNumStars();
+	    for(i=0; i< numStars; i++) {
+	      declstr << "*";
+	      defstr << "*";
+	    }
+	    declstr << " " <<  pl->getGivenName();
+	    defstr << " " <<  pl->getGivenName();
+	  }
+	  else if (pl->isReference() == 1) {
+	    declstr << pl->getBaseName() <<"& " <<pl->getGivenName();
+	    defstr << pl->getBaseName() <<"& " <<pl->getGivenName();
+	  }
+	  else if (pl->isArray() == 1){
+	    declstr << pl->getBaseName() <<"* " <<pl->getGivenName();
+	    defstr << pl->getBaseName() <<"* " <<pl->getGivenName();
+	  }
+	  else if ((pl->isBuiltin() == 1) || (pl->isNamed() == 1)) {
+	    declstr << pl->getBaseName() <<" " <<pl->getGivenName();
+	    defstr << pl->getBaseName() <<" " <<pl->getGivenName();
+	  }
+	  pl = pl->next;
+	  count++;
+	}
+	declstr << "); \n";
+	defstr << ") { \n";
+     }
+     declstr << "      void get_" << getEntryName() << "(CkCallback cb);\n";
+     declstr << "      int publishflag_" << getEntryName() << ";\n";
+     declstr << "      int getflag_" << getEntryName() << ";\n";
+     declstr << "      CkCallback " << getEntryName() << "_cb;\n"; 
+     declstr << parameters->charstar();     
+   
+     // Following generates the def publish::connectFunction code
+  
+     // Traverse thru parameter list and set the local messages accordingly 
+     defstr <<"    const CkEntryOptions *impl_e_opts = NULL;\n";
+     connectParam->marshall(defstr);
+     defstr << "   " << getEntryName() << "_msg = impl_msg;\n";
+     defstr << "   " << "if (getflag_" << getEntryName() <<" == 1) {\n";
+     // FIX THE FOLLOWING IN CASE MSG IS VOID 
+     defstr << "     " << getEntryName() << "_cb.send(" << getEntryName() <<"_msg);\n";
+     defstr << "   }\n";
+     defstr << "   else\n";
+     defstr << "     publishflag_" << getEntryName() << " = 1;\n";
+     defstr << "}\n\n";
+
+     // Following generates the def publish::get_connectFunction code
+ 
+     defstr << "void publish::get_" << getEntryName() << "(CkCallback cb) {\n";
+     defstr << "   " << getEntryName() << "_cb = cb;\n";
+     defstr << "   if (publishflag_" << getEntryName() << " == 1) {\n";
+     defstr << "     cb.send(" << getEntryName() << "_msg);\n";
+     defstr << "     publishflag_" << getEntryName() << " = 0 ;\n";
+     defstr << "   }\n";
+     defstr << "   else\n";
+     defstr << "     getflag_" << getEntryName() << " = 1;\n";
+     defstr << "}\n";
+  }
+}
+
 
 //This routine is only used in Entry::genDefs.
 // It ends the current procedure with a call to awaken another thread,
@@ -2310,11 +2644,11 @@ void ParamList::beginUnmarshall(XStr &str)
 {
     	if (isMarshalled()) 
     	{
-    		str<<"  //Unmarshall pup'd fields: ";print(str,0);str<<"\n";
+    		str<<"  /*Unmarshall pup'd fields: ";print(str,0);str<<"*/\n";
     		str<<"  PUP::fromMem implP(impl_buf);\n";
     		callEach(&Parameter::beginUnmarshall,str);
     		str<<"  impl_buf+=CK_ALIGN(implP.size(),16);\n";
-		str<<"  //Unmarshall arrays:\n";
+		str<<"  /*Unmarshall arrays:*/\n";
 		callEach(&Parameter::unmarshallArrayData,str);
     	}
 	else if (isVoid()) {str<<"  CkFreeSysMsg(impl_msg);\n";}
@@ -2376,6 +2710,7 @@ void InitCall::print(XStr& str)
 {
 	str<<"  initcall void "<<name<<"(void);\n";
 }
+void InitCall::genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent) {}
 void InitCall::genDecls(XStr& str) {}
 void InitCall::genIndexDecls(XStr& str) {}
 void InitCall::genDefs(XStr& str) {}
@@ -2398,6 +2733,7 @@ void PUPableClass::print(XStr& str)
 	str<<"  PUPable "<<name<<";\n";
 	if (next) next->print(str);
 }
+void PUPableClass::genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent) {}
 void PUPableClass::genDecls(XStr& str) {}
 void PUPableClass::genIndexDecls(XStr& str) {}
 void PUPableClass::genDefs(XStr& str) 
