@@ -24,16 +24,24 @@ void traceResume(void);
 void traceSuspend(void);
 void traceAwaken(CthThread t);
 void traceUserEvent(int);
-int  traceRegisterUserEvent(const char*);
+void traceUserBracketEvent(int, double);
+int  traceRegisterUserEvent(const char*, int e
+#ifdef __cplusplus
+=-1
+#endif
+);
 void traceClose(void);
 void traceCharmClose(void);          /* close trace in ck */
 void traceBegin(void);
 void traceEnd(void);
-int traceIsOn(void);			/* return if trace is on */
 void traceWriteSts(void);
 
 #ifndef CMK_OPTIMIZE
 CpvExtern(int, traceOn);
+#define traceIsOn()  (CpvAccess(traceOn))
+#else 
+#define traceIsOn()  0
 #endif
+
 
 #endif
