@@ -16,8 +16,7 @@ class envelope;
 extern "C" void traceClearEps();
 extern "C" void traceCommonInit(char **argv);
 
-// Base class of all tracing strategies.
-
+/// Base class of all tracing strategies.
 class Trace {
   public:
     virtual void userEvent(int) {}
@@ -49,8 +48,7 @@ class Trace {
 
 #define ALLDO(x) for (int i=0; i<traces.length(); i++) traces[i]->x
 
-// Array of Traces so that every event can go through every Trace registered.
-
+/// Array of Traces modules,  every event raised will go through every Trace module.
 class TraceArray {
 private:
   CkVec<Trace *>  traces;
