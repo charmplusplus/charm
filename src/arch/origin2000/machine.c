@@ -203,6 +203,7 @@ void CmiTimerInit(void);
 static void threadInit(void *arg)
 {
   USER_PARAMETERS *usrparam;
+  int i;
   usrparam = (USER_PARAMETERS *) arg;
 
 
@@ -223,14 +224,10 @@ static void threadInit(void *arg)
   ConverseCommonInit(usrparam->argv);
   if (usrparam->initret==0 || usrparam->mype) {
     usrparam->fn(CountArgs(usrparam->argv), usrparam->argv);
-    if (usrparam->usched==0 || usrparam->mype ) {
+    if (usrparam->usched==0) {
       CsdScheduler(-1);
-      ConverseExit();
-      if(usrparam->mype==0) {
-        for(int i=1;i<usrparam->npe;i++)
-          wait(0);
-      }
     }
+    ConverseExit();
   }
 }
 
@@ -393,7 +390,9 @@ McQueue * McQueueCreate(void)
 
 void McQueueAddToBack(McQueue *queue, void *element)
 {
+#if NODE_0_IS_CONVHOST
   inside_comm = 1;
+#endif
 #ifdef DEBUG
   printf("[%d] Waiting for lock\n",CmiMyPe());
 #endif
@@ -418,7 +417,9 @@ void McQueueAddToBack(McQueue *queue, void *element)
 #ifdef DEBUG
   printf("[%d] released lock\n",CmiMyPe());
 #endif
+#if NODE_0_IS_CONVHOST
   inside_comm = 0;
+#endif
 }
 
 
