@@ -28,7 +28,7 @@ INC=../include
 all: charm++ bluegene LIBS AMPI f90charm TSM SM PVM doc
 
 charm++: basics
-	$(MAKE) charmxi converse $(L)/libck.a loadbalancers default_libs
+	$(MAKE) charm-target
 
 bgampi: bluegene AMPI
 
@@ -241,7 +241,7 @@ dirs+sources:
 # Converse Libraries
 #
 ###############################################################################
-CLBLIBS=$(L)/libldb-rand.o $(L)/libldb-spray.o $(L)/libldb-graph.o $(L)/libldb-test.o $(L)/libldb-bluegene.o
+CLBLIBS=$(L)/libldb-rand.o $(L)/libldb-spray.o $(L)/libldb-neighbor.o $(L)/libldb-test.o $(L)/libldb-bluegene.o
 TRACELIBS=$(L)/libtrace-projections.a  $(L)/libtrace-summary.a \
           $(L)/libtrace-counter.a $(L)/libtrace-bluegene.a \
 	  $(L)/libtrace-projector.a $(L)/libtrace-all.a $(L)/libtrace-converse.a
@@ -260,9 +260,10 @@ CVLIBS=$(L)/libconv-core.a \
 	$(L)/libccs-client.a
 
 LIBCONV_CORE= convcore.o conv-conds.o queueing.o msgmgr.o \
-	cpm.o cpthreads.o futures.o cldb.o random.o traceCore.o traceCoreCommon.o \
-	converseProjections.o machineProjections.o \
+	cpm.o cpthreads.o futures.o cldb.o LBTopology.o random.o \
 	debug-conv.o generate.o edgelist.o conv-ccs.o ccs-builtins.o \
+	traceCore.o traceCoreCommon.o \
+	converseProjections.o machineProjections.o \
 	quiescence.o isomalloc.o \
 	global-nop.o
 
@@ -318,7 +319,7 @@ $(L)/libconv-util.a: $(LIBCONV_UTIL)
 	$(CHARMC) -o $@ $(LIBCONV_UTIL)
 
 $(L)/libconv-utilf.a: $(LIBCONV_UTILF)
-	-$(CHARMC) -o $@ $(LIBCONV_UTILF)
+	-$(CHARMC) -o $@ $(LIBCONV_UTILF) || touch $@
 
 $(L)/libccs-client.a: ccs-client.o
 	$(CHARMC) -o $@ ccs-client.o
@@ -345,7 +346,7 @@ pup_paged.o: pup_paged.C $(CVHEADERS) $(UTILHEADERS)
 	$(CHARMC) -o pup_paged.o pup_paged.C
 	
 pup_f.o: pup_f.f90 $(CVHEADERS)
-	-$(CHARMC) -c pup_f.f90 && $(CHARMC) -cpmod ../include pupmod.M
+	-$(CHARMC) -c pup_f.f90 && $(CHARMC) -cpmod ../include pupmod.M || touch pup_f.o
 
 ckhashtable.o: ckhashtable.C ckhashtable.h $(CVHEADERS)
 	$(CHARMC) -o ckhashtable.o ckhashtable.C
@@ -366,8 +367,8 @@ conv-lists.o: conv-lists.C $(UTILHEADERS) $(CVHEADERS)
 $(L)/libldb-rand.o: cldb.rand.c cldb.h $(CVHEADERS)
 	$(CHARMC) -o $@ cldb.rand.c
 
-$(L)/libldb-graph.o: cldb.graph.c graph.h $(CVHEADERS)
-	$(CHARMC) -o $@ cldb.graph.c
+$(L)/libldb-neighbor.o: cldb.neighbor.c graph.h $(CVHEADERS)
+	$(CHARMC) -o $@ cldb.neighbor.c
 
 $(L)/libldb-spray.o: cldb.spray.c $(CVHEADERS)
 	$(CHARMC) -o $@ cldb.spray.c
@@ -417,19 +418,19 @@ $(L)/libthreads-qt.o: threads.c $(CVHEADERS)
 	$(CHARMC) -o $@ -DCMK_THREADS_BUILD_QT=1 -IQuickThreads threads.c
 
 $(L)/libthreads-context.o: threads.c $(CVHEADERS)
-	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_CONTEXT=1 -IQuickThreads threads.c
+	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_CONTEXT=1 -IQuickThreads threads.c || touch $@
 
 $(L)/libthreads-pthreads.o: threads.c $(CVHEADERS)
-	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_PTHREADS=1 -IQuickThreads threads.c
+	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_PTHREADS=1 -IQuickThreads threads.c || touch $@
 
 $(L)/libthreads-fibers.o: threads.c $(CVHEADERS)
-	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_FIBERS=1 -IQuickThreads threads.c 2> /dev/null
+	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_FIBERS=1 -IQuickThreads threads.c 2> /dev/null || touch $@
 
 ## Global swapping (-swapglobal)
 swapglobal-target: $(L)/libglobal-swap.o
 
 $(L)/libglobal-swap.o: global-elfgot.C $(CVHEADERS)
-	-$(CHARMC) -c global-elfgot.C -o $@
+	-$(CHARMC) -c global-elfgot.C -o $@ || touch $@
 
 
 ###############################################################################
@@ -445,12 +446,14 @@ LIBCK_CORE=trace-common.o init.o register.o qd.o ck.o main.o msgalloc.o \
 	   cklocation.o ckarray.o ckreduction.o ckarrayreductionmgr.o\
            tempo.o waitqd.o LBDatabase.o lbdb.o charisma.o ckcheckpoint.o\
            LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o \
-	   BaseLB.o CentralLB.o NborBaseLB.o WSLB.o LBTopology.o \
+	   BaseLB.o CentralLB.o NborBaseLB.o WSLB.o \
            ObjGraph.o graph.o  \
            Refiner.o RefinerComm.o bitvecset.o Set.o heap.o CommLBHeap.o \
 	   NullLB.o LBSimulation.o 	\
 	   ComlibStrategy.o ComlibArrayListener.o  \
 	   charmProjections.o
+
+charm-target: converse $(L)/libck.a loadbalancers default_libs
 
 CHARMLIBS: charm++
 	cd libs; $(MAKE) charmlibs OPTS='$(OPTS)'
