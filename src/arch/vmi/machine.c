@@ -1726,7 +1726,7 @@ void ConverseExit ()
   DEBUG_PRINT ("ConverseExit() called.\n");
 
   /* Call VMI_Poll() to encourage the network to reach quiescence. */
-  for (i = 0; i < 10; i++) {
+  for (i = 0; i < 1000000; i++) {
     sched_yield ();
     status = VMI_Poll ();
     CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
@@ -1887,9 +1887,12 @@ void ConverseExit ()
   VMI_Cache_Stats();
 #endif
 
+  exit (0);
+#if 0
   /* Terminate VMI. */
   SET_VMI_SUCCESS (status);
   VMI_Terminate (status);
+#endif
 }
 
 
@@ -2354,14 +2357,16 @@ void CmiSyncBroadcastFn (int msgsize, char *msg)
     handle.refcount = Cmi_numpes;
 
     for (i = 0; i < Cmi_mype; i++) {
-      status = VMI_Stream_Send ((&CMI_VMI_Procs[i])->conn, bufHandles, addrs,
-	   sz, 2, CMI_VMI_Stream_Completion_Handler, (PVOID) &handle, TRUE);
+      status = VMI_Stream_Send ((&CMI_VMI_Procs[i])->connection, bufHandles,
+           addrs, sz, 2, CMI_VMI_Stream_Completion_Handler, (PVOID) &handle,
+           TRUE);
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send()");
     }
 
     for (i = (Cmi_mype + 1); i < Cmi_numpes; i++) {
-      status = VMI_Stream_Send ((&CMI_VMI_Procs[i])->conn, bufHandles, addrs,
-	   sz, 2, CMI_VMI_Stream_Completion_Handler, (PVOID) &handle, TRUE);
+      status = VMI_Stream_Send ((&CMI_VMI_Procs[i])->connection, bufHandles,
+           addrs, sz, 2, CMI_VMI_Stream_Completion_Handler, (PVOID) &handle,
+           TRUE);
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send()");
     }
 #endif   /* CMK_BROADCAST_SPANNING_TREE */
@@ -2428,14 +2433,14 @@ void CmiSyncBroadcastFn (int msgsize, char *msg)
     handle.refcount = Cmi_numpes;
 
     for (i = 0; i < Cmi_mype; i++) {
-      status = VMI_Stream_Send_Inline ((&CMI_VMI_Procs[i])->conn,
+      status = VMI_Stream_Send_Inline ((&CMI_VMI_Procs[i])->connection,
 	   addrs, sz, 1, sizeof (CMI_VMI_Message_Header_T) +
            sizeof (CMI_VMI_Message_Body_Rendezvous_T));
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
     }
 
     for (i = (Cmi_mype + 1); i < Cmi_numpes; i++) {
-      status = VMI_Stream_Send_Inline ((&CMI_VMI_Procs[i])->conn,
+      status = VMI_Stream_Send_Inline ((&CMI_VMI_Procs[i])->connection,
 	   addrs, sz, 1, sizeof (CMI_VMI_Message_Header_T) +
            sizeof (CMI_VMI_Message_Body_Rendezvous_T));
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
@@ -2535,13 +2540,13 @@ CmiCommHandle CmiAsyncBroadcastFn (int msgsize, char *msg)
     }
 #else   /* CMK_BROADCAST_SPANNING_TREE */
     for (i = 0; i < Cmi_mype; i++) {
-      status = VMI_Stream_Send_Inline ((&CMI_VMI_Procs[i])->conn,
+      status = VMI_Stream_Send_Inline ((&CMI_VMI_Procs[i])->connection,
            addrs, sz, 2, sizeof (CMI_VMI_Message_Header_T) + msgsize);
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
     }
 
     for (i = (Cmi_mype + 1); i < Cmi_numpes; i++) {
-      status = VMI_Stream_Send_Inline ((&CMI_VMI_Procs[i])->conn,
+      status = VMI_Stream_Send_Inline ((&CMI_VMI_Procs[i])->connection,
            addrs, sz, 2, sizeof (CMI_VMI_Message_Header_T) + msgsize);
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
     }
@@ -2619,14 +2624,16 @@ CmiCommHandle CmiAsyncBroadcastFn (int msgsize, char *msg)
     CMI_VMI_AsyncMsgCount += (Cmi_numpes - 1);
 
     for (i = 0; i < Cmi_mype; i++) {
-      status = VMI_Stream_Send ((&CMI_VMI_Procs[i])->conn, bufHandles, addrs,
-	   sz, 2, CMI_VMI_Stream_Completion_Handler, (PVOID) &handle, TRUE);
+      status = VMI_Stream_Send ((&CMI_VMI_Procs[i])->connection, bufHandles,
+           addrs, sz, 2, CMI_VMI_Stream_Completion_Handler, (PVOID) &handle,
+           TRUE);
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send()");
     }
 
     for (i = (Cmi_mype + 1); i < Cmi_numpes; i++) {
-      status = VMI_Stream_Send ((&CMI_VMI_Procs[i])->conn, bufHandles, addrs,
-	   sz, 2, CMI_VMI_Stream_Completion_Handler, (PVOID) &handle, TRUE);
+      status = VMI_Stream_Send ((&CMI_VMI_Procs[i])->connection, bufHandles,
+           addrs, sz, 2, CMI_VMI_Stream_Completion_Handler, (PVOID) &handle,
+           TRUE);
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send()");
     }
 #endif   /* CMK_BROADCAST_SPANNING_TREE */
@@ -2693,14 +2700,14 @@ CmiCommHandle CmiAsyncBroadcastFn (int msgsize, char *msg)
     CMI_VMI_AsyncMsgCount += (Cmi_numpes - 1);
 
     for (i = 0; i < Cmi_mype; i++) {
-      status = VMI_Stream_Send_Inline ((&CMI_VMI_Procs[i])->conn,
+      status = VMI_Stream_Send_Inline ((&CMI_VMI_Procs[i])->connection,
            addrs, sz, 1, sizeof (CMI_VMI_Message_Header_T) +
            sizeof (CMI_VMI_Message_Body_Rendezvous_T));
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
     }
 
     for (i = (Cmi_mype + 1); i < Cmi_numpes; i++) {
-      status = VMI_Stream_Send_Inline ((&CMI_VMI_Procs[i])->conn,
+      status = VMI_Stream_Send_Inline ((&CMI_VMI_Procs[i])->connection,
            addrs, sz, 1, sizeof (CMI_VMI_Message_Header_T) +
            sizeof (CMI_VMI_Message_Body_Rendezvous_T));
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
@@ -2811,14 +2818,16 @@ void CmiFreeBroadcastFn (int msgsize, char *msg)
     handle.refcount = Cmi_numpes;
 
     for (i = 0; i < Cmi_mype; i++) {
-      status = VMI_Stream_Send ((&CMI_VMI_Procs[i])->conn, bufHandles, addrs,
-	   sz, 2, CMI_VMI_Stream_Completion_Handler, (PVOID) &handle, TRUE);
+      status = VMI_Stream_Send ((&CMI_VMI_Procs[i])->connection, bufHandles,
+           addrs, sz, 2, CMI_VMI_Stream_Completion_Handler, (PVOID) &handle,
+           TRUE);
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send()");
     }
 
     for (i = (Cmi_mype + 1); i < Cmi_numpes; i++) {
-      status = VMI_Stream_Send ((&CMI_VMI_Procs[i])->conn, bufHandles, addrs,
-	   sz, 2, CMI_VMI_Stream_Completion_Handler, (PVOID) &handle, TRUE);
+      status = VMI_Stream_Send ((&CMI_VMI_Procs[i])->connection, bufHandles,
+           addrs, sz, 2, CMI_VMI_Stream_Completion_Handler, (PVOID) &handle,
+           TRUE);
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send()");
     }
 #endif   /* CMK_BROADCAST_SPANNING_TREE */
@@ -2885,14 +2894,14 @@ void CmiFreeBroadcastFn (int msgsize, char *msg)
     handle.refcount = Cmi_numpes;
 
     for (i = 0; i < Cmi_mype; i++) {
-      status = VMI_Stream_Send_Inline ((&CMI_VMI_Procs[i])->conn,
+      status = VMI_Stream_Send_Inline ((&CMI_VMI_Procs[i])->connection,
 	   addrs, sz, 1, sizeof (CMI_VMI_Message_Header_T) +
            sizeof (CMI_VMI_Message_Body_Rendezvous_T));
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
     }
 
     for (i = (Cmi_mype + 1); i < Cmi_numpes; i++) {
-      status = VMI_Stream_Send_Inline ((&CMI_VMI_Procs[i])->conn,
+      status = VMI_Stream_Send_Inline ((&CMI_VMI_Procs[i])->connection,
 	   addrs, sz, 1, sizeof (CMI_VMI_Message_Header_T) +
            sizeof (CMI_VMI_Message_Body_Rendezvous_T));
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
