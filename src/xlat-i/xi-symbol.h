@@ -648,6 +648,7 @@ class Message : public TEntity {
 #define SCREATEHERE   0x40 //<- is a create-here-if-nonexistant
 #define SCREATEHOME   0x80 //<- is a create-at-home-if-nonexistant
 #define SIMMEDIATE    0x100 //<- is a immediate
+#define SNOKEEP       0x200
 
 /* An entry construct */
 class Entry : public Member {

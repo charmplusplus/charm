@@ -1781,6 +1781,7 @@ struct rwtable rwtable[] = {
   "pupable",	PUPABLE,
   "createhere",	CREATEHERE,
   "createhome",	CREATEHOME,
+  "nokeep",	NOKEEP,
   "template",	TEMPLATE,
   "class",	CLASS,
   "sync",	SYNC,

@@ -1482,6 +1482,7 @@ Entry::Entry(int l, int a, Type *r, char *n, ParamList *p, Value *sz) :
   line=l; container=NULL; 
   entryCount=-1;
   sdagCode = 0;
+  if (param && param->isMarshalled()) attribs|=SNOKEEP;
 
   if(!isThreaded() && stacksize) die("Non-Threaded methods cannot have stacksize",line);
   if(retType && !isSync() && !retType->isVoid()) 
@@ -2054,6 +2055,7 @@ void Entry::genReg(XStr& str)
   str << "// REG: "<<*this;
   str << "  "<<epIdx(0)<<" = CkRegisterEp(\""<<name<<"("<<paramType(0)<<")\",\n"
   	"     (CkCallFnPtr)_call_"<<epStr()<<", ";
+  /* messageIdx: */
   if (param->isMarshalled()) {
     str<<"CkMarshallMsg::__idx";
   } else if(!param->isVoid() && !(attribs&SMIGRATE)) {
@@ -2062,7 +2064,12 @@ void Entry::genReg(XStr& str)
   } else {
     str << "0";
   }
-  str << ", __idx);\n";
+  /* chareIdx */
+  str << ", __idx";
+  /* attributes */
+  str << ", 0";
+  if (attribs & SNOKEEP) str << "+CK_EP_NOKEEP";
+  str << ");\n";
   if (isConstructor()) {
     if(container->isMainChare())
       str << "  CkRegisterMainChare(__idx, "<<epIdx(0)<<");\n";
@@ -2338,9 +2345,11 @@ void ParamList::unmarshallAddress(XStr &str)  //Pass-by-reference, for Fortran
 }
 void ParamList::endUnmarshall(XStr &str) 
 {
+	/* Marshalled entry points now have the "SNOKEEP" attribute...
     	if (isMarshalled()) {
     		str<<"  delete (CkMarshallMsg *)impl_msg;\n";
     	}
+	*/
 }
 
 /***************** InitCall **************/
