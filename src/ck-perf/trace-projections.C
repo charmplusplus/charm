@@ -26,7 +26,7 @@ static int _threadMsg, _threadChare, _threadEP;
 /*
 On T3E, we need to have file number control by open/close files only when needed.
 */
-#if CMI_FILE_NUM_CONTROL
+#if CMK_TRACE_LOGFILE_NUM_CONTROL
 #define OPEN_LOG  \
   do  {  \
     fp = fopen(fname, "a");   \
@@ -170,7 +170,7 @@ LogPool::LogPool(char *pgm, int b) {
   if(!fp) {
     CmiAbort("Cannot open Projections Trace File for writing...\n");
   }
-#if CMI_FILE_NUM_CONTROL
+#if CMK_TRACE_LOGFILE_NUM_CONTROL
   CLOSE_LOG 
 #endif
   if(!binary) {
@@ -184,7 +184,7 @@ LogPool::~LogPool()
 {
   if(binary) writeBinary();
   else write();
-#if !CMI_FILE_NUM_CONTROL
+#if !CMK_TRACE_LOGFILE_NUM_CONTROL
   fclose(fp);
 #endif
   delete[] pool;
