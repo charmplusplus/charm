@@ -32,6 +32,7 @@ CkChareID mainhandle;
 main::main(CkArgMsg *m)
 {
   int i;
+  nblocks = CkNumPes();
   for(i=1;i<m->argc;i++) {
     if(strncmp(m->argv[i], "+vp", 3) == 0) {
       if (strlen(m->argv[i]) > 2) {
@@ -66,12 +67,14 @@ main::qd(void)
   return;
 }
 
+CpvExtern(int, _numSwitches);
+
 void
 main::done(void)
 {
   numDone++;
   if(numDone==nblocks) {
-    ckout << "Exiting" << endl;
+    // ckout << "Exiting" << endl;
     CkExit();
   }
 }
@@ -94,6 +97,8 @@ ampi::ampi(ArrayElementCreateMessage *msg) : TempoArray(msg)
   ntypes = 0;
   nirequests = 0;
   firstfree = 0;
+  nReductions = 0;
+  nAllReductions = 0;
   int i;
   for(i=0;i<100;i++) {
     irequests[i].nextfree = (i+1)%100;
@@ -178,16 +183,26 @@ ampi::run(void)
 
   // CkPrintf("[%d] main_ called\n", getIndex());
   main_();
+  // CkPrintf("[%d] main_ finished\n", getIndex());
   myThis = (ampi*) ampiArray->getElement(myIdx);
-  //CkPrintf("[%d] main_ finished\n", myThis->getIndex());
 
   // itersDone();
+  CProxy_main mp(mainhandle);
+  mp.done();
+  // CkPrintf("[%d] sent donemsg\n", myThis->getIndex());
+  CkPrintf("[%d] #ctxt switches: %d\n", CmiMyPe(), CpvAccess(_numSwitches));
+  CkPrintf("[%d] #reductions: %d\n", myIdx, nReductions);
+  CkPrintf("[%d] #Allreductions: %d\n", myIdx, nAllReductions);
+  CthSuspend();
 
-  myThis->ckTempoBarrier();
+  // myThis->ckTempoBarrier();
+
+/*
   if(myThis->getIndex()==0)
     CmiAbort("");
   else
     CthSuspend();
+*/
 }
 
 extern "C" void migrate_(void *gptr)
@@ -409,6 +424,7 @@ extern "C" int MPI_Reduce(void *inbuf, void *outbuf, int count, int type,
   optype(op, type, &myop, &mytype);
   ampi *ptr = CtvAccess(ampiPtr);
   //CkPrintf("[%d] reduction called\n", ptr->getIndex());
+  ptr->nReductions++;
   ptr->ckTempoReduce(root,myop,inbuf,outbuf,count,mytype);
   //CkPrintf("[%d] reduction finished\n", ptr->getIndex());
   return 0;
@@ -427,6 +443,7 @@ extern "C" int MPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
   optype(op, type, &myop, &mytype);
   ampi *ptr = CtvAccess(ampiPtr);
   //CkPrintf("[%d] Allreduce called\n", ptr->getIndex());
+  ptr->nAllReductions++;
   ptr->ckTempoAllReduce(myop,inbuf,outbuf,count,mytype);
   //CkPrintf("[%d] Allreduce finished\n", ptr->getIndex());
   return 0;
@@ -642,6 +659,199 @@ extern "C" void mpi_irecv_(void *buf, int *count, int *datatype, int *src,
                            int *tag, int *comm, int *request, int *ierr)
 {
   *ierr = MPI_Irecv(buf, *count, *datatype, *src, *tag, *comm, request);
+}
+
+#define MPI_GATHER_TAG 5000
+
+extern "C" 
+int MPI_Allgatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype, 
+                   void *recvbuf, int *recvcounts, int *displs, 
+                   MPI_Datatype recvtype, MPI_Comm comm) 
+{
+  ampi *ptr = CtvAccess(ampiPtr);
+  int size = ptr->getSize();
+  int i;
+  for(i=0;i<size;i++) {
+    MPI_Send(sendbuf, sendcount, sendtype, i, MPI_GATHER_TAG, comm);
+  }
+
+  MPI_Status status;
+  int itemsize = typesize(recvtype, 1, ptr);
+  
+  for(i=0;i<size;i++) {
+    MPI_Recv(((char*)recvbuf)+(itemsize*displs[i]), recvcounts[i], recvtype,
+             i, MPI_GATHER_TAG, comm, &status);
+  }
+  return 0;
+}
+
+extern "C"
+void mpi_allgatherv_(void *sendbuf, int *sendcount, int *sendtype,
+                     void *recvbuf, int *recvcounts, int *displs,
+                     int *recvtype, int *comm, int *ierr)
+{
+  *ierr = MPI_Allgatherv(sendbuf, *sendcount, *sendtype, recvbuf, recvcounts,
+                         displs, *recvtype, *comm);
+}
+
+extern "C"
+int MPI_Allgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
+                  void *recvbuf, int recvcount, MPI_Datatype recvtype,
+                  MPI_Comm comm)
+{
+  ampi *ptr = CtvAccess(ampiPtr);
+  int size = ptr->getSize();
+  int i;
+  for(i=0;i<size;i++) {
+    MPI_Send(sendbuf, sendcount, sendtype, i, MPI_GATHER_TAG, comm);
+  }
+
+  MPI_Status status;
+  int itemsize = typesize(recvtype, 1, ptr);
+  
+  for(i=0;i<size;i++) {
+    MPI_Recv(((char*)recvbuf)+(recvcount*itemsize*i), recvcount, recvtype,
+             i, MPI_GATHER_TAG, comm, &status);
+  }
+  return 0;
+}
+
+extern "C"
+void mpi_allgather_(void *sendbuf, int *sendcount, int *sendtype,
+                  void *recvbuf, int *recvcount, int *recvtype,
+                  int *comm, int *ierr)
+{
+  *ierr = MPI_Allgather(sendbuf, *sendcount, *sendtype, recvbuf, *recvcount,
+                        *recvtype, *comm);
+}
+
+extern "C"
+int MPI_Gatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
+                void *recvbuf, int *recvcounts, int *displs,
+                MPI_Datatype recvtype, int root, MPI_Comm comm)
+{
+  ampi *ptr = CtvAccess(ampiPtr);
+  int size = ptr->getSize();
+  int i;
+
+  MPI_Send(sendbuf, sendcount, sendtype, root, MPI_GATHER_TAG, comm);
+
+  if(ptr->getIndex() == root) {
+    MPI_Status status;
+    int itemsize = typesize(recvtype, 1, ptr);
+  
+    for(i=0;i<size;i++) {
+      MPI_Recv(((char*)recvbuf)+(itemsize*displs[i]), recvcounts[i], recvtype,
+               i, MPI_GATHER_TAG, comm, &status);
+    }
+  }
+  return 0;
+}
+
+extern "C"
+void mpi_gatherv_(void *sendbuf, int *sendcount, int *sendtype,
+                  void *recvbuf, int *recvcounts, int *displs,
+                  int *recvtype, int *root, int *comm, int *ierr)
+{
+  *ierr = MPI_Gatherv(sendbuf, *sendcount, *sendtype, recvbuf, recvcounts,
+                      displs, *recvtype, *root, *comm);
+}
+
+extern "C"
+int MPI_Gather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
+               void *recvbuf, int recvcount, MPI_Datatype recvtype, 
+               int root, MPI_Comm comm)
+{
+  ampi *ptr = CtvAccess(ampiPtr);
+  int size = ptr->getSize();
+  int i;
+  MPI_Send(sendbuf, sendcount, sendtype, root, MPI_GATHER_TAG, comm);
+
+  if(ptr->getIndex()==root) {
+    MPI_Status status;
+    int itemsize = typesize(recvtype, 1, ptr);
+  
+    for(i=0;i<size;i++) {
+      MPI_Recv(((char*)recvbuf)+(recvcount*itemsize*i), recvcount, recvtype,
+               i, MPI_GATHER_TAG, comm, &status);
+    }
+  }
+  return 0;
+}
+
+extern "C"
+void mpi_gather_(void *sendbuf, int *sendcount, int *sendtype,
+                 void *recvbuf, int *recvcount, int *recvtype,
+                 int *root, int *comm, int *ierr)
+{
+  *ierr = MPI_Gather(sendbuf, *sendcount, *sendtype, recvbuf, *recvcount, 
+                     *recvtype, *root, *comm);
+}
+
+extern "C" 
+int MPI_Alltoallv(void *sendbuf, int *sendcounts, int *sdispls,
+                  MPI_Datatype sendtype, void *recvbuf, int *recvcounts,
+                  int *rdispls, MPI_Datatype recvtype, MPI_Comm comm)
+{
+  ampi *ptr = CtvAccess(ampiPtr);
+  int size = ptr->getSize();
+  int itemsize = typesize(sendtype, 1, ptr);
+  int i;
+  for(i=0;i<size;i++) {
+    MPI_Send(((char*)sendbuf)+(itemsize*sdispls[i]), sendcounts[i], sendtype,
+             i, MPI_GATHER_TAG, comm);
+  }
+
+  MPI_Status status;
+  itemsize = typesize(recvtype, 1, ptr);
+  
+  for(i=0;i<size;i++) {
+    MPI_Recv(((char*)recvbuf)+(itemsize*rdispls[i]), recvcounts[i], recvtype,
+             i, MPI_GATHER_TAG, comm, &status);
+  }
+  return 0;
+}
+
+extern "C"
+void mpi_alltoallv_(void *sendbuf, int *sendcounts, int *sdispls,
+                    int *sendtype, void *recvbuf, int *recvcounts,
+                    int *rdispls, int *recvtype, int *comm, int *ierr)
+{
+  *ierr = MPI_Alltoallv(sendbuf, sendcounts, sdispls, *sendtype, recvbuf,
+                        recvcounts, rdispls, *recvtype, *comm);
+}
+
+extern "C" 
+int MPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype, 
+                 void *recvbuf, int recvcount, MPI_Datatype recvtype, 
+                 MPI_Comm comm)
+{
+  ampi *ptr = CtvAccess(ampiPtr);
+  int size = ptr->getSize();
+  int itemsize = typesize(sendtype, 1, ptr);
+  int i;
+  for(i=0;i<size;i++) {
+    MPI_Send(((char*)sendbuf)+(itemsize*sendcount*i), sendcount, sendtype,
+             i, MPI_GATHER_TAG, comm);
+  }
+
+  MPI_Status status;
+  itemsize = typesize(recvtype, 1, ptr);
+  
+  for(i=0;i<size;i++) {
+    MPI_Recv(((char*)recvbuf)+(itemsize*recvcount*i), recvcount, recvtype,
+             i, MPI_GATHER_TAG, comm, &status);
+  }
+  return 0;
+}
+
+extern "C"
+void mpi_alltoall_(void *sendbuf, int *sendcount, int *sendtype,
+                   void *recvbuf, int *recvcount, int *recvtype,
+                   int *comm, int *ierr)
+{
+  *ierr = MPI_Alltoall(sendbuf, *sendcount, *sendtype, recvbuf, *recvcount,
+                       *recvtype, *comm);
 }
 
 #include "ampi.def.h"

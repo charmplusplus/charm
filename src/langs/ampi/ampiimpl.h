@@ -74,6 +74,8 @@ class ampi : public TempoArray {
     int firstfree;
     int nbcasts; // to keep bcasts from mixing up
     void *packedBlock;
+    int nReductions;
+    int nAllReductions;
 
     ampi(ArrayElementCreateMessage *msg);
     ampi(ArrayElementMigrateMessage *msg);

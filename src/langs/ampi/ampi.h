@@ -70,6 +70,24 @@ int MPI_Isend(void *buf, int count, MPI_Datatype datatype, int dest,
               int tag, MPI_Comm comm, MPI_Request *request);
 int MPI_Irecv(void *buf, int count, MPI_Datatype datatype, int src, 
               int tag, MPI_Comm comm, MPI_Request *request);
+int MPI_Allgatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype, 
+                   void *recvbuf, int *recvcounts, int *displs, 
+                   MPI_Datatype recvtype, MPI_Comm comm) ;
+int MPI_Allgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
+                  void *recvbuf, int recvcount, MPI_Datatype recvtype,
+                  MPI_Comm comm);
+int MPI_Gatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
+                void *recvbuf, int *recvcounts, int *displs,
+                MPI_Datatype recvtype, int root, MPI_Comm comm);
+int MPI_Gather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
+               void *recvbuf, int recvcount, MPI_Datatype recvtype, 
+               int root, MPI_Comm comm);
+int MPI_Alltoallv(void *sendbuf, int *sendcounts, int *sdispls,
+                  MPI_Datatype sendtype, void *recvbuf, int *recvcounts,
+                  int *rdispls, MPI_Datatype recvtype, MPI_Comm comm);
+int MPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype, 
+                 void *recvbuf, int recvcount, MPI_Datatype recvtype, 
+                 MPI_Comm comm);
 #ifdef __cplusplus
 }
 #endif
