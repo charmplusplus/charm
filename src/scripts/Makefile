@@ -234,7 +234,7 @@ TRACELIBS=$(L)/libtrace-projections.a  $(L)/libtrace-summary.a \
 	  $(L)/libtrace-projector.a $(L)/libtrace-all.a $(L)/libtrace-converse.a
 MEMLIBS=$(L)/libmemory-default.o $(L)/libmemory-os.o $(L)/libmemory-gnu.o \
    $(L)/libmemory-gnuold.o \
-   $(L)/libmemory-verbose.o $(L)/libmemory-paranoid.o $(L)/libmemory-isomalloc.o
+   $(L)/libmemory-verbose.o $(L)/libmemory-paranoid.o $(L)/libmemory-leak.o $(L)/libmemory-isomalloc.o
 THREADLIBS=$(L)/libthreads-default.o $(L)/libthreads-qt.o $(L)/libthreads-context.o $(L)/libthreads-pthreads.o $(L)/libthreads-fibers.o
 
 CVLIBS=$(L)/libconv-core.a \
@@ -434,6 +434,9 @@ $(L)/libmemory-verbose.o: memory-verbose.c $(MEM_DEPS)
 
 $(L)/libmemory-paranoid.o: memory-paranoid.c $(MEM_DEPS)
 	-$(CHARMC) -o $@ -DCMK_MEMORY_BUILD_PARANOID memory.c
+
+$(L)/libmemory-leak.o: memory-leak.c $(MEM_DEPS)
+	-$(CHARMC) -o $@ -DCMK_MEMORY_BUILD_LEAK memory.c
 
 $(L)/libmemory-cache.o: memory-cache.c $(MEM_DEPS)
 	-$(CHARMC) -o $@ -DCMK_MEMORY_BUILD_CACHE memory.c
