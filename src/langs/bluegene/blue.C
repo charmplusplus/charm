@@ -30,6 +30,7 @@
 #define MAX_HANDLERS	32
 #define BROADCAST	-1
 #define BROADCASTALL	-2
+
 template<class T> class bgQueue;
 
 typedef char ThreadType;
@@ -38,10 +39,11 @@ const char UNKNOWN_THREAD=0, COMM_THREAD=1, WORK_THREAD=2;
 /* converse message send to other bgnodes */
 class bgMsg {
 public:
+  char core[CmiMsgHeaderSizeBytes];
   int node;		/* bluegene node serial number */
   int threadID;		/* the thread ID in the node */
-  int handlerID;
-  WorkType type;
+  int handlerID;	/* handler function registered */
+  WorkType type;	/* work type */
   int len;
   double recvTime;
   char  first[1];	/* first byte of user data */
@@ -56,6 +58,9 @@ typedef CkQ<bgMsg *> 	    ckMsgQueue;
 
 class nodeInfo;
 class threadInfo;
+
+#define cva CpvAccess
+#define cta CtvAccess
 
 /* node level variables */
 CpvDeclare(nodeInfo*, nodeinfo);		/* represent a bluegene node */
@@ -89,19 +94,19 @@ CpvStaticDeclare(int, numNodes);	/* number of bg nodes on this PE */
 CpvDeclare(int, inEmulatorInit);
 CpvDeclare(int, cpvinited);
 
-#define tMYID		CtvAccess(threadinfo)->id
-#define tMYGLOBALID	CtvAccess(threadinfo)->globalId
-#define tTHREADTYPE	CtvAccess(threadinfo)->type
-#define tMYNODE		CtvAccess(threadinfo)->myNode
+#define tMYID		cta(threadinfo)->id
+#define tMYGLOBALID	cta(threadinfo)->globalId
+#define tTHREADTYPE	cta(threadinfo)->type
+#define tMYNODE		cta(threadinfo)->myNode
 #define tSTARTTIME	tMYNODE->startTime
-#define tCURRTIME	CtvAccess(threadinfo)->currTime
+#define tCURRTIME	cta(threadinfo)->currTime
 #define tMYX		tMYNODE->x
 #define tMYY		tMYNODE->y
 #define tMYZ		tMYNODE->z
 #define tMYNODEID	tMYNODE->id
 #define tCOMMTHQ	tMYNODE->commThQ
-#define tINBUFFER	CpvAccess(inBuffer)[tMYNODE->id]
-#define tMSGBUFFER	CpvAccess(msgBuffer)[tMYNODE->id]
+#define tINBUFFER	cva(inBuffer)[tMYNODE->id]
+#define tMSGBUFFER	cva(msgBuffer)[tMYNODE->id]
 #define tUSERDATA	tMYNODE->udata
 #define tTHREADTABLE    tMYNODE->threadTable
 #define tAFFINITYQ      tMYNODE->affinityQ[tMYID]
@@ -111,11 +116,11 @@ CpvDeclare(int, cpvinited);
 #define ASSERT(x)	if (!(x)) { CmiPrintf("Assert failure at %s:%d\n", __FILE__,__LINE__); CmiAbort("Abort!"); }
 
 #define BGARGSCHECK   	\
-  if (CpvAccess(numX)==0 || CpvAccess(numY)==0 || CpvAccess(numZ)==0)  { CmiPrintf("\nMissing parameters for BlueGene machine size!\n<tip> use command line options: +x, +y, or +z.\n"); BgShutdown(); } \
-  if (CpvAccess(numCth)==0 || CpvAccess(numWth)==0) { CmiAbort("\nMissing parameters for number of communication/worker threads!\n<tip> use command line options: +cth or +wth.\n"); BgShutdown(); }
+  if (cva(numX)==0 || cva(numY)==0 || cva(numZ)==0)  { CmiPrintf("\nMissing parameters for BlueGene machine size!\n<tip> use command line options: +x, +y, or +z.\n"); BgShutdown(); } \
+  if (cva(numCth)==0 || cva(numWth)==0) { CmiAbort("\nMissing parameters for number of communication/worker threads!\n<tip> use command line options: +cth or +wth.\n"); BgShutdown(); }
 
 #define HANDLERCHECK(handler)	\
-  if (CpvAccess(handlerTable)[handler] == NULL) {	\
+  if (cva(handlerTable)[handler] == NULL) {	\
     CmiPrintf("Handler %d unregistered!\n", handler);	\
     CmiAbort("Abort!\n");	\
   }
@@ -177,11 +182,11 @@ public:
 public:
   nodeInfo(): udata(NULL), started(0) {
     commThQ = new threadQueue;
-    commThQ->initialize(CpvAccess(numCth));
+    commThQ->initialize(cva(numCth));
 
-    threadTable = new CthThread[CpvAccess(numWth)+CpvAccess(numCth)];
+    threadTable = new CthThread[cva(numWth)+cva(numCth)];
 
-    affinityQ = new ckMsgQueue[CpvAccess(numWth)];
+    affinityQ = new ckMsgQueue[cva(numWth)];
   }
 
   ~nodeInfo() {
@@ -194,22 +199,22 @@ public:
   inline static int numLocalNodes()
   {
     int n, m;
-    n = (CpvAccess(numX) * CpvAccess(numY) * CpvAccess(numZ)) / CmiNumPes();
-    m = (CpvAccess(numX) * CpvAccess(numY) * CpvAccess(numZ)) % CmiNumPes();
+    n = (cva(numX) * cva(numY) * cva(numZ)) / CmiNumPes();
+    m = (cva(numX) * cva(numY) * cva(numZ)) % CmiNumPes();
     if (CmiMyPe() < m) n++;
     return n;
   }
 
     /* map global serial number to (x,y,z) ++++ */
   inline static void Global2XYZ(int seq, int *x, int *y, int *z) {
-    *x = seq / (CpvAccess(numY) * CpvAccess(numZ));
-    *y = (seq - *x * CpvAccess(numY) * CpvAccess(numZ)) / CpvAccess(numZ);
-    *z = (seq - *x * CpvAccess(numY) * CpvAccess(numZ)) % CpvAccess(numZ);
+    *x = seq / (cva(numY) * cva(numZ));
+    *y = (seq - *x * cva(numY) * cva(numZ)) / cva(numZ);
+    *z = (seq - *x * cva(numY) * cva(numZ)) % cva(numZ);
   }
 
     /* calculate global serial number of (x,y,z) ++++ */
   inline static int XYZ2Global(int x, int y, int z) {
-    return x*(CpvAccess(numY) * CpvAccess(numZ)) + y*CpvAccess(numZ) + z;
+    return x*(cva(numY) * cva(numZ)) + y*cva(numZ) + z;
   }
 
     /* map (x,y,z) to emulator PE ++++ */
@@ -257,7 +262,7 @@ public:
 public:
   threadInfo(int _id, ThreadType _type, nodeInfo *_node): id(_id), type(_type), myNode(_node) {
     currTime=0.0;
-    if (id != -1) globalId = nodeInfo::Local2Global(_node->id)*(CpvAccess(numCth)+CpvAccess(numWth))+_id;
+    if (id != -1) globalId = nodeInfo::Local2Global(_node->id)*(cva(numCth)+cva(numWth))+_id;
   }
   inline void setThread(CthThread t) { me = t; }
   inline CthThread getThread() { return me; }
@@ -276,12 +281,12 @@ extern "C" void defaultBgHandler(char *null)
 int BgRegisterHandler(BgHandler h)
 {
   /* leave 0 as blank, so it can report error luckily */
-  int cur = CpvAccess(handlerTableCount)++;
+  int cur = cva(handlerTableCount)++;
 
-  ASSERT(CpvAccess(inEmulatorInit));
+  ASSERT(cva(inEmulatorInit));
   if (cur >= MAX_HANDLERS)
     CmiAbort("BG> HandlerID exceed the maximum.\n");
-  CpvAccess(handlerTable)[cur] = h;
+  cva(handlerTable)[cur] = h;
   return cur;
 }
 
@@ -313,15 +318,15 @@ void addBgNodeInbuffer(bgMsg *msgPtr, int nodeID)
   int tags[1];
 
   /* if inbuffer is full, store in the msgbuffer */
-  if (CpvAccess(inBuffer)[nodeID].isFull()) {
+  if (cva(inBuffer)[nodeID].isFull()) {
     tags[0] = nodeID;
-    CmmPut(CpvAccess(msgBuffer)[nodeID], 1, tags, (char *)msgPtr);
+    CmmPut(cva(msgBuffer)[nodeID], 1, tags, (char *)msgPtr);
   }
   else {
-    CpvAccess(inBuffer)[nodeID].enq(msgPtr);
+    cva(inBuffer)[nodeID].enq(msgPtr);
   }
   /* awake a communication thread to schedule it */
-  CthThread t=CpvAccess(nodeinfo)[nodeID].commThQ->deq();
+  CthThread t=cva(nodeinfo)[nodeID].commThQ->deq();
   if (t) CthAwaken(t);
 }
 
@@ -339,7 +344,7 @@ void addBgNodeMessage(bgMsg *msgPtr)
 {
   /* find a idle worker thread */
   /* FIXME:  flat search is bad if there is many work threads */
-  for (int i=0; i<CpvAccess(numWth); i++)
+  for (int i=0; i<cva(numWth); i++)
     if (tMYNODE->affinityQ[i].length() == 0)
     {
       /* this work thread is idle, schedule the msg here */
@@ -367,7 +372,7 @@ void sendPacket(int x, int y, int z, int msgSize,bgMsg *msg)
 CmiHandler msgHandlerFunc(char *msg)
 {
   /* bgmsg is CmiMsgHeaderSizeBytes offset of original message pointer */
-  bgMsg *bgmsg = (bgMsg *)(msg+CmiMsgHeaderSizeBytes);
+  bgMsg *bgmsg = (bgMsg *)msg;
   int nodeID = bgmsg->node;
   if (nodeID >= 0) {
     nodeID = nodeInfo::Global2Local(nodeID);
@@ -376,11 +381,11 @@ CmiHandler msgHandlerFunc(char *msg)
   else {
     int len = bgmsg->len;
     addBgNodeInbuffer(bgmsg, 0);
-    for (int i=1; i<CpvAccess(numNodes); i++)
+    for (int i=1; i<cva(numNodes); i++)
     {
       char *dupmsg = (char *)malloc(len);
       memcpy(dupmsg, msg, len);
-      addBgNodeInbuffer((bgMsg*)(dupmsg+CmiMsgHeaderSizeBytes), i);
+      addBgNodeInbuffer((bgMsg*)dupmsg, i);
     }
   }
   return 0;
@@ -402,10 +407,10 @@ static double MSGTIME(int ox, int oy, int oz, int nx, int ny, int nz)
 /* user data is not freeed in this routine, user can reuse the data ! */
 void sendPacket_(int x, int y, int z, int threadID, int handlerID, WorkType type, int numbytes, char* data, int local)
 {
-  int msgSize = CmiMsgHeaderSizeBytes+sizeof(bgMsg)-1+numbytes;
+  int msgSize = sizeof(bgMsg)-1+numbytes;
   void *sendmsg = CmiAlloc(msgSize);
-  CmiSetHandler(sendmsg, CpvAccess(msgHandler));
-  bgMsg *bgmsg = (bgMsg *)((char *)sendmsg+CmiMsgHeaderSizeBytes);
+  CmiSetHandler(sendmsg, cva(msgHandler));
+  bgMsg *bgmsg = (bgMsg *)sendmsg;
   bgmsg->node = nodeInfo::XYZ2Global(x,y,z);
   bgmsg->threadID = threadID;
   bgmsg->handlerID = handlerID;
@@ -424,10 +429,10 @@ void sendPacket_(int x, int y, int z, int threadID, int handlerID, WorkType type
 /* user data is not freeed in this routine, user can reuse the data ! */
 void broadcastPacket_(int bcasttype, int threadID, int handlerID, WorkType type, int numbytes, char* data)
 {
-  int msgSize = CmiMsgHeaderSizeBytes+sizeof(bgMsg)-1+numbytes;	
+  int msgSize = sizeof(bgMsg)-1+numbytes;	
   void *sendmsg = CmiAlloc(msgSize);	
-  CmiSetHandler(sendmsg, CpvAccess(msgHandler));	
-  bgMsg *bgmsg = (bgMsg *)((char *)sendmsg+CmiMsgHeaderSizeBytes);	
+  CmiSetHandler(sendmsg, cva(msgHandler));	
+  bgMsg *bgmsg = (bgMsg *)sendmsg;
   bgmsg->node = bcasttype;
   bgmsg->threadID = threadID;	
   bgmsg->handlerID = handlerID;	
@@ -444,7 +449,7 @@ void broadcastPacket_(int bcasttype, int threadID, int handlerID, WorkType type,
 /* this function can be called by any thread */
 void BgSendNonLocalPacket(int x, int y, int z, int threadID, int handlerID, WorkType type, int numbytes, char * data)
 {
-  if (x<0 || y<0 || z<0 || x>=CpvAccess(numX) || y>=CpvAccess(numY) || z>=CpvAccess(numZ)) {
+  if (x<0 || y<0 || z<0 || x>=cva(numX) || y>=cva(numY) || z>=cva(numZ)) {
     CmiPrintf("Trying to send packet to a nonexisting node: (%d %d %d)!\n", x,y,z);
     CmiAbort("Abort!\n");
   }
@@ -474,32 +479,33 @@ void BgSendPacket(int x, int y, int z, int threadID, int handlerID, WorkType typ
 /* must be called in a communication or worker thread */
 void BgGetXYZ(int *x, int *y, int *z)
 {
-  ASSERT(!CpvAccess(inEmulatorInit));
+  ASSERT(!cva(inEmulatorInit));
   *x = tMYX; *y = tMYY; *z = tMYZ;
 }
 
 void BgGetSize(int *sx, int *sy, int *sz)
 {
-  *sx = CpvAccess(numX); *sy = CpvAccess(numY); *sz = CpvAccess(numZ);
+  *sx = cva(numX); *sy = cva(numY); *sz = cva(numZ);
 }
 
 /* can only called in emulatorinit */
 void BgSetSize(int sx, int sy, int sz)
 {
-  ASSERT(CpvAccess(inEmulatorInit));
-  CpvAccess(numX) = sx; CpvAccess(numY) = sy; CpvAccess(numZ) = sz;
+  ASSERT(cva(inEmulatorInit));
+  cva(numX) = sx; cva(numY) = sy; cva(numZ) = sz;
 }
 
+/* return number of bg nodes on this emulator node */
 int BgNumNodes()
 {
-  ASSERT(!CpvAccess(inEmulatorInit));
-  return CpvAccess(numNodes);
+  ASSERT(!cva(inEmulatorInit));
+  return cva(numNodes);
 }
 
-/* return the node ID */
+/* return the bg node ID (local array index) */
 int BgMyRank()
 {
-//  ASSERT(!CpvAccess(inEmulatorInit));
+  ASSERT(!cva(inEmulatorInit));
   return tMYNODEID;
 }
 
@@ -522,30 +528,30 @@ char *BgGetNodeData()
 
 void BgSetNodeData(char *data)
 {
-  ASSERT(!CpvAccess(inEmulatorInit));
+  ASSERT(!cva(inEmulatorInit));
   tUSERDATA = data;
 }
 
 int BgGetNumWorkThread()
 {
-  return CpvAccess(numWth);
+  return cva(numWth);
 }
 
 void BgSetNumWorkThread(int num)
 {
-  ASSERT(CpvAccess(inEmulatorInit));
-  CpvAccess(numWth) = num;
+  ASSERT(cva(inEmulatorInit));
+  cva(numWth) = num;
 }
 
 int BgGetNumCommThread()
 {
-  return CpvAccess(numCth);
+  return cva(numCth);
 }
 
 void BgSetNumCommThread(int num)
 {
-  ASSERT(CpvAccess(inEmulatorInit));
-  CpvAccess(numCth) = num;
+  ASSERT(cva(inEmulatorInit));
+  cva(numCth) = num;
 }
 
 double BgGetTime()
@@ -557,6 +563,7 @@ double BgGetTime()
   tSTARTTIME = tp2;
   return tCURRTIME;
 #else
+  /* sometime I am interested in real wall time */
   tCURRTIME = CmiWallTimer();
   return tCURRTIME;
 #endif
@@ -566,7 +573,7 @@ void BgShutdown()
 {
   int msgSize = CmiMsgHeaderSizeBytes;
   void *sendmsg = CmiAlloc(msgSize);
-  CmiSetHandler(sendmsg, CpvAccess(exitHandler));
+  CmiSetHandler(sendmsg, cva(exitHandler));
   
   /* broadcast to shutdown */
   CmiSyncBroadcastAllAndFree(msgSize, sendmsg);
@@ -582,7 +589,7 @@ void BgShutdown()
 /*
   int i;
   // TODO: free memory 
-  delete [] CpvAccess(nodeinfo);
+  delete [] cva(nodeinfo);
   delete [] inBuffer;
   for (i=0; i<numNodes; i++) CmmFree(msgBuffer[i]);
   delete [] msgBuffer;
@@ -598,7 +605,7 @@ void BgShutdown()
 void comm_thread(threadInfo *tinfo)
 {
   /* set the thread-private threadinfo */
-  CtvAccess(threadinfo) = tinfo;
+  cta(threadinfo) = tinfo;
 
   tSTARTTIME = CmiWallTimer();
 
@@ -606,7 +613,7 @@ void comm_thread(threadInfo *tinfo)
     tSTARTED = 1;
     BgNodeStart(arg_argc, arg_argv);
     /* bnv should be initialized */
-    CpvAccess(cpvinited) = 1;
+    cva(cpvinited) = 1;
   }
 
   for (;;) {
@@ -623,9 +630,9 @@ void comm_thread(threadInfo *tinfo)
       if (msg->recvTime > tCURRTIME)  tCURRTIME = msg->recvTime;
       /* call user registered handler function */
       int handler = msg->handlerID;
-      CpvAccess(handlerTable)[handler](msg->first);
+      cva(handlerTable)[handler](msg->first);
       /* free the message */
-      CmiFree((char *)msg-CmiMsgHeaderSizeBytes); 
+      CmiFree((char *)msg); 
     }
     else {
       if (msg->threadID == ANYTHREAD) {
@@ -646,7 +653,7 @@ void work_thread(threadInfo *tinfo)
 {
   int handler;
 
-  CtvAccess(threadinfo) = tinfo;
+  cta(threadinfo) = tinfo;
 
   tSTARTTIME = CmiWallTimer();
   for (;;) {
@@ -677,9 +684,9 @@ void work_thread(threadInfo *tinfo)
     handler = msg->handlerID;
     
     /* call user registered handler function */
-    CpvAccess(handlerTable)[handler](msg->first);
+    cva(handlerTable)[handler](msg->first);
       /* free the msg and clear the buffer */
-    CmiFree((char *)msg-CmiMsgHeaderSizeBytes); 
+    CmiFree((char *)msg); 
     /* let other work thread do their jobs */
     tCURRTIME += (CmiWallTimer()-tSTARTTIME);
     CthYield();
@@ -698,7 +705,7 @@ void BgNodeInitialize(nodeInfo *ninfo)
   tSTARTTIME = CmiWallTimer();
 
   /* creat work threads */
-  for (i=0; i< CpvAccess(numWth); i++)
+  for (i=0; i< cva(numWth); i++)
   {
     threadInfo *tinfo = new threadInfo(i, WORK_THREAD, ninfo);
     _MEMCHECK(tinfo);
@@ -711,9 +718,9 @@ void BgNodeInitialize(nodeInfo *ninfo)
   }
 
   /* creat communication thread */
-  for (i=0; i< CpvAccess(numCth); i++)
+  for (i=0; i< cva(numCth); i++)
   {
-    threadInfo *tinfo = new threadInfo(i+CpvAccess(numWth), COMM_THREAD, ninfo);
+    threadInfo *tinfo = new threadInfo(i+cva(numWth), COMM_THREAD, ninfo);
     _MEMCHECK(tinfo);
     t = CthCreate((CthVoidFn)comm_thread, tinfo, 0);
     if (t == NULL) CmiAbort("BG> Failed to create communication thread. \n");
@@ -728,10 +735,10 @@ CmiHandler exitHandlerFunc(char *msg)
 {
   // TODO: free memory before exit
   int i;
-  delete [] CpvAccess(nodeinfo);
-  delete [] CpvAccess(inBuffer);
-  for (i=0; i<CpvAccess(numNodes); i++) CmmFree(CpvAccess(msgBuffer)[i]);
-  delete [] CpvAccess(msgBuffer);
+  delete [] cva(nodeinfo);
+  delete [] cva(inBuffer);
+  for (i=0; i<cva(numNodes); i++) CmmFree(cva(msgBuffer)[i]);
+  delete [] cva(msgBuffer);
 
   //ConverseExit();
   CsdExitScheduler();
@@ -752,42 +759,42 @@ CmiStartFn mymain(int argc, char **argv)
   CpvInitialize(int,numZ);
   CpvInitialize(int,numCth);
   CpvInitialize(int,numWth);
-  CpvAccess(numX) = CpvAccess(numY) = CpvAccess(numZ) = 0;
-  CpvAccess(numCth) = CpvAccess(numWth) = 0;
+  cva(numX) = cva(numY) = cva(numZ) = 0;
+  cva(numCth) = cva(numWth) = 0;
 
-  CmiGetArgInt(argv, "+x", &CpvAccess(numX));
-  CmiGetArgInt(argv, "+y", &CpvAccess(numY));
-  CmiGetArgInt(argv, "+z", &CpvAccess(numZ));
-  CmiGetArgInt(argv, "+cth", &CpvAccess(numCth));
-  CmiGetArgInt(argv, "+wth", &CpvAccess(numWth));
+  CmiGetArgInt(argv, "+x", &cva(numX));
+  CmiGetArgInt(argv, "+y", &cva(numY));
+  CmiGetArgInt(argv, "+z", &cva(numZ));
+  CmiGetArgInt(argv, "+cth", &cva(numCth));
+  CmiGetArgInt(argv, "+wth", &cva(numWth));
 
   arg_argv = argv;
   arg_argc = CmiGetArgc(argv);
 
   /* msg handler */
   CpvInitialize(int,msgHandler);
-  CpvAccess(msgHandler) = CmiRegisterHandler((CmiHandler) msgHandlerFunc);
+  cva(msgHandler) = CmiRegisterHandler((CmiHandler) msgHandlerFunc);
 
   CpvInitialize(int,exitHandler);
-  CpvAccess(exitHandler) = CmiRegisterHandler((CmiHandler) exitHandlerFunc);
+  cva(exitHandler) = CmiRegisterHandler((CmiHandler) exitHandlerFunc);
 
   /* init handlerTable */
   CpvInitialize(int, handlerTableCount);
-  CpvAccess(handlerTableCount) = 1;
+  cva(handlerTableCount) = 1;
   CpvInitialize(BgHandler*, handlerTable);
-  CpvAccess(handlerTable) = (BgHandler *)malloc(MAX_HANDLERS * sizeof(BgHandler));
-  for (i=0; i<MAX_HANDLERS; i++) CpvAccess(handlerTable)[i] = defaultBgHandler;
+  cva(handlerTable) = (BgHandler *)malloc(MAX_HANDLERS * sizeof(BgHandler));
+  for (i=0; i<MAX_HANDLERS; i++) cva(handlerTable)[i] = defaultBgHandler;
 
   CpvInitialize(int, inEmulatorInit);
-  CpvAccess(inEmulatorInit) = 0;
+  cva(inEmulatorInit) = 0;
 
   CpvInitialize(int, cpvinited);
-  CpvAccess(cpvinited) = 0;
+  cva(cpvinited) = 0;
 
-  CpvAccess(inEmulatorInit) = 1;
+  cva(inEmulatorInit) = 1;
   /* call user defined BgEmulatorInit */
   BgEmulatorInit(arg_argc, arg_argv);
-  CpvAccess(inEmulatorInit) = 0;
+  cva(inEmulatorInit) = 0;
 
   /* check if all bluegene node size and thread information are set */
   BGARGSCHECK;
@@ -796,31 +803,31 @@ CmiStartFn mymain(int argc, char **argv)
 
   /* number of bg nodes on this PE */
   CpvInitialize(int, numNodes);
-  CpvAccess(numNodes) = nodeInfo::numLocalNodes();
+  cva(numNodes) = nodeInfo::numLocalNodes();
 
   CpvInitialize(msgQueue *, inBuffer);
-  CpvAccess(inBuffer) = new msgQueue[CpvAccess(numNodes)];
-  _MEMCHECK( CpvAccess(inBuffer));
-  for (i=0; i<CpvAccess(numNodes); i++) CpvAccess(inBuffer)[i].initialize(INBUFFER_SIZE);
+  cva(inBuffer) = new msgQueue[cva(numNodes)];
+  _MEMCHECK(cva(inBuffer));
+  for (i=0; i<cva(numNodes); i++) cva(inBuffer)[i].initialize(INBUFFER_SIZE);
   CpvInitialize(CmmTable *, msgBuffer);
-  CpvAccess(msgBuffer) = new CmmTable[CpvAccess(numNodes)];
-  _MEMCHECK(CpvAccess(msgBuffer));
-  for (i=0; i<CpvAccess(numNodes); i++) CpvAccess(msgBuffer)[i] = CmmNew();
+  cva(msgBuffer) = new CmmTable[cva(numNodes)];
+  _MEMCHECK(cva(msgBuffer));
+  for (i=0; i<cva(numNodes); i++) cva(msgBuffer)[i] = CmmNew();
 
   /* create BG nodes */
   CpvInitialize(nodeInfo *, nodeinfo);
-  CpvAccess(nodeinfo) = new nodeInfo[CpvAccess(numNodes)];
-  _MEMCHECK(CpvAccess(nodeinfo));
-  CtvAccess(threadinfo) = new threadInfo(-1, UNKNOWN_THREAD, NULL);
-  _MEMCHECK(CtvAccess(threadinfo));
-  for (i=0; i<CpvAccess(numNodes); i++)
+  cva(nodeinfo) = new nodeInfo[cva(numNodes)];
+  _MEMCHECK(cva(nodeinfo));
+  cta(threadinfo) = new threadInfo(-1, UNKNOWN_THREAD, NULL);
+  _MEMCHECK(cta(threadinfo));
+  for (i=0; i<cva(numNodes); i++)
   {
-    nodeInfo *ninfo = CpvAccess(nodeinfo) + i;
+    nodeInfo *ninfo = cva(nodeinfo) + i;
     ninfo->id = i;
     nodeInfo::Local2XYZ(i, &ninfo->x, &ninfo->y, &ninfo->z);
 
     /* pretend that I am a thread */
-    CtvAccess(threadinfo)->myNode = ninfo;
+    cta(threadinfo)->myNode = ninfo;
 
     /* initialize a BG node and fire all threads */
     BgNodeInitialize(ninfo);

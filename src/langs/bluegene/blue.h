@@ -69,11 +69,12 @@ extern void BgEmulatorInit(int argc, char **argv);
 extern void BgNodeStart(int argc, char **argv);
 
 /*****************************************************************************
-      Node Private variables
+      Node Private variables macros (Bnv)
 *****************************************************************************/
 
 CpvExtern(int, inEmulatorInit);
 CpvExtern(int, cpvinited);
+
 #define BnvDeclare(T, v)    CpvDeclare(T*, v)
 #define BnvStaticDeclare(T, v)    CpvStaticDeclare(T*, v)
 #define BnvExtern(T, v)    CpvExtern(T*, v)
@@ -86,6 +87,11 @@ CpvExtern(int, cpvinited);
   } while(0)
 #define BnvAccess(v)       CpvAccess(v)[BgMyRank()]
 
+#define BpvDeclare(T, v)            CtvDeclare(T, v)
+#define BpvStaticDeclare(T, v)      CtvStaticDeclare(T, v)
+#define BpvExtern(T, v)             CtvExtern(T, v)
+#define BpvInitialize(T, v)         CtvInitialize(T, v)
+#define BpvAccess(v)                CtvAccess(v)
 
 #if defined(__cplusplus)
 }
