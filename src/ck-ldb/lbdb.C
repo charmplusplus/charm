@@ -405,6 +405,12 @@ double LDGetLBPeriod(LDHandle _db)   // s is in seconds
   return db->GetPeriod();
 }
 
+int LDMemusage(LDHandle _db) 
+{
+  LBDB *const db = (LBDB*)(_db.handle);
+  return db->useMem();
+}
+
 #endif // CMK_LBDB_ON
 
 /*@}*/

@@ -123,6 +123,8 @@ private:
   TableState* state;
   int cur_sz;
   int in_use;
+public:
+  int useMem() { return cur_sz*(sizeof(LBCommData) + sizeof(TableState)) + sizeof(LBCommTable); }
 };
 
 

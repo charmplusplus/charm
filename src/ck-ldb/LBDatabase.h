@@ -180,6 +180,7 @@ public:
   LastLBInfo lastLBInfo;
   inline double myExpectedLoad() { return lastLBInfo.expectedLoad[CkMyPe()]; }
   inline double* expectedLoad() { return lastLBInfo.expectedLoad; }
+  inline int useMem() { return LDMemusage(myLDHandle); }
 };
 
 void TurnManualLBOn();

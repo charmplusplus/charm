@@ -210,6 +210,8 @@ CmiBool LDObjIDEqual(const LDObjid &i1, const LDObjid &i2);
 void LDSetLBPeriod(LDHandle _db, double s);
 double LDGetLBPeriod(LDHandle _db);
 
+int LDMemusage(LDHandle _db);
+
 #ifdef __cplusplus
 }
 #endif /* _cplusplus */

@@ -109,6 +109,9 @@ private:
   int migrates_completed;
   int migrates_expected;
   double start_lb_time;
+
+public:
+  int useMem();
 };
 
 class CLBStatsMsg : public CMessage_CLBStatsMsg {

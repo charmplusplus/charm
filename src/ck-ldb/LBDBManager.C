@@ -291,6 +291,17 @@ void LBDB::DumpDatabase()
 #endif
 }
 
+int LBDB::useMem() {
+  int size = sizeof(LBDB);
+  int i=0;
+  size += oms.length() * sizeof(LBOM);
+  size += objs.length() * sizeof(LBObj);
+  size += migrateCBList.length() * sizeof(MigrateCBList);
+  size += startLBFnList.length() * sizeof(StartLBCB);
+  size += commTable->useMem();
+  return size;
+}
+
 LDBarrierClient LocalBarrier::AddClient(LDResumeFn fn, void* data)
 {
   client* new_client = new client;

@@ -374,8 +374,11 @@ void CentralLB::MigrationDone(int balancing)
 {
   if (balancing && CkMyPe() == cur_ld_balancer) {
     double end_lb_time = CmiWallTimer();
-    CkPrintf("[%s] Load balancing step %d finished at %f duration %f\n",
-	     lbName(), step(),end_lb_time,end_lb_time - start_lb_time);
+    CkPrintf("[%s] Load balancing step %d finished at %f\n",
+	     lbName(), step(),end_lb_time);
+    CkPrintf("[%s] duration %f memUsage:%dKB\n", lbName(),
+	     end_lb_time - start_lb_time,
+	     useMem() + LBDatabase::Object()->useMem()/1000);
   }
   migrates_completed = 0;
   migrates_expected = -1;
@@ -661,6 +664,12 @@ static int FindPEAfterMigration(LDObjid& id, CentralLB::LDStats* stats, int coun
 	CkAssert(0);
 	return -1;
 }
+
+int CentralLB::useMem() { 
+  return CkNumPes() * (sizeof(CentralLB::LDStats)+sizeof(CLBStatsMsg)) +
+                        sizeof(CentralLB);
+}
+
 #endif
 
 /*@}*/

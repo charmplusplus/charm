@@ -215,7 +215,8 @@ private:
 
   StartLBCBList  startLBFnList;
   int            startLBFn_count;
-
+public:
+  int useMem();
 };
 
 #endif
