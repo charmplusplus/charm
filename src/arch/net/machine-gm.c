@@ -387,7 +387,7 @@ void send_callback(struct gm_port *p, void *context, gm_status_t status)
     char *errmsg;
     DgramHeaderBreak(msg, rank, srcpe, magic, seqno);
     errmsg = getErrorMsg(status);
-    CmiPrintf("GM Error> PE:%d send to msg %p node %d rank %d mach_id %d port %d failed to complete (error %d): %s\n", srcpe, msg, out->node_idx, rank, out->mach_id, out->dataport, status, errmsg); 
+    CmiPrintf("GM Error> PE:%d send to msg %p node %d rank %d mach_id %d port %d len %d size %d failed to complete (error %d): %s\n", srcpe, msg, out->node_idx, rank, out->mach_id, out->dataport, out->length, out->size, status, errmsg); 
 #ifdef __FAULT__ 
     if (status != GM_SEND_DROPPED) {
       gm_drop_sends (gmport, GM_LOW_PRIORITY, out->mach_id, out->dataport,
@@ -575,8 +575,8 @@ void CmiMachineInit()
 
     maxMsgSize = len;
 
-    if (i<=5) num = 0;
-    else if (i<17 && i>5)  num = 20;
+    if (i<5) num = 0;
+    else if (i<17)  num = 20;
     else if (i>22) num = 1;
     for (j=0; j<num; j++) {
       buf = gm_dma_malloc(gmport, len);
