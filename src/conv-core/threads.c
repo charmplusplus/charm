@@ -108,7 +108,7 @@
 #include <malloc.h> /*<- for memalign*/
 
 #include "converse.h"
-#ifndef  WIN32
+#ifndef _WIN32
 #include "qt.h"
 #endif
 #include "conv-trace.h"
@@ -410,10 +410,12 @@ int size;
 
 #elif  CMK_THREADS_ARE_WIN32_FIBERS
 
-#define _WIN32_WINNT  0x0400
-
 #include <windows.h>
 #include <winbase.h>
+
+#ifndef _WIN32_WINNT
+#define _WIN32_WINNT  0x0400
+#endif
 
 #if(_WIN32_WINNT >= 0x0400)
 typedef VOID (WINAPI *PFIBER_START_ROUTINE)(
@@ -668,7 +670,7 @@ void CthYield()
   CthSuspend();
 }
 
-void CthAwakenPrio(CthThread th, int s, int pb, int *prio)
+void CthAwakenPrio(CthThread th, int s, int pb, unsigned int *prio)
 {
   if (th->awakenfn == 0) CthNoStrategy();
   CpvAccess(curThread) = th;
@@ -679,7 +681,7 @@ void CthAwakenPrio(CthThread th, int s, int pb, int *prio)
   th->awakenfn(th, s, pb, prio);
 }
 
-void CthYieldPrio(int s, int pb, int *prio)
+void CthYieldPrio(int s, int pb, unsigned int *prio)
 {
   CthAwakenPrio(CthCpvAccess(CthCurrent), s, pb, prio);
   CthSuspend();
