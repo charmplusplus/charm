@@ -1,5 +1,42 @@
-What's New Since Charm/Converse 5.0
-===================================
+What's New since Charm++ 5.4 release 1
+========================================
+
+--------------------------------------------------------------------------------
+New Supported Platforms:
+--------------------------------------------------------------------------------
+1. Charm++ ported to IA64 Itanium running Win2K and Linux;
+
+2. Charm++ ported to Power Macintosh powerpc running Darwin;
+
+--------------------------------------------------------------------------------
+Summary of New Features:
+--------------------------------------------------------------------------------
+1. Structure Dagger
+   Structured Dagger is a coordination language built on top of CHARM++.
+   Structured Dagger allows easy expression of dependences among messages and 
+   computations and also among computations within the same object using 
+   when-blocks and various structured constructs. 
+
+2. Entry functions support parameter marshalling
+   Now you can declare and invoke remote entry functions using parameter 
+   marshalling instead of defining messages.
+
+3. Easier running - standalone mode
+   For net-* version running locally, you can now run Charm program without 
+   charmrun. Running node program directly from command line, this is virtually
+   same as "charmrun +p1 <program>", for SMP version, you can also specify 
+   number of processors greater than 1: "program +p2".
+   
+
+--------------------------------------------------------------------------------
+Summary of Changes:
+--------------------------------------------------------------------------------
+
+                *******   Old Change histories *******
+
+
+What's New in Charm++ 5.4 release 1 since 5.0
+===============================================================
 
 --------------------------------------------------------------------------------
 New Supported Platforms:
@@ -56,7 +93,7 @@ Summary of New Features:
    1) master-slave library: for writing manager-worker paradigm programs.
    2) receiver library: provide asynchronous communication mode for chare array.
    3) f90charm:  provides Fortran90 bindings for Charm++ Array.
-   4) BlueGene:  a Charm++/Converse emulator for IBM BlueGene.
+   4) BlueGene:  a Charm++/Converse emulator for IBM proposed Blue Gene.
 
 --------------------------------------------------------------------------------
 Summary of Changes:
