@@ -1,0 +1,21 @@
+// -*- mode: c++; tab-width: 4 -*-
+mainmodule t3
+{
+    mainchare t3
+    {
+        entry void t3(CkArgMsg*);
+        entry void done(CkReductionMsg*);
+    };
+
+    array[1D] TestArray
+    {
+        entry void TestArray(MSA2DRM arr_, unsigned int numWorkers_);
+        entry [threaded] void Start();
+        entry [threaded] void Kontinue();
+    };
+
+    /* Currently, you must explicitly instantiate any
+       MSA templates that you use. */
+    group MSA_CacheGroup<Double, DefaultEntry<Double,true>, MSA_DEFAULT_ENTRIES_PER_PAGE>;
+    array [1D] MSA_PageArray<Double, DefaultEntry<Double,true>, MSA_DEFAULT_ENTRIES_PER_PAGE>;
+};

@@ -1,0 +1,31 @@
+// -*- mode: c++; tab-width: 4 -*-
+mainmodule moldyn
+{
+    readonly bool detailedTimings;
+
+    mainchare moldyn
+    {
+        entry void moldyn(CkArgMsg*);
+        entry void done(CkReductionMsg*);
+    };
+
+    array[1D] WorkerArray
+    {
+        entry void WorkerArray(XyzMSA coords_, XyzMSA forces_,
+                               AtomInfoMSA atominfo_, NeighborMSA nbrList_,
+                               unsigned int numWorkers);
+        entry [threaded] void Start();
+        entry [threaded] void Kontinue();
+    };
+
+    /* Currently, you must explicitly instantiate any
+       MSA templates that you use. */
+    group MSA_CacheGroup<XYZ, DefaultEntry<XYZ,false>, NEPP>;
+    array [1D] MSA_PageArray<XYZ, DefaultEntry<XYZ,false>, NEPP>;
+
+    group MSA_CacheGroup<AtomInfo, DefaultEntry<AtomInfo,false>, NEPP>;
+    array [1D] MSA_PageArray<AtomInfo, DefaultEntry<AtomInfo,false>, NEPP>;
+
+    group MSA_CacheGroup<bool, DefaultEntry<bool,false>, NEPP>;
+    array [1D] MSA_PageArray<bool, DefaultEntry<bool,false>, NEPP>;
+};

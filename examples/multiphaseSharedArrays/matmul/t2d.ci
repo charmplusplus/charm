@@ -1,0 +1,34 @@
+// -*- mode: c++; tab-width: 4 -*-
+mainmodule t2d
+{
+    readonly unsigned int DECOMPOSITION;
+    readonly bool detailedTimings;
+
+    mainchare t2d
+    {
+        entry void t2d(CkArgMsg*);
+        entry void done(CkReductionMsg*);
+    };
+
+    array[1D] TestArray
+    {
+        entry void TestArray(MSA2DRowMjr arr1, MSA2DColMjr arr2, MSA2DRowMjrC prod, unsigned int numWorkers);
+        entry [threaded] void Start();
+        entry [threaded] void Kontinue();
+    };
+
+    /* Currently, you must explicitly instantiate any
+       MSA templates that you use. */
+// #ifdef PUP_EVERY
+    group MSA_CacheGroup<double, DefaultEntry<double,true>, NEPP>;
+    array [1D] MSA_PageArray<double, DefaultEntry<double,true>, NEPP>;
+    group MSA_CacheGroup<double, DefaultEntry<double,true>, NEPP_C>;
+    array [1D] MSA_PageArray<double, DefaultEntry<double,true>, NEPP_C>;
+// #else
+    group MSA_CacheGroup<double, DefaultEntry<double,false>, NEPP>;
+    array [1D] MSA_PageArray<double, DefaultEntry<double,false>, NEPP>;
+    group MSA_CacheGroup<double, DefaultEntry<double,false>, NEPP_C>;
+    array [1D] MSA_PageArray<double, DefaultEntry<double,false>, NEPP_C>;
+// #endif
+
+};
