@@ -51,6 +51,23 @@ done
 [ -d $VERSION/tmp ] || mkdir $VERSION/tmp
 echo "Copying src/Common/scripts/Makefile to $VERSION/tmp"
 rm -f $VERSION/tmp/Makefile
+
+if [ "x_`echo $VERSION | awk -F- '{print $2}'`" = "x_win32" ]
+then
+#Win32 version needs special compilers and *copied* (not linked)
+# source files.
+	echo "Copying compilers for win32 into cygwin /bin directory"
+	cp src/Common.win32/unix2nt* /bin
+	cp src/Common.win32/system_ln $VERSION/tmp
+else
+	cat > $VERSION/tmp/system_ln <<EOF
+#!/bin/sh
+ln -f -s \$@
+EOF
+fi
+
+chmod +x $VERSION/tmp/system_ln
 ln -s "../../src/Common/scripts/Makefile" $VERSION/tmp/Makefile
+
 echo "Performing 'make $MAKEOPTS $PROGRAM OPTS="$OPTS"' in $VERSION/tmp"
 cd $VERSION/tmp ; make $MAKEOPTS $PROGRAM OPTS="$OPTS"
