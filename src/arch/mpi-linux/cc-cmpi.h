@@ -8,8 +8,13 @@
 
 /* keep using QT, context thread migration is broken (megampi) on tungsten */
 /* however QT crash megatest marshall test */
+/* the reason cmpirun/gm crashed megatest seems to be some problem related
+   to GM message protocol for long messages, using -gm_long <size> seems to 
+   work around it, so now switch it back to QT */
+#if 0
 #undef CMK_THREADS_USE_CONTEXT
 #define CMK_THREADS_USE_CONTEXT                            1
+#endif
 
 #undef CMK_TYPEDEF_INT8
 #undef CMK_TYPEDEF_UINT8
