@@ -950,10 +950,13 @@ esac
 #
 ########################################################################
 
-if [ -x $CHARMBIN/conv-host ]
+Postfix=
+test $OSTYPE = cygwin && Postfix='.exe'
+
+if [ -x $CHARMBIN/conv-host${Postfix} ]
 then
-	DoNoErrCheck $RM conv-host
-	Do $CP $CHARMBIN/conv-host conv-host
+	DoNoErrCheck $RM conv-host${Postfix}
+	Do $CP $CHARMBIN/conv-host${Postfix} conv-host${Postfix}
 fi
 
 Copyobj
