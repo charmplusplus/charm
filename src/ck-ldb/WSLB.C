@@ -367,7 +367,7 @@ WSLBMigrateMsg* WSLB::Strategy(WSLB::LDStats* stats, int count)
     // Scale times we need appropriately for relative proc speeds
     double hisload = stats[i].total_walltime - stats[i].idletime;
     const double hisusage = stats[i].total_cputime / hisload;
-    const double scale =  ((double)myStats.proc_speed * myusage) 
+    const double scale =  (myStats.proc_speed * myusage) 
       / (stats[i].proc_speed * hisusage);
 
     hisload *= scale;
@@ -390,8 +390,8 @@ WSLBMigrateMsg* WSLB::Strategy(WSLB::LDStats* stats, int count)
   // only if we are overloaded
 
   if (vacate || myload > avgload) {
-    //CkPrintf("[%d] OVERLOAD My load is %f, average load is %f\n",
-    //    	     CkMyPe(),myload,avgload);
+    //    CkPrintf("[%d] OVERLOAD My load is %f, average load is %f\n",
+    //	     CkMyPe(),myload,avgload);
 
     // First, build heaps of other processors and my objects
     // Then assign objects to other processors until either
@@ -494,14 +494,9 @@ WSLBMigrateMsg* WSLB::Strategy(WSLB::LDStats* stats, int count)
 
   // Now build the message to actually perform the migrations
   int migrate_count=migrateInfo.size();
-  if (vacate) {
-    CkPrintf("PE %d vacating: Sent away %d of %d objects\n",
-	     CkMyPe(),migrate_count,myStats.obj_data_sz);
-  }
-  //  CkPrintf("PE %d has %d objects\n",myStats.obj_data_sz - migrate_count);
-
-  //  if (migrate_count > 0) {
-  //    CkPrintf("PE %d migrating %d elements\n",CkMyPe(),migrate_count);
+  //  if (migrate_count) {
+  //    CkPrintf("PE %d: Sent away %d of %d objects\n",
+  //	     CkMyPe(),migrate_count,myStats.obj_data_sz);
   //  }
   WSLBMigrateMsg* msg = new(&migrate_count,1) WSLBMigrateMsg;
   msg->n_moves = migrate_count;
