@@ -19,23 +19,6 @@
 #define AMPI_DEBUG /* empty */
 #endif
 
-/* is large AMPI msg fragmented and pipelined? */
-#define AMPI_ENABLE_FRAG_MSG 0
-#define AMPI_MSG_FRAG_SIZE (65536-ALIGN8(sizeof(AmpiMsg)))
-#if AMPI_ENABLE_FRAG_MSG
-#define nfragCkPrintf CkPrintf
-#else
-#define nfragCkPrintf
-#endif
-/* do we trap CmiAlloc to do buffer pooling for ampimsg? */
-#define AMPI_ENABLE_BUFFER_POOLING 0
-#if AMPI_ENABLE_BUFFER_POOLING
-#define bufpCkPrintf CkPrintf
-#else
-#define bufpCkPrintf
-#endif
-
-
 void applyOp(MPI_Datatype datatype, MPI_Op op, int count, void* invec, void* inoutvec);
 PUPfunctionpointer(MPI_Op);
 class AmpiOpHeader {
@@ -732,11 +715,6 @@ inline void pupFromBuf(const void *data,T &t) {
 	PUP::fromMem p(data); p|t;
 }
 
-#if AMPI_ENABLE_BUFFER_POOLING
-static void* AmpiMsg_alloc(int msgnum, size_t size, int *sizes, int pb);
-static void AmpiMsg_ampi_CkFreeMsg(void *buf);
-#endif
-
 class AmpiMsg : public CMessage_AmpiMsg {
  public:
   int seq; //Sequence number (for message ordering)
@@ -745,57 +723,15 @@ class AmpiMsg : public CMessage_AmpiMsg {
   int srcRank; //Communicator rank for source
   MPI_Comm comm; //Communicator for source
   int length; //Number of bytes in this message 
-#if AMPI_ENABLE_BUFFER_POOLING
-  int alloclength; // number of bytes allocated for this msg (when use msg pool)
-#endif
-#if AMPI_ENABLE_FRAG_MSG
-  int totallength; // number of bytes in the all msg frags (if fragmented)
-  int nFrags;	// number of fragments 
-  int snFrag;	// serial number in fragments
-#endif
   char *data;
 
   AmpiMsg(void) { data = NULL; }
-#if AMPI_ENABLE_FRAG_MSG
-  AmpiMsg(int _s, int t, int sIdx,int sRank, int l, int c, int tl=0, int nf=1, int snf=0) :
-    seq(_s), tag(t),srcIdx(sIdx), srcRank(sRank), comm(c), length(l), totallength(tl), nFrags(nf), snFrag(snf) {
-    if(nf==1 && tl==0) totallength = length;
-    data = (char *)this + sizeof(AmpiMsg);
-  }  
-#else
   AmpiMsg(int _s, int t, int sIdx,int sRank, int l, int c) :
     seq(_s), tag(t),srcIdx(sIdx), srcRank(sRank), comm(c), length(l) {
-    data = (char *)this + sizeof(AmpiMsg);
   }  
-#endif
-
-#if AMPI_ENABLE_BUFFER_POOLING
-  /* trapping AmpiMsg::alloc and CkFreeMsg() */
-  static void* alloc(int msgnum, size_t size, int *sizes, int pb){
-      return AmpiMsg_alloc(msgnum,size,sizes,pb);
-  }
-  static void ampi_CkFreeMsg(void *buf){
-      AmpiMsg_ampi_CkFreeMsg(buf);
-  }
-
-#if CMK_MULTIPLE_DELETE
-  void operator delete(void*p,void*){ampi_CkFreeMsg(p);}
-  void operator delete(void*p,const int){ampi_CkFreeMsg(p);}
-  void operator delete(void*p){ ampi_CkFreeMsg(p);}
-  void operator delete(void*p,int*,const int){ampi_CkFreeMsg(p);}
-  void operator delete(void*p,int*){ampi_CkFreeMsg(p);}
-  void operator delete(void *p,int, const int){ampi_CkFreeMsg(p);}
-#endif
-  void operator delete(void*p,size_t){ampi_CkFreeMsg(p);}
-
-#endif	// AMPI_ENABLE_BUFFER_POOLING
-
   static AmpiMsg* pup(PUP::er &p, AmpiMsg *m)
   {
     int seq, length, tag, srcIdx, srcRank, comm;
-#if AMPI_ENABLE_FRAG_MSG
-    int totallength, nFrags, snFrag;
-#endif    
     if(p.isPacking() || p.isSizing()) {
       seq = m->seq;
       tag = m->tag;
@@ -803,22 +739,10 @@ class AmpiMsg : public CMessage_AmpiMsg {
       srcRank = m->srcRank;
       comm = m->comm;
       length = m->length;
-#if AMPI_ENABLE_FRAG_MSG
-      totallength = m->totallength;
-      nFrags = m->nFrags;
-      snFrag = m->snFrag;
-#endif
     }
     p(seq); p(tag); p(srcIdx); p(srcRank); p(comm); p(length); 
-#if AMPI_ENABLE_FRAG_MSG
-    p(totallength); p(nFrags); p(snFrag);
-#endif
     if(p.isUnpacking()) {
-#if AMPI_ENABLE_FRAG_MSG
-      m = new (length, 0) AmpiMsg(seq, tag, srcIdx, srcRank, length, comm, totallength, nFrags, snFrag);
-#else
       m = new (length, 0) AmpiMsg(seq, tag, srcIdx, srcRank, length, comm);
-#endif
     }
     p(m->data, length);
     if(p.isDeleting()) {
@@ -1327,10 +1251,6 @@ class ampi : public CBase_ampi {
                         int idx);
     void delesend(int t, int s, const void* buf, int count, int type,  
                   int rank, MPI_Comm destcomm, CProxy_ampi arrproxy);
-#if AMPI_ENABLE_FRAG_MSG
-    void sendPipeMsgs(CProxy_ampi proxy, int destIdx, int t, int sRank, 
-		      const void* buf, int count, int type, MPI_Comm destcomm);
-#endif
     int recv(int t,int s,void* buf,int count,int type,int comm,int *sts=0);
     void probe(int t,int s,int comm,int *sts);
     int iprobe(int t,int s,int comm,int *sts);

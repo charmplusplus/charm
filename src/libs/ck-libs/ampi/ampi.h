@@ -204,7 +204,7 @@ extern MPI_Comm MPI_COMM_UNIVERSE[MPI_MAX_COMM_WORLDS];
 
 typedef int MPI_Request;
 typedef struct {
-  int MPI_TAG, MPI_SOURCE, MPI_COMM, MPI_LENGTH, dummy; /*dummy is for tags[5]*/
+  int MPI_TAG, MPI_SOURCE, MPI_COMM, MPI_LENGTH;
 } MPI_Status;
 #define stsempty(sts) (sts).MPI_TAG=(sts).MPI_SOURCE=(sts).MPI_COMM=(sts).MPI_LENGTH=0
 #define MPI_STATUS_IGNORE (MPI_Status *)0

@@ -1,5 +1,5 @@
 module ampi {
-  message AmpiMsg{
+  message AmpiMsg {
     char data[];
   };
 

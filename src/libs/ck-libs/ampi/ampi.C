@@ -23,107 +23,6 @@
 #  define AMPI_COMLIB 0
 #endif
 
-#if AMPI_ENABLE_BUFFER_POOLING
-const int MSG_SIZE_01K = 1024;  
-const int MSG_SIZE_04K = 4096;  
-const int MSG_SIZE_16K = 16384; 
-const int MSG_SIZE_64K = 65536; 
-CpvDeclare(CkQ<void *>, ampi01KBufferQueue);
-CpvDeclare(CkQ<void *>, ampi04KBufferQueue);
-CpvDeclare(CkQ<void *>, ampi16KBufferQueue);
-CpvDeclare(CkQ<void *>, ampi64KBufferQueue);
-
-void AmpiMsgPoolInit(void){
-  CpvInitialize(CkQ<void *>, ampi01KBufferQueue);
-  CpvInitialize(CkQ<void *>, ampi04KBufferQueue);
-  CpvInitialize(CkQ<void *>, ampi16KBufferQueue);
-  CpvInitialize(CkQ<void *>, ampi64KBufferQueue);
-}
-
-static void* prepareAmpiMsg(void *msg, int msgnum){
-    register envelope* env;
-    env = UsrToEnv(msg);
-    env->setMsgIdx(msgnum);
-    return EnvToUsr(env);
-}
-
-static void* AmpiMsg_alloc(int msgnum, size_t size, int *sizes, int pb) {
-      void *msg;
-      int tsize, offset;
-      if(sizes==0)
-        tsize = ALIGN8(size);
-      else
-        tsize = ALIGN8(size) + ALIGN8(sizeof(char)*sizes[0]);
-      if(tsize<=MSG_SIZE_01K){
-        if(!(CpvAccess(ampi01KBufferQueue)).isEmpty()){
-bufpCkPrintf("popping from 1k queue, size=%d\n",tsize);
-          msg = prepareAmpiMsg((CpvAccess(ampi01KBufferQueue)).deq(),msgnum);
-        }else{
-bufpCkPrintf("allocating 1k, size=%d\n",tsize);
-          offset = MSG_SIZE_01K - ALIGN8(size);
-          msg = CMessage_AmpiMsg::alloc(msgnum, size, &offset, pb);
-          ((AmpiMsg*)msg)->alloclength = MSG_SIZE_01K;
-        }
-      }else if(tsize<=MSG_SIZE_04K){
-        if(!(CpvAccess(ampi04KBufferQueue)).isEmpty()){
-bufpCkPrintf("popping from 4k queue,size=%d\n",tsize);
-          msg = prepareAmpiMsg((CpvAccess(ampi04KBufferQueue)).deq(),msgnum);
-        }else{
-bufpCkPrintf("allocating 4k ,size=%d\n",tsize);
-          offset = MSG_SIZE_04K - ALIGN8(size);
-          msg = CMessage_AmpiMsg::alloc(msgnum, size, &offset, pb);
-          ((AmpiMsg*)msg)->alloclength = MSG_SIZE_04K;
-        }
-      }else if(tsize<=MSG_SIZE_16K){
-        if(!(CpvAccess(ampi16KBufferQueue)).isEmpty()){
-bufpCkPrintf("popping from 16k queue,size=%d\n",tsize);
-          msg = prepareAmpiMsg((CpvAccess(ampi16KBufferQueue)).deq(),msgnum);
-        }else{
-bufpCkPrintf("allocating 16k ,size=%d\n",tsize);
-          offset = MSG_SIZE_16K - ALIGN8(size);
-          msg = CMessage_AmpiMsg::alloc(msgnum, size, &offset, pb);
-          ((AmpiMsg*)msg)->alloclength = MSG_SIZE_16K;
-        }
-      }else if(tsize<=MSG_SIZE_64K){
-        if(!(CpvAccess(ampi64KBufferQueue)).isEmpty()){
-bufpCkPrintf("popping from 64k queue,size=%d\n",tsize);
-          msg = prepareAmpiMsg((CpvAccess(ampi64KBufferQueue)).deq(),msgnum);
-        }else{
-bufpCkPrintf("allocating 64k, size=%d\n",tsize);
-          offset = MSG_SIZE_64K - ALIGN8(size);
-          msg = CMessage_AmpiMsg::alloc(msgnum, size, &offset, pb);
-          ((AmpiMsg*)msg)->alloclength = MSG_SIZE_64K;
-        }
-      }else{
-bufpCkPrintf("allocating %d bytes\n",tsize);
-        msg = CMessage_AmpiMsg::alloc(msgnum, size, sizes, pb);
-        ((AmpiMsg*)msg)->alloclength = tsize;
-      }
-      return msg;
-}
-  
-static void AmpiMsg_ampi_CkFreeMsg(void *buf){
-      int tsize = ((AmpiMsg*)buf)->alloclength;
-      if(tsize==MSG_SIZE_01K){
-bufpCkPrintf("pushing into 1k queue,size=%d\n",tsize);
-        (CpvAccess(ampi01KBufferQueue)).enq(buf);
-      }else if(tsize==MSG_SIZE_04K){
-bufpCkPrintf("pushing into 4k queue,size=%d\n",tsize);
-        (CpvAccess(ampi04KBufferQueue)).enq(buf);
-      }else if(tsize==MSG_SIZE_16K){
-bufpCkPrintf("pushing into 16k queue,size=%d\n",tsize);
-        (CpvAccess(ampi16KBufferQueue)).enq(buf);
-      }else if(tsize==MSG_SIZE_64K){
-bufpCkPrintf("pushing into 64k queue,size=%d\n",tsize);
-        (CpvAccess(ampi64KBufferQueue)).enq(buf);
-      }else{
-bufpCkPrintf("freeing buffer size=%d\n",tsize);
-        CkFreeMsg(buf);
-      }
-}
-#endif	// AMPI_ENABLE_BUFFER_POOLING
-
-
 //------------- startup -------------
 static mpi_comm_worlds mpi_worlds;
 
@@ -473,10 +372,6 @@ static void ampiNodeInit(void)
 
   AmpiReducer = CkReduction::addReducer(AmpiReducerFunc);
   
-#if AMPI_ENABLE_BUFFER_POOLING
-  AmpiMsgPoolInit();
-#endif
-  
   nodeinit_has_been_called=1;
 }
 
@@ -559,10 +454,6 @@ static ampi *ampiInit(char **argv)
 		}
   }
   
-/*  if(0==CmiGetArgIntDesc(argv,"+pmsg",&AMPI_MSG_FRAG_SIZE,NULL)){
-    AMPI_MSG_FRAG_SIZE=65536;
-  }*/
-    
   MPI_Comm new_world;
   int _nchunks;
   CkArrayOptions opts;
@@ -1347,11 +1238,7 @@ MSG_ORDER_DEBUG(
     inorder(msg);
   }
   
-  // resume until last fragment is there
   if(resumeOnRecv){
-#if AMPI_ENABLE_FRAG_MSG
-   if(msg->snFrag == msg->nFrags-1)  
-#endif
     thread->resume();
   }
 }
@@ -1363,67 +1250,10 @@ MSG_ORDER_DEBUG(
   CkPrintf("AMPI vp %d inorder: tag=%d, src=%d, comm=%d  (from %d, seq %d)\n",
   	thisIndex,msg->tag,msg->srcRank,msg->comm, msg->srcIdx, msg->seq);
 )
-  int tags[5];
+  int tags[3];
   tags[0] = msg->tag; tags[1] = msg->srcRank; tags[2] = msg->comm;
-#if AMPI_ENABLE_FRAG_MSG
-  tags[3] = msg->snFrag; tags[4] = msg->nFrags; 
-  CmmPut(msgs, 5, tags, msg);
-#else
   CmmPut(msgs, 3, tags, msg);
-#endif
 }
-
-#if AMPI_ENABLE_FRAG_MSG
-void ampi::sendPipeMsgs(CProxy_ampi proxy, int destIdx, int t, int sRank, 
-			const void* buf, int count, int type, MPI_Comm destcomm)
-{
-  if(type > MPI_LONG_DOUBLE){
-    if(destIdx==-1)	// bdcast
-      proxy.generic(makeAmpiMsg(destIdx,t,sRank,buf,count,type,destcomm));
-    else
-      proxy[destIdx].generic(makeAmpiMsg(destIdx,t,sRank,buf,count,type,destcomm));
-    return;
-  }
-  
-  CkDDT_DataType *ddt = getDDT()->getType(type);
-  int len;
-  len = ddt->getSize(count);
-  if(len < AMPI_MSG_FRAG_SIZE){
-    if(destIdx==-1)	// bdcast
-      proxy.generic(makeAmpiMsg(destIdx,t,sRank,buf,count,type,destcomm));
-    else
-      proxy[destIdx].generic(makeAmpiMsg(destIdx,t,sRank,buf,count,type,destcomm));
-    return;
-  }
-
-  int nFrags = (int)ceil((double)len/AMPI_MSG_FRAG_SIZE);
-  int thislen = AMPI_MSG_FRAG_SIZE;
-  int sIdx = thisIndex;
-  int seq = -1;
-  int thisstart = 0;
-  int totallen = len;
-nfragCkPrintf("nFrags=%d(%f),(total,start,thislen)=%d,%d,%d\n",nFrags,((double)len/AMPI_MSG_FRAG_SIZE),totallen,thisstart,thislen);
-  // for each fragment, make msg and send out
-  for(int i=0; i<nFrags; i++){
-    if(totallen<AMPI_MSG_FRAG_SIZE)
-      thislen = totallen;
-    if (destIdx>=0 && destcomm<=MPI_COMM_WORLD && t<=MPI_TAG_UB_VALUE)//Not cross-module: set seqno
-      seq = oorder.nextOutgoing(destIdx);
-
-nfragCkPrintf("i=%d,nFrags=%d,(total,start,thislen)=%d,%d,%d\n",i,nFrags,totallen,thisstart,thislen);
-    
-    AmpiMsg *msg = new (thislen, 0) AmpiMsg(seq,t,sIdx,sRank,thislen,destcomm,len,nFrags,i);
-    memcpy((void *)(msg->data), (void*)((char*)buf+thisstart), thislen);  // from buffer to msg data
-    proxy[destIdx].generic(msg);
-    
-    totallen -= thislen;
-    thisstart += thislen;
-  }
-  
-  CkAssert(totallen==0);
-}
-#endif	// AMPI_ENABLE_FRAG_MSG
-
 
 AmpiMsg *ampi::makeAmpiMsg(int destIdx,
 	int t,int sRank,const void *buf,int count,int type,MPI_Comm destcomm)
@@ -1471,11 +1301,7 @@ ampi::delesend(int t, int sRank, const void* buf, int count, int type,  int rank
   CkPrintf("AMPI vp %d send: tag=%d, src=%d, comm=%d (to %d)\n",thisIndex,t,sRank,destcomm,destIdx);
  )
 
-#if AMPI_ENABLE_FRAG_MSG
-  sendPipeMsgs(arrproxy,destIdx,t,sRank,buf,count,type,destcomm);
-#else
   arrproxy[destIdx].generic(makeAmpiMsg(destIdx,t,sRank,buf,count,type,destcomm));
-#endif
 
 #ifndef CMK_OPTIMIZE
   int size=0;
@@ -1505,7 +1331,7 @@ ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
     comm = MPI_COMM_FIRST_INTER;
   }
 
-  int tags[5];
+  int tags[3];
   AmpiMsg *msg = 0;
   CkDDT_DataType *ddt = getDDT()->getType(type);
   int len = ddt->getSize(count);
@@ -1515,76 +1341,17 @@ ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
  )
 
   resumeOnRecv=true;
-  
-  int msglength, msgsrcrank;
-  tags[0] = t; tags[1] = s; tags[2] = comm;
-#if AMPI_ENABLE_FRAG_MSG
-  while(1) {		// get number of fragments
-    tags[4] = CmmGetLastTag(msgs, 3, tags);
-    if(tags[4]>0) break;
-    thread->suspend();
-  }
-  
-  if(tags[4] == 1){	// not fragmented
-    tags[3] = 0;
-    msg = (AmpiMsg *) CmmGet(msgs, 5, tags, sts);
-    CkAssert(msg);
-    if (msg->totallength-len==sizeof(AmpiOpHeader)) {	// reduction msg
-      ddt->serialize((char*)buf, (char*)msg->data+sizeof(AmpiOpHeader), count, (-1));
-    } else {	// normal non-frag msg
-      ddt->serialize((char*)buf, (char*)msg->data, count, (-1));
-    }
-    msglength = msg->totallength;
-    msgsrcrank = msg->srcRank;
-    delete msg;
-  }else{	// fragmented msg
-    tags[3] = 0;
-    msg = (AmpiMsg *) CmmProbe(msgs, 5, tags, sts);
-    CkAssert(msg);
-    int thisstart = 0;
-    int thislen = AMPI_MSG_FRAG_SIZE;
-    int totallen = msg->totallength;
-    msglength = msg->length;
-    msgsrcrank = msg->srcRank;
-nfragCkPrintf("[%d]ampi::recv, frags=%d\n",thisIndex,tags[4]);
-    for(int i=0;i<tags[4];i++){	// get each frag and memcpy to user buffer
-      tags[3] = i;
-      if(totallen < AMPI_MSG_FRAG_SIZE)
-        thislen = totallen;
-      while(1) {
-        msg = (AmpiMsg *) CmmGet(msgs, 5, tags, sts);
-	if(msg) break;
-	thread->suspend();
-      }
-      memcpy((void*)((char*)buf+thisstart), (void *)(msg->data), thislen);
-nfragCkPrintf("[%d]ampi::recv, frag=%d,(total,start,thislen)=%d,%d,%d\n",thisIndex,i,totallen,thisstart,thislen);
-      totallen -= thislen;
-      thisstart += thislen;
-      delete msg;
-    }
-    CkAssert(totallen==0);
-  }
-#else
   while(1) {
+    tags[0] = t; tags[1] = s; tags[2] = comm;
     msg = (AmpiMsg *) CmmGet(msgs, 3, tags, sts);
     if (msg) break;
     thread->suspend();
   }
-  if (msg->length-len==sizeof(AmpiOpHeader)) {	// reduction msg
-    ddt->serialize((char*)buf, (char*)msg->data+sizeof(AmpiOpHeader), count, (-1));
-  } else {	// normal non-frag msg
-    ddt->serialize((char*)buf, (char*)msg->data, count, (-1));
-  }
-  msglength = msg->length;
-  msgsrcrank = msg->srcRank;
-  delete msg;
-#endif
-  
   resumeOnRecv=false;
   
   if(sts)
-    ((MPI_Status*)sts)->MPI_LENGTH = msglength;
-  if (msglength > len && msglength-len!=sizeof(AmpiOpHeader))
+    ((MPI_Status*)sts)->MPI_LENGTH = msg->length;
+  if (msg->length > len && msg->length-len!=sizeof(AmpiOpHeader))
   { /* Received more data than we were expecting */
     char einfo[1024];
     sprintf(einfo, "FATAL ERROR in rank %d MPI_Recv (tag=%d, source=%d)\n"
@@ -1592,17 +1359,23 @@ nfragCkPrintf("[%d]ampi::recv, frag=%d,(total,start,thislen)=%d,%d,%d\n",thisInd
 	"  but received %d bytes from rank %d\nAMPI> MPI_Send was longer than matching MPI_Recv.",
             thisIndex,t,s,
 	    len, count, type,
-	    msglength, msgsrcrank);
+	    msg->length, msg->srcRank);
     CkError(einfo);
     return -1;
-  }else if(msglength < len){ // only at rare case shall we reset count by using divide
-    count = msglength/(ddt->getSize(1));
+  }else if(msg->length < len){ // only at rare case shall we reset count by using divide
+    count = msg->length/(ddt->getSize(1));
+  }
+  if (msg->length-len==sizeof(AmpiOpHeader)) {	// reduction msg
+    ddt->serialize((char*)buf, (char*)msg->data+sizeof(AmpiOpHeader), count, (-1));
+  } else {
+    ddt->serialize((char*)buf, (char*)msg->data, count, (-1));
   }
   _LOG_E_BEGIN_AMPI_PROCESSING(thisIndex,s,count)
 #if CMK_BLUEGENE_CHARM
   TRACE_BG_AMPI_RESUME(thread->getThread(), msg, "RECV_RESUME", curLog);
 #endif
 
+  delete msg;
   return 0;
 }
 
@@ -1626,11 +1399,7 @@ ampi::probe(int t, int s, int comm, int *sts)
   }
   resumeOnRecv=false;
   if(sts)
-#if AMPI_ENABLE_FRAG_MSG
-    ((MPI_Status*)sts)->MPI_LENGTH = msg->totallength;
-#else
     ((MPI_Status*)sts)->MPI_LENGTH = msg->length;
-#endif
 #if CMK_BLUEGENE_CHARM
   TRACE_BG_AMPI_RESUME(thread->getThread(), msg, "PROBE_RESUME", curLog);
 #endif
@@ -1645,11 +1414,7 @@ ampi::iprobe(int t, int s, int comm, int *sts)
   msg = (AmpiMsg *) CmmProbe(msgs, 3, tags, sts);
   if (msg) {
     if(sts)
-#if AMPI_ENABLE_FRAG_MSG
-      ((MPI_Status*)sts)->MPI_LENGTH = msg->totallength;
-#else
       ((MPI_Status*)sts)->MPI_LENGTH = msg->length;
-#endif
     return 1;
   }
   thread->schedule();
@@ -1665,11 +1430,7 @@ ampi::bcast(int root, void* buf, int count, int type,MPI_Comm destcomm)
   int rootIdx=dest.getIndexForRank(root);
   if(rootIdx==thisIndex) {
     /* Broadcast my message to the array proxy */
-#if AMPI_ENABLE_FRAG_MSG
-    sendPipeMsgs(dest.getProxy(),-1,MPI_BCAST_TAG,0,buf,count,type,MPI_BCAST_COMM);
-#else
     dest.getProxy().generic(makeAmpiMsg(-1,MPI_BCAST_TAG,0, buf,count,type, MPI_BCAST_COMM));
-#endif
   }
   if(-1==recv(MPI_BCAST_TAG,0, buf,count,type, MPI_BCAST_COMM)) CkAbort("AMPI> Error in broadcast");
   nbcasts++;
