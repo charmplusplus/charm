@@ -96,26 +96,29 @@ void MsgPacker::deliver(CombinedMessage *cmb_msg){
 
         CProxyElement_ArrayBase ap(aid, idx);
         ArrayElement *a_elem = ap.ckLocal();
-        
+
+        int msgIdx = _entryTable[ep]->msgIdx;
         if(_entryTable[ep]->noKeep && a_elem != NULL) {
-            int msgIdx = _entryTable[ep]->msgIdx;
             //Unpack the message
             senv.data = (char *)_msgTable[msgIdx]->unpack(senv.data); 
+
             CkDeliverMessageReadonly(ep, senv.data, a_elem);
             delete [] senv.data;
         }
         else {
             //envelope *env = (envelope *)CmiAlloc(sizeof(envelope) + size);
-
             envelope *env = _allocEnv(ForArrayEltMsg, sizeof(envelope) + size);
 
             void *data = EnvToUsr(env);
             memcpy(data, senv.data, size);
             
+            //Unpack the message
+            data = (char *)_msgTable[msgIdx]->unpack(data); 
+
             env->getsetArrayMgr() = aid;
             env->getsetArrayIndex() = idx;
             env->getsetArrayEp() = ep;
-            env->setPacked(1); 
+            env->setPacked(0); 
             env->getsetArraySrcPe()=CkMyPe();  //FOO Bar change later
             env->getsetArrayHops()=0;  //FOO BAR change later
             env->setQueueing(CK_QUEUEING_FIFO);            
@@ -123,14 +126,10 @@ void MsgPacker::deliver(CombinedMessage *cmb_msg){
 
             delete[] senv.data;
             
-            CkUnpackMessage(&env);
-
-            //if(a_elem)
-            //  CkDeliverMessageFree(ep, data, a_elem);                     
-            //else
-            //CkAbort("Array Element not FOUND \n");
-
-            ap.ckSend((CkArrayMessage *)data, ep);
+            if(a_elem)
+                CkDeliverMessageFree(ep, data, a_elem);                     
+            else
+                ap.ckSend((CkArrayMessage *)data, ep);
         }        
     }      
         
