@@ -8,7 +8,7 @@ $(BIN)/conv-host: conv-host.c
 	$(CHARMC) -cp $(BIN) -seq -o conv-host-silent conv-host.o
 	$(CHARMC) -c -seq -DNOTIFY conv-host.c
 	$(CHARMC) -cp $(BIN) -seq -o conv-host-notify conv-host.o
-	cp $(BIN)/conv-host-notify $(BIN)/conv-host
+	(if test $$OSTYPE = cygwin; then cp $(BIN)/conv-host-notify.exe $(BIN)/conv-host.exe; else cp $(BIN)/conv-host-notify $(BIN)/conv-host; fi)
 
 clean:
 	rm -f *.o conv-host conv-host-notify conv-host-silent

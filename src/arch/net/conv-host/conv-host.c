@@ -1657,7 +1657,7 @@ int xstr_read(xstr l, int fd)
 }
 
 
-#ifdef __CYGWIN__
+#if 0
 void xstr_printf(xstr l, char *fmt, ...)
 {
   va_list p;
