@@ -188,14 +188,12 @@ void LV3D_Array::LV3D_Prepare(void) {}
 #if LV3D_USE_FLAT
 void impl_LV3D_Array::LV3D_FlatRender(liveVizRequestMsg *m,LV3D_Array *arr)
 {
-	if (!viewable) { /* nothing to show */
-	  // printf("Skipping deposit for %d\n",arr->thisIndex.data[0]);
-	  liveVizDeposit(m, 0,0, 0,0, 0, arr);
-	  return;
-	}
+   {
+	if (!viewable) goto skipit;
 	CkViewpoint vp;
 	liveVizRequestUnpack(m,vp);
 	CkQuadView *v=(CkQuadView *)viewable->renderView(vp);
+	if (v==NULL) goto skipit; /* out of bounds */
 	CkVector3d topLeft=vp.project(v->corners[0]);
 	CkAllocImage &src=v->getImage(); // FIXME: assumed to be RGBA
 	int w=src.getWidth(), h=src.getHeight();
@@ -220,6 +218,11 @@ void impl_LV3D_Array::LV3D_FlatRender(liveVizRequestMsg *m,LV3D_Array *arr)
 	x=(int)(topLeft.x+0.5), y=(int)(topLeft.y+0.5);
 	liveVizDeposit(m, x,y, w,h, dest.getData(), arr);
 	delete v;
+	return;
+   }
+skipit:/* nothing to show: deposit empty image (so reduction completes) */
+	// printf("Skipping deposit for %d\n",arr->thisIndex.data[0]);
+	liveVizDeposit(m, 0,0, 0,0, 0, arr);
 }
 #endif
 
