@@ -1,12 +1,49 @@
-
-
 \chapter{Timers, Periodic Checks, and Conditions}
 
 This module provides functions that allow users to insert hooks,
 i.e. user-supplied functions, that are called by the system at
-specified times, or as specific conditions arise.
+as specific conditions arise.  These conditions differ from UNIX
+signals in that they are raised synchronously, via a regular
+function call; and that a single condition can call several 
+different functions.  
 
-\function{void CcdCallOnCondition(condnum,fnp,arg)}
+The system-defined conditions are:
+\begin{description}
+\item[CcdPROCESSOR\_BEGIN\_IDLE] Raised when the scheduler first
+finds it has no messages to execute.  That is, this condition is
+raised at the trailing edge of the processor utilization graph.
+\item[CcdPROCESSOR\_STILL\_IDLE] Raised when the scheduler subsequently
+finds it still has no messages to execute.  That is, this condition is
+raised while the processor utilization graph is flat.
+\item[CcdPROCESSOR\_BEGIN\_BUSY] Raised when a message first arrives
+on an idle processor.  That is, raised on the rising edge of the
+processor utilization graph.
+\item[CcdPERIODIC] The scheduler attempts to raise this condition every
+few milliseconds.  The scheduling for this and the other periodic conditions
+is nonpreemptive, and hence may be delayed until the current entry point is 
+finished.
+\item[CcdPERIODIC\_10ms] Raised every 10ms (at 100Hz).
+\item[CcdPERIODIC\_100ms] Raised every 100ms (at 10Hz).
+\item[CcdPERIODIC\_1second] Raised once per second.
+\item[CcdPERIODIC\_10second] Raised once every 10 seconds.
+\item[CcdPERIODIC\_1minute] Raised once per minute.
+\item[CcdPERIODIC\_10minute] Raised once every 10 minutes.
+\item[CcdPERIODIC\_1hour] Raised once every hour.
+\item[CcdPERIODIC\_12hour] Raised once every twelve hours.
+\item[CcdPERIODIC\_1day] Raised once every day.
+
+\item[CcdQUIESCENCE] Raised when the quiescence detection system
+has determined that the system is quiescent.
+\item[CcdSIGUSR1] Raised when the system receives the UNIX signal SIGUSR1.
+Be aware that this condition is thus raised asynchronously, from
+within a signal handler, and all the usual signal handler restrictions apply.
+\item[CcdSIGUSR2] Raised when the system receives the UNIX signal SIGUSR2.
+\item[CcdUSER] The system never raises this or any larger conditions.
+They can be used by the user for application-specific use.  All conditions
+from CcdUSER to CcdUSER+256 are so available.
+\end{description}
+
+\function{int CcdCallOnCondition(condnum,fnp,arg)}
 \args{int condnum;}
 \args{CcdVoidFn fnp;}
 \args{void *arg;}
@@ -14,48 +51,34 @@ specified times, or as specific conditions arise.
 This call instructs the system to call the function indicated by the
 function pointer {\tt fnp}, with the specified argument {\tt arg}, when the
 condition indicated by {\tt condnum} is raised next. Multiple functions may
-be registered for the same condition number. A total of 511
-conditions, numbered 1 through 511, are supported.  Currently, users
-must make sure that various condition numbers used in a program are
-disjoint.  (In the future, we may provide a call to allocate the next
-available condition number.)
+be registered for the same condition number.
 
-The system supports a predefined condition, with condition number 1
-(CcdPROCESSORIDLE, BUT I AM AM NOT SURE THAT IS EXPORTED TO THE USER
-PROGRAM), which is raised by the system when there are no entities
-(ready threads, messages for objects, posted handlers, etc.) in the
-scheduler's queue.
+\function{int CcdCallOnConditionKeep(condnum,fnp,arg)}
+As above, but the association is permanent-- the given function will
+be called again whenever this condition is raised.
+
+Returns an index that may be used to cancel the association later.
+
+\function{void CcdCancelCallOnCondition(int condnum, int idx)}
+\function{void CcdCancelCallOnConditionKeep(int condnum, int idx)}
+Delete the given index from the list of callbacks for
+the given condition. The corresponding function will no longer be 
+called when the condition is raised.
 
 \function{void CcdRaiseCondition(condNum)}
 \args{int condNum;}
 
 When this function is called, it invokes all the functions whose
 pointers were registered for the \verb#condNum# via a {\em prior} call
-to {\tt CcdCallOnCondition(..)}.  All calls to {\tt
-CcdCallOnCondition(..)} {\em during} this function's execution takes
-effect only after it returns.  Once a user-registered
-function is called, it loses its registration.  So, if users want the
-function to be called the next time the same condition arises, they
-must register the function again.
+to {\tt CcdCallOnCondition} or {\tt CcdCallOnConditionKeep}.  
 
-\function{void CcdPeriodicallyCall(fnp, arg)}
+\function{void CcdCallFnAfter(fnp, arg, msLater)}
 \args{CcdVoidFn fnp;}
 \args{void *arg;}
-
-A function registered through this call is called periodically by the
-system's scheduler.  Typically, it would be called every time the
-scheduler gets control, such as while switching context to a new
-thread or before scheduling a message for an object, or before calling
-a posted handler. These functions don't have to be re-registered after
-every call, unlike the functions for the "conditions". 
-
-\function{void CcdCallFnAfter(fnp, arg, deltaT)}
-\args{CcdVoidFn fnp;}
-\args{void *arg;}
-\args{unsigned int deltaT;}
+\args{unsigned int msLater;}
 
 This call registers a function via a pointer to it, {\tt fnp},  that will be
-called at least {\tt deltaT} milliseconds later. 
+called at least {\tt msLater} milliseconds later. 
 The registered function {\tt fnp} is actually called the first time the
 scheduler gets control after {\tt deltaT} milliseconds have elapsed. 
 
