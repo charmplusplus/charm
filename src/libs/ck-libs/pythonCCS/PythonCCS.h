@@ -24,11 +24,15 @@ extern PyMethodDef CkPy_MethodsDefault[];
 class PythonObject {
   static PyMethodDef CkPy_MethodsCustom[];
  public:
-  void execute(CkCcsRequestMsg *msg);
+  void pyRequest(CkCcsRequestMsg *msg);
+  void execute(CkCcsRequestMsg *msg, CcsDelayedReply *reply);
+  void print(PythonPrint *pyMsg, CcsDelayedReply *reply);
+  void finished(PythonFinished *pyMsg, CcsDelayedReply *reply);
+
   void cleanup(PythonExecute *pyMsg, PyThreadState *pts, CmiUInt4 pyVal);
   void getPrint(CkCcsRequestMsg *msg);
   static void _callthr_executeThread(CkThrCallArg *impl_arg);
-  void executeThread(CkCcsRequestMsg *msg);
+  void executeThread(PythonExecute *pyMsg);
   virtual PyMethodDef *getMethods() {return CkPy_MethodsCustom;}
 
   // utility functions to manipulate python objects
@@ -53,7 +57,6 @@ class PythonObject {
 
   // utility functions to deal with threads
   PyObject *pythonGetArg(int);
-  void pythonPrepareReturn(int);
   void pythonReturn(int);
   void pythonReturn(int, PyObject*);
   void pythonAwake(int);
@@ -78,18 +81,29 @@ class PythonObject {
 typedef struct {
   PythonObject *object; /* The c++ object running the job */
   bool inUse;
+  bool isKeepPrint;
   PyObject *arg;
   PyObject **result;
   CthThread thread;       /* The charm thread running the python code */
   PyThreadState *pythread; /* The python interpreter interpreting the code */
+
   int clientReady; /* whether or not a client has sent a request for print */
   /* meanings of clientReady:
      1  - there is a client wainting for data
      0  - no client waiting for data
-     -1 - no client watiing, and the current structure is alive only because of
+     -1 - no client waiting, and the current structure is alive only because of
      "KeepPrint". it has to be deleted when a client synchonizes
   */
   CcsDelayedReply client; /* Where to send the printed data when ready */
+
+  int finishReady; /* wheather or not a client is waiting to be notified of
+		      script finish */
+  /* meanings of finishReady:
+     1  - there is a client waiting
+     0  - no client is waiting
+  */
+  CcsDelayedReply finish; /* Where to send the ack of termination */
+
   std::string printed; /* Union of all printed string and not yet shipped to the client */
 } PythonStruct;
 typedef std::map<CmiUInt4,PythonStruct> PythonTable;

@@ -517,6 +517,14 @@ void Chare::sharedDisambiguation(XStr &str,const XStr &super)
     str<<"    void pup(PUP::er &p) {\n";
     genProxyNames(str,"      ",NULL,"::pup(p);\n","");
     str<<"    }\n";
+    if (isPython()) {
+      str<<"    void registerPython(char *str) {\n";
+      str<<"      CcsRegisterHandler(str, CkCallback("<<Prefix::Index<<type<<"::pyRequest(0), ";
+      if (isArray()) str<<"ckGetArrayID()";
+      else str<<"ckGetChareID()";
+      str<<"));\n";
+      str<<"    }\n";
+    }
 }
 
 
@@ -616,7 +624,7 @@ Chare::genDecls(XStr& str)
   if (isPython()) {
     str << "#include \"PythonCCS.h\"\n";
     if (list) {
-      Entry *etemp = new Entry(0,0,new BuiltinType("void"),"execute",new ParamList(new Parameter(0,new PtrType(new NamedType("CkCcsRequestMsg",0)),"msg")),0,0,0,0);
+      Entry *etemp = new Entry(0,0,new BuiltinType("void"),"pyRequest",new ParamList(new Parameter(0,new PtrType(new NamedType("CkCcsRequestMsg",0)),"msg")),0,0,0,0);
       list->appendMember(etemp);
       etemp->setChare(this);
       //etemp = new Entry(0,0,new BuiltinType("void"),"getPrint",new ParamList(new Parameter(0,new PtrType(new NamedType("CkCcsRequestMsg",0)),"msg")),0,0,0,0);
@@ -2422,7 +2430,6 @@ void Entry::genPythonDefs(XStr& str) {
 
     str << "  pyWorker->thisProxy."<<name<<"(pyNumber);\n";
 
-    str << "  PyEval_ReleaseLock();\n";
     str << "  CthSuspend();\n";
 
     str << "  if (CtvAccess(pythonReturnValue)) {\n";

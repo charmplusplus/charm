@@ -18,6 +18,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <netinet/in.h>
 
 /* This class is empty, and should be reimplemented by the user */
 class PythonIterator {
@@ -53,6 +54,11 @@ class PythonAbstract {
   /* magic contains the size of the class passed, it is filled by the
      constructors of the inheriting classes */
   CmiUInt4 magic;
+
+  bool isFinished();
+  bool isExecute();
+  bool isPrint();
+  void unpack();
 };
 
 /* the unions with the "dummy" variables are to force a 64 bit space, which will
@@ -94,7 +100,9 @@ class PythonExecute : private PythonAbstract {
   static const char FLAG_KEEPPRINT = 0x40;
   static const char FLAG_HIGHLEVEL = 0x20;
   static const char FLAG_ITERATE = 0x10;
+  static const char FLAG_WAIT = 0x08;
  public:
+  static const CmiUInt4 localmagic = 37492037;
 
   /* constructors */
   /* by default, if the code is persistent, then the prints will be maintained */
@@ -110,12 +118,14 @@ class PythonExecute : private PythonAbstract {
   void setIterate(bool _set);
   void setHighLevel(bool _set);
   void setKeepPrint(bool _set);
+  void setWait(bool _set);
   void setInterpreter(CmiUInt4 i) { interpreter = i; };
 
   bool isPersistent() { return flags & FLAG_PERSISTENT; };
   bool isIterate() { return flags & FLAG_ITERATE; };
   bool isHighLevel() { return flags & FLAG_HIGHLEVEL; };
   bool isKeepPrint() { return flags & FLAG_KEEPPRINT; };
+  bool isWait() { return flags & FLAG_WAIT; };
   CmiUInt4 getInterpreter() { return interpreter; };
 
   int size();
@@ -132,16 +142,49 @@ class PythonPrint : private PythonAbstract {
   char flags;
   /* flags has the following parameters: (bit 1 is the MSB)
      bit 1: noWait
+     bit 2: kill previous request
+  */
+  static const char FLAG_WAIT = 0x80;
+  static const char FLAG_KILL = 0x40;
+ public:
+  static const CmiUInt4 localmagic = 989370215;
+  PythonPrint(CmiUInt4 _interp, bool Wait=true, bool Kill=false);
+
+  void setWait(bool _set);
+  bool isWait() { return flags & FLAG_WAIT; };
+
+  void setKill(bool _set);
+  bool isKill() { return flags & FLAG_KILL; };
+
+
+  int size() { return sizeof(*this); };
+  char *pack() { magic = htonl(magic); //interpreter = htonl(interpreter);
+ return (char *)this; };
+  void unpack() { interpreter = ntohl(interpreter); }
+
+  void print(); /* for debugging */
+};
+
+class PythonFinished : private PythonAbstract {
+  friend class PythonObject;
+ private:
+  CmiUInt4 interpreter;
+  char flags;
+  /* flags has the following parameters: (bit 1 is the MSB)
+     bit 1: noWait
   */
   static const char FLAG_WAIT = 0x80;
  public:
-  PythonPrint(CmiUInt4 _interp, bool Wait=true);
+  static const CmiUInt4 localmagic = 738963580;
+  PythonFinished(CmiUInt4 _interp, bool Wait=true);
 
   void setWait(bool _set);
   bool isWait() { return flags & FLAG_WAIT; };
 
   int size() { return sizeof(*this); };
-  char *pack() { return (char *)this; };
+  char *pack() { magic = htonl(magic); //interpreter = htonl(interpreter);
+ return (char *)this; };
+  void unpack() { interpreter = ntohl(interpreter); }
 
   void print(); /* for debugging */
 };

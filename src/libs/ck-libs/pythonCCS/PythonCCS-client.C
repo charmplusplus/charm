@@ -1,8 +1,7 @@
-#include <netinet/in.h>
 #include "PythonCCS-client.h"
 
 PythonExecute::PythonExecute(char *_code, bool _persistent, bool _highlevel, CmiUInt4 _interp) {
-  magic = sizeof(*this);
+  magic = sizeof(*this) ^ localmagic;
   codeLength = strlen(_code);
   code.code = strdup(_code);
   methodNameLength = 0;
@@ -19,7 +18,7 @@ PythonExecute::PythonExecute(char *_code, bool _persistent, bool _highlevel, Cmi
 }
 
 PythonExecute::PythonExecute(char *_code, char *_method, PythonIterator *_info, bool _persistent, bool _highlevel, CmiUInt4 _interp) {
-  magic = sizeof(*this);
+  magic = sizeof(*this) ^ localmagic;
   codeLength = strlen(_code);
   code.code = strdup(_code);
   methodNameLength = strlen(_method);
@@ -77,6 +76,11 @@ void PythonExecute::setKeepPrint(bool _set) {
   else flags &= ~FLAG_KEEPPRINT;
 }
 
+void PythonExecute::setWait(bool _set) {
+  if (_set) flags |= FLAG_WAIT;
+  else flags &= ~FLAG_WAIT;
+}
+
 int PythonExecute::size() {
   return sizeof(PythonExecute)+codeLength+1+methodNameLength+1+infoSize;
 }
@@ -97,6 +101,8 @@ char *PythonExecute::pack() {
     memcpy (ptr, info.info, infoSize);
   }
   // transform unsigned integers from host byte order to network byte order
+  ((PythonAbstract*)memory)->magic = htonl(magic);
+  //((PythonExecute*)memory)->interpreter = htonl(interpreter);
   ((PythonExecute*)memory)->codeLength = htonl(codeLength);
   ((PythonExecute*)memory)->methodNameLength = htonl(methodNameLength);
   ((PythonExecute*)memory)->infoSize = htonl(infoSize);
@@ -106,6 +112,7 @@ char *PythonExecute::pack() {
 
 void PythonExecute::unpack() {
   // transform unsigned integers back to host byte order (from network byte order)
+  interpreter = ntohl(interpreter);
   codeLength = ntohl(codeLength);
   methodNameLength = ntohl(methodNameLength);
   infoSize = ntohl(infoSize);
@@ -114,14 +121,48 @@ void PythonExecute::unpack() {
   if (infoSize) info.info = (PythonIterator*) (methodName.methodName + methodNameLength+1);
 }
 
-PythonPrint::PythonPrint(CmiUInt4 _interp, bool Wait) {
-  magic = sizeof(*this);
+void PythonAbstract::unpack() {
+  magic = ntohl(magic);
+}
+
+bool PythonAbstract::isFinished() {
+  return (magic == (sizeof(PythonFinished) ^ PythonFinished::localmagic));
+}
+
+bool PythonAbstract::isExecute() {
+  return (magic == (sizeof(PythonExecute) ^ PythonExecute::localmagic));
+}
+
+bool PythonAbstract::isPrint() {
+  return (magic == (sizeof(PythonPrint) ^ PythonPrint::localmagic));
+}
+
+PythonPrint::PythonPrint(CmiUInt4 _interp, bool Wait, bool Kill) {
+  magic = sizeof(*this) ^ localmagic;
+  interpreter = _interp;
+  flags = 0;
+  if (Wait) flags |= FLAG_WAIT;
+  if (Kill) flags |= FLAG_KILL;
+}
+
+void PythonPrint::setWait(bool _set) {
+  if (_set) flags |= FLAG_WAIT;
+  else flags &= ~FLAG_WAIT;
+}
+
+void PythonPrint::setKill(bool _set) {
+  if (_set) flags |= FLAG_KILL;
+  else flags &= ~FLAG_KILL;
+}
+
+PythonFinished::PythonFinished(CmiUInt4 _interp, bool Wait) {
+  magic = sizeof(*this) ^ localmagic;
   interpreter = _interp;
   flags = 0;
   if (Wait) flags |= FLAG_WAIT;
 }
 
-void PythonPrint::setWait(bool _set) {
+void PythonFinished::setWait(bool _set) {
   if (_set) flags |= FLAG_WAIT;
   else flags &= ~FLAG_WAIT;
 }
@@ -135,12 +176,10 @@ void PythonPrint::print() {
 }
 
 /* Testing routine */
-/*
-int main () {
+/*int main () {
 PythonExecute a("abcdefl");
 printf("size: %d %d\n",sizeof(PythonExecute),a.size());
 //a.print();
-printf("ok %s\n",a.toString()+a.size());
+printf("ok %s, %d\n",a.pack()+sizeof(a), strlen("abcdefl"));
 return 0;
-}
-*/
+}*/
