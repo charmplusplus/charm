@@ -28,7 +28,8 @@ PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int
   numRecd = 0;
   numExpected = grainSize;
 
-  kUnits=5;   // FIXME: hardcoding the streaming factor to 5
+  kUnits=5;     // trial non streaming
+
 
   kLeftOffset= new int[numExpected];
   kRightOffset= new int[numExpected];
@@ -162,6 +163,175 @@ PairCalculator::~PairCalculator()
     delete [] kRightOffset;
   if(kLeftOffset!=NULL)
     delete [] kLeftOffset;
+}
+
+
+void
+PairCalculator::calculatePairs_gemm(int size, complex *points, int sender, bool fromRow, bool flag_dp)
+{
+#ifdef _PAIRCALC_DEBUG_
+  CkPrintf("     pairCalc[%d %d %d %d] got from [%d %d] with size {%d}, symm=%d, from=%d\n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z,  thisIndex.w, sender, size, symmetric, fromRow);
+#endif
+
+  numRecd++;   // increment the number of received counts
+  int offset = -1;
+  complex **inData;
+  if (fromRow) {   // This could be the symmetric diagonal case
+    offset = sender - thisIndex.x;
+    inData = inDataLeft;
+    kLeftOffset[kLeftDoneCount + kLeftCount]=offset;
+    kLeftCount++;
+  }
+  else {
+    offset = sender - thisIndex.y;
+    inData = inDataRight;
+    kRightOffset[kRightDoneCount + kRightCount]=offset;
+    kRightCount++;
+  }
+
+  /** The new way is to append the new data
+   * Recording its offset in the offset array
+   * NOTE: may need to count from 1 for fortran scatter joy
+   * Once we have accumulated kUnits new rows (or have all)
+   * we zgemm it.
+   *
+   * Scheme 1: Keep each partition of kUnit rows as its own matrix
+   *           multiply the new matrix by all previous partitions each time.
+   *           Resulting in a new kUnits X kUnits solution matrix for each.
+   *
+   * Scheme 2: each time we have kUnits of new data
+   *    We can consider ourselves to have a sGrainsize X kUnits matrix
+   *    at the end of our inData.
+   *    We can then take inData up to the new mark and multiply it by
+   *    the new inData for a (kUnixs*p X sGrainSize) X ( sGrainsize X kUnits)
+   *     
+   * Scheme 3: Collect everything and do it in one big zgemm.
+   * Scheme 3 is implemented below.
+   */
+  N = size; // N is init here with the size of the data chunk. 
+  /* 
+     NOTE: Assumes that data chunk of the same plane across all states are of the same size 
+  */
+
+  if (inData[0]==NULL) 
+  { // now that we know N we can allocate contiguous space
+    inData[0] = new complex[numExpected*N];
+    for(int i=1;i<numExpected;i++)
+      inData[i] = inData[i-1] + N;
+  }
+  memcpy(inData[offset], points, size * sizeof(complex));
+
+  // In scheme 3 we'll have everything collected
+
+  if (numRecd == numExpected * 2 || (symmetric && thisIndex.x==thisIndex.y && numRecd==numExpected)) {
+    char transform='N';
+    char transformT='T';
+    int incx=2;
+    int incy=1;
+#ifdef _SPARSECONT_  
+    int m_in=numExpected;
+    int n_in=numExpected;
+    int k_in=N;
+    int matrixSize=numExpected*numExpected;
+#else
+    int m_in=numExpected;
+    int n_in=numExpected;
+    int k_in=N;
+    int matrixSize=numExpected*numExpected;
+    /*  int m_in=S;
+	int n_in=N;
+	int k_in=S;
+	int matrixSize=S*S;
+    */
+#endif
+    // so this should be a (numExpected X N) X (N X numExpected) = (numExpected X numExpected) operation
+    // Not a (N X numExpected) X (numExpected X N) = (N X N) operation
+    int lda=N;   //leading dimension A
+    int ldb=N;   //leading dimension B
+    int ldc=numExpected;   //leading dimension C
+
+
+#ifdef DGEMM_MADNESS
+    /* I do not understand how this scheme can possibly work.
+       If we treat the complex array as simply twice as many doubles
+       we are just doubling the size of N to 2N.
+       The multiplication is (numExpected X N) X (N X numExpected).
+       So we take the dot product of size N vectors.
+       Doubling N doesn't get us twice as many results.
+       We have numExpected X numExpected results independant of N.
+
+       In any case, casting to double seems to lead to segfault land.
+    */
+    double alpha=double(1.0);//multiplicative identity 
+    double beta=double(0.0);
+    double *ldata=(double *) inDataLeft[0];
+    double *rdata=(double *) inDataRight[0];
+    // if we have everthing blast it in one big gemm
+    if( numRecd == numExpected * 2) 
+      {
+	DGEMM(&transformT, &transform, &m_in, &n_in, &k_in, &alpha, ldata, &lda, rdata, &ldb, &beta, outData, &ldc);
+      }
+    else if (symmetric && thisIndex.x==thisIndex.y && numRecd==numExpected)
+      {
+	DGEMM(&transformT, &transform, &m_in, &n_in, &k_in, &alpha, ldata, &lda, ldata, &ldb, &beta, outData, &ldc);
+      }
+    // Now crunch out the imaginary
+    //    DCOPY(&matrixSize,odata,&incx, outData,&incy);
+    //    delete [] odata;
+#else
+    complex **outComplex= new complex*[numExpected];
+    outComplex[0] = new complex[matrixSize];
+    complex alpha(1.0,0.0);//multiplicative identity 
+    complex beta(0.0,0.0);
+    // if we have everthing blast it in one big gemm
+    if( numRecd == numExpected * 2)
+      {
+	ZGEMM(&transformT, &transform, &m_in, &n_in, &k_in, &alpha, &(inDataLeft[0][0]), &lda, &(inDataRight[0][0]), &ldb, &beta, &(outComplex[0][0]), &ldc);
+      }
+    else if (symmetric && thisIndex.x==thisIndex.y && numRecd==numExpected)
+      {
+	ZGEMM(&transformT, &transform, &m_in, &n_in, &k_in, &alpha, &(inDataLeft[0][0]), &lda, &(inDataLeft[0][0]), &ldb, &beta, &(outComplex[0][0]), &ldc);
+
+      }
+    // now crunch out the imaginary
+    double *inmatrix= (double *) outComplex[0];
+    DCOPY(&matrixSize, inmatrix, &incx, outData, &incy);
+    delete [] outComplex[0];
+    delete [] outComplex;
+#endif
+    numRecd = 0;
+    kLeftCount=0;
+    kRightCount=0;
+    kLeftDoneCount = 0;
+    kRightDoneCount = 0;
+
+    if (flag_dp) {
+      if(thisIndex.w != 0) {   // Adjusting for double packing of incoming data
+#ifdef _SPARSECONT_
+	for (int i = 0; i < grainSize*grainSize; i++)
+	  outData[i] *= 2.0;
+#else
+	for (int i = 0; i < grainSize; i++)
+	  for (int j = 0; j < grainSize; j++)		  
+	    outData[(i+thisIndex.y)*S + j + thisIndex.x] *= 2.0; 
+#endif
+      }
+    }
+#ifdef _SPARSECONT_
+    r.add((int)thisIndex.y, (int)thisIndex.x, (int)(thisIndex.y+grainSize-1), (int)(thisIndex.x+grainSize-1), outData);
+    r.contribute(this, sparse_sum_double);
+#else
+#if !CONVERSE_VERSION_ELAN
+    contribute(S * S *sizeof(double), outData, CkReduction::sum_double);
+#else
+    //CkPrintf("[%d] ELAN VERSION %d\n", CkMyPe(), symmetric);
+    CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id); 
+    pairCalcReducerProxy.ckLocalBranch()->acceptContribute(S * S, outData, 
+							   cb, !symmetric, symmetric);
+#endif
+#endif
+  }
+
 }
 
 void

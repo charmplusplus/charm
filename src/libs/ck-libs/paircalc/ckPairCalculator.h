@@ -21,10 +21,12 @@
 
 #ifdef FORTRANUNDERSCORE
 #define ZGEMM zgemm_ 
+#define DGEMM dgemm_ 
 #define DCOPY dcopy_
 #define ZTODO ztodo_
 #else
 #define ZGEMM zgemm
+#define DGEMM dgemm
 #define DCOPY dcopy
 #define ZTODO ztodo
 #endif
@@ -33,6 +35,11 @@
 #ifdef _PAIRCALC_USE_BLAS_
 extern "C" complex ZTODO( const int *N,  complex *X, const int *incX, complex *Y, const int *incY);
 
+#endif
+
+#ifdef _PAIRCALC_USE_DGEMM_
+
+extern "C" void DGEMM(char *,char *, int *,int *, int *,double *,double *,int *, double *,int *,double *,double *,int *);
 #endif
 
 #ifdef _PAIRCALC_USE_ZGEMM_
@@ -100,6 +107,7 @@ class PairCalculator: public CBase_PairCalculator {
   PairCalculator(CkMigrateMessage *);
   ~PairCalculator();
   void calculatePairs(int, complex *, int, bool, bool); 
+  void calculatePairs_gemm(int, complex *, int, bool, bool); 
   void acceptResult(int size, double *matrix);
   void acceptResult(int size, double *matrix1, double *matrix2);
   void sumPartialResult(int size, complex *result, int offset);
