@@ -186,7 +186,7 @@ schedules it for a worker thread
 \end{description}
 }
 
-\function{void getXYZ(int& x, int& y, int& z)}
+\function{void getXYZ(int\& x, int\& y, int\& z)}
 \desc{
 Gets which Blue Gene node do the invoking thread belongs to
 }
@@ -259,7 +259,7 @@ void BgInit(Main *main)
   int num_args = main->getNumArgs();
   if (num_args < 4) \{ 
     // Abort application: insufficient number of arguments
-    CkAbort("Usage: ring <x> <y> <z> [<numCommTh> <numWorkTh>]\n"); 
+    CkAbort("Usage: ring <x> <y> <z> [<numCommTh> <numWorkTh>]\verb+\n+"); 
   \}
 
   if (num_args > 5) \{ num_work = atoi(main->getArgs()[5]); \}
@@ -281,7 +281,7 @@ void* BgNodeInit(BgNode *bgNode)
   bgNode->registerHandler(computeID, compute) ;
 
   // trigger computation at Node[0,0,0]
-  if(bgNode->thisIndex.x==0 && bgNode->thisIndex.y==0 && bgNode->thisIndex.z==0)
+  if(bgNode->thisIndex.x==0 \&\& bgNode->thisIndex.y==0 \&\& bgNode->thisIndex.z==0)
   \{
    MyMsg *msg = new MyMsg ;
    msg->dummy = 0 ;
@@ -299,7 +299,7 @@ void compute(ThreadInfo *info)
 
   info->bgNode->getXYZ(i,j,k) ;
 
-  if(i==info->bgNode->numBgX-1 && j==info->bgNode->numBgY-1 && 
+  if(i==info->bgNode->numBgX-1 \&\& j==info->bgNode->numBgY-1 \&\& 
      k==info->bgNode->numBgZ-1)
   \{
            ckout << "Exiting" << endl ;
@@ -327,9 +327,12 @@ void compute(ThreadInfo *info)
   msg->dummy = i+j+k ;
   info->bgNode->sendPacket(ni, nj, nk, msg, computeID, 0) ;
 \}
+\end{alltt}
 
 
 \subsection{Sample Application 2}
+
+\begin{alltt}
 
 /* Application: 
  *   Find the maximum element.
@@ -380,7 +383,7 @@ void BgInit(Main *main)
 and worker threads
   int num_args = main->getNumArgs();
   if (num_args < 4) \{ 
-    CkAbort("Usage: maxReduceNV <x> <y> <z> [<numCommTh> <numWorkTh>]\n"); 
+    CkAbort("Usage: maxReduceNV <x> <y> <z> [<numCommTh> <numWorkTh>]\verb+\n+"); 
   \}
   if (num_args > 5) \{ num_work = atoi(main->getArgs()[5]); \}
   if (num_args > 4) \{ num_comm = atoi(main->getArgs()[4]); \}
@@ -470,11 +473,11 @@ void contribute(ThreadInfo *info)
   \{
          reqCount = 1 ;
   \}
-  else if(z>0 || (z==0 && x==info->bgNode->numBgX-1))
+  else if(z>0 || (z==0 \&\& x==info->bgNode->numBgX-1))
   \{
          reqCount = 2 ;
   \}
-  else if(x>0 || (x==0 && y==info->bgNode->numBgY-1))
+  else if(x>0 || (x==0 \&\& y==info->bgNode->numBgY-1))
   \{
          reqCount = 3 ;
   \}
@@ -509,7 +512,7 @@ void reduce(ThreadInfo *info)
            max = ((userData*)(info->bgNode->nvData))->data[i] ;
   \}
 
-  if(x==0 && y==0 && z==0)
+  if(x==0 \&\& y==0 \&\& z==0)
   \{
          ckout << "Exiting: max value is " << max << endl ;
          info->bgNode->finish() ;
@@ -530,6 +533,7 @@ void reduce(ThreadInfo *info)
 
   ckout << "sending max value " << max << " to " << x << ", " << y << ", " << z << endl ;
 \}
+\end{alltt}
 
 \section{Compiling and Running}
 
