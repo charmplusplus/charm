@@ -299,45 +299,51 @@ class updateState {
 	int doWhat;
 	MPI_Comm comm;
 	int myRank, master;
-	int oldMesh, splitMesh;
+	int or_mesh; /* old partitioned read mesh */
+	int osr_mesh; /* old serial read mesh */
+	int nsw_mesh; /* new serial write mesh */
 public:
 	updateState(int doWhat_) :doWhat(doWhat_) {
 		comm=(MPI_Comm)FEMchunk::get("FEM_Update_mesh")->defaultComm;
 		MPI_Comm_rank(comm,&myRank);
 		master=0;
-		oldMesh=splitMesh=-1;
+		or_mesh=osr_mesh=nsw_mesh=-1;
+	}
+	~updateState() {
 	}
 	
-	bool pre(void) {
-		/* Assemble mesh from default write */
-		int mesh=FEM_Mesh_default_write();
-		oldMesh=FEM_Mesh_default_read();
-		FEM_Mesh_copy_globalno(oldMesh,mesh);
-		int serialMesh=FEM_Mesh_reduce(mesh,master,(FEM_Comm_t)comm);
-		FEM_Mesh_deallocate(mesh);
-		FEM_Mesh_set_default_read(serialMesh);
-		if (myRank==master) {
-			if (doWhat==FEM_MESH_UPDATE) {
-				splitMesh=FEM_Mesh_allocate();
-				FEM_Mesh_set_default_write(splitMesh);
-			}
-			return true;
-		}
-		else
-			return false;
+	bool pre(void) 
+	{
+		/* Assemble serial read mesh from default write */
+		or_mesh=FEM_Mesh_default_read(); /* stash the old read mesh */
+		int ow_mesh=FEM_Mesh_default_write();
+		FEM_Mesh_copy_globalno(or_mesh,ow_mesh);
+		osr_mesh=FEM_Mesh_reduce(ow_mesh,master,(FEM_Comm_t)comm);
+		FEM_Mesh_deallocate(ow_mesh);
+		
+		if (myRank==master && doWhat==FEM_MESH_UPDATE) 
+			nsw_mesh=FEM_Mesh_allocate();
+		
+		FEM_Mesh_set_default_read(osr_mesh);
+		FEM_Mesh_set_default_write(nsw_mesh);
+		return (myRank==master);
 	}
 	void post(void) {
 		if (doWhat==FEM_MESH_FINALIZE)
-			MPI_Barrier(comm);
+			MPI_Barrier(comm); /* other processors wait for main to finish */
+		if (osr_mesh>0) FEM_Mesh_deallocate(osr_mesh);
+		
 		if (doWhat==FEM_MESH_UPDATE) 
 		{ /* Partition the new serial mesh */
-			int newMesh=FEM_Mesh_broadcast(splitMesh,master,(FEM_Comm_t)comm);
-			if (myRank==master) FEM_Mesh_deallocate(splitMesh);
-			FEM_Mesh_set_default_read(newMesh);
+			FEM_Mesh_deallocate(or_mesh); /* get rid of the old read mesh */
+			int nr_mesh=FEM_Mesh_broadcast(nsw_mesh,master,(FEM_Comm_t)comm);
+			FEM_Mesh_set_default_read(nr_mesh);
 		}
 		else /* no update, switch back to old read mesh */
-			FEM_Mesh_set_default_read(oldMesh);
+			FEM_Mesh_set_default_read(or_mesh);
 		FEM_Mesh_set_default_write(FEM_Mesh_allocate());
+		
+		if (nsw_mesh>0) FEM_Mesh_deallocate(nsw_mesh);
 	}
 };
 
