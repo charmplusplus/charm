@@ -1608,6 +1608,15 @@ CmiCommHandle CmiGeneralSend(int pe, int size, int freemode, char *data)
     memcpy(copy, data, size);
     data = copy; freemode = 'F';
   }
+#ifdef CMK_RANDOMLY_CORRUPT_MESSAGES
+  if (0==(rand()%CMK_RANDOMLY_CORRUPT_MESSAGES))
+  { /* insert one random bit flip into this message: */
+    int badByte=rand()%size;
+    int badBit=rand()%8;
+    data[badByte]^=(1<<badBit);
+  } 
+#endif
+  
   if (pe == cs->pe) 
 #if ! CMK_SMP
   if (!_immRunning) /* CdsFifo_Enqueue, below, isn't SIGIO or thread safe.  
@@ -1855,6 +1864,13 @@ static void ConverseRunPE(int everReturn)
     /*Initialize the clock*/
     Cmi_clock=GetClock();
   }
+  
+#ifdef CMK_RANDOMLY_CORRUPT_MESSAGES
+  srand((int)(1024.0*CmiWallTimer()));
+  if (CmiMyPe()==0)
+    CmiPrintf("Charm++: Machine layer will randomly corrupt every %d'th message (rand %d)\n",
+    	CMK_RANDOMLY_CORRUPT_MESSAGES,rand());
+#endif
 
   /* communication thread */
   if (CmiMyRank() == CmiMyNodeSize()) {
