@@ -237,9 +237,6 @@ char **argv;
   if (CmiGetArgFlag(argv,"+qs"))
     CpvAccess(CstatPrintQueueStatsFlag)=1;
 
-#ifndef CMK_OPTIMIZE
-  traceInit(argv);
-#endif
 }
 
 int CstatMemory(i)
@@ -1450,6 +1447,9 @@ void ConverseCommonInit(char **argv)
   CmiTimerInit();
   CstatsInit(argv);
   CcdModuleInit(argv);
+#ifndef CMK_OPTIMIZE
+  traceInit(argv);
+#endif
   CmiHandlerInit();
 #if CMK_THREADS_USE_ISOMALLOC
   CthHandlerInit();
