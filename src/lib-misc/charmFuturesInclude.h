@@ -2,8 +2,8 @@
 extern "C" SetRefNumber(void *, int);
 extern "C" GetRefNumber(void *);
 
-extern "C"     InitCharmFutures();
+extern "C" void InitCharmFutures();
 extern "C" void*  CharmBlockingCall(int entry, void * m, int g, int p);
 extern "C" CthThread CthCreate(void (*)(...), void *, int);
 
-extern "C" CSendToFuture(void *m, int processor);
+extern "C" void CSendToFuture(void *m, int processor);

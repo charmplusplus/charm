@@ -92,7 +92,7 @@ static void awaken_threads (Element *e)
   {  Element *f;
     while (e)
       {
-// CmiPrintf("[%d] Awakening next thread\n",CmiMyPe());
+/* CmiPrintf("[%d] Awakening next thread\n",CmiMyPe()); */
 	CthAwaken(e->t);
 	f = e;
 	e = e->next;

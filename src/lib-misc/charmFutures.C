@@ -42,7 +42,7 @@ public:
     //    CPrintf("[%d]Starting Future handler BOC\n", CmiMyPe());
   }
 
-  SetFuture(FutureInitMsg * m)
+  void SetFuture(FutureInitMsg * m)
   { int key;
 
     key = GetRefNumber(m);
@@ -52,14 +52,14 @@ public:
 };
 
 extern "C" 
-InitCharmFutures()
+void InitCharmFutures()
 {
     FutureInitMsg *message2 = new (MsgIndex(FutureInitMsg)) FutureInitMsg ;	
     futureBocNum = new_group (Future, message2);
 }
 
 extern "C" 
-CSendToFuture(void *m, int processor)
+void CSendToFuture(void *m, int processor)
 {
 
 	CSendMsgBranch(Future, SetFuture, m, futureBocNum, processor);
