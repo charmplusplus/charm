@@ -81,9 +81,6 @@ public:
       	UInt roIdx;
       } roMsg;
     };
-private:
-    u_type type; //Depends on message type (attribs.mtype)
-    UShort ref; //Used by futures
     struct s_attribs { //Packed bitwise struct
     	UChar msgIdx; //Usertype of message (determines pack routine)
 	UChar mtype;
@@ -92,6 +89,9 @@ private:
     	UChar isUsed:1;
     	UChar ifNotThere:2; //Used by arrays
     };
+private:
+    u_type type; //Depends on message type (attribs.mtype)
+    UShort ref; //Used by futures
     s_attribs attribs;
     UChar align[D(sizeof(u_type)+sizeof(UShort)+sizeof(s_attribs))];
     
