@@ -18,9 +18,7 @@ void createPairCalculator(bool sym, int s, int numZ, int* z, int op1, FuncType f
   /*
   Strategy * pstrat = new PipeBroadcastStrategy(USE_HYPERCUBE, pairCalculatorProxy.ckGetArrayID());
   */
-  Strategy *bstrat = new BroadcastStrategy(pairCalcReducerProxy.ckGetGroupID(),
-                                           CkIndex_PairCalcReducer::
-                                           __idx_broadcastEntireResult_marshall3);
+  Strategy *bstrat = new BroadcastStrategy();
 
   ComlibInstanceHandle bcastInstance = CkGetComlibInstance();
   bcastInstance.setStrategy(bstrat);

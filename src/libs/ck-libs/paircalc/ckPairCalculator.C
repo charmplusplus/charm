@@ -207,8 +207,8 @@ PairCalculator::acceptResult(int size, double *matrix, int rowNum, CkCallback cb
 	      //  {
 	      m = matrix[iSindex + j];
 	      for (int p = size1; p < size1+PARTITION_SIZE; p++)
-		  if(inDataLeft[j][p].notzero())
-		      newiNdata[p] += inDataLeft[j][p] * m;
+		  //if(inDataLeft[j][p].notzero())
+                  newiNdata[p] += inDataLeft[j][p] * m;
 	      //}
 	  }
       }
@@ -222,8 +222,8 @@ PairCalculator::acceptResult(int size, double *matrix, int rowNum, CkCallback cb
 	    for (int j = 0; j < grainSize; j++){ 
 		m = matrix[iSindex + j];
 		for (int p = start_offset; p < N; p++)
-		    if(inDataLeft[j][p].notzero())
-			newiNdata[p] += inDataLeft[j][p] * m;
+		    //if(inDataLeft[j][p].notzero())
+                    newiNdata[p] += inDataLeft[j][p] * m;
 	    }
 	}
   }
