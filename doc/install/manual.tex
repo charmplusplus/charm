@@ -12,7 +12,10 @@
 % REVISION HISTORY:
 %
 % $Log$
-% Revision 1.2  1995-11-01 20:02:08  milind
+% Revision 1.3  1995-11-17 17:48:18  brunner
+% New title page, but I can't get rid of page number
+%
+% Revision 1.2  1995/11/01  20:02:08  milind
 % *** empty log message ***
 %
 % Revision 1.1  1995/10/31  22:27:53  milind
@@ -21,7 +24,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \documentstyle[11pt,fullpage]{article}
-\pagestyle{headings}
+\pagestyle{empty}
 \setlength{\textwidth}{6.5in}
 \setlength{\textheight}{9in}
 \setlength{\parindent}{0in}
@@ -34,19 +37,39 @@
 
 \begin{document}
  
+%\begin{titlepage}
+%\vspace*{2in}
+%\Huge
+%\begin{center}
+%Charm/Charm++/Converse \\
+%Installation\\
+%Manual\\
+%\vspace*{0.7in}
+%\today
+%\end{center}
+%\normalsize
+%\end{titlepage}
+
 \begin{titlepage}
-\vspace*{2in}
-\Huge
-\begin{center}
-Charm/Charm++/Converse \\
-Installation\\
-Manual\\
-\vspace*{0.7in}
-\today
-\end{center}
-\normalsize
+
+\title{
+\vspace*{3in}
+Charm/Charm++/Converse Installation and Usage
+}
+
+\author{Parallel Programming Laboratory\\
+	Department of Computer Science\\
+	University of Illinois at Urbana--Champaign}
+\date{\today}
+
+\maketitle
+
 \end{titlepage}
 
+\newpage
+\pagestyle{headings}
+
+\section{Introduction}
 In this manual, we describe how to install Charm, Charm++ and
 Converse, how to compile and execute programs, and the available
 command line options.  We also describe queueing and load balancing
