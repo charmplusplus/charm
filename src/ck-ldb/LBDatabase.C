@@ -260,8 +260,10 @@ void _loadbalancerInit()
   // set alpha and beeta
   _lb_args.alpha() = PER_MESSAGE_SEND_OVERHEAD_DEFAULT;
   _lb_args.beeta() = PER_BYTE_SEND_OVERHEAD_DEFAULT;
-  CmiGetArgDoubleDesc(argv,"+LBAlpha", &_lb_args.alpha(),"per message send overhead");
-  CmiGetArgDoubleDesc(argv,"+LBBeta", &_lb_args.beeta(),"per byte send overhead");
+  CmiGetArgDoubleDesc(argv,"+LBAlpha", &_lb_args.alpha(),
+                           "per message send overhead");
+  CmiGetArgDoubleDesc(argv,"+LBBeta", &_lb_args.beeta(),
+                           "per byte send overhead");
 
   if (CkMyPe() == 0) {
     if (_lb_args.debug()) {
@@ -275,7 +277,7 @@ void _loadbalancerInit()
     if (_lb_args.useCpuTime())
       CmiPrintf("LB> Load balancer uses CPU time instead of wallclock time.\n");
     if (LBSimulation::doSimulation)
-      CmiPrintf("LB> Load balancer running in simulation mode.\n");
+      CmiPrintf("LB> Load balancer running in simulation mode on file '%s' version %d.\n", LBSimulation::dumpFile, _lb_args.lbversion());
     if (_lb_args.statsOn()==0)
       CkPrintf("LB> Load balancing instrumentation is off.\n");
     if (_lb_args.traceComm()==0)

@@ -788,6 +788,11 @@ void CentralLB::readStatsMsgs(const char* filename)
   pd((char *)&machInfo, sizeof(machInfo));	// read machine info
   PUP::xlater p(machInfo, pd);
 
+  if (_lb_args.lbversion() >= 1) {
+    p|_lb_args.lbversion();		// write version number
+    CkPrintf("LB> File version detected: %d\n", _lb_args.lbversion());
+    CmiAssert(_lb_args.lbversion() <= LB_FORMAT_VERSION);
+  }
   p|stats_msg_count;
 
   CmiPrintf("readStatsMsgs for %d pes starts ... \n", stats_msg_count);
@@ -818,6 +823,7 @@ void CentralLB::writeStatsMsgs(const char* filename)
   PUP::toDisk p(f);
   p((char *)&machInfo, sizeof(machInfo));	// machine info
 
+  p|_lb_args.lbversion();		// write version number
   p|stats_msg_count;
   statsData->pup(p);
 

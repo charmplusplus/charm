@@ -54,6 +54,9 @@ public:
     inline void pup(PUP::er &p) {
       p|total_walltime;  p|total_cputime; p|idletime;
       p|bg_walltime; p|bg_cputime; p|pe_speed;
+      if (_lb_args.lbversion() < 1 && p.isUnpacking()) {
+         double dummy;  p|dummy;    // for old utilization
+      }
       p|available; p|n_objs;
     }
   };
