@@ -509,6 +509,8 @@ void InitCallTable::enumerateInitCalls()
   {
     for (i=0; i<initNodeCalls.length(); i++) initNodeCalls[i]();
   }
+  // initproc may depend on initnode calls.
+  CmiNodeAllBarrier();
   for (i=0; i<initProcCalls.length(); i++) initProcCalls[i]();
 }
 
