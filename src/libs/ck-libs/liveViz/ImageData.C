@@ -613,7 +613,8 @@ EXITPOINT:
     return returnVal;
 }
 
-void ImageData::CombineImageData (int nMsg, CkReductionMsg **msgs, byte* dest)
+void ImageData::CombineImageData (int nMsg, CkReductionMsg **msgs, byte* dest, 
+                                  int reducer)
 {
     int     headPos         = 0;    // in 'buff'
     int     dataPos         = 0;    // in 'buff' 
@@ -633,13 +634,14 @@ void ImageData::CombineImageData (int nMsg, CkReductionMsg **msgs, byte* dest)
     // copy image data to buff
     for (int i=0; i<nMsg; i++)
     {
-        CopyImageData (dest, m_numDataLines, msgs[i]);
+        CopyImageData (dest, m_numDataLines, msgs[i], reducer);
     }
 }
 
 int ImageData::CopyImageData (byte* dest,
                               int n,
-                              CkReductionMsg* msg)
+                              CkReductionMsg* msg,
+                              int reducer)
 {
     int returnVal       = 0;
     int destHeadPos     = 0;
@@ -678,15 +680,23 @@ int ImageData::CopyImageData (byte* dest,
                              destHeader->m_pos) * m_bytesPerPixel;
         for (int j=0; j<bytesToCopy; j++)
         {
-            pixelByte = *(dest + destDataPos + posInDataLine + j);
-            pixelByte += *(src + srcDataPos++);
+            if (reducer == sum_image_pixels) {
+              pixelByte = *(dest + destDataPos + posInDataLine + j);
+              pixelByte += *(src + srcDataPos++);
 
-            if (0xff < pixelByte)
-            {
-                pixelByte = 0xff;
+              if (0xff < pixelByte)
+              {
+                  pixelByte = 0xff;
+              }
+
+              *(dest + destDataPos + posInDataLine + j) = pixelByte;
+            } else {
+              if (reducer == max_image_pixels) {
+                if (*(src + srcDataPos) > *(dest + destDataPos + posInDataLine + j))
+                  *(dest + destDataPos + posInDataLine + j) = *(src + srcDataPos);
+                ++srcDataPos;
+              }
             }
-
-            *(dest + destDataPos + posInDataLine + j) = pixelByte;
         }
 
         srcHeader++;

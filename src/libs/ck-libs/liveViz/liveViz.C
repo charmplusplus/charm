@@ -9,8 +9,9 @@ Orion Sky Lawlor, olawlor@acm.org, 6/11/2002
 PUPbytes(liveVizConfig)
 
 liveVizConfig lv_config;
+CkReduction::reducerType sum_image_data;
+CkReduction::reducerType max_image_data;
 CProxy_liveVizGroup lvG;
-CkReduction::reducerType imageCombineReducer;
 CkCallback clientGetImageCallback;
 
 //Called by clients to start liveViz.
@@ -47,39 +48,39 @@ a small cache, it may be better to use an "if" instead of this table.
 static byte *overflowArray=CkImage::newClip();
 
 static void liveVizNodeInit(void) {
-	imageCombineReducer=CkReduction::addReducer(imageCombine);
+  sum_image_data=CkReduction::addReducer(imageCombineSum);
+  max_image_data=CkReduction::addReducer(imageCombineMax);
 }
 
 #if 1
 /****************** Fast but complex image combining *****************
 
-Here I create a list of non-overlapping images (lines) and contribute the list of images rather than the combined images.
+Here I create a list of non-overlapping images (lines) and contribute 
+the list of images rather than the combined images.
 
 The contributed data looks like:
-	a list of Images (lines) packed into a run of bytes
+  a list of Images (lines) packed into a run of bytes
 **********************************************************************/
 
 //Called by clients to deposit a piece of the final image
 void liveVizDeposit(const liveVizRequest &req,
-		    int startx, int starty,
-		    int sizex, int sizey, const byte * src,
-		    ArrayElement* client)
+                    int startx, int starty,
+                    int sizex, int sizey, const byte * src,
+                    ArrayElement* client,
+                    CkReduction::reducerType reducer)
 {
   if (lv_config.getVerbose(2))
     CkPrintf("liveVizDeposit> Deposited image at (%d,%d), (%d x %d) pixels, on pe %d \n",startx,starty,sizex,sizey,CkMyPe());
 
   ImageData imageData (lv_config.getBytesPerPixel ());
-
   CkReductionMsg* msg = CkReductionMsg::buildNew(imageData.GetBuffSize (startx,
-						                                                starty,
-																	    sizex,
-																	    sizey,
-																	    &req,
-																	    src),
-				                                 NULL,
-												 imageCombineReducer);
-  imageData.AddImage (&req,
-					  (byte*)(msg->getData()));
+                                                                        starty,
+                                                                        sizex,
+                                                                        sizey,
+                                                                        &req,
+                                                                        src),
+                                                 NULL, reducer);
+  imageData.AddImage (&req, (byte*)(msg->getData()));
 
   //Contribute this image to the reduction
   msg->setCallback(CkCallback(vizReductionHandler));
@@ -92,28 +93,59 @@ Called by the reduction manager to combine all the source images
 received on one processor. This function adds all the image on one
 processor to one list of non-overlapping images.
 */
-CkReductionMsg *imageCombine(int nMsg,CkReductionMsg **msgs)
+CkReductionMsg *imageCombineSum(int nMsg,CkReductionMsg **msgs)
 {
   if (nMsg==1) { //Don't bother copying if there's only one source
     if (lv_config.getVerbose(2))
-      CkPrintf("imageCombine> Skipping combine on pe %d\n",CkMyPe());
-  	CkReductionMsg *ret=msgs[0];
-	msgs[0]=NULL; //Prevent reduction manager from double-delete
-	return ret;
+      CkPrintf("imageCombineSum> Skipping combine on pe %d\n",CkMyPe());
+    
+    CkReductionMsg *ret=msgs[0];
+    msgs[0]=NULL; //Prevent reduction manager from double-delete
+    return ret;
   }
 
   if (lv_config.getVerbose(2))
-    CkPrintf("imageCombine> image combine on pe %d\n",CkMyPe());
+    CkPrintf("imageCombineSum> image combine on pe %d\n",CkMyPe());
 
   ImageData imageData (lv_config.getBytesPerPixel ());
 
   CkReductionMsg* msg = CkReductionMsg::buildNew(imageData.CombineImageDataSize (nMsg,
-						                                                         msgs),
+                                                                                 msgs),
+                                                 NULL, sum_image_data);
 
-				                                 NULL,
-												 imageCombineReducer);
+  imageData.CombineImageData (nMsg, msgs, (byte*)(msg->getData()), 
+                              sum_image_pixels);
 
-  imageData.CombineImageData (nMsg, msgs, (byte*)(msg->getData()));
+  return msg;
+}
+
+/*
+Called by the reduction manager to combine all the source images
+received on one processor. This function adds all the image on one
+processor to one list of non-overlapping images.
+*/
+CkReductionMsg *imageCombineMax(int nMsg,CkReductionMsg **msgs)
+{
+  if (nMsg==1) { //Don't bother copying if there's only one source
+    if (lv_config.getVerbose(2))
+      CkPrintf("imageCombineMax> Skipping combine on pe %d\n",CkMyPe());
+    
+    CkReductionMsg *ret=msgs[0];
+    msgs[0]=NULL; //Prevent reduction manager from double-delete
+    return ret;
+  }
+
+  if (lv_config.getVerbose(2))
+    CkPrintf("imageCombineMax> image combine on pe %d\n",CkMyPe());
+
+  ImageData imageData (lv_config.getBytesPerPixel ());
+
+  CkReductionMsg* msg = CkReductionMsg::buildNew(imageData.CombineImageDataSize (nMsg,
+                                                                                 msgs),
+                                                 NULL, max_image_data);
+
+  imageData.CombineImageData (nMsg, msgs, (byte*)(msg->getData()), 
+                              max_image_pixels);
 
   return msg;
 }

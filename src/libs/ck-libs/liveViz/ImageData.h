@@ -10,6 +10,11 @@ typedef struct
     int m_size; // size in pixels
 } Header;
 
+enum {
+  sum_image_pixels,
+  max_image_pixels
+};
+
 class ImageData
 {
     public:
@@ -77,7 +82,8 @@ class ImageData
         /*
            This function copies image data from n-input msgs to 'dest' buffer. 
         */
-        void CombineImageData (int nMsg, CkReductionMsg **msgs, byte* dest);
+        void CombineImageData (int nMsg, CkReductionMsg **msgs, byte* dest,
+                               int reducer);
 
 
         /*
@@ -98,7 +104,8 @@ class ImageData
            "dest" buff. Here 'n' indicates, number of lines of data in 'dest'
            buff.
         */
-        int CopyImageData (byte* dest, int n, CkReductionMsg* msg);
+        int CopyImageData (byte* dest, int n, CkReductionMsg* msg,
+                           int reducer);
 
 
         /*

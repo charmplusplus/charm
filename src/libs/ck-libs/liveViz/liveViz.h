@@ -129,6 +129,9 @@ inline void liveVizPollDeposit(ArrayElement *from,
 /********************** LiveViz ***********************/
 #include "liveViz.decl.h"
 
+extern CkReduction::reducerType sum_image_data;
+extern CkReduction::reducerType max_image_data;
+
 /*
   Start liveViz.  This routine should be called once on processor 0
   when you are ready to begin receiving image requests.
@@ -156,18 +159,21 @@ public:
   	liveVizDeposit(0,0, 0,0, NULL, this);
 */
 void liveVizDeposit(const liveVizRequest &req,
-		    int startx, int starty,
-		    int sizex, int sizey, const byte * imageData,
-		    ArrayElement* client);
+                    int startx, int starty,
+                    int sizex, int sizey, const byte * imageData,
+                    ArrayElement* client,
+                    CkReduction::reducerType reducer=sum_image_data);
 
 
 //As above, but taking a message instead of a request:
 inline void liveVizDeposit(liveVizRequestMsg *reqMsg,
 		    int startx, int starty,
 		    int sizex, int sizey, const byte * imageData,
-		    ArrayElement* client)
+		    ArrayElement* client,
+                    CkReduction::reducerType reducer=sum_image_data)
 {
-	liveVizDeposit(reqMsg->req,startx,starty,sizex,sizey,imageData,client);
+	liveVizDeposit(reqMsg->req,startx,starty,sizex,sizey,imageData,client,
+                       reducer);
 	delete reqMsg;
 }
 
