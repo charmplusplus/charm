@@ -106,7 +106,6 @@ module MPIINCL
   external MPI_Errhandler_free
   external MPI_Error_string
   external MPI_Error_class
-  external MPI_Wtime
   external MPI_Wtick
   external MPI_Init
   external MPI_Initialized
