@@ -1323,7 +1323,6 @@ void CWebInit(void)
 
   CWebPerformanceRegisterFunction(getUsage);
   CWebPerformanceRegisterFunction(f2);
-  CWebPerformanceRegisterFunction(f3);
 
 }
 
@@ -2541,9 +2540,8 @@ extern void CrnInit(void);
 void ConverseCommonInit(char **argv)
 {
 #if NODE_0_IS_CONVHOST
-  int i, j;
+  int i,j;
 #endif
-  CrnInit();
   CmiTimerInit();
   CstatsInit(argv);
   CcdModuleInit(argv);
@@ -2568,14 +2566,16 @@ void ConverseCommonInit(char **argv)
   CmiSignal(SIGALRM, SIGIO, 0, CommunicationServer);
   CmiEnableAsyncIO(hostskt);
   CHostRegister();
-  
+ 
   if(CmiMyPe() == 0){
     char *ptr;
-    for(ptr = argv[0]; ptr != 0; i++, ptr = argv[i])
+    i = 0;
+    for(ptr = argv[i]; ptr != 0; i++, ptr = argv[i])
       if(strcmp(ptr, "++server") == 0) {
 	serverFlag = 1;
 	for(j = i; argv[j] != 0; j++)
 	  argv[j] = argv[j+1];
+        break;
       }
   }
 #endif
