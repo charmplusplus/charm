@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.18  1995-09-20 16:36:56  jyelon
+ * Revision 2.19  1995-09-20 17:22:14  jyelon
+ * Added CthImplemented
+ *
+ * Revision 2.18  1995/09/20  16:36:56  jyelon
  * *** empty log message ***
  *
  * Revision 2.17  1995/09/20  15:09:42  sanjeev
@@ -245,6 +248,8 @@ typedef struct StructCthThread *CthThread;
 
 typedef void        (*CthVoidFn)();
 typedef CthThread   (*CthThFn)();
+
+int        CthImplemented  CMK_PROTO((void));
 
 CthThread  CthSelf     CMK_PROTO((void));
 CthThread  CthCreate   CMK_PROTO((CthVoidFn, void *, int));

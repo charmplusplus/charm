@@ -13,7 +13,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.5  1995-09-20 16:36:56  jyelon
+ * Revision 1.6  1995-09-20 17:22:14  jyelon
+ * Added CthImplemented
+ *
+ * Revision 1.5  1995/09/20  16:36:56  jyelon
  * *** empty log message ***
  *
  * Revision 1.4  1995/09/20  15:39:54  jyelon
@@ -203,6 +206,9 @@ static int       thread_growsdown;
 
 #define ABS(a) (((a) > 0)? (a) : -(a) )
 
+int CthImplemented()
+    { return 1; }
+
 static void CthInit()
 {
   char *sp1 = alloca(8);
@@ -375,7 +381,10 @@ static void CthFail()
   CmiPrintf("Threads not currently supported on this hardware platform.\n");
   exit(1);
 }
-        
+
+int CthImplemented()
+    { return 0; }
+
 CthThread CthSelf()
     { CthFail(); }
 
@@ -399,7 +408,7 @@ void CthAwaken(t)
     { CthFail(); }
 
 void CthSetStrategy(t, awkfn, chsfn)
-    CthVoidFn insfn; CthThFn chsfn;
+    CthThread t; CthVoidFn awkfn; CthThFn chsfn;
     { CthFail(); }
 
 void CthYield()
