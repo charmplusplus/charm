@@ -396,6 +396,17 @@ CMK_LIBS="\$CMK_LIBS -lz"
 EOT
 fi
 
+#### test if has values.h ####
+cat > $t <<EOT
+#include <values.h>
+int main() { 
+  double d = MAXDOUBLE;
+  return 0;
+}
+EOT
+test_cxx "whether has values.h " "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_VALUES_H, $pass)
+
 ################## Fortran #########################
 
 ### test fortran subroutine name ###
