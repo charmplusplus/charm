@@ -720,16 +720,18 @@ CDECL double TCharmWallTimer(void)
 /*Include Fortran-style "iargc" and "getarg" routines.
 These are needed to get access to the command-line arguments from Fortran.
 */
-FDECL int FTN_NAME(IARGC,iargc)(void) {
-  TCHARMAPI("iargc");
+FDECL int FTN_NAME(TCHARM_IARGC,tcharm_iargc)(void) {
+  TCHARMAPI("tcharm_iargc");
   return CkGetArgc()-1;
 }
 
-FDECL void FTN_NAME(GETARG,getarg)(int *i_p,char *dest,int destLen) {
-  TCHARMAPI("getarg");
+FDECL void FTN_NAME(TCHARM_GETARG,tcharm_getarg)
+	(int *i_p,char *dest,int destLen) 
+{
+  TCHARMAPI("tcharm_getarg");
   int i=*i_p;
-  if (i<0) CkAbort("getarg called with negative argument!");
-  if (i>=CkGetArgc()) CkAbort("getarg called with argument > iargc!");
+  if (i<0) CkAbort("tcharm_getarg called with negative argument!");
+  if (i>=CkGetArgc()) CkAbort("tcharm_getarg called with argument > iargc!");
   const char *src=CkGetArgv()[i];
   strcpy(dest,src);
   for (i=strlen(dest);i<destLen;i++) dest[i]=' ';

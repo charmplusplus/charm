@@ -15,5 +15,5 @@
        external tcharm_readonly_globals
        external tcharm_init
 
-       integer, external :: iargc
-       external getarg
+       integer, external :: tcharm_iargc
+       external tcharm_getarg
