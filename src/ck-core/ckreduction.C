@@ -300,6 +300,7 @@ void CkReductionMgr::contributorDied(contributorInfo *ci)
 
   finishReduction();
 }
+
 //Migrating away (note that global count doesn't change)
 void CkReductionMgr::contributorLeaving(contributorInfo *ci)
 {
@@ -311,11 +312,17 @@ void CkReductionMgr::contributorLeaving(contributorInfo *ci)
 
   finishReduction();
 }
+
 //Migrating in (note that global count doesn't change)
 void CkReductionMgr::contributorArriving(contributorInfo *ci)
 {
   DEBR((AA"Contributor %p(%d) migrating in\n"AB,ci,ci->redNo));
   lcount++;//We gained a local
+#if CMK_MEM_CHECKPOINT
+  // ignore from listener if it is during restart from crash
+  // because the ci may be old.
+  if (CkInRestarting()) return;
+#endif
   //He has already contributed (elsewhere) to several reductions:
   for (int r=redNo;r<ci->redNo;r++)
     adj(r).lcount--;//He won't be contributing to r here
