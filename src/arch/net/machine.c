@@ -591,7 +591,7 @@ char **argv;
 {
   resend_wait = 10;
   resend_fail = 600000;
-  Cmi_enableinterrupts = 1;
+  Cmi_enableinterrupts = 0;
   Topology = 'F';
   outputfile = NULL;
 
