@@ -144,8 +144,8 @@ class CkVec : private CkSTLHelper<T> {
     typedef CkVec<T> this_type;
 
     T *block; //Elements of vector
-    int blklen; //Allocated size of block 
-    int len; //Number of used elements in block
+    int blklen; //Allocated size of block (STL capacity) 
+    int len; //Number of used elements in block (STL size; <= capacity)
     void makeBlock(int blklen_,int len_) {
        block=new T[blklen_];
        blklen=blklen_; len=len_;
@@ -178,15 +178,24 @@ class CkVec : private CkSTLHelper<T> {
     T& operator[](size_t n) { return block[n]; }
     const T& operator[](size_t n) const { return block[n]; }
     
-    void setSize(int blklen_) {
+    /// Reserve at least this much space (changes capacity, size unchanged)
+    void reserve(int newcapacity) {
+      if (newcapacity<blklen) return; /* already there */
       T *oldBlock=block; 
-      makeBlock(blklen_,len);
+      makeBlock(newcapacity,len);
       elementCopy(block,oldBlock,len);
       delete[] oldBlock; //WARNING: leaks if element copy throws exception
     }
+    inline int capacity(void) const {return blklen;}
+
+    /// Set our length to this value
+    void resize(int newsize) {
+      reserve(newsize); len=newsize;
+    }
+
     //Grow to contain at least this position:
     void growAtLeast(int pos) {
-      if (pos>=blklen) setSize(pos*2+16);
+      if (pos>=blklen) reserve(pos*2+16);
     }
     void insert(int pos, const T &elt) {
       if (pos>=len) { 
@@ -212,7 +221,7 @@ class CkVec : private CkSTLHelper<T> {
     int pupbase(PUP::er &p) {
        int l=len;
        p(l);
-       if (p.isUnpacking()) { setSize(l); len=l;}
+       if (p.isUnpacking()) resize(l); 
        return l;
     }
     
@@ -349,7 +358,7 @@ class CkPupPtrVec : public CkVec< CkZeroPtr<T, PUP_PTR> > {
 	}
 	void pup(PUP::er &p) {
 		int l=pupbase(p);
-		for (int i=0;i<length();i++) p|operator[] (i);
+		for (int i=0;i<l;i++) p|operator[] (i);
 	}
 	friend void operator|(PUP::er &p,this_type &v) {v.pup(p);}
 };
@@ -383,7 +392,7 @@ class CkPupAblePtrVec : public CkVec< CkZeroPtr<T, CkPupAblePtr<T> > > {
 	}
 	void pup(PUP::er &p) {
 		int l=pupbase(p);
-		for (int i=0;i<length();i++) p|operator[] (i);
+		for (int i=0;i<l;i++) p|operator[] (i);
 	}
 	friend void operator|(PUP::er &p,this_type &v) {v.pup(p);}
 };

@@ -353,9 +353,8 @@ public:
   PropMap(CkMigrateMessage *m) {}
   int registerArray(int numElements,CkArrayID aid)
   {
-    int idx = arrs.length();
-    arrs.setSize(idx+1);
-    arrs.length() = idx+1;
+    int idx = arrs.size();
+    arrs.resize(idx+1);
     arrs[idx] = new arrInfo(numElements, speeds);
     return idx;
   }
@@ -586,8 +585,7 @@ CkMigratableList::CkMigratableList() {}
 CkMigratableList::~CkMigratableList() {}
 
 void CkMigratableList::setSize(int s) {
-	el.setSize(s);
-	el.length()=s;
+	el.resize(s);
 }
 
 void CkMigratableList::put(CkMigratable *v,int atIdx) {
@@ -1082,7 +1080,7 @@ int CkLocMgr::nextFree(void) {
 		for (ManagerRec *m=firstManager;m!=NULL;m=m->next)
 			m->elts.setSize(localLen);
 		//Update the free list
-		freeList.setSize(localLen);
+		freeList.resize(localLen);
 		for (int i=oldLen;i<localLen;i++)
 			freeList[i]=i+1;
 	}
