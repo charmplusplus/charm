@@ -551,6 +551,7 @@ double   CmiStartTimer(void);
 #define CmiTimerIsSynchronized()	(0)
 
 #else
+void     CmiTimerInit();
 double   CmiTimer(void);
 double   CmiWallTimer(void);
 #define  CmiStartTimer()                (0.0)
@@ -728,6 +729,7 @@ void     CmiNodeSpanTreeChildren(int node, int *children) ;
 
 typedef CMK_MULTICAST_GROUP_TYPE CmiGroup;
 
+void     CmiGroupInit();
 CmiGroup CmiEstablishGroup(int npes, int *pes);
 void     CmiLookupGroup(CmiGroup grp, int *npes, int **pes);
 
@@ -832,6 +834,7 @@ void          CmiFreeNodeBroadcastAllFn(int, char *);
 
 /******** CMI MESSAGE RECEPTION ********/
 
+void   CmiDeliversInit();
 int    CmiDeliverMsgs(int maxmsgs);
 void   CmiDeliverSpecificMsg(int handler);
 void   CmiHandleMessage(void *msg);
