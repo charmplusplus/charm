@@ -22,7 +22,7 @@
 #endif
 
 #define NO_NAGLE_ALG		1
-#define FRAGMENTATION		0
+#define FRAGMENTATION		1
 
 void ReceiveDatagram(int pe);
 int TransmitDatagram(int pe);
@@ -288,27 +288,33 @@ static void CommunicationServerThread(int sleepTime)
 #endif
 }
 
-static void IntegrateMessageDatagram(char *msg, int len)
+static void IntegrateMessageDatagram(char **msg, int len)
 {
   char *newmsg;
   int rank, srcpe, seqno, magic, i;
   int size;
   
   if (len >= DGRAM_HEADER_SIZE) {
-    DgramHeaderBreak(msg, rank, srcpe, magic, seqno);
+    DgramHeaderBreak(*msg, rank, srcpe, magic, seqno);
     if (magic == (Cmi_charmrun_pid&DGRAM_MAGIC_MASK)) {
       OtherNode node = nodes_by_pe[srcpe];
       newmsg = node->asm_msg;
       if (newmsg == NULL) {
-        size = CmiMsgHeaderGetLength(msg);
+        size = CmiMsgHeaderGetLength(*msg);
         if (size < len) KillEveryoneCode(4559312);
 #if FRAGMENTATION
-        newmsg = (char *)CmiAlloc(size);
-        if (!newmsg)
-          fprintf(stderr, "%d: Out of mem\n", Cmi_mynode);
-        memcpy(newmsg, msg, len);
+	if (size <= Cmi_dgram_max_data+DGRAM_HEADER_SIZE) {
+	  newmsg = *msg;
+	  *msg = NULL;	       /* directly use the buffer */
+	}    
+	else {		       /* allocate new and reuse the buffer next time */
+          newmsg = (char *)CmiAlloc(size);
+          if (!newmsg)
+            fprintf(stderr, "%d: Out of mem\n", Cmi_mynode);
+          memcpy(newmsg, *msg, len);
+	}
 #else
-        newmsg = msg;
+        newmsg = *msg;
 #endif
         node->asm_rank = rank;
         node->asm_total = size;
@@ -319,7 +325,7 @@ static void IntegrateMessageDatagram(char *msg, int len)
 	CmiAssert(0);
 #endif
         size = len - DGRAM_HEADER_SIZE;
-        memcpy(newmsg + node->asm_fill, msg+DGRAM_HEADER_SIZE, size);
+        memcpy(newmsg + node->asm_fill, (*msg)+DGRAM_HEADER_SIZE, size);
         node->asm_fill += size;
       }
       if (node->asm_fill > node->asm_total)
@@ -360,6 +366,7 @@ void ReceiveDatagram(int pe)
     KillEveryoneCode(4559318);
 
 #if FRAGMENTATION
+    /* try to reuse the buffer */
   if (!buf) buf = (char *)CmiAlloc(Cmi_dgram_max_data+DGRAM_HEADER_SIZE);
 #else
   buf = (char *)CmiAlloc(size);
@@ -368,7 +375,7 @@ void ReceiveDatagram(int pe)
   if (-1==skt_recvN(fd, buf, size))
     KillEveryoneCode(4559319);
 
-  IntegrateMessageDatagram(buf, size);
+  IntegrateMessageDatagram(&buf, size);
 }
 
 
@@ -485,7 +492,7 @@ void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank)
 void CmiMachineInit()
 {
 #if FRAGMENTATION
-  Cmi_dgram_max_data = 1400-DGRAM_HEADER_SIZE; 
+  Cmi_dgram_max_data = 65535-DGRAM_HEADER_SIZE; 
 #else
   Cmi_dgram_max_data = 1000000000;
 #endif
