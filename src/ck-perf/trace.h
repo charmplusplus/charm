@@ -124,7 +124,7 @@ public:
         }
         n -= removed;
     }
-    inline const int length() const { return n; }
+    inline int length() const { return n; }
 
     inline void userEvent(int e) { ALLDO(userEvent(e));}
     inline void userBracketEvent(int e,double bt, double et) {ALLDO(userBracketEvent(e,bt,et));}
