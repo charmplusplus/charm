@@ -19,7 +19,7 @@
 #include "LBDatabase.h"
 #include "LBDatabase.def.h"
 #include "LBSimulation.h"
-#include "LBTopology.h"
+#include "topology.h"
 
 #include "NullLB.h"
 
