@@ -28,6 +28,7 @@ bgMsgEntry::bgMsgEntry(char *msg)
 {
   msgID = CmiBgMsgID(msg);
   sendtime = BgGetCurTime();
+  recvTime = CmiBgMsgRecvTime(msg);
   dstPe = CmiBgMsgNodeID(msg);
   tID = CmiBgMsgThreadID(msg);
 }

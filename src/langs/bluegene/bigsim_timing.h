@@ -26,6 +26,7 @@ public:
   int msgID;
   CmiUInt2 tID;		// destination worker thread ID
   double sendtime;
+  double recvTime;
   int dstPe;
 public:
   bgMsgEntry(char *msg);
