@@ -123,11 +123,11 @@ MAXMIN_MAP_TYPES(MAXMIN_REDUCER)
 // Instantiate the maxLoc/minLoc templates
 #if STUPID_SUN_TEMPLATES
 #  define MAXMIN_INSTANTIATE(fn,V,I) \
-  template<> CkReductionMsg *fn<V,I>(int n,CkReductionMsg **m,V,I); \
+  template CkReductionMsg *fn<V,I>(int n,CkReductionMsg **m,V,I); \
   typedef CkReductionMsg *(* fn##V##I##Type)(int n,CkReductionMsg **m,V,I);
 #else
 #  define MAXMIN_INSTANTIATE(fn,V,I) \
-  template<> CkReductionMsg *fn<V,I>(int n,CkReductionMsg **m);
+  template CkReductionMsg *fn<V,I>(int n,CkReductionMsg **m);
 #endif
 MAXMIN_MAP_TYPES(MAXMIN_INSTANTIATE)
 
