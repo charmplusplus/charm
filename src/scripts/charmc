@@ -465,10 +465,10 @@ do
 	-L*|-shared|-G)
 		OPTS_LD="$OPTS_LD $arg"
 		;;
-	-charm-shared|-charmShared)
+	-charm-shared)
 		CHARM_SHARED="1"
 		;;
-	-build-shared|-buildShared)
+	-build-shared)
 		# used internally when building Charm++ to create lib_so
 		BUILD_SHARE="1"
 		;;
@@ -995,10 +995,6 @@ case "$OBJECT" in
 	DoNoErrCheck $RM $OBJECT
 	Do $CMK_AR $OBJECT $OBJECTFILES
 	Do $CMK_RANLIB $OBJECT
-	destDir="$OBJECT.dir"
-	[ -n "$COPYTO" ] && destDir="$COPYTO/$OBJECT.dir"
-	[ ! -d $destDir ] && DoNoErrCheck mkdir $destDir
-	Do cp $OBJECTFILES $destDir
 	Copyobj
 	;;
 esac
