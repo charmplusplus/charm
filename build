@@ -130,7 +130,14 @@ printOption() {
           files=`cd $dir; ls $prefix-*.h 2>/dev/null`
           opts="$opts "`echo $files | sed 's/'$prefix'-\([^.]*\).h/\1/g'`
     done 
-    opts=`echo $opts | sed -e 's/ /\n/g' | sort | uniq`
+    tmp=.tmp.$$
+    rm -f $tmp; touch $tmp
+    for o in $opts
+    do
+      echo $o >> $tmp
+    done
+    opts=`sort $tmp | uniq`
+    rm -f $tmp
     echo $str $opts
   done
   exit 1
