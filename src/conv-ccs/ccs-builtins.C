@@ -338,10 +338,17 @@ static void CpdListInit(void) {
 /******************************************************
 Web performance monitoring interface:
 	Clients will register for performance data with 
-processor 0.  Every WEB_INTERVAL (few seconds), this code
+processor 0 by calling the "perf_monitor" CCS request.  
+Every WEB_INTERVAL (few seconds), this code
 calls all registered web performance functions on all processors.  
-The resulting integers are sent back to the client.  The current
-reply format is ASCII and rather nasty. 
+The resulting integers are sent back to the client as a 
+CCS reply.  
+
+The current reply format is ASCII and rather nasty:
+it's the string "perf" followed by space-separated list
+of the performance functions for each processor.  By default,
+only two performance functions are registered: the current 
+processor utilization, in percent; and the current queue length.
 
 The actual call sequence is:
 CCS Client->CWebHandler->...  (processor 0)
@@ -499,30 +506,37 @@ static void CWebHandler(void){
 spent actually processing messages on each processor.   
 It's a simple performance measure collected by the CWeb framework.
 **/
+struct CWebModeStats {
+public:
+	double beginTime; ///< Start of last collection interval
+	double startTime; ///< Start of last busy time
+	double usedTime; ///< Total busy time in last collection interval
+	int PROCESSING; ///< If 1, processor is busy
+};
+CpvStaticDeclare(CWebModeStats *,cwebStats);
 
-CpvStaticDeclare(double, startTime);
-CpvStaticDeclare(double, beginTime);
-CpvStaticDeclare(double, usedTime);
-CpvStaticDeclare(int, PROCESSING);
+/* Called to begin a collection interval
+*/
+static void usageReset(CWebModeStats *stats,double curWallTime)
+{
+   stats->beginTime=curWallTime;
+   stats->usedTime = 0.;
+}
 
 /* Called when processor becomes busy
 */
-static void usageStart(void)
+static void usageStart(CWebModeStats *stats,double curWallTime)
 {
-   if(CpvAccess(PROCESSING)) return;
-
-   CpvAccess(startTime)  = CmiWallTimer();
-   CpvAccess(PROCESSING) = 1;
+   stats->startTime  = curWallTime;
+   stats->PROCESSING = 1;
 }
 
 /* Called when processor becomes idle
 */
-static void usageStop(void)
+static void usageStop(CWebModeStats *stats,double curWallTime)
 {
-   if(!CpvAccess(PROCESSING)) return;
-
-   CpvAccess(usedTime)   += CmiWallTimer() - CpvAccess(startTime);
-   CpvAccess(PROCESSING) = 0;
+   stats->usedTime   += curWallTime - stats->startTime;
+   stats->PROCESSING = 0;
 }
 
 /* Call this when the program is started
@@ -531,33 +545,29 @@ static void usageStop(void)
 */
 static void initUsage()
 {
-   CpvInitialize(double, startTime);
-   CpvInitialize(double, beginTime);
-   CpvInitialize(double, usedTime);
-   CpvInitialize(int, PROCESSING);
-   CpvAccess(startTime)  = CmiWallTimer();
-   CpvAccess(beginTime)  = CmiWallTimer();
-   CpvAccess(usedTime)   = 0.;
-   CpvAccess(PROCESSING) = 1;
-   CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_BUSY,(CcdVoidFn)usageStart,0);
-   CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)usageStop,0);      
+   CpvInitialize(CWebModeStats *, cwebStats);
+   CWebModeStats *stats=new CWebModeStats;
+   CpvAccess(cwebStats)=stats;
+   usageReset(stats,CmiWallTimer());
+   usageStart(stats,CmiWallTimer());
+   CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_BUSY,(CcdVoidFn)usageStart,stats);
+   CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)usageStop,stats);    
 }
 
 static int getUsage(void)
 {
    int usage = 0;
    double time      = CmiWallTimer();
-   double totalTime = time - CpvAccess(beginTime);
+   CWebModeStats *stats=CpvAccess(cwebStats);
+   double totalTime = time - stats->beginTime;
 
-   if(CpvAccess(PROCESSING))
-   {
-      CpvAccess(usedTime) += time - CpvAccess(startTime);
-      CpvAccess(startTime) = time;
+   if(stats->PROCESSING)
+   { /* Lock in current CPU usage */
+      usageStop(stats,time); usageStart(stats,time);
    }
    if(totalTime > 0.)
-      usage = (int)((100 * CpvAccess(usedTime))/totalTime);
-   CpvAccess(usedTime)  = 0.;
-   CpvAccess(beginTime) = time;
+      usage = (int)(0.5 + 100 *stats->usedTime/totalTime);
+   usageReset(stats,time);
 
    return usage;
 }
