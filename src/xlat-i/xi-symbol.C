@@ -1611,6 +1611,8 @@ void Entry::genGroupDecl(XStr& str)
         str << "         ckDelegatedTo()->"<<node<<"GroupBroadcast("<<paramg<<");\n";
         str << "      else CkBroadcastMsg"<<node<<"Branch("<<paramg<<");\n";
       }
+      if (isSync() && !retType->isVoid())
+        str << "      return ("<<retType<<") NULL;\n";
     }
     str << "    }\n";
 
