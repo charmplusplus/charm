@@ -24,11 +24,7 @@ typedef struct {
   pthread_mutex_t mutex;
   pthread_cond_t cond;
   int waiting;
-  void     **blk;
-  unsigned int blk_len;
-  unsigned int first;
-  unsigned int len;
-  unsigned int maxlen;
+  CdsFifo q;
 } McQueue;
 
 static McQueue *McQueueCreate(void);
@@ -151,10 +147,6 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   pthread_mutex_init(&memory_mutex, (pthread_mutexattr_t *) 0);
 
   MsgQueue=(McQueue **)CmiAlloc(Cmi_numpes*sizeof(McQueue *));
-  if (MsgQueue == (McQueue **)0) {
-    CmiError("Cannot Allocate Memory...\n");
-    abort();
-  }
   for(i=0; i<Cmi_numpes; i++) 
     MsgQueue[i] = McQueueCreate();
 
@@ -340,30 +332,14 @@ McQueue * McQueueCreate(void)
   pthread_mutex_init(&(queue->mutex), (pthread_mutexattr_t *) 0);
   pthread_cond_init(&(queue->cond), (pthread_condattr_t *) 0);
   queue->waiting = 0;
-  queue->blk = AllocBlock(BLK_LEN);
-  queue->blk_len = BLK_LEN;
-  queue->first = 0;
-  queue->len = 0;
-  queue->maxlen = 0;
+  queue->q = CdsFifo_Create_len(BLK_LEN);
   return queue;
 }
 
 void McQueueAddToBack(McQueue *queue, void *element)
 {
   pthread_mutex_lock(&(queue->mutex));
-  if(queue->len==queue->blk_len) {
-    void **blk;
-
-    queue->blk_len *= 3;
-    blk = AllocBlock(queue->blk_len);
-    SpillBlock(queue->blk, blk, queue->first, queue->len);
-    CmiFree(queue->blk);
-    queue->blk = blk;
-    queue->first = 0;
-  }
-  queue->blk[(queue->first+queue->len++)%queue->blk_len] = element;
-  if(queue->len>queue->maxlen)
-    queue->maxlen = queue->len;
+  CdsFifo_Enqueue(queue->q, element);
   if(queue->waiting) {
     pthread_cond_broadcast(&(queue->cond));
   }
@@ -375,11 +351,7 @@ void * McQueueRemoveFromFront(McQueue *queue)
 {
   void *element = 0;
   pthread_mutex_lock(&(queue->mutex));
-  if(queue->len) {
-    element = queue->blk[queue->first++];
-    queue->first = (queue->first+queue->blk_len)%queue->blk_len;
-    queue->len--;
-  }
+  element = CdsFifo_Dequeue(queue->q);
   pthread_mutex_unlock(&(queue->mutex));
   return element;
 }
