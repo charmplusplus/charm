@@ -1,0 +1,12 @@
+module receiver {
+
+message [varsize] receiverMsg;
+
+array [1D] receiver
+{
+  entry receiver();
+  entry void generic(receiverMsg *);
+  entry void ready2go(void);
+};
+
+};
