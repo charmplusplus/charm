@@ -26,6 +26,8 @@
 #define CkDDT_2INT            18
 #define CkDDT_SHORT_INT       19
 #define CkDDT_LONG_DOUBLE_INT 20
+#define CkDDT_2FLOAT          21
+#define CkDDT_2DOUBLE         22
 
 #define CkDDT_TYPE_NULL  -1
 #define CkDDT_PRIMITIVE  14
@@ -306,7 +308,9 @@ class CkDDT {
     typeTable[18] = new CkDDT_DataType(CkDDT_2INT);
     typeTable[19] = new CkDDT_DataType(CkDDT_SHORT_INT);
     typeTable[20] = new CkDDT_DataType(CkDDT_LONG_DOUBLE_INT);
-    num_types = 21;
+    typeTable[21] = new CkDDT_DataType(CkDDT_2FLOAT);
+    typeTable[22] = new CkDDT_DataType(CkDDT_2DOUBLE);
+    num_types = 23;
 
     int i;
     for(i=0 ; i < num_types; i++)
