@@ -377,6 +377,7 @@ class CkPupAblePtrVec : public CkVec< CkZeroPtr<T, CkPupAblePtr<T> > > {
 	this_type &operator=(const this_type &t) {
 		destroy();
 		copy_from(t);
+		return *this;
 	}
 	void copy_from(const this_type &t) {
 		for (int i=0;i<t.length();i++)
