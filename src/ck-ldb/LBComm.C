@@ -91,7 +91,7 @@ void LBCommTable::Resize()
   delete [] old_state;
 }	
 
-CmiBool LBCommData::equal(const LBCommData d2) const
+CmiBool LBCommData::equal(const LBCommData &d2) const
 {
   if (from_proc()) {
     if (src_proc != d2.src_proc)
