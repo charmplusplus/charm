@@ -1049,6 +1049,10 @@ map_slots(int slot, int nslots)
     CmiError("mmap call failed to allocate %d bytes at %p.\n", sz*nslots, addr);
     CmiAbort("Exiting\n");
   }
+#if CMK_THREADS_DEBUG
+  CmiPrintf("[%d] mmap'd slots %d-%d to address %p\n",CmiMyPe(),
+	    slot,slot+nslots-1,addr);
+#endif
   return pa;
 }
 
@@ -1063,13 +1067,76 @@ unmap_slots(int slot, int nslots)
   int retval = munmap((void*) addr, sz*nslots);
   if (retval==(-1))
     CmiAbort("munmap call failed to deallocate requested memory.\n");
+#if CMK_THREADS_DEBUG
+  CmiPrintf("[%d] munmap'd slots %d-%d from address %p\n",CmiMyPe(),
+	    slot,slot+nslots-1,addr);
+#endif
 }
+/*Estimate the top of the current stack*/
 static void *__cur_stack_frame(void)
 {
   char __dummy;
   void *top_of_stack=(void *)&__dummy;
   return top_of_stack;
 }
+/*Estimate the location of the static data region*/
+static void *__static_data_loc(void)
+{
+  static char __dummy;
+  return (void *)&__dummy;
+}
+
+
+/*This struct describes a range of virtual addresses*/
+typedef unsigned long memRange_t;
+typedef struct {
+  char *start; /*First byte of region*/
+  memRange_t len; /*Number of bytes in region*/
+  const char *type; /*String describing memory in region (debugging only)*/
+} memRegion_t;
+
+static char *pmin(char *a,char *b) {return (a<b)?a:b;}
+static char *pmax(char *a,char *b) {return (a>b)?a:b;}
+
+/*Find the first available memory region of at least the
+  given size not touching any data in the used list.
+ */
+static memRegion_t findFreeRegion(memRegion_t *used,int nUsed,int atLeast) 
+{
+  memRegion_t max;
+  int i,j;  
+
+  /*Find the largest hole between regions*/
+  for (i=0;i<nUsed;i++) {
+    /*Consider a hole starting at the end of region i*/
+    char *holeStart=used[i].start+used[i].len;
+    char *holeEnd=(void *)(-1);
+    
+    /*Shrink the hole by all others*/ 
+    for (j=0;j<nUsed && holeStart<holeEnd;j++) {
+      if (used[j].start<holeStart) holeStart=pmax(holeStart,used[j].start+used[j].len);
+      else if (used[j].start<holeEnd) holeEnd=pmin(holeEnd,used[j].start);
+    } 
+    if (holeStart<holeEnd) 
+    { /*There is some room between these two regions*/
+      memRange_t len=((memRange_t)holeEnd)-((memRange_t)holeStart);
+#if CMK_THREADS_DEBUG
+      CmiPrintf("[%d] Usable address space at %p - %p\n",CmiMyPe(),holeStart,holeEnd);
+#endif
+      if (len>=atLeast) { /*This is a large enough hole-- return it*/
+	max.len=len;
+	max.start=holeStart;
+	max.type="Unused";
+	return max;
+      }
+    }
+  }
+
+  /*If we get here, there are no large enough holes*/
+  CmiAbort("ISOMALLOC cannot locate any free virtual address space!");
+  return max; /*<- never executed*/
+}
+
 
 void CthInit(char **argv)
 {
@@ -1097,37 +1164,79 @@ void CthInit(char **argv)
    * and allocate the slotset.
    */
   do {
-    void *heap = (void*) malloc(1);
-    void *stack = __cur_stack_frame();
-    void *stackbdry;
+    char *staticData =(char *) __static_data_loc();
+    char *code = (char *)&CthInit;
+    char *heapLil = (char*) malloc(1);
+    char *heapBig = (char*) malloc(4*1024*1024);
+    char *stack = (char *)__cur_stack_frame();
     int stacksize = CpvAccess(_defaultStackSize);
-    _MEMCHECK(heap);
+
+    memRange_t meg=1024*1024; /*One megabyte*/
+    memRange_t gig=1024*meg; /*One gigabyte*/
+    int i,nRegions=6;
+    memRegion_t regions[6]; /*used portions of address space*/
+    memRegion_t freeRegion; /*Largest unused block of address space*/
+
+/*Mark off regions of virtual address space as ususable*/
+    regions[0].type="NULL (inaccessible)";
+    regions[0].start=NULL; regions[0].len=16u*meg;
+    
+    regions[1].type="Static program data";
+    regions[1].start=staticData; regions[1].len=256u*meg;
+    
+    regions[2].type="Program executable code";
+    regions[2].start=code; regions[2].len=256u*meg;
+    
+    regions[3].type="Heap (small blocks)";
+    regions[3].start=heapLil; regions[3].len=2u*gig;
+
+    regions[4].type="Heap (large blocks)";
+    regions[4].start=heapBig; regions[4].len=2u*gig;
+    
+    regions[5].type="Stack space";
+    regions[5].start=stack; regions[5].len=256u*meg;
+
+    _MEMCHECK(heapBig); free(heapBig);
+    _MEMCHECK(heapLil); free(heapLil); 
+    
+    /*Align each memory region*/
+    for (i=0;i<nRegions;i++) {
+      memRange_t p=(memRange_t)regions[i].start;
+      p&=~(regions[i].len-1); /*Round down to a len-boundary (mask off low bits)*/
+      regions[i].start=(char *)p;
 #if CMK_THREADS_DEBUG
-    CmiPrintf("[%d] heap=%p\tstack=%p\n",CmiMyPe(),heap,stack);
+    CmiPrintf("[%d] Memory map: %p - %p  %s\n",CmiMyPe(),
+	      regions[i].start,regions[i].start+regions[i].len,regions[i].type);
 #endif
-    /* Align heap to a 1G boundary to leave space to grow */
-    /* Align stack to a 256M boundary  to leave space to grow */
-#ifdef QT_GROW_UP
-    CpvAccess(heapbdry) = (void *)(((size_t)heap-(2<<30))&(~((1<<30)-1)));
-    stackbdry = (void *)(((size_t)stack+(1<<28))&(~((1<<28)-1)));
-    CpvAccess(numslots) = (((size_t)CpvAccess(heapbdry)-(size_t)stackbdry)/stacksize)
-                 / CmiNumPes();
-#else
-    CpvAccess(heapbdry) = (void *)(((size_t)heap+(2<<30))&(~((1<<30)-1)));
-    stackbdry = (void *)(((size_t)stack-(1<<28))&(~((1<<28)-1)));
-    CpvAccess(numslots) = (((size_t)stackbdry-(size_t)CpvAccess(heapbdry))/stacksize)
-                 / CmiNumPes();
-#endif
+    }
+    
+    /*Find the largest unused region*/
+    freeRegion=findFreeRegion(regions,nRegions,(512u+256u)*meg);
+
+    /*If the unused region is very large, pad it for safety*/
+    if (freeRegion.len/gig>64u) {
+      freeRegion.start+=32u*gig;
+      freeRegion.len-=40u*gig;
+    }
+
 #if CMK_THREADS_DEBUG
-    CmiPrintf("[%d] heapbdry=%p\tstackbdry=%p\n",
-              CmiMyPe(),CpvAccess(heapbdry),stackbdry);
+    CmiPrintf("[%d] Largest unused region: %p - %p (%d megs)\n",CmiMyPe(),
+	      freeRegion.start,freeRegion.start+freeRegion.len,
+	      freeRegion.len/meg);
+#endif
+
+    /*Allocate stacks in unused region*/
+    CpvAccess(heapbdry)=freeRegion.start;
+    CpvAccess(numslots)=(freeRegion.len/stacksize)/CmiNumPes();
+
+#if CMK_THREADS_DEBUG
     CmiPrintf("[%d] numthreads per pe=%d\n",CmiMyPe(),CpvAccess(numslots));
 #endif
-    CpvAccess(zerofd) = open("/dev/zero", O_RDWR);
-    if(CpvAccess(zerofd)<0)
-      CmiAbort("Cannot open /dev/zero. Aborting.\n");
-    free(heap);
   } while(0);
+
+  CpvAccess(zerofd) = open("/dev/zero", O_RDWR);
+  if(CpvAccess(zerofd)<0)
+    CmiAbort("Cannot open /dev/zero. Aborting.\n");
 
   CpvInitialize(slotset *, myss);
   CpvAccess(myss) = new_slotset(CmiMyPe()*CpvAccess(numslots), CpvAccess(numslots));
@@ -1261,7 +1370,7 @@ CthThread CthPup(pup_er p, CthThread t)
   int i;
 
 #ifndef CMK_OPTIMIZE
-  if (pup_isPacking(p))
+  if (!pup_isUnpacking(p))
   {
     if (CthCpvAccess(CthCurrent) == t)
       CmiAbort("Trying to pack a running thread!!\n");
@@ -1275,6 +1384,7 @@ CthThread CthPup(pup_er p, CthThread t)
   }
   pup_bytes(p, (void*)t, sizeof(struct CthThreadStruct));
   CthPupBase(p,&t->base);
+  /*CmiPrintf("[%d] CthPup (slot %d)\n",CmiMyPe(),t->slotnum);*/
 
   if (pup_isUnpacking(p)) {
     int homePe = t->slotnum/CpvAccess(numslots);
