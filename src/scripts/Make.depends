@@ -136,6 +136,10 @@ isomalloc.o: isomalloc.c converse.h conv-config.h conv-common.h \
   persistent.h debug-conv.h memory-isomalloc.h
 	$(CHARMC) -c -I. isomalloc.c
 
+cmipool.o:  converse.h conv-config.h conv-common.h cmipool.h \
+  conv-mach.h conv-autoconfig.h conv-mach-opt.h conv-cpm.h cmipool.c 
+	$(CHARMC) -c -I. cmipool.c
+
 conv-counter.o: conv-counter.c converse.h conv-config.h conv-common.h \
   conv-mach.h conv-autoconfig.h conv-mach-opt.h pup_c.h conv-cpm.h \
   conv-cpath.h conv-qd.h conv-random.h conv-lists.h conv-trace.h \
