@@ -140,15 +140,7 @@ int AMPI_Register(void *, AMPI_PupFn);
 void AMPI_Migrate(void);
 void AMPI_Checkpoint(char *dirname);
 void *AMPI_Get_userdata(int);
-#if AMPI_FORTRAN
-#if CMK_FORTRAN_USES_ALLCAPS
-void AMPI_REGISTER_MAIN(void (*mainfunc) (int,char**));
-#else
-void ampi_register_main_(void (*mainfunc) (int,char**));
-#endif
-#else
-void AMPI_Register_main(void (*mainfunc) (int,char**));
-#endif
+void AMPI_Register_main(void (*mainfunc) (int,char**), char *, int);
 #ifdef __cplusplus
 }
 #endif

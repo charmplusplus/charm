@@ -92,14 +92,23 @@ ampimain::checkpointOnQd(void)
   qwait = 0;
 }
 
-extern "C" void 
-ampi_register_main(void (*mainfunc)(int, char **))
+void
+ampimain::register_main(void (*mainfunc)(int, char **), char *name, int namelen)
 {
-  if(ampimain::ncomms == AMPI_MAX_COMM)
+  if(ncomms == AMPI_MAX_COMM)
   {
     CkAbort("AMPI> Number of registered comm_worlds exceeded limit.\n");
   }
-  ampimain::ampi_comms[ampimain::ncomms++].mainfunc = mainfunc;
+  ampi_comms[ncomms].mainfunc = mainfunc;
+  ampi_comms[ncomms].name = new char[namelen+1];
+  memcpy(ampi_comms[ncomms].name, name, namelen);
+  ampi_comms[ncomms].name[namelen] = '\0';
+  ncomms++;
+}
+extern "C" void 
+ampi_register_main(void (*mainfunc)(int, char **), char *name, int namelen)
+{
+  ampimain::register_main(mainfunc, name, namelen);
 }
 
 #include "ampimain.def.h"

@@ -52,6 +52,7 @@ struct ampi_comm_struct
 {
   CkArrayID aid;
   void (*mainfunc)(int, char **);
+  char *name;
   int nobj;
   ampi_redn_spec rspec;
 };
@@ -72,6 +73,7 @@ class ampimain : public Chare
     static CkChareID handle;
     static ampi_comm_struct ampi_comms[AMPI_MAX_COMM];
     static int ncomms;
+    static void register_main(void (*)(int, char **), char *, int);
     ampimain(CkArgMsg *);
     ampimain(CkMigrateMessage *m) {}
     void done(void);
