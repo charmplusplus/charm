@@ -784,7 +784,7 @@ Message::genAllocDecl(XStr &str)
       str << "    void operator delete(void *p,";
       for(i=0;i<num;i++)
         str << "int, ";
-      str << "const int){CkFreeMsg(p)}\n";
+      str << "const int){CkFreeMsg(p);}\n";
     }
   }
 }
