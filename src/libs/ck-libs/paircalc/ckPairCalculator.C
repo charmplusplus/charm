@@ -557,72 +557,132 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
   register double m=0;  
 
 
-  int m_in=grainSize;
-  int n_in=N;
-  int k_in=grainSize;
   int matrixSize=grainSize*grainSize;
-  complex *amatrix=new complex[matrixSize];
-  int incx=1;
-  int incy=2;
-  complex alpha(1.0,0.0);//multiplicative identity 
-  complex beta(0.0,0.0);
-  char transform='N';
-  char transformT='T';
+
+#ifdef ZG_BACK
+  /* old zgemm ztuff zlated for zeletion */
+     complex *amatrix=NULL;
+     int incx=1;
+     int incy=2;
+     complex alpha(1.0,0.0);//multiplicative identity 
+     complex beta(0.0,0.0);
+#else
+     double *amatrix=NULL;
+#endif
 
   index = thisIndex.x*S + thisIndex.y;
-  memset(amatrix, 0, matrixSize*sizeof(complex));
-
   double *localMatrix;
   double *outMatrix;
-  
-  for(int i=0;i<grainSize;i++){
-    localMatrix = (matrix1+index+i*S);
-    outMatrix   = reinterpret_cast <double *> (amatrix+i*grainSize);
-    //    DCOPY(&grainSize,localMatrix,&incx, outMatrix,&incy);
-    // copy in real leaving imaginary as zeros
-    for(incx=0,incy=0;incx<grainSize;incx++,incy+=2)
-      outMatrix[incy]=localMatrix[incx];
-  }
+#ifndef ZG_BACK
+  if(S!=grainSize)  
+    {
+      // copy S stripe
+      amatrix=new double[matrixSize];
+#else
+      amatrix=new complex[matrixSize];
+#endif
+      for(int i=0;i<grainSize;i++){
+	localMatrix = (matrix1+index+i*S);
+	outMatrix   = reinterpret_cast <double *> (amatrix+i*grainSize);
+#ifndef ZG_BACK
+	memcpy(outMatrix,localMatrix,grainSize);
+	/* hopefully redundant zgemm stuff
+ 	 *   equivalent for loop below for this
+	 *  DCOPY(&grainSize,localMatrix,&incx, outMatrix,&incy);
+	 * copy in real leaving imaginary as zeros for zgemm only */
+#else
+	for(incx=0,incy=0;incx<grainSize;incx++,incy+=2)
+	  outMatrix[incy]=localMatrix[incx];
+#endif
+
+      }
+#ifndef ZG_BACK
+    }
+  else // all at once no malloc
+    {
+      amatrix=matrix1+index;
+    }
+#endif
+
 #ifdef _PAIRCALC_DEBUG_
   for (int i = 0; i < grainSize; i++) {
     for (int j = 0; j < grainSize; j++){ 
       m = matrix1[index + j + i*S];
-      if(m!=amatrix[i*grainSize+j].re){CkPrintf("Dcopy broken in back path: %2.5g != %2.5g \n", m, amatrix[i*grainSize+j].re);}
+      if(m!=amatrix[i*grainSize+j]){CkPrintf("Dcopy broken in back path: %2.5g != %2.5g \n", m, amatrix[i*grainSize+j]);}
     }
   }
 #endif _PAIRCALC_DEBUG_
-  ZGEMM(&transform, &transformT, &n_in, &m_in, &k_in, &alpha, inDataLeft, &n_in, 
-        &(amatrix[0]), &k_in, &beta, &(mynewData[0]), &n_in);
 
+
+
+#ifdef ZG_BACK
+  int m_in=grainSize;
+  int n_in=N;  
+  int k_in=grainSize;
+  char transform='N';
+  char transformT='T';
+  ZGEMM(&transform, &transformT, &n_in, &m_in, &k_in, &alpha, inDataLeft, &n_in,   &(amatrix[0]), &k_in, &beta, &(mynewData[0]), &n_in);
+#else
+  int m_in=grainSize;
+  int n_in=N*2;  
+  int k_in=grainSize;
+  double *leftd= reinterpret_cast <double *> (inDataLeft);
+  double *mynewDatad= reinterpret_cast <double *> (mynewData);
+  double alphad(1.0);
+  double betad(0.0);
+  char transform='N';
+  char transformT='T';
+  DGEMM(&transform, &transformT, &n_in, &m_in, &k_in, &alphad, leftd, &n_in,  amatrix, &k_in, &betad, mynewDatad, &n_in);
+#endif
   if(!unitcoef){
-
-    beta=complex(1.0,0.0);  // C = alpha*A*B + beta*C
-
-    for(int i=0;i<grainSize;i++){
-      localMatrix = (matrix2+index+i*S);
-      outMatrix   = reinterpret_cast <double *> (amatrix+i*grainSize);
-      // DCOPY(&grainSize,localMatrix,&incx, outMatrix,&incy);
-      for(incx=0,incy=0;incx<grainSize;incx++,incy+=2)
-	outMatrix[incy]=localMatrix[incx];
-    }
+    /*zgemm thing zlated for zeletion
+     *  beta=complex(1.0,0.0);  // C = alpha*A*B + beta*C
+     */
+#ifndef ZG_BACK
+    if(S!=grainSize)  
+#endif
+      for(int i=0;i<grainSize;i++){
+	localMatrix = (matrix2+index+i*S);
+	outMatrix   = reinterpret_cast <double *> (amatrix+i*grainSize);
+#ifndef ZG_BACK
+	memcpy(outMatrix,localMatrix,grainSize);
+#else
+	/* zlated for zeletion
+	 * DCOPY(&grainSize,localMatrix,&incx, outMatrix,&incy); */
+	for(incx=0,incy=0;incx<grainSize;incx++,incy+=2)
+	  outMatrix[incy]=localMatrix[incx];
+#endif
+      }
+#ifndef ZG_BACK
+    else
+      amatrix=matrix2+index;
+#endif
 
 #ifdef _PAIRCALC_DEBUG_
     for (int i = 0; i < grainSize; i++) {
       for (int j = 0; j < grainSize; j++){ 
 	m = matrix2[index + j + i*S];
 
-	if(m!=amatrix[i*grainSize+j].re){CkPrintf("Dcopy broken in back path: %2.5g != %2.5g \n",
-						  m, amatrix[i*grainSize+j]);}
+	if(m!=amatrix[i*grainSize+j]){CkPrintf("Dcopy broken in back path: %2.5g != %2.5g \n",
+					       m, amatrix[i*grainSize+j]);}
       }
     }
 #endif
 
-    ZGEMM(&transform, &transformT, &n_in, &m_in, &k_in, &alpha, inDataRight, &n_in, 
-	  &(amatrix[0]), &k_in, &beta, &(mynewData[0]), &n_in);
+#ifdef ZG_BACK    
+       ZGEMM(&transform, &transformT, &n_in, &m_in, &k_in, &alpha, inDataRight, &n_in,  &(amatrix[0]), &k_in, &beta, &(mynewData[0]), &n_in);
+#else       
+    double *rightd=reinterpret_cast <double *> (inDataRight);
+    // C = alpha*A*B + beta*C
+    DGEMM(&transform, &transformT, &n_in, &m_in, &k_in, &alphad, rightd, &n_in,  amatrix, &k_in, &betad, mynewDatad, &n_in);
+#endif
+
   }
-
-  delete [] amatrix;
-
+#ifndef ZG_BACK
+  if(S!=grainSize)  
+#endif
+    delete [] amatrix;
+  // else we didn't allocate one
 
   /* revise this to partition the data into S/M objects 
    * add new message and entry method for sumPartial result
