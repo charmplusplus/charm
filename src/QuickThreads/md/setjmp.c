@@ -8,10 +8,8 @@
 
 #include "qt.h"
 #include <setjmp.h>
-#include "conv-autoconfig.h"
 
-/*#ifdef ALLOCA_H*/
-#if CMK_HAS_ALLOCA
+#ifdef ALLOCA_H
 #include <alloca.h>
 #endif
 
