@@ -190,6 +190,7 @@ charmrun-target:
 
 QuickThreads/libckqt.a:
 	. ./conv-mach.sh;cd QuickThreads;./configure $$CMK_QT
+	rm -f QuickThreads/libqt.a
 	cd QuickThreads ; make qt  OPTS='$(OPTS)'
 	cp QuickThreads/libqt.a ../lib/libckqt.a
 
