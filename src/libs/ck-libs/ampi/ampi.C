@@ -510,10 +510,10 @@ static ampi *ampiInit(char **argv)
 	BroadcastStrategy *sBcast = new BroadcastStrategy(arr.ckGetArrayID(),USE_HYPERCUBE);
         ciBcast.setStrategy(sBcast);
 	
-	EachToManyMulticastStrategy *sAllgather = new EachToManyMulticastStrategy(USE_MESH,arr.ckGetArrayID(),arr.ckGetArrayID());
+	EachToManyMulticastStrategy *sAllgather = new EachToManyMulticastStrategy(USE_HYPERCUBE,arr.ckGetArrayID(),arr.ckGetArrayID());
         ciAllgather.setStrategy(sAllgather);
 	
-	EachToManyMulticastStrategy *sAlltoall = new EachToManyMulticastStrategy(USE_HYPERCUBE, arr.ckGetArrayID(),arr.ckGetArrayID());
+	EachToManyMulticastStrategy *sAlltoall = new EachToManyMulticastStrategy(USE_MESH, arr.ckGetArrayID(),arr.ckGetArrayID());
         ciAlltoall.setStrategy(sAlltoall);
 #endif        
   }
@@ -1478,7 +1478,7 @@ ampi::bcast(int root, void* buf, int count, int type,MPI_Comm destcomm)
   const ampiCommStruct &dest=comm2CommStruct(destcomm);
   int rootIdx=dest.getIndexForRank(root);
   if(rootIdx==thisIndex) {
-#if AMPI_COMLIB
+#if 0//AMPI_COMLIB
     ciBcast.beginIteration();
     comlibProxy.generic(makeAmpiMsg(-1,MPI_BCAST_TAG,0, buf,count,type, MPI_BCAST_COMM));
 #else
