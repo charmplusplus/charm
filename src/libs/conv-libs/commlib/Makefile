@@ -3,41 +3,52 @@ OBJS=commlib.o gridrouter.o de.o treerouter.o petable.o overlapper.o \
      rsend.o bcast.o charm_bind.o
 
 all: libcomm.a
-	rm -f ../../../../include/commlib.h
-	cp commlib.h ../../../../include
+	@rm -f ../../../../include/commlib.h
+	@cp commlib.h ../../../../include
 
 libcomm.a: $(OBJS)
-	$(CHARMC) -cp ../../../../lib -o libcomm.a $(OBJS)
+	@echo 'building libcomm.a...'
+	@$(CHARMC) -cp ../../../../lib -o libcomm.a $(OBJS)
 
 charm_bind.o: charm_bind.C commlib.h
-	$(CHARMC)  -c -I../../.. charm_bind.C
+	@echo '.... charm_bind.c...'
+	@$(CHARMC)  -c -I../../.. charm_bind.C
 
 commlib.o:  commlib.C commlib_pvt.h
-	$(CHARMC)  -c commlib.C
+	@echo '.... commlib.C...'
+	@$(CHARMC)  -c commlib.C
 
 overlapper.o:  overlapper.C overlapper.h newtypes.h
-	$(CHARMC)  -c overlapper.C
+	@echo '.... overlapper.C...'
+	@$(CHARMC)  -c overlapper.C
 
 convfns.o: convfns.c
-	$(CHARMC)  -c convfns.c
+	@echo '.... convfns.c...'
+	@$(CHARMC)  -c convfns.c
 
 treerouter.o:  treerouter.C  treerouter.h commlib.h
-	$(CHARMC)  -c treerouter.C
+	@echo '.... treerouter.C...'
+	@$(CHARMC)  -c treerouter.C
 
 gridrouter.o:  gridrouter.C commlib.h gridrouter.h 
-	$(CHARMC)  -c gridrouter.C
+	@echo '.... gridrouter.C...'
+	@$(CHARMC)  -c gridrouter.C
 
 de.o: de.C commlib.h de.h
-	$(CHARMC)  -c de.C
+	@echo '.... de.C...'
+	@$(CHARMC)  -c de.C
 
 bcast.o:  bcast.C commlib.h bcast.h
-	$(CHARMC)  -c bcast.C
+	@echo '.... bcast.C...'
+	@$(CHARMC)  -c bcast.C
 
 rsend.o:  rsend.C commlib.h rsend.h
-	$(CHARMC)  -c rsend.C
+	@echo '.... rsend.C...'
+	@$(CHARMC)  -c rsend.C
 
 petable.o: petable.C petable.h commlib_pvt.h
-	$(CHARMC)  -c petable.C
+	@echo '.... petable.C...'
+	@$(CHARMC)  -c petable.C
 
 clean:
 	rm -f *.o *.a

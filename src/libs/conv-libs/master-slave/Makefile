@@ -3,9 +3,11 @@ CHARMC=../../../../bin/charmc $(OPTS)
 all: libcms.a
 
 libcms.a: cms.o
-	$(CHARMC) -cp ../../../../lib -o libcms.a cms.o
-	rm -f ../../../../include/cms.h
-	cp cms.h ../../../../include
+	@echo 'buidling libcms.a...'
+	@$(CHARMC) -cp ../../../../lib -o libcms.a cms.o
+	@rm -f ../../../../include/cms.h
+	@cp cms.h ../../../../include
 
 cms.o: cms.c
-	$(CHARMC) -c cms.c
+	@echo '.... cms.c...'
+	@$(CHARMC) -c cms.c
