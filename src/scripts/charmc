@@ -70,6 +70,7 @@ PROG_EXT=""
 COPY_EXIT="true"
 CHARM_SHARED="0"
 BUILD_SHARE="0"
+SWAPGLOBALS="0"
 
 ####################################################################
 #
@@ -336,6 +337,12 @@ do
 			TRACEMODE=$TRACEMODE_NEW
 		fi
 		shift
+		;;
+	
+	"-swapglobal"|"-swapglobals")
+		SWAPGLOBALS="1"
+		# fixme: -fpic is only for gcc-- should wait until we read config script
+		OPTS="$OPTS -fpic"
 		;;
 
 	"-verbose")
@@ -1043,6 +1050,19 @@ esac
 if [ "$AMPIMAIN" != "" ]
 then
 	OBJECTFILES="$CHARMLIB/lib$AMPIMAIN.o $OBJECTFILES"
+fi
+
+if [ "$SWAPGLOBALS" = "1" ]
+then
+	swapo="$CHARMLIB/libglobal-swap.o"
+	if [ ! -r "$swapo" ]
+	then
+		echo "Global-swapping library $swapo missing--"
+		echo "  Is -swapglobals supported on this machine?"
+		exit 1
+	else
+		OBJECTFILES="$swapo $OBJECTFILES"
+	fi
 fi
 
 if [ $USE_F90_LIBRARIES = "1" ]
