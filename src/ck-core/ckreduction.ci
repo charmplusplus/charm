@@ -1,11 +1,14 @@
 module CkReduction {
 
 //Group object creation support:
-  message CkGroupInitCallbackMsg;
+  message CkGroupCallbackMsg;
   group CkGroupInitCallback {
   	entry CkGroupInitCallback(void);
-  	
-	entry void callMeBack(CkGroupInitCallbackMsg *);
+	entry void callMeBack(CkGroupCallbackMsg *);
+  };
+  group CkGroupReadyCallback {
+  	entry CkGroupReadyCallback(void);
+	entry void callMeBack(CkGroupCallbackMsg *);
   };
   
   message CkReductionMsg;

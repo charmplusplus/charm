@@ -170,7 +170,7 @@ be created on, and also where messages to this element will
 be forwarded by default.
 */
 
-CkArrayMap::CkArrayMap(void) {}
+CkArrayMap::CkArrayMap(void) {setReady();}
 int CkArrayMap::registerArray(CkArrayMapRegisterMessage *) 
 {return 0;}
 int CkArrayMap::procNum(int arrayHdl,const CkArrayIndex &element) 
@@ -184,6 +184,7 @@ public:
   RRMap(void)
   {
   // CkPrintf("PE %d creating RRMap\n",CkMyPe());
+    setReady();
   }
   RRMap(CkMigrateMessage *m) {}
   int registerArray(CkArrayMapRegisterMessage *msg)
@@ -205,6 +206,123 @@ public:
 	unsigned int hash=(i.hash()+739)%1280107;
 	return (hash % CkNumPes());
       }
+  }
+};
+
+CpvStaticDeclare(double*, rem);
+
+class arrInfo {
+ private:
+   int _nelems;
+   int *_map;
+   void distrib(int *speeds);
+ public:
+   arrInfo(int n, int *speeds)
+   {
+     _nelems = n;
+     _map = new int[_nelems];
+   }
+   ~arrInfo() { delete[] _map; }
+   int getMap(const CkArrayIndex &i);
+};
+
+static int cmp(const void *first, const void *second)
+{
+  int fi = *((const int *)first);
+  int si = *((const int *)second);
+  return ((CpvAccess(rem)[fi]==CpvAccess(rem)[si]) ? 
+          0 : 
+          ((CpvAccess(rem)[fi]<CpvAccess(rem)[si]) ? 
+          1 : (-1)));
+}
+
+void
+arrInfo::distrib(int *speeds)
+{
+  double total = 0.0;
+  int npes = CkNumPes();
+  int i,j,k;
+  for(i=0;i<npes;i++)
+    total += (double) speeds[i];
+  double *nspeeds = new double[npes];
+  for(i=0;i<npes;i++)
+    nspeeds[i] = (double) speeds[i] / total;
+  int *cp = new int[npes];
+  for(i=0;i<npes;i++)
+    cp[i] = (int) (nspeeds[i]*_nelems);
+  int nr = 0;
+  for(i=0;i<npes;i++)
+    nr += cp[i];
+  nr = _nelems - nr;
+  if(nr != 0)
+  {
+    CpvAccess(rem) = new double[npes];
+    for(i=0;i<npes;i++)
+      CpvAccess(rem)[i] = (double)_nelems*nspeeds[i] - cp[i];
+    int *pes = new int[npes];
+    for(i=0;i<npes;i++)
+      pes[i] = i;
+    qsort(pes, npes, sizeof(int), cmp);
+    for(i=0;i<nr;i++)
+      cp[pes[i]]++;
+    delete[] CpvAccess(rem);
+    delete[] pes;
+  }
+  k = 0;
+  for(i=0;i<npes;i++)
+  {
+    for(j=0;j<cp[i];j++)
+      _map[k++] = i;
+  }
+  delete[] nspeeds;
+  delete[] cp;
+}
+
+int
+arrInfo::getMap(const CkArrayIndex &i)
+{
+  if(i.nInts==1)
+    return _map[i.data()[0]];
+  else
+    return _map[((i.hash()+739)%1280107)%_nelems];
+}
+
+class PropMap : public CkArrayMap
+{
+private:
+  int numrecd;
+  int *speeds;
+  CkVec<arrInfo *> arrs;
+public:
+  PropMap(void)
+  {
+    CpvInitialize(double*, rem);
+    speeds = new int[CkNumPes()];
+    numrecd = 0;
+    CkPrintf("Measuring processor speed for prop. mapping...\n");
+    int s = LDProcessorSpeed();
+    CProxy_PropMap grp(thisgroup);
+    grp.recv(new CkProcSpeedMsg(CkMyPe(),s));
+  }
+  PropMap(CkMigrateMessage *m) {}
+  void recv(CkProcSpeedMsg *m)
+  {
+    speeds[m->getPe()] = m->getSpeed();
+    delete m;
+    numrecd++;
+    if(numrecd==CkNumPes())
+      setReady();
+  }
+  int registerArray(CkArrayMapRegisterMessage *msg)
+  {
+    int idx = arrs.length();
+    arrs[idx] = new arrInfo(msg->numElements, speeds);
+    delete msg;
+    return idx;
+  }
+  int procNum(int arrayHdl, const CkArrayIndex &i)
+  {
+    return arrs[arrayHdl]->getMap(i);
   }
 };
 
@@ -871,16 +989,20 @@ CkArray::CkArray(CkArrayCreateMsg *msg) :
   mapID=msg->mapID;map=NULL;
   delete msg;
   
-  if (NULL!=_localBranch(mapID))
+  CkArrayMap *_map = (CkArrayMap*)_localBranch(mapID);
+  if (NULL!=_map && _map->isReady())
     initAfterMap();
   else //Wait for the map to be created 
-    CProxy_CkArrayMap(mapID).callMeBack(
-					new CkGroupInitCallbackMsg
-					(
-					 static_initAfterMap,
-					 (void *)this
-					 )
-					);
+  {
+    CProxy_CkArrayMap pmap(mapID);
+    pmap[CkMyPe()].callMeBack(
+			new CkGroupCallbackMsg
+			(
+			 static_initAfterMap,
+			 (void *)this
+			)
+		   );
+  }
 }
   
 void CkArray::static_initAfterMap(void *dis)

@@ -99,10 +99,10 @@ private:
 
 //This message is sent between group objects on a single PE
 // to let each know the other has been created.
-class CkGroupInitCallbackMsg:public CMessage_CkGroupInitCallbackMsg {
+class CkGroupCallbackMsg:public CMessage_CkGroupCallbackMsg {
 public:
 	typedef void (*callbackType)(void *param);
-	CkGroupInitCallbackMsg(callbackType Ncallback,void *Nparam)
+	CkGroupCallbackMsg(callbackType Ncallback,void *Nparam)
 		{callback=Ncallback;param=Nparam;}
 	void call(void) {(*callback)(param);}
 private:
@@ -114,8 +114,25 @@ class CkGroupInitCallback : public Group {
 public:
 	CkGroupInitCallback(void);
 	CkGroupInitCallback(CkMigrateMessage *m) {}
-	void callMeBack(CkGroupInitCallbackMsg *m);
+	void callMeBack(CkGroupCallbackMsg *m);
 	virtual void pup(PUP::er &p) { Group::pup(p); }
+};
+
+
+class CkGroupReadyCallback : public Group {
+private:
+  int _isReady;
+  CkQ<CkGroupCallbackMsg *> _msgs;
+  void callBuffered(void);
+public:
+	CkGroupReadyCallback(void);
+	CkGroupReadyCallback(CkMigrateMessage *m) {}
+	void callMeBack(CkGroupCallbackMsg *m);
+	virtual void pup(PUP::er &p) { Group::pup(p); p(_isReady); }
+	int isReady(void) { return _isReady; }
+protected:
+	void setReady(void) {_isReady = 1; callBuffered(); }
+	void setNotReady(void) {_isReady = 0; }
 };
 
 

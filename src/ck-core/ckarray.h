@@ -258,14 +258,14 @@ public:
   CkArray *array;
 };
 
-class CkArrayMap : public CkGroupInitCallback
+class CkArrayMap : public CkGroupReadyCallback
 {
 public:
   CkArrayMap(void);
   CkArrayMap(CkMigrateMessage *m) {}
   virtual int registerArray(CkArrayMapRegisterMessage *);
   virtual int procNum(int arrayHdl,const CkArrayIndex &element);
-  virtual void pup(PUP::er &p) { CkGroupInitCallback::pup(p); }
+  virtual void pup(PUP::er &p) { CkGroupReadyCallback::pup(p); }
 };
 
 /************************ Array Element *********************/
@@ -359,6 +359,25 @@ typedef ArrayElementT<CkArray_index3D> ArrayElement3D;
 /*********************** Array Manager BOC *******************/
 
 #include "CkArray.decl.h"
+
+/*This really doesn't belong here: need a marshall.h */
+class CkMarshallMsg : public CMessage_CkMarshallMsg {
+public: char *msgBuf;
+};
+
+class CkProcSpeedMsg : public CMessage_CkProcSpeedMsg {
+ private:
+   int _pe, _speed;
+ public:
+   CkProcSpeedMsg(int pe, int speed) { _pe = pe; _speed = speed; }
+   int getPe(void) { return _pe; }
+   int getSpeed(void) { return _speed; }
+};
+
+static inline CkGroupID CkCreatePropMap(void)
+{
+  return CProxy_PropMap::ckNew();
+}
 
 class CkArrayRec;//An array element record
 
@@ -521,10 +540,6 @@ public:
 
 /************************** Array Messages ****************************/
 
-/*This really doesn't belong here: need a marshall.h */
-class CkMarshallMsg : public CMessage_CkMarshallMsg {
-public: char *msgBuf;
-};
 
 //This is the default creation message sent to a new array element
 class CkArrayElementCreateMsg:public CMessage_CkArrayElementCreateMsg {};

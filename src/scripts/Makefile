@@ -24,7 +24,7 @@
 SHELL=/bin/sh
 L=../lib
 
-all: charm++ bluegene LIBS ampi f90charm tsm sm pvm doc
+all: charm++ bluegene LIBS AMPI f90charm tsm sm pvm doc
 
 charm++: converse libck.a charmxi
 
@@ -53,11 +53,11 @@ MBLOCKC: charm++ LIBS
 
 MBLOCKF: MBLOCKC libconv-utilf.a
 
-AMPI: AMPIC AMPIF libampilib.a
+AMPI: AMPIC AMPIF libAMPILIB.a
 
-AMPIC: charm++ CONVLIBS libampi.a
+AMPIC: charm++ CONVLIBS libAMPI.a
 
-AMPIF: charm++ libconv-utilf.a LIBS libampif.a
+AMPIF: charm++ libconv-utilf.a LIBS libAMPIF.a
 
 f90charm: charm++ libf90charm.a
 
@@ -75,8 +75,8 @@ test-converse: converse
 test-charm: charm++
 	cd ../pgms ; make test-charm  OPTS='$(OPTS)'
 
-test-ampi: AMPI
-	cd ../pgms ; make test-ampi  OPTS='$(OPTS)'
+test-AMPI: AMPI
+	cd ../pgms ; make test-AMPI  OPTS='$(OPTS)'
 
 test-fem: FEM
 	cd ../pgms ; make test-fem  OPTS='$(OPTS)'
@@ -728,25 +728,25 @@ AMPISRC=ampi.C ampi.h ampiimpl.h ampi-defmain.C \
            ampi.decl.h ampi.def.h ampimain.decl.h \
            ampimain.def.h
 
-libampilib.a: $(AMPISRC)
+libAMPILIB.a: $(AMPISRC)
 	$(CHARMC) -DAMPI_FORTRAN=0 -DAMPI_STANDALONE=1 -c ampi.C
 	$(CHARMC) -DAMPI_FORTRAN=0 -c ampif.C
 	$(CHARMC) -cp ../lib -o $@ ampi.o ampif.o
 
-libampi.a: $(AMPISRC)
+libAMPI.a: $(AMPISRC)
 	$(CHARMC) -DAMPI_FORTRAN=0 -c ampi.C
 	$(CHARMC) -DAMPI_FORTRAN=0 -c ampimain.C
 	$(CHARMC) -DAMPI_FORTRAN=0 -c ampi-defmain.C
-	$(CHARMC) -cp ../lib -o libampi.a ampi.o ampimain.o ampi-defmain.o
+	$(CHARMC) -cp ../lib -o libAMPI.a ampi.o ampimain.o ampi-defmain.o
 
-libampif.a: $(AMPISRC)
+libAMPIF.a: $(AMPISRC)
 	$(CHARMC) -DAMPI_FORTRAN=1 -c ampi.C
 	$(CHARMC) -DAMPI_FORTRAN=1 -c ampimain.C
 	$(CHARMC) -DAMPI_FORTRAN=1 -c ampif.C
 	$(CHARMC) -DAMPI_FORTRAN=1 -c ampi-defmain.C
 	$(CHARMC) -c ampimod.f90
 	$(CHARMC) -cpmod ../include ampi.M
-	$(CHARMC) -cp ../lib -o libampif.a ampimain.o ampi.o ampif.o ampimod.o ampi-defmain.o
+	$(CHARMC) -cp ../lib -o libAMPIF.a ampimain.o ampi.o ampif.o ampimod.o ampi-defmain.o
 
 libf90charm.a: f90main.ci f90main.h f90main.C charmf.h charmf.C futil.f90
 	$(CHARMC) f90main.ci

@@ -868,11 +868,11 @@ IS_F90="n"
 
 case "$LANGUAGE" in
 "ampi")
-        PRE_LIBRARIES="$PRE_LIBRARIES -lampi -lddt "
+        PRE_LIBRARIES="$PRE_LIBRARIES -lAMPI -lddt "
         POST_LIBRARIES="$POST_LIBRARIES -lmetis"
 	;;
 "ampif")
-        PRE_LIBRARIES="$PRE_LIBRARIES -lampif -lddt -lconv-utilf "
+        PRE_LIBRARIES="$PRE_LIBRARIES -lAMPIF -lddt -lconv-utilf "
         POST_LIBRARIES="$POST_LIBRARIES -lmetis $CMK_F90LIBS"
 	IS_F90="y"
 	;;
@@ -881,7 +881,7 @@ case "$LANGUAGE" in
         POST_LIBRARIES="$POST_LIBRARIES -lmetis "
 	;;
 "femf")
-        PRE_LIBRARIES="$PRE_LIBRARIES -lfemf -lcollide -lampilib -lddt -lconv-utilf"
+        PRE_LIBRARIES="$PRE_LIBRARIES -lfemf -lcollide -lAMPILIB -lddt -lconv-utilf"
         POST_LIBRARIES="$POST_LIBRARIES -lmetis $CMK_F90LIBS"
 	IS_F90="y"
 	;;

@@ -43,12 +43,18 @@ module CkArray {
   };
 
 //Array Map object support:
-  group CkArrayMap : CkGroupInitCallback {
+  group CkArrayMap : CkGroupReadyCallback {
     entry CkArrayMap(void);
   };
 
   group RRMap : CkArrayMap {
     entry RRMap(void);
+  };
+
+  message CkProcSpeedMsg;
+  group PropMap : CkArrayMap {
+    entry PropMap(void);
+    entry void recv(CkProcSpeedMsg *);
   };
 
   mainchare CkArrayInit {

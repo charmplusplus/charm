@@ -70,12 +70,41 @@ CkGroupInitCallback::CkGroupInitCallback(void) {}
 The callback is just used to tell the caller that this group
 has been constructed.  (Now they can safely call CkLocalBranch)
 */
-void CkGroupInitCallback::callMeBack(CkGroupInitCallbackMsg *m)
+void CkGroupInitCallback::callMeBack(CkGroupCallbackMsg *m)
 {
   m->call();
   delete m;
 }
 
+/*
+The callback is just used to tell the caller that this group
+is constructed and ready to process other calls.
+*/
+CkGroupReadyCallback::CkGroupReadyCallback(void)
+{
+  _isReady = 0;
+}
+void 
+CkGroupReadyCallback::callBuffered(void)
+{
+  int n = _msgs.length();
+  for(int i=0;i<n;i++)
+  {
+    CkGroupCallbackMsg *msg = _msgs.deq();
+    msg->call();
+    delete msg;
+  }
+}
+void
+CkGroupReadyCallback::callMeBack(CkGroupCallbackMsg *msg)
+{
+  if(_isReady) {
+    msg->call();
+    delete msg;
+  } else {
+    _msgs.enq(msg);
+  }
+}
 
 
 ///////////////// Reduction Manager //////////////////
