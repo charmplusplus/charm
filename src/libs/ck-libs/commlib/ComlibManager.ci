@@ -33,7 +33,9 @@ module commlib {
   PUPable NodeMulticast;
   PUPable StreamingStrategy;
   PUPable MPIStrategy;
+  PUPable DirectMulticastStrategy;
   PUPable EachToManyMulticastStrategy;	
+  PUPable RingMulticastStrategy;	
 
   //PUPable ComlibArrayListener;
 };

@@ -7,7 +7,7 @@ LIB = libmodulecommlib.a
 
 STRATEGY_OBJS = EachToManyStrategy.o MPIStrategy.o StreamingStrategy.o \
 		DummyStrategy.o NodeMulticast.o EachToManyMulticastStrategy.o \
-		MsgPacker.o
+		MsgPacker.o DirectMulticastStrategy.o RingMulticastStrategy.o
 
 CONVERSE_COM_OBJS = $(COMMLIBDIR)/commlib.o $(COMMLIBDIR)/gridrouter.o \
 	$(COMMLIBDIR)/de.o $(COMMLIBDIR)/treerouter.o $(COMMLIBDIR)/petable.o\
@@ -20,10 +20,12 @@ OBJS = ComlibManager.o $(STRATEGY_OBJS) $(CONVERSE_COM_OBJS)
 all: cifiles conversecom $(LIB) 
 	rm -f $(CDIR)/include/ComlibManager.h
 	cp  ComlibManager.h $(CDIR)/include
-	rm -f $(CDIR)/include/EachToManyStrategy.h
-	cp  EachToManyStrategy.h $(CDIR)/include
 	rm -f $(CDIR)/include/EachToManyMulticastStrategy.h
 	cp  EachToManyMulticastStrategy.h $(CDIR)/include
+	rm -f $(CDIR)/include/DirectMulticastStrategy.h
+	cp  DirectMulticastStrategy.h $(CDIR)/include
+	rm -f $(CDIR)/include/RingMulticastStrategy.h
+	cp  RingMulticastStrategy.h $(CDIR)/include
 	rm -f $(CDIR)/include/DummyStrategy.h
 	cp  DummyStrategy.h $(CDIR)/include
 	rm -f $(CDIR)/include/NodeMulticast.h
@@ -50,6 +52,14 @@ EachToManyStrategy.o: EachToManyStrategy.C EachToManyStrategy.h ComlibManager.h
 EachToManyMulticastStrategy.o: EachToManyMulticastStrategy.C EachToManyMulticastStrategy.h \
 	ComlibManager.h
 	$(CHARMC) -c EachToManyMulticastStrategy.C
+
+DirectMulticastStrategy.o: DirectMulticastStrategy.C DirectMulticastStrategy.h\
+	ComlibManager.h
+	$(CHARMC) -c DirectMulticastStrategy.C
+
+RingMulticastStrategy.o: RingMulticastStrategy.C RingMulticastStrategy.h\
+	ComlibManager.h
+	$(CHARMC) -c RingMulticastStrategy.C
 
 MPIStrategy.o: MPIStrategy.C MPIStrategy.h ComlibManager.h
 	$(CHARMC) -c MPIStrategy.C

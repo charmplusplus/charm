@@ -2,11 +2,13 @@
 
 #include "EachToManyStrategy.h"
 #include "EachToManyMulticastStrategy.h"
+#include "DirectMulticastStrategy.h"
 #include "StreamingStrategy.h"
 #include "DummyStrategy.h"
 #include "MPIStrategy.h"
 #include "NodeMulticast.h"
 #include "MsgPacker.h"
+#include "RingMulticastStrategy.h"
 
 CpvDeclare(int, RecvmsgHandle);
 CpvDeclare(int, RecvCombinedShortMsgHdlrIdx);
@@ -50,7 +52,7 @@ void recv_dummy(void *msg){
 
 //An initialization routine which does prelimnary initialization of the 
 void initComlibManager(void){
-    //comm_debug = 1;
+    //    comm_debug = 1;
     ComlibInit();
     ComlibPrintf("Init Call\n");
 
@@ -160,10 +162,13 @@ void ComlibManager::registerStrategy(int pos, Strategy *strat) {
 //End of registering function, if barriers have been reached send them over
 void ComlibManager::doneCreating() {
     if(!barrierReached)
-      return;
+      return;    
 
     ComlibPrintf("Sending Strategies %d, %d\n", nstrats, 
                  ListOfStrategies.length());
+
+    if(nstrats == 0)
+        return;
 
     StrategyWrapper sw;
     sw.s_table = new Strategy* [nstrats];
@@ -262,8 +267,7 @@ void ComlibManager::receiveTable(StrategyWrapper sw){
     int count = 0;
     for(count = 0; count < nstrats; count ++) {
         strategyTable[count].strategy = sw.s_table[count];
-        
-        strategyTable[count].strategy->setInstance(count);               
+        strategyTable[count].strategy->setInstance(count);  
         
         if(strategyTable[count].strategy->isSourceArray()){           
             strategyTable[count].strategy->
@@ -393,95 +397,6 @@ void ComlibManager::ArraySend(int ep, void *msg,
     //CmiPrintf("After Insert\n");
 }
 
-void ComlibManager::ArrayBroadcast(int ep,void *m,CkArrayID a){
-    ComlibPrintf("[%d] Array Broadcast \n", CkMyPe());
-
-    register envelope * env = UsrToEnv(m);
-    env->array_mgr()=a;
-    env->array_srcPe()=CkMyPe();
-    env->array_ep()=ep;
-    env->array_hops()=0;
-    env->array_index()= dummyArrayIndex;
-    
-    CmiSetHandler(env, CpvAccess(RecvmsgHandle));
-    
-    multicast(m);
-}
-
-void ComlibManager::GroupBroadcast(int ep,void *m,CkGroupID g) {
-    register envelope * env = UsrToEnv(m);
-
-    env->setEpIdx(ep);
-    env->setSrcPe(CkMyPe());
-    env->setGroupNum(g);
-    CmiSetHandler(env, _charmHandlerIdx);
-    
-    multicast(m);
-}
-
-void ComlibManager::multicast(void *msg) {
-
-    register envelope * env = UsrToEnv(msg);
-    
-    ComlibPrintf("[%d]: In multicast\n", CkMyPe());
-
-    env->setUsed(0);    
-    CkPackMessage(&env);
-    //CmiSetHandler(env, CpvAccess(RecvmsgHandle));
-    
-    totalMsgCount ++;
-    totalBytes += env->getTotalsize();
-
-    CharmMessageHolder *cmsg = new CharmMessageHolder((char *)msg,IS_MULTICAST);
-    //Provide a dummy dest proc as it does not matter for mulitcast 
-    //get rid of the new.
-    cmsg->npes = CkNumPes();
-    cmsg->pelist = NULL;
-
-    if (receivedTable)
-	strategyTable[curStratID].strategy->insertMessage(cmsg);
-    else {
-        flushTable = 1;
-	cmsg->next = NULL;
-	ComlibPrintf("Enqueuing message in tmplist\n");
-        strategyTable[curStratID].tmplist.enq(cmsg);
-    }
-
-    ComlibPrintf("After multicast\n");
-}
-
-/*
-void ComlibManager::multicast(void *msg, int npes, int *pelist) {
-    register envelope * env = UsrToEnv(msg);
-    
-    ComlibPrintf("[%d]: In multicast\n", CkMyPe());
-
-    env->setUsed(0);    
-    CkPackMessage(&env);
-    CmiSetHandler(env, CpvAccess(RecvmsgHandle));
-    
-    totalMsgCount ++;
-    totalBytes += env->getTotalsize();
-
-    CharmMessageHolder *cmsg = new CharmMessageHolder((char *)msg,IS_MULTICAST);
-    cmsg->npes = npes;
-    cmsg->pelist = pelist;
-    //Provide a dummy dest proc as it does not matter for mulitcast 
-    //get rid of the new.
-    
-    if (receivedTable)
-	strategyTable[curStratID].strategy->insertMessage(cmsg);
-    else {
-        flushTable = 1;
-	cmsg->next = NULL;
-	ComlibPrintf("Enqueuing message in tmplist\n");
-        strategyTable[curStratID].tmplist.enq(cmsg);
-    }
-
-    ComlibPrintf("After multicast\n");
-}
-*/
-
 
 #include "qd.h"
 //CpvExtern(QdState*, _qd);
@@ -536,6 +451,35 @@ void ComlibManager::GroupSend(int ep, void *msg, int onPE, CkGroupID gid){
     }
 }
 
+void ComlibManager::ArrayBroadcast(int ep,void *m,CkArrayID a){
+    ComlibPrintf("[%d] Array Broadcast \n", CkMyPe());
+
+    register envelope * env = UsrToEnv(m);
+    env->array_mgr()=a;
+    env->array_srcPe()=CkMyPe();
+    env->array_ep()=ep;
+    env->array_hops()=0;
+    env->array_index()= dummyArrayIndex;
+    
+    CmiSetHandler(env, CpvAccess(RecvmsgHandle));
+
+    CkSectionInfo minfo;
+    minfo.type = COMLIB_MULTICAST_MESSAGE;
+    minfo.sInfo.cInfo.instId = curStratID;
+    minfo.sInfo.cInfo.status = COMLIB_MULTICAST_ALL;  
+    minfo.sInfo.cInfo.id = 0; 
+    minfo.pe = CkMyPe();
+    ((CkMcastBaseMsg *)m)->_cookie = minfo;       
+
+    CharmMessageHolder *cmsg = new 
+        CharmMessageHolder((char *)m, IS_MULTICAST);
+    cmsg->npes = 0;
+    cmsg->pelist = NULL;
+    cmsg->sec_id = NULL;
+
+    multicast(cmsg);
+}
+
 void ComlibManager::ArraySectionSend(int ep, void *m, CkArrayID a, 
                                      CkSectionID &s) {
     ComlibPrintf("[%d] Array Section Send \n", CkMyPe());
@@ -555,18 +499,57 @@ void ComlibManager::ArraySectionSend(int ep, void *m, CkArrayID a,
     totalMsgCount ++;
     totalBytes += env->getTotalsize();
 
-    CharmMessageHolder *cmsg = new CharmMessageHolder((char *)m, IS_MULTICAST); 
     //Provide a dummy dest proc as it does not matter for mulitcast 
-    //get rid of the new.
+    CharmMessageHolder *cmsg = new CharmMessageHolder((char *)m,IS_MULTICAST);
     cmsg->npes = 0;
-    cmsg->nIndices = s._nElems;
-    cmsg->indexlist = new CkArrayIndexMax[cmsg->nIndices];
-    memcpy(cmsg->indexlist, s._elems, s._nElems * sizeof(CkArrayIndexMax));
+    cmsg->sec_id = &s;
 
-    ((CkMcastBaseMsg *)m)->_cookie.type = COMMLIB_MULTICAST_MESSAGE;
-    ((CkMcastBaseMsg *)m)->_cookie.sInfo.cInfo.instId = curStratID;
-    ((CkMcastBaseMsg *)m)->_cookie.sInfo.cInfo.nIndices = 0;
+    CkSectionInfo minfo;
+    minfo.type = COMLIB_MULTICAST_MESSAGE;
+    minfo.sInfo.cInfo.instId = curStratID;
+    minfo.sInfo.cInfo.status = COMLIB_MULTICAST_ALL;  
+    minfo.sInfo.cInfo.id = 0; 
+    minfo.pe = CkMyPe();
+    ((CkMcastBaseMsg *)m)->_cookie = minfo;    
 
+    multicast(cmsg);
+}
+
+void ComlibManager::GroupBroadcast(int ep,void *m,CkGroupID g) {
+    register envelope * env = UsrToEnv(m);
+
+    CpvAccess(_qd)->create(1);
+
+    env->setMsgtype(ForBocMsg);
+    env->setEpIdx(ep);
+    env->setGroupNum(g);
+    env->setSrcPe(CkMyPe());
+    env->setUsed(0);
+
+    CkPackMessage(&env);
+    CmiSetHandler(env, _charmHandlerIdx);
+    
+    //Provide a dummy dest proc as it does not matter for mulitcast 
+    CharmMessageHolder *cmsg = new CharmMessageHolder((char *)m,IS_MULTICAST);
+    
+    cmsg->npes = 0;
+    cmsg->pelist = NULL;
+
+    multicast(cmsg);
+}
+
+void ComlibManager::multicast(CharmMessageHolder *cmsg) {
+
+    register envelope * env = UsrToEnv(cmsg->getCharmMessage());    
+    ComlibPrintf("[%d]: In multicast\n", CkMyPe());
+
+    env->setUsed(0);    
+    CkPackMessage(&env);
+
+    //Will be used to detect multicast message for learning
+    totalMsgCount ++;
+    totalBytes += env->getTotalsize();
+    
     if (receivedTable)
 	strategyTable[curStratID].strategy->insertMessage(cmsg);
     else {
@@ -575,7 +558,43 @@ void ComlibManager::ArraySectionSend(int ep, void *m, CkArrayID a,
 	ComlibPrintf("Enqueuing message in tmplist\n");
         strategyTable[curStratID].tmplist.enq(cmsg);
     }
+
+    ComlibPrintf("After multicast\n");
 }
+
+/*
+void ComlibManager::multicast(void *msg, int npes, int *pelist) {
+    register envelope * env = UsrToEnv(msg);
+    
+    ComlibPrintf("[%d]: In multicast\n", CkMyPe());
+
+    env->setUsed(0);    
+    CkPackMessage(&env);
+    CmiSetHandler(env, CpvAccess(RecvmsgHandle));
+    
+    totalMsgCount ++;
+    totalBytes += env->getTotalsize();
+
+    CharmMessageHolder *cmsg = new 
+    CharmMessageHolder((char *)msg,IS_MULTICAST);
+    cmsg->npes = npes;
+    cmsg->pelist = pelist;
+    //Provide a dummy dest proc as it does not matter for mulitcast 
+    //get rid of the new.
+    
+    if (receivedTable)
+	strategyTable[curStratID].strategy->insertMessage(cmsg);
+    else {
+        flushTable = 1;
+	cmsg->next = NULL;
+	ComlibPrintf("Enqueuing message in tmplist\n");
+        strategyTable[curStratID].tmplist.enq(cmsg);
+    }
+
+    ComlibPrintf("After multicast\n");
+}
+*/
+
 
 void ComlibManager::learnPattern(int total_msg_count, int total_bytes) {
     static int nrecvd = 0;
@@ -592,7 +611,8 @@ void ComlibManager::learnPattern(int total_msg_count, int total_bytes) {
         avg_message_count /= CmiNumPes();
         avg_message_bytes /= CmiNumPes();
         
-        //CkPrintf("STATS = %5.3lf, %5.3lf", avg_message_count, avg_message_bytes);
+        //CkPrintf("STATS = %5.3lf, %5.3lf", avg_message_count,
+        //avg_message_bytes);
 
         //Learning, ignoring contention for now! 
         double cost_dir, cost_mesh, cost_grid, cost_hyp;
@@ -620,45 +640,6 @@ void ComlibManager::learnPattern(int total_msg_count, int total_bytes) {
 void ComlibManager::switchStrategy(int strat){
     //CkPrintf("Switching to %d\n", strat);
 }
-
-
-ComlibMulticastMsg *ComlibManager::getPackedMulticastMessage(CharmMessageHolder *cmsg){
-
-    void *m = cmsg->getCharmMessage();
-    envelope *env = UsrToEnv(m);
-    
-    CkPackMessage(&env);
-    m = EnvToUsr(env);
-
-    if(cmsg->nIndices > 0) {
-        int sizes[2];
-        sizes[0] = cmsg->nIndices;
-        sizes[1] = env->getTotalsize();                
-
-        ComlibPrintf("Creating new comlib multicast message %d, %d\n", sizes[0], sizes[1]);
-
-        ComlibMulticastMsg *msg = new(sizes, 0) ComlibMulticastMsg;
-        msg->size = sizes[1];
-        msg->_cookie.sInfo.cInfo =((CkMcastBaseMsg *)m)->_cookie.sInfo.cInfo;
-        msg->_cookie.sInfo.cInfo.nIndices = cmsg->nIndices;
-
-        memcpy(msg->indices, cmsg->indexlist, sizes[0] * sizeof(CkArrayIndexMax));
-        memcpy(msg->usrMsg, env, sizes[1] * sizeof(char));        
-        
-        envelope *newenv = UsrToEnv(msg);
-        
-        newenv->array_mgr() = env->array_mgr();
-        newenv->array_srcPe() = env->array_srcPe();
-        newenv->array_ep() = env->array_ep();
-        newenv->array_hops() = env->array_hops();
-        newenv->array_index() = env->array_index();
-
-        CkPackMessage(&newenv);        
-        return (ComlibMulticastMsg *)EnvToUsr(newenv);
-    }   
-    return NULL;
-}
-
 
 /*
 void ComlibManager::prioEndIteration(PrioMsg *pmsg){
@@ -703,11 +684,25 @@ void ComlibDelegateProxy(CProxy *proxy){
     proxy->ckDelegate(cgproxy.ckLocalBranch());
 }
 
+ComlibInstanceHandle CkCreateComlibInstance(){
+    return CkGetComlibInstance();
+}
+
 ComlibInstanceHandle CkGetComlibInstance() {
     if(CkMyPe() != 0)
         CkAbort("Comlib Instance can only be created on Processor 0");
     CProxy_ComlibManager cgproxy(CpvAccess(cmgrID));    
     return (cgproxy.ckLocalBranch())->createInstance();
+}
+
+ComlibInstanceHandle CkGetComlibInstance(int id) {
+    ComlibInstanceHandle cinst(id, CpvAccess(cmgrID));
+    return cinst;
+}
+
+void ComlibDoneCreating(){
+    CProxy_ComlibManager cgproxy(CpvAccess(cmgrID));
+    (cgproxy.ckLocalBranch())->doneCreating();
 }
 
 class ComlibManagerMain {

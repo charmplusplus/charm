@@ -2,8 +2,10 @@
 #define EACH_TO_MANY_MULTICAST_STRATEGY
 
 #include "ComlibManager.h"
+#include "DirectMulticastStrategy.h"
 
 class EachToManyMulticastStrategy: public Strategy {
+ protected:
     CkQ <CharmMessageHolder*> *messageBuf;
     int routerID;      //Which topology
     comID comid;
@@ -19,17 +21,26 @@ class EachToManyMulticastStrategy: public Strategy {
     int nDestElements;  //0 for all array elements
     CkArrayIndexMax *destIndices; //NULL for all indices
     CkVec<CkArrayIndexMax> localDestIndices;
+    //Dynamically set by the application
+    CkHashtableT<ComlibSectionHashKey, void *> sec_ht;
+
+    void localMulticast(CkVec<CkArrayIndexMax> *vec, envelope *env);
+    ComlibMulticastMsg *getPackedMulticastMessage(CharmMessageHolder *cmsg);
+    void setReverseMap();    
     
-    void init();
-    void localMulticast(CkVec<CkArrayIndexMax> vec, envelope *env);
-    void setReverseMap();
+    //Executes common code just after array and group constructors
+    virtual void commonInit();
+    virtual void initSectionID(CkSectionID *sid);
+
+    int MaxSectionID;
 
  public:
-    EachToManyMulticastStrategy(int strategyId,int nsrcpes =0,
-                                int *srcpelist=0);
-    EachToManyMulticastStrategy(int strategyId, int nsrcpes, int *srcpelist, 
+    //Group constructor
+    EachToManyMulticastStrategy(int strategyId, int nsrcpes=0, 
+                                int *srcpelist=0, 
                                 int ndestpes =0, int *destpelist =0);
     
+    //Array constructor
     EachToManyMulticastStrategy(int substrategy, CkArrayID src, 
                                 CkArrayID dest, int nsrc=0, 
                                 CkArrayIndexMax *srcelements=0, int ndest=0, 
@@ -37,17 +48,20 @@ class EachToManyMulticastStrategy: public Strategy {
     
     EachToManyMulticastStrategy(CkMigrateMessage *m){}
 
-    //ComlibMulticastHandler getHandler()
-    //  {return (ComlibMulticastHandler)handler;};
-    void insertMessage(CharmMessageHolder *msg);
-    void doneInserting();
+    //Basic function, subclasses should not have to change it
+    virtual void insertMessage(CharmMessageHolder *msg);
+    //More specielized function
+    virtual void doneInserting();
 
     virtual void pup(PUP::er &p);    
     virtual void beginProcessing(int nelements);
-    void localMulticast(void *msg);
-    void setDestArray(CkArrayID dest) {destArrayID=dest;}
+    virtual void localMulticast(void *msg);
+    virtual void setDestArray(CkArrayID dest) {destArrayID=dest;}
     
+    ComlibMulticastMsg *getNewMulticastMessage(CharmMessageHolder *m);
+
     PUPable_decl(EachToManyMulticastStrategy);
+
 };
 #endif
 

@@ -7,13 +7,11 @@
 #include "commlib.h"
 #include <math.h>
 
-#define USE_DIRECT 4          //A dummy strategy that directly forwards 
-                              //messages without any processing.
 #define USE_TREE 1            //Organizes the all to all as a tree
 #define USE_MESH 2            //Virtual topology is a mesh here
 #define USE_HYPERCUBE 3       //Virtual topology is a hypercube
-#define USE_GROUP_BY_PROCESSOR 4 //Groups messages by destination processor 
-                                 //(does not work as of now)
+#define USE_DIRECT 4          //A dummy strategy that directly forwards 
+                              //messages without any processing.
 #define USE_GRID 5            //Virtual topology is a 3d grid
 
 #define CHARM_MPI 0 
@@ -49,7 +47,7 @@ class ComlibMulticastMsg : public CkMcastBaseMsg,
                public CMessage_ComlibMulticastMsg {
     
   public:
-    int size;
+    int nIndices;
     char *usrMsg;        
     CkArrayIndexMax *indices;
 };
@@ -65,7 +63,6 @@ class ComlibInstanceHandle {
 
     ComlibInstanceHandle();
     ComlibInstanceHandle(int instid, CkGroupID dmid);    
-    //    ComlibInstanceHandle(ComlibInstanceHandle &that);
     
     void init();
     void beginIteration();
@@ -104,8 +101,8 @@ class ComlibManager: public CkDelegateMgr {
     void init(); //initialization function
 
     //charm_message for multicast for a section of that group
-    void multicast(void *charm_msg); //charm_message here.
-    void multicast(void *charm_msg, int npes, int *pelist);     
+    void multicast(CharmMessageHolder *cmsg); //charm message holder here
+    //void multicast(void *charm_msg, int npes, int *pelist);
 
     //The following funtions can be accessed only from ComlibInstanceHandle
     void beginIteration();     //Notify begining of a bracket 
@@ -117,12 +114,13 @@ class ComlibManager: public CkDelegateMgr {
     void setInstance(int id); 
     //void prioEndIteration(PrioMsg *pmsg);
     void registerStrategy(int pos, Strategy *s);
-    void doneCreating();             //Done creating instances
 
  public:
     ComlibManager();  //Receommended constructor
-    ComlibManager::ComlibManager(CkMigrateMessage *m){ }
-
+    ComlibManager(CkMigrateMessage *m){ }
+    int useDefCtor(void){ return 1; } //Use default constructor should
+    //be pupped and store all the strategies.
+    
     void barrier(void);
     void barrier2(void);
     void resumeFromBarrier2(void);
@@ -143,16 +141,20 @@ class ComlibManager: public CkDelegateMgr {
 
     //To create a new strategy, returns handle to the strategy table;
     ComlibInstanceHandle createInstance();  
+    void doneCreating();             //Done creating instances
 
     //Learning functions
     void learnPattern(int totalMessageCount, int totalBytes);
     void switchStrategy(int strat);
-
-    static ComlibMulticastMsg *
-        getPackedMulticastMessage(CharmMessageHolder *m);
 };
 
 void ComlibDelegateProxy(CProxy *proxy);
+
+ComlibInstanceHandle CkCreateComlibInstance();
 ComlibInstanceHandle CkGetComlibInstance();
+ComlibInstanceHandle CkGetComlibInstance(int id);
+
+//Only Called when the strategies are not being created in main::main
+void ComlibDoneCreating(); 
 
 #endif
