@@ -614,10 +614,10 @@ if ($?VERBOSE) echo $CMK_CC $OPTS_CC -c CHARMC-MOD.TMP.c
 $CMK_CC $OPTS_CC -c CHARMC-MOD.TMP.c
 if ($status) goto failure
 
-# Scan user-object for charm_main, if none, set MAINOBJ
+# Scan user-object for user_main, if none, set MAINOBJ
 
 set MAINOBJ=$CHARMLIB/lib${LIBCLASS}-defmain.o
-if { (egrep '^charm_main$' < CHARMC-USR.TMP.nm >& /dev/null) } set MAINOBJ=
+if { (egrep '^user_main$' < CHARMC-USR.TMP.nm >& /dev/null) } set MAINOBJ=
 
 # Perform final linkage
 
