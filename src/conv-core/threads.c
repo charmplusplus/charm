@@ -1362,7 +1362,7 @@ void CthInit(char **argv)
   CthBaseInit(argv);  
   mainThread=CthThreadInit();
   CthCpvAccess(CthCurrent)=mainThread;
-  mainThread->base.suspendable=0; /*Can't suspend main thread (trashes Quickthreads jump buffer)*/
+  /* mainThread->base.suspendable=0;*/ /*Can't suspend main thread (trashes Quickthreads jump buffer)*/
 }
 
 void CthFree(CthThread t)
