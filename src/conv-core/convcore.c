@@ -1065,6 +1065,10 @@ void CmiMulticastInit()
  *
  ***************************************************************************/
 
+#define SIZEFIELD(m) ((int *)((char *)(m)-2*sizeof(int)))[0]
+#define REFFIELD(m) ((int *)((char *)(m)-sizeof(int)))[0]
+#define BLKSTART(m) ((char *)m-2*sizeof(int))
+
 void *CmiAlloc(size)
 int size;
 {
@@ -1072,14 +1076,14 @@ int size;
   res =(char *)malloc(size+2*sizeof(int));
   if (res==0) CmiAbort("Memory allocation failed.");
   ((int *)res)[0]=size;
-  ((int *)((char *)res + sizeof(int)))[0]=-1;    /* Reference count value */
+  ((int *)res)[1]=-1;    /* Reference count value */
   return (void *)(res+2*sizeof(int));
 }
 
 int CmiSize(blk)
 void *blk;
 {
-  return ((int *)(((char *)blk)-2*sizeof(int)))[0];
+  return SIZEFIELD(blk);
 }
 
 void CmiFree(blk)
@@ -1088,44 +1092,29 @@ void *blk;
   int offset;
   int refCount;
 
-  refCount = ((int *)((char *)blk - sizeof(int)))[0];
+  refCount = REFFIELD(blk);
 
   /* Check if the reference count is -1 */
   if(refCount == -1){
-    free(((char *)blk)-2*sizeof(int));
+    free(BLKSTART(blk));
+    return;
   }
-  else{
-    /* CmiPrintf("Calling CmiFree in special case :\n"); */
-
-    /* if the value is positive then it is a header having the actual refernce count value */
-    /* else it is the actual offset to go all the way back */
-
-    if(refCount >= 0){ /* This is the Header for the Multiple messages */
-
-      /* CmiPrintf("in CmiFree (for header) : refCount = %d\n", refCount); */
-      
-      if(((int *)((char *)blk - sizeof(int)))[0] == 0){
-	free(((char *)blk - 2*sizeof(int)));
-	return;
-      }
-      ((int *)((char *)blk - sizeof(int)))[0]--;
-      if(((int *)((char *)blk - sizeof(int)))[0] == 0){
-	free(((char *)blk - 2*sizeof(int)));
-      }
+  if(refCount >= 0){ /* This is the Header for the Multiple messages */
+    if(REFFIELD(blk)==0){
+      free(BLKSTART(blk));
+      return;
     }
-    else {
-      offset = refCount;
-      
-      /*      CmiPrintf("in CmiFree : offset = %d\n", offset); */
-      /*      CmiPrintf("in CmiFree : size = %d\n",((int *)((char *)blk - 8))[0]);  */
-      
-      ((int *)((char *)blk + offset - sizeof(int)))[0]--;
-      
-      /*      CmiPrintf("in CmiFree : Ref Count : %d\n",((int *)((char *)blk + offset - sizeof(int)))[0]);*/
-
-      if(((int *)((char *)blk + offset - sizeof(int)))[0] == 0){
-	free(((char *)blk + offset - 2*sizeof(int)));
-      }
+    REFFIELD(blk)--;
+    if(REFFIELD(blk)==0){
+      free(BLKSTART(blk));
+      return;
+    }
+  } else {
+    offset = refCount;
+    REFFIELD((char *)blk+offset)--;
+    if(REFFIELD((char *)blk+offset)==0){
+      free(BLKSTART((char *)blk+offset));
+      return;
     }
   }
 }
