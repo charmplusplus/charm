@@ -99,6 +99,85 @@ void Group::pup(PUP::er &p)
   reductionInfo.pup(p);
 }
 
+/**** Delegation Manager Group */
+CkDelegateMgr::~CkDelegateMgr() { }
+
+//Default delegator implementation: do not delegate-- send directly
+void CkDelegateMgr::ChareSend(CkDelegateData *pd,int ep,void *m,const CkChareID *c,int onPE)
+  { CkSendMsg(ep,m,c); }
+void CkDelegateMgr::GroupSend(CkDelegateData *pd,int ep,void *m,int onPE,CkGroupID g)
+  { CkSendMsgBranch(ep,m,onPE,g); }
+void CkDelegateMgr::GroupBroadcast(CkDelegateData *pd,int ep,void *m,CkGroupID g)
+  { CkBroadcastMsgBranch(ep,m,g); }
+void CkDelegateMgr::NodeGroupSend(CkDelegateData *pd,int ep,void *m,int onNode,CkNodeGroupID g)
+  { CkSendMsgNodeBranch(ep,m,onNode,g); }
+void CkDelegateMgr::NodeGroupBroadcast(CkDelegateData *pd,int ep,void *m,CkNodeGroupID g)
+  { CkBroadcastMsgNodeBranch(ep,m,g); }
+void CkDelegateMgr::ArrayCreate(CkDelegateData *pd,int ep,void *m,const CkArrayIndexMax &idx,int onPE,CkArrayID a)
+{
+	CProxyElement_ArrayBase ap(a,idx);
+	ap.ckInsert((CkArrayMessage *)m,ep,onPE);
+}
+void CkDelegateMgr::ArraySend(CkDelegateData *pd,int ep,void *m,const CkArrayIndexMax &idx,CkArrayID a)
+{
+	CProxyElement_ArrayBase ap(a,idx);
+	ap.ckSend((CkArrayMessage *)m,ep);
+}
+void CkDelegateMgr::ArrayBroadcast(CkDelegateData *pd,int ep,void *m,CkArrayID a)
+{
+	CProxy_ArrayBase ap(a);
+	ap.ckBroadcast((CkArrayMessage *)m,ep);
+}
+
+void CkDelegateMgr::ArraySectionSend(CkDelegateData *pd,int ep,void *m, CkArrayID a,CkSectionID &s)
+{
+	CmiAbort("ArraySectionSend is not implemented!\n");
+/*
+	CProxyElement_ArrayBase ap(a,idx);
+	ap.ckSend((CkArrayMessage *)m,ep);
+*/
+}
+
+/*** Proxy <-> delegator communication */
+CkDelegateData::~CkDelegateData() {}
+
+CkDelegateData *CkDelegateMgr::DelegatePointerPup(PUP::er &p,CkDelegateData *pd) {
+  return pd; // default implementation ignores pup call
+}
+
+/** FIXME: make a "CkReferenceHandle<CkDelegateData>" class to avoid
+   this tricky manual reference counting business... */
+
+void CProxy::ckDelegate(CkDelegateMgr *dTo,CkDelegateData *dPtr) {
+ 	if (dPtr) dPtr->ref();
+	ckUndelegate(); 
+	delegatedMgr = dTo; 
+	delegatedPtr = dPtr;
+}
+void CProxy::ckUndelegate(void) {
+	delegatedMgr=NULL; 
+	if (delegatedPtr) delegatedPtr->unref(); 
+	delegatedPtr=NULL; 
+}
+
+/// Copy constructor
+CProxy::CProxy(const CProxy &src) 
+	:delegatedMgr(src.delegatedMgr), delegatedPtr(src.delegatedPtr)
+{
+	if (delegatedPtr) delegatedPtr->ref();
+}
+
+/// Assignment operator
+CProxy& CProxy::operator=(const CProxy &src) {
+	CkDelegateData *oldPtr=delegatedPtr;
+	ckUndelegate();
+	delegatedMgr=src.delegatedMgr;
+	delegatedPtr=src.delegatedPtr;
+	if (delegatedPtr) delegatedPtr->ref();
+	// subtle: do unref *after* ref, because it's possible oldPtr == delegatedPtr
+	if (oldPtr) oldPtr->unref();
+}
+
 void CProxy::pup(PUP::er &p) {
       CkGroupID delegatedTo;
       delegatedTo.setZero();
@@ -110,56 +189,21 @@ void CProxy::pup(PUP::er &p) {
         }
       }
       p|delegatedTo;
-      p|isNodeGroup;
-      if (p.isUnpacking()) {
-	if (!delegatedTo.isZero()) {
-//	  isNodeGroup? ckNodeDelegate(delegatedTo): ckDelegate(delegatedTo);
+      if (!delegatedTo.isZero()) {
+        p|isNodeGroup;
+        if (p.isUnpacking()) {
 	  if (isNodeGroup)
 		delegatedMgr=(CkDelegateMgr *)CkLocalNodeBranch(delegatedTo);
 	  else
 		delegatedMgr=(CkDelegateMgr *)CkLocalBranch(delegatedTo);
 	}
+        delegatedPtr=delegatedMgr->DelegatePointerPup(p,delegatedPtr);
+	if (p.isUnpacking() && delegatedPtr)
+	  delegatedPtr->ref();
       }
 }
 
-CkDelegateMgr::~CkDelegateMgr() { }
-
-//Default delegator implementation: do not delegate-- send directly
-void CkDelegateMgr::ChareSend(int ep,void *m,const CkChareID *c,int onPE)
-  { CkSendMsg(ep,m,c); }
-void CkDelegateMgr::GroupSend(int ep,void *m,int onPE,CkGroupID g)
-  { CkSendMsgBranch(ep,m,onPE,g); }
-void CkDelegateMgr::GroupBroadcast(int ep,void *m,CkGroupID g)
-  { CkBroadcastMsgBranch(ep,m,g); }
-void CkDelegateMgr::NodeGroupSend(int ep,void *m,int onNode,CkNodeGroupID g)
-  { CkSendMsgNodeBranch(ep,m,onNode,g); }
-void CkDelegateMgr::NodeGroupBroadcast(int ep,void *m,CkNodeGroupID g)
-  { CkBroadcastMsgNodeBranch(ep,m,g); }
-void CkDelegateMgr::ArrayCreate(int ep,void *m,const CkArrayIndexMax &idx,int onPE,CkArrayID a)
-{
-	CProxyElement_ArrayBase ap(a,idx);
-	ap.ckInsert((CkArrayMessage *)m,ep,onPE);
-}
-void CkDelegateMgr::ArraySend(int ep,void *m,const CkArrayIndexMax &idx,CkArrayID a)
-{
-	CProxyElement_ArrayBase ap(a,idx);
-	ap.ckSend((CkArrayMessage *)m,ep);
-}
-void CkDelegateMgr::ArrayBroadcast(int ep,void *m,CkArrayID a)
-{
-	CProxy_ArrayBase ap(a);
-	ap.ckBroadcast((CkArrayMessage *)m,ep);
-}
-
-void CkDelegateMgr::ArraySectionSend(int ep,void *m, CkArrayID a,CkSectionID &s)
-{
-	CmiAbort("ArraySectionSend is not implemented!\n");
-/*
-	CProxyElement_ArrayBase ap(a,idx);
-	ap.ckSend((CkArrayMessage *)m,ep);
-*/
-}
-
+/**** Array sections */
 CkSectionID::CkSectionID(const CkArrayID &aid, const CkArrayIndexMax *elems, const int nElems): _nElems(nElems) {
   _cookie.aid = aid;
   _cookie.get_pe() = CkMyPe();
@@ -189,6 +233,8 @@ void CkSectionID::pup(PUP::er &p) {
     if (p.isUnpacking()) _elems = new CkArrayIndexMax[_nElems];
     for (int i=0; i< _nElems; i++) p | _elems[i];
 }
+
+/**** Tiny random API routines */
 
 extern "C"
 void CkSetRefNum(void *msg, int ref)

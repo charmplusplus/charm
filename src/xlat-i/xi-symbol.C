@@ -506,9 +506,9 @@ char *Chare::proxyPrefix(void)
 //Common multiple inheritance disambiguation code
 void Chare::sharedDisambiguation(XStr &str,const XStr &super)
 {
-    str<<"    void ckDelegate(CkDelegateMgr *to) {\n";
-    genProxyNames(str,"      ",NULL,"::ckDelegate(to);\n","");
-     str<<"    }\n";
+    str<<"    void ckDelegate(CkDelegateMgr *dTo,CkDelegateData *dPtr=NULL) {\n";
+    genProxyNames(str,"      ",NULL,"::ckDelegate(dTo,dPtr);\n","");
+    str<<"    }\n";
     str<<"    void ckUndelegate(void) {\n";
     genProxyNames(str,"      ",NULL,"::ckUndelegate();\n","");
     str<<"    }\n";
@@ -781,8 +781,8 @@ Group::genSubDecls(XStr& str)
 
   if (forElement==forIndividual) 
   {//For a single element
-    str << "    "<<ptype<<"(CkGroupID _gid,int _onPE,CkGroupID dTo) : ";
-    genProxyNames(str, "", NULL,"(_gid,_onPE,dTo)", ", ");
+    str << "    "<<ptype<<"(CkGroupID _gid,int _onPE,CK_DELCTOR_PARAM) : ";
+    genProxyNames(str, "", NULL,"(_gid,_onPE,CK_DELCTOR_ARGS)", ", ");
     str << "{  }\n";
     str << "    "<<ptype<<"(CkGroupID _gid,int _onPE) : ";
     genProxyNames(str, "", NULL,"(_gid,_onPE)", ", ");
@@ -792,8 +792,8 @@ Group::genSubDecls(XStr& str)
   } 
   else if (forElement==forAll)
   {//For whole group
-    str << "    "<<ptype<<"(CkGroupID _gid,CkGroupID dTo) : ";
-    genProxyNames(str, "", NULL,"(_gid,dTo)", ", ");
+    str << "    "<<ptype<<"(CkGroupID _gid,CK_DELCTOR_PARAM) : ";
+    genProxyNames(str, "", NULL,"(_gid,CK_DELCTOR_ARGS)", ", ");
     str << "{  }\n";      
     str << "    "<<ptype<<"(CkGroupID _gid) : ";
     genProxyNames(str, "", NULL,"(_gid)", ", ");
@@ -802,7 +802,7 @@ Group::genSubDecls(XStr& str)
     //Group proxy can be indexed into an element proxy:
     forElement=forIndividual;//<- for the proxyName below
     str << "    "<<proxyName(1)<<" operator[](int onPE) const\n";
-    str << "      {return "<<proxyName(1)<<"(ckGetGroupID(),onPE,ckDelegatedIdx());}\n";
+    str << "      {return "<<proxyName(1)<<"(ckGetGroupID(),onPE,CK_DELCTOR_CALL);}\n";
     forElement=forAll;
 
     str<<"   CK_DISAMBIG_GROUP("<<super<<")\n";
@@ -905,8 +905,8 @@ Array::genSubDecls(XStr& str)
     str << "      { return ("<<type<<tvars()<<" *)"<<super<<"::ckLocal(); }\n";  
     //This constructor is used for array indexing
     str <<
-         "    "<<ptype<<"(const CkArrayID &aid,const "<<indexType<<" &idx,CkGroupID dTo)\n"
-         "        :";genProxyNames(str, "",NULL, "(aid,idx,dTo)", ", ");str<<" {}\n";  
+         "    "<<ptype<<"(const CkArrayID &aid,const "<<indexType<<" &idx,CK_DELCTOR_PARAM)\n"
+         "        :";genProxyNames(str, "",NULL, "(aid,idx,CK_DELCTOR_ARGS)", ", ");str<<" {}\n";  
     str <<
          "    "<<ptype<<"(const CkArrayID &aid,const "<<indexType<<" &idx)\n"
          "        :";genProxyNames(str, "",NULL, "(aid,idx)", ", ");str<<" {}\n";  
@@ -924,9 +924,9 @@ Array::genSubDecls(XStr& str)
       str <<
     "//Generalized array indexing:\n"
     "    "<<etype<<" operator [] (const "<<indexType<<" &idx) const\n"
-    "        {return "<<etype<<"(ckGetArrayID(), idx, ckDelegatedIdx());}\n"
+    "        {return "<<etype<<"(ckGetArrayID(), idx, CK_DELCTOR_CALL);}\n"
     "    "<<etype<<" operator() (const "<<indexType<<" &idx) const\n"
-    "        {return "<<etype<<"(ckGetArrayID(), idx, ckDelegatedIdx());}\n";
+    "        {return "<<etype<<"(ckGetArrayID(), idx, CK_DELCTOR_CALL);}\n";
     }
   
   //Add specialized indexing for these common types
@@ -934,20 +934,20 @@ Array::genSubDecls(XStr& str)
     {
     str << 
     "    "<<etype<<" operator [] (int idx) const \n"
-    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex1D(idx), ckDelegatedIdx());}\n"
+    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex1D(idx), CK_DELCTOR_CALL);}\n"
     "    "<<etype<<" operator () (int idx) const \n"
-    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex1D(idx), ckDelegatedIdx());}\n";
+    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex1D(idx), CK_DELCTOR_CALL);}\n";
     } else if (indexSuffix==(const char*)"2D") {
     str << 
     "    "<<etype<<" operator () (int i0,int i1) const \n"
-    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex2D(i0,i1), ckDelegatedIdx());}\n";
+    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex2D(i0,i1), CK_DELCTOR_CALL);}\n";
     } else if (indexSuffix==(const char*)"3D") {
     str << 
     "    "<<etype<<" operator () (int i0,int i1,int i2) const \n"
-    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex3D(i0,i1,i2), ckDelegatedIdx());}\n";
+    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex3D(i0,i1,i2), CK_DELCTOR_CALL);}\n";
     }
-    str <<"    "<<ptype<<"(const CkArrayID &aid,CkGroupID dTo) \n"
-         "        :";genProxyNames(str, "",NULL, "(aid,dTo)", ", ");str<<" {}\n";
+    str <<"    "<<ptype<<"(const CkArrayID &aid,CK_DELCTOR_PARAM) \n"
+         "        :";genProxyNames(str, "",NULL, "(aid,CK_DELCTOR_ARGS)", ", ");str<<" {}\n";
     str <<"    "<<ptype<<"(const CkArrayID &aid) \n"
          "        :";genProxyNames(str, "",NULL, "(aid)", ", ");str<<" {}\n";
   }
@@ -961,9 +961,9 @@ Array::genSubDecls(XStr& str)
       str <<
     "//Generalized array indexing:\n"
     "    "<<etype<<" operator [] (const "<<indexType<<" &idx) const\n"
-    "        {return "<<etype<<"(ckGetArrayID(), idx, ckDelegatedIdx());}\n"
+    "        {return "<<etype<<"(ckGetArrayID(), idx, CK_DELCTOR_CALL);}\n"
     "    "<<etype<<" operator() (const "<<indexType<<" &idx) const\n"
-    "        {return "<<etype<<"(ckGetArrayID(), idx, ckDelegatedIdx());}\n";
+    "        {return "<<etype<<"(ckGetArrayID(), idx, CK_DELCTOR_CALL);}\n";
     }
   
   //Add specialized indexing for these common types
@@ -971,21 +971,21 @@ Array::genSubDecls(XStr& str)
     {
     str << 
     "    "<<etype<<" operator [] (int idx) const \n"
-    "        {return "<<etype<<"(ckGetArrayID(), *(CkArrayIndex1D*)&ckGetArrayElements()[idx], ckDelegatedIdx());}\n"
+    "        {return "<<etype<<"(ckGetArrayID(), *(CkArrayIndex1D*)&ckGetArrayElements()[idx], CK_DELCTOR_CALL);}\n"
     "    "<<etype<<" operator () (int idx) const \n"
-    "        {return "<<etype<<"(ckGetArrayID(), *(CkArrayIndex1D*)&ckGetArrayElements()[idx], ckDelegatedIdx());}\n";
+    "        {return "<<etype<<"(ckGetArrayID(), *(CkArrayIndex1D*)&ckGetArrayElements()[idx], CK_DELCTOR_CALL);}\n";
     } else if (indexSuffix==(const char*)"2D") {
     str << 
     "    "<<etype<<" operator () (int idx) const \n"
-    "        {return "<<etype<<"(ckGetArrayID(), *(CkArrayIndex2D*)&ckGetArrayElements()[idx], ckDelegatedIdx());}\n";
+    "        {return "<<etype<<"(ckGetArrayID(), *(CkArrayIndex2D*)&ckGetArrayElements()[idx], CK_DELCTOR_CALL);}\n";
     } else if (indexSuffix==(const char*)"3D") {
     str << 
     "    "<<etype<<" operator () (int idx) const \n"
-    "        {return "<<etype<<"(ckGetArrayID(), *(CkArrayIndex3D*)&ckGetArrayElements()[idx], ckDelegatedIdx());}\n";
+    "        {return "<<etype<<"(ckGetArrayID(), *(CkArrayIndex3D*)&ckGetArrayElements()[idx], CK_DELCTOR_CALL);}\n";
     }
 
-    str <<"    "<<ptype<<"(const CkArrayID &aid, CkArrayIndexMax *elems, int nElems, CkGroupID dTo) \n"
-         "        :";genProxyNames(str, "",NULL, "(aid,elems,nElems,dTo)", ", ");str << " {}\n";
+    str <<"    "<<ptype<<"(const CkArrayID &aid, CkArrayIndexMax *elems, int nElems, CK_DELCTOR_PARAM) \n"
+         "        :";genProxyNames(str, "",NULL, "(aid,elems,nElems,CK_DELCTOR_ARGS)", ", ");str << " {}\n";
     str <<"    "<<ptype<<"(const CkArrayID &aid, CkArrayIndexMax *elems, int nElems) \n"
          "        :";genProxyNames(str, "",NULL, "(aid,elems,nElems)", ", ");str<<" {}\n";
     str <<"    "<<ptype<<"(const CkSectionID &sid)"
@@ -2016,7 +2016,7 @@ void Entry::genChareDefs(XStr& str)
     } else {//Regular, non-sync message
       str << "  if (ckIsDelegated()) {\n";
       str << "    int destPE=CkChareMsgPrep("<<params<<");\n";
-      str << "    if (destPE!=-1) ckDelegatedTo()->ChareSend("<<params<<",destPE);\n";
+      str << "    if (destPE!=-1) ckDelegatedTo()->ChareSend(ckDelegatedPtr(),"<<params<<",destPE);\n";
       str << "  }\n";
       str << "  else CkSendMsg("<<params<<");\n";
     }
@@ -2174,14 +2174,14 @@ void Entry::genGroupDecl(XStr& str)
 	  str << "      ((CkMessage*)impl_msg)->setImmediate(CmiTrue);\n";
         str << "      if (ckIsDelegated()) {\n";
         str << "         Ck"<<node<<"GroupMsgPrep("<<paramg<<");\n";
-	str << "         ckDelegatedTo()->"<<node<<"GroupSend("<<parampg<<");\n";
+	str << "         ckDelegatedTo()->"<<node<<"GroupSend(ckDelegatedPtr(),"<<parampg<<");\n";
         str << "      } else CkSendMsg"<<node<<"Branch"<<immediate<<"("<<parampg<<");\n";
       }
       else
       {// Broadcast
         str << "      if (ckIsDelegated()) {\n";
         str << "         Ck"<<node<<"GroupMsgPrep("<<paramg<<");\n";
-        str << "         ckDelegatedTo()->"<<node<<"GroupBroadcast("<<paramg<<");\n";
+        str << "         ckDelegatedTo()->"<<node<<"GroupBroadcast(ckDelegatedPtr(),"<<paramg<<");\n";
         str << "      } else CkBroadcastMsg"<<node<<"Branch("<<paramg<<");\n";
       }
     }

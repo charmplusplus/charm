@@ -222,8 +222,8 @@ public:
 		_aid.setZero();
 #endif
 	}
-	CProxy_ArrayBase(const CkArrayID &aid,CkGroupID dTo)
-		:CProxy(dTo), _aid(aid) { }
+	CProxy_ArrayBase(const CkArrayID &aid,CK_DELCTOR_PARAM)
+		:CProxy(CK_DELCTOR_ARGS), _aid(aid) { }
 	CProxy_ArrayBase(const CkArrayID &aid)
 		:CProxy(), _aid(aid) { }
 	CProxy_ArrayBase(const ArrayElement *e);
@@ -282,8 +282,8 @@ private:
 public:
 	CProxyElement_ArrayBase() { }
 	CProxyElement_ArrayBase(const CkArrayID &aid,
-		const CkArrayIndex &idx,CkGroupID dTo)
-		:CProxy_ArrayBase(aid,dTo), _idx(idx) { }
+		const CkArrayIndex &idx,CK_DELCTOR_PARAM)
+		:CProxy_ArrayBase(aid,CK_DELCTOR_ARGS), _idx(idx) { }
 	CProxyElement_ArrayBase(const CkArrayID &aid, const CkArrayIndex &idx)
 		:CProxy_ArrayBase(aid), _idx(idx) { }
 	CProxyElement_ArrayBase(const ArrayElement *e);
@@ -315,15 +315,15 @@ private:
 public:
 	CProxySection_ArrayBase() { }
 	CProxySection_ArrayBase(const CkArrayID &aid,
-		const CkArrayIndexMax *elems, const int nElems, CkGroupID dTo)
-		:CProxy_ArrayBase(aid,dTo), _sid(aid, elems, nElems) { }
+		const CkArrayIndexMax *elems, const int nElems, CK_DELCTOR_PARAM)
+		:CProxy_ArrayBase(aid,CK_DELCTOR_ARGS), _sid(aid, elems, nElems) { }
 	CProxySection_ArrayBase(const CkArrayID &aid,
 		const CkArrayIndexMax *elems, const int nElems)
 		:CProxy_ArrayBase(aid), _sid(aid, elems, nElems) { }
 	CProxySection_ArrayBase(const CkSectionID &sid)
 		:CProxy_ArrayBase(sid._cookie.aid), _sid(sid){}
-	CProxySection_ArrayBase(const CkSectionID &sid, CkGroupID dTo)
-		:CProxy_ArrayBase(sid._cookie.aid, dTo), _sid(sid){}
+	CProxySection_ArrayBase(const CkSectionID &sid, CK_DELCTOR_PARAM)
+		:CProxy_ArrayBase(sid._cookie.aid, CK_DELCTOR_ARGS), _sid(sid){}
         CProxySection_ArrayBase(const CProxySection_ArrayBase &cs)
 		:CProxy_ArrayBase(cs.ckGetArrayID()),
 		 _sid(cs.ckGetArrayID(), cs.ckGetArrayElements(), cs.ckGetNumElements()) {}

@@ -384,7 +384,7 @@ void CProxy_ArrayBase::ckInsertIdx(CkArrayMessage *m,int ctor,int onPe,
   m->array_ep()=ctor;
   ckLocalBranch()->prepareCtorMsg(m,onPe,idx);
   if (ckIsDelegated()) {
-  	ckDelegatedTo()->ArrayCreate(ctor,m,idx,onPe,_aid);
+  	ckDelegatedTo()->ArrayCreate(ckDelegatedPtr(),ctor,m,idx,onPe,_aid);
   	return;
   }
   
@@ -657,7 +657,7 @@ void CProxyElement_ArrayBase::ckSend(CkArrayMessage *msg, int ep) const
 	msg_prepareSend(msg,ep,ckGetArrayID());
 	msg->array_index()=_idx;//Insert array index
 	if (ckIsDelegated()) //Just call our delegateMgr
-	  ckDelegatedTo()->ArraySend(ep,msg,_idx,ckGetArrayID());
+	  ckDelegatedTo()->ArraySend(ckDelegatedPtr(),ep,msg,_idx,ckGetArrayID());
 	else 
 	{ //Usual case: a direct send
 	  ckLocalBranch()->deliver(msg, CkDeliver_queue);
@@ -674,7 +674,7 @@ void *CProxyElement_ArrayBase::ckSendSync(CkArrayMessage *msg, int ep) const
 void CProxySection_ArrayBase::ckSend(CkArrayMessage *msg, int ep)
 {
 	if (ckIsDelegated()) //Just call our delegateMgr
-	  ckDelegatedTo()->ArraySectionSend(ep,msg,ckGetArrayID(),ckGetSectionID());
+	  ckDelegatedTo()->ArraySectionSend(ckDelegatedPtr(),ep,msg,ckGetArrayID(),ckGetSectionID());
 	else {
 	  // send through all
 	  for (int i=0; i< _sid._nElems-1; i++) {
@@ -829,7 +829,7 @@ void CProxy_ArrayBase::ckBroadcast(CkArrayMessage *msg, int ep) const
 {
 	msg->array_ep_bcast()=ep;
 	if (ckIsDelegated()) //Just call our delegateMgr
-	  ckDelegatedTo()->ArrayBroadcast(ep,msg,_aid);
+	  ckDelegatedTo()->ArrayBroadcast(ckDelegatedPtr(),ep,msg,_aid);
 	else 
 	{ //Broadcast message via serializer node
 	  _TRACE_CREATION_DETAILED(UsrToEnv(msg), ep);
