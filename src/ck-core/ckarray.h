@@ -10,7 +10,9 @@ The general structure is:
 CkArray is the "array manager" Group, or BOC-- 
 it creates, keeps track of, and cares for all the
 array elements on this PE (i.e.. "local" elements).  
-It does so using a hashtable.
+It does so using a hashtable of CkArrayRec objects--
+there's an entry for each local, home-here, and recently
+communicated remote array elements.
 
 CkArrayElement is the type of the array 
 elements (a subclass of Chare).
@@ -84,14 +86,18 @@ class CkArrayIndexMax : public CkArrayIndex {
 	struct {
 		int data[CK_ARRAYINDEX_MAXLEN];
 	} index;
-public:
-	CkArrayIndexMax &operator=(const CkArrayIndex &that) 
+	void copyFrom(const CkArrayIndex &that)
 	{
 		nInts=that.nInts;
 		index=((const CkArrayIndexMax *)&that)->index;
 		//for (int i=0;i<nInts;i++) index[i]=that.data()[i];
-		return *this;
 	}
+public:
+	CkArrayIndexMax(void) { }
+	CkArrayIndexMax(const CkArrayIndex &that) 
+		{copyFrom(that);}
+	CkArrayIndexMax &operator=(const CkArrayIndex &that) 
+		{copyFrom(that); return *this;}
 };
 
 class CkArrayIndexStruct {
@@ -101,7 +107,7 @@ public:
 };
 
 /*********************** Array Messages ************************/
-class CkArrayMessage {
+class CkArrayMessage : public Message {
 public:
   //These routines are implementation utilities
   inline CkArrayIndexMax &array_index(void);
@@ -109,6 +115,7 @@ public:
   unsigned char &array_hops(void);
   unsigned int array_getSrcPe(void);
   unsigned int array_ifNotThere(void);
+  void array_setIfNotThere(unsigned int);
   
   //This allows us to delete bare CkArrayMessages
   void operator delete(void *p){CkFreeMsg(p);}
@@ -139,9 +146,9 @@ extern CkGroupID _RRMapID;
 #define ALIGN8(x)       (int)((~7)&((x)+7))
 
 #define MessageIndex(mt)        CMessage_##mt##::__idx
-#define ChareIndex(ct)          CProxy_##ct##::__idx
-#define EntryIndex(ct,ep,mt)    CProxy_##ct##::ckIdx_##ep##((mt *)0)
-#define ConstructorIndex(ct,mt) EntryIndex(ct,ct,mt)
+#define ChareIndex(ct)          CkIndex_##ct##::__idx
+#define EntryIndex(ct,ep,mt)    CkIndex_##ct##::ep##((mt *)0)
+#define ConstructorIndex(ct,mt) EntryIndex(ct,ckNew,mt)
 
 typedef int MessageIndexType;
 typedef int ChareIndexType;
@@ -167,35 +174,68 @@ typedef enum {
 //This class is a wrapper around a CkArrayIndex and ArrayID,
 // used by array element proxies.  This makes the translator's
 // job simpler, and the translated code smaller. 
-class CProxy_CkArrayBase :public CkArrayID {
-protected:
-	CkArrayIndexMax _idx;//<- our element's array index; nInts=-1 if none
+class CProxy_ArrayBase :public CProxyBase_Delegatable {
+private:
+	CkArrayID _aid;
 public:
-	CProxy_CkArrayBase() {}
-	CProxy_CkArrayBase(const CkArrayID &aid) {_aid=aid._aid;_idx.nInts=-1;}
-	CProxy_CkArrayBase(const CkArrayID &aid,const CkArrayIndex &idx)
-		{_aid=aid._aid;_idx=idx;}
+	CProxy_ArrayBase() { }
+	CProxy_ArrayBase(const CkArrayID &aid,CkGroupID dTo=-1) 
+		:CProxyBase_Delegatable(dTo), _aid(aid) { }
 
-	//Create 1D initial elements
-	void base_insert1D(int ctorIndex,int numElements,CkArrayMessage *m=NULL);
-protected:
-	void base_insert(int ctorIndex,int onPE,CkArrayMessage *m=NULL);
-	void base_insert(int ctorIndex,int onPE,const CkArrayIndex &idx,CkArrayMessage *m=NULL);
-	
-//Messaging:
-	void base_send(CkArrayMessage *msg, 
-		int entryIndex, CkArray_IfNotThere nt) const;
-	void base_broadcast(CkArrayMessage *msg, 
-		int entryIndex, CkArray_IfNotThere nt) const;
-public:
-	CkGroupID ckGetGroupID(void) { return _aid; }
-	
-	void doneInserting(void);//Call after last insert (for load balancer)
-	
-//Register the given reduction client
+	void ckInsertIdx(CkArrayMessage *m,int ctor,int onPE,const CkArrayIndex &idx);	
+	void ckInsert1D(CkArrayMessage *m,int ctor,int numElements);
+	void ckBroadcast(CkArrayMessage *m, int ep) const;
+	CkArrayID ckGetArrayID(void) const { return _aid; }
+	CkArray *ckLocalBranch(void) const { return _aid.ckLocalBranch(); }	
+	void doneInserting(void);
 	void setReductionClient(CkReductionMgr::clientFn fn,void *param=NULL);
+
 	void pup(PUP::er &p);
 };
+PUPmarshall(CProxy_ArrayBase);
+#define CK_DISAMBIG_ARRAY(super) \
+	CK_DISAMBIG_DELEGATABLE(super) \
+	void ckInsertIdx(CkArrayMessage *m,int ctor,int onPE,const CkArrayIndex &idx) \
+	  { super::ckInsertIdx(m,ctor,onPE,idx); }\
+	void ckInsert1D(CkArrayMessage *m,int ctor,int n) \
+	  { super::ckInsert1D(m,ctor,n); } \
+	void ckBroadcast(CkArrayMessage *m, int ep) const \
+	  { super::ckBroadcast(m,ep); } \
+	CkArrayID ckGetArrayID(void) const \
+	  { return super::ckGetArrayID();} \
+	CkArray *ckLocalBranch(void) const \
+	  { return super::ckLocalBranch(); } \
+	void doneInserting(void) { super::doneInserting(); }\
+	void setReductionClient(CkReductionMgr::clientFn fn,void *param=NULL)\
+	  { super::setReductionClient(fn,param); }\
+
+
+class CProxyElement_ArrayBase:public CProxy_ArrayBase {
+private:
+	CkArrayIndexMax _idx;//<- our element's array index
+public:
+	CProxyElement_ArrayBase() { }
+	CProxyElement_ArrayBase(const CkArrayID &aid,
+		const CkArrayIndex &idx,CkGroupID dTo=-1)
+		:CProxy_ArrayBase(aid,dTo), _idx(idx) { }
+	
+	void ckInsert(CkArrayMessage *m,int ctor,int onPE);
+	void ckSend(CkArrayMessage *m, int ep) const;
+	const CkArrayIndex &ckGetIndex() const {return _idx;}
+
+	ArrayElement *ckLocal(void) const;
+	void pup(PUP::er &p);
+};
+PUPmarshall(CProxyElement_ArrayBase);
+#define CK_DISAMBIG_ARRAY_ELEMENT(super) \
+	CK_DISAMBIG_ARRAY(super) \
+	void ckInsert(CkArrayMessage *m,int ctor,int onPE) \
+	  { super::ckInsert(m,ctor,onPE); }\
+	void ckSend(CkArrayMessage *m, int ep) const \
+	  { super::ckSend(m,ep); }\
+	const CkArrayIndex &ckGetIndex() const \
+	  { return super::ckGetIndex(); }\
+
 
 /************************* Array Map  ************************
 An array map tells which PE to put each array element on.
@@ -312,12 +352,26 @@ class CkArrayRec;//An array element record
 class CkArray : public CkReductionMgr {
 	friend class ArrayElement;
 	friend class ArrayElement1D;
-	friend class CProxy_CkArrayBase;
+	friend class CProxy_ArrayBase;
 	friend class CkArrayRec;
 	friend class CkArrayRec_aging;
 	friend class CkArrayRec_local;
 	friend class CkArrayRec_remote;
 	friend class CkArrayRec_buffering;
+
+//A fixed value, to detect bad GroupID/heap corruption
+#define CkArray_MAGIC 0xf1a5D00D
+  int CkArray_magic;
+#ifdef CMK_OPTIMIZE
+# define CkArray_MAGIC_CHECK() /*empty, for speed*/
+#else
+# define CkArray_MAGIC_CHECK() do{ \
+	if (CkArray_magic != CkArray_MAGIC) \
+		CkAbort("Charm++ array manager trashed-- indicates "\
+        "a bad GroupID, corrupted message, or heap corruption");\
+  } while(0)
+#endif
+
 public:
 //Array Creation:
   static  CkGroupID CreateArray(CkGroupID mapID,int numInitial=0);
@@ -411,12 +465,10 @@ private:
   //Deliver this message to this array element
   void invokeEntry(ArrayElement *el,int entryIdx,void *msg);
 
-  //Allocate a new, uninitialized array element of the given (chare) type
-  // and owning the given index.
-  ArrayElement *allocateElement(int type,const CkArrayIndex &ind);
-  //Call the user's given constructor, passing the given message.
-  // Add the element to the hashtable.
-  void ctorElement(ArrayElement *el,int ctor,void *msg);
+  //Create, but do not register an element
+  ArrayElement *buildElement(int type,int ctor,void *msg,
+		const CkArrayIndex &ind,bool fromMigration);
+
   //Create, initialize, and register this new element
   ArrayElement *newElement(int ctor,void *msg,const CkArrayIndex &ind);
 
