@@ -29,21 +29,30 @@ public:
   void Refine(int count, CentralLB::LDStats* stats, int* cur_p, int* new_p);
 
 private:
+  struct CommTable {
+    int* msgSentCount; // # of messages sent by each PE
+    int* msgRecvCount; // # of messages received by each PE
+    int* byteSentCount;// # of bytes sent by each PE
+    int* byteRecvCount;// # of bytes reeived by each PE
+    int count;
+    CommTable(int p);
+    ~CommTable();
+    void clear();
+    void increase(bool issend, int pe, int msgs, int bytes);
+    double overheadOnPe(int pe);
+  };
   CentralLB::LDStats* stats;
-  int* msgSentCount; // # of messages sent by each PE
-  int* msgRecvCount; // # of messages received by each PE
-  int* byteSentCount;// # of bytes sent by each PE
-  int* byteRecvCount;// # of bytes reeived by each PE
+  CommTable *commTable;
+
   void create(int count, CentralLB::LDStats* , int* cur_p);
-  void addProcessorCommCost();
-  void updateCommunication(int c, int oldpe, int newpe);
+  void processorCommCost();
   void assign(computeInfo *c, int p);
   void assign(computeInfo *c, processorInfo *p);
   void deAssign(computeInfo *c, processorInfo *pRec);
-  double commOverheadOnPe(int);
+  void commCost(int c, int pe, int &byteSent, int &msgSent, int &byteRecv, int &msgRecv);
   int refine();
   void computeAverageWithComm();
-  double RefinerComm::commAffinity(int c, int pe);
+  double commAffinity(int c, int pe);
 };
 
 #endif /* _REFINERCOMM_H_ */

@@ -49,7 +49,8 @@ public:
    int originalPE;  // These two are used by refiner, but ignored by RefineLB
    int originalIdx;
    int migratable;
-   CkVec<int>  messages;
+   CkVec<int>  sendmessages;
+   CkVec<int>  recvmessages;
 };
 
 class processorInfo: public InfoRecord

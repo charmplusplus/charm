@@ -19,93 +19,83 @@
 
 void RefinerComm::create(int count, CentralLB::LDStats* _stats, int* procs)
 {
+  int i;
   stats = _stats;
   Refiner::create(count, _stats, procs);
 
-  // fill communication hash table
-  stats->makeCommHash();
   LDCommData *cdata = stats->commData;
-  for (int i=0; i<stats->n_comm; i++) 
+  for (i=0; i<stats->n_comm; i++) 
   {
      	LDCommData &comm = cdata[i];
-	if (comm.from_proc()) continue;
-	int computeIdx = stats->getHash(comm.sender);
-        CmiAssert(computeIdx >= 0 && computeIdx < numComputes);
-        computes[computeIdx].messages.push_back(i);
+	if (!comm.from_proc()) {
+	  // FIXME: only obj msg here
+          // out going message
+	  int computeIdx = stats->getHash(comm.sender);
+          CmiAssert(computeIdx >= 0 && computeIdx < numComputes);
+          computes[computeIdx].sendmessages.push_back(i);
+        }
+
+        // incoming messages
+	if (comm.receiver.get_type() == LD_OBJ_MSG)  {
+          int computeIdx = stats->getHash(comm.receiver.get_destObj());
+          CmiAssert(computeIdx != -1);
+          computes[computeIdx].recvmessages.push_back(i);
+        }
   }
 }
 
 void RefinerComm::computeAverageWithComm()
 {
   int i;
-  double total = 0;
+  double total = 0.;
   for (i=0; i<numComputes; i++) total += computes[i].load;
 
   for (i=0; i<P; i++) {
     if (processors[i].available == CmiTrue) {
 	total += processors[i].backgroundLoad;
-        total += commOverheadOnPe(i);
+        total += commTable->overheadOnPe(i);
     }
   }
 
   averageLoad = total/numAvail;
-CmiPrintf("averageLoad: %f\n", averageLoad);
 }
 
-void RefinerComm::addProcessorCommCost()
+// compute the initial per processor communication overhead
+void RefinerComm::processorCommCost()
 {
   int i;
-  msgSentCount = new int[P]; // # of messages sent by each PE
-  msgRecvCount = new int[P]; // # of messages received by each PE
-  byteSentCount = new int[P];// # of bytes sent by each PE
-  byteRecvCount = new int[P];// # of bytes reeived by each PE
-
-  for(i = 0; i < P; i++)
-    msgSentCount[i] = msgRecvCount[i] = byteSentCount[i] = byteRecvCount[i] = 0;
 
   for (int cidx=0; cidx < stats->n_comm; cidx++) {
     LDCommData& cdata = stats->commData[cidx];
-    int senderPE, receiverPE;
+    int senderPE, receiverPE = -1;
     if (cdata.from_proc())
       senderPE = cdata.src_proc;
     else {
       int idx = stats->getHash(cdata.sender);
       CmiAssert(idx != -1);
-      senderPE = computes[idx].processor;	// object's original processor
-      CmiAssert(senderPE != -1);
+      senderPE = stats->from_proc[idx];  //computes[idx].processor;	// object's original processor
     }
-    if (cdata.receiver.get_type() == LD_PROC_MSG)
+    switch (cdata.receiver.get_type()) {
+    case LD_PROC_MSG:
       receiverPE = cdata.receiver.proc();
-    else {
+      break;
+    case LD_OBJ_MSG:  {  // object message FIXME add multicast
       int idx = stats->getHash(cdata.receiver.get_destObj());
       CmiAssert(idx != -1);
-      receiverPE = computes[idx].processor;
-      CmiAssert(receiverPE != -1);
+      receiverPE = stats->from_proc[idx]; //computes[idx].processor;
+      break;
+      }
+    case LD_OBJLIST_MSG:
+      break;
     }
+    CmiAssert(senderPE != -1);
+    CmiAssert(receiverPE != -1);
     if(senderPE != receiverPE)
     {
-       msgSentCount[senderPE] += cdata.messages;
-       byteSentCount[senderPE] += cdata.bytes;
-
-       msgRecvCount[receiverPE] += cdata.messages;
-       byteRecvCount[receiverPE] += cdata.bytes;
+       commTable->increase(true, senderPE, cdata.messages, cdata.bytes);
+       commTable->increase(false, receiverPE, cdata.messages, cdata.bytes);
      }
   }
-
-  for(i = 0; i < P; i++)
-    processors[i].load += commOverheadOnPe(i);
-}
-
-double RefinerComm::commOverheadOnPe(int pe)
-{
-  return msgRecvCount[pe]  * PER_MESSAGE_RECV_OVERHEAD +
-	 msgSentCount[pe]  * PER_MESSAGE_SEND_OVERHEAD +
-	 byteRecvCount[pe] * PER_BYTE_RECV_OVERHEAD +
-	 byteSentCount[pe] * PER_BYTE_SEND_OVERHEAD;
-}
-
-void RefinerComm::updateCommunication(int c, int oldpe, int newpe)
-{
 }
 
 void RefinerComm::assign(computeInfo *c, int processor)
@@ -118,7 +108,14 @@ void RefinerComm::assign(computeInfo *c, processorInfo *p)
    c->processor = p->Id;
    p->computeSet->insert((InfoRecord *) c);
    p->computeLoad += c->load;
-   p->load = p->computeLoad + p->backgroundLoad;
+//   p->load = p->computeLoad + p->backgroundLoad;
+   // add communication cost
+   int byteSent, msgSent, byteRecv, msgRecv;
+   commCost(c->Id, p->Id, byteSent, msgSent, byteRecv, msgRecv);
+   commTable->increase(true, p->Id, msgSent, byteSent);
+   commTable->increase(false, p->Id, msgRecv, byteRecv);
+   
+   p->load = p->computeLoad + p->backgroundLoad + commTable->overheadOnPe(p->Id);
 }
 
 void  RefinerComm::deAssign(computeInfo *c, processorInfo *p)
@@ -126,22 +123,29 @@ void  RefinerComm::deAssign(computeInfo *c, processorInfo *p)
    c->processor = -1;
    p->computeSet->remove(c);
    p->computeLoad -= c->load;
-   p->load = p->computeLoad + p->backgroundLoad;
+//   p->load = p->computeLoad + p->backgroundLoad;
+   int byteSent, msgSent, byteRecv, msgRecv;
+   commCost(c->Id, p->Id, byteSent, msgSent, byteRecv, msgRecv);
+   commTable->increase(true, p->Id, -msgSent, -byteSent);
+   commTable->increase(false, p->Id, -msgRecv, -byteRecv);
+   
+   p->load = p->computeLoad + p->backgroundLoad + commTable->overheadOnPe(p->Id);
 }
 
 // how much communication from compute c  to pe
 double RefinerComm::commAffinity(int c, int pe)
 {
-  int byteSent=0, msgSent=0;
+  int byteSent=0, msgSent=0, byteRecv=0, msgRecv=0;
   computeInfo &obj = computes[c];
-  int nMsgs = obj.messages.length();
-  for (int i=0; i<nMsgs; i++) {
-    LDCommData &cdata = stats->commData[obj.messages[i]];
+
+  int nSendMsgs = obj.sendmessages.length();
+  for (int i=0; i<nSendMsgs; i++) {
+    LDCommData &cdata = stats->commData[obj.sendmessages[i]];
     bool sendtope = false;
     if (cdata.receiver.get_type() == LD_OBJ_MSG) {
       int recvCompute = stats->getHash(cdata.receiver.get_destObj());
       int recvProc = computes[recvCompute].processor;
-      if (recvProc == pe) sendtope = true;
+      if (recvProc != -1 && recvProc == pe) sendtope = true;
     }
     else if (cdata.receiver.get_type() == LD_OBJLIST_MSG) {  // multicast
       int nobjs;
@@ -149,7 +153,7 @@ double RefinerComm::commAffinity(int c, int pe)
       for (int j=0; j<nobjs; j++) {
         int recvCompute = stats->getHash(recvs[j]);
         int recvProc = computes[recvCompute].processor;	// FIXME
-        if (recvProc == pe) { sendtope = true; continue; }
+        if (recvProc != -1 && recvProc == pe) { sendtope = true; continue; }
       }  
     }
     if (sendtope) {
@@ -157,8 +161,83 @@ double RefinerComm::commAffinity(int c, int pe)
       msgSent += cdata.messages;
     }
   }  // end of for
+
+  int nRecvMsgs = obj.recvmessages.length();
+  for (int i=0; i<nRecvMsgs; i++) {
+    LDCommData &cdata = stats->commData[obj.recvmessages[i]];
+    int sendProc;
+    if (cdata.from_proc()) {
+      sendProc = cdata.src_proc;
+    }
+    else {
+      int sendCompute = stats->getHash(cdata.sender);
+      sendProc = computes[sendCompute].processor;
+    }
+    if (sendProc != -1 && sendProc == pe) {
+      byteRecv += cdata.bytes;
+      msgRecv += cdata.messages;
+    }
+  }  // end of for
   return msgSent  * PER_MESSAGE_SEND_OVERHEAD + 
-	 byteSent * PER_BYTE_SEND_OVERHEAD;
+	 byteSent * PER_BYTE_SEND_OVERHEAD +
+	 msgRecv * PER_MESSAGE_RECV_OVERHEAD +
+	 byteRecv * PER_BYTE_RECV_OVERHEAD;
+}
+
+// assume c is on pe, how much comm overhead it will be?
+void RefinerComm::commCost(int c, int pe, int &byteSent, int &msgSent, int &byteRecv, int &msgRecv)
+{
+  byteSent=msgSent=byteRecv=msgRecv=0;
+  computeInfo &obj = computes[c];
+
+  // find out send overhead for every outgoing message that has receiver
+  // not same as pe
+  int nSendMsgs = obj.sendmessages.length();
+  for (int i=0; i<nSendMsgs; i++) {
+    LDCommData &cdata = stats->commData[obj.sendmessages[i]];
+    bool diffPe = false;
+    if (cdata.receiver.get_type() == LD_PROC_MSG) {
+      CmiAssert(0);
+    }
+    if (cdata.receiver.get_type() == LD_OBJ_MSG) {
+      int recvCompute = stats->getHash(cdata.receiver.get_destObj());
+      int recvProc = computes[recvCompute].processor;
+      if (recvProc!= -1 && recvProc != pe) diffPe = true;
+    }
+    else if (cdata.receiver.get_type() == LD_OBJLIST_MSG) {  // multicast
+      int nobjs;
+      LDObjKey *recvs = cdata.receiver.get_destObjs(nobjs);
+      for (int j=0; j<nobjs; j++) {
+        int recvCompute = stats->getHash(recvs[j]);
+        int recvProc = computes[recvCompute].processor;	// FIXME
+        if (recvProc!= -1 && recvProc != pe) { diffPe = true; }
+      }  
+    }
+    if (diffPe) {
+      byteSent += cdata.bytes;
+      msgSent += cdata.messages;
+    }
+  }  // end of for
+
+  // find out recv overhead for every incoming message that has sender
+  // not same as pe
+  int nRecvMsgs = obj.recvmessages.length();
+  for (int i=0; i<nRecvMsgs; i++) {
+    LDCommData &cdata = stats->commData[obj.recvmessages[i]];
+    bool diffPe = false;
+    if (cdata.from_proc()) {
+      if (cdata.src_proc != pe) diffPe = true;
+    }
+    else {
+      int sendCompute = stats->getHash(cdata.sender);
+      int sendProc = computes[sendCompute].processor;
+      if (sendProc != -1 && sendProc != pe) diffPe = true;
+    }
+    if (diffPe) {	// sender is not pe
+      byteRecv += cdata.bytes;
+      msgRecv += cdata.messages;
+    }
+  }  // end of for
 }
 
 int RefinerComm::refine()
@@ -214,19 +293,14 @@ int RefinerComm::refine()
         }
 	//CkPrintf("c->load: %f p->load:%f overLoad*averageLoad:%f \n",
 	//c->load, p->load, overLoad*averageLoad);
-	double commgain = commAffinity(c->Id, c->processor) -
-			  commAffinity(c->Id, p->Id);
+	double commgain = commAffinity(c->Id, p->Id) -
+			  commAffinity(c->Id, c->processor);
 	if ( c->load + p->load < overLoad*averageLoad) {
 	  // iout << iINFO << "Considering Compute : " 
 	  //      << c->Id << " with load " 
 	  //      << c->load << "\n" << endi;
 	  if(c->load + commgain > bestSize) {
-CmiPrintf("comm gain %f bestSize:%f\n", commgain, bestSize);
-    // show the load
-    for (i=0; i<P; i++) 
-      CmiPrintf("%f ", processors[i].load), 
-    CmiPrintf("\n");
-
+            //CmiPrintf("[%d] comm gain %f bestSize:%f\n", c->Id, commgain, bestSize);
 	    bestSize = c->load + commgain;
 	    bestCompute = c;
 	    bestP = p;
@@ -241,31 +315,35 @@ CmiPrintf("comm gain %f bestSize:%f\n", commgain, bestSize);
     }
 
     if (bestCompute) {
-            CkPrintf("Assign: [%d] with load: %f from %d to %d \n",
-      	       bestCompute->id.id[0], bestCompute->load, 
+      if (_lb_debug)
+      CkPrintf("Assign: [%d] with load: %f from %d to %d \n",
+      	       bestCompute->Id, bestCompute->load, 
                donor->Id, bestP->Id);
       deAssign(bestCompute, donor);      
       assign(bestCompute, bestP);
+
+      // show the load
+      if (_lb_debug) {
+        for (i=0; i<P; i++) CmiPrintf("%f ", processors[i].load);
+        CmiPrintf("\n");
+      }
+
       // update commnication
+      computeAverageWithComm();
+      if (_lb_debug) CmiPrintf("averageLoad: %f\n", averageLoad);
     } else {
       finish = 0;
       break;
     }
 
 
-    if (bestP->load > averageLoad) {
-CmiPrintf("bestpe %d is not light anymore\n", bestP->Id);
+    if (bestP->load > averageLoad)
       lightProcessors->remove(bestP);
-    }
     
-    if (isHeavy(donor)) {
-CmiPrintf("doner pe %d is heavy anymore\n", donor->Id);
+    if (isHeavy(donor))
       heavyProcessors->insert((InfoRecord *) donor);
-}
-    else if (isLight(donor)) {
-CmiPrintf("doner pe %d is light %f %f\n", donor->Id, donor->load, averageLoad);
+    else if (isLight(donor))
       lightProcessors->insert((InfoRecord *) donor);
-}
   }  
 
   delete heavyProcessors;
@@ -283,8 +361,16 @@ void RefinerComm::Refine(int count, CentralLB::LDStats* stats,
   numComputes = stats->n_objs;
   computes = new computeInfo[numComputes];
   processors = new processorInfo[count];
+  commTable = new CommTable(P);
+
+  // fill communication hash table
+  stats->makeCommHash();
 
   create(count, stats, cur_p);
+
+  commTable->clear();
+
+  processorCommCost();
 
   int i;
   for (i=0; i<numComputes; i++)
@@ -293,9 +379,8 @@ void RefinerComm::Refine(int count, CentralLB::LDStats* stats,
 
   removeComputes();
 
-  addProcessorCommCost();
-
   computeAverageWithComm();
+  if (_lb_debug) CmiPrintf("averageLoad: %f\n", averageLoad);
 
   refine();
 
@@ -313,14 +398,54 @@ void RefinerComm::Refine(int count, CentralLB::LDStats* stats,
 	             next((Iterator *)&nextCompute);
     }
   }
+
+  delete [] computes;
+  delete [] processors;
+  delete commTable;
+};
+
+RefinerComm::CommTable::CommTable(int P)
+{
+  count = P;
+  msgSentCount = new int[P]; // # of messages sent by each PE
+  msgRecvCount = new int[P]; // # of messages received by each PE
+  byteSentCount = new int[P];// # of bytes sent by each PE
+  byteRecvCount = new int[P];// # of bytes reeived by each PE
+  clear();
+}
+
+RefinerComm::CommTable::~CommTable()
+{
   delete [] msgSentCount;
   delete [] msgRecvCount;
   delete [] byteSentCount;
   delete [] byteRecvCount;
+}
 
-  delete [] computes;
-  delete [] processors;
-};
+void RefinerComm::CommTable::clear()
+{
+  for(int i = 0; i < count; i++)
+    msgSentCount[i] = msgRecvCount[i] = byteSentCount[i] = byteRecvCount[i] = 0;
+}
 
+void RefinerComm::CommTable::increase(bool issend, int pe, int msgs, int bytes)
+{
+  if (issend) {
+    msgSentCount[pe] += msgs;
+    byteSentCount[pe] += bytes;
+  }
+  else {
+    msgRecvCount[pe] += msgs;
+    byteRecvCount[pe] += bytes;
+  }
+}
+
+double RefinerComm::CommTable::overheadOnPe(int pe)
+{
+  return msgRecvCount[pe]  * PER_MESSAGE_RECV_OVERHEAD +
+	 msgSentCount[pe]  * PER_MESSAGE_SEND_OVERHEAD +
+	 byteRecvCount[pe] * PER_BYTE_RECV_OVERHEAD +
+	 byteSentCount[pe] * PER_BYTE_SEND_OVERHEAD;
+}
 
 /*@}*/
