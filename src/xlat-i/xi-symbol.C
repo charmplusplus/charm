@@ -1805,7 +1805,7 @@ XStr Entry::callThread(const XStr &procName,int prependEntryName)
 void Entry::genDefs(XStr& str)
 {
   XStr containerType=container->baseName();
-  XStr preCall,postCall;
+  XStr preMarshall,preCall,postCall;
   
   str << "/* DEFS: "; print(str); str << " */\n";
     
@@ -1829,8 +1829,8 @@ void Entry::genDefs(XStr& str)
   //A synchronous method can return a value, and must finish before
   // the caller can proceed.
     if(isConstructor()) die("Constructors cannot be [sync]",line);
-    preCall<< "  int impl_ref = CkGetRefNum(impl_msg), impl_src = CkGetSrcPe(impl_msg);\n";
-    preCall << "  void *impl_retMsg=";
+    preMarshall<< "  int impl_ref = CkGetRefNum(impl_msg), impl_src = CkGetSrcPe(impl_msg);\n";
+    preCall<< "  void *impl_retMsg=";
     if(retType->isVoid()) {
       preCall << "CkAllocSysMsg();\n  ";
     } else {
@@ -1842,11 +1842,11 @@ void Entry::genDefs(XStr& str)
   //An exclusive method 
     if(!container->isNodeGroup()) die("only nodegroup methods can be exclusive",line);
     if(isConstructor()) die("Constructors cannot be [exclusive]",line);
-    preCall << "  if(CmiTryLock(impl_obj->__nodelock)) {\n"; /*Resend msg. if lock busy*/
+    preMarshall << "  if(CmiTryLock(impl_obj->__nodelock)) {\n"; /*Resend msg. if lock busy*/
     /******* DANGER-- RESEND CODE UNTESTED **********/
-    preCall << "    CkSendMsgNodeBranch("<<epIdx()<<",impl_msg,CkMyNode(),CkGetNodeGroupID());\n";
-    preCall << "    return;\n";
-    preCall << "  }\n";
+    preMarshall << "    CkSendMsgNodeBranch("<<epIdx()<<",impl_msg,CkMyNode(),CkGetNodeGroupID());\n";
+    preMarshall << "    return;\n";
+    preMarshall << "  }\n";
     
     postCall << "  CmiUnlock(impl_obj->__nodelock);\n";
   }
@@ -1887,8 +1887,9 @@ void Entry::genDefs(XStr& str)
   str << makeDecl("void")<<"::_call_"<<epStr()<<"(void* impl_msg,"<<containerType<<" * impl_obj)\n";
   str << "{\n";
   if(isThreaded()) str << callThread(epStr());
-  str << preCall;
+  str << preMarshall;
   param->beginUnmarshall(str);
+  str << preCall;
   if (!isConstructor() && fortranMode) {
     str << "/* FORTRAN */\n";
     str << "  int index = impl_obj->thisIndex;\n";
