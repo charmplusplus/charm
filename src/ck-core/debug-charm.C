@@ -45,7 +45,7 @@ void CpdBreakPointInit()
   CpvInitialize(int, lastBreakPointIndex);
   CpvInitialize(int, _debugMsg);
   CpvInitialize(int, _debugChare);
-  CpvInitialize(CpdBpFuncTable_t, breakPointEntryTable);
+  CpvInitialize(CpdBpFuncTable_t *, breakPointEntryTable);
   CpvAccess(lastBreakPointMsg) = NULL;
   CpvAccess(lastBreakPointObject) = NULL;
   CpvAccess(lastBreakPointIndex) = 0;
