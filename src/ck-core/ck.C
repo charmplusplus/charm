@@ -444,6 +444,7 @@ void _createNodeGroup(int groupID, envelope *env, int retEp, CkChareID *retChare
     env = UsrToEnv(msg);
     CmiSetHandler(env, _bocHandlerIdx);
     _numInitMsgs++;
+    _numInitNodeMsgs++;
     CmiSyncNodeBroadcast(env->getTotalsize(), env);
     CpvAccess(_qd)->create(CkNumNodes()-1);
     if(env->isPacked() && _msgTable[msgIdx]->unpack) {

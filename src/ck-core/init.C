@@ -279,8 +279,9 @@ static void _initHandler(void *msg)
     default:
       CmiAbort("Internal Error: Unknown-msg-type. Contact Developers.\n");
   }
-  if(_numInitMsgs&&(CpvAccess(_numInitsRecd)+_numInitNodeMsgs==_numInitMsgs))
+  if(_numInitMsgs&&(CpvAccess(_numInitsRecd)+_numInitNodeMsgs==_numInitMsgs)) {
     _initDone();
+  }
 }
 
 extern "C"

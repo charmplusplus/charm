@@ -2208,7 +2208,7 @@ void DeliverOutgoingNodeMessage(OutgoingMsg ogm)
   case NODE_BROADCAST_OTHERS:
     for (i = 0; i<Cmi_numnodes; i++)
       if (i!=Cmi_mynode)
-	DeliverViaNetwork(ogm, nodes + i, DGRAM_BROADCAST);
+	DeliverViaNetwork(ogm, nodes + i, DGRAM_NODEMESSAGE);
     GarbageCollectMsg(ogm);
     break;
   case NODE_BROADCAST_ALL:
