@@ -150,5 +150,6 @@ static inline void _CHECK_CID(CkChareID, int){}
 #include "CkFutures.decl.h"
 #include "tempo.h"
 #include "waitqd.h"
+#include "sdag.h"
 
 #endif

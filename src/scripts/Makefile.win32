@@ -79,7 +79,6 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 
 ALLHEADERS=$(CKHEADERS) \
     simplemsg.h sm.h pvmc.h pvm3.h sdag.h \
-    CDep.h CCounter.h CMsgBuffer.h CWhenTrigger.h TList.h \
 	graph.h bitvecset.h Set.h ampiimpl.h
 
 BASICS : DIRSSOURCES $(ALLHEADERS)
@@ -109,7 +108,6 @@ DIRSSOURCES :
 	@xcopy /d /q  ..\..\src\Common\langs\bluegene\* .
 	@xcopy /d /q  ..\..\src\Common\langs\simplemsg\* .
 	@xcopy /d /q  ..\..\src\Common\langs\sdag\xlator\* .
-	@xcopy /d /q  ..\..\src\Common\langs\sdag\runtime\* .
 	@xcopy /d /q  ..\..\src\Common\langs\pvmc\* .
 	@xcopy /d /q  ..\..\src\Common\util\* .
 	@xcopy /d /q  ..\..\src\Common\xlat-i\* .

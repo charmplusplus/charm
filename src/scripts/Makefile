@@ -125,7 +125,6 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 
 ALLHEADERS=$(CKHEADERS) \
     simplemsg.h sm.h pvmc.h pvm3.h sdag.h \
-    CDep.h CCounter.h CMsgBuffer.h CWhenTrigger.h TList.h \
 	graph.h bitvecset.h Set.h ampiimpl.h
 
 basics: headers
@@ -165,7 +164,6 @@ dirs+sources:
 	./gatherflat ../../src/Common/langs/ampi       .
 	./gatherflat ../../src/Common/langs/bluegene   .
 	./gatherflat ../../src/Common/langs/sdag/xlator       .
-	./gatherflat ../../src/Common/langs/sdag/runtime      .
 	./gatherflat ../../src/Common/langs/f90charm      .
 	./gatherflat ../../src/Common/xlat-i           .
 	./gatherflat ../../src/Common/xlatcpm          .

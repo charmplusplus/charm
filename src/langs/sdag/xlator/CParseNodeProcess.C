@@ -577,7 +577,7 @@ void CParseNode::generateForall(void)
               con2->text->charstar(), con3->text->charstar(),
               con4->text->charstar());
   pH(2, "if (__first > __last) {\n");
-  pH(3, "__swap(&__first, &__last);\n");
+  pH(3, "int __tmp=__first; __first=__last; __last=__tmp;\n");
   pH(3, "__stride = -__stride;\n");
   pH(2, "}\n");
   pH(2, "CCounter *%s = new CCounter(__first,__last,__stride);\n", 
