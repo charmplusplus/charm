@@ -566,7 +566,7 @@ const char *CiClass0 = // classname
 "void CI\01::ciCreate(void) {\n"
 "  CIMsgEmpty *msg = new CIMsgEmpty;\n"
 "  if(isChare()) {\n"
-"    CkChareIDType cid;\n"
+"    CkChareID cid;\n"
 "    CProxy_CC\01::ckNew(msg,&cid,cih.ciGetProc());\n"
 "    cih.setCID(cid);\n"
 "  } else {\n"
@@ -762,7 +762,7 @@ const char *CIcTop1 = // basename
 ;
 
 const char *CIiTop0 = // basename
-"mainmodule CI\01 {\n"
+"module CI\01 {\n"
 "extern message CIMsgEmpty;\n"
 ;
 
@@ -860,7 +860,7 @@ clean_up()
 
   spew(CIh, CIhTop1, baseName);
   spew(CIc, CIcTop1, baseName);
-  spew(CIc, CIiTop1, baseName);
+  spew(CIi, CIiTop1, baseName);
 
   *FH << CIh->get_string();
   *FC << CIc->get_string();
