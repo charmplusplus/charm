@@ -1311,7 +1311,7 @@ void Entry::genGroupDecl(XStr& str)
           str << "msg, ";
         else
           str << "CkAllocSysMsg(), ";
-        str << "_ck_gid, onPE));\n";
+        str << "_ck_gid, onPE);\n";
         str << "    }\n";
       }
     }
@@ -1338,7 +1338,7 @@ void Entry::genGroupDecl(XStr& str)
           str << "msg, ";
         else
           str << "CkAllocSysMsg(), ";
-        str << "&_ck_cid));\n";
+        str << "&_ck_cid);\n";
         str << "    }\n";
       }
     }
