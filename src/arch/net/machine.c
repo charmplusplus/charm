@@ -255,6 +255,7 @@ void CmiYield(void);
 void ConverseCommonExit(void);
 
 static unsigned int dataport=0;
+static int Cmi_mach_id=0; /* Machine-specific identifier (GM-only) */
 static SOCKET       dataskt;
 
 /****************************************************************************
@@ -576,19 +577,13 @@ static void parse_netstart(void)
                 fprintf(stderr,"Error parsing NETSTART '%s'\n",ns);
                 exit(1);
         }
-#if CMK_USE_GM
-        /* port is only useful for Myrinet */
-        dataport = port;
-#endif
   } else 
   {/*No charmrun-- set flag values for standalone operation*/
   	Cmi_mynode=0;
   	Cmi_charmrun_IP=skt_invalid_ip;
   	Cmi_charmrun_port=0;
   	Cmi_charmrun_pid=0;
-#if CMK_USE_GM
         dataport = -1;
-#endif
   }
 }
 
@@ -1301,21 +1296,8 @@ static void node_addresses_obtain(char **argv)
 	*/
 	me.info.nPE=ChMessageInt_new(0);
 	me.info.IP=skt_invalid_ip;
-#if !CMK_USE_GM
+	me.info.mach_id=ChMessageInt_new(Cmi_mach_id);
   	me.info.dataport=ChMessageInt_new(dataport);
-#else
-        {
-        /* get and send node id */
-        unsigned int nodeid;
-        if (gmport == NULL) nodeid = 0;
-        else {
-          gm_status_t status;
-          status = gm_get_node_id(gmport, &nodeid);
-          if (status != GM_SUCCESS) nodeid = 0;
-        }
-        me.info.dataport=ChMessageInt_new(nodeid);
-        }
-#endif
 
   	/*Send our node info. to charmrun.
   	CommLock hasn't been initialized yet-- 

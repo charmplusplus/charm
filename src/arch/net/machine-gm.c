@@ -374,7 +374,7 @@ static void send_progress()
       OtherNode node = out->node;
       char *msg = out->msg;
       gm_send_with_callback(gmport, msg, out->size, out->length, 
-                            GM_LOW_PRIORITY, *(int *)&node->IP, node->dataport, 
+                            GM_LOW_PRIORITY, node->mach_id, node->dataport, 
                             send_callback, msg);
       dequeue_sending();
       free(out);
@@ -433,7 +433,7 @@ void EnqueueOutgoingDgram
     return;
   }
   gm_send_with_callback(gmport, buf, size, len, 
-                        GM_LOW_PRIORITY, *(int *)&node->IP, node->dataport, 
+                        GM_LOW_PRIORITY, node->mach_id, node->dataport, 
                         send_callback, buf);
 }
 
@@ -460,9 +460,9 @@ void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank)
 
 void CmiMachineInit()
 {
+  int dataport_max=16; /*number of largest GM port to check*/
   gm_status_t status;
   int device, i, j, maxsize;
-  char portname[200];
   char *buf;
   int mlen;
 
@@ -471,12 +471,24 @@ void CmiMachineInit()
 
   status = gm_init();
   if (status != GM_SUCCESS) { gm_perror("gm_init", status); return; }
-
+  
   device = 0;
-  sprintf(portname, "port%d%d", Cmi_charmrun_pid, Cmi_mynode);
-  status = gm_open(&gmport, device, dataport, portname, GM_API_VERSION_1_1);
-  if (status != GM_SUCCESS) { return; }
-
+  for (dataport=2;dataport<dataport_max;dataport++) {
+    char portname[200];
+    sprintf(portname, "converse_port%d_%d", Cmi_charmrun_pid, Cmi_mynode);
+    status = gm_open(&gmport, device, dataport, portname, GM_API_VERSION_1_1);
+    if (status == GM_SUCCESS) { break; }
+  }
+  if (dataport==dataport_max) 
+  { /* Couldn't open any GM port... */
+    dataport=0;
+    return;
+  }
+  
+  /* get our node id */
+  status = gm_get_node_id(gmport, (unsigned int *)&Cmi_mach_id);
+  if (status != GM_SUCCESS) { gm_perror("gm_get_node_id", status); return; }
+  
   /* default abort will take care of gm clean up */
   skt_set_abort(gmExit);
 
@@ -528,12 +540,11 @@ void CmiCheckGmStatus()
   for (i=0; i<Cmi_numnodes; i++) {
     gm_status_t status;
     char uid[6], str[100];
-    unsigned int ip;
-    memcpy(&ip, &nodes[i].IP, sizeof(nodes[i].IP));
-    status = gm_node_id_to_unique_id(gmport, ip, uid);
+    unsigned int mach_id=nodes[i].mach_id;
+    status = gm_node_id_to_unique_id(gmport, mach_id, uid);
     if (status != GM_SUCCESS || ( uid[0]==0 && uid[1]== 0 
          && uid[2]==0 && uid[3]==0 && uid[4]==0 && uid[5]==0)) { 
-      CmiPrintf("Error> gm node %d doesn't know node %d. \n", CmiMyPe(), i);
+      CmiPrintf("Error> gm node %d can't contact node %d. \n", CmiMyPe(), i);
       doabort = 1;
     }
 /*    CmiPrintf("%d: ip:%d %d %d %d\n", CmiMyPe(), nodes[i].IP,uid[0], uid[3], uid[5]); */

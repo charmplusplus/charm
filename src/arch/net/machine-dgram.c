@@ -172,6 +172,7 @@ typedef struct OtherNodeStruct
 {
   int nodestart, nodesize;
   skt_ip_t IP;
+  unsigned int mach_id;
   unsigned int dataport;
   struct sockaddr_in addr;
 #if CMK_USE_TCP
@@ -293,6 +294,7 @@ static void node_addresses_store(ChMessage *msg)
   for (i=0; i<Cmi_numnodes; i++) {
     nodes[i].nodestart = nodestart;
     nodes[i].nodesize  = ChMessageInt(d[i].nPE);
+    nodes[i].mach_id = ChMessageInt(d[i].mach_id);
     nodes[i].IP=d[i].IP;
     if (i==Cmi_mynode) {
       Cmi_nodestart=nodes[i].nodestart;
