@@ -81,7 +81,7 @@ int PythonExecute::size() {
   return sizeof(PythonExecute)+codeLength+1+methodNameLength+1+infoSize;
 }
 
-char *PythonExecute::toString() {
+char *PythonExecute::pack() {
   void *memory = malloc(size());
   memcpy (memory, this, sizeof(PythonExecute));
   char *ptr = (char*)memory+sizeof(PythonExecute);

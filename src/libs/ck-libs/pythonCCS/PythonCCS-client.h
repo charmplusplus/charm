@@ -34,10 +34,10 @@ class PythonIterator {
   // pack the message into a contiguous memory and return the pointer to this
   // memory. the memory needs to be persistent (i.e. cannot disappear) and will
   // be freed automatically. It should not modify the original data.
-  virtual PythonIterator *pack() {
+  virtual char *pack() {
     void *memory = malloc(size());
     memcpy (memory, this, size());
-    return (PythonIterator *)memory;
+    return (char *)memory;
   };
 
   // unpack needs to reposition the pointer in the case they are used
@@ -79,9 +79,9 @@ class PythonExecute : private PythonAbstract {
     char dummy[8];
   } info;
 
-  /* interpreter is not sent in network byte order, since it does not need to be
-     interpreted by the client. The only two values which need to be interpreted
-     are 0 and -1 which are the same in both big and little endian notation. */
+  /* interpreter does not necessarely needs to be sent in byte order (since the
+     client does not need to read it), but it is to have a common interface with
+     java */
   CmiUInt4 interpreter; /* request for an existing interpreter */
   char flags;
   /* flags has the following parameters: (bit 1 is the MSB)
@@ -119,8 +119,7 @@ class PythonExecute : private PythonAbstract {
   CmiUInt4 getInterpreter() { return interpreter; };
 
   int size();
-  char *toString();
-  inline char *pack() { return toString(); };
+  char *pack();
   void unpack();
 
   void print(); /* for debugging */
@@ -140,6 +139,9 @@ class PythonPrint : private PythonAbstract {
 
   void setWait(bool _set);
   bool isWait() { return flags & FLAG_WAIT; };
+
+  int size() { return sizeof(*this); };
+  char *pack() { return (char *)this; };
 
   void print(); /* for debugging */
 };
