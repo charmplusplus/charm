@@ -303,11 +303,14 @@ static void IntegrateMessageDatagram(char **msg, int len)
         size = CmiMsgHeaderGetLength(*msg);
         if (size < len) KillEveryoneCode(4559312);
 #if FRAGMENTATION
+#if 0
 	if (size <= Cmi_dgram_max_data+DGRAM_HEADER_SIZE) {
 	  newmsg = *msg;
 	  *msg = NULL;	       /* directly use the buffer */
 	}    
-	else {		       /* allocate new and reuse the buffer next time */
+	else 
+#endif
+	{		       /* allocate new and reuse the buffer next time */
           newmsg = (char *)CmiAlloc(size);
           if (!newmsg)
             fprintf(stderr, "%d: Out of mem\n", Cmi_mynode);
