@@ -722,7 +722,7 @@ static void _skipCldHandler(void *converseMsg)
 
 static void _skipCldEnqueue(int pe,envelope *env, int infoFn)
 {
-  if (pe == CkMyPe()) {
+  if (pe == CkMyPe() && !CmiImmIsRunning()) {
     CqsEnqueueGeneral((Queue)CpvAccess(CsdSchedQueue),
   	env, env->getQueueing(),env->getPriobits(),
   	(unsigned int *)env->getPrioPtr());
@@ -903,7 +903,7 @@ void CkSendMsgBranch(int eIdx, void *msg, int pe, CkGroupID gID)
 {
   _sendMsgBranch(eIdx, msg, gID, pe);
   _STATS_RECORD_SEND_BRANCH_1();
-  CpvAccess(_qd)->create();
+  CkpvAccess(_coreState)->create();
 }
 
 extern "C"
@@ -937,7 +937,7 @@ void CkSendMsgBranchInline(int eIdx, void *msg, int destPE, CkGroupID gID)
     _noCldEnqueue(destPE, env);
     _TRACE_CREATION_DONE(numPes);
     _STATS_RECORD_SEND_BRANCH_1();
-    CpvAccess(_qd)->create();
+    CkpvAccess(_coreState)->create();
   }
   else
 #endif
@@ -976,7 +976,7 @@ void CkSendMsgNodeBranch(int eIdx, void *msg, int node, CkGroupID gID)
 {
   _sendMsgNodeBranch(eIdx, msg, gID, node);
   _STATS_RECORD_SEND_NODE_BRANCH_1();
-  CpvAccess(_qd)->create();
+  CkpvAccess(_coreState)->create();
 }
 
 extern "C"
@@ -1011,7 +1011,7 @@ void CkSendMsgNodeBranchInline(int eIdx, void *msg, int node, CkGroupID gID)
     _TRACE_CREATION_N(env, numPes);
     _noCldNodeEnqueue(node, env);
     _STATS_RECORD_SEND_BRANCH_1();
-    CpvAccess(_qd)->create();
+    CkpvAccess(_coreState)->create();
     _TRACE_CREATION_DONE(numPes);
   }
   else

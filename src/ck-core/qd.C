@@ -23,7 +23,7 @@ static inline void _bcastQD1(QdState* state, QdMsg *msg)
   state->propagate(msg);
   msg->setPhase(1);
   DEBUGP(("[%d] State: getCreated:%d getProcessed:%d\n", CmiMyPe(), state->getCreated(), state->getProcessed()));
-#if CMK_SMP
+#if 1
   QdState *comm_state;
   static int comm_create=0, comm_process=0;
   if (CmiMyRank()==0) {
