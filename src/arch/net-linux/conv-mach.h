@@ -135,6 +135,7 @@
 #define CMK_CPP_CAST_ILLEGAL                               0
 #define CMK_CPP_CAST_LEGAL                                 1
 
+#define CMK_FORTRAN_USES_ALLCAPS                           1
 #endif
 
 

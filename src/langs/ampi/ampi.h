@@ -121,6 +121,7 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, AMPI_Datatype sendtype,
 int AMPI_Comm_dup(AMPI_Comm comm, AMPI_Comm *newcomm);
 int AMPI_Comm_free(AMPI_Comm *comm);
 int AMPI_Abort(AMPI_Comm comm, int errorcode);
+void AMPI_Print(char *str);
 #ifdef __cplusplus
 }
 #endif

@@ -796,4 +796,11 @@ int AMPI_Abort(int comm, int errorcode)
   return errorcode;
 }
 
+extern "C"
+void AMPI_Print(char *str)
+{
+  ampi *ptr = CtvAccess(ampiPtr);
+  CkPrintf("[%d] %s\n", ptr->thisIndex, str);
+}
+
 #include "ampi.def.h"
