@@ -2,7 +2,7 @@
 
        Copyright (C) 1989-2000 Regents of the University of Illinois
 
-Now you can compile charm++ under Windows9x/2000/NT with Cygwin.
+Now you can compile charm++ under Windows9x/2000/NT/XP with Cygwin.
 Note: This version of cygwin is still under testing.
 Check the FAQ at end of this file for more help.
 
@@ -11,15 +11,16 @@ Check the FAQ at end of this file for more help.
                     ===========================
 
 To compile charm on cygwin:
-1. install cygwin from: http://sourceware.cygnus.com/cygwin
-   with inetutils, openssh, w32api packages and gcc of course. Remember to
+1. install cygwin from: http://www.cygwin.com/mirrors.html
+   download inetutils, openssh, w32api packages and gcc of course. Remember to
    choose default file type as "unix" at the beginning of cygwin installation.
 
 2. before compiling, make sure you have /bin/sh correctly installed, otherwise
    make a link from /bin/bash.exe:  ln -s /bin/bash.exe /bin/sh.exe
-   compile charm++:    ./build charm++ net-cygwin
+   compile charm++:    
+     ./build charm++ net-cygwin
 
-3. setting up running environment:
+3. set up environment:
      There are several ways to do this, using rsh or ssh. 
    Under Windows2000/NT, ssh is recommended, I once had difficulty to have 
    inetd working.
@@ -56,9 +57,13 @@ shell     514/tcp    cmd
    for the first time to generate global config files and server keys; and 
    run /usr/bin/ssh-user-config creates the private and public keys for a user.
    You may need to modify /etc/sshd_config or /etc/ssh_config for your needs.
+   
      Setup ~/.shosts, or add your public key to your ~/.ssh/authorized_keys to 
-   allow you to login without password authentication.
-   now you can start sshd and run charm programs. To tell Charmrun to use ssh
+   allow you to login without password authentication. You can test if your
+   setting works by:   
+       ssh localhost date
+   
+   Now you can start sshd and run charm programs. To tell Charmrun to use ssh
    instead of rsh(default), you need to add ++shell option in ~/.nodelist file:
 
 group main ++shell /bin/ssh
@@ -79,7 +84,7 @@ host localhost
    This will run only one copy of program locally.
 
 4. If you have any problem with it, please check the FAQ below for help.
-   Let me know if it works or not by sending email to (ppl@cs.uiuc.edu).
+   Let me know if it works or not by sending email to (ppl@uiuc.edu).
 
 
 
