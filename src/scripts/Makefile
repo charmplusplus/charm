@@ -350,7 +350,7 @@ QuickThreads/libqt.a:  $(CVHEADERS)
 	  cp QuickThreads/libqt.$$CMK_SHARED_SUF ../lib_so/libckqt.$$CMK_SHARED_SUF)
 
 METIS:  charm++
-	cd libs/ck-libs/parmetis/METISLib; $(MAKE) OPTS='$(OPTS)'
+	cd libs/ck-libs/parmetis/METISLib && $(MAKE) OPTS='$(OPTS)'
 
 CONVLIBS: converse
 	cd libs; $(MAKE) convlibs OPTS='$(OPTS)'
@@ -919,8 +919,7 @@ depends: basics
 	      SRCFILE=`basename $$i .o`.C ; \
 	      [ ! -f $$SRCFILE ] && SRCFILE=`basename $$i .o`.c ;	\
               echo "checking dependencies for $$SRCFILE" ; \
-              g++ -MM -Wno-deprecated -I. -I$(INC) $$SRCFILE  >> $(DEPENDFILE); \
-              echo '	$$(CHARMC) -c -I. '$$SRCFILE >> $(DEPENDFILE) ; \
+              if g++ -MM -Wno-deprecated -I. -I$(INC) $$SRCFILE  >> $(DEPENDFILE); then   echo '	$$(CHARMC) -c -I. '$$SRCFILE >> $(DEPENDFILE) ; else echo '' ; echo "Compilation of '$$SRCFILE' failed, please fix it first!!!!" ; exit; fi;  \
 	      echo '' >> $(DEPENDFILE) ; \
         done;
 
