@@ -32,7 +32,7 @@ CkVec<funcData *> funcTable; /*stores the name and index for the different funct
 CkVec<vprocData *> vprocTable; /*stores the activation stack (only those functions that are being traced) for each virtual processor*/
 
 extern "C" void initAmpiProjections(){
-	ampi_beginProcessing(current_rank,current_src,current_count);
+	//ampi_beginProcessing(current_rank,current_src,current_count);
 }
 
 extern "C" void closeAmpiProjections(){	

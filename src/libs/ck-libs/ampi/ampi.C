@@ -1384,7 +1384,7 @@ int MPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
   /*HACK: Use recv() to block until the reduction data comes back*/
   _LOG_E_END_AMPI_PROCESSING(ptr->thisIndex)
   ptr->recv(MPI_REDUCE_TAG, MPI_REDUCE_SOURCE, outbuf, count, type, MPI_REDUCE_COMM);
-  _LOG_E_BEGIN_AMPI_PROCESSING(ptr->thisIndex,-1,count)
+  _LOG_E_BEGIN_AMPI_PROCESSING(ptr->thisIndex,-2,count)
   return 0;
 }
 
