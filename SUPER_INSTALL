@@ -24,7 +24,7 @@ syntax() {
 
   [ $# -lt 2 ] && syntax
   PROGRAM=$1 ; shift
-  VERSION=$1 ; shif t
+  VERSION=$1 ; shift
 
   [ "x$VERSION" = "x" ] && syntax
 	
