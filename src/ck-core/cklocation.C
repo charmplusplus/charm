@@ -312,27 +312,27 @@ static void _speedHdlr(void *m)
 void _propMapInit(void)
 {
   CpvInitialize(int*, speeds);
-  CpvAccess(speeds) = new int[CmiNumPes()];
+  CpvAccess(speeds) = new int[CkNumPes()];
   int hdlr = CmiRegisterHandler((CmiHandler)_speedHdlr);
-  CmiPrintf("[%d]Measuring processor speed for prop. mapping...\n", CmiMyPe());
+  CmiPrintf("[%d]Measuring processor speed for prop. mapping...\n", CkMyPe());
   int s = LDProcessorSpeed();
   speedMsg msg;
   CmiSetHandler(&msg, hdlr);
-  msg.pe = CmiMyPe();
+  msg.pe = CkMyPe();
   msg.speed = s;
   CmiSyncBroadcast(sizeof(msg), &msg);
-  CpvAccess(speeds)[CmiMyPe()] = s;
+  CpvAccess(speeds)[CkMyPe()] = s;
   int i;
-  for(i=1;i<CmiNumPes();i++)
+  for(i=1;i<CkNumPes();i++)
     CmiDeliverSpecificMsg(hdlr);
 }
 #else
 void _propMapInit(void)
 {
   CpvInitialize(int*, speeds);
-  CpvAccess(speeds) = new int[CmiNumPes()];
+  CpvAccess(speeds) = new int[CkNumPes()];
   int i;
-  for(i=0;i<CmiNumPes();i++)
+  for(i=0;i<CkNumPes();i++)
     CpvAccess(speeds)[i] = 1;
 }
 #endif

@@ -618,7 +618,7 @@ static void _skipCldHandler(void *msg)
 
 static void _skipCldEnqueue(int pe,envelope *env, int infoFn)
 {
-  if (pe == CmiMyPe()) {
+  if (pe == CkMyPe()) {
     CqsEnqueueGeneral((Queue)CpvAccess(CsdSchedQueue),
   	env, env->getQueueing(),env->getPriobits(),
   	(unsigned int *)env->getPrioPtr());
