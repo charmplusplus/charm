@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1995-06-08 17:07:12  gursoy
+ * Revision 2.2  1995-07-05 22:11:59  sanjeev
+ * put SetEnv_EP(env, 0) in VidSend() to fix CM5 bug
+ *
+ * Revision 2.1  1995/06/08  17:07:12  gursoy
  * Cpv macro changes done
  *
  * Revision 1.4  1995/04/13  20:55:50  sanjeev
@@ -154,6 +157,7 @@ VID_BLOCK *vidPtr;
     SetEnv_destPeFixed(env, 1);
     SetEnv_onPE(env, CmiMyPe());
     SetEnv_vidBlockPtr(env, (int)  vidPtr);
+    SetEnv_EP(env, 0) ;
 
     msg->dataPtr = chareblockPtr;
     msg->chare_magic_number =
