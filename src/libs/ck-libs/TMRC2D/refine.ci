@@ -1,0 +1,3 @@
+module TMR_Interface {
+  extern module TriangularMesh;
+};
