@@ -407,7 +407,12 @@ public:
    * same edge.  If nodes A and B are shared by some other local
    * triangle, that triangle will immediately receive a "split" call
    * for the same edge.  
-   *
+	 *
+	 * flag denotes the properties of the new node added by the split	
+   * 0x1 - node is on the chunk boundary
+	 * 0x2 - since split will be called twice for each new node,
+	 *       this bit shows whether it is the first time or not
+	 *
    * Client's responsibilities:
    *   -Add the new node D.  Since both sides of a shared local edge
    *      will receive a "split" call, you must ensure the node is
@@ -416,6 +421,7 @@ public:
    *   -Add new triangle.
    */
   virtual void split(int triNo,int edgeOfTri,int movingNode,double frac) =0;
+  virtual void split(int triNo,int edgeOfTri,int movingNode,double frac,int flags) =0;
 
 };
 

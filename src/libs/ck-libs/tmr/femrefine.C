@@ -92,9 +92,10 @@ void FEM_REFINE2D_Split(int meshID,int nodeID,double *coord,int elemID,double *d
 		// current number of nodes in the mesh
 		int cur_nodes = FEM_Mesh_get_length(meshID,nodeID);
 		int *connData = connTable.getData();
+		int flags;
 
 
-		REFINE2D_Get_Split(splitNo,(int *)(connData),&tri,&A,&B,&C,&frac);
+		REFINE2D_Get_Split(splitNo,(int *)(connData),&tri,&A,&B,&C,&frac,&flags);
 		if((A == lastA && B == lastB ) || (A == lastB && B == lastA)){
 			//node already exists
 			D = lastD;
