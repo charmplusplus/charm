@@ -115,8 +115,9 @@ LBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
 
   int i, j, m;
   int option = 0;
-  int numobjs = 0;
-  numobjs = stats->n_objs;
+  int numobjs = stats->n_objs;
+
+  stats->makeCommHash();
 
   // allocate space for the computing data
   double *objtime = new double[numobjs];
@@ -167,10 +168,8 @@ LBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
       LDCommData &cdata = stats->commData[i];
       if(cdata.from_proc() || cdata.receiver.get_type() != LD_OBJ_MSG)
         continue;
-      // FIXME!
-      // senderID and recverID is not correct !!!
-      int senderID = cdata.sender.objID().id[0];
-      int recverID = cdata.receiver.get_destObj().objID().id[0];
+      int senderID = stats->getHash(cdata.sender);
+      int recverID = stats->getHash(cdata.receiver.get_destObj());
       CmiAssert(senderID < numobjs);
       CmiAssert(recverID < numobjs);
       comm[senderID][recverID] += cdata.messages;
