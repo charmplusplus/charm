@@ -8,6 +8,8 @@
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
 
+#define CMK_USE_GM                                         0
+
 #define CMK_ASYNC_NOT_NEEDED                               0
 #define CMK_ASYNC_USE_FIOASYNC_AND_FIOSETOWN               0
 #define CMK_ASYNC_USE_FIOASYNC_AND_SIOCSPGRP               0
@@ -22,7 +24,7 @@
 #define CMK_CMIPRINTF_IS_A_BUILTIN                         1
 #define CMK_CMIPRINTF_IS_JUST_PRINTF                       0
 
-#define CMK_GETPAGESIZE_AVAILABLE                          0
+#define CMK_GETPAGESIZE_AVAILABLE                          1
 
 #define CMK_HANDLE_SIGUSR                                  1
 
