@@ -76,7 +76,7 @@ class LBPredictorFunction {
 public:
   int num_params;
 
-  void initialize_params(double *x) {double normall=1.0/pow(2,31); x[0]=rand()*normall; x[1]=rand()*normall; x[2]=rand()*normall; x[3]=rand()*normall; x[4]=rand()*normall; x[5]=rand()*normall;}
+  void initialize_params(double *x) {double normall=1.0/pow((double)2,31); x[0]=rand()*normall; x[1]=rand()*normall; x[2]=rand()*normall; x[3]=rand()*normall; x[4]=rand()*normall; x[5]=rand()*normall;}
 
   virtual double predict(double x, double *params) =0;
   virtual void print(double *params) {PredictorPrintf("LB: unknown model\n");};

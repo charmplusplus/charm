@@ -901,9 +901,9 @@ void gaussj(double **a, double *b, int n) {
 
 void Marquardt_coefficients(double *x, double *y, double *param, double **alpha, double *beta, double &chisq, LBPredictorFunction *predict) {
 #if CMK_LBDB_ON
-  double dyda[predict->num_params];
   int i,j,k,l,m;
   double ymod, dy;
+  double *dyda = new double[predict->num_params];
 
   for (i=0; i<predict->num_params; ++i) {
     for (j=0; j<=i; ++j) alpha[i][j] = 0;
@@ -929,25 +929,27 @@ void Marquardt_coefficients(double *x, double *y, double *param, double **alpha,
     for (k=0; k<j; ++k) alpha[k][j] = alpha[j][k];
   }
 
+  delete[] dyda;
 #endif
 }
 
 bool Marquardt_solver(CentralLB::FutureModel *mod, int object) {
 #if CMK_LBDB_ON
-  double oneda[mod->predictor->num_params];
-  double atry[mod->predictor->num_params];
-  double beta[mod->predictor->num_params];
-  double da[mod->predictor->num_params];
-  double *covar[mod->predictor->num_params];
-  double *alpha[mod->predictor->num_params];
   double chisq, ochisq;
   double lambda = 0.001;
-  double x[mod->cur_stats-1];
-  double y[mod->cur_stats-1];
-  double *temp[mod->predictor->num_params];
   int i,j;
   int iterations=0;
   bool allow_stop = false;
+
+  double *oneda = new double[mod->predictor->num_params];
+  double *atry = new double[mod->predictor->num_params];
+  double *beta = new double[mod->predictor->num_params];
+  double *da = new double[mod->predictor->num_params];
+  double **covar = new double*[mod->predictor->num_params];
+  double **alpha = new double*[mod->predictor->num_params];
+  double *x = new double[mod->cur_stats-1];
+  double *y = new double[mod->cur_stats-1];
+  double **temp = new double*[mod->predictor->num_params];
 
   for (i=0; i<mod->predictor->num_params; ++i) {
     alpha[i] = new double[mod->predictor->num_params];
@@ -1005,6 +1007,16 @@ bool Marquardt_solver(CentralLB::FutureModel *mod, int object) {
     delete[] covar[i];
     delete[] temp[i];
   }
+  delete[] oneda;
+  delete[] atry;
+  delete[] beta;
+  delete[] da;
+  delete[] covar;
+  delete[] alpha;
+  delete[] x;
+  delete[] y;
+  delete[] temp;
+
   return true;
 #endif
 }
