@@ -461,7 +461,7 @@ CkPrintf("[%d] end init\n",myChunk);
   for (i=0;i<g.nelems;i++){
     checkTriangle(g,i);
 	}	
-
+	sleep(5);
   //Timeloop
   if (CkMyPe()==0){
     CkPrintf("Entering timeloop\n");
