@@ -850,6 +850,12 @@ char *nodetab_args(char *args,nodetab_host *h)
     else return args;
     args = skipblanks(e2);
   }
+#if CMK_SHARED_VARS_UNAVAILABLE
+  if (h->cpus != 1) {
+    fprintf(stderr,"Warning> Invalid cpus %d in nodelist ignored.\n", h->cpus);
+    h->cpus = 1;
+  }
+#endif
   return args;
 }
 
