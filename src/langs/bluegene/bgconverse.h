@@ -6,9 +6,6 @@
 #define _BGCONVERSE_H_
 
 #include "blue.h"
-#if ! CMK_NAMESPACES_BROKEN
-using namespace BGConverse;
-#endif
 
 #undef CmiRegisterHandler
 #undef CmiNumberHandler
