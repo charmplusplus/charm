@@ -232,8 +232,8 @@ int MPI_Waitany(int count, MPI_Request *request, int *index, MPI_Status *sts);
 int MPI_Testany(int count, MPI_Request *request, int *index, int *flag, MPI_Status *status);
 int MPI_Waitall(int count, MPI_Request *request, MPI_Status *sts);
 int MPI_Testall(int count, MPI_Request *request, int *flag, MPI_Status *sts);
-/* int MPI_Waitsome(int incount, MPI_Request *array_of_requests, int *outcount, int *array_of_indices, MPI_Status *array_of_statuses) */
-/* int MPI_Testsome(int incount, MPI_Request *array_of_requests, int *outcount, int *array_of_indices, MPI_Status *array_of_statuses) */
+int MPI_Waitsome(int incount, MPI_Request *array_of_requests, int *outcount, int *array_of_indices, MPI_Status *array_of_statuses);
+int MPI_Testsome(int incount, MPI_Request *array_of_requests, int *outcount, int *array_of_indices, MPI_Status *array_of_statuses);
 int MPI_Request_free(MPI_Request *request);
 int MPI_Cancel(MPI_Request *request);
 /* int MPI_Test_cancelled(MPI_Status *status, int *flag); */
@@ -393,7 +393,7 @@ int MPI_Error_string(int errorcode, char *string, int *resultlen);
 int MPI_Error_class(int errorcode, int *errorclass);
 
 double MPI_Wtime(void);
-/* double MPI_Wtick(void); */
+double MPI_Wtick(void);
 int MPI_Init(int *argc, char*** argv); /* FORTRAN VERSION MISSING */
 int MPI_Initialized(int *isInit); /* FORTRAN VERSION MISSING */
 int MPI_Finalize(void);

@@ -1398,7 +1398,7 @@ int MPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
 
 CDECL
 int MPI_Iallreduce(void *inbuf, void *outbuf, int count, int type,
-                  MPI_Op op, MPI_Comm comm, MPI_Request* request)
+                   MPI_Op op, MPI_Comm comm, MPI_Request* request)
 {
   AMPIAPI("MPI_Allreduce");
   ampi *ptr = getAmpiInstance(comm);
@@ -1450,7 +1450,14 @@ int MPI_Reduce_scatter(void* sendbuf, void* recvbuf, int *recvcounts,
 CDECL
 double MPI_Wtime(void)
 {
+  AMPIAPI("MPI_Wtime");
   return TCHARM_Wall_timer();
+}
+
+CDECL
+double MPI_Wtick(void){
+  AMPIAPI("MPI_Wtick");
+  return 1e-6;
 }
 
 int PersReq::start(){
@@ -1541,12 +1548,36 @@ int MPI_Waitany(int count, MPI_Request *request, int *idx, MPI_Status *sts)
   int flag=0;
   while(1){
     for(int i=0;i<count;i++) {
-      MPI_Test(&request[i], &flag, sts+i);
-      if(flag == 1)
-        return i;
+      MPI_Test(&request[i], &flag, sts);
+      if(flag == 1){
+        *idx = i;
+        return 0;
+      }
     }
   }
-  return MPI_UNDEFINED;
+  *idx = MPI_UNDEFINED;
+  return 0;
+}
+
+CDECL
+int MPI_Waitsome(int incount, MPI_Request *array_of_requests, int *outcount,
+                 int *array_of_indices, MPI_Status *array_of_statuses)
+{
+  AMPIAPI("MPI_Waitsome");
+  MPI_Status sts;
+  int flag;
+  *outcount = 0;
+  while(1){
+    for(int i=0;i<incount;i++) {
+      MPI_Test(&array_of_requests[i], &flag, &sts);
+      if(flag == 1){
+        array_of_indices[(*outcount)]=i;
+	array_of_statuses[(*outcount)++]=sts;
+      }
+    }
+    if(outcount > 0) break; // alternative: turn around and test [0 ~ AOI[0]-1]
+  }
+  return 0;
 }
 
 CmiBool PersReq::test(MPI_Status *sts){
@@ -1611,9 +1642,13 @@ int MPI_Testany(int count, MPI_Request *request, int *index, int *flag, MPI_Stat
   *flag=0;
   for(int i=0;i<count;i++)
   {
-    MPI_Test(&request[i], flag, sts+i);
-    if(*flag==1) return 0;
+    MPI_Test(&request[i], flag, sts);
+    if(*flag==1){
+      *index = i;
+      return 0;
+    }
   }
+  *index = MPI_UNDEFINED;
   return 0;
 }
 
@@ -1627,6 +1662,24 @@ int MPI_Testall(int count, MPI_Request *request, int *flag, MPI_Status *sts)
   {
     MPI_Test(&request[i], &tmpflag, sts+i);
     *flag *= tmpflag;
+  }
+  return 0;
+}
+
+CDECL
+int MPI_Testsome(int incount, MPI_Request *array_of_requests, int *outcount,
+                 int *array_of_indices, MPI_Status *array_of_statuses)
+{
+  AMPIAPI("MPI_Testsome");
+  MPI_Status sts;
+  int flag;
+  *outcount = 0;
+  for(int i=0;i<incount;i++) {
+    MPI_Test(&array_of_requests[i], &flag, &sts);
+    if(flag == 1){
+      array_of_indices[(*outcount)]=i;
+      array_of_statuses[(*outcount)++]=sts;
+    }
   }
   return 0;
 }
