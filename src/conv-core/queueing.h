@@ -84,7 +84,8 @@ typedef struct prioq1_struct
   prioqelt1 hashtab[PRIOQ_TABSIZE];
 }
 *prioq1;
-/*#endif*/
+#endif
+*/
 
 /*#ifndef FASTQ*/
 typedef struct Queue_struct
