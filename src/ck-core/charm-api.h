@@ -7,6 +7,7 @@ libraries written in Charm for other languages.
 #define __CHARM_API_H
 
 #include "conv-mach.h"
+#include "conv-autoconfig.h"
 
 #ifdef __cplusplus
 #  define CLINKAGE extern "C"
