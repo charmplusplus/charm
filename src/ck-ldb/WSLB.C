@@ -13,8 +13,8 @@ CkGroupID wslb;
 // Temporary vacating flags
 // Set PROC to -1 to disable
 
-#define VACATE_PROC -1
-//#define VACATE_PROC (CkNumPes()/2)
+//#define VACATE_PROC -1
+#define VACATE_PROC (CkNumPes()/2)
 #define VACATE_AFTER 30
 #define UNVACATE_AFTER 15
 
@@ -352,14 +352,27 @@ WSLBMigrateMsg* WSLB::Strategy(WSLB::LDStats* stats, int count)
   // Compute the average load to see if we are overloaded relative
   // to our neighbors
   double myload = myStats.total_walltime - myStats.idletime;
-  const double myusage = myStats.total_cputime / myload;
   const double load_factor = 1.05;
   double objload;
+
+  double myobjcpu=0;
+  double myobjwall=0;
+
+  double myusage;
+  int i;
+  for(i=0; i < myStats.obj_data_sz; i++) {
+    myobjcpu += myStats.objData[i].cpuTime;
+    myobjwall += myStats.objData[i].wallTime;
+  }
+  if (myobjwall > 0)
+    myusage = myobjcpu / myobjwall;
+  else if (myload > 0)
+    myusage = myStats.total_cputime / myload;
+  else myusage = 1.0;
 
   CkPrintf("PE %d myload = %f myusage = %f\n",CkMyPe(),myload,myusage);
 
   double avgload = myload;
-  int i;
   int unvacated_neighbors = 0;
   for(i=0; i < count; i++) {
     // If the neighbor is vacating, skip him
@@ -368,7 +381,11 @@ WSLBMigrateMsg* WSLB::Strategy(WSLB::LDStats* stats, int count)
 
     // Scale times we need appropriately for relative proc speeds
     double hisload = stats[i].total_walltime - stats[i].idletime;
-    const double hisusage = stats[i].total_cputime / hisload;
+    double hisusage;
+    if (hisload > 0)
+      hisusage = stats[i].total_cputime / hisload;
+    else hisusage = 1.0;
+
     const double scale =  (myStats.proc_speed * myusage) 
       / (stats[i].proc_speed * hisusage);
 
@@ -467,8 +484,8 @@ WSLBMigrateMsg* WSLB::Strategy(WSLB::LDStats* stats, int count)
 
       const int me = CkMyPe();
       // Apparently we can give this object to this processor
-      //      CkPrintf("[%d] Obj %d of %d migrating from %d to %d\n",
-      //      	       CkMyPe(),obj->Id,myStats.obj_data_sz,me,p->Id);
+      CkPrintf("[%d] Obj %d of %d migrating from %d to %d\n",
+	       CkMyPe(),obj->Id,myStats.obj_data_sz,me,p->Id);
 
       MigrateInfo* migrateMe = new MigrateInfo;
       migrateMe->obj = myStats.objData[obj->Id].handle;
