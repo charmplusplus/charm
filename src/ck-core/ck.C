@@ -16,7 +16,7 @@ clients, including the rest of Charm++, are actually C++.
 #include "trace.h"
 #include "queueing.h"
  
-#define CK_MSG_SKIP_OR_IMM    (CK_MSG_SKIPSCHEDULER | CK_MSG_IMMEDIATE)
+#define CK_MSG_SKIP_OR_IMM    (CK_MSG_EXPEDITED | CK_MSG_IMMEDIATE)
 
 VidBlock::VidBlock() { state = UNFILLED; msgQ = new PtrQ(); _MEMCHECK(msgQ); }
 

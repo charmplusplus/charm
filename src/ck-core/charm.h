@@ -204,7 +204,7 @@ extern void CkCreateLocalNodeGroup(CkGroupID groupID, int constructorIdx, envelo
 
 #define CK_MSG_INLINE      	0x1
 #define CK_MSG_IMMEDIATE   	0x2
-#define CK_MSG_SKIPSCHEDULER	0x4
+#define CK_MSG_EXPEDITED	0x4
 #define CK_MSG_KEEP		0x8    /* send without freeing message */
 #define CK_MSG_LB_NOTRACE	0x10   /* load balancer doesn't trace */
 
