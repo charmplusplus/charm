@@ -17,7 +17,6 @@
 \pagestyle{headings}
 
 \title{Fortran90 Bindings for Charm++\footnote{last modified 3/3/2001 by Gengbin Zheng}}
-\author{Gengbin Zheng, Jayant Desouza}
 
 \begin{document}
 
@@ -59,9 +58,10 @@ represented as a fortran type structure. Here is an example:
       END MODULE
 \end{verbatim}
 You can think of this module as a chare declaration. Type [Hello] defines 
-arbitary user private data and HelloPtr defines the Chare pointer which 
+arbitary user program data and HelloPtr defines the Chare pointer which 
 fortran program will use later to communicate with the f90charm runtime 
-library. \\
+library, the [aid] is the handle of array returned by f90charm library, user 
+shouldn't change it.. \\
 As same in C++ charm program, you need to write a .ci interface file
 so that charm translator will generate helper functions. However, for
 Fortran90 charm, the syntax is a little different. First, it only support
