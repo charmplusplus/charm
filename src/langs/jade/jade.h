@@ -30,4 +30,34 @@
 
 #define _JADE_MIN(a,b) (((a)<(b))?(a):(b))
 
+/// Fast, fixed-size bitvector class, by Orion.
+template <unsigned int NUM_BITS>
+class _jade_fixedlength_bitvector {
+public:
+	/// Data type used to store actual bits in the vector.
+	typedef unsigned long store_t;
+	enum { store_bits=8*sizeof(store_t) };
+	
+	/// Number of store_t's in our vector.
+	enum { len=(NUM_BITS+(store_bits-1))/store_bits };
+	store_t store[len];
+	
+	/// Fill the entire vector with this value.
+	void fill(store_t s) {
+		for (int i=0;i<len;i++) store[i]=s;
+	}
+	void clear(void) {fill(0);}
+	_jade_fixedlength_bitvector() {clear();}
+	
+	/// Set-to-1 bit i of the vector.
+	void set(unsigned int i) { store[i/store_bits] |= (1lu<<(i%store_bits)); }
+	/// Clear-to-0 bit i of the vector.
+	void clear(unsigned int i) { store[i/store_bits] &= ~(1lu<<(i%store_bits)); }
+	
+	/// Return the i'th bit of the vector.
+	bool get(unsigned int i) { return (store[i/store_bits] & (1lu<<(i%store_bits))); }
+
+//     virtual void pup(PUP::er &p){p(store,len);};
+};
+
 #endif
