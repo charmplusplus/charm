@@ -106,7 +106,7 @@ void PipeBroadcastStrategy::pup(PUP::er &p){
 
 
 void PipeBroadcastStrategy::beginProcessing(int x){ 
-  CsvAccess(pipeBcastPropagateHandle) = CmiRegisterHandler((CmiHandler)propagate_handler);
+  CsvAccess(pipeBcastPropagateHandle) = CkRegisterHandler((CmiHandler)propagate_handler);
 
 }
 
