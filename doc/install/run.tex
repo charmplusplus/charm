@@ -1,38 +1,117 @@
-\section{Executing \converse{}/\charmpp{} Programs}
+\section{Executing \charmpp{} Programs}
 \label{executing charm programs}
 
-The charmc linker produces one executable file.  On most machines
-a link to the proper host program
-{\tt charmrun} is created in the user program directory.  Sample
-execution example is given below (the executable is called {\tt
-pgm}). Exact details will differ from site to site.  The list of {\tt charmrun}
-command line options is in Section~\ref{command line options}.
+When compiling \charmpp{} programs, the charmc linker produces 
+both an executable file and a program called {\tt charmrun},
+which is used to load the executable onto the parallel machine.
 
+To run a \charmpp{} program named ``pgm'' on four processors, type:
 \begin{alltt}
 charmrun pgm +p4
 \end{alltt}
 
-Executes {\tt pgm} on 4 nodes.  In a network environment, {\tt charmrun} must
-be able to locate the directory of the executable.  If all workstations
-share a common file name space this is trivial.  If they don't, {\tt charmrun}
-will attempt to find the executable in a directory with the same path
-from the {\bf \$HOME} directory.  Pathname resolution is performed as 
-follows:
+A complete list of {\tt charmrun} command line options is in 
+Section~\ref{command line options}.
+
+
+\subsection[Command Line Options]{Command Line Options}
+\label{command line options}
+\index{command line options}
+
+A \charmpp{} program accepts the following command line options:
+\begin{description}
+
+\item[{\tt +pN}] Run the program with N processors. The default is 1.
+
+\item[{\tt +ss}] Print summary statistics about chare creation.  This option
+prints the total number of chare creation requests, and the total number of
+chare creation requests processed across all processors.
+
+\item[{\tt +cs}] Print statistics about the number of create chare messages
+requested and processed, the number of messages for chares requested and 
+processed, and the number of messages for branch office chares requested and
+processed, on a per processor basis.  Note that the number of messages 
+created and processed for a particular type of message on a given node 
+may not be the same, since a message may be processed by a different
+processor from the one originating the request.
+
+\item[{\tt user\_options}] Options that are be interpreted by the user
+program may be included mixed with the system options. 
+However, {\tt user\_options} cannot start with +.
+The {\tt user\_options} will be passed as arguments to the user program 
+via the usual {\tt argc/argv} construct to the {\tt main}
+entry point of the main chare. 
+\charmpp{} system options will not appear in {\tt argc/argv}.
+
+\end{description}
+
+
+
+\subsubsection{Additional Network Options}
+\label{network command line options}
+
+Programs built using the network version of \charmpp{} can be
+run alone, without charmrun.  This restricts you to using the 
+processors on the local
+machine, but it is convenient and often useful for debugging.
+For example, a \charmpp{} program can be run on one processor
+in the debugger using:
+
+\begin{alltt}
+gdb pgm
+\end{alltt}
+
+
+The following {\tt ++} command line options are available in
+the network version:
+\begin{description}
+
+\item[{\tt ++local}] Run charm program only on local machines. No 
+ remote shell invocation is needed in this case. It starts node programs 
+ right on your local machine. This could be useful if you just want to 
+ run small program on only one machine, for example, your laptop.
+
+\item[{\tt ++debug}] Run each node under gdb in an xterm window, prompting
+the user to begin execution.
+
+\item[{\tt ++debug-no-pause}] Run each node under gdb in an xterm window
+immediately (i.e. without prompting the user to begin execution).
+
+\item[{\tt ++maxrsh}] Maximum number of {\tt rsh}'s to run at a
+time.
+
+\item[{\tt ++nodelist}] File containing list of nodes.
+
+\end{description}
+
+If using the {\tt ++debug} option, the user must ensure the
+following:
 \begin{enumerate}
-	\item The system computes the absolute path of {\tt pgm}.
-	\item If the absolute path starts with the equivalent of {\bf \$HOME} 
-	or the current working directory, the beginning part of the 
-        path 
-	is replaced with the environment variable {\bf \$HOME} or the 
-	current working directory. However, if {\tt exec\_home} is 
-        specified in the nodes file (see below), the beginning part of
-        the path is replaced with {\tt exec\_home}.
-	\item The system tries to locate this program (with modified 
-	pathname and appended extension if specified) on all nodes.
+
+\item The {\tt DISPLAY} environment variable points to your terminal.
+SSH's X11 forwarding does not work properly with \charmpp{}.
+
+\item The nodes must be authorized to create windows on the host machine (see
+man pages for {\tt xhost} and {\tt xauth}).
+
+\item {\tt xterm}, {\tt xdpyinfo},  and {\tt gdb} must be in
+the user's path.
+
+\item The path must be set in the {\tt .cshrc} file, not the {\tt .login}
+file, because {\tt rsh} does not run the {\tt .login} file. 
+
 \end{enumerate}
 
+
+
+\subsection{Nodelist file}
+
 For network of workstations,
-the list of nodes must be specified in a file.  The format of this file
+the list of machines to run the program can be specified in a file.  
+Without a nodelist file, \charmpp{} runs the program only on the 
+local machine.
+
+The format of this file
 allows you to define groups of machines, giving each group a name.
 Each line of the nodes file is a command.  The most important command
 is:
@@ -114,256 +193,29 @@ Thus, if one specifies
 it will use ``localhost'' four times.  ``localhost'' is a Unix
 trick; it always find a name for whatever machine you're on.
 
-Since the new nodes file is incompatible with the old nodes file, it has
-been renamed.  It now is called ``.nodelist'', and all the options and
-environment variables pertaining to it have also been renamed {\tt NODELIST}.
-
 The user is required to set up remote login permissions on all nodes
 using the ``.rhosts'' file in the home directory if ``rsh'' is used for remote
 login into the hosts. If ``ssh'' is used, the user will have to setup
-password-less login to remote hosts either using ``.shosts'' file, or using
-RSA authentication based on a key-pair and adding public keys to ``.ssh/authorized\_keys'' file. See ``ssh'' documentation for more information.
+password-less login to remote hosts using
+RSA authentication based on a key-pair and adding public keys to 
+``.ssh/authorized\_keys'' file. See ``ssh'' documentation for more information.
 
-Note that the charmc linker will provide the correct 
-executable. The user, however, needs to know how programs are run for
-the particular machine.
-
-\subsection{Running with the simulator}
-
-\converse{} provides a simple parallel machine simulator for developing
-and debugging purposes.  It simulates a message passing system
-composed of a collection of processing nodes connected with a
-communication network. Each node is composed of an application
-processor, local memory, and a communication coprocessor.  The
-simulator is a beta version, and it is not yet proven that the
-simulator timers for performance measurements produce realistic
-results.
-
-
-In order to run \charmpp{} programs with the simulator:
-\begin{itemize}
-
-\item prepare a configuration file as described below
-
-\item to run, type \verb#pgm +pN# (and possibly other runtime options) where
-   N is the number of processors.
-
-\end{itemize}
-Currently only \charmpp{} programs can take advantage of the
-simulator features.
-In the future, a method to allow any \converse{} based program
-to use the simulator features will be devised.
-
-The basic task of the simulator is to manage the message passing
-obeying various machine and network parameters.  A message experiences
-delays in various components of the machine. These include: 1) sender
-application processor, 2) sender communication coprocesssor, 3)
-network, 4) receiver communication processor, and 5) receiver
-application processor.  Each component of the delayed is modelled by
-the widely used formula $\alpha + n\beta$ where $\alpha$ is the
-startup cost, and $\beta$ is the cost per byte.  In addition to
-message delay parameters, there are others related to the network
-capacity and random variations in network delays. These parameters are
-specified in a configuration file named "sim.param" in the directory
-of the user program. If the simulator can't find this file, it assumes
-default values (mostly zero latencies).  Figure~\ref{fig:simconfig}
-lists a sample configuration. The lines starting with the \# sign are
-treated as comments. Each line contains a keyword followed by some
-numbers. The explanation of each keyword is given below:
-
-\begin{description}
-
-\item[{\tt cpu\_recv\_cost}] $\alpha$ and  $\beta$ values  for the software
-                            cost of a message-receive at the application
-                            processor.
-
-\item[{\tt cpu\_send\_cost}] $\alpha$ and  $\beta$ values  for the software
-                            cost of a message-send at the application
-                            processor.
-
-\item[{\tt rcp\_cost}] $\alpha$ and  $\beta$ values for a message-receive 
-                       at the communication processor.
-
-\item[{\tt scp\_cost}] $\alpha$ and  $\beta$ values for a message-send
-                       at the communication processor.
-
-\item[{\tt net\_cost}] $\alpha$ and  $\beta$ values for a message-send
-                       in the netowrk.
-
-\item[{\tt cpu\_queue\_threshold\_number}] max number of messages queued
-                       at the application processors's incoming message queue.
-
-\item[{\tt cpu\_queue\_threshold\_size}] max cumulative size of
-		       messages in bytes queued at the application
-		       processors's incoming message queue.
-
-
-\item[{\tt cpu\_queue\_threshold\_number}] max number of messages in the incoming
-                       message queue of communication processor.
-
-
-\item[{\tt rcp\_queue\_threshold\_number}] max number of messages in the 
-                       incoming-message-queue of communication processors.                    
-\item[{\tt rcp\_queue\_threshold\_size}] max cumulative size of messages in bytes
-                       in the incoming-message-queue of communication 
-                       processors.
-
-\item[{\tt net\_queue\_threshold\_number}] max number of transient messages in 
-                       the network.
-
-\item[{\tt net\_queue\_threshold\_size}] max cumulative size of transient 
-                       messages in bytes in the network.
-
-\item[{\tt latency-fixed}] no random variations in the network latency 
-                           ($\alpha$)
-
-\item[{\tt latency-rand}] network latency ($\alpha$) is incremented by
-                       a random value distributed exponentially. The first
-                       number after the keyword is the mean of the
-                       exponential distribution. The second number is the
-                       initial seed vbalue for the random number generator.
-
-
-\item[{\tt processor\_scale}] The simulator scales the measured time
-                      execution of code-blocks by this value.
-
-\item[{\tt periodic\_interval}] Converse has periodic checks for
-                      various purposes. This is the time on seconds
-                      those checks are called.
-\end{description}
-
-
-\begin{figure}
-\begin{verbatim}
-#latency parameters
-cpu_recv_cost 1E-6 1E-7              
-cpu_send_cost 1E-6 1E-7
-rcp_cost      1E-3 1E-7
-scp_cost      1E-6 1E-7
-net_cost      1E-6 1E-7
-
-
-#capacity parameters
-# choose one 
-cpu_nolimit
-#cpu_queue_threshold_number 100000
-#cpu_queue_threshold_size   100000
-
-
-#choose one
-scp_nolimit
-#scp_queue_threshold_number 100000
-#scp_queue_threshold_size   100000
-
-#choose one
-rcp_net_nolimit
-#rcp_queue_threshold_number 100000
-#rcp_queue_threshold_size   100000
-#net_queue_threshold_number 100000
-#net_queue_threshold_size   100000
-
-#random variations in latency
-#choose one
-latency-fixed
-#latency-rand   0.0001 123456
-
-processor_scale 1.0
-periodic_interval 0.1
-\end{verbatim}
-\caption{A sample configuration file for the simulator}
-\label{fig:simconfig}
-\end{figure}
-
-\subsection[Command Line Options]{Command Line Options}
-\label{command line options}
-\index{command line options}
-
-A \charmpp{} program accepts the following command line options:
-\begin{description}
-
-\item[{\tt +pN}] Run the program with N processors. The default is 1.
-
-\item[{\tt +ss}] Print summary statistics about chare creation.  This option
-prints the total number of chare creation requests, and the total number of
-chare creation requests processed across all processors.
-
-\item[{\tt +cs}] Print statistics about the number of create chare messages
-requested and processed, the number of messages for chares requested and 
-processed, and the number of messages for branch office chares requested and
-processed, on a per processor basis.  Note that the number of messages 
-created and processed for a particular type of message on a given node 
-may not be the same, since a message may be processed by a different
-processor from the one originating the request.
-
-\item[{\tt user\_options}] Options that are be interpreted by the user
-program may be included after all the system options. 
-However, {\tt user\_options} cannot start with +.
-The {\tt user\_options} will be passed as arguments to the user program 
-via the usual {\tt argc/argv} construct to the {\tt main}
-entry point of the main chare. 
-\charmpp{} system options will not appear in {\tt argc/argv}.
-
-\end{description}
-
-\subsubsection{Additional Uniprocessor Command Line Options}
-\label{uniprocessor command line options}
-
-The uniprocessor versions can be used to simulate multiple
-processors on a single workstation
-Any number of processors between 1 and 32 can be simulated by
-using the {\tt +p} option, limited only by the available memory on the
-uniprocessor workstation.  By default, the uniprocessor versions handle
-a single message from each processor, going in order from processor 0
-thru $P-1$ (where $P$ is the number of processors) repeatedly.  
-
-\subsubsection{Additional Network Command Line Options}
-\label{network command line options}
-
-The following {\tt ++} command line options are available in
-the network version:
-\begin{description}
-
-\item[{\tt ++local}] Run charm program only on local machines. No 
- remote shell invocation is needed in this case. It starts node programs 
- right on your local machine. This could be useful if you just want to 
- run small program on only one machine, for example, your laptop.
-
-\item[{\tt ++debug}] Run each node under gdb in an xterm window, prompting
-the user to begin execution.
-
-\item[{\tt ++debug-no-pause}] Run each node under gdb in an xterm window
-immediately (i.e. without prompting the user to begin execution).
-
-\item[{\tt ++maxrsh}] Maximum number of {\tt rsh}'s to run at a
-time.
-
-\item[{\tt ++resend-wait}] Timeout before retransmitting datagrams
-(in msec).
-
-\item[{\tt ++resend-fail}] Timeout before retransmission fails (in
-msec).
-This parameter can help the user kill ``runaway'' processes, which may not
-be killed otherwise when the user interrupts the program before it 
-completes execution.
-Currently a bug exists in the network version that may cause programs to
-terminate prematurely if this value is set too low and {\tt scanf} 
-operations are being performed.
-
-\item[{\tt ++nodelist}] File containing list of nodes.
-
-\end{description}
-
-If using the {\tt ++debug} option, the user must ensure the
-following:
+In a network environment, {\tt charmrun} must
+be able to locate the directory of the executable.  If all workstations
+share a common file name space this is trivial.  If they don't, {\tt charmrun}
+will attempt to find the executable in a directory with the same path
+from the {\bf \$HOME} directory.  Pathname resolution is performed as 
+follows:
 \begin{enumerate}
-
-\item {\tt xterm}, {\tt xdpyinfo},  and {\tt gdb} must be in
-the user's path.
-
-\item The path must be set in the {\tt .cshrc} file, not the {\tt .login}
-file, because {\tt rsh} does not run the {\tt .login} file. 
-
-\item The nodes must be authorized to create windows on the host machine (see
-man pages for {\tt xhost} and {\tt xauth}).
-
+	\item The system computes the absolute path of {\tt pgm}.
+	\item If the absolute path starts with the equivalent of {\bf \$HOME} 
+	or the current working directory, the beginning part of the 
+        path 
+	is replaced with the environment variable {\bf \$HOME} or the 
+	current working directory. However, if {\tt exec\_home} is 
+        specified in the nodes file (see below), the beginning part of
+        the path is replaced with {\tt exec\_home}.
+	\item The system tries to locate this program (with modified 
+	pathname and appended extension if specified) on all nodes.
 \end{enumerate}
+
