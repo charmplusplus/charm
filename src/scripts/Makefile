@@ -24,24 +24,24 @@
 SHELL=/bin/sh
 L=../lib
 
-all: charm++ bluegene LIBS AMPI f90charm tsm sm pvm doc
+all: charm++ bluegene LIBS AMPI f90charm TSM SM PVM doc
 
-charm++: converse libck.a charmxi
+charm++: converse libck.a loadbalancers charmxi
 
 bluegene: charm++ libconv-bluegene.a
 
 for-namd: charm++ pvm AMPIC
 
-tsm: converse libtsm.a
+TSM: converse libtsm.a
 
-sm: converse libsm.a
+SM: converse libsm.a
 
-pvm: converse libpvmc.a
+PVM: converse libpvmc.a
 
 AMR: charm++ LIBS
 	cd libs/ck-libs/amr; make all OPTS='$(OPTS)'
 
-FEM: charm++ CONVLIBS libAMPILIB.a FEMC LIBS FEMF
+FEM: charm++ CONVLIBS FEMC LIBS FEMF
 
 FEMC: charm++ LIBS
 
@@ -53,11 +53,11 @@ MBLOCKC: charm++ LIBS
 
 MBLOCKF: MBLOCKC libconv-utilf.a
 
-AMPI: AMPIC libAMPILIB.a AMPIF
+AMPI: charm++ CONVLIBS AMPIC AMPIF
 
-AMPIC: charm++ CONVLIBS libAMPI.a
+AMPIC: charm++ LIBS
 
-AMPIF: charm++ libconv-utilf.a LIBS libAMPIF.a
+AMPIF: AMPIC libconv-utilf.a
 
 f90charm: charm++ libf90charm.a
 
@@ -104,19 +104,19 @@ SEQCHARMC=../bin/charmc -seq $(CHARMOPTS)
 #
 ###############################################################################
 
-CVHEADERS=cpthreads.h converse.h conv-trace.h trace.h \
+CVHEADERS=cpthreads.h converse.h conv-trace.h trace.h charm-api.h\
       conv-ccs.h ccs-client.c ccs-client.h ccs-auth.c ccs-auth.h CcsServer.java \
       debug-conv.h debug-charm.h conv-autoconfig.h \
       conv-mach.h conv-mach-opt.h conv-mach.sh conv-mach-opt.sh\
       CkMarshall.decl.h CkArray.decl.h CkLocation.decl.h CkReduction.decl.h \
-      CkFutures.decl.h LBDatabase.decl.h CentralLB.decl.h \
+      CkFutures.decl.h LBDatabase.decl.h CentralLB.decl.h NullLB.decl.h \
       RandCentLB.decl.h RecBisectBfLB.decl.h \
       MetisLB.decl.h RefineLB.decl.h \
       HeapCentLB.decl.h NborBaseLB.decl.h NeighborLB.decl.h \
       WSLB.decl.h GreedyRefLB.decl.h RandRefLB.decl.h \
       tempo.decl.h waitqd.decl.h \
 	  CommLB.decl.h Comm1LB.decl.h  \
-	  ampi.decl.h ampimain.decl.h BlueGene.decl.h blue.h
+	  BlueGene.decl.h blue.h
 
 # The .c files are there to be #included by clients whole
 # This is a bit unusual, but makes client linking simpler.
@@ -133,12 +133,12 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  RefineLB.h HeapCentLB.h CommLB.h Comm1LB.h \
 	  MetisLB.h NborBaseLB.h \
 	  NeighborLB.h WSLB.h GreedyRefLB.h RandRefLB.h \
-	  ampi.h BlueGene.h \
+	  BlueGene.h \
 	  $(CVHEADERS)
 
 ALLHEADERS=$(CKHEADERS) \
     simplemsg.h sm.h pvmc.h pvm3.h sdag.h \
-	graph.h bitvecset.h Set.h ampiimpl.h
+	graph.h bitvecset.h Set.h
 
 basics: headers
 	touch basics
@@ -175,13 +175,13 @@ dirs+sources:
 	./gatherflat ../../src/Common/ck-ldb           .
 	./gatherflat ../../src/Common/langs/simplemsg  .
 	./gatherflat ../../src/Common/langs/pvmc       .
-	./gatherflat ../../src/Common/langs/ampi       .
 	./gatherflat ../../src/Common/langs/bluegene   .
 	./gatherflat ../../src/Common/langs/f90charm   .
 	./gatherflat ../../src/Common/xlat-i           .
 	./gatherflat ../../src/Common/xlatcpm          .
 	./gathertree ../../src/QuickThreads QuickThreads
 	./gathertree ../../src/Common/libs libs
+	./gathertree ../../src/Common/langs langs
 	./gathertree ../../src/Common.`cat .gdir`      .
 	./gatherflat ../../src/`cat .vdir`             .
 	./gathertree ../../pgms ../pgms
@@ -213,13 +213,13 @@ CVLIBS=libconv-core.a \
 LIBCONV_CORE=threads.o convcore.o conv-conds.o queueing.o msgmgr.o \
 	cpm.o cpthreads.o futures.o cldb.o random.o trace-common.o \
 	debug-conv.o generate.o edgelist.o conv-ccs.o ccs-builtins.o \
-	quiescence.o 
+	quiescence.o isomalloc.o
 
 LIBCONV_UTIL=pup_util.o pup_xlater.o pup_c.o ckhashtable.o sockRoutines.o conv-lists.o
 
 LIBCONV_UTILF=pup_f.o
 
-converse: basics QuickThreads/libqt.a $(CVLIBS) charmrun-target conv-cpm
+converse: basics QuickThreads/libqt.a $(CVLIBS) fmain-ok charmrun-target conv-cpm
 
 charmrun-target: daemon-target sockRoutines.c sockRoutines.h ccs-server.c ccs-server.h
 	if [ -d charmrun ] ; then ( cd charmrun ; make OPTS='$(OPTS)' ) ; fi
@@ -231,6 +231,11 @@ daemon-target: sockRoutines-seq.o
 	if test -f daemon.c ; then $(CHARMC) -DFACELESS -seq daemon.c \
 		sockRoutines-seq.o -o ../bin/charmd_faceless; fi 
 	touch daemon-target
+
+fmain-ok: fmain.f90
+	-@$(CHARMC) -c fmain.f90
+	-@cp fmain.o ../lib
+	-@touch fmain-ok
 
 QuickThreads/libqt.a:
 	. ./conv-mach.sh;. ./conv-mach-opt.sh; cd QuickThreads;./configure $$CMK_QT
@@ -254,13 +259,16 @@ libconv-util.a: $(LIBCONV_UTIL)
 	$(CHARMC) -cp ../lib/ -o $@ $(LIBCONV_UTIL)
 
 libconv-utilf.a: $(LIBCONV_UTILF)
-	$(CHARMC) -cp ../lib/ -o $@ $(LIBCONV_UTILF)
+	-@$(CHARMC) -cp ../lib/ -o $@ $(LIBCONV_UTILF)
 
 libccs-client.a: ccs-client.o
 	$(CHARMC) -cp ../lib/ -o $@ ccs-client.o
 
 cpm.o: cpm.c $(CVHEADERS)
 	$(CHARMC) cpm.c
+
+isomalloc.o: isomalloc.c $(CVHEADERS)
+	$(CHARMC) isomalloc.c
 
 threads.o: threads.c $(CVHEADERS)
 	$(CHARMC) -IQuickThreads threads.c
@@ -326,8 +334,8 @@ pup_c.o: pup_c.C $(UTILHEADERS)
 	$(CHARMC) -o pup_c.o pup_c.C
 
 pup_f.o: pup_f.f90
-	-$(CHARMC) -c pup_f.f90
-	-$(CHARMC) -cpmod ../include pupmod.M
+	-@$(CHARMC) -c pup_f.f90
+	-@$(CHARMC) -cpmod ../include pupmod.M
 
 ckhashtable.o: ckhashtable.C ckhashtable.h
 	$(CHARMC) -o ckhashtable.o ckhashtable.C
@@ -381,25 +389,16 @@ CK_LIBS_CORE=libck.a
 LIBCK_CORE=init.o register.o qd.o ck.o main.o msgalloc.o ckfutures.o \
            debug-message.o cklocation.o ckarray.o ckreduction.o \
            tempo.o waitqd.o LBDatabase.o lbdb.o \
-	   LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o Refiner.o \
-	   ObjGraph.o \
-	   CentralLB.o RandCentLB.o \
-	   RecBisectBfLB.o graph.o bitvecset.o \
-	   MetisLB.o RefineLB.o Set.o CommLB.o Comm1LB.o\
-           HeapCentLB.o heap.o NborBaseLB.o NeighborLB.o WSLB.o \
-	   GreedyRefLB.o RandRefLB.o CommLBHeap.o
+           LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o Refiner.o \
+	   CentralLB.o NborBaseLB.o ObjGraph.o graph.o bitvecset.o \
+           Set.o heap.o CommLBHeap.o NullLB.o \
+	   compat_regmm.o
 
 CHARMLIBS: charm++
 	cd libs; make charmlibs OPTS='$(OPTS)'
 
 libck.a: $(LIBCK_CORE)
 	$(CHARMC) -cp ../lib/ -o $@ $(LIBCK_CORE)
-
-ampi.decl.h ampi.def.h : ampi.ci charmxi
-	$(CHARMC) ampi.ci
-
-ampimain.decl.h ampimain.def.h : ampimain.ci charmxi
-	$(CHARMC) ampimain.ci
 
 CkFutures.decl.h CkFutures.def.h : ckfutures.ci charmxi
 	$(CHARMC) ckfutures.ci
@@ -410,47 +409,11 @@ tempo.decl.h tempo.def.h : tempo.ci charmxi
 waitqd.decl.h waitqd.def.h : waitqd.ci charmxi
 	$(CHARMC) waitqd.ci
 
-CentralLB.decl.h CentralLB.def.h : CentralLB.ci charmxi
-	$(CHARMC) CentralLB.ci
-
 LBDatabase.decl.h LBDatabase.def.h : LBDatabase.ci charmxi
 	$(CHARMC) LBDatabase.ci
 
-RandCentLB.decl.h RandCentLB.def.h : RandCentLB.ci charmxi
-	$(CHARMC) RandCentLB.ci
-
-RecBisectBfLB.decl.h RecBisectBfLB.def.h : RecBisectBfLB.ci charmxi
-	$(CHARMC) RecBisectBfLB.ci
-
-MetisLB.decl.h MetisLB.def.h : MetisLB.ci charmxi
-	$(CHARMC) MetisLB.ci
-
-RefineLB.decl.h RefineLB.def.h : RefineLB.ci charmxi
-	$(CHARMC) RefineLB.ci
-
-CommLB.decl.h CommLB.def.h : CommLB.ci charmxi
-	$(CHARMC) CommLB.ci
-
-Comm1LB.decl.h Comm1LB.def.h : Comm1LB.ci charmxi
-	$(CHARMC) Comm1LB.ci
-
-HeapCentLB.decl.h HeapCentLB.def.h : HeapCentLB.ci charmxi
-	$(CHARMC) HeapCentLB.ci
-
-NborBaseLB.decl.h NborBaseLB.def.h : NborBaseLB.ci charmxi
-	$(CHARMC) NborBaseLB.ci
-
-NeighborLB.decl.h NeighborLB.def.h : NeighborLB.ci charmxi
-	$(CHARMC) NeighborLB.ci
-
-WSLB.decl.h WSLB.def.h : WSLB.ci charmxi
-	$(CHARMC) WSLB.ci
-
-GreedyRefLB.decl.h GreedyRefLB.def.h : GreedyRefLB.ci charmxi
-	$(CHARMC) GreedyRefLB.ci
-
-RandRefLB.decl.h RandRefLB.def.h : RandRefLB.ci charmxi
-	$(CHARMC) RandRefLB.ci
+NullLB.decl.h NullLB.def.h : NullLB.ci charmxi
+	$(CHARMC) NullLB.ci
 
 init.o: init.C $(CKHEADERS)
 	$(CHARMC) -o init.o init.C
@@ -524,20 +487,14 @@ LBMachineUtil.o: LBMachineUtil.C $(CKHEADERS)
 LBDatabase.o: LBDatabase.C $(CKHEADERS)
 	$(CHARMC) -o LBDatabase.o LBDatabase.C
 
+NullLB.o: NullLB.C $(CKHEADERS)
+	$(CHARMC) NullLB.C
+
 Refiner.o: Refiner.C $(CKHEADERS)
 	$(CHARMC) -o Refiner.o Refiner.C
 
 ObjGraph.o: ObjGraph.C $(CKHEADERS)
 	$(CHARMC) -o ObjGraph.o ObjGraph.C
-
-CentralLB.o: CentralLB.C $(CKHEADERS)
-	$(CHARMC) -o CentralLB.o CentralLB.C
-
-RandCentLB.o: RandCentLB.C $(CKHEADERS)
-	$(CHARMC) -o RandCentLB.o RandCentLB.C
-
-RecBisectBfLB.o: RecBisectBfLB.C $(CKHEADERS) graph.h bitvecset.h
-	$(CHARMC) -o RecBisectBfLB.o RecBisectBfLB.C
 
 graph.o: graph.c 
 	$(CHARMC) -o graph.o graph.c
@@ -545,45 +502,29 @@ graph.o: graph.c
 bitvecset.o: bitvecset.c bitvecset.h
 	$(CHARMC) -o bitvecset.o bitvecset.c
 
-MetisLB.o: MetisLB.C $(CKHEADERS)
-	$(CHARMC) -o MetisLB.o MetisLB.C
-
-RefineLB.o: RefineLB.C $(CKHEADERS)
-	$(CHARMC) -o RefineLB.o RefineLB.C
-
-CommLB.o: CommLB.C $(CKHEADERS)
-	$(CHARMC) -o CommLB.o CommLB.C
-
-Comm1LB.o: Comm1LB.C $(CKHEADERS)
-	$(CHARMC) -o Comm1LB.o Comm1LB.C
-
-HeapCentLB.o: HeapCentLB.C $(CKHEADERS)
-	$(CHARMC) -o HeapCentLB.o HeapCentLB.C
-
 Set.o: Set.C $(CKHEADERS) Set.h elements.h 
 	$(CHARMC) -o Set.o Set.C
 
 heap.o: heap.C $(CKHEADERS) elements.h heap.h
 	$(CHARMC) -o heap.o heap.C
 
-CommLBHeap.o: CommLBHeap.C $(CKHEADERS) CommLBHeap.h
-	$(CHARMC) -o CommLBHeap.o CommLBHeap.C
+CentralLB.decl.h: CentralLB.ci charmxi
+	$(CHARMC) CentralLB.ci
 
-NborBaseLB.o: NborBaseLB.C $(CKHEADERS)
-	$(CHARMC) -o NborBaseLB.o NborBaseLB.C
+CentralLB.o: CentralLB.C CentralLB.decl.h $(CKHEADERS)
+	$(CHARMC) -c CentralLB.C
 
-NeighborLB.o: NeighborLB.C $(CKHEADERS)
-	$(CHARMC) -o NeighborLB.o NeighborLB.C
+NborBaseLB.decl.h: NborBaseLB.ci charmxi
+	$(CHARMC) NborBaseLB.ci
 
-WSLB.o: WSLB.C $(CKHEADERS)
-	$(CHARMC) -o WSLB.o WSLB.C
+NborBaseLB.o: NborBaseLB.C NborBaseLB.decl.h $(CKHEADERS)
+	$(CHARMC) -c NborBaseLB.C
 
-GreedyRefLB.o: GreedyRefLB.C $(CKHEADERS)
-	$(CHARMC) -o GreedyRefLB.o GreedyRefLB.C
+CommLBHeap.o: CommLBHeap.C $(CKHEADERS)
+	$(CHARMC) -c CommLBHeap.C
 
-RandRefLB.o: RandRefLB.C $(CKHEADERS)
-	$(CHARMC) -o RandRefLB.o RandRefLB.C
-
+compat_regmm.o: compat_regmm.c
+	$(CHARMC) -c compat_regmm.c
 
 ## Tracing libraries (profiling, -tracemode)
 LIBTRACE_NONE=trace-none.o trace-common.o
@@ -610,6 +551,127 @@ trace-projections.o:trace-projections.C trace-projections.h trace.h $(CKHEADERS)
 trace-summary.o:trace-summary.C trace-summary.h trace.h $(CKHEADERS)
 	$(CHARMC) -o trace-summary.o trace-summary.C
 
+
+###############################################################################
+#
+# Dynamic Load Balancers
+#
+###############################################################################
+
+# This portion of the makefile automatically generated with Makefile_lb.sh
+LOADBALANCERS=\
+   $(L)/libmoduleRandCentLB.a \
+   $(L)/libmoduleRecBisectBfLB.a \
+   $(L)/libmoduleMetisLB.a \
+   $(L)/libmoduleRefineLB.a \
+   $(L)/libmoduleCommLB.a \
+   $(L)/libmoduleComm1LB.a \
+   $(L)/libmoduleHeapCentLB.a \
+   $(L)/libmoduleNeighborLB.a \
+   $(L)/libmoduleWSLB.a \
+   $(L)/libmoduleGreedyRefLB.a \
+   $(L)/libmoduleRandRefLB.a 
+
+RandCentLB.decl.h: RandCentLB.ci charmxi
+	$(CHARMC) RandCentLB.ci
+
+RandCentLB.o: RandCentLB.C RandCentLB.decl.h $(CKHEADERS)
+	$(CHARMC) -c RandCentLB.C
+
+$(L)/libmoduleRandCentLB.a: RandCentLB.o
+	$(CHARMC) -o $(L)/libmoduleRandCentLB.a RandCentLB.o
+
+RecBisectBfLB.decl.h: RecBisectBfLB.ci charmxi
+	$(CHARMC) RecBisectBfLB.ci
+
+RecBisectBfLB.o: RecBisectBfLB.C RecBisectBfLB.decl.h $(CKHEADERS)
+	$(CHARMC) -c RecBisectBfLB.C
+
+$(L)/libmoduleRecBisectBfLB.a: RecBisectBfLB.o
+	$(CHARMC) -o $(L)/libmoduleRecBisectBfLB.a RecBisectBfLB.o
+
+MetisLB.decl.h: MetisLB.ci charmxi
+	$(CHARMC) MetisLB.ci
+
+MetisLB.o: MetisLB.C MetisLB.decl.h $(CKHEADERS)
+	$(CHARMC) -c MetisLB.C
+
+$(L)/libmoduleMetisLB.a: MetisLB.o
+	$(CHARMC) -o $(L)/libmoduleMetisLB.a MetisLB.o
+
+RefineLB.decl.h: RefineLB.ci charmxi
+	$(CHARMC) RefineLB.ci
+
+RefineLB.o: RefineLB.C RefineLB.decl.h $(CKHEADERS)
+	$(CHARMC) -c RefineLB.C
+
+$(L)/libmoduleRefineLB.a: RefineLB.o
+	$(CHARMC) -o $(L)/libmoduleRefineLB.a RefineLB.o
+
+CommLB.decl.h: CommLB.ci charmxi
+	$(CHARMC) CommLB.ci
+
+CommLB.o: CommLB.C CommLB.decl.h $(CKHEADERS)
+	$(CHARMC) -c CommLB.C
+
+$(L)/libmoduleCommLB.a: CommLB.o
+	$(CHARMC) -o $(L)/libmoduleCommLB.a CommLB.o
+
+Comm1LB.decl.h: Comm1LB.ci charmxi
+	$(CHARMC) Comm1LB.ci
+
+Comm1LB.o: Comm1LB.C Comm1LB.decl.h $(CKHEADERS)
+	$(CHARMC) -c Comm1LB.C
+
+$(L)/libmoduleComm1LB.a: Comm1LB.o
+	$(CHARMC) -o $(L)/libmoduleComm1LB.a Comm1LB.o
+
+HeapCentLB.decl.h: HeapCentLB.ci charmxi
+	$(CHARMC) HeapCentLB.ci
+
+HeapCentLB.o: HeapCentLB.C HeapCentLB.decl.h $(CKHEADERS)
+	$(CHARMC) -c HeapCentLB.C
+
+$(L)/libmoduleHeapCentLB.a: HeapCentLB.o
+	$(CHARMC) -o $(L)/libmoduleHeapCentLB.a HeapCentLB.o
+
+NeighborLB.decl.h: NeighborLB.ci charmxi
+	$(CHARMC) NeighborLB.ci
+
+NeighborLB.o: NeighborLB.C NeighborLB.decl.h $(CKHEADERS)
+	$(CHARMC) -c NeighborLB.C
+
+$(L)/libmoduleNeighborLB.a: NeighborLB.o
+	$(CHARMC) -o $(L)/libmoduleNeighborLB.a NeighborLB.o
+
+WSLB.decl.h: WSLB.ci charmxi
+	$(CHARMC) WSLB.ci
+
+WSLB.o: WSLB.C WSLB.decl.h $(CKHEADERS)
+	$(CHARMC) -c WSLB.C
+
+$(L)/libmoduleWSLB.a: WSLB.o
+	$(CHARMC) -o $(L)/libmoduleWSLB.a WSLB.o
+
+GreedyRefLB.decl.h: GreedyRefLB.ci charmxi
+	$(CHARMC) GreedyRefLB.ci
+
+GreedyRefLB.o: GreedyRefLB.C GreedyRefLB.decl.h $(CKHEADERS)
+	$(CHARMC) -c GreedyRefLB.C
+
+$(L)/libmoduleGreedyRefLB.a: GreedyRefLB.o
+	$(CHARMC) -o $(L)/libmoduleGreedyRefLB.a GreedyRefLB.o
+
+RandRefLB.decl.h: RandRefLB.ci charmxi
+	$(CHARMC) RandRefLB.ci
+
+RandRefLB.o: RandRefLB.C RandRefLB.decl.h $(CKHEADERS)
+	$(CHARMC) -c RandRefLB.C
+
+$(L)/libmoduleRandRefLB.a: RandRefLB.o
+	$(CHARMC) -o $(L)/libmoduleRandRefLB.a RandRefLB.o
+
+loadbalancers: $(LOADBALANCERS)
 
 ###############################################################################
 #
@@ -741,36 +803,12 @@ pvmc_groups.o: pvmc_groups.c pvmc.h pvm3.h
 pvmc_main.o: pvmc_main.c pvmc.h pvm3.h
 	$(CHARMC) -o $@ pvmc_main.c
 
-AMPISRC=ampi.C ampi.h ampiimpl.h ampi-defmain.C \
-           ampi.decl.h ampi.def.h ampimain.decl.h \
-           ampimain.def.h
-
-libAMPILIB.a: $(AMPISRC)
-	$(CHARMC) -DAMPI_FORTRAN=0 -DAMPI_STANDALONE=1 -c ampi.C
-	$(CHARMC) -DAMPI_FORTRAN=0 -c ampif.C
-	$(CHARMC) -cp ../lib -o $@ ampi.o ampif.o
-
-libAMPI.a: $(AMPISRC)
-	$(CHARMC) -DAMPI_FORTRAN=0 -c ampi.C
-	$(CHARMC) -DAMPI_FORTRAN=0 -c ampimain.C
-	$(CHARMC) -DAMPI_FORTRAN=0 -c ampi-defmain.C
-	$(CHARMC) -cp ../lib -o libAMPI.a ampi.o ampimain.o ampi-defmain.o
-
-libAMPIF.a: $(AMPISRC)
-	$(CHARMC) -DAMPI_FORTRAN=1 -c ampi.C
-	$(CHARMC) -DAMPI_FORTRAN=1 -c ampimain.C
-	$(CHARMC) -DAMPI_FORTRAN=1 -c ampif.C
-	$(CHARMC) -DAMPI_FORTRAN=1 -c ampi-defmain.C
-	$(CHARMC) -c ampimod.f90
-	$(CHARMC) -cpmod ../include ampi.M
-	$(CHARMC) -cp ../lib -o libAMPIF.a ampimain.o ampi.o ampif.o ampimod.o ampi-defmain.o
-
 libf90charm.a: f90main.ci f90main.h f90main.C charmf.h charmf.C futil.f90
 	$(CHARMC) f90main.ci
 	$(CHARMC) -c -DAMPI_FORTRAN=1 f90main.C
 	$(CHARMC) -c -DAMPI_FORTRAN=1 charmf.C
-	$(CHARMC) -c futil.f90
-	$(CHARMC) -cp ../lib -o libf90charm.a f90main.o charmf.o futil.o
+	-$(CHARMC) -c futil.f90
+	-$(CHARMC) -cp ../lib -o libf90charm.a f90main.o charmf.o futil.o
 
 ###############################################################################
 #
