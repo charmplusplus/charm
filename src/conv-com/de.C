@@ -124,7 +124,7 @@ DimexRouter::DimexRouter(int n, int me, int ndirect)
   }
 
   CreateStageTable(NumPes, dp);
-  delete(dp);
+  delete [] dp;
 
   //CmiPrintf("%d DE constructor done dim=%d, mymax=%d IC=%d\n", MyPe, Dim, 1<<Dim, InitCounter);
 
@@ -406,7 +406,7 @@ void DimexRouter::CreateStageTable(int numpes, int *destpes)
         }
     }
   }
-  delete dir;
+  delete [] dir;
   return;
 }
 
