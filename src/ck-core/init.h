@@ -31,7 +31,7 @@ class TableEntry {
     void setcIdx(int cIdx_){
       cIdx = cIdx_;
     }
-    inline const int getcIdx(void){ return cIdx; }
+    inline int getcIdx(void) const { return cIdx; }
 };
 
 template <class dtype>
