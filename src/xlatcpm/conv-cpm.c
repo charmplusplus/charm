@@ -236,7 +236,7 @@ void yy_flush_buffer YY_PROTO(( YY_BUFFER_STATE b ));
 #define YY_FLUSH_BUFFER yy_flush_buffer( yy_current_buffer )
 
 YY_BUFFER_STATE yy_scan_buffer YY_PROTO(( char *base, yy_size_t size ));
-YY_BUFFER_STATE yy_scan_string YY_PROTO(( yyconst char *str ));
+YY_BUFFER_STATE yy_scan_string YY_PROTO(( yyconst char *yy_str ));
 YY_BUFFER_STATE yy_scan_bytes YY_PROTO(( yyconst char *bytes, int len ));
 
 static void *yy_flex_alloc YY_PROTO(( yy_size_t ));
@@ -491,9 +491,9 @@ static char *yy_last_accepting_cpos;
 #define YY_MORE_ADJ 0
 #define YY_RESTORE_YY_MORE_OFFSET
 char *yytext;
-#line 1 "conv-cpm.l"
+#line 1 "conv-cpm.flex"
 #define INITIAL 0
-#line 2 "conv-cpm.l"
+#line 2 "conv-cpm.flex"
 #include <stdio.h>
 #include <string.h>
 int tok_lineno = 0;
@@ -513,6 +513,7 @@ FILE *file_cpm;
  * Lexical Analyzer
  *
  *****************************************************************************/
+#line 517 "lex.yy.c"
 
 /* Macros after this point can all be overridden by user definitions in
  * section 1.
@@ -663,9 +664,10 @@ YY_DECL
 	register char *yy_cp, *yy_bp;
 	register int yy_act;
 
-#line 32 "conv-cpm.l"
+#line 32 "conv-cpm.flex"
 
 
+#line 671 "lex.yy.c"
 
 	if ( yy_init )
 		{
@@ -750,84 +752,85 @@ do_action:	/* This label is used only to access EOF actions. */
 
 case 1:
 YY_RULE_SETUP
-#line 34 "conv-cpm.l"
+#line 34 "conv-cpm.flex"
 { return 'P'; }
 	YY_BREAK
 case 2:
 YY_RULE_SETUP
-#line 35 "conv-cpm.l"
+#line 35 "conv-cpm.flex"
 { return 'S'; }
 	YY_BREAK
 case 3:
 YY_RULE_SETUP
-#line 36 "conv-cpm.l"
+#line 36 "conv-cpm.flex"
 { return 'I'; }
 	YY_BREAK
 case 4:
 YY_RULE_SETUP
-#line 37 "conv-cpm.l"
+#line 37 "conv-cpm.flex"
 { return 'i'; }
 	YY_BREAK
 case 5:
 YY_RULE_SETUP
-#line 38 "conv-cpm.l"
+#line 38 "conv-cpm.flex"
 { return '0'; }
 	YY_BREAK
 case 6:
 YY_RULE_SETUP
-#line 39 "conv-cpm.l"
+#line 39 "conv-cpm.flex"
 { return '0'; }
 	YY_BREAK
 case 7:
 YY_RULE_SETUP
-#line 40 "conv-cpm.l"
+#line 40 "conv-cpm.flex"
 { return '0'; }
 	YY_BREAK
 case 8:
 YY_RULE_SETUP
-#line 41 "conv-cpm.l"
+#line 41 "conv-cpm.flex"
 { return '0'; }
 	YY_BREAK
 case 9:
 YY_RULE_SETUP
-#line 42 "conv-cpm.l"
+#line 42 "conv-cpm.flex"
 { return '0'; }
 	YY_BREAK
 case 10:
 YY_RULE_SETUP
-#line 43 "conv-cpm.l"
+#line 43 "conv-cpm.flex"
 { return '0'; }
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
-#line 44 "conv-cpm.l"
+#line 44 "conv-cpm.flex"
 { return '"'; }
 	YY_BREAK
 case 12:
 YY_RULE_SETUP
-#line 45 "conv-cpm.l"
+#line 45 "conv-cpm.flex"
 { return 'c'; }
 	YY_BREAK
 case 13:
 YY_RULE_SETUP
-#line 46 "conv-cpm.l"
+#line 46 "conv-cpm.flex"
 { }
 	YY_BREAK
 case 14:
 YY_RULE_SETUP
-#line 47 "conv-cpm.l"
+#line 47 "conv-cpm.flex"
 { tok_lineno++; }
 	YY_BREAK
 case 15:
 YY_RULE_SETUP
-#line 48 "conv-cpm.l"
+#line 48 "conv-cpm.flex"
 { return yytext[0]; }
 	YY_BREAK
 case 16:
 YY_RULE_SETUP
-#line 50 "conv-cpm.l"
+#line 50 "conv-cpm.flex"
 ECHO;
 	YY_BREAK
+#line 834 "lex.yy.c"
 case YY_STATE_EOF(INITIAL):
 	yyterminate();
 
@@ -1011,7 +1014,7 @@ static int yy_get_next_buffer()
 		/* don't do the read, it's not guaranteed to return an EOF,
 		 * just force an EOF
 		 */
-		yy_n_chars = 0;
+		yy_current_buffer->yy_n_chars = yy_n_chars = 0;
 
 	else
 		{
@@ -1066,6 +1069,8 @@ static int yy_get_next_buffer()
 		/* Read in more data. */
 		YY_INPUT( (&yy_current_buffer->yy_ch_buf[number_to_move]),
 			yy_n_chars, num_to_read );
+
+		yy_current_buffer->yy_n_chars = yy_n_chars;
 		}
 
 	if ( yy_n_chars == 0 )
@@ -1190,7 +1195,8 @@ register char *yy_bp;
 
 		yy_cp += (int) (dest - source);
 		yy_bp += (int) (dest - source);
-		yy_n_chars = yy_current_buffer->yy_buf_size;
+		yy_current_buffer->yy_n_chars =
+			yy_n_chars = yy_current_buffer->yy_buf_size;
 
 		if ( yy_cp < yy_current_buffer->yy_ch_buf + 2 )
 			YY_FATAL_ERROR( "flex scanner push-back overflow" );
@@ -1233,13 +1239,26 @@ static int input()
 
 			switch ( yy_get_next_buffer() )
 				{
+				case EOB_ACT_LAST_MATCH:
+					/* This happens because yy_g_n_b()
+					 * sees that we've accumulated a
+					 * token and flags that we need to
+					 * try matching the token before
+					 * proceeding.  But for input(),
+					 * there's no matching to consider.
+					 * So convert the EOB_ACT_LAST_MATCH
+					 * to EOB_ACT_END_OF_FILE.
+					 */
+
+					/* Reset buffer status. */
+					yyrestart( yyin );
+
+					/* fall through */
+
 				case EOB_ACT_END_OF_FILE:
 					{
 					if ( yywrap() )
-						{
-						yy_c_buf_p = yytext_ptr + offset;
 						return EOF;
-						}
 
 					if ( ! yy_did_buffer_switch_on_eof )
 						YY_NEW_FILE;
@@ -1253,15 +1272,6 @@ static int input()
 				case EOB_ACT_CONTINUE_SCAN:
 					yy_c_buf_p = yytext_ptr + offset;
 					break;
-
-				case EOB_ACT_LAST_MATCH:
-#ifdef __cplusplus
-					YY_FATAL_ERROR(
-					"unexpected last match in yyinput()" );
-#else
-					YY_FATAL_ERROR(
-					"unexpected last match in input()" );
-#endif
 				}
 			}
 		}
@@ -1425,6 +1435,9 @@ YY_BUFFER_STATE b;
 #endif
 
 	{
+	if ( ! b )
+		return;
+
 	b->yy_n_chars = 0;
 
 	/* We always need two end-of-buffer characters.  The first causes
@@ -1484,17 +1497,17 @@ yy_size_t size;
 
 #ifndef YY_NO_SCAN_STRING
 #ifdef YY_USE_PROTOS
-YY_BUFFER_STATE yy_scan_string( yyconst char *str )
+YY_BUFFER_STATE yy_scan_string( yyconst char *yy_str )
 #else
-YY_BUFFER_STATE yy_scan_string( str )
-yyconst char *str;
+YY_BUFFER_STATE yy_scan_string( yy_str )
+yyconst char *yy_str;
 #endif
 	{
 	int len;
-	for ( len = 0; str[len]; ++len )
+	for ( len = 0; yy_str[len]; ++len )
 		;
 
-	return yy_scan_bytes( str, len );
+	return yy_scan_bytes( yy_str, len );
 	}
 #endif
 
@@ -1703,7 +1716,7 @@ int main()
 	return 0;
 	}
 #endif
-#line 50 "conv-cpm.l"
+#line 50 "conv-cpm.flex"
 
 
 
@@ -1886,7 +1899,7 @@ void gen_func_send()
       fprintf(file_cpm, "int aoffs%d;\n",i);
     if (func_pointer[i]) {
       if (func_array[i]) {
-	fprintf(file_cpm, "int *poffs%d = (int *)malloc(a%d*sizeof(int));\n",i,i-1);
+	fprintf(file_cpm, "size_t *poffs%d = (size_t *)malloc(a%d*sizeof(size_t));\n",i,i-1);
       } else {
 	fprintf(file_cpm, "int poffs%d;\n",i);
       }
@@ -1937,7 +1950,7 @@ void gen_func_send()
       break;
     case 3: /* array pointer */
       fprintf(file_cpm, "msg->f%d = aoffs%d;\n",i,i);
-      fprintf(file_cpm, "memcpy(data+aoffs%d, poffs%d, a%d*sizeof(int));\n",
+      fprintf(file_cpm, "memcpy(data+aoffs%d, poffs%d, a%d*sizeof(size_t));\n",
 	      i,i,i-1);
       fprintf(file_cpm, "for(i=0; i<a%d; i++)\n",i-1);
       fprintf(file_cpm, "  CpmPtrPack_%s(((%s)(data+(poffs%d[i]))), a%d[i]);\n",
