@@ -76,6 +76,14 @@ Array1D::Array1D(ArrayCreateMessage *msg)
   elementConstType = msg->elementConstType;
   elementMigrateType = msg->elementMigrateType;
 
+//Set reduction state variables
+  nFuture=0;reductionClient=NULL;
+  reductionNo=0;//We'll claim we were just doing reduction number zero...
+  reductionFinished=1;//...but it is done now.
+  curReducer=NULL;
+  curMsgs=NULL;
+  curMax=nCur=nComposite=expectedComposite=0;
+
 #if CMK_LBDB_ON
   the_lbdb = CProxy_LBDatabase(msg->loadbalancer).ckLocalBranch();
   if (the_lbdb == 0)
@@ -313,6 +321,7 @@ void Array1D::migrateMe(int index, int where)
   int bufSize = elementIDs[index].element->packsize();
   ArrayMigrateMessage *msg = new (&bufSize, 0) ArrayMigrateMessage;
   msg->index = index;
+  msg->nContributions=elementIDs[index].element->nContributions;
   msg->from = CkMyPe();
   msg->elementSize = bufSize;
   msg->hopCount = elementIDs[index].curHop + 1;
@@ -332,6 +341,8 @@ void Array1D::migrateMe(int index, int where)
 
   CProxy_Array1D arr(thisgroup);
   arr.RecvMigratedElement(msg, where);
+  
+  tryEndReduction();//This may have been the guy we were waiting on...
 }
 
 void Array1D::RecvMigratedElement(ArrayMigrateMessage *msg)
@@ -356,6 +367,7 @@ void Array1D::RecvMigratedElement(ArrayMigrateMessage *msg)
   ArrayElementMigrateMessage *new_msg = new ArrayElementMigrateMessage;
 
   new_msg->index = index;
+  new_msg->nContributions=msg->nContributions;
   new_msg->numElements = numElements;
   new_msg->arrayID = thishandle;
   new_msg->groupID = thisgroup;
@@ -565,6 +577,7 @@ ArrayElement::ArrayElement(ArrayElementCreateMessage *msg)
   thisAID._elem = (-1);
   thisArrayID = thisAID;
   thisIndex = msg->index;
+  nContributions=0;
 }
 
 ArrayElement::ArrayElement(ArrayElementMigrateMessage *msg)
@@ -577,6 +590,7 @@ ArrayElement::ArrayElement(ArrayElementMigrateMessage *msg)
   thisAID._elem = (-1);
   thisArrayID = thisAID;
   thisIndex = msg->index;
+  nContributions=msg->nContributions;
 }
 
 void ArrayElement::finishConstruction(CmiBool use_local_barrier)
@@ -654,3 +668,279 @@ void RRMap::registerArray(ArrayMapRegisterMessage *msg)
   array->RecvMapID(this, hdl);
 }
 
+/////////////////////////////////////////////////////////////////////////////
+/////////////////////// Array Reduction Implementation //////////////////////
+// Orion Sky Lawlor, olawlor@acm.org, 11/15/1999
+
+//Debugging defines-- set this to 1 for tons of (useless?) debugging output.
+#define GIVE_DEBUGGING_OUTPUT 0
+#if GIVE_DEBUGGING_OUTPUT
+#define RED_DEB(x) CkPrintf x
+#else
+#define RED_DEB(x) /*empty*/
+#endif
+#define RA "PE_%d/reduction %d: "
+#define RB ,CkMyPe(),reductionNo
+
+//Call contribute to add your contribution to a new global reduction.
+// The array BOC will keep a copy the data. reducer must be the same on all PEs.
+void ArrayElement::contribute(int dataSize,void *data,ArrayReductionFn reducer)
+{
+	RED_DEB(("index %d sends contribution %d to node %d\n",thisIndex,nContributions+1,CkMyPe()));
+	ArrayReductionMessage *msg=ArrayReductionMessage::buildNew(dataSize,data);
+	msg->source=thisIndex;
+	msg->reductionNo=(++nContributions);
+	thisArray->addReductionContribution(msg,reducer);
+}
+
+void Array1D::registerReductionHandler(ArrayReductionClientFn handler,void *param)
+{
+	reductionClient=handler;
+	reductionClientParam=param;
+}
+
+static int printARM(ArrayReductionMessage *m)
+{
+	CkPrintf("-----PE %d: Reduction message--------------------\n",CkMyPe());
+	CkPrintf("\t  source=%d  (may be negative for composites)\n",m->source);
+	CkPrintf("\t  reductionNo=%d\n",m->reductionNo);
+	CkPrintf("\t  dataSize=%d\n",m->dataSize);
+	CkPrintf("\t  data[0]=%08x\n",((int *)(m->data))[0]);
+	//CkPrintf("\t  data[1]=%08x\n",((int *)(m->data))[1]);
+	//CkPrintf("\t  data[2]=%08x\n",((int *)(m->data))[2]);
+	//CkPrintf("\t  data[3]=%08x\n",((int *)(m->data))[3]);
+	CkPrintf("------------------------------------\n");
+	return 0;
+}
+
+
+void Array1D::RecvReductionMessage(ArrayReductionMessage *msg)
+{
+	RED_DEB((RA"recv'd remote contribution\n"RB,printARM(msg)));
+	addReductionContribution(msg,NULL);
+}
+
+//This is called by ArrayElement::contribute() and RcvReductionMessage.
+// reducer may be NULL. The given message is kept by Array1D.
+void Array1D::addReductionContribution(
+	ArrayReductionMessage *m,ArrayReductionFn reducer)
+{
+	if (m->reductionNo>reductionNo)
+	{//We haven't dealt with this reduction number yet--
+		if (reductionFinished)
+		{//We're ready for a new reduction
+			if (reducer==NULL)
+				beginReduction(0);//We were invoked remotely
+			else
+				beginReduction(1);//We were invoked by a local element
+		}
+		else 
+		{//A prior reduction is in progress-- buffer this message
+			m->futureReducer=reducer;//Stash the reducer for later use
+			futureBuffer[nFuture++]=m;
+			RED_DEB((RA"recv'd %dth early contribution from %d\n"RB,nFuture,m->source));
+			if (nFuture>=ARRAY_RED_FUTURE_MAX) CkAbort("Too many out-of-order reduction messages sent.\n");
+			return;//We can't handle this message yet
+		}
+	} else if ((m->reductionNo<reductionNo)||
+		((m->reductionNo==reductionNo)&&reductionFinished))
+	{//This message is for a reduction we already finished!
+		if (CkMyPe()==0)
+		//This is an error in the reduction library
+			CkAbort("ERROR! Root node recieved a message for a reduction which is already complete!\n");
+		else //This message is late because of migration--
+		{//forward it straight to the root
+			RED_DEB((RA"recv'd late contribution from %d\n"RB,m->source));
+			CProxy_Array1D arr(thisgroup);
+			arr.RecvReductionMessage(m, 0);
+			return;
+		}
+	}
+	
+	if (reducer!=NULL) curReducer=reducer;//Set the reduction function
+	curMsgs[nCur++]=m;
+	if (m->source<0)//This was a message from one of our kids
+		nComposite++;
+	RED_DEB((RA"recv'd %dth contribution\n"RB,nCur));
+	
+	tryEndReduction();
+}
+
+int i_min(int a,int b) {if (a<b) return a; else return b;}
+//BeginReduction is called to start each reduction
+//It allocates msgs array above, increments reductionNo
+typedef ArrayReductionMessage* ArrayReductionMessagePtr;
+void Array1D::beginReduction(int extraLocals)
+{
+	reductionFinished=0;
+	reductionNo++;//Start a new reduction
+	
+	//This is the PE number of my first child
+	int firstKid=(CkMyPe()<<ARRAY_RED_TREE_LOG)+1;
+	if (firstKid<CkNumPes()) //We have children-- expect 1 message from each
+		expectedComposite=i_min(ARRAY_RED_TREE,CkNumPes()-firstKid);
+	else	expectedComposite=0;//We are a leaf in the reduction tree.
+	
+	//Allocate a buffer for the new expected messages
+	curMax=expectedComposite+expectedLocalMessages()+extraLocals;
+	if (CkMyPe()==0)
+		//The root node may have to recieve a few extra messages
+		// from migrating nodes.
+		curMax+=250;
+	curMsgs=new ArrayReductionMessagePtr[curMax];
+	nComposite=nCur=0;
+	RED_DEB((RA"starting reduction. expecting %d remote messages, %d local (+%d)\n"RB,expectedComposite,curMax-expectedComposite,extraLocals));
+}
+//How many messages do we still need from local elements?
+int Array1D::expectedLocalMessages(void)
+{
+	int i,nExpected=0;
+	//We expect one message from each local who hasn't yet contributed
+	for (i=0;i<numElements;i++)
+		if (elementIDs[i].state==here || elementIDs[i].state==creating)
+			if (elementIDs[i].element->nContributions<reductionNo)
+				nExpected++;
+	//We also expect one message from each occupant of the future file
+	for (i=0;i<nFuture;i++)
+		if (futureBuffer[i]->reductionNo==reductionNo)/*<-is this reduction*/
+			if (futureBuffer[i]->futureReducer!=NULL) /*<-is local*/
+				nExpected++;
+	return nExpected;
+}
+
+void Array1D::tryEndReduction(void)//Check if we're done, and if so, finish.
+{
+	if (nCur==curMax)
+		endReduction();//We have all the messages we can handle
+	else if ((expectedComposite==nComposite)&&(expectedLocalMessages()==0))
+		endReduction();//We have all the messages we're going to get
+}
+
+//This is called at the end of each reduction
+//It combines the msgs array, sends it off, and sets the finished flag
+void Array1D::endReduction(void)
+{
+	int i;
+	if (curReducer==NULL)
+		CkAbort("Array reduction function is NULL!  Are there any array elements on this PE?");
+	RED_DEB((RA"about to finish reduction, %d contributions in\n"RB,nCur));
+	//Combine the current messages into a reduced message
+	ArrayReductionMessage *m=(*curReducer)(nCur,curMsgs);
+	//Set the reduction number and compute the number of message sources.
+	m->reductionNo=reductionNo;
+	int nSources=0;
+	for (i=0;i<nCur;i++)
+		nSources+=curMsgs[i]->getSources();
+	m->source=-nSources;//m->source is negative as a flag (composite)
+	
+	if (CkMyPe()==0)
+	{//We are the root-- check to see if we have all the messages yet
+		if (nSources==numElements)
+		{//We've collected the contributions from all elements--
+		// call the user's reduction client function.
+			reductionFinished=1;
+			RED_DEB((RA"reduction finished.  Calling reduction client.\n"RB));
+			if (reductionClient!=NULL)
+				(*reductionClient)(reductionClientParam,m->dataSize,m->data);
+			delete m;
+		} else {//We don't have all the contributions yet--
+			//Some stragglers must be migrating.  We'll get them next time.
+			RED_DEB((RA"reduction NOT finished because some elements are migrating-- only have %d out of %d contributions.\n"RB,nSources,numElements));
+			delete m;
+			return;
+		}
+	} else {
+	//We aren't root-- we can just forward the message to our parent
+		reductionFinished=1;
+		int parentNode=(CkMyPe()-1)>>ARRAY_RED_TREE_LOG;
+		RED_DEB((RA"forwarding reduced message to my parent, %d.\n"RB,parentNode,printARM(m)));
+		//Send the new message to our parent node
+		CProxy_Array1D arr(thisgroup);
+		arr.RecvReductionMessage(m, parentNode);
+	}
+	
+	//We're finished-- clean up
+	curReducer=NULL;//Flush the old reducer
+	for (i=0;i<nCur;i++)
+		delete curMsgs[i];
+	delete curMsgs;//Delete buffered reduction messages
+	RED_DEB((RA"finished with reduction.\n"RB,CkMyPe(),reductionNo));
+	
+	//Check to see if we can handle any messages from the future now
+	int orig_nFuture=nFuture;
+	for (i=0;i<orig_nFuture;i++)
+	{
+		//Pop an element from the front of the future buffer
+		ArrayReductionMessage *m=futureBuffer[0];
+		RED_DEB((RA"handling future message %d of %d, from reduction %d\n"RB,i,orig_nFuture,m->reductionNo));
+		//Move everybody in the future buffer down a notch
+		for (int j=0;j+1<nFuture;j++)
+			futureBuffer[j]=futureBuffer[j+1];
+		nFuture--;
+		//Try to handle this message-- if we still can't, it'll
+		// go right back into the (end of the) futureBuffer.
+		addReductionContribution(m,m->futureReducer);
+	}
+}
+
+////////////////////////////////
+//ArrayReductionMessage support
+
+//ReductionMessage default private constructor-- does nothing
+ArrayReductionMessage::ArrayReductionMessage(){}
+
+//Return the number of array elements from which this message's data came
+int ArrayReductionMessage::getSources()
+{
+	if (source>=0) return 1;//This data came from a single element
+	else return -source;//This data came from several elements
+}
+
+//This define gives the distance from the start of the ArrayReductionMessage
+// object to the start of the user data area (just below last object field)
+#define ARM_DATASTART ALIGN8(sizeof(ArrayReductionMessage))
+
+//"Constructor"-- builds and returns a new ArrayReductionMessage.
+//  the "data" array you specify will be copied into this object.
+ArrayReductionMessage *ArrayReductionMessage::
+	buildNew(int NdataSize,void *srcData)
+{
+	int totalsize=ARM_DATASTART+NdataSize;
+	
+	ArrayReductionMessage *ret = (ArrayReductionMessage *)
+		CkAllocMsg(__idx,totalsize,0);
+	ret->dataSize=NdataSize;
+	ret->data=(void *)(ARM_DATASTART+(char *)ret);
+	if (srcData!=NULL)
+		memcpy(ret->data,srcData,NdataSize);
+	return ret;
+}
+
+void *
+ArrayReductionMessage::alloc(int msgnum,int size,int *sz,int priobits)
+{
+	int totalsize=ARM_DATASTART+(*sz);
+	RED_DEB(("Allocating %d %d %d\n",msgnum,totalsize,priobits));
+	ArrayReductionMessage *ret = (ArrayReductionMessage *)
+		CkAllocMsg(msgnum,totalsize,priobits);
+	ret->data=(void *)(ARM_DATASTART+(char *)ret);
+	return (void *) ret;
+}
+  
+void *
+ArrayReductionMessage::pack(ArrayReductionMessage* in)
+{
+	RED_DEB(("PE %d Packing %d %d %d\n",CkMyPe(),in->source,in->reductionNo,in->dataSize));
+	in->data = NULL;
+	return (void*) in;
+}
+
+ArrayReductionMessage* 
+ArrayReductionMessage::unpack(void *in)
+{
+	ArrayReductionMessage *ret = (ArrayReductionMessage *)in;
+	RED_DEB(("PE %d Unpacking %d %d %d\n",
+		CkMyPe(),ret->source,ret->reductionNo,ret->dataSize));
+	ret->data=(void *)(ARM_DATASTART+(char *)ret);
+	return ret;
+}
