@@ -5,13 +5,7 @@ Written by Mike Campbell, 2003.
 Modified by Orion Lawlor, 2004.
 */
 
-/* For debugging prints */
-#include <iostream>
-using std::ostream;
-using std::istream;
-using std::cerr;
-using std::endl;
-
+#include <charm.h> /* for CkAbort */
 #include <vector>
 #include <list>
 using std::list;
@@ -78,8 +72,7 @@ GenericElement::shape_func(const CVector &nc,double SF[]) const
     break;
   }
   default: 
-    cerr << "GenericElement::shape_func:Error: unkown element type." << endl;
-    exit(1);
+    CkAbort("GenericElement::shape_func:Error: unkown element type.");
   }
 }
 
@@ -130,8 +123,7 @@ GenericElement::dshape_func(const CVector &nc,double dSF[][3]) const
     break;
   }
   default:
-    cerr << "GenericElement::dshape_func:error: Unknown element type." << endl;
-    exit(1);
+    CkAbort("GenericElement::dshape_func:error: Unknown element type.");
   }
 }
 
@@ -176,9 +168,7 @@ GenericElement::jacobian(const CPoint p[],const CVector &nc,CVector J[]) const
     break;
   }
   default:
-    cerr << "GenericElement::jacobian:Error: Cannot handle this" 
-	 << " element size (yet)." << endl;
-    exit(1);
+    CkAbort("GenericElement::jacobian:Error: Cannot handle this element size (yet).");
   }
 }
 
@@ -233,9 +223,7 @@ GenericElement::interpolate_natural(int nValuesPerNode,
       break;
     }
     default:
-      cerr << "interpolate::error Cannot handle this element "
-   	   << "type (yet)." << endl;
-      exit(1);
+      CkAbort("interpolate::error Cannot handle this element type (yet).");
     }
   }
 }
@@ -304,15 +292,12 @@ GenericElement::element_contains_point(const CPoint &p, //    Target Mesh point
   else if (_size == 8 || _size == 20)
     natc=CVector(.5,.5,.5);
   else{
-    cerr << "GenericElement::element_contains_point: Error: Cannot handle" 
-  	 << " this element type. (yet)" << endl;
-    exit(1);
+    CkAbort("GenericElement::element_contains_point: Error: Cannot handle this element type. (yet)");
   }
   
   // Solve for the natural coordinates using non-linear newton-raphson 
   if(!NewtonRaphson(natc,*this,e,p)){
-    cerr << "GenericElement::global_find_point_in_mesh: error NewtonRaphson failed." << endl;
-    return(false);
+    CkAbort("GenericElement::global_find_point_in_mesh: error NewtonRaphson failed.");
   }
   
   // Make sure natural coordinates lie in unit cube:
@@ -366,7 +351,7 @@ NewtonRaphson(CVector &natc,
       return (true);
     p = -1.0 * fvec;
     if(!LUDcmp(fjac,indx)){
-      cerr << "NewtonRaphson::error: LUDcmp failed." << endl;
+      // cerr << "NewtonRaphson::error: LUDcmp failed." << endl;
       return(false);
     }
     LUBksb(fjac,indx,p);
@@ -377,7 +362,7 @@ NewtonRaphson(CVector &natc,
     if (errx <= TOL)
       return (true);
   }
-  cerr << "NewtonRaphson::warning: reached maximum iterations" << endl;
+  // cerr << "NewtonRaphson::warning: reached maximum iterations" << endl;
   return (true);
 }
 
@@ -398,7 +383,7 @@ LUDcmp(CVector a[], int indx[])
     for (j=0;j<3;j++)
       if ((temp=fabs(a[i][j])) > big) big=temp;
     if (big == 0.0){
-      cerr << "LUDcmp::error: Singular matrix" << endl;
+      // cerr << "LUDcmp::error: Singular matrix" << endl;
       return(false);
     }
     vv[i]=1.0/big;
