@@ -217,9 +217,12 @@ void GreedyCommLB::work(CentralLB::LDStats* _stats, int count)
     for(pe=0;pe < count;pe++)
 	CkPrintf("avail for %d = %d\n",pe,stats[pe].available);
     */
-    for(pe=0;pe < count;pe++)
-	if(stats->procs[pe].available == 1)
-	    break;
+    pe = -1;
+    for (int p=0; p<count; p++) {
+      if (!stats->procs[p].available) continue;
+      if (pe == -1 || alloc_array[p][nobj] < alloc_array[pe][nobj]) pe = p;
+    }
+    if (pe==-1) CmiAbort("LB Panic: No processor is available!");
 
     int first_avail_pe = pe;
 
@@ -236,7 +239,6 @@ void GreedyCommLB::work(CentralLB::LDStats* _stats, int count)
 	CmiAssert(stats->from_proc[mpos] == spe);
 	stats->to_proc[mpos] = pe;
     }
-
 
     for(id = 1;id<nmigobj;id++){
 	x  = maxh.deleteMax();
