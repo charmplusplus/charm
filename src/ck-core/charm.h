@@ -200,6 +200,27 @@ extern void *CkWaitReleaseFuture(CkFutureID futNum);
 
 /******************************************************************************
  *
+ * Semaphore calls
+ *
+ *****************************************************************************/
+
+typedef struct _ckSemaID {
+  int pe;
+  int idx;
+#ifdef __cplusplus
+  public:
+    void pup(PUP::er &p) { p(pe); p(idx); }
+#endif
+} CkSemaID;
+
+extern CkSemaID CkSemaCreate(void);
+extern void *CkSemaWait(CkSemaID id);
+extern void CkSemaWaitN(CkSemaID id, int n, void *marray[]);
+extern void CkSemaSignal(CkSemaID id, void *m);
+extern void CkSemaDestroy(CkSemaID id);
+
+/******************************************************************************
+ *
  * Quiescence Calls
  *
  *****************************************************************************/

@@ -6,6 +6,7 @@ module CkFutures {
   group FutureBOC {
     entry FutureBOC(FutureInitMsg *);
     entry void SetFuture(FutureInitMsg *);
+    entry void SetSema(FutureInitMsg *);
   };
 
   mainchare FutureMain {

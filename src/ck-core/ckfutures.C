@@ -34,7 +34,86 @@ typedef struct {
 }
 FutureState;
 
+class CkSema {
+  private:
+    CkQ<void*> msgs;
+    CkQ<CthThread> waiters;
+  public:
+    void *wait(void) {
+      void *retmsg = msgs.deq();
+      if(retmsg==0) {
+        waiters.enq(CthSelf());
+        CthSuspend();
+        retmsg = msgs.deq();
+      }
+      return retmsg;
+    }
+    void waitN(int n, void *marray[]) {
+      while (1) {
+        if(msgs.length()<n) {
+          waiters.enq(CthSelf());
+          CthSuspend();
+          continue;
+        }
+        for(int i=0;i<n;i++)
+          marray[i] = msgs.deq();
+        return;
+      }
+    }
+    void signal(void *msg)
+    {
+      msgs.enq(msg);
+      if(!waiters.isEmpty())
+        CthAwaken(waiters.deq());
+      return;
+    }
+};
+
+class CkSemaPool {
+  private:
+    CkVec<CkSema*> pool;
+    CkQ<int> freelist;
+  public:
+    int getNew(void) {
+      CkSema *sem = new CkSema();
+      int idx;
+      if(freelist.isEmpty()) {
+        idx = pool.length();
+        pool.insertAtEnd(sem);
+      } else {
+        idx = freelist.deq();
+        pool[idx] = new CkSema();
+      }
+      return idx;
+    }
+    void release(int idx) {
+      CkSema * sem = pool[idx];
+      delete sem;
+      freelist.enq(idx);
+    }
+    void _check(int idx) {
+#ifndef CMK_OPTIMIZE
+      if(pool[idx]==0) {
+	      CkAbort("ERROR! operation attempted on invalid semaphore\n");
+      }
+#endif
+    }
+    void *wait(int idx) { 
+      _check(idx);
+      return pool[idx]->wait(); 
+    }
+    void waitN(int idx, int n, void *marray[]) { 
+      _check(idx);
+      pool[idx]->waitN(n, marray); 
+    }
+    void signal(int idx, void *msg) { 
+      _check(idx);
+      pool[idx]->signal(msg); 
+    }
+};
+
 CpvStaticDeclare(FutureState, futurestate);
+CpvStaticDeclare(CkSemaPool*, semapool);
 
 static void addedFutures(int lo, int hi)
 {
@@ -136,11 +215,13 @@ static void setFuture(CkFutureID handle, void *pointer)
 void _futuresModuleInit(void)
 {
   CpvInitialize(FutureState, futurestate);
+  CpvInitialize(CkSemaPool, *semapool);
   CpvAccess(futurestate).array = (Future *)malloc(10*sizeof(Future));
   _MEMCHECK(CpvAccess(futurestate).array);
   CpvAccess(futurestate).max   = 10;
   CpvAccess(futurestate).freelist = -1;
   addedFutures(0,10);
+  CpvAccess(semapool) = new CkSemaPool();
 }
 
 CkGroupID _fbocID;
@@ -228,6 +309,14 @@ public:
     key = UsrToEnv((void *)m)->getRef();
     setFuture( key, m);
   }
+  void SetSema(FutureInitMsg *m) {
+#ifndef CMK_OPTIMIZE
+    if (m==NULL) CkAbort("FutureBOC::SetSema called with NULL!");
+#endif
+    int idx;
+    idx = UsrToEnv((void *)m)->getRef();
+    CpvAccess(semapool)->signal(idx,(void*)m);
+  }
 };
 
 extern "C" 
@@ -236,6 +325,56 @@ void CkSendToFuture(CkFutureID futNum, void *m, int PE)
   UsrToEnv(m)->setRef(futNum);
   CProxy_FutureBOC fBOC(_fbocID);
   fBOC[PE].SetFuture((FutureInitMsg *)m);
+}
+
+extern "C"
+CkSemaID CkSemaCreate(void)
+{
+  CkSemaID id;
+  id.pe = CkMyPe();
+  id.idx = CpvAccess(semapool)->getNew();
+  return id;
+}
+
+extern "C"
+void *CkSemaWait(CkSemaID id)
+{
+#ifndef CMK_OPTIMIZE
+  if(id.pe != CkMyPe()) {
+    CkAbort("ERROR: Waiting on nonlocal semaphore! Aborting..\n");
+  }
+#endif
+  return CpvAccess(semapool)->wait(id.idx);
+}
+
+extern "C"
+void CkSemaWaitN(CkSemaID id, int n, void *marray[])
+{
+#ifndef CMK_OPTIMIZE
+  if(id.pe != CkMyPe()) {
+    CkAbort("ERROR: Waiting on nonlocal semaphore! Aborting..\n");
+  }
+#endif
+  CpvAccess(semapool)->waitN(id.idx, n, marray);
+}
+
+extern "C"
+void CkSemaSignal(CkSemaID id, void *m)
+{
+  UsrToEnv(m)->setRef(id.idx);
+  CProxy_FutureBOC fBOC(_fbocID);
+  fBOC[id.pe].SetSema((FutureInitMsg *)m);
+}
+
+extern "C"
+void CkSemaDestroy(CkSemaID id)
+{
+#ifndef CMK_OPTIMIZE
+  if(id.pe != CkMyPe()) {
+    CkAbort("ERROR: destroying a nonlocal semaphore! Aborting..\n");
+  }
+#endif
+  CpvAccess(semapool)->release(id.idx);
 }
 
 #include "CkFutures.def.h"
