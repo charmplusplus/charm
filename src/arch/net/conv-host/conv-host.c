@@ -48,7 +48,6 @@
 #define DIRSEP "/"
 #endif
 
-
 #if CMK_RSH_NOT_NEEDED /*No RSH-- use daemon to start node-programs*/
 #  define CMK_USE_RSH 0
 
@@ -1854,7 +1853,6 @@ prog rsh_start(nodeno)
   char *rshargv[6];
   prog rsh;
   
-  if (arg_verbose) printf("Conv-host> Starting rsh %s -l %s\n",nodetab_name(nodeno),nodetab_login(nodeno));
   rshargv[0]=nodetab_shell(nodeno);
   rshargv[1]=nodetab_name(nodeno);
   rshargv[2]="-l";
@@ -1865,6 +1863,7 @@ prog rsh_start(nodeno)
   rshargv[4]="exec /bin/csh -f";
 #endif
   rshargv[5]=0;
+  if (arg_verbose) printf("Conv-host> Starting %s %s -l %s %s\n",nodetab_shell(nodeno), nodetab_name(nodeno),nodetab_login(nodeno), rshargv[4]);
 
   rsh = prog_start(nodetab_shell(nodeno), rshargv, 1);
   if ((rsh==0)&&(errno!=EMFILE)) { perror("ERROR> starting rsh"); exit(1); }
@@ -1892,8 +1891,8 @@ void rsh_pump_sh(p, nodeno, rank0no, argv)
 
   xstr_printf(ibuf,"test -x ~/.conv-hostrc && . ~/.conv-hostrc\n");
   if (arg_display)
-    xstr_printf(ibuf,"export DISPLAY=%s\n",arg_display);
-  xstr_printf(ibuf,"export NETSTART='%s'\n",create_netstart(rank0no));
+    xstr_printf(ibuf,"DISPLAY=%s;export DISPLAY\n",arg_display);
+  xstr_printf(ibuf,"NETSTART='%s';export NETSTART\n",create_netstart(rank0no));
   prog_flush(p);
 
   /* find the node-program */
@@ -1904,9 +1903,9 @@ void rsh_pump_sh(p, nodeno, rank0no, argv)
 
   if (arg_debug || arg_debug_no_pause || arg_in_xterm) {
     xstr_printf(ibuf,"for dir in `echo $PATH | sed -e 's/:/ /g'`; do\n");
-    xstr_printf(ibuf,"  test -f $dir/%s && export F_XTERM=$dir/%s\n", 
+    xstr_printf(ibuf,"  test -f $dir/%s && F_XTERM=$dir/%s && export F_XTERM\n", 
                      nodetab_xterm(nodeno), nodetab_xterm(nodeno));
-    xstr_printf(ibuf,"  test -f $dir/xrdb && export F_XRDB=$dir/xrdb\n");
+    xstr_printf(ibuf,"  test -f $dir/xrdb && F_XRDB=$dir/xrdb && export F_XRDB\n");
     xstr_printf(ibuf,"done\n");
     xstr_printf(ibuf,"if test -z \"$F_XTERM\";  then\n");
     xstr_printf(ibuf,"   echo '%s not in path --- set your path in your profile.'\n", nodetab_xterm(nodeno));
@@ -1923,7 +1922,7 @@ void rsh_pump_sh(p, nodeno, rank0no, argv)
   if (arg_debug || arg_debug_no_pause)
   	{
           xstr_printf(ibuf,"for dir in `echo $PATH | sed -e 's/:/ /g'`; do\n");
-          xstr_printf(ibuf,"  test -f $dir/%s && export F_DBG=$dir/%s\n",dbg,dbg);
+          xstr_printf(ibuf,"  test -f $dir/%s && F_DBG=$dir/%s && export F_DBG\n",dbg,dbg);
           xstr_printf(ibuf,"done\n");
           xstr_printf(ibuf,"if -z \"$F_DBG\"; then\n");
           xstr_printf(ibuf,"   echo '%s not in path - set your path in your cshrc.'\n",dbg);
