@@ -38,7 +38,7 @@
 ELAN_BASE     *elan_base;
 ELAN_TPORT    *elan_port;
 ELAN_QUEUE    *elan_q;
-const int SMALL_MESSAGE_SIZE= 5000;     /* for comm bench */
+const int SMALL_MESSAGE_SIZE= 2048;     /* for comm bench */
                                      /* Message sizes greater will be 
 					  probe received adding 5us overhead*/
 #define SYNC_MESSAGE_SIZE 165000
@@ -47,7 +47,7 @@ const int SMALL_MESSAGE_SIZE= 5000;     /* for comm bench */
 
 #define NON_BLOCKING_MSG  256          /* Message sizes greater 
 					  than this will be sent asynchronously*/
-#define RECV_MSG_Q_SIZE 32
+#define RECV_MSG_Q_SIZE 16
 
 ELAN_EVENT *esmall[RECV_MSG_Q_SIZE], *elarge;
 #define TAG_SMALL 0x69
