@@ -53,7 +53,7 @@ CDECL void REFINE2D_NewMesh(int nEl,int nGhost,int nnodes,const int *conn,const 
 
 /* FIXME: global barrier is a silly way to avoid early edge numbering messages */
   MPI_Barrier(MPI_COMM_WORLD);
-  CtvAccess(_refineChunk)->newMesh(nEl,nGhost,conn, gid, 0);
+  CtvAccess(_refineChunk)->newMesh(nEl,nGhost,conn, gid, nnodes, boundaries, 0);
   CkWaitQD(); //Wait for all edge numbering messages to finish
 }
 FDECL void FTN_NAME(REFINE2D_NEWMESH,refine2d_newmesh)

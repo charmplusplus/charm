@@ -19,40 +19,40 @@ class node {  // a 2D double coordinate
   edgeRef lockHolder;
  public:
   int present;  // indicates this is an edge present in the mesh
-  int border; // mesh boundary info
+  int boundary; // mesh boundary info: 0 for internal pos int for boundary
+  int corner;   // mesh corner info: 0 for non-corner, 1 for corner
   
   node() {
-    x=-1.0; y=-1.0; theLock = reports = border = 0; 
+    x=-1.0; y=-1.0; theLock = reports = boundary = corner = 0; 
     sumReports[0]=sumReports[1]=0.0; present = 0;
   }
   node(double a, double b) { 
-    x = a;  y = b;  reports = border = theLock = 0; 
+    x = a;  y = b;  reports = boundary = corner = theLock = 0; 
     sumReports[0] = sumReports[1] = 0.0; present = 1;
   }
   node(const node& n) { 
-    x = n.x;  y = n.y;  reports = n.reports; border = n.border; 
-    theLock = n.theLock; present = n.present;
+    x = n.x;  y = n.y;  reports = n.reports; boundary = n.boundary; 
+    theLock = n.theLock; present = n.present; corner = n.corner;
     sumReports[0] = n.sumReports[0];  sumReports[1] = n.sumReports[1];
   }
   void set(double a, double b) { 
     x = a;  y = b; present = 1;
   }
-  void setBorder() { border = 1; }
   void reset() { 
-    theLock = reports = border = 0;
+    theLock = reports = boundary = corner = 0;
     sumReports[0] = sumReports[1] = 0.0; present = 0;
   }
   int operator==(const node& n) { return ((x == n.x) && (y == n.y)); }
   node& operator=(const node& n) { 
-    x = n.x;  y = n.y;  reports = n.reports;  border = n.border;
-    theLock = n.theLock;
+    x = n.x;  y = n.y;  reports = n.reports;  boundary = n.boundary;
+    theLock = n.theLock; corner = n.corner;
     present = n.present;
     sumReports[0] = n.sumReports[0];  sumReports[1] = n.sumReports[1];
     return *this; 
   }
   void pup(PUP::er &p) {
-    p(x); p(y); p(present); p(reports); p(theLock); p(border); 
-    p(sumReports, DIM);
+    p(x); p(y); p(present); p(reports); p(theLock); p(boundary); 
+    p(sumReports, DIM); p(corner);
   }
   int isPresent() { return present; }
   double X() { return x; }
@@ -117,7 +117,7 @@ class node {  // a 2D double coordinate
     reports++;
   }
   int safeToMove(node m) {
-    if (border) return 0;  // this node on border; don't move it
+    if (boundary) return 0;  // this node on boundary; don't move it
     return 1;
   }
   int safeToMove(node m, elemRef E0, edgeRef e0, edgeRef e1, 
@@ -128,7 +128,7 @@ class node {  // a 2D double coordinate
     edgeRef ei, eold = e1;
     node ni;
     */
-    if (border) return 0;  // this node on border; don't move it
+    if (boundary) return 0;  // this node on boundary; don't move it
     return 1;
     /*
     else { // check if this node can flip edges when moved to m

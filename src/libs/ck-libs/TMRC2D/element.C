@@ -191,7 +191,7 @@ void element::collapse(int shortEdge)
 
   int opnode, delNode, keepNode, delEdge, keepEdge, result;
   elemRef keepNbr, delNbr, nbr;
-  int local, first, flag;
+  int local, first, flag, kBound, dBound, kCorner, dCorner, collapseFlag=-1;
 
   if (edges[shortEdge].isPending(myRef)) {
   }
@@ -210,7 +210,61 @@ void element::collapse(int shortEdge)
   keepNbr = edges[keepEdge].getNbr(myRef);
   delNbr = edges[delEdge].getNbr(myRef);
   nbr = edges[shortEdge].getNbr(myRef);
-  
+  // get the boundary flags for the nodes on the edge to collapse
+  kBound = C->theNodes[nodes[keepNode]].boundary;
+  dBound = C->theNodes[nodes[delNode]].boundary;
+  kCorner = C->theNodes[nodes[keepNode]].corner;
+  dCorner = C->theNodes[nodes[delNode]].corner;
+
+  // check boundary conditions
+  if ((kBound == 0) && (dBound == 0)) { // both interior nodes
+    // collapse edge to midpoint
+  }
+  else if ((kBound == 0) || (dBound == 0)) { // one on boundary
+    // collapse edge to boundary node
+    if (kBound) collapseFlag = keepNode;
+    else collapseFlag = delNode;
+  }
+  else if (kBound == dBound) { // both on same boundary
+    // check corner status of both nodes
+    // if both corners don't refine
+    if (kCorner && dCorner) return;
+    // if one corner, collapse edge to corner
+    else if (kCorner || dCorner) {
+      if (kCorner) collapseFlag = keepNode;
+      else collapseFlag = delNode;
+    }
+    else { // if neither are corners, collapse edge to midpoint
+    }
+  }
+  else { // nodes on different boundary
+    // check if edge is internal
+    if (nbr.cid >= 0) {
+      // edge is internal; don't coarsen
+      return;
+    }
+    else { // if it isn't check if lower boundary node is a corner
+      if (dBound > kBound) { // dBound is numbered higher
+	CkAssert(dCorner);
+	if (kCorner) { // if it is, don't coarsen
+	  return;
+	}
+	else { // if it isn't, collapse edge to larger boundary node
+	  collapseFlag = delNode;
+	}
+      }
+      else { // kBound is numbered higher
+	CkAssert(kCorner);
+	if (dCorner) { // if it is, don't coarsen
+	  return;
+	}
+	else { // if it isn't, collapse edge to larger boundary node
+	  collapseFlag = keepNode;
+	}
+      }
+    }
+  }
+
   double length = 
     C->theNodes[nodes[keepNode]].distance(C->theNodes[nodes[delNode]]);
   CkPrintf("TMRC2D: LOCKing opnode=%d\n", nodes[opnode]);
@@ -233,8 +287,13 @@ void element::collapse(int shortEdge)
   if (result == 1) {
     // collapse successful; keepNode is node to keep
     // tell delNbr to replace delEdge with keepEdge
-    newNode = 
-      C->theNodes[nodes[keepNode]].midpoint(C->theNodes[nodes[delNode]]);
+    if (collapseFlag == -1)
+      newNode = 
+	C->theNodes[nodes[keepNode]].midpoint(C->theNodes[nodes[delNode]]);
+    else if (collapseFlag == delNode)
+      newNode = C->theNodes[nodes[delNode]];
+    else
+      C->theNodes[nodes[keepNode]];
     CkPrintf("In collapse[%d](a) shortEdge=%d delEdge=%d keepEdge=%d opnode=%d delNode=%d keepNode=%d delNbr=%d keepNbr=%d\n", myRef.idx, edges[shortEdge].idx, edges[delEdge].idx, edges[keepEdge].idx, nodes[opnode], nodes[delNode], nodes[keepNode], delNbr.idx, keepNbr.idx);
     if (delNbr.cid != -1)
       mesh[delNbr.cid].updateElementEdge(delNbr.idx, edges[delEdge], 
@@ -264,8 +323,13 @@ void element::collapse(int shortEdge)
     // tell delNbr to replace delEdge with keepEdge
     keepNbr = edges[keepEdge].getNbr(myRef);
     delNbr = edges[delEdge].getNbr(myRef);
-    newNode = 
-      C->theNodes[nodes[keepNode]].midpoint(C->theNodes[nodes[delNode]]);
+    if (collapseFlag == -1)
+      newNode = 
+	C->theNodes[nodes[keepNode]].midpoint(C->theNodes[nodes[delNode]]);
+    else if (collapseFlag == delNode)
+      newNode = C->theNodes[nodes[delNode]];
+    else
+      C->theNodes[nodes[keepNode]];
     CkPrintf("In collapse[%d](b) shortEdge=%d delEdge=%d keepEdge=%d opnode=%d delNode=%d keepNode=%d delNbr=%d keepNbr=%d\n", myRef.idx, edges[shortEdge].idx, edges[delEdge].idx, edges[keepEdge].idx, nodes[opnode], nodes[delNode], nodes[keepNode], delNbr.idx, keepNbr.idx);
     if (delNbr.cid != -1)
       mesh[delNbr.cid].updateElementEdge(delNbr.idx, edges[delEdge], 

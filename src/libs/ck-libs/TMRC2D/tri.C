@@ -692,7 +692,7 @@ void chunk::multipleCoarsen(double *desiredArea, refineClient *client)
 }
 
 void chunk::newMesh(int nEl, int nGhost, const int *conn_, const int *gid_, 
-		    int idxOffset)
+		    int nnodes, int *boundaries, int idxOffset)
 {
   int i, j;
   CkPrintf("TMRC2D: newMesh on chunk %d...\n", cid);
@@ -729,6 +729,15 @@ void chunk::newMesh(int nEl, int nGhost, const int *conn_, const int *gid_,
 
   // derive edges from elements on this chunk
   deriveEdges(conn, gid);
+  CkAssert(nnodes == numNodes);
+  if (boundaries) {
+    for (i=0; i<numNodes; i++) {
+      theNodes[i].boundary = boundaries[i];
+    }
+  }
+  else {
+    deriveBoundaries();
+  }
   delete[] conn;
   delete[] gid;
   CkPrintf("TMRC2D: newMesh DONE; chunk created with %d elements.\n", 
@@ -837,9 +846,10 @@ int chunk::hasEdge(int n1, int n2, int *conn, int idx)
   return -1;
 }
 
-void chunk::deriveBorderNodes()
+void chunk::deriveBoundaries()
 {
-  CkPrintf("TMRC2D: WARNING! chunk::deriveBorderNodes called but not implemented!\n");
+  CkPrintf("TMRC2D: WARNING! Null list of boundary flags passed to newMesh...\n ...I hope you didn't want coarsening to work!\n");
+  //CkPrintf("TMRC2D: WARNING! chunk::deriveBorderNodes called but not implemented!\n");
   /*
   elemRef nullRef;
   for (int i=0; i<numEdges; i++) {

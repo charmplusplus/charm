@@ -151,7 +151,7 @@ class chunk : public TCharmClient1D {
   void sanityCheck(void);
  
   // entry methods
-  void deriveBorderNodes();
+  void deriveBoundaries();
   void tweakMesh();
   void improveChunk();
   void improve();
@@ -216,7 +216,7 @@ class chunk : public TCharmClient1D {
   // *** These methods are part of the interface with the FEM framework ***
   // create a chunk's mesh data
   void newMesh(int nEl, int nGhost,const int *conn_,const int *gid_, 
-	       int idxOffset);
+	       int nnodes, int *boundaries, int idxOffset);
   // Sets target areas specified by desiredArea, starts refining
   void multipleRefine(double *desiredArea, refineClient *client);
   // Sets target areas specified by desiredArea, starts coarsening
