@@ -64,7 +64,8 @@ void sim::Step()
   case SPEC_T:
   case ADAPT_T:
   case ADAPT2_T:
-  case ADAPT3_T: // pass this step call directly to strategy
+  case ADAPT3_T:
+  case ADAPT4_T: // pass this step call directly to strategy
     myStrat->Step();
     break;
   default: 

@@ -1,4 +1,4 @@
-/// Adaptive Synchronization Strategy No. 3
+/// Adaptive Synchronization Strategy No. 4
 /** This is the most experimental strategy.  It may or may not differ from 
     adapt at any given time.
     Performs locally available events speculatively, as long as they
@@ -13,16 +13,16 @@
     speculative window moves forward. This happens only when a new GVT
     estimate is obtained.  When this happens all objects attempt to
     execute their available events */
-#ifndef ADAPT3_H
-#define ADAPT3_H
+#ifndef ADAPT4_H
+#define ADAPT4_H
 
-class adapt3 : public opt3 {
+class adapt4 : public opt3 {
   double specTol;
  public:
-  adapt3() { 
-    STRAT_T = ADAPT3_T; 
+  adapt4() { 
+    STRAT_T = ADAPT4_T; 
     timeLeash = POSE_TimeMax/2;
-    specTol = 0.05;
+    specTol = 0.25;
   }
   virtual void Step();
 };

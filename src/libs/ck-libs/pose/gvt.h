@@ -84,6 +84,7 @@ class PVT : public Group {
   int reportTo, reportsExpected, reportReduceTo, reportEnd;
   /// where the centralized GVT goes
   int gvtTurn;
+  int specEventCount, eventCount;
  public:
   /// Basic Constructor
   PVT(void);
@@ -96,6 +97,12 @@ class PVT : public Group {
   void setGVT(GVTMsg *m);            
   /// Returns GVT estimate
   POSE_TimeType getGVT() { return estGVT; }    
+
+  int getSpecEventCount() { return specEventCount; }    
+  int getEventCount() { return eventCount; }    
+  void incSpecEventCount() { specEventCount++; }    
+  void incEventCount() { eventCount++; }
+  void decEventCount() { eventCount--; }
   /// Returns termination flag
   int done() { return simdone; }
   /// Register poser with PVT
