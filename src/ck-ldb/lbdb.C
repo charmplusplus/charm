@@ -162,6 +162,22 @@ extern "C" void LDTotalTime(LDHandle _db,double* walltime, double* cputime)
   return;
 }
 
+extern "C" void LDNonMigratable(const LDObjHandle &h)
+{
+  LBDB *const db = (LBDB*)(h.omhandle.ldb.handle);
+  LBObj *const obj = db->LbObj(h);
+
+  obj->SetMigratable(0);
+}
+
+extern "C" void LDMigratable(const LDObjHandle &h)
+{
+  LBDB *const db = (LBDB*)(h.omhandle.ldb.handle);
+  LBObj *const obj = db->LbObj(h);
+
+  obj->SetMigratable(1);
+}
+
 extern "C" void LDClearLoads(LDHandle _db)
 {
   LBDB *const db = (LBDB*)(_db.handle);

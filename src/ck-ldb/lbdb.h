@@ -137,8 +137,8 @@ void LDMessage(LDObjHandle from,
 	       LDOMid toOM, LDObjid *toID, int bytes);
 
 void LDEstObjLoad(LDObjHandle h, double load);
-void LDNonMigratable(LDObjHandle h);
-void LDMigratable(LDObjHandle h);
+void LDNonMigratable(const LDObjHandle &h);
+void LDMigratable(const LDObjHandle &h);
 void LDDumpDatabase(LDHandle lbdb);
 
 /*

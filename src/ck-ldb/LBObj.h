@@ -52,6 +52,7 @@ public:
   void StopTimer(double* walltime, double* cputime);
 
   inline const LDObjHandle &GetLDObjHandle() const { return myhandle; }
+  inline void SetMigratable(int mig) { migratable = mig; }
 private:
   inline LDObjData ObjData() { return data; };
 
