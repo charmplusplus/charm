@@ -73,15 +73,14 @@ void NullLB::AtSync()
 
   // prevent this message from being traced by QD
   // so that the QD detection works
-// only for now
-//  CpvAccess(_qd)->create(-1);
+  CpvAccess(_qd)->create(-1);
   //We don't *do* any migrations, so they're already done!
   thisProxy[CkMyPe()].migrationsDone();
 }
 
 void NullLB::migrationsDone(void)
 {
-//  CpvAccess(_qd)->process(-1);
+  CpvAccess(_qd)->process(-1);
   theLbdb->ResumeClients();
 }
 #else
