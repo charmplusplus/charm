@@ -25,15 +25,11 @@ C interface file
 #define MBLK_DONE 1
 #define MBLK_NOTDONE 0
 
-#if MBLK_FORTRAN
-typedef void (*MBLK_PupFn)(pup_er, void*);
-#else
-typedef void *(*MBLK_PupFn)(pup_er, void*);
-#endif
-
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+  typedef void (*MBLK_PupFn)(pup_er, void*);
   typedef void (*MBLK_BcFn)(void *p1,void *p2,int *start,int *end);
 
   /*Utility*/
@@ -48,6 +44,9 @@ extern "C" {
   int MBLK_Set_prefix(const char *prefix);
   int MBLK_Set_nblocks(const int n);
   int MBLK_Set_dim(const int n);
+
+  /* attach to an existing TCharm array */
+  void MBLK_Attach(void);
 
   /* field creation */
   int MBLK_Create_field(int *dimensions,int isVoxel,
@@ -74,7 +73,7 @@ extern "C" {
   int MBLK_Register(void *userData, MBLK_PupFn _pup_ud, int *rid);
   int MBLK_Migrate(void);
   int MBLK_Get_registered(int rid, void ** block);
-  
+
 #ifdef __cplusplus
 }
 #endif
