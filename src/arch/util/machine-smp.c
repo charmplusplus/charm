@@ -174,15 +174,14 @@ static HANDLE barrier_mutex;
 static volatile int    barrier_wait[2] = {0,0};
 static volatile int    barrier_which = 0;
 
-void  CmiNodeBarrier(void)
-{
+void CmiNodeBarrierCount(int nThreads) {
   int doWait = 1;
   int which;
 
   WaitForSingleObject(barrier_mutex, INFINITE);
   which=barrier_which;
   barrier_wait[which]++;
-  if (barrier_wait[which] == Cmi_mynodesize) {
+  if (barrier_wait[which] == nThreads) {
     barrier_which = !which;
     barrier_wait[barrier_which] = 0;/*Reset new counter*/
     doWait = 0;
@@ -266,11 +265,11 @@ int barrier;
 pthread_cond_t barrier_cond;
 pthread_mutex_t barrier_mutex;
 
-void CmiNodeBarrier(void)
+void CmiNodeBarrierCount(int nThreads)
 {
   pthread_mutex_lock(&barrier_mutex);
   barrier++;
-  if(barrier != CmiMyNodeSize())
+  if(barrier != nThreads)
     pthread_cond_wait(&barrier_cond, &barrier_mutex);
   else{
     barrier = 0;
@@ -278,20 +277,6 @@ void CmiNodeBarrier(void)
   }
   pthread_mutex_unlock(&barrier_mutex);
 }
-
-void CmiNodeAllBarrier(void)
-{
-  pthread_mutex_lock(&barrier_mutex);
-  barrier++;
-  if(barrier != CmiMyNodeSize()+1)
-    pthread_cond_wait(&barrier_cond, &barrier_mutex);
-  else{
-    barrier = 0;
-    pthread_cond_broadcast(&barrier_cond);
-  }
-  pthread_mutex_unlock(&barrier_mutex);
-}
-
 
 #define CmiGetStateN(n) (Cmi_state_vector+(n))
 
@@ -386,6 +371,18 @@ static void CmiStartThreads(char **argv)
 
 #endif
 
+#if !CMK_SHARED_VARS_UNAVAILABLE
+
+/* Wait for all worker threads */
+void  CmiNodeBarrier(void) {
+  CmiNodeBarrierCount(CmiMyNodeSize());
+}
+/* Wait for all worker threads as well as comm. thread */
+void CmiNodeAllBarrier(void) {
+  CmiNodeBarrierCount(CmiMyNodeSize()+1);
+}
+
+#endif
 
 /***********************************************************
  * SMP Idle Locking
