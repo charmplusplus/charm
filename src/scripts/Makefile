@@ -184,6 +184,7 @@ dirs+sources:
 	./gatherflat ../../src/Common/xlatcpm          .
 	./gathertree ../../src/QuickThreads QuickThreads
 	./gathertree ../../src/Common/libs libs
+	./gathertree ../../src/Common.util      .
 	./gathertree ../../src/Common/langs langs
 	./gathertree ../../src/Common.`cat .gdir`      .
 	./gatherflat ../../src/`cat .vdir`             .
