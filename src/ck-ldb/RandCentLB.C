@@ -47,6 +47,9 @@ LBMigrateMsg* RandCentLB::Strategy(CentralLB::LDStats* stats, int count)
 {
   //  CkPrintf("[%d] RandCentLB strategy\n",CkMyPe());
 
+  // remove non-migratable objects
+  RemoveNonMigratable(stats, count);
+
   CkVec<MigrateInfo*> migrateInfo;
 
   for(int pe=0; pe < count; pe++) {

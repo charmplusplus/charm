@@ -200,6 +200,9 @@ LBMigrateMsg* RefineLB::Strategy(CentralLB::LDStats* stats, int count)
 
   //  CkPrintf("[%d] RefineLB strategy\n",CkMyPe());
 
+  // remove non-migratable objects
+  RemoveNonMigratable(stats, count);
+
 /*
   create(stats, count);
 
