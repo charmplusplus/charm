@@ -550,6 +550,7 @@ public:
 	void reclaimRemote(const CkArrayIndexMax &idx,int deletedOnPe);
 	void dummyAtSync(void);
 
+	virtual void flushStates(void);
 	void pup(PUP::er &p);
 	
 private:

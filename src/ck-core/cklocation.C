@@ -973,7 +973,7 @@ public:
 	CkLocRec_buffering(CkLocMgr *Narr):CkLocRec_aging(Narr) {}
 	virtual ~CkLocRec_buffering() {
 		if (0!=buffer.length())
-			CkAbort("Messages abandoned in array manager buffer!\n");
+			CkPrintf("Warning: Messages abandoned in array manager buffer!\n");
 	}
   
 	virtual RecType type(void) {return buffering;}
@@ -1058,6 +1058,24 @@ inline void CkLocMgr::springCleaning(void)
 void CkLocMgr::staticSpringCleaning(void *forWhom) {
 	DEBK((AA"Starting spring cleaning at %.2f\n"AB,CkWallTimer()));
 	((CkLocMgr *)forWhom)->springCleaning();
+}
+
+void CkLocMgr::flushStates(void)
+{
+  // clean all buffer'ed messages
+  void *objp;
+  void *keyp;
+  CkHashtableIterator *it=hash.iterator();
+  while (NULL!=(objp=it->next(&keyp))) {
+    CkLocRec *rec=*(CkLocRec **)objp;
+    CkArrayIndex &idx=*(CkArrayIndex *)keyp;
+    if (rec->type()==CkLocRec::buffering) {
+      hash.remove(*(CkArrayIndexMax *)&idx);
+      delete rec;
+      it->seek(-1);//retry this hash slot
+    }
+  }
+  delete it;
 }
 
 /*************************** LocMgr: CREATION *****************************/
