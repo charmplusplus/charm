@@ -30,7 +30,7 @@ public:
     userData = usr_ptr;
     parentDB = _parentDB;
 //    migratable = _migratable;
-    registered = CmiTrue;
+//    registered = CmiTrue;
     lastCpuTime = lastWallTime = .0;
   }
 
@@ -78,7 +78,7 @@ private:
 //  LDOMHandle parentOM;
 //  LDObjHandle myhandle;
   LDObjData data;
-  CmiBool registered;
+//  CmiBool registered;
   double startWTime;
   double startCTime;
   double lastCpuTime;

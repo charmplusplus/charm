@@ -110,7 +110,11 @@ LDObjHandle LBDB::AddObj(LDOMHandle _omh, LDObjid _id,
 
 void LBDB::UnregisterObj(LDObjHandle _h)
 {
-  (objs[_h.handle])->registered=CmiFalse;
+//  (objs[_h.handle])->registered=CmiFalse;
+// free the memory, it is a memory leak.
+// CmiPrintf("[%d] UnregisterObj: %d\n", CkMyPe(), _h.handle);
+  delete objs[_h.handle];
+  objs[_h.handle] = NULL;
 }
 
 void LBDB::RegisteringObjects(LDOMHandle _h)
@@ -165,7 +169,7 @@ void LBDB::ClearLoads(void)
   int i;
   for(i=0; i < objCount; i++) {
     LBObj *obj = objs[i];
-    if (obj->registered)
+    if (obj)
     {
       if (obj->data.cpuTime>.0) {
         obj->lastCpuTime = obj->data.cpuTime;
@@ -187,12 +191,12 @@ int LBDB::ObjDataCount()
   int i;
   if (lb_ignoreBgLoad) {
   for(i=0; i < objCount; i++)
-    if ((objs[i])->registered && (objs[i])->data.migratable)
+    if (objs[i] && (objs[i])->data.migratable)
       nitems++;
   }
   else {
   for(i=0; i < objCount; i++)
-    if ((objs[i])->registered)
+    if (objs[i])
       nitems++;
   }
   return nitems;
@@ -203,14 +207,14 @@ void LBDB::GetObjData(LDObjData *dp)
   if (lb_ignoreBgLoad) {
   for(int i = 0; i < objs.length(); i++) {
     LBObj* obj = objs[i];
-    if ( obj->registered && obj->data.migratable)
+    if ( obj && obj->data.migratable)
       *dp++ = obj->ObjData();
   }
   }
   else {
   for(int i = 0; i < objs.length(); i++) {
     LBObj* obj = objs[i];
-    if ( obj->registered )
+    if (obj)
       *dp++ = obj->ObjData();
   }
   }
@@ -220,11 +224,11 @@ void LBDB::Migrate(LDObjHandle h, int dest)
 {
   if (h.handle > objCount)
     CmiPrintf("[%d] Handle %d out of range 0-%d\n",CkMyPe(),h.handle,objCount);
-  else if (!(objs[h.handle])->registered)
+  else if (!objs[h.handle])
     CmiPrintf("[%d] Handle %d no longer registered, range 0-%d\n",
 	    CkMyPe(),h.handle,objCount);
 
-  if ((h.handle < objCount) && ((objs[h.handle])->registered)) {
+  if ((h.handle < objCount) && objs[h.handle]) {
     LBOM *const om = oms[(objs[h.handle])->parentOM().handle];
     om->Migrate(h, dest);
   }
@@ -309,7 +313,7 @@ void LBDB::DumpDatabase()
 int LBDB::useMem() {
   int size = sizeof(LBDB);
   size += oms.length() * sizeof(LBOM);
-  size += objs.length() * sizeof(LBObj);
+  size += ObjDataCount() * sizeof(LBObj);
   size += migrateCBList.length() * sizeof(MigrateCBList);
   size += startLBFnList.length() * sizeof(StartLBCB);
   size += commTable->useMem();

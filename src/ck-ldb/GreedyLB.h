@@ -30,7 +30,6 @@ public:
   GreedyLB();
   GreedyLB(CkMigrateMessage *m):CentralLB(m) {}
   void work(LDStats* stats,int count);
-  LBMigrateMsg * createMigrateMsg(LDStats* stats,int count);
 private:
 	enum           HeapCmp {GT = '>', LT = '<'};
     	void           Heapify(HeapData*, int, int, HeapCmp);

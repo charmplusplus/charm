@@ -491,12 +491,37 @@ void CentralLB::work(LDStats* stats,int count)
     }
 }
 
+// generate migrate message from stats->from_proc and to_proc
 LBMigrateMsg * CentralLB::createMigrateMsg(LDStats* stats,int count)
 {
-  int sizes=0;
-  LBMigrateMsg* msg = new(&sizes,1) LBMigrateMsg;
-  msg->n_moves = 0;
+  int i;
+  CkVec<MigrateInfo*> migrateInfo;
+  for (i=0; i<stats->n_objs; i++) {
+    LDObjData &objData = stats->objData[i];
+    int frompe = stats->from_proc[i];
+    int tope = stats->to_proc[i];
+    if (frompe != tope) {
+      //      CkPrintf("[%d] Obj %d migrating from %d to %d\n",
+      //         CkMyPe(),obj,pe,dest);
+      MigrateInfo *migrateMe = new MigrateInfo;
+      migrateMe->obj = objData.handle;
+      migrateMe->from_pe = frompe;
+      migrateMe->to_pe = tope;
+      migrateInfo.insertAtEnd(migrateMe);
+    }
+  }
 
+  int migrate_count=migrateInfo.length();
+  LBMigrateMsg* msg = new(&migrate_count,1) LBMigrateMsg;
+  msg->n_moves = migrate_count;
+  for(i=0; i < migrate_count; i++) {
+    MigrateInfo* item = (MigrateInfo*) migrateInfo[i];
+    msg->moves[i] = *item;
+    delete item;
+    migrateInfo[i] = 0;
+  }
+  if (lb_debug)
+    CkPrintf("%s: %d objects migrating.\n", lbname, migrate_count);
   return msg;
 }
 
