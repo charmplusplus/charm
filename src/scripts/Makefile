@@ -23,6 +23,7 @@
 
 SHELL=/bin/sh
 L=../lib
+INC=../include
 
 all: charm++ bluegene LIBS AMPI f90charm TSM SM PVM doc
 
@@ -279,10 +280,14 @@ $(L)/libconv-core.a: $(LIBCONV_CORE)
 	$(CHARMC) -o $@ $(LIBCONV_CORE)
 
 $(L)/libconv-cplus-y.a: machine.c $(CVHEADERS)
+	@-test -f $(INC)/mpi.h && mv -f $(INC)/mpi.h $(INC)/mpi.BAK || true
 	$(CHARMC) -o $@ -DFOR_CPLUS=1 machine.c
+	@-test -f $(INC)/mpi.BAK && mv -f $(INC)/mpi.BAK $(INC)/mpi.h || true
 
 $(L)/libconv-cplus-n.a: machine.c $(CVHEADERS)
+	@-test -f $(INC)/mpi.h && mv -f $(INC)/mpi.h $(INC)/mpi.BAK || true
 	$(CHARMC) -o $@ -DFOR_CPLUS=0 machine.c
+	@-test -f $(INC)/mpi.BAK && mv -f $(INC)/mpi.BAK $(INC)/mpi.h || true
 
 $(L)/libconv-util.a: $(LIBCONV_UTIL)
 	$(CHARMC) -o $@ $(LIBCONV_UTIL)
