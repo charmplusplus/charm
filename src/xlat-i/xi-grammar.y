@@ -3,7 +3,7 @@
 #include "xi-symbol.h"
 
 extern int yylex (void) ;
-int yyerror(char *);
+void yyerror(char *);
 extern int lineno;
 ModuleList *modlist;
 
@@ -469,8 +469,8 @@ OptStackSize	: /* Empty */
 		{ $$ = new Value($3); }
 		;
 %%
-int yyerror(char *mesg)
+void yyerror(char *mesg)
 {
   cout << "Syntax error at line " << lineno << ": " << mesg << endl;
-  return 0;
+  // return 0;
 }
