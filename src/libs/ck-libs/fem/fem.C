@@ -115,14 +115,17 @@ static FILE *openMeshFile(int chunkNo,bool forRead)
 
 class MeshChunkOutputWriter : public MeshChunkOutput {
 public:
-	void accept(int chunkNo,MeshChunk *chk)
-	{
-		FILE *fp=openMeshFile(chunkNo,false);
-		chk->write(fp);
-		fclose(fp);
-		delete chk;
-	}
+	void accept(int chunkNo,MeshChunk *chk);
 };
+
+void MeshChunkOutputWriter::accept(int chunkNo,MeshChunk *chk)
+{
+	FILE *fp=openMeshFile(chunkNo,false);
+	chk->write(fp);
+	fclose(fp);
+	delete chk;
+}
+
 
 class MeshChunkOutputSender : public MeshChunkOutput {
 	CProxy_FEMchunk dest;
