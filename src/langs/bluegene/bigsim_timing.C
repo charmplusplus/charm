@@ -275,11 +275,5 @@ void BgWriteThreadTimeLine(char **argv, int x, int y, int z, int th, BgTimeLine 
 }
 
 
-// 
-void BgProjectionEvent(void *data)
-{
-  if (genTimeLog) {
-  }
-}
 
 

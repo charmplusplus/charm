@@ -43,6 +43,7 @@ const char UNKNOWN_THREAD=0, COMM_THREAD=1, WORK_THREAD=2;
 #define tMYZ		tMYNODE->z
 #define tMYNODEID	tMYNODE->id
 #define tCOMMTHQ	tMYNODE->commThQ
+#define tTIMELINE	tMYNODE->timelines[tMYID]
 #define tINBUFFER	cva(inBuffer)[tMYNODE->id]
 #define tMSGBUFFER	cva(msgBuffer)[tMYNODE->id]
 #define tUSERDATA	tMYNODE->udata

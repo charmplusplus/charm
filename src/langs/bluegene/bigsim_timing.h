@@ -19,7 +19,7 @@ public:
 };
 
 /**
-  a message sent event
+  a message sent event in timeline
 */
 class bgMsgEntry {
 public:
@@ -46,10 +46,10 @@ typedef void (*bgEventCallBackFn) (void *data, double adjust);
 */
 class bgEvents {
 private:
-  void*   data;         // can be for example trace projection log
+  void*   data;         // e.g. can be pointer to trace projection log entry
   double  rTime;	// relative time from the start entry
 public:
-  bgEvents(void *d): data(d) {}
+  bgEvents(void *d, double t): data(d), rTime(t) {}
   inline void update(bgEventCallBackFn fn, double startTime) {
     fn(data, startTime+rTime);
   }
@@ -73,7 +73,7 @@ public:
   ~bgTimeLog();
   inline void closeLog() { endTime = BgGetCurTime(); }
   inline void addMsg(char *msg) { msgs.push_back(new bgMsgEntry(msg)); }
-  inline void addEvent(void *data) { evts.push_back(new bgEvents(data)); }
+  inline void addEvent(void *data, double absT) { evts.push_back(new bgEvents(data, absT-startTime)); }
   void print(int node, int th);
   void write(FILE *fp);
 
@@ -92,7 +92,6 @@ extern void BgInitTiming();
 extern void BgMsgSetTiming(char *msg);
 extern void BgPrintThreadTimeLine(int node, int th, BgTimeLine &tline);
 extern void BgWriteThreadTimeLine(char **argv, int x, int y, int z, int th, BgTimeLine &tline);
-extern void BgGetMsgStartTime(double recvTime, BgTimeLine &tline, double* startTime, int index);
 extern void BgAdjustTimeLineInsert(BgTimeLine &tline);
 extern int BgAdjustTimeLineForward(int msgID, double tAdjustAbs, BgTimeLine &tline);
 
@@ -101,12 +100,12 @@ extern int BgAdjustTimeLineForward(int msgID, double tAdjustAbs, BgTimeLine &tli
 #define BG_ENTRYSTART(handler, m)  \
         if (genTimeLog)	\
 	  if (tTHREADTYPE == WORK_THREAD) 	\
-	    tMYNODE->timelines[tMYID].enq(new bgTimeLog(handler, m));
+	    tTIMELINE.enq(new bgTimeLog(handler, m));
 
 #define BG_ENTRYEND()  \
         if (genTimeLog)	{ \
 	  if (tTHREADTYPE == WORK_THREAD) {	\
-            BgTimeLine &log = tMYNODE->timelines[tMYID];	\
+            BgTimeLine &log = tTIMELINE;	\
             log[log.length()-1]->closeLog();	\
 	    if (correctTimeLog) BgAdjustTimeLineInsert(log);	\
           }	\
@@ -117,7 +116,7 @@ extern int BgAdjustTimeLineForward(int msgID, double tAdjustAbs, BgTimeLine &tli
           BgGetTime();		\
 	  BgMsgSetTiming(m); 	\
 	  if (tTHREADTYPE == WORK_THREAD) {	\
-            BgTimeLine &log = tMYNODE->timelines[tMYID];	\
+            BgTimeLine &log = tTIMELINE;	\
             int n = log.length();				\
             if (n>0) {				\
               bgTimeLog *tline = log[n-1];	\
@@ -135,6 +134,5 @@ extern int BgAdjustTimeLineForward(int msgID, double tAdjustAbs, BgTimeLine &tli
 
 extern int  genTimeLog;
 extern int  correctTimeLog;
-
 
 #endif

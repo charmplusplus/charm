@@ -747,6 +747,22 @@ double BgGetCurTime()
   return tCURRTIME;
 }
 
+// quiescence detection callback
+// only used when doing timing correction to wait for 
+static void BroadcastShutdown(void *null)
+{
+  /* broadcast to shutdown */
+  int msgSize = CmiBlueGeneMsgHeaderSizeBytes;
+  void *sendmsg = CmiAlloc(msgSize);
+  CmiSetHandler(sendmsg, cva(exitHandler));
+
+  CmiSyncBroadcastAllAndFree(msgSize, sendmsg);
+  CmiDeliverMsgs(-1);
+  CmiPrintf("\nBG> BlueGene emulator shutdown gracefully!\n");
+  ConverseExit();
+  exit(0);
+}
+
 void BgShutdown()
 {
   // timing
@@ -764,20 +780,29 @@ void BgShutdown()
   }
 #endif
 
-  int msgSize = CmiBlueGeneMsgHeaderSizeBytes;
-  void *sendmsg = CmiAlloc(msgSize);
-  CmiSetHandler(sendmsg, cva(exitHandler));
-  
-  /* broadcast to shutdown */
-  CmiSyncBroadcastAllAndFree(msgSize, sendmsg);
-  //CmiAbort("\nBG> BlueGene emulator shutdown gracefully!\n");
-  // CmiPrintf("\nBG> BlueGene emulator shutdown gracefully!\n");
-  /* don't return */
-  // ConverseExit();
-  CmiDeliverMsgs(-1);
-  CmiPrintf("\nBG> BlueGene emulator shutdown gracefully!\n");
-  ConverseExit();
-  exit(0);
+  /* when doing timing correction, do a converse quiescence detection
+     to wait for all timing correction messages
+  */
+  if (!correctTimeLog) {
+    /* broadcast to shutdown */
+    int msgSize = CmiBlueGeneMsgHeaderSizeBytes;
+    void *sendmsg = CmiAlloc(msgSize);
+    CmiSetHandler(sendmsg, cva(exitHandler));
+
+    CmiSyncBroadcastAllAndFree(msgSize, sendmsg);
+    //CmiAbort("\nBG> BlueGene emulator shutdown gracefully!\n");
+    // CmiPrintf("\nBG> BlueGene emulator shutdown gracefully!\n");
+    /* don't return */
+    // ConverseExit();
+    CmiDeliverMsgs(-1);
+    CmiPrintf("\nBG> BlueGene emulator shutdown gracefully!\n");
+    ConverseExit();
+    exit(0);
+  }
+  else {
+    CmiStartQD(BroadcastShutdown, NULL);
+    CmiDeliverMsgs(-1);
+  }
   
 /*
   int i;
@@ -854,7 +879,7 @@ static inline void ProcessMessage(char *msg)
   }
 }
 
-void correctTime(char *msg);
+void correctMsgTime(char *msg);
 
 void comm_thread(threadInfo *tinfo)
 {
@@ -889,7 +914,7 @@ void comm_thread(threadInfo *tinfo)
     }
     else {
 #if BLUEGENE_TIMING
-      correctTime(msg);
+      correctMsgTime(msg);
 #endif
       if (CmiBgMsgThreadID(msg) == ANYTHREAD) {
         DEBUGF(("anythread, call addBgNodeMessage\n"));
@@ -1279,7 +1304,7 @@ CmiPrintf("destNode: %d ignored\n", m->destNode);
 // update arrive time from buffer messages
 // before start an entry, check message time against buffered timing
 // correction message to update to the correct time.
-void correctTime(char *msg)
+void correctMsgTime(char *msg)
 {
    if (!correctTimeLog) return;
    bgCorrectionQ &cmsg = cva(nodeinfo)[tMYNODEID].cmsg;
@@ -1297,4 +1322,36 @@ void correctTime(char *msg)
      }
    }
 }
+
+
+/*****************************************************************************
+		TimeLog correction with trace projection
+*****************************************************************************/
+
+void bgAddProjEvent(void *data, double t)
+{
+  if (!genTimeLog) return;
+  CmiAssert(tTHREADTYPE == WORK_THREAD);
+
+  BgTimeLine &log = tTIMELINE;
+  CmiAssert(log.length() > 0);
+  bgTimeLog *tline = log[log.length()-1];
+  // make sure this time log entry is not closed
+  if (tline->endTime != 0.0) tline->addEvent(data, t);
+}
+
+
+// trace projections callback update projections with new timestamp after
+// timing correction
+void bgUpdateProj(bgEventCallBackFn fn)
+{
+  BgTimeLine &log = tTIMELINE;
+  for (int i=0; i< log.length(); i++) {
+    for (int j=0; j<log[i]->evts.length(); j++)
+      log[i]->evts[j]->update(fn, log[i]->startTime);
+  }
+}
+
+
+
 
