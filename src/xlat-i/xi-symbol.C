@@ -429,7 +429,6 @@ ConstructList::genReg(XStr& str)
     next->genReg(str);
 }
 
-
 XStr Chare::proxyName(int withTemplates)
 {
   XStr str;
@@ -2712,10 +2711,10 @@ void ParamList::endUnmarshall(XStr &str)
 }
 
 /***************** InitCall **************/
-InitCall::InitCall(int l, const char *n)
+InitCall::InitCall(int l, const char *n, int nodeCall)
 	    : name(n)
 { 
-	line=l; setChare(0); 
+	line=l; setChare(0); isNodeCall=nodeCall;
 }
 void InitCall::print(XStr& str)
 {
@@ -2725,12 +2724,13 @@ void InitCall::genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connect
 void InitCall::genDecls(XStr& str) {}
 void InitCall::genIndexDecls(XStr& str) {}
 void InitCall::genDefs(XStr& str) {}
-void InitCall::genReg(XStr& str)
+void InitCall::genReg(XStr& str) 
 {
-	str<<"      ";
+	str<<"      _registerInitCall(";
 	if (container)
 		str<<container->baseName()<<"::";
-	str<<name<<"();\n";
+	str<<name;
+	str<<","<<isNodeCall<<");\n";
 }
 
 /***************** PUP::able support **************/

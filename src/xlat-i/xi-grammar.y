@@ -52,6 +52,8 @@ ModuleList *modlist;
 %token EXTERN
 %token READONLY
 %token INITCALL
+%token INITNODE
+%token INITPROC
 %token PUPABLE
 %token <intval> CHARE MAINCHARE GROUP NODEGROUP ARRAY
 %token MESSAGE
@@ -105,7 +107,7 @@ ModuleList *modlist;
 %type <plist>           ParamList EParameters
 %type <typelist>	BaseList OptBaseList
 %type <mbrlist>		MemberEList MemberList
-%type <member>		Member NonEntryMember InitCall
+%type <member>		Member NonEntryMember InitNode InitProc
 %type <pupable>		PUPableClass
 %type <tvar>		TVar
 %type <tvarlist>	TVarList TemplateSpec
@@ -519,16 +521,29 @@ NonEntryMember  : Readonly ';'
 		{ $$ = $1; }
 		| ReadonlyMsg ';'
 		{ $$ = $1; }
-		| InitCall ';'
+		| InitProc ';'
+		| InitNode ';'
 		{ $$ = $1; }
 		| PUPABLE PUPableClass ';'
 		{ $$ = $2; }
 		;
 
-InitCall	: INITCALL OptVoid QualName
-		{ $$ = new InitCall(lineno, $3); }
+InitNode	: INITNODE OptVoid QualName
+		{ $$ = new InitCall(lineno, $3, 1); }
+		| INITNODE OptVoid QualName '(' OptVoid ')'
+		{ $$ = new InitCall(lineno, $3, 1); }
+                | INITCALL OptVoid QualName
+		{ printf("Warning: deprecated use of initcall. Use initnode or initproc instead.\n"); 
+		  $$ = new InitCall(lineno, $3, 1); }
 		| INITCALL OptVoid QualName '(' OptVoid ')'
-		{ $$ = new InitCall(lineno, $3); }
+		{ printf("Warning: deprecated use of initcall. Use initnode or initproc instead.\n");
+		  $$ = new InitCall(lineno, $3, 1); }
+		;
+
+InitProc	: INITPROC OptVoid QualName
+		{ $$ = new InitCall(lineno, $3, 0); }
+		| INITPROC OptVoid QualName '(' OptVoid ')'
+		{ $$ = new InitCall(lineno, $3, 0); }
 		;
 
 PUPableClass    : QualName

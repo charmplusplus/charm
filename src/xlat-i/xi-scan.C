@@ -1967,6 +1967,8 @@ struct rwtable rwtable[] = {
   "message",	MESSAGE,
   "extern",	EXTERN,
   "initcall",	INITCALL,
+  "initnode",	INITNODE,
+  "initproc",	INITPROC,
   "readonly",	READONLY,
   "stacksize",	STACKSIZE,
   "threaded",	THREADED,

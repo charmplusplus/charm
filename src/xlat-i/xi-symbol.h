@@ -810,8 +810,9 @@ class Readonly : public Member {
 
 class InitCall : public Member {
     const char *name; //Name of subroutine to call
+    int isNodeCall;
 public:
-    InitCall(int l, const char *n);
+    InitCall(int l, const char *n, int nodeCall);
     void print(XStr& str);
     void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent);
     void genDecls(XStr& str);
