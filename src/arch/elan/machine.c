@@ -939,12 +939,6 @@ void CmiAbort(const char *message)
   exit(1);
 }
 
-void CmiAbort(const char *message)
-{
-  CmiError(message);
-  exit(1);
-}
-
 void CmiSyncListSendFn(int npes, int *pes, int len, char *msg)
 {
   CmiError("ListSend not implemented.");
