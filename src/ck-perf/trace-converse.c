@@ -11,7 +11,7 @@
 #include "conv-trace.h"
 
 CpvDeclare(int, traceOn); /* For threads.c */
-CpvExtern(int, _traceCoreOn);   /* For cursed projector core */
+CpvDeclare(int, _traceCoreOn);   /* For cursed projector core */
 int _threadEP=-123; /* for charmProjections.C */
 
 void traceInit(char **argv) {
@@ -19,7 +19,7 @@ void traceInit(char **argv) {
   CpvInitialize(int, _traceCoreOn); 
   CpvAccess(traceOn)=0;
   CpvAccess(_traceCoreOn)=0; 
-  initTraceCore(argv);
+  /* initTraceCore(argv); */
 }
 void traceMessageRecv(char *msg, int pe) {}
 void traceBeginIdle(void) {}
