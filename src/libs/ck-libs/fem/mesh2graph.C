@@ -1,5 +1,3 @@
-#include <stdio.h>
-#include <stdlib.h>
 #define CHK(p) do\
                {\
                  if ((p)==0)\
@@ -8,175 +6,269 @@
                    exit(1);\
                  }\
                } while (0)
+
+#include <stdio.h>
+#include <stdlib.h>
 #include <assert.h>
 
-class vertex
+class Mesh
 {
- private:
-  int nn; // number of current neighbors
-  int sn; // size of array n
-  int *nbrs; // list of nbrs
+  int _nelems, _nnodes, _esize;
+  int *conn;
  public:
-  void init(int _sn)
+  Mesh() { conn = 0; _nelems = _nnodes = _esize = 0; }
+  ~Mesh() { delete [] conn; }
+  void load(char *file);	// Load a mesh from file
+  int nelems() { return _nelems; }
+  int nnodes() { return _nnodes; }
+  int esize() { return _esize; }
+  int node(int elem, int nnode);
+};
+
+class NList
+{
+  int nn; // number of current elements
+  int sn; // size of array n
+  int *elts; // list of elts
+  static int cmp(const void *v1, const void *v2);
+ public:
+  NList(void) { sn = 0; nn = 0; elts = 0; }
+  void init(int _sn) { sn = _sn; nn = 0; elts = new int[sn]; }
+  void add(int elt);
+  int found(int elt);
+  void sort(void) { qsort(elts, nn, sizeof(int), cmp); };
+  int getnn(void) { return nn; }
+  int getelt(int n) { assert(n < nn); return elts[n]; }
+  ~NList() { delete [] elts; }
+};
+
+class Nodes
+{
+  int nnodes;
+  NList *elts;
+ public:
+  Nodes(int _nnodes);
+  ~Nodes() { delete [] elts; }
+  void add(int node, int elem);
+  int nelems(int node) 
   {
-    sn = _sn;
-    nbrs = new int[sn]; CHK(nbrs);
-    nn = 0;
+    assert(node < nnodes);
+    return elts[node].getnn();
   }
-  void add(int nbr)
+  int getelt(int node, int n)
   {
-    // see if nbrs is full
-    // if yes, allocate more space, and copy existing nbrs there
-    // delete old space
-    if (sn <= nn)
-    {
-      sn *= 2;
-      int *tnbrs = new int[sn];
-      for (int i=0; i<nn; i++)
-        tnbrs[i] = nbrs[i];
-      delete[] nbrs;
-      nbrs = tnbrs;
-    }
-    // add new neighbor
-    nbrs[nn++] = nbr;
-  }
-  void destroy(void)
-  {
-    delete[] nbrs;
-  }
-  int getnn(void)
-  {
-    return nn;
-  }
-  int *getnbrs(void)
-  {
-    return nbrs;
+    assert(node < nnodes);
+    return elts[node].getelt(n);
   }
 };
 
-// Converts given mesh to graph (CSR) required by Metis Graph Partitioner
-// ne: (in) number of elements
-// esize: (in) number of nodes per element
-// conn[ne][esize]: (in) connectivity matrix
-// xadj[ne+1]: (out) xadj[i] is the starting index of the adjacency list of 
-//             element i.
-// returns adj[2m] : (out) m is the number of edges. allocated inside this
-//                   function, since number of edges is not known in advance.
-static int*
-mesh2graph(int ne, int esize, int *conn, int *xadj)
+class Graph
 {
-  int i, j, k, l;
-  vertex *v = new vertex[ne]; CHK(v);
-  for (i=0;i<ne;i++)
-    v[i].init(esize);
-  for (i=0; i<(ne-1); i++)
+  int nelems;
+  NList *nbrs;
+ public:
+  Graph(int elems);
+  ~Graph() { delete [] nbrs; }
+  void add(int elem1, int elem2);
+  int elems(int elem)
   {
-    if(i%100 == 0) printf("processing element %d\n", i);
-    for (k=i+1; k<ne; k++)
-    {
-      int found = 0;
-      for (j=0; j<esize && !found; j++)
-      {
-        int n1 = conn[i*esize+j];
-        for (l=0; l<esize; l++)
-        {
-          int n2 = conn[k*esize+l];
-          if (n1 == n2) // elements i and k share a node
-          {
-            v[i].add(k);
-            v[k].add(i);
-            found = 1;
-            break;
-          }
-        }
+    assert(elem<nelems);
+    return nbrs[elem].getnn();
+  }
+  void save(char *file, Mesh *m);
+};
+
+void Mesh::load(char *file)
+{
+  fprintf(stderr, "reading mesh file\n");
+
+  FILE *fp;
+
+  if((fp=fopen(file, "r")) == NULL) {
+    perror(file);
+    exit(1);
+  }
+
+  fscanf(fp, "%d%d%d", &_nelems, &_nnodes, &_esize);
+
+  conn = new int[_nelems*_esize]; CHK(conn);
+  int i, j;
+  for (i=0;i<_nelems;i++)
+    for (j=0;j<_esize;j++)
+      fscanf(fp, "%d", &conn[i*_esize+j]);
+  fclose(fp);
+
+}
+
+int Mesh::node(int elem, int nnode) 
+{
+  assert(elem < _nelems);
+  assert(nnode < _esize);
+  return conn[elem*_esize + nnode];
+}
+
+int NList::cmp(const void *v1, const void *v2)
+{
+  int *e1 = (int *) v1;
+  int *e2 = (int *) v2;
+  if(*e1==*e2) return 0;
+  else if(*e1 < *e2) return -1;
+  else return 1;
+}
+
+void NList::add(int elt) 
+{
+  // see if elts is full
+  // if yes, allocate more space, and copy existing nbrs there
+  // delete old space
+
+  if (sn <= nn) {
+    sn *= 2;
+    int *telts = new int[sn];
+    for (int i=0; i<nn; i++)
+      telts[i] = elts[i];
+    delete[] elts;
+    elts = telts;
+  }
+
+  // add new neighbor
+  elts[nn++] = elt;
+}
+
+int NList::found(int elt)
+{
+  for(int i = 0; i < nn; i++) 
+  {
+    if(elts[i] == elt)
+      return 1;
+  }
+  return 0;
+}
+
+Nodes::Nodes(int _nnodes) 
+{
+  nnodes = _nnodes;
+  elts = new NList[nnodes];
+
+  for(int i=0; i<nnodes; i++) {
+    elts[i].init(10);
+  }
+}
+
+void Nodes::add(int node, int elem) 
+{
+  assert(node < nnodes);
+  elts[node].add(elem);
+}
+
+Graph::Graph(int _nelems) 
+{
+  nelems = _nelems;
+  nbrs = new NList[nelems];
+
+  for(int i=0; i<nelems; i++) 
+  {
+    nbrs[i].init(10);
+  }
+}
+
+void Graph::add(int elem1, int elem2) 
+{
+  assert(elem1 < nelems);
+  assert(elem2 < nelems);
+
+// eliminate duplicates
+
+  if(!nbrs[elem1].found(elem2)) 
+  {
+    nbrs[elem1].add(elem2);
+    nbrs[elem2].add(elem1);
+  }
+}
+
+void Graph::save(char *file, Mesh *m) 
+{
+  FILE *fp;
+
+  if((fp = fopen(file, "w")) == NULL) {
+    perror(file);
+    exit(1);
+  }
+
+  printf("writing graph file...\n");
+    
+  fprintf(fp, "%d %d %d\n", m->nelems(), m->nnodes(), m->esize());
+
+  for(int i=0; i<m->nelems(); i++) {
+    for(int j = 0; j < m->esize(); j++)
+      fprintf(fp, "%d ", m->node(i, j));
+    fprintf(fp, "\n");
+  }
+
+  int *xadj = new int[nelems+1];
+  xadj[0] = 0;
+  for(int i=1; i<nelems+1; i++)
+    xadj[i] = xadj[i-1] + elems(i-1);
+
+  for(int i = 0; i < nelems+1; i++)
+    fprintf(fp, "%d\n", xadj[i]);
+
+  for(int i = 0; i < nelems; i++) {
+    nbrs[i].sort();
+    for(int j = 0; j < nbrs[i].getnn(); j++)
+      fprintf(fp, "%d ", nbrs[i].getelt(j));
+    fprintf(fp, "\n");
+  }
+
+  fclose(fp);
+}
+
+void mesh2graph(Mesh *m, Graph *g)
+{
+  int nelems = m->nelems();
+  int nnodes = m->nnodes();
+  int esize = m->esize();
+
+  Nodes nl(nnodes);
+
+  for(int i = 0; i < nelems; i++)
+    for(int j = 0; j < esize; j++) {
+      nl.add(m->node(i, j), i);
+    }
+
+  // nl to graph
+    
+  for(int i = 0; i < nnodes; i++) {
+    int nn = nl.nelems(i);
+    for(int j = 0; j < nn; j++) {
+      int e1 = nl.getelt(i, j);
+      for(int k = j + 1; k < nn; k++) {
+        int e2 = nl.getelt(i, k);
+        g->add(e1, e2);
       }
     }
   }
-  int m = 0;
-  xadj[0] = 0;
-  for (i=0;i<ne;i++)
-  {
-    m += v[i].getnn();
-    xadj[i+1] = m;
-  }
-  int *adjncy = new int[m]; CHK(adjncy);
-  for (k=0, i=0; i<ne; i++)
-  {
-    int nn = v[i].getnn();
-    if (nn==0)
-    { 
-      fprintf(stderr, "Disconnected Mesh? Element %d has no nbrs\n", i);
-      exit(1);
-    }
-    int *nbrs = v[i].getnbrs();
-    for (j=0; j<nn; j++)
-    {
-      adjncy[k++] = nbrs[j];
-    }
-  }
-  for (i=0;i<ne;i++)
-    v[i].destroy();
-  delete[] v;
-  return adjncy;
 }
 
-static void
-usage (char *pgm)
+int main(int argc, char **argv) 
 {
-  fprintf(stderr, "Usage: %s <meshfile> <graphfile>\n", pgm);
-  exit(1);
-}
+  Mesh *m = new Mesh; CHK(m);
 
-int 
-main (int argc, char **argv)
-{
-  if (argc != 3)
-    usage(argv[0]);
-  FILE *fp = fopen(argv[1], "r");
-  FILE *fo = fopen(argv[2], "w");
-  if (fp==0)
-  { 
-    fprintf(stderr, "cannot open %s for reading.\n", argv[1]);
-    exit(1);
+  if(argc != 3) {
+    fprintf(stderr, "Usage: %s <mesh-file> <graph-file>\n", argv[0]);
+    exit(0);
   }
-  if (fo==0)
-  { 
-    fprintf(stderr, "cannot open %s for writing.\n", argv[2]);
-    exit(1);
-  }
-  int nelems, nnodes, esize;
-  printf("reading mesh file...\n");
-  fscanf(fp, "%d%d%d", &nelems, &nnodes, &esize);
-  int *conn = new int[nelems*esize]; CHK(conn);
-  int i, j;
-  for (i=0;i<nelems;i++)
-    for (j=0;j<esize;j++)
-      fscanf(fp, "%d", &conn[i*esize+j]);
-  fclose(fp);
-  printf("finished reading mesh file...\n");
-  int *xadj = new int[nelems+1]; CHK(xadj);
-  printf("calling mesh2graph...\n");
-  int *adjncy = mesh2graph(nelems, esize, conn, xadj);
-  printf("mesh2graph returned...\n");
-  printf("writing graph file...\n");
-  fprintf(fo, "%d %d %d\n", nelems, nnodes, esize);
-  for (i=0;i<nelems;i++)
-  {
-    for (j=0;j<esize;j++)
-      fprintf(fo, "%d ", conn[i*esize+j]);
-    fprintf(fo, "\n");
-  }
-  for(i=0;i<(nelems+1);i++)
-    fprintf(fo, "%d\n", xadj[i]);
-  for(i=0;i<nelems;i++)
-  {
-    for(j=xadj[i];j<xadj[i+1];j++)
-      fprintf(fo, "%d ", adjncy[j]);
-    fprintf(fo, "\n");
-  }
-  fclose(fo);
-  printf("graph file written...\n");
-  delete[] conn;
-  delete[] adjncy;
+
+  m->load(argv[1]);
+
+  Graph* g = new Graph(m->nelems()); CHK(g);
+
+  mesh2graph(m, g);
+
+  g->save(argv[2], m);
+
+  delete m;
+  delete g;
+
   return 0;
 }
