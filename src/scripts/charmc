@@ -877,13 +877,13 @@ case "$LANGUAGE" in
 "f90charm")
         PRE_LIBRARIES="$PRE_LIBRARIES -lf90charm "
         POST_LIBRARIES="$POST_LIBRARIES $CMK_F90LIBS"
-        if [ ! -z "$CMK_F90OBJS" ] 
-        then
-          for f90obj in $CMK_F90OBJS
-          do
-            OBJECTFILES="$OBJECTFILES $CHARMLIB/$f90obj"
-          done
-        fi
+#        if [ ! -z "$CMK_F90OBJS" ] 
+#        then
+#          for f90obj in $CMK_F90OBJS
+#          do
+#            OBJECTFILES="$OBJECTFILES $CHARMLIB/$f90obj"
+#          done
+#        fi
 	;;
 "bluegene")
         POST_LIBRARIES="$POST_LIBRARIES -lbluegene"
