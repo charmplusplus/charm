@@ -729,7 +729,7 @@ static CthThread CthSuspendSchedulingThread()
 
 static void CthResumeNormalThread(CthThread t)
 {
-  CmiGrabBuffer(&t);
+  CmiGrabBuffer((void **)&t);
   /** addition for tracing */
   CpvAccess(cThread) = t;
   if(CpvAccess(traceOn))
@@ -741,7 +741,7 @@ static void CthResumeNormalThread(CthThread t)
 static void CthResumeSchedulingThread(CthThread t)
 {
   CthThread me = CthSelf();
-  CmiGrabBuffer(&t);
+  CmiGrabBuffer((void **)&t);
   if (me == CpvAccess(CthMainThread)) {
     CthEnqueueSchedulingThread(me);
   } else {
