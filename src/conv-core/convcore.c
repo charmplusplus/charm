@@ -1122,10 +1122,13 @@ void CsdSchedulerState_new(CsdSchedulerState_t *s)
 
 void *CsdNextMessage(CsdSchedulerState_t *s) {
 	void *msg;
-	if (NULL!=(msg=CmiGetNonLocal()) ||
-            NULL!=(msg=CdsFifo_Dequeue(s->localQ)) ) {
-          CpvAccess(cQdState)->mProcessed++;
-          return msg;
+        CqsDequeue(s->schedQ,(void **)&msg);
+	if (msg!=NULL) return msg;
+
+	if ( NULL!=(msg=CmiGetNonLocal()) || 
+             NULL!=(msg=CdsFifo_Dequeue(s->localQ)) ) {
+            CpvAccess(cQdState)->mProcessed++;
+            return msg;
         }
 #if CMK_NODE_QUEUE_AVAILABLE
 	if (NULL!=(msg=CmiGetNonLocalNodeQ())) return msg;
@@ -1143,8 +1146,6 @@ void *CsdNextMessage(CsdSchedulerState_t *s) {
           return msg;
         }
 #endif
-	CqsDequeue(s->schedQ,(void **)&msg);
-	if (msg!=NULL) return msg;
 	return NULL;
 }
 
@@ -2283,6 +2284,7 @@ void ConverseCommonInit(char **argv)
   CmiTmpInit(argv);
   CmiTimerInit();
   CstatsInit(argv);
+
   CcdModuleInit(argv);
   CmiHandlerInit();
   CIdleTimeoutInit(argv);
