@@ -69,26 +69,6 @@ void CmiFree(void *blk)
 }
 
 
-#if 0
-void *CmiSvAlloc(int size)
-{
-  char *res;
-  res =(char *) usmalloc(size+8,arena);
-  if (res==0) {
-    CmiError("Memory allocation failed.");
-    abort();
-  }
-  ((int *)res)[0]=size;
-  return (void *)(res+8);
-}
-
-void CmiSvFree(blk)
-char *blk;
-{
-  usfree(blk-8, arena);
-}
-#endif
-
 int CmiAsyncMsgSent(CmiCommHandle msgid)
 {
   return 0;
@@ -160,11 +140,13 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   for(i=0; i<requested_npe; i++) 
     MsgQueue[i] = McQueueCreate();
 
-  for(i=0; i<requested_npe; i++) {
+  for(i=1; i<requested_npe; i++) {
     usrparam.mype = i;
     sproc(threadInit, PR_SFDS, (void *)&usrparam);
   }
-  for(i=0;i<requested_npe;i++)
+  usrparam.mype = 0;
+  threadInit(&usrparam);
+  for(i=1;i<requested_npe;i++)
     wait(0);
 }
 
@@ -302,13 +284,6 @@ void CmiFreeBroadcastAllFn(int size, char *msg)
   }
   FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg);
 }
-
-#if 0
-void CmiNodeBarrier()
-{
-  barrier(barr,nthreads);
-}
-#endif
 
 /* ********************************************************************** */
 /* The following functions are required by the load balance modules       */
