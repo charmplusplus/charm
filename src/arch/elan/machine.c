@@ -17,6 +17,10 @@ Developed by Sameer Kumar
 #include "machine.h"
 #include "pcqueue.h"
 
+#if CMK_PERSISTENT_COMM
+#include "persist_impl.h"
+#endif
+
 /* copy from elan/version.h */
 #ifndef QSNETLIBS_VERSION_CODE
 #define QSNETLIBS_VERSION(a,b,c)        (((a) << 16) + ((b) << 8) + (c))
@@ -140,9 +144,6 @@ static int Cmi_dim;
 static SMSG_LIST *sent_msgs=0;
 static SMSG_LIST *end_sent=0;
 static SMSG_LIST *cur_unsent=0;
-
-PersistentHandle  *phs = NULL;
-int phsSize;
 
 void PumpPersistent();
 void CmiSendPersistentMsg(PersistentHandle h, int destPE, int size, void *m);
