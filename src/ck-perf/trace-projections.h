@@ -23,7 +23,7 @@
 
 #include "pup.h"
 
-#define PROJECTION_VERSION  "6.0"
+#define PROJECTION_VERSION  "6.5"
 
 // Macro to make projections check for errors before an fprintf succeeds.
 #define CheckAndFPrintF(f,string,data) \
@@ -38,22 +38,23 @@
 class LogEntry {
   public:
     double time;
+    double cputime;
+    double recvTime;
     int event;
     int pe;
     unsigned short mIdx;
     unsigned short eIdx;
-    unsigned char type; 
     int msglen;
-    double recvTime;
     CmiObjId   id;
     int numpes;
     int *pes;
+    unsigned char type; 
   public:
     LogEntry() {}
-    LogEntry(double tm, unsigned char t, unsigned short m=0, unsigned short e=0, int ev=0, int p=0, int ml=0, CmiObjId *d=NULL, double rt=0.) {
+    LogEntry(double tm, unsigned char t, unsigned short m=0, unsigned short e=0, int ev=0, int p=0, int ml=0, CmiObjId *d=NULL, double rt=0., double cputm=0.) {
       type = t; mIdx = m; eIdx = e; event = ev; pe = p; time = tm; msglen = ml;
       if (d) id = *d; else {id.id[0]=id.id[1]=id.id[2]=0; };
-      recvTime = rt; 
+      recvTime = rt; cputime = cputm;
     }
     // **CW** new constructor for multicast data
     LogEntry(double tm, unsigned short m, unsigned short e, int ev, int p,
@@ -108,7 +109,7 @@ class LogPool {
     void writeLog(void);
     void write(int writedelta);
     void writeSts(void);
-    void add(unsigned char type,unsigned short mIdx,unsigned short eIdx,double time,int event,int pe, int ml=0, CmiObjId* id=0, double recvT=0.);
+    void add(unsigned char type,unsigned short mIdx,unsigned short eIdx,double time,int event,int pe, int ml=0, CmiObjId* id=0, double recvT=0., double cpuT=0.0);
     void addCreationMulticast(unsigned short mIdx,unsigned short eIdx,double time,int event,int pe, int ml=0, CmiObjId* id=0, double recvT=0., int num=0, int *pelist=NULL);
     void postProcessLog();
 };

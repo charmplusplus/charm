@@ -43,6 +43,7 @@ CkpvDeclare(TraceBluegene*, _tracebg);
 int traceBluegeneLinked=0;			// if trace-bluegene is linked
 
 CkpvDeclare(double, traceInitTime);
+CkpvDeclare(double, traceInitCpuTime);
 CpvDeclare(int, traceOn);
 #if CMK_TRACE_IN_CHARM
 CkpvDeclare(int, traceOnPe);
@@ -63,6 +64,8 @@ static void traceCommonInit(char **argv)
   DEBUGF(("[%d] in traceCommonInit.\n", CkMyPe()));
   CkpvInitialize(double, traceInitTime);
   CkpvAccess(traceInitTime) = TRACE_TIMER();
+  CkpvInitialize(double, traceInitCpuTime);
+  CkpvAccess(traceInitCpuTime) = TRACE_CPUTIMER();
   CpvInitialize(int, traceOn);
   CpvInitialize(int, _traceCoreOn); //projector
   CkpvInitialize(int, CtrLogBufSize);

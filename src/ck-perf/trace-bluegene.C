@@ -97,6 +97,7 @@ void TraceBluegene::bgBeginExec(char* msg, char *name)
   tTIMELINEREC.logEntryStart(newLog);
 }
 
+// create a new log, which depends on log
 void TraceBluegene::bgAmpiBeginExec(char *msg, char *name, void *log)
 {
   if (!genTimeLog) return;

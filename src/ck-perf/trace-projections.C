@@ -359,10 +359,10 @@ static void updateProjLog(void *data, double t, double recvT, void *ptr)
 }
 #endif
 
-void LogPool::add(UChar type,UShort mIdx,UShort eIdx,double time,int event,int pe, int ml, CmiObjId *id, double recvT) 
+void LogPool::add(UChar type,UShort mIdx,UShort eIdx,double time,int event,int pe, int ml, CmiObjId *id, double recvT, double cpuT) 
 {
   new (&pool[numEntries++])
-    LogEntry(time, type, mIdx, eIdx, event, pe, ml, id, recvT);
+    LogEntry(time, type, mIdx, eIdx, event, pe, ml, id, recvT, cpuT);
   if(poolSize==numEntries) {
     double writeTime = TraceTimer();
     writeLog();
@@ -441,7 +441,7 @@ LogEntry::LogEntry(double tm, unsigned short m, unsigned short e, int ev, int p,
 
 void LogEntry::pup(PUP::er &p)
 {
-  int itime, irecvtime;
+  int itime, irecvtime, icputime;
   char ret = '\n';
 
   p|type;
@@ -460,10 +460,22 @@ void LogEntry::pup(PUP::er &p)
       p|itime; p|pe; 
       break;
     case BEGIN_PROCESSING:
-      if (p.isPacking()) irecvtime = (int)(1.0e6*recvTime);
+      if (p.isPacking()) {
+        irecvtime = (int)(1.0e6*recvTime);
+        icputime = (int)(1.0e6*cputime);
+      }
       p|mIdx; p|eIdx; p|itime; p|event; p|pe; 
       p|msglen; p|irecvtime; p|id.id[0]; p|id.id[1]; p|id.id[2];
-      if (p.isUnpacking()) recvTime = irecvtime/1.0e6;
+      p|icputime;
+      if (p.isUnpacking()) {
+	recvTime = irecvtime/1.0e6;
+	cputime = icputime/1.0e6;
+      }
+      break;
+    case END_PROCESSING:
+      if (p.isPacking()) icputime = (int)(1.0e6*cputime);
+      p|mIdx; p|eIdx; p|itime; p|event; p|pe; p|msglen; p|icputime;
+      if (p.isUnpacking()) cputime = icputime/1.0e6;
       break;
     case CREATION:
       if (p.isPacking()) irecvtime = (int)(1.0e6*recvTime);
@@ -484,7 +496,6 @@ void LogEntry::pup(PUP::er &p)
       }
       if (p.isUnpacking()) recvTime = irecvtime/1.0e6;
       break;
-    case END_PROCESSING:
     case MESSAGE_RECV:
       p|mIdx; p|eIdx; p|itime; p|event; p|pe; p|msglen;
       break;
@@ -701,7 +712,7 @@ void TraceProjections::beginExecute(envelope *e)
     execEvent = CtvAccess(curThreadEvent);
     execEp = (-1);
     _logPool->add(BEGIN_PROCESSING,ForChareMsg,_threadEP,TraceTimer(),
-                             execEvent,CkMyPe());
+                             execEvent,CkMyPe(), 0, 0, 0.0, TraceCpuTimer());
     inEntry = 1;
   } else {
     beginExecute(e->getEvent(),e->getMsgtype(),e->getEpIdx(),e->getSrcPe(),e->getTotalsize());
@@ -714,8 +725,8 @@ void TraceProjections::beginExecute(int event,int msgType,int ep,int srcPe, int 
   execEvent=event;
   execEp=ep;
   execPe=srcPe;
-  _logPool->add(BEGIN_PROCESSING,msgType,ep,TraceTimer(),
-                             event,srcPe, mlen, idx);
+  _logPool->add(BEGIN_PROCESSING,msgType,ep,TraceTimer(),event,
+                             srcPe, mlen, idx, 0.0, TraceCpuTimer());
   inEntry = 1;
 }
 
@@ -724,10 +735,10 @@ void TraceProjections::endExecute(void)
   if (checknested && !inEntry) CmiAbort("Nested EndExecute!\n");
   if(execEp == (-1)) {
     _logPool->add(END_PROCESSING,0,_threadEP,TraceTimer(),
-                             execEvent,CkMyPe());
+                             execEvent,CkMyPe(),0,0,0.0,TraceCpuTimer());
   } else {
     _logPool->add(END_PROCESSING,0,execEp,TraceTimer(),
-                             execEvent,execPe);
+                             execEvent,execPe,0,0,0.0,TraceCpuTimer());
   }
   inEntry = 0;
 }
