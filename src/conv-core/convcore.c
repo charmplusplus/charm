@@ -19,6 +19,8 @@ static char ident[] = "@(#)$Header$";
 #include "trace.h"
 #include <errno.h>
 
+/* #define MEMMONITOR */
+
 #if CMK_WHEN_PROCESSOR_IDLE_USLEEP
 #include <sys/types.h>
 #include <sys/time.h>
@@ -45,6 +47,15 @@ static char ident[] = "@(#)$Header$";
 #if CMK_STRERROR_USE_SYS_ERRLIST
 extern char *sys_errlist[];
 char *strerror(i) int i; { return sys_errlist[i]; }
+#endif
+
+#ifdef MEMMONITOR
+typedef unsigned long mmulong;
+CpvDeclare(mmulong,MemoryUsage);
+CpvDeclare(mmulong,HiWaterMark);
+CpvDeclare(mmulong,ReportedHiWaterMark);
+CpvDeclare(int,AllocCount);
+CpvDeclare(int,BlocksAllocated);
 #endif
 
 #if CMK_SIGHOLD_USE_SIGMASK
@@ -110,6 +121,19 @@ char **argv;
   int argc;
   char **origArgv = argv;
   int trace = 1;
+
+#ifdef MEMMONITOR
+  CpvInitialize(mmulong,MemoryUsage);
+  CpvAccess(MemoryUsage) = 0;
+  CpvInitialize(mmulong,HiWaterMark);
+  CpvAccess(HiWaterMark) = 0;
+  CpvInitialize(mmulong,ReportedHiWaterMark);
+  CpvAccess(ReportedHiWaterMark) = 0;
+  CpvInitialize(int,AllocCount);
+  CpvAccess(AllocCount) = 0;
+  CpvInitialize(int,BlocksAllocated);
+  CpvAccess(BlocksAllocated) = 0;
+#endif
 
   CpvInitialize(int, CtrRecdTraceMsg);
   CpvInitialize(int, CtrLogBufSize);
@@ -1081,6 +1105,27 @@ int size;
   char *res;
   res =(char *)malloc(size+2*sizeof(int));
   if (res==0) CmiAbort("Memory allocation failed.");
+
+#ifdef MEMMONITOR
+  CpvAccess(MemoryUsage) += size+2*sizeof(int);
+  CpvAccess(AllocCount)++;
+  CpvAccess(BlocksAllocated)++;
+  if (CpvAccess(MemoryUsage) > CpvAccess(HiWaterMark)) {
+    CpvAccess(HiWaterMark) = CpvAccess(MemoryUsage);
+  }
+  if (CpvAccess(MemoryUsage) > 1.1 * CpvAccess(ReportedHiWaterMark)) {
+    CmiPrintf("HIMEM STAT PE%d: %d Allocs, %d blocks, %lu K, Max %lu K\n",
+	    CmiMyPe(), CpvAccess(AllocCount), CpvAccess(BlocksAllocated),
+            CpvAccess(MemoryUsage)/1024, CpvAccess(HiWaterMark)/1024);
+    CpvAccess(ReportedHiWaterMark) = CpvAccess(MemoryUsage);
+  }
+  if ((CpvAccess(AllocCount) % 1000) == 0) {
+    CmiPrintf("MEM STAT PE%d: %d Allocs, %d blocks, %lu K, Max %lu K\n",
+	    CmiMyPe(), CpvAccess(AllocCount), CpvAccess(BlocksAllocated),
+            CpvAccess(MemoryUsage)/1024, CpvAccess(HiWaterMark)/1024);
+  }
+#endif
+
   ((int *)res)[0]=size;
   ((int *)res)[1]=1;
   return (void *)(res+2*sizeof(int));
@@ -1115,11 +1160,24 @@ void *blk;
     refCount = REFFIELD(blk);
   }
   if(refCount==0) {
+#ifdef MEMMONITOR
+    if (SIZEFIELD(blk) > 100000)
+      CmiPrintf("MEMSTAT Uh-oh -- SIZEFIELD=%d\n",SIZEFIELD(blk));
+    CpvAccess(MemoryUsage) -= (SIZEFIELD(blk) + 2*sizeof(int));
+    CpvAccess(BlocksAllocated)--;
+    CmiPrintf("Refcount 0 case called\n");
+#endif
     free(BLKSTART(blk));
     return;
   }
   refCount--;
   if(refCount==0) {
+#ifdef MEMMONITOR
+    if (SIZEFIELD(blk) > 100000)
+      CmiPrintf("MEMSTAT Uh-oh -- SIZEFIELD=%d\n",SIZEFIELD(blk));
+    CpvAccess(MemoryUsage) -= (SIZEFIELD(blk) + 2*sizeof(int));
+    CpvAccess(BlocksAllocated)--;
+#endif
     free(BLKSTART(blk));
     return;
   }
