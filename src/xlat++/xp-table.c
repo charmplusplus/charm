@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.13  1995-10-27 20:48:17  sanjeev
+ * Revision 2.14  1995-11-01 23:05:43  sanjeev
+ * fixed bugs from CM5
+ *
+ * Revision 2.13  1995/10/27  20:48:17  sanjeev
  * bug fixes
  *
  * Revision 2.12  1995/10/13  18:17:13  jyelon
@@ -238,7 +241,7 @@ int CheckCharmName()
 /* Check if CurrentTypedef is CHARM type, for use by the 
    possibly upcoming handle decl */
 	int i, ind ;
-	int ScopedType ;
+	int ScopedType=FALSE ;
 	char *lastagg ;
 	char *type ;
 	int printtype=1 ;
@@ -354,9 +357,9 @@ HandleEntry table[] ;
 int *size ;
 char *id ;
 {
-	table[*size].name = (char *)malloc(sizeof(char)*strlen(id)) ;
+	table[*size].name = (char *)malloc(sizeof(char)*strlen(id)+1) ;
 	strcpy(table[*size].name,id) ;
-	table[*size].typestr = (char *)malloc((strlen(CurrentAsterisk)+1)*sizeof(char)) ;
+	table[*size].typestr = (char *)malloc((strlen(CurrentAsterisk)+1)*sizeof(char)+1) ;
 	strcpy(table[*size].typestr, CurrentAsterisk) ;
 	(*size)++ ;
 }
