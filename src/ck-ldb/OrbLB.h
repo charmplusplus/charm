@@ -17,6 +17,7 @@
 #include "OrbLB.decl.h"
 
 void CreateOrbLB();
+BaseLB *AllocateOrbLB(void);
 
 class OrbLB : public CentralLB {
 public:/* <- Sun CC demands Partition be public for ComputeLoad to access it. */
@@ -76,10 +77,9 @@ public:
 public:
   OrbLB(const CkLBOptions &);
   OrbLB(CkMigrateMessage *m):CentralLB(m) { lbname = "OrbLB"; }
-private:
-  CmiBool QueryBalanceNow(int step);
-  void work(CentralLB::LDStats* stats, int count);
 
+  void work(CentralLB::LDStats* stats, int count);
+  CmiBool QueryBalanceNow(int step);
 };
 
 

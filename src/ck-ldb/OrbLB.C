@@ -299,7 +299,10 @@ void OrbLB::mapPartitionsToNodes()
   if (_lb_args.debug()) {
     CmiPrintf("After partitioning: \n");
     for (i=0; i<npartition; i++) {
-      CmiPrintf("[%d=>%d] (%d,%d,%d) (%d,%d,%d) load:%f count:%d objload:%f\n", i, partitions[i].node, partitions[i].origin[0], partitions[i].origin[1], partitions[i].origin[2], partitions[i].corner[0], partitions[i].corner[1], partitions[i].corner[2], partitions[i].load, partitions[i].count, partitions[i].load-statsData->procs[partitions[i].bkpes[0]].bg_walltime);
+      double bgload = 0.0;
+      if (!_lb_args.ignoreBgLoad())
+        bgload = statsData->procs[partitions[i].bkpes[0]].bg_walltime;
+      CmiPrintf("[%d=>%d] (%d,%d,%d) (%d,%d,%d) load:%f count:%d objload:%f\n", i, partitions[i].node, partitions[i].origin[0], partitions[i].origin[1], partitions[i].origin[2], partitions[i].corner[0], partitions[i].corner[1], partitions[i].corner[2], partitions[i].load, partitions[i].count, partitions[i].load-bgload);
     }
     for (i=npartition; i<P; i++) CmiPrintf("[%d] --------- \n", i);
   }
@@ -315,8 +318,8 @@ void OrbLB::work(CentralLB::LDStats* stats, int count)
 
   P = count;
 
-  // calculate total number of objects
-  nObjs = stats->n_objs;
+  // calculate total number of migratable objects
+  nObjs = stats->n_migrateobjs;
 #ifdef DEBUG
   CmiPrintf("ORB: num objects:%d\n", nObjs);
 #endif
@@ -328,8 +331,9 @@ void OrbLB::work(CentralLB::LDStats* stats, int count)
   // v[0] = XDIR  v[1] = YDIR v[2] = ZDIR
   // vArray[XDIR] is an array holding the x vector for all computes
   int objIdx = 0;
-  for (i=0; i<nObjs; i++) {
+  for (i=0; i<stats->n_objs; i++) {
     LDObjData &odata = stats->objData[i];
+    if (odata.migratable == 0) continue;
     computeLoad[objIdx].id = objIdx;
     computeLoad[objIdx].v[XDIR] = odata.objID().id[0];
     computeLoad[objIdx].v[YDIR] = odata.objID().id[1];
@@ -346,6 +350,7 @@ void OrbLB::work(CentralLB::LDStats* stats, int count)
 #endif
     objIdx ++;
   }
+  CmiAssert(nObjs == objIdx);
 
   double t = CkWallTimer();
 
@@ -445,9 +450,13 @@ void OrbLB::work(CentralLB::LDStats* stats, int count)
   delete [] num;
 
   // Save output
+  objIdx = 0;
   for(int obj=0;obj<stats->n_objs;obj++) {
+      stats->to_proc[obj] = stats->from_proc[obj];
+      LDObjData &odata = stats->objData[obj];
+      if (odata.migratable == 0) { continue; }
       int frompe = stats->from_proc[obj];
-      int tope = computeLoad[obj].partition->node;
+      int tope = computeLoad[objIdx].partition->node;
       if (frompe != tope) {
         if (_lb_args.debug() >= 3) {
               CkPrintf("[%d] Obj %d migrating from %d to %d\n",
@@ -455,6 +464,7 @@ void OrbLB::work(CentralLB::LDStats* stats, int count)
         }
 	stats->to_proc[obj] = tope;
       }
+      objIdx ++;
   }
 
   // free memory
