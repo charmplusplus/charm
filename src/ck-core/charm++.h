@@ -115,7 +115,8 @@ class _CK_AID {
     void _setChare(int c) { _chare = c; }
 };
 
-typedef _CK_AID CkAID;
+typedef _CK_AID CkArrayID;
+typedef CkArrayID CkAID;  /* Depricated usage */
 
 class CkQdMsg {
   public:
