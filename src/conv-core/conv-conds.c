@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.3  1995-06-19 17:45:44  sanjeev
+ * Revision 2.4  1995-06-26 19:46:14  sanjeev
+ * removed CkExit
+ *
+ * Revision 2.3  1995/06/19  17:45:44  sanjeev
  * bug in PeriodicChecks
  *
  * Revision 2.2  1995/06/19  16:36:04  sanjeev
@@ -194,7 +197,7 @@ static void InsertInHeap(unsigned int theTime, FN_PTR fnp, void *arg)
   if(CpvAccess(numHeapEntries) > MAXTIMERHEAPENTRIES) 
     {
       CmiPrintf("Heap overflow (InsertInHeap), exiting...\n");
-      CkExit();
+      exit();
     }
   else 
     {
@@ -222,7 +225,7 @@ static void RemoveFromHeap(int index)
   if(!CpvAccess(numHeapEntries) || (index != 1)) 
     {
       CmiPrintf("Internal inconsistency (RemoveFromHeap), exiting ...\n");
-      CkExit();
+      exit();
     } 
   else 
     {
