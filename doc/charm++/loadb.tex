@@ -38,16 +38,16 @@ Here are the two terms often used in \charmpp{} load balancing framework:
 Listed below are the available load balancers and their brief 
 descriptions:
 \begin{itemize}
+\item \kw{RefineLB}:     Move objects away from the most overloaded processors to reach average;
 \item \kw{RandCentLB}:   Randomly assign objects to processors;
 \item \kw{RandRefLB}:    Randomly assign objects to processors, then refine;
-\item \kw{RefineLB}:     Move a few objects away from the most overloaded processors;
-\item \kw{RecBisectBfLB}:        Recursive partition with Breadth first enumeration;
-\item \kw{MetisLB}:      Use Metis^{tm} to partitioning object communication graph;
-\item \kw{CommLB}:       Greedy with communication;
+\item \kw{RecBisectBfLB}:        Recursively partition with Breadth first enumeration;
+\item \kw{MetisLB}:      Use Metis(tm) to partitioning object communication graph;
+\item \kw{CommLB}:       Greedy algorithm which takes communication graph into account;
 \item \kw{Comm1LB}:      another variation of CommLB;
-\item \kw{HeapCentLB}:   Heap Centralized;
+\item \kw{HeapCentLB}:   Similar to RefineLB, but using heap to sort by load;
 \item \kw{GreedyRefLB}:  Apply greedy, then refine;
-\item \kw{NeighborLB}:   The neighborhood load balancer
+\item \kw{NeighborLB}:   A neighborhood load balancer
 \end{itemize}
 
 It is up to the users to choose which load balancing algorithm for the 
