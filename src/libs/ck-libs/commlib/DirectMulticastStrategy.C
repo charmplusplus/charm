@@ -96,13 +96,14 @@ void DirectMulticastStrategy::insertMessage(CharmMessageHolder *cmsg){
         }
         else {
             CkSectionID *sid = cmsg->sec_id;
-            initSectionID(sid);
-            
+
             //New sec id, so send it along with the message
             void *newmsg = (void *)getNewMulticastMessage(cmsg);
             CkFreeMsg(cmsg->getCharmMessage());
             delete cmsg;
             
+            initSectionID(sid);
+
             cmsg = new CharmMessageHolder((char *)newmsg, IS_MULTICAST); 
             cmsg->sec_id = sid;
         }        

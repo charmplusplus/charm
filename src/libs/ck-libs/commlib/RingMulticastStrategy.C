@@ -192,7 +192,7 @@ void RingMulticastStrategy::handleMulticastMessage(void *msg){
 
 void RingMulticastStrategy::initSectionID(CkSectionID *sid){
 
-    ComlibPrintf("Ring Init section ID\n");
+    CkPrintf("Ring Init section ID\n");
     sid->pelist = NULL;
     sid->npes = 0;
 
