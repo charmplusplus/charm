@@ -1,4 +1,4 @@
-DOCDIR=../../../doc
+DOCDIR=..
 WEBDIR=/expand6/groupMosaic/ppl_manuals
 BASE=tcharm
 
