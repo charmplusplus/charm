@@ -12,7 +12,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 2.0  1995-07-10 22:11:15  knauff
+# Revision 2.1  1995-07-10 22:22:51  knauff
+# *** empty log message ***
+#
+# Revision 2.0  1995/07/10  22:11:15  knauff
 # Initial revision
 #
 ############################################################################
@@ -35,5 +38,5 @@ set CMK_SEQ_CC			= 'gcc'
 set CMK_SEQ_LD			= 'gcc'
 set CMK_NM			= 'nm'
 set CMK_NM_FILTER		= "grep '|GLOB' | colrm 1 56"
-set CMK_EXTRAS			= 'gcc -o ../bin/conv-host conv-host.c '
-set CMK_CLEAN			= 'rm -f ../bin/conv-host'
+set CMK_EXTRAS			= ''
+set CMK_CLEAN			= ''
