@@ -2,6 +2,8 @@
 
 #define PARTITION_SIZE 500
 
+//#define _SPARSECONT_ 
+
 PairCalculator::PairCalculator(CkMigrateMessage *m) { }
 	
 PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int op1,  FuncType fn1, int op2,  FuncType fn2, CkCallback cb, CkGroupID gid) 
@@ -38,9 +40,12 @@ PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int
       inDataRight[i] = NULL;
   }
 
-  //outData = new double[grainSize * grainSize];
+#ifdef _SPARSECONT_ 
+  outData = new double[grainSize * grainSize];
+#else
   outData = new double[S * S];
-  memset(outData, 0 , sizeof(double)* S *S);
+#endif
+  //memset(outData, 0 , sizeof(double)* S *S);
 
   newData = NULL;
   sumPartialCount = 0;
@@ -77,7 +82,11 @@ PairCalculator::pup(PUP::er &p)
       p|ldiff;
     }
   if (p.isUnpacking()) {
+#ifdef _SPARSECONT_ 
     outData = new double[grainSize * grainSize];
+#else
+    outData = new double[S*S];
+#endif
     inDataLeft = new complex*[numExpected];
     for (int i = 0; i < numExpected; i++)
       inDataLeft[i] = new complex[N];
@@ -231,11 +240,12 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
 		  outData[i] *= 2.0;
 	  }
       }
-
-      //r.add((int)thisIndex.y, (int)thisIndex.x, (int)(thisIndex.y+grainSize-1), (int)(thisIndex.x+grainSize-1), (CkTwoDoubles*)outData);
-      //r.contribute(this, sparse_sum_double);
-      
+#ifdef _SPARSECONT_
+      r.add((int)thisIndex.y, (int)thisIndex.x, (int)(thisIndex.y+grainSize-1), (int)(thisIndex.x+grainSize-1), (CkTwoDoubles*)outData);
+      r.contribute(this, sparse_sum_double);
+#else
       contribute(S * S *sizeof(double), outData, CkReduction::sum_double);
+#endif
   }
   
   /*
