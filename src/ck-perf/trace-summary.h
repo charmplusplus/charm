@@ -59,6 +59,11 @@ class LogPool {
     UInt numEntries;
     LogEntry *pool;
     FILE *fp ;
+
+    double  *epTime;
+    int *epCount;
+    int epSize;
+
   public:
     LogPool(char *pgm) {
       poolSize = CpvAccess(CtrLogBufSize);
@@ -85,7 +90,14 @@ class LogPool {
         CmiAbort("Cannot open Projections Trace File for writing...\n");
       }
 //      fprintf(fp, "SUMMARY-RECORD\n");
-      fprintf(fp, "%d", CmiMyPe());
+
+      epSize = 1000;
+      epTime = new double[epSize];
+      epCount = new int[epSize];
+      for (int i=0; i< epSize; i++) {
+	epTime[i] = 0.0;
+	epCount[i] = 0;
+      };
     }
     ~LogPool() {
 //      add(index, bin, CmiMyPe());
@@ -94,10 +106,7 @@ class LogPool {
       fclose(fp);
       delete[] pool;
     }
-    void write(void) {
-      for(int i=0; i<numEntries; i++)
-        pool[i].write(fp);
-    }
+    void write(void) ;
     void writeSts(void);
     void add(UChar type,UShort mIdx,UShort eIdx,double time,int event,int pe) {
       new (&pool[numEntries++])
@@ -122,6 +131,14 @@ class LogPool {
         shrink();
       }
     }
+    void setEp(int epidx, double time) {
+      if (epidx >= epSize) {
+        CmiAbort("Too many entry points!!\n");
+      }
+      //CmiPrintf("set EP: %d %e \n", epidx, time);
+      epTime[epidx] += time;
+      epCount[epidx] ++;
+    }
     void shrink(void) ;
 };
 
@@ -131,26 +148,12 @@ class TraceProjections : public Trace {
     int execEp;
     int execPe;
 
-    double  *epTime;
-    int *epCount;
-    int epSize;
-
     double binStart;
     double start;
     double bin;
     int msgNum;
   public:
-    TraceProjections() { 
-      curevent=0; msgNum=0; binStart=0.0;
-      epSize = 1000;
-//      CkPrintf("NUM OF ENTRIES: %d\n", _numEntries);
-      epTime = new double[epSize];
-      epCount = new int[epSize];
-      for (int i=0; i< epSize; i++) {
-	epTime[i] = 0.0;
-	epCount[i] = 0;
-      };
-    }
+    TraceProjections() { curevent=0; msgNum=0; binStart=0.0; }
     void userEvent(int e);
     void creation(envelope *e, int num=1);
     void beginExecute(envelope *e);
@@ -167,7 +170,6 @@ class TraceProjections : public Trace {
     void dequeue(envelope *e);
     void beginComputation(void);
     void endComputation(void);
-    void writeEvent(void);
 };
 
 #endif

@@ -108,7 +108,21 @@ void traceClose(void)
       CpvAccess(_logPool)->writeSts();
   // destructor call the write()
   delete CpvAccess(_logPool);
-  CpvAccess(_trace)->writeEvent();
+}
+
+void LogPool::write(void) 
+{
+  int i;
+  fprintf(fp, "%d/%d entries:%d interval:%le\n", CmiMyPe(), CmiNumPes(), _numEntries, CpvAccess(binSize));
+  for(i=0; i<numEntries; i++)
+    pool[i].write(fp);
+  fprintf(fp, "\n");
+  for (i=0; i<_numEntries; i++)
+    fprintf(fp, "%ld ", (long)(epTime[i]*1.0e9));
+  fprintf(fp, "\n");
+  for (i=0; i<_numEntries; i++)
+    fprintf(fp, "%d ", epCount[i]);
+  fprintf(fp, "\n");
 }
 
 void LogPool::writeSts(void)
@@ -175,7 +189,6 @@ void TraceProjections::beginExecute(envelope *e)
   }
   else {
     execEp = e->getEpIdx();
-    epCount[execEp] ++;
   }
   double t = CmiTimer();
 //CmiPrintf("start: %f \n", start);
@@ -210,7 +223,7 @@ void TraceProjections::endExecute(void)
 
   if (execEp != -1)
   {
-    epTime[execEp] += t - ts;
+    CpvAccess(_logPool)->setEp(execEp, t-ts);
   }
 
   while ((nts = nts + CpvAccess(binSize)) < t)
@@ -287,6 +300,7 @@ void TraceProjections::endComputation(void)
   }
 }
 
+/*
 void TraceProjections::writeEvent(void)
 {
   char pestr[10];
@@ -307,3 +321,4 @@ void TraceProjections::writeEvent(void)
   fprintf(sts, "\n");
   fclose(sts);
 }
+*/
