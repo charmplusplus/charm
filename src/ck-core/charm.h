@@ -186,6 +186,7 @@ typedef struct msg_struct {
   FUNCTION_PTR packfn;
   FUNCTION_PTR unpackfn;
   FUNCTION_PTR alloc;
+  FUNCTION_PTR coerce;
 } MSG_STRUCT;
 
 typedef struct mono_struct {

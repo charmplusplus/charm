@@ -249,6 +249,12 @@ void GenerateStructsFns(ofstream& top, ofstream& bot)
 
   /* for allocked MsgTypes output the alloc stub functions */
   for ( m=thismodule->messages; m!=NULL; m=m->next ) {
+    sprintf(str,
+      "static comm_object *_CK_coerce_%s(void *msg)\n{\n",
+      m->name);
+    bot << str;
+    sprintf(str, "\treturn (comm_object *) new (msg) %s;\n}\n", m->name);
+    bot << str;
     if ( !m->allocked )
       continue ;
     sprintf(str,
@@ -377,7 +383,8 @@ void GenerateRegisterCalls(ofstream& top, ofstream& bot)
         m->name, m->name) ;
     bot << str ;
 
-    sprintf(str,"sizeof(%s)) ;\n\n",m->name) ;
+    sprintf(str,"(FUNCTION_PTR) &_CK_coerce_%s, sizeof(%s)) ;\n\n",
+                m->name, m->name) ;
     bot << str ;
   }
   sprintf(str,"\n\n") ;

@@ -47,15 +47,16 @@ char *name;
   return(CpvAccess(eventCount)-1) ;
 }
 
-int registerMsg(name,allocf,packf,unpackf,size)
+int registerMsg(name,allocf,packf,unpackf,coerce,size)
 char *name;
-FUNCTION_PTR allocf, packf, unpackf;
+FUNCTION_PTR allocf, packf, unpackf, coerce;
 int size ;
 {
 /* fills in MsgToStructTable */
 	CsvAccess(MsgToStructTable)[CpvAccess(msgCount)].alloc = allocf ;
 	CsvAccess(MsgToStructTable)[CpvAccess(msgCount)].packfn = packf ;
 	CsvAccess(MsgToStructTable)[CpvAccess(msgCount)].unpackfn = unpackf ;
+	CsvAccess(MsgToStructTable)[CpvAccess(msgCount)].coerce = coerce ;
 	CsvAccess(MsgToStructTable)[CpvAccess(msgCount)].size = size ;
 	CpvAccess(msgCount) ++ ;
 	return(CpvAccess(msgCount)-1) ;

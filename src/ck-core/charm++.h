@@ -39,7 +39,7 @@ FUNCTION_PTR CFunctionRefToName(int index) ;
 
 /* These are C functions in the Charm runtime system */
 
-extern "C" int registerMsg(char *name, FUNCTION_PTR allocf, FUNCTION_PTR packf, FUNCTION_PTR unpackf, int size) ;
+extern "C" int registerMsg(char *name, FUNCTION_PTR allocf, FUNCTION_PTR packf, FUNCTION_PTR unpackf, FUNCTION_PTR coerce, int size) ;
 
 extern "C" int registerBocEp(char *name, FUNCTION_PTR epFunc , int epType , int msgIndx, int chareIndx) ;
 
@@ -176,6 +176,10 @@ public:	void operator delete(void *msg) {
 	}
 
 	void *operator new(CMK_SIZE_T size) ;
+
+	void *operator new(CMK_SIZE_T size, void *ptr) {
+          return ptr;
+        }
 
 	void *operator new(CMK_SIZE_T size, int id) {
 		return (void *)GenericCkAlloc(id, size, 0) ;
