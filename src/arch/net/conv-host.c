@@ -1977,8 +1977,8 @@ prog rsh_start(nodeno)
   return rsh;
 }
 
-int rsh_pump(p, nodeno, argv)
-    prog p; int nodeno; char **argv;
+int rsh_pump(p, nodeno, rank0no, argv)
+    prog p; int nodeno, rank0no; char **argv;
 {
   static char buf[1024];
   int len;
@@ -1989,8 +1989,9 @@ int rsh_pump(p, nodeno, argv)
 
   if (arg_display)
     xstr_printf(ibuf,"setenv DISPLAY %s\n",arg_display);
-  xstr_printf(ibuf,"setenv NETSTART '%d %d %d %d %d %d %d'\n",
-	      nodeno, nodetab_size, nodetab_cpus(nodeno), nodetab_rank(nodeno),
+  xstr_printf(ibuf,"setenv NETSTART '%d %d %d %d %d %d %d %d'\n",
+	      nodetab_rank0_size, rank0no,
+	      nodeno, nodetab_cpus(nodeno), nodetab_size,
 	      nodetab_ip(nodeno), req_ip, req_port);
   prog_flush(p);
   
@@ -2142,7 +2143,7 @@ int start_nodes()
     pe = nodetab_rank0_table[i];
     p = rsh_start(pe);
     if (p==0) { rsh_maxsim=i; break; }
-    rsh_pump(p, pe, arg_argv);
+    rsh_pump(p, pe, i, arg_argv);
     rsh_prog[i] = p;
     rsh_node[i] = pe;
   }
@@ -2197,7 +2198,7 @@ int start_nodes()
       pe = nodetab_rank0_table[rsh_nstarted];
       p = rsh_start(pe);
       if (p==0) { perror("starting rsh"); exit(1); }
-      rsh_pump(p, pe, arg_argv);
+      rsh_pump(p, pe, rsh_nstarted, arg_argv);
       rsh_prog[i] = p;
       rsh_node[i] = pe;
       rsh_nstarted++;
