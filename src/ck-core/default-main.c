@@ -12,8 +12,8 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1995-06-08 17:07:12  gursoy
- * Cpv macro changes done
+ * Revision 2.2  1995-06-09 16:37:40  gursoy
+ * Csv accesses modified
  *
  * Revision 1.4  1995/04/13  20:54:18  sanjeev
  * Changed Mc to Cmi
@@ -49,6 +49,8 @@ main(argc, argv)
 int argc;
 char *argv[];
 {
+  if (CmiMyRank() != 0) CmiNodeBarrier();
+
   defaultmainModuleInit();
   bocModuleInit();
   ckModuleInit();
@@ -63,15 +65,16 @@ char *argv[];
   ldbModuleInit();
 
 
+  if (CmiMyRank() == 0) CmiNodeBarrier();
 
   ConverseInit(argv);
   StartCharm(argv);
-  CsdStopFlag=0;
+  CpvAccess(CsdStopFlag)=0;
   while (1) {
     void *msg;
     msg = CsdGetMsg();
     if (msg) (CmiGetHandlerFunction(msg))(msg);
-    if (CsdStopFlag) break;
+    if (CpvAccess(CsdStopFlag)) break;
     if (!CpvAccess(disable_sys_msgs))
         { if (CpvAccess(numHeapEntries) > 0) TimerChecks();
           if (CpvAccess(numCondChkArryElts) > 0) PeriodicChecks(); }
