@@ -9,7 +9,7 @@ explicitly managed shared memory system.
 memory does not take any (RAM, swap or disk) space.
 
   The way it's implemented is that each processor claims some section 
-of the available virtual address space, and statisfies all new allocations
+of the available virtual address space, and satisfies all new allocations
 from that space.  Migrating structures use whatever space they started with.
 
 Written for migratable threads by Milind Bhandarkar around August 2000;
@@ -17,6 +17,8 @@ generalized by Orion Lawlor November 2001.
 */
 #include "converse.h"
 #include "memory-isomalloc.h"
+
+/*#define CMK_THREADS_DEBUG 1*/
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -223,25 +225,35 @@ print_slots(slotset *ss)
 }
 #endif
 
-#if CMK_THREADS_ARE_WIN32_FIBERS || ! CMK_HAS_MMAN_H || CMK_NO_ISO_MALLOC
+#if ! CMK_HAS_MMAP
 /****************** Manipulate memory map (Win32 non-version) *****************/
+static int map_warned=0;
+
 static void *
 map_slots(int slot, int nslots)
 {
-	CmiAbort("isomalloc: Cannot map/unmap memory");
+	if (!map_warned) {
+		map_warned=1;
+		if (CmiMyPe()==0)
+			CmiError("isomalloc.c> Warning: since mmap() doesn't work,"
+			" you won't be able to migrate\n");
+	}
+
+	return malloc(slotsize*nslots);
 }
 
 static void
 unmap_slots(int slot, int nslots)
 {
-	CmiAbort("isomalloc: Cannot map/unmap memory");
+	/*emtpy-- there's no way to recover the actual address we 
+	  were allocated at.*/
 }
 
 static void 
 init_map(char **argv)
 {
 }
-#else
+#else /* CMK_HAS_MMAP */
 /****************** Manipulate memory map (UNIX version) *****************/
 #include <sys/types.h>
 #include <sys/mman.h>
@@ -259,11 +271,28 @@ map_slots(int slot, int nslots)
   void *pa;
   void *addr=slot2addr(slot);
   pa = mmap(addr, slotsize*nslots, 
-            PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED,
-            CpvAccess(zerofd), 0);
-  if((pa==((void*)(-1))) || (pa != addr)) {
-    CmiError("mmap call failed to allocate %d bytes at %p.\n", slotsize*nslots, addr);
-    CmiAbort("Exiting\n");
+            PROT_READ|PROT_WRITE, 
+#if CMK_HAS_MMAP_ANON
+	    MAP_PRIVATE|MAP_ANONYMOUS,-1,
+#else
+	    MAP_PRIVATE|MAP_FIXED,CpvAccess(zerofd),
+#endif
+	    0);
+  if (pa==((void*)(-1)) || pa==NULL) 
+  { /*Map just failed completely*/
+#if CMK_THREADS_DEBUG
+    perror("mmap failed");
+    CmiPrintf("[%d] tried to mmap %p, but encountered error\n",CmiMyPe(),addr);
+#endif
+    return NULL;
+  }
+  if (pa != addr)
+  { /*Map worked, but gave us back the wrong place*/
+#if CMK_THREADS_DEBUG
+    CmiPrintf("[%d] tried to mmap %p, but got %p back\n",CmiMyPe(),addr,pa);
+#endif
+    munmap(addr,slotsize*nslots);
+    return NULL;
   }
 #if CMK_THREADS_DEBUG
   CmiPrintf("[%d] mmap'd slots %d-%d to address %p\n",CmiMyPe(),
@@ -291,13 +320,25 @@ unmap_slots(int slot, int nslots)
 static void 
 init_map(char **argv)
 {
+#if ! CMK_HAS_MMAP_ANON
   CpvInitialize(int, zerofd);  
   CpvAccess(zerofd) = open("/dev/zero", O_RDWR);
   if(CpvAccess(zerofd)<0)
     CmiAbort("Cannot open /dev/zero. Aborting.\n");	
+#endif
 }
 
 #endif /* UNIX memory map */
+
+
+static void map_bad(int s,int n)
+{
+  void *addr=slot2addr(s);
+  CmiError("map failed to allocate %d bytes at %p.\n", slotsize*n, addr);
+  CmiAbort("Exiting\n");
+}
+
+
 
 /************ Address space voodoo: find free address range **********/
 CpvStaticDeclare(slotset *, myss); /*My managed slots*/
@@ -327,6 +368,71 @@ static void *__static_data_loc(void)
 static char *pmin(char *a,char *b) {return (a<b)?a:b;}
 static char *pmax(char *a,char *b) {return (a>b)?a:b;}
 
+/*Check if this memory location is usable.  
+  If not, return 1.
+*/
+static int bad_range(char *loc) {
+  void *addr;
+  isomallocStart=loc;
+  addr=map_slots(0,1);
+  if (addr==NULL) {
+#if CMK_THREADS_DEBUG
+    CmiPrintf("[%d] Skipping unmappable space at %p\n",CmiMyPe(),loc);
+#endif
+    return 1; /*No good*/
+  }
+  unmap_slots(0,1);
+  return 0; /*This works*/
+}
+
+/*Check if this memory range is usable.  
+  If so, write it into max.
+*/
+static void check_range(char *start,char *end,memRegion_t *max)
+{
+  memRange_t len;
+  memRange_t searchQuantStart=128u*1024*1024; /*Shift search location by this far*/
+  memRange_t searchQuant;
+  void *addr;
+
+  if (start>=end) return; /*Ran out of hole*/
+  len=(memRange_t)end-(memRange_t)start;
+  if (len<=max->len) return; /*It's too short already!*/
+#if CMK_THREADS_DEBUG
+  CmiPrintf("[%d] Checking usable address space at %p - %p\n",CmiMyPe(),start,end);
+#endif
+
+  /* Trim off start of range until we hit usable memory*/  
+  searchQuant=searchQuantStart;
+  while (bad_range(start)) {
+	start+=searchQuant;
+        if (start>=end) return; /*Ran out of hole*/
+	searchQuant*=2; /*Exponential search*/
+        if (searchQuant==0) return; /*SearchQuant overflowed-- no good memory anywhere*/
+  }
+
+  /* Trim off end of range until we hit usable memory*/
+  searchQuant=searchQuantStart;
+  while (bad_range(end-slotsize)) {
+	end-=searchQuant;
+        if (start>=end) return; /*Ran out of hole*/
+	searchQuant*=2;
+        if (searchQuant==0) return; /*SearchQuant overflowed-- no good memory anywhere*/
+  }
+  
+  len=(memRange_t)end-(memRange_t)start;
+  if (len<max->len) return; /*It's now too short.*/
+  
+#if CMK_THREADS_DEBUG
+  CmiPrintf("[%d] Address space at %p - %p is largest\n",CmiMyPe(),start,end);
+#endif
+
+  /*If we got here, we're the new largest usable range*/
+  max->len=len;
+  max->start=start;
+  max->type="Unused";
+}
+
 /*Find the first available memory region of at least the
   given size not touching any data in the used list.
  */
@@ -335,6 +441,7 @@ static memRegion_t find_free_region(memRegion_t *used,int nUsed,int atLeast)
   memRegion_t max;
   int i,j;  
 
+  max.len=0;
   /*Find the largest hole between regions*/
   for (i=0;i<nUsed;i++) {
     /*Consider a hole starting at the end of region i*/
@@ -343,31 +450,25 @@ static memRegion_t find_free_region(memRegion_t *used,int nUsed,int atLeast)
     
     /*Shrink the hole by all others*/ 
     for (j=0;j<nUsed && holeStart<holeEnd;j++) {
-      if (used[j].start<holeStart) holeStart=pmax(holeStart,used[j].start+used[j].len);
-      else if (used[j].start<holeEnd) holeEnd=pmin(holeEnd,used[j].start);
+      if ((memRange_t)used[j].start<(memRange_t)holeStart) 
+        holeStart=pmax(holeStart,used[j].start+used[j].len);
+      else if ((memRange_t)used[j].start<(memRange_t)holeEnd) 
+        holeEnd=pmin(holeEnd,used[j].start);
     } 
-    if (holeStart<holeEnd) 
-    { /*There is some room between these two regions*/
-      memRange_t len=((memRange_t)holeEnd)-((memRange_t)holeStart);
-#if CMK_THREADS_DEBUG
-      CmiPrintf("[%d] Usable address space at %p - %p\n",CmiMyPe(),holeStart,holeEnd);
-#endif
-      if (len>=atLeast) { /*This is a large enough hole-- return it*/
-	max.len=len;
-	max.start=holeStart;
-	max.type="Unused";
-	return max;
-      }
-    }
+
+    check_range(holeStart,holeEnd,&max);
   }
 
-  /*If we get here, there are no large enough holes*/
-  CmiAbort("ISOMALLOC cannot locate any free virtual address space!");
-  return max; /*<- never executed*/
+  if (max.len==0)
+    CmiAbort("ISOMALLOC cannot locate any free virtual address space!");
+  return max; 
 }
 
 static void init_ranges(char **argv)
 {
+  /*Largest value a signed int can hold*/
+  memRange_t intMax=((memRange_t)1)<<(sizeof(int)*8-1)-1;
+
   /*Round slot size up to nearest page size*/
   slotsize=16*1024;
   slotsize=(slotsize+CMK_MEMORY_PAGESIZE-1) & ~(CMK_MEMORY_PAGESIZE-1);
@@ -426,8 +527,8 @@ static void init_ranges(char **argv)
 #endif
     }
     
-    /*Find the largest unused region*/
-    freeRegion=find_free_region(regions,nRegions,(512u+256u)*meg);
+    /*Find a large, unused region*/
+    freeRegion=find_free_region(regions,nRegions,(512u)*meg);
 
     /*If the unused region is very large, pad it on both ends for safety*/
     if (freeRegion.len/gig>64u) {
@@ -444,11 +545,16 @@ static void init_ranges(char **argv)
     /*Allocate stacks in unused region*/
     isomallocStart=freeRegion.start;
     isomallocEnd=freeRegion.start+freeRegion.len;
-    numslots=(freeRegion.len/slotsize)/CmiNumPes();
 
+    /*Make sure our largest slot number doesn't overflow an int:*/
+    if (freeRegion.len/slotsize>intMax)
+      freeRegion.len=intMax*slotsize;
+    
+    numslots=(freeRegion.len/slotsize)/CmiNumPes();
+    
 #if CMK_THREADS_DEBUG
-    CmiPrintf("[%d] Can isomalloc up to %d megs per pe\n",CmiMyPe(),
-	      numslots*slotsize/1024/1024);
+    CmiPrintf("[%d] Can isomalloc up to %lu megs per pe\n",CmiMyPe(),
+	      ((memRange_t)numslots)*slotsize/meg);
 #endif
   }
 
@@ -545,6 +651,7 @@ static void all_slotOP(const slotOP *op,int s,int n)
 void *CmiIsomalloc(int size,CmiIsomallocBlock *b)
 {
 	int s,n;
+	void *ret;
 	n=length2slots(size);
 	/*Always satisfy mallocs with local slots:*/
 	s=get_slots(CpvAccess(myss),n);
@@ -556,7 +663,9 @@ void *CmiIsomalloc(int size,CmiIsomallocBlock *b)
 	grab_slots(CpvAccess(myss),s,n);
 	b->slot=s;
 	b->nslots=n;
-	return map_slots(s,n);
+	ret=map_slots(s,n);
+	if (!ret) map_bad(s,n);
+	return ret;
 }
 
 void *CmiIsomallocPup(pup_er p,CmiIsomallocBlock *b)
@@ -570,7 +679,7 @@ void *CmiIsomallocPup(pup_er p,CmiIsomallocBlock *b)
 		if (pup_isUserlevel(p))
 			/*Checkpoint: must grab old slots (even remote!)*/
 			all_slotOP(&grabOP,s,n);
-		map_slots(s,n);
+		if (!map_slots(s,n)) map_bad(s,n);
 	}
 	
 	/*Pup the allocated data*/
