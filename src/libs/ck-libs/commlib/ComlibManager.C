@@ -757,6 +757,12 @@ void ComlibInstanceHandle::setStrategy(Strategy *s) {
 
 CkGroupID ComlibInstanceHandle::getComlibManagerID() {return _dmid;}    
 
+void ComlibInitSection(CkSectionInfo &id){
+    id.sInfo.cInfo.id = 0;
+    id.type = COMLIB_MULTICAST_MESSAGE;
+    id.pe = CkMyPe();
+}
+
 #include "commlib.def.h"
 
 

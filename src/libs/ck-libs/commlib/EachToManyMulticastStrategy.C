@@ -23,7 +23,7 @@ void *itrDoneHandler(void *msg){
     int nexpected = sentry->numElements;
     
     if(nexpected == 0) {             
-        //CkPrintf("[%d] Calling Dummy Done Inserting\n", CkMyPe());
+        ComlibPrintf("[%d] Calling Dummy Done Inserting\n", CkMyPe());
         nm_mgr = (EachToManyMulticastStrategy *)sentry->strategy;    
         nm_mgr->doneInserting();
     }

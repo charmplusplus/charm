@@ -164,7 +164,6 @@ void DirectMulticastStrategy::beginProcessing(int numElements){
 
 void DirectMulticastStrategy::handleMulticastMessage(void *msg){
     register envelope *env = (envelope *)msg;
-    CkUnpackMessage(&env);
     
     CkMcastBaseMsg *cbmsg = (CkMcastBaseMsg *)EnvToUsr(env);
 
@@ -180,7 +179,7 @@ void DirectMulticastStrategy::handleMulticastMessage(void *msg){
         localMulticast(&localDestIndices, env);
     }   
     else if(status == COMLIB_MULTICAST_NEW_SECTION){        
-
+        CkUnpackMessage(&env);
         dest_indices = new CkVec<CkArrayIndexMax>;
 
         ComlibPrintf("[%d] Received message for new section %d %d\n", 
@@ -197,7 +196,7 @@ void DirectMulticastStrategy::handleMulticastMessage(void *msg){
             if(dest_proc == CkMyPe())
                 dest_indices->insertAtEnd(idx);                        
         }            
-
+        
         envelope *usrenv = (envelope *) ccmsg->usrMsg;
         envelope *newenv = (envelope *)CmiAlloc(usrenv->getTotalsize());
         memcpy(newenv, ccmsg->usrMsg, usrenv->getTotalsize());
@@ -234,9 +233,11 @@ void DirectMulticastStrategy::localMulticast(CkVec<CkArrayIndexMax>*vec,
     void *msg = EnvToUsr(env);
     int nelements = vec->size();
 
-    if(nelements == 0)
+    if(nelements == 0) {
         CmiFree(env);
-
+        return;
+    }
+    
     void *newmsg;
     envelope *newenv;
     for(int count = 0; count < nelements; count ++){
@@ -249,13 +250,13 @@ void DirectMulticastStrategy::localMulticast(CkVec<CkArrayIndexMax>*vec,
         if(count < nelements - 1) {
             newmsg = CkCopyMsg(&msg); 
             newenv = UsrToEnv(newmsg);
-            newenv->setUsed(0);            
         }
         else {
             newmsg = msg;
             newenv = env;
         }
         
+        newenv->setUsed(0);        
         CProxyElement_ArrayBase ap(destArrayID, idx);
         ap.ckSend((CkArrayMessage *)newmsg, newenv->array_ep());
     }

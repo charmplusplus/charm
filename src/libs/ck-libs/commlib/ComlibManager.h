@@ -157,4 +157,7 @@ ComlibInstanceHandle CkGetComlibInstance(int id);
 //Only Called when the strategies are not being created in main::main
 void ComlibDoneCreating(); 
 
+void ComlibInitSection(CkSectionInfo &id);
+void ComlibDeleteSection();
+
 #endif
