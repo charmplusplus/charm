@@ -140,7 +140,7 @@ CVHEADERS=converse.h conv-mach.h conv-mach.csh \
           ../include/tempo.decl.h tempo.def.h \
           ../include/waitqd.decl.h waitqd.def.h
 
-TRACELIBS=libtrace-none.a libtrace-projections.a
+TRACELIBS=libtrace-none.a libtrace-projections.a libtrace-summary.a
 
 CVLIBS=libconv-core.a libconv-cplus-n.a libconv-cplus-y.a libldb-rand.o libldb-spray.o libldb-graph.o libldb-test.o $(TRACELIBS)
 
@@ -268,6 +268,10 @@ libtrace-none.a: $(LIBTRACE_NONE)
 LIBTRACE_PROJ=trace-projections.o
 libtrace-projections.a: $(LIBTRACE_PROJ)
 	$(CHARMC) -cp ../lib/ -o $@ $(LIBTRACE_PROJ)
+
+LIBTRACE_SUMM=trace-summary.o
+libtrace-summary.a: $(LIBTRACE_SUMM)
+	$(CHARMC) -cp ../lib/ -o $@ $(LIBTRACE_SUMM)
 
 ../include/CkArray.decl.h : CkArray.decl.h
 	/bin/cp CkArray.decl.h ../include
@@ -409,6 +413,9 @@ trace-none.o : trace-none.C trace.h $(CKHEADERS)
 
 trace-projections.o:trace-projections.C trace-projections.h trace.h $(CKHEADERS)
 	$(CHARMC) -o trace-projections.o trace-projections.C
+
+trace-summary.o:trace-summary.C trace-summary.h trace.h $(CKHEADERS)
+	$(CHARMC) -o trace-summary.o trace-summary.C
 
 
 ###############################################################################
