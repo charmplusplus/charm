@@ -38,7 +38,7 @@ entry [\uw{attribute1}, ..., \uw{attributeN}] void \uw{EntryMethod}(\uw{paramete
 \end{alltt}
 
 \charmpp{} currently offers four attributes that one may give an entry method:
-\kw{threaded}, \kw{sync}, and \kw{exclusive}.
+\kw{threaded}, \kw{sync}, \kw{exclusive}, \kw{immediate}.
 
 \index{threaded}Threaded \index{entry method}entry methods are simply entry
 methods which are run in their own nonpremptible threads.  To make an
@@ -61,10 +61,17 @@ will wait for the first to finish before it executes.  To make an \index{entry
 method}entry method exclusive, add the keyword \kw{exclusive} to that
 entry method's attribute list.
 
-
-
-
-
+\index{immediate}Immediate entry methods are entry functions in which short
+messages can be executed in an "immediate" fashion when they are received 
+either by an interrupt(Network version) or by a communication 
+thread(SMP version). Such messages can be useful for 
+implementing multicasts/reductions as well as data lookup, in which case 
+processing of critical messages won't be blocked by some entry functions that
+could take long time to finish. Immediate entry methods should be reentrant,
+and it cannot depend on any processor private data. 
+It is user's responsibility to use lock to protect critical data. 
+Function \kw{CmiPollImmediateMsg()} can be called in users code to 
+probe and process immediate messages periodically.
 
 
 
