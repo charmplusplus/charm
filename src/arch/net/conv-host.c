@@ -2943,7 +2943,7 @@ main(argc, argv)
 #if CMK_CCS_AVAILABLE
   if(arg_server == 1){
     skt_server(&myIP, &myPortNo, &myFd);
-    printf("%s\nServer IP = %u, Server port = %u $\n", 
+    printf("ccs: %s\nccs: Server IP = %u, Server port = %u $\n", 
            CMK_CCS_VERSION, myIP, myPortNo);
     fflush(stdout);
   }
