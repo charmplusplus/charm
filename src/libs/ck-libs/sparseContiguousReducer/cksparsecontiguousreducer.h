@@ -161,6 +161,8 @@ class CkSparseContiguousReducer
 	   r.getNumElements()*sizeof(T));
     /* contribute on behalf of chare calling this function */
     elem->contribute(size, ptr, type, cb);
+    
+    delete [] ptr;
   }
 
   /* 
@@ -178,6 +180,8 @@ class CkSparseContiguousReducer
     r.getNumElements()*sizeof(T));
     /* contribute on behalf of chare calling this function */
     elem->contribute(size, ptr, type);
+    
+    delete [] ptr;
   }
 };
 
