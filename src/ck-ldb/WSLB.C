@@ -10,7 +10,7 @@
 
 void CreateWSLB()
 {
-  loadbalancer = CProxy_WSLB::ckNew();
+  neighborlb = CProxy_WSLB::ckNew();
 }
 
 WSLB::WSLB()

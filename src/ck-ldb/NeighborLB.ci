@@ -2,7 +2,7 @@ module NeighborLB {
 
 extern module LBDatabase;
 
-readonly CkGroupID loadbalancer;
+readonly CkGroupID neighborlb;
 
 message NLBStatsMsg;
 message[varsize] NLBMigrateMsg;

@@ -4,13 +4,13 @@
 #include "NeighborLB.h"
 #include "NeighborLB.def.h"
 
-CkGroupID loadbalancer;
+CkGroupID neighborlb;
 
 #if CMK_LBDB_ON
 
 void CreateNeighborLB()
 {
-  loadbalancer = CProxy_NeighborLB::ckNew();
+  neighborlb = CProxy_NeighborLB::ckNew();
 }
 
 void NeighborLB::staticMigrated(void* data, LDObjHandle h)

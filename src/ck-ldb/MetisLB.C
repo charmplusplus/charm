@@ -215,11 +215,11 @@ CLBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
   if(!sameMapFlag) {
     for(i=0; i<numobjs; i++) {
       if(origmap[i] != newmap[i]) {
-	MigrateInfo migrateMe;
-	migrateMe.obj = handles[i];
-	migrateMe.from_pe = origmap[i];
-	migrateMe.to_pe = newmap[i];
-	migrateInfo.push(migrateMe);
+	MigrateInfo* migrateMe = new MigrateInfo;
+	migrateMe->obj = handles[i];
+	migrateMe->from_pe = origmap[i];
+	migrateMe->to_pe = newmap[i];
+	migrateInfo.push_back(migrateMe);
       }
     }
   }
