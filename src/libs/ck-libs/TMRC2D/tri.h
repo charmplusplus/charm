@@ -154,7 +154,7 @@ class chunk : public TCharmClient1D {
   void sanityCheck(void);
  
   // entry methods
-  void deriveBoundaries();
+  void deriveBoundaries(int *conn, int *gid);
   void tweakMesh();
   void improveChunk();
   void improve();

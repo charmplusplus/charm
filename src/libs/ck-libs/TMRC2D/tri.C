@@ -217,6 +217,7 @@ void chunk::nodeUpdate(node n, node newNode)
   for (int i=0; i<nodeSlots; i++) {
     if (theNodes[i].isPresent() && (n == theNodes[i])) {
       theNodes[i].set(newNode.X(), newNode.Y());
+      theNodes[i].boundary = newNode.boundary;
       theNodes[i].unlock();
       theClient->nodeUpdate(i, newNode.X(), newNode.Y());
       CkPrintf("TMRC2D: [%d] theClient->nodeUpdate(%d, %2.10f, %2.10f\n", cid, 
@@ -251,6 +252,7 @@ void chunk::nodeDelete(node n, node ndReplace)
   }
   else if (rIdx == -1) {
     theNodes[nIdx].set(ndReplace.X(), ndReplace.Y());
+    theNodes[nIdx].boundary = ndReplace.boundary;
     theNodes[nIdx].unlock();
     theClient->nodeUpdate(nIdx, ndReplace.X(), ndReplace.Y());
     CkPrintf("TMRC2D: [%d] theClient->nodeUpdate(%d, %2.10f, %2.10f\n", cid, 
@@ -296,6 +298,7 @@ void chunk::nodeReplaceDelete(node kn, node dn, node nn)
     if (kIdx != -1) {
       theNodes[kIdx].unlock();
       theNodes[kIdx].set(nn.X(), nn.Y());
+      theNodes[kIdx].boundary = nn.boundary;
       theClient->nodeUpdate(kIdx, nn.X(), nn.Y());
       CkPrintf("TMRC2D: [%d] (a)theClient->nodeUpdate(%d, %2.10f, %2.10f\n", cid, 
 	       kIdx, nn.X(), nn.Y());
@@ -304,6 +307,7 @@ void chunk::nodeReplaceDelete(node kn, node dn, node nn)
   }
   else if (kIdx == -1) {
     theNodes[dIdx].set(nn.X(), nn.Y());
+    theNodes[dIdx].boundary = nn.boundary;
     theNodes[dIdx].unlock();
     theClient->nodeUpdate(dIdx, nn.X(), nn.Y());
     CkPrintf("TMRC2D: [%d] (b)theClient->nodeUpdate(%d, %2.10f, %2.10f\n", cid, 
@@ -313,6 +317,7 @@ void chunk::nodeReplaceDelete(node kn, node dn, node nn)
     removeNode(dIdx);
     theNodes[kIdx].unlock();
     theNodes[kIdx].set(nn.X(), nn.Y());
+    theNodes[kIdx].boundary = nn.boundary;
     theClient->nodeUpdate(kIdx, nn.X(), nn.Y());
     CkPrintf("TMRC2D: [%d] (c)theClient->nodeUpdate(%d, %2.10f, %2.10f\n", cid, 
 	     kIdx, nn.X(), nn.Y());
@@ -725,6 +730,8 @@ void chunk::updateNodeCoords(int nNode, double *coord, int nEl)
   for (i=0; i<nodeSlots; i++)
     if (theNodes[i].isPresent()) {
       theNodes[i].set(coord[2*i], coord[2*i + 1]);
+      if (theNodes[i].boundary) 
+	CkPrintf("TMRC2D: [%d] Node %d on boundary!\n", cid, i);
     }
   // recalculate and cache new areas for each element
   for (i=0; i<elementSlots; i++) 
@@ -828,7 +835,7 @@ void chunk::newMesh(int nEl, int nGhost, const int *conn_, const int *gid_,
     }
   }
   else {
-    deriveBoundaries();
+    deriveBoundaries(conn, gid);
   }
   delete[] conn;
   delete[] gid;
@@ -877,7 +884,11 @@ void chunk::deriveEdges(int *conn, int *gid)
 	  }
 	}
 	// else edge will be made on a different chunk
-        else CkPrintf("TMRC2D: [%d] Edge between nodes %d,%d to be created elsewhere...\n", cid, theElements[i].nodes[n1localIdx], theElements[i].nodes[n2localIdx]);
+        else { 
+	  CkPrintf("TMRC2D: [%d] Edge between nodes %d,%d to be created elsewhere...\n", cid, theElements[i].nodes[n1localIdx], theElements[i].nodes[n2localIdx]);
+	  // mark the edge as non-boundary; will be filled later
+	  theElements[i].edges[j].idx = theElements[i].edges[j].cid = -2;
+	}
       }
       else CkPrintf("TMRC2D: [%d] Edge between nodes %d,%d exists at %d\n", cid, theElements[i].nodes[n1localIdx], theElements[i].nodes[n2localIdx], theElements[i].edges[j].idx);
     }
@@ -903,6 +914,7 @@ void chunk::deriveNodes()
       if ((aNode + 1) > numNodes)
 	numNodes = aNode + 1;
       theNodes[aNode].present = 1;
+      theNodes[aNode].boundary = 0;
     }
   }
   CkPrintf("TMRC2D: [%d] NumNodes = %d; max node idx = %d\n", cid, numNodes, numNodes-1);
@@ -920,11 +932,14 @@ int chunk::getNbrRefOnEdge(int n1, int n2, int *conn, int nGhost, int *gid,
 {
   int i, e;
   er->set(-1, -1);
-  for (i=idx+1; i<nGhost; i++)
-    if ((e = hasEdge(n1, n2, conn, i)) != -1) {
-      er->set(gid[i*2], gid[i*2+1]);
-      return e;
+  for (i=0; i<nGhost; i++) {
+    if (i != idx) {
+      if ((e = hasEdge(n1, n2, conn, i)) != -1) {
+	er->set(gid[i*2], gid[i*2+1]);
+	return e;
+      }
     }
+  }
   return -1;
 }
 
@@ -940,19 +955,29 @@ int chunk::hasEdge(int n1, int n2, int *conn, int idx)
   return -1;
 }
 
-void chunk::deriveBoundaries()
+void chunk::deriveBoundaries(int *conn, int *gid)
 {
+  int edgeIdx;
+  elemRef nbrRef;
   CkPrintf("TMRC2D: [%d] WARNING! Null list of boundary flags passed to newMesh...\n ...I hope you didn't want coarsening to work!\n", cid);
-  /*
-  elemRef nullRef;
-  for (int i=0; i<numEdges; i++) {
-    if ((theEdges[i].elements[0] == nullRef) || 
-	(theEdges[i].elements[1] == nullRef)) {
-      theEdges[i].nodes[0].setBorder();
-      theEdges[i].nodes[1].setBorder();
+  CkPrintf("TMRC2D: [%d] WARNING! Attempting to derive single boundary information -- corners will be ignored!\n", cid);
+  for (int i=0; i<numElements; i++) {
+    for (int j=0; j<3; j++) {
+      edgeIdx = getNbrRefOnEdge(theElements[i].nodes[j], 
+				theElements[i].nodes[(j+1)%3], 
+				conn, numGhosts, gid, i, &nbrRef); 
+      CkPrintf("TMRC2D: [%d] Neighbor is (%d, %d)\n",
+	       cid,nbrRef.idx,nbrRef.cid);
+      if ((nbrRef.idx == -1) && (nbrRef.cid == -1)) {
+	CkPrintf("TMRC2D: [%d] Marking node %d as a boundary.\n", cid,
+		 theElements[i].nodes[j] );
+	theNodes[theElements[i].nodes[j]].boundary = 1;
+	theNodes[theElements[i].nodes[(j+1)%3]].boundary = 1;
+	CkPrintf("TMRC2D: [%d] Marking node %d as a boundary.\n", cid,
+		 theElements[i].nodes[(j+1)%3] );
+      }
     }
   }
-  */
 }
 
 void chunk::tweakMesh()
