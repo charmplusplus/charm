@@ -22,6 +22,8 @@ static int _numEvents = 0;
 static int warned = 0;
 static int _threadMsg, _threadChare, _threadEP;
 
+CkpvStaticDeclare(CkVec<char *>, usrEvents);
+
 #ifdef CMK_OPTIMIZE
 #define OPTIMIZED_VERSION 	\
 	if (!warned) { warned=1; 	\
@@ -81,6 +83,7 @@ void LogPool::closeLog(void)
 void _createTraceprojections(char **argv)
 {
   DEBUGF(("%d createTraceProjections\n", CkMyPe()));
+  CkpvInitialize(CkVec<char *>, usrEvents);
   CkpvInitialize(Trace*, _trace);
   CkpvAccess(_trace) = new  TraceProjections(argv);
   CkpvAccess(_traces)->addTrace(CkpvAccess(_trace));
@@ -207,7 +210,7 @@ void LogPool::writeSts(void)
   for(i=0;i<_numMsgs;i++)
     fprintf(sts, "MESSAGE %d %d\n", i, _msgTable[i]->size);
   for(i=0;i<_numEvents;i++)
-    fprintf(sts, "EVENT %d Event%d\n", i, i);
+    fprintf(sts, "EVENT %d %s\n", i, CkpvAccess(usrEvents)[i]);
   fprintf(sts, "END\n");
   fclose(sts);
 }
@@ -398,11 +401,15 @@ TraceProjections::TraceProjections(char **argv): curevent(0), isIdle(0)
 }
 
 
-int TraceProjections::traceRegisterUserEvent(const char*)
+int TraceProjections::traceRegisterUserEvent(const char* evt)
 {
   OPTIMIZED_VERSION
-  if(CkMyPe()==0)
+  if(CkMyPe()==0) {
+    CkAssert(evt != NULL);
+    CkAssert(CkpvAccess(usrEvents).length() ==  _numEvents);
+    CkpvAccess(usrEvents).push_back((char *)evt);
     return _numEvents++;
+  }
   else
     return 0;
 }
