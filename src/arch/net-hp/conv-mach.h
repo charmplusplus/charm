@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.12  1995-10-13 22:35:38  jyelon
+ * Revision 2.13  1995-10-18 03:07:23  jyelon
+ * net-hp.
+ *
+ * Revision 2.12  1995/10/13  22:35:38  jyelon
  * *** empty log message ***
  *
  * Revision 2.11  1995/10/13  18:17:44  jyelon
@@ -130,6 +133,6 @@
 #define CMK_HAVE_SYS_WAIT_H
 /* #define CMK_HAVE_WAITFLAGS_H */
 
-#define CMK_MACHINE_NAME "NETWORK"
+#define CMK_MACHINE_NAME "net-hp"
 
 #endif
