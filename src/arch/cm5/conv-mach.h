@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-15 20:15:00  sanjeev
+ * Revision 2.1  1995-06-21 15:16:49  sanjeev
+ * added CMK_COMPILER_LIKES_STATIC_PROTO
+ *
+ * Revision 2.0  1995/06/15  20:15:00  sanjeev
  * *** empty log message ***
  *
  ***************************************************************************/
@@ -58,3 +61,7 @@
 
    #define CMK_NO_SHARED_VARS_AT_ALL
 /* #define CMK_SHARED_VARS_EXEMPLAR */
+
+   #define CMK_COMPILER_LIKES_STATIC_PROTO
+/* #define CMK_COMPILER_HATES_STATIC_PROTO */
+
