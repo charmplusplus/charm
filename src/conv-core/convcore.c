@@ -603,6 +603,9 @@ int CsdScheduler(int maxmsgs)
 	return maxmsgs;
       }
     }
+    if (!CpvAccess(disable_sys_msgs))
+      if (CpvAccess(CcdNumChecks) > 0)
+        CcdCallBacks();
   }
 }
 
@@ -700,7 +703,6 @@ static CthThread CthSuspendSchedulingThread()
     CthSetStrategy(succ,
 		   CthEnqueueSchedulingThread,
 		   CthSuspendSchedulingThread);
-
   }
   
   CpvAccess(CthSchedulingThread) = succ;
@@ -709,7 +711,6 @@ static CthThread CthSuspendSchedulingThread()
 
 static void CthResumeNormalThread(CthThread t)
 {
-  CthThread me = CthSelf();
   CmiGrabBuffer(&t);
   /** addition for tracing */
   CpvAccess(cThread) = t;
