@@ -85,7 +85,10 @@ int    BgGetArgc() { return arg_argc; }
 int read_counters(int e0, long long *c0, int e1, long long *c1) {
   // PAPI_read_counters resets the counter, hence it behaves like the perfctr
   // code for Origin2000
-  if (PAPI_read_counters(papiValues, 2) != PAPI_OK) {
+  int status;
+  status = PAPI_read_counters(papiValues, 2);
+  if (status != PAPI_OK) {
+    CmiPrintf("PAPI error: %d\n", status);
     CmiAbort("Failed to read PAPI counters!\n");
   }
   *c0 = papiValues[0];
@@ -668,9 +671,8 @@ void startVTimer()
     // do a fake read to reset the counters. It would be more efficient
     // to use the low level API, but that would be a lot more code to
     // write for now.
-    if (PAPI_read_counters(papiValues, 2) != PAPI_OK) {
-      CmiAbort("Failed to read PAPI counters!!\n");
-    }
+    long long c0, c1;
+    if (read_counters(0, &c0, 21, &c1) < 0) perror("read_counters");
   }
 #endif
 }
@@ -983,8 +985,19 @@ CmiStartFn bgMain(int argc, char **argv)
 #elif CMK_HAS_COUNTER_PAPI
   if (CmiGetArgFlagDesc(argv, "+bgpapi", "Use PAPI Performance counters")) {
     cva(bgMach).timingMethod = BG_COUNTER;
+  }
+  if (cva(bgMach).timingMethod == BG_COUNTER) {
     // PAPI high level API does not require explicit library intialization
-    if (PAPI_start_counters(papiEvents, 2) != PAPI_OK) {
+    papiEvents[0] = PAPI_TOT_CYC;
+    if (PAPI_query_event(PAPI_FP_INS) == PAPI_OK) {
+      printf("PAPI_FP_INS\n");
+      papiEvents[1] = PAPI_FP_INS;
+    } else {
+      printf("PAPI_TOT_INS\n");
+      papiEvents[1] = PAPI_TOT_INS;
+    }
+    int status = PAPI_start_counters(papiEvents, 2);
+    if (status != PAPI_OK) {
       CmiAbort("Unable to start PAPI counters!\n");
     }
   }
