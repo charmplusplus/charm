@@ -68,7 +68,7 @@ static void CmiNotifyBeginIdle(CmiIdleState *s)
 static void CmiNotifyStillIdle(CmiIdleState *s)
 {
 #if CMK_SHARED_VARS_UNAVAILABLE
-  CommunicationServer(1, 0);
+  CommunicationServer(10, 0);
 #else
   int nSpins=20; /*Number of times to spin before sleeping*/
   s->nIdles++;
@@ -444,9 +444,9 @@ void ReceiveDatagram(int node)
       buf = (char *)CmiAlloc(size);
   }
   else {
-    /* this is not the first packet of a message */
+      /* this is not the first packet of a message */
     CmiAssert(nodeptr->asm_fill+size-DGRAM_HEADER_SIZE <= nodeptr->asm_total);
-    /* find the dgram header start and save the header to temp */
+      /* find the dgram header start and save the header to temp */
     buf = (char*)nodeptr->asm_msg + nodeptr->asm_fill - DGRAM_HEADER_SIZE;
     head = (DgramHeader *)buf;
     temp = *head;
@@ -462,6 +462,7 @@ void ReceiveDatagram(int node)
   IntegrateMessageDatagram(&buf, size);
 
 #if FRAGMENTATION
+    /* restore header */
   if (newmsg) *head = temp;
 #endif
 
@@ -521,6 +522,7 @@ int TransmitDatagram(int pe)
   if (dg) {
     if (TransmitImplicitDgram(dg)) {
       node->send_queue_h = dg->next;
+      if (node->send_queue_h == NULL) node->send_queue_t = NULL;
       DiscardImplicitDgram(dg);
     }
   }
