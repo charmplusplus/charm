@@ -25,7 +25,7 @@ PythonExecute::PythonExecute(char *_code, char *_method, PythonIterator *_info, 
   methodNameLength = strlen(_method);
   methodName.methodName = strdup(_method);
   infoSize = _info->size();
-  info.info = _info->pack();
+  info.info = (PythonIterator *)_info->pack();
   flags = 0;
   if (_persistent) {
     flags |= FLAG_PERSISTENT;
@@ -54,7 +54,7 @@ void PythonExecute::setMethodName(char *_set) {
 
 void PythonExecute::setIterator(PythonIterator *_set) {
   infoSize = _set->size();
-  info.info = _set->pack();
+  info.info = (PythonIterator *)_set->pack();
 }
 
 void PythonExecute::setPersistent(bool _set) {
