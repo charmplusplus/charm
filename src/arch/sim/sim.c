@@ -659,7 +659,8 @@ int numpe;
 #ifdef DEBUG
     malloc_debug(2);
 #endif
-    srand(seed);
+    /* srand(seed); */
+    CrnSrand(seed);
     
     init_max_time_const();
     time_zero(&gclock);
