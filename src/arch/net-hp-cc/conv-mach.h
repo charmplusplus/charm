@@ -8,7 +8,11 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.16  1997-02-13 09:31:44  jyelon
+ * Revision 1.17  1997-02-13 17:32:42  milind
+ * Fixed a minor typo in CmiSignal in convcore.c.
+ * Changed net-hp-cc/conv-mach.h to set ASYNC_NOT_NEEDED.
+ *
+ * Revision 1.16  1997/02/13 09:31:44  jyelon
  * Updated for new main/ConverseInit structure.
  *
  * Revision 1.15  1997/02/08 14:10:18  jyelon
@@ -83,8 +87,8 @@
 
 #define CMK_MACHINE_NAME                                   "net-hp-cc"
 
-#define CMK_MALLOC_USE_GNU_MALLOC                          0
-#define CMK_MALLOC_USE_OS_BUILTIN                          1
+#define CMK_MALLOC_USE_GNU_MALLOC                          1
+#define CMK_MALLOC_USE_OS_BUILTIN                          0
 
 #define CMK_MSG_HEADER_SIZE_BYTES                         16
 #define CMK_MSG_HEADER_BLANK_SPACE                        12

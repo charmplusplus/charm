@@ -1245,9 +1245,13 @@ static void CmiStartThreads()
   Cmi_mype = Cmi_nodestart;
   Cmi_myrank = 0;
   
+#if CMK_ASYNC_NOT_NEEDED
+  CmiSignal(SIGALRM, 0, 0, CommunicationServer);
+#else
   CmiSignal(SIGALRM, SIGIO, 0, CommunicationServer);
   CmiEnableAsyncIO(dataskt);
   CmiEnableAsyncIO(ctrlskt);
+#endif
   i.it_interval.tv_sec = 0;
   i.it_interval.tv_usec = Cmi_tickspeed;
   i.it_value.tv_sec = 0;

@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.4  1995-09-06 21:48:50  jyelon
+ * Revision 1.5  1997-02-13 17:32:40  milind
+ * Fixed a minor typo in CmiSignal in convcore.c.
+ * Changed net-hp-cc/conv-mach.h to set ASYNC_NOT_NEEDED.
+ *
+ * Revision 1.4  1995/09/06 21:48:50  jyelon
  * Eliminated 'CkProcess_BocMsg', using 'CkProcess_ForChareMsg' instead.
  *
  * Revision 1.3  1995/07/27  20:29:34  jyelon
@@ -63,7 +67,6 @@ the node part of the boc.
 #include "converse.h"
 #include <stdio.h>
 #include <string.h>
-
 
 /*** MACROS ***/
 #define isLeaf(peNum) (CmiNumSpanTreeChildren(peNum) == 0)
