@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.2  1995-06-19 16:36:04  sanjeev
+ * Revision 2.3  1995-06-19 17:45:44  sanjeev
+ * bug in PeriodicChecks
+ *
+ * Revision 2.2  1995/06/19  16:36:04  sanjeev
  * Integrated TimerChecks and PeriodicChecks
  *
  * Revision 2.1  1995/06/18  21:56:02  sanjeev
@@ -151,23 +154,32 @@ void CcdCallBacks()
   unsigned int currTime;
   int index;
   int i,j;
-  FN_ARG *temp;
+  FN_ARG *temp, *next;
   
 /* This was formerly TimerChecks() */
-  currTime = CmiTimer();
+  if ( CpvAccess(numHeapEntries) > 0 ) {
+    currTime = CmiTimer();
   
-  while ((CpvAccess(numHeapEntries) > 0) && CpvAccess(timerHeap)[1].timeVal < currTime)
+    while ((CpvAccess(numHeapEntries) > 0) && CpvAccess(timerHeap)[1].timeVal < currTime)
     {
       (*(CpvAccess(timerHeap)[1].fn))(CpvAccess(timerHeap)[1].arg);
       RemoveFromHeap(1);
     }
+  }
 
 /* This was formerly PeriodicChecks() */
 /* Call the functions that have been added to the list of periodic functions */
 
-  for(temp = CpvAccess(PeriodicCalls); temp; temp = temp->next) {
-    (*(temp->fn))(temp->arg);
+  temp = CpvAccess(PeriodicCalls); 
+  CpvAccess(PeriodicCalls) = NULL ;
+
+  for(; temp; temp = next) {
     CpvAccess(CcdNumChecks)--;
+
+    (*(temp->fn))(temp->arg);
+
+    next = temp->next ;
+    CmiFree(temp) ;
   }
 } 
 
