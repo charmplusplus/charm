@@ -11,8 +11,11 @@
  ***************************************************************************
  * REVISION HISTORY:
  *      $Log$
- *      Revision 2.8  1995-10-27 21:37:45  jyelon
- *      changed NumPe --> NumPes
+ *      Revision 2.9  1995-10-30 14:31:12  jyelon
+ *      Fixed an obvious bug, but there's probably still more.
+ *
+ * Revision 2.8  1995/10/27  21:37:45  jyelon
+ * changed NumPe --> NumPes
  *
  * Revision 2.7  1995/07/27  20:48:27  jyelon
  * *** empty log message ***
@@ -329,7 +332,7 @@ TRACE(CmiPrintf("[%d] Send out perf message to %d\n",
 		mype, CmiSpanTreeParent(mype)));
 
 	GeneralSendMsgBranch(CsvAccess(CkEp_Stat_PerfCollectNodes), msg,
-		CmiSpanTreeParent(mype), USERcat, BocMsg, StatisticBocNum);
+		CmiSpanTreeParent(mype), BocMsg, StatisticBocNum);
 }
 
 
