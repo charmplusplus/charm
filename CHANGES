@@ -4,7 +4,8 @@ What's New since Charm++ 5.4 release 1
 --------------------------------------------------------------------------------
 New Supported Platforms:
 --------------------------------------------------------------------------------
-1. Charm++ ported to IA64 Itanium running Win2K and Linux;
+1. Charm++ ported to IA64 Itanium running Win2K and Linux, Charm++ also support
+   Intel C/C++ compilers;
 
 2. Charm++ ported to Power Macintosh powerpc running Darwin;
 
@@ -33,6 +34,12 @@ Summary of New Features:
 --------------------------------------------------------------------------------
 Summary of Changes:
 --------------------------------------------------------------------------------
+1. "build" changed for compilation of Charm++
+   To build Charm++ from scratch, we now take additional command line options
+   to compile with addon features and using different compilers other than gcc.
+   For example, to build Linux IA64 with Myrinet support, type command:
+   ./build net-linux-ia64  gm
+
 
                 *******   Old Change histories *******
 

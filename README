@@ -35,7 +35,22 @@ What you need to do is as following:
 PICKING A VERSION
 =================
 
-First, you need to decide which version of charm++ to use. 
+First, you need to decide which version of charm++ to use. The "build" 
+script in charm source directory takes several command line options to
+compile Charm++. The command line syntax is:
+
+build <target> <version> [options ...] [charmc-options ...]
+
+<taget> specify the parts of Charm++ to compile, the most oftenly used 
+<target> is charm++, it will compile most the key Charm++ executables and 
+runtime libraries.
+<versions> defines the CPU, OS and Communication of the machines, see 
+"How to choose a <version>" below;
+<options> defines more detailed information of the compilations including 
+compilers and features to support, etc. see "How to choose <option>" below.
+
+**** How to choose a <version> ****
+
 Here is a table for choosing correct version, for the detailed explanation
 of the options see the comments following the table.
 (Note: this table doesn't necessarily include all the current supported version,
@@ -45,17 +60,14 @@ Charm version          OS        Communication     Compiler
 -------------       ---------    --------------   --------------------
 net-linux            PC Linux       UDP/Myrinet   GNU compiler
 net-linux-ia64       IA64 Linux     UDP/Myrinet   GNU compiler
-net-linux-kcc        PC Linux       UDP           KAI C++ compiler
-net-linux-pgcc       PC Linux       UDP           Portland Group's C++ compiler
-net-linux-scyld      PC Linux     Scyld/UDP       GNU compiler
 net-linux-smp        PC Linux SMP workstations    GNU compiler
 mpi-linux            PC Linux       MPI           GNU compiler
 mpi-axp-cc           Alpha          MPI           DIGITAL C++ compiler  
 mpi-linux-axp        Alpha Linux    MPI           GNU compiler
-mpi-linux-axp-cxx    Alpha Linux    MPI           DIGITAL C++ compiler
 net-axp-cc           Alpha          UDP           DIGITAL C++ compiler
 net-cygwin           Win32/cygwin   UDP           GNU compiler
 net-win32            Win32          UDP           MS Visual C++
+net-win32-smp        Win32 SMP      UDP           MS Visual C++
 net-sol-cc           Solaris        UDP           Sun WorkShop C++ Compiler
 net-sol              Solaris        UDP           GNU compiler
 net-irix             IRIX	    UDP           SGI C++ compiler
@@ -70,7 +82,7 @@ t3e                  Cray T3E    shared-mem       Cray C++ compiler
 net-ppc-darwin       Mac            UDP           GNU C++ compiler
 
 
-Your choice is determined by three options:
+To choose <versions>, your choice is determined by three options:
 
 1.)  The way a parallel program written in Charm++ will communicate:
 
@@ -105,22 +117,10 @@ threads; "sim-" switches between processors and counts communications.
 	"axp"     DEC Alpha DECUNIX
 	
 
-3.)  Your compiler and other options.  Charm++ normally picks an
-appropriate compiler for the system, but you may select another
-compiler:
-
-	"-cc"      The OEM C/C++ compiler.  When given, this
-will override the choice of the GNU C/C++ compiler.
-	"-kcc"     Kuck & Associates C++ compiler.
-	"-acc"     Uses HP's aCC instead of CC.
-	"-pgcc"    Portland Group's ANSI and K&R C compiler.
-
-Some operating systems have other options, such as:
+3.)  Some operating systems have other options, such as:
 	"-x86"     For Solaris, use PC hardware (instead of Sun).
 	"-axp"     For Linux, use Alpha hardware (instead of PC).
 	"-64"      For IRIX, use -64 instead of -32. 
-	"-scyld"   For Beowulf Cluster with Scyld.
-	"-vmi"	   For NCSA's Virtual Machine Interface.
 
 You may also choose to enable direct SMP support with a "-smp"
 version, which may result in more efficient communication in
@@ -134,14 +134,42 @@ Your Charm++ version is made by concatenating all three options, e.g.:
 
 "net-linux"     Charm++ for a network of Linux workstations, compiled
                 using g++.
-"net-linux-kcc" Charm++ for a network of Linux workstations, compiled
-                using Kuck & Associates C++ compiler.
 "net-linux-smp" Charm++ for a network of Linux SMP workstations,
                 compiled using g++.
-"net-sol-cc"    Charm++ for a network of Sun workstations, 
-                compiled using Sun CC.
 "mpi-origin"    Charm++ for SGI Origin 2000, compiled using SGI CC.
 
+
+**** How to choose <options> ****
+
+<version> above defines the most important OS, CPU and Communication of 
+your machine, and most of time, it use the GNU gcc as default compiler. 
+To use different compiler or demand additional special feature support, you 
+need to choose <options> from the following list:
+
+* cc  - For Sun WorkShop C++ compilers;
+* cc64 - For 64 bits Sun WorkShop C++ compilers;
+* cxx - DIGITAL C++ compiler;
+* kcc - KAI C++ compiler;
+* pgcc - Portland Group's C++ compiler;
+* icc - Intel C/C++ compiler
+
+* scyld - support Beowulf Scyld;
+* gm - support MyriCom's Myrinet GM library;
+* vmi - support NCSA's VMI library;
+
+For s specific version, for example: net-linux, you can use following command 
+to display the supported <options> on this platform:
+> ./build charm++ net-linux help
+supported options: gm icc pgcc scyld
+
+
+After you find all the options you need, you can use build to compile Charm++.
+For example, to compile net-linux with Myrinet support, type:
+./build charm++ net-linux gm
+
+Or, to compile mpi-linux with pgcc compiler and vmi support, type:
+./build charm++ mpi-linux vmi pgcc
+(the sequence of options is not important)
 
 
 BUILDING THE SOURCE
