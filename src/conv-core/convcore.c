@@ -90,47 +90,87 @@ CpvDeclare(int,   CsdStopFlag);
  *
  *****************************************************************************/
 
-
-
 static int usageChecked=0; /* set when argv has been searched for a usage request */
 static int printUsage=0; /* if set, print command-line usage information */
-static const char *CLAformatString="%20s %12s %s\n";
+static const char *CLAformatString="%20s %10s %s\n";
 
-/* Print out the CLA header */
+/* This little list of CLA's holds the argument descriptions until it's
+   safe to print them--it's needed because the net- versions don't have 
+   printf until they're pretty well started.
+ */
+typedef struct {
+	const char *arg; /* Flag name, like "-foo"*/
+	const char *param; /* Argument's parameter type, like "integer" or "none"*/
+	const char *desc; /* Human-readable description of what it does */
+} CLA;
+static int CLAlistLen=0;
+static int CLAlistMax=0;
+static CLA *CLAlist=NULL;
+
+/* Add this CLA */
+static void CmiAddCLA(const char *arg,const char *param,const char *desc) {
+	int i;
+	if (CmiMyPe()!=0) return; /*Don't bother if we're not PE 0*/
+	if (usageChecked) { /* Printf should work now */
+		if (printUsage)
+			CmiPrintf(CLAformatString,arg,param,desc);
+	}
+	else { /* Printf doesn't work yet-- just add to the list.
+		This assumes the const char *'s are static references,
+		which is probably reasonable. */
+		i=CLAlistLen++;
+		if (CLAlistLen>CLAlistMax) { /*Grow the CLA list */
+			CLAlistMax=16+2*CLAlistLen;
+			CLAlist=realloc(CLAlist,sizeof(CLA)*CLAlistMax);\
+		}
+		CLAlist[i].arg=arg;
+		CLAlist[i].param=param;
+		CLAlist[i].desc=desc;
+	}
+}
+
+/* Print out the stored list of CLA's */
 static void CmiPrintCLAs(void) {
 	int i;
 	if (CmiMyPe()!=0) return; /*Don't bother if we're not PE 0*/
-	CmiPrintf("Accepted Command Line Options:\n ");
+	CmiPrintf("Converse Machine Command-line Parameters:\n ");
 	CmiPrintf(CLAformatString,"Option:","Parameter:","Description:");
+	for (i=0;i<CLAlistLen;i++) {
+		CLA *c=&CLAlist[i];
+		CmiPrintf(CLAformatString,c->arg,c->param,c->desc);
+	}
 }
 
 /**
- * Return true if command-line usage information should be printed--
+ * Determines if command-line usage information should be printed--
  * that is, if a "-?", "-h", or "--help" flag is present.
+ * Must be called after printf is setup.
  */
-int CmiDoPrintUsage(char **argv) {
-	if (!usageChecked) {
-		/* Look for usage request in command line */
-		int i;
-		for (i=0;argv[i]!=NULL;i++)
+void CmiArgInit(char **argv) {
+	int i;
+	for (i=0;argv[i]!=NULL;i++)
+	{
+		if (0==strcmp(argv[i],"-?") ||
+		    0==strcmp(argv[i],"-h") ||
+		    0==strcmp(argv[i],"--help")) 
 		{
-			if (0==strcmp(argv[i],"-?") ||
-			    0==strcmp(argv[i],"-h") ||
-			    0==strcmp(argv[i],"--help")) 
-			{
-				printUsage=1;
-				CmiDeleteArgs(&argv[i],1);
-				CmiPrintCLAs();
-			}
+			printUsage=1;
+			CmiDeleteArgs(&argv[i],1);
+			CmiPrintCLAs();
 		}
-		usageChecked=1;
 	}
-	if (CmiMyPe()!=0) 
-		return 0; /* Only processor 0 gets to print usage info... */
-	else /* CmiMyPe()==0 */
-		return printUsage;
+	if (CmiMyPe()==0) { /* Throw away list of stored CLA's */
+		CLAlistLen=CLAlistMax=0;
+		free(CLAlist); CLAlist=NULL;
+	}
+	usageChecked=1;
 }
 
+
+void CmiArgGroup(const char *groupName) {
+	if (CmiMyPe()==0 && printUsage)
+		CmiPrintf("\n%s Command-line Parameters:\n",groupName);
+}
 
 /*Count the number of non-NULL arguments in list*/
 int CmiGetArgc(char **argv)
@@ -174,8 +214,7 @@ and sets argv={"a.out","foo","bar"};
 int CmiGetArgStringDesc(char **argv,const char *arg,char **optDest,const char *desc)
 {
 	int i;
-	if (CmiDoPrintUsage(argv))
-		CmiPrintf(CLAformatString,arg,"string",desc);
+	CmiAddCLA(arg,"string",desc);
 	for (i=0;argv[i]!=NULL;i++)
 		if (0==strcmp(argv[i],arg))
 		{/*We found the argument*/
@@ -201,8 +240,7 @@ int CmiGetArgIntDesc(char **argv,const char *arg,int *optDest,const char *desc)
 {
 	int i;
 	int argLen=strlen(arg);
-	if (CmiDoPrintUsage(argv))
-		CmiPrintf(CLAformatString,arg,"integer",desc);
+	CmiAddCLA(arg,"integer",desc);
 	for (i=0;argv[i]!=NULL;i++)
 		if (0==strncmp(argv[i],arg,argLen))
 		{/*We *may* have found the argument*/
@@ -245,8 +283,7 @@ argv={...,"-foobar",...}.
 int CmiGetArgFlagDesc(char **argv,const char *arg,const char *desc)
 {
 	int i;
-	if (CmiDoPrintUsage(argv))
-		CmiPrintf(CLAformatString,arg,"none",desc);
+	CmiAddCLA(arg,"",desc);
 	for (i=0;argv[i]!=NULL;i++)
 		if (0==strcmp(argv[i],arg))
 		{/*We found the argument*/
@@ -1751,6 +1788,8 @@ void CommunicationServerInit()
 
 void ConverseCommonInit(char **argv)
 {
+  CmiArgInit(argv);
+  CmiArgGroup("Converse");
   CmiMemoryInit(argv);
   CmiTimerInit();
   CstatsInit(argv);
