@@ -56,7 +56,7 @@ void bgTimeLog::addMsg(char *msg)
 
 void bgTimeLog::print(int node, int th)
 {
-  CmiPrintf("<<== [%d th:%d] ep:%d startTime:%f endTime:%f srcpe:%d msgID:%d\n", node, th, ep, startTime, endTime, srcpe, msgID);
+  CmiPrintf("<<== [%d th:%d] ep:%d startTime:%f endTime:%f srcnode:%d msgID:%d\n", node, th, ep, startTime, endTime, srcpe, msgID);
   for (int i=0; i<msgs.length(); i++)
     msgs[i]->print();
   CmiPrintf("==>>\n");

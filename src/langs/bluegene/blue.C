@@ -29,7 +29,9 @@ template<class T> class bgQueue;
 typedef bgQueue<int>  	    threadIDQueue;
 typedef bgQueue<CthThread>  threadQueue;
 typedef bgQueue<char *>     msgQueue;
-typedef CkQ<char *> 	    ckMsgQueue;
+//typedef CkQ<char *> 	    ckMsgQueue;
+// use a queue sorted by recv time
+typedef minMsgHeap 	    ckMsgQueue;
 
 class nodeInfo;
 class threadInfo;
@@ -58,6 +60,7 @@ CpvStaticDeclare(msgQueue *,inBuffer);	/* emulate the bluegene fix-size inbuffer
 CpvStaticDeclare(CmmTable *,msgBuffer);	/* if inBuffer is full, put to this buffer */
 
 CpvDeclare(int, inEmulatorInit);
+static int printTimeLog;
 
 #define ASSERT(x)	if (!(x)) { CmiPrintf("Assert failure at %s:%d\n", __FILE__,__LINE__); CmiAbort("Abort!"); }
 
@@ -341,7 +344,7 @@ void addBgThreadMessage(char *msgPtr, int threadID)
 #endif
   ckMsgQueue &que = tMYNODE->affinityQ[threadID];
   que.enq(msgPtr);
-  if (que.length() == 1)
+//  if (que.length() == 1)
     CthAwaken(tTHREADTABLE[threadID]);
 }
 
@@ -701,14 +704,14 @@ double BgGetTime()
 void BgShutdown()
 {
   // timing
-#if 0
 #if BLUEGENE_TIMING
-  for (int j=0; j<cva(numNodes); j++)
-  for (int i=0; i<cva(numWth); i++) {
-    BgTimeLine &log = cva(nodeinfo)[j].timelines[i];	
-    BgPrintThreadTimeLine(nodeInfo::Local2Global(j), i, log);
+  if (printTimeLog) {
+    for (int j=0; j<cva(numNodes); j++)
+    for (int i=0; i<cva(numWth); i++) {
+      BgTimeLine &log = cva(nodeinfo)[j].timelines[i];	
+      BgPrintThreadTimeLine(nodeInfo::Local2Global(j), i, log);
+    }
   }
-#endif
 #endif
 
   int msgSize = CmiBlueGeneMsgHeaderSizeBytes;
@@ -889,7 +892,8 @@ void work_thread(threadInfo *tinfo)
 
     /* let other work thread do their jobs */
     tCURRTIME += (CmiWallTimer()-tSTARTTIME);
-    CthYield();
+    // suspend work thread, awaken at line 347 - addBgThreadMessage().
+    CthSuspend();
     tSTARTTIME = CmiWallTimer();
   }
 }
@@ -965,6 +969,7 @@ CmiStartFn bgMain(int argc, char **argv)
   CmiGetArgInt(argv, "+z", &cva(numZ));
   CmiGetArgInt(argv, "+cth", &cva(numCth));
   CmiGetArgInt(argv, "+wth", &cva(numWth));
+  printTimeLog = CmiGetArgFlag(argv, "+bglog");
 
   arg_argv = argv;
   arg_argc = CmiGetArgc(argv);
