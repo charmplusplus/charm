@@ -1595,6 +1595,7 @@ struct rwtable rwtable[] = {
   "mainmodule",	MAINMODULE,
   "chare",	CHARE,
   "group",	GROUP,
+  "nodegroup",  NODEGROUP,
   "array",	ARRAY,
   "message",	MESSAGE,
   "extern",	EXTERN,

@@ -269,6 +269,7 @@ class TEntity : public Printable {
 #define SMAINCHARE 2
 #define SGROUP 3
 #define SARRAY 4
+#define SNODEGROUP 5
 
 /* Chare or group is a templated entity */
 

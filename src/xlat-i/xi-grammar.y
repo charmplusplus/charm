@@ -41,7 +41,7 @@ ModuleList *modlist;
 %token MAINMODULE
 %token EXTERN
 %token READONLY
-%token <intval> CHARE GROUP ARRAY
+%token <intval> CHARE GROUP NODEGROUP ARRAY
 %token MESSAGE
 %token CLASS
 %token STACKSIZE
@@ -74,7 +74,7 @@ ModuleList *modlist;
 %type <ptype>		PtrType OnePtrType
 %type <readonly>	Readonly ReadonlyMsg
 %type <message>		Message TMessage
-%type <chare>		Chare Group Array TChare TGroup TArray
+%type <chare>		Chare Group NodeGroup Array TChare TGroup TNodeGroup TArray
 %type <entry>		Entry
 %type <templat>		Template
 %type <typelist>	BaseList OptBaseList TypeList
@@ -144,6 +144,8 @@ Construct	: OptExtern '{' ConstructList '}' OptSemiColon
 		| OptExtern Chare
 		{ $2->setExtern($1); $$ = $2; }
 		| OptExtern Group
+		{ $2->setExtern($1); $$ = $2; }
+		| OptExtern NodeGroup
 		{ $2->setExtern($1); $$ = $2; }
 		| OptExtern Array
 		{ $2->setExtern($1); $$ = $2; }
@@ -322,6 +324,10 @@ Group		: GROUP NamedType OptBaseList MemberEList
 		{ $$ = new Chare(SGROUP, $2, $3, $4); if($4) $4->setChare($$);}
 		;
 
+NodeGroup	: NODEGROUP NamedType OptBaseList MemberEList
+		{ $$ = new Chare(SNODEGROUP, $2, $3, $4); if($4) $4->setChare($$);}
+		;
+
 Array		: ARRAY NamedType OptBaseList MemberEList
 		{ $$ = new Chare(SARRAY, $2, $3, $4); if($4) $4->setChare($$);}
 		;
@@ -336,6 +342,11 @@ TChare		: CHARE Name OptBaseList MemberEList
 
 TGroup		: GROUP Name OptBaseList MemberEList
 		{ $$ = new Chare(SGROUP, new NamedType($2), $3, $4); 
+                  if($4) $4->setChare($$);}
+		;
+
+TNodeGroup	: NODEGROUP Name OptBaseList MemberEList
+		{ $$ = new Chare(SNODEGROUP, new NamedType($2), $3, $4); 
                   if($4) $4->setChare($$);}
 		;
 
@@ -383,6 +394,8 @@ TemplateSpec	: TEMPLATE '<' TVarList '>'
 Template	: TemplateSpec TChare
 		{ $$ = new Template($1, $2); $2->setTemplate($$); }
 		| TemplateSpec TGroup
+		{ $$ = new Template($1, $2); $2->setTemplate($$); }
+		| TemplateSpec TNodeGroup
 		{ $$ = new Template($1, $2); $2->setTemplate($$); }
 		| TemplateSpec TArray
 		{ $$ = new Template($1, $2); $2->setTemplate($$); }

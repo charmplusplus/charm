@@ -71,6 +71,7 @@ Chare::print(XStr& str)
     case SCHARE: str << "chare "; break;
     case SMAINCHARE: str << "mainchare "; break;
     case SGROUP: str << "group "; break;
+    case SNODEGROUP: str << "nodegroup "; break;
   }
   type->print(str);
   if(bases) { str << ": "; bases->print(str); }
@@ -330,7 +331,10 @@ Chare::genGroupDecls(XStr& str)
     return;
   }
   str << ": ";
-  str <<" public virtual _CK_GID";
+  if(chareType==SGROUP)
+    str <<" public virtual _CK_GID";
+  else
+    str <<" public virtual _CK_NGID";
   if(bases!=0) {
     str << ", ";
     bases->genProxyNames(str);
@@ -339,34 +343,52 @@ Chare::genGroupDecls(XStr& str)
   str << "    ";
   str<<group_prefix();
   type->print(str);
-  str << "(int _gid) { _ck_gid = _gid; }\n";
-  str << "    int ckGetGroupId(void) { return _ck_gid; }\n";
-  str << "    void ckSetGroupId(int _gid) { _ck_gid = _gid; }\n";
+  if(chareType==SGROUP) {
+    str << "(int _gid) { _ck_gid = _gid; }\n";
+    str << "    int ckGetGroupId(void) { return _ck_gid; }\n";
+    str << "    void ckSetGroupId(int _gid) { _ck_gid = _gid; }\n";
+  } else {
+    str << "(int _gid) { _ck_ngid = _gid; }\n";
+    str << "    int ckGetNodeGroupId(void) { return _ck_ngid; }\n";
+    str << "    void ckSetNodeGroupId(int _gid) { _ck_ngid = _gid; }\n";
+  }
   str << "    ";
   type->print(str);
   if(templat) {
     templat->genVars(str);
   }
-  str << "* ckLocalBranch(void) {\n";
+  if(chareType==SGROUP)
+    str << "* ckLocalBranch(void) {\n";
+  else
+    str << "* ckLocalNodeBranch(void) {\n";
   str << "      return (";
   type->print(str);
   if(templat) {
     templat->genVars(str);
   }
-  str << " *) CkLocalBranch(_ck_gid);\n";
+  if(chareType==SGROUP)
+    str << " *) CkLocalBranch(_ck_gid);\n";
+  else
+    str << " *) CkLocalNodeBranch(_ck_ngid);\n";
   str << "    }\n";
   str << "    static ";
   type->print(str);
   if(templat) {
     templat->genVars(str);
   }
-  str << "* ckLocalBranch(int gID) {\n";
+  if(chareType==SGROUP)
+    str << "* ckLocalBranch(int gID) {\n";
+  else
+    str << "* ckLocalNodeBranch(int gID) {\n";
   str << "      return (";
   type->print(str);
   if(templat) {
     templat->genVars(str);
   }
-  str << " *) CkLocalBranch(gID);\n";
+  if(chareType==SGROUP)
+    str << " *) CkLocalBranch(gID);\n";
+  else
+    str << " *) CkLocalNodeBranch(gID);\n";
   str << "    }\n";
   if(list)
     list->genDecls(str);
@@ -422,7 +444,7 @@ Chare::genDecls(XStr& str)
     templat->genSpec(str);
   if(chareType==SCHARE||chareType==SMAINCHARE) {
     genChareDecls(str);
-  } else if(chareType==SGROUP) {
+  } else if(chareType==SGROUP || chareType==SNODEGROUP) {
     genGroupDecls(str);
   } else if(chareType==SARRAY) {
     genArrayDecls(str);
@@ -451,7 +473,7 @@ Chare::genDefs(XStr& str)
   str << "void ";
   if(chareType==SCHARE||chareType==SMAINCHARE) {
     str << chare_prefix();
-  } else if(chareType==SGROUP) {
+  } else if(chareType==SGROUP || chareType==SNODEGROUP) {
     str << group_prefix();
   } else if(chareType==SARRAY) {
     str << array_prefix();
@@ -482,7 +504,7 @@ Chare::genReg(XStr& str)
   str << "  ";
   if(chareType==SCHARE||chareType==SMAINCHARE) {
     str << chare_prefix();
-  } else if (chareType==SGROUP) {
+  } else if (chareType==SGROUP || chareType==SNODEGROUP) {
     str << group_prefix();
   } else if (chareType==SARRAY) {
     str << array_prefix();
@@ -1022,14 +1044,20 @@ void Entry::genGroupDecl(XStr& str)
           str << "msg";
       }
       str<< ") {\n";
-      str << "      CkBroadcastMsgBranch(__idx_";
+      if(container->getChareType()==SGROUP)
+        str << "      CkBroadcastMsgBranch(__idx_";
+      else
+        str << "      CkBroadcastMsgNodeBranch(__idx_";
       genEpIdx(str);
       str << ", ";
       if(!param->isVoid())
         str << "msg, ";
       else
         str << "CkAllocSysMsg(), ";
-      str << "_ck_gid);\n";
+      if(container->getChareType()==SGROUP)
+        str << "_ck_gid);\n";
+      else
+        str << "_ck_ngid);\n";
       str << "    }\n";
     }
     // entry method onPE declaration
@@ -1044,11 +1072,17 @@ void Entry::genGroupDecl(XStr& str)
     str<< "int onPE) {\n";
     if(isSync()) {
       if(retType->isVoid()) {
-        str << "    CkFreeSysMsg(CkRemoteBranchCall(__idx_";
+        if(container->getChareType()==SGROUP)
+          str << "    CkFreeSysMsg(CkRemoteBranchCall(__idx_";
+        else
+          str << "    CkFreeSysMsg(CkRemoteNodeBranchCall(__idx_";
       } else {
         str << "      return (";
         retType->print(str);
-        str << ") (CkRemoteBranchCall(__idx_";
+        if(container->getChareType()==SGROUP)
+          str << ") (CkRemoteBranchCall(__idx_";
+        else
+          str << ") (CkRemoteNodeBranchCall(__idx_";
       }
       genEpIdx(str);
       str << ", ";
@@ -1059,14 +1093,20 @@ void Entry::genGroupDecl(XStr& str)
       str << "_ck_gid, onPE));\n";
       str << "    }\n";
     } else {
-      str << "      CkSendMsgBranch(__idx_";
+      if(container->getChareType()==SGROUP)
+        str << "      CkSendMsgBranch(__idx_";
+      else
+        str << "      CkSendMsgNodeBranch(__idx_";
       genEpIdx(str);
       str << ", ";
       if(!param->isVoid())
         str << "msg, ";
       else
         str << "CkAllocSysMsg(), ";
-      str << "onPE, _ck_gid);\n";
+      if(container->getChareType()==SGROUP)
+        str << "onPE, _ck_gid);\n";
+      else
+        str << "onPE, _ck_ngid);\n";
       str << "    }\n";
     }
     // entry ptr declaration
@@ -1150,7 +1190,7 @@ void Entry::genDecls(XStr& str)
 {
   str << "/* DECLS: "; print(str); str << " */\n";
   genEpIdxDecl(str);
-  if(container->getChareType()==SGROUP) {
+  if(container->getChareType()==SGROUP || container->getChareType()==SNODEGROUP) {
     genGroupDecl(str);
   } else if(container->getChareType()==SARRAY) {
     genArrayDecl(str);
@@ -1306,7 +1346,10 @@ void Entry::genGroupStaticConstructorDefs(XStr& str)
   if(param->isVoid()) {
     str << "  void *msg = CkAllocSysMsg();\n";
   }
-  str << "  return CkCreateGroup(__idx, __idx_";
+  if(container->getChareType()==SGROUP)
+    str << "  return CkCreateGroup(__idx, __idx_";
+  else
+    str << "  return CkCreateNodeGroup(__idx, __idx_";
   genEpIdx(str);
   str << ", msg, 0, 0);\n";
   str << "}\n";
@@ -1331,7 +1374,10 @@ void Entry::genGroupStaticConstructorDefs(XStr& str)
   if(param->isVoid()) {
     str << "  void *msg = CkAllocSysMsg();\n";
   }
-  str << "  _ck_gid = CkCreateGroup(__idx, __idx_";
+  if(container->getChareType()==SGROUP)
+    str << "  _ck_gid = CkCreateGroup(__idx, __idx_";
+  else
+    str << "  _ck_ngid = CkCreateNodeGroup(__idx, __idx_";
   genEpIdx(str);
   str << ", msg, retEP, cid);\n";
   str << "}\n";
@@ -1356,7 +1402,10 @@ void Entry::genGroupStaticConstructorDefs(XStr& str)
   if(param->isVoid()) {
     str << "  void *msg = CkAllocSysMsg();\n";
   }
-  str << "  _ck_gid = CkCreateGroup(__idx, __idx_";
+  if(container->getChareType()==SGROUP)
+    str << "  _ck_gid = CkCreateGroup(__idx, __idx_";
+  else
+    str << "  _ck_ngid = CkCreateNodeGroup(__idx, __idx_";
   genEpIdx(str);
   str << ", msg, 0, 0);\n";
   str << "}\n";
@@ -1464,7 +1513,7 @@ void Entry::genDefs(XStr& str)
 {
   str << "/* DEFS: "; print(str); str << " */\n";
   genEpIdxDef(str);
-  if(container->getChareType()==SGROUP) {
+  if(container->getChareType()==SGROUP || container->getChareType()==SNODEGROUP) {
     genGroupDefs(str);
   } else if (container->getChareType()==SARRAY) {
     genArrayDefs(str);

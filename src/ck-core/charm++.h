@@ -45,6 +45,13 @@ class Group : public Chare {
     Group() { thisgroup = CkGetGroupID(); }
 };
 
+class NodeGroup : public Chare {
+  protected:
+    int thisnodegroup;
+  public:
+    NodeGroup() { thisnodegroup = CkGetNodeGroupID(); }
+};
+
 class _CK_CID {
   protected:
     CkChareID _ck_cid;
@@ -53,6 +60,11 @@ class _CK_CID {
 class _CK_GID : public _CK_CID {
   protected:
     int _ck_gid;
+};
+
+class _CK_NGID : public _CK_CID {
+  protected:
+    int _ck_ngid;
 };
 
 class Array1D;
