@@ -188,7 +188,7 @@ Here is an example of a {\em packed} message implementation:
 
 \begin{verbatim}
 // File: pgm.ci
-module PackExample {
+mainmodule PackExample {
   ...
   message [packed] PackedMessage;
   ...
@@ -199,49 +199,53 @@ module PackExample {
 class PackedMessage : public CMessage_PackedMessage
 {
   public:
-    BinaryTree<NodeType> *btree; // Non-linear data structure used in e.g. only 
-    static void *pack(PackedMessage *);
-    static PackedMessage *unpack(void *);
+    BinaryTree<char> btree; // Non-linear data structure used in e.g. only 
+    static void* pack(PackedMessage*);
+    static PackedMessage* unpack(void*);
     ...
 };
 ...
 
 // File: pgm.C
 ...
-void *
-PackedMessage::pack(PackedMessage *inmsg)
+void*
+PackedMessage::pack(PackedMessage* inmsg)
 {
-  int numnodes = inmsg->btree->numNodes();
-  int totalsize = numnodes*sizeof(NodeType) + sizeof(int);
-  int *buf = (int *)CkAllocBuffer(inmsg, totalsize);
-  // buf is now just raw memory to store the data structure 
-  *buf = numnodes;           // copy numnodes into buffer 
-  buf++;		     // don't overwrite numnodes 
-  inmsg->btree->flatten((void *)buf); // copies nodes, and 
-                                      // replaces pointers by indices
-  buf--;                     // don't lose numnodes  
+  int treesize = inmsg->btree.getFlattenedSize();
+  int totalsize = treesize + sizeof(int);
+  char *buf = (char*)CkAllocBuffer(inmsg, totalsize);
+  // buf is now just raw memory to store the data structure
+  int num_nodes = inmsg->btree.getNumNodes();
+  memcpy(buf, &num_nodes, sizeof(int));  // copy numnodes into buffer
+  buf = buf + sizeof(int);               // don't overwrite numnodes
+  // copies into buffer, give size of buffer minus header
+  inmsg->btree.Flatten((void*)buf, treesize);    
+  buf = buf - sizeof(int);              // don't lose numnodes
   delete inmsg;
-  return (void *)(buf);
+  return (void*) buf;
 }
 
-PackedMessage *
-PackedMessage::unpack(void *inbuf)
+PackedMessage*
+PackedMessage::unpack(void* inbuf)
 {
-  // inbuf is the raw memory allocated and assigned in pack 
-  int *buf = (int *)inbuf;  // stop the compiler from whining 
-  int numnodes = *buf;      // pull out numnodes from the buffer 
-  buf++; 
-   // allocate the message through the charm kernel      
-  PackedMessage *pmsg = (PackedMessage*)CkAllocBuffer(inbuf, sizeof(PackedMessage));
-   // call the Constructor of PackedMessage that takes a raw buffer in 
-   //   the format numnodes, flattened btree and constructs itself 
-  pmsg = new ((void *)pmsg) PackedMessage(inbuf, numnodes); // constructs btree
+  // inbuf is the raw memory allocated and assigned in pack
+  char* buf = (char*) inbuf;
+  int num_nodes;
+  memcpy(&num_nodes, buf, sizeof(int));
+  buf = buf + sizeof(int);
+  // allocate the message through charm kernel
+  PackedMessage* pmsg = 
+    (PackedMessage*)CkAllocBuffer(inbuf, sizeof(PackedMessage));
+  // call "inplace" constructor of PackedMessage that calls constructor
+  // of PackedMessage using the memory allocated by CkAllocBuffer,
+  // takes a raw buffer inbuf, the number of nodes, and constructs the btree
+  pmsg = new ((void*)pmsg) PackedMessage(buf, num_nodes);  
   CkFreeMsg(inbuf);
-  return pmsg; 
+  return pmsg;
 }
 ... 
-PackedMessage *pm = new PackedMessage;  // just like always 
-pm->bTree = new BinaryTree<NodeType>; 
+PackedMessage* pm = new PackedMessage();  // just like always 
+pm->btree.Insert('A');
 ...
 \end{verbatim}
 
@@ -275,16 +279,17 @@ A \kw{varsize} message is declared as {\tt message [varsize] mtype} in
 
 Thus, a varsize message is declared in the interface as: 
 
-\verb+message [varsize] MyVarsizeMessage;+ 
+\verb+message [varsize] VarsizeMessage;+ 
 
 In the \CC\ header file, it has to be declared as: 
 
 \begin{verbatim}
-class MyVarsizeMessage : public CMessage_MyVarsizeMessage { 
-// Other methods & data members 
-  static void *alloc(int msgnum, size_t size, int *array, int priobits); 
-  static void* pack(MyVarsizeMessage* in); 
-  static MyVarSizeMessage* unpack(void* in); 
+class VarsizeMessage : public CMessage_VarsizeMessage { 
+  public:
+    // Other methods & data members 
+    static void* alloc(int msgnum, size_t size, int* array, int priobits);
+    static void* pack(VarsizeMessage*);
+    static VarsizeMessage* unpack(void*);
 }; 
 \end{verbatim}
 
@@ -303,79 +308,84 @@ void *CkAllocMsg(int msgnum, int size, int priobits);
 Suppose a \charmpp\ message contains two varsize fields:
 
 \begin{verbatim} 
-class VarsizeMessage : public CMessage_VarsizeMessage { 
-  int length; 
-  int *firstArray; 
-  double *secondArray; 
-}; 
+class VarsizeMessage: public CMessage_VarsizeMessage {
+  public:
+    int lengthFirst;
+    int lengthSecond;
+    int* firstArray;
+    double* secondArray;
+    // other functions here
+};
 \end{verbatim}
 
 Then in the {\tt .ci} file, this can be represented as: 
 
 \begin{verbatim}
-message [varsize] NewVarsizeMessage;
+message [varsize] VarsizeMessage;
 \end{verbatim}
 
 and in the {\tt .h} or {\tt .C} file as:
 
 \begin{verbatim} 
 
-class NewVarsizeMessage : public CMessage_NewVarsizeMessage { 
+class VarsizeMessage : public CMessage_VarsizeMessage { 
   public: 
-    int len; 
-    int *firstArray; 
-    double *secondArray; 
+    int lengthFirst;
+    int lengthSecond;
+    int* firstArray;
+    double* secondArray;
+    // other functions here
+);
 
-  static void *alloc(int msgnum, int size, int *array, int priobits) 
-  { 
-    int totalsize; 
-    // array is passed in when the message is allocated using new (see below).
-    // size is the amount of space needed for the part of the message  
-    //   known about at compile time.  Depending on their values, 
-    //   sometimes a segfault will occur if size/totalsize is not 
-    //   altered with ALIGN8. 
-    size = ALIGN8(size);       // 8-byte align size with this macro 
-    totalsize = size + array[0]*sizeof(int) + array[1]*sizeof(double); 
-    NewVarsizeMessage *newMsg = 
-      (NewVarsizeMessage *) CkAllocMsg(msgnum, totalsize, priobits); 
+// allocate memory for varmessage so charm can keep track of memory
+void* VarsizeMessage::alloc(int msgnum, size_t size, int* array, int priobits)
+{
+  int totalsize, first_start, second_start;
+  // array is passed in when the message is allocated using new (see below).
+  // size is the amount of space needed for the part of the message known
+  // about at compile time.  Depending on their values, sometimes a segfault
+  // will occur if memory addressing is not on 8-byte boundary, so altered
+  // with ALIGN8
+  first_start = ALIGN8(size);  // 8-byte align with this macro
+  second_start = ALIGN8(first_start + array[0]*sizeof(int));
+  totalsize = second_start + array[1]*sizeof(double);
+  VarsizeMessage* newMsg = 
+    (VarsizeMessage*) CkAllocMsg(msgnum, totalsize, priobits);
+  
+  // store size of array
+  newMsg->lengthFirst = array[0];
+  newMsg->lengthSecond = array[1];
+  // make firstArray point to end of newMsg in memory
+  newMsg->firstArray = (int*) ((char*)newMsg + first_start);
+  // make secondArray point to after end of firstArray in memory
+  newMsg->secondArray = (double*) ((char*)newMsg + second_start);
 
-    // make firstArray point to the end of newMsg in memory  
-    newMsg->firstArray = (int *) ((char *)newMsg+size); 
-    // make secondArray point to after the end of first array  
-    newMsg->secondArray = (double *) ((char *)newMsg + size + 
-                                      sizeof(int)*array[0]); 
-    return (void *)newMsg; 
-  } 
+  return (void*) newMsg;
+}
 
-  static void *pack(NewVarsizeMessage *in) 
-  {
-    // set firstArray an offset from the start of in 
-    in->firstArray = (int *) ((char *) in->firstArray - 
-                              (char *)&in->firstArray); 
-    // set secondArray to the appropriate offset 
-    in->secondArray = (double *) ((char *) in->secondArray - 
-                                  (char *) &in->secondArray); 
-    return in; 
-  } 
+// returns pointer to memory containing packed message
+void* VarsizeMessage::pack(VarsizeMessage* in) {
+  // set firstArray an offset from the start of in
+  in->firstArray = (int*) ((char*)in->firstArray - (char*)in);
+  // set secondArray to the appropriate offset
+  in->secondArray = (double*) ((char*)in->secondArray - (char*)in);
+  return in;
+}
 
-  static NewVarsizeMessage* unpack(void *in) 
-  { 
-    NewVarsizeMessage *me = (NewVarsizeMessage *) in;  // stop compiler whining
- 
-    // return firstArray to an absolute address in memory
-    me->firstArray = (int *) ((char *) &(me->firstArray) + 
-                              (size_t)(me->firstArray)); 
-    // likewise for secondArray
-    me->secondArray = (double *) ((char *) &(me->secondArray) + 
-                                  (size_t)(me->secondArray)); 
-    return me;
-  } 
-}; 
+// returns new message from raw memory
+VarsizeMessage* VarsizeMessage::unpack(void* inbuf) {
+  VarsizeMessage* me = (VarsizeMessage*)inbuf;
+  // return first array to absolute address in memory
+  me->firstArray = (int*) ((size_t)me->firstArray + (char*)me);
+  // likewise for secondArray
+  me->secondArray = (double*) ((size_t)me->secondArray + (char*)me);
+  return me;
+}
 
 int size[2];
 size[0] = 4;               // firstArray will have 4 elements
 size[1] = 5;               // secondArray will have 5 elements 
-NewVarsizeMessage *p = new(size, 0) NewVarsizeMessage;
+VarsizeMessage* p = new(size, 0) VarsizeMessage;
 p->firstArray[2] = 13;     // the arrays have already been allocated 
 p->secondArray[4] = 6.7; 
 

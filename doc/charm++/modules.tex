@@ -56,15 +56,15 @@ A simple \charmpp\ program is given below:
 ///////////////////////////////////////
 // File: pgm.ci
 
-module Hello {
-  readonly mid;
+mainmodule Hello {
+  readonly CkChareID mid;
   mainchare HelloMain {
     entry HelloMain(); // implicit CkArgMsg * as argument
     entry void Wait(void);
   };
   group HelloGroup {
     entry HelloGroup(void);
-  } 
+  };
 };
 
 ////////////////////////////////////////
@@ -72,30 +72,36 @@ module Hello {
 #include "Hello.decl.h" // Note: not pgm.decl.h
 
 class HelloMain: public Chare {
-  int count;
-  HelloMain(CkArgMsg *);
-  void Wait(void);
+  public:
+    HelloMain(CkArgMsg *);
+    void Wait(void);
+  private:
+    int count;
 };
 
 class HelloGroup: public Group {
-  HelloGroup(void);
+  public:
+    HelloGroup(void);
 };
 
 /////////////////////////////////////////
 // File: pgm.C
 #include "pgm.h"
 
+CkChareID mid;
+
 HelloMain::HelloMain(CkArgMsg *msg) {
   delete msg;
   count = 0;
-  CProxy_HelloGroup::ckNew(); //Create a new ``HelloGroup''
+  CProxy_HelloGroup::ckNew(); // Create a new "HelloGroup"
   mid = thishandle;
 }
 
 void HelloMain::Wait(void) {
-  count ++;
-  if(count == CkNumPes())  // Wait for all group members to finish the printf.
-      CkExit();	
+  count++;
+  if (count == CkNumPes()) { // Wait for all group members to finish the printf
+    CkExit();
+  }
 }
 
 HelloGroup::HelloGroup(void) {
@@ -104,7 +110,7 @@ HelloGroup::HelloGroup(void) {
   pself.Wait();
 }
 
-#include "Hello.def.h" //Include the Charm++ object implementations
+#include "Hello.def.h" // Include the Charm++ object implementations
 
 /////////////////////////////////////////
 // File: Makefile
