@@ -775,6 +775,7 @@ static double Cmi_ack_delay;
 static int    Cmi_dgram_max_data;
 static int    Cmi_tickspeed;
 static int    Cmi_netpoll;
+static int    Cmi_syncprint;
 
 static int Cmi_print_stats = 0;
 
@@ -1812,20 +1813,17 @@ static void InternalPrintf(f, l) char *f; va_list l;
   char *buffer = CpvAccess(internal_printf_buffer);
   vsprintf(buffer, f, l);
   if (Cmi_charmrun_fd!=-1) {
-#if CMK_SYNC_PRINTF
-  	ctrl_sendone_locking("printsync", buffer,strlen(buffer)+1,NULL,0);
-    CmiCommLock();
-  	ChMessage_recv(Cmi_charmrun_fd,&replymsg);
-  	ChMessage_free(&replymsg);
-    CmiCommUnlock();
-#else
-  	ctrl_sendone_locking("print", buffer,strlen(buffer)+1,NULL,0);
-#endif
+    if(Cmi_syncprint) {
+  	  ctrl_sendone_locking("printsync", buffer,strlen(buffer)+1,NULL,0);
+      CmiCommLock();
+  	  ChMessage_recv(Cmi_charmrun_fd,&replymsg);
+  	  ChMessage_free(&replymsg);
+      CmiCommUnlock();
+    } else {
+  	  ctrl_sendone_locking("print", buffer,strlen(buffer)+1,NULL,0);
+    }
   } else {
   	fprintf(stdout,"%s",buffer);
-#if CMK_SYNC_PRINTF
-    fflush(stdout);
-#endif
   }
 }
 
@@ -1835,20 +1833,17 @@ static void InternalError(f, l) char *f; va_list l;
   char *buffer = CpvAccess(internal_printf_buffer);
   vsprintf(buffer, f, l);
   if (Cmi_charmrun_fd!=-1) {
-#if CMK_SYNC_PRINTF
-  	ctrl_sendone_locking("printerrsync", buffer,strlen(buffer)+1,NULL,0);
-    CmiCommLock();
-  	ChMessage_recv(Cmi_charmrun_fd,&replymsg);
-  	ChMessage_free(&replymsg);
-    CmiCommUnlock();
-#else
-  	ctrl_sendone_locking("printerr", buffer,strlen(buffer)+1,NULL,0);
-#endif
+    if(Cmi_syncprint) {
+  	  ctrl_sendone_locking("printerrsync", buffer,strlen(buffer)+1,NULL,0);
+      CmiCommLock();
+  	  ChMessage_recv(Cmi_charmrun_fd,&replymsg);
+  	  ChMessage_free(&replymsg);
+      CmiCommUnlock();
+    } else {
+  	  ctrl_sendone_locking("printerr", buffer,strlen(buffer)+1,NULL,0);
+    }
   } else {
   	fprintf(stderr,"%s",buffer);
-#if CMK_SYNC_PRINTF
-    fflush(stderr);
-#endif
   }
 }
 
@@ -2981,6 +2976,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
 #endif
   Cmi_argv = argv; Cmi_startfn = fn; Cmi_usrsched = usc;
   Cmi_netpoll=CmiGetArgFlag(argv,"+netpoll");
+  Cmi_syncprint=CmiGetArgFlag(argv,"+syncprint");
   skt_init();
   atexit(exitDelay);
   parse_netstart();
