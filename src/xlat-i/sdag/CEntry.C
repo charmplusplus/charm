@@ -11,7 +11,7 @@
 void CEntry::generateDeps(XStr& op)
 {
   CParseNode *cn;
-  for(cn=(CParseNode *)whenList->begin(); !whenList->end(); cn=(CParseNode *)whenList->next()) {
+  for(cn=whenList.begin(); !whenList.end(); cn=whenList.next()) {
     op << "    __cDep->addDepends("<<cn->nodeNum<<","<<entryNum<<");\n";
   }
 }
@@ -31,8 +31,8 @@ void CEntry::generateCode(XStr& op)
   }
   op << "    if (tr == 0)\n";
   op << "      return;\n";
-  if(whenList->length() == 1) {
-    cn = (CParseNode *)whenList->begin();
+  if(whenList.length() == 1) {
+    cn = whenList.begin();
     op << "    " << cn->label->charstar() << "(";
     CStateVar *sv = (CStateVar *)cn->stateVars->begin();
     int i = 0;
@@ -45,7 +45,7 @@ void CEntry::generateCode(XStr& op)
     op << "    return;\n";
   } else {
     op << "    switch(tr->whenID) {\n";
-    for(cn=(CParseNode *)whenList->begin(); !whenList->end(); cn=(CParseNode *)whenList->next()) {
+    for(cn=whenList.begin(); !whenList.end(); cn=whenList.next()) {
       op << "      case " << cn->nodeNum << ":\n";
       op << cn->label->charstar() << "(";
       CStateVar *sv = (CStateVar *)cn->stateVars->begin();

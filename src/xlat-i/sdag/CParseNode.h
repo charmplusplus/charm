@@ -27,9 +27,9 @@ class CParseNode {
     EToken type;
     XStr *text;
     CParseNode *con1, *con2, *con3, *con4;
-    TList *constructs;
-    TList *stateVars;
-    TList *stateVarsChildren;
+    TList<CParseNode*> *constructs;
+    TList<CStateVar*> *stateVars;
+    TList<CStateVar*> *stateVarsChildren;
     CParseNode *next;
     int nextBeginOrEnd;
     CEntry *entryPtr;
@@ -38,11 +38,12 @@ class CParseNode {
                                          con3(0), con4(0), constructs(0) {}
     void numberNodes(void);
     void labelNodes(void);
-    void generateEntryList(TList *, CParseNode *);
-    void propogateState(TList *);
+    void generateEntryList(TList<CEntry*>&, CParseNode *);
+    void propagateState(void);
     void generateCode(XStr& output);
     void setNext(CParseNode *, int);
   private:
+    void propagateState(TList<CStateVar*>&);
     void generateWhen(XStr& op);
     void generateOverlap(XStr& op);
     void generateWhile(XStr& op);
@@ -54,7 +55,7 @@ class CParseNode {
     void generateSdagEntry(XStr& op);
     void generateSlist(XStr& op);
     void generateAtomic(XStr& op);
-    void generatePrototype(XStr& op, TList *);
-    void generateCall(XStr& op, TList *);
+    void generatePrototype(XStr& op, TList<CStateVar*>&);
+    void generateCall(XStr& op, TList<CStateVar*>&);
 };
 #endif

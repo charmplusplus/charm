@@ -19,25 +19,22 @@ class CParsedFile {
   private:
     void numberNodes(void);
     void labelNodes(void);
-    void propogateState(void);
+    void propagateState(void);
     void generateEntryList(void);
     void generateCode(XStr& output);
     void generateEntries(XStr& output);
     void generateInitFunction(XStr& output);
   public:
-    TList *entryList;
-    TList *nodeList;
-    CParsedFile(void) {
-      entryList = new TList();
-      nodeList = new TList();
-    }
+    TList<CEntry*> entryList;
+    TList<CParseNode*> nodeList;
+    CParsedFile(void) {}
     ~CParsedFile(void){}
     void print(int indent);
     void doProcess(XStr& classname, XStr& output) {
       output << "#define " << classname << "_SDAG_CODE \n";
       numberNodes();
       labelNodes();
-      propogateState();
+      propagateState();
       generateEntryList();
       generateCode(output);
       generateEntries(output);

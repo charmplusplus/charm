@@ -8,11 +8,11 @@
 #include "CParseNode.h"
 #include "CParser.h"
 
-void printc(TList *cons, int indent, char *sep)
+void printc(TList<CParseNode*> *cons, int indent, char *sep)
 {
-  for(CParseNode *tmp=(CParseNode *)(cons->begin()); !cons->end();) {
+  for(CParseNode *tmp=cons->begin(); !cons->end();) {
     tmp->print(indent);
-    tmp = (CParseNode *)(cons->next());
+    tmp = cons->next();
     if(!cons->end())
       printf("%s", sep);
   }
@@ -109,7 +109,7 @@ CParseNode::CParseNode(EToken t, CLexer *cLexer, CParser *cParser)
 {
   CToken *tok;
 
-  type = t; text = 0; constructs = new TList();
+  type = t; text = 0; constructs = new TList<CParseNode*>();
   con1 = con2 = con3 = con4 = 0;
   switch (t) {
     case SDAGENTRY:

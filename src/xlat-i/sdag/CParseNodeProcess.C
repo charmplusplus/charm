@@ -31,7 +31,7 @@ void CParseNode::numberNodes(void)
       break;
   }
   CParseNode *cn;
-  for(cn=(CParseNode *)(constructs->begin()); !constructs->end(); cn=(CParseNode *)(constructs->next())) {
+  for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
     cn->numberNodes();
   }
 }
@@ -99,7 +99,7 @@ void CParseNode::labelNodes(void)
   }
 }
 
-void CParseNode::generateEntryList(TList *list, CParseNode *thisWhen)
+void CParseNode::generateEntryList(TList<CEntry*>& list, CParseNode *thisWhen)
 {
   switch(type) {
     case WHEN:
@@ -111,22 +111,21 @@ void CParseNode::generateEntryList(TList *list, CParseNode *thisWhen)
     case ENTRY:
       CEntry *entry;
       int found=0;
-      for(entry=(CEntry *)(list->begin()); !list->end(); 
-          entry=(CEntry *)(list->next())) {
+      for(entry=list.begin(); !list.end(); entry=list.next()) {
         if(*(entry->entry) == *(con1->text) &&
            *(entry->msgType) == *(con3->text)) {
            found = 1;
            // check to see if thisWhen is already in entry's whenList
            int whenFound = 0;
-           TList *tmpList = entry->whenList;
+           TList<CParseNode*> *tmpList = &(entry->whenList);
            CParseNode *tmpNode;
-           for(tmpNode = (CParseNode *) tmpList->begin(); !tmpList->end();
-               tmpNode = (CParseNode *) tmpList->next()) {
+           for(tmpNode = tmpList->begin(); !tmpList->end();
+               tmpNode = tmpList->next()) {
              if(tmpNode->nodeNum == thisWhen->nodeNum)
                whenFound = 1;
            }
            if(!whenFound)
-             entry->whenList->append(thisWhen);
+             entry->whenList.append(thisWhen);
            entryPtr = entry;
 	   if(con2)
 	     entry->refNumNeeded = 1;
@@ -136,37 +135,47 @@ void CParseNode::generateEntryList(TList *list, CParseNode *thisWhen)
       if(!found) {
         CEntry *newEntry;
         newEntry = new CEntry(new XStr(*(con1->text)), new XStr(*(con3->text)));
-        list->append(newEntry);
+        list.append(newEntry);
         entryPtr = newEntry;
-        newEntry->whenList->append(thisWhen);
+        newEntry->whenList.append(thisWhen);
 	if(con2)
 	  newEntry->refNumNeeded = 1;
       }
       break;
   }
   CParseNode *cn;
-  for(cn=(CParseNode *)(constructs->begin()); !constructs->end(); cn=(CParseNode *)(constructs->next())) {
+  for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
     cn->generateEntryList(list,thisWhen);
   }
 }
 
-void CParseNode::propogateState(TList *list)
+void CParseNode::propagateState(void)
 {
   CStateVar *sv;
-  stateVars = new TList();
+  if(type != SDAGENTRY) {
+    fprintf(stderr, "use of non-entry as the outermost construct..\n");
+    exit(1);
+  }
+  stateVars = new TList<CStateVar*>();
+  XStr *vType = new XStr(*(con2->text));
+  vType->append(" *");
+  sv = new CStateVar(vType, new XStr(*(con3->text)));
+  stateVars->append(sv);
+  stateVarsChildren = stateVars;
+  CParseNode *cn;
+  for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
+    cn->propagateState(*stateVarsChildren);
+  }
+}
+
+void CParseNode::propagateState(TList<CStateVar*>& list)
+{
+  CStateVar *sv;
+  stateVars = new TList<CStateVar*>();
   switch(type) {
-    case SDAGENTRY:
-      {
-        XStr *vType = new XStr(*(con2->text));
-        vType->append(" *");
-        sv = new CStateVar(vType, new XStr(*(con3->text)));
-      }
-      stateVars->append(sv);
-      stateVarsChildren = stateVars;
-      break;
     case FORALL:
-      stateVarsChildren = new TList();
-      for(sv=(CStateVar *)(list->begin()); !list->end(); sv=(CStateVar *)(list->next())) {
+      stateVarsChildren = new TList<CStateVar*>();
+      for(sv=list.begin(); !list.end(); sv=list.next()) {
         stateVars->append(sv);
         stateVarsChildren->append(sv);
       }
@@ -181,15 +190,15 @@ void CParseNode::propogateState(TList *list)
       }
       break;
     case WHEN:
-      stateVarsChildren = new TList();
-      for(sv=(CStateVar *)(list->begin()); !list->end(); sv=(CStateVar *)(list->next())) {
+      stateVarsChildren = new TList<CStateVar*>();
+      for(sv=list.begin(); !list.end(); sv=list.next()) {
         stateVars->append(sv);
         stateVarsChildren->append(sv);
       }
       {
-        TList *elist = con1->constructs;
+        TList<CParseNode*> *elist = con1->constructs;
         CParseNode *en;
-        for(en=(CParseNode *)(elist->begin()); !elist->end(); en=(CParseNode *)(elist->next())) {
+        for(en=elist->begin(); !elist->end(); en=elist->next()) {
           XStr *vType = new XStr(*(en->con3->text));
           vType->append(" *");
           sv = new CStateVar(vType, new XStr(*(en->con4->text)));
@@ -198,15 +207,15 @@ void CParseNode::propogateState(TList *list)
       }
       break;
     case IF:
-      for(sv=(CStateVar *)(list->begin()); !list->end(); sv=(CStateVar *)(list->next())) {
+      for(sv=list.begin(); !list.end(); sv=list.next()) {
         stateVars->append(sv);
       }
       stateVarsChildren = stateVars;
-      if(con2 != 0) con2->propogateState(list);
+      if(con2 != 0) con2->propagateState(list);
       break;
     case OLIST:
-      stateVarsChildren = new TList();
-      for(sv=(CStateVar *)(list->begin()); !list->end(); sv=(CStateVar *)(list->next())) {
+      stateVarsChildren = new TList<CStateVar*>();
+      for(sv=list.begin(); !list.end(); sv=list.next()) {
         stateVars->append(sv);
         stateVarsChildren->append(sv);
       }
@@ -224,7 +233,7 @@ void CParseNode::propogateState(TList *list)
     case SLIST:
     case OVERLAP:
     case ATOMIC:
-      for(sv=(CStateVar *)(list->begin()); !list->end(); sv=(CStateVar *)(list->next())) {
+      for(sv=list.begin(); !list.end(); sv=list.next()) {
         stateVars->append(sv);
       }
       stateVarsChildren = stateVars;
@@ -233,12 +242,15 @@ void CParseNode::propogateState(TList *list)
     case IDENT:
     case ENTRY:
     case ELIST:
+      break;
     default:
+      fprintf(stderr, "internal error in sdag translator..\n");
+      exit(1);
       break;
   }
   CParseNode *cn;
-  for(cn=(CParseNode *)(constructs->begin()); !constructs->end(); cn=(CParseNode *)(constructs->next())) {
-    cn->propogateState(stateVarsChildren);
+  for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
+    cn->propagateState(*stateVarsChildren);
   }
 }
 
@@ -284,7 +296,7 @@ void CParseNode::generateCode(XStr& op)
       break;
   }
   CParseNode *cn;
-  for(cn=(CParseNode *)(constructs->begin()); !constructs->end(); cn=(CParseNode *)(constructs->next())) {
+  for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
     cn->generateCode(op);
   }
 }
@@ -292,17 +304,17 @@ void CParseNode::generateCode(XStr& op)
 void CParseNode::generateWhen(XStr& op)
 {
   op << "  int " << label->charstar() << "(";
-  generatePrototype(op, stateVars);
+  generatePrototype(op, *stateVars);
   op << ") {\n";
-  TList *elist = con1->constructs;
+  TList<CParseNode*> *elist = con1->constructs;
   CParseNode *el;
-  for(el=(CParseNode *)(elist->begin()); !elist->end(); el=(CParseNode *)(elist->next())) {
+  for(el=elist->begin(); !elist->end(); el=elist->next()) {
     op << "    CMsgBuffer *"<<el->con4->text->charstar()<<"_buf;\n";
     op << "    " << el->con3->text->charstar() << " *" <<
                     el->con4->text->charstar() << ";\n";
   }
   op << "\n";
-  for(el=(CParseNode *)(elist->begin()); !elist->end(); el=(CParseNode *)(elist->next())) {
+  for(el=elist->begin(); !elist->end(); el=elist->next()) {
     if(el->con2 == 0)
       op << "    " << el->con4->text->charstar() << 
             "_buf = __cDep->getMessage(" << el->entryPtr->entryNum << ");\n";
@@ -313,29 +325,29 @@ void CParseNode::generateWhen(XStr& op)
   }
   op << "\n";
   op << "    if (";
-  for(el=(CParseNode *)(elist->begin()); !elist->end();) {
+  for(el=elist->begin(); !elist->end();) {
     op << "(" << el->con4->text->charstar() << "_buf != 0)";
-    el = (CParseNode *)(elist->next());
+    el = elist->next();
     if(el != 0)
       op << "&&";
   }
   op << ") {\n";
-  for(el=(CParseNode *)(elist->begin()); !elist->end(); el=(CParseNode *)(elist->next())) {
+  for(el=elist->begin(); !elist->end(); el=elist->next()) {
     op << "      " << el->con4->text->charstar() << " = (" << 
           el->con3->text->charstar() << " *) " <<
           el->con4->text->charstar() << "_buf->msg;\n";
     op << "      __cDep->removeMessage(" << el->con4->text->charstar() <<
           "_buf);\n";
   }
-  op << "      " << ((CParseNode *)constructs->front())->label->charstar() << 
+  op << "      " << constructs->front()->label->charstar() << 
         "(";
-  generateCall(op, stateVarsChildren);
+  generateCall(op, *stateVarsChildren);
   op << ");\n";
   op << "      return 1;\n";
   op << "    } else {\n";
 
   int nRefs=0, nAny=0;
-  for(el=(CParseNode *)(elist->begin()); !elist->end(); el=(CParseNode *)(elist->next())) {
+  for(el=elist->begin(); !elist->end(); el=elist->next()) {
     if(el->con2 == 0)
       nAny++;
     else
@@ -369,12 +381,12 @@ void CParseNode::generateWhen(XStr& op)
         stateVars->length() << ", " << nRefs << ", " << nAny << ");\n";
   CStateVar *sv;
   int iArgs=0;
-  for(sv=(CStateVar *)(stateVars->begin());!stateVars->end();sv=(CStateVar *)(stateVars->next())) {
+  for(sv=stateVars->begin();!stateVars->end();sv=stateVars->next()) {
     op << "      tr->args[" << iArgs++ << "] = (size_t) " <<
           sv->name->charstar() << ";\n";
   }
   int iRef=0, iAny=0;
-  for(el=(CParseNode *)(elist->begin()); !elist->end(); el=(CParseNode *)(elist->next())) {
+  for(el=elist->begin(); !elist->end(); el=elist->next()) {
     if(el->con2 == 0) {
       op << "      tr->anyEntries[" << iAny++ << "] = " <<
             el->entryPtr->entryNum << ";\n";
@@ -392,17 +404,17 @@ void CParseNode::generateWhen(XStr& op)
   op << "  }\n\n";
   // end function
   op << "  void " << label->charstar() << "_end(";
-  generatePrototype(op, stateVarsChildren);
+  generatePrototype(op, *stateVarsChildren);
   op << ") {\n";
   // actual code here 
-  for(el=(CParseNode *)(elist->begin()); !elist->end(); el=(CParseNode *)(elist->next())) {
+  for(el=elist->begin(); !elist->end(); el=elist->next()) {
     // op << "    delete " <<  el->con4->text->charstar() << ";\n";
   }
   if(nextBeginOrEnd == 1)
    op << "    " << next->label->charstar() << "(";
   else
    op << "    " << next->label->charstar() << "_end(";
-  generateCall(op, stateVars);
+  generateCall(op, *stateVars);
   op << ");\n";
   // end actual code
   op << "  }\n\n";
@@ -412,40 +424,40 @@ void CParseNode::generateWhile(XStr& op)
 {
   // inlined start function
   op << "  void " << label->charstar() << "(";
-  generatePrototype(op, stateVars);
+  generatePrototype(op, *stateVars);
   op << ") {\n";
   // actual code here 
   op << "    if (" << con1->text->charstar() << ") {\n";
-  op << "      " << ((CParseNode *)constructs->front())->label->charstar() << 
+  op << "      " << constructs->front()->label->charstar() << 
         "(";
-  generateCall(op, stateVarsChildren);
+  generateCall(op, *stateVarsChildren);
   op << ");\n";
   op << "    } else {\n";
   if(nextBeginOrEnd == 1)
    op << "      " << next->label->charstar() << "(";
   else
    op << "      " << next->label->charstar() << "_end(";
-  generateCall(op, stateVars);
+  generateCall(op, *stateVars);
   op << ");\n";
   op << "    }\n";
   // end actual code
   op << "  }\n\n";
   // inlined end function
   op << "  void " << label->charstar() << "_end(";
-  generatePrototype(op, stateVarsChildren);
+  generatePrototype(op, *stateVarsChildren);
   op << ") {\n";
   // actual code here 
   op << "    if (" << con1->text->charstar() << ") {\n";
-  op << "      " << ((CParseNode *)constructs->front())->label->charstar() <<
+  op << "      " << constructs->front()->label->charstar() <<
         "(";
-  generateCall(op, stateVarsChildren);
+  generateCall(op, *stateVarsChildren);
   op << ");\n";
   op << "    } else {\n";
   if(nextBeginOrEnd == 1)
    op << "      " <<  next->label->charstar() << "(";
   else
    op << "      " << next->label->charstar() << "_end(";
-  generateCall(op, stateVars);
+  generateCall(op, *stateVars);
   op << ");\n";
   op << "    }\n";
   // end actual code
@@ -456,42 +468,42 @@ void CParseNode::generateFor(XStr& op)
 {
   // inlined start function
   op << "  void " << label->charstar() << "(";
-  generatePrototype(op, stateVars);
+  generatePrototype(op, *stateVars);
   op << ") {\n";
   // actual code here 
   op << "    " << con1->text->charstar() << ";\n";
   op << "    if (" << con2->text->charstar() << ") {\n";
-  op << "      " << ((CParseNode *)constructs->front())->label->charstar() <<
+  op << "      " << constructs->front()->label->charstar() <<
         "(";
-  generateCall(op, stateVarsChildren);
+  generateCall(op, *stateVarsChildren);
   op << ");\n";
   op << "    } else {\n";
   if(nextBeginOrEnd == 1)
    op << "      " << next->label->charstar() << "(";
   else
    op << "      " << next->label->charstar() << "_end(";
-  generateCall(op, stateVars);
+  generateCall(op, *stateVars);
   op << ");\n";
   op << "    }\n";
   // end actual code
   op << "  }\n";
   // inlined end function
   op << "  void " << label->charstar() << "_end(";
-  generatePrototype(op, stateVarsChildren);
+  generatePrototype(op, *stateVarsChildren);
   op << ") {\n";
   // actual code here 
   op << con3->text->charstar() << ";\n";
   op << "    if (" << con2->text->charstar() << ") {\n";
-  op << "      " << ((CParseNode *)constructs->front())->label->charstar() <<
+  op << "      " << constructs->front()->label->charstar() <<
         "(";
-  generateCall(op, stateVarsChildren);
+  generateCall(op, *stateVarsChildren);
   op << ");\n";
   op << "    } else {\n";
   if(nextBeginOrEnd == 1)
    op << "      " << next->label->charstar() << "(";
   else
    op << "      " << next->label->charstar() << "_end(";
-  generateCall(op, stateVars);
+  generateCall(op, *stateVars);
   op << ");\n";
   op << "    }\n";
   // end actual code
@@ -502,22 +514,22 @@ void CParseNode::generateIf(XStr& op)
 {
   // inlined start function
   op << "  void " << label->charstar() << "(";
-  generatePrototype(op, stateVars);
+  generatePrototype(op, *stateVars);
   op << ") {\n";
   // actual code here 
   op << "    if (" << con1->text->charstar() << ") {\n";
-  op << "      " << ((CParseNode *)constructs->front())->label->charstar() <<
+  op << "      " << constructs->front()->label->charstar() <<
         "(";
-  generateCall(op, stateVarsChildren);
+  generateCall(op, *stateVarsChildren);
   op << ");\n";
   op << "    } else {\n";
   if (con2 != 0) {
     op << "      " << con2->label->charstar() << "(";
-    generateCall(op, stateVarsChildren);
+    generateCall(op, *stateVarsChildren);
     op << ");\n";
   } else {
     op << "      " << label->charstar() << "_end(";
-    generateCall(op, stateVarsChildren);
+    generateCall(op, *stateVarsChildren);
     op << ");\n";
   }
   op << "    }\n";
@@ -525,14 +537,14 @@ void CParseNode::generateIf(XStr& op)
   op << "  }\n\n";
   // inlined end function
   op << "  void " << label->charstar() << "_end(";
-  generatePrototype(op, stateVarsChildren);
+  generatePrototype(op, *stateVarsChildren);
   op << ") {\n";
   // actual code here 
   if(nextBeginOrEnd == 1)
    op << "      " << next->label->charstar() << "(";
   else
    op << "      " << next->label->charstar() << "_end(";
-  generateCall(op, stateVars);
+  generateCall(op, *stateVars);
   op << ");\n";
   // end actual code
   op << "  }\n\n";
@@ -542,25 +554,25 @@ void CParseNode::generateElse(XStr& op)
 {
   // inlined start function
   op << "  void " << label->charstar() << "(";
-  generatePrototype(op, stateVars);
+  generatePrototype(op, *stateVars);
   op << ") {\n";
   // actual code here 
-  op << "    " << ((CParseNode *)constructs->front())->label->charstar() << 
+  op << "    " << constructs->front()->label->charstar() << 
         "(";
-  generateCall(op, stateVarsChildren);
+  generateCall(op, *stateVarsChildren);
   op << ");\n";
   // end actual code
   op << "  }\n\n";
   // inlined end function
   op << "  void " << label->charstar() << "_end(";
-  generatePrototype(op, stateVarsChildren);
+  generatePrototype(op, *stateVarsChildren);
   op << ") {\n";
   // actual code here 
   if(nextBeginOrEnd == 1)
    op << "      " << next->label->charstar() << "(";
   else
    op << "      " << next->label->charstar() << "_end(";
-  generateCall(op, stateVars);
+  generateCall(op, *stateVars);
   op << ");\n";
   // end actual code
   op << "  }\n\n";
@@ -570,7 +582,7 @@ void CParseNode::generateForall(XStr& op)
 {
   // inlined start function
   op << "  void " << label->charstar() << "(";
-  generatePrototype(op, stateVars);
+  generatePrototype(op, *stateVars);
   op << ") {\n";
   // actual code here 
   op << "    int __first = (" << con2->text->charstar() <<
@@ -585,16 +597,16 @@ void CParseNode::generateForall(XStr& op)
   op << "    for(int " << con1->text->charstar() << 
         "=__first;" << con1->text->charstar() <<
         "<=__last;" << con1->text->charstar() << "+=__stride) {\n";
-  op << "      " << ((CParseNode *)constructs->front())->label->charstar() <<
+  op << "      " << constructs->front()->label->charstar() <<
         "(";
-  generateCall(op, stateVarsChildren);
+  generateCall(op, *stateVarsChildren);
   op << ");\n";
   op << "    }\n";
   // end actual code
   op << "  }\n\n";
   // inlined end function
   op << "  void " << label->charstar() << "_end(";
-  generatePrototype(op, stateVarsChildren);
+  generatePrototype(op, *stateVarsChildren);
   op << ") {\n";
   // actual code here 
   op << "    " << counter->charstar() << "->decrement();\n";
@@ -604,7 +616,7 @@ void CParseNode::generateForall(XStr& op)
    op << "      " << next->label->charstar() << "(";
   else
    op << "      " << next->label->charstar() << "_end(";
-  generateCall(op, stateVars);
+  generateCall(op, *stateVars);
   op << ");\n";
   // end actual code
   op << "    }\n  }\n\n";
@@ -614,22 +626,22 @@ void CParseNode::generateOlist(XStr& op)
 {
   // inlined start function
   op << "  void " << label->charstar() << "(";
-  generatePrototype(op, stateVars);
+  generatePrototype(op, *stateVars);
   op << ") {\n";
   // actual code here 
   op << "    CCounter *" << counter->charstar() << "= new CCounter(" <<
         constructs->length() << ");\n";
-  for(CParseNode *cn=(CParseNode *)(constructs->begin()); 
-                     !constructs->end(); cn=(CParseNode *)(constructs->next())) {
+  for(CParseNode *cn=constructs->begin(); 
+                     !constructs->end(); cn=constructs->next()) {
     op << "    " << cn->label->charstar() << "(";
-    generateCall(op, stateVarsChildren);
+    generateCall(op, *stateVarsChildren);
     op << ");\n";
   }
   // end actual code
   op << "  }\n";
   // inlined end function
   op << "  void " << label->charstar() << "_end(";
-  generatePrototype(op, stateVarsChildren);
+  generatePrototype(op, *stateVarsChildren);
   op << ") {\n";
   // actual code here 
   op << "    " << counter->charstar() << "->decrement();\n";
@@ -639,7 +651,7 @@ void CParseNode::generateOlist(XStr& op)
    op << "      " << next->label->charstar() << "(";
   else
    op << "      " << next->label->charstar() << "_end(";
-  generateCall(op, stateVars);
+  generateCall(op, *stateVars);
   op << ");\n";
   // end actual code
   op << "    }\n";
@@ -650,25 +662,25 @@ void CParseNode::generateOverlap(XStr& op)
 {
   // inlined start function
   op << "  void " << label->charstar() << "(";
-  generatePrototype(op, stateVars);
+  generatePrototype(op, *stateVars);
   op << ") {\n";
   // actual code here 
-  op << "    " << ((CParseNode *)constructs->front())->label->charstar() <<
+  op << "    " << constructs->front()->label->charstar() <<
         "(";
-  generateCall(op, stateVarsChildren);
+  generateCall(op, *stateVarsChildren);
   op << ");\n";
   // end actual code
   op << "  }\n";
   // inlined end function
   op << "  void " << label->charstar() << "_end(";
-  generatePrototype(op, stateVarsChildren);
+  generatePrototype(op, *stateVarsChildren);
   op << ") {\n";
   // actual code here 
   if(nextBeginOrEnd == 1)
    op << "    " << next->label->charstar() << "(";
   else
    op << "    " << next->label->charstar() << "_end(";
-  generateCall(op, stateVars);
+  generateCall(op, *stateVars);
   op << ");\n";
   // end actual code
   op << "  }\n";
@@ -678,25 +690,25 @@ void CParseNode::generateSlist(XStr& op)
 {
   // inlined start function
   op << "  void " << label->charstar() << "(";
-  generatePrototype(op, stateVars);
+  generatePrototype(op, *stateVars);
   op << ") {\n";
   // actual code here 
-  op << "    " << ((CParseNode *)constructs->front())->label->charstar() <<
+  op << "    " << constructs->front()->label->charstar() <<
         "(";
-  generateCall(op, stateVarsChildren);
+  generateCall(op, *stateVarsChildren);
   op << ");\n";
   // end actual code
   op << "  }\n";
   // inlined end function
   op << "  void " << label->charstar() << "_end(";
-  generatePrototype(op, stateVarsChildren);
+  generatePrototype(op, *stateVarsChildren);
   op << ") {\n";
   // actual code here 
   if(nextBeginOrEnd == 1)
    op << "    " << next->label->charstar() << "(";
   else
    op << "    " << next->label->charstar() << "_end(";
-  generateCall(op, stateVars);
+  generateCall(op, *stateVars);
   op << ");\n";
   // end actual code
   op << "  }\n";
@@ -707,18 +719,18 @@ void CParseNode::generateSdagEntry(XStr& op)
   // header file
   op << "public:\n";
   op << "  void " << con1->text->charstar() << "(";
-  generatePrototype(op, stateVars);
+  generatePrototype(op, *stateVars);
   op << ") {\n";
   // actual code here 
-  op << "    " << ((CParseNode *)constructs->front())->label->charstar() <<
+  op << "    " << constructs->front()->label->charstar() <<
         "(";
-  generateCall(op, stateVarsChildren);
+  generateCall(op, *stateVarsChildren);
   op << ");\n";
   // end actual code
   op << "  }\n\n";
   op << "private:\n";
   op << "  void " << con1->text->charstar() << "_end(";
-  generatePrototype(op, stateVars);
+  generatePrototype(op, *stateVars);
   op << ") {\n";
   // actual code here 
   // op << "    delete " << con3->text->charstar() << ";\n";
@@ -729,34 +741,34 @@ void CParseNode::generateSdagEntry(XStr& op)
 void CParseNode::generateAtomic(XStr& op)
 {
   op << "  void " << label->charstar() << "(";
-  generatePrototype(op, stateVars);
+  generatePrototype(op, *stateVars);
   op << ") {\n";
   op << "    " << text->charstar() << "\n";
   if(nextBeginOrEnd == 1)
     op << "    " << next->label->charstar() << "(";
   else
     op << "    " << next->label->charstar() << "_end(";
-  generateCall(op, stateVars);
+  generateCall(op, *stateVars);
   op << ");\n";
   op << "  }\n\n";
 }
 
-void CParseNode::generatePrototype(XStr& op, TList *list)
+void CParseNode::generatePrototype(XStr& op, TList<CStateVar*>& list)
 {
   CStateVar *sv;
-  for(sv=(CStateVar *)(list->begin()); !list->end(); ) {
+  for(sv=list.begin(); !list.end(); ) {
     op << sv->type->charstar() << " " << sv->name->charstar();
-    sv = (CStateVar *)list->next();
+    sv = list.next();
     if (sv != 0)
       op << ", ";
   }
 }
 
-void CParseNode::generateCall(XStr& op, TList *list) {
+void CParseNode::generateCall(XStr& op, TList<CStateVar*>& list) {
   CStateVar *sv;
-  for(sv=(CStateVar *)list->begin(); !list->end(); ) {
+  for(sv=list.begin(); !list.end(); ) {
     op << sv->name->charstar();
-    sv = (CStateVar *)list->next();
+    sv = list.next();
     if (sv != 0)
       op << ", ";
   }
@@ -771,14 +783,14 @@ void CParseNode::setNext(CParseNode *n, int boe)
       next = n;
       nextBeginOrEnd = boe;
       {
-        CParseNode *cn=(CParseNode *)constructs->begin();
+        CParseNode *cn=constructs->begin();
         if (cn==0) // empty slist
           return;
-        CParseNode *nextNode=(CParseNode *)constructs->next();
+        CParseNode *nextNode=constructs->next();
         for(; nextNode != 0;) {
           cn->setNext(nextNode, 1);
           cn = nextNode;
-          nextNode = (CParseNode *)constructs->next();
+          nextNode = constructs->next();
         }
         cn->setNext(this, 0);
       }
@@ -807,7 +819,7 @@ void CParseNode::setNext(CParseNode *n, int boe)
       break;
   }
   CParseNode *cn;
-  for(cn=(CParseNode *)constructs->begin(); !constructs->end(); cn=(CParseNode *)constructs->next()) {
+  for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
     cn->setNext(n, boe);
   }
 }

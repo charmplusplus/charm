@@ -79,7 +79,7 @@ CParsedFile *CParser::doParse(void)
     tok = lookForToken(SDAGENTRY);
     if(tok == 0)
       break;
-    cParsedFile->nodeList->append(new CParseNode(SDAGENTRY, cLexer, this));
+    cParsedFile->nodeList.append(new CParseNode(SDAGENTRY, cLexer, this));
   }
   return cParsedFile;
 }

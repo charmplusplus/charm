@@ -8,12 +8,9 @@
 #ifndef _TList_H_
 #define _TList_H_
 
-#include <stdio.h>
-
 // Quick and dirty List for small numbers of items.
-// This should ideally be a template but for portability's sake, its
-// a generic list of (void *)
 
+template <class T>
 class TList
 {
   private:
@@ -22,8 +19,8 @@ class TList
     {
       public:
       Elem *next;
-      void *data;
-      Elem(void *d) : next(NULL), data(d) {;}
+      T data;
+      Elem(T d) : next(0), data(d) {;}
     };
 
     Elem *first;
@@ -36,56 +33,46 @@ class TList
 
     int empty(void) { return ! first; }
     
-    void *begin(void) {
+    T begin(void) {
       current = first;
-      if(current==(Elem *)0)
-        return (void *) 0;
-      else
-        return current->data;
+      return (current ? current->data : T(0));
     }
-
 
     int end(void) {
       return (current == 0);
     }
 
-    void *next (void) {
+    T next (void) {
       current = current->next;
-      if(current==(Elem *)0)
-	return (void *)0;
-      else
-        return current->data;
+      return (current ? current->data : T(0));
     }
 
-    void *front(void)
-    {
+    T front(void) {
       return ((first==0) ? 0 : first->data);
     }
 
-    void *pop(void)
-    {
-      void *data;
-      if( first!= 0) {
+    T pop(void) {
+      T data = T(0);
+      if(first) {
         data = first->data;
         Elem *nn = first->next;
         delete first;
         first = nn;
         len --;
-      } else {
-        data = 0;
       }
       return data;
     }
 
-    void remove(void *data)
-    {
+    void remove(T data) {
       // case 1: empty list
       if (first == 0)
         return;
       // case 2: first element to be removed
       if(first->data == data) {
+	Elemt *tbr = first;
         first = first->next;
         len --;
+	delete tbr;
         return;
       }
       // case 3: middle or last element to be removed
@@ -95,20 +82,21 @@ class TList
         if (nn->data == data) {
           prev->next = nn->next;
           len --;
+	  delete nn;
           return;
         }
         prev = nn;
       }
     }
 
-    void append(void *data)
-    {
+    void append(T data) {
+      Elem *e = new Elem(data);
       if(first == 0) {
-        first = new Elem(data);
+        first = e;
       } else {
         Elem *nn;
         for( nn = first ; nn->next ; nn = nn->next );
-        nn->next = new Elem(data);
+        nn->next = e;
       }
       len++;
     }
