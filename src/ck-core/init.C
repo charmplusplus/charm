@@ -397,7 +397,7 @@ void _initCharm(int argc, char **argv)
 	CpvInitialize(CkGroupID, _currentNodeGroup);
 	CpvInitialize(GroupTable, _groupTable);
 	CpvInitialize(UInt, _numGroups);
-	CpvInitialize(UInt, _numNodeGroups);
+//	CpvInitialize(UInt, _numNodeGroups);
 	CpvInitialize(int, _numInitsRecd);
 	CpvInitialize(QdState*, _qd);
 	CpvInitialize(MsgPool*, _msgPool);
