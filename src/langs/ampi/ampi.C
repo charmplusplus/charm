@@ -62,13 +62,22 @@ ampi::generic(AmpiMsg* msg)
 }
 
 void 
-ampi::send(int t1, int t2, void* buf, int count, int type, int idx)
+ampi::send(int t1, int t2, void* buf, int count, int type,  int idx)
 {
   DDT_DataType *ddt = myDDT->getType(type);
   int len = ddt->getSize(count);
   AmpiMsg *msg = new (&len, 0) AmpiMsg(t1, t2, len);
   ddt->serialize((char*)buf, (char*)msg->data, count, 1);
   CProxy_ampi pa(thisArrayID);
+  pa[idx].generic(msg);
+}
+
+void 
+ampi::sendraw(int t1, int t2, void* buf, int len, CkArrayID aid, int idx)
+{
+  AmpiMsg *msg = new (&len, 0) AmpiMsg(t1, t2, len);
+  memcpy(msg->data, buf, len);
+  CProxy_ampi pa(aid);
   pa[idx].generic(msg);
 }
 

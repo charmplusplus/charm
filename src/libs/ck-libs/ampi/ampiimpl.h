@@ -87,6 +87,8 @@ class ampi : public ArrayElement1D {
     void generic(AmpiMsg *);
   public: // to be used by AMPI_* functions
     void send(int t1, int t2, void* buf, int count, int type, int idx);
+    static void sendraw(int t1, int t2, void* buf, int len, CkArrayID aid, 
+                        int idx);
     void recv(int t1, int t2, void* buf, int count, int type);
     void barrier(void);
     void bcast(int root, void* buf, int count, int type);
