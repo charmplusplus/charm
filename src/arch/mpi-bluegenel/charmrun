@@ -36,11 +36,11 @@ do
 	shift
 done
 
-echo "Copying $firstArg to $BL_HOME..."
-cp $firstArg $BL_HOME 
-if [ $? -ne 0 ]
+if [ $firstArg -nt $BL_HOME/$firstArg ]
 then
-	exit 1
+  echo "Copying $firstArg to $BL_HOME..."
+  cp $firstArg $BL_HOME 
+  [ $? -ne 0 ] && exit 1
 fi
 
 echo "Running on $pes processors: $args"
