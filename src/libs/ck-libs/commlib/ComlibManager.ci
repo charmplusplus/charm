@@ -38,6 +38,7 @@ module commlib {
   PUPable RingMulticastStrategy;	
   PUPable PipeBroadcastStrategy;
   PUPable MeshStreamingStrategy;
+  PUPable PrioStreaming;
 
   //PUPable ComlibArrayListener;
 };

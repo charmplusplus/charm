@@ -11,6 +11,7 @@
 #include "RingMulticastStrategy.h"
 #include "PipeBroadcastStrategy.h"
 #include "MeshStreamingStrategy.h"
+#include "PrioStreaming.h"
 
 CkpvDeclare(int, RecvmsgHandle);
 CkpvDeclare(int, RecvCombinedShortMsgHdlrIdx);

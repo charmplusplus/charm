@@ -13,7 +13,8 @@ class short_envelope {
     CkArrayIndexMax idx;
     char *data;
 
-    short_envelope(){}
+    short_envelope();
+    ~short_envelope();
     short_envelope(CkMigrateMessage *){}
     
     void pup(PUP::er &p);
@@ -21,9 +22,13 @@ class short_envelope {
 PUPmarshall(short_envelope);
 
 #if CMK_BLUEGENE_CHARM
+#ifndef CmiReservedHeaderSize 
 #define CmiReservedHeaderSize   CmiBlueGeneMsgHeaderSizeBytes
+#endif
 #else
+#ifndef CmiReservedHeaderSize
 #define CmiReservedHeaderSize   CmiMsgHeaderSizeBytes
+#endif
 #endif
 
 struct CombinedMessage{

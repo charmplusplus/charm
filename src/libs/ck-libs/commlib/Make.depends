@@ -97,3 +97,11 @@ MeshStreamingStrategy.o: \
         ComlibManager.h \
         commlib.decl.h
 	$(CHARMC) -c -o MeshStreamingStrategy.o MeshStreamingStrategy.C
+
+
+PrioStreaming.o: \
+        PrioStreaming.C \
+        PrioStreaming.h \
+        ComlibManager.h \
+        commlib.decl.h
+	$(CHARMC) -c -o PrioStreaming.o PrioStreaming.C
