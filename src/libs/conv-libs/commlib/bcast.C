@@ -5,7 +5,11 @@
 * Broadcast based multicast. Not fully functional
 * Doesnot work with multicast groups
 **************************************************/
+#ifdef   WIN32
+#include <string.h>
+#else
 #include <strings.h>
+#endif
 #include "bcast.h"
 
 #define NULL 0
