@@ -6,27 +6,25 @@
 class CkSectionInfo {
 public:
   CkArrayID aid;
+  int pe;
   union section_type {
-    struct sec_mcast {
-      int pe;
-      void *val;    // point to mCastCookie
+    struct sec_mcast {		// used for section multicast
       int redNo;
+      void *val;    // point to mCastCookie
     }  sCookie;
-    int  sectionId;
+    int  sectionId;		// used for commlib
   } sInfo;
   char  type;
 public:
-  CkSectionInfo() {
-	type = MulticastMsg;
-	sInfo.sCookie.pe = -1; 
-	sInfo.sCookie.val=NULL;
-	sInfo.sCookie.redNo=0;
+  CkSectionInfo()  {
+	type = 0; pe = -1;
+	sInfo.sCookie.val=NULL; sInfo.sCookie.redNo=0;
   }
   CkSectionInfo(int t) {
-	type = t;
+	type = t; pe = -1;
 	switch (type) {
 	case MulticastMsg:
-	  sInfo.sCookie.pe=-1; sInfo.sCookie.val=NULL; sInfo.sCookie.redNo=0;
+	  sInfo.sCookie.val=NULL; sInfo.sCookie.redNo=0;
 	  break;
 	default:
 	  CmiAssert(0);
@@ -34,19 +32,19 @@ public:
   }
   CkSectionInfo(void *p) {
 	type = MulticastMsg;
-	sInfo.sCookie.pe = CkMyPe(); 
+	pe = CkMyPe(); 
 	sInfo.sCookie.val=p;
 	sInfo.sCookie.redNo=0;
   }
   CkSectionInfo(int e, void *p, int r) {
 	type = MulticastMsg;
-	sInfo.sCookie.pe = e; 
+	pe = e; 
 	sInfo.sCookie.val=p;
 	sInfo.sCookie.redNo=r;
   }
-  int &get_pe() { CmiAssert(type==MulticastMsg); return sInfo.sCookie.pe; }
-  int &get_redNo() {CmiAssert(type==MulticastMsg); return sInfo.sCookie.redNo; }
-  void * &get_val() { CmiAssert(type==MulticastMsg); return sInfo.sCookie.val; }
+  inline int &get_pe() { return pe; }
+  inline int &get_redNo() {CmiAssert(type==MulticastMsg); return sInfo.sCookie.redNo; }
+  inline void * &get_val() { CmiAssert(type==MulticastMsg); return sInfo.sCookie.val; }
 };
 PUPbytes(CkSectionInfo) //FIXME: write a real pup routine
 PUPmarshall(CkSectionInfo)
@@ -66,5 +64,22 @@ public:
 };
 PUPmarshall(CkSectionID)
 
+#define _SECTION_MAGIC     88       /**< multicast magic number for error checking */
+/**
+ CkMcastBaseMsg is the base class for all multicast message.
+*/
+class CkMcastBaseMsg {
+public:
+  char magic;
+  CkArrayID aid;
+  CkSectionInfo _cookie;
+  int ep;
+public:
+  CkMcastBaseMsg(): magic(_SECTION_MAGIC) {}
+  static inline int checkMagic(CkMcastBaseMsg *m) { return m->magic == _SECTION_MAGIC; }
+  inline int &gpe(void) { return _cookie.get_pe(); }
+  inline int &redno(void) { return _cookie.get_redNo(); }
+  inline void *&cookie(void) { return _cookie.get_val(); }
+};
 
 #endif

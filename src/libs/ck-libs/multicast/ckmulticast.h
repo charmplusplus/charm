@@ -14,25 +14,6 @@ PUPbytes(mCastEntryPtr);
 
 #include "CkMulticast.decl.h"
 
-#define MAGIC 88              /**< multicast magic number for error checking */
-
-/**
- CkMcastBaseMsg is the base class for all multicast message.
-*/
-class CkMcastBaseMsg {
-public:
-  char magic;
-  CkArrayID aid;
-  CkSectionInfo _cookie;
-  int ep;
-public:
-  CkMcastBaseMsg(): magic(MAGIC) {}
-  static inline int checkMagic(CkMcastBaseMsg *m) { return m->magic == MAGIC; }
-  inline int &gpe(void) { return _cookie.get_pe(); }
-  inline int &redno(void) { return _cookie.get_redNo(); }
-  inline void *&cookie(void) { return _cookie.get_val(); }
-};
-
 #if 0
 class CkMcastReductionMsg: public CMessage_CkMcastReductionMsg {
 friend class CkMulticastMgr;
