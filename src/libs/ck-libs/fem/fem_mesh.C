@@ -371,19 +371,10 @@ void FEM_Register_array_layout(int fem_mesh,int entity,int attr,void *data,const
 	int max = e->getMax();
 	FEM_Attribute *a = e->lookup(attr,caller);
 	
-	if(entity== FEM_NODE && attr == FEM_DATA){
-		double *d = (double *)data;
-		printf("in register_array %.6f %.6f \n",d[0],d[1]);
-	}
 	
 	if(m->isSetting()){
 	}else{
 		a->get(data,firstItem,length,layout,caller);
-	//	FEM_Mesh_data_layout(fem_mesh,entity,attr,data,firstItem,length,layout);
-	}
-	if(entity== FEM_NODE && attr == FEM_DATA){
-		double *d = (double *)data;
-		printf("in register_array %.6f %.6f \n",d[0],d[1]);
 	}
 	//replace the attribute's data array with the user's data
 	a->register_data(data,length,max,layout,caller);
@@ -655,7 +646,6 @@ template <class T>
 inline void getTableData(void *user, int firstItem, int length, 
 	IDXL_LAYOUT_PARAM, const AllocTable2d<T> *table) 
 {
-	printf("in get data starts at %p \n",table->getRow(0));
 	for (int r=0;r<length;r++) {
 		register const T *tableRow=table->getRow(firstItem+r);
 		for (int c=0;c<width;c++)
@@ -851,7 +841,6 @@ void FEM_IndexAttribute::copyEntity(int dstEntity,const FEM_Attribute &src,int s
 {
 	const FEM_IndexAttribute *csrc=(const FEM_IndexAttribute *)&src;
 	idx.setRow(dstEntity,csrc->idx.getRow(srcEntity));
-	printf("indexattribute copyEntity called %d %p %p \n",getAttr(),csrc->idx.getRow(srcEntity),idx.getRow(dstEntity));
 }
 
 /********************** Entity **************************/
@@ -959,7 +948,6 @@ void FEM_Entity::setLength(int newlen) {
 	}else{
 		length = newlen;
 		if(length > max){
-			printf("Resize to be called %d %d\n",length,max);
 			if(max > 4){
 				max = max + (max >> 2);
 			}else{

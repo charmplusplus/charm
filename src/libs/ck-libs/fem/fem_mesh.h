@@ -241,7 +241,6 @@ public:
 		}else{
 			for (int r=copyRows;r<max;r++)
 				setRow(r,fill);
-			printf("zeroed out data at %p \n",table);	
 		}
 		allocTable = table;
 		//Zero out new table entries:
