@@ -99,7 +99,7 @@
 #define CMK_LBDB_OFF					   0
 
 
-
+#define CMK_TRACE_LOGFILE_NUM_CONTROL                      1
 
 
 #endif
