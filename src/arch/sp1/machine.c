@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.6  1995-10-27 21:45:35  jyelon
+ * Revision 2.7  1995-11-09 18:23:11  milind
+ * Fixed the CmiFreeSendFn bug for messages to self.
+ *
+ * Revision 2.6  1995/10/27  21:45:35  jyelon
  * Changed CmiNumPe --> CmiNumPes
  *
  * Revision 2.5  1995/10/10  06:10:58  jyelon
@@ -289,11 +292,15 @@ CmiCommHandle CmiAsyncSendFn(destPE, size, msg)
 }
 
 void CmiFreeSendFn(destPE, size, msg)
-     int destPE, size;
-     char *msg;
+int destPE, size;
+char *msg;
 {
-    CmiSyncSendFn(destPE, size, msg);
-    CmiFree(msg);
+	if (CpvAccess(Cmi_mype)==destPE) {
+		FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg);
+	} else {
+		CmiSyncSendFn(destPE, size, msg);
+		CmiFree(msg);
+	}
 }
 
 
