@@ -35,5 +35,6 @@ int main()
   }
 
   delete [] allNodeOffsets;
+  printf("End of program\n");
 }
 
