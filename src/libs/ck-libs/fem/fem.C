@@ -35,13 +35,13 @@ static void callDrivers(void) {
         FTN_NAME(DRIVER,driver)();
 }
 
+static int initFlags=0;
+
 static void FEMfallbackSetup(void)
 {
 	int nChunks=TCharmGetNumChunks();
 	char **argv=CkGetArgv();
 	int initFlags=0;
-	if (CmiGetArgFlag(argv,"-read")) initFlags|=FEM_INIT_READ;
-	if (CmiGetArgFlag(argv,"-write")) initFlags|=FEM_INIT_WRITE;
 	TCharmCreate(nChunks,callDrivers);
 	if (!(initFlags&FEM_INIT_READ)) {
 		fem_impl_call_init(); // init();
@@ -58,7 +58,10 @@ PUPable_def(FEM_Sym_Linear);
 void FEMnodeInit(void) {
 	PUPable_reg(FEM_Sym_Linear);
 	CtvInitialize(FEMchunk*, _femptr);
-	TCharmSetFallbackSetup(FEMfallbackSetup);	
+	TCharmSetFallbackSetup(FEMfallbackSetup);
+	char **argv=CkGetArgv();
+	if (CmiGetArgFlag(argv,"-read")) initFlags|=FEM_INIT_READ;
+	if (CmiGetArgFlag(argv,"-write")) initFlags|=FEM_INIT_WRITE;	
 }
 
 static void 
