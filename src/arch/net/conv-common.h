@@ -32,3 +32,5 @@
 
 #define CMK_IMMEDIATE_MSG				   1
 
+#define CMK_PERSISTENT_COMM				   0
+
