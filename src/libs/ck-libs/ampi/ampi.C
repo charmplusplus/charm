@@ -835,7 +835,7 @@ void ampi::cartCreate(const groupStruct vec,MPI_Comm* newcomm){
   int rootIdx=vec[0];
   tmpVec = vec;
   CkCallback cb(CkIndex_ampi::cartCreatePhase1(NULL),CkArrayIndex1D(rootIdx),myComm.getProxy());
-  
+
   MPI_Comm nextcart = parent->getNextCart();
   contribute(sizeof(nextcart), &nextcart,CkReduction::max_int,cb);
   
@@ -1560,6 +1560,12 @@ int MPI_Reduce_scatter(void* sendbuf, void* recvbuf, int *recvcounts,
   return 0;
 }
 
+CDECL
+int MPI_Scan(void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype, MPI_Op op, MPI_Comm comm ){
+  AMPIAPI("MPI_Scan");
+  
+  return 0;
+}
 
 CDECL
 double MPI_Wtime(void)
@@ -2615,12 +2621,47 @@ void FTN_NAME(MPI_REGISTER_MAIN,mpi_register_main)
 }
 
 CDECL
+int MPI_Keyval_create(MPI_Copy_function *copy_fn, MPI_Delete_function *delete_fn, int *keyval, void* extra_state){
+  AMPIAPI("MPI_Keyval_create");
+
+  return 0;
+}
+
+CDECL
+int MPI_Keyval_free(int *keyval){
+  AMPIAPI("MPI_Keyval_free");
+
+  return 0;
+}
+
+CDECL
+int MPI_Attr_put(MPI_Comm comm, int keyval, void* attribute_val){
+  AMPIAPI("MPI_Attr_put");
+
+  return 0;
+}
+
+CDECL
+int MPI_Attr_get(MPI_Comm comm, int keyval, void *attribute_val, int *flag){
+  AMPIAPI("MPI_Attr_get");
+
+  return 0;
+}
+
+CDECL
+int MPI_Attr_delete(MPI_Comm comm, int keyval){
+  AMPIAPI("MPI_Attr_delete");
+
+  return 0;
+}
+
+CDECL
 int MPI_Cart_map(MPI_Comm comm, int ndims, int *dims, int *periods,
 		 int *newrank) {
   AMPIAPI("MPI_Cart_map");
-  
+
   MPI_Comm_rank(comm, newrank);
-  
+
   return 0;
 }
 
@@ -2629,16 +2670,16 @@ int MPI_Graph_map(MPI_Comm comm, int nnodes, int *index, int *edges,
 		  int *newrank) {
   AMPIAPI("MPI_Graph_map");
   MPI_Comm_rank(comm, newrank);
-  
+
   return 0;
 }
 
 CDECL
 int MPI_Cart_create(MPI_Comm comm_old, int ndims, int *dims, int *periods,
                    int reorder, MPI_Comm *comm_cart) {
-  
+
   AMPIAPI("MPI_Cart_create");
-  
+
   /* Create new cartesian communicator. No attention is being paid to mapping
      virtual processes to processors, which ideally should be handled by the
      load balancer with input from virtual topology information.
@@ -2775,7 +2816,7 @@ int MPI_Cart_rank(MPI_Comm comm, int *coords, int *rank) {
       if (periods[i] == 1)
 	if (coords[i] > 0)
 	  coords[i] %= dims[i];
-	else 
+	else
 	  coords[i] += (((-coords[i] / dims[i]) + 1) * dims[i]) % dims[i];
     r += prod * coords[i];
     prod *= dims[i];
@@ -2889,7 +2930,7 @@ int MPI_Graph_neighbors_count(MPI_Comm comm, int rank, int *nneighbors) {
 }
 
 CDECL
-int MPI_Graph_neighbors(MPI_Comm comm, int rank, int maxneighbors, 
+int MPI_Graph_neighbors(MPI_Comm comm, int rank, int maxneighbors,
 			int *neighbors) {
   AMPIAPI("MPI_Graph_neighbors");
 
@@ -2910,9 +2951,9 @@ int MPI_Graph_neighbors(MPI_Comm comm, int rank, int maxneighbors,
   if (rank == 0)
     for (int i = 0; i < maxneighbors; i++)
       neighbors[i] = edges[i];
-
-  for (int i = 0; i < maxneighbors; i++)
-    neighbors[i] = edges[index[rank - 1] + i];
+  else
+    for (int i = 0; i < maxneighbors; i++)
+      neighbors[i] = edges[index[rank - 1] + i];
 
   return 0;
 }

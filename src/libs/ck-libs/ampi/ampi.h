@@ -327,7 +327,7 @@ int MPI_Iallreduce(void *inbuf, void *outbuf, int count, int type,
                   MPI_Op op, MPI_Comm comm, MPI_Request *request);
 int MPI_Reduce_scatter(void* sendbuf, void* recvbuf, int *recvcounts,
                        MPI_Datatype datatype, MPI_Op op, MPI_Comm comm);
-/* MPI_Scan */
+int MPI_Scan(void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype, MPI_Op op, MPI_Comm comm );
 /* MPI_Op_create */
 /* MPI_Op_free */
 
@@ -358,11 +358,11 @@ int MPI_Comm_free(MPI_Comm *comm);
 /* MPI_Comm_remote_group */
 /* MPI_Intercomm_create */
 /* MPI_Intercomm_merge */
-/* MPI_Keyval_create */
-/* MPI_Keyval_free */
-/* MPI_Attr_put */
-/* MPI_Attr_get */
-/* MPI_Attr_delete */
+int MPI_Keyval_create(MPI_Copy_function *copy_fn, MPI_Delete_function *delete_fn, int *keyval, void* extra_state);
+int MPI_Keyval_free(int *keyval);
+int MPI_Attr_put(MPI_Comm comm, int keyval, void* attribute_val);
+int MPI_Attr_get(MPI_Comm comm, int keyval, void *attribute_val, int *flag);
+int MPI_Attr_delete(MPI_Comm comm, int keyval);
 
 /***topologies***/
 
@@ -387,7 +387,7 @@ int MPI_Graph_get(MPI_Comm comm, int maxindex, int maxedges, int *index,
 		  int *edges); 
 int MPI_Graph_neighbors_count(MPI_Comm comm, int rank, int *nneighbors);
 int MPI_Graph_neighbors(MPI_Comm comm, int rank, int maxneighbors, 
-			int *neighbors); 
+			int *neighbors);
 int MPI_Dims_create(int nnodes, int ndims, int *dims);
 int MPI_Cart_sub(MPI_Comm comm, int *remain_dims, MPI_Comm *newcomm);
 
