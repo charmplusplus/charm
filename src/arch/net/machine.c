@@ -460,6 +460,7 @@ void CmiAbort(const char *message)
   *(int *)NULL = 0; /*Write to null, causing bus error*/
 #else
   host_abort(message);
+  exit(1);
 #endif
 }
 
@@ -1529,8 +1530,13 @@ static void ctrl_getone()
 	char *cmsg=CcsImpl_ccs2converse(hdr,msg.data+sizeof(CcsImplHeader),NULL);
 	PCQueuePush(CmiGetStateN(pe)->recv,cmsg);
 #endif
-  } else /*Unrecognized message header type*/ 
-    KillEveryoneCode(2932);
+  }  else {
+  /* We do not use KillEveryOne here because it calls CmiMyPe(),
+   * which is not available to the communication thread on an SMP version.
+   */
+    host_abort("ERROR> Unrecognized message from host.\n");
+    exit(1);
+  }
   
   ChMessage_free(&msg);
 }
