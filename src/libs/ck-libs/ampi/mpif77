@@ -1,2 +1,3 @@
 #!/bin/sh
-`which charmc` -language ampif $@
+CHARMBIN=`dirname $0`
+$CHARMBIN/charmc -language ampif $@
