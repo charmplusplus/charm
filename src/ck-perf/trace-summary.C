@@ -15,7 +15,7 @@ into utilization time?
 
 #include "trace-summary.h"
 
-#define VER   "2.0"
+#define VER   2.0
 
 CpvDeclare(Trace*, _trace);
 CpvDeclare(int, traceOn);
@@ -46,7 +46,7 @@ void traceInit(int* argc, char **argv)
   CpvAccess(pgmName) = (char *) malloc(strlen(argv[0])+1);
   _MEMCHECK(CpvAccess(pgmName));
   strcpy(CpvAccess(pgmName), argv[0]);
-  CpvAccess(CtrLogBufSize) = 10000;
+  CpvAccess(CtrLogBufSize) = LogBufSize;
   CpvAccess(binSize) = BIN_SIZE;
   int i;
   for(i=1;i<*argc;i++) {
@@ -160,7 +160,7 @@ void LogPool::addEventType(int eventType, double time)
 void LogPool::write(void) 
 {
   int i;
-  fprintf(fp, "%d/%d count:%d ep:%d interval:%le ver:%s\n", CmiMyPe(), CmiNumPes(), numEntries, _numEntries, CpvAccess(binSize), VER);
+  fprintf(fp, "ver:%3.1f %d/%d count:%d ep:%d interval:%le\n", VER, CmiMyPe(), CmiNumPes(), numEntries, _numEntries, CpvAccess(binSize));
   // write bin time
   for(i=0; i<numEntries; i++)
     pool[i].write(fp);
@@ -174,12 +174,15 @@ void LogPool::write(void)
     fprintf(fp, "%d ", epCount[i]);
   fprintf(fp, "\n");
   // write marks
+  if (VER>=2.0) 
+  {
   fprintf(fp, "%d ", markcount);
   for (i=0; i<256; i++) {
     for(MarkEntry *e = events[i].marks; e; e=e->next)
         fprintf(fp, "%d %f ", i, e->time);
   }
   fprintf(fp, "\n");
+  }
 }
 
 void LogPool::writeSts(void)
@@ -226,8 +229,6 @@ void LogPool::shrink(void)
 void LogEntry::write(FILE* fp)
 {
   int per = time * 100.0 / CpvAccess(binSize);
-//  fprintf(fp, "%d %f%% \n", index, per);
-//  fprintf(fp, "%d %4d \n", index, per);
   fprintf(fp, "%4d", per);
 }
 
@@ -265,7 +266,6 @@ void TraceProjections::beginExecute(envelope *e)
 
 void TraceProjections::endExecute(void)
 {
-//CmiPrintf("end:msgNum: %d bin:%f\n", msgNum, bin);
   double t = CmiTimer();
   double ts = start;
   double nts = binStart;
@@ -280,11 +280,9 @@ void TraceProjections::endExecute(void)
      bin += nts-ts;
      binStart  = nts;
      CpvAccess(_logPool)->add(bin, CmiMyPe());
-//CmiPrintf("add time: %f\n", bin);
      bin = 0;
      ts = nts;
   }
-//  CpvAccess(_logPool)->add(index, t - ts, CmiMyPe());
   bin += t - ts;
 }
 
@@ -303,8 +301,7 @@ void TraceProjections::beginPack(void)
 
 void TraceProjections::endPack(void)
 {
-    double t = CmiTimer();
-    CpvAccess(_logPool)->setEp(_packEP, t-packstart);
+    CpvAccess(_logPool)->setEp(_packEP, CmiTimer() - packstart);
 }
 
 void TraceProjections::beginUnpack(void)
@@ -314,8 +311,7 @@ void TraceProjections::beginUnpack(void)
 
 void TraceProjections::endUnpack(void)
 {
-    double t = CmiTimer();
-    CpvAccess(_logPool)->setEp(_unpackEP, t-unpackstart);
+    CpvAccess(_logPool)->setEp(_unpackEP, CmiTimer()-unpackstart);
 }
 
 void TraceProjections::beginCharmInit(void) {}
@@ -349,13 +345,7 @@ void TraceProjections::endComputation(void)
 //CmiPrintf("Add at last: %d pe:%d time:%f msg:%d\n", index, CmiMyPe(), bin, msgNum);
      CpvAccess(_logPool)->add(bin, CmiMyPe());
      msgNum ++;
-/*
-     // fill gap till end of program
-     int curIdx = CmiTimer() / CpvAccess(binSize);
-     for (int i=index+1; i<=curIdx; i++) {
-        CpvAccess(_logPool)->add(i, 0.0, CmiMyPe());
-     }
-*/
+
      binStart  += CpvAccess(binSize);
      double t = CmiTimer();
      double ts = binStart;
@@ -368,25 +358,3 @@ void TraceProjections::endComputation(void)
   }
 }
 
-/*
-void TraceProjections::writeEvent(void)
-{
-  char pestr[10];
-  sprintf(pestr, "%d", CkMyPe());
-  int len = strlen(CpvAccess(pgmName)) + strlen(".eps.") + strlen(pestr) + 1;
-  char *fname = new char[len];
-  sprintf(fname, "%s.%s.eps", CpvAccess(pgmName), pestr);
-  FILE *sts = fopen(fname, "w+");
-  //CmiPrintf("File: %s \n", fname);
-  if(sts==0)
-    CmiAbort("Cannot open projections sts file for writing.\n");
-  delete[] fname;
-  for (int i=0; i<_numEntries; i++)
-    fprintf(sts, "%d ", (int)(epTime[i]*1.0e6));
-  fprintf(sts, "\n");
-  for (int i=0; i<_numEntries; i++)
-    fprintf(sts, "%d ", epCount[i]);
-  fprintf(sts, "\n");
-  fclose(sts);
-}
-*/
