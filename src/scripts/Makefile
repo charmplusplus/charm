@@ -235,7 +235,7 @@ CVLIBS=$(L)/libconv-core.a \
 
 LIBCONV_CORE= convcore.o conv-conds.o queueing.o msgmgr.o \
 	cpm.o cpthreads.o futures.o cldb.o random.o traceCore.o traceCoreCommon.o \
-	charmProjections.o converseProjections.o machineProjections.o \
+	converseProjections.o machineProjections.o \
 	debug-conv.o generate.o edgelist.o conv-ccs.o ccs-builtins.o \
 	quiescence.o isomalloc.o
 
@@ -461,7 +461,8 @@ LIBCK_CORE=trace-common.o init.o register.o qd.o ck.o main.o msgalloc.o \
            LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o \
 	   BaseLB.o CentralLB.o NborBaseLB.o WSLB.o ObjGraph.o graph.o  \
            Refiner.o bitvecset.o Set.o heap.o CommLBHeap.o NullLB.o \
-	   LBSimulation.o ComlibStrategy.o ComlibArrayListener.o
+	   LBSimulation.o ComlibStrategy.o ComlibArrayListener.o	\
+	   charmProjections.o
 
 CHARMLIBS: charm++
 	cd libs; make charmlibs OPTS='$(OPTS)'
