@@ -33,14 +33,33 @@ monitoring and visualization, and checkpoint/restart, with no additional
 effort. The FEM framework also combines naturally with other \charmpp
 frameworks built on TCHARM.
 
+\subsection{Philosophy}
+
+The \charmpp{} FEM framework is designed to be flexible, in that it
+provided a few very general operations, such as loading and partitioning 
+a ``mesh.''  
+In describing these operations, we draw on examples from structural analysis,
+but in fact the same calls can be used for other applications, including
+fluid dynamics or partial differential equations solvers, or
+even general-purpose graph manipulation.
+
+For example, the FEM framework does not specify the number of spatial
+dimensions.  Node locations are treated as just another kind of node data,
+with no restrictions on the number of data items.
+This allows the FEM framework to work with problems having any number 
+of spatial dimensions.
+
 
 \subsection{Terminology}
 
-A FEM program manipulates elements and nodes. An element is a portion of
+A FEM program manipulates elements and nodes. An {\bf element} is a portion of
 the problem domain, typically in the shape of a triangle, square, or hexagon
-in 2D; or tetrahedron or rectangular solid in 3D.  A node is a point in the
-domain.  An element knows which nodes surround it via the connectivity
-table, which lists adjacent nodes.
+in 2D; or tetrahedron or rectangular solid in 3D.  A {\bf node} is a point in the
+domain.  Together, the elements and nodes form a {\bf mesh}, which is the 
+central data structure in the FEM framework.
+
+An element knows which nodes surround it via the element's
+{\bf connectivity table}, which lists the nodes adjacent to each element.
 
 \begin{figure}[h]
 \begin{center}
@@ -78,10 +97,10 @@ example, a material dynamics program has the structure:
 \end{alltt}
 
 We can parallelize such FEM programs by partitioning the serial mesh
-elements into several chunks  (at least one chunk per processor; perhaps
-even more).  During partitioning, we give nodes and elements new,
-chunk-local numbers.  Below, we partition the mesh above into two chunks, A
-and B.
+elements into several smaller meshes, or {\bf chunks}.  There is normally
+at least one chunk per processor; and often even more.  During partitioning, 
+we give nodes and elements new, {\bf local} numbers within that chunk.
+In the figure below, we have partitioned the mesh above into two chunks, A and B.
 
 \begin{figure}[h]
 \begin{center}
@@ -91,7 +110,7 @@ and B.
 \label{fig:partitionedmesh}
 \end{figure}
 
-\begin{table}[h]
+\begin{table}[hh]
 \begin{center}
 \begin{tabular}{||l||l|l|l||}\hline
 Element & \multicolumn{3}{c||}{Adjacent Nodes} \\\hline
@@ -104,7 +123,7 @@ e2 & n1 & n2 & n4 \\
 \label{table:chunkA}
 \end{table}
 
-\begin{table}[h]
+\begin{table}[hh]
 \begin{center}
 \begin{tabular}{||l||l|l|l||}\hline
 Element & \multicolumn{3}{c||}{Adjacent Nodes}\\\hline
@@ -123,8 +142,23 @@ can handle shared nodes by computing the forces normally (ignoring the
 existence of the other chunk), then adding both chunks' net force for the
 shared node together.  This ``node update'' will give us the same resulting
 force on each shared node as we would get without partitioning, thus the
-same positions, thus the same final result.  Hence, each chunk's time loop
-has the structure:
+same positions, thus the same final result.  
+
+For example, under hydrostatic pressure, each chunk might compute a local
+net force vector for its nodes as shown in Figure~\ref{fig:forcedecomp}
+(a).  After adding forces across chunks, we have the consistent global forces
+shown in Figure~\ref{fig:forcedecomp} (b).
+
+\begin{figure}[h]
+\begin{center}
+\includegraphics[height=3in]{fig/forcedecomp}
+\end{center}
+\caption{A force calculation decomposed across chunks: (a) before update
+(b) after updating forces across nodes.}
+\label{fig:forcedecomp}
+\end{figure}
+
+Hence, each chunk's time loop has the structure:
 
 \begin{alltt}
      chunk time loop
@@ -309,26 +343,6 @@ but any new added nodes are assumed private (not shared).
 new pieces and optionally repartition the serial mesh.
 
 
-\prototype{FEM\_Set\_mesh}
-\function{void FEM\_Set\_mesh(int nElem, int nNodes, int nodePerEl,const int* conn);}
-
-     This is a convenience routine equivalent to:
-\begin{alltt}
-          FEM\_Set\_node(nNodes,0);
-          FEM\_Set\_elem(0,nElem,0,nodePerEl);
-          FEM\_Set\_elem\_Conn(0,conn);
-\end{alltt}
-
-\function{subroutine FEM\_Set\_mesh(nElem,nNodes,nodePerEl,conn)}
-    \args{integer, intent(in) :: nElem, nNodes, nodePerEl}
-    \args{integer, intent(in), dimension(nElem,nodePerEl) :: conn;}
-
-     This is a convenience routine equivalent to:
-\begin{alltt}
-          CALL FEM\_Set\_node(nNodes,0)
-          CALL FEM\_Set\_elem(1,nElem,0,nodePerEl)
-          CALL FEM\_Set\_elem\_Conn\_c(1,conn)
-\end{alltt}
 
 \prototype{FEM\_Get/Set\_elem}
 \function{void FEM\_Set\_elem(int elType,int  nEl,int  doublePerEl,int  nodePerEl);}
@@ -434,7 +448,38 @@ arrays can be row- or column- major (see \kw{FEM\_Set\_elem\_conn} for
 details).  The row-major form is preferred.
 
 
+\subsection{Backward Compatability}
+\prototype{FEM\_Set\_mesh}
+\function{void FEM\_Set\_mesh(int nElem, int nNodes, int nodePerEl,const int* conn);}
+
+     This is a convenience routine equivalent to:
+\begin{alltt}
+          FEM\_Set\_node(nNodes,0);
+          FEM\_Set\_elem(0,nElem,0,nodePerEl);
+          FEM\_Set\_elem\_Conn(0,conn);
+\end{alltt}
+
+\function{subroutine FEM\_Set\_mesh(nElem,nNodes,nodePerEl,conn)}
+    \args{integer, intent(in) :: nElem, nNodes, nodePerEl}
+    \args{integer, intent(in), dimension(nElem,nodePerEl) :: conn;}
+
+     This is a convenience routine equivalent to:
+\begin{alltt}
+          CALL FEM\_Set\_node(nNodes,0)
+          CALL FEM\_Set\_elem(1,nElem,0,nodePerEl)
+          CALL FEM\_Set\_elem\_Conn\_c(1,conn)
+\end{alltt}
+
+
 \subsection{Sparse Data}
+
+Sparse data is typically used to represent boundary conditions.  For
+example, in a structural dynamics program typically some nodes have 
+an imposed force or position.  The routines in this section are 
+used to describe this kind of mesh-associated data---data that only 
+applies to some ``sparse'' subset of the nodes or elements.  
+
+
 \prototype{FEM\_Set\_sparse}
 \function{void FEM\_Set\_sparse(int S\_id,int nRec,
          const int *nodes,int nodesPerRec,
@@ -534,8 +579,8 @@ This call adds a new node, with local index \kw{localIdx}, to the current mesh c
 BetweenNodes lists the local node numbers of the all the nodes the new node is 
 ``between''-- for example, when adding a new node along an edge, nBetween is 2
 and betweenNodes lists the endpoints of the edge.
-\kw{FEM\_Add\_node} only affects the current chunk-- no other chunks are affected.
 
+\kw{FEM\_Add\_node} only affects the current chunk-- no other chunks are affected.
 To create shared nodes, \kw{FEM\_Add\_node} must be called on all the chunks that 
 share the node, to create the local copies of the node.
 When adding multiple nodes, \kw{FEM\_Add\_node} must be called in the same order 
@@ -612,6 +657,40 @@ the drivers, since the entire serial mesh is available to \uw{my\_update\_routin
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section {Mesh Ghosts}
 An option to add ``ghosts'' to a mesh is provided by the framework. A ghost is a local read-only copy of a node or element that actually lives on another chunk.  Ghosts are typically added to the boundary of a chunk to allow the real (non-ghost) elements at the boundary to access values across the processor boundary.  This makes a chunk ``feel'' as if it was part of a complete unpartitioned mesh.
+
+
+\begin{figure}[h]
+\begin{center}
+\includegraphics[width=2in]{fig/ghost_pre}
+\end{center}
+\caption{A small mesh partitioned into two pieces.}
+\label{fig:ghostpre}
+\end{figure}
+
+In Figure~\ref{fig:ghostpre}, we begin with a small mesh partitioned
+into pieces on the left and right.  In Figure~\ref{fig:ghostedge},
+we have added ghost elements (dark hashing) that share an edge with
+adjacent real elements (light hatching).  In Figure~\ref{fig:ghostnode},
+we add ghost elements that share at least one node with adjacent 
+real elements.
+
+\begin{figure}[h]
+\begin{center}
+\includegraphics[width=2in]{fig/ghost_edge}
+\end{center}
+\caption{The same mesh with one layer of edge-adjacent ghosts.}
+\label{fig:ghostedge}
+\end{figure}
+
+\begin{figure}[h]
+\begin{center}
+\includegraphics[width=2in]{fig/ghost_node}
+\end{center}
+\caption{The same mesh with one layer of node-adjacent ghosts.}
+\label{fig:ghostnode}
+\end{figure}
+
+
 
 \subsection{Setting up the ghost layer}
 The framework's ghost handling is element-centric. You specify which kinds of elements should be ghosts and how they connect by listing their ``tuples'' via calls in the \kw{init()} routine.  
@@ -707,7 +786,25 @@ and various types of periodicities.  The interface for these ghosts is
 simple---you ask for the symmetries to be created, then you will get 
 extra ghosts along each symmetry boundary.  The symmetry ghosts are
 updated properly during any communication, even if the symmetry ghosts
-are ghosts of real local elements.
+are ghosts of real local elements from the same chunk.
+
+
+\begin{figure}[h]
+\begin{center}
+\includegraphics[width=3in]{fig/sym_ghost}
+\end{center}
+\caption{Illustrating symmetry ghost elements.}
+\label{fig:symghost}
+\end{figure}
+
+Figure~\ref{fig:symghost} shows a chunk of a mesh for a 
+rectangular domain with horizontal linear translational periodicity---that 
+is, the domain repeats horizontally.
+Symmetry ghosts lie along the left and right sides; ordinary cross-processor
+parallel ghosts lie along the top edge where this chunk joins up with the
+rest of the domain; and the external boundary along the bottom of the chunk
+has no ghosts.
+
 
 
 \prototype{FEM\_Add\_linear\_periodicity}
