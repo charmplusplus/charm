@@ -2033,6 +2033,7 @@ void ConverseExit(void)
   if (Cmi_charmrun_fd!=-1) {
   	ctrl_sendone_locking("ending",NULL,0,NULL,0); /* this causes charmrun to go away */
 #if CMK_SHARED_VARS_UNAVAILABLE
+ 	Cmi_check_delay = 1.0;		/* speed up checking of charmrun */
  	while (1) CommunicationServer(500, 2);
 #endif
   }
