@@ -3,13 +3,13 @@
 
 #define MACHINE_DEBUG 0
 #if MACHINE_DEBUG
-/*Controls amount of debug messages: 1 (the lowest priority) is 
+/**Controls amount of debug messages: 1 (the lowest priority) is 
 extremely verbose, 2 shows most procedure entrance/exits, 
 3 shows most communication, and 5 only shows rare or unexpected items.
 Displaying lower priority messages doesn't stop higher priority ones.
 */
 #define MACHINE_DEBUG_PRIO 2
-#define MACHINE_DEBUG_LOG 0 /*Controls whether output goes to log file*/
+#define MACHINE_DEBUG_LOG 0 /**Controls whether output goes to log file*/
 
 FILE *debugLog;
 # define MACHSTATE_I(prio,args) if ((prio)>=MACHINE_DEBUG_PRIO) {\
