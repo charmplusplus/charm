@@ -145,7 +145,7 @@ typedef struct _LDCommDesc {
 #ifdef __cplusplus
   char &get_type() { return type; }
   char get_type() const { return type; }
-  int proc() const { return type==1?dest.destProc:-1; }
+  int proc() const { return type==LD_PROC_MSG?dest.destProc:-1; }
   int lastKnown() const { 
     if (type==LD_OBJ_MSG) return dest.destObj.destObjProc;
     if (type==LD_PROC_MSG) return dest.destProc;
