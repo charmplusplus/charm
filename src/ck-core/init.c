@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.24  1995-09-26 22:23:17  sanjeev
+ * Revision 2.25  1995-09-26 22:36:55  jyelon
+ * Fixed a bug pertaining to CkInitPhase.
+ *
+ * Revision 2.24  1995/09/26  22:23:17  sanjeev
  * fixed bug because CkBuffQueue was created too late : moved it up
  * in StartCharm
  *
@@ -258,6 +261,8 @@ static void EndInitPhase()
   void  *buffMsg;
   ENVELOPE *bocMsg;
 
+  CpvAccess(CkInitPhase) = 0;
+
   /* set the main handler to the unbuffering one */
   CsvAccess(HANDLE_INCOMING_MSG_Index) = CsvAccess(MAIN_HANDLE_INCOMING_MSG_Index);
   
@@ -293,7 +298,6 @@ static void PropagateInitBarrier()
 {
   if (CpvAccess(CkCountArrived) && CpvAccess(CkInitCount)==0) {
     /* initialization phase is done, set the flag to 0 */
-    CpvAccess(CkInitPhase) = 0;
     if (CpvAccess(NumChildrenDoneWithStartCharm)==
         CmiNumSpanTreeChildren(CmiMyPe())) {
       int parent = CmiSpanTreeParent(CmiMyPe());
