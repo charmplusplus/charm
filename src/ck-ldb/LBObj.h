@@ -51,7 +51,7 @@ public:
   void StopTimer(double* walltime, double* cputime);
 
 private:
-  LDObjData ObjData() { return data; };
+  inline LDObjData ObjData() { return data; };
 
   LBDB* parentDB;
   LDOMHandle parentOM;

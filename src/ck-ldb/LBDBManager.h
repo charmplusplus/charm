@@ -81,61 +81,61 @@ public:
   void RegisteringObjects(LDOMHandle _h);
   void DoneRegisteringObjects(LDOMHandle _h);
 
-  LBOM *LbOM(LDOMHandle h) { return oms[h.handle]; };
-  LBObj *LbObj(LDObjHandle h) { return objs[h.handle]; };
+  inline LBOM *LbOM(LDOMHandle h) { return oms[h.handle]; };
+  inline LBObj *LbObj(LDObjHandle h) { return objs[h.handle]; };
   void DumpDatabase(void);
-  void TurnStatsOn(void) { statsAreOn = CmiTrue; machineUtil.StatsOn(); };
-  void TurnStatsOff(void) { statsAreOn = CmiFalse; machineUtil.StatsOff(); };
-  CmiBool StatsOn(void) { return statsAreOn; };
+  inline void TurnStatsOn(void) {statsAreOn = CmiTrue; machineUtil.StatsOn();}
+  inline void TurnStatsOff(void) {statsAreOn = CmiFalse;machineUtil.StatsOff();}
+  inline CmiBool StatsOn(void) { return statsAreOn; };
   void Send(LDOMHandle destOM, LDObjid destid, unsigned int bytes);
   int ObjDataCount();
   void GetObjData(LDObjData *data);
-  int CommDataCount() { 
+  inline int CommDataCount() { 
     if (commTable)
       return commTable->CommCount();
     else return 0;
   }
-  void GetCommData(LDCommData *data) { 
+  inline void GetCommData(LDCommData *data) { 
     if (commTable) commTable->GetCommData(data);
   };
 
   void Migrate(LDObjHandle h, int dest);
   void Migrated(LDObjHandle h);
   void NotifyMigrated(LDMigratedFn fn, void* data);
-  void IdleTime(double* walltime) { 
+  inline void IdleTime(double* walltime) { 
     machineUtil.IdleTime(walltime); 
   };
-  void TotalTime(double* walltime, double* cputime) {
+  inline void TotalTime(double* walltime, double* cputime) {
     machineUtil.TotalTime(walltime,cputime);
   };
   void BackgroundLoad(double* walltime, double* cputime);
   void ClearLoads(void);
-  void SetRunningObj(LDObjHandle _h) {
+  inline void SetRunningObj(LDObjHandle _h) {
     runningObj = _h; obj_running = CmiTrue;
   };
-  void NoRunningObj() { obj_running = CmiFalse; };
-  CmiBool ObjIsRunning() { return obj_running; };
-  LDObjHandle RunningObj() { return runningObj; };
+  inline void NoRunningObj() { obj_running = CmiFalse; };
+  inline CmiBool ObjIsRunning() { return obj_running; };
+  inline LDObjHandle RunningObj() { return runningObj; };
   
-  LDBarrierClient AddLocalBarrierClient(LDResumeFn fn, void* data) { 
+  inline LDBarrierClient AddLocalBarrierClient(LDResumeFn fn, void* data) { 
     return localBarrier.AddClient(fn,data);
   };
-  void RemoveLocalBarrierClient(LDBarrierClient h) {
+  inline void RemoveLocalBarrierClient(LDBarrierClient h) {
     localBarrier.RemoveClient(h);
   };
-  LDBarrierReceiver AddLocalBarrierReceiver(LDBarrierFn fn, void* data) {
+  inline LDBarrierReceiver AddLocalBarrierReceiver(LDBarrierFn fn, void* data) {
     return localBarrier.AddReceiver(fn,data);
   };
-  void RemoveLocalBarrierReceiver(LDBarrierReceiver h) {
+  inline void RemoveLocalBarrierReceiver(LDBarrierReceiver h) {
     localBarrier.RemoveReceiver(h);
   };
-  void AtLocalBarrier(LDBarrierClient h) {
+  inline void AtLocalBarrier(LDBarrierClient h) {
     localBarrier.AtBarrier(h);
   };
-  void ResumeClients() {
+  inline void ResumeClients() {
     localBarrier.ResumeClients();
   };
-  void MeasuredObjTime(double wtime, double ctime) {
+  inline void MeasuredObjTime(double wtime, double ctime) {
     if (statsAreOn) {
       obj_walltime += wtime;
       obj_cputime += ctime;

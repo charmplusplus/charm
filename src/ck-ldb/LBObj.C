@@ -47,10 +47,8 @@ void LBObj::StartTimer(void)
 
 void LBObj::StopTimer(double* walltime, double* cputime)
 {
-  const double endWTime = CmiWallTimer();
-  const double endCTime = CmiCpuTimer();
-  *walltime = endWTime - startWTime;
-  *cputime = endCTime - startCTime;
+  *walltime = CmiWallTimer() - startWTime;
+  *cputime = CmiCpuTimer() - startCTime;
 }
 
 #endif
