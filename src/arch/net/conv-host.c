@@ -1347,46 +1347,8 @@ arg_init(argc, argv)
 
 /****************************************************************************
  *                                                                           
- * NODE:  The nodes file and nodes table.
+ * NODETAB:  The nodes file and nodes table.
  *
- * void nodetab_init()
- *
- *  - initialize the nodes table.
- *    
- *
- * int nodetab_size;
- *
- *  - number of nodes in the nodes table.
- *
- * char *nodetab_name(int i)
- *
- *  - returns the name of node i.
- *
- * char *nodetab_login(int i)
- *
- *  - returns the login name for node i.
- *
- * char *nodetab_passwd(int i)
- *
- *  - returns the password for node I.
- *
- * char *nodetab_setup(int i)
- *
- *  - returns the setup command for node I.
- *
- * unsigned int nodetab_ip(int i)
- *
- *  - returns the IP address of node I.
- *
- * The routines described above retrieve their information from the nodesfile.
- * This module looks in several places for the nodes file, in the following
- * order:                                                   
- *                                                                           
- *      a file specified by ++nodesfile                                      
- *      a file whose name is getenv("NODES")                                 
- *      a file called "nodes" in the current directory.                      
- *      a file called ".nodes" in the user's home directory.                 
- *                                                                           
  ****************************************************************************/
 
 char *nodetab_file_find()
@@ -1425,8 +1387,9 @@ typedef struct nodetab_host {
   char *home;
   char *ext;
   char *setup;
+  int   cpus;
+  int   rank;
   double speed;
-  int cpus;
   unsigned int ip;
 } *nodetab_host;
 
@@ -1438,9 +1401,13 @@ char    *default_ext = "*";
 char    *default_setup = "*";
 double   default_speed = 1.0;
 int      default_cpus = 1;
+int      default_rank = 0;
 
 nodetab_host *nodetab_table;
+int           nodetab_max;
 int           nodetab_size;
+int          *nodetab_rank0_table;
+int           nodetab_rank0_size;
 
 void nodetab_makehost(char *host)
 {
@@ -1451,6 +1418,7 @@ void nodetab_makehost(char *host)
     fprintf(stderr,"Cannot obtain IP address of %s\n", host);
     exit(0);
   }
+  if (nodetab_size == nodetab_max) return;
   res = (nodetab_host)malloc(sizeof(struct nodetab_host));
   res->name = host;
   res->login = default_login;
@@ -1459,8 +1427,11 @@ void nodetab_makehost(char *host)
   res->ext = default_ext;
   res->setup = default_setup;
   res->speed = default_speed;
+  res->rank = default_rank;
   res->cpus = default_cpus;
   res->ip = ip;
+  if (res->rank == 0)
+    nodetab_rank0_table[nodetab_rank0_size++] = nodetab_size;
   nodetab_table[nodetab_size++] = res;
 }
 
@@ -1480,10 +1451,13 @@ void nodetab_init()
   }
   
   nodetab_table=(nodetab_host*)malloc(arg_requested_pes*sizeof(nodetab_host));
+  nodetab_rank0_table=(int*)malloc(arg_requested_pes*sizeof(int));
+  nodetab_max=arg_requested_pes;
   
   rightgroup = (strcmp(arg_nodegroup,"main")==0);
-
+  
   while(fgets(input_line,sizeof(input_line)-1,f)!=0) {
+    if (nodetab_size == arg_requested_pes) break;
     if (input_line[0]=='#') continue;
     zap_newline(input_line);
     b1 = skipblanks(input_line);
@@ -1501,8 +1475,9 @@ void nodetab_init()
     else if (subeqs(b1,e1,"ext")&&(*b3==0))    default_ext = substr(b2,e2);
     else if (subeqs(b1,e1,"setup"))            default_setup = strdup(b2);
     else if (subeqs(b1,e1,"host")&&(*b3==0)) {
-      if (rightgroup) nodetab_makehost(substr(b2,e2));
-      if (nodetab_size == arg_requested_pes) break;
+      if (rightgroup)
+	for (default_rank=0; default_rank<default_cpus; default_rank++)
+	  nodetab_makehost(substr(b2,e2));
     } else if (subeqs(b1,e1, "group")&&(*b3==0)) {
       rightgroup = subeqs(b2,e2,arg_nodegroup);
     } else {
@@ -1544,7 +1519,8 @@ char        *nodetab_setup(i) int i;   { return nodetab_getinfo(i)->setup; }
 char        *nodetab_home(i) int i;    { return nodetab_getinfo(i)->home; }
 char        *nodetab_ext(i) int i;     { return nodetab_getinfo(i)->ext; }
 unsigned int nodetab_ip(i) int i;      { return nodetab_getinfo(i)->ip; }
- 
+unsigned int nodetab_cpus(i) int i;    { return nodetab_getinfo(i)->cpus; }
+unsigned int nodetab_rank(i) int i;    { return nodetab_getinfo(i)->rank; }
 
  
 /****************************************************************************
@@ -2007,10 +1983,11 @@ int rsh_pump(p, nodeno, argv)
 
   if (arg_display)
     xstr_printf(ibuf,"setenv DISPLAY %s\n",arg_display);
-  xstr_printf(ibuf,"setenv NETSTART '%d %d %d %d %d'\n",
-    nodeno, nodetab_size, nodetab_ip(nodeno), req_ip, req_port);
+  xstr_printf(ibuf,"setenv NETSTART '%d %d %d %d %d %d %d'\n",
+	      nodeno, nodetab_size, nodetab_cpus(nodeno), nodetab_rank(nodeno),
+	      nodetab_ip(nodeno), req_ip, req_port);
   prog_flush(p);
-
+  
   /* find the node-program, relative version */
   sprintf(buf,"%s",getenv("HOME"));
   if ((len=path_isprefix(buf,arg_nodeprog_a))!=0) {
@@ -2140,7 +2117,7 @@ int start_nodes()
   int         rsh_nfinished;
   int         rsh_freeslot;
   int         rsh_maxsim;
-  fd_set rfds; int i;
+  fd_set rfds; int i; prog p; int pe;
   
   /* Return immediately.  That way, the nodes which are starting */
   /* Will be able to establish communication with the host */
@@ -2149,26 +2126,27 @@ int start_nodes()
   /* Obtain the values from the command line options */
   rsh_maxsim = arg_maxrsh;
   if (rsh_maxsim < 1) rsh_maxsim=1;
-  if (rsh_maxsim > nodetab_size) rsh_maxsim=nodetab_size;
+  if (rsh_maxsim > nodetab_rank0_size) rsh_maxsim=nodetab_rank0_size;
   if (rsh_maxsim > 200) rsh_maxsim=200;
   
   /* start initial group of rsh's */
   for (i=0; i<rsh_maxsim; i++) {
-    prog p = rsh_start(i);
+    pe = nodetab_rank0_table[i];
+    p = rsh_start(pe);
     if (p==0) { rsh_maxsim=i; break; }
-    rsh_pump(p, i, arg_argv);
+    rsh_pump(p, pe, arg_argv);
     rsh_prog[i] = p;
-    rsh_node[i] = i;
+    rsh_node[i] = pe;
   }
   if (rsh_maxsim==0) { perror("starting rsh"); exit(1); }
   rsh_nstarted = rsh_maxsim;
   rsh_nfinished = 0;
   
-  while (rsh_nfinished < nodetab_size) {
+  while (rsh_nfinished < nodetab_rank0_size) {
     int maxfd=0; int ok;
     FD_ZERO(&rfds);
     for (i=0; i<rsh_maxsim; i++) {
-      prog p = rsh_prog[i];
+      p = rsh_prog[i];
       if (p==0) continue;
       FD_SET(p->ofd, &rfds);
       if (p->ofd > maxfd) maxfd = p->ofd;
@@ -2182,7 +2160,7 @@ int start_nodes()
       char *line = 0;
       char buffer[1000];
       int nread, done = 0;
-      prog p = rsh_prog[i];
+      p = rsh_prog[i];
       if (p==0) continue;
       if (!FD_ISSET(p->ofd, &rfds)) continue;
       do nread = read(p->ofd, buffer, 1000);
@@ -2207,12 +2185,13 @@ int start_nodes()
       rsh_nfinished++;
       prog_close(p);
       rsh_prog[i] = 0;
-      if (rsh_nstarted==nodetab_size) break;
-      p = rsh_start(rsh_nstarted);
+      if (rsh_nstarted==nodetab_rank0_size) break;
+      pe = nodetab_rank0_table[rsh_nstarted];
+      p = rsh_start(pe);
       if (p==0) { perror("starting rsh"); exit(1); }
-      rsh_pump(p, rsh_nstarted, arg_argv);
+      rsh_pump(p, pe, arg_argv);
       rsh_prog[i] = p;
-      rsh_node[i] = rsh_nstarted;
+      rsh_node[i] = pe;
       rsh_nstarted++;
     }
   }

@@ -91,8 +91,214 @@ static void KillEveryoneCode();
 extern int CmemInsideMem();
 extern void CmemCallWhenMemAvail();
 
+/******************************************************************************
+ *
+ * Protocol State Variables
+ *
+ *****************************************************************************/
 
-static int NumAlloc, NumFree;
+#define MAX_NODES 100
+
+typedef struct {
+  int IP;
+  int dataport;
+  int ctrlport;
+  struct sockaddr_in addr;
+} node_info;
+
+/* Types of messages. */
+
+# define SEND  1
+# define ACK  2
+
+typedef unsigned char BYTE;
+
+/* In bytes.  Make sure this is greater than zero! */
+/* Works out to be about 2018 bytes. */
+
+# define MAXDSIZE (CMK_DGRAM_MAX_SIZE - sizeof(DATA_HDR))
+
+/* Format of the header sent with each fragment. */
+typedef struct DATA_HDR
+{
+  unsigned int seq_num;   /* Sequence Number */
+  unsigned int PeNum;     /* always penum of the originator*/
+  unsigned int pktidx;    /* Index of packet within message */
+  unsigned int rem_size;  /*Size of remaining message including this packet*/
+                          /*If this is zero, it is ACK otherwise SEND */
+}
+DATA_HDR;
+
+/* Header combined with data fragment. */
+typedef struct msgspace
+{
+  DATA_HDR hd;
+  char data[MAXDSIZE];
+}
+msgspace;
+
+typedef struct
+{
+  DATA_HDR        *packet;
+  unsigned int     seq_num;
+  double           send_time;
+}
+WindowElement;
+
+typedef struct pkt_queue_elem
+{
+  DATA_HDR *packet;
+  struct pkt_queue_elem *nextptr;
+}
+PacketQueueElem;
+
+typedef struct msg_queue_elem
+{
+  char *mesg;
+  struct msg_queue_elem *nextptr;
+}
+MsgQueueElem;
+
+typedef struct new_msg
+{
+  int numpackets;
+  int numfrags;
+  char *mesg;
+}
+NewMessage;
+
+#define MAX_SEQ_NUM 0xFFFFFFFF     /* 2^32 - 1 */
+
+/*****************************************************************************
+ *
+ * These variables contain all the processor-specific state.
+ *
+ *****************************************************************************/
+
+typedef struct cmi_state_struct
+{
+  int ctrl_port;
+  int ctrl_skt;
+  int data_port;
+  int data_skt;
+
+  node_info node_table[MAX_NODES];
+  int       node_table_fill;
+
+  int all_done;
+  char *scanf_data;
+  double CmiNow;
+  FILE *outlog_file;
+  
+  int Communication_init;            /* Communication set up yet? */
+  WindowElement **send_window;       /* packets awaiting acks  */
+  PacketQueueElem **transmit_head;   /* packets awaiting transmission */
+  PacketQueueElem **transmit_tail; 
+  int *first_window_index; 
+  int *last_window_index;
+  int *cur_window_size;
+  unsigned int  *next_seq_num;
+  int *timeout_factor;
+  WindowElement **recv_window;    /* packets awaiting acks  */
+  int *next_window_index;         /* index of 1st entry in recv window */
+  unsigned int *expected_seq_num; /* next sequence number expected */
+  NewMessage *recd_messages;
+  int *needack;
+  DATA_HDR ack;
+  MsgQueueElem *recd_msg_head, *recd_msg_tail;
+
+  int NumAlloc;
+  int NumFree;
+  int NumIntr;
+  int NumIntrCalls;
+  int NumOutsideMc;
+  int NumRetransmits;
+  int NumAcksSent;
+  int NumUseless;
+  int NumSends;
+  int NumEvents;
+}
+*cmi_state;
+
+CpvStaticDeclare(cmi_state, CmiStateVar);
+
+#define CmiState() (CpvAccess(CmiStateVar))
+
+/*****************************************************************************
+ *
+ * Exported CPV and CSV variables
+ * 
+ * ONLY put CPV and CSV variables that are needed by the rest of the system
+ * here.  All other state should go in the CmiState struct above.
+ *
+ *****************************************************************************/
+
+CpvDeclare(int,   Cmi_mype);
+CpvDeclare(int,   Cmi_numpes);
+CpvDeclare(void *,CmiLocalQueue);
+
+/*****************************************************************************
+ *
+ * Statistics Module
+ *
+ *****************************************************************************/
+
+CmiStatsInit()
+{
+  cmi_state cs = CmiState();
+  cs->NumAlloc = 0;
+  cs->NumFree = 0;
+  cs->NumIntr = 0;
+  cs->NumIntrCalls = 0;
+  cs->NumOutsideMc = 0;
+  cs->NumRetransmits = 0;
+  cs->NumAcksSent = 0;
+  cs->NumUseless = 0;
+  cs->NumSends = 0;
+  cs->NumEvents = 0;
+}
+
+CmiStatsPrint()
+{
+  cmi_state cs = CmiState();
+  CmiPrintf("NumAlloc = %d\n", cs->NumAlloc);
+  CmiPrintf("NumFree = %d\n", cs->NumFree);
+  CmiPrintf("NumIntr = %d\n", cs->NumIntr);
+  CmiPrintf("NumIntrCalls = %d\n", cs->NumIntrCalls);
+  CmiPrintf("NumOutsideMc = %d\n", cs->NumOutsideMc);
+  CmiPrintf("NumRetransmits = %d\n", cs->NumRetransmits);
+  CmiPrintf("NumAcksSent = %d\n", cs->NumAcksSent);
+  CmiPrintf("NumUseless = %d\n", cs->NumUseless);
+  CmiPrintf("NumSends = %d\n", cs->NumSends);
+  CmiPrintf("NumEvents = %d\n", cs->NumEvents);
+}
+
+static void outlog_init(outputfile, index) char *outputfile; int index;
+{
+  cmi_state cs = CmiState();
+  char fn[MAXPATHLEN];
+  if (outputfile) {
+    sprintf(fn,outputfile,index);
+    cs->outlog_file = fopen(fn,"w");
+  }
+  else cs->outlog_file = 0;
+}
+
+static void outlog_done()
+{
+  cmi_state cs = CmiState();
+  fclose(cs->outlog_file);
+}
+
+static void outlog_output(buf) char *buf;
+{
+  cmi_state cs = CmiState();
+  if (cs->outlog_file) {
+    fprintf(cs->outlog_file,"%s",buf);
+    fflush(cs->outlog_file);
+  }
+}
+
 
 /*****************************************************************************
  *
@@ -103,8 +309,9 @@ static int NumAlloc, NumFree;
 void *CmiAlloc(size)
 int size;
 {
+  cmi_state cs = CmiState();
   char *res;
-  NumAlloc++;
+  cs->NumAlloc++;
   res =(char *)malloc(size+8);
   if (res==0) KillEveryone("Memory allocation failed.");
   ((int *)res)[0]=size;
@@ -120,7 +327,8 @@ void *blk;
 void CmiFree(blk)
 void *blk;
 {
-  NumFree++;
+  cmi_state cs = CmiState();
+  cs->NumFree++;
   free(((char *)blk)-8);
 }
 
@@ -263,35 +471,13 @@ static int wait_readable(fd, sec) int fd; int sec;
   }
 }
 
-/*****************************************************************************
- *
- * Logging Module
- *
- *****************************************************************************/
-
-static FILE *outlog_file;
-
-static void outlog_init(outputfile, index) char *outputfile; int index;
+static char *DeleteArg(argv)
+char **argv;
 {
-  char fn[MAXPATHLEN];
-  if (outputfile) {
-    sprintf(fn,outputfile,index);
-    outlog_file = fopen(fn,"w");
-  }
-  else outlog_file = 0;
-}
-
-static void outlog_done()
-{
-  fclose(outlog_file);
-}
-
-static void outlog_output(buf) char *buf;
-{
-  if (outlog_file) {
-    fprintf(outlog_file,"%s",buf);
-    fflush(outlog_file);
-  }
+  char *res = argv[0];
+  if (res==0) KillEveryone("Illegal Arglist");
+  while (*argv) { argv[0]=argv[1]; argv++; }
+  return res;
 }
 
 /**************************************************************************
@@ -326,10 +512,6 @@ static void outlog_output(buf) char *buf;
  *
  *
  **************************************************************************/
-
-/* This should depend on the OS. So, this may have to be made a m/c specific 
- constant. Set to the largest value possible, unless eats into memory 
- available significantly */ 
 
 static void skt_server(ppo, pfd)
 unsigned int *ppo;
@@ -448,9 +630,13 @@ unsigned int ip; int port; int seconds;
   return fd;
 }
 
-/*****************************************************************************
+/******************************************************************************
  *
- * Readonly Data
+ * Configuration Data
+ *
+ * This configuration data must be parsed before the CPV/CSV system
+ * is initialized.  Therefore, it must be stored in variables which are
+ * neither CPV or CSV.  We use static variables (informal CSV).
  *
  * Note that the default resend-wait and resend-fail are 10 and 600000
  * milliseconds, respectively. Both are set very high, to
@@ -462,102 +648,70 @@ unsigned int ip; int port; int seconds;
  *
  *****************************************************************************/
 
-static double resend_wait;        /* seconds to wait before re-sending. */
-static double resend_fail;        /* seconds to wait before giving up. */
-static int    Cmi_enableinterrupts;
-static char   Topology;
-static char  *outputfile;
+static int    conf_node_start; /* PE number of first processor in this node */
+static int    conf_node_size;  /* total number of PE's in this node */
+static int    conf_num_pes;    /* total size of machine (same as CmiNumPes) */
+static int    conf_host_IP;
+static int    conf_self_IP;
+static int    conf_host_port;
+static char   conf_host_IP_str[16];
+static char   conf_self_IP_str[16];
+static char   conf_topology;
+static char  *conf_outfile;
+static int    conf_enableinterrupts;
+static double conf_resend_wait;
+static double conf_resend_fail;
 
-CpvDeclare(int, Cmi_mype);
-CpvDeclare(int, Cmi_numpes);
-
-static int    host_IP;
-static char   host_IP_str[16];
-static int    host_port;
-static int    self_IP;
-static char   self_IP_str[16];
-static int    ctrl_port, ctrl_skt;
-static int    data_port, data_skt;
-
-
-#define MAX_NODES 100
-
-typedef struct {
-   int IP;
-   int dataport;
-   int ctrlport;
-} node_info;
-
-/* Information table about host and other nodes. */
-static node_info node_table[MAX_NODES];
-static int       node_table_fill;
-
-static struct sockaddr_in addr_table[MAX_NODES];
-
-static void ParseNetstart()
+static void conf_parse_netstart()
 {
   char *ns;
-  int nread;
+  int nread, rank;
   ns = getenv("NETSTART");
   if (ns==0) goto abort;
-  nread = sscanf(ns, "%d%d%d%d%d",
-     &CpvAccess(Cmi_mype),&CpvAccess(Cmi_numpes),&self_IP,&host_IP,&host_port);
-  if (nread!=5) goto abort;
+  nread = sscanf(ns, "%d%d%d%d%d%d%d",
+		 &conf_node_start, &conf_num_pes, &conf_node_size, &rank,
+		 &conf_self_IP, &conf_host_IP, &conf_host_port);
+  if (nread!=7) goto abort;
+  if (rank!=0) goto abort;
+  sprintf(conf_self_IP_str,"%d.%d.%d.%d",
+	  (conf_self_IP>>24)&0xFF,(conf_self_IP>>16)&0xFF,
+	  (conf_self_IP>>8)&0xFF,conf_self_IP&0xFF);
+  sprintf(conf_host_IP_str,"%d.%d.%d.%d",
+	  (conf_host_IP>>24)&0xFF,(conf_host_IP>>16)&0xFF,
+	  (conf_host_IP>>8)&0xFF,conf_host_IP&0xFF);
   return;
  abort:
   fprintf(stderr,"program not started using 'conv-host' utility. aborting.\n");
   exit(1);
 }
 
-static char *DeleteArg(argv)
+static void conf_extract_args(argv)
 char **argv;
 {
-  char *res = argv[0];
-  if (res==0) KillEveryone("Illegal Arglist");
-  while (*argv) { argv[0]=argv[1]; argv++; }
-  return res;
-}
-
-static void ExtractArgs(argv)
-char **argv;
-{
-  resend_wait =   0.030; /* This could be m/c dependent -- -Sanjay */
-  resend_fail = 600.000;
-  Cmi_enableinterrupts = 1;
-  Topology = 'H';
-  outputfile = NULL;
+  conf_resend_wait =   0.030; /* This could be m/c dependent -- -Sanjay */
+  conf_resend_fail = 600.000;
+  conf_enableinterrupts = 1;
+  conf_topology = 'H';
+  conf_outfile = NULL;
 
   while (*argv) {
     if (strcmp(*argv,"++resend-wait")==0) {
-      DeleteArg(argv); resend_wait = atoi(DeleteArg(argv)) *.001;
+      DeleteArg(argv); conf_resend_wait = atoi(DeleteArg(argv)) *.001;
     } else
     if (strcmp(*argv,"++resend-fail")==0) {
-      DeleteArg(argv); resend_fail = atoi(DeleteArg(argv)) * .001;
+      DeleteArg(argv); conf_resend_fail = atoi(DeleteArg(argv)) * .001;
     } else
     if (strcmp(*argv,"++no-interrupts")==0) {
-      DeleteArg(argv); Cmi_enableinterrupts=0;
+      DeleteArg(argv); conf_enableinterrupts=0;
     } else
     if (strcmp(*argv,"++topology")==0) {
-      DeleteArg(argv); Topology=DeleteArg(argv)[0];
+      DeleteArg(argv); conf_topology=DeleteArg(argv)[0];
     } else
     if (strcmp(*argv,"++outputfile")==0) {
-      DeleteArg(argv); outputfile=DeleteArg(argv);
+      DeleteArg(argv); conf_outfile=DeleteArg(argv);
     } else
     argv++;
   }
-}
-
-static void InitializePorts()
-{
-  skt_datagram(&data_port, &data_skt);
-  skt_server(&ctrl_port, &ctrl_skt);
-  
-  sprintf(self_IP_str,"%d.%d.%d.%d",
-    (self_IP>>24)&0xFF,(self_IP>>16)&0xFF,
-    (self_IP>>8)&0xFF,self_IP&0xFF);
-  sprintf(host_IP_str,"%d.%d.%d.%d",
-    (host_IP>>24)&0xFF,(host_IP>>16)&0xFF,
-    (host_IP>>8)&0xFF,host_IP&0xFF);
 }
 
 /****************************************************************************
@@ -580,11 +734,12 @@ char *cmd; unsigned int ip; unsigned int port; int sec;
 static void KillEveryone(msg)
 char *msg;
 {
+  cmi_state cs = CmiState();
   char buffer[1024]; int i;
   sprintf(buffer,"die %s",msg);
-  KillIndividual(buffer, host_IP, host_port, 30);
-  for (i=0; i<CpvAccess(Cmi_numpes); i++)
-    KillIndividual(buffer, node_table[i].IP, node_table[i].ctrlport, 3);
+  KillIndividual(buffer, conf_host_IP, conf_host_port, 30);
+  for (i=0; i<CmiNumPes(); i++)
+    KillIndividual(buffer, cs->node_table[i].IP, cs->node_table[i].ctrlport,3);
   exit(1);
 }
 
@@ -592,21 +747,22 @@ static void KillEveryoneCode(n)
 int n;
 {
   char buffer[1024];
-  sprintf(buffer,"Internal error #%d (node %d)\n(Contact CHARM developers)\n", n,CpvAccess(Cmi_mype));
+  sprintf(buffer,"Internal error #%d (node %d)\n(Contact CHARM developers)\n",
+	  n,CmiMyPe());
   KillEveryone(buffer);
 }
 
 static void KillOnSegv()
 {
   char buffer[1024];
-  sprintf(buffer, "Node %d: Segmentation fault.\n",CpvAccess(Cmi_mype));
+  sprintf(buffer, "Node %d: Segmentation fault.\n",CmiMyPe());
   KillEveryone(buffer);
 }
 
 static void KillOnIntr()
 {
   char buffer[1000];
-  sprintf(buffer, "Node %d: Interrupted.\n",CpvAccess(Cmi_mype));
+  sprintf(buffer, "Node %d: Interrupted.\n",CmiMyPe());
   KillEveryone(buffer);
 }
 
@@ -640,6 +796,8 @@ static void KillInit()
  *
  ****************************************************************************/
 
+static void node_addresses_store();
+
 static void ctrl_sendone(va_alist) va_dcl
 {
   char buffer[1024];
@@ -649,7 +807,7 @@ static void ctrl_sendone(va_alist) va_dcl
   delay = va_arg(p, int);
   f = va_arg(p, char *);
   vsprintf(buffer, f, p);
-  fd = skt_connect(host_IP, host_port, delay);
+  fd = skt_connect(conf_host_IP, conf_host_port, delay);
   if (fd<0) KillEveryone("cannot contact host");
   writeall(fd, buffer, strlen(buffer));
   shutdown(fd, 1);
@@ -657,20 +815,17 @@ static void ctrl_sendone(va_alist) va_dcl
   close(fd);
 }
 
-static char *scanf_data = 0;
-static int all_done = 0;
-static void node_addresses_store();
-
 static void ctrl_getone()
 {
+  cmi_state cs = CmiState();
   char line[10000];
   int ok, ip, port, fd;  FILE *f;
-  skt_accept(ctrl_skt, &ip, &port, &fd);
+  skt_accept(cs->ctrl_skt, &ip, &port, &fd);
   f = fdopen(fd,"r");
   while (fgets(line, 9999, f)) {
     if      (strncmp(line,"aval addr ",10)==0) node_addresses_store(line);
-    else if (strncmp(line,"aval done ",10)==0) all_done = 1;
-    else if (strncmp(line,"scanf-data ",11)==0) scanf_data=strdupl(line+11);
+    else if (strncmp(line,"aval done ",10)==0) cs->all_done = 1;
+    else if (strncmp(line,"scanf-data ",11)==0)cs->scanf_data=strdupl(line+11);
     else if (strncmp(line,"die ",4)==0) {
       fprintf(stderr,"aborting: %s\n",line+4);
       exit(0);
@@ -705,12 +860,13 @@ static void ctrl_getone()
 
 static void node_addresses_receive()
 {
+  cmi_state cs = CmiState();
   ctrl_sendone(120, "aset addr %d %s.%d.%d\n",
-         CpvAccess(Cmi_mype), self_IP_str, ctrl_port, data_port);
+         CmiMyPe(), conf_self_IP_str, cs->ctrl_port, cs->data_port);
   ctrl_sendone(120, "aget %s %d addr 0 %d\n",
-    self_IP_str,ctrl_port,CpvAccess(Cmi_numpes)-1);
-  while (node_table_fill != CpvAccess(Cmi_numpes)) {
-    if (wait_readable(ctrl_skt, 300)<0)
+    conf_self_IP_str,cs->ctrl_port,CmiNumPes()-1);
+  while (cs->node_table_fill != CmiNumPes()) {
+    if (wait_readable(cs->ctrl_skt, 300)<0)
       { perror("waiting for data"); KillEveryoneCode(21323); }
     ctrl_getone();
   }
@@ -718,30 +874,32 @@ static void node_addresses_receive()
 
 static void node_addresses_store(addrs) char *addrs;
 {
+  cmi_state cs = CmiState();
   char *p, *e; int i, lo, hi;
   if (strncmp(addrs,"aval addr ",10)!=0) KillEveryoneCode(83473);
   p = skipblanks(addrs+10);
   p = readint(p,&lo);
   p = readint(p,&hi);
-  if ((lo!=0)||(hi!=CpvAccess(Cmi_numpes)-1)) KillEveryoneCode(824793);
-  for (i=0; i<CpvAccess(Cmi_numpes); i++) {
-    unsigned int ip0,ip1,ip2,ip3,cport,dport;
+  if ((lo!=0)||(hi!=CmiNumPes()-1)) KillEveryoneCode(824793);
+  for (i=0; i<CmiNumPes(); i++) {
+    unsigned int ip0,ip1,ip2,ip3,cport,dport,ip;
     p = readint(p,&ip0);
     p = readint(p,&ip1);
     p = readint(p,&ip2);
     p = readint(p,&ip3);
     p = readint(p,&cport);
     p = readint(p,&dport);
-    node_table[i].IP = (ip0<<24)+(ip1<<16)+(ip2<<8)+ip3;
-    node_table[i].ctrlport = cport;
-    node_table[i].dataport = dport;
-    addr_table[i].sin_family      = AF_INET;
-    addr_table[i].sin_port        = htons(dport);
-    addr_table[i].sin_addr.s_addr = htonl(node_table[i].IP);
+    ip = (ip0<<24)+(ip1<<16)+(ip2<<8)+ip3;
+    cs->node_table[i].IP = ip;
+    cs->node_table[i].ctrlport = cport;
+    cs->node_table[i].dataport = dport;
+    cs->node_table[i].addr.sin_family      = AF_INET;
+    cs->node_table[i].addr.sin_port        = htons(dport);
+    cs->node_table[i].addr.sin_addr.s_addr = htonl(ip);
   }
   p = skipblanks(p);
   if (*p!=0) KillEveryoneCode(82283);
-  node_table_fill = CpvAccess(Cmi_numpes);
+  cs->node_table_fill = CmiNumPes();
 }
 
 /*****************************************************************************
@@ -749,6 +907,7 @@ static void node_addresses_store(addrs) char *addrs;
  * CmiPrintf, CmiError, CmiScanf
  *
  *****************************************************************************/
+
 static void InternalPrintf(f, l) char *f; va_list l;
 {
   char *p, *buf;
@@ -791,6 +950,7 @@ static int InternalScanf(fmt, l)
     char *fmt;
     va_list l;
 {
+  cmi_state cs = CmiState();
   static int CmiProbe();
   char *ptr[20];
   char *p; int nargs, i;
@@ -804,14 +964,14 @@ static int InternalScanf(fmt, l)
   }
   if (nargs > 18) KillEveryone("CmiScanf only does 18 args.\n");
   for (i=0; i<nargs; i++) ptr[i]=va_arg(l, char *);
-  ctrl_sendone(120, "scanf %s %d %s", self_IP_str, ctrl_port, fmt);
-  while (scanf_data==0) CmiProbe();
-  i = sscanf(scanf_data, fmt,
+  ctrl_sendone(120, "scanf %s %d %s", conf_self_IP_str, cs->ctrl_port, fmt);
+  while (cs->scanf_data==0) CmiProbe();
+  i = sscanf(cs->scanf_data, fmt,
          ptr[ 0], ptr[ 1], ptr[ 2], ptr[ 3], ptr[ 4], ptr[ 5],
          ptr[ 6], ptr[ 7], ptr[ 8], ptr[ 9], ptr[10], ptr[11],
          ptr[12], ptr[13], ptr[14], ptr[15], ptr[16], ptr[17]);
-  CmiFree(scanf_data);
-  scanf_data=0;
+  CmiFree(cs->scanf_data);
+  cs->scanf_data=0;
   return i;
 }
 
@@ -835,29 +995,6 @@ int CmiScanf(va_alist) va_dcl
 
 
 /*****************************************************************************
- *
- * Statistics Variables
- *
- *****************************************************************************/
-
-static int NumIntr;
-
-static int NumIntrCalls;
-static int NumOutsideMc;
-static int NumRetransmits;
-static int NumAcksSent;
-static int NumUseless;
-static int NumSends;
-static unsigned int NumEvents;
-
-CmiNetPrintUdpStatistics()
-{
-  CmiPrintf("[%d]: NumIntr= %d, NumRetransmits= %d, NumAcksSent= %d, NumSends= %d\n",
-    CmiMyPe(), NumIntr, NumRetransmits, NumAcksSent, NumSends);
-  CmiPrintf("[%d]: NumAlloc = %d, NumFree = %d NumEvents=%u\n", CmiMyPe(), NumAlloc, NumFree, NumEvents);
-}
-
-/*****************************************************************************
  *                                                                           
  * Neighbour-Lookup functions.                                               
  *                                                                           
@@ -873,13 +1010,12 @@ int node;
   bit = 1;
   while (1) {
     int neighbour = node ^ bit;
-    if (neighbour < CpvAccess(Cmi_numpes)) count++;
+    if (neighbour < CmiNumPes()) count++;
     bit = bit<<1; 
-    if (bit > CpvAccess(Cmi_numpes)) break;
+    if (bit > CmiNumPes()) break;
   }
   return count;
 }
- 
  
 int CmiGetNodeNeighbours(node, neighbours)
 int node, *neighbours;
@@ -888,13 +1024,12 @@ int node, *neighbours;
   bit = 1;
   while (1) {
     int neighbour = node ^ bit;
-    if (neighbour < CpvAccess(Cmi_numpes)) neighbours[count++] = neighbour;
+    if (neighbour < CmiNumPes()) neighbours[count++] = neighbour;
     bit = bit<<1; 
-    if (bit > CpvAccess(Cmi_numpes)) break;
+    if (bit > CmiNumPes()) break;
   }
   return count;
 }
- 
  
 int CmiNeighboursIndex(node, nbr)
 int node, nbr;
@@ -903,119 +1038,12 @@ int node, nbr;
   bit = 1;
   while (1) {
     int neighbour = node ^ bit;
-    if (neighbour < CpvAccess(Cmi_numpes)) { if (nbr==neighbour) return count; count++; }
+    if (neighbour < CmiNumPes()) { if (nbr==neighbour) return count; count++; }
     bit = bit<<=1; 
-    if (bit > CpvAccess(Cmi_numpes)) break;
+    if (bit > CmiNumPes()) break;
   }
   return(-1);
 }
-
-/*****************************************************************************
- *
- * Datagram Transmission Definitions
- *
- *****************************************************************************/
-
-/* Types of messages. */
-
-# define SEND  1
-# define ACK  2
-
-typedef unsigned char BYTE;
-
-/* In bytes.  Make sure this is greater than zero! */
-/* Works out to be about 2018 bytes. */
-
-# define MAXDSIZE (CMK_DGRAM_MAX_SIZE - sizeof(DATA_HDR))
-
-/* Format of the header sent with each fragment. */
-typedef struct DATA_HDR
-{
-  unsigned int seq_num;   /* Sequence Number */
-  unsigned int PeNum;     /* always penum of the originator*/
-  unsigned int pktidx;    /* Index of packet within message */
-  unsigned int rem_size;  /*Size of remaining message including this packet*/
-                          /*If this is zero, it is ACK otherwise SEND */
-}
-DATA_HDR;
-
-/* Header combined with data fragment. */
-typedef struct msgspace
-{
-  DATA_HDR hd;
-  char data[MAXDSIZE];
-}
-msgspace;
-
-typedef struct
-{
-  DATA_HDR        *packet;
-  unsigned int     seq_num;
-  double           send_time;
-}
-WindowElement;
-
-typedef struct pkt_queue_elem
-{
-  DATA_HDR *packet;
-  struct pkt_queue_elem *nextptr;
-}
-PacketQueueElem;
-
-typedef struct msg_queue_elem
-{
-  char *mesg;
-  struct msg_queue_elem *nextptr;
-}
-MsgQueueElem;
-
-typedef struct new_msg
-{
-  int numpackets;
-  int numfrags;
-  char *mesg;
-}
-NewMessage;
-
-
-#define MAX_SEQ_NUM 0xFFFFFFFF     /* 2^32 - 1 */
-
-static int free_ack=0;
-static int free_send=0;
-static int alloc_ack=0;
-static int alloc_send=0;
-
-static int Communication_init;  /* Communication set up yet? */
-
-
-static WindowElement **send_window;       /* packets awaiting acks  */
-
-static PacketQueueElem **transmit_head;   /* packets awaiting transmission */
-static PacketQueueElem **transmit_tail; 
-                
-
-static int *first_window_index;     
-static int *last_window_index;     
-static int *cur_window_size;
-static unsigned int  *next_seq_num;
-static int *timeout_factor ;
-
-static WindowElement **recv_window;    /* packets awaiting acks  */
-
-static int *next_window_index;         /* index of 1st entry in recv window */
-static unsigned int *expected_seq_num; /* next sequence number expected */
-
-static NewMessage *recd_messages;
-
-static int *needack;
-
-static DATA_HDR ack;
-
-static MsgQueueElem *recd_msg_head, *recd_msg_tail;
-
-CpvDeclare(void *,CmiLocalQueue);
-
-static double CmiNow;
 
 /****************************************************************************/
 /* ROUTINES FOR SENDING/RECEIVING MESSAGES
@@ -1041,15 +1069,16 @@ static void send_ack(packet,penum)
      DATA_HDR *packet; 
      int penum;
 {
-  NumSends++;
+  cmi_state cs = CmiState();
+  cs->NumSends++;
 #if CMK_IS_HETERO
   packet->seq_num = htonl(packet->seq_num);
   packet->PeNum = htonl(packet->PeNum);
   packet->pktidx = htonl(packet->pktidx);
   packet->rem_size = htonl(packet->rem_size);
 #endif
-  my_sendto(data_skt, (char *)packet, sizeof(DATA_HDR), 0, 
-    (struct sockaddr *)&addr_table[penum],
+  my_sendto(cs->data_skt, (char *)packet, sizeof(DATA_HDR), 0, 
+    (struct sockaddr *)&(cs->node_table[penum].addr),
     sizeof(struct sockaddr_in));
 }
 
@@ -1083,37 +1112,41 @@ static void send_ack(packet,penum)
       
 static void SendWindowInit()
 {
+  cmi_state cs = CmiState();
+  int mype = CmiMyPe();
+  int numpe = CmiNumPes();
   int i,j;
-  int numpe = CpvAccess(Cmi_numpes);
-  int mype = CpvAccess(Cmi_mype);
 
-  send_window = (WindowElement **)CmiAlloc(numpe*sizeof(WindowElement *));
-  transmit_head=(PacketQueueElem **)CmiAlloc(numpe*sizeof(PacketQueueElem *));
-  transmit_tail=(PacketQueueElem **)CmiAlloc(numpe*sizeof(PacketQueueElem *));
-  first_window_index = (int *) CmiAlloc(numpe*sizeof(int));
-  last_window_index = (int *) CmiAlloc(numpe * sizeof(int));
-  cur_window_size = (int *) CmiAlloc(numpe * sizeof(int));
-  next_seq_num = (unsigned int  *) CmiAlloc(numpe * sizeof(unsigned int ));
-  timeout_factor = (int *)CmiAlloc(numpe * sizeof(int)) ;
+  cs->send_window=(WindowElement **)CmiAlloc(numpe*sizeof(WindowElement *));
+  cs->transmit_head=
+    (PacketQueueElem **)CmiAlloc(numpe*sizeof(PacketQueueElem *));
+  cs->transmit_tail=
+    (PacketQueueElem **)CmiAlloc(numpe*sizeof(PacketQueueElem *));
+  cs->first_window_index = (int *)CmiAlloc(numpe*sizeof(int));
+  cs->last_window_index = (int *)CmiAlloc(numpe*sizeof(int));
+  cs->cur_window_size = (int *) CmiAlloc(numpe * sizeof(int));
+  cs->next_seq_num = (unsigned int  *) CmiAlloc(numpe * sizeof(unsigned int ));
+  cs->timeout_factor = (int *)CmiAlloc(numpe * sizeof(int)) ;
 
   for (i = 0; i < numpe; i++) {
     if (i != mype) {
-       send_window[i]=(WindowElement *)CmiAlloc(CMK_DGRAM_WINDOW_SIZE*sizeof(WindowElement));
+      cs->send_window[i]=
+	(WindowElement *)CmiAlloc(CMK_DGRAM_WINDOW_SIZE*sizeof(WindowElement));
       for (j = 0; j < CMK_DGRAM_WINDOW_SIZE; j++) {
-        send_window[i][j].packet = NULL;
-        send_window[i][j].seq_num = 0;
-        send_window[i][j].send_time = 0.0;
+        cs->send_window[i][j].packet = NULL;
+        cs->send_window[i][j].seq_num = 0;
+        cs->send_window[i][j].send_time = 0.0;
       }
     }
-    else send_window[i] = NULL;  /* never used */
+    else cs->send_window[i] = NULL;  /* never used */
 
-    first_window_index[i] = 0;
-    last_window_index[i] = 0;
-    cur_window_size[i] = 0;
-    next_seq_num[i] = 0;
-    transmit_head[i] = NULL;
-    transmit_tail[i] = NULL;
-    timeout_factor[i] = 1 ;
+    cs->first_window_index[i] = 0;
+    cs->last_window_index[i] = 0;
+    cs->cur_window_size[i] = 0;
+    cs->next_seq_num[i] = 0;
+    cs->transmit_head[i] = NULL;
+    cs->transmit_tail[i] = NULL;
+    cs->timeout_factor[i] = 1 ;
   }
 }
 
@@ -1123,16 +1156,17 @@ static void InsertInTransmitQueue(packet, destpe)
 DATA_HDR *packet;
 int destpe;
 {
+  cmi_state cs = CmiState();
   PacketQueueElem *newelem;
 
   newelem = (PacketQueueElem *) CmiAlloc(sizeof(PacketQueueElem));
   newelem->packet = packet;
   newelem->nextptr = NULL;
-  if  (transmit_tail[destpe] == NULL)
-    transmit_head[destpe] = newelem;
+  if  (cs->transmit_tail[destpe] == NULL)
+    cs->transmit_head[destpe] = newelem;
   else 
-    transmit_tail[destpe]->nextptr = newelem;
-  transmit_tail[destpe] = newelem;
+    cs->transmit_tail[destpe]->nextptr = newelem;
+  cs->transmit_tail[destpe] = newelem;
 }
 
 
@@ -1142,15 +1176,16 @@ int destpe;
 static DATA_HDR *GetTransmitPacket(destpe)
 int destpe;
 {
+  cmi_state cs = CmiState();
   PacketQueueElem *elem;
   DATA_HDR *packet;
 
-  if  (transmit_head[destpe] == NULL)
+  if  (cs->transmit_head[destpe] == NULL)
     return NULL;
-  elem = transmit_head[destpe];
-  transmit_head[destpe] = transmit_head[destpe]->nextptr;
-  if (transmit_head[destpe] == NULL)
-    transmit_tail[destpe] = NULL;
+  elem = cs->transmit_head[destpe];
+  cs->transmit_head[destpe] = cs->transmit_head[destpe]->nextptr;
+  if (cs->transmit_head[destpe] == NULL)
+    cs->transmit_tail[destpe] = NULL;
   packet = elem->packet;
   CmiFree(elem);
   return packet;
@@ -1165,36 +1200,39 @@ static int AddToSendWindow(packet, destpe)
 DATA_HDR *packet;
 int destpe;
 {
-  send_window[destpe][last_window_index[destpe]].packet =  packet;
-  send_window[destpe][last_window_index[destpe]].seq_num = next_seq_num[destpe];
-  send_window[destpe][last_window_index[destpe]].send_time = CmiNow;
-  packet->seq_num = next_seq_num[destpe];
-  next_seq_num[destpe]++;
-  last_window_index[destpe] = (last_window_index[destpe] + 1) % CMK_DGRAM_WINDOW_SIZE;
-  cur_window_size[destpe]++;
+  cmi_state cs = CmiState();
+  int lwi = cs->last_window_index[destpe];
+  cs->send_window[destpe][lwi].packet = packet;
+  cs->send_window[destpe][lwi].seq_num = cs->next_seq_num[destpe];
+  cs->send_window[destpe][lwi].send_time = cs->CmiNow;
+  packet->seq_num = cs->next_seq_num[destpe];
+  cs->next_seq_num[destpe]++;
+  cs->last_window_index[destpe] = (lwi + 1) % CMK_DGRAM_WINDOW_SIZE;
+  cs->cur_window_size[destpe]++;
   return 1;
 }
 
 static SendPackets(destpe)
 int destpe;
 {
+  cmi_state cs = CmiState();
   DATA_HDR *GetTransmitPacket();
   DATA_HDR *packet;
   int bytes_sent;
   unsigned int act_size;
   int i;
 
-  CmiNow = CmiWallTimer();
-  while (cur_window_size[destpe] < CMK_DGRAM_WINDOW_SIZE &&
+  cs->CmiNow = CmiWallTimer();
+  while (cs->cur_window_size[destpe] < CMK_DGRAM_WINDOW_SIZE &&
      ((packet = GetTransmitPacket(destpe)) != NULL))
   {
     AddToSendWindow(packet, destpe);
     TRACE(CmiPrintf("Node %d: sending packet seq_num=%d, rem_size=%d\n",
-           CpvAccess(Cmi_mype),
+           CmiMyPe(),
            packet->seq_num, 
            ntohl(packet->rem_size)));
-
-    NumSends++ ;
+    
+    cs->NumSends++ ;
     act_size=(packet->rem_size<MAXDSIZE)?packet->rem_size:MAXDSIZE;
 #if CMK_IS_HETERO
     packet->seq_num = htonl(packet->seq_num);
@@ -1202,9 +1240,9 @@ int destpe;
     packet->pktidx = htonl(packet->pktidx);
     packet->rem_size = htonl(packet->rem_size);
 #endif
-    bytes_sent = my_sendto(data_skt, (char *)packet,
+    bytes_sent = my_sendto(cs->data_skt, (char *)packet,
           act_size + sizeof(DATA_HDR),
-          0, (struct sockaddr *)&addr_table[destpe],
+          0, (struct sockaddr *)&(cs->node_table[destpe].addr),
           sizeof(struct sockaddr_in));
   }
 }
@@ -1216,33 +1254,34 @@ static UpdateSendWindow(ack, sourcepe)
 DATA_HDR *ack;
 int sourcepe;
 {
+  cmi_state cs = CmiState();
   int i, index, found, count;
   DATA_HDR *PacketsToBeFreed[CMK_DGRAM_WINDOW_SIZE];
 
-  if (cur_window_size[sourcepe] == 0)  /* empty window */
+  if (cs->cur_window_size[sourcepe] == 0)  /* empty window */
     return;
 
-  index = first_window_index[sourcepe];
+  index = cs->first_window_index[sourcepe];
   found = 0;
   count = 0;
-  while (count < cur_window_size[sourcepe] && !found) 
+  while (count < cs->cur_window_size[sourcepe] && !found) 
   {
-    found = (send_window[sourcepe][index].seq_num == ack->seq_num);
+    found = (cs->send_window[sourcepe][index].seq_num == ack->seq_num);
     index = (index + 1) % CMK_DGRAM_WINDOW_SIZE;
     count++;
   }
   if (found) {
     TRACE(CmiPrintf("Node %d: received ack with seq_num %d\n",
-           CpvAccess(Cmi_mype), ack->seq_num)); 
-    index = first_window_index[sourcepe];
+           CmiMyPe(), ack->seq_num)); 
+    index = cs->first_window_index[sourcepe];
     for (i = 0; i < count; i++)
     {
-      PacketsToBeFreed[i] = send_window[sourcepe][index].packet;
-      send_window[sourcepe][index].packet = NULL;
+      PacketsToBeFreed[i] = cs->send_window[sourcepe][index].packet;
+      cs->send_window[sourcepe][index].packet = NULL;
       index = (index + 1) % CMK_DGRAM_WINDOW_SIZE;
     }
-    first_window_index[sourcepe] = index;
-    cur_window_size[sourcepe] -= count;
+    cs->first_window_index[sourcepe] = index;
+    cs->cur_window_size[sourcepe] -= count;
   }
   SendPackets(sourcepe);   /* any untransmitted pkts */
   if(found)
@@ -1257,23 +1296,24 @@ int sourcepe;
 
 static int RetransmitPackets()
 {
+  cmi_state cs = CmiState();
   int i, index, fnord, act_size;
   DATA_HDR *packet;
   int sending=0;
 
-  CmiNow = CmiWallTimer();
-  for (i = 0; i < CpvAccess(Cmi_numpes); i++) {
-    index = first_window_index[i];
-    if (cur_window_size[i] > 0) {
+  cs->CmiNow = CmiWallTimer();
+  for (i = 0; i < CmiNumPes(); i++) {
+    index = cs->first_window_index[i];
+    if (cs->cur_window_size[i] > 0) {
       sending = 1;
-      if ((CmiNow - send_window[i][index].send_time) > 
-          (resend_wait * timeout_factor[i])) {
-        if (resend_wait * timeout_factor[i] > resend_fail) {
+      if ((cs->CmiNow - cs->send_window[i][index].send_time) > 
+          (conf_resend_wait * cs->timeout_factor[i])) {
+        if (conf_resend_wait * cs->timeout_factor[i] > conf_resend_fail) {
           KillEveryone("retransmission failed, timeout.");
         }
-        packet = send_window[i][index].packet;
-        NumRetransmits++ ;
-        NumSends++;
+        packet = cs->send_window[i][index].packet;
+        cs->NumRetransmits++;
+        cs->NumSends++;
         act_size=(packet->rem_size<MAXDSIZE)?packet->rem_size:MAXDSIZE;
 #if CMK_IS_HETERO
         packet->seq_num = htonl(packet->seq_num);
@@ -1281,10 +1321,11 @@ static int RetransmitPackets()
         packet->pktidx = htonl(packet->pktidx);
         packet->rem_size = htonl(packet->rem_size);
 #endif
-        my_sendto(data_skt, (char *)packet,
-            act_size + sizeof(DATA_HDR), 0, (struct sockaddr *)&addr_table[i],
-            sizeof(struct sockaddr_in)); 
-        send_window[i][index].send_time = CmiNow;
+        my_sendto(cs->data_skt, (char *)packet,
+            act_size + sizeof(DATA_HDR), 0,
+	    (struct sockaddr *)&(cs->node_table[i].addr),
+	    sizeof(struct sockaddr_in)); 
+        cs->send_window[i][index].send_time = cs->CmiNow;
       }
     }
   }
@@ -1314,39 +1355,41 @@ static int RetransmitPackets()
 
 static RecvWindowInit()
 {
+  cmi_state cs = CmiState();
+  int numpe = CmiNumPes();
+  int mype = CmiMyPe();
   int i,j;
-  int numpe = CpvAccess(Cmi_numpes);
-  int mype = CpvAccess(Cmi_mype);
 
-  recv_window = (WindowElement **) CmiAlloc(numpe * sizeof(WindowElement *));
-  next_window_index = (int *) CmiAlloc(numpe * sizeof(int));
-  expected_seq_num = (unsigned int *) CmiAlloc(numpe * sizeof(unsigned int));
-  recd_messages = (NewMessage *) CmiAlloc(numpe * sizeof(NewMessage));
-  needack = (int *) CmiAlloc(numpe * sizeof(int));
+  cs->recv_window = (WindowElement **)CmiAlloc(numpe*sizeof(WindowElement *));
+  cs->next_window_index = (int *) CmiAlloc(numpe*sizeof(int));
+  cs->expected_seq_num = (unsigned int *)CmiAlloc(numpe*sizeof(unsigned int));
+  cs->recd_messages = (NewMessage *)CmiAlloc(numpe * sizeof(NewMessage));
+  cs->needack = (int *) CmiAlloc(numpe * sizeof(int));
   for (i = 0; i < numpe; i++) {
     if (i != mype) {
-      recv_window[i]=(WindowElement *)CmiAlloc(CMK_DGRAM_WINDOW_SIZE*sizeof(WindowElement));
+      cs->recv_window[i]=
+	(WindowElement *)CmiAlloc(CMK_DGRAM_WINDOW_SIZE*sizeof(WindowElement));
       for (j = 0; j < CMK_DGRAM_WINDOW_SIZE; j++) {
-        recv_window[i][j].packet = NULL;
-        recv_window[i][j].seq_num = 0;
-        recv_window[i][j].send_time = 0.0;
+        cs->recv_window[i][j].packet = NULL;
+        cs->recv_window[i][j].seq_num = 0;
+        cs->recv_window[i][j].send_time = 0.0;
       }
     }
     else 
-      recv_window[i] = NULL;  /* never used */
+      cs->recv_window[i] = NULL;  /* never used */
 
-    next_window_index[i] = 0;
-    expected_seq_num[i] = 0;
-    recd_messages[i].numpackets = 0;
-    recd_messages[i].numfrags = 0;
-    recd_messages[i].mesg = NULL;
-    needack[i] = 0;
+    cs->next_window_index[i] = 0;
+    cs->expected_seq_num[i] = 0;
+    cs->recd_messages[i].numpackets = 0;
+    cs->recd_messages[i].numfrags = 0;
+    cs->recd_messages[i].mesg = NULL;
+    cs->needack[i] = 0;
   }
-  recd_msg_head = NULL;
-  recd_msg_tail = NULL;
+  cs->recd_msg_head = NULL;
+  cs->recd_msg_tail = NULL;
 
-  ack.PeNum = CpvAccess(Cmi_mype);
-  ack.rem_size = 0;
+  cs->ack.PeNum = CmiMyPe();
+  cs->ack.rem_size = 0;
 }
 
 
@@ -1362,9 +1405,11 @@ static int AddToReceiveWindow(packet, sourcepe)
      DATA_HDR *packet;
      int sourcepe;
 {
+  cmi_state cs = CmiState();
   int index;
   unsigned int seq_num = packet->seq_num;
-  unsigned int last_seq_num = expected_seq_num[sourcepe] + CMK_DGRAM_WINDOW_SIZE - 1;
+  unsigned int last_seq_num =
+    cs->expected_seq_num[sourcepe] + CMK_DGRAM_WINDOW_SIZE - 1;
 
   /* 
      Note that seq_num cannot be > last_seq_num.
@@ -1374,24 +1419,24 @@ static int AddToReceiveWindow(packet, sourcepe)
      which is a contradiction
    */
 
-  if (expected_seq_num[sourcepe] < last_seq_num) {
-    if (seq_num < expected_seq_num[sourcepe]) {
+  if (cs->expected_seq_num[sourcepe] < last_seq_num) {
+    if (seq_num < cs->expected_seq_num[sourcepe]) {
       CmiFree(packet);  /* already received */
-      needack[sourcepe] = 1;
-      NumUseless++ ;
+      cs->needack[sourcepe] = 1;
+      cs->NumUseless++ ;
       return 0;
     }
     else {
-      index = (next_window_index[sourcepe] + 
-      seq_num - expected_seq_num[sourcepe]) % CMK_DGRAM_WINDOW_SIZE;
+      index = (cs->next_window_index[sourcepe] + 
+      seq_num - cs->expected_seq_num[sourcepe]) % CMK_DGRAM_WINDOW_SIZE;
       /* put needack and NumUseless++ here ??? */
-      if (recv_window[sourcepe][index].packet) 
+      if (cs->recv_window[sourcepe][index].packet) 
         CmiFree(packet);
       else {
-        recv_window[sourcepe][index].packet = packet;
-        recv_window[sourcepe][index].seq_num = seq_num;
+        cs->recv_window[sourcepe][index].packet = packet;
+        cs->recv_window[sourcepe][index].seq_num = seq_num;
         TRACE(CmiPrintf("Node %d: Inserting packet %d at index %d in recv window\n",
-               CpvAccess(Cmi_mype),
+               CmiMyPe(),
                seq_num, index)); 
       }
     }
@@ -1408,15 +1453,17 @@ static int AddToReceiveWindow(packet, sourcepe)
 static DATA_HDR *ExtractNextPacket(sourcepe)
      int sourcepe;
 {
+  cmi_state cs = CmiState();
   DATA_HDR *packet;
-  int index = next_window_index[sourcepe];
+  int index = cs->next_window_index[sourcepe];
 
-  packet = recv_window[sourcepe][index].packet;
+  packet = cs->recv_window[sourcepe][index].packet;
   if (packet != NULL) {
-    recv_window[sourcepe][index].packet = NULL;
-    needack[sourcepe] = 1;
-    expected_seq_num[sourcepe]++;
-    next_window_index[sourcepe]=(next_window_index[sourcepe] + 1) % CMK_DGRAM_WINDOW_SIZE;
+    cs->recv_window[sourcepe][index].packet = NULL;
+    cs->needack[sourcepe] = 1;
+    cs->expected_seq_num[sourcepe]++;
+    cs->next_window_index[sourcepe]=
+      (cs->next_window_index[sourcepe] + 1) % CMK_DGRAM_WINDOW_SIZE;
   }
   return packet;
 }
@@ -1427,31 +1474,33 @@ static DATA_HDR *ExtractNextPacket(sourcepe)
 static InsertInMessageQueue(mesg)
      char *mesg;
 {
+  cmi_state cs = CmiState();
   MsgQueueElem *newelem;
 
   newelem = (MsgQueueElem *) CmiAlloc(sizeof(MsgQueueElem));
   newelem->mesg = mesg;
   newelem->nextptr = NULL;
-  if  (recd_msg_tail == NULL)
-    recd_msg_head = newelem;
+  if  (cs->recd_msg_tail == NULL)
+    cs->recd_msg_head = newelem;
   else 
-    recd_msg_tail->nextptr = newelem;
-  recd_msg_tail = newelem;
+    cs->recd_msg_tail->nextptr = newelem;
+  cs->recd_msg_tail = newelem;
 }
 
 
 static void ConstructMessages()
 {
+  cmi_state cs = CmiState();
   int i;
   DATA_HDR *packet;
   DATA_HDR *ExtractNextPacket();
   NewMessage *msg;
   unsigned int numfrags, msglength, rsize, offset;
 
-  TRACE(CmiPrintf("Node %d: in ConstructMessages().\n",CpvAccess(Cmi_mype)));
-  for (i=0; i < CpvAccess(Cmi_numpes); i++) {
-    if (i != CpvAccess(Cmi_mype)) {
-      msg = &recd_messages[i];
+  TRACE(CmiPrintf("Node %d: in ConstructMessages().\n",CmiMyPe()));
+  for (i=0; i < CmiNumPes(); i++) {
+    if (i != CmiMyPe()) {
+      msg = cs->recd_messages+i;
       packet = ExtractNextPacket(i);
       while (packet != NULL) {
         offset = packet->pktidx*MAXDSIZE;
@@ -1480,29 +1529,30 @@ static void ConstructMessages()
 
 static void AckReceivedMsgs()
 {
+  cmi_state cs = CmiState();
   int i;
-  for (i = 0; i < CpvAccess(Cmi_numpes); i++) {
-    if (needack[i])  {
-      needack[i] = 0;
-      ack.seq_num = expected_seq_num[i] - 1;
-      if (CpvAccess(Cmi_mype) < CpvAccess(Cmi_numpes))
+  for (i = 0; i < CmiNumPes(); i++) {
+    if (cs->needack[i])  {
+      cs->needack[i] = 0;
+      cs->ack.seq_num = cs->expected_seq_num[i] - 1;
+      if (CmiMyPe() < CmiNumPes())
         TRACE(CmiPrintf("Node %d: acking seq_num %d on window %d\n",
-            CpvAccess(Cmi_mype), ack.seq_num, i)); 
-      NumAcksSent++ ;
-      ack.seq_num = ack.seq_num;
-      send_ack(&ack,i);
+            CmiMyPe(), ack.seq_num, i)); 
+      cs->NumAcksSent++ ;
+      cs->ack.seq_num = cs->ack.seq_num;
+      send_ack(&(cs->ack),i);
     }
   }
 }
 
-#define shift(root, num) ((num+total-root)%CpvAccess(Cmi_numpes))
-#define unshift(root, num) ((num+root)%CpvAccess(Cmi_numpes))
+#define shift(root, num) ((num+total-root)%CmiNumPes())
+#define unshift(root, num) ((num+root)%CmiNumPes())
 
 static void my_children(root, pchild1, pchild2)
     int root, *pchild1, *pchild2;
 {
-  int mynum = CpvAccess(Cmi_mype);
-  int total = CpvAccess(Cmi_numpes);
+  int mynum = CmiMyPe();
+  int total = CmiNumPes();
   int p1, p2;
 
   mynum = shift(root, mynum);
@@ -1520,6 +1570,7 @@ static void my_children(root, pchild1, pchild2)
 
 static int data_getone()
 {
+  cmi_state cs = CmiState();
   msgspace *recv_buf=NULL;
   struct sockaddr_in src;
   int i, srclen=sizeof(struct sockaddr_in);
@@ -1528,7 +1579,7 @@ static int data_getone()
   int n;
 
   recv_buf = (msgspace *)CmiAlloc(CMK_DGRAM_MAX_SIZE);
-  do n=recvfrom(data_skt,(char *)recv_buf,CMK_DGRAM_MAX_SIZE,0,(struct sockaddr *)&src,&srclen);
+  do n=recvfrom(cs->data_skt,(char *)recv_buf,CMK_DGRAM_MAX_SIZE,0,(struct sockaddr *)&src,&srclen);
   while ((n<0)&&(errno==EINTR));
   if (n<0) { KillEveryone(strerror(errno)); }
   recv_buf->hd.seq_num = ntohl(recv_buf->hd.seq_num);
@@ -1540,65 +1591,66 @@ static int data_getone()
     UpdateSendWindow(recv_buf, (int) recv_buf->hd.PeNum);
     CmiFree(recv_buf);
   } else if (kind == SEND) {
-	 /*Milind*/
-	 if(recv_buf->hd.PeNum & (1<<31)) {
-		int root, srcnode, d1, d2;
-		msgspace *m1=NULL, *m2=NULL;
+    /*Milind*/
+    if(recv_buf->hd.PeNum & (1<<31)) {
+      int root, srcnode, d1, d2;
+      msgspace *m1=NULL, *m2=NULL;
       
-		root = (recv_buf->hd.PeNum >> 16) & (~(1<<15));
-		srcnode = (recv_buf->hd.PeNum ^ (root<<16)) & (~(1<<31));
-		my_children(root, &d1, &d2);
-		if(d1!=(-1)){
-		  int tmp = recv_buf->hd.PeNum;
-		  m1 = (msgspace *)CmiAlloc(CMK_DGRAM_MAX_SIZE);
-		  memcpy(m1, recv_buf, CMK_DGRAM_MAX_SIZE);
-		  tmp = ((tmp >> 16) << 16) | CpvAccess(Cmi_mype);
-		  m1->hd.PeNum = tmp;
-                  InsertInTransmitQueue(m1, d1);
-		  SendPackets(d1);
-		}
-		if(d2!=(-1)){
-		  int tmp = recv_buf->hd.PeNum;
-		  m2 = (msgspace *)CmiAlloc(CMK_DGRAM_MAX_SIZE);
-		  memcpy(m2, recv_buf, CMK_DGRAM_MAX_SIZE);
-		  tmp = ((tmp >> 16) << 16) | CpvAccess(Cmi_mype);
-		  m2->hd.PeNum = tmp;
-                  InsertInTransmitQueue(m2, d2);
-		  SendPackets(d2);
-		}
-		recv_buf->hd.PeNum = srcnode;
-      sender = node_table + recv_buf->hd.PeNum;
+      root = (recv_buf->hd.PeNum >> 16) & (~(1<<15));
+      srcnode = (recv_buf->hd.PeNum ^ (root<<16)) & (~(1<<31));
+      my_children(root, &d1, &d2);
+      if(d1!=(-1)){
+	int tmp = recv_buf->hd.PeNum;
+	m1 = (msgspace *)CmiAlloc(CMK_DGRAM_MAX_SIZE);
+	memcpy(m1, recv_buf, CMK_DGRAM_MAX_SIZE);
+	tmp = ((tmp >> 16) << 16) | CmiMyPe();
+	m1->hd.PeNum = tmp;
+	InsertInTransmitQueue(m1, d1);
+	SendPackets(d1);
+      }
+      if(d2!=(-1)){
+	int tmp = recv_buf->hd.PeNum;
+	m2 = (msgspace *)CmiAlloc(CMK_DGRAM_MAX_SIZE);
+	memcpy(m2, recv_buf, CMK_DGRAM_MAX_SIZE);
+	tmp = ((tmp >> 16) << 16) | CmiMyPe();
+	m2->hd.PeNum = tmp;
+	InsertInTransmitQueue(m2, d2);
+	SendPackets(d2);
+      }
+      recv_buf->hd.PeNum = srcnode;
+      sender = cs->node_table + recv_buf->hd.PeNum;
       if((sender->dataport)&&(sender->dataport!=htons(src.sin_port)))
         KillEveryoneCode(38473);
       AddToReceiveWindow(recv_buf, (int) recv_buf->hd.PeNum);
-	 } else {
-      sender = node_table + recv_buf->hd.PeNum;
+    } else {
+      sender = cs->node_table + recv_buf->hd.PeNum;
       if((sender->dataport)&&(sender->dataport!=htons(src.sin_port)))
         KillEveryoneCode(38473);
       AddToReceiveWindow(recv_buf, (int) recv_buf->hd.PeNum);
-	 }
+    }
   } 
   return kind;
 }
 
 static int dgram_scan()
 {
+  cmi_state cs = CmiState();
   fd_set rfds;
   struct timeval tmo;
   int nreadable, gotsend=0;
 
   while (1) {
     FD_ZERO(&rfds);
-    FD_SET(data_skt, &rfds);
-    FD_SET(ctrl_skt, &rfds);
+    FD_SET(cs->data_skt, &rfds);
+    FD_SET(cs->ctrl_skt, &rfds);
     tmo.tv_sec = 0;
     tmo.tv_usec = 0;
     do nreadable = select(FD_SETSIZE, &rfds, NULL, NULL, &tmo);
     while ((nreadable<0)&&(errno==EINTR));
     if (nreadable <= 0) break;
-    if (FD_ISSET(ctrl_skt, &rfds))
+    if (FD_ISSET(cs->ctrl_skt, &rfds))
       ctrl_getone();
-    if (FD_ISSET(data_skt, &rfds)) {
+    if (FD_ISSET(cs->data_skt, &rfds)) {
       int kind = data_getone();
       if (kind==SEND) gotsend=1;
     }
@@ -1616,6 +1668,7 @@ static int ticker_countup = 0;
 
 static void ticker_reset()
 {
+  cmi_state cs = CmiState();
   struct itimerval i;
   if (ticker_countup < 8) {
     i.it_interval.tv_sec = 0;
@@ -1633,12 +1686,13 @@ static void ticker_reset()
 
 static void InterruptHandler()
 {
+  cmi_state cs;
   int prevmask ;
   int dgram_scan();
   CmiInterruptHeader(InterruptHandler);
-
-  NumIntrCalls++;
-  NumOutsideMc++;
+  cs = CmiState();
+  cs->NumIntrCalls++;
+  cs->NumOutsideMc++;
   ticker_countup++;
   sighold(SIGALRM);
   
@@ -1647,12 +1701,12 @@ static void InterruptHandler()
   ticker_reset();
 
   sigrelse(SIGALRM);
-  NumIntr++ ;
+  cs->NumIntr++;
 }
 
 static void InterruptInit()
 {
-  if (Cmi_enableinterrupts) {
+  if (conf_enableinterrupts) {
     CmiSignal(SIGALRM, InterruptHandler);
     ticker_reset();
   }
@@ -1662,26 +1716,29 @@ static void InterruptInit()
 
 static void InterruptHandler()
 {
-  int prevmask ;
+  cmi_state cs;
+  int prevmask;
   int dgram_scan();
   CmiInterruptHeader(InterruptHandler);
 
-  NumIntrCalls++;
-  NumOutsideMc++;
+  cs = CmiState();
+  cs->NumIntrCalls++;
+  cs->NumOutsideMc++;
   sighold(SIGIO) ;
   
   dgram_scan();
   RetransmitPackets();
 
   sigrelse(SIGIO) ;
-  NumIntr++ ;
+  cs->NumIntr++ ;
 }
 
 static void InterruptInit()
 {
-  if (Cmi_enableinterrupts) {
+  cmi_state cs = CmiState();
+  if (conf_enableinterrupts) {
     CmiSignal(SIGIO, InterruptHandler);
-    CmiEnableAsyncIO(data_skt);
+    CmiEnableAsyncIO(cs->data_skt);
   }
 }
 
@@ -1695,15 +1752,16 @@ static int netSend(destPE, size, msg)
      int destPE, size; 
      char * msg; 
 {
+  cmi_state cs = CmiState();
   DATA_HDR *hd;
   unsigned int pktnum = 0;
   unsigned int numfrag = ((size-1)/MAXDSIZE) + 1;
 
   CmiInterruptsBlock();
   
-  if (!Communication_init) return -1;
+  if (!cs->Communication_init) return -1;
   
-  if (destPE==CpvAccess(Cmi_mype)) {
+  if (destPE==CmiMyPe()) {
     CmiPrintf("netSend to self illegal.\n");
     exit(1);
   } 
@@ -1712,7 +1770,7 @@ static int netSend(destPE, size, msg)
     hd = (DATA_HDR *)CmiAlloc(CMK_DGRAM_MAX_SIZE);
     hd->pktidx = pktnum;
     hd->rem_size = size;
-    hd->PeNum = CpvAccess(Cmi_mype);
+    hd->PeNum = CmiMyPe();
     memcpy((hd+1), msg, MAXDSIZE);
     InsertInTransmitQueue(hd, destPE);
     msg += MAXDSIZE;
@@ -1721,7 +1779,7 @@ static int netSend(destPE, size, msg)
   hd = (DATA_HDR *)CmiAlloc(sizeof(DATA_HDR)+size);
   hd->pktidx = pktnum;
   hd->rem_size = size;
-  hd->PeNum = CpvAccess(Cmi_mype);
+  hd->PeNum = CmiMyPe();
   memcpy((hd+1), msg, size);
   InsertInTransmitQueue(hd, destPE);
   
@@ -1734,12 +1792,13 @@ static int netBcast(size, msg)
      int size; 
      char * msg; 
 {
+  cmi_state cs = CmiState();
   DATA_HDR *hd,*hd2;
   unsigned int pktnum = 0;
   unsigned int numfrag = ((size-1)/MAXDSIZE) + 1;
   unsigned int destPE1, destPE2;
 
-  my_children(CpvAccess(Cmi_mype), &destPE1, &destPE2);
+  my_children(CmiMyPe(), &destPE1, &destPE2);
   if(destPE1==(-1) || destPE2==(-1)){
 	 if(destPE1!=(-1))
 		netSend(destPE1, size, msg);
@@ -1750,13 +1809,13 @@ static int netBcast(size, msg)
 
   CmiInterruptsBlock();
   
-  if (!Communication_init) return -1;
+  if (!cs->Communication_init) return -1;
   
   for(;pktnum<(numfrag-1);pktnum++) {
     hd = (DATA_HDR *)CmiAlloc(CMK_DGRAM_MAX_SIZE);
     hd->pktidx = pktnum;
     hd->rem_size = size;
-    hd->PeNum = (1<<31) | (CpvAccess(Cmi_mype)<<16) | (CpvAccess(Cmi_mype));
+    hd->PeNum = (1<<31) | (CmiMyPe()<<16) | (CmiMyPe());
     memcpy((hd+1), msg, MAXDSIZE);
 	 hd2 = (DATA_HDR *)CmiAlloc(CMK_DGRAM_MAX_SIZE);
 	 memcpy(hd2,hd,CMK_DGRAM_MAX_SIZE);
@@ -1768,7 +1827,7 @@ static int netBcast(size, msg)
   hd = (DATA_HDR *)CmiAlloc(sizeof(DATA_HDR)+size);
   hd->pktidx = pktnum;
   hd->rem_size = size;
-  hd->PeNum = (1<<31) | (CpvAccess(Cmi_mype)<<16) | (CpvAccess(Cmi_mype));
+  hd->PeNum = (1<<31) | (CmiMyPe()<<16) | (CmiMyPe());
   memcpy((hd+1), msg, size);
   hd2 = (DATA_HDR *)CmiAlloc(sizeof(DATA_HDR)+size);
   memcpy(hd2,hd,sizeof(DATA_HDR)+size);
@@ -1785,6 +1844,7 @@ static int netSendV(destPE, n, sizes, msgs)
      int destPE, n, *sizes; 
      char **msgs; 
 {
+  cmi_state cs = CmiState();
   DATA_HDR *hd;
   unsigned int pktnum = 0;
   unsigned int numfrag;
@@ -1797,9 +1857,9 @@ static int netSendV(destPE, n, sizes, msgs)
 
   CmiInterruptsBlock();
   
-  if (!Communication_init) return -1;
+  if (!cs->Communication_init) return -1;
   
-  if (destPE==CpvAccess(Cmi_mype)) {
+  if (destPE==CmiMyPe()) {
     CmiPrintf("netSend to self illegal.\n");
     exit(1);
   } 
@@ -1812,7 +1872,7 @@ static int netSendV(destPE, n, sizes, msgs)
     hd = (DATA_HDR *)CmiAlloc(CMK_DGRAM_MAX_SIZE);
     hd->pktidx = pktnum;
     hd->rem_size = size;
-    hd->PeNum = CpvAccess(Cmi_mype);
+    hd->PeNum = CmiMyPe();
 	remfill = MAXDSIZE;
 	tmpdst = (char *) (hd+1);
 	while(remfill>0){ /* fill the datagram here */
@@ -1836,7 +1896,7 @@ static int netSendV(destPE, n, sizes, msgs)
   hd = (DATA_HDR *)CmiAlloc(sizeof(DATA_HDR)+size);
   hd->pktidx = pktnum;
   hd->rem_size = size;
-  hd->PeNum = CpvAccess(Cmi_mype);
+  hd->PeNum = CmiMyPe();
   remfill = size;
   tmpdst = (char *) (hd+1);
   while(remfill>0){ /* fill the datagram here */
@@ -1865,12 +1925,13 @@ static int CmiProbe()
 {
   int val;
   int dgram_scan();
+  cmi_state cs = CmiState();
 
   CmiInterruptsBlock();
 
   dgram_scan();
   RetransmitPackets();
-  val = (recd_msg_head != NULL);
+  val = (cs->recd_msg_head != NULL);
 
   CmiInterruptsRelease();
   return (val);
@@ -1878,23 +1939,24 @@ static int CmiProbe()
 
 void *CmiGetNonLocal()
 {
-  int i;
+  cmi_state cs = CmiState();
   MsgQueueElem *msgelem;
   char *newmsg=NULL;
+  int i;
 
   CmiInterruptsBlock();
 
   dgram_scan();
   RetransmitPackets();
-  if (recd_msg_head!=NULL) {
-    msgelem = recd_msg_head;
+  if (cs->recd_msg_head!=NULL) {
+    msgelem = cs->recd_msg_head;
     newmsg = msgelem->mesg;
-    if (recd_msg_head == recd_msg_tail) {
-      recd_msg_head = NULL;
-      recd_msg_tail = NULL;
+    if (cs->recd_msg_head == cs->recd_msg_tail) {
+      cs->recd_msg_head = NULL;
+      cs->recd_msg_tail = NULL;
     }
     else 
-      recd_msg_head = recd_msg_head->nextptr;
+      cs->recd_msg_head = cs->recd_msg_head->nextptr;
     CmiFree(msgelem);
   } 
   CmiInterruptsRelease();
@@ -1906,7 +1968,7 @@ int destPE;
 int size;
 char *msg;
 {
-  if (CpvAccess(Cmi_mype)==destPE) {
+  if (CmiMyPe()==destPE) {
     char *msg1 = (char *)CmiAlloc(size);
     memcpy(msg1,msg,size);
     FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg1);
@@ -1920,7 +1982,7 @@ char **msgs;
 {
   int total_size,i;
 
-  if (CpvAccess(Cmi_mype)==destPE) {
+  if (CmiMyPe()==destPE) {
     char *msg1,*tmp;
 	for(total_size=0,i=0;i<n;total_size += sizes[i++]);
 	tmp = msg1 = (char *)CmiAlloc(total_size);
@@ -1965,7 +2027,7 @@ void CmiFreeSendFn(destPE, size, msg)
      int destPE, size;
      char *msg;
 {
-  if (CpvAccess(Cmi_mype)==destPE) {
+  if (CmiMyPe()==destPE) {
     FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg);
   } else {
     CmiSyncSendFn(destPE, size, msg);
@@ -1979,8 +2041,8 @@ void CmiSyncBroadcastFn(size,msg)
   netBcast(size,msg);
   /*
   int i;
-  for (i=0;i<CpvAccess(Cmi_numpes);i++) {
-    if (i != CpvAccess(Cmi_mype)) 
+  for (i=0;i<CmiNumPes();i++) {
+    if (i != CmiMyPe()) 
       netSend(i,size,msg);
   }
   */
@@ -1999,8 +2061,8 @@ void CmiFreeBroadcastFn(size,msg)
   netBcast(size,msg);
   /*
   int i;
-  for (i=0;i<CpvAccess(Cmi_numpes);i++) {
-    if (i != CpvAccess(Cmi_mype)) 
+  for (i=0;i<CmiNumPes();i++) {
+    if (i != CmiMyPe()) 
       netSend(i,size,msg);
   }
   */
@@ -2014,8 +2076,8 @@ void CmiSyncBroadcastAllFn(size,msg)
   char *msg1;
   netBcast(size,msg);
   /*
-  for (i=0;i<CpvAccess(Cmi_numpes);i++)
-    if (i != CpvAccess(Cmi_mype)) 
+  for (i=0;i<CmiNumPes();i++)
+    if (i != CmiMyPe()) 
       netSend(i,size,msg);
   */
   msg1 = (char *)CmiAlloc(size);
@@ -2036,8 +2098,8 @@ void CmiFreeBroadcastAllFn(size,msg)
   netBcast(size,msg);
   /*
   int i;
-  for (i=0;i<CpvAccess(Cmi_numpes);i++)
-    if (i != CpvAccess(Cmi_mype)) 
+  for (i=0;i<CmiNumPes();i++)
+    if (i != CmiMyPe()) 
       netSend(i,size,msg);
   */
   FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg);
@@ -2045,7 +2107,7 @@ void CmiFreeBroadcastAllFn(size,msg)
 
 static void CmiSleep()
 {
-  if (Cmi_enableinterrupts) sigpause(0L);
+  if (conf_enableinterrupts) sigpause(0L);
 }
 
 int CmiAsyncMsgSent(handle)
@@ -2068,32 +2130,30 @@ void CmiReleaseCommHandle(handle)
 CmiInitMc(argv)
 char **argv;
 {
+  cmi_state cs = CmiState();
   static int initmc=0;
-  void *FIFO_Create();
-  Communication_init = 0;
   
+  cs->Communication_init = 0;
   CmiInterruptsBlock();
   if (initmc==1) KillEveryone("CmiInit called twice");
   initmc=1;
-  
-  ExtractArgs(argv);
-  ParseNetstart();
-  InitializePorts();
-  CpvAccess(CmiLocalQueue) = FIFO_Create();
+  skt_datagram(&cs->data_port, &cs->data_skt);
+  skt_server(&cs->ctrl_port, &cs->ctrl_skt);
   KillInit();
-  ctrl_sendone(120,"notify-die %s %d\n",self_IP_str,ctrl_port);
-  outlog_init(outputfile, CpvAccess(Cmi_mype));
+  ctrl_sendone(120,"notify-die %s %d\n",conf_self_IP_str,cs->ctrl_port);
+  outlog_init(conf_outfile, CmiMyPe());
   node_addresses_receive();
   CmiTimerInit();
   SendWindowInit();
   RecvWindowInit();
   InterruptInit();
-  Communication_init = 1;
+  cs->Communication_init = 1;
   CmiInterruptsRelease();
 }
 
 CmiExit()
 {
+  cmi_state cs = CmiState();
   static int exited;
   int begin;
   
@@ -2103,14 +2163,14 @@ CmiExit()
   CmiInterruptsBlock();
 
   ctrl_sendone(120,"aget %s %d done 0 %d\n",
-         self_IP_str,ctrl_port,CpvAccess(Cmi_numpes)-1);
-  ctrl_sendone(120,"aset done %d TRUE\n",CpvAccess(Cmi_mype));
+         conf_self_IP_str,cs->ctrl_port,CmiNumPes()-1);
+  ctrl_sendone(120,"aset done %d TRUE\n",CmiMyPe());
   ctrl_sendone(120,"ending\n");
   begin = time(0);
-  while(!all_done && (time(0)<begin+120))
+  while(!cs->all_done && (time(0)<begin+120))
     { RetransmitPackets(); dgram_scan(); sleep(1); }
   outlog_done();
-
+  
   CmiInterruptsRelease();
 }
 
@@ -2118,10 +2178,29 @@ main(argc, argv)
 int argc;
 char **argv;
 {
+  void *FIFO_Create();
+  int i;
 #if CMK_USE_HP_MAIN_FIX
 #if FOR_CPLUS
   _main(argc,argv);
 #endif
 #endif
-  user_main(argc, argv);
+  conf_parse_netstart();
+  conf_extract_args(argv);
+  for (i=0; i<conf_node_size; i++) {
+    if (fork()==0) {
+      CpvInitialize(int, Cmi_mype);
+      CpvInitialize(int, Cmi_numpes);
+      CpvInitialize(void *,CmiLocalQueue);
+      CpvInitialize(cmi_state, CmiStateVar);
+      CpvAccess(Cmi_mype) = conf_node_start + i;
+      CpvAccess(Cmi_numpes) = conf_num_pes;
+      CpvAccess(CmiLocalQueue) = FIFO_Create();
+      CpvAccess(CmiStateVar) =
+	(cmi_state)malloc(sizeof(struct cmi_state_struct));
+      user_main(argc, argv);
+      exit(0);
+    }
+  }
+  exit(0);
 }
