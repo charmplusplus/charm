@@ -12,7 +12,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 2.4  1995-07-26 21:25:18  knauff
+# Revision 2.5  1995-10-02 18:59:47  knauff
+# Added CMK_CXXPP.
+#
+# Revision 2.4  1995/07/26  21:25:18  knauff
 # Took out '-D_NO_PROTO' in CMK_CPP, changed CMK_RANLIB
 #
 # Revision 2.3  1995/07/19  20:56:47  knauff
@@ -34,6 +37,7 @@ set CMK_CPP			= '/usr/lib/cpp -P '
 set CMK_LDRO			= 'ld -r -o '
 set CMK_CC			= 'mpcc'
 set CMK_CXX			= 'mpCC'
+set CMK_CXXPP			= 'cc -E'
 set CMK_CF77			= 'mpxlf'
 set CMK_LD			= 'mpcc -us'
 set CMK_LDXX			= 'mpCC -us'
