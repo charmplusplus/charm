@@ -49,7 +49,7 @@ void CcsSendDelayedReply(CcsDelayedReply d,int size, const void *reply);
 #define CcsEnabled() 0
 #define CcsIsRemoteRequest() 0
 #define CcsCallerId(x,y)  /*empty*/
-#define CcsDelayReply() /*Empty*/
+#define CcsDelayReply() 0
 #define CcsSendReply(s,r) /*empty*/
 #define CcsSendDelayedReply(d,s,r); 
 #endif
