@@ -8,6 +8,7 @@ class multicastSetupMsg;
 class multicastGrpMsg;
 class cookieMsg;
 class CkMcastBaseMsg;
+class reductionInfo;
 
 typedef mCastEntry * mCastEntryPtr;
 PUPbytes(mCastEntryPtr);
@@ -79,8 +80,10 @@ class CkMulticastMgr: public CkDelegateMgr {
     // for reduction
     void setReductionClient(CProxySection_ArrayElement &, redClientFn fn,void *param=NULL);
     void setReductionClient(CProxySection_ArrayElement &, CkCallback *cb);
-    void contribute(int dataSize,void *data,CkReduction::reducerType type, CkSectionInfo &sid);
-    void contribute(int dataSize,void *data,CkReduction::reducerType type, CkSectionInfo &sid, CkCallback &cb);
+    // user should be careful while passing non-default value of fragSize
+    // fragSize%sizeof(data_type) should be zero
+    void contribute(int dataSize,void *data,CkReduction::reducerType type, CkSectionInfo &sid, int fragSize=-1);
+    void contribute(int dataSize,void *data,CkReduction::reducerType type, CkSectionInfo &sid, CkCallback &cb, int fragSize=-1);
     void rebuild(CkSectionInfo &);
     // entry
     void recvRedMsg(CkReductionMsg *msg);
@@ -95,6 +98,12 @@ class CkMulticastMgr: public CkDelegateMgr {
     void releaseFutureReduceMsgs(mCastEntryPtr entry);
     void releaseBufferedReduceMsgs(mCastEntryPtr entry);
     inline CkReductionMsg *buildContributeMsg(int dataSize,void *data,CkReduction::reducerType type, CkSectionInfo &id, CkCallback &cb);
+    void reduceFragment (int index, CkSectionInfo& id,
+                         mCastEntry* entry, reductionInfo& redInfo,
+                         int& updateReduceNo, int currentTreeUp);
+    CkReductionMsg* combineFrags (CkSectionInfo& id,
+                                  mCastEntry* entry,
+                                  reductionInfo& redInfo);
 };
 
 

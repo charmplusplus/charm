@@ -5,31 +5,41 @@
 
 #define DEBUGF(x)   // CkPrintf x;
 
-#define MAXMCASTCHILDREN  2
+#define MAXMCASTCHILDREN 2
 
-#define SPLIT_MULTICAST			0
-#define SPLIT_NUM	  2
+#define SPLIT_MULTICAST 0
+#define SPLIT_NUM 2
+// maximum number of fragments into which a message can be broken
+#define MAXFRAGS 5
 
-typedef CkQ<multicastGrpMsg *> multicastGrpMsgBuf;
-typedef CkVec<CkArrayIndexMax>  arrayIndexList;
-typedef CkVec<CkSectionInfo>  sectionIdList;
+typedef CkQ<multicastGrpMsg *>   multicastGrpMsgBuf;
+typedef CkVec<CkArrayIndexMax>   arrayIndexList;
+typedef CkVec<CkSectionInfo>     sectionIdList;
 typedef CkVec<CkReductionMsg *>  reductionMsgs;
-
+typedef CkQ<int>                 PieceSize;
+typedef unsigned char            byte;
 
 class reductionInfo {
 public:
-  int lcount;   /**< local elem collected */
-  int ccount;   /**< children node collected */
-  int gcount;   /**< total elem collected */
-  CkCallback *storedCallback;   /**< user callback */
-  redClientFn storedClient;     /**< reduction client function */
-  void *storedClientParam;      /**< user provided data */
-  int redNo;                    /**< reduction sequence number */
-  reductionMsgs  msgs;          /**< messages for this reduction */
-  reductionMsgs  futureMsgs;    /**< messages of future reductions */
+  int            lcount [MAXFRAGS]; /**< local elem collected */
+  int            ccount [MAXFRAGS]; /**< children node collected */
+  int            gcount [MAXFRAGS]; /**< total elem collected */
+  int            npProcessed;
+  CkCallback*    storedCallback;    /**< user callback */
+  redClientFn    storedClient;      /**< reduction client function */
+  void*          storedClientParam; /**< user provided data */
+  int            redNo;             /**< reduction sequence number */
+  reductionMsgs  msgs [MAXFRAGS];   /**< messages for this reduction */
+  reductionMsgs  futureMsgs;        /**< messages of future reductions */
 public:
-  reductionInfo(): lcount(0), ccount(0), gcount(0), 
-		   storedCallback(NULL), storedClientParam(NULL), redNo(0) {}
+  reductionInfo(): storedCallback(NULL), storedClientParam(NULL), redNo(0),
+                   npProcessed(0) {
+    for (int i=0; i<MAXFRAGS; i++) {
+      lcount [i] = 0;
+      ccount [i] = 0;
+      gcount [i] = 0;
+    }
+  }
 };
 
 /// cookie status
@@ -609,30 +619,197 @@ inline CkReductionMsg *CkMulticastMgr::buildContributeMsg(int dataSize,void *dat
   return msg;
 }
 
-void CkMulticastMgr::contribute(int dataSize,void *data,CkReduction::reducerType type, CkSectionInfo &id)
+void CkMulticastMgr::contribute(int dataSize,void *data,CkReduction::reducerType type, CkSectionInfo &id, int fragSize)
 {
   CkCallback cb;
-  contribute(dataSize, data, type, id, cb);
+  contribute(dataSize, data, type, id, cb, fragSize);
 }
 
-void CkMulticastMgr::contribute(int dataSize,void *data,CkReduction::reducerType type, CkSectionInfo &id, CkCallback &cb)
+void CkMulticastMgr::contribute(int dataSize,void *data,CkReduction::reducerType type, CkSectionInfo &id, CkCallback &cb, int fragSize)
 {
   if (id.get_val() == NULL || id.get_redNo() == -1) 
     CmiAbort("contribute: SectionID is not initialized\n");
 
-  CkReductionMsg *msg = CkReductionMsg::buildNew(dataSize, data);
-  msg->reducer = type;
-  msg->sid = id;
-  msg->sourceFlag = 1;   // from array element
-  msg->redNo = id.get_redNo();
-  msg->gcount = 1;
-  msg->rebuilt = (id.get_pe() == CkMyPe())?0:1;
-  msg->callback = cb;
+  int nFrags = 1;
+  if (-1 == fragSize) fragSize = dataSize;
+
+  CmiAssert (dataSize >= fragSize);
+  nFrags = dataSize/fragSize;
+  if (dataSize%fragSize) nFrags++;
+
+  if (MAXFRAGS < nFrags) {
+    CmiPrintf ("Recompile CkMulticast library for fragmenting msgs into more than %d fragments\n", MAXFRAGS);
+    CmiAbort ("frag size too small\n");
+  }
+
+  int fSize = fragSize;
+  CProxy_CkMulticastMgr  mCastGrp(thisgroup);
+
+  // break the message into kpiece fragments
+  for (int i=0; i<nFrags; i++) {
+    if ((0 != i) && ((nFrags-1) == i) && (0 != dataSize%fragSize)) {
+      fSize = dataSize%fragSize;
+    }
+
+    CkReductionMsg *msg = CkReductionMsg::buildNew(fSize, data);
+
+    // initialize the new msg
+    msg->reducer            = type;
+    msg->sid                = id;
+    msg->nFrags             = nFrags;
+    msg->fragNo             = i;
+    msg->sourceFlag         = 1;
+    msg->redNo              = id.get_redNo();
+    msg->gcount             = 1;
+    msg->rebuilt            = (id.get_pe() == CkMyPe())?0:1;
+    msg->callback           = cb;
+
+    mCastGrp[id.get_pe()].recvRedMsg(msg);
+
+    CmiAssert (1 == sizeof (byte));
+    data = (void*)(((byte*)data) + fSize);
+  }
 
   id.get_redNo()++;
-  DEBUGF(("[%d] val: %d %p\n", CkMyPe(), id.get_pe(), id.get_val()));
+  DEBUGF(("[%d] val: %d %p\n", CkMyPe(), id.pe, id.val));
+}
+
+CkReductionMsg* CkMulticastMgr::combineFrags (CkSectionInfo& id, 
+                                              mCastEntry* entry,
+                                              reductionInfo& redInfo) {
+  int dataSize = 0;
+  int nFrags   = redInfo.msgs[0][0]->nFrags;
+
+  // to avoid memcpy and allocation cost for non-pipelined reductions
+  if (1 == nFrags) {
+    CkReductionMsg* msg = redInfo.msgs[0][0];
+
+    // free up the msg slot
+    redInfo.msgs[0].length() = 0;
+
+    return msg;
+  }
+
+  for (int i=0; i<nFrags; i++) {
+    dataSize += redInfo.msgs[i][0]->dataSize;
+  }
+
+  CkReductionMsg *msg = CkReductionMsg::buildNew(dataSize, NULL);
+
+  // initialize msg header
+  msg->redNo      = redInfo.msgs[0][0]->redNo;
+  msg->reducer    = redInfo.msgs[0][0]->reducer;
+  msg->sid        = id;
+  msg->nFrags     = nFrags;
+
+  // I guess following fields need not be initialized
+  msg->sourceFlag = 2;
+  msg->rebuilt    = redInfo.msgs[0][0]->rebuilt;
+  msg->callback   = redInfo.msgs[0][0]->callback;
+
+  byte* data = (byte*)msg->getData ();
+  for (int i=0; i<nFrags; i++) {
+    // copy data from fragments to msg
+    memcpy(data, redInfo.msgs[i][0]->getData(), redInfo.msgs[i][0]->dataSize);
+    data += redInfo.msgs[i][0]->dataSize;
+
+    // free fragments
+    delete redInfo.msgs[i][0];
+    redInfo.msgs[i].length() = 0;    
+  }
+
+  return msg;
+}
+
+void CkMulticastMgr::reduceFragment (int index, CkSectionInfo& id,
+                                     mCastEntry* entry, reductionInfo& redInfo,
+                                     int& updateReduceNo, int currentTreeUp){
+
   CProxy_CkMulticastMgr  mCastGrp(thisgroup);
-  mCastGrp[id.get_pe()].recvRedMsg(msg);
+  reductionMsgs& rmsgs = redInfo.msgs[index];
+  int dataSize         = rmsgs[0]->dataSize;
+  CkReduction::reducerType reducer = rmsgs[0]->reducer;
+  int i;
+  int oldRedNo = redInfo.redNo;
+  int nFrags   = rmsgs[0]->nFrags;
+  int fragNo   = rmsgs[0]->fragNo;
+                                                                                
+  // reduce msgs
+  CkReduction::reducerFn f= CkReduction::reducerTable[reducer];
+  CkAssert(NULL != f);
+
+  // check valid callback in msg and check if migration happened
+  CkCallback msg_cb;
+  int rebuilt = 0;
+  for (i=0; i<rmsgs.length(); i++) {
+    if (rmsgs[i]->rebuilt) rebuilt = 1;
+    if (!rmsgs[i]->callback.isInvalid()) msg_cb = rmsgs[i]->callback;
+  }
+
+  CkReductionMsg *newmsg = (*f)(rmsgs.length(), rmsgs.getVec()); 
+  newmsg->redNo  = redInfo.redNo;
+  newmsg->nFrags = nFrags;
+  newmsg->fragNo = fragNo;
+
+  // increment num-frags processed
+  redInfo.npProcessed ++;
+
+  // check if migration and free messages
+  for (i=0; i<rmsgs.length(); i++) {
+    delete rmsgs[i];
+  }
+  rmsgs.length() = 0;
+
+  if (redInfo.npProcessed == nFrags) {
+    entry->incReduceNo();
+    DEBUGF(("advanced entry:%p redNo: %d\n", entry, entry->red.redNo));
+  }
+  if (updateReduceNo) mCastGrp[CkMyPe()].updateRedNo(entry, redInfo.redNo);
+                                                                                
+  if (entry->hasParent()) {
+    // send up to parent
+    newmsg->reducer    = reducer;
+    newmsg->sid        = entry->parentGrp;
+    newmsg->sourceFlag = 2;
+    newmsg->redNo      = oldRedNo;
+    newmsg->gcount     = redInfo.gcount [index];
+    newmsg->rebuilt    = rebuilt;
+    newmsg->callback   = msg_cb;
+    DEBUGF(("send to parent %p: %d\n", entry->parentGrp.val, entry->parentGrp.pe));
+    mCastGrp[entry->parentGrp.get_pe()].recvRedMsg(newmsg);
+  } else { // root
+    newmsg->sid = id;
+    // buffer message
+    rmsgs.push_back (newmsg);
+
+    //if (entry->allElem.length() == redInfo.gcount) {
+    if (redInfo.npProcessed == nFrags) {
+
+      newmsg = combineFrags (id, entry, redInfo);
+
+      if (!msg_cb.isInvalid()) {
+        msg_cb.send(newmsg);
+      }
+      else if (redInfo.storedCallback != NULL) {
+        redInfo.storedCallback->send(newmsg);
+      }
+      else if (redInfo.storedClient != NULL) {
+        redInfo.storedClient(id, redInfo.storedClientParam, dataSize,
+           newmsg->data);
+        delete newmsg;
+      }
+      else
+        CmiAbort("Did you forget to register a reduction client?");
+                                                                                
+      DEBUGF(("currentTreeUp: %d entry:%p oldc: %p\n", currentTreeUp, entry, entry->oldc));
+      if (currentTreeUp && entry->oldc) {
+        // free old tree;
+        mCastGrp[CkMyPe()].freeup(CkSectionInfo(id.get_pe(), entry->oldc, 0));
+        entry->oldc = NULL;
+      }
+      if (rebuilt) entry->needRebuild = 1;
+    }
+  }
 }
 
 void CkMulticastMgr::recvRedMsg(CkReductionMsg *msg)
@@ -661,6 +838,7 @@ void CkMulticastMgr::recvRedMsg(CkReductionMsg *msg)
     }
     else {
       msg->sid = entry->rootSid;
+
       msg->sourceFlag = 0;
       mCastGrp[entry->rootSid.get_pe()].recvRedMsg(msg);
       return;
@@ -681,97 +859,74 @@ void CkMulticastMgr::recvRedMsg(CkReductionMsg *msg)
     return;
   }
 
-  DEBUGF(("[%d] recvRedMsg flag:%d red:%d\n", CkMyPe(), msg->sourceFlag, redInfo.redNo));
-  if (msg->sourceFlag == 1) redInfo.lcount ++;
-  if (msg->sourceFlag == 2) redInfo.ccount ++;
-  redInfo.gcount += msg->gcount;
+  DEBUGF(("[%d] recvRedMsg flag:%d red:%d\n", CkMyPe(), msg->flag, redInfo.redNo));
+
+  const int index = msg->fragNo;
 
   // buffer this msg
-  // check first
-  if (redInfo.msgs.length() && msg->dataSize != redInfo.msgs[0]->dataSize)
-    CmiAbort("Reduction data are not of same length!");
-  redInfo.msgs.push_back(msg);
+  if (msg->sourceFlag == 1) {
+    // new reduction message from ArrayElement
+    redInfo.lcount [index] ++;
+  }
 
-  if (CkMyPe() == 0)
-  DEBUGF(("[%d] lcount:%d-%d, ccount:%d-%d, gcount:%d-%d root:%d\n", CkMyPe(),entry->red.lcount,entry->localElem.length(), entry->red.ccount, entry->children.length(), entry->red.gcount, entry->allElem.length(), !entry->hasParent()));
+  if (msg->sourceFlag == 2) {
+    redInfo.ccount [index] ++;
+  }
+
+  redInfo.gcount [index] += msg->gcount;
+
+  // buffer the msg
+  // first check if message is of proper size
+  if ((0 != redInfo.msgs[index].length()) && 
+      (msg->dataSize != (redInfo.msgs [index][0]->dataSize))) {
+    CmiAbort("Reduction data are not of same length!");
+  }
+
+  redInfo.msgs [index].push_back(msg);
+
+  const int numFragsRcvd = redInfo.msgs [index].length();
+
+  if (CkMyPe() == 0) {
+    DEBUGF(("[%d] lcount:%d-%d, ccount:%d-%d, gcount:%d-%d root:%d\n", CkMyPe(),entry->red.lcount,entry->localElem.length(), entry->red.ccount, entry->children.length(), entry->red.gcount, entry->allElem.length(), !entry->hasParent()));
+  }
 
   int currentTreeUp = 0;
-  if (redInfo.lcount == entry->localElem.length() && 
-      redInfo.ccount == entry->children.length())
+  if (redInfo.lcount [index] == entry->localElem.length() &&
+      redInfo.ccount [index] == entry->children.length())
       currentTreeUp = 1;
+
   int mixTreeUp = 0;
-  if (!entry->hasParent() && redInfo.gcount == entry->allElem.length())
-      mixTreeUp = 1;
+  const int numElems = entry->allElem.length();
+  
+  if (!entry->hasParent()) {
+    mixTreeUp = 1;
+    for (int i=0; i<msg->nFrags; i++) {
+      if (entry->allElem.length() != redInfo.gcount [i]) {
+        mixTreeUp = 0;
+      }
+    }
+  }
+
   if (currentTreeUp || mixTreeUp)
   {
-    int dataSize = msg->dataSize;
-    CkReduction::reducerType reducer = msg->reducer;
+    const int nFrags = msg->nFrags;  
+    
+    // msg from children contain only one fragment
+    reduceFragment (index, id, entry, redInfo, updateReduceNo, 
+                    currentTreeUp);
 
-    // reduce msgs
-    CkReduction::reducerFn f= CkReduction::reducerTable[reducer];
-    CkAssert(f != NULL);
-    // check valid callback in msg and check if migration happened
-    CkCallback msg_cb;
-    int rebuilt = 0;
-    for (i=0; i<redInfo.msgs.length(); i++) {
-      if (redInfo.msgs[i]->rebuilt) rebuilt = 1;
-      if (!redInfo.msgs[i]->callback.isInvalid()) msg_cb = redInfo.msgs[i]->callback;
-    }
-    CkReductionMsg *newmsg = (*f)(redInfo.msgs.length(), redInfo.msgs.getVec());
-    newmsg->redNo = redInfo.redNo;
-    // check if migration and free messages
-    for (i=0; i<redInfo.msgs.length(); i++) {
-      delete redInfo.msgs[i];
-    }
-    redInfo.msgs.length() = 0;
-
-    int oldRedNo = redInfo.redNo;
-    entry->incReduceNo();
-    DEBUGF(("advanced entry:%p redNo: %d\n", entry, entry->red.redNo));
-    if (updateReduceNo) mCastGrp[CkMyPe()].updateRedNo(entry, redInfo.redNo);
-
-    if (entry->hasParent()) {
-      // send up to parent
-      newmsg->reducer = reducer;
-      newmsg->sid = entry->parentGrp;
-      newmsg->sourceFlag = 2;
-      newmsg->redNo = oldRedNo;
-      newmsg->gcount = redInfo.gcount;
-      newmsg->rebuilt = rebuilt;
-      newmsg->callback = msg_cb;
-      DEBUGF(("send to parent %p: %d\n", entry->parentGrp.get_val(), entry->parentGrp.get_pe()));
-      mCastGrp[entry->parentGrp.get_pe()].recvRedMsg(newmsg);
-    }
-    else {   // root
-      newmsg->sid = id;
-      if (!msg_cb.isInvalid()) {
-        msg_cb.send(newmsg);
+    if (redInfo.npProcessed == nFrags) {
+      // reset counters
+      for (i=0; i<nFrags; i++) {
+        redInfo.lcount [i] = 0;
+        redInfo.ccount [i] = 0;
+        redInfo.gcount [i] = 0;
       }
-      else if (redInfo.storedCallback != NULL) {
-        redInfo.storedCallback->send(newmsg);
-      }
-      else if (redInfo.storedClient != NULL) {
-        redInfo.storedClient(id, redInfo.storedClientParam, dataSize,
-	   newmsg->data);
-        delete newmsg;
-      } 
-      else
-	CmiAbort("Did you forget to register a reduction client?");
+      redInfo.npProcessed = 0;
 
-      DEBUGF(("currentTreeUp: %d entry:%p oldc: %p\n", currentTreeUp, entry, entry->oldc));
-      if (currentTreeUp && entry->oldc) {
-	// free old tree;
-	mCastGrp[CkMyPe()].freeup(CkSectionInfo(id.get_pe(), entry->oldc, 0));
-	entry->oldc = NULL;
-      }
-      if (rebuilt) entry->needRebuild = 1;
+      // release future msgs
+      releaseFutureReduceMsgs(entry);
     }
-
-    // reset counters
-    redInfo.lcount = redInfo.ccount = redInfo.gcount = 0;
-
-    // release future msgs
-    releaseFutureReduceMsgs(entry);
   }
 }
 
@@ -792,13 +947,16 @@ void CkMulticastMgr::releaseBufferedReduceMsgs(mCastEntryPtr entry)
   int i;
   CProxy_CkMulticastMgr  mCastGrp(thisgroup);
 
-  for (i=0; i<entry->red.msgs.length(); i++) {
-    DEBUGF(("releaseBufferedReduceMsgs: %p\n", entry->red.msgs[i]));
-    entry->red.msgs[i]->sid = entry->rootSid;
-    entry->red.msgs[i]->sourceFlag = 0;
-    mCastGrp[entry->rootSid.get_pe()].recvRedMsg(entry->red.msgs[i]);
+  for (int j=0; j<MAXFRAGS; j++) {
+    for (i=0; i<entry->red.msgs[j].length(); i++) {
+      DEBUGF(("releaseBufferedReduceMsgs: %p\n", entry->red.msgs[i]));
+      entry->red.msgs[j][i]->sid = entry->rootSid;
+      entry->red.msgs[j][i]->sourceFlag = 0;
+      mCastGrp[entry->rootSid.get_pe()].recvRedMsg(entry->red.msgs[j][i]);
+    }
+    entry->red.msgs[j].length() = 0;
   }
-  entry->red.msgs.length() = 0;
+
 
   for (i=0; i<entry->red.futureMsgs.length(); i++) {
     DEBUGF(("releaseBufferedFutureReduceMsgs: %p\n", entry->red.futureMsgs[i]));
