@@ -297,48 +297,48 @@ arrInfo::getMap(const CkArrayIndex &i)
     return _map[((i.hash()+739)%1280107)%_nelems];
 }
 
-CkpvStaticDeclare(int*, speeds);
+//Speeds maps processor number to "speed" (some sort of iterations per second counter)
+// It is initialized by processor 0.
+static int* speeds;
 
 #if CMK_USE_PROP_MAP
 typedef struct _speedmsg
 {
   char hdr[CmiMsgHeaderSizeBytes];
-  int pe;
+  int node;
   int speed;
 } speedMsg;
 
 static void _speedHdlr(void *m)
 {
-  speedMsg *msg = (speedMsg *) m;
-  CkpvAccess(speeds)[msg->pe] = msg->speed;
+  speedMsg *msg=(speedMsg *)m;
+  if (CmiMyRank()==0)
+    for (int pe=0;pe<CmiNodeSize(msg->node);pe++)
+      speeds[CmiNodeFirst(msg->node)+pe] = msg->speed;  
   CmiFree(m);
 }
 
 void _propMapInit(void)
 {
-  CkpvInitialize(int*, speeds);
-  CkpvAccess(speeds) = new int[CkNumPes()];
+  speeds = new int[CkNumPes()];
   int hdlr = CkRegisterHandler((CmiHandler)_speedHdlr);
   CmiPrintf("[%d]Measuring processor speed for prop. mapping...\n", CkMyPe());
   int s = LDProcessorSpeed();
   speedMsg msg;
   CmiSetHandler(&msg, hdlr);
-  msg.pe = CkMyPe();
+  msg.node = CkMyNode();
   msg.speed = s;
-  CmiSyncBroadcast(sizeof(msg), &msg);
-  CkpvAccess(speeds)[CkMyPe()] = s;
-  int i;
-  for(i=1;i<CkNumPes();i++)
+  CmiSyncBroadcastAllAndFree(sizeof(msg), &msg);
+  for(int i=0;i<CkNumNodes();i++)
     CmiDeliverSpecificMsg(hdlr);
 }
 #else
 void _propMapInit(void)
 {
-  CkpvInitialize(int*, speeds);
-  CkpvAccess(speeds) = new int[CkNumPes()];
+  speeds = new int[CkNumPes()];
   int i;
   for(i=0;i<CkNumPes();i++)
-    CkpvAccess(speeds)[i] = 1;
+    speeds[i] = 1;
 }
 #endif
 /**
@@ -361,7 +361,7 @@ public:
   int registerArray(int numElements,CkArrayID aid)
   {
     int idx = arrs.length();
-    arrs.insertAtEnd(new arrInfo(numElements, CkpvAccess(speeds)));
+    arrs.insertAtEnd(new arrInfo(numElements, speeds));
     return idx;
   }
   int procNum(int arrayHdl, const CkArrayIndex &i)
