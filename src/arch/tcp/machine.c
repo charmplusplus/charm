@@ -1294,6 +1294,11 @@ main(argc, argv)
 int argc;
 char **argv;
 {
+#if CMK_USE_HP_MAIN_FIX
+#if FOR_CPLUS
+  _main(argc,argv);
+#endif
+#endif
 setbuf(stderr,0);
 user_main(argc, argv);
 }

@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 2.28  1996-11-23 02:25:44  milind
+ * Revision 2.29  1997-01-15 19:23:47  milind
+ * Fixed CMK_HP_MAIN_FIX bug in tcp-hp version.
+ *
+ * Revision 2.28  1996/11/23 02:25:44  milind
  * Fixed several subtle bugs in the converse runtime for convex
  * exemplar.
  *
@@ -141,8 +144,8 @@
 #define CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT                   0
 #define CMK_WHEN_PROCESSOR_IDLE_USLEEP                     1
 
-#define CMK_USE_HP_MAIN_FIX                                0
-#define CMK_DONT_USE_HP_MAIN_FIX                           1
+#define CMK_USE_HP_MAIN_FIX                                1
+#define CMK_DONT_USE_HP_MAIN_FIX                           0
 
 #endif
 
