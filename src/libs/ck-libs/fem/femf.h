@@ -86,7 +86,7 @@
          integer,intent (in) :: newElemType
        end subroutine    
        subroutine FEM_Combine_Elem(srcEl,destEl,newInterior,newGhost)
-         integer,intent (in) :: oldEl,newEl
+         integer,intent (in) :: srcEl,destEl
 	 integer,intent (in) :: newInterior,newGhost
        end subroutine    
 
