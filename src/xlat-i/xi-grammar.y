@@ -86,7 +86,8 @@ ModuleList *modlist;
 %type <module>		Module
 %type <conslist>	ConstructEList ConstructList
 %type <construct>	Construct
-%type <strval>		Name QualName CCode CPROGRAM_List OptNameInit
+%type <strval>		Name QualName CCode CPROGRAM_List OptNameInit 
+%type <strval>		OptTraceName
 %type <val>		OptStackSize
 %type <intval>		OptExtern OptSemiColon MAttribs MAttribList MAttrib
 %type <intval>		EAttribs EAttribList EAttrib OptVoid
@@ -759,9 +760,17 @@ PublishesList	: IDENT
 		{ $$ = new SdagConstruct(SPUBLISHES, new SdagConstruct(SIDENT, $1), $3);  }
 		;
 
- SingleConstruct : ATOMIC ParamBraceStart CCode ParamBraceEnd OptPubList 
-		 { RemoveSdagComments($3);
-		   $$ = new SdagConstruct(SATOMIC, new XStr($3), $5, 0,0,0,0, 0 ); }
+OptTraceName	: LITERAL
+		 { $$ = $1; }
+		|
+		 { $$ = 0; }
+		;
+
+SingleConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd OptPubList 
+		 { RemoveSdagComments($4);
+		   $$ = new SdagConstruct(SATOMIC, new XStr($4), $6, 0,0,0,0, 0 ); 
+		   if ($2) { $2[strlen($2)-1]=0; $$->traceName = new XStr($2+1); }
+		 }
 		| CONNECT '(' IDENT EParameters ')' ParamBraceStart CCode '}'
 		{  
 		   in_braces = 0;

@@ -1536,7 +1536,15 @@ void SdagConstruct::generateTrace()
   char text[1024];
   switch(type) {
   case SATOMIC:
-    sprintf(text, "%s%s", CParsedFile::className->charstar(), label->charstar());
+    if (traceName) {
+      sprintf(text, "%s_%s", CParsedFile::className->charstar(), traceName->charstar());
+      // remove blanks
+      for (int i=0; i<strlen(text); i++)
+        if (isblank(text[i])) text[i]='_';
+    }
+    else {
+      sprintf(text, "%s%s", CParsedFile::className->charstar(), label->charstar());
+    }
     traceName = new XStr(text);
     break;
   default:
