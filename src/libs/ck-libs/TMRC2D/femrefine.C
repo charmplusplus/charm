@@ -95,8 +95,8 @@ void FEM_REFINE2D_Newmesh(int meshID,int nodeID,int elemID,int nodeBoundary){
 	delete [] tempMesh;
 }
 
-FDECL void FTN_NAME(FEM_REFINE2D_NEWMESH,fem_refine2d_newmesh)(int *meshID,int *nodeID,int *elemID){
-	FEM_REFINE2D_Newmesh(*meshID,*nodeID,*elemID);
+FDECL void FTN_NAME(FEM_REFINE2D_NEWMESH,fem_refine2d_newmesh)(int *meshID,int *nodeID,int *elemID, int *nodeBoundary){
+	FEM_REFINE2D_Newmesh(*meshID,*nodeID,*elemID,*nodeBoundary);
 }
 
 
