@@ -672,7 +672,7 @@ Chare::genDefs(XStr& str)
     str << "public:\n";
     str << "  " << baseName() << "()\n";
     str << "  {\n";
-    str << "    CkPrintf(\"" << baseName() << " %d created\\n\",thisIndex);\n";
+//    str << "    CkPrintf(\"" << baseName() << " %d created\\n\",thisIndex);\n";
     str << "    CkArrayID *aid = &thisArrayID;\n";
     str << "    " << fortranify(baseName()) << "_allocate_((char **)&user_data, &aid);\n";
     str << "  }\n";
@@ -1122,7 +1122,8 @@ void TypeList::genProxyNames2(XStr& str, const char *prefix,
 void TypeList::genUnmarshalList0(XStr& str, int depth)
 {
   if(type) {
-    type->print(str);
+//    type->print(str);
+    str << type->getBaseName();
     str << "*";
   }
   if(next) {
@@ -1134,7 +1135,10 @@ void TypeList::genUnmarshalList0(XStr& str, int depth)
 void TypeList::genUnmarshalList1(XStr& str, const char* message_name, int depth)
 {
   if(type) {
-    str << "&((" << message_name << "*)msg)->p" << depth;
+    if (type->typeName() != arrayType)
+      str << "&((" << message_name << "*)msg)->p" << depth;
+    else
+      str << "((" << message_name << "*)msg)->p" << depth;
   }
   if(next) {
     str << ", ";
@@ -1145,7 +1149,11 @@ void TypeList::genUnmarshalList1(XStr& str, const char* message_name, int depth)
 void TypeList::genUnmarshalList2(XStr& str, int depth)
 {
   if(type) {
-    str << "  " << type->getBaseName() << " p" << depth << ";\n";
+//    str << "  " << type->getBaseName() << " p" << depth << ";\n";
+    char p[10];
+    sprintf(p, "p%d", depth);
+    type->printVar(str, p);
+    str<<";\n";
   }
   if(next) {
     next->genUnmarshalList2(str, depth+1);
@@ -1166,7 +1174,14 @@ void TypeList::genUnmarshalList3(XStr& str, int depth)
 void TypeList::genUnmarshalList4(XStr& str, int depth)
 {
   if(type) {
-    str << "  msg->p" << depth << " = *p" << depth << ";\n";
+    if (type->typeName() != arrayType) 
+      str << "  msg->p" << depth << " = *p" << depth << ";\n";
+    else {
+      ArrayType *atype = (ArrayType *)type;
+      str << "  memcpy(msg->p" << depth << ", p" << depth << ", ";
+      atype->printDim(str);
+      str << "*sizeof(" << atype->getBaseName() << "));\n";
+    }
   }
   if(next) {
     next->genUnmarshalList4(str, depth+1);

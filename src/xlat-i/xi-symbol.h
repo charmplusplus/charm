@@ -19,6 +19,7 @@
 #include "xi-util.h"
 
 typedef enum { original, ansi } CompileMode;
+typedef enum { baseType, arrayType } TypeName;
 extern CompileMode compilemode;
 extern int fortranMode;
 
@@ -90,11 +91,16 @@ class TParamList : public Printable {
 };
 class Message;
 class Type : public Printable {
+  protected:
+    TypeName name;
   public:
+    Type(): name(baseType) {};
+    TypeName typeName() {return name;}
     virtual void print(XStr&) = 0;
     virtual int isVoid(void) = 0;
     virtual const char *getBaseName(void) = 0;
     virtual void genProxyName(XStr &str);
+    virtual void printVar(XStr &str, char *var) {print(str); str<<" "; str<<var;}
 };
 
 class TypeList : public Printable {
@@ -184,8 +190,10 @@ class ArrayType : public Type {
     Type *type;
     Value* dim;
   public:
-    ArrayType(Type* t, Value* d) : type(t), dim(d) {}
+    ArrayType(Type* t, Value* d) : type(t), dim(d) {name = arrayType;}
     void print(XStr& str){type->print(str);str<<"[";dim->print(str);str<<"]";}
+    void printVar(XStr& str, char *var){type->print(str);str<<" ";str<<var;str<<"[";dim->print(str);str<<"]";}
+    void printDim(XStr& str) { dim->print(str); }
     int isVoid(void) { return 0; }
     const char *getBaseName(void) { return type->getBaseName(); }
 };
