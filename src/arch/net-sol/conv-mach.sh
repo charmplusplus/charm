@@ -5,7 +5,7 @@ CMK_CC="gcc $CMK_DEFS"
 CMK_CXX="g++ $CMK_DEFS "
 CMK_CXXPP="g++ -x c++ -E $CMK_DEFS "
 CMK_XIOPTS=''
-CMK_LIBS=' -lnsl -lsocket -lckqt'
+CMK_LIBS=' -lnsl -lsocket -lckqt -lthread'
 
 # for Sun Forte Developer 7 f90 7.0
 # avoid -C (array boundry checking flag)
@@ -26,7 +26,7 @@ CMK_NATIVE_CC="$CMK_CC"
 CMK_NATIVE_LD="$CMK_CC"
 CMK_NATIVE_CXX="$CMK_CXX"
 CMK_NATIVE_LDXX="$CMK_CXX"
-CMK_NATIVE_LIBS=' -lnsl -lsocket'
+CMK_NATIVE_LIBS='-lnsl -lsocket -lthread '
 
 CMK_RANLIB='true'
 CMK_QT='solaris-gcc'
