@@ -53,7 +53,7 @@ void CkImage::clear(void) {
 	*/
 	CkImage::pixel_t *CkImage::newClip(void){
 		const int pixelMax=255;
-		const int tableLen=2*pixelMax;
+		const int tableLen=2*pixelMax+1; //subtle: 2*pixelMax is last valid index
 		pixel_t *ret=new pixel_t[tableLen];
 		int i;
 		for (i=0;i<pixelMax;i++) ret[i]=(pixel_t)i;
