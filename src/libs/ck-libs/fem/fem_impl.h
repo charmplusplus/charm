@@ -13,7 +13,7 @@ Orion Sky Lawlor, olawlor@acm.org, 9/28/00
 
 extern CkChareID _mainhandle;
 extern CkArrayID _femaid;
-extern unsigned int _nchunks;
+extern int _nchunks;
 
 #define CHK(p) do{if((p)==0)CkAbort("FEM>Memory Allocation failure.");}while(0)
 
@@ -58,7 +58,7 @@ class DataMsg : public CMessage_DataMsg
   void *data;
   int tag;
   DataMsg(int t, int f, int d) : 
-    tag(t), from(f), dtype(d) { data = (void*) (this+1); }
+    from(f), dtype(d), tag(t) { data = (void*) (this+1); }
   DataMsg(void) { data = (void*) (this+1); }
   static void *pack(DataMsg *);
   static DataMsg *unpack(void *);
@@ -167,6 +167,7 @@ public:
 //Describes a local chunk of a mesh
 class ChunkMsg : public CMessage_ChunkMsg {
  public:
+        int isPacked;//Is this message one contiguous block?
 	FEM_Mesh m; //The chunk mesh
 	commCounts comm; //Shared nodes
 	int *elemNums; // Maps local elem#-> global elem#  [m.nElems()]
@@ -176,7 +177,10 @@ class ChunkMsg : public CMessage_ChunkMsg {
 	int updateCount,fromChunk;
 	int callMeshUpdated,doRepartition;
 
+        ChunkMsg(void) { isPacked=0; }
+        ~ChunkMsg() { deallocate(); }
 	void deallocate(void); //Free all stored memory
+
 	void pup(PUP::er &p); //For send/recv
 	int size() const; //Return total storage size, in bytes
 	static void *pack(ChunkMsg *);
@@ -230,6 +234,8 @@ private:
   chunk(CkMigrateMessage *msg): ArrayElement1D(msg) {stored_mesh=NULL;}
   ~chunk();
   
+  void serialSwitch(ChunkMsg *);
+  
   void run(void);
   void run(ChunkMsg*);
   void recv(DataMsg *);
@@ -266,6 +272,8 @@ private:
   int check_userdata(int n);
   void *get_userdata(int n) 
     { return userdata[check_userdata(n)]; }
+    
+  const commCounts &getComm(void) const {return comm;}
 
   void pup(PUP::er &p);
   void readyToMigrate(void)
@@ -307,15 +315,16 @@ private:
 
 class main : public Chare
 {
- public:
-  main(CkArgMsg *);
-
+  ChunkMsg **cmsgs;//Array of _nchunks chunk messages
   int updateCount;
   CkQ<ChunkMsg *> futureUpdates;
   CkQ<ChunkMsg *> curUpdates;
+  int numdone;
+ public:
+  main(CkArgMsg *);
+
   void updateMesh(ChunkMsg *);
 
-  int numdone;
   void done(void);
 };
 

@@ -2,7 +2,7 @@ mainmodule fem {
   extern module MetisLB;
   readonly CkChareID _mainhandle;
   readonly CkArrayID _femaid;
-  readonly unsigned int _nchunks;
+  readonly int _nchunks;
   message DataMsg;
   message ChunkMsg;
   mainchare main {

@@ -60,6 +60,13 @@ extern "C" {
   void FEM_Get_Elem_Conn(int elType,int *conn);
 
   void FEM_Update_Mesh(int callMeshUpdated,int doRepartition);
+  
+  void FEM_Set_Partition(int *elem2chunk);
+  
+  int FEM_Get_Comm_Partners(void);
+  int FEM_Get_Comm_Partner(int partnerNo);
+  int FEM_Get_Comm_Count(int partnerNo);
+  void FEM_Get_Comm_Nodes(int partnerNo,int *nodeNos);
 
   /*Node update*/
   int FEM_Create_Field(int base_type, int vec_len, int init_offset, 
