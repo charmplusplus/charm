@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.4  1995-10-27 21:45:35  jyelon
+ * Revision 1.5  1995-11-07 23:22:56  jyelon
+ * Fixed the neighbour functions.
+ *
+ * Revision 1.4  1995/10/27  21:45:35  jyelon
  * Changed CmiNumPe --> CmiNumPes
  *
  * Revision 1.3  1995/10/13  22:05:59  gursoy
@@ -269,97 +272,43 @@ char * msg;
 
 /**********************  LOAD BALANCER NEEDS **********************/
 
-static int _MC_neighbour[4]; 
-static int _MC_numofneighbour;
-static neighbour_check();
 long CmiNumNeighbours(node)
 int node;
 {
-    if (node == CmiMyPe() ) 
-     return  _MC_numofneighbour;
-    else 
-     return 0;
+  int bit, count=0;
+  bit = 1;
+  while (1) {
+    int neighbour = node ^ bit;
+    if (neighbour < Cmi_numpes) count++;
+    bit<<1; if (bit > Cmi_numpes) break;
+  }
+  return count;
 }
 
-
-CmiGetNodeNeighbours(node, neighbours)
+int CmiGetNodeNeighbours(node, neighbours)
 int node, *neighbours;
 {
-    int i;
-
-    if (node == CmiMyPe() )
-       for(i=0; i<_MC_numofneighbour; i++) neighbours[i] = _MC_neighbour[i];
-
+  int bit, count=0;
+  bit = 1;
+  while (1) {
+    int neighbour = node ^ bit;
+    if (neighbour < Cmi_numpes) neighbours[count++] = neighbour;
+    bit<<1; if (bit > Cmi_numpes) break;
+  }
+  return count;
 }
-
-
-int CmiNeighboursIndex(node, neighbour)
-int node, neighbour;
+ 
+int CmiNeighboursIndex(node, nbr)
+int node, nbr;
 {
-    int i;
-
-    for(i=0; i<_MC_numofneighbour; i++)
-       if (_MC_neighbour[i] == neighbour) return i;
-    return(-1);
-}
-
-
-static neighbour_init(p)
-int p;
-{
-    int a,b,n;
-
-    a = (int) floor(sqrt((double)CmiNumPes()));
-    b = (int) ceil( ((double)CmiNumPes() / (double)a) );
-
-   
-    _MC_numofneighbour = 0;
-   
-    /* east neighbour */
-    if ( (p+1)%b == 0 )
-           n = p-b+1;
-    else {
-           n = p+1;
-           if (n>=CmiNumPes()) n = (a-1)*b; /* west-south corner */
-    }
-    if (neighbour_check(p,n) ) _MC_neighbour[_MC_numofneighbour++] = n;
-
-    /* west neigbour */
-    if ( (p%b) == 0) {
-          n = p+b-1;
-          if (n >= CmiNumPes()) n = CmiNumPes()-1;
-       }
-    else
-          n = p-1;
-    if (neighbour_check(p,n) ) _MC_neighbour[_MC_numofneighbour++] = n;
-
-    /* north neighbour */
-    if ( (p/b) == 0) {
-          n = (a-1)*b+p;
-          if (n >= CmiNumPes()) n = n-b;
-       }
-    else
-          n = p-b;
-    if (neighbour_check(p,n) ) _MC_neighbour[_MC_numofneighbour++] = n;
-    
-    /* south neighbour */
-    if ( (p/b) == (a-1) )
-           n = p%b;
-    else {
-           n = p+b;
-           if (n >= CmiNumPes()) n = n%b;
-    } 
-    if (neighbour_check(p,n) ) _MC_neighbour[_MC_numofneighbour++] = n;
-
-}
-
-static neighbour_check(p,n)
-int p,n;
-{
-    int i; 
-    if (n==p) return 0;
-    for(i=0; i<_MC_numofneighbour; i++) if (_MC_neighbour[i] == n) return 0;
-    return 1; 
+  int bit, count=0;
+  bit = 1;
+  while (1) {
+    int neighbour = node ^ bit;
+    if (neighbour < Cmi_numpes) { if (nbr==neighbour) return count; count++; }
+    bit<<=1; if (bit > Cmi_numpes) break;
+  }
+  return(-1);
 }
 
 
@@ -368,7 +317,6 @@ int p,n;
 void CmiInitMc(argv)
 char *argv[];
 {
-    neighbour_init(Cmi_mype);
     CpvAccess(CmiLocalQueue) = (void *) FIFO_Create();
     CmiSpanTreeInit();
     CsiTimerInit();
