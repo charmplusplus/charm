@@ -55,11 +55,7 @@ typedef int*  AMPI_Aint ;
 
 #include "pup_c.h"
 
-#if AMPI_FORTRAN
 typedef void (*AMPI_PupFn)(pup_er, void*);
-#else
-typedef void *(*AMPI_PupFn)(pup_er, void*);
-#endif
 
 int AMPI_Init(int *argc, char*** argv);
 int AMPI_Comm_rank(AMPI_Comm comm, int *rank);

@@ -222,11 +222,7 @@ void ampi::pup(PUP::er &p)
   for(i=0;i<nudata;i++) {
     p((void*)&(userdata[i]), sizeof(void*));
     p((void*)&(pup_ud[i]), sizeof(AMPI_PupFn));
-#if AMPI_FORTRAN
     pup_ud[i]((pup_er) &p, userdata[i]);
-#else
-    userdata[i] = pup_ud[i]((pup_er) &p, userdata[i]);
-#endif
   }
   if (p.isPacking() || p.isSizing()) 
   {//In this case, pack the thread after the user data
