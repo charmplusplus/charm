@@ -3,8 +3,8 @@
 \subsubsection{Structure of a \charmpp\ Program}
 
 A \charmpp\ program is structurally similar to a \CC{} program.  Most of a
-\charmpp\ program {\em is} \CC{} code \footnote{\bf Constraint: The \CC{} code
-cannot, however, contain global or static variables.}. The main syntactic units
+\charmpp\ program {\em is} \CC{} code.\footnote{\bf Constraint: The \CC{} code
+cannot, however, contain global or static variables.} The main syntactic units
 in a \charmpp\ program are class definitions. A \charmpp\ program can be
 distributed across several source code files.
 
@@ -39,15 +39,15 @@ and ``.def.h'', {\em for each module declared in the ``.ci'' file}), that
 contain declarations (interface) and definitions (implementation)of various
 translator-generated entities. If the name of a module is \uw{MOD}, then the
 files produced by the \charmpp\ interface translator are named \uw{MOD.decl.h}
-and \uw{MOD.def.h}\footnote{Note that the interface file for module \uw{MOD}
+and \uw{MOD.def.h}.\footnote{Note that the interface file for module \uw{MOD}
 need not be named \uw{MOD.ci}. Indeed one ``.ci'' file may contain interface
 declarations for multiple modules, and the translator will produce one pair of
-declaration and definition files for each module.}.  We recommend that the
+declaration and definition files for each module.}  We recommend that the
 declarations header file be included at the top of the header file (\uw{MOD.h})
 for module \uw{MOD}, and the definitions file be included at the bottom of the
-code for module (\uw{MOD.C}) \footnote{In the earlier version of interface
+code for module (\uw{MOD.C}).\footnote{In the earlier version of interface
 translator, these files used to be suffixed with ``.top.h'' and ``.bot.h'' for
-this reason.}.
+this reason.}
 
 A simple \charmpp\ program is given below:
 
