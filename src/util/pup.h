@@ -388,25 +388,27 @@ class toTextUtil : public er {
   virtual void bytes(void *p,int n,size_t itemSize,dataType t);
   virtual void object(able** a);
 };
+/* Return the number of characters, including terminating NULL */
 class sizerText : public toTextUtil {
  private:
   char line[1000];
-  int charCount; /*Total characters seen so far*/
+  int charCount; /*Total characters seen so far (not including NULL) */
  protected:
   virtual char *advance(char *cur);
  public:
   sizerText(void);
-  int size(void) const {return charCount;}
+  int size(void) const {return charCount+1; /*add NULL*/ }
 };
+/* Copy data to this C string, including terminating NULL. */
 class toText : public toTextUtil {
  private:
   char *buf;
-  int charCount; /*Total characters written so far*/
+  int charCount; /*Total characters written so far (not including NULL) */
  protected:
   virtual char *advance(char *cur);
  public:
-  toText(char *outBuf);
-  int size(void) const {return charCount;}
+  toText(char *outStr);
+  int size(void) const {return charCount+1; /*add NULL*/ }
 };
 
 class toTextFile : public er {
