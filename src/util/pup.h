@@ -514,6 +514,7 @@ public:
 	static PUP_ID register_constructor(const char *className,
 		constructor_function fn);
 	static constructor_function get_constructor(const PUP_ID &id);
+	virtual /*PUP::*/able *clone(void) const;
 
 //Target methods:
 	virtual void pup(er &p);

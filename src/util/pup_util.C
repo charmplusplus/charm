@@ -354,6 +354,24 @@ void PUP::er::object(able** a)
 	(*a)->pup(*this);
 }
 
+PUP::able *PUP::able::clone(void) const {
+	// Make a new object to fill out
+	PUP::able *ret=get_constructor(get_PUP_ID()) ();
+
+	// Save our own state into a buffer
+	PUP::able *mthis=(PUP::able *)this; /* cast away constness */
+	int size;
+	{ PUP::sizer ps; mthis->pup(ps); size=ps.size(); }
+	void *buf=malloc(size);
+	{ PUP::toMem pt(buf); mthis->pup(pt); }
+	
+	// Fill the new object with our values
+	{ PUP::fromMem pf(buf); ret->pup(pf); }
+	free(buf);
+	
+	return ret;
+}
+
 //Empty destructor & pup routine
 PUP::able::~able() {}
 void PUP::able::pup(PUP::er &p) {}

@@ -282,6 +282,10 @@ public:
 	T *operator=(T *sto) {storage=sto; return sto;}
 	
 	operator T* () const {return storage;}
+
+	T *release() {
+		T *ret=storage; storage=0; return ret;
+	}
 	
 	//Stolen from boost::scoped_ptr:
 	T & operator*() const // never throws
@@ -306,13 +310,13 @@ public:
 
 ///A vector of zero-initialized heap-allocated objects of type T
 template <class T, class PUP_PTR=CkPupAllocatePtr<T> >
-class CkPupPtrVec : public CkVec< CkZeroPtr<T, PUP_PTR> >, 
-	public CkNoncopyable {
+class CkPupPtrVec : public CkVec< CkZeroPtr<T, PUP_PTR> > {
  public:
 	typedef CkPupPtrVec<T,PUP_PTR> this_type;
 	typedef CkVec< CkZeroPtr<T, PUP_PTR> > super;
 	CkPupPtrVec() {}
 	CkPupPtrVec(int size) :super(size) {}
+
 	~CkPupPtrVec() {
 		for (int i=0;i<length();i++)
 			operator[] (i).destroy();
@@ -326,16 +330,30 @@ class CkPupPtrVec : public CkVec< CkZeroPtr<T, PUP_PTR> >,
 
 ///A vector of pointers-to-subclasses of a PUP::able parent
 template <class T>
-class CkPupAblePtrVec : public CkVec< CkZeroPtr<T, CkPupAblePtr<T> > >, 
-	public CkNoncopyable {
+class CkPupAblePtrVec : public CkVec< CkZeroPtr<T, CkPupAblePtr<T> > > {
  public:
 	typedef CkPupAblePtrVec<T> this_type;
 	typedef CkVec< CkZeroPtr<T, CkPupAblePtr<T> > > super;
 	CkPupAblePtrVec() {}
 	CkPupAblePtrVec(int size) :super(size) {}
-	~CkPupAblePtrVec() {
+	CkPupAblePtrVec(const this_type &t) {
+		copy_from(t);
+	}
+	this_type &operator=(const this_type &t) {
+		destroy();
+		copy_from(t);
+	}
+	void copy_from(const this_type &t) {
+		for (int i=0;i<t.length();i++)
+			push_back((T *)t[i]->clone());
+	}
+	void destroy(void) {
 		for (int i=0;i<length();i++)
 			operator[] (i).destroy();
+		length()=0;
+	}
+	~CkPupAblePtrVec() {
+		destroy();
 	}
 	void pup(PUP::er &p) {
 		int l=pupbase(p);
