@@ -9,7 +9,7 @@ DEST=$(CDIR)/lib/libmoduletcharm.a
 all: $(DEST)
 
 $(DEST): $(OBJS) $(COMPAT) headers
-	$(CHARMC) $(OBJS) $(COMPAT) -o $@
+	$(CHARMC) $(OBJS) $(COMPAT) -o $(DEST)
 
 headers: $(HEADERS)
 	cp $(HEADERS) $(CDIR)/include/
@@ -24,7 +24,7 @@ $(COMPAT):
 	done
 
 tcharm.o: tcharm.C $(HEADERS)
-	$(CHARMC) $(CFLAGS) -c $<
+	$(CHARMC) $(CFLAGS) -c tcharm.C
 
 tcharm.decl.h: tcharm.ci
 	$(CHARMC) tcharm.ci
