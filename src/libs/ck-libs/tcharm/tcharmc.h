@@ -48,6 +48,7 @@ int TCHARM_Num_elements(void);
 void TCHARM_Barrier(void);
 void TCHARM_Migrate(void);
 void TCHARM_Done(void);
+void TCHARM_Yield(void);
 
 /* Set/get thread-private ("thread global") data. */
 typedef void (*TCHARM_Pup_fn)(pup_er p,void *data);

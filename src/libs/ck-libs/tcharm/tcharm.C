@@ -85,8 +85,10 @@ void TCHARM_Api_trace(const char *routineName,const char *libraryName)
 	TCharm *tc=CtvAccess(_curTCharm);
 	char where[100];
 	if (tc==NULL) sprintf(where,"[serial context on %d]",CkMyPe());
-	else sprintf(where,"[vp %d, p %d]",tc->getElement(),CkMyPe());
+	else sprintf(where,"[%p> vp %d, p %d]",(void *)tc,tc->getElement(),CkMyPe());
 	CmiPrintf("%s Called routine %s\n",where,routineName);
+	CmiPrintStackTrace(1);
+	CmiPrintf("\n");
 }
 
 static void startTCharmThread(TCharmInitMsg *msg)
@@ -664,6 +666,7 @@ static void checkAddress(void *data)
 	    CkAbort("The UserData you register must be allocated on the stack!\n");
 }
 
+/* Old "register"-based userdata: */
 CDECL int TCHARM_Register(void *data,TCHARM_Pup_fn pfn)
 { 
 	TCHARMAPI("TCHARM_Register");
@@ -687,6 +690,7 @@ CDECL void *TCHARM_Get_userdata(int id)
 FDECL void *FTN_NAME(TCHARM_GET_USERDATA,tcharm_get_userdata)(int *id)
 { return TCHARM_Get_userdata(*id); }
 
+/* New hardcoded-ID userdata: */
 CDECL void TCHARM_Set_global(int globalID,void *new_value,TCHARM_Pup_global_fn pup_or_NULL)
 {
 	TCHARMAPI("TCHARM_Set_global");
@@ -717,6 +721,16 @@ FDECL void FTN_NAME(TCHARM_MIGRATE,tcharm_migrate)(void)
 {
 	TCHARMAPI("TCHARM_Migrate");
 	TCharm::get()->migrate();
+}
+
+CDECL void TCHARM_Yield(void)
+{
+	TCHARMAPI("TCHARM_Yield");
+	TCharm::get()->schedule();
+}
+FDECL void FTN_NAME(TCHARM_YIELD,tcharm_yield)(void)
+{
+	TCHARM_Yield();
 }
 
 CDECL void TCHARM_Barrier(void)

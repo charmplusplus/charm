@@ -10,6 +10,7 @@
 
        external TCHARM_Register
        external TCHARM_Migrate
+       external TCHARM_Yield
        external TCHARM_Done
 
        external TCHARM_Readonly_globals
