@@ -179,7 +179,7 @@ public:
   };
   LastLBInfo lastLBInfo;
   inline double myExpectedLoad() { return lastLBInfo.expectedLoad[CkMyPe()]; }
-
+  inline double* expectedLoad() { return lastLBInfo.expectedLoad; }
 };
 
 void TurnManualLBOn();
