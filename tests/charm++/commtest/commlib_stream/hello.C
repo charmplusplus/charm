@@ -106,7 +106,9 @@ public:
             //Pass the hello on:
             array_proxy[next].SayHi(hiNo+1, hcount+1);
       else{
-          mainProxy.done();    
+          static int c=0;
+	  c++;
+	  if (c==2000) mainProxy.done();    
       }
     }
 };
