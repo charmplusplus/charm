@@ -43,7 +43,7 @@ pdf: $(FILE).pdf
 
 $(FILE).pdf: $(TEX) $(FILE).aux
 	pdflatex $(FILE).tex
-
+	pdflatex $(FILE).tex
 
 # HTML Target:
 html: $(FILE)
