@@ -1,0 +1,9 @@
+module Comm1LB {
+
+extern module CentralLB;
+
+group Comm1LB : CentralLB {
+  entry void Comm1LB(void);  
+};
+
+};
