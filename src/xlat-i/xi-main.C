@@ -34,38 +34,26 @@ ModuleList *Parse(char *interfacefile)
 
 void abortxi(char *name)
 {
-  cout << "Usage : " << name << " [-ansi]  module.ci" << endl;
+  cout << "Usage : " << name << " [-ansi|-f90|-intrinsic]  module.ci" << endl;
   exit(1) ;
 }
 
 main(int argc, char *argv[])
 {
-  char *fname;
-  char *option=0;
-
+  char *fname=NULL;
   fortranMode = 0;
+  internalMode = 0;
 
-  switch (argc) {
-  case 2:
-    fname = argv[1];
-    break;
-
-  case 3:
-    if (*argv[1]=='-') {
-      option = argv[1];
-      fname = argv[2];
-    } else if (*(argv[2]) == '-') {
-      fname = argv[1];
-      option = argv[2];
-    } else abortxi(argv[0]);
-
-    break;
-  default:
-    abortxi(argv[0]);
+  for (int i=1; i<argc; i++) {
+    if (*argv[i]=='-') {
+      if (strcmp(argv[i],"-f90")==0)  fortranMode = 1;
+      if (strcmp(argv[i],"-intrinsic")==0)  internalMode = 1;
+      else abortxi(argv[0]);
+    }
+    else
+      fname = argv[i];
   }
-
-  if (option != 0 && strcmp(option,"-f90")==0)
-    fortranMode = 1;
+  if (fname==NULL) abortxi(argv[0]);
 
   ModuleList *m = Parse(fname) ;
   m->generate();

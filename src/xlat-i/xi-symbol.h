@@ -39,6 +39,7 @@ class Chare;//Forward declaration
 class Message;
 class TParamList;
 extern int fortranMode;
+extern int internalMode;
 extern const char *cur_file;
 void die(const char *why,int line=-1);
 

@@ -17,6 +17,7 @@
 #endif
 
 int fortranMode;
+int internalMode;
 const char *cur_file;
 
 const char *Prefix::Proxy="CProxy_";
@@ -2583,6 +2584,7 @@ void Entry::genReg(XStr& str)
   /* attributes */
   str << ", 0";
   if (attribs & SNOKEEP) str << "+CK_EP_NOKEEP";
+  if (internalMode) str << "+CK_EP_INTRINSIC";
   str << ");\n";
   if (isConstructor()) {
     if(container->isMainChare()&&!(attribs&SMIGRATE))
