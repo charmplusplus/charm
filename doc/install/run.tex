@@ -12,7 +12,10 @@
 % REVISION HISTORY:
 %
 % $Log$
-% Revision 1.10  1997-07-25 21:07:54  wilmarth
+% Revision 1.11  1998-11-03 19:24:48  milind
+% Added documentation for the new shell option in nodelist.
+%
+% Revision 1.10  1997/07/25 21:07:54  wilmarth
 % Made a few more nodes file changes.
 %
 % Revision 1.9  1997/07/23 17:29:14  wilmarth
@@ -123,7 +126,9 @@ the properties of all hosts that follow them.  The qualifiers are:
 \begin{tabbing}
 {\tt group <groupname>}~~~\= - subsequent hosts are members of specified group\\
 {\tt login <login>  }     \> - subsequent hosts use the specified login\\
-{\tt passwd <passwd>}     \> - subsequent hosts use the specified password\\
+{\tt shell <shell>  }     \> - subsequent hosts use the specified remote 
+shell\\
+%{\tt passwd <passwd>}     \> - subsequent hosts use the specified password\\
 {\tt setup <cmd>  }       \> - subsequent hosts should execute cmd\\
 {\tt home <dir> }         \> - subsequent hosts should find programs under dir\\
 {\tt cpus <n>}            \> - subsequent hosts should use N light-weight processes\\
@@ -131,7 +136,14 @@ the properties of all hosts that follow them.  The qualifiers are:
 {\tt ext <extn>}          \> - subsequent hosts should append extn to the pgm name\\
 \end{tabbing}
 
-All of these accept "*" as an argument, this resets the modifier to
+{\bf Note:}
+ By default, conv-host uses a remote shell "rsh" to spawn node processes
+on the remote hosts. The {\tt shell} qualifier can be used to override
+it with say, "ssh". One can set the {\tt CONV\_RSH} environment variable
+or use conv-host option {\tt ++remote-shell} to override the default remote 
+shell for all hosts with unspecified {\tt shell} qualifier.
+
+All qualifiers accept "*" as an argument, this resets the modifier to
 its default value.  Note that currently, the passwd, cpus, and speed
 factors are ignored.  Inline qualifiers will be added:
 
