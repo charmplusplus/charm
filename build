@@ -299,7 +299,7 @@ fi
 echo "Copying src/scripts/Makefile to $VERSION/tmp"
 rm -f $VERSION/tmp/Makefile
 rm -f $VERSION/tmp/Make.depends
-rm -f $VERSION/tmp/Makefile_lb
+rm -f $VERSION/tmp/Make.lb
 
 if [ "x_`echo $VERSION | awk -F- '{print $2}'`" = "x_win32" ]
 then
@@ -327,9 +327,9 @@ EOF
 	done
 fi
 
-$VERSION/tmp/system_ln "../../src/scripts/Makefile" $VERSION/tmp/Makefile
 $VERSION/tmp/system_ln "../../src/scripts/Make.depends" $VERSION/tmp/Make.depends
-$VERSION/tmp/system_ln "../../src/ck-ldb/Makefile_lb" $VERSION/tmp/Makefile_lb
+$VERSION/tmp/system_ln "../../src/ck-ldb/Make.lb" $VERSION/tmp/Make.lb
+$VERSION/tmp/system_ln "../../src/scripts/Makefile" $VERSION/tmp/Makefile
 
 ConvUsr="$VERSION/tmp/conv-mach-pre.sh"
 echo "Generating $ConvUsr"
