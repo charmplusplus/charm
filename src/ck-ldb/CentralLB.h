@@ -82,8 +82,6 @@ protected:
 
 private:  
 
-
-
   int mystep;
   int myspeed;
   int stats_msg_count;
@@ -91,6 +89,7 @@ private:
   LDStats* statsDataList;
   int migrates_completed;
   int migrates_expected;
+  int startFlag;
   double start_lb_time;
 };
 

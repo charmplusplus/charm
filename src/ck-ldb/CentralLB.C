@@ -96,10 +96,12 @@ void CentralLB::AtSync()
 {
   DEBUGF(("[%d] CentralLB At Sync step %d!!!!\n",CkMyPe(),mystep));
 
+  startFlag = 0;
   if (!QueryBalanceNow(step())) {
     MigrationDone();
     return;
   }
+  startFlag = 1;
   thisProxy [CkMyPe()].ProcessAtSync();
 }
 
@@ -261,7 +263,7 @@ void CentralLB::ReceiveMigration(LBMigrateMsg *m)
 
 void CentralLB::MigrationDone()
 {
-  if (CkMyPe() == cur_ld_balancer) {
+  if (startFlag && CkMyPe() == cur_ld_balancer) {
     double end_lb_time = CmiWallTimer();
     CkPrintf("Load balancing step %d finished at %f duration %f\n",
 	     step(),end_lb_time,end_lb_time - start_lb_time);
