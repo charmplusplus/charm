@@ -140,7 +140,7 @@ FORTRAN_AS_C_RETURN(int,
 
 /// Return a new'd copy of this class, by calling pup.
 template <class T>
-T *clonePointerViaPup(T *old) {
+inline T *clonePointerViaPup(T *old) {
 	int len=PUP::size(*old);
 	char *buf=new char[len];
 	PUP::toMemBuf(*old,buf,len);
