@@ -1,9 +1,9 @@
 /***************************************************************************
  * RCS INFORMATION:
  *
- *	$RCSfile$
- *	$Author$	$Locker$		$State$
- *	$Revision$	$Date$
+ *      $RCSfile$
+ *      $Author$        $Locker$                $State$
+ *      $Revision$      $Date$
  *
  ***************************************************************************
  * DESCRIPTION:
@@ -11,678 +11,636 @@
  ***************************************************************************
  * REVISION HISTORY:
  *
- * $Log$
- * Revision 1.8  1997-04-25 20:48:19  jyelon
- * Corrected CmiNotifyIdle
- *
- * Revision 1.7  1997/04/24 22:37:11  jyelon
- * Added CmiNotifyIdle
- *
- * Revision 1.6  1997/03/19 04:31:55  jyelon
- * Redesigned ConverseInit
- *
- * Revision 1.5  1997/02/13 09:31:57  jyelon
- * Updated for new main/ConverseInit structure.
- *
- * Revision 1.4  1996/07/16 21:08:30  gursoy
- * added empty CmiDeliverSpecificMsg
- *
- * Revision 1.3  1996/07/15  20:59:22  jyelon
- * Moved much timer, signal, etc code into common.
- *
- * Revision 1.2  1996/06/28 20:30:51  gursoy
- * *** empty log message ***
- *
- * Revision 1.1  1996/05/16  15:59:43  gursoy
- * Initial revision
- *
  ***************************************************************************/
 static char ident[] = "@(#)$Header$";
 
-#include <time.h>
-#include <unistd.h>
-#include <math.h>
+/*
+ * This is a complete port, but could be made considerably more efficient
+ * by handling asynchronous messages correctly, ie. without doing
+ * an extra copy and synchronous send
+ */
+
+#include <stdlib.h>
+#include <malloc.h>
+#include <mpp/shmem.h>
 #include "converse.h"
-#include "fm.h"
 
-CpvDeclare(int,  Cmi_mype);
-CpvDeclare(int, Cmi_numpes);
-CpvDeclare(void*, CmiLocalQueue);
-CpvDeclare(int, CmiBufferGrabbed);
+/*
+ *  We require statically allocated variables for locks.  This defines
+ *  the max number of processors available.
+ */
+#define MAX_PES 8192
 
-static int _MC_neighbour[4]; 
-static int _MC_numofneighbour;
-static long ticksPerSecond;
-static long beginTicks;
-static int  remainingMsgCount;
-static int  lastMsgType;
-static int  singlepktMsgLen;
-static void *singlepktMsg;
-
-static void singlepkt_msg_handler();
-static void mulpkt_header_handler();
-static void mulpkt_data_handler();
-static void mulpkt_send();
-
-/* default value used by FM is 1024 bytes */
-#define MAX_PACKET_SIZE 1024
-
-#define DATA_SIZE (MAX_PACKET_SIZE - sizeof(int))
-
-#define RESET         0
-#define SINGLEPKT_MSG 1
-#define MULTIPKT_MSG  2
-
-#define machine_send(dest, size, msg)  \
-    { if (size <= MAX_PACKET_SIZE) \
-        { FMs_send(dest, singlepkt_msg_handler, msg, size);\
-          FMs_complete_send();}\
-      else mulpkt_send(dest, size, msg);}\
-
-typedef void (*FM_HANDLER)(void *, int) ;
-typedef int (*FUNCTION_PTR)();   
-
-
-
-void *CmiAlloc(size)
-int size;
-{
-char *res;
-res =(char *)malloc(size+8);
-if (res==0) printf("Memory allocation failed.");
-((int *)res)[0]=size;
-return (void *)(res+8);
-}
-
-int CmiSize(blk)
-void *blk;
-{
-return ((int *)( ((char *)blk)-8))[0];
-}
-
-void CmiFree(blk)
-void *blk;
-{
-free( ((char *)blk)-8);
-}
-
-
-
-/**************************  TIMER FUNCTIONS **************************/
-
-double CmiWallTimer()
-{
-  double t;
-  t = (double) (rtclock() - beginTicks); 
-  return (double) (t/(double)ticksPerSecond);
-}
-
-double CmiCpuTimer()
-{
-  double t;
-  t = (double) (rtclock() - beginTicks); 
-  return (double) (t/(double)ticksPerSecond);
-}
-
-double CmiTimer()
-{
-  double t;
-  t = (double) (rtclock() - beginTicks); 
-  return (double) (t/(double)ticksPerSecond);
-}
-
-static void CmiTimerInit()
-{
-  ticksPerSecond = sysconf(_SC_CLK_TCK) ;
-  beginTicks = rtclock() ;
-}
-
-/********************* MESSAGE RECEIVE FUNCTIONS ******************/
-
-void CmiDeliversInit()
-{
-  CpvInitialize(int, CmiBufferGrabbed);
-  CpvAccess(CmiBufferGrabbed) = 0;
-}
-
-
-
-void CmiGrabBuffer(void **msg)
-{
-  CpvAccess(CmiBufferGrabbed) = 1;
-
-  if (lastMsgType == SINGLEPKT_MSG)
-  {
-       *msg = (void *) CmiAlloc(singlepktMsgLen);
-       memcpy(*msg, singlepktMsg, singlepktMsgLen);
-  }
-}
-
-
-int CmiDeliverMsgs(maxmsgs)
-int maxmsgs;
-{
-    int n;
-    void *msg;
-
-    remainingMsgCount = maxmsgs;
-
-    while (1)
-    {
-        n = FMs_extract_1();
-        if (remainingMsgCount==0) break;
-
-        FIFO_DeQueue(CpvAccess(CmiLocalQueue), &msg);
-        if (msg) 
-        {
-            CpvAccess(CmiBufferGrabbed)=0;
-            (CmiGetHandlerFunction(msg))(msg);
-            if (!CpvAccess(CmiBufferGrabbed)) CmiFree(msg);
-            remainingMsgCount--; if (remainingMsgCount==0) break;
-        }
- 
-        if(n==0 && msg==0) break;
-
-    }
-
-    return remainingMsgCount;
-}
-
-
+/*
+ * Some constants
+ */
+enum boolean {false = 0, true = 1};
+enum {list_empty = -1 };
 
 
 /*
- * CmiDeliverSpecificMsg(lang)
+ * Local declarations for Cmi, used by common code
+ */
+CpvDeclare(void*, CmiLocalQueue);
+int Cmi_mype;
+int Cmi_numpes;
+int Cmi_myrank;
+
+/*
+ * Local queue functions, used by common code to store messages 
+ * to my own node efficiently.  These are used when 
+ * CMK_CMIDELIVERS_USE_COMMON_CODE is true.
+ */
+extern void *FIFO_Create(void);
+extern void FIFO_EnQueue(void *, void *);
+
+/*
+ * Distributed list declarations.  This linked list goes across machines,
+ * storing all the messages for this node until this processor copies them
+ * into local memory.
+ */
+typedef struct McDistListS
+{
+  int nxt_node;
+  struct McMsgHdrS *nxt_addr;
+  int msg_sz;
+} McDistList;
+
+typedef struct McMsgHdrS
+{
+  McDistList list_node;
+  enum boolean received_f;
+  int handler;
+} McMsgHdr;
+
+
+/*
+ * Mc functions, used in machine.c only.
+ */
+static void McInit();
+static void McInitList();
+static void McEnqueueRemote(void *msg, int msg_sz, int dst_pe);
+static void McRetrieveRemote(void);
+static void McCleanUpInTransit(void);
+
+/*
+ * These declarations are for a local linked list to hold messages which
+ * have been copied into local memory.  It is a modified version of the
+ * Origin2000 code with the locks removed.
+ */
+/* Allocation block size, to reduce num of mallocs */
+#define BLK_LEN  512  
+
+typedef struct McQueueS
+{
+  void     **blk;
+  unsigned int blk_len;
+  unsigned int first;
+  unsigned int len;
+} McQueue;
+
+static McQueue *McQueueCreate(void);
+static void McQueueAddToBack(McQueue *queue, void *element);
+static void *McQueueRemoveFromFront(McQueue *queue);
+static void *McQueueRemoveFromBack(McQueue *queue);
+
+/*************************************************************
+ * static variable declarations
+ */
+/*
+ *  Local queues used for mem management.
  *
- * - waits till a message with the specified handler is received,
- *   then delivers it.
- *
+ * These queues hold outgoing messages which will be picked up by
+ * receiver PEs.  Garbage collection works by scanning the 
+ * in_transit_queue for messages, freeing delivered ones, and moving
+ * others to in_transit_tmp_queue.  Then the pointers are swapped,
+ * so in_transit_queue contains all the undelivered messages, and
+ * in_transit_tmp_queue is empty.
+ */
+static McQueue *in_transit_queue;
+static McQueue *in_transit_tmp_queue;
+
+/* tmp_queue is used to invert the order of incoming messages */
+static McQueue *tmp_queue;  
+
+/* received_queue holds all the messages which have been moved
+ * into local memory.  Messages are dequede from here.
+ */
+static McQueue *received_queue;
+
+/*
+ * head is the pointer to my next incoming message.
+ */
+static McDistList head;
+
+/* Static variables are necessary for locks. */
+static long *my_lock;
+static long head_lock[MAX_PES];
+
+/**********************************************************************
+ *  CMI Functions START HERE
  */
 
-void CmiDeliverSpecificMsg(handler)
-int handler;
+
+/**********************************************************************
+ * Cmi Message calls.  This implementation uses sync-type sends for
+ * everything.  An async interface would be efficient, and not difficult
+ * to add
+ */
+void CmiSyncSendFn(int dest_pe, int size, char *msg)
 {
-  /* not implemented yet */
+  McMsgHdr *dup_msg;
+
+  dup_msg = (McMsgHdr *)CmiAlloc(size);
+  memcpy(dup_msg,msg,size);
+
+  McRetrieveRemote();
+
+  if (dest_pe == Cmi_mype)
+    FIFO_EnQueue(CpvAccess(CmiLocalQueue),dup_msg);
+  else
+  {
+    McEnqueueRemote(dup_msg,size,dest_pe); 
+  }
 }
 
-
-
-
-
-
-
-int CmiAsyncMsgSent(c)
-CmiCommHandle c ;
+CmiCommHandle CmiAsyncSendFn(int dest_pe, int size, char *msg)
 {
-    return 1;
+  CmiSyncSendFn(dest_pe, size, msg);
+  return 1;
 }
 
-
-void CmiReleaseCommHandle(c)
-CmiCommHandle c ;
+void CmiFreeSendFn(int dest_pe, int size, char *msg)
 {
+  /* No need to copy message, since we will immediately free it */
+  McRetrieveRemote();
+
+  if (dest_pe == Cmi_mype)
+    FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg);
+  else
+  {
+    McEnqueueRemote(msg,size,dest_pe); 
+  }
 }
 
-void CmiNotifyIdle()
+void CmiSyncBroadcastFn(int size, char *msg)
 {
-#if CMK_WHEN_PROCESSOR_IDLE_USLEEP
-  tv.tv_sec=0; tv.tv_usec=5000;
-  select(0,0,0,0,&tv);
+  int i;
+  for(i=0; i<Cmi_numpes; i++)
+    if (i != Cmi_mype)
+      CmiSyncSendFn(i, size, msg);
+}
+
+CmiCommHandle CmiAsyncBroadcastFn(int size, char *msg)
+{
+  CmiSyncBroadcastFn(size,msg);
+  return 1;
+}
+
+void CmiFreeBroadcastFn(int size, char *msg)
+{
+  CmiSyncBroadcastFn(size,msg);
+  CmiFree(msg);
+}
+
+void CmiSyncBroadcastAllFn(int size, char *msg)
+{
+  int i;
+  for(i=0; i<Cmi_numpes; i++)
+      CmiSyncSendFn(i, size, msg);
+}
+
+CmiCommHandle CmiAsyncBroadcastAllFn(int size, char *msg)
+{
+  CmiSyncBroadcastAllFn(size,msg);
+  return 1;
+}
+
+void CmiFreeBroadcastAllFn(int size, char *msg)
+{
+  CmiSyncBroadcastAllFn(size,msg);
+  CmiFree(msg);
+}
+
+/**********************************************************************
+ * CMI memory calls
+ */
+void *CmiAlloc(int size)
+{
+  char *res;
+
+#ifdef DEBUG
+  printf("[%d] Allocating %d really %d\n",Cmi_mype,size,size+8);
 #endif
+
+  res =(char *) malloc(size+8);
+  if (res==(char *)0) { 
+    CmiError("%d:Memory allocation failed.",CmiMyPe()); 
+    abort();
+  }
+  ((int *)res)[0]=size;
+  return (void *)(res+8);
 }
- 
 
-
-
-
-
-
-/********************* MESSAGE SEND FUNCTIONS ******************/
-
-
-
-void CmiSyncSendFn(destPE, size, msg)
-int destPE;
-int size;
-char * msg;
+int CmiSize(void *blk)
 {
-    char *temp;
-    if (CpvAccess(Cmi_mype) == destPE)
-       {
-          temp = (char *)CmiAlloc(size) ;
-          memcpy(temp, msg, size) ;
-          FIFO_EnQueue(CpvAccess(CmiLocalQueue), temp);
-       }
-    else
-          machine_send(destPE, size, msg);
+  return ((int *)( ((char *) blk) - 8))[0];
 }
 
-
-CmiCommHandle CmiAsyncSendFn(destPE, size, msg)  
-int destPE;
-int size;
-char * msg;
+void CmiFree(void *blk)
 {
-    CmiSyncSendFn(destPE, size, msg);
-    return 0;
+#ifdef DEBUG
+  printf("[%d] freeing %lx\n",Cmi_mype,blk);
+#endif
+  free( ((char *)blk) - 8);
 }
 
+/**********************************************************************
+ * CMI utility functions for startup, shutdown, and other miscellaneous
+ * activities.
+ */
 
-
-
-
-void CmiFreeSendFn(destPE, size, msg)
-     int destPE, size;
-     char *msg;
+/*
+ * This port uses the common CmiDeliver code, so we only provide
+ * CmiGetNonLocal()
+ */
+void *CmiGetNonLocal()
 {
-    if (CpvAccess(Cmi_mype) == destPE)
-       {
-          FIFO_EnQueue(CpvAccess(CmiLocalQueue), msg);
-       }
-    else
-       {  
-          machine_send(destPE, size, msg);
-          CmiFree(msg);
-       }
+  McRetrieveRemote();
+
+  return (void *)McQueueRemoveFromFront(received_queue);
 }
 
-
-
-void CmiSyncBroadcastFn(size, msg)        /* ALL_EXCEPT_ME  */
-int size;
-char * msg;
+void 
+ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 {
-    int i;
-    if (CpvAccess(Cmi_numpes) > 1) 
-    {
-        for(i=0; i<CpvAccess(Cmi_numpes); i++)
-          if (i!= CpvAccess(Cmi_mype)) {machine_send(i, size, msg);}
-    }
+  CmiSpanTreeInit();
+  CmiTimerInit();
+  McInit();
+  ConverseCommonInit(argv);
+  CthInit(argv);
+  if (initret==0)
+  {
+    fn(argc,argv);
+    if (usched==0) CsdScheduler(-1);
+    ConverseExit();
+  }
 }
-
-
-
-CmiCommHandle CmiAsyncBroadcastFn(size, msg) /* ALL_EXCEPT_ME  */
-int size;
-char * msg;
-{
-    CmiSyncBroadcastFn(size, msg);
-}
-
-
-
-
-void CmiFreeBroadcastFn(size, msg)
-    int size;
-    char *msg;
-{
-    CmiSyncBroadcastFn(size,msg);
-    CmiFree(msg);
-}
-
-
-
-
- 
-void CmiSyncBroadcastAllFn(size, msg)
-int size;
-char * msg;
-{
-    int i;
-    char *temp;
-    if (CpvAccess(Cmi_numpes) > 1) 
-    {
-       for(i=0; i<CpvAccess(Cmi_numpes); i++) 
-          if (i!= CpvAccess(Cmi_mype)) {machine_send(i, size, msg);}
-    } 
-    temp = (char *)CmiAlloc(size) ;
-    memcpy(temp, msg, size) ;
-    FIFO_EnQueue(CpvAccess(CmiLocalQueue), temp); 
-}
-
-
-CmiCommHandle CmiAsyncBroadcastAllFn(size, msg)
-int size;
-char * msg;
-{
-    CmiSyncBroadcastAllFn(size, msg);
-}
-
-
-
-void CmiFreeBroadcastAllFn(size, msg)
-int size;
-char * msg;
-{
-    int i;
-    if (CpvAccess(Cmi_numpes) > 1)
-    {
-        for(i=0; i<CpvAccess(Cmi_numpes); i++) 
-          if (i!= CpvAccess(Cmi_mype)) {machine_send(i, size, msg);}
-
-    }
-    FIFO_EnQueue(CpvAccess(CmiLocalQueue), msg);
-}
-
-
-
-/************************** SETUP ***********************************/
 
 void ConverseExit()
 {
   exit(0);
 }
 
-void ConverseInit(argc, argv, fn, usched, initret)
-int argc;
-char *argv[];
-CmiStartFn fn;
+void CmiNotifyIdle(void)
 {
-  CpvInitialize(int, Cmi_mype);
-  CpvInitialize(int, Cmi_numpes);
-  CpvInitialize(void*, CmiLocalQueue);
-  CpvAccess(Cmi_mype)  = _my_pe();
-  CpvAccess(Cmi_numpes) = _num_pes();
-  CpvAccess(CmiLocalQueue)= (void *) FIFO_Create();
-  ConverseCommonSetup(argv);
-  CthInit(argv);
-  neighbour_init(CpvAccess(Cmi_mype));
-  CmiSpanTreeInit();
-  FM_set_parameter(MAX_MSG_SIZE_FINC, MAX_PACKET_SIZE) ;
-  /* 512 is the default value used by FM */
-  FM_set_parameter(MSG_BUFFER_SIZE_FINC, 512);
-  FM_initialize() ;
-  CmiTimerInit();
-  if (initret==0) {
-    fn(argc, argv);
-    if (usched==0) CsdScheduler(-1);
-    ConverseExit();
+  /* Use this opportunity to clean up the in_transit_queue */
+  McCleanUpInTransit();
+}
+
+/**********************************************************************
+ * Mc Functions:
+ * Mc functions are used internally in machine.c only
+ */
+static void McInit(void)
+{
+  CpvInitialize(void *, CmiLocalQueue);
+  CpvAccess(CmiLocalQueue) = FIFO_Create();
+  Cmi_mype = _my_pe();
+  Cmi_numpes = _num_pes();
+  Cmi_myrank = 0;
+  shmem_set_cache_inv();
+
+  McInitList();
+}
+
+static void McInitList(void)
+{
+  int i;
+
+  received_queue = McQueueCreate();
+  tmp_queue = McQueueCreate();
+  in_transit_tmp_queue = McQueueCreate();
+  in_transit_queue = McQueueCreate();
+
+  head.nxt_node = list_empty;
+  head.nxt_addr = NULL;
+  head.msg_sz = 0;
+  if (Cmi_numpes > MAX_PES)
+  {
+    CmiPrintf("Not enough processors allocated in machine.c.\n");
+    CmiPrintf("Change MAX_PES in t3e/machine.c to at least %d and recompile Converse\n",
+    Cmi_numpes);
   }
+  for(i=0; i < Cmi_numpes; i++)
+    head_lock[i] = 0;
+  my_lock = &(head_lock[Cmi_mype]);
+  barrier();
+  shmem_clear_lock(my_lock);
 }
 
-/**********************  LOAD BALANCER NEEDS **********************/
-
-
-
-long CmiNumNeighbours(node)
-int node;
+static void McEnqueueRemote(void *msg, int msg_sz, int dst_pe)
 {
-    if (node == CpvAccess(Cmi_mype) )
-     return  _MC_numofneighbour;
-    else
-     return 0;
+ /*
+  * To enqueue on a remote node, we should:
+  * 0. Free any delivered messages from the message_in_transit list.
+  * 1. Add message in the "message_in_transit" list
+  * 2. Fill in the fields in the message header
+  * 3. Lock the head pointer on the remote node.
+  * 4. Swap the list pointer with that on the other node.
+  * 5. Release lock
+  */
+
+  McDistList tmp_link;
+  McDistList *msg_link;
+
+  /* 0. Free any delivered messages from the in_transit_queue list. */
+  McCleanUpInTransit();
+
+  /* 1. Add message in the "in_transit_queue" list */
+  McQueueAddToBack(in_transit_queue,msg);
+
+  /* 2. Fill in the fields in the message header */
+  msg_link = &(((McMsgHdr *)msg)->list_node);
+  ((McMsgHdr *)msg)->received_f = false;
+
+  /* Set list fields to point back to this processor, this message.  */
+  tmp_link.nxt_node = Cmi_mype;
+  tmp_link.nxt_addr = msg;
+  tmp_link.msg_sz = msg_sz;
+
+  /* 3. Lock the head pointer on the remote node.
+     Acquire lock on the destination queue.  If locks turn oout to
+     be inefficient, use fetch and increment to imp. lock
+   */
+#ifdef DEBUG
+  printf("[%d] Locking on %d:%lx\n",Cmi_mype,
+         dst_pe,&(head_lock[dst_pe]));
+#endif
+
+  shmem_set_lock(&(head_lock[dst_pe]));
+
+#ifdef DEBUG
+  printf("[%d] Locked on %d:%lx\n",Cmi_mype,
+         dst_pe,&(head_lock[dst_pe]));
+#endif
+
+  /* 4. Swap the list pointer with that on the other node.
+   */
+  /* First, get current head pointer, and stick it in this 
+   * message data area.
+   */
+  shmem_get(msg_link, &head, sizeof(McDistList)/sizeof(int), dst_pe);
+  /* Next, write the new message into the top of the list */
+  shmem_put(&head, &tmp_link, sizeof(McDistList)/sizeof(int),dst_pe);
+
+#ifdef DEBUG
+  printf("[%d] Adding Message to pe %d\n",Cmi_mype,dst_pe);
+  printf("[%d]   nxt_node = %d\n",Cmi_mype,tmp_link.nxt_node);
+  printf("[%d]   nxt_addr = %x\n",Cmi_mype,tmp_link.nxt_addr);
+  printf("[%d]   msg_sz = %x\n",Cmi_mype,tmp_link.msg_sz);
+  printf("[%d] Old Message is now at %x\n",Cmi_mype,msg_link);
+  printf("[%d]   nxt_node = %d\n",Cmi_mype,msg_link->nxt_node);
+  printf("[%d]   nxt_addr = %x\n",Cmi_mype,msg_link->nxt_addr);
+  printf("[%d]   msg_sz = %x\n",Cmi_mype,msg_link->msg_sz);
+#endif
+
+#ifdef DEBUG
+  printf("[%d] Releasing lock %d:%lx\n",Cmi_mype,
+         dst_pe,&(head_lock[dst_pe]));
+#endif
+
+  /* 5. Release lock */
+  shmem_clear_lock(&(head_lock[dst_pe]));
+
+#ifdef DEBUG
+  printf("[%d] Released lock %d:%lx\n",Cmi_mype,
+         dst_pe,&(head_lock[dst_pe]));
+#endif
 }
 
-
-CmiGetNodeNeighbours(node, neighbours)
-int node, *neighbours;
+static void McRetrieveRemote(void)
 {
-    int i;
+  /*
+   * The local host should retrieve messages from the distributed list
+   * and put them in local memory, in a messages queue.
+   * Steps:
+   * 0) Lock list pointer.
+   * 1) Replace list pointer with NULL and unlock list
+   * 2) Get each message into local memory
+   * 3) Enqueue list into local message queue, in reverse order
+   */
 
-    if (node == CpvAccess(Cmi_mype) )
-       for(i=0; i<_MC_numofneighbour; i++) neighbours[i] = _MC_neighbour[i];
+  McDistList list_head;
+  McDistList *cur_node;
+  McMsgHdr *cur_msg; 
+  int received_f;
 
-}
+#ifdef DEBUG
+  printf("[%d] Start front = %lx, back = %lx\n",Cmi_mype,received_queue_front,received_queue_back);
+#endif
+  /* Get the head of the list */
 
+  if (head.nxt_node == list_empty)  /* apparently there are no messages */
+    return;
+#ifdef DEBUG
+  printf("[%d] Locking on %lx\n",Cmi_mype,
+         my_lock);
+#endif
+  /* 0) Lock list pointer. */
+  shmem_set_lock(my_lock);
+#ifdef DEBUG
+  printf("[%d] Locked on %lx\n",Cmi_mype,
+         my_lock);
+#endif
+  /* 1) Replace list pointer with NULL and unlock list */
+  list_head = head;
+  head.nxt_node = list_empty;
+  head.nxt_addr = NULL;
+  head.msg_sz = 0;
+  shmem_clear_lock(my_lock);
+#ifdef DEBUG
+  printf("[%d] Released lock on %lx\n",Cmi_mype,
+         my_lock);
+#endif
 
-int CmiNeighboursIndex(node, neighbour)
-int node, neighbour;
-{
-    int i;
+  /* 2) Get each message into local memory
+   * Start copying the messages into local memory, putting messages into
+   * a local list for future reversing.
+   */
+  cur_node = &list_head;
+  received_f = true;
 
-    for(i=0; i<_MC_numofneighbour; i++)
-       if (_MC_neighbour[i] == neighbour) return i;
-    return(-1);
-}
-
-
-
-/* internal functions                                                 */
-/* Following functions establish a two dimensional torus connection */
-/* among the procesors (for any number of processors > 0              */
-   
-
-
-static neighbour_init(p)
-int p;
-{
-    int a,b,n;
-
-    a = (int) floor(sqrt((double) CpvAccess(Cmi_numpes)));
-    b = (int) ceil( ((double)CpvAccess(Cmi_numpes) / (double)a) );
-
-   
-    _MC_numofneighbour = 0;
-   
-    /* east neighbour */
-    if ( (p+1)%b == 0 )
-           n = p-b+1;
-    else {
-           n = p+1;
-           if (n>=CpvAccess(Cmi_numpes)) n = (a-1)*b; /* west-south corner */
+  while (cur_node->nxt_node != list_empty)
+  {
+#ifdef DEBUG
+    printf("%d allocating %d bytes\n",Cmi_mype,cur_node->msg_sz);
+#endif
+    cur_msg = (McMsgHdr *)CmiAlloc(cur_node->msg_sz);
+    if (cur_msg ==NULL)
+    {
+      CmiError("%s:%d Cannot Allocate Memory\n",__FILE__,__LINE__);
+      exit(1);
     }
-    if (neighbour_check(p,n) ) _MC_neighbour[_MC_numofneighbour++] = n;
 
-    /* west neigbour */
-    if ( (p%b) == 0) {
-          n = p+b-1;
-          if (n >= CpvAccess(Cmi_numpes)) n = CpvAccess(Cmi_numpes)-1;
-       }
+#ifdef DEBUG
+    printf("[%d] Retrieving message from [%d]:%x size %d at %x to %x\n",
+           Cmi_mype,cur_node->nxt_node,cur_node->nxt_addr,
+           cur_node->msg_sz,cur_node,cur_msg);
+#endif
+
+    shmem_get(cur_msg, cur_node->nxt_addr,
+              cur_node->msg_sz/8, cur_node->nxt_node);
+
+#ifdef DEBUG
+    printf("[%d]   nxt_node = %d\n",
+	   Cmi_mype,cur_msg->list_node.nxt_node);
+    printf("[%d]   nxt_addr = %x\n",
+	   Cmi_mype,cur_msg->list_node.nxt_addr);
+    printf("[%d]   msg_sz = %x\n",
+#endif
+
+    /* Mark the remote message for future deletion */
+    shmem_put(&(cur_node->nxt_addr->received_f),&received_f,
+              1, cur_node->nxt_node);
+
+    /* Add to list for reversing */
+    McQueueAddToBack(tmp_queue,cur_msg);
+
+    /* Move pointer to next message */
+    cur_node = &(cur_msg->list_node);
+  }
+
+  /* 3) Enqueue list into local message queue, in reverse order */
+  while ((cur_msg = McQueueRemoveFromBack(tmp_queue)) != NULL)  {
+    McQueueAddToBack(received_queue,cur_msg);
+  }
+  return;
+}
+
+static void McCleanUpInTransit(void)
+{
+  McMsgHdr *msg;
+  McQueue *swap_ptr;
+
+#ifdef DEBUG
+  CmiPrintf("[%d] in_transit_queue = %d, tmp_queue = %d\n",
+	Cmi_mype,in_transit_queue->len,in_transit_tmp_queue->len);
+#endif
+  /* 
+   * Free received messages, and move others to tmp_queue
+   */
+  while ((msg = (McMsgHdr *)McQueueRemoveFromFront(in_transit_queue)) 
+	 != NULL)
+  {
+    if (msg->received_f)
+    {
+#ifdef DEBUG
+      CmiPrintf("[%d] Freeing message at %x\n",Cmi_mype,msg);
+#endif
+      CmiFree(msg);
+    }
     else
-          n = p-1;
-    if (neighbour_check(p,n) ) _MC_neighbour[_MC_numofneighbour++] = n;
-
-    /* north neighbour */
-    if ( (p/b) == 0) {
-          n = (a-1)*b+p;
-          if (n >= CpvAccess(Cmi_numpes)) n = n-b;
-       }
-    else
-          n = p-b;
-    if (neighbour_check(p,n) ) _MC_neighbour[_MC_numofneighbour++] = n;
-    
-    /* south neighbour */
-    if ( (p/b) == (a-1) )
-           n = p%b;
-    else {
-           n = p+b;
-           if (n >= CpvAccess(Cmi_numpes)) n = n%b;
-    } 
-    if (neighbour_check(p,n) ) _MC_neighbour[_MC_numofneighbour++] = n;
-
+    {
+#ifdef DEBUG
+      CmiPrintf("[%d] Not freeing message at %x\n",Cmi_mype,msg);
+#endif
+      McQueueAddToBack(in_transit_tmp_queue,msg);
+    }
+  }
+  /*
+   * swap queues, so tmp_queue is now empty, and in_transit_queue has
+   * only non-received messages.
+   */
+  swap_ptr = in_transit_tmp_queue;
+  in_transit_tmp_queue = in_transit_queue;
+  in_transit_queue = swap_ptr;
+#ifdef DEBUG
+  CmiPrintf("[%d] done in_transit_queue = %d, tmp_queue = %d\n",
+	Cmi_mype,in_transit_queue->len,in_transit_tmp_queue->len);
+#endif
 }
 
-static neighbour_check(p,n)
-int p,n;
+/*******************************************************************
+ * The following internal functions implements FIFO queues for
+ * messages in the local address space.  This is used for the
+ * received_queue, the in_transit_queue, and tmp_queue.  Code
+ * originally comes from the Origin2000 port, with modifications.
+ */
+static void **McQueueAllocBlock(unsigned int len)
 {
-    int i; 
-    if (n==p) return 0;
-    for(i=0; i<_MC_numofneighbour; i++) if (_MC_neighbour[i] == n) return 0;
-    return 1; 
+  void ** blk;
+
+  blk=(void **)malloc(len*sizeof(void *));
+  if(blk==(void **)0) {
+    CmiError("Cannot Allocate Memory!\n");
+    abort();
+  }
+  return blk;
 }
 
-
-
-
-
-/* ******************************************************************* */
-/* Following functions performs packetizing and work with FM           */
-/* ******************************************************************* */
-
-
-
-typedef struct _MsgStruct {
-	char *beginPtr ;
-	char *currentPtr ;
-	int  length;
-        int  remainingPckts;
-} MsgStruct ;
-
-
-static MsgStruct MsgTable[512] ;
-
-
-
-
-static void singlepkt_msg_handler(buf,len)
-int *buf;
-int len;
+static void 
+McQueueSpillBlock(void **srcblk, void **destblk, 
+	     unsigned int first, unsigned int len)
 {
-   lastMsgType     = SINGLEPKT_MSG;
-   singlepktMsgLen = len;
-   singlepktMsg    = buf;
-   CpvAccess(CmiBufferGrabbed)=0;
-   ( (FUNCTION_PTR) CmiGetHandlerFunction((void *)buf) ) ((void *)buf);
-   remainingMsgCount--;
-   lastMsgType = RESET;
+  memcpy(destblk, &srcblk[first], (len-first)*sizeof(void *));
+  memcpy(&destblk[len-first],srcblk,first*sizeof(void *));
 }
 
-
-
-
-static void mulpkt_header_handler(len,sourcePe,nPackets,firstWord)
-int len ; /* in bytes */
-int sourcePe;
-int nPackets;
-int firstWord;
-{ 
-	/* This is the control information for multi packet message */
-        /* it has the following info 
-           1-      message length in bytes 
-           2-      source  processor number 
-           3-      number of packets that will follow this 
-           4-      the first word of the first packet in the sequence
-
-           The fourth field is necessary because packey will have the 
-           source pe in its first word. Therefore, The data of that word
-           will be sent with previous word.
-        */
-
-
-	MsgTable[sourcePe].length         = len ;
-        MsgTable[sourcePe].remainingPckts = nPackets;
-	MsgTable[sourcePe].beginPtr       = (char *) CmiAlloc(len) ;
-	MsgTable[sourcePe].currentPtr     = MsgTable[sourcePe].beginPtr;
-
-        /* save the first of the first data packet */
-
-        *((int *) MsgTable[sourcePe].beginPtr) = firstWord;
-        MsgTable[sourcePe].currentPtr +=  sizeof(int);
-}
-
-
-
-
-
-
-
-static void mulpkt_data_handler(buf, len)
-int *buf ;
-int len ; /* in bytes */
+static McQueue * McQueueCreate(void)
 {
-	int  i,sourcePe;
-        
-	sourcePe = *buf;
+  McQueue *queue;
 
-        buf++; /* skip the control word */
-        len -= sizeof(int);
-
-        MsgTable[sourcePe].remainingPckts--;
-
-        if (MsgTable[sourcePe].remainingPckts == 0)  /* last packet */
-        {
-            /* the last data packet is received */
-            char *bufPtr = (char *)buf;
-            char *msgPtr;     
-            /* byte by byte copy */
-            /* starting from the last poition we were left */
-            msgPtr =  MsgTable[sourcePe].currentPtr;
-            for(i=0; i<len; i++) *(msgPtr++) = *(bufPtr++);
-
-            /* message is assembled, point to the beginning */ 
-            msgPtr = MsgTable[sourcePe].beginPtr;
-
-
-
-            lastMsgType = MULTIPKT_MSG;
-
-            CpvAccess(CmiBufferGrabbed)=0;
-
-            /* call the handler (converse) */
-            ((FUNCTION_PTR)CmiGetHandlerFunction(msgPtr))(msgPtr) ;
-
-            lastMsgType =  RESET;
-
-            if (!CpvAccess(CmiBufferGrabbed)) CmiFree(msgPtr);
-
-            remainingMsgCount--;
-
-            MsgTable[sourcePe].length         = 0;
-            MsgTable[sourcePe].remainingPckts = 0;
-            MsgTable[sourcePe].beginPtr       = 0;
-            MsgTable[sourcePe].currentPtr     = 0;
-	}
-
-        else
- 
-        {
-           /* a data packet is received (not the last one) */
-           /* do a word by word copy for a faster transfer */
-           int *bufPtr = buf;
-           int *msgPtr =  (int *) MsgTable[sourcePe].currentPtr;
-           MsgTable[sourcePe].currentPtr += len;
-           /* copy int by int for faster copying */
-           len = len >> 3; /* divide by sizeof(int)==8 bytes*/
-           for(i=0; i<len; i++) *msgPtr++ = *buf++;
-        }
+  queue = (McQueue *) malloc(sizeof(McQueue));
+  if(queue==(McQueue *)0) {
+    CmiError("Cannot Allocate Memory!\n");
+    abort();
+  }
+  queue->blk = McQueueAllocBlock(BLK_LEN);
+  queue->blk_len = BLK_LEN;
+  queue->first = 0;
+  queue->len = 0;
+  return queue;
 }
 
-
-
-
-
-
-
-
-static void mulpkt_send(dest, size, msg)
-int  dest, size;
-int *msg;
+static void McQueueAddToBack(McQueue *queue, void *element)
 {
-/* msg size (in bytes) is bigger than MAX_PACKET_SIZE, so packetize */
+  if(queue->len==queue->blk_len) {
+    void **blk;
 
-     int i, numPackets,lastsize;
-     char *nextPacketPtr;
-
-     /* data packets are of length (DATA_SIZE + sizeof(int) (which is equal */
-     /* to  MAX_PACKET_SIZE). The first integer is the control info and */
-     /* the rest is the real data  */
-
-     numPackets = size / DATA_SIZE;
-
-     lastsize = size % DATA_SIZE;
-     if ( lastsize ) 
-        numPackets++; /* add the last short packet */
-     else
-        lastsize = DATA_SIZE; /* there is no short packet at the end */
-
-
-     /* send header packet */
-     FMs_send_4(dest,mulpkt_header_handler,size,CmiMyPe(),numPackets,*msg);
-     FMs_complete_send();
-     /* send the data packets */
-     /* numPackets-1  packets are of size  MAX_PACKET_SIZE, for sure */
-
-     *msg = CmiMyPe(); /* first word was sent already */
-     nextPacketPtr = (char *) msg; 
-     for(i=0; i<numPackets-1; i++)
-     {
-         FMs_send(dest, mulpkt_data_handler, nextPacketPtr, MAX_PACKET_SIZE);
-         FMs_complete_send();
-         nextPacketPtr += DATA_SIZE;
-         *((int *)nextPacketPtr) = CmiMyPe();
-     }
-
-     /* last packet could be shorter */
-     FMs_send(dest, mulpkt_data_handler, nextPacketPtr, lastsize);
-     FMs_complete_send();
+    queue->blk_len *= 3;
+    blk = McQueueAllocBlock(queue->blk_len);
+    McQueueSpillBlock(queue->blk, blk, queue->first, queue->len);
+    free(queue->blk);
+    queue->blk = blk;
+    queue->first = 0;
+  }
+#ifdef DEBUG
+  CmiPrintf("[%d] Adding %x\n",Cmi_mype,element);
+#endif
+  queue->blk[(queue->first+queue->len++)%queue->blk_len] = element;
 }
+
+static void * McQueueRemoveFromBack(McQueue *queue)
+{
+  void *element;
+  element = (void *) 0;
+  if(queue->len) {
+    element = queue->blk[(queue->first+queue->len-1)%queue->blk_len];
+    queue->len--;
+  }
+  return element;
+}
+
+static void * McQueueRemoveFromFront(McQueue *queue)
+{
+  void *element;
+  element = (void *) 0;
+  if(queue->len) {
+    element = queue->blk[queue->first++];
+    queue->first = (queue->first+queue->blk_len)%queue->blk_len;
+    queue->len--;
+  }
+  return element;
+}
+

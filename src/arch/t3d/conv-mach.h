@@ -8,14 +8,17 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.21  1997-07-28 19:01:27  jyelon
+ * Revision 1.22  1997-07-31 18:50:27  rbrunner
+ * New T3D version based on T3E version.  Old files are now in t3d-fm
+ *
+ * Revision 1.3  1997/07/28 19:01:29  jyelon
  * *** empty log message ***
  *
- * Revision 1.20  1997/07/26 16:42:20  jyelon
+ * Revision 1.2  1997/07/26 16:42:21  jyelon
  * *** empty log message ***
  *
- * Revision 1.19  1997/05/05 13:56:14  jyelon
- * Updated for quickthreads
+ * Revision 1.1  1997/07/07 22:57:18  rbrunner
+ * T3E port
  *
  * Revision 1.18  1997/04/01 08:10:40  jyelon
  * Added CMK_GETPAGESIZE_AVAILABLE
@@ -78,8 +81,8 @@
 #define CMK_ASYNC_USE_FIOSSAIOSTAT_AND_FIOSSAIOOWN         0
 #define CMK_ASYNC_USE_F_SETFL_AND_F_SETOWN                 0
 
-#define CMK_CMIDELIVERS_USE_COMMON_CODE                    0
-#define CMK_CMIDELIVERS_USE_SPECIAL_CODE                   1
+#define CMK_CMIDELIVERS_USE_COMMON_CODE                    1
+#define CMK_CMIDELIVERS_USE_SPECIAL_CODE                   0
 
 #define CMK_CMIPRINTF_IS_A_BUILTIN                         0
 #define CMK_CMIPRINTF_IS_JUST_PRINTF                       1
@@ -96,13 +99,13 @@
 
 #define CMK_IS_HETERO                                      0
 
-#define CMK_MACHINE_NAME                                   "t3d"
+#define CMK_MACHINE_NAME                                   "t3e"
 
 #define CMK_MALLOC_USE_GNU_MALLOC                          0
 #define CMK_MALLOC_USE_OS_BUILTIN                          1
 
-#define CMK_MSG_HEADER_SIZE_BYTES                          8
-#define CMK_MSG_HEADER_BLANK_SPACE                         0
+#define CMK_MSG_HEADER_SIZE_BYTES                          40
+#define CMK_MSG_HEADER_BLANK_SPACE                         32
 
 #define CMK_PREPROCESSOR_CANNOT_DO_CONCATENATION           0
 #define CMK_PREPROCESSOR_USES_ANSI_STANDARD_CONCATENATION  1
@@ -142,8 +145,8 @@
 #define CMK_THREADS_REQUIRE_NO_CPV                         0
 
 #define CMK_TIMER_USE_GETRUSAGE                            0
-#define CMK_TIMER_USE_SPECIAL                              1
-#define CMK_TIMER_USE_TIMES                                0
+#define CMK_TIMER_USE_SPECIAL                              0
+#define CMK_TIMER_USE_TIMES                                1
 
 #define CMK_VECTOR_SEND_USES_COMMON_CODE                        1
 #define CMK_VECTOR_SEND_USES_SPECIAL_CODE                        0
@@ -155,8 +158,8 @@
 #define CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT                   1
 #define CMK_WHEN_PROCESSOR_IDLE_USLEEP                     0
 
-#define CMK_USE_HP_MAIN_FIX                                0
-#define CMK_DONT_USE_HP_MAIN_FIX                           1
+#define CMK_USE_HP_MAIN_FIX                                1
+#define CMK_DONT_USE_HP_MAIN_FIX                           0
 
 #endif
 
