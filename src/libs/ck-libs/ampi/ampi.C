@@ -473,22 +473,25 @@ static ampi *ampiInit(char **argv)
 
         ComlibInstanceHandle cinst1;
         ComlibInstanceHandle cinst2;
-
 #if AMPI_COMLIB
 	cinst1=CkGetComlibInstance();
         cinst1.setForwardingOnMigration();
 	cinst2=CkGetComlibInstance();
+#endif
+
+        //Create and attach the ampiParent array
+        CkArrayID threads;
+        opts=TCHARM_Attach_start(&threads,&_nchunks);
+	parent=CProxy_ampiParent::ckNew(new_world,threads,cinst1,cinst2,opts);
+	STARTUP_DEBUG("ampiInit> array size "<<_nchunks);
+
+#if AMPI_COMLIB
 	EachToManyMulticastStrategy *strategy1 = new EachToManyMulticastStrategy(strat, parent.ckGetArrayID(), parent.ckGetArrayID());
         cinst1.setStrategy(strategy1);
 	CharmStrategy *strategy2 = new PipeBroadcastStrategy(USE_HYPERCUBE, parent.ckGetArrayID(), 1048576);
 	cinst2.setStrategy(strategy2);
 #endif
         
-        //Create and attach the ampiParent array
-        CkArrayID threads;
-        opts=TCHARM_Attach_start(&threads,&_nchunks);
-	parent=CProxy_ampiParent::ckNew(new_world,threads,cinst1,cinst2,opts);
-	STARTUP_DEBUG("ampiInit> array size "<<_nchunks);
   }
   int *barrier = (int *)TCharm::get()->semaGet(AMPI_BARRIER_SEMAID);
   if (TCHARM_Element()==0)
