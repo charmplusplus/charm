@@ -538,14 +538,28 @@ unsigned int ChMessageInt(ChMessageInt_t src)
 int ChMessage_recv(SOCKET fd,ChMessage *dst)
 {
   /*Get the binary header*/
+  if (0!=ChMessageHeader_recv(fd,dst)) return -1;
+  if (0!=ChMessageData_recv(fd,dst)) return -1;
+  return 0;
+}
+
+int ChMessageHeader_recv(SOCKET fd,ChMessage *dst)
+{
+  /*Get the binary header*/
   if (0!=skt_recvN(fd,(char *)&dst->header,sizeof(dst->header))) return -1;
   /*Allocate a recieve buffer*/
   dst->len=ChMessageInt(dst->header.len);
+  dst->data=0;
+  return 0;
+}
+int ChMessageData_recv(SOCKET fd,ChMessage *dst)
+{
   dst->data=(char *)malloc(dst->len);
   /*Get the actual data*/
   if (0!=skt_recvN(fd,dst->data,dst->len)) return -1;
   return 0;
 }
+
 void ChMessage_free(ChMessage *doomed)
 {
   free(doomed->data);

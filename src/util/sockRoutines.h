@@ -246,6 +246,8 @@ typedef struct ChMessage {
   char *data; /*Pointer to heap-allocated data*/
 } ChMessage;
 int ChMessage_recv(SOCKET fd,ChMessage *dst);
+int ChMessageHeader_recv(SOCKET fd,ChMessage *dst);
+int ChMessageData_recv(SOCKET fd,ChMessage *dst);
 void ChMessage_free(ChMessage *doomed);
 void ChMessageHeader_new(const char *type,int len,ChMessageHeader *dst);
 void ChMessage_new(const char *type,int len,ChMessage *dst);
