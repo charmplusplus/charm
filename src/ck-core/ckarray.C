@@ -288,6 +288,7 @@ CkArray::CkArray(const CkArrayOptions &c,CkMarshalledMessage &initMsg)
   CcdCallOnConditionKeep(CcdPERIODIC_1minute,staticSpringCleaning,(void *)this);
 
   //Set class variables
+  ckEnableTracing=CmiFalse; //Prevent us from being recorded
   numInitial=c.getNumInitial();
   isInserting=CmiTrue;
   bcastNo=oldBcastNo=0;
