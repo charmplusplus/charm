@@ -61,6 +61,10 @@
 #include "conv-ooc.h"
 #endif
 
+#if CONVERSE_POOL
+#include "cmipool.h"
+#endif
+
 #if CMK_CONDS_USE_SPECIAL_CODE
 CmiSwitchToPEFnPtr CmiSwitchToPE;
 #endif
@@ -1759,32 +1763,6 @@ void CmiMulticastInit()
  *
  ***************************************************************************/
 
-#define SIMPLE_CMIALLOC 0
-
-#if SIMPLE_CMIALLOC
-/* For debugging only: Avoids all madness of nested buffers. */
-void *CmiAlloc(int size)
-{
-	return malloc_nomigrate(size);
-}
-
-void CmiReference(void *blk)
-{
-	CmiAbort("CmiReference not supported!\n");
-}
-
-int CmiSize(void *blk)
-{
-	CmiAbort("CmiSize not supported!\n");
-	return (int)0;
-}
-
-void CmiFree(void *blk)
-{
-	free_nomigrate(blk);
-}
-
-#else /*!SIMPLE_CMIALLOC*/
 
 /* Given a user chunk m, extract the enclosing chunk header fields: */
 #define SIZEFIELD(m) (((CmiChunkHeader *)(m))[-1].size)
@@ -1799,6 +1777,8 @@ void *CmiAlloc(int size)
   res = (char *) elan_CmiAlloc(size+sizeof(CmiChunkHeader));
 #elif CONVERSE_VERSION_VMI
   res = (char *) CMI_VMI_CmiAlloc(size+sizeof(CmiChunkHeader));
+#elif CONVERSE_POOL
+  res =(char *) CmiPoolAlloc(size+sizeof(CmiChunkHeader));
 #else
   res =(char *) malloc_nomigrate(size+sizeof(CmiChunkHeader));
 #endif
@@ -1878,12 +1858,13 @@ void CmiFree(void *blk)
     elan_CmiFree(BLKSTART(parentBlk));
 #elif CONVERSE_VERSION_VMI
     CMI_VMI_CmiFree(BLKSTART(parentBlk));
+#elif CONVERSE_POOL
+    CmiPoolFree(BLKSTART(parentBlk));
 #else
     free_nomigrate(BLKSTART(parentBlk));
 #endif
   }
 }
-#endif /*!SIMPLE_CMIALLOC*/
 
 
 /***************************************************************************
@@ -2336,6 +2317,9 @@ void CommunicationServerInit()
 */
 void ConverseCommonInit(char **argv)
 {
+#if CONVERSE_POOL
+  CmiPoolAllocInit(30);  
+#endif
   CmiArgInit(argv);
   CmiMemoryInit(argv);
   CmiTmpInit(argv);

@@ -496,6 +496,9 @@ void *CmiTmpAlloc(int size);
 void CmiTmpFree(void *);
 #endif
 
+/* Pool features */
+
+
 /* Various special features of certain -memory modes: */
 void CmiMemoryCheck(void); /* heap check, for -memory paranoid */
 void CmiMemoryMark(void); /* ignore current allocations, for -memory leak */
