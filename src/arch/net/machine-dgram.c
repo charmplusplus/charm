@@ -76,8 +76,8 @@ static void setspeed_eth()
   Cmi_max_dgram_size   = 1400;
   Cmi_window_size      = 40;
   Cmi_os_buffer_size   = Cmi_window_size*Cmi_max_dgram_size;
-  Cmi_delay_retransmit = 0.1000;
-  Cmi_ack_delay        = 0.0200;
+  Cmi_delay_retransmit = 0.0400;
+  Cmi_ack_delay        = 0.0050;
 }
 
 static void extract_args(char **argv)
@@ -499,9 +499,10 @@ static void CommunicationsClock(void)
   if (Cmi_clock > Cmi_ack_last + 0.5*Cmi_ack_delay) {
     MACHSTATE(4,"CommunicationsClock timing out acks");    
     Cmi_ack_last=Cmi_clock;
-    writeableAcks=1; /*Some acks may be ready*/
-    writeableDgrams=1; /*Some dgrams may be retransmitted*/
+    writeableAcks=1;
+    writeableDgrams=1;
   }
+  
   if (Cmi_clock > Cmi_check_last + Cmi_check_delay) {
     MACHSTATE(4,"CommunicationsClock pinging charmrun");       
     Cmi_check_last = Cmi_clock; 
