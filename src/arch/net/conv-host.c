@@ -56,6 +56,17 @@ extern char *sys_errlist[];
 #define RSH_CMD "remsh"
 #endif
 
+static void jsleep(int sec, int usec)
+{
+  struct timeval tm;
+  tm.tv_sec = sec;
+  tm.tv_usec = usec;
+  while (1) {
+    if (select(0,0,0,0,&tm)==0) break;
+    if (errno!=EINTR) break;
+  }
+}
+
 /****************************************************************************
  *
  * Death-notification
@@ -245,7 +256,7 @@ void skt_accept(src,pip,ppo,pfd)
  acc:
   fd = accept(src, (struct sockaddr *)&remote, &i);
 #if CMK_FIX_HP_CONNECT_BUG
-  usleep(50000);
+  jsleep(0,50000);
 #endif
   if ((fd<0)&&(errno==EINTR)) goto acc;
   if ((fd<0)&&(errno==EMFILE)) goto acc;
