@@ -23,6 +23,7 @@ static void *meta_malloc(size_t size)
   void *ret=mm_malloc(size);
   if (memInit) CmiPrintf("CMI_MEMORY(%d)> malloc(%d) => %p\n",
 			 CmiMyPe(),size,ret);
+  if (memInit>1) {int memBack=memInit; memInit=0; CmiPrintStackTrace(0); memInit=memBack;}
   return ret;
 }
 
@@ -30,6 +31,7 @@ static void meta_free(void *mem)
 {
   if (memInit) CmiPrintf("CMI_MEMORY(%d)> free(%p)\n",
 			 CmiMyPe(),mem);
+  if (memInit>1) {int memBack=memInit; memInit=0; CmiPrintStackTrace(0); memInit=memBack;}
   mm_free(mem);
 }
 
