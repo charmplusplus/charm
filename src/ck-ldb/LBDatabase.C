@@ -360,13 +360,14 @@ void LBDatabase::addLoadbalancer(BaseLB *lb, int seq) {
   loadbalancers[seq] = lb;
 }
 
+// switch strategy in order
 void LBDatabase::nextLoadbalancer(int seq) {
   if (seq == -1) return;		// -1 means this is the only LB
   int next = seq+1;
-  if (next == nloadbalancers) next --;
-  CmiAssert(loadbalancers[next]);
+  if (next == nloadbalancers) next --;  // keep using the last one
   if (seq != next) {
     loadbalancers[seq]->turnOff();
+    CmiAssert(loadbalancers[next]);
     loadbalancers[next]->turnOn();
   }
 }
