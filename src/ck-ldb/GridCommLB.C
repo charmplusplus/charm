@@ -105,8 +105,8 @@ int GridCommLB::Find_Minimum_WAN_PE (int cluster)
 
 
   min_index = -1;
-  min_wan_objs = INT_MAX;
-  min_lan_objs = INT_MAX;
+  min_wan_objs = 999999999;
+  min_lan_objs = 999999999;
 
   for (i = 0; i < Num_PEs; i++) {
     if (((&PE_Data[i])->available) && ((&PE_Data[i])->cluster == cluster)) {
