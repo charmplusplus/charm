@@ -121,20 +121,38 @@ associated resources. It does not free the message buffer.
 \param{handle} could be reused by CMI for another communication after
 this call succeeds.}
 
-\internal{
-\function{CommHandle CmiVectorSend(int destPE, int HandlerId, int len, int sizes[], void *DataArray[])}
+\function{CmiCommHandle CmiAsyncVectorSend(int destPE, int len, int sizes[], char *msgComps[])}
 \desc{Initiates an asynchronous send of data to processor
 \param{destPE}.  The data consists of \param{len} pieces residing in
 different areas of memory, which are logically concatenated.  The
-\param{DataArray} array contains pointers to the pieces; the size of
-\param{DataArray[i]} is taken from \param{sizes[i]}. \param{HandlerId}
-is inserted at the appropriate place in the combined message and the
-corresponding handler will be invoked on the receiving side. This
-function returns a communication handle which could be used to enquire
+\param{msgComps} array contains pointers to the pieces; the size of
+\param{msgComps[i]} is taken from \param{sizes[i]}. 
+This function returns a communication handle which could be used to enquire
 about the status of communication using \param{CmiAsyncMsgSent()}.
 Individual pieces of data as well as the arrays \param{sizes} and
-\param{DataArray} should not be overwritten or freed before the
+\param{msgComps} should not be overwritten or freed before the
 communication is complete.}
+
+\function{void CmiSyncVectorSend(int destPE, int len, int sizes[], char *msgComps[])}
+\desc{Synchronous send of data to processor
+\param{destPE}.  The data consists of \param{len} pieces residing in
+different areas of memory, which are logically concatenated.  The
+\param{msgComps} array contains pointers to the pieces; the size of
+\param{msgComps[i]} is taken from \param{sizes[i]}. 
+\param{sizes}, \param{msgComps} and the message components specified in
+\param{msgComps} could be reused after the function call returns.
+}
+
+\function{void CmiSyncVectorSendAndFree(int destPE, int len, int sizes[], char *msgComps[])}
+\desc{Synchronous send of data to processor
+\param{destPE}.  The data consists of \param{len} pieces residing in
+different areas of memory, which are logically concatenated.  The
+\param{msgComps} array contains pointers to the pieces; the size of
+\param{msgComps[i]} is taken from \param{sizes[i]}. 
+The message components specified in \param{msgComps} are freed by this function
+therefore, they should be dynamically allocated using \param{CmiAlloc()}.
+However, the \param{sizes} and \param{msgComps} array themselves are not
+freed. 
 }
 
 \function{void CmiGrabBuffer(void **pbuf)}
