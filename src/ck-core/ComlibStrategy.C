@@ -15,6 +15,7 @@ Strategy::Strategy() {
     nsrcpes = 0;
     srcpelist = NULL;
     myInstanceID = 0;
+    isStrategyBracketed = 0;
 };
 
 void Strategy::setSourceArray(CkArrayID aid, CkArrayIndexMax *e, int nind){
