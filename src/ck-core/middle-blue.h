@@ -1,3 +1,6 @@
+#ifndef _MIDDLE_BLUE_H_
+#define _MIDDLE_BLUE_H_
+
 #include "converse.h"
 #include "blue.h"
 
@@ -176,3 +179,7 @@ static inline void BgCharmExit()
 
 }
 
+
+
+
+#endif

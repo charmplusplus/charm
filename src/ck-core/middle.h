@@ -1,3 +1,6 @@
+#ifndef _MIDDLE_H_
+#define _MIDDLE_H_
+
 #include "converse.h"
 
 #define CkpvDeclare 	CpvDeclare
@@ -81,3 +84,7 @@ public:
 #define CpvInitialize(t,v)     v.init()
 #define CpvAccess(v)  v.data
 */
+
+
+
+#endif
