@@ -298,7 +298,7 @@ static void CmiReleaseSentMessages(void)
 #ifndef CMK_OPTIMIZE 
   double rel_end_time = CmiWallTimer();
   if(rel_end_time > rel_start_time + 5.0/1e6)
-    traceUserBracketEvent(20, rel_start_time);
+    traceUserBracketEvent(20, rel_start_time, rel_end_time);
 #endif
 }
 
@@ -443,7 +443,7 @@ int PumpMsgs(int retflag)
 #ifndef CMK_OPTIMIZE 
       double pmp_end_time = CmiWallTimer();
       if(pmp_end_time > pmp_start_time + 5.0/1e6)
-	traceUserBracketEvent(10, pmp_start_time);
+	traceUserBracketEvent(10, pmp_start_time, pmp_end_time);
 #endif
       return recd;    
     }
@@ -452,7 +452,7 @@ int PumpMsgs(int retflag)
 #ifndef CMK_OPTIMIZE 
       double pmp_end_time = CmiWallTimer();
       if(pmp_end_time > pmp_start_time + 5.0/1e6)
-	traceUserBracketEvent(10, pmp_start_time);
+	traceUserBracketEvent(10, pmp_start_time, pmp_end_time);
 #endif
       return flg;
     }
@@ -461,6 +461,26 @@ int PumpMsgs(int retflag)
     flg = 0;
   }
   return recd;
+}
+
+void *remote_get(void * srcptr, void *destptr, int size, int srcPE){
+  return (void *)elan_get(elan_base->state, srcptr, destptr, size, srcPE);
+}
+
+int remote_get_done(void *e){
+  ELAN_EVENT *evt = (ELAN_EVENT *)e;
+
+  int flag = elan_poll(evt, ELAN_POLL_EVENT);
+  if(flag) {
+    elan_wait(evt, ELAN_WAIT_EVENT);
+    return 1;
+  }
+  else
+    return 0;  
+}
+
+void remote_get_wait_all(){
+  elan_getWaitAll(elan_base->state, ELAN_WAIT_EVENT);
 }
 
 /********************* MESSAGE RECEIVE FUNCTIONS ******************/
@@ -583,7 +603,7 @@ void CmiFreeSendFn(int destPE, int size, char *msg)
 #ifndef CMK_OPTIMIZE 
   double snd_end_time = CmiWallTimer();
   if(snd_end_time > snd_start_time + 5.0/1e6)
-    traceUserBracketEvent(30, snd_start_time);
+    traceUserBracketEvent(30, snd_start_time, snd_end_time);
 #endif
 }
 
