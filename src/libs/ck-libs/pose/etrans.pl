@@ -16,7 +16,7 @@ my $inh = "$infile.h";
 my $inC = "$infile.C";
 my $outci = "$infile\_sim.ci";
 my $outh = "$infile\_sim.h";
-my $outC = "$infile\_sim.C";
+#my $outC = "$infile\_sim.C";
 my (@strategies,@representations,@posera,@groups,@newline);
 my (%posers,%strat, %methods,%rep,%base,%events,%nonevents,%messages,%needsopeq,%puppy,%cppuppy,%emessages);
 my ($class,$method,$message);
@@ -364,26 +364,26 @@ $outhhandle->close;
 $inhhandle->close;
 # END WRITE .H FILES
 
-# BEGIN WRITE .C FILES
-foreach my $incfile (@otherfiles, $inC)
+# BEGIN WRITE .C FILE
+my ($inbase,$inext)=split('\.',$inC);
+my $simhead=$inbase.'_sim.h';
+my $defhead=$inbase.'.def.h';
+my $outC=$inbase.'_sim'.'.'.$inext;
+my $outChandle=new FileHandle();
+if ( $wantindent && ( $indent =~ /GNU/) && ( $indent !~ /2.2.5/) ) {
+  $outChandle->open("|indent -npcs -npsl -bap -bad -br -nce>$outC") or die "cannot open $outC";
+} else {
+  $outChandle->open(">$outC") or die "cannot open $outC";
+}
+$outChandle->print( "#include \"$simhead\"\n");
+$outChandle->print( "#include \"$defhead\"\n\n");
+
+foreach my $incfile ($inC,@otherfiles)
 {
 
   print "Generating source for $incfile...\n";
 
   my ($inbase,$inext)=split('\.',$incfile);
-  my $outC=$inbase.'_sim'.'.'.$inext;
-  my $outChandle=new FileHandle();
-  if ( $wantindent && ( $indent =~ /GNU/) && ( $indent !~ /2.2.5/) ) {
-    $outChandle->open("|indent -npcs -npsl -bap -bad -br -nce>$outC") or die "cannot open $outC";
-  } else {
-    $outChandle->open(">$outC") or die "cannot open $outC";
-  }
-
-  # write outC
-#  if ($incfile eq $inC) {
-    $outChandle->print( "#include \"$inbase\_sim.h\"\n");
-    $outChandle->print( "#include \"$inbase.def.h\"\n\n");
-#  }
   my $inChandle=new FileHandle();
   $inChandle->open("$incfile") or die "cannot open $incfile";
   inithandle($inChandle);
