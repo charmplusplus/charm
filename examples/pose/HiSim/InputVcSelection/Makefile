@@ -10,6 +10,8 @@ RedStorm: $(OBJDIR)/RoundRobin.o
 
 HypCubeArch: $(OBJDIR)/RoundRobin.o
 
+HypCubeArchOB: $(OBJDIR)/outputBufferIn.o
+
 BlueGene: $(OBJDIR)/SLQ.o
 
 IB: $(OBJDIR)/SLQ_Switch.o
@@ -24,6 +26,9 @@ $(OBJDIR)/SLQ.o: SLQ.C SLQ.h
 
 $(OBJDIR)/SLQ_Switch.o: SLQ_Switch.C SLQ_Switch.h
 	$(CHARMC) -o $@ -seq SLQ_Switch.C -I$(MACHINE)
+
+$(OBJDIR)/outputBufferIn.o: outputBufferIn.C outputBufferIn.h
+	$(CHARMC) -o $@ -seq outputBufferIn.C -I$(MACHINE)
 
 clean:
 	rm -f charmrun conv-host *.o
