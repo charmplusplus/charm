@@ -10,6 +10,7 @@ CkGroupID TheGVT;
 /// Basic Constructor
 PVT::PVT() 
 {
+  LBTurnInstrumentOff();
 #ifdef POSE_COMM_ON
   //comm_debug = 1;
 #endif
@@ -23,6 +24,29 @@ PVT::PVT()
   SendsAndRecvs->Initialize();
   waitForFirst = 0;
   iterMin = POSE_UnsetTS;
+  if (CkNumPes() == 1) {
+  }
+  else if (CkNumPes() == 2) {
+  }
+  else if (CkMyPe()%2 == 1) {
+    reportTo = CkMyPe()-1;
+    reportReduceTo =  -1;
+    reportsExpected = reportEnd = 0;
+    if (CkMyPe() >= CkNumPes()-2) {
+      reportEnd = 1;
+      reportsExpected = CkNumPes()/4;
+    }
+  }
+  else {
+    reportTo = CkMyPe();
+    if (CkMyPe() <= CkNumPes()/2)
+      reportReduceTo = CkNumPes()-2;
+    else reportReduceTo = CkNumPes()-1;
+    if (CkMyPe() >= CkNumPes()-2) {
+      reportEnd = 1;
+      reportsExpected = CkNumPes()/4;
+    }
+  }
 #ifdef POSE_STATS_ON
   localStats->TimerStop();
 #endif
@@ -96,9 +120,11 @@ void PVT::startPhase()
   repPVT = pvt;
   if ((um->numEntries > 0) && ((um->SRs[0].timestamp < pvt) || (pvt == POSE_UnsetTS)))
     repPVT = um->SRs[0].timestamp;
-  /*  if (um->numEntries > 0)
+  /*
+  if (um->numEntries > 0)
     CkPrintf("PE %d has %d SRs reported to GVT; earliest=%d pvt=%d\n", 
-    CkMyPe(), um->numEntries, um->SRs[0].timestamp, pvt);*/
+	     CkMyPe(), um->numEntries, um->SRs[0].timestamp, pvt);
+  */
   // send data to GVT estimation
   if (simdone) // transmit final info to GVT on PE 0
     g[0].computeGVT(um);              
@@ -215,6 +241,8 @@ GVT::GVT()
 #endif
   estGVT = lastEarliest = inactiveTime = POSE_UnsetTS;
   lastSends = lastRecvs = inactive = 0;
+  reportsExpected = 1;
+  if (CkNumPes() > 1) reportsExpected = 2;
   if (CkMyPe() == 0) { // start the PVT phase of the GVT algorithm
     CProxy_PVT p(ThePVT);
     p.startPhase(); // broadcast PVT calculation to all PVT branches
@@ -330,8 +358,10 @@ void GVT::computeGVT(UpdateMsg *m)
     else inactive = 0;
 
     // check the estimate
-    //CkPrintf("opt=%d con=%d lastGVT=%d early=%d lastSR=%d et=%d\n", 
-    //optGVT, conGVT, lastGVT, earliestMsg, lastSR, POSE_endtime);
+    /*
+    CkPrintf("opt=%d con=%d lastGVT=%d early=%d lastSR=%d et=%d\n", 
+	     optGVT, conGVT, lastGVT, earliestMsg, lastSR, POSE_endtime);
+    */
     CmiAssert(estGVT >= lastGVT); 
     //if (estGVT % 1000 == 0)
     //CkPrintf("[%d] New GVT = %d\n", CkMyPe(), estGVT);

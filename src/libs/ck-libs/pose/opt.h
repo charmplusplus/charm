@@ -41,7 +41,7 @@ public:
     STRAT_T = OPT_T; 
     cpRate = STORE_RATE; 
     specEventCount = eventCount = stepCount = avgEventsPerStep = rbCount = jumpCount = rbFlag = 0;
-    avgRBoffset = POSE_UnsetTS;
+    avgRBoffset = POSE_TimeMax/2;
     idle = avgTimeLeash = avgJump = 0;
   }
   /// Initialize the synchronization strategy type of the poser
@@ -61,12 +61,6 @@ public:
     // Object is idle; report -1
     if ((ec == POSE_UnsetTS) && (worktime == POSE_UnsetTS))
       return POSE_UnsetTS;
-    /*    if (eq->RBevent)  {
-      theTime = eq->RBevent->timestamp;
-      if ((ec < theTime) && (ec > POSE_UnsetTS))
-	theTime = ec;
-    }
-    else */
     if (ec > POSE_UnsetTS) {
       theTime = ec;
       if ((worktime > POSE_UnsetTS) && (worktime < ec) && (ovt < worktime))
@@ -83,9 +77,11 @@ public:
       if (ovt > worktime)
 	theTime = ovt;
     }
-    /*if (!((theTime == POSE_UnsetTS) || (theTime >= gvt) ||
-	  (theTime == gvt-1)))
-	  CkPrintf("theTime=%d ovt=%d wt=%d ec=%d gvt=%d\n", theTime, ovt, worktime, ec, gvt); */
+    /*
+    if (theTime == gvt)
+      CkPrintf("theTime=%d ovt=%d wt=%d ec=%d gvt=%d\n", theTime, ovt, 
+	       worktime, ec, gvt);
+    */
     CkAssert((theTime == POSE_UnsetTS) || (theTime >= gvt) ||
 	     (theTime == gvt-1));
     return theTime;

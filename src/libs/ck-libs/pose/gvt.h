@@ -79,7 +79,9 @@ class PVT : public Group {
   /// Table to store send/recv timestamps
   SRtable *SendsAndRecvs;            
   /// List of objects registered with this PVT branch
-  pvtObjects objs;                   
+  pvtObjects objs;           
+  /// reduction-related vars
+  int reportTo, reportsExpected, reportReduceTo, reportEnd;
  public:
   /// Basic Constructor
   PVT(void);
@@ -126,6 +128,8 @@ private:
   int lastSends;
   /// Number of receives at lastEarliest
   int lastRecvs;
+  /// Number of PVT reports expected (1 or 2)
+  int reportsExpected;
 public:
   /// Basic Constructor
   GVT(void);
