@@ -58,7 +58,7 @@ class rep
   virtual void dump() { CkPrintf("[REP: ovt=%d]\n", ovt); }
   /// Pack/unpack/sizing operator
   /** Derived classes must provide pup */
-  virtual void pup(PUP::er &p) { p(ovt); p(myHandle); p(copy); }
+  virtual void pup(PUP::er &p) { p(ovt); p(ort); p(myHandle); p(copy); }
 };
 
 #endif

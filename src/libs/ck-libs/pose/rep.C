@@ -15,8 +15,10 @@ void rep::update(int t, double rt)
 { 
   ovt = (ovt < t) ? t : ovt;
   parent->eq->currentPtr->svt = ovt;
+#ifdef POSE_DOP_ON  
   ort = (ort < rt) ? rt : ort;
   parent->eq->currentPtr->srt = ort;
+#endif
 }
 
 /// Timestamps event message, sets priority, and records in spawned list
