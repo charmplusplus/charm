@@ -208,6 +208,7 @@ void NeighborLB::ReceiveStats(NLBStatsMsg *m)
 
   const int clients = num_neighbors();
   if (stats_msg_count == clients && receive_stats_ready) {
+    double strat_start_time = CmiWallTimer();
     receive_stats_ready = 0;
     NLBMigrateMsg* migrateMsg = Strategy(statsDataList,clients);
 
@@ -243,6 +244,8 @@ void NeighborLB::ReceiveStats(NLBStatsMsg *m)
     stats_msg_count=0;
 
     theLbdb->ClearLoads();
+    double strat_end_time = CmiWallTimer();
+    CkPrintf("Strat elapsed time %f\n",strat_end_time-strat_start_time);
   }
   
 }

@@ -132,6 +132,8 @@ void CentralLB::ReceiveStats(CLBStatsMsg *m)
 
   const int clients = CkNumPes();
   if (stats_msg_count == clients) {
+    double strat_start_time = CmiWallTimer();
+    
 
     CLBMigrateMsg* migrateMsg = Strategy(statsDataList,clients);
     CProxy_CentralLB(thisgroup).ReceiveMigration(migrateMsg);
@@ -142,6 +144,8 @@ void CentralLB::ReceiveStats(CLBStatsMsg *m)
       statsMsgsList[i]=0;
     }
     stats_msg_count=0;
+    double strat_end_time = CmiWallTimer();
+    CkPrintf("Strat elapsed time %f\n",strat_end_time-strat_start_time);
   }
   
 }
