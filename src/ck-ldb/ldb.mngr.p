@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.5  1995-11-06 17:55:09  milind
+ * Revision 2.6  1996-02-08 23:33:36  sanjeev
+ * added documentation on how it works
+ *
+ * Revision 2.5  1995/11/06 17:55:09  milind
  * Changed to conform to the definition of functions NewSeedFrom*
  *
  * Revision 2.4  1995/10/27  22:09:16  jyelon
@@ -38,6 +41,77 @@
 /* * * * * * * * The MNGR Load Balancing Strategy* * * * * * * * */
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+
+/*  The following notes on how the multiple-managers strategy works
+    were made by Sanjeev on 2/8/96.
+
+MyLoad calls CldMyLoad which is the length of seed (token) queue.
+Note: controllers usually have most of the tokens
+ 
+MyController(myPE) : 0-15 is 15, 16-31 is 31, and so on.
+CONTROLLER(pe) is true if pe is a controller.
+controller variable is true if I am a controller.
+mycontroller variable stores my controller
+ 
+LDB_ELEMENT has srcPE and piggybackLoad fields
+ 
+FillLDB sets piggybackLoad to MyLoad.
+StripLDB calls RecvUpdateStatus on controllers, which sets
+load_boss[] or load_cluster[].
+ 
+EnqMsg enqueues a token in a token-list as well as in scheduler's queue
+LeastLoadKids (called only from managers) returns the least loaded
+kid and its load, or -1 if minload > KID_SATURATION.
+LeastLoadBosses (called only from managers) returns the least loaded
+manager out of the managers in the "exchange" group.
+"exchanges" is log2(numBosses) : each manager exchanges load
+with that many other managers. I dont understand what the use of "start_pe"
+in LeastLoadBosses is.
+ 
+NewMsg_FromLocal on managees sends the chare to controller.
+on controllers it does EnqMsg().
+NewMsg_FromNet on managees enqueues the msg locally.
+On controllers it calls Strategy(), which does EnqMsg(seed).
+Then it finds the least loaded controller/kid. (a kid is chosen if
+its load is less than MINIMUM_KID_LOAD). If minload is < saturation,
+Strategy calls SendFreeChare(least_load_pe), which calls CldPickSeedAndSend()
+and then increments load of that pe.
+CldPickSeedAndSend (in ldbcfns.c) picks any seed from token list and sends
+it to the pe.
+ 
+PeriodicKidStatus() on kids sends a message to RecvStatus in its
+controller periodically, and boss doesnt seem to do anything.
+(Im not sure it works because CldPeriodicKidStatus doesnt do anything).
+PeriodicBossStatus() on controllers periodically sends msgs to
+each of its neighbor controllers (round-robin). When bosses receive
+the msg at RecvStatus they call do_redistribution() with sender.
+ 
+do_redistribution() sends half the load difference to the other boss.
+ 
+PeriodicKidsRedist() is called periodically on bosses. It sends all
+tokens enqueued on the boss to kids until they are saturated.
+PeriodicBossesRedist() doesnt seem to work because CldPeriodicBossesRedist
+is not called from anywhere.
+
+
+****************************************************************************/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 #define MAXINT  0xffff
 #define HUGE_INT 9999999
