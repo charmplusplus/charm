@@ -514,6 +514,10 @@ void
 chunk::reduce(int fid, void *inbuf, void *outbuf, int op)
 {
   int len = dtypes[fid].length();
+  if(numElements==1) {
+    memcpy(outbuf,inbuf,len);
+    return;
+  }
   CkReduction::reducerType rtype;
   switch(op) {
     case FEM_SUM:
