@@ -62,9 +62,11 @@ class QdState {
       _MEMCHECK(callbacks);
       nChildren = CmiNumSpanTreeChildren(CkMyPe());
       parent = CmiSpanTreeParent(CkMyPe());
-      children = new int[nChildren];
-      _MEMCHECK(children);
-      CmiSpanTreeChildren(CkMyPe(), children);
+      if (nChildren != 0) {
+	children = new int[nChildren];
+	_MEMCHECK(children);
+	CmiSpanTreeChildren(CkMyPe(), children);
+      }
     }
     void propagate(QdMsg *msg) {
       envelope *env = UsrToEnv((void *)msg);
