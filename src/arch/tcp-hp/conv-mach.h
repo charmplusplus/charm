@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.5  1995-09-20 17:20:49  gursoy
+ * Revision 2.6  1995-09-20 17:23:46  gursoy
+ * threads dont use alloca, this time fixed
+ *
+ * Revision 2.5  1995/09/20  17:20:49  gursoy
  * threads dont use alloca
  *
  * Revision 2.4  1995/09/20  13:22:49  jyelon
@@ -55,8 +58,8 @@
 /* #define CMK_CMIPRINTF_IS_JUST_PRINTF */
 #define CMK_CMIPRINTF_IS_A_BUILTIN
 
-/* #define CMK_THREADS_UNAVAILABLE */
-#define CMK_THREADS_USE_ALLOCA
+#define CMK_THREADS_UNAVAILABLE
+/* #define CMK_THREADS_USE_ALLOCA */
 
 
 
@@ -88,7 +91,7 @@
 /* #define CMK_HAVE_STRINGS_H */
 /* #define CMK_JUST_DECLARE_STRING_FNS */
 
-/* #define CMK_HAVE_SYS_WAIT_H */
-#define CMK_HAVE_WAITFLAGS_H
+#define CMK_HAVE_SYS_WAIT_H
+/* #define CMK_HAVE_WAITFLAGS_H */
 
 #endif
