@@ -83,6 +83,8 @@ typedef struct {
   void* objPtr;
 } CkChareID;
 
+typedef int CkGroupID;
+
 /******************************************************************************
  *
  * Function Pointer Types
