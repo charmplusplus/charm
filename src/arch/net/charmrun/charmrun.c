@@ -592,6 +592,7 @@ char *arg_server_auth=NULL;
 #if CMK_SCYLD
 int   arg_startpe;
 int   arg_endpe;
+int   arg_singlemaster;
 #endif
 
 void arg_init(int argc, char **argv)
@@ -627,8 +628,10 @@ void arg_init(int argc, char **argv)
   pparam_str(&arg_xterm,          0, "xterm",         "which xterm to use");
 #endif
 #ifdef CMK_SCYLD
+  /* options for Scyld */
   pparam_int(&arg_startpe,   0, "startpe",   "first pe to start job(SCYLD)");
   pparam_int(&arg_endpe,  1000000, "endpe",   "last pe to start job(SCYLD)");
+  pparam_flag(&arg_singlemaster, 0, "singlemaster", "Only assign one process to master node(SCYLD)");
 #endif
   pparam_flag(&arg_help,	0, "help", "print help messages");
   pparam_int(&arg_ppn,          0, "ppn",             "number of pes per node");
@@ -1820,7 +1823,8 @@ void nodetab_init_for_scyld()
   if (arg_requested_pes > npes) {
     int orig_size = npes;
     int node = 0;
-    if (nodetab_rank0_size > 1) node = arg_ppn;      /* skip -1 if we can */
+    if (arg_singlemaster && nodetab_rank0_size > 1) 
+    	node = arg_ppn;      /* skip -1 if we can */
     while (npes < arg_requested_pes) {
       if (npes+arg_ppn > arg_requested_pes) group.cpus = arg_requested_pes-npes;
       else group.cpus = arg_ppn;
