@@ -268,7 +268,7 @@ LogPool::~LogPool()
     closeLog();
     creatFiles("-bg");
     writeHeader();
-    if (CkMyPe() == 0) writeSts();
+    if (CkMyPe() == 0) writeSts(NULL);
     postProcessLog();
   }
 #endif
@@ -375,9 +375,26 @@ void LogPool::writeSts(void)
   for(int i=0;i<CkpvAccess(usrEvents)->length();i++){
     fprintf(stsfp, "EVENT %d %s\n", (*CkpvAccess(usrEvents))[i]->e, (*CkpvAccess(usrEvents))[i]->str);
   }	
-  fprintf(stsfp, "END\n");
-  fclose(stsfp);
 }
+
+void LogPool::writeSts(TraceProjections *traceProj){
+	writeSts();
+	if(traceProj != NULL){
+		CkHashtableIterator  *funcIter = traceProj->getfuncIterator();		
+		funcIter->seekStart();
+		int numFuncs = traceProj->getFuncNumber();
+		fprintf(stsfp,"TOTAL FUNCTIONS %d \n",numFuncs);
+		while(funcIter->hasNext()){
+			StrKey *key;
+			int *obj = (int *)funcIter->next((void **)&key);
+			fprintf(stsfp,"FUNCTION %s %d \n",key->getStr(),*obj);
+		}
+	}
+	fprintf(stsfp, "END\n");
+	fclose(stsfp);
+	
+}
+
 
 #if CMK_BLUEGENE_CHARM
 static void updateProjLog(void *data, double t, double recvT, void *ptr)
@@ -651,7 +668,6 @@ curevent(0), inEntry(0), computationStarted(0)
 #endif
   _logPool->creatFiles();
 	funcCount=1;
-	fileCount=1;
 }
 
 int TraceProjections::traceRegisterUserEvent(const char* evt, int e)
@@ -690,13 +706,13 @@ void TraceProjections::traceClearEps(void)
 void TraceProjections::traceWriteSts(void)
 {
   if(CkMyPe()==0)
-    _logPool->writeSts();
+    _logPool->writeSts(this);
 }
 
 void TraceProjections::traceClose(void)
 {
   if(CkMyPe()==0){
-    _logPool->writeSts();
+    _logPool->writeSts(this);
   }
   if (TRACE_CHARM_PE()) {
     CkpvAccess(_trace)->endComputation();

@@ -138,6 +138,8 @@ class LogPool {
     void writeLog(void);
     void write(int writedelta);
     void writeSts(void);
+		void writeSts(TraceProjections *traceProj);
+
     void add(unsigned char type,unsigned short mIdx,unsigned short eIdx,double time,int event,int pe, int ml=0, CmiObjId* id=0, double recvT=0., double cpuT=0.0, int numPap=0, LONG_LONG_PAPI *papVals=NULL);
     void add(unsigned char type,double time,unsigned short funcID,int lineNum,char *fileName);
     void addCreationMulticast(unsigned short mIdx,unsigned short eIdx,double time,int event,int pe, int ml=0, CmiObjId* id=0, double recvT=0., int num=0, int *pelist=NULL);
@@ -191,6 +193,9 @@ class StrKey {
 		}
 		return 1;
 	}
+	inline char *getStr(){
+		return str;
+	}
 };
 
 /// class for recording trace projections events 
@@ -207,9 +212,8 @@ class TraceProjections : public Trace {
     int inEntry;
     int computationStarted;
 
-		int funcCount,fileCount;
+		int funcCount;
 		CkHashtableT<StrKey,int> funcHashtable;
-		CkHashtableT<StrKey,int> fileHashtable;
   public:
     TraceProjections(char **argv);
     void userEvent(int e);
@@ -240,6 +244,8 @@ class TraceProjections : public Trace {
     void traceBegin();
     void traceEnd();
 		//functions that perform function tracing
+		CkHashtableIterator *getfuncIterator(){return funcHashtable.iterator();};
+		int getFuncNumber(){return funcHashtable.numObjects();};
 		void regFunc(char *name);
 		void beginFunc(char *name,char *file,int line);
 		void endFunc(char *name);
