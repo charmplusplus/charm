@@ -1749,7 +1749,6 @@ CthThread t;
 void CthInit(char **argv)
 {
   CthThread t;
-  int i;
 
   CmiGetArgInt(argv,"+stacksize",&_stksize);
   CpvInitialize(int, _numSwitches);

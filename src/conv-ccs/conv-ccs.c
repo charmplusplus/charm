@@ -17,6 +17,7 @@
 #include "conv-ccs.h"
 #include "ccs-server.h"
 #include "sockRoutines.h"
+#include "queueing.h"
 
 #if CMK_CCS_AVAILABLE
 

@@ -213,12 +213,21 @@ CpvDeclare(int, CstatsMaxFixedChareQueueLength);
 CpvStaticDeclare(int, CstatPrintQueueStatsFlag);
 CpvStaticDeclare(int, CstatPrintMemStatsFlag);
 
+#if CMK_WEB_MODE
+extern void initUsage(void);
+extern void usageStart(void);
+extern void usageStop(void);
+extern void CWebInit(void);
+#else
+#define initUsage()
+#define usageStart()
+#define usageStop()
+#define CWebInit()
+#endif
+
 void CstatsInit(argv)
 char **argv;
 {
-#if CMK_WEB_MODE
-  void initUsage();
-#endif
 
 #ifdef MEMMONITOR
   CpvInitialize(mmulong,MemoryUsage);
@@ -254,9 +263,7 @@ char **argv;
   traceInit(argv);
 #endif
 
-#if CMK_WEB_MODE
   initUsage();
-#endif
 }
 
 int CstatMemory(i)
@@ -604,9 +611,7 @@ void CsdBeginIdle(void)
   if(CpvAccess(traceOn))
     traceBeginIdle();
 #endif
-#if CMK_WEB_MODE
   usageStop();  
-#endif
   CmiNotifyIdle();
   CcdRaiseCondition(CcdPROCESSORIDLE) ;
 }
@@ -626,9 +631,7 @@ void CsdEndIdle(void)
   if(CpvAccess(traceOn))
     traceEndIdle();
 #endif
-#if CMK_WEB_MODE
   usageStart();  
-#endif
   CcdRaiseCondition(CcdPROCESSORBUSY) ;
 }
 
@@ -906,9 +909,7 @@ void CthResumeNormalThread(CthThread t)
     traceResume();
 #endif
   /* end addition */
-#if CMK_WEB_MODE
   usageStart();  
-#endif
   CthResume(t);
 }
 
@@ -1604,9 +1605,7 @@ void ConverseCommonInit(char **argv)
 #if CMK_DEBUG_MODE
   CpdInit();
 #endif
-#if CMK_WEB_MODE
   CWebInit();
-#endif
 #if NODE_0_IS_CONVHOST
   if (CmiGetArgFlag(argv,"++server"))
     ccs_serverFlag=1;

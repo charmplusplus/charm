@@ -6,6 +6,7 @@
  *****************************************************************************/
 
 #include <stdlib.h>
+#include <string.h>
 #include "converse.h"
 
 typedef struct Cfuture_data_s

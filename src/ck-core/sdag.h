@@ -34,7 +34,7 @@ class CWhenTrigger {
     int refnums[MAXREF];
     CWhenTrigger *next;
     CWhenTrigger(int id, int na, int ne, int nae) :
-       whenID(id), nArgs(na), nEntries(ne), nAnyEntries(nae){}
+       whenID(id), nArgs(na), nAnyEntries(nae), nEntries(ne){}
 };
 
 // Quick and dirty List for small numbers of items.

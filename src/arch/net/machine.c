@@ -1512,6 +1512,8 @@ static void CommunicationInterrupt(int arg)
   CommunicationServer(0);
 }
 
+extern void CmiSignal(int sig1, int sig2, int sig3, void (*handler)());
+
 static void CmiStartThreads()
 {
   struct itimerval i;

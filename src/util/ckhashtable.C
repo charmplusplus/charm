@@ -23,7 +23,7 @@ CkHashCode CkHashFunction_default(const void *keyData,size_t keyLen)
 {
 	const unsigned char *d=(const unsigned char *)keyData;
 	CkHashCode ret=0;
-	for (int i=0;i<keyLen;i++) {
+	for (unsigned int i=0;i<keyLen;i++) {
 		int shift1=((5*i)%16)+0;
 		int shift2=((6*i)%16)+8;
 		ret+=((0xa5^d[i])<<shift2)+(d[i]<<shift1);
@@ -50,7 +50,7 @@ int CkHashCompare_default(const void *key1,const void *key2,size_t keyLen)
 	DEBUGF(("    comparing %d-byte keys--",keyLen))
 	const char *a=(const char *)key1;
 	const char *b=(const char *)key2;
-	for (int i=0;i<keyLen;i++)
+	for (unsigned int i=0;i<keyLen;i++)
 		if (a[i]!=b[i]) {DEBUGF(("different\n")) return 0;}
 	DEBUGF(("equal\n"))
 	return 1;

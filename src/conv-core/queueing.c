@@ -6,6 +6,7 @@
  *****************************************************************************/
 
 #include <converse.h>
+#include <string.h>
 #include "queueing.h"
 
 void CqsDeqInit(d)
@@ -291,8 +292,7 @@ void CqsEnqueueGeneral(Queue q, void *data, int strategy,
     CqsDeqEnqueueLifo(d, data);
     break;
   default:
-    CmiError("CqsEnqueueGeneral: invalid queueing strategy.\n");
-    exit(1);
+    CmiAbort("CqsEnqueueGeneral: invalid queueing strategy.\n");
   }
   q->length++; if (q->length>q->maxlen) q->maxlen=q->length;
 }
