@@ -18,6 +18,7 @@ class Chare {
     CkChareID thishandle;
   public:
     void *operator new(size_t, void *ptr) { return ptr; }
+    void operator delete(void *, void *) { }
     void *operator new(size_t s) { return malloc(s); }
     void operator delete(void *ptr) { free(ptr); }
 #if CMK_DEBUG_MODE
