@@ -22,7 +22,7 @@ $(DEST): $(OBJS) headers
 $(DESTF): $(OBJS) headers
 	$(CHARMC) -DAMPI_FORTRAN=1 -c ampisetup.C
 	-$(CHARMC) -c ampimod.f90
-	-$(CHARMC) -cpmod ../include ampi.M
+	-$(CHARMC) -cpmod ../../../../include ampi.M
 	-$(CHARMC) $(OBJS) ampimod.o ampisetup.o -o $@
 
 headers: $(HEADERS)
@@ -47,4 +47,4 @@ ampi.decl.h ampi.def.h: ampi.ci
 	$(CHARMC) ampi.ci
 
 clean: 
-	-rm -fr *.o *~ *.decl.h *.def.h gmon.out $(DEST) $(DESTF) conv-host charmrun headers
+	-rm -fr *.o *~ *.decl.h *.def.h gmon.out $(DEST) $(DESTF) conv-host charmrun headers *.mod
