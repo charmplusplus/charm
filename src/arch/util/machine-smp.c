@@ -171,7 +171,7 @@ static DWORD WINAPI call_startfn(LPVOID vindex)
 FIXME: This should be the barrier implementation for 
 all thread types.
 */
-static HANDLE barrier_mutex;
+static volatile HANDLE barrier_mutex;
 static volatile int    barrier_wait[2] = {0,0};
 static volatile int    barrier_which = 0;
 
@@ -179,7 +179,7 @@ void CmiNodeBarrierCount(int nThreads) {
   int doWait = 1;
   int which;
 
-  WaitForSingleObject(barrier_mutex, INFINITE);
+  while (WaitForSingleObject(barrier_mutex, INFINITE)!=WAIT_OBJECT_0);
   which=barrier_which;
   barrier_wait[which]++;
   if (barrier_wait[which] == nThreads) {
@@ -187,7 +187,7 @@ void CmiNodeBarrierCount(int nThreads) {
     barrier_wait[barrier_which] = 0;/*Reset new counter*/
     doWait = 0;
   }
-  ReleaseMutex(barrier_mutex);
+  while (!ReleaseMutex(barrier_mutex));
 
   if (doWait)
       while(barrier_wait[which] != nThreads)
@@ -403,16 +403,10 @@ void  CmiNodeBarrier(void) {
 }
 
 /* Wait for all worker threads as well as comm. thread */
-/* unfortunately this could also be called in a non smp version, e.g.
-   net-win32 */
+/* unfortunately this could also be called in a seemingly non smp version
+   net-win32, which actually is implemented as smp with comm. thread */
 void CmiNodeAllBarrier(void) {
-  int count;
-#if CMK_SMP
-  count = CmiMyNodeSize()+1;
-#else
-  count = CmiMyNodeSize();
-#endif
-  CmiNodeBarrierCount(count);
+  CmiNodeBarrierCount(CmiMyNodeSize()+1);
 }
 
 #endif
