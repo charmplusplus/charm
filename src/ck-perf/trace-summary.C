@@ -178,37 +178,41 @@ void SumLogPool::write(void)
   fprintf(fp, "\n");
 
   // write entry execution time
+  fprintf(fp, "EPExeTime: ");
   for (i=0; i<_numEntries; i++)
     fprintf(fp, "%ld ", (long)(epInfo[i].epTime*1.0e6));
   fprintf(fp, "\n");
   // write entry function call times
+  fprintf(fp, "EPCallTime: ");
   for (i=0; i<_numEntries; i++)
     fprintf(fp, "%d ", epInfo[i].epCount);
   fprintf(fp, "\n");
   // write max entry function execute times
-  fprintf(fp, "PE%d MaxEPTime: ", CkMyPe());
+  fprintf(fp, "MaxEPTime: ");
   for (i=0; i<_numEntries; i++)
     fprintf(fp, "%ld ", (long)(epInfo[i].epMaxTime*1.0e6));
   fprintf(fp, "\n");
+#if 0
   for (i=0; i<SumEntryInfo::HIST_SIZE; i++) {
     for (j=0; j<_numEntries; j++) 
       fprintf(fp, "%d ", epInfo[j].hist[i]);
     fprintf(fp, "\n");
   }
+#endif
   // write marks
   if (CkpvAccess(version)>=2.0) 
   {
-  fprintf(fp, "NumMarks: %d ", markcount);
-  for (i=0; i<MAX_MARKS; i++) {
-    for(int j=0; j<events[i].length(); j++)
+    fprintf(fp, "NumMarks: %d ", markcount);
+    for (i=0; i<MAX_MARKS; i++) {
+      for(int j=0; j<events[i].length(); j++)
         fprintf(fp, "%d %f ", i, events[i][j]->time);
-  }
-  fprintf(fp, "\n");
+    }
+    fprintf(fp, "\n");
   }
   // write phases
   if (CkpvAccess(version)>=3.0)
   {
-  phaseTab.write(fp);
+    phaseTab.write(fp);
   }
 }
 
