@@ -724,10 +724,10 @@ int CMI_VMI_Open_Connections (char *key)
 			         AF_INET);
     if (!remote_host) {
       DEBUG_PRINT ("Error looking up host [%d.%d.%d.%d].\n",
-		   (processes->node_IP >>  0) & 0xFF,
-		   (processes->node_IP >>  8) & 0xFF,
-		   (processes->node_IP >> 16) & 0xFF,
-		   (processes->node_IP >> 24) & 0xFF);
+		   (process->node_IP >>  0) & 0xFF,
+		   (process->node_IP >>  8) & 0xFF,
+		   (process->node_IP >> 16) & 0xFF,
+		   (process->node_IP >> 24) & 0xFF);
       free (remote_key);
       VMI_Buffer_Deallocate (connect_message_buffer);
       return (-1);
