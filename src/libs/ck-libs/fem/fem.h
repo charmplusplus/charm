@@ -110,6 +110,7 @@ extern "C" {
 #define FEM_NODE_PRIMARY (FEM_ATTRIB_FIRST+7) /* This chunk owns this node (nodes only; width=1, datatype=FEM_BYTE) */
 #define FEM_CHUNK (FEM_ATTRIB_FIRST+8) /* For Nodes and Elements. Used during ghost creation
 to mark the chunk to which a ghost node or element belongs datatype=FEM_INDEX*/
+#define FEM_BOUNDARY (FEM_ATTRIB_FIRST+9) /*provides the boundary flag for nodes, elements and sparse elements FEM_INT*/
 #define FEM_ATTRIB_LAST (FEM_ATTRIB_FIRST+10) /*This is the last valid attribute code*/
 
   /* Specialized routines: */

@@ -971,7 +971,6 @@ void FEM_Entity::copyShape(const FEM_Entity &src) {
 }
 
 void FEM_Entity::setLength(int newlen) {
-	CkPrintf("in SetLength %d %d \n",newlen,max);
 	if(!resize){
 		if (size()!=newlen) {
 			length=newlen;
