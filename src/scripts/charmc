@@ -955,7 +955,7 @@ if [ -x $CHARMBIN/$targ ]
 then
 	DoNoErrCheck $RM $targ
 	Do $CP $CHARMBIN/$targ $targ
-	if [ ! -f $conv-host ]; then Do $LN -f -s $targ $conv-host; fi
+	[ ! -f $convhost ] && Do $LN -f -s $targ $convhost
 fi
 
 Copyobj
