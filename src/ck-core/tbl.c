@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.2  1995-06-29 22:00:56  narain
+ * Revision 2.3  1995-07-22 23:45:15  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.2  1995/06/29  22:00:56  narain
  * Changed name of member in PSEDO_STRUCT to tbl
  *
  * Revision 2.1  1995/06/08  17:07:12  gursoy
@@ -342,12 +345,10 @@ int option;
 	if (index == -1)
 		place = Hash(tbl, key);
 	
-#ifdef DEBUGGING_MODE
 	if (index == -1)
 		trace_table(INSERT, tbl, key, place->penum);
 	else 
 		trace_table(INSERT, tbl, key, CmiMyPe());
-#endif
 
 	if (!data)  {
 		CmiPrintf("*** ERROR *** Insert on processor %d has null data.\n",
@@ -436,12 +437,10 @@ int option;
 	if (index == -1)
 		place = Hash(tbl, key);	
 
-#ifdef DEBUGGING_MODE
 	if (index == -1)
 		trace_table(DELETE, tbl, key, place->penum);
 	else 
 		trace_table(DELETE, tbl, key, CmiMyPe());
-#endif
 
 	if ( (index == -1) && ( place->penum != CmiMyPe()))
 		pack(&operation, &tbl, &(place->index), place->penum,
@@ -514,12 +513,10 @@ int option;
 			CmiPrintf("***error*** TblFind :: Unknown option chosen\n");
 	place = Hash(tbl, key);	
 
-#ifdef DEBUGGING_MODE
 	if (index == -1)
 		trace_table(FIND, tbl, key, place->penum);
 	else 
 		trace_table(FIND, tbl, key, CmiMyPe());
-#endif
 
 
 	if ( (index == -1) && (place->penum != CmiMyPe()))

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.3  1995-07-12 16:28:45  jyelon
+ * Revision 2.4  1995-07-22 23:44:13  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.3  1995/07/12  16:28:45  jyelon
  * *** empty log message ***
  *
  * Revision 2.2  1995/07/05  19:38:31  narain
@@ -276,12 +279,12 @@ ChareIDType *ReturnID;
 
 
 
-BOC_BLOCK * CreateBocBlock(sizeData)
+BOC_BLOCK *CreateBocBlock(sizeData)
 int sizeData;
 {
 	BOC_BLOCK *p;
 
-	p =  (BOC_BLOCK *) CmiAlloc( sizeof(BOC_BLOCK) + sizeData );
+	p =  (BOC_BLOCK *)CmiAlloc( sizeof(BOC_BLOCK) + sizeData);
 	CkMemError(p);
 	return(p);
 }
@@ -296,18 +299,18 @@ EntryNumType ReturnEP;
 ChareIDType *ReturnID;
 {
 	ENVELOPE *env ;
+        int dataMag = bytes_to_magnitude(SizeData);
 
-TRACE(CmiPrintf("[%d] GeneralCreateBoc: SizeData=%d, Entry=%d, ReturnEP=%d\n",
-		CmiMyPe(), SizeData, Entry, ReturnEP));
+TRACE(CmiPrintf("[%d] GeneralCreateBoc: Entry=%d, ReturnEP=%d\n",
+		CmiMyPe(), Entry, ReturnEP));
 
 	env = (ENVELOPE *) ENVELOPE_UPTR(Msg);
 	SetEnv_category(env, USERcat);
 	SetEnv_destPeFixed(env, 1);
-	SetEnv_destPE(env, (ALL_NODES_EXCEPT_ME));
 
 	if ((CmiMyPe() == 0)  || CpvAccess(InsideDataInit))
 	{
-		SetEnv_sizeData(env, SizeData);
+		SetEnv_dataMag(env, dataMag);
 		SetEnv_boc_num(env, ++CpvAccess(currentBocNum));
 		SetEnv_EP(env, Entry);
 	}
@@ -318,7 +321,7 @@ TRACE(CmiPrintf("[%d] GeneralCreateBoc: SizeData=%d, Entry=%d, ReturnEP=%d\n",
 
 		SetEnv_msgType(env, BocInitMsg);
 		trace_creation(GetEnv_msgType(env), Entry, env);
-		CkCheck_and_BroadcastNoFreeNoLdb(env, Entry);
+		CkCheck_and_BroadcastNoFreeNoLdb(env);
 		/* env becomes the usrMsg, hence should not be freed by us */
 		executing_boc_num = ProcessBocInitMsg(env);
 		if (ReturnEP >= 0)
@@ -345,7 +348,7 @@ TRACE(CmiPrintf("[%d] GeneralCreateBoc: SizeData=%d, Entry=%d, ReturnEP=%d\n",
 			SetEnv_msgType(env, DynamicBocInitMsg);
 
 			trace_creation(GetEnv_msgType(env), Entry, env);
-			CkCheck_and_BroadcastNoFree(env, Entry);
+			CkCheck_and_BroadcastNoFree(env);
 
 		        CmiSetHandler(env,CsvAccess(CallProcessMsg_Index)) ;
 			CkEnqueue(env);
@@ -384,14 +387,13 @@ ChareIDType *pChareID;
 void *mydata;
 {
 	SetID_onPE((*pChareID), CmiMyPe());
-	SetID_isBOC((*pChareID), 1);
 	SetID_boc_num((*pChareID), MyBocNum(mydata));
 }
 
-GeneralSendMsgBranch(ep, msg, destPe, category, type, bocnum)
+GeneralSendMsgBranch(ep, msg, destPE, category, type, bocnum)
 EntryPointType ep;
 void *msg;
-PeNumType destPe;
+PeNumType destPE;
 MsgCategories category;
 MsgTypes type;
 ChareNumType bocnum;
@@ -400,7 +402,6 @@ ChareNumType bocnum;
 
 	env  = ENVELOPE_UPTR(msg);
 
-	SetEnv_destPE(env, destPe);
 	SetEnv_category(env, category);
 	SetEnv_msgType(env, type);
 	SetEnv_destPeFixed(env, 1);
@@ -413,9 +414,8 @@ TRACE(CmiPrintf("[%d] GeneralSend: type=%d, msgType=%d\n",
 	if (bocnum >= NumSysBoc)
         	CpvAccess(nodebocMsgsCreated)++;
 
-
 	trace_creation(GetEnv_msgType(env), ep, env);
-	CkCheck_and_Send(env, ep);
+	CkCheck_and_Send(destPE, env);
 	QDCountThisCreation(ep, category, type, 1);
 }
 
@@ -432,7 +432,6 @@ ChareNumType bocnum;
 
 	env = ENVELOPE_UPTR(msg);
 
-	SetEnv_destPE(env, ALL_NODES);
 	SetEnv_category(env, category);
 	SetEnv_msgType(env, type);
 	SetEnv_destPeFixed(env, 1);
@@ -446,7 +445,7 @@ TRACE(CmiPrintf("[%d] GeneralBroadcast: type=%d, msgType=%d\n",
         	CpvAccess(nodebocMsgsCreated)+=CmiNumPe();
 
 	trace_creation(GetEnv_msgType(env), ep, env);
-	CkCheck_and_BroadcastAll(env, ep); /* Asynchronous broadcast */
+	CkCheck_and_BroadcastAll(env); /* Asynchronous broadcast */
 	QDCountThisCreation(ep, category, type, CmiNumPe());
 }
 
@@ -511,27 +510,27 @@ InitiateDynamicBocBroadcast(msg, mydata)
 DYNAMIC_BOC_NUM_MSG *msg;
 char *mydata;
 {
-	int size;
+	int dataSize, dataMag;
 	void *tmsg;
         ENVELOPE * env;
 	ChareNumType ep;
 
-	GetDynamicBocMsg(msg->ref, &tmsg, &ep, &size); 
+	GetDynamicBocMsg(msg->ref, &tmsg, &ep, &dataSize); 
+        dataMag = bytes_to_magnitude(dataSize);
 
-TRACE(CmiPrintf("[%d] InitiateDynamicBocBroadcast: ref=%d, boc=%d, ep=%d, size=%d\n",
-		CmiMyPe(), msg->ref, msg->boc, ep, size));
+TRACE(CmiPrintf("[%d] InitiateDynamicBocBroadcast: ref=%d, boc=%d, ep=%d\n",
+		CmiMyPe(), msg->ref, msg->boc, ep));
 
         env = (ENVELOPE *) ENVELOPE_UPTR(tmsg);
         SetEnv_category(env, USERcat);
         SetEnv_destPeFixed(env, 1);
-        SetEnv_destPE(env, (ALL_NODES_EXCEPT_ME));
-        SetEnv_sizeData(env, size);
+        SetEnv_dataMag(env, dataMag);
         SetEnv_boc_num(env, msg->boc);
         SetEnv_EP(env, ep);
         SetEnv_msgType(env, DynamicBocInitMsg);
 
 	trace_creation(GetEnv_msgType(env), ep, env);
-        CkCheck_and_BroadcastAll(env, ep);
+        CkCheck_and_BroadcastAll(env);
 
         QDCountThisCreation(ep, USERcat, DynamicBocInitMsg,CmiNumPe());
 

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1995-06-08 17:07:12  gursoy
+ * Revision 2.2  1995-07-22 23:45:15  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.1  1995/06/08  17:07:12  gursoy
  * Cpv macro changes done
  *
  * Revision 1.5  1995/04/23  20:55:17  sanjeev
@@ -49,17 +52,3 @@
          if ((type != QdBocMsg) && (type != QdBroadcastBocMsg) && \
 			(type != LdbMsg)) CpvAccess(msgs_created) += x;
 
-#ifdef DEBUGGING_MODE
-#define COPY_AND_SEND(env)  { \
-	ENVELOPE *new = (ENVELOPE *) CkCopyEnv(env); \
-	trace_creation(GetEnv_msgType(new), GetEnv_EP(new), new); \
-        CmiSetHandler(env,CsvAccess(HANDLE_INCOMING_MSG_Index)); \
-        CkAsyncSend(GetEnv_destPE(new), \
-        CmiSize(new), new); }
-#else
-#define COPY_AND_SEND(env)  { \
-	ENVELOPE *new = (ENVELOPE *) CkCopyEnv(env); \
-        CmiSetHandler(env,CsvAccess(HANDLE_INCOMING_MSG_Index)); \
-        CkAsyncSend(GetEnv_destPE(new), \
-        CmiSize(new), new); }
-#endif

@@ -11,9 +11,12 @@
  ***************************************************************************
  * REVISION HISTORY:
  *      $Log$
- *      Revision 2.5  1995-07-12 21:36:20  brunner
- *      Added prog_name to perfModuleInit(), so argv[0] can be used
- *      to generate a unique tace file name.
+ *      Revision 2.6  1995-07-22 23:44:01  jyelon
+ *      *** empty log message ***
+ *
+ * Revision 2.5  1995/07/12  21:36:20  brunner
+ * Added prog_name to perfModuleInit(), so argv[0] can be used
+ * to generate a unique tace file name.
  *
  * Revision 2.4  1995/07/12  20:23:47  brunner
  * Changed global variable time to now, to avoid conflict with
@@ -117,6 +120,15 @@ int id, msg_type, entry;
 				CpvAccess(current_time_interval)); 
 	CpvAccess(start_processing_time) = CpvAccess(last_time_interval) = -1;
 }
+
+trace_begin_charminit()
+{}
+
+trace_end_charminit()
+{}
+
+trace_begin_computation()
+{}
 
 trace_enqueue(envelope)
 ENVELOPE *envelope;

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.8  1995-07-19 22:15:32  jyelon
+ * Revision 2.9  1995-07-22 23:44:13  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.8  1995/07/19  22:15:32  jyelon
  * *** empty log message ***
  *
  * Revision 2.7  1995/07/12  16:28:45  jyelon
@@ -130,49 +133,41 @@
 
 
 
-#define CkCheck_and_Send(env,Entry) { \
-	if ( GetEnv_destPE(env) == CmiMyPe()) { \
+#define CkCheck_and_Send(PE, env)\
+    {\
+	if (PE == CmiMyPe()) { \
 	        CmiSetHandler(env,CsvAccess(CallProcessMsg_Index)) ; \
                 CkEnqueue(env); \
-	} \
-        else \
-		CkSend(GetEnv_destPE(env), env); \
-	}
+	} else { \
+        	CldFillLdb(PE, LDB_ELEMENT_PTR(env)); \
+        	PACK(env); \
+        	CmiSetHandler(env,CsvAccess(HANDLE_INCOMING_MSG_Index)); \
+        	CmiSyncSend(PE,CmiSize(env),env); \
+        	CmiFree(env); \
+	}\
+    }
 
-/* NOTE : The CmiSize call below is required because the 
-   msg size might change after packing */
-
-#define CkSend(pe,env) \
-{ \
-	CldFillLdb(GetEnv_destPE(env), LDB_ELEMENT_PTR(env)); \
-	PACK(env); \
-	CmiSetHandler(env,CsvAccess(HANDLE_INCOMING_MSG_Index)); \
-	CmiSyncSend(pe,CmiSize(env),env); \
-	CmiFree(env) ; \
-}
-
-
-#define CkCheck_and_Broadcast(env,Entry) { \
-        CldFillLdb(GetEnv_destPE(env), LDB_ELEMENT_PTR(env)); PACK(env); \
+#define CkCheck_and_Broadcast(env) { \
+        CldFillLdb(ALL_NODES_EXCEPT_ME, LDB_ELEMENT_PTR(env)); PACK(env); \
         CmiSetHandler(env,CsvAccess(HANDLE_INCOMING_MSG_Index)); \
 	CmiSyncBroadcast(CmiSize(env),env); \
 	CmiFree(env) ; \
         }
 
-#define CkCheck_and_BroadcastNoFree(env,Entry) { \
-        CldFillLdb(GetEnv_destPE(env), LDB_ELEMENT_PTR(env)); PACK(env); \
+#define CkCheck_and_BroadcastNoFree(env) { \
+        CldFillLdb(ALL_NODES_EXCEPT_ME, LDB_ELEMENT_PTR(env)); PACK(env); \
         CmiSetHandler(env,CsvAccess(HANDLE_INCOMING_MSG_Index)); \
 	CmiSyncBroadcast(CmiSize(env),env); UNPACK(env);  \
         }
 
-#define CkCheck_and_BroadcastNoFreeNoLdb(env,Entry) { \
+#define CkCheck_and_BroadcastNoFreeNoLdb(env) { \
         PACK(env); \
         CmiSetHandler(env,CsvAccess(HANDLE_INCOMING_MSG_Index)); \
 	CmiSyncBroadcast(CmiSize(env),env); UNPACK(env);  \
         }
 
-#define CkCheck_and_BroadcastAll(env,Entry) { \
-        CldFillLdb(GetEnv_destPE(env), LDB_ELEMENT_PTR(env)); PACK(env); \
+#define CkCheck_and_BroadcastAll(env) { \
+        CldFillLdb(ALL_NODES, LDB_ELEMENT_PTR(env)); PACK(env); \
         CmiSetHandler(env,CsvAccess(HANDLE_INCOMING_MSG_Index)); \
 	CmiSyncBroadcastAllAndFree(CmiSize(env),env);\
         }

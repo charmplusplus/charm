@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1995-06-08 17:07:12  gursoy
+ * Revision 2.2  1995-07-22 23:45:15  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.1  1995/06/08  17:07:12  gursoy
  * Cpv macro changes done
  *
  * Revision 1.3  1995/04/21  22:43:18  sanjeev
@@ -67,7 +70,6 @@ struct chare_block * mainChareBlock;
 	ENVELOPE * env;
 
 	env = ENVELOPE_UPTR(ReadBuffer);
-	SetEnv_destPE(env,  ALL_NODES_EXCEPT_ME);
 	SetEnv_category(env, USERcat);
 	SetEnv_msgType(env, ReadVarMsg);
 	SetEnv_destPeFixed(env, 1);
@@ -82,7 +84,7 @@ struct chare_block * mainChareBlock;
 		SetEnv_chare_magic_number(env, 
 			GetID_chare_magic_number(mainChareBlock->selfID));
 
-	CkCheck_and_Broadcast(env, 0);
+	CkCheck_and_Broadcast(env);
 }
 
 
@@ -95,7 +97,6 @@ int id;
 
 	env = ENVELOPE_UPTR(msg);
 	CpvAccess(NumReadMsg)++;
-	SetEnv_destPE(env, ALL_NODES_EXCEPT_ME);
 	SetEnv_category(env, USERcat);
 	SetEnv_msgType(env, ReadMsgMsg);
 	SetEnv_destPeFixed(env, 1);
@@ -104,6 +105,6 @@ int id;
 		packed = 1;
 	else
 		 packed = 0;
-	CkCheck_and_BroadcastNoFree(env, 0);
+	CkCheck_and_BroadcastNoFree(env);
 }
 

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.7  1995-07-19 22:15:28  jyelon
+ * Revision 2.8  1995-07-22 23:44:13  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.7  1995/07/19  22:15:28  jyelon
  * *** empty log message ***
  *
  * Revision 2.6  1995/07/12  16:28:45  jyelon
@@ -185,6 +188,7 @@ ENVELOPE *envelope;
 	ChareNumType executing_boc_num;
 	int current_msgType = GetEnv_msgType(envelope);
 	EntryPointType current_ep = GetEnv_EP(envelope);
+        CHARE_BLOCK *current_block;
 	void *usrMsg ;
 
 	TRACE(CmiPrintf("[%d] ProcessMsg: msgType = %d, ep = %d\n",
@@ -195,24 +199,25 @@ ENVELOPE *envelope;
 	{
 
 	case NewChareMsg:
-
-		TRACE(CmiPrintf("[%d] Loop: isVID=%d, sizeData=%d\n",
-		    CmiMyPe(), GetEnv_isVID(envelope), GetEnv_sizeData(envelope)));
-
 		/* allocate data area, and strart execution. */
-		CpvAccess(currentChareBlock) = (struct chare_block *)
-		    CreateChareBlock(GetEnv_sizeData(envelope));
-		SetID_chare_magic_number(CpvAccess(currentChareBlock)->selfID,
+                current_block = (CHARE_BLOCK *)
+		    CreateChareBlock
+                        (magnitude_to_bytes(GetEnv_dataMag(envelope)));
+		CpvAccess(currentChareBlock) = current_block;
+		SetID_chare_magic_number(current_block->selfID,
 		    CpvAccess(nodecharesProcessed));
+                SetID_onPE(current_block->selfID, CmiMyPe());
+                SetID_chareBlockPtr(current_block->selfID, current_block);
 
 		TRACE(CmiPrintf("[%d] Loop: currentChareBlock=0x%x, magic=%d\n",
 		    CmiMyPe(), CpvAccess(currentChareBlock), 
 		    GetID_chare_magic_number(CpvAccess(currentChareBlock)->selfID)));
 
 		/* If virtual block exists, get all messages for this chare	*/
-		if (GetEnv_isVID(envelope))
-			VidSend(CpvAccess(currentChareBlock), GetEnv_onPE(envelope),
-			    GetEnv_vidBlockPtr(envelope));
+		if (GetEnv_vidBlockPtr(envelope))
+			VidSend(CpvAccess(currentChareBlock),
+				GetEnv_vidPE(envelope),
+				GetEnv_vidBlockPtr(envelope));
 		trace_begin_execute(envelope);
 		(*(CsvAccess(EpTable)[current_ep])) (usrMsg, CpvAccess(currentChareBlock) + 1);
 		trace_end_execute(CpvAccess(nodecharesProcessed), current_msgType, current_ep);
@@ -244,7 +249,7 @@ ENVELOPE *envelope;
 			trace_end_execute(id, current_msgType, current_ep);
 		}
 		else 
-			CmiPrintf("[%d] *** ERROR *** Message to dead chare at entry point %d.\n", CmiMyPe(),  CsvAccess(EpChareTable)[current_ep]);
+			CmiPrintf("[%d] *** ERROR *** Invalid or expired chareID used at entry point %s.\n", CmiMyPe(),  CsvAccess(EpNameTable)[current_ep]);
 
 		break;
 
@@ -279,13 +284,19 @@ CmiMyPe(), current_ep, executing_boc_num));
 		break;
 
 
-	case VidMsg:
-		current_ep = GetEnv_vidEP(envelope);
+	case VidEnqueueMsg:
+		current_ep = VidQueueUpInVidBlock_EP;
 		trace_begin_execute(envelope);
 		(*(CsvAccess(EpTable)[current_ep])) (usrMsg, NULL);
 		trace_end_execute(VidBocNum, current_msgType, current_ep);
 		break;
 
+        case VidSendOverMsg:
+		current_ep = VidSendOverMessages_EP;
+		trace_begin_execute(envelope);
+		(*(CsvAccess(EpTable)[current_ep])) (usrMsg, NULL);
+		trace_end_execute(VidBocNum, current_msgType, current_ep);
+		break;
 
 	default :
 		CmiPrintf("*** ERROR *** Illegal Msg %d in Loop for EP %d.\n", GetEnv_msgType(envelope), GetEnv_EP(envelope));

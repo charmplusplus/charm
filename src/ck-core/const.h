@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.5  1995-07-19 22:15:33  jyelon
+ * Revision 2.6  1995-07-22 23:44:13  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.5  1995/07/19  22:15:33  jyelon
  * *** empty log message ***
  *
  * Revision 2.4  1995/07/12  16:28:45  jyelon
@@ -166,9 +169,10 @@
 
 /**********		IMMEDIATEcat		*******/
 #define LdbMsg			12
-#define VidMsg			13
-#define QdBocMsg		14
-#define QdBroadcastBocMsg	15
+#define VidEnqueueMsg   	13
+#define VidSendOverMsg          14
+#define QdBocMsg		15
+#define QdBroadcastBocMsg	16
 
 
 #endif

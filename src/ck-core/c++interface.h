@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.2  1995-06-14 19:39:26  gursoy
+ * Revision 2.3  1995-07-22 23:44:13  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.2  1995/06/14  19:39:26  gursoy
  * *** empty log message ***
  *
  * Revision 2.1  1995/06/08  17:09:41  gursoy
@@ -45,7 +48,7 @@
 
 #define NULL_EP -1
 
-typedef int MAGIC_NUMBER_TYPE ;
+typedef unsigned short MAGIC_NUMBER_TYPE ;
 
 extern "C" void CollectValue(int, int, ChareIDType *) ;
 extern "C" void * MonoValue(int) ;
@@ -64,11 +67,8 @@ public:
 
 	_CK_Object() {}
 
-	_CK_Object(MAGIC_NUMBER_TYPE magic) {
+	_CK_Object(int magic) {
         	SetID_onPE(thishandle, CmiMyPe());
-        	SetID_isVID(thishandle, 0);
-        	SetID_isBOC(thishandle, 0);
-	
         	SetID_chare_magic_number(thishandle,(int)magic) ;
         	SetID_chareBlockPtr(thishandle, ((CHARE_BLOCK *)this));
 	}
@@ -91,7 +91,7 @@ public:
 	int thishandle ;  /* also stores BocNum */
 
 	_CK_BOC() {}
-	_CK_BOC(MAGIC_NUMBER_TYPE mn) : _CK_Object(mn) {}
+	_CK_BOC(int magic) : _CK_Object(magic) {}
 
 	void setBocNum(int num) {
 		thishandle = _CK_MyBocNum = num ;
@@ -133,7 +133,7 @@ public:
 typedef void (*EPFnType)(void *, _CK_Object *) ;
 
 /* CHAREFNTYPE is a pointer to a _CK_create_ChareName() function */
-typedef _CK_Object * (*CHAREFNTYPE)(MAGIC_NUMBER_TYPE) ;
+typedef _CK_Object * (*CHAREFNTYPE)(int) ;
 
 /* BOCFNTYPE is a pointer to a _CK_create_BocName() function */
 typedef _CK_BOC * (*BOCFNTYPE)(void) ;

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.5  1995-07-19 22:15:22  jyelon
+ * Revision 2.6  1995-07-22 23:44:13  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.5  1995/07/19  22:15:22  jyelon
  * *** empty log message ***
  *
  * Revision 2.4  1995/07/12  16:28:45  jyelon
@@ -271,21 +274,7 @@ ChareIDType * chareid;
 MyChareID(pChareID)
 ChareIDType * pChareID;
 {
-	SetID_onPE((*pChareID), CmiMyPe());
-	SetID_isVID((*pChareID), 0);
-	SetID_isBOC((*pChareID), 0);
-
-	SetID_chare_magic_number((*pChareID), 
-	    GetID_chare_magic_number(CpvAccess(currentChareBlock)->selfID));
-	SetID_chareBlockPtr((*pChareID), CpvAccess(currentChareBlock));
-
-	TRACE(CmiPrintf("[%d] MyChareID: onPE=%d, isBOC=%d, id_magic=%d, current_magic=%d, id_ptr=0x%x, current_ptr=0x%x\n",
-	    CmiMyPe(), GetID_onPE((*pChareID)),
-	    GetID_isBOC((*pChareID)), 
-	    GetID_chare_magic_number((*pChareID)),
-	    GetID_chare_magic_number(CpvAccess(currentChareBlock)->selfID),
-	    GetID_chareBlockPtr((*pChareID)),
-	    CpvAccess(currentChareBlock)));
+    *pChareID = CpvAccess(currentChareBlock)->selfID;
 }
 
 
@@ -295,9 +284,6 @@ MainChareID(pChareID)
 ChareIDType * pChareID;
 {
 	SetID_onPE((*pChareID), 0);
-	SetID_isVID((*pChareID), 0);
-	SetID_isBOC((*pChareID), 0);
-
 	if (CmiMyPe() == 0)
 		SetID_chare_magic_number((*pChareID),
 		    GetID_chare_magic_number(CpvAccess(mainChareBlock)->selfID));
@@ -322,21 +308,21 @@ ChareIDType * pChareID;
 
 */
 
-CreateChare(id, Entry, Msg, vid, DestPe)
+CreateChare(id, Entry, Msg, vid, destPE)
 int id;
 EntryNumType Entry;
 void *Msg;
 ChareIDType *vid;
-int DestPe;
+int destPE;
 {
 	ENVELOPE * env;
 	VID_BLOCK * vidblock;
-	int DataSize ;
+	int DataMag ;
 
 	if ( IsCharmPlus(Entry) )
-		DataSize = id ;
+		DataMag = bytes_to_magnitude(id);
 	else
-		DataSize =  CsvAccess(ChareSizesTable)[id];
+		DataMag = bytes_to_magnitude(CsvAccess(ChareSizesTable)[id]);
 
 	TRACE(CmiPrintf("[%d] CreateChare: Entry=%d\n", CmiMyPe(), Entry));
 
@@ -345,8 +331,7 @@ int DestPe;
 
 	SetEnv_category(env, USERcat);
 	SetEnv_msgType(env, NewChareMsg);
-	SetEnv_sizeData(env, DataSize);
-	SetEnv_onPE(env, CmiMyPe());
+	SetEnv_dataMag(env, DataMag);
 	SetEnv_EP(env, Entry);
 
 	if (vid != NULL_VID)
@@ -355,23 +340,19 @@ int DestPe;
 		CkMemError(vidblock);
 		vidblock->vidPenum = -1;
 		vidblock->info_block.vid_queue = (void *) FIFO_Create();
-		SetID_isBOC((*vid), 0);
-		SetID_isVID((*vid), 1);
 		SetID_onPE((*vid), CmiMyPe());
 		SetID_vidBlockPtr((*vid),  (struct vid_block *) vidblock);
-
-		SetEnv_isVID(env, 1);
+                SetEnv_vidPE(env, CmiMyPe());
 		SetEnv_vidBlockPtr(env, (int) vidblock);
 	}
 	else
 	{
-		SetEnv_isVID(env, 0);
+                SetEnv_vidPE(env, -1);
 		SetEnv_vidBlockPtr(env, NULL);
 	}
 
-	TRACE(CmiPrintf("[%d] CreateChare: isVID=%d, vid=0x%x\n",
-	    CmiMyPe(), GetEnv_isVID(env), 
-	    vid));
+	TRACE(CmiPrintf("[%d] CreateChare: vid=0x%x\n",
+	    CmiMyPe(), vid));
 
 	TRACE(CmiPrintf("[%d] CreateChare: category=%d, msgType=%d, ep=%d\n",
 	    CmiMyPe(), GetEnv_category(env), 
@@ -386,10 +367,9 @@ int DestPe;
    calls were moved inside this if-then-else  */
 
 	trace_creation(GetEnv_msgType(env), Entry, env);
-	if (DestPe == NULL_PE)
+	if (destPE == NULL_PE)
 	{
 		/* Currently set to local PE, */
-		SetEnv_destPE(env, CmiMyPe());
 		SetEnv_destPeFixed(env, 0);
 		CmiSetHandler(env,CsvAccess(CallProcessMsg_Index)) ;
 		if (CmiNumPe() > 1) 
@@ -403,9 +383,8 @@ int DestPe;
 	      }
 	else
 	{
-		SetEnv_destPE(env, DestPe);
 		SetEnv_destPeFixed(env, 1);
-		CkCheck_and_Send(env, Entry);
+		CkCheck_and_Send(destPE, env);
 	}
 
 }
@@ -430,9 +409,9 @@ ChareIDType * pChareID;
 		    GetID_onPE((*pChareID)), USERcat, BocMsg, GetID_boc_num((*pChareID)));
 	else
 	{
+                int destPE = GetID_onPE((*pChareID));
 		CpvAccess(nodeforCharesCreated)++;
 		env = ENVELOPE_UPTR(Msg);
-		SetEnv_destPE(env,    GetID_onPE((*pChareID)));
 		SetEnv_msgType(env,   ForChareMsg);
 		SetEnv_destPeFixed(env, 1);
 		if (!GetID_isVID((*pChareID)))
@@ -447,10 +426,10 @@ ChareIDType * pChareID;
 		else 
 		{
 			SetEnv_category(env, IMMEDIATEcat);
-			SetEnv_msgType(env, VidMsg);
-			SetEnv_vidEP(env, VidQueueUpInVidBlock_EP);
+			SetEnv_msgType(env, VidEnqueueMsg);
 			SetEnv_vidBlockPtr(env, (int) GetID_vidBlockPtr((*pChareID)));
-			QDCountThisCreation(GetEnv_vidEP(env), IMMEDIATEcat, VidMsg, 1);
+			QDCountThisCreation(VidQueueUpInVidBlock_EP,
+					    IMMEDIATEcat, VidEnqueueMsg, 1);
 		}
 
 		SetEnv_EP(env, Entry);
@@ -462,16 +441,17 @@ ChareIDType * pChareID;
 		    CmiMyPe(), GetEnv_chare_magic_number(env),
 		    GetEnv_category(env), GetEnv_msgType(env), GetEnv_EP(env)));
 
-		if ((GetID_isVID((*pChareID))) && (GetEnv_destPE(env) == CmiMyPe()))
+		if ((GetID_isVID((*pChareID))) && (destPE == CmiMyPe()))
 		{
-			trace_creation(VidMsg, GetEnv_vidEP(env), env);
+			trace_creation(VidEnqueueMsg,
+				       VidQueueUpInVidBlock_EP, env);
 		        CmiSetHandler(env,CsvAccess(CallProcessMsg_Index)) ;
 			CkEnqueue(env);
 		}
 		else
 		{
 			trace_creation(GetEnv_msgType(env), Entry, env);
-			CkCheck_and_Send(env, Entry);
+			CkCheck_and_Send(destPE, env);
 		}
 
 		TRACE(CmiPrintf("[%d] Done with SendMsg.\n", CmiMyPe()));
@@ -529,15 +509,14 @@ void *usrptr;
  * message to another processor
  *****************************************************************************/
 
-void CkLdbSend(msgst, destPe)
+void CkLdbSend(msgst, destPE)
      void *msgst;
-     int destPe;
+     int destPE;
 {
   ENVELOPE *env = (ENVELOPE *)msgst;
   CmiSetHandler(env, CsvAccess(HANDLE_INCOMING_MSG_Index));
   trace_creation(GetEnv_msgType(env), GetEnv_EP(env), env); 
-  SetEnv_destPE(env,destPe); 
-  CkSend(destPe, env); 
+  CkCheck_and_Send(destPE, env);
 }
 
 CkEnqueue(env)

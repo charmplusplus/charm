@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.3  1995-06-29 21:51:53  narain
+ * Revision 2.4  1995-07-22 23:45:15  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.3  1995/06/29  21:51:53  narain
  * Changed members of MSG_STRUCT and PSEUDO_STRUCT : packfn, unpackfn and tbl
  *
  * Revision 2.2  1995/06/27  22:10:49  gursoy
@@ -93,30 +96,22 @@ int size ;
 }
 
 
-int registerBocEp(name,epFunc,epType,msgIndx,chareIndx)
+void registerSpecificEp(ep,name,epFunc,epType,msgIndx,chareIndx,chboc)
 char *name;
 FUNCTION_PTR epFunc ;
-int epType ;
-int msgIndx, chareIndx;
+int ep, epType, msgIndx, chareIndx, chboc;
 {
-/* fills in EpTable, EpIsImplicitTable, EpNameTable, EpChareTable
-   EpToMsgTable */
-	CsvAccess(EpTable)[CpvAccess(chareEpsCount)] = epFunc ;
-	CsvAccess(EpIsImplicitTable)[CpvAccess(chareEpsCount)] = 0 ;
-	CsvAccess(EpNameTable)[CpvAccess(chareEpsCount)] = 
-                               (char *)CmiSvAlloc(strlen(name)*sizeof(char)+1);
-	strcpy(CsvAccess(EpNameTable)[CpvAccess(chareEpsCount)], name) ;
-	CsvAccess(EpChareTable)[CpvAccess(chareEpsCount)] = chareIndx ;
-	CsvAccess(EpToMsgTable)[CpvAccess(chareEpsCount)] = msgIndx ;
-	CsvAccess(EpLanguageTable)[CpvAccess(chareEpsCount)] = epType ;
+  char *nname = (char *)CmiSvAlloc(strlen(name)*sizeof(char)+1);
+  strcpy(nname, name);
 
-	CsvAccess(EpChareTypeTable)[CpvAccess(chareEpsCount)] = BOC ;
-
-	CpvAccess(chareEpsCount) ++ ;
-	return(CpvAccess(chareEpsCount)-1) ;
+  CsvAccess(EpTable)          [ep] = epFunc;
+  CsvAccess(EpIsImplicitTable)[ep] = 0;
+  CsvAccess(EpNameTable)      [ep] = nname;
+  CsvAccess(EpChareTable)     [ep] = chareIndx;
+  CsvAccess(EpToMsgTable)     [ep] = msgIndx;
+  CsvAccess(EpLanguageTable)  [ep] = epType;
+  CsvAccess(EpChareTypeTable) [ep] = chboc;
 }
-
-
 
 int registerEp(name,epFunc,epType,msgIndx,chareIndx)
 char *name;
@@ -124,22 +119,20 @@ FUNCTION_PTR epFunc ;
 int epType ;
 int msgIndx, chareIndx;
 {
-/* fills in EpTable, EpIsImplicitTable, EpNameTable, EpChareTable
-   EpToMsgTable */
+  int index=CpvAccess(chareEpsCount)++;
+  registerSpecificEp(index, name, epFunc, epType, msgIndx, chareIndx, CHARE);
+  return index;
+}
 
-	CsvAccess(EpTable)[CpvAccess(chareEpsCount)] = epFunc ;
-	CsvAccess(EpIsImplicitTable)[CpvAccess(chareEpsCount)] = 0 ;
-	CsvAccess(EpNameTable)[CpvAccess(chareEpsCount)] = 
-                              (char *)CmiSvAlloc(strlen(name)*sizeof(char)+1);
-	strcpy(CsvAccess(EpNameTable)[CpvAccess(chareEpsCount)], name) ;
-	CsvAccess(EpChareTable)[CpvAccess(chareEpsCount)] = chareIndx ;
-	CsvAccess(EpToMsgTable)[CpvAccess(chareEpsCount)] = msgIndx ;
-	CsvAccess(EpLanguageTable)[CpvAccess(chareEpsCount)] = epType ;
-
-	CsvAccess(EpChareTypeTable)[CpvAccess(chareEpsCount)] = CHARE ;
-
-	CpvAccess(chareEpsCount)++ ;
-	return(CpvAccess(chareEpsCount)-1) ;
+int registerBocEp(name,epFunc,epType,msgIndx,chareIndx)
+char *name;
+FUNCTION_PTR epFunc ;
+int epType ;
+int msgIndx, chareIndx;
+{
+  int index=CpvAccess(chareEpsCount)++;
+  registerSpecificEp(index, name, epFunc, epType, msgIndx, chareIndx, BOC);
+  return index;
 }
 
 int registerChare(name,dataSz,createfn)

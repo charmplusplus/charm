@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.2  1995-07-12 16:28:45  jyelon
+ * Revision 2.3  1995-07-22 23:44:13  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.2  1995/07/12  16:28:45  jyelon
  * *** empty log message ***
  *
  * Revision 2.1  1995/06/08  17:09:41  gursoy
@@ -52,25 +55,15 @@ typedef int 		FunctionRefType;
 typedef int 		WriteOnceID;    
 
 typedef struct chare_id_type  {
+  unsigned int   i_tag1;
   unsigned short onPE;
-  unsigned char isBOC;
-  unsigned char isVID;
-  union chareboc {
-  	int chare_magic_number;
-	ChareNumType boc_num;
-  } chare_boc;
-  union idblock{
-  	struct chare_block  * chareBlockPtr;
-  	struct vid_block * vidBlockPtr;
-  } id_block;
+  unsigned short magic;
 } ChareIDType;
-
 
 typedef struct boc_block {
   ChareNumType boc_num;             /* boc instance number */
   double dummy;  /* to pad this struct to one word length */
 } BOC_BLOCK;
-
 
 typedef struct chare_block { 
  ChareIDType selfID;
@@ -80,7 +73,7 @@ typedef struct chare_block {
 
 typedef struct vid_block {
   PeNumType vidPenum;
-  int chare_magic_number;
+  unsigned short chare_magic_number;
   union infoblock {
  	struct fifo_queue * vid_queue;
  	CHARE_BLOCK      * chareBlockPtr;

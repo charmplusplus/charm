@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1995-06-08 17:07:12  gursoy
+ * Revision 2.2  1995-07-22 23:45:15  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.1  1995/06/08  17:07:12  gursoy
  * Cpv macro changes done
  *
  * Revision 1.2  1994/11/11  05:25:19  brunner
@@ -33,8 +36,7 @@ typedef struct dummy_msg {
 	int dummy;
 } DUMMY_MSG;
 
-typedef struct vid_msg{
- 	CHARE_BLOCK *dataPtr;
-        int chare_magic_number;
+typedef struct chare_id_msg{
+        ChareIDType ID;
 } CHARE_ID_MSG;
 #endif

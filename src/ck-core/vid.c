@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.3  1995-07-05 22:51:39  sanjeev
+ * Revision 2.4  1995-07-22 23:45:15  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.3  1995/07/05  22:51:39  sanjeev
  * added comments at top
  *
  * Revision 2.2  1995/07/05  22:11:59  sanjeev
@@ -42,22 +45,6 @@ Comments : 7/5/95 (after debugging bug on CM5 with Megatest++).
 Bug was intermittent crash in TTAB and ACC.
 Caused due to EP field not being filled in VidSend, so causing
 EpLanguageTable to be indexed by 65535 in CallProcessMsg.
-The VidMsg msg-type is used for
-1. In SendMsg when a msg is sent to a vid.
-In this case the EP field holds the actual user EP in the chare.
-The vidEP field holds "VidQueueUpInVidBlock_EP".
-2. In VidSend (called from NewChareMsg in ProcessMsg() after chare has 
-actually been created) to tell vid to send over its buffered msgs.
-Here vidEP field holds "VidSendOverMessages_EP"
-
-The vidEP field is used to distinguish the two cases for a VidMsg 
-in the switch in ProcessMsg().
-As the real EP field is not used in case 2, we could use it to encode
-VidSendOverMessages_EP, and send the msg as a regular BocMsg.
-So in case 1, we dont need the vidEP field, so can call VidQueueUpInVidBlock()
-directly from ProcessMsg().
-So we dont need the vidEP field, so we can possibly
-save 14 bits in tag2 of ENVELOPE.
 ************************************************************************/
 
 
@@ -107,11 +94,10 @@ void *data_area;
     {
 	SetEnv_category(env,USERcat);
 	SetEnv_msgType(env,ForChareMsg);
-	SetEnv_destPE(env,vidblock->vidPenum);
 	SetEnv_chareBlockPtr(env, (int) vidblock->info_block.chareBlockPtr);
 	SetEnv_chare_magic_number(env, vidblock->chare_magic_number);
 	trace_creation(GetEnv_msgType(env), GetEnv_EP(env), env);
-	CkCheck_and_Send(env, GetEnv_EP(env));
+	CkCheck_and_Send(vidblock->vidPenum, env);
 	QDCountThisCreation(GetEnv_EP(env), USERcat, ForChareMsg, 1);
     }
 }
@@ -132,28 +118,29 @@ VidSendOverMessages(msgPtr, data_area)
 CHARE_ID_MSG *msgPtr;
 void *data_area;
 {
-    CHARE_BLOCK 	*cblock = msgPtr->dataPtr;
+    ChareIDType         ID=msgPtr->ID;
     ENVELOPE 		*env = ENVELOPE_UPTR(msgPtr);
     VID_BLOCK 		*vidblock = (VID_BLOCK *) GetEnv_vidBlockPtr(env);
     void 		*vidqueue;
-    int 		magic_number = msgPtr->chare_magic_number;
+    int 		chare_magic = GetID_chare_magic_number(ID);
+    int                 chare_pe    = GetID_onPE(ID);
+    CHARE_BLOCK        *chare_block = GetID_chareBlockPtr(ID);
 
-    vidblock->vidPenum = GetEnv_onPE(env);
-    vidblock->chare_magic_number = magic_number;
+    vidblock->vidPenum = chare_pe;
+    vidblock->chare_magic_number = chare_magic;
+    vidblock->info_block.chareBlockPtr = chare_block;
     vidqueue = vidblock->info_block.vid_queue;
     while (!FIFO_Empty(vidqueue))
     {
 	FIFO_DeQueue(vidqueue, &env);
 	SetEnv_category(env, USERcat);
 	SetEnv_msgType(env, ForChareMsg);
-	SetEnv_destPE(env, vidblock->vidPenum);
-	SetEnv_chareBlockPtr(env, (int) cblock);
-	SetEnv_chare_magic_number(env, magic_number);
+	SetEnv_chareBlockPtr(env, chare_block);
+	SetEnv_chare_magic_number(env, chare_magic);
 	trace_creation(GetEnv_msgType(env), GetEnv_EP(env), env);
-	CkCheck_and_Send(env, GetEnv_EP(env));
+	CkCheck_and_Send(vidblock->vidPenum, env);
 	QDCountThisCreation(GetEnv_EP(env), USERcat, ForChareMsg, 1);
    }
-   vidblock->info_block.chareBlockPtr = cblock; 
 }
 
 
@@ -178,23 +165,18 @@ VID_BLOCK *vidPtr;
     CHARE_ID_MSG * msg;
     ENVELOPE * env;
 
-    msg  = (CHARE_ID_MSG *) CkAllocMsg(sizeof(CHARE_ID_MSG));
+    msg = (CHARE_ID_MSG *)CkAllocMsg(sizeof(CHARE_ID_MSG));
+    msg->ID = CpvAccess(currentChareBlock)->selfID;
     CkMemError(msg);
     env = ENVELOPE_UPTR(msg);
-    SetEnv_destPE(env, destPE);
     SetEnv_category(env, IMMEDIATEcat);
-    SetEnv_vidEP(env, VidSendOverMessages_EP);
-    SetEnv_msgType(env, VidMsg);
+    SetEnv_msgType(env, VidSendOverMsg);
     SetEnv_destPeFixed(env, 1);
-    SetEnv_onPE(env, CmiMyPe());
     SetEnv_vidBlockPtr(env, (int)  vidPtr);
-    SetEnv_EP(env, 0) ;
+    SetEnv_EP(env, 0);
 
-    msg->dataPtr = chareblockPtr;
-    msg->chare_magic_number =
-	GetID_chare_magic_number(CpvAccess(currentChareBlock)->selfID);
 
-    QDCountThisCreation(GetEnv_vidEP(env), IMMEDIATEcat, VidMsg, 1);
+    QDCountThisCreation(VidSendOverMessages_EP, IMMEDIATEcat, VidSendOverMsg, 1);
     trace_creation(GetEnv_msgType(env), GetEnv_EP(env), env);
-    CkCheck_and_Send(env, GetEnv_vidEP(env));
+    CkCheck_and_Send(destPE, env);
 }

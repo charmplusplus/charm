@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.8  1995-07-19 22:15:26  jyelon
+ * Revision 2.9  1995-07-22 23:44:13  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.8  1995/07/19  22:15:26  jyelon
  * *** empty log message ***
  *
  * Revision 2.7  1995/07/12  16:28:45  jyelon
@@ -194,9 +197,7 @@ char **argv;
   
  
         log_init();
-#ifdef DEBUGGING_MODE
         trace_begin_computation();
-#endif
         SysBocInit();
         CpvAccess(msgs_created) = CpvAccess(msgs_processed) = 0;
 
@@ -214,9 +215,7 @@ char **argv;
 
 		CpvAccess(InsideDataInit) = 0;
 
-#ifdef DEBUGGING_MODE
 		trace_begin_charminit();
-#endif
 		if (CsvAccess(MainChareLanguage) == CHARMPLUSPLUS)
 		{
 			CPlus_CallCharmInit(CpvAccess(userArgc), CpvAccess(userArgv));
@@ -231,6 +230,9 @@ char **argv;
 
 			SetID_chare_magic_number(CpvAccess(mainChareBlock)->selfID,
 						 rand());
+			SetID_onPE(CpvAccess(mainChareBlock)->selfID,0);
+                        SetID_chareBlockPtr(CpvAccess(mainChareBlock)->selfID,
+                                    mainChareBlock);
 			/* Calling CharmInit entry point */
 			CpvAccess(NumReadMsg) = 0;
 			CpvAccess(InsideDataInit) = 1;
@@ -240,9 +242,8 @@ char **argv;
 				    CpvAccess(userArgc), CpvAccess(userArgv));
 			CpvAccess(InsideDataInit) = 0;
 		}
-#ifdef DEBUGGING_MODE
 		trace_end_charminit();
-#endif
+
 		/* create the buffer for the read only variables */
 		ReadBufMsg = (char *) CkAllocMsg(CsvAccess(ReadBuffSize));
 		CpvAccess(ReadBufIndex) = ReadBufMsg;
@@ -381,7 +382,7 @@ ENVELOPE       *envelope;
 	else
 	{
 		bocBlock = (BOC_BLOCK *) CreateBocBlock
-			(GetEnv_sizeData(envelope));
+			(magnitude_to_bytes(GetEnv_dataMag(envelope)));
 		bocBlock->boc_num = executing_boc_num;
 		SetBocDataPtr(executing_boc_num, (void *) (bocBlock + 1));
 		trace_begin_execute(envelope);
@@ -664,14 +665,13 @@ BroadcastCount()
 	dummy_msg = (int *) CkAllocMsg(sizeof(int));
 	CkMemError(dummy_msg);
 	env = ENVELOPE_UPTR(dummy_msg);
-	SetEnv_destPE(env, ALL_NODES_EXCEPT_ME);
 	SetEnv_category(env, USERcat);
 	SetEnv_msgType(env, InitCountMsg);
 	SetEnv_destPeFixed(env, 1);
 
 	SetEnv_count(env, CpvAccess(currentBocNum) - NumSysBoc + 2 + CpvAccess(NumReadMsg));
 
-	CkCheck_and_Broadcast(env, 0);
+	CkCheck_and_Broadcast(env);
 	/* CkFreeMsg(dummy_msg);  commented on Jun 23 */
 }
 

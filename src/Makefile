@@ -8,7 +8,6 @@
 #     * The CHARM++ libraries
 #     * The CHARM translator
 #     * The CHARM++ translator
-#     * The conv-mach.sh and conv-mach.csh scripts
 #     * The charmreplay program
 # 
 # This Makefile is common to all machines.  This works because the charmc
@@ -117,11 +116,11 @@ cmk_clean:
 # Charm Libraries
 #
 # Each source file is compiled twice, once with debugging enabled,
-# yielding a file with the extension .d.o, and once with debugging
-# disabled, yielding a file with the extension .n.o.
+# yielding a file with the extension .o, and once with debugging
+# disabled, yielding a file with the extension .o.
 #
 # The object files so produced are collected into libraries, which
-# are named libckd-* if they contain debugging objects, or libckn-*
+# are named libck-* if they contain debugging objects, or libck-*
 # if they contain normal objects.
 #
 ###############################################################################
@@ -129,206 +128,145 @@ cmk_clean:
 CKHEADERS=chare.h const.h msg_macros.h prio_macros.h env_macros.h globals.h\
 	  sys_macros.h communication.h performance.h $(CVHEADERS)
 
-CK_LDB_N=libckn-ldb-rand.o libckn-ldb-acwn.o # libckn-ldb-mngr.o libckn-ldb-priomngr.o libckn-ldb-recv.o libckn-ldb-tok.o libckn-ldb-btok.o
+CK_LIBS_CORE=libck-core-notrace.o libck-core-summary.o
 
-CK_LDB_D= libckd-ldb-rand.o libckd-ldb-acwn.o #libckd-ldb-mngr.o libckd-ldb-priomngr.o libckd-ldb-recv.o libckd-ldb-tok.o libckd-ldb-btok.o 
+CK_LIBS_LDB=libck-ldb-rand.o libck-ldb-acwn.o # libck-ldb-mngr.o libck-ldb-priomngr.o libck-ldb-recv.o libck-ldb-tok.o libck-ldb-btok.o
 
-CK_CPLUS_N=libckn-cplus-n.o
+CK_LIBS_CPLUS=libck-cplus-n.o
 
-CK_CPLUS_D=libckd-cplus-n.o
+CK_LIBS_MAIN=libck-defmain.o libck-unimain.o
 
-CK_CORE_N=libckn-core-notrace.o libckn-core-summary.o
+CK_LIBS=$(CK_LIBS_CORE) $(CK_LIBS_LDB) $(CK_LIBS_CPLUS) $(CK_LIBS_MAIN)
 
-CK_CORE_D=libckd-core-proj.o libckd-core-replay.o libckd-core-record.o
+LIBCK_CORE=common.o globals.o init.o register.o boc.o condsend.o qd.o vid.o rdonly.o stat.o wrtone.o acc.o mono.o tbl.o memstuff.o ldbcfns.o ck.o
 
-CK_LIBS_N=$(CK_LDB_N) $(CK_CPLUS_N) $(CK_CORE_N) libckn-defmain.o libckn-unimain.o
+charmlibs: converse $(CK_LIBS)
 
-CK_LIBS_D=$(CK_LDB_D) $(CK_CPLUS_D) $(CK_CORE_D) libckd-defmain.o libckd-unimain.o
+LIBCK_CORE_NOTRACE=$(LIBCK_CORE) perf-none.o main.n.o
+libck-core-notrace.o: $(LIBCK_CORE_NOTRACE)
+	$(CHARMC) -cp ../lib/ -o $@ $(LIBCK_CORE_NOTRACE)
 
-LIBCKN_CORE=common.n.o globals.n.o init.n.o register.n.o boc.n.o condsend.n.o qd.n.o vid.n.o rdonly.n.o stat.n.o wrtone.n.o acc.n.o mono.n.o tbl.n.o memstuff.n.o ldbcfns.n.o
+LIBCK_CORE_SUMMARY=$(LIBCK_CORE) perf-sum.o main.n.o
+libck-core-summary.o: $(LIBCK_CORE_SUMMARY)
+	$(CHARMC) -cp ../lib/ -o $@ $(LIBCK_CORE_SUMMARY)
 
-LIBCKD_CORE=common.d.o globals.d.o init.d.o register.d.o boc.d.o condsend.d.o qd.d.o vid.d.o rdonly.d.o stat.d.o wrtone.d.o acc.d.o mono.d.o tbl.d.o memstuff.d.o ldbcfns.d.o
+LIBCK_CORE_PROJ=$(LIBCK_CORE) perf-proj.o perfio.o main.n.o
+libck-core-proj.o: $(LIBCK_CORE_PROJ)
+	$(CHARMC) -cp ../lib/ -o $@ $(LIBCK_CORE_PROJ)
 
-charmlibs: converse $(CK_LIBS_N) $(CK_LIBS_D)
+LIBCK_CORE_RECORD=$(LIBCK_CORE) perf-recd.o perfio.o main.n.o
+libck-core-record.o: $(LIBCK_CORE_RECORD)
+	$(CHARMC) -cp ../lib/ -o $@ $(LIBCK_CORE_RECORD)
 
-LIBCKN_CORE_NOTRACE=$(LIBCKN_CORE) perf-none.n.o main.n.o ck.n.o
-libckn-core-notrace.o: $(LIBCKN_CORE_NOTRACE)
-	$(CHARMC) -cp ../lib/ -o $@ $(LIBCKN_CORE_NOTRACE)
+LIBCK_CORE_REPLAY=$(LIBCK_CORE) perf-repl.o perfio.o main.r.o
+libck-core-replay.o: $(LIBCK_CORE)
+	$(CHARMC) -cp ../lib/ -o $@ $(LIBCK_CORE)
 
-LIBCKN_CORE_SUMMARY=$(LIBCKN_CORE) perf-sum.n.o main.n.o ck.n.o
-libckn-core-summary.o: $(LIBCKN_CORE_SUMMARY)
-	$(CHARMC) -cp ../lib/ -o $@ $(LIBCKN_CORE_SUMMARY)
-
-LIBCKD_CORE_PROJ=$(LIBCKD_CORE) perf-proj.d.o perfio.d.o main.d.o ck.d.o
-libckd-core-proj.o: $(LIBCKD_CORE_PROJ)
-	$(CHARMC) -cp ../lib/ -o $@ $(LIBCKD_CORE_PROJ)
-
-LIBCKD_CORE_RECORD=$(LIBCKD_CORE) perf-recd.d.o perfio.d.o main.d.o ck.d.o
-libckd-core-record.o: $(LIBCKD_CORE_RECORD)
-	$(CHARMC) -cp ../lib/ -o $@ $(LIBCKD_CORE_RECORD)
-
-LIBCKD_CORE_REPLAY=$(LIBCKD_CORE) perf-repl.d.o perfio.d.o main.r.o ck.r.o
-libckd-core-replay.o: $(LIBCKD_CORE)
-	$(CHARMC) -cp ../lib/ -o $@ $(LIBCKD_CORE)
-
-libckn-ldb-acwn.o: ldb.acwn.p ldb.h
+libck-ldb-acwn.o: ldb.acwn.p ldb.h
 	$(CHARMC) -cp ../lib/ -o $@ ldb.acwn.p
 
-libckd-ldb-acwn.o: ldb.acwn.p ldb.h
-	$(CHARMC) -cp ../lib/ -o $@ ldb.acwn.p -DDEBUGGING_MODE
-
-libckn-ldb-rand.o: ldb.rand.p ldb.h
+libck-ldb-rand.o: ldb.rand.p ldb.h
 	$(CHARMC) -cp ../lib/ -o $@ ldb.rand.p
 
-libckd-ldb-rand.o: ldb.rand.p ldb.h
-	$(CHARMC) -cp ../lib/ -o $@ ldb.rand.p -DDEBUGGING_MODE
-
-libckn-ldb-mngr.o: ldb.mngr.p ldb.h
+libck-ldb-mngr.o: ldb.mngr.p ldb.h
 	$(CHARMC) -cp ../lib/ -o $@ ldb.mngr.p
 
-libckd-ldb-mngr.o: ldb.mngr.p ldb.h
-	$(CHARMC) -cp ../lib/ -o $@ ldb.mngr.p -DDEBUGGING_MODE
-
-libckn-ldb-priomngr.o: ldb.priomngr.p ldb.h
+libck-ldb-priomngr.o: ldb.priomngr.p ldb.h
 	$(CHARMC) -cp ../lib/ -o $@ ldb.priomngr.p
 
-libckd-ldb-priomngr.o: ldb.priomngr.p ldb.h
-	$(CHARMC) -cp ../lib/ -o $@ ldb.priomngr.p -DDEBUGGING_MODE
-
-libckn-ldb-tok.o: ldb.tok.p ldb.h
+libck-ldb-tok.o: ldb.tok.p ldb.h
 	$(CHARMC) -cp ../lib/ -o $@ ldb.tok.p
 
-libckd-ldb-tok.o: ldb.tok.p ldb.h
-	$(CHARMC) -cp ../lib/ -o $@ ldb.tok.p -DDEBUGGING_MODE
-
-libckn-ldb-btok.o: ldb.btok.p ldb.h
+libck-ldb-btok.o: ldb.btok.p ldb.h
 	$(CHARMC) -cp ../lib/ -o $@ ldb.tok.p -DBITVECTOR
 
-libckd-ldb-btok.o: ldb.btok.p ldb.h
-	$(CHARMC) -cp ../lib/ -o $@ ldb.btok.p -DDEBUGGING_MODE  -DBITVECTOR
-
-libckn-ldb-repl.o: ldb.repl.p ldb.h
+libck-ldb-repl.o: ldb.repl.p ldb.h
 	$(CHARMC) -cp ../lib/ -o $@ ldb.repl.p
 
-libckd-ldb-repl.o: ldb.repl.p ldb.h
-	$(CHARMC) -cp ../lib/ -o $@ ldb.repl.p -DDEBUGGING_MODE
-
-libckn-ldb-recv.o: ldb.recv.p ldb.h
+libck-ldb-recv.o: ldb.recv.p ldb.h
 	$(CHARMC) -cp ../lib/ -o $@ ldb.recv.p
 
-libckd-ldb-recv.o: ldb.recv.p ldb.h
-	$(CHARMC) -cp ../lib/ -o $@ ldb.recv.p -DDEBUGGING_MODE
-
-libckn-cplus-n.o: dummy.cplus.c
+libck-cplus-n.o: dummy.cplus.c
 	$(CHARMC) -cp ../lib/ -o $@ dummy.cplus.c
 
-libckd-cplus-n.o: dummy.cplus.c
-	$(CHARMC) -cp ../lib/ -o $@ dummy.cplus.c -DDEBUGGING_MODE
-
-libckn-defmain.o: default-main.c
+libck-defmain.o: default-main.c
 	$(CHARMC) -cp ../lib/ -o $@ default-main.c
 
-libckd-defmain.o: default-main.c
-	$(CHARMC) -cp ../lib/ -o $@ default-main.c -DDEBUGGING_MODE
-
-libckn-unimain.o: uni_user_main.c
+libck-unimain.o: uni_user_main.c
 	$(CHARMC) -cp ../lib/ -o $@ uni_user_main.c
 
-libckd-unimain.o: uni_user_main.c
-	$(CHARMC) -cp ../lib/ -o $@ uni_user_main.c -DDEBUGGING_MODE
+ldbcfns.o: ldbcfns.c $(CKHEADERS)
+	$(CHARMC) -o ldbcfns.o ldbcfns.c
 
-ldbcfns.n.o ldbcfns.d.o: ldbcfns.c $(CKHEADERS)
-	$(CHARMC) -o ldbcfns.n.o ldbcfns.c
-	$(CHARMC) -o ldbcfns.d.o ldbcfns.c -DDEBUGGING_MODE
+common.o: common.c $(CKHEADERS)
+	$(CHARMC) -o common.o common.c
 
-common.n.o common.d.o: common.c $(CKHEADERS)
-	$(CHARMC) -o common.n.o common.c
-	$(CHARMC) -o common.d.o common.c -DDEBUGGING_MODE
+globals.o: globals.c $(CKHEADERS)
+	$(CHARMC) -o globals.o globals.c
 
-globals.n.o globals.d.o: globals.c $(CKHEADERS)
-	$(CHARMC) -o globals.n.o globals.c
-	$(CHARMC) -o globals.d.o globals.c -DDEBUGGING_MODE
+register.o: register.c $(CKHEADERS)
+	$(CHARMC) -o register.o register.c
 
-register.n.o register.d.o: register.c $(CKHEADERS)
-	$(CHARMC) -o register.n.o register.c
-	$(CHARMC) -o register.d.o register.c -DDEBUGGING_MODE
+init.o: init.c $(CKHEADERS)
+	$(CHARMC) -o init.o init.c
 
-init.n.o init.d.o: init.c $(CKHEADERS)
-	$(CHARMC) -o init.n.o init.c
-	$(CHARMC) -o init.d.o init.c -DDEBUGGING_MODE
+boc.o: boc.c $(CKHEADERS)
+	$(CHARMC) -o boc.o boc.c
 
-boc.n.o boc.d.o: boc.c $(CKHEADERS)
-	$(CHARMC) -o boc.n.o boc.c
-	$(CHARMC) -o boc.d.o boc.c -DDEBUGGING_MODE
+condsend.o: condsend.c condsend.h $(CKHEADERS)
+	$(CHARMC) -o condsend.o condsend.c
 
-condsend.n.o condsend.d.o: condsend.c condsend.h $(CKHEADERS)
-	$(CHARMC) -o condsend.n.o condsend.c
-	$(CHARMC) -o condsend.d.o condsend.c -DDEBUGGING_MODE
+qd.o: qd.c qd.h $(CKHEADERS)
+	$(CHARMC) -o qd.o qd.c
 
-qd.n.o qd.d.o: qd.c qd.h $(CKHEADERS)
-	$(CHARMC) -o qd.n.o qd.c
-	$(CHARMC) -o qd.d.o qd.c -DDEBUGGING_MODE
+vid.o: vid.c vid.h $(CKHEADERS)
+	$(CHARMC) -o vid.o vid.c
 
-vid.n.o vid.d.o: vid.c vid.h $(CKHEADERS)
-	$(CHARMC) -o vid.n.o vid.c
-	$(CHARMC) -o vid.d.o vid.c -DDEBUGGING_MODE
+stat.o: stat.c stat.h $(CKHEADERS)
+	$(CHARMC) -o stat.o stat.c
 
-stat.n.o stat.d.o: stat.c stat.h $(CKHEADERS)
-	$(CHARMC) -o stat.n.o stat.c
-	$(CHARMC) -o stat.d.o stat.c -DDEBUGGING_MODE
+rdonly.o: rdonly.c $(CKHEADERS)
+	$(CHARMC) -o rdonly.o rdonly.c
 
-rdonly.n.o rdonly.d.o: rdonly.c $(CKHEADERS)
-	$(CHARMC) -o rdonly.n.o rdonly.c
-	$(CHARMC) -o rdonly.d.o rdonly.c -DDEBUGGING_MODE
+acc.o: acc.c acc.h $(CKHEADERS)
+	$(CHARMC) -o acc.o acc.c
 
-acc.n.o acc.d.o: acc.c acc.h $(CKHEADERS)
-	$(CHARMC) -o acc.n.o acc.c
-	$(CHARMC) -o acc.d.o acc.c -DDEBUGGING_MODE
+mono.o: mono.c mono.h $(CKHEADERS)
+	$(CHARMC) -o mono.o mono.c
 
-mono.n.o mono.d.o: mono.c mono.h $(CKHEADERS)
-	$(CHARMC) -o mono.n.o mono.c
-	$(CHARMC) -o mono.d.o mono.c -DDEBUGGING_MODE
+tbl.o: tbl.c tbl.h $(CKHEADERS)
+	$(CHARMC) -o tbl.o tbl.c
 
-tbl.n.o tbl.d.o: tbl.c tbl.h $(CKHEADERS)
-	$(CHARMC) -o tbl.n.o tbl.c
-	$(CHARMC) -o tbl.d.o tbl.c -DDEBUGGING_MODE
+wrtone.o: wrtone.c wrtone.h $(CKHEADERS)
+	$(CHARMC) -o wrtone.o wrtone.c
 
-wrtone.n.o wrtone.d.o: wrtone.c wrtone.h $(CKHEADERS)
-	$(CHARMC) -o wrtone.n.o wrtone.c
-	$(CHARMC) -o wrtone.d.o wrtone.c -DDEBUGGING_MODE
+memstuff.o: memstuff.c $(CKHEADERS)
+	$(CHARMC) -o memstuff.o memstuff.c
 
-memstuff.n.o memstuff.d.o: memstuff.c $(CKHEADERS)
-	$(CHARMC) -o memstuff.n.o memstuff.c
-	$(CHARMC) -o memstuff.d.o memstuff.c -DDEBUGGING_MODE
-
-main.n.o main.d.o main.r.o: main.c $(CKHEADERS)
+main.n.o main.r.o: main.c $(CKHEADERS)
 	$(CHARMC) -o main.n.o main.c
-	$(CHARMC) -o main.d.o main.c -DDEBUGGING_MODE
-	$(CHARMC) -o main.r.o main.c -DDEBUGGING_MODE -DREPLAY_DEBUGGING
+	$(CHARMC) -o main.r.o main.c -DREPLAY_DEBUGGING
 
-ck.n.o ck.d.o ck.r.o: ck.c $(CKHEADERS)
-	$(CHARMC) -o ck.n.o ck.c
-	$(CHARMC) -o ck.d.o ck.c -DDEBUGGING_MODE
-	$(CHARMC) -o ck.r.o ck.c -DDEBUGGING_MODE -DREPLAY_DEBUGGING
+ck.o: ck.c $(CKHEADERS)
+	$(CHARMC) -o ck.o ck.c
 
-perfio.n.o perfio.d.o : perfio.c performance.h $(CKHEADERS)
-	$(CHARMC) -o perfio.n.o perfio.c
-	$(CHARMC) -o perfio.d.o perfio.c -DDEBUGGING_MODE
+perfio.o : perfio.c performance.h $(CKHEADERS)
+	$(CHARMC) -o perfio.o perfio.c
 
-perf-none.n.o : perf-none.c performance.h $(CKHEADERS)
-	$(CHARMC) -o perf-none.n.o perf-none.c
+perf-none.o : perf-none.c performance.h $(CKHEADERS)
+	$(CHARMC) -o perf-none.o perf-none.c
 
-perf-sum.n.o : perf-sum.c performance.h $(CKHEADERS)
-	$(CHARMC) -o perf-sum.n.o perf-sum.c
+perf-sum.o : perf-sum.c performance.h $(CKHEADERS)
+	$(CHARMC) -o perf-sum.o perf-sum.c
 
-perf-recd.d.o : perf-recd.c performance.h $(CKHEADERS)
-	$(CHARMC) -o perf-recd.d.o perf-recd.c -DDEBUGGING_MODE
+perf-recd.o : perf-recd.c performance.h $(CKHEADERS)
+	$(CHARMC) -o perf-recd.o perf-recd.c
 
-perf-repl.d.o : perf-repl.c performance.h $(CKHEADERS)
-	$(CHARMC) -o perf-repl.d.o perf-repl.c -DDEBUGGING_MODE
+perf-repl.o : perf-repl.c performance.h $(CKHEADERS)
+	$(CHARMC) -o perf-repl.o perf-repl.c
 
-perf-proj.d.o : perf-proj.c performance.h $(CKHEADERS)
-	$(CHARMC) -o perf-proj.d.o perf-proj.c -DDEBUGGING_MODE
+perf-proj.o : perf-proj.c performance.h $(CKHEADERS)
+	$(CHARMC) -o perf-proj.o perf-proj.c
 
 ###############################################################################
 #
@@ -337,35 +275,26 @@ perf-proj.d.o : perf-proj.c performance.h $(CKHEADERS)
 ###############################################################################
 
 
-charm++libs: charmlibs libckn-cplus-y.o libckd-cplus-y.o 
+charm++libs: charmlibs libck-cplus-y.o libck-cplus-y.o 
 
-LIBCKN_CPLUS_Y=init.cplus.n.o main.cplus.n.o ck.cplus.n.o acc.cplus.n.o mono.cplus.n.o
-libckn-cplus-y.o: $(LIBCKN_CPLUS_Y)
-	$(CHARMC) -cp ../lib/ -o $@ $(LIBCKN_CPLUS_Y)
+LIBCK_CPLUS_Y=init.cplus.o main.cplus.o ck.cplus.o acc.cplus.o mono.cplus.o
+libck-cplus-y.o: $(LIBCK_CPLUS_Y)
+	$(CHARMC) -cp ../lib/ -o $@ $(LIBCK_CPLUS_Y)
 
-LIBCKD_CPLUS_Y=init.cplus.d.o main.cplus.d.o ck.cplus.d.o acc.cplus.d.o mono.cplus.d.o
-libckd-cplus-y.o: $(LIBCKD_CPLUS_Y)
-	$(CHARMC) -cp ../lib/ -o $@ $(LIBCKD_CPLUS_Y)
+init.cplus.o: init.cplus.C $(CKHEADERS) c++interface.h
+	$(CHARMC) -o init.cplus.o init.cplus.C
 
-init.cplus.n.o init.cplus.d.o : init.cplus.C $(CKHEADERS) c++interface.h
-	$(CHARMC) -o init.cplus.n.o init.cplus.C
-	$(CHARMC) -o init.cplus.d.o init.cplus.C -DDEBUGGING_MODE
+main.cplus.o: main.cplus.C $(CKHEADERS) c++interface.h
+	$(CHARMC) -o main.cplus.o main.cplus.C
 
-main.cplus.n.o main.cplus.d.o : main.cplus.C $(CKHEADERS) c++interface.h
-	$(CHARMC) -o main.cplus.n.o main.cplus.C
-	$(CHARMC) -o main.cplus.d.o main.cplus.C -DDEBUGGING_MODE
+ck.cplus.o: ck.cplus.C $(CKHEADERS) c++interface.h
+	$(CHARMC) -o ck.cplus.o ck.cplus.C
 
-ck.cplus.n.o ck.cplus.d.o : ck.cplus.C $(CKHEADERS) c++interface.h
-	$(CHARMC) -o ck.cplus.n.o ck.cplus.C
-	$(CHARMC) -o ck.cplus.d.o ck.cplus.C -DDEBUGGING_MODE
+acc.cplus.o: acc.cplus.C $(CKHEADERS) c++interface.h acc.h
+	$(CHARMC) -o acc.cplus.o acc.cplus.C
 
-acc.cplus.n.o acc.cplus.d.o : acc.cplus.C $(CKHEADERS) c++interface.h acc.h
-	$(CHARMC) -o acc.cplus.n.o acc.cplus.C
-	$(CHARMC) -o acc.cplus.d.o acc.cplus.C -DDEBUGGING_MODE
-
-mono.cplus.n.o mono.cplus.d.o : mono.cplus.C $(CKHEADERS) c++interface.h mono.h
-	$(CHARMC) -o mono.cplus.n.o mono.cplus.C
-	$(CHARMC) -o mono.cplus.d.o mono.cplus.C -DDEBUGGING_MODE
+mono.cplus.o: mono.cplus.C $(CKHEADERS) c++interface.h mono.h
+	$(CHARMC) -o mono.cplus.o mono.cplus.C
 
 ###############################################################################
 #

@@ -468,14 +468,15 @@ if ($?OBJECT == 0) goto success
 
 switch ($OBJECT)
   case "*.o":
-    rm -f $OBJECT
     if (($#FILES == 1)&&($#OBJECTFILES == 1)) then
         if ($OBJECT != $OBJECTFILES) then
+            rm -f $OBJECT
             if ($?VERBOSE) echo mv $OBJECTFILES $OBJECT
             mv $OBJECTFILES $OBJECT
             if ($status) goto failure
         endif
     else
+        rm -f $OBJECT
         if ( $?VERBOSE ) echo $CMK_LDRO $OBJECT $OPTS_LDRO $OBJECTFILES
         $CMK_LDRO $OBJECT $OPTS_LDRO $OBJECTFILES
         if ($status) goto failure
@@ -523,16 +524,10 @@ endif
 
 if ($?EXECMODE == 0) set EXECMODE=notrace
 
-if (-e $CHARMLIB/libckn-core-$EXECMODE.o) then
-   set LIBCLASS=ckn
-else
-   if (-e $CHARMLIB/libckd-core-$EXECMODE.o) then
-      set LIBCLASS=ckd
-   else
-      echo "charmc : No such execmode $EXECMODE"
-      (cd $CHARMLIB ; ls -al libck?-core-*)
-      goto failure
-   endif
+if (! -e $CHARMLIB/libck-core-$EXECMODE.o) then
+   echo "charmc : No such execmode $EXECMODE"
+   (cd $CHARMLIB ; ls -al libck-core-*)
+   goto failure
 endif
 
 # Check for valid choice of BALANCE
@@ -552,7 +547,7 @@ endif
 # Check that the BAL_OBJ exists
 
 if ($BALANCE:h == $BALANCE) then
-   set BAL_OBJ = $CHARMLIB/lib${LIBCLASS}-ldb-$BALANCE.o
+   set BAL_OBJ = $CHARMLIB/libck-ldb-$BALANCE.o
 else
    set BAL_OBJ = $BALANCE
 endif
@@ -562,7 +557,7 @@ if (! -e $BAL_OBJ) then
 	echo "charmc : Could not find load balancer object $BAL_OBJ"
    else
 	echo "charmc : Unknown load balancer $BALANCE"
-	(cd $CHARMLIB ; ls -al lib${LIBCLASS}-ldb-*)
+	(cd $CHARMLIB ; ls -al libck-ldb-*)
    endif
    goto failure
 endif
@@ -575,8 +570,8 @@ switch ($LANGUAGE)
                       $OBJECTFILES $LIBRARIES $BAL_OBJ)
 	set LOADER=($CMK_LD $OPTS_LD -o $OBJECT \
 		      CHARMC-USR.TMP.o CHARMC-MOD.TMP.o \
-        	      $CHARMLIB/lib${LIBCLASS}-core-$EXECMODE.o \
-        	      $CHARMLIB/lib${LIBCLASS}-cplus-n.o \
+        	      $CHARMLIB/libck-core-$EXECMODE.o \
+        	      $CHARMLIB/libck-cplus-n.o \
         	      $CHARMLIB/libconv-core.o \
 		      $CMK_LIBS -lm )
         breaksw
@@ -585,8 +580,8 @@ switch ($LANGUAGE)
                       $OBJECTFILES $LIBRARIES $BAL_OBJ)
         set LOADER =($CMK_LDXX $OPTS_LD -o $OBJECT \
 		      CHARMC-USR.TMP.o CHARMC-MOD.TMP.o \
-                      $CHARMLIB/lib${LIBCLASS}-core-$EXECMODE.o \
-        	      $CHARMLIB/lib${LIBCLASS}-cplus-y.o \
+                      $CHARMLIB/libck-core-$EXECMODE.o \
+        	      $CHARMLIB/libck-cplus-y.o \
         	      $CHARMLIB/libconv-core.o \
 		      $CMK_LIBS -lm )
         breaksw
@@ -636,7 +631,7 @@ if ($status) goto failure
 # Scan user-object for user_main, if none, set MAINOBJ
 
 if (! { (egrep '^user_main$' < CHARMC-USR.TMP.nm >& /dev/null) }) then
-    set LOADER=($LOADER $CHARMLIB/lib${LIBCLASS}-defmain.o)
+    set LOADER=($LOADER $CHARMLIB/libck-defmain.o)
 endif
 
 if ($?VERBOSE) echo $LOADER
