@@ -917,11 +917,17 @@ $(L)/libbluegene.a: BlueGene.C BlueGene.h BlueGene.decl.h BlueGene.def.h
 
 # (Converse) Blue Gene emulator
 BLUE_HEADERS = blue_types.h blue_timing.h blue_defs.h blue_logs.h blue.h blue_impl.h
-BLUE_OBJS = blue.o blue_init.o blue_timing.o
+BLUE_OBJS = blue.o blue_node.o blue_proc.o blue_init.o blue_timing.o
 BLUE_IO_OBJS = blue_IO.o blue_logs.o
 
 blue.o:  blue.C $(BLUE_HEADERS) $(CVHEADERS)
 	$(CHARMC) -c blue.C
+
+blue_node.o:  blue_node.C $(BLUE_HEADERS) $(CVHEADERS)
+	$(CHARMC) -c blue_node.C
+
+blue_proc.o:  blue_proc.C $(BLUE_HEADERS) $(CVHEADERS)
+	$(CHARMC) -c blue_proc.C
 
 blue_timing.o:  blue_timing.C $(BLUE_HEADERS) $(CVHEADERS)
 	$(CHARMC) -c blue_timing.C
