@@ -22,7 +22,9 @@
 #ifdef __cplusplus
 
 #include <stdlib.h>
+#ifndef  WIN32
 #include <unistd.h>
+#endif
 
 /* Use prototypes in function declarations. */
 #define YY_USE_PROTOS
@@ -393,7 +395,7 @@ char *yytext;
 #include <ctype.h>
 
 /* Global Variables and Functions - used in grammar.y */
-unsigned int lineno = 1;
+int lineno = 1;
 
 /* Local to file */
 static unsigned char in_comment=0;
