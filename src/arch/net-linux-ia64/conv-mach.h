@@ -51,8 +51,6 @@
 #define CMK_RSH_NOT_NEEDED                                 0
 #define CMK_RSH_USE_REMSH                                  0
 
-#define CMK_CONV_HOST_WANT_CSH                             1
-
 #define CMK_SHARED_VARS_EXEMPLAR                           0
 #define CMK_SHARED_VARS_UNAVAILABLE                        1
 #define CMK_SHARED_VARS_SUN_THREADS                        0
@@ -105,6 +103,5 @@
 #define CMK_LBDB_OFF					   0
 
 #endif
-
 
 
