@@ -5,238 +5,111 @@
  * $Revision$
  *****************************************************************************/
 
-#include <converse.h>
-#include <charm++.h>
+#include <ck.h>
 #include "envelope.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "queueing.h"
 
-#if CMK_DEBUG_MODE
-
-#define NUM_MESSAGES 100
-
-extern "C" void  CqsEnumerateQueue(Queue, void ***);
-
-CpvDeclare(handlerType, handlerArray);
-
-void **schedQueue=0;
-void **FIFOQueue=0;
-void **DQueue=0;
-
-int schedIndex;
-int debugIndex;
-int FIFOIndex;
-
-void msgListCleanup(void)
-{
-  if(schedQueue != 0) CmiFree(schedQueue);
-  if(FIFOQueue != 0) free(FIFOQueue);
-  if(DQueue != 0) free(DQueue);
-  schedIndex = 0;
-  FIFOIndex = 0;
-  debugIndex = 0;
-
-  schedQueue = 0;
-  FIFOQueue = 0;
-  DQueue = 0;
-}
-
-void msgListCache(void)
-{
+#if 0
+/* Queue message extraction calls: */
   CqsEnumerateQueue((Queue)CpvAccess(CsdSchedQueue), &schedQueue);
   FIFOQueue = CdsFifo_Enumerate((CdsFifo)CpvAccess(CmiLocalQueue));
-  schedIndex = 0;
-  FIFOIndex = 0;
-  debugIndex = 0;
-}
-
-extern "C"
-void CpdInitializeHandlerArray(void){
-  int i;
-
-  CpvInitialize(handlerType, handlerArray);
-  for(i = 0; i < MAX_NUM_HANDLERS; i++){
-    CpvAccess(handlerArray)[i][0] = 0;
-    CpvAccess(handlerArray)[i][1] = 0;
-  }
-}
-
-void handlerArrayRegister(int hndlrID, hndlrIDFunction fHeader, 
-                                       hndlrIDFunction fContent){
-    CpvAccess(handlerArray)[hndlrID][0] = fHeader;
-    CpvAccess(handlerArray)[hndlrID][1] = fContent;
-}
-
-static const char *HeaderUnknownFormat =
-"<HEADER>:Unknown Format #"
-;
-
-// type = 0 header required
-//      = 1 contents required
-char* genericViewMsgFunction(char *msg, int type){
-  int hndlrID;
-  char *temp;
-  hndlrIDFunction f;
-
-  hndlrID = CmiGetHandler(msg);
-  f = CpvAccess(handlerArray)[hndlrID][type];
-  if(f == 0){
-    // Undefined Content/Header function
-    temp = (char *)malloc(strlen(HeaderUnknownFormat)+1);
-    _MEMCHECK(temp);
-    strcpy(temp, HeaderUnknownFormat);
-    return(temp);
-  } else{
-    return((*f)(msg));
-  }
-}
-
-char* getMsgListSched(void)
-{
-  int ending;
-  int count = 0;
-  char *list;
-  char t[10];
-  int maxLength;
-
-  ending = NUM_MESSAGES;
-  if ( (ending + schedIndex) > ((Queue)(CpvAccess(CsdSchedQueue)))->length) {
-    ending = (((Queue)(CpvAccess(CsdSchedQueue)))->length) - schedIndex;
-  }
-  maxLength = ending * sizeof(char) * 20 + 1;
-  list = (char *)malloc(maxLength);
-  _MEMCHECK(list);
-  strcpy(list, "");
-
-  for(int i = schedIndex; i < ending + schedIndex; i++){
-    char *temp = genericViewMsgFunction((char *)schedQueue[i], 0);
-    if(strlen(list) + strlen(temp) + 10 > maxLength){ 
-      free(temp);
-      break;
-    }
-    strcat(list, temp);
-    strcat(list, "#");
-    sprintf(t, "%d", i);
-    strcat(list, t);
-    strcat(list, "#");
-    count++;
-    free(temp);
-  }
-  schedIndex += count;
-  return(list);
-}
-
-static const char *NotImpl = "Not Implemented";
-
-char* getMsgListPCQueue(void)
-{
-  char *list;
-
-  list = (char *)malloc(strlen(NotImpl)+1);
-  _MEMCHECK(list);
-  strcpy(list, NotImpl);
-  return(list);
-}
-
-char* getMsgListFIFO(void)
-{
-  int ending;
-  char *temp;
-  int count = 0;
-  char *list;
-  char t[10];
-  int maxLength;
-
-  ending = NUM_MESSAGES;
-  if ( (ending+FIFOIndex) > CdsFifo_Length(CpvAccess(CmiLocalQueue))) {
-    ending = CdsFifo_Length(CpvAccess(CmiLocalQueue)) - FIFOIndex;
-  }
-  maxLength = ending * sizeof(char) * 20 + 1;
-  list = (char *)malloc(maxLength);
-  _MEMCHECK(list);
-  strcpy(list, "");
-
-  for(int i=FIFOIndex; i < FIFOIndex+ending; i++){
-    temp = genericViewMsgFunction((char *)FIFOQueue[i], 0);
-    if(strlen(list) + strlen(temp) + 10 > maxLength){
-      free(temp); 
-      break;
-    }
-    strcat(list, temp);
-    strcat(list, "#");
-    sprintf(t, "%d", i);
-    strcat(list, t);
-    strcat(list, "#");
-    count++;
-    free(temp);
-  }
-  FIFOIndex += count;
-  return(list);
-}
-
-char* getMsgListDebug(void)
-{
-  int ending;
-  int count = 0;
-  char *list;
-  char t[10];
-  int maxLength;
-  char *temp;
-
-  ending = NUM_MESSAGES;
-  if ( (ending+debugIndex) > CdsFifo_Length(CpvAccess(debugQueue))) {
-      ending = CdsFifo_Length(CpvAccess(debugQueue)) - debugIndex;
-  }
-  maxLength = ending * sizeof(char) * 20 + 1;
-  list = (char *)malloc(maxLength);
-  _MEMCHECK(list);
-  strcpy(list, "");
-
-  if(DQueue != 0) free(DQueue);
   DQueue = CdsFifo_Enumerate(CpvAccess(debugQueue));
-
-  for(int i=debugIndex; i < ending+debugIndex; i++){
-    temp = genericViewMsgFunction((char *)DQueue[i], 0);
-    if(strlen(list) + strlen(temp) + 10 > maxLength){ 
-      free(temp);
-      break;
-    }
-    strcat(list, temp);
-    strcat(list, "#");
-    sprintf(t, "%d", i);
-    strcat(list, t);
-    strcat(list, "#");
-    count++;
-    free(temp);
-  }
-  debugIndex += count;
-  return(list);
-}
-
-char* getMsgContentsSched(int index)
-{
-  return genericViewMsgFunction((char *)schedQueue[index], 1);
-}
-
-char* getMsgContentsPCQueue(int index)
-{
-  char *temp;
-  temp = (char *)malloc(strlen(NotImpl)+1);
-  _MEMCHECK(temp);
-  strcpy(temp, NotImpl);
-  return(temp);
-}
-
-char* getMsgContentsFIFO(int index)
-{
-  return genericViewMsgFunction((char *)FIFOQueue[index], 1);
-}
-
-char* getMsgContentsDebug(int index)
-{
-  return genericViewMsgFunction((char *)DQueue[index], 1);
-}
-
 #endif
+
+/************ Charm++ Message PUP *****************/
+void CkPupMessage(PUP::er &p,void **atMsg,int fast_and_dirty) {
+	UChar type;
+	int size,prioBits;
+	envelope *env=UsrToEnv(*atMsg);
+	unsigned char wasPacked=0;
+	p.comment("Begin Charm++ Message {");
+	if (!p.isUnpacking()) {
+		wasPacked=env->isPacked();
+		if (0==wasPacked) //If it's not already packed...
+		  CkPackMessage(&env); //Pack it
+		type=env->getMsgtype();
+		size=env->getTotalsize();
+		prioBits=env->getPriobits();
+	}
+	p(type);
+	p(wasPacked);
+	p(size);
+	p(prioBits);
+	int userSize=size-sizeof(envelope)-sizeof(int)*PW(prioBits);
+	if (p.isUnpacking())
+		env=_allocEnv(type,userSize,prioBits);
+	if (fast_and_dirty) {
+	  /*Pup entire header and message as raw bytes.*/
+	  p((void *)env,size);
+	} 
+	else 
+	{ /*Pup each field separately, which allows debugging*/
+	  p.comment("Message Envelope:");
+	  env->pup(p);
+	  p.comment("Message User Data:");
+	  int ep=env->getEpIdx();
+#if 0 /* Messages *should* be packed according to entry point: */
+	  if (ep>0 && ep<_numEntries)
+	    _entryTable[ep]->pupFn(p,*atMsg);
+	  else
+#endif
+	    ((Message *)*atMsg)->pup(p);
+	  p.comment("} End Charm++ Message");
+	}
+	if (0==wasPacked) //Restore the packed-ness to previous state-- unpacked
+	  CkUnpackMessage(&env);
+	*atMsg=EnvToUsr(env);
+}
+
+void envelope::pup(PUP::er &p) {
+	//message type, totalsize, and priobits are already pup'd (above)
+	p((void *)core,CmiMsgHeaderSizeBytes);
+	p(ref);
+	p|attribs;
+	p(epIdx);
+	p(pe);
+	p(event);
+	p(getPrioPtr(),getPrioBytes());
+	switch(getMsgtype()) {
+	case NewChareMsg: case NewVChareMsg: 
+	case ForChareMsg: case ForVidMsg: case FillVidMsg:
+		p((void *)&(type.chare.ptr),sizeof(void *));
+		p(type.chare.forAnyPe);
+		break;
+	case DBocReqMsg: case DBocNumMsg: 
+	case DNodeBocReqMsg: case DNodeBocNumMsg:
+		p((void *)&(type.group.gtype.dgroup.usrMsg),sizeof(void *));
+		/*fallthrough, no break*/
+	case BocInitMsg: case ForNodeBocMsg:
+		p(type.group.num);
+		break;
+	case ForBocMsg:
+		p(type.group.gtype.array.index.nInts);
+		p(type.group.gtype.array.index.index,CK_ARRAYINDEX_MAXLEN);
+		p(type.group.gtype.array.srcPe);
+		p(type.group.gtype.array.epIdx);
+		p(type.group.gtype.array.hopCount);
+		p(type.group.num);
+		break;
+	case RODataMsg:
+		p(type.roData.count);
+		break;
+	case ROMsgMsg:
+		p(type.roMsg.roIdx);
+		break;
+	default: /*No type-dependent fields to pack*/
+		break;
+	}
+}
+
+void Message::pup(PUP::er &p) {
+	//Default message pup: just copy user portion as bytes
+	envelope *env=UsrToEnv((void *)this);
+	int userSize=env->getTotalsize()-sizeof(envelope)-env->getPrioBytes();
+	p((void *)this,userSize);
+}
+
+
