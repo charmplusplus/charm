@@ -35,6 +35,12 @@ public:
 	virtual void doBalance(void);
 };
 
+/**
+ We'll be running lv3d on this array-- do any needed magic.
+ Currently changes the map to stay away from PE 0
+ (which does CCS interfacing).
+*/
+void LV3D1_Attach(CkArrayOptions &opts);
 
 
 /**

@@ -239,6 +239,37 @@ skipit:/* nothing to show: deposit empty image (so reduction completes) */
 }
 #endif
 
+/**************** Map ********************/
+/*
+ Simple map that stays away from PE 0.
+*/
+class LV3D1_Map : public CkArrayMap {
+public:
+	LV3D1_Map() {}
+	LV3D1_Map(CkMigrateMessage *m):CkArrayMap(m){}
+  
+  int procNum(int arrayHdl, const CkArrayIndex &i)
+  {
+#if 1
+    if (i.nInts==1) {
+      //Map 1D integer indices in simple round-robin fashion
+      return 1+((i.data()[0])%(CkNumPes()-1));
+    }
+    else 
+#endif
+      {
+        //Map other indices based on their hash code, mod a big prime.
+        unsigned int hash=(i.hash()+739)%1280107;
+        return 1+(hash % (CkNumPes()-1));
+      }
+  }
+};
+
+void LV3D1_Attach(CkArrayOptions &opts)
+{
+	opts.setMap(CProxy_LV3D1_Map::ckNew());
+}
+
 /**************** Network Messages **************/
 
 /// Make a prioritized LV3D_RenderMsg:

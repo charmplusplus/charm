@@ -71,7 +71,7 @@ void stats::stats::print(FILE *f,const char *what,double scale,double thresh) co
 			if (i.isTime) {
 				if (val<1.0) {val*=1.0e3; units="ms";}
 			}
-			fprintf(f,"    %s: %.2f %s\n",i.name,val,units);
+			fprintf(f,"  %s_%s: %.2f %s\n",what,i.name,val,units);
 		}
 	fprintf(f,"} \n");
 }

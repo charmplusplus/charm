@@ -228,7 +228,7 @@ public:
 			bucket_bytes-=v->view_size;
 			stats::get()->add(1.0,op_master_count);
 			stats::get()->add(v->view_size,op_master_bytes);
-			stats::get()->add(v->pixels,op_master_bytes);
+			stats::get()->add(v->pixels,op_master_pixels);
 			mgrProxy[masterProcessor].addView(v);
 		}
 	}
@@ -439,36 +439,47 @@ void LV3D0_Deposit(CkView *v,int clientID) {
 /**************** Performance collection ***************/
 
 static stats::op_t op_pes=stats::count_op("cmi.pes","Processors","pes");
-static stats::op_t op_time=stats::count_op("cmi.time","Time","s");
-static stats::op_t op_parallel=stats::time_op("cmi.unknown","Time");
+static stats::op_t op_time=stats::time_op("cmi.time","Elapsed wall-clock time");
+static stats::op_t op_unknown=stats::time_op("cmi.unknown","Unaccounted-for time");
+static stats::op_t op_idle=stats::time_op("cmi.idle","Time spent waiting for data");
 
+/// Reduction handler, used to print statistics.
 static void printStats(void *rednMsg) {
 	CkReductionMsg *m=(CkReductionMsg *)rednMsg;
 	const stats::stats *s=(const stats::stats *)m->getData();
 	s->print(stdout,"total",1.0);
-	s->print(stdout,"per pe",1.0/CkNumPes());
-	s->print(stdout,"per sec",1.0/s->t[op_time]);
-	s->print(stdout,"per pe-sec",1.0/(CkNumPes()*s->t[op_time]));
+	s->print(stdout,"per_second",1.0/s->t[op_time]);
+	s->print(stdout,"per_pe-second",1.0/(CkNumPes()*s->t[op_time]));
 	printf("\n");
+	delete m;
+}
+
+/// Ccd idle handler: notifies stats collection of our idleness.
+static void perfmanager_stats_idle(void *ptr,double timer)
+{
+	stats::swap(op_idle);
 }
 
 class LV3D_PerfManager : public CBase_LV3D_PerfManager {
 public:
 	LV3D_PerfManager(void) {
 		zero();
+		CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,perfmanager_stats_idle,0);
+		CcdCallOnConditionKeep(CcdPROCESSOR_END_IDLE,perfmanager_stats_idle,0);
 	}
 	void zero(void) { /* zero out collected statistics */
 		stats::stats *s=stats::get();
+		stats::swap(op_unknown); // so unknown gets zerod out
 		s->zero();
 		s->add(1.0,op_pes);
 		s->add(stats::time(),op_time);
-		stats::swap(op_parallel);
+		stats::swap(op_unknown);
 	}
 	void collect(void) { /* contribute current stats to reduction */
 		stats::stats *s=stats::get();
 		if (CkMyPe()==0) s->t[op_time]=stats::time()-s->t[op_time];
 		else s->t[op_time]=0;
-		stats::swap(op_parallel);
+		stats::swap(op_unknown);
 		contribute(sizeof(double)*stats::op_len,&s->t[0],CkReduction::sum_double,
 			CkCallback(printStats));
 		zero();
@@ -505,6 +516,7 @@ extern "C" void LV3D0_setup(char *msg) {
 	theMgr->newClient(clientID);
 	CmiPrintf("Registered (client %d)\n",clientID);
 	delete[] buf;
+	perfMgr.zero(); // New client implicitly zeros out stats.
 }
 
 

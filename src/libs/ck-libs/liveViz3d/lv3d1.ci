@@ -10,4 +10,7 @@ module lv3d1 {
 		entry void LV3D_FlatRender(liveVizRequestMsg *m);
 		entry void LV3D_DoBalance(void);
 	};
+	group LV3D1_Map {
+		entry LV3D1_Map();
+	};
 };
