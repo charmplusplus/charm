@@ -496,6 +496,8 @@ CMK_C_DEBUG="-g"
 CMK_CXX_DEBUG="-g"
 CMK_F90_DEBUG="-g"
 
+CMK_CF90_FIXED="none"
+
 if [ -r $CHARMINC/conv-mach-pre.sh ]
 then
 . $CHARMINC/conv-mach-pre.sh
@@ -526,6 +528,11 @@ then
     CMK_CC="$CMK_CC_FASTEST"
 fi
 
+if [ "$CMK_CF90_FIXED" = "none" ]
+then
+   CMK_CF90_FIXED="$CMK_CF90"
+fi
+
 if [ -n "$CMK_F90_MODINC" ]
 then
     CMK_CF90_MODINC="$CMK_F90_MODINC"
@@ -543,7 +550,7 @@ then
     CMK_CC="$CMK_SEQ_CC -DCMK_SEQUENTIAL=1 "
     CMK_LD="$CMK_SEQ_LD"
     CMK_CXX="$CMK_SEQ_CXX -DCMK_SEQUENTIAL=1 " 
-    CMK_F90="$CMK_SEQ_F90 -DCMK_SEQUENTIAL=1 " 
+    CMK_CF90="$CMK_SEQ_F90 -DCMK_SEQUENTIAL=1 " 
     CMK_LDXX="$CMK_SEQ_LDXX" 
     if [ -n "$CMK_SEQ_AR" ]
     then
@@ -567,7 +574,7 @@ fi
 
 if [ -n "$OVERRIDE_F90" ]
 then
-    CMK_F90="$OVERRIDE_F90 $CMK_F90 "
+    CMK_CF90="$OVERRIDE_F90 $CMK_CF90 "
 fi
 
 if [ -n "$OVERRIDE_LD" ]
@@ -743,7 +750,7 @@ do
 		NU_OBJ=$BASEO
 		;;
 	*.f|*.F)
-		Do $CMK_CF90 $OPTS_CPP $OPTS_F90 -I$CHARMINC -c $FILE $DESTO
+		Do $CMK_CF90_FIXED $OPTS_CPP $OPTS_F90 -I$CHARMINC -c $FILE $DESTO
 		NU_OBJ=$BASEO
 		;;
 	*.f90|*.F90)
