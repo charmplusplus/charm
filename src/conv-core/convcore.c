@@ -372,6 +372,7 @@ int maxmsgs;
       if (CpvAccess(CsdStopFlag)) return maxmsgs;
       maxmsgs--; if (maxmsgs==0) return maxmsgs;
     } else { /* Processor is idle */
+      usleep(10000);
       CcdRaiseCondition(CcdPROCESSORIDLE) ;
       if (CpvAccess(CsdStopFlag)) return maxmsgs;
     }
