@@ -710,16 +710,28 @@ EOF
   if test "$NAME" != ""
   then
     fortran_postfix=TWOSCORE
+    cat >> confdefs.h <<EOF
+#define CMK_FORTRAN_USES_TWOSCORE 1
+EOF
+
   else
     NAME=`nm conftest.o | grep "foo_foo_"`
     if test "$NAME" != ""
     then
       fortran_postfix=ONESCORE
+      cat >> confdefs.h <<EOF
+#define CMK_FORTRAN_USES_ONESCORE 1
+EOF
+
     else
       NAME=`nm conftest.o | grep "foo_foo"`
       if test "$NAME" != ""
       then
-        fortran_postfix=NONSCORE
+        fortran_postfix=NOSCORE
+        cat >> confdefs.h <<EOF
+#define CMK_FORTRAN_USES_NOSCORE 1
+EOF
+
       else
         NAME=`nm conftest.o | grep "FOO_FOO"`
         if test "$NAME" != ""
@@ -730,7 +742,7 @@ EOF
 EOF
 
         else
-          echo "FORTRAM compiler generated name not supported yet"
+          echo "FORTRAN compiler generated name not supported yet"
           exit 1
         fi
       fi
@@ -752,7 +764,7 @@ then
     # Extract the first word of "wget", so it can be a program name with args.
 set dummy wget; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:756: checking for $ac_word" >&5
+echo "configure:768: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_WGET'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -781,7 +793,7 @@ fi
     # Extract the first word of "lynx", so it can be a program name with args.
 set dummy lynx; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:785: checking for $ac_word" >&5
+echo "configure:797: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_LYNX'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else

@@ -129,16 +129,19 @@ EOF
   if test "$NAME" != ""
   then
     fortran_postfix=TWOSCORE
+    AC_DEFINE_UNQUOTED(CMK_FORTRAN_USES_TWOSCORE, 1)
   else
     NAME=`nm conftest.o | grep "foo_foo_"`
     if test "$NAME" != ""
     then
       fortran_postfix=ONESCORE
+      AC_DEFINE_UNQUOTED(CMK_FORTRAN_USES_ONESCORE, 1)
     else
       NAME=`nm conftest.o | grep "foo_foo"`
       if test "$NAME" != ""
       then
-        fortran_postfix=NONSCORE
+        fortran_postfix=NOSCORE
+        AC_DEFINE_UNQUOTED(CMK_FORTRAN_USES_NOSCORE, 1)
       else
         NAME=`nm conftest.o | grep "FOO_FOO"`
         if test "$NAME" != ""
@@ -146,7 +149,7 @@ EOF
           fortran_postfix=ALLCAPS
           AC_DEFINE_UNQUOTED(CMK_FORTRAN_USES_ALLCAPS, 1)
         else
-          echo "FORTRAM compiler generated name not supported yet"
+          echo "FORTRAN compiler generated name not supported yet"
           exit 1
         fi
       fi
