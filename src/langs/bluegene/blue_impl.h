@@ -428,6 +428,7 @@ char ** BgGetArgv();
 int     BgGetArgc();
 void    startVTimer();
 void    stopVTimer();
+void    resetVTime();
 
 char * getFullBuffer();
 void   addBgNodeMessage(char *msgPtr);

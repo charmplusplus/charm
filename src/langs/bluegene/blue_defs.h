@@ -87,11 +87,7 @@ inline int isEqual(double v1, double v2){
             }						\
 	    /* log[log.length()-1]->print(); */		\
           }	\
-	  /* reset start time bypassing the previous code */	\
-	  if (cva(bgMach).timingMethod == BG_WALLTIME)\
-                tSTARTTIME = CmiWallTimer();\
-          else if (cva(bgMach).timingMethod == BG_ELAPSE)\
-                tSTARTTIME = tCURRTIME;	\
+	  resetVTime(); \
 	}
 
 #else

@@ -1,5 +1,5 @@
 
-const double CHARM_OVERHEAD = 2E-6;    // 2 us
+const double CHARM_OVERHEAD = 0.5E-6;    // time to enqueue a msg - 0.5 us
 
 class BigSimNetwork
 {

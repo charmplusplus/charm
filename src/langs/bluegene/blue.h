@@ -154,6 +154,9 @@ void BgSendNonLocalPacket(int x, int y, int z, int threadID, int handlerID,
 void BgSendPacket(int x, int y, int z, int threadID, int handlerID, 
                   WorkType type, int numbytes, char* data);
 
+void BgStartStreaming();
+void BgEndStreaming();
+
 /************************ collective functions ************************/
 
 /**

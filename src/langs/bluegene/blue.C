@@ -230,6 +230,150 @@ void BgNumberHandlerEx(int idx, BgHandlerEx h, void *uPtr)
 #endif
 }
 
+/*****************************************************************************
+      BG Timing Functions
+*****************************************************************************/
+
+void resetVTime()
+{
+  /* reset start time */
+  int timingMethod = cva(bgMach).timingMethod;
+  if (timingMethod == BG_WALLTIME) {
+    double ct = CmiWallTimer();
+    CmiAssert(ct >= tSTARTTIME);
+    tSTARTTIME = ct;
+  }
+  else if (timingMethod == BG_ELAPSE)
+    tSTARTTIME = tCURRTIME;
+#ifdef CMK_ORIGIN2000
+  else if (timingMethod == BG_COUNTER) {
+    if (start_counters(0, 21) <0) {
+      perror("start_counters");;
+    }
+  }
+#elif CMK_HAS_COUNTER_PAPI
+  else if (timingMethod == BG_COUNTER) {
+    // do a fake read to reset the counters. It would be more efficient
+    // to use the low level API, but that would be a lot more code to
+    // write for now.
+    if (read_counters(papiValues, numPapiEvents) < 0) perror("read_counters");
+  }
+#endif
+}
+
+void startVTimer()
+{
+  CmiAssert(tTIMERON == 0);
+  tTIMERON = 1;
+  resetVTime();
+}
+
+// should be used only when BG_WALLTIME
+static inline void advanceTime(double inc)
+{
+  CmiAssert(inc>=0.0);
+  inc *= cva(bgMach).cpufactor;
+  tCURRTIME += inc;
+}
+
+void stopVTimer()
+{
+  int k;
+  if (tTIMERON != 1) {
+    CmiAbort("stopVTimer called without startVTimer!\n");
+  }
+  CmiAssert(tTIMERON == 1);
+  tTIMERON = 0;
+  const int timingMethod = cva(bgMach).timingMethod;
+  if (timingMethod == BG_WALLTIME) {
+    const double tp = CmiWallTimer();
+    double inc = tp-tSTARTTIME;
+    advanceTime(inc);
+//    tSTARTTIME = CmiWallTimer();	// skip the above time
+  }
+  else if (timingMethod == BG_ELAPSE) {
+    // if no bgelapse called, assume it takes 1us
+    if (tCURRTIME-tSTARTTIME < 1E-9) {
+//      tCURRTIME += 1e-6;
+    }
+  }
+  else if (timingMethod == BG_COUNTER)  {
+#if CMK_ORIGIN2000
+    long long c0, c1;
+    if (read_counters(0, &c0, 21, &c1) < 0) perror("read_counters");
+    tCURRTIME += Count2Time(c1);
+#elif CMK_HAS_COUNTER_PAPI
+    if (read_counters(papiValues, numPapiEvents) < 0) perror("read_counters");
+    tCURRTIME += Count2Time(papiValues, numPapiEvents);
+#endif
+  }
+}
+
+double BgGetTime()
+{
+#if 1
+  const int timingMethod = cva(bgMach).timingMethod;
+  if (timingMethod == BG_WALLTIME) {
+    /* accumulate time since last starttime, and reset starttime */
+    if (tTIMERON) {
+      const double tp2= CmiWallTimer();
+      double &startTime = tSTARTTIME;
+      double inc = tp2 - startTime;
+      advanceTime(inc);
+      startTime = CmiWallTimer();
+    }
+    return tCURRTIME;
+  }
+  else if (timingMethod == BG_ELAPSE) {
+    return tCURRTIME;
+  }
+  else if (timingMethod == BG_COUNTER) {
+    if (tTIMERON) {
+#if CMK_ORIGIN2000
+      long long c0, c1;
+      if (read_counters(0, &c0, 21, &c1) <0) perror("read_counters");;
+      tCURRTIME += Count2Time(c1);
+      if (start_counters(0, 21)<0) perror("start_counters");;
+#elif CMK_HAS_COUNTER_PAPI
+    if (read_counters(papiValues, numPapiEvents) < 0) perror("read_counters");
+    tCURRTIME += Count2Time(papiValues, numPapiEvents);
+#endif
+    }
+    return tCURRTIME;
+  }
+  else 
+    CmiAbort("Unknown Timing Method.");
+  return -1;
+#else
+  /* sometime I am interested in real wall time */
+  tCURRTIME = CmiWallTimer();
+  return tCURRTIME;
+#endif
+}
+
+// moved to blue_logs.C
+double BgGetCurTime()
+{
+  ASSERT(tTHREADTYPE == WORK_THREAD);
+  return tCURRTIME;
+}
+
+extern "C" 
+void BgElapse(double t)
+{
+//  ASSERT(tTHREADTYPE == WORK_THREAD);
+  if (cva(bgMach).timingMethod == BG_ELAPSE)
+    tCURRTIME += t;
+}
+
+// advance virtual timer no matter what scheme is used
+extern "C" 
+void BgAdvance(double t)
+{
+//  ASSERT(tTHREADTYPE == WORK_THREAD);
+  tCURRTIME += t;
+}
+
 /* BG API Func
  * called by a communication thread to test if poll data 
  * in the node's INBUFFER for its own queue 
@@ -386,33 +530,106 @@ static inline double MSGTIME(int ox, int oy, int oz, int nx, int ny, int nz, int
   return cva(bgMach).network->latency(ox, oy, oz, nx, ny, nz, bytes);
 }
 
+/**
+ *   a simple message streaming on demand and special purpose
+ *   user call  BgStartStreaming() and BgEndStreaming()
+ *   each worker thread call one send, and all sends are sent
+ *   via multiplesend at the end
+ */
+
+static int bg_streaming = 0;
+
+class BgStreaming {
+public:
+  char **streamingMsgs;
+  int  *streamingMsgSizes;
+  int count;
+  int pe;
+public:
+  BgStreaming() {
+    streamingMsgs = NULL;
+    streamingMsgSizes = NULL;
+    count = 0;
+    pe = -1;
+  }
+  ~BgStreaming() {
+    if (streamingMsgs) {
+      delete [] streamingMsgs;
+      delete [] streamingMsgSizes;
+    }
+  }
+  void init(int c) {
+    streamingMsgs = new char *[c];
+    streamingMsgSizes = new int [c];
+  }
+  void depositMsg(int p, int size, char *m) {
+    streamingMsgs[count] = m;
+    streamingMsgSizes[count] = size;
+    count ++;
+    if (pe == -1) pe = p;
+    else CmiAssert(pe == p);
+    if (count == cva(numNodes)) {
+      // CkPrintf("streaming send\n");
+      CmiMultipleSend(pe, count, streamingMsgSizes, streamingMsgs);
+      for (int i=0; i<count; i++) CmiFree(streamingMsgs[i]);
+      pe = -1;
+      count = 0;
+    }
+  }
+};
+
+BgStreaming bgstreaming;
+
+void BgStartStreaming()
+{
+  bg_streaming = 1;
+}
+
+void BgEndStreaming()
+{
+  bg_streaming = 0;
+}
+
+
 void CmiSendPacket(int x, int y, int z, int msgSize,char *msg)
 {
 //  CmiSyncSendAndFree(nodeInfo::XYZ2PE(x,y,z),msgSize,(char *)msg);
 #if !DELAY_SEND
-  CmiSyncSendAndFree(nodeInfo::XYZ2PE(x,y,z), msgSize, msg);
+  const int pe = nodeInfo::XYZ2PE(x,y,z);
+  CmiSyncSendAndFree(pe, msgSize, msg);
 #else
-  if (!correctTimeLog)
-      CmiSyncSendAndFree(nodeInfo::XYZ2PE(x,y,z), msgSize, msg);
+  if (!correctTimeLog) {
+    const int pe = nodeInfo::XYZ2PE(x,y,z);
+    if (bg_streaming && pe != CmiMyPe())
+      bgstreaming.depositMsg(pe, msgSize, msg);
+    else
+      CmiSyncSendAndFree(pe, msgSize, msg);
+  }
 #endif
 }
 
 /* send will copy data to msg buffer */
-/* user data is not freeed in this routine, user can reuse the data ! */
+/* user data is not free'd in this routine, user can reuse the data ! */
 void sendPacket_(nodeInfo *myNode, int x, int y, int z, int threadID, int handlerID, WorkType type, int numbytes, char* sendmsg, int local)
 {
+  double latency;
   CmiSetHandler(sendmsg, cva(simState).msgHandler);
   CmiBgMsgNodeID(sendmsg) = nodeInfo::XYZ2Global(x,y,z);
   CmiBgMsgThreadID(sendmsg) = threadID;
   CmiBgMsgHandle(sendmsg) = handlerID;
   CmiBgMsgType(sendmsg) = type;
   CmiBgMsgLength(sendmsg) = numbytes;
-  BgElapse(cva(bgMach).network->alphacost());
-  double latency = MSGTIME(myNode->x, myNode->y, myNode->z, x,y,z, numbytes);
-  CmiAssert(latency >= 0);
+  if (local) {
+    BgAdvance(cva(bgMach).network->charmcost());
+    latency = 0.0;
+  }
+  else {
+    BgAdvance(cva(bgMach).network->alphacost());
+    latency = MSGTIME(myNode->x, myNode->y, myNode->z, x,y,z, numbytes);
+    CmiAssert(latency >= 0);
+  }
   CmiBgMsgRecvTime(sendmsg) = latency + BgGetTime();
   
-
   // timing
   BG_ADDMSG(sendmsg, CmiBgMsgNodeID(sendmsg), threadID, local, 1);
 
@@ -420,6 +637,9 @@ void sendPacket_(nodeInfo *myNode, int x, int y, int z, int threadID, int handle
     addBgNodeInbuffer(sendmsg, myNode->id);
   else
     CmiSendPacket(x, y, z, numbytes, sendmsg);
+
+  // bypassing send time
+  resetVTime();
 }
 
 /* broadcast will copy data to msg buffer */
@@ -447,6 +667,8 @@ static inline void nodeBroadcastPacketExcept_(int node, CmiInt2 threadID, int ha
   if (!correctTimeLog)
 #endif
   CmiSyncBroadcastAllAndFree(numbytes,sendmsg);
+
+  resetVTime();
 }
 
 /* broadcast will copy data to msg buffer */
@@ -462,7 +684,7 @@ static inline void threadBroadcastPacketExcept_(int node, CmiInt2 threadID, int 
   CmiBgMsgType(sendmsg) = type;	
   CmiBgMsgLength(sendmsg) = numbytes;
   /* FIXME */
-  BgElapse(cva(bgMach).network->alphacost());
+  BgAdvance(cva(bgMach).network->alphacost());
   CmiBgMsgRecvTime(sendmsg) = BgGetTime();	
 
   // timing
@@ -488,6 +710,8 @@ static inline void threadBroadcastPacketExcept_(int node, CmiInt2 threadID, int 
   if (!correctTimeLog)
 #endif
   CmiSyncBroadcastAllAndFree(numbytes,sendmsg);
+
+  resetVTime();
 }
 
 /* sendPacket to route */
@@ -558,6 +782,10 @@ void BgSyncListSend(int npes, int *pes, int handlerID, WorkType type, int numbyt
   CmiBgMsgType(msg) = type;
   CmiBgMsgLength(msg) = numbytes;
 
+  BgAdvance(cva(bgMach).network->alphacost());
+
+  double now = BgGetTime();
+
   // send one by one
   for (int i=0; i<npes; i++)
   {
@@ -575,10 +803,9 @@ void BgSyncListSend(int npes, int *pes, int handlerID, WorkType type, int numbyt
     char *sendmsg = CmiCopyMsg(msg, numbytes);
     CmiBgMsgNodeID(sendmsg) = nodeInfo::XYZ2Global(x,y,z);
     CmiBgMsgThreadID(sendmsg) = t;
-    BgElapse(cva(bgMach).network->alphacost());
     double latency = MSGTIME(myNode->x, myNode->y, myNode->z, x,y,z, numbytes);
     CmiAssert(latency >= 0);
-    CmiBgMsgRecvTime(sendmsg) = latency + BgGetTime();
+    CmiBgMsgRecvTime(sendmsg) = latency + now;
 
     if (myNode->x == x && myNode->y == y && myNode->z == z) local = 1;
 
@@ -593,6 +820,8 @@ void BgSyncListSend(int npes, int *pes, int handlerID, WorkType type, int numbyt
   }
 
   CmiFree(msg);
+
+  resetVTime();
 }
 
 /*****************************************************************************
@@ -719,128 +948,6 @@ void BgSetNumCommThread(int num)
 {
   ASSERT(cva(simState).inEmulatorInit);
   cva(bgMach).numCth = num;
-}
-
-/*****************************************************************************
-      BG Timing Functions
-*****************************************************************************/
-
-void startVTimer()
-{
-  CmiAssert(tTIMERON == 0);
-  tTIMERON = 1;
-  if (cva(bgMach).timingMethod == BG_WALLTIME) {
-    double ct = CmiWallTimer();
-    CmiAssert(ct >= tSTARTTIME);
-    tSTARTTIME = ct;
-  }
-  else if (cva(bgMach).timingMethod == BG_ELAPSE)
-    tSTARTTIME = tCURRTIME;
-#ifdef CMK_ORIGIN2000
-  else if (cva(bgMach).timingMethod == BG_COUNTER) {
-    if (start_counters(0, 21) <0) {
-      perror("start_counters");;
-    }
-  }
-#elif CMK_HAS_COUNTER_PAPI
-  else if (cva(bgMach).timingMethod == BG_COUNTER) {
-    // do a fake read to reset the counters. It would be more efficient
-    // to use the low level API, but that would be a lot more code to
-    // write for now.
-    if (read_counters(papiValues, numPapiEvents) < 0) perror("read_counters");
-  }
-#endif
-}
-
-static inline void advanceTime(double inc)
-{
-  CmiAssert(inc>=0.0);
-  inc *= cva(bgMach).cpufactor;
-  tCURRTIME += inc;
-}
-
-void stopVTimer()
-{
-  CmiAssert(tTIMERON == 1);
-  tTIMERON = 0;
-  if (cva(bgMach).timingMethod == BG_WALLTIME) {
-    const double tp = CmiWallTimer();
-    double inc = tp-tSTARTTIME;
-    advanceTime(inc);
-//    tSTARTTIME = CmiWallTimer();	// skip the above time
-  }
-  else if (cva(bgMach).timingMethod == BG_ELAPSE) {
-    // if no bgelapse called, assume it takes 1us
-    if (tCURRTIME-tSTARTTIME < 1E-9) {
-//      tCURRTIME += 1e-6;
-    }
-  }
-  else if (cva(bgMach).timingMethod == BG_COUNTER)  {
-#if CMK_ORIGIN2000
-    long long c0, c1;
-    if (read_counters(0, &c0, 21, &c1) < 0) perror("read_counters");
-    tCURRTIME += Count2Time(c1);
-#elif CMK_HAS_COUNTER_PAPI
-    if (read_counters(papiValues, numPapiEvents) < 0) perror("read_counters");
-    tCURRTIME += Count2Time(papiValues, numPapiEvents);
-#endif
-  }
-}
-
-double BgGetTime()
-{
-#if 1
-  if (cva(bgMach).timingMethod == BG_WALLTIME) {
-    /* accumulate time since last starttime, and reset starttime */
-    if (tTIMERON) {
-      const double tp2= CmiWallTimer();
-      double &startTime = tSTARTTIME;
-      double inc = tp2 - startTime;
-      advanceTime(inc);
-      startTime = CmiWallTimer();
-    }
-    return tCURRTIME;
-  }
-  else if (cva(bgMach).timingMethod == BG_ELAPSE) {
-    return tCURRTIME;
-  }
-  else if (cva(bgMach).timingMethod == BG_COUNTER) {
-    if (tTIMERON) {
-#if CMK_ORIGIN2000
-      long long c0, c1;
-      if (read_counters(0, &c0, 21, &c1) <0) perror("read_counters");;
-      tCURRTIME += Count2Time(c1);
-      if (start_counters(0, 21)<0) perror("start_counters");;
-#elif CMK_HAS_COUNTER_PAPI
-    if (read_counters(papiValues, numPapiEvents) < 0) perror("read_counters");
-    tCURRTIME += Count2Time(papiValues, numPapiEvents);
-#endif
-    }
-    return tCURRTIME;
-  }
-  else 
-    CmiAbort("Unknown Timing Method.");
-  return -1;
-#else
-  /* sometime I am interested in real wall time */
-  tCURRTIME = CmiWallTimer();
-  return tCURRTIME;
-#endif
-}
-
-// moved to blue_logs.C
-double BgGetCurTime()
-{
-  ASSERT(tTHREADTYPE == WORK_THREAD);
-  return tCURRTIME;
-}
-
-extern "C" 
-void BgElapse(double t)
-{
-//  ASSERT(tTHREADTYPE == WORK_THREAD);
-  if (cva(bgMach).timingMethod == BG_ELAPSE)
-    tCURRTIME += t;
 }
 
 /*****************************************************************************
@@ -1167,6 +1274,8 @@ CmiStartFn bgMain(int argc, char **argv)
   /* number of bg nodes on this PE */
   CpvInitialize(int, numNodes);
   cva(numNodes) = nodeInfo::numLocalNodes();
+
+  bgstreaming.init(cva(numNodes));
 
   /* create BG nodes */
   CpvInitialize(nodeInfo *, nodeinfo);
