@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.1  1995-09-30 15:00:00  jyelon
+ * Revision 1.2  1995-09-30 15:44:59  jyelon
+ * fixed a bug.
+ *
+ * Revision 1.1  1995/09/30  15:00:00  jyelon
  * Initial revision
  *
  * Revision 2.5  1995/09/29  09:50:07  jyelon
@@ -52,6 +55,15 @@ static char ident[] = "@(#)$Header$";
 #include <sys/time.h>
 #include <sys/resource.h>
 #endif
+
+static char *DeleteArg(argv)
+  char **argv;
+{
+  char *res = argv[0];
+  if (res==0) { CmiError("Bad arglist."); exit(1); }
+  while (*argv) { argv[0]=argv[1]; argv++; }
+  return res;
+}
 
 static void mycpy(unsigned long long *dst, unsigned long long *src, int bytes)
 {
@@ -269,6 +281,7 @@ typedef void *Fifo;
 
 int        Cmi_mype;
 int        Cmi_numpe;
+int        Cmi_stacksize = 64000;
 char     **CmiArgv;
 CthThread *CmiThreads;
 Fifo      *CmiQueues;
@@ -455,7 +468,11 @@ char **argv;
   char **argp;
   
   for (argp=argv; *argp; ) {
-    if ((strcmp(*argp,"+p")==0)&&(argp[1])) {
+    if ((strcmp(*argp,"++stacksize")==0)&&(argp[1])) {
+      DeleteArg(argp);
+      Cmi_stacksize = atoi(*argp);
+      DeleteArg(argp);
+    } else if ((strcmp(*argp,"+p")==0)&&(argp[1])) {
       Cmi_numpe = atoi(argp[1]);
       argp+=2;
     } else if (sscanf(*argp, "+p%d", &Cmi_numpe) == 1) {
@@ -478,9 +495,6 @@ char *argv[];
   CmiArgv = argv;
   CmiParseArgs(argv);
   
-  stacksize = 8000000 / Cmi_numpe;
-  if (stacksize > 256000) stacksize = 256000;
-  
   CthInit(argv);
   
   CpvInitialize(void*, CmiLocalQueue);
@@ -490,7 +504,7 @@ char *argv[];
   
   /* Create threads for all PE except PE 0 */
   for(i=0; i<Cmi_numpe; i++) {
-    t = (i==0) ? CthSelf() : CthCreate(CmiCallMain, 0, stacksize);
+    t = (i==0) ? CthSelf() : CthCreate(CmiCallMain, 0, Cmi_stacksize);
     CthSetVar(t, (void **)(&Cmi_mype), (void *)i);
     CmiThreads[i] = t;
     CmiBarred[i] = 0;
