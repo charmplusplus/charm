@@ -20,10 +20,12 @@ armci_api.o: armci_api.C armci.decl.h armci.def.h armci.h \
 		armci_impl.h
 	$(CHARMC) $(OPTS) -c armci_api.C
 
-armci_util.o: armci_util.C armci_impl.h
+armci_util.o: armci_util.C armci_impl.h armci.decl.h
 	$(CHARMC) $(OPTS) -c armci_util.C
 
-armci.decl.h armci.def.h: armci.ci
+armci.decl.h: armci.def.h
+
+armci.def.h: armci.ci
 	$(CHARMC) armci.ci
 
 clean:
