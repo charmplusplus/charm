@@ -18,13 +18,14 @@
 
 ##############################################################################
 #
-# Initialize the main controlling variables, then setup error handler
+# Initialize the main controlling variables, setup error handler
 #
 # ALL variables used by this script should be initialized here.
 #
 ##############################################################################
 
 onintr failure
+
 unsetenv MACHTYPE
 unsetenv SEQUENTIAL
 unsetenv LANGUAGE
@@ -193,8 +194,6 @@ while ($argindex <= $#argv)
         case "-g"
             set OPTS_CC=  ( $OPTS_CC   $arg )
             set OPTS_CXX= ( $OPTS_CXX  $arg )
-            set OPTS_LD=  ( $OPTS_LD   $arg )
-            set OPTS_LDXX=( $OPTS_LDXX $arg )
             breaksw
 
         case "-O*"
@@ -218,6 +217,7 @@ while ($argindex <= $#argv)
             set OPTS_CXX= ( $OPTS_CXX  $arg )
             set OPTS_LD=  ( $OPTS_LD   $arg )
 	    set OPTS_LDXX=( $OPTS_LDXX $arg )
+            set OPTS_LDRO=( $OPTS_LDRO $arg )
             breaksw
 
         case "*.*"
@@ -566,9 +566,23 @@ if (! -e $BAL_OBJ) then
    goto failure
 endif
 
-# Select linkers
+########################################################################
+#
+# Select linkers and libraries based on language.
+#
+########################################################################
 
 switch ($LANGUAGE)
+    case "charm++"
+        set PRELOAD=($CMK_LDRO CHARMC-USR.TMP.o $OPTS_LDRO -L$CHARMLIB \
+                      $OBJECTFILES $LIBRARIES $BAL_OBJ)
+        set LOADER =($CMK_LDXX $OPTS_LDXX -o $OBJECT \
+		      CHARMC-USR.TMP.o CHARMC-MOD.TMP.o \
+                      $CHARMLIB/libck-core-$EXECMODE.o \
+        	      $CHARMLIB/libck-cplus-y.o \
+        	      $CHARMLIB/libconv-core.o \
+		      $CMK_LIBS -lm )
+        breaksw
     case "charm"
         set PRELOAD=($CMK_LDRO CHARMC-USR.TMP.o $OPTS_LDRO -L$CHARMLIB \
                       $OBJECTFILES $LIBRARIES $BAL_OBJ)
@@ -576,16 +590,6 @@ switch ($LANGUAGE)
 		      CHARMC-USR.TMP.o CHARMC-MOD.TMP.o \
         	      $CHARMLIB/libck-core-$EXECMODE.o \
         	      $CHARMLIB/libck-cplus-n.o \
-        	      $CHARMLIB/libconv-core.o \
-		      $CMK_LIBS -lm )
-        breaksw
-    case "charm++"
-        set PRELOAD=($CMK_LDRO CHARMC-USR.TMP.o $OPTS_LDRO -L$CHARMLIB \
-                      $OBJECTFILES $LIBRARIES $BAL_OBJ)
-        set LOADER =($CMK_LDXX $OPTS_LD -o $OBJECT \
-		      CHARMC-USR.TMP.o CHARMC-MOD.TMP.o \
-                      $CHARMLIB/libck-core-$EXECMODE.o \
-        	      $CHARMLIB/libck-cplus-y.o \
         	      $CHARMLIB/libconv-core.o \
 		      $CMK_LIBS -lm )
         breaksw
@@ -599,8 +603,13 @@ switch ($LANGUAGE)
         breaksw
 endsw
 
-# Bind together user-specified objects and libraries,
-# thereby creating CHARMC-USR.TMP.o and CHARMC-USR.TMP.nm
+########################################################################
+#
+# Bind together user-specified objects and libraries, thereby
+# creating CHARMC-USR.TMP.o, then 'nm' that file, thereby yielding
+# a list of function names in CHARMC-USR.TMP.nm
+#
+########################################################################
 
 echo "linking $OBJECT with -language $LANGUAGE"
 
@@ -609,20 +618,21 @@ if ($?VERBOSE) echo $PRELOAD
 $PRELOAD
 if ($status) goto failure
 
-#
-# 'nm' the user-specified code, to find function names.
-#
-
 $CMK_NM CHARMC-USR.TMP.o | csh -fc "$CMK_NM_FILTER" > CHARMC-USR.TMP.nm
 if ($status) goto failure
 
+
+########################################################################
+#
 # Scan user-object for initialization functions, create CHARMC-MOD.TMP.o
+#
+########################################################################
 
 if ($?VERBOSE) echo "Creating CHARMC-MOD.TMP.c"
 set DELETE=(CHARMC-MOD.TMP.dat CHARMC-MOD.TMP.c CHARMC-MOD.TMP.o $DELETE)
 rm -f CHARMC-MOD.TMP.dat CHARMC-MOD.TMP.c CHARMC-MOD.TMP.o
 awk '(/^_CK_.*_init$/&&(\!/^_CK_.*_struct_init$/)) { print substr($1, 5, length($1)-9); }' < CHARMC-USR.TMP.nm | sort | uniq > CHARMC-MOD.TMP.dat
-echo 'Modules: '`cat CHARMC-MOD.TMP.dat`
+echo 'Charm Modules: '`cat CHARMC-MOD.TMP.dat`
 awk '{print "extern void _CK_"$1"_init();";}' < CHARMC-MOD.TMP.dat >> CHARMC-MOD.TMP.c
 echo '_CK_module_init_fn()' >> CHARMC-MOD.TMP.c
 echo '{' >> CHARMC-MOD.TMP.c
@@ -632,17 +642,32 @@ if ($?VERBOSE) echo $CMK_CC $OPTS_CC -c CHARMC-MOD.TMP.c
 $CMK_CC $OPTS_CC -c CHARMC-MOD.TMP.c
 if ($status) goto failure
 
-# Scan user-object for user_main, if none, set MAINOBJ
+########################################################################
+#
+# Scan user-object for the function 'user_main', if not defined,
+# add libck-defmain to list of object files.
+#
+########################################################################
 
 if (! { (egrep '^user_main$' < CHARMC-USR.TMP.nm >& /dev/null) }) then
     set LOADER=($LOADER $CHARMLIB/libck-defmain.o)
 endif
 
+########################################################################
+#
+# Finally, link.
+#
+########################################################################
+
 if ($?VERBOSE) echo $LOADER
 $LOADER
 if ($status) goto failure
 
-# Copy conv-host
+########################################################################
+#
+# Copy conv-host to user directory if it is present in installation.
+#
+########################################################################
 
 if (-e $CHARMBIN/conv-host) then
     /bin/rm -f conv-host
@@ -651,7 +676,7 @@ endif
 
 ########################################################################
 #
-# copyobj: if more than one -o specified, copy the resulting object file.
+# copyobj: if -cp specified, copy the resulting output file.
 #
 ########################################################################
 
@@ -662,7 +687,7 @@ foreach x ($COPIES)
 	set COPY=$x
 	if (-d $COPY) set COPY=$COPY/$OBJECT
         if ($?VERBOSE) echo rm -f $COPY ";" ln $OBJECT $COPY
-        rm -f $COPY ; ln $OBJECT $COPY
+        rm -f $COPY ; cp $OBJECT $COPY
     endif
 end
 
