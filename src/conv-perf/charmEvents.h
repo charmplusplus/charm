@@ -48,7 +48,7 @@
 #define _LOG_E_CREATION_N(env, n) 	{ creation(env, n); }
 #define _LOG_E_BEGIN_EXECUTE(env) 	{ beginExecute(env); }
 #define _LOG_E_BEGIN_EXECUTE_DETAILED(event, msgType, ep, srcPe, ml) \
-	{ beginExecute(event, msgType, ep, srcPe, ml); }
+	{ beginExecuteDetailed(event, msgType, ep, srcPe, ml); }
 #define _LOG_E_END_EXECUTE()	 	{ endExecute(); }
 //#define _LOG_E_BEGIN_PROCESSING() 
 //#define _LOG_E_END_PROCESSING() 

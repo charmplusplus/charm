@@ -11,6 +11,8 @@ extern "C" {
 /* Trace Storage and associated Structure */
 CpvExtern(int, _traceCoreOn);
 CpvExtern(double, _traceCoreInitTime);
+CpvExtern(char*, _traceCoreRoot);
+CpvExtern(int, _traceCoreBufferSize);
 
 /* Trace Timer */
 #define  TRACE_CORE_TIMER   CmiWallTimer
@@ -29,6 +31,9 @@ void resumeTraceCore();
 void RegisterLanguage(int lID);
 void RegisterEvent(int lID, int eID);
 void LogEvent(int lID, int eID);
+void LogEvent1(int lID, int eID, int iLen, int* iData);
+void LogEvent2(int lID, int eID, int sLen, char* sData);
+void LogEvent3(int lID, int eID, int iLen, int* iData, int sLen, char* sData);
 
 #ifdef __cplusplus
 }

@@ -1,5 +1,6 @@
 
-#include "envelope.h"
+#include <stdio.h>
+#include <stdlib.h>
 #include "converse.h"
 #include "charmProjections.h"
 #include "traceCoreCommon.h"
@@ -21,7 +22,9 @@ extern "C" void initCharmProjections()
   curEvent = 0;
 }
 
-extern "C" int  traceRegisterUserEvent(const char*) {}	//TODO
+//TODO
+//extern "C" int  traceRegisterUserEvent(const char*) 
+//{return -1;}	
 
 extern "C" void creation(envelope *e, int num)
 {
@@ -32,7 +35,7 @@ extern "C" void creation(envelope *e, int num)
 	iData[1] = _threadEP;
 	iData[2] = curEvent++;
 	iData[3] = CkMyPe();
-	LogEvent(_CHARM_LANG_ID, _E_CREATION, 4, iData); 
+	LogEvent1(_CHARM_LANG_ID, _E_CREATION, 4, iData); 
   } else {
     e->setEvent(curEvent);
     for(int i=0; i<num; i++) {
@@ -42,7 +45,7 @@ extern "C" void creation(envelope *e, int num)
 		iData[2] = curEvent+i;
 		iData[3] = CkMyPe();
 		iData[4] = e->getTotalsize();
-		LogEvent(_CHARM_LANG_ID, _E_CREATION, 5, iData); 
+		LogEvent1(_CHARM_LANG_ID, _E_CREATION, 5, iData); 
     }
     curEvent += num;
   }
@@ -58,13 +61,13 @@ extern "C" void beginExecute(envelope *e)
 	iData[1] = _threadEP;
 	iData[2] = execEvent;
 	iData[3] = CkMyPe();
-	LogEvent(_CHARM_LANG_ID, _E_BEGIN_PROCESSING, 4, iData); 
+	LogEvent1(_CHARM_LANG_ID, _E_BEGIN_PROCESSING, 4, iData); 
   } else {
-    beginExecute(e->getEvent(),e->getMsgtype(),e->getEpIdx(),e->getSrcPe(),e->getTotalsize());
+    beginExecuteDetailed(e->getEvent(),e->getMsgtype(),e->getEpIdx(),e->getSrcPe(),e->getTotalsize());
   }
 }
 
-extern "C" void beginExecute(int event,int msgType,int ep,int srcPe,int ml)
+extern "C" void beginExecuteDetailed(int event,int msgType,int ep,int srcPe,int ml)
 {
   execEvent=event;
   execEp=ep;
@@ -75,7 +78,7 @@ extern "C" void beginExecute(int event,int msgType,int ep,int srcPe,int ml)
   iData[2] = event;
   iData[3] = srcPe;
   iData[4] = ml;
-  LogEvent(_CHARM_LANG_ID, _E_BEGIN_PROCESSING, 5, iData); 
+  LogEvent1(_CHARM_LANG_ID, _E_BEGIN_PROCESSING, 5, iData); 
 }
 
 extern "C" void endExecute(void)
@@ -86,14 +89,14 @@ extern "C" void endExecute(void)
 	iData[1] = _threadEP;
 	iData[2] = execEvent;
 	iData[3] = CkMyPe();
-	LogEvent(_CHARM_LANG_ID, _E_END_PROCESSING, 4, iData); 
+	LogEvent1(_CHARM_LANG_ID, _E_END_PROCESSING, 4, iData); 
   } else {
 	int* iData = (int*)malloc(sizeof(int)*4); 
 	iData[0] = 0;
 	iData[1] = execEp;
 	iData[2] = execEvent;
 	iData[3] = execPe;
-	LogEvent(_CHARM_LANG_ID, _E_END_PROCESSING, 4, iData); 
+	LogEvent1(_CHARM_LANG_ID, _E_END_PROCESSING, 4, iData); 
   }
 }
 
@@ -112,7 +115,7 @@ extern "C" void beginComputation(void)
 	int* iData = (int*)malloc(sizeof(int)*4); 
 	iData[0] = iData[1] = 0;
 	iData[2] = iData[3] = -1;
-	LogEvent(_CHARM_LANG_ID, _E_BEGIN_COMPUTATION, 4, iData); 
+	LogEvent1(_CHARM_LANG_ID, _E_BEGIN_COMPUTATION, 4, iData); 
 }
 
 extern "C" void endComputation(void)
@@ -120,18 +123,19 @@ extern "C" void endComputation(void)
 	int* iData = (int*)malloc(sizeof(int)*4); 
 	iData[0] = iData[1] = 0;
 	iData[2] = iData[3] = -1;
-	LogEvent(_CHARM_LANG_ID, _E_END_COMPUTATION, 4, iData); 
+	LogEvent1(_CHARM_LANG_ID, _E_END_COMPUTATION, 4, iData); 
 }
 
 extern "C" void messageRecv(char *env, int pe) {} //TODO
 
-extern "C" void userEvent(int e)
+extern "C" void userEvent(int e) {}	//TODO
+
 extern "C" void beginPack(void)
 {
 	int* iData = (int*)malloc(sizeof(int)*4); 
 	iData[0] = iData[1] = iData[2] = 0;
 	iData[3] = CkMyPe();
-	LogEvent(_CHARM_LANG_ID, _E_BEGIN_PACK, 4, iData); 
+	LogEvent1(_CHARM_LANG_ID, _E_BEGIN_PACK, 4, iData); 
 }
 
 extern "C" void endPack(void)
@@ -139,7 +143,7 @@ extern "C" void endPack(void)
 	int* iData = (int*)malloc(sizeof(int)*4); 
 	iData[0] = iData[1] = iData[2] = 0;
 	iData[3] = CkMyPe();
-	LogEvent(_CHARM_LANG_ID, _E_END_PACK, 4, iData); 
+	LogEvent1(_CHARM_LANG_ID, _E_END_PACK, 4, iData); 
 }
 
 extern "C" void beginUnpack(void)
@@ -147,7 +151,7 @@ extern "C" void beginUnpack(void)
 	int* iData = (int*)malloc(sizeof(int)*4); 
 	iData[0] = iData[1] = iData[2] = 0;
 	iData[3] = CkMyPe();
-	LogEvent(_CHARM_LANG_ID, _E_BEGIN_UNPACK, 4, iData); 
+	LogEvent1(_CHARM_LANG_ID, _E_BEGIN_UNPACK, 4, iData); 
 }
 
 extern "C" void endUnpack(void)
@@ -155,7 +159,7 @@ extern "C" void endUnpack(void)
 	int* iData = (int*)malloc(sizeof(int)*4); 
 	iData[0] = iData[1] = iData[2] = 0;
 	iData[3] = CkMyPe();
-	LogEvent(_CHARM_LANG_ID, _E_END_UNPACK, 4, iData); 
+	LogEvent1(_CHARM_LANG_ID, _E_END_UNPACK, 4, iData); 
 }
 
 

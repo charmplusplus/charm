@@ -2,18 +2,18 @@
 #ifndef __CHARM_PROJECTIONS_H__
 #define __CHARM_PROJECTIONS_H__
 
-#include "envelope.h"
+#include "ck.h"	//NOTE: ck.h included for envelope
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 void initCharmProjections();
-int  traceRegisterUserEvent(const char*);	//TODO
+//int  traceRegisterUserEvent(const char*);	//TODO
 
 void creation(envelope *e, int num=1);
 void beginExecute(envelope *e);
-void beginExecute(int event,int msgType,int ep,int srcPe,int ml);
+void beginExecuteDetailed(int event,int msgType,int ep,int srcPe,int ml);
 void endExecute(void);
 void enqueue(envelope *e);
 void dequeue(envelope *e);
