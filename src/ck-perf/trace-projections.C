@@ -15,7 +15,7 @@ CpvStaticDeclare(char*, traceRoot);
 CpvExtern(CthThread, curThread);
 static int _numEvents = 0;
 #if CMK_OPTIMIZE
-static warned = 0;
+static int warned = 0;
 #endif
 static int _threadMsg, _threadChare, _threadEP;
 
