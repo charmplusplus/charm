@@ -144,12 +144,12 @@ handle the node-updates.
 
 \section{Structure of a FEM Framework Program}
 
-A FEM framework program consists of three subroutines: \kw{init()}, \kw{driver()},
-and \kw{mesh\_updated()}.  \kw{init()} and \kw{mesh\_updated()} are called by the FEM framework
-only on the first processor -- these routines typically do specialized I/O,
+A FEM framework program consists of two subroutines: \kw{init()} and \kw{driver()}.
+\kw{init()} is called by the FEM framework
+only on the first processor -- this routine typically does specialized I/O,
 startup and shutdown tasks.  \kw{driver()} is called for every chunk on every
 processor, and does the main work of the program.  In the language of the
-TCHARM manual, \kw{init()} and \kw{mesh\_updated()} run in the serial context, 
+TCHARM manual, \kw{init()} runs in the serial context, 
 and \kw{driver()} runs in the parallel context.
 
 
@@ -165,10 +165,6 @@ and \kw{driver()} runs in the parallel context.
                update shared node fields
                more FEM computations
           end time loop
-     end subroutine
-
-     subroutine mesh_updated
-          write out results; possibly modify serial mesh
      end subroutine
 \end{alltt}
 
@@ -187,7 +183,7 @@ for several example and test programs.
 
 At runtime, an FEM framework program accepts the following
 options, in addition to all the usual Charm++ options described in 
-the Charm++ "Installation and Usage Manual".
+the Charm++ ``Installation and Usage Manual''.
 
 \begin{itemize}
 \item {\tt +vp} $v$  
@@ -238,10 +234,10 @@ diagnostics can slow a program down, use this option with care.
 
 Some of the routines in the FEM framework have different requirements or meanings
 depending on where they are called from.  When a routine is described
-as being "called from driver", this means it is called in the parallel
+as being ``called from driver'', this means it is called in the parallel
 context---from \kw{driver()} itself, any subroutine called by \kw{driver()},
 or from whatever routine is runs the FEM-attached TCHARM threads.
-When a routine is described as being "called from init", this means it is 
+When a routine is described as being ``called from init'', this means it is 
 called in the serial context---from \kw{init()} itself, from any subroutine
 called from \kw{init()}, or from whatever TCHARM code executes before the
 \kw{FEM\_Attach}.
@@ -312,11 +308,6 @@ but any new added nodes are assumed private (not shared).
 \kw{FEM\_Update\_mesh} will reassemble a serial version of the mesh from the
 new pieces and optionally repartition the serial mesh.
 
-From \kw{mesh\_updated()}, the \kw{FEM\_Get} and \kw{FEM\_Set} routines
-manipulate the serial mesh.   \kw{mesh\_updated()} is only executed if you call
-\kw{FEM\_Update\_mesh} during driver-- otherwise, \kw{mesh\_updated()} can be an
-empty procedure.  The parameter \kw{callMeshUpdated} is passed down to
-\kw{mesh\_updated()}.
 
 \prototype{FEM\_Set\_mesh}
 \function{void FEM\_Set\_mesh(int nElem, int nNodes, int nodePerEl,const int* conn);}
@@ -405,7 +396,9 @@ to make them in linearly increasing order.  However, for a given type of element
 
      \kw{doublePerNode} may be zero, indicating that no user data is
      associated with each node.
+     
 
+\subsection{Mesh Data}
 \prototype{FEM\_Get/Set\_data}
 \function{void FEM\_Set\_node\_data(const double *data);}
 \function{void FEM\_Get\_node\_data(double *data);}
@@ -441,6 +434,7 @@ arrays can be row- or column- major (see \kw{FEM\_Set\_elem\_conn} for
 details).  The row-major form is preferred.
 
 
+\subsection{Sparse Data}
 \prototype{FEM\_Set\_sparse}
 \function{void FEM\_Set\_sparse(int S\_id,int nRec,
          const int *nodes,int nodesPerRec,
@@ -524,11 +518,103 @@ are available.  \kw{FEM\_Get\_sparse} returns you the actual nodes
 these sparse records.
 
 
-\subsection {Mesh Ghosts}
-An option to add "ghosts" to a mesh is provided by the framework. A ghost is a local read-only copy of a node or element that actually lives on another chunk.  Ghosts are typically added to the boundary of a chunk to allow the real (non-ghost) elements at the boundary to access values across the processor boundary.  This makes a chunk ``feel'' as if it was part of a complete unpartitioned mesh.
 
-\subsubsection{Setting up the ghost layer}
-The framework's ghost handling is element-centric. You specify which kinds of elements should be ghosts and how they connect by listing their "tuples" via calls in the \kw{init()} routine.  
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\newpage
+\section{Mesh Modification}
+
+\prototype{FEM\_Add\_node}
+\function{void FEM\_Add\_node(int localIdx,int nBetween,int *betweenNodes);}
+\function{subroutine FEM\_Add\_node(localIdx,nBetween,betweenNodes)}
+    \args{integer, intent(in) :: localIdx,nBetween}
+    \args{integer, intent(in) :: betweenNodes(nBetween)}
+
+This call adds a new node, with local index \kw{localIdx}, to the current mesh chunk. 
+BetweenNodes lists the local node numbers of the all the nodes the new node is 
+``between''-- for example, when adding a new node along an edge, nBetween is 2
+and betweenNodes lists the endpoints of the edge.
+\kw{FEM\_Add\_node} only affects the current chunk-- no other chunks are affected.
+
+To create shared nodes, \kw{FEM\_Add\_node} must be called on all the chunks that 
+share the node, to create the local copies of the node.
+When adding multiple nodes, \kw{FEM\_Add\_node} must be called in the same order 
+on all the processors that share the new node--that is, if two new
+nodes $x$ and $y$ are added between chunks $a$ and $b$, if $a$ calls
+\kw{FEM\_Add\_node} with its local number for $x$ before it calls \kw{FEM\_Add\_node}
+with its local number for $y$, $b$ must also add its copy of node $x$ before $y$.
+
+
+\prototype{FEM\_Update\_mesh}
+\function{void FEM\_Update\_mesh(FEM\_Update\_mesh\_fn routine, int callMeshUpdated,int doWhat);}
+\function{subroutine FEM\_Update\_mesh(routine,callMeshUpdated,doWhat)}
+    \args{external, intent(in) :: routine}
+    \args{integer, intent(in) :: callMeshUpdated,doWhat}
+
+Reassemble the mesh chunks from each partition into a single serial mesh,
+and call the given \kw{routine} on the assembled mesh.
+In this \kw{routine}, which runs on processor 0, the \kw{FEM\_Get} and \kw{FEM\_Set} routines
+can manipulate the serial mesh.  The parameter \kw{callMeshUpdated}, which must
+be non-zero, is passed down to \kw{routine} as \kw{routine(callMeshUpdated)}.
+
+\kw{FEM\_Get} calls from
+\kw{driver()} will only return the new mesh after a \kw{FEM\_Update\_mesh} call
+where \kw{doWhat} is \kw{FEM\_MESH\_UPDATE}; otherwise \kw{FEM\_Get} from \kw{driver()} will still
+return the old mesh.
+\kw{FEM\_Update\_mesh} can only be called from driver; and must be called by the driver routine for
+every chunk. 
+
+%     If \kw{doRepartition} is 0, the mesh is not repartitioned, and \kw{FEM\_Update\_mesh}
+%returns immediately.  If \kw{doRepartition} is 1, \kw{FEM\_Update\_mesh} blocks
+%until the reassembled serial mesh is repartitioned back into chunks and redistributed.
+%If \kw{doRepartition} is 2, 
+
+\begin{center}
+\begin{tabular}{|l|l|l|l|}\hline
+\kw{doWhat} & Numeric & Repartition? & \kw{FEM\_Update\_mesh} \\\hline
+\kw{FEM\_MESH\_OUTPUT} & 0 & No & \kw{driver()} continues alongside \kw{routine} \\
+\kw{FEM\_MESH\_FINALIZE} & 2 & No & \kw{driver()} blocks until \kw{routine} finishes\\
+\kw{FEM\_MESH\_UPDATE} & 1 & Yes & \kw{driver()} blocks for the new partition \\
+\hline
+\end{tabular}
+\end{center}
+
+For example, \kw{FEM\_Update\_mesh}(\uw{my\_output\_routine}, \uw{k}, \kw{FEM\_MESH\_OUTPUT}) 
+reassembles the mesh and calls a routine named
+\uw{my\_output\_routine(k)} while the driver routines continue with the computation.
+This might be useful, for example, for writing out intermediate solutions as a 
+single file; writing outputs from \kw{driver()} is more efficient but often results 
+in a separate file for each mesh chunk.
+
+   To block the driver routines during a call to a routine named
+\uw{my\_finalize\_routine(k)}, such as 
+at the end of the computation when the drivers have no other work to do, 
+use \kw{FEM\_Update\_mesh}(\uw{my\_finalize\_routine}, \uw{k}, \kw{FEM\_MESH\_FINALIZE}).
+
+     To reassemble, modify, and repartition the mesh, use
+\kw{FEM\_Update\_mesh}(\uw{my\_update\_routine}, \uw{k}, \kw{FEM\_MESH\_UPDATE}).
+It may be easier to perform major mesh modifications from \uw{my\_update\_routine(k)} than
+the drivers, since the entire serial mesh is available to \uw{my\_update\_routine(k)}.
+
+     \kw{FEM\_Update\_mesh} reassembles the serial mesh with an attempt to
+     preserve the element and node global numbering.  If the new mesh
+     has the same number and type of elements and nodes, the global
+     numbers (and hence serial mesh) will be unchanged.  If new
+     elements or nodes are added at each chunk, they will be assigned
+     new unique global numbers.  If elements or nodes are removed,
+     their global numbers are not re-used-- you can detect the
+     resulting holes in the serial mesh since the user data associated
+     with the deleted elements will be all zero.  Generally, however, it
+     is less error-prone to perform mesh modifications only in \kw{driver()}
+     or only in an update routine, rather than some in both.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section {Mesh Ghosts}
+An option to add ``ghosts'' to a mesh is provided by the framework. A ghost is a local read-only copy of a node or element that actually lives on another chunk.  Ghosts are typically added to the boundary of a chunk to allow the real (non-ghost) elements at the boundary to access values across the processor boundary.  This makes a chunk ``feel'' as if it was part of a complete unpartitioned mesh.
+
+\subsection{Setting up the ghost layer}
+The framework's ghost handling is element-centric. You specify which kinds of elements should be ghosts and how they connect by listing their ``tuples'' via calls in the \kw{init()} routine.  
 
 \begin{itemize}
 \item
@@ -537,7 +623,7 @@ The framework's ghost handling is element-centric. You specify which kinds of el
 \function{void FEM\_Add\_ghost\_layer(int nodesPerTuple,int doAddNodes);}
 \function{subroutine FEM\_Add\_ghost\_layer(nodesPerTuple,doAddNodes)}
   \args{integer, intent(in) :: nodesPerTuple,doAddNodes}
-This routine creates a new layer of ghosts around each FEM chunk. \kw{nodesPerTuple} is the number of shared nodes that together form a "tuple". \kw{doAddNodes} specifies that you want ghost nodes as well as elements.
+This routine creates a new layer of ghosts around each FEM chunk. \kw{nodesPerTuple} is the number of shared nodes that together form a ``tuple''. \kw{doAddNodes} specifies that you want ghost nodes as well as elements.
 
 A tuple is an unordered set of nodes, and is an abstract way to describe which ghosts
 your application needs---an element will be added to your chunk if it connects to at 
@@ -582,7 +668,7 @@ If you require two shared nodes (a shared edge), the code will look like:
 
 
 
-\subsubsection{Extracting the ghost layer}
+\subsection{Extracting the ghost layer}
 After the ghost layer is created, we need a way to distinquish real nodes and elements 
 from ghost nodes and elements. FEM\_Get\_node and FEM\_Get\_elem return the 
 \textbf{total} number of nodes and elements, including ghosts. The routines below 
@@ -613,7 +699,7 @@ Fortran version:
         end do
 \end{alltt}
 
-\subsubsection{Symmetries and Ghosts--Geometric Layer}
+\subsection{Symmetries and Ghosts--Geometric Layer}
 
 The FEM framework can create ghosts not only of things that are on other 
 processors, but also for various problem symmetries, like mirror reflection,
@@ -671,7 +757,7 @@ This call can only be issued from \kw{driver()}.
 
 
 
-\subsubsection{Symmetries and Ghosts--Lower Layer}
+\subsection{Symmetries and Ghosts--Lower Layer}
 
 The geometric symmetry layer in the preceeding section is actually
 a thin wrapper around this lower, more difficult to use layer.
@@ -761,86 +847,7 @@ multiple layers of symmetry ghosts.
 % void fem_get_node_numbers(int *gNo)
 
 
-\subsection{Mesh Modification}
-
-\prototype{FEM\_Add\_node}
-\function{void FEM\_Add\_node(int localIdx,int nBetween,int *betweenNodes);}
-\function{subroutine FEM\_Add\_node(localIdx,nBetween,betweenNodes)}
-    \args{integer, intent(in) :: localIdx,nBetween}
-    \args{integer, intent(in) :: betweenNodes(nBetween)}
-
-This call adds a new node, with local index \kw{localIdx}, to the current mesh chunk. 
-BetweenNodes lists the local node numbers of the all the nodes the new node is 
-"between"-- for example, when adding a new node along an edge, nBetween is 2
-and betweenNodes lists the endpoints of the edge.
-\kw{FEM\_Add\_node} only affects the current chunk-- no other chunks are affected.
-
-To create shared nodes, \kw{FEM\_Add\_node} must be called on all the chunks that 
-share the node, to create the local copies of the node.
-When adding multiple nodes, \kw{FEM\_Add\_node} must be called in the same order 
-on all the processors that share the new node--that is, if two new
-nodes $x$ and $y$ are added between chunks $a$ and $b$, if $a$ calls
-\kw{FEM\_Add\_node} with its local number for $x$ before it calls \kw{FEM\_Add\_node}
-with its local number for $y$, $b$ must also add its copy of node $x$ before $y$.
-
-
-\prototype{FEM\_Update\_mesh}
-\function{void FEM\_Update\_mesh(int callMeshUpdated,int doWhat);}
-\function{subroutine FEM\_Update\_mesh(callMeshUpdated,doWhat)}
-    \args{integer, intent(in) :: callMeshUpdated,doWhat}
-
-Reassemble the mesh chunks from each partition into a single serial mesh.
-Can only be called from driver; and must be called by the driver routine for
-every chunk. \kw{FEM\_Get} calls from
-\kw{driver()} will only return the new mesh after a \kw{FEM\_Update\_mesh} call
-where \kw{doWhat} is 1; otherwise \kw{FEM\_Get} returns the old mesh.
-
-If \kw{callMeshUpdated} is not zero, \kw{mesh\_updated(callMeshUpdated)}
-will be called on the first processor after the mesh is reassembled.
-
-%     If \kw{doRepartition} is 0, the mesh is not repartitioned, and \kw{FEM\_Update\_mesh}
-%returns immediately.  If \kw{doRepartition} is 1, \kw{FEM\_Update\_mesh} blocks
-%until the reassembled serial mesh is repartitioned back into chunks and redistributed.
-%If \kw{doRepartition} is 2, 
-
-\begin{center}
-\begin{tabular}{|l|l|l|l|}\hline
-\kw{doWhat} & Repartition? & \kw{FEM\_Update\_mesh} \\\hline
-0 & No & Immediately continues execution \\
-1 & Yes & Blocks for the new partition \\
-2 & No & Blocks until \kw{mesh\_updated()} is complete\\
-\hline
-\end{tabular}
-\end{center}
-
-For example, \kw{FEM\_Update\_mesh}(k,0) reassembles the mesh and calls
-\kw{mesh\_updated(k)} while the driver routines continue with the computation.
-This might be useful, for example, for writing out intermediate solutions as a 
-single file; writing outputs from \kw{driver()} is more efficient but often results 
-in a separate file for each mesh chunk.
-
-   To block the driver routines during the call to \kw{mesh\_updated(k)}, such as 
-at the end of the computation when the drivers have no other work to do, 
-use \kw{FEM\_Update\_mesh}(k,2).
-
-     To reassemble, modify, and repartition the mesh, use \kw{FEM\_Update\_mesh}(k,1).
-It may be easier to perform major mesh modifications from \kw{mesh\_updated(k)} than
-the drivers, since the entire serial mesh is available to \kw{mesh\_updated(k)}.
-
-     \kw{FEM\_Update\_mesh} reassembles the serial mesh with an attempt to
-     preserve the element and node global numbering.  If the new mesh
-     has the same number and type of elements and nodes, the global
-     numbers (and hence serial mesh) will be unchanged.  If new
-     elements or nodes are added at each chunk, they will be assigned
-     new unique global numbers.  If elements or nodes are removed,
-     their global numbers are not re-used-- you can detect the
-     resulting holes in the serial mesh since the user data associated
-     with the deleted elements will be all zero.  Generally, however, it
-     is less error-prone to perform mesh modifications only in \kw{driver()}
-     or only in \kw{mesh\_updated(k)}, rather than some in both.
-
-
-
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Communication Fields}
 
 The FEM framework handles the updating of the values of shared nodes-- that
@@ -941,11 +948,11 @@ register this node force for update with:
           INTEGER :: Fid
           ...allocate nodes array as n_nodes...
           Fid=FEM_Create_field(FEM_DOUBLE,3,
-              offsetof(nodes(1), nodes(1)%fXYZ),
-              offsetof(nodes(1), nodes(2)) )
+              foffsetof(nodes(1), nodes(1)%fXYZ),
+              foffsetof(nodes(1), nodes(2)) )
 \end{alltt}
 
-     This example uses the Fortran-only helper routine \kw{offsetof}, which
+     This example uses the Fortran-only helper routine \kw{foffsetof}, which
      returns the offset in bytes of memory between its two given
      variables.  The C version uses pointer arithmetic to achieve the
      same result.
@@ -1041,6 +1048,7 @@ identical values in \kw{outVal}.  Op has the same values and meaning as
 
 
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Ghost Communication}
 
 It is possible to get values for a chunk's ghost nodes and elements from the neighbors. To do this, use:
@@ -1087,7 +1095,7 @@ The returned indices will all refer to ghost elements in my chunk.
 %   FEM_Serial_Split(ndom) ! Partition into ndom domains
 %   FEM_Serial_Begin(idom) ! Begin accessing the idom'th domain
 %   
-% "There has to be a better way:"
+% ``There has to be a better way:''
 %   FEM_Composite_elem, FEM_Combine_elem
 
 
