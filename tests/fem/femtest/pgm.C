@@ -327,11 +327,20 @@ printargs();
   	myId, nnodes,ngnodes, nelems,ngelems);
   
   if (TEST_GHOST) {//Update ghost field test
+    
     // Write crap into our ghost values:
     for (i=0;i<nelems;i++) {elements[i].val=elData[i];}
     for (i=nelems;i<ngelems;i++) {elements[i].val=-1.0;}
     if (1) { //Use IDXL routines directly
       IDXL_t elComm=FEM_Comm_ghost(FEM_Mesh_default_read(),FEM_ELEM+0);
+      /* Make sure each ghost is accessible */
+      int gCount=ngelems-nelems;
+      for (int g=0;g<gCount;g++) {
+        int src=IDXL_Get_source(elComm,g);
+	if (src==myId || src<0) 
+		CkAbort("Bad chunk number returned by IDXL_Get_source");
+      }
+      
       IDXL_t sumComm=IDXL_Create();
       IDXL_Combine(sumComm,elComm, 0, nelems); //Shift ghosts down to nelems..ngelems
       if (myId==0) IDXL_Print(sumComm);
