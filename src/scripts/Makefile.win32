@@ -55,7 +55,7 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h trace.h conv-ccs.h \
       RandCentLB.decl.h RecBisectBfLB.decl.h \
       MetisLB.decl.h RefineLB.decl.h \
       HeapCentLB.decl.h NborBaseLB.decl.h NeighborLB.decl.h \
-      WSLB.decl.h GreedyRefLB.decl.h RandRefLB.decl.h \
+      WSLB.decl.h GridCommLB.decl.h GreedyRefLB.decl.h RandRefLB.decl.h \
       tempo.decl.h waitqd.decl.h \
 	  CommLB.decl.h Comm1LB.decl.h  \
 	  ampi.decl.h ampimain.decl.h BlueGene.decl.h blue.h
@@ -73,7 +73,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  CentralLB.h RandCentLB.h RecBisectBfLB.h \
 	  RefineLB.h HeapCentLB.h CommLB.h Comm1LB.h \
 	  MetisLB.h NborBaseLB.h \
-	  NeighborLB.h WSLB.h GreedyRefLB.h RandRefLB.h \
+	  NeighborLB.h WSLB.h GridCommLB.h GreedyRefLB.h RandRefLB.h \
 	  ampi.h BlueGene.h \
 	  $(CVHEADERS)
 
@@ -301,7 +301,7 @@ LIBCK_CORE=init.obj register.obj qd.obj ck.obj main.obj msgalloc.obj ckfutures.o
 	   RecBisectBfLB.obj graph.obj bitvecset.obj \
 	   MetisLB.obj RefineLB.obj Set.obj CommLB.obj Comm1LB.obj\
            HeapCentLB.obj heap.obj NborBaseLB.obj NeighborLB.obj WSLB.obj \
-	   GreedyRefLB.obj RandRefLB.obj CommLBHeap.obj
+	   GridCommLB.obj GreedyRefLB.obj RandRefLB.obj CommLBHeap.obj
 
 
 CHARMLIBS : CONVERSE $(CK_LIBS_CORE)
@@ -387,6 +387,9 @@ NborBaseLB.decl.h NborBaseLB.def.h : NborBaseLB.ci $(CHARMXI)
 
 WSLB.decl.h WSLB.def.h : WSLB.ci $(CHARMXI)
 	$(CHARMXI) -ansi WSLB.ci
+
+GridCommLB.decl.h GridCommLB.def.h : GridCommLB.ci $(CHARMXI)
+	$(CHARMXI) -ansi GridCommLB.ci
 
 GreedyRefLB.decl.h GreedyRefLB.def.h : GreedyRefLB.ci $(CHARMXI)
 	$(CHARMXI) -ansi GreedyRefLB.ci
@@ -498,6 +501,9 @@ NeighborLB.obj: NeighborLB.C $(CKHEADERS)
 
 WSLB.obj: WSLB.C $(CKHEADERS)
 	$(CPP) $(CPP_PROJ) /TP WSLB.C
+
+GridCommLB.obj: GridCommLB.C $(CKHEADERS)
+	$(CPP) $(CPP_PROJ) /TP GridCommLB.C
 
 GreedyRefLB.obj: GreedyRefLB.C $(CKHEADERS)
 	$(CPP) $(CPP_PROJ) /TP GreedyRefLB.C
