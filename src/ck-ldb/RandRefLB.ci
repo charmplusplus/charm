@@ -1,0 +1,9 @@
+module RandRefLB {
+
+extern module CentralLB;
+
+group RandRefLB : CentralLB {
+  entry void RandRefLB(void);  
+};
+
+};
