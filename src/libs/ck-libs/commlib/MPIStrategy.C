@@ -1,5 +1,4 @@
 #include "MPIStrategy.h"
-#include "mpi.h"
 
 #if CHARM_MPI
 MPI_Comm groupComm;
