@@ -16,6 +16,7 @@ CMK_AR="$CMK_CXX -ar -o"
 CMK_RANLIB='true'
 CMK_LIBS=' -lckqt -lfastm -lmpi'
 CMK_LD_LIBRARY_PATH="-rpath $CHARMLIBSO/"
+CMK_LD_SHARED_THREAD="context"
 CMK_NM='nm'
 CMK_NM_FILTER="grep '|GLOB |' | sed -e 's/.*|//'"
 CMK_QT='origin'
