@@ -159,25 +159,25 @@ class ampiCommStruct {
 	int size; //Number of processes in communicator
 	int isWorld; //1 if ranks are 0..size-1?
 	int isInter; // 0: intra-communicator; 1: inter-communicator
-	CkPupBasicVec<int> indices;  //indices[r] gives the array index for rank r
-	CkPupBasicVec<int> remoteIndices;  // remote group for inter-communicator
+	CkVec<int> indices;  //indices[r] gives the array index for rank r
+	CkVec<int> remoteIndices;  // remote group for inter-communicator
 	// cartesian virtual topology parameters
 	int ndims;
-	CkPupBasicVec<int> dims;
-	CkPupBasicVec<int> periods;
+	CkVec<int> dims;
+	CkVec<int> periods;
 	
 	// For communicator attributes (MPI_Attr_get): indexed by keyval
 	CkVec<void *> keyvals;
 
 	// graph virtual topology parameters
 	int nvertices;
-	CkPupBasicVec<int> index;
-	CkPupBasicVec<int> edges;
+	CkVec<int> index;
+	CkVec<int> edges;
 
 	// Lazily fill world communicator indices
 	void makeWorldIndices(void) const {
 		// cast away constness of "index" list
-		CkPupBasicVec<int> *ind=(CkPupBasicVec<int> *)&index;
+		CkVec<int> *ind=(CkVec<int> *)&index;
 		for (int i=0;i<size;i++) ind->push_back(i);
 	}
 public:
@@ -185,22 +185,22 @@ public:
 	ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_,int size_)
 		:comm(comm_), ampiID(id_),size(size_), isWorld(1), isInter(0) {}
 	ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_,
-		int size_,const CkPupBasicVec<int> &indices_)
+		int size_,const CkVec<int> &indices_)
 		:comm(comm_), ampiID(id_),size(size_),isInter(0),
 		 isWorld(0), indices(indices_) {}
 	ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_,
-		int size_,const CkPupBasicVec<int> &indices_,
-		const CkPupBasicVec<int> &remoteIndices_)
+		int size_,const CkVec<int> &indices_,
+		const CkVec<int> &remoteIndices_)
 		:comm(comm_),ampiID(id_),size(size_),isWorld(0),isInter(1),
 		indices(indices_),remoteIndices(remoteIndices_) {}
 	void setArrayID(const CkArrayID &nID) {ampiID=nID;}
 
 	MPI_Comm getComm(void) const {return comm;}
-	const CkPupBasicVec<int> &getIndices(void) const {
+	const CkVec<int> &getIndices(void) const {
 		if (isWorld && indices.size()!=size) makeWorldIndices();
 		return indices;
 	}
-	const CkPupBasicVec<int> &getRemoteIndices(void) const {return remoteIndices;}
+	const CkVec<int> &getRemoteIndices(void) const {return remoteIndices;}
 	CkVec<void *> &getKeyvals(void) {return keyvals;}
 
 	//Get the proxy for the entire array
@@ -234,26 +234,26 @@ public:
 	int getSize(void) const {return size;}
 
 	inline const int isinter(void) const { return isInter; }
-	inline const CkPupBasicVec<int> &getindices() const {
+	inline const CkVec<int> &getindices() const {
 		if (isWorld && indices.size()!=size) makeWorldIndices();
 		return indices;
 	}
-	inline const CkPupBasicVec<int> &getdims() const {return dims;}
-	inline const CkPupBasicVec<int> &getperiods() const {return periods;}
+	inline const CkVec<int> &getdims() const {return dims;}
+	inline const CkVec<int> &getperiods() const {return periods;}
 
 	inline int getndims() {return ndims;}
 	inline void setndims(int ndims_) {ndims = ndims_; }
-	inline void setdims(const CkPupBasicVec<int> &dims_) { dims = dims_; }
-	inline void setperiods(const CkPupBasicVec<int> &periods_) { periods = periods_; }
+	inline void setdims(const CkVec<int> &dims_) { dims = dims_; }
+	inline void setperiods(const CkVec<int> &periods_) { periods = periods_; }
 
 	/* Similar hack for graph vt */
 	inline int getnvertices() {return nvertices;}
-	inline const CkPupBasicVec<int> &getindex() const {return index;}
-	inline const CkPupBasicVec<int> &getedges() const {return edges;}
+	inline const CkVec<int> &getindex() const {return index;}
+	inline const CkVec<int> &getedges() const {return edges;}
 
 	inline void setnvertices(int nvertices_) {nvertices = nvertices_; }
-	inline void setindex(const CkPupBasicVec<int> &index_) { index = index_; }
-	inline void setedges(const CkPupBasicVec<int> &edges_) { edges = edges_; }
+	inline void setindex(const CkVec<int> &index_) { index = index_; }
+	inline void setedges(const CkVec<int> &edges_) { edges = edges_; }
 
 	void pup(PUP::er &p) {
 		p|comm;
@@ -314,7 +314,7 @@ public:
 	}
 };
 
-typedef CkPupBasicVec<int> groupStruct;
+typedef CkVec<int> groupStruct;
 // groupStructure operations
 inline void outputOp(groupStruct vec){
   if(vec.size()>50){
@@ -404,7 +404,7 @@ inline groupStruct rangeInclOp(int n, int ranges[][3], groupStruct vec){
 }
 inline groupStruct rangeExclOp(int n, int ranges[][3], groupStruct vec){
   groupStruct retvec;
-  CkPupBasicVec<int> ranksvec;
+  CkVec<int> ranksvec;
   int first,last,stride;
   int *ranks,cnt;
   int i,j;
@@ -1236,7 +1236,7 @@ class ampi : public CBase_ampi {
     inline int getRank(void) const {return myRank;}
     inline int getSize(void) const {return myComm.getSize();}
     inline MPI_Comm getComm(void) const {return myComm.getComm();}
-    inline CkPupBasicVec<int> getIndices(void) const { return myComm.getindices(); }
+    inline CkVec<int> getIndices(void) const { return myComm.getindices(); }
     inline const CProxy_ampi &getProxy(void) const {return thisProxy;}
     inline const CProxy_ampi &getRemoteProxy(void) const {return remoteProxy;}
     inline void setRemoteProxy(CProxy_ampi rproxy) { remoteProxy = rproxy; thread->resume(); }

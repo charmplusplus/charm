@@ -514,7 +514,7 @@ class l2g_t;
  *  FEM_Attributes. 
  */
 class FEM_Entity {
-	typedef CkPupBasicVec<FEM_Symmetries_t> sym_t;
+	typedef CkVec<FEM_Symmetries_t> sym_t;
 	int length; // Number of entities of our type currently in the mesh
 	int max;    // Maximum number of entities of our type in the mesh that will be allowed
 	FEM_Mesh_alloc_fn resize; // should be a function pointer to the actual resize function later

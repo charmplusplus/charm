@@ -537,7 +537,7 @@ static ampi *ampiInit(char **argv)
 	//Make a new ampi array
 	CkArrayID empty;
 
-        CkPupBasicVec<int> _indices;
+        CkVec<int> _indices;
         for(int i=0;i<_nchunks;i++) _indices.push_back(i);
         ampiCommStruct worldComm(new_world,empty,_nchunks,_indices);
         CProxy_ampi arr;
@@ -642,7 +642,7 @@ TCharm *ampiParent::registerAmpi(ampi *ptr,ampiCommStruct s,bool forMigration)
      worldStruct=s;
 
     //MPI_COMM_SELF has the same member as MPI_COMM_WORLD, but it's alone:
-     CkPupBasicVec<int> _indices;
+     CkVec<int> _indices;
      _indices.push_back(thisIndex);
      selfStruct = ampiCommStruct(MPI_COMM_SELF,s.getProxy(),1,_indices);
   }
@@ -948,7 +948,7 @@ void ampi::splitPhase1(CkReductionMsg *msg)
 			lastAmpi=CProxy_ampi::ckNew(unusedAID,unusedComm,opts);
 			lastAmpi.doneInserting(); //<- Meaning, I need to do my own creation race resolution
 
-			CkPupBasicVec<int> indices; //Maps rank to array indices for new arrau
+			CkVec<int> indices; //Maps rank to array indices for new arrau
 			for (int i=c;i<nKeys;i++) {
 				if (keys[i].color!=lastColor) break; //Done with this color
 				int idx=myComm.getIndexForRank(keys[i].rank);
@@ -1644,7 +1644,7 @@ int AMPI_Comm_compare(MPI_Comm comm1,MPI_Comm comm2, int *result)
   if(comm1==comm2) *result=MPI_IDENT;
   else{
     int equal=1;
-    CkPupBasicVec<int> ind1, ind2;
+    CkVec<int> ind1, ind2;
     ind1 = getAmpiInstance(comm1)->getIndices();
     ind2 = getAmpiInstance(comm2)->getIndices();
     if(ind1.size()==ind2.size()){
@@ -2912,7 +2912,7 @@ int AMPI_Intercomm_create(MPI_Comm lcomm, int lleader, MPI_Comm pcomm, int rlead
   AMPIAPI("AMPI_Intercomm_create");
   ampi *ptr = getAmpiInstance(lcomm);
   int root = ptr->getIndexForRank(lleader);
-  CkPupBasicVec<int> rvec;
+  CkVec<int> rvec;
   int lrank;
   AMPI_Comm_rank(lcomm,&lrank);
 
@@ -2921,7 +2921,7 @@ int AMPI_Intercomm_create(MPI_Comm lcomm, int lleader, MPI_Comm pcomm, int rlead
     lsize = ptr->getSize();
     int *larr = new int [lsize];
     int *rarr;
-    CkPupBasicVec<int> lvec = ptr->getIndices();
+    CkVec<int> lvec = ptr->getIndices();
     MPI_Status sts;
 
     // local leader exchanges groupStruct with remote leader
@@ -3403,8 +3403,8 @@ int AMPI_Cart_create(MPI_Comm comm_old, int ndims, int *dims, int *periods,
   ampiCommStruct &c = ptr->getCart(*comm_cart);
   c.setndims(ndims);
   
-  CkPupBasicVec<int> dimsv;
-  CkPupBasicVec<int> periodsv;
+  CkVec<int> dimsv;
+  CkVec<int> periodsv;
 
   for (int i = 0; i < ndims; i++) {
     dimsv.push_back(dims[i]);
@@ -3435,8 +3435,8 @@ int AMPI_Graph_create(MPI_Comm comm_old, int nnodes, int *index, int *edges,
   ampiCommStruct &c = ptr->getGraph(*comm_graph);
   c.setnvertices(nnodes);
 
-  CkPupBasicVec<int> index_;
-  CkPupBasicVec<int> edges_;
+  CkVec<int> index_;
+  CkVec<int> edges_;
 
   int i;
   for (i = 0; i < nnodes; i++)
@@ -3489,8 +3489,8 @@ int AMPI_Cart_get(MPI_Comm comm, int maxdims, int *dims, int *periods,
 
   AMPI_Comm_rank(comm, &rank);
 
-  const CkPupBasicVec<int> &dims_ = c.getdims();
-  const CkPupBasicVec<int> &periods_ = c.getperiods();
+  const CkVec<int> &dims_ = c.getdims();
+  const CkVec<int> &periods_ = c.getperiods();
   
   for (i = 0; i < maxdims; i++) {
     dims[i] = dims_[i];
@@ -3512,8 +3512,8 @@ int AMPI_Cart_rank(MPI_Comm comm, int *coords, int *rank) {
 
   ampiCommStruct &c = getAmpiParent()->getCart(comm);
   int ndims = c.getndims();
-  const CkPupBasicVec<int> &dims = c.getdims();
-  const CkPupBasicVec<int> &periods = c.getperiods();
+  const CkVec<int> &dims = c.getdims();
+  const CkVec<int> &periods = c.getperiods();
 
   int prod = 1;
   int r = 0;
@@ -3540,7 +3540,7 @@ int AMPI_Cart_coords(MPI_Comm comm, int rank, int maxdims, int *coords) {
 
   ampiCommStruct &c = getAmpiParent()->getCart(comm);
   int ndims = c.getndims();
-  const CkPupBasicVec<int> &dims = c.getdims();
+  const CkVec<int> &dims = c.getdims();
 
   for (int i = ndims - 1; i >= 0; i--) {
     if (i < maxdims)
@@ -3558,8 +3558,8 @@ int AMPI_Cart_shift(MPI_Comm comm, int direction, int disp, int *rank_source,
   
   ampiCommStruct &c = getAmpiParent()->getCart(comm);
   int ndims = c.getndims();
-  const CkPupBasicVec<int> &dims = c.getdims();
-  const CkPupBasicVec<int> &periods = c.getperiods();
+  const CkVec<int> &dims = c.getdims();
+  const CkVec<int> &periods = c.getperiods();
   int *coords = new int[ndims];
 
   AMPI_Comm_rank(comm, rank_source);
@@ -3589,7 +3589,7 @@ int AMPI_Graphdims_get(MPI_Comm comm, int *nnodes, int *nedges) {
 
   ampiCommStruct &c = getAmpiParent()->getGraph(comm);
   *nnodes = c.getnvertices();
-  const CkPupBasicVec<int> &index = c.getindex();
+  const CkVec<int> &index = c.getindex();
   *nedges = index[(*nnodes) - 1];
   
   return 0;
@@ -3602,8 +3602,8 @@ int AMPI_Graph_get(MPI_Comm comm, int maxindex, int maxedges, int *index,
 
   ampiCommStruct &c = getAmpiParent()->getGraph(comm);
 
-  const CkPupBasicVec<int> &index_ = c.getindex();
-  const CkPupBasicVec<int> &edges_ = c.getedges();
+  const CkVec<int> &index_ = c.getindex();
+  const CkVec<int> &edges_ = c.getedges();
 
   if (maxindex > index_.size())
     maxindex = index_.size();
@@ -3624,7 +3624,7 @@ int AMPI_Graph_neighbors_count(MPI_Comm comm, int rank, int *nneighbors) {
 
   ampiCommStruct &c = getAmpiParent()->getGraph(comm);
 
-  const CkPupBasicVec<int> &index = c.getindex();
+  const CkVec<int> &index = c.getindex();
 
   if ((rank >= index.size()) || (rank < 0))
     CkAbort("MPI_Graph_neighbors_count: rank not within range");
@@ -3643,8 +3643,8 @@ int AMPI_Graph_neighbors(MPI_Comm comm, int rank, int maxneighbors,
   AMPIAPI("AMPI_Graph_neighbors");
 
   ampiCommStruct &c = getAmpiParent()->getGraph(comm);
-  const CkPupBasicVec<int> &index = c.getindex();
-  const CkPupBasicVec<int> &edges = c.getedges();
+  const CkVec<int> &index = c.getindex();
+  const CkVec<int> &edges = c.getedges();
   
   int numneighbors = (rank == 0) ? index[rank] : index[rank] - index[rank - 1];
   if (maxneighbors > numneighbors)
@@ -3756,7 +3756,7 @@ int AMPI_Cart_sub(MPI_Comm comm, int *remain_dims, MPI_Comm *newcomm) {
   AMPI_Comm_rank(comm, &rank);
   ampiCommStruct &c = getAmpiParent()->getCart(comm);
   ndims = c.getndims();
-  const CkPupBasicVec<int> &dims = c.getdims();
+  const CkVec<int> &dims = c.getdims();
   int num_remain_dims = 0;
 
   coords = new int [ndims];
@@ -3776,9 +3776,9 @@ int AMPI_Cart_sub(MPI_Comm comm, int *remain_dims, MPI_Comm *newcomm) {
 
   ampiCommStruct &newc = getAmpiParent()->getCart(*newcomm);
   newc.setndims(num_remain_dims);
-  CkPupBasicVec<int> dimsv;
-  const CkPupBasicVec<int> &periods = c.getperiods();
-  CkPupBasicVec<int> periodsv;
+  CkVec<int> dimsv;
+  const CkVec<int> &periods = c.getperiods();
+  CkVec<int> periodsv;
 
   for (i = 0; i < ndims; i++)
     if (remain_dims[i]) {
