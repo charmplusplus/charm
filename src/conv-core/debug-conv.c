@@ -15,7 +15,7 @@ Orion Sky Lawlor, olawlor@acm.org, 4/10/2001
 CpvStaticDeclare(int, freezeModeFlag);
 CpvStaticDeclare(int, continueFlag);
 CpvStaticDeclare(int, stepFlag);
-CpvStaticDeclare(void *, debugQueue);
+CpvDeclare(void *, debugQueue);
 
 /***************************************************
   The CCS interface to the debugger
