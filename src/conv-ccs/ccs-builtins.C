@@ -221,14 +221,10 @@ static void CpdList_ccs_list_items_txt(char *msg)
       if (p.size()!=bufLen)
 	CmiError("ERROR! Sizing/packing length mismatch for %s list pup function!\n",
 		acc->getPath());
-     //CmiPrintf("pupped the data successfully\n");
     }
     CcsSendReply(bufLen,(void *)buf);
-    //CmiPrintf("sent pupped data successfully\n");
   }
-  //CmiPrintf("before CmiFree msg\n");
   CmiFree(msg);
-  //CmiPrintf("after CmiFree msg\n");
 }
 
 
@@ -268,10 +264,26 @@ public:
   CpdList_localQ() {}
   virtual const char * getPath(void) const {return "converse/localqueue";}
   virtual int getLength(void) const {
-    CmiPrintf("*******Returning fifo length*********\n");
+    /*CmiPrintf("*******Returning fifo length*********\n");*/
     return CdsFifo_Length((CdsFifo)(CpvAccess(CmiLocalQueue)));
   }
   virtual void pup(PUP::er &p, CpdListItemsRequest &req) {
+    void ** messages = CdsFifo_Enumerate(CpvAccess(CmiLocalQueue));
+    int curObj=0;
+    if ((req.lo>=0) && (req.lo< getLength()) && (req.hi<getLength()))
+    {
+       for(curObj=req.lo; curObj<req.hi; curObj++)
+       {
+	beginItem(p,curObj);
+        p.comment("Message Handler Id");
+        int hdlrid = CmiGetHandler(messages[curObj]); 
+        p(hdlrid);
+        p.comment("Message Info"); 
+        int minfo = CmiGetInfo(messages[curObj]); 
+        p(minfo);
+       }
+    }
+      
   }
 };
 
@@ -282,10 +294,11 @@ public:
   CpdList_schedQ() {}
   virtual const char * getPath(void) const {return "converse/schedqueue";}
   virtual int getLength(void) const {
-    CmiPrintf("*******Returning prio q length*********\n");
+    /* CmiPrintf("*******Returning prio q length*********\n");*/
     return (CqsLength((Queue)(CpvAccess(CsdSchedQueue))));
   }
   virtual void pup(PUP::er &p, CpdListItemsRequest &req) {
+    
   }
 };
 
