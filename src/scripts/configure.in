@@ -140,6 +140,26 @@ EOT
 test_cxx "whether namespaces work" "ok" "no"
 AC_DEFINE_UNQUOTED(CMK_NAMESPACES_BROKEN, $fail)
 
+
+cat > $t <<EOT
+#include <typeinfo>
+const char *foo(void) {
+	int x;
+	return typeid(x).name();
+}
+EOT
+test_cxx "whether typeinfo/typeid works" "ok" "no"
+AC_DEFINE_UNQUOTED(CMK_HAS_TYPEINFO, $pass)
+
+cat > $t <<EOT
+namespace foo {
+	int x;
+};
+EOT
+test_cxx "whether namespaces work" "ok" "no"
+AC_DEFINE_UNQUOTED(CMK_NAMESPACES_BROKEN, $fail)
+
+
 #test if we can have multiple delete like this
 cat > $t <<EOT
 class foo {
@@ -216,7 +236,7 @@ fi
 #go get libpthread.a from charm website
 if test $version = net-linux-smp  || test $version = mpi-linux-vmi || test $version = mpi-linux-vmi-pgcc
 then
-  if test ! -f ../lib/libpthread.a
+  if test ! -r ../lib/libpthread.a
   then
     AC_CHECK_PROG(WGET, wget, wget )
     AC_CHECK_PROG(LYNX, lynx, lynx )
@@ -225,25 +245,27 @@ then
     
     CHARMIP='128.174.241.211'
 #    CHARMIP='charm.cs.uiuc.edu'
-    URL="http://${CHARMIP}/distrib/libpthread.a"
+    VERSION=`nm /lib/libc.so.6 | grep "A GLIBC_" | tail -1 | sed -e "s/00000000 A GLIBC_//g"`
+    L="libpthread-$VERSION.a"
+    URL="http://${CHARMIP}/distrib/$L"
     finish=0
-    printf "getting libpthread.a from $URL ..."
+    printf "getting $L from $URL ..."
     if test -n "$WGET"
     then
       printf "(wget) ..."
-      $WGET $URL > /dev/null 2>&1  && mv libpthread.a ../lib && finish=1
+      $WGET $URL > /dev/null 2>&1  && mv $L ../lib && finish=1
     fi
     if test $finish = 0 && test -n "$LYNX"
     then
       printf "(lynx) ..."
-      $LYNX -source $URL > libpthread.a 2>/dev/null && mv libpthread.a ../lib && finish=1
+      $LYNX -source $URL > $L 2>/dev/null && mv $L ../lib && finish=1
     fi
     if test $finish = 0 && test -n "$TELNET" && test -n "$UUDECODE"
     then
       printf "(telnet) ..."
       cat > get_libpthread <<EOT
 #! /bin/sh
-echo "GET /distrib/libpthread.uu 1.0"
+echo "GET /distrib/libpthread-$VERSION.uu 1.0"
 echo
 # exit normally when the telnet session closes.
 trap "exit 0" 13
@@ -252,14 +274,17 @@ while : ; do
  sleep 1
 done
 EOT
-      /bin/sh ./get_libpthread | ($TELNET $CHARMIP 80 > .uulib 2>/dev/null); $UUDECODE .uulib 2>/dev/null && rm -f .uulib && mv libpthread.a ../lib && finish=1
+      /bin/sh ./get_libpthread | ($TELNET $CHARMIP 80 > .uulib 2>/dev/null); $UUDECODE .uulib 2>/dev/null && rm -f .uulib && mv $L ../lib && finish=1
     fi
-    if test $finish = 0 || test ! -f ../lib/libpthread.a
+    ln -s $L ../lib/libpthread.a
+    if test $finish = 0 || test ! -r ../lib/libpthread.a
     then
       /bin/rm -f ../lib/libpthread.a
       echo "failed"
       echo "#####################################################################"
       echo "wget, lynx or telnet must be installed to get libpthread.a from charm website."
+      echo "Alternately, your version of GLIBC ($VERSION) is not yet supported--"
+      echo " contact ppl@cs.uiuc.edu for assistance."
       echo "#####################################################################"
       exit 1
     else
