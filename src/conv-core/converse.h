@@ -707,6 +707,9 @@ CthThread  CthCreate(CthVoidFn, void *, int);
 void       CthResume(CthThread);
 void       CthFree(CthThread);
 
+void       CthSetSuspendable(CthThread, int);
+int        CthIsSuspendable(CthThread);
+
 void       CthSuspend(void);
 void       CthAwaken(CthThread);
 void       CthSetStrategy(CthThread, CthVoidFn, CthThFn);

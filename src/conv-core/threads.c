@@ -119,6 +119,7 @@ typedef struct CthThreadStruct
   int        killed;     /* thread is marked for death */
   char      *data;       /* thread private data */
   int        datasize;   /* size of thread-private data, in bytes */
+  int        suspendable;
 /** addition for tracing */
   int        Event;
 /** End Addition */
@@ -128,6 +129,16 @@ typedef struct CthThreadStruct
   int        stacklen;   /* length of the allocated savedstack >= savedsize */
   qt_t      *savedptr;   /* stack pointer */
 } CthThreadStruct;
+
+void CthSetSuspendable(CthThread t, int val)
+{
+  t->suspendable = val;
+}
+
+int CthIsSuspendable(CthThread t)
+{
+  return t->suspendable;
+}
 
 int CthPackBufSize(CthThread t)
 {
@@ -215,6 +226,7 @@ static void CthThreadInit(CthThread t, CthVoidFn fn, void *arg)
   t->savedsize = 0;
   t->stacklen = 0;
   t->savedptr = 0;
+  t->suspendable = 1;
   CthSetStrategyDefault(t);
 }
 
@@ -287,7 +299,7 @@ void CthInit()
 CthThread CthSelf()
 {
   CthThread result = CthCpvAccess(CthProc)->current;
-  if (result==0) CmiAbort("BARF!");
+  if (result==0) CmiAbort("BARF!\n");
   return result;
 }
 
@@ -366,14 +378,16 @@ void CthSuspend()
 {
   CthThread current, next;
   current = CthCpvAccess(CthProc)->current;
+  if(!(current->suspendable))
+    CmiAbort("trying to suspend main thread!!\n");
   if (current->choosefn == 0) CthNoStrategy();
   /* Pick a thread, discarding dead ones */
   while (1) {
     next = current->choosefn();
     if (next->killed == 0) break;
-    CmiAbort("picked dead thread.");
+    CmiAbort("picked dead thread.\n");
     if (next==current)
-      CmiAbort("Current thread dead, cannot pick new thread.");
+      CmiAbort("Current thread dead, cannot pick new thread.\n");
     CthFreeNow(next);
   }
   CthResume(next);
@@ -383,7 +397,7 @@ void CthAwaken(th)
 CthThread th;
 {
   if (th->awakenfn == 0) CthNoStrategy();
-  if (th->insched) CmiAbort("CthAwaken: thread already awake.");
+  if (th->insched) CmiAbort("CthAwaken: thread already awake.\n");
   th->awakenfn(th);
   th->insched = 1;
 }
@@ -455,6 +469,7 @@ struct CthThreadStruct
   int        autoyield_blocks;
   char      *data;
   int        datasize;
+  int        suspendable;
 /** addition for tracing */
   int        Event;
 /** End Addition */
@@ -464,6 +479,16 @@ struct CthThreadStruct
   qt_t      *stack;
   qt_t      *stackp;
 };
+
+void CthSetSuspendable(CthThread t, int val)
+{
+  t->suspendable = val;
+}
+
+int CthIsSuspendable(CthThread t)
+{
+  return t->suspendable;
+}
 
 /** addition for tracing */
 void setEvent(CthThread t, int event)
@@ -503,6 +528,7 @@ CthThread t;
   t->qnext=0;
   t->autoyield_enable = 0;
   t->autoyield_blocks = 0;
+  t->suspendable = 1;
 }
 
 void CthFixData(t)
@@ -633,6 +659,8 @@ void CthSuspend()
 #if CMK_WEB_MODE
   void usageStop();
 #endif
+  if(!(CthCpvAccess(CthCurrent)->suspendable))
+    CmiAbort("trying to suspend main thread!!\n");
   if (CthCpvAccess(CthCurrent)->choosefn == 0) CthNoStrategy();
   next = CthCpvAccess(CthCurrent)->choosefn();
   /** addition for tracing */
