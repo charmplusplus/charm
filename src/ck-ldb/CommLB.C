@@ -164,7 +164,7 @@ CLBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* stats, int count)
       x->pe = pe;
       maxh.insert(x);
     }
-    //    CkPrintf("OBJ: %d = %5.3lf\n",pe,load_pe);
+    CkPrintf("LOAD on %d = %5.3lf\n",pe,load_pe);
   }
 
   npe = count;
@@ -250,12 +250,12 @@ CLBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* stats, int count)
     }
   }
   //  CkPrintf("OBJ: After\n"); 
-
+  /*
   for(pe=0;pe<count;pe++)
     for(obj=0;obj<nobj;obj++)
-      //      if(alloc_array[pe][obj] > 0)
-	//	CkPrintf("OBJ: %d , %d , %5.3lf\n",pe,translate[obj].oid.id[0],alloc_array[pe][obj]);
- 
+      if(alloc_array[pe][obj] > 0)
+	CkPrintf("OBJ: %d , %d , %5.3lf\n",pe,translate[obj].oid.id[0],alloc_array[pe][obj]);
+  */
   int migrate_count = migrateInfo.size();
   CLBMigrateMsg* msg = new(&migrate_count,1) CLBMigrateMsg;
   msg->n_moves = migrate_count;
