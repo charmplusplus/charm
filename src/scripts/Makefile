@@ -59,7 +59,7 @@ SEQCHARMC=../bin/charmc -seq $(CHARMOPTS)
 #
 ###############################################################################
 
-ALLHEADERS=charm++.h ckstream.h charm.h cpthreads.h converse.h conv-trace.h conv-mach.h simplemsg.h sm.h trace.h pvmc.h pvm3.h sdag.h CDep.h CCounter.h CMsgBuffer.h CWhenTrigger.h TList.h idl.h ckarray.h tempo.h
+ALLHEADERS=charm++.h ckstream.h charm.h cpthreads.h converse.h conv-trace.h conv-mach.h simplemsg.h sm.h trace.h pvmc.h pvm3.h sdag.h CDep.h CCounter.h CMsgBuffer.h CWhenTrigger.h TList.h idl.h ckarray.h tempo.h waitqd.h
 
 ALLINTERFACES=idl.ci
 
@@ -125,7 +125,8 @@ dirs+sources:
 CVHEADERS=converse.h conv-mach.h conv-mach.csh \
           ../include/CkFutures.decl.h CkFutures.def.h \
           ../include/CkArray.decl.h CkArray.def.h \
-          ../include/tempo.decl.h tempo.def.h
+          ../include/tempo.decl.h tempo.def.h \
+          ../include/waitqd.decl.h waitqd.def.h
 
 TRACELIBS=libtrace-none.a libtrace-projections.a
 
@@ -221,12 +222,12 @@ libldb-test.o: cldb.test.c $(CVHEADERS)
 ###############################################################################
 
 CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h trace.h \
-          ckfutures.h ckarray.h tempo.h $(CVHEADERS)
+          ckfutures.h ckarray.h tempo.h waitqd.h $(CVHEADERS)
 
 CK_LIBS_CORE=libck.a
 
 LIBCK_CORE=init.o register.o qd.o ck.o main.o msgalloc.o ckfutures.o \
-           ckarray.o tempo.o
+           ckarray.o tempo.o waitqd.o
 
 charmlibs: converse $(CK_LIBS_CORE)
 	cd libs; make charmlibs OPTS='$(OPTS)'
@@ -257,6 +258,12 @@ CkFutures.decl.h CkFutures.def.h : ckfutures.ci charmxi
 tempo.decl.h tempo.def.h : tempo.ci charmxi
 	$(CHARMC) tempo.ci
 
+../include/waitqd.decl.h : waitqd.decl.h
+	/bin/cp waitqd.decl.h ../include
+
+waitqd.decl.h waitqd.def.h : waitqd.ci charmxi
+	$(CHARMC) waitqd.ci
+
 CkArray.decl.h CkArray.def.h : ckarray.ci charmxi
 	$(CHARMC) ckarray.ci
 
@@ -274,6 +281,9 @@ ckfutures.o: ckfutures.C $(CKHEADERS)
 
 tempo.o: tempo.C $(CKHEADERS)
 	$(CHARMC) -o tempo.o tempo.C
+
+waitqd.o: waitqd.C $(CKHEADERS)
+	$(CHARMC) -o waitqd.o waitqd.C
 
 ckarray.o: ckarray.C $(CKHEADERS)
 	$(CHARMC) -o ckarray.o ckarray.C
