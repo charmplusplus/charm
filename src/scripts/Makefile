@@ -128,7 +128,7 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
 
 # The .c files are there to be #included by clients whole
 # This is a bit unusual, but makes client linking simpler.
-UTILHEADERS=pup.h pupf.h pup_c.h ckhashtable.h cklists.h \
+UTILHEADERS=pup.h pupf.h pup_c.h pup_stl.h ckhashtable.h cklists.h \
 	ckvector3d.h conv-lists.h \
 	sockRoutines.h sockRoutines.c
 
