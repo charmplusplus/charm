@@ -6,7 +6,6 @@
 //#define _PAIRCALC_DEBUG_
 
 #define _PAIRCALC_FIRSTPHASE_STREAM_
-#define _PAIRCALC_USE_ZGEMM_
 
 PairCalculator::PairCalculator(CkMigrateMessage *m) { }
 	
@@ -479,7 +478,7 @@ PairCalculator::acceptResult(int size, double *matrix, int rowNum)
 
   // replace with zgemm mynewData=inDataLeft * matrix
   // convert matrix to complex
-#if _PAIRCALC_USE_ZGEMM_
+#ifdef _PAIRCALC_USE_ZGEMM_
   int m_in=grainSize;
   int n_in=N;
   int k_in=grainSize;
@@ -487,43 +486,76 @@ PairCalculator::acceptResult(int size, double *matrix, int rowNum)
   complex *amatrix=new complex[matrixSize];
   int incx=1;
   int incy=2;
-  double *localMatrix=matrix+index;
-/*
-  if(thisIndex.w==0 && thisIndex.x==0 && thisIndex.y==0 && thisIndex.z==0){
-      FILE *fp = fopen("dcopytest1.out", "w");
-      for(int i=0; i<grainSize; i++)
-	  for(int j=0; j<grainSize; j++)
-	      fprintf(fp, "[%d %d]: %2.5g\n", i, j, localMatrix[i*S+j]);
-      fclose(fp);
-  }
-*/
-  for(int i=0;i<grainSize;i++){
-    DCOPY(&grainSize,localMatrix+i*S,&incx,(double *) (amatrix+i*grainSize),&incy);
-  }
-
-/*
-  if(thisIndex.w==0 && thisIndex.x==0 && thisIndex.y==0 && thisIndex.z==0){
-      FILE *fp = fopen("dcopytest2.out", "w");
-      for(int i=0;i<grainSize; i++)
-	  for(int j=0; j<grainSize; j++)
-	      fprintf(fp, "[%d %d]: %2.5g\n", i, j, amatrix[i*grainSize+j].re);
-      fclose(fp);
-  }
-*/
   complex alpha=complex(1.0,0.0);//multiplicative identity 
   complex beta=complex(0.0,0.0);
   char transform='N';
+  char transformT='T';
+  complex *leftptr = inDataLeft[0];
 
-  ZGEMM(&transform, &transform, &n_in, &m_in, &k_in, &alpha, &(inDataLeft[0][0]), &n_in, &(amatrix[0]), &k_in, &beta, &(mynewData[0]), &n_in);
+
+  index = thisIndex.x*S + thisIndex.y;
+  memset(amatrix, 0, matrixSize*sizeof(complex));
+  double *localMatrix;
+  double * outMatrix;
+  for(int i=0;i<grainSize;i++){
+    localMatrix = (matrix+index+i*S);
+    outMatrix   = (double*)(amatrix+i*grainSize);
+    DCOPY(&grainSize,localMatrix,&incx, outMatrix,&incy);
+  }
+
+  for (int i = 0; i < grainSize; i++) {
+    for (int j = 0; j < grainSize; j++){ 
+      m = matrix[index + j + i*S];
+      if(m!=amatrix[i*grainSize+j].re){CkPrintf("Dcopy broken in back path\n");}
+    }
+  }
+
+
+
+#define _MANUAL_OFF_
+#ifndef _MANUAL_
+
+
+  ZGEMM(&transform, &transformT, &n_in, &m_in, &k_in, &alpha, &(inDataLeft[0][0]), &n_in, 
+        &(amatrix[0]), &k_in, &beta, &(mynewData[0]), &n_in);
 
   if(symmetric && thisIndex.x != thisIndex.y){
     index = thisIndex.x*S + thisIndex.y;
     localMatrix=matrix+index;
     for(int i=0;i<grainSize;i++)
       DCOPY(&grainSize,localMatrix+i*S,&incx,(double *) (amatrix+i*grainSize),&incy);
-    ZGEMM(&transform, &transform, &n_in, &m_in, &k_in, &alpha, &(inDataRight[0][0]), &n_in, &(amatrix[0]), &k_in, &beta, &(othernewData[0]), &n_in);
+      ZGEMM(&transform, &transform, &n_in, &m_in, &k_in, &alpha, &(inDataRight[0][0]), &n_in, 
+            &(amatrix[0]), &k_in, &beta, &(othernewData[0]), &n_in);
   }
   delete [] amatrix;
+
+
+#else
+  
+// manual calculation
+  memset(mynewData, 0, N*grainSize*sizeof(complex));
+  index = thisIndex.x*S + thisIndex.y;
+  for (int i = 0; i < grainSize; i++) {
+    for (int j = 0; j < grainSize; j++){ 
+      m = matrix[index + j + i*S];
+      for (int p = 0; p < N; p++){
+	mynewData[p + i*N] += leftptr[j*N + p] * m;
+      }
+    }
+  }
+
+#endif
+
+//  if(thisIndex.w==0 && thisIndex.x==0 && thisIndex.y==0 && thisIndex.z==0){
+//    CkPrintf("Index = %d, S = %d, N = %d, grainSize = %d, \n", index, S, N, grainSize);
+//      FILE *fp = fopen("zgemmtest2.out", "w");
+//      for(int i=0;i<grainSize; i++)
+//	  for(int j=0; j<N; j++)
+//	      fprintf(fp, "[%d %d]: %2.5g %2.5g\n", i, j, mynewData[i*N+j].re,  mynewData[i*N+j].im);
+//      fclose(fp);
+//  }
+
+
 #else
 
 #ifndef _PAIRCALC_SECONDPHASE_BLOCKING_
