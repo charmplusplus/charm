@@ -957,8 +957,8 @@ int node;
   bit = 1;
   while (1) {
     int neighbour = node ^ bit;
-    if (neighbour < Cmi_numpes) count++;
-    bit<<1; if (bit > Cmi_numpes) break;
+    if (neighbour < CpvAccess(Cmi_numpes)) count++;
+    bit<<1; if (bit > CpvAccess(Cmi_numpes)) break;
   }
   return count;
 }
@@ -971,8 +971,8 @@ int node, *neighbours;
   bit = 1;
   while (1) {
     int neighbour = node ^ bit;
-    if (neighbour < Cmi_numpes) neighbours[count++] = neighbour;
-    bit<<1; if (bit > Cmi_numpes) break;
+    if (neighbour < CpvAccess(Cmi_numpes)) neighbours[count++] = neighbour;
+    bit<<1; if (bit > CpvAccess(Cmi_numpes)) break;
   }
   return count;
 }
@@ -985,8 +985,8 @@ int node, nbr;
   bit = 1;
   while (1) {
     int neighbour = node ^ bit;
-    if (neighbour < Cmi_numpes) { if (nbr==neighbour) return count; count++; }
-    bit<<=1; if (bit > Cmi_numpes) break;
+    if (neighbour < CpvAccess(Cmi_numpes)) { if (nbr==neighbour) return count; count++; }
+    bit<<=1; if (bit > CpvAccess(Cmi_numpes)) break;
   }
   return(-1);
 }
