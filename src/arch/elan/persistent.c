@@ -193,7 +193,7 @@ void CmiPersistentInit()
 }
 
 
-void CmiClearPersistent()
+void CmiDestoryAllPersistent()
 {
   int i;
   for (i=0; i<TABLESIZE; i++) {
