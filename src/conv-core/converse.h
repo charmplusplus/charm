@@ -922,7 +922,8 @@ typedef struct CmmTableStruct *CmmTable;
 
 #define CmmWildCard (-1)
 
-CmmTable CmmPup(pup_er, CmmTable);
+typedef void (*CmmPupMessageFn)(pup_er p,void **msg);
+CmmTable CmmPup(pup_er p, CmmTable t, CmmPupMessageFn msgpup);
 
 CmmTable   CmmNew();
 void       CmmFree(CmmTable t);

@@ -803,6 +803,10 @@ MBlockChunk::print(void)
   CkPrintf("--------------------------------------------------\n",thisIndex);
 }  
   
+static void cmm_pup_mblock_message(pup_er p,void **msg) {
+	CkPupMessage(*(PUP::er *)p,msg,1);
+	if (pup_isDeleting(p)) delete (MBlockDataMsg *)*msg;
+}
 
 void
 MBlockChunk::pup(PUP::er &p)
@@ -811,7 +815,7 @@ MBlockChunk::pup(PUP::er &p)
   ArrayElement1D::pup(p);
 
   threads.pup(p);
-  messages=CmmPup(&p,messages);
+  messages=CmmPup(&p,messages,cmm_pup_mblock_message);
 
   if(p.isUnpacking())
     b = new block();

@@ -727,6 +727,11 @@ void ampi::findParent(bool forMigration) {
 	if (thread==NULL) CkAbort("AMPI can't find its thread!");
 }
 
+static void cmm_pup_ampi_message(pup_er p,void **msg) {
+	CkPupMessage(*(PUP::er *)p,msg,1);
+	if (pup_isDeleting(p)) delete (AmpiMsg *)*msg;
+}
+
 void ampi::pup(PUP::er &p)
 {
   if(!p.isUserlevel())
@@ -738,7 +743,7 @@ void ampi::pup(PUP::er &p)
   p|tmpVec;
   p|remoteProxy;
 
-  msgs=CmmPup((pup_er)&p,msgs);
+  msgs=CmmPup((pup_er)&p,msgs,cmm_pup_ampi_message);
 
   p|seqEntries;
   if(p.isUnpacking())

@@ -36,15 +36,8 @@ CmmTable CmmNew()
 void CmmFree(t)
 CmmTable t;
 {
-  CmmEntry n,e;
   if (t==NULL) return;
-  e = t->first;
-  while (e) {
-    CmiFree(e->msg);
-    n = e->next;
-    CmiFree(e);
-    e = n;
-  }
+  if (t->first!=NULL) CmiAbort("Cannot free a non-empty message table!");
   CmiFree(t);
 }
 
@@ -121,27 +114,27 @@ CmmTable t;
   return n;
 }
 
-#define MSGSIZE(msg) (((int*)((char*)(msg)-(2*sizeof(int))))[0])
 
-CmmTable CmmPup(pup_er p, CmmTable t)
+CmmTable CmmPup(pup_er p, CmmTable t, CmmPupMessageFn msgpup)
 {
   int nentries;
 
   if(!pup_isUnpacking(p))
   {
-    CmmEntry e = t->first;
+    CmmEntry e = t->first, doomed;
     nentries = CmmEntries(t);
     pup_int(p, &nentries);
     while(e) {
-      /* messages are always allocated with CmiAlloc */
-      int msize = MSGSIZE(e->msg);
       pup_int(p, &(e->ntags));
-      pup_int(p, &msize);
       pup_ints(p, e->tags, e->ntags);
-      pup_bytes(p, e->msg, msize);
+      msgpup(p,&e->msg);
+      doomed=e;
       e = e->next;
+      if (pup_isDeleting(p)) CmiFree(doomed);
     }
-    if(pup_isDeleting(p)) {
+    if(pup_isDeleting(p)) 
+    { /* We've now deleted all the links */
+      t->first=NULL;
       CmmFree(t);
       return 0;
     } else
@@ -154,14 +147,12 @@ CmmTable CmmPup(pup_er p, CmmTable t)
     pup_int(p, &nentries);
     for(i=0;i<nentries;i++)
     {
-      int ntags, msize, *tags;
+      int ntags, *tags;
       void *msg;
       pup_int(p, &ntags);
-      pup_int(p, &msize);
       tags = (int*) malloc(ntags*sizeof(int));
       pup_ints(p, tags, ntags);
-      msg = CmiAlloc(msize);
-      pup_bytes(p, msg, msize);
+      msgpup(p,&msg);
       CmmPut(t, ntags, tags, msg);
       free(tags);
     }
