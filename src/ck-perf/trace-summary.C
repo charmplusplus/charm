@@ -7,11 +7,12 @@
 
 #include "trace-summary.h"
 
+#define DEBUGF(x)  // CmiPrintf x
+
 #define VER   3.0
 
-CpvDeclare(Trace*, _trace);
-CpvDeclare(int, CtrLogBufSize);
-CpvStaticDeclare(LogPool*, _logPool);
+CpvStaticDeclare(Trace*, _trace);
+CpvStaticDeclare(SumLogPool*, _logPool);
 CpvStaticDeclare(char*, pgmName);
 static int _numEvents = 0;
 static int _threadMsg, _threadChare, _threadEP;
@@ -20,92 +21,14 @@ static int _unpackMsg, _unpackChare, _unpackEP;
 CpvDeclare(double, binSize);
 CpvDeclare(double, version);
 
-extern "C" 
-void traceInit(char **argv)
+void _createTracesummary()
 {
-  char *tmpStr;
-  traceCommonInit(argv,1);
+  DEBUGF(("%d createTraceSummary\n", CkMyPe()));
   CpvInitialize(Trace*, _trace);
-  CpvInitialize(LogPool*, _logPool);
-  CpvInitialize(int, CtrLogBufSize);
-  CpvInitialize(char*, pgmName);
-  CpvInitialize(double, binSize);
-  CpvInitialize(double, version);
-  CpvAccess(_trace) = new TraceProjections();
-  CpvAccess(pgmName) = (char *) malloc(strlen(argv[0])+1);
-  _MEMCHECK(CpvAccess(pgmName));
-  strcpy(CpvAccess(pgmName), argv[0]);
-  CpvAccess(CtrLogBufSize) = LogBufSize;
-  CpvAccess(binSize) = BIN_SIZE;
-  CpvAccess(version) = VER;
-  CmiGetArgInt(argv,"+logsize",&CpvAccess(CtrLogBufSize));
-  if (CmiGetArgString(argv,"+binsize",&tmpStr))
-  	sscanf(tmpStr,"%lf",&CpvAccess(binSize));
-  if (CmiGetArgString(argv,"+version",&tmpStr))
-  	sscanf(tmpStr,"%lf",&CpvAccess(version));
-  CpvAccess(_logPool) = new LogPool(CpvAccess(pgmName));
+  CpvAccess(_trace) = new  TraceSummary();
+  CpvAccess(_traces)->addTrace(CpvAccess(_trace));
 }
 
-extern "C"
-void traceBeginIdle(void)
-{
-}
-
-extern "C"
-void traceEndIdle(void)
-{
-}
-
-extern "C"
-void traceResume(void)
-{
-  CpvAccess(_trace)->beginExecute(0);
-}
-
-extern "C"
-void traceSuspend(void)
-{
-  CpvAccess(_trace)->endExecute();
-}
-
-extern "C"
-void traceAwaken(CthThread t)
-{
-}
-
-extern "C"
-void traceUserEvent(int e)
-{
-}
-
-extern "C"
-int traceRegisterUserEvent(const char*)
-{
-  return 0;
-}
-
-extern "C"
-void traceWriteSts(void)
-{
-  if(CmiMyPe()==0)
-      CpvAccess(_logPool)->writeSts();
-}
-
-extern "C"
-void traceClose(void)
-{
-  CpvAccess(_trace)->endComputation();
-  if(CmiMyPe()==0)
-      CpvAccess(_logPool)->writeSts();
-  // destructor call the write()
-  delete CpvAccess(_logPool);
-}
-
-extern "C"
-void traceClearEps(void)
-{
-  CpvAccess(_logPool)->clearEps();
-}
 
 extern "C" 
 void CkSummary_StartPhase(int phase)
@@ -139,7 +62,7 @@ PhaseTable::PhaseTable(int n) : numPhase(n)
   phaseCalled = 0;
 }
 
-void LogPool::addEventType(int eventType, double time)
+void SumLogPool::addEventType(int eventType, double time)
 {
    if (eventType <0 || eventType >= MAX_MARKS) {
        CkPrintf("Invalid event type %d!\n", eventType);
@@ -152,12 +75,12 @@ void LogPool::addEventType(int eventType, double time)
    markcount ++;
 }
 
-LogPool::LogPool(char *pgm) : phaseTab(MAX_PHASES) 
+SumLogPool::SumLogPool(char *pgm) : phaseTab(MAX_PHASES) 
 {
     int i;
     poolSize = CpvAccess(CtrLogBufSize);
     if (poolSize % 2) poolSize++;	// make sure it is even
-    pool = new LogEntry[poolSize];
+    pool = new SumLogEntry[poolSize];
     _MEMCHECK(pool);
     numEntries = 0;
     char pestr[10];
@@ -172,7 +95,7 @@ LogPool::LogPool(char *pgm) : phaseTab(MAX_PHASES)
     } while (!fp && errno == EINTR);
     delete[] fname;
     if(!fp) {
-      CmiAbort("Cannot open Projections Trace File for writing...\n");
+      CmiAbort("Cannot open Summary Trace File for writing...\n");
     }
 
     epSize = MAX_ENTRIES;
@@ -190,7 +113,7 @@ LogPool::LogPool(char *pgm) : phaseTab(MAX_PHASES)
     markcount = 0;
 }
 
-void LogPool::write(void) 
+void SumLogPool::write(void) 
 {
   int i;
   unsigned int j;
@@ -229,10 +152,10 @@ void LogPool::write(void)
   }
 }
 
-void LogPool::writeSts(void)
+void SumLogPool::writeSts(void)
 {
   char *fname = new char[strlen(CpvAccess(pgmName))+strlen(".sts")+1];
-  sprintf(fname, "%s.sts", CpvAccess(pgmName));
+  sprintf(fname, "%s.sum.sts", CpvAccess(pgmName));
   FILE *sts = fopen(fname, "w+");
   //CmiPrintf("File: %s \n", fname);
   if(sts==0)
@@ -259,14 +182,14 @@ void LogPool::writeSts(void)
   fclose(sts);
 }
 
-void LogPool::add(double time, int pe) 
+void SumLogPool::add(double time, int pe) 
 {
   new (&pool[numEntries++])
-  LogEntry(time, pe);
+  SumLogEntry(time, pe);
   if(poolSize==numEntries) shrink();
 }
 
-void LogPool::setEp(int epidx, double time) 
+void SumLogPool::setEp(int epidx, double time) 
 {
   if (epidx >= epSize) {
         CmiAbort("Too many entry points!!\n");
@@ -278,7 +201,7 @@ void LogPool::setEp(int epidx, double time)
   phaseTab.setEp(epidx, time);
 }
 
-void LogPool::shrink(void)
+void SumLogPool::shrink(void)
 {
   int entries = numEntries/2;
   for (int i=0; i<entries; i++)
@@ -291,21 +214,73 @@ void LogPool::shrink(void)
 //CkPrintf("Shrinked binsize: %f entries:%d!!!!\n", CpvAccess(binSize), numEntries);
 }
 
-void LogEntry::write(FILE* fp)
+void SumLogEntry::write(FILE* fp)
 {
   int per = (int)(time * 100.0 / CpvAccess(binSize));
   fprintf(fp, "%4d", per);
 }
 
-void TraceProjections::userEvent(int e)
+void TraceSummary::traceInit(char **argv)
+{
+  char *tmpStr;
+  CpvInitialize(SumLogPool*, _logPool);
+  CpvInitialize(char*, pgmName);
+  CpvInitialize(double, binSize);
+  CpvInitialize(double, version);
+  CpvAccess(pgmName) = (char *) malloc(strlen(argv[0])+1);
+  _MEMCHECK(CpvAccess(pgmName));
+  strcpy(CpvAccess(pgmName), argv[0]);
+  CpvAccess(binSize) = BIN_SIZE;
+  CpvAccess(version) = VER;
+  if (CmiGetArgString(argv,"+binsize",&tmpStr))
+  	sscanf(tmpStr,"%lf",&CpvAccess(binSize));
+  if (CmiGetArgString(argv,"+version",&tmpStr))
+  	sscanf(tmpStr,"%lf",&CpvAccess(version));
+  CpvAccess(_logPool) = new SumLogPool(CpvAccess(pgmName));
+}
+
+int TraceSummary::traceRegisterUserEvent(const char*)
+{
+  return 0;
+}
+
+void TraceSummary::traceClearEps(void)
+{
+  CpvAccess(_logPool)->clearEps();
+}
+
+void TraceSummary::traceWriteSts(void)
+{
+  if(CmiMyPe()==0)
+      CpvAccess(_logPool)->writeSts();
+}
+
+void TraceSummary::traceClose(void)
+{
+  CpvAccess(_trace)->endComputation();
+  if(CmiMyPe()==0)
+      CpvAccess(_logPool)->writeSts();
+  // destructor call the write()
+  delete CpvAccess(_logPool);
+}
+
+void TraceSummary::traceBegin(void)
 {
 }
 
-void TraceProjections::creation(envelope *e, int num)
+void TraceSummary::traceEnd(void)
 {
 }
 
-void TraceProjections::beginExecute(envelope *e)
+void TraceSummary::userEvent(int e)
+{
+}
+
+void TraceSummary::creation(envelope *e, int num)
+{
+}
+
+void TraceSummary::beginExecute(envelope *e)
 {
   // no message means thread execution
   if (e==NULL) {
@@ -316,7 +291,7 @@ void TraceProjections::beginExecute(envelope *e)
   }  
 }
 
-void TraceProjections::beginExecute(int event,int msgType,int ep,int srcPe)
+void TraceSummary::beginExecute(int event,int msgType,int ep,int srcPe)
 {
   execEp=ep;
   double t = CmiWallTimer();
@@ -333,7 +308,7 @@ void TraceProjections::beginExecute(int event,int msgType,int ep,int srcPe)
   }
 }
 
-void TraceProjections::endExecute(void)
+void TraceSummary::endExecute(void)
 {
 //  if (!flag) return;
   double t = CmiWallTimer();
@@ -356,43 +331,43 @@ void TraceProjections::endExecute(void)
   bin += t - ts;
 }
 
-void TraceProjections::beginIdle(void)
+void TraceSummary::beginIdle(void)
 {
 }
 
-void TraceProjections::endIdle(void)
+void TraceSummary::endIdle(void)
 {
 }
 
-void TraceProjections::beginPack(void)
+void TraceSummary::beginPack(void)
 {
     packstart = CmiWallTimer();
 }
 
-void TraceProjections::endPack(void)
+void TraceSummary::endPack(void)
 {
     CpvAccess(_logPool)->setEp(_packEP, CmiWallTimer() - packstart);
 }
 
-void TraceProjections::beginUnpack(void)
+void TraceSummary::beginUnpack(void)
 {
     unpackstart = CmiWallTimer();
 }
 
-void TraceProjections::endUnpack(void)
+void TraceSummary::endUnpack(void)
 {
     CpvAccess(_logPool)->setEp(_unpackEP, CmiWallTimer()-unpackstart);
 }
 
-void TraceProjections::beginCharmInit(void) {}
+void TraceSummary::beginCharmInit(void) {}
 
-void TraceProjections::endCharmInit(void) {}
+void TraceSummary::endCharmInit(void) {}
 
-void TraceProjections::enqueue(envelope *) {}
+void TraceSummary::enqueue(envelope *) {}
 
-void TraceProjections::dequeue(envelope *) {}
+void TraceSummary::dequeue(envelope *) {}
 
-void TraceProjections::beginComputation(void)
+void TraceSummary::beginComputation(void)
 {
   if(CmiMyRank()==0) {
     _threadMsg = CkRegisterMsg("dummy_thread_msg", 0, 0, 0, 0);
@@ -409,7 +384,7 @@ void TraceProjections::beginComputation(void)
   }
 }
 
-void TraceProjections::endComputation(void)
+void TraceSummary::endComputation(void)
 {
   if (msgNum==0) {
 //CmiPrintf("Add at last: %d pe:%d time:%f msg:%d\n", index, CmiMyPe(), bin, msgNum);

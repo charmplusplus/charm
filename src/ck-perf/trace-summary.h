@@ -14,8 +14,6 @@
 #include "trace.h"
 #include "ck.h"
 
-#define LogBufSize      10000
-
 // in second
 #define  BIN_SIZE	0.001
 
@@ -44,7 +42,7 @@
 
 CpvExtern(int, CtrLogBufSize);
 
-class LogEntry {
+class SumLogEntry {
   public:
     void *operator new(size_t s) {void*ret=malloc(s);_MEMCHECK(ret);return ret;}
     void *operator new(size_t, void *ptr) { return ptr; }
@@ -52,8 +50,8 @@ class LogEntry {
 #ifdef WIN32
     void operator delete(void *, void *) { }
 #endif
-    LogEntry() {}
-    LogEntry(double t, int p=0) { 
+    SumLogEntry() {}
+    SumLogEntry(double t, int p=0) { 
       time = t; pe = p;
     }
     double getTime() { return time; }
@@ -133,11 +131,11 @@ class PhaseTable {
     }
 };
 
-class LogPool {
+class SumLogPool {
   private:
     UInt poolSize;
     UInt numEntries;
-    LogEntry *pool;
+    SumLogEntry *pool;
     FILE *fp ;
 
     double  *epTime;
@@ -151,8 +149,8 @@ class LogPool {
     // for phases
     PhaseTable phaseTab;
   public:
-    LogPool(char *pgm);
-    ~LogPool() {
+    SumLogPool(char *pgm);
+    ~SumLogPool() {
       write();
       fclose(fp);
       // free memory for mark
@@ -182,7 +180,7 @@ class LogPool {
     void startPhase(int phase) { phaseTab.startPhase(phase); }
 };
 
-class TraceProjections : public Trace {
+class TraceSummary : public Trace {
     int curevent;
     int execEvent;
     int execEp;
@@ -193,7 +191,7 @@ class TraceProjections : public Trace {
     double bin;
     int msgNum;
   public:
-    TraceProjections() { curevent=0; msgNum=0; binStart=0.0; bin=0.0;}
+    TraceSummary() { curevent=0; msgNum=0; binStart=0.0; bin=0.0;}
     void userEvent(int e);
     void creation(envelope *e, int num=1);
     void beginExecute(envelope *e);
@@ -211,6 +209,14 @@ class TraceProjections : public Trace {
     void dequeue(envelope *e);
     void beginComputation(void);
     void endComputation(void);
+
+    void traceInit(char **argv);
+    int traceRegisterUserEvent(const char*);
+    void traceClearEps();
+    void traceWriteSts();
+    void traceClose();
+    void traceBegin();
+    void traceEnd();
 };
 
 #endif

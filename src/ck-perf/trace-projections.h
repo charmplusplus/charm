@@ -80,6 +80,7 @@ class TraceProjections : public Trace {
     int execEp;
     int execPe;
     int isIdle;
+    int cancel_beginIdle, cancel_endIdle;
   public:
     TraceProjections() { curevent=0; isIdle=0; }
     void userEvent(int e);
@@ -99,6 +100,14 @@ class TraceProjections : public Trace {
     void dequeue(envelope *e);
     void beginComputation(void);
     void endComputation(void);
+
+    void traceInit(char **argv);
+    int traceRegisterUserEvent(const char*);
+    void traceClearEps();
+    void traceWriteSts();
+    void traceClose();
+    void traceBegin();
+    void traceEnd();
 };
 
 #endif

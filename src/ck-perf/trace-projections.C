@@ -7,16 +7,14 @@
 
 #include "trace-projections.h"
 
-CpvDeclare(Trace*, _trace);
-CpvDeclare(int, CtrLogBufSize);
+#define DEBUGF(x)          // CmiPrintf x
+
+CpvStaticDeclare(Trace*, _trace);
 CpvStaticDeclare(LogPool*, _logPool);
-CpvStaticDeclare(char*, traceRoot);
 CtvStaticDeclare(int,curThreadEvent);
 
 static int _numEvents = 0;
-#ifdef CMK_OPTIMIZE
 static int warned = 0;
-#endif
 static int _threadMsg, _threadChare, _threadEP;
 
 #define OPTIMIZED_VERSION 	\
@@ -38,117 +36,24 @@ On T3E, we need to have file number control by open/close files only when needed
 #define CLOSE_LOG
 #endif
 
-extern "C" 
-void traceInit(char **argv)
+void _createTraceprojections()
 {
-  traceCommonInit(argv,1);
+  DEBUGF(("%d createTraceProjections\n", CkMyPe()));
   CpvInitialize(Trace*, _trace);
-  CpvInitialize(LogPool*, _logPool);
-  CpvInitialize(int, CtrLogBufSize);
-  CpvInitialize(char*, traceRoot);
-  CtvInitialize(int,curThreadEvent);
-  CtvAccess(curThreadEvent)=0;
-  CpvAccess(_trace) = new TraceProjections();
-  CpvAccess(CtrLogBufSize) = 10000;
-  CmiGetArgInt(argv,"+logsize",&CpvAccess(CtrLogBufSize));
-  int binary = CmiGetArgFlag(argv,"+binary-trace");
-  char *root;
-  if (CmiGetArgString(argv, "+trace-root", &root)) {
-    int i;
-    for (i=strlen(argv[0])-1; i>=0; i--) if (argv[0][i] == '/') break;
-    i++;
-    CpvAccess(traceRoot) = (char *)malloc(strlen(argv[0]+i) + strlen(root) + 2);
-    _MEMCHECK(CpvAccess(traceRoot));
-    strcpy(CpvAccess(traceRoot), root);
-    strcat(CpvAccess(traceRoot), "/");
-    strcat(CpvAccess(traceRoot), argv[0]+i);
-  }
-  else {
-    CpvAccess(traceRoot) = (char *) malloc(strlen(argv[0])+1);
-    _MEMCHECK(CpvAccess(traceRoot));
-    strcpy(CpvAccess(traceRoot), argv[0]);
-  }
-  CpvAccess(_logPool) = new LogPool(CpvAccess(traceRoot),binary);
+  CpvAccess(_trace) = new  TraceProjections();
+  CpvAccess(_traces)->addTrace(CpvAccess(_trace));
 }
 
 extern "C"
-void traceBeginIdle(void)
+void traceProjectionsBeginIdle(void)
 {
   CpvAccess(_trace)->beginIdle();
 }
 
 extern "C"
-void traceEndIdle(void)
+void traceProjectionsEndIdle(void)
 {
   CpvAccess(_trace)->endIdle();
-}
-
-extern "C"
-void traceResume(void)
-{
-  CpvAccess(_trace)->beginExecute(0);
-}
-
-extern "C"
-void traceSuspend(void)
-{
-  CpvAccess(_trace)->endExecute();
-}
-
-extern "C"
-void traceAwaken(CthThread t)
-{
-  CpvAccess(_trace)->creation(0);
-}
-
-extern "C"
-void traceUserEvent(int e)
-{
-#ifdef CMK_OPTIMIZE
-  OPTIMIZED_VERSION
-#else
-  CpvAccess(_trace)->userEvent(e);
-#endif
-}
-
-extern "C"
-int traceRegisterUserEvent(const char*)
-{
-#ifdef CMK_OPTIMIZE
-  OPTIMIZED_VERSION
-  return 0;
-#else
-  if(CmiMyPe()==0)
-    return _numEvents++;
-  else
-    return 0;
-#endif
-}
-
-extern "C"
-void traceClearEps(void)
-{
-  // In trace-summary, this zeros out the EP bins, to eliminate noise
-  // from startup.  Here, this isn't useful, since we can do that in
-  // post-processing
-}
-
-extern "C"
-void traceWriteSts(void)
-{
-  if(CmiMyPe()==0)
-    CpvAccess(_logPool)->writeSts();
-}
-
-extern "C"
-void traceClose(void)
-{
-  CpvAccess(_trace)->endComputation();
-  if(CmiMyPe()==0)
-    CpvAccess(_logPool)->writeSts();
-  delete CpvAccess(_logPool);
-  delete CpvAccess(_trace);
-  free(CpvAccess(traceRoot));
 }
 
 LogPool::LogPool(char *pgm, int b) {
@@ -342,6 +247,59 @@ void LogEntry::writeBinary(FILE* fp)
       CmiError("***Internal Error*** Wierd Event %d.\n", type);
       break;
   }
+}
+
+void TraceProjections::traceInit(char **argv)
+{
+  CpvInitialize(LogPool*, _logPool);
+  CtvInitialize(int,curThreadEvent);
+  CtvAccess(curThreadEvent)=0;
+  int binary = CmiGetArgFlag(argv,"+binary-trace");
+  CpvAccess(_logPool) = new LogPool(CpvAccess(traceRoot),binary);
+}
+
+int TraceProjections::traceRegisterUserEvent(const char*)
+{
+  OPTIMIZED_VERSION
+  if(CmiMyPe()==0)
+    return _numEvents++;
+  else
+    return 0;
+}
+
+void TraceProjections::traceClearEps(void)
+{
+  // In trace-summary, this zeros out the EP bins, to eliminate noise
+  // from startup.  Here, this isn't useful, since we can do that in
+  // post-processing
+}
+
+void TraceProjections::traceWriteSts(void)
+{
+  if(CmiMyPe()==0)
+    CpvAccess(_logPool)->writeSts();
+}
+
+void TraceProjections::traceClose(void)
+{
+  CpvAccess(_trace)->endComputation();
+  if(CmiMyPe()==0)
+    CpvAccess(_logPool)->writeSts();
+  delete CpvAccess(_logPool);
+  delete CpvAccess(_trace);
+  free(CpvAccess(traceRoot));
+}
+
+void TraceProjections::traceBegin(void)
+{
+  cancel_beginIdle = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)traceProjectionsBeginIdle,0);
+  cancel_endIdle = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_BUSY,(CcdVoidFn)traceProjectionsEndIdle,0);
+}
+
+void TraceProjections::traceEnd(void) 
+{
+  CcdCancelCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE, cancel_beginIdle);
+  CcdCancelCallOnConditionKeep(CcdPROCESSOR_BEGIN_BUSY, cancel_endIdle);
 }
 
 void TraceProjections::userEvent(int e)
