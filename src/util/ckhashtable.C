@@ -366,7 +366,7 @@ CDECL CkHashtable_c CkCreateHashtable_int(int objBytes,int initSize)
 /*Create hashtable with a C string pointer as the key*/
 CDECL CkHashtable_c CkCreateHashtable_string(int objBytes,int initSize)
 {
-	return (CkHashtable_c)new CkHashtable(sizeof(int),objBytes,initSize,0.75,
+	return (CkHashtable_c)new CkHashtable(sizeof(char *),objBytes,initSize,0.75,
 		CkHashFunction_string,CkHashCompare_string);
 }
 CDECL void CkDeleteHashtable(CkHashtable_c h)
