@@ -20,6 +20,7 @@ module CkMemCheckpoint {
  	entry void recvData(CkArrayCheckPTMessage *);
 	entry void recvProcData(CkProcCheckPTMessage *);
  	entry void cpFinish();
+ 	entry void report();
 	// restart
         entry void restart(int);
   	entry void resetReductionMgr();

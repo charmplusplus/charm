@@ -24,6 +24,7 @@ public:
 class CkProcCheckPTMessage: public CMessage_CkProcCheckPTMessage {
 public:
 	int pe;
+	int reportPe;		// chkpt starter
 	int failedpe;
 	int cur_restart_phase;
 	int len;
@@ -62,6 +63,7 @@ public:
   void recvData(CkArrayCheckPTMessage *);
   void recvProcData(CkProcCheckPTMessage *);
   void cpFinish();
+  void report();
   void recoverBuddies();
   void recoverArrayElements();
   void quiescence(CkCallback &);
@@ -72,7 +74,9 @@ public:
 public:
   static CkCallback  cpCallback;
 
-  int inRestarting;
+  static int inRestarting;
+  static double startTime;
+  static char*  stage;
 private:
   CkVec<CkMemCheckPTInfo *> ckTable;
 
@@ -83,7 +87,9 @@ private:
 private:
   inline int iFailed() { return isFailed(CkMyPe()); }
   int isFailed(int pe);
+  int totalFailed();
   void failed(int pe);
+  inline int isMaster(int pe);
 
   void sendProcData();
 };
