@@ -2024,7 +2024,7 @@ CmiCommHandle CmiGeneralSend(int pe, int size, int freemode, char *data)
 
   if (freemode == 'S') {
     char *copy = (char *)CmiAlloc(size);
-    jmemcpy(copy, data, size);
+    memcpy(copy, data, size);
     data = copy; freemode = 'F';
   }
 
