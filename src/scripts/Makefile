@@ -209,9 +209,9 @@ charmrun-target: daemon-target
 
 daemon-target: sockRoutines.o
 	if test -f daemon.c ; then $(CHARMC) -seq daemon.c \
-		sockRoutines.o -o ../bin/daemon; fi 
+		sockRoutines.o -o ../bin/charmd; fi 
 	if test -f daemon.c ; then $(CHARMC) -DFACELESS -seq daemon.c \
-		sockRoutines.o -o ../bin/daemon_faceless; fi 
+		sockRoutines.o -o ../bin/charmd_faceless; fi 
 	touch daemon-target
 
 QuickThreads/libckqt.a:
