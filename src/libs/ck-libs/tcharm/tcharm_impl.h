@@ -55,9 +55,6 @@ class TCharmInitMsg : public CMessage_TCharmInitMsg {
 //Thread-local variables:
 CtvExtern(TCharm *,_curTCharm);
 
-CDECL {typedef void (*TCpupUserDataC)(pup_er p,void *data);};
-FDECL {typedef void (*TCpupUserDataF)(pup_er p,void *data);};
-
 class TCharm: public CBase_TCharm
 {
  public:
@@ -65,16 +62,15 @@ class TCharm: public CBase_TCharm
 //User's heap-allocated/global data:
 	class UserData {
 		void *data; //user data pointer
-		bool isC;
-		TCpupUserDataC cfn;
-		TCpupUserDataF ffn;
+		char mode;
+		TCHARM_Pup_fn cfn;
+		TCHARM_Pup_global_fn gfn;
 	public:
-		UserData(int i=0) {data=NULL; cfn=NULL; ffn=NULL;}
-		UserData(TCpupUserDataC cfn_,void *data_)
-			{cfn=cfn_; data=data_; isC=true;}
-		class isFortran{};
-		UserData(TCpupUserDataF ffn_,void *data_,isFortran tag)
-			{ffn=ffn_; data=data_; isC=false;}
+		UserData(int i=0) {data=NULL; mode='?'; cfn=NULL; gfn=NULL;}
+		UserData(TCHARM_Pup_fn cfn_,void *data_)
+			{cfn=cfn_; data=data_; mode='c';}
+		UserData(TCHARM_Pup_global_fn gfn_,void *data_)
+			{gfn=gfn_; data=data_; mode='g';}
 		inline void *getData(void) const {return data;}
 		void pup(PUP::er &p);
 		friend inline void operator|(PUP::er &p,UserData &d) {d.pup(p);}

@@ -152,10 +152,21 @@ TCharm::TCharm(CkMigrateMessage *msg)
   threadInfo.tProxy=CProxy_TCharm(thisArrayID);
 }
 
+void checkPupMismatch(PUP::er &p,int expected,const char *where)
+{
+	int v=expected;
+	p|v;
+	if (v!=expected) {
+		CkError("FATAL ERROR> Mismatch %s pup routine\n",where);
+		CkAbort("FATAL ERROR: Pup direction mismatch");
+	}
+}
+
 void TCharm::pup(PUP::er &p) {
 //Pup superclass
   ArrayElement1D::pup(p);
 
+  checkPupMismatch(p,5136,"before TCHARM");
   p(isStopped); p(resumeAfterMigration); p(exitWhenDone);
   p(threadInfo.thisElement);
   p(threadInfo.numElements);
@@ -170,11 +181,16 @@ void TCharm::pup(PUP::er &p) {
   if (tcharm_nomig) CkAbort("Cannot migrate with the +tcharm_nomig option!\n");
 #endif
 
-//Pup thread (EVIL & UGLY):
   //This seekBlock allows us to reorder the packing/unpacking--
   // This is needed because the userData depends on the thread's stack
   // and heap data both at pack and unpack time.
   PUP::seekBlock s(p,2);
+  
+// Set up TCHARM context for use during user's pup routines:
+  CtvAccess(_curTCharm)=this;
+  activateThread();
+  
+//Pup thread (EVIL & UGLY):
   if (p.isUnpacking())
   {//In this case, unpack the thread & heap before the user data
     s.seek(1);
@@ -186,16 +202,17 @@ void TCharm::pup(PUP::er &p) {
     double packTime;
     p(packTime);
     timeOffset=packTime-CkWallTimer();
+    checkPupMismatch(p,5138,"after TCHARM thread");
   }
 
   //Pack all user data
   s.seek(0);
   p(nUd);
   
-  activateThread();
   for(int i=0;i<nUd;i++) ud[i].pup(p);
+  checkPupMismatch(p,5137,"after TCHARM_Register user data");
   p|sud;
-  deactivateThread();
+  checkPupMismatch(p,5138,"after TCHARM_Global user data");
   
   if (!p.isUnpacking())
   {//In this case, pack the thread & heap after the user data
@@ -206,27 +223,37 @@ void TCharm::pup(PUP::er &p) {
     //Stop our clock:
     double packTime=CkWallTimer()+timeOffset;
     p(packTime);
+    checkPupMismatch(p,5138,"after TCHARM thread");
   }
+  
+  CtvAccess(_curTCharm)=NULL;
+  deactivateThread();
+  
   s.endBlock(); //End of seeking block
+  checkPupMismatch(p,5140,"after TCHARM");
 }
 
 //Pup one group of user data
 void TCharm::UserData::pup(PUP::er &p)
 {
   pup_er pext=(pup_er)(&p);
-  p(isC);
-  //Save address of userdata-- assumes user data is on the stack
-  p((void*)&data,sizeof(data));
-  if (isC) { //C version
-    //FIXME: function pointers may not be valid across processors
-    p((void*)&cfn, sizeof(TCpupUserDataC));
-    if (cfn) cfn(pext,data);
-  }
-  else { //Fortran version
-    //FIXME: function pointers may not be valid across processors
-    p((void*)&ffn, sizeof(TCpupUserDataF));
-    if (ffn) ffn(pext,data);
-  }
+  p(mode);
+  switch(mode) {
+  case 'c': { /* C mode: userdata is on the stack, so keep address */
+     p((void*)&data,sizeof(data));
+     //FIXME: function pointers may not be valid across processors
+     p((void*)&cfn, sizeof(TCHARM_Pup_fn));
+     if (cfn) cfn(pext,data);
+     } break;
+  case 'g': { /* Global mode: zero out userdata on arrival */
+     if (p.isUnpacking()) data=0;
+     //FIXME: function pointers may not be valid across processors
+     p((void*)&gfn, sizeof(TCHARM_Pup_global_fn));
+     if (gfn) gfn(pext);
+     } break;
+  default:
+     break;
+  };
 }
 
 TCharm::~TCharm()
@@ -586,12 +613,11 @@ CDECL int TCHARM_Register(void *data,TCHARM_Pup_fn pfn)
 	return TCharm::get()->add(TCharm::UserData(pfn,data));
 }
 FDECL int FTN_NAME(TCHARM_REGISTER,tcharm_register)
-	(void *data,TCpupUserDataF pfn)
+	(void *data,TCHARM_Pup_fn pfn)
 { 
 	TCHARMAPI("TCHARM_Register");
 	checkAddress(data);
-	return TCharm::get()->add(TCharm::UserData(
-		pfn,data,TCharm::UserData::isFortran()));
+	return TCharm::get()->add(TCharm::UserData(pfn,data));
 }
 
 CDECL void *TCHARM_Get_userdata(int id)
@@ -612,7 +638,7 @@ CDECL void TCHARM_Set_global(int globalID,void *new_value,TCHARM_Pup_global_fn p
 		int newLen=2*globalID;
 		tc->sud.resize(newLen);
 	}
-	tc->sud[globalID]=TCharm::UserData((TCHARM_Pup_fn) pup_or_NULL,new_value);
+	tc->sud[globalID]=TCharm::UserData(pup_or_NULL,new_value);
 }
 CDECL void *TCHARM_Get_global(int globalID)
 {
