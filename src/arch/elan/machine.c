@@ -310,9 +310,11 @@ static void CmiReleaseSentMessages(void)
   release_pmsg_list();
 
 #ifndef CMK_OPTIMIZE 
+#if ! CMK_TRACE_IN_CHARM
   double rel_end_time = CmiWallTimer();
   if(rel_end_time > rel_start_time + 5.0/1e6)
     traceUserBracketEvent(20, rel_start_time, rel_end_time);
+#endif
 #endif
 }
 
@@ -434,18 +436,22 @@ int PumpMsgs(int retflag)
 
     if(!flg) {
 #ifndef CMK_OPTIMIZE 
+#if ! CMK_TRACE_IN_CHARM
       double pmp_end_time = CmiWallTimer();
       if(pmp_end_time > pmp_start_time + 5.0/1e6)
 	traceUserBracketEvent(10, pmp_start_time, pmp_end_time);
+#endif
 #endif
       return recd;    
     }
 
     if (retflag) {
 #ifndef CMK_OPTIMIZE 
+#if ! CMK_TRACE_IN_CHARM
       double pmp_end_time = CmiWallTimer();
       if(pmp_end_time > pmp_start_time + 5.0/1e6)
 	traceUserBracketEvent(10, pmp_start_time, pmp_end_time);
+#endif
 #endif
       return flg;
     }
@@ -667,9 +673,11 @@ void CmiFreeSendFn(int destPE, int size, char *msg)
   }
 
 #ifndef CMK_OPTIMIZE 
+#if ! CMK_TRACE_IN_CHARM
   double snd_end_time = CmiWallTimer();
   if(snd_end_time > snd_start_time + 5.0/1e6)
     traceUserBracketEvent(30, snd_start_time, snd_end_time);
+#endif
 #endif
 }
 
@@ -948,9 +956,11 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   ConverseRunPE(initret);
 
 #ifndef CMK_OPTIMIZE 
+#if ! CMK_TRACE_IN_CHARM
   traceRegisterUserEvent("Pump Messages", 10);
   traceRegisterUserEvent("Release Sent Messages", 20);
   traceRegisterUserEvent("ELAN Send", 30);
+#endif
 #endif
 }
 
