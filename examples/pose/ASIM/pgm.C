@@ -151,7 +151,10 @@ main::main(CkArgMsg *m)
 
     wd->Timestamp(0);
     //wd->dump();
-    (*(CProxy_worker *) &POSE_Objects)[i].insert(wd, dest);
+    if (distribution == RANDOM)
+      (*(CProxy_worker *) &POSE_Objects)[i].insert(wd);
+    else
+      (*(CProxy_worker *) &POSE_Objects)[i].insert(wd, dest);
   }
 }
 
