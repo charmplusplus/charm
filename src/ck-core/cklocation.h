@@ -229,7 +229,6 @@ public:
 #else
   inline void ckStopTiming(void) { }
   inline void ckStartTiming(void) { }
-  inline LBDatabase *getLBDB(void) const {return NULL;}
 #endif
   //Initiate a migration to the given processor
   inline void ckMigrate(int toPe) {myRec->migrateMe(toPe);}
