@@ -249,7 +249,8 @@ void CEntry::generateCode(XStr& op)
   
     op << "    delete tr;\n";
 #if CMK_BLUEGENE_CHARM
-    cn->generateBeginExec(op, "dummy");
+    cn->generateTlineEndCall(op);
+    cn->generateBeginExec(op, "sdagholder");
 #endif
     cn->generateDummyBeginExecute(op);
     op << "    return;\n";
@@ -325,7 +326,8 @@ void CEntry::generateCode(XStr& op)
       op << "        delete tr;\n";
 
 #if CMK_BLUEGENE_CHARM
-      cn->generateBeginExec(op, "dummy");
+      cn->generateTlineEndCall(op);
+      cn->generateBeginExec(op, "sdagholder");
 #endif
       cn->generateDummyBeginExecute(op);
 

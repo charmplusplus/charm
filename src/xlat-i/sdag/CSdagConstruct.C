@@ -1335,7 +1335,8 @@ void SdagConstruct::generateSdagEntry(XStr& op)
   generateCall(op, *stateVarsChildren);
   op << ");\n";
 #if CMK_BLUEGENE_CHARM
-  generateBeginExec(op, "dummy");
+  generateTlineEndCall(op);
+  generateBeginExec(op, "spaceholder");
 #endif
   generateDummyBeginExecute(op);
   // end actual code
