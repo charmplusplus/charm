@@ -4,6 +4,5 @@
 #include "CkFutures.decl.h"
 
 extern void _futuresModuleInit(void);
-extern void _registerCkFutures(void);
 
 #endif

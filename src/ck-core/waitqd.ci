@@ -1,0 +1,23 @@
+////////////////////////////////////////////////////
+//
+//  waitqd.ci
+//
+//  The waitqd module provides a sync method
+//  that does not return until quiescence is detected
+//
+//  Author: Michael Lang
+//  Created: 7/15/99
+//
+////////////////////////////////////////////////////
+
+module waitqd {
+
+  readonly CkChareID waitqd_qdhandle; 
+
+  mainchare waitqd_QDChare {
+    entry waitqd_QDChare();
+    entry [threaded, sync] void waitQD(void);
+    entry void onQD(CkQdMsg *);
+  };
+};
+

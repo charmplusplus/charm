@@ -115,4 +115,5 @@ class CkThrCallArg {
 #include "CkArray.decl.h"
 #include "ckarray.h"
 #include "tempo.h"
+#include "waitqd.h"
 #endif

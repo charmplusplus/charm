@@ -157,6 +157,7 @@ extern void  CkSendToFuture(int futNum, void *msg, int pe);
  *****************************************************************************/
 
 extern void CkStartQD(int entryIdx, CkChareID *chare);
+extern void CkWaitQD(void);
 
 /******************************************************************************
  *

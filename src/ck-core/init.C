@@ -493,6 +493,7 @@ void _initCharm(int argc, char **argv)
     _registerCkFutures();
     _registerCkArray();
     _registertempo();
+    _registerwaitqd();
     CkRegisterMainModule();
   }
 #ifndef CMK_OPTIMIZE

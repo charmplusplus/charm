@@ -4,8 +4,6 @@
 #include "charm++.h"
 #include "CkArray.decl.h"
 
-extern void _registerCkArray(void);
-
 #define ALIGN8(x)       (int)(8*(((x)+7)/8))
 
 #define MessageIndex(mt)        CMessage_##mt##::__idx

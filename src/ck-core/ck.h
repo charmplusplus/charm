@@ -20,6 +20,7 @@
 #include "ckfutures.h"
 #include "ckarray.h"
 #include "ckstream.h"
+#include "waitqd.h"
 
 class VidBlock {
     enum VidState {FILLED, UNFILLED};

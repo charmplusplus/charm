@@ -99,5 +99,4 @@ class TempoArray : public ArrayElement, public Tempo
     void ckTempoAllReduce(int op,void *inbuf,void *outbuf,int count,int type);
 };
 
-extern void _registertempo(void);
 #endif
