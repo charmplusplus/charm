@@ -445,6 +445,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   recdQueueInit();
   CthInit(argv);
   ConverseCommonInit(argv);
+  CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,CmiNotifyIdle,NULL);
   if (initret==0) {
     fn(CmiGetArgc(argv), argv);
     if (usched==0) CsdScheduler(-1);

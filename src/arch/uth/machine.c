@@ -252,6 +252,7 @@ char **CmiInitPE()
   CpvAccess(CmiLocalQueue) = CmiQueues[CmiMyPe()];
   CmiTimerInit();
   ConverseCommonInit(argv);
+  CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,CmiNotifyIdle,NULL);
   return argv;
 }
 

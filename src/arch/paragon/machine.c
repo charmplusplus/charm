@@ -284,7 +284,8 @@ int usched, initret;
   CpvAccess(CmiLocalQueue)= CdsFifo_Create();
   /*  CmiTimerInit(); */
   CthInit(argv);
-  ConverseCommonInit(argv);
+  ConverseCommonInit(argv);  
+  CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,CmiNotifyIdle,NULL);
   if (initret==0) {
     fn(argc, argv);
     if (usched==0) CsdScheduler(-1);

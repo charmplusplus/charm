@@ -271,6 +271,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int initret)
     CpvAccess(CmiLocalQueue) = CdsFifo_Create();
     CthInit(argv);
     ConverseCommonInit(argv);
+    CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,CmiNotifyIdle,NULL);
     argc=CmiGetArgc(argv);
     fn(argc, CmiCopyArgs(argv));
     CpvAccess(CsdStopFlag) = 0;
