@@ -47,7 +47,7 @@ extern "C" {
  *
  *****************************************************************************/
 
-#if CMK_SHARED_VARS_UNAVAILABLE
+#if CMK_SHARED_VARS_UNAVAILABLE /* Non-SMP version of shared vars. */
 
 extern int Cmi_mype;
 extern int Cmi_numpes;
@@ -63,18 +63,12 @@ extern int Cmi_numpes;
 #define CmiNodeOf(pe)       (pe)
 #define CmiRankOf(pe)       0
 
-#define SHARED_DECL
 #define CpvDeclare(t,v) t CMK_CONCAT(Cpv_Var_,v)
 #define CpvExtern(t,v)  extern t CMK_CONCAT(Cpv_Var_,v)
 #define CpvStaticDeclare(t,v) static t CMK_CONCAT(Cpv_Var_,v)
 #define CpvInitialize(t,v) do {} while(0)
+#define CpvInitialized(v) 1
 #define CpvAccess(v) CMK_CONCAT(Cpv_Var_,v)
-
-#define CsvDeclare(t,v) t CMK_CONCAT(Csv_Var_,v)
-#define CsvStaticDeclare(t,v) static t CMK_CONCAT(Csv_Var_,v)
-#define CsvInitialize(t,v) do{}while(0)
-#define CsvExtern(t,v) extern t CMK_CONCAT(Csv_Var_,v)
-#define CsvAccess(v) CMK_CONCAT(Csv_Var_,v)
 
 extern void CmiMemLock();
 extern void CmiMemUnlock();
@@ -90,57 +84,7 @@ typedef void *CmiNodeLock;
 
 #endif
 
-#if CMK_SHARED_VARS_EXEMPLAR
-
-#include <spp_prog_model.h>
-#include <cps.h>
-
-extern int Cmi_numpes;
-extern int Cmi_mynodesize;
-
-#define CmiMyPe()           (my_thread())
-#define CmiMyRank()         (my_thread())
-#define CmiNumPes()         Cmi_numpes
-#define CmiMyNodeSize()     Cmi_numpes
-#define CmiMyNode()         0
-#define CmiNumNodes()       1
-#define CmiNodeFirst(node)  0
-#define CmiNodeSize(node)   Cmi_numpes
-#define CmiNodeOf(pe)       0
-#define CmiRankOf(pe)       (pe)
-
-#define SHARED_DECL
-#define CpvDeclare(t,v) t* CMK_CONCAT(Cpv_Var_,v)
-#define CpvExtern(t,v)  extern t* CMK_CONCAT(Cpv_Var_,v)
-#define CpvStaticDeclare(t,v) static t* CMK_CONCAT(Cpv_Var_,v)
-#define CpvInitialize(t,v)\
-    do { if (CmiMyRank()) CmiNodeBarrier();\
-    else { CMK_CONCAT(Cpv_Var_,v)=(t*)malloc(sizeof(t)*CmiMyNodeSize());\
-           CmiNodeBarrier();}} while(0)
-#define CpvAccess(v) CMK_CONCAT(Cpv_Var_,v)[CmiMyRank()]
-
-#define CsvDeclare(t,v) t CMK_CONCAT(Csv_Var_,v)
-#define CsvStaticDeclare(t,v) static t CMK_CONCAT(Csv_Var_,v)
-#define CsvExtern(t,v) extern t CMK_CONCAT(Csv_Var_,v)
-#define CsvInitialize(t,v) do{}while(0)
-#define CsvAccess(v) CMK_CONCAT(Csv_Var_,v)
-
-
-extern void CmiMemLock();
-extern void CmiMemUnlock();
-extern void CmiNodeBarrier(void);
-extern void *CmiSvAlloc(int);
-
-typedef cps_mutex_t *CmiNodeLock;
-extern CmiNodeLock CmiCreateLock(void);
-#define CmiLock(lock) (cps_mutex_lock(lock))
-#define CmiUnlock(lock) (cps_mutex_unlock(lock))
-#define CmiTryLock(lock) (cps_mutex_trylock(lock))
-#define CmiDestroyLock(lock) (cps_mutex_free(lock))
-
-#endif
-
-#if CMK_SHARED_VARS_POSIX_THREADS_SMP
+#if CMK_SHARED_VARS_POSIX_THREADS_SMP /*Used by the net-*-smp versions*/
 
 #include <pthread.h>
 #include <sched.h>
@@ -165,22 +109,7 @@ extern int CmiNodeSize(int node);
 extern int CmiNodeOf(int pe);
 extern int CmiRankOf(int pe);
 
-#define SHARED_DECL
-
-#define CpvDeclare(t,v) t* CMK_CONCAT(Cpv_Var_,v)
-#define CpvExtern(t,v)  extern t* CMK_CONCAT(Cpv_Var_,v)
-#define CpvStaticDeclare(t,v) static t* CMK_CONCAT(Cpv_Var_,v)
-#define CpvInitialize(t,v)\
-  do { if (CmiMyRank()) while (CMK_CONCAT(Cpv_Var_,v)==0) sched_yield();\
-       else { CMK_CONCAT(Cpv_Var_,v)=(t*)malloc(sizeof(t)*CmiMyNodeSize()); }}\
-  while(0)
-#define CpvAccess(v) CMK_CONCAT(Cpv_Var_,v)[CmiMyRank()]
-
-#define CsvDeclare(t,v) t CMK_CONCAT(Csv_Var_,v)
-#define CsvStaticDeclare(t,v) static t CMK_CONCAT(Csv_Var_,v)
-#define CsvExtern(t,v) extern t CMK_CONCAT(Csv_Var_,v)
-#define CsvInitialize(t,v) do{}while(0)
-#define CsvAccess(v) CMK_CONCAT(Csv_Var_,v)
+#define CMK_CPV_IS_SMP sched_yield();
 
 extern void CmiNodeBarrier(void);
 #define CmiSvAlloc CmiAlloc
@@ -198,7 +127,43 @@ extern CmiNodeLock CmiMemLock_lock;
 
 #endif
 
-#if CMK_SHARED_VARS_UNIPROCESSOR
+
+#if CMK_SHARED_VARS_EXEMPLAR /* Used only by HP Exemplar version */
+
+#include <spp_prog_model.h>
+#include <cps.h>
+
+extern int Cmi_numpes;
+extern int Cmi_mynodesize;
+
+#define CmiMyPe()           (my_thread())
+#define CmiMyRank()         (my_thread())
+#define CmiNumPes()         Cmi_numpes
+#define CmiMyNodeSize()     Cmi_numpes
+#define CmiMyNode()         0
+#define CmiNumNodes()       1
+#define CmiNodeFirst(node)  0
+#define CmiNodeSize(node)   Cmi_numpes
+#define CmiNodeOf(pe)       0
+#define CmiRankOf(pe)       (pe)
+
+#define CMK_CPV_IS_SMP {} 
+
+extern void CmiMemLock();
+extern void CmiMemUnlock();
+extern void CmiNodeBarrier(void);
+extern void *CmiSvAlloc(int);
+
+typedef cps_mutex_t *CmiNodeLock;
+extern CmiNodeLock CmiCreateLock(void);
+#define CmiLock(lock) (cps_mutex_lock(lock))
+#define CmiUnlock(lock) (cps_mutex_unlock(lock))
+#define CmiTryLock(lock) (cps_mutex_trylock(lock))
+#define CmiDestroyLock(lock) (cps_mutex_free(lock))
+
+#endif
+
+#if CMK_SHARED_VARS_UNIPROCESSOR /*Used only by uth- and sim- versions*/
 
 extern int Cmi_mype;
 extern int Cmi_numpes;
@@ -214,8 +179,6 @@ extern int Cmi_numpes;
 #define CmiNodeOf(pe)          0
 #define CmiRankOf(pe)          (pe)
 
-#define SHARED_DECL
-
 #define CpvDeclare(t,v) t* CMK_CONCAT(Cpv_Var_,v)
 #define CpvExtern(t,v)  extern t* CMK_CONCAT(Cpv_Var_,v)
 #define CpvStaticDeclare(t,v) static t* CMK_CONCAT(Cpv_Var_,v)
@@ -223,13 +186,8 @@ extern int Cmi_numpes;
   do  { if (CMK_CONCAT(Cpv_Var_,v)==0)\
         { CMK_CONCAT(Cpv_Var_,v) = (t *)CmiAlloc(CmiNumPes()*sizeof(t)); }}\
   while(0)
+#define CpvInitialized(v) (0!=CMK_CONCAT(Cpv_Var_,v))
 #define CpvAccess(v) CMK_CONCAT(Cpv_Var_,v)[CmiMyPe()]
-
-#define CsvDeclare(t,v) t CMK_CONCAT(Csv_Var_,v)
-#define CsvStaticDeclare(t,v) static t CMK_CONCAT(Csv_Var_,v)
-#define CsvExtern(t,v) extern t CMK_CONCAT(Csv_Var_,v)
-#define CsvInitialize(t,v) do{}while(0)
-#define CsvAccess(v) CMK_CONCAT(Csv_Var_,v)
 
 #define CmiMemLock() 0
 #define CmiMemUnlock() 0
@@ -245,7 +203,7 @@ extern void         CmiDestroyLock(CmiNodeLock lock);
 
 #endif
 
-#if CMK_SHARED_VARS_PTHREADS
+#if CMK_SHARED_VARS_PTHREADS /*Used only by origin-pthreads*/
 
 #include <pthread.h>
 #include <sched.h>
@@ -263,22 +221,7 @@ extern int Cmi_numpes;
 #define CmiNodeOf(pe)          0
 #define CmiRankOf(pe)          (pe)
 
-#define SHARED_DECL
-
-#define CpvDeclare(t,v) t* CMK_CONCAT(Cpv_Var_,v)
-#define CpvExtern(t,v)  extern t* CMK_CONCAT(Cpv_Var_,v)
-#define CpvStaticDeclare(t,v) static t* CMK_CONCAT(Cpv_Var_,v)
-#define CpvInitialize(t,v)\
-  do { if (CmiMyRank()) while (CMK_CONCAT(Cpv_Var_,v)==0) sched_yield();\
-       else {CMK_CONCAT(Cpv_Var_,v)=(t*)CmiAlloc(sizeof(t)*CmiMyNodeSize());}}\
-  while(0)
-#define CpvAccess(v) CMK_CONCAT(Cpv_Var_,v)[CmiMyRank()]
-
-#define CsvDeclare(t,v) t CMK_CONCAT(Csv_Var_,v)
-#define CsvStaticDeclare(t,v) static t CMK_CONCAT(Csv_Var_,v)
-#define CsvExtern(t,v) extern t CMK_CONCAT(Csv_Var_,v)
-#define CsvInitialize(t,v) do{}while(0)
-#define CsvAccess(v) CMK_CONCAT(Csv_Var_,v)
+#define CMK_CPV_IS_SMP sched_yield();
 
 extern void CmiMemLock();
 extern void CmiMemUnlock();
@@ -294,7 +237,7 @@ extern void         CmiDestroyLock(CmiNodeLock lock);
 
 #endif
 
-#if CMK_SHARED_VARS_NT_THREADS
+#if CMK_SHARED_VARS_NT_THREADS /*Used only by win32 versions*/
 
 #include <windows.h>
 
@@ -314,26 +257,10 @@ extern int CmiNodeSize(int node);
 extern int CmiNodeOf(int pe);
 extern int CmiRankOf(int pe);
 
-#define SHARED_DECL
-
-#define CpvDeclare(t,v) t* CMK_CONCAT(Cpv_Var_,v)
-#define CpvExtern(t,v)  extern t* CMK_CONCAT(Cpv_Var_,v)
-#define CpvStaticDeclare(t,v) static t* CMK_CONCAT(Cpv_Var_,v)
-#define CpvInitialize(t,v)\
- do { if (CmiMyRank()) while (CMK_CONCAT(Cpv_Var_,v)==0) Sleep(0);\
-    else { CMK_CONCAT(Cpv_Var_,v)=(t*)malloc(sizeof(t)*CmiMyNodeSize()); }} \
- while(0)
-#define CpvAccess(v) CMK_CONCAT(Cpv_Var_,v)[CmiMyRank()]
-
-#define CsvDeclare(t,v) t CMK_CONCAT(Csv_Var_,v)
-#define CsvStaticDeclare(t,v) static t CMK_CONCAT(Csv_Var_,v)
-#define CsvExtern(t,v) extern t CMK_CONCAT(Csv_Var_,v)
-#define CsvInitialize(t,v) do{}while(0)
-#define CsvAccess(v) CMK_CONCAT(Csv_Var_,v)
+#define CMK_CPV_IS_SMP Sleep(0);
 
 extern void CmiNodeBarrier(void);
 #define CmiSvAlloc CmiAlloc
-
 
 typedef HANDLE CmiNodeLock;
 extern  CmiNodeLock CmiCreateLock(void);
@@ -347,6 +274,38 @@ extern CmiNodeLock CmiMemLock_lock;
 #define CmiMemUnlock() do{if (CmiMemLock_lock) CmiUnlock(CmiMemLock_lock);} while (0)
 
 #endif
+
+/* This is the default Cpv implmentation for SMP-style systems:
+A Cpv variable is actually a pointer to an array of values, one
+for each processor in the node.
+*/
+#ifdef CMK_CPV_IS_SMP
+
+#define CpvDeclare(t,v) t* CMK_CONCAT(Cpv_Var_,v)
+#define CpvExtern(t,v)  extern t* CMK_CONCAT(Cpv_Var_,v)
+#define CpvStaticDeclare(t,v) static t* CMK_CONCAT(Cpv_Var_,v)
+#define CpvInitialize(t,v)\
+    do { \
+       if (CmiMyRank()) { \
+		while (!CpvInitialized(v)) CMK_CPV_IS_SMP \
+       } else { \
+	       CMK_CONCAT(Cpv_Var_,v)=(t*)calloc((1+CmiMyNodeSize()),sizeof(t));\
+       } \
+    } while(0)
+#define CpvInitialized(v) (0!=CMK_CONCAT(Cpv_Var_,v))
+#define CpvAccess(v) CMK_CONCAT(Cpv_Var_,v)[CmiMyRank()]
+
+#endif
+
+/*Csv are the same almost everywhere:*/
+#ifndef CsvDeclare
+#define CsvDeclare(t,v) t CMK_CONCAT(Csv_Var_,v)
+#define CsvStaticDeclare(t,v) static t CMK_CONCAT(Csv_Var_,v)
+#define CsvExtern(t,v) extern t CMK_CONCAT(Csv_Var_,v)
+#define CsvInitialize(t,v) do{}while(0)
+#define CsvAccess(v) CMK_CONCAT(Csv_Var_,v)
+#endif
+
 
 
 /******** CMI: TYPE DEFINITIONS ********/
