@@ -118,7 +118,7 @@ void LogPool::write(void)
     pool[i].write(fp);
   fprintf(fp, "\n");
   for (i=0; i<_numEntries; i++)
-    fprintf(fp, "%ld ", (long)(epTime[i]*1.0e9));
+    fprintf(fp, "%ld ", (long)(epTime[i]*1.0e6));
   fprintf(fp, "\n");
   for (i=0; i<_numEntries; i++)
     fprintf(fp, "%d ", epCount[i]);
