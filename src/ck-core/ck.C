@@ -541,7 +541,7 @@ static inline void _processForNodeBocMsg(CkCoreState *ck,envelope *env)
 {
   register CkGroupID groupID = env->getGroupNum();
   register void *obj;
-#if CMK_IMMEDIATE_MSG && ! defined(CMK_CPV_IS_SMP)
+#if CMK_IMMEDIATE_MSG && ! CMK_SMP
   if (CmiTryLock(CksvAccess(_nodeLock))) {
     CmiDelayImmediate();
     return;
