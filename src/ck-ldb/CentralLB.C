@@ -44,6 +44,8 @@ CentralLB::CentralLB()
 
   statsDataList = new LDStats[CkNumPes()];
   theLbdb->CollectStatsOn();
+  migrates_completed = 0;
+  migrates_expected = -1;
 }
 
 CentralLB::~CentralLB()
