@@ -31,6 +31,8 @@ CkpvDeclare(char*, dumpFile);		 /**< the name of the file in which the data will
 CkpvDeclare(int, doSimulation);		 /**< true if the program is running under "simulation" mode for load balancing */
 const char defaultDumpFileName[] = "lbdata.dat";   //default fname for dumping
 
+int lb_debug=0;
+
 static LBDefaultCreateFn defaultCreate=NULL;
 void LBSetDefaultCreate(LBDefaultCreateFn f)
 {
@@ -140,6 +142,7 @@ void _loadbalancerInit()
 
   // get the simulation flag
   CkpvAccess(doSimulation) = CmiGetArgFlagDesc(argv, "+LBSim", "Read LB state from LBDumpFile");
+  lb_debug = CmiGetArgFlagDesc(argv, "+LBDebug", "Turn on LB debugging printouts");
 }
 
 int LBDatabase::manualOn = 0;

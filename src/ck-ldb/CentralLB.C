@@ -125,8 +125,9 @@ void CentralLB::ProcessAtSync()
 {
   if (CkMyPe() == cur_ld_balancer) {
     start_lb_time = CmiWallTimer();
-    CmiPrintf("[%s] Load balancing step %d starting at %f in PE%d\n",
-    lbName(), step(),start_lb_time, cur_ld_balancer);
+    if (lb_debug) 
+      CmiPrintf("[%s] Load balancing step %d starting at %f in PE%d\n",
+                 lbName(), step(),start_lb_time, cur_ld_balancer);
   }
   // Send stats
   const int osz = theLbdb->GetObjDataSz();
@@ -375,12 +376,15 @@ void CentralLB::MigrationDone(int balancing)
 {
   if (balancing && CkMyPe() == cur_ld_balancer) {
     double end_lb_time = CmiWallTimer();
-    CkPrintf("[%s] Load balancing step %d finished at %f\n",
-	     lbName(), step(),end_lb_time);
-    double lbdbMemsize = LBDatabase::Object()->useMem()/1000;
-    CkPrintf("[%s] duration %f memUsage: LBManager:%dKB CentralLB:%dKB\n", 
-	     lbName(), end_lb_time - start_lb_time,
-	     (int)lbdbMemsize, (int)(useMem()/1000));
+    if (lb_debug)
+      CkPrintf("[%s] Load balancing step %d finished at %f\n",
+  	        lbName(), step(),end_lb_time);
+    if (lb_debug) {
+      double lbdbMemsize = LBDatabase::Object()->useMem()/1000;
+      CkPrintf("[%s] duration %f memUsage: LBManager:%dKB CentralLB:%dKB\n", 
+  	        lbName(), end_lb_time - start_lb_time,
+	        (int)lbdbMemsize, (int)(useMem()/1000));
+    }
   }
   migrates_completed = 0;
   migrates_expected = -1;

@@ -27,6 +27,8 @@ CkpvExtern(int, dumpStep);
 CkpvExtern(char*, dumpFile);
 CkpvExtern(int, doSimulation);
 
+extern int lb_debug;
+
 typedef void (*LBDefaultCreateFn)(void);
 void LBSetDefaultCreate(LBDefaultCreateFn f);
 
