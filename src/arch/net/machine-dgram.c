@@ -298,6 +298,9 @@ static void node_addresses_store(ChMessage *msg)
       Cmi_self_IP=nodes[i].IP;
     }
     nodes[i].dataport = ChMessageInt(d[i].dataport);
+    MACHSTATE4(2,"Nodetable[%d]={'pe' %d,IP=%08x,port=%d}",
+	       i,nodes[i].nodestart,nodes[i].IP,nodes[i].dataport);
+
     nodes[i].addr = skt_build_addr(nodes[i].IP,nodes[i].dataport);
 #if CMK_USE_TCP
     nodes[i].sock = INVALID_SOCKET;
@@ -463,7 +466,7 @@ void DiscardImplicitDgram(ImplicitDgram dg)
 static double Cmi_ack_last, Cmi_check_last;
 static void CommunicationsClock(void)
 {
-  MACHSTATE(3,"CommunicationsClock");
+  MACHSTATE(1,"CommunicationsClock");
   Cmi_clock = GetClock();
   if (Cmi_clock > Cmi_ack_last + 0.5*Cmi_ack_delay) {
     MACHSTATE(4,"CommunicationsClock timing out acks");    
