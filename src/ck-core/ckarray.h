@@ -182,8 +182,10 @@ public:
 	CProxy_ArrayBase(const CkArrayID &aid,CkGroupID dTo=-1) 
 		:CProxyBase_Delegatable(dTo), _aid(aid) { }
 
+	static CkGroupID ckCreateArray(CkGroupID mapID=_RRMapID,int numInitial=0);
+	static CkGroupID ckCreateArray1D(int ctorIndex,CkArrayMessage *m,
+	     int numInitial,CkGroupID mapID);
 	void ckInsertIdx(CkArrayMessage *m,int ctor,int onPE,const CkArrayIndex &idx);	
-	void ckInsert1D(CkArrayMessage *m,int ctor,int numElements);
 	void ckBroadcast(CkArrayMessage *m, int ep) const;
 	CkArrayID ckGetArrayID(void) const { return _aid; }
 	CkArray *ckLocalBranch(void) const { return _aid.ckLocalBranch(); }	
@@ -195,10 +197,13 @@ public:
 PUPmarshall(CProxy_ArrayBase);
 #define CK_DISAMBIG_ARRAY(super) \
 	CK_DISAMBIG_DELEGATABLE(super) \
+	static CkGroupID ckCreateArray(CkGroupID mapID=_RRMapID,int numInitial=0)\
+	  { return super::ckCreateArray(mapID,numInitial); }\
+	static CkGroupID ckCreateArray1D(int ctorIndex,CkArrayMessage *m,\
+	     int numInitial,CkGroupID mapID)\
+	  { return super::ckCreateArray1D(ctorIndex,m,numInitial,mapID); }\
 	void ckInsertIdx(CkArrayMessage *m,int ctor,int onPE,const CkArrayIndex &idx) \
 	  { super::ckInsertIdx(m,ctor,onPE,idx); }\
-	void ckInsert1D(CkArrayMessage *m,int ctor,int n) \
-	  { super::ckInsert1D(m,ctor,n); } \
 	void ckBroadcast(CkArrayMessage *m, int ep) const \
 	  { super::ckBroadcast(m,ep); } \
 	CkArrayID ckGetArrayID(void) const \
@@ -347,6 +352,8 @@ typedef ArrayElementT<CkArray_index3D> ArrayElement3D;
 
 /*********************** Array Manager BOC *******************/
 
+#include "CkArray.decl.h"
+
 class CkArrayRec;//An array element record
 
 class CkArray : public CkReductionMgr {
@@ -372,10 +379,9 @@ class CkArray : public CkReductionMgr {
   } while(0)
 #endif
 
+  CProxy_CkArray thisproxy;
 public:
 //Array Creation:
-  static  CkGroupID CreateArray(CkGroupID mapID,int numInitial=0);
-
   CkArray(CkArrayCreateMsg *);
   CkArray(CkMigrateMessage *);
   CkGroupID &getGroupID(void) {return thisgroup;}
@@ -508,8 +514,6 @@ public:
 };
 
 /************************** Array Messages ****************************/
-
-#include "CkArray.decl.h"
 
 /*This really doesn't belong here: need a marshall.h */
 class CkMarshallMsg : public CMessage_CkMarshallMsg {

@@ -21,8 +21,6 @@ Orion Sky Lawlor, olawlor@acm.org
 #include "LBDatabase.h"
 #endif // CMK_LBDB_ON
 
-#define thisproxy (CProxy_CkArray(thisgroup))
-
 /************************** Debugging Utilities **************/
 
 //For debugging: convert given index to a string
@@ -750,8 +748,13 @@ ArrayElement *CkArray::getElement(const CkArrayIndex &idx)
 }  
 
 //Create 1D initial array elements
-void CProxy_ArrayBase::ckInsert1D(CkArrayMessage *inM,int ctorIndex,int numInitial)
+CkGroupID CProxy_ArrayBase::ckCreateArray1D(
+	    int ctorIndex,CkArrayMessage *inM,
+	    int numInitial,CkGroupID mapID)
 {
+  //First build the array
+  CkArrayID id=ckCreateArray(mapID, numInitial);
+  CProxy_ArrayBase prox(id);
   DEBC(("In createInitial-- will build %d elements\n",numInitial));
   if (numInitial>0) {
     //Build some 1D elements: (mostly for backward compatability)
@@ -763,11 +766,12 @@ void CProxy_ArrayBase::ckInsert1D(CkArrayMessage *inM,int ctorIndex,int numIniti
 	else
 	  m=inM;//Last time around, send off the original message
       }
-      ckInsertIdx(m,ctorIndex,-1,CkArrayIndex1D(i));
+      prox.ckInsertIdx(m,ctorIndex,-1,CkArrayIndex1D(i));
     }
     DEBC(("Done building elements\n"));
-    doneInserting();
+    prox.doneInserting();
   }
+  return id;
 }
 
 void CProxy_ArrayBase::ckInsertIdx(CkArrayMessage *m,int ctorIndex,int onPE,
@@ -786,7 +790,8 @@ void CProxy_ArrayBase::ckInsertIdx(CkArrayMessage *m,int ctorIndex,int onPE,
   	arr->insertRec(new CkArrayRec_remote(arr,onPE),idx);
   
   DEBC((AA"Proxy inserting element %s on PE %d\n"AB,idx2str(idx),onPE));
-  (CProxy_CkArray(_aid))[onPE].InsertElement(m);
+  CProxy_CkArray ap(_aid);
+  ap[onPE].InsertElement(m);
 }
 
 void CProxyElement_ArrayBase::ckInsert(CkArrayMessage *m,int ctorIndex,int onPE)
@@ -831,7 +836,7 @@ public:
 };
 
 //static method
-CkGroupID CkArray::CreateArray(CkGroupID mapID,int numInitial)
+CkGroupID CProxy_ArrayBase::ckCreateArray(CkGroupID mapID,int numInitial)
 {
   CkGroupID group;
 
@@ -845,8 +850,8 @@ CkGroupID CkArray::CreateArray(CkGroupID mapID,int numInitial)
   return group;
 }
 
-
-CkArray::CkArray(CkMigrateMessage *) :CkReductionMgr(),
+CkArray::CkArray(CkMigrateMessage *) :
+        thisproxy(thisgroup), CkReductionMgr(),
 	hash(17,0.75,CkArrayIndex_hashN,CkArrayIndex_compareN)
 {
   CkArray_magic=CkArray_MAGIC;
@@ -854,7 +859,8 @@ CkArray::CkArray(CkMigrateMessage *) :CkReductionMgr(),
   	(void *)&thisgroup,SECONDS_Btw_SPRINGS*1000);
 }
 
-CkArray::CkArray(CkArrayCreateMsg *msg) :CkReductionMgr(),
+CkArray::CkArray(CkArrayCreateMsg *msg) :
+        thisproxy(thisgroup), CkReductionMgr(),
 	hash(17,0.3,CkArrayIndex_hashN,CkArrayIndex_compareN)
 {
   CkArray_magic=CkArray_MAGIC;
@@ -1300,7 +1306,8 @@ void CProxy_ArrayBase::ckBroadcast(CkArrayMessage *msg, int ep) const
 		CProxy_CkArray(_aid).RecvBroadcast(msg);
 	  } else {
 		DEBB((AA"Forwarding array broadcast to serializer node %d\n"AB,serializer));
-		(CProxy_CkArray(_aid))[serializer].SendBroadcast(msg);
+		CProxy_CkArray ap(_aid);
+		ap[serializer].SendBroadcast(msg);
 	  }
 	}
 }

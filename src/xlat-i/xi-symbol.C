@@ -744,24 +744,10 @@ Array::genSubDecls(XStr& str)
   else 
   {/*Collective, indexible version*/    
     str << "    CK_DISAMBIG_ARRAY("<<super<<")\n";
-    //Create an empty array
-    str <<"    static CkGroupID buildArrayGroup(CkGroupID mapID=_RRMapID,int numInitial=0)\n"
-	"    {\n"
-	"        return CkArray::CreateArray(mapID,numInitial);\n"
-	"    }\n";
-    if (is1D()) //Create an array with some 1D elements
-    {
-      str <<"    static CkGroupID buildArrayGroup(int ctorIndex,int numInitial,CkGroupID mapID,\n"
-	"            CkArrayMessage *msg)\n"
-	"    {\n"
-	"        CkGroupID id=buildArrayGroup(mapID,numInitial);\n"
-	"        CProxy_ArrayBase(id).ckInsert1D(msg,ctorIndex,numInitial);\n"
-	"        return id;\n"
-	"    }\n";
-    }
+
     str<< //Build a simple, empty array (named _mapped to avoid ambiguity with 1D ckNew(nElem))
-      "    static CkArrayID ckNew(void) {return CkArrayID(buildArrayGroup());}\n"
-      "    static CkArrayID ckNew_mapped(CkGroupID mapID) {return CkArrayID(buildArrayGroup(mapID));}\n";
+      "    static CkArrayID ckNew(void) {return CkArrayID(ckCreateArray());}\n"
+      "    static CkArrayID ckNew_mapped(CkGroupID mapID) {return CkArrayID(ckCreateArray(mapID));}\n";
 
     XStr etype; etype<<Prefix::ProxyElement<<type;
     if (indexSuffix!=(const char*)"none")
@@ -1549,7 +1535,8 @@ void Entry::genArrayStaticConstructorDefs(XStr& str)
        str<< //With numInitial
        makeDecl("CkArrayID",1)<<"::ckNew("<<paramComma(0)<<"int numElements,CkGroupID mapID)\n"
        "{ \n"<<marshallMsg(0)<<
-       "   return CkArrayID(buildArrayGroup("<<epIdx()<<",numElements,mapID,"<<callMsg<<"));\n}\n";
+	 "   return CkArrayID(ckCreateArray1D("<<epIdx()<<","<<callMsg<<",numElements,mapID));\n"
+       "}\n";
 
     if (container->isForElement())
       str<<
