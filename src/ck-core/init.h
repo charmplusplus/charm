@@ -74,6 +74,7 @@ extern UInt    _numGroups;
 extern UInt    _numNodeGroups;
 extern int     _infoIdx;
 extern UInt    _numInitMsgs;
+extern UInt    _numInitNodeMsgs;
 extern int     _charmHandlerIdx;
 extern int     _initHandlerIdx;
 extern int     _bocHandlerIdx;

@@ -7,6 +7,7 @@ UInt  _printSS = 0;
 UInt  _numGroups = 0;
 UInt  _numNodeGroups = 0;
 UInt  _numInitMsgs = 0;
+UInt  _numInitNodeMsgs = 0;
 int   _infoIdx;
 int   _charmHandlerIdx;
 int   _initHandlerIdx;
@@ -257,6 +258,9 @@ static void _initHandler(void *msg)
       CpvAccess(_bocInitQ)->enq(msg);
       break;
     case NodeBocInitMsg:
+      CmiLock(_nodeLock);
+      _numInitNodeMsgs++;
+      CmiUnlock(_nodeLock);
       CpvAccess(_qd)->process();
       CpvAccess(_nodeBocInitQ)->enq(msg);
       break;
@@ -275,7 +279,7 @@ static void _initHandler(void *msg)
     default:
       CmiAbort("Internal Error: Unknown-msg-type. Contact Developers.\n");
   }
-  if(_numInitMsgs&&(CpvAccess(_numInitsRecd)==_numInitMsgs))
+  if(_numInitMsgs&&(CpvAccess(_numInitsRecd)+_numInitNodeMsgs==_numInitMsgs))
     _initDone();
 }
 
