@@ -38,7 +38,7 @@ static const char *idx2str(const CkArrayIndex &ind)
   return retBuf;
 }
 static const char *idx2str(const ArrayElement *el)
-  {return idx2str(el->thisindex);}
+  {return idx2str(el->thisIndexMax);}
 
 #define ARRAY_DEBUG_OUTPUT 0
 
@@ -244,7 +244,7 @@ ArrayElement::~ArrayElement()
   lbUnregister();
   //To detect use-after-delete: 
   thisArray=(CkArray *)0xDEADa7a1;
-  thisindex.nInts=-123456;
+  thisIndexMax.nInts=-123456;
 }
 
 
@@ -270,7 +270,7 @@ void ArrayElement::pup(PUP::er &p)
   thisArrayID.pup(p);
   if (p.isUnpacking())
   	thisArray=thisArrayID.ckLocalBranch();
-  thisindex.pup(p);
+  thisIndexMax.pup(p);
   p(thisChareType);
   p(bcastNo);
   reductionInfo.pup(p);
@@ -308,7 +308,7 @@ void ArrayElement::lbRegister(void)//Connect to load balancer
   DEBL((AA"Registering element %s with load balancer (%s AtSync)\n"AB,idx2str(this),usesAtSync?"and":"without"));	
   ldHandle = thisArray->the_lbdb->
     RegisterObj(thisArray->myLBHandle,
-		idx2LDObjid(thisindex),(void *)this,1);
+		idx2LDObjid(thisIndexMax),(void *)this,1);
   
   if (usesAtSync)
     ldBarrierHandle = thisArray->the_lbdb->AddLocalBarrierClient(
@@ -334,12 +334,12 @@ void ArrayElement::lbUnregister(void) {}//Disconnect from load balancer
 ArrayElement1D::ArrayElement1D(void)
 {
   numElements=thisArray->numInitial;
-  thisIndex=thisindex.data()[0];
+  thisIndex=thisIndexMax.data()[0];
 }
 ArrayElement1D::ArrayElement1D(CkMigrateMessage *msg)
 {
   numElements=thisArray->numInitial;
-  thisIndex=thisindex.data()[0];
+  thisIndex=thisIndexMax.data()[0];
 }
 
 void ArrayElement1D::pup(PUP::er &p)
@@ -872,7 +872,7 @@ inline void CkArray::invokeEntry(ArrayElement *el,int entryIdx,void *msg)
 ArrayElement *CkArray::allocateElement(int chareType,const CkArrayIndex &ind)
 {
   ArrayElement *el=(ArrayElement *)malloc(_chareTable[chareType]->size);
-  el->thisindex=ind;
+  el->thisIndexMax=ind;
   el->thisArray=this;
   el->thisArrayID=thisgroup;
   el->thisChareType=chareType;
@@ -903,8 +903,8 @@ ArrayElement *CkArray::newElement(int ctor,
   ctorElement(el,ctor,msg);
   if (!curElementIsDead) { 
     //<- element may have immediately migrated away or died.
-    insertRec(new CkArrayRec_local(this,el),el->thisindex);
-    DEBC((AA"  finished adding local element %s\n"AB,idx2str(el->thisindex)));
+    insertRec(new CkArrayRec_local(this,el),el->thisIndexMax);
+    DEBC((AA"  finished adding local element %s\n"AB,idx2str(el)));
     return el;
   }
   return NULL;
@@ -959,7 +959,7 @@ void CkArray::DoneInserting(void)
 
 void CkArray::localElementDying(ArrayElement *el)
 {
-  const CkArrayIndex &idx=el->thisindex;
+  const CkArrayIndex &idx=el->thisIndexMax;
   curElementIsDead=CmiTrue;
   CkArrayRec *rec=elementNrec(idx);
   if (rec!=NULL) {
@@ -998,7 +998,7 @@ void CkArray::ElementDying(CkArrayRemoveMsg *m)
 
 void CkArray::migrateMe(ArrayElement *el, int where)
 {
-  const CkArrayIndex &idx=el->thisindex;
+  const CkArrayIndex &idx=el->thisIndexMax;
   DEBM((AA"Migrating element %s to %d\n"AB,idx2str(idx),where));
   
   //Pack the element and send it off
@@ -1056,7 +1056,7 @@ void CkArray::RecvMigratedElement(CkArrayElementMigrateMessage *msg)
   
   if (!curElementIsDead)
     //Put the new guy in the hash table
-    insertRec(new CkArrayRec_local(this,el),el->thisindex);
+    insertRec(new CkArrayRec_local(this,el),el->thisIndexMax);
 }
 
 /*
@@ -1096,7 +1096,7 @@ inline void CkArray::deliverLocal(CkArrayMessage *msg,ArrayElement *el)
 		else
 		{//Send a routing message letting original sender know new element location
 			DEBS((AA"Sending update back to %d for element %s\n"AB,srcPE,idx2str(el)));
-			thisproxy.UpdateLocation(new CkArrayUpdateMsg(el->thisindex),srcPE);
+			thisproxy.UpdateLocation(new CkArrayUpdateMsg(el->thisIndexMax),srcPE);
 		}
 	}
 	invokeEntry(el,msg->array_ep(),msg);

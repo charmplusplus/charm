@@ -228,7 +228,7 @@ public:
 
   virtual ~ArrayElement();//Deletes heap-allocated array index
   
-  CkArrayIndexMax thisindex;//Index of this element
+  CkArrayIndexMax thisIndexMax;//Index of this element
   
   void destroy(void);
   
@@ -290,8 +290,8 @@ template <class T>
 class ArrayElementT : public ArrayElement
 {
 public:
-  ArrayElementT(void) {thisIndex=*(T *)thisindex.data();}
-  ArrayElementT(CkMigrateMessage *msg) {thisIndex=*(T *)thisindex.data();}
+  ArrayElementT(void) {thisIndex=*(T *)thisIndexMax.data();}
+  ArrayElementT(CkMigrateMessage *msg) {thisIndex=*(T *)thisIndexMax.data();}
   
   T thisIndex;//Object array index
 };
