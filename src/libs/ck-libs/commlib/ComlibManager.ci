@@ -27,5 +27,7 @@ module ComlibModule {
     entry void receiveNamdMessage(ComlibMsg * msg);
     entry void createId(void);
     entry void createId(int *, int);
+
+    entry void learnPattern(int, int);
   }
 };

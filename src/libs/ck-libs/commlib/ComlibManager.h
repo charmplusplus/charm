@@ -5,6 +5,7 @@
 #include "converse.h"
 #include "envelope.h"
 #include "commlib.h"
+#include <math.h>
 
 #define USE_STREAMING 0
 #define USE_TREE 1
@@ -29,6 +30,10 @@
 char mpi_sndbuf[MPI_BUF_SIZE];
 char mpi_recvbuf[MPI_BUF_SIZE];
 #endif
+
+#define LEARNING_PERIOD 2
+#define ALPHA 50E-6
+#define BETA 3.33E-9
 
 #include "ComlibModule.decl.h"
 
@@ -92,6 +97,8 @@ class ComlibManager: public CkDelegateMgr{
     void init(int s, int n); //strategy, nelements 
     void setReverseMap(int *, int);
 
+    int totalMsgCount, totalBytes, nIterations;
+
  public:
     ComlibManager(int s); //strategy, nelements 
     ComlibManager(int s, int n); //strategy, nelements 
@@ -113,6 +120,10 @@ class ComlibManager: public CkDelegateMgr{
     void receiveNamdMessage(ComlibMsg * msg);
     void createId();
     void createId(int *, int);
+
+    //Learning functions
+    void learnPattern(int totalMessageCount, int totalBytes);
+    void switchStrategy(int strat);
 };
 
 #endif

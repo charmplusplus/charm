@@ -112,6 +112,10 @@ void ComlibManager::init(int s, int n){
 
     createDone = 0;
     doneReceived = 0;
+
+    totalMsgCount = 0;
+    totalBytes = 0;
+    nIterations = 0;
 }
 
 void ComlibManager::done(){
@@ -210,6 +214,15 @@ void ComlibManager::endIteration(){
         ComlibPrintf("[%d]:In End Iteration %d\n", CkMyPe(), elementCount);
         iterationFinished = 1;
         
+        totalMsgCount += messageCount;
+        nIterations ++;
+
+        if(nIterations == LEARNING_PERIOD) {
+            //CkPrintf("Sending %d, %d\n", totalMsgCount, totalBytes);
+            CProxy_ComlibManager cgproxy(cmgrID);
+            cgproxy[0].learnPattern(totalMsgCount, totalBytes);
+        }
+
         if((messageCount == 0) && (CkNumPes() > 0)) {
             DummyMsg * dummymsg = new DummyMsg;
             
@@ -613,6 +626,8 @@ void ComlibManager::ArraySend(int ep, void *msg,
     */
     messageCount ++;
 
+    totalBytes += UsrToEnv(msg)->getTotalsize();
+
     if(strategy != USE_STREAMING) {
         cmsg->next = messageBuf;
         messageBuf = cmsg;    
@@ -692,6 +707,49 @@ void ComlibManager::receiveNamdMessage(ComlibMsg * msg){
     CkPrintf("After receive namd message\n");
 
     delete msg;
+}
+
+void ComlibManager::learnPattern(int total_msg_count, int total_bytes) {
+    static int nrecvd = 0;
+    static double avg_message_count = 0;
+    static double avg_message_bytes = 0;
+
+    avg_message_count += ((double) total_msg_count) / LEARNING_PERIOD;
+    avg_message_bytes += ((double) total_bytes) /  LEARNING_PERIOD;
+
+    nrecvd ++;
+    
+    if(nrecvd == CmiNumPes()) {
+        //Number of messages and bytes a processor sends in each iteration
+        avg_message_count /= CmiNumPes();
+        avg_message_bytes /= CmiNumPes();
+        
+        CkPrintf("STATS = %5.3lf, %5.3lf", avg_message_count, avg_message_bytes);
+
+        //Learning, ignoring contention for now! 
+        double cost_dir, cost_mesh, cost_grid, cost_hyp;
+        cost_dir = ALPHA * avg_message_count + BETA * avg_message_bytes;
+        cost_mesh = ALPHA * 2 * sqrt(CmiNumPes()) + BETA * avg_message_bytes * 2;
+        cost_grid = ALPHA * 3 * cbrt(CmiNumPes()) + BETA * avg_message_bytes * 3;
+        cost_hyp =  (log(CmiNumPes())/log(2.0))*(ALPHA  + BETA * avg_message_bytes/2.0);
+        
+        // Find the one with the minimum cost!
+        int min_strat = USE_MESH; 
+        double min_cost = cost_mesh;
+        if(min_cost > cost_hyp)
+            min_strat = USE_HYPERCUBE;
+        if(min_cost > cost_grid)
+            min_strat = USE_GRID;
+
+        if(min_cost > cost_dir)
+            min_strat = USE_DIRECT;
+
+        switchStrategy(min_strat);        
+    }
+}
+
+void ComlibManager::switchStrategy(int strat){
+    CkPrintf("Switching to %d\n", strat);
 }
 
 CharmMessageHolder::CharmMessageHolder(char * msg, int proc) {
