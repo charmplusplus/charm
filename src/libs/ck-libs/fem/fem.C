@@ -118,7 +118,15 @@ main::main(CkArgMsg *am)
   isMeshSet = 0;
   // call application-specific initialization
   _mainptr = this;
+#if FEM_FORTRAN
+#if CMK_FORTRAN_USES_ALLCAPS
+  INIT();
+#else // fortran-uses-trailing-undescore
   init_();
+#endif
+#else // C/C++
+  init();
+#endif // Fortran
   _mainptr = 0;
   if(!isMeshSet) {
     for(i=0;i<_nchunks;i++) {
@@ -169,7 +177,8 @@ main::setMesh(int nelem, int nnodes, int ctype, int *connmat, int *xconn)
   delete[] msgs;
 }
 
-void FEM_Set_Mesh(int nelem, int nnodes, int ctype, int *connmat)
+extern "C" void 
+FEM_Set_Mesh(int nelem, int nnodes, int ctype, int *connmat)
 {
   if(_mainptr == 0) {
     CkAbort("FEM_Set_Mesh can be called from within _init only.\n");
@@ -177,8 +186,9 @@ void FEM_Set_Mesh(int nelem, int nnodes, int ctype, int *connmat)
   _mainptr->setMesh(nelem, nnodes, ctype, connmat, connmat);
 }
 
-void FEM_Set_Mesh_Transform(int nelem, int nnodes, int ctype, int *connmat,
-                            int *permute)
+extern "C" void 
+FEM_Set_Mesh_Transform(int nelem, int nnodes, int ctype, int *connmat,
+                       int *permute)
 {
   if(_mainptr == 0) {
     CkAbort("FEM_Set_Mesh_Transform can be called from within _init only.\n");
@@ -228,35 +238,21 @@ void FEM_Set_Mesh_Transform(int nelem, int nnodes, int ctype, int *connmat,
   delete[] conn;
 }
 
-extern "C" void
-#if CMK_FORTRAN_USES_ALLCAPS
-FEM_SET_MESH
-#else
-fem_set_mesh_
-#endif
-(int *nelem, int *nnodes, int *ctype, int *connmat)
-{
-  FEM_Set_Mesh(*nelem, *nnodes, *ctype, connmat);
-}
-
-extern "C" void
-#if CMK_FORTRAN_USES_ALLCAPS
-FEM_SET_MESH_TRANSFORM
-#else
-fem_set_mesh_transform_
-#endif
-(int *nelem, int *nnodes, int *ctype, int *connmat, int *permute)
-{
-  FEM_Set_Mesh_Transform(*nelem, *nnodes, *ctype, connmat, permute);
-}
-
 void
 main::done(void)
 {
   numdone++;
   if (numdone == _nchunks) {
     // call application-specific finalization
+#if FEM_FORTRAN
+#if CMK_FORTRAN_USES_ALLCAPS
+    FINALIZE();
+#else // fortran-uses-trailing-undescore
     finalize_();
+#endif
+#else // C/C++
+    finalize();
+#endif // Fortran
     CkExit();
   }
 }
@@ -342,15 +338,29 @@ chunk::chunk(void)
 }
 
 void
+chunk::callDriver(void)
+{
+  // call the application-specific driver
+  doneCalled = 0;
+#if FEM_FORTRAN
+#if CMK_FORTRAN_USES_ALLCAPS
+  DRIVER(&numNodes, gNodeNums, &numElems, gElemNums, &numNodesPerElem, conn);
+#else // fortran-uses-trailing-undescore
+  driver_(&numNodes, gNodeNums, &numElems, gElemNums, &numNodesPerElem, conn);
+#endif
+#else // C/C++
+  driver(numNodes, gNodeNums, numElems, gElemNums, numNodesPerElem, conn);
+#endif // Fortran
+  FEM_Done();
+}
+
+void
 chunk::run(ChunkMsg *msg)
 {
   CtvInitialize(chunk*, _femptr);
   CtvAccess(_femptr) = this;
   readChunk(msg);
-  // call the application-specific driver
-  doneCalled = 0;
-  driver_(&numNodes, gNodeNums, &numElems, gElemNums, &numNodesPerElem, conn);
-  FEM_Done();
+  callDriver();
 }
 
 void
@@ -359,10 +369,7 @@ chunk::run(void)
   CtvInitialize(chunk*, _femptr);
   CtvAccess(_femptr) = this;
   readChunk();
-  // call the application-specific driver
-  doneCalled = 0;
-  driver_(&numNodes, gNodeNums, &numElems, gElemNums, &numNodesPerElem, conn);
-  FEM_Done();
+  callDriver();
 }
 
 void
@@ -717,7 +724,7 @@ chunk::print(void)
   CkPrintf("%s", str);
 }
 
-void 
+extern "C" void 
 FEM_Done(void)
 {
   chunk *cptr = CtvAccess(_femptr);
@@ -728,68 +735,70 @@ FEM_Done(void)
   }
 }
 
-int 
+extern "C" int 
 FEM_Create_Field(int base_type, int vec_len, int init_offset, int distance)
 {
   chunk *cptr = CtvAccess(_femptr);
   return cptr->new_DT(base_type, vec_len, init_offset, distance);
 }
 
-void
+extern "C" void
 FEM_Update_Field(int fid, void *nodes)
 {
   chunk *cptr = CtvAccess(_femptr);
   cptr->update(fid, nodes);
 }
 
-void
+extern "C" void
 FEM_Reduce_Field(int fid, void *nodes, void *outbuf, int op)
 {
   chunk *cptr = CtvAccess(_femptr);
   cptr->reduce_field(fid, nodes, outbuf, op);
 }
 
-void
+extern "C" void
 FEM_Reduce(int fid, void *inbuf, void *outbuf, int op)
 {
   chunk *cptr = CtvAccess(_femptr);
   cptr->reduce(fid, inbuf, outbuf, op);
 }
 
-void
+extern "C" void
 FEM_Read_Field(int fid, void *nodes, char *fname)
 {
   chunk *cptr = CtvAccess(_femptr);
   cptr->readField(fid, nodes, fname);
 }
 
-int
+extern "C" int
 FEM_My_Partition(void)
 {
   chunk *cptr = CtvAccess(_femptr);
   return cptr->id();
 }
 
-int
+extern "C" int
 FEM_Num_Partitions(void)
 {
   return _nchunks;
 }
 
-void FEM_Print(char *str)
+extern "C" void 
+FEM_Print(char *str)
 {
   chunk *cptr = CtvAccess(_femptr);
   CkPrintf("[%d] %s\n", cptr->thisIndex, str);
 }
 
-void FEM_Print_Partition(void)
+extern "C" void 
+FEM_Print_Partition(void)
 {
   chunk *cptr = CtvAccess(_femptr);
   cptr->print();
 }
 
 // Fortran Bindings
-
+#if FEM_FORTRAN
 extern "C" int
 #if CMK_FORTRAN_USES_ALLCAPS
 FEM_CREATE_FIELD
@@ -912,4 +921,26 @@ fem_print_partition_
   ptr->print();
 }
 
+extern "C" void
+#if CMK_FORTRAN_USES_ALLCAPS
+FEM_SET_MESH
+#else
+fem_set_mesh_
+#endif
+(int *nelem, int *nnodes, int *ctype, int *connmat)
+{
+  FEM_Set_Mesh(*nelem, *nnodes, *ctype, connmat);
+}
+
+extern "C" void
+#if CMK_FORTRAN_USES_ALLCAPS
+FEM_SET_MESH_TRANSFORM
+#else
+fem_set_mesh_transform_
+#endif
+(int *nelem, int *nnodes, int *ctype, int *connmat, int *permute)
+{
+  FEM_Set_Mesh_Transform(*nelem, *nnodes, *ctype, connmat, permute);
+}
+#endif
 #include "fem.def.h"

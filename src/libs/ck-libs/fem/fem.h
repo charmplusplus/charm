@@ -159,62 +159,69 @@ class chunk : public ArrayElement1D
   void readElems(ChunkMsg *msg=0);
   void readComm(ChunkMsg *msg=0);
   void readChunk(ChunkMsg *msg=0);
+  void callDriver(void);
 };
 
-void FEM_Done(void);
-int FEM_Create_Field(int base_type, int vec_len, int init_offset, int distance);
-void FEM_Update_Field(int fid, void *nodes);
-void FEM_Reduce_Field(int fid, void *nodes, void *outbuf, int op);
-void FEM_Reduce(int fid, void *inbuf, void *outbuf, int op);
-int FEM_My_Partition(void);
-int FEM_Num_Partitions(void);
-void FEM_Read_Field(int fid, void *nodes, char *fname);
-void FEM_Print(char *str);
-void FEM_Set_Mesh(int nelem, int nnodes, int ctype, int* connmat);
-void FEM_Set_Mesh_Transform(int nelem, int nnodes, int ctype, int* connmat, 
-                            int *permute);
-void FEM_Print_Partition(void);
+extern "C" {
+  void FEM_Done(void);
+  int FEM_Create_Field(int base_type, int vec_len, int init_offset, 
+                       int distance);
+  void FEM_Update_Field(int fid, void *nodes);
+  void FEM_Reduce_Field(int fid, void *nodes, void *outbuf, int op);
+  void FEM_Reduce(int fid, void *inbuf, void *outbuf, int op);
+  int FEM_My_Partition(void);
+  int FEM_Num_Partitions(void);
+  void FEM_Read_Field(int fid, void *nodes, char *fname);
+  void FEM_Print(char *str);
+  void FEM_Set_Mesh(int nelem, int nnodes, int ctype, int* connmat);
+  void FEM_Set_Mesh_Transform(int nelem, int nnodes, int ctype, int* connmat, 
+                              int *permute);
+  void FEM_Print_Partition(void);
 
-// Fortran Bindings
+  // Fortran Bindings
+
+#if FEM_FORTRAN
 #if CMK_FORTRAN_USES_ALLCAPS
-extern "C" int FEM_CREATE_FIELD(int *bt, int *vl, int *io, int *d);
-extern "C" void FEM_UPDATE_FIELD(int *fid, void *nodes);
-extern "C" void FEM_REDUCE_FIELD(int *fid, void *nodes, void *outbuf, int *op);
-extern "C" void FEM_REDUCE(int *fid, void *inbuf, void *outbuf, int *op);
-extern "C" int FEM_MY_PARTITION(void);
-extern "C" int FEM_NUM_PARTITIONS(void);
-// FIXME: correct fortran-c interoperability issue for passing character arrays
-extern "C" void FEM_READ_FIELD(int *fid, void *nodes, char *fname, int len);
-extern "C" void FEM_PRINT(char *str, int len);
-extern "C" void FEM_SET_MESH(int *nelem,int *nnodes,int *ctype,int *connmat);
-extern "C" void FEM_SET_MESH_TRANSFORM(int *nelem,int *nnodes,int *ctype,
-                                       int *connmat, int *permute);
-extern "C" void FEM_PRINT_PARTITION(void);
-extern "C" int OFFSETOF(void *, void *);
-// to be provided by the application
-extern "C" void INIT(void);
-extern "C" void DRIVER(int *, int *, int *, int *, int *, int *);
-extern "C" void FINALIZE(void);
-#else
-extern "C" int fem_create_field_(int *bt, int *vl, int *io, int *d);
-extern "C" void fem_update_field_(int *fid, void *nodes);
-extern "C" void fem_reduce_field_(int *fid, void *nodes, void *outbuf, int *op);
-extern "C" void fem_reduce_(int *fid, void *inbuf, void *outbuf, int *op);
-extern "C" int fem_my_partition_(void);
-extern "C" int fem_num_partitions_(void);
-// FIXME: correct fortran-c interoperability issue for passing character arrays
-extern "C" void fem_read_field_(int *fid, void *nodes, char *fname, int len);
-extern "C" void fem_print_(char *str, int len);
-extern "C" void fem_set_mesh_(int *nelem,int *nnodes,int *ctype,int *connmat);
-extern "C" void fem_set_mesh_transform_(int *nelem,int *nnodes,int *ctype,
-                                        int *connmat, int *permute);
-extern "C" void fem_print_partition_(void);
-extern "C" int offsetof_(void *, void *);
-// to be provided by the application
-extern "C" void init_(void);
-extern "C" void driver_(int *, int *, int *, int *, int *, int *);
-extern "C" void finalize_(void);
-#endif
-
-
+  int FEM_CREATE_FIELD(int *bt, int *vl, int *io, int *d);
+  void FEM_UPDATE_FIELD(int *fid, void *nodes);
+  void FEM_REDUCE_FIELD(int *fid, void *nodes, void *outbuf, int *op);
+  void FEM_REDUCE(int *fid, void *inbuf, void *outbuf, int *op);
+  int FEM_MY_PARTITION(void);
+  int FEM_NUM_PARTITIONS(void);
+  void FEM_READ_FIELD(int *fid, void *nodes, char *fname, int len);
+  void FEM_PRINT(char *str, int len);
+  void FEM_SET_MESH(int *nelem,int *nnodes,int *ctype,int *connmat);
+  void FEM_SET_MESH_TRANSFORM(int *nelem,int *nnodes,int *ctype,
+                              int *connmat, int *permute);
+  void FEM_PRINT_PARTITION(void);
+  int OFFSETOF(void *, void *);
+  // to be provided by the application
+  void INIT(void);
+  void DRIVER(int *, int *, int *, int *, int *, int *);
+  void FINALIZE(void);
+#else // fortran uses trailing underscore
+  int fem_create_field_(int *bt, int *vl, int *io, int *d);
+  void fem_update_field_(int *fid, void *nodes);
+  void fem_reduce_field_(int *fid, void *nodes, void *outbuf, int *op);
+  void fem_reduce_(int *fid, void *inbuf, void *outbuf, int *op);
+  int fem_my_partition_(void);
+  int fem_num_partitions_(void);
+  void fem_read_field_(int *fid, void *nodes, char *fname, int len);
+  void fem_print_(char *str, int len);
+  void fem_set_mesh_(int *nelem,int *nnodes,int *ctype,int *connmat);
+  void fem_set_mesh_transform_(int *nelem,int *nnodes,int *ctype,
+                               int *connmat, int *permute);
+  void fem_print_partition_(void);
+  int offsetof_(void *, void *);
+  // to be provided by the application
+  void init_(void);
+  void driver_(int *, int *, int *, int *, int *, int *);
+  void finalize_(void);
+#endif // fortran-uses-uppercase
+#else // C/C++
+  void init(void);
+  void driver(int, int *, int, int *, int, int *);
+  void finalize(void);
+#endif // Fortran
+}
 #endif
