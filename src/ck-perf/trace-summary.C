@@ -598,15 +598,15 @@ void TraceSummary::beginComputation(void)
 #endif
     _threadMsg = CkRegisterMsg("dummy_thread_msg", 0, 0, 0, 0);
     _threadChare = CkRegisterChare("dummy_thread_chare", 0);
-    _threadEP = CkRegisterEp("dummy_thread_ep", 0, _threadMsg,_threadChare);
+    _threadEP = CkRegisterEp("dummy_thread_ep", 0, _threadMsg,_threadChare,0);
 
     _packMsg = CkRegisterMsg("dummy_pack_msg", 0, 0, 0, 0);
     _packChare = CkRegisterChare("dummy_pack_chare", 0);
-    _packEP = CkRegisterEp("dummy_pack_ep", 0, _packMsg,_packChare);
+    _packEP = CkRegisterEp("dummy_pack_ep", 0, _packMsg,_packChare,0);
 
     _unpackMsg = CkRegisterMsg("dummy_unpack_msg", 0, 0, 0, 0);
     _unpackChare = CkRegisterChare("dummy_unpack_chare", 0);
-    _unpackEP = CkRegisterEp("dummy_unpack_ep", 0, _unpackMsg,_unpackChare);
+    _unpackEP = CkRegisterEp("dummy_unpack_ep", 0, _unpackMsg,_unpackChare,0);
   }
 
   // initialze arrays because now the number of entries is known.

@@ -479,7 +479,7 @@ TraceProjections::TraceProjections(char **argv): curevent(0), isIdle(0)
 #endif
     _threadMsg = CkRegisterMsg("dummy_thread_msg", 0, 0, 0, 0);
     _threadChare = CkRegisterChare("dummy_thread_chare", 0);
-    _threadEP = CkRegisterEp("dummy_thread_ep", 0, _threadMsg,_threadChare);
+    _threadEP = CkRegisterEp("dummy_thread_ep", 0, _threadMsg,_threadChare,0);
   }
 
   if (TRACE_CHARM_PE() == 0) return;
