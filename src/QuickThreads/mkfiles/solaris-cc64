@@ -1,0 +1,22 @@
+
+CC=cc -I. -O -xarch=v9a -KPIC
+
+all: qt stp testpgm
+
+qt: md/sparc.h qt.c md/sparc.s
+	rm -f qtmd.h
+	ln -s md/sparc.h qtmd.h
+	$(CC) -c -o qt.o qt.c
+	$(CC) -c -o qtmds.o md/sparc.s
+	ar cr libqt.a qt.o qtmds.o
+	$(CC) -G -o libqt.so qt.o qtmds.o
+
+stp:
+	$(CC) -c stp.c
+	ar cr libstp.a stp.o
+
+testpgm:
+	$(CC) -c meas.c
+	$(CC) -c -o qtmdb.o md/sparc_b.s
+	$(CC) -o run meas.o qtmdb.o libstp.a libqt.a
+	
