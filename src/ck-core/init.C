@@ -37,8 +37,8 @@ CpvDeclare(_CkErrStream*, _ckerr);
 
 CpvStaticDeclare(UInt,  _numInitsRecd);
 CpvStaticDeclare(PtrQ*, _buffQ);
-CpvStaticDeclare(PtrQ*, _bocInitQ);
-CpvStaticDeclare(PtrQ*, _nodeBocInitQ);
+CpvStaticDeclare(PtrVec*, _bocInitVec);
+CpvStaticDeclare(PtrVec*, _nodeBocInitVec);
 
 static int    _exitHandlerIdx;
 
@@ -206,7 +206,12 @@ static inline void _processBufferedBocInits(void)
 {
   register envelope *env;
   CmiNumberHandler(_bocHandlerIdx, (CmiHandler)_processHandler);
-  while(env=(envelope *)CpvAccess(_bocInitQ)->deq()) {
+  register int i = 0;
+  register int len = CpvAccess(_bocInitVec)->length();
+  register void **vec = CpvAccess(_bocInitVec)->getVec();
+  for(i=0; i<len; i++) {
+    env = (envelope *) vec[i];
+    if(env==0) continue;
     if(env->isPacked() && _msgTable[env->getMsgIdx()]->unpack) {
       _TRACE_BEGIN_UNPACK();
       env = UsrToEnv(_msgTable[env->getMsgIdx()]->unpack(EnvToUsr(env)));
@@ -214,13 +219,19 @@ static inline void _processBufferedBocInits(void)
     }
     _processBocInitMsg(env);
   }
+  delete CpvAccess(_bocInitVec);
 }
 
 static inline void _processBufferedNodeBocInits(void)
 {
   register envelope *env;
   CmiNumberHandler(_nodeBocHandlerIdx, (CmiHandler)_processHandler);
-  while(env=(envelope *)CpvAccess(_nodeBocInitQ)->deq()) {
+  register int i = 0;
+  register int len = CpvAccess(_nodeBocInitVec)->length();
+  register void **vec = CpvAccess(_nodeBocInitVec)->getVec();
+  for(i=0; i<len; i++) {
+    env = (envelope *) vec[i];
+    if(env==0) continue;
     if(env->isPacked() && _msgTable[env->getMsgIdx()]->unpack) {
       _TRACE_BEGIN_UNPACK();
       env = UsrToEnv(_msgTable[env->getMsgIdx()]->unpack(EnvToUsr(env)));
@@ -228,6 +239,7 @@ static inline void _processBufferedNodeBocInits(void)
     }
     _processNodeBocInitMsg(env);
   }
+  delete CpvAccess(_nodeBocInitVec);
 }
 
 static inline void _processBufferedMsgs(void)
@@ -284,14 +296,14 @@ static void _initHandler(void *msg)
     case BocInitMsg:
       CpvAccess(_numInitsRecd)++;
       CpvAccess(_qd)->process();
-      CpvAccess(_bocInitQ)->enq(msg);
+      CpvAccess(_bocInitVec)->insert(env->getGroupNum(), msg);
       break;
     case NodeBocInitMsg:
       CmiLock(_nodeLock);
       _numInitNodeMsgs++;
       CmiUnlock(_nodeLock);
       CpvAccess(_qd)->process();
-      CpvAccess(_nodeBocInitQ)->enq(msg);
+      CpvAccess(_nodeBocInitVec)->insert(env->getGroupNum(), msg);
       break;
     case ROMsgMsg:
       CpvAccess(_numInitsRecd)++;
@@ -420,8 +432,8 @@ static char* fContent(char *msg)
 void _initCharm(int argc, char **argv)
 {
   CpvInitialize(PtrQ*,_buffQ);
-  CpvInitialize(PtrQ*,_bocInitQ);
-  CpvInitialize(PtrQ*,_nodeBocInitQ);
+  CpvInitialize(PtrVec*,_bocInitVec);
+  CpvInitialize(PtrVec*,_nodeBocInitVec);
   CpvInitialize(void*, _currentChare);
   CpvInitialize(CkGroupID, _currentGroup);
   CpvInitialize(CkGroupID, _currentNodeGroup);
@@ -437,10 +449,10 @@ void _initCharm(int argc, char **argv)
 
   CpvAccess(_buffQ) = new PtrQ();
   _MEMCHECK(CpvAccess(_buffQ));
-  CpvAccess(_bocInitQ) = new PtrQ();
-  _MEMCHECK(CpvAccess(_bocInitQ));
-  CpvAccess(_nodeBocInitQ) = new PtrQ();
-  _MEMCHECK(CpvAccess(_nodeBocInitQ));
+  CpvAccess(_bocInitVec) = new PtrVec();
+  _MEMCHECK(CpvAccess(_bocInitVec));
+  CpvAccess(_nodeBocInitVec) = new PtrVec();
+  _MEMCHECK(CpvAccess(_nodeBocInitVec));
   CpvAccess(_groupTable) = new GroupTable();
   _MEMCHECK(CpvAccess(_groupTable));
   if(CmiMyRank()==0) {
