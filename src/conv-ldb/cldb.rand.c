@@ -1,13 +1,10 @@
 #include "converse.h"
+#include "cldb.h"
 
 char *CldGetStrategy(void)
 {
   return "rand";
 }
-
-CpvDeclare(int, CldRelocatedMessages);
-CpvDeclare(int, CldLoadBalanceMessages);
-CpvDeclare(int, CldMessageChunks);
 
 void CldHandler(char *msg)
 {
@@ -19,8 +16,6 @@ void CldHandler(char *msg)
   ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
   CsdEnqueueGeneral(msg, queueing, priobits, prioptr);
 }
-
-CpvDeclare(int, CldHandlerIndex);
 
 void CldEnqueue(int pe, void *msg, int infofn)
 {
