@@ -100,6 +100,10 @@ LIBS: CONVLIBS CHARMLIBS
 
 test-all: test
 
+bgtest: bluegene AMPI
+	cd ../tests ; $(MAKE) bgtest OPTS='$(OPTS)'
+	cd ../examples ; $(MAKE) bgtest OPTS='$(OPTS)'
+
 test: AMPI
 	cd ../tests ; $(MAKE) test OPTS='$(OPTS)'
 	cd ../examples ; $(MAKE) test OPTS='$(OPTS)'
