@@ -319,6 +319,22 @@ const char *LBDatabase::loadbalancer(int seq) {
   }
 }
 
+void LBDatabase::pup(PUP::er& p)
+{ 
+  IrrGroup::pup(p); 
+  // the memory should be already allocated
+  int np;
+  if (!p.isUnpacking()) np = CkNumPes();
+  p|np;
+  CmiAssert(avail_vector);
+  // in case number of processors changes
+  if (p.isUnpacking() && np > CkNumPes()) {
+    delete [] avail_vector;
+    avail_vector = new char[np];
+    for (int i=0; i<np; i++) avail_vector[i] = 1;
+  }
+  p(avail_vector, np);
+}
 /*
   callable from user's code
 */

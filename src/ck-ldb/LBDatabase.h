@@ -73,7 +73,7 @@ public:
   inline LBDB *getLBDB() {return (LBDB*)(myLDHandle.handle);}
 #endif
 
-  void pup(PUP::er& p){ IrrGroup::pup(p); }
+  void pup(PUP::er& p);
 
   /*
    * Calls from object managers to load database
@@ -232,6 +232,10 @@ void LBTurnInstrumentOn();
 void LBTurnInstrumentOff();
 
 inline LBDatabase* LBDatabaseObj() { return LBDatabase::Object(); }
+
+inline void get_avail_vector(char * bitmap) {
+  LBDatabaseObj()->get_avail_vector(bitmap);
+}
 
 inline void set_avail_vector(char * bitmap) {
   LBDatabaseObj()->set_avail_vector(bitmap);

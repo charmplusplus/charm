@@ -22,6 +22,8 @@ load balancer around.
 #define NULLLB_CONVERSE                     1
 
 void CreateNullLB(void) {
+  // special seqno -1
+  // not putting into LBDatabase's loadbalancer list
   CProxy_NullLB::ckNew(-1);
 }
 
