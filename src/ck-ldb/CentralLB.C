@@ -66,7 +66,7 @@ CentralLB::CentralLB(const CkLBOptions &opt): BaseLB(opt)
     AddStartLBFn((LDStartLBFn)(staticStartLB),(void*)(this));
 
   // CkPrintf("[%d] CentralLB seq %d\n",CkMyPe(), seq);
-  if (opt.getSeqNo()) turnOff();
+  if (opt.getSeqNo() > 0) turnOff();
 
   stats_msg_count = 0;
   statsMsgsList = new CLBStatsMsg*[CkNumPes()];
