@@ -23,15 +23,15 @@
 
 SHELL=/bin/sh
 
-all: charm++ simplemsg pvmc
+all: charm++ smsg pvm
 
 charm: converse charmxlat charmlibs libcharm
 
 charm++: converse charmxlat charmlibs charmxlat++ charmfilter++ charmxi libcharm libck-cplus-y.a libck-defmain-cpp.a
 
-simplemsg: converse libsimplemsg.a
+smsg: converse libsimplemsg.a
 
-pvmc: converse libpvmc.a
+pvm: converse libpvmc.a
 
 translators: charmxlat charmfilter charmxlat++ charmfilter++ charmxi conv-cpm
 
@@ -557,7 +557,7 @@ xi-scan.o: xi-scan.C $(XIHEADERS)
 #
 ###############################################################################
 
-libsimplemsg.a: simplemsg.c simplemsg.h
+libsimplemsg.a: converse simplemsg.c simplemsg.h
 	$(CHARMC) -cp ../lib/ -o $@ simplemsg.c
 
 ###############################################################################
@@ -568,7 +568,7 @@ libsimplemsg.a: simplemsg.c simplemsg.h
 
 PVMC=pvmc_buf.o pvmc_comm.o pvmc_conv.o pvmc_main.o pvmc_pack.o pvmc_groups.o
 
-libpvmc.a: $(PVMC)
+libpvmc.a: converse $(PVMC)
 	$(CHARMC) -cp ../lib -o libpvmc.a $(PVMC)
 
 pvmc_buf.o: pvmc_buf.c pvmc.h pvm3.h

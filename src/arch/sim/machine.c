@@ -12,7 +12,12 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.13  1997-08-04 09:50:40  jyelon
+ * Revision 1.14  1997-08-06 14:57:32  milind
+ * Added net-linux and sim-linux versions.
+ * Fixed some bugs in Makefile.
+ * Fixed a bug in machine.c in common.sim.
+ *
+ * Revision 1.13  1997/08/04 09:50:40  jyelon
  * *** empty log message ***
  *
  * Revision 1.12  1997/03/24 16:21:54  milind
@@ -59,11 +64,11 @@ static char ident[] = "@(#)$Header$";
 #include "machine.h"
 #include "converse.h"
 
-#ifdef CMK_TIMER_SIM_USE_TIMES
+#if CMK_TIMER_SIM_USE_TIMES
 #include <sys/times.h>
 #include <sys/unistd.h>
 #endif
-#ifdef CMK_TIMER_SIM_USE_GETRUSAGE
+#if CMK_TIMER_SIM_USE_GETRUSAGE
 #include <sys/time.h>
 #include <sys/resource.h>
 #endif

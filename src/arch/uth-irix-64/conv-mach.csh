@@ -45,3 +45,4 @@ set CMK_NM='nm'
 set CMK_NM_FILTER="grep '|GLOB |' | sed -e 's/.*|//'"
 set CMK_CPP_SUFFIX="i"
 set CMK_XLATPP='charmxlat++ -w '
+set CMK_QT='origin'
