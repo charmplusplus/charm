@@ -1048,7 +1048,7 @@ void TraceProjections::endComputation(void)
   _logPool->add(END_COMPUTATION, 0, 0, TraceTimer(), -1, -1);
 }
 
-void TraceProjections::regFunc(char *name){
+int TraceProjections::regFunc(char *name){
 	StrKey k(name,strlen(name));
 	int num = funcHashtable.get(k);
 	if(num == 0){
@@ -1057,30 +1057,37 @@ void TraceProjections::regFunc(char *name){
 		StrKey *newKey = new StrKey(st,strlen(st));
 		int &ref = funcHashtable.put(*newKey);
 		ref=funcCount;
+		num = funcCount;
 		funcCount++;
 	}
-
+	return num;	
 }
 
 void TraceProjections::beginFunc(char *name,char *file,int line){
 	StrKey k(name,strlen(name));	
 	unsigned short  num = (unsigned short)funcHashtable.get(k);
-	if(num == 0){
-		CmiError("Unregistered function %s being used in %s:%d \n",name,file,line);
-	}
-	_logPool->add(BEGIN_FUNC,TraceTimer(),num,line,file);
+	beginFunc(num,file,line);
+}
+
+void TraceProjections::beginFunc(int idx,char *file,int line){
+	if(idx <= 0){
+		CmiError("Unregistered function id %d being used in %s:%d \n",idx,file,line);
+	}	
+	_logPool->add(BEGIN_FUNC,TraceTimer(),idx,line,file);
 }
 
 void TraceProjections::endFunc(char *name){
 	StrKey k(name,strlen(name));	
 	int num = funcHashtable.get(k);
-	if(num == 0){
-		printf("endFunc without start :O\n");
-	}
-	_logPool->add(END_FUNC,TraceTimer(),num,0,NULL);	
+	endFunc(num);	
 }
 
-
+void TraceProjections::endFunc(int num){
+	if(num <= 0){
+		printf("endFunc without start :O\n");
+	}
+	_logPool->add(END_FUNC,TraceTimer(),num,0,NULL);
+}
 
 // specialized PUP:ers for handling trace projections logs
 void toProjectionsFile::bytes(void *p,int n,size_t itemSize,dataType t)

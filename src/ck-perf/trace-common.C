@@ -409,9 +409,20 @@ void TraceArray::creationMulticast(envelope *env, int ep, int num,
     ALLDO(creationMulticast(env, ep, num, pelist));
 }
 
+/*
 extern "C" 
 void registerFunction(char *name){
 	_TRACE_ONLY(CkpvAccess(_traces)->regFunc(name));
+}
+*/
+
+extern "C"
+int registerFunction(char* name) {
+#ifndef CMK_OPTIMIZE
+  return CkpvAccess(_traces)->regFunc(name);
+#else
+  return 0;
+#endif
 }
 
 extern "C" 
@@ -419,8 +430,19 @@ void beginFuncProj(char *name,char *file,int line){
 	 _TRACE_ONLY(CkpvAccess(_traces)->beginFunc(name,file,line));
 }
 
+extern "C"
+void beginFuncIndexProj(int idx,char *file,int line){
+	 _TRACE_ONLY(CkpvAccess(_traces)->beginFunc(idx,file,line));
+}
+
 extern "C" 
 void endFuncProj(char *name){
 	 _TRACE_ONLY(CkpvAccess(_traces)->endFunc(name));
 }
+
+extern "C" 
+void endFuncIndexProj(int idx){
+	 _TRACE_ONLY(CkpvAccess(_traces)->endFunc(idx));
+}
+
 /*@}*/

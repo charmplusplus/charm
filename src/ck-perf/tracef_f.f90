@@ -19,6 +19,16 @@
         end subroutine
         subroutine ftraceFlushLog()
         end subroutine
+        subroutine ftraceRegisterFunc(str, outidx)
+          character(*), intent(in) :: str
+          integer, intent(in) :: outidx
+        end subroutine
+        subroutine ftraceBeginFunc(idx)
+          integer, intent(in) :: idx
+        end subroutine
+        subroutine ftraceEndFunc(idx)
+          integer, intent(in) :: idx
+        end subroutine
       end interface
       end module
 

@@ -40,10 +40,10 @@ void traceEnd(void) {}
 void traceWriteSts(void) {}
 void traceFlushLog(void) {}
 int  traceAvailable() {return 0;}
-void registerFunction(char *name){
-}
-void beginFuncProj(char *name,char *file,int line){
-}
-void endFuncProj(char *name){
-}
+
+int registerFunction(char *name) {}
+void beginFuncIndexProj(int idx, char* name, int lineNo) {}
+void endFuncIndexProj(int idx) {}
+void beginFuncProj(char *name,char *file,int line){}
+void endFuncProj(char *name){}
 

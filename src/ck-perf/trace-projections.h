@@ -272,9 +272,11 @@ class TraceProjections : public Trace {
     //functions that perform function tracing
     CkHashtableIterator *getfuncIterator(){return funcHashtable.iterator();};
     int getFuncNumber(){return funcHashtable.numObjects();};
-    void regFunc(char *name);
+    int regFunc(char *name);
     void beginFunc(char *name,char *file,int line);
+		void beginFunc(int idx,char *file,int line);
     void endFunc(char *name);
+		void endFunc(int num);
 
     /* for overiding basic thread listener support in Trace class */
     virtual void traceAddThreadListeners(CthThread tid, envelope *e);

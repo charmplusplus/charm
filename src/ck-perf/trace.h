@@ -119,9 +119,11 @@ class Trace {
     virtual void traceFlushLog() {}
 
     //for tracing function calls
-    virtual void regFunc(char *name){}
+    virtual int regFunc(char *name){}
     virtual void beginFunc(char *name,char *file,int line){}
-    virtual void endFunc(char *name){}
+    virtual void beginFunc(int idx,char *file,int line){}
+    virtual void endFunc(char *name){}    
+    virtual void endFunc(int idx){}
 
     /* for implementing thread listeners */
     virtual void traceAddThreadListeners(CthThread tid, envelope *e) {}
@@ -205,9 +207,11 @@ public:
     void traceEnd();
 
     /*Calls for tracing function begins and ends*/
-    inline void regFunc(char *name){ ALLDO(regFunc(name)); }
+    inline int regFunc(char *name){ ALLDO(regFunc(name)); }
     inline void beginFunc(char *name,char *file,int line){ ALLDO(beginFunc(name,file,line)); };
+    inline void beginFunc(int idx,char *file,int line){ ALLDO(beginFunc(idx,file,line)); };
     inline void endFunc(char *name){ ALLDO(endFunc(name)); }
+    inline void endFunc(int idx){ ALLDO(endFunc(idx)); }
 
     /* calls for thread listener registration for each trace module */
     inline void traceAddThreadListeners(CthThread tid, envelope *e) {

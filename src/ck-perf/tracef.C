@@ -16,6 +16,15 @@ static void checkInit(void) {
         CpvAccess(a)=0;
 }
 
+static char * FortrantoCString(char *x,int len){
+	char *newstr = new char[len + 1];
+  _MEMCHECK(newstr);
+  strncpy(newstr, x, len);
+  newstr[len] = 0;
+	return newstr;
+}
+
+
 FDECL {
 
 #define ftracebegin              FTN_NAME(FTRACEBEGIN, ftracebegin)
@@ -24,6 +33,9 @@ FDECL {
 #define ftraceuserbracketevent   FTN_NAME(FTRACEUSERBRACKETEVENT, ftraceuserbracketevent)
 #define ftraceUserEvent   	 FTN_NAME(FTRACEUSEREVENT, ftraceuserevent)
 #define ftraceFlushLog   	 FTN_NAME(FTRACEFLUSHLOG, ftraceflushlog)
+#define ftraceRegisterFunc	 FTN_NAME(FTRACEREGISTERFUNC,ftraceregisterfunc) 
+#define ftraceBeginFunc		 FTN_NAME(FTRACEBEGINFUNC,ftracebeginfunc)
+#define ftraceEndFunc		 FTN_NAME(FTRACEENDFUNC,ftraceendfunc)
 
 void ftracebegin()
 {
@@ -74,6 +86,21 @@ void ftraceFlushLog()
 {
   traceFlushLog();
 }
+
+void ftraceRegisterFunc(char *name,int *outIdx,int lenName){
+	char *newstr = FortrantoCString(name,lenName);
+	*outIdx = registerFunction(newstr);
+	delete [] newstr;
+}
+
+void ftraceBeginFunc(int idx){
+	beginFuncIndexProj(idx,"FORTRAN",0);
+}
+
+void ftraceEndFunc(int idx){
+	endFuncIndexProj(idx);
+}
+
 
 }  // FDECL
 
