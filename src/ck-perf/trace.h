@@ -17,8 +17,9 @@ class envelope;
 
 // An additional interface for summary data
 extern "C" void traceClearEps();
-
 extern double CmiTraceTimer();
+
+extern int _dummyMsg, _dummyChare, _dummyEP;
 
 // trace_in_charm means only do trace for Charm++ level
 // traceOnPe controls if charm pe will generate trace logs
@@ -99,6 +100,7 @@ class Trace {
 };
 
 #define ALLDO(x) for (int i=0; i<length(); i++) if (traces[i]->traceOnPE()) traces[i]->x
+#define ALLREVERSEDO(x) for (int i=length()-1; i>=0; i--) if (traces[i]->traceOnPE()) traces[i]->x
 
 /// Array of Traces modules,  every event raised will go through every Trace module.
 class TraceArray {
@@ -134,7 +136,7 @@ public:
     inline void beginExecute(envelope *env) {ALLDO(beginExecute(env));}
     inline void beginExecute(CmiObjId *tid) {ALLDO(beginExecute(tid));}
     inline void beginExecute(int event,int msgType,int ep,int srcPe, int mlen,CmiObjId *idx=NULL) {ALLDO(beginExecute(event, msgType, ep, srcPe, mlen,idx));}
-    inline void endExecute(void) {ALLDO(endExecute());}
+    inline void endExecute(void) {ALLREVERSEDO(endExecute());}
     inline void messageRecv(char *env, int pe) {ALLDO(messageRecv(env, pe));}
     inline void beginIdle(void) {ALLDO(beginIdle());}
     inline void endIdle(void) {ALLDO(endIdle());}
@@ -206,7 +208,8 @@ extern "C" {
 #define _TRACE_ENQUEUE(env) _TRACE_ONLY(CkpvAccess(_traces)->enqueue(env))
 #define _TRACE_DEQUEUE(env) _TRACE_ONLY(CkpvAccess(_traces)->dequeue(env))
 
-// for Blue Gene only
+// for Sdag only
+// fixme - think of better api for tracing sdag code
 #define BgPrint(x)  _TRACE_ONLY(CkpvAccess(_traces)->bgPrint(x))
 #define _TRACE_BG_BEGIN_EXECUTE(x,pLogPtr)  _TRACE_ONLY(CkpvAccess(_traces)->bgBeginExec(x,pLogPtr))
 #define _TRACE_BG_END_EXECUTE()   _TRACE_ONLY(CkpvAccess(_traces)->bgEndExec())

@@ -52,6 +52,7 @@ inline double TraceTimer(double t) { return t - CkpvAccess(traceInitTime); }
 extern int _threadMsg, _threadChare, _threadEP;
 extern int _packMsg, _packChare, _packEP;
 extern int _unpackMsg, _unpackChare, _unpackEP;
+extern int _dummyMsg, _dummyChare, _dummyEP;
 
 /** Write out the common parts of the .sts file. */
 extern void traceWriteSTS(FILE *stsfp,int nUserEvents);

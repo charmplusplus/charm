@@ -16,7 +16,6 @@
 
 #include "trace.h"
 #include "blue.h"
-#include "blue_timing.h"
 #include "blue_impl.h"
 
 class TraceBluegene : public Trace {
@@ -35,7 +34,7 @@ class TraceBluegene : public Trace {
     void getForwardDepForAll(void** logs1, void** logs2, int logsize,void* fDepPtr);
     void tlineEnd(void** parentLogPtr);
     void bgBeginExec(char* name,void** parentLogPtr);
-    void bgEndExec();
+    void bgEndExec(void);
     void userBracketEvent(char* name, double bt, double et, void** parentLogPtr);
     void userBracketEvent(char* name, double bt, double et, void** parentLogPtr, CkVec<void*> bgLogList);
     void bgPrint(char* str);

@@ -48,6 +48,7 @@ CkpvDeclare(char*, traceRoot);
 int _threadMsg, _threadChare, _threadEP;
 int _packMsg, _packChare, _packEP;
 int _unpackMsg, _unpackChare, _unpackEP;
+int _dummyMsg, _dummyChare, _dummyEP;
 
 
 /// decide parameters from command line
@@ -66,7 +67,7 @@ static void traceCommonInit(char **argv)
 #if CMK_TRACE_IN_CHARM
   CkpvInitialize(int, traceOnPe);
   CkpvAccess(traceOnPe) = 1;
-#if 0
+#if 1
   // example for choosing subset of processors for tracing
   CkpvAccess(traceOnPe) = 0;
   if (CkMyPe() < 20 && CkMyPe() > 15) CkpvAccess(traceOnPe) = 1;
@@ -113,6 +114,10 @@ static void traceCommonInit(char **argv)
     _unpackMsg = CkRegisterMsg("dummy_unpack_msg", 0, 0, 0);
     _unpackChare = CkRegisterChare("dummy_unpack_chare", 0);
     _unpackEP = CkRegisterEp("dummy_unpack_ep", 0, _unpackMsg,_unpackChare, 0);
+
+    _dummyMsg = CkRegisterMsg("dummy_msg", 0, 0, 0);
+    _dummyChare = CkRegisterChare("dummy_chare", 0);
+    _dummyEP = CkRegisterEp("dummy_ep", 0, _dummyMsg,_dummyChare, 0);
   }
 }
 

@@ -52,6 +52,7 @@ TraceBluegene::TraceBluegene(char** argv): stsfp(NULL), pfp(NULL)
     if(stsfp==0)
       CmiAbort("Cannot open Bluegene sts file for writing.\n");
   }
+  currLog = NULL;
 }
 
 void TraceBluegene::traceClose() {
@@ -97,16 +98,14 @@ void TraceBluegene::bgBeginExec(char* name,void** parentLogPtr){
   bgTimeLog* newLog = new bgTimeLog(_threadEP,name,BgGetCurTime());
   if(*parentLogPtr)
     newLog->addBackwardDep(*(bgTimeLog**)parentLogPtr);
-  currLog = newLog;
-  BgInsertLog((void*)newLog);
+  tTIMELINEREC.logEntryStart(newLog);
   *parentLogPtr = newLog;
 }
 
 
-void TraceBluegene::bgEndExec(){
-
-  if (!genTimeLog) return;
-  currLog->closeLog();
+void TraceBluegene::bgEndExec()
+{
+  tTIMELINEREC.logEntryClose();
 }
 
 
@@ -151,7 +150,7 @@ void TraceBluegene::userBracketEvent(char* name, double bt, double et, void** pa
     newLog->addBackwardDep(*(bgTimeLog**)parentLogPtr);
   *parentLogPtr = newLog;
   currLog = newLog;
-  BgInsertLog((void*)newLog);
+  tTIMELINEREC.logEntryInsert(newLog);
 }
 
 
@@ -163,7 +162,7 @@ void TraceBluegene::userBracketEvent(char* name, double bt, double et, void** pa
   newLog->addBackwardDeps(bgLogList);
   *parentLogPtr = newLog;
   currLog = newLog;
-  BgInsertLog((void*)newLog);
+  tTIMELINEREC.logEntryInsert(newLog);
 }
 
 
