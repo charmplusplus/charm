@@ -7,6 +7,5 @@ Things to do for Charm++/Converse Release 5.5
 * Check documentation for correctness (mainly see that all example
   programs in the manual work.)
 * AMPI manual to be integrated.
-* Make migratable threads available on intel machines (linux)
 * Fortran90 support on blue horizon.
 * Test. Test. Test.
