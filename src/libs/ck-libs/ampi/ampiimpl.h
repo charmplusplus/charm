@@ -730,7 +730,7 @@ class CkPagedVector : private CkNoncopyable {
 	int nPages;
 	void allocatePages(int nEntries) {
 		nPages=(nEntries+pageSize-1)/pageSize; // round up
-		pages=new (T*)[nPages];
+		pages=new T*[nPages];
 		for (int pg=0;pg<nPages;pg++) pages[pg]=0;
 	}
 	void allocatePage(int pg) {
@@ -748,7 +748,7 @@ public:
 				delete[] pages[pg];
 		delete[] pages;
 	}
-	void CkPagedVector::init(int nEntries) {
+	void init(int nEntries) {
 		allocatePages(nEntries);
 	}
 	
@@ -1052,6 +1052,7 @@ public:
       }
       if (comm>MPI_COMM_WORLD) return worldPtr; //Use MPI_WORLD ampi for cross-world messages:
       CkAbort("Invalid communicator used!");
+      return NULL;
     }
 
     inline int hasComm(const MPI_Group group){
