@@ -1,0 +1,162 @@
+                              Charm++ 5.5
+
+       Copyright (C) 1989-2000 Regents of the University of Illinois
+
+INTRODUCTION
+============
+
+Charm++ is a message-passing parallel language and runtime system.
+It is implemented as a set of libraries for C++, is efficient,
+and is portable to a wide variety of parallel machines.
+Source code is provided, and non-commercial use is free.
+
+
+PICKING A VERSION
+=================
+
+First, you need to decide which version of charm++ to use.  Your
+choice is determined by three options:
+
+1.)  The way a parallel program written in Charm++ will communicate:
+
+	"net-" Charm++ communicates using the regular TCP/IP stack
+(UDP packets), which works everywhere but is fairly slow.  Use this
+option for networks of workstations, clusters, or single-machine 
+development and testing.
+
+	"mpi-" Charm++ communicates using MPI calls.  Use this for
+machines with a good MPI implementation (such as the Origin 2000).
+
+	"exemplar", "ncube-2", "paragon-red", "sp3", and "t3e" Charm++
+communicates using direct calls to the machine's communication primitives.
+
+	"sim-" and "uth-" are not actively maintained.  These are
+single-processor versions: "uth-" simulates processors as user-level
+threads; "sim-" switches between processors and counts communications.
+
+
+2.)  Your operating system:
+
+	"linux"   Linux 
+	"win32"   MS Windows NT/98/2k (and MS Visual C++ compiler)
+	"cygwin"  MS Windows with Cygnus' Cygwin Unix layer
+	"irix"    SGI IRIX
+	"origin"  SGI Origin 2000 IRIX
+	"sol"     Solaris
+	"sun"     SunOS
+	"rs6k"    IBM R/S 6000 A/IX 
+	"sp"      IBM SP A/IX
+	"hp"      Hewlett-Packard HP-UX
+	"axp"     DEC Alpha DECUNIX
+	
+
+3.)  Your compiler and other options.  Charm++ normally picks an
+appropriate compiler for the system, but you may select another
+compiler:
+
+	"-cc"      The OEM C/C++ compiler.  When given, this
+will override the choice of the GNU C/C++ compiler.
+	"-kcc"     Kuck & Associates C++ compiler.
+	"-acc"     Uses HP's aCC instead of CC.
+
+Some operating systems have other options, such as:
+	"-x86"     For Solaris, use PC hardware (instead of Sun).
+	"-axp"     For Linux, use Alpha hardware (instead of PC).
+	"-64"      For IRIX, use -64 instead of -32. 
+
+You may also choose to enable direct SMP support with a "-smp"
+version, which may result in more efficient communication in
+a cluster-of-SMPs.  A "-smp" version will communicate using
+shared memory within a machine; but message passing across machines.
+"-smp" is currently only available with "net-" versions.
+Because of locking, "-smp" may slightly impact non-SMP performance.
+
+
+Your Charm++ version is made by concatenating all three options, e.g.:
+
+"net-linux"     Charm++ for a network of Linux workstations, compiled
+                using g++.
+"net-linux-kcc" Charm++ for a network of Linux workstations, compiled
+                using Kuck & Associates C++ compiler.
+"net-linux-smp" Charm++ for a network of Linux SMP workstations,
+                compiled using g++.
+"net-sol-cc"    Charm++ for a network of Sun workstations, 
+                compiled using Sun CC.
+"mpi-origin"    Charm++ for SGI Origin 2000, compiled using SGI CC.
+
+
+
+BUILDING THE SOURCE
+===================
+
+If you have downloaded a binary version of Charm++, you can skip
+this step-- Charm++ should already be compiled.  For win32 systems,
+see README.win32; for net- version, see README.net
+
+Once you have decided on a version, unpack Charm++, cd into charm,
+and run
+
+     > ./SUPER_INSTALL _target_ _version_
+
+Where _target_ is one of
+	"charm++"  The basic Charm++ language.
+	"AMPI"     An implementation of MPI on top of Charm++
+	"FEM"      A Finite-Element framework on top of Charm++
+
+For example, on a Linux machine, you would run
+     > ./SUPER_INSTALL charm++ net-linux
+
+
+This will construct a _version_ directory, link over all
+the Charm++ source code into _version_/tmp, build the entire
+Charm++ runtime system in _version_/tmp, and link sample programs 
+into _version_/pgms.
+
+
+
+BUILDING A PROGRAM
+==================
+
+To make a sample program, cd into _version_/pgms/charm++/queens/.
+This program solves the N-queens problem-- find how many ways there 
+are to arrange N queens on an NxN chess board such that none may 
+attack another.  
+
+To build the program, type make.  You should get an
+executable named "pgm".
+
+To run the program on two processors, type
+     > ./charmrun pgm 12 100 +p2
+
+This should run for a few seconds, and print out:
+There are 14200 Solutions to 12 queens. Finish time=4.030000
+
+
+
+FOR MORE INFORMATION
+====================
+
+The Charm++ web page, with documentation, more programs,
+and the latest version of Charm++, is at
+	http://charm.cs.uiuc.edu/
+
+The Charm++ mailing list, for questions, comments, suggestions, 
+improvements, or bug reports is
+	ppl@cs.uiuc.edu
+
+
+AUTHORS
+=======
+
+Charm++ is written and maintained by the Parallel Programming
+Lab, in the Computer Science department at the University of 
+Illinois at Urbana-Champaign.  Our managing professor is
+Dr. L.V. Kale; students have included (in rough time order)
+Wennie Shu, Kevin Nomura, Wayne Fenton, Balkrishna Ramkumar,
+Vikram Saletore, Amitabh B. Sinha, Manish Gupta, Attila Gursoy, 
+Balkrishna Ramkumar, Amitabh B. Sinha, Nimish Shah, Sanjeev 
+Krishnan, Parthasarathy Ramachandran, Jeff Wright, Michael Lang, 
+Jackie Wang, Fang Hu, Michael Denardo, Joshua Yelon, Narain Jagathesan,
+Zehra Sura, Krishnan Varadarajan, and Sameer Paranjpye.  Current developers
+include Milind Bhandarkar, Robert Brunner, Terry Wilmarth, Gengbin Zheng, 
+Jayant Desouza, Orion Lawlor, Karthik Mahesh, and Neelam Saboo.
