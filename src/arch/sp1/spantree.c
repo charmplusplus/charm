@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1995-07-17 17:47:17  knauff
+ * Revision 2.2  1995-09-08 02:38:48  gursoy
+ * Cmi_dim is no more exported from machine.c. now thru a function call
+ *
+ * Revision 2.1  1995/07/17  17:47:17  knauff
  * Added '#include "converse.h"'
  *
  * Revision 2.0  1995/07/10  22:12:53  knauff
@@ -37,11 +40,10 @@ typedef struct spantreearray {
     int *children;
 } SpanTreeArray;
 
-SpanTreeArray *SpanArray;
-int *NodeStore;   /* used to store the nodes in the spanning 
+static SpanTreeArray *SpanArray;
+static int *NodeStore;   /* used to store the nodes in the spanning 
 		       tree in breadth first order */
-extern int Cmi_dim;
-int numnodes;
+static int numnodes;
 
 CmiSpanTreeInit()
 {
@@ -49,8 +51,10 @@ CmiSpanTreeInit()
     BOOLEAN visited[MAXNODES];
     int next, currentnode;
     int neighbours[MAXCUBEDIM];
+    int dim;
 
-    numnodes = (1 << Cmi_dim);
+    numnodes = CmiNumPe();
+    dim      = CmiNumNeighbours(0);
     SpanArray = (SpanTreeArray *)CmiAlloc(sizeof(SpanTreeArray) * numnodes);
     NodeStore = (int *) CmiAlloc(sizeof(int) * numnodes);
     visited[0] = TRUE;
@@ -65,7 +69,7 @@ CmiSpanTreeInit()
 	currentnode = NodeStore[i];
 	CmiGetNodeNeighbours(currentnode, neighbours);
 	SpanArray[currentnode].noofchildren = 0;
-	for (j = 0; j < Cmi_dim && 
+	for (j = 0; j < dim && 
 	            SpanArray[currentnode].noofchildren < MAXSPAN; j++)
 	{
 	    if (!visited[neighbours[j]])
