@@ -1081,7 +1081,7 @@ FEM_Mesh *FEM_Mesh_assemble(int nChunks,FEM_Mesh **chunks)
 {
 	FEM_Mesh *m=new FEM_Mesh;
 	m->copyShape(*chunks[0]); //Copy datatypes from some random chunk
-	int t,c,e,n;
+	int t,c;
 
 // Copy over nodes:
 	FEM_Entity_numberer nodeNum;

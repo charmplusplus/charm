@@ -96,7 +96,6 @@ CDECL void
 FEM_Mesh_data(int fem_mesh,int entity,int attr, 	
   	void *data, int firstItem,int length, int datatype,int width)
 {
-	const char *callingRoutine="FEM_Mesh_data";
 	IDXL_Layout lo(datatype,width);
 	FEM_Mesh_data_layout(fem_mesh,entity,attr,data,firstItem,length,lo);
 }

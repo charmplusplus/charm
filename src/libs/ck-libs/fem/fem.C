@@ -1221,7 +1221,6 @@ void FEM_Mesh::print(int idxBase)
 void
 FEMchunk::print(int idxBase)
 {
-  int i;
   CkPrintf("-------------------- Chunk %d --------------------\n",thisIndex);
   cur_mesh->print(idxBase);
   CkPrintf("\n\n");
