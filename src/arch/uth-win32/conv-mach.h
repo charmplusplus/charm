@@ -26,9 +26,6 @@
 #define CMK_MEMORY_PAGESIZE                                8192
 #define CMK_MEMORY_PROTECTABLE                             0
 
-#define CMK_MSG_HEADER_BASIC  CMK_MSG_HEADER_EXT
-#define CMK_MSG_HEADER_EXT    { CmiUInt2 hdl,xhdl,info,d0; }
-
 #define CMK_IS_HETERO                                      0
 
 #define CMK_MULTICAST_GROUP_TYPE                struct { unsigned pe, id; }
@@ -59,8 +56,6 @@
 #define CMK_SPANTREE_USE_COMMON_CODE                       1
 #define CMK_SPANTREE_USE_SPECIAL_CODE                      0
 
-
-
 #define CMK_SYNCHRONIZE_ON_TCP_CLOSE                       0
 
 #define CMK_THREADS_REQUIRE_NO_CPV                         1
@@ -89,14 +84,7 @@
 #define CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT                   0
 #define CMK_WHEN_PROCESSOR_IDLE_USLEEP                     0
 
-
-
 #define CMK_WEB_MODE                                       0
-
-#define CMK_LBDB_ON					   1
-
-
-
 
 #endif
 
