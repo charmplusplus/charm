@@ -40,9 +40,9 @@ protected:
 public:
   RefineLB(const CkLBOptions &);
   RefineLB(CkMigrateMessage *m):CentralLB(m) {}
-private:
-  CmiBool QueryBalanceNow(int step);
   void work(CentralLB::LDStats* stats, int count);
+private:
+  CmiBool QueryBalanceNow(int step) { return CmiTrue; }
 
 protected:
 /*

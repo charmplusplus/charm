@@ -12,7 +12,7 @@
 
 int LBSimulation::dumpStep = -1;  	     /// first step number to dump
 int LBSimulation::dumpStepSize = 1;          /// number of steps to dump 
-char* LBSimulation::dumpFile = "lbdata.dat"; /// dump file name
+char* LBSimulation::dumpFile = (char*)"lbdata.dat"; /// dump file name
 int LBSimulation::doSimulation = 0; 	     /// flag if do simulation
 int LBSimulation::simStep = -1;              /// first step number to simulate
 int LBSimulation::simStepSize = 1;           /// number of steps to simulate

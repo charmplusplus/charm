@@ -337,6 +337,7 @@ void Refiner::Refine(int count, CentralLB::LDStats* stats,
 
   multirefine();
 
+  int nmoves = 0;
   for (int pe=0; pe < P; pe++) {
     Iterator nextCompute;
     nextCompute.id = 0;
@@ -344,6 +345,7 @@ void Refiner::Refine(int count, CentralLB::LDStats* stats,
       processors[pe].computeSet->iterator((Iterator *)&nextCompute);
     while(c) {
       new_p[c->Id] = c->processor;
+      if (new_p[c->Id] != cur_p[c->Id]) nmoves++;
 //      if (c->oldProcessor != c->processor)
 //      CkPrintf("Refiner::Refine: from %d to %d\n", c->oldProcessor, c->processor);
       nextCompute.id++;
@@ -351,6 +353,7 @@ void Refiner::Refine(int count, CentralLB::LDStats* stats,
 	             next((Iterator *)&nextCompute);
     }
   }
+  if (_lb_debug) CkPrintf("Refiner: moving %d obejcts. \n", nmoves);
   delete [] computes;
   delete [] processors;
 };

@@ -19,8 +19,6 @@
 #include "heap.h"
 #include "WSLB.h"
 
-#if CMK_LBDB_ON
-
 // Temporary vacating flags
 // Set PROC to -1 to disable
 
@@ -30,6 +28,7 @@
 #define UNVACATE_AFTER 15
 
 CreateLBFunc_Def(WSLB);
+
 
 void WSLB::staticMigrated(void* data, LDObjHandle h)
 {
@@ -47,6 +46,7 @@ void WSLB::staticAtSync(void* data)
 
 WSLB::WSLB(const CkLBOptions &opt) : BaseLB(opt) 
 {
+#if CMK_LBDB_ON
   thisProxy = CProxy_WSLB(thisgroup);
   lbname = "WSLB";
   if (CkMyPe() == 0)
@@ -84,6 +84,7 @@ WSLB::WSLB(const CkLBOptions &opt) : BaseLB(opt)
   usage_int_err = 0.;
 
   theLbdb->CollectStatsOn();
+#endif
 }
 
 WSLB::~WSLB()
@@ -111,6 +112,7 @@ void WSLB::FindNeighbors()
 
 void WSLB::AtSync()
 {
+#if CMK_LBDB_ON
   //  CkPrintf("[%d] WSLB At Sync step %d!!!!\n",CkMyPe(),mystep);
 
   if (CkMyPe() == 0) {
@@ -132,10 +134,12 @@ void WSLB::AtSync()
 
   // Tell our own node that we are ready
   ReceiveStats((WSLBStatsMsg*)0);
+#endif
 }
 
 WSLBStatsMsg* WSLB::AssembleStats()
 {
+#if CMK_LBDB_ON
   // Get stats
   theLbdb->TotalTime(&myStats.total_walltime,&myStats.total_cputime);
   theLbdb->IdleTime(&myStats.idletime);
@@ -208,20 +212,26 @@ WSLBStatsMsg* WSLB::AssembleStats()
   //  CkPrintf("PE %d sending %d to ReceiveStats %d objs, %d comm\n",
   //	   CkMyPe(),msg->serial,msg->n_objs,msg->n_comm);
   return msg;
+#else
+  return NULL;
+#endif
 }
 
 void WSLB::Migrated(LDObjHandle h)
 {
+#if CMK_LBDB_ON
   migrates_completed++;
   //  CkPrintf("[%d] An object migrated! %d %d\n",
   //  	   CkMyPe(),migrates_completed,migrates_expected);
   if (migrates_completed == migrates_expected) {
     MigrationDone();
   }
+#endif
 }
 
 void WSLB::ReceiveStats(WSLBStatsMsg *m)
 {
+#if CMK_LBDB_ON
   if (neighbor_pes == 0) FindNeighbors();
 
   if (m == 0) { // This is from our own node
@@ -294,11 +304,12 @@ void WSLB::ReceiveStats(WSLBStatsMsg *m)
       CkPrintf("Strat elapsed time %f\n",strat_end_time-strat_start_time);
     }
   }
-  
+#endif  
 }
 
 void WSLB::ReceiveMigration(LBMigrateMsg *msg)
 {
+#if CMK_LBDB_ON
   if (neighbor_pes == 0) FindNeighbors();
 
   if (mig_msgs_received == 0) migrates_expected = 0;
@@ -335,11 +346,13 @@ void WSLB::ReceiveMigration(LBMigrateMsg *msg)
   mig_msgs_received = 0;
   if (migrates_expected == 0 || migrates_expected == migrates_completed)
     MigrationDone();
+#endif
 }
 
 
 void WSLB::MigrationDone()
 {
+#if CMK_LBDB_ON
   if (CkMyPe() == 0) {
     double end_lb_time = CmiWallTimer();
     CkPrintf("Load balancing step %d finished at %f duration %f\n",
@@ -350,15 +363,19 @@ void WSLB::MigrationDone()
   // Increment to next step
   mystep++;
   thisProxy [CkMyPe()].ResumeClients();
+#endif
 }
 
 void WSLB::ResumeClients()
 {
+#if CMK_LBDB_ON
   theLbdb->ResumeClients();
+#endif
 }
 
 CmiBool WSLB::QueryBalanceNow(int step)
 {
+#if CMK_LBDB_ON
   double now = CmiWallTimer();
 
   if (step==0)
@@ -373,12 +390,13 @@ CmiBool WSLB::QueryBalanceNow(int step)
       CkPrintf("PE %d unvacating at %f\n",CkMyPe(),now);
     vacate = CmiFalse;
   }
-
+#endif
   return CmiTrue;
 }
 
 LBMigrateMsg* WSLB::Strategy(WSLB::LDStats* stats, int count)
 {
+#if CMK_LBDB_ON
   //  CkPrintf("[%d] Strategy starting\n",CkMyPe());
   // Compute the average load to see if we are overloaded relative
   // to our neighbors
@@ -543,10 +561,12 @@ LBMigrateMsg* WSLB::Strategy(WSLB::LDStats* stats, int count)
   }
 
   return msg;
+#else
+  return NULL;
+#endif
 };
 
 #include "WSLB.def.h"
-#endif
 
 
 /*@}*/

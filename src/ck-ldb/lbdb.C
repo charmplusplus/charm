@@ -12,8 +12,6 @@
 
 #include <converse.h>
 
-#if CMK_LBDB_ON
-
 #include <math.h>
 
 #include "lbdb.h"
@@ -21,6 +19,8 @@
 #include "LBOM.h"
 #include "LBDBManager.h"
   
+#if CMK_LBDB_ON
+
 extern "C" LDHandle LDCreate(void)
 {
   LDHandle h;
@@ -394,18 +394,6 @@ extern "C" int LDProcessorSpeed()
   return wps;
 }
 
-CmiBool LDOMidEqual(const LDOMid &i1, const LDOMid &i2)
-{
- return (CmiBool)(i1.id == i2.id);
-}
-
-CmiBool LDObjIDEqual(const LDObjid &i1, const LDObjid &i2)
-{
-  return (CmiBool)(i1.id[0] == i2.id[0] 
-	 && i1.id[1] == i2.id[1] && i1.id[2] == i2.id[2] 
-	 && i1.id[3] == i2.id[3]);
-}
-
 void LDSetLBPeriod(LDHandle _db, double s)   // s is in seconds
 {
   LBDB *const db = (LBDB*)(_db.handle);
@@ -425,5 +413,17 @@ int LDMemusage(LDHandle _db)
 }
 
 #endif // CMK_LBDB_ON
+
+CmiBool LDOMidEqual(const LDOMid &i1, const LDOMid &i2)
+{
+ return (CmiBool)(i1.id == i2.id);
+}
+
+CmiBool LDObjIDEqual(const LDObjid &i1, const LDObjid &i2)
+{
+  return (CmiBool)(i1.id[0] == i2.id[0] 
+	 && i1.id[1] == i2.id[1] && i1.id[2] == i2.id[2] 
+	 && i1.id[3] == i2.id[3]);
+}
 
 /*@}*/
