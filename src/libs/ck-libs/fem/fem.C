@@ -1755,11 +1755,12 @@ void FEMchunk::exchangeGhostLists(int elemType,
 			outIdx[rec->getChk(s)].push_back(rec->getIdx(s));
 	}
 	//Send off the comm. idx list to each chk:
-	for (int chk=0;chk<nChk;chk++)
+	for (int chk=0;chk<nChk;chk++) {
 		thisproxy[cnt[chk].getDest()].recvList(
 			elemType,cnt[chk].getOurName(),
 			outIdx[chk].size(), outIdx[chk].getVec()
 		);
+	}
 	delete[] outIdx;
 	
 //Check if the replies have all arrived
@@ -1767,6 +1768,8 @@ void FEMchunk::exchangeGhostLists(int elemType,
 		listSuspended=true;
 		thread->suspend(); //<- sleep until all lists arrive
 	}
+	else //We have everything we need-- reset and continue
+		listCount=0;
 }
 
 void FEMchunk::recvList(int elemType,int fmChk,int nIdx,const int *idx)
@@ -1781,10 +1784,10 @@ void FEMchunk::recvList(int elemType,int fmChk,int nIdx,const int *idx)
 bool FEMchunk::finishListExchange(const commCounts &l)
 {
 	if (listCount<l.size()) return false; //Not finished yet!
-	listCount=0;
 	if (listSuspended) {
 		listSuspended=false;
 		thread->resume();
+		listCount=0;
 	}
 	return true;
 }
