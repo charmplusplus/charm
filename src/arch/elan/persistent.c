@@ -27,9 +27,12 @@ typedef struct pmsg_list {
 
 static PMSG_LIST *pending_persistent_msgs = NULL;
 static PMSG_LIST *end_pending_persistent_msgs = NULL;
+static PMSG_LIST *free_list_head = NULL;
 
+/* free_list_head keeps a list of reusable PMSG_LIST */
 #define NEW_PMSG_LIST(evt, m, s, dest, ph) \
-  msg_tmp = (PMSG_LIST *) CmiAlloc(sizeof(PMSG_LIST));	\
+  if (free_list_head) { msg_tmp = free_list_head; free_list_head=free_list_head->next; }  \
+  else msg_tmp = (PMSG_LIST *) CmiAlloc(sizeof(PMSG_LIST));	\
   msg_tmp->msg = m;	\
   msg_tmp->e = evt;	\
   msg_tmp->size = s;	\
@@ -57,11 +60,11 @@ void CmiSendPersistentMsg(PersistentHandle h, int destPE, int size, void *m)
     CmiAbort("Abort: Invalid size\n");
   }
 
-//CmiPrintf("[%d] CmiSendPersistentMsg h=%p hdl=%d destAddress=%p size=%d\n", CmiMyPe(), *phs, CmiGetHandler(m), slot->destAddress, size);
+/*CmiPrintf("[%d] CmiSendPersistentMsg h=%p hdl=%d destAddress=%p size=%d\n", CmiMyPe(), *phs, CmiGetHandler(m), slot->destAddress, size);*/
 
   if (slot->destAddress) {
     ELAN_EVENT *e1, *e2;
-    //CmiPrintf("[%d]Calling elan put\n", CmiMyPe());
+    /*CmiPrintf("[%d]Calling elan put\n", CmiMyPe());*/
     e1 = elan_put(elan_base->state, m, slot->destAddress, size, destPE);
 #if 1
     PMSG_LIST *msg_tmp;
@@ -71,7 +74,7 @@ void CmiSendPersistentMsg(PersistentHandle h, int destPE, int size, void *m)
     elan_wait(e1, ELAN_POLL_EVENT);
     e2 = elan_put(elan_base->state, &size, slot->destSizeAddress, sizeof(int), destPE);
     elan_wait(e2, ELAN_POLL_EVENT);
-    //CmiPrintf("[%d] elan finished. \n", CmiMyPe());
+    /*CmiPrintf("[%d] elan finished. \n", CmiMyPe());*/
     CmiFree(m);
 #endif
   }
@@ -101,7 +104,7 @@ void CmiSyncSendPersistent(int destPE, int size, char *msg, PersistentHandle h)
   char *dupmsg = (char *) CmiAlloc(size);
   memcpy(dupmsg, msg, size);
 
-  //  CmiPrintf("Setting root to %d\n", 0);
+  /*  CmiPrintf("Setting root to %d\n", 0); */
   CMI_SET_BROADCAST_ROOT(dupmsg, 0);
 
   if (cs->pe==destPE) {
@@ -112,8 +115,10 @@ void CmiSyncSendPersistent(int destPE, int size, char *msg, PersistentHandle h)
     CmiSendPersistentMsg(h, destPE, size, dupmsg);
 }
 
-// 1: finish the first put but still need to be in the queue for the second put.
-// 2: finish and should be removed from queue.
+/* 
+  1: finish the first put but still need to be in the queue for the second put.
+  2: finish and should be removed from queue.
+*/
 static int remote_put_done(PMSG_LIST *smsg)
 {
   int flag = elan_poll(smsg->e, ELAN_POLL_EVENT);
@@ -150,7 +155,9 @@ void release_pmsg_list()
         pending_persistent_msgs = temp;
       else
         prev->next = temp;
-      CmiFree(msg_tmp);
+      /*CmiFree(msg_tmp);*/
+      if (free_list_head) { msg_tmp->next = free_list_head; free_list_head = msg_tmp; }
+      else free_list_head = msg_tmp;
       msg_tmp = temp;
     }
     else {
@@ -182,7 +189,7 @@ void PumpPersistent()
       msg = dupmsg;
 #else
       /* return messagePtr directly and user MUST make sure not to delete it. */
-      //CmiPrintf("[%d] %p size:%d rank:%d root:%d\n", CmiMyPe(), msg, size, CMI_DEST_RANK(msg), CMI_BROADCAST_ROOT(msg));
+      /*CmiPrintf("[%d] %p size:%d rank:%d root:%d\n", CmiMyPe(), msg, size, CMI_DEST_RANK(msg), CMI_BROADCAST_ROOT(msg));*/
 
       CmiReference(msg);
 #endif
