@@ -9,6 +9,7 @@ qt: md/sparc.h qt.c md/sparc.s
 	$(CC) -pedantic -Wall -c -o qt.o qt.c
 	as -o qtmds.o md/sparc.s
 	ar q libqt.a qt.o qtmds.o
+	$(CC) -shared libqt.so  qt.o qtmds.o
 
 stp:
 	$(CC) -c stp.c
