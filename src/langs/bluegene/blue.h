@@ -101,7 +101,7 @@ void BgGetXYZ(int pe, int *x, int *y, int *z);
   set functions can only be called in user's BgGlobalInit code
 */
 void BgGetSize(int *sx, int *sy, int *sz);
-int  BgNumNodes();      /* total number of Blue Gene nodes */
+int  BgNumNodes();	/**<  total number of Blue Gene nodes */
 void BgSetSize(int sx, int sy, int sz);
 int  BgNodeSize();      /* return the number of nodes on this emulator pe */
 int  BgMyRank();	/* node ID, this is local ID */
@@ -201,15 +201,21 @@ void BgSetNodeData(char *data);
 
 #define BG_ELAPSE      1
 #define BG_WALLTIME    2
+#define BG_COUNTER     3
 
 typedef void (*bgEventCallBackFn)(void *data, double adjust, double recvT, void *usrPtr);
 
 void BgElapse(double t);
+void BgStartCorrection();
 
 void *BgCreateEvent(int eidx);
-void bgAddProjEvent(void *data, double t, bgEventCallBackFn fn);
-void bgUpdateProj(void *ptr);
+void BgInsertLog(void* log);
+void BgEntrySplit();
+void bgAddProjEvent(void *data, double t, bgEventCallBackFn fn, void *uptr, int eType);
+void bgUpdateProj(int eType);
 double BgGetRecvTime();
+void BgResetRecvTime();
+void BgSkipEndExecuteEvent();
 
 #if defined(__cplusplus)
 }

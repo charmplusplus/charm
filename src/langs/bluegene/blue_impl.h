@@ -1,7 +1,7 @@
 #ifndef BLUE_IMPL_H
 #define BLUE_IMPL_H
 
-#include "conv-config.h"
+#include "conv-mach.h"
 #include <stdlib.h>
 
 #include "blue_types.h"
@@ -17,17 +17,18 @@
 
 #define CYCLES_PER_HOP     5
 #define CYCLES_PER_CORNER  75
-#define CYCLE_TIME_FACTOR  0.001  /* one cycle = nanosecond = 10^(-3) us */
+#define CYCLE_TIME_FACTOR  (0.001)  /* one cycle = nanosecond = 10^(-3) us */
+#define ALPHACOST          (0.1E-6)
 /* end of system parameters */
 
 #define MAX_HANDLERS	100
 
-CpvStaticDeclare(int, numX);	/* size of bluegene nodes in cube */
-CpvStaticDeclare(int, numY);
-CpvStaticDeclare(int, numZ);
-CpvStaticDeclare(int, numCth);	/* number of threads */
-CpvStaticDeclare(int, numWth);
-CpvStaticDeclare(int, numNodes);	/* number of bg nodes on this PE */
+CpvExtern(int, numX);	/* size of bluegene nodes in cube */
+CpvExtern(int, numY);
+CpvExtern(int, numZ);
+CpvExtern(int, numCth);	/* number of threads */
+CpvExtern(int, numWth);
+CpvExtern(int, numNodes);	/* number of bg nodes on this PE */
 
 typedef char ThreadType;
 const char UNKNOWN_THREAD=0, COMM_THREAD=1, WORK_THREAD=2;
@@ -39,6 +40,7 @@ typedef bgQueue<char *>     msgQueue;
 // use a queue sorted by recv time
 typedef minMsgHeap 	    ckMsgQueue;
 typedef CkQ<bgCorrectionMsg *> 	    bgCorrectionQ;
+//typedef minHeap<bgCorrectionMsg *> 	    bgCorrectionQ;
 
 /**
   definition of Handler Table;
@@ -99,6 +101,8 @@ public:
 
 class threadInfo;
 CtvExtern(threadInfo *, threadinfo); 
+class nodeInfo;
+CpvExtern(nodeInfo *, nodeinfo); 
 
 #define tMYID		cta(threadinfo)->id
 #define tMYGLOBALID	cta(threadinfo)->globalId
@@ -114,7 +118,8 @@ CtvExtern(threadInfo *, threadinfo);
 #define tMYZ		tMYNODE->z
 #define tMYNODEID	tMYNODE->id
 #define tCOMMTHQ	tMYNODE->commThQ
-#define tTIMELINE	tMYNODE->timelines[tMYID]
+#define tTIMELINEREC	tMYNODE->timelines[tMYID]
+#define tTIMELINE	tMYNODE->timelines[tMYID].timeline
 #define tINBUFFER	cva(inBuffer)[tMYNODE->id]
 #define tMSGBUFFER	cva(msgBuffer)[tMYNODE->id]
 #define tUSERDATA	tMYNODE->udata
@@ -290,7 +295,7 @@ public:
   HandlerTable handlerTable; /* node level handler table */
 #if BLUEGENE_TIMING
   // for timing
-  BgTimeLine *timelines;
+  BgTimeLineRec *timelines;
   bgCorrectionQ cmsg;
 #endif
 public:
@@ -339,5 +344,41 @@ public:
 }; 
 
 extern double BgGetCurTime();
+
+
+/* blue gene debug */
+
+#define BLUEGENE_DEBUG 0
+
+#if BLUEGENE_DEBUG
+/**Controls amount of debug messages: 1 (the lowest priority) is 
+extremely verbose, 2 shows most procedure entrance/exits, 
+3 shows most communication, and 5 only shows rare or unexpected items.
+Displaying lower priority messages doesn't stop higher priority ones.
+*/
+#define BLUEGENE_DEBUG_PRIO 2
+#define BLUEGENE_DEBUG_LOG 1 /**Controls whether output goes to log file*/
+
+extern FILE *bgDebugLog;
+# define BGSTATE_I(prio,args) if ((prio)>=BLUEGENE_DEBUG_PRIO) {\
+	fprintf args ; fflush(bgDebugLog); }
+# define BGSTATE(prio,str) \
+	BGSTATE_I(prio,(bgDebugLog,"[%.3f]> "str"\n",CmiWallTimer()))
+# define BGSTATE1(prio,str,a) \
+	BGSTATE_I(prio,(bgDebugLog,"[%.3f]> "str"\n",CmiWallTimer(),a))
+# define BGSTATE2(prio,str,a,b) \
+	BGSTATE_I(prio,(bgDebugLog,"[%.3f]> "str"\n",CmiWallTimer(),a,b))
+# define BGSTATE3(prio,str,a,b,c) \
+	BGSTATE_I(prio,(bgDebugLog,"[%.3f]> "str"\n",CmiWallTimer(),a,b,c))
+# define BGSTATE4(prio,str,a,b,c,d) \
+	BGSTATE_I(prio,(bgDebugLog,"[%.3f]> "str"\n",CmiWallTimer(),a,b,c,d))
+#else
+# define BLUEGENE_DEBUG_LOG 0
+# define BGSTATE(n,x) /*empty*/
+# define BGSTATE1(n,x,a) /*empty*/
+# define BGSTATE2(n,x,a,b) /*empty*/
+# define BGSTATE3(n,x,a,b,c) /*empty*/
+# define BGSTATE4(n,x,a,b,c,d) /*empty*/
+#endif
 
 #endif

@@ -14,15 +14,23 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <values.h>
 
 #include "cklists.h"
 
 #define  DEBUGF(x)      //CmiPrintf x;
 
+#include "queueing.h"
 #include "blue.h"
-
 #include "blue_impl.h"    	// implementation header file
 #include "blue_timing.h" 	// timing module
+
+#ifdef CMK_ORIGIN2000
+extern "C" int start_counters(int e0, int e1);
+extern "C" int read_counters(int e0, long long *c0, int e1, long long *c1);
+static int counterStarted = 0;
+inline double Count2Time(long long c) { return c*5.e-7; }
+#endif
 
 /* node level variables */
 CpvDeclare(nodeInfo*, nodeinfo);		/* represent a bluegene node */
@@ -32,35 +40,52 @@ CtvDeclare(threadInfo *, threadinfo);	/* represent a bluegene thread */
 
 CpvStaticDeclare(CthThread, mainThread);
 
+/* BG machine parameter */
+CpvDeclare(int, numX);    /* size of bluegene nodes in cube */
+CpvDeclare(int, numY);
+CpvDeclare(int, numZ);
+CpvDeclare(int, numCth);  /* number of threads */
+CpvDeclare(int, numWth);
+CpvDeclare(int, numNodes);        /* number of bg nodes on this PE */
+
 /* emulator node level variables */
 CpvDeclare(int,msgHandler);
 CpvDeclare(int,nBcastMsgHandler);
 CpvDeclare(int,tBcastMsgHandler);
-CpvDeclare(int,bgCorrectionHandler);
 CpvDeclare(int,exitHandler);
+CpvDeclare(int,beginExitHandler);
+CpvDeclare(int,bgStatCollectHandler);
+CpvDeclare(int, inEmulatorInit);
 
 /* message handlers */
 void msgHandlerFunc(char *msg);
 void nodeBCastMsgHandlerFunc(char *msg);
 void threadBCastMsgHandlerFunc(char *msg);
-void bgCorrectionFunc(char *msg);
+void scheduleWorkerThread(char *msg);
 
+static void sendCorrectionStats();
 extern "C" void defaultBgHandler(char *, void *);
 
 CpvStaticDeclare(msgQueue *,inBuffer);	/* emulate the fix-size inbuffer */
 CpvStaticDeclare(CmmTable *,msgBuffer);	/* buffer when inBuffer is full */
 
-CpvDeclare(int, inEmulatorInit);
-
 static int arg_argc;
 static char **arg_argv;
 
-int bgSize = 0;
-
 static int printTimeLog = 0;
+int bgSize = 0;
 int genTimeLog = 0;
 int correctTimeLog = 0;
 static int timingMethod = BG_ELAPSE;
+static int delayCheckFlag = 1;          // when enabled, only check correction 
+					// messages after some interval
+int programExit = 0;
+
+int bgcorroff = 0;
+int bgstats = 0;
+FILE *bgDebugLog;			// for debugging
+
+extern int processCount, corrMsgCount;
 
 #define ASSERT(x)	if (!(x)) { CmiPrintf("Assert failure at %s:%d\n", __FILE__,__LINE__); CmiAbort("Abort!"); }
 
@@ -71,6 +96,19 @@ static int timingMethod = BG_ELAPSE;
     CmiPrintf("\nToo few BlueGene nodes!\n");	\
     BgShutdown(); 	\
   }
+
+
+StateCounters stateCounters;
+
+
+class StatsMessage {
+  char core[CmiBlueGeneMsgHeaderSizeBytes];
+public:
+  int processCount;
+  int corrMsgCount;
+  int realMsgCount;
+  int maxTimelineLen, minTimelineLen;
+};
 
 
 /*****************************************************************************
@@ -105,6 +143,10 @@ public:
   inline int isFull() { return count == size; }
   inline int isEmpty() { return count == 0; }
 };
+
+/*****************************************************************************
+     Handler Table, one per thread
+*****************************************************************************/
 
 HandlerTable::HandlerTable()
 {
@@ -168,21 +210,27 @@ nodeInfo::nodeInfo(): lastW(0), udata(NULL), started(0)
     commThQ->initialize(cva(numCth));
 
     threadTable = new CthThread[cva(numWth)+cva(numCth)];
+    _MEMCHECK(threadTable);
     threadinfo = new threadInfo*[cva(numWth)+cva(numCth)];
+    _MEMCHECK(threadinfo);
 
     affinityQ = new ckMsgQueue[cva(numWth)];
+    _MEMCHECK(affinityQ);
 
     // create threadinfo
     for (i=0; i< cva(numWth); i++)
     {
       threadinfo[i] = new threadInfo(i, WORK_THREAD, this);
+      _MEMCHECK(threadinfo[i]);
     }
     for (i=0; i< cva(numCth); i++)
     {
       threadinfo[i+cva(numWth)] = new threadInfo(i+cva(numWth), COMM_THREAD, this);
+      _MEMCHECK(threadinfo[i+cva(numWth)]);
     }
 #if BLUEGENE_TIMING
-    timelines = new BgTimeLine[cva(numWth)];
+    timelines = new BgTimeLineRec[cva(numWth)]; // set default size 1024
+    _MEMCHECK(timelines);
 #endif
   }
 
@@ -290,8 +338,15 @@ void addBgNodeInbuffer(char *msgPtr, int nodeID)
   }
   /* awake a communication thread to schedule it */
   CthThread t=cva(nodeinfo)[nodeID].commThQ->deq();
-  DEBUGF(("activate communication thread: %p.\n", t));
-  if (t) CthAwaken(t);
+  if (t) {
+    DEBUGF(("activate communication thread on node %d: %p.\n", nodeID, t));
+#if 0
+    unsigned int prio = 0;
+    CthAwakenPrio(t, CQS_QUEUEING_IFIFO, sizeof(int), &prio);
+#else
+    CthAwaken(t);
+#endif
+  }
 }
 
 /* add a message to a thread's affinity queue */
@@ -302,8 +357,19 @@ void addBgThreadMessage(char *msgPtr, int threadID)
 #endif
   ckMsgQueue &que = tMYNODE->affinityQ[threadID];
   que.enq(msgPtr);
-  if (que.length() == 1)
+#if SCHEDULE_WORK
+  /* don't awake, put into a priority queue sorted by recv time */
+//  double nextT = CmiBgMsgRecvTime(que[0]);
+  double nextT = CmiBgMsgRecvTime(msgPtr);
+  CthThread tid = tTHREADTABLE[threadID];
+  unsigned int prio = (unsigned int)(nextT*PRIO_FACTOR)+1;
+  DEBUGF(("[%d] awaken worker thread with prio %d.\n", tMYNODEID, prio));
+  CthAwakenPrio(tid, CQS_QUEUEING_IFIFO, sizeof(int), &prio);
+#else
+  if (que.length() == 1) {
     CthAwaken(tTHREADTABLE[threadID]);
+  }
+#endif
 }
 
 /* add a message to a node's non-affinity queue */
@@ -321,7 +387,14 @@ void addBgNodeMessage(char *msgPtr)
       /* this work thread is idle, schedule the msg here */
       DEBUGF(("activate a work thread %d - %p.\n", wID, tTHREADTABLE[wID]));
       tMYNODE->affinityQ[wID].enq(msgPtr);
+#if SCHEDULE_WORK
+      double nextT = CmiBgMsgRecvTime(msgPtr);
+      CthThread tid = tTHREADTABLE[wID];
+      unsigned int prio = (unsigned int)(nextT*PRIO_FACTOR)+1;
+      CthAwakenPrio(tid, CQS_QUEUEING_IFIFO, sizeof(int), &prio);
+#else
       CthAwaken(tTHREADTABLE[wID]);
+#endif
       tMYNODE->lastW = wID;
       return;
     }
@@ -338,10 +411,6 @@ int checkReady()
   return !tINBUFFER.isEmpty();
 }
 
-void sendPacket(int x, int y, int z, int msgSize,char *msg)
-{
-  CmiSyncSendAndFree(nodeInfo::XYZ2PE(x,y,z),msgSize,(char *)msg);
-}
 
 /* handler to process the msg */
 void msgHandlerFunc(char *msg)
@@ -385,7 +454,7 @@ void nodeBCastMsgHandlerFunc(char *msg)
       dupmsg = (char *)CmiAlloc(len);
       memcpy(dupmsg, msg, len);
     }
-    DEBUGF(("addBgNodeInbuffer to %d\n", i));
+    DEBUGF(("[%d] addBgNodeInbuffer to %d\n", BgMyNode(), i));
     addBgNodeInbuffer(dupmsg, i);
     count ++;
   }
@@ -412,6 +481,7 @@ void threadBCastMsgHandlerFunc(char *msg)
       if (i==nodeID && j==threadID) continue;
       dupmsg = (char *)CmiAlloc(len);
       memcpy(dupmsg, msg, len);
+      CmiBgMsgNodeID(dupmsg) = nodeInfo::Local2Global(i);
       CmiBgMsgThreadID(dupmsg) = j;
       DEBUGF(("[%d] addBgNodeInbuffer to %d tid:%d\n", CmiMyPe(), i, j));
       addBgNodeInbuffer(dupmsg, i);
@@ -420,8 +490,6 @@ void threadBCastMsgHandlerFunc(char *msg)
   CmiFree(msg);
 }
 
-#define ABS(x) (((x)<0)? -(x) : (x))
-
 static inline double MSGTIME(int ox, int oy, int oz, int nx, int ny, int nz)
 {
   int xd=ABS(ox-nx), yd=ABS(oy-ny), zd=ABS(oz-nz);
@@ -429,6 +497,17 @@ static inline double MSGTIME(int ox, int oy, int oz, int nx, int ny, int nz)
   ncorners -= (xd?0:1 + yd?0:1 + zd?0:1);
   ncorners = (ncorners<0)?0:ncorners;
   return (ncorners*CYCLES_PER_CORNER + (xd+yd+zd)*CYCLES_PER_HOP)*CYCLE_TIME_FACTOR*1E-6;
+}
+
+void CmiSendPacket(int x, int y, int z, int msgSize,char *msg)
+{
+//  CmiSyncSendAndFree(nodeInfo::XYZ2PE(x,y,z),msgSize,(char *)msg);
+#if !DELAY_SEND
+  CmiSyncSendAndFree(nodeInfo::XYZ2PE(x,y,z), msgSize, msg);
+#else
+  if (!correctTimeLog)
+      CmiSyncSendAndFree(nodeInfo::XYZ2PE(x,y,z), msgSize, msg);
+#endif
 }
 
 /* send will copy data to msg buffer */
@@ -441,15 +520,16 @@ void sendPacket_(int x, int y, int z, int threadID, int handlerID, WorkType type
   CmiBgMsgHandle(sendmsg) = handlerID;
   CmiBgMsgType(sendmsg) = type;
   CmiBgMsgLength(sendmsg) = numbytes;
+  BgElapse(ALPHACOST);
   CmiBgMsgRecvTime(sendmsg) = MSGTIME(tMYX, tMYY, tMYZ, x,y,z) + BgGetTime();
 
   // timing
-  BG_ADDMSG(sendmsg);
+  BG_ADDMSG(sendmsg, CmiBgMsgNodeID(sendmsg), threadID, local);
 
   if (local)
     addBgNodeInbuffer(sendmsg, tMYNODEID);
   else
-    CmiSyncSendAndFree(nodeInfo::XYZ2PE(x,y,z),numbytes,sendmsg);
+    CmiSendPacket(x, y, z, numbytes, sendmsg);
 }
 
 /* broadcast will copy data to msg buffer */
@@ -468,7 +548,8 @@ static inline void nodeBroadcastPacketExcept_(int node, CmiUInt2 threadID, int h
   CmiBgMsgRecvTime(sendmsg) = BgGetTime();	
 
   // timing
-  BG_ADDMSG(sendmsg);
+  // FIXME
+  BG_ADDMSG(sendmsg, CmiBgMsgNodeID(sendmsg), threadID, 0);
 
   DEBUGF(("[%d]CmiSyncBroadcastAllAndFree node: %d\n", BgMyNode(), node));
   CmiSyncBroadcastAllAndFree(numbytes,sendmsg);
@@ -487,12 +568,31 @@ static inline void threadBroadcastPacketExcept_(int node, CmiUInt2 threadID, int
   CmiBgMsgType(sendmsg) = type;	
   CmiBgMsgLength(sendmsg) = numbytes;
   /* FIXME */
+  BgElapse(ALPHACOST);
   CmiBgMsgRecvTime(sendmsg) = BgGetTime();	
 
   // timing
-  BG_ADDMSG(sendmsg);
+#if 0
+  if (node == BG_BROADCASTALL) {
+    for (int i=0; i<bgSize; i++) {
+      for (int j=0; j<cva(numWth); j++) {
+        BG_ADDMSG(sendmsg, node);
+      }
+    }
+  }
+  else {
+    CmiAssert(node >= 0);
+    BG_ADDMSG(sendmsg, (node+100));
+  }
+#else
+  // FIXME
+  BG_ADDMSG(sendmsg, CmiBgMsgNodeID(sendmsg), threadID, 0);
+#endif
 
   DEBUGF(("[%d]CmiSyncBroadcastAllAndFree node: %d tid:%d\n", BgMyNode(), node, threadID));
+#if DELAY_SEND
+  if (!correctTimeLog)
+#endif
   CmiSyncBroadcastAllAndFree(numbytes,sendmsg);
 }
 
@@ -661,6 +761,44 @@ void BgSetNumCommThread(int num)
   cva(numCth) = num;
 }
 
+static inline void startVTimer()
+{
+  if (timingMethod == BG_WALLTIME)
+    tSTARTTIME = CmiWallTimer();
+  else if (timingMethod == BG_ELAPSE)
+    tSTARTTIME = tCURRTIME;
+#ifdef CMK_ORIGIN2000
+  else if (timingMethod == BG_COUNTER) {
+    if (start_counters(0, 21) <0) {
+      perror("start_counters");;
+    }
+    counterStarted = 1;
+  }
+#endif
+}
+
+static inline void stopVTimer()
+{
+  if (timingMethod == BG_WALLTIME) {
+    tCURRTIME += (CmiWallTimer()-tSTARTTIME);
+    tSTARTTIME = CmiWallTimer();
+  }
+  else if (timingMethod == BG_ELAPSE) {
+    // if no bgelapse called, assume it takes 1us
+    if (tCURRTIME-tSTARTTIME < 1E-9) {
+//      tCURRTIME += 1e-6;
+    }
+  }
+#ifdef CMK_ORIGIN2000
+  else if (timingMethod == BG_COUNTER)  {
+    long long c0, c1;
+    if (read_counters(0, &c0, 21, &c1) < 0) perror("read_counters");
+    tCURRTIME += Count2Time(c1);
+    counterStarted = 0;
+  }
+#endif
+}
+
 double BgGetTime()
 {
 #if 1
@@ -674,6 +812,17 @@ double BgGetTime()
   else if (timingMethod == BG_ELAPSE) {
     return tCURRTIME;
   }
+#ifdef CMK_ORIGIN2000
+  else if (timingMethod == BG_COUNTER) {
+    if (counterStarted) {
+      long long c0, c1;
+      if (read_counters(0, &c0, 21, &c1) <0) perror("read_counters");;
+      tCURRTIME += Count2Time(c1);
+      if (start_counters(0, 21)<0) perror("start_counters");;
+    }
+    return tCURRTIME;
+  }
+#endif
   else 
     CmiAbort("Unknown Timing Method.");
 #else
@@ -693,26 +842,32 @@ double BgGetCurTime()
 static void BroadcastShutdown(void *null)
 {
   /* broadcast to shutdown */
+  CmiPrintf("BG> In BroadcastShutdown after quiescence. \n");
+
   int msgSize = CmiBlueGeneMsgHeaderSizeBytes;
   void *sendmsg = CmiAlloc(msgSize);
   CmiSetHandler(sendmsg, cva(exitHandler));
-
   CmiSyncBroadcastAllAndFree(msgSize, sendmsg);
+
   CmiDeliverMsgs(-1);
   CmiPrintf("\nBG> BlueGene emulator shutdown gracefully!\n");
+  CsdExitScheduler();
+/*
   ConverseExit();
   exit(0);
+*/
 }
 
 void BgShutdown()
 {
   // timing
 #if BLUEGENE_TIMING
+  // moved to exitHandlerFunc()
   if (0)
   if (genTimeLog) {
     for (int j=0; j<cva(numNodes); j++)
     for (int i=0; i<cva(numWth); i++) {
-      BgTimeLine &log = cva(nodeinfo)[j].timelines[i];	
+      BgTimeLine &log = cva(nodeinfo)[j].timelines[i].timeline;
 //      BgPrintThreadTimeLine(nodeInfo::Local2Global(j), i, log);
       int x,y,z;
       nodeInfo::Local2XYZ(j, &x, &y, &z);
@@ -724,13 +879,15 @@ void BgShutdown()
   /* when doing timing correction, do a converse quiescence detection
      to wait for all timing correction messages
   */
+
   if (!correctTimeLog) {
     /* broadcast to shutdown */
     int msgSize = CmiBlueGeneMsgHeaderSizeBytes;
     void *sendmsg = CmiAlloc(msgSize);
-    CmiSetHandler(sendmsg, cva(exitHandler));
-
+    
+    CmiSetHandler(sendmsg, cva(exitHandler));  
     CmiSyncBroadcastAllAndFree(msgSize, sendmsg);
+    
     //CmiAbort("\nBG> BlueGene emulator shutdown gracefully!\n");
     // CmiPrintf("\nBG> BlueGene emulator shutdown gracefully!\n");
     /* don't return */
@@ -741,10 +898,25 @@ void BgShutdown()
     exit(0);
   }
   else {
+  
+    int msgSize = CmiBlueGeneMsgHeaderSizeBytes;
+    void *sendmsg = CmiAlloc(msgSize); 
+CmiPrintf("\n\n\nBroadcast begin EXIT\n");
+    CmiSetHandler(sendmsg, cva(beginExitHandler));  
+    CmiSyncBroadcastAllAndFree(msgSize, sendmsg);
+
     CmiStartQD(BroadcastShutdown, NULL);
-    // trapped here, close the log
+
+#if 0
+    // trapped here, so close the log
     BG_ENTRYEND();
+    stopVTimer();
+    // hack to remove the pending message for this work thread
+    tAFFINITYQ.deq();
+
     CmiDeliverMsgs(-1);
+    ConverseExit();
+#endif
   }
 }
 
@@ -774,7 +946,7 @@ static void InitHandlerTable()
 static inline void ProcessMessage(char *msg)
 {
   int handler = CmiBgMsgHandle(msg);
-  DEBUGF(("[%d] ProcessMessage call handler %d\n", BgMyNode(), handler));
+  DEBUGF(("[%d] call handler %d\n", BgMyNode(), handler));
 
   BgHandlerInfo *handInfo;
   BgHandlerEx entryFunc;
@@ -794,23 +966,11 @@ static inline void ProcessMessage(char *msg)
   CmiSetHandler(msg, CmiBgMsgHandle(msg));
 
   // don't count thread overhead and timing overhead
-  if (timingMethod == BG_WALLTIME)
-    tSTARTTIME = CmiWallTimer();
-  else if (timingMethod == BG_ELAPSE)
-    tSTARTTIME = tCURRTIME;
+  startVTimer();
 
   entryFunc(msg, handInfo->userPtr);
 
-  if (timingMethod == BG_WALLTIME) {
-    tCURRTIME += (CmiWallTimer()-tSTARTTIME);
-    tSTARTTIME = CmiWallTimer();
-  }
-  else if (timingMethod == BG_ELAPSE) {
-    // if no bgelapse called, assume it takes 1us
-    if (tCURRTIME-tSTARTTIME < 1E-9) {
-//      tCURRTIME += 1e-6;
-    }
-  }
+  stopVTimer();
 }
 
 void correctMsgTime(char *msg);
@@ -834,7 +994,9 @@ void comm_thread(threadInfo *tinfo)
     if (!msg) { 
 //      tCURRTIME += (CmiWallTimer()-tSTARTTIME);
       tCOMMTHQ->enq(CthSelf());
+      DEBUGF(("[%d] comm thread suspend.\n", BgMyNode()));
       CthSuspend(); 
+      DEBUGF(("[%d] comm thread assume.\n", BgMyNode()));
 //      tSTARTTIME = CmiWallTimer();
       continue;
     }
@@ -862,7 +1024,9 @@ void comm_thread(threadInfo *tinfo)
     }
     /* let other communication thread do their jobs */
 //    tCURRTIME += (CmiWallTimer()-tSTARTTIME);
+#if !SCHEDULE_WORK
     CthYield();
+#endif
     tSTARTTIME = CmiWallTimer();
   }
 }
@@ -870,10 +1034,18 @@ void comm_thread(threadInfo *tinfo)
 extern "C" 
 void BgElapse(double t)
 {
-  ASSERT(tTHREADTYPE == WORK_THREAD);
+//  ASSERT(tTHREADTYPE == WORK_THREAD);
   if (timingMethod == BG_ELAPSE)
     tCURRTIME += t;
 }
+
+void scheduleWorkerThread(char *msg)
+{
+  CthThread tid = (CthThread)msg;
+//CmiPrintf("scheduleWorkerThread %p\n", tid);
+  CthAwaken(tid);
+}
+
 
 void work_thread(threadInfo *tinfo)
 {
@@ -883,11 +1055,14 @@ void work_thread(threadInfo *tinfo)
 
 //  InitHandlerTable();
   if (workStartFunc) {
+    DEBUGF(("[%d] work thread %d start.\n", BgMyNode(), tMYID));
     char **Cmi_argvcopy = CmiCopyArgs(arg_argv);
     // timing
+    startVTimer();
     BG_ENTRYSTART(-1, NULL);
     workStartFunc(arg_argc, Cmi_argvcopy);
     BG_ENTRYEND();
+    stopVTimer();
   }
 
   for (;;) {
@@ -916,7 +1091,23 @@ void work_thread(threadInfo *tinfo)
       DEBUGF(("[%d] work thread %d awakened.\n", BgMyNode(), tMYID));
       continue;
     }
+#if BLUEGENE_TIMING
+    correctMsgTime(msg);
+#if THROTTLE_WORK
+    if (correctTimeLog) {
+      if (CmiBgMsgRecvTime(msg) > gvt+ LEASH) {
+	double nextT = CmiBgMsgRecvTime(msg);
+	unsigned int prio = (unsigned int)(nextT*PRIO_FACTOR)+1;
+	CthYieldPrio(CQS_QUEUEING_IFIFO, sizeof(int), &prio);
+	continue;
+      }
+    }
+#endif
+#endif   /* TIMING */
     DEBUGF(("[%d] work thread %d has a msg.\n", BgMyNode(), tMYID));
+
+//if (tMYNODEID==0)
+//CmiPrintf("[%d] recvT: %e\n", tMYNODEID, CmiBgMsgRecvTime(msg));
 
     if (CmiBgMsgRecvTime(msg) > tCURRTIME) {
       tCURRTIME = CmiBgMsgRecvTime(msg);
@@ -927,12 +1118,21 @@ void work_thread(threadInfo *tinfo)
     ProcessMessage(msg);
     BG_ENTRYEND();
 
+    // counter of processed real mesgs
+    stateCounters.realMsgProcCnt++;
+
     if (fromQ2 == 1) q2.deq();
 
     DEBUGF(("[%d] work thread %d finish a msg.\n", BgMyNode(), tMYID));
 
     /* let other work thread do their jobs */
+#if SCHEDULE_WORK
+    DEBUGF(("[%d] work thread %d suspend when done.\n", BgMyNode(), tMYID));
+    CthSuspend();
+    DEBUGF(("[%d] work thread %d awakened here.\n", BgMyNode(), tMYID));
+#else
     CthYield();
+#endif
   }
 }
 
@@ -972,33 +1172,57 @@ void BgNodeInitialize(nodeInfo *ninfo)
 
 }
 
+static void beginExitHandlerFunc(void *msg);
+
 CmiHandler exitHandlerFunc(char *msg)
 {
   // TODO: free memory before exit
   int i,j;
 
+  programExit = 2;
 #if BLUEGENE_TIMING
   // timing
-  if (1)
+  if (0)	// detail
   if (genTimeLog) {
     for (j=0; j<cva(numNodes); j++)
     for (i=0; i<cva(numWth); i++) {
-      BgTimeLine &log = cva(nodeinfo)[j].timelines[i];
+      BgTimeLine &log = cva(nodeinfo)[j].timelines[i].timeline;	
 //      BgPrintThreadTimeLine(nodeInfo::Local2Global(j), i, log);
       int x,y,z;
       nodeInfo::Local2XYZ(j, &x, &y, &z);
       BgWriteThreadTimeLine(arg_argv, x, y, z, i, log);
     }
+
   }
 #endif
+  if (genTimeLog) sendCorrectionStats();
 
+//  if (tTHREADTYPE == WORK_THREAD)
+  {
+  int origPe = -2;
+  // close all tracing modules
+  for (j=0; j<cva(numNodes); j++)
+    for (i=0; i<cva(numWth); i++) {
+      int oldPe = CmiSwitchToPE(nodeInfo::Local2Global(j)*cva(numWth)+i);
+      if (origPe == -2) origPe = oldPe;
+      traceCharmClose();
+//      CmiSwitchToPE(oldPe);
+    }
+    if (origPe!=-2) CmiSwitchToPE(origPe);
+  }
+
+#if 0
   delete [] cva(nodeinfo);
   delete [] cva(inBuffer);
   for (i=0; i<cva(numNodes); i++) CmmFree(cva(msgBuffer)[i]);
   delete [] cva(msgBuffer);
+#endif
 
   //ConverseExit();
-  CsdExitScheduler();
+  if (genTimeLog)
+    { if (CmiMyPe() != 0) CsdExitScheduler(); }
+  else
+    CsdExitScheduler();
 
   //if (CmiMyPe() == 0) CmiPrintf("\nBG> BlueGene emulator shutdown gracefully!\n");
 
@@ -1025,27 +1249,35 @@ CmiStartFn bgMain(int argc, char **argv)
   CmiGetArgIntDesc(argv, "+cth", &cva(numCth), "The number of simulated communication threads per node");
   CmiGetArgIntDesc(argv, "+wth", &cva(numWth), "The number of simulated worker threads per node");
 
-//  printTimeLog = CmiGetArgFlag(argv, "+bglog");
   genTimeLog = CmiGetArgFlagDesc(argv, "+bglog", "Write events to log file");
   correctTimeLog = CmiGetArgFlagDesc(argv, "+bgcorrect", "Apply timestamp correction to logs");
   if (correctTimeLog) genTimeLog = 1;
 
   // for timing method, default using elapse calls.
   timingMethod = BG_ELAPSE;
-  if(CmiGetArgFlagDesc(argv, "+bgwalltime", "Use walltime, not CPU time, for time estimate")) 
-  	 timingMethod = BG_WALLTIME;
+  if(CmiGetArgFlagDesc(argv, "+bgwalltime", 
+                       "Use walltime, not estimated time, for time estimate")) 
+      timingMethod = BG_WALLTIME;
+#ifdef CMK_ORIGIN2000
+  if(CmiGetArgFlagDesc(argv, "+bgcounter", "Use performance counter")) 
+      timingMethod = BG_COUNTER;
+#endif
+  
+  bgcorroff = 0;
+  if(CmiGetArgFlagDesc(argv, "+bgcorroff", "Start with correction off")) 
+    bgcorroff = 1;
 
-  if (CmiMyPe() == 0) {
-    CmiPrintf("BG info> Simulating %dx%dx%d nodes with %d comm + %d work threads each.\n", cva(numX), cva(numY), cva(numZ), cva(numCth), cva(numWth));
-    if (timingMethod == BG_ELAPSE) 
-      CmiPrintf("BG info> Using BgElapse calls for timing method. \n");
-    else if (timingMethod == BG_WALLTIME)
-      CmiPrintf("BG info> Using WallTimer for timing method. \n");
-    if (genTimeLog)
-      CmiPrintf("BG info> Generating timing log. \n");
-    if (correctTimeLog)
-      CmiPrintf("BG info> Perform timing log correction. \n");
+  bgstats=0;
+  if(CmiGetArgFlagDesc(argv, "+bgstats", "Print correction statistics")) 
+    bgstats = 1;
+
+#if BLUEGENE_DEBUG_LOG
+  {
+    char ln[200];
+    sprintf(ln,"bgdebugLog.%d",CmiMyPe());
+    bgDebugLog=fopen(ln,"w");
   }
+#endif
 
   arg_argv = argv;
   arg_argc = CmiGetArgc(argv);
@@ -1061,10 +1293,8 @@ CmiStartFn bgMain(int argc, char **argv)
   CpvInitialize(int,exitHandler);
   cva(exitHandler) = CmiRegisterHandler((CmiHandler) exitHandlerFunc);
 
-#if BLUEGENE_TIMING
-  CpvInitialize(int,bgCorrectionHandler);
-  cva(bgCorrectionHandler) = CmiRegisterHandler((CmiHandler) bgCorrectionFunc);
-#endif
+  CpvInitialize(int,beginExitHandler);
+  cva(beginExitHandler) = CmiRegisterHandler((CmiHandler) beginExitHandlerFunc);
 
   CpvInitialize(int, inEmulatorInit);
   cva(inEmulatorInit) = 1;
@@ -1076,6 +1306,20 @@ CmiStartFn bgMain(int argc, char **argv)
   BGARGSCHECK;
 
   BgInitTiming();		// timing module
+
+  if (CmiMyPe() == 0) {
+    CmiPrintf("BG info> Simulating %dx%dx%d nodes with %d comm + %d work threads each.\n", cva(numX), cva(numY), cva(numZ), cva(numCth), cva(numWth));
+    if (timingMethod == BG_ELAPSE) 
+      CmiPrintf("BG info> Using BgElapse calls for timing method. \n");
+    else if (timingMethod == BG_WALLTIME)
+      CmiPrintf("BG info> Using WallTimer for timing method. \n");
+    else if (timingMethod == BG_COUNTER)
+      CmiPrintf("BG info> Using performance counter for timing method. \n");
+    if (genTimeLog)
+      CmiPrintf("BG info> Generating timing log. \n");
+    if (correctTimeLog)
+      CmiPrintf("BG info> Perform timing log correction. \n");
+  }
 
   bgSize = cva(numX)*cva(numY)*cva(numZ);
 
@@ -1089,6 +1333,7 @@ CmiStartFn bgMain(int argc, char **argv)
   cva(inBuffer) = new msgQueue[cva(numNodes)];
   _MEMCHECK(cva(inBuffer));
   for (i=0; i<cva(numNodes); i++) cva(inBuffer)[i].initialize(INBUFFER_SIZE);
+
   CpvInitialize(CmmTable *, msgBuffer);
   cva(msgBuffer) = new CmmTable[cva(numNodes)];
   _MEMCHECK(cva(msgBuffer));
@@ -1098,8 +1343,10 @@ CmiStartFn bgMain(int argc, char **argv)
   CpvInitialize(nodeInfo *, nodeinfo);
   cva(nodeinfo) = new nodeInfo[cva(numNodes)];
   _MEMCHECK(cva(nodeinfo));
+
   cta(threadinfo) = new threadInfo(-1, UNKNOWN_THREAD, NULL);
   _MEMCHECK(cta(threadinfo));
+
   for (i=0; i<cva(numNodes); i++)
   {
     nodeInfo *ninfo = cva(nodeinfo) + i;
@@ -1135,7 +1382,7 @@ extern "C" int CmiSwitchToPE(int pe)
 {
   if (pe == -2) return -2;
   int oldpe;
-  ASSERT(tTHREADTYPE != COMM_THREAD);
+//  ASSERT(tTHREADTYPE != COMM_THREAD);
   if (tMYNODE == NULL) oldpe = -1;
   else if (tTHREADTYPE == COMM_THREAD) oldpe = -BgGetThreadID();
   else oldpe = BgGetGlobalWorkerThreadID();
@@ -1177,130 +1424,187 @@ extern "C" int CmiSwitchToPE(int pe)
 			TimeLog correction
 *****************************************************************************/
 
-static inline int handleCorrectionMsg(BgTimeLine *logs, bgCorrectionMsg *m, int del)
+extern void processCorrectionMsg(int nodeidx);
+
+int updateRealMsgs(bgCorrectionMsg *cm, int nodeidx)
 {
-	CmiUInt2 tID = m->tID;
-	if (tID == ANYTHREAD) {
-	  int found = 0;
-	  for (tID=0; tID<cva(numWth); tID++) {
-            BgTimeLine &tline = logs[tID];	
-	    for (int j=0; j<tline.length(); j++)
-	      if (tline[j]->msgID == m->msgID) { found = 1; break; }
-	    if (found) break;    
-	  }
-	  if (!found) {
-//	    CmiPrintf("Correction message arrived early. \n");
-		return 0;
-	  }
-	}
-//CmiPrintf("tAdjust: %f\n", m->tAdjust);
-	if (BgAdjustTimeLineForward(m->msgID, m->tAdjust, logs[tID]) == 0)
-          return 0;
-	if (del) CmiFree(m);
-	return 1;
+  ckMsgQueue &affinityQ = cva(nodeinfo)[nodeidx].affinityQ[cm->tID];
+  for (int i=0; i<affinityQ.length(); i++)  {
+    char *msg = affinityQ[i];
+//    if (CkMsgDoCorrect(msg) == 0) return 0;
+    int msgID = CmiBgMsgID(msg);
+    int srcnode = CmiBgMsgSrcPe(msg);
+    if (msgID == cm->msgID && srcnode == cm->srcNode) {
+	CmiBgMsgRecvTime(msg) = cm->tAdjust;
+        affinityQ.update(i);
+        CthThread tid = cva(nodeinfo)[nodeidx].threadTable[cm->tID];
+  	unsigned int prio = (unsigned int)(cm->tAdjust*PRIO_FACTOR)+1;
+        CthAwakenPrio(tid, CQS_QUEUEING_IFIFO, sizeof(int), &prio);
+        stateCounters.corrMsgCRCnt++;
+	return 1;       /* invalidate this msg */
+    }
+  }
+  return 0;
 }
 
-// Converse handler for correction msgs
-void bgCorrectionFunc(char *msg)
+// Coverse handler for begin exit
+// flush and process all correction messages
+static void beginExitHandlerFunc(void *msg)
 {
-    int i, j;
-    static double lastCheck = .0;
+  CmiFree(msg);
+  delayCheckFlag = 0;
+//CmiPrintf("\n\n\nbeginExitHandlerFunc called on %d\n", CmiMyPe());
+  programExit = 1;
+#if LIMITED_SEND
+  CQdCreate(CpvAccess(cQdState), BgNodeSize());
+#endif
 
-    bgCorrectionMsg* m = (bgCorrectionMsg*)msg;
-    int nodeidx = nodeInfo::Global2Local(m->destNode);	
-    if (nodeidx == BG_BROADCASTALL) {
-CmiPrintf("destNode: %d ignored\n", m->destNode);
-      CmiFree(m);
-      return;
-      for (i=0; i<BgNodeSize(); i++) {
-        bgCorrectionQ &cmsg = cva(nodeinfo)[i].cmsg;
-        BgTimeLine *logs = cva(nodeinfo)[i].timelines;
+#if 1
+  for (int i=0; i<BgNodeSize(); i++) 
+    processCorrectionMsg(i); 
+#if USE_MULTISEND
+  BgSendBufferedCorrMsgs();
+#endif
+#else
+  // the msg queue should be empty now.
+  // don't do insert adjustment, but start to do all timing correction from here
+  int nodeidx, tID;
+  for (nodeidx=0; nodeidx<BgNodeSize(); nodeidx++) {
+    BgTimeLineRec *tlines = cva(nodeinfo)[nodeidx].timelines;
+    for (tID=0; tID<cva(numWth); tID++) {
+        BgTimeLineRec &tlinerec = tlines[tID];
+        BgAdjustTimeLine(tlinerec, nodeidx, tID);
+    }
+  }
 
-        cmsg.enq(m);
-        int len = cmsg.length();
-        for (j=0; j<len; j++) {
-          bgCorrectionMsg *cm = cmsg.deq();
-          if (handleCorrectionMsg(logs, cm, 0) == 0) cmsg.enq(cm);
+#endif
+
+#if !THROTTLE_WORK
+#if DELAY_CHECK
+  CcdCallFnAfter(processBufferCorrectionMsgs,NULL,CHECK_INTERVAL);
+#endif
+#endif
+}
+
+#define HISTOGRAM_SIZE  100
+// compute total CPU utilization for each timeline and 
+// return the number of real msgs
+void computeUtilForAll(int* array, int *nReal)
+{
+  double scale = 1000.0;	// scale to ms
+
+  //We measure from 1ms to 5001 ms in steps of 100 ms
+  int min = 0, max = HISTOGRAM_SIZE, step = 1;
+
+  int size = (max-min)/step;
+  CmiAssert(size == HISTOGRAM_SIZE);
+  for(int i=0;i<size;i++) array[i] = 0;
+
+  for (int nodeidx=0; nodeidx<cva(numNodes); nodeidx++) {
+    BgTimeLineRec *tlinerec = cva(nodeinfo)[nodeidx].timelines;
+    for (int tID=0; tID<cva(numWth); tID++) {
+      int util = (int)(scale*(tlinerec[tID].computeUtil(nReal)));
+
+      if (util >= max) util=max-1;
+      array[(util-min)/step]++;
+    }
+  }
+}
+
+static void sendCorrectionStats()
+{
+  int msgSize = sizeof(StatsMessage)+sizeof(int)*HISTOGRAM_SIZE;
+  StatsMessage *statsMsg = (StatsMessage *)CmiAlloc(msgSize);
+  statsMsg->processCount = processCount;
+  statsMsg->corrMsgCount = corrMsgCount;
+  int numMsgs=0;
+  int maxTimelineLen=-1, minTimelineLen=MAXINT;
+  int totalMem = 0;
+  if (bgstats) {
+  for (int nodeidx=0; nodeidx<cva(numNodes); nodeidx++) {
+    BgTimeLineRec *tlines = cva(nodeinfo)[nodeidx].timelines;
+    for (int tID=0; tID<cva(numWth); tID++) {
+        BgTimeLineRec &tlinerec = tlines[tID];
+	int tlen = tlinerec.length();
+	if (tlen>maxTimelineLen) maxTimelineLen=tlen;
+	if (tlen<minTimelineLen) minTimelineLen=tlen;
+        totalMem = tlen*sizeof(bgTimeLog);
+//CmiPrintf("[%d node:%d] bgTimeLog: %dK len:%d size of bglog: %d bytes\n", CmiMyPe(), nodeidx, totalMem/1000, tlen, sizeof(bgTimeLog));
+#if 0
+        for (int i=0; i< tlinerec.length(); i++) {
+          numMsgs += tlinerec[i]->msgs.length();
         }
-      }
-      return;
+#endif
     }
-    CmiAssert(nodeidx >= 0);
-    bgCorrectionQ &cmsg = cva(nodeinfo)[nodeidx].cmsg;
-    BgTimeLine *logs = cva(nodeinfo)[nodeidx].timelines;
+  }
+  computeUtilForAll((int*)(statsMsg+1), &numMsgs);
+  statsMsg->realMsgCount = numMsgs;
+  statsMsg->maxTimelineLen = maxTimelineLen;
+  statsMsg->minTimelineLen = minTimelineLen;
+  }  // end if
 
-    int removed = 0;
-    for (i=0; i<cmsg.length(); i++) {
-      bgCorrectionMsg* cm = cmsg[i-removed];
-      if (cm->msgID == m->msgID) {
-        cmsg.remove(i-removed);
-	removed++;
-        CmiFree(cm);
-      }
-    }
-
-    cmsg.enq(m);
-
-    // only correct message every 0.2s
-    if (CmiWallTimer() - lastCheck < 0.2) {
-      return; 
-    }
-    lastCheck = CmiWallTimer();
-    int len = cmsg.length();
-    for (i=0; i<len; i++) {
-      bgCorrectionMsg *cm = cmsg.deq();
-      if (handleCorrectionMsg(logs, cm, 1) == 0) cmsg.enq(cm);
-    }
+  CmiSetHandler(statsMsg, cva(bgStatCollectHandler));
+  CmiSyncSendAndFree(0, msgSize, statsMsg);
 }
 
-// update arrive time from buffer messages
+// Converse handler for collecting stats
+void statsCollectionHandlerFunc(void *msg)
+{
+  static int count=0;
+  static int pc=0, cc=0, realMsgCount=0;
+  static int maxTimelineLen=0, minTimelineLen=MAXINT;
+  static int *histArray = NULL;
+  int i;
+
+  count++;
+  if (histArray == NULL) {
+    histArray = new int[HISTOGRAM_SIZE];
+    for (i=0; i<HISTOGRAM_SIZE; i++) histArray[i]=0;
+  }
+  StatsMessage *m = (StatsMessage *)msg;
+  pc += m->processCount;
+  cc += m->corrMsgCount;
+  realMsgCount += m->realMsgCount;
+  if (minTimelineLen> m->minTimelineLen) minTimelineLen=m->minTimelineLen;
+  if (maxTimelineLen< m->maxTimelineLen) maxTimelineLen=m->maxTimelineLen;
+  int *array = (int *)(m+1);
+  for (i=0; i<HISTOGRAM_SIZE; i++) histArray[i] += array[i];
+  if (count == CmiNumPes()) {
+    if (bgstats) {
+      CmiPrintf("Total procCount:%d corrMsgCount:%d realMsg:%d timeline:%d-%d\n", pc, cc, realMsgCount, minTimelineLen, maxTimelineLen);
+      for (i=0; i<HISTOGRAM_SIZE; i++) CmiPrintf("%d ", histArray[i]);
+      CmiPrintf("\n");
+    }
+    CsdExitScheduler();
+  }
+  CmiFree(msg);
+}
+
+// update arrival time from buffer messages
 // before start an entry, check message time against buffered timing
 // correction message to update to the correct time.
 void correctMsgTime(char *msg)
 {
    if (!correctTimeLog) return;
-   bgCorrectionQ &cmsg = cva(nodeinfo)[tMYNODEID].cmsg;
+//   if (CkMsgDoCorrect(msg) == 0) return;
+
    int msgID = CmiBgMsgID(msg);
-//CmiPrintf("[%d] check: %d len:%d\n", tMYNODEID, msgID, cmsg.length());
-   int removed = 0;
-   for (int i=0; i<cmsg.length(); i++) {
-     bgCorrectionMsg* m = cmsg[i-removed];
-     if (msgID == m->msgID) {
-//CmiPrintf("correct: %d %f\n", msgID, m->tAdjust);
+   int srcnode = CmiBgMsgSrcPe(msg);
+   CmiUInt2 tid = CmiBgMsgThreadID(msg);
+
+   bgCorrectionQ &cmsg = cva(nodeinfo)[tMYNODEID].cmsg;
+   int len = cmsg.length();
+   for (int i=0; i<len; i++) {
+     bgCorrectionMsg* m = cmsg[i];
+     if (msgID == m->msgID && srcnode == m->srcNode && tid == m->tID) {
+        if (m->tAdjust < 0.0) return;
+        //CmiPrintf("correctMsgTime from %e to %e\n", CmiBgMsgRecvTime(msg), m->tAdjust);
 	CmiBgMsgRecvTime(msg) = m->tAdjust;
-        cmsg.remove(i-removed);
-	removed++;
-        CmiFree(m);
+	m->tAdjust = -1.0;       /* invalidate this msg */
+//	cmsg.update(i);
+        stateCounters.corrMsgRCCnt++;
+	break;
      }
    }
 }
-
-
-/*****************************************************************************
-		TimeLog correction with trace projection
-*****************************************************************************/
-
-void bgAddProjEvent(void *data, double t, bgEventCallBackFn fn)
-{
-  if (!genTimeLog) return;
-  CmiAssert(tTHREADTYPE == WORK_THREAD);
-
-  BgTimeLine &log = tTIMELINE;
-  CmiAssert(log.length() > 0);
-  bgTimeLog *tline = log[log.length()-1];
-  // make sure this time log entry is not closed
-  if (tline->endTime == 0.0) tline->addEvent(data, t, fn);
-}
-
-
-// trace projections callback update projections with new timestamp after
-// timing correction
-void bgUpdateProj(void *usrPtr)
-{
-  BgTimeLine &log = tTIMELINE;
-  for (int i=0; i< log.length(); i++) {
-      log[i]->updateEvents(usrPtr);
-  }
-}
-
 
