@@ -13,8 +13,8 @@ Name: Charm-smp
 Name: Charm
 %endif
 
-Version: 5.6
-Release: 12
+Version: 5.9
+Release: 1
 Copyright: GPL
 Group: Applications/System
 BuildRoot: /var/tmp/%{name}-root
@@ -23,7 +23,7 @@ URL: http://charm.cs.uiuc.edu
 Vendor: PPL <ppl@uiuc.edu>
 
 %description
-Charm++ for Redhat
+Charm++ RPM for Linux
 
 %prep
 %setup -n %{name}-%{version}-%{release}
@@ -34,7 +34,7 @@ bzip2 -dc  %{_sourcedir}/Charm-%{version}-%{release}.tar.bz2 | tar xvf -
 rm -rf $RPM_BUILD_ROOT
 %install
 mkdir -p $RPM_BUILD_ROOT
-cd tmp; make DESTDIR=$RPM_BUILD_ROOT/usr/local/%{name}  install 
+cd tmp; make DESTDIR=$RPM_BUILD_ROOT/usr/local/%{name} install
 %post
  
 %files
