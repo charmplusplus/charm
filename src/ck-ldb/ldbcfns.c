@@ -12,12 +12,19 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-07-07 00:43:58  narain
+ * Revision 2.1  1995-07-07 01:06:48  narain
+ * *** empty log message ***
+ *
+ * Revision 2.0  1995/07/07  00:43:58  narain
  * *** empty log message ***
  *
  ***************************************************************************/
 static char ident[] = "@(#)$Header$";
 #include "converse.h"
+
+#ifndef NULL
+#define NULL 0
+#endif
 
 CpvDeclare(int, LDB_ELEM_SIZE);
 
@@ -73,14 +80,14 @@ int CldAddToken(void *msg, void (*sendfn))
   if(temp)
     {
       temp->next = newtok;
-      CpvAccess(Cldlastoken) = newtok;
+      CpvAccess(Cldlasttoken) = newtok;
     }
   else /* Empty list of tokens */
     CpvAccess(Cldtokenlist) = CpvAccess(Cldlasttoken) = newtok;
 
   /* Add a token in the scheduler's queue to call this strategy */
-  enqmsg = malloc(CmiMsgHeaderSizeBytes + sizeof(int));
-  CmiSetHandler(enqmsg, CpvAccess(current_seednum));
+  enqmsg = (void *)malloc(CmiMsgHeaderSizeBytes + sizeof(int));
+  CmiSetHandler(enqmsg, CpvAccess(Cldcurrent_seednum));
   CsdEnqueue(enqmsg);
 }
 
@@ -147,7 +154,7 @@ int Cldbtokensinit()
  *********************************************************************/
 int CldMyLoad()
 {
-  return CpvAccess(numseeds);
+  return CpvAccess(Cldnumseeds);
 }
 
 /*******************************************
@@ -158,13 +165,13 @@ CldTOK_HOLDER *CldPickFreeSeed()
 {
   CldTOK_HOLDER *ret = NULL;
 
-  if(CpvAccess(numseeds))
+  if(CpvAccess(Cldnumseeds))
     {
       ret = CpvAccess(Cldtokenlist);
       CpvAccess(Cldtokenlist) = ret->next;
-      CpvAccess(numseeds)--;
+      CpvAccess(Cldnumseeds)--;
       
-      if(CpvAccess(numseeds) == 0)
+      if(CpvAccess(Cldnumseeds) == 0)
 	CpvAccess(Cldlasttoken) = NULL;
     }
   return ret;
