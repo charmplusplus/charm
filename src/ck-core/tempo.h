@@ -19,7 +19,7 @@
 
 #define TempoAlign(x) (((x)+7)&~7)
 
-class TempoMessage : public ArrayMessage, public CMessage_TempoMessage
+class TempoMessage : public CMessage_TempoMessage
 {
   public:
     int tag1, tag2, length;
@@ -90,10 +90,8 @@ class TempoArray : public ArrayElement1D, public Tempo
 {
   int nGOps;
   public:
-    TempoArray(ArrayElementCreateMessage *msg) : ArrayElement1D(msg)
-      { nGOps=0; }
-    TempoArray(ArrayElementMigrateMessage *msg) : ArrayElement1D(msg)
-      { }
+    TempoArray(void) { nGOps=0; }
+    TempoArray(ArrayElementMigrateMessage *msg) { }
     static void ckTempoSendElem(int tag1, int tag2, void *buffer, int buflen,
                                 CkArrayID aid, int idx);
     static void ckTempoSendElem(int tag, void *buffer, int buflen,

@@ -10,6 +10,9 @@
 
 #include <stdlib.h>
 #include "charm.h"
+
+#include "pup.h"
+
 #if CMK_DEBUG_MODE
 #include <string.h>
 #endif
@@ -32,23 +35,14 @@ class Chare {
     void operator delete(void *ptr) { free(ptr); }
 #if CMK_DEBUG_MODE
     Chare() { CkGetChareID(&thishandle); putObject(this); }
-    // Making the destructor virtual gets rid of some egcs warnings
-    virtual ~Chare() { removeObject(this); }
-    virtual char *showHeader(void) {
-      char *ret = (char *)malloc(strlen("Default Header")+1);
-      _MEMCHECK(ret);
-      strcpy(ret,"Default Header");
-      return ret;
-    }
-    virtual char *showContents(void) {
-      char *ret = (char *)malloc(strlen("Default Content")+1);
-      _MEMCHECK(ret);
-      strcpy(ret,"Default Content");
-      return ret;
-    }
+    virtual ~Chare();
+    virtual char *showHeader(void);
+    virtual char *showContents(void);
 #else
     Chare() { CkGetChareID(&thishandle); }
+    virtual ~Chare(); //<- this is needed if *any* child is to have a virtual destructor
 #endif
+    virtual void pup(PUP::er &p);//<- pack/unpack routine
 };
 
 class Group : public Chare {
@@ -194,9 +188,9 @@ class CkVec {
 };
 
 
+#include "ckarray.h"
 #include "ckstream.h"
 #include "CkFutures.decl.h"
-#include "ckarray.h"
 #include "tempo.h"
 #include "waitqd.h"
 

@@ -109,7 +109,7 @@ CkReductionMgr::CkReductionMgr()//Constructor
 //////////// Reduction Manager Client API /////////////
 
 //Add the given client function.  Overwrites any previous client.
-void CkReductionMgr::addClient(clientFn client,void *param)
+void CkReductionMgr::setClient(clientFn client,void *param)
 {
 	storedClient=client;
 	storedClientParam=param;
@@ -120,22 +120,9 @@ void CkReductionMgr::addClient(clientFn client,void *param)
 
 /*Contributor migration support:
 */
-int CkReductionMgr::contributorInfo::packsize(void) const
+void CkReductionMgr::contributorInfo::pup(PUP::er &p)
 {
-	return sizeof(redNo);
-}
-void *CkReductionMgr::contributorInfo::pack(void *into) const
-{
-	char *buf=(char *)into;
-	*(int *)buf=redNo; buf+=sizeof(int);
-	return (void *)buf;
-}
-const void *CkReductionMgr::contributorInfo::unpack(const void *from)
-{
-	const char *buf=(const char *)from;
-	redNo=*(int *)buf; buf+=sizeof(int); 
-	return (const void *)buf;
-	
+	p(redNo);
 }
 
 ////////////////////// Contributor list maintainance: /////////////////

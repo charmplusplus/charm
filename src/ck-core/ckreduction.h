@@ -133,17 +133,15 @@ public:
 	typedef void (*clientFn)(void *param,int dataSize,void *data);
 
 	//Add the given client function.  Overwrites any previous client.
-	void addClient(clientFn client,void *param=NULL);
+	void setClient(clientFn client,void *param=NULL);
 
 //Contributors keep a copy of this structure:
 	class contributorInfo {
 	public:
 		int redNo;//Current reduction number
 		contributorInfo() {redNo=0;}
-		//Migration utilities
-		int packsize(void) const;
-		void *pack(void *into) const;
-		const void *unpack(const void *from);
+		//Migration utilities:
+		void pup(PUP::er &p);
 	};
 	
 //Contributor list maintainance:

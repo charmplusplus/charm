@@ -2,24 +2,23 @@ module CkArray {
   extern module CkReduction;
 	
   readonly CkGroupID _RRMapID;
-  message ArrayMessage;
-  message ArrayElementCreateMessage;
+  message CkArrayMessage;
+  message CkArrayElementCreateMsg;
   message [varsize] ArrayElementMigrateMessage;
   
   message CkArrayCreateMsg;
-  message CkArrayInsertMsg;
   message CkArrayRemoveMsg;
   message CkArrayUpdateMsg;
 
   group CkArray : CkReductionMgr {
 	entry CkArray(CkArrayCreateMsg *);
 	//Insertion:
-	entry void InsertElement(CkArrayInsertMsg *);
+	entry void InsertElement(CkArrayMessage *);
 	entry void DoneInserting(void);
 	entry void ElementDying(CkArrayRemoveMsg *);
 	//Messaging:
-	entry void Send(ArrayMessage *);
-	entry void RecvForElement(ArrayMessage *);
+	entry void Send(CkArrayMessage *);
+	entry void RecvForElement(CkArrayMessage *);
 	//Migration:
 	entry void RecvMigratedElement(ArrayElementMigrateMessage *);
 	entry void UpdateLocation(CkArrayUpdateMsg *);
@@ -28,11 +27,11 @@ module CkArray {
 	//Housecleaning:
 	entry void SpringCleaning(void);
 	//Broadcast
-	entry void SendBroadcast(ArrayMessage *);
-	entry void RecvBroadcast(ArrayMessage *);	
+	entry void SendBroadcast(CkArrayMessage *);
+	entry void RecvBroadcast(CkArrayMessage *);	
   };
 
-  array ArrayElement {
+  array [none] ArrayElement {
     entry ArrayElement();
     //Calls destructor:
     entry void destroy(void);

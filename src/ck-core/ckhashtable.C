@@ -78,22 +78,82 @@ int HashKey::equals(const HashKey &that) const
 }
 
 
-// This hashkey is used to store the contents of other hash keys
-class HashKeyHeap:public HashKey {
+// This hashkey is used to store a (variable) n bytes of data
+class hashKeyHeap:public HashKey {
 protected:
 	int nBytes;unsigned char *data;
 public:
-	HashKeyHeap(const HashKey &h) {
-		const unsigned char *Ndata=h.getKey(nBytes);
-		data=new unsigned char[nBytes];
+	hashKeyHeap(int NnBytes,const void *Ndata) {
+		nBytes=NnBytes;
 		memcpy(data,Ndata,nBytes);
 	}
-	~HashKeyHeap() {delete data;}
+	~hashKeyHeap() {delete data;}
 	virtual const unsigned char *getKey(int &len) const {
 		len=nBytes;
 		return data;
 	}
 };
+
+// This hashkey stores a (fixed) n bytes of data
+template <int n>
+class hashKeyFixed:public HashKey {
+protected:
+	//We declare data as an int array so it's int-aligned.
+	int data[(n+sizeof(int)-1)/sizeof(int)];//<- n/sizeof(int), rounded up
+public:
+	hashKeyFixed(const void *Ndata) {
+		memcpy((void *)&data,(const void *)Ndata,n);
+	}
+	virtual const unsigned char *getKey(int &len) const {
+		len=n;
+		return (const unsigned char *)&data;
+	}
+};
+
+// This hashkey stores no bytes of data
+class hashKeyNone:public HashKey {
+public:
+	virtual const unsigned char *getKey(int &len) const
+		{ len=0;return NULL; }
+};
+
+//Return a heap-allocated key containing the given data
+HashKey *HashKey::newKey(int n,const void *data)
+{
+	switch(n)
+	{
+	case 0: return new hashKeyNone();
+	case 1: return new hashKeyFixed<1>(data);
+	case 2: return new hashKeyFixed<2>(data);
+	case 3: return new hashKeyFixed<3>(data);
+	case 4: return new hashKeyFixed<4>(data);
+	case 5: return new hashKeyFixed<5>(data);
+	case 6: return new hashKeyFixed<6>(data);
+	case 7: return new hashKeyFixed<7>(data);
+	case 8: return new hashKeyFixed<8>(data);
+	case 9: return new hashKeyFixed<9>(data);
+	case 10: return new hashKeyFixed<10>(data);
+	case 11: return new hashKeyFixed<11>(data);
+	case 12: return new hashKeyFixed<12>(data);
+	case 13: return new hashKeyFixed<13>(data);
+	case 14: return new hashKeyFixed<14>(data);
+	case 15: return new hashKeyFixed<15>(data);
+	case 16: return new hashKeyFixed<16>(data);
+	case 17: return new hashKeyFixed<17>(data);
+	case 18: return new hashKeyFixed<18>(data);
+	case 19: return new hashKeyFixed<19>(data);
+	case 20: return new hashKeyFixed<20>(data);
+	default: return new hashKeyHeap(n,data);
+	}
+}
+
+//Return a heap-allocated key containing my data
+HashKey *HashKey::newKey(void) const
+{
+	int n;
+	const unsigned char *d=getKey(n);
+	return newKey(n,(const void *)d);
+}
 
 ///////////////////////// Hashtable //////////////////////
 
@@ -204,7 +264,7 @@ void *Hashtable::put(const HashKey &key,void *obj)
 	DEBUGF(("Inserting new key at %d\n",index))
 	void *oldObject=objTable[index];
 	if (keyTable[index]==NULL)//This location had no key--
-		keyTable[index]=new HashKeyHeap(key);
+		keyTable[index]=key.newKey();
 	//Plop the new object into the table
 	objTable[index]=obj;
 	nElem++;

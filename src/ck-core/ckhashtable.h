@@ -29,7 +29,11 @@ public:
 
 	//Return an arbitrary but repeatable number as a hash table index.
 	//Computes a hash function of the key data.
-	hashCode getHashCode(void) const;
+	virtual hashCode getHashCode(void) const;
+	
+	//Returns a new heap copy of this key
+	HashKey *newKey(void) const;
+	static HashKey *newKey(int nBytes,const void *data);
 	
 	//Return 1 if this key equals the given key.
 	//Compares the key length and data.

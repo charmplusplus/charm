@@ -10,6 +10,30 @@
 
 VidBlock::VidBlock() { state = UNFILLED; msgQ = new PtrQ(); _MEMCHECK(msgQ); }
 
+//Chare virtual functions: declaring these here results in a smaller executable
+#if CMK_DEBUG_MODE
+Chare::~Chare() 
+{ 
+  removeObject(this); 
+}
+char *Chare::showHeader(void) {
+  char *ret = (char *)malloc(strlen("Default Header")+1);
+  _MEMCHECK(ret);
+  strcpy(ret,"Default Header");
+  return ret;
+}
+char *Chare::showContents(void) {
+  char *ret = (char *)malloc(strlen("Default Content")+1);
+  _MEMCHECK(ret);
+  strcpy(ret,"Default Content");
+  return ret;
+}
+#else
+Chare::~Chare() {}
+#endif
+void Chare::pup(PUP::er &p) {} 
+
+
 extern "C"
 void CkSetRefNum(void *msg, int ref)
 {

@@ -13,7 +13,7 @@ module tempo  {
     entry void tempoGeneric(TempoMessage *);
   };
 
-  array TempoArray
+  array[1D] TempoArray
   {
     entry [threaded] TempoArray();
     entry void tempoGeneric(TempoMessage *);
