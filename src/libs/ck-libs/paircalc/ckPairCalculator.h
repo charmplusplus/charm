@@ -117,7 +117,7 @@ class PairCalculator: public CBase_PairCalculator {
   int sumPartialCount;
   bool symmetric;
   CkCallback cb;
-  CkSparseContiguousReducer<CkTwoDoubles> r;
+  CkSparseContiguousReducer<double> r;
 };
 
 class PairCalcReducer : public Group {

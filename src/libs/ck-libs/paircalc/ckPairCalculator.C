@@ -2,7 +2,7 @@
 
 #define PARTITION_SIZE 500
 
-//#define _SPARSECONT_ 
+#define _SPARSECONT_ 
 
 PairCalculator::PairCalculator(CkMigrateMessage *m) { }
 	
@@ -42,10 +42,11 @@ PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int
 
 #ifdef _SPARSECONT_ 
   outData = new double[grainSize * grainSize];
+  memset(outData, 0 , sizeof(double)* grainSize * grainSize);
 #else
   outData = new double[S * S];
+  memset(outData, 0 , sizeof(double)* S *S);
 #endif
-  //memset(outData, 0 , sizeof(double)* S *S);
 
   newData = NULL;
   sumPartialCount = 0;
@@ -197,7 +198,11 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
 	    for(int jkth=0;jkth<iunits;jkth++)
 	      {
 		j=kLeftMark[jkth];
-		outData[(i+thisIndex.y)*S + j + thisIndex.x] = 
+#ifdef  _SPARSECONT_	
+		outData[i * grainSize + j] = 
+#else
+		    outData[(i+thisIndex.y)*S + j + thisIndex.x] = 
+#endif
                     compute_entry(size, inDataLeft[i],
                                   inDataLeft[j], op1);        
 	      }
@@ -212,7 +217,11 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
 	    for(int jkth=0;jkth<junits;jkth++)
 	      {
 		j=kRightMark[jkth];
-		outData[(i+thisIndex.y)*S + j + thisIndex.x] = 
+#ifdef _SPARSECONT_
+		outData[i * grainSize + j] =
+#else
+		    outData[(i+thisIndex.y)*S + j + thisIndex.x] = 
+#endif	    
                     compute_entry(size, inDataLeft[i],
                                   inDataRight[j],op1);        
 	      }
@@ -234,6 +243,7 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
       kRightCount=0;
       kLeftMark=kLeftOffset;
       kRightMark=kRightOffset;
+
       if (flag_dp) {
 	  if(thisIndex.w != 0) {   // Adjusting for double packing of incoming data
 	      for (int i = 0; i < grainSize*grainSize; i++)
@@ -241,7 +251,7 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
 	  }
       }
 #ifdef _SPARSECONT_
-      r.add((int)thisIndex.y, (int)thisIndex.x, (int)(thisIndex.y+grainSize-1), (int)(thisIndex.x+grainSize-1), (CkTwoDoubles*)outData);
+      r.add((int)thisIndex.y, (int)thisIndex.x, (int)(thisIndex.y+grainSize-1), (int)(thisIndex.x+grainSize-1), outData);
       r.contribute(this, sparse_sum_double);
 #else
       contribute(S * S *sizeof(double), outData, CkReduction::sum_double);
