@@ -21,14 +21,95 @@ virtual functions are defined here.
 
 PUP::er::~er() {}
 
+/*define CK_CHECK_PUP to get type and bounds checking during Pack and unpack.
+This checking substantially slows down PUPing, and increases the space
+required by packed objects. It can save hours of debugging, however.
+*/
+#ifdef CK_CHECK_PUP
+static int bannerDisplayed=0;
+static void showBanner(void) {
+	bannerDisplayed=1;
+	fprintf(stderr,"CK_CHECK_PUP pup routine checking enabled\n");
+	CmiPrintf("CK_CHECK_PUP pup routine checking enabled\n");
+}
+
+class pupCheckRec {
+	unsigned char magic[4];//Cannot use "int" because of alignment
+	unsigned char type;
+	unsigned char length[3];
+	enum {pupMagic=0xf36c5a21,typeMask=0x75};
+	int getMagic(void) const {return (magic[3]<<24)+(magic[2]<<16)+(magic[1]<<8)+magic[0];}
+	void setMagic(int v) {for (int i=0;i<4;i++) magic[i]=(v>>(8*i));}
+	PUP::dataType getType(void) const {return (PUP::dataType)(type^typeMask);}
+	void setType(PUP::dataType v) {type=v^typeMask;}
+	int getLength(void) const {return (length[2]<<16)+(length[1]<<8)+length[0];}
+	void setLength(int v) {for (int i=0;i<3;i++) length[i]=(v>>(8*i));}
+	
+	/*Compare the packed value (from us) and the unpacked value
+	  (from the user).
+	 */
+	void compare(const char *kind,const char *why,int packed,int unpacked) const
+	{
+		if (packed==unpacked) return;
+		//If we get here, there is an error in the user's pack/unpack routine
+		fprintf(stderr,"CK_CHECK_PUP error!\nPacked %s (%d, or %08x) does "
+			"not equal unpacked value (%d, or %08x)!\nThis means %s\n",
+			kind,packed,packed,unpacked,unpacked,why);
+		CmiPrintf("CK_CHECK_PUP error! Run with debugger for more info.\n");
+		//Invoke the debugger
+		abort();
+	}
+public:
+	void write(PUP::dataType t,int n) {
+		if (!bannerDisplayed) showBanner();
+		setMagic(pupMagic);
+		type=t^typeMask;
+		setLength(n);
+	}
+	void check(PUP::dataType t,int n) const {
+		compare("magic number",
+			"you unpacked more than you packed, or the values were corrupted during transport",
+			getMagic(),pupMagic);
+		compare("data type",
+			"the pack and unpack paths do not match up",
+			getType(),t);
+		compare("length",
+			"you may have forgotten to pup the array length",
+			getLength(),n);
+	}
+};
+#endif
+
+
 void PUP::sizer::bytes(void * /*p*/,int n,size_t itemSize,dataType /*t*/,const char *desc)
-	{nBytes+=n*itemSize;}
+{
+#ifdef CK_CHECK_PUP
+	nBytes+=sizeof(pupCheckRec);
+#endif
+	nBytes+=n*itemSize;
+}
 
 /*Memory PUP::er's*/
-void PUP::toMem::bytes(void *p,int n,size_t itemSize,dataType /*t*/,const char *desc)
-  {n*=itemSize; memcpy((void *)buf,p,n); buf+=n;}
-void PUP::fromMem::bytes(void *p,int n,size_t itemSize,dataType /*t*/,const char *desc)
-  {n*=itemSize; memcpy(p,(const void *)buf,n); buf+=n;}
+void PUP::toMem::bytes(void *p,int n,size_t itemSize,dataType t,const char *desc)
+{
+#ifdef CK_CHECK_PUP
+	((pupCheckRec *)buf)->write(t,n);
+	buf+=sizeof(pupCheckRec);
+#endif
+	n*=itemSize;
+	memcpy((void *)buf,p,n); 
+	buf+=n;
+}
+void PUP::fromMem::bytes(void *p,int n,size_t itemSize,dataType t,const char *desc)
+{
+#ifdef CK_CHECK_PUP
+	((pupCheckRec *)buf)->check(t,n);
+	buf+=sizeof(pupCheckRec);
+#endif
+	n*=itemSize; 
+	memcpy(p,(const void *)buf,n); 
+	buf+=n;
+}
 
 /*Disk PUP::er's*/
 PUP::disk::~disk() 
