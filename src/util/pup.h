@@ -568,13 +568,24 @@ public:\
 //Holds a pointer to a (possibly dynamically allocated) PUP::able.
 //  This is used by parameter marshalling, which doesn't work well 
 //  with pointers.
+extern "C" void CmiAbort(const char *msg);
 template <class T>
 class PUPable_marshall {
 	T *allocated; //Pointer that PUP dynamically allocated for us (recv only)
 	T *ptr; //Read-only pointer
 
-	//Don't use the copy constructor!
-	PUPable_marshall(const PUPable_marshall<T> &src);
+#if 0 /* Private (do-not-use) copy constructor.  This prevents allocated from being
+         deleted twice--once in the original, and again in the copy.*/
+	PUPable_marshall(const PUPable_marshall<T> &src); // Don't use this!
+#else /* Some compilers, like gcc3, have a hideous bug that causes them to *demand*
+         a public copy constructor when a class is used to initialize a const-reference
+	 from a temporary.  The public copy constructor should never be called, though. */
+public:
+	PUPable_marshall(const PUPable_marshall<T> &src) {
+		CmiAbort("PUPable_marshall's cannot be passed by value.  Pass them only by reference!");
+	}
+#endif
+
 public:
 	/// Marshall this object.
 	/// Used on the send side, and does *not* delete the object.
