@@ -136,7 +136,7 @@ UTILHEADERS=pup.h pupf.h pup_c.h pup_stl.h pup_toNetwork4.h \
 
 CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  ckfutures.h \
-	  ckcallback.h CkCallback.decl.h ckcallback-ccs.h ckarrayreductionmgr.h \
+	  ckcallback.h CkCallback.decl.h ckcallback-ccs.h ckarrayreductionmgr.h cknodegroupreduction.h\
 	  ckarray.h cklocation.h ckreduction.h ckcheckpoint.h\
 	  readonly.h charisma.h \
 	  $(UTILHEADERS) \
