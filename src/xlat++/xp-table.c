@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.7  1995-09-21 16:39:22  sanjeev
+ * Revision 2.8  1995-09-26 22:39:17  sanjeev
+ * *** empty log message ***
+ *
+ * Revision 2.7  1995/09/21  16:39:22  sanjeev
  * changes in message allocation
  *
  * Revision 2.0  1995/06/05  19:01:24  brunner
@@ -35,9 +38,9 @@
  *
  ***************************************************************************/
 static char ident[] = "@(#)$Header$";
-#include "y.tab.h"
-#include "t.h"
-#include "externs.h"
+#include "xp-ytab.h"
+#include "xp-t.h"
+#include "xp-extn.h"
 
 
 char *CheckSendError() ;
