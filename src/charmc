@@ -371,8 +371,8 @@ foreach FILE ($FILES)
       if ($?VERBOSE) echo "$CHARMBIN/charmxlat++ $TMP.space $TMP.C"
       $CHARMBIN/charmxlat++ $TMP.space $TMP.C
       if ($status) goto failure
-      if ($?VERBOSE) echo "$CMK_CXX $OPTS_CPLUS -I$CHARMINC $TMP.C"
-      $CMK_CXX $OPTS_CPLUS -I$CHARMINC $TMP.C
+      if ($?VERBOSE) echo "$CMK_CXX $OPTS_CPLUS -I$CHARMINC -c $TMP.C"
+      $CMK_CXX $OPTS_CPLUS -I$CHARMINC -c $TMP.C
       if ($status) goto failure
       if ($?OBJECT == 0) then
         if ($?VERBOSE) echo "/bin/mv $TMP.o $BASE.o"
@@ -391,8 +391,8 @@ foreach FILE ($FILES)
       endif
       breaksw
     case "*.C"
-      if ($?VERBOSE) echo "$CMK_CXX $OPTS_CPLUS -I$CHARMINC $BASE.C"
-      $CMK_CXX $OPTS_CPLUS -I$CHARMINC $BASE.C
+      if ($?VERBOSE) echo "$CMK_CXX $OPTS_CPLUS -I$CHARMINC -c $BASE.C"
+      $CMK_CXX $OPTS_CPLUS -I$CHARMINC -c $BASE.C
       if ($status) goto failure
       if ($?OBJECT) then
 	if ($OBJECT != $BASE.o) set DELETE=( $DELETE $BASE.o )
@@ -400,8 +400,8 @@ foreach FILE ($FILES)
       endif
       breaksw
     case "*.cxx"
-      if ($?VERBOSE) echo "$CMK_CXX $OPTS_CPLUS -I$CHARMINC $BASE.cxx"
-      $CMK_CXX $OPTS_CPLUS -I$CHARMINC $BASE.cxx
+      if ($?VERBOSE) echo "$CMK_CXX $OPTS_CPLUS -I$CHARMINC -c $BASE.cxx"
+      $CMK_CXX $OPTS_CPLUS -I$CHARMINC -c $BASE.cxx
       if ($status) goto failure
       if ($?OBJECT) then
 	if ($OBJECT != $BASE.o) set DELETE=( $DELETE $BASE.o )
