@@ -356,7 +356,9 @@ Currently the following subset of MPI 1.1 standard is supported in \ampi{}.
   AMPI_Type_size       AMPI_Allgatherv    AMPI_Allgather    
   AMPI_Gatherv         AMPI_Gather        AMPI_Alltoallv    
   AMPI_Alltoall        AMPI_Comm_dup      AMPI_Comm_free
-  AMPI_Abort
+  AMPI_Abort           AMPI_Probe         AMPI_Iprobe
+  AMPI_Testall         AMPI_Get_count     AMPI_Pack
+  AMPI_Unpack          AMPI_Pack_size
 \end{alltt}
 
 Following MPI 1.1 basic datatypes are supported in \ampi{}.
@@ -579,6 +581,25 @@ END SUBROUTINE
 One more function \verb+pup_issz+ is also available in module \texttt{pupmod}
 that returns \verb+.TRUE.+ when the invocation is a sizing one. In practice one
 almost never needs to use it.
+
+\subsubsection{Extensions for Checkpointing}
+
+The pack-unpack subroutines written for migrations make sure that the current
+state of the program is correctly packed (serialized) so that it can be
+restarted on a different processor. Using the \emph{same} subroutines, it
+is also possible to save the state of the program to disk, so that if the 
+program were to crash abruptly, or if the allocated time for the program
+expires before completing execution, the program can be restarted from the
+previously checkpointed state. Thus, the pack-unpack subroutines act as the key facility for checkpointing in addition to their usual role for migration.
+
+A subroutine, \texttt{AMPI\_Checkpoint} has been added to AMPI. This subroutine
+takes a directory name as its argument. Every chunk in the program needs to
+call this subroutine and specify the same directory name. (Typically, in an
+iterative AMPI program, the iteration number, converted to a character string,
+can serve as a checkpoint directory name.) This directory is created, and the
+entire state of the program is checkpointed to this directory.  One can restart
+the program from the checkpointed state by specifying \texttt{"+restart
+dirname"} on the command-line.
 
 \subsection{Extensions for Interoperability}
 
