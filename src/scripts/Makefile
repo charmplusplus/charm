@@ -61,7 +61,7 @@ AMPIF: AMPIC
 
 f90charm: charm++ libf90charm.a
 
-multicast:
+multicast: charm++
 	cd libs/ck-libs/multicast && make
 
 translators: charmxi conv-cpm
