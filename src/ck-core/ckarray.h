@@ -36,7 +36,7 @@ Orion Sky Lawlor, olawlor@acm.org
 extern void _registerCkArray(void);
 
 
-//Simple ArrayIndex classes: the key is just integer indices.
+/// Simple ArrayIndex classes: the key is just integer indices.
 class CkArrayIndex1D : public CkArrayIndex {
 public: int index;
 	CkArrayIndex1D(int i0) {index=i0;nInts=1;}
@@ -52,8 +52,9 @@ public: int index[3];
 		nInts=3;}
 };
 
-//A slightly more complex array index: the key is an object
-// whose size is fixed at compile time.
+/** A slightly more complex array index: the key is an object
+ *  whose size is fixed at compile time.
+ */
 template <class object> //Key object
 class CkArrayIndexT : public CkArrayIndex {
 public:
@@ -64,31 +65,33 @@ public:
 
 #define ALIGN8(x)       (int)((~7)&((x)+7))
 
-//Arguments for array creation:
+/// Arguments for array creation:
 class CkArrayOptions {
-	int numInitial;//Number of elements to create
-	CkGroupID map;//Array location map object
-	CkGroupID locMgr;//Location manager to bind to
+	int numInitial;/// Number of elements to create
+	CkGroupID map;/// Array location map object
+	CkGroupID locMgr;/// Location manager to bind to
  public:
  //Used by external world:
-	CkArrayOptions(void); //Default: empty array
-	CkArrayOptions(int numInitial_); //With initial elements
+	CkArrayOptions(void); /// Default: empty array
+	CkArrayOptions(int numInitial_); /// With initial elements
 
-	//These functions return a copy of this so you can string them together, e.g.:
-	//  foo(CkArrayOptions().setMap(mid).bindTo(aid));
+	/**
+	 * These functions return "this" so you can string them together, e.g.:
+	 *   foo(CkArrayOptions().setMap(mid).bindTo(aid));
+	 */
 
-	//Create this many initial elements
+	/// Create this many initial elements
 	CkArrayOptions &setNumInitial(int ni)
 		{numInitial=ni; return *this;}
 
-	//Use this location map
+	/// Use this location map
 	CkArrayOptions &setMap(const CkGroupID &m)
 		{map=m; return *this;}
 
-	//Bind our elements to this array
+	/// Bind our elements to this array
 	CkArrayOptions &bindTo(const CkArrayID &b);
 	
-	//Use this location manager
+	/// Use this location manager
 	CkArrayOptions &setLocationManager(const CkGroupID &l)
 		{locMgr=l; return *this;}
 	
@@ -109,9 +112,11 @@ PUPmarshall(CkArrayOptions);
 class ArrayBase { /*empty*/ };
 /*forward*/ class ArrayElement;
 
-//This class is a wrapper around a CkArrayIndex and ArrayID,
-// used by array element proxies.  This makes the translator's
-// job simpler, and the translated code smaller. 
+/**
+ * This class is a wrapper around a CkArrayIndex and ArrayID,
+ *  used by array element proxies.  This makes the translator's
+ *  job simpler, and the translated code smaller. 
+ */
 class CProxy_ArrayBase :public CProxy {
 private:
 	CkArrayID _aid;
@@ -253,6 +258,11 @@ void CkSendMsgArray(int entryIndex, void *msg, CkArrayID aID, const CkArrayIndex
 void CkBroadcastMsgArray(int entryIndex, void *msg, CkArrayID aID);
 
 /************************ Array Element *********************/
+/**
+ *An array element is a chare that lives inside the array.
+ *Unlike regular chares, array elements can migrate from one
+ *Pe to another.  Each element has a unique index.
+ */
 
 class ArrayElement : public CkMigratable
 {
@@ -263,18 +273,18 @@ public:
   ArrayElement(CkMigrateMessage *m);
   virtual ~ArrayElement();
   
-  int numElements; //Initial number of array elements (DEPRICATED)
+  int numElements; /// Initial number of array elements (DEPRICATED)
   
-//Pack/unpack routine (called before and after migration)
+/// Pack/unpack routine (called before and after migration)
   virtual void pup(PUP::er &p);
 
 //Overridden functions:
-  //Called by the system just before and after migration to another processor:  
+  /// Called by the system just before and after migration to another processor:  
   virtual void ckAboutToMigrate(void); 
   virtual void ckJustMigrated(void); 
   virtual void ckDestroy(void);
 
-  //Synonym for ckMigrate
+  /// Synonym for ckMigrate
   inline void migrateMe(int toPe) {ckMigrate(toPe);}
 
   CK_REDUCTION_CONTRIBUTE_METHODS_DECL
@@ -294,8 +304,9 @@ private:
   CkReductionMgr::contributorInfo reductionInfo;//My reduction information
 };
 
-//An ArrayElementT is a utility class where you are 
-// constrained to a "thisIndex" of some fixed-sized type T.
+/**An ArrayElementT is a utility class where you are 
+ * constrained to a "thisIndex" of some fixed-sized type T.
+ */
 template <class T>
 class ArrayElementT : public ArrayElement
 {
@@ -305,7 +316,7 @@ public:
 	:ArrayElement(msg)
 	{thisIndex=*(T *)thisIndexMax.data();}
   
-  T thisIndex;//Object array index
+  T thisIndex;/// Object array index
 };
 
 typedef int CkIndex1D;
@@ -347,43 +358,43 @@ public:
   inline int getNumInitial(void) const {return numInitial;}
   inline int homePe(const CkArrayIndex &idx) const {return locMgr->homePe(idx);}
 
-  /* Return the last known processor for this array index.
-   Valid for any possible array index. */
+  /// Return the last known processor for this array index.
+  /// Valid for any possible array index.
   inline int lastKnown(const CkArrayIndex &idx) const
 	  {return locMgr->lastKnown(idx);}
-  //Deliver message to this element (directly if local)
+  /// Deliver message to this element (directly if local)
   inline void deliver(CkMessage *m) 
 	  {locMgr->deliver(m);}
   inline void deliverViaQueue(CkMessage *m) 
 	  {locMgr->deliverViaQueue(m);}
-  //Fetch a local element via its index (return NULL if not local)
+  /// Fetch a local element via its index (return NULL if not local)
   inline ArrayElement *lookup(const CkArrayIndex &index)
 	  {return (ArrayElement *)locMgr->lookup(index,thisgroup);}
 
 //Creation:
-  //Create-after-migrate:
+  /// Create-after-migrate:
   virtual CkMigratable *allocateMigrated(int elChareType,const CkArrayIndex &idx);
   
-  //Create initial:
+  /// Create initial array elements:
   virtual void insertInitial(const CkArrayIndex &idx,void *ctorMsg);
   virtual void doneInserting(void);
   void remoteDoneInserting(void);
 
-  //Create manually:
+  /// Create manually:
   virtual CmiBool insertElement(CkMessage *);
 
-//Demand-creation:
+/// Demand-creation:
   CmiBool demandCreateElement(const CkArrayIndex &idx,int onPe,int ctor);
 
-//Broadcast communication:
+/// Broadcast communication:
   void sendBroadcast(CkMessage *msg);
   void recvBroadcast(CkMessage *msg);
   
 private:
-  int numInitial;//Number of 1D initial array elements
-  CmiBool isInserting;//Are we currently inserting elements?
+  int numInitial;/// Number of 1D initial array elements
+  CmiBool isInserting;/// Are we currently inserting elements?
 
-//Allocate space for a new array element
+/// Allocate space for a new array element
   ArrayElement *allocate(int elChareType,const CkArrayIndex &idx,
 	int bcast,CmiBool fromMigration);
   

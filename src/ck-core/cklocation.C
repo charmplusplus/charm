@@ -108,7 +108,7 @@ CkHashCode CkArrayIndex::staticHash(const void *v,size_t)
 inline int CkArrayIndex::compare(const CkArrayIndex &i2) const
 {
 	const CkArrayIndex &i1=*this;
-#if ONEDONLY
+#if CMK_1D_ONLY
 	return i1.data()[0]==i2.data()[0];
 #else
 	const int *d1=i1.data();
@@ -188,6 +188,10 @@ void CkArrayMap::populateInitial(int arrayHdl,int numElements,void *ctorMsg,CkAr
 
 CkGroupID _RRMapID;
 
+/**
+ *The default map object-- round-robin homes.  This is 
+ * almost always what you want.
+ */
 class RRMap : public CkArrayMap
 {
 public:
@@ -337,7 +341,12 @@ void _propMapInit(void)
     CkpvAccess(speeds)[i] = 1;
 }
 #endif
-
+/**
+ * A proportional map object-- tries to map more objects to
+ * faster processors and fewer to slower processors.  Also
+ * attempts to ensure good locality by mapping nearby elements
+ * together.
+ */
 class PropMap : public CkArrayMap
 {
 private:
@@ -373,6 +382,10 @@ public:
 
 
 /****************************** CkMigratable ***************************/
+/**
+ * This tiny class is used to convey information to the 
+ * newly created CkMigratable object when its constructor is called.
+ */
 class CkMigratable_initInfo {
 public:
 	CkLocRec_local *locRec;  
@@ -651,9 +664,11 @@ void CkLocRec_local::staticMigrate(LDObjHandle h, int dest)
 }
 #endif
 
-/*------------------- dead
-Represents a deleted array element (prevents re-use)
-*/
+/**
+ * Represents a deleted array element (and prevents re-use).
+ * These are a debugging aid, usable only by uncommenting a line in
+ * the element destruction code.
+ */
 class CkLocRec_dead:public CkLocRec {
 public:
 	CkLocRec_dead(CkLocMgr *Narr):CkLocRec(Narr) {}
@@ -672,10 +687,10 @@ public:
 	virtual CmiBool isObsolete(int nSprings,const CkArrayIndex &idx) {return CmiFalse;}	
 };
 
-/*-------------------- aging
-This is the abstract superclass of arrayRecs that keep track of their age,
-and eventually expire. Its kids are remote and buffering.
-*/
+/**
+ * This is the abstract superclass of arrayRecs that keep track of their age,
+ * and eventually expire. Its kids are remote and buffering.
+ */
 class CkLocRec_aging:public CkLocRec {
 private:
 	int lastAccess;//Age when last accessed
@@ -699,9 +714,9 @@ public:
 };
 
 
-/*----------------------- Remote
-Represents a remote array element.
-*/
+/**
+ * Represents a remote array element.  This is just a PE number.
+ */
 class CkLocRec_remote:public CkLocRec_aging {
 private:
 	int onPe;//The last known Pe for this element
@@ -745,12 +760,17 @@ public:
 };
 
 
-/*------------------ Buffering
-Buffers messages until record is replaced in the hash table, 
-then delivers all messages to the replacing record.  This is 
-used when a local element is created, buffering messages until 
-the new element checks in, replacing us by a CkLocRec_local.
-*/
+/**
+ * Buffers messages until record is replaced in the hash table, 
+ * then delivers all messages to the replacing record.  This is 
+ * used when a message arrives for a local element that has not
+ * yet been created, buffering messages until the new element finally
+ * checks in.
+ *
+ * It's silly to send a message to an element you won't ever create,
+ * so this kind of record causes an abort "Stale array manager message!"
+ * if it's left undelivered too long.
+ */
 class CkLocRec_buffering:public CkLocRec_aging {
 private:
 	CkQ<CkArrayMessage *> buffer;//Buffered messages.
@@ -810,14 +830,17 @@ public:
     }*/
 };
 
-/*********************** Spring Cleaning *****************
-Periodically flush the location cache.
-
-Cleaning often will free up memory quickly, but slow things
-down because the cleaning takes time and some not-recently-referenced
-remote element pointers might be valid and used some time in 
-the future.
-*/
+/*********************** Spring Cleaning *****************/
+/**
+ * Used to periodically flush out unused remote element pointers.
+ *
+ * Cleaning often will free up memory quickly, but slow things
+ * down because the cleaning takes time and some not-recently-referenced
+ * remote element pointers might be valid and used some time in 
+ * the future.
+ *
+ * Also used to determine if buffered messages have become stale.
+ */
 inline void CkLocMgr::springCleaning(void)
 {
   nSprings++;
@@ -873,7 +896,9 @@ CkLocMgr::CkLocMgr(CkGroupID mapID_,CkGroupID lbdbID_,int numInitial)
 }
 
 
-//Add a new local array manager to our list
+/// Add a new local array manager to our list.
+/// Returns a new CkMigratableList for the manager to store his 
+/// elements in.
 CkMigratableList *CkLocMgr::addManager(CkArrayID id,CkArrMgr *mgr)
 {
 	magic.check();
@@ -888,7 +913,7 @@ CkMigratableList *CkLocMgr::addManager(CkArrayID id,CkArrMgr *mgr)
 	return &n->elts;
 }
 
-//Return the next unused local element index
+/// Return the next unused local element index.
 int CkLocMgr::nextFree(void) {
 	if (firstFree>=localLen) 
 	{//Need more space in the local index arrays-- enlarge them
@@ -986,7 +1011,7 @@ void CkLocMgr::updateLocation(const CkArrayIndexMax &idx,int nowOnPe) {
 }
 
 /*************************** LocMgr: DELETION *****************************/
-//This index will no longer be used-- delete the associated elements
+/// This index will no longer be used-- delete the associated elements
 void CkLocMgr::reclaim(const CkArrayIndex &idx,int localIdx) {
 	magic.check();
 	DEBC((AA"Destroying element %s (local %d)\n"AB,idx2str(idx),localIdx));
@@ -1034,7 +1059,7 @@ void CkLocMgr::removeFromTable(const CkArrayIndex &idx) {
 }
 
 /************************** LocMgr: MESSAGING *************************/
-//Deliver message to this element, going via the scheduler if local
+/// Deliver message to this element, going via the scheduler if local
 void CkLocMgr::deliverViaQueue(CkMessage *m) {
 	magic.check();
 	CkArrayMessage *msg=(CkArrayMessage *)m;
@@ -1048,7 +1073,7 @@ void CkLocMgr::deliverViaQueue(CkMessage *m) {
 		rec->deliver(msg,CmiTrue);
 	else deliverUnknown(msg);
 }
-//Deliver message directly to this element
+/// Deliver message directly to this element
 CmiBool CkLocMgr::deliver(CkMessage *m) {
 	magic.check();
 	CkArrayMessage *msg=(CkArrayMessage *)m;
@@ -1061,12 +1086,14 @@ CmiBool CkLocMgr::deliver(CkMessage *m) {
 		return deliverUnknown(msg);
 }
 
+/// This index is not hashed-- somehow figure out what to do.
 CmiBool CkLocMgr::deliverUnknown(CkArrayMessage *msg)
-{//This index is not hashed-- send to its home processor
+{
 	magic.check();
 	const CkArrayIndex &idx=msg->array_index();
 	int onPe=homePe(idx);
-	if (onPe!=CkMyPe()) {
+	if (onPe!=CkMyPe()) 
+	{// Forward the message to its home processor
 		DEBM((AA"Forwarding message for unknown %s\n"AB,idx2str(idx)));
 		msg->array_hops()++;
 		thisProxy[onPe].deliver(msg);
@@ -1167,7 +1194,7 @@ void CkLocMgr::pupElementsFor(PUP::er &p,CkLocRec_local *rec)
 	}
 }
 
-//Migrate us to another processor
+/// Migrate this element to another processor.
 void CkLocMgr::migrate(CkLocRec_local *rec,int toPe)
 {
 	magic.check();

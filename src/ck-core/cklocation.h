@@ -53,7 +53,9 @@ typedef enum {
 #include "CkLocation.decl.h"
 
 /************************** Array Messages ****************************/
-//This is the default creation message sent to a new array element
+/**
+ *  This is the message type used to actually send a migrating array element.
+ */
 
 class CkArrayElementMigrateMessage : public CMessage_CkArrayElementMigrateMessage {
 public:
@@ -67,6 +69,9 @@ extern CkGroupID _RRMapID;
 class CkLocMgr;
 class CkArrMgr;
 
+/** The "map" is used by the array manager to map an array index to 
+ * a home processor number.
+ */
 class CkArrayMap : public IrrGroup // : public CkGroupReadyCallback
 {
 public:
@@ -93,6 +98,11 @@ class CkArray;//Array manager
 class CkLocMgr;//Location manager
 class CkMigratable;//Migratable object
 
+/**
+ * A CkLocRec is our local representation of an array element.
+ * The location manager's main hashtable maps array indices to
+ * CkLocRec *'s.
+ */
 class CkLocRec {
 protected:
   CkLocMgr *myLocMgr;
@@ -104,7 +114,7 @@ public:
   virtual ~CkLocRec();
   inline CkLocMgr *getLocMgr(void) const {return myLocMgr;}
 
-  //Return the type of this ArrayRec:
+  /// Return the type of this ArrayRec:
   typedef enum {
     base=0,//Base class (invalid type)
     local,//Array element that lives on this Pe
@@ -114,28 +124,32 @@ public:
   } RecType;
   virtual RecType type(void)=0;
   
-  //Accept a message for this element
+  /// Accept a message for this element
   virtual CmiBool deliver(CkArrayMessage *m,CmiBool viaScheduler)=0;
   
-  //This is called when this ArrayRec is about to be replaced.
-  // It is only used to deliver buffered element messages.
+  /// This is called when this ArrayRec is about to be replaced.
+  /// It is only used to deliver buffered element messages.
   virtual void beenReplaced(void);
   
-  //Return if this rec is now obsolete
+  /// Return if this rec is now obsolete
   virtual CmiBool isObsolete(int nSprings,const CkArrayIndex &idx)=0; 
 
-  //Return the represented array element; or NULL if there is none
+  /// Return the represented array element; or NULL if there is none
   virtual CkMigratable *lookupElement(CkArrayID aid);
-  //Return the last known processor; or -1 if none
+
+  /// Return the last known processor; or -1 if none
   virtual int lookupProcessor(void);
 };
 
+/**
+ * Represents a local array element.
+ */
 class CkLocRec_local : public CkLocRec {
-  CkArrayIndexMax idx;//Array index
-  int localIdx; //Local index
-  CmiBool running; //Inside a startTiming/stopTiming pair
-  CmiBool *deletedMarker; //Set this if we're deleted during processing
-  CkQ<CkArrayMessage *> halfCreated; //Messages for nonexistent siblings of existing elements
+  CkArrayIndexMax idx;/// Element's array index
+  int localIdx; /// Local index (into array manager's element lists)
+  CmiBool running; /// True when inside a startTiming/stopTiming pair
+  CmiBool *deletedMarker; /// Set this if we're deleted during processing
+  CkQ<CkArrayMessage *> halfCreated; /// Stores messages for nonexistent siblings of existing elements
 public:
   //Creation and Destruction:
   CkLocRec_local(CkLocMgr *mgr,CmiBool fromMigration,
@@ -144,22 +158,25 @@ public:
   void destroy(void); //User called destructor
   virtual ~CkLocRec_local();
   
-  //A new element has been added to this index
+  /// A new element has been added to this index
   void addedElement(void);
 
-  //Accept a message for this element
-  // Returns false if the element died in transit
+  /**
+   *  Accept a message for this element.
+   *  Returns false if the element died during the receive.
+   */
   virtual CmiBool deliver(CkArrayMessage *m,CmiBool viaScheduler);
   
-  //Invoke the given entry method on this element
-  // Returns false if the element died in transit
+  /** Invoke the given entry method on this element.
+   *   Returns false if the element died during the receive.
+   */
   CmiBool invokeEntry(CkMigratable *obj,void *msg,int idx);
 
   virtual RecType type(void);
   virtual CmiBool isObsolete(int nSprings,const CkArrayIndex &idx);
   
 #if CMK_LBDB_ON  //For load balancing:
-  //Load balancer
+  /// Control the load balancer:
   void startTiming(void);
   void stopTiming(void);
 #else
@@ -183,7 +200,9 @@ private:
 class CkLocRec_remote;
 
 /*********************** CkMigratable ******************************/
-//This is the superclass of all migratable parallel objects
+/** This is the superclass of all migratable parallel objects.
+ *  Currently, that's just array elements.
+ */
 class CkMigratable : public Chare {
 private:
   CkLocRec_local *myRec;
@@ -212,20 +231,20 @@ public:
   //Initiate a migration to the given processor
   inline void ckMigrate(int toPe) {myRec->migrateMe(toPe);}
   
-  //Called by the system just before and after migration to another processor:  
+  /// Called by the system just before and after migration to another processor:  
   virtual void ckAboutToMigrate(void); /*default is empty*/
   virtual void ckJustMigrated(void); /*default is empty*/
 
-  //Delete this object
+  /// Delete this object
   virtual void ckDestroy(void);
 
-  //Execute the given entry method.  Returns false if the element 
-  // deleted itself or migrated away during execution.
+  /// Execute the given entry method.  Returns false if the element 
+  /// deleted itself or migrated away during execution.
   inline CmiBool ckInvokeEntry(int epIdx,void *msg) 
 	  {return myRec->invokeEntry(this,msg,epIdx);}
 
 protected:
-  //More verbose form of abort
+  /// A more verbose form of abort
   virtual void CkAbort(const char *str) const;
 
   CmiBool usesAtSync;//You must set this in the constructor to use AtSync().
@@ -246,7 +265,10 @@ public:
 #endif
 };
 
-//Stores a list of array elements
+/** 
+ * Stores a list of array elements.  These lists are 
+ * kept by the array managers. 
+ */
 class CkMigratableList {
 	CkVec<CkMigratable *> el;
  public:
@@ -256,14 +278,16 @@ class CkMigratableList {
 	void setSize(int s);
 	inline int length(void) const {return el.length();}
 
-	//Add an element at the given location
+	/// Add an element at the given location
 	void put(CkMigratable *v,int atIdx);
 
-	//Return the element at the given location
+	/// Return the element at the given location
 	inline CkMigratable *get(int localIdx) {return el[localIdx];}
 
-	//Return the next non-empty element starting from the given index,
-	// or NULL if there is none.  Updates from to point past the returned index.
+	/**
+	 * Return the next non-empty element starting from the given index,
+	 * or NULL if there is none.  Updates from to point past the returned index.
+	*/
 	CkMigratable *next(int &from) {
 		while (from<length()) {
 			CkMigratable *ret=el[from];
@@ -273,11 +297,13 @@ class CkMigratableList {
 		return NULL;
 	}
 
-	//Remove the element at the given location
+	/// Remove the element at the given location
 	inline void empty(int localIdx) {el[localIdx]=NULL;}
 };
 
-//A typed version of the above
+/**
+ *A typed version of the above.
+ */
 template <class T>
 class CkMigratableListT : public CkMigratableList {
 	typedef CkMigratableList super;
@@ -289,7 +315,7 @@ public:
 
 
 /********************** CkLocMgr ********************/
-//A tiny class for detecting heap corruption
+/// A tiny class for detecting heap corruption
 class CkMagicNumber_impl {
  protected:
 	int magic;
@@ -310,27 +336,30 @@ class CkMagicNumber : public CkMagicNumber_impl {
 #endif
 };
 
-//Abstract superclass of all array manager objects 
+/// Abstract superclass of all array manager objects 
 class CkArrMgr {
 public:
-	//Insert this initial element on this processor
+	/// Insert this initial element on this processor
 	virtual void insertInitial(const CkArrayIndex &idx,void *ctorMsg)=0;
 	
-	//Done with initial insertions
+	/// Done with initial insertions
 	virtual void doneInserting(void)=0;
 	
-	//Create an uninitialized element after migration
-	//  The element's constructor will be called immediately after.
+	/// Create an uninitialized element after migration
+	///  The element's constructor will be called immediately after.
 	virtual CkMigratable *allocateMigrated(int elChareType,const CkArrayIndex &idx);
 
-	//Demand-create an element at this index on this processor
-	// Returns true if the element was successfully added;
-	// false if the element migrated away or deleted itself.
+	/// Demand-create an element at this index on this processor
+	///  Returns true if the element was successfully added;
+	///  false if the element migrated away or deleted itself.
 	virtual CmiBool demandCreateElement(const CkArrayIndex &idx,int onPe,int ctor) =0;
 };
 
-//A group which manages the location of an indexed set of
-// migratable objects.
+/**
+ * A group which manages the location of an indexed set of
+ * migratable objects.  Knows about insertions, deletions, 
+ * home processors, migration, and message forwarding.
+ */
 class CkLocMgr : public IrrGroup {
 	CkMagicNumber<CkMigratable> magic; //To detect heap corruption
 public:
@@ -343,35 +372,35 @@ public:
 		{return thislocalproxy;}
 
 //Interface used by array manager and proxies
-	//Add a new local array manager to our list.  Array managers
-	// must be registered in the same order on all processors.
-	//Returns a list which will contain that array's local elements
+	/// Add a new local array manager to our list.  Array managers
+	///  must be registered in the same order on all processors.
+	/// Returns a list which will contain that array's local elements
 	CkMigratableList *addManager(CkArrayID aid,CkArrMgr *mgr);
 
-	//Populate this array with initial elements
+	/// Populate this array with initial elements
 	void populateInitial(int numElements,void *initMsg,CkArrMgr *mgr) 
 		{map->populateInitial(mapHandle,numElements,initMsg,mgr);}
 	
-	//Add a new local array element, calling element's constructor
-	// Returns true if the element was successfully added;
-	// false if the element migrated away or deleted itself.
+	/// Add a new local array element, calling element's constructor
+	///  Returns true if the element was successfully added;
+	///  false if the element migrated away or deleted itself.
 	CmiBool addElement(CkArrayID aid,const CkArrayIndex &idx,
 		CkMigratable *elt,int ctorIdx,void *ctorMsg);
 	
-	//Deliver message to this element, going via the scheduler if local
+	///Deliver message to this element, going via the scheduler if local
 	void deliverViaQueue(CkMessage *m);
 
-	//Done inserting elements for now
+	///Done inserting elements for now
 	void doneInserting(void);
 
 //Advisories:
-	//This index now lives on the given processor-- update local records
+	///This index now lives on the given processor-- update local records
 	void inform(const CkArrayIndex &idx,int nowOnPe);
 	
-	//This index now lives on the given processor-- tell the home processor
+	///This index now lives on the given processor-- tell the home processor
 	void informHome(const CkArrayIndex &idx,int nowOnPe);
 
-	//This message took several hops to reach us-- fix it
+	///This message took several hops to reach us-- fix it
 	void multiHop(CkArrayMessage *m);
 
 //Interface used by CkLocRec_local
@@ -400,14 +429,14 @@ public:
 	CmiBool demandCreateElement(CkArrayMessage *msg,int onPe);
 	
 //Interface used by external users:
-	//Home mapping
+	/// Home mapping
 	inline int homePe(const CkArrayIndex &idx) const
 		{return map->procNum(mapHandle,idx);}	
 	inline CmiBool isHome(const CkArrayIndex &idx) const
 		{return (CmiBool)(homePe(idx)==CkMyPe());}
-	//Look up the object with this array index, or return NULL
+	/// Look up the object with this array index, or return NULL
 	CkMigratable *lookup(const CkArrayIndex &idx,CkArrayID aid);
-	//"Last-known" location (returns a processor number)
+	/// Return the "last-known" location (returns a processor number)
 	int lastKnown(const CkArrayIndex &idx) const;
 
 //Communication:
@@ -467,9 +496,10 @@ private:
 	
 	CProxy_CkLocMgr thisProxy;
 	CProxyElement_CkLocMgr thislocalproxy;
+	/// The core of the location manager: map array index to element representative
 	CkHashtableT<CkArrayIndexMax,CkLocRec *> hash;
 	
-	//This flag is set while we delete an old copy of a migrator
+	/// This flag is set while we delete an old copy of a migrator
 	CmiBool duringMigration;
 	
 	//Occasionally clear out stale remote pointers

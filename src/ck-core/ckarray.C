@@ -68,12 +68,7 @@ inline CkArrayIndexMax &CkArrayMessage::array_index(void)
 	return UsrToEnv((void *)this)->array_index();
 }
 
-/************************** ArrayElement *******************
-An array element is a chare that lives inside the array.
-Unlike regular chares, array elements can migrate from one
-Pe to another.  Each element has a unique index.
-*/
-
+/************************* ArrayElement *******************/
 class ArrayElement_initInfo {
 public:
   CkArray *thisArray;
@@ -117,7 +112,7 @@ void ArrayElement::ckJustMigrated(void) {
 
 CK_REDUCTION_CONTRIBUTE_METHODS_DEF(ArrayElement,thisArray,reductionInfo);
 
-//Remote method: calls destructor
+/// Remote method: calls destructor
 void ArrayElement::ckDestroy(void)
 {
 	thisArray->contributorDied(&reductionInfo);
@@ -142,7 +137,7 @@ void ArrayElement::pup(PUP::er &p)
   reductionInfo.pup(p);
 }
 
-//More verbose form of abort
+/// A more verbose form of abort
 void ArrayElement::CkAbort(const char *str) const
 {
 	CkError("Array element at index %s aborting:\n",
@@ -196,7 +191,7 @@ CkArrayOptions::CkArrayOptions(int ni) //With initial elements
 	locMgr.setZero();
 }
 
-//Bind our elements to this array
+/// Bind our elements to this array
 CkArrayOptions &CkArrayOptions::bindTo(const CkArrayID &b)
 {
 	CkArray *arr=CProxy_CkArray(b).ckLocalBranch();
@@ -331,7 +326,7 @@ ArrayElement *CkArray::allocate(int elChareType,const CkArrayIndex &idx,int bcas
 	return (ArrayElement *)malloc(elSize);
 }
 
-//This method is called by the user to add an element.
+/// This method is called by the user to add an element.
 CmiBool CkArray::insertElement(CkMessage *me)
 {
   magic.check();
@@ -357,7 +352,7 @@ void CkArray::doneInserting(void)
   thisProxy[CkMyPe()].remoteDoneInserting();
 }
 
-//This is called after the last array insertion.
+/// This is called on every processor after the last array insertion.
 void CkArray::remoteDoneInserting(void)
 {
   magic.check();
@@ -391,7 +386,7 @@ void CkArray::insertInitial(const CkArrayIndex &idx,void *ctorMsg)
 }
 
 /********************* CkArray Messaging ******************/
-//Fill out a message's array fields before sending it
+/// Fill out a message's array fields before sending it
 inline void msg_prepareSend(CkArrayMessage *msg, int ep,CkArrayID aid)
 {
 	envelope *env=UsrToEnv((void *)msg);
@@ -473,7 +468,7 @@ void CProxy_ArrayBase::ckBroadcast(CkArrayMessage *msg, int ep) const
 }
 
 
-//Reflect a broadcast off this Pe:
+/// Reflect a broadcast off this Pe:
 void CkArray::sendBroadcast(CkMessage *msg)
 {
 	magic.check();
@@ -481,7 +476,7 @@ void CkArray::sendBroadcast(CkMessage *msg)
 	thisProxy.recvBroadcast(msg);
 }
 
-//Increment broadcast count; deliver to all local elements
+/// Increment broadcast count; deliver to all local elements
 void CkArray::recvBroadcast(CkMessage *msg)
 {
 	magic.check();
@@ -491,7 +486,7 @@ void CkArray::recvBroadcast(CkMessage *msg)
 	oldBcasts.enq((CkArrayMessage *)msg);//Stash the message for later use
 }
 
-//Deliver a copy of the given broadcast to all local elements
+/// Deliver a copy of the given broadcast to all local elements
 void CkArray::deliverBroadcast(CkArrayMessage *bcast)
 {
 	magic.check();
@@ -502,7 +497,7 @@ void CkArray::deliverBroadcast(CkArrayMessage *bcast)
 		deliverBroadcast(bcast,el);
 }
 
-//Deliver a copy of the given broadcast to the given local element
+/// Deliver a copy of the given broadcast to the given local element
 CmiBool CkArray::deliverBroadcast(CkArrayMessage *bcast,ArrayElement *el)
 {
 	el->bcastNo++;
@@ -511,7 +506,7 @@ CmiBool CkArray::deliverBroadcast(CkArrayMessage *bcast,ArrayElement *el)
 	int epIdx=((CkArrayMessage *)newMsg)->array_ep();
 	return el->ckInvokeEntry(epIdx,newMsg);
 }
-//Deliver all needed broadcasts to the given local element
+/// Deliver all needed broadcasts to the given local element
 CmiBool CkArray::bringBroadcastUpToDate(ArrayElement *el)
 {
 	if (el->bcastNo<bcastNo)
