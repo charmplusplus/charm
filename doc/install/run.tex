@@ -12,7 +12,10 @@
 % REVISION HISTORY:
 %
 % $Log$
-% Revision 1.8  1996-11-14 18:41:14  milind
+% Revision 1.9  1997-07-23 17:29:14  wilmarth
+% Updated with latest nodes file format.
+%
+% Revision 1.8  1996/11/14 18:41:14  milind
 % Modified to reflect the changes made to the nodesfile format.
 % Also, changed the Makefile to install into proper directories.
 %
@@ -101,34 +104,116 @@ command line options is in Section~\ref{command line options}.
 			pathname and appended extension if specified) on all nodes.
 	\end{enumerate}
 
-The list of nodes must be specified in a file, with one node entry per
-line, each entry being in the format:
+The list of nodes must be specified in a file.  The format of this file
+allows you to define groups of machines, giving each group a name.
+Each line of the nodes file is a command.  The most important command
+is:
 
-{\fexec nodename [username] [passwd] [exec\_home] [extension] [setup\_command]}
+\begin{verbatim}
+host <hostname>
+\end{verbatim}
 
-The {\fparm nodename} must be specified completely (e.g. sparc1.cs.uiuc.edu).
-The {\fparm username} is optional; if the login id on that node is the
-same as the current login id, it need not be specified.
-The {\fparm password} argument is ignored in the current implementation.
-The {\fparm exec\_home} argument is optional; if the directory path under
-which the executable is found is the same as on the node running 
-{\fexec conv-host}, it could be ignored. This argument is used for pathname
-resolution as explained above.
-The {\fparm extension} argument is useful when the names for executables 
-on each node differ. If specified, {\fexec conv-host}
-appends the extension to the name of the executable specified on the 
-command line and executes the new program.
-The {\fparm setup\_command} is optional; if specified,
-the command is executed on the corresponding node before the program 
-begins execution. The {\bf *} character may be used as a
-placeholder for an absent argument.
-The number of nodes specified in the nodes file must not be less
-than the number of nodes specified with the {\fexec +p} command
-line option. If the number of nodes specified in the nodes file is
-greater than the number of nodes specified with the {\fexec +p} option,
-{\fexec +p} entries in the nodes file will be used in succession, starting
-with the first entry in the file.
-The name of the nodes fil\index{nodes file}\index{.nodes} itself is
+which specifies a host.  The other commands are qualifiers: they modify
+the properties of all hosts that follow them.  The qualifiers are:
+
+
+\begin{tabbing}
+{\tt group <groupname>}~~~\= - subsequent hosts are members of specified group\\
+{\tt login <login>  }     \> - subsequent hosts use the specified login\\
+{\tt passwd <passwd>}     \> - subsequent hosts use the specified password\\
+{\tt setup <cmd>  }       \> - subsequent hosts should execute cmd\\
+{\tt home <dir> }         \> - subsequent hosts should find programs under dir\\
+{\tt cpus <n>}            \> - subsequent hosts should use N light-weight processes\\
+{\tt speed <s>}           \> - subsequent hosts have relative speed rating\\
+{\tt ext <extn>}          \> - subsequent hosts should append extn to the pgm name\\
+\end{tabbing}
+
+All of these accept "*" as an argument, this resets the modifier to
+its default value.  Note that currently, the passwd, cpus, and speed
+factors are ignored.  The cpus option will come into play when the SMP
+version is implemented.  Inline qualifiers will be added:
+
+\begin{verbatim}
+host beauty ++cpus 2
+\end{verbatim}
+
+and also user-defined qualifiers.
+
+Here is a simple nodes file:
+
+\begin{verbatim}
+        group kale-sun
+         
+        host charm.cs.uiuc.edu
+        host dp.cs.uiuc.edu
+        host grace.cs.uiuc.edu
+        host dagger.cs.uiuc.edu
+         
+        group kale-sol
+         
+        host beauty.cs.uiuc.edu
+         
+        group main
+         
+        host localhost
+\end{verbatim}
+
+This defines three groups of machines: group kale-sun, group kale-sol,
+and group main.  The ++nodegroup option is used to specify which group
+of machines to use.  Note that there is wraparound: if you specify
+more nodes than there are hosts in the group, it will reuse
+hosts. Thus,
+
+\begin{verbatim}
+        conv-host pgm ++nodegroup kale-sun +p6
+\end{verbatim}
+
+uses hosts (charm, dp, grace, dagger, charm, dp) respectively as
+nodes (0, 1, 2, 3, 4, 5).
+
+If you don't specify a ++nodegroup, the default is ++nodegroup main.
+Thus, if one specifies
+
+\begin{verbatim}
+        conv-host pgm +p4
+\end{verbatim}
+
+it will use ``localhost'' four times.  ``localhost'' is a Unix
+trick; it always find a name for whatever machine you're on.
+
+Since the new nodes file is incompatible with the old nodes file, it has
+been renamed.  It now is called ``.nodelist'', and all the options and
+environment variables pertaining to it have also been renamed {\tt nodelist}.
+
+%%
+%The list of nodes must be specified in a file, with one node entry per
+%line, each entry being in the format:
+%
+%{\fexec nodename [username] [passwd] [exec\_home] [extension] [setup\_command]}
+%
+%The {\fparm nodename} must be specified completely (e.g. sparc1.cs.uiuc.edu).
+%The {\fparm username} is optional; if the login id on that node is the
+%same as the current login id, it need not be specified.
+%The {\fparm password} argument is ignored in the current implementation.
+%The {\fparm exec\_home} argument is optional; if the directory path under
+%which the executable is found is the same as on the node running 
+%{\fexec conv-host}, it could be ignored. This argument is used for pathname
+%resolution as explained above.
+%The {\fparm extension} argument is useful when the names for executables 
+%on each node differ. If specified, {\fexec conv-host}
+%appends the extension to the name of the executable specified on the 
+%command line and executes the new program.
+%The {\fparm setup\_command} is optional; if specified,
+%the command is executed on the corresponding node before the program 
+%begins execution. The {\bf *} character may be used as a
+%placeholder for an absent argument.
+%The number of nodes specified in the nodes file must not be less
+%than the number of nodes specified with the {\fexec +p} command
+%line option. If the number of nodes specified in the nodes file is
+%greater than the number of nodes specified with the {\fexec +p} option,
+%{\fexec +p} entries in the nodes file will be used in succession, starting
+%with the first entry in the file.
+The name of the nodes file\index{nodes file}\index{.nodes} itself is
 obtained by  {\fexec conv-host} in the following order:
 \begin{enumerate}
 
@@ -138,11 +223,11 @@ obtained by  {\fexec conv-host} in the following order:
 environment variable {\fexec NODES} is taken to be the nodes file.
 
 \item	If the environment variable {\fexec NODES} is not set, the file 
-{\fparm .nodes}\index{.nodes}\index{nodes file} in the user's home
+{\fparm .nodelist}\index{.nodelist}\index{nodes file} in the user's home
 directory is taken to be the nodes file.
 
 \item	If the above file does not exist, the file 
-{\fparm .nodes}\index{.nodes}\index{nodes file} in the current
+{\fparm .nodelist}\index{.nodelist}\index{nodes file} in the current
 directory is used as the nodes file.
 
 \end{enumerate}
