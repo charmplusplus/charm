@@ -551,9 +551,6 @@ CmiCommHandle ElanSendFn(int destPE, int size, char *msg, int flag)
   }
 
   if (phs) {
-/*
-CmiPrintf("CmiSendPersistentMsg h=%d hdl=%d\n", h, CmiGetHandler(msg));
-*/
     CmiAssert(phsSize == 1);
     CmiSendPersistentMsg(*phs, destPE, size, msg);
     return NULL;
@@ -973,6 +970,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 void CmiAbort(const char *message)
 {
   CmiError(message);
+  *((int *)NULL) = 0;
   exit(1);
 }
 
@@ -1026,69 +1024,6 @@ void CmiFreeListSendFn(int npes, int *pes, int len, char *msg)
     }
   */
 }
-
-
-#if 0
-
-typedef struct _PersistentRequestMsg {
-  char core[CmiMsgHeaderSizeBytes];
-  int maxBytes;
-  int sourceHandlerIndex;
-  int requestorPE;
-} PersistentRequestMsg;
-
-typedef struct _PersistentReqGrantedMsg {
-  char core[CmiMsgHeaderSizeBytes];
-  void *slotFlagAddress;
-  void *msgAddr;
-  int sourceHandlerIndex;
-} PersistentReqGrantedMsg;
-
-#define RESET 0
-#define SET 1
-
-int getFreeRecvSlot()
-{
-}
-
-int setPersistent(int destPE, int maxBytes)
-{
-}
-
-
-void persistentRequestHandler(envelope *env)
-{             
-  PersistentRequestMsg *msg = (PersistentRequestMsg *)env;
-  int slotIdx;
-  PersistentReceivesTable *slot;
-
-  slotIdx = getFreeRecvSlot();
-  slot = &persistentReceivesTable[slotIdx];
-  slot->messagePtr = CmiAlloc(msg->maxBytes);
-  slot->flag = RESET;
-
-  PersistentReqGrantedMsg *gmsg = CmiAlloc(sizeof(PersistentReqGrantedMsg));
-  gmsg->slotFlagAddress = &slot->flag;
-  gmsg->msgAddr = messagePtr;
-  gmsg->sourceHandlerIndex = msg->sourceHandlerIndex;
-
-  CmiSetHandler(gmsg, persistenceReqGrantedHandlerIdx);
-  CmiSyncSendAndFree(msg->requestorPE,sizeof(PersistentReqGrantedMsg),gmsg);
-}
-
-void persistenceReqGrantedHandler(envelope *env)
-{
-  PersistentReqGrantedMsg *msg = (PersistentReqGrantedMsg *)env;
-  int h = msg->sourceHandlerIndex;
-  persistentSendsTable[h].destSlotFlagAddress = msg->slotFlagAddress;
-  persistentSendsTable[h].destAddress = msg->msgAddr;
-
-  if (persistentSendsTable[h].messagePtr) {
-  }
-}
-
-
-#endif
 
 
 #include "persistent.c"
