@@ -1,30 +1,55 @@
 \chapter{Initialization and Completion}
 
-\function{void ConverseInit(char *argv[])}
+The program utilizing Converse begins executing at {\tt main}, like
+any other C program.  However, depending on the machine and the
+implementation decisions of the machine's vendor, {\tt main} may be
+executed by more than one processor.  On some machines, every
+processor executes {\tt main}.  On others, only one processor executes
+{\tt main}.  All processors which don't execute {\tt main} are asleep
+when the program begins.
+
+There are two ways for the program to start up the Converse system.
+The first method is to use ConverseInit:
+
+\function{typedef void (*CmiStartFn)(int argc, char **argv);}
+\function{void ConverseInit(int argc, char *argv[], CmiStartFn fn)}
 \index{ConverseInit}
-\desc{This function initializes the machine interface. It should be
-called prior to any other Converse functions. 
-Multiple calls to this function in a process should
-be avoided. \param{argv} is in similar format as passed to
-\param{main(argc, argv)}. 
-It would be utilized by \param{ConverseInit()} to initialize
-machine specific parameters such as number of processors.}
+\desc{This must be called by every processor which initially executed
+{\tt main}.  Initializes the entire Converse system, then causes all
+processors to begin executing the function {\tt fn}, which should
+perform all your computation.  ConverseInit never returns.  You may
+not call any other Converse function until initialization is complete,
+that is, until {\tt fn} begins executing. \param{argc} and
+\param{argv} are in the same format as the arguments passed to
+\param{main(argc, argv)}.}
+
+ConverseInit is the initialization method one would use in most
+programs.  However, some programs may find it difficult to work around
+the constraint that ConverseInit never returns.  Thus, we provide
+ConverseStart, an alternate initialization method.  Currently,
+ConverseStart is supported on all machines, however, it is {\em
+potentially} possible that it will be unimplementable on some
+machines.  Thus, we do not guarantee its presence.  Use it only when
+you absolutely need a startup function that returns.
+
+\function{void ConverseStart(int argc, char *argv[], CmiStartFn fn)}
+\index{ConverseInit}
+\desc{This must be called by every processor which initially executed
+{\tt main}.  Initializes the entire Converse system, then causes all
+processors {\em which did not initially execute {\tt main}} to begin
+executing the function {\tt fn}.  Once these threads have been
+launched, ConverseStart returns.  You may not call any other Converse
+function until initialization is complete, that is, until {\tt fn}
+begins executing and ConverseStart returns. \param{argc} and
+\param{argv} are in the same format as the arguments as passed to
+\param{main(argc, argv)}.}
+
+Regardless which startup method is used, all processors should call
+ConverseExit during termination:
 
 \function{void ConverseExit(void)}
 \index{ConverseExit}
 \desc{This function frees the resources acquired by Converse and wraps up. 
-Any other Converse function should not be called after a call to this function.
-\note{It does not terminate the calling
-process. A separate call to \param{exit()} is needed after 
-\param{ConverseExit()} to achieve this.}}
+Any other Converse function should not be called after a call to this
+function.}
 
-\function{void user\_main(int argc, char **argv)}
-\index{user_main}
-\desc{This function must be written by the Converse user.  When the
-converse program is loaded, this function will be called on ALL
-processors.  Typically, this function is structured as follows: first,
-one calls ConverseInit.  Second, adds some work to the work-pool by
-sending messages or creating threads.  Third, one performs all work in
-the work-pool by calling CsdScheduler.  Finally, when all work is done
-and CsdScheduler exits, one shuts down the system by calling
-ConverseExit.}
