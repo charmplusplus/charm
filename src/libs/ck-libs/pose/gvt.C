@@ -65,7 +65,7 @@ void PVT::startPhase()
     }
 
   // (1) Find out the local PVT from optPVT and conPVT
-  int pvt = optPVT;
+  POSE_TimeType pvt = optPVT;
   if ((conPVT < pvt) && (conPVT > POSE_UnsetTS)) pvt = conPVT;
   if ((iterMin < pvt) && (iterMin > POSE_UnsetTS)) pvt = iterMin;
   if (waitForFirst) {
@@ -74,7 +74,7 @@ void PVT::startPhase()
   }
 
   //CkPrintf("[%d] pvt=%d gvt=%d optPVT=%d iterMin=%d\n", CkMyPe(), pvt, estGVT, optPVT, iterMin);
-  int xt;
+  POSE_TimeType xt;
   if (pvt == POSE_UnsetTS) { // all are idle; find max ovt
     POSE_TimeType maxOVT = POSE_UnsetTS;
     for (i=0; i<end; i++)
@@ -297,7 +297,7 @@ void GVT::computeGVT(UpdateMsg *m)
     /*    if (SRs) SRs->dump();
 	  else CkPrintf("No SRs reported to GVT!\n");*/
     SRentry *tmp = SRs;
-    int lastSR = POSE_UnsetTS, earlyAny = POSE_UnsetTS;
+    POSE_TimeType lastSR = POSE_UnsetTS, earlyAny = POSE_UnsetTS;
     while (tmp && ((tmp->timestamp <= estGVT) || (estGVT == POSE_UnsetTS))) {
       lastSR = tmp->timestamp;
       if (tmp->sends || tmp->recvs)

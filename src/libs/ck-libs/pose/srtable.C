@@ -489,7 +489,8 @@ void SRtable::dump()
 /// Check validity of data field
 void SRtable::sanitize()
 {
-  int bktMin, bktMax, sCount, rCount;
+  POSE_TimeType bktMin, bktMax;
+  int sCount, rCount;
   SRentry *tmp;
   CmiAssert(offset > -1);
   CmiAssert((b>-1) && (b <= MAX_B));

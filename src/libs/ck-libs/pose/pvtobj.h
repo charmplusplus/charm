@@ -27,12 +27,12 @@ class pvtObjectNode {
   /// Basic Constructor
   pvtObjectNode() { present = 0; }
   /// Sets all data fields
-  void set(int ts, int idx, short int on, short int s, sim *p) {
+  void set(POSE_TimeType ts, int idx, short int on, short int s, sim *p) {
     ovt = ts; index = idx; present = on; sync = s; localObjPtr = p; qdo = 0.0;
     ovt2 = -1;
   }
   /// Sets ovt to -1 to indicate idle
-  void setIdle() { ovt = ovt2 = -1; }
+  void setIdle() { ovt = ovt2 = POSE_UnsetTS; }
   /// Test present flag
   int isPresent() { return present; }
   /// Test if synchronization strategy is optimistic
@@ -40,13 +40,13 @@ class pvtObjectNode {
   /// Test if synchronization strategy is conservative
   int isConservative() { return (sync == CONSERVATIVE); }
   /// Return ovt
-  int getOVT() { return ovt; }
+  POSE_TimeType getOVT() { return ovt; }
   /// Return ovt2
-  int getOVT2() { return ovt2; }
+  POSE_TimeType getOVT2() { return ovt2; }
   /// Set ovt to st
-  void setOVT(int st) { ovt = st; }
+  void setOVT(POSE_TimeType st) { ovt = st; }
   /// Set ovt2 to st
-  void setOVT2(int st) { ovt2 = st; }
+  void setOVT2(POSE_TimeType st) { ovt2 = st; }
   /// Add time to qdo
   void addQdoTime(double t) { qdo += t; }
   /// Return qdo
@@ -97,7 +97,7 @@ class pvtObjects {
   /// Insert poser in list
   /** Inserts an object in the list in the firstEmpty slot, expanding the list
       size if necessary */
-  int Insert(int index, int ovt, int sync, sim *myPtr); 
+  int Insert(int index, POSE_TimeType ovt, int sync, sim *myPtr); 
   /// Delete a poser from the list
   void Delete(int idx) {
     objs[idx].set(-1, -1, 0, 0, NULL);

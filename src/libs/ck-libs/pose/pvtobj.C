@@ -27,7 +27,7 @@ pvtObjects::pvtObjects()
 }
 
 /// Insert poser in list
-int pvtObjects::Insert(int index, int ovt, int sync, sim *myPtr)
+int pvtObjects::Insert(int index, POSE_TimeType ovt, int sync, sim *myPtr)
 {
   int idx;
   register int i;
