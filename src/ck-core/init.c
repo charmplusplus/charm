@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.31  1995-11-06 00:17:42  sanjeev
+ * Revision 2.32  1995-11-06 21:36:29  milind
+ * Removed CldPeriodicCheckInit() call from SysPeriodicCheckInit().
+ *
+ * Revision 2.31  1995/11/06  00:17:42  sanjeev
  * magic numbers for main-chare and BOCs are not rand()
  *
  * Revision 2.30  1995/10/27  21:31:25  jyelon
@@ -566,7 +569,9 @@ ENVELOPE       *envelope;
 
 SysPeriodicCheckInit()
 {
+	/*
 	CldPeriodicCheckInit();
+	*/
 }
 
 
