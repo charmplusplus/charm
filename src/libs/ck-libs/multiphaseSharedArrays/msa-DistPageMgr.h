@@ -14,10 +14,10 @@
 
 /// Stores a list of indices to be written out.
 struct MSA_WriteSpan_t {
-  int start,end;
-  inline void pup(PUP::er &p) {
-     p|start; p|end;
-  }
+    int start,end;
+    inline void pup(PUP::er &p) {
+        p|start; p|end;
+    }
 };
 
 template<class T> class DefaultEntry;
@@ -319,39 +319,39 @@ protected:
     unsigned int victim; // next page to throw out.
     
     bool recentlyUsed(unsigned int page) {
-      for (int k=0;k<K;k++) if (page==last[k]) return true;
-      return false;
+        for (int k=0;k<K;k++) if (page==last[k]) return true;
+        return false;
     }
 
 public:
     inline vmNRUReplacementPolicy(unsigned int nPages_,const page_ptr_t* pageTable_,MSA_Page_State ** pageState_)
     : nPages(nPages_), pageTable(pageTable_), pageState(pageState_)
     {
-      Klast=0;
-      for (int k=0;k<K;k++) last[k]=MSA_INVALID_PAGE_NO;
-      victim=0;
+        Klast=0;
+        for (int k=0;k<K;k++) last[k]=MSA_INVALID_PAGE_NO;
+        victim=0;
     }
 
     inline void pageAccessed(unsigned int page)
     {
-      if (page!=last[Klast]) {
-        Klast++; if (Klast>=K) Klast=0;
-	last[Klast]=page;
-      }
+        if (page!=last[Klast]) {
+            Klast++; if (Klast>=K) Klast=0;
+            last[Klast]=page;
+        }
     }
 
     inline unsigned int selectPage() {
-      unsigned int last_victim=victim;
-      do {
-	victim++; if (victim>=nPages) victim=0;
-        if (pageTable[victim]
-	  &&pageState[victim]->canPageOut()
-	  &&!recentlyUsed(victim))
-	{ /* victim is an allocated, unlocked, non-recently-used page: page him out. */
-	   return victim;
-	}
-      } while (victim!=last_victim);
-      return MSA_INVALID_PAGE_NO;  /* nobody is pageable */
+        unsigned int last_victim=victim;
+        do {
+            victim++; if (victim>=nPages) victim=0;
+            if (pageTable[victim]
+                &&pageState[victim]->canPageOut()
+                &&!recentlyUsed(victim)) {
+                /* victim is an allocated, unlocked, non-recently-used page: page him out. */
+                return victim;
+            }
+        } while (victim!=last_victim);
+        return MSA_INVALID_PAGE_NO;  /* nobody is pageable */
     }
 };
 
@@ -426,6 +426,7 @@ class MSA_PageT : public MSA_Page {
 	ENTRY *data;
 	/** Merger object */
 	MERGER m;
+
 public:
 	MSA_PageT() {
 		data=new ENTRY[ENTRIES_PER_PAGE];
@@ -577,14 +578,14 @@ protected:
             int pageToSwap = replacementPolicy->selectPage();
             if(pageToSwap != MSA_INVALID_PAGE_NO)
             {
-		CkAssert(pageTable[pageToSwap] != NULL);
+                CkAssert(pageTable[pageToSwap] != NULL);
                 CkAssert(state(pageToSwap)->canPageOut() == true);
 		
                 relocatePage(pageToSwap, async);
                 nu = pageTable[pageToSwap];
                 pageTable[pageToSwap] = 0;
-        	delete pageStateStorage[pageToSwap];
-        	pageStateStorage[pageToSwap]=0;
+                delete pageStateStorage[pageToSwap];
+                pageStateStorage[pageToSwap]=0;
             }
         }
 
@@ -598,12 +599,12 @@ protected:
     inline ENTRY_TYPE* makePage(unsigned int page) // @@@
     {
         ENTRY_TYPE* nu=pageTable[page];
-	if (nu==0) {
-	   nu=tryBuffer();
-	   if (nu==0) CkAbort("MSA: No available space to create pages.\n");
-	   pageTable[page]=nu;
-	}
-	return nu;
+        if (nu==0) {
+            nu=tryBuffer();
+            if (nu==0) CkAbort("MSA: No available space to create pages.\n");
+            pageTable[page]=nu;
+        }
+        return nu;
     }
     
     /// Throw away this allocated page.
@@ -612,18 +613,18 @@ protected:
     {
         ENTRY_TYPE* nu=pageTable[page];
         pageTable[page] = 0;
-	if (pageStateStorage[page]->canDelete()) {
+        if (pageStateStorage[page]->canDelete()) {
         	delete pageStateStorage[page];
         	pageStateStorage[page]=0;
-	}
-	resident_pages--;
-	return nu;
+        }
+        resident_pages--;
+        return nu;
     }
     
     //MSA_CacheGroup::
     void pageFault(unsigned int page, MSA_Page_Fault_t why)
     {
-	// Write the page to the page table
+        // Write the page to the page table
         state(page)->state = why;
         if(why == Read_Fault)
         { // Issue a remote request to fetch the new page
@@ -653,8 +654,10 @@ protected:
             pageFault(page, access);
         }
 #ifndef CMK_OPTIMIZE
-        if (stateN(page)->state!=access)
+        if (stateN(page)->state!=access) {
+            CkPrintf("page=%d mode=%d pagestate=%d", page, access, stateN(page)->state);
             CkAbort("MSA Runtime error: Attempting to access a page that is still in another mode.");
+        }
 #endif
         replacementPolicy->pageAccessed(page);
     }
@@ -697,10 +700,10 @@ protected:
     {
         sendRLEChangesToPageArray(page);
 	
-	MSA_Thread_Listener *l=getListener();
+        MSA_Thread_Listener *l=getListener();
         state(page)->writeRequests.add(l);
-	if (!async)
-	   l->suspend(); // Suspend until page is really gone.
+        if (!async)
+            l->suspend(); // Suspend until page is really gone.
         // TODO: Are write acknowledgements really necessary ?
     }
 
@@ -716,24 +719,24 @@ protected:
     inline void sendRLEChangesToPageArray(const unsigned int page) // @@@
     {
         ENTRY_TYPE *writePage=pageTable[page];
-	int nSpans=stateN(page)->writeSpans(writeSpans);
-	if (nSpans==1) 
-	{ /* common case: can make very fast */
-	    pageArray[page].ReceiveRLEPage(writeSpans,nSpans,
-	    	&writePage[writeSpans[0].start],writeSpans[0].end-writeSpans[0].start,
-		CkMyPe(),stateN(page)->state);
-	} 
-	else /* nSpans>1 */ 
-	{ /* must copy separate spans into a single output buffer (luckily rare) */
-	    int nEntries=0;
-	    for (int s=0;s<nSpans;s++) {
-	        for (int i=writeSpans[s].start;i<writeSpans[s].end;i++)
-		   writeEntries[nEntries++]=writePage[i];
-	    }
-	    pageArray[page].ReceiveRLEPage(writeSpans,nSpans,
-	    	writeEntries,nEntries,
-		CkMyPe(),stateN(page)->state);
-	}
+        int nSpans=stateN(page)->writeSpans(writeSpans);
+        if (nSpans==1) 
+        { /* common case: can make very fast */
+                pageArray[page].ReceiveRLEPage(writeSpans,nSpans,
+                    &writePage[writeSpans[0].start],writeSpans[0].end-writeSpans[0].start,
+                    CkMyPe(),stateN(page)->state);
+        } 
+        else /* nSpans>1 */ 
+        { /* must copy separate spans into a single output buffer (luckily rare) */
+            int nEntries=0;
+            for (int s=0;s<nSpans;s++) {
+                for (int i=writeSpans[s].start;i<writeSpans[s].end;i++)
+                    writeEntries[nEntries++]=writePage[i];
+            }
+            pageArray[page].ReceiveRLEPage(writeSpans,nSpans,
+                                           writeEntries,nEntries,
+                                           CkMyPe(),stateN(page)->state);
+        }
     }
 
 /*********************** Public Interface **********************/
@@ -840,16 +843,16 @@ public:
         ENTRY_TYPE *nu=makePage(page);
         if(size!=0)
         {
-	    for(unsigned int i = 0; i < size; i++)
-               nu[i] = pageData[i]; // @@@, calls assignment operator
+            for(unsigned int i = 0; i < size; i++)
+                nu[i] = pageData[i]; // @@@, calls assignment operator
         }
         else /* isEmpty */
         {
             // the page we requested for is empty, so we can just initialize it.
-	    writeIdentity(nu);
+            writeIdentity(nu);
         }
 	
-	state(page)->readRequests.signal(page);
+        state(page)->readRequests.signal(page);
     }
 
     // This EP is invoked during sync to acknowledge that a dirty page
@@ -966,6 +969,7 @@ public:
     inline void Sync()
     {
         syncThreadCount++;
+        //ckout << "[" << CkMyPe() << "] syncThreadCount = " << syncThreadCount << " " << numberLocalWorkerThreads << endl;
         //ckout << "[" << CkMyPe() << "] syncThreadCount = " << syncThreadCount << ", registered threads = " << getNumRegisteredThreads()
         //    << ", number of suspended threads = " << getNumSuspendedThreads() << endl;
 
@@ -993,9 +997,9 @@ public:
         // written and acknowledged.
         getListener()->suspend();
 
-    // So far, the sync has been asynchronous, i.e. PE0 might be ahead
-    // of PE1.  Next we basically do a barrier to ensure that all PE's
-    // are synchronized.
+        // So far, the sync has been asynchronous, i.e. PE0 might be ahead
+        // of PE1.  Next we basically do a barrier to ensure that all PE's
+        // are synchronized.
 
         // at this point, the sync's across the group should
         // synchronize among themselves by each one sending
@@ -1007,14 +1011,11 @@ public:
         }
         else /* I *am* PE 0 */
         {
-	    SyncAck();
+            SyncAck();
         }
-	/* Wait until sync is reflected from PE 0 */
-	addAndSuspend(syncWaiters);
+        /* Wait until sync is reflected from PE 0 */
+        addAndSuspend(syncWaiters);
 	
-	/* Reset for next sync */
-        syncThreadCount = 0;
-        syncAckCount = 0;
     }
 
     inline unsigned int getNumEntries() { return nEntries; }
@@ -1036,6 +1037,9 @@ public:
     {
         //ckout << "[" << CkMyPe() << "] Sync Done indication" << endl;
         //ckout << "[" << CkMyPe() << "] Sync Done indication" << endl;
+        /* Reset for next sync */
+        syncThreadCount = 0;
+        syncAckCount = 0;
         syncWaiters.signal(0);
     }
 
@@ -1269,8 +1273,8 @@ public:
     /// Receive a runlength encoded page from the network:
     inline void ReceiveRLEPage(
     	const MSA_WriteSpan_t *spans, unsigned int nSpans, 
-	const ENTRY_TYPE *entries, unsigned int nEntries, 
-	int pe, MSA_Page_Fault_t pageState)
+        const ENTRY_TYPE *entries, unsigned int nEntries, 
+        int pe, MSA_Page_Fault_t pageState)
     {
         allocatePage(pageState);
 	
