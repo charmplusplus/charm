@@ -99,6 +99,7 @@ int phsSize;
 
 void PumpPersistent();
 void CmiSendPersistentMsg(PersistentHandle h, int destPE, int size, void *m);
+void CmiSyncSendPersistent(int destPE, int size, char *msg, PersistentHandle h);
 
 void ElanSendQueuedMessages();
 

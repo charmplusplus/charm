@@ -258,6 +258,23 @@ void CmiSendPersistentMsg(PersistentHandle h, int destPE, int size, void *m)
   }
 }
 
+void CmiSyncSendPersistent(int destPE, int size, char *msg, PersistentHandle h)
+{
+  CmiState cs = CmiGetState();
+  char *dupmsg = (char *) CmiAlloc(size);
+  memcpy(dupmsg, msg, size);
+
+  //  CmiPrintf("Setting root to %d\n", 0);
+  CMI_SET_BROADCAST_ROOT(dupmsg, 0);
+
+  if (cs->pe==destPE) {
+    CQdCreate(CpvAccess(cQdState), 1);
+    CdsFifo_Enqueue(CpvAccess(CmiLocalQueue),dupmsg);
+  }
+  else
+    CmiSendPersistentMsg(h, destPE, size, dupmsg);
+}
+
 // 1: finish the first put but still need to be in the queue for the second put.
 // 2: finish and should be removed from queue.
 static int remote_put_done(PMSG_LIST *smsg)
