@@ -2,6 +2,7 @@
 #define _CKLISTS_H
 
 //#include <converse.h> // for size_t
+#include "pup.h"
 #include <stdlib.h> // for size_t
 #include <string.h> // for memcpy
 
@@ -14,8 +15,20 @@ public:
 	CkNoncopyable(void) {}
 };
 
+//Implementation class 
 template <class T>
-class CkQ : private CkNoncopyable {
+class CkSTLHelper {
+protected:
+    //Copy nEl elements from src into dest
+    void elementCopy(T *dest,const T *src,int nEl) {
+      for (int i=0;i<nEl;i++) dest[i]=src[i];
+    }
+};
+
+/// A single-ended FIFO queue.
+///  See CkMsgQ if T is a Charm++ message type.
+template <class T>
+class CkQ : private CkSTLHelper<T>, private CkNoncopyable {
     T *block;
     int blklen;
     int first;
@@ -23,8 +36,8 @@ class CkQ : private CkNoncopyable {
     void _expand(void) {
       int newlen=16+len*2;
       T *newblk = new T[newlen];
-      memcpy(newblk, block+first, sizeof(T)*(blklen-first));
-      memcpy(newblk+blklen-first, block, sizeof(T)*first);
+      elementCopy(newblk,block+first,blklen-first);
+      elementCopy(newblk+blklen-first,block,first);
       delete[] block; block = newblk;
       blklen = newlen; first = 0;
     }
@@ -94,31 +107,38 @@ class CkQ : private CkNoncopyable {
     }
 };
 
-/*
-This class is modelled after, but *not* identical to, the (still nonportable)
-std::vector.  In particular, this class really stupidly uses constructors
-and destructors (new and delete), but also uses memcpy() instead of an actual
-copy constructor.  This leads to horrific, impossible-to-track-down memory
-leaks and double-deletes.  The general rule is to *never* store a class that
-requires a copy constructor in a CkVec; you'll have to store pointers to that 
-class (see CkPupPtrVec).
-*/
+
+/// A typesafe, automatically growing array.
+/// Classes used must have a default constructor and working copy constructor.
+/// This class is modelled after, but *not* identical to, the 
+/// (still nonportable) std::vector. 
+///   The elements of the array are pup'd using plain old "p|elt;".
 template <class T>
-class CkVec {
-    T *block;
-    int blklen,len;
-    void copyFrom(const CkVec<T> &src) {
-       blklen=src.blklen; len=src.len;
-       block=new T[blklen];
-       memcpy(block,src.block,sizeof(T)*blklen);
+class CkVec : private CkSTLHelper<T> {
+    typedef CkVec<T> this_type;
+    
+    T *block; //Elements of vector
+    int blklen; //Allocated size of block 
+    int len; //Number of used elements in block
+    void makeBlock(int blklen_,int len_) {
+       block=new T[blklen_];
+       blklen=blklen_; len=len_;
+    }
+    void freeBlock(void) {
+       len=0; blklen=0;
+       delete[] block; block=NULL;
+    }
+    void copyFrom(const this_type &src) {
+       makeBlock(src.blklen, src.len);
+       elementCopy(block,src.block,blklen);
     }
   public:
     CkVec() {block=NULL;blklen=len=0;}
-    ~CkVec() { delete[] block; }
-    CkVec(const CkVec<T> &src) {copyFrom(src);}
-    CkVec(int size) { len = 0; blklen = size; block = new T[blklen];} // added by Ramkumar
-    CkVec<T> &operator=(const CkVec<T> &src) {
-      delete[] block;
+    ~CkVec() { freeBlock(); }
+    CkVec(const this_type &src) {copyFrom(src);}
+    CkVec(int size) { makeBlock(size,size); } 
+    this_type &operator=(const this_type &src) {
+      freeBlock();
       copyFrom(src);
       return *this;
     }
@@ -127,20 +147,23 @@ class CkVec {
     int length(void) const {return len;}
     T *getVec(void) { return block; }
     const T *getVec(void) const { return block; }
+    
     T& operator[](size_t n) { return block[n]; }
     const T& operator[](size_t n) const { return block[n]; }
-    void setSize(int newlen) {
-      T *newblk = new T[newlen];
-      if (block!=NULL)
-         memcpy(newblk, block, sizeof(T)*blklen);
-      for(int i=blklen; i<newlen; i++) newblk[i] = T();
-      delete[] block; block = newblk;
-      blklen = newlen;
+    
+    void setSize(int blklen_) {
+      T *oldBlock=block; 
+      makeBlock(blklen_,len);
+      elementCopy(block,oldBlock,len);
+      delete[] oldBlock; //WARNING: leaks if element copy throws exception
+    }
+    //Grow to contain at least this position:
+    void growAtLeast(int pos) {
+      if (pos>=blklen) setSize(pos*2+16);
     }
     void insert(int pos, const T &elt) {
       if (pos>=len) { 
-        if(pos>=blklen) 
-          setSize(pos*2+16);
+        growAtLeast(pos);
         len=pos+1;
       }
       block[pos] = elt;
@@ -150,6 +173,135 @@ class CkVec {
 //STL-compatability:
     void push_back(const T &elt) {insert(length(),elt);}
     int size(void) const {return len;}
+ 
+//PUP routine:
+  protected:
+    //Only pup the length of this vector, which is returned:
+    int pupbase(PUP::er &p) {
+       int l=len;
+       p(l);
+       if (p.isUnpacking()) { setSize(l); len=l;}
+       return l;
+    }
+  public:
+    void pup(PUP::er &p) {
+       int l=pupbase(p);
+       for (int i=0;i<l;i++) p|block[i];
+    }
+    friend void operator|(PUP::er &p,this_type &v) {v.pup(p);}
 };
+
+
+///A vector of basic types, which can be pupped as an array
+/// (more restricted, but more efficient version of CkVec)
+template <class T>
+class CkPupBasicVec : public CkVec<T> {
+public:
+	CkPupBasicVec() {}
+	CkPupBasicVec(int size) :CkVec<T>(size) {}
+	
+        void pup(PUP::er &p) {   
+                int l=pupbase(p);
+                p(getVec(),l);
+        }
+        friend void operator|(PUP::er &p,CkPupBasicVec<T> &v) {v.pup(p);}
+};
+
+
+/// Helper for smart pointer classes: allocate a new copy when pup'd:
+template <class T> 
+class CkPupAllocatePtr {
+public:
+	void pup(PUP::er &p,T *&ptr) {
+		int isNull=(ptr==0);
+		p(isNull);
+		if (isNull) ptr=0;
+		else {
+			if (p.isUnpacking()) ptr=new T;
+			p|*ptr;
+		}
+	}
+};
+
+/// Helper for smart pointer classes: copy a PUP::able pointer
+template <class T> 
+class CkPupAblePtr {
+public:
+	void pup(PUP::er &p,T *&ptr) {
+		p|ptr;
+	}
+};
+
+/// A not-so-smart smart pointer type: just zero initialized
+template <class T, class PUP_PTR=CkPupAllocatePtr<T> > 
+class CkZeroPtr {
+protected:
+	T *storage;
+public:
+	CkZeroPtr() {storage=0;}
+	CkZeroPtr(T *sto) {storage=sto;}
+	//Default copy constructor, asssignment operator
+	T *operator=(T *sto) {storage=sto; return sto;}
+	
+	operator T* () const {return storage;}
+	
+	//Stolen from boost::scoped_ptr:
+	T & operator*() const // never throws
+		{ return *storage; }
+	T * operator->() const // never throws
+		{ return storage; }
+
+	// implicit conversion to "bool"
+	operator bool () const // never throws
+	{
+		return storage == 0;
+	}
+	
+	//Free referenced pointer:
+	void destroy(void) {
+		delete storage;
+		storage=0;
+	}
+	
+        void pup(PUP::er &p) {   
+		PUP_PTR ppr;
+		ppr.pup(p,storage);
+        }
+        friend void operator|(PUP::er &p,CkZeroPtr<T,PUP_PTR> &v) {v.pup(p);}
+};
+
+
+///A vector of zero-initialized heap-allocated objects of type T
+template <class T>
+class CkPupPtrVec : public CkVec< CkZeroPtr<T> >, 
+	public CkNoncopyable {
+ public:
+	typedef CkPupPtrVec<T> this_type;
+	typedef CkVec< CkZeroPtr<T> > super;
+	CkPupPtrVec() {}
+	CkPupPtrVec(int size) :super(size) {}
+	~CkPupPtrVec() {
+		for (int i=0;i<length();i++)
+			operator[] (i).destroy();
+	}
+	friend void operator|(PUP::er &p,this_type &v) {v.pup(p);}
+};
+
+///A vector of pointers-to-subclasses of a PUP::able parent
+template <class T>
+class CkPupAblePtrVec : public CkVec< CkZeroPtr<T, CkPupAblePtr<T> > >, 
+	public CkNoncopyable {
+ public:
+	typedef CkPupAblePtrVec<T> this_type;
+	typedef CkVec< CkZeroPtr<T, CkPupAblePtr<T> > > super;
+	CkPupAblePtrVec() {}
+	CkPupAblePtrVec(int size) :super(size) {}
+	~CkPupAblePtrVec() {
+		for (int i=0;i<length();i++)
+			operator[] (i).destroy();
+	}
+	friend void operator|(PUP::er &p,this_type &v) {v.pup(p);}
+};
+
 
 #endif
