@@ -14,6 +14,7 @@
 #include <time.h>
 
 #include "sockRoutines.h"
+#ifndef CMK_NO_SOCKETS /*<- for ASCI Red*/
 
 /*Just print out error message and exit*/
 static void default_skt_abort(int code,const char *msg)
@@ -389,7 +390,7 @@ void ChMessage_send(SOCKET fd,const ChMessage *src)
   skt_sendN(fd,(const char *)src->data,src->len);
 } /*You must free after send*/
 
-
+#endif /*!CMK_NO_SOCKETS*/
 
 
 

@@ -77,6 +77,14 @@
 #ifndef __SOCK_ROUTINES_H
 #define __SOCK_ROUTINES_H
 
+#include "conv-mach.h" /*<- for CMK_NO_SOCKETS*/
+
+#ifdef CMK_NO_SOCKETS
+#define SOCKET int
+#define SOCKET_ERROR (-1)
+#define INVALID_SOCKET (SOCKET)(~0)
+#else /*Use actual sockets*/
+
 /*Preliminaries*/
 #ifdef _WIN32
   /*For windows systems:*/
@@ -132,6 +140,7 @@ int skt_select1(SOCKET fd,int msec);
 void skt_sendN(SOCKET hSocket,const char *pBuff,int nBytes);
 void skt_recvN(SOCKET hSocket,      char *pBuff,int nBytes);
 
+#endif /*!CMK_NO_SOCKETS*/
 
 /***********************************
 Conv-host messages: these are a simple
