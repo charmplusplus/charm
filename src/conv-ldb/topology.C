@@ -13,7 +13,9 @@
 
 #include <math.h>
 
-#include "LBDatabase.h"
+//#include "LBDatabase.h"
+#include "charm.h"
+#include "cklists.h"
 #include "topology.h"
 
 // ring
