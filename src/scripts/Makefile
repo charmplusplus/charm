@@ -22,6 +22,7 @@
 ###############################################################################
 
 SHELL=/bin/sh
+L=../lib
 
 all: charm++ bluegene LIBS ampi f90charm tsm sm pvm doc
 
@@ -190,12 +191,19 @@ dirs+sources:
 # Converse Libraries
 #
 ###############################################################################
+CLBLIBS=$(L)/libldb-rand.o $(L)/libldb-spray.o $(L)/libldb-graph.o $(L)/libldb-test.o
+TRACELIBS=$(L)/libtrace-none.a $(L)/libtrace-projections.a $(L)/libtrace-summary.a
+MEMLIBS=$(L)/libmemory-default.o $(L)/libmemory-os.o $(L)/libmemory-gnu.o \
+   $(L)/libmemory-verbose.o $(L)/libmemory-paranoid.o
 
-TRACELIBS=libtrace-none.a libtrace-projections.a libtrace-summary.a
+CVLIBS=libconv-core.a \
+	libconv-cplus-n.a libconv-cplus-y.a libconv-util.a \
+	$(CLBLIBS) $(TRACELIBS) $(MEMLIBS)
 
-CVLIBS=libconv-core.a libconv-cplus-n.a libconv-cplus-y.a libconv-util.a libldb-rand.o libldb-spray.o libldb-graph.o libldb-test.o $(TRACELIBS)
-
-LIBCONV_CORE=threads.o convcore.o conv-conds.o queueing.o msgmgr.o memory.o cpm.o cpthreads.o futures.o cldb.o random.o debug-conv.o debug-message.o debug-object.o info.o generate.o edgelist.o conv-ccs.o quiescence.o 
+LIBCONV_CORE=threads.o convcore.o conv-conds.o queueing.o msgmgr.o \
+	cpm.o cpthreads.o futures.o cldb.o random.o \
+	debug-conv.o debug-message.o debug-object.o info.o \
+	generate.o edgelist.o conv-ccs.o quiescence.o 
 
 LIBCONV_UTIL=pup_util.o pup_xlater.o pup_c.o ckhashtable.o sockRoutines.o conv-lists.o
 
@@ -274,9 +282,6 @@ msgmgr.o: msgmgr.c $(CVHEADERS)
 cpthreads.o: cpthreads.c $(CVHEADERS)
 	$(CHARMC) cpthreads.c
 
-memory.o: memory.c $(CVHEADERS)
-	$(CHARMC) memory.c
-
 debug-conv.o: debug-conv.c $(CVHEADERS)
 	$(CHARMC) debug-conv.c
 
@@ -291,18 +296,6 @@ cldb.o: cldb.c ../../src/Common/conv-ldb/cldb.h $(CVHEADERS)
 
 quiescence.o: quiescence.c $(CVHEADERS)
 	$(CHARMC) quiescence.c
-
-libldb-rand.o: cldb.rand.c ../../src/Common/conv-ldb/cldb.h $(CVHEADERS)
-	$(CHARMC) -I../../src/Common/conv-ldb/ -cp ../lib/ -o $@ cldb.rand.c
-
-libldb-graph.o: cldb.graph.c ../../src/Common/conv-ldb/cldb.graph.h $(CVHEADERS)
-	$(CHARMC) -I../../src/Common/conv-ldb/ -cp ../lib/ -o $@ cldb.graph.c 
-
-libldb-spray.o: cldb.spray.c $(CVHEADERS)
-	$(CHARMC) -cp ../lib/ -o $@ cldb.spray.c
-
-libldb-test.o: cldb.test.c $(CVHEADERS)
-	$(CHARMC) -cp ../lib/ -o $@ cldb.test.c
 
 pup_util.o: pup_util.C $(UTILHEADERS)
 	$(CHARMC) -o pup_util.o pup_util.C
@@ -322,6 +315,41 @@ ckhashtable.o: ckhashtable.C ckhashtable.h
 
 conv-lists.o: conv-lists.C $(UTILHEADERS)
 	$(CHARMC) -o conv-lists.o conv-lists.C
+
+## Converse load balancers (seed balancers, -balance)
+$(L)/libldb-rand.o: cldb.rand.c ../../src/Common/conv-ldb/cldb.h $(CVHEADERS)
+	$(CHARMC) -I../../src/Common/conv-ldb/ -o $@ cldb.rand.c
+
+$(L)/libldb-graph.o: cldb.graph.c ../../src/Common/conv-ldb/cldb.graph.h $(CVHEADERS)
+	$(CHARMC) -I../../src/Common/conv-ldb/ -o $@ cldb.graph.c 
+
+$(L)/libldb-spray.o: cldb.spray.c $(CVHEADERS)
+	$(CHARMC) -o $@ cldb.spray.c
+
+$(L)/libldb-test.o: cldb.test.c $(CVHEADERS)
+	$(CHARMC) -o $@ cldb.test.c
+
+## Memory allocation libraries (-memory)
+MEM_DEPS=memory.c memory-gnu.c converse.h conv-mach.h
+$(L)/libmemory-default.o: $(MEM_DEPS)
+	$(CHARMC) -o $@ -DCMK_MEMORY_BUILD_DEFAULT memory.c
+
+$(L)/libmemory-os.o: $(MEM_DEPS)
+	$(CHARMC) -o $@ -DCMK_MEMORY_BUILD_OS memory.c
+
+# If the system doesn't have sbrk, these compilations may fail.
+#  This is OK, but then we can't use "-memory gnu" or friends.
+$(L)/libmemory-gnu.o: $(MEM_DEPS)
+	-$(CHARMC) -o $@ -DCMK_MEMORY_BUILD_GNU memory.c
+
+$(L)/libmemory-verbose.o: memory-verbose.c $(MEM_DEPS)
+	-$(CHARMC) -o $@ -DCMK_MEMORY_BUILD_VERBOSE memory.c
+
+$(L)/libmemory-paranoid.o: memory-paranoid.c $(MEM_DEPS)
+	-$(CHARMC) -o $@ -DCMK_MEMORY_BUILD_PARANOID memory.c
+
+$(L)/libmemory-cache.o: memory-cache.c $(MEM_DEPS)
+	-$(CHARMC) -o $@ -DCMK_MEMORY_BUILD_CACHE memory.c
 
 ###############################################################################
 #
@@ -347,18 +375,6 @@ CHARMLIBS: charm++
 
 libck.a: $(LIBCK_CORE)
 	$(CHARMC) -cp ../lib/ -o $@ $(LIBCK_CORE)
-
-LIBTRACE_NONE=trace-none.o
-libtrace-none.a: $(LIBTRACE_NONE)
-	$(CHARMC) -cp ../lib/ -o $@ $(LIBTRACE_NONE)
-
-LIBTRACE_PROJ=trace-projections.o
-libtrace-projections.a: $(LIBTRACE_PROJ)
-	$(CHARMC) -cp ../lib/ -o $@ $(LIBTRACE_PROJ)
-
-LIBTRACE_SUMM=trace-summary.o
-libtrace-summary.a: $(LIBTRACE_SUMM)
-	$(CHARMC) -cp ../lib/ -o $@ $(LIBTRACE_SUMM)
 
 ampi.decl.h ampi.def.h : ampi.ci charmxi
 	$(CHARMC) ampi.ci
@@ -432,6 +448,24 @@ ckfutures.o: ckfutures.C $(CKHEADERS)
 tempo.o: tempo.C $(CKHEADERS)
 	$(CHARMC) -o tempo.o tempo.C
 
+qd.o: qd.C $(CKHEADERS)
+	$(CHARMC) -o qd.o qd.C
+
+main.o: main.C $(CKHEADERS)
+	$(CHARMC) -o main.o main.C
+
+debug-object.o: debug-object.h debug-object.C $(CKHEADERS)
+	$(CHARMC) -o debug-object.o debug-object.C
+
+debug-message.o: debug-message.C $(CKHEADERS)
+	$(CHARMC) -o debug-message.o debug-message.C
+
+info.o:	info.C $(CKHEADERS)
+	$(CHARMC) -o info.o info.C
+
+ck.o: ck.C $(CKHEADERS)
+	$(CHARMC) -o ck.o ck.C
+
 waitqd.o: waitqd.C $(CKHEADERS)
 	$(CHARMC) -o waitqd.o waitqd.C
 
@@ -446,6 +480,9 @@ CkArray.decl.h CkArray.def.h : ckarray.ci charmxi
 
 ckarray.o: ckarray.C $(CKHEADERS)
 	$(CHARMC) -o ckarray.o ckarray.C
+
+
+## Charm++ Load balancer (Dynamic load balancer)
 
 lbdb.o: lbdb.C $(CKHEADERS)
 	$(CHARMC) -o lbdb.o lbdb.C
@@ -525,23 +562,19 @@ GreedyRefLB.o: GreedyRefLB.C $(CKHEADERS)
 RandRefLB.o: RandRefLB.C $(CKHEADERS)
 	$(CHARMC) -o RandRefLB.o RandRefLB.C
 
-qd.o: qd.C $(CKHEADERS)
-	$(CHARMC) -o qd.o qd.C
 
-main.o: main.C $(CKHEADERS)
-	$(CHARMC) -o main.o main.C
+## Tracing libraries (profiling, -tracemode)
+LIBTRACE_NONE=trace-none.o
+$(L)/libtrace-none.a: $(LIBTRACE_NONE)
+	$(CHARMC) -o $@ $(LIBTRACE_NONE)
 
-debug-object.o: debug-object.h debug-object.C $(CKHEADERS)
-	$(CHARMC) -o debug-object.o debug-object.C
+LIBTRACE_PROJ=trace-projections.o
+$(L)/libtrace-projections.a: $(LIBTRACE_PROJ)
+	$(CHARMC) -o $@ $(LIBTRACE_PROJ)
 
-debug-message.o: debug-message.C $(CKHEADERS)
-	$(CHARMC) -o debug-message.o debug-message.C
-
-info.o:	info.C $(CKHEADERS)
-	$(CHARMC) -o info.o info.C
-
-ck.o: ck.C $(CKHEADERS)
-	$(CHARMC) -o ck.o ck.C
+LIBTRACE_SUMM=trace-summary.o
+$(L)/libtrace-summary.a: $(LIBTRACE_SUMM)
+	$(CHARMC) -o $@ $(LIBTRACE_SUMM)
 
 trace-none.o : trace-none.C trace.h $(CKHEADERS)
 	$(CHARMC) -o trace-none.o trace-none.C
