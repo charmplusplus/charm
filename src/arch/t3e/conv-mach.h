@@ -8,7 +8,11 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.5  1997-12-22 21:58:30  jyelon
+ * Revision 1.6  1998-01-28 00:37:33  rbrunner
+ * Implemented a new broadcast scheme, to eliminate copying the message once
+ * for each receiver.
+ *
+ * Revision 1.5  1997/12/22 21:58:30  jyelon
  * Changed LDB initialization scheme.
  *
  * Revision 1.4  1997/08/06 20:36:17  jyelon
@@ -110,8 +114,8 @@
 #define CMK_MEMORY_PAGESIZE                                8192
 #define CMK_MEMORY_PROTECTABLE                             0
 
-#define CMK_MSG_HEADER_SIZE_BYTES                          40
-#define CMK_MSG_HEADER_BLANK_SPACE                         32
+#define CMK_MSG_HEADER_SIZE_BYTES                          64
+#define CMK_MSG_HEADER_BLANK_SPACE                         56
 
 #define CMK_PREPROCESSOR_CANNOT_DO_CONCATENATION           0
 #define CMK_PREPROCESSOR_USES_ANSI_STANDARD_CONCATENATION  1

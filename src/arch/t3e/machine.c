@@ -29,7 +29,7 @@ static char ident[] = "@(#)$Header$";
  *  We require statically allocated variables for locks.  This defines
  *  the max number of processors available.
  */
-#define MAX_PES 8192
+#define MAX_PES 2048
 
 /*
  * Some constants
@@ -69,7 +69,14 @@ typedef struct McDistListS
 typedef struct McMsgHdrS
 {
   McDistList list_node;
+  enum {Unknown, Message, BcastMessage } msg_type;
   enum boolean received_f;
+  union
+  {
+    struct McMsgHdrS *ptr;
+    int count;
+  } bcast;
+  int bcast_msg_size;
   int handler;
 } McMsgHdr;
 
@@ -128,6 +135,17 @@ static McQueue *tmp_queue;
  */
 static McQueue *received_queue;
 
+/* received_token_queue saves incoming broadcast-message tokens,
+ * until McRetrieveRemote is done with them.
+ */
+static McQueue *received_token_queue;
+
+/* outgoing broadcast message queue, holds messages until all receivers have
+ * picked it up
+ */
+static McQueue *broadcast_queue;
+static McQueue *broadcast_tmp_queue;
+
 /*
  * head is the pointer to my next incoming message.
  */
@@ -136,8 +154,20 @@ static McDistList head;
 /* Static variables are necessary for locks. */
 static long *my_lock;
 static long head_lock[MAX_PES];
+static long bcast_lock[MAX_PES];
 
 #define ALIGN8(x)  (8*(((x)+7)/8))
+
+int McChecksum(char *msg, int size)
+{
+  int chksm;
+  int i;
+
+  chksm=0xff;
+  for(i=0; i < size; i++)
+    chksm ^= *(msg+i);
+  return chksm;
+}
 
 /**********************************************************************
  *  CMI Functions START HERE
@@ -155,6 +185,7 @@ void CmiSyncSendFn(int dest_pe, int size, char *msg)
 
   dup_msg = (McMsgHdr *)CmiAlloc(ALIGN8(size));
   memcpy(dup_msg,msg,size);
+  dup_msg->msg_type = Message;
 
   McRetrieveRemote();
 
@@ -176,6 +207,7 @@ void CmiFreeSendFn(int dest_pe, int size, char *msg)
 {
   /* No need to copy message, since we will immediately free it */
   McRetrieveRemote();
+  ((McMsgHdr *)msg)->msg_type = Message;
 
   if (dest_pe == Cmi_mype)
     FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg);
@@ -188,9 +220,46 @@ void CmiFreeSendFn(int dest_pe, int size, char *msg)
 void CmiSyncBroadcastFn(int size, char *msg)
 {
   int i;
+  McMsgHdr *dup_msg;
+  McMsgHdr bcast_msg_tok;
+  McMsgHdr *dup_tok;
+  int hdr_size;
+
+  /*
+   * Copy user's message, and set count to the correct number of recients
+   */
+  dup_msg = (McMsgHdr *)CmiAlloc(ALIGN8(size));
+  memcpy(dup_msg,msg,size);
+  dup_msg->bcast.count = Cmi_numpes - 1;
+  /*
+  CmiPrintf("PE %d broadcast handler=%d\n",Cmi_mype,dup_msg->handler);
+  */
+  /*
+   * Make the broadcast token point to the copied message
+   */
+  bcast_msg_tok.msg_type = BcastMessage;
+  bcast_msg_tok.bcast.ptr = dup_msg;
+  bcast_msg_tok.bcast_msg_size = size;
+
+  hdr_size = ALIGN8(sizeof(McMsgHdr));
+
+  /*
+   * Enqueue copies of the token message on other nodes.  This code should
+   * be similar to CmiSyncSend
+   */
   for(i=0; i<Cmi_numpes; i++)
     if (i != Cmi_mype)
-      CmiSyncSendFn(i, size, msg);
+    {
+      dup_tok = (McMsgHdr *)CmiAlloc(hdr_size);
+      memcpy(dup_tok,&bcast_msg_tok,hdr_size);
+      McEnqueueRemote(dup_tok,hdr_size,i); 
+    }
+  /*
+   * The token message will be deleted as a normal message,
+   * but the message being broadcast needs to be saved for future
+   * garbage collection.
+   */
+  McQueueAddToBack(broadcast_queue,dup_msg);
 }
 
 CmiCommHandle CmiAsyncBroadcastFn(int size, char *msg)
@@ -208,8 +277,8 @@ void CmiFreeBroadcastFn(int size, char *msg)
 void CmiSyncBroadcastAllFn(int size, char *msg)
 {
   int i;
-  for(i=0; i<Cmi_numpes; i++)
-      CmiSyncSendFn(i, size, msg);
+  CmiSyncBroadcastFn(size,msg);
+  CmiSyncSendFn(Cmi_mype, size, msg);
 }
 
 CmiCommHandle CmiAsyncBroadcastAllFn(int size, char *msg)
@@ -227,20 +296,30 @@ void CmiFreeBroadcastAllFn(int size, char *msg)
 /**********************************************************************
  * CMI memory calls
  */
+
+static int McMemAllocated=0;
+static int McMemMaxAllocated=0;
+
 void *CmiAlloc(int size)
 {
   char *res;
-
-#ifdef DEBUG
-  printf("[%d] Allocating %d really %d\n",Cmi_mype,size,size+8);
-#endif
 
   res =(char *) malloc(size+8);
   if (res==(char *)0) { 
     CmiError("%d:Memory allocation failed.",CmiMyPe()); 
     abort();
   }
+  McMemAllocated += (size + 8);
+  if (McMemAllocated > McMemMaxAllocated)
+  {
+    if (Cmi_mype == 0)
+      CmiPrintf("[%d] Allocating: %d High watermark: %d\n",
+		Cmi_mype,size+8,McMemAllocated);
+    McMemMaxAllocated = McMemAllocated;
+  }
   ((int *)res)[0]=size;
+  /*  printf("[%d] Allocating %d at %d\n",Cmi_mype,size,res+8); */
+
   return (void *)(res+8);
 }
 
@@ -251,9 +330,8 @@ int CmiSize(void *blk)
 
 void CmiFree(void *blk)
 {
-#ifdef DEBUG
-  printf("[%d] freeing %lx\n",Cmi_mype,blk);
-#endif
+  /*  printf("[%d] freeing %d at %d\n",Cmi_mype,*((int *)blk - 1),blk); */
+  McMemAllocated -= (((int *)( ((char *) blk) - 8))[0] + 8);
   free( ((char *)blk) - 8);
 }
 
@@ -322,6 +400,9 @@ static void McInitList(void)
 
   received_queue = McQueueCreate();
   tmp_queue = McQueueCreate();
+  received_token_queue = McQueueCreate();
+  broadcast_queue = McQueueCreate();
+  broadcast_tmp_queue = McQueueCreate();
   in_transit_tmp_queue = McQueueCreate();
   in_transit_queue = McQueueCreate();
 
@@ -335,10 +416,14 @@ static void McInitList(void)
     Cmi_numpes);
   }
   for(i=0; i < Cmi_numpes; i++)
+  {
     head_lock[i] = 0;
+    bcast_lock[i] = 0;
+  }
   my_lock = &(head_lock[Cmi_mype]);
   barrier();
   shmem_clear_lock(my_lock);
+  shmem_clear_lock(&bcast_lock[Cmi_mype]);
 }
 
 static void McEnqueueRemote(void *msg, int msg_sz, int dst_pe)
@@ -356,6 +441,8 @@ static void McEnqueueRemote(void *msg, int msg_sz, int dst_pe)
   McDistList tmp_link;
   McDistList *msg_link;
 
+  /*  CmiPrintf("PE %d outgoing msg = %d msg_type = %d size = %d\n",
+	    Cmi_mype,msg,((McMsgHdr *)msg)->msg_type,msg_sz);*/
   /* 0. Free any delivered messages from the in_transit_queue list. */
   McCleanUpInTransit();
 
@@ -375,17 +462,9 @@ static void McEnqueueRemote(void *msg, int msg_sz, int dst_pe)
      Acquire lock on the destination queue.  If locks turn oout to
      be inefficient, use fetch and increment to imp. lock
    */
-#ifdef DEBUG
-  printf("[%d] Locking on %d:%lx\n",Cmi_mype,
-         dst_pe,&(head_lock[dst_pe]));
-#endif
 
   shmem_set_lock(&(head_lock[dst_pe]));
 
-#ifdef DEBUG
-  printf("[%d] Locked on %d:%lx\n",Cmi_mype,
-         dst_pe,&(head_lock[dst_pe]));
-#endif
 
   /* 4. Swap the list pointer with that on the other node.
    */
@@ -407,18 +486,8 @@ static void McEnqueueRemote(void *msg, int msg_sz, int dst_pe)
   printf("[%d]   msg_sz = %x\n",Cmi_mype,msg_link->msg_sz);
 #endif
 
-#ifdef DEBUG
-  printf("[%d] Releasing lock %d:%lx\n",Cmi_mype,
-         dst_pe,&(head_lock[dst_pe]));
-#endif
-
   /* 5. Release lock */
   shmem_clear_lock(&(head_lock[dst_pe]));
-
-#ifdef DEBUG
-  printf("[%d] Released lock %d:%lx\n",Cmi_mype,
-         dst_pe,&(head_lock[dst_pe]));
-#endif
 }
 
 static void McRetrieveRemote(void)
@@ -437,34 +506,23 @@ static void McRetrieveRemote(void)
   McDistList *cur_node;
   McMsgHdr *cur_msg; 
   int received_f;
+  enum boolean bcast_msg;
+  McMsgHdr *bcast_ptr;
 
-#ifdef DEBUG
-  printf("[%d] Start front = %lx, back = %lx\n",Cmi_mype,received_queue_front,received_queue_back);
-#endif
   /* Get the head of the list */
 
   if (head.nxt_node == list_empty)  /* apparently there are no messages */
     return;
-#ifdef DEBUG
-  printf("[%d] Locking on %lx\n",Cmi_mype,
-         my_lock);
-#endif
+
   /* 0) Lock list pointer. */
   shmem_set_lock(my_lock);
-#ifdef DEBUG
-  printf("[%d] Locked on %lx\n",Cmi_mype,
-         my_lock);
-#endif
+
   /* 1) Replace list pointer with NULL and unlock list */
   list_head = head;
   head.nxt_node = list_empty;
   head.nxt_addr = NULL;
   head.msg_sz = 0;
   shmem_clear_lock(my_lock);
-#ifdef DEBUG
-  printf("[%d] Released lock on %lx\n",Cmi_mype,
-         my_lock);
-#endif
 
   /* 2) Get each message into local memory
    * Start copying the messages into local memory, putting messages into
@@ -475,9 +533,6 @@ static void McRetrieveRemote(void)
 
   while (cur_node->nxt_node != list_empty)
   {
-#ifdef DEBUG
-    printf("%d allocating %d bytes\n",Cmi_mype,cur_node->msg_sz);
-#endif
     cur_msg = (McMsgHdr *)CmiAlloc(ALIGN8(cur_node->msg_sz));
     if (cur_msg ==NULL)
     {
@@ -485,29 +540,59 @@ static void McRetrieveRemote(void)
       exit(1);
     }
 
-#ifdef DEBUG
-    printf("[%d] Retrieving message from [%d]:%x size %d at %x to %x\n",
-           Cmi_mype,cur_node->nxt_node,cur_node->nxt_addr,
-           cur_node->msg_sz,cur_node,cur_msg);
-#endif
-
     shmem_get(cur_msg, cur_node->nxt_addr,
               ALIGN8(cur_node->msg_sz)/8, cur_node->nxt_node);
 
-#ifdef DEBUG
-    printf("[%d]   nxt_node = %d\n",
-	   Cmi_mype,cur_msg->list_node.nxt_node);
-    printf("[%d]   nxt_addr = %x\n",
-	   Cmi_mype,cur_msg->list_node.nxt_addr);
-    printf("[%d]   msg_sz = %x\n",
-#endif
+    /*    CmiPrintf("PE %d incoming msg = %d msg_type = %d, size = %d\n",
+	      Cmi_mype,cur_msg,cur_msg->msg_type,cur_node->msg_sz);*/
+
+    /* If it is a broadcast message, retrieve the actual message */
+    if (cur_msg->msg_type == BcastMessage)
+    {
+      /*      CmiPrintf("PE %d receiving broadcast message from %d\n",
+		Cmi_mype,cur_node->nxt_node);*/
+
+      bcast_msg = true;
+      bcast_ptr = (McMsgHdr *)CmiAlloc(ALIGN8(cur_msg->bcast_msg_size));
+      shmem_set_lock(&(bcast_lock[cur_node->nxt_node]));
+
+      /*
+      CmiPrintf(
+	"PE %d getting message from node %d at addr %d to %d, size=%d\n",
+	Cmi_mype,cur_node->nxt_node,cur_msg->bcast.ptr,bcast_ptr,
+	cur_msg->bcast_msg_size
+	);
+	*/
+      /* Get the message */
+      shmem_get(bcast_ptr,cur_msg->bcast.ptr,
+		ALIGN8(cur_msg->bcast_msg_size)/8,cur_node->nxt_node);
+      /* Decrement the count, and write it back to the original node. */
+      /*      CmiPrintf(
+      "PE %d received broadcast message count=%d size=%d handler=%d\n",
+		Cmi_mype,bcast_ptr->bcast.count,
+		cur_msg->bcast_msg_size,bcast_ptr->handler
+      );
+      */
+      bcast_ptr->bcast.count--;
+
+      shmem_put(&(cur_msg->bcast.ptr->bcast.count),
+		&bcast_ptr->bcast.count,1,cur_node->nxt_node);
+      shmem_clear_lock(&(bcast_lock[cur_node->nxt_node]));
+    }
+    else bcast_msg = false;
 
     /* Mark the remote message for future deletion */
     shmem_put(&(cur_node->nxt_addr->received_f),&received_f,
               1, cur_node->nxt_node);
 
     /* Add to list for reversing */
-    McQueueAddToBack(tmp_queue,cur_msg);
+    if (bcast_msg)
+    {
+      McQueueAddToBack(received_token_queue,cur_msg);
+      McQueueAddToBack(tmp_queue,bcast_ptr);
+    }
+    else 
+      McQueueAddToBack(tmp_queue,cur_msg);
 
     /* Move pointer to next message */
     cur_node = &(cur_msg->list_node);
@@ -517,6 +602,11 @@ static void McRetrieveRemote(void)
   while ((cur_msg = McQueueRemoveFromBack(tmp_queue)) != NULL)  {
     McQueueAddToBack(received_queue,cur_msg);
   }
+
+  /* 4) Delete broadcast-message tokens */
+  while ((cur_msg = McQueueRemoveFromBack(received_token_queue)) != NULL)  {
+    CmiFree(cur_msg);
+  }
   return;
 }
 
@@ -525,28 +615,44 @@ static void McCleanUpInTransit(void)
   McMsgHdr *msg;
   McQueue *swap_ptr;
 
-#ifdef DEBUG
-  CmiPrintf("[%d] in_transit_queue = %d, tmp_queue = %d\n",
-	Cmi_mype,in_transit_queue->len,in_transit_tmp_queue->len);
-#endif
+  /* Check broadcast message queue, to see if messages have been retrieved
+   */
+  while ((msg = (McMsgHdr *)McQueueRemoveFromFront(broadcast_queue)) 
+	 != NULL)
+  {
+    if (msg->bcast.count == 0)
+    {
+      /* 
+	 CmiPrintf("PE %d freeing broadcast message at %d\n",Cmi_mype,msg);
+       */
+      CmiFree(msg);
+    }
+    else
+    {
+      McQueueAddToBack(broadcast_tmp_queue,msg);
+    }
+  }
+  /*
+   * swap queues, so tmp_queue is now empty, and in_transit_queue has
+   * only non-received messages.
+   */
+  swap_ptr = broadcast_tmp_queue;
+  broadcast_tmp_queue = broadcast_queue;
+  broadcast_queue = swap_ptr;
+
   /* 
-   * Free received messages, and move others to tmp_queue
+   * Free received messages, and move others to tmp_queue.  Similar to
+   * above
    */
   while ((msg = (McMsgHdr *)McQueueRemoveFromFront(in_transit_queue)) 
 	 != NULL)
   {
     if (msg->received_f)
     {
-#ifdef DEBUG
-      CmiPrintf("[%d] Freeing message at %x\n",Cmi_mype,msg);
-#endif
       CmiFree(msg);
     }
     else
     {
-#ifdef DEBUG
-      CmiPrintf("[%d] Not freeing message at %x\n",Cmi_mype,msg);
-#endif
       McQueueAddToBack(in_transit_tmp_queue,msg);
     }
   }
