@@ -27,7 +27,7 @@ public:
     return bytes/bandwidth;
   }
   void print() {
-    CmiPrintf("bandwidth: %f; alpha: %f.\n", bandwidth, alpha);
+    CmiPrintf("bandwidth: %e; alpha: %e.\n", bandwidth, alpha);
   }
 };
 
@@ -58,8 +58,8 @@ public:
     return  packetcost * numpackets;
   }
   void print() {
-    CmiPrintf("alpha: %f	packetsize: %d	CYCLE_TIME_FACTOR:%f.\n", alpha, packetsize, CYCLE_TIME_FACTOR);
-    CmiPrintf("CYCLES_PER_HOP: %f	CYCLES_PER_CORNER: %f.\n", CYCLES_PER_HOP, CYCLES_PER_CORNER);
+    CmiPrintf("alpha: %e	packetsize: %d	CYCLE_TIME_FACTOR:%e.\n", alpha, packetsize, CYCLE_TIME_FACTOR);
+    CmiPrintf("CYCLES_PER_HOP: %d	CYCLES_PER_CORNER: %d.\n", CYCLES_PER_HOP, CYCLES_PER_CORNER);
   }
 };
 
