@@ -96,35 +96,9 @@ a run of bytes used to look up an object in a hash table.
 */
 typedef unsigned char uc;
 
-inline CkHashCode CkArrayIndex::hash(void) const
-{
-        register int i;
-	register const int *d=data();
-	register CkHashCode ret=d[0];
-	for (i=1;i<nInts;i++)
-		ret +=circleShift(d[i],10+11*i)+circleShift(d[i],9+7*i);
-	return ret;
-}
 CkHashCode CkArrayIndex::staticHash(const void *v,size_t)
 	{return ((const CkArrayIndex *)v)->hash();}
 
-inline int CkArrayIndex::compare(const CkArrayIndex &i2) const
-{
-	const CkArrayIndex &i1=*this;
-#if CMK_1D_ONLY
-	return i1.data()[0]==i2.data()[0];
-#else
-	const int *d1=i1.data();
-	const int *d2=i2.data();
-	int l=i1.nInts;
-	if (l!=i2.nInts) return 0;
-	for (int i=0;i<l;i++)
-		if (d1[i]!=d2[i])
-			return 0;
-	//If we got here, the two keys must have exactly the same data
-	return 1;
-#endif
-}
 int CkArrayIndex::staticCompare(const void *k1,const void *k2,size_t /*len*/)
 {
 	return ((const CkArrayIndex *)k1)->
