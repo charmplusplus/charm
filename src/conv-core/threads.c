@@ -174,11 +174,13 @@ initialized so far on this processor.
 */
 static void CthFixData(CthThread t)
 {
-  int datasize = CthCpvAccess(CthDatasize);
-  if (B(t)->datasize < datasize) {
-    B(t)->datasize = 2*datasize;
+  int newsize = CthCpvAccess(CthDatasize);
+  int oldsize = B(t)->datasize;
+  if (oldsize < newsize) {
+    B(t)->datasize = 2*newsize;
     /* Note: realloc(NULL,size) is equivalent to malloc(size) */
-    B(t)->data = (char *)realloc(B(t)->data, B(t)->datasize);
+    B(t)->data = (char *)realloc(B(t)->data, newsize);
+    memset(B(t)->data+oldsize, 0, newsize-oldsize);
   }
 }
 
