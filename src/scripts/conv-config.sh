@@ -20,6 +20,8 @@ then
 	exit 1
 fi
 
+CMK_LD_SHARED="-shared"
+
 . $CHARMINC/conv-mach.sh
 
 [ -z "$CMK_C_OPTIMIZE" ] && CMK_C_OPTIMIZE="-O"
