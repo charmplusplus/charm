@@ -1,7 +1,7 @@
 CDIR=../../../..
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
-HEADERS=ampi.h
+HEADERS=ampi.h ampif.h
 HEADDEP=$(HEADERS) ampiimpl.h ampi.decl.h
 COMPAT=compat_ampius.o compat_ampifus.o
 OBJS=ampi.o ampif.o compat_ampius.o
@@ -30,6 +30,7 @@ $(DESTF): $(OBJSF) headers
 headers: $(HEADERS)
 	cp $(HEADERS) $(CDIR)/include/
 	cp ampi.h $(CDIR)/include/mpi.h
+	cp ampif.h $(CDIR)/include/mpif.h
 	cp mpiCC mpicc mpif77 mpif90 $(CDIR)/bin
 	touch headers
 
