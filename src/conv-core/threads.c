@@ -1017,8 +1017,12 @@ static CthThread CthCreateInner(CthVoidFn fn,void *arg,int size,int migratable)
   size += SIGSTKSZ;
   CthAllocateStack(&result->base,&size,migratable);
   stack = result->base.stack;
-#if CMK_STACK_GROWDOWN
+#if CMK_STACK_GROWUNKNOWN || CMK_STACK_GROWDOWN
+#if CMK_STACK_GROWUNKNOWN
+  stack = stack +  size/2;
+#elif CMK_STACK_GROWDOWN
   stack = stack +  size - MINSIGSTKSZ;
+#endif
   stack=STP_STKALIGN(stack, sizeof(char*)*8);
   size = stack - (char *)result->base.stack;
 #endif
