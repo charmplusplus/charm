@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.6  1995-07-07 14:04:35  gursoy
+ * Revision 2.7  1995-07-11 16:52:37  gursoy
+ * CsdExitScheduler is a function for uniprocessor now
+ *
+ * Revision 2.6  1995/07/07  14:04:35  gursoy
  * redone uniprocessors changes again, somehow an old version
  * is checked in
  *
@@ -180,7 +183,10 @@ int   CmiScanf  CMK_PROTO(());
 CpvExtern(void*, CsdSchedQueue);
 CpvExtern(int, CsdStopFlag);
 
+/* for uniprocessor CsdExitScheduler() is a function in machine.c */
+#ifndef CMK_SHARED_VARS_UNIPROCESSOR
 #define CsdExitScheduler()  (CpvAccess(CsdStopFlag)=1)
+#endif 
 
 #define CsdEnqueue(x)  (CqsEnqueue(CpvAccess(CsdSchedQueue),x))
 
@@ -196,33 +202,4 @@ extern  void *CsdGetMsg CMK_PROTO(());
 #endif
 
 #endif /* CONVERSE_H */
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
