@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.7  1995-07-24 01:54:40  jyelon
+ * Revision 2.8  1995-07-27 20:29:34  jyelon
+ * Improvements to runtime system, general cleanup.
+ *
+ * Revision 2.7  1995/07/24  01:54:40  jyelon
  * *** empty log message ***
  *
  * Revision 2.6  1995/07/22  23:45:15  jyelon
@@ -218,34 +221,5 @@ unsigned int priobits;
         SetEnv_packid(env, 0);
     }
     return ((void *)USER_MSG_PTR(env));
-}
-
-/*
- * bytes_to_magnitude and magnitude_to_bytes
- *
- * These routines convert 32-bit sizes into 16-bit magnitudes, and vice
- * versa.  This allows me to store object sizes in tight places, like in
- * the message envelope, without wasting a lot of bits.
- *
- */
-
-int bytes_to_magnitude(int bytes)
-{
-    int mag;
-    return bytes;
-    mag=0;
-    bytes=(bytes+0x4003)>>2;
-    if (bytes>=0x100000) { mag+=0x8000; bytes=((bytes+0xFF)>>8); }
-    if (bytes>=0x010000) { mag+=0x4000; bytes=((bytes+0x0F)>>4); }
-    if (bytes>=0x004000) { mag+=0x2000; bytes=((bytes+0x03)>>2); }
-    if (bytes>=0x002000) { mag+=0x1000; bytes=((bytes+0x01)>>1); }
-    mag+=(bytes-0x1000);
-    return mag;
-}
-
-int magnitude_to_bytes(int mag)
-{
-    return mag;
-    return ((0x1000+(mag&0xFFF))<<(2+(mag>>12)))-0x4000;
 }
 

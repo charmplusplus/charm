@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.2  1995-06-13 14:33:55  gursoy
+ * Revision 2.3  1995-07-27 20:29:34  jyelon
+ * Improvements to runtime system, general cleanup.
+ *
+ * Revision 2.2  1995/06/13  14:33:55  gursoy
  * *** empty log message ***
  *
  * Revision 1.7  1995/05/04  22:03:51  jyelon
@@ -74,22 +77,11 @@ CpvDeclare(int, currentBocNum);
 CpvDeclare(int, MainDataSize);  /* size of dataarea for main chare 	*/
 
 
-CsvDeclare(int*, EpLanguageTable);
-
-
 CsvDeclare(FUNCTION_PTR*, ROCopyFromBufferTable);
 CsvDeclare(FUNCTION_PTR*, ROCopyToBufferTable);
-CsvDeclare(int*, EpIsImplicitTable);
-CsvDeclare(FUNCTION_PTR*, EpTable); /* actual table to be allocated dynamically
-			     	    depending on the number of entry-points */
-CsvDeclare(int*, EpToMsgTable);  /* Table mapping EPs to associated messages.*/
-CsvDeclare(int*, EpChareTypeTable);  /* Table mapping EPs to chare type 
-				      (CHARE or BOC) */ 	
-CsvDeclare(MSG_STRUCT*, MsgToStructTable); /* Table mapping message to 
-                                           struct table*/
-CsvDeclare(PSEUDO_STRUCT*,  PseudoTable);
-CsvDeclare(int*, EpChareTable);
-CsvDeclare(char**, EpNameTable);
+CsvDeclare(EP_STRUCT*, EpInfoTable);
+CsvDeclare(MSG_STRUCT*, MsgToStructTable);
+CsvDeclare(PSEUDO_STRUCT*, PseudoTable);
 CsvDeclare(int*, ChareSizesTable);
 CsvDeclare(FUNCTION_PTR*, ChareFnTable);
 CsvDeclare(char**, ChareNamesTable);
@@ -124,10 +116,66 @@ CsvDeclare(FUNCTION_PTR*,  _CK_9_GlobalFunctionTable);
 
 CsvDeclare(int, MainChareLanguage);
 
+/* Handlers for various message-types */
+CsvDeclare(int, HANDLE_INCOMING_MSG_Index);
+CsvDeclare(int, CkProcIdx_ForChareMsg);
+CsvDeclare(int, CkProcIdx_DynamicBocInitMsg);
+CsvDeclare(int, CkProcIdx_NewChareMsg);
+CsvDeclare(int, CkProcIdx_BocMsg);
+CsvDeclare(int, CkProcIdx_VidEnqueueMsg);
+CsvDeclare(int, CkProcIdx_VidSendOverMsg);
+
+/* System-defined chare numbers */
+CsvDeclare(int, CkChare_ACC);
+CsvDeclare(int, CkChare_MONO);
+
+/* Entry points for Quiescence detection BOC 	*/
+CsvDeclare(int, CkEp_QD_Init);
+CsvDeclare(int, CkEp_QD_InsertQuiescenceList);
+CsvDeclare(int, CkEp_QD_PhaseIBroadcast);
+CsvDeclare(int, CkEp_QD_PhaseIMsg);
+CsvDeclare(int, CkEp_QD_PhaseIIBroadcast);
+CsvDeclare(int, CkEp_QD_PhaseIIMsg);
+
+/* Entry points for Write Once Variables 	*/
+CsvDeclare(int, CkEp_WOV_AddWOV);
+CsvDeclare(int, CkEp_WOV_RcvAck);
+CsvDeclare(int, CkEp_WOV_HostAddWOV);
+CsvDeclare(int, CkEp_WOV_HostRcvAck);
+
+/* Entry points for dynamic tables BOC    	*/
+CsvDeclare(int, CkEp_Tbl_Unpack);
+
+/* Entry points for accumulator BOC		*/
+CsvDeclare(int, CkEp_ACC_CollectFromNode);
+CsvDeclare(int, CkEp_ACC_LeafNodeCollect);
+CsvDeclare(int, CkEp_ACC_InteriorNodeCollect);
+CsvDeclare(int, CkEp_ACC_BranchInit);
+
+/* Entry points for monotonic BOC		*/
+CsvDeclare(int, CkEp_MONO_BranchInit);
+CsvDeclare(int, CkEp_MONO_BranchUpdate);
+CsvDeclare(int, CkEp_MONO_ChildrenUpdate);
+
+/* These are the entry points necessary for the dynamic BOC creation. */
+CsvDeclare(int, CkEp_DBOC_RegisterDynamicBocInitMsg);
+CsvDeclare(int, CkEp_DBOC_OtherCreateBoc);
+CsvDeclare(int, CkEp_DBOC_InitiateDynamicBocBroadcast);
+
+/* These are the entry points for the statistics BOC */
+CsvDeclare(int, CkEp_Stat_CollectNodes);
+CsvDeclare(int, CkEp_Stat_Data);
+CsvDeclare(int, CkEp_Stat_PerfCollectNodes);
+CsvDeclare(int, CkEp_Stat_BroadcastExitMessage);
+CsvDeclare(int, CkEp_Stat_ExitMessage);
+
+/* Entry points for LoadBalancing BOC 		*/
+CsvDeclare(int, CkEp_Ldb_NbrStatus);
+
+CsvDeclare(int, NumSysBocEps);
 
 void globalsModuleInit()
 {
-
    CpvInitialize(int, PAD_SIZE);
    CpvInitialize(int, HEADER_SIZE);
    CpvInitialize(int, _CK_Env_To_Usr);
@@ -161,7 +209,6 @@ void globalsModuleInit()
    CpvInitialize(int, _CK_13ChareEPCount);
    CpvInitialize(int, _CK_13TotalMsgCount);
 
-  
    CpvAccess(NumReadMsg)             = 0; 
    CpvAccess(InsideDataInit)         = 0;
    CpvAccess(currentBocNum)          = (NumSysBoc - 1); /* was set to  -1 */

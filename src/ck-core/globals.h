@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.4  1995-07-24 01:54:40  jyelon
+ * Revision 2.5  1995-07-27 20:29:34  jyelon
+ * Improvements to runtime system, general cleanup.
+ *
+ * Revision 2.4  1995/07/24  01:54:40  jyelon
  * *** empty log message ***
  *
  * Revision 2.3  1995/07/06  22:42:11  narain
@@ -66,21 +69,15 @@ typedef struct chare_block *CHARE_BLOCK_;
 CpvExtern(CHARE_BLOCK_, mainChareBlock);
 CpvExtern(CHARE_BLOCK_, currentChareBlock);
 
-CsvExtern(int*, EpLanguageTable);
 CsvExtern(FUNCTION_PTR*, ROCopyFromBufferTable);
 CsvExtern(FUNCTION_PTR*, ROCopyToBufferTable);
-CsvExtern(int*, EpIsImplicitTable);
-CsvExtern(int*, EpToMsgTable);
-CsvExtern(int*, EpChareTypeTable);
-CsvExtern(FUNCTION_PTR*,  EpTable);
+CsvExtern(EP_STRUCT*, EpInfoTable);
 CsvExtern(MSG_STRUCT*, MsgToStructTable); 
 CsvExtern(int*,  ChareSizesTable);
 CsvExtern(FUNCTION_PTR*,  ChareFnTable);
 CsvExtern(PSEUDO_STRUCT*, PseudoTable);
-CsvExtern(char**, EpNameTable);
 
 CsvExtern(char**, ChareNamesTable);
-CsvExtern(int*, EpChareTable);
 
 CpvExtern(int, msgs_processed);
 CpvExtern(int, msgs_created);
@@ -109,11 +106,62 @@ CsvExtern(int, MainChareLanguage);
 
 CpvExtern(int, LDB_ELEM_SIZE);
 
+/* Handlers for various message-types */
 CsvExtern(int, HANDLE_INCOMING_MSG_Index);
-CsvExtern(int, CkProcess_ForChareMsg_Index);
-CsvExtern(int, CkProcess_DynamicBocInitMsg_Index);
-CsvExtern(int, CkProcess_NewChareMsg_Index);
-CsvExtern(int, CkProcess_BocMsg_Index);
-CsvExtern(int, CkProcess_VidEnqueueMsg_Index);
-CsvExtern(int, CkProcess_VidSendOverMsg_Index);
+CsvExtern(int, CkProcIdx_ForChareMsg);
+CsvExtern(int, CkProcIdx_DynamicBocInitMsg);
+CsvExtern(int, CkProcIdx_NewChareMsg);
+CsvExtern(int, CkProcIdx_BocMsg);
+CsvExtern(int, CkProcIdx_VidEnqueueMsg);
+CsvExtern(int, CkProcIdx_VidSendOverMsg);
+
+/* System-defined chare numbers */
+CsvExtern(int, CkChare_ACC);
+CsvExtern(int, CkChare_MONO);
+
+/* Entry points for Quiescence detection BOC 	*/
+CsvExtern(int, CkEp_QD_Init);
+CsvExtern(int, CkEp_QD_InsertQuiescenceList);
+CsvExtern(int, CkEp_QD_PhaseIBroadcast);
+CsvExtern(int, CkEp_QD_PhaseIMsg);
+CsvExtern(int, CkEp_QD_PhaseIIBroadcast);
+CsvExtern(int, CkEp_QD_PhaseIIMsg);
+
+/* Entry points for Write Once Variables 	*/
+CsvExtern(int, CkEp_WOV_AddWOV);
+CsvExtern(int, CkEp_WOV_RcvAck);
+CsvExtern(int, CkEp_WOV_HostAddWOV);
+CsvExtern(int, CkEp_WOV_HostRcvAck);
+
+
+/* Entry points for dynamic tables BOC    	*/
+CsvExtern(int, CkEp_Tbl_Unpack);
+
+/* Entry points for accumulator BOC		*/
+CsvExtern(int, CkEp_ACC_CollectFromNode);
+CsvExtern(int, CkEp_ACC_LeafNodeCollect);
+CsvExtern(int, CkEp_ACC_InteriorNodeCollect);
+CsvExtern(int, CkEp_ACC_BranchInit);
+
+/* Entry points for monotonic BOC		*/
+CsvExtern(int, CkEp_MONO_BranchInit);
+CsvExtern(int, CkEp_MONO_BranchUpdate);
+CsvExtern(int, CkEp_MONO_ChildrenUpdate);
+
+/* These are the entry points necessary for the dynamic BOC creation. */
+CsvExtern(int, CkEp_DBOC_RegisterDynamicBocInitMsg);
+CsvExtern(int, CkEp_DBOC_OtherCreateBoc);
+CsvExtern(int, CkEp_DBOC_InitiateDynamicBocBroadcast);
+
+/* These are the entry points for the statistics BOC */
+CsvExtern(int, CkEp_Stat_CollectNodes);
+CsvExtern(int, CkEp_Stat_Data);
+CsvExtern(int, CkEp_Stat_PerfCollectNodes);
+CsvExtern(int, CkEp_Stat_BroadcastExitMessage);
+CsvExtern(int, CkEp_Stat_ExitMessage);
+
+/* Entry points for LoadBalancing BOC 		*/
+CsvExtern(int, CkEp_Ldb_NbrStatus);
+
+CsvExtern(int, NumSysBocEps);
 

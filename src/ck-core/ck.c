@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.8  1995-07-25 00:29:31  jyelon
+ * Revision 2.9  1995-07-27 20:29:34  jyelon
+ * Improvements to runtime system, general cleanup.
+ *
+ * Revision 2.8  1995/07/25  00:29:31  jyelon
  * *** empty log message ***
  *
  * Revision 2.7  1995/07/24  01:54:40  jyelon
@@ -138,8 +141,8 @@ CkExit()
 	CkMemError(msg);
 	*msg = CpvAccess(num_exits);
 
-	GeneralSendMsgBranch(StatBroadcastExitMessage_EP,
-			msg, 0, USERcat,  BocMsg, StatisticBocNum);
+	GeneralSendMsgBranch(CsvAccess(CkEp_Stat_BroadcastExitMessage),
+			msg, 0, BocMsg, StatisticBocNum);
 }
 
 
@@ -158,8 +161,8 @@ CkEndCharm()
 	CkMemError(msg);
 	*msg = -1;
 
-	GeneralSendMsgBranch(StatBroadcastExitMessage_EP,
-			msg, 0, USERcat,  BocMsg, StatisticBocNum);
+	GeneralSendMsgBranch(CsvAccess(CkEp_Stat_BroadcastExitMessage),
+			msg, 0, BocMsg, StatisticBocNum);
 }
 
 BroadcastExitMessage(usr, data)
@@ -167,7 +170,7 @@ void *usr, *data;
 {
 /*
    This function is executed only on node 0 - corresponds to 
-                 StatBroadcastExitMessage_EP
+                 CsvAccess(CkEp_Stat_BroadcastExitMessage)
 */
 	int *msg;
 	
@@ -192,8 +195,8 @@ CmiMyPe()))
 	msg = (int *) CkAllocMsg(sizeof(int));
 	CkMemError(msg);
 	*msg = *((int *)usr);
-	GeneralBroadcastMsgBranch(StatExitMessage_EP, msg, 
-			USERcat, BroadcastBocMsg, StatisticBocNum);
+	GeneralBroadcastMsgBranch(CsvAccess(CkEp_Stat_ExitMessage), msg, 
+			BroadcastBocMsg, StatisticBocNum);
 	CpvAccess(disable_sys_msgs) = 1;
 }
 
@@ -247,8 +250,7 @@ ChareExit()
 
 SendNodeStatistics()
 {
-	/*NodeCollectStatistics(NULL, NULL);*/
-	(*(CsvAccess(EpTable)[StatData_EP])) (NULL,NULL);
+	(*(CsvAccess(EpInfoTable)[CsvAccess(CkEp_Stat_Data)].function)) (NULL,NULL);
 }
 
 
@@ -320,19 +322,15 @@ int destPE;
 {
   ENVELOPE * env;
   VID_BLOCK * vidblock;
-  int DataMag ;
-  
-  if ( IsCharmPlus(Entry) )
-    DataMag = bytes_to_magnitude(id);
-  else
-    DataMag = bytes_to_magnitude(CsvAccess(ChareSizesTable)[id]);
-  
+
+  if (id!=CpvAccess(EpInfoTable)[Entry].chareindex) 
+    CmiPrintf("** ERROR ** Illegal combination of CHAREINDEX/EP in CreateChare\n");
+
   TRACE(CmiPrintf("[%d] CreateChare: Entry=%d\n", CmiMyPe(), Entry));
   
   CpvAccess(nodecharesCreated)++;
   env = ENVELOPE_UPTR(Msg);
   
-  SetEnv_dataMag(env, DataMag);
   SetEnv_EP(env, Entry);
   
   if (vid != NULL_VID)
@@ -355,9 +353,8 @@ int destPE;
   TRACE(CmiPrintf("[%d] CreateChare: vid=0x%x\n",
 		  CmiMyPe(), vid));
   
-  TRACE(CmiPrintf("[%d] CreateChare: category=%d, msgType=%d, ep=%d\n",
-		  CmiMyPe(), GetEnv_category(env), 
-		  GetEnv_msgType(env), GetEnv_EP(env)));
+  TRACE(CmiPrintf("[%d] CreateChare: msgType=%d, ep=%d\n",
+		  CmiMyPe(), GetEnv_msgType(env), GetEnv_EP(env)));
   
   
   QDCountThisCreation(Entry, USERcat, NewChareMsg, 1);
@@ -373,7 +370,7 @@ int destPE;
       CmiPrintf("** ERROR ** Illegal destPE in CreateChare\n");
     }
     SetEnv_msgType(env, NewChareMsg);
-    CmiSetHandler(env,CsvAccess(CkProcess_NewChareMsg_Index)) ;
+    CmiSetHandler(env,CsvAccess(CkProcIdx_NewChareMsg)) ;
     CldNewSeedFromLocal(env, LDB_ELEMENT_PTR(env),
 			CkLdbSend,
 			GetEnv_queueing(env),
@@ -396,7 +393,7 @@ ChareIDType * pChareID;
   
   if (GetID_isBOC((*pChareID)))
     GeneralSendMsgBranch(Entry, Msg, 
-			 GetID_onPE((*pChareID)), USERcat, BocMsg, GetID_boc_num((*pChareID)));
+			 GetID_onPE((*pChareID)), BocMsg, GetID_boc_num((*pChareID)));
   else
     {
       int destPE = GetID_onPE((*pChareID));
@@ -411,14 +408,12 @@ ChareIDType * pChareID;
 	  SetEnv_chare_magic_number(env,
 				    GetID_chare_magic_number((*pChareID)));
 	  QDCountThisCreation(Entry, USERcat, ForChareMsg, 1);
-	  
 	}
       else 
 	{
 	  SetEnv_msgType(env, VidEnqueueMsg);
 	  SetEnv_vidBlockPtr(env, (int) GetID_vidBlockPtr((*pChareID)));
-	  QDCountThisCreation(VidQueueUpInVidBlock_EP,
-			      IMMEDIATEcat, VidEnqueueMsg, 1);
+	  QDCountThisCreation(0, IMMEDIATEcat, VidEnqueueMsg, 1);
 	}
       trace_creation(GetEnv_msgType(env), Entry, env);
       CkCheck_and_Send(destPE, env);

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.6  1995-07-25 00:29:31  jyelon
+ * Revision 2.7  1995-07-27 20:29:34  jyelon
+ * Improvements to runtime system, general cleanup.
+ *
+ * Revision 2.6  1995/07/25  00:29:31  jyelon
  * *** empty log message ***
  *
  * Revision 2.5  1995/07/24  01:54:40  jyelon
@@ -101,7 +104,7 @@ typedef struct envelope {
   unsigned int   TotalSize; /* total size of message, in bytes */
 
   unsigned short s_tag1;  /* vidPE OR ref OR other_id */
-  unsigned short s_tag2;  /* dataMag OR chare_magic_number */
+  unsigned short s_tag2;  /* chare_magic_number */
 
   unsigned short EP;      /* entry point to call */
   unsigned short priosize;/* priority length, measured in bits */
@@ -153,12 +156,6 @@ typedef struct envelope {
 
 #define GetEnv_chare_magic_number(e)	(env(e)->s_tag2)
 #define SetEnv_chare_magic_number(e,x)  (env(e)->s_tag2=(x))
-
-#define GetEnv_dataMag(e)               (env(e)->s_tag2)
-#define SetEnv_dataMag(e,x)             (env(e)->s_tag2=(x))
-
-#define GetEnv_chareIndex(e)            (env(e)->s_tag2)
-#define SetEnv_chareIndex(e,x)          (env(e)->s_tag2=(x))
 
 /*********************************************************/
 /** These fields share a byte.                           */

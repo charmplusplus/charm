@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.4  1995-07-24 01:54:40  jyelon
+ * Revision 2.5  1995-07-27 20:29:34  jyelon
+ * Improvements to runtime system, general cleanup.
+ *
+ * Revision 2.4  1995/07/24  01:54:40  jyelon
  * *** empty log message ***
  *
  * Revision 2.3  1995/07/07  02:04:59  narain
@@ -48,7 +51,6 @@
 #define CHARE 		53
 #define BOC 		35
 
-/* Used to find which Language an EP is of by EpLanguageTable */
 #define CHARM 		0
 #define CHARMPLUSPLUS 	1
 
@@ -76,20 +78,29 @@
 
 #ifdef STRIP
 #define _CK_BroadcastMsgBranch(ep,msg,boc)  GeneralBroadcastMsgBranch(ep,msg,\
-					IMMEDIATEcat,ImmBroadcastBocMsg,boc)
+					ImmBroadcastBocMsg,boc)
 #define _CK_SendMsgBranch(ep,msg,boc,pe)	GeneralSendMsgBranch(ep,msg,pe,\
-					IMMEDIATEcat,ImmBocMsg,boc)
+					ImmBocMsg,boc)
 #else
 #define _CK_BroadcastMsgBranch(ep,msg,boc)  GeneralBroadcastMsgBranch(ep,msg,\
-					USERcat,BroadcastBocMsg,boc)
+					BroadcastBocMsg,boc)
 #define _CK_SendMsgBranch(ep,msg,boc,pe)	GeneralSendMsgBranch(ep,msg,pe,\
-					USERcat,BocMsg,boc)
+					BocMsg,boc)
 #endif
 #define _CK_ImmSendMsgBranch(ep,msg,boc,pe)	GeneralSendMsgBranch(ep,msg,pe,\
-					IMMEDIATEcat,ImmBocMsg,boc)
+					ImmBocMsg,boc)
 
 #define VOIDFNPTR			FUNCTION_PTR
 
+typedef struct ep_struct {
+    char *name;
+    FUNCTION_PTR function;
+    int language;
+    int messageindex;
+    int chareindex;
+    int chare_or_boc;
+} EP_STRUCT;
+        
 typedef struct msg_struct {
 	int size;
 	FUNCTION_PTR packfn;

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.2  1995-07-24 01:54:40  jyelon
+ * Revision 2.3  1995-07-27 20:29:34  jyelon
+ * Improvements to runtime system, general cleanup.
+ *
+ * Revision 2.2  1995/07/24  01:54:40  jyelon
  * *** empty log message ***
  *
  * Revision 2.1  1995/06/08  17:07:12  gursoy
@@ -94,8 +97,8 @@ TRACE(CmiPrintf("[%d]:: NodeWrtOnceVar...Ack to Host for wovID %d\n",
 TRACE(CmiPrintf("[%d]:: NodeWrtOnceVar...Ack to Parent %d for wovID %d\n",
 			    CmiMyPe(), CmiSpanTreeParent(CmiMyPe()),
 			    ackMsg->wovID);)
-			GeneralSendMsgBranch(NodeRcvAck_EP, ackMsg, 
-				 CmiSpanTreeParent(CmiMyPe()), IMMEDIATEcat,
+			GeneralSendMsgBranch(CsvAccess(CkEp_WOV_RcvAck), ackMsg, 
+				 CmiSpanTreeParent(CmiMyPe()),
 				 ImmBocMsg, WOVBocNum);
 		}
 	}
@@ -129,8 +132,8 @@ TRACE(CmiPrintf("[%d]:: NodeRecvAck...wovID = %d, kids left = %d\n",
 		if(CmiMyPe() == CmiSpanTreeRoot())
 			    HostReceiveAcknowledge(ackMsg, bocData);
 		else
-			    GeneralSendMsgBranch(NodeRcvAck_EP, ackMsg, 
-				CmiSpanTreeParent(CmiMyPe()), IMMEDIATEcat,
+			    GeneralSendMsgBranch(CsvAccess(CkEp_WOV_RcvAck), ackMsg, 
+				CmiSpanTreeParent(CmiMyPe()),
 				ImmBocMsg, WOVBocNum);
 	}
 	else 
@@ -190,8 +193,8 @@ void *msgptr_,*localdataptr_;
 TRACE(CmiPrintf("Host::  HostAddWriteOnceVar...wovID %d, size %d\n",
 			msgForNodes->wovID, newWov->wovSize);)
 
-	GeneralBroadcastMsgBranch(NodeAddWOV_EP, msgForNodes,
-			IMMEDIATEcat, ImmBroadcastBocMsg, WOVBocNum);
+	GeneralBroadcastMsgBranch(CsvAccess(CkEp_WOV_AddWOV), msgForNodes,
+			ImmBroadcastBocMsg, WOVBocNum);
 
 	localBocData->numWOVs++;            /* weve got one more wov */
 }
@@ -256,16 +259,28 @@ ChareIDType    cid;
 	if (CmiMyPe() == 0)
 		HostAddWriteOnceVar(newWov,GetBocDataPtr(WOVBocNum));
 	else
-		GeneralSendMsgBranch(HostAddWOV_EP, newWov,
-		    0, IMMEDIATEcat, ImmBocMsg, WOVBocNum);
+		GeneralSendMsgBranch(CkEp_WOV_HostAddWOV, newWov,
+		    0, ImmBocMsg, WOVBocNum);
 }
 
 
 WOVAddSysBocEps()
 {
-	CsvAccess(EpTable)[NodeAddWOV_EP] = (FUNCTION_PTR) NodeAddWriteOnceVar;
-	CsvAccess(EpTable)[NodeRcvAck_EP]=(FUNCTION_PTR) NodeReceiveAcknowledge;
-	CsvAccess(EpTable)[HostAddWOV_EP] = (FUNCTION_PTR) HostAddWriteOnceVar;
-	CsvAccess(EpTable)[HostRcvAck_EP]=(FUNCTION_PTR) HostReceiveAcknowledge;
+  CsvAccess(CkEp_WOV_AddWOV) =
+    registerBocEp("CkEp_WOV_AddWOV",
+		  NodeAddWriteOnceVar,
+		  CHARM, 0, 0);
+  CsvAccess(CkEp_WOV_RcvAck) =
+    registerBocEp("CkEp_WOV_RcvAck",
+		  NodeReceiveAcknowledge,
+		  CHARM, 0, 0);
+  CsvAccess(CkEp_WOV_HostAddWOV) =
+    registerBocEp("CkEp_WOV_HostAddWOV",
+		  HostAddWriteOnceVar,
+		  CHARM, 0, 0);
+  CsvAccess(CkEp_WOV_HostRcvAck) =
+    registerBocEp("CkEp_WOV_HostRcvAck",
+		  HostReceiveAcknowledge,
+		  CHARM, 0, 0);
 }
 

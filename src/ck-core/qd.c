@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.2  1995-07-07 14:10:01  gursoy
+ * Revision 1.3  1995-07-27 20:29:34  jyelon
+ * Improvements to runtime system, general cleanup.
+ *
+ * Revision 1.2  1995/07/07  14:10:01  gursoy
  * eplanguage table fro qd enrypints is filled
  *
  * Revision 1.1  1995/06/14  19:35:24  gursoy
@@ -228,9 +231,9 @@ ChareIDType *chareid;
 	if (CmiMyPe() == 0)
 		InsertQuiescenceList(msg, NULL);
 	else
-                GeneralSendMsgBranch(QDInsertQuiescenceList_EP,
+                GeneralSendMsgBranch(CsvAccess(CkEp_QD_InsertQuiescenceList),
                                 msg, 0,
-                                IMMEDIATEcat, QdBocMsg, QDBocNum);
+                                QdBocMsg, QDBocNum);
 
 }
 
@@ -344,9 +347,9 @@ TRACE(CmiPrintf("Inside sendUpI\n"));
 		else {
 			TRACE(CmiPrintf("Nd[%d] sendUpI() sndng endPhaseI msg up to nd[%d]\n",
 			    CpvAccess(myPe),CpvAccess(parentPe)));
-			GeneralSendMsgBranch(QDPhaseIMsg_EP,
+			GeneralSendMsgBranch(CsvAccess(CkEp_QD_PhaseIMsg),
 				msg1, CpvAccess(parentPe),
-				IMMEDIATEcat, QdBocMsg, QDBocNum);
+				QdBocMsg, QDBocNum);
 		}
 		return(1); /* inform the conditional-wait manager that the cond.
 				                     is satisfied, (and so should be removed from the Q) */
@@ -424,9 +427,9 @@ int bocNum;
 		else {                       /* not the root, pass it up */
 			TRACE(CmiPrintf("sendUpII node[%d]sending endPhaseII msg up to nd[%d]\n",
 			    CpvAccess(myPe),CmiSpanTreeParent(CpvAccess(myPe))));
-			GeneralSendMsgBranch(QDPhaseIIMsg_EP,
+			GeneralSendMsgBranch(CsvAccess(CkEp_QD_PhaseIIMsg),
 			    	msg2, CpvAccess(parentPe),
-				IMMEDIATEcat, QdBocMsg, QDBocNum);
+				QdBocMsg, QDBocNum);
 		}
 		return(1); /* inform the cond.-wait manager that the cond. stsfd */
 	}
@@ -447,9 +450,9 @@ void StartPhaseI()
 
 	msg1 = (PhaseIMSG *)  CkAllocMsg(sizeof(PhaseIMSG));
 	CkMemError(msg1);
-	ep   = QDPhaseIBroadcast_EP;
+	ep   = CsvAccess(CkEp_QD_PhaseIBroadcast);
 
-	GeneralBroadcastMsgBranch(ep, msg1, IMMEDIATEcat, 
+	GeneralBroadcastMsgBranch(ep, msg1,
 			QdBroadcastBocMsg, QDBocNum);
 }
 
@@ -488,12 +491,12 @@ int bocNum;
 	TRACE(CmiPrintf("Host: starting PhaseII at T=[%d]\n",CkTimer()));
 	CpvAccess(HostQDdirty) = 0;
 
-	ep   = QDPhaseIIBroadcast_EP;
+	ep   = CsvAccess(CkEp_QD_PhaseIIBroadcast);
 	msg2 = (PhaseIIMSG *) CkAllocMsg(sizeof(PhaseIIMSG));
 	CkMemError(msg2);
 
 	GeneralBroadcastMsgBranch(ep, msg2, 
-		IMMEDIATEcat, QdBroadcastBocMsg, QDBocNum);
+		QdBroadcastBocMsg, QDBocNum);
 }
 
 
@@ -535,16 +538,28 @@ here we set up the entry points so we can call our boc ep functions
 ****************************************************************************/
 void QDAddSysBocEps()
 {
-        CsvAccess(EpTable)[QDInit_EP]   = (FUNCTION_PTR) QDBocInit;
-        CsvAccess(EpLanguageTable)[QDInit_EP] = CHARM;
-        CsvAccess(EpTable)[QDInsertQuiescenceList_EP] = (FUNCTION_PTR) InsertQuiescenceList;
-        CsvAccess(EpLanguageTable)[QDInsertQuiescenceList_EP] = CHARM;
-        CsvAccess(EpTable)[QDPhaseIBroadcast_EP] = (FUNCTION_PTR) PhaseIBroadcast;
-        CsvAccess(EpLanguageTable)[QDPhaseIBroadcast_EP] = CHARM;
-        CsvAccess(EpTable)[QDPhaseIMsg_EP] = (FUNCTION_PTR) HandlePhaseIMsg;
-        CsvAccess(EpLanguageTable)[QDPhaseIMsg_EP] = CHARM;
-        CsvAccess(EpTable)[QDPhaseIIBroadcast_EP] = (FUNCTION_PTR) PhaseIIBroadcast;
-        CsvAccess(EpLanguageTable)[QDPhaseIIBroadcast_EP] = CHARM;
-        CsvAccess(EpTable)[QDPhaseIIMsg_EP] = (FUNCTION_PTR) HandlePhaseIIMsg;
-        CsvAccess(EpLanguageTable)[QDPhaseIIMsg_EP] = CHARM;
+    CsvAccess(CkEp_QD_Init) =
+      registerBocEp("CkEp_QD_Init", 
+		 QDBocInit,
+		 CHARM, 0, 0);
+    CsvAccess(CkEp_QD_InsertQuiescenceList) =
+      registerBocEp("CkEp_QD_InsertQuiescenceList",
+		 InsertQuiescenceList,
+		 CHARM, 0, 0);
+    CsvAccess(CkEp_QD_PhaseIBroadcast) =
+      registerBocEp("CkEp_QD_PhaseIBroadcast",
+		 PhaseIBroadcast, 
+		 CHARM, 0, 0);
+    CsvAccess(CkEp_QD_PhaseIMsg) =
+      registerBocEp("CkEp_QD_PhaseIMsg",
+		 HandlePhaseIMsg, 
+		 CHARM, 0, 0);
+    CsvAccess(CkEp_QD_PhaseIIBroadcast) =
+      registerBocEp("CkEp_QD_PhaseIIBroadcast",
+		 PhaseIIBroadcast, 
+		 CHARM, 0, 0);
+    CsvAccess(CkEp_QD_PhaseIIMsg) =
+      registerBocEp("CkEp_QD_PhaseIIMsg",
+		 HandlePhaseIIMsg, 
+		 CHARM, 0, 0);
 }

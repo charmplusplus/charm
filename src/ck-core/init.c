@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.10  1995-07-24 01:54:40  jyelon
+ * Revision 2.11  1995-07-27 20:29:34  jyelon
+ * Improvements to runtime system, general cleanup.
+ *
+ * Revision 2.10  1995/07/24  01:54:40  jyelon
  * *** empty log message ***
  *
  * Revision 2.9  1995/07/22  23:44:13  jyelon
@@ -239,9 +242,10 @@ char **argv;
 			CpvAccess(NumReadMsg) = 0;
 			CpvAccess(InsideDataInit) = 1;
 
-			(CsvAccess(EpTable)[CsvAccess(_CK_MainEpIndex)]) (NULL, 
-                                    CpvAccess(currentChareBlock) + 1,
-				    CpvAccess(userArgc), CpvAccess(userArgv));
+			(CsvAccess(EpInfoTable)[CsvAccess(_CK_MainEpIndex)].function)
+			  (NULL, 
+			   CpvAccess(currentChareBlock) + 1,
+			   CpvAccess(userArgc), CpvAccess(userArgv));
 			CpvAccess(InsideDataInit) = 0;
 		}
 		trace_end_charminit();
@@ -354,33 +358,33 @@ CharmInitLoop()
 	case BroadcastBocMsg:
 	case ImmBroadcastBocMsg:
 	case QdBroadcastBocMsg:      
-	  CmiSetHandler(envelope,CsvAccess(CkProcess_BocMsg_Index));
+	  CmiSetHandler(envelope,CsvAccess(CkProcIdx_BocMsg));
 	  CkEnqueue(envelope);
 	  break;
 
 	case NewChareNoBalanceMsg:
 	case NewChareMsg:
-	  CmiSetHandler(envelope,CsvAccess(CkProcess_NewChareMsg_Index));
+	  CmiSetHandler(envelope,CsvAccess(CkProcIdx_NewChareMsg));
 	  CkEnqueue(envelope);
 	  break;
 	  
 	case ForChareMsg:
-	  CmiSetHandler(envelope,CsvAccess(CkProcess_ForChareMsg_Index));
+	  CmiSetHandler(envelope,CsvAccess(CkProcIdx_ForChareMsg));
 	  CkEnqueue(envelope);
 	  break;
 	  
 	case DynamicBocInitMsg:
-	  CmiSetHandler(envelope,CsvAccess(CkProcess_DynamicBocInitMsg_Index));
+	  CmiSetHandler(envelope,CsvAccess(CkProcIdx_DynamicBocInitMsg));
 	  CkEnqueue(envelope);
 	  break;
 	  
 	case VidSendOverMsg:
-	  CmiSetHandler(envelope,CsvAccess(CkProcess_VidSendOverMsg_Index));
+	  CmiSetHandler(envelope,CsvAccess(CkProcIdx_VidSendOverMsg));
 	  CkEnqueue(envelope);
 	  break;
 	  
 	case VidEnqueueMsg:
-	  CmiSetHandler(envelope,CsvAccess(CkProcess_VidEnqueueMsg_Index));
+	  CmiSetHandler(envelope,CsvAccess(CkProcIdx_VidEnqueueMsg));
 	  CkEnqueue(envelope);
 	  break;
 	  
@@ -407,31 +411,30 @@ CharmInitLoop()
 ProcessBocInitMsg(envelope)
 ENVELOPE       *envelope;
 {
-	BOC_BLOCK      *bocBlock;
-	void           *usrMsg = USER_MSG_PTR(envelope);
-	int             current_ep = GetEnv_EP(envelope);
-	int             executing_boc_num = GetEnv_boc_num(envelope);
-	int             current_msgType = GetEnv_msgType(envelope);
-	if (IsCharmPlus(current_ep))
-	{			/* Charm++ BOC */
-		CPlus_ProcessBocInitMsg(envelope, usrMsg, executing_boc_num, 
-					current_msgType, current_ep);
-	}
-	else
-	{
-		bocBlock = (BOC_BLOCK *) CreateBocBlock
-			(magnitude_to_bytes(GetEnv_dataMag(envelope)));
-		bocBlock->boc_num = executing_boc_num;
-		SetBocDataPtr(executing_boc_num, (void *) (bocBlock + 1));
-		trace_begin_execute(envelope);
-		(*(CsvAccess(EpTable)[current_ep]))
-			(usrMsg, GetBocDataPtr(executing_boc_num));
-		trace_end_execute(executing_boc_num, current_msgType,
-				  current_ep);
-	}
+  BOC_BLOCK      *bocBlock;
+  void           *usrMsg = USER_MSG_PTR(envelope);
+  int             current_ep = GetEnv_EP(envelope);
+  EP_STRUCT      *current_epinfo = CsvAccess(EpInfoTable) + current_ep;
+  int             current_bocnum = GetEnv_boc_num(envelope);
+  int             current_msgType = GetEnv_msgType(envelope);
+  int             current_chare = current_epinfo->chareindex;
 
-	/* for dynamic BOC creation, used in node_main.c */
-	return executing_boc_num ;
+  if (current_epinfo->language == CHARMPLUSPLUS)
+    CPlus_ProcessBocInitMsg(envelope, usrMsg, current_bocnum, 
+			    current_msgType, current_ep);
+  else
+    {
+      bocBlock = (BOC_BLOCK *)CreateBocBlock
+                    (CsvAccess(ChareSizesTable)[current_chare]);
+      bocBlock->boc_num = current_bocnum;
+      SetBocDataPtr(current_bocnum, (void *) (bocBlock + 1));
+      trace_begin_execute(envelope);
+      (current_epinfo->function)(usrMsg, GetBocDataPtr(current_bocnum));
+      trace_end_execute(current_bocnum, current_msgType, current_ep);
+    }
+
+  /* for dynamic BOC creation, used in node_main.c */
+  return current_bocnum ;
 }
 
 
@@ -526,7 +529,7 @@ InitializeEPTables()
   int             TotalModules;
   int             TotalReadMsgs;
   int             TotalPseudos;
-  
+  EP_STRUCT      *epinfo;
   
   /*
    * TotalEps 	=  _CK_5mainChareEPCount(); TotalFns	=
@@ -565,41 +568,14 @@ InitializeEPTables()
       CkMemError(CsvAccess(ROCopyToBufferTable));
     }
   
-  CsvAccess(EpTable) = (FUNCTION_PTR *) 
-    CmiSvAlloc((TotalEps + 1) * sizeof(FUNCTION_PTR));
-  
-  CsvAccess(EpIsImplicitTable) = (int *) 
-    CmiSvAlloc((TotalEps + 1) * sizeof(int));
-  
-  CsvAccess(EpLanguageTable) = (int *) 
-    CmiSvAlloc((TotalEps + 1) * sizeof(int));
-  
-  for (i = 0; i < TotalEps + 1; i++)
-    CsvAccess(EpIsImplicitTable)[i] = 0;
-  
-  CsvAccess(EpNameTable) = (char **) CmiSvAlloc((TotalEps + 1) * sizeof(char *));
-  CsvAccess(EpChareTable) = (int *) CmiSvAlloc((TotalEps + 1) * sizeof(int));
-  CsvAccess(EpToMsgTable) = (int *) CmiSvAlloc((TotalEps + 1) * sizeof(int));
-  CsvAccess(EpChareTypeTable) = (int *) CmiSvAlloc((TotalEps + 1) * sizeof(int));
-  
-  if (TotalEps > 0)
-    {
-      CkMemError(CsvAccess(EpTable));
-      CkMemError(CsvAccess(EpIsImplicitTable));
-      CkMemError(CsvAccess(EpLanguageTable));
-      CkMemError(CsvAccess(EpNameTable));
-      CkMemError(CsvAccess(EpChareTable));
-      CkMemError(CsvAccess(EpToMsgTable));
-      CkMemError(CsvAccess(EpChareTypeTable));
-    }
-  
-  /*
-   * set all the system BOC EPs to be CHARM bocs because they dont get
-   * registered in the normal way
-   */
-  for (i = 0; i < CpvAccess(chareEpsCount); i++)
-    CsvAccess(EpLanguageTable)[i] = -1;
-  
+  epinfo=(EP_STRUCT*)CmiSvAlloc((TotalEps+1)*sizeof(EP_STRUCT));
+  CsvAccess(EpInfoTable)=epinfo;
+  if (TotalEps > 0) {
+    CkMemError(epinfo);
+    memset((char *)epinfo, 0, (TotalEps+1)*sizeof(EP_STRUCT));
+    for (i = 0; i < CpvAccess(chareEpsCount); i++)
+      epinfo[i].language = -1;
+  }
   
   _CK_9_GlobalFunctionTable = (FUNCTION_PTR *) 
     CmiSvAlloc((TotalFns + 1) * sizeof(FUNCTION_PTR));
@@ -648,8 +624,10 @@ InitializeEPTables()
   registerTable("NULLTABLE",_CkNullFunc,_CkNullFunc) ;
   registerAccumulator("NULLACC",_CkNullFunc,_CkNullFunc,_CkNullFunc,CHARM) ;
   
-  CpvAccess(chareEpsCount) += AddSysBocEps();
-  
+  /* Register all the built-in BOC's */
+  AddSysBocEps();
+  NumSysBocEps = chareEpsCount;
+
   /*
    * This is the top level call to all modules for initialization. It
    * is generated at link time by charmc, in module_init_fn.c
@@ -663,17 +641,17 @@ InitializeEPTables()
   /* Register the Charm handlers with Converse */
   CsvAccess(HANDLE_INCOMING_MSG_Index)
     = CmiRegisterHandler(HANDLE_INCOMING_MSG) ;
-  CsvAccess(CkProcess_ForChareMsg_Index)
+  CsvAccess(CkProcIdx_ForChareMsg)
     = CmiRegisterHandler(CkProcess_ForChareMsg);
-  CsvAccess(CkProcess_DynamicBocInitMsg_Index)
+  CsvAccess(CkProcIdx_DynamicBocInitMsg)
     = CmiRegisterHandler(CkProcess_DynamicBocInitMsg);
-  CsvAccess(CkProcess_NewChareMsg_Index)
+  CsvAccess(CkProcIdx_NewChareMsg)
     = CmiRegisterHandler(CkProcess_NewChareMsg);
-  CsvAccess(CkProcess_BocMsg_Index)
+  CsvAccess(CkProcIdx_BocMsg)
     = CmiRegisterHandler(CkProcess_BocMsg);
-  CsvAccess(CkProcess_VidEnqueueMsg_Index)
+  CsvAccess(CkProcIdx_VidEnqueueMsg)
     = CmiRegisterHandler(CkProcess_VidEnqueueMsg);
-  CsvAccess(CkProcess_VidSendOverMsg_Index)
+  CsvAccess(CkProcIdx_VidSendOverMsg)
     = CmiRegisterHandler(CkProcess_VidSendOverMsg);
   
   /* set all the "Total" variables so that the rest of the modules work */
@@ -700,8 +678,6 @@ AddSysBocEps()
 	MonoAddSysBocEps();
 	DynamicAddSysBocEps();
 	StatAddSysBocEps();
-
-	return (NumSysBocEps);	/* number of system boc-eps */
 }
 
 
@@ -788,7 +764,6 @@ ENVELOPE *DeQueueBocInitMsgs()
 SysBocInit()
 {
 	QDBocInit();
-	VidBocInit();
 	TblBocInit();
 	WOVBocInit();
 	DynamicBocInit();

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.4  1995-07-24 01:54:40  jyelon
+ * Revision 2.5  1995-07-27 20:29:34  jyelon
+ * Improvements to runtime system, general cleanup.
+ *
+ * Revision 2.4  1995/07/24  01:54:40  jyelon
  * *** empty log message ***
  *
  * Revision 2.3  1995/07/22  23:45:15  jyelon
@@ -316,8 +319,8 @@ TRACE(CmiPrintf("[%d] Pack:: size_chareid=%d, total_size=%d\n",
 		structure_copy(ptr, option, size);
 	TRACE(CmiPrintf("Pack :: sending key %d to penum %d\n", 
 			*((int *) key), penum));
-		GeneralSendMsgBranch(TblUnpack_EP, original,
-				penum, IMMEDIATEcat, ImmBocMsg, TblBocNum);
+		GeneralSendMsgBranch(CsvAccess(CkEp_Tbl_Unpack), original,
+				penum, ImmBocMsg, TblBocNum);
 	}
 }
 
@@ -609,5 +612,8 @@ TRACE(CmiPrintf("[%d] TblFind: Sent message.\n"));
 
 TblAddSysBocEps()
 {
-   	CsvAccess(EpTable)[TblUnpack_EP] = (FUNCTION_PTR) Unpack;
+  CsvAccess(CkEp_Tbl_Unpack) =
+    registerBocEp("CkEp_Tbl_Unpack",
+		  Unpack,
+		  CHARM, 0, 0);
 }

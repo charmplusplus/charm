@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.2  1995-07-24 01:54:40  jyelon
+ * Revision 2.3  1995-07-27 20:29:34  jyelon
+ * Improvements to runtime system, general cleanup.
+ *
+ * Revision 2.2  1995/07/24  01:54:40  jyelon
  * *** empty log message ***
  *
  * Revision 2.1  1995/06/08  17:07:12  gursoy
@@ -53,14 +56,14 @@ char *initmsg;
 EntryPointType ReturnEP;
 ChareIDType *ReturnID;
 {
-	int boc;
-	ENVELOPE *env = (ENVELOPE  *) ENVELOPE_UPTR(initmsg);
-
-	SetEnv_other_id(env, id);
-    	boc = GeneralCreateBoc(sizeof(MONO_DATA), MONO_BranchInit_EP,
-			 initmsg,  ReturnEP, ReturnID);
-TRACE(CmiPrintf("[%d] CreateMono: boc = %d\n", CmiMyPe(), boc));
-	return(boc);
+  int boc;
+  ENVELOPE *env = (ENVELOPE  *) ENVELOPE_UPTR(initmsg);
+  
+  SetEnv_other_id(env, id);
+  boc=CreateBoc(CsvAccess(CkChare_MONO), CsvAccess(CkEp_MONO_BranchInit),
+		initmsg,  ReturnEP, ReturnID);
+  TRACE(CmiPrintf("[%d] CreateMono: boc = %d\n", CmiMyPe(), boc));
+  return(boc);
 }
 
 
@@ -109,13 +112,6 @@ MONO_DATA *mydata;
 
 
 
-MonoAddSysBocEps()
-{
-	EpTable[MONO_BranchInit_EP] = MONO_BranchInit_Fn;
-	EpTable[MONO_BranchUpdate_EP] = MONO_BranchUpdate_Fn;
-}
-
-
 void * _CK_9GetMonoDataPtr(monodata)
 MONO_DATA *monodata;
 {
@@ -144,6 +140,24 @@ int bocnum ;
 	char *tmsg;
 
 	tmsg = (char *) CkCopyMsg(msg);
-	GeneralBroadcastMsgBranch(MONO_BranchUpdate_EP,
-			tmsg,	IMMEDIATEcat, ImmBroadcastBocMsg, bocnum) ;
+	GeneralBroadcastMsgBranch(CsvAccess(CkEp_MONO_BranchUpdate),
+			tmsg,	ImmBroadcastBocMsg, bocnum) ;
 }
+
+
+MonoAddSysBocEps()
+{
+  CsvAccess(CkChare_MONO) =
+    registerChare("CkChare_MONO",sizeof(MONO_DATA),NULL);
+
+  CsvAccess(CkEp_MONO_BranchInit) =
+    registerBocEp("CkEp_MONO_BranchInit",
+		  MONO_BranchInit_Fn,
+		  CHARM, 0, CsvAccess(CkChare_MONO));
+  CsvAccess(CkEp_MONO_BranchUpdate) =
+    registerBocEp("CkEp_MONO_BranchUpdate",
+		  MONO_BranchUpdate_Fn,
+		  CHARM, 0, CsvAccess(CkChare_MONO));
+}
+
+

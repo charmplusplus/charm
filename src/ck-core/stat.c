@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.5  1995-07-24 01:54:40  jyelon
+ * Revision 2.6  1995-07-27 20:29:34  jyelon
+ * Improvements to runtime system, general cleanup.
+ *
+ * Revision 2.5  1995/07/24  01:54:40  jyelon
  * *** empty log message ***
  *
  * Revision 2.4  1995/07/06  22:42:11  narain
@@ -119,8 +122,8 @@ TRACE(CmiPrintf("Node %d: Enter NodeCollectStatistics() \n", CmiMyPe()));
 	for (i=0; i < MAXMEMSTAT; i++)
 		sPtr->nodeMemStat[i] = CstatMemory(i);
 
-	GeneralSendMsgBranch(StatCollectNodes_EP, sPtr, 
-		0, USERcat, BocMsg, StatisticBocNum);
+	GeneralSendMsgBranch(CsvAccess(CkEp_Stat_CollectNodes), sPtr, 
+		0, BocMsg, StatisticBocNum);
 }
 
 
@@ -133,8 +136,8 @@ CollectStatistics()
 	TRACE(CmiPrintf("Host: Enter CollectStatistics(): and Call BroadcastMsgBranch()\n"));
 	mPtr = (DUMMY_STAT_MSG *) CkAllocMsg(sizeof(DUMMY_STAT_MSG));
 	CkMemError(mPtr);
-	GeneralBroadcastMsgBranch(StatData_EP, mPtr,
-				 IMMEDIATEcat, ImmBroadcastBocMsg,
+	GeneralBroadcastMsgBranch(CsvAccess(CkEp_Stat_Data), mPtr,
+				 ImmBroadcastBocMsg,
                                  StatisticBocNum);
 }
 
@@ -290,16 +293,26 @@ PrintOutStatistics()
 
 StatAddSysBocEps()
 {
-	extern BroadcastExitMessage(), ExitMessage();
+  extern BroadcastExitMessage(), ExitMessage();
 
-	CsvAccess(EpTable)[StatCollectNodes_EP] = CollectFromNodes;
-	CsvAccess(EpLanguageTable)[StatCollectNodes_EP] = CHARM;
-	CsvAccess(EpTable)[StatData_EP] = NodeCollectStatistics;
-	CsvAccess(EpLanguageTable)[StatData_EP] = CHARM;
-	CsvAccess(EpTable)[StatPerfCollectNodes_EP] = CollectPerfFromNodes;
-	CsvAccess(EpLanguageTable)[StatPerfCollectNodes_EP] = CHARM;
-	CsvAccess(EpTable)[StatBroadcastExitMessage_EP] = BroadcastExitMessage;
-	CsvAccess(EpLanguageTable)[StatBroadcastExitMessage_EP] = CHARM;
-	CsvAccess(EpTable)[StatExitMessage_EP] = ExitMessage;
-	CsvAccess(EpLanguageTable)[StatExitMessage_EP] = CHARM;
+  CsvAccess(CkEp_Stat_CollectNodes)=
+    registerBocEp("CkEp_Stat_CollectNodes",
+		  CollectFromNodes,
+		  CHARM, 0, 0);
+  CsvAccess(CkEp_Stat_Data)=
+    registerBocEp("CkEp_Stat_Data",
+		  NodeCollectStatistics,
+		  CHARM, 0, 0);
+  CsvAccess(CkEp_Stat_PerfCollectNodes)=
+    registerBocEp("CkEp_Stat_PerfCollectNodes",
+		  CollectPerfFromNodes,
+		  CHARM, 0, 0);
+  CsvAccess(CkEp_Stat_BroadcastExitMessage)=
+    registerBocEp("CkEp_Stat_BroadcastExitMessage",
+		  BroadcastExitMessage,
+		  CHARM, 0, 0);
+  CsvAccess(CkEp_Stat_ExitMessage)=
+    registerBocEp("CkEp_Stat_ExitMessage",
+		  ExitMessage,
+		  CHARM, 0, 0);
 }

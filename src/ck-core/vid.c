@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.5  1995-07-24 01:54:40  jyelon
+ * Revision 2.6  1995-07-27 20:29:34  jyelon
+ * Improvements to runtime system, general cleanup.
+ *
+ * Revision 2.5  1995/07/24  01:54:40  jyelon
  * *** empty log message ***
  *
  * Revision 2.4  1995/07/22  23:45:15  jyelon
@@ -57,17 +60,6 @@ EpLanguageTable to be indexed by 65535 in CallProcessMsg.
 #include "globals.h"
 #include "performance.h"
 #include "vid.h"
-
-
-VidBocInit()
-{
-    BOC_BLOCK *bocBlock;
-
-    bocBlock = (BOC_BLOCK *) CreateBocBlock(sizeof(DATA_BR_VID));
-    bocBlock->boc_num = VidBocNum;
-    SetBocDataPtr(VidBocNum, (void *) (bocBlock + 1));
-}
-
 
 
 /************************************************************************/
@@ -136,7 +128,7 @@ void *data_area;
 	SetEnv_chareBlockPtr(env, chare_block);
 	SetEnv_chare_magic_number(env, chare_magic);
 	trace_creation(GetEnv_msgType(env), GetEnv_EP(env), env);
-	CkCheck_and_Send(vidblock->vidPenum, env);
+	CkCheck_and_Send(chare_pe, env);
 	QDCountThisCreation(GetEnv_EP(env), USERcat, ForChareMsg, 1);
    }
    vidblock->vidPenum = chare_pe;
@@ -147,8 +139,6 @@ void *data_area;
 
 VidAddSysBocEps()
 {
-   CsvAccess(EpTable)[VidQueueUpInVidBlock_EP] = VidQueueUpInVidBlock;
-   CsvAccess(EpTable)[VidSendOverMessages_EP] = VidSendOverMessages;
 }
 
 
@@ -175,7 +165,7 @@ VID_BLOCK *vidPtr;
     SetEnv_EP(env, 0);
 
 
-    QDCountThisCreation(VidSendOverMessages_EP, IMMEDIATEcat, VidSendOverMsg, 1);
+    QDCountThisCreation(0, IMMEDIATEcat, VidSendOverMsg, 1);
     trace_creation(GetEnv_msgType(env), GetEnv_EP(env), env);
     CkCheck_and_Send(destPE, env);
 }

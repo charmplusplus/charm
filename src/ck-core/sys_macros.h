@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.2  1995-07-22 23:45:15  jyelon
+ * Revision 2.3  1995-07-27 20:29:34  jyelon
+ * Improvements to runtime system, general cleanup.
+ *
+ * Revision 2.2  1995/07/22  23:45:15  jyelon
  * *** empty log message ***
  *
  * Revision 2.1  1995/06/08  17:07:12  gursoy
@@ -34,9 +37,9 @@
  * Initial revision
  *
  ***************************************************************************/
-/* #define IsCharmPlus(Entry) (Entry & 0xffff8000)	*/
 
-#define IsCharmPlus(Entry) (CsvAccess(EpLanguageTable)[Entry]==CHARMPLUSPLUS)
+#define IsCharmPlus(Entry)\
+    (CsvAccess(EpInfoTable)[Entry].language==CHARMPLUSPLUS)
 
 #define IsCharmPlusPseudo(id) (CsvAccess(PseudoTable)[id].language==CHARMPLUSPLUS)
 

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.10  1995-07-25 00:29:31  jyelon
+ * Revision 2.11  1995-07-27 20:29:34  jyelon
+ * Improvements to runtime system, general cleanup.
+ *
+ * Revision 2.10  1995/07/25  00:29:31  jyelon
  * *** empty log message ***
  *
  * Revision 2.9  1995/07/24  01:54:40  jyelon
@@ -92,16 +95,8 @@ static char ident[] = "@(#)$Header$";
 
 /* This is the "processMsg()" for Charm and Charm++ */
 
-CsvDeclare(int, CkProcess_ForChareMsg_Index);
-CsvDeclare(int, CkProcess_DynamicBocInitMsg_Index);
-CsvDeclare(int, CkProcess_NewChareMsg_Index);
-CsvDeclare(int, CkProcess_BocMsg_Index);
-CsvDeclare(int, CkProcess_VidEnqueueMsg_Index);
-CsvDeclare(int, CkProcess_VidSendOverMsg_Index);
-
 /* This is the "handleMsg()" for Charm and Charm++ */
 int HANDLE_INCOMING_MSG() ;
-CsvDeclare(int, HANDLE_INCOMING_MSG_Index);
 
 extern void CkLdbSend();
 
@@ -115,8 +110,10 @@ ENVELOPE *envelope;
 {
   int current_ep, current_magic, current_msgType; void *current_usr;
   CHARE_BLOCK *current_block;
+  EP_STRUCT *current_epinfo;
   current_ep = GetEnv_EP(envelope);
-  if (EpLanguageTable[current_ep]==CHARMPLUSPLUS)
+  current_epinfo = CsvAccess(EpInfoTable) + current_ep;
+  if (current_epinfo->language == CHARMPLUSPLUS)
     { CkProcess_Cplus_ForChareMsg(envelope); return; }
   current_magic = GetEnv_chare_magic_number(envelope);
   current_msgType = GetEnv_msgType(envelope);
@@ -125,13 +122,12 @@ ENVELOPE *envelope;
   CpvAccess(currentChareBlock) = (void *)current_block;
   CpvAccess(nodeforCharesProcessed)++;
 
-  if (current_magic != GetID_chare_magic_number(current_block->selfID)) {
-    CmiPrintf("[%d] *** ERROR *** Invalid or expired chareID used at entry point %s.\n", CmiMyPe(), CsvAccess(EpNameTable)[current_ep]);
-  }
+  if (current_magic != GetID_chare_magic_number(current_block->selfID))
+    CmiPrintf("[%d] *** ERROR *** Invalid or expired chareID used at entry point %s.\n", CmiMyPe(), current_epinfo->name);
 
   /* Run the entry-point */
   trace_begin_execute(envelope);
-  (*(CsvAccess(EpTable)[current_ep])) (current_usr,current_block+1);
+  (current_epinfo->function) (current_usr,current_block+1);
   trace_end_execute(current_magic, current_msgType, current_ep);
   QDCountThisProcessing(current_msgType);
 }
@@ -152,39 +148,37 @@ ENVELOPE *envelope;
 void CkProcess_NewChareMsg(envelope)
 ENVELOPE *envelope;
 {
-  int current_ep, current_msgType; void *current_usr;
+  int current_ep, current_msgType, current_magic, current_chare;
+  void *current_usr;
   CHARE_BLOCK *current_block;
+  EP_STRUCT *current_epinfo;
   void * CreateChareBlock();
 
   current_ep = GetEnv_EP(envelope);
-  if (EpLanguageTable[current_ep]==CHARMPLUSPLUS)
+  current_epinfo = CsvAccess(EpInfoTable) + current_ep;
+  if (current_epinfo->language==CHARMPLUSPLUS)
     { CkProcess_Cplus_NewChareMsg(envelope); return; }
+  current_chare = current_epinfo->chareindex;
   current_usr = USER_MSG_PTR(envelope);
   current_msgType = GetEnv_msgType(envelope);
-  /* allocate data area, and strart execution. */
   current_block= (CHARE_BLOCK *)CreateChareBlock
-    (magnitude_to_bytes(GetEnv_dataMag(envelope)));
+    (CsvAccess(ChareSizesTable)[current_epinfo->chareindex]);
+  current_magic = CpvAccess(nodecharesProcessed)++;
   CpvAccess(currentChareBlock) = current_block;
-  SetID_chare_magic_number(current_block->selfID,
-			   CpvAccess(nodecharesProcessed));
+  SetID_chare_magic_number(current_block->selfID, current_magic);
   SetID_onPE(current_block->selfID, CmiMyPe());
   SetID_chareBlockPtr(current_block->selfID, current_block);
 
   /* If virtual block exists, get all messages for this chare	*/
   if (GetEnv_vidBlockPtr(envelope))
-    VidSend(CpvAccess(currentChareBlock),
+    VidSend(current_block,
 	    GetEnv_vidPE(envelope),
 	    GetEnv_vidBlockPtr(envelope));
-
+  
   /* run the entry point */
   trace_begin_execute(envelope);
-  (*(CsvAccess(EpTable)[current_ep]))
-    (current_usr, CpvAccess(currentChareBlock) + 1);
-  trace_end_execute
-    (CpvAccess(nodecharesProcessed), current_msgType, current_ep);
-
-  /* Collect statistics */
-  CpvAccess(nodecharesProcessed)++;
+  (current_epinfo->function)(current_usr, current_block + 1);
+  trace_end_execute(current_magic, current_msgType, current_ep);
   QDCountThisProcessing(current_msgType);
 }
 
@@ -193,15 +187,16 @@ void CkProcess_BocMsg(env)
 ENVELOPE *env;
 {
   int current_ep, current_msgType, current_bocnum; void *current_usr;
+  EP_STRUCT *current_epinfo;
   current_ep = GetEnv_EP(env);
-  if (EpLanguageTable[current_ep]==CHARMPLUSPLUS)
+  current_epinfo = CsvAccess(EpInfoTable) + current_ep;
+  if (current_epinfo->language == CHARMPLUSPLUS)
     { CkProcess_Cplus_BocMsg(env); return; }
   current_usr = USER_MSG_PTR(env);
   current_msgType = GetEnv_msgType(env);
   current_bocnum = GetEnv_boc_num(env);
   trace_begin_execute(env);
-  (*(CsvAccess(EpTable)[current_ep]))(current_usr, 
-			    GetBocDataPtr(current_bocnum));
+  (current_epinfo->function)(current_usr, GetBocDataPtr(current_bocnum));
   trace_end_execute(current_bocnum, current_msgType, current_ep);
   CpvAccess(nodebocMsgsProcessed)++;
   QDCountThisProcessing(current_msgType);
@@ -213,8 +208,8 @@ ENVELOPE *env;
   int current_msgType = GetEnv_msgType(env);
   void *current_usr = USER_MSG_PTR(env);
   trace_begin_execute(env);
-  (*(CsvAccess(EpTable)[VidQueueUpInVidBlock_EP])) (current_usr, NULL);
-  trace_end_execute(VidBocNum, current_msgType, VidQueueUpInVidBlock_EP);
+  VidQueueUpInVidBlock(current_usr, NULL);
+  trace_end_execute(0, current_msgType, 0);
   QDCountThisProcessing(current_msgType);
 }
 
@@ -224,8 +219,8 @@ ENVELOPE *env;
   int current_msgType = GetEnv_msgType(env);
   void *current_usr = USER_MSG_PTR(env);
   trace_begin_execute(env);
-  (*(CsvAccess(EpTable)[VidSendOverMessages_EP])) (current_usr, NULL);
-  trace_end_execute(VidBocNum, current_msgType, VidSendOverMessages_EP);
+  VidSendOverMessages(current_usr, NULL);
+  trace_end_execute(0, current_msgType, 0);
   QDCountThisProcessing(current_msgType);
 }
 
@@ -243,7 +238,7 @@ ENVELOPE *env;
   switch (type)
     {
     case NewChareMsg:
-      CmiSetHandler(env,CsvAccess(CkProcess_NewChareMsg_Index));
+      CmiSetHandler(env,CsvAccess(CkProcIdx_NewChareMsg));
       CldNewSeedFromNet(env, LDB_ELEMENT_PTR(env),
 			CkLdbSend,
 			GetEnv_queueing(env),
@@ -251,11 +246,11 @@ ENVELOPE *env;
 			GetEnv_priobgn(env));
       break;
     case NewChareNoBalanceMsg:
-      CmiSetHandler(env,CsvAccess(CkProcess_NewChareMsg_Index));
+      CmiSetHandler(env,CsvAccess(CkProcIdx_NewChareMsg));
       CkEnqueue(env);
       break;
     case ForChareMsg:
-      CmiSetHandler(env,CsvAccess(CkProcess_ForChareMsg_Index));
+      CmiSetHandler(env,CsvAccess(CkProcIdx_ForChareMsg));
       CkEnqueue(env);
       break;
     case VidEnqueueMsg:
@@ -266,7 +261,7 @@ ENVELOPE *env;
       break;
     case BocMsg:
     case BroadcastBocMsg:
-      CmiSetHandler(env,CsvAccess(CkProcess_BocMsg_Index));
+      CmiSetHandler(env,CsvAccess(CkProcIdx_BocMsg));
       CkEnqueue(env);
       break;
     case LdbMsg:
@@ -277,7 +272,7 @@ ENVELOPE *env;
       CkProcess_BocMsg(env);
       break;
     case DynamicBocInitMsg:
-      CmiSetHandler(env,CsvAccess(CkProcess_DynamicBocInitMsg_Index));
+      CmiSetHandler(env,CsvAccess(CkProcIdx_DynamicBocInitMsg));
       CkEnqueue(env);
       break;
     default:

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.2  1995-07-24 01:54:40  jyelon
+ * Revision 2.3  1995-07-27 20:29:34  jyelon
+ * Improvements to runtime system, general cleanup.
+ *
+ * Revision 2.2  1995/07/24  01:54:40  jyelon
  * *** empty log message ***
  *
  * Revision 2.1  1995/06/08  17:09:41  gursoy
@@ -48,6 +51,29 @@ static ACC_InteriorNodeCollect_Fn();
 static ACC_BranchInit_Fn();
 
 
+AccAddSysBocEps()
+{
+  CsvAccess(CkChare_ACC) =
+    registerChare("CkChare_ACC", sizeof(ACC_DATA), NULL);
+
+  CsvAccess(CkEp_ACC_CollectFromNode) =
+    registerBocEp("CkEp_ACC_CollectFromNode",
+		  ACC_CollectFromNode_Fn,
+		  CHARM, 0, CsvAccess(CkChare_ACC));
+  CsvAccess(CkEp_ACC_LeafNodeCollect) =
+    registerBocEp("CkEp_ACC_LeafNodeCollect",
+		  ACC_LeafNodeCollect_Fn,
+		  CHARM, 0, CsvAccess(CkChare_ACC));
+  CsvAccess(CkEp_ACC_InteriorNodeCollect) =
+    registerBocEp("CkEp_ACC_InteriorNodeCollect",
+		  ACC_InteriorNodeCollect_Fn,
+		  CHARM, 0, CsvAccess(CkChare_ACC));
+  CsvAccess(CkEp_ACC_BranchInit) =
+    registerBocEp("CkEp_ACC_BranchInit",
+		  ACC_BranchInit_Fn,
+		  CHARM, 0, CsvAccess(CkChare_ACC));
+}
+
 
 
 
@@ -65,8 +91,8 @@ ChareIDType *CID;
 	if (CmiMyPe() == 0)
 		ACC_CollectFromNode_Fn(msg, GetBocDataPtr(bocnum)); 
 	else
-		GeneralSendMsgBranch(ACC_CollectFromNode_EP, msg,
-			0, IMMEDIATEcat, ImmBocMsg, bocnum);
+		GeneralSendMsgBranch(CsvAccess(CkEp_ACC_CollectFromNode), msg,
+			0, ImmBocMsg, bocnum);
 }
 
 
@@ -85,8 +111,8 @@ ACC_DATA *mydata;
 		mydata->CID = msg->cid;
 		tmsg = (DummyMsg *) CkAllocMsg(sizeof(DummyMsg));
 		mydata->AlreadyDone = 1;
-		GeneralBroadcastMsgBranch(ACC_LeafNodeCollect_EP, tmsg,
-			IMMEDIATEcat, ImmBroadcastBocMsg,
+		GeneralBroadcastMsgBranch(CsvAccess(CkEp_ACC_LeafNodeCollect), tmsg,
+			ImmBroadcastBocMsg,
 			((BOC_BLOCK *) mydata - 1)->boc_num);
 	}
 }
@@ -109,9 +135,9 @@ ACC_DATA *mydata;
 TRACE(CmiPrintf("[%d] ACC_NodeCollect : Sent message to parent\n",
 	CmiMyPe()));
 			mydata->Penum = CmiSpanTreeParent(mydata->Penum);
-			GeneralSendMsgBranch(ACC_InteriorNodeCollect_EP, 
+			GeneralSendMsgBranch(CsvAccess(CkEp_ACC_InteriorNodeCollect), 
 					GetAccMsgPtr(mydata), mydata->Penum,
-					IMMEDIATEcat, ImmBocMsg,
+					ImmBocMsg,
 					((BOC_BLOCK *) mydata - 1)->boc_num);
 		}
 	}
@@ -139,9 +165,9 @@ ACC_DATA *mydata;
 TRACE(CmiPrintf("[%d] ACC_NodeCollect : Sent message to parent\n",
 		CmiMyPe()));
 			mydata->Penum = CmiSpanTreeParent(mydata->Penum);
-			GeneralSendMsgBranch(ACC_InteriorNodeCollect_EP, 
+			GeneralSendMsgBranch(CsvAccess(CkEp_ACC_InteriorNodeCollect), 
 					GetAccMsgPtr(mydata), mydata->Penum,
-					IMMEDIATEcat, ImmBocMsg,
+					ImmBocMsg,
 					((BOC_BLOCK *) mydata - 1)->boc_num);
 		}
 	}
@@ -159,7 +185,7 @@ ChareIDType *ReturnID;
 
 	SetEnv_other_id(envelope, id);
 TRACE(CmiPrintf("[%d] CreateAcc: id=%d\n", CmiMyPe(), id));
-	boc = GeneralCreateBoc(sizeof(ACC_DATA), ACC_BranchInit_EP,
+	boc = CreateBoc(CsvAccess(CkChare_ACC), CsvAccess(CkEp_ACC_BranchInit),
 			 initmsg, ReturnEP, ReturnID);
 TRACE(CmiPrintf("[%d] CreateAcc: boc = %d\n", CmiMyPe(), (AccIDType ) boc));
 	return((AccIDType) boc);
@@ -189,14 +215,6 @@ TRACE(CmiPrintf("[%d] ACC_BranchInit : id = %d\n", CmiMyPe(), id));
 
 TRACE(CmiPrintf("[%d] ACC_BranchInit : NumChildren = %d\n",
 	CmiMyPe(),  mydata->NumChildren));
-}
-
-AccAddSysBocEps()
-{
-	CsvAccess(EpTable)[ACC_CollectFromNode_EP] = ACC_CollectFromNode_Fn;
-	CsvAccess(EpTable)[ACC_LeafNodeCollect_EP] = ACC_LeafNodeCollect_Fn;
-	CsvAccess(EpTable)[ACC_InteriorNodeCollect_EP] = ACC_InteriorNodeCollect_Fn;
-	CsvAccess(EpTable)[ACC_BranchInit_EP] = ACC_BranchInit_Fn;
 }
 
 

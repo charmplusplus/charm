@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.3  1995-07-22 23:44:13  jyelon
+ * Revision 2.4  1995-07-27 20:29:34  jyelon
+ * Improvements to runtime system, general cleanup.
+ *
+ * Revision 2.3  1995/07/22  23:44:13  jyelon
  * *** empty log message ***
  *
  * Revision 2.2  1995/06/14  19:39:26  gursoy
@@ -208,8 +211,8 @@ extern "C" void CkFreeMsg(void *) ;
 extern "C" void CmiFree(void *) ;
 extern "C" int CmiNumPe() ;
 extern "C" int CmiMyPe() ;
-extern "C" void GeneralSendMsgBranch(int, void *, int, char, int, int) ;
-extern "C" void GeneralBroadcastMsgBranch(int, void *, char, int, int) ;
+extern "C" void GeneralSendMsgBranch(int, void *, int, int, int) ;
+extern "C" void GeneralBroadcastMsgBranch(int, void *, int, int) ;
 extern "C" void SendMsg(int, void *, ChareIDType *) ;
 extern "C" void *GetBocDataPtr(int) ;
 extern "C" void SetBocDataPtr(int, _CK_BOC *) ;

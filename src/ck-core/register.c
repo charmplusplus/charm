@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.4  1995-07-22 23:45:15  jyelon
+ * Revision 2.5  1995-07-27 20:29:34  jyelon
+ * Improvements to runtime system, general cleanup.
+ *
+ * Revision 2.4  1995/07/22  23:45:15  jyelon
  * *** empty log message ***
  *
  * Revision 2.3  1995/06/29  21:51:53  narain
@@ -96,42 +99,42 @@ int size ;
 }
 
 
-void registerSpecificEp(ep,name,epFunc,epType,msgIndx,chareIndx,chboc)
+void SetEp(ep,name,function,language,messageindex,chareindex,chare_or_boc)
 char *name;
-FUNCTION_PTR epFunc ;
-int ep, epType, msgIndx, chareIndx, chboc;
+FUNCTION_PTR function ;
+int ep, language, messageindex, chareindex, chare_or_boc;
 {
-  char *nname = (char *)CmiSvAlloc(strlen(name)*sizeof(char)+1);
+  EP_STRUCT *epinfo = CsvAccess(EpInfoTable)+ep;
+  char *nname = (char *)CmiSvAlloc(strlen(name)+1);
   strcpy(nname, name);
 
-  CsvAccess(EpTable)          [ep] = epFunc;
-  CsvAccess(EpIsImplicitTable)[ep] = 0;
-  CsvAccess(EpNameTable)      [ep] = nname;
-  CsvAccess(EpChareTable)     [ep] = chareIndx;
-  CsvAccess(EpToMsgTable)     [ep] = msgIndx;
-  CsvAccess(EpLanguageTable)  [ep] = epType;
-  CsvAccess(EpChareTypeTable) [ep] = chboc;
+  epinfo->name        = nname;
+  epinfo->function    = function;
+  epinfo->language    = language;
+  epinfo->messageindex= messageindex;
+  epinfo->chareindex  = chareindex;
+  epinfo->chare_or_boc= chare_or_boc;
 }
 
-int registerEp(name,epFunc,epType,msgIndx,chareIndx)
+int registerEp(name,function,language,messageindex,chareindex)
 char *name;
-FUNCTION_PTR epFunc ;
-int epType ;
-int msgIndx, chareIndx;
+FUNCTION_PTR function ;
+int language ;
+int messageindex, chareindex;
 {
   int index=CpvAccess(chareEpsCount)++;
-  registerSpecificEp(index, name, epFunc, epType, msgIndx, chareIndx, CHARE);
+  SetEp(index, name, function, language, messageindex, chareindex, CHARE);
   return index;
 }
 
-int registerBocEp(name,epFunc,epType,msgIndx,chareIndx)
+int registerBocEp(name,function,language,messageindex,chareindex)
 char *name;
-FUNCTION_PTR epFunc ;
-int epType ;
-int msgIndx, chareIndx;
+FUNCTION_PTR function ;
+int language ;
+int messageindex, chareindex;
 {
   int index=CpvAccess(chareEpsCount)++;
-  registerSpecificEp(index, name, epFunc, epType, msgIndx, chareIndx, BOC);
+  SetEp(index, name, function, language, messageindex, chareindex, BOC);
   return index;
 }
 
