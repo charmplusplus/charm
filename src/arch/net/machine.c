@@ -182,34 +182,8 @@
 #include <stdarg.h> /*<- was <varargs.h>*/
 #include <string.h>
 
-#define MACHINE_DEBUG 0
-#if MACHINE_DEBUG
-/*Controls amount of debug messages: 1 (the lowest priority) is 
-extremely verbose, 2 shows most procedure entrance/exits, 
-3 shows most communication, and 5 only shows rare or unexpected items.
-Displaying lower priority messages doesn't stop higher priority ones.
-*/
-#define MACHINE_DEBUG_PRIO 2
-#define MACHINE_DEBUG_LOG 0 /*Controls whether output goes to log file*/
-
-FILE *debugLog;
-# define MACHSTATE_I(prio,args) if ((prio)>=MACHINE_DEBUG_PRIO) {\
-	fprintf args ; fflush(debugLog); }
-# define MACHSTATE(prio,str) \
-	MACHSTATE_I(prio,(debugLog,"[%.3f]> "str"\n",CmiWallTimer()))
-# define MACHSTATE1(prio,str,a) \
-	MACHSTATE_I(prio,(debugLog,"[%.3f]> "str"\n",CmiWallTimer(),a))
-# define MACHSTATE2(prio,str,a,b) \
-	MACHSTATE_I(prio,(debugLog,"[%.3f]> "str"\n",CmiWallTimer(),a,b))
-# define MACHSTATE3(prio,str,a,b,c) \
-	MACHSTATE_I(prio,(debugLog,"[%.3f]> "str"\n",CmiWallTimer(),a,b,c))
-#else
-# define MACHINE_DEBUG_LOG 0
-# define MACHSTATE(n,x) /*empty*/
-# define MACHSTATE1(n,x,a) /*empty*/
-# define MACHSTATE2(n,x,a,b) /*empty*/
-# define MACHSTATE3(n,x,a,b,c) /*empty*/
-#endif
+/* define machine debug */
+#include "machine.h"
 
 #if CMK_USE_POLL
 #include <poll.h>
@@ -372,122 +346,7 @@ char *CopyMsg(char *msg, int len)
  *
  ****************************************************************************/
 
-#define PCQueueSize 0x100
-
-typedef struct CircQueueStruct
-{
-  struct CircQueueStruct *next;
-  int push;
-  int pull;
-  char *data[PCQueueSize];
-}
-*CircQueue;
-
-typedef struct PCQueueStruct
-{
-  CircQueue head;
-  CircQueue tail;
-}
-*PCQueue;
-
-/* static CircQueue Cmi_freelist_circqueuestruct = 0;
-   static int freeCount = 0; */
-
-#define FreeCircQueueStruct(dg) {\
-  CircQueue d;\
-  CmiMemLock();\
-  d=(dg);\
-  d->next = Cmi_freelist_circqueuestruct;\
-  Cmi_freelist_circqueuestruct = d;\
-  freeCount++;\
-  CmiMemUnlock();\
-}
-
-#define MallocCircQueueStruct(dg) {\
-  CircQueue d;\
-  CmiMemLock();\
-  d = Cmi_freelist_circqueuestruct;\
-  if (d==(CircQueue)0){\
-    d = ((CircQueue)calloc(1, sizeof(struct CircQueueStruct)));\
-  }\
-  else{\
-    freeCount--;\
-    Cmi_freelist_circqueuestruct = d->next;\
-    }\
-  dg = d;\
-  CmiMemUnlock();\
-}
-
-
-PCQueue PCQueueCreate(void)
-{
-  CircQueue circ;
-  PCQueue Q;
-
-  /* MallocCircQueueStruct(circ); */
-  circ = (CircQueue)calloc(1, sizeof(struct CircQueueStruct));
-
-  Q = (PCQueue)malloc(sizeof(struct PCQueueStruct));
-  _MEMCHECK(Q);
-  Q->head = circ;
-  Q->tail = circ;
-  return Q;
-}
-
-int PCQueueEmpty(PCQueue Q)
-{
-  CircQueue circ = Q->head;
-  char *data = circ->data[circ->pull];
-  return (data == 0);
-}
-
-char *PCQueuePop(PCQueue Q)
-{
-  CircQueue circ; int pull; char *data;
-
-    circ = Q->head;
-    pull = circ->pull;
-    data = circ->data[pull];
-    if (data) {
-      circ->pull = (pull + 1);
-      circ->data[pull] = 0;
-      if (pull == PCQueueSize - 1) { /* just pulled the data from the last slot
-                                     of this buffer */
-        Q->head = circ-> next; /* next buffer must exist, because "Push"  */
-	
-	/* FreeCircQueueStruct(circ); */
-        free(circ);
-	
-	/* links in the next buffer *before* filling */
-                               /* in the last slot. See below. */
-      }
-      return data;
-    }
-    else { /* queue seems to be empty. The producer may be adding something
-              to it, but its ok to report queue is empty. */
-      return 0;
-    }
-}
-
-void PCQueuePush(PCQueue Q, char *data)
-{
-  CircQueue circ, circ1; int push;
-  
-  circ1 = Q->tail;
-  push = circ1->push;
-  if (push == (PCQueueSize -1)) { /* last slot is about to be filled */
-    /* this way, the next buffer is linked in before data is filled in 
-       in the last slot of this buffer */
-
-    circ = (CircQueue)calloc(1, sizeof(struct CircQueueStruct));
-    /* MallocCircQueueStruct(circ); */
-
-    Q->tail->next = circ;
-    Q->tail = circ;
-  }
-  circ1->data[push] = data;
-  circ1->push = (push + 1);
-}
+#include "pcqueue.h"
 
 /***********************************************************************
  *
