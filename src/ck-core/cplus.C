@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.12  1995-11-02 22:50:47  knauff
+ * Revision 2.13  1997-07-18 21:39:46  milind
+ * Fixed a minor bug caused by recent projections changes.
+ *
+ * Revision 2.12  1995/11/02 22:50:47  knauff
  * Switched #include "c++interface.h" and #include <stdio.h> to fix
  * problems on SP.
  *
@@ -59,7 +62,7 @@ static char ident[] = "@(#)$Header$";
 #include "chare.h"
 #include "msg_macros.h"
 #include "globals.h"
-#include "performance.h"
+#include "trace.h"
 
 #include "c++interface.h"
 
