@@ -485,10 +485,10 @@ do
 	-L*|-shared|-G)
 		OPTS_LD="$OPTS_LD $arg"
 		;;
-	-charm-shared)
+	-charm-shared|-cs)
 		CHARM_SHARED="1"
 		;;
-	-build-shared)
+	-build-shared|-bs)
 		# used internally when building Charm++ to create lib_so
 		BUILD_SHARE="1"
 		;;
