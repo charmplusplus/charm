@@ -1,6 +1,7 @@
 #ifndef _MIDDLE_BLUE_H_
 #define _MIDDLE_BLUE_H_
 
+#include <memory.h>
 #include "converse.h"
 #include "blue.h"
 
