@@ -20,8 +20,15 @@ protected:
   int npes;
 public:
   LBTopology(int p): npes(p) {}
+  virtual ~LBTopology() {}
   virtual int max_neighbors() = 0;
   virtual void neighbors(int mype, int* _n, int &nb) = 0;
+  //added by zshao1, these defaults mean the the topology does not support these methods
+  virtual int get_dimension() { return -1;}
+  virtual bool get_processor_coordinates(int processor_id, int* processor_coordinates) { return false; }
+  virtual bool get_processor_id(const int* processor_coordinates, int* processor_id) { return false; }
+  virtual bool coordinate_difference(const int* my_coordinates, const int* target_coordinates, int* difference) { return false;}
+  virtual bool coordinate_difference(int my_processor_id, int target_processor_id, int* difference) { return false; }
 };
 
 #define LBTOPO_MACRO(x) \

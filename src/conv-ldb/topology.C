@@ -34,7 +34,7 @@ void LBTopo_ring::neighbors(int mype, int* _n, int &nb)
   if (npes>2) _n[nb++] = (mype + 1) % npes;
 }
 
-//  MESH 2D
+//  TORUS 2D
 
 LBTOPO_MACRO(LBTopo_torus2d);
 
@@ -93,7 +93,7 @@ void LBTopo_torus2d::neighbors(int mype, int* _n, int &nb)
 }
 
 
-//  MESH 3D
+//  TORUS 3D
 
 LBTOPO_MACRO(LBTopo_torus3d);
 
@@ -160,6 +160,120 @@ void LBTopo_torus3d::neighbors(int mype, int* _n, int &nb)
   }
 }
 
+//  TORUS ND 
+//  added by zshao1
+
+template <int dimension>
+class LBTopo_torus_nd: public LBTopology {
+private:
+  // inherited int npes;
+  int* Cardinality;
+  int VirtualProcessorCount;
+private:
+	int GetNeighborID(int ProcessorID, int number) {
+		CmiAssert(number>=0 && number<max_neighbors());
+		int displacement = (number%2)? -1: 1;
+		for(int i=0;i<number/2; i++) {
+			displacement *= Cardinality[i];
+		}
+		do{
+			ProcessorID = (ProcessorID + displacement) % VirtualProcessorCount;
+		} while (ProcessorID >= npes);
+		return ProcessorID;
+	}
+public:
+  LBTopo_torus_nd(int p): LBTopology(p) /*inherited :npes(p) */ {
+    CmiAssert(dimension>=1 && dimension<=16);
+    CmiAssert(p>=1);
+
+    Cardinality = new int[dimension];
+
+    double pp = p;
+    for(int i=0;i<dimension;i++) {
+      Cardinality[i] = (int)ceil(pow(pp,1.0/(dimension-i))-1e-5);
+      pp = pp / Cardinality[i];
+    }
+    VirtualProcessorCount = 1;
+    for(int i=0;i<dimension;i++) {
+      VirtualProcessorCount *= Cardinality[i];
+    }
+  }
+  ~LBTopo_torus_nd() {
+  	delete[] Cardinality;
+  }
+  virtual int max_neighbors() {
+  	return dimension*2;
+  }
+  virtual void neighbors(int mype, int* _n, int &nb) {
+  	nb = 0;
+  	for(int i=0;i<dimension*2;i++) {
+  		_n[nb] = GetNeighborID(mype, i);
+  		if (_n[nb]!=mype && (nb==0 || _n[nb-1]!=_n[nb]) ) nb++;
+  	}
+  }
+  virtual int get_dimension() {
+  	return dimension;
+  }
+  virtual bool get_processor_coordinates(int processor_id, int* processor_coordinates) {
+		CmiAssert(processor_id>=0 && processor_id<VirtualProcessorCount);
+		CmiAssert( processor_coordinates != NULL );
+		for(int i=0;i<dimension;i++) {
+			processor_coordinates[i] = processor_id % Cardinality[i];
+			processor_id = processor_id / Cardinality[i];
+		}
+		return true;
+  }
+  virtual bool get_processor_id(const int* processor_coordinates, int* processor_id) {
+  		CmiAssert( processor_coordinates != NULL );
+  		CmiAssert( processor_id != NULL );
+		(*processor_id) = 0;
+		for(int i=dimension-1;i>=0;i--) {
+			(*processor_id) = (*processor_id)* Cardinality[i] + processor_coordinates[i];
+		}
+		return true;
+  }
+  virtual bool coordinate_difference(const int* my_coordinates, const int* target_coordinates, int* difference) { 
+  	CmiAssert( my_coordinates != NULL);
+  	CmiAssert( target_coordinates != NULL);
+  	CmiAssert( difference != NULL);
+		for(int i=0;i<dimension;i--) {
+			difference[i] = target_coordinates[i] - my_coordinates[i];
+			if (abs(difference[i])*2 > Cardinality[i]) {
+				difference[i] += (difference[i]>0) ? -Cardinality[i] : Cardinality[i];
+			} else if (abs(difference[i])*2 == Cardinality[i]) {
+				difference[i] = 0;
+			}
+		}
+		return true;
+  }
+  virtual bool coordinate_difference(int my_processor_id, int target_processor_id, int* difference) { 
+  	CmiAssert( difference != NULL);
+	int my_coordinates[dimension];
+  	int target_coordinates[dimension];
+  	get_processor_coordinates(my_processor_id, my_coordinates);
+  	get_processor_coordinates(target_processor_id, target_coordinates);
+  	coordinate_difference(my_coordinates, target_coordinates, difference);
+  	return true; 
+  }
+};
+
+typedef LBTopo_torus_nd<1> LBTopo_torus_nd_1;
+typedef LBTopo_torus_nd<2> LBTopo_torus_nd_2;
+typedef LBTopo_torus_nd<3> LBTopo_torus_nd_3;
+typedef LBTopo_torus_nd<4> LBTopo_torus_nd_4;
+typedef LBTopo_torus_nd<5> LBTopo_torus_nd_5;
+typedef LBTopo_torus_nd<6> LBTopo_torus_nd_6;
+typedef LBTopo_torus_nd<7> LBTopo_torus_nd_7;
+
+LBTOPO_MACRO(LBTopo_torus_nd_1);
+LBTOPO_MACRO(LBTopo_torus_nd_2);
+LBTOPO_MACRO(LBTopo_torus_nd_3);
+LBTOPO_MACRO(LBTopo_torus_nd_4);
+LBTOPO_MACRO(LBTopo_torus_nd_5);
+LBTOPO_MACRO(LBTopo_torus_nd_6);
+LBTOPO_MACRO(LBTopo_torus_nd_7);
+
+
 // dense graph
 
 LBTOPO_MACRO(LBTopo_graph);
@@ -194,6 +308,13 @@ void registerLBTopos()
   lbTopoMap.push_back(new LBTopoMap("ring", createLBTopo_ring));
   lbTopoMap.push_back(new LBTopoMap("torus2d", createLBTopo_torus2d));
   lbTopoMap.push_back(new LBTopoMap("torus3d", createLBTopo_torus3d));
+  lbTopoMap.push_back(new LBTopoMap("torus_nd_1", createLBTopo_torus_nd_1));
+  lbTopoMap.push_back(new LBTopoMap("torus_nd_2", createLBTopo_torus_nd_2));
+  lbTopoMap.push_back(new LBTopoMap("torus_nd_3", createLBTopo_torus_nd_3));
+  lbTopoMap.push_back(new LBTopoMap("torus_nd_4", createLBTopo_torus_nd_4));
+  lbTopoMap.push_back(new LBTopoMap("torus_nd_5", createLBTopo_torus_nd_5));
+  lbTopoMap.push_back(new LBTopoMap("torus_nd_6", createLBTopo_torus_nd_6));
+  lbTopoMap.push_back(new LBTopoMap("torus_nd_7", createLBTopo_torus_nd_7));
   lbTopoMap.push_back(new LBTopoMap("graph", createLBTopo_graph));
   }
 }
