@@ -807,7 +807,11 @@ static void ConverseRunPE(int everReturn)
   cs = CmiGetState();
   CpvInitialize(void *,CmiLocalQueue);
   CpvAccess(CmiLocalQueue) = cs->localqueue;
+  /*  since elan version is not a SMP version */
+  /*
   CmiMyArgv=CmiCopyArgs(Cmi_argv);
+  */
+  CmiMyArgv=Cmi_argv;
   CthInit(CmiMyArgv);
 #if MACHINE_DEBUG_LOG
   {
@@ -933,4 +937,37 @@ void CmiAbort(const char *message)
 {
   CmiError(message);
   exit(1);
+}
+
+void CmiAbort(const char *message)
+{
+  CmiError(message);
+  exit(1);
+}
+
+void CmiSyncListSendFn(int npes, int *pes, int len, char *msg)
+{
+  CmiError("ListSend not implemented.");
+}
+
+CmiCommHandle CmiAsyncListSendFn(int npes, int *pes, int len, char *msg)
+{
+  CmiError("ListSend not implemented.");
+  return (CmiCommHandle) 0;
+}
+
+void CmiFreeListSendFn(int npes, int *pes, int len, char *msg)
+{
+  //  CmiError("ListSend not implemented.");
+  
+  int i = 0;
+  for(i=0;i<npes;i++) {
+    CmiSyncSend(pes[i], len, msg);
+  }
+  CmiFree(msg);
+
+  /*
+    for(i=0;i<npes;i++) {
+    }
+  */
 }
