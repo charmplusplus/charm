@@ -104,12 +104,15 @@ void CentralLB::initLB(const CkLBOptions &opt)
 CentralLB::~CentralLB()
 {
 #if CMK_LBDB_ON
-  CkPrintf("Going away\n");
   delete [] statsMsgsList;
-  theLbdb->getLBDB()->
-    RemoveNotifyMigrated(notifier);
-  theLbdb->
-    RemoveStartLBFn((LDStartLBFn)(staticStartLB));
+  delete statsData;
+  theLbdb = CProxy_LBDatabase(_lbdb).ckLocalBranch();
+  if (theLbdb) {
+    theLbdb->getLBDB()->
+      RemoveNotifyMigrated(notifier);
+    theLbdb->
+      RemoveStartLBFn((LDStartLBFn)(staticStartLB));
+  }
 #endif
 }
 
