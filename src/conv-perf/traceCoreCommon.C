@@ -10,7 +10,9 @@
 #define TRACE_CORE_BUFFER_SIZE 10
 
 /* Trace Storage and associated Structure */
+extern "C" {
 CpvDeclare(int, _traceCoreOn);
+}
 CpvDeclare(double, _traceCoreInitTime);
 CpvDeclare(char*, _traceCoreRoot);
 CpvDeclare(int, _traceCoreBufferSize);
