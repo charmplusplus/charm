@@ -17,7 +17,7 @@ module waitqd {
   readonly CkChareID waitqd_qdhandle; 
 
   mainchare waitqd_QDChare {
-    entry waitqd_QDChare();
+    entry waitqd_QDChare(CkArgMsg *m);
     entry [threaded, sync] void waitQD(void);
     entry void onQD(CkQdMsg *);
   };

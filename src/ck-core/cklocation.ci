@@ -33,6 +33,6 @@ module CkLocation {
   };
 
   mainchare CkMapsInit {
-    entry CkMapsInit();
+    entry CkMapsInit(CkArgMsg *m);
   };
 };

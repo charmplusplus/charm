@@ -1,7 +1,7 @@
 module CkCallback {
 	readonly CProxy_ckcallback_group ckcallbackgroup;
 	mainchare ckcallback_main {
-		entry ckcallback_main();
+		entry ckcallback_main(CkArgMsg *m);
 	};
 	group ckcallback_group {
 		entry ckcallback_group();

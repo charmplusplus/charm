@@ -2,7 +2,7 @@
 module TraceSummary {
 
   mainchare TraceSummaryInit {
-    entry TraceSummaryInit();
+    entry TraceSummaryInit(CkArgMsg *m);
   };
 
   initcall void initTraceSummaryBOC();

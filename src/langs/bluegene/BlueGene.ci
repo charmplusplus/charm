@@ -11,7 +11,7 @@ mainmodule BlueGene
 
   mainchare Main
   {
-	entry      Main() ;
+	entry      Main(CkArgMsg *m) ;
 	entry void Finish(void) ;
   } ;
 

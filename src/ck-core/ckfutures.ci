@@ -10,7 +10,7 @@ module CkFutures {
   };
 
   mainchare FutureMain {
-    entry FutureMain();
+    entry FutureMain(CkArgMsg *m);
   };
 
   readonly CkGroupID _fbocID;
