@@ -10,6 +10,8 @@
 #include "CentralLB.h"
 #include "CentralLB.def.h"
 
+#define  DEBUGF(x)    // CmiPrintf x;
+
 CkGroupID loadbalancer;
 char ** avail_vector_address;
 int * lb_ptr;
@@ -89,7 +91,7 @@ CentralLB::~CentralLB()
 
 void CentralLB::AtSync()
 {
-  //  CkPrintf("[%d] CentralLB At Sync step %d!!!!\n",CkMyPe(),mystep);
+  DEBUGF(("[%d] CentralLB At Sync step %d!!!!\n",CkMyPe(),mystep));
 
   if (!QueryBalanceNow(step())) {
     MigrationDone();
@@ -102,7 +104,7 @@ void CentralLB::ProcessAtSync()
 {
   if (CkMyPe() == cur_ld_balancer) {
     start_lb_time = CmiWallTimer();
-    CkPrintf("Load balancing step %d starting at %f in %d\n",
+    CmiPrintf("Load balancing step %d starting at %f in %d\n",
     step(),start_lb_time, cur_ld_balancer);
   }
   // Send stats
@@ -129,8 +131,8 @@ void CentralLB::ProcessAtSync()
   msg->n_comm = csz;
   theLbdb->GetCommData(msg->commData);
   theLbdb->ClearLoads();
-//  CkPrintf("PE %d sending %d to ReceiveStats %d objs, %d comm\n",
-//  	   CkMyPe(),msg->serial,msg->n_objs,msg->n_comm);
+  DEBUGF(("PE %d sending %d to ReceiveStats %d objs, %d comm\n",
+  	   CkMyPe(),msg->serial,msg->n_objs,msg->n_comm));
 
   // Scheduler PART.
 
@@ -169,6 +171,7 @@ void CentralLB::ReceiveStats(CLBStatsMsg *m)
 	  avail_vector[proc] = m->avail_vector[proc]; 
   }
 
+  DEBUGF(("ReceiveStats from %d step: %d\n", pe, mystep));
   if (statsMsgsList[pe] != 0) {
     CkPrintf("*** Unexpected CLBStatsMsg in ReceiveStats from PE %d ***\n",
 	     pe);
@@ -226,13 +229,13 @@ void CentralLB::ReceiveStats(CLBStatsMsg *m)
 
 void CentralLB::ReceiveMigration(CLBMigrateMsg *m)
 {
-//  CkPrintf("[%d] in ReceiveMigration %d moves\n",CkMyPe(),m->n_moves);
+  DEBUGF(("[%d] in ReceiveMigration %d moves\n",CkMyPe(),m->n_moves));
   migrates_expected = 0;
   for(int i=0; i < m->n_moves; i++) {
     MigrateInfo& move = m->moves[i];
     const int me = CkMyPe();
     if (move.from_pe == me && move.to_pe != me) {
-	//      CkPrintf("[%d] migrating object to %d\n",move.from_pe,move.to_pe);
+      DEBUGF(("[%d] migrating object to %d\n",move.from_pe,move.to_pe));
       theLbdb->Migrate(move.obj,move.to_pe);
     } else if (move.from_pe != me && move.to_pe == me) {
 	//  CkPrintf("[%d] expecting object from %d\n",move.to_pe,move.from_pe);
@@ -269,7 +272,7 @@ void CentralLB::MigrationDone()
 
 void CentralLB::ResumeClients()
 {
-//  CkPrintf("Resuming clients on PE %d\n",CkMyPe());
+  DEBUGF(("Resuming clients on PE %d\n",CkMyPe()));
   theLbdb->ResumeClients();
 }
 
