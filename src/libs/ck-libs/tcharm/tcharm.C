@@ -18,7 +18,7 @@ Orion Sky Lawlor, olawlor@acm.org, 11/19/2001
 #endif
 
 CtvDeclare(TCharm *,_curTCharm);
-CpvDeclare(inState,_stateTCharm);
+CkpvDeclare(inState,_stateTCharm);
 
 static int lastNumChunks=0;
 
@@ -43,6 +43,8 @@ public:
 		for (i=0;0!=*lib;i++,lib++)
 			libNames[curLibs][i]=tolower(*lib);
 		libNames[curLibs][i]=0;
+		// if already tracing, skip
+		if (checkIfTracing(libNames[curLibs])) return;
 		curLibs++;
 	}
 	inline int isTracing(const char *lib) const {
@@ -58,8 +60,17 @@ void TCharm::nodeInit(void)
 {
   CtvInitialize(TCharm *,_curTCharm);
   CtvAccess(_curTCharm)=NULL;
-  CpvInitialize(inState,_stateTCharm);
-  CmiArgGroup("Library","TCharm");
+  CkpvInitialize(inState,_stateTCharm);
+
+  TCharm::setState(inNodeSetup);
+  TCHARM_User_node_setup();
+  FTN_NAME(TCHARM_USER_NODE_SETUP,tcharm_user_node_setup)();
+  TCharm::setState(inInit);
+}
+
+void TCharm::procInit(void)
+{
+  // called on every pe to east these arguments
   char **argv=CkGetArgv();
   tcharm_nomig=CmiGetArgFlagDesc(argv,"+tcharm_nomig","Disable migration support (debugging)");
   tcharm_nothreads=CmiGetArgFlagDesc(argv,"+tcharm_nothread","Disable thread support (debugging)");
@@ -73,11 +84,6 @@ void TCharm::nodeInit(void)
   	while (CmiGetArgIntDesc(argv,"-vp",&ignored,NULL)) {}
   	while (CmiGetArgIntDesc(argv,"+vp",&ignored,NULL)) {}
   }
-
-  TCharm::setState(inNodeSetup);
-  TCHARM_User_node_setup();
-  FTN_NAME(TCHARM_USER_NODE_SETUP,tcharm_user_node_setup)();
-  TCharm::setState(inInit);
 }
 
 void TCHARM_Api_trace(const char *routineName,const char *libraryName)
@@ -117,6 +123,9 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
     } else {
       tid=CthCreateMigratable((CthVoidFn)startTCharmThread,initMsg,initMsg->stackSize);
     }
+#if CMK_BLUEGENE_CHARM
+    BgAttach(tid);
+#endif
   }
   CtvAccessOther(tid,_curTCharm)=this;
   TCharm::setState(inInit);

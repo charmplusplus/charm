@@ -9,7 +9,7 @@ LIBDIR=$(CDIR)/lib
 
 LIB=libmoduletcharm
 DEST=$(LIBDIR)/$(LIB).a
-COMPATLIB=$(LIBDIR)/libmoduletcharm-compat.a
+COMPATLIB=$(LIBDIR)/libtcharm-compat.a
 
 all: $(DEST) $(COMPATLIB)
 

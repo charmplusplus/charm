@@ -63,7 +63,7 @@ typedef enum {inNodeSetup,inInit,inDriver,inFramework,inPup} inState;
 
 //Thread-local variables:
 CtvExtern(TCharm *,_curTCharm);
-CpvExtern(inState,_stateTCharm);
+CkpvExtern(inState,_stateTCharm);
 
 CDECL {typedef void (*TCpupUserDataC)(pup_er p,void *data);};
 FDECL {typedef void (*TCpupUserDataF)(pup_er p,void *data);};
@@ -117,6 +117,7 @@ class TCharm: public CBase_TCharm
 
 	//One-time initialization
 	static void nodeInit(void);
+	static void procInit(void);
  private:
 	//Informational data about the current thread:
 	class ThreadInfo {
@@ -184,8 +185,8 @@ class TCharm: public CBase_TCharm
 	void *lookupUserData(int ud);
 	
 	inline static TCharm *get(void) {check(); return CtvAccess(_curTCharm);}
-	inline static inState getState(void) {return CpvAccess(_stateTCharm);}
-	inline static void setState(inState to) {CpvAccess(_stateTCharm)=to;}
+	inline static inState getState(void) {return CkpvAccess(_stateTCharm);}
+	inline static void setState(inState to) {CkpvAccess(_stateTCharm)=to;}
 	inline CthThread getThread(void) {return tid;}
 	inline const CProxy_TCharm &getProxy(void) const {return threadInfo.tProxy;}
 	inline int getElement(void) const {return threadInfo.thisElement;}
