@@ -17,7 +17,7 @@ CONVERSE_COM_OBJS = $(COMMLIBDIR)/commlib.o $(COMMLIBDIR)/gridrouter.o \
 
 OBJS = ComlibManager.o $(STRATEGY_OBJS) $(CONVERSE_COM_OBJS)
 
-all: cifiles conversecom $(LIB) 
+all: conversecom $(LIB) 
 	rm -f $(CDIR)/include/ComlibManager.h
 	cp  ComlibManager.h $(CDIR)/include
 	rm -f $(CDIR)/include/EachToManyMulticastStrategy.h
@@ -76,8 +76,10 @@ NodeMulticast.o: NodeMulticast.C NodeMulticast.h ComlibManager.h
 MsgPacker.o: MsgPacker.C MsgPacker.h
 	$(CHARMC) -c MsgPacker.C
 
-cifiles: ComlibManager.ci
+commlib.decl.h commlib.def.h: ComlibManager.ci
 	$(CHARMC) ComlibManager.ci
+
+ComlibManager.h: commlib.decl.h
 
 clean:
 	rm -f *~ *.decl.h *.def.h *.o $(LIB) \
