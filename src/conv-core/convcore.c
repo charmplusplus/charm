@@ -623,6 +623,11 @@ CpvStaticDeclare(double, clocktick);
 CpvStaticDeclare(int,inittime_wallclock);
 CpvStaticDeclare(int,inittime_virtual);
 
+int CmiTimerIsSynchronized()
+{
+  return 0;
+}
+
 void CmiTimerInit()
 {
   struct tms temp;
@@ -668,6 +673,11 @@ double CmiTimer()
 
 static double inittime_wallclock;
 CpvStaticDeclare(double, inittime_virtual);
+
+int CmiTimerIsSynchronized()
+{
+  return 0;
+}
 
 void CmiTimerInit()
 {
@@ -807,6 +817,11 @@ static inline unsigned long long BGLTimebase(void)
 
 static unsigned long long inittime_wallclock;
 CpvStaticDeclare(double, clocktick);
+
+int CmiTimerIsSynchronized()
+{
+  return 0;
+}
 
 void CmiTimerInit()
 {
