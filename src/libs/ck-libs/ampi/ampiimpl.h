@@ -9,7 +9,6 @@
 #define _AMPIIMPL_H
 
 #include "ampi.h"
-#include "ampiOOQ.h"
 #include "charm++.h"
 #include "EachToManyMulticastStrategy.h" /* for ComlibManager Strategy*/
 #include <string.h> /* for strlen */
