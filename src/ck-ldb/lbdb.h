@@ -80,7 +80,7 @@ typedef struct {
 #endif
 } LDObjData;
 
-/* used for load balancer */
+/* used by load balancer */
 typedef struct {
   int index;
   LDObjData data;
@@ -229,9 +229,12 @@ int LDMemusage(LDHandle _db);
 }
 #endif /* _cplusplus */
 
+#ifdef __cplusplus
 /* put outside of __cplusplus */
 PUPbytes(LDObjData)
+PUPbytes(LDObjStats)
 PUPbytes(LDCommData)
+#endif
 
 #endif /* LBDBH_H */
 

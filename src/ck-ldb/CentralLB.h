@@ -46,7 +46,7 @@ public:
   void ProcessAtSync(void); // Receive a message from AtSync to avoid
                             // making projections output look funny
 
-  void ReceiveStats(CLBStatsMsg *); 		// Receive stats on PE 0
+  void ReceiveStats(CkMarshalledCLBStatsMessage &msg);	// Receive stats on PE 0
   void ResumeClients(void);                     // Resuming clients needs
 	                                        // to be resumed via message
   void ReceiveMigration(LBMigrateMsg *); 	// Receive migration data
@@ -159,7 +159,12 @@ public:
   int useMem();
 };
 
-class CLBStatsMsg : public CMessage_CLBStatsMsg {
+PUPbytes(CentralLB::ProcStats);
+
+// CLBStatsMsg is not directly sent in the entry function
+// CkMarshalledCLBStatsMessage is used instead to use the pup defined here.
+//class CLBStatsMsg: public CMessage_CLBStatsMsg {
+class CLBStatsMsg {
 public:
   int from_pe;
   int serial;
@@ -176,6 +181,11 @@ public:
 
   char * avail_vector;
   int next_lb;
+public:
+  CLBStatsMsg(int osz, int csz);
+  CLBStatsMsg()  {}
+  ~CLBStatsMsg();
+  void pup(PUP::er &p);
 }; 
 
 #endif /* CENTRALLB_H */

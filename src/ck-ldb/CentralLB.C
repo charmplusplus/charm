@@ -22,8 +22,6 @@ char ** avail_vector_address;
 int * lb_ptr;
 int load_balancer_created;
 
-#define LB_DUMP_MSG       0
-
 #if CMK_LBDB_ON
 
 static void getPredictedLoad(CentralLB::LDStats* stats, int count, 
@@ -131,12 +129,12 @@ void CentralLB::ProcessAtSync()
       CmiPrintf("[%s] Load balancing step %d starting at %f in PE%d\n",
                  lbName(), step(),start_lb_time, cur_ld_balancer);
   }
-  // Send stats
+  // build and send stats
   const int osz = theLbdb->GetObjDataSz();
   const int csz = theLbdb->GetCommDataSz();
 
   int npes = CkNumPes();
-  CLBStatsMsg* msg = new(osz, csz, npes, 0) CLBStatsMsg;
+  CLBStatsMsg* msg = new CLBStatsMsg(osz, csz);
   msg->from_pe = CkMyPe();
   // msg->serial = rand();
   msg->serial = CrnRand();
@@ -145,10 +143,10 @@ void CentralLB::ProcessAtSync()
   theLbdb->IdleTime(&msg->idletime);
   theLbdb->BackgroundLoad(&msg->bg_walltime,&msg->bg_cputime);
   msg->pe_speed = myspeed;
-  //  CkPrintf(
-  //    "Processors %d Total time (wall,cpu) = %f %f Idle = %f Bg = %f %f\n",
-  //    CkMyPe(),msg->total_walltime,msg->total_cputime,
-  //    msg->idletime,msg->bg_walltime,msg->bg_cputime);
+//  CkPrintf(
+//    "Processors %d Total time (wall,cpu) = %f %f Idle = %f Bg = %f %f\n",
+//    CkMyPe(),msg->total_walltime,msg->total_cputime,
+//    msg->idletime,msg->bg_walltime,msg->bg_cputime);
 
   msg->n_objs = osz;
   theLbdb->GetObjData(msg->objData);
@@ -156,19 +154,19 @@ void CentralLB::ProcessAtSync()
   theLbdb->GetCommData(msg->commData);
 //  theLbdb->ClearLoads();
   DEBUGF(("PE %d sending %d to ReceiveStats %d objs, %d comm\n",
-  	   CkMyPe(),msg->serial,msg->n_objs,msg->n_comm));
+           CkMyPe(),msg->serial,msg->n_objs,msg->n_comm));
 
-  // Scheduler PART.
+// Scheduler PART.
 
-  if(CkMyPe() == 0){
-      int num_proc = CkNumPes();
-      for(int proc = 0; proc < num_proc; proc++){
-	  msg->avail_vector[proc] = avail_vector[proc];
-      }
-      msg->next_lb = new_ld_balancer;
+  if(CkMyPe() == cur_ld_balancer) {
+    int num_proc = CkNumPes();
+    for(int proc = 0; proc < num_proc; proc++){
+      msg->avail_vector[proc] = avail_vector[proc];
+    }
+    msg->next_lb = new_ld_balancer;
   }
 
-  thisProxy [cur_ld_balancer].ReceiveStats(msg);
+  thisProxy[cur_ld_balancer].ReceiveStats(msg);
 }
 
 void CentralLB::Migrated(LDObjHandle h)
@@ -191,6 +189,7 @@ void CentralLB::buildStats()
     statsData->commData = new LDCommData[statsData->n_comm];
     int nobj = 0;
     int ncom = 0;
+    // copy all data in individule message to this bug structure
     for (int pe=0; pe<stats_msg_count; pe++) {
        int i;
        CLBStatsMsg *msg = statsMsgsList[pe];
@@ -208,8 +207,9 @@ void CentralLB::buildStats()
     }
 }
 
-void CentralLB::ReceiveStats(CLBStatsMsg *m)
+void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
 {
+  CLBStatsMsg *m = (CLBStatsMsg *)msg.getMessage();
   int proc;
   const int pe = m->from_pe;
 //  CkPrintf("Stats msg received, %d %d %d %d %p\n",
@@ -548,69 +548,8 @@ void CentralLB::readStatsMsgs(const char* filename) {
   CmiPrintf("readStatsMsgs for %d pes starts ... \n", stats_msg_count);
   if (LBSimulation::simProcs == 0) LBSimulation::simProcs = stats_msg_count;
 
-#if LB_DUMP_MSG
-  // now rebuild new structures
-  int tableSize = stats_msg_count;
-  if (tableSize < LBSimulation::simProcs) tableSize = LBSimulation::simProcs;
-  statsMsgsList = new CLBStatsMsg*[stats_msg_count];
-  statsData->clear();
-
-  statsData->procs = new ProcStats[stats_msg_count];
-  statsData->count = stats_msg_count;
-
-  for (i = 0; i < stats_msg_count; i++) {
-    CLBStatsMsg* m = new CLBStatsMsg;
-    CLBStatsMsg *oldm = m;
-    envelope oldenv=*UsrToEnv(oldm);
-    CkPupMessage(p, (void **)&m, 2);
-    envelope *env=UsrToEnv(m);
-    // msgIdx can be different across different applictions
-    env->setMsgIdx(oldenv.getMsgIdx());
-    CkUnpackMessage(&env); //UnPack it
-//    CmiPrintf("CLBStatsMsg for pe %d retrieved.\n", i);
-    m = (CLBStatsMsg *)EnvToUsr(env);
-
-    statsMsgsList[i] = m;
-    struct ProcStats &proc = statsData->procs[i];
-
-    proc.total_walltime = m->total_walltime;
-    proc.total_cputime = m->total_cputime;
-    proc.idletime = m->idletime;
-#if 0
-    proc.bg_walltime = m->bg_walltime;
-    proc.bg_cputime = m->bg_cputime;
-#else
-    proc.bg_walltime = 0.;
-    proc.bg_cputime = 0.;
-#endif
-    proc.pe_speed = m->pe_speed;
-    proc.utilization = 1.0;
-    proc.available = CmiTrue;
-    statsData->n_objs += m->n_objs;
-    statsData->n_comm += m->n_comm;
-  }
-
-  buildStats();
-
-//CmiPrintf("i:%d bg_walltime: %f total_walltime: %f objData: %d %p comm: %d %p\n", i, m->bg_walltime, m->total_walltime, m->n_objs, m->objData, m->n_comm, m->commData);
-
-  if (stats_msg_count < LBSimulation::simProcs) {
-    for (int i=stats_msg_count; i<LBSimulation::simProcs; i++) {
-      struct ProcStats &proc = statsData->procs[i];
-      proc.total_walltime = 0.0;
-      proc.total_cputime = 0.0;
-      proc.idletime = 0.0;
-      proc.bg_walltime = 0.;
-      proc.bg_cputime = 0.;
-      proc.pe_speed = 1;
-      proc.utilization = 1.0;
-      proc.available = CmiTrue;
-    }
-  }
-#else
-    // LBSimulation::simProcs must be set
+  // LBSimulation::simProcs must be set
   statsData->pup(p);
-#endif
 
   CmiPrintf("Simulation for %d pes \n", LBSimulation::simProcs);
 
@@ -806,6 +745,7 @@ void CentralLB::LDStats::pup(PUP::er &p)
   p(n_objs);
   p(n_comm);
   if (p.isUnpacking()) {
+    // user can specify simulated processors other than the real # of procs.
     int maxpe = count>LBSimulation::simProcs?count:LBSimulation::simProcs;
     procs = new ProcStats[maxpe];
     objData = new LDObjData[n_objs];
@@ -815,24 +755,78 @@ void CentralLB::LDStats::pup(PUP::er &p)
     transTable = NULL;
     objHash = NULL;
   }
-#if 1
-  ProcStats dummy;		// ignore the background load
-  for (i=0; i<count; i++) p((char*)&dummy, sizeof(ProcStats));
-#else
-  for (i=0; i<count; i++) p((char*)&procs[i], sizeof(ProcStats));
-#endif
-  for (i=0; i<n_objs; i++) p((char*)&objData[i], sizeof(LDObjStats));
+  // ignore the background load when unpacking
+  if (p.isUnpacking()) {
+    ProcStats dummy;
+    for (i=0; i<count; i++) p|dummy; 
+  }
+  else
+    for (i=0; i<count; i++) p|procs[i];
+  for (i=0; i<n_objs; i++) p|objData[i]; 
   p(from_proc, n_objs);
   p(to_proc, n_objs);
-  for (i=0; i<n_comm; i++) p((char*)&commData[i], sizeof(LDCommData));
+  for (i=0; i<n_comm; i++) p|commData[i];
   if (p.isUnpacking())
     count = LBSimulation::simProcs;
 }
 
 int CentralLB::LDStats::useMem() { 
+  // calculate the memory usage of this LB (superclass).
   return sizeof(LDStats) + sizeof(ProcStats)*count + 
 	 (sizeof(LDObjData) + 2*sizeof(int)) * n_objs +
  	 sizeof(LDCommData) * n_comm;
+}
+
+/**
+  CLBStatsMsg is not a real message now.
+  CLBStatsMsg is used for all processors to fill in their local load and comm
+  statistics and send to processor 0
+*/
+
+CLBStatsMsg::CLBStatsMsg(int osz, int csz) {
+  objData = new LDObjData[osz];
+  commData = new LDCommData[csz];
+  avail_vector = new char[CkNumPes()];
+}
+
+CLBStatsMsg::~CLBStatsMsg() {
+  delete [] objData;
+  delete [] commData;
+  delete [] avail_vector;
+}
+
+void CLBStatsMsg::pup(PUP::er &p) {
+  int i;
+  p|from_pe;
+  p|serial;
+  p|pe_speed;
+  p|total_walltime; p|total_cputime;
+  p|idletime;
+  p|bg_walltime;   p|bg_cputime;
+  p|n_objs;        
+  if (p.isUnpacking()) objData = new LDObjData[n_objs];
+  for (i=0; i<n_objs; i++) p|objData[i];
+  p|n_comm;
+  if (p.isUnpacking()) commData = new LDCommData[n_comm];
+  for (i=0; i<n_comm; i++) p|commData[i];
+  if (p.isUnpacking()) avail_vector = new char[CkNumPes()];
+  p(avail_vector, CkNumPes());
+  p(next_lb);
+}
+
+// CkMarshalledCLBStatsMessage is used in the marshalled parameter in
+// the entry function, it is just used to use to pup.
+// I don't use CLBStatsMsg directly as marshalled parameter because
+// I want the data pointer stored and not to be freed by the Charm++.
+CkMarshalledCLBStatsMessage::~CkMarshalledCLBStatsMessage() {
+  if (msg) delete msg;
+}
+
+void CkMarshalledCLBStatsMessage::pup(PUP::er &p)
+{
+  if (p.isUnpacking()) msg = new CLBStatsMsg;
+  else CmiAssert(msg);
+  msg->pup(p);
 }
 
 #endif
