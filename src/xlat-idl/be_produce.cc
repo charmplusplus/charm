@@ -28,9 +28,13 @@ class XString {
     XString(char *_s) {
       len = strlen(_s);
       blklen = SZ;
+      // gzheng
+      blklen = (len/SZ + 1)*SZ;
+      /*  HP doesn't support while in this inline constructor
       while ( len >= blklen ) {
         blklen += SZ;
       }
+      */
       s = new char[blklen];
       strcpy(s, _s);
     }

@@ -73,6 +73,11 @@ trademarks or registered trademarks of Sun Microsystems, Inc.
                        // Works for KCC linux
 typedef int bool;
 #endif
+// gzheng  
+// works for HP
+#ifndef bool
+typedef int bool;
+#endif
 const int FALSE = 0;
 const int TRUE = 1;
 
