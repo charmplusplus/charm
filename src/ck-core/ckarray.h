@@ -416,10 +416,17 @@ typedef struct {int x,y;} CkIndex2D;
 inline void operator|(PUP::er &p,CkIndex2D &i) {p(i.x); p(i.y);}
 typedef struct {int x,y,z;} CkIndex3D;
 inline void operator|(PUP::er &p,CkIndex3D &i) {p(i.x); p(i.y); p(i.z);}
+typedef struct {int data[CK_ARRAYINDEX_MAXLEN];} CkIndexMax;
+inline void operator|(PUP::er &p,CkIndexMax &i) {
+  for (int j=0;j<CK_ARRAYINDEX_MAXLEN;j++) {
+    p|i.data[j];
+  }
+}
 
 typedef ArrayElementT<CkIndex1D> ArrayElement1D;
 typedef ArrayElementT<CkIndex2D> ArrayElement2D;
 typedef ArrayElementT<CkIndex3D> ArrayElement3D;
+typedef ArrayElementT<CkIndexMax> ArrayElementMax;
 
 
 /*********************** Array Manager BOC *******************/
