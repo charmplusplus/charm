@@ -878,7 +878,7 @@ GridCommLB.o: GridCommLB.C charm++.h charm.h converse.h conv-config.h \
   CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
   GridCommLB.h CentralLB.h BaseLB.h CentralLB.decl.h CentralLBMsg.h \
   GridCommLB.decl.h CommLBHeap.h GridCommLB.def.h manager.h
-        $(CHARMC) -c -I. GridCommLB.C
+	$(CHARMC) -c -I. GridCommLB.C
 
 ObjGraph.o: ObjGraph.C ObjGraph.h lbdb.h converse.h conv-config.h \
   conv-common.h conv-mach.h conv-autoconfig.h conv-mach-opt.h pup_c.h \
