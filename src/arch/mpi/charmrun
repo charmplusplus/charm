@@ -73,7 +73,7 @@ $ppn
 $ncpus
 #
 # This determines the wall-clock time limit (here 5 minutes):
-#PBS -l walltime=5:00
+#PBS -l walltime=20:00
 #
 $mem
 #
