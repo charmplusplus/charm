@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1995-06-08 17:09:41  gursoy
+ * Revision 2.2  1995-06-14 19:39:26  gursoy
+ * *** empty log message ***
+ *
+ * Revision 2.1  1995/06/08  17:09:41  gursoy
  * Cpv macro changes done
  *
  * Revision 1.6  1995/05/04  22:11:15  jyelon
@@ -195,7 +198,7 @@ extern "C" void registerMainChare(int m, int ep , int type) ;
 
 extern "C" void * GenericCkAlloc(int, int, int) ;
 extern "C" void * VarSizeCkAlloc(int, int, int, int[]) ;
-extern "C" void * CmiAllocPackBuffer(void *, int) ;
+extern "C" void * CkAllocPackBuffer(void *, int) ;
 extern "C" int CreateBoc(int, int, void *, int, ChareIDType *) ;
 extern "C" void CreateChare(int, int, void *, ChareIDType *, int) ;
 extern "C" int CreateAcc(int, void *, int, ChareIDType *) ;
