@@ -208,9 +208,6 @@ void CentralLB::ReceiveStats(CLBStatsMsg *m)
     
 //    CkPrintf("Before Calling Strategy\n");
 
-    // remove all nonmigratable objects from stats
-    RemoveNonMigratable(statsDataList,clients);
-    
     LBMigrateMsg* migrateMsg = Strategy(statsDataList,clients);
 
 //    CkPrintf("returned successfully\n");
