@@ -146,7 +146,7 @@ void
 TempoArray::ckTempoSendElem(int tag1, int tag2, void *buffer, int buflen, 
                             int idx)
 {
-  ckTempoSendElem(tag1, tag2, buffer, buflen, thisAID, idx);
+  ckTempoSendElem(tag1, tag2, buffer, buflen, thisArrayID, idx);
 }
 
 void 

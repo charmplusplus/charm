@@ -84,25 +84,16 @@ class _CK_GID : public _CK_CID {
 class _CK_NGID : public _CK_GID {
 };
 
-class Array1D;
+class CkArray;
 
 class CkArrayID {
   public:
-    CkGroupID _ck_aid;
-    Array1D *_array;
-    int _elem;
-    void _setAid(CkGroupID aid) {
-      _ck_aid = aid;
-      _array = (Array1D*) CkLocalBranch(aid);
-    }
-    CkArrayID(CkGroupID aid, int elem=-1) {
-      _setAid(aid);
-      _elem = elem;
+    CkGroupID _aid;
+    CkArrayID(CkGroupID aid) {
+      _aid=aid;
     }
     CkArrayID() {}
 };
-
-typedef CkArrayID CkAID;/* Depricated usage */
 
 class CkQdMsg {
   public:
@@ -132,6 +123,76 @@ static inline void _CHECK_CID(CkChareID cid, int idx)
 #else
 static inline void _CHECK_CID(CkChareID, int){}
 #endif
+
+/* These came from init.h-- OSL, 3/20/2000 */
+
+template <class T>
+class CkQ {
+    T *block;
+    int blklen;
+    int first;
+    int len;
+  public:
+    CkQ() :first(0),len(0) {
+      block = new T[blklen=16];
+    }
+    ~CkQ() { delete[] block; }
+    int length(void) { return len; }
+    T deq(void) {
+      if(len>0) {
+        T &ret = block[first];
+        first = (first+1)%blklen;
+        len--;
+      	return ret;
+      } else return T(0);
+    }
+    void enq(const T &elt) {
+      if(len==blklen) {
+      	int newlen=len*2;
+        T *newblk = new T[newlen];
+        memcpy(newblk, block+first, sizeof(T)*(blklen-first));
+        memcpy(newblk+blklen-first, block, sizeof(T)*first);
+        delete[] block; block = newblk;
+        blklen = newlen; first = 0;
+      }
+      block[(first+len)%blklen] = elt;
+      len++;
+    }
+    //Peek at the n'th item from the queue
+    T& operator[](size_t n) 
+    {
+    	n=(n+first)%blklen;
+    	return block[n];
+    }
+};
+
+template <class T>
+class CkVec {
+    T *block;
+    int blklen,len;
+  public:
+    CkVec() {block=NULL;blklen=len=0;}
+    ~CkVec() { delete[] block; }
+    int &length(void) { return len; }
+    T *getVec(void) { return block; }
+    T& operator[](size_t n) { return block[n]; }
+    const T& operator[](size_t n) const { return block[n]; }
+    void insert(int pos, const T &elt) {
+      if(pos>=blklen) {
+      	int newlen=pos*2+16;//Double length at each step
+        T *newblk = new T[newlen];
+        if (block!=NULL)
+        	memcpy(newblk, block, sizeof(T)*blklen);
+        for(int i=blklen; i<newlen; i++) newblk[i] = T(0);
+        delete[] block; block = newblk;
+        blklen = newlen;
+      }
+      if (pos>=len) len=pos+1;
+      block[pos] = elt;
+    }
+    void insertAtEnd(const T &elt) {insert(length(),elt);}
+};
+
 
 #include "ckstream.h"
 #include "CkFutures.decl.h"

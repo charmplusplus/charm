@@ -17,17 +17,14 @@
 
 #include <assert.h>
 
-#include "charm.h"
+#include "charm++.h"
 
 #include "envelope.h"
 #include "init.h"
 #include "qd.h"
 #include "register.h"
 #include "stats.h"
-#include "waitqd.h"
 #include "ckfutures.h"
-#include "ckarray.h"
-#include "ckstream.h"
 
 #ifndef CMK_OPTIMIZE
 #define _CHECK_VALID(p, msg) do {if((p)==0){CkAbort(msg);}} while(0)

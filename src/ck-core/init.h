@@ -1,74 +1,12 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 #ifndef _INIT_H
 #define _INIT_H
 
-#define BLKSZ 32
-class PtrQ {
-    void **block;
-    int blklen;
-    int first;
-    int len;
-  public:
-    PtrQ();
-    ~PtrQ() { delete[] block; }
-    int length(void) { return len; }
-    void *deq(void) {
-      void *ret=0;
-      if(len>0) {
-        len--;
-        ret = block[first];
-        first = (first+1)%blklen;
-      }
-      return ret;
-    }
-    void enq(void *elt) {
-      if(len==blklen) {
-        void **newblk = new void*[blklen+BLKSZ];
-        _MEMCHECK(newblk);
-        memcpy(newblk, block+first, sizeof(void*)*(blklen-first));
-        memcpy(newblk+blklen-first, block, sizeof(void*)*first);
-        delete[] block; block = newblk;
-        blklen += BLKSZ; first = 0;
-      }
-      block[(first+len)%blklen] = elt;
-      len++;
-      return;
-    }
-};
 
-class PtrVec {
-    void **block;
-    int blklen;
-  public:
-    PtrVec();
-    ~PtrVec() { delete[] block; }
-    int length(void) { return blklen; }
-    void **getVec(void) { return block; }
-    void insert(int pos, void *elt) {
-      if(pos>=blklen) {
-        void **newblk = new void*[pos+BLKSZ];
-        _MEMCHECK(newblk);
-        memcpy(newblk, block, sizeof(void*)*blklen);
-        for(int i=blklen; i<pos+BLKSZ; i++) newblk[i] = 0;
-        delete[] block; block = newblk;
-        blklen = pos+BLKSZ;
-      }
-      block[pos] = elt;
-      return;
-    }
-};
-
-// const inst MAXBINS = 32; in GroupTable is not allowed on solaris CC
-
-#define MAXBINS 32
+typedef CkQ<void *> PtrQ;
+typedef CkVec<void *> PtrVec;
 
 class GroupTable {
+  enum {MAXBINS=32};
   class TableEntry {
     public:
       CkGroupID num;

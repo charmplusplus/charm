@@ -1,45 +1,53 @@
 module CkArray {
+  extern module CkReduction;
+	
   readonly CkGroupID _RRMapID;
-  message ArrayCreateMessage;
   message ArrayMessage;
-  message ArrayElementAckMessage;
-  message ArrayElementUpdateMessage;
-  message [varsize] ArrayMigrateMessage;
-  
-  message [varsize] ArrayReductionMessage;
-  message ArrayReductionHeartbeatM;
-
-  group Array1D {
-    entry Array1D(ArrayCreateMessage *);
-    entry void RecvForElement(ArrayMessage *);
-    entry void RecvMigratedElement(ArrayMigrateMessage *);
-    entry void AckMigratedElement(ArrayElementAckMessage *);
-    entry void UpdateLocation(ArrayElementUpdateMessage *);
-    entry void RecvReductionMessage(ArrayReductionMessage *);
-    entry void ReductionHeartbeat(ArrayReductionHeartbeatM *);
-    entry void DummyAtSync(void);
-  };
-
   message ArrayElementCreateMessage;
-  message ArrayElementMigrateMessage;
-  message ArrayElementExitMessage;
+  message [varsize] ArrayElementMigrateMessage;
+  
+  message CkArrayCreateMsg;
+  message CkArrayInsertMsg;
+  message CkArrayRemoveMsg;
+  message CkArrayUpdateMsg;
+
+  group CkArray : CkReductionMgr {
+	entry CkArray(CkArrayCreateMsg *);
+	//Insertion:
+	entry void InsertElement(CkArrayInsertMsg *);
+	entry void DoneInserting(void);
+	entry void ElementDying(CkArrayRemoveMsg *);
+	//Messaging:
+	entry void Send(ArrayMessage *);
+	entry void RecvForElement(ArrayMessage *);
+	//Migration:
+	entry void RecvMigratedElement(ArrayElementMigrateMessage *);
+	entry void UpdateLocation(CkArrayUpdateMsg *);
+	//Load balancing:
+	entry void DummyAtSync(void);
+	//Housecleaning:
+	entry void SpringCleaning(void);
+	//Broadcast
+	entry void SendBroadcast(ArrayMessage *);
+	entry void RecvBroadcast(ArrayMessage *);	
+  };
 
   array ArrayElement {
     entry ArrayElement();
-    entry void exit(ArrayElementExitMessage *);
+    //Calls destructor:
+    entry void destroy(void);
   };
 
-  message ArrayMapRegisterMessage;
-
-  group ArrayMap {
-    entry [virtual] void registerArray(ArrayMapRegisterMessage *) = 0;
+//Array Map object support:
+  group CkArrayMap : CkGroupInitCallback {
+    entry CkArrayMap(void);
   };
 
-  group RRMap : ArrayMap {
+  group RRMap : CkArrayMap {
     entry RRMap(void);
   };
 
-  mainchare ArrayInit {
-    entry ArrayInit();
+  mainchare CkArrayInit {
+    entry CkArrayInit();
   };
 };

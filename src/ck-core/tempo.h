@@ -86,14 +86,14 @@ class TempoGroup : public Group, public Tempo
 #define TEMPO_INT    2
 #define TEMPO_DOUBLE 3
 
-class TempoArray : public ArrayElement, public Tempo
+class TempoArray : public ArrayElement1D, public Tempo
 {
   int nGOps;
   public:
-    TempoArray(ArrayElementCreateMessage *msg) : ArrayElement(msg)
-      { nGOps=0; finishConstruction(); }
-    TempoArray(ArrayElementMigrateMessage *msg) : ArrayElement(msg)
-      { /*finishMigration();*/ }
+    TempoArray(ArrayElementCreateMessage *msg) : ArrayElement1D(msg)
+      { nGOps=0; }
+    TempoArray(ArrayElementMigrateMessage *msg) : ArrayElement1D(msg)
+      { }
     static void ckTempoSendElem(int tag1, int tag2, void *buffer, int buflen,
                                 CkArrayID aid, int idx);
     static void ckTempoSendElem(int tag, void *buffer, int buflen,

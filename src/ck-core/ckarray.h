@@ -1,28 +1,129 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
+/* Generalized Chare Arrays
 
-/*
-Charm++ File: Chare Arrays
-Array Reduction Library section
-added 11/11/1999 by Orion Sky Lawlor, olawlor@acm.org
+These classes implement Chare Arrays.  
+These are dynamic (i.e. allowing insertion
+and deletion) collections of ordinary Chares 
+indexed by arbitrary runs of bytes.
+
+The general structure is:
+
+CkArray is the "array manager" Group, or BOC-- 
+it creates, keeps track of, and cares for all the
+array elements on this PE (i.e.. "local" elements).  
+It does so using a hashtable.
+
+CkArrayElement is the type of the array 
+elements (a subclass of Chare).
+
+CkArrayIndex is an arbitrary run of bytes,
+used to index into the CkArray hashtable.
+
+
+Converted from 1-D arrays 2/27/2000 by
+Orion Sky Lawlor, olawlor@acm.org
+
 */
 #ifndef _CKARRAY_H
 #define _CKARRAY_H
 
-#include "charm++.h"
+#include "ckreduction.h"
+
+/*******************************************************
+Array Index class.  An array index is just a HashKey-- 
+a run of bytes used to look up an object in a hash table.
+An Array Index cannot be modified once it is created.
+ */
+
+#include "ckhashtable.h"
+
+class CkArrayIndex : public HashKey 
+{
+public:
+	// This method returns the length of and a pointer to the key data.
+	//The returned pointer must be aligned to at least an integer boundary.
+	virtual const unsigned char *getKey(/*out*/ int &len) const =0;
+	
+	//These utility routines call the routine above
+	// (they're slightly less efficient, but easier to use)
+	int len(void) const {int len;getKey(len);return len;}
+	const unsigned char *data(void) const {int len;return getKey(len);}
+};
+
+//Simple ArrayIndex classes: the key is just integer indices.
+class CkArrayIndex1D : public CkArrayIndex {
+public: int index;
+	CkArrayIndex1D(int i0) {index=i0;}
+	virtual const unsigned char *getKey(/*out*/ int &len) const;
+};
+class CkArrayIndex2D : public CkArrayIndex {
+public: int index[2];
+	CkArrayIndex2D(int i0,int i1) {index[0]=i0;index[1]=i1;}
+	virtual const unsigned char *getKey(/*out*/ int &len) const;
+};
+class CkArrayIndex3D : public CkArrayIndex {
+public: int index[3];
+	CkArrayIndex3D(int i0,int i1,int i2) {index[0]=i0;index[1]=i1;index[2]=i2;}
+	virtual const unsigned char *getKey(/*out*/ int &len) const;
+};
+class CkArrayIndex4D : public CkArrayIndex {
+public: int index[4];
+	CkArrayIndex4D(int i0,int i1,int i2,int i3) 
+	  {index[0]=i0;index[1]=i1;index[2]=i2;index[3]=i3;}
+	virtual const unsigned char *getKey(/*out*/ int &len) const;
+};
+
+//A slightly more complex array index: the key is an object
+// whose size is fixed at compile time.
+template <class object> //Key object
+class CkArrayIndexObject : public CkArrayIndex {
+public:
+	object obj;
+	CkArrayIndexObject(const object &srcObj) {obj=srcObj;}
+	virtual const unsigned char *getKey(/*out*/ int &len) const 
+	  {len=sizeof(object);return (const unsigned char *)&obj;}
+};
+
+//Here the key is a run of bytes whose length can vary at run time;
+// the data does not belong to us, and is not deleted when we are.
+class CkArrayIndexConst : public CkArrayIndex {
+protected:
+	int nBytes;//Length of key in bytes
+	const unsigned char *constData;//Data array, which we do not own
+public:
+	CkArrayIndexConst(int len,const void *srcData);//Copy given data
+	CkArrayIndexConst(const CkArrayIndex &that); //Copy given index's data
+	virtual const unsigned char *getKey(/*out*/ int &len) const;
+};
+
+//Finally, here the key is a run of bytes whose length can vary at run time.  
+// Is generic because it can contain the data of *any* kind of ArrayIndex.
+class CkArrayIndexGeneric : public CkArrayIndex {
+protected:
+	int nBytes;//Length of key in bytes
+	unsigned char *heapData;//Heap-allocated data array
+	void copyFrom(int len,const void *srcData);
+public:
+	CkArrayIndexGeneric(int len,const void *srcData);//Copy given data
+	CkArrayIndexGeneric(const CkArrayIndex &that); //Copy given index's data
+	virtual ~CkArrayIndexGeneric();//Deletes allocated data
+	virtual const unsigned char *getKey(/*out*/ int &len) const;
+};
+
+
+/***********************************************************
+	Utility defines, includes, etc.
+*/
+
+//#undef CMK_LBDB_ON  //FOR TESTING:  DISABLE LOAD BALANCER
+//#define CMK_LBDB_ON 0
 
 #if CMK_LBDB_ON
 #include "LBDatabase.h"
+class LBDatabase;
 #endif
 
 extern void _registerCkArray(void);
-
-class PtrQ;
-class PtrVec;
+extern CkGroupID _RRMapID;
 
 #define ALIGN8(x)       (int)((~7)&((x)+7))
 
@@ -34,458 +135,391 @@ class PtrVec;
 typedef int MessageIndexType;
 typedef int ChareIndexType;
 typedef int EntryIndexType;
+typedef struct {
+	ChareIndexType chareType;
+	EntryIndexType constructorType;
+	EntryIndexType migrateType;
+} CkArrayElementType;
 
-extern CkGroupID _RRMapID;
+//Forward declarations
+class CkArray;
+class ArrayElement;
+class ArrayMessage;
+class CkArrayCreateMsg;
+class CkArrayInsertMsg;
+class CkArrayRemoveMsg;
+class CkArrayUpdateMsg;
 
-#if CMK_LBDB_ON
-class LBDatabase;
-#endif
-
-class Array1D;
-class ArrayMapRegisterMessage;
-class ArrayElementCreateMessage;
-class ArrayElementMigrateMessage;
-class ArrayElementExitMessage;
-class ArrayReductionHeartbeatM;
-
-
-class ArrayMap : public Group
-{
+//This class is a wrapper around a CkArrayIndex and ArrayID,
+// used by array proxies. 
+class CkArrayProxyBase :public CkArrayID {
+protected:
+	CkArrayIndex *_idx;//<- specialized array index, or NULL
+	CkArrayProxyBase() {}
+	CkArrayProxyBase(const CkArrayID &aid) {_aid=aid._aid;_idx=NULL;}
+	CkArrayProxyBase(const CkArrayID &aid,CkArrayIndex *idx)
+	  {_aid=aid._aid;_idx=idx;}
 public:
-  virtual int procNum(int arrayHdl, int element) = 0;
-  virtual void registerArray(ArrayMapRegisterMessage *) = 0;
+	CkGroupID ckGetGroupID(void) { return _aid; }
+//Messaging:
+	void send(ArrayMessage *msg, int entryIndex);
+	void broadcast(ArrayMessage *msg, int entryIndex);
+		
+//Array element insertion
+	void insert(int onPE=-1);
+	void doneInserting(void);//Call on PE 0 after inserts (for load balancer)
+	
+//Register the given reduction client:
+	void reductionClient(CkReductionMgr::clientFn fn,void *param=NULL);
 };
 
-//////////////////////// Array Reduction Library //////////////
-#define CK_ARRAY_REDUCTIONS 1
-#ifdef CK_ARRAY_REDUCTIONS
+/************************* Array Map  ************************
+An array map tells which PE to put each array element on.
+*/
+class CkArrayMapRegisterMessage
+{
+public:
+  int numElements;
+  CkArray *array;
+};
 
-class ArrayReductionMessage;//See definition at end of file
+class CkArrayMap : public CkGroupInitCallback
+{
+public:
+  CkArrayMap(void);
+  virtual int registerArray(CkArrayMapRegisterMessage *);
+  virtual int procNum(int arrayHdl,const CkArrayIndex &element);
+};
 
-//An ArrayReductionFn is used to combine the contributions
-//of several array elements into a single summed contribution:
-//  nMsg gives the number of messages to reduce.
-//  msgs[i] contains a contribution from a local element or remote branch.
-typedef ArrayReductionMessage *(*ArrayReductionFn)(int nMsg,ArrayReductionMessage **msgs);
-
-//An ArrayReductionClientFn is called on PE 0 when the contributions
-// from all array elements have been received and reduced.
-//  param can be ignored, or used to pass any client-specific data you wish
-//  dataSize gives the size (in bytes) of the data array
-//  data gives the reduced contributions of all array elements.  
-//       It will be disposed of by the Array BOC when this procedure returns.
-typedef void (*ArrayReductionClientFn)(void *param,int dataSize,void *data);
-#endif //CK_ARRAY_REDUCTIONS
-
+/************************ Array Element *********************/
+class ArrayElementCreateMessage;
+class ArrayElementMigrateMessage;
 
 class ArrayElement : public Chare
 {
-friend class Array1D;
+	friend class CkArray;
 public:
   ArrayElement(ArrayElementCreateMessage *msg);
   ArrayElement(ArrayElementMigrateMessage *msg);
 
+  virtual ~ArrayElement();//Deletes heap-allocated array index
+  
+  CkArrayIndexGeneric *thisindex;//Array index (allocated on heap)
+
+//Remote method: deletes this array element
+  void destroy(void);
+  
+//Contribute to the given reduction type.  Data is copied, not deleted.
+  void contribute(int dataSize,void *data,CkReduction::reducerType type);
+
+//Migrate to the given processor number
+  void migrateMe(int toPE);
+  
 private:
-  ArrayElement(void) {};
+  ArrayElement(void) {} /*Forces us to use the odd constructors above*/
 
 protected:
-	//Call contribute to add your contribution to a new global reduction.
-	// The array BOC will keep a copy the data. reducer must be the same on all PEs.
-	void contribute(int dataSize,void *data,ArrayReductionFn reducer);
-	//This value is used by Array1D to keep track of which ArrayElements have contribute()'d.
-	// It is simply the number of times contribute has been called.
-	int nContributions;
-	
+  CkArray *thisArray;//My source array
+  
+  //For migration, overload these:
+  virtual int packsize(void) const;//Returns number of bytes I need
+  virtual void *pack(void *intoBuf);//Write me to given buffer
+  virtual const void *unpack(const void *fromBuf);//Extract me from given buffer
 
-  // For Backward compatibility:
-  void finishConstruction(void) { finishConstruction(CmiFalse); };
+  CkArrayID thisArrayID;//My source array
+  CkReductionMgr::contributorInfo reductionInfo;//My reduction information
 
-  void finishConstruction(CmiBool use_local_barrier);
-  void finishMigration(void);
+#if CMK_LBDB_ON  //For load balancing:
+  void AtSync(void);
+  virtual void ResumeFromSync(void);
+protected:
+    CmiBool usesAtSync;//You must set this in the constructor to use AtSync().
+private: //Load balancer state:
+    LDObjHandle ldHandle;//Transient (not migrated)
+    LDBarrierClient ldBarrierHandle;//Transient (not migrated)  
+    static void staticResumeFromSync(void* data);
+    static void staticMigrate(LDObjHandle h, int dest);
+#endif
+    void lbRegister(void);//Connect to load balancer
+    void lbUnregister(void);//Disconnect from load balancer
 
-  virtual int packsize(void) { return 0; }
-  virtual void pack(void *) { return; }
-  void AtSync();
-  virtual void ResumeFromSync(void) {
-    CkPrintf("No ResumeFromSync() defined for this element!\n");
-  };
-
-  int thisIndex;
-  CkArrayID thisAID;     // thisArrayID is preferred
-  CkArrayID thisArrayID; // A duplicate of thisAID
-  int numElements;
-
+//Array implementation methods: 
+private:
+  int bcastNo;//Number of broadcasts received (also serial number)
+  void private_startConstruction(CkGroupID agID,const CkArrayIndex &idx);
+  void private_startMigration(CkGroupID agID,const CkArrayIndex &idx);
 public:
-  void migrate(int where);
-  void exit(ArrayElementExitMessage *msg);
-  int getIndex(void) { return thisIndex; }
-  int getSize(void)  { return numElements; }
-
-private:
-  CkChareID arrayChareID;
-  CkGroupID arrayGroupID;
-
-protected:
-  Array1D *thisArray;
+//these are called by the translator-generated constructors.
+  void private_finishConstruction(void);
+  void private_finishMigration(void);
 };
 
-enum {unknownPe = -1};
-
-class ArrayCreateMessage;
-class ArrayMessage;
-class ArrayMigrateMessage;
-class ArrayElementAckMessage;
-class ArrayElementUpdateMessage;
-
-class Array1D : public Group {
-friend class ArrayElement;
-
+//An ArrayElement1D is a utility class where you are 
+// constrained to a 1D "thisIndex" and 1D "numElements".
+class ArrayElement1D : public ArrayElement
+{
 public:
-  static  CkGroupID CreateArray(int numElements,
+  ArrayElement1D(ArrayElementCreateMessage *msg);
+  ArrayElement1D(ArrayElementMigrateMessage *msg);
+  int getIndex(void) {return thisIndex;}
+  int getSize(void)  {return numElements;}
+
+protected:
+  //For migration, overload these:
+  virtual int packsize(void) const;//Returns number of bytes I need
+  virtual void *pack(void *intoBuf);//Write me to given buffer
+  virtual const void *unpack(const void *fromBuf);//Extract me from given buffer
+  
+  int numElements;//Initial array size
+  int thisIndex;//1-D array index
+};
+
+//An ArrayElementT is a utility class where you are 
+// constrained to a "thisIndex" of some fixed-sized type T.
+template <class T>
+class ArrayElementT : public ArrayElement
+{
+public:
+  ArrayElementT(ArrayElementCreateMessage *msg):ArrayElement(msg)
+  {thisIndex=*(T *)thisindex->data();}
+  ArrayElementT(ArrayElementMigrateMessage *msg):ArrayElement(msg) {}
+
+protected:
+  //For migration, overload these:
+  virtual int packsize(void) const//Returns number of bytes I need
+  {return ArrayElement::packsize()+sizeof(T);}
+  virtual void *pack(void *intoBuf)//Write me to given buffer
+  {
+  	char *buf=(char *)ArrayElement::pack(intoBuf);
+  	*(T *)buf=thisIndex; buf+=sizeof(T);
+  	return buf;
+  }
+  virtual const void *unpack(const void *fromBuf)//Extract me from given buffer
+  {
+  	const char *buf=(const char *)ArrayElement::unpack(fromBuf);
+  	thisIndex=*(T *)buf; buf+=sizeof(T);
+  	return buf;
+  }
+  
+  T thisIndex;//Object array index
+};
+
+/*********************** Array Manager BOC *******************/
+
+class CkArrayRec;//An array element record
+
+class CkArray : public CkReductionMgr {
+	friend class ArrayElement;
+	friend class CkArrayProxyBase;
+	friend class CkArrayRec;
+	friend class CkArrayRec_aging;
+	friend class CkArrayRec_local;
+	friend class CkArrayRec_remote;
+	friend class CkArrayRec_buffering;
+	friend class CkArrayRec_buffering_migrated;
+public:
+//Array Creation:
+  static  CkGroupID CreateArray(int numInitialElements,
 				CkGroupID mapID,
 				ChareIndexType elementChare,
 				EntryIndexType elementConstructor,
 				EntryIndexType elementMigrator);
 
-  Array1D(ArrayCreateMessage *);
-  void send(ArrayMessage *msg, int index, EntryIndexType ei);
-  void broadcast(ArrayMessage *msg, EntryIndexType ei);
-  void RecvMapID(ArrayMap *mapPtr,int mapHandle);
-  void RecvElementID(int index, ArrayElement *elem, CkChareID handle,
-		     CmiBool uses_barrier);
+  CkArray(CkArrayCreateMsg *);
+  CkGroupID &getGroupID(void) {return thisgroup;}
+
+//Element creation/destruction:
+  void InsertElement(CkArrayInsertMsg *m);
+  void DoneInserting(void);
+  void ElementDying(CkArrayRemoveMsg *m);
+  
+  //Fetch a local element via its index (return NULL if not local)
+  ArrayElement *getElement(const CkArrayIndex &index);
+  
+  //Internal creation calls (called only by ArrayElement)
+  void recvElementID(const CkArrayIndex &index, ArrayElement *elem,bool fromMigration);
+
+//Messaging:
+  //Called by proxy to deliver message to any array index
+  // After send, the array owns msg.
+  void Send(ArrayMessage *msg);
+  //Called by send to deliver message to an element.
   void RecvForElement(ArrayMessage *msg);
-  void RecvMigratedElement(ArrayMigrateMessage *msg);
-  void RecvMigratedElementID(int index, ArrayElement *elem, CkChareID handle);
-  void AckMigratedElement(ArrayElementAckMessage *msg);
-  void UpdateLocation(ArrayElementUpdateMessage *msg);
-  int array_size(void) { return numElements; };
-  int num_local(void) { return numLocalElements; };
-  int ckGetGroupId(void) { return thisgroup; }
-  ArrayElement *getElement(int idx) { return elementIDs[idx].element; }
+  //Called by CkArrayRec for a local message
+  void deliverLocal(ArrayMessage *msg,ArrayElement *el);
+   //Called by CkArrayRec for a remote message
+  void deliverRemote(ArrayMessage *msg,int onPE);
+
+//Migration:
+  void migrateMe(ArrayElement *elem, int where);
+  
+  //Internal:
+  void RecvMigratedElement(ArrayElementMigrateMessage *msg);
+  void UpdateLocation(CkArrayUpdateMsg *msg);
+
+//Load balancing:
   void DummyAtSync(void);
+  
+//Housecleaning: called periodically from node zero
+  void SpringCleaning(void);
 
-#ifdef CK_ARRAY_REDUCTIONS
-  //Register a function to be called once the reduction is complete--
-  //  need only be called on PE 0 (but is harmless otherwise).
-#define CkRegisterArrayReductionHandler(aid,handler,param) \
-      (aid)._array->registerReductionHandler(handler,param)
-  void registerReductionHandler(ArrayReductionClientFn handler,void *param);
-  void RecvReductionMessage(ArrayReductionMessage *msg);
-  void ReductionHeartbeat(ArrayReductionHeartbeatM *msg);
-#endif
-
-#if CMK_LBDB_ON
-  static void staticMigrate(LDObjHandle _h, int _dest);
-  static void staticSetStats(LDOMHandle _h, int _state);
-  static void staticQueryLoad(LDOMHandle _h);
-  static void staticResumeFromSync(void* data);
-  static void staticRecvAtSync(void* data);
-  static void staticDummyResumeFromSync(void* data);
-#endif
-
-  typedef enum {creating, here, moving_to, arriving, at} ElementState;
-
+//Broadcast:
+  void SendBroadcast(ArrayMessage *msg);
+  void RecvBroadcast(ArrayMessage *msg);
+  
 private:
-  void migrateMe(int index, int where);
-
 #if CMK_LBDB_ON
-  void Migrate(LDObjHandle _h, int _dest);
-  void SetStats(LDOMHandle _h, int _state);
-  void QueryLoad(LDOMHandle _h);
-
-  void RegisterElementForSync(int index);
-  void AtSync(int index);
-  void ResumeFromSync(int index);
-  void DummyResumeFromSync();
-  void RecvAtSync();
-#endif
-
-  struct ElementIDs {
-    struct BarrierClientData {
-      Array1D *me;            
-      int index;
-    };
-
-    ElementState state;
-    int originalPE;
-    int pe;
-    ArrayElement *element;
-    CkChareID elementHandle;
-    int cameFrom;
-    int curHop;
-    ArrayMigrateMessage *migrateMsg;
-#if CMK_LBDB_ON
-    LDObjHandle ldHandle;
-    CmiBool uses_barrier;
-    LDBarrierClient barrierHandle;
-    BarrierClientData barrierData;
-#endif
-  };
-
-  int numElements;
-  int mapHandle;
-  CkGroupID mapGroup;
-  ArrayMap *map;
-  ChareIndexType elementChareType;
-  EntryIndexType elementConstType;
-  EntryIndexType elementMigrateType;
-  ElementIDs *elementIDs;
-  int elementIDsReported;
-  int numLocalElements;
-
-#if CMK_LBDB_ON
-  LDOMHandle myHandle;
-  LBDatabase *the_lbdb;
   LDBarrierClient dummyBarrierHandle;
+  static void staticDummyResumeFromSync(void* data);
+  void dummyResumeFromSync(void);
+  static void staticRecvAtSync(void* data);
+  void recvAtSync(void);
+  
+  //Load balancing callbacks:
+  static void staticSetStats(LDOMHandle _h, int _state);
+  void setStats(LDOMHandle _h, int _state);
+  static void staticQueryLoad(LDOMHandle _h);
+  void queryLoad(LDOMHandle _h);
+  
+  LDOMHandle myLBHandle;
+  LBDatabase *the_lbdb;
 #endif
-  PtrQ *bufferedForElement;
-  PtrQ *bufferedMigrated; 
- 
-#ifdef CK_ARRAY_REDUCTIONS
-// Array Reduction Implementation:
-	ArrayReductionClientFn reductionClient;//Will be called with reduction result
-	void *reductionClientParam;//Parameter to pass to reduction client
+  //This flag lets us detect element suicide, so we can stop timing
+  bool curElementIsDead;
 
-#define ARRAY_RED_TREE 4 //Number of kids of each tree node
 
-//This is used to hold messages that arrive for reductions we haven't started yet
-	PtrQ *futureBuffer;//Holds ArrayReductionMessages from future reductions
-	
-	int reductionNo;//The number of the current reduction (starts at -1)
-	int reductionFinished;//Flag: is the current reduction (above) complete? (as far as we are concerned)
-	PtrQ *curMsgs;//Holds ArrayReductionMessages for current reduction
-	int nContributions;//Number of contributions, counting combined
-	int nRemote;//Number of messages recieved up the reduction tree
-	int expectedRemote;//Number of messages we expect to receive from our kids
+  Hashtable hash;//Maps array index to array element records (CkArrayRec)
+  //Add given element array record (which then owns it) at idx.
+  // If replaceOld, old record is discarded and replaced.
+  void insertRec(CkArrayRec *rec,const CkArrayIndex &idx,int replaceOld=1);
+  //Look up array element in hash table.  Index out-of-bounds if not found.
+  CkArrayRec *elementRec(const CkArrayIndex &idx);
+  //Look up array element in hash table.  Return NULL if not there.
+  CkArrayRec *elementNrec(const CkArrayIndex &idx) 
+  	{return (CkArrayRec *)hash.get(idx);}
+  
+  //This structure keeps counts of numbers of array elements:
+  struct {
+  	int local;//Living here
+  	int migrating;//Just left
+  	int arriving;//Just arrived
+  	int creating;//Just created
+  } num;//<- array element counts
+  
+  CkArrayElementType type;
+  int numInitial;//Initial array size (used only for 1D case)
 
-//This is called by ArrayElement::contribute() and RcvReductionMessage.
-// reducer may be NULL. The given message is kept by Array1D.
-	void addContribution(ArrayReductionMessage *m);
-//Like above, but only handles messages from current reduction
-	void addCurrentContribution(ArrayReductionMessage *m);
+//Broadcast support
+  int bcastNo;//Number of broadcasts received (also serial number)
+  int oldBcastNo;//Above value last spring cleaning
+  //This queue stores old broadcasts (in case a migrant arrives
+  // and needs to be brought up to date)
+  CkQ<ArrayMessage *> oldBcasts;
+  void bringBroadcastUpToDate(ArrayElement *el);
+  void deliverBroadcast(ArrayMessage *bcast,ArrayElement *el);
 
-//These two are called by addReductionContribution, above
-	void tryBeginReduction(int atLeast);//increment reductionNo, compute expectedComposite
-	int expectedLocalMessages(void);//How many messages do we still need from locals?
-	void tryEndReduction(void);//Check if we're done, and if so, finish.
-	void endReduction(void);//Combine msgs array and send off, set finished flag
-#endif //CK_ARRAY_REDUCTIONS
+//For houscleaning:
+  int nSprings;//Number of times "SpringCleaning" has been broadcast
+  double lastCleaning;//Wall time that last springcleaning was broadcast
+
+///// Map support:
+  CkGroupID mapID;
+  int mapHandle;
+  CkArrayMap *map;
+//Return the home PE of the given array index
+  int homePE(const CkArrayIndex &idx) const
+  	{return map->procNum(mapHandle,idx);}
+//Return 1 if this is the home PE of the given array index
+  bool isHome(const CkArrayIndex &idx) const
+  	{return homePE(idx)==CkMyPe();}
+
+//Initialization support:
+  static void static_initAfterMap(void *dis);
+  void initAfterMap(void);
+};
+
+/*********************** Array Messages ************************/
+//This is a superclass of all the messages which contain array indices.
+class CkArrayIndexMsg
+{
+private:
+  //This array keeps the array index of the destination if it fits,
+  //  otherwise the array index gets appended at the end of the message.
+#define CKARRAYINDEX_STORELEN_INTS 3 //Store 3 ints in indexStore
+#define CKARRAYINDEX_STORELEN sizeof(int)*CKARRAYINDEX_STORELEN_INTS
+  int indexStore[CKARRAYINDEX_STORELEN_INTS];
+  int indexLength;//Bytes in destination array index
+
+public:
+  //Allocate and return a new CkArrayIndexGeneric with this message's index
+  CkArrayIndexGeneric *copyIndex(void);
+  
+  //Return a CkArrayIndexConst with this message's index
+  const CkArrayIndexConst index(void) const;
+
+  //Writes the given index into this array message,
+  // reallocating and copying if needed-- it may not be possible
+  // to do this "in place".
+  CkArrayIndexMsg *insertArrayIndex(const CkArrayIndex &idx);
+};
+
+//This class is used to avoid the cast on the insert index call above--
+// It's just "syntactic sugar".
+template <class M>
+class CkArrayIndexMsgT : public CkArrayIndexMsg {
+public:
+	M *insert(const CkArrayIndex &idx) {return (M *)insertArrayIndex(idx);}
+};
+
+class ArrayMessage:public CkArrayIndexMsgT<ArrayMessage>  {
+public:
+  int from_pe,hopCount;//Original sender, number of hops since
+  EntryIndexType entryIndex;//Destination entry method
 };
 
 #include "CkArray.decl.h"
 
-class ArrayCreateMessage : public CMessage_ArrayCreateMessage
-{
+class ArrayElementCreateMessage : public CkArrayIndexMsgT<ArrayElementCreateMessage>, 
+public CMessage_ArrayElementCreateMessage {
 public:
-  int numElements;
-  CkGroupID mapID;
-  ChareIndexType elementChareType;
-  EntryIndexType elementConstType;
-  EntryIndexType elementMigrateType;
-  CkGroupID loadbalancer;
+	CkGroupID agID;//Array's group ID
+	int numInitial;//Initial array size (used only for 1D case)
+};
+class ArrayElementMigrateMessage : public CkArrayIndexMsgT<ArrayElementMigrateMessage>, 
+public CMessage_ArrayElementMigrateMessage {
+public:
+	static void *alloc(int msgnum, int size, int *array, int priobits);
+	static void *pack(ArrayElementMigrateMessage *);
+	static ArrayElementMigrateMessage *unpack(void *in);
+
+	CkGroupID agID;//Array's group ID
+	int numInitial;//Initial array size (used only for 1D case)
+	int from_pe;//Source PE
+	void* packData;
 };
 
-class ArrayMessage
-{
-public:
-  int from_pe;
-  int destIndex;
-  EntryIndexType entryIndex;
-  int hopCount;
-  int serial_num;
+//Message: Add an array element at this index.
+class CkArrayInsertMsg : public CkArrayIndexMsgT<CkArrayInsertMsg>,
+public CMessage_CkArrayInsertMsg 
+{public:
+	int onPE;//PE to create on, or -1 if not known yet.
+	int chareType;//Kind of chare to create, or -1 for array's default type.
+	int constructorIndex;//Chare constructor index, or -1 for array's default type.
+	CkArrayInsertMsg(int NonPE=-1,
+		int NchareType=-1,int NconstructorIndex=-1);
 };
 
-class ArrayElementAckMessage : public CMessage_ArrayElementAckMessage
-{
-public:
-  int index;
-  int arrivedAt;
-  int deleteElement;
-  CkChareID handle;
-  int hopCount;
+//Message: Remove the array element at the given index.
+class CkArrayRemoveMsg : public CkArrayIndexMsgT<CkArrayRemoveMsg>,
+public CMessage_CkArrayRemoveMsg 
+{/*The array index is enough*/};
+
+//Message: Direct future messages for this array element to this PE.
+class CkArrayUpdateMsg : public CkArrayIndexMsgT<CkArrayUpdateMsg>, 
+public CMessage_CkArrayUpdateMsg 
+{public:
+	int onPE;//Indicates given array index lives on this PE
+	CkArrayUpdateMsg(void);
 };
-
-class ArrayElementUpdateMessage : public CMessage_ArrayElementUpdateMessage
-{
-public:
-  int index;
-  int hopCount;
-  int pe;
-};
-
-class ArrayMigrateMessage : public CMessage_ArrayMigrateMessage
-{
-public:
-  int from;
-  int index,nContributions;
-  int elementSize;
-  void *elementData;
-  int hopCount;
-  CmiBool uses_barrier;
-
-  static void *alloc(int msgnum, int size, int *array, int priobits);
-  static void *pack(ArrayMigrateMessage *);
-  static ArrayMigrateMessage *unpack(void *in);
-};
-
-class RRMap : public ArrayMap
-{
-private:
-  PtrVec *arrayVec;
-public:
-  RRMap(void);
-  void registerArray(ArrayMapRegisterMessage *);
-  int procNum(int arrayHdl, int element);
-};
-
-class ArrayInit : public Chare 
-{
-public:
-  ArrayInit(CkArgMsg *msg) {
-    _RRMapID = CProxy_RRMap::ckNew();
-    delete msg;
-  }
-};
-
-class ArrayMapRegisterMessage : public CMessage_ArrayMapRegisterMessage
-{
-public:
-  int numElements;
-  CkChareID arrayID;
-  CkGroupID groupID;
-};
-
-class ArrayElementCreateMessage : public CMessage_ArrayElementCreateMessage {
-public:
-  int numElements;
-  CkChareID arrayID;
-  CkGroupID groupID;
-  Array1D *arrayPtr;
-  int index;
-};
-
-class ArrayElementMigrateMessage : public CMessage_ArrayElementMigrateMessage {
-public:
-  int numElements;
-  CkChareID arrayID;
-  CkGroupID groupID;
-  Array1D *arrayPtr;
-  int index,nContributions;
-  void* packData;
-};
-
-class ArrayElementExitMessage : public CMessage_ArrayElementExitMessage
-{
-public:
-  int dummy;
-};
-
-#ifdef CK_ARRAY_REDUCTIONS
-//An ArrayReductionMessage is sent up the reduction tree-- it
-// carries the contribution of one 
-// (or reduced contributions of several) array elements.
-class ArrayReductionMessage : public CMessage_ArrayReductionMessage
-{
-private:
-  //Default constructor is private-- use "buildNew", below
-  ArrayReductionMessage();
-public:
-//External fields
-  //Length of array below, in bytes
-  int dataSize;
-  //Reduction data
-  void *data;
-  //Index of array element which made this contribution,
-  //  or -n-1, where n is the number of contributing elements
-  int source;
-  
-  //Return if this is a single element's contribution
-  int isSingleton(void);
-  //Return the number of array elements from which this message's data came
-  int getSources(void);
-  
-  //"Constructor"-- builds and returns a new ArrayReductionMessage.
-  //  the "srcData" array you specify will be copied into this object (unless NULL).
-  static ArrayReductionMessage *buildNew(int NdataSize,void *srcData);
-
-
-//Internal fields
-  //The number of this reduction (0, 1, ...)
-  int reductionNo;
-  //The reduction function pointer.
-  ArrayReductionFn reducer;
- 
-  //Message runtime support
-  static void *alloc(int msgnum, int size, int *reqSize, int priobits);
-  static void *pack(ArrayReductionMessage *);
-  static ArrayReductionMessage *unpack(void *in);
-};
-
-class ArrayReductionHeartbeatM : public CMessage_ArrayReductionHeartbeatM
-{
-public:
-  int currentReduction;
-  ArrayReductionHeartbeatM(int r) {currentReduction=r;}
-};
-
-//Reduction Library:
-/*
-A small library of oft-used reductions for use with the 
-Array Reduction Manager.
-
-Parallel Programming Lab, University of Illinois at Urbana-Champaign
-Orion Sky Lawlor, 11/13/1999, olawlor@acm.org
-
-*/
-
-//Compute the sum the numbers passed by each element.
-ArrayReductionMessage *CkReduction_sum_int(int nMsg,ArrayReductionMessage **msg);
-ArrayReductionMessage *CkReduction_sum_float(int nMsg,ArrayReductionMessage **msg);
-ArrayReductionMessage *CkReduction_sum_double(int nMsg,ArrayReductionMessage **msg);
-
-//Compute the product the numbers passed by each element.
-ArrayReductionMessage *CkReduction_product_int(int nMsg,ArrayReductionMessage **msg);
-ArrayReductionMessage *CkReduction_product_float(int nMsg,ArrayReductionMessage **msg);
-ArrayReductionMessage *CkReduction_product_double(int nMsg,ArrayReductionMessage **msg);
-
-//Compute the largest number passed by any element.
-ArrayReductionMessage *CkReduction_max_int(int nMsg,ArrayReductionMessage **msg);
-ArrayReductionMessage *CkReduction_max_float(int nMsg,ArrayReductionMessage **msg);
-ArrayReductionMessage *CkReduction_max_double(int nMsg,ArrayReductionMessage **msg);
-
-//Compute the smallest number passed by any element.
-ArrayReductionMessage *CkReduction_min_int(int nMsg,ArrayReductionMessage **msg);
-ArrayReductionMessage *CkReduction_min_float(int nMsg,ArrayReductionMessage **msg);
-ArrayReductionMessage *CkReduction_min_double(int nMsg,ArrayReductionMessage **msg);
-
-
-//Compute the logical AND of the integers passed by each element.
-// The resulting integer will be zero if any source integer is zero.
-ArrayReductionMessage *CkReduction_and(int nMsg,ArrayReductionMessage **msg);
-
-//Compute the logical OR of the integers passed by each element.
-// The resulting integer will be 1 if any source integer is nonzero.
-ArrayReductionMessage *CkReduction_or(int nMsg,ArrayReductionMessage **msg);
-
-
-//This structure contains the contribution of one array element.
-typedef struct {
-	int sourceElement;//The element number from which this contribution came
-	int dataSize;//The length of the data array below
-	char data[1];//The (dataSize-long) array of data
-} CkReduction_set_element;
-
-//Combine the data passed by each element into an list of reduction_set_elements.
-// Each element may contribute arbitrary data (with arbitrary length).
-ArrayReductionMessage *CkReduction_set(int nMsg,ArrayReductionMessage **msg);
-
-//Utility routine: get the next reduction_set_element in the list
-// if there is one, or return NULL if there are none.
-//To get all the elements, just keep feeding this procedure's output back to
-// its input until it returns NULL.
-CkReduction_set_element *CkReduction_set_element_next(CkReduction_set_element *cur);
-
-#endif //CK_ARRAY_REDUCTIONS
-
 
 #endif

@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 #include "ck.h"
 #include "trace.h"
 
@@ -599,13 +592,3 @@ GroupTable::GroupTable()
     bins[i] = 0;
 }
 
-PtrQ::PtrQ() :len(0), first(0) {
-      block = new void*[blklen=BLKSZ];
-      _MEMCHECK(block);
-}
-
-PtrVec::PtrVec() {
-      block = new void*[blklen=BLKSZ];
-      for(int i=0; i<blklen; i++) block[i] = 0;
-      _MEMCHECK(block);
-}
