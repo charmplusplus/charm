@@ -101,8 +101,8 @@
 
        interface
        
-       subroutine FEM_Attach(flags) 
-           integer,intent(in) :: flags
+       subroutine FEM_Init(comm) 
+           integer,intent(in) :: comm
        end subroutine
        function FEM_My_Partition()
           integer  :: FEM_My_Partition

@@ -37,8 +37,8 @@ extern "C" {
 #endif
   typedef void (*FEM_PupFn)(pup_er, void*);
 
-  /*Attach a new FEM chunk to the existing TCharm array*/
-  void FEM_Attach(int flags);
+  /* Attach a new FEM chunk to this MPI communicator */
+  void FEM_Init(int comm);
 
   /*Utility*/
   int FEM_My_partition(void);

@@ -21,6 +21,9 @@ then resume the thread when the results arrive.
  */
 #include "fem_impl.h"
 
+/* TCharm semaphore ID, used for mesh startup */
+#define FEM_TCHARM_SEMAID 0x00FE300 /* __FEM__ */
+
 void FEM_Abort(const char *msg) {
 	CkAbort(msg);
 }
@@ -40,28 +43,28 @@ CDECL void fem_impl_call_init(void);
 
 FDECL void FTN_NAME(INIT,init)(void);
 FDECL void FTN_NAME(DRIVER,driver)(void);
+static int initFlags=0;
 
 /*Startup:*/
 static void callDrivers(void) {
+	FEM_Init(initFlags);
         driver();
 #ifndef CMK_FORTRAN_USES_NOSCORE
         FTN_NAME(DRIVER,driver)();
 #endif
 }
 
-static int initFlags=0;
 
 static void FEMfallbackSetup(void)
 {
-	int nChunks=TCHARM_Get_num_chunks();
-	TCHARM_Create(nChunks,callDrivers);
 	if (!(initFlags&FEM_INIT_READ)) {
 		fem_impl_call_init(); // init();
 #ifndef CMK_FORTRAN_USES_NOSCORE
 		FTN_NAME(INIT,init)();
 #endif
 	}
-        FEM_Attach(initFlags);
+	int nChunks=TCHARM_Get_num_chunks();
+	TCHARM_Create(nChunks,callDrivers);
 }
 
 //_femptr gives the current chunk, and is only
@@ -151,24 +154,20 @@ public:
 
 static void RestoreTCharmGlobals(int _nchunks) {
   PUP::fromTextFile pg(FEM_openMeshFile(_nchunks,_nchunks,true));
-  TCharmReadonlys::pupAllReadonlys(pg);
+  TCharmReadonlys::pupAll(pg);
 }
 static void SaveTCharmGlobals(int _nchunks) {
   PUP::toTextFile pg(FEM_openMeshFile(_nchunks,_nchunks,false));
-  TCharmReadonlys::pupAllReadonlys(pg);
+  TCharmReadonlys::pupAll(pg);
 }
 
-FDECL void FTN_NAME(FEM_ATTACH,fem_attach)(int *flags) 
-{
-	FEM_Attach(*flags);
-}
-
-CDECL void FEM_Attach(int flags)
+static void FEM_Attach(int comm)
 {
 	FEMAPI("FEM_Attach");
 	CkArrayID threadsAID; int _nchunks;
 	CkArrayOptions opts=TCHARM_Attach_start(&threadsAID,&_nchunks);
 	
+	int flags=initFlags;
 	if (flags&FEM_INIT_WRITE) 
 	{ //First save the user's globals (if any):
 		SaveTCharmGlobals(_nchunks);
@@ -190,7 +189,6 @@ CDECL void FEM_Attach(int flags)
 	CProxy_FEMchunk chunks= CProxy_FEMchunk::ckNew(init,opts);
 	chunks.setReductionClient(_allReduceHandler, new CProxy_FEMchunk(chunks));
 	coord.setArray(chunks);
-	TCHARM_Attach_finish(chunks);
 	
 	//Send the mesh out to the chunks
 	if (_destSerialMesh!=NULL) 
@@ -202,6 +200,14 @@ CDECL void FEM_Attach(int flags)
 		chunks.run();
 	}
 }
+
+CDECL void FEM_Init(int comm)
+{
+	if (TCHARM_Element()==0) 
+		FEM_Attach(comm);
+	FEMchunk *c=(FEMchunk *)TCharm::get()->semaGet(FEM_TCHARM_SEMAID);
+}
+FORTRAN_AS_C(FEM_INIT,FEM_Init,fem_init, (int *comm), (*comm))
 
 //This coordinator manages mesh reassembly for a FEM array:
 class FEMcoordinator : public Chare {
@@ -618,14 +624,14 @@ void
 FEMchunk::run(marshallMeshChunk &msg)
 {
   setMesh(msg);
-  thread->ready();
+  thread->semaPut(FEM_TCHARM_SEMAID,this);
 }
 
 void
 FEMchunk::run(void)
 {
   setMesh();
-  thread->ready();
+  thread->semaPut(FEM_TCHARM_SEMAID,this);
 }
 
 void
