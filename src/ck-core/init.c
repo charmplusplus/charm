@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.35  1995-11-13 04:04:33  gursoy
+ * Revision 2.36  1995-11-14 23:22:08  jyelon
+ * handle_bocinitmsg now saves and restores currentChareBlock.
+ *
+ * Revision 2.35  1995/11/13  04:04:33  gursoy
  * made changes related to initial msg synchronization
  *
  * Revision 2.34  1995/11/07  17:53:45  sanjeev
@@ -568,9 +571,11 @@ ENVELOPE       *envelope;
   int             current_msgType = GetEnv_msgType(envelope);
   int             current_chare = current_epinfo->chareindex;
   int             current_magic = CpvAccess(nodecharesProcessed)++;
+  CHARE_BLOCK    *prev_chare_block;
 
   CpvAccess(nodebocInitProcessed)++ ;
 
+  prev_chare_block = CpvAccess(currentChareBlock);
   CpvAccess(currentChareBlock) = bocBlock = 
 		CreateChareBlock(CsvAccess(ChareSizesTable)[current_chare], 
 					CHAREKIND_BOCNODE, current_magic);
@@ -580,6 +585,7 @@ ENVELOPE       *envelope;
   trace_begin_execute(envelope);
   (current_epinfo->function)(usrMsg, bocBlock->chareptr);
   trace_end_execute(current_magic, current_msgType, current_ep);
+  CpvAccess(currentChareBlock) = prev_chare_block;
 
   /* for dynamic BOC creation, used in node_main.c */
   return current_bocnum ;
