@@ -79,43 +79,17 @@ void CmiNotifyIdle(void) {
 
 int CheckSocketsReady(int withDelayMs)
 {   
-  int nreadable;
-#if !CMK_USE_POLL
-  static fd_set rfds; 
-  static fd_set wfds; 
-  struct timeval tmo;
+  int nreadable,dataWrite=writeableDgrams || writeableAcks;
+  CMK_PIPE_DECL(withDelayMs);
   
-  MACHSTATE(1,"CheckSocketsReady {")
-  FD_ZERO(&rfds);FD_ZERO(&wfds);
-  if (Cmi_charmrun_fd!=-1)
-  	FD_SET(Cmi_charmrun_fd, &rfds);
-  else 
-        return 0;	// standalone mode
+  CmiStdoutAdd(CMK_PIPE_SUB);
+  if (Cmi_charmrun_fd!=-1) CMK_PIPE_ADDREAD(Cmi_charmrun_fd);
   if (dataskt!=-1) {
-  	FD_SET(dataskt, &rfds);
-  	if (writeableDgrams || writeableAcks)
-  	  FD_SET(dataskt, &wfds); /*Outgoing queue is nonempty*/
+	CMK_PIPE_ADDREAD(dataskt);
+  	if (dataWrite)
+	    CMK_PIPE_ADDWRITE(dataskt);
   }
-  tmo.tv_sec = 0;
-  tmo.tv_usec = withDelayMs*1000;
-  nreadable = select(FD_SETSIZE, &rfds, &wfds, NULL, &tmo);
-#else
-  struct pollfd fds[3]; 
-  int n = 0;
-  MACHSTATE(1,"CheckSocketsReady {")
-  if (Cmi_charmrun_fd!=-1) {
-    fds[n].fd = Cmi_charmrun_fd;
-    fds[n].events = POLLIN;
-    n++;
-  }
-  if (dataskt!=-1) {
-    fds[n].fd = dataskt;
-    fds[n].events = POLLIN;
-    if (writeableDgrams || writeableAcks)  fds[n].events |= POLLOUT;
-    n++;
-  }
-  nreadable = poll(fds, n, withDelayMs);
-#endif
+  nreadable=CMK_PIPE_CALL();
   ctrlskt_ready_read = 0;
   dataskt_ready_read = 0;
   dataskt_ready_write = 0;
@@ -125,38 +99,19 @@ int CheckSocketsReady(int withDelayMs)
     return nreadable;
   }
   if (nreadable==-1) {
-#if defined(_WIN32) && !defined(__CYGWIN__)
-/* Win32 socket seems to randomly return inexplicable errors
-here-- WSAEINVAL, WSAENOTSOCK-- yet everything is actually OK. 
-	int err=WSAGetLastError();
-	CmiPrintf("(%d)Select returns -1; errno=%d, WSAerr=%d\n",withDelayMs,errno,err);
-*/
-#else
-	if (errno!=EINTR)
-		KillEveryone("Socket error in CheckSocketsReady!\n");
-#endif
+    CMK_PIPE_CHECKERR();
     MACHSTATE(2,"} CheckSocketsReady (INTERRUPTED!)")
     return CheckSocketsReady(0);
   }
-#if !CMK_USE_POLL
-  if (Cmi_charmrun_fd!=-1)
-	ctrlskt_ready_read = (FD_ISSET(Cmi_charmrun_fd, &rfds));
+  
+  CmiStdoutCheck(CMK_PIPE_SUB);
+  if (Cmi_charmrun_fd!=-1) 
+	  ctrlskt_ready_read = CMK_PIPE_CHECKREAD(Cmi_charmrun_fd);
   if (dataskt!=-1) {
-  	dataskt_ready_read = (FD_ISSET(dataskt, &rfds));
-	dataskt_ready_write = (FD_ISSET(dataskt, &wfds));
+	dataskt_ready_read = CMK_PIPE_CHECKREAD(dataskt);
+	if (dataWrite)
+		dataskt_ready_write = CMK_PIPE_CHECKWRITE(dataskt);
   }
-#else
-  if (dataskt!=-1) {
-    n--;
-    dataskt_ready_read = fds[n].revents & POLLIN;
-    dataskt_ready_write = fds[n].revents & POLLOUT;
-  }
-  if (Cmi_charmrun_fd!=-1) {
-    n--;
-    ctrlskt_ready_read = fds[n].revents & POLLIN;
-  }
-#endif
-  MACHSTATE(1,"} CheckSocketsReady")
   return nreadable;
 }
 
@@ -730,6 +685,7 @@ static void CommunicationServer(int sleepTime)
       if (writeableDgrams)
         if (0!=(writeableDgrams=TransmitDatagram())) again=1; 
     }
+    if (CmiStdoutNeedsService()) {CmiStdoutService();}
     if (!again) break; /* Nothing more to do */
     if ((nTimes++ &16)==15) {
       /*We just grabbed a whole pile of packets-- try to retire a few*/

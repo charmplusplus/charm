@@ -97,6 +97,7 @@ static int CmiSetupSockets()
     fds[numSocks].events = POLLIN;
     numSocks ++;
   }
+  CmiStdoutAdd(fds,&numSocks);
 }
 
 static void CmiCheckSocks()
@@ -123,9 +124,14 @@ static void CmiCheckSocks()
     ctrlskt_ready_read = fds[n].revents & POLLIN;
     n++;
   }
+  CmiStdoutCheck(fds,&numSocks);
 }
 #else
 
+/*
+WARNING: fd_set gets zero'd out after you call select, so this
+code won't work as written!
+ */
 static fd_set rfds; 
 static fd_set wfds; 
 
@@ -144,6 +150,7 @@ static int CmiSetupSockets()
       if (nodes[i].send_queue_h) FD_SET(nodes[i].sock, &wfds);
     }
   }  
+  CmiStdoutAdd(&rfds,&wfds);
 }
 
 static void CmiCheckSocks()
@@ -165,6 +172,7 @@ static void CmiCheckSocks()
       }
     }
   }
+  CmiStdoutCheck(&rfds,&wfds);
 }
 #endif
 
@@ -248,6 +256,7 @@ static void CommunicationServer(int sleepTime)
     sleepTime=0;
     if (ctrlskt_ready_read) {again=1;ctrl_getone();}
     if (dataskt_ready_read || dataskt_ready_write) {again=1;}
+    if (CmiStdoutNeedsService()) {CmiStdoutService();}
     if (!again) break; /* Nothing more to do */
     if ((nTimes++ &16)==15) {
       break;

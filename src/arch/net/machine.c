@@ -170,6 +170,29 @@
  *
  ****************************************************************************/
 
+#include <stdarg.h> /*<- was <varargs.h>*/
+
+#define CMK_USE_PRINTF_HACK 0
+#if CMK_USE_PRINTF_HACK
+/*HACK: turn printf into CmiPrintf, by just defining our own
+external symbol "printf".  This may be more trouble than it's worth,
+since the only advantage is that it works properly with +syncprint.
+
+This version *won't* work with fprintf(stdout,...) or C++ or Fortran I/O,
+because they don't call printf.  Has to be defined up here because we probably 
+haven't properly guessed this compiler's prototype for "printf".
+*/
+static void InternalPrintf(const char *f, va_list l);
+int printf(const char *fmt, ...) {
+	int nChar;
+	va_list p; va_start(p, fmt);
+        InternalPrintf(fmt,p);
+	va_end(p);
+	return 10;
+}
+#endif
+
+
 #include "converse.h"
 
 #include <stdio.h>
@@ -179,7 +202,6 @@
 #include <errno.h>
 #include <setjmp.h>
 #include <signal.h>
-#include <stdarg.h> /*<- was <varargs.h>*/
 #include <string.h>
 
 /* define machine debug */
@@ -213,6 +235,7 @@ int  portFinish = 0;
 #else /*UNIX*/
 #  include <pwd.h>
 #  include <unistd.h>
+#  include <fcntl.h>
 #  include <sys/file.h>
 #endif
 
@@ -308,8 +331,65 @@ static void PerrorExit(const char *msg)
 /*****************************************************************************
  *
  *     Utility routines for network machine interface.
-*
+ *
  *****************************************************************************/
+
+/*
+Horrific #defines to hide the differences between select() and poll().
+ */
+#if CMK_USE_POLL /*poll() version*/
+# define CMK_PIPE_DECL(delayMs) \
+	struct pollfd fds[10]; \
+	int nFds_sto=0; int *nFds=&nFds_sto; \
+	int pollDelayMs=delayMs;
+# define CMK_PIPE_SUB fds,nFds
+# define CMK_PIPE_CALL() poll(fds, *nFds, pollDelayMs); *nFds=0
+
+# define CMK_PIPE_PARAM struct pollfd *fds,int *nFds
+# define CMK_PIPE_ADDREAD(rd_fd) \
+	do {fds[*nFds].fd=rd_fd; fds[*nFds].events=POLLIN; (*nFds)++;} while(0)
+# define CMK_PIPE_ADDWRITE(wr_fd) \
+	do {fds[*nFds].fd=wr_fd; fds[*nFds].events=POLLOUT; (*nFds)++;} while(0)
+# define CMK_PIPE_CHECKREAD(rd_fd) fds[(*nFds)++].revents&POLLIN
+# define CMK_PIPE_CHECKWRITE(wr_fd) fds[(*nFds)++].revents&POLLOUT
+
+#else /*select() version*/
+
+# define CMK_PIPE_DECL(delayMs) \
+	fd_set rfds_sto,wfds_sto;\
+	fd_set *rfds=&rfds_sto,*wfds=&wfds_sto; struct timeval tmo; \
+	FD_ZERO(rfds); FD_ZERO(wfds);tmo.tv_sec=0; tmo.tv_usec=1000*delayMs;
+# define CMK_PIPE_SUB rfds,wfds
+# define CMK_PIPE_CALL() select(FD_SETSIZE, rfds, wfds, NULL, &tmo)
+
+# define CMK_PIPE_PARAM fd_set *rfds,fd_set *wfds
+# define CMK_PIPE_ADDREAD(rd_fd) FD_SET(rd_fd,rfds)
+# define CMK_PIPE_ADDWRITE(wr_fd) FD_SET(wr_fd,wfds)
+# define CMK_PIPE_CHECKREAD(rd_fd) FD_ISSET(rd_fd,rfds)
+# define CMK_PIPE_CHECKWRITE(wr_fd) FD_ISSET(wr_fd,wfds)
+#endif
+
+static void CMK_PIPE_CHECKERR(void) {
+#if defined(_WIN32) && !defined(__CYGWIN__)
+/* Win32 socket seems to randomly return inexplicable errors
+here-- WSAEINVAL, WSAENOTSOCK-- yet everything is actually OK. 
+        int err=WSAGetLastError();
+        CmiPrintf("(%d)Select returns -1; errno=%d, WSAerr=%d\n",withDelayMs,errn
+o,err);
+*/
+#else /*UNIX machine*/
+        if (errno!=EINTR)
+                KillEveryone("Socket error in CheckSocketsReady!\n");
+#endif
+}
+
+
+static void CmiStdoutFlush(void);
+static int  CmiStdoutNeedsService(void);
+static void CmiStdoutService(void);
+static void CmiStdoutAdd(CMK_PIPE_PARAM);
+static void CmiStdoutCheck(CMK_PIPE_PARAM);
+
 
 double GetClock(void)
 {
@@ -358,6 +438,9 @@ static int  Cmi_truecrash;
 
 void CmiAbort(const char *message)
 {
+  /*Send off any remaining prints*/
+  CmiStdoutFlush();
+  
   if(Cmi_truecrash) {
     printf("CHARM++ FATAL ERROR: %s\n", message);
     *(int *)NULL = 0; /*Write to null, causing bus error*/
@@ -400,7 +483,7 @@ void CmiEnableAsyncIO(int fd)
 void CmiEnableAsyncIO(int fd) { }
 #endif
 
-#if 0
+#if 1 /* <- what machines won't this work for? */
 void CmiEnableNonblockingIO(int fd) {
   int on=1;
   if (fcntl(fd,F_SETFL,O_NONBLOCK,&on)<0) {
@@ -408,6 +491,8 @@ void CmiEnableNonblockingIO(int fd) {
     exit(1);
   }
 }
+#else
+void CmiEnableNonblockingIO(int fd) { }
 #endif
 
 /***********************************************************
@@ -1137,6 +1222,7 @@ static void ctrl_sendone_nolock(const char *type,
 				const char *data2,int dataLen2)
 {
   ChMessageHeader hdr;
+  skt_abortFn oldAbort=skt_set_abort(sendone_abort_fn);
   if (Cmi_charmrun_fd==-1) 
   	charmrun_abort("ctrl_sendone called in standalone!\n");
   Cmi_charmrun_fd_sendflag=1;
@@ -1145,17 +1231,15 @@ static void ctrl_sendone_nolock(const char *type,
   if (dataLen1>0) skt_sendN(Cmi_charmrun_fd,data1,dataLen1);
   if (dataLen2>0) skt_sendN(Cmi_charmrun_fd,data2,dataLen2);
   Cmi_charmrun_fd_sendflag=0;
+  skt_set_abort(oldAbort);
 }
 
 static void ctrl_sendone_locking(const char *type,
 				const char *data1,int dataLen1,
 				const char *data2,int dataLen2)
 {
-  skt_abortFn oldAbort;
   CmiCommLock();
-  oldAbort=skt_set_abort(sendone_abort_fn);
   ctrl_sendone_nolock(type,data1,dataLen1,data2,dataLen2);
-  skt_set_abort(oldAbort);
   CmiCommUnlock();
 }
 
@@ -1173,6 +1257,9 @@ static void pingCharmrun(int ignored)
     ctrl_sendone_nolock("ping",NULL,0,NULL,0); /*Charmrun may have died*/
     CmiCommUnlock();
   }
+#if 1
+  CmiStdoutFlush(); /*Make sure stdout buffer hasn't filled up*/
+#endif
 }
 
 /* periodic charm ping, for gm and netpoll */
@@ -1257,13 +1344,14 @@ void CcsImpl_reply(CcsImplHeader *hdr,int repLen,const void *repData)
  *
  *****************************************************************************/
 
-static void InternalPrintf(f, l) char *f; va_list l;
+static void InternalPrintf(const char *f, va_list l)
 {
   ChMessage replymsg;
   char *buffer = CpvAccess(internal_printf_buffer);
+  CmiStdoutFlush();
   vsprintf(buffer, f, l);
   if(Cmi_syncprint) {
-  	  ctrl_sendone_locking("printsync", buffer,strlen(buffer)+1,NULL,0);
+  	  ctrl_sendone_locking("printsyn", buffer,strlen(buffer)+1,NULL,0);
 	  CmiCommLock();
   	  ChMessage_recv(Cmi_charmrun_fd,&replymsg);
   	  ChMessage_free(&replymsg);
@@ -1273,13 +1361,14 @@ static void InternalPrintf(f, l) char *f; va_list l;
   }
 }
 
-static void InternalError(f, l) char *f; va_list l;
+static void InternalError(const char *f, va_list l)
 {
   ChMessage replymsg;
   char *buffer = CpvAccess(internal_printf_buffer);
+  CmiStdoutFlush();
   vsprintf(buffer, f, l);
   if(Cmi_syncprint) {
-  	  ctrl_sendone_locking("printerrsync", buffer,strlen(buffer)+1,NULL,0);
+  	  ctrl_sendone_locking("printerrsyn", buffer,strlen(buffer)+1,NULL,0);
 	  CmiCommLock();
   	  ChMessage_recv(Cmi_charmrun_fd,&replymsg);
   	  ChMessage_free(&replymsg);
@@ -1289,9 +1378,7 @@ static void InternalError(f, l) char *f; va_list l;
   }
 }
 
-static int InternalScanf(fmt, l)
-    char *fmt;
-    va_list l;
+static int InternalScanf(char *fmt, va_list l)
 {
   ChMessage replymsg;
   char *ptr[20];
@@ -1353,11 +1440,137 @@ void CmiError(const char *fmt, ...)
 int CmiScanf(const char *fmt, ...)
 {
   va_list p; int i; va_start(p, fmt);
-  i = InternalScanf(fmt, p);
+  i = InternalScanf((char *)fmt, p);
   va_end(p);
   return i;
 }
 
+/***************************************************************************
+ * Output redirection:
+ *  When people don't use CkPrintf, like above, we'd still like to be able
+ * to collect their output.  Thus we make a pipe and dup2 it to stdout,
+ * which lets us read the characters sent to stdout at our lesiure.
+ ***************************************************************************/
+
+/*Can read from stdout or stderr using these fd's*/
+static int readStdout[2]; 
+static int serviceStdout[2]; /*Normally zero; one if service needed.*/
+#define readStdoutBufLen 8192
+static char readStdoutBuf[readStdoutBufLen+1]; /*Protected by comm. lock*/
+static int servicingStdout;
+
+/*Initialization-- should only be called once per node*/
+static void CmiStdoutInit(void) {
+	int i;
+	if (Cmi_charmrun_fd==-1) return; /* standalone mode */
+	
+/*There's some way to do this same thing in windows, but I don't know how*/
+#if !defined(_WIN32) || defined(__CYGWIN__)
+	/*Prevent buffering in stdio library:*/
+	setbuf(stdout,NULL); setbuf(stderr,NULL);
+
+	/*Reopen stdout and stderr fd's as new pipes:*/
+        for (i=0;i<2;i++) {
+		int pair[2];
+		int srcFd=1+i; /* 1 is stdout; 2 is stderr */
+		
+		if (-1==pipe(pair)) {perror("building redirection pipe"); exit(1);}
+		readStdout[i]=pair[0]; /*We get the read end of pipe*/
+		if (-1==dup2(pair[1],srcFd)) {perror("dup2 redirection pipe"); exit(1);}
+		/*Prevent StdoutServiceAll from blocking if there's nothing available*/
+		CmiEnableNonblockingIO(readStdout[i]);
+		
+#if 0 /*Keep writes from blocking.  This just drops excess output, which is bad.*/
+		CmiEnableNonblockingIO(srcFd);
+#endif
+#if 0	/*Get a SIGIO on each write().  Doesn't seem to actually work (no SIGIO's).*/
+		CmiEnableAsyncIO(readStdout[i]);
+#endif
+	}
+#endif
+}
+
+/*
+  Service this particular stdout pipe.  
+  Must hold comm. lock.
+*/
+static void CmiStdoutServiceOne(int i) {
+	int nBytes;
+	const static char *cmdName[2]={"print","printerr"};
+	servicingStdout=1;
+	while(1) {
+		const char *tooMuchWarn=NULL; int tooMuchLen=0;
+		nBytes=read(readStdout[i],readStdoutBuf,readStdoutBufLen);
+		if (nBytes<=0) break; /*Nothing to send*/
+		
+		/*Send these bytes off to charmrun*/
+		readStdoutBuf[nBytes]=0; /*Zero-terminate read string*/
+		nBytes++; /*Include zero-terminator in message to charmrun*/
+		
+		if (nBytes>=4000) 
+		{ /*We must have filled up our output pipe-- most output libraries
+		   don't handle this well (e.g., glibc printf just drops the line).*/
+			
+			tooMuchWarn="\nWARNING: Too much output at once-- possible output discontinuity!\n"
+				"Use CkPrintf to avoid discontinuity (and this warning).\n\n";
+			nBytes--; /*Remove terminator from user's data*/
+			tooMuchLen=strlen(tooMuchWarn)+1;
+		}
+		ctrl_sendone_nolock(cmdName[i],readStdoutBuf,nBytes,
+				    tooMuchWarn,tooMuchLen);
+	}
+	servicingStdout=0;
+	serviceStdout[i]=0; /*This pipe is now serviced*/
+}
+
+/*Service all stdout pipes, whether it looks like they need it
+  or not.  Used when you aren't sure if select() has been called recently.
+  Must hold comm. lock.
+*/
+static void CmiStdoutServiceAll(void) {
+	int i;
+	for (i=0;i<2;i++) {
+		if (readStdout[i]==0) continue; /*Pipe not open*/
+		CmiStdoutServiceOne(i);
+	}
+}
+
+/*Service any outstanding stdout pipes.
+  Must hold comm. lock.
+*/
+static void CmiStdoutService(void) {
+	CmiStdoutServiceAll();
+}
+
+/*Add our pipes to the pile for select() or poll().
+  Both can be called with or without the comm. lock.
+*/
+static void CmiStdoutAdd(CMK_PIPE_PARAM) {
+	int i;
+	for (i=0;i<2;i++) {
+		if (readStdout[i]==0) continue; /*Pipe not open*/
+		CMK_PIPE_ADDREAD(readStdout[i]);
+	}
+}
+static void CmiStdoutCheck(CMK_PIPE_PARAM) {
+	int i;
+	for (i=0;i<2;i++) {
+		if (readStdout[i]==0) continue; /*Pipe not open*/
+		if (CMK_PIPE_CHECKREAD(readStdout[i])) serviceStdout[i]=1;
+	}
+}
+static int CmiStdoutNeedsService(void) {
+	return (serviceStdout[0]!=0 || serviceStdout[1]!=0);
+}
+
+/*Called every few milliseconds to flush the stdout pipes*/
+static void CmiStdoutFlush(void) {
+	if (servicingStdout) return; /* might be called by SIGALRM */
+	CmiCommLockOrElse( return; )
+	CmiCommLock();
+	CmiStdoutServiceAll();
+	CmiCommUnlock();
+}
 
 /***************************************************************************
  * Message Delivery:
@@ -1893,6 +2106,7 @@ static void ConverseRunPE(int everReturn)
 #endif
 
   if (CmiMyRank()==0 && Cmi_charmrun_fd!=-1) {
+    CcdCallOnConditionKeep(CcdPERIODIC_10ms,CmiStdoutFlush,NULL);
 #if CMK_SHARED_VARS_UNAVAILABLE
     if (Cmi_netpoll == 1) {
     /* gm cannot live with setitimer */
@@ -1933,6 +2147,7 @@ void ConverseExit(void)
     if(Cmi_print_stats)
       printNetStatistics();
     log_done();
+    CmiStdoutFlush();
     ConverseCommonExit();
     if (Cmi_charmrun_fd==-1) exit(0); /*Standalone version-- just leave*/
   }
@@ -2030,6 +2245,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
         dataskt=-1;
 #endif
   	Cmi_charmrun_fd = skt_connect(Cmi_charmrun_IP, Cmi_charmrun_port, 1800);
+	CmiStdoutInit();
   } else {/*Standalone operation*/
   	printf("Charm++: standalone mode (not using charmrun)\n");
   	dataskt=-1;
