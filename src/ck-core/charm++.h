@@ -25,7 +25,8 @@ class Chare {
     void operator delete(void *ptr) { free(ptr); }
 #if CMK_DEBUG_MODE
     Chare() { CkGetChareID(&thishandle); putObject(this); }
-    ~Chare() { removeObject(this); }
+    // Making the destructor virtual gets rid of some egcs warnings
+    virtual ~Chare() { removeObject(this); }
     virtual char *showHeader(void) {
       char *ret = (char *)malloc(strlen("Default Header")+1);
       strcpy(ret,"Default Header");
