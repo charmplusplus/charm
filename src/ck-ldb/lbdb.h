@@ -303,6 +303,7 @@ int LDMemusage(LDHandle _db);
 #endif /* _cplusplus */
 
 #ifdef __cplusplus
+PUPbytes(LDHandle)
 /* put outside of __cplusplus */
 inline void LDOMid::pup(PUP::er &p) {
   id.pup(p);
@@ -326,6 +327,16 @@ inline void LDObjStats::pup(PUP::er &p) {
 PUPmarshall(LDObjStats);
 inline void LDOMHandle::pup(PUP::er &p) {
   // skip ldb since it is a pointer
+  int ptrSize = sizeof(void *);
+  p|ptrSize;
+  // if pointer size is not expected, must be in simulation mode
+  // ignore this field
+  if (p.isUnpacking() && ptrSize != sizeof(void *)) {  
+    char dummy;
+    for (int i=0; i<ptrSize; i++) p|dummy;
+  }
+  else
+    p|ldb;
   p|id;
   p|handle;
 }
