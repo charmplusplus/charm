@@ -131,10 +131,10 @@ libconv-core.a: $(LIBCONV_CORE)
 	$(CHARMC) -cp ../lib/ -o $@ $(LIBCONV_CORE)
 
 libconv-cplus-y.a: machine.c
-	$(CHARMC) -cp ../lib/ -o $@ -DFOR_CPLUS=0 machine.c
+	$(CHARMC) -cp ../lib/ -o $@ -DFOR_CPLUS=1 machine.c
 
 libconv-cplus-n.a: machine.c
-	$(CHARMC) -cp ../lib/ -o $@ -DFOR_CPLUS=1 machine.c
+	$(CHARMC) -cp ../lib/ -o $@ -DFOR_CPLUS=0 machine.c
 
 cpm.o: cpm.c $(CVHEADERS)
 	$(CHARMC) cpm.c
