@@ -11,6 +11,7 @@ CMK_C_OPTIMIZE='-O3 -r10000 -INLINE:all -TARG:platform=ip27 -OPT:Olimit=0:roundo
 CMK_CXX_OPTIMIZE='-O3 -r10000 -INLINE:all -TARG:platform=ip27 -OPT:Olimit=0:roundoff=3:div_split=ON:alias=typed '
 CMK_LD="$CMK_CC -w"
 CMK_LDXX="$CMK_CXX -w"
+CMK_LD_SHARED_THREAD="context"
 CMK_AR="$CMK_CXX -ar -o"
 CMK_RANLIB='true'
 CMK_LIBS=' -lckqt -lfastm '
