@@ -41,13 +41,13 @@ pvm: converse libpvmc.a
 AMR: charm++ LIBS
 	cd libs/ck-libs/amr; make all OPTS='$(OPTS)'
 
-FEM: FEMC FEMF
+FEM: AMPI FEMC FEMF
 
 FEMC: charm++ LIBS
 
 FEMF: FEMC libconv-utilf.a
 
-AMPI: AMPIC AMPIF
+AMPI: AMPIC AMPIF libampilib.a
 
 AMPIC: charm++ CONVLIBS libampi.a
 
@@ -201,7 +201,7 @@ CVLIBS=libconv-core.a \
 	$(CLBLIBS) $(TRACELIBS) $(MEMLIBS)
 
 LIBCONV_CORE=threads.o convcore.o conv-conds.o queueing.o msgmgr.o \
-	cpm.o cpthreads.o futures.o cldb.o random.o \
+	cpm.o cpthreads.o futures.o cldb.o random.o trace-common.o \
 	debug-conv.o debug-message.o debug-object.o info.o \
 	generate.o edgelist.o conv-ccs.o quiescence.o 
 
@@ -576,6 +576,9 @@ LIBTRACE_SUMM=trace-summary.o
 $(L)/libtrace-summary.a: $(LIBTRACE_SUMM)
 	$(CHARMC) -o $@ $(LIBTRACE_SUMM)
 
+trace-common.o: trace-common.C $(CKHEADERS)
+	$(CHARMC) trace-common.C
+
 trace-none.o : trace-none.C trace.h $(CKHEADERS)
 	$(CHARMC) -o trace-none.o trace-none.C
 
@@ -716,17 +719,22 @@ pvmc_groups.o: pvmc_groups.c pvmc.h pvm3.h
 pvmc_main.o: pvmc_main.c pvmc.h pvm3.h
 	$(CHARMC) -o $@ pvmc_main.c
 
-libampi.a: ampi.C ampi.h ampiimpl.h ampi-defmain.C \
+AMPISRC=ampi.C ampi.h ampiimpl.h ampi-defmain.C \
            ampi.decl.h ampi.def.h ampimain.decl.h \
            ampimain.def.h
+
+libampilib.a: $(AMPISRC)
+	$(CHARMC) -DAMPI_FORTRAN=0 -DAMPI_STANDALONE=1 -c ampi.C
+	$(CHARMC) -DAMPI_FORTRAN=0 -c ampif.C
+	$(CHARMC) -cp ../lib -o $@ ampi.o ampif.o
+
+libampi.a: $(AMPISRC)
 	$(CHARMC) -DAMPI_FORTRAN=0 -c ampi.C
 	$(CHARMC) -DAMPI_FORTRAN=0 -c ampimain.C
 	$(CHARMC) -DAMPI_FORTRAN=0 -c ampi-defmain.C
 	$(CHARMC) -cp ../lib -o libampi.a ampi.o ampimain.o ampi-defmain.o
 
-libampif.a: ampi.C ampimain.C ampif.C ampimod.f90 ampi.h ampiimpl.h \
-            ampi-defmain.C ampi.decl.h ampi.def.h \
-            ampimain.decl.h ampimain.def.h
+libampif.a: $(AMPISRC)
 	$(CHARMC) -DAMPI_FORTRAN=1 -c ampi.C
 	$(CHARMC) -DAMPI_FORTRAN=1 -c ampimain.C
 	$(CHARMC) -DAMPI_FORTRAN=1 -c ampif.C
