@@ -74,30 +74,8 @@ trademarks or registered trademarks of Sun Microsystems, Inc.
 
 #include	"drv_private.hh"
 
-#ifdef		SOLARIS2
-
 #include	<unistd.h>		// POSIX standard types
 #include	<wait.h>		// POSIX definition of wait()
-
-#endif		// SOLARIS2
-
-#ifdef		__KCC                   // This works for Linux. I don't
-					// know about other KCCs
-
-#include	<unistd.h>		// POSIX standard types
-#include	<wait.h>		// POSIX definition of wait()
-
-#endif		// __KCC
-
-#if defined(apollo)
-#include	<sysent.h>
-#endif		// apollo
-
-#if defined(hpux) || defined(__hpux) || defined(SUNOS4)
-#include	<sys/unistd.h>		// POSIX standard types
-#include	<sys/wait.h>		// POSIX definition of wait()
-#endif		// defined(hpux) || defined(__hpux) || defined(SUNOS4)
-
 
 /*
  * Fork off a process, wait for it to die
