@@ -11,7 +11,6 @@
 #include "../sockRoutines.c"
 #include "../ccs-server.h"
 #include "../ccs-server.c"
-#include "../daemon.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -23,7 +22,7 @@
 #include <fcntl.h>
 #include <time.h>
 
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(__CYGWIN__)
 /*Win32 has screwy names for the standard UNIX calls:*/
 #define getcwd _getcwd
 #define strdup _strdup
@@ -55,7 +54,11 @@
 
 #else /*Use RSH to start node-programs*/
 #  define CMK_USE_RSH 1
+#ifndef __CYGWIN__
 #  include <rpc/rpc.h>
+#else
+#  include <w32api/rpc.h>
+#endif
 #  if CMK_RSH_IS_A_COMMAND
 #    define RSH_CMD "rsh"
 #  endif
@@ -64,6 +67,8 @@
 #    define RSH_CMD "remsh"
 #  endif
 #endif
+
+#include "../daemon.h"
 
 #define DEBUGF(x) /*printf x*/
 
@@ -104,7 +109,7 @@ int probefile(path)
 
 char *mylogin(void)
 {
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(__CYGWIN__)
 	static char name[100]={'d','u','n','n','o',0};
 	int len=100;
 	GetUserName(name,&len);
@@ -244,7 +249,7 @@ char *getenv_rsh()
 }
 #endif
 
-#ifndef _WIN32
+#if !defined(_WIN32) || defined(__CYGWIN__)
 char *getenv_display()
 {
   static char result[100];
@@ -645,7 +650,7 @@ void arg_init(int argc, char **argv)
   }
   arg_nodeprog_r = argv[1];
 
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(__CYGWIN__)
   if (argv[1][1]==':') { /*E.g.: "C:\foo\bar.exe*/
 #else
   if (argv[1][0]=='/') { /*E.g.: "\foo\bar"*/
@@ -685,7 +690,7 @@ char *nodetab_file_find()
   }
   /* Find a nodes-file by looking under 'nodelist' in the current directory */
   if (probefile("./nodelist")) return strdup("./nodelist");
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(__CYGWIN__)
   nodetab_tempName=tmpnam(buffer);
 #else /*UNIX*/
   if (getenv("HOME")) {
@@ -1478,7 +1483,7 @@ void start_nodes_daemon(void)
   }
 }
 
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(__CYGWIN__)
 /*Sadly, interprocess communication on Win32 is quite
   different, so we can't use Rsh on win32 yet.  
   Fall back to the daemon.*/
@@ -1651,6 +1656,18 @@ int xstr_read(xstr l, int fd)
   return nread;
 }
 
+
+#ifdef __CYGWIN__
+void xstr_printf(xstr l, char *fmt, ...)
+{
+  va_list p;
+  char buffer[10000];
+  va_start(p, fmt);
+  vsprintf(buffer, fmt, p);
+  xstr_write(l, buffer, strlen(buffer));
+  va_end(p);
+}
+#else
 void xstr_printf(va_alist) va_dcl
 {
   char buffer[10000];
@@ -1662,6 +1679,7 @@ void xstr_printf(va_alist) va_dcl
   vsprintf(buffer, fmt, p);
   xstr_write(l, buffer, strlen(buffer));
 }
+#endif
 
 char *xstr_gets(buff, size, s)
     char *buff; int size; xstr s;
