@@ -641,6 +641,7 @@ static inline void _CHECK_CID(CkChareID, int){}
 #include "ckarray.h"
 #include "ckstream.h"
 #include "CkFutures.decl.h"
+#include "charisma.h"
 #include "tempo.h"
 #include "waitqd.h"
 #include "sdag.h"

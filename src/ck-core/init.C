@@ -497,6 +497,7 @@ void _initCharm(int argc, char **argv)
 		_registertempo();
 		_registerwaitqd();
 		_registerLBDatabase();
+		_registercharisma();
 		_registerExternalModules(argv);
 		CkRegisterMainModule();
 	}

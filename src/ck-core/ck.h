@@ -18,6 +18,7 @@
 #include "register.h"
 #include "stats.h"
 #include "ckfutures.h"
+#include "charisma.h"
 
 #ifndef CMK_OPTIMIZE
 #define _CHECK_VALID(p, msg) do {if((p)==0){CkAbort(msg);}} while(0)

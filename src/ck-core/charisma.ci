@@ -1,0 +1,5 @@
+module charisma {
+  group Charisma {
+    entry Charisma(void);
+  };
+}
