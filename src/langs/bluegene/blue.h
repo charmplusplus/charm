@@ -89,12 +89,17 @@ extern void BgEmulatorInit(int argc, char **argv);
 	/* called every bluegene node to trigger the computation */
 extern void BgNodeStart(int argc, char **argv);
 
+CpvExtern(int, inEmulatorInit);
+
+#if defined(__cplusplus)
+}
+#endif
+
 /*****************************************************************************
       Node Private variables macros (Bnv)
 *****************************************************************************/
 
-CpvExtern(int, inEmulatorInit);
-
+#if 0
 #define BnvDeclare(T, v)    CpvDeclare(T*, v)=0; 
 #define BnvStaticDeclare(T, v)    CpvStaticDeclare(T*, v)=0; 
 #define BnvExtern(T, v)    CpvExtern(T*, v); CpvExtern(int, v##_flag_)
@@ -108,14 +113,36 @@ CpvExtern(int, inEmulatorInit);
   } while(0)
 #define BnvAccess(v)       CpvAccess(v)[BgMyRank()]
 
+#else
+
+#ifdef __cplusplus
+template <class d>
+class Cpv {
+public:
+  d **data;
+public:
+  Cpv(): data(NULL) {}
+  inline void init() {
+    if (data == NULL) {
+      data = new (d*)[CmiMyNodeSize()];
+      for (int i=0; i<CmiMyNodeSize(); i++)
+        data[i] = new d[BgNumNodes()];
+    }
+  }
+};
+#define BnvDeclare(T, v)    Cpv<T> CMK_CONCAT(Bnv_Var, v); 
+#define BnvStaticDeclare(T, v)    static Cpv<T> CMK_CONCAT(Bnv_Var, v); 
+#define BnvExtern(T, v)           extern Cpv<T> CMK_CONCAT(Bnv_Var, v);
+#define BnvInitialize(T, v)       CMK_CONCAT(Bnv_Var, v).init()
+#define BnvAccess(v)       CMK_CONCAT(Bnv_Var, v).data[CmiMyRank()][BgMyRank()]
+#endif
+
+#endif
+
 #define BpvDeclare(T, v)            CtvDeclare(T, v)
 #define BpvStaticDeclare(T, v)      CtvStaticDeclare(T, v)
 #define BpvExtern(T, v)             CtvExtern(T, v)
 #define BpvInitialize(T, v)         CtvInitialize(T, v)
 #define BpvAccess(v)                CtvAccess(v)
-
-#if defined(__cplusplus)
-}
-#endif
 
 #endif

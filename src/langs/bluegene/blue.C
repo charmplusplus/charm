@@ -746,18 +746,17 @@ void work_thread(threadInfo *tinfo)
     ckMsgQueue &q2 = tAFFINITYQ;
     int e1 = q1.isEmpty();
     int e2 = q2.isEmpty();
-    int fromQ = 0;
+    int fromQ2 = 0;		// delay the deq of msg from affinity queue
 
-    if (e1 && !e2) { msg = q2[0]; fromQ = 2;}
-    else if (e2 && !e1) { msg = q1[0]; fromQ = 1;}
+    if (e1 && !e2) { msg = q2[0]; fromQ2 = 1;}
+    else if (e2 && !e1) { msg = q1.deq(); }
     else if (!e1 && !e2) {
       if (CmiBgMsgRecvTime(q1[0]) < CmiBgMsgRecvTime(q2[0])) {
-        msg = q1[0];
-        fromQ = 1;
+        msg = q1.deq();
       }
       else {
         msg = q2[0];
-        fromQ = 2;
+        fromQ2 = 1;
       }
     }
     /* if no msg is ready, put it to sleep */
@@ -774,8 +773,7 @@ void work_thread(threadInfo *tinfo)
     // ProcessMessage may trap into scheduler
     ProcessMessage(msg);
 
-    if (fromQ == 1) q1.deq();
-    else if (fromQ == 2)   q2.deq();
+    if (fromQ2 == 1) q2.deq();
 
     /* let other work thread do their jobs */
     tCURRTIME += (CmiWallTimer()-tSTARTTIME);
