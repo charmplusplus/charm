@@ -4,7 +4,7 @@
 
 extern int yylex (void) ;
 void yyerror(const char *);
-extern int lineno;
+extern unsigned int lineno;
 ModuleList *modlist;
 
 %}
