@@ -140,60 +140,6 @@ extern CmiNodeLock CmiCreateLock(void);
 
 #endif
 
-#if CMK_SHARED_VARS_SUN_THREADS
-
-#include <thread.h>
-#include <synch.h>
-#include <stdlib.h>
-
-extern int Cmi_numpes;
-extern int Cmi_mynodesize;
-extern int Cmi_mynode;
-extern int Cmi_numnodes;
-
-extern int CmiMyPe();
-extern int CmiMyRank();
-#define CmiNumPes()         Cmi_numpes
-#define CmiMyNodeSize()     Cmi_mynodesize
-#define CmiMyNode()         Cmi_mynode
-#define CmiNumNodes()       Cmi_numnodes
-extern int CmiNodeFirst(int node);
-extern int CmiNodeSize(int node);
-extern int CmiNodeOf(int pe);
-extern int CmiRankOf(int pe);
-
-#define SHARED_DECL
-
-#define CpvDeclare(t,v) t* CMK_CONCAT(Cpv_Var_,v)
-#define CpvExtern(t,v)  extern t* CMK_CONCAT(Cpv_Var_,v)
-#define CpvStaticDeclare(t,v) static t* CMK_CONCAT(Cpv_Var_,v)
-#define CpvInitialize(t,v)\
-  do { if (CmiMyRank()) while (CMK_CONCAT(Cpv_Var_,v)==0) thr_yield();\
-       else { CMK_CONCAT(Cpv_Var_,v)=(t*)malloc(sizeof(t)*CmiMyNodeSize()); }}\
-  while(0)
-#define CpvAccess(v) CMK_CONCAT(Cpv_Var_,v)[CmiMyRank()]
-
-#define CsvDeclare(t,v) t CMK_CONCAT(Csv_Var_,v)
-#define CsvStaticDeclare(t,v) static t CMK_CONCAT(Csv_Var_,v)
-#define CsvExtern(t,v) extern t CMK_CONCAT(Csv_Var_,v)
-#define CsvInitialize(t,v) do{}while(0)
-#define CsvAccess(v) CMK_CONCAT(Csv_Var_,v)
-
-extern void CmiMemLock();
-extern void CmiMemUnlock();
-extern void CmiNodeBarrier(void);
-#define CmiSvAlloc CmiAlloc
-
-
-typedef mutex_t *CmiNodeLock;
-extern CmiNodeLock CmiCreateLock();
-#define CmiLock(lock) (mutex_lock(lock))
-#define CmiUnlock(lock) (mutex_unlock(lock))
-#define CmiTryLock(lock) (mutex_trylock(lock))
-extern void CmiDestroyLock(CmiNodeLock lock);
-
-#endif
-
 #if CMK_SHARED_VARS_POSIX_THREADS_SMP
 
 #include <pthread.h>
@@ -232,11 +178,8 @@ extern int CmiRankOf(int pe);
 #define CsvInitialize(t,v) do{}while(0)
 #define CsvAccess(v) CMK_CONCAT(Csv_Var_,v)
 
-extern void CmiMemLock();
-extern void CmiMemUnlock();
 extern void CmiNodeBarrier(void);
 #define CmiSvAlloc CmiAlloc
-
 
 typedef pthread_mutex_t *CmiNodeLock;
 extern CmiNodeLock CmiCreateLock();
@@ -244,6 +187,10 @@ extern CmiNodeLock CmiCreateLock();
 #define CmiUnlock(lock) (pthread_mutex_unlock(lock))
 #define CmiTryLock(lock) (pthread_mutex_trylock(lock))
 extern void CmiDestroyLock(CmiNodeLock lock);
+
+extern CmiNodeLock CmiMemLock_lock;
+#define CmiMemLock() do{if (CmiMemLock_lock) CmiLock(CmiMemLock_lock);} while (0)
+#define CmiMemUnlock() do{if (CmiMemLock_lock) CmiUnlock(CmiMemLock_lock);} while (0)
 
 #endif
 
@@ -380,8 +327,6 @@ extern int CmiRankOf(int pe);
 #define CsvInitialize(t,v) do{}while(0)
 #define CsvAccess(v) CMK_CONCAT(Csv_Var_,v)
 
-extern void CmiMemLock();
-extern void CmiMemUnlock();
 extern void CmiNodeBarrier(void);
 #define CmiSvAlloc CmiAlloc
 
@@ -393,7 +338,12 @@ extern  CmiNodeLock CmiCreateLock(void);
 #define CmiTryLock(lock) (WaitForSingleObject(lock, 0))
 extern  void CmiDestroyLock(CmiNodeLock lock);
 
+extern CmiNodeLock CmiMemLock_lock;
+#define CmiMemLock() do{if (CmiMemLock_lock) CmiLock(CmiMemLock_lock);} while (0)
+#define CmiMemUnlock() do{if (CmiMemLock_lock) CmiUnlock(CmiMemLock_lock);} while (0)
+
 #endif
+
 
 /******** CMI: TYPE DEFINITIONS ********/
 
@@ -430,53 +380,6 @@ extern int CmiRegisterHandler(CmiHandler);
 extern int CmiRegisterHandlerLocal(CmiHandler);
 extern int CmiRegisterHandlerGlobal(CmiHandler);
 extern void CmiNumberHandler(int, CmiHandler);
-
-/*
- * I'm planning on doing the byte-order conversion slightly differently
- * now.  The repair of the header will be done in the machine layer,
- * just after receiving a message.  This will be cheaper than doing it
- * here.  Since the CMI can only repair the header and not the contents
- * of the message, we provide these functions that the user can use to
- * repair the contents of the message.
- *
- * CmiConvertInt2(msg, p)
- * CmiConvertInt4(msg, p)
- * CmiConvertInt8(msg, p)
- * CmiConvertFloat4(msg, p)
- * CmiConvertFloat8(msg, p)
- * CmiConvertFloat16(msg, p)
- *
- *   Given a message and a pointer to a number in that message,
- *   converts the number in-place.  This accounts for the byte-order
- *   and other format peculiarities of the sender.
- *
- * CmiConversionNeeded(msg)
- *
- *   When speed is of the essence, this function may make it possible
- *   to skip some conversions.  It returns a combination of the following
- *   flags:
- *
- *   CMI_CONVERT_INTS_BACKWARD   - ints are in backward byte-order.
- *   CMI_CONVERT_INTS_FOREIGN    - ints are in a wildly different format.
- *   CMI_CONVERT_FLOATS_BACKWARD - floats are in backward byte-order.
- *   CMI_CONVERT_FLOATS_FOREIGN  - floats are in a wildly different format.
- *
- * If neither bit is set, the numbers are in local format, and no
- * conversion is needed whatsoever.  Thus, a value of 0 indicates that
- * the message is entirely in local format.  If the values are in wildly
- * different format, one has no choice but to use the CmiConvert functions.
- * If they're just in backward-byte-order, you can swap the bytes yourself,
- * possibly faster than we can.
- *
- */
-
-#define CmiConversionNeeded(m) 0
-#define CmiConvertInt2(m,p) 0
-#define CmiConvertInt4(m,p) 0
-#define CmiConvertInt8(m,p) 0
-#define CmiConvertFloat4(m,p) 0
-#define CmiConvertFloat8(m,p) 0
-#define CmiConvertFloat16(m,p) 0
 
 #define CmiGetHandler(m)  (((CmiMsgHeaderExt*)m)->hdl)
 #define CmiGetXHandler(m) (((CmiMsgHeaderExt*)m)->xhdl)
@@ -590,9 +493,18 @@ extern void  CsdEndIdle(void);
 extern void  CsdStillIdle(void);
 extern void  CsdBeginIdle(void);
 
+typedef struct {
+  void *localQ;
+  void *nodeQ;
+  void *schedQ;
+  CmiNodeLock nodeLock;
+} CsdSchedulerState_t;
+extern void CsdSchedulerState_new(CsdSchedulerState_t *state);
+extern void *CsdNextMessage(CsdSchedulerState_t *state);
+
 extern void  *CmiGetNonLocal(void);
 extern void   CmiNotifyIdle(void);
-extern  int CsdScheduler(int);
+extern  int CsdScheduler(int maxmsgs);
 #define CsdExitScheduler()  (CpvAccess(CsdStopFlag)++)
 
 #if CMK_SPANTREE_USE_COMMON_CODE
@@ -752,11 +664,7 @@ void          CmiFreeNodeBroadcastAllFn(int, char *);
 int    CmiDeliverMsgs(int maxmsgs);
 void   CmiDeliverSpecificMsg(int handler);
 
-#if !CMK_DEBUG_MODE
 #define CmiHandleMessage(msg) (CmiGetHandlerFunction(msg))(msg)
-#else
-#define CmiHandleMessage(msg) Cpd_CmiHandleMessage(msg)
-#endif
 
 /******** CQS: THE QUEUEING SYSTEM ********/
 
@@ -1118,10 +1026,6 @@ void CcdCancelCallOnConditionKeep(int condnum, int idx);
 
 void CcdRaiseCondition(int condnum);
 
-/******** Parallel Debugger *********/
-
-#include "debug-conv.h"
-
 /* Command-Line-Argument handling */
 int CmiGetArgString(char **argv,const char *arg,char **optDest);
 int CmiGetArgInt(char **argv,const char *arg,int *optDest);
@@ -1184,5 +1088,8 @@ double CrnDrand(void);
 #if defined(__cplusplus)
 }
 #endif
+
+#include "debug-conv.h"
+
 
 #endif /* CONVERSE_H */
