@@ -179,6 +179,16 @@ void EachToManyMulticastStrategy::insertMessage(CharmMessageHolder *cmsg){
     if(cmsg->dest_proc == IS_BROADCAST) {
         cmsg->npes = ndestpes;
         cmsg->pelist = destpelist;
+
+        //Added write now as a move from ComlibManager::ArrayBroadcast
+        void *m = cmsg->getCharmMessage();
+        CkSectionInfo minfo;
+        minfo.type = COMLIB_MULTICAST_MESSAGE;
+        minfo.sInfo.cInfo.instId = getInstance();
+        minfo.sInfo.cInfo.status = COMLIB_MULTICAST_ALL;  
+        minfo.sInfo.cInfo.id = 0; 
+        minfo.pe = CkMyPe();
+        ((CkMcastBaseMsg *)m)->_cookie = minfo;       
     }
 
     //For section multicasts and broadcasts

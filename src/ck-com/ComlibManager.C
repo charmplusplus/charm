@@ -576,14 +576,16 @@ void ComlibManager::ArrayBroadcast(CkDelegateData *pd,int ep,void *m,CkArrayID a
     ((CmiMsgHeaderExt *)env)->stratid = curStratID;
 
     CmiSetHandler(env, CkpvAccess(RecvmsgHandle));
-
-    CkSectionInfo minfo;
-    minfo.type = COMLIB_MULTICAST_MESSAGE;
-    minfo.sInfo.cInfo.instId = curStratID;
-    minfo.sInfo.cInfo.status = COMLIB_MULTICAST_ALL;  
-    minfo.sInfo.cInfo.id = 0; 
-    minfo.pe = CkMyPe();
-    ((CkMcastBaseMsg *)m)->_cookie = minfo;       
+    
+    /*  //section multicast header not needed for broadcast
+      CkSectionInfo minfo;
+      minfo.type = COMLIB_MULTICAST_MESSAGE;
+      minfo.sInfo.cInfo.instId = curStratID;
+      minfo.sInfo.cInfo.status = COMLIB_MULTICAST_ALL;  
+      minfo.sInfo.cInfo.id = 0; 
+      minfo.pe = CkMyPe();
+      ((CkMcastBaseMsg *)m)->_cookie = minfo;       
+    */
 
     //RECORD_SENDM_STATS(curStratID, env->getTotalsize(), dest_proc);
 

@@ -32,6 +32,17 @@ void RingMulticastStrategy::insertMessage(CharmMessageHolder *cmsg){
     ComlibPrintf("[%d] Comlib Direct Multicast: insertMessage \n", 
                  CkMyPe());   
     
+    if(cmsg->dest_proc == IS_BROADCAST) {
+        void *m = cmsg->getCharmMessage();
+        CkSectionInfo minfo;
+        minfo.type = COMLIB_MULTICAST_MESSAGE;
+        minfo.sInfo.cInfo.instId = getInstance();
+        minfo.sInfo.cInfo.status = COMLIB_MULTICAST_ALL;  
+        minfo.sInfo.cInfo.id = 0; 
+        minfo.pe = CkMyPe();
+        ((CkMcastBaseMsg *)m)->_cookie = minfo;       
+    }
+
     if(cmsg->dest_proc == IS_SECTION_MULTICAST && cmsg->sec_id != NULL) { 
         int cur_sec_id = ComlibSectionInfo::getSectionID(*cmsg->sec_id);
 
