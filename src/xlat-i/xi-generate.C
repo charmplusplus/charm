@@ -90,25 +90,21 @@ void GenerateStructsFns(ofstream& top, ofstream& bot)
 
   for (c=thismodule->chares; c!=NULL; c=c->next ) {
 
-    if (c->isExtern()){
+    sprintf(str,"extern int _CK_chare_%s ;",c->name) ;
+    top << str << endl ;
+    if (!c->isExtern()){
       sprintf(str,"int _CK_chare_%s = 0 ;",c->name) ;
       bot << str << endl ;
-
-      sprintf(str,"extern int _CK_chare_%s ;",c->name) ;
-    } else
-      sprintf(str,"int _CK_chare_%s = 0 ;",c->name) ;
-    top << str << endl ;
+    }
 
     for (e=c->entries; e!=NULL; e=e->next ) {
-      if (c->isExtern()) {
+      sprintf(str,"extern int _CK_ep_%s_%s;",c->name,e->name) ;
+      top << str << endl ;
+      if (!c->isExtern()) {
         sprintf(str,"int _CK_ep_%s_%s = 0 ;",c->name,e->name) ;
         bot << str << endl ;
-
-        sprintf(str,"extern int _CK_ep_%s_%s ;",c->name,e->name) ;
-      } else
-        sprintf(str,"int _CK_ep_%s_%s = 0 ;",c->name,e->name) ;
-      top << str << endl ;
-    }
+      }
+    } // endfor e
   }
 
 
@@ -185,17 +181,21 @@ void GenerateStructsFns(ofstream& top, ofstream& bot)
   ReadOnly *r;
   /* Output ids for readonly messages */
   for ( r=thismodule->readonlys; r!=NULL; r=r->next ) 
-    if ( r->ismsg )
+    if ( r->ismsg ) {
       top << "int _CK_index_" << r->name << ";" << endl ;
+// #### add isExtern to Readonly
+//      if (!r->isExtern())
+//        bot << "int _CK_index_" << r->name << ";" << endl ;
+    }
 
 
   Message *m;
   /* Output ids for message types */
-  for ( m=thismodule->messages; m!=NULL; m=m->next ) 
-    if (m->isExtern())
-      top << "extern int _CK_msg_" << m->name << ";" << endl ;
-    else
-      top << "int _CK_msg_" << m->name << "=0;" << endl ;
+  for ( m=thismodule->messages; m!=NULL; m=m->next ) {
+    top << "extern int _CK_msg_" << m->name << ";" << endl ;
+    if (!m->isExtern())
+      bot << "int _CK_msg_" << m->name << "=0;" << endl ;
+  }
 
 
 
