@@ -411,6 +411,7 @@ int      source;
 	msg2->length     = msg->length;
 	msg2->broadcast  = msg->broadcast;
 	msg2->dest       = i ;
+        msg2->arrival_time = msg->arrival_time;
 
         
         tempmsg = (char *)CmiAlloc(msg->length);
