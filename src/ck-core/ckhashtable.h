@@ -42,6 +42,7 @@ public:
 	// This method returns the length of and a pointer to the key data.
 	//The returned pointer must be aligned to at least an integer boundary.
 	virtual const unsigned char *getKey(/*out*/ int &len) const =0;
+	virtual void pup(PUP::er &p) = 0;
 };
 
 ///////////////////////// HashTable //////////////////////
@@ -88,6 +89,7 @@ public:
 	
 	//Return an iterator for the objects in this hash table
 	HashtableIterator *objects(void);
+	int numElements(void) const { return nElem; } 
 };
 
 //A HashtableIterator lets you easily list all the objects

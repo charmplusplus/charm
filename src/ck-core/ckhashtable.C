@@ -14,6 +14,7 @@ shamelessly stolen from java.util.Hashtable.
 #ifndef  WIN32
 #include <values.h> //For INTBITS
 #endif
+#include "pup.h"
 #include "ckhashtable.h"
 
 static unsigned int primeLargerThan(unsigned int x);
@@ -95,6 +96,11 @@ public:
 		len=nBytes;
 		return data;
 	}
+	virtual void pup(PUP::er &p) {
+		p(nBytes);
+		if (p.isUnpacking()) data = new unsigned char[nBytes];
+		p((void *) data, nBytes);
+	}
 };
 
 // This hashkey stores a (fixed) n bytes of data
@@ -111,6 +117,11 @@ public:
 		len=n;
 		return (const unsigned char *)&data;
 	}
+	virtual void pup(PUP::er &p) {
+		int len = n;
+		p(len);
+		p((void *) data, n);
+	}
 };
 
 // This hashkey stores no bytes of data
@@ -118,9 +129,10 @@ class hashKeyNone:public HashKey {
 public:
 	virtual const unsigned char *getKey(int &len) const
 		{ len=0;return NULL; }
+	virtual void pup(PUP::er &p) { int len = 0; p(len); }
 };
 
-//Return a heap-allocated key containing the given data
+//static method - Return a heap-allocated key containing the given data
 HashKey *HashKey::newKey(int n,const void *data)
 {
 	switch(n)
@@ -153,103 +165,104 @@ HashKey *HashKey::newKey(int n,const void *data)
 //Return a heap-allocated key containing my data
 HashKey *HashKey::newKey(void) const
 {
-	int n;
-	const unsigned char *d=getKey(n);
-	return newKey(n,(const void *)d);
+  int n;
+  const unsigned char *d=getKey(n);
+  return newKey(n,(const void *)d); //call static newKey to allocate key
 }
 
 ///////////////////////// Hashtable //////////////////////
 
 #define DEBUGF(x) /*printf x;*/
 
+//static method:
 //Return the index into the table of the given key.
 //If the key is not in the table, but there is room for it,
 // returns the index where the key would go.  If no room, returns -1.
 int Hashtable::findIndex(const HashKey &key,int tableSize,const HashKeyPtr *table)
 {
-	DEBUGF(("Finding index in table of %d--\n",tableSize))
-	hashCode code=key.getHashCode();
-	int startIndex=code%tableSize;
-	int nRemaining=tableSize;//Number of unsearched locations
-	int index=startIndex;
-	
-	//Look for the key starting at the hash index
-	while (nRemaining>0)
+  DEBUGF(("Finding index in table of %d--\n",tableSize))
+    hashCode code=key.getHashCode();
+  int startIndex=code%tableSize;
+  int nRemaining=tableSize;//Number of unsearched locations
+  int index=startIndex;
+  
+  //Look for the key starting at the hash index
+  while (nRemaining>0)
+    {
+      if (table[index]!=NULL)
 	{
-		if (table[index]!=NULL)
-		{
-			if (table[index]->equals(key)) 
-				return index; //We found the key!
-		} else 
-			return index;//Here's an empty spot for the key
-		index++;if (index>=tableSize) index=0;//Wrap around to start
-		nRemaining--;
-	}
-	
-
-	DEBUGF(("No index in table of size %d.\n",tableSize))
-	//At this point, we've searched the entire array and 
-	// haven't found the key *or* an empty spot for it.
-	return -1;
+	  if (table[index]->equals(key)) 
+	    return index; //We found the key!
+	} else 
+	  return index;//Here's an empty spot for the key
+      index++;if (index>=tableSize) index=0;//Wrap around to start
+      nRemaining--;
+    }
+  
+  
+  DEBUGF(("No index in table of size %d.\n",tableSize))
+    //At this point, we've searched the entire array and 
+    // haven't found the key *or* an empty spot for it.
+    return -1;
 }
 
 //Set the table array to the given size, re-hashing everything.
 void Hashtable::rehash(int newSize)
 {
-	DEBUGF(("Setting size to %d\n",newSize))
-	int i;
-	HashKeyPtr *newKeyTable=new HashKeyPtr[newSize];
-	HashObjectPtr *newObjTable=new HashObjectPtr[newSize];
-	
-	//Zero out the new table
-	for (i=0;i<newSize;i++)
-		{newKeyTable[i]=NULL;newObjTable[i]=NULL;}
-	
-	//Copy the old keys into the new table
-	for (i=0;i<tableSize;i++)
-		if (keyTable[i]!=NULL)
-		{//This key is set-- find a place for it in the new table & copy it
-			int newIndex=findIndex(*keyTable[i],newSize,newKeyTable);
-			newKeyTable[newIndex]=keyTable[i];
-			newObjTable[newIndex]=objTable[i];
-			DEBUGF(("Expansion re-hash: %d -> %d\n",i,newIndex)) 
-		}
-	
-	//Delete the old tables
-	delete keyTable;
-	delete objTable;
-	
-	//Copy over the new tables
-	tableSize=newSize;
-	keyTable=newKeyTable;
-	objTable=newObjTable;
+  DEBUGF(("Setting size to %d\n",newSize))
+    int i;
+  HashKeyPtr *newKeyTable=new HashKeyPtr[newSize];
+  HashObjectPtr *newObjTable=new HashObjectPtr[newSize];
+  
+  //Zero out the new table
+  for (i=0;i<newSize;i++)
+    {newKeyTable[i]=NULL;newObjTable[i]=NULL;}
+  
+  //Copy the old keys into the new table
+  for (i=0;i<tableSize;i++)
+    if (keyTable[i]!=NULL)
+      {//This key is set-- find a place for it in the new table & copy it
+	int newIndex=findIndex(*keyTable[i],newSize,newKeyTable);
+	newKeyTable[newIndex]=keyTable[i];
+	newObjTable[newIndex]=objTable[i];
+	DEBUGF(("Expansion re-hash: %d -> %d\n",i,newIndex)) 
+	  }
+  
+  //Delete the old tables
+  delete keyTable;
+  delete objTable;
+  
+  //Copy over the new tables
+  tableSize=newSize;
+  keyTable=newKeyTable;
+  objTable=newObjTable;
 }
 
 //Constructor-- create an empty hash table of at least the given size
 Hashtable::Hashtable(int initSize,float NloadFactor)
 {
-	loadFactor=NloadFactor;
-	tableSize=primeLargerThan(initSize-1);
-	
-	//Allocate a new table
-	keyTable=new HashKeyPtr[tableSize];
-	objTable=new HashObjectPtr[tableSize];
-	
-	//Zero out the new table
-	for (int i=0;i<tableSize;i++)
-		{keyTable[i]=NULL;objTable[i]=NULL;}
-	nElem=0;
+  loadFactor=NloadFactor;
+  tableSize=primeLargerThan(initSize-1);
+  
+  //Allocate a new table
+  keyTable=new HashKeyPtr[tableSize];
+  objTable=new HashObjectPtr[tableSize];
+  
+  //Zero out the new table
+  for (int i=0;i<tableSize;i++)
+    {keyTable[i]=NULL;objTable[i]=NULL;}
+  nElem=0;
 }
 
 //Destructor-- destroy keys and tables
 Hashtable::~Hashtable()
 {
-	for (int i=0;i<tableSize;i++)
-		if (keyTable[i]!=NULL)
-			delete keyTable[i];
-	delete keyTable;
-	delete objTable;
-	nElem=-1;tableSize=-1;
+  for (int i=0;i<tableSize;i++)
+    if (keyTable[i]!=NULL)
+      delete keyTable[i];
+  delete keyTable;
+  delete objTable;
+  nElem=-1;tableSize=-1;
 }
 
 //Add the given object to this table under the given key
@@ -257,82 +270,81 @@ Hashtable::~Hashtable()
 // Table will be resized if needed.
 void *Hashtable::put(const HashKey &key,void *obj)
 {
-	int index=findIndex(key,tableSize,keyTable);
-	if ((index==-1)||((nElem+1)>(int)(loadFactor*tableSize)))
-	{//The table is too small-- increase its size
-		rehash(primeLargerThan(tableSize));
-		//Find the key location in the new table
-		index=findIndex(key,tableSize,keyTable);
-	}
-	DEBUGF(("Inserting new key at %d\n",index))
-	void *oldObject=objTable[index];
-	if (keyTable[index]==NULL)//This location had no key--
-		keyTable[index]=key.newKey();
-	//Plop the new object into the table
-	objTable[index]=obj;
-	nElem++;
-	return oldObject;
+  int index=findIndex(key,tableSize,keyTable);
+  if ((index==-1)||((nElem+1)>(int)(loadFactor*tableSize)))
+    {//The table is too small-- increase its size
+      rehash(primeLargerThan(tableSize));
+      //Find the key location in the new table
+      index=findIndex(key,tableSize,keyTable);
+    }
+  DEBUGF(("Inserting new key at %d\n",index))
+    void *oldObject=objTable[index];
+  if (keyTable[index]==NULL)//This location had no key--
+    keyTable[index]=key.newKey();
+  //Plop the new object into the table
+  objTable[index]=obj;
+  nElem++;
+  return oldObject;
 }
 
 //Look up the given object in this table.  Return NULL if not found.
 void *Hashtable::get(const HashKey &key) const
 {
-	int index=findIndex(key,tableSize,keyTable);
-	if (keyTable[index]!=NULL)
-		return objTable[index];//The object is in the table
-	else
-		return NULL;//The key is not in the table
+  int index=findIndex(key,tableSize,keyTable);
+  if (keyTable[index]!=NULL)
+    return objTable[index];//The object is in the table
+  else
+    return NULL;//The key is not in the table
 }
 
 //Remove this object from the hashtable (re-hashing if needed)
 // Returns the old object, if there was one.
 void *Hashtable::remove(const HashKey &doomedKey)
 {
-	int index=findIndex(doomedKey,tableSize,keyTable);
-	if ((index!=-1)&&(keyTable[index]!=NULL))
-	{//The doomed key is in the table-- remove it
-		DEBUGF(("Removing key at index %d\n",index))
-		delete keyTable[index];
-		void *oldValue=objTable[index];
-		keyTable[index]=NULL;objTable[index]=NULL;
-		
-		//Now we have to re-hash all contiguous objects below--
-		// these may have been bumped down because of the doomedKey.
-		index=(index+1)%tableSize;
-		while (keyTable[index]!=NULL)
-		{//Here's a key that may need to be moved-- re-hash it.
-			HashKey *key=keyTable[index];void *obj=objTable[index];
-			keyTable[index]=NULL;objTable[index]=NULL;
-			int newIndex=findIndex(*key,tableSize,keyTable);
-			keyTable[newIndex]=key;objTable[newIndex]=obj;
-			DEBUGF(("Removal re-hash: %d -> %d\n",index,newIndex)) 
-			//Advance to next location
-			index++;if (index>=tableSize) index=0;//Wrap around to start
-		}
-		return oldValue;//Return old object to user
-	} 
-	else return NULL;//Key wasn't in hash table
+  int index=findIndex(doomedKey,tableSize,keyTable);
+  if ((index!=-1)&&(keyTable[index]!=NULL))
+    {//The doomed key is in the table-- remove it
+      DEBUGF(("Removing key at index %d\n",index))
+	delete keyTable[index];
+      void *oldValue=objTable[index];
+      keyTable[index]=NULL;objTable[index]=NULL;
+      
+      //Now we have to re-hash all contiguous objects below--
+      // these may have been bumped down because of the doomedKey.
+      index=(index+1)%tableSize;
+      while (keyTable[index]!=NULL) {
+	//Here's a key that may need to be moved-- re-hash it.
+	HashKey *key=keyTable[index];void *obj=objTable[index];
+	keyTable[index]=NULL;objTable[index]=NULL;
+	int newIndex=findIndex(*key,tableSize,keyTable);
+	keyTable[newIndex]=key;objTable[newIndex]=obj;
+	DEBUGF(("Removal re-hash: %d -> %d\n",index,newIndex)) 
+	  //Advance to next location
+	  index++;if (index>=tableSize) index=0;//Wrap around to start
+      }
+      return oldValue;//Return old object to user
+    } 
+  else return NULL;//Key wasn't in hash table
 }
 
 //Return an iterator for the objects in this hash table
 HashtableIterator *Hashtable::objects(void)
 {
-	return new HashtableIterator(keyTable,objTable,tableSize);
+  return new HashtableIterator(keyTable,objTable,tableSize);
 }
-
 
 //////////////////////// HashtableIterator //////////////////
 //A HashtableIterator lets you easily list all the objects
 // in a hash table (without knowing all the keys).
 
 HashtableIterator::HashtableIterator(HashKeyPtr *NkeyTable,
-		HashObjectPtr *NobjTable,
-		int nLen)
+				     HashObjectPtr *NobjTable,
+				     int nLen)
 {
-	keyTable=NkeyTable;
-	objTable=NobjTable;
-	tableLen=nLen;
-	curNo=0;
+  keyTable=NkeyTable;
+  objTable=NobjTable;
+  tableLen=nLen;
+  curNo=0;
 }
 
 //Seek to start of hash table
@@ -341,38 +353,36 @@ void HashtableIterator::seekStart(void) {curNo=0;}
 //Seek forward (or back) n hash slots
 void HashtableIterator::seek(int n)
 {
-	curNo+=n;
-	if (curNo<0) curNo=0;
-	if (curNo>tableLen) curNo=tableLen;
+  curNo+=n;
+  if (curNo<0) curNo=0;
+  if (curNo>tableLen) curNo=tableLen;
 }
 	
 //Return 1 if next will be non-NULL
 int HashtableIterator::hasNext(void)
 {
-	while (curNo<tableLen)
-	{
-		if (keyTable[curNo]!=NULL)
-			return 1;//We have a next object
-		else 
-			curNo++;//This spot is blank-- skip over it
-	}
-	return 0;//We went through the whole table-- no object
+  while (curNo<tableLen) {
+    if (keyTable[curNo]!=NULL)
+      return 1;//We have a next object
+    else 
+      curNo++;//This spot is blank-- skip over it
+  }
+  return 0;//We went through the whole table-- no object
 }
 
 //Return the next object, or NULL if none
 // The corresponding object key will be returned in retKey.
 void *HashtableIterator::next(HashKey **retKey)
 {
-	while (curNo<tableLen)
-	{
-		if (keyTable[curNo]!=NULL)
-		{//Here's the next object
-			if (retKey) *retKey=keyTable[curNo];
-			return objTable[curNo++];
-		} else 
-			curNo++;//This spot is blank-- skip over it
-	}
-	return NULL;//We went through the whole table-- no object
+  while (curNo<tableLen) {
+    if (keyTable[curNo]!=NULL) {
+      //Here's the next object
+      if (retKey) *retKey=keyTable[curNo];
+      return objTable[curNo++];
+    } else 
+      curNo++;//This spot is blank-- skip over it
+  }
+  return NULL;//We went through the whole table-- no object
 }
 
 /************************ Prime List ************************

@@ -50,6 +50,7 @@ public:
 	CkArrayIndex *newIndex(void) const {return (CkArrayIndex *)newKey();}
 	static CkArrayIndex *newIndex(int nBytes,const void *data)
 		{return (CkArrayIndex *)newKey(nBytes,data);}
+	virtual void pup(PUP::er &p) { }
 };
 
 //Simple ArrayIndex classes: the key is just integer indices.
@@ -57,22 +58,26 @@ class CkArrayIndex1D : public CkArrayIndex {
 public: int index;
 	CkArrayIndex1D(int i0) {index=i0;}
 	virtual const unsigned char *getKey(/*out*/ int &len) const;
+	virtual void pup(PUP::er &p);
 };
 class CkArrayIndex2D : public CkArrayIndex {
 public: int index[2];
 	CkArrayIndex2D(int i0,int i1) {index[0]=i0;index[1]=i1;}
 	virtual const unsigned char *getKey(/*out*/ int &len) const;
+	virtual void pup(PUP::er &p);
 };
 class CkArrayIndex3D : public CkArrayIndex {
 public: int index[3];
 	CkArrayIndex3D(int i0,int i1,int i2) {index[0]=i0;index[1]=i1;index[2]=i2;}
 	virtual const unsigned char *getKey(/*out*/ int &len) const;
+	virtual void pup(PUP::er &p);
 };
 class CkArrayIndex4D : public CkArrayIndex {
 public: int index[4];
 	CkArrayIndex4D(int i0,int i1,int i2,int i3) 
 	  {index[0]=i0;index[1]=i1;index[2]=i2;index[3]=i3;}
 	virtual const unsigned char *getKey(/*out*/ int &len) const;
+	virtual void pup(PUP::er &p);
 };
 
 //A slightly more complex array index: the key is an object
@@ -84,6 +89,7 @@ public:
 	CkArrayIndexT(const object &srcObj) {obj=srcObj;}
 	virtual const unsigned char *getKey(/*out*/ int &len) const 
 	  {len=sizeof(object);return (const unsigned char *)&obj;}
+	virtual void pup(PUP::er &p) { int len = sizeof(object); p(len); p((void *)obj, len); }
 };
 
 //Here the key is a run of bytes whose length can vary at run time;
@@ -96,6 +102,7 @@ public:
 	CkArrayIndexConst(int len,const void *srcData);//Copy given data
 	CkArrayIndexConst(const CkArrayIndex &that); //Copy given index's data
 	virtual const unsigned char *getKey(/*out*/ int &len) const;
+	virtual void pup(PUP::er &p);
 };
 
 
@@ -214,6 +221,7 @@ public:
 	
 //Register the given reduction client:
 	void setReductionClient(CkReductionMgr::clientFn fn,void *param=NULL);
+	virtual void pup(PUP::er &p);
 };
 
 /************************* Array Map  ************************
@@ -233,6 +241,7 @@ public:
   CkArrayMap(CkMigrateMessage *m) {}
   virtual int registerArray(CkArrayMapRegisterMessage *);
   virtual int procNum(int arrayHdl,const CkArrayIndex &element);
+  virtual void pup(PUP::er &p) { CkGroupInitCallback::pup(p); }
 };
 
 /************************ Array Element *********************/
@@ -455,8 +464,12 @@ private:
 //Initialization support:
   static void static_initAfterMap(void *dis);
   void initAfterMap(void);
+  CkArrayRec* pupArrayRec(PUP::er &p, CkArrayRec *rec, CkArrayIndex *idx);
+  void pupHashTable(PUP::er &p);
 public:
   int array_size(void) { return numInitial; } // required for historic reasons
+  virtual void pup(PUP::er &p); //pack-unpack method
+  static void pupArrayMsgQ(CkQ<CkArrayMessage *> &q, PUP::er &p);
 };
 
 /************************** Array Messages ****************************/

@@ -31,8 +31,15 @@ char *Chare::showContents(void) {
 #else
 Chare::~Chare() {}
 #endif
-void Chare::pup(PUP::er &p) {} 
-void Group::pup(PUP::er &p) {} 
+void Chare::pup(PUP::er &p) 
+{
+} 
+
+void Group::pup(PUP::er &p) 
+{
+	Chare::pup(p);
+	p(thisgroup);
+} 
 
 
 extern "C"

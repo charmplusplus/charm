@@ -111,6 +111,7 @@ public:
 	CkGroupInitCallback(void);
 	CkGroupInitCallback(CkMigrateMessage *m) {}
 	void callMeBack(CkGroupInitCallbackMsg *m);
+	virtual void pup(PUP::er &p) { Group::pup(p); }
 };
 
 
@@ -233,6 +234,15 @@ private:
 	countAdjustment &adj(int number);
 	//Shift the list of countAdjustments down
 	void shiftAdjVec(void);
+
+//Checkpointing utilities
+	//pack-unpack method for CkReductionMsg
+        CkReductionMsg* pupCkReductionMsg(CkReductionMsg *m, PUP::er &p);
+        void pupMsgVector(CkVec<CkReductionMsg *> &msgs, PUP::er &p);
+        void pupMsgQ(CkQ<CkReductionMsg *> &msgs, PUP::er &p);
+        void pupAdjVec(CkVec<countAdjustment> &vec, PUP::er &p);
+ public:
+	virtual void pup(PUP::er &p);
 };
 
 

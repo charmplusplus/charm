@@ -45,6 +45,7 @@ waits for the migrant contributions to straggle in.
 
 */
 #include "charm++.h"
+#include "ck.h"
 
 #if 0
 //Debugging messages:
@@ -465,6 +466,87 @@ CkReductionMsg *CkReductionMgr::reduceMessages(void)
 }
 
 
+//Checkpointing utilities
+//pack-unpack method for CkReductionMsg
+//if packing pack the message and then unpack and return it
+//if unpacking allocate memory for it read it off disk and then unapck
+//and return it
+CkReductionMsg* CkReductionMgr::pupCkReductionMsg(CkReductionMsg *m, PUP::er &p)
+{
+  int len;
+  envelope *env;
+
+  if (p.isPacking()) {
+	env = UsrToEnv(CkReductionMsg::pack(m));
+    len = env->getTotalsize();
+  }
+  p(len);
+  if (p.isUnpacking())
+	env = (envelope *) CmiAlloc(len);
+  p((void *)env, len);
+
+  return CkReductionMsg::unpack(EnvToUsr(env));
+}
+
+//pack-unpack method for reduction message vector
+void CkReductionMgr::pupMsgVector(CkVec<CkReductionMsg *> &msgs, PUP::er &p)
+{
+  int nMsgs;
+  CkReductionMsg *m;
+
+  if (p.isPacking()) nMsgs = msgs.length();
+  p(nMsgs);
+
+  for(int i = 0; i < nMsgs; i++) {
+	m = p.isPacking() ? msgs[i] : 0;
+	msgs.insert(i, pupCkReductionMsg(m, p));
+  }
+}
+
+//pack-unpack method for reduction message Qs
+void CkReductionMgr::pupMsgQ(CkQ<CkReductionMsg *> &msgs, PUP::er &p)
+{
+  int nMsgs;
+  CkReductionMsg *m;
+
+  if (p.isPacking()) nMsgs = msgs.length();
+  p(nMsgs);
+
+  for(int i = 0; i < nMsgs; i++) {
+	m = p.isPacking() ? msgs.deq() : 0;
+	msgs.enq(pupCkReductionMsg(m, p));
+  }
+}
+
+//pack-unpack method for count adjustment vector
+void CkReductionMgr::pupAdjVec(CkVec<CkReductionMgr::countAdjustment> &vec, PUP::er &p)
+{
+  int nAdjs;
+
+  if (p.isPacking()) nAdjs = vec.length();
+  p(nAdjs);
+
+  for(int i = 0; i < nAdjs; i++) {
+	if (p.isUnpacking()) vec.insertAtEnd(countAdjustment());
+	p(vec[i].gcount);
+	p(vec[i].lcount);
+  }
+}
+
+void CkReductionMgr::pup(PUP::er &p)
+{
+//We do not store the client function pointer or the client function parameter,
+//it is the responsibility of the programmer to correctly restore these
+  CkGroupInitCallback::pup(p);
+  p(redNo);
+  p(inProgress); p(creating); p(startRequested);
+  p(gcount); p(lcount);
+  p(nContrib); p(nRemote);
+  pupMsgVector(msgs, p);
+  pupMsgQ(futureMsgs, p);
+  pupMsgQ(futureRemoteMsgs, p);
+  pupAdjVec(adjVec, p);
+}
 
 /////////////////////////////////////////////////////////////////////////
 

@@ -99,6 +99,11 @@ class CkArrayID {
     }
     CkArray *getArrayManager(void) { return _array; }
     CkArrayID() {}
+    virtual void pup(PUP::er &p) { 
+      p(_aid); 
+      if (p.isUnpacking()) 
+	_array = (CkArray *) CkLocalBranch(_aid); 
+    }
 };
 
 class CkQdMsg {
