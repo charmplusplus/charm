@@ -18,16 +18,31 @@ Orion Sky Lawlor, olawlor@acm.org, 8/20/2002
 #if CMK_USE_BACKTRACE
 #  include <execinfo.h> /* for backtrace (GNU glibc header) */
 
-char **CmiBacktrace(int *nStackLevels) {
+/* Extract the function-return pointers listed in the stack
+   up to this depth.
+ */
+void CmiBacktraceRecord(void **retPtrs,int nSkip,int *nLevels) {
+	int i;
 #define max_stack 64 /* trace back at most this many levels of the stack */
 	void *stackPtrs[max_stack];
-        *nStackLevels=backtrace(stackPtrs,max_stack);
-        return backtrace_symbols(stackPtrs,*nStackLevels);
+	nSkip++; /* don't trace this routine */
+	*nLevels=backtrace(stackPtrs,nSkip+*nLevels)-nSkip;
+	for (i=0;i<*nLevels;i++)
+		retPtrs[i]=stackPtrs[nSkip+i];
 }
 
-#else /*Backtrace not available-- use do-nothing verion*/
-char **CmiBacktrace(int *nStackLevels) {
-	*nStackLevels=0;
+/* Look up the names of these function pointers */
+char **CmiBacktraceLookup(void **srcPtrs,int nLevels) {
+	return backtrace_symbols(srcPtrs,nLevels);
+}
+
+#else /*Backtrace not available-- use do-nothing version*/
+void CmiBacktraceRecord(void **retPtrs,int nSkip,int nLevels) {
+	/* emtpy */
+}
+
+/* Look up the names of these function pointers */
+char **CmiBacktraceLookup(void **srcPtrs,int nLevels) {
 	return NULL;
 }
 #endif

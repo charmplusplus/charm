@@ -407,6 +407,12 @@ void *CmiTmpAlloc(int size);
 void CmiTmpFree(void *);
 #endif
 
+/* Various special features of certain -memory modes: */
+void CmiMemoryCheck(void); /* heap check, for -memory paranoid */
+void CmiMemoryMark(void); /* ignore current allocations, for -memory leak */
+void CmiMemoryMarkBlock(void *blk); /* ignore this allocation, for -memory leak */
+void CmiMemorySweep(const char *where); /* print current allocations, for -memory leak */
+
 void CmiMkdir(const char *dirName);
 
 double   CmiCpuTimer(void);
@@ -966,10 +972,26 @@ int CmiGetArgc(char **argv);
 char **CmiCopyArgs(char **argv);
 int CmiArgGivingUsage(void);
 
-/* Return the names of the functions that have been called
-   up to this point in a malloc'd pointer array.*/
-char **CmiBacktrace(int *nStackLevels);
-/* Print (to stderr) the names of the functions that have been 
+/** 
+   Extract the function-return pointers listed in the stack
+   up to this depth.  nSkip is the number of enclosing functions
+   to skip-- for example, nSkip==0 means the retPtrs[0]
+   will be the caller of CmiBacktraceRecord.  
+   Returns retPtrs[0..*nLevels-1] stack pointers.
+   *nLevels may be decreased if not enough levels are available.
+ */
+void CmiBacktraceRecord(void **retPtrs,int nSkip,int *nLevels);
+
+/** Look up the names of these function pointers.
+Caller must free() the returned array, but not the individual
+strings.
+*/
+char **CmiBacktraceLookup(void **srcPtrs,int nLevels);
+
+/** Print out the names of these function pointers. */
+void CmiBacktracePrint(void **retPtrs,int nLevels);
+
+/* Print (to stdout) the names of the functions that have been 
    called up to this point. nSkip is the number of routines on the
    top of the stack to *not* print out. */
 void CmiPrintStackTrace(int nSkip);

@@ -381,8 +381,9 @@ cat > $t <<EOT
 #include "cmibacktrace.c"
 
 int main() {
-	int nLevels;
-	char **stack=CmiBacktrace(&nLevels);
+	int nLevels=1;
+	void *stack;
+	CmiBacktraceRecord(&stack,0,&nLevels);
 	return 0;
 }
 EOT

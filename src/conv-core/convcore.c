@@ -396,29 +396,39 @@ static const char* _implGetBacktraceSys(const char *name) {
   return 0; /*ordinary user routine-- just print normally*/
 }
 
-void CmiPrintStackTrace(int nSkip) {
-#if CMK_USE_BACKTRACE
-  int i,max=0;
-  char **names=CmiBacktrace(&max);
-  nSkip+=2; /*Since "CmiPrintStackTrace" and "CmiBacktrace" will be in list.*/
-  if (max>nSkip) {
+/** Print out the names of these function pointers. */
+void CmiBacktracePrint(void **retPtrs,int nLevels) {
+  if (nLevels>0) {
+    int i;
+    char **names=CmiBacktraceLookup(retPtrs,nLevels);
+    if (names==NULL) return;
     CmiPrintf("Stack Traceback:\n");
-    for (i=nSkip;i<max;i++) {
+    for (i=0;i<nLevels;i++) {
       const char *trimmed=_implTrimParenthesis(names[i]);
       const char *print=trimmed;
       const char *sys=_implGetBacktraceSys(print);
       if (sys) {
-          CmiPrintf("  [%d] Charm++ Runtime: %s (%s)\n",i-nSkip,sys,print);
+          CmiPrintf("  [%d] Charm++ Runtime: %s (%s)\n",i,sys,print);
           break; /*Stop when we hit Charm++ runtime.*/
       } else {
-          CmiPrintf("  [%d] %s\n",i-nSkip,print);
+          CmiPrintf("  [%d] %s\n",i,print);
       }
     }
+    free(names);
   }
-  free(names);
-#endif
 }
 
+/* Print (to stdout) the names of the functions that have been 
+   called up to this point. nSkip is the number of routines on the
+   top of the stack to *not* print out. */
+void CmiPrintStackTrace(int nSkip) {
+#if CMK_USE_BACKTRACE
+	int nLevels=max_stack;
+	void *stackPtrs[max_stack];
+	CmiBacktraceRecord(stackPtrs,1+nSkip,&nLevels);
+	CmiBacktracePrint(stackPtrs,nLevels);
+#endif
+}
 
 /*****************************************************************************
  *
