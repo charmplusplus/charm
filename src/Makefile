@@ -77,7 +77,7 @@ dirs+sources:
 
 CVHEADERS=converse.h conv-conds.h conv-mach.h 
 
-CVLIBS_QS=libconv-qs-fifo.o libconv-qs-lifo.o # libconv-qs-bfifo.o libconv-qs-ififo.o libconv-qs-bstack.o libconv-qs-istack.o libconv-qs-newfifo.o libconv-qs-replay.o libconv-qs-rand.o libconv-qs-fifolifo.o
+CVLIBS_QS=libconv-qs-super.o libconv-qs-fifo.o libconv-qs-lifo.o # libconv-qs-bfifo.o libconv-qs-ififo.o libconv-qs-bstack.o libconv-qs-istack.o libconv-qs-newfifo.o libconv-qs-replay.o libconv-qs-rand.o libconv-qs-fifolifo.o
 
 CVLIBS=libconv-core.o $(CVLIBS_QS)
 
@@ -85,6 +85,9 @@ converse: basics $(CVLIBS) cmk_extras
 
 libconv-core.o: convcore.o conv-conds.o machine.o spantree.o fifo.o
 	$(CHARMC) -cp ../lib/ -o $@ convcore.o conv-conds.o machine.o spantree.o fifo.o
+
+libconv-qs-super.o: qs.super.c
+	$(CHARMC) -cp ../lib/ -o $@ qs.super.c
 
 libconv-qs-fifo.o: qs.fifo.c
 	$(CHARMC) -cp ../lib/ -o $@ qs.fifo.c
