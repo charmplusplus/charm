@@ -197,7 +197,7 @@ PUPmarshall(CProxySection_ArrayBase);
 	inline const CkArrayIndexMax *ckGetArrayElements() const \
 	  { return super::ckGetArrayElements(); } \
 	inline int ckGetNumElements() const \
-	  { return ckGetNumElements(); }
+	  { return super::ckGetNumElements(); }
 
 /************************ Array Element *********************/
 
