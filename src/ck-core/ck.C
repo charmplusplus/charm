@@ -317,8 +317,12 @@ void CkCreateLocalGroup(CkGroupID groupID, int epIdx, envelope *env)
 void CkCreateLocalNodeGroup(CkGroupID groupID, int epIdx, envelope *env)
 {
   register int gIdx = _entryTable[epIdx]->chareIdx;
-  register void *obj = malloc(_chareTable[gIdx]->size);
+  int objSize=_chareTable[gIdx]->size;
+  register void *obj = malloc(objSize);
   _MEMCHECK(obj);
+  /* Zero out the storage for nodegroups, to allow them to use
+     "I'm done with my constructor" flags. */
+  memset(obj,0,objSize);
   CmiLock(CksvAccess(_nodeLock));
   CksvAccess(_nodeGroupTable)->find(groupID).setObj(obj);
   CksvAccess(_nodeGroupTable)->find(groupID).setcIdx(gIdx);
