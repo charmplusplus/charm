@@ -69,10 +69,28 @@ transfers to the next task in the scheduler queue.}
 must only be in the queue once.  Pushing it in twice is a crashable
 error.}
 
+\function{void CthAwakenPrio(CthThread t, int strategy, int priobits, int *prio)}
+\index{CthAwakenPrio}
+\desc{Pushes a thread into the scheduler queue with priority specified by 
+{\tt priobits} and {\tt prio} and queueing strategy {\tt strategy}.  
+Caution: a thread
+must only be in the queue once.  Pushing it in twice is a crashable
+error. {\tt prio} is not copied internally, and is used when the scheduler 
+dequeues the message, so it should not be reused until then.}
+
 \function{void CthYield()}
 \index{CthYield}
 \desc{This function is part of the scheduler-interface.  It simply
 executes {\tt \{ CthAwaken(CthSelf()); CthSuspend(); \} }.  This combination
+gives up control temporarily, but ensures that control will eventually
+return.}
+
+\function{void CthYieldPrio(int strategy, int priobits, int *prio)}
+\index{CthYieldPrio}
+\desc{This function is part of the scheduler-interface.  It simply
+executes \\
+{\tt\{CthAwakenPrio(CthSelf(),strategy,priobits,prio);CthSuspend();\}}\\
+This combination
 gives up control temporarily, but ensures that control will eventually
 return.}
 
@@ -139,7 +157,7 @@ To achieve this, you must first implement a new kind of ready-queue.
 You must implement a function that inserts threads into this queue.
 The function must have this prototype:
 
-{\bf void awakenfn(CthThread t);}
+{\bf void awakenfn(CthThread t, int strategy, int priobits, int *prio);}
 
 When a thread suspends, it must choose a new thread to transfer control
 to.  You must implement a function that makes the decision: which thread
@@ -155,7 +173,7 @@ scheduling thread.
 You then configure individual threads to actually use this new
 ready-queue.  This is done using CthSetStrategy:
 
-\function{void CthSetStrategy(CthThread t, CthVoidFn awakenfn, CthThFn choosefn)}
+\function{void CthSetStrategy(CthThread t, CthAwkFn awakenfn, CthThFn choosefn)}
 \index{CthSetStrategy}
 \desc{Causes the thread to use the specified \param{awakefn} whenever
 you CthAwaken it, and the specified \param{choosefn} whenever you
