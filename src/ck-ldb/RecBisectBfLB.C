@@ -41,7 +41,8 @@ void CreateRecBisectBfLB()
 }
 
 static void lbinit(void) {
-        LBSetDefaultCreate(CreateRecBisectBfLB);
+//        LBSetDefaultCreate(CreateRecBisectBfLB);
+  LBRegisterBalancer("RecBisectBfLB", CreateRecBisectBfLB, "Recursive partitioning with Breadth first enumeration");
 }
 
 #include "RecBisectBfLB.def.h"

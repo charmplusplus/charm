@@ -7,7 +7,6 @@ module EveryLB {
    extern module Comm1LB;
    extern module HeapCentLB;
    extern module NeighborLB;
-   extern module WSLB;
    extern module GreedyRefLB;
    extern module RandRefLB;
    initcall void initEveryLB(void);

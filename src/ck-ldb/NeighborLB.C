@@ -20,7 +20,8 @@ void CreateNeighborLB()
 }
 
 static void lbinit(void) {
-        LBSetDefaultCreate(CreateNeighborLB);        
+//  LBSetDefaultCreate(CreateNeighborLB);        
+  LBRegisterBalancer("NeighborLB", CreateNeighborLB, "The neighborhood load balancer");
 }
 
 #include "NeighborLB.def.h"

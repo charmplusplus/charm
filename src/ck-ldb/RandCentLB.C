@@ -21,7 +21,8 @@ void CreateRandCentLB()
 }
 
 static void lbinit(void) {
-	LBSetDefaultCreate(CreateRandCentLB);
+//	LBSetDefaultCreate(CreateRandCentLB);
+  LBRegisterBalancer("RandCentLB", CreateRandCentLB, "Assign objects to processors randomly");
 }
 #include "RandCentLB.def.h"
 

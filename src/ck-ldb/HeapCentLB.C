@@ -20,7 +20,8 @@ void CreateHeapCentLB()
 }
 
 static void lbinit(void) {
-        LBSetDefaultCreate(CreateHeapCentLB);        
+//        LBSetDefaultCreate(CreateHeapCentLB);        
+  LBRegisterBalancer("HeapCentLB", CreateHeapCentLB, "Heap Centralized");
 }
 
 #include "HeapCentLB.def.h"

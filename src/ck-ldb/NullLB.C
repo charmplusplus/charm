@@ -16,7 +16,7 @@ void CreateNullLB(void)
 
 static void initNullLB(void) {
 #if CMK_LBDB_ON
-  LBSetDefaultCreate(CreateNullLB);
+//  LBSetDefaultCreate(CreateNullLB);
 #endif
 }
 

@@ -31,10 +31,6 @@ void CreateWSLB()
   wslb = CProxy_WSLB::ckNew();
 }
 
-static void lbinit(void) {
-        LBSetDefaultCreate(CreateWSLB);        
-}
-
 void WSLB::staticMigrated(void* data, LDObjHandle h)
 {
   WSLB *me = (WSLB*)(data);
@@ -51,6 +47,9 @@ void WSLB::staticAtSync(void* data)
 
 WSLB::WSLB()  :thisproxy(thisgroup)
 {
+  if (CkMyPe() == 0)
+    CkPrintf("[%d] WSLB created\n",CkMyPe());
+
   mystep = 0;
   theLbdb = CProxy_LBDatabase(lbdb).ckLocalBranch();
   theLbdb->

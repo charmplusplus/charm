@@ -20,7 +20,8 @@ void CreateGreedyRefLB()
 }
 
 static void lbinit(void) {
-        LBSetDefaultCreate(CreateGreedyRefLB);        
+//        LBSetDefaultCreate(CreateGreedyRefLB);        
+  LBRegisterBalancer("GreedyRefLB", CreateGreedyRefLB, "Apply greedy, then refine");
 }
 
 #include "GreedyRefLB.def.h"

@@ -1,7 +1,6 @@
 module WSLB {
 
 extern module LBDatabase;
-initcall void lbinit(void);
 
 readonly CkGroupID wslb;
 

@@ -27,7 +27,8 @@ void CreateComm1LB()
 }
 
 static void lbinit(void) {
-        LBSetDefaultCreate(CreateComm1LB);        
+//        LBSetDefaultCreate(CreateComm1LB);        
+  LBRegisterBalancer("Comm1LB", CreateComm1LB, "another variation of CommLB");
 }
 
 #include "Comm1LB.def.h"

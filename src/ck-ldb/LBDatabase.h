@@ -16,6 +16,8 @@ extern CkGroupID lbdb;
 typedef void (*LBDefaultCreateFn)(void);
 void LBSetDefaultCreate(LBDefaultCreateFn f);
 
+void LBRegisterBalancer(const char *, LBDefaultCreateFn, const char *);
+
 class LBDBInit : public Chare {
   public:
     LBDBInit(CkArgMsg*);

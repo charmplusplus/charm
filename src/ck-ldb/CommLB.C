@@ -23,7 +23,8 @@ void CreateCommLB()
 }
 
 static void lbinit(void) {
-        LBSetDefaultCreate(CreateCommLB);        
+//        LBSetDefaultCreate(CreateCommLB);        
+  LBRegisterBalancer("CommLB", CreateCommLB, "Greedy with communication");
 }
 
 #include "CommLB.def.h"

@@ -1,6 +1,6 @@
 #!/bin/sh
 LOADBALANCERS="RandCentLB RecBisectBfLB MetisLB RefineLB CommLB Comm1LB\
-           HeapCentLB NeighborLB WSLB GreedyRefLB RandRefLB"
+           HeapCentLB NeighborLB GreedyRefLB RandRefLB"
 
 out="Makefile_lb"
 

@@ -12,7 +12,7 @@ static void CreateNoLB(void)
 
 void initEveryLB(void) {
 #if CMK_LBDB_ON
-  LBSetDefaultCreate(CreateNoLB);
+//  LBSetDefaultCreate(CreateNoLB);
 #endif
 }
 

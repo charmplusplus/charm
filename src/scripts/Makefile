@@ -389,7 +389,7 @@ LIBCK_CORE=init.o register.o qd.o ck.o main.o msgalloc.o ckfutures.o \
            debug-message.o cklocation.o ckarray.o ckreduction.o \
            tempo.o waitqd.o LBDatabase.o lbdb.o \
            LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o Refiner.o \
-	   CentralLB.o NborBaseLB.o ObjGraph.o graph.o bitvecset.o \
+	   CentralLB.o NborBaseLB.o WSLB.o ObjGraph.o graph.o bitvecset.o \
            Set.o heap.o CommLBHeap.o NullLB.o \
 	   compat_regmm.o
 
@@ -519,6 +519,12 @@ NborBaseLB.decl.h: NborBaseLB.ci charmxi
 NborBaseLB.o: NborBaseLB.C NborBaseLB.decl.h $(CKHEADERS)
 	$(CHARMC) -c NborBaseLB.C
 
+WSLB.decl.h: WSLB.ci charmxi
+	$(CHARMC) WSLB.ci
+
+WSLB.o: WSLB.C WSLB.decl.h $(CKHEADERS)
+	$(CHARMC) -c WSLB.C
+
 CommLBHeap.o: CommLBHeap.C $(CKHEADERS)
 	$(CHARMC) -c CommLBHeap.C
 
@@ -567,7 +573,6 @@ LOADBALANCERS=\
    $(L)/libmoduleComm1LB.a \
    $(L)/libmoduleHeapCentLB.a \
    $(L)/libmoduleNeighborLB.a \
-   $(L)/libmoduleWSLB.a \
    $(L)/libmoduleGreedyRefLB.a \
    $(L)/libmoduleRandRefLB.a 
 
@@ -643,15 +648,6 @@ NeighborLB.o: NeighborLB.C NeighborLB.decl.h $(CKHEADERS)
 $(L)/libmoduleNeighborLB.a: NeighborLB.o
 	$(CHARMC) -o $(L)/libmoduleNeighborLB.a NeighborLB.o
 
-WSLB.decl.h: WSLB.ci charmxi
-	$(CHARMC) WSLB.ci
-
-WSLB.o: WSLB.C WSLB.decl.h $(CKHEADERS)
-	$(CHARMC) -c WSLB.C
-
-$(L)/libmoduleWSLB.a: WSLB.o
-	$(CHARMC) -o $(L)/libmoduleWSLB.a WSLB.o
-
 GreedyRefLB.decl.h: GreedyRefLB.ci charmxi
 	$(CHARMC) GreedyRefLB.ci
 
@@ -679,7 +675,6 @@ LB_OBJ=EveryLB.o \
     Comm1LB.o \
     HeapCentLB.o \
     NeighborLB.o \
-    WSLB.o \
     GreedyRefLB.o \
     RandRefLB.o 
 

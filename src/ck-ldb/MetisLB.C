@@ -21,7 +21,8 @@ void CreateMetisLB()
 }
 
 static void lbinit(void) {
-        LBSetDefaultCreate(CreateMetisLB);
+//        LBSetDefaultCreate(CreateMetisLB);
+  LBRegisterBalancer("MetisLB", CreateMetisLB, "Use Metis(tm) to partition object graph");
 }
 
 #include "MetisLB.def.h"

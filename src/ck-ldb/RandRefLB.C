@@ -22,7 +22,8 @@ void CreateRandRefLB()
 }
 
 static void lbinit(void) {
-        LBSetDefaultCreate(CreateRandRefLB);
+//        LBSetDefaultCreate(CreateRandRefLB);
+  LBRegisterBalancer("RandRefLB", CreateRandRefLB, "Apply random, then refine");
 }
 
 #include "RandRefLB.def.h"
