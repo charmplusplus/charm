@@ -92,8 +92,8 @@ CkChareID mid;
 HelloMain::HelloMain(CkArgMsg *msg) \{
   delete msg;
   count = 0;
-  CProxy_HelloGroup::ckNew(); // Create a new "HelloGroup"
   mid = thishandle;
+  CProxy_HelloGroup::ckNew(); // Create a new "HelloGroup"
 \}
 
 void HelloMain::Wait(void) \{
