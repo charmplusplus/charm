@@ -8,3 +8,6 @@
 #define CMK_BLUEGENE_THREAD				  1
 
 #define CMK_TRACE_IN_CHARM                                1
+
+#undef  CMK_IMMEDIATE_MSG
+#define CMK_IMMEDIATE_MSG				   0
