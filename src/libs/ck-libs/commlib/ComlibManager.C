@@ -21,12 +21,12 @@ void recv_msg(void *msg){
 }
 
 ComlibManager::ComlibManager(int s){
-    init(s, 0, 1000, 50000);
+    init(s, 0, 1000000, 5000000);
 }
 
 //s = Strategy (0 = tree, 1 = mesh, 2 = hypercube) 
 ComlibManager::ComlibManager(int s, int n){
-    init(s, n, 1000, 50000);
+    init(s, n, 1000000, 5000000);
 }
 
 
@@ -49,9 +49,9 @@ void ComlibManager::init(int s, int n, int nmFlush, int bFlush){
     strategy = s;
     
     if(nmFlush == 0)
-        nmFlush = 1000;
+        nmFlush = 1000000;
     if(bFlush == 0)
-        bFlush = 50000;
+        bFlush = 5000000;
     
     messagesBeforeFlush = nmFlush;
     bytesBeforeFlush = bFlush;
@@ -62,7 +62,7 @@ void ComlibManager::init(int s, int n, int nmFlush, int bFlush){
     elementCount = 0;
     //    elementRecvCount = 0;
 
-    //CkPrintf("Strategy %d %d\n", strategy, nelements);
+    //CkPrintf("Strategy %d %d %d\n", strategy, nelements, messagesBeforeFlush);
 
     CpvInitialize(int, RecvmsgHandle);
     CpvAccess(RecvmsgHandle) = CmiRegisterHandler((CmiHandler)recv_msg);
@@ -124,10 +124,11 @@ void ComlibManager::beginIteration(){
 //called when the array elements has finished sending messages
 void ComlibManager::endIteration(){
   
-    //    CkPrintf("In End Iteration\n");
-
     elementCount ++;
+    
     if(elementCount == nelements) {
+      
+        //CkPrintf("[%d]:In End Iteration %d\n", CkMyPe(), elementCount);
         iterationFinished = 1;
 
         if(idSet) {
@@ -155,7 +156,7 @@ void ComlibManager::endIteration(){
                         break;
                     }
            
-            //            CkPrintf("Setting Num Deposit to %d\n", ndeposit);
+	    //CkPrintf("Setting Num Deposit to %d\n", ndeposit);
             NumDeposits(comid, ndeposit);
 
             for(count = 0; count < CkNumPes(); count ++)
@@ -175,7 +176,7 @@ void ComlibManager::endIteration(){
 void ComlibManager::receiveID(comID id){
     
     //    CkPrintf("received id in %d\n", CkMyPe());
-
+    
     if(idSet)
         return;
 
@@ -190,7 +191,7 @@ void ComlibManager::receiveID(comID id){
             if(messageBuf[count] != NULL)
                 ndeposit ++;
 
-        //        CkPrintf("Setting Num Deposit to %d\n", ndeposit);
+	//	CkPrintf("Setting Num Deposit to %d\n", ndeposit);
 
         if((ndeposit == 0) && (CkNumPes() > 0))
             for(count = 0; count < CkNumPes(); count ++)
@@ -222,7 +223,7 @@ void ComlibManager::ArraySend(int ep, void *msg,
     //    int dest_proc = msg->dst % CkNumPes();
     int dest_proc = CkArrayID::CkLocalBranch(a)->lastKnown(myidx);
     
-    //    CkPrintf("Send Data %d %d\n", CkMyPe(), dest_proc);
+    //CkPrintf("Send Data %d %d %d\n", CkMyPe(), dest_proc, UsrToEnv(msg)->getTotalsize());
 
     if(dest_proc == CkMyPe()){
         //CkArrayID::CkLocalBranch(a)->deliverViaQueue((CkArrayMessage *) msg);
@@ -240,20 +241,24 @@ void ComlibManager::ArraySend(int ep, void *msg,
     cmsg->next = messageBuf[dest_proc];
     messageBuf[dest_proc] = cmsg;    
 
+    
+    //    CkPrintf("Message Size = %d\n", messageSize[dest_proc]);
     if ((messageCount[dest_proc] >= messagesBeforeFlush)
-        || (messageSize[dest_proc] >= bytesBeforeFlush))
+        /*|| (messageSize[dest_proc] >= bytesBeforeFlush) */) {
+        //CkPrintf("Sending to %d after %d messages and %d \n", dest_proc, messageCount[dest_proc], messagesBeforeFlush); 
         sendMessage(dest_proc);
+    }
 }
 
 void ComlibManager::sendMessage(int dest_proc){
 
-    if(!idSet)
+    if(strategy != USE_DIRECT && !idSet)
         return;
 
     if(messageCount[dest_proc] == 0)
         return;
 
-    //    CkPrintf("Sending data\n");
+    //    CkPrintf("Sending data %d\n", messageCount[dest_proc]);
 
     int sizes[1];
     sizes[0] = messageSize[dest_proc];
@@ -287,11 +292,11 @@ void ComlibManager::sendMessage(int dest_proc){
 
     CmiSetHandler(UsrToEnv(newmsg), CpvAccess(RecvmsgHandle));
 
-    //    CkPrintf("Calling EachToMany %d %d %d\n", UsrToEnv(newmsg)->getTotalsize(), CkMyPe(), dest_proc);
-
-    if(strategy != USE_DIRECT)
-        EachToManyMulticast(comid, UsrToEnv(newmsg)->getTotalsize(), 
+    if(strategy != USE_DIRECT) {
+        //        CkPrintf("Calling EachToMany %d %d %d\n", UsrToEnv(newmsg)->getTotalsize(), CkMyPe(), dest_proc);
+	EachToManyMulticast(comid, UsrToEnv(newmsg)->getTotalsize(), 
                             UsrToEnv(newmsg), 1, &dest_proc);
+    }
     else
         CmiSyncSendAndFree(dest_proc,  UsrToEnv(newmsg)->getTotalsize(), (char *)UsrToEnv(newmsg));
 }

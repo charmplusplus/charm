@@ -22,7 +22,7 @@ conversecom :
 	(cd ../../conv-libs/commlib; make)
 
 libcomm.a: $(OBJS)
-	$(CHARMC) -cp ../../../../lib -o libcomm.a $(OBJS)
+	$(CHARMC) -cp ../../../../../lib -o libcomm.a $(OBJS)
 
 ComlibManager.o:
 	$(CHARMC) ComlibManager.C
