@@ -1854,6 +1854,21 @@ void start_nodes_local(char ** env)
 
 #elif CMK_BPROC
 
+int bproc_nodeisup(int node)
+{
+#if CMK_BPROC_VERSION < 4
+    if (bproc_nodestatus(node) == bproc_node_up) return 1;
+#else
+    char status[128];
+    if (bproc_nodestatus(node, status, 128)) {
+      if (arg_verbose)
+        printf("Charmrun> node %d status: %s\n", node, status);
+      if (strcmp(status, "up")==0) return 1;
+    }
+#endif
+  return 0;
+}
+
 /**
   ++ppn now is supported in both SMP and non SMP version
   in SMP, ++ppn specifies number of threads on each node;
@@ -1891,7 +1906,7 @@ void nodetab_init_for_scyld()
   npes = 0;
   for (i=-1; i<maxNodes && npes < arg_requested_pes; i++) {
     char hostname[256];
-    if (bproc_nodestatus(i) != bproc_node_up) continue;
+    if (!bproc_nodeisup(i)) continue;
     if (i!= -1 && i<arg_startpe) continue;
     if (i==-1 && arg_skipmaster) continue;    /* skip master node -1 */
     sprintf(hostname, "%d", i);
