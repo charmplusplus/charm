@@ -345,7 +345,8 @@ void splitter::separateSparse(void)
 {
 	if (mesh->nSparse()==0) return; //No sparse data at all
 	
-	FEM_Sparse **dest=new (FEM_Sparse*)[nchunks]; //Destination sparse records
+	typedef FEM_Sparse* FEM_Sparse_Ptr;
+	FEM_Sparse **dest=new FEM_Sparse_Ptr[nchunks]; //Destination sparse records
 	int *destLen=new int[nchunks]; //Number of records per chunk
 	int *destChunks=new int[nchunks]; //List of chunks a record belongs in
 	int s,i;
@@ -364,7 +365,8 @@ void splitter::separateSparse(void)
 		// to count up the length of each chunk in destLen:
 		int nSrc=src.size(),nNodes=src.getNodesPer();
 		int nDest; //Number of destination chunks for this record
-		peList **srcPes=new (peList*)[nNodes];
+		typedef peList* peListPtr;
+		peList **srcPes=new peListPtr[nNodes];
 		for (s=0;s<nSrc;s++) {
 			for (i=0;i<nNodes;i++) srcPes[i]=&gNode[src.getNodes(s)[i]];
 			intersectPeLists(srcPes,nNodes,destChunks,&nDest);
