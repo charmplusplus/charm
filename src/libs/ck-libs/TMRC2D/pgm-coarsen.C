@@ -440,75 +440,64 @@ driver(void)
   int ignored;
   int i;  
   int myChunk=FEM_My_partition();
-
-/*Add a refinement object to FEM array*/
-CkPrintf("[%d] begin init\n",myChunk);
+  
+  /*Add a refinement object to FEM array*/
+  CkPrintf("[%d] begin init\n",myChunk);
   FEM_REFINE2D_Init();
-CkPrintf("[%d] end init\n",myChunk);
+  CkPrintf("[%d] end init\n",myChunk);
 
   myGlobals g;
   FEM_Register(&g,(FEM_PupFn)pup_myGlobals);
-
-	init_myGlobal(&g);
+  init_myGlobal(&g);
   
- 	g.nnodes = FEM_Mesh_get_length(FEM_Mesh_default_read(),FEM_NODE);
-	int maxNodes = g.nnodes;
+  g.nnodes = FEM_Mesh_get_length(FEM_Mesh_default_read(),FEM_NODE);
+  int maxNodes = g.nnodes;
   g.maxnodes=2*maxNodes;
-  
-	g.m_i_fid=FEM_Create_field(FEM_DOUBLE,1,0,sizeof(double));
-
-	
-	resize_nodes((void *)&g,&g.nnodes,&maxNodes);
-  
-	
-	int nghost=0;
-  
-	g.nelems=FEM_Mesh_get_length(FEM_Mesh_default_read(),FEM_ELEM);
+  g.m_i_fid=FEM_Create_field(FEM_DOUBLE,1,0,sizeof(double));
+  resize_nodes((void *)&g,&g.nnodes,&maxNodes);
+  int nghost=0;
+  g.nelems=FEM_Mesh_get_length(FEM_Mesh_default_read(),FEM_ELEM);
   g.maxelems=g.nelems;
+  resize_elems((void *)&g,&g.nelems,&g.maxelems);
 
-	resize_elems((void *)&g,&g.nelems,&g.maxelems);
-
-	FEM_REFINE2D_Newmesh(FEM_Mesh_default_read(),FEM_NODE,FEM_ELEM);
-  
+  FEM_REFINE2D_Newmesh(FEM_Mesh_default_read(),FEM_NODE,FEM_ELEM);
   
   //Initialize associated data
-  for (i=0;i<g.maxnodes;i++){
+  for (i=0;i<g.maxnodes;i++) {
     g.R_net[i]=g.d[i]=g.v[i]=g.a[i]=vector2d(0.0);
-	}
+  }
 
-//Apply a small initial perturbation to positions
+  //Apply a small initial perturbation to positions
   for (i=0;i<g.nnodes;i++) {
-	  const double max=1.0e-15/15.0; //Tiny perturbation
-	  g.d[i].x+=max*(i&15);
-	  g.d[i].y+=max*((i+5)&15);
+    const double max=1.0e-15/15.0; //Tiny perturbation
+    g.d[i].x+=max*(i&15);
+    g.d[i].y+=max*((i+5)&15);
   }
 
   int fid=FEM_Create_field(FEM_DOUBLE,2,0,sizeof(vector2d));
   
   for (i=0;i<g.nelems;i++){
     checkTriangle(g,i);
-	}	
-	sleep(5);
+  }	
+  sleep(5);
   //Timeloop
   if (CkMyPe()==0){
     CkPrintf("Entering timeloop\n");
-	}	
-//  int tSteps=0x70FF00FF;
-  int tSteps=2;
-	calcMasses(g);
+  }	
+  //  int tSteps=0x70FF00FF;
+  int tSteps=3;
+  int z=13;
+  calcMasses(g);
   double startTime=CkWallTimer();
   double curArea=2.5e-5/1024;
   for (int t=0;t<tSteps;t++) {
-/*    if (1) { //Structural mechanics
-    	//Compute forces on nodes exerted by elements
-			CST_NL(g.coord,g.conn,g.R_net,g.d,matConst,g.nnodes,g.nelems,g.S11,g.S22,g.S12);
-	
-	    //Communicate net force on shared nodes
-			FEM_Update_field(fid,g.R_net);
-
-	    //Advance node positions
-			advanceNodes(dt,g.nnodes,g.coord,g.R_net,g.a,g.v,g.d,g.m_i,(t%4)==0);
-    
+    /*    if (1) { //Structural mechanics
+    //Compute forces on nodes exerted by elements
+    CST_NL(g.coord,g.conn,g.R_net,g.d,matConst,g.nnodes,g.nelems,g.S11,g.S22,g.S12);
+    //Communicate net force on shared nodes
+    FEM_Update_field(fid,g.R_net);
+    //Advance node positions
+    advanceNodes(dt,g.nnodes,g.coord,g.R_net,g.a,g.v,g.d,g.m_i,(t%4)==0);
     }*/
 
     //Debugging/perf. output
@@ -528,71 +517,64 @@ CkPrintf("[%d] end init\n",myChunk);
 //    if (t%512==0)
 //      FEM_Migrate();
 
-      vector2d *loc=new vector2d[2*g.nnodes];
-      for (i=0;i<g.nnodes;i++) {
-	loc[i]=g.coord[i];//+g.d[i];
-      }
-      double *areas=new double[g.nelems];
-	//coarsen in the last step
-      for (i=0;i<g.nelems;i++) {
-      	areas[i]=calcArea(g,i) * 2.0;
-      }
-
-			//coarsen in the last step
-      if(t >= tSteps-1){
-				CkPrintf("[%d] Starting coarsening step: %d nodes, %d elements to %.3g\n",
-		       myChunk,g.nnodes,g.nelems,curArea);
-			
-				FEM_REFINE2D_Coarsen(FEM_Mesh_default_read(),FEM_NODE,(double *)g.coord,FEM_ELEM,areas);
-				repeat_after_split((void *)&g);
-
-			
-	      g.nelems = FEM_Mesh_get_length(FEM_Mesh_default_read(),FEM_ELEM);
-				g.nnodes = FEM_Mesh_get_length(FEM_Mesh_default_read(),FEM_NODE);
-             
-	      CkPrintf("[%d] Done with coarsening step: %d nodes, %d elements\n",
-	       myChunk,g.nnodes,g.nelems);
-
-	}		    
+    vector2d *loc=new vector2d[2*g.nnodes];
+    for (i=0;i<g.nnodes;i++) {
+      loc[i]=g.coord[i];//+g.d[i];
+    }
+    double *areas=new double[g.nelems];
+    for (i=0;i<g.nelems;i++) {
+      areas[i]=calcArea(g,i);
+    }
     
+    //coarsen all steps but 0
+    if (t > 0) {
+      areas[z] *= 2.0;
+      z += 7;
+      CkPrintf("[%d] Starting coarsening step: %d nodes, %d elements to %.3g\n", myChunk,g.nnodes,g.nelems,curArea);
+      FEM_REFINE2D_Coarsen(FEM_Mesh_default_read(),FEM_NODE,(double *)g.coord,FEM_ELEM,areas);
+      repeat_after_split((void *)&g);
+      g.nelems = FEM_Mesh_get_length(FEM_Mesh_default_read(),FEM_ELEM);
+      g.nnodes = FEM_Mesh_get_length(FEM_Mesh_default_read(),FEM_NODE);
+      CkPrintf("[%d] Done with coarsening step: %d nodes, %d elements\n",
+	       myChunk,g.nnodes,g.nelems);
+    }		    
     if (1) { //Publish data to the net
-    		
-	    NetFEM n=NetFEM_Begin(myChunk,t,2,NetFEM_POINTAT);
-	    int count=0;
-	    double *vcoord = new double[2*g.nnodes];
-	    for(int i=0;i<g.nnodes;i++){
-	    	if(g.validNode[i]){
-			vcoord[2*count] = ((double *)g.coord)[2*i];
-			vcoord[2*count+1] = ((double *)g.coord)[2*i+1];
-			count++;	
-		}
-	    }
-	    NetFEM_Nodes(n,count,(double *)vcoord,"Position (m)");
-	/*    NetFEM_Vector(n,(double *)g.d,"Displacement (m)");
+      NetFEM n=NetFEM_Begin(myChunk,t,2,NetFEM_POINTAT);
+      int count=0;
+      double *vcoord = new double[2*g.nnodes];
+      for(int i=0;i<g.nnodes;i++){
+	if(g.validNode[i]){
+	  vcoord[2*count] = ((double *)g.coord)[2*i];
+	  vcoord[2*count+1] = ((double *)g.coord)[2*i+1];
+	  count++;	
+	}
+      }
+      NetFEM_Nodes(n,count,(double *)vcoord,"Position (m)");
+      /*    NetFEM_Vector(n,(double *)g.d,"Displacement (m)");
 	    NetFEM_Vector(n,(double *)g.v,"Velocity (m/s)");*/
-	    
-	    count=0;
-	    int *vconn = new int[3*g.nelems];
-	    for(int i=0;i<g.nelems;i++){
-	    	if(g.validElem[i]){
-			vconn[3*count] = g.conn[3*i];
-			vconn[3*count+1] = g.conn[3*i+1];
-			vconn[3*count+2] = g.conn[3*i+2];
-			count++;	
-		}
-	    }
-	    
-	    NetFEM_Elements(n,count,3,(int *)vconn,"Triangles");
-	/*	NetFEM_Scalar(n,g.S11,1,"X Stress (pure)");
+      
+      count=0;
+      int *vconn = new int[3*g.nelems];
+      for(int i=0;i<g.nelems;i++){
+	if(g.validElem[i]){
+	  vconn[3*count] = g.conn[3*i];
+	  vconn[3*count+1] = g.conn[3*i+1];
+	  vconn[3*count+2] = g.conn[3*i+2];
+	  count++;	
+	}
+      }
+      NetFEM_Elements(n,count,3,(int *)vconn,"Triangles");
+      /*	NetFEM_Scalar(n,g.S11,1,"X Stress (pure)");
 		NetFEM_Scalar(n,g.S22,1,"Y Stress (pure)");
 		NetFEM_Scalar(n,g.S12,1,"Shear Stress (pure)");*/
-	    
-	    NetFEM_End(n);
-	    delete [] vcoord;
-	    delete [] vconn;
+      NetFEM_End(n);
+      delete [] vcoord;
+      delete [] vconn;
+      CkPrintf("Reported data to NetFEM!\n");
+      if (t==0) sleep(5);
     }
   }
-
+  
   if (CkMyPe()==0)
     CkPrintf("Driver finished\n");
 }
