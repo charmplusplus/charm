@@ -32,7 +32,15 @@ public:
 	void pup(PUP::er &p);
 };
 
-class Chare { //Superclass of all Chares
+#include "CkMarshall.decl.h"
+
+class CkMarshallMsg : public CMessage_CkMarshallMsg {
+public: 
+	char *msgBuf;
+};
+
+/********************* Superclass of all Chares ******************/
+class Chare {
   protected:
     CkChareID thishandle;
   public:

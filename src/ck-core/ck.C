@@ -833,3 +833,6 @@ void CkBroadcastMsgNodeBranch(int eIdx, void *msg, CkGroupID gID)
 void _ckModuleInit(void) {
 	index_skipCldHandler = CmiRegisterHandler((CmiHandler)_skipCldHandler);
 }
+
+#include "CkMarshall.def.h"
+
