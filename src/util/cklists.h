@@ -3,6 +3,7 @@
 
 #include <converse.h> // for size_t
 #include <stdlib.h> // for size_t
+#include <string.h> // for memcpy
 
 template <class T>
 class CkQ {
