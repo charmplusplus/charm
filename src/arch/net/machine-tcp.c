@@ -24,7 +24,13 @@
 #define NO_NAGLE_ALG		1
 #define FRAGMENTATION		1
 
-void ReceiveDatagram(int pe);
+#if FRAGMENTATION
+#define PACKET_MAX		65535
+#else
+#define PACKET_MAX		1000000000
+#endif
+
+void ReceiveDatagram(int node);
 int TransmitDatagram(int pe);
 
 /******************************************************************************
@@ -150,18 +156,18 @@ static char sockWriteStates[1000] = {0};
 /* check data sockets and invoking functions */
 static void CmiCheckSocks()
 {
-  int pe;
+  int node;
   if (dataskt!=-1) {
-    for (pe=0; pe<CmiNumNodes(); pe++)
+    for (node=0; node<CmiNumNodes(); node++)
     {
-      if (pe == CmiMyNode()) continue;
-      if (sockReadStates[pe]) {
-        MACHSTATE1(2,"go to ReceiveDatagram %d", pe)
-	ReceiveDatagram(pe);
+      if (node == CmiMyNode()) continue;
+      if (sockReadStates[node]) {
+        MACHSTATE1(2,"go to ReceiveDatagram %d", node)
+	ReceiveDatagram(node);
       }
-      if (sockWriteStates[pe]) {
-        MACHSTATE1(2,"go to TransmitDatagram %d", pe)
-	TransmitDatagram(pe);
+      if (sockWriteStates[node]) {
+        MACHSTATE1(2,"go to TransmitDatagram %d", node)
+	TransmitDatagram(node);
       }
     }
   }
@@ -288,6 +294,36 @@ static void CommunicationServerThread(int sleepTime)
 #endif
 }
 
+#if FRAGMENTATION
+/* keep one buffer of PACKET_MAX size to ensure copy free operation 
+   1. for short message that is less than PACKET_MAX, 
+      buffer of that size is allocated and directly pass up
+   2. for long messages,
+      for first packet, buffer of PACKET_MAX is allocated and can be reused
+      as recv buffer, asm_msg of actual message size.
+      for afterwards packets, recv buffer will not allocated and the real 
+      message is used as recv buffer
+*/
+static char * maxbuf = NULL;
+
+static char * getMaxBuf() {
+  char *buf;
+  if (maxbuf == NULL)
+    buf = (char *)CmiAlloc(PACKET_MAX);
+  else {
+    buf = maxbuf; 
+    maxbuf = NULL;
+  }
+  return buf;
+}
+
+static void freeMaxBuf(char *buf) {
+  if (maxbuf) CmiFree(buf);
+  else maxbuf = buf;
+}
+
+#endif
+
 static void IntegrateMessageDatagram(char **msg, int len)
 {
   char *newmsg;
@@ -303,18 +339,15 @@ static void IntegrateMessageDatagram(char **msg, int len)
         size = CmiMsgHeaderGetLength(*msg);
         if (size < len) KillEveryoneCode(4559312);
 #if FRAGMENTATION
-#if 0
-	if (size <= Cmi_dgram_max_data+DGRAM_HEADER_SIZE) {
-	  newmsg = *msg;
-	  *msg = NULL;	       /* directly use the buffer */
-	}    
-	else 
-#endif
-	{		       /* allocate new and reuse the buffer next time */
+        if (size == len) {		/* whole message in one packet */
+	  newmsg = *msg;		/* directly use the buffer */
+	}
+	else {
           newmsg = (char *)CmiAlloc(size);
           if (!newmsg)
             fprintf(stderr, "%d: Out of mem\n", Cmi_mynode);
           memcpy(newmsg, *msg, len);
+	  freeMaxBuf(*msg);		/* free buffer, must be max size */
 	}
 #else
         newmsg = *msg;
@@ -324,11 +357,11 @@ static void IntegrateMessageDatagram(char **msg, int len)
         node->asm_fill = len;
         node->asm_msg = newmsg;
       } else {
+        size = len - DGRAM_HEADER_SIZE;
 #if ! FRAGMENTATION
 	CmiAssert(0);
-#endif
-        size = len - DGRAM_HEADER_SIZE;
         memcpy(newmsg + node->asm_fill, (*msg)+DGRAM_HEADER_SIZE, size);
+#endif
         node->asm_fill += size;
       }
       if (node->asm_fill > node->asm_total)
@@ -336,7 +369,7 @@ static void IntegrateMessageDatagram(char **msg, int len)
       if (node->asm_fill == node->asm_total) {
         if (rank == DGRAM_BROADCAST) {
           for (i=1; i<Cmi_mynodesize; i++)
-            CmiPushPE(i, CopyMsg(newmsg, len));
+            CmiPushPE(i, CopyMsg(newmsg, node->asm_total));
           CmiPushPE(0, newmsg);
         } else {
 #if CMK_NODE_QUEUE_AVAILABLE
@@ -358,27 +391,50 @@ static void IntegrateMessageDatagram(char **msg, int len)
   else CmiPrintf("message ignored2!\n");
 }
 
-void ReceiveDatagram(int pe)
+
+void ReceiveDatagram(int node)
 {
   static char *buf = NULL;
   int size;
-  double t;
+  DgramHeader *head, temp;
+  int newmsg = 0;
 
-  SOCKET fd = nodes[pe].sock;
+  OtherNode nodeptr = &nodes[node];
+
+  SOCKET fd = nodeptr->sock;
   if (-1 == skt_recvN(fd, &size, sizeof(int)))
     KillEveryoneCode(4559318);
 
 #if FRAGMENTATION
-    /* try to reuse the buffer */
-  if (!buf) buf = (char *)CmiAlloc(Cmi_dgram_max_data+DGRAM_HEADER_SIZE);
+  CmiAssert(size<=PACKET_MAX);
+  if (nodeptr->asm_msg == NULL) {
+    if (size == PACKET_MAX)
+      buf = getMaxBuf();
+    else
+      buf = (char *)CmiAlloc(size);
+  }
+  else {
+    /* this is not the first packet of a message */
+    CmiAssert(nodeptr->asm_fill+size-DGRAM_HEADER_SIZE <= nodeptr->asm_total);
+    /* find the dgram header start and save the header to temp */
+    buf = (char*)nodeptr->asm_msg + nodeptr->asm_fill - DGRAM_HEADER_SIZE;
+    head = (DgramHeader *)buf;
+    temp = *head;
+    newmsg = 1;
+  }
 #else
   buf = (char *)CmiAlloc(size);
 #endif
-  /* buf[0] = size; */
+
   if (-1==skt_recvN(fd, buf, size))
     KillEveryoneCode(4559319);
 
   IntegrateMessageDatagram(&buf, size);
+
+#if FRAGMENTATION
+  if (newmsg) *head = temp;
+#endif
+
 }
 
 
@@ -495,9 +551,9 @@ void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank)
 void CmiMachineInit()
 {
 #if FRAGMENTATION
-  Cmi_dgram_max_data = 65535-DGRAM_HEADER_SIZE; 
+  Cmi_dgram_max_data = PACKET_MAX - DGRAM_HEADER_SIZE; 
 #else
-  Cmi_dgram_max_data = 1000000000;
+  Cmi_dgram_max_data = PACKET_MAX;
 #endif
 }
 
