@@ -103,7 +103,7 @@ void BroadcastStrategy::handleHypercube(char *msg){
     int i;
     int size = env->getTotalsize();
     
-    double logp = CmiNumPes();
+    double logp = CkNumPes();
     logp = log(logp)/log(2.0);
     logp = ceil(logp);
     
@@ -120,7 +120,7 @@ void BroadcastStrategy::handleHypercube(char *msg){
         //CkPrintf("%d --> %d, %d\n", CkMyPe(), p, newcycle); 
 
         env->setSrcPe(newcycle);
-        if(p < CmiNumPes()) {
+        if(p < CkNumPes()) {
             CmiSyncSendFn(p, size, msg);
         }
     }
