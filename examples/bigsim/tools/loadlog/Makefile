@@ -9,3 +9,6 @@ loadlog.o: loadlog.C
 clean:
 	rm -f *.o loadlog *~ moduleinit.C charmrun conv-host
 	rm -rf *.decl.h *.def.h core *.log
+
+test: loadlog
+	./loadlog
