@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.34  1998-06-29 16:51:31  milind
+ * Revision 1.35  1998-07-08 22:44:38  jyelon
+ * Was storing argv in global var, not good, since stack-allocated.
+ *
+ * Revision 1.34  1998/06/29 16:51:31  milind
  * Fixed the argv passing to all the processors as only processor 0 was
  * processing and removing the command-line arguments.
  *
@@ -461,12 +464,19 @@ char **argv;
   }
 }
 
+static char **CopyArgvec(char **src)
+{
+  int argc; char **argv;
+  for (argc=0; src[argc]; argc++);
+  argv = (char **)malloc((argc+1)*sizeof(char *));
+  memcpy(argv, src, (argc+1)*sizeof(char *));
+  return argv;
+}
+
 char **CmiInitPE()
 {
   int argc; char **argv;
-  for (argc=0; CmiArgv[argc]; argc++);
-  argv = (char **)CmiAlloc((argc+1)*sizeof(char *));
-  memcpy(argv, CmiArgv, (argc+1)*sizeof(char *));
+  argv = CopyArgvec(CmiArgv);
   CpvAccess(CmiLocalQueue) = CmiQueues[CmiMyPe()];
   CmiSpanTreeInit();
   CmiTimerInit();
@@ -506,7 +516,7 @@ int usched, initret;
 #endif
 #endif
   
-  CmiArgv = argv;
+  CmiArgv = CopyArgvec(argv);
   CmiStart = fn;
   CmiUsched = usched;
   CmiParseArgs(argv);
