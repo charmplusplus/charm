@@ -66,7 +66,7 @@ extern void BgInitTiming();
 extern void BgMsgSetTiming(char *msg);
 extern void BgPrintThreadTimeLine(int node, int th, BgTimeLine &tline);
 extern void BgGetMsgStartTime(double recvTime, BgTimeLine &tline, double* startTime, int index);
-extern void BgAdjustTimeLineInsert(bgTimeLog* tlog, BgTimeLine &tline);
+extern void BgAdjustTimeLineInsert(BgTimeLine &tline);
 extern void BgAdjustTimeLineForward(int msgID, double tAdjust, BgTimeLine &tline);
 
 #if BLUEGENE_TIMING
