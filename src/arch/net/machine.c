@@ -1953,26 +1953,26 @@ void SendHypercube(OutgoingMsg ogm, int root, int size, char *msg, unsigned int 
 
   if (root) {
     msg = ogm->data;
-    srcpe = CmiMyPe();
+    srcpe = CmiMyNode();
   }
   else ogm = NULL;
 
-  tmp = srcpe ^ CmiMyPe();
-  k = log_of_2(CmiNumPes()) + 2;
+  tmp = srcpe ^ CmiMyNode();
+  k = log_of_2(CmiNumNodes()) + 2;
   if (tmp) {
      do {--k;} while (!(tmp>>k));
   }
 
   dest_pes = CmiTmpAlloc(sizeof(int)*(k+1));
   k--;
-  npes = HypercubeGetBcastDestinations(CmiMyPe(), CmiNumPes(), k, dest_pes);
+  npes = HypercubeGetBcastDestinations(CmiMyNode(), CmiNumNodes(), k, dest_pes);
   
   for (i = 0; i < npes; i++) {
     int p = dest_pes[i];
     /* CmiPrintf("SendHypercube: %d => %d (%d)\n", cs->pe, p, i); */
     if (!root && !ogm) 
       ogm=PrepareOutgoing(cs ,PE_BROADCAST_OTHERS, size,'F',CopyMsg(msg, size));
-    DeliverViaNetwork(ogm, nodes + p, noderank, CmiMyPe());
+    DeliverViaNetwork(ogm, nodes + p, noderank, CmiMyNode());
   }
   if (!root && ogm) GarbageCollectMsg(ogm);
   CmiTmpFree(dest_pes);
