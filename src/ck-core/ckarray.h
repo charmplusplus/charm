@@ -217,9 +217,6 @@ public:
   
   int numElements; //Initial number of array elements (DEPRICATED)
   
-//Contribute to the given reduction type.  Data is copied, not deleted.
-  void contribute(int dataSize,void *data,CkReduction::reducerType type);
-
 //Pack/unpack routine (called before and after migration)
   virtual void pup(PUP::er &p);
 
@@ -231,6 +228,8 @@ public:
 
   //Synonym for ckMigrate
   inline void migrateMe(int toPe) {ckMigrate(toPe);}
+
+  CK_REDUCTION_CONTRIBUTE_METHODS_DECL
 
 protected:
   CkArray *thisArray;//My source array

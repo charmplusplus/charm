@@ -285,7 +285,7 @@ public:
   	int nSources(void) {return abs(sourceFlag);}
 	//"Constructor"-- builds and returns a new CkReductionMsg.
 	//  the "srcData" array you specify will be copied into this object (unless NULL).
-	static CkReductionMsg *buildNew(int NdataSize,void *srcData,
+	static CkReductionMsg *buildNew(int NdataSize,const void *srcData,
 		CkReduction::reducerType reducer=CkReduction::invalid);
 
 	//Msg runtime support
@@ -302,6 +302,30 @@ private:
 	
 	//Default constructor is private so you must use "buildNew", above
 	CkReductionMsg();
+};
+
+
+//Define methods used to contribute to the given reduction type.
+//  Data is copied, not deleted.
+#define CK_REDUCTION_CONTRIBUTE_METHODS_DECL \
+  void contribute(int dataSize,const void *data,CkReduction::reducerType type);
+
+#define CK_REDUCTION_CONTRIBUTE_METHODS_DEF(me,myRednMgr,myRednInfo) \
+void me::contribute(int dataSize,const void *data,CkReduction::reducerType type)\
+{\
+	myRednMgr->contribute(&myRednInfo,\
+		CkReductionMsg::buildNew(dataSize,data,type));\
+}
+
+//A group that can contribute to reductions
+class CkReductionGroup : public CkReductionMgr
+{
+	CkReductionMgr::contributorInfo reductionInfo;//My reduction information
+ public:
+	CkReductionGroup();
+	CkReductionGroup(CkMigrateMessage *msg):CkReductionMgr(msg) {}
+
+	CK_REDUCTION_CONTRIBUTE_METHODS_DECL
 };
 
 #endif //_CKREDUCTION_H

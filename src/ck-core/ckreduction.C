@@ -63,7 +63,15 @@ waits for the migrant contributions to straggle in.
 #define RED_DEB(x) //CkPrintf x
 #endif
 
-
+CkReductionGroup::CkReductionGroup() 
+{
+	creatingContributors();
+	contributorCreated(&reductionInfo);
+	doneCreatingContributors();
+}
+CK_REDUCTION_CONTRIBUTE_METHODS_DEF(CkReductionGroup,
+				    ((CkReductionMgr *)this),
+				    reductionInfo);
 
 CkGroupInitCallback::CkGroupInitCallback(void) {}
 /*
@@ -593,7 +601,7 @@ CkReductionMsg::CkReductionMsg(){}
 //"Constructor"-- builds and returns a new CkReductionMsg.
 //  the "data" array you specify will be copied into this object.
 CkReductionMsg *CkReductionMsg::
-  buildNew(int NdataSize,void *srcData,
+  buildNew(int NdataSize,const void *srcData,
     CkReduction::reducerType reducer)
 {
   int len[1];

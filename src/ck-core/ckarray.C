@@ -115,7 +115,7 @@ void ArrayElement::ckJustMigrated(void) {
 	if (!thisArray->bringBroadcastUpToDate(this)) return;
 }
 
-
+CK_REDUCTION_CONTRIBUTE_METHODS_DEF(ArrayElement,thisArray,reductionInfo);
 
 //Remote method: calls destructor
 void ArrayElement::ckDestroy(void)
@@ -129,14 +129,6 @@ ArrayElement::~ArrayElement()
 {
   //To detect use-after-delete: 
   thisArray=(CkArray *)0xDEADa7a1;
-}
-
-
-//Contribute to the given reduction type.  Data is copied, not deleted.
-void ArrayElement::contribute(int dataSize,void *data,CkReduction::reducerType type)
-{
-  thisArray->contribute(&reductionInfo,
-			CkReductionMsg::buildNew(dataSize,data,type));
 }
 
 void ArrayElement::pup(PUP::er &p)
