@@ -96,6 +96,9 @@ void ComlibGroupInfo::getSourceGroup(CkGroupID &gid, int *&pelist,
     npes = nsrcpes;
 }
 
+void ComlibGroupInfo::getSourceGroup(CkGroupID &gid){
+    gid = this->gid;
+}
 
 ComlibArrayInfo::ComlibArrayInfo() {
 

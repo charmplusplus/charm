@@ -56,6 +56,7 @@ class ComlibGroupInfo {
 
     void setSourceGroup(CkGroupID gid, int *srcpelist=0, int nsrcpes=0);
     int isSourceGroup(){return isGroup;}
+    void getSourceGroup(CkGroupID &gid);
     void getSourceGroup(CkGroupID &gid, int *&pelist, int &npes);
     
     void pup(PUP::er &p);
@@ -134,7 +135,7 @@ class CharmStrategy : public Strategy {
     //Called for each message
     //Function inserts a Charm++ message
     virtual void insertMessage(CharmMessageHolder *msg) {
-        CkAbort("Bummer Should Not come here:CharmStrategy is abstract\n");
+      CkAbort("Bummer Should Not come here:CharmStrategy is abstract\n");
     }
 
     //Removed the virtual!
@@ -143,7 +144,7 @@ class CharmStrategy : public Strategy {
     
     //Called after all chares and groups have finished depositing their 
     //messages on that processor.
-    virtual void doneInserting() {}
+    // DUPLICATED virtual void doneInserting() {}
 
     //Added a new call that is called after the strategy had be
     //created on every processor.
