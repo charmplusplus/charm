@@ -882,7 +882,7 @@ void chunk::deriveEdges(int *conn, int *gid)
 				      conn, numGhosts, gid, i, &nbrRef); 
 	if (edgeLocal(myRef, nbrRef)) { // make edge here
 	  newEdge = addEdge();
-	  CkPrintf("TMRC2D: [%d] New edge (%d,%d) added between nodes %d and %d and elements %d and %d\n", cid, newEdge.cid, newEdge.idx, theElements[i].nodes[n1localIdx], theElements[i].nodes[n2localIdx], i, nbrRef.idx);
+	  DEBUGREF(CkPrintf("TMRC2D: [%d] New edge (%d,%d) added between nodes %d and %d and elements %d and %d\n", cid, newEdge.cid, newEdge.idx, theElements[i].nodes[n1localIdx], theElements[i].nodes[n2localIdx], i, nbrRef.idx);)
 	  // point edge to the two neighboring elements
 	  theEdges[newEdge.idx].update(nullRef, myRef);
 	  theEdges[newEdge.idx].update(nullRef, nbrRef);
