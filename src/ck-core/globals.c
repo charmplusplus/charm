@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.18  1998-06-15 22:16:36  milind
+ * Revision 2.19  1998-06-15 23:49:22  milind
+ * Fixed charm++ message macros to adhere to the new LDB structure.
+ *
+ * Revision 2.18  1998/06/15 22:16:36  milind
  * Reduced Charm++ overhead by reducing variable accesses.
  *
  * Revision 2.17  1998/02/27 11:52:02  jyelon
@@ -104,19 +107,6 @@
 static char ident[] = "@(#)$Header$";
 #include "charm.h"
 #include <stdio.h>
-
-/**********************************************************************/
-/* These fields are needed by message macros. Any changes must be
-reflected there. */
-/**********************************************************************/
-
-CpvDeclare(int, PAD_SIZE);
-CpvDeclare(int, HEADER_SIZE);
-CpvDeclare(int, _CK_Env_To_Usr);
-CpvDeclare(int, _CK_Ldb_To_Usr);
-
-
-
 
 /**********************************************************************/
 /* Other global variables. */

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.4  1998-06-15 22:16:25  milind
+ * Revision 2.5  1998-06-15 23:49:19  milind
+ * Fixed charm++ message macros to adhere to the new LDB structure.
+ *
+ * Revision 2.4  1998/06/15 22:16:25  milind
  * Reduced Charm++ overhead by reducing variable accesses.
  *
  * Revision 2.3  1998/05/13 19:58:19  milind
@@ -290,7 +293,7 @@ typedef struct DUMMY_MSG {
  *****************************************************************************/
 
 typedef struct envelope {
-  char     core[CmiMsgHeaderSizeBytes];
+  char     core[CmiExtHeaderSizeBytes];
   
   unsigned int   event;   /* unknown meaning. Used only for logging.*/
 
@@ -468,36 +471,15 @@ extern void          CkPrioConcatFn    CMK_PROTO((void *,void *,unsigned int));
 
 
 #define ENVELOPE_SIZE sizeof(ENVELOPE)
-#define _CK_Env_To_Ldb ENVELOPE_SIZE
-#define _CK_Ldb_To_Env (-ENVELOPE_SIZE)
-
-CpvExtern(int,  PAD_SIZE);
-CpvExtern(int,  HEADER_SIZE);
-CpvExtern(int,  LDB_ELEM_SIZE);
-CpvExtern(int, _CK_Env_To_Usr);
-CpvExtern(int, _CK_Ldb_To_Usr);
 
 #define TOTAL_MSG_SIZE(usrsize, priowords)\
-    (CpvAccess(HEADER_SIZE)+((priowords)*sizeof(int))+(usrsize))
-
-
-#define LDB_ELEMENT_PTR(env)  \
-    (void *) (CHARRED(env) + _CK_Env_To_Ldb)
+    (ENVELOPE_SIZE+((priowords)*sizeof(int))+(usrsize))
 
 #define USER_MSG_PTR(env)\
-    (CHARRED(env) + CpvAccess(_CK_Env_To_Usr))
-
-#define ENVELOPE_LDBPTR(ldbptr) \
-	(ENVELOPE *) (CHARRED(ldbptr) + _CK_Ldb_To_Env)
-
-#define USR_MSG_LDBPTR(ldbptr) \
-	(CHARRED(ldbptr) + CpvAccess(_CK_Ldb_To_Usr))
+    (CHARRED(env) + ENVELOPE_SIZE)
 
 #define ENVELOPE_UPTR(usrptr)\
-	(ENVELOPE *) (CHARRED(usrptr) - CpvAccess(_CK_Env_To_Usr))
-
-#define LDB_UPTR(usrptr)\
-        (LDB_ELEMENT *) (CHARRED(usrptr) - CpvAccess(_CK_Ldb_To_Usr))
+	(ENVELOPE *) (CHARRED(usrptr) - ENVELOPE_SIZE)
 
 /******************************************************************************
  *

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.89  1998-06-15 23:11:15  wilmarth
+ * Revision 2.90  1998-06-15 23:49:23  milind
+ * Fixed charm++ message macros to adhere to the new LDB structure.
+ *
+ * Revision 2.89  1998/06/15 23:11:15  wilmarth
  * Removed CLdField parameter from CldInfoFn.
  *
  * Revision 2.88  1998/06/15 22:10:48  jyelon
@@ -788,14 +791,9 @@ void CfutureInit();
 
 /****** CLD: THE LOAD BALANCER ******/
 
-extern int Cld_fieldsize;
-
 #define CLD_ANYWHERE (-1)
 #define CLD_BROADCAST (-2)
 #define CLD_BROADCAST_ALL (-3)
-#define CLD_FIELDSIZE (Cld_fieldsize)
-
-#define CLD_STANDARD_FIELD_STUFF int stdsave[2];
 
 typedef void (*CldInfoFn)(void *msg, 
 			  int *len,

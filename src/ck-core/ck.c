@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.27  1998-06-15 22:16:29  milind
+ * Revision 2.28  1998-06-15 23:49:20  milind
+ * Fixed charm++ message macros to adhere to the new LDB structure.
+ *
+ * Revision 2.27  1998/06/15 22:16:29  milind
  * Reduced Charm++ overhead by reducing variable accesses.
  *
  * Revision 2.26  1998/02/27 11:51:51  jyelon
@@ -165,8 +168,7 @@ static char ident[] = "@(#)$Header$";
 
 void CkUnpack(ENVELOPE **msg);
 void CkPack(ENVELOPE **msg);
-void CkInfo(void *msg, 
-	      int *len, void *ldbo, int *qs, int *pb, unsigned int **pp);
+void CkInfo(void *msg, int *len, int *qs, int *pb, unsigned int **pp);
 
 extern void *FIFO_Create();
 extern CHARE_BLOCK *CreateChareBlock();
@@ -548,12 +550,11 @@ void CkPack(ENVELOPE **henv)
 }
 
 
-void CkInfo(void *msg, int *len, void *ldbfield,
+void CkInfo(void *msg, int *len,
 	    int *queueing, int *priobits, unsigned int **prioptr)
 {
   ENVELOPE *env = (ENVELOPE *)msg;
   *len = GetEnv_TotalSize(env);
-  *(void**)ldbfield = LDB_ELEMENT_PTR(env);
   *queueing = GetEnv_queueing(env);
   *priobits = GetEnv_priosize(env);
   *prioptr = GetEnv_priobgn(env);

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.5  1998-06-15 22:16:33  milind
+ * Revision 2.6  1998-06-15 23:49:21  milind
+ * Fixed charm++ message macros to adhere to the new LDB structure.
+ *
+ * Revision 2.5  1998/06/15 22:16:33  milind
  * Reduced Charm++ overhead by reducing variable accesses.
  *
  * Revision 2.4  1998/02/27 11:51:53  jyelon
@@ -65,33 +68,4 @@ of the message must be reflected here. */
 /**********************************************************************/
 void InitializeMessageMacros(void)
 {
-/* The message format is as follows :
-        -------------------------------------
-        | env | ldb | pad | user | priority |
-        -------------------------------------
-*/
-
-
-#define ENVELOPE_SIZE sizeof(ENVELOPE)
-
-/* count everything except the padding, then add the padding if needed */ 
-	CpvAccess(HEADER_SIZE) = ENVELOPE_SIZE + CLD_FIELDSIZE ;
-
-	if (CpvAccess(HEADER_SIZE) % 8 == 0)
-		CpvAccess(PAD_SIZE) = 0;
-	else {
-       		CpvAccess(PAD_SIZE) = 8 - (CpvAccess(HEADER_SIZE) % 8);
-	    	CpvAccess(HEADER_SIZE) += CpvAccess(PAD_SIZE);
-	}
-
-	/********************* ENVELOPE **************************************/
-
-	CpvAccess(_CK_Env_To_Usr) = ENVELOPE_SIZE + CLD_FIELDSIZE + CpvAccess(PAD_SIZE) ;
-
-
-	/******************** LDB ********************************************/
-
- 	CpvAccess(_CK_Ldb_To_Usr) = CLD_FIELDSIZE + CpvAccess(PAD_SIZE) ;
-
-
 }	
