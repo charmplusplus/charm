@@ -308,7 +308,7 @@ void SendSpanningChildren(int size, char *msg)
     if (p > Cmi_numpes - 1) break;
     p += startpe;
     p = p%Cmi_numpes;
-//CmiPrintf("send: %d %d %d %d\n", startpe, Cmi_mype, p , p%Cmi_numpes);
+/*CmiPrintf("send: %d %d %d %d\n", startpe, Cmi_mype, p , p%Cmi_numpes);*/
     assert(p>=0 && p<Cmi_numpes && p!=Cmi_mype);
     CmiSyncSendFn1(p, size, msg);
   }
