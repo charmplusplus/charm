@@ -430,6 +430,7 @@ void CkMemCheckPT::restart(int diePe)
 
 void CkMemCheckPT::removeArrayElements()
 {
+#if CMK_MEM_CHECKPOINT
   int len = ckTable.length();
   double curTime = CmiWallTimer();
   CkPrintf("[%d] CkMemCheckPT ----- %s len:%d in %f seconds.\n",CkMyPe(),stage,len,curTime-startTime);
@@ -462,6 +463,7 @@ CkPrintf("[%d] Destory: ", CkMyPe()); entry->index.print();
   //if (CkMyPe() == 0)
   //  CkStartQD(CkCallback(CkIndex_CkMemCheckPT::resetReductionMgr(), thisProxy));
   thisProxy[0].quiescence(CkCallback(CkIndex_CkMemCheckPT::resetReductionMgr(), thisProxy));
+#endif
 }
 
 // flush state in reduction manager
