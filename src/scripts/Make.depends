@@ -29,7 +29,7 @@ convcore.o: \
 	machineProjections.h \
 	quiescence.h \
 	cmibacktrace.c
-	$(CHARMC) -c convcore.c
+	$(CHARMC) -c -I. convcore.c
 
 conv-conds.o: \
 	conv-conds.c \
@@ -48,7 +48,7 @@ conv-conds.o: \
 	conv-trace.h \
 	persistent.h \
 	debug-conv.h
-	$(CHARMC) -c conv-conds.c
+	$(CHARMC) -c -I. conv-conds.c
 
 queueing.o: \
 	queueing.c \
@@ -68,7 +68,7 @@ queueing.o: \
 	persistent.h \
 	debug-conv.h \
 	queueing.h
-	$(CHARMC) -c queueing.c
+	$(CHARMC) -c -I. queueing.c
 
 msgmgr.o: \
 	msgmgr.c \
@@ -87,7 +87,7 @@ msgmgr.o: \
 	conv-trace.h \
 	persistent.h \
 	debug-conv.h
-	$(CHARMC) -c msgmgr.c
+	$(CHARMC) -c -I. msgmgr.c
 
 cpm.o: \
 	cpm.c \
@@ -107,7 +107,7 @@ cpm.o: \
 	conv-trace.h \
 	persistent.h \
 	debug-conv.h
-	$(CHARMC) -c cpm.c
+	$(CHARMC) -c -I. cpm.c
 
 cpthreads.o: \
 	cpthreads.c \
@@ -127,7 +127,7 @@ cpthreads.o: \
 	conv-trace.h \
 	persistent.h \
 	debug-conv.h
-	$(CHARMC) -c cpthreads.c
+	$(CHARMC) -c -I. cpthreads.c
 
 futures.o: \
 	futures.c \
@@ -146,7 +146,7 @@ futures.o: \
 	conv-trace.h \
 	persistent.h \
 	debug-conv.h
-	$(CHARMC) -c futures.c
+	$(CHARMC) -c -I. futures.c
 
 cldb.o: \
 	cldb.c \
@@ -167,7 +167,7 @@ cldb.o: \
 	conv-trace.h \
 	persistent.h \
 	debug-conv.h
-	$(CHARMC) -c cldb.c
+	$(CHARMC) -c -I. cldb.c
 
 random.o: \
 	random.c \
@@ -186,7 +186,7 @@ random.o: \
 	conv-trace.h \
 	persistent.h \
 	debug-conv.h
-	$(CHARMC) -c random.c
+	$(CHARMC) -c -I. random.c
 
 debug-conv.o: \
 	debug-conv.c \
@@ -209,7 +209,7 @@ debug-conv.o: \
 	conv-ccs.h \
 	sockRoutines.h \
 	ccs-server.h
-	$(CHARMC) -c debug-conv.c
+	$(CHARMC) -c -I. debug-conv.c
 
 generate.o: \
 	generate.c \
@@ -229,7 +229,7 @@ generate.o: \
 	persistent.h \
 	debug-conv.h \
 	typedefs.h
-	$(CHARMC) -c generate.c
+	$(CHARMC) -c -I. generate.c
 
 edgelist.o: \
 	edgelist.c \
@@ -249,7 +249,7 @@ edgelist.o: \
 	conv-trace.h \
 	persistent.h \
 	debug-conv.h
-	$(CHARMC) -c edgelist.c
+	$(CHARMC) -c -I. edgelist.c
 
 conv-ccs.o: \
 	conv-ccs.c \
@@ -273,7 +273,7 @@ conv-ccs.o: \
 	ccs-server.h \
 	queueing.h \
 	ckhashtable.h
-	$(CHARMC) -c conv-ccs.c
+	$(CHARMC) -c -I. conv-ccs.c
 
 ccs-builtins.o: \
 	ccs-builtins.C \
@@ -299,7 +299,7 @@ ccs-builtins.o: \
 	sockRoutines.h \
 	ccs-server.h \
 	queueing.h
-	$(CHARMC) -c ccs-builtins.C
+	$(CHARMC) -c -I. ccs-builtins.C
 
 quiescence.o: \
 	quiescence.c \
@@ -319,7 +319,7 @@ quiescence.o: \
 	persistent.h \
 	debug-conv.h \
 	quiescence.h
-	$(CHARMC) -c quiescence.c
+	$(CHARMC) -c -I. quiescence.c
 
 isomalloc.o: \
 	isomalloc.c \
@@ -339,7 +339,7 @@ isomalloc.o: \
 	persistent.h \
 	debug-conv.h \
 	memory-isomalloc.h
-	$(CHARMC) -c isomalloc.c
+	$(CHARMC) -c -I. isomalloc.c
 
 global-nop.o: \
 	global-nop.c \
@@ -358,7 +358,7 @@ global-nop.o: \
 	conv-trace.h \
 	persistent.h \
 	debug-conv.h
-	$(CHARMC) -c global-nop.c
+	$(CHARMC) -c -I. global-nop.c
 
 init.o: \
 	init.C \
@@ -426,7 +426,7 @@ init.o: \
 	register.h \
 	stats.h \
 	ckfutures.h
-	$(CHARMC) -c init.C
+	$(CHARMC) -c -I. init.C
 
 register.o: \
 	register.C \
@@ -494,7 +494,7 @@ register.o: \
 	register.h \
 	stats.h \
 	ckfutures.h
-	$(CHARMC) -c register.C
+	$(CHARMC) -c -I. register.C
 
 qd.o: \
 	qd.C \
@@ -562,7 +562,7 @@ qd.o: \
 	register.h \
 	stats.h \
 	ckfutures.h
-	$(CHARMC) -c qd.C
+	$(CHARMC) -c -I. qd.C
 
 ck.o: \
 	ck.C \
@@ -632,7 +632,7 @@ ck.o: \
 	ckfutures.h \
 	queueing.h \
 	CkMarshall.def.h
-	$(CHARMC) -c ck.C
+	$(CHARMC) -c -I. ck.C
 
 main.o: \
 	main.C \
@@ -700,7 +700,7 @@ main.o: \
 	register.h \
 	stats.h \
 	ckfutures.h
-	$(CHARMC) -c main.C
+	$(CHARMC) -c -I. main.C
 
 msgalloc.o: \
 	msgalloc.C \
@@ -769,7 +769,7 @@ msgalloc.o: \
 	stats.h \
 	ckfutures.h \
 	queueing.h
-	$(CHARMC) -c msgalloc.C
+	$(CHARMC) -c -I. msgalloc.C
 
 ckfutures.o: \
 	ckfutures.C \
@@ -838,7 +838,7 @@ ckfutures.o: \
 	stats.h \
 	ckfutures.h \
 	CkFutures.def.h
-	$(CHARMC) -c ckfutures.C
+	$(CHARMC) -c -I. ckfutures.C
 
 debug-message.o: \
 	debug-message.C \
@@ -907,7 +907,7 @@ debug-message.o: \
 	stats.h \
 	ckfutures.h \
 	queueing.h
-	$(CHARMC) -c debug-message.C
+	$(CHARMC) -c -I. debug-message.C
 
 ckcallback.o: \
 	ckcallback.C \
@@ -975,7 +975,7 @@ ckcallback.o: \
 	ccs-server.h \
 	CkCallback.decl.h \
 	CkCallback.def.h
-	$(CHARMC) -c ckcallback.C
+	$(CHARMC) -c -I. ckcallback.C
 
 cklocation.o: \
 	cklocation.C \
@@ -1044,7 +1044,7 @@ cklocation.o: \
 	stats.h \
 	ckfutures.h \
 	CkLocation.def.h
-	$(CHARMC) -c cklocation.C
+	$(CHARMC) -c -I. cklocation.C
 
 ckarray.o: \
 	ckarray.C \
@@ -1113,7 +1113,7 @@ ckarray.o: \
 	stats.h \
 	ckfutures.h \
 	CkArray.def.h
-	$(CHARMC) -c ckarray.C
+	$(CHARMC) -c -I. ckarray.C
 
 ckreduction.o: \
 	ckreduction.C \
@@ -1182,7 +1182,7 @@ ckreduction.o: \
 	stats.h \
 	ckfutures.h \
 	CkReduction.def.h
-	$(CHARMC) -c ckreduction.C
+	$(CHARMC) -c -I. ckreduction.C
 
 ckarrayreductionmgr.o: \
 	ckarrayreductionmgr.C \
@@ -1251,7 +1251,7 @@ ckarrayreductionmgr.o: \
 	stats.h \
 	ckfutures.h \
 	CkArrayReductionMgr.def.h
-	$(CHARMC) -c ckarrayreductionmgr.C
+	$(CHARMC) -c -I. ckarrayreductionmgr.C
 
 tempo.o: \
 	tempo.C \
@@ -1314,7 +1314,7 @@ tempo.o: \
 	trace.h \
 	trace-bluegene.h \
 	tempo.def.h
-	$(CHARMC) -c tempo.C
+	$(CHARMC) -c -I. tempo.C
 
 waitqd.o: \
 	waitqd.C \
@@ -1377,7 +1377,7 @@ waitqd.o: \
 	trace-bluegene.h \
 	waitqd.decl.h \
 	waitqd.def.h
-	$(CHARMC) -c waitqd.C
+	$(CHARMC) -c -I. waitqd.C
 
 LBDatabase.o: \
 	LBDatabase.C \
@@ -1446,7 +1446,7 @@ LBDatabase.o: \
 	CentralLB.decl.h \
 	CentralLBMsg.h \
 	NullLB.h
-	$(CHARMC) -c LBDatabase.C
+	$(CHARMC) -c -I. LBDatabase.C
 
 lbdb.o: \
 	lbdb.C \
@@ -1474,7 +1474,7 @@ lbdb.o: \
 	cklists.h \
 	LBComm.h \
 	LBMachineUtil.h
-	$(CHARMC) -c lbdb.C
+	$(CHARMC) -c -I. lbdb.C
 
 charisma.o: \
 	charisma.C \
@@ -1537,7 +1537,7 @@ charisma.o: \
 	trace.h \
 	trace-bluegene.h \
 	charisma.def.h
-	$(CHARMC) -c charisma.C
+	$(CHARMC) -c -I. charisma.C
 
 ckcheckpoint.o: \
 	ckcheckpoint.C \
@@ -1606,7 +1606,7 @@ ckcheckpoint.o: \
 	stats.h \
 	ckfutures.h \
 	CkCheckpoint.def.h
-	$(CHARMC) -c ckcheckpoint.C
+	$(CHARMC) -c -I. ckcheckpoint.C
 
 LBDBManager.o: \
 	LBDBManager.C \
@@ -1673,7 +1673,7 @@ LBDBManager.o: \
 	LBOM.h \
 	LBComm.h \
 	LBMachineUtil.h
-	$(CHARMC) -c LBDBManager.C
+	$(CHARMC) -c -I. LBDBManager.C
 
 LBComm.o: \
 	LBComm.C \
@@ -1696,7 +1696,7 @@ LBComm.o: \
 	lbdb.h \
 	charm.h \
 	pup.h
-	$(CHARMC) -c LBComm.C
+	$(CHARMC) -c -I. LBComm.C
 
 LBObj.o: \
 	LBObj.C \
@@ -1724,7 +1724,7 @@ LBObj.o: \
 	cklists.h \
 	LBComm.h \
 	LBMachineUtil.h
-	$(CHARMC) -c LBObj.C
+	$(CHARMC) -c -I. LBObj.C
 
 LBMachineUtil.o: \
 	LBMachineUtil.C \
@@ -1744,7 +1744,7 @@ LBMachineUtil.o: \
 	conv-trace.h \
 	persistent.h \
 	debug-conv.h
-	$(CHARMC) -c LBMachineUtil.C
+	$(CHARMC) -c -I. LBMachineUtil.C
 
 BaseLB.o: \
 	BaseLB.C \
@@ -1808,7 +1808,7 @@ BaseLB.o: \
 	trace-bluegene.h \
 	BaseLB.h \
 	BaseLB.def.h
-	$(CHARMC) -c BaseLB.C
+	$(CHARMC) -c -I. BaseLB.C
 
 CentralLB.o: \
 	CentralLB.C \
@@ -1882,7 +1882,7 @@ CentralLB.o: \
 	LBOM.h \
 	LBComm.h \
 	LBMachineUtil.h
-	$(CHARMC) -c CentralLB.C
+	$(CHARMC) -c -I. CentralLB.C
 
 NborBaseLB.o: \
 	NborBaseLB.C \
@@ -1948,7 +1948,7 @@ NborBaseLB.o: \
 	NborBaseLB.h \
 	NborBaseLB.decl.h \
 	NborBaseLB.def.h
-	$(CHARMC) -c NborBaseLB.C
+	$(CHARMC) -c -I. NborBaseLB.C
 
 WSLB.o: \
 	WSLB.C \
@@ -2017,7 +2017,7 @@ WSLB.o: \
 	WSLB.h \
 	WSLB.decl.h \
 	WSLB.def.h
-	$(CHARMC) -c WSLB.C
+	$(CHARMC) -c -I. WSLB.C
 
 ObjGraph.o: \
 	ObjGraph.C \
@@ -2085,7 +2085,7 @@ ObjGraph.o: \
 	CentralLB.decl.h \
 	CentralLBMsg.h \
 	LBSimulation.h
-	$(CHARMC) -c ObjGraph.C
+	$(CHARMC) -c -I. ObjGraph.C
 
 graph.o: \
 	graph.c \
@@ -2105,7 +2105,7 @@ graph.o: \
 	persistent.h \
 	debug-conv.h \
 	graph.h
-	$(CHARMC) -c graph.c
+	$(CHARMC) -c -I. graph.c
 
 Refiner.o: \
 	Refiner.C \
@@ -2176,7 +2176,7 @@ Refiner.o: \
 	elements.h \
 	Set.h \
 	heap.h
-	$(CHARMC) -c Refiner.C
+	$(CHARMC) -c -I. Refiner.C
 
 RefinerComm.o: \
 	RefinerComm.C \
@@ -2248,12 +2248,12 @@ RefinerComm.o: \
 	Set.h \
 	heap.h \
 	Refiner.h
-	$(CHARMC) -c RefinerComm.C
+	$(CHARMC) -c -I. RefinerComm.C
 
 bitvecset.o: \
 	bitvecset.c \
 	bitvecset.h
-	$(CHARMC) -c bitvecset.c
+	$(CHARMC) -c -I. bitvecset.c
 
 Set.o: \
 	Set.C \
@@ -2278,7 +2278,7 @@ Set.o: \
 	charm.h \
 	pup.h \
 	cklists.h
-	$(CHARMC) -c Set.C
+	$(CHARMC) -c -I. Set.C
 
 heap.o: \
 	heap.C \
@@ -2304,7 +2304,7 @@ heap.o: \
 	pup.h \
 	Set.h \
 	cklists.h
-	$(CHARMC) -c heap.C
+	$(CHARMC) -c -I. heap.C
 
 CommLBHeap.o: \
 	CommLBHeap.C \
@@ -2367,7 +2367,7 @@ CommLBHeap.o: \
 	ckarrayreductionmgr.h \
 	trace.h \
 	trace-bluegene.h
-	$(CHARMC) -c CommLBHeap.C
+	$(CHARMC) -c -I. CommLBHeap.C
 
 NullLB.o: \
 	NullLB.C \
@@ -2438,7 +2438,7 @@ NullLB.o: \
 	stats.h \
 	ckfutures.h \
 	NullLB.def.h
-	$(CHARMC) -c NullLB.C
+	$(CHARMC) -c -I. NullLB.C
 
 LBSimulation.o: \
 	LBSimulation.C \
@@ -2505,7 +2505,7 @@ LBSimulation.o: \
 	BaseLB.h \
 	CentralLB.decl.h \
 	CentralLBMsg.h
-	$(CHARMC) -c LBSimulation.C
+	$(CHARMC) -c -I. LBSimulation.C
 
 ComlibStrategy.o: \
 	ComlibStrategy.C \
@@ -2568,7 +2568,7 @@ ComlibStrategy.o: \
 	trace.h \
 	trace-bluegene.h \
 	envelope.h
-	$(CHARMC) -c ComlibStrategy.C
+	$(CHARMC) -c -I. ComlibStrategy.C
 
 ComlibArrayListener.o: \
 	ComlibArrayListener.C \
@@ -2631,7 +2631,7 @@ ComlibArrayListener.o: \
 	trace.h \
 	trace-bluegene.h \
 	envelope.h
-	$(CHARMC) -c ComlibArrayListener.C
+	$(CHARMC) -c -I. ComlibArrayListener.C
 
 EveryLB.o: \
 	EveryLB.C \
@@ -2711,7 +2711,7 @@ EveryLB.o: \
 	RandRefLB.decl.h \
 	WSLB.decl.h \
 	EveryLB.def.h
-	$(CHARMC) -c EveryLB.C
+	$(CHARMC) -c -I. EveryLB.C
 
 DummyLB.o: \
 	DummyLB.C \
@@ -2781,7 +2781,7 @@ DummyLB.o: \
 	LBSimulation.h \
 	DummyLB.decl.h \
 	DummyLB.def.h
-	$(CHARMC) -c DummyLB.C
+	$(CHARMC) -c -I. DummyLB.C
 
 RandCentLB.o: \
 	RandCentLB.C \
@@ -2851,7 +2851,7 @@ RandCentLB.o: \
 	LBSimulation.h \
 	RandCentLB.decl.h \
 	RandCentLB.def.h
-	$(CHARMC) -c RandCentLB.C
+	$(CHARMC) -c -I. RandCentLB.C
 
 RecBisectBfLB.o: \
 	RecBisectBfLB.C \
@@ -2924,7 +2924,7 @@ RecBisectBfLB.o: \
 	graph.h \
 	bitvecset.h \
 	RecBisectBfLB.def.h
-	$(CHARMC) -c RecBisectBfLB.C
+	$(CHARMC) -c -I. RecBisectBfLB.C
 
 MetisLB.o: \
 	MetisLB.C \
@@ -2994,7 +2994,7 @@ MetisLB.o: \
 	LBSimulation.h \
 	MetisLB.decl.h \
 	MetisLB.def.h
-	$(CHARMC) -c MetisLB.C
+	$(CHARMC) -c -I. MetisLB.C
 
 RefineLB.o: \
 	RefineLB.C \
@@ -3068,7 +3068,7 @@ RefineLB.o: \
 	heap.h \
 	RefineLB.decl.h \
 	RefineLB.def.h
-	$(CHARMC) -c RefineLB.C
+	$(CHARMC) -c -I. RefineLB.C
 
 CommLB.o: \
 	CommLB.C \
@@ -3140,7 +3140,7 @@ CommLB.o: \
 	CommLBHeap.h \
 	CommLB.def.h \
 	manager.h
-	$(CHARMC) -c CommLB.C
+	$(CHARMC) -c -I. CommLB.C
 
 Comm1LB.o: \
 	Comm1LB.C \
@@ -3213,7 +3213,7 @@ Comm1LB.o: \
 	CommLB.h \
 	CommLB.decl.h \
 	Comm1LB.def.h
-	$(CHARMC) -c Comm1LB.C
+	$(CHARMC) -c -I. Comm1LB.C
 
 GreedyLB.o: \
 	GreedyLB.C \
@@ -3283,7 +3283,7 @@ GreedyLB.o: \
 	LBSimulation.h \
 	GreedyLB.decl.h \
 	GreedyLB.def.h
-	$(CHARMC) -c GreedyLB.C
+	$(CHARMC) -c -I. GreedyLB.C
 
 NeighborLB.o: \
 	NeighborLB.C \
@@ -3354,7 +3354,7 @@ NeighborLB.o: \
 	NborBaseLB.decl.h \
 	NeighborLB.decl.h \
 	NeighborLB.def.h
-	$(CHARMC) -c NeighborLB.C
+	$(CHARMC) -c -I. NeighborLB.C
 
 GreedyRefLB.o: \
 	GreedyRefLB.C \
@@ -3430,7 +3430,7 @@ GreedyRefLB.o: \
 	heap.h \
 	GreedyRefLB.decl.h \
 	GreedyRefLB.def.h
-	$(CHARMC) -c GreedyRefLB.C
+	$(CHARMC) -c -I. GreedyRefLB.C
 
 OrbLB.o: \
 	OrbLB.C \
@@ -3500,7 +3500,7 @@ OrbLB.o: \
 	LBSimulation.h \
 	OrbLB.decl.h \
 	OrbLB.def.h
-	$(CHARMC) -c OrbLB.C
+	$(CHARMC) -c -I. OrbLB.C
 
 RandRefLB.o: \
 	RandRefLB.C \
@@ -3576,7 +3576,7 @@ RandRefLB.o: \
 	RandCentLB.decl.h \
 	RandRefLB.decl.h \
 	RandRefLB.def.h
-	$(CHARMC) -c RandRefLB.C
+	$(CHARMC) -c -I. RandRefLB.C
 
 manager.o: \
 	manager.C \
@@ -3647,7 +3647,7 @@ manager.o: \
 	conv-ccs.h \
 	sockRoutines.h \
 	ccs-server.h
-	$(CHARMC) -c manager.C
+	$(CHARMC) -c -I. manager.C
 
 blue.o: \
 	blue.C \
@@ -3675,7 +3675,7 @@ blue.o: \
 	blue_timing.h \
 	blue_logs.h \
 	blue_defs.h
-	$(CHARMC) -c blue.C
+	$(CHARMC) -c -I. blue.C
 
 blue_node.o: \
 	blue_node.C \
@@ -3702,7 +3702,7 @@ blue_node.o: \
 	pup.h \
 	blue_logs.h \
 	blue_defs.h
-	$(CHARMC) -c blue_node.C
+	$(CHARMC) -c -I. blue_node.C
 
 blue_proc.o: \
 	blue_proc.C \
@@ -3729,7 +3729,7 @@ blue_proc.o: \
 	pup.h \
 	blue_logs.h \
 	blue_defs.h
-	$(CHARMC) -c blue_proc.C
+	$(CHARMC) -c -I. blue_proc.C
 
 blue_init.o: \
 	blue_init.C \
@@ -3757,7 +3757,7 @@ blue_init.o: \
 	blue_timing.h \
 	blue_logs.h \
 	blue_defs.h
-	$(CHARMC) -c blue_init.C
+	$(CHARMC) -c -I. blue_init.C
 
 blue_timing.o: \
 	blue_timing.C \
@@ -3784,7 +3784,7 @@ blue_timing.o: \
 	pup.h \
 	blue_logs.h \
 	blue_defs.h
-	$(CHARMC) -c blue_timing.C
+	$(CHARMC) -c -I. blue_timing.C
 
 blue_IO.o: \
 	blue_IO.C \
@@ -3811,7 +3811,7 @@ blue_IO.o: \
 	pup.h \
 	blue_logs.h \
 	blue_defs.h
-	$(CHARMC) -c blue_IO.C
+	$(CHARMC) -c -I. blue_IO.C
 
 blue_logs.o: \
 	blue_logs.C \
@@ -3838,5 +3838,5 @@ blue_logs.o: \
 	pup.h \
 	blue_logs.h \
 	blue_defs.h
-	$(CHARMC) -c blue_logs.C
+	$(CHARMC) -c -I. blue_logs.C
 

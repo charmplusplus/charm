@@ -131,13 +131,13 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
       memory-isomalloc.h debug-conv.h debug-charm.h conv-autoconfig.h \
       conv-common.h conv-config.sh conv-config.h conv-mach.h conv-mach.sh \
       CkMarshall.decl.h CkArray.decl.h CkLocation.decl.h CkReduction.decl.h CkArrayReductionMgr.decl.h\
+      tempo.decl.h waitqd.decl.h \
       CkFutures.decl.h LBDatabase.decl.h CentralLB.decl.h NullLB.decl.h CkCheckpoint.decl.h\
       RandCentLB.decl.h RecBisectBfLB.decl.h BaseLB.decl.h \
       MetisLB.decl.h DummyLB.decl.h RefineLB.decl.h OrbLB.decl.h \
       GreedyLB.decl.h NborBaseLB.decl.h NeighborLB.decl.h \
       WSLB.decl.h GreedyRefLB.decl.h RandRefLB.decl.h \
-      tempo.decl.h waitqd.decl.h \
-      CommLB.decl.h Comm1LB.decl.h  \
+      CommLB.decl.h Comm1LB.decl.h EveryLB.decl.h \
       charisma.decl.h \
       TraceSummary.decl.h	\
       BlueGene.decl.h blue.h
@@ -960,7 +960,7 @@ depends: basics
               echo "checking dependencies for $$SRCFILE" ; \
               g++ -MM -Wno-deprecated -I. -I$(INC) $$SRCFILE | \
               perl ../bin/dep.pl $(INC) /usr/include /usr/local >> $(DEPENDFILE); \
-              echo '	$$(CHARMC) -c '$$SRCFILE >> $(DEPENDFILE) ; \
+              echo '	$$(CHARMC) -c -I. '$$SRCFILE >> $(DEPENDFILE) ; \
 	      echo '' >> $(DEPENDFILE) ; \
         done; 
 
