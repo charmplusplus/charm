@@ -1269,7 +1269,7 @@ int req_handler_dispatch(ChMessage *msg,SOCKET replyFd)
   else if (strcmp(cmd,"ending")==0)     return req_handle_ending(msg,replyFd);
   else if (strcmp(cmd,"abort")==0)      return req_handle_abort(msg,replyFd);
   else {
-        fprintf(stderr,"charmrun> Bad control socket request %s\n",cmd); 
+        fprintf(stderr,"Charmrun> Bad control socket request %s\n",cmd); 
         abort();
   }
   return REQ_OK;
@@ -1287,7 +1287,7 @@ void req_serve_client(SOCKET fd)
   {
     case REQ_OK: break;
     case REQ_FAILED: 
-        fprintf(stderr,"charmrun> Error processing control socket request %s\n",msg.header.type); 
+        fprintf(stderr,"Charmrun> Error processing control socket request %s\n",msg.header.type); 
         abort();
         break;
   }
@@ -1361,7 +1361,7 @@ static SOCKET server_fd;
 
 int client_connect_problem(int code,const char *msg)
 {/*Called when something goes wrong during a client connect*/
-	fprintf(stderr,"charmrun> error attaching to node %d:\n"
+	fprintf(stderr,"Charmrun> error attaching to node %d:\n"
 		"%s\n",code,msg);
 	exit(1);
 	return -1;
