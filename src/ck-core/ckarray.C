@@ -770,6 +770,8 @@ void CkArrayBroadcaster::incoming(CkArrayMessage *msg)
 CmiBool CkArrayBroadcaster::deliver(CkArrayMessage *bcast,ArrayElement *el)
 {
   int &elBcastNo=getData(el);
+  // if this array element already received this message, skip it
+  if (elBcastNo >= bcastNo) return CmiFalse;
   elBcastNo++;
   DEBB((AA"Delivering broadcast %d to element %s\n"AB,elBcastNo,idx2str(el)));
   int epIdx=bcast->array_ep_bcast();
