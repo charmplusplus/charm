@@ -114,10 +114,14 @@ else
 #!/bin/sh
 ln -f -s \$@
 EOF
-	for dir in `echo bin lib include tmp`
+	for newdir in `echo bin lib include tmp`
 	do
-		[ -L $dir ] && rm -f $dir
-		ln -s $VERSION/$dir $dir
+		echo "Soft-linking over $newdir"
+		if [ -r $newdir ] 
+		then
+			rm -f $newdir
+		fi
+		ln -s $VERSION/$newdir $newdir
 	done
 fi
 
