@@ -223,13 +223,14 @@ CLBMigrateMsg* RefineLB::Strategy(CentralLB::LDStats* stats, int count)
          processors[pe].computeSet->iterator((Iterator *)&nextCompute);
     while(c)
     {
-       nextCompute.id++;
-       c = (computeInfo *) processors[pe].computeSet->next((Iterator *)&nextCompute);
 	MigrateInfo migrateMe;
 	migrateMe.obj = c->handle;
 	migrateMe.from_pe = pe;
 	migrateMe.to_pe = c->processor;
 	migrateInfo.push(migrateMe);
+
+        nextCompute.id++;
+        c = (computeInfo *) processors[pe].computeSet->next((Iterator *)&nextCompute);
     }
   }
 
