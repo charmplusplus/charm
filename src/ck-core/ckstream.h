@@ -17,14 +17,20 @@ class _CkOStream {
       _isErr = isErr; 
       _obuf[0] = '\0'; 
     }
-    void endl(void) {
+    _CkOStream& endl(void) {
       strcat(_obuf, "\n");
       if(_isErr)
         CkError(_obuf);
       else
         CkPrintf(_obuf);
+      _obuf[0] = '\0'; 
+      _actlen=1;
+      return *this;
     }
 
+    _CkOStream& operator << (_CkOStream& (*f)(_CkOStream &)) {
+      return f(*this);
+    }
 #define _OPSHIFTLEFT(type, format) \
     _CkOStream& operator << (type x) { \
       sprintf(_tbuf, format, x); \
@@ -49,7 +55,7 @@ class _CkOStream {
     _OPSHIFTLEFT(void*, "%x");
 };
 
-static inline _CkOStream& endl(_CkOStream& s)  { s.endl(); return s; }
+static inline _CkOStream& endl(_CkOStream& s)  { return s.endl(); }
 
 class _CkOutStream : public _CkOStream {
   public:
@@ -66,6 +72,10 @@ CpvExtern(_CkErrStream*, _ckerr);
 
 class CkOutStream {
   public:
+  CkOutStream& operator << (_CkOStream& (*f)(_CkOStream &)) {
+    f(*CpvAccess(_ckout));
+    return *this;
+  }
 #define OUTSHIFTLEFT(type) \
   CkOutStream& operator << (type x) { \
     *CpvAccess(_ckout) << x; \
@@ -85,13 +95,12 @@ class CkOutStream {
     OUTSHIFTLEFT(void*);
 };
 
-static inline CkOutStream& endl(CkOutStream& s)  
-{ 
-  CpvAccess(_ckout)->endl(); return s; 
-}
-
 class CkErrStream {
   public:
+  CkErrStream& operator << (_CkOStream& (*f)(_CkOStream &)) {
+    f(*CpvAccess(_ckerr));
+    return *this;
+  }
 #define ERRSHIFTLEFT(type) \
   CkErrStream& operator << (type x) { \
     *CpvAccess(_ckerr) << x; \
@@ -110,11 +119,6 @@ class CkErrStream {
     ERRSHIFTLEFT(const char*);
     ERRSHIFTLEFT(void*);
 };
-
-static inline CkErrStream& endl(CkErrStream& s)  
-{ 
-  CpvAccess(_ckerr)->endl(); return s; 
-}
 
 extern CkOutStream ckout;
 extern CkErrStream ckerr;
