@@ -1059,7 +1059,7 @@ Do $CMK_CXX $OPTS_CPP $OPTS_CXX -c $modInitSrc -o $modInitObj
 Debug "About to perform final link..."
 
 LANG_LIBS="-L$CHARMLIB -I$CHARMINC $BAL_OBJ $OBJECTFILES $modInitObj $PRE_LIBRARIES"
-CORE_LIBS="-lconv-core -lconv-util $TRACE_OBJ $MEM_OBJ "
+CORE_LIBS="$LINK_MODULES -lconv-core -lconv-util $TRACE_OBJ $MEM_OBJ "
 
 case "$LANGUAGE" in
 "charm"|"charm++"|"f90charm"|"tcharm"|"tcharmf"|"ckbluegene"|"bgcharm++")
