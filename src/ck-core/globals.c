@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.11  1995-11-06 22:59:01  sanjeev
+ * Revision 2.12  1995-11-13 04:05:29  gursoy
+ * made changes related to sync (init messages).
+ *
+ * Revision 2.11  1995/11/06  22:59:01  sanjeev
  * fixes for statistics collection
  *
  * Revision 2.10  1995/10/11  17:54:40  sanjeev
@@ -142,9 +145,9 @@ CsvDeclare(FUNCTION_PTR*,  _CK_9_GlobalFunctionTable);
 CsvDeclare(int, MainChareLanguage);
 
 /* Handlers for various message-types */
+CpvDeclare(int, HANDLE_INCOMING_MSG_Index);
 CsvDeclare(int, BUFFER_INCOMING_MSG_Index);
 CsvDeclare(int, MAIN_HANDLE_INCOMING_MSG_Index);
-CsvDeclare(int, HANDLE_INCOMING_MSG_Index);
 CsvDeclare(int, HANDLE_INIT_MSG_Index);
 CsvDeclare(int, CkProcIdx_ForChareMsg);
 CsvDeclare(int, CkProcIdx_DynamicBocInitMsg);
@@ -262,6 +265,7 @@ void globalsModuleInit()
    CpvInitialize(int, CkInitCount);
    CpvInitialize(int, CkCountArrived);
    CpvInitialize(void*, CkBuffQueue); 
+   CpvInitialize(int, HANDLE_INCOMING_MSG_Index);
 
    CpvAccess(NumReadMsg)             = 0; 
    CpvAccess(InsideDataInit)         = 0;
