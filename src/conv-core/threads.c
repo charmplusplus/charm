@@ -1665,12 +1665,11 @@ CthThread CthPup(pup_er p, CthThread t)
 
 #elif  CMK_THREADS_USE_CONTEXT
 
+#include <signal.h>
 #include <ucontext.h>
 
 #define STACKSIZE (32768)
 static int _stksize = 0;
-
-#define CMK_MEMORY_PAGESIZE  16384
 
 struct CthThreadStruct
 {
@@ -1685,7 +1684,7 @@ struct CthThreadStruct
   int        Event;
   CthThread  qnext;
   char      *stack;
-  ucontext_t *stackp;
+  ucontext_t      stackp;
 };
 
 char *CthGetData(CthThread t) { return t->data; }
@@ -1741,9 +1740,6 @@ void CthInit(char **argv)
   t = (CthThread)malloc(sizeof(struct CthThreadStruct));
   _MEMCHECK(t);
   CthThreadInit(t);
-  t->stackp = (ucontext_t*)malloc(sizeof(ucontext_t));
-  getcontext(t->stackp);
-CmiPrintf("MAIN:%p\n", t->stackp);
   CthCpvAccess(CthData)=0;
   CthCpvAccess(CthCurrent)=t;
   CthCpvAccess(CthDatasize)=1;
@@ -1772,18 +1768,12 @@ static void *CthAbortHelp(ucontext_t *sp, CthThread old, void *null)
 {
   if (old->data) free(old->data);
   free(old->stack);
-  free(old->stackp);
   free(old);
   return (void *) 0;
 }
 
-static void *CthBlockHelp(ucontext_t *sp, CthThread old, void *null)
-{
-  old->stackp = sp;
-  return (void *) 0;
-}
-
-void CthResume(CthThread t)
+void CthResume(t)
+CthThread t;
 {
   CthThread tc;
   tc = CthCpvAccess(CthCurrent);
@@ -1794,13 +1784,16 @@ void CthResume(CthThread t)
   CthCpvAccess(CthData) = t->data;
   if (CthCpvAccess(CthExiting)) {
     CthCpvAccess(CthExiting)=0;
-CmiPrintf("qt_abort\n");
-    CthAbortHelp(tc->stackp, tc, 0);
-    setcontext(t->stackp);
+    CthAbortHelp(&tc->stackp, tc, 0);
+    setcontext(&t->stackp);
   } else {
-CmiPrintf("swap stack tc:%p t:%p pos:%p\n", tc->stackp, t->stackp, &tc);
-    swapcontext(tc->stackp, t->stackp);
-CmiPrintf("here: stack:%p %p %p pos:%p\n", tc->stackp, tc, CthCpvAccess(CthCurrent), &tc);
+/*
+CmiPrintf("qt_block swap stack tc:%p t:%p \n", &tc->stackp, &t->stackp);
+*/
+    if (0 != swapcontext(&tc->stackp, &t->stackp)) CmiAbort("CthResume: swapcontext failed\n");
+/*
+CmiPrintf("here: stack:%p %p %p\n", &tc->stackp, tc, CthCpvAccess(CthCurrent));
+*/
   }
   if (tc!=CthCpvAccess(CthCurrent)) { CmiAbort("Stack corrupted?\n"); }
 }
@@ -1810,42 +1803,52 @@ void CthOnly(void *arg, void *vt, qt_userf_t fn)
   fn(arg);
   CthCpvAccess(CthExiting) = 1;
   CthSuspend();
-CmiAbort("ERROR to be here\n");
 }
 
-char *sigst[2048];
+static int did=0;
 
+#define STP_STKALIGN(sp, alignment) \
+  ((void *)((((qt_word_t)(sp)) + (alignment) - 1) & ~((alignment)-1)))
+
+/*  for Solaris, it seems it already allocate a stack for new context,
+    so, there is no need to assign a new one.
+*/
 CthThread CthCreate(fn, arg, size)
 CthVoidFn fn; void *arg; int size;
 {
   CthThread result; char *stack, *stackbase;
-  ucontext_t *jb;
-  stack_t st;
-  int oldc;
-  sigset_t set;
-//  size = (size) ? size : ((_stksize) ? _stksize : STACKSIZE);
-  size = 16384;
+  ucontext_t *jb, *stackp;
+  size = 16384*2;
   stack = (char*)malloc(size);
   _MEMCHECK(stack);
   result = (CthThread)malloc(sizeof(struct CthThreadStruct));
   _MEMCHECK(result);
   CthThreadInit(result);
-//  stackbase = QT_SP(stack, 16384);
-//  t->stk = (void *)ROUND (((iaddr_t)t->stk), QT_STKALIGN);
-//  stackbase = QT_SP(stack, QT_STKBASE);
   stackbase = stack;
-  jb = (ucontext_t*)malloc(sizeof(ucontext_t));
-  getcontext(jb);
-  st.ss_sp = sigst;
-  st.ss_size = 2048;
-  sigaltstack(&st,0);
-  jb->uc_stack.ss_sp = stackbase;
-  jb->uc_stack.ss_size = 8192;
-  sigemptyset(&jb->_u._mc.sc_mask);
-  jb->uc_link = 0;
-  makecontext(jb, (void (*) (void))CthOnly, 3, arg, result, fn);
-CmiPrintf("created: %p stack:%p\n", result, jb);
-  result->stackp = jb;
+#if CMK_SOLARIS
+  if (did == 0) {
+    stack_t sigstk;
+    did = 1;
+    sigstk.ss_sp = (char *)malloc(SIGSTKSZ);
+    _MEMCHECK(sigstk.ss_sp);
+    sigstk.ss_size = SIGSTKSZ;
+    sigstk.ss_flags = 0;
+    if (sigaltstack(&sigstk, (stack_t *)0) < 0) CmiAbort("sigaltstack");
+  }
+#endif
+  stackbase = stack;
+/*  stackbase = STP_STKALIGN(stackbase, 16); */
+  getcontext(&result->stackp);
+#if ! CMK_SOLARIS
+  result->stackp.uc_stack.ss_sp = stackbase+8192;
+  result->stackp.uc_stack.ss_size = 8192*2;
+  result->stackp.uc_stack.ss_flags = 0;
+#endif
+  result->stackp.uc_link = 0;
+  makecontext(&result->stackp, (void (*) (void))CthOnly, 3, arg, result, fn);
+/*
+CmiPrintf("created: %p stack:%p\n", result, &result->stackp);
+*/
   result->stack = stack;
   CthSetStrategyDefault(result);
   return result;
