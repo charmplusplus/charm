@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.5  1995-06-14 21:51:24  gursoy
+ * Revision 2.6  1995-07-05 21:17:02  narain
+ * Added #defines for timers
+ *
+ * Revision 2.5  1995/06/14  21:51:24  gursoy
  * *** empty log message ***
  *
  * Revision 2.4  1995/06/14  20:18:55  gursoy
@@ -103,7 +106,8 @@
 #define CharmExit               CkExit
 #define CkAlloc                 CmiAlloc
 #define CkFree                  CmiFree
-
+#define CkTimer()               ((int)(CmiTimer()*1000))
+#define CkUTimer()              ((int)(CmiTimer()*1000000))
 
 #define CMaxPeNum               CmiNumPe
 #define CNumSpanTreeChildren    CmiNumSpanTreeChildren
