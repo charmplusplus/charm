@@ -14,6 +14,8 @@
  *****************************************/
 #include "rsend.h"
 
+#define PERSISTENT_BUFSIZE 65536
+
 #ifndef NULL
 #define NULL 0
 #endif
@@ -28,6 +30,17 @@ RsendRouter::RsendRouter(int n, int me)
   gpes=NULL;
   PSendCounter=0;
   //CmiPrintf("%d Rsend constructor done\n", MyPe);
+
+#if CMK_PERSISTENT_COMM
+  handlerArray = new PersistentHandle[NumPes];
+  handlerArrayEven = new PersistentHandle[NumPes];
+  
+  for(int pcount = 0; pcount < NumPes; pcount++){
+      handlerArray[pcount] = CmiCreatePersistent(pcount, PERSISTENT_BUFSIZE);
+      handlerArrayEven[pcount] = CmiCreatePersistent(pcount, 
+                                                     PERSISTENT_BUFSIZE);
+  }
+#endif
 }
  
 RsendRouter :: ~RsendRouter()
@@ -49,16 +62,41 @@ void RsendRouter::NumDeposits(comID, int num)
 
 void RsendRouter::EachToManyMulticast(comID id, int size, void *msg, int numpes, int *destpes, int more)
 {
-  int i;
+    static int step = 0;
+    int i;
 
-  if (!size) return;
-  for (i=0;i<numpes-1;i++) {
+    if(!more)
+        step ++;
+
+    if (!size) return;
+    for (i=0;i<numpes-1;i++) {
 	//CmiPrintf("%d sending to %d\n", CmiMyPe(), destpes[i]);
+#if CMK_PERSISTENT_COMM
+        //if(step % 2 == 1)
+        //  CmiUsePersistentHandle(&handlerArray[destpes[i]], 1);
+        //else
+        //  CmiUsePersistentHandle(&handlerArrayEven[destpes[i]], 1);
+#endif        
 	CmiSyncSend(destpes[i], size, msg);
-  }
-  CmiSyncSendAndFree(destpes[i], size, msg);
-  //CmiPrintf("%d rsend calling kdone\n", MyPe);
-  KDone(id);
+#if CMK_PERSISTENT_COMM
+        CmiUsePersistentHandle(NULL, 0);
+#endif        
+    }
+    
+#if CMK_PERSISTENT_COMM
+    //if(step % 2 == 1)
+    //  CmiUsePersistentHandle(&handlerArray[destpes[i]], 1);
+    //else
+    //  CmiUsePersistentHandle(&handlerArrayEven[destpes[i]], 1);
+#endif        
+    CmiSyncSendAndFree(destpes[i], size, msg);
+
+#if CMK_PERSISTENT_COMM
+    CmiUsePersistentHandle(NULL, 0);
+#endif        
+
+    //CmiPrintf("%d rsend calling kdone\n", MyPe);
+    KDone(id);
 }
 
 

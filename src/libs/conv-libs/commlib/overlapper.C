@@ -19,7 +19,7 @@
 #include "overlapper.h"
 #include "ovmacros.h"
 
-#define SWITCHCYCLE 100
+#define SWITCHCYCLE 1000000
 
 CpvExtern(int, SwitchHandle);
 extern Router * GetStrategyObject(int, int, int );

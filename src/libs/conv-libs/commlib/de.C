@@ -18,6 +18,8 @@
 
 /**The only communication op used. Modify this to use
  ** vector send */
+//CmiPrintf("[%d]DE sending message of size %d to %d\n", CmiMyPe(), len, knextpe); 
+
 #define HCUBESENDFN(kid, u1, u2, knpe, kpelist, khndl, knextpe)  \
   	{int len;\
 	char *newmsg;\
@@ -282,6 +284,6 @@ void DimexRouter::CreateStageTable(int numpes, int *destpes)
 
 Router * newhcubeobject(int n, int me)
 {
-  Router *obj=new DimexRouter(n, me);
-  return(obj);
+    Router *obj=new DimexRouter(n, me);
+    return(obj);
 }

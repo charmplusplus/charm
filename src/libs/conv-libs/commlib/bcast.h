@@ -27,7 +27,7 @@ class BcastRouter : public Router
 	BcastRouter(int, int);
 	~BcastRouter();
 	void NumDeposits(comID, int);
-	void EachToAllMulticast(comID, int , void *, int);
+	void EachToAllMulticast(comID , int , void *, int);
 	void EachToManyMulticast(comID, int , void *, int, int *, int);
 	void ProcMsg(int, msgstruct **) {;}
 	void RecvManyMsg(comID, char *);

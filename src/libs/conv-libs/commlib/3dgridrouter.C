@@ -150,8 +150,8 @@ D3GridRouter::D3GridRouter(int n, int me)
     
     PeGrid = new PeTable(/*CmiNumPes()*/NumPes);
     
-    oneplane = (int *)CmiAlloc(NPLANES * ROWLEN * sizeof(int));
-    zline = (int *)CmiAlloc(NPLANES * sizeof(int));
+    oneplane = new int[NPLANES * ROWLEN];
+    zline = new int[NPLANES];
     
     InitVars();
     ComlibPrintf("%d:%d:COLLEN=%d, ROWLEN=%d, recvexpected=%d,%d\n", CmiMyPe(), MyPe, COLLEN, ROWLEN, recvExpected[0], recvExpected[1]);
@@ -160,8 +160,8 @@ D3GridRouter::D3GridRouter(int n, int me)
 D3GridRouter::~D3GridRouter()
 {
     delete PeGrid;
-    CmiFree(zline);
-    CmiFree(oneplane);
+    delete[] zline;
+    delete[] oneplane;
 }
 
 void D3GridRouter :: InitVars()

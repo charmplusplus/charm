@@ -54,7 +54,7 @@ class Overlapper {
 	~Overlapper();
 	void NumDeposits(comID, int);
 	void EachToAllMulticast(comID id, int size, void *msg);
-	void EachToManyMulticast(comID, int , void *, int, int *);
+	void EachToManyMulticast(comID , int , void *, int, int *);
 	void NumPSends(comID, int) {;}
 	void RecvManyMsg(comID, char *) ;
 	void DummyEP(comID, int, int);

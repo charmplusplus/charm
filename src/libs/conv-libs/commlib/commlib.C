@@ -40,7 +40,7 @@ int callBackHandler;
 void UpdateImplTable(comID id)
 {
   if (CpvAccess(ImplTable)[id.srcpe] == NULL) {
-	CpvAccess(ImplTable)[id.srcpe]=(Overlapper **) CmiAlloc(sizeof(Overlapper *)*MAXINSTANCE);
+        CpvAccess(ImplTable)[id.srcpe]=(Overlapper **) CmiAlloc(sizeof(Overlapper *)*MAXINSTANCE);
         for (int j=1;j<MAXINSTANCE;j++) CpvAccess(ImplTable)[id.srcpe][j]=0;
         CpvAccess(ImplTable)[id.srcpe][0]=0;
   }
@@ -155,13 +155,13 @@ void DeleteInstance(comID id)
   //CpvAccess(ImplTable)[id.srcpe][id.ImplIndex]=NULL;
 }
 
-void EachToAllMulticast(comID  id, int size, void * msg)
+void EachToAllMulticast(comID id, int size, void * msg)
 {
   UpdateImplTable(id);
   (CpvAccess(ImplTable)[id.srcpe][id.ImplIndex])->EachToAllMulticast(id, size, msg);
 }
 
-void EachToManyMulticast(comID  id, int size, void * msg, int pesize, int * pelist)
+void EachToManyMulticast(comID id, int size, void * msg, int pesize, int * pelist)
 {
   UpdateImplTable(id);
   (CpvAccess(ImplTable)[id.srcpe][id.ImplIndex])->EachToManyMulticast(id, size, msg, pesize, pelist);

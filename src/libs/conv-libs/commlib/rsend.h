@@ -7,6 +7,7 @@
 
 #include <converse.h>
 #include "commlib.h"
+#include "persistent.h"
 
 //Dimensional Exchange (Hypercube) based router
 class RsendRouter : public Router
@@ -16,6 +17,10 @@ class RsendRouter : public Router
 	int *gpes;
   	int MyPe, NumPes;
 	int PSendCounter, PSendExpected;
+#if CMK_PERSISTENT_COMM
+        PersistentHandle *handlerArray, *handlerArrayEven;
+#endif
+
   public:
 	RsendRouter(int, int);
 	~RsendRouter();

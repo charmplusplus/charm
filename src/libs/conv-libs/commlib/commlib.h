@@ -21,7 +21,7 @@ enum{BCAST=0,TREE, GRID, HCUBE, RSEND};
 #define MAXNUMMSGS 1000
 #define MAXNUMSTRATEGY 10
 #define MSGSIZETHRESHOLD 5000000
-#define MAXBUFSIZE 5000
+#define MAXBUFSIZE 65536
 
 typedef struct {
   int srcpe;
@@ -52,7 +52,7 @@ Router * GetStrategyObject(int n, int me, int indx);
 void DeleteInstance(comID id);
 
 /* Converse messages */
-void EachToAllMulticast(comID  id, int size, void * msg);
+void EachToAllMulticast(comID id, int size, void * msg);
 void EachToManyMulticast(comID id, int size, void *msg, int npe, int * pelist);
 
 /* Charm++ messages */
@@ -78,9 +78,9 @@ class Router
 	virtual ~Router() {};
 	virtual void NumDeposits(comID, int) 
 						{CmiPrintf("Not impl\n");}
-	virtual void EachToAllMulticast(comID, int , void *, int) 
+	virtual void EachToAllMulticast(comID , int , void *, int) 
 						{CmiPrintf("Not impl\n");}
-	virtual void EachToManyMulticast(comID, int , void *, int, int *, int) 
+	virtual void EachToManyMulticast(comID , int , void *, int, int *, int) 
 						{CmiPrintf("Not impl\n");}
 	virtual void RecvManyMsg(comID, char *) {CmiPrintf("Not Impl\n");}
 	virtual void ProcManyMsg(comID, char *) {CmiPrintf("Not Impl\n");}

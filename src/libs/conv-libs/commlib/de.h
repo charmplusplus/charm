@@ -29,8 +29,8 @@ class DimexRouter : public Router
 	DimexRouter(int, int);
 	~DimexRouter();
 	void NumDeposits(comID, int);
-	void EachToAllMulticast(comID, int , void *, int);
-	void EachToManyMulticast(comID, int , void *, int, int *, int);
+	void EachToAllMulticast(comID , int , void *, int);
+	void EachToManyMulticast(comID , int , void *, int, int *, int);
 	void ProcMsg(int, msgstruct **) {;}
 	void RecvManyMsg(comID, char *);
 	void ProcManyMsg(comID, char *);

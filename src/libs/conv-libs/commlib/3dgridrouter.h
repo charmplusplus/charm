@@ -30,8 +30,8 @@ class D3GridRouter : public Router
 	D3GridRouter(int, int);
 	~D3GridRouter();
 	void NumDeposits(comID, int);
-	void EachToAllMulticast(comID, int , void *, int);
-	void EachToManyMulticast(comID, int , void *, int, int *, int);
+	void EachToAllMulticast(comID , int , void *, int);
+	void EachToManyMulticast(comID , int , void *, int, int *, int);
 	void RecvManyMsg(comID, char *);
 	void ProcManyMsg(comID, char *);
 	void DummyEP(comID id, int);

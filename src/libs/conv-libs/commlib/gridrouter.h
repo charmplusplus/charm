@@ -36,6 +36,8 @@ inline int Expect(int pe, int npes)
   return(len);
 }
 
+#include "persistent.h"
+
 //Grid based router
 class GridRouter : public Router
 {
@@ -48,12 +50,17 @@ class GridRouter : public Router
 	int recvExpected, recvCount;
 	void InitVars();
 	void LocalProcMsg();
+#if CMK_PERSISTENT_COMM
+	PersistentHandle *rowHandleArray, *columnHandleArray;
+        PersistentHandle *rowHandleArrayEven, *columnHandleArrayEven;
+#endif          
+
   public:
 	GridRouter(int, int);
 	~GridRouter();
 	void NumDeposits(comID, int);
-	void EachToAllMulticast(comID, int , void *, int);
-	void EachToManyMulticast(comID, int , void *, int, int *, int);
+	void EachToAllMulticast(comID , int , void *, int);
+	void EachToManyMulticast(comID , int , void *, int, int *, int);
 	void RecvManyMsg(comID, char *);
 	void ProcManyMsg(comID, char *);
 	void DummyEP(comID id, int);

@@ -13,7 +13,11 @@
  * Grid (mesh) based router
  ***********************************************************/
 #include "gridrouter.h"
-#define NULL 0
+#include "globals.h"
+
+//#define NULL 0
+
+#define PERSISTENT_BUFSIZE 65536
 
 #define gmap(pe) {if (gpes) pe=gpes[pe];}
 
@@ -37,7 +41,7 @@
  *****************************************************/
 GridRouter::GridRouter(int n, int me)
 {
-  //ComlibPrintf("PE=%d me=%d NUMPES=%d\n", CmiMyPe(), me, n);
+  //CmiPrintf("PE=%d me=%d NUMPES=%d\n", MyPe, me, n);
   
   NumPes=n;
   MyPe=me;
@@ -65,29 +69,66 @@ GridRouter::GridRouter(int n, int me)
           //Special case with one hole only
 	  recvExpected ++;      
   }
-
-  /*
-    int myrep=myrow*COLLEN;
-    int nummappedpes=ROWLEN;
-    int numunmappedpes=myrep+ROWLEN-NumPes;
-    if (numunmappedpes >0) {
-    nummappedpes=NumPes-myrep;
-    int i=NumPes+MyPe-myrep;
-    while (i<myrep+ROWLEN) {
-    recvExpected+=Expect(i, NumPes);
-    i+=nummappedpes;
-    }
-    }
-  */
   
-  //  CkPrintf("%d LPMsgExpected=%d\n", MyPe, LPMsgExpected);
+  ComlibPrintf("%d LPMsgExpected=%d\n", MyPe, LPMsgExpected);
 
-  PeMesh = new PeTable(/*CmiNumPes()*/NumPes);
+  PeMesh = new PeTable(NumPes);
 
   onerow=(int *)CmiAlloc(ROWLEN*sizeof(int));
   
   InitVars();
-  //  CkPrintf("%d:%d:COLLEN=%d, ROWLEN=%d, recvexpected=%d\n", CmiMyPe(), MyPe, COLLEN, ROWLEN, recvExpected);
+  ComlibPrintf("%d:COLLEN=%d, ROWLEN=%d, recvexpected=%d\n", MyPe, COLLEN, ROWLEN, recvExpected);
+
+#if CMK_PERSISTENT_COMM
+  rowHandleArray = new PersistentHandle[COLLEN];
+  rowHandleArrayEven = new PersistentHandle[COLLEN];
+  columnHandleArray = new PersistentHandle[COLLEN];
+  columnHandleArrayEven = new PersistentHandle[COLLEN];
+
+  //handles for all the same column elements
+  int pcount = 0;
+  for (pcount = 0; pcount < COLLEN; pcount ++) {
+    int dest = pcount *COLLEN + mycol;
+
+    if(dest < NumPes) {
+        ComlibPrintf("%d:Creating Persistent Buffer of size %d at %d\n", MyPe,
+                     PERSISTENT_BUFSIZE, dest);
+        gmap(dest);
+        columnHandleArray[pcount] = CmiCreatePersistent(dest, 
+                                                        PERSISTENT_BUFSIZE);
+        ComlibPrintf("%d:Creating Even Persistent Buffer of size %d at %d\n",
+                     MyPe, PERSISTENT_BUFSIZE, dest);
+        columnHandleArrayEven[pcount] = CmiCreatePersistent
+            (dest, PERSISTENT_BUFSIZE);
+    }
+    else
+        columnHandleArray[pcount] = NULL;
+  }
+
+  //handles for all same row elements
+  for (pcount = 0; pcount < COLLEN; pcount++) {
+    int dest = myrow *COLLEN + pcount;
+
+    if(dest >= NumPes){
+        dest = COLLEN * (mycol % myrow) + pcount;
+    }
+    
+    if(dest < NumPes && dest != MyPe){
+      ComlibPrintf("[%d] Creating Persistent Buffer of size %d at %d\n", MyPe,
+		   PERSISTENT_BUFSIZE, dest);
+      gmap(dest);
+      rowHandleArray[pcount] = CmiCreatePersistent(dest, PERSISTENT_BUFSIZE);
+      ComlibPrintf("[%d] Creating Even Persistent Buffer of size %d at %d\n",
+                   MyPe, PERSISTENT_BUFSIZE, dest);
+      rowHandleArrayEven[pcount] = CmiCreatePersistent(dest, 
+                                                       PERSISTENT_BUFSIZE);
+    }
+    else 
+        rowHandleArray[pcount] = NULL;
+  }
+
+  ComlibPrintf("After Initializing Persistent Buffers\n");
+#endif
 }
 
 GridRouter::~GridRouter()
@@ -116,6 +157,7 @@ void GridRouter::EachToAllMulticast(comID id, int size, void *msg, int more)
 void GridRouter::EachToManyMulticast(comID id, int size, void *msg, int numpes, int *destpes, int more)
 {
   int i;
+  static int step = 0;
 
   //Buffer the message
   if (size) {
@@ -124,62 +166,72 @@ void GridRouter::EachToManyMulticast(comID id, int size, void *msg, int numpes, 
 
   if (more) return;
 
-  ComlibPrintf("All messages received %d %d\n", CmiMyPe(), COLLEN);
+  ComlibPrintf("All messages received %d %d\n", MyPe, COLLEN);
+
+  step ++;
 
   //Send the messages
-  for (i=0;i<ROWLEN;i++) {
+  int MYROW=MyPe/COLLEN;
+  int MYCOL = MyPe%COLLEN;
+  int myrep=MYROW*COLLEN;
+  
+  for (int colcount= MYCOL; colcount < ROWLEN + MYCOL; colcount++) {
+      i = colcount % ROWLEN;
+      int nextpe= myrep + i;
 
-      //    ComlibPrintf("ROWLEN = %d, COLLEN =%d\n", ROWLEN, COLLEN);
+      if (nextpe >= NumPes) {
+          //Previously hole assigned to elements in the same row as nextpe
+          // Now they are spread across the grid in the same column as nextpe
+          nextpe = COLLEN * (MYCOL % MYROW) + i;
+      }
 
-    int MYROW=MyPe/COLLEN;
-    int MYCOL = MyPe%COLLEN;
+      int length = (NumPes - 1)/COLLEN + 1;
+      if((length - 1)* COLLEN + i >= NumPes)
+          length --;
+      
+      for (int j=0;j<length;j++) {
+          onerow[j]=j * COLLEN + i;
+      }
+      
+      if (nextpe == MyPe) {
+          RecvManyMsg(id, NULL);
+          continue;
+      }
     
-    int myrep=MYROW*COLLEN;
-    int nextpe= myrep + i;
+      gmap(nextpe);
+      ComlibPrintf("%d:sending to %d of column %d\n", MyPe, nextpe, i);
 
-    if (nextpe >= NumPes) {
-      //Previously hole assigned to elements in the same row as nextpe
-      //int mm=(nextpe-NumPes) % nummappedpes;
-      //nextpe=nextrowrep+mm;
+#if CMK_PERSISTENT_COMM
+      if(step % 2 == 1)
+          CmiUsePersistentHandle(&rowHandleArray[i], 1);
+      else
+          CmiUsePersistentHandle(&rowHandleArrayEven[i], 1);
+#endif          
 
-      // Now they are spread across the grid in the same column as nextpe
-      nextpe = COLLEN * (MYCOL % MYROW) + i;
-    }
-
-    int length = (NumPes - 1)/COLLEN + 1;
-    if((length - 1)* COLLEN + i >= NumPes)
-        length --;
-
-    for (int j=0;j<length;j++) {
-	onerow[j]=j * COLLEN + i;
-    }
-    
-    if (nextpe == MyPe) {
-        //      ComlibPrintf("%d calling recv directly refno=%d\n", MyPe, KMyActiveRefno(MyID));
-        RecvManyMsg(id, NULL);
-        continue;
-    }
-    
-    //    ComlibPrintf("nummappedpes = %d, NumPes = %d, nextrowrep = %d, nextpe = %d, mype = %d\n", nummappedpes, NumPes, nextrowrep,  nextpe, MyPe);
-
-    gmap(nextpe);
-    //    CkPrintf("%d:sending to %d of column %d\n", MyPe, nextpe, i);
-    GRIDSENDFN(MyID, 0, 0, length, onerow, CpvAccess(RecvHandle), nextpe); 
+      GRIDSENDFN(MyID, 0, 0, length, onerow, CpvAccess(RecvHandle), nextpe); 
+      
+#if CMK_PERSISTENT_COMM
+      CmiUsePersistentHandle(NULL, 0);
+#endif          
   }
 }
 
 void GridRouter::RecvManyMsg(comID id, char *msg)
 {
+  static int step = 0;
   if (msg)
     PeMesh->UnpackAndInsert(msg);
 
   recvCount++;
   if (recvCount == recvExpected) {
-    //    CkPrintf("%d recvcount=%d recvexpected = %d refno=%d\n", MyPe, recvCount, recvExpected, KMyActiveRefno(MyID));
+    step ++;
+    ComlibPrintf("%d recvcount=%d recvexpected = %d refno=%d\n", MyPe, recvCount, recvExpected, KMyActiveRefno(MyID));
 
-    for (int i=0;i<COLLEN;i++) {
-      int myrow=MyPe/COLLEN;
-      int mycol=MyPe%COLLEN;
+    int myrow=MyPe/COLLEN;
+    int mycol=MyPe%COLLEN;
+    
+    for (int rowcount= myrow; rowcount < COLLEN + myrow; rowcount++) {
+      int i = rowcount % COLLEN;
       int nextrowrep=i*COLLEN;
       int nextpe=nextrowrep+mycol;
       
@@ -196,7 +248,18 @@ void GridRouter::RecvManyMsg(comID id, char *msg)
 
       ComlibPrintf("After gmap %d\n", nextpe);
 
+#if CMK_PERSISTENT_COMM
+      if(step % 2 == 1)
+          CmiUsePersistentHandle(&columnHandleArray[i], 1);
+      else
+          CmiUsePersistentHandle(&columnHandleArrayEven[i], 1);
+#endif          
+      
       GRIDSENDFN(MyID, 0, 1, 1, pelist, CpvAccess(ProcHandle), nextpe);
+
+#if CMK_PERSISTENT_COMM
+      CmiUsePersistentHandle(NULL, 0);
+#endif          
     }
     LocalProcMsg();
   }
