@@ -1681,6 +1681,12 @@ static void node_addresses_store();
 
 #if CMK_CCS_AVAILABLE
 CpvExtern(int, strHandlerID);
+CpvDeclare(void *, CcsRequestQueue);
+CpvDeclare(int, stateAvailable);
+typedef struct CcsRequestNode {
+  char *ptr;
+  int pe;
+} *CcsRequest;
 #endif
 
 static void ctrl_getone()
@@ -1709,7 +1715,15 @@ static void ctrl_getone()
       strcpy(msg+CmiMsgHeaderSizeBytes, line);
       fread(msg+CmiMsgHeaderSizeBytes+len, 1, size, f);
       msg[CmiMsgHeaderSizeBytes+len+size] = '\0';
-      PCQueuePush(CmiGetStateN(pe)->recv, msg);
+      if(CpvAccess(stateAvailable) == 0){
+	CcsRequest qmsg = (CcsRequest)malloc(sizeof(struct CcsRequestNode));
+	qmsg->ptr = msg;
+	qmsg->pe = pe;
+	FIFO_EnQueue(CpvAccess(CcsRequestQueue), qmsg);
+      }
+      else{
+	PCQueuePush(CmiGetStateN(pe)->recv, msg);
+      }
 #endif
     } else if (strncmp(line,"die ",4)==0) {
       fprintf(stderr,"aborting: %s\n",line+4);
@@ -2812,11 +2826,26 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int ret)
   skt_datagram(&dataport, &dataskt, Cmi_os_buffer_size);
   skt_server(&ctrlport, &ctrlskt);
   Cmi_host_fd = skt_connect(Cmi_host_IP, Cmi_host_port, 60);
+#if CMK_CCS_AVAILABLE
+  CpvInitialize(void *, CcsRequestQueue);
+  CpvAccess(CcsRequestQueue) = FIFO_Create();
+  CpvInitialize(int, stateAvailable);
+  CpvAccess(stateAvailable) = 0;
+#endif
   node_addresses_obtain();
   Cmi_check_delay = Cmi_numnodes * 0.5;
   Cmi_scanf_mutex = CmiCreateLock();
   CmiStartThreads();
   ConverseInitPE();
+#if CMK_CCS_AVAILABLE
+  CpvAccess(stateAvailable) = 1;
+  while(!FIFO_Empty(CpvAccess(CcsRequestQueue))){
+    CcsRequest queuedMsg;
+    FIFO_DeQueue(CpvAccess(CcsRequestQueue), (void **)&queuedMsg);
+    CmiSetHandler(queuedMsg->ptr, CpvAccess(strHandlerID));
+    PCQueuePush(CmiGetStateN(queuedMsg->pe)->recv, queuedMsg->ptr);
+  }
+#endif
   if (ret==0) {
     fn(CountArgs(argv), argv);
     if (usc==0) CsdScheduler(-1);
