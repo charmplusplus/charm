@@ -1564,11 +1564,11 @@ void SdagConstruct::generateTraceEndCall(XStr& op)          // for trace
 }
 
 void SdagConstruct::generateBeginExec(XStr& op, char *name){
-  op << "     " << "_TRACE_BG_BEGIN_EXECUTE(\""<<name<<"\",&_bgParentLog);\n"; 
+  op << "     " << "_TRACE_BG_BEGIN_EXECUTE_NOMSG(\""<<name<<"\",&_bgParentLog);\n"; 
 }
 
 void SdagConstruct::generateEndExec(XStr& op){
-  op << "     " << "_TRACE_BG_END_EXECUTE();\n";
+  op << "     " << "_TRACE_BG_END_EXECUTE(0);\n";
 }
 
 void SdagConstruct::generateBeginTime(XStr& op)
