@@ -14,6 +14,7 @@ typedef CcdVoidFn CQdVoidFn;
 CpvExtern(CQdState, cQdState);
 
 void CQdInit(void);
+void CQdCpvInit(void);
 void CQdCreate(CQdState, int);
 void CQdProcess(CQdState, int);
 int  CQdGetCreated(CQdState);

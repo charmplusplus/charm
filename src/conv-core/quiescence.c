@@ -5,6 +5,20 @@
  * $Revision$
  *****************************************************************************/
 
+/**
+FIXME: (OSL, 2/28/2003)
+ Messages sent from the communications thread or SIGIO
+ (i.e., messages sent from immediate messages) add
+ mCreated and mProcessed to the communication thread's
+ CpvAccess(cQdState), not to any real processor's
+ CpvAccess(cQdState).  Thus processor rank 0 should
+ add CpvAccessOther(cQdState,CmiNodeSize())'s counts to its own.
+ 
+Until this is fixed, if you send or receive immediate 
+messages (e.g., from reductions) you CANNOT use converse 
+quiescence detection!
+*/
+
 #include "converse.h"
 #include "quiescence.h"
 #include <stdio.h>
@@ -274,11 +288,14 @@ void CQdAnnounceHandler(CQdMsg msg)
   CcdRaiseCondition(CcdQUIESCENCE);
 }
 
+void CQdCpvInit(void) {
+  CpvInitialize(CQdState, cQdState);
+  CpvAccess(cQdState) = CQdStateCreate();
+}
 
 void CQdInit(void)
 {
-  CpvInitialize(CQdState, cQdState);
-  CpvAccess(cQdState) = CQdStateCreate();
+  CQdCpvInit();
   CQdHandlerIdx = CmiRegisterHandler((CmiHandler)CQdHandler);
   CQdAnnounceHandlerIdx = 
     CmiRegisterHandler((CmiHandler)CQdAnnounceHandler);
