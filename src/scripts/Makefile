@@ -154,7 +154,7 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
       conv-common.h conv-config.sh conv-config.h conv-mach.h conv-mach.sh \
       blue.h blue-conv.h bgconverse.h \
 	convcomlibstrategy.h 3dgridrouter.h de.h hypercubetopology.h	\
-	routerstrategy.h comlib.h dummystrategy.h  treerouter.h \
+	routerstrategy.h comlib.h dummyconversestrategy.h  treerouter.h \
 	convcomlibmanager.h graphrouter.h petable.h gridrouter.h router.h       
 
 # The .c files are there to be #included by clients whole
@@ -190,7 +190,8 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
           WSLB.decl.h GreedyRefLB.decl.h RandRefLB.decl.h \
           GreedyCommLB.decl.h Comm1LB.decl.h EveryLB.decl.h \
           charisma.decl.h TraceSummary.decl.h BlueGene.decl.h \
-	  comlib.decl.h ComlibManager.h DirectMulticastStrategy.h DummyStrategy.h\
+	  comlib.decl.h ComlibManager.h DummyStrategy.h	\
+	  DirectMulticastStrategy.h RingMulticastStrategy.h	\
 	  EachToManyMulticastStrategy.h MsgPacker.h StreamingStrategy.h \
 	  NodeMulticast.h PipeBroadcastStrategy.h MeshStreamingStrategy.h \
           PrioStreaming.h MPIStrategy.h MsgPacker.h StreamingStrategy.h \
