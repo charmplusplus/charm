@@ -10,6 +10,7 @@
 #include "converse.h"
 #include "ckhashtable.h"
 #include "pup.h"
+#include "pup_toNetwork4.h"
 #include "debug-charm.h"
 #include "conv-ccs.h"
 #include "sockRoutines.h"
@@ -140,6 +141,9 @@ static void CpdListBoundsCheck(CpdListAccessor *l,int &lo,int &hi)
 typedef CkHashtableTslow<const char *,CpdListAccessor *> CpdListTable_t;
 CpvStaticDeclare(CpdListTable_t *,cpdListTable);
 
+/**
+  Return the list at this (null-terminated ASCII) path.
+*/
 static CpdListAccessor *CpdListLookup(const char *path)
 {
   CpdListAccessor *acc=CpvAccess(cpdListTable)->get(path);
@@ -150,15 +154,20 @@ static CpdListAccessor *CpdListLookup(const char *path)
   return acc;
 }
 
-static const int CpdListMaxLen=80;
+/**
+  Return a CpdListAccessor, given a network string containing the 
+  list path.  A network string is a big-endian 32-bit "length" 
+  field, followed by a null-terminated ASCII string of that length.
+*/
 static CpdListAccessor *CpdListLookup(const ChMessageInt_t *lenAndPath)
 {
+  static const int CpdListMaxLen=80;
   int len=ChMessageInt(lenAndPath[0]);
   const char *path=(const char *)(lenAndPath+1);
   char pathBuf[CpdListMaxLen+1]; //Temporary null-termination buffer
   if ((len<0) || (len>CpdListMaxLen)) {
     CmiError("CpdListAccessor> Invalid list path length %d!\n",len);
-    return NULL; //Character count makes no sense
+    return NULL; //Character count is invalid
   }
   strncpy(pathBuf,path,len);
   pathBuf[len]=0; //Ensure string is null-terminated
@@ -192,44 +201,169 @@ static CpdListAccessor *CpdListHeader_ccs_list_items(char *msg,
   int msgLen=CmiSize((void *)msg)-CmiMsgHeaderSizeBytes;
   CpdListAccessor *ret=NULL;
   const ChMessageInt_t *req=(const ChMessageInt_t *)(msg+CmiMsgHeaderSizeBytes);
-  h.lo=ChMessageInt(req[0]);
-  h.hi=ChMessageInt(req[1]);
-  h.extraLen=ChMessageInt(req[2]);
-  if (h.extraLen>=0 && ((int)(3*sizeof(ChMessageInt_t)+h.extraLen))<msgLen) {
-    h.extra=(void *)(req+3);
+  h.lo=ChMessageInt(req[0]); // first item to send
+  h.hi=ChMessageInt(req[1]); // last item to send+1
+  h.extraLen=ChMessageInt(req[2]); // extra data length
+  if (h.extraLen>=0 
+  && ((int)(3*sizeof(ChMessageInt_t)+h.extraLen))<msgLen) {
+    h.extra=(void *)(req+3);  // extra data
     ret=CpdListLookup((ChMessageInt_t *)(h.extraLen+(char *)h.extra));
     if (ret!=NULL) CpdListBoundsCheck(ret,h.lo,h.hi);
   }
   return ret;
 }
 
+
+// Pup this cpd list's items under this request.
+static void pupCpd(PUP::er &p, CpdListAccessor *acc, CpdListItemsRequest &req)
+{
+      p.syncComment(PUP::sync_begin_array,"CpdList");
+      acc->pup(p,req);
+      p.syncComment(PUP::sync_end_array);
+}
+
 static void CpdList_ccs_list_items_txt(char *msg)
 {
   CpdListItemsRequest req;
   CpdListAccessor *acc=CpdListHeader_ccs_list_items(msg,req);
-  if(acc == NULL) CmiPrintf("Null Accessor\n");
+  if(acc == NULL) CmiPrintf("ccs-builtins> Null Accessor--bad list name (txt)\n");
   if (acc!=NULL) {
     int bufLen;
     { 
-      PUP::sizerText p; 
-      acc->pup(p,req);
-      bufLen=p.size(); 
+      PUP::sizerText p; pupCpd(p,acc,req); bufLen=p.size(); 
     }
     char *buf=new char[bufLen];
     { 
-      PUP::toText p(buf); 
-      acc->pup(p,req); 
+      PUP::toText p(buf); pupCpd(p,acc,req);
       if (p.size()!=bufLen)
 	CmiError("ERROR! Sizing/packing length mismatch for %s list pup function!\n",
 		acc->getPath());
     }
     CcsSendReply(bufLen,(void *)buf);
+    delete[] buf;
   }
   CmiFree(msg);
 }
 
 
-//Introspection object
+/**
+  A PUP_fmt inserts a 1-byte data format code 
+  before each pup'd data item.  This makes it possible
+  to unpack items without using PUP.
+*/
+class PUP_fmt : public PUP::wrap_er {
+	typedef PUP::er parent;
+	
+	typedef unsigned char byte;
+	/**
+	  The introductory byte for each field is bit-coded as:
+	       | unused(2) | lengthLen(2) | typeCode(4) |
+	*/
+	typedef enum {
+		lengthLen_single=0, // field is a single item
+		lengthLen_byte=1, // following 8 bits gives length of array
+		lengthLen_int=2, // following 32 bits gives length of array
+		lengthLen_long=3 // following 64 bits gives length of array (unimpl)
+	} lengthLen_t;
+	typedef enum { 
+		typeCode_byte=0, // unknown data type: nItems bytes
+		typeCode_int=2, // 32-bit integer array: nItems ints
+		typeCode_float=5, // 32-bit floating-point array: nItems floats
+		typeCode_comment=10, // comment/label: nItems byte characters
+		typeCode_sync=11 // synchronization code
+	} typeCode_t;
+	void fieldHeader(typeCode_t typeCode,int nItems) {
+		// Compute and write intro byte:
+		lengthLen_t ll;
+		if (nItems==1) ll=lengthLen_single;
+		else if (nItems<256) ll=lengthLen_byte;
+		else ll=lengthLen_int;
+		// CmiPrintf("Intro byte: l=%d t=%d\n",(int)ll,(int)typeCode);
+		byte intro=(((int)ll)<<4)+(int)typeCode;
+		p(intro);
+		// Compute and write length:
+		switch(ll) {
+		case lengthLen_single: break; // Single item
+		case lengthLen_byte: {
+			byte l=nItems;
+			p(l);
+			} break;
+		case lengthLen_int: {
+			p(nItems); 
+			} break; 
+		};
+	}
+public:
+	PUP_fmt(PUP::er &parent_) 
+		:PUP::wrap_er(parent_,PUP::er::IS_COMMENTS) {}
+	
+	virtual void comment(const char *message);
+	virtual void synchronize(unsigned int m);
+	virtual void bytes(void *p,int n,size_t itemSize,PUP::dataType t);
+};
+
+void PUP_fmt::comment(const char *message) {
+	int nItems=strlen(message);
+	fieldHeader(typeCode_comment,nItems);
+	p((char *)message,nItems);
+}
+void PUP_fmt::synchronize(unsigned int m) {
+	fieldHeader(typeCode_sync,1);
+	p(m);
+}
+void PUP_fmt::bytes(void *ptr,int n,size_t itemSize,PUP::dataType t) {
+	switch(t) {
+	case PUP::Tchar:
+	case PUP::Tuchar:
+	case PUP::Tbyte:
+		fieldHeader(typeCode_byte,n);
+		p.bytes(ptr,n,itemSize,t);
+		break;
+	case PUP::Tshort: case PUP::Tint: case PUP::Tlong: case PUP::Tlonglong:
+	case PUP::Tushort: case PUP::Tuint: case PUP::Tulong: case PUP::Tulonglong:
+	case PUP::Tbool:
+		fieldHeader(typeCode_int,n);
+		p.bytes(ptr,n,itemSize,t);
+		break;
+	case PUP::Tfloat: case PUP::Tdouble: case PUP::Tlongdouble:
+		fieldHeader(typeCode_float,n);
+		p.bytes(ptr,n,itemSize,t);
+		break;
+	default: CmiAbort("Unrecognized type code in PUP_fmt::bytes");
+	};
+}
+
+static void CpdList_ccs_list_items_fmt(char *msg)
+{
+  CpdListItemsRequest req;
+  CpdListAccessor *acc=CpdListHeader_ccs_list_items(msg,req);
+  if (acc!=NULL) {
+    int bufLen;
+    { 
+      PUP_toNetwork4_sizer ps;
+      PUP_fmt p(ps); 
+      pupCpd(p,acc,req);
+      bufLen=ps.size(); 
+    }
+    char *buf=new char[bufLen];
+    { 
+      PUP_toNetwork4_pack pp(buf); 
+      PUP_fmt p(pp);
+      pupCpd(p,acc,req);
+      if (pp.size()!=bufLen)
+	CmiError("ERROR! Sizing/packing length mismatch for %s list pup function (%d sizing, %d packing)\n",
+		acc->getPath(),bufLen,pp.size());
+    }
+    CcsSendReply(bufLen,(void *)buf);
+    delete[] buf;
+  }
+  CmiFree(msg);
+}
+
+
+
+
+//Introspection object-- extract a list of CpdLists!
 class CpdList_introspect : public CpdListAccessor {
   CpdListTable_t *tab;
 public:
@@ -280,9 +414,7 @@ void CpdSimpleListAccessor::pup(PUP::er &p,CpdListItemsRequest &req)
 
 static void CpdListBeginItem_impl(PUP::er &p,int itemNo)
 {
-	p.synchronize(0x7137FACEu);
-	p.comment("---------- Next list item: ----------");
-	p(itemNo);
+	p.syncComment(PUP::sync_item);
 }
 
 extern "C" void CpdListBeginItem(pup_er p,int itemNo)
@@ -330,8 +462,7 @@ static void CpdListInit(void) {
 
   CcsRegisterHandler("ccs_list_len",(CmiHandler)CpdList_ccs_list_len);
   CcsRegisterHandler("ccs_list_items.txt",(CmiHandler)CpdList_ccs_list_items_txt);
-  //added 9/16/2003
- 
+  CcsRegisterHandler("ccs_list_items.fmt",(CmiHandler)CpdList_ccs_list_items_fmt);
 }
 
 #if CMK_WEB_MODE
