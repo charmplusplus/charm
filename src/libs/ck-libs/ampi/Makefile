@@ -20,6 +20,8 @@ COMPATLIB=$(LIBDIR)/libampi-compat.a
 .C.o:
 	$(CHARMC) -c $<
 
+#AMPI-ROMIO: AMPI AMPIF $(COMPATLIB)
+
 all: AMPI AMPIF $(COMPATLIB)
 	cd romio; ./installromio.sh
 
@@ -78,3 +80,4 @@ ampiProjections.o: ampiProjections.C ampiEvents.h ampiProjections.h $(HEADDEP)
 
 clean: 
 	-rm -fr *.o *~ *.decl.h *.def.h gmon.out $(DEST) $(DESTF) $(COMPATLIB) conv-host charmrun headers *.mod
+	cd romio; make clean
