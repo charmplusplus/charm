@@ -14,4 +14,7 @@ private:
   CLBMigrateMsg* Strategy(CentralLB::LDStats* stats, int count);
 };
 
+#define WEIGHTED 1
+#define MULTI_CONSTRAINT 2
+
 #endif /* _METISLB_H_ */

@@ -84,7 +84,8 @@ extern "C" void METIS_mCPartGraphKway(int*, int*, int*, int*, int*, int*,
                                     int*, int*, int*, int*, int*,
                                     int*, int*);
 
-CLBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
+CLBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count,
+				 int option=0)
 {
   // CkPrintf("[%d] MetisLB strategy\n",CkMyPe());
   CkVector migrateInfo;
@@ -96,32 +97,41 @@ CLBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
   }
 
   // allocate space for the computing data
-  double *cputime = new double[numobjs];
+  double *objtime = new double[numobjs];
   int *objwt = new int[numobjs];
   int *origmap = new int[numobjs];
   LDObjHandle *handles = new LDObjHandle[numobjs];
   for(i=0;i<numobjs;i++) {
-    cputime[i] = 0.0;
+    objtime[i] = 0.0;
     objwt[i] = 0;
     origmap[i] = 0;
   }
 
+  int k=0;
   for (j=0; j<count; j++) {
     for (i=0; i<stats[j].n_objs; i++) {
       LDObjData *odata = stats[j].objData;
+      /*
       origmap[odata[i].id.id[0]] = j;
       cputime[odata[i].id.id[0]] = odata[i].cpuTime;
       handles[odata[i].id.id[0]] = odata[i].handle;
+      */
+      origmap[k] = j;
+      objtime[k] = odata[i].wallTime*stats[j].pe_speed;
+      handles[k] = odata[i].handle;
+      k++;
     }
   }
-  double max_cputime = cputime[0];
+
+  // to convert the weights on vertices to integers
+  double max_objtime = objtime[0];
   for(i=0; i<numobjs; i++) {
-    if(max_cputime < cputime[i])
-      max_cputime = cputime[i];
+    if(max_objtime < objtime[i])
+      max_objtime = objtime[i];
   }
-  double ratio = 1000.0/max_cputime;
+  double ratio = 1000.0/max_objtime;
   for(i=0; i<numobjs; i++) {
-      objwt[i] = (int)(cputime[i]*ratio);
+      objwt[i] = (int)(objtime[i]*ratio);
   }
   int **comm = new int*[numobjs];
   for (i=0; i<numobjs; i++) {
@@ -171,7 +181,7 @@ CLBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
   }
 
   CkPrintf("Pre-LDB Statistics step %d\n", step());
-  printStats(count, numobjs, cputime, comm, origmap);
+  printStats(count, numobjs, objtime, comm, origmap);
 
   int wgtflag = 3; // Weights both on vertices and edges
   int numflag = 0; // C Style numbering
@@ -179,34 +189,72 @@ CLBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
   options[0] = 0;
   int edgecut;
   int *newmap;
-  int sameMapFlag = 0;
+  int sameMapFlag = 1;
 
-  if(count > 1) {
+  if (count < 1) {
+    CkPrintf("error: Number of Pe less than 1!");
+  }
+  else if (count == 1) {
+    newmap = origmap;
+    sameMapFlag = 1;
+  }
+  else {
+    sameMapFlag = 0;
     newmap = new int[numobjs];
     for(i=0;i<(numobjs+1);i++)
       xadj[i] = 0;
     delete[] edgewt;
     edgewt = 0;
     wgtflag = 2;
-    if (count > 8)
-      METIS_PartGraphKway(&numobjs, xadj, adjncy, objwt, edgewt, 
-			  &wgtflag, &numflag, &count, options, 
-			  &edgecut, newmap);
-    else
-      METIS_PartGraphRecursive(&numobjs, xadj, adjncy, objwt, edgewt, 
-			       &wgtflag, &numflag, &count, options, 
-			       &edgecut, newmap);
-  } else {
-    newmap = origmap;
-    sameMapFlag = 1;
+    if (0 == option) {
+      if (count > 8)
+	METIS_PartGraphKway(&numobjs, xadj, adjncy, objwt, edgewt, 
+			    &wgtflag, &numflag, &count, options, 
+			    &edgecut, newmap);
+      else
+	METIS_PartGraphRecursive(&numobjs, xadj, adjncy, objwt, edgewt, 
+				 &wgtflag, &numflag, &count, options, 
+				 &edgecut, newmap);
+    }
+    else if (WEIGHTED == option) {
+      float maxtotal_walltime = stats[0].total_walltime;
+      for (int m=1; m<count; m++) {
+	if (maxtotal_walltime < stats[m].total_walltime)
+	  maxtotal_walltime = stats[m].total_walltime;
+      }
+      float totaltimeAllPe = 0.0;
+      for (int m=0; m<count; m++) {
+	totaltimeAllPe += stats[m].pe_speed * 
+	  (maxtotal_walltime-stats[m].bg_walltime);
+      }
+      // set up the different weights
+      float *tpwgts = new float[count];
+      for (int m=0; m<count; m++) {
+	tpwgts[m] = stats[m].pe_speed * 
+	  (maxtotal_walltime-stats[m].bg_walltime) / totaltimeAllPe;
+      }
+      if (count > 8)
+	METIS_WPartGraphKway(&numobjs, xadj, adjncy, objwt, edgewt, 
+			     &wgtflag, &numflag, &count, tpwgts, options, 
+			     &edgecut, newmap);
+      else
+	METIS_WPartGraphRecursive(&numobjs, xadj, adjncy, objwt, edgewt, 
+				  &wgtflag, &numflag, &count, tpwgts, options, 
+				  &edgecut, newmap);
+      delete[] tpwgts;
+    }
+    else if (MULTI_CONSTRAINT == option) {
+      CkPrintf("Metis load balance strategy: ");
+      Ckprintf("multiple constraints not implemented yet.\n";
+    }
   }
   CkPrintf("Post-LDB Statistics step %d\n", step());
-  printStats(count, numobjs, cputime, comm, newmap);
+  printStats(count, numobjs, objtime, comm, newmap);
 
   for(i=0;i<numobjs;i++)
     delete[] comm[i];
   delete[] comm;
-  delete[] cputime;
+  delete[] objtime;
   delete[] xadj;
   delete[] adjncy;
   if(objwt) delete[] objwt;
