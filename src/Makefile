@@ -34,7 +34,7 @@ charm: converse charmxlat charmlibs libcharm
 
 charm++: converse charmxlat charmlibs charmxlat++ charmfilter++ charmxi libcharm libck-cplus-y.a
 
-translators: charmxlat charmfilter charmxlat++ charmfilter++ charmxi
+translators: charmxlat charmfilter charmxlat++ charmfilter++ charmxi conv-cpm
 
 test-converse: converse
 	(cd ../pgms ; make test-converse)
@@ -113,9 +113,9 @@ CVHEADERS=converse.h conv-mach.h
 
 CVLIBS=libconv-core.a $(CVLIBS_QS)
 
-LIBCONV_CORE=threads.o convcore.o conv-conds.o machine.o spantree.o queueing.o fifo.o msgmgr.o memory.o
+LIBCONV_CORE=threads.o convcore.o conv-conds.o machine.o spantree.o queueing.o fifo.o msgmgr.o memory.o cpm.o
 
-converse: basics $(CVLIBS) conv-host-if-needed
+converse: basics $(CVLIBS) conv-host-if-needed conv-cpm
 
 conv-host-if-needed:
 	if [ -f conv-host.c ] ; then make conv-host OPTS='$(OPTS)' ; fi
@@ -128,6 +128,9 @@ conv-host: conv-host.c
 
 libconv-core.a: $(LIBCONV_CORE)
 	$(CHARMC) -cp ../lib/ -o $@ $(LIBCONV_CORE)
+
+cpm.o: cpm.c $(CVHEADERS)
+	$(CHARMC) cpm.c
 
 fifo.o: fifo.c $(CVHEADERS)
 	$(CHARMC) fifo.c
@@ -456,7 +459,7 @@ charmxi: $(XIFILES)
 yacci:
 	make -f Maketrans yacci OPTS='$(OPTS)'
 
-conv-cpm: conv-cpm.c conv-cpm.l
+conv-cpm: conv-cpm.c
 	make -f Maketrans conv-cpm OPTS='$(OPTS)'
 
 yacc-cpm:

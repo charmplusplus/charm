@@ -423,7 +423,7 @@ foreach FILE ($FILES)
   endif
   switch ($FILE)
     case "*.p"
-      ($ECHOCMD ; $CMK_CPP $OPTS_CPP -I$CHARMINC $BASE.p > $TMP.cpp)
+      ($ECHOCMD ; $CMK_CPP_CHARM $OPTS_CPP -I$CHARMINC $BASE.p > $TMP.cpp)
       ($ECHOCMD ; $CHARMBIN/charmfilter < $TMP.cpp | $CMK_M4 > $TMP.space)
       ($ECHOCMD ; $CHARMBIN/charmxlat $TMP.space $TMP.c)
       if ($status) goto failure
@@ -453,6 +453,20 @@ foreach FILE ($FILES)
         ($ECHOCMD ; /bin/mv $TMP.o $BASE.o)
       else
         set OBJECTFILES=( $OBJECTFILES $TMP.o )
+      endif
+      breaksw
+    case "*.cpm"
+      ($ECHOCMD ; /bin/rm -f $BASE.cpm.h $TMP.c)
+      ($ECHOCMD ; /usr/bin/touch $BASE.cpm.h ; /bin/ln -s $BASE.cpm $TMP.c)
+      ($ECHOCMD ; $CMK_CPP_C $OPTS_CPP -I$CHARMINC $TMP.c > $TMP.i)
+      ($ECHOCMD ; $CHARMBIN/conv-cpm $TMP.i $BASE.cpm.h)
+      if ($status) goto failure
+      ($ECHOCMD ; $CMK_CC $OPTS_CC -I$CHARMINC -c $TMP.c)
+      if ($status) goto failure
+      if ($?OBJECT == 0) then
+          ($ECHOCMD ; /bin/mv $TMP.o $BASE.o)
+      else
+          set OBJECTFILES=( $OBJECTFILES $TMP.o )
       endif
       breaksw
     case "*.ci"
@@ -576,6 +590,11 @@ endif
 
 if ($LANGUAGE != converse) then
 
+    if (! -e $CHARMLIB/libck-core-notrace.a) then
+        echo "charmc: charm libraries not installed."
+        goto failure
+    endif
+    
     if ($?EXECMODE == 0) set EXECMODE=notrace
 
     if (! -e $CHARMLIB/libck-core-$EXECMODE.a) then
@@ -778,12 +797,9 @@ end:
         foreach FILE ($FILES)
             set BASE=$FILE:r
             set TMP=$BASE:t.TMP
-            # Warning: do not delete $BASE.anything or you can easily delete
-            # the user's source files.  (Remember, people frequently use the
-            # same extension for multiple purposes.)  If it's a temp file,
-            # put TMP in its name.
             /bin/rm -f $TMP.P.C $TMP.cpp $TMP.space $TMP.xlat $TMP.o $BASE.headers
-            /bin/rm -f $TMP.c $TMP.c.0.h $TMP.c.1.h $TMP.c.2.h $TMP.$CMK_CPP_SUFFIX
+            /bin/rm -f $TMP.c $TMP.c.0.h $TMP.c.1.h $TMP.c.2.h $BASE.cpm.h
+            /bin/rm -f $TMP.i $TMP.$CMK_CPP_SUFFIX
         end
         rm -f core $DELETE
     endif

@@ -12,7 +12,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 2.14  1996-04-09 22:56:22  jyelon
+# Revision 2.15  1996-04-16 22:45:34  jyelon
+# *** empty log message ***
+#
+# Revision 2.14  1996/04/09 22:56:22  jyelon
 # *** empty log message ***
 #
 # Revision 2.13  1995/11/08 22:27:49  milind
@@ -59,8 +62,8 @@
 #
 ############################################################################
 
-set CMK_CPP			= '/usr/lib/cpp -D_NO_PROTO '
-
+set CMK_CPP_CHARM		= '/usr/lib/cpp -D_NO_PROTO '
+set CMK_CPP_C                   = '/usr/lib/cpp -D_NO_PROTO '
 set CMK_LDRO			= 'ld -r -o '
 set CMK_CC			= 'mpcc'
 set CMK_CC_RELIABLE		= 'mpcc'

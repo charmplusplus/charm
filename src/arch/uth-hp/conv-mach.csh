@@ -12,7 +12,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 1.8  1996-04-09 22:56:30  jyelon
+# Revision 1.9  1996-04-16 22:45:34  jyelon
+# *** empty log message ***
+#
+# Revision 1.8  1996/04/09 22:56:30  jyelon
 # *** empty log message ***
 #
 # Revision 1.7  1995/11/13 16:36:46  jyelon
@@ -44,7 +47,8 @@
 #
 ############################################################################
 
-set CMK_CPP='/lib/cpp -P'
+set CMK_CPP_CHARM='/lib/cpp -P'
+set CMK_CPP_C='gcc -E'
 set CMK_LDRO='ld -r -o'
 set CMK_CC='gcc'
 set CMK_CC_RELIABLE='gcc'

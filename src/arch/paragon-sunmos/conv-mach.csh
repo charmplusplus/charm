@@ -14,7 +14,8 @@
 #
 ############################################################################
 
-set CMK_CPP='/usr/lib/cpp -P'
+set CMK_CPP_CHARM='/usr/lib/cpp -P'
+set CMK_CPP_C='sicc -E'
 set CMK_LDRO='ld860 -r -o'
 set CMK_CC='sicc'
 set CMK_CC_RELIABLE='sicc'

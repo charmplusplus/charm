@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.40  1996-04-15 23:57:04  jyelon
+ * Revision 2.41  1996-04-16 22:44:42  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.40  1996/04/15 23:57:04  jyelon
  * *** empty log message ***
  *
  * Revision 2.39  1996/04/07 19:16:52  jyelon
@@ -470,6 +473,117 @@ extern int CthRegister CMK_PROTO((int));
 #endif /* CMK_PREPROCESSOR_CANNOT_DO_CONCATENATION */
 #endif /* CMK_THREADS_USE_EATSTACK */
 
+
+/************************************************************************
+ *
+ * CpmControl
+ *
+ * A CpmControl structure enables the user of the Cpm module to tell
+ * the parameter-marshalling system what kind of envelope to put int the
+ * message, and what to do with it after it has been filled.
+ *
+ ***********************************************************************/
+
+typedef struct CpmControlStruct *CpmControl;
+
+typedef void *(*CpmSender) CMK_PROTO((CpmControl, int, void *));
+
+struct CpmControlStruct
+{
+  CpmSender sendfn;
+  int envsize;
+};
+
+#define CpmPE(n) n
+#define CpmALL (-1)
+#define CpmOTHERS (-2)
+
+CpmControl CpmSend CMK_PROTO((int pe));
+CpmControl CpmMakeThread CMK_PROTO((int pe));
+CpmControl CpmEnqueue CMK_PROTO((int pe, int qs, int priobits, int *prioptr));
+CpmControl CpmEnqueueFIFO CMK_PROTO((int pe, int prio));
+CpmControl CpmEnqueueLIFO CMK_PROTO((int pe, int prio));
+CpmControl CpmEnqueueIFIFO CMK_PROTO((int pe, int prio));
+CpmControl CpmEnqueueILIFO CMK_PROTO((int pe, int prio));
+CpmControl CpmEnqueueBFIFO CMK_PROTO((int pe, int priobits, int *prioptr));
+CpmControl CpmEnqueueBLIFO CMK_PROTO((int pe, int priobits, int *prioptr));
+
+/***********************************************************************
+ *
+ * CPM macros
+ *
+ *      CpmInvokable
+ *      CpmDeclareSimple(x)
+ *      CpmDeclarePointer(x)
+ *
+ * These macros supposedly expand into CPM ``declarations''.  In
+ * actuality, they macroexpand into C code which has no effect.
+ * However, when the CPM scanner sees the macroexpansions, it
+ * recognizes them and understands them.
+ *
+ **********************************************************************/
+
+typedef void CpmInvokable;
+typedef int CpmDeclareSimple1;
+typedef int CpmDeclarePointer1;
+#define CpmDeclareSimple(c) typedef CpmDeclareSimple1 CpmType_##c;
+#define CpmDeclarePointer(c) typedef CpmDeclarePointer1 CpmType_##c;
+
+/***********************************************************************
+ *
+ * Accessing a CPM message:
+ *
+ ***********************************************************************/
+
+struct CpmHeader
+{
+  char convcore[CmiMsgHeaderSizeBytes];
+  int envpos;
+};
+#define CpmEnv(msg) (((char *)msg)+(((struct CpmHeader *)msg)->envpos))
+#define CpmAlign(val, type) ((val+sizeof(type)-1)&(~(sizeof(type)-1)))
+
+/***********************************************************************
+ *
+ * Built-in CPM types
+ *
+ **********************************************************************/
+
+CpmDeclareSimple(char);
+#define CpmPack_char(v)
+#define CpmUnpack_char(v)
+
+CpmDeclareSimple(short);
+#define CpmPack_short(v)
+#define CpmUnpack_short(v)
+
+CpmDeclareSimple(int);
+#define CpmPack_int(v)
+#define CpmUnpack_int(v)
+
+CpmDeclareSimple(long);
+#define CpmPack_long(v)
+#define CpmUnpack_long(v)
+
+CpmDeclareSimple(float);
+#define CpmPack_float(v)
+#define CpmUnpack_float(v)
+
+CpmDeclareSimple(double);
+#define CpmPack_double(v)
+#define CpmUnpack_double(v)
+
+typedef int CpmDim;
+CpmDeclareSimple(CpmDim);
+#define CpmPack_CpmDim(v)
+#define CpmUnpack_CpmDim(v)
+
+typedef char *CpmStr;
+CpmDeclarePointer(CpmStr);
+#define CpmPtrSize_CpmStr(v) (strlen(v)+1)
+#define CpmPtrPack_CpmStr(p, v) (strcpy(p, v))
+#define CpmPtrUnpack_CpmStr(v)
+#define CpmPtrFree_CpmStr(v)
 
 /****** CMM: THE MESSAGE MANAGER ******/
 

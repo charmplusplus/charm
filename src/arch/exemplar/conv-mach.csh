@@ -14,7 +14,8 @@
 #
 ############################################################################
 
-set CMK_CPP='/lib/cpp -P'
+set CMK_CPP_CHARM='/lib/cpp -P'
+set CMK_CPP_C='echo "Please set CMK_CPP_C" ; exit 1 ; echo '
 set CMK_CXXPP='echo "Convex doesnt support charm++" ; exit 1 ; echo '
 set CMK_LDRO='ld -r -o'
 set CMK_CC='cc'
