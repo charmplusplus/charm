@@ -455,7 +455,7 @@ foreach FILE ($FILES)
       ($ECHOCMD ; $CHARMBIN/charmfilter < $TMP.cpp | $CMK_M4 > $TMP.space)
       ($ECHOCMD ; $CHARMBIN/charmxlat $TMP.space $TMP.c)
       if ($status) goto failure
-      ($ECHOCMD ; $CMK_CC $OPTS_CC -I$CHARMINC -c $TMP.c)
+      ($ECHOCMD ; $CMK_CC $OPTS_CC -I$CHARMINC -c $TMP.c -o $TMP.o)
       if ($status) goto failure
       if ($?OBJECT == 0) then
           ($ECHOCMD ; /bin/mv $TMP.o $BASE.o)
@@ -475,7 +475,7 @@ foreach FILE ($FILES)
       if ($status) goto failure
       ($ECHOCMD ; /bin/cat $BASE.headers > $TMP.$CMK_CPP_SUFFIX)
       ($ECHOCMD ; /bin/cat $TMP.xlat >> $TMP.$CMK_CPP_SUFFIX)
-      ($ECHOCMD ; $CMK_CXX $OPTS_CXX -I$CHARMINC -c $TMP.$CMK_CPP_SUFFIX)
+      ($ECHOCMD ; $CMK_CXX $OPTS_CXX -I$CHARMINC -c $TMP.$CMK_CPP_SUFFIX -o $TMP.o)
       if ($status) goto failure
       if ($?OBJECT == 0) then
         ($ECHOCMD ; /bin/mv $TMP.o $BASE.o)
@@ -488,7 +488,7 @@ foreach FILE ($FILES)
       if ($status) goto failure
       breaksw
     case "*.c"
-      ($ECHOCMD ; $CMK_CC $OPTS_CC -I$CHARMINC -c $BASE.c)
+      ($ECHOCMD ; $CMK_CC $OPTS_CC -I$CHARMINC -c $BASE.c -o $BASE.o)
       if ($status) goto failure
       if ($?OBJECT) then
 	if ($OBJECT != $BASE.o) set DELETE=( $DELETE $BASE.o )
@@ -496,7 +496,7 @@ foreach FILE ($FILES)
       endif
       breaksw
     case "*.C"
-      ($ECHOCMD ; $CMK_CXX $OPTS_CXX -I$CHARMINC -c $BASE.C)
+      ($ECHOCMD ; $CMK_CXX $OPTS_CXX -I$CHARMINC -c $BASE.C -o $BASE.o)
       if ($status) goto failure
       if ($?OBJECT) then
 	if ($OBJECT != $BASE.o) set DELETE=( $DELETE $BASE.o )
@@ -504,7 +504,7 @@ foreach FILE ($FILES)
       endif
       breaksw
     case "*.cxx"
-      ($ECHOCMD ; $CMK_CXX $OPTS_CXX -I$CHARMINC -c $BASE.cxx)
+      ($ECHOCMD ; $CMK_CXX $OPTS_CXX -I$CHARMINC -c $BASE.cxx -o $BASE.o)
       if ($status) goto failure
       if ($?OBJECT) then
 	if ($OBJECT != $BASE.o) set DELETE=( $DELETE $BASE.o )
