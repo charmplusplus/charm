@@ -55,7 +55,7 @@ class QdState {
     int parent;
     int *children;
   public:
-    QdState():mCreated(0),mProcessed(0),stage(0),nReported(0) {
+    QdState():stage(0),mCreated(0),mProcessed(0),nReported(0) {
       cCreated = 0; cProcessed = 0; cDirty = 0;
       oProcessed = 0;
       callbacks = new PtrQ();

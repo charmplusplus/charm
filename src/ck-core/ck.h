@@ -56,7 +56,7 @@ class VidBlock {
       actualID.objPtr = oPtr;
       actualID.magic = magic;
       envelope *env;
-      while(env=(envelope*)msgQ->deq()) {
+      while(NULL!=(env=(envelope*)msgQ->deq())) {
         env->setSrcPe(CkMyPe());
         env->setMsgtype(ForChareMsg);
         env->setObjPtr(actualID.objPtr);

@@ -94,7 +94,7 @@ static inline void _handlePhase2(QdState *state, QdMsg *msg)
         _bcastQD1(state, msg);
       } else {
         QdCallback* cb;
-        while(cb=state->deq()) {
+        while(NULL!=(cb=state->deq())) {
           cb->send();
           delete cb;
         }

@@ -258,7 +258,7 @@ static inline void _processBufferedMsgs(void)
 {
   CmiNumberHandler(_charmHandlerIdx,(CmiHandler)_processHandler);
   envelope *env;
-  while(env=(envelope*)CpvAccess(_buffQ)->deq()) {
+  while(NULL!=(env=(envelope*)CpvAccess(_buffQ)->deq())) {
     if(env->getMsgtype()==NewChareMsg || env->getMsgtype()==NewVChareMsg) {
       if(env->isForAnyPE())
         CldEnqueue(CLD_ANYWHERE, env, _infoIdx);

@@ -816,8 +816,6 @@ void CProxy_CkArrayBase::create1Dinitial(int ctorIndex,int chareType,int numInit
   DEBC(("In createInitial-- will build %d elements\n",numInitial));
   if (numInitial>0) {
     //Build some 1D elements: (mostly for backward compatability)
-    CProxy_CkArray aProxy(_aid);
-    CkArray *aMgr=(CkArray *)CkLocalBranch(_aid);
     for (int i=0;i<numInitial;i++) {
       CkArrayMessage *m=NULL;
       if (inM!=NULL) { 

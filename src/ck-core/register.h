@@ -29,7 +29,7 @@ class MsgInfo {
     int size;
 
     MsgInfo(const char *n,CkPackFnPtr p,CkUnpackFnPtr u,CkCoerceFnPtr c,int s):
-      name(n), size(s), pack(p), unpack(u), coerce(c) 
+      name(n), pack(p), unpack(u), coerce(c), size(s)
     {}
 };
 
