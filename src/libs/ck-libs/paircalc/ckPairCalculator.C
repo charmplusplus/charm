@@ -109,9 +109,35 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
   if (!inData[offset])
     inData[offset] = new complex[size];
   memcpy(inData[offset], points, size * sizeof(complex));
+
+#if 0
+    CkPrintf("--------Partial Deposit----------\n");
+    for (int i = 0; i < size; i++){
+      CkPrintf(" {%.2f %.2f}", points[i].re, points[i].im);    
+    }
+    CkPrintf("\n");
+#endif
   
   numRecd++; 
   if (numRecd == numExpected * 2 || (symmetric && thisIndex.x==thisIndex.y && numRecd==numExpected )) {
+#if 0
+    CkPrintf("--------All Deposit----------\n");
+    for (int j = 0; j < numExpected; j++)
+    for (int i = 0; i < size; i++){
+      CkPrintf(" {%.2f %.2f}", inDataLeft[j][i].re, inDataLeft[j][i].im);    
+    }
+
+    CkPrintf("\n");
+    if(!symmetric) {
+    for (int j = 0; j < numExpected; j++)
+    for (int i = 0; i < size; i++){
+      CkPrintf(" {%.2f %.2f}", inDataRight[j][i].re, inDataRight[j][i].im);    
+    }
+
+    CkPrintf("\n");
+    }
+#endif
+  
 #ifdef _DEBUG_
     CkPrintf("     pairCalc[%d %d %d %d] got expected \n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z);
 #endif
@@ -135,10 +161,32 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
     }
 
     // FIXME: should do 'op2' here!!!
-    complex *ptr = new complex[S*S];
-    for(int i=0; i<grainSize; i++)
-      memcpy(ptr+thisIndex.y+thisIndex.x*S+i*S, outData, grainSize);
-    contribute(S*S*sizeof(complex), ptr,CkReduction::sum_double);
+    double *ptr = new double[S*S*2];
+    for(int i=0; i<S*S*2; i++)
+      ptr[i] =0; 
+    //    for(int i=0; i<grainSize; i++)
+    //      memcpy(ptr+(thisIndex.y+thisIndex.x*S+i*S)*2, outData+i*grainSize, grainSize*sizeof(complex));
+    for(int i=0; i<grainSize; i++) {
+      for(int j=0; j<grainSize; j++){
+	ptr[(i*S+j+thisIndex.y+thisIndex.x*S)*2] = outData[i*grainSize+j].re;
+	ptr[(i*S+j+thisIndex.y+thisIndex.x*S)*2+1] = outData[i*grainSize+j].im;
+      }
+    }
+#if 0
+    CkPrintf("--------Partial Result----------\n");
+    for (int i = 0; i < grainSize; i++){
+      for (int j = 0; j < grainSize; j++)
+	CkPrintf(" {%.2f %.2f}", outData[i * grainSize + j].re, outData[i * grainSize + j].im);    
+      CkPrintf("\n");
+    }
+    for (int i = 0; i < S; i++){
+      for (int j = 0; j < S; j++)
+	CkPrintf(" [%.2f %.2f]", ptr[(i * S + j)*2], ptr[(i * S + j)*2+1]);    
+      CkPrintf("\n");
+    }
+#endif
+    //contribute(S*S*sizeof(double) * 2, ptr, sparse_sum_TwoDoubles);
+    contribute(S*S*sizeof(double) * 2, ptr, CkReduction::sum_double);
     delete [] ptr;
   }
 }
