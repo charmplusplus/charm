@@ -221,7 +221,7 @@ print_slots(slotset *ss)
 }
 #endif
 
-#if CMK_THREADS_ARE_WIN32_FIBERS
+#if CMK_THREADS_ARE_WIN32_FIBERS || ! CMK_HAS_MMAN_H
 /****************** Manipulate memory map (Win32 non-version) *****************/
 static void *
 map_slots(int slot, int nslots)
