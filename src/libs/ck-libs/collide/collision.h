@@ -139,18 +139,6 @@ public:
 		{findCollisions(0,dest);}
 };
 
-//A sparse but regular 3D grid of octants
-class grid3d : public objConsumer {
-	CkHashtableT<gridLoc3d,octant *> table;
-	inline void addAt(crossObjRec *p,const gridLoc3d &g);
-public:
-	grid3d();
-	virtual ~grid3d();
-	virtual void add(crossObjRec *);
-	void findCollisions(collisionList &dest);
-};
-
-
 //Records a single pair of intersecting polygons
 class collision {
 public:
