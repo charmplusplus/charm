@@ -27,10 +27,8 @@ pdf:
 	( cd charm++; $(LNCMD); $(MAKE) pdf )
 	( cd libraries; $(LNCMD); $(MAKE) pdf )
 	( cd f90charm; $(LNCMD); $(MAKE) pdf )
-	( cd fem; $(LNCMD); $(MAKE) pdf )
 	( cd ampi; $(LNCMD); $(MAKE) pdf )
 	( cd bluegene; $(LNCMD); $(MAKE) pdf )
-	( cd mblock; $(LNCMD); $(MAKE) pdf )
 	( cd projections; $(LNCMD); $(MAKE) pdf )
 	( cd tcharm; $(LNCMD); $(MAKE) pdf )
 
@@ -71,10 +69,8 @@ web:
 	( cd ck; $(LNCMD); $(MAKE) web )
 	( cd libraries; $(LNCMD); $(MAKE) web )
 	( cd f90charm; $(LNCMD); $(MAKE) web )
-	( cd fem; $(LNCMD); $(MAKE) web )
 	( cd ampi; $(LNCMD); $(MAKE) web )
 	( cd bluegene; $(LNCMD); $(MAKE) web )
-	( cd mblock; $(LNCMD); $(MAKE) web )
 	( cd projections; $(LNCMD); $(MAKE) web )
 	( cd tcharm; $(LNCMD); $(MAKE) web )
 
