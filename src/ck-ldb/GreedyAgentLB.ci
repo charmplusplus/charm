@@ -1,0 +1,9 @@
+module GreedyAgentLB {
+
+extern module CentralLB;
+initnode void lbinit(void);
+group [migratable] GreedyAgentLB : CentralLB {
+  entry void GreedyAgentLB(const CkLBOptions &);  
+};
+
+};
