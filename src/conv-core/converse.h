@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.33  1995-10-27 21:39:32  jyelon
+ * Revision 2.34  1995-10-27 22:37:08  jyelon
+ * Changed NumPe -> NumPes
+ *
+ * Revision 2.33  1995/10/27  21:39:32  jyelon
  * changed NumPe --> NumPes
  *
  * Revision 2.32  1995/10/23  23:09:05  jyelon
@@ -205,7 +208,7 @@ extern void *CmiSvAlloc CMK_PROTO((int));
 #define CpvStaticDeclare(t,v) static t* CMK_CONCAT(Cpv_Var_,v)
 #define CpvInitialize(t,v)\
     { if (CMK_CONCAT(Cpv_Var_,v)==0)\
-        { CMK_CONCAT(Cpv_Var_,v) = (t *)CmiAlloc(Cmi_numpe*sizeof(t)); }}
+        { CMK_CONCAT(Cpv_Var_,v) = (t *)CmiAlloc(Cmi_numpes*sizeof(t)); }}
 #define CpvAccess(v) CMK_CONCAT(Cpv_Var_,v)[Cmi_mype]
 
 #define CsvDeclare(t,v) t CMK_CONCAT(Csv_Var_,v)
@@ -270,14 +273,14 @@ int CmiNumPes CMK_PROTO((void));
 
 #ifdef CMK_CMIMYPE_IS_A_VARIABLE
 CpvExtern(int, Cmi_mype);
-CpvExtern(int, Cmi_numpe);
+CpvExtern(int, Cmi_numpes);
 #define CmiMyPe() CpvAccess(Cmi_mype)
 #define CmiNumPes() CpvAccess(Cmi_numpes)
 #endif
 
 #ifdef CMK_CMIMYPE_UNIPROCESSOR
 extern int Cmi_mype;
-extern int Cmi_numpe;
+extern int Cmi_numpes;
 #define CmiMyPe() Cmi_mype
 #define CmiNumPes() Cmi_numpes
 #endif
