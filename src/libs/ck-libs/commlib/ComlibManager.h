@@ -66,35 +66,35 @@ class ComlibMsg: public CMessage_ComlibMsg {
     CharmMessageHolder * next();
 };
 
+class Strategy {
+ public:
+    virtual void insertMessage(CharmMessageHolder *msg) = 0;
+    virtual void doneInserting() = 0;
+    virtual void setID(comID id) = 0;
+};
+
 class ComlibManager: public CkDelegateMgr{
 
     CkGroupID cmgrID;
-    CharmMessageHolder * messageBuf;
 
-    CharmMessageHolder **streamingMsgBuf;
-    int *streamingMsgCount;
-
-    int *procMap;
+    //int *procMap;
 
     int createDone, doneReceived;
 
     int npes;
     int *pelist;
 
-    int messagesBeforeFlush;
-    int bytesBeforeFlush;
-
-    int messageCount;
-
     int nelements; //number of array elements on one processor
     int elementCount; //counter for the above
-    int strategy;
+    
+    int strategyID; //Identifier of the strategy
+    Strategy *strategy; //Pointer to the strategy class
     comID comid;
     
     //flags
     int idSet, iterationFinished;
     
-    void init(int s, int n); //strategy, nelements 
+    void init(Strategy *s); //strategy, nelements 
     void setReverseMap(int *, int);
 
     int totalMsgCount, totalBytes, nIterations;
@@ -107,17 +107,16 @@ class ComlibManager: public CkDelegateMgr{
     void localElement();
 
     void receiveID(comID id);
-
     void receiveID(int npes, int *pelist, comID id);
 
     void ArraySend(int ep, void *msg, const CkArrayIndexMax &idx, CkArrayID a);
     void GroupSend(int ep, void *msg, int onpe, CkGroupID gid);
-    void setNumMessages(int nmessages);
+    //    void setNumMessages(int nmessages);
     
     void beginIteration();
     void endIteration();
 
-    void receiveNamdMessage(ComlibMsg * msg);
+    //void receiveNamdMessage(ComlibMsg * msg);
     void createId();
     void createId(int *, int);
 

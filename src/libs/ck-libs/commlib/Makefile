@@ -3,10 +3,16 @@ CHARMC=$(CDIR)/bin/charmc $(OPTS)
 COMMLIBDIR=../../conv-libs/commlib
 
 LIB = libcomm.a
-OBJS = ComlibManager.o $(COMMLIBDIR)/commlib.o $(COMMLIBDIR)/gridrouter.o \
+
+STRATEGY_OBJS = EachToManyStrategy.o MPIStrategy.o StreamingStrategy.o \
+		DummyStrategy.o 
+
+CONVERSE_COM_OBJS = $(COMMLIBDIR)/commlib.o $(COMMLIBDIR)/gridrouter.o \
 	$(COMMLIBDIR)/de.o $(COMMLIBDIR)/treerouter.o $(COMMLIBDIR)/petable.o \
 	$(COMMLIBDIR)/overlapper.o $(COMMLIBDIR)/rsend.o $(COMMLIBDIR)/bcast.o \
 	$(COMMLIBDIR)/charm_bind.o $(COMMLIBDIR)/3dgridrouter.o
+
+OBJS = ComlibManager.o $(STRATEGY_OBJS) $(CONVERSE_COM_OBJS)
 
 all: cifiles conversecom $(LIB) 
 	rm -f $(CDIR)/include/ComlibManager.h
@@ -23,11 +29,23 @@ all: cifiles conversecom $(LIB)
 conversecom :
 	(cd ../../conv-libs/commlib; make)
 
-libcomm.a: $(OBJS)
+libcomm.a: $(OBJS) $(STRATEGY_OBJS) $(CONVERSE_COM_OBJS)
 	$(CHARMC) -cp ../../../../../lib -o libcomm.a $(OBJS)
 
 ComlibManager.o: ComlibManager.C ComlibManager.h
-	$(CHARMC) ComlibManager.C
+	$(CHARMC) -c ComlibManager.C
+
+EachToManyStrategy.o: EachToManyStrategy.C EachToManyStrategy.h ComlibManager.h
+	$(CHARMC) -c EachToManyStrategy.C
+
+MPIStrategy.o: MPIStrategy.C MPIStrategy.h ComlibManager.h
+	$(CHARMC) -c MPIStrategy.C
+
+StreamingStrategy.o: StreamingStrategy.C StreamingStrategy.h ComlibManager.h
+	$(CHARMC) -c StreamingStrategy.C
+
+DummyStrategy.o: DummyStrategy.C DummyStrategy.h ComlibManager.h
+	$(CHARMC) -c DummyStrategy.C
 
 cifiles: ComlibManager.ci
 	$(CHARMC) ComlibManager.ci

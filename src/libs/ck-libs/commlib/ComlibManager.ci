@@ -24,7 +24,7 @@ module ComlibModule {
     entry void beginIteration();
     entry void endIteration();
 
-    entry void receiveNamdMessage(ComlibMsg * msg);
+    //entry void receiveNamdMessage(ComlibMsg * msg);
     entry void createId(void);
     entry void createId(int *, int);
 
