@@ -31,6 +31,7 @@ set OBJECTFILES=
 set LIBRARIES=
 set CONVERSE=
 set DELETE=
+set SEQUENTIAL=
 onintr failure
 
 ##############################################################################
@@ -57,6 +58,10 @@ while ($argindex <= $#argv)
             set CHARMBIN=.
             set CHARMLIB=.
             set CHARMINC=.
+            breaksw
+
+        case "-seq"
+	    set SEQUENTIAL=1
             breaksw
 
         case "-language"
@@ -274,6 +279,11 @@ if ($?CHARMINC == 0) set CHARMINC=$CHARMBIN/../include
 ##############################################################################
 
 source $CHARMINC/conv-mach.csh
+
+if ($?SEQUENTIAL) then
+    set CMK_CC=( $CMK_SEQ_CC )
+    set CMK_LD=( $CMK_SEQ_LD )
+endif
 
 if ($?OVERRIDE_CC) then
     set CMK_CC[1]=""

@@ -11,11 +11,9 @@
 #     * The conv-mach.sh and conv-mach.csh scripts
 #     * The charmreplay program
 # 
-# This Makefile is common to all versions.  However, it includes a
-# machine-specific component, conv-mach.mk, which defines a variety
-# of compilers and linkers $(CMK_CC), $(CMK_LD), and two make-rules
-# cmk_extras and cmk_clean.  cmk_extras can be used to build any
-# machine-specific utilities (say, a host-program).
+# This Makefile is common to all machines.  This works because the charmc
+# is smart enough to "conceal" the differences between machines.  charmc
+# gets its smarts by reading the conv-mach.csh configuration file.
 #
 ###############################################################################
 
@@ -24,31 +22,6 @@ all:
 	@echo '  make converse'
 	@echo '  make charm'
 	@echo '  make charm++'
-
-include conv-mach.mk
-
-###############################################################################
-#
-# The machine-configuration-scripts, conv-mach.mk, conv-mach.sh, conv-mach.csh
-#
-# The machine directory must provide a script conv-mach.mk containing
-# definitions of several compilers and linkers $(CMK_CC), $(CMK_LD), etc.
-# These rules translate conv-mach.mk into scripts for the bourne and csh
-# shells.
-#
-###############################################################################
-
-conv-mach: conv-mach.sh conv-mach.csh
-
-conv-mach.sh: conv-mach.mk
-	egrep '^CMK_' conv-mach.mk > tmp1~
-	sed -e "s@=@='@" -e 's@$$@'"'@" tmp1~ > tmp2~
-	mv tmp2~ conv-mach.sh
-
-conv-mach.csh: conv-mach.mk
-	egrep '^CMK_' conv-mach.mk > tmp1~
-	sed -e "s@^@setenv @" -e "s@=@ '@" -e 's@$$@'"'@" tmp1~ > tmp2~
-	mv tmp2~ conv-mach.csh
 
 ###############################################################################
 #
@@ -62,7 +35,7 @@ CVLIBS_QS=libconv-qs-fifo.a libconv-qs-lifo.a # libconv-qs-bfifo.o libconv-qs-if
 
 CVLIBS=libconv-core.a $(CVLIBS_QS)
 
-converse: conv-mach $(CVLIBS) cmk_extras
+converse: $(CVLIBS) cmk_extras
 
 libconv-core.a: convcore.o machine.o spantree.o fifo.o
 	charmc -cwd -o libconv-core.a convcore.o machine.o spantree.o fifo.o
@@ -108,6 +81,14 @@ machine.o: machine.c $(CVHEADERS)
 
 convcore.o: convcore.c $(CVHEADERS)
 	charmc -cwd -c convcore.c
+
+cmk_extras:
+	csh -fc "source conv-mach.csh ; $$CMK_EXTRAS"
+	touch cmk_extras
+
+cmk_clean:
+	csh -fc "source conv-mach.csh ; $$CMK_CLEAN"
+	rm -f cmk_extras
 
 ###############################################################################
 #
@@ -336,10 +317,10 @@ mono.cplus.n.o mono.cplus.d.o : mono.cplus.cxx $(CKHEADERS) c++interface.h mono.
 ###############################################################################
 
 charmreplay: charmreplay.o perfio.o
-	$(CMK_SEQ_LD) -o charmreplay charmreplay.o perfio.o
+	charmc -seq -cwd -o charmreplay charmreplay.o perfio.o
 
 charmreplay.o: charmreplay.c
-	$(CMK_SEQ_CC) -c charmreplay.c
+	charmc -seq -cwd -c charmreplay.c
 
 
 ###############################################################################
@@ -350,43 +331,43 @@ charmreplay.o: charmreplay.c
 
 CHARMXLAT=xl-main.o xl-ytab.o xl-sym.o xl-str.o xl-lex.o xl-lexyy.o xl-rdtok.o xl-parse.o xl-outh.o xl-srch.o xl-dag.o
 charmxlat: $(CHARMXLAT)
-	$(CMK_SEQ_LD) -o charmxlat $(CHARMXLAT)
+	charmc -seq -cwd -o charmxlat $(CHARMXLAT)
 
 xl-main.o: main.c
-	$(CMK_SEQ_CC) -c xl-main.c
+	charmc -seq -cwd -c xl-main.c
 
 xl-ytab.o: xl-ytab.c xl-lex.h xl-sym.h
-	$(CMK_SEQ_CC) -c xl-ytab.c
+	charmc -seq -cwd -c xl-ytab.c
 
 xl-sym.o: xl-sym.c xl-sym.h
-	$(CMK_SEQ_CC) -c xl-sym.c
+	charmc -seq -cwd -c xl-sym.c
 
 xl-str.o: xl-str.c
-	$(CMK_SEQ_CC) -c xl-str.c
+	charmc -seq -cwd -c xl-str.c
 
 xl-lex.o: xl-lex.c xl-lex.h xl-sym.h
-	$(CMK_SEQ_CC) -c xl-lex.c
+	charmc -seq -cwd -c xl-lex.c
 
 xl-lexyy.o: xl-lexyy.c	
-	$(CMK_SEQ_CC) -c xl-lexyy.c
+	charmc -seq -cwd -c xl-lexyy.c
 
 xl-rdtok.o: xl-rdtok.c xl-lex.h xl-sym.h
-	$(CMK_SEQ_CC) -c xl-rdtok.c
+	charmc -seq -cwd -c xl-rdtok.c
 
 xl-parse.o: xl-parse.c xl-lex.h xl-sym.h
-	$(CMK_SEQ_CC) -c xl-parse.c
+	charmc -seq -cwd -c xl-parse.c
 
 xl-outh.o: xl-outh.c xl-lex.h xl-sym.h
-	$(CMK_SEQ_CC) -c xl-outh.c
+	charmc -seq -cwd -c xl-outh.c
 
 xl-srch.o: xl-srch.c xl-lex.h xl-sym.h
-	$(CMK_SEQ_CC) -c xl-srch.c
+	charmc -seq -cwd -c xl-srch.c
 
 xl-dag.o: xl-dag.c
-	$(CMK_SEQ_CC) -c xl-dag.c
+	charmc -seq -cwd -c xl-dag.c
 
 charmfilter: xl-space.c
-	$(CMK_SEQ_LD) -o charmfilter xl-space.c
+	charmc -seq -cwd -o charmfilter xl-space.c
 
 ###############################################################################
 #
@@ -398,25 +379,25 @@ XPHEADERS=xp-extn.h xp-t.h xp-ytab.h
 
 CHARMXLATXX=xp-lexyy.o xp-process.o xp-table.o xp-ytab.o
 charmxlat++: $(CHARMXLATXX)
-	$(CMK_SEQ_CC) -o charmxlat++ $(CHARMXLATXX)
+	charmc -seq -cwd -o charmxlat++ $(CHARMXLATXX)
 
 charmfilter++: xp-space.o
-	$(CMK_SEQ_CC) -o charmfilter++ xp-space.o
+	charmc -seq -cwd -o charmfilter++ xp-space.o
 
 xp-lexyy.o: xp-lexyy.c $(XPHEADERS)
-	$(CMK_SEQ_CC) -c xp-lexyy.c
+	charmc -seq -cwd -c xp-lexyy.c
 
 xp-process.o: xp-process.c $(XPHEADERS)
-	$(CMK_SEQ_CC) -c xp-process.c
+	charmc -seq -cwd -c xp-process.c
 
 xp-table.o: xp-table.c $(XPHEADERS)
-	$(CMK_SEQ_CC) -c xp-table.c
+	charmc -seq -cwd -c xp-table.c
 
 xp-ytab.o: xp-ytab.c $(XPHEADERS)
-	$(CMK_SEQ_CC) -c xp-ytab.c
+	charmc -seq -cwd -c xp-ytab.c
 
 xp-space.o: xp-space.c $(XPHEADERS)
-	$(CMK_SEQ_CC) -c xp-space.c
+	charmc -seq -cwd -c xp-space.c
 
 
 ###############################################################################
