@@ -1,4 +1,5 @@
 #include "fem.h"
+#include <limits.h>
 
 CkChareID _mainhandle;
 CkArrayID _femaid;
@@ -329,6 +330,52 @@ void min(const int len, d* lhs, d* rhs)
   }
 }
 
+template<class d>
+void assign(const int len, d* lhs, d val)
+{
+  int i;
+  for(i=0;i<len;i++) {
+    *lhs = val;
+  }
+}
+
+static inline void
+initialize(const DType& dt, void *lhs, int op)
+{
+  switch(op) {
+    case FEM_SUM:
+      switch(dt.base_type) {
+        case FEM_BYTE : 
+          assign(dt.vec_len,(unsigned char*)lhs, (unsigned char)0); 
+          break;
+        case FEM_INT : assign(dt.vec_len,(int*)lhs, 0); break;
+        case FEM_REAL : assign(dt.vec_len,(float*)lhs, (float)0.0); break;
+        case FEM_DOUBLE : assign(dt.vec_len,(double*)lhs, 0.0); break;
+      }
+      break;
+    case FEM_MAX:
+      switch(dt.base_type) {
+        case FEM_BYTE : 
+          assign(dt.vec_len,(unsigned char*)lhs, (unsigned char)CHAR_MIN); 
+          break;
+        case FEM_INT : assign(dt.vec_len,(int*)lhs, INT_MIN); break;
+        case FEM_REAL : assign(dt.vec_len,(float*)lhs, FLT_MIN); break;
+        case FEM_DOUBLE : assign(dt.vec_len,(double*)lhs, DBL_MIN); break;
+      }
+      break;
+    case FEM_MIN:
+      switch(dt.base_type) {
+        case FEM_BYTE : 
+          assign(dt.vec_len,(unsigned char*)lhs, (unsigned char)CHAR_MAX); 
+          break;
+        case FEM_INT : assign(dt.vec_len,(int*)lhs, INT_MAX); break;
+        case FEM_REAL : assign(dt.vec_len,(float*)lhs, FLT_MAX); break;
+        case FEM_DOUBLE : assign(dt.vec_len,(double*)lhs, DBL_MAX); break;
+      }
+      break;
+  }
+}
+
 static inline void
 combine(const DType& dt, void* lhs, void* rhs, int op)
 {
@@ -512,6 +559,7 @@ chunk::reduce_field(int fid, void *nodes, void *outbuf, int op)
   // first reduce over local nodes
   DType *dt = &dtypes[fid];
   void *src = (void *) ((char *) nodes + dt->init_offset);
+  initialize(*dt,outbuf,op);
   for(int i=0; i<numNodes; i++) {
     if(isPrimary[i]) {
       combine(*dt, outbuf, src, op);
