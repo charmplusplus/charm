@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.24  1995-11-02 20:23:20  sanjeev
+ * Revision 2.25  1995-11-03 02:48:29  sanjeev
+ * *** empty log message ***
+ *
+ * Revision 2.24  1995/11/02  20:23:20  sanjeev
  * added CFunctionRefToName
  *
  * Revision 2.23  1995/10/31  23:15:08  knauff
@@ -117,7 +120,7 @@ class _CK_Object ;
 class groupmember ;
 
 /* GroupIdType is the generic type usable for all BOC ids */
-typedef ChareNumType GroupIdType ;
+typedef int GroupIdType ;
 
 /* EPFnType is a pointer to a _CK_call_Chare_EP() function */
 typedef void (*EPFnType)(void *, _CK_Object *) ;
@@ -226,7 +229,7 @@ extern "C" ENVELOPE *CkCopyEnv(ENVELOPE *) ;
    seen by the C++ compiler because this file is #included in the program. */
 
 class GroupIdMessage {	// sizeof(GroupIdMessage) MUST be 4
-public:	GroupIdType group ;
+public:	GroupIdType groupid ;
 
 	void *operator new(size_t size) {	// should never be called
 		size = 0 ;	// to prevent CC from generating "size unused"
