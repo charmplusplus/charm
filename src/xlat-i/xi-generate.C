@@ -187,6 +187,7 @@ static const char *CIBotROMIndex = // readonlyMessageName
 
 static const char *CITopMsgDecl = // messageName
 "extern int _CK_msg_\1;\n"
+"class \1;\n"
 ;
 
 static const char *CIBotMsgDef = // messageName
@@ -561,7 +562,6 @@ void GenerateRegisterCalls(ofstream& bot)
 }
 
 static const char *CImessage = // msgType
-"class \01;\n"
 "class CMessage_\01 : public comm_object {\n"
 "  public:\n"
 "    void *operator new(CMK_SIZE_T size, void *ptr) { return ptr; }\n"
