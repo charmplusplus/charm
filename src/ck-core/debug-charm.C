@@ -12,10 +12,94 @@
 #include "ckhashtable.h"
 #include "conv-ccs.h"
 #include "sockRoutines.h"
-#include "queueing.h"
+//#include "queueing.h"
 
 #if CMK_CCS_AVAILABLE
 
+#include "ck.h"
+
+
+class ArrayElementExamineIterator : public CkLocIterator {
+private:
+   int *indexData;
+   int nInts;
+public:
+   ArrayElementExamineIterator( int * _idxData, int _n) :indexData(_idxData), nInts(_n){}
+   ~ArrayElementExamineIterator() {}
+   void addLocation (CkLocation & loc)
+   {
+     const CkArrayIndex &idx = loc.getIndex();
+     const int * idxData = idx.data();
+     int flag = 1;
+     if (nInts != idx.nInts) flag = 0;
+     else
+        for(int i=0; i < idx.nInts; i++)
+        {
+          if (idxData[i] != indexData[i])
+          {
+             flag = 0;
+             break;
+          }   
+        }
+     if (flag) 
+     {
+         int bufLen = 0;
+           {
+              PUP::sizerText p;
+              loc.pupCpdData(p);
+              bufLen=p.size();
+           }
+          char *buf=new char[bufLen];
+           {
+              PUP::toText p(buf);
+              loc.pupCpdData(p);
+              if (p.size()!=bufLen)
+                CmiError("ERROR! Sizing/packing length mismatch for pup function in showCpdData!\n");
+           }
+ 
+         CcsSendReply(bufLen, (void *)buf);
+      }
+    
+   }
+};
+
+/* passed a message in the form Array:<groupid>;Element:<index>
+In <index> each field separated by : */
+void CpdExamineArrayElement(char *msg)
+{
+  char parameter[250];
+  char arrayid[100];
+  char elementid[100];
+  char * buf = NULL;
+  int idxData[10];
+  int nInts = 0;
+  int groupid;
+  sscanf(msg+CmiMsgHeaderSizeBytes, "%s", parameter);
+  if(buf = strstr(parameter, ";"))
+  {
+     int i = strlen(parameter) - strlen(buf);
+     strncpy(arrayid, parameter+6, i-6);
+     groupid = atoi(arrayid);
+     nInts = 0;
+     char * tmp = buf + 1 + 8;
+     while (buf = strtok(tmp, ":"))
+     {
+        idxData[nInts] = atoi(buf);
+        nInts++;
+        tmp = NULL;
+      }
+  }
+  if (nInts && strlen(arrayid))
+  {
+    IrrGroup * c = NULL;
+    if (c = (CkpvAccess(_groupTable)->find((*CkpvAccess(_groupIDTable))[groupid])).getObj())
+    {
+       ArrayElementExamineIterator itr(idxData, nInts);
+       if (c->isLocMgr())
+          ((CkLocMgr*)(c))->iterate(itr);
+    }
+  }
+}
 
 #include "charm.h"
 #include "middle.h"
@@ -166,6 +250,10 @@ void CpdRemoveAllBreakPoints ()
   }
 }
 
+
+
+
+
 CpvExtern(char *, displayArgument);
 
 void CpdStartGdb(void)
@@ -176,7 +264,7 @@ void CpdStartGdb(void)
   int pid;
   if (CpvAccess(displayArgument) != NULL)
   {
-     CmiPrintf("MY NODE IS %d  and process id is %d\n", CmiMyPe(), getpid());
+     /*CmiPrintf("MY NODE IS %d  and process id is %d\n", CmiMyPe(), getpid());*/
      sprintf(gdbScript, "/tmp/cpdstartgdb.%d.%d", getpid(), CmiMyPe());
      f = fopen(gdbScript, "w");
      fprintf(f,"#!/bin/sh\n");
@@ -213,6 +301,7 @@ void CpdStartGdb(void)
 #endif
 }
 
+extern void CpdExamineArrayElement(char *);
 
 
 void CpdCharmInit()
@@ -224,8 +313,10 @@ void CpdCharmInit()
   CcsRegisterHandler("ccs_continue_break_point",(CmiHandler)CpdContinueFromBreakPoint);
   CcsRegisterHandler("ccs_debug_quit",(CmiHandler)CpdQuitDebug);
   CcsRegisterHandler("ccs_debug_startgdb",(CmiHandler)CpdStartGdb);
+  CcsRegisterHandler("ccs_examine_arrayelement",(CmiHandler)CpdExamineArrayElement);
 
 }
+
 
 
 #endif /*CMK_CCS_AVAILABLE*/
