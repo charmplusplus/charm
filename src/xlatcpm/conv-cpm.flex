@@ -229,7 +229,7 @@ void gen_func_send()
       fprintf(file_cpm, "int aoffs%d;\n",i);
     if (func_pointer[i]) {
       if (func_array[i]) {
-	fprintf(file_cpm, "int *poffs%d = (int *)malloc(a%d*sizeof(int));\n",i,i-1);
+	fprintf(file_cpm, "size_t *poffs%d = (size_t *)malloc(a%d*sizeof(size_t));\n",i,i-1);
       } else {
 	fprintf(file_cpm, "int poffs%d;\n",i);
       }
@@ -280,7 +280,7 @@ void gen_func_send()
       break;
     case 3: /* array pointer */
       fprintf(file_cpm, "msg->f%d = aoffs%d;\n",i,i);
-      fprintf(file_cpm, "memcpy(data+aoffs%d, poffs%d, a%d*sizeof(int));\n",
+      fprintf(file_cpm, "memcpy(data+aoffs%d, poffs%d, a%d*sizeof(size_t));\n",
 	      i,i,i-1);
       fprintf(file_cpm, "for(i=0; i<a%d; i++)\n",i-1);
       fprintf(file_cpm, "  CpmPtrPack_%s(((%s)(data+(poffs%d[i]))), a%d[i]);\n",
