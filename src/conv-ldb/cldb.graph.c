@@ -2,6 +2,8 @@
 #define PERIOD 20                /* default: 30 */
 #define MAXOVERLOAD 1
 
+extern gengraph(int, int, int);
+
 CpvDeclare(int, CldLoadResponseHandlerIndex);
 CpvDeclare(int, MinLoad);
 CpvDeclare(int, MinProc);
@@ -240,6 +242,9 @@ void CldReadNeighborData()
 
 void CldGraphModuleInit()
 {
+  FILE *fp;
+  char filename[20];
+  
   CpvInitialize(int, numNeighbors);
   CpvInitialize(int, MinLoad);
   CpvInitialize(int, Mindex);
@@ -258,6 +263,16 @@ void CldGraphModuleInit()
     CmiRegisterHandler(CldLoadResponseHandler);
 
   if (CmiNumPes() > 1) {
+    if (CmiMyPe() == 0) {
+      sprintf(filename, "graph%d/graph%d", CmiNumPes(), CmiMyPe());
+      if ((fp = fopen(filename, "r")) == 0)
+	{
+	  CmiPrintf("No proper graph%d directory exists in current directory.\n Generating...  ", CmiNumPes());
+	  gengraph(CmiNumPes(), (int)(sqrt(CmiNumPes())+0.5), 234);
+	  CmiPrintf("done.\n");
+	}
+      else fclose(fp);
+    }
     CldReadNeighborData();
     CldBalance();
   }
