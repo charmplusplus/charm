@@ -12,7 +12,14 @@
 extern "C" {
 #endif
 
+/*NON-standard define: this lets people #ifdef on
+AMPI, e.g. for our bizarre AMPI_Main.
+*/
+#define AMPI
+
 /* MPI prototypes and #defines here */
+#define AMPI_SUCCESS 0
+/* Somebody needs to define AMPI_ERRs here */
 
 /* these values have to match values in ampif.h */
 #define AMPI_DOUBLE 0
