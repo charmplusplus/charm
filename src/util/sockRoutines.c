@@ -441,19 +441,19 @@ int skt_sendN(SOCKET hSocket,const void *buff,int nBytes)
 /*Cheezy vector send: 
   really should use writev on machines where it's available. 
 */
+#define skt_sendV_max (16*1024)
+static char sendvbuf[skt_sendV_max];
 int skt_sendV(SOCKET fd,int nBuffers,const void **bufs,int *lens)
 {
 	int b,len=0;
 	for (b=0;b<nBuffers;b++) len+=lens[b];
-#define skt_sendV_max (16*1024)
 	if (len<=skt_sendV_max) { /*Short message: Copy and do one big send*/
-		char buf[skt_sendV_max];
-		char *dest=buf;
+		char *dest=sendvbuf;
 		for (b=0;b<nBuffers;b++) {
 			memcpy(dest,bufs[b],lens[b]);
 			dest+=lens[b];
 		}
-		return skt_sendN(fd,buf,len);
+		return skt_sendN(fd,sendvbuf,len);
 	}
 	else { /*Big message: Just send one-by-one as usual*/
 		int ret;
