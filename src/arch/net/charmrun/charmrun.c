@@ -928,7 +928,7 @@ void nodetab_init_for_local()
   group.cpus = arg_ppn;
   i = 0;
   while (!done) {
-    char *hostname = "localhost";
+    char *hostname = "127.0.0.1";
     for (group.rank = 0; group.rank<arg_ppn; group.rank++) {
       nodetab_makehost(hostname, &group);
       if (++i == arg_requested_pes) { done = 1; break; }
