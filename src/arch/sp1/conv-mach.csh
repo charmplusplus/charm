@@ -12,7 +12,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 2.12  1995-11-02 22:45:43  sanjeev
+# Revision 2.13  1995-11-08 22:27:49  milind
+# changed CMK_CXXPP to xlC -E.
+#
+# Revision 2.12  1995/11/02  22:45:43  sanjeev
 # added CMK_CPP_SUFFIX
 #
 # Revision 2.11  1995/11/02  21:14:01  milind
@@ -60,7 +63,7 @@ set CMK_CC			= 'mpcc'
 set CMK_CC_RELIABLE		= 'mpcc'
 set CMK_CC_FASTEST		= 'mpcc'
 set CMK_CXX			= 'mpCC'
-set CMK_CXXPP			= 'cc -E'
+set CMK_CXXPP			= 'xlC -E'
 set CMK_CF77			= 'mpxlf'
 set CMK_C_DEBUG                 = '-g'
 set CMK_C_OPTIMIZE              = '-O'
