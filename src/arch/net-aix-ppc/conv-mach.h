@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.8  1995-10-18 03:07:37  jyelon
+ * Revision 1.9  1995-10-18 22:20:57  jyelon
+ * minor cleanup.
+ *
+ * Revision 1.8  1995/10/18  03:07:37  jyelon
  * added machine_name
  *
  * Revision 1.7  1995/10/13  18:17:44  jyelon
@@ -43,6 +46,8 @@
 
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
+
+#define CMK_MACHINE_NAME "net-rs6k"
 
 /* #define CMK_USE_GNU_MALLOC */
 /* #define CMK_USE_OS_MALLOC */
@@ -79,6 +84,8 @@
 /* #define CMK_CMIPRINTF_IS_JUST_PRINTF */
 #define CMK_CMIPRINTF_IS_A_BUILTIN
 
+/* #define CMK_THREADS_USE_EATSTACK */
+/* #define CMK_THREADS_USE_ALLOCA_WITH_HEADER_FILE */
 /* #define CMK_THREADS_UNAVAILABLE */
 #define CMK_THREADS_USE_ALLOCA
 
@@ -113,7 +120,5 @@
 
 #define CMK_HAVE_SYS_WAIT_H
 /* #define CMK_HAVE_WAITFLAGS_H */
-
-#define CMK_MACHINE_NAME "net-rs6k"
 
 #endif

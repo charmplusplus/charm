@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.13  1995-10-18 03:07:23  jyelon
+ * Revision 2.14  1995-10-18 22:20:57  jyelon
+ * minor cleanup.
+ *
+ * Revision 2.13  1995/10/18  03:07:23  jyelon
  * net-hp.
  *
  * Revision 2.12  1995/10/13  22:35:38  jyelon
@@ -61,6 +64,8 @@
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
 
+#define CMK_MACHINE_NAME "net-hp"
+
 /* #define CMK_USE_GNU_MALLOC */
 /* #define CMK_USE_OS_MALLOC */
 #define CMK_USE_GNU_MALLOC_WITH_INTERRUPT_SUPPORT
@@ -96,8 +101,9 @@
 /* #define CMK_CMIPRINTF_IS_JUST_PRINTF */
 #define CMK_CMIPRINTF_IS_A_BUILTIN
 
-/* #define CMK_THREADS_UNAVAILABLE */
+/* #define CMK_THREADS_USE_ALLOCA */
 /* #define CMK_THREADS_USE_ALLOCA_WITH_HEADER_FILE */
+/* #define CMK_THREADS_UNAVAILABLE */
 #define CMK_THREADS_USE_ALLOCA
 
 
@@ -132,7 +138,5 @@
 
 #define CMK_HAVE_SYS_WAIT_H
 /* #define CMK_HAVE_WAITFLAGS_H */
-
-#define CMK_MACHINE_NAME "net-hp"
 
 #endif

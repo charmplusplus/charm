@@ -17,6 +17,8 @@
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
 
+#define CMK_MACHINE_NAME "uth-sol"
+
 /* #define CMK_USE_OS_MALLOC */
 /* #define CMK_USE_GNU_MALLOC_WITH_INTERRUPT_SUPPORT */
 #define CMK_USE_OS_MALLOC
@@ -54,6 +56,7 @@
 #define CMK_CMIPRINTF_IS_JUST_PRINTF
 
 /* #define CMK_THREADS_UNAVAILABLE */
+/* #define CMK_THREADS_USE_EATSTACK */
 /* #define CMK_THREADS_USE_ALLOCA */
 #define CMK_THREADS_USE_ALLOCA_WITH_HEADER_FILE
 
@@ -86,8 +89,6 @@
 
 /* #define CMK_HAVE_WAITFLAGS_H */
 #define CMK_HAVE_SYS_WAIT_H
-
-#define CMK_MACHINE_NAME "UNITHREAD"
 
 
 #endif
