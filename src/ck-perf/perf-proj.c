@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.2  1995-07-10 22:29:40  brunner
+ * Revision 2.3  1995-07-11 20:34:38  knauff
+ * Changed 'uint' to 'un_int' to avoid crashes with gcc v 2.5.8
+ * (on the SP, at least)
+ *
+ * Revision 2.2  1995/07/10  22:29:40  brunner
  * Created perfModuleInit() to handle CPV macros
  *
  * Revision 2.1  1995/06/19  16:47:38  brunner
@@ -63,12 +67,12 @@ CpvDeclare(int,iteration);
 CpvDeclare(int,store_event);
 CpvDeclare(int,store_pe);
 
-typedef unsigned int uint;
-CpvDeclare(uint, store_time);  /* not used currently? */
+typedef unsigned int un_int;
+CpvDeclare(un_int, store_time);  /* not used currently? */
 
 CpvDeclare(int,begin_pe);
 CpvDeclare(int,begin_event);
-CpvDeclare(uint,begin_processing_time);
+CpvDeclare(un_int,begin_processing_time);
 
 CpvDeclare(FILE*,state_file_fd);
 
@@ -87,10 +91,10 @@ perfModuleInit()
   CpvInitialize(int,iteration);
   CpvInitialize(int,store_event);
   CpvInitialize(int,store_pe);
-  CpvInitialize(uint, store_time);  /* not used currently? */
+  CpvInitialize(un_int, store_time);  /* not used currently? */
   CpvInitialize(int,begin_pe);
   CpvInitialize(int,begin_event);
-  CpvInitialize(uint,begin_processing_time);
+  CpvInitialize(un_int,begin_processing_time);
   CpvInitialize(FILE*,state_file_fd);
 }
 
