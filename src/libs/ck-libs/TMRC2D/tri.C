@@ -742,8 +742,9 @@ void chunk::updateNodeCoords(int nNode, double *coord, int nEl)
   for (i=0; i<nodeSlots; i++)
     if (theNodes[i].isPresent()) {
       theNodes[i].set(coord[2*i], coord[2*i + 1]);
-      if (theNodes[i].boundary) 
-	CkPrintf("TMRC2D: [%d] Node %d on boundary!\n", cid, i);
+      if (theNodes[i].boundary) {
+				DEBUGREF(CkPrintf("TMRC2D: [%d] Node %d on boundary!\n", cid, i);)
+			}	
     }
   // recalculate and cache new areas for each element
   for (i=0; i<elementSlots; i++) 
