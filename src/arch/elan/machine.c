@@ -1098,18 +1098,21 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 
   CsvInitialize(CmiNodeState, NodeState);
   CmiNodeStateInit(&CsvAccess(NodeState));
-
-  int rms_nodes = 1, rms_procs = 1;
-
-  if(getenv("RMS_NODES") != NULL)
-    rms_nodes = atoi(getenv("RMS_NODES"));
-  if(getenv("RMS_PROCS") != NULL)
-    rms_procs = atoi(getenv("RMS_PROCS"));
-  ppn_factor = (rms_procs/rms_nodes);   //4 nodes is the stretch group affinity
-  if(ppn_factor == 0)   //debug
-    ppn_factor = 1;
-
+  
+  //4 nodes is the stretch group affinity
   ppn_factor = 4;
+  
+  if(0&&
+  	(getenv("RMS_NODES") != NULL) && (getenv("RMS_PROCS") != NULL)
+  )
+  { /* Extract stretch group from queueing system info: */
+    int rms_nodes = 1, rms_procs = 1;
+    rms_nodes = atoi(getenv("RMS_NODES"));
+    rms_procs = atoi(getenv("RMS_PROCS"));
+    ppn_factor = (rms_procs/rms_nodes);  
+    if(ppn_factor == 0)   //debug
+      ppn_factor = 1;
+  }
   
   //CmiPrintf("ppn_factor = %d\n", ppn_factor);
 
