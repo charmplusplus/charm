@@ -16,6 +16,12 @@
 
 #define DEBUGF(x)           // CmiPrintf x
 
+// **CW** Simple delta encoding implementation
+// delta encoding is on by default. It may be turned off later in
+// the runtime.
+int deltaLog;
+int nonDeltaLog;
+
 CkpvStaticDeclare(Trace*, _trace);
 CtvStaticDeclare(int,curThreadEvent);
 
@@ -53,33 +59,76 @@ void LogPool::openLog(const char *mode)
 {
 #if CMK_PROJECTIONS_USE_ZLIB
   if(compressed) {
-    do {
-      zfp = gzopen(fname, mode);
-    } while (!zfp && (errno == EINTR || errno == EMFILE));
-    if(!zfp) CmiAbort("Cannot open Projections Trace File for writing...\n");
+    if (nonDeltaLog) {
+      do {
+	zfp = gzopen(fname, mode);
+      } while (!zfp && (errno == EINTR || errno == EMFILE));
+      if(!zfp) CmiAbort("Cannot open Projections Compressed Non Delta Trace File for writing...\n");
+    }
+    if (deltaLog) {
+      do {
+	deltazfp = gzopen(dfname, mode);
+      } while (!deltazfp && (errno == EINTR || errno == EMFILE));
+      if (!deltazfp) 
+	CmiAbort("Cannot open Projections Compressed Delta Trace File for writing...\n");
+    }
   } else {
+    if (nonDeltaLog) {
+      do {
+	fp = fopen(fname, mode);
+      } while (!fp && (errno == EINTR || errno == EMFILE));
+      if(!fp) CmiAbort("Cannot open Projections Non Delta Trace File for writing...\n");
+    }
+    if (deltaLog) {
+      do {
+	deltafp = fopen(dfname, mode);
+      } while (!deltafp && (errno == EINTR || errno == EMFILE));
+      if (!deltafp) 
+	CmiAbort("Cannot open Projections Delta Trace File for writing...\n");
+    }
+  }
+#else
+  if (nonDeltaLog) {
     do {
       fp = fopen(fname, mode);
     } while (!fp && (errno == EINTR || errno == EMFILE));
-    if(!fp) CmiAbort("Cannot open Projections Trace File for writing...\n");
+    if(!fp) CmiAbort("Cannot open Projections Non Delta Trace File for writing...\n");
   }
-#else
-  do {
-    fp = fopen(fname, mode);
-  } while (!fp && (errno == EINTR || errno == EMFILE));
-  if(!fp) CmiAbort("Cannot open Projections Trace File for writing...\n");
+  if (deltaLog) {
+    do {
+      deltafp = fopen(dfname, mode);
+    } while (!deltafp && (errno == EINTR || errno == EMFILE));
+    if(!deltafp) 
+      CmiAbort("Cannot open Projections Delta Trace File for writing...\n");
+  }
 #endif
 }
 
 void LogPool::closeLog(void)
 {
 #if CMK_PROJECTIONS_USE_ZLIB
-  if(compressed)
-    gzclose(zfp);
-  else
-    fclose(fp);
+  if(compressed) {
+    if (nonDeltaLog) {
+      gzclose(zfp);
+    }
+    if (deltaLog) {
+      gzclose(deltazfp);
+    }
+  } else {
+    if (nonDeltaLog) {
+      fclose(fp);
+    }
+    if (deltaLog) {
+      fclose(deltafp);
+    }
+  }
 #else
+  if (nonDeltaLog) {
     fclose(fp);
+  }
+  if (deltaLog) {
+    fclose(deltafp);
+  }
 #endif
 }
 /**
@@ -116,6 +165,9 @@ void traceProjectionsEndIdle(void)
 LogPool::LogPool(char *pgm) {
   pool = new LogEntry[CkpvAccess(CtrLogBufSize)];
   numEntries = 0;
+  // **CW** for simple delta encoding
+  prevTime = 0.0;
+  timeErr = 0.0;
   poolSize = CkpvAccess(CtrLogBufSize);
   pgmname = new char[strlen(pgm)+1];
   strcpy(pgmname, pgm);
@@ -128,29 +180,61 @@ void LogPool::creatFiles(char *fix)
 #if CMK_PROJECTIONS_USE_ZLIB
   int len;
   if(compressed)
-    len = strlen(pgmname)+strlen(fix)+strlen(".log")+strlen(pestr)+strlen(".gz")+3;
+    len = strlen(pgmname)+strlen(fix)+strlen(".logd")+strlen(pestr)+strlen(".gz")+3;
   else
-    len = strlen(pgmname)+strlen(fix)+strlen(".log")+strlen(pestr)+3;
+    len = strlen(pgmname)+strlen(fix)+strlen(".logd")+strlen(pestr)+3;
 #else
-  int len = strlen(pgmname)+strlen(fix)+strlen(".log")+strlen(pestr)+3;
+  int len = strlen(pgmname)+strlen(fix)+strlen(".logd")+strlen(pestr)+3;
 #endif
-  fname = new char[len];
+  if (nonDeltaLog) {
+    fname = new char[len];
+  }
+  if (deltaLog) {
+    dfname = new char[len];
+  }
 #if CMK_PROJECTIONS_USE_ZLIB
-  if(compressed)
-    sprintf(fname, "%s%s.%s.log.gz", pgmname, fix, pestr);
-  else
-    sprintf(fname, "%s%s.%s.log", pgmname, fix, pestr);
+  if(compressed) {
+    if (nonDeltaLog) {
+      sprintf(fname, "%s%s.%s.log.gz", pgmname, fix, pestr);
+    }
+    if (deltaLog) {
+      sprintf(dfname, "%s%s.%s.logd.gz", pgmname, fix, pestr);
+    }
+  } else {
+    if (nonDeltaLog) {
+      sprintf(fname, "%s%s.%s.log", pgmname, fix, pestr);
+    }
+    if (deltaLog) {
+      sprintf(dfname, "%s%s.%s.logd", pgmname, fix, pestr);
+    }
+  }
 #else
-  sprintf(fname, "%s%s.%s.log", pgmname, fix, pestr);
+  if (nonDeltaLog) {
+    sprintf(fname, "%s%s.%s.log", pgmname, fix, pestr);
+  }
+  if (deltaLog) {
+    sprintf(dfname, "%s%s.%s.logd", pgmname, fix, pestr);
+  }
 #endif
   openLog("w+");
   if(!binary) {
 #if CMK_PROJECTIONS_USE_ZLIB
-    if(compressed)
-      gzprintf(zfp, "PROJECTIONS-RECORD\n");
-    else
+    if(compressed) {
+      if (nonDeltaLog) {
+	gzprintf(zfp, "PROJECTIONS-RECORD\n");
+      }
+      if (deltaLog) {
+	gzprintf(deltazfp, "PROJECTIONS-RECORD\n");
+      }
+    } else {
 #endif
-      fprintf(fp, "PROJECTIONS-RECORD\n");
+      if (nonDeltaLog) {
+	fprintf(fp, "PROJECTIONS-RECORD\n");
+      }
+      if (deltaLog) {
+	fprintf(deltafp, "PROJECTIONS-RECORD\n");
+      }
+    }
   }
   CLOSE_LOG 
 
@@ -201,19 +285,39 @@ void LogPool::writeLog(void)
 
 void LogPool::write(void) 
 {
-  for(UInt i=0; i<numEntries; i++)
-    pool[i].write(fp);
+  // **CW** Simple delta encoding implementation
+  // prevTime has to be maintained as an object variable because
+  // LogPool::write may be called several times depending on the
+  // +logsize value.
+  for(UInt i=0; i<numEntries; i++) {
+    if (nonDeltaLog) {
+      pool[i].write(fp); // for non-delta implementation
+    }
+    if (deltaLog) {
+      prevTime = pool[i].write(deltafp, prevTime, &timeErr);
+    }
+  }
 }
 
 void LogPool::writeBinary(void) {
+  // **CW** The binary format does not benefit from delta encoding
+  // hence it will not employ prevTime.
   for(UInt i=0; i<numEntries; i++)
     pool[i].writeBinary(fp);
 }
 
 #if CMK_PROJECTIONS_USE_ZLIB
 void LogPool::writeCompressed(void) {
-  for(UInt i=0; i<numEntries; i++)
-    pool[i].writeCompressed(zfp);
+  // **CW** Simple delta encoding implementation. The compressed format
+  // _may_ benefit from the encoding, so for now, it is added.
+  for(UInt i=0; i<numEntries; i++) {
+    if (nonDeltaLog) {
+      pool[i].writeCompressed(zfp); // for non-delta implementation
+    }
+    if (deltaLog) {
+      prevTime = pool[i].writeCompressed(deltazfp, prevTime, &timeErr);
+    }
+  }
 }
 #endif
 
@@ -278,66 +382,105 @@ void LogPool::postProcessLog()
 #endif
 }
 
+// **CW** Wrapper method for backward compatible signature (and behavior)
+// of the write method.
 void LogEntry::write(FILE* fp)
+{
+  // the error value is ignored here
+  double dummyErr = 0.0;
+  write(fp, 0.0, &dummyErr);
+}
+
+// **CW** Simple delta encoding implementation. The timestamp of the current
+// entry is returned and passed to the next entry's write call.
+double LogEntry::write(FILE* fp, double prevTime, double *timeErr)
 {
   fprintf(fp, "%d ", type);
 
+  // **CW** Hopefully a correct time correction algorithm
+  double timeDiff = (time-prevTime)*1.0e6;
+  unsigned int intTimeDiff = (UInt)timeDiff;
+  *timeErr += timeDiff - intTimeDiff; // timeErr is never >= 2.0
+  if (*timeErr > 1.0) {
+    *timeErr -= 1.0;
+    intTimeDiff++;
+  }
+
   switch (type) {
     case USER_EVENT:
     case USER_EVENT_PAIR:
-      fprintf(fp, "%d %u %d %d\n", mIdx, (UInt) (time*1.0e6), event, pe);
+      fprintf(fp, "%d %u %d %d\n", mIdx, intTimeDiff, event, pe);
       break;
-
     case BEGIN_IDLE:
     case END_IDLE:
     case BEGIN_PACK:
     case END_PACK:
     case BEGIN_UNPACK:
     case END_UNPACK:
-      fprintf(fp, "%u %d\n", (UInt) (time*1.0e6), pe);
+      fprintf(fp, "%u %d\n", intTimeDiff, pe);
       break;
-
     case BEGIN_PROCESSING:
-      fprintf(fp, "%d %d %u %d %d %d %d %d %d %d\n", mIdx, eIdx, (UInt) (time*1.0e6), event, pe, msglen, (UInt)(recvTime*1.e6), id.id[0], id.id[1], id.id[2]);
+      fprintf(fp, "%d %d %u %d %d %d %d %d %d %d\n", mIdx, intTimeDiff, 
+	      eIdx, event, pe, msglen, (UInt)(recvTime*1.e6), 
+	      id.id[0], id.id[1], id.id[2]);
       break;
     case CREATION:
-      fprintf(fp, "%d %d %u %d %d %d %d\n", mIdx, eIdx, (UInt) (time*1.0e6), event, pe, msglen, (UInt)(recvTime*1.e6));
+      fprintf(fp, "%d %d %u %d %d %d %d\n", mIdx, eIdx, intTimeDiff, 
+	      event, pe, msglen, (UInt)(recvTime*1.e6));
       break;
     case END_PROCESSING:
     case MESSAGE_RECV:
-      fprintf(fp, "%d %d %u %d %d %d\n", mIdx, eIdx, (UInt) (time*1.0e6), event, pe, msglen);
+      fprintf(fp, "%d %d %u %d %d %d\n", mIdx, eIdx, intTimeDiff,
+	      event, pe, msglen);
       break;
 
     case ENQUEUE:
     case DEQUEUE:
-      fprintf(fp, "%d %u %d %d\n", mIdx, (UInt) (time*1.0e6), event, pe);
+      fprintf(fp, "%d %u %d %d\n", mIdx, intTimeDiff, event, pe);
       break;
 
     case BEGIN_INTERRUPT:
     case END_INTERRUPT:
-      fprintf(fp, "%u %d %d\n", (UInt) (time*1.0e6), event, pe);
+      fprintf(fp, "%u %d %d\n", intTimeDiff, event, pe);
       break;
 
     case BEGIN_COMPUTATION:
     case END_COMPUTATION:
-    fprintf(fp, "%u\n", (UInt) (time*1.0e6));
+    fprintf(fp, "%u\n", intTimeDiff);
       break;
 
     default:
       CmiError("***Internal Error*** Wierd Event %d.\n", type);
       break;
   }
+  return time;
 }
 
 #if CMK_PROJECTIONS_USE_ZLIB
+// **CW** backward compatibility wrapper
 void LogEntry::writeCompressed(gzFile zfp)
 {
+  double dummyErr = 0.0;
+  writeCompressed(zfp, 0.0, &dummyErr);
+}
+
+double LogEntry::writeCompressed(gzFile zfp, double prevTime, double *timeErr)
+{
   gzprintf(zfp, "%d ", type);
+
+  // **CW** Hopefully a correct time correction algorithm
+  double timeDiff = (time-prevTime)*1.0e6;
+  unsigned int intTimeDiff = (UInt)timeDiff;
+  *timeErr += timeDiff - intTimeDiff; // timeErr is never >= 2.0
+  if (*timeErr > 1.0) {
+    *timeErr -= 1.0;
+    intTimeDiff++;
+  }
 
   switch (type) {
     case USER_EVENT:
     case USER_EVENT_PAIR:
-      gzprintf(zfp, "%d %u %d %d\n", mIdx, (UInt) (time*1.0e6), event, pe);
+      gzprintf(zfp, "%d %u %d %d\n", mIdx, intTimeDiff, event, pe);
       break;
 
     case BEGIN_IDLE:
@@ -346,38 +489,41 @@ void LogEntry::writeCompressed(gzFile zfp)
     case END_PACK:
     case BEGIN_UNPACK:
     case END_UNPACK:
-      gzprintf(zfp, "%u %d\n", (UInt) (time*1.0e6), pe);
+      gzprintf(zfp, "%u %d\n", intTimeDiff, pe);
       break;
 
     case CREATION:
-      gzprintf(zfp, "%d %d %u %d %d %d %d\n", mIdx, eIdx, (UInt) (time*1.0e6), event, pe, msglen, (UInt)(recvTime*1.e6));
+      gzprintf(zfp, "%d %d %u %d %d %d %d\n", mIdx, eIdx, intTimeDiff, event, 
+	       pe, msglen, (UInt)(recvTime*1.e6));
       break;
-
+      
     case BEGIN_PROCESSING:
     case END_PROCESSING:
     case MESSAGE_RECV:
-      gzprintf(zfp, "%d %d %u %d %d %d\n", mIdx, eIdx, (UInt) (time*1.0e6), event, pe, msglen);
+      gzprintf(zfp, "%d %d %u %d %d %d\n", mIdx, eIdx, intTimeDiff, event, 
+	       pe, msglen);
       break;
 
     case ENQUEUE:
     case DEQUEUE:
-      gzprintf(zfp, "%d %u %d %d\n", mIdx, (UInt) (time*1.0e6), event, pe);
+      gzprintf(zfp, "%d %u %d %d\n", mIdx, intTimeDiff, event, pe);
       break;
-
+      
     case BEGIN_INTERRUPT:
     case END_INTERRUPT:
-      gzprintf(zfp, "%u %d %d\n", (UInt) (time*1.0e6), event, pe);
+      gzprintf(zfp, "%u %d %d\n", intTimeDiff, event, pe);
       break;
 
     case BEGIN_COMPUTATION:
     case END_COMPUTATION:
-      gzprintf(zfp, "%u\n", (UInt) (time*1.0e6));
+      gzprintf(zfp, "%u\n", intTimeDiff);
       break;
 
     default:
       CmiError("***Internal Error*** Wierd Event %d.\n", type);
       break;
   }
+  return time;
 }
 #endif
 
@@ -464,6 +610,22 @@ TraceProjections::TraceProjections(char **argv): curevent(0), isIdle(0)
 #if CMK_PROJECTIONS_USE_ZLIB
   int compressed = CmiGetArgFlagDesc(argv,"+gz-trace","Write log files pre-compressed with gzip");
 #endif
+
+  // **CW** default to delta log encoding. The user may choose to do
+  // create both logs (for debugging) or just the old log timestamping
+  // (for compatibility).
+  // Generating just the non delta log takes precedence over generating
+  // both logs (if both arguments appear on the command line).
+  deltaLog = 1;
+  nonDeltaLog = CmiGetArgFlagDesc(argv, "+logNonDelta",
+				  "Generate Delta encoded and simple timestamped log files");
+  int oldLogOnly = CmiGetArgFlagDesc(argv, "+logNonDeltaOnly", 
+				     "No Delta Encoding for Log Files");
+  if (oldLogOnly) {
+    deltaLog = 0;
+    nonDeltaLog = 1;
+  }
+
   _logPool = new LogPool(CkpvAccess(traceRoot));
   _logPool->setBinary(binary);
 #if CMK_PROJECTIONS_USE_ZLIB

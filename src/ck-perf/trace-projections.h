@@ -52,10 +52,16 @@ class LogEntry {
 #ifdef WIN32
     void operator delete(void *, void *) { }
 #endif
+    // **CW** For backward compatibility, the previous signature is provided.
     void write(FILE *fp);
+    // **CW** Simple delta encoding implementation
+    double write(FILE *fp, double prevTime, double *timeErr);
     void writeBinary(FILE *fp);
 #if CMK_PROJECTIONS_USE_ZLIB
+    // **CW** for backward compatibility, the previous signature is provided.
     void writeCompressed(gzFile fp);
+    // **CW** Simple delta encoding implementation
+    double writeCompressed(gzFile fp, double prevTime, double *timeErr);
 #endif
 };
 
@@ -67,14 +73,23 @@ class LogPool {
     UInt numEntries;
     LogEntry *pool;
     FILE *fp;
+    FILE *deltafp;
     FILE *stsfp;
     char *fname;
+    char *dfname;
     char *pgmname;
     int binary;
 #if CMK_PROJECTIONS_USE_ZLIB
+    gzFile deltazfp;
     gzFile zfp;
     int compressed;
 #endif
+    // **CW** prevTime stores the timestamp of the last event
+    // written out to log. This allows the implementation of
+    // simple delta encoding and should only be used when
+    // writing out logs.
+    double prevTime;
+    double timeErr;
   public:
     LogPool(char *pgm);
     ~LogPool();
