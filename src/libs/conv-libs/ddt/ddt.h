@@ -7,6 +7,7 @@
 
 #define DDTDEBUG /* CkPrintf */
 
+#define CkDDT_TYPE_NULL  -1
 #define CkDDT_DOUBLE          0
 #define CkDDT_INT             1
 #define CkDDT_FLOAT           2
@@ -33,14 +34,13 @@
 #define CkDDT_LB              23
 #define CkDDT_UB              24
 
-#define CkDDT_TYPE_NULL  -1
-#define CkDDT_PRIMITIVE  14
-#define CkDDT_CONTIGUOUS 15
-#define CkDDT_VECTOR     16
-#define CkDDT_HVECTOR    17
-#define CkDDT_INDEXED    18
-#define CkDDT_HINDEXED   19
-#define CkDDT_STRUCT     20
+#define CkDDT_PRIMITIVE  24
+#define CkDDT_CONTIGUOUS 25
+#define CkDDT_VECTOR     26
+#define CkDDT_HVECTOR    27
+#define CkDDT_INDEXED    28
+#define CkDDT_HINDEXED   29
+#define CkDDT_STRUCT     30
 
 typedef int CkDDT_Type ;
 class CkDDT ;
@@ -212,7 +212,7 @@ class CkDDT_Indexed : public CkDDT_DataType {
 /*
   The HIndexed type allows one to specify a noncontiguous data 
   layout where displacements between
-  successive blocks need not be equal. 
+  successive blocks need not be equal.
   This allows one to gather arbitrary entries from an array
   and make a single buffer out of it. 
   Unlike Indexed type , block displacements are arbitrary
@@ -272,8 +272,8 @@ class CkDDT_Struct : public CkDDT_DataType {
   typeTable - holds the table of CkDDT_DataType
 
   Type_Contiguous - 
-  Type_Vector - 
-  Type_HVector - 
+  Type_Vector -
+  Type_HVector -
   Type_Indexed - 
   Type_HIndexed - 
   Type_Struct - builds the new type 
@@ -293,7 +293,7 @@ class CkDDT {
   CkDDT(void*) {} // emulates migration constructor
   CkDDT()
   {
-    max_types = 40;
+    max_types = 50;
     typeTable = new CkDDT_DataType*[max_types];
     types = new int[max_types];
     typeTable[0] = new CkDDT_DataType(CkDDT_DOUBLE);
@@ -348,6 +348,10 @@ class CkDDT {
   int   getNextFreeIndex(void) ;
   void  pup(PUP::er &p);
   CkDDT_DataType*  getType(int nIndex);
+  int iscontig(int nIndex){
+    if(nIndex<num_types) return (types[nIndex]==CkDDT_CONTIGUOUS);
+    else return 0;
+  }
   int  getSize(int nIndex, int count=1);
   int  getExtent(int nIndex);
   int  getLB(int nIndex);
