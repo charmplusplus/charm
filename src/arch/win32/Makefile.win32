@@ -1,39 +1,40 @@
 COMMON_SRC = .
 CONVLIBS_SRC = .\libs\conv-libs
 
-RUNTIME_LIB = ..\lib
-CHARMXLATI_LIB = ..\bin
-HOST_LIB = ..\bin
+LIBS_DIR = ..\lib
+XLATI_DIR = ..\bin
+HOST_DIR = ..\bin
 
 INC = /I"$(COMMON_SRC)"
 
 CPP_PROJ=/nologo /MT /W3 /GX /Z7 /Od $(INC)\
- /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /YX\
+ /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /YX \
  /Fo /FD /c
 
-SEQCPP_PROJ=/nologo /ML /W3 /GX /Z7 /Od $(INC)\
- /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /YX\
+SEQCPP_PROJ=/nologo /ML /W3 /GX /Z7 /Od $(INC) \
+ /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /YX \
  /Fo /FD /c
 
 CPP = cl.exe
-
 LINK = link.exe
-
 LIBR = lib.exe
-
 LINK_FLAGS = /nologo 
 
-LINK_OTHER = kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib\
- advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib\
+CHARMXI=$(XLATI_DIR)\charmxlati.exe
+
+LINK_OTHER = kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib \
+ advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib \
  odbccp32.lib /subsystem:console /incremental:no /machine:I386 
 
+ALL: CHARM++ AMPI
 
 CHARM++ : CONVERSE TRANSLATORS LIBS
 
-TRANSLATORS : CHARMXI CONVCPM
+TRANSLATORS : $(CHARMXI) CONVCPM
+
+AMPI: CHARM++ $(LIB_DIR)\libampi.lib $(LIB_DIR)\libampif.lib
 
 .SILENT:
-
 LIBS : CONVLIBS CHARMLIBS
 	 @echo Nothing to do here right now.
 
@@ -45,12 +46,16 @@ LIBS : CONVLIBS CHARMLIBS
 
 ALLHEADERS=charm++.h ckstream.h charm.h cpthreads.h converse.h \
 	conv-trace.h conv-mach.h trace.h \
-	idl.h ckarray.h tempo.h waitqd.h LBDatabase.h \
-	lbdb.h LBDBManager.h LBComm.h LBOM.h LBObj.h LBMachineUtil.h Refiner.h ObjGraph.h \
-	CentralLB.h RandCentLB.h RecBisectBfLB.h graph.h fifoInt.h bitvecset.h \
-	RefineLB.h MetisLB.h Comm1LB.h HeapCentLB.h Set.h elements.h heap.h conv-ccs.h \
+	ckarray.h pup.h ckreduction.h ckhashtable.h \
+	idl.h tempo.h waitqd.h LBDatabase.h \
+	lbdb.h LBDBManager.h LBComm.h LBOM.h LBObj.h LBMachineUtil.h \
+	Refiner.h ObjGraph.h CentralLB.h RandCentLB.h \
+	RecBisectBfLB.h graph.h fifoInt.h bitvecset.h \
+	RefineLB.h MetisLB.h Comm1LB.h \
+	HeapCentLB.h Set.h elements.h heap.h conv-ccs.h \
 	NborBaseLb.h NeighborLB.h \
-	WSLB.h CkLists.h GreedyRefLB.h RandRefLB.h CommLB.h CommLBHeap.h
+	WSLB.h CkLists.h GreedyRefLB.h RandRefLB.h CommLB.h CommLBHeap.h \
+	ampi.h ampif.h
 
 BASICS : DIRSSOURCES $(ALLHEADERS)
 	@echo off
@@ -63,7 +68,7 @@ DIRSSOURCES :
 	@echo off
 	@echo Gathering source code...
 	@if exist ..\bin\nul       rd    /s /q  ..\bin
- 	@if exist ..\lib\nul       rd    /s /q  ..\lib
+	@if exist ..\lib\nul       rd    /s /q  ..\lib
 	@if exist ..\src\nul       rd    /s /q  ..\src
 	@if exist ..\pgms\nul      rd    /s /q  ..\pgms
 	@if exist ..\libsrc\nul    rd    /s /q  ..\libsrc
@@ -85,6 +90,7 @@ DIRSSOURCES :
 CVHEADERS=converse.h conv-mach.h \
           ..\include\CkFutures.decl.h CkFutures.def.h \
           ..\include\CkArray.decl.h CkArray.def.h \
+	  ..\include\CkReduction.decl.h CkReduction.def.h \
           ..\include\LBDatabase.decl.h LBDatabase.def.h \
           ..\include\CentralLB.decl.h CentralLB.def.h \
           ..\include\RandCentLB.decl.h RandCentLB.def.h \
@@ -100,14 +106,19 @@ CVHEADERS=converse.h conv-mach.h \
           ..\include\tempo.decl.h tempo.def.h \
           ..\include\waitqd.decl.h waitqd.def.h \
 	  ..\include\CommLB.decl.h CommLB.def.h \
-	  ..\include\Comm1LB.decl.h Comm1LB.def.h
+	  ..\include\Comm1LB.decl.h Comm1LB.def.h \
+	  ..\include\ampi.decl.h ampi.def.h
 
 
 TRACELIBS=libtrace-none.lib libtrace-projections.lib libtrace-summary.lib
 
-CVLIBS=libconv-core.lib libconv-cplus-n.lib libconv-cplus-y.lib libldb-rand.obj libldb-spray.obj libldb-graph.obj libldb-test.obj $(TRACELIBS)
-	
-LIBCONV_CORE=threads.obj convcore.obj conv-conds.obj queueing.obj fifo.obj msgmgr.obj memory.obj cpm.obj cpthreads.obj futures.obj cldb.obj random.obj debug-message.obj debug-object.obj info.obj generate.obj edgelist.obj conv-ccs.obj quiescence.obj
+CVLIBS=$(LIB_DIR)\libconv-core.lib libconv-cplus-n.lib libconv-cplus-y.lib \
+libldb-rand.obj libldb-spray.obj libldb-graph.obj libldb-test.obj $(TRACELIBS)
+
+
+LIBCONV_CORE=threads.obj convcore.obj conv-conds.obj queueing.obj fifo.obj msgmgr.obj memory.obj \
+cpm.obj cpthreads.obj futures.obj cldb.obj random.obj debug-message.obj debug-object.obj info.obj \
+generate.obj edgelist.obj conv-ccs.obj quiescence.obj
 
 CONVERSE : BASICS $(CVLIBS) CONV-HOST CONVLIBS DAEMON CONVCPM
 
@@ -115,29 +126,30 @@ DAEMON :
 	$(CPP) $(CPP_PROJ) $(COMMON_SRC)\daemon.c
 	$(CPP) $(CPP_PROJ) $(COMMON_SRC)\SocketReadAndWrite.c
 	$(CPP) $(CPP_PROJ) $(COMMON_SRC)\sockRoutines.c
-	$(LINK) $(LINK_FLAGS) ws2_32.lib advapi32.lib $(LINK_OTHER) /out:"$(HOST_LIB)\daemon.exe" daemon.obj sockRoutines.obj SocketReadAndWrite.obj
-	
+	$(LINK) $(LINK_FLAGS) ws2_32.lib advapi32.lib $(LINK_OTHER) \
+	/out:"$(HOST_DIR)\daemon.exe" daemon.obj sockRoutines.obj SocketReadAndWrite.obj
+
 CONV-HOST : conv-host.c
 	$(CPP) $(CPP_PROJ) $(COMMON_SRC)\conv-host.c
-	$(LINK) $(LINK_FLAGS) ws2_32.lib advapi32.lib $(LINK_OTHER)  /out:"$(HOST_LIB)\conv-host.exe" \
+	$(LINK) $(LINK_FLAGS) ws2_32.lib advapi32.lib $(LINK_OTHER)  /out:"$(HOST_DIR)\conv-host.exe" \
 	conv-host.obj
 
 CONVLIBS : MASTER-SLAVE PACKLIB COMMLIB
 
 MASTER-SLAVE : $(CONVLIBS_SRC)\master-slave\cms.c
 	$(CPP) $(CPP_PROJ) $(CONVLIBS_SRC)\master-slave\cms.c
-	$(LIBR) $(LINK_FLAGS) /out:"$(RUNTIME_LIB)\libcms.lib"\
-	cms.obj
+	$(LIBR) $(LINK_FLAGS) /out:"$(LIBS_DIR)\libcms.lib" cms.obj
 	@if exist ..\include\cms.h del /q ..\include\cms.h
 	@copy $(CONVLIBS_SRC)\master-slave\cms.h ..\include\cms.h
 
-COMMOBJS=commlib.obj gridrouter.obj de.obj treerouter.obj petable.obj overlapper.obj rsend.obj bcast.obj charm_bind.obj
+COMMOBJS=commlib.obj gridrouter.obj de.obj treerouter.obj petable.obj overlapper.obj \
+	rsend.obj bcast.obj charm_bind.obj
 
 COMMLIB : 
 	@if exist ..\include\commlib.h del /q ..\include\commlib.h
 	@copy  $(CONVLIBS_SRC)\commlib\commlib.h ..\include\commlib.h
 	@xcopy /q $(CONVLIBS_SRC)\commlib\*.C .
- 	@xcopy /q $(CONVLIBS_SRC)\commlib\*.h .
+	@xcopy /q $(CONVLIBS_SRC)\commlib\*.h .
 	$(CPP) $(CPP_PROJ) /TP charm_bind.C
 	$(CPP) $(CPP_PROJ) /TP commlib.C
 	$(CPP) $(CPP_PROJ) /TP overlapper.C 
@@ -147,7 +159,7 @@ COMMLIB :
 	$(CPP) $(CPP_PROJ) /TP bcast.C 
 	$(CPP) $(CPP_PROJ) /TP rsend.C 
 	$(CPP) $(CPP_PROJ) /TP petable.C 
-	$(LIBR) $(LINK_FLAGS) /out:"$(RUNTIME_LIB)\libcomm.lib" \
+	$(LIBR) $(LINK_FLAGS) /out:"$(LIBS_DIR)\libcomm.lib" \
 	$(COMMOBJS)
 
 PACKLIB :
@@ -159,24 +171,23 @@ PACKLIB :
 	@xcopy /q  $(CONVLIBS_SRC)\packLib\*.h .
 	$(CPP) $(CPP_PROJ) /TP packc.C
 	$(CPP) $(CPP_PROJ) /TP packf77.C
-	$(LIBR) $(LINK_FLAGS) /out:"$(RUNTIME_LIB)\libpacklib.lib" \
+	$(LIBR) $(LINK_FLAGS) /out:"$(LIBS_DIR)\libpacklib.lib" \
 	packc.obj packf77.obj
 
-
-libconv-core.lib : $(LIBCONV_CORE)
-	$(LIBR) $(LINK_FLAGS) /out:"$(RUNTIME_LIB)\libconv-core.lib" \
+$(LIB_DIR)\libconv-core.lib : $(LIBCONV_CORE)
+	$(LIBR) $(LINK_FLAGS) /out:"$(LIBS_DIR)\libconv-core.lib" \
 	$(LIBCONV_CORE)
 
 libconv-cplus-y.lib : machine.c $(CVHEADERS)
 	$(CPP) $(CPP_PROJ) /D "_LIB" /D"FOR_CPLUS=1" machine.c
-	$(LINK) -lib $(LINK_FLAGS) /out:"$(RUNTIME_LIB)\libconv-cplus-y.lib" \
+	$(LINK) -lib $(LINK_FLAGS) /out:"$(LIBS_DIR)\libconv-cplus-y.lib" \
 	machine.obj
 
 libconv-cplus-n.lib : machine.c $(CVHEADERS)
 	$(CPP) $(CPP_PROJ) /D"FOR_CPLUS=0" machine.c
-	$(LINK) -lib $(LINK_FLAGS) /out:"$(RUNTIME_LIB)\libconv-cplus-y.lib" \
+	$(LINK) -lib $(LINK_FLAGS) /out:"$(LIBS_DIR)\libconv-cplus-y.lib" \
 	machine.obj
-	
+
 cpm.obj : cpm.c $(CVHEADERS)
 	$(CPP) $(CPP_PROJ) $(COMMON_SRC)\cpm.c
 
@@ -232,7 +243,7 @@ libldb-rand.obj : cldb.rand.c $(CVHEADERS)
 libldb-graph.obj : cldb.graph.c cldb.graph.h $(CVHEADERS)
 	$(CPP) $(CPP_PROJ) cldb.graph.c 
 	@copy cldb.graph.obj ..\lib\libldb-graph.obj
-	
+
 libldb-spray.obj : cldb.spray.c $(CVHEADERS)
 	$(CPP) $(CPP_PROJ)  cldb.spray.c
 	@copy cldb.spray.obj ..\lib\libldb-spray.obj
@@ -248,44 +259,48 @@ libldb-test.obj : cldb.test.c $(CVHEADERS)
 ########################################################################################################
 
 CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h trace.h \
-          ckfutures.h ckarray.h tempo.h waitqd.h \
+          ckfutures.h ckarray.h ckreduction.h ckhashtable.h tempo.h waitqd.h \
 	  LBDatabase.h lbdb.h LBDBManager.h LBComm.h LBOM.h LBObj.h \
 	  LBMachineUtil.h Refiner.h ObjGraph.h heap.h elements.h CommLBHeap.h \
 	  CentralLB.h RandCentLB.h RecBisectBfLB.h RefineLB.h HeapCentLB.h MetisLB.h \
 	  CommLB.h Comm1LB.h NborBaseLB.h NeighborLB.h WSLB.h GreedyRefLB.h RandRefLB.h CkLists.h \
+	  ampi.h ampif.h \
 	  $(CVHEADERS)
 
-CK_LIBS_CORE=libck.lib
+CK_LIBS_CORE=$(LIB_DIR)\libck.lib
 
 LIBCK_CORE=init.obj register.obj qd.obj ck.obj main.obj msgalloc.obj ckfutures.obj \
-           ckarray.obj tempo.obj waitqd.obj \
+           ckarray.obj pup_util.obj pup_xlater.obj ckreduction.obj ckhashtable.obj \
+	   tempo.obj waitqd.obj \
 	   LBDatabase.obj lbdb.obj LBDBManager.obj LBComm.obj LBObj.obj CentralLB.obj \
-	   LBMachineUtil.obj Refiner.obj ObjGraph.obj RecBisectBfLB.obj graph.obj bitvecset.obj fifoInt.obj \
-	   RandCentLB.obj MetisLB.obj RefineLB.obj Set.obj CommLB.obj Comm1LB.obj HeapCentLB.obj heap.obj \
+	   LBMachineUtil.obj Refiner.obj ObjGraph.obj RecBisectBfLB.obj graph.obj \
+	   bitvecset.obj fifoInt.obj \
+	   RandCentLB.obj MetisLB.obj RefineLB.obj Set.obj CommLB.obj Comm1LB.obj \
+	   HeapCentLB.obj heap.obj \
 	   NborBaseLB.obj NeighborLB.obj WSLB.obj GreedyRefLB.obj RandRefLB.obj CommLBHeap.obj
 
 CHARMLIBS : CONVERSE $(CK_LIBS_CORE)
 
-libck.lib : $(LIBCK_CORE)
-		$(LIBR) $(LINK_FLAGS) /out:"$(RUNTIME_LIB)\libck.lib" \
-		$(LIBCK_CORE)
-				
+$(CK_LIBS_CORE) : $(LIBCK_CORE)
+	$(LIBR) $(LINK_FLAGS) /out:"$(LIBS_DIR)\libck.lib" \
+	$(LIBCK_CORE)
+
 LIBTRACE_NONE=trace-none.obj
 
 libtrace-none.lib : $(LIBTRACE_NONE)
-	$(LIBR) $(LINK_FLAGS) /out:"$(RUNTIME_LIB)\libtrace-none.lib" \
+	$(LIBR) $(LINK_FLAGS) /out:"$(LIBS_DIR)\libtrace-none.lib" \
 	$(LIBTRACE_NONE)
 
 LIBTRACE_PROJ=trace-projections.obj
 
 libtrace-projections.lib : $(LIBTRACE_PROJ)
-	$(LIBR) $(LINK_FLAGS) /out:"$(RUNTIME_LIB)\libtrace-projections.lib" \
+	$(LIBR) $(LINK_FLAGS) /out:"$(LIBS_DIR)\libtrace-projections.lib" \
 	$(LIBTRACE_PROJ)
 
 LIBTRACE_SUMM=trace-summary.obj
 
 libtrace-summary.lib: $(LIBTRACE_SUMM)
-	$(LIBR) $(LINK_FLAGS) /out:"$(RUNTIME_LIB)\libtrace-summary.lib" \
+	$(LIBR) $(LINK_FLAGS) /out:"$(LIBS_DIR)\libtrace-summary.lib" \
 	$(LIBTRACE_SUMM)
 
 ..\include\CkArray.decl.h : CkArray.decl.h
@@ -301,7 +316,7 @@ libtrace-summary.lib: $(LIBTRACE_SUMM)
 	@copy RandCentLB.decl.h ..\include
 
 ..\include\RecBisectBfLB.decl.h : RecBisectBfLB.decl.h
-	copy RecBisectBfLB.decl.h ..\include
+	@copy RecBisectBfLB.decl.h ..\include
 
 ..\include\MetisLB.decl.h : MetisLB.decl.h
 	@copy MetisLB.decl.h ..\include
@@ -310,93 +325,103 @@ libtrace-summary.lib: $(LIBTRACE_SUMM)
 	@copy RefineLB.decl.h ..\include
 
 ..\include\CommLB.decl.h : CommLB.decl.h
-	copy CommLB.decl.h ..\include
+	@copy CommLB.decl.h ..\include
 
 ..\include\Comm1LB.decl.h : Comm1LB.decl.h
-	copy Comm1LB.decl.h ..\include
+	@copy Comm1LB.decl.h ..\include
 
 ..\include\HeapCentLB.decl.h : HeapCentLB.decl.h
 	@copy HeapCentLB.decl.h ..\include
 
 ..\include\NborBaseLB.decl.h : NborBaseLB.decl.h
-	copy NborBaseLB.decl.h ..\include
+	@copy NborBaseLB.decl.h ..\include
 
 ..\include\NeighborLB.decl.h : NeighborLB.decl.h
-	copy NeighborLB.decl.h ..\include
+	@copy NeighborLB.decl.h ..\include
 
 ..\include\WSLB.decl.h : WSLB.decl.h
-	copy WSLB.decl.h ..\include
+	@copy WSLB.decl.h ..\include
 
 ..\include\GreedyRefLB.decl.h : GreedyRefLB.decl.h
-	copy GreedyRefLB.decl.h ..\include
+	@copy GreedyRefLB.decl.h ..\include
 
 ..\include\RandRefLB.decl.h : RandRefLB.decl.h
-	copy RandRefLB.decl.h ..\include
+	@copy RandRefLB.decl.h ..\include
 
 ..\include\CkFutures.decl.h : CkFutures.decl.h
 	@copy CkFutures.decl.h ..\include
 
-CkFutures.decl.h CkFutures.def.h : ckfutures.ci CHARMXI
-	..\bin\charmxlati ckfutures.ci                      
+..\include\ampi.decl.h : ampi.decl.h
+	@copy ampi.decl.h ..\include
+
+ampi.decl.h ampi.def.h : ampi.ci $(CHARMXI)
+	$(CHARMXI) -ansi ampi.ci
+
+CkFutures.decl.h CkFutures.def.h : ckfutures.ci $(CHARMXI)
+	$(CHARMXI) -ansi ckfutures.ci                      
 
 ..\include\tempo.decl.h : tempo.decl.h
 	@copy tempo.decl.h ..\include
 
-tempo.decl.h tempo.def.h : tempo.ci CHARMXI
-	..\bin\charmxlati tempo.ci                         
+tempo.decl.h tempo.def.h : tempo.ci $(CHARMXI)
+	$(CHARMXI) -ansi tempo.ci                         
 
 ..\include\waitqd.decl.h : waitqd.decl.h
 	@copy waitqd.decl.h ..\include
 
-waitqd.decl.h waitqd.def.h : waitqd.ci CHARMXI
-	..\bin\charmxlati waitqd.ci                        
+waitqd.decl.h waitqd.def.h : waitqd.ci $(CHARMXI)
+	$(CHARMXI) -ansi waitqd.ci     
 
-CkArray.decl.h CkArray.def.h : ckarray.ci CHARMXI
-	..\bin\charmxlati ckarray.ci
+..\include\CkReduction.decl.h : CkReduction.decl.h
+	@copy CkReduction.decl.h ..\include
 
-LBDatabase.decl.h LBDatabase.def.h : LBDatabase.ci CHARMXI
-	..\bin\charmxlati LBDatabase.ci
+CkReduction.decl.h CkReduction.def.h : ckreduction.ci $(CHARMXI)
+	$(CHARMXI) -ansi ckreduction.ci
 
-CentralLB.decl.h Central.def.h : CentralLB.ci CHARMXI
-	..\bin\charmxlati CentralLB.ci
+CkArray.decl.h CkArray.def.h : ckarray.ci $(CHARMXI)
+	$(CHARMXI) -ansi ckarray.ci
 
-RandCentLB.decl.h RandCent.def.h : RandCentLB.ci CHARMXI
-	..\bin\charmxlati RandCentLB.ci
+LBDatabase.decl.h LBDatabase.def.h : LBDatabase.ci $(CHARMXI)
+	$(CHARMXI) -ansi LBDatabase.ci
 
-RecBisectBfLB.decl.h RandCent.def.h : RecBisectBfLB.ci CHARMXI
-	..\bin\charmxlati RecBisectBfLB.ci
+CentralLB.decl.h Central.def.h : CentralLB.ci $(CHARMXI)
+	$(CHARMXI) -ansi CentralLB.ci
 
-MetisLB.decl.h MetisLB.def.h : MetisLB.ci CHARMXI
-	..\bin\charmxlati MetisLB.ci
+RandCentLB.decl.h RandCent.def.h : RandCentLB.ci $(CHARMXI)
+	$(CHARMXI) -ansi RandCentLB.ci
 
-RefineLB.decl.h RefineLB.def.h : RefineLB.ci CHARMXI
-	..\bin\charmxlati RefineLB.ci
+RecBisectBfLB.decl.h RandCent.def.h : RecBisectBfLB.ci $(CHARMXI)
+	$(CHARMXI) -ansi RecBisectBfLB.ci
 
-CommLB.decl.h CommLB.def.h : CommLB.ci CHARMXI
-	..\bin\charmxlati CommLB.ci
+MetisLB.decl.h MetisLB.def.h : MetisLB.ci $(CHARMXI)
+	$(CHARMXI) -ansi MetisLB.ci
 
-Comm1LB.decl.h Comm1LB.def.h : Comm1LB.ci CHARMXI
-	..\bin\charmxlati Comm1LB.ci
+RefineLB.decl.h RefineLB.def.h : RefineLB.ci $(CHARMXI)
+	$(CHARMXI) -ansi RefineLB.ci
 
-HeapCentLB.decl.h HeapCentLB.def.h : HeapCentLB.ci CHARMXI
-	..\bin\charmxlati HeapCentLB.ci
+CommLB.decl.h CommLB.def.h : CommLB.ci $(CHARMXI)
+	$(CHARMXI) -ansi CommLB.ci
 
-NborBaseLB.decl.h NborBaseLB.def.h : NborBaseLB.ci CHARMXI
-	..\bin\charmxlati NborBaseLB.ci
+Comm1LB.decl.h Comm1LB.def.h : Comm1LB.ci $(CHARMXI)
+	$(CHARMXI) -ansi Comm1LB.ci
 
-WSLB.decl.h WSLB.def.h : WSLB.ci CHARMXI
-	..\bin\charmxlati WSLB.ci
+HeapCentLB.decl.h HeapCentLB.def.h : HeapCentLB.ci $(CHARMXI)
+	$(CHARMXI) -ansi HeapCentLB.ci
 
-GreedyRefLB.decl.h GreedyRefLB.def.h : GreedyRefLB.ci CHARMXI
-	..\bin\charmxlati GreedyRefLB.ci
+NborBaseLB.decl.h NborBaseLB.def.h : NborBaseLB.ci $(CHARMXI)
+	$(CHARMXI) -ansi NborBaseLB.ci
 
-NeighborLB.decl.h NeighborLB.def.h : NeighborLB.ci CHARMXI
-	..\bin\charmxlati NeighborLB.ci
+WSLB.decl.h WSLB.def.h : WSLB.ci $(CHARMXI)
+	$(CHARMXI) -ansi WSLB.ci
 
-RandRefLB.decl.h RandRefLB.def.h : RandRefLB.ci CHARMXI
-	..\bin\charmxlati RandRefLB.ci
+GreedyRefLB.decl.h GreedyRefLB.def.h : GreedyRefLB.ci $(CHARMXI)
+	$(CHARMXI) -ansi GreedyRefLB.ci
 
-# Check  CPP options
+NeighborLB.decl.h NeighborLB.def.h : NeighborLB.ci $(CHARMXI)
+	$(CHARMXI) -ansi NeighborLB.ci
+
+RandRefLB.decl.h RandRefLB.def.h : RandRefLB.ci $(CHARMXI)
+	$(CHARMXI) -ansi RandRefLB.ci
 
 init.obj: init.C $(CKHEADERS)
 	$(CPP) $(CPP_PROJ) /TP init.C
@@ -419,14 +444,19 @@ waitqd.obj: waitqd.C $(CKHEADERS)
 ckarray.obj: ckarray.C $(CKHEADERS)
 	$(CPP) $(CPP_PROJ) /TP ckarray.C
 
+ckreduction.obj: ckreduction.C $(CKHEADERS)
+	$(CPP) $(CPP_PROJ) /TP ckreduction.C
+
+ckhashtable.obj: ckhashtable.C $(CKHEADERS)
+	$(CPP) $(CPP_PROJ) /TP ckhashtable.C
+
 lbdb.obj: lbdb.C $(CKHEADERS)
 	$(CPP) $(CPP_PROJ) /TP lbdb.C
 
-# Check case
-LBDBManager.obj:	LBDBManager.C $(CKHEADERS)
+LBDBManager.obj: LBDBManager.C $(CKHEADERS)
 	$(CPP) $(CPP_PROJ) /TP LBDBManager.C
 
-LBComm.obj:	LBComm.C $(CKHEADERS)
+LBComm.obj: LBComm.C $(CKHEADERS)
 	$(CPP) $(CPP_PROJ) /TP LBComm.C
 
 LBObj.obj: LBObj.C $(CKHEADERS)
@@ -513,11 +543,17 @@ debug-object.obj: debug-object.h debug-object.C $(CKHEADERS)
 debug-message.obj: debug-message.C $(CKHEADERS)
 	$(CPP) $(CPP_PROJ) /TP debug-message.C
 
-info.obj:	info.C $(CKHEADERS)
+info.obj: info.C $(CKHEADERS)
 	$(CPP) $(CPP_PROJ) /TP info.C
 
 ck.obj: ck.C $(CKHEADERS)
 	$(CPP) $(CPP_PROJ) /TP ck.C
+
+pup_util.obj: pup_util.C $(CKHEADERS)
+	$(CPP) $(CPP_PROJ) /TP pup_util.C
+
+pup_xlater.obj: pup_xlater.C $(CKHEADERS)
+	$(CPP) $(CPP_PROJ) /TP pup_xlater.C
 
 trace-none.obj : trace-none.C trace.h $(CKHEADERS)
 	$(CPP) $(CPP_PROJ) /TP trace-none.C
@@ -539,12 +575,11 @@ CHARMXLATI=xi-main.obj xi-symbol.obj xi-grammar.tab.obj xi-scan.obj xi-util.obj
 
 CONVCPM: conv-cpm.c
 	$(CPP) $(SEQCPP_PROJ) conv-cpm.c
-	$(LINK) $(LINK_FLAGS) $(LINK_OTHER) /out:"$(HOST_LIB)\conv-cpm.exe" conv-cpm.obj
+	$(LINK) $(LINK_FLAGS) $(LINK_OTHER) /out:"$(XLATI_DIR)\conv-cpm.exe" conv-cpm.obj
 
-CHARMXI: $(CHARMXLATI)
-	   $(LINK) $(LINK_FLAGS) /LIBPATH:"C:\Program Files\Microsoft Visual Studio\VC98\Lib" \
-	   /out:"$(CHARMXLATI_LIB)\charmxlati.exe" \
-	   $(CHARMXLATI)
+$(CHARMXI): $(CHARMXLATI)
+	$(LINK) $(LINK_FLAGS) /out:"$(XLATI_DIR)\charmxlati.exe" \
+	$(CHARMXLATI)
 
 xi-main.obj :                                         
 	$(CPP) $(SEQCPP_PROJ) /TP $(COMMON_SRC)\xi-main.C
@@ -562,15 +597,13 @@ xi-scan.obj :
 	$(CPP) $(SEQCPP_PROJ) /TP /DYY_NEVER_INTERACTIVE $(COMMON_SRC)\xi-scan.C
 
 .IGNORE:	 
-
 CLEAN :
 	rd /s /q BASICS
 	rd /s /q DIRSSOURCES 
 	rd /s /q libs
 	del   /q *.obj
-	del   /q *.exe
 	del   /q vc60.*
-	
+
 VERYCLEAN : CLEAN
 	rd /s /q ..\bin
 	rd /s /q ..\lib
@@ -578,9 +611,4 @@ VERYCLEAN : CLEAN
 	rd /s /q ..\libsrc
 	rd /s /q ..\include
 	rd /s /q ..\src
-	
 
-#Files modified
-#xi-scan.C | remove #include <unistd.h>
-#xi-grammar.tab.C | extern int lineno -> extern unsigned int lineno
-#threads.c | + #include <stdlib.h>, #include <malloc.h>
