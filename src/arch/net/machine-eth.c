@@ -40,6 +40,17 @@ static void CmiNotifyBeginIdle(CmiIdleState *s)
 static void CmiNotifyStillIdle(CmiIdleState *s)
 {
 #if CMK_SHARED_VARS_UNAVAILABLE
+  int nSpins=0; /*Number of times to spin before sleeping*/
+#else
+  int nSpins=20; /*Number of times to spin before sleeping*/
+#endif
+
+  s->nIdles++;
+  if (s->nIdles>nSpins) { /*Start giving some time back to the OS*/
+    s->sleepMs+=2;
+    if (s->sleepMs>10) s->sleepMs=10;
+  }
+#if CMK_SHARED_VARS_UNAVAILABLE
   /*No comm. thread-- listen on sockets for incoming messages*/
   MACHSTATE(3,"idle commserver {")
   if (s->nIdles%4 ==3) CommunicationsClock();
@@ -47,13 +58,9 @@ static void CmiNotifyStillIdle(CmiIdleState *s)
   MACHSTATE(3,"} idle commserver")
 #else
   /*Comm. thread will listen on sockets-- just sleep*/
-    CmiIdleLock_sleep(&s->cs->idle,5);
+  if (s->sleepMs>0)
+    CmiIdleLock_sleep(&s->cs->idle,s->sleepMs);
 #endif
-  s->nIdles++;
-  if (s->nIdles>10) { /*Start giving some time back to the OS*/
-    s->sleepMs++;
-    if (s->sleepMs>10) s->sleepMs=10;
-  }
 }
 
 void CmiNotifyIdle(void) {
@@ -76,7 +83,9 @@ static int TransmitUDP(OtherNode node,void *data,int len)
   int retval = sendto(dataskt, data,len, 0,
 	 (struct sockaddr *)&(node->addr),sizeof(node->addr));
   if (retval==-1) {
+#if 0
     if (errno==EWOULDBLOCK) return 0; /*Outgoing full-- try again later*/
+#endif
     if (errno==EINTR) return 0; /*Interrutped*/
     CmiAbort("Error sending UDP datagram to other node");
   }
@@ -112,7 +121,7 @@ static int TransmitImplicitDgram(ImplicitDgram dg,int isRetransmit)
   OtherNode dest;
   int retval;
 
-  MACHSTATE(2,isRetransmit?"    (RE)TransmitImplicit":"    TransmitImplicit")
+  MACHSTATE(2,"   TransmitImplicit")
   len = dg->datalen;
   data = dg->dataptr;
   head = (DgramHeader *)(data - DGRAM_HEADER_SIZE);
@@ -146,7 +155,7 @@ static int TryTransmitAcknowledgement(OtherNode node)
 #endif
   if ((node->recv_ack_cnt > Cmi_half_window) ||
       (Cmi_clock >= node->recv_ack_time)) {
-    MACHSTATE(4," ** Sending Ack ** ");
+    MACHSTATE1(4," ** Sending Ack ** (%d)",node->recv_next-1);
     TransmitAckDatagram(node);
     if (node->recv_winsz) { /*We still have unintegrated packets*/
       node->recv_ack_cnt  = 1;
@@ -206,7 +215,7 @@ static int TryTransmitDatagram(OtherNode node,ImplicitDgram dg)
 void TransmitDatagram()
 {
   ImplicitDgram dg; OtherNode node;
-  static int nextnode=0; int skip, count, slot;
+  static int nextnode=0; int skip, count;
   unsigned int seqno;
   MACHSTATE(2,"  TransmitDatagram {")
   writeableDgrams=0;
@@ -216,21 +225,19 @@ void TransmitDatagram()
     while (node->send_queue_h) {
       MACHSTATE(2," Transmitting delayed packets ");
       if (!TryTransmitDatagram(node,node->send_queue_h)) {
-	MACHSTATE(5," **   Delaying transmit-- send window full ** ");
+	MACHSTATE1(5," **   Delaying transmit-- send window full ** (%d) ",node->send_queue_h->seqno);
 	writeableDgrams=1;
 	break;
       }
     }
     if (Cmi_clock > node->send_primer) {
-      slot = (node->send_last % Cmi_window_size);
       for (count=0; count<Cmi_window_size; count++) {
-	dg = node->send_window[slot];
+	dg = node->send_window[count];
 	if (dg) { /*Retransmit all un-ack'd packets*/
-	  MACHSTATE(5," **   Timeout--retransmitting datagram ** ");
-	  TransmitImplicitDgram(node->send_window[slot],1);
+	  MACHSTATE1(5," **   Timeout--retransmitting datagram ** (%d)",dg->seqno);
+	  TransmitImplicitDgram(node->send_window[count],1);
 	  node->send_primer = Cmi_clock + Cmi_delay_retransmit;
 	}
-	slot = ((slot+Cmi_window_size-1) % Cmi_window_size);
       }
     }
   }
@@ -272,7 +279,7 @@ void EnqueueOutgoingDgram
     node->send_queue_t = dg;
   }
   if (!TryTransmitDatagram(node,dg)) {
-    MACHSTATE(5," **   Delaying outgoing datagram ** ")
+    MACHSTATE1(5," **   Delaying outgoing datagram ** (%d) ",dg->seqno)
     writeableDgrams=1;
   } else {
     MACHSTATE(3,"      Sending outgoing datagram")
@@ -323,7 +330,7 @@ void AssembleDatagram(OtherNode node, ExplicitDgram dg)
   unsigned int size; char *msg;
   OtherNode myNode = nodes+CmiMyNode();
 
-  MACHSTATE(3,"      AssembleDatagram")
+  MACHSTATE1(3,"      AssembleDatagram (%d)",dg->seqno)
   LOG(Cmi_clock, Cmi_nodestart, 'X', dg->srcpe, dg->seqno);
   msg = node->asm_msg;
   if (msg == 0) {
@@ -433,8 +440,10 @@ void IntegrateMessageDatagram(ExplicitDgram dg)
         writeableAcks=1;
       return;
     }
+    MACHSTATE1(5,"  Already have seqno %d packet",dg->seqno)    
+  } else {
+    MACHSTATE2(5,"  Throwing away wildly-unexpected seqno %d packet (ready for %d or better)",dg->seqno,node->recv_next)  
   }
-  MACHSTATE(5,"  Throwing away unexpected-seqno packet")  
   LOG(Cmi_clock, Cmi_nodestart, 'y', node->recv_next, dg->seqno);
   FreeExplicitDgram(dg);
 }
@@ -462,14 +471,12 @@ void IntegrateAckDatagram(ExplicitDgram dg)
 {
   OtherNode node; 
   int i; 
-  unsigned int slot, seqno, ackseqno;
+  unsigned int ackseqno;
   int packetsAckd;
 
-  MACHSTATE(3,"  IntegrateAckDatagram")
   node = nodes_by_pe[dg->srcpe];
   ackseqno = dg->seqno;
-  seqno = ackseqno;
-  slot = seqno % Cmi_window_size;
+  MACHSTATE1(3,"  IntegrateAckDatagram(%d)",ackseqno)
 
   node->stat_recv_ack++;
   LOG(Cmi_clock, Cmi_nodestart, 'R', node->nodestart, dg->seqno);
@@ -484,16 +491,14 @@ void IntegrateAckDatagram(ExplicitDgram dg)
   
   packetsAckd=0;
   for (i=0; i<Cmi_window_size;i++) {
-    ImplicitDgram idg=node->send_window[slot];
-    if (idg!=NULL && idg->seqno==seqno) {
+    ImplicitDgram idg=node->send_window[i];
+    if (idg!=NULL && idg->seqno<=ackseqno) {
       /*This datagram arrived safely*/
       packetsAckd++;
       LOG(Cmi_clock, Cmi_nodestart, 'r', node->nodestart, seqno);
-      node->send_window[slot] = 0;
+      node->send_window[i] = 0;
       DiscardImplicitDgram(idg);
     }
-    slot--; if (slot== ((unsigned int)-1)) slot+=Cmi_window_size;
-    seqno = (seqno-1) & DGRAM_SEQNO_MASK;
   }
   if (packetsAckd>0) 
     writeableDgrams=1; /*May have freed up some send slots*/
@@ -513,9 +518,11 @@ int ReceiveDatagram()
   /*ok = recvfrom(dataskt,(char*)(dg->data),Cmi_max_dgram_size,0, 0, 0);*/
   if (ok < 0) {
     FreeExplicitDgram(dg);
-    if (errno == EWOULDBLOCK) return 0; /* No more messages on that socket. */
     if (errno == EINTR) return 1;  /* A SIGIO interrupted the receive */
+#if !defined(_WIN32) || defined(__CYGWIN__) 
+	if (errno == EWOULDBLOCK) return 0; /* No more messages on that socket. */
     if (errno == ECONNREFUSED) return 0;  /* A "Host unreachable" ICMP packet came in */
+#endif
     CmiPrintf("ReceiveDatagram: recv: %s\n", strerror(errno)) ;
     KillEveryoneCode(37489437);
   }
@@ -564,8 +571,7 @@ static void CommunicationServer(int sleepTime)
     return;
   });
   LOG(GetClock(), Cmi_nodestart, 'I', 0, 0);
-  MACHSTATE(sleepTime?3:2,
-	    sleepTime?"CommunicationServer(sleep) {":"CommunicationServer(poll) {")  
+  MACHSTATE1(sleepTime?3:2,"CommunicationsServer(%d)",sleepTime)  
 #if !CMK_SHARED_VARS_UNAVAILABLE /*SMP mode: comm. lock is precious*/
   if (sleepTime!=0) /*Sleep *without* holding the comm. lock*/
     if (CheckSocketsReady(sleepTime)<=0) {
