@@ -487,37 +487,45 @@ elemRef chunk::addElement(int n1, int n2, int n3,
 void chunk::removeNode(int n)
 {
   CkPrintf("TMRC2D: Removing node %d on chunk %d\n", n, cid);
-  theNodes[n].present = 0;
-  theNodes[n].reset();
-  if (n < firstFreeNode) firstFreeNode = n;
-  else if ((n == firstFreeNode) && (firstFreeNode == nodeSlots)) {
-    firstFreeNode--; nodeSlots--;
+  if (theNodes[n].present) {
+    theNodes[n].present = 0;
+    theNodes[n].reset();
+    if (n < firstFreeNode) firstFreeNode = n;
+    else if ((n == firstFreeNode) && (firstFreeNode == nodeSlots)) {
+      firstFreeNode--; nodeSlots--;
+    }
+    numNodes--;
   }
-  numNodes--;
 }
 
 void chunk::removeEdge(int n)
 {
   CkPrintf("TMRC2D: Removing edge %d on chunk %d\n", n, cid);
-  theEdges[n].present = 0;
-  theEdges[n].reset();
-  if (n < firstFreeEdge) firstFreeEdge = n;
-  else if ((n == firstFreeEdge) && (firstFreeEdge == edgeSlots)) {
-    firstFreeEdge--; edgeSlots--;
+  if (theEdges[n].present) {
+    theEdges[n].present = 0;
+    theEdges[n].reset();
+    if (n < firstFreeEdge) firstFreeEdge = n;
+    else if ((n == firstFreeEdge) && (firstFreeEdge == edgeSlots)) {
+      firstFreeEdge--; edgeSlots--;
+    }
+    numEdges--;
   }
-  numEdges--;
+  else CkPrintf("TMRC2D: WARNING: chunk::removeEdge(%d): edge not present\n", n);
 }
 
 void chunk::removeElement(int n)
 {
   CkPrintf("TMRC2D: Removing element %d on chunk %d\n", n, cid);
-  theElements[n].present = 0;
-  theElements[n].clear();
-  if (n < firstFreeElement) firstFreeElement = n;
-  else if ((n == firstFreeElement) && (firstFreeElement == elementSlots)) {
-    firstFreeElement--; elementSlots--;
+  if (theElements[n].present) {
+    theElements[n].present = 0;
+    theElements[n].clear();
+    if (n < firstFreeElement) firstFreeElement = n;
+    else if ((n == firstFreeElement) && (firstFreeElement == elementSlots)) {
+      firstFreeElement--; elementSlots--;
+    }
+    numElements--;
   }
-  numElements--;
+  else CkPrintf("TMRC2D: WARNING: chunk::removeElement(%d): element not present\n", n);
 }
 
 // these two functions produce debugging output by printing somewhat
@@ -598,9 +606,11 @@ void chunk::updateNodeCoords(int nNode, double *coord, int nEl)
   CkPrintf("TMRC2D: updateNodeCoords...\n");
   // do some error checking
   //CkAssert(nEl == numElements);
-  CkAssert(nEl == elementSlots);
+  if (nEl != numElements) 
+    CkPrintf("TMRC2D: WARNING: nEl=%d passed in updateNodeCoords does not match TMRC2D numElements=%d!\n", nEl, numElements);
   //CkAssert(nNode == numNodes);
-  CkAssert(nNode == nodeSlots);
+  if (nNode != numNodes) 
+    CkPrintf("TMRC2D: WARNING: nNode=%d passed in updateNodeCoords does not match TMRC2D numNodes=%d!\n", nNode, numNodes);
   // update node coordinates from coord
   for (i=0; i<nodeSlots; i++)
     if (theNodes[i].isPresent()) {

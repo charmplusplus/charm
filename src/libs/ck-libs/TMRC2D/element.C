@@ -361,6 +361,7 @@ int element::nodeDelete(node n, edgeRef from, elemRef end, node ndReplace)
   if (!found) {
     //CkPrintf("TMRC2D: about to replace node %d\n", nodes[nIdx]);
     C->theNodes[nodes[nIdx]] = ndReplace;
+    C->theNodes[nodes[nIdx]].present = 1;
   }
   if (myRef == end) return 1;
   if (nIdx == fIdx) nextIdx = (nIdx + 2) % 3;
