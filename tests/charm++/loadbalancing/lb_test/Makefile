@@ -26,6 +26,9 @@ Topo.o: Topo.C Topo.h Topo.decl.h
 test:  lb_test
 	./charmrun +p4 ./lb_test 100 100 10 40 10 1000 comm ring +LBDebug 1
 
+bgtest:  lb_test
+	./charmrun +p4 ./lb_test 100 100 10 40 10 1000 comm ring +LBDebug 1 +x2 +y2 +z1 +cth1 +wth1
+
 clean:
 	rm -f *.decl.h *.def.h conv-host *.o lb_test charmrun
 

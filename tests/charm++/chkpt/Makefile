@@ -22,3 +22,9 @@ test: all
 	./charmrun hello +p3
 	./charmrun hello +p3 +restart log 
 	./charmrun hello +p4 +restart log 
+
+bgtest: all
+	-rm -fr log
+	./charmrun hello +p2 +x3 +y1 +z1
+	./charmrun hello +p2 +restart log  +x3 +y1 +z1
+	./charmrun hello +p2 +restart log  +x2 +y2 +z1

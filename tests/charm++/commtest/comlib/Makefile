@@ -26,3 +26,13 @@ test: all
 	./charmrun hello +p4 10 5
 	./charmrun hello +p2 1
 
+bgtest: all
+	./charmrun hello +p1 1 +x1 +y1 +z1
+	./charmrun hello +p1 2 +x1 +y1 +z1
+	./charmrun hello +p2 2 +x2 +y1 +z1
+	./charmrun hello +p4 10 2 +x2 +y2 +z1
+	./charmrun hello +p4 10 3 +x2 +y2 +z1
+	./charmrun hello +p4 10 4 +x2 +y2 +z1
+	./charmrun hello +p4 10 5 +x2 +y2 +z1
+	./charmrun hello +p2 1 +x2 +y1 +z1
+

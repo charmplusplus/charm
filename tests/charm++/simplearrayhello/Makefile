@@ -18,3 +18,6 @@ hello.o: hello.C hello.decl.h
 
 test: all
 	./charmrun ./hello +p4 10
+
+bgtest: all
+	./charmrun ./hello +p4 10 +x2 +y2 +z2 +cth1 +wth1

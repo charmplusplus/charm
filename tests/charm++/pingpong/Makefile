@@ -21,3 +21,10 @@ test: all
 	./charmrun ./pgm +p1
 	@echo "Inter-processor Pingpong.."
 	./charmrun ./pgm +p2
+
+bgtest: all
+	@echo "Intra-processor Pingpong.."
+	./charmrun ./pgm +p1 +x1 +y1 +z1
+	@echo "Inter-processor Pingpong.."
+	./charmrun ./pgm +p2 +x2 +y1 +z1
+
