@@ -46,6 +46,7 @@ ModuleList *modlist;
 %token CLASS
 %token STACKSIZE
 %token THREADED
+%token MIGRATABLE
 %token TEMPLATE
 %token SYNC EXCLUSIVE VIRTUAL
 %token VOID
