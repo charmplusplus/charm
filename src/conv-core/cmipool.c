@@ -139,7 +139,7 @@ inline
 #endif
 void CmiPoolFree(void * p) 
 {
-  char **header = (char **)( p - CMI_POOL_HEADER_SIZE);
+  char **header = (char **)( p - (void *) CMI_POOL_HEADER_SIZE);
   int bin = (int) *header;
   /*  CmiPrintf("f%d\n",bin,CpvAccess(maxBin));  */
   if(bin==0)
