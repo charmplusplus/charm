@@ -1,5 +1,6 @@
 module liveVizPoll {
 message liveVizPollRequestMsg;
+PUPable liveVizArrayListener;
 
 readonly CProxy_liveVizPollArray proxy;
 array [Max] liveVizPollArray {

@@ -34,10 +34,6 @@ public:
 		lv_config=cfg;
 		contribute(0,0,CkReduction::sum_int,CkCallback(liveVizInitComplete));
 	}
-
-	CkComponent *ckLookupComponent(int userIndex); //Defined in LiveVizPoll.C
 };
-
-
 
 #endif

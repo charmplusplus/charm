@@ -41,6 +41,9 @@ public:
 class liveVizArrayListener : public CkArrayListener {
 public:
   liveVizArrayListener() : CkArrayListener(0) {};
+  liveVizArrayListener(CkMigrateMessage *m) : CkArrayListener(m) {}
+  PUPable_decl(liveVizArrayListener)
+
   void ckBeginInserting() {
   }
   void ckEndInserting() {
@@ -50,15 +53,6 @@ public:
     proxy(elt->thisIndexMax).insert();
   }
 };
-
-
-CkComponent *liveVizGroup::ckLookupComponent(int userIndex) {
-	if ( userIndex == 4321 ) {
-		return new liveVizArrayListener();
-	} else {
-		return IrrGroup::ckLookupComponent(userIndex);
-	}
-}
 
 
 //Called by clients to start liveViz.
@@ -78,8 +72,7 @@ void liveVizPollInit(const liveVizConfig &cfg,
   liveVizInit(cfg, proxy, myCB);
 
   // Create our array listener object who'll manage our proxy array.
-  CkComponentID listener(lvG, 4321);
-  opts.addListener(listener);
+  opts.addListener(new liveVizArrayListener());
 }
 
 // Called by clients to look and see if they need to do image work
