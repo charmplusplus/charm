@@ -118,8 +118,10 @@ SumLogPool::SumLogPool(char *pgm) : phaseTab(MAX_PHASES)
    _MEMCHECK(epTime);
    epCount = new int[epSize];
    _MEMCHECK(epCount);
+   epMaxTime = new double[epSize];
+   _MEMCHECK(epMaxTime);
    for (i=0; i< epSize; i++) {
-     epTime[i] = 0.0;
+     epTime[i] = epMaxTime[i] = 0.0;
      epCount[i] = 0;
    };
 
@@ -181,6 +183,10 @@ void SumLogPool::write(void)
   for (i=0; i<_numEntries; i++)
     fprintf(fp, "%d ", epCount[i]);
   fprintf(fp, "\n");
+  // write max entry function execute times
+  for (i=0; i<_numEntries; i++)
+    fprintf(fp, "%ld ", (long)(epMaxTime[i]*1.0e6));
+  fprintf(fp, "\n");
   // write marks
   if (CkpvAccess(version)>=2.0) 
   {
@@ -235,6 +241,7 @@ void SumLogPool::setEp(int epidx, double time)
   //CmiPrintf("set EP: %d %e \n", epidx, time);
   epTime[epidx] += time;
   epCount[epidx] ++;
+  if (epMaxTime[epidx] < time) epMaxTime[epidx] = time;
   // set phase table counter
   phaseTab.setEp(epidx, time);
 }

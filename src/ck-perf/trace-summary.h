@@ -140,7 +140,7 @@ class SumLogPool {
     BinEntry *pool;	/**< bins */
     FILE *fp, *stsfp ;
 
-    double  *epTime;
+    double  *epTime, *epMaxTime;
     int *epCount;
     int epSize;
 
