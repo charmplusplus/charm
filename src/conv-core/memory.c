@@ -72,32 +72,32 @@ char **argv;
 {
 }
 
-char *malloc(size)
+void *malloc(size)
     unsigned size;
 {
   char *result;
   CmiMemLock();
   result = CmiMemory_Gnu_malloc(size);
   CmiMemUnlock();
-  return result;
+  return (void *) result;
 }
 
 void free(mem)
-    char *mem;
+    void *mem;
 {
   CmiMemLock();
   CmiMemory_Gnu_free(mem);
   CmiMemUnlock();
 }
 
-char *calloc(nelem, size)
+void *calloc(nelem, size)
     unsigned nelem, size;
 {
   char *result;
   CmiMemLock();
   result = CmiMemory_Gnu_calloc(nelem, size);
   CmiMemUnlock();
-  return result;
+  return (void *) result;
 }
 
 void cfree(mem)
@@ -108,15 +108,15 @@ void cfree(mem)
   CmiMemUnlock();
 }
 
-char *realloc(mem, size)
-    char *mem;
-    int size;
+void *realloc(mem, size)
+    void *mem;
+    size_t size;
 {
   char *result;
   CmiMemLock();
   result = CmiMemory_Gnu_realloc(mem, size);
   CmiMemUnlock();
-  return result;
+  return (void *) result;
 }
 
 char *memalign(align, size)
@@ -129,14 +129,14 @@ char *memalign(align, size)
   return result;    
 }
 
-char *valloc(size)
-    int size;
+void *valloc(size)
+    size_t size;
 {
   char *result;
   CmiMemLock();
   result = CmiMemory_Gnu_valloc(size);
   CmiMemUnlock();
-  return result;
+  return (void *) result;
 }
 
 #endif /* CMK_MALLOC_USE_GNU_MALLOC */

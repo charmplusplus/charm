@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.27  1998-02-19 08:39:31  jyelon
+ * Revision 1.28  1998-03-04 17:17:19  milind
+ * Fixed the size_t errors.
+ *
+ * Revision 1.27  1998/02/19 08:39:31  jyelon
  * Added multicast code.
  *
  * Revision 1.26  1997/12/22 21:57:48  jyelon
@@ -92,6 +95,8 @@
 
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
+
+#include <stdlib.h>
 
 #define CMK_ASYNC_NOT_NEEDED                               1
 #define CMK_ASYNC_USE_FIOASYNC_AND_FIOSETOWN               0

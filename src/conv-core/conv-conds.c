@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.9  1997-07-22 14:22:33  kale
+ * Revision 2.10  1998-03-04 17:17:13  milind
+ * Fixed the size_t errors.
+ *
+ * Revision 2.9  1997/07/22 14:22:33  kale
  * set the function-list  pointer to null AT THE BEGINNING of raisecondition
  * function.
  *
@@ -243,7 +246,7 @@ static void InsertInHeap(theTime, fnp, arg)
   if(CpvAccess(numHeapEntries) > MAXTIMERHEAPENTRIES) 
     {
       CmiPrintf("Heap overflow (InsertInHeap), exiting...\n");
-      exit();
+      exit(1);
     }
   else 
     {
@@ -272,7 +275,7 @@ static void RemoveFromHeap(index)
   if(!CpvAccess(numHeapEntries) || (index != 1)) 
     {
       CmiPrintf("Internal inconsistency (RemoveFromHeap), exiting ...\n");
-      exit();
+      exit(1);
     } 
   else 
     {
