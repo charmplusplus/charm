@@ -807,11 +807,7 @@ static void ConverseRunPE(int everReturn)
   cs = CmiGetState();
   CpvInitialize(void *,CmiLocalQueue);
   CpvAccess(CmiLocalQueue) = cs->localqueue;
-  /*  since elan version is not a SMP version */
-  /*
   CmiMyArgv=CmiCopyArgs(Cmi_argv);
-  */
-  CmiMyArgv=Cmi_argv;
   CthInit(CmiMyArgv);
 #if MACHINE_DEBUG_LOG
   {
