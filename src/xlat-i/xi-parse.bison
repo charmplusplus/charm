@@ -25,6 +25,7 @@ int yyerror(char *);
 %token CHARE
 %token ENTRY
 %token MESSAGE
+%token PACKMESSAGE
 %token READONLY
 %token TABLE
 %token THREADED
@@ -114,6 +115,14 @@ EntryName:	Id
 Message	:	OptionalExtern MESSAGE MessageName ';'
 		{
 			Message *m = new Message($3, 0, $1) ;
+			delete $3;
+			thismodule->AddMessage(m) ;
+		}
+	;
+
+PackMessage	:	OptionalExtern PACKMESSAGE MessageName ';'
+		{
+			Message *m = new Message($3, 1, $1) ;
 			delete $3;
 			thismodule->AddMessage(m) ;
 		}

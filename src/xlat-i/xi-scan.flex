@@ -61,7 +61,7 @@ struct rwtable {
 
 /* Reserved word table */
 struct rwtable rwtable[] = {
-	"",		9,
+	"",		10,
 /* MUST BE IN SORTED ORDER */
 	"boc",		BOC,
 	"chare",	CHARE,
@@ -69,6 +69,7 @@ struct rwtable rwtable[] = {
 	"extern",	EXTERN,
 	"group",	BOC,
 	"message",	MESSAGE,
+	"packmessage",	PACKMESSAGE,
 	"readonly",	READONLY,
 	"table",	TABLE,
 	"threaded",	THREADED,
