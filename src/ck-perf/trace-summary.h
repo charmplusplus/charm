@@ -72,6 +72,7 @@ class PhaseEntry {
     void write(FILE *fp, int seq) {
 	int i;
 	fprintf(fp, "[%d] ", seq);
+	int _numEntries=_entryTable.size();
 	for (i=0; i<_numEntries; i++) 
 	    fprintf(fp, "%d ", count[i]);
 	fprintf(fp, "\n");

@@ -220,22 +220,8 @@ void LogPool::writeCompressed(void) {
 void LogPool::writeSts(void)
 {
   fprintf(stsfp, "VERSION %s\n", PROJECTION_VERSION);
-  fprintf(stsfp, "MACHINE %s\n",CMK_MACHINE_NAME);
-  fprintf(stsfp, "PROCESSORS %d\n", CkNumPes());
-  fprintf(stsfp, "TOTAL_CHARES %d\n", _numChares);
-  fprintf(stsfp, "TOTAL_EPS %d\n", _numEntries);
-  fprintf(stsfp, "TOTAL_MSGS %d\n", _numMsgs);
-  fprintf(stsfp, "TOTAL_PSEUDOS %d\n", 0);
-  fprintf(stsfp, "TOTAL_EVENTS %d\n", CkpvAccess(usrEvents)->length());
-  int i;
-  for(i=0;i<_numChares;i++)
-    fprintf(stsfp, "CHARE %d %s\n", i, _chareTable[i]->name);
-  for(i=0;i<_numEntries;i++)
-    fprintf(stsfp, "ENTRY CHARE %d %s %d %d\n", i, _entryTable[i]->name,
-                 _entryTable[i]->chareIdx, _entryTable[i]->msgIdx);
-  for(i=0;i<_numMsgs;i++)
-    fprintf(stsfp, "MESSAGE %d %d\n", i, _msgTable[i]->size);
-  for(i=0;i<CkpvAccess(usrEvents)->length();i++)
+  traceWriteSTS(stsfp,CkpvAccess(usrEvents)->length());
+  for(int i=0;i<CkpvAccess(usrEvents)->length();i++)
     fprintf(stsfp, "EVENT %d %s\n", (*CkpvAccess(usrEvents))[i]->e, (*CkpvAccess(usrEvents))[i]->str);
   fprintf(stsfp, "END\n");
   fclose(stsfp);

@@ -101,18 +101,37 @@ static void traceCommonInit(char **argv)
 #else
   if(CkMyRank()==0) {
 #endif
-    _threadMsg = CkRegisterMsg("dummy_thread_msg", 0, 0, 0, 0);
+    _threadMsg = CkRegisterMsg("dummy_thread_msg", 0, 0, 0);
     _threadChare = CkRegisterChare("dummy_thread_chare", 0);
     _threadEP = CkRegisterEp("dummy_thread_ep", 0, _threadMsg,_threadChare,0);
 
-    _packMsg = CkRegisterMsg("dummy_pack_msg", 0, 0, 0, 0);
+    _packMsg = CkRegisterMsg("dummy_pack_msg", 0, 0, 0);
     _packChare = CkRegisterChare("dummy_pack_chare", 0);
     _packEP = CkRegisterEp("dummy_pack_ep", 0, _packMsg,_packChare, 0);
 
-    _unpackMsg = CkRegisterMsg("dummy_unpack_msg", 0, 0, 0, 0);
+    _unpackMsg = CkRegisterMsg("dummy_unpack_msg", 0, 0, 0);
     _unpackChare = CkRegisterChare("dummy_unpack_chare", 0);
     _unpackEP = CkRegisterEp("dummy_unpack_ep", 0, _unpackMsg,_unpackChare, 0);
   }
+}
+
+/** Write out the common parts of the .sts file. */
+extern void traceWriteSTS(FILE *stsfp,int nUserEvents) {
+  fprintf(stsfp, "MACHINE %s\n",CMK_MACHINE_NAME);
+  fprintf(stsfp, "PROCESSORS %d\n", CkNumPes());
+  fprintf(stsfp, "TOTAL_CHARES %d\n", _chareTable.size());
+  fprintf(stsfp, "TOTAL_EPS %d\n", _entryTable.size());
+  fprintf(stsfp, "TOTAL_MSGS %d\n", _msgTable.size());
+  fprintf(stsfp, "TOTAL_PSEUDOS %d\n", 0);
+  fprintf(stsfp, "TOTAL_EVENTS %d\n", nUserEvents);
+  int i;
+  for(i=0;i<_chareTable.size();i++)
+    fprintf(stsfp, "CHARE %d %s\n", i, _chareTable[i]->name);
+  for(i=0;i<_entryTable.size();i++)
+    fprintf(stsfp, "ENTRY CHARE %d %s %d %d\n", i, _entryTable[i]->name,
+                 _entryTable[i]->chareIdx, _entryTable[i]->msgIdx);
+  for(i=0;i<_msgTable.size();i++)
+    fprintf(stsfp, "MESSAGE %d %d\n", i, _msgTable[i]->size);
 }
 
 /*Install the beginIdle/endIdle condition handlers.*/

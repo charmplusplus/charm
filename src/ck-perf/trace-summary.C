@@ -60,7 +60,9 @@ void CkSummary_MarkEvent(int eventType)
 
 PhaseEntry::PhaseEntry() 
 {
-  nEPs = _numEntries+10;
+  int _numEntries=_entryTable.size();
+  // FIXME: Hopes there won't be more than 10 more EP's registered from now on...
+  nEPs = _numEntries+10; 
   count = new int[nEPs];
   times = new double[nEPs];
   maxtimes = new double[nEPs];
@@ -159,6 +161,7 @@ SumLogPool::SumLogPool(char *pgm) : numBins(0), phaseTab(MAX_PHASES)
 
 void SumLogPool::initMem()
 {
+   int _numEntries=_entryTable.size();
    epInfoSize = _numEntries + NUM_DUMMY_EPS + 1; // keep a spare EP
    epInfo = new SumEntryInfo[epInfoSize];
    _MEMCHECK(epInfo);
@@ -191,6 +194,7 @@ void SumLogPool::write(void)
 {
   int i;
   unsigned int j;
+  int _numEntries=_entryTable.size();
 
   fprintf(fp, "ver:%3.1f %d/%d count:%d ep:%d interval:%e", CkpvAccess(version), CkMyPe(), CkNumPes(), numBins, _numEntries, CkpvAccess(binSize));
   if (CkpvAccess(version)>=3.0)
@@ -320,22 +324,8 @@ void SumLogPool::write(void)
 
 void SumLogPool::writeSts(void)
 {
-  fprintf(stsfp, "MACHINE %s\n",CMK_MACHINE_NAME);
-  fprintf(stsfp, "PROCESSORS %d\n", CkNumPes());
-  fprintf(stsfp, "TOTAL_CHARES %d\n", _numChares);
-  fprintf(stsfp, "TOTAL_EPS %d\n", _numEntries);
-  fprintf(stsfp, "TOTAL_MSGS %d\n", _numMsgs);
-  fprintf(stsfp, "TOTAL_PSEUDOS %d\n", 0);
-  fprintf(stsfp, "TOTAL_EVENTS %d\n", _numEvents);
-  int i;
-  for(i=0;i<_numChares;i++)
-    fprintf(stsfp, "CHARE %d %s\n", i, _chareTable[i]->name);
-  for(i=0;i<_numEntries;i++)
-    fprintf(stsfp, "ENTRY CHARE %d %s %d %d\n", i, _entryTable[i]->name,
-                 _entryTable[i]->chareIdx, _entryTable[i]->msgIdx);
-  for(i=0;i<_numMsgs;i++)
-    fprintf(stsfp, "MESSAGE %d %d\n", i, _msgTable[i]->size);
-  for(i=0;i<_numEvents;i++)
+  traceWriteSTS(stsfp,_numEvents);
+  for(int i=0;i<_numEvents;i++)
     fprintf(stsfp, "EVENT %d Event%d\n", i, i);
   fprintf(stsfp, "END\n");
   fclose(stsfp);
@@ -698,6 +688,7 @@ void TraceSummaryBOC::write(void)
 {
   int i;
   unsigned int j;
+  int _numEntries=_entryTable.size();
 
   char *fname = new char[strlen(CkpvAccess(traceRoot))+strlen(".sum")+1];
   sprintf(fname, "%s.sum", CkpvAccess(traceRoot));

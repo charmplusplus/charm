@@ -53,6 +53,9 @@ extern int _threadMsg, _threadChare, _threadEP;
 extern int _packMsg, _packChare, _packEP;
 extern int _unpackMsg, _unpackChare, _unpackEP;
 
+/** Write out the common parts of the .sts file. */
+extern void traceWriteSTS(FILE *stsfp,int nUserEvents);
+
 #endif
 
 /*@}*/
