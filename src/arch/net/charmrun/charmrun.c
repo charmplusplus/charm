@@ -1856,17 +1856,20 @@ void start_nodes_local(char ** env)
 
 int bproc_nodeisup(int node)
 {
+    int status = 0;
 #if CMK_BPROC_VERSION < 4
-    if (bproc_nodestatus(node) == bproc_node_up) return 1;
+    if (bproc_nodestatus(node) == bproc_node_up) status = 1;
+    if (arg_verbose)
+      printf("Charmrun> node %d status: %s\n", node, status?"up":"down");
 #else
     char status[128];
     if (bproc_nodestatus(node, status, 128)) {
       if (arg_verbose)
         printf("Charmrun> node %d status: %s\n", node, status);
-      if (strcmp(status, "up")==0) return 1;
+      if (strcmp(status, "up")==0) status = 1;
     }
 #endif
-  return 0;
+  return status;
 }
 
 /**
