@@ -8,9 +8,10 @@ CkChareID mid;
 CProxy_Hello arr;
 CkGroupID mCastGrpId;
 CProxySection_Hello *mcast;
+CProxySection_Hello mcp;
 
 #define SECTIONSIZE  5
-#define REDUCE_TIME  30
+#define REDUCE_TIME  100
 
 class HiMsg : public CkMcastBaseMsg, public CMessage_HiMsg
 {
@@ -83,16 +84,19 @@ void client(CkSectionCookie sid, void *param, int dataSize, void *data)
   if (c->reductionsRemaining<=0) {
     CProxy_main mproxy(mid);
     mproxy.maindone();
+    c->reductionNo++;
   }
   else {
     CkMulticastMgr *mg = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
-//    if (c->reductionNo % 4 == 0)
-    mg->rebuild(mcast->ckGetSectionID());
+    if (c->reductionNo % 32 == 0)
+    mg->rebuild(mcp.ckGetSectionCookie());
 
-    c->reductionNo++;
+    if (c->reductionNo%3 == 0) {
     HiMsg *hiMsg = new (1, 0) HiMsg;
     hiMsg->data[0] = 18+c->reductionNo;
-    mcast->SayHi(hiMsg);
+    mcp.SayHi(hiMsg);
+    }
+    c->reductionNo++;
   }
 }
 
@@ -113,14 +117,20 @@ public:
 
   void start()
   {
+CmiPrintf("start\n");
     CkMulticastMgr *mg = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
 
     CkArrayIndexMax al[SECTIONSIZE];
     for (int i=0; i<SECTIONSIZE; i++) {
       al[i] = CkArrayIndex1D(i);
     }
+#if 0
     mcast = new CProxySection_Hello(thisArrayID, al, SECTIONSIZE, mCastGrpId);
-    mg->setSection(mcast);
+#endif
+    mcp = CProxySection_Hello::ckNew(thisArrayID, al, SECTIONSIZE);
+    mcp.ckDelegate(mCastGrpId);
+
+    mg->setSection(mcp);
 
 #if 0
     mg->setSection(sid, thisArrayID, al, SECTIONSIZE);
@@ -133,19 +143,19 @@ public:
     myReductionCounter *c=new myReductionCounter;
     c->reductionsRemaining=REDUCE_TIME;
     c->reductionNo=0;
-    mg->setReductionClient(mcast, client, c);
+    mg->setReductionClient(mcp, client, c);
 
     HiMsg *hiMsg = new (1, 0) HiMsg;
     hiMsg->data[0] = 17;
-    mcast->SayHi(hiMsg);
+    mcp.SayHi(hiMsg);
   }
   
   void SayHi(HiMsg *m)
   {
 //    CkPrintf("[%d] Hi[%d] from element %d\n",CmiMyPe(), m->data[0],thisIndex);
 
-    CkGetSectionID(sid, m);
-CmiPrintf("[%d] SayHi: sid on %d %p\n", CmiMyPe(), sid.pe, sid.val);
+    CkGetSectionCookie(sid, m);
+//CmiPrintf("[%d] SayHi: sid on %d %p\n", CmiMyPe(), sid.pe, sid.val);
 
     CkMulticastMgr *mg = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
 

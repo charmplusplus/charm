@@ -1,5 +1,4 @@
 mainmodule hello {
-//  extern module CkMulticast;
 
   readonly CkChareID mid;
   readonly CProxy_Hello arr;
