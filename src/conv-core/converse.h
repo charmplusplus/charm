@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.31  1995-10-20 17:29:10  jyelon
+ * Revision 2.32  1995-10-23 23:09:05  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.31  1995/10/20  17:29:10  jyelon
  * *** empty log message ***
  *
  * Revision 2.30  1995/10/19  18:22:08  jyelon
@@ -108,6 +111,14 @@
 
 /**** DEAL WITH DIFFERENCES: KERNIGHAN-RITCHIE-C, ANSI-C, AND C++ ****/
 
+#ifdef CMK_PREPROCESSOR_CANNOT_DO_CONCATENATION
+#define CMK_CONCAT(x,y) y
+#endif
+
+#ifdef CMK_PREPROCESSOR_USES_ANSI_STANDARD_CONCATENATION
+#define CMK_CONCAT(x,y) x##y
+#endif
+
 /* the following flags denote properties of the C compiler,  */
 /* not the C++ compiler.  If this is C++, ignore them.       */
 #ifdef __cplusplus
@@ -124,14 +135,6 @@ extern "C" {
 
 #ifdef CMK_COMPILER_HATES_PROTOTYPES
 #define CMK_PROTO(x) ()
-#endif
-
-#ifdef CMK_PREPROCESSOR_CANNOT_DO_CONCATENATION
-#define CMK_CONCAT(x,y) y
-#endif
-
-#ifdef CMK_PREPROCESSOR_USES_ANSI_STANDARD_CONCATENATION
-#define CMK_CONCAT(x,y) x##y
 #endif
 
 #ifdef CMK_COMPILER_LIKES_STATIC_PROTO
