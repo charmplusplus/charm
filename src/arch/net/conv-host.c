@@ -1976,7 +1976,8 @@ int req_handle_print(line)
 int req_handle_printerr(line)
     char *line;
 {
-  fprintf(stderr,"%s\n",line+9);
+  fprintf(stderr,"%s",line+9);
+  fflush(stderr);
   return REQ_OK;
 }
 
