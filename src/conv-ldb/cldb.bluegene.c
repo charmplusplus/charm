@@ -146,6 +146,7 @@ void CldEnqueue(int pe, void *msg, int infofn)
 /*
     CsdEnqueueGeneral(msg, CQS_QUEUEING_LIFO, priobits, prioptr);
 */
+    pe = BgMyPe();
     BGSENDPE(pe, msg, len);
   }
   else {
