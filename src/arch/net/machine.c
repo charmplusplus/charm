@@ -193,7 +193,7 @@
    Uncommenting the define below will cause the program to crash where the 
    problem occurs instead of calling host_abort which lets the program 
    exit gracefully and lose all the debugging info... */
-#define TRUECRASH
+/* #define TRUECRASH */
 
 #define CmiPrintf I_Hate_C_1
 #define CmiError  I_Hate_C_2
