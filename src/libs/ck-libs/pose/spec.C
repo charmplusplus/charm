@@ -8,24 +8,9 @@ void spec::Step()
   static POSE_TimeType lastGVT = POSE_UnsetTS;
 
   lastGVT = localPVT->getGVT();
-  if (!parent->cancels.IsEmpty()) {// Cancel as much as possible
-#ifdef POSE_STATS_ON
-    localStats->SwitchTimer(CAN_TIMER);      
-#endif
-    CancelEvents();
-#ifdef POSE_STATS_ON
-    localStats->SwitchTimer(SIM_TIMER);      
-#endif
-  }
-  if (RBevent) { // Rollback if necessary
-#ifdef POSE_STATS_ON
-    localStats->SwitchTimer(RB_TIMER);      
-#endif
-    Rollback(); 
-#ifdef POSE_STATS_ON
-    localStats->SwitchTimer(SIM_TIMER);      
-#endif
-  }
+  if (!parent->cancels.IsEmpty()) CancelUnexecutedEvents();
+  if (eq->RBevent) Rollback(); 
+  if (!parent->cancels.IsEmpty()) CancelEvents();
 
   // Prepare to execute an event
   ev = eq->currentPtr;

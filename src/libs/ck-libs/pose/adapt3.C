@@ -10,37 +10,11 @@ void adapt3::Step()
   static int advances=0;
   int iter=0;
 
-  lastGVT = localPVT->getGVT();
   rbFlag = 0;
-  if (!parent->cancels.IsEmpty()) { // Cancel as much as possible
-#ifdef POSE_STATS_ON
-    localStats->SwitchTimer(CAN_TIMER);      
-#endif
-    //CkPrintf("Trying to cancel events...\n");
-    //POSE_TimeType ct = eq->currentPtr->timestamp;  // store time of next event
-    CancelEvents();
-    // if cancellations of executed events occurred, adjust timeLeash
-    /*
-    if ((ct > -1) && (eq->currentPtr->timestamp < ct)) {
-      timeLeash = eq->currentPtr->timestamp - lastGVT;
-      advances = 1;
-    }
-    */
-#ifdef POSE_STATS_ON
-    localStats->SwitchTimer(SIM_TIMER);      
-#endif
-  }
-  if (RBevent) { // Rollback if necessary
-#ifdef POSE_STATS_ON
-    localStats->SwitchTimer(RB_TIMER);      
-#endif
-    //timeLeash = RBevent->timestamp - lastGVT;
-    Rollback(); 
-    //advances = 1;
-#ifdef POSE_STATS_ON
-    localStats->SwitchTimer(SIM_TIMER);      
-#endif
-  }
+  lastGVT = localPVT->getGVT();
+  if (!parent->cancels.IsEmpty()) CancelUnexecutedEvents();
+  if (eq->RBevent) Rollback(); 
+  if (!parent->cancels.IsEmpty()) CancelEvents();
 
   // Prepare to execute an event
   ev = eq->currentPtr;

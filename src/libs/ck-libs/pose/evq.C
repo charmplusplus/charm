@@ -1,6 +1,8 @@
 /// Queue of executed and unexecuted events on a poser
 #include "pose.h"
 
+//#define EQ_SANITIZE 1
+
 /// Basic Constructor
 eventQueue::eventQueue()
 {
@@ -38,7 +40,10 @@ eventQueue::eventQueue()
   // link them together
   frontPtr->next = backPtr;
   backPtr->prev = frontPtr;
+  RBevent = NULL;
+#ifdef EQ_SANITIZE
   sanitize();
+#endif
 }
 
 /// Destructor
@@ -57,7 +62,9 @@ eventQueue::~eventQueue()
 /// Insert e in the queue in timestamp order
 void eventQueue::InsertEvent(Event *e)
 {
+#ifdef EQ_SANITIZE
   sanitize();
+#endif
 #ifdef DETERMINISTIC_EVENTS
   InsertEventDeterministic(e);
 #else
@@ -84,8 +91,12 @@ void eventQueue::InsertEvent(Event *e)
     // if e is inserted before currPtr, move currPtr back to avoid rollback
     if ((currentPtr->prev == e) && (currentPtr->done < 1))
       currentPtr = currentPtr->prev;
+    else if ((currentPtr == backPtr) || (e->timestamp < currentPtr->timestamp))
+      SetRBevent(e);
   }
+#ifdef EQ_SANITIZE
   sanitize();
+#endif
 #endif
 }
 
@@ -122,14 +133,23 @@ void eventQueue::InsertEventDeterministic(Event *e)
     // if e is inserted before currPtr, move currPtr back to avoid rollback
     if ((currentPtr->prev == e) && (currentPtr->done < 1))
       currentPtr = currentPtr->prev;
+    else if ((currentPtr == backPtr) || 
+	     ((e->timestamp < currentPtr->timestamp) ||
+	      ((e->timestamp == currentPtr->timestamp) && 
+	       (e->evID < currentPtr->evID))))
+      SetRBevent(e);
   }
+#ifdef EQ_SANITIZE
   sanitize();
+#endif
 }
 
 /// Move currentPtr to next event in queue
 void eventQueue::ShiftEvent() { 
   Event *e;
+#ifdef EQ_SANITIZE
   sanitize();
+#endif
   CmiAssert(currentPtr->next != NULL);
   currentPtr = currentPtr->next; // set currentPtr to next event
   if ((currentPtr == backPtr) && (eqh->top)) { // currentPtr on back sentinel
@@ -144,7 +164,9 @@ void eventQueue::ShiftEvent() {
   if (currentPtr == backPtr) largest = POSE_UnsetTS;
   else FindLargest();
   eventCount--;
+#ifdef EQ_SANITIZE
   sanitize();
+#endif
 }
 
 void eventQueue::CommitStatsHelper(Event *commitPtr)
@@ -175,7 +197,9 @@ void eventQueue::CommitStatsHelper(Event *commitPtr)
 /// Commit (delete) events before target timestamp ts
 void eventQueue::CommitEvents(sim *obj, POSE_TimeType ts)
 {
+#ifdef EQ_SANITIZE
   sanitize();
+#endif
   Event *target = frontPtr->next, *commitPtr = frontPtr->next;
   if (ts == POSE_UnsetTS) {
     CommitAll(obj);
@@ -225,13 +249,17 @@ void eventQueue::CommitEvents(sim *obj, POSE_TimeType ts)
   }
   frontPtr->next = link;
   link->prev = frontPtr;
+#ifdef EQ_SANITIZE
   sanitize();
+#endif
 }
 
 /// Commit (delete) all events
 void eventQueue::CommitAll(sim *obj)
 {
+#ifdef EQ_SANITIZE
   sanitize();
+#endif
   Event *commitPtr = frontPtr->next;
   
   while (commitPtr != backPtr) {
@@ -254,8 +282,10 @@ void eventQueue::CommitAll(sim *obj)
     delete commitPtr->next;
   }
   frontPtr->next = link;
-  link->prev = frontPtr;
+  link->prev = frontPtr; 
+#ifdef EQ_SANITIZE
   sanitize();
+#endif
 }
 
 /// Change currentPtr to point to event e
@@ -279,7 +309,9 @@ void eventQueue::SetCurrentPtr(Event *e) {
 /// Return first (earliest) unexecuted event before currentPtr
 Event *eventQueue::RecomputeRollbackTime() 
 {
+#ifdef EQ_SANITIZE
   sanitize();
+#endif
   Event *ev = frontPtr->next; // start at front
   //  while ((ev->done == 1) && (ev != currentPtr)) ev = ev->next;
   while (ev->done == 1) ev = ev->next;
@@ -290,7 +322,9 @@ Event *eventQueue::RecomputeRollbackTime()
 /// Delete event and reconnect surrounding events in queue
 void eventQueue::DeleteEvent(Event *ev) 
 {
+#ifdef EQ_SANITIZE
   sanitize();
+#endif
   CmiAssert(ev != currentPtr);
   CmiAssert(ev->spawnedList == NULL);
   CmiAssert(ev != frontPtr);
@@ -302,7 +336,9 @@ void eventQueue::DeleteEvent(Event *ev)
   if (!ev->done) eventCount--;
   delete ev; // then delete the event
   if (ts == largest) FindLargest();
+#ifdef EQ_SANITIZE
   sanitize();
+#endif
 }
 
 /// Find largest timestamp of the unexecuted events
@@ -463,6 +499,14 @@ void eventQueue::sanitize()
   // first event in queue should always have a checkpoint
   if ((frontPtr->next != backPtr) && (frontPtr->next->done))
     CmiAssert(frontPtr->next->cpData);
+
+  // Rollback check
+  tmp = frontPtr->next;
+  while ((tmp != currentPtr) && (tmp->done == 1))
+    tmp = tmp->next;
+  if (tmp == currentPtr) CmiAssert(RBevent == NULL);
+  else CmiAssert((RBevent == NULL) || (tmp == RBevent));
+
 
   // check eqheap
   eqh->sanitize();

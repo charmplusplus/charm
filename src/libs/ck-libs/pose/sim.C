@@ -56,15 +56,7 @@ void sim::Step()
   case CONS_T:
   case OPT_T:
   case OPT2_T: // pass this step call directly to strategy
-    myStrat->Step();
-    break;
   case OPT3_T: // prioritize this step call if work exists
-    if (eq->currentPtr->timestamp > POSE_UnsetTS) {
-      pm = new prioMsg;
-      pm->setPriority(eq->currentPtr->timestamp-POSE_TimeMax);
-      POSE_Objects[thisIndex].Step(pm);
-    }
-    break;
   case SPEC_T:
   case ADAPT_T:
   case ADAPT2_T:

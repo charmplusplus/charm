@@ -11,8 +11,8 @@ void opt::Step()
   CmiAssert(eq == parent->eq);
   CmiAssert(userObj == parent->objID);
 
-
-  if (RBevent) Rollback(); 
+  //if (!parent->cancels.IsEmpty()) CancelUnexecutedEvents();
+  if (eq->RBevent) Rollback(); 
   if (!parent->cancels.IsEmpty()) CancelEvents();
 
   // Execute an event
@@ -38,25 +38,23 @@ void opt::Step()
 void opt::Rollback()
 {
 #ifdef POSE_STATS_ON
-    localStats->SwitchTimer(RB_TIMER);      
+  localStats->SwitchTimer(RB_TIMER);      
 #endif
   Event *ev = eq->currentPtr->prev, *recoveryPoint;
-  eq->sanitize();
   // find earliest event that must be undone
-  recoveryPoint = RBevent;
+  recoveryPoint = eq->RBevent;
   // skip forward over other stragglers
   while ((recoveryPoint != eq->back()) && (recoveryPoint->done == 0) 
 	 && (recoveryPoint != eq->currentPtr)) 
     recoveryPoint = recoveryPoint->next;
-  CmiAssert(recoveryPoint != eq->back());
   if (recoveryPoint == eq->currentPtr) {
-    eq->SetCurrentPtr(RBevent);
-    eq->sanitize();
+    eq->SetCurrentPtr(eq->RBevent);
+    eq->RBevent = NULL;
     return;
   }
-
-    CmiAssert(RBevent->prev->next == RBevent);
-    CmiAssert(RBevent->next->prev == RBevent);
+  CmiAssert(recoveryPoint != eq->back());
+  CmiAssert(eq->RBevent->prev->next == eq->RBevent);
+  CmiAssert(eq->RBevent->next->prev == eq->RBevent);
 
   rbCount++;
   rbFlag = 1;
@@ -69,7 +67,6 @@ void opt::Rollback()
     ev = ev->prev;     
   }
 
-  eq->sanitize();
   // ev is now at recovery point
   if (userObj->usesAntimethods()) {
     targetEvent = recoveryPoint;
@@ -86,18 +83,13 @@ void opt::Rollback()
     }
   }
 
-  eq->sanitize();
-    CmiAssert(RBevent->prev->next == RBevent);
-    CmiAssert(RBevent->next->prev == RBevent);
-  eq->SetCurrentPtr(RBevent); // adjust currentPtr
-  eq->sanitize();
+  eq->SetCurrentPtr(eq->RBevent); // adjust currentPtr
   avgRBoffset = 
     (avgRBoffset*(rbCount-1)+(eq->currentPtr->timestamp-localPVT->getGVT()))/rbCount;
   eq->FindLargest();
-  RBevent = targetEvent = NULL; // reset RBevent & targetEvent
-  eq->sanitize();
+  eq->RBevent = targetEvent = NULL; // reset RBevent & targetEvent
 #ifdef POSE_STATS_ON
-    localStats->SwitchTimer(SIM_TIMER);      
+  localStats->SwitchTimer(SIM_TIMER);      
 #endif
 }
 
@@ -129,13 +121,12 @@ void opt::UndoEvent(Event *e)
 void opt::CancelEvents() 
 {
 #ifdef POSE_STATS_ON
-    localStats->SwitchTimer(CAN_TIMER);      
+  localStats->SwitchTimer(CAN_TIMER);      
 #endif
   Event *ev, *tmp, *recoveryPoint;
   int found;
   CancelNode *it=NULL, *last=NULL;
 
-  eq->sanitize();
   last = parent->cancels.GetItem(); // make note of last item to examine
   while (!parent->cancels.IsEmpty()) { // loop through all cancellations
     it = parent->cancels.GetItem();
@@ -155,10 +146,7 @@ void opt::CancelEvents()
 	}
 	if (!found) { // not in linked list; check the heap
 	  found = eq->eqh->DeleteEvent(it->evID, it->timestamp);
-	  if (found) {
-	    //CkPrintf("Cancelled event "); it->evID.dump(); CkPrintf(" deleted!\n");
-	    ev = NULL; // make ev NULL so we know it was deleted
-	  }
+	  if (found)  ev = NULL; // make ev NULL so we know it was deleted
 	}
       }
       if (!found) { 
@@ -173,7 +161,7 @@ void opt::CancelEvents()
 	}
       }
       if (!found) { // "it" event has not arrived yet
-	if (it == last) {  eq->sanitize();return; }// seen all cancellations during this call
+	if (it == last) return;  // seen all cancellations during this call
 	it = parent->cancels.GetItem(); // try the next cancellation
       }
     }
@@ -228,14 +216,88 @@ void opt::CancelEvents()
     }
     if (it == last) {
       parent->cancels.RemoveItem(it); // Clean up
-      eq->sanitize();
       return;
     }
     else parent->cancels.RemoveItem(it); // Clean up
   } // end outer while which loops through entire cancellations list
-  eq->sanitize();
 #ifdef POSE_STATS_ON
-    localStats->SwitchTimer(SIM_TIMER);      
+  localStats->SwitchTimer(SIM_TIMER);      
+#endif
+}
+
+/// Cancel events in cancellation list that have arrived
+void opt::CancelUnexecutedEvents() 
+{
+#ifdef POSE_STATS_ON
+    localStats->SwitchTimer(CAN_TIMER);      
+#endif
+  Event *ev, *tmp, *recoveryPoint;
+  int found;
+  CancelNode *it=NULL, *last=NULL;
+
+  last = parent->cancels.GetItem(); // make note of last item to examine
+  while (!parent->cancels.IsEmpty()) { // loop through all cancellations
+    it = parent->cancels.GetItem();
+    found = 0; // init the found flag to not found (0)
+    // search cancellations list for a cancellation that has a corresponding
+    // event in the event queue
+    while (!found) {  // loop until one is found, or exit fn if all examined
+      ev = eq->currentPtr;               // set search start point
+      if (ev == eq->back()) ev = ev->prev;
+      if (ev->timestamp <= it->timestamp) {
+	// search forward for 'it' from currentPtr to backPtr
+	while (!found && (ev->timestamp > POSE_UnsetTS) && 
+	       (ev->timestamp <= it->timestamp)) {
+	  if (ev->evID == it->evID) found = 1; // found it
+	  else ev = ev->next;
+	}
+	if (!found) { // not in linked list; check the heap
+	  found = eq->eqh->DeleteEvent(it->evID, it->timestamp);
+	  if (found) ev = NULL; // make ev NULL so we know it was deleted
+	}
+      }
+      if (!found) { 
+	ev = eq->currentPtr; // set search start point
+	if (ev == eq->back()) ev = ev->prev;
+	if (ev->timestamp >= it->timestamp) { // search backward
+	  while (!found && (ev->timestamp > POSE_UnsetTS) && 
+		 (ev->timestamp >= it->timestamp)) {
+	    if (ev->evID == it->evID)  found = 1; // found it
+	    else ev = ev->prev;
+	  }
+	}
+      }
+      if (!found) { // "it" event has not arrived yet
+	if (it == last) return;  // seen all cancellations during this call
+	it = parent->cancels.GetItem(); // try the next cancellation
+      }
+    }
+
+    // something was found!
+    if (ev && (ev->done == 0)) { // found it to be unexecuted; get rid of it
+      if (ev == eq->currentPtr) eq->ShiftEvent(); // adjust currentPtr
+      int rbf = 0;
+      if (ev == eq->RBevent) { 
+	rbf = 1; 
+	eq->RBevent = eq->RBevent->next; 
+      }
+      eq->DeleteEvent(ev); // delete the event
+      if (rbf) {
+	while ((eq->RBevent != eq->currentPtr) && (eq->RBevent != eq->backPtr) 
+	       && (eq->RBevent->done == 1)) 
+	  eq->RBevent = eq->RBevent->next;
+	if ((eq->RBevent == eq->currentPtr) || (eq->RBevent == eq->backPtr))
+	  eq->RBevent == NULL;
+      }
+    }
+    if (it == last) {
+      parent->cancels.RemoveItem(it); // Clean up
+      return;
+    }
+    else parent->cancels.RemoveItem(it); // Clean up
+  } // end outer while which loops through entire cancellations list
+#ifdef POSE_STATS_ON
+  localStats->SwitchTimer(SIM_TIMER);      
 #endif
 }
 

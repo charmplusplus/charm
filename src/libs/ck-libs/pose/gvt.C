@@ -76,6 +76,8 @@ void PVT::startPhase()
   um->conPVT = conPVT;
   um->runGVTflag = 0;
 
+  CkPrintf("PVT %d reporting pvt=%d.\n", CkMyPe(), pvt);
+
   // send data to GVT estimation
   if (simdone) // transmit final info to GVT on PE 0
     g[0].computeGVT(um);              
@@ -265,6 +267,8 @@ void GVT::computeGVT(UpdateMsg *m)
       lastSR = tmp->timestamp;
       if (tmp->sends != tmp->recvs) {
 	earliestMsg = tmp->timestamp;
+	//	CkPrintf("GVT: @ %d, sends=%d recvs=%d estGVT was %d.\n", earliestMsg,
+	//		 tmp->sends, tmp->recvs, estGVT);
 	break;
       }
       tmp = tmp->next;

@@ -562,13 +562,7 @@ foreach my $incfile ($inC,@otherfiles)
 	$outChandle->print("    e->spawnedList = NULL;\n");
 	#$outChandle->print("    CkPrintf(\"POSE_RECV\\n\");\n");
 	$outChandle->print("    eq->InsertEvent(e);\n");
-	$outChandle->print("#ifndef SEQUENTIAL_POSE\n");
-	$outChandle->print("    if ((e->timestamp < eq->currentPtr->timestamp)\n");
-	$outChandle->print("        || (eq->currentPtr == eq->backPtr)) {\n");
-	$outChandle->print("      myStrat->ResetRBevent(e);\n");
-	$outChandle->print("    }\n");
-	$outChandle->print("#endif\n");
-	$outChandle->print("      Step();\n");
+	$outChandle->print("    Step();\n");
 	$outChandle->print("  }\n");
 	$outChandle->print("#ifndef SEQUENTIAL_POSE\n");
 	$outChandle->print("  pvt->objUpdate($messagename->timestamp, RECV);\n");
@@ -603,6 +597,7 @@ foreach my $incfile ($inC,@otherfiles)
 	$outChandle->print("  $messagename->str = myStrat;\n");
 	$outChandle->print("  POSE_TimeType _ts = $messagename->timestamp;\n");
 	$outChandle->print("#ifdef POSE_STATS_ON\n  localStats->SwitchTimer(DO_TIMER);\n#endif\n");
+
 	$outChandle->print("  objID = new state_$method($messagename);\n");
 	$outChandle->print("#ifdef POSE_STATS_ON\n  localStats->SwitchTimer(SIM_TIMER);\n#endif\n");
 	$outChandle->print("  myStrat->init(eq, objID, this, thisIndex);\n");
@@ -1169,8 +1164,10 @@ sub posefuncmap
 		  $output.="#endif\n";
 		  $output.="$msg->rst = 0.0;\n";
 		  #$output.="    CkPrintf(\"POSE_SEND\\n\");\n";
+
 		  $output.="(* (CProxy_".$segments[2]." *)&POSE_Objects)[_POSE_handle].".$segments[1].";\n";
 		  $output.="int _destPE = POSE_Objects.ckLocalBranch()->lastKnown(CkArrayIndex1D(_POSE_handle));\n";
+
 		  $output.="parent->srVector[_destPE]++;\n";
 		  $output.="}\n";
 		} else {
@@ -1184,6 +1181,7 @@ sub posefuncmap
 		  $output.="$msg->rst = parent->ct - parent->st + parent->eq->currentPtr->srt;\n";
 		  $output.="#endif\n";
 		  #$output.="    CkPrintf(\"POSE_SEND\\n\");\n";
+
 		  $output.="(* (CProxy_".$segments[2]." *)&POSE_Objects)[_POSE_handle].".$segments[1].";\n";
 		  $output.="int _destPE = POSE_Objects.ckLocalBranch()->lastKnown(CkArrayIndex1D(_POSE_handle));\n";
 		  $output.="parent->srVector[_destPE]++;\n";
@@ -1211,6 +1209,7 @@ sub posefuncmap
 		    $output.="#endif\n";
 		    $output.="$msg->rst = 0.0;\n";
 		    #$output.="    CkPrintf(\"POSE_SEND\\n\");\n";
+
 		    $output.="(*(CProxy_".$segments[2]." *)&POSE_Objects)[_POSE_handle].".$segments[1].";\n";
 		    $output.="int _destPE = POSE_Objects.ckLocalBranch()->lastKnown(CkArrayIndex1D(_POSE_handle));\n";
 		    $output.="parent->srVector[_destPE]++;\n";
@@ -1229,6 +1228,7 @@ sub posefuncmap
 		  $output.="$msg->rst = parent->ct - parent->st + parent->eq->currentPtr->srt;\n";
 		  $output.="#endif\n";
 		    #$output.="    CkPrintf(\"POSE_SEND\\n\");\n";
+
 		    $output.="(* (CProxy_".$segments[2]." *)&POSE_Objects)[_POSE_handle].".$segments[1].";\n";
 		    $output.="int _destPE = POSE_Objects.ckLocalBranch()->lastKnown(CkArrayIndex1D(_POSE_handle));\n";
 		    $output.="parent->srVector[_destPE]++;\n";
@@ -1253,7 +1253,9 @@ sub posefuncmap
 		      $output.="pvt->objUpdate(ovt+(_POSE_timeOffset), SEND);\n";
 		      $output.="#endif\n";
 		      $output.="$msg->rst = 0.0;\n";
+
 		      $output.="(* (CProxy_".$simobjtype." *)&POSE_Objects)[parent->thisIndex].".$segments[1].";\n";
+
 		      $output.="parent->srVector[CkMyPe()]++;\n";
 		      $output.="}\n";
 		    } elsif ($issim) {
@@ -1266,6 +1268,7 @@ sub posefuncmap
 		  $output.="$msg->rst = parent->ct - parent->st + parent->eq->currentPtr->srt;\n";
 		  $output.="#endif\n";
 		      #$output.="    CkPrintf(\"POSE_SEND\\n\");\n";
+
 		      $output.="(* (CProxy_".$simobjtype." *)&POSE_Objects)[parent->thisIndex].".$segments[1].";\n";
 		      $output.="parent->srVector[CkMyPe()]++;\n";
 		      $output.="}\n";

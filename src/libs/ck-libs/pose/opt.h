@@ -22,6 +22,7 @@ protected:
       rollback is performed.  No forward execution happens until all the
       cancellations have been examined. */
   virtual void CancelEvents();          
+  virtual void CancelUnexecutedEvents();          
   /// Undo a single event, cancelling its spawned events
   virtual void UndoEvent(Event *e);     
 public:
@@ -56,10 +57,10 @@ public:
       ec=parent->cancels.getEarliest(), gvt=localPVT->getGVT(), 
       worktime = eq->currentPtr->timestamp;
     // Object is idle; report -1
-    if (!RBevent && (ec == POSE_UnsetTS) && (worktime == POSE_UnsetTS) && 
-	(ovt <= gvt))  
+    if (!(eq->RBevent) && (ec == POSE_UnsetTS) && (worktime == POSE_UnsetTS) 
+	&& (ovt <= gvt))
       return POSE_UnsetTS;
-    if (RBevent)  theTime = RBevent->timestamp;
+    if (eq->RBevent)  theTime = eq->RBevent->timestamp;
     if ((ec > POSE_UnsetTS) && ((ec < theTime) || (theTime == POSE_UnsetTS)))  
       theTime = ec;
     POSE_TimeType maxWork = worktime;
@@ -68,8 +69,8 @@ public:
     if (((maxWork != POSE_UnsetTS) && (maxWork < theTime)) || 
 	(theTime == POSE_UnsetTS))
       theTime = maxWork;
-    CkAssert((theTime == POSE_UnsetTS) || (theTime >= gvt));
-    //if (theTime == gvt) CkPrintf("safe=%d ovt=%d wt=%d ec=%d gvt=%d\n", theTime, ovt, worktime, ec, gvt);
+    CkAssert((theTime == POSE_UnsetTS) || (theTime >= gvt) ||
+	     (theTime == gvt-1));
     return theTime;
   }
   /// Add spawned event to current event's spawned event list

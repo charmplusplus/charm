@@ -8,7 +8,7 @@ void rep::init(eventMsg *m)
   ort = 0.0;
   parent = m->parent; 
   myStrat = m->str;
-  myHandle = parent->thisIndex;
+  myHandle = m->parent->thisIndex;
   anti_methods = 0;
 }
 

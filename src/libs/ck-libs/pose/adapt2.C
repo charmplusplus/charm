@@ -8,28 +8,13 @@ void adapt2::Step()
   static POSE_TimeType lastGVT = POSE_UnsetTS;
 
   lastGVT = localPVT->getGVT();
-  if (!parent->cancels.IsEmpty()) { // Cancel as much as possible
-#ifdef POSE_STATS_ON
-    localStats->SwitchTimer(CAN_TIMER);      
-#endif
-    //CkPrintf("Trying to cancel events...\n");
-    CancelEvents();
-#ifdef POSE_STATS_ON
-    localStats->SwitchTimer(SIM_TIMER);      
-#endif
-  }
-  if (RBevent) { // Rollback if necessary
-#ifdef POSE_STATS_ON
-    localStats->SwitchTimer(RB_TIMER);      
-#endif
-    timeLeash = RBevent->timestamp - lastGVT;
+  if (!parent->cancels.IsEmpty()) CancelUnexecutedEvents();
+  if (eq->RBevent) {
+    timeLeash = eq->RBevent->timestamp - lastGVT;
     if (timeLeash < MIN_LEASH) timeLeash = MIN_LEASH;
-    //timeLeash = MIN_LEASH;
     Rollback(); 
-#ifdef POSE_STATS_ON
-    localStats->SwitchTimer(SIM_TIMER);      
-#endif
   }
+  if (!parent->cancels.IsEmpty()) CancelEvents();
 
   // Prepare to execute an event
   ev = eq->currentPtr;

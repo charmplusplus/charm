@@ -14,13 +14,13 @@ class rep
   /// Pointer to synchronization strategy
   strat *myStrat;          
  public:
+  /// the object's unique handle
+  /** Initialized to index of poser wrapper in POSE_objects array */
+  int myHandle;            
   /// The object's virtual time (OVT)
   POSE_TimeType ovt;
   /// The object's real time (ORT)
   double ort;
-  /// the object's unique handle
-  /** Initialized to index of poser wrapper in POSE_objects array */
-  int myHandle;            
   /// Flag to signify if this is a checkpointed copy of the real object
   int copy;                
   /// Flag indicating this object uses anti-methods rather than checkpoints

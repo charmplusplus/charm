@@ -13,6 +13,8 @@ class eventQueue {
   Event *frontPtr, *backPtr;
   /// Pointer to next unexecuted event
   Event *currentPtr;
+  /// Event to rollback to
+  Event *RBevent;
   /// Heap of unexecuted events
   EqHeap *eqh;
   /// Largest unexecuted event timestamp in queue
@@ -66,6 +68,25 @@ class eventQueue {
   SpawnedEvent *GetNextCurrentSpawn();
   /// Find the largest timestamp of the unexecuted events
   void FindLargest();
+  /// Set rollback point to event e
+  void SetRBevent(Event *e) {
+    if (!RBevent) RBevent = e; 
+#ifdef DETERMINISTIC_EVENTS
+    else if ((RBevent->timestamp > e->timestamp) ||
+	     ((RBevent->timestamp == e->timestamp) && 
+	      (e->evID < RBevent->evID))) {
+      CmiAssert(RBevent->prev->next == RBevent);
+      CmiAssert(RBevent->next->prev == RBevent);
+      RBevent = e;
+    }
+#else
+    else if (RBevent->timestamp > e->timestamp) {
+      CmiAssert(RBevent->prev->next == RBevent);
+      CmiAssert(RBevent->next->prev == RBevent);
+      RBevent = e;
+    }
+#endif
+  }
   /// Dump the event queue
   void dump();        
   /// Pack/unpack/sizing operator

@@ -35,6 +35,7 @@ void SRtable::Insert(POSE_TimeType ts, int sr)
 #ifdef SR_SANITIZE
   sanitize();
 #endif
+  //if (ts == 0) dump();
   CmiAssert(ts >= offset);
   CmiAssert((sr == 0) || (sr == 1));
   int destBkt = (ts-offset)/size_b;  // which bucket?
@@ -48,8 +49,15 @@ void SRtable::Insert(POSE_TimeType ts, int sr)
   }
   else { // put in buckets[destBkt]
     if (buckets[destBkt]) {
-      end_bucket[destBkt]->next = e;
-      end_bucket[destBkt] = e;
+      if (end_bucket[destBkt]->timestamp == ts) {
+	if (sr == SEND) end_bucket[destBkt]->sends++;
+	else end_bucket[destBkt]->recvs++;
+	delete e;
+      }
+      else {
+	end_bucket[destBkt]->next = e;
+	end_bucket[destBkt] = e;
+      }
     }
     else buckets[destBkt] = end_bucket[destBkt] = e;
   }
@@ -362,7 +370,8 @@ void SRtable::dump()
 {
   SRentry *tmp;
   CkPrintf("\nSRtable: offset=%d b=%d size_b=%d\n", offset, b, size_b);
-  for (int i=0; i<b; i++) {
+  //  for (int i=0; i<b; i++) {
+  for (int i=0; i<1; i++) {
     tmp = buckets[i];
     CkPrintf("... Bucket[%d]: ", i);
     while (tmp) { 
@@ -371,12 +380,14 @@ void SRtable::dump()
     }
     CkPrintf("\n");
   }
+/*
   tmp = overflow;
   CkPrintf("... Overflow: ");
   while (tmp) {
     tmp->dump();
     tmp = tmp->next;
   }
+*/
   CkPrintf("\n");
 }
 
