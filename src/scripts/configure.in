@@ -164,6 +164,20 @@ AC_DEFINE_UNQUOTED(CMK_STL_USE_DOT_H, $fail)
 AC_DEFINE_UNQUOTED(CMK_STL_DONT_USE_DOT_H, $pass)
 
 cat > $t <<EOT
+#include <vector>
+
+int foo(void) {
+  std::vector<int> v;      
+  v.push_back(2); v.push_back(3);
+  std::vector<int>::iterator it=v.begin();
+  it++;
+  return *it;
+}
+EOT
+test_cxx "whether the std:: names for STL work" "ok" "no" ""
+AC_DEFINE_UNQUOTED(CMK_USE_STL, $pass)
+
+cat > $t <<EOT
 namespace foo {
 	int x;
 };

@@ -13,6 +13,8 @@
 
 #undef CMK_TEMPLATE_MEMBERS_BROKEN
 
+#undef CMK_USE_STL
+
 #undef CMK_STL_USE_DOT_H
 #undef CMK_STL_DONT_USE_DOT_H
 
