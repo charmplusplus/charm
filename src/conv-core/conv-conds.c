@@ -222,8 +222,9 @@ static void ccd_heap_swap(int index1, int index2)
 }
 
 /*
- expand the ccd_heap, double the size
- 256 is reasonably big, so expanding won't happen often
+ expand the ccd_heap, double the heap size and copy everything over.
+ Initial 256 is reasonably big, so expanding won't happen often.
+ Had a bug previously due to late expansion, should work now - Gengbin 12/4/03
 */
 static void expand_ccd_heap()
 {
@@ -232,7 +233,7 @@ static void expand_ccd_heap()
   int newlen = oldlen*2;
   ccd_heap_elem *newheap;
 
-CmiPrintf("[%d] ccd_heap expand from %d to %d\n", CmiMyPe(),oldlen, newlen);
+CmiPrintf("[%d] Warning: ccd_heap expand from %d to %d\n", CmiMyPe(),oldlen, newlen);
 
   newheap = (ccd_heap_elem*) malloc(sizeof(ccd_heap_elem)*2*(newlen+1));
   _MEMCHECK(newheap);
@@ -251,7 +252,7 @@ static void ccd_heap_insert(double t, CcdVoidFn fnp, void *arg, int pe)
   int child, parent;
   ccd_heap_elem *h;
   
-  if(CpvAccess(ccd_heaplen) > CpvAccess(ccd_heapmaxlen)) {
+  if(CpvAccess(ccd_heaplen) >= CpvAccess(ccd_heapmaxlen)) {
 /* CmiAbort("Heap overflow (InsertInHeap), exiting...\n"); */
     expand_ccd_heap();
   } 
