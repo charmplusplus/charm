@@ -333,11 +333,14 @@ in this fashion.
               TYPE(my_block) :: m
             end subroutine
           end interface
-          TYPE(my_block) :: m
+          TYPE(my_block), TARGET :: m
           call TCHARM_Register(m,pup_my_block)
 \end{alltt}
 
-     Note that the data block must be allocated on the stack.
+     Note that the data block must be allocated on the stack. 
+     Also, in Fortran, the "TARGET" attribute must be used on the 
+     block (as above) or else the compiler may not update values during 
+     a migration, because it believes only it can access the block.
 
 \vspace{0.2in}
 \function{void TCHARM\_Migrate()}
