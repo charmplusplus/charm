@@ -155,6 +155,7 @@ extern CkFutureID CkRemoteCallAsync(int eIdx, void *msg, CkChareID *chare);
 extern CkFutureID CkRemoteBranchCallAsync(int eIdx, void *msg, CkGroupID gID, int pe);
 extern CkFutureID CkRemoteNodeBranchCallAsync(int eIdx, void *msg, CkGroupID gID, int node);
 extern void* CkWaitFuture(CkFutureID futNum);
+extern void CkWaitVoidFuture(CkFutureID futNum);
 extern void CkReleaseFuture(CkFutureID futNum);
 extern int CkProbeFuture(CkFutureID futNum);
 extern void  CkSendToFuture(CkFutureID futNum, void *msg, int pe);

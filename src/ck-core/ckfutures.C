@@ -93,6 +93,12 @@ void *CkWaitFuture(CkFutureID handle)
   return value;
 }
 
+extern "C"
+void CkWaitVoidFuture(CkFutureID handle)
+{
+  CkFreeMsg(CkWaitFuture(handle));
+}
+
 static void setFuture(CkFutureID handle, void *pointer)
 {
   CthThread t;

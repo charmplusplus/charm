@@ -64,13 +64,21 @@ class _CK_CID {
 };
 
 class _CK_GID : public _CK_CID {
+  private:
+    int _chare;
   protected:
     CkGroupID _ck_gid;
+    int _isChare(void) { return _chare; }
+    void _setChare(int c) { _chare = c; }
 };
 
 class _CK_NGID : public _CK_CID {
+  private:
+    int _chare;
   protected:
     CkGroupID _ck_ngid;
+    int _isChare(void) { return _chare; }
+    void _setChare(int c) { _chare = c; }
 };
 
 class Array1D;
