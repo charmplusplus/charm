@@ -3957,7 +3957,133 @@ int MPI_Resume(int dest, int comm) {
 	return 0;
 }
 
+void AmpiOOQ::_expand (void) {
+  AmpiNode* list;
 
+  list = new AmpiNode [m_totalNodes + INITIAL_Q_SIZE];
+  memcpy (list, m_list, sizeof (AmpiNode)*m_totalNodes);
 
+  delete [] m_list;
+  m_list = list;
+
+  m_freeNode = m_totalNodes;
+  for (int i=m_totalNodes; i<m_totalNodes+INITIAL_Q_SIZE; i++) {
+    m_list [i].m_next = i+1;
+  }
+  m_totalNodes += INITIAL_Q_SIZE;
+  m_list [m_totalNodes-1].m_next = -1;
+  m_availNodes = INITIAL_Q_SIZE;
+}
+
+void AmpiOOQ::init (int numP) {
+  m_numP       = numP;
+  m_totalNodes = INITIAL_Q_SIZE;
+  m_freeNode   = 0;
+  m_availNodes = m_totalNodes;
+  m_q          = new Que [numP];
+  m_list       = new AmpiNode [m_totalNodes];
+  for (int i=0; i<m_totalNodes; i++) {
+    m_list [i].m_next = i+1;
+  }
+  m_list [m_totalNodes-1].m_next = -1;
+}
+
+AmpiOOQ::~AmpiOOQ () {
+  delete [] m_list;
+  delete [] m_q;
+}
+  
+void AmpiOOQ::pup(PUP::er &p) {
+  p|m_numP;
+  p|m_totalNodes;
+  p|m_freeNode;
+  p|m_availNodes;
+   
+  if (p.isUnpacking()) {
+    m_q    = new Que [m_numP];
+    m_list = new AmpiNode [m_totalNodes];
+  }
+  p(m_q,m_numP);
+  p(m_list,m_totalNodes);
+}
+
+AmpiMsg* AmpiOOQ::deq (int p) {
+  if (-1 != m_q[p].m_head) {
+    int index                     = m_q[p].m_head;
+    AmpiMsg*& ret                 = m_list [index].m_data;
+    m_q[p].m_head                 = m_list [index].m_next;
+    m_list [index].m_next         = m_freeNode;
+    m_freeNode                    = index;
+    m_q[p].m_size --;
+    m_availNodes ++;
+    if (-1 == m_q[p].m_head)
+      m_q[p].m_tail = -1;
+    return ret;
+ } else return NULL;
+}
+
+void AmpiOOQ::insert (int p, int pos, AmpiMsg*& elt) {
+  if (-1 == m_freeNode) _expand ();
+
+  if ((0 == m_q[p].m_size) || (pos == m_q[p].m_size)) {
+    enq (p, elt);
+  } else {
+    int index = m_freeNode;
+
+    m_list [index].m_data = elt;
+    m_availNodes --;
+    m_freeNode = m_list [index].m_next;
+    m_q[p].m_size ++;
+
+    // insert the message at proper position
+    if (0 == pos) {
+      // insert before the current head of queue
+      m_list [index].m_next = m_q[p].m_head;
+      m_q[p].m_head = index;
+    } else {
+      // find the position between head and tail
+      int curr = m_q[p].m_head;
+      int next = m_list[curr].m_next;
+        
+      for (int i=0; i<pos-1; i++) {
+        curr = next;
+        next = m_list[curr].m_next;
+      }
+
+      m_list [curr].m_next = index;
+      m_list [index].m_next = next;
+    }
+  }
+}
+
+void AmpiOOQ::enq (int p, AmpiMsg*& elt) {
+  if (-1 == m_freeNode) _expand ();
+
+  m_list [m_freeNode].m_data = elt;
+  m_availNodes --;
+  m_q[p].m_size ++;
+  if (-1 != m_q[p].m_tail) {
+    m_list [m_q[p].m_tail].m_next = m_freeNode;
+  } else {
+    m_q[p].m_head = m_freeNode;
+  }
+  m_q[p].m_tail = m_freeNode;
+  m_freeNode = m_list [m_freeNode].m_next;
+  m_list [m_q[p].m_tail].m_next = -1;
+}
+
+AmpiMsg* AmpiOOQ::peek (int p, int pos) {
+  int index = m_q[p].m_head;
+
+  if (pos >= m_q[p].m_size)
+    return NULL;
+  else {
+    for (int i=0; i<pos; i++) {
+      index = m_list [index].m_next;
+    }
+    return m_list [index].m_data;
+  }
+}
+  
 #include "ampi.def.h"
 

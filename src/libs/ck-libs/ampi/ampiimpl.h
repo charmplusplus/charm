@@ -639,9 +639,91 @@ class AmpiMsg : public CMessage_AmpiMsg {
   }
 };
 
+
+#define INITIAL_Q_SIZE 8
+
+class AmpiNode {
+public:
+  AmpiMsg*   m_data;
+  int        m_next;
+
+  AmpiNode () {
+    m_next  = -1;
+  }
+  
+  void pup(PUP::er &p) {
+    if (p.isUnpacking ())
+      m_data = AmpiMsg::pup(p,0);
+    else
+      AmpiMsg::pup(p, m_data);
+      
+    p|m_next;
+  }
+};
+
+class Que {
+public:
+  int m_head;
+  int m_tail;
+  int m_size;
+
+  Que () {
+    m_head = -1;
+    m_tail = -1;
+    m_size = 0;
+  }
+  
+  void pup(PUP::er &p) {
+    p|m_head;
+    p|m_tail;
+    p|m_size;
+  }
+};
+
+class AmpiOOQ {
+  AmpiNode*     m_list;        // list holding virtual queues data
+  Que*          m_q;           // pointer to list of virtual queues
+  int           m_numP;        // num of virtual queues
+  int           m_totalNodes;  // total nodes in the list
+  int           m_freeNode;    // index of head of free node list
+  int           m_availNodes;  // free nodes
+
+  /**
+   * This function should be called when m_availNodes == 0.
+   * It adds 'INITIAL_Q_SIZE' more nodes to existing queue.
+   */
+  void _expand (void);
+
+public:
+
+  AmpiOOQ () {}
+  
+  void init (int numP);
+
+  ~AmpiOOQ ();
+  
+  void pup(PUP::er &p);
+
+  int length () { return (m_totalNodes - m_availNodes); }
+
+  int length (int p) { return m_q[p].m_size; }
+
+  int isEmpty (int p) { return (0 == m_q[p].m_size); }
+
+  bool isEmpty () { return (m_totalNodes == m_availNodes); }
+
+  AmpiMsg* deq (int p);
+
+  void insert (int p, int pos, AmpiMsg*& elt);
+
+  void enq (int p, AmpiMsg*& elt);
+
+  AmpiMsg* peek (int p, int pos);
+};
+
 class AmpiSeqQ : private CkNoncopyable {
   int *next;
-  AmpiOOQ<AmpiMsg*> q;
+  AmpiOOQ q;
   int seqEntries;
   
   public:
@@ -655,7 +737,7 @@ class AmpiSeqQ : private CkNoncopyable {
   void init(int p) {
     seqEntries = p;
     q.init (p);
-    next = new int [p]; 
+    next = new int [seqEntries]; 
     for (int i=0; i<p; i++)
       next [i] = 0;
   }
@@ -681,6 +763,9 @@ class AmpiSeqQ : private CkNoncopyable {
   }
   void pup(PUP::er &p) {
     p|seqEntries;
+    if (p.isUnpacking ()) {
+      next = new int [seqEntries]; 
+    }
     p(next,seqEntries);
     p|q;
   }
