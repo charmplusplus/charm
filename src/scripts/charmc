@@ -686,7 +686,7 @@ do
 	BASE=`stripExtention $FILE`
 	TMP=`basename $FILE`".TMP"
 	FILE_EXT=`getExtention $FILE`
-	if [ "$FILE_EXT" != ".o" ]
+	if [ "$FILE_EXT" != ".o" -a "$FILE_EXT" != ".M" -a "$FILE_EXT" != ".ci" ]
 	then
 		[ $VERBOSE ] && echo "Compiling $FILE"
 		DoNoErrCheck $RM $BASE.o $BASE.f.o
