@@ -681,6 +681,10 @@ if [ "$LANGUAGE" = "charm++" -a -n "$CMK_BLUEGENE" ]
 then
         LANGUAGE="bgcharm++"
 fi
+if [ "$LANGUAGE" = "converse++" -a -n "$CMK_BLUEGENE" ]
+then
+        LANGUAGE="bgconverse++"
+fi
 if [ "$LANGUAGE" = "bgcharm++" ]
 then
 	TRACEMODE=`AddList $TRACEMODE bluegene`
@@ -1107,6 +1111,9 @@ case "$LANGUAGE" in
 "bgcharm++")
         PRE_LIBRARIES="$PRE_LIBRARIES -lconv-bluegene -lconv-bluegene-logs"
 	;;
+"bgconverse++")
+        MIDDLE_LIBS="$MIDDLE_LIBS -lconv-bluegene -lconv-bluegene-logs"
+	;;
 esac
 
 if [ "$AMPIMAIN" != "" ]
@@ -1319,9 +1326,9 @@ case "$LANGUAGE" in
 	MAKE_LD="1"
 	MIDDLE_LIBS="-lconv-cplus-n $CORE_LIBS -ltrace-converse -lm"
 	;;
-"converse++"|"bluegene")
+"converse++"|"bluegene"|"bgconverse++")
 	MAKE_LDXX="1"
-	MIDDLE_LIBS="-lconv-cplus-y $CORE_LIBS -ltrace-converse -lm"
+	MIDDLE_LIBS="$MIDDLE_LIBS -lconv-cplus-y $CORE_LIBS -ltrace-converse -lm"
 	;;
 *)
 	Abort "Unrecognized choice of language $LANGUAGE"

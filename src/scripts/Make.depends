@@ -85,14 +85,14 @@ conv-ccs.o: conv-ccs.c converse.h conv-config.h conv-common.h conv-mach.h \
   conv-autoconfig.h conv-mach-opt.h pup_c.h conv-cpm.h conv-cpath.h \
   conv-qd.h conv-random.h conv-lists.h conv-trace.h persistent.h \
   debug-conv.h conv-ccs.h sockRoutines.h ccs-server.h queueing.h \
-  ckhashtable.h
+  ckhashtable.h pup.h
 	$(CHARMC) -c -I. conv-ccs.c
 
 ccs-builtins.o: ccs-builtins.C converse.h conv-config.h conv-common.h \
   conv-mach.h conv-autoconfig.h conv-mach-opt.h pup_c.h conv-cpm.h \
   conv-cpath.h conv-qd.h conv-random.h conv-lists.h conv-trace.h \
-  persistent.h debug-conv.h ckhashtable.h pup.h debug-charm.h conv-ccs.h \
-  sockRoutines.h ccs-server.h queueing.h
+  persistent.h debug-conv.h ckhashtable.h pup.h pup_toNetwork4.h \
+  debug-charm.h conv-ccs.h sockRoutines.h ccs-server.h queueing.h
 	$(CHARMC) -c -I. ccs-builtins.C
 
 traceCore.o: traceCore.C converse.h conv-config.h conv-common.h \
@@ -204,8 +204,8 @@ trace-bluegene.o: trace-bluegene.C charm++.h charm.h converse.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h CkFutures.decl.h \
   charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
   sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
-  trace-bluegene.h trace-common.h blue.h blue_impl.h blue_types.h \
-  blue_timing.h blue_logs.h blue_defs.h
+  trace-bluegene.h trace-common.h blue.h blue-conv.h blue_impl.h \
+  blue_types.h blue_timing.h blue_logs.h blue_defs.h
 	$(CHARMC) -c -I. trace-bluegene.C
 
 trace-projector.o: trace-projector.C charm++.h charm.h converse.h \
@@ -399,9 +399,9 @@ debug-message.o: debug-message.C ck.h charm++.h charm.h converse.h \
 debug-charm.o: debug-charm.C converse.h conv-config.h conv-common.h \
   conv-mach.h conv-autoconfig.h conv-mach-opt.h pup_c.h conv-cpm.h \
   conv-cpath.h conv-qd.h conv-random.h conv-lists.h conv-trace.h \
-  persistent.h debug-conv.h ckhashtable.h conv-ccs.h sockRoutines.h \
-  ccs-server.h ck.h charm++.h charm.h pup.h middle.h middle-conv.h \
-  cklists.h ckbitvector.h ckstream.h init.h debug-charm.h \
+  persistent.h debug-conv.h ckhashtable.h pup.h conv-ccs.h sockRoutines.h \
+  ccs-server.h debug-charm.h charm.h middle.h middle-conv.h cklists.h \
+  register.h ck.h charm++.h ckbitvector.h ckstream.h init.h \
   CkMarshall.decl.h cksection.h ckcallback.h ckobjQ.h ckreduction.h \
   CkReduction.decl.h cknodegroupreduction.h CkArrayReductionMgr.decl.h \
   ckmemcheckpoint.h CkMemCheckpoint.decl.h readonly.h ckarray.h \
@@ -410,7 +410,7 @@ debug-charm.o: debug-charm.C converse.h conv-config.h conv-common.h \
   ComlibStrategy.h CkFutures.decl.h charisma.h charisma.decl.h tempo.h \
   tempo.decl.h waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h \
   CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
-  envelope.h qd.h register.h stats.h ckfutures.h
+  envelope.h qd.h stats.h ckfutures.h
 	$(CHARMC) -c -I. debug-charm.C
 
 ckcallback.o: ckcallback.C charm++.h charm.h converse.h conv-config.h \
@@ -1216,49 +1216,49 @@ manager.o: manager.C manager.h CentralLB.h BaseLB.h LBDatabase.h lbdb.h \
 blue.o: blue.C cklists.h pup.h converse.h conv-config.h conv-common.h \
   conv-mach.h conv-autoconfig.h conv-mach-opt.h pup_c.h conv-cpm.h \
   conv-cpath.h conv-qd.h conv-random.h conv-lists.h conv-trace.h \
-  persistent.h debug-conv.h queueing.h blue.h blue_impl.h blue_types.h \
-  blue_timing.h blue_logs.h blue_defs.h
+  persistent.h debug-conv.h queueing.h blue.h blue-conv.h blue_impl.h \
+  blue_types.h blue_timing.h blue_logs.h blue_defs.h
 	$(CHARMC) -c -I. blue.C
 
 blue_node.o: blue_node.C blue.h converse.h conv-config.h conv-common.h \
   conv-mach.h conv-autoconfig.h conv-mach-opt.h pup_c.h conv-cpm.h \
   conv-cpath.h conv-qd.h conv-random.h conv-lists.h conv-trace.h \
-  persistent.h debug-conv.h blue_impl.h blue_types.h blue_timing.h \
-  cklists.h pup.h blue_logs.h blue_defs.h
+  persistent.h debug-conv.h blue-conv.h blue_impl.h blue_types.h \
+  blue_timing.h cklists.h pup.h blue_logs.h blue_defs.h
 	$(CHARMC) -c -I. blue_node.C
 
 blue_proc.o: blue_proc.C blue.h converse.h conv-config.h conv-common.h \
   conv-mach.h conv-autoconfig.h conv-mach-opt.h pup_c.h conv-cpm.h \
   conv-cpath.h conv-qd.h conv-random.h conv-lists.h conv-trace.h \
-  persistent.h debug-conv.h blue_impl.h blue_types.h blue_timing.h \
-  cklists.h pup.h blue_logs.h blue_defs.h
+  persistent.h debug-conv.h blue-conv.h blue_impl.h blue_types.h \
+  blue_timing.h cklists.h pup.h blue_logs.h blue_defs.h
 	$(CHARMC) -c -I. blue_proc.C
 
 blue_init.o: blue_init.C cklists.h pup.h converse.h conv-config.h \
   conv-common.h conv-mach.h conv-autoconfig.h conv-mach-opt.h pup_c.h \
   conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
-  conv-trace.h persistent.h debug-conv.h queueing.h blue.h blue_impl.h \
-  blue_types.h blue_timing.h blue_logs.h blue_defs.h
+  conv-trace.h persistent.h debug-conv.h queueing.h blue.h blue-conv.h \
+  blue_impl.h blue_types.h blue_timing.h blue_logs.h blue_defs.h
 	$(CHARMC) -c -I. blue_init.C
 
 blue_timing.o: blue_timing.C blue.h converse.h conv-config.h \
   conv-common.h conv-mach.h conv-autoconfig.h conv-mach-opt.h pup_c.h \
   conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
-  conv-trace.h persistent.h debug-conv.h blue_impl.h blue_types.h \
-  blue_timing.h cklists.h pup.h blue_logs.h blue_defs.h
+  conv-trace.h persistent.h debug-conv.h blue-conv.h blue_impl.h \
+  blue_types.h blue_timing.h cklists.h pup.h blue_logs.h blue_defs.h
 	$(CHARMC) -c -I. blue_timing.C
 
 blue_IO.o: blue_IO.C blue.h converse.h conv-config.h conv-common.h \
   conv-mach.h conv-autoconfig.h conv-mach-opt.h pup_c.h conv-cpm.h \
   conv-cpath.h conv-qd.h conv-random.h conv-lists.h conv-trace.h \
-  persistent.h debug-conv.h blue_impl.h blue_types.h blue_timing.h \
-  cklists.h pup.h blue_logs.h blue_defs.h
+  persistent.h debug-conv.h blue-conv.h blue_impl.h blue_types.h \
+  blue_timing.h cklists.h pup.h blue_logs.h blue_defs.h
 	$(CHARMC) -c -I. blue_IO.C
 
 blue_logs.o: blue_logs.C blue.h converse.h conv-config.h conv-common.h \
   conv-mach.h conv-autoconfig.h conv-mach-opt.h pup_c.h conv-cpm.h \
   conv-cpath.h conv-qd.h conv-random.h conv-lists.h conv-trace.h \
-  persistent.h debug-conv.h blue_impl.h blue_types.h blue_timing.h \
-  cklists.h pup.h blue_logs.h blue_defs.h
+  persistent.h debug-conv.h blue-conv.h blue_impl.h blue_types.h \
+  blue_timing.h cklists.h pup.h blue_logs.h blue_defs.h
 	$(CHARMC) -c -I. blue_logs.C
 
