@@ -73,6 +73,8 @@ int               Cmi_numpes;    /* Total number of processors */
 static int        Cmi_nodestart; /* First processor in this address space */ 
 CpvDeclare(void*, CmiLocalQueue);
 
+int 		  idleblock = 0;
+
 #define BLK_LEN  512
 
 #if CMK_NODE_QUEUE_AVAILABLE
@@ -343,6 +345,50 @@ static int PumpMsgs(void)
   }
 }
 
+/* blocking version */
+static int PumpMsgsBlocking(void)
+{
+  static int nbytes = 5000000;
+  static char *buf = NULL;
+  int size, flg, res;
+  MPI_Status sts;
+  char *msg;
+  int recd=0;
+
+  if (!PCQueueEmpty(CmiGetState()->recv)) return; 
+  if (!CdsFifo_Empty(CpvAccess(CmiLocalQueue))) return;
+  if (!CqsEmpty(CpvAccess(CsdSchedQueue))) return;
+  if (sent_msgs)  return;
+
+  // CmiPrintf("[%d] PumpMsgsBlocking. \n", CmiMyPe());
+
+  if (buf == NULL) buf = (char *) CmiAlloc(nbytes);
+
+  while(1) {
+    if (MPI_SUCCESS != PMPI_Recv(buf,nbytes,MPI_BYTE,MPI_ANY_SOURCE,TAG, MPI_COMM_WORLD,&sts)) 
+      CmiAbort("PumpMsgs: PMP_Recv failed!\n");
+    PMPI_Get_count(&sts, MPI_BYTE, &size);
+    msg = (char *) CmiAlloc(size);
+    memcpy(msg, buf, size);
+
+#if CMK_NODE_QUEUE_AVAILABLE
+    if (CMI_DEST_RANK(msg)==DGRAM_NODEMESSAGE)
+      PCQueuePush(CsvAccess(NodeRecv), msg);
+    else
+#endif
+      CmiPushPE(CMI_DEST_RANK(msg), msg);
+
+#if CMK_BROADCAST_SPANNING_TREE
+    if (CMI_BROADCAST_ROOT(msg))
+      SendSpanningChildren(nbytes, msg);
+#elif CMK_BROADCAST_HYPERCUBE
+    if (CMI_GET_CYCLE(msg))
+      SendHypercube(nbytes, msg);
+#endif
+    break;
+  }
+}
+
 /********************* MESSAGE RECEIVE FUNCTIONS ******************/
 
 static int inexit = 0;
@@ -417,7 +463,7 @@ void *CmiGetNonLocal(void)
 void CmiNotifyIdle(void)
 {
   CmiReleaseSentMessages();
-  PumpMsgs();
+  if (!PumpMsgs() && idleblock) PumpMsgsBlocking();
 }
  
 /********************* MESSAGE SEND FUNCTIONS ******************/
@@ -929,6 +975,10 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   if (Cmi_mynodesize > 1 && Cmi_mynode == 0) 
     CmiAbort("+ppn cannot be used in non SMP version!\n");
 #endif
+  idleblock = CmiGetArgFlag(argv, "+idleblocking");
+  if (idleblock && Cmi_mynode == 0) {
+    CmiPrintf("Running with idle blocking mode.\n");
+  }
   Cmi_numpes = Cmi_numnodes * Cmi_mynodesize;
   Cmi_nodestart = Cmi_mynode * Cmi_mynodesize;
   Cmi_argvcopy = CmiCopyArgs(argv);
