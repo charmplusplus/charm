@@ -59,8 +59,7 @@ typedef enum {
 /// How to do a message delivery:
 typedef enum {
 	CkDeliver_queue=0, //Deliver via the scheduler's queue
-	CkDeliver_inline=1, //Deliver via a regular call
-	CkDeliver_immediate=2 //Deliver immediate message
+	CkDeliver_inline=1  //Deliver via a regular call
 } CkDeliver_t;
 
 #include "CkLocation.decl.h"
@@ -491,7 +490,6 @@ public:
 	///Deliver message to this element:
 	inline void deliverViaQueue(CkMessage *m) {deliver(m,CkDeliver_queue);}
 	inline void deliverInline(CkMessage *m) {deliver(m,CkDeliver_inline);}
-	inline void deliverImmediate(CkMessage *m) {deliver(m,CkDeliver_immediate);}
 	void deliver(CkMessage *m, CkDeliver_t type);
 
 	///Done inserting elements for now

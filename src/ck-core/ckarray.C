@@ -583,15 +583,13 @@ void CProxyElement_ArrayBase::ckSend(CkArrayMessage *msg, int ep) const
 		CkAbort("Array index length (nInts) is too long-- did you "
 			"use bytes instead of integers?\n");
 #endif
-        CmiBool immediate = (CmiBool)msg->array_isImmediate();
 	msg_prepareSend(msg,ep,ckGetArrayID());
 	msg->array_index()=_idx;//Insert array index
 	if (ckIsDelegated()) //Just call our delegateMgr
 	  ckDelegatedTo()->ArraySend(ep,msg,_idx,ckGetArrayID());
 	else 
 	{ //Usual case: a direct send
-	  ckLocalBranch()->deliver(msg, 
-	  	immediate?CkDeliver_immediate:CkDeliver_queue);
+	  ckLocalBranch()->deliver(msg, CkDeliver_queue);
 	}
 }
 

@@ -894,10 +894,7 @@ public:
 		msg->array_hops()++;
 		DEBS((AA"   Forwarding message for element %s to %d (REMOTE)\n"AB,
 		      idx2str(msg->array_index()),onPe));
-		if (type==CkDeliver_immediate)
-		  myLocMgr->getProxy()[onPe].deliverImmediate(msg);
-		else /* normal message */
-		  CkArrayManagerDeliver(onPe,msg);
+		CkArrayManagerDeliver(onPe,msg);
 		return CmiTrue;
 	}
 	//Return if this element is now obsolete
@@ -1082,7 +1079,6 @@ void CkLocMgr::pup(PUP::er &p){
 void _CkLocMgrInit(void) {
   /* Don't trace our deliver method--it does its own tracing */
   CkDisableTracing(CkIndex_CkLocMgr::deliverInline(0));
-  CkDisableTracing(CkIndex_CkLocMgr::deliverImmediate(0));
 }
 
 /// Add a new local array manager to our list.
@@ -1287,10 +1283,7 @@ CmiBool CkLocMgr::deliverUnknown(CkArrayMessage *msg,CkDeliver_t type)
 	{// Forward the message to its home processor
 		DEBM((AA"Forwarding message for unknown %s\n"AB,idx2str(idx)));
 		msg->array_hops()++;
-		if (type==CkDeliver_immediate) 
-			thisProxy[onPe].deliverImmediate(msg);
-		else
-			CkArrayManagerDeliver(onPe,msg);
+		CkArrayManagerDeliver(onPe,msg);
 		return CmiTrue;
 	}
 	else
