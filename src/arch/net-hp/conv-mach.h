@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 2.21  1996-07-15 20:58:27  jyelon
+ * Revision 2.22  1996-07-16 05:20:41  milind
+ * Added CMK_VECTOR_SEND
+ *
+ * Revision 2.21  1996/07/15  20:58:27  jyelon
  * Flags now use #if, not #ifdef.  Also cleaned up a lot.
  *
  *
@@ -102,6 +105,9 @@
 #define CMK_TIMER_USE_GETRUSAGE                            0
 #define CMK_TIMER_USE_SPECIAL                              0
 #define CMK_TIMER_USE_TIMES                                1
+
+#define CMK_USE_GENERIC_VECTOR_SEND                        0
+#define CMK_USE_SPECIAL_VECTOR_SEND                        1
 
 #define CMK_WAIT_NOT_NEEDED                                0
 #define CMK_WAIT_USES_SYS_WAIT_H                           1
