@@ -73,7 +73,7 @@
 
 #include "../daemon.h"
 
-//#define DEBUGF(x) printf x
+/*#define DEBUGF(x) printf x*/
 #define DEBUGF(x) 
 
 #ifndef MAXPATHLEN
@@ -1249,7 +1249,7 @@ void req_handle_ccs(void) {}
  ****************************************************************************/
  /** Macro to switch on the case when charmrun stays up even if
  one of the processor crashes*/
-//#define __FAULT__
+/*#define __FAULT__*/
 
 SOCKET *req_clients; /*TCP request sockets for each node*/
 int  req_nClients;/*Number of entries in above list (==nodetab_rank0_size)*/
@@ -1462,8 +1462,8 @@ which kills everybody.
 */
 int socket_error_in_poll(int code,const char *msg)
 {
-//commenting it for fault tolerance
-//ifdef it
+/*commenting it for fault tolerance*/
+/*ifdef it*/
 
 	int i;
 	skt_set_abort(ignore_socket_errors);
