@@ -281,7 +281,7 @@ generate.o : generate.c ../../src/Common/conv-ldb/typedefs.h $(CVHEADERS)
 cldb.o: cldb.c ../../src/Common/conv-ldb/cldb.h $(CVHEADERS)
 	$(CHARMC) -I../../src/Common/conv-ldb/ cldb.c
 
-quiescence.o: quiescence.h $(CVHEADERS)
+quiescence.o: quiescence.c $(CVHEADERS)
 	$(CHARMC) quiescence.c
 
 libldb-rand.o: cldb.rand.c ../../src/Common/conv-ldb/cldb.h $(CVHEADERS)
