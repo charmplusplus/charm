@@ -36,7 +36,7 @@ struct ComplexPt {
 
 class complex : public fftw_complex {
 public:
-  complex() {re=0; im=0;}
+  inline complex() {re=0; im=0;}
   explicit complex(fftw_real r) {re=r; im=0;}
   complex(fftw_real r,fftw_real i) {re=r; im=i;}
   double getMagSqr(void) const { return re*re+im*im; }
@@ -60,10 +60,10 @@ public:
     p|im;
   }
 
-  complex * operator new[] (size_t size){
+  void * operator new[] (size_t size){
     void *buf = CmiAlloc(size);
-    memset(buf, 0, size);
-    return (complex *)buf;
+    //memset(buf, 0, size);
+    return buf;
   }
   
   void operator delete[] (void *buf){

@@ -188,7 +188,7 @@ PairCalculator::acceptResult(int size, double *matrix, int rowNum, CkCallback cb
   CkPrintf("[%d %d %d %d]: Accept Result with size %d\n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z, size);
 #endif
   complex *mynewData = new complex[N*grainSize];
-  memset(mynewData, 0, sizeof(complex)*N*grainSize);
+  //  memset(mynewData, 0, sizeof(complex)*N*grainSize);
 
   int offset = 0, index = thisIndex.y*S + thisIndex.x;
 
