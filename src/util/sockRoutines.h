@@ -122,8 +122,8 @@ static void sleep(int secs) {Sleep(1000*secs);}
 
 #else
   /*For non-windows (UNIX) systems:*/
-#include <sys/time.h>
 #include <sys/types.h>
+#include <sys/time.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -132,9 +132,9 @@ static void sleep(int secs) {Sleep(1000*secs);}
 #include <fcntl.h>
 
 #ifndef SOCKET
-#define SOCKET int
-#define INVALID_SOCKET (SOCKET)(~0)
-#define SOCKET_ERROR (-1)
+#  define SOCKET int
+#  define INVALID_SOCKET (SOCKET)(~0)
+#  define SOCKET_ERROR (-1)
 #endif /*def SOCKET*/
 
 #endif /*WIN32*/

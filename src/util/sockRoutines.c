@@ -5,20 +5,20 @@
  * $Revision$
  *****************************************************************************/
 
+#include "sockRoutines.h"
+#ifndef CMK_NO_SOCKETS /*<- for ASCI Red*/
+
 #include <stdio.h>
-#include <fcntl.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 #include <signal.h>
 #include <time.h>
 #include <ctype.h>
+
 #if CMK_BPROC
 #include <sys/bproc.h>
 #endif
-
-#include "sockRoutines.h"
-#ifndef CMK_NO_SOCKETS /*<- for ASCI Red*/
 
 #if CMK_USE_CONVERSE
 #  include "converse.h" /* use real CmiTmpAlloc/Free */
