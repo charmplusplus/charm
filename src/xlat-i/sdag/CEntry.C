@@ -264,8 +264,10 @@ void CEntry::generateCode(XStr& op)
       op << "      case " << cn->nodeNum << ":\n";
       op << "      {\n";
       
+#if CMK_BLUEGENE_CHARM
       // bgLog2 stores the parent dependence of when, e.g. for, olist
       op <<"  cmsgbuf->bgLog2 = (void*)tr->args[1];\n";	 
+#endif
       sv = (CStateVar *)cn->stateVars->begin();
       i = 0;
       paramMarshalling = 0;
@@ -285,6 +287,8 @@ void CEntry::generateCode(XStr& op)
 	    if(i==1) {
 	       whenParams->append(" NULL ");
 	       lastWasVoid=0;
+	       // skip this arg which is supposed to be _bgParentLog
+	       iArgs++;
 	       continue;
 	    }
 #endif
