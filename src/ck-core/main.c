@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.15  1995-09-06 21:48:50  jyelon
+ * Revision 2.16  1995-09-07 05:27:11  gursoy
+ * modified HANDLE_INCOMING_MSG to buffer messages
+ *
+ * Revision 2.15  1995/09/06  21:48:50  jyelon
  * Eliminated 'CkProcess_BocMsg', using 'CkProcess_ForChareMsg' instead.
  *
  * Revision 2.14  1995/09/06  04:08:51  sanjeev
@@ -233,6 +236,17 @@ ENVELOPE *env;
 {
   CHARE_BLOCK *chare;
   int ep, type = GetEnv_msgType(env);  
+
+
+  /* temporary fix for messages arrived during initialization */
+  if (CpvAccess(CkInitPhase))
+  {
+      if (CmiMyPe() == 0)
+         CmiPrintf("** ERROR ** Processor 0 received an init message\n");
+      FIFO_EnQueue(CpvAccess(CkBuffQueue),(void *)env);
+      return;
+  }
+
   UNPACK(env);
   if (GetEnv_LdbFull(env))
     if(CpvAccess(InsideDataInit))
