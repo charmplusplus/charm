@@ -130,7 +130,7 @@ LDObjHandle LDRegisterObj(LDOMHandle h, LDObjid id, void *userptr,
 			  int migratable);
 void LDUnregisterObj(LDObjHandle h);
 
-void LDObjTime(LDObjHandle h, double walltime, double cputime);
+void LDObjTime(LDObjHandle &h, double walltime, double cputime);
 int LDRunningObject(LDHandle _h, LDObjHandle* _o );
 void LDObjectStart(const LDObjHandle &_h);
 void LDObjectStop(const LDObjHandle &_h);
@@ -160,6 +160,7 @@ void LDTurnManualLBOff(LDHandle lbdb);
 void LDCollectStatsOn(LDHandle lbdb);
 void LDCollectStatsOff(LDHandle lbdb);
 void LDQueryEstLoad(LDHandle bdb);
+void LDQueryKnownObjLoad(LDObjHandle &h, double *cpuT, double *wallT);
 
 int LDGetObjDataSz(LDHandle lbdb);
 void LDGetObjData(LDHandle lbdb, LDObjData *data);

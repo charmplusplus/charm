@@ -30,6 +30,7 @@ public:
     parentDB = _parentDB;
     migratable = _migratable;
     registered = CmiTrue;
+    lastCpuTime = lastWallTime = .0;
   }
 
   ~LBObj() { };
@@ -66,8 +67,9 @@ public:
   inline LDOMHandle &parentOM() { return data.handle.omhandle; }
   inline const LDObjHandle &GetLDObjHandle() const { return data.handle; }
   inline void SetMigratable(int mig) { data.migratable = mig; }
+  inline LDObjData &ObjData() { return data; };
+  inline void lastKnownLoad(double *c, double *w) {*c=lastCpuTime; *w=lastWallTime; }
 private:
-  inline LDObjData ObjData() { return data; };
 
   LBDB* parentDB;
 //  LDOMHandle parentOM;
@@ -76,6 +78,8 @@ private:
 //  void *userData;
   double startWTime;
   double startCTime;
+  double lastCpuTime;
+  double lastWallTime;
   CmiBool migratable;   // temp
   CmiBool registered;
 };

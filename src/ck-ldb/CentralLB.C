@@ -66,6 +66,7 @@ void CentralLB::staticAtSync(void* data)
 
 CentralLB::CentralLB()
 {
+  lbname = "CentralLB";
   mystep = 0;
   //  CkPrintf("Construct in %d\n",CkMyPe());
   theLbdb = CProxy_LBDatabase(lbdb).ckLocalBranch();
@@ -332,9 +333,12 @@ void CentralLB::RemoveNonMigratable(LDStats* stats, int count)
 
 void CentralLB::ReceiveMigration(LBMigrateMsg *m)
 {
+  int i;
+  for (i=0; i<CkNumPes(); i++) theLbdb->lastLBInfo.expectedLoad[i] = m->expectedLoad[i];
+  
   DEBUGF(("[%d] in ReceiveMigration %d moves\n",CkMyPe(),m->n_moves));
   migrates_expected = 0;
-  for(int i=0; i < m->n_moves; i++) {
+  for(i=0; i < m->n_moves; i++) {
     MigrateInfo& move = m->moves[i];
     const int me = CkMyPe();
     if (move.from_pe == me && move.to_pe != me) {
@@ -351,8 +355,6 @@ void CentralLB::ReceiveMigration(LBMigrateMsg *m)
   }
 #endif
 
-  lastLBInfo.expectedLoad = m->expectedLoad[CkMyPe()];
-  
   cur_ld_balancer = m->next_lb;
   if((CkMyPe() == cur_ld_balancer) && (cur_ld_balancer != 0)){
       int num_proc = CkNumPes();

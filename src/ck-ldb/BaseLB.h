@@ -27,16 +27,10 @@ protected:
   char *lbname;
   LBDatabase *theLbdb;
   LDBarrierReceiver receiver;
-
-  struct LastLBInfo {
-    double expectedLoad;
-  };
-  LastLBInfo lastLBInfo;
 public:
   BaseLB() ;
   void unregister(); 
   inline char *lbName() { return lbname; }
-  inline double expectedLoad() { return lastLBInfo.expectedLoad; }
 };
 
 /// migration decision for an obj.

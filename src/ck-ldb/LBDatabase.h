@@ -172,6 +172,13 @@ public:
   inline double GetLBPeriod() { return LDGetLBPeriod(myLDHandle);}
 private:
   LDHandle myLDHandle;
+public:
+  struct LastLBInfo {
+    double *expectedLoad;
+    LastLBInfo() { expectedLoad=new double[CkNumPes()]; }
+  };
+  LastLBInfo lastLBInfo;
+  inline double myExpectedLoad() { return lastLBInfo.expectedLoad[CkMyPe()]; }
 
 };
 

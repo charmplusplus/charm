@@ -164,12 +164,18 @@ void LBDB::Send(const LDOMHandle &destOM, const LDObjid &destid, unsigned int by
 void LBDB::ClearLoads(void)
 {
   int i;
-  for(i=0; i < objCount; i++)
-    if ((objs[i])->registered)
+  for(i=0; i < objCount; i++) {
+    LBObj *obj = objs[i];
+    if (obj->registered)
     {
-      (objs[i])->data.wallTime = 
-	(objs[i])->data.cpuTime = 0.;
+      if (obj->data.cpuTime>.0) {
+        obj->lastCpuTime = obj->data.cpuTime;
+        obj->lastWallTime = obj->data.wallTime;
+      }
+      obj->data.wallTime = 
+	obj->data.cpuTime = 0.;
     }
+  }
   delete commTable;
   commTable = new LBCommTable;
   machineUtil.Clear();

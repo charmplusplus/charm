@@ -61,7 +61,7 @@ extern "C" void LDUnregisterObj(LDObjHandle _h)
   return;
 }
 
-extern "C" void LDObjTime(LDObjHandle _h,
+extern "C" void LDObjTime(LDObjHandle &_h,
 			    double walltime, double cputime)
 {
   LBDB *const db = (LBDB*)(_h.omhandle.ldb.handle);
@@ -69,6 +69,13 @@ extern "C" void LDObjTime(LDObjHandle _h,
   obj->IncrementTime(walltime,cputime);
 }
   
+extern "C" void LDQueryKnownObjLoad(LDObjHandle &_h, double *cpuT, double *wallT)
+{
+  LBDB *const db = (LBDB*)(_h.omhandle.ldb.handle);
+  LBObj *const obj = db->LbObj(_h);
+  obj->lastKnownLoad(cpuT, wallT);
+}
+
 extern "C" void LDDumpDatabase(LDHandle _db)
 {
   LBDB *const db = (LBDB*)(_db.handle);
