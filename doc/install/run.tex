@@ -12,7 +12,10 @@
 % REVISION HISTORY:
 %
 % $Log$
-% Revision 1.6  1995-11-20 16:47:00  brunner
+% Revision 1.7  1995-11-20 20:14:22  brunner
+% Made the comments about simulator and Converse more sensible.
+%
+% Revision 1.6  1995/11/20  16:47:00  brunner
 % Added comments about simulator only working for Charm/Charm++
 %
 % Revision 1.5  1995/11/17  17:19:37  brunner
@@ -148,12 +151,10 @@ communication network. Each node is composed of an application
 processor, local memory, and a communication coprocessor.  The
 simulator is a beta version, and it is not yet proven that the
 simulator timers for performance measurements produce realistic
-results. Currently only Charm and Charm++ programs can take advantage
-of the simulator features, although other Converse based systems will
-still function without simulated network delays.
+results.
 
 
-In order to run Converse programs with the simulator:
+In order to run Charm and Charm++ programs with the simulator:
 \begin{itemize}
 
 \item link user program with \verb+<machine>/lib/libck-unimain.o+
@@ -164,6 +165,10 @@ In order to run Converse programs with the simulator:
    N is the number of processors.
 
 \end{itemize}
+Currently only Charm and Charm++ programs can take advantage of the
+simulator features, because the \verb+libck-unimain.o+ file is Charm
+specific.  In the future, a method to allow any Converse based program
+to use the simulator features will be devised.
 
 The basic task of the simulator is to manage the message passing
 obeying various machine and network parameters.  A message experiences
@@ -398,6 +403,6 @@ the user's path.
 file, because {\fexec rsh} does not run the {\fexec .login} file. 
 
 \item The nodes must be authorized to create windows on the host machine (see
-man page for {\fexec xhost} {\fexec xauth}).
+man pages for {\fexec xhost} and {\fexec xauth}).
 
 \end{enumerate}
