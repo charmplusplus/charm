@@ -8,81 +8,130 @@
 #ifndef _CKSTREAM_H
 #define _CKSTREAM_H
 
-// Because different people and platforms prefer
-//  different versions of the standard streambuf and
-//  ostream classes, they are protected these via typedefs.
-//  Eventually everybody should use the std:: versions.
-#if CMK_STL_USE_DOT_H || defined(CK_IOSTREAM_DOT_H)
-/* Weird pre-ISO nonstandard headers */
-# include <iostream.h>
-  typedef streambuf Ck_std_streambuf;
-  typedef ostream Ck_std_ostream;
-#else
-/* Normal ISO standard headers */
-# include <iostream>
-  typedef std::streambuf Ck_std_streambuf;
-  typedef std::ostream Ck_std_ostream;
-  using std::endl;
-#endif
+#include <string.h>
+#include <stdio.h>
 
-/** 
- * This std::streambuf buffers up characters for
- * output via CkPrintf or CkError.
- */
-class CkOStreamBuf : public Ck_std_streambuf {
-public:
-  CkOStreamBuf (int isErr_) { 
-    isErr=isErr_; 
-    resetMyBuffer();
+#define BUF_MAXLEN  16384
+
+class _CkOStream {
+  private:
+    int _isErr;
+    size_t _buflen, _actlen;
+    char _obuf[BUF_MAXLEN];
+    char _tbuf[1024];
+  public:
+    _CkOStream(int isErr=0) { 
+      _buflen=BUF_MAXLEN; 
+      _actlen=1;
+      _isErr = isErr; 
+      _obuf[0] = '\0'; 
+    }
+    _CkOStream& endl(void) {
+      strcat(_obuf, "\n");
+      if(_isErr)
+        CkError(_obuf);
+      else
+        CkPrintf(_obuf);
+      _obuf[0] = '\0'; 
+      _actlen=1;
+      return *this;
+    }
+
+    _CkOStream& operator << (_CkOStream& (*f)(_CkOStream &)) {
+      return f(*this);
+    }
+#define _OPSHIFTLEFT(type, format) \
+    _CkOStream& operator << (type x) { \
+      sprintf(_tbuf, format, (type) x); \
+      _actlen += strlen(_tbuf); \
+      if(_actlen > _buflen) \
+        CmiAbort("Print Buffer Overflow!!\n"); \
+      strcat(_obuf, _tbuf); \
+      return *this; \
+    }
+
+    _OPSHIFTLEFT(int, "%d");
+    _OPSHIFTLEFT(unsigned int, "%u");
+    _OPSHIFTLEFT(short, "%hd");
+    _OPSHIFTLEFT(unsigned short, "%hu");
+    _OPSHIFTLEFT(long, "%ld");
+    _OPSHIFTLEFT(unsigned long, "%lu");
+    _OPSHIFTLEFT(char, "%c");
+    _OPSHIFTLEFT(unsigned char, "%u");
+    _OPSHIFTLEFT(float, "%f");
+    _OPSHIFTLEFT(double, "%f");  // Floats and doubles are identical for printf
+    _OPSHIFTLEFT(const char*, "%s");
+    _OPSHIFTLEFT(void*, "%p");
+};
+
+static inline _CkOStream& endl(_CkOStream& s)  { return s.endl(); }
+
+class _CkOutStream : public _CkOStream {
+  public:
+    _CkOutStream() : _CkOStream(0) {}
+};
+
+class _CkErrStream : public _CkOStream {
+  public:
+    _CkErrStream() : _CkOStream(1) {}
+};
+
+CkpvExtern(_CkOutStream*, _ckout);
+CkpvExtern(_CkErrStream*, _ckerr);
+
+class CkOutStream {
+  public:
+  CkOutStream& operator << (_CkOStream& (*f)(_CkOStream &)) {
+    f(*CkpvAccess(_ckout));
+    return *this;
   }
-  ~CkOStreamBuf() {sync();}
-  
-protected:
-  int isErr;
-  enum {BUFSIZE=1024};
-  char buf[BUFSIZE+1]; // My output buffer
-  
-  /// The one true output routine: write these n characters.
-  ///  buf is always zero-terminated.
-  void myWrite(const char *buf,int n);
-  
-  /// Set up the streambuf with my output buffer.
-  void resetMyBuffer(void) {
-    setp(buf,buf+BUFSIZE);
+#define OUTSHIFTLEFT(type) \
+  CkOutStream& operator << (type x) { \
+    *CkpvAccess(_ckout) << x; \
+    return *this; \
   }
-
-  /// std::streambuf routine: write buffer to output
-  int sync (void);
-  /// std::streambuf routine: buffer is full
-  int overflow (int ch);
+    OUTSHIFTLEFT(int);
+    OUTSHIFTLEFT(unsigned int);
+    OUTSHIFTLEFT(short);
+    OUTSHIFTLEFT(unsigned short);
+    OUTSHIFTLEFT(long);
+    OUTSHIFTLEFT(unsigned long);
+    OUTSHIFTLEFT(char);
+    OUTSHIFTLEFT(unsigned char);
+    OUTSHIFTLEFT(float);
+    OUTSHIFTLEFT(double);
+    OUTSHIFTLEFT(const char*);
+    OUTSHIFTLEFT(void*);
 };
 
-/// A std::ostream that sends its output to CkPrintf.
-class CkOutStream : public Ck_std_ostream {
-	CkOStreamBuf buf;
-public:
-	CkOutStream() :Ck_std_ostream(&buf), buf(0) {}
+class CkErrStream {
+  public:
+  CkErrStream& operator << (_CkOStream& (*f)(_CkOStream &)) {
+    f(*CkpvAccess(_ckerr));
+    return *this;
+  }
+#define ERRSHIFTLEFT(type) \
+  CkErrStream& operator << (type x) { \
+    *CkpvAccess(_ckerr) << x; \
+    return *this; \
+  }
+    ERRSHIFTLEFT(int);
+    ERRSHIFTLEFT(unsigned int);
+    ERRSHIFTLEFT(short);
+    ERRSHIFTLEFT(unsigned short);
+    ERRSHIFTLEFT(long);
+    ERRSHIFTLEFT(unsigned long);
+    ERRSHIFTLEFT(char);
+    ERRSHIFTLEFT(unsigned char);
+    ERRSHIFTLEFT(float);
+    ERRSHIFTLEFT(double);
+    ERRSHIFTLEFT(const char*);
+    ERRSHIFTLEFT(void*);
 };
 
-/// A std::ostream that sends its output to CkError.
-class CkErrStream : public Ck_std_ostream {
-	CkOStreamBuf buf;
-public:
-	CkErrStream() :Ck_std_ostream(&buf), buf(1) {}
-};
+extern CkOutStream ckout;
+extern CkErrStream ckerr;
 
-// For SMP safety, keep a separate output stream per thread:
-CpvExtern(CkOutStream,_ckout);
-CpvExtern(CkErrStream,_ckerr);
-#define ckout CpvAccess(_ckout)
-#define ckerr CpvAccess(_ckerr)
-
-
-
-/**
- * A silly, silly replacement for std::istream.
- *  This should probably just be removed, since it's nonstandard.
- */
 class CkInStream {
   public:
 #define OPSHIFTRIGHT(type, format) \
@@ -107,6 +156,7 @@ class CkInStream {
       return *this;
     }
 };
+
 extern CkInStream ckin;
 
 #endif

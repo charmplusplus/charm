@@ -128,7 +128,6 @@ static inline IrrGroup *_localBranch(CkGroupID gID)
 }
 
 extern void _initCharm(int argc, char **argv);
-extern void CkStreamInit(char **argv);
 
 typedef  void  (*CkExitFn) (void);
 
