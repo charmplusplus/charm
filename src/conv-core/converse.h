@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.91  1998-07-02 02:52:18  jyelon
+ * Revision 2.92  1998-09-01 04:29:32  pramacha
+ * Added declarations for CmiNodeBarrier() (and associated CmiNodeBarrierInit())
+ *
+ * Revision 2.91  1998/07/02 02:52:18  jyelon
  * Changed CldEnqueue to three parameters ( no pack function )
  *
  * Revision 2.90  1998/06/15 23:49:23  milind
@@ -270,7 +273,8 @@ extern int CmiRankOf(int pe);
 
 extern void CmiMemLock();
 extern void CmiMemUnlock();
-#define CmiNodeBarrier() 0
+extern void CmiNodeBarrierInit();
+extern void CmiNodeBarrier CMK_PROTO((void));
 #define CmiSvAlloc CmiAlloc
 
 
