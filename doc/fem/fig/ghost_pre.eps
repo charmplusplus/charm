@@ -1,9 +1,9 @@
 %!PS-Adobe-2.0 EPSF-2.0
-%%Title: partitioned_mesh.eps
+%%Title: ghost_pre.eps
 %%Creator: fig2dev Version 3.2 Patchlevel 3d
-%%CreationDate: Fri Dec 13 15:34:45 2002
+%%CreationDate: Fri Dec 13 16:07:43 2002
 %%For: olawlor@talent.cs.uiuc.edu (Orion Lawlor)
-%%BoundingBox: 0 0 673 414
+%%BoundingBox: 0 0 665 444
 %%Magnification: 1.0000
 %%EndComments
 /$F2psDict 200 dict def
@@ -45,8 +45,8 @@ $F2psDict /mtrx matrix put
 
 end
 save
-newpath 0 414 moveto 0 0 lineto 673 0 lineto 673 414 lineto closepath clip newpath
--58.5 495.0 translate
+newpath 0 444 moveto 0 0 lineto 665 0 lineto 665 444 lineto closepath clip newpath
+-48.2 527.8 translate
 1 -1 scale
 
 /cp {closepath} bind def
@@ -80,19 +80,6 @@ newpath 0 414 moveto 0 0 lineto 673 0 lineto 673 414 lineto closepath clip newpa
   bind def
 /shd {dup dup currentrgbcolor 4 -2 roll mul 4 -2 roll mul
   4 -2 roll mul srgb} bind def
- /DrawEllipse {
-	/endangle exch def
-	/startangle exch def
-	/yrad exch def
-	/xrad exch def
-	/y exch def
-	/x exch def
-	/savematrix mtrx currentmatrix def
-	x y tr xrad yrad sc 0 0 1 startangle endangle arc
-	closepath
-	savematrix setmatrix
-	} def
-
 /$F2psBegin {$F2psDict begin /$F2psEnteredState save def} def
 /$F2psEnd {$F2psEnteredState restore end} def
 
@@ -102,67 +89,87 @@ $F2psBegin
 %
 % Fig objects follow
 %
-7.500 slw
-% Ellipse
-n 2475 2250 106 106 0 360 DrawEllipse gs 0.00 setgray ef gr gs col0 s gr
-
-% Ellipse
-n 1456 7650 106 106 0 360 DrawEllipse gs 0.00 setgray ef gr gs col0 s gr
-
-% Ellipse
-n 5356 6150 106 106 0 360 DrawEllipse gs 0.00 setgray ef gr gs col0 s gr
-
-% Ellipse
-n 8206 1875 106 106 0 360 DrawEllipse gs 0.00 setgray ef gr gs col0 s gr
-
-% Ellipse
-n 6075 6900 106 106 0 360 DrawEllipse gs 0.00 setgray ef gr gs col0 s gr
-
-% Ellipse
-n 8925 2625 106 106 0 360 DrawEllipse gs 0.00 setgray ef gr gs col0 s gr
-
-% Ellipse
-n 11700 6075 106 106 0 360 DrawEllipse gs 0.00 setgray ef gr gs col0 s gr
-
 % Polyline
-30.000 slw
-n 2475 2175 m 1425 7650 l
- 5325 6150 l gs col0 s gr 
+15.000 slw
+n 2925 3075 m 4275 2925 l 3675 4425 l
+ cp gs col0 s gr 
 % Polyline
-n 2475 2250 m 8175 1875 l 5325 6150 l
- 2475 2175 l gs col0 s gr 
+n 4275 2925 m 4725 2325 l 5475 3375 l
+ cp gs col0 s gr 
 % Polyline
-n 6075 6900 m 8925 2625 l 11700 6075 l
- 6075 6900 l  cp gs col0 s gr 
-/Times-Roman ff 480.00 scf sf
-975 8250 m
-gs 1 -1 sc (A n3) col0 sh gr
-/Times-Roman ff 480.00 scf sf
-1950 1875 m
-gs 1 -1 sc (A n1) col0 sh gr
-/Times-Roman ff 480.00 scf sf
-4800 3675 m
-gs 1 -1 sc (A e2) col0 sh gr
-/Times-Roman ff 480.00 scf sf
-2625 5400 m
-gs 1 -1 sc (A e1) col0 sh gr
-/Times-Roman ff 480.00 scf sf
-4275 6825 m
-gs 1 -1 sc (A n4) col0 sh gr
-/Times-Roman ff 480.00 scf sf
-7275 1725 m
-gs 1 -1 sc (A n2) col0 sh gr
-/Times-Roman ff 480.00 scf sf
-6150 7500 m
-gs 1 -1 sc (B n3) col0 sh gr
-/Times-Roman ff 480.00 scf sf
-11250 6675 m
-gs 1 -1 sc (B n2) col0 sh gr
-/Times-Roman ff 480.00 scf sf
-9150 2475 m
-gs 1 -1 sc (B n1) col0 sh gr
-/Times-Roman ff 480.00 scf sf
-8700 5250 m
-gs 1 -1 sc (B e1) col0 sh gr
+n 5475 3375 m 3675 4425 l 4275 2925 l
+ cp gs col0 s gr 
+% Polyline
+n 3675 4425 m 2325 4275 l 3375 5925 l
+ cp gs col0 s gr 
+% Polyline
+n 2925 3075 m 2325 4275 l 3675 4425 l
+ cp gs col0 s gr 
+% Polyline
+n 2925 3075 m 3825 2175 l 4275 2925 l
+ cp gs col0 s gr 
+% Polyline
+n 3825 2175 m 4725 2325 l 4275 2925 l
+ cp gs col0 s gr 
+% Polyline
+n 3825 2175 m 4425 1725 l 4725 2325 l
+ cp gs col0 s gr 
+% Polyline
+n 2325 4275 m 2175 6525 l 3375 5925 l
+ cp gs col0 s gr 
+% Polyline
+n 2175 6525 m 2325 8625 l 3525 7725 l
+ cp gs col0 s gr 
+% Polyline
+n 4425 1725 m 4275 1425 l 3675 1575 l
+ cp gs col0 s gr 
+% Polyline
+n 3675 1575 m 3825 2175 l 2625 2175 l
+ cp gs col0 s gr 
+% Polyline
+n 2625 2175 m 2925 3075 l 1725 3225 l
+ cp gs col0 s gr 
+% Polyline
+n 1725 3225 m 2325 4275 l 1125 4275 l
+ cp gs col0 s gr 
+% Polyline
+n 1125 4275 m 2175 6525 l 825 6675 l
+ cp gs col0 s gr 
+% Polyline
+n 825 6675 m 2325 8625 l 975 8775 l
+ cp gs col0 s gr 
+% Polyline
+n 3375 5925 m 3525 7725 l 2175 6525 l
+ cp gs col0 s gr 
+% Polyline
+45.000 slw
+n 3525 7725 m 3375 5910 l 3690 4395 l
+ 5460 3390 l gs col0 s gr 
+% Polyline
+15.000 slw
+n 8100 4515 m 9750 4815 l 7800 6015 l
+ cp gs col0 s gr 
+% Polyline
+n 9750 4815 m 9900 6465 l 7800 6015 l
+ cp gs col0 s gr 
+% Polyline
+n 7800 6015 m 7950 7815 l 9900 6465 l
+ cp gs col0 s gr 
+% Polyline
+n 9900 6465 m 11100 4365 l 11850 6015 l
+ cp gs col0 s gr 
+% Polyline
+n 9750 4815 m 11100 4365 l 9900 6465 l
+ cp gs col0 s gr 
+% Polyline
+n 9767 4814 m 9917 3464 l 11117 4364 l
+ cp gs col0 s gr 
+% Polyline
+n 8108 4515 m 9758 4815 l 9908 3465 l
+ cp gs col0 s gr 
+% Polyline
+45.000 slw
+n 9930 3465 m 8100 4515 l 7800 6015 l
+ 7950 7815 l gs col0 s gr 
 $F2psEnd
 rs
