@@ -7,6 +7,7 @@
 
 #ifndef QUEUEING_H
 #define QUEUEING_H
+//#define FASTQ
 
 #ifdef __cplusplus
 extern "C" {
@@ -34,6 +35,7 @@ typedef struct deq_struct
 }
 *deq;
 
+#ifndef FASTQ
 typedef struct prioqelt_struct
 {
   struct deq_struct data;
@@ -42,17 +44,50 @@ typedef struct prioqelt_struct
   struct prio_struct pri;
 }
 *prioqelt;
+#else
+typedef struct prioqelt_struct
+{
+  struct deq_struct data;
+  struct prioqelt_struct *ht_left; /* Pointer to left bucket in hash table. */
+  struct prioqelt_struct *ht_right; /* Pointer to right bucket in hash table. */
+  struct prioqelt_struct *ht_parent; /* Pointer to the parent bucket in the hash table */
+  struct prioqelt_struct **ht_handle; /* Pointer to pointer in the hashtable that points to me (!) */
+  struct prio_struct pri;
+  //  int deleted;
+}
+*prioqelt;
+#endif
 
+//#ifndef FASTQ
+//#define PRIOQ_TABSIZE 1017
+//#else
 #define PRIOQ_TABSIZE 1017
+//#endif
+
+/*#ifndef FASTQ*/
 typedef struct prioq_struct
 {
   int heapsize;
   int heapnext;
   prioqelt *heap;
-  prioqelt hashtab[PRIOQ_TABSIZE];
+  prioqelt *hashtab;
+  int hash_key_size;
+  int hash_entry_size;
 }
 *prioq;
+/*#else
+typedef struct prioq1_struct
+{
+  int heapsize;
+  int heapnext;
+  prioqelt1 *heap;
+  prioqelt1 hashtab[PRIOQ_TABSIZE];
+}
+*prioq1;
+#endif
+*/
 
+/*#ifndef FASTQ*/
 typedef struct Queue_struct
 {
   unsigned int length;
@@ -62,6 +97,18 @@ typedef struct Queue_struct
   struct prioq_struct posprioq;
 }
 *Queue;
+/*#else
+typedef struct Queue1_struct
+{
+  unsigned int length;
+  unsigned int maxlen;
+  struct deq_struct zeroprio;
+  struct prioq1_struct negprioq;
+  struct prioq1_struct posprioq;
+}
+*Queue;
+#endif
+*/
 
 Queue CqsCreate(void);
 void CqsDelete(Queue);
@@ -77,7 +124,7 @@ void CqsDequeue(Queue, void **msgPtr);
 unsigned int CqsLength(Queue);
 unsigned int CqsMaxLength(Queue);
 int CqsEmpty(Queue);
-int  CqsPrioGT(prio, prio);
+int CqsPrioGT(prio, prio);
 prio CqsGetPriority(Queue);
 
 #ifdef __cplusplus
