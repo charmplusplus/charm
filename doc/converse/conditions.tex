@@ -1,0 +1,76 @@
+
+
+\chapter{Timers, periodic checks, and conditions}
+
+This module provides functions that allow users to insert hooks, that
+is user supplied functions that are called by the system at specified
+times, or as specific conditions arise.
+
+{\bf  CcdCallOnCondition}
+\begin{verbatim}
+void CcdCallOnCondition(condnum,fnp,arg)
+    int condnum;
+    CcdVoidFn fnp;
+    void *arg;      
+\end{verbatim}
+
+This called instructs the system to call the function indicated by the
+function pointer fnp, with the specified argument arg, when the
+condition indicated by condnum is raised next. Multiple functions may
+be registered for the same condition number. A total of 511
+conditions, numbered one through 511, are supported.  Currently, users
+must make sure that various condition numbers used in a program are
+disjoint.  (In future, we may provide a call to allocate the next
+available condition number.)
+
+The system supports a predefined condition, with condition number 1
+(CcdPROCESSORIDLE, BUT I AM AM NOT SURE THAT IS EXPORTED TO THE USER
+PROGRAM), which is raised by the system when they are no entities
+(ready threads, messages for objects, posted handlers, etc.) in the
+scheduler's queue.
+
+\vspace*{0.2in}
+{\bf  CcdRaiseCondition}
+\begin{verbatim}
+void CcdRaiseCondition(condNum)
+     int condNum;
+\end{verbatim}
+
+When this function is called, it invokes all the functions whose
+pointers were registered for the \verb#condNum# via a {\em prior} call
+to CcdCallOnCondition(..).  All calls to CcdCallOnCondition(..) {\em
+during} this function's execution take effect only after this function
+returns.  Once a user-registered function is called, it loses its
+registration.  So, if users want the function to be called the next
+time the same condition arises, they must register the function again.
+
+\vspace*{0.2in}
+{\bf  CcdPeriodicallyCall}
+\begin{verbatim}
+void CcdPeriodicallyCall(fnp, arg)
+    CcdVoidFn fnp;
+    void *arg;  
+\end{verbatim}
+
+To function registered through this call is called periodically by the
+system's scheduler.  Typically, it would be called every time the
+scheduler gets control, such as while switching context to a new
+thread or before scheduling a message for an object, or before calling
+a posted handler. These functions don't have to be re-registered after
+every call, unlike the functions for the "conditions". 
+
+\vspace*{0.2in}
+{\bf  CcdCallFnAfter}
+\begin{verbatim}
+void CcdCallFnAfter(fnp, arg, deltaT)
+    CcdVoidFn fnp;
+    void *arg;
+    unsigned int deltaT; 
+\end{verbatim}
+
+This call registers a function via a pointer to it, fnp,  that will be
+called at least deltaT milliseconds later. 
+The registered function fnp is actually called the first time
+scheduler gets control after deltaT milliseconds have elapsed. 
+(This function may not work correctly at the moment! When corrected,
+the time units may switch to seconds expressed as a "double"). 
