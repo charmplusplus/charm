@@ -468,6 +468,11 @@ Debug "About to read machine config script"
 
 Debug "Read config script, setting vars..."
 
+if [ -n "$CMK_CP" ]
+then
+	CP="$CMK_CP"
+fi
+
 if [ -n "$USE_RELIABLE_CC" ]
 then
 	CMK_CC="$CMK_CC_RELIABLE"
