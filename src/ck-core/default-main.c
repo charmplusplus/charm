@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.6  1995-07-03 17:55:55  gursoy
+ * Revision 2.7  1995-07-10 22:30:49  brunner
+ * Added call to perfModuleInit() for CPV macros
+ *
+ * Revision 2.6  1995/07/03  17:55:55  gursoy
  * changed charm_main to user_main
  *
  * Revision 2.5  1995/06/18  21:55:06  sanjeev
@@ -72,6 +75,7 @@ char *argv[];
   statModuleInit();
   tblModuleInit(); 
   ldbModuleInit();
+  perfModuleInit();
 
   if (CmiMyRank() == 0) CmiNodeBarrier();
 
