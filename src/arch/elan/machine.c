@@ -471,12 +471,15 @@ int remote_get_done(void *e){
   ELAN_EVENT *evt = (ELAN_EVENT *)e;
 
   int flag = elan_poll(evt, ELAN_POLL_EVENT);
+  /*
   if(flag) {
     elan_wait(evt, ELAN_WAIT_EVENT);
     return 1;
   }
   else
     return 0;  
+  */
+  return flag;
 }
 
 void remote_get_wait_all(){
