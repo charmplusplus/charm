@@ -556,7 +556,7 @@ class CProxy {
 	:delegatedMgr(dTo)
         {
             delegatedPtr = NULL;
-            if(delegatedMgr != NULL) 
+            if(delegatedMgr != NULL && dPtr != NULL) 
                 delegatedPtr = dTo->ckCopyDelegateData(dPtr);            
         }
   public:

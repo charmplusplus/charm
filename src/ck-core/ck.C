@@ -185,7 +185,7 @@ CProxy::CProxy(const CProxy &src)
     :delegatedMgr(src.delegatedMgr) 
 {
     delegatedPtr = NULL;
-    if(delegatedMgr != NULL) 
+    if(delegatedMgr != NULL && src.delegatedPtr != NULL) 
         delegatedPtr = src.delegatedMgr->ckCopyDelegateData(src.delegatedPtr);
 }
 
@@ -195,7 +195,7 @@ CProxy& CProxy::operator=(const CProxy &src) {
 	ckUndelegate();
 	delegatedMgr=src.delegatedMgr;
 
-        if(delegatedMgr != NULL)
+        if(delegatedMgr != NULL && src.delegatedPtr != NULL)
             delegatedPtr = delegatedMgr->ckCopyDelegateData(src.delegatedPtr);
         else
             delegatedPtr = NULL;
@@ -225,7 +225,7 @@ void CProxy::pup(PUP::er &p) {
 		delegatedMgr=(CkDelegateMgr *)CkLocalBranch(delegatedTo);
 	}
         
-        delegatedPtr=delegatedMgr->DelegatePointerPup(p,delegatedPtr);
+        delegatedPtr = delegatedMgr->DelegatePointerPup(p,delegatedPtr);
 	if (p.isUnpacking() && delegatedPtr)
             delegatedPtr->ref();
       }
