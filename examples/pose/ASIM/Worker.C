@@ -26,6 +26,7 @@ worker::worker(WorkerData *m)
   elapseIdx = sendIdx = nbrIdx = offsetIdx = msgIdx = gsIdx = 0;
   SmallWorkMsg *sm = new SmallWorkMsg;
   memset(sm->data, 0, SM_MSG_SZ*sizeof(int));
+  //CkPrintf("Worker %d created on PE %d. Sending message to self...\n", parent->thisIndex, CkMyPe());
   POSE_invoke(workSmall(sm), worker, parent->thisIndex, 0);
 }
 
@@ -118,7 +119,7 @@ void worker::doWork()
   MediumWorkMsg *mm;
   LargeWorkMsg *lm;
 
-  if (OVT() > 2000) return;
+  if ((POSE_endtime > -1) && (OVT() > POSE_endtime))  return;
 
   // do some computation based on gsIdx
   if (granularity > 0.0) POSE_busy_wait(granularity);

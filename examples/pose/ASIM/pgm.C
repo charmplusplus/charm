@@ -70,7 +70,7 @@ main::main(CkArgMsg *m)
     granularity = atof(&(grainString[2]));
 
   CkPrintf("%s distribution  %s connectivity  %d%% locality  %d endtime  %s grainsize %f granularity\n",
-	   m->argv[4], m->argv[5], locality, POSE_endtime, text, granularity);
+	   m->argv[4], m->argv[5], locality, atoi(m->argv[7]), text, granularity);
 
   pattern = atoi(m->argv[9]);
   elapsePattern = pattern / 100;
@@ -83,8 +83,8 @@ main::main(CkArgMsg *m)
 	   elapsePattern, offsetPattern, sendPattern);
 
   POSE_init();
-  //POSE_endtime = atoi(m->argv[7]);
   //POSE_useQD();
+  POSE_useET(atoi(m->argv[7]));
   POSE_useID();
 
   // create all the workers
