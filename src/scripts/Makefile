@@ -23,7 +23,7 @@
 
 SHELL=/bin/sh
 
-all: charm++ bluegene LIBS ampi tsm sm pvm sdag doc
+all: charm++ bluegene LIBS ampi f90charm tsm sm pvm sdag doc
 
 charm++: converse libck.a charmxi
 
@@ -50,6 +50,8 @@ AMPI: AMPIC AMPIF
 AMPIC: charm++ LIBS libampi.a
 
 AMPIF: charm++ libconv-utilf.a LIBS libampif.a
+
+f90charm: charm++ libf90charm.a
 
 translators: sdagx charmxi conv-cpm
 
@@ -157,6 +159,7 @@ dirs+sources:
 	./gatherflat ../../src/Common/langs/bluegene   .
 	./gatherflat ../../src/Common/langs/sdag/xlator       .
 	./gatherflat ../../src/Common/langs/sdag/runtime      .
+	./gatherflat ../../src/Common/langs/f90charm      .
 	./gatherflat ../../src/Common/xlat-i           .
 	./gatherflat ../../src/Common/xlatcpm          .
 	./gathertree ../../src/QuickThreads QuickThreads
@@ -632,6 +635,13 @@ libampif.a: ampi.C ampimain.C ampif.C ampi.h ampiimpl.h ampi.decl.h ampi.def.h \
 	$(CHARMC) -DAMPI_FORTRAN=1 -c ampimain.C
 	$(CHARMC) -DAMPI_FORTRAN=1 -c ampif.C
 	$(CHARMC) -cp ../lib -o libampif.a ampimain.o ampi.o ampif.o
+
+libf90charm.a: f90main.ci f90main.h f90main.C charmf.h charmf.C futil.f90
+	$(CHARMC) f90main.ci
+	$(CHARMC) -c -DAMPI_FORTRAN=1 f90main.C
+	$(CHARMC) -c -DAMPI_FORTRAN=1 charmf.C
+	$(CHARMC) -c futil.f90
+	$(CHARMC) -cp ../lib -o libf90charm.a f90main.o charmf.o futil.o
 
 libsdag.a: CDep.o
 	$(CHARMC) -cp ../lib -o libsdag.a CDep.o

@@ -900,7 +900,7 @@ case "$LANGUAGE" in
         fi
 	;;
 "f90charm")
-        PRE_LIBRARIES="$PRE_LIBRARIES lib/libmain.a "
+        PRE_LIBRARIES="$PRE_LIBRARIES -lf90charm "
         POST_LIBRARIES="$POST_LIBRARIES $CMK_F90LIBS"
         if [ ! -z "$CMK_F90OBJS" ] 
         then
