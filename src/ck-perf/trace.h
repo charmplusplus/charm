@@ -142,6 +142,7 @@ CkpvExtern(int, traceOnPe);
 #endif
 
 #define _TRACE_USER_EVENT(x) _TRACE_ONLY(CkpvAccess(_traces)->userEvent(x))
+#define _TRACE_USER_EVENT_BRACKET(x,bt,et) _TRACE_ONLY(CkpvAccess(_traces)->userBracketEvent(x,bt,et))
 #define _TRACE_CREATION_1(env, t) _TRACE_ONLY(CkpvAccess(_traces)->creation(env, t))
 #define _TRACE_CREATION_N(env, t, num) _TRACE_ONLY(CkpvAccess(_traces)->creation(env, t, num))
 #define _TRACE_BEGIN_EXECUTE(env) _TRACE_ONLY(CkpvAccess(_traces)->beginExecute(env))
