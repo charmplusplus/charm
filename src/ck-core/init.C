@@ -479,6 +479,9 @@ void _initCharm(int argc, char **argv)
   _nodeBocHandlerIdx = CmiRegisterHandler((CmiHandler)_initHandler);
   _qdHandlerIdx = CmiRegisterHandler((CmiHandler)_qdHandler);
   _infoIdx = CldRegisterInfoFn((CldInfoFn)_infoFn);
+
+  CthSetSuspendable(CthSelf(), 0);
+
   CldRegisterEstimator((CldEstimator)_charmLoadEstimator);
 
 #if CMK_DEBUG_MODE
