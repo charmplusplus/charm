@@ -1,6 +1,8 @@
 #ifndef LBDBH_H
 #define LBDBH_H
 
+#include <converse.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
