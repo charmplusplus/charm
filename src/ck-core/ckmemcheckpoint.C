@@ -151,16 +151,18 @@ public:
 // class for in-disk checkpointing
 class CkDiskCheckPTInfo: public CkCheckPTInfo 
 {
-  char fname[64];
+  char *fname;
   int bud1, bud2;
   int len; 			// checkpoint size
 public:
   CkDiskCheckPTInfo(CkArrayID a, CkGroupID loc, CkArrayIndexMax idx, int pno, int myidx): CkCheckPTInfo(a, loc, idx, pno)
   {
-#if !defined(_WIN32) || defined(__CYGWIN__)
-    sprintf(fname, "/tmp/ckpt%d.%d", getpid(), myidx);
+#if CMK_USE_MKSTEMP
+    fname = new char[64];
+    sprintf(fname, "/tmp/ckpt%d-XXXXXX", myidx);
+    mkstemp(fname);
 #else
-    sprintf(fname, "/tmp/ckpt%d.%d", rand(), myidx);
+    fname=tmpnam(NULL);
 #endif
     bud1 = bud2 = -1;
     len = 0;
