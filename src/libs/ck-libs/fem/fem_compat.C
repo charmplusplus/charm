@@ -15,32 +15,63 @@ public, documented interfaces.
 #define S FEM_Mesh_default_write()
 #define G FEM_Mesh_default_read()
 
-/***************** Mesh Set ******************/
+/***************** Mesh Utility ******************/
+
+// Renumber connectivity from bizarre new double-ended indexing to 
+//  sensible old "first real, then ghost" connectivity.
+static void renumberGhostConn(int nodeGhosts, //Number of real nodes
+	int *conn,int per,int n,int idxbase) 
+{
+	for (int r=0;r<n;r++)
+	for (int c=0;c<per;c++)
+	{
+		int i=conn[r*per+c];
+		if (idxbase==0) { /* C version: */
+			if (FEM_Is_ghost_index(i))
+				conn[r*per+c]=nodeGhosts+FEM_From_ghost_index(i);
+		} else { /* f90 version: */
+			if (i<0)
+				conn[r*per+c]=nodeGhosts+(-i);
+		}
+	}
+}
+
+// get/set this entity's connectivity, as both real and ghost:
+static void mesh_conn(int fem_mesh,int entity,int *conn,int idxBase) {
+	int n=FEM_Mesh_get_length(fem_mesh,entity);
+	int per=FEM_Mesh_get_width(fem_mesh,entity,FEM_CONN);
+	FEM_Mesh_data(fem_mesh,entity,FEM_CONN, conn, 0,n, FEM_INDEX_0+idxBase,per);
+	
+	if (FEM_Mesh_is_get(fem_mesh))
+	{ /* Consider getting ghost data (never set ghost data) */
+		int nGhosts=FEM_Mesh_get_length(fem_mesh,FEM_GHOST+entity);
+		if (nGhosts>0) { /* Grab ghost data on the end of the regular data */ 
+			int *ghostConn=&conn[n*per];
+			FEM_Mesh_data(fem_mesh,FEM_GHOST+entity,FEM_CONN,
+				ghostConn, 0,nGhosts, FEM_INDEX_0+idxBase,per);
+			renumberGhostConn(FEM_Mesh_get_length(fem_mesh,FEM_NODE),ghostConn,per,nGhosts,idxBase);
+		}
+	}
+}
 
 // Little utility routine: get/set real and ghost data
 static void mesh_data(int fem_mesh,int entity, int dtype,void *v_data) {
 	int n=FEM_Mesh_get_length(fem_mesh,entity);
 	int per=FEM_Mesh_get_width(fem_mesh,entity,FEM_DATA);
 	FEM_Mesh_data(fem_mesh,entity,FEM_DATA,v_data, 0,n, dtype,per);
-	int nGhosts=FEM_Mesh_get_length(fem_mesh,FEM_GHOST+entity);
-	char *data=(char *)v_data;
-	int size=IDXL_Layout::type_size(dtype);
-	if (nGhosts>0) /* Grab ghost data on the end of the regular data */ 
-		FEM_Mesh_data(fem_mesh,FEM_GHOST+entity,FEM_DATA,
-			(void *)&data[n*per*size], 0,nGhosts, dtype,per);
-}
-// Little utility routine: get/set real and ghost data, as doubles
-static void mesh_double_data(int fem_mesh,int entity, const double *data) {
-	mesh_data(fem_mesh,entity,FEM_DOUBLE,(void *)data);
-}
-static void mesh_fortran_conn(int mesh,int entity, int *conn, int first,int n, int per)
-{
-	FEM_Mesh_data(mesh,entity, FEM_CONN, conn, first,n, FEM_INDEX_1, per);
+	
+	if (FEM_Mesh_is_get(fem_mesh))
+	{ /* Consider getting ghost data (never set ghost data) */
+		int nGhosts=FEM_Mesh_get_length(fem_mesh,FEM_GHOST+entity);
+		char *data=(char *)v_data;
+		int size=IDXL_Layout::type_size(dtype);
+		if (nGhosts>0) /* Grab ghost data on the end of the regular data */ 
+			FEM_Mesh_data(fem_mesh,FEM_GHOST+entity,FEM_DATA,
+				(void *)&data[n*per*size], 0,nGhosts, dtype,per);
+	}
 }
 
-int mesh_get_ghost_length(int mesh,int entity) {
-	return FEM_Mesh_get_length(mesh,entity)+FEM_Mesh_get_length(mesh,FEM_GHOST+entity);
-}
+/***************** Mesh Set ******************/
 
 // Lengths
 CDECL void FEM_Set_node(int nNodes,int doublePerNode) {
@@ -64,14 +95,14 @@ FORTRAN_AS_C(FEM_SET_ELEM,FEM_Set_elem,fem_set_elem,
 // Data
   // FIXME: add FEM_[GS]et_[node|elem]_data_c
 CDECL void FEM_Set_node_data(const double *data) {
-	mesh_double_data(S,FEM_NODE,data);
+	mesh_data(S,FEM_NODE,FEM_DOUBLE,(void *)data);
 }
 FORTRAN_AS_C(FEM_SET_NODE_DATA_R,FEM_Set_node_data,fem_set_node_data_r,
 	(const double *data), (data)
 )
 
 CDECL void FEM_Set_elem_data(int elType,const double *data) {
-	mesh_double_data(S,FEM_ELEM+elType,data);
+	mesh_data(S,FEM_ELEM+elType,FEM_DOUBLE,(void *)data);
 }
 FORTRAN_AS_C(FEM_SET_ELEM_DATA_R,FEM_Set_elem_data,fem_set_elem_data_r,
 	(int *t,const double *d), (*t,d)
@@ -79,19 +110,13 @@ FORTRAN_AS_C(FEM_SET_ELEM_DATA_R,FEM_Set_elem_data,fem_set_elem_data_r,
 
 // Connectivity
 CDECL void FEM_Set_elem_conn(int elType,const int *conn) {
-	int entity=FEM_ELEM+elType;
-	int n=FEM_Mesh_get_length(S,entity);
-	int per=FEM_Mesh_get_width(S,entity,FEM_CONN);
-	FEM_Mesh_set_data(S,entity, FEM_CONN, (int *)conn, 0,n, FEM_INDEX_0, per);
+	mesh_conn(S,FEM_ELEM+elType, (int *)conn, 0);
 }
 
 FDECL void FTN_NAME(FEM_SET_ELEM_CONN_R,fem_set_elem_conn_r)
 	(int *elType,const int *conn) 
 {
-	int entity=FEM_ELEM+*elType;
-	int n=FEM_Mesh_get_length(S,entity);
-	int per=FEM_Mesh_get_width(S,entity,FEM_CONN);
-	mesh_fortran_conn(S,entity, (int *)conn, 0,n, per);
+	mesh_conn(S,FEM_ELEM+*elType, (int *)conn, 1);
 }
 
 // Sparse
@@ -100,10 +125,8 @@ CDECL void FEM_Set_sparse(int sid,int nRecords,
   	const void *data,int dataPerRec,int dataType) 
 {
 	int entity=FEM_SPARSE+sid;
-	FEM_Mesh_set_conn(S,entity,
-		(int *)nodes, 0,nRecords, nodesPerRec);
-	FEM_Mesh_set_data(S,entity,FEM_DATA,
-		(void *)data, 0,nRecords, dataType,dataPerRec); 
+	FEM_Mesh_set_data(S,entity,FEM_CONN, (int *)nodes, 0,nRecords, FEM_INDEX_0,nodesPerRec);
+	FEM_Mesh_set_data(S,entity,FEM_DATA, (void *)data, 0,nRecords, dataType,dataPerRec); 
 }
 FDECL void FTN_NAME(FEM_SET_SPARSE,fem_set_sparse)
 	(int *sid,int *nRecords,
@@ -112,7 +135,7 @@ FDECL void FTN_NAME(FEM_SET_SPARSE,fem_set_sparse)
 {
 	int entity=FEM_SPARSE+*sid;
 	int n=*nRecords;
-	mesh_fortran_conn(S,entity, (int *)nodes, 0,n, *nodesPerRec);
+	FEM_Mesh_set_data(S,entity,FEM_CONN, (int *)nodes, 0,n, FEM_INDEX_1,*nodesPerRec);
 	FEM_Mesh_set_data(S,entity,FEM_DATA, (void *)data, 0,n, *dataType,*dataPerRec); 
 }
 
@@ -120,8 +143,7 @@ CDECL void FEM_Set_sparse_elem(int sid,const int *rec2elem)
 {
 	int entity=FEM_SPARSE+sid;
 	int n=FEM_Mesh_get_length(S,FEM_SPARSE+sid);
-	FEM_Mesh_set_data(S,entity,FEM_SPARSE_ELEM,
-		(void *)rec2elem, 0,n, FEM_INDEX_0,2);
+	FEM_Mesh_set_data(S,entity,FEM_SPARSE_ELEM, (void *)rec2elem, 0,n, FEM_INDEX_0,2);
 }
 FDECL void FTN_NAME(FEM_SET_SPARSE_ELEM,fem_set_sparse_elem)
 	(int *sid,int *rec2elem) 
@@ -142,39 +164,10 @@ FDECL void FTN_NAME(FEM_SET_SPARSE_ELEM,fem_set_sparse_elem)
 
 
 /***************** Mesh Get ******************/
-// Renumber connectivity from bizarre new double-ended indexing to 
-//  sensible old "first real, then ghost" connectivity.
-static void renumberGhostConn(int nodeGhosts, //Number of real nodes
-	int *conn,int per,int n,int idxbase) 
-{
-	for (int r=0;r<n;r++)
-	for (int c=0;c<per;c++)
-	{
-		int i=conn[r*per+c];
-		if (idxbase==0) { /* C version: */
-			if (FEM_Is_ghost_index(i))
-				conn[r*per+c]=nodeGhosts+FEM_From_ghost_index(i);
-		} else { /* f90 version: */
-			if (i<0)
-				conn[r*per+c]=nodeGhosts+(-i);
-		}
-	}
+// Get total number of real and ghosts for this entity type
+static int mesh_get_ghost_length(int mesh,int entity) {
+	return FEM_Mesh_get_length(mesh,entity)+FEM_Mesh_get_length(mesh,FEM_GHOST+entity);
 }
-
-// read this entity types' connectivity, as both real and ghost:
-static void mesh_conn(int fem_mesh,int entity,int *conn,int idxBase) {
-	int n=FEM_Mesh_get_length(fem_mesh,entity);
-	int per=FEM_Mesh_get_width(fem_mesh,entity,FEM_CONN);
-	FEM_Mesh_data(fem_mesh,entity,FEM_CONN, conn, 0,n, FEM_INDEX_0+idxBase,per);
-	int nGhosts=FEM_Mesh_get_length(fem_mesh,FEM_GHOST+entity);
-	if (nGhosts>0) { /* Grab ghost data on the end of the regular data */ 
-		int *ghostConn=&conn[n*per];
-		FEM_Mesh_data(fem_mesh,FEM_GHOST+entity,FEM_CONN,
-			ghostConn, 0,nGhosts, FEM_INDEX_0+idxBase,per);
-		renumberGhostConn(FEM_Mesh_get_length(fem_mesh,FEM_NODE),ghostConn,per,nGhosts,idxBase);
-	}
-}
-
 
 // Lengths
 CDECL void FEM_Get_node(int *nNodes,int *perNode) {
@@ -195,13 +188,13 @@ FORTRAN_AS_C(FEM_GET_ELEM,FEM_Get_elem,fem_get_elem,
 
 // Data
 CDECL void FEM_Get_node_data(double *data) {
-	mesh_double_data(G,FEM_NODE,data);
+	mesh_data(G,FEM_NODE,FEM_DOUBLE,data);
 }
 FORTRAN_AS_C(FEM_GET_NODE_DATA_R,FEM_Get_node_data,fem_get_node_data_r,
 	(double *data), (data))
 
 CDECL void FEM_Get_elem_data(int elType,double *data) {
-	mesh_double_data(G,FEM_ELEM+elType,data);
+	mesh_data(G,FEM_ELEM+elType,FEM_DOUBLE,data);
 }
 FORTRAN_AS_C(FEM_GET_ELEM_DATA_R,FEM_Get_elem_data,fem_get_elem_data_r,
 	(int *elType,double *data), (*elType,data))
