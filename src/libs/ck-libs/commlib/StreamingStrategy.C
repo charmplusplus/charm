@@ -12,11 +12,12 @@ StreamingStrategy::StreamingStrategy(int periodMs,int bufferMax_)
 
 void StreamingStrategy::insertMessage(CharmMessageHolder *cmsg) {
 
-    ComlibPrintf("StramingStrategy: InsertMessage %d, %d\n",  PERIOD, bufferMax);
     int pe=cmsg->dest_proc;
     char *msg = cmsg->getCharmMessage();
     envelope *env = UsrToEnv(msg);
     int size = env->getTotalsize();
+
+    ComlibPrintf("StramingStrategy: InsertMessage %d, %d, %d\n",  PERIOD, bufferMax, size);
     
     if(size > MAX_STREAMING_MESSAGE_SIZE) {//AVOID COPYING
         CmiSyncSendAndFree(pe, size, (char *)env);
@@ -45,7 +46,7 @@ void StreamingStrategy::flushPE(int pe) {
         CombinedMessage *msg; 
         int size;
         mpack.getMessage(msg, size);
-	ComlibPrintf("[%d] Streaming :flushPE %d messages, \n", CkMyPe(),streamingMsgCount[pe]);            
+	ComlibPrintf("[%d] Streaming :flushPE %d messages, \n", CkMyPe(),streamingMsgCount[pe]); 
         CmiSyncSendAndFree(pe, size, (char *)msg);
         streamingMsgCount[pe] = 0;
 

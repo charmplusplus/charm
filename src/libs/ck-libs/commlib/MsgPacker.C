@@ -144,6 +144,8 @@ void MsgPacker::deliver(CombinedMessage *cmb_msg){
             env->setUsed(0);
             env->setMsgIdx(msgIdx);
 
+            env->setTotalsize(sizeof(envelope) + size);
+
             if(a_elem)
                 CkDeliverMessageFree(ep, data, a_elem);                     
             else
