@@ -17,6 +17,7 @@ class PythonMain : public Chare {
 //#define PY_FLOAT   2
 //#define PY_DOUBLE  3
 
+/*
 enum Py_types {PY_INT, PY_LONG, PY_FLOAT, PY_DOUBLE};
 enum Py_objects {PY_CHARE, PY_GROUP, PY_NODEGROUP, PY_ARRAY1D, PY_ARRAY2D};
 
@@ -60,6 +61,7 @@ typedef struct TypedValue_ {
     }
   }
 } TypedValue;
+*/
 
 class PythonObject {
  public:
@@ -67,9 +69,8 @@ class PythonObject {
   void execute(CkCcsRequestMsg *msg);
 
   // the following three methods should be overwritten by the user
-  virtual TypedValue read(std::string) {CkAbort("PythonCCS: Method read should be reimplemented");};
-  virtual void write(std::string, TypedValue) {CkAbort("PythonCCS: Method write should be reimplemented");};
-  virtual Py_types getType(std::string) {CkAbort("PythonCCS: Method getType should be reimplemented");};
+  virtual PyObject* read(PyObject*) {CkAbort("PythonCCS: Method read should be reimplemented");};
+  virtual void write(PyObject*, PyObject*) {CkAbort("PythonCCS: Method write should be reimplemented");};
   //virtual void registerPython();
 };
 
@@ -79,73 +80,34 @@ class PythonChare : public Chare, public PythonObject {
  public:
   PythonChare() {}
   PythonChare(CkMigrateMessage *msg) {}
-  //void execute(CkCcsRequestMsg *msg);
-
-  /*
-  // the following two methods should be overwritten by the user
-  virtual TypedValue read(std::string) {CkAbort("PythonCCS: Method read should be reimplemented");};
-  virtual void write(std::string, TypedValue) {CkAbort("PythonCCS: Method write should be reimplemented");};
-  virtual Py_types getType(std::string) {CkAbort("PythonCCS: Method getType should be reimplemented");};
-  //virtual void registerPython();
-  */
 };
 
 class PythonGroup : public Group, public PythonObject {
  public:
   PythonGroup() {}
   PythonGroup(CkMigrateMessage *msg) {}
-  //void execute(CkCcsRequestMsg *msg);
-
-  /*
-  // the following three methods should be overwritten by the user
-  virtual TypedValue read(std::string) {CkAbort("PythonCCS: Method read should be reimplemented");};
-  virtual void write(std::string, TypedValue) {CkAbort("PythonCCS: Method write should be reimplemented");};
-  virtual Py_types getType(std::string) {CkAbort("PythonCCS: Method getType should be reimplemented");};
-  //virtual void registerPython();
-  */
 };
 
 class PythonNodeGroup : public NodeGroup, public PythonObject {
  public:
   PythonNodeGroup() {}
   PythonNodeGroup(CkMigrateMessage *msg) {}
-  //void execute(CkCcsRequestMsg *msg);
-
-  /*
-  // the following two methods should be overwritten by the user
-  virtual TypedValue read(std::string) {CkAbort("PythonCCS: Method read should be reimplemented");};
-  virtual void write(std::string, TypedValue) {CkAbort("PythonCCS: Method write should be reimplemented");};
-  virtual Py_types getType(std::string) {CkAbort("PythonCCS: Method getType should be reimplemented");};
-  //virtual void registerPython();
-  */
 };
 
 class PythonArray1D : public CBase_PythonArray1D, public PythonObject {
  public:
   PythonArray1D() {}
   PythonArray1D(CkMigrateMessage *msg) {}
-  //void execute(CkCcsRequestMsg *msg);
-
-  /*
-  // the following two methods should be overwritten by the user
-  virtual TypedValue read(std::string) {CkAbort("PythonCCS: Method read should be reimplemented");};
-  virtual void write(std::string, TypedValue) {CkAbort("PythonCCS: Method write should be reimplemented");};
-  virtual Py_types getType(std::string) {CkAbort("PythonCCS: Method getType should be reimplemented");};
-  //virtual void registerPython();
-  */
 };
 
 class PythonArray2D : public CBase_PythonArray2D, public PythonObject {
  public:
   PythonArray2D() {}
   PythonArray2D(CkMigrateMessage *msg) {}
-  //void execute(CkCcsRequestMsg *msg);
+};
 
-  /*
-  // the following two methods should be overwritten by the user
-  virtual TypedValue read(std::string) {CkAbort("PythonCCS: Method read should be reimplemented");};
-  virtual void write(std::string, TypedValue) {CkAbort("PythonCCS: Method write should be reimplemented");};
-  virtual Py_types getType(std::string) {CkAbort("PythonCCS: Method getType should be reimplemented");};
-  //virtual void registerPython();
-  */
+class PythonArray3D : public CBase_PythonArray3D, public PythonObject {
+ public:
+  PythonArray3D() {}
+  PythonArray3D(CkMigrateMessage *msg) {}
 };

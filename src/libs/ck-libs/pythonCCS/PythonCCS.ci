@@ -31,5 +31,10 @@ module PythonCCS {
 		entry void execute (CkCcsRequestMsg *msg);
 	}
 
+	array [3D] PythonArray3D {
+		entry PythonArray3D(void);
+		entry void execute (CkCcsRequestMsg *msg);
+	}
+
 	initnode void initializePythonDefault(void);
 }
