@@ -86,6 +86,13 @@ void  *CmiGetNonLocalNodeQ();
 #endif
 
 CpvDeclare(void*, CsdSchedQueue);
+
+#if CMK_OUT_OF_CORE
+/* The Queue where the Prefetch Thread puts the messages from CsdSchedQueue  */
+CpvDeclare(void*, CsdPrefetchQueue);
+pthread_mutex_t prefetchLock;
+#endif
+
 #if CMK_NODE_QUEUE_AVAILABLE
 CsvDeclare(void*, CsdNodeQueue);
 CsvDeclare(CmiNodeLock, CsdNodeQueueLock);
