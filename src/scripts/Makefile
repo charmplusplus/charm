@@ -899,7 +899,7 @@ conv-cpm.o: conv-cpm.c
 XIHEADERS=xi-symbol.h xi-util.h xi-grammar.tab.h
 CHARMXI=xi-main.o xi-symbol.o xi-grammar.tab.o xi-scan.o xi-util.o
 SDAGOBJ=sdag-globals.o CSdagConstruct.o CEntry.o
-SDAGHEADERS= CToken.h EToken.h CParsedFile.h \
+SDAGHEADERS= CToken.h EToken.h xiParsedFile.h \
 	sdag-globals.h CEntry.h
 
 charmxi: $(CHARMXI) $(SDAGOBJ)
