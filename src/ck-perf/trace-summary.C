@@ -20,9 +20,12 @@
 
 #define INVALIDEP     -2
 
+#define DefaultBinCount      10000
+
 CkpvStaticDeclare(TraceSummary*, _trace);
 static int _numEvents = 0;
 #define NUM_DUMMY_EPS 9
+CkpvDeclare(int, binCount);
 CkpvDeclare(double, binSize);
 CkpvDeclare(double, version);
 
@@ -113,7 +116,7 @@ SumLogPool::SumLogPool(char *pgm) : numBins(0), phaseTab(MAX_PHASES)
    if (TRACE_CHARM_PE() == 0) return; // blue gene related
 
    // TBD: Can this be moved to initMem?
-   poolSize = CkpvAccess(CtrLogBufSize);
+   poolSize = CkpvAccess(binCount);
    if (poolSize % 2) poolSize++;	// make sure it is even
    pool = new BinEntry[poolSize];
    _MEMCHECK(pool);
@@ -431,10 +434,15 @@ void BinEntry::write(FILE* fp)
 TraceSummary::TraceSummary(char **argv):binStart(0.0),bin(0.0),msgNum(0)
 {
   char *tmpStr;
+  CkpvInitialize(int, binCount);
   CkpvInitialize(double, binSize);
   CkpvInitialize(double, version);
   CkpvAccess(binSize) = BIN_SIZE;
   CkpvAccess(version) = VER;
+  CkpvAccess(binCount) = DefaultBinCount;
+  if (CmiGetArgIntDesc(argv,"+bincount",&CkpvAccess(binCount), "Total number of summary bins"))
+    if (CkMyPe() == 0) 
+      CmiPrintf("Trace: bincount: %d\n", CkpvAccess(binCount));
   CmiGetArgDoubleDesc(argv,"+binsize",&CkpvAccess(binSize),
   	"CPU usage log time resolution");
   CmiGetArgDoubleDesc(argv,"+version",&CkpvAccess(version),
