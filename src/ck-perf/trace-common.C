@@ -19,6 +19,8 @@
 
 #include "trace.h"
 #include "trace-common.h"
+#include "allEvents.h"          //projector
+CpvExtern(int, _traceCoreOn);   // projector
 
 #define DEBUGF(x)          // CmiPrintf x
 
@@ -49,9 +51,11 @@ static void traceCommonInit(char **argv)
   CkpvInitialize(double, traceInitTime);
   CkpvAccess(traceInitTime) = TRACE_TIMER();
   CpvInitialize(int, traceOn);
+  CpvInitialize(int, _traceCoreOn); //projector
   CkpvInitialize(int, CtrLogBufSize);
   CkpvInitialize(char*, traceRoot);
   CpvAccess(traceOn) = 0;
+  CpvAccess(_traceCoreOn)=0; //projector
 #if CMK_TRACE_IN_CHARM
   CkpvInitialize(int, traceOnPe);
   CkpvAccess(traceOnPe) = 1;
@@ -133,6 +137,7 @@ extern "C" void traceInit(char **argv)
 #if ! CMK_TRACE_IN_CHARM
   _traceInit(argv);
 #endif
+  initTraceCore(argv);
 }
 
 /// Charm++ version
@@ -159,6 +164,8 @@ void traceResume(CmiObjId *tid)
 #if ! CMK_TRACE_IN_CHARM
     CkpvAccess(_traces)->beginExecute(tid);
 #endif
+    if(CpvAccess(_traceCoreOn))
+	    resumeTraceCore();
 }
 
 extern "C"
@@ -230,6 +237,7 @@ void traceClose(void)
   OPTIMIZE_WARNING
   CkpvAccess(_traces)->traceClose();
 #endif
+   closeTraceCore();
 }
 
 extern "C"

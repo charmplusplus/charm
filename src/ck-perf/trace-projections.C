@@ -503,8 +503,10 @@ void TraceProjections::traceWriteSts(void)
 
 void TraceProjections::traceClose(void)
 {
-  if(CkMyPe()==0)
+  
+  if(CkMyPe()==0){
     _logPool->writeSts();
+  }
   if (TRACE_CHARM_PE()) {
     CkpvAccess(_trace)->endComputation();
     delete _logPool;		// will write

@@ -23,6 +23,7 @@
 #endif
 
 #include "trace-common.h"
+#include "trace-projector.h"
 
 #define PROJECTION_VERSION  "4.0"
 
