@@ -9,7 +9,7 @@ syntax() {
   echo '<versions>: ' 
   ( cd src ; ls -1 | egrep -v '(^Common)|(^CVS)|(^QuickThreads)|(^ccs-client)' | pr -3 -t )
 #  echo ''
-  echo '<options>:  help cxx pgcc icc gm vmi scyld '
+  echo '<options>: help cxx kcc pgcc icc gm vmi scyld '
   echo '<charmc-options>: e.g. -g -save -verbose'
   echo 'Note: This script is trivial.  It'
   echo ' 1. Creates directories <version> and <version>/tmp';
@@ -48,7 +48,7 @@ do
           test "$1" = "help" && printOption
           while [ ! $# -eq 0 ]
           do
-            if test "$1" = "pgcc" || test "$1" = "icc" || test "$1" = "cxx"
+            if test "$1" = "pgcc" || test "$1" = "icc" || test "$1" = "cxx" || test "$1" = "kcc"
             then
               if [ ! -f src/$VERSION/conv-mach-$1.h ]
               then
