@@ -767,12 +767,11 @@ int f3()
 
 /** ADDED 2-14-99 BY MD FOR USAGE TRACKING (TEMPORARY) **/
 
-#define CkUTimer()      ((int)(CmiWallTimer() * 1000000.0))
+// #define CkUTimer()      ((int)(CmiWallTimer() * 1000000.0))
 
-typedef unsigned int un_int;
-CpvDeclare(un_int, startTime);
-CpvDeclare(un_int, beginTime);
-CpvDeclare(un_int, usedTime);
+CpvDeclare(double, startTime);
+CpvDeclare(double, beginTime);
+CpvDeclare(double, usedTime);
 CpvDeclare(int, PROCESSING);
 
 /* Call this when the program is started
@@ -781,29 +780,29 @@ CpvDeclare(int, PROCESSING);
 */
 void initUsage()
 {
-   CpvInitialize(un_int, startTime);
-   CpvInitialize(un_int, beginTime);
-   CpvInitialize(un_int, usedTime);
+   CpvInitialize(double, startTime);
+   CpvInitialize(double, beginTime);
+   CpvInitialize(double, usedTime);
    CpvInitialize(int, PROCESSING);
-   CpvAccess(beginTime)  = CkUTimer();
-   CpvAccess(usedTime)   = 0;
+   CpvAccess(beginTime)  = CmiWallTimer();
+   CpvAccess(usedTime)   = 0.;
    CpvAccess(PROCESSING) = 0;
 }
 
 int getUsage()
 {
    int usage = 0;
-   un_int time      = CkUTimer();
-   un_int totalTime = time - CpvAccess(beginTime);
+   double time      = CmiWallTimer();
+   double totalTime = time - CpvAccess(beginTime);
 
    if(CpvAccess(PROCESSING))
    {
       CpvAccess(usedTime) += time - CpvAccess(startTime);
       CpvAccess(startTime) = time;
    }
-   if(totalTime > 0)
+   if(totalTime > 0.)
       usage = (100 * CpvAccess(usedTime))/totalTime;
-   CpvAccess(usedTime)  = 0;
+   CpvAccess(usedTime)  = 0.;
    CpvAccess(beginTime) = time;
    return usage;
 }
@@ -817,7 +816,7 @@ void usageStart()
 {
    if(CpvAccess(PROCESSING)) return;
 
-   CpvAccess(startTime)  = CkUTimer();
+   CpvAccess(startTime)  = CmiWallTimer();
    CpvAccess(PROCESSING) = 1;
 }
 
@@ -830,7 +829,7 @@ void usageStop()
 {
    if(!CpvAccess(PROCESSING)) return;
 
-   CpvAccess(usedTime)   += CkUTimer() - CpvAccess(startTime);
+   CpvAccess(usedTime)   += CmiWallTimer() - CpvAccess(startTime);
    CpvAccess(PROCESSING) = 0;
 }
 
