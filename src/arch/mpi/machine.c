@@ -58,9 +58,17 @@
 
 #define CMI_DEST_RANK(msg)               ((CmiMsgHeaderBasic *)msg)->rank
 
-#if CMK_USE_CHECKSUM
-#define CMI_SET_CHECKSUM(msg, len)	((CmiMsgHeaderBasic *)msg)->cksum = 0; ((CmiMsgHeaderBasic *)msg)->cksum = computeCheckSum(msg, len);
-#define CMI_CHECK_CHECKSUM(msg, len)	if (computeCheckSum(msg, len) != 0) CmiAbort("Fatal error: checksum doesn't agree!\n");
+#if !CMK_OPTIMIZE
+static int checksum_flag = 0;
+#define CMI_SET_CHECKSUM(msg, len)	\
+	if (checksum_flag)  {	\
+	  ((CmiMsgHeaderBasic *)msg)->cksum = 0; 	\
+	  ((CmiMsgHeaderBasic *)msg)->cksum = computeCheckSum((unsigned char*)msg, len);	\
+	}
+#define CMI_CHECK_CHECKSUM(msg, len)	\
+	if (checksum_flag) 	\
+	  if (computeCheckSum((unsigned char*)msg, len) != 0) 	\
+	    CmiAbort("Fatal error: checksum doesn't agree!\n");
 #else
 #define CMI_SET_CHECKSUM(msg, len)
 #define CMI_CHECK_CHECKSUM(msg, len)
@@ -1261,6 +1269,17 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   request_max=MAX_QLEN;
   CmiGetArgInt(argv,"+requestmax",&request_max);
   /*printf("request max=%d\n", request_max);*/
+
+  /* checksum flag */
+  if (CmiGetArgFlag(argv,"+checksum")) {
+#if !CMK_OPTIMIZE
+    checksum_flag = 1;
+    if (_Cmi_mynode == 0) CmiPrintf("Charm++: CheckSum checking enabled! \n");
+#else
+    if (_Cmi_mynode == 0) CmiPrintf("Charm++: +checksum ignored in optimized version! \n");
+#endif
+  }
+
   if (CmiGetArgFlag(argv,"++debug"))
   {   /*Pause so user has a chance to start and attach debugger*/
     printf("CHARMDEBUG> Processor %d has PID %d\n",_Cmi_mynode,getpid());
