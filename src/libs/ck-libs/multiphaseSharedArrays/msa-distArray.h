@@ -276,7 +276,7 @@ public:
         : rows(rows_), cols(cols_), super(cg_)
     {}
 
-    // get the index of the given entry as per the row major/column major format
+    // get the 1D index of the given entry as per the row major/column major format
     inline unsigned int getIndex(unsigned int row, unsigned int col)
     {
         unsigned int index;
@@ -289,6 +289,7 @@ public:
         return index;
     }
 
+    // Which page is (row, col) on?
     inline unsigned int getPageIndex(unsigned int row, unsigned int col)
     {
         return getIndex(row, col)/ENTRIES_PER_PAGE;
