@@ -968,6 +968,12 @@ static void charmrun_abort(const char *s)
 
 /* ctrl_getone */
 
+#ifdef __FAULT__
+#include "machine-recover.c"
+#endif
+
+static void node_addresses_store(ChMessage *msg);
+
 static void ctrl_getone(void)
 {
   ChMessage msg;
@@ -980,8 +986,9 @@ static void ctrl_getone(void)
     log_done();
     ConverseCommonExit();
     machine_exit(0);
+  } 
 #if CMK_CCS_AVAILABLE
-  } else if (strcmp(msg.header.type, "req_fw")==0) {
+  else if (strcmp(msg.header.type, "req_fw")==0) {
     CcsImplHeader *hdr=(CcsImplHeader *)msg.data;
 	/*Sadly, I *can't* do a:
       CcsImpl_netRequest(hdr,msg.data+sizeof(CcsImplHeader));
@@ -989,12 +996,24 @@ static void ctrl_getone(void)
 	communication thread.  I *can* poke this message into 
 	any convenient processor's queue, though:  (OSL, 9/14/2000)
 	*/
-	int pe=0;/*<- node-local processor number. Any one will do.*/
-	void *cmsg=(void *)CcsImpl_ccs2converse(hdr,msg.data+sizeof(CcsImplHeader),NULL);
-	MACHSTATE(2,"Incoming CCS request");
-	CmiPushPE(pe,cmsg);
+    int pe=0;/*<- node-local processor number. Any one will do.*/
+    void *cmsg=(void *)CcsImpl_ccs2converse(hdr,msg.data+sizeof(CcsImplHeader),NULL);
+    MACHSTATE(2,"Incoming CCS request");
+    CmiPushPE(pe,cmsg);
+  }
 #endif
-  }  else {
+#ifdef __FAULT__	
+  else if(strcmp(msg.header.type,"crashnode")==0) {
+	crash_node_handle(&msg);
+  }
+  else if(strcmp(msg.header.type,"initnodetab")==0) {
+	/** A processor crashed and got recreated. So charmrun sent 
+	  across the whole nodetable data to update this processor*/
+	node_addresses_store(&msg);
+	fprintf(stdout,"nodetable added %d\n",CmiMyPe());
+  }
+#endif
+  else {
   /* We do not use KillEveryOne here because it calls CmiMyPe(),
    * which is not available to the communication thread on an SMP version.
    */
