@@ -87,8 +87,8 @@ CkHashtable::entry_t *CkHashtable::findKey(const void *key) const
 	int startSpot=i;
 	do {
 		entry_t *cur=entry(i);
-		if (compare(key,e2k(cur),kb)) return cur;
 		if (keyEmpty(e2k(cur))) return NULL;
+		if (compare(key,e2k(cur),kb)) return cur;
 		DEBUGF(("   still looking for key...\n"))
 	} while (inc(i)!=startSpot);
 	DEBUGF(("  No key found!\n"))
