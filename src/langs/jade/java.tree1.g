@@ -22,6 +22,7 @@ class JavaTreeParser1 extends TreeParser;
 
 options {
 	importVocab = Java;
+    ASTLabelType = "ASTJ";
 }
 
 compilationUnit

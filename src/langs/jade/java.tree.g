@@ -23,9 +23,14 @@ import java.io.FileWriter;
 class JavaTreeParser extends TreeParser;
 options {
 	importVocab = JavaTreeParser2;
+    ASTLabelType = "ASTJ";
 }
 {
 // Class Members
+
+    private void eieio()
+    {
+    }
 }
 
 compilationUnit
@@ -33,7 +38,7 @@ compilationUnit
                 String name = J.pE(p.getFirstChild());
                 J.tmp.push(name);
 
-                J.ci.append((((ASTJ)p).status?"main":"") +
+                J.ci.append((p.status?"main":"") +
                     "module " + name + " {\n");
                 J.h.append("\n#include <vector>\nusing std::vector;\n#include \"pup_stl.h\"\n");
                 J.h.append("\n#include \"jade.h\"\n");
@@ -115,7 +120,7 @@ typeDefinition
                     if (e.getFirstChild() == null)
                         J.fatalError( e, "synchronized class " + #IDENT.getText() + " must extend chare, charearray1d, or charearray2d");
                     else if (e.getFirstChild().getText().equalsIgnoreCase(J.strChare))
-                        J.ci.append(J.indent() + (((ASTJ)c).status?"main":"") + "chare " + #IDENT.getText());
+                        J.ci.append(J.indent() + (c.status?"main":"") + "chare " + #IDENT.getText());
                     else if (e.getFirstChild().getText().equalsIgnoreCase(J.strChareArray1D))
                         J.ci.append(J.indent() + "array [1D] " + #IDENT.getText());
                     else if (e.getFirstChild().getText().equalsIgnoreCase(J.strChareArray2D))
@@ -601,6 +606,18 @@ variableDef[boolean classVarq, boolean outputOnNewLine]
                 else {
                     if (outputOnNewLine) J.c.append(J.indent());
                     J.c.append(J.printTypeSpec(ts, varName)); // convert int[], int[][]. etc. to JArray<int>
+
+                    // if MSA
+                    if (ts.isTypeMSA()) {
+                        // generate the template instantiations
+                        String templateStuff = J.printTemplateList(ts.getNode("ff"), 3);
+                        ((StringBuffer)J.endci2.peek()).append(J.indent() + "group MSA_CacheGroup" + templateStuff + ";\n");
+                        ((StringBuffer)J.endci2.peek()).append(J.indent() + "array [1D] MSA_PageArray" + templateStuff + ";\n");
+
+                        System.out.println("reached here");
+                        System.out.println("ts="+ts.toStringTree());
+                    }
+
                     if (vi != null) {
                         // @@ see handling of vi in class vars above.
 
