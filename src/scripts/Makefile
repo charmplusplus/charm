@@ -47,6 +47,12 @@ FEMC: charm++ LIBS
 
 FEMF: FEMC libconv-utilf.a
 
+MBLOCK: MBLOCKC MBLOCKF
+
+MBLOCKC: charm++ LIBS
+
+MBLOCKF: MBLOCKC libconv-utilf.a
+
 AMPI: AMPIC AMPIF libampilib.a
 
 AMPIC: charm++ CONVLIBS libampi.a
