@@ -94,6 +94,23 @@ class CkPupPtrVec : public implCkVecPup<T *> {
 	friend void operator|(PUP::er &p,CkPupPtrVec<T> &v) {v.pup(p);}
 };
 
+///A vector of pointers-to-subclasses of a PUP::able parent
+template <class T>
+class CkPupAblePtrVec : public implCkVecPup<T *> {
+ public:
+	~CkPupAblePtrVec() {
+		for (int i=0;i<size();i++)
+			delete (*this)[i];
+	}
+	void pup(PUP::er &p) {
+		int l=pupbase(p);
+		for (int i=0;i<l;i++)
+			p|(*this)[i]; //Pup framework will allocate appropriately
+	}
+	friend void operator|(PUP::er &p,CkPupAblePtrVec<T> &v) {v.pup(p);}
+};
+
+
 #include "debug-charm.h"
 
 class CkMessage { //Superclass of all Charm++ messages
