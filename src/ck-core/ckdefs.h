@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.16  1996-03-22 17:34:11  sanjeev
+ * Revision 2.17  1996-03-28 15:25:21  sanjeev
+ * *** empty log message ***
+ *
+ * Revision 2.16  1996/03/22 17:34:11  sanjeev
  * *** empty log message ***
  *
  * Revision 2.15  1996/03/22 17:24:09  sanjeev
@@ -222,15 +225,15 @@
 
 #define MsgIndex(MessageType)	_CK_msg_##MessageType
 
-#define newchare(ChareType, msg)	CreateChare(CMK_CONCAT(_CK_chare_,ChareType), GetEntryPtr(ChareType,ChareType), msg, 0, (0xFFF2))
+#define new_chare(ChareType, msg)	CreateChare(CMK_CONCAT(_CK_chare_,ChareType), GetEntryPtr(ChareType,ChareType), msg, 0, (0xFFF2))
 
-#define newchare2(ChareType, msg, vid, pe) 	CreateChare(CMK_CONCAT(_CK_chare_,ChareType), GetEntryPtr(ChareType,ChareType), msg, vid, pe)
-
-
-#define newgroup(ChareType, msg)	CreateBoc(CMK_CONCAT(_CK_chare_,ChareType), GetEntryPtr(ChareType,ChareType), msg, 0, 0)
+#define new_chare2(ChareType, msg, vid, pe) 	CreateChare(CMK_CONCAT(_CK_chare_,ChareType), GetEntryPtr(ChareType,ChareType), msg, vid, pe)
 
 
-#define newgroup2(ChareType, msg, returnEP, returnID)	CreateBoc(CMK_CONCAT(_CK_chare_,ChareType), GetEntryPtr(ChareType,ChareType), msg, returnEP, returnID)
+#define new_group(ChareType, msg)	CreateBoc(CMK_CONCAT(_CK_chare_,ChareType), GetEntryPtr(ChareType,ChareType), msg, 0, 0)
+
+
+#define new_group2(ChareType, msg, returnEP, returnID)	CreateBoc(CMK_CONCAT(_CK_chare_,ChareType), GetEntryPtr(ChareType,ChareType), msg, returnEP, returnID)
 
 
 
