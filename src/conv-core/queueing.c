@@ -143,7 +143,7 @@ void CqsPrioqRehash(pq)
  * where prios are treated as unsigned
  */
 
-inline int CqsPrioGT(prio1, prio2)
+int CqsPrioGT(prio1, prio2)
 prio prio1;
 prio prio2;
 {
