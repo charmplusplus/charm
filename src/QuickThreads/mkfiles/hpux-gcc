@@ -1,15 +1,20 @@
-#!/bin/sh -x
 
-CC="gcc -I. -O -D_HPUX_SOURCE"
+CC=gcc -I. -O -D_HPUX_SOURCE
 
-ln -s md/hppa.h qtmd.h
-$CC -pedantic -Wall -c -o qt.o qt.c
-as -o qtmds.o md/hppa.s
-ar q libqt.a qt.o qtmds.o
+all: qt stp testpgm
 
-$CC -c stp.c
-ar q libstp.a stp.o
+qt:
+	ln -s md/hppa.h qtmd.h
+	$(CC) -pedantic -Wall -c -o qt.o qt.c
+	as -o qtmds.o md/hppa.s
+	ar q libqt.a qt.o qtmds.o
 
-$CC -c meas.c
-as -o qtmdb.o md/hppa_b.s
-$CC -o run meas.o qtmdb.o libstp.a libqt.a
+stp:
+	$(CC) -c stp.c
+	ar q libstp.a stp.o
+
+testpgm:
+	$(CC) -c meas.c
+	as -o qtmdb.o md/hppa_b.s
+	$(CC) -o run meas.o qtmdb.o libstp.a libqt.a
+

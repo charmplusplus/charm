@@ -10,6 +10,18 @@ if [ ! -f mkfiles/$1 ] ; then
     exit 1
 fi
 
-rm -f Makescript
-ln -s mkfiles/$1 Makescript
+rm -f Makefile
+cp mkfiles/$1 Makefile
+
+cat >> Makefile << EOF
+
+mostlyclean:
+	rm -f qtmd.h libqt.a libstp.a meas.o stp.o qt.o
+	rm -f qtmdb.s qtmds.s qtmdc.o qtmdb.o qtmds.o run
+
+clean: mostlyclean
+	rm -f Makefile
+
+EOF
+
 echo "You're ready to do a make now."

@@ -1,15 +1,19 @@
-#!/bin/sh -x
 
-CC="gcc -I."
+CC=gcc -I.
 
-ln -s md/setjmp_d.h qtmd.h
-$CC -pedantic -Wall -c -o qt.o qt.c
-$CC -c -o qtmds.o md/sjalloca.c
-ar q libqt.a qt.o qtmds.o
+all: qt stp testpgm
 
-$CC -c stp.c
-ar q libstp.a stp.o
+qt:
+	ln -s md/setjmp_d.h qtmd.h
+	$(CC) -pedantic -Wall -c -o qt.o qt.c
+	$(CC) -c -o qtmds.o md/sjalloca.c
+	ar q libqt.a qt.o qtmds.o
 
-$CC -c meas.c
-$CC -c -o qtmdb.o md/setjmp_b.c
-$CC -o run meas.o qtmdb.o libstp.a libqt.a
+stp:
+	$(CC) -c stp.c
+	ar q libstp.a stp.o
+
+testpgm:
+	$(CC) -c meas.c
+	$(CC) -c -o qtmdb.o md/setjmp_b.c
+	$(CC) -o run meas.o qtmdb.o libstp.a libqt.a

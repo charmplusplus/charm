@@ -1,16 +1,21 @@
-#!/bin/sh -x
 
-CC="gcc88 -Dm88k -ansi -fno-builtin -I. -O"
+CC=gcc88 -Dm88k -ansi -fno-builtin -I. -O
 
-ln -s md/m88k.h qtmd.h
-$CC -pedantic -Wall -c -o qt.o qt.c
-$CC -pedantic -Wall -c -o qtmdc.o md/m88k.c
-as88 -o qtmds.o md/m88k.s
-ar q libqt.a qt.o qtmds.o qtmdc.o
+all: qt stp testpgm
 
-$CC -c stp.c
-ar q libstp.a stp.o
+qt:
+	ln -s md/m88k.h qtmd.h
+	$(CC) -pedantic -Wall -c -o qt.o qt.c
+	$(CC) -pedantic -Wall -c -o qtmdc.o md/m88k.c
+	as88 -o qtmds.o md/m88k.s
+	ar q libqt.a qt.o qtmds.o qtmdc.o
 
-$CC -c meas.c
-as88 -o qtmdb.o md/m88k_b.s
-$CC -o run meas.o qtmdb.o libstp.a libqt.a
+stp:
+	$(CC) -c stp.c
+	ar q libstp.a stp.o
+
+testpgm:
+	$(CC) -c meas.c
+	as88 -o qtmdb.o md/m88k_b.s
+	$(CC) -o run meas.o qtmdb.o libstp.a libqt.a
+	

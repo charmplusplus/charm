@@ -18,19 +18,20 @@ purpose.
 
 Configure with
 
-	./configure *machtype*
+	./configure operating-system-and-compiler
 
-where "*machtype*" is one of the supported target machines.  As of
-May 1997, the makefiles were revamped, and they aren't quite up-to-date.
-These are the machines for which we currently have working makefiles:
-
-	axp-gcc      convex-hppa  i386-gcc-ss  setjmp-gcc   stub-gcc
-	axp-osf1-cc  hppa-cc      ksr1-cc      solaris-cc
-	axp-osf2-cc  i386-gcc     meerkat      solaris-gcc
-
-However, there is also a vax version without a makefile, and several
-of these versions can be trivially ported to other operating systems
-with the same architecture by editing the makefiles.
+Where operating-system-and-compiler is one of the supported
+configurations.  You can list the supported configurations by listing
+the contents of the mkfiles subdirectory.  (Note: as of May 1997, many
+of those makefiles are untested.  The C and assembly language is fine,
+but the makefiles themselves may not work.  You may need to do some
+minor repairs.)  If you don't see your machine listed, don't despair:
+usually, all you have to do is write a new makefile.  Find a makefile
+for a system with the same CPU as yours.  Copy it, and edit it until
+it works with your system.  If that doesn't work, try switching to the
+generic version.  Copy the generic makefile, and edit that one until
+it compiles.  If that fails too (very unlikely), you may have an
+actual porting effort on your hands.
 
 * Build
 

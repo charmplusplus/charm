@@ -1,15 +1,19 @@
-#!/bin/sh -x
 
-CC="cc -32 -I. -O"
+CC=cc -32 -I. -O
 
-ln -s md/mips.h qtmd.h
-$CC -c -o qt.o qt.c
-as -o qtmds.o md/mips-irix5.s
-ar q libqt.a qt.o qtmds.o
+all: qt stp testpgm
 
-$CC -c stp.c
-ar q libstp.a stp.o
+qt:
+	ln -s md/mips.h qtmd.h
+	$(CC) -c -o qt.o qt.c
+	as -o qtmds.o md/mips-irix5.s
+	ar q libqt.a qt.o qtmds.o
 
-$CC -c meas.c
-as -o qtmdb.o md/mips_b.s
-$CC -o run meas.o qtmdb.o libstp.a libqt.a
+stp:
+	$(CC) -c stp.c
+	ar q libstp.a stp.o
+
+testpgm:
+	$(CC) -c meas.c
+	as -o qtmdb.o md/mips_b.s
+	$(CC) -o run meas.o qtmdb.o libstp.a libqt.a

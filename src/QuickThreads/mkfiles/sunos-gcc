@@ -1,17 +1,21 @@
-#!/bin/sh -x
 
-CC="gcc -I. -O2"
+CC=gcc -I. -O2
 
-ln -s md/sparc.h qtmd.h
-$CC -pedantic -Wall -c -o qt.o qt.c
-as -o qtmds.o md/sparc.s
-ar q libqt.a qt.o qtmds.o
-ranlib libqt.a
+all: qt stp run
 
-$CC -c stp.c
-ar q libstp.a stp.o
-ranlib libqt.a
+qt:
+	ln -s md/sparc.h qtmd.h
+	$(CC) -pedantic -Wall -c -o qt.o qt.c
+	as -o qtmds.o md/sparc.s
+	ar q libqt.a qt.o qtmds.o
+	ranlib libqt.a
 
-$CC -c meas.c
-as -o qtmdb.o md/sparc_b.s
-$CC -o run meas.o qtmdb.o libstp.a libqt.a
+stp:
+	$(CC) -c stp.c
+	ar q libstp.a stp.o
+	ranlib libqt.a
+
+testpgm:
+	$(CC) -c meas.c
+	as -o qtmdb.o md/sparc_b.s
+	$(CC) -o run meas.o qtmdb.o libstp.a libqt.a

@@ -1,15 +1,19 @@
-#!/bin/sh -x
 
-CC="gcc -I. -O2"
+CC=gcc -I. -O2
 
-ln -s md/i386.h qtmd.h
-$CC -pedantic -Wall -c -o qt.o qt.c
-as -o qtmds.o md/i386.s
-ar q libqt.a qt.o qtmds.o
+all: qt stp testpgm
 
-$CC -c stp.c
-ar q libstp.a stp.o
+qt:
+	ln -s md/i386.h qtmd.h
+	$(CC) -pedantic -Wall -c -o qt.o qt.c
+	as -o qtmds.o md/i386.s
+	ar q libqt.a qt.o qtmds.o
 
-$CC -c meas.c
-as -o qtmdb.o md/i386_b.s
-$CC -o run meas.o qtmdb.o libstp.a libqt.a
+stp:
+	$(CC) -c stp.c
+	ar q libstp.a stp.o
+
+testpgm:
+	$(CC) -c meas.c
+	as -o qtmdb.o md/i386_b.s
+	$(CC) -o run meas.o qtmdb.o libstp.a libqt.a
