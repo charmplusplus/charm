@@ -173,7 +173,8 @@ basics: headers
 	touch basics
 
 # Headers is used only for the dependencies
-headers: dirs+sources headerlinks $(ALLHEADERS)
+headers: dirs+sources 
+	$(MAKE) headerlinks
 
 conv-autoconfig.h: configure
 	./configure
