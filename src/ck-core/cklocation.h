@@ -210,16 +210,18 @@ public:
   inline LBDatabase *getLBDB(void) const {return the_lbdb;}
   static void staticMigrate(LDObjHandle h, int dest);
   void recvMigrate(int dest);
-  void setMigratable(int migratable);
-  void usesReadyMigrate();
-  CmiBool isUsingReadyMigrate()   { return usingReadyMove; }
-  void ReadyMigrate(CmiBool ready)  { readyMove = ready; }   //called from user
-  CmiBool checkBufferedMigration();
+  void setMigratable(int migratable);	/// set migratable
+  void AsyncMigrate(CmiBool use);
+  CmiBool isAsyncMigrate()   { return asyncMigrate; }
+  void ReadyMigrate(CmiBool ready) { readyMigrate = ready; } ///called from user
+  int  isReadyMigrate()	{ return readyMigrate; }
+  CmiBool checkBufferedMigration();	// check and execute pending migration
+  int   MigrateToPe();
 private:
   LBDatabase *the_lbdb;
   LDObjHandle ldHandle;
-  CmiBool  usingReadyMove;  /// if readyMove is inited
-  CmiBool  readyMove;	    /// status whether it is ready to migrate
+  CmiBool  asyncMigrate;  /// if readyMove is inited
+  CmiBool  readyMigrate;    /// status whether it is ready to migrate
   int  nextPe;              /// next migration dest processor
 #endif
 };
@@ -287,19 +289,19 @@ protected:
   virtual void ResumeFromSync(void);
   CmiBool barrierRegistered;//True iff barrier handle below is set
 
-  CmiBool usesReadyMigrate;
 #if CMK_LBDB_ON  //For load balancing:
-  void AtSync(void);
-  void ReadyMigrate(CmiBool ready);
+  void AtSync(int waitForMigration=1);
+  int MigrateToPe()  { return myRec->MigrateToPe(); }
 private: //Load balancer state:
   LDBarrierClient ldBarrierHandle;//Transient (not migrated)  
   LDBarrierReceiver ldBarrierRecvHandle;//Transient (not migrated)  
   static void staticResumeFromSync(void* data);
 public:
+  void ReadyMigrate(CmiBool ready);
   void ckFinishConstruction(void);
   void setMigratable(int migratable);
 #else
-  void AtSync(void) { ResumeFromSync();}
+  void AtSync(int waitForMigration=1) { ResumeFromSync();}
 public:
   void ckFinishConstruction(void) { }
 #endif

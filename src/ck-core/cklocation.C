@@ -562,7 +562,6 @@ void CkMigratable::commonInit(void) {
 	thisChareType=i.chareType;
 	usesAtSync=CmiFalse;
 	barrierRegistered=CmiFalse;
-	usesReadyMigrate=CmiFalse;
 }
 
 CkMigratable::CkMigratable(void) {
@@ -578,7 +577,12 @@ void CkMigratable::pup(PUP::er &p) {
 	Chare::pup(p);
 	p|thisIndexMax;
 	p(usesAtSync);
-	p(usesReadyMigrate);
+#if CMK_LBDB_ON 
+	int readyMigrate;
+	if (p.isPacking()) readyMigrate = myRec->isReadyMigrate();
+	p|readyMigrate;
+	if (p.isUnpacking()) myRec->ReadyMigrate(readyMigrate);
+#endif
 	if(p.isUnpacking()) barrierRegistered=CmiFalse;
 	ckFinishConstruction();
 }
@@ -631,9 +635,6 @@ void CkMigratable::ResumeFromSync(void)
 #if CMK_LBDB_ON  //For load balancing:
 void CkMigratable::ckFinishConstruction(void)
 {
-	if (usesReadyMigrate) {
-	  myRec->usesReadyMigrate();
-	}
 //	if ((!usesAtSync) || barrierRegistered) return;
 	if (barrierRegistered) return;
 	DEBL((AA"Registering barrier client for %s\n"AB,idx2str(thisIndexMax)));
@@ -645,18 +646,18 @@ void CkMigratable::ckFinishConstruction(void)
 		(LDBarrierFn)staticResumeFromSync,(void*)(this));
 	barrierRegistered=CmiTrue;
 }
-void CkMigratable::AtSync(void)
+void CkMigratable::AtSync(int waitForMigration)
 {
 	if (!usesAtSync)
 		CkAbort("You must set usesAtSync=CmiTrue in your array element constructor to use AtSync!\n");
+	myRec->AsyncMigrate(!waitForMigration);
+	if (waitForMigration) ReadyMigrate(CmiTrue);
 	ckFinishConstruction();
 	DEBL((AA"Element %s going to sync\n"AB,idx2str(thisIndexMax)));
 	myRec->getLBDB()->AtLocalBarrier(ldBarrierHandle);
 }
 void CkMigratable::ReadyMigrate(CmiBool ready)
 {
-	if (!usesReadyMigrate)
-		CkAbort("You must set usesReadyMigrate=CmiTrue in your array element constructor to use ReadyMigrate!\n");
 	myRec->ReadyMigrate(ready);
 }
 void CkMigratable::staticResumeFromSync(void* data)
@@ -717,19 +718,17 @@ CkLocRec_local::CkLocRec_local(CkLocMgr *mgr,CmiBool fromMigration,
 #if CMK_LBDB_ON
 	DEBL((AA"Registering element %s with load balancer\n"AB,idx2str(idx)));
 	nextPe = -1;
-	usingReadyMove = CmiFalse;
-	readyMove = CmiTrue;
+	asyncMigrate = CmiFalse;
+	readyMigrate = CmiTrue;
 	the_lbdb=mgr->getLBDB();
 	ldHandle=the_lbdb->RegisterObj(mgr->getOMHandle(),
 		idx2LDObjid(idx),(void *)this,1);
 	if (fromMigration) {
-		if (!ignoreArrival) {
-		  DEBL((AA"Element %s migrated in\n"AB,idx2str(idx)));
-		  the_lbdb->Migrated(ldHandle);
-		}
-		else {
+		DEBL((AA"Element %s migrated in\n"AB,idx2str(idx)));
+		the_lbdb->Migrated(ldHandle, !ignoreArrival);
+		if (ignoreArrival)  {
 		  // load balancer should ignore this objects movement
-		  usesReadyMigrate();
+		  AsyncMigrate(CmiTrue);
 		}
 	}
 #endif
@@ -881,23 +880,21 @@ void CkLocRec_local::recvMigrate(int toPe)
 {
 	// we are in the mode of delaying actual migration
  	// till readyMigrate()
-	if (readyMove) { migrateMe(toPe); }
+	if (readyMigrate) { migrateMe(toPe); }
 	else nextPe = toPe;
 }
 
-void CkLocRec_local::usesReadyMigrate()  {
-        if (!usingReadyMove) {    // only allow it to change the flag once
-            usingReadyMove = CmiTrue; 
-	    readyMove=CmiFalse;
-  	    the_lbdb->UseReadyMigrate(ldHandle, CmiTrue);
-        }
+void CkLocRec_local::AsyncMigrate(CmiBool use)  
+{
+        asyncMigrate = use; 
+	the_lbdb->UseAsyncMigrate(ldHandle, use);
 }
 
 CmiBool CkLocRec_local::checkBufferedMigration()
 {
 	// we don't migrate in user's code when calling ReadyMigrate(true)
 	// we postphone the action to here until we exit from the user code.
-	if (readyMove && nextPe != -1) {
+	if (readyMigrate && nextPe != -1) {
 	    int toPe = nextPe;
 	    nextPe = -1;
 	    // don't migrate inside the object call
@@ -906,6 +903,13 @@ CmiBool CkLocRec_local::checkBufferedMigration()
 	    return CmiTrue;
 	}
 	return CmiFalse;
+}
+
+int CkLocRec_local::MigrateToPe()
+{
+	int pe = nextPe;
+	nextPe = -1;
+	return pe;
 }
 
 void CkLocRec_local::setMigratable(int migratable)
@@ -1600,7 +1604,7 @@ void CkLocMgr::migrate(CkLocRec_local *rec,int toPe)
 	msg->idx=idx;
 	msg->length=bufSize;
 #if CMK_LBDB_ON
-	msg->ignoreArrival = rec->isUsingReadyMigrate()?1:0;
+	msg->ignoreArrival = rec->isAsyncMigrate()?1:0;
 #endif
 	{
 		PUP::toMem p(msg->packData); 
