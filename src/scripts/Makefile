@@ -313,7 +313,7 @@ ccs-client.o: ccs-client.c
 	$(CHARMC) ccs-client.c
 
 sockRoutines.o: sockRoutines.c $(CVHEADERS) $(UTILHEADERS)
-	$(CHARMC) sockRoutines.c
+	$(CHARMC) -DCMK_USE_CONVERSE=1 sockRoutines.c
 
 sockRoutines-seq.o: sockRoutines.c $(CVHEADERS) $(UTILHEADERS)
 	$(CHARMC) -seq -o sockRoutines-seq.o sockRoutines.c
