@@ -28,9 +28,10 @@
 #define CMK_SPANTREE_MAXSPAN                               4
 #define CMK_SPANTREE_USE_COMMON_CODE                       1
 
+#define CMK_MSG_HEADER_FIELDS  CmiUInt2 vmitype,tree_rank,tree_root,hdl,xhdl,info,stratid,root;
 #define CMK_MSG_HEADER_BASIC  CMK_MSG_HEADER_EXT
-#define CMK_MSG_HEADER_EXT    { CmiUInt2 vmitype,tree_rank,tree_root,hdl,xhdl,info,stratid,root; }
-#define CMK_MSG_HEADER_BLUEGENE    { CmiUInt2 d0,d1,d2,d3,d4,d5,hdl,xhdl,info,stratid,root,padding3; int nd, n; double rt; CmiInt2 tID; CmiUInt2 hID; char t; int msgID; int srcPe;}
+#define CMK_MSG_HEADER_EXT    { CMK_MSG_HEADER_FIELDS }
+#define CMK_MSG_HEADER_BLUEGENE    { CMK_MSG_HEADER_FIELDS CMK_BLUEGENE_FIELDS }
 
 #define CMK_VECTOR_SEND_USES_COMMON_CODE                   1
 
