@@ -95,9 +95,9 @@ public:
 			renderUpdate(m);
 			
 			int prioAdj=0;
-			LV3D_RenderMsg *m= LV3D_RenderMsg::new_(
+			LV3D_RenderMsg *rm= LV3D_RenderMsg::new_(
 				m->clientID,m->frameID,0,prioAdj);
-			array->thisProxy[array->thisIndexMax].LV3D_Render(m);
+			array->thisProxy[array->thisIndexMax].LV3D_Render(rm);
 		  }
 		}
 	}
