@@ -642,6 +642,7 @@ Chare::genDefs(XStr& str)
       exit(1);
     }
     // We have to generate the chare array itself
+    str << "/* FORTRAN */\n";
     str << "extern \"C\" " << fortranify(baseName()) << "_allocate_(char **, void *);\n";
     str << "\n";
     str << "class " << baseName() << " : public ArrayElement1D\n";
@@ -822,6 +823,7 @@ Message::genDefs(XStr& str)
       // Define the Marshalling message for Fortran
       if (fortranMode)
       {
+        str << "/* FORTRAN */\n";
         str << "class " << type 
             << " : public CMessage_" << type << "\n";
         str << "{\npublic:\n";
@@ -1678,6 +1680,8 @@ void Entry::genDefs(XStr& str)
     if (!isConstructor() && fortranMode) { // Fortran90
       const char* msg_name = param->getBaseName();
       TypeList *msg_contents = (message_list.find(msg_name))->getContents();
+
+      str << "/* FORTRAN SECTION */\n";
 
       // Declare the Fortran Entry Function
       // This is called from C++
