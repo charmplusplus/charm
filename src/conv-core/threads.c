@@ -988,6 +988,7 @@ Written by Gengbin Zheng around April 2001
 struct CthThreadStruct
 {
   CthThreadBase base;
+  double * dummy;
   ucontext_t context;
 };
 
