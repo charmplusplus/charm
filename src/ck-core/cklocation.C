@@ -701,6 +701,11 @@ void CkMigratable::CkAddThreadListeners(CthThread tid, void *msg)
 	a->mig=this;
 	CthAddListener(tid,(struct CthThreadListener *)a);
 }
+#else
+/* no load balancer: need dummy implementations to prevent link error */
+void CkMigratable::CkAddThreadListeners(CthThread tid, void *msg)
+{
+}
 #endif
 
 
