@@ -5,20 +5,20 @@
 
 #ifndef SRTABLE_H
 #define SRTABLE_H
-
 #include "pose.h"
 
 class UpdateMsg;
 
 class SRentry { // A record for a single send/recv event
+  // for now we wish to keep the timestamp associated with a send/recv,
+  // since later we may choose to alter the bktSz in SRtable
  public:
-  int timestamp, sr;  // sr denotes either SEND or RECV
-  SRentry *next;
+  int sr;         // sr denotes either SEND or RECV
+  int timestamp;  // timestamp of the message
+  SRentry *next;  // this type is used almost always in linked lists
   SRentry() { timestamp = sr = -1; next = NULL; }
   //~SRentry() { next = NULL; }
-  SRentry(int ts, int srSt, SRentry *p) { 
-    timestamp = ts; sr = srSt; next = p;
-  }
+  SRentry(int ts, int mt, SRentry *p) { timestamp = ts; sr = mt; next = p; }
   int operator==(const SRentry &obj) const {
     return ((timestamp == obj.timestamp) && (sr == obj.sr));
   }
@@ -27,18 +27,16 @@ class SRentry { // A record for a single send/recv event
     sr = obj.sr;
     return *this;
   }
-  void Set(int ts, int srSt, SRentry *p) { 
-    timestamp = ts; sr = srSt; next = p;
-  }
-  void dump() { 
-    CkPrintf("TS:%d SR:%d", timestamp, sr);
-  }
+  void Set(int ts, int mt, SRentry *p) { timestamp = ts; sr = mt; next = p; }
+  void dump() { CkPrintf("TS:%d SR:%d", timestamp, sr); }
 };
 
 class SRbucket { // A bucket for holding a range of SRentries
  public:
-  SRentry *bucket;  // should we sort entries into bucket?
-  int count, bktSz, offset;
+  int count;        // the number of SRentries in bucket
+  int bktSz;        // the range of timestamps to be stored in this bucket
+  int offset;       // the minimum timestamp to be stored in this bucket
+  SRentry *bucket, *bucketTail;  // the entries in this bucket
   SRbucket() { bucket = NULL;  count = 0; bktSz = -1; offset = 0; }
   ~SRbucket() {
     SRentry *next, *current=bucket;
@@ -47,73 +45,85 @@ class SRbucket { // A bucket for holding a range of SRentries
       delete current;
       current = next;
     }
-    bucket = NULL;
+    bucket = bucketTail = NULL;
     count = 0;
   }
   void initBucket(int sz, int os) { 
-    bucket = NULL; count = 0; bktSz = sz;  offset = os; 
+    bucket = bucketTail = NULL; count = 0; bktSz = sz;  offset = os; 
   }
+  void setBucketOffset(int os) { offset = os; }
   int diffBucket(const SRbucket& bkt) { 
-    int *myTSarray = new int[bktSz], *theirTSarray = new int[bktSz], i, result=-1;
-    SRentry *current = bucket;
-    CmiAssert(bktSz > 0);
-    for (i=0; i<bktSz; i++) myTSarray[i] = theirTSarray[i] = 0;
-    while (current) {
-      CmiAssert(current->timestamp - offset >= 0);
-      CmiAssert(current->timestamp - offset < bktSz);
-      myTSarray[current->timestamp - offset]++;
-      current = current->next;
-    }
-    current = bkt.bucket;
-    while (current) {
-      CmiAssert(current->timestamp - offset >= 0);
-      CmiAssert(current->timestamp - offset < bktSz);
-      theirTSarray[current->timestamp - offset]++;
-      current = current->next;
-    }
-    for (i=0; i<bktSz; i++) 
-      if (myTSarray[i] != theirTSarray[i]) {
-	result = i+offset;
+    // return the timestamp at which this bucket and bkt first differ
+    // assumes bucket is sorted by non-decreasing timestamp
+    int i, result=-1;
+    SRentry *myCurrent = bucket, *theirCurrent = bkt.bucket;
+    while (myCurrent && theirCurrent) {
+      if (myCurrent->timestamp != theirCurrent->timestamp) {
+	result = myCurrent->timestamp;
+	if (theirCurrent->timestamp < result)
+	  result = theirCurrent->timestamp;
 	break;
       }
-    delete[] myTSarray;
-    delete[] theirTSarray;
-    return result;
+      myCurrent = myCurrent->next;
+      theirCurrent = theirCurrent->next;
+    }
+    if (result != -1)
+      return result;
+    else if (!myCurrent && theirCurrent)
+      return theirCurrent->timestamp;
+    else if (!theirCurrent && myCurrent)
+      return myCurrent->timestamp;
+    else return result;
   }
   void addToBucket(SRentry *p) {
-    CmiAssert((p->timestamp >= offset) && (p->timestamp < offset+bktSz));
-    CmiAssert((p->sr == 0) || (p->sr == 1));
-    p->next = bucket;
-    bucket = p;
-    count++;
+    if (!bucket || (p->timestamp <= bucket->timestamp)) {
+      p->next = bucket;
+      if (!bucket) bucket = bucketTail = p;
+      else bucket = p;
+      count++;
+    }
+    else {
+      SRentry *current = bucket;
+      while (current->next) {
+	if (p->timestamp <= current->next->timestamp) {
+	  p->next = current->next;
+	  if (!current->next) bucketTail = current->next = p;
+	  else current->next = p;
+	  count++;
+	  return;
+	}
+	current = current->next;
+      }
+      p->next = current->next;
+      if (!current->next) bucketTail = current->next = p;
+      else current->next = p;
+      count++;
+    }
   }
   int findInBucket(SRentry *p) const {
     SRentry *current=bucket;
     if (count == 0) return 0;
-    while (current) {
+    while (current && (current->timestamp <= p->timestamp)) {
       if (p->timestamp == current->timestamp) return 1;
       current = current->next;
     }
     return 0;
   }
-  void emptyOutBucket(SRentry *recyc) {
-    SRentry *next, *current=bucket;
-    if (count == 0) return;
-    while (current) {
-      next = current->next;
-      current->next = recyc;
-      recyc = current;
-      current = next;
+  void emptyOutBucket(SRentry *recyc, SRentry *recycTail) {
+    if (bucket) { 
+      bucketTail->next = recyc; 
+      recyc = bucket;
+      if (!recycTail) recycTail = bucketTail;
+      bucket = bucketTail = NULL;
+      count = 0;
     }
-    bucket = NULL;
-    count = 0;
   }
 };
 
 class SRtable {
  private:
-  SRentry *residuals;           // all other send/recv events
-  SRentry *recyc;
+  SRentry *residuals, *residualsTail;  // all other send/recv events
+  SRentry *recyc, *recycTail;          // SRentries that can be reused
  public:
   SRbucket *sends, *recvs; // send/recv events occurring 
                                 // at timestamps between gvt and gvt+gvtWindow
@@ -124,12 +134,13 @@ class SRtable {
   SRtable();                    // basic constructor
   ~SRtable();                   // needed to free up the linked lists
   void SetOffset(int gvt) {     // set GVT offset
-    CmiAssert(offset <= gvt);
+    //    CmiAssert(offset <= gvt);
     offset = gvt;
     for (int i=0; i<numBuckets; i++) {
       sends[i].initBucket(bktSz, offset+i*bktSz);
       recvs[i].initBucket(bktSz, offset+i*bktSz);
     }
+    //sanitize();
   }
   int TestThreshold() {
     if (inBuckets == 0) {
@@ -146,8 +157,9 @@ class SRtable {
     return 0;
   }
   void Insert(int timestamp, int srSt); // insert s/r at timestamp
-  int FindDifferenceTimestamp(SRtable *t) {
-    // return timestamp with first difference
+  int FindDifferenceTimestamp() {
+    //sanitize();
+    // return timestamp with first difference in sends and recvs
     int result;
     for (int i=0; i<numBuckets; i++)
       if ((result = sends[i].diffBucket(recvs[i])) > -1)
@@ -156,7 +168,22 @@ class SRtable {
   }
   void PurgeBelow(int ts);      // purge table below timestamp ts
   void FileResiduals();         // try to file each residual event in table
-  void FreeTable();             // reset counters & ptrs; free all
+  void FreeTable() {            // reset counters & ptrs; free all
+    // Clears all data from the table
+    //sanitize();
+    for (int i=0; i<numBuckets; i++) {
+      sends[i].emptyOutBucket(recyc, recycTail);
+      recvs[i].emptyOutBucket(recyc, recycTail);
+    }
+    inBuckets = offset = 0;
+    if (residuals) { 
+      residualsTail->next = recyc; 
+      recyc = residuals;
+      if (!recycTail) recycTail = residualsTail;
+      residuals = residualsTail = NULL;
+    }
+    //sanitize();
+  }
   UpdateMsg *packTable();
   void addEntries(UpdateMsg *um);
   void shrink();

@@ -119,28 +119,24 @@ void opt::CancelEvents()
   int found, eGVT = localPVT->getGVT();
   CancelNode *it=NULL, *last=NULL;
 
+  //CkPrintf("Cancelling stuff...");
   last = parent->cancels.GetItem(eGVT);  // make note of last item to examine
-  if (!last)  // none of the cancellations are early enough to bother with
-    return;
   while (!parent->cancels.IsEmpty()) {   // loop through all cancellations
+    //CkPrintf("Inside outer CancelEvents loop: %d cancellations...\n",
+    //     parent->cancels.count);
     it = parent->cancels.GetItem(eGVT);
-    if (!it)  // none of the cancellations are early enough to bother with
-      return;
     found = 0;                         // init the found flag to not found (0)
-
     // search cancellations list for a cancellation that has a corresponding
     // event in the event queue
     while (!found) {  // loop until one is found, or exit fn if all examined
+      //CkPrintf("[%d] Inside inner CancelEvents search loop w/%d events...\n", parent->thisIndex, parent->cancels.count);
       ev = eq->currentPtr;               // set search start point
-
-      // look for "it" above currentPtr
-      if ((ev->timestamp <= it->timestamp) && (ev != eq->backPtr)) {
-	// search forward from currentPtr until backPtr is reached or break
-	while ((ev->timestamp >= 0) && (ev->timestamp <= it->timestamp)) {
-	  if (ev->evID == it->evID) {    // found it
-	    found = 1;
-	    break;
-	  }
+      if (ev == eq->backPtr) ev = ev->prev;
+      if (ev->timestamp <= it->timestamp) {
+	// search forward for 'it' from currentPtr to backPtr
+	while (!found && (ev->timestamp >= 0) && 
+	       (ev->timestamp <= it->timestamp)) {
+	  if (ev->evID == it->evID) found = 1;  // found it
 	  else ev = ev->next;
 	}
 	if (!found) {             // not in linked list; check the heap
@@ -148,40 +144,37 @@ void opt::CancelEvents()
 	  if (found) ev = NULL;   // make ev NULL so we know it was deleted
 	}
       }
-      else {                      // current is backPtr; check the heap
-	found = eq->eqh->DeleteEvent(it->evID, it->timestamp);
-	if (found) ev = NULL;     // make ev NULL so we know it was deleted
-      }
-      if (!found) {               // "it" may be below current
-	// search backward from currentPtr until backPtr is reached or break
-	ev = eq->currentPtr->prev;
-	while ((ev->timestamp >= 0) && (ev->timestamp >= it->timestamp))
-	  if (ev->evID == it->evID) {  // found it
-	    found = 1;
-	    break;
+      if (!found) { 
+	ev = eq->currentPtr;               // set search start point
+	if (ev == eq->backPtr) ev = ev->prev;
+	if (ev->timestamp >= it->timestamp) {
+	  // ev->timestamp >= it->timestamp; so search backward
+	  while (!found && (ev->timestamp >= 0) && 
+		 (ev->timestamp >= it->timestamp)) {
+	    if (ev->evID == it->evID)  found = 1;  // found it
+	    else ev = ev->prev;
 	  }
-	  else ev = ev->prev;
+	}
       }
-      if (!found) {                       // "it" event has not arrived yet
-	if (it == last) {                 // seen all cancellations during this call
-	  /*
-	  CkPrintf("WARNING: opt::CancelEvents: Waiting for [%d.%d.%d] to arrive\n",
-		   it->evID.id, it->evID.pe);
-	  */
-	  return;                         // print a message and bail out
+      if (!found) {                 // "it" event has not arrived yet
+	if (it == last) { // seen all cancellations during this call
+	  //CkPrintf("No cancellations found; returning...\n");
+	  return;     
 	}
 	it = parent->cancels.GetItem(eGVT);   // try the next cancellation
-	if (!it)  // none of the cancellations are early enough to bother with
-	  return;
       }
     }
 
+    // something was found!
+    //CkPrintf("Cancelled event found; proceeding to remove...\n");
     if (ev && (ev->done == 0)) {   // found it to be unexecuted; get rid of it
+      //CkPrintf("Cancelled event was undone; deleting...\n");
       if (ev == eq->currentPtr)    // adjust currentPtr
 	eq->ShiftEvent();
       eq->DeleteEvent(ev);         // delete the event
     }
     else if (ev) { // it's been executed, so rollback
+      //CkPrintf("Cancelled event was done; rolling back...\n");
 #ifdef POSE_STATS_ON
       localStats->SwitchTimer(RB_TIMER);
 #endif
@@ -191,7 +184,6 @@ void opt::CancelEvents()
       localStats->Rollback();
 #endif
 
-      if (ev->done == 0) CkPrintf("Why am I here?\n");
       while (tmp != recoveryPoint) { // rollback, undoing along the way
 	UndoEvent(tmp);              // undo the event
 	tmp = tmp->prev;
@@ -219,15 +211,18 @@ void opt::CancelEvents()
       localStats->SwitchTimer(SIM_TIMER);
 #endif
     }
+    //CkPrintf("Done handling found cancellation; removing from cancelList...\n");
     if (it == last) {
       parent->cancels.RemoveItem(it);                  // Clean up
-      if (!parent->cancels.IsEmpty())
-	last = parent->cancels.GetItem(eGVT);
+      RBevent = eq->RecomputeRollbackTime();
+      return;
     }
     else
       parent->cancels.RemoveItem(it);                  // Clean up
   } // end outer while which loops through entire cancellations list
+  //CkPrintf("Recomputing rollbackTime...\n");
   RBevent = eq->RecomputeRollbackTime();
+  //CkPrintf("...CancelEvents DONE\n");
 }
 
 int opt::SafeTime()
@@ -240,19 +235,19 @@ int opt::SafeTime()
     
     if (worktime > theTime)                         // check queued events
       theTime = worktime;
-    if ((theTime >= 0) && (ovt > theTime))
+    else if (theTime < 0) 
       theTime = ovt;
-    if (RBevent && ((RBevent->timestamp<theTime)||(theTime<0))) // rollbacks
+    if (RBevent && (RBevent->timestamp<theTime)) // rollbacks
       theTime = RBevent->timestamp;
-    if ((ec >= 0) && ((ec < theTime)||(theTime<0)))     // check cancellations
+    if ((ec >= 0) && (ec < theTime))     // check cancellations
       theTime = ec;
-    if ((theTime < 0) && (ovt > gvt))
+    if ((ovt < theTime) && (ovt > gvt))
       theTime = ovt;
     
-    if ((theTime < gvt) && (theTime >= 0)) {
-      CkPrintf("WARNING: opt::SafeTime: time calculated (%d) is less than GVT estimate (%d)\n ovt=%d ec=%d worktime=%d\n", theTime, gvt, ovt, ec, worktime);
-      theTime = gvt;
-    }
+    //    if ((theTime < gvt) && (theTime >= 0)) {
+    //      CkPrintf("WARNING: opt::SafeTime: time calculated (%d) is less than GVT estimate (%d)\n ovt=%d ec=%d worktime=%d\n", theTime, gvt, ovt, ec, worktime);
+    //      theTime = gvt;
+    //    }
     //CkPrintf("%d on PE %d: ovt=%d ec=%d worktime=%d\n", 
     //parent->thisIndex, CkMyPe(), ovt, ec, worktime);
     return theTime;

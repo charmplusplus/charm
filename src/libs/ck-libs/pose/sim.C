@@ -65,7 +65,8 @@ void sim::Step()
     else myStrat->Step();
     break;
   case SPEC_T:
-  case ADAPT_T: // non-prioritized step
+  case ADAPT_T: 
+  case ADAPT2_T: // non-prioritized step
     myStrat->Step(); // Call Step on strategy
     break;
   default: 
@@ -99,7 +100,10 @@ void sim::Step(prioMsg *m)
 
 void sim::Status()
 {
-  int st = myStrat->SafeTime();
+  //int st = myStrat->SafeTime();
+  //  if (st == localPVT->getGVT())
+  //    CkPrintf("Object %d has safeTime == GVT...\n", thisIndex);
+  //localPVT->objUpdate(myPVTidx, st, -1, -1);
   localPVT->objUpdate(myPVTidx, myStrat->SafeTime(), -1, -1);
 }
 
@@ -108,32 +112,33 @@ void sim::Commit()
 {
   if (active < 0)
     return;
+  //#ifdef POSE_STATS_ON
+  //  int tstat = localStats->TimerRunning();
+  //  if (!tstat)
+  //    localStats->TimerStart(MISC_TIMER);
+  //  else localStats->SwitchTimer(MISC_TIMER);
+  //#endif
+
 #ifdef POSE_STATS_ON
   int tstat = localStats->TimerRunning();
   if (!tstat)
-    localStats->TimerStart(MISC_TIMER);
-  else localStats->SwitchTimer(MISC_TIMER);
+    localStats->TimerStart(SIM_TIMER);
+  else localStats->SwitchTimer(SIM_TIMER);
 #endif
 
-  int time = localPVT->getGVT();
-  Event *commitEvent = eq->currentPtr->prev;
-
-  if (localPVT->done() && (POSE_endtime == -1)) { // commit all events in queue
-    eq->CommitEvents(this, NULL);
+  if (localPVT->done() && (POSE_endtime == -1)) { //commit all events in queue
+    eq->CommitEvents(this, -1);
     objID->terminus();
   }
-  else if (time >= 0) {
-    while (commitEvent->timestamp >= time)
-      commitEvent = commitEvent->prev;
-    if (commitEvent != eq->frontPtr)
-      eq->CommitEvents(this, commitEvent);
+  else {
+    eq->CommitEvents(this, localPVT->getGVT());
     if (localPVT->done())
       objID->terminus();
   }
   objID->ResetCheckpointRate();
-#ifdef POSE_STATS_ON
-  localStats->SwitchTimer(SIM_TIMER);
-#endif
+  //#ifdef POSE_STATS_ON
+  //  localStats->SwitchTimer(SIM_TIMER);
+  //#endif
   if (!localPVT->done() && 
       ((eq->currentPtr->timestamp >= 0) || !cancels.IsEmpty())) {
     Step();

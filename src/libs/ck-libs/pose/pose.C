@@ -29,7 +29,7 @@ void POSE_init()
   // Create the communication library for POSE
   ComlibInstanceHandle cinst = CkGetComlibInstance();
   // Create the communication strategy for POSE
-  Strategy *strategy = new StreamingStrategy(10,2);
+  Strategy *strategy = new StreamingStrategy(5,5);
   //Register the strategy
   cinst.setStrategy(strategy);
 #endif

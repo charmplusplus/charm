@@ -11,6 +11,7 @@ void CancelList::Insert(int ts, eventID e)
 {
   CancelNode *newnode = new CancelNode(ts, e);
   count++;
+  if (count > 1000) CkPrintf("WARNING: CancelList has %d events!\n", count);
   if ((ts < earliest) || (earliest < 0)) // new event has earliest timestamp
     earliest = ts;
   newnode->next = cancellations; // place at front of list
@@ -19,18 +20,11 @@ void CancelList::Insert(int ts, eventID e)
 }
 
 // Returns a pointer to a node in list; uses current to cycle through nodes
-// so as to return a new item each time GetItem is called; only returns items
-// with timestamp <= eGVT + MAX_FUTURE_OFFSET
+// so as to return a new item each time GetItem is called
 CancelNode *CancelList::GetItem(int eGVT) 
 {
   CancelNode *result, *start = current;
   if (!current) CkPrintf("ERROR: CancelList::GetItem: CancelList is empty\n");
-  while (current->timestamp > eGVT + MAX_FUTURE_OFFSET) {
-    if (current->next) current = current->next;
-    else current = cancellations;
-    if (current == start)
-      return NULL;
-  }
   result = current;
   if (current->next) current = current->next;
   else current = cancellations;

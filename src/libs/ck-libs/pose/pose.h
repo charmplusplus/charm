@@ -25,11 +25,13 @@
 #define STORE_RATE 1         // default store rate: 1 for every n events
 #define SPEC_WINDOW 30       // speculative event window
 #define MIN_LEASH 0          // min spec window for adaptive strategy
-#define MAX_LEASH 30        // max  "     "     "     "        " 
-#define GVT_WINDOW 200       // GVT improvement limit; sets s/r table size
-#define GVT_bucket 25        // number of buckets to sort sends/recvs into
+#define MAX_LEASH 100        // max  "     "     "     "        " 
+#define GVT_WINDOW 8         // GVT improvement limit; sets s/r table size
+#define GVT_bucket 1         // number of buckets to sort sends/recvs into
 #define TBL_THRESHOLD 2000   // max # entries in table before it shrinks
 #define MAX_GVT_WINDOW 100000// don't expand GVT SRtable beyond this
+#define MAX_EVENTS 10        // eventLeash controls quantity of events that
+#define MIN_EVENTS 1         // are executed by a Step call on a strategy
 
 // MISC
 #define MAX_POOL_SIZE 20     // maximum size of an eventMsg pool
@@ -70,6 +72,7 @@ class strat; // defined later in strat.h
 #include "opt3.h"
 #include "spec.h"
 #include "adapt.h"
+#include "adapt2.h"
 #include "cons.h"
 #include "chpt.h"
 

@@ -16,7 +16,7 @@ class eventQueue {
   ~eventQueue();
   void InsertEvent(Event *e);      // Insert e in timestamp order.
   void ShiftEvent();               // Moves currentPtr to next event
-  void CommitEvents(sim *obj, Event *target); // Commit events before target
+  void CommitEvents(sim *obj, int ts); // Commit events before target
   void SetCurrentPtr(Event *e);    // Changes what currentPtr points to
   Event *RecomputeRollbackTime();  // Get 1st unexec'ed event before currentPtr
   void DeleteEvent(Event *ev);     // Delete ev and make sure to reconnect

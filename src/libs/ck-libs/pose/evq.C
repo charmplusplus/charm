@@ -95,39 +95,46 @@ void eventQueue::ShiftEvent() {
 }
 
 // Commit events before target
-void eventQueue::CommitEvents(sim *obj, Event *target)
+void eventQueue::CommitEvents(sim *obj, int ts)
 {
-  if (target == NULL)                  // null target; commit up to currentPtr
-    target = currentPtr;
-  while ((target != frontPtr) && !target->cpData) 
-    target = target->prev; // move to checkpoint
-  if ((target == frontPtr) && (frontPtr->next != backPtr)) {
-    CkPrintf("ERROR: target moved back before frontPtr. Nothing to commit.\n");
-    return;
+  Event *target;
+  if (ts >= 0) { // commit up to ts
+    target = currentPtr->prev;
+    while (target->timestamp >= ts)
+      target = target->prev;
+    target = target->next;
+    while (!target->cpData && (target != frontPtr))
+      target = target->prev;
+    if (target == frontPtr) return;  // nothing to commit
+    commitPtr = frontPtr->next;
   }
-  else if ((target == frontPtr) && (frontPtr->next == backPtr)) return;
-  commitPtr = frontPtr->next;                    // start at front
-  while (commitPtr != target) { 
-    if (commitPtr->done != 1)                    // only commit executed events
-      CkPrintf("ERROR: committing unexecuted event@%d\n",commitPtr->timestamp);
-    obj->ResolveCommitFn(commitPtr->fnIdx, commitPtr->msg); // exec commit fn
-    if (commitPtr->commitBfrLen > 0)  {             // print buffered I/O
+  else if (ts == -1) {
+    commitPtr = frontPtr->next;
+    if (commitPtr == currentPtr) return;  // nothing to commit
+    target = currentPtr;
+  }
+  while (commitPtr != target) { // commit up to next checkpoint
+    //CmiAssert(commitPtr->done == 1);  // only commit executed events
+    obj->ResolveCommitFn(commitPtr->fnIdx, commitPtr->msg); // commit fn
+    if (commitPtr->commitBfrLen > 0)  { // print buffered I/O
       CkPrintf("%s", commitPtr->commitBfr);
       if (commitPtr->commitErr) CmiAbort("Commit ERROR");
     }
     commitPtr = commitPtr->next;
     /* if (obj->recycCount < 0)
-      obj->recyc[obj->recycCount] = commitPtr->prev->cpData;
-      else*/ 
-    delete commitPtr->prev->cpData;
-//#ifdef POSE_STATS_ON
-//    localStat *localStats = (localStat *)CkLocalBranch(theLocalStats);
-//    localStats->Reclaim();
-//#endif
-
-    delete commitPtr->prev;                     // delete committed event
+       obj->recyc[obj->recycCount] = commitPtr->prev->cpData;
+       else*/ 
+    if (commitPtr->prev->cpData)
+      delete commitPtr->prev->cpData; 
+#ifdef POSE_STATS_ON
+    obj->localStats->SwitchTimer(MISC_TIMER);
+#endif
+    delete commitPtr->prev;  // delete committed event
+#ifdef POSE_STATS_ON
+    obj->localStats->SwitchTimer(SIM_TIMER);
+#endif
   }
-  commitPtr->prev = frontPtr;                   // reattach front sentinel node
+  commitPtr->prev = frontPtr;  // reattach front sentinel node
   frontPtr->next = commitPtr;
   commitPtr = NULL;
 }

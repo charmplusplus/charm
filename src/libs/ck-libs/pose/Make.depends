@@ -111,7 +111,7 @@ pose.o: pose.C pose.h ../../../../include/StreamingStrategy.h \
   pose.decl.h eventID.h evmpool.h evmpool.decl.h srtable.h stats.h \
   stats.decl.h cancel.h event.h eqheap.h pvtobj.h lbObject.h ldbal.h \
   ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h adapt.h cons.h chpt.h pose.def.h
+  opt.h opt2.h opt3.h spec.h adapt.h cons.h chpt.h pose.def.h
 	$(CHARMC) -o pose.o pose.C
 srtable.o: srtable.C ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -153,8 +153,8 @@ srtable.o: srtable.C ../../../../include/charm++.h \
   ../../../../include/commlib.h ../../../../include/commlib.decl.h \
   pose.decl.h eventID.h evmpool.h evmpool.decl.h stats.h stats.decl.h \
   cancel.h event.h eqheap.h pvtobj.h lbObject.h ldbal.h ldbal.decl.h \
-  gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h opt.h adapt.h \
-  cons.h chpt.h
+  gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h opt.h opt2.h \
+  opt3.h spec.h adapt.h cons.h chpt.h
 	$(CHARMC) -o srtable.o srtable.C
 cancel.o: cancel.C eventID.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -196,8 +196,8 @@ cancel.o: cancel.C eventID.h ../../../../include/charm++.h \
   ../../../../include/commlib.h ../../../../include/commlib.decl.h \
   pose.decl.h evmpool.h evmpool.decl.h srtable.h stats.h stats.decl.h \
   cancel.h event.h eqheap.h pvtobj.h lbObject.h ldbal.h ldbal.decl.h \
-  gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h opt.h adapt.h \
-  cons.h chpt.h
+  gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h opt.h opt2.h \
+  opt3.h spec.h adapt.h cons.h chpt.h
 	$(CHARMC) -o cancel.o cancel.C
 evmpool.o: evmpool.C ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -240,7 +240,7 @@ evmpool.o: evmpool.C ../../../../include/charm++.h \
   pose.decl.h eventID.h evmpool.h evmpool.decl.h srtable.h stats.h \
   stats.decl.h cancel.h event.h eqheap.h pvtobj.h lbObject.h ldbal.h \
   ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h adapt.h cons.h chpt.h evmpool.def.h
+  opt.h opt2.h opt3.h spec.h adapt.h cons.h chpt.h evmpool.def.h
 	$(CHARMC) -o evmpool.o evmpool.C
 pvtobj.o: pvtobj.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/charm++.h \
@@ -282,7 +282,7 @@ pvtobj.o: pvtobj.C pose.h ../../../../include/StreamingStrategy.h \
   pose.decl.h eventID.h evmpool.h evmpool.decl.h srtable.h stats.h \
   stats.decl.h cancel.h event.h eqheap.h pvtobj.h lbObject.h ldbal.h \
   ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h adapt.h cons.h chpt.h
+  opt.h opt2.h opt3.h spec.h adapt.h cons.h chpt.h
 	$(CHARMC) -o pvtobj.o pvtobj.C
 lbObject.o: lbObject.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/charm++.h \
@@ -324,7 +324,7 @@ lbObject.o: lbObject.C pose.h ../../../../include/StreamingStrategy.h \
   pose.decl.h eventID.h evmpool.h evmpool.decl.h srtable.h stats.h \
   stats.decl.h cancel.h event.h eqheap.h pvtobj.h lbObject.h ldbal.h \
   ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h adapt.h cons.h chpt.h
+  opt.h opt2.h opt3.h spec.h adapt.h cons.h chpt.h
 	$(CHARMC) -o lbObject.o lbObject.C
 ldbal.o: ldbal.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/charm++.h \
@@ -366,7 +366,7 @@ ldbal.o: ldbal.C pose.h ../../../../include/StreamingStrategy.h \
   pose.decl.h eventID.h evmpool.h evmpool.decl.h srtable.h stats.h \
   stats.decl.h cancel.h event.h eqheap.h pvtobj.h lbObject.h ldbal.h \
   ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h adapt.h cons.h chpt.h ldbal.def.h
+  opt.h opt2.h opt3.h spec.h adapt.h cons.h chpt.h ldbal.def.h
 	$(CHARMC) -o ldbal.o ldbal.C
 gvt.o: gvt.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/charm++.h \
@@ -408,7 +408,8 @@ gvt.o: gvt.C pose.h ../../../../include/StreamingStrategy.h \
   pose.decl.h eventID.h evmpool.h evmpool.decl.h srtable.h stats.h \
   stats.decl.h cancel.h event.h eqheap.h pvtobj.h lbObject.h ldbal.h \
   ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h adapt.h cons.h chpt.h gvt.def.h ../../../../include/qd.h
+  opt.h opt2.h opt3.h spec.h adapt.h cons.h chpt.h gvt.def.h \
+  ../../../../include/qd.h
 	$(CHARMC) -o gvt.o gvt.C
 event.o: event.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/charm++.h \
@@ -450,7 +451,7 @@ event.o: event.C pose.h ../../../../include/StreamingStrategy.h \
   pose.decl.h eventID.h evmpool.h evmpool.decl.h srtable.h stats.h \
   stats.decl.h cancel.h event.h eqheap.h pvtobj.h lbObject.h ldbal.h \
   ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h adapt.h cons.h chpt.h
+  opt.h opt2.h opt3.h spec.h adapt.h cons.h chpt.h
 	$(CHARMC) -o event.o event.C
 eqheap.o: eqheap.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/charm++.h \
@@ -492,7 +493,7 @@ eqheap.o: eqheap.C pose.h ../../../../include/StreamingStrategy.h \
   pose.decl.h eventID.h evmpool.h evmpool.decl.h srtable.h stats.h \
   stats.decl.h cancel.h event.h eqheap.h pvtobj.h lbObject.h ldbal.h \
   ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h adapt.h cons.h chpt.h
+  opt.h opt2.h opt3.h spec.h adapt.h cons.h chpt.h
 	$(CHARMC) -o eqheap.o eqheap.C
 evq.o: evq.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/charm++.h \
@@ -534,7 +535,7 @@ evq.o: evq.C pose.h ../../../../include/StreamingStrategy.h \
   pose.decl.h eventID.h evmpool.h evmpool.decl.h srtable.h stats.h \
   stats.decl.h cancel.h event.h eqheap.h pvtobj.h lbObject.h ldbal.h \
   ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h adapt.h cons.h chpt.h
+  opt.h opt2.h opt3.h spec.h adapt.h cons.h chpt.h
 	$(CHARMC) -o evq.o evq.C
 sim.o: sim.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/charm++.h \
@@ -576,7 +577,7 @@ sim.o: sim.C pose.h ../../../../include/StreamingStrategy.h \
   pose.decl.h eventID.h evmpool.h evmpool.decl.h srtable.h stats.h \
   stats.decl.h cancel.h event.h eqheap.h pvtobj.h lbObject.h ldbal.h \
   ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h adapt.h cons.h chpt.h sim.def.h
+  opt.h opt2.h opt3.h spec.h adapt.h cons.h chpt.h sim.def.h
 	$(CHARMC) -o sim.o sim.C
 rep.o: rep.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/charm++.h \
@@ -618,7 +619,7 @@ rep.o: rep.C pose.h ../../../../include/StreamingStrategy.h \
   pose.decl.h eventID.h evmpool.h evmpool.decl.h srtable.h stats.h \
   stats.decl.h cancel.h event.h eqheap.h pvtobj.h lbObject.h ldbal.h \
   ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h adapt.h cons.h chpt.h
+  opt.h opt2.h opt3.h spec.h adapt.h cons.h chpt.h
 	$(CHARMC) -o rep.o rep.C
 strat.o: strat.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/charm++.h \
@@ -660,7 +661,7 @@ strat.o: strat.C pose.h ../../../../include/StreamingStrategy.h \
   pose.decl.h eventID.h evmpool.h evmpool.decl.h srtable.h stats.h \
   stats.decl.h cancel.h event.h eqheap.h pvtobj.h lbObject.h ldbal.h \
   ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h adapt.h cons.h chpt.h
+  opt.h opt2.h opt3.h spec.h adapt.h cons.h chpt.h
 	$(CHARMC) -o strat.o strat.C
 cons.o: cons.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/charm++.h \
@@ -702,7 +703,7 @@ cons.o: cons.C pose.h ../../../../include/StreamingStrategy.h \
   pose.decl.h eventID.h evmpool.h evmpool.decl.h srtable.h stats.h \
   stats.decl.h cancel.h event.h eqheap.h pvtobj.h lbObject.h ldbal.h \
   ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h adapt.h cons.h chpt.h
+  opt.h opt2.h opt3.h spec.h adapt.h cons.h chpt.h
 	$(CHARMC) -o cons.o cons.C
 opt.o: opt.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/charm++.h \
@@ -744,7 +745,7 @@ opt.o: opt.C pose.h ../../../../include/StreamingStrategy.h \
   pose.decl.h eventID.h evmpool.h evmpool.decl.h srtable.h stats.h \
   stats.decl.h cancel.h event.h eqheap.h pvtobj.h lbObject.h ldbal.h \
   ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h adapt.h cons.h chpt.h
+  opt.h opt2.h opt3.h spec.h adapt.h cons.h chpt.h
 	$(CHARMC) -o opt.o opt.C
 opt2.o: opt2.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/charm++.h \
@@ -786,7 +787,7 @@ opt2.o: opt2.C pose.h ../../../../include/StreamingStrategy.h \
   pose.decl.h eventID.h evmpool.h evmpool.decl.h srtable.h stats.h \
   stats.decl.h cancel.h event.h eqheap.h pvtobj.h lbObject.h ldbal.h \
   ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h adapt.h cons.h chpt.h
+  opt.h opt2.h opt3.h spec.h adapt.h cons.h chpt.h
 	$(CHARMC) -o opt2.o opt2.C
 opt3.o: opt3.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/charm++.h \
@@ -828,7 +829,7 @@ opt3.o: opt3.C pose.h ../../../../include/StreamingStrategy.h \
   pose.decl.h eventID.h evmpool.h evmpool.decl.h srtable.h stats.h \
   stats.decl.h cancel.h event.h eqheap.h pvtobj.h lbObject.h ldbal.h \
   ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h adapt.h cons.h chpt.h
+  opt.h opt2.h opt3.h spec.h adapt.h cons.h chpt.h
 	$(CHARMC) -o opt3.o opt3.C
 spec.o: spec.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/charm++.h \
@@ -870,7 +871,7 @@ spec.o: spec.C pose.h ../../../../include/StreamingStrategy.h \
   pose.decl.h eventID.h evmpool.h evmpool.decl.h srtable.h stats.h \
   stats.decl.h cancel.h event.h eqheap.h pvtobj.h lbObject.h ldbal.h \
   ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h adapt.h cons.h chpt.h
+  opt.h opt2.h opt3.h spec.h adapt.h cons.h chpt.h
 	$(CHARMC) -o spec.o spec.C
 adapt.o: adapt.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/charm++.h \
@@ -912,5 +913,47 @@ adapt.o: adapt.C pose.h ../../../../include/StreamingStrategy.h \
   pose.decl.h eventID.h evmpool.h evmpool.decl.h srtable.h stats.h \
   stats.decl.h cancel.h event.h eqheap.h pvtobj.h lbObject.h ldbal.h \
   ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h adapt.h cons.h chpt.h
+  opt.h opt2.h opt3.h spec.h adapt.h cons.h chpt.h
 	$(CHARMC) -o adapt.o adapt.C
+adapt2.o: adapt2.C pose.h ../../../../include/StreamingStrategy.h \
+  ../../../../include/ComlibManager.h ../../../../include/charm++.h \
+  ../../../../include/charm.h ../../../../include/converse.h \
+  ../../../../include/conv-config.h ../../../../include/conv-common.h \
+  ../../../../include/conv-mach.h ../../../../include/conv-autoconfig.h \
+  ../../../../include/conv-mach-opt.h ../../../../include/pup_c.h \
+  ../../../../include/conv-cpm.h ../../../../include/conv-cpath.h \
+  ../../../../include/conv-qd.h ../../../../include/conv-random.h \
+  ../../../../include/conv-lists.h ../../../../include/conv-trace.h \
+  ../../../../include/persistent.h ../../../../include/debug-conv.h \
+  ../../../../include/pup.h ../../../../include/middle.h \
+  ../../../../include/middle-conv.h ../../../../include/cklists.h \
+  ../../../../include/ckbitvector.h ../../../../include/ckstream.h \
+  ../../../../include/init.h ../../../../include/ckhashtable.h \
+  ../../../../include/debug-charm.h ../../../../include/CkMarshall.decl.h \
+  ../../../../include/cksection.h ../../../../include/ckcallback.h \
+  ../../../../include/ckreduction.h \
+  ../../../../include/CkReduction.decl.h \
+  ../../../../include/cknodegroupreduction.h \
+  ../../../../include/CkArrayReductionMgr.decl.h \
+  ../../../../include/readonly.h ../../../../include/ckarray.h \
+  ../../../../include/cklocation.h ../../../../include/LBDatabase.h \
+  ../../../../include/lbdb.h ../../../../include/LBDatabase.decl.h \
+  ../../../../include/NullLB.decl.h ../../../../include/BaseLB.decl.h \
+  ../../../../include/CkLocation.decl.h \
+  ../../../../include/CkArray.decl.h \
+  ../../../../include/ComlibArrayListener.h \
+  ../../../../include/ComlibStrategy.h \
+  ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
+  ../../../../include/charisma.decl.h ../../../../include/tempo.h \
+  ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
+  ../../../../include/waitqd.decl.h ../../../../include/sdag.h \
+  ../../../../include/ckcheckpoint.h \
+  ../../../../include/CkCheckpoint.decl.h \
+  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace-bluegene.h ../../../../include/envelope.h \
+  ../../../../include/commlib.h ../../../../include/commlib.decl.h \
+  pose.decl.h eventID.h evmpool.h evmpool.decl.h srtable.h stats.h \
+  stats.decl.h cancel.h event.h eqheap.h pvtobj.h lbObject.h ldbal.h \
+  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
+  opt.h opt2.h opt3.h spec.h adapt.h cons.h chpt.h
+	$(CHARMC) -o adapt2.o adapt2.C

@@ -162,7 +162,6 @@ GVT::GVT()
   estGVT = -1;
   inactive = 0;
   SendsAndRecvs = new SRtable();
-  LastSR = new SRtable();
 #ifdef LB_ON
   nextLBstart = LB_SKIP - 1;
 #endif
@@ -191,15 +190,10 @@ void GVT::runGVT(UpdateMsg *m)
 #endif
   estGVT = m->optPVT;
   nextLBstart = m->nextLB;
-  LastSR->FreeTable();
-  LastSR->SetOffset(m->conPVT);
-  LastSR->addEntries(m);
   SendsAndRecvs->FreeTable();
   SendsAndRecvs->SetOffset(m->conPVT);
   CkFreeMsg(m);
   CProxy_PVT p(ThePVT);
-  //CkPrintf("GVT on [%d] issuing startPhase; table offset=%d...\n", CkMyPe(),
-  //estGVT);
   p.startPhase();  // start the PVT phase of the GVT algorithm
 #ifdef POSE_STATS_ON
   localStats->TimerStop();
@@ -248,13 +242,16 @@ void GVT::computeGVT(UpdateMsg *m)
     else inactive = 0;
 
     // STEP 2: Check if send/recv activity provides lower possible estimate
-    int unmatchedMsg = SendsAndRecvs->FindDifferenceTimestamp(LastSR);
-    if ((unmatchedMsg < estGVT) || (estGVT < 0))
-      estGVT = unmatchedMsg;
-    //SendsAndRecvs->dump();
-    
+    int unmatchedMsg;
+    if ((estGVT > lastGVT) || (estGVT < 0)) {
+      unmatchedMsg = SendsAndRecvs->FindDifferenceTimestamp();
+      if ((unmatchedMsg < estGVT) || (estGVT < 0))
+	estGVT = unmatchedMsg;
+      //SendsAndRecvs->dump();
+    }
+
     //CkPrintf("opt=%d con=%d lastGVT=%d lastMsg=%d\n", 
-    //     optGVT, conGVT, lastGVT, unmatchedMsg);
+    //optGVT, conGVT, lastGVT, unmatchedMsg);
     
     // STEP 3: In times of inactivity, GVT must be set to lastGVT
     if ((estGVT < 0) && (lastGVT < 0)) { estGVT = 0; }
@@ -312,14 +309,11 @@ void GVT::computeGVT(UpdateMsg *m)
 #endif
 #endif
 
-      UpdateMsg *umsg = SendsAndRecvs->packTable();
+      UpdateMsg *umsg = new UpdateMsg;
       umsg->optPVT = estGVT;
       umsg->conPVT = SendsAndRecvs->offset;
       umsg->gvtW = SendsAndRecvs->gvtWindow;
       umsg->numB = SendsAndRecvs->numBuckets;
-      int prio = 0; //estGVT - INT_MAX + 2*SPEC_WINDOW;
-      *((int*)CkPriorityPtr(umsg)) = prio;
-      CkSetQueueing(umsg, CK_QUEUEING_IFIFO);
       g[(CkMyPe()+1) % CkNumPes()].runGVT(umsg);
     }
     optGVT = conGVT = -1;

@@ -13,6 +13,7 @@
 #define OPT3_T 2
 #define SPEC_T 3
 #define ADAPT_T 4
+#define ADAPT2_T 5
 
 class strat
 {
