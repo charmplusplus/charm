@@ -669,7 +669,7 @@ void _initCharm(int unused_argc, char **argv)
 	}
 
 	if (faultFunc) {
-		_allStats = new Stats*[CkNumPes()];
+		if (CkMyPe()==0) _allStats = new Stats*[CkNumPes()];
 		faultFunc(_restartDir);
 	}else if(CkMyPe()==0){
 		_allStats = new Stats*[CkNumPes()];

@@ -42,8 +42,6 @@ CkCallback CkMemCheckPT::cpCallback;    // static
 
 CpvStaticDeclare(CkProcCheckPTMessage*, procChkptBuf);
 
-int cur_restart_phase = 0;
-
 // compute the backup processor
 // FIXME: avoid crashed processors
 inline int ChkptOnPe() { return (CkMyPe()+1)%CkNumPes(); }
@@ -303,6 +301,7 @@ void CkMemCheckPT::cpFinish()
 // restore the bitmap vector for LB
 void CkMemCheckPT::resetLB(int diepe)
 {
+#if CMK_LBDB_ON
   int i;
   char *bitmap = new char[CkNumPes()];
   // set processor available bitmap
@@ -319,6 +318,7 @@ void CkMemCheckPT::resetLB(int diepe)
     if (bitmap[i]==0) failed(bitmap[i]);
 
   delete [] bitmap;
+#endif
 }
 
 // in case when failedPe dies, everybody go through its check point table:
@@ -483,7 +483,7 @@ void CkMemCheckPT::quiescence(CkCallback &cb)
 
 // function called by user to start a check point
 // callback cb is used to pass control back
-void CkStartMemcheckPoint(CkCallback &cb)
+void CkStartMemCheckpoint(CkCallback &cb)
 {
 #if CMK_MEM_CHECKPOINT
     // store user callback and user data
@@ -492,6 +492,9 @@ void CkStartMemcheckPoint(CkCallback &cb)
     // broadcast to start check pointing
   CProxy_CkMemCheckPT checkptMgr(ckCheckPTGroupID);
   checkptMgr.doItNow(CkMyPe(), cb);
+#else
+  // when mem checkpoint is not enabled, invike cb immediately
+  cb.send();
 #endif
 }
 
@@ -518,6 +521,7 @@ static int recoverProcDataHandlerIdx;
 
 static void restartBcastHandler(char *msg)
 {
+#if CMK_MEM_CHECKPOINT
   // advance phase counter
   cur_restart_phase ++;
   _diePE = *(int *)(msg+CmiMsgHeaderSizeBytes);
@@ -530,6 +534,7 @@ static void restartBcastHandler(char *msg)
   if (CkMyPe()==_diePE)
       CkRestartCheckPointCallback(NULL, NULL);
   CmiFree(msg);
+#endif
 }
 
 extern void _initDone();
@@ -537,6 +542,7 @@ extern void _initDone();
 // called on crashed processor
 static void recoverProcDataHandler(char *msg)
 {
+#if CMK_MEM_CHECKPOINT
    int i;
    CmiPrintf("[%d] ----- recoverProcDataHandler  cur_restart_phase:%d\n", CkMyPe(), cur_restart_phase);
    envelope *env = (envelope *)msg;
@@ -556,12 +562,14 @@ static void recoverProcDataHandler(char *msg)
    CmiFree(msg);
 
    _initDone();
+#endif
 }
 
 // called on its backup processor
 // get backup message buffer and sent to crashed processor
 static void askProcDataHandler(char *msg)
 {
+#if CMK_MEM_CHECKPOINT
     int diePe = *(int *)(msg+CmiMsgHeaderSizeBytes);
     CkPrintf("[%d] restartBcastHandler called with '%d' cur_restart_phase:%d.\n",CmiMyPe(),diePe, cur_restart_phase);
     envelope *env = (envelope *)(UsrToEnv(CpvAccess(procChkptBuf)));
@@ -574,10 +582,12 @@ static void askProcDataHandler(char *msg)
     CmiSetHandler(env, recoverProcDataHandlerIdx);
     CmiSyncSendAndFree(CpvAccess(procChkptBuf)->pe, env->getTotalsize(), (char *)env);
     CpvAccess(procChkptBuf) = NULL;
+#endif
 }
 
 void CkMemRestart(const char *dummy)
 {
+#if CMK_MEM_CHECKPOINT
    CmiPrintf("[%d] I am restarting  cur_restart_phase:%d \n",CmiMyPe(), cur_restart_phase);
    char msg[CmiMsgHeaderSizeBytes+sizeof(int)];
    *(int *)(&msg[CmiMsgHeaderSizeBytes]) = CkMyPe();
@@ -586,6 +596,9 @@ void CkMemRestart(const char *dummy)
    int pe = ChkptOnPe();
    CmiSyncSend(pe, CmiMsgHeaderSizeBytes+sizeof(int), (char *)&msg);
    cur_restart_phase=-1;
+#else
+   CmiAbort("Fault tolerance is not support, rebuild charm++ with 'ft' option");
+#endif
 }
 
 // can be called in other files
