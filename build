@@ -118,21 +118,24 @@ chmod +x $VERSION/tmp/system_ln
 ln -s "../../src/Common/scripts/Makefile" $VERSION/tmp/Makefile
 
 #special options
-echo "Generating $VERSION/tmp/conv-mach-opt.h, conv-mach-opt.sh"
-/bin/rm -f $VERSION/tmp/conv-mach-opt.h
-/bin/rm -f $VERSION/tmp/conv-mach-opt.sh
-touch $VERSION/tmp/conv-mach-opt.h
-touch $VERSION/tmp/conv-mach-opt.sh
-if test -n "$MORE"
+ConvHeader="$VERSION/tmp/conv-mach-opt.h"
+ConvSh="$VERSION/tmp/conv-mach-opt.sh"
+if test ! -f $ConvHeader
 then
-  for i in $MORE
-  do
-    touch $VERSION/tmp/$i
-    echo '/* '"src/$BASEVERSION/conv-mach-$i.h"' */' >> $VERSION/tmp/conv-mach-opt.h
-    cat src/$BASEVERSION/conv-mach-$i.h >> $VERSION/tmp/conv-mach-opt.h
-    echo '# '"src/$BASEVERSION/conv-mach-$i.sh" >> $VERSION/tmp/conv-mach-opt.sh
-    cat src/$BASEVERSION/conv-mach-$i.sh >> $VERSION/tmp/conv-mach-opt.sh
-  done
+  echo "Generating $ConvHeader, conv-mach-opt.sh"
+  /bin/rm -f $ConvHeader  $ConvSh
+  touch $ConvHeader; touch $ConvSh
+  if test -n "$MORE"
+  then
+    for i in $MORE
+    do
+#      touch $VERSION/tmp/$i
+      echo '/* '"src/$BASEVERSION/conv-mach-$i.h"' */' >> $ConvHeader
+      cat src/$BASEVERSION/conv-mach-$i.h >> $ConvHeader
+      echo '# '"src/$BASEVERSION/conv-mach-$i.sh" >> $ConvSh
+      cat src/$BASEVERSION/conv-mach-$i.sh >> $ConvSh
+    done
+  fi
 fi
 
 echo $BASEVERSION > $VERSION/tmp/.vdir
