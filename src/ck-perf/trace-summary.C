@@ -106,16 +106,19 @@ void traceEndIdle(void)
 extern "C"
 void traceResume(void)
 {
+  CpvAccess(_trace)->beginExecute(0);
 }
 
 extern "C"
 void traceSuspend(void)
 {
+  CpvAccess(_trace)->endExecute();
 }
 
 extern "C"
 void traceAwaken(void)
 {
+//  CpvAccess(_trace)->creation(0);
 }
 
 extern "C"
@@ -146,7 +149,7 @@ extern "C" void Ck_Summary_MarkEvent(int eventType)
 
 void LogPool::addEventType(int eventType, double time)
 {
-   if (eventType <0 || eventType >= 256) {
+   if (eventType <0 || eventType >= MAX_MARKS) {
        CkPrintf("Invalid event type %d!\n", eventType);
        return;
    }
@@ -177,7 +180,7 @@ void LogPool::write(void)
   if (VER>=2.0) 
   {
   fprintf(fp, "%d ", markcount);
-  for (i=0; i<256; i++) {
+  for (i=0; i<MAX_MARKS; i++) {
     for(MarkEntry *e = events[i].marks; e; e=e->next)
         fprintf(fp, "%d %f ", i, e->time);
   }
@@ -217,18 +220,28 @@ void LogPool::writeSts(void)
 
 void LogPool::shrink(void)
 {
+/*
   for (int i=0; i<numEntries; i++)
   {
      pool[i].setTime(pool[i*2].getTime() + pool[i*2+1].getTime());
   }
   numEntries /= 2;
+*/
+  int entries = numEntries/2;
+//  if (numEntries%2) entries++;
+  for (int i=0; i<entries; i++)
+  {
+     pool[i].setTime(pool[i*2].getTime() + pool[i*2+1].getTime());
+  }
+  numEntries = entries;
   CpvAccess(binSize) *= 2;
-//CkPrintf("Shrinked binsize: %f !!!!\n", CpvAccess(binSize));
+
+//CkPrintf("Shrinked binsize: %f entries:%d!!!!\n", CpvAccess(binSize), numEntries);
 }
 
 void LogEntry::write(FILE* fp)
 {
-  int per = time * 100.0 / CpvAccess(binSize);
+  int per = (int)(time * 100.0 / CpvAccess(binSize));
   fprintf(fp, "%4d", per);
 }
 
@@ -266,6 +279,7 @@ void TraceProjections::beginExecute(envelope *e)
 
 void TraceProjections::endExecute(void)
 {
+//  if (!flag) return;
   double t = CmiTimer();
   double ts = start;
   double nts = binStart;

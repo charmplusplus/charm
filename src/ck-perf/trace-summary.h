@@ -17,7 +17,9 @@
 // in second
 #define  BIN_SIZE	0.001
 
-#define  MARKSIZE       256
+#define  MAX_ENTRIES      1000
+
+#define  MAX_MARKS       256
 
 #define  CREATION           1
 #define  BEGIN_PROCESSING   2
@@ -84,7 +86,7 @@ class LogPool {
     int *epCount;
     int epSize;
 
-    LogMark events[MARKSIZE];
+    LogMark events[MAX_MARKS];
     int markcount;
   public:
     LogPool(char *pgm) {
@@ -92,15 +94,12 @@ class LogPool {
       poolSize = CpvAccess(CtrLogBufSize);
       if (poolSize % 2) poolSize++;	// make sure it is even
       pool = new LogEntry[poolSize];
-      if (pool == NULL) {
-         CkPrintf("memory overflow!\n");
-	 exit(1);
-      }
+      _MEMCHECK(pool);
       numEntries = 0;
       char pestr[10];
       sprintf(pestr, "%d", CkMyPe());
-      int len = strlen(pgm) + strlen(".log.") + strlen(pestr) + 1;
-      char *fname = new char[len];
+      int len = strlen(pgm) + strlen(".sum.") + strlen(pestr) + 1;
+      char *fname = new char[len+1];
       sprintf(fname, "%s.%s.sum", pgm, pestr);
       fp = NULL;
       //CmiPrintf("TRACE: %s:%d\n", fname, errno);
@@ -114,16 +113,18 @@ class LogPool {
       }
 //      fprintf(fp, "SUMMARY-RECORD\n");
 
-      epSize = 1000;
+      epSize = MAX_ENTRIES;
       epTime = new double[epSize];
+      _MEMCHECK(epTime);
       epCount = new int[epSize];
+      _MEMCHECK(epCount);
       for (i=0; i< epSize; i++) {
 	epTime[i] = 0.0;
 	epCount[i] = 0;
       };
 
       // event
-      for (i=0; i<MARKSIZE; i++) events[i].marks = NULL;
+      for (i=0; i<MAX_MARKS; i++) events[i].marks = NULL;
       markcount = 0;
     }
     ~LogPool() {
@@ -132,7 +133,7 @@ class LogPool {
       fclose(fp);
       // free memory for mark
       if (markcount > 0)
-      for (int i=0; i<MARKSIZE; i++) {
+      for (int i=0; i<MAX_MARKS; i++) {
           MarkEntry *e=events[i].marks, *t;
           while (e) {
 	      t = e;
@@ -190,7 +191,7 @@ class TraceProjections : public Trace {
     double bin;
     int msgNum;
   public:
-    TraceProjections() { curevent=0; msgNum=0; binStart=0.0; }
+    TraceProjections() { curevent=0; msgNum=0; binStart=0.0; bin=0.0;}
     void userEvent(int e);
     void creation(envelope *e, int num=1);
     void beginExecute(envelope *e);
