@@ -191,7 +191,7 @@ void CentralLB::ReceiveStats(CLBStatsMsg *m)
 
 //    CkPrintf("Before setting bitmap\n");
     for(proc = 0; proc < clients; proc++)
-      statsDataList[proc].available = avail_vector[proc];
+      statsDataList[proc].available = (CmiBool)avail_vector[proc];
     
 //    CkPrintf("Before Calling Strategy\n");
 
