@@ -103,6 +103,9 @@ static void *recdQueueRemoveFromFront(void);
 static void ConverseRunPE(int everReturn);
 static void CommunicationServer(int sleepTime);
 static void CommunicationServerThread(int sleepTime);
+#if CMK_IMMEDIATE_MSG
+void CmiHandleImmediate();
+#endif
 
 typedef struct msg_list {
      MPI_Request req;
@@ -185,6 +188,8 @@ static int Cmi_charmrun_fd = 0;
 
 CsvDeclare(CmiNodeState, NodeState);
 
+#include "immediate.c"
+
 #if ! CMK_SMP
 /************ non SMP **************/
 static struct CmiStateStruct Cmi_state;
@@ -213,10 +218,14 @@ static void CmiPushPE(int pe,void *msg)
   CmiState cs=CmiGetStateN(pe);
   MACHSTATE1(2,"Pushing message into %d's queue",pe);
 #if CMK_IMMEDIATE_MSG
-  if (CmiGetHandler(msg) == CpvAccessOther(CmiImmediateMsgHandlerIdx,0)) {
-/*CmiPrintf("[node %d] Immediate Message {{. \n", CmiMyNode());*/
+  if (CmiGetHandler(msg) == CpvAccessOther(CmiImmediateMsgHandlerIdx,pe)) {
+/*
+CmiPrintf("[node %d] Immediate Message {{. \n", CmiMyNode());
     CmiHandleMessage(msg);
-/*CmiPrintf("[node %d] Immediate Message done.}} \n", CmiMyNode());*/
+CmiPrintf("[node %d] Immediate Message done.}} \n", CmiMyNode());
+*/
+    *(CmiUInt2 *)msg = pe;
+    CmiPushImmediateMsg(msg);
     return;
   }
 #endif
@@ -229,6 +238,26 @@ static void CmiPushPE(int pe,void *msg)
   CmiCommUnlock();
 #endif
 }
+
+#if CMK_NODE_QUEUE_AVAILABLE
+/*Add a message to this processor's receive queue */
+static void CmiPushNode(void *msg)
+{
+  CmiState cs=CmiGetStateN(0);
+  MACHSTATE1(2,"Pushing message into %d's queue",pe);
+#if CMK_IMMEDIATE_MSG
+  if (CmiGetHandler(msg) == CpvAccessOther(CmiImmediateMsgHandlerIdx,0)) {
+    CMI_DEST_RANK(msg) = 0;
+    CmiPushImmediateMsg(msg);
+    return;
+  }
+#endif
+  CmiLock(CsvAccess(NodeState).CmiNodeRecvLock);
+  PCQueuePush(CsvAccess(NodeState).NodeRecv,msg);
+  CmiUnlock(CsvAccess(NodeState).CmiNodeRecvLock);
+  CmiIdleLock_addMessage(&cs->idle); 
+}
+#endif
 
 #ifndef CmiMyPe
 int CmiMyPe(void)
@@ -295,16 +324,6 @@ void CmiReleaseCommHandle(CmiCommHandle c)
   return;
 }
 
-void CmiHandleImmediate()
-{
-   while (!CdsFifo_Empty(CsvAccess(NodeState).imm)) {
-     void *msg = CdsFifo_Dequeue(CsvAccess(NodeState).imm);
-CmiPrintf("[%d] CmiHandleMessage\n", CmiMyNode());
-     CmiHandleMessage(msg);
-CmiPrintf("[%d] CmiHandleMessage done\n", CmiMyNode());
-   }
-}
-
 static void CmiReleaseSentMessages(void)
 {
   SMSG_LIST *msg_tmp=sent_msgs;
@@ -359,7 +378,7 @@ static int PumpMsgs(void)
 
 #if CMK_NODE_QUEUE_AVAILABLE
     if (CMI_DEST_RANK(msg)==DGRAM_NODEMESSAGE)
-      PCQueuePush(CsvAccess(NodeState).NodeRecv, msg);
+      CmiPushNode(msg);
     else
 #endif
       CmiPushPE(CMI_DEST_RANK(msg), msg);
@@ -403,7 +422,7 @@ static void PumpMsgsBlocking(void)
 
 #if CMK_NODE_QUEUE_AVAILABLE
    if (CMI_DEST_RANK(msg)==DGRAM_NODEMESSAGE)
-      PCQueuePush(CsvAccess(NodeState).NodeRecv, msg);
+      CmiPushNode(msg);
    else
 #endif
       CmiPushPE(CMI_DEST_RANK(msg), msg);
@@ -431,6 +450,18 @@ static int MsgQueueEmpty()
 
 #if CMK_SMP
 static void SendMsgBuf();
+
+/* test if all processors recv queues are empty */
+static int RecvQueueEmpty()
+{
+  int i;
+  for (i=0; i<Cmi_mynodesize; i++) {
+    CmiState cs=CmiGetStateN(i);
+    if (!PCQueueEmpty(cs->recv)) return 0;
+  }
+  return 1;
+}
+
 /**
 CommunicationServer calls MPI to send messages in the queues and probe message from network.
 */
@@ -440,10 +471,11 @@ static void CommunicationServer(int sleepTime)
   SendMsgBuf(); 
   if (!PumpMsgs()) CmiYield(); 
   if (inexit == 1) {
-    while(!MsgQueueEmpty() || !CmiAllAsyncMsgsSent()) {
+    while(!MsgQueueEmpty() || !CmiAllAsyncMsgsSent() || !RecvQueueEmpty()) {
       CmiReleaseSentMessages();
       SendMsgBuf(); 
       PumpMsgs();
+      CmiYield();
     }
     if (MPI_SUCCESS != PMPI_Barrier(MPI_COMM_WORLD))
       CmiAbort("ConverseExit: PMPI_Barrier failed!\n");
@@ -461,7 +493,11 @@ static void CommunicationServer(int sleepTime)
 static void CommunicationServerThread(int sleepTime)
 {
   CommunicationServer(sleepTime);
+#if CMK_IMMEDIATE_MSG
+  CmiHandleImmediate();
+#endif
 }
+
 
 #if CMK_NODE_QUEUE_AVAILABLE
 char *CmiGetNonLocalNodeQ(void)
@@ -531,6 +567,7 @@ void CmiSyncSendFn(int destPE, int size, char *msg)
     CmiAsyncSendFn(destPE, size, dupmsg);
 }
 
+/* called by communication thread in SMP */
 static void SendMsgBuf()
 {
   SMSG_LIST *msg_tmp;
@@ -543,6 +580,7 @@ static void SendMsgBuf()
     while (!PCQueueEmpty(msgBuf[i]))
     {
       msg_tmp = (SMSG_LIST *)PCQueuePop(msgBuf[i]);
+      if (!msg_tmp) break;
       node = msg_tmp->destpe;
       size = msg_tmp->size;
       msg = msg_tmp->msg;
