@@ -29,8 +29,8 @@ void NodeMulticast::setDestinationArray(CkArrayID a, int nelem,
     mode = ARRAY_MODE;
     messageBuf = NULL;
     pes_per_node = 4;
-    //if(getenv("RMS_NODES") != NULL)
-    //pes_per_node = CkNumPes()/atoi(getenv("RMS_NODES"));
+    if(getenv("RMS_NODES") != NULL)
+	pes_per_node = CkNumPes()/atoi(getenv("RMS_NODES"));
 
     mAid = a;
     nelements = nelem;
@@ -191,24 +191,28 @@ void NodeMulticast::doneInserting(){
         CmiSetHandler(env, NodeMulticastHandlerId);
         ComlibPrintf("After set handler\n");
         
-        for(int count = 0; count < numNodes; count++) 
-	    if(nodeMap[count]) {
+        for(int count = 0; count < numNodes; count++) {
+	    int dest_node = count;
+	    //int dest_node = count ^ (CkMyPe()/pes_per_node);
+	    if(nodeMap[dest_node]) {
 		void *newcharmmsg = CkCopyMsg((void **)&msg); 
 		envelope *newenv = UsrToEnv(newcharmmsg);
 		
-		ComlibPrintf("[%d]In cmisyncsend to %d\n", CkMyPe(), count * pes_per_node + myRank);
+		ComlibPrintf("[%d]In cmisyncsend to %d\n", CkMyPe(), 
+			     dest_node * pes_per_node + myRank);
 #if CMK_PERSISTENT_COMM
 		if(env->getTotalsize() < MAX_BUF_SIZE)
-		  CmiUsePersistentHandle(&persistentHandlerArray[count],1);
+		  CmiUsePersistentHandle(&persistentHandlerArray[dest_node],1);
 #endif
-		CmiSyncSendAndFree(count * pes_per_node + myRank, env->getTotalsize(), 
-				   (char *)newenv);
+		CmiSyncSendAndFree(dest_node * pes_per_node + myRank, 
+				   env->getTotalsize(), (char *)newenv);
 #if CMK_PERSISTENT_COMM
 		if(env->getTotalsize() < MAX_BUF_SIZE)
 		  CmiUsePersistentHandle(NULL, 0);
 #endif          
 	  }
-        
+	}
+
         ComlibPrintf("[%d] CmiFree (Code) (%x)\n", CkMyPe(), (char *)env - 2*sizeof(int));
         CmiFree(env);
         delete cmsg;
