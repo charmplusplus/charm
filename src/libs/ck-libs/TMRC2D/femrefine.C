@@ -345,8 +345,9 @@ void FEM_REFINE2D_Split(int meshID,int nodeID,double *coord,int elemID,double *d
 	int read = FEM_Mesh_is_get(meshID) ;
 	assert(read);
 	
-	IDXL_t sharedid = FEM_Comm_shared(meshID,nodeID);
+/*	IDXL_t sharedid = FEM_Comm_shared(meshID,nodeID);
 	IDXL_Side_t sharedsendid = IDXL_Get_send(sharedid);
+	if(
 	int numshared = IDXL_Get_count(sharedsendid,0);
 	int *list = new int[numshared];
 	
@@ -360,7 +361,7 @@ void FEM_REFINE2D_Split(int meshID,int nodeID,double *coord,int elemID,double *d
 	}
 	fprintf(fp,"*********************************\n");	
 	fclose(fp);
-	delete [] list;
+	delete [] list;*/
 }
 
 FDECL void FTN_NAME(FEM_REFINE2D_SPLIT,fem_refine2d_split)(int *meshID,int *nodeID,double *coord,int *elemID,double *desiredAreas){
