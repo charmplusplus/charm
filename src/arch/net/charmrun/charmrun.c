@@ -1089,7 +1089,8 @@ void nodeinfo_add(const ChSingleNodeinfo *in,SOCKET ctrlfd)
 {
 	int node=ChMessageInt(in->nodeNo);
 	ChNodeinfo i=in->info;
-	int nt,pe,dataport;
+	unsigned int nt;
+	unsigned int pe,dataport;
 	if (node<0 || node>=nodetab_rank0_size)
 		{fprintf(stderr,"Unexpected node %d registered!\n",node);exit(1);}
 	nt=nodetab_rank0_table[node];/*Nodetable index for this node*/
@@ -1737,7 +1738,6 @@ void start_nodes_daemon(void)
     strcat(argBuffer," ");
     strcat(argBuffer,arg_argv[i]);
   }
-  task.argLength=ChMessageInt_new(strlen(argBuffer));
   
   task.magic=ChMessageInt_new(DAEMON_MAGIC);
 
@@ -1745,6 +1745,8 @@ void start_nodes_daemon(void)
   to PE 0 on each node.*/
   for (nodeNumber=0;nodeNumber<nodetab_rank0_size;nodeNumber++)
   {
+    char nodeArgBuffer[5000];/*Buffer to hold assembled program arguments*/
+    char *argBuf;
     char* arg_nodeprog_r, *arg_currdir_r;
     char statusCode='N';/*Default error code-- network problem*/
     int fd;
@@ -1761,13 +1763,22 @@ void start_nodes_daemon(void)
 
     sprintf(task.env,"NETSTART=%s",create_netstart(nodeNumber));
 
+    if (nodetab_nice(nodeNumber) != -100) {
+      if(arg_verbose) fprintf(stderr, "Charmrun> +nice %d\n", nodetab_nice(nodeNumber));
+      sprintf(nodeArgBuffer, "%s +nice %d", argBuffer, nodetab_nice(nodeNumber));
+      argBuf = nodeArgBuffer;
+    }
+    else 
+      argBuf = argBuffer;
+    task.argLength=ChMessageInt_new(strlen(argBuf));
+
     /*Send request out to remote node*/
     fd = skt_connect(nodetab_ip(pe0),
 		     DAEMON_IP_PORT,30);
     if (fd!=INVALID_SOCKET)
     {/*Contact!  Ask the daemon to start the program*/
       skt_sendN(fd, (const char *)&task, sizeof(task));
-      skt_sendN(fd, (const char *)argBuffer, strlen(argBuffer));
+      skt_sendN(fd, (const char *)argBuf, strlen(argBuf));
       skt_recvN(fd, &statusCode,sizeof(char));
     }
     if (statusCode!='G')
@@ -1839,6 +1850,7 @@ void start_nodes_local(char ** env)
     si.cb = sizeof(si);   
     if (arg_verbose)
       printf("Charmrun> start %d node program on localhost.\n", i);
+
     ret = CreateProcess(NULL,	/* application name */
 		    cmdLine,	/* command line */
 		    NULL,/*&sa,*/		/* process SA */
