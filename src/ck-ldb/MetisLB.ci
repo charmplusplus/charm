@@ -2,7 +2,7 @@ module MetisLB {
 
 extern module CentralLB;
 initcall void lbinit(void);
-group MetisLB : CentralLB {
+group [migratable] MetisLB : CentralLB {
   entry void MetisLB(void);  
 };
 

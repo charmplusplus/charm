@@ -21,7 +21,7 @@ void CreateDummyLB();
 class DummyLB : public CentralLB {
 public:
   DummyLB();
-  DummyLB(CkMigrateMessage *m) {}
+  DummyLB(CkMigrateMessage *m):CentralLB(m) {}
 private:
   CmiBool QueryBalanceNow(int step);
   LBMigrateMsg* Strategy(CentralLB::LDStats* stats, int count);

@@ -2,7 +2,7 @@ module NeighborLB {
 
 extern module NborBaseLB;
 initcall void lbinit(void);
-group NeighborLB : NborBaseLB {
+group [migratable] NeighborLB : NborBaseLB {
   entry void NeighborLB(void);  
 };
 

@@ -43,6 +43,10 @@ CommLB::CommLB()
 	CkPrintf("[%d] CommLB created\n",CkMyPe());
     manager_init();
 }
+CommLB::CommLB(CkMigrateMessage *m):CentralLB(m) {
+    lbname = "CommLB";
+    manager_init();
+}
 
 CmiBool CommLB::QueryBalanceNow(int _step)
 {

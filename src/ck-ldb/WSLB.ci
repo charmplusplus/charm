@@ -7,7 +7,7 @@ readonly CkGroupID wslb;
 
 message WSLBStatsMsg;
 
-group WSLB: BaseLB {
+group [migratable] WSLB: BaseLB {
   entry void WSLB(void);  
   entry void ReceiveStats(WSLBStatsMsg*);
   entry void ResumeClients(void);

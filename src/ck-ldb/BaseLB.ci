@@ -4,7 +4,7 @@ extern module LBDatabase;
 
 message LBMigrateMsg;
 
-group BaseLB {
+group [migratable] BaseLB {
   entry void BaseLB(void);  
   entry void unregister(void);
 };

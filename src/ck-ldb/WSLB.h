@@ -24,7 +24,7 @@ class WSLB : public CBase_WSLB
 {
 public:
   WSLB();
-  WSLB(CkMigrateMessage *m) {}
+  WSLB(CkMigrateMessage *m):CBase_WSLB(m) {}
   ~WSLB();
   static void staticAtSync(void*);
   void AtSync(void); // Everything is at the PE barrier

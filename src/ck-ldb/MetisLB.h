@@ -21,7 +21,7 @@ void CreateMetisLB();
 class MetisLB : public CentralLB {
 public:
   MetisLB();
-  MetisLB(CkMigrateMessage *m) {}
+  MetisLB(CkMigrateMessage *m):CentralLB(m) {}
 private:
   CmiBool QueryBalanceNow(int step);
   LBMigrateMsg* Strategy(CentralLB::LDStats* stats, int count);

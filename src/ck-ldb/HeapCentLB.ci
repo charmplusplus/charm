@@ -2,7 +2,7 @@ module HeapCentLB {
 
 extern module CentralLB;
 initcall void lbinit(void);
-group HeapCentLB : CentralLB {
+group [migratable] HeapCentLB : CentralLB {
   entry void HeapCentLB(void);  
 };
 

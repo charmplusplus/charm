@@ -40,7 +40,7 @@ public:
 
 public:
   RefineLB();
-  RefineLB(CkMigrateMessage *m) {}
+  RefineLB(CkMigrateMessage *m):CentralLB(m) {}
 private:
   CmiBool QueryBalanceNow(int step);
   LBMigrateMsg* Strategy(CentralLB::LDStats* stats, int count);

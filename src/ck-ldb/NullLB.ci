@@ -4,7 +4,7 @@ extern module LBDatabase;
 extern module BaseLB;
 initcall void initNullLB(void);
 
-group NullLB: BaseLB {
+group [migratable] NullLB: BaseLB {
   entry void NullLB(void);  
   entry void migrationsDone(void);
 };

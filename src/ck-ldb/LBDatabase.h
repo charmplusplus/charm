@@ -39,26 +39,30 @@ void _LBDBInit();
 class LBDBInit : public Chare {
   public:
     LBDBInit(CkArgMsg*);
-    LBDBInit(CkMigrateMessage *m) {}
+    LBDBInit(CkMigrateMessage *m):Chare(m) {}
 };
 
 
-class LBDatabase : public Group {
+class LBDatabase : public IrrGroup {
 public:
   static int manualOn;
 public:
   LBDatabase(void) {
-    myLDHandle = LDCreate();  
+    myLDHandle = LDCreate();
     CkpvAccess(lbdatabaseInited) = 1;
 #if CMK_LBDB_ON
     if (manualOn) TurnManualLBOn();
 #endif
   };
-  LBDatabase(CkMigrateMessage *m) { myLDHandle = LDCreate(); }
+
+  LBDatabase(CkMigrateMessage *m);
+  
   inline static LBDatabase * Object() { return CkpvAccess(lbdatabaseInited)?(LBDatabase *)CkLocalBranch(lbdb):NULL; }
 #if CMK_LBDB_ON
   inline LBDB *getLBDB() {return (LBDB*)(myLDHandle.handle);}
 #endif
+
+  void pup(PUP::er& p){ IrrGroup::pup(p); }
 
   /*
    * Calls from object managers to load database

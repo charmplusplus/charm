@@ -7,7 +7,7 @@ module LBDatabase {
     entry LBDBInit(CkArgMsg *m);
   };
 
-  group LBDatabase {
+  group [migratable] LBDatabase {
     entry void LBDatabase(void);  
   };
 

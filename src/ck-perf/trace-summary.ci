@@ -9,7 +9,7 @@ module TraceSummary {
   
   readonly CkGroupID traceSummaryGID;
 
-  group TraceSummaryBOC {
+  group [migratable] TraceSummaryBOC {
     entry TraceSummaryBOC(void);
     entry void askSummary();
     entry void sendSummaryBOC(int traced, int n, BinEntry s[n]);

@@ -2,7 +2,7 @@ module GreedyRefLB {
 
 extern module CentralLB;
 initcall void lbinit(void);
-group GreedyRefLB : CentralLB {
+group [migratable] GreedyRefLB : CentralLB {
   entry void GreedyRefLB(void);  
 };
 

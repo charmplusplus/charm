@@ -116,7 +116,7 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h queueing.h
       memory-isomalloc.h debug-conv.h debug-charm.h conv-autoconfig.h \
       conv-common.h conv-mach.h conv-mach.sh \
       CkMarshall.decl.h CkArray.decl.h CkLocation.decl.h CkReduction.decl.h CkArrayReductionMgr.decl.h\
-      CkFutures.decl.h LBDatabase.decl.h CentralLB.decl.h NullLB.decl.h \
+      CkFutures.decl.h LBDatabase.decl.h CentralLB.decl.h NullLB.decl.h CkCheckpoint.decl.h\
       RandCentLB.decl.h RecBisectBfLB.decl.h BaseLB.decl.h \
       MetisLB.decl.h DummyLB.decl.h RefineLB.decl.h OrbLB.decl.h \
       HeapCentLB.decl.h NborBaseLB.decl.h NeighborLB.decl.h \
@@ -137,7 +137,7 @@ UTILHEADERS=pup.h pupf.h pup_c.h pup_stl.h pup_toNetwork4.h \
 CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  ckfutures.h \
 	  ckcallback.h CkCallback.decl.h ckcallback-ccs.h ckarrayreductionmgr.h \
-	  ckarray.h cklocation.h ckreduction.h \
+	  ckarray.h cklocation.h ckreduction.h ckcheckpoint.h\
 	  readonly.h charisma.h \
 	  $(UTILHEADERS) \
 	  tempo.h waitqd.h LBDatabase.h lbdb.h \
@@ -170,7 +170,11 @@ headerlinks: dirs+sources Makefile $(ALLHEADERS)
 
 dirs+sources:
 	rm -f .gdir
+	echo HHH $(PWD)
 	(cd .. ; basename "`pwd`" | sed -e 's@-.*@@') 	> .gdir
+	echo HHH $(PWD)
+	pwd
+	cat .gdir
 	find . -type l -exec rm {} \;
 	rm -rf QuickThreads
 	rm -rf libs
@@ -179,21 +183,27 @@ dirs+sources:
 	rm -rf ../pgms
 	rm -rf ../doc ; ln -s ../doc ../doc
 	../../src/scripts/gatherflat ../../src/scripts .
+	cat .gdir
 	./gatherflat ../../src/conv-core        .
 	./gatherflat ../../src/conv-ldb         .
+	cat .gdir
 	./gatherflat ../../src/conv-ccs         .
 	./gatherflat ../../src/conv-perf	.
 	./gatherflat ../../src/ck-core          .
+	cat .gdir
 	./gatherflat ../../src/util             .
 	./gatherflat ../../src/ck-perf          .
 	./gatherflat ../../src/ck-ldb           .
+	cat .gdir
 	./gatherflat ../../src/langs/simplemsg  .
 	./gatherflat ../../src/langs/pvmc       .
 	./gatherflat ../../src/langs/bluegene   .
 	./gatherflat ../../src/langs/f90charm   .
+	cat .gdir
 	./gatherflat ../../src/xlat-i           .
 	./gatherflat ../../src/xlatcpm          .
 	./gathertree ../../src/QuickThreads QuickThreads
+	cat .gdir
 	./gathertree ../../src/libs libs
 	./gathertree ../../src/arch/util      .
 	./gathertree ../../src/langs langs
@@ -430,7 +440,7 @@ CK_LIBS_CORE=libck.a
 
 LIBCK_CORE=init.o register.o qd.o ck.o main.o msgalloc.o ckfutures.o \
            debug-message.o ckcallback.o cklocation.o ckarray.o ckreduction.o ckarrayreductionmgr.o\
-           tempo.o waitqd.o LBDatabase.o lbdb.o charisma.o \
+           tempo.o waitqd.o LBDatabase.o lbdb.o charisma.o ckcheckpoint.o\
            LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o \
 	   BaseLB.o CentralLB.o NborBaseLB.o WSLB.o ObjGraph.o graph.o  \
            Refiner.o bitvecset.o Set.o heap.o CommLBHeap.o NullLB.o \
@@ -498,6 +508,12 @@ CkReduction.decl.h CkReduction.def.h: ckreduction.ci charmxi
 
 ckreduction.o: ckreduction.C $(CKHEADERS)
 	$(CHARMC) -o ckreduction.o ckreduction.C
+
+CkCheckpoint.decl.h CkCheckpoint.def.h: ckcheckpoint.ci charmxi
+	$(CHARMC) ckcheckpoint.ci
+
+ckcheckpoint.o: ckcheckpoint.C $(CKHEADERS)
+	$(CHARMC) -o ckcheckpoint.o ckcheckpoint.C
 
 CkMarshall.decl.h CkMarshall.def.h : ckmarshall.ci charmxi
 	$(CHARMC) ckmarshall.ci
@@ -573,7 +589,7 @@ graph.o: graph.c
 bitvecset.o: bitvecset.c bitvecset.h
 	$(CHARMC) -o bitvecset.o bitvecset.c
 
-Set.o: Set.C $(CKHEADERS) Set.h elements.h 
+Set.o: Set.C $(CKHEADERS) Set.h elements.h
 	$(CHARMC) -o Set.o Set.C
 
 heap.o: heap.C $(CKHEADERS) elements.h heap.h

@@ -10,7 +10,7 @@ message NLBStatsMsg {
   LDCommData commData[];
 };
 
-group NborBaseLB: BaseLB {
+group [migratable] NborBaseLB: BaseLB {
   entry void NborBaseLB(void);  
   entry void ReceiveStats(NLBStatsMsg*);
   entry void ResumeClients(void);

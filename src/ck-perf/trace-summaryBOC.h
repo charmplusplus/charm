@@ -8,7 +8,7 @@ class TraceSummaryInit : public Chare {
   TraceSummaryInit(CkArgMsg*) {
     traceSummaryGID = CProxy_TraceSummaryBOC::ckNew();
   }
-  TraceSummaryInit(CkMigrateMessage *m) {}
+  TraceSummaryInit(CkMigrateMessage *m):Chare(m) {}
 };
 
 class TraceSummaryBOC : public CBase_TraceSummaryBOC {
@@ -19,7 +19,7 @@ private:
   int nTracedPEs;
 public:
   TraceSummaryBOC(void): count(0), bins(NULL), nBins(0), nTracedPEs(0) {};
-  TraceSummaryBOC(CkMigrateMessage *m) {};
+  TraceSummaryBOC(CkMigrateMessage *m):CBase_TraceSummaryBOC(m) {};
   void askSummary();
   void sendSummaryBOC(int traced, int n, BinEntry *b);
 private:

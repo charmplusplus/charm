@@ -2,7 +2,7 @@ module RecBisectBfLB {
 
 extern module CentralLB;
 initcall void lbinit(void);
-group RecBisectBfLB : CentralLB {
+group [migratable] RecBisectBfLB : CentralLB {
   entry void RecBisectBfLB(void);  
 };
 

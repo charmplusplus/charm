@@ -28,7 +28,7 @@ class NullLB : public CBase_NullLB
   void init(void);
 public:
   NullLB() {init(); lbname="NullLB";}
-  NullLB(CkMigrateMessage *m) {init();}
+  NullLB(CkMigrateMessage *m):CBase_NullLB(m) {init();}
   ~NullLB();
 
   static void staticAtSync(void*);

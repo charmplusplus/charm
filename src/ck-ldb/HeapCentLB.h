@@ -28,7 +28,7 @@ public:
   };
 
   HeapCentLB();
-  HeapCentLB(CkMigrateMessage *m) {}
+  HeapCentLB(CkMigrateMessage *m):CentralLB(m) {}
 private:
 	enum           HeapCmp {GT = '>', LT = '<'};
     void           Heapify(HeapData*, int, int, HeapCmp);

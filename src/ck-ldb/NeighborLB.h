@@ -23,7 +23,7 @@ void CreateNeighborLB();
 class NeighborLB : public NborBaseLB {
 public:
   NeighborLB();
-  NeighborLB(CkMigrateMessage *m) {}
+  NeighborLB(CkMigrateMessage *m):NborBaseLB(m) {}
 private:
   CmiBool QueryBalanceNow(int step) { return CmiTrue; };
   virtual int max_neighbors() {

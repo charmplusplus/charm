@@ -21,7 +21,7 @@
   it does some tracking about how many lb strategies are created.
   it also defines some common functions.
 */
-class BaseLB: public Group
+class BaseLB: public IrrGroup
 {
 protected:
   char *lbname;
@@ -29,6 +29,7 @@ protected:
   LDBarrierReceiver receiver;
 public:
   BaseLB() ;
+  BaseLB(CkMigrateMessage *m):IrrGroup(m) { /* empty */ }
   void unregister(); 
   inline char *lbName() { return lbname; }
 };

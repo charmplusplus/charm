@@ -41,7 +41,7 @@ public:
   obj_id * translate;
   int * htable;
   CommLB();
-  CommLB(CkMigrateMessage *m) {}
+  CommLB(CkMigrateMessage *m);
 private:
   CmiBool QueryBalanceNow(int step);
   LBMigrateMsg* Strategy(CentralLB::LDStats* stats, int count);
