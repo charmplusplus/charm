@@ -37,11 +37,13 @@ ampimain::ampimain(CkArgMsg *m)
   char *dname;
   int isRestart;
   isRestart = CmiGetArgString(m->argv, "+restart", &dname);
+  CkGroupID mapID = CkCreatePropMap();
   for(i=0;i<ncomms;i++)
   {
     nobjs += ampi_comms[i].nobj;
     ampi_comms[i].aid = CProxy_ampi::ckNew(new AmpiStartMsg(i), 
-                                           ampi_comms[i].nobj);
+                                           ampi_comms[i].nobj,
+					   mapID);
     CProxy_ampi jarray(ampi_comms[i].aid);
     jarray.setReductionClient(allReduceHandler,(void*)&ampi_comms[i]);
     if(isRestart) {
