@@ -121,7 +121,7 @@ void opt::UndoEvent(Event *e)
 #endif
     parent->UNDOs++;
     localPVT->decEventCount();
-    //eventCount--;
+    eventCount--;
     //CkPrintf("POSE_UNDO\n");
     parent->ResolveFn(((e->fnIdx) * -1), e->msg); // execute the anti-method
     if (e->commitBfrLen > 0) free(e->commitBfr); // clean up buffered output
