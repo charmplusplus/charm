@@ -1,4 +1,0 @@
-group Ring{
-  entry Ring(InitMsg);
-  entry StartRing(StartMsg);
-}

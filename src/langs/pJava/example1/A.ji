@@ -1,4 +1,0 @@
-class A {
-  entry A(InitMessage);
-  entry DoWork(WorkMessage);
-}

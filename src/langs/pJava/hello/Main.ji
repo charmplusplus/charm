@@ -1,4 +1,0 @@
-class Main {
-  entry Exit(HelloMessage);
-}
-

@@ -1,6 +1,0 @@
-class RingNode {
-  entry RingNode(RingMessage);
-  entry SetNext(RingMessage);
-  entry StartRing(RingMessage);
-  entry Forward(RingMessage);
-}

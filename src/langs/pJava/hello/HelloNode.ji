@@ -1,3 +1,0 @@
-group HelloNode {
-  entry HelloNode(HelloMessage);
-}
