@@ -89,7 +89,7 @@ namespace cg3d { class Planar3dDest; };
  * Compute the volume of the intersection of these two cells.
  */
 double getSharedVolume(int s,const TetMesh &srcMesh,
-	int d,const TetMesh &destMesh,cg3d::Planar3dDest *dest=NULL);
+	int d,const TetMesh &destMesh);
 
 /**
  * Conservatively, accurately transfer 

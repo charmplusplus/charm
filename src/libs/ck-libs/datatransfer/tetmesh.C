@@ -6,7 +6,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "tetmesh.h"
-#include "cg3d.h"
 #include "bbox.h"
 #include "charm.h" /* for CkAbort */
 
@@ -54,10 +53,20 @@ void TetMesh::allocate(int nt,int np) {
 	justAllocate(nt,np);
 }
 
+/**
+ * Return the volume of the tetrahedron with these vertices.
+ */
+double tetVolume(const CkVector3d &A,const CkVector3d &B,
+		const CkVector3d &C,const CkVector3d &D) 
+{
+	const static double oneSixth=1.0/6.0;
+	return oneSixth*(B-A).dot((D-A).cross(C-A));
+}
+
 // Compute the volume of cell s
 double TetMesh::getTetVolume(int s) const {
 	const int *sc=getTet(s);
-	return fabs(cg3d::tetVolume(getPoint(sc[0]),getPoint(sc[1]),
+	return fabs(tetVolume(getPoint(sc[0]),getPoint(sc[1]),
 	                 getPoint(sc[2]),getPoint(sc[3])));
 }
 

@@ -1,11 +1,15 @@
 CDIR=../../../..
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
+# Directory where Magic software headers live:
+MGC=mgc
+MGCOBJS=$(MGC)/MgcIntr3DTetrTetr.o  $(MGC)/MgcMath.o  $(MGC)/MgcPlane.o \
+	$(MGC)/MgcTetrahedron.o  $(MGC)/MgcVector3.o
+
 HEADERS=
 # datatransfer.h
-HEADDEP=$(HEADERS) cg3d.h
-MGCOBJS=mgc/MgcIntr3DTetrTetr.o  mgc/MgcMath.o  mgc/MgcPlane.o  mgc/MgcTetrahedron.o  mgc/MgcVector3.o
-TOBJS=$(MGCOBJS) cg3d.o transfer.o tetmesh.o tetmesh_noboite.o
+HEADDEP=$(HEADERS) 
+TOBJS=$(MGCOBJS) transfer.o tetmesh.o tetmesh_noboite.o
 OBJS=$(TOBJS) tetmesh_fem.o paralleltransfer.o pgm.o
 DEST=pgm
 LIBS=-module collide -module fem -language ampi
@@ -46,14 +50,21 @@ test: $(tests)
 	./$(test3) test_transfer_dir/dest.noboite test_transfer_dir/src.noboite
 
 clean:
-	rm -rf *.a *.def.h *.decl.h *.o SunWS_cache $(DEST) $(tests) headers
+	rm -rf *.a *.def.h *.decl.h *.o $(MGC)/*.o \
+		SunWS_cache $(DEST) $(tests) headers
 
 # Trick gmake into compiling .C's into .o's.
 %.o: %.C
-	$(CHARMC) -c $<
+	$(CHARMC) -c $< -o $@
+
+%.o: %.cpp
+	$(CHARMC) -c $< -o $@
 
 # Trick other makes into compiling .C's into .o's.
-.SUFFIXES: .C
+.SUFFIXES: .C .cpp
 
 .C.o:
-	$(CHARMC) -c $<
+	$(CHARMC) -c $< -o $@
+
+.cpp.o:
+	$(CHARMC) -c $< -o $@

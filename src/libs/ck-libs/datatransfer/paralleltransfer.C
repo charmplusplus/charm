@@ -3,7 +3,6 @@
  * Orion Sky Lawlor, olawlor@acm.org, 2003/3/24
  */
 #include "tetmesh.h"
-#include "cg3d.h"
 #include "collidec.h"
 #include "bbox.h"
 #include "mpi.h"
