@@ -162,9 +162,11 @@ FORTRAN_AS_C_RETURN(int,
 CDECL void 
 FEM_Mesh_deallocate(int fem_mesh) /* delete this local mesh */
 {
-	const char *caller="FEM_Mesh_deallocate";FEMAPI(caller);
-	FEMchunk *c=FEMchunk::get(caller);
-	c->meshes.destroy(fem_mesh,caller);
+	if (fem_mesh!=-1) {
+		const char *caller="FEM_Mesh_deallocate";FEMAPI(caller);
+		FEMchunk *c=FEMchunk::get(caller);
+		c->meshes.destroy(fem_mesh,caller);
+	}
 }
 FORTRAN_AS_C(FEM_MESH_DEALLOCATE,FEM_Mesh_deallocate,fem_mesh_deallocate, (int *m),(*m))
 
