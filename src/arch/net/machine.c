@@ -188,6 +188,15 @@
  *
  */
 
+
+/* About TRUECRASH:  When debugging Charm++/Converse, CmiAbort is your enemy.
+   Uncommenting the define below will cause the program to crash where the 
+   problem occurs instead of calling host_abort which lets the program 
+   exit gracefully and lose all the debugging info... */
+/*
+#define TRUECRASH
+*/
+
 #define CmiPrintf I_Hate_C_1
 #define CmiError  I_Hate_C_2
 #define CmiScanf  I_Hate_C_3
@@ -730,7 +739,13 @@ void PCQueuePush(PCQueue Q, char *data)
 
 void CmiAbort(const char *message)
 {
+  int *i = 0;
+#ifdef TRUECRASH
+  CmiPrintf("%s", message);
+  i[0] = 0;
+#else
   host_abort(message);
+#endif
 }
 
 
