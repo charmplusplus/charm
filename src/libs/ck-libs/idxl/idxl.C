@@ -196,9 +196,19 @@ void IDXL_Comm::reset(int tag_,int context) {
 	tag=tag_;
 	if (context==0) comm=MPI_COMM_WORLD;
 	else comm=(MPI_Comm)context; /* silly: not all MPI's use "int" for MPI_Comm */
-	nSto=nMsg=0;
+	sto.resize(0);
+	nMsgs=0;
+	/* don't delete the msg array, because we want to avoid
+	   reallocating its message buffers whenever possible. */
+	msgReq.resize(0);
+	msgSts.resize(0);
+	
 	isPost=false;
 	isDone=false;
+}
+IDXL_Comm::~IDXL_Comm() {
+	for (int i=0;i<msg.size();i++)
+		delete msg[i];
 }
 
 
@@ -206,20 +216,17 @@ void IDXL_Comm::reset(int tag_,int context) {
 void IDXL_Comm::send(const IDXL_Side *idx,const IDXL_Layout *dtype,const void *src)
 {
 	if (isPost) CkAbort("Cannot call IDXL_Comm_send after IDXL_Comm_flush!");
-	if (nSto == maxSto) CkAbort("send buffer overflow!");
-	sto[nSto++]=sto_t(idx,dtype,(void *)src,send_t); 
+	sto.push_back(sto_t(idx,dtype,(void *)src,send_t)); 
 }
 void IDXL_Comm::recv(const IDXL_Side *idx,const IDXL_Layout *dtype,void *dest)
 { 
 	if (isPost) CkAbort("Cannot call IDXL_Comm_recv after IDXL_Comm_flush!");
-	if (nSto == maxSto) CkAbort("send buffer overflow!");
-	sto[nSto++]=sto_t(idx,dtype,dest,recv_t); 
+	sto.push_back(sto_t(idx,dtype,dest,recv_t)); 
 }
 void IDXL_Comm::sum(const IDXL_Side *idx,const IDXL_Layout *dtype,void *srcdest)
 { 
 	if (isPost) CkAbort("Cannot call IDXL_Comm_sum after IDXL_Comm_flush!");
-	if (nSto == maxSto) CkAbort("send buffer overflow!");
-	sto[nSto++]=sto_t(idx,dtype,srcdest,sum_t); 
+	sto.push_back(sto_t(idx,dtype,srcdest,sum_t)); 
 }
 
 void IDXL_Comm::post(void) {
@@ -227,49 +234,62 @@ void IDXL_Comm::post(void) {
 	isPost=true;
 	
 	//Post all our sends and receives:
-	nMsg=0;
-	for (int s=0;s<nSto;s++) {
+	nMsgs=0;
+	for (int s=0;s<sto.size();s++) {
 		const IDXL_Side *idx=sto[s].idx;
 		const IDXL_Layout *dtype=sto[s].dtype;
 		for (int ll=0;ll<idx->size();ll++) {
 			const IDXL_List &l=idx->getLocalList(ll);
-			msg_t *m=&msg[nMsg];
+			
+			// Create message struct
+			++nMsgs;
+			if (nMsgs>msg.size()) {
+				msg.resize(nMsgs);
+				msg[nMsgs-1]=new msg_t;
+			}
+			msg_t *m=msg[nMsgs-1];
 			m->sto=&sto[s];
 			m->ll=ll;
+			
+			// Allocate storage for message data
 			int len=l.size()*dtype->compressedBytes();
 			m->allocate(len);
+			
+			// Copy data and post MPI request
+			MPI_Request req;
 			switch (sto[s].op) {
 			case send_t:
-				sto[s].dtype->gather(l.size(),l.getVec(),sto[s].data,m->buf);
-				MPI_Isend(m->buf,len,MPI_BYTE,l.getDest(),tag,comm,&msgReq[nMsg]);
+				sto[s].dtype->gather(l.size(),l.getVec(),sto[s].data,m->getBuf());
+				MPI_Isend(m->getBuf(),len,MPI_BYTE,l.getDest(),tag,comm,&req);
 				break;
 			case recv_t:case sum_t:
-				MPI_Irecv(m->buf,len,MPI_BYTE,l.getDest(),tag,comm,&msgReq[nMsg]);
+				MPI_Irecv(m->getBuf(),len,MPI_BYTE,l.getDest(),tag,comm,&req);
 				break;
 			};
-			nMsg++;
-			if (nMsg == maxMsg)CkAbort("Message buffers and MPI_Requests overflow!");
+			msgReq.push_back(req);
 		}
 	}
 }
 
 void IDXL_Comm::wait(void) {
 	if (!isPosted()) post();
-	MPI_Status sts[maxMsg];
-	MPI_Waitall(nMsg,msgReq,sts);
+	CkAssert(msg.size()>=nMsgs);
+	CkAssert(msgReq.size()==nMsgs);
+	msgSts.resize(nMsgs);
+	MPI_Waitall(nMsgs,&msgReq[0],&msgSts[0]);
 	//Process all received messages:
-	for (int im=0;im<nMsg;im++) {
-		msg_t *m=&msg[im];
+	for (int im=0;im<nMsgs;im++) {
+		msg_t *m=msg[im];
 		sto_t *s=m->sto;
 		const IDXL_List &l=s->idx->getLocalList(m->ll);
 		switch (s->op) {
 		case send_t: /* nothing else to do */
 			break;
 		case recv_t:
-			s->dtype->scatter(l.size(),l.getVec(),m->buf,s->data);
+			s->dtype->scatter(l.size(),l.getVec(),m->getBuf(),s->data);
 			break;
 		case sum_t:
-			s->dtype->scatteradd(l.size(),l.getVec(),m->buf,s->data);
+			s->dtype->scatteradd(l.size(),l.getVec(),m->getBuf(),s->data);
 			break;
 		};
 	}

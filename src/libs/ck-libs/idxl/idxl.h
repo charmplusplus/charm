@@ -37,40 +37,46 @@ void IDXL_Abort(const char *callingRoutine,const char *msg,int m0=0,int m1=0,int
 class IDXL_Comm {
 public: //<- Sun CC demands these types be public for use from an inner class
 	typedef enum { send_t=17,recv_t,sum_t} op_t;
+	
+	/// This class represents one communication operation:
+	///   a send/sum or send/recv.
 	class sto_t { public:
-		const IDXL_Side *idx; //Indices to read from/write to
-		const IDXL_Layout *dtype; //Format of user data
-		void *data; //User data to read from/write to
-		op_t op; //Operation to perform
+		const IDXL_Side *idx; ///< Indices to read from/write to
+		const IDXL_Layout *dtype; ///< Format of user data
+		void *data; ///< User data to read from/write to
+		op_t op; ///< Operation to perform
 		
 		sto_t(const IDXL_Side *idx_,const IDXL_Layout *dtype_,void *data_,op_t op_)
 			:idx(idx_), dtype(dtype_), data(data_), op(op_) {}
 		sto_t(void) {}
 	};
-	class msg_t { public:
+	
+	/// This class represents an MPI send or receive operation.
+	class msg_t { 
+		CkVec<char> buf; /* Send/receive buffer */
+	public:
 		sto_t *sto; /* Indices to send/receive */
 		int ll; /* Local processor to communicate with */
-		char *buf; /* Send/receive buffer */
-		int bufLen; /* bytes in send/receive buffer */
 		void allocate(int len) {
-			if (len==bufLen) return; /* right length already */
-			if (buf) {delete[] buf;buf=NULL;}
-			buf=new char[len];
-			bufLen=len;
+			buf.resize(len);
 		}
-		msg_t() :buf(NULL),bufLen(0) {}
-		~msg_t() {if (buf) {delete[] buf;}}
+		void *getBuf(void) {return &buf[0];}
 	};
 
 private:
-	enum {maxSto=100};
-	sto_t sto[maxSto]; //Stuff to send/receive
-	int nSto;
+	/// Stuff to send/receive.
+	CkVec<sto_t> sto;
+	/// Message buffers for each processor.
+	///  Only the first nMsgs elements are used this time,
+	///  but the remaining elements stay allocated (lazy deallocation).
+	///  This avoids slow memory allocation at runtime.
+	CkVec<msg_t *> msg; 
+	int nMsgs;
 	
-	enum {maxMsg=150};
-	msg_t msg[maxMsg]; //Messages to each processor
-	MPI_Request msgReq[maxMsg];
-	int nMsg;
+	/// List of outgoing MPI requests (needs to be a separate array for MPI)
+	///  Length is always nMsgs.
+	CkVec<MPI_Request> msgReq;
+	CkVec<MPI_Status> msgSts;
 	
 	int tag; MPI_Comm comm;
 	bool isPost; //If true, no more adds are allowed
@@ -78,6 +84,7 @@ private:
 public:
 	IDXL_Comm(int tag,int context);
 	void reset(int tag,int context);
+	~IDXL_Comm();
 	
 	// prepare to write this field to the message:
 	void send(const IDXL_Side *idx,const IDXL_Layout *dtype,const void *src);
