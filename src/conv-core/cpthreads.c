@@ -31,7 +31,6 @@
 #include "cpthreads.h"
 #include <stdlib.h>
 #include <errno.h>
-#include "fifo.h"
 
 /******************************************************************************
  *
@@ -439,7 +438,7 @@ int Cpthread_mutex_init(Cpthread_mutex_t *mutex, Cpthread_mutexattr_t *mattr)
   if (mattr->magic != MATTR_MAGIC) errcode(EINVAL);
   mutex->magic = MUTEX_MAGIC;
   mutex->onpe = CmiMyPe();
-  mutex->users = FIFO_Create();
+  mutex->users = CdsFifo_Create();
   return 0;
 }
 
@@ -447,9 +446,9 @@ int Cpthread_mutex_destroy(Cpthread_mutex_t *mutex)
 {
   if (mutex->magic != MUTEX_MAGIC) errcode(EINVAL);
   if (mutex->onpe != CmiMyPe()) errspan();
-  if (!FIFO_Empty(mutex->users)) errcode(EBUSY);
+  if (!CdsFifo_Empty(mutex->users)) errcode(EBUSY);
   mutex->magic = 0;
-  FIFO_Destroy(mutex->users);
+  CdsFifo_Destroy(mutex->users);
   return 0;
 }
 
@@ -458,8 +457,8 @@ int Cpthread_mutex_lock(Cpthread_mutex_t *mutex)
   CthThread self = CthSelf();
   if (mutex->magic != MUTEX_MAGIC) errcode(EINVAL);
   if (mutex->onpe != CmiMyPe()) errspan();
-  FIFO_EnQueue(mutex->users, self);
-  if (FIFO_Peek(mutex->users) != self) CthSuspend();
+  CdsFifo_Enqueue(mutex->users, self);
+  if (CdsFifo_Peek(mutex->users) != self) CthSuspend();
   return 0;
 }
 
@@ -468,8 +467,8 @@ int Cpthread_mutex_trylock(Cpthread_mutex_t *mutex)
   CthThread self = CthSelf();
   if (mutex->magic != MUTEX_MAGIC) errcode(EINVAL);
   if (mutex->onpe != CmiMyPe()) errspan();
-  if (!FIFO_Empty(mutex->users)) errcode(EBUSY);
-  FIFO_EnQueue(mutex->users, self);
+  if (!CdsFifo_Empty(mutex->users)) errcode(EBUSY);
+  CdsFifo_Enqueue(mutex->users, self);
   return 0;
 }
 
@@ -479,9 +478,9 @@ int Cpthread_mutex_unlock(Cpthread_mutex_t *mutex)
   CthThread sleeper;
   if (mutex->magic != MUTEX_MAGIC) errcode(EINVAL);
   if (mutex->onpe != CmiMyPe()) errspan();
-  if (FIFO_Peek(mutex->users) != self) errcode(EPERM);
-  FIFO_Pop(mutex->users);
-  sleeper = FIFO_Peek(mutex->users);
+  if (CdsFifo_Peek(mutex->users) != self) errcode(EPERM);
+  CdsFifo_Pop(mutex->users);
+  sleeper = CdsFifo_Peek(mutex->users);
   if (sleeper) CthAwaken(sleeper);
   return 0;
 }
@@ -523,7 +522,7 @@ int Cpthread_cond_init(Cpthread_cond_t *cond, Cpthread_condattr_t *cattr)
   if (cattr->magic != CATTR_MAGIC) errcode(EINVAL);
   cond->magic = COND_MAGIC;
   cond->onpe = CmiMyPe();
-  cond->users = FIFO_Create();
+  cond->users = CdsFifo_Create();
   return 0;
 }
 
@@ -532,7 +531,7 @@ int Cpthread_cond_destroy(Cpthread_cond_t *cond)
   if (cond->magic != COND_MAGIC) errcode(EINVAL);
   if (cond->onpe != CmiMyPe()) errspan();
   cond->magic = 0;
-  FIFO_Destroy(cond->users);
+  CdsFifo_Destroy(cond->users);
   return 0;
 }
 
@@ -546,14 +545,14 @@ int Cpthread_cond_wait(Cpthread_cond_t *cond, Cpthread_mutex_t *mutex)
   if (cond->onpe != CmiMyPe()) errspan();
   if (mutex->onpe != CmiMyPe()) errspan();
 
-  if (FIFO_Peek(mutex->users) != self) errcode(EPERM);
-  FIFO_Pop(mutex->users);
-  sleeper = FIFO_Peek(mutex->users);
+  if (CdsFifo_Peek(mutex->users) != self) errcode(EPERM);
+  CdsFifo_Pop(mutex->users);
+  sleeper = CdsFifo_Peek(mutex->users);
   if (sleeper) CthAwaken(sleeper);
-  FIFO_EnQueue(cond->users, self);
+  CdsFifo_Enqueue(cond->users, self);
   CthSuspend();
-  FIFO_EnQueue(mutex->users, self);
-  if (FIFO_Peek(mutex->users) != self) CthSuspend();
+  CdsFifo_Enqueue(mutex->users, self);
+  if (CdsFifo_Peek(mutex->users) != self) CthSuspend();
   return 0;
 }
 
@@ -562,7 +561,7 @@ int Cpthread_cond_signal(Cpthread_cond_t *cond)
   CthThread sleeper;
   if (cond->magic != COND_MAGIC) errcode(EINVAL);
   if (cond->onpe != CmiMyPe()) errspan();
-  FIFO_DeQueue(cond->users, (void**)&sleeper);
+  sleeper = CdsFifo_Dequeue(cond->users);
   if (sleeper) CthAwaken(sleeper);
   return 0;
 }
@@ -573,7 +572,7 @@ int Cpthread_cond_broadcast(Cpthread_cond_t *cond)
   if (cond->magic != COND_MAGIC) errcode(EINVAL);
   if (cond->onpe != CmiMyPe()) errspan();
   while (1) {
-    FIFO_DeQueue(cond->users, (void**)&sleeper);
+    sleeper = CdsFifo_Dequeue(cond->users);
     if (sleeper==0) break;
     CthAwaken(sleeper);
   }

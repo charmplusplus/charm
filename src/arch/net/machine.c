@@ -187,7 +187,6 @@
 #include <signal.h>
 #include <stdarg.h> /*<- was <varargs.h>*/
 
-#include "fifo.h"
 #include "conv-ccs.h"
 #include "ccs-server.h"
 #include "sockRoutines.h"
@@ -623,7 +622,7 @@ void CmiStateInit(int pe, int rank, CmiState state)
   state->pe = pe;
   state->rank = rank;
   state->recv = PCQueueCreate();
-  state->localqueue = FIFO_Create();
+  state->localqueue = CdsFifo_Create();
 #if CMK_NODE_QUEUE_AVAILABLE
   CsvInitialize(CmiNodeLock, CmiNodeRecvLock);
   CsvInitialize(PCQueue, NodeRecv);
@@ -2557,7 +2556,7 @@ CmiCommHandle CmiGeneralSend(int pe, int size, int freemode, char *data)
   }
 
   if (pe == cs->pe) {
-    FIFO_EnQueue(cs->localqueue, data);
+    CdsFifo_Enqueue(cs->localqueue, data);
     if (freemode == 'A') {
       MallocOutgoingMsg(ogm);
       ogm->freemode = 'X';
@@ -2839,7 +2838,7 @@ libpacklib.lib, libck.lib
 
 And also the conv-core sources:
 	cldb.c (from conv-ldb), conv-ccs.c, conv-conds.c, cpm.c, 
-cpthreads.c, fifo.c, futures.c, machine.c (this file, from Common.net), 
+cpthreads.c, futures.c, machine.c (this file, from Common.net), 
 memory.c, msgmgr.c, queueing.c, quiescence.c, random.c, threads.c, sockRoutines.c
  (whew!)
 

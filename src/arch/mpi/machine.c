@@ -9,7 +9,6 @@
 #include <sys/time.h>
 #include "converse.h"
 #include <mpi.h>
-#include "fifo.h"
 
 #define FLIPBIT(node,bitnumber) (node ^ (1 << bitnumber))
 #define MAX_QLEN 200
@@ -195,7 +194,7 @@ void CmiSyncSendFn(int destPE, int size, char *msg)
   memcpy(dupmsg, msg, size);
   if (Cmi_mype==destPE) {
     CQdCreate(CpvAccess(cQdState), 1);
-    FIFO_EnQueue(CpvAccess(CmiLocalQueue),dupmsg);
+    CdsFifo_Enqueue(CpvAccess(CmiLocalQueue),dupmsg);
   }
   else
     CmiAsyncSendFn(destPE, size, dupmsg);
@@ -210,7 +209,7 @@ CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg)
   if(destPE == CmiMyPe()) {
     char *dupmsg = (char *) CmiAlloc(size);
     memcpy(dupmsg, msg, size);
-    FIFO_EnQueue(CpvAccess(CmiLocalQueue),dupmsg);
+    CdsFifo_Enqueue(CpvAccess(CmiLocalQueue),dupmsg);
     return 0;
   }
   msg_tmp = (SMSG_LIST *) CmiAlloc(sizeof(SMSG_LIST));
@@ -234,7 +233,7 @@ void CmiFreeSendFn(int destPE, int size, char *msg)
 {
   if (Cmi_mype==destPE) {
     CQdCreate(CpvAccess(cQdState), 1);
-    FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg);
+    CdsFifo_Enqueue(CpvAccess(CmiLocalQueue),msg);
   } else {
     CmiAsyncSendFn(destPE, size, msg);
   }
@@ -340,7 +339,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   /*printf("request max=%d\n", request_max);*/
   CmiTimerInit();
   CpvInitialize(void *, CmiLocalQueue);
-  CpvAccess(CmiLocalQueue) = (void *)FIFO_Create();
+  CpvAccess(CmiLocalQueue) = CdsFifo_Create();
   recdQueueInit();
   CthInit(argv);
   ConverseCommonInit(argv);

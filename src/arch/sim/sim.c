@@ -198,10 +198,10 @@ int pno;
     Csi_global_time = gclock;
     Csi_start_time  = CsiTimer();
 
-    if ( !FIFO_Empty(CpvAccess(CmiLocalQueue)) )
+    if ( !CdsFifo_Empty(CpvAccess(CmiLocalQueue)) )
       {
          
-         FIFO_DeQueue(CpvAccess(CmiLocalQueue), &msg); 
+         msg = CdsFifo_Dequeue(CpvAccess(CmiLocalQueue)); 
          CmiHandleMessage(msg);
 
          elapsed_time = (REL_TIME) (CsiTimer() - Csi_start_time); 

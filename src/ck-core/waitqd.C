@@ -6,7 +6,6 @@
  *****************************************************************************/
 
 #include "waitqd.h"
-#include "fifo.h"
 
 /* readonly */ 
 CkChareID waitqd_qdhandle;
@@ -53,11 +52,11 @@ waitqd_QDChare::waitqd_QDChare(CkArgMsg *m) {
 
 void waitqd_QDChare::waitQD(void) {
   if (waitStarted == 1) {
-    FIFO_EnQueue((FIFO_QUEUE*)threadList, (void *)CthSelf());
+    CdsFifo_Enqueue((CdsFifo)threadList, (void *)CthSelf());
   } else {
     waitStarted = 1;
-    threadList = (void*) FIFO_Create();
-    FIFO_EnQueue((FIFO_QUEUE*) threadList, (void *)CthSelf());
+    threadList = (void*) CdsFifo_Create();
+    CdsFifo_Enqueue((CdsFifo) threadList, (void *)CthSelf());
     CkStartQD(EntryIndex(waitqd_QDChare, onQD, CkQdMsg), &thishandle);
   }
   CthSuspend();
@@ -65,11 +64,11 @@ void waitqd_QDChare::waitQD(void) {
 
 void waitqd_QDChare::onQD(CkQdMsg *ckqm) {
   CthThread pthr;
-  while(!FIFO_Empty((FIFO_QUEUE*) threadList)) {
-    FIFO_DeQueue((FIFO_QUEUE*) threadList, (void**) &pthr);
+  while(!CdsFifo_Empty((CdsFifo) threadList)) {
+    pthr = CdsFifo_Dequeue((CdsFifo) threadList);
     CthAwaken(pthr);
   }
-  FIFO_Destroy((FIFO_QUEUE*) threadList);
+  CdsFifo_Destroy((CdsFifo) threadList);
   threadList = 0;
   waitStarted = 0;
   delete ckqm;

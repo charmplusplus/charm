@@ -15,7 +15,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "fifo.h"
 #include "queueing.h"
 
 #if CMK_DEBUG_MODE
@@ -68,7 +67,7 @@ void msgListCleanup(void)
 void msgListCache(void)
 {
   CqsEnumerateQueue((Queue)CpvAccess(CsdSchedQueue), &schedQueue);
-  FIFO_Enumerate((FIFO_QUEUE *)CpvAccess(CmiLocalQueue), &FIFOQueue);
+  FIFOQueue = CdsFifo_Enumerate((CdsFifo)CpvAccess(CmiLocalQueue));
   schedIndex = 0;
   FIFOIndex = 0;
   debugIndex = 0;
@@ -172,8 +171,8 @@ char* getMsgListFIFO(void)
   int maxLength;
 
   ending = NUM_MESSAGES;
-  if ( (ending+FIFOIndex) > ((FIFO_QUEUE *)(CpvAccess(CmiLocalQueue)))->fill) {
-    ending = (((FIFO_QUEUE *)(CpvAccess(CmiLocalQueue)))->fill) - FIFOIndex;
+  if ( (ending+FIFOIndex) > CdsFifo_Length(CpvAccess(CmiLocalQueue))) {
+    ending = CdsFifo_Length(CpvAccess(CmiLocalQueue)) - FIFOIndex;
   }
   maxLength = ending * sizeof(char) * 20 + 1;
   list = (char *)malloc(maxLength);
@@ -208,8 +207,8 @@ char* getMsgListDebug(void)
   char *temp;
 
   ending = NUM_MESSAGES;
-  if ( (ending+debugIndex) > ((FIFO_QUEUE *)(CpvAccess(debugQueue)))->fill) {
-      ending = (((FIFO_QUEUE *)(CpvAccess(debugQueue)))->fill) - debugIndex;
+  if ( (ending+debugIndex) > CdsFifo_Length(CpvAccess(debugQueue))) {
+      ending = CdsFifo_Length(CpvAccess(debugQueue)) - debugIndex;
   }
   maxLength = ending * sizeof(char) * 20 + 1;
   list = (char *)malloc(maxLength);
@@ -217,7 +216,7 @@ char* getMsgListDebug(void)
   strcpy(list, "");
 
   if(DQueue != 0) free(DQueue);
-  FIFO_Enumerate((FIFO_QUEUE *)CpvAccess(debugQueue), &DQueue);
+  DQueue = CdsFifo_Enumerate(CpvAccess(debugQueue));
 
   for(int i=debugIndex; i < ending+debugIndex; i++){
     temp = genericViewMsgFunction((char *)DQueue[i], 0);

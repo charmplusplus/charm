@@ -17,7 +17,6 @@
 #include <unistd.h>
 
 #include "converse.h"
-#include "fifo.h"
 
 #define BLK_LEN  512
 
@@ -194,7 +193,7 @@ static void *threadInit(void *arg)
   CthInit(usrparam->argv);
   ConverseCommonInit(usrparam->argv);
   CpvInitialize(void*, CmiLocalQueue);
-  CpvAccess(CmiLocalQueue) = (void *) FIFO_Create();
+  CpvAccess(CmiLocalQueue) = CdsFifo_Create();
   CmiTimerInit();
   if (Cmi_initret==0) {
     Cmi_startFn(Cmi_argc, usrparam->argv);
@@ -260,7 +259,7 @@ CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg)
 void CmiFreeSendFn(int destPE, int size, char *msg)
 {
   if (CmiMyPe()==destPE) {
-    FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg);
+    CdsFifo_Enqueue(CpvAccess(CmiLocalQueue),msg);
   } else {
     McQueueAddToBack(MsgQueue[destPE],msg); 
   }
@@ -309,7 +308,7 @@ void CmiFreeBroadcastAllFn(int size, char *msg)
       CmiSyncSendFn(i,size,msg);
     }
   }
-  FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg);
+  CdsFifo_Enqueue(CpvAccess(CmiLocalQueue),msg);
   CQdCreate(CpvAccess(cQdState), 1);
 }
 

@@ -7,7 +7,6 @@
 
 #include <stdio.h>
 #include "converse.h"
-#include "fifo.h"
 
 #define MSG_TYPE 1
 
@@ -123,7 +122,7 @@ char * msg;
        {
           temp = (char *)CmiAlloc(size) ;
           memcpy(temp, msg, size) ;
-          FIFO_EnQueue(CpvAccess(CmiLocalQueue), temp);
+          CdsFifo_Enqueue(CpvAccess(CmiLocalQueue), temp);
        }
     else
           nwrite(msg, size, destPE, MSG_TYPE, &cflag);
@@ -147,7 +146,7 @@ void CmiFreeSendFn(destPE, size, msg)
      char *msg;
 {
     if (CpvAccess(Cmi_mype) == destPE)
-        FIFO_EnQueue(CpvAccess(CmiLocalQueue), msg);
+        CdsFifo_Enqueue(CpvAccess(CmiLocalQueue), msg);
     else
       {
         nwrite(msg, size, destPE, MSG_TYPE, &cflag);
@@ -247,7 +246,7 @@ int usched, initret;
   CpvInitialize(void*, CmiLocalQueue);
   whoami(&CpvAccess(Cmi_mype), &process, &host, &Cmi_dim);
   CpvAccess(Cmi_numpes) = (1 << Cmi_dim) ;
-  CpvAccess(CmiLocalQueue)= (void *) FIFO_Create();
+  CpvAccess(CmiLocalQueue)= CdsFifo_Create();
   CmiSpanTreeInit();
   CmiTimerInit();
   CthInit(argv);

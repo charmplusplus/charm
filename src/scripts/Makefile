@@ -101,7 +101,7 @@ CVHEADERS=cpthreads.h converse.h conv-mach.h conv-mach.sh \
 
 # The .c files are there to be #included by clients whole
 # This is a bit unusual, but makes client linking simpler.
-UTILHEADERS=pup.h pup_c.h ckhashtable.h cklists.h \
+UTILHEADERS=pup.h pup_c.h ckhashtable.h cklists.h conv-lists.h \
 	sockRoutines.h sockRoutines.c
 
 CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
@@ -182,9 +182,9 @@ TRACELIBS=libtrace-none.a libtrace-projections.a libtrace-summary.a
 
 CVLIBS=libconv-core.a libconv-cplus-n.a libconv-cplus-y.a libconv-util.a libldb-rand.o libldb-spray.o libldb-graph.o libldb-test.o $(TRACELIBS)
 
-LIBCONV_CORE=threads.o convcore.o conv-conds.o queueing.o fifo.o msgmgr.o memory.o cpm.o cpthreads.o futures.o cldb.o random.o debug-message.o debug-object.o info.o generate.o edgelist.o conv-ccs.o quiescence.o 
+LIBCONV_CORE=threads.o convcore.o conv-conds.o queueing.o msgmgr.o memory.o cpm.o cpthreads.o futures.o cldb.o random.o debug-message.o debug-object.o info.o generate.o edgelist.o conv-ccs.o quiescence.o 
 
-LIBCONV_UTIL=pup_util.o pup_xlater.o pup_c.o ckhashtable.o sockRoutines.o
+LIBCONV_UTIL=pup_util.o pup_xlater.o pup_c.o ckhashtable.o sockRoutines.o conv-lists.o
 
 LIBCONV_UTILF=pup_f.o
 
@@ -220,9 +220,6 @@ libconv-utilf.a: $(LIBCONV_UTILF)
 
 cpm.o: cpm.c $(CVHEADERS)
 	$(CHARMC) cpm.c
-
-fifo.o: fifo.c $(CVHEADERS)
-	$(CHARMC) fifo.c
 
 threads.o: threads.c $(CVHEADERS)
 	$(CHARMC) -IQuickThreads threads.c
@@ -296,6 +293,9 @@ pup_f.o: pup_f.f90
 
 ckhashtable.o: ckhashtable.C ckhashtable.h
 	$(CHARMC) -o ckhashtable.o ckhashtable.C
+
+conv-lists.o: conv-lists.C $(UTILHEADERS)
+	$(CHARMC) -o conv-lists.o conv-lists.C
 
 ###############################################################################
 #

@@ -10,7 +10,6 @@
 #include <cps.h>
 #include <math.h>
 #include "converse.h"
-#include "fifo.h"
 
 
 #define BLK_LEN		512
@@ -164,7 +163,7 @@ void *arg;
 
     ConverseCommonInit(argv);
     neighbour_init(CmiMyPe());
-    CpvAccess(CmiLocalQueue) = (void *) FIFO_Create();
+    CpvAccess(CmiLocalQueue) = CdsFifo_Create();
     CmiSpanTreeInit();
     CmiTimerInit();
     if (Cmi_initret==0) {
@@ -215,7 +214,7 @@ CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg)
 void CmiFreeSendFn(int destPE, int size, char *msg)
 {
   if (CmiMyPe()==destPE) {
-    FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg);
+    CdsFifo_Enqueue(CpvAccess(CmiLocalQueue),msg);
     CQdCreate(CpvAccess(cQdState), 1);
   } else {
     CmiSyncSendFn(destPE, size, msg);
@@ -261,7 +260,7 @@ void CmiFreeBroadcastAllFn(int size, char *msg)
     int i;
     for(i=0; i<CmiNumPes(); i++)
        if (CmiMyPe() != i) CmiSyncSendFn(i,size,msg);
-    FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg);
+    CdsFifo_Enqueue(CpvAccess(CmiLocalQueue),msg);
     CQdCreate(CpvAccess(cQdState), 1);
 }
 

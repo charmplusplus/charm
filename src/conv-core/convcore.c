@@ -50,8 +50,6 @@ extern void CldModuleInit(void);
 #include <sys/timeb.h>
 #endif
 
-#include "fifo.h"
-
 /*****************************************************************************
  *
  * Unix Stub Functions
@@ -707,7 +705,7 @@ void (*handler)();
  *      - returns a message just retrieved from some other PE, not from
  *        local.  If no such message exists, returns 0.
  *
- * CpvExtern(FIFO_Queue, CmiLocalQueue);
+ * CpvExtern(CdsFifo, CmiLocalQueue);
  *
  *      - a FIFO queue containing all messages from the local processor.
  *
@@ -902,21 +900,20 @@ int CsdScheduler(int maxmsgs)
 	if(strncmp((char *)((char *)msg+CmiMsgHeaderSizeBytes),"req",3)!=0){
           /*CQdCreate(CpvAccess(cQdState), 1);*/
 	  CsdEndIdle();
-	  FIFO_EnQueue(CpvAccess(debugQueue), msg);
+	  CdsFifo_Enqueue(CpvAccess(debugQueue), msg);
 	  continue;
         }
       } 
     } else {
       /* If the debugQueue contains any messages, process them */
-      while(((!FIFO_Empty(CpvAccess(debugQueue))) && (CpvAccess(freezeModeFlag)==0))){
-        char *queuedMsg;
-	FIFO_DeQueue(CpvAccess(debugQueue), (void**)&queuedMsg);
+      while(((!CdsFifo_Empty(CpvAccess(debugQueue))) && (CpvAccess(freezeModeFlag)==0))){
+        char *queuedMsg = (char *)CdsFifo_Dequeue(CpvAccess(debugQueue));
 	CmiHandleMessage(queuedMsg);
 	maxmsgs--; if (maxmsgs==0) return maxmsgs;	
       }
     }
 #endif
-    if (msg==0) FIFO_DeQueue(localqueue, (void**)&msg);
+    if (msg==0) msg = CdsFifo_Dequeue(localqueue);
 #if CMK_NODE_QUEUE_AVAILABLE
 	csdMsgFlag = 0;
     if (msg==0) msg = CmiGetNonLocalNodeQ();
@@ -960,7 +957,7 @@ int handler;
   while (1) {
     side ^= 1;
     if (side) msg = CmiGetNonLocal();
-    else      FIFO_DeQueue(localqueue, (void**)&msg);
+    else      msg = CdsFifo_Dequeue(localqueue);
     if (msg) {
       if (CmiGetHandler(msg)==handler) {
 	CQdProcess(CpvAccess(cQdState), 1);
@@ -968,7 +965,7 @@ int handler;
 	CmiHandleMessage(msg);
 	return;
       } else {
-	FIFO_EnQueue(localqueue, msg);
+	CdsFifo_Enqueue(localqueue, msg);
       }
     }
   }

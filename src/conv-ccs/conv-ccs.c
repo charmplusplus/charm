@@ -85,7 +85,6 @@ void CcsImpl_kill(void)
 /* move */
 
 #if CMK_DEBUG_MODE
-#include "fifo.h"
 CpvDeclare(int, freezeModeFlag);
 CpvDeclare(int, continueFlag);
 CpvDeclare(int, stepFlag);
@@ -297,7 +296,7 @@ void CpdInit(void)
   CpvAccess(stepFlag) = 0;
 
   CpvInitialize(void *, debugQueue);
-  CpvAccess(debugQueue) = FIFO_Create();
+  CpvAccess(debugQueue) = CdsFifo_Create();
     
   CpdInitializeObjectTable();
   CpdInitializeHandlerArray();

@@ -1205,6 +1205,7 @@ void CrnSrand(int);
 int CrnRand(void);
 double CrnDrand(void);
 
+#include "conv-lists.h"
 #include "conv-trace.h"
 
 /**** DEAL WITH DIFFERENCES: KERNIGHAN-RITCHIE-C, ANSI-C, AND C++ ****/

@@ -10,6 +10,14 @@ class CkQ {
     int blklen;
     int first;
     int len;
+    void _expand(void) {
+      int newlen=len*2;
+      T *newblk = new T[newlen];
+      memcpy(newblk, block+first, sizeof(T)*(blklen-first));
+      memcpy(newblk+blklen-first, block, sizeof(T)*first);
+      delete[] block; block = newblk;
+      blklen = newlen; first = 0;
+    }
   public:
     CkQ() :first(0),len(0) {
       block = new T[blklen=16];
@@ -29,15 +37,15 @@ class CkQ {
       } else return T(0);
     }
     void enq(const T &elt) {
-      if(len==blklen) {
-      	int newlen=len*2;
-        T *newblk = new T[newlen];
-        memcpy(newblk, block+first, sizeof(T)*(blklen-first));
-        memcpy(newblk+blklen-first, block, sizeof(T)*first);
-        delete[] block; block = newblk;
-        blklen = newlen; first = 0;
-      }
+      if(len==blklen) _expand();
       block[(first+len)%blklen] = elt;
+      len++;
+    }
+    // stack semantics, needed to replace FIFO_QUEUE of converse
+    void push(const T &elt) {
+      if(len==blklen) _expand();
+      first = (first-1+blklen)%blklen;
+      block[first] = elt;
       len++;
     }
     //Peek at the n'th item from the queue
@@ -45,6 +53,16 @@ class CkQ {
     {
     	n=(n+first)%blklen;
     	return block[n];
+    }
+    // needed to replace FIFO_Enumerate
+    T* getArray(void) {
+      T *newblk = new T[len];
+      int i,j;
+      for(i=0,j=first;i<len;i++){
+        newblk[i] = block[j];
+        j = (j+1)%blklen;
+      }
+      return newblk;
     }
 };
 

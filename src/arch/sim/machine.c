@@ -9,7 +9,6 @@
 #include <math.h>
 #include "machine.h"
 #include "converse.h"
-#include "fifo.h"
 
 #if CMK_TIMER_SIM_USE_TIMES
 #include <sys/times.h>
@@ -178,7 +177,7 @@ char * msg;
     for(i=0; i<Cmi_numpes; i++)
        if (i!= Cmi_mype) CmiSyncSendFn(i,size,msg);
          
-    FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg);
+    CdsFifo_Enqueue(CpvAccess(CmiLocalQueue),msg);
 }
 
 
@@ -205,7 +204,7 @@ char * msg;
 
      buf =  (char *) CmiAlloc(size);
      memcpy(buf,msg,size);
-     FIFO_EnQueue(CpvAccess(CmiLocalQueue),buf);
+     CdsFifo_Enqueue(CpvAccess(CmiLocalQueue),buf);
 }
 
 
@@ -271,7 +270,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int initret)
   Cmi_mype   = 0;
 
   McQueue = (void **) malloc(requested_npe * sizeof(void *)); 
-  for(i=0; i<requested_npe; i++) McQueue[i] = (void *) FIFO_Create();
+  for(i=0; i<requested_npe; i++) McQueue[i] = CdsFifo_Create();
   CrnInit();
   sim_initialize("sim.param",requested_npe);
   
@@ -279,7 +278,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int initret)
   for(i=0; i<CmiNumPes(); i++) {
     CmiUniContextSwitch(i);
     CpvInitialize(void*, CmiLocalQueue);
-    CpvAccess(CmiLocalQueue) = (void *) FIFO_Create();
+    CpvAccess(CmiLocalQueue) = CdsFifo_Create();
     CthInit(argv);
     ConverseCommonInit(argv);
     argc=CmiGetArgc(argv);

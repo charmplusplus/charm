@@ -10,7 +10,6 @@
 #include "converse.h"
 #include <mpproto.h>
 #include <sys/systemcfg.h>
-#include "fifo.h"
 
 #define FLIPBIT(node,bitnumber) (node ^ (1 << bitnumber))
 
@@ -175,7 +174,7 @@ void CmiSyncSendFn(int destPE, int size, char *msg)
   char *dupmsg = (char *) CmiAlloc(size);
   memcpy(dupmsg, msg, size);
   if (Cmi_mype==destPE) {
-    FIFO_EnQueue(CpvAccess(CmiLocalQueue),dupmsg);
+    CdsFifo_Enqueue(CpvAccess(CmiLocalQueue),dupmsg);
     CQdCreate(CpvAccess(cQdState), 1);
   }
   else
@@ -206,7 +205,7 @@ void CmiFreeSendFn(int destPE, int size, char *msg)
 {
   if (Cmi_mype==destPE) {
     CQdCreate(CpvAccess(cQdState), 1);
-    FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg);
+    CdsFifo_Enqueue(CpvAccess(CmiLocalQueue),msg);
   } else {
     CmiAsyncSendFn(destPE, size, msg);
   }
@@ -299,7 +298,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   /* CmiSpanTreeInit(); */
   CmiTimerInit();
   CpvInitialize(void *, CmiLocalQueue);
-  CpvAccess(CmiLocalQueue) = (void *)FIFO_Create();
+  CpvAccess(CmiLocalQueue) = CdsFifo_Create();
   recdQueueInit();
   CthInit(argv);
   ConverseCommonInit(argv);

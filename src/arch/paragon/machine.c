@@ -8,7 +8,6 @@
 #include <nx.h>
 #include <math.h>
 #include "converse.h"
-#include "fifo.h"
 
 #define MSG_TYPE 1
 #define PROCESS_PID 0
@@ -153,7 +152,7 @@ char * msg;
        {
           temp = (char *)CmiAlloc(size) ;
           memcpy(temp, msg, size) ;
-          FIFO_EnQueue(CpvAccess(CmiLocalQueue), temp);
+          CdsFifo_Enqueue(CpvAccess(CmiLocalQueue), temp);
        }
     else
           csend(MSG_TYPE, msg, size, destPE, PROCESS_PID);
@@ -182,7 +181,7 @@ void CmiFreeSendFn(destPE, size, msg)
 {
     if (Cmi_mype == destPE)
        {
-          FIFO_EnQueue(CpvAccess(CmiLocalQueue), msg);
+          CdsFifo_Enqueue(CpvAccess(CmiLocalQueue), msg);
        }
     else
        {  
@@ -231,7 +230,7 @@ char * msg;
        csend(MSG_TYPE, msg, size, ALL_NODES,PROCESS_PID);
     temp = (char *)CmiAlloc(size) ;
     memcpy(temp, msg, size) ;
-    FIFO_EnQueue(CpvAccess(CmiLocalQueue), temp); 
+    CdsFifo_Enqueue(CpvAccess(CmiLocalQueue), temp); 
     CQdCreate(CpvAccess(cQdState), Cmi_numpes);
 }
 
@@ -245,7 +244,7 @@ char * msg;
         msgid = isend(MSG_TYPE, msg, size, ALL_NODES, PROCESS_PID);
         temp = (char *)CmiAlloc(size) ;
         memcpy(temp, msg, size) ;
-        FIFO_EnQueue(CpvAccess(CmiLocalQueue), temp);
+        CdsFifo_Enqueue(CpvAccess(CmiLocalQueue), temp);
         CQdCreate(CpvAccess(cQdState), Cmi_numpes);
         return msgid;
 }
@@ -258,7 +257,7 @@ char * msg;
 {
     if (Cmi_numpes > 1)
        csend(MSG_TYPE, msg, size, ALL_NODES,PROCESS_PID);
-    FIFO_EnQueue(CpvAccess(CmiLocalQueue), msg);
+    CdsFifo_Enqueue(CpvAccess(CmiLocalQueue), msg);
     CQdCreate(CpvAccess(cQdState), Cmi_numpes);
 }
 
@@ -282,7 +281,7 @@ int usched, initret;
   Cmi_mype = mynode();
   Cmi_numpes = numnodes();
   /*  neighbour_init(Cmi_mype); */
-  CpvAccess(CmiLocalQueue)= (void *) FIFO_Create();
+  CpvAccess(CmiLocalQueue)= CdsFifo_Create();
   /*  CmiTimerInit(); */
   CthInit(argv);
   ConverseCommonInit(argv);

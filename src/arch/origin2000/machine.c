@@ -15,7 +15,6 @@
 #include <stdlib.h>
 #include "converse.h"
 #include <time.h>
-#include "fifo.h"
 
 usptr_t *arena;
 static barrier_t *barr;
@@ -159,7 +158,7 @@ static void threadInit(void *arg)
   prctl(PR_SETEXITSIG, SIGHUP,0);
 
   CthInit(usrparam->argv);
-  CpvAccess(CmiLocalQueue) = (void *) FIFO_Create();
+  CpvAccess(CmiLocalQueue) = CdsFifo_Create();
   CmiTimerInit();
   /*  neighbour_init(Cmi_mype); */
   usadd(arena);
@@ -234,7 +233,7 @@ void CmiFreeSendFn(int destPE, int size, char *msg)
 {
   if (Cmi_mype==destPE) {
     CQdCreate(CpvAccess(cQdState), 1);
-    FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg);
+    CdsFifo_Enqueue(CpvAccess(CmiLocalQueue),msg);
   } else {
     CmiSyncSendFn(destPE, size, msg);
     CmiFree(msg);
@@ -283,7 +282,7 @@ void CmiFreeBroadcastAllFn(int size, char *msg)
       CmiSyncSendFn(i,size,msg);
     }
   }
-  FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg);
+  CdsFifo_Enqueue(CpvAccess(CmiLocalQueue),msg);
   CQdCreate(CpvAccess(cQdState), 1);
 }
 

@@ -16,7 +16,6 @@
 #include <malloc.h>
 #include <mpp/shmem.h>
 #include "converse.h"
-#include "fifo.h"
 
 /*
  *  We require statically allocated variables for locks.  This defines
@@ -180,7 +179,7 @@ void CmiSyncSendFn(int dest_pe, int size, char *msg)
   McRetrieveRemote();
 
   if (dest_pe == Cmi_mype)
-    FIFO_EnQueue(CpvAccess(CmiLocalQueue),dup_msg);
+    CdsFifo_Enqueue(CpvAccess(CmiLocalQueue),dup_msg);
   else
   {
     McEnqueueRemote(dup_msg,ALIGN8(size),dest_pe); 
@@ -201,7 +200,7 @@ void CmiFreeSendFn(int dest_pe, int size, char *msg)
   ((McMsgHdr *)msg)->msg_type = Message;
 
   if (dest_pe == Cmi_mype)
-    FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg);
+    CdsFifo_Enqueue(CpvAccess(CmiLocalQueue),msg);
   else
   {
     McEnqueueRemote(msg,size,dest_pe); 
@@ -490,7 +489,7 @@ void CmiNotifyIdle(void)
 static void McInit(void)
 {
   CpvInitialize(void *, CmiLocalQueue);
-  CpvAccess(CmiLocalQueue) = FIFO_Create();
+  CpvAccess(CmiLocalQueue) = CdsFifo_Create();
   Cmi_mype = _my_pe();
   Cmi_numpes = _num_pes();
   Cmi_myrank = 0;
