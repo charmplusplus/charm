@@ -208,12 +208,12 @@ void traceMessageRecv(char *msg, int pe)
 }
 
 // CMK_OPTIMIZE is already guarded in convcore.c
+// converse thread tracing is not supported in blue gene simulator
+// only AMPI threads are traced.
 extern "C"
 void traceResume(CmiObjId *tid)
 {
-#if ! CMK_TRACE_IN_CHARM
     CkpvAccess(_traces)->beginExecute(tid);
-#endif
     if(CpvAccess(_traceCoreOn))
 	    resumeTraceCore();
 }
@@ -221,17 +221,13 @@ void traceResume(CmiObjId *tid)
 extern "C"
 void traceSuspend(void)
 {
-#if ! CMK_TRACE_IN_CHARM
   CkpvAccess(_traces)->endExecute();
-#endif
 }
 
 extern "C"
 void traceAwaken(CthThread t)
 {
-#if ! CMK_TRACE_IN_CHARM
   CkpvAccess(_traces)->creation(0, _threadEP);
-#endif
 }
 
 extern "C"

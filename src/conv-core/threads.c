@@ -389,8 +389,10 @@ void CthSuspend(void)
   if (cur->choosefn == 0) CthNoStrategy();
   next = cur->choosefn();
 #ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_IN_CHARM
   if(CpvAccess(traceOn))
     traceSuspend();
+#endif
 #endif
   CthResume(next);
 }
@@ -399,8 +401,10 @@ void CthAwaken(CthThread th)
 {
   if (B(th)->awakenfn == 0) CthNoStrategy();
 #ifndef CMK_OPTIMIZE
+#if ! CMK_TRACE_IN_CHARM
   if(CpvAccess(traceOn))
     traceAwaken(th);
+#endif
 #endif
   B(th)->awakenfn(th, CQS_QUEUEING_FIFO, 0, 0);
 }
@@ -415,8 +419,10 @@ void CthAwakenPrio(CthThread th, int s, int pb, unsigned int *prio)
 {
   if (B(th)->awakenfn == 0) CthNoStrategy();
 #ifndef CMK_OPTIMIZE
+#if ! CMK_TRACE_IN_CHARM
   if(CpvAccess(traceOn))
     traceAwaken(th);
+#endif
 #endif
   B(th)->awakenfn(th, s, pb, prio);
 }
