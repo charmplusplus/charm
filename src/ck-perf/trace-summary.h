@@ -244,6 +244,7 @@ class TraceSummary : public Trace {
   public:
     TraceSummary(char **argv);
     void beginExecute(envelope *e);
+    void beginExecute(CmiObjId  *tid);
     void beginExecute(int event,int msgType,int ep,int srcPe, int mlen=0);
     void endExecute(void);
     void beginPack(void);
