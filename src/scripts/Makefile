@@ -178,6 +178,7 @@ dirs+sources:
 	rm -rf libs
 	rm -rf ../bin ; mkdir ../bin
 	rm -rf ../lib ; mkdir ../lib
+	rm -rf ../lib_so ; mkdir ../lib_so
 	rm -rf ../pgms
 	rm -rf ../doc ; ln -s ../doc ../doc
 	../../src/scripts/gatherflat ../../src/scripts .
@@ -203,8 +204,6 @@ dirs+sources:
 	./gathertree ../../src/arch/`cat .gdir`      .
 	./gatherflat ../../src/arch/`cat .vdir`      .
 	./gathertree ../../pgms ../pgms
-	cat .gdir
-	cat .vdir
 	rm -f ../bin/charmc ; cp charmc ../bin/
 	chmod +x ../bin/charmc
 	rm -f .gdir
@@ -267,6 +266,7 @@ QuickThreads/libqt.a:
 	rm -f QuickThreads/libqt.a
 	cd QuickThreads ; make qt  OPTS='$(OPTS)'
 	cp QuickThreads/libqt.a ../lib/libckqt.a
+	-cp QuickThreads/libqt.so ../lib_so/libckqt.so
 	-@ test -d ../lib/libckqt.a.dir && /bin/rm -rf ../lib/libckqt.a.dir
 	-@ cp -r QuickThreads/libqt.a.dir ../lib/libckqt.a.dir
 
