@@ -9,7 +9,7 @@ static int immRunning=0; /* if set, somebody's inside an immediate message */
 
 int CmiImmIsRunning()
 {
-#if CMK_NET_VERSION && ! defined(CMK_CPV_IS_SMP)
+#if CMK_NET_VERSION && ! CMK_SMP
   if (!Cmi_netpoll) return immRunning;
 #endif
   return 0;

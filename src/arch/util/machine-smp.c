@@ -382,7 +382,7 @@ void  CmiNodeBarrier(void) {
 /* unfortunately this could also be called in a non smp version, e.g.
    net-win32 */
 void CmiNodeAllBarrier(void) {
-#ifdef CMK_CPV_IS_SMP
+#if CMK_SMP
   CmiNodeBarrierCount(CmiMyNodeSize()+1);
 #else
   CmiNodeBarrierCount(CmiMyNodeSize());
