@@ -759,6 +759,7 @@ void ampi::init(void) {
   thread=NULL;
   msgs=NULL;
   resumeOnRecv=false;
+  localResume=false;
 }
 
 ampi::ampi()
@@ -1251,6 +1252,8 @@ void ampi::yield(void){
 }
 
 void ampi::unblock(void){
+	if(localResume) 
+	  localResume=false;
 	thread->resume();
 }
 
@@ -1279,7 +1282,11 @@ MSG_ORDER_DEBUG(
   }
   
   if(resumeOnRecv){
-    thread->resume();
+    if(!localResume){
+      localResume = true;
+      thisProxy[thisIndex].unblock();	// push a local msg to do resume;
+    }
+    //thread->resume();
   }
 }
 
@@ -1387,11 +1394,14 @@ ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
  )
 
   resumeOnRecv=true;
+//  int counter=0;
   while(1) {
     tags[0] = t; tags[1] = s; tags[2] = comm;
     msg = (AmpiMsg *) CmmGet(msgs, 3, tags, sts);
+ //   if(msg) counters.push_back(counter);
     if (msg) break;
     thread->suspend();
+//    counter++;
   }
   resumeOnRecv=false;
   
@@ -1782,6 +1792,7 @@ int AMPI_Finalize(void)
 #if CMK_BLUEGENE_CHARM
   TRACE_BG_AMPI_SUSPEND();
 #endif
+//  getAmpiInstance(MPI_COMM_WORLD)->outputCounter();
   AMPI_Exit(0);
   return 0;
 }
@@ -1793,7 +1804,7 @@ int AMPI_Send(void *msg, int count, MPI_Datatype type, int dest,
   AMPIAPI("AMPI_Send");
   ampi *ptr = getAmpiInstance(comm);
 #if AMPI_COMLIB
-  if(enableStreaming && comm==MPI_COMM_WORLD){  
+  if(enableStreaming){  
     ptr->getStreaming().beginIteration();
     ptr->comlibsend(tag,ptr->getRank(comm),msg,count,type,dest,comm);
   } else
@@ -2661,7 +2672,7 @@ int AMPI_Isend(void *buf, int count, MPI_Datatype type, int dest,
   USER_CALL_DEBUG("AMPI_Isend("<<type<<","<<dest<<","<<tag<<","<<comm<<")");
   ampi *ptr = getAmpiInstance(comm);
 #if AMPI_COMLIB
-  if(enableStreaming && comm==MPI_COMM_WORLD){
+  if(enableStreaming){
     ptr->getStreaming().beginIteration();
     ptr->comlibsend(tag,ptr->getRank(comm),buf,count,type,dest,comm);
   } else
@@ -2724,7 +2735,7 @@ int AMPI_Allgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize(comm);
   int i;
-#if 0 // AMPI_COMLIB
+#if AMPI_COMLIB
   if(comm == MPI_COMM_WORLD) {
       // commlib support
       ptr->getAllgather().beginIteration();
@@ -2765,7 +2776,7 @@ int AMPI_Iallgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize(comm);
   int i;
-#if 0 // AMPI_COMLIB
+#if AMPI_COMLIB
   if(comm == MPI_COMM_WORLD) {
       // commlib support
       ptr->getAllgather().beginIteration();
@@ -2808,7 +2819,7 @@ int AMPI_Allgatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize(comm);
   int i;
-#if 0 // AMPI_COMLIB
+#if AMPI_COMLIB
   if(comm == MPI_COMM_WORLD) {
       // commlib support
       ptr->getAllgather().beginIteration();

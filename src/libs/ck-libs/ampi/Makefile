@@ -38,6 +38,7 @@ AMPI: $(DEST)
 	@echo "AMPI built successfully"
 
 AMPIF: $(DESTF)
+	@echo "AMPIF built successfully"
 
 $(DEST): $(OBJS) headers
 	$(CHARMC) $(OBJS) -o $@
