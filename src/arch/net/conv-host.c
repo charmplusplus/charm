@@ -1648,6 +1648,7 @@ int req_handle_print(line)
     char *line;
 {
   printf("%s\n",line+6);
+  fflush(stdout);
   return REQ_OK;
 }
 
@@ -1663,6 +1664,7 @@ int req_handle_printerr(line)
     char *line;
 {
   fprintf(stderr,"%s\n",line+9);
+  fflush(stderr);
   return REQ_OK;
 }
 
@@ -1670,6 +1672,7 @@ int req_handle_princerr(line)
     char *line;
 {
   fprintf(stderr,"%s",line+9);
+  fflush(stderr);
   return REQ_OK;
 }
 
