@@ -1,17 +1,21 @@
 #include <stdlib.h>
 /* #include <sys/timer.h> */
-#include <sys/time.h>
 #include <sys/unistd.h>
 #include <errno.h>
+#include <sys/time.h>
 
 #include "conv-ccs.h"
-
 
 #if CMK_WEB_MODE
 int appletFd = -1;
 #endif
 
 #if NODE_0_IS_CONVHOST
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h>
+
 int serverFlag = 0;
 extern int inside_comm;
 CpvExtern(int, strHandlerID);
@@ -362,7 +366,7 @@ void CHostInit()
 /* move */
 
 #if CMK_DEBUG_MODE
-
+#include "fifo.h"
 CpvDeclare(int, freezeModeFlag);
 CpvDeclare(int, continueFlag);
 CpvDeclare(int, stepFlag);

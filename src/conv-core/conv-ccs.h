@@ -25,4 +25,18 @@ void CcsSendReplyFd(unsigned int ip, unsigned int port, int size, void *reply);
 #define CcsSendReply(i,p,s,r)
 #endif
 
+#if NODE_0_IS_CONVHOST
+extern int serverFlag;
+extern int inside_comm;
+CpvExtern(int, strHandlerID);
+extern int hostport, hostskt;
+extern int hostskt_ready_read;
+CpvExtern(int, CHostHandlerIndex);
+extern unsigned int *nodeIPs;
+extern unsigned int *nodePorts;
+extern int numRegistered;
+extern void CommunicationServer();
+extern unsigned int clientIP, clientPort, clientKillPort;
+#endif
+
 #endif

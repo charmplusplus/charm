@@ -4,6 +4,8 @@
 #include "conv-trace.h"
 #include "conv-ccs.h"
 #include <errno.h>
+
+/*
 #if NODE_0_IS_CONVHOST
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -11,6 +13,7 @@
 #include <netdb.h>
 #include <sys/time.h>
 #endif
+*/
 
 #if CMK_WHEN_PROCESSOR_IDLE_USLEEP
 #include <sys/types.h>
@@ -28,11 +31,15 @@
 #include <sys/resource.h>
 #endif
 
-#if CMK_CCS_AVAILABLE
-#include "conv-ccs.h"
-#endif
-
 #include "fifo.h"
+
+#if NODE_0_IS_CONVHOST
+extern int serverFlag;
+extern int hostport, hostskt;
+extern int hostskt_ready_read;
+extern unsigned int *nodeIPs;
+extern unsigned int *nodePorts;
+#endif
 
 /*****************************************************************************
  *
@@ -80,6 +87,7 @@ CsvDeclare(void*, CsdNodeQueue);
 CsvDeclare(CmiNodeLock, CsdNodeQueueLock);
 #endif
 CpvDeclare(int,   CsdStopFlag);
+
 
 
 /*****************************************************************************

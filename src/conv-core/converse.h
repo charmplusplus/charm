@@ -4,15 +4,6 @@
 #ifndef _conv_mach_h
 #include "conv-mach.h"
 #endif
-/*
-#if CMK_WEB_MODE
-#include "conv-ccs.h"
-#endif
-
-#if CMK_DEBUG_MODE
-#include "conv-ccs.h"
-#endif
-*/
 
 /**** DEAL WITH DIFFERENCES: KERNIGHAN-RITCHIE-C, ANSI-C, AND C++ ****/
 
