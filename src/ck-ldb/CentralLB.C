@@ -711,8 +711,13 @@ int CentralLB::useMem() {
                         sizeof(CentralLB);
 }
 
+static inline int i_abs(int c) { return c>0?c:-c; }
+
 inline static int ObjKey(const LDObjid &oid, const int hashSize) {
-  return ((oid.id[0]<<16)|(oid.id[1]<<8)|oid.id[2]) % hashSize;
+  // make sure all positive
+  return ((i_abs(oid.id[0])<<16)
+	 |(i_abs(oid.id[1])<<8)
+	 |i_abs(oid.id[2])) % hashSize;
 }
 
 void CentralLB::LDStats::makeCommHash() {
@@ -728,6 +733,7 @@ void CentralLB::LDStats::makeCommHash() {
   for(i=0;i<n_objs;i++){
         const LDObjid &oid = objData[i].objID();
         int hash = ObjKey(oid, hashSize);
+	CmiAssert(hash != -1);
         while(objHash[hash] != -1)
             hash = (hash+1)%hashSize;
         objHash[hash] = i;
@@ -746,6 +752,7 @@ int CentralLB::LDStats::getHash(const LDObjid &oid, const LDOMid &mid)
 
     for(int id=0;id<hashSize;id++){
         int index = (id+hash)%hashSize;
+	if (index == -1 || objHash[index] == -1) return -1;
         if (LDObjIDEqual(objData[objHash[index]].objID(), oid) &&
             LDOMidEqual(objData[objHash[index]].omID(), mid))
             return objHash[index];

@@ -43,8 +43,8 @@ void* LBMigrateMsg::alloc(int msgnum, size_t size, int* array, int priobits)
     (LBMigrateMsg*)(CkAllocMsg(msgnum,totalsize,priobits));
 
   ret->moves = (MigrateInfo*) ((char*)(ret)+ ALIGN8(size));
-  ret->avail_vector = (char *)(ret->moves + ALIGN8(array[0]));
-  ret->expectedLoad = (double *)(ret->avail_vector + ALIGN8(CkNumPes()*sizeof(char)));
+  ret->avail_vector = (char *)((char*)ret->moves + ALIGN8(array[0]*sizeof(MigrateInfo)));
+  ret->expectedLoad = (double *)((char*)ret->avail_vector + ALIGN8(CkNumPes()*sizeof(char)));
   return (void*)(ret);
 }
 
