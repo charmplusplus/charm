@@ -1,40 +1,41 @@
 CDIR=../../../..
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
-OBJS=partition.o map.o
-HEADERS=fem.h fem_impl.h fem.decl.h fem.def.h
+HEADERS=fem.h femf.h
+HEADDEP=$(HEADERS) fem_impl.h fem.decl.h fem.def.h
+OBJS=fem.o partition.o map.o
+COMPAT=compat_init.o compat_finit.o compat_driver.o compat_fdriver.o \
+	compat_mu.o compat_fmu.o
+DEST=$(CDIR)/lib/libmodulefem.a
 
-all: $(CDIR)/include/fem.h $(CDIR)/include/femf.h \
-	libfem.a libfemf.a $(CDIR)/lib/fmain.o
+all: $(DEST)
 
-libfem.a: fem.C $(HEADERS) $(OBJS)
-	$(CHARMC) -DFEM_FORTRAN=0 -c fem.C
-	$(CHARMC) -cp $(CDIR)/lib -o libfem.a fem.o $(OBJS)
+$(DEST): $(OBJS) $(COMPAT) headers
+	$(CHARMC) $(OBJS) $(COMPAT) -o $@
 
-libfemf.a: fem.C $(HEADERS) $(OBJS)
-	$(CHARMC) -DFEM_FORTRAN=1 -c fem.C
-	$(CHARMC) -cp $(CDIR)/lib -o libfemf.a fem.o $(OBJS)
+headers: $(HEADERS)
+	cp $(HEADERS) $(CDIR)/include/
+	touch headers
 
-fmain.o: fmain.f90
-	$(CHARMC) -c fmain.f90
+$(COMPAT):
+	@for o in $(COMPAT); \
+	do \
+	        file=`echo $$o | sed -e "s/\.o/.c/g"`; \
+	        echo "$(CHARMC) -c $$file..."; \
+	        $(CHARMC) -c $$file || exit 1; \
+	done
 
-partition.o: partition.C $(HEADERS)
+fem.o: fem.C $(HEADDEP)
+	$(CHARMC) -c fem.C
+
+partition.o: partition.C $(HEADDEP)
 	$(CHARMC) -c partition.C
 
-map.o: map.C $(HEADERS)
+map.o: map.C $(HEADDEP)
 	$(CHARMC) -c map.C
 
 fem.decl.h fem.def.h: fem.ci
 	$(CHARMC) fem.ci
 
-$(CDIR)/include/fem.h: fem.h
-	/bin/cp fem.h $(CDIR)/include
-
-$(CDIR)/include/femf.h: femf.h
-	/bin/cp femf.h $(CDIR)/include
-
-$(CDIR)/lib/fmain.o: fmain.o
-	/bin/cp fmain.o $(CDIR)/lib
-
 clean:
-	rm -rf *.a *.def.h *.decl.h *.o SunWS_cache
+	rm -rf *.a *.def.h *.decl.h *.o SunWS_cache $(DEST) headers
