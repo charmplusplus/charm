@@ -47,7 +47,6 @@ class StatTable {
       double totTime[MAX_ENTRIES];  // total time associated with this counter
 
       Statistics(): name(NULL) { }
-      ~Statistics() { if (name != NULL) { delete [] name; } }
     };
 
     Statistics* stats_;             // track stats for each entry point
