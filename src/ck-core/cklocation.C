@@ -189,7 +189,6 @@ public:
   RRMap(void)
   {
 	  DEBC((AA"Creating RRMap\n"AB));
-  // CkPrintf("Pe %d creating RRMap\n",CkMyPe());
   }
   RRMap(CkMigrateMessage *m):CkArrayMap(m){}
   int procNum(int /*arrayHdl*/, const CkArrayIndex &i)
@@ -230,6 +229,36 @@ public:
 	}
 	mgr->doneInserting();
 	CkFreeMsg(ctorMsg);
+  }
+};
+
+/**
+ * map object-- use seed load balancer.  
+ */
+class CldMap : public CkArrayMap
+{
+public:
+  CldMap(void)
+  {
+	  DEBC((AA"Creating CldMap\n"AB));
+  }
+  CldMap(CkMigrateMessage *m):CkArrayMap(m){}
+  int homePe(int /*arrayHdl*/, const CkArrayIndex &i)
+  {
+    if (i.nInts==1) {
+      //Map 1D integer indices in simple round-robin fashion
+      return (i.data()[0])%CkNumPes();
+    }
+    else 
+      {
+	//Map other indices based on their hash code, mod a big prime.
+	unsigned int hash=(i.hash()+739)%1280107;
+	return (hash % CkNumPes());
+      }
+  }
+  int procNum(int arrayHdl, const CkArrayIndex &i)
+  {
+     return CLD_ANYWHERE;   // -1
   }
 };
 

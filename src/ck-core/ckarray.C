@@ -464,8 +464,8 @@ void CkArray::prepareCtorMsg(CkMessage *m,int &onPe,const CkArrayIndex &idx)
   env->getsetArrayIndex()=idx;
   int *listenerData=env->getsetArrayListenerData();
   CK_ARRAYLISTENER_STAMP_LOOP(listenerData);
-  if (onPe==-1) onPe=homePe(idx);
-  if (onPe!=CkMyPe()) //Let the local manager know where this el't is
+  if (onPe==-1) onPe=procNum(idx);   // onPe may still be -1
+  if (onPe!=CkMyPe()&&onPe!=-1) //Let the local manager know where this el't is
   	getLocMgr()->inform(idx,onPe);
 }
 

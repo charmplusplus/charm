@@ -99,6 +99,8 @@ public:
   virtual int registerArray(int numElements,CkArrayID aid);
   virtual void populateInitial(int arrayHdl,int numElements,void *ctorMsg,CkArrMgr *mgr);
   virtual int procNum(int arrayHdl,const CkArrayIndex &element) =0;
+  virtual int homePe(int arrayHdl,const CkArrayIndex &element)
+             { return procNum(arrayHdl, element); }
 //  virtual void pup(PUP::er &p) { CkGroupReadyCallback::pup(p); }
 };
 /*@}*/
@@ -533,6 +535,8 @@ public:
 //Interface used by external users:
 	/// Home mapping
 	inline int homePe(const CkArrayIndex &idx) const
+		{return map->homePe(mapHandle,idx);}
+	inline int procNum(const CkArrayIndex &idx) const
 		{return map->procNum(mapHandle,idx);}
 	inline CmiBool isHome(const CkArrayIndex &idx) const
 		{return (CmiBool)(homePe(idx)==CkMyPe());}
