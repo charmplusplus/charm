@@ -1,6 +1,5 @@
 
-\section{3D FFT Library}
-\subsection{Introduction and Motivation}
+\section{Introduction and Motivation}
 The 3D FFT library provides an interface to do paralle FFT computation
 in a scalable fashion. 
 
@@ -23,7 +22,7 @@ pencils. So the second approach provides finer grained parallelism and
 it's possible to perform better when the number of processing units is
 larger than the number of planes.
 
-\subsection{Compilation and Execution}
+\section{Compilation and Execution}
 
 To install the FFT library, you will need to have charm++ installed in
 you system. You can follow the Charm++ manual to do that. Also you
@@ -37,16 +36,111 @@ your FFTW installation. Then cd to your-charm-dir/tmp, and do 'make
 fftlib'. To compile a program using the fftlib, pass the '-lfftlib
 -L(your-fftwlib-dir) -lfftw' flag to charmc.
 
-\subsection{Library Interfaces}
+\section{Library Initialization and Data Format} 
+To initialize the library, user will need to construct a data struct and pass it to the library. 
+
+For plane-based version, the struct is called: NormalFFTinfo . And the
+constructor of 'NormalFFTinfo' is defined as:
+
+\begin{alltt}
+        NormalFFTinfo(CProxy_NormalSlabArray &srcProxy, CProxy_NormalSlabArray &destProxy,
+                      int srcDim[2], int destDim[2], int isSrc, complex *dptr, 
+                      int srcPlanesPerSlab=1, int destPlanesPerSlab=1)
+
+        Where: 
+        CProxy_NormalSlabArray &srcProxy : proxy for source charm array 
+        CProxy_NormalSlabArray &destProxy : proxy for destination charm array 
+        int srcDim[2] : FFT plane data dimension at source array (*)
+        int destDim[2] : FFT plane data dimension at destination array ( srcDim[1] must equal to destDim[0].) (*) 
+        int isSrcArray : whether this array is source (1) or destination (0)
+        complex *dataptr : pointer to FFT data 
+        int srcPlanesPerSlab : number of planes in each slab at source array, default value is 1 (**) 
+        int destPlanesPerSlab : number of planes in each slab at destination array, default value is 1 (**)
+
+          * Data layout : The multi-dimensional FFT data are supposed
+            to be stored in a contiguous one-dimensional array in
+            row-major order. For example, in source array, data is
+            {\it srcPlanesPerSlab} planes, each plane is {\it
+            srcSize[0]} rows of size {\it srcSize[0]} numbers. Similar
+            rules apply to destination side.
+
+
+          ** Currently, srcPlanesPerSlab/destPlanesPerSlab has to be
+             the same across all array elements.
+
+          *** Total data size can be calculated by:
+              srcPlanesPerSlab*srcDim[0]*srcDim[1] at source array, and
+              destPlanesPerSlab*destDim[0]*destDim[1] at destination array
+ 
+\end{alltt}
+
+%{\it put a figure here with reference of above parameters.}
+%\caption doing a {\it nz*ny*nz} size FFT, if data layout at source side is x then y then z, and at destination is z then x then y,
+%srcDim[] = {ny, nx}, destDim={nx, nz}
+
+
+For pencil-based version, the struct is called: LineFFTinfo.
+
+\begin{alltt} 
+        LineFFTinfo(CProxy_NormalLineArray &xProxy, 
+                    CProxy_NormalLineArray &yProxy, 
+                    CProxy_NormalLineArray &zProxy, 
+                    int size[3], int isSrcArray, complex *dataptr, 
+                    int srcPencilsPerSlab=1, int destPencilsPerSlab=1) 
+
+        where: 
+        CProxy_NormalSlabArray &xProxy : proxy for first charm array 
+        CProxy_NormalSlabArray &yProxy : proxy for second charm array 
+        CProxy_NormalSlabArray &zProxy : proxy for third charm array 
+        int size[3] : FFT plane data dimension (*)
+        int isSrcArray : whether this array is source (1) or intermediate (2) or  destination (0)
+        complex *dataptr : pointer to FFT data 
+        int srcPencilsPerSlab : number of pencils in each slab at source array, default value is 1
+        int destPencilsPerSlab : number of pencils in each slab at destination array, default value is 1
+
+          *data layout : pencils in the three arrays are of size {\it
+           size[0]/size[1]/size[2]}. And if there is more than one
+           pencil per slab, the other dimension is the dimension for
+           pencils in the next array.
+
+\end{alltt}
+
+%{\it put a figure here with reference of above parameters.}
+%\caption doing a {\it nz*ny*nz} size FFT,
+
+
+In both cases, data is deposited by passing in a pointer to the data
+field, and the pointer will be stored in 'complex *dataptr' in the
+struct. Memory allocation and initializtion of data field needs to be
+done by user before pointer is passed in. The library doesn't allocate
+any memory for data field. Also note that FFT's done internally in the
+library are in-place FFTs, which means that data field will be
+overwriten with results.
+
+\section{Library Interfaces}
 There are two types of interfaces provided by the library: Charm++
 based and AMPI based. 
 
-\begin{itemize}
-\item Charm++ based - this is the raw interface of charm++.  
+\subsection{Charm++ interface}
 
-To use the charm++ based library, user has to create their own charm
-arrays which derive from predefined arrays in library. By overiding
-default methods, user can add in additional functions. 
+The Charm++ interface is the raw interface of the library and slightly
+more difficult to use but gives more flexibility. To use the charm++
+based library, user has to create their own charm arrays which derive
+from predefined arrays in library. By overiding default methods, user
+can add in additional functions.
+
+
+For the plane-based library, there are several relevant member
+functions: 'doFFT', 'doIFFT', 'doneFFT' and 'doneIFFT'. 'doFFT' and
+'doIFFT' need to be called to start the computation. 'doneFFT' and
+'doneIFFT' are callback functions, and they need to be
+inheritated. 
+
+The sample code below should shed more light on this. For complex
+sample programs, refer to file under
+your-charm-dir/pgms/charm++/fftdemo/.
+
+
 
 (sample code here)
 \begin{alltt}
@@ -124,7 +218,8 @@ main::main(CkArgMsg *m)
 
 \end{alltt}
 
-\item AMPI based - MPI-like interface which facilitates MPI program to
+\subsection {AMPI Interface}
+The MPI-like interface aims at easy migration of MPI program to
 use the library.
 
 The AMPI interface has five functions:
@@ -141,4 +236,3 @@ charm++ level data structures, prepare for FFT computation.
 \begin{alltt}
 \end{alltt}
 
-\end{itemize}
