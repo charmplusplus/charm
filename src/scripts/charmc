@@ -114,15 +114,21 @@ End() {
     exit $1
 }
 
-# This procedure prints an error message and exits.
+# Write this error message to stderr
 # ("1>&2" redirects the echo output to stderr).
+Warning() {
+	echo $* 1>&2
+}
+
+# This procedure prints an error message and exits.
 # Args: written to stderr
 Abort() {
-	echo "Fatal Error by charmc in directory "`pwd` 1>&2
-	echo "   $*" 1>&2
-	echo "charmc exiting..." 1>&2
+	Warning "Fatal Error by charmc in directory "`pwd`
+	Warning "   $*"
+	Warning "charmc exiting..."
 	End 1
 }
+
 
 # Instead of an ECHO_CMD variable, I define a procedure Do,
 # which (possibly) echos, runs, and tests the errors of the given command.
@@ -269,7 +275,7 @@ do
 		;;
 
 	"-queue")
-		echo "Warning: -queue currently being ignored."
+		Warning "Warning: -queue currently being ignored."
 		shift
 		;;
 
@@ -410,7 +416,7 @@ do
 		;;
 
 	-LANG*)
-		echo "passing unrecognized option $arg to all compilers and linkers"
+		Warning "passing unrecognized option $arg to all compilers and linkers"
 		OPTS="$OPTS $arg"
 		;;
 	-L*)
@@ -446,7 +452,7 @@ do
 	        printUsage
 		;;
 	-*|+*)
-		echo "passing unrecognized option $arg to all compilers and linkers"
+		Warning "passing unrecognized option $arg to all compilers and linkers"
 		OPTS="$OPTS  $arg"
 		;;
 	*.*)
@@ -701,7 +707,7 @@ Copyobj() {
 		then
 			[ -d $COPY ] && COPY="$COPY/"
 			if [ "a$PROG_EXT" != "a" -a -r "$OBJECT$PROG_EXT" ] ; then
-				echo "Appending $PROG_EXT to object file name"
+				Warning "Appending $PROG_EXT to object file name"
 				OBJECT="$OBJECT$PROG_EXT"
 			fi
 			[ ! -d $COPY ] && DoNoErrCheck $RM $COPY 
@@ -721,7 +727,7 @@ Copymod() {
 			  OBJECT=`echo $OBJECT | tr "a-z" "A-Z"`
 			fi
 			if [ -r "$OBJECT.$CMK_MOD_EXT" ] ; then
-			  echo "Appending .$CMK_MOD_EXT to object file name"
+			  Warning "Appending .$CMK_MOD_EXT to object file name"
 			  OBJECT="$OBJECT.$CMK_MOD_EXT"
 			fi
 			[ ! -d $COPY ] && DoNoErrCheck $RM $COPY 
