@@ -35,12 +35,13 @@ EachToManyStrategy::EachToManyStrategy(int substrategy, int npes, int *pelist){
     messageBuf = NULL;
     messageCount = 0;
 
-    comid = ComlibInstance(routerID, CkNumPes());
-    comid = ComlibEstablishGroup(comid, npes, pelist);
-    this->npes = npes;
-
     procMap = new int[CkNumPes()];
     setReverseMap(procMap, pelist, npes);
+    
+    comid = ComlibInstance(routerID, CkNumPes());
+    if(npes < CkNumPes())
+      comid = ComlibEstablishGroup(comid, npes, pelist);
+    this->npes = npes;
 }
 
 void EachToManyStrategy::insertMessage(CharmMessageHolder *cmsg){

@@ -73,8 +73,8 @@ void initComlibManager(void){
 //ComlibManager Constructor with 1 int the strategy id being passed
 //s = Strategy (0 = tree, 1 = tree, 2 = mesh, 3 = hypercube) 
 ComlibManager::ComlibManager(int s){
-    strategyID = s;
     init();
+    strategyID = s;
     Strategy *strat = createStrategy(s, 0);
     createInstance(strat);
 }
@@ -83,14 +83,13 @@ ComlibManager::ComlibManager(int s){
 //number of array elements being passed. For Streaming the second 
 //int can be used for 
 ComlibManager::ComlibManager(int s, int n){
+    init();
     strategyID = s;
     if(s == USE_STREAMING) 
-        strategyTable[0].numElements = 1;
+      strategyTable[0].numElements = 1;
     else 
-        strategyTable[0].numElements = n;  
-
-    init();
-
+      strategyTable[0].numElements = n;  
+    
     //receivedTable = 1;
     ComlibPrintf("Strategy %d %d\n", strategyID, strategyTable[0].numElements);
 
@@ -146,7 +145,8 @@ void ComlibManager::createId(int *pelist, int npes){
     else 
         strat = new MPIStrategy(npes, pelist);
 
-    createInstance(strat);        
+    //createInstance(strat);        
+    ListOfStrategies.insert(0, strat);
     doneCreating();
 }
 
@@ -160,11 +160,11 @@ int ComlibManager::createInstance(Strategy *strat) {
 void ComlibManager::doneCreating() {
     StrategyWrapper sw;
     sw.s_table = new Strategy* [nstrats];
-    Strategy *aStrategy = ListOfStrategies.deq();
+    //    Strategy *aStrategy = ListOfStrategies.deq();
     sw.nstrats = nstrats;
     
     for (int count=0; count<nstrats; count++)
-        sw.s_table[count] = aStrategy;
+        sw.s_table[count] = ListOfStrategies.deq();
 
     CProxy_ComlibManager cgproxy(cmgrID);
     cgproxy.receiveTable(sw);
