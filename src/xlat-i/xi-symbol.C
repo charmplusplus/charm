@@ -777,7 +777,8 @@ Message::genAllocDecl(XStr &str)
     if(compilemode==ansi)
       str << CIAllocDeclAnsi;
     else str << CIAllocDecl;
-  } else if(isVarrays()) {
+  }
+  if(isVarrays()) {
     int num = mvlist->len();
     str << "    void *operator new(size_t s,";
     int i;
@@ -801,7 +802,7 @@ Message::genVarraysMacros(XStr& str)
   MsgVarList *ml = mvlist;
   MsgVar *mv = ml->msg_var;
   int i;
-  str << "\n#define " << type << "_VARRAYS_MACROS() \\\n";
+  str << "\n#define " << type << "_VARSIZE_MACROS() \\\n";
   str << "  static void* alloc(int msgnum, int sz, int *sizes, int pb) {\\\n";
   str << "    int offsets[" << num+1 << "];\\\n";
   str << "    offsets[0] = ALIGN8(sz);\\\n";
@@ -1005,7 +1006,7 @@ Message::genReg(XStr& str)
   if(!templat && !external) {
     str << "  "<<proxyPrefix()<<type<<"::";
     str << "__register(\""<<type<<"\", sizeof("<<type<<"),";
-    if(isPacked()||isVarsize()||isVarrays()) {
+    if(isPacked()||isVarsize()) {
       str << "(CkPackFnPtr) "<<type;
       if(templat)
         templat->genVars(str);

@@ -53,7 +53,7 @@ ModuleList *modlist;
 %token SYNC EXCLUSIVE VIRTUAL
 %token VOID
 %token PACKED
-%token VARSIZE VARRAYS
+%token VARSIZE
 %token ENTRY
 %token <intval> MAINCHARE
 %token <strval> IDENT NUMBER LITERAL
@@ -311,8 +311,6 @@ MAttrib		: PACKED
 		{ $$ = SPACKED; }
 		| VARSIZE
 		{ $$ = SVARSIZE; }
-		| VARRAYS
-		{ $$ = SVARRAYS; }
 		;
 
 CAttribs	: /* Empty */

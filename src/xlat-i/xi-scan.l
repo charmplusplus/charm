@@ -87,7 +87,6 @@ struct rwtable rwtable[] = {
   "mainchare",	MAINCHARE,
   "packed",     PACKED,
   "varsize",    VARSIZE,
-  "varrays",    VARRAYS,
   "entry",      ENTRY,
   "int",        INT,
   "short",      SHORT,

@@ -389,7 +389,6 @@ class NodeGroup : public Group {
 
 #define SPACKED  0x01
 #define SVARSIZE 0x02
-#define SVARRAYS 0x04
 
 class Message; // forward declaration
 //  typedef map< string, Message* > MessageList;
@@ -466,7 +465,7 @@ class Message : public TEntity, public Construct {
     void genReg(XStr& str);
     int  isPacked(void) { return attrib&SPACKED; }
     int  isVarsize(void) { return attrib&SVARSIZE; }
-    int  isVarrays(void) { return attrib&SVARRAYS; }
+    int  isVarrays(void) { return (isVarsize() && (mvlist!=0)); }
     virtual char *proxyPrefix(void) {return msg_prefix();}
     TypeList *getContents(void) const { return contents; }
     void genAllocDecl(XStr& str);

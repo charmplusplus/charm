@@ -9,7 +9,6 @@
 #define YY_FLEX_MINOR_VERSION 5
 
 #include <stdio.h>
-#include <unistd.h>
 
 
 /* cfront 1.2 defines "c_plusplus" instead of "__cplusplus" */
@@ -23,6 +22,7 @@
 #ifdef __cplusplus
 
 #include <stdlib.h>
+#include <unistd.h>
 
 /* Use prototypes in function declarations. */
 #define YY_USE_PROTOS
@@ -560,7 +560,7 @@ YY_MALLOC_DECL
 YY_DECL
 	{
 	register yy_state_type yy_current_state;
-	register char *yy_cp = NULL, *yy_bp = NULL;
+	register char *yy_cp, *yy_bp;
 	register int yy_act;
 
 #line 48 "xi-scan.l"
@@ -1269,6 +1269,11 @@ YY_BUFFER_STATE b;
 	}
 
 
+#ifndef YY_ALWAYS_INTERACTIVE
+#ifndef YY_NEVER_INTERACTIVE
+extern int isatty YY_PROTO(( int ));
+#endif
+#endif
 
 #ifdef YY_USE_PROTOS
 void yy_init_buffer( YY_BUFFER_STATE b, FILE *file )
@@ -1616,7 +1621,6 @@ struct rwtable rwtable[] = {
   "mainchare",	MAINCHARE,
   "packed",     PACKED,
   "varsize",    VARSIZE,
-  "varrays",    VARRAYS,
   "entry",      ENTRY,
   "int",        INT,
   "short",      SHORT,
