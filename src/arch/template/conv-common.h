@@ -18,7 +18,7 @@
 
 #define CMK_MSG_HEADER_BASIC  CMK_MSG_HEADER_EXT
 #define CMK_MSG_HEADER_EXT            { CMK_MSG_HEADER_UNIQUE }
-#define CMK_MSG_HEADER_BLUEGENE {CMK_MSG_HEADER_UNIQUE int nd, n; double rt; CmiInt2 tID; CmiUInt2 hID; char t; int msgID; int srcPe;}
+#define CMK_MSG_HEADER_BLUEGENE {CMK_MSG_HEADER_UNIQUE CMK_BLUEGENE_FIELDS}
 
 /* defines different parameters of groups of processors. (next 4 definitions)
    used in converse.h (the first) and convcore.c (the others). a value of 1
