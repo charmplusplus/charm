@@ -27,6 +27,15 @@
 	  RegisterEvent(_CONVERSE_LANG_ID, _E_HANDLER_END  ); \
 	  \
 	}
+
+#ifdef CMK_OPTIMIZE
+#define _LOG_E_MSG_SENT(destPE, size)
+#define _LOG_E_MSG_QUEUED()
+#define _LOG_E_MSG_RECV_MC()
+#define _LOG_E_MSG_RECV_SC()
+#define _LOG_E_HANDLER_BEGIN(handlerIdx)
+#define _LOG_E_HANDLER_END(handlerIdx)
+#else
 #define _LOG_E_MSG_SENT(destPE, size) \
 	{ converse_msgSent(destPE, size); }
 #define _LOG_E_MSG_QUEUED() \
@@ -39,5 +48,6 @@
 	{ converse_handlerBegin(handlerIdx); }
 #define _LOG_E_HANDLER_END(handlerIdx) \
 	{ converse_handlerEnd(handlerIdx); }
+#endif
 
 #endif
