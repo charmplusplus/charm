@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.12  1996-07-16 17:23:37  jyelon
+ * Revision 1.13  1996-07-19 17:07:37  jyelon
+ * *** empty log message ***
+ *
+ * Revision 1.12  1996/07/16 17:23:37  jyelon
  * Renamed a flag.
  *
  * Revision 1.11  1996/07/16 05:20:41  milind
@@ -87,7 +90,7 @@
 #define CMK_SIGNAL_USE_SIGACTION                           1
 #define CMK_SIGNAL_USE_SIGACTION_WITH_RESTART              0
 
-#define CMK_SIZE_T                                         unsigned
+#define CMK_SIZE_T                                         unsigned int
 
 #define CMK_STATIC_PROTO_FAILS                             0
 #define CMK_STATIC_PROTO_WORKS                             1

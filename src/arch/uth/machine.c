@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.15  1996-07-15 20:59:22  jyelon
+ * Revision 1.16  1996-07-19 17:07:37  jyelon
+ * *** empty log message ***
+ *
+ * Revision 1.15  1996/07/15 20:59:22  jyelon
  * Moved much timer, signal, etc code into common.
  *
  * Revision 1.14  1996/07/02 21:25:22  jyelon
@@ -374,24 +377,23 @@ int maxmsgs;
 void CmiDeliverSpecificMsg(handler)
 int handler;
 {
-  void *tmpqueue = FIFO_Create(); int *msg;
+  void *tmpqueue = FIFO_Create(); int *msg, *msg1;
   
   while (1) {
     FIFO_DeQueue(CpvAccess(CmiLocalQueue), &msg);
     if (msg == 0) { CmiYield(); continue; }
-    if (CmiGetHandler(msg)==handler) {
-      CpvAccess(CmiBufferGrabbed)=0;
-      (CmiGetHandlerFunction(msg))(msg);
-      if (!CpvAccess(CmiBufferGrabbed)) CmiFree(msg);
-      break;
-    } else FIFO_EnQueue(tmpqueue, msg);
+    if (CmiGetHandler(msg)==handler) break;
+    FIFO_EnQueue(tmpqueue, msg);
   }
   while (1) {
-    FIFO_DeQueue(tmpqueue, &msg);
-    if (msg==0) break;
-    FIFO_EnQueue(CpvAccess(CmiLocalQueue), msg);
+    FIFO_DeQueue(tmpqueue, &msg1);
+    if (msg1==0) break;
+    FIFO_EnQueue(CpvAccess(CmiLocalQueue), msg1);
   }
   FIFO_Destroy(tmpqueue);
+  CpvAccess(CmiBufferGrabbed)=0;
+  (CmiGetHandlerFunction(msg))(msg);
+  if (!CpvAccess(CmiBufferGrabbed)) CmiFree(msg);
 }
 
 /********************* MESSAGE SEND FUNCTIONS ******************/

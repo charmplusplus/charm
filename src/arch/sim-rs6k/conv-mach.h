@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.8  1996-07-16 17:23:37  jyelon
+ * Revision 1.9  1996-07-19 17:07:37  jyelon
+ * *** empty log message ***
+ *
+ * Revision 1.8  1996/07/16 17:23:37  jyelon
  * Renamed a flag.
  *
  * Revision 1.7  1996/07/16 05:20:41  milind
@@ -87,7 +90,7 @@
 #define CMK_SIGNAL_USE_SIGACTION                           0
 #define CMK_SIGNAL_USE_SIGACTION_WITH_RESTART              0
 
-#define CMK_SIZE_T                                         long
+#define CMK_SIZE_T                                         long unsigned int
 
 #define CMK_STATIC_PROTO_FAILS                             0
 #define CMK_STATIC_PROTO_WORKS                             1
@@ -109,8 +112,8 @@
 #define CMK_TIMER_USE_SPECIAL                              0
 #define CMK_TIMER_USE_TIMES                                1
 
-#define CMK_VECTOR_SEND_USES_COMMON_CODE                        1
-#define CMK_VECTOR_SEND_USES_SPECIAL_CODE                        0
+#define CMK_VECTOR_SEND_USES_COMMON_CODE                   1
+#define CMK_VECTOR_SEND_USES_SPECIAL_CODE                  0
 
 #define CMK_WAIT_NOT_NEEDED                                0
 #define CMK_WAIT_USES_SYS_WAIT_H                           1

@@ -17,8 +17,8 @@ void           *
 FIFO_Create()
 {
 	FIFO_QUEUE     *queue;
-	queue = (FIFO_QUEUE *)CmiAlloc(sizeof(FIFO_QUEUE));
-	queue->block = (void **) CmiAlloc(BLK_LEN * sizeof(void *));
+	queue = (FIFO_QUEUE *)malloc(sizeof(FIFO_QUEUE));
+	queue->block = (void **) malloc(BLK_LEN * sizeof(void *));
 	queue->block_len = BLK_LEN;
 	queue->first = queue->avail = 0;
 	queue->length = 0;
@@ -52,7 +52,7 @@ void           *element;
 		{
 			void          **blk = queue->block;
 			int             i, j;
-			queue->block = (void **) CmiAlloc(sizeof(void *) * (queue->
+			queue->block = (void **) malloc(sizeof(void *) * (queue->
 							     block_len) *3);
 			for (i = queue->first, j = 0; i < queue->block_len; i++, j++)
 				queue->block[j] = blk[i];
@@ -63,7 +63,7 @@ void           *element;
 			queue->first = 0;
 			queue->avail = j;
 			queue->length++;
-			CmiFree(blk);
+			free(blk);
 		}
 		else
 		{
