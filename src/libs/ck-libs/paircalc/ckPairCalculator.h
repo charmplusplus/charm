@@ -1,7 +1,7 @@
 #ifndef _ckPairCalculator_h_
 #define _ckPairCalculator_h_
 
-#include "util.h"
+#include "pairutil.h"
 #include "cksparsecontiguousreducer.h"
 
 typedef void (*FuncType) (complex a, complex b);

@@ -43,7 +43,13 @@ public:
   complex operator+(complex a) { return complex(re+a.re,im+a.im); }
   complex conj(void) { return complex(re, -im); }
   inline void operator+=(complex a) { re+=a.re; im+=a.im; }
-  inline void operator*=(complex a);
+  inline void operator*=(complex a) {        
+    double treal, tim;
+    treal = re * a.re - im * a.im;
+    tim = re * a.im + im * a.re;
+    re = treal;
+    im = tim;
+  }
   complex operator*(complex a) {
     return complex( re * a.re - im * a.im, re * a.im + im * a.re); }
   void pup(PUP::er &p) {
