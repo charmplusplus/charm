@@ -17,6 +17,10 @@
 #include "converse.h"
 #include CMK_SHMEM_H
 
+#if !CMK_SHMEM_T3E
+#define globalexit exit
+#endif 
+
 /*
  *  We require statically allocated variables for locks.  This defines
  *  the max number of processors available.
@@ -144,10 +148,6 @@ static McDistList head;
 static long *my_lock;
 static long head_lock[MAX_PES];
 static long bcast_lock[MAX_PES];
-/*
-static long head_lock;
-static long bcast_lock;
-*/
 
 #define ALIGN8(x)  (8*(((x)+7)/8))
 
@@ -519,7 +519,7 @@ void clear_lock(long *lock, int pe)
 
 static void McInit(void)
 {
-  shmem_init();
+  CMK_SHMEM_INIT;
 
   CpvInitialize(void *, CmiLocalQueue);
   CpvAccess(CmiLocalQueue) = CdsFifo_Create();
@@ -558,8 +558,10 @@ static void McInitList(void)
   }
   my_lock = &(head_lock[Cmi_mype]);
   shmem_barrier_all();
+/*
   clear_lock(my_lock, Cmi_mype);
   clear_lock(&bcast_lock[Cmi_mype], Cmi_mype);
+*/
 }
 
 static void McEnqueueRemote(void *msg, int msg_sz, int dst_pe)
@@ -676,7 +678,7 @@ static void McRetrieveRemote(void)
       globalexit(1);
     }
 
-    shmem_long_get((long*)cur_msg, (long*)cur_node->nxt_addr,
+    shmem_get64((long*)cur_msg, (long*)cur_node->nxt_addr,
               ALIGN8(cur_node->msg_sz)/8, cur_node->nxt_node);
 
     /*    CmiPrintf("PE %d incoming msg = %d msg_type = %d, size = %d\n",
@@ -698,7 +700,7 @@ static void McRetrieveRemote(void)
 	);
 	*/
       /* Get the message */
-      shmem_long_get((long*)bcast_ptr,(long*)cur_msg->bcast.ptr,
+      shmem_get64((long*)bcast_ptr,(long*)cur_msg->bcast.ptr,
 		ALIGN8(cur_msg->bcast_msg_size)/8,cur_node->nxt_node);
       /* Decrement the count, and write it back to the original node. */
       /*
