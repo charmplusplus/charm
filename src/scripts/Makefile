@@ -59,7 +59,12 @@ SEQCHARMC=../bin/charmc -seq $(CHARMOPTS)
 #
 ###############################################################################
 
-ALLHEADERS=charm++.h ckstream.h charm.h cpthreads.h converse.h conv-trace.h conv-mach.h simplemsg.h sm.h trace.h pvmc.h pvm3.h sdag.h CDep.h CCounter.h CMsgBuffer.h CWhenTrigger.h TList.h idl.h ckarray.h tempo.h waitqd.h LBDatabase.h lbdb.h LBDB.h LBComm.h LBOM.h LBObj.h CentralLB.h RandCentLB.h RefineLB.h Set.h elements.h heap.h conv-ccs.h
+ALLHEADERS=charm++.h ckstream.h charm.h cpthreads.h converse.h \
+	conv-trace.h conv-mach.h simplemsg.h sm.h trace.h pvmc.h \
+	pvm3.h sdag.h CDep.h CCounter.h CMsgBuffer.h CWhenTrigger.h \
+	TList.h idl.h ckarray.h tempo.h waitqd.h LBDatabase.h \
+	lbdb.h LBDB.h LBComm.h LBOM.h LBObj.h CentralLB.h RandCentLB.h \
+	RefineLB.h HeapCentLB.h Set.h elements.h heap.h conv-ccs.h
 
 ALLINTERFACES=idl.ci
 
@@ -130,6 +135,7 @@ CVHEADERS=converse.h conv-mach.h conv-mach.csh \
           ../include/CentralLB.decl.h CentralLB.def.h \
           ../include/RandCentLB.decl.h RandCentLB.def.h \
           ../include/RefineLB.decl.h RefineLB.def.h \
+          ../include/HeapCentLB.decl.h HeapCentLB.def.h \
           ../include/tempo.decl.h tempo.def.h \
           ../include/waitqd.decl.h waitqd.def.h
 
@@ -238,7 +244,7 @@ libldb-test.o: cldb.test.c $(CVHEADERS)
 CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h trace.h \
           ckfutures.h ckarray.h tempo.h waitqd.h \
 	  LBDatabase.h lbdb.h LBDB.h LBComm.h LBOM.h LBObj.h \
-	  CentralLB.h RandCentLB.h RefineLB.h 	\
+	  CentralLB.h RandCentLB.h RefineLB.h HeapCentLB.h	\
 	  $(CVHEADERS)
 
 CK_LIBS_CORE=libck.a
@@ -246,7 +252,7 @@ CK_LIBS_CORE=libck.a
 LIBCK_CORE=init.o register.o qd.o ck.o main.o msgalloc.o ckfutures.o \
            ckarray.o tempo.o waitqd.o \
 	   LBDatabase.o lbdb.o LBDB.o LBComm.o LBObj.o CentralLB.o \
-	   RandCentLB.o RefineLB.o Set.o heap.o
+	   RandCentLB.o RefineLB.o Set.o HeapCentLB.o heap.o
 
 charmlibs: converse $(CK_LIBS_CORE)
 	cd libs; make charmlibs OPTS='$(OPTS)'
@@ -276,6 +282,9 @@ libtrace-projections.a: $(LIBTRACE_PROJ)
 
 ../include/RefineLB.decl.h : RefineLB.decl.h
 	/bin/cp RefineLB.decl.h ../include
+
+../include/HeapCentLB.decl.h : HeapCentLB.decl.h
+	/bin/cp HeapCentLB.decl.h ../include
 
 ../include/CkFutures.decl.h : CkFutures.decl.h
 	/bin/cp CkFutures.decl.h ../include
@@ -309,6 +318,9 @@ RandCentLB.decl.h RandCent.def.h : RandCentLB.ci charmxi
 
 RefineLB.decl.h RefineLB.def.h : RefineLB.ci charmxi
 	$(CHARMC) RefineLB.ci
+
+HeapCentLB.decl.h HeapCentLB.def.h : HeapCentLB.ci charmxi
+	$(CHARMC) HeapCentLB.ci
 
 init.o: init.C $(CKHEADERS)
 	$(CHARMC) -o init.o init.C
@@ -354,6 +366,9 @@ RandCentLB.o: RandCentLB.C $(CKHEADERS)
 
 RefineLB.o: RefineLB.C $(CKHEADERS)
 	$(CHARMC) -o RefineLB.o RefineLB.C
+
+HeapCentLB.o: HeapCentLB.C $(CKHEADERS)
+	$(CHARMC) -o HeapCentLB.o HeapCentLB.C
 
 Set.o: Set.C $(CKHEADERS) Set.h elements.h 
 	$(CHARMC) -o Set.o Set.C
