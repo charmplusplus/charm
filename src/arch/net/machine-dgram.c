@@ -469,7 +469,7 @@ void DiscardImplicitDgram(ImplicitDgram dg)
 }
 
 static double Cmi_ack_last, Cmi_check_last;
-void CommunicationsClock(void)
+static void CommunicationsClock(void)
 {
   MACHSTATE(3,"CommunicationsClock");
   Cmi_clock = GetClock();
@@ -484,14 +484,24 @@ void CommunicationsClock(void)
     Cmi_check_last = Cmi_clock; 
     ctrl_sendone_locking("ping",NULL,0,NULL,0); /*Charmrun may have died*/
   }
-  CcdCallFnAfter(CommunicationsClock,NULL,100);
 }
+
+static void CommunicationsClockCaller(void *ignored)
+{
+  CommunicationsClock();
+  CcdCallFnAfter(CommunicationsClockCaller,NULL,100);  
+}
+
 #if CMK_SHARED_VARS_UNAVAILABLE
-void CommunicationPeriodic(void *ignored) 
+static void CommunicationPeriodic(void) 
 { /*Poll on the communications server*/
   CommunicationServer(0);
-  if (!Cmi_netpoll)
-    CcdCallFnAfter(CommunicationPeriodic,NULL,100);
+}
+
+static void CommunicationPeriodicCaller(void *ignored)
+{
+  CommunicationPeriodic();
+  CcdCallFnAfter(CommunicationPeriodicCaller,NULL,100);
 }
 #endif
 

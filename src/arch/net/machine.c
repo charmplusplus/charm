@@ -2010,7 +2010,7 @@ static void ConverseRunPE(int everReturn)
   if (Cmi_netpoll) /*Repeatedly call CommServer*/
     CcdPeriodicCallKeep(CommunicationPeriodic,NULL);
   else /*Only need this for retransmits*/
-    CcdCallFnAfter(CommunicationPeriodic,NULL,100);
+    CcdCallFnAfter(CommunicationPeriodicCaller,NULL,100);
 #endif
 
   if (CmiMyRank()==0 && Cmi_charmrun_fd!=-1) {
@@ -2026,7 +2026,7 @@ static void ConverseRunPE(int everReturn)
 #endif
     
     /*Occasionally check for retransmissions, outgoing acks, etc.*/
-    CcdCallFnAfter(CommunicationsClock,NULL,100);
+    CcdCallFnAfter(CommunicationsClockCaller,NULL,100);
   }
 
   if (!everReturn) {
