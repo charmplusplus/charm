@@ -1857,9 +1857,8 @@ prog rsh_start(nodeno)
   rshargv[1]=nodetab_name(nodeno);
   rshargv[2]="-l";
   rshargv[3]=nodetab_login(nodeno);
-#if CMK_CONV_HOST_CSH_UNAVAILABLE
   rshargv[4]="exec /bin/sh -f";
-#else
+#if CMK_CONV_HOST_WANT_CSH
   rshargv[4]="exec /bin/csh -f";
 #endif
   rshargv[5]=0;
@@ -1909,12 +1908,12 @@ void rsh_pump_sh(p, nodeno, rank0no, argv)
     xstr_printf(ibuf,"done\n");
     xstr_printf(ibuf,"if test -z \"$F_XTERM\";  then\n");
     xstr_printf(ibuf,"   echo '%s not in path --- set your path in your ~/.conv-hostrc or profile.'\n", nodetab_xterm(nodeno));
-    xstr_printf(ibuf,"   test -f /bin/sync && sync\n");
+    xstr_printf(ibuf,"   test -f /bin/sync && /bin/sync\n");
     xstr_printf(ibuf,"   exit 1\n");
     xstr_printf(ibuf,"fi\n");
     xstr_printf(ibuf,"if test -z \"$F_XRDB\"; then\n");
     xstr_printf(ibuf,"   echo 'xrdb not in path - set your path in your ~/.conv-hostrc or profile.'\n");
-    xstr_printf(ibuf,"   test -f /bin/sync && sync\n");
+    xstr_printf(ibuf,"   test -f /bin/sync && /bin/sync\n");
     xstr_printf(ibuf,"   exit 1\n");
     xstr_printf(ibuf,"fi\n");
     if(arg_verbose) xstr_printf(ibuf,"echo 'using xterm' $F_XTERM\n");
@@ -1928,7 +1927,7 @@ void rsh_pump_sh(p, nodeno, rank0no, argv)
           xstr_printf(ibuf,"done\n");
           xstr_printf(ibuf,"if -z \"$F_DBG\"; then\n");
           xstr_printf(ibuf,"   echo '%s not in path - set your path in your cshrc.'\n",dbg);
-          xstr_printf(ibuf,"   test -f /bin/sync && sync\n");
+          xstr_printf(ibuf,"   test -f /bin/sync && /bin/sync\n");
           xstr_printf(ibuf,"   exit 1\n");
           xstr_printf(ibuf,"fi\n");
           prog_flush(p);
@@ -1940,6 +1939,7 @@ void rsh_pump_sh(p, nodeno, rank0no, argv)
     xstr_printf(ibuf,"  echo 'Cannot contact X Server '$DISPLAY'.  You probably'\n");
     xstr_printf(ibuf,"  echo 'need to run xhost to authorize connections.'\n");
     xstr_printf(ibuf,"  echo '(See manual for xhost for security issues)'\n");
+    xstr_printf(ibuf,"  test -f /bin/sync && /bin/sync\n");
     xstr_printf(ibuf,"  exit 1\n");
     xstr_printf(ibuf,"fi\n");
     prog_flush(p);
@@ -1948,6 +1948,7 @@ void rsh_pump_sh(p, nodeno, rank0no, argv)
   xstr_printf(ibuf,"if test ! -x %s; then\n",arg_nodeprog_r);
   xstr_printf(ibuf,"  echo 'Cannot locate this node-program:'\n");
   xstr_printf(ibuf,"  echo '%s'\n",arg_nodeprog_r);
+  xstr_printf(ibuf,"  test -f /bin/sync && /bin/sync\n");
   xstr_printf(ibuf,"  exit 1\n");
   xstr_printf(ibuf,"fi\n");
   
@@ -1955,6 +1956,7 @@ void rsh_pump_sh(p, nodeno, rank0no, argv)
   xstr_printf(ibuf,"if test $? = 1; then\n");
   xstr_printf(ibuf,"  echo 'Cannot propagate this current directory:'\n"); 
   xstr_printf(ibuf,"  echo '%s'\n",arg_currdir_r);
+  xstr_printf(ibuf,"  test -f /bin/sync && /bin/sync\n");
   xstr_printf(ibuf,"  exit 1\n");
   xstr_printf(ibuf,"fi\n");
   
@@ -1965,6 +1967,7 @@ void rsh_pump_sh(p, nodeno, rank0no, argv)
     xstr_printf(ibuf,"  echo 'this initialization command failed:'\n");
     xstr_printf(ibuf,"  echo '\"%s\"'\n",nodetab_setup(nodeno));
     xstr_printf(ibuf,"  echo 'edit your nodes file to fix it.'\n");
+    xstr_printf(ibuf,"  test -f /bin/sync && /bin/sync\n");
     xstr_printf(ibuf,"  exit 1\n");
     xstr_printf(ibuf,"fi\n");
   }
@@ -1973,7 +1976,7 @@ void rsh_pump_sh(p, nodeno, rank0no, argv)
   if (arg_debug || arg_debug_no_pause ) {
 	 if ( strcmp(dbg, "gdb") == 0 ) {
            xstr_printf(ibuf,"cat > /tmp/gdb%08x << END_OF_SCRIPT\n",randno);
-           xstr_printf(ibuf,"shell rm -f /tmp/gdb%08x\n",randno);
+           xstr_printf(ibuf,"shell /bin/rm -f /tmp/gdb%08x\n",randno);
            xstr_printf(ibuf,"handle SIGPIPE nostop noprint\n");
            xstr_printf(ibuf,"handle SIGWINCH nostop noprint\n");
            xstr_printf(ibuf,"handle SIGWAITING nostop noprint\n");
@@ -1991,7 +1994,7 @@ void rsh_pump_sh(p, nodeno, rank0no, argv)
            }
         } else if ( strcmp(dbg, "dbx") == 0 ) {
           xstr_printf(ibuf,"cat > /tmp/dbx%08x << END_OF_SCRIPT\n",randno);
-          xstr_printf(ibuf,"sh rm -f /tmp/dbx%08x\n",randno);
+          xstr_printf(ibuf,"sh /bin/rm -f /tmp/dbx%08x\n",randno);
           xstr_printf(ibuf,"dbxenv suppress_startup_message 5.0\n");
           xstr_printf(ibuf,"ignore SIGPOLL\n");
           xstr_printf(ibuf,"ignore SIGPIPE\n");
@@ -2026,7 +2029,7 @@ void rsh_pump_sh(p, nodeno, rank0no, argv)
     }
     xstr_printf(ibuf,"cat > /tmp/inx%08x << END_OF_SCRIPT\n", randno);
     xstr_printf(ibuf,"#!/bin/sh\n");
-    xstr_printf(ibuf,"rm -f /tmp/inx%08x\n",randno);
+    xstr_printf(ibuf,"/bin/rm -f /tmp/inx%08x\n",randno);
     xstr_printf(ibuf,"%s", arg_nodeprog_r);
     while (*argv) { xstr_printf(ibuf," %s",*argv); argv++; }
     xstr_printf(ibuf,"\n");
@@ -2047,12 +2050,14 @@ void rsh_pump_sh(p, nodeno, rank0no, argv)
     xstr_printf(ibuf,"\n");
   }
   
-    xstr_printf(ibuf,"echo 'rsh phase successful.'\n");
-    xstr_printf(ibuf,"exit 0\n");
+  xstr_printf(ibuf,"echo 'rsh phase successful.'\n");
+  xstr_printf(ibuf,"test -f /bin/sync && /bin/sync\n");
+  xstr_printf(ibuf,"exit 0\n");
   prog_flush(p);
   
 }
 
+#if CMK_CONV_HOST_WANT_CSH
 void rsh_pump_csh(p, nodeno, rank0no, argv)
     prog p; int nodeno, rank0no; char **argv;
 {
@@ -2224,15 +2229,16 @@ void rsh_pump_csh(p, nodeno, rank0no, argv)
   prog_flush(p);
   
 }
+#endif
 
 
 void rsh_pump(p, nodeno, rank0no, argv)
     prog p; int nodeno, rank0no; char **argv;
 {
-#if CMK_CONV_HOST_CSH_UNAVAILABLE
-  rsh_pump_sh(p, nodeno, rank0no, argv);
-#else
+#if CMK_CONV_HOST_WANT_CSH
   rsh_pump_csh(p, nodeno, rank0no, argv);
+#else
+  rsh_pump_sh(p, nodeno, rank0no, argv);
 #endif
 }
 
