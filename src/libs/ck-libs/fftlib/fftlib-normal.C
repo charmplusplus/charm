@@ -175,8 +175,10 @@ NormalSlabArray::acceptDataForIFFT(int numPoints, complex *points, int posn, int
 	       points, 
 	       sizeof(complex) * lineSize * fftinfo.destPlanesPerSlab);
 	points += lineSize * fftinfo.destPlanesPerSlab;
+#ifdef IFFT_DUMP
 	for(int apoint=0;apoint<lineSize*fftinfo.destPlanesPerSlab;apoint++)
 	  fprintf(ifd,"p %d r %.10g i %.10g\n", p,((complex *) dataPtr +p *planeSize +posn*lineSize*fftinfo.destPlanesPerSlab+apoint)->re,((complex *) dataPtr +p *planeSize +posn*lineSize*fftinfo.destPlanesPerSlab+apoint)->im);
+#endif
     }
 #ifdef IFFT_DUMP
     fclose(ifd);
