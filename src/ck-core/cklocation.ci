@@ -6,7 +6,7 @@ module CkLocation {
   };
 
   group [migratable] CkLocMgr {
-	entry CkLocMgr(CkGroupID map,CkGroupID lbdb,int numInitial);
+	entry CkLocMgr(CkGroupID map,CkGroupID _lbdb,int numInitial);
 	entry void deliverInline(CkMessage *m);
 //	entry [immediate] void deliverImmediate(CkMessage *m);
 	entry void deliverImmediate(CkMessage *m);

@@ -40,12 +40,12 @@ int CmiMyPe(void) {return 0;}
 #ifndef CmiMyRank
 int CmiMyRank(void) {return 0;}
 #endif
-int Cmi_mype=0;
-int Cmi_numpes=1;
-int Cmi_myrank=0;
-int Cmi_mynodesize=1;
-int Cmi_mynode=0;
-int Cmi_numnodes=1;
+int _Cmi_mype=0;
+int _Cmi_numpes=1;
+int _Cmi_myrank=0;
+int _Cmi_mynodesize=1;
+int _Cmi_mynode=0;
+int _Cmi_numnodes=1;
  */
 
 /* Mini-micro TCHARM */

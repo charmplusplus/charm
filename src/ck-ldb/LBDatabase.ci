@@ -1,7 +1,7 @@
 module LBDatabase {
   extern module NullLB;
 
-  readonly CkGroupID lbdb;
+  readonly CkGroupID _lbdb;
 
   mainchare LBDBInit {
     entry LBDBInit(CkArgMsg *m);

@@ -301,10 +301,10 @@ CkArrayID CProxy_ArrayBase::ckCreateArray(CkArrayMessage *m,int ctor,
   if (opts.getLocationManager().isZero())
   { //Create a new location manager
 #if !CMK_LBDB_ON
-    CkGroupID lbdb;
+    CkGroupID _lbdb;
 #endif
     opts.setLocationManager(CProxy_CkLocMgr::ckNew(
-      opts.getMap(),lbdb,opts.getNumInitial()
+      opts.getMap(),_lbdb,opts.getNumInitial()
       ));
   }
   //Create the array manager

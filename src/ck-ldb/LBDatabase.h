@@ -28,7 +28,7 @@ PUPbytes(CkLBOptions);
                                                                                 
 #include "LBDatabase.decl.h"
 
-extern CkGroupID lbdb;
+extern CkGroupID _lbdb;
 
 class LBDB;
 
@@ -36,9 +36,9 @@ CkpvExtern(int, numLoadBalancers);
 CkpvExtern(int, hasNullLB);
 CkpvExtern(int, lbdatabaseInited);
 
-extern double autoLbPeriod;
-extern int lb_debug;
-extern int lb_ignoreBgLoad;
+extern double _autoLbPeriod;
+extern int _lb_debug;
+extern int _lb_ignoreBgLoad;
 
 typedef void (*LBCreateFn)();
 void LBDefaultCreate(LBCreateFn f);
@@ -63,7 +63,7 @@ public:
 private:
   void init();
 public:
-  inline static LBDatabase * Object() { return CkpvAccess(lbdatabaseInited)?(LBDatabase *)CkLocalBranch(lbdb):NULL; }
+  inline static LBDatabase * Object() { return CkpvAccess(lbdatabaseInited)?(LBDatabase *)CkLocalBranch(_lbdb):NULL; }
 #if CMK_LBDB_ON
   inline LBDB *getLBDB() {return (LBDB*)(myLDHandle.handle);}
 #endif

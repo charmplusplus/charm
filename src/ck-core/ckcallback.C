@@ -13,13 +13,13 @@ Initial version by Orion Sky Lawlor, olawlor@acm.org, 2/8/2002
 #include "ckcallback-ccs.h"
 #include "CkCallback.decl.h"
 
-/*readonly*/ CProxy_ckcallback_group ckcallbackgroup;
+/*readonly*/ CProxy_ckcallback_group _ckcallbackgroup;
 
 //This main chare is only used to create the callback forwarding group
 class ckcallback_main : public CBase_ckcallback_main {
 public:
 	ckcallback_main(CkArgMsg *m) {
-		ckcallbackgroup=CProxy_ckcallback_group::ckNew();
+		_ckcallbackgroup=CProxy_ckcallback_group::ckNew();
 		delete m;
 	}
 };
@@ -112,7 +112,7 @@ void CkCallback::send(void *msg) const
 				CthAwaken(dest->d.thread.th);
 		} 
 		else //Forward message to processor where the thread actually lives
-			ckcallbackgroup[d.thread.onPE].call(*this,(CkMessage *)msg);
+			_ckcallbackgroup[d.thread.onPE].call(*this,(CkMessage *)msg);
 		break;
 	case call1Fn: //Call a C function pointer on the current processor
 		(d.c1fn.fn)(msg);
@@ -121,7 +121,7 @@ void CkCallback::send(void *msg) const
 		if (d.cfn.onPE==CkMyPe())
 			(d.cfn.fn)(d.cfn.param,msg);
 		else
-			ckcallbackgroup[d.cfn.onPE].call(*this,(CkMessage *)msg);
+			_ckcallbackgroup[d.cfn.onPE].call(*this,(CkMessage *)msg);
 		break;
 	case sendChare: //Send message to a chare
 		if (!msg) msg=CkAllocSysMsg();
@@ -187,7 +187,7 @@ void ckcallback_group::registerCcsCallback(const char *name,const CkCallback &cb
 
 // Broadcast this callback registration to all processors
 void CcsRegisterHandler(const char *ccs_handlername,const CkCallback &cb) {
-	ckcallbackgroup.registerCcsCallback(ccs_handlername,cb);
+	_ckcallbackgroup.registerCcsCallback(ccs_handlername,cb);
 }
 
 

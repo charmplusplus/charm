@@ -22,7 +22,7 @@ BaseLB::BaseLB(const CkLBOptions &opt) {
   if (CkpvAccess(numLoadBalancers) - CkpvAccess(hasNullLB) > 1)
     CmiAbort("Error: try to create more than one load balancer strategies!");
 */
-  theLbdb = CProxy_LBDatabase(lbdb).ckLocalBranch();
+  theLbdb = CProxy_LBDatabase(_lbdb).ckLocalBranch();
   lbname = "Unknown";
   // register this load balancer to LBDatabase at the sequence number
   theLbdb->addLoadbalancer(this, seqno);

@@ -28,8 +28,8 @@ quiescence detection!
 #endif
 
 CpvDeclare(CQdState, cQdState);
-unsigned int CQdHandlerIdx;
-unsigned int CQdAnnounceHandlerIdx;
+unsigned int _CQdHandlerIdx;
+unsigned int _CQdAnnounceHandlerIdx;
 
 
 int  CQdMsgGetPhase(CQdMsg msg) 
@@ -72,7 +72,7 @@ void CQdProcess(CQdState state, int n)
 void CQdPropagate(CQdState state, CQdMsg msg) 
 {   
   int i;
-  CmiSetHandler(msg, CQdHandlerIdx);
+  CmiSetHandler(msg, _CQdHandlerIdx);
   for(i=0; i<state->nChildren; i++) {
     CQdCreate(state, -1);
     CmiSyncSend(state->children[i], sizeof(struct ConvQdMsg), (char *)msg);
@@ -235,7 +235,7 @@ static void CQdHandlePhase2(CQdState state, CQdMsg msg)
       if(CQdIsDirty(state)) 
 	CQdBcastQD1(state, msg);
       else {
-	CmiSetHandler(msg, CQdAnnounceHandlerIdx);
+	CmiSetHandler(msg, _CQdAnnounceHandlerIdx);
 	CQdCreate(state, 0-CmiNumPes());
 	CmiSyncBroadcastAllAndFree(sizeof(struct ConvQdMsg), (char *) msg);
 	CQdReset(state); 
@@ -296,8 +296,8 @@ void CQdCpvInit(void) {
 void CQdInit(void)
 {
   CQdCpvInit();
-  CQdHandlerIdx = CmiRegisterHandler((CmiHandler)CQdHandler);
-  CQdAnnounceHandlerIdx = 
+  _CQdHandlerIdx = CmiRegisterHandler((CmiHandler)CQdHandler);
+  _CQdAnnounceHandlerIdx = 
     CmiRegisterHandler((CmiHandler)CQdAnnounceHandler);
 }
 
@@ -306,7 +306,7 @@ void CmiStartQD(CQdVoidFn fn, void *arg)
   register CQdMsg msg = (CQdMsg) CmiAlloc(sizeof(struct ConvQdMsg)); 
   CQdRegisterCallback(fn, arg);
   CQdMsgSetPhase(msg, 0);  
-  CmiSetHandler(msg, CQdHandlerIdx);
+  CmiSetHandler(msg, _CQdHandlerIdx);
   CQdCreate(CpvAccess(cQdState), -1);
   CmiSyncSendAndFree(0, sizeof(struct ConvQdMsg), (char *)msg);
 }

@@ -60,16 +60,16 @@ extern "C" {
 
 #if CMK_SHARED_VARS_UNAVAILABLE /* Non-SMP version of shared vars. */
 
-extern int Cmi_mype;
-extern int Cmi_numpes;
-extern int Cmi_myrank; /* Normally zero; only 1 during SIGIO handling */
+extern int _Cmi_mype;
+extern int _Cmi_numpes;
+extern int _Cmi_myrank; /* Normally zero; only 1 during SIGIO handling */
 
-#define CmiMyPe()           Cmi_mype
+#define CmiMyPe()           _Cmi_mype
 #define CmiMyRank()         0
-#define CmiNumPes()         Cmi_numpes
+#define CmiNumPes()         _Cmi_numpes
 #define CmiMyNodeSize()     1
-#define CmiMyNode()         Cmi_mype
-#define CmiNumNodes()       Cmi_numpes
+#define CmiMyNode()         _Cmi_mype
+#define CmiNumNodes()       _Cmi_numpes
 #define CmiNodeFirst(node)  (node)
 #define CmiNodeSize(node)   1
 #define CmiNodeOf(pe)       (pe)
@@ -81,7 +81,7 @@ extern int Cmi_myrank; /* Normally zero; only 1 during SIGIO handling */
 #define CpvStaticDeclare(t,v) static t CMK_TAG(Cpv_,v)[2]
 #define CpvInitialize(t,v) do {} while(0)
 #define CpvInitialized(v) 1
-#define CpvAccess(v) CMK_TAG(Cpv_,v)[Cmi_myrank]
+#define CpvAccess(v) CMK_TAG(Cpv_,v)[_Cmi_myrank]
 #define CpvAccessOther(v, r) CMK_TAG(Cpv_,v)[r]
 
 extern void CmiMemLock();
@@ -108,17 +108,17 @@ typedef int CmiNodeLock;
 #define sched_yield() sleep(0)
 #endif
 
-extern int Cmi_numpes;
-extern int Cmi_mynodesize;
-extern int Cmi_mynode;
-extern int Cmi_numnodes;
+extern int _Cmi_numpes;
+extern int _Cmi_mynodesize;
+extern int _Cmi_mynode;
+extern int _Cmi_numnodes;
 
 extern int CmiMyPe();
 extern int CmiMyRank();
-#define CmiNumPes()         Cmi_numpes
-#define CmiMyNodeSize()     Cmi_mynodesize
-#define CmiMyNode()         Cmi_mynode
-#define CmiNumNodes()       Cmi_numnodes
+#define CmiNumPes()         _Cmi_numpes
+#define CmiMyNodeSize()     _Cmi_mynodesize
+#define CmiMyNode()         _Cmi_mynode
+#define CmiNumNodes()       _Cmi_numnodes
 extern int CmiNodeFirst(int node);
 extern int CmiNodeSize(int node);
 extern int CmiNodeOf(int pe);
@@ -149,17 +149,17 @@ extern CmiNodeLock CmiMemLock_lock;
 #include <spp_prog_model.h>
 #include <cps.h>
 
-extern int Cmi_numpes;
-extern int Cmi_mynodesize;
+extern int _Cmi_numpes;
+extern int _Cmi_mynodesize;
 
 #define CmiMyPe()           (my_thread())
 #define CmiMyRank()         (my_thread())
-#define CmiNumPes()         Cmi_numpes
-#define CmiMyNodeSize()     Cmi_numpes
+#define CmiNumPes()         _Cmi_numpes
+#define CmiMyNodeSize()     _Cmi_numpes
 #define CmiMyNode()         0
 #define CmiNumNodes()       1
 #define CmiNodeFirst(node)  0
-#define CmiNodeSize(node)   Cmi_numpes
+#define CmiNodeSize(node)   _Cmi_numpes
 #define CmiNodeOf(pe)       0
 #define CmiRankOf(pe)       (pe)
 
@@ -181,17 +181,17 @@ extern CmiNodeLock CmiCreateLock(void);
 
 #if CMK_SHARED_VARS_UNIPROCESSOR /*Used only by uth- and sim- versions*/
 
-extern int Cmi_mype;
-extern int Cmi_numpes;
+extern int _Cmi_mype;
+extern int _Cmi_numpes;
 
-#define CmiMyPe()              Cmi_mype
-#define CmiMyRank()            Cmi_mype
-#define CmiNumPes()            Cmi_numpes
-#define CmiMyNodeSize()        Cmi_numpes
+#define CmiMyPe()              _Cmi_mype
+#define CmiMyRank()            _Cmi_mype
+#define CmiNumPes()            _Cmi_numpes
+#define CmiMyNodeSize()        _Cmi_numpes
 #define CmiMyNode()            0
 #define CmiNumNodes()          1
 #define CmiNodeFirst(node)     0
-#define CmiNodeSize(node)      Cmi_numpes
+#define CmiNodeSize(node)      _Cmi_numpes
 #define CmiNodeOf(pe)          0
 #define CmiRankOf(pe)          (pe)
 
@@ -228,15 +228,15 @@ extern void         CmiDestroyLock(CmiNodeLock lock);
 #include <sched.h>
 
 extern int CmiMyPe();
-extern int Cmi_numpes;
+extern int _Cmi_numpes;
 
-#define CmiNumPes()            Cmi_numpes
+#define CmiNumPes()            _Cmi_numpes
 #define CmiMyRank()            CmiMyPe()
-#define CmiMyNodeSize()        Cmi_numpes
+#define CmiMyNodeSize()        _Cmi_numpes
 #define CmiMyNode()            0
 #define CmiNumNodes()          1
 #define CmiNodeFirst(node)     0
-#define CmiNodeSize(node)      Cmi_numpes
+#define CmiNodeSize(node)      _Cmi_numpes
 #define CmiNodeOf(pe)          0
 #define CmiRankOf(pe)          (pe)
 
@@ -260,17 +260,17 @@ extern void         CmiDestroyLock(CmiNodeLock lock);
 
 #include <windows.h>
 
-extern int Cmi_numpes;
-extern int Cmi_mynodesize;
-extern int Cmi_mynode;
-extern int Cmi_numnodes;
+extern int _Cmi_numpes;
+extern int _Cmi_mynodesize;
+extern int _Cmi_mynode;
+extern int _Cmi_numnodes;
 
 extern int CmiMyPe();
 extern int CmiMyRank();
-#define CmiNumPes()         Cmi_numpes
-#define CmiMyNodeSize()     Cmi_mynodesize
-#define CmiMyNode()         Cmi_mynode
-#define CmiNumNodes()       Cmi_numnodes
+#define CmiNumPes()         _Cmi_numpes
+#define CmiMyNodeSize()     _Cmi_mynodesize
+#define CmiMyNode()         _Cmi_mynode
+#define CmiNumNodes()       _Cmi_numnodes
 extern int CmiNodeFirst(int node);
 extern int CmiNodeSize(int node);
 extern int CmiNodeOf(int pe);
@@ -413,7 +413,7 @@ double   CmiCpuTimer(void);
 
 #if CMK_TIMER_USE_RDTSC
 
-extern double cpu_speed_factor;
+extern double _cpu_speed_factor;
 
 static __inline__ unsigned long long int rdtsc(void)
 {
@@ -426,7 +426,7 @@ static __inline__ unsigned long long int rdtsc(void)
         return x;
 }
 
-#define CmiWallTimer() ((double)rdtsc()*(cpu_speed_factor))
+#define CmiWallTimer() ((double)rdtsc()*(_cpu_speed_factor))
 #define CmiTimer CmiCpuTimer
 
 #else
@@ -992,13 +992,13 @@ void CmiDelayImmediate();
 	CmiSetHandler(msg,CpvAccessOther(CmiImmediateMsgHandlerIdx,0)); \
      } while (0)
 /* 
-  for non smp and non intr based version, it returns immRunning
+  for non smp and non intr based version, it returns _immRunning
   for smp, this doesnot matter - CkMyPe() comparasion normaly fails and
            non threadsafe CqsEnqueueGeneral is avoided.
 */
 #if CMK_NET_VERSION && ! CMK_SMP
-extern int immRunning;
-#  define CmiImmIsRunning()        (immRunning)
+extern int _immRunning;
+#  define CmiImmIsRunning()        (_immRunning)
 #else
 #  define CmiImmIsRunning()        (0)
 #endif

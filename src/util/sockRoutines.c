@@ -176,7 +176,7 @@ int skt_select1(SOCKET fd,int msec)
 
 
 /******* DNS *********/
-skt_ip_t skt_invalid_ip={{0}};
+skt_ip_t _skt_invalid_ip={{0}};
 
 skt_ip_t skt_my_ip(void)
 {
@@ -185,13 +185,13 @@ skt_ip_t skt_my_ip(void)
   if (gethostname(hostname, 999)==0)
       return skt_lookup_ip(hostname);
 
-  return skt_invalid_ip;
+  return _skt_invalid_ip;
 }
 
 static int skt_parse_dotted(const char *str,skt_ip_t *ret)
 {
   int i,v;
-  *ret=skt_invalid_ip;
+  *ret=_skt_invalid_ip;
   for (i=0;i<sizeof(skt_ip_t);i++) {
     if (1!=sscanf(str,"%d",&v)) return 0;
     if (v<0 || v>255) return 0;
@@ -209,13 +209,13 @@ static int skt_parse_dotted(const char *str,skt_ip_t *ret)
 
 skt_ip_t skt_lookup_ip(const char *name)
 {
-  skt_ip_t ret=skt_invalid_ip;
+  skt_ip_t ret=_skt_invalid_ip;
   /*First try to parse the name as dotted decimal*/
   if (skt_parse_dotted(name,&ret))
     return ret;
   else {/*Try a DNS lookup*/
     struct hostent *h = gethostbyname(name);
-    if (h==0) return skt_invalid_ip;
+    if (h==0) return _skt_invalid_ip;
     memcpy(&ret,h->h_addr_list[0],h->h_length);
     return ret;
   }
@@ -242,7 +242,7 @@ skt_ip_t skt_innode_lookup_ip(const char *name)
   struct sockaddr_in addr;
   int len = sizeof(struct sockaddr_in);
   if (-1 == bproc_nodeaddr(atoi(name), &addr, &len)) {
-    return skt_invalid_ip;
+    return _skt_invalid_ip;
   }
   else {
     skt_ip_t ret;
@@ -283,7 +283,7 @@ struct sockaddr_in skt_build_addr(skt_ip_t IP,int port)
 SOCKET skt_datagram(int *port, int bufsize)
 {  
   int connPort=(port==NULL)?0:*port;
-  struct sockaddr_in addr=skt_build_addr(skt_invalid_ip,connPort);
+  struct sockaddr_in addr=skt_build_addr(_skt_invalid_ip,connPort);
   socklen_t          len;
   SOCKET             ret;
   
@@ -323,7 +323,7 @@ SOCKET skt_server_ip(int *port,skt_ip_t *ip)
   socklen_t          len;
   int on = 1; /* for setsockopt */
   int connPort=(port==NULL)?0:*port;
-  struct sockaddr_in addr=skt_build_addr((ip==NULL)?skt_invalid_ip:*ip,connPort);
+  struct sockaddr_in addr=skt_build_addr((ip==NULL)?_skt_invalid_ip:*ip,connPort);
   
 retry:
   ret = socket(PF_INET, SOCK_STREAM, 0);

@@ -453,17 +453,17 @@ void _CkExit(void)
 #endif
 }
 
-CkQ<CkExitFn> CkExitFnVec;
+CkQ<CkExitFn> _CkExitFnVec;
 
 // wrapper of CkExit
-// traverse CkExitFnVec to call registered user exit functions
+// traverse _CkExitFnVec to call registered user exit functions
 // CkExitFn will call CkExit() when finished to make sure other
 // registered functions get called.
 extern "C"
 void CkExit(void)
 {
-  if (!CkExitFnVec.isEmpty()) {
-    CkExitFn fn = CkExitFnVec.deq();
+  if (!_CkExitFnVec.isEmpty()) {
+    CkExitFn fn = _CkExitFnVec.deq();
     fn();
   }
   else
@@ -755,7 +755,7 @@ extern "C" void fmain_(int *argc,char _argv[][80],int length[])
 // see trace-summary for an example.
 void registerExitFn(CkExitFn fn)
 {
-  CkExitFnVec.enq(fn);
+  _CkExitFnVec.enq(fn);
 }
 
 /*@}*/

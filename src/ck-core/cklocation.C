@@ -616,7 +616,7 @@ int CkLocRec::lookupProcessor(void) {return -1;}
 
 
 /*----------------- Local:
-Matches up the array index with the local index, and
+Matches up the array index with the local index, an
 interfaces with the load balancer on behalf of the
 represented array elements.
 */
@@ -1044,7 +1044,7 @@ CkPrintf("CkLocMgr::pup after puping lbdbID=%d\n",lbdbID.idx);
 		map=(CkArrayMap *)CkLocalBranch(mapID);
 		if (map==NULL) CkAbort("ERROR!  Local branch of array map is NULL!");
 		mapHandle=map->registerArray(0,thisgroup);
-		// lbdb is the fixed global groupID
+		// _lbdb is the fixed global groupID
 		initLB(lbdbID);
 		doneInserting();
 	}

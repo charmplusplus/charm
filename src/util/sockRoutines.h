@@ -54,7 +54,7 @@
  * SOCKET skt_server_ip(unsigned int *port,skt_ip_t *ip)
  *
  *   - create a TCP server socket on the given port and IP
- *     Use 0 for any port and skt_invalid_ip for any IP.  
+ *     Use 0 for any port and _skt_invalid_ip for any IP.  
  *     Performs the whole socket/bind/listen procedure.  
  *     Returns the actual port and IP address of the socket 
  *     and the file descriptor.
@@ -156,7 +156,7 @@ skt_abortFn skt_set_abort(skt_abortFn f);
 typedef struct { /*IPv4 IP address*/
 	unsigned char data[4];
 } skt_ip_t;
-extern skt_ip_t skt_invalid_ip;
+extern skt_ip_t _skt_invalid_ip;
 skt_ip_t skt_my_ip(void);
 skt_ip_t skt_lookup_ip(const char *name);
 skt_ip_t skt_innode_my_ip(void);	/* inner node version */

@@ -194,7 +194,7 @@ LDHandle LDCreate(void);
 #define LDCreate() 0
 #endif
 
-LDOMHandle LDRegisterOM(LDHandle lbdb, LDOMid userID, 
+LDOMHandle LDRegisterOM(LDHandle _lbdb, LDOMid userID, 
 			void *userptr, LDCallbacks cb);
 void * LDOMUserData(LDOMHandle &_h);
 void LDRegisteringObjects(LDOMHandle _h);
@@ -217,37 +217,37 @@ void LDMessage(LDObjHandle from,
 void LDEstObjLoad(LDObjHandle h, double load);
 void LDNonMigratable(const LDObjHandle &h);
 void LDMigratable(const LDObjHandle &h);
-void LDDumpDatabase(LDHandle lbdb);
+void LDDumpDatabase(LDHandle _lbdb);
 
 /*
  * Calls from load balancer to load database
  */  
 typedef void (*LDMigratedFn)(void* data, LDObjHandle handle);
-void LDNotifyMigrated(LDHandle lbdb, LDMigratedFn fn, void* data);
+void LDNotifyMigrated(LDHandle _lbdb, LDMigratedFn fn, void* data);
 
 typedef void (*LDStartLBFn)(void *user_ptr);
-void LDAddStartLBFn(LDHandle lbdb, LDStartLBFn fn, void* data);
-void LDRemoveStartLBFn(LDHandle lbdb, LDStartLBFn fn);
+void LDAddStartLBFn(LDHandle _lbdb, LDStartLBFn fn, void* data);
+void LDRemoveStartLBFn(LDHandle _lbdb, LDStartLBFn fn);
 void LDStartLB(LDHandle _db);
-void LDTurnManualLBOn(LDHandle lbdb);
-void LDTurnManualLBOff(LDHandle lbdb);
+void LDTurnManualLBOn(LDHandle _lbdb);
+void LDTurnManualLBOff(LDHandle _lbdb);
 
-void LDCollectStatsOn(LDHandle lbdb);
-void LDCollectStatsOff(LDHandle lbdb);
+void LDCollectStatsOn(LDHandle _lbdb);
+void LDCollectStatsOff(LDHandle _lbdb);
 void LDQueryEstLoad(LDHandle bdb);
 void LDQueryKnownObjLoad(LDObjHandle &h, double *cpuT, double *wallT);
 
-int LDGetObjDataSz(LDHandle lbdb);
-void LDGetObjData(LDHandle lbdb, LDObjData *data);
+int LDGetObjDataSz(LDHandle _lbdb);
+void LDGetObjData(LDHandle _lbdb, LDObjData *data);
 
-int LDGetCommDataSz(LDHandle lbdb);
-void LDGetCommData(LDHandle lbdb, LDCommData *data);
+int LDGetCommDataSz(LDHandle _lbdb);
+void LDGetCommData(LDHandle _lbdb, LDCommData *data);
 
-void LDBackgroundLoad(LDHandle lbdb, double *walltime, double *cputime);
-void LDIdleTime(LDHandle lbdb, double *walltime);
-void LDTotalTime(LDHandle lbdb, double *walltime, double *cputime);
+void LDBackgroundLoad(LDHandle _lbdb, double *walltime, double *cputime);
+void LDIdleTime(LDHandle _lbdb, double *walltime);
+void LDTotalTime(LDHandle _lbdb, double *walltime, double *cputime);
 
-void LDClearLoads(LDHandle lbdb);
+void LDClearLoads(LDHandle _lbdb);
 void LDMigrate(LDObjHandle h, int dest);
 void LDMigrated(LDObjHandle h);
 
@@ -265,16 +265,16 @@ typedef struct {
   int serial;
 } LDBarrierReceiver;
 
-LDBarrierClient LDAddLocalBarrierClient(LDHandle lbdb,LDResumeFn fn,
+LDBarrierClient LDAddLocalBarrierClient(LDHandle _lbdb,LDResumeFn fn,
 					void* data);
-void LDRemoveLocalBarrierClient(LDHandle lbdb, LDBarrierClient h);
-LDBarrierReceiver LDAddLocalBarrierReceiver(LDHandle lbdb,LDBarrierFn fn,
+void LDRemoveLocalBarrierClient(LDHandle _lbdb, LDBarrierClient h);
+LDBarrierReceiver LDAddLocalBarrierReceiver(LDHandle _lbdb,LDBarrierFn fn,
 					    void* data);
-void LDRemoveLocalBarrierReceiver(LDHandle lbdb,LDBarrierReceiver h);
-void LDAtLocalBarrier(LDHandle lbdb, LDBarrierClient h);
+void LDRemoveLocalBarrierReceiver(LDHandle _lbdb,LDBarrierReceiver h);
+void LDAtLocalBarrier(LDHandle _lbdb, LDBarrierClient h);
 void LDLocalBarrierOn(LDHandle _db);
 void LDLocalBarrierOff(LDHandle _db);
-void LDResumeClients(LDHandle lbdb);
+void LDResumeClients(LDHandle _lbdb);
 int LDProcessorSpeed();
 CmiBool LDOMidEqual(const LDOMid &i1, const LDOMid &i2);
 CmiBool LDObjIDEqual(const LDObjid &i1, const LDObjid &i2);

@@ -14,7 +14,7 @@ module waitqd {
 
   extern module CkFutures;
 
-  readonly CkChareID waitqd_qdhandle; 
+  readonly CkChareID _waitqd_qdhandle; 
 
   mainchare waitqd_QDChare {
     entry waitqd_QDChare(CkArgMsg *m);

@@ -711,13 +711,13 @@ static double readMHz(void)
   return 0.0;
 }
 
-double cpu_speed_factor;
+double _cpu_speed_factor;
 CpvStaticDeclare(double, inittime_virtual);
 
 void CmiTimerInit()
 {
   struct rusage ru;
-  cpu_speed_factor = 1.0/(readMHz()*1.0e6); 
+  _cpu_speed_factor = 1.0/(readMHz()*1.0e6); 
   rdtsc(); rdtsc(); rdtsc(); rdtsc(); rdtsc();
   CpvInitialize(double, inittime_virtual);
   getrusage(0, &ru); 

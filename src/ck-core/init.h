@@ -152,7 +152,7 @@ extern "C" void CkRegisterMainModule(void);
 
 typedef  void  (*CkExitFn) (void);
 
-extern CkQ<CkExitFn> CkExitFnVec;
+extern CkQ<CkExitFn> _CkExitFnVec;
 extern void registerExitFn(CkExitFn);
 
 /*@}*/

@@ -3,7 +3,7 @@
 */
 
 
-int immRunning=0; /* if set, somebody's inside an immediate message */
+int _immRunning=0; /* if set, somebody's inside an immediate message */
 
 #if CMK_IMMEDIATE_MSG
 
@@ -22,7 +22,7 @@ void CmiPushImmediateMsg(void *msg)
 {
   MACHSTATE(4,"pushing immediate message {");
   /* This lock check needs portable access to comm_flag, which is tough:
-     MACHLOCK_ASSERT(immRunning||comm_flag,"CmiPushImmediateMsg");
+     MACHLOCK_ASSERT(_immRunning||comm_flag,"CmiPushImmediateMsg");
   */
   
   CmiLock(CsvAccess(NodeState).immSendLock);
@@ -40,7 +40,7 @@ SMP: This routine must be called holding immRecvLock
 */
 void CmiDelayImmediate(void)
 {
-  MACHLOCK_ASSERT(immRunning,"CmiDelayImmediate");
+  MACHLOCK_ASSERT(_immRunning,"CmiDelayImmediate");
 
   CQdCreate(CpvAccess(cQdState),1);
   MACHSTATE(5,"Actually delaying an immediate message");
@@ -61,7 +61,7 @@ static void CmiHandleImmediateMessage(void *msg) {
   CmiHandlerInfo *h=&CpvAccess(CmiHandlerTable)[handlerNo];
   CmiAssert(h && h->hdlr);
 
-  MACHLOCK_ASSERT(immRunning,"CmiHandleImmediateMessage");
+  MACHLOCK_ASSERT(_immRunning,"CmiHandleImmediateMessage");
   CQdProcess(CpvAccess(cQdState),1);
   (h->hdlr)(msg,h->userPtr);
 }
@@ -84,8 +84,8 @@ void CmiHandleImmediate()
    /* Make sure only one thread is running immediate messages: */
    CmiLock(CsvAccess(NodeState).immRecvLock);
 
-   MACHLOCK_ASSERT(!immRunning,"CmiHandleImmediate");
-   immRunning=1; /* prevents SIGIO reentrancy, and allows different send */
+   MACHLOCK_ASSERT(!_immRunning,"CmiHandleImmediate");
+   _immRunning=1; /* prevents SIGIO reentrancy, and allows different send */
    MACHSTATE(2,"Entered handleImmediate {")
 
    /* Handle all pending immediate messages */
@@ -102,7 +102,7 @@ void CmiHandleImmediate()
    	CmiPushImmediateMsg(msg);
    
    MACHSTATE(2,"} exiting handleImmediate")
-   immRunning = 0;
+   _immRunning = 0;
    
    CmiUnlock(CsvAccess(NodeState).immRecvLock);
 }

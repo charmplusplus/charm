@@ -8,17 +8,17 @@
 #include "waitqd.h"
 
 /* readonly */ 
-CkChareID waitqd_qdhandle;
+CkChareID _waitqd_qdhandle;
 
 extern "C" void CkWaitQD(void) {
-  CProxy_waitqd_QDChare qdchareproxy(waitqd_qdhandle);
+  CProxy_waitqd_QDChare qdchareproxy(_waitqd_qdhandle);
   qdchareproxy.waitQD();
 }
   
 waitqd_QDChare::waitqd_QDChare(CkArgMsg *m) {
   waitStarted = 0;
   threadList = 0;
-  waitqd_qdhandle = thishandle;
+  _waitqd_qdhandle = thishandle;
   delete m;
 }
 

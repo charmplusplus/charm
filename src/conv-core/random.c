@@ -37,9 +37,9 @@
 int MAX_STREAMS = (146138719);
 */
 
-extern unsigned int prime_list[];
+extern unsigned int _prime_list[];
 
-unsigned int PARAMLIST[3][2] = {{0x87b0b0fdU, 0x27bb2ee6U}, 
+unsigned int _PARAMLIST[3][2] = {{0x87b0b0fdU, 0x27bb2ee6U}, 
 				      {0xe78b6955U,0x2c6fe96eU},
 				      {0x31a53f85U,0x369dea0fU}};
 
@@ -77,11 +77,11 @@ void CrnInitStream(CrnStream *genptr, int seed, int type)
   int gennum = seed+CpvAccess(nstreams)*CmiNumPes();
   int i;
 
-  genptr->prime = prime_list[gennum%MAX_STREAMS];
-  genptr->multiplier[0] = (double) (PARAMLIST[type][0]&0x3fffff);
+  genptr->prime = _prime_list[gennum%MAX_STREAMS];
+  genptr->multiplier[0] = (double) (_PARAMLIST[type][0]&0x3fffff);
   genptr->multiplier[1] = (double) 
-    (PARAMLIST[type][0]>>22 | (PARAMLIST[type][1]&0xfff)<<10);
-  genptr->multiplier[2] = (double) (PARAMLIST[type][1]>>12);
+    (_PARAMLIST[type][0]>>22 | (_PARAMLIST[type][1]&0xfff)<<10);
+  genptr->multiplier[2] = (double) (_PARAMLIST[type][1]>>12);
   genptr->state[0] = (double) ((INIT_SEED0^gennum)&0x3fffff);
   genptr->state[1] = (double) 
     ((INIT_SEED0^gennum)>>22 | ((INIT_SEED1 ^ (unsigned)seed<<1)&0xfff)<<10);
@@ -142,7 +142,7 @@ double CrnDrand(void)
   return CrnDouble(&CpvAccess(_defaultStream));
 }
 
-unsigned int prime_list[MAX_STREAMS] = 
+unsigned int _prime_list[MAX_STREAMS] = 
 {
 3037000493U,
 3037000453U,

@@ -211,7 +211,7 @@ void CentralLB::buildStats()
        statsMsgsList[pe]=0;
     }
     statsData->n_migrateobjs = nmigobj;
-    if (lb_debug) {
+    if (_lb_debug) {
       CmiPrintf("n_obj:%d migratable:%d ncom:%d\n", nobj, nmigobj, ncom);
     }
 }
@@ -238,7 +238,7 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
     struct ProcStats &procStat = statsData->procs[pe];
     procStat.total_walltime = m->total_walltime;
     procStat.total_cputime = m->total_cputime;
-    if (lb_ignoreBgLoad) {
+    if (_lb_ignoreBgLoad) {
       procStat.idletime = 0.0;
       procStat.bg_walltime = 0.0;
       procStat.bg_cputime = 0.0;
@@ -260,7 +260,7 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
 
   const int clients = CkNumPes();
   if (stats_msg_count == clients) {
-    if (lb_debug) 
+    if (_lb_debug) 
       CmiPrintf("[%s] Load balancing step %d starting at %f in PE%d\n",
                  lbName(), step(),start_lb_time, cur_ld_balancer);
 //    double strat_start_time = CmiWallTimer();
@@ -284,7 +284,7 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
 
 //  calculate predicted load
 //  very time consuming though, so only happen when debugging is on
-    if (lb_debug) {
+    if (_lb_debug) {
       double minObjLoad, maxObjLoad;
       getPredictedLoad(statsData, clients, migrateMsg, migrateMsg->expectedLoad, minObjLoad, maxObjLoad, 1);
     }
@@ -409,7 +409,7 @@ void CentralLB::ReceiveMigration(LBMigrateMsg *m)
 
 void CentralLB::MigrationDone(int balancing)
 {
-  if (balancing && lb_debug && CkMyPe() == cur_ld_balancer) {
+  if (balancing && _lb_debug && CkMyPe() == cur_ld_balancer) {
     double end_lb_time = CmiWallTimer();
       CkPrintf("[%s] Load balancing step %d finished at %f\n",
   	        lbName(), step(),end_lb_time);
@@ -520,7 +520,7 @@ LBMigrateMsg * CentralLB::createMigrateMsg(LDStats* stats,int count)
     delete item;
     migrateInfo[i] = 0;
   }
-  if (lb_debug)
+  if (_lb_debug)
     CkPrintf("%s: %d objects migrating.\n", lbname, migrate_count);
   return msg;
 }

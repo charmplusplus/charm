@@ -1,5 +1,5 @@
 module CkCallback {
-	readonly CProxy_ckcallback_group ckcallbackgroup;
+	readonly CProxy_ckcallback_group _ckcallbackgroup;
 	message CkCcsRequestMsg {
 		char data[];
  	};
