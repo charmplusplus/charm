@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 2.20  1996-08-02 21:14:19  milind
+ * Revision 2.21  1996-08-08 20:16:53  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.20  1996/08/02 21:14:19  milind
  * changes to use special timer functions
  * made size_t unsigned long instead of long
  *
@@ -59,6 +62,8 @@
 #define CMK_DGRAM_BUF_SIZE                                 0
 #define CMK_DGRAM_MAX_SIZE                                 0
 #define CMK_DGRAM_WINDOW_SIZE                              0
+
+#define CMK_FIX_HP_CONNECT_BUG                             0
 
 #define CMK_MACHINE_NAME                                   "cm5"
 

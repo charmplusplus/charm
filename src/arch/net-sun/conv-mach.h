@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 2.22  1996-08-08 17:18:28  milind
+ * Revision 2.23  1996-08-08 20:16:53  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.22  1996/08/08 17:18:28  milind
  * changed to use getrusage instead of times.
  *
  * Revision 2.21  1996/07/24 22:33:01  milind
@@ -61,6 +64,8 @@
 #define CMK_DGRAM_BUF_SIZE                                 52000
 #define CMK_DGRAM_MAX_SIZE                                 4096
 #define CMK_DGRAM_WINDOW_SIZE                              12
+
+#define CMK_FIX_HP_CONNECT_BUG                             0
 
 #define CMK_MACHINE_NAME                                   "net-sun"
 

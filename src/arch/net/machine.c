@@ -156,6 +156,17 @@ void *blk;
  *
  *****************************************************************************/
 
+static void jsleep(int sec, int usec)
+{
+  struct timeval tm;
+  tm.tv_sec = sec;
+  tm.tv_usec = usec;
+  while (1) {
+    if (select(0,0,0,0,&tm)==0) break;
+    if (errno!=EINTR) break;
+  }
+}
+
 static void writeall(int fd, char *buf, int size)
 {
   int ok;
@@ -412,7 +423,7 @@ unsigned int ip; int port; int seconds;
   remote.sin_port = htons(sport);
   remote.sin_addr.s_addr = htonl(ip);
     
-  begin = time(0);
+  begin = time(0); ok= -1;
   while (time(0)-begin < seconds) {
   sock:
     fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -421,15 +432,18 @@ unsigned int ip; int port; int seconds;
     
   conn:
     ok = connect(fd, (struct sockaddr *)&(remote), sizeof(remote));
-    if ((ok<0)&&(errno==EINTR)) { close(fd); goto sock; }
-    if ((ok<0)&&(errno==EADDRINUSE)) { close(fd); goto sock; }
     if (ok>=0) break;
-    if (errno!=ECONNREFUSED) break;
-    
-    sleep(1);
+    close(fd);
+    switch (errno) {
+    case EINTR: break;
+    case ECONNREFUSED: jsleep(1,0); break;
+    case EADDRINUSE: jsleep(1,0); break;
+    case EADDRNOTAVAIL: jsleep(5,0); break;
+    default: KillEveryone(strerror(errno));
+    }
   }
   if (ok<0) {
-    perror("connect"); exit(1);
+    KillEveryone(strerror(errno)); exit(1);
   }
   return fd;
 }

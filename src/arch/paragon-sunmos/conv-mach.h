@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.6  1996-07-16 17:23:37  jyelon
+ * Revision 1.7  1996-08-08 20:16:53  jyelon
+ * *** empty log message ***
+ *
+ * Revision 1.6  1996/07/16 17:23:37  jyelon
  * Renamed a flag.
  *
  * Revision 1.5  1996/07/16 05:20:41  milind
@@ -55,6 +58,8 @@
 #define CMK_DGRAM_BUF_SIZE                                 0
 #define CMK_DGRAM_MAX_SIZE                                 0
 #define CMK_DGRAM_WINDOW_SIZE                              0
+
+#define CMK_FIX_HP_CONNECT_BUG                             0
 
 #define CMK_MACHINE_NAME                                   "paragon"
 

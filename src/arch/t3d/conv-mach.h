@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.7  1996-07-16 21:08:30  gursoy
+ * Revision 1.8  1996-08-08 20:16:53  jyelon
+ * *** empty log message ***
+ *
+ * Revision 1.7  1996/07/16 21:08:30  gursoy
  * selected the correct thread option
  *
  * Revision 1.6  1996/07/16  17:23:37  jyelon
@@ -58,6 +61,8 @@
 #define CMK_DGRAM_BUF_SIZE                                 0
 #define CMK_DGRAM_MAX_SIZE                                 0
 #define CMK_DGRAM_WINDOW_SIZE                              0
+
+#define CMK_FIX_HP_CONNECT_BUG                             0
 
 #define CMK_MACHINE_NAME                                   "t3d"
 

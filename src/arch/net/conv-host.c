@@ -244,6 +244,9 @@ void skt_accept(src,pip,ppo,pfd)
   i = sizeof(remote);
  acc:
   fd = accept(src, (struct sockaddr *)&remote, &i);
+#if CMK_FIX_HP_CONNECT_BUG
+  usleep(50000);
+#endif
   if ((fd<0)&&(errno==EINTR)) goto acc;
   if ((fd<0)&&(errno==EMFILE)) goto acc;
   if (fd<0) { perror("accept"); notify_abort(); }

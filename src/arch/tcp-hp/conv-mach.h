@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 2.24  1996-07-19 17:07:37  jyelon
+ * Revision 2.25  1996-08-08 20:16:53  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.24  1996/07/19 17:07:37  jyelon
  * *** empty log message ***
  *
  * Revision 2.23  1996/07/16 17:23:37  jyelon
@@ -58,6 +61,8 @@
 #define CMK_DGRAM_BUF_SIZE                                 0
 #define CMK_DGRAM_MAX_SIZE                                 0
 #define CMK_DGRAM_WINDOW_SIZE                              0
+
+#define CMK_FIX_HP_CONNECT_BUG                             1
 
 #define CMK_MACHINE_NAME                                   "tcp-hp"
 

@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.11  1996-07-24 21:28:11  gursoy
+ * Revision 1.12  1996-08-08 20:16:53  jyelon
+ * *** empty log message ***
+ *
+ * Revision 1.11  1996/07/24 21:28:11  gursoy
  * added new timer flags for simulator
  *
  * Revision 1.10  1996/07/19  17:07:37  jyelon
@@ -61,6 +64,8 @@
 #define CMK_DGRAM_BUF_SIZE                                 0
 #define CMK_DGRAM_MAX_SIZE                                 0
 #define CMK_DGRAM_WINDOW_SIZE                              0
+
+#define CMK_FIX_HP_CONNECT_BUG                             0
 
 #define CMK_MACHINE_NAME                                   "sim-hp"
 
