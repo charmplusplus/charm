@@ -12,6 +12,7 @@
 #include "converseEvents.h"	//TODO: remove this hack for REGISTER_CONVESE
 #include "charmEvents.h"	//TODO: remove this hack for REGISTER_CHARM
 #include "machineEvents.h"	// for machine events
+#include "ampiEvents.h" 	/* for ampi events */
 
 CpvExtern(double, _traceCoreInitTime);
 CpvExtern(char*, _traceCoreRoot);
@@ -41,11 +42,14 @@ TraceCore::TraceCore(char** argv)
 	REGISTER_CONVERSE
 	REGISTER_CHARM
 	REGISTER_MACHINE
+	REGISTER_AMPI
 	closePtc();
 }
 
 TraceCore::~TraceCore()
-{ if(traceLogger) delete traceLogger; }
+{
+	if(traceLogger) delete traceLogger; 
+}
 
 void TraceCore::RegisterLanguage(int lID, char* ln)
 {
@@ -168,7 +172,7 @@ void TraceCore::LogEvent(int lID, int eID)
 
 void TraceCore::LogEvent(int lID, int eID, int iLen, int* iData)
 { 
-	if(traceCoreOn == 0){
+	if(traceCoreOn == 0){		
 		return;
 	}
 	LogEvent(lID, eID, iLen, iData, 0, NULL); 
@@ -467,6 +471,7 @@ void TraceLogger::openLogFiles()
 
 void TraceLogger::closeLogFiles()
 {
+
   for(int i=1; i<numLangs; i++){
 		if(fptrs[i])
 			fclose(fptrs[i]);
