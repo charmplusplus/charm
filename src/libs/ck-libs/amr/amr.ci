@@ -1,0 +1,42 @@
+module amr {
+ message NeighborMsg;
+ message _DMsg;
+ message _ArrInitMsg;
+ message ChildInitMsg;
+ message _RefineChkMsg;
+ message _RefineMsg;
+ message _RedMsg;
+ message StartUpMsg;
+
+
+
+ chare AmrCoordinator
+ {
+  	entry AmrCoordinator(_DMsg*);
+	entry AmrCoordinator(StartUpMsg*);
+	entry void synchronise(_RedMsg*);
+ };
+
+ array [BitVec] Cell
+ {
+
+	entry void neighbor_data(NeighborMsg*);
+ 	entry void refine(_RefineMsg*);
+	entry void change_to_leaf(ChildInitMsg*);
+	entry void refine_confirmed(_DMsg *);
+	entry void resume(_DMsg *);
+	entry void synchronise(_RedMsg*);
+	entry void refineExec(_DMsg*);
+	entry void checkRefine(_RefineChkMsg*);
+ };
+
+array [BitVec] Cell1D :Cell
+ {
+	entry Cell1D(_ArrInitMsg*);
+ };
+
+array [BitVec] Cell2D :Cell
+ {
+	entry Cell2D(_ArrInitMsg*);
+ };
+};
