@@ -137,7 +137,7 @@ int LBCommData::hash(const int i, const int m) const
   const int k = key();
   const double ka = k * a;
 
-  int h1 = floor(m*(ka-floor(ka)));
+  int h1 = (int) floor(m*(ka-floor(ka)));
   int h2 = 1;  // Should be odd, to guarantee that h2 and size of table
 	       // are relatively prime.
 
