@@ -69,8 +69,10 @@ translators: charmxi conv-cpm
 LIBS: CONVLIBS CHARMLIBS
 	cd libs; make otherlibs OPTS='$(OPTS)'
 
-test-all: all
-	cd ../pgms ; make test-all  OPTS='$(OPTS)'
+test-all: test
+
+test: test-charm test-AMPI test-fem
+	@echo "--- All tests passed ---"
 
 test-converse: converse
 	cd ../pgms ; make test-converse  OPTS='$(OPTS)'
