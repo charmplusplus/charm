@@ -63,7 +63,7 @@ public:
    */
   virtual void split(int triNo,int edgeOfTri,int movingNode,double frac) =0;
   virtual void split(int triNo,int edgeOfTri,int movingNode,double frac,int flag) =0;
-
+  //  virtual void collapse(int triNo,int edgeOfTri,int movingNode,double frac,int flag) =0;
 };
 
 class refineResults; //Used by refinement API to store intermediate results
