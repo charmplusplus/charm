@@ -913,15 +913,23 @@ CkDelegateData* ComlibManager::ckCopyDelegateData(CkDelegateData *data) {
 
 CkDelegateData * ComlibManager::DelegatePointerPup(PUP::er &p,
                                                    CkDelegateData *pd) {
+
+    CmiBool to_pup = CmiFalse;
+
     ComlibInstanceHandle *inst; 
-    if(!p.isUnpacking()) 
-        inst = (ComlibInstanceHandle *) pd;
-    
-    if(p.isUnpacking()) 
+    if(!p.isUnpacking()) {
+        inst = (ComlibInstanceHandle *) pd;       
+        if(pd != NULL)
+            to_pup = CmiTrue;
+    }
+    else 
         //Call migrate constructor
         inst = new ComlibInstanceHandle();
-    
-    inst->pup(p);
+
+    p | to_pup;
+
+    if(to_pup)
+        inst->pup(p);
     return inst;
 }    
 
