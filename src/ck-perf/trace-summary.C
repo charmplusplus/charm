@@ -136,7 +136,7 @@ extern "C" void Ck_Summary_MarkEvent(int eventType)
 
 void LogPool::addEventType(int eventType, double time)
 {
-   if (eventType >= 256) {
+   if (eventType <0 || eventType >= 256) {
        CkPrintf("Invalid event type %d!\n", eventType);
        return;
    }
