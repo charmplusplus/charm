@@ -8,6 +8,7 @@
 /* Generate a random graph, given the number of nodes, the number of
    connections per node.
 
+dump graph if "tofile" is true
 Output form: directory graphN/ containing files graph0 ... graphN-1
              file graphK has C, the number of connections, followed by
              a list of C vertices that K is connected to
@@ -22,6 +23,7 @@ Modified from the original: changed output format, and converted main to a param
 #include "typedefs.h"
 
 int addEdge(EdgeListType *l,int fm,int to);
+void addspEdge(EdgeListType *, int, int);
 int edgeExists(int fm, int to);
 static Q * makeQueue();
 static int isEmpty(Q*);
@@ -89,7 +91,7 @@ void gengraph(int pV, int pC, int pseed, int *pes, int *npe, int tofile)
   if (CmiMyPe()==0) diameter();
 }
 
-
+#if 0
 static void AddEdges(EdgeListType *EdgeList, int V, int n)
    /* Add more edges to make up a total of E edges */
 {int i,j,w,x,y;
@@ -120,6 +122,45 @@ n -= (V-1);
        } while ((y== x) || connections(y) >= C);
      } while (edgeExists(x,y));
      addEdge(EdgeList, x, y);
+   }
+}
+#endif
+
+static void AddEdges(EdgeListType *EdgeList, int V, int n)
+   /* Add more edges to make up a total of E edges */
+{int i,j,w,x,y;
+/* first add edges for a C-way spanning tree.*/
+int c1;
+int varr[V];
+if (C>1) c1 = C-1;
+
+for (i=0; i< V/c1; i++)
+  for (j=0; j<c1; j++) {
+      w = c1*i + j +1; 
+      /* printf("considering (%d, %d)\n", i, w);  */
+      if (w < V) {
+	addEdge(EdgeList,i,w);
+	/* printf(" --- added.\n"); */
+      }
+      else /*printf(" not added.\n")*/; 
+  }
+
+n -= (V-1);
+
+for (i=0; i<n; i++) 
+   {
+     do {
+	   x = rand() % V;
+        } while (connections(x) >= C);
+     do {
+	   y = rand() % V;
+        } while ((y == x) || connections(y) >= C);
+     if (edgeExists(x,y)) {
+          if (i==n-1) addspEdge(EdgeList,x,y);
+          else i--;
+     }
+     else  
+       addEdge(EdgeList, x, y);
    }
 }
 
