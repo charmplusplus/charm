@@ -10,8 +10,9 @@ Orion Sky Lawlor, olawlor@acm.org, 11/3/1999
 #ifndef __UIUC_PPL_CHARM_VECTOR_3D_H
 #define __UIUC_PPL_CHARM_VECTOR_3D_H
 
-#include <math.h>
 #include "pup.h"
+
+#include <math.h>
 
 //MS Visual C++ defines max/min as a (cursed) macro
 #ifdef max
@@ -28,20 +29,15 @@ class CkVector3dT {
 public:
 	real x,y,z;
 	CkVector3dT(void) {}//Default consructor
-
 	//Simple 1-value constructors
 	explicit CkVector3dT(int init) {x=y=z=(real)init;}
 	explicit CkVector3dT(float init) {x=y=z=(real)init;}
 	explicit CkVector3dT(double init) {x=y=z=(real)init;}
-	//Array constructors:
-	explicit CkVector3dT(const int *i) {x=(real)i[0];y=(real)i[1];z=(real)i[2];}
-	explicit CkVector3dT(const float *i) {x=(real)i[0];y=(real)i[1];z=(real)i[2];}
-	explicit CkVector3dT(const double *i) {x=(real)i[0];y=(real)i[1];z=(real)i[2];}
-
 	//3-value constructor
 	CkVector3dT(const real Nx,const real Ny,const real Nz) {x=Nx;y=Ny;z=Nz;}
+	//real array constructor
+	CkVector3dT(const real *arr) {x=arr[0];y=arr[1];z=arr[2];}
 
-#if 0
 	//Constructors from other types of CkVector:
 	CkVector3dT(const CkVector3dT<float> &src) 
 	  {x=(real)src.x; y=(real)src.y; z=(real)src.z;}
@@ -49,7 +45,6 @@ public:
 	  {x=(real)src.x; y=(real)src.y; z=(real)src.z;}
 	CkVector3dT(const CkVector3dT<int> &src) 
 	  {x=(real)src.x; y=(real)src.y; z=(real)src.z;}
-#endif
 
 	//Copy constructor & assignment operator by default
 	
@@ -112,11 +107,10 @@ public:
 		if (y<by.y) y=by.y;
 		if (z<by.z) z=by.z;     
 	}
-
-	void pup(PUP::er &p) {
-		p|x; p|y; p|z;
-	}
-	friend inline void operator|(PUP::er &p,vec &v) {v.pup(p);}
+	
+#ifdef __CK_PUP_H
+	void pup(PUP::er &p) {p|x;p|y;p|z;}
+#endif
 };
 
 typedef CkVector3dT<double> CkVector3d;
@@ -142,9 +136,11 @@ public:
 	void add(const CkBbox3d &b) {
 		add(b.min); add(b.max);
 	}
+#ifdef __CK_PUP_H
+	void pup(PUP::er &p) {p|min;p|max;}
+#endif
 };
 
-#if 0 /* fast but roundoff-unfriendly halfspace: */
 //A CkHalfspace3d is the portion of a 3d plane lying on
 // one side of the plane (p1,p2,p3).
 class CkHalfspace3d {
@@ -176,63 +172,16 @@ public:
 	double side(cv &pt) const
 	{return n.dot(pt)+d;}
 	
-	/*Return a value t such that pos+t*dir lies on our plane.*/
-	double intersectDir(cv &pos,cv &dir) const
+	//Return a value t such that pos+t*dir lies on our plane.
+	double intersect(cv &pos,cv &dir) const
 		{return -(d+n.dot(pos))/n.dot(dir);}
-	double intersect(cv &start,cv &end) const
-		{return intersectDir(start,end-start);}
 	
-	/*Returns the Point that lies on our plane and 
-	  the line starting at start and going in dir*/
-	CkVector3d intersectDirPt(cv &start,cv &dir) const
-		{return start+dir*intersectDir(start,dir);}
-	CkVector3d intersectPt(cv &start,cv &end) const
-		{return intersectDirPt(start,end-start);}
-};
-#else /* slower but more roundoff-friendly halfspace: */
-//A CkHalfspace3d is the portion of a 3d plane lying on
-// one side of the plane (p1,p2,p3).
-class CkHalfspace3d {
-public:
-	// n dot p-o==0 for plane points p
-	CkVector3d n;//Plane normal
-	CkVector3d o;//A point on the plane
-	
-	typedef const CkVector3d cv;
-	CkHalfspace3d() {}
-	CkHalfspace3d(cv &p1,cv &p2,cv &p3) {init(p1,p2,p3);}
-	CkHalfspace3d(cv &p1,cv &p2,cv &p3,cv &in) {initCheck(p1,p2,p3,in);}
-	//Norm points into the halfspace; p0 is on the line
-	CkHalfspace3d(cv &norm,cv &p0) {n=norm;o=p0;}
-
-	//Set this halfspace to (p1,p2,p3).
-	// inside points are on the right-handed thumb side of p1,p2,p3
-	void init(cv &p1,cv &p2,cv &p3) {
-		n=(p2-p1).cross(p3-p1);
-		o=p1;
+	/*Returns the point that lies on our plane and 
+	  the line starting at start and going in dir.*/
+	CkVector3d intersectPt(cv &start,cv &dir) const
+	{
+		return start+dir*intersect(start,dir);
 	}
-	
-	//Set this halfspace to (p1,p2,p3) with in inside.
-	void initCheck(cv &p1,cv &p2,cv &p3,cv &in)
-	{ init(p1,p2,p3); if (side(in)<0) {n=-n;} }
-	
-	//Returns + if inside halfspace, - if outside (and 0 on line).
-	double side(cv &pt) const
-	{return n.dot(pt-o);}
-	
-	/*Return a value t such that pos+t*dir lies on our plane.*/
-	double intersectDir(cv &pos,cv &dir) const
-		{return -(n.dot(pos-o))/n.dot(dir);}
-	double intersect(cv &start,cv &end) const
-		{return intersectDir(start,end-start);}
-	
-	/*Returns the Point that lies on our plane and 
-	  the line starting at start and going in dir*/
-	CkVector3d intersectDirPt(cv &start,cv &dir) const
-		{return start+dir*intersectDir(start,dir);}
-	CkVector3d intersectPt(cv &start,cv &end) const
-		{return intersectDirPt(start,end-start);}
 };
-#endif
 
 #endif /*def(thisHeader)*/
