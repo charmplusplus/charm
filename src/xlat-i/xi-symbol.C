@@ -234,6 +234,7 @@ Module::generate()
   if(isMain()) {
     defstr << "void CkRegisterMainModule(void) {" << endx;
     defstr << "  _register" << name << "();" << endx;
+    defstr << "  _REGISTER_DONE();" << endx;
     defstr << "}" << endx;
   }
   defstr<<"#endif"<<endx;
@@ -366,9 +367,9 @@ Chare::genChareDecls(XStr& str)
   str << "    ";
   str<<chare_prefix();
   type->print(str);
-  str << "(CkChareID _cid) { _ck_cid = _cid; }\n";
+  str << "(CkChareID _cid) { _CHECK_CID(_cid,__idx); _ck_cid = _cid; }\n";
   str << "    CkChareID ckGetChareId(void) { return _ck_cid; }\n";
-  str << "    void ckSetChareId(CkChareID _cid) { _ck_cid = _cid; }\n";
+  str << "    void ckSetChareId(CkChareID _cid){_CHECK_CID(_cid,__idx);_ck_cid=_cid;}\n";
   if(list)
     list->genDecls(str);
   str.spew(CIChareEnd);
@@ -404,9 +405,9 @@ Chare::genGroupDecls(XStr& str)
   str << "    ";
   str<<group_prefix();
   type->print(str);
-  str << "(CkChareID _cid) { _ck_cid = _cid; _setChare(1); }\n";
+  str << "(CkChareID _cid) { _CHECK_CID(_cid,__idx);_ck_cid = _cid; _setChare(1); }\n";
   str << "    CkChareID ckGetChareId(void) { return _ck_cid; }\n";
-  str << "    void ckSetChareId(CkChareID _cid){_ck_cid=_cid;_setChare(1);}\n";
+  str << "    void ckSetChareId(CkChareID _cid){_CHECK_CID(_cid,__idx);_ck_cid=_cid;_setChare(1);}\n";
   if(chareType==SGROUP) {
     str << "    CkGroupID ckGetGroupId(void) { return _ck_gid; }\n";
     str << "   void ckSetGroupId(CkGroupID _gid){_ck_gid=_gid;_setChare(0);}\n";
@@ -551,6 +552,10 @@ Chare::genDefs(XStr& str)
   if(templat)
     templat->genVars(str);
   str << "));\n";
+  // register all bases
+  if(bases !=0) {
+    bases->genProxyNames(str, "_REGISTER_BASE(__idx, ", "::__idx);\n", "");
+  }
   if(list)
     list->genReg(str);
   str << "}\n";
