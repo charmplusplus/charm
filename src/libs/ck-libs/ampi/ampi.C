@@ -1006,7 +1006,6 @@ void ampiParent::interChildRegister(const ampiCommStruct &s) {
 }
 
 void ampi::intercommMerge(int first, MPI_Comm *ncomm){ // first valid only at local root
-CkPrintf("[%d]ampi::intercommMerge first=%d\n",parent->thisIndex,first);
   if(getRank() == 0 && first == 1){ // first (lower) group creates the intracommunicator for the higher group
     groupStruct lvec = myComm.getIndices();
     groupStruct rvec = myComm.getRemoteIndices();
@@ -1027,11 +1026,9 @@ CkPrintf("[%d]ampi::intercommMerge first=%d\n",parent->thisIndex,first);
   thread->suspend(); //Resumed by ampiParent::interChildRegister
   MPI_Comm newcomm=parent->getNextIntra()-1;
   *ncomm=newcomm;
-CkPrintf("[%d]ampi::intercommMerge done\n",parent->thisIndex);
 }
 
 void ampi::intercommMergePhase1(CkReductionMsg *msg){  // gets called on two roots, first root creates the comm
-CkPrintf("[%d]ampi::intercommMergePhase1, size=%d \n",parent->thisIndex,tmpVec.size());
   if(tmpVec.size()==0) { delete msg; return; }
   MPI_Comm *nextIntraComm = (int *)msg->getData();
   CkArrayOptions opts;
@@ -1051,7 +1048,6 @@ CkPrintf("[%d]ampi::intercommMergePhase1, size=%d \n",parent->thisIndex,tmpVec.s
 }
 
 void ampiParent::intraChildRegister(const ampiCommStruct &s) {
-CkPrintf("[%d]ampiParent::intraChildRegister,size=%d\n",thisIndex,s.getSize());
   int idx=s.getComm()-MPI_COMM_FIRST_INTRA;
   if (intraComm.size()<=idx) intraComm.resize(idx+1);
   intraComm[idx]=new ampiCommStruct(s);
@@ -1088,8 +1084,6 @@ ampi::generic(AmpiMsg* msg)
 MSG_ORDER_DEBUG(
   CkPrintf("AMPI Rank %d arrival: tag=%d, src=%d, comm=%d  (from %d, seq %d)\n",
   	getRank(),msg->tag,msg->srcRank,msg->comm, msg->srcIdx, msg->seq);
-)
-CkPrintf("[%d]AMPI Rank %d arrival: tag=%d, src=%d, comm=%d  (from %d, seq %d)\n",
 	 parent->thisIndex,getRank(),msg->tag,msg->srcRank,msg->comm, msg->srcIdx, msg->seq);
 //	AmpiMsg *msgcopy = msg;
   if(msg->seq != -1) {
@@ -1165,8 +1159,6 @@ ampi::delesend(int t, int sRank, const void* buf, int count, int type,  int rank
   CkPrintf("AMPI Rank %d send: tag=%d, src=%d, comm=%d (to %d)\n",getRank(),t,sRank,destcomm,destIdx);
  )
 
-CkPrintf("[%d]AMPI Rank %d send: tag=%d, src=%d, comm=%d (to %d)\n",parent->thisIndex,getRank(),t,sRank,destcomm,destIdx);
-
   arrproxy[destIdx].generic(makeAmpiMsg(destIdx,t,sRank,buf,count,type,destcomm));
 
 #ifndef CMK_OPTIMIZE
@@ -1194,7 +1186,6 @@ ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
   CkPrintf("AMPI Rank %d blocking recv: tag=%d, src=%d, comm=%d\n",getRank(),t,s,comm);
  )
 
-CkPrintf("[%d]AMPI Rank %d blocking recv: tag=%d, src=%d, comm=%d\n",parent->thisIndex,getRank(),t,s,comm);
   resumeOnRecv=true;
   while(1) {
     tags[0] = t; tags[1] = s; tags[2] = comm;
@@ -2624,8 +2615,6 @@ int MPI_Intercomm_merge(MPI_Comm intercomm, int high, MPI_Comm *newintracomm){
   rroot = ptr->getIndexForRemoteRank(0);
   lhigh = high;
   lrank = ptr->getRank();
-
-CkPrintf("[%d]MPI_Intercomm_merge\n",ptr->thisIndex);
 
   if(lrank==0){
     MPI_Status sts;
