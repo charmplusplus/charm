@@ -98,7 +98,8 @@ void _createTracecounter(char **argv)
   CpvAccess(_traces)->addTrace(CpvAccess(_trace));
 }
 
-StatTable::StatTable(char** args, int argc): stats_(NULL), numStats_(0)
+StatTable::StatTable(char** name, char** desc, int argc): 
+  stats_(NULL), numStats_(0)
 {
   DEBUGF(("%d/%d DEBUG: StatTable::StatTable %08x size %d\n", 
           CkMyPe(), CkNumPes(), this, argc));
@@ -106,8 +107,10 @@ StatTable::StatTable(char** args, int argc): stats_(NULL), numStats_(0)
   stats_ = new Statistics[argc];  _MEMCHECK(stats_);
   numStats_ = argc;
   for (int i=0; i<argc; i++) { 
-    DEBUGF(("%d/%d DEBUG:   %d name %s\n", CkMyPe(), CkNumPes(), i, args[i]));
-    stats_[i].name = args[i]; 
+    DEBUGF(("%d/%d DEBUG:   %d name %s\n     desc %s\n", 
+	    CkMyPe(), CkNumPes(), i, name[i], desc[i]));
+    stats_[i].name = name[i]; 
+    stats_[i].desc = desc[i];
   }
   clear();
 }
@@ -123,10 +126,10 @@ void StatTable::setEp(int epidx, int stat, long long value, double time)
   CkAssert(epidx<MAX_ENTRIES);
   CkAssert(stat<numStats_);
   
-  int count = stats_[stat].count[epidx];
-  double avg = stats_[stat].average[epidx];
-  stats_[stat].count[epidx]++;
-  stats_[stat].average[epidx] = (avg * count + value) / (count + 1);
+  // int numCalled = stats_[stat].numCalled[epidx];
+  // double avg = stats_[stat].totCount[epidx]/numCalled;
+  stats_[stat].numCalled[epidx]++;
+  stats_[stat].totCount[epidx] += value;
   stats_[stat].totTime[epidx] += time;
 }
 
@@ -139,22 +142,24 @@ void StatTable::write(FILE* fp)
   DEBUGF(("%d/%d DEBUG: Writing StatTable\n", CkMyPe(), CkNumPes()));
   int i, j;
   for (i=0; i<numStats_; i++) {
+    // write description of the entry
+    fprintf(fp, "[%s {%s}]\n", stats_[i].name, stats_[i].desc);
     // write number of calls for each entry
     fprintf(fp, "[%s num_called] ", stats_[i].name);
     for (j=0; j<_numEntries; j++) { 
-      fprintf(fp, "%d ", stats_[i].count[j]); 
+      fprintf(fp, "%d ", stats_[i].numCalled[j]); 
     }
     fprintf(fp, "\n");
     // write average count for each 
-    fprintf(fp, "[%s average_count] ", stats_[i].name);
+    fprintf(fp, "[%s total_count] ", stats_[i].name);
     for (j=0; j<_numEntries; j++) { 
-      fprintf(fp, "%f ", stats_[i].average[j]); 
+      fprintf(fp, "%ld ", stats_[i].totCount[j]); 
     }
     fprintf(fp, "\n");
     // write total time in us spent for each entry
-    fprintf(fp, "[%s total_time] ", stats_[i].name);
+    fprintf(fp, "[%s total_time(s)] ", stats_[i].name);
     for (j=0; j<_numEntries; j++) {
-      fprintf(fp, "%ld ", (long)(stats_[i].totTime[j]*1.0e6));
+      fprintf(fp, "%f ", (long)(stats_[i].totTime[j]));
     }
     fprintf(fp, "\n");
   }
@@ -165,19 +170,18 @@ void StatTable::clear()
 {
   for (int i=0; i<numStats_; i++) {
     for (int j=0; j<MAX_ENTRIES; j++) {
-      stats_[i].count[j] = 0;
-      stats_[i].average[j] = 0.0;
+      stats_[i].numCalled[j] = 0;
+      stats_[i].totCount[j] = 0.0;
       stats_[i].totTime[j] = 0.0;
     }
   }
 }
 
-CountLogPool::CountLogPool(char* pgm, char** args, int argc): 
-  stats_(args, argc)
+CountLogPool::CountLogPool(char* pgm, char** name, char** desc, int argc): 
+  stats_(name, desc, argc)
 {
   DEBUGF(("%d/%d DEBUG: CountLogPool::CountLogPool() %08x\n", 
           CkMyPe(), CkNumPes(), this));
-  // for (int j=0; j<argc; j++) { DEBUGF(("    DEBUG:   %d %s\n", j, args[j])); }
 
   char pestr[10];
   sprintf(pestr, "%d", CkMyPe());
@@ -341,10 +345,11 @@ void TraceCounter::traceInit(char **argv)
   counter1_ = counterArg1.code;
   counter2_ = counterArg2.code;
   DEBUGF(("    DEBUG: Counter1=%d Counter2=%d\n", counter1_, counter2_));
-  char* args[2];  // prepare arguments for creating log pool
-  args[0] = counterArg1.arg;
-  args[1] = counterArg2.arg;
-  CpvAccess(_logPool) = new CountLogPool(CpvAccess(pgmName), args, 2);
+  char* name[2];  // prepare names for creating log pool
+  char* desc[2];  // prepare descriptions for creating log pool
+  name[0] = counterArg1.arg;  desc[0] = counterArg1.desc;
+  name[1] = counterArg2.arg;  desc[1] = counterArg2.desc;
+  CpvAccess(_logPool) = new CountLogPool(CpvAccess(pgmName), name, desc, 2);
   _MEMCHECK(CpvAccess(_logPool));
   DEBUGF(("%d/%d DEBUG: Created _logPool at %08x\n", 
           CkMyPe(), CkNumPes(), CpvAccess(_logPool)));
@@ -417,6 +422,8 @@ void TraceCounter::endExecute(void)
   }
   else { status_=IDLE; }
 
+  double t = TraceTimer();
+
   long long value1 = 0, value2 = 0;
   int genRead;
   if ((genRead=read_counters(counter1_, &value1, counter2_, &value2)) < 0 ||
@@ -427,7 +434,6 @@ void TraceCounter::endExecute(void)
 	      genRead, genStart_, value1, value2);
     CmiAbort("ERROR: read_counters() in endExecute\n");
   }
-  double t = TraceTimer();
 
   DEBUGF(("%d/%d DEBUG:   endExecute genRead %d Time %f counter1 %d counter2 %ld\n", 
 	  CkMyPe(), CkNumPes(), genRead, t-startEP_, value1, value2));
@@ -469,6 +475,8 @@ void TraceCounter::endPack(void)
   }
   else { status_=IDLE; }
 
+  double t = CmiWallTimer();
+
   long long value1 = 0, value2 = 0;
   int genRead;
   if ((genRead=read_counters(counter1_, &value1, counter2_, &value2)) < 0 ||
@@ -479,7 +487,6 @@ void TraceCounter::endPack(void)
 	      genRead, genStart_, value1, value2);
     CmiAbort("ERROR: read_counters() in endPack\n");
   }
-  double t = CmiWallTimer();
 
   DEBUGF(("%d/%d DEBUG:   endPack genRead %d EP %d Time %f counter1 %d counter2 %ld\n", 
 	  CkMyPe(), CkNumPes(), genRead, _packEP, t-startPack_, value1, value2));
@@ -520,6 +527,8 @@ void TraceCounter::endUnpack(void)
   }
   else { status_=IDLE; }
 
+  double t = CmiWallTimer();
+
   long long value1 = 0, value2 = 0;
   int genRead;
   if ((genRead=read_counters(counter1_, &value1, counter2_, &value2))<0 ||
@@ -530,7 +539,6 @@ void TraceCounter::endUnpack(void)
 	      genRead, genStart_, value1, value2);
     CmiAbort("ERROR: read_counters() in endUnpack\n");
   }
-  double t = CmiWallTimer();
 
   DEBUGF(("%d/%d DEBUG:   endUnpack genRead %d EP %d Time %f counter1 %d counter2 %ld\n", 
 	  CkMyPe(), CkNumPes(), genRead, _unpackEP, t-startUnpack_, value1, value2));

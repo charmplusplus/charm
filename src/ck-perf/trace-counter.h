@@ -28,7 +28,7 @@
 //! track statistics for all entry points
 class StatTable {
   public:
-    StatTable(char** args, int argc);
+    StatTable(char** name, char** desc, int argc);
     ~StatTable();
     //! one entry is called for 'time' seconds, value is counter reading 
     void setEp(int epidx, int stat, long long value, double time);
@@ -43,10 +43,11 @@ class StatTable {
   private:
     //! struct to maintain statistics
     struct Statistics {
-      char*  name;                  // name of stat being tracked
-      UInt   count[MAX_ENTRIES];    // total number times called
-      double average[MAX_ENTRIES];  // track average of value
-      double totTime[MAX_ENTRIES];  // total time associated with this counter
+      char*  name;                    // name of stat being tracked
+      char*  desc;                    // description of stat being tracked
+      UInt   numCalled[MAX_ENTRIES];  // total number times called
+      UInt   totCount[MAX_ENTRIES];   // track average of value
+      double totTime[MAX_ENTRIES];    // total time associated with this counter
 
       Statistics(): name(NULL) { }
     };
@@ -59,7 +60,7 @@ class StatTable {
 // counter log pool
 class CountLogPool {
   public:
-    CountLogPool(char* pgm, char** args, int argc);
+    CountLogPool(char* pgm, char** name, char** desc, int argc);
     ~CountLogPool();
     void write(void) ;
     void writeSts(void);
