@@ -403,6 +403,7 @@ static void _nullFn(void *, void *)
 extern void _registerLBDatabase(void);
 extern void _registerExternalModules(void);
 extern void _ckModuleInit(void);
+extern void _loadbalancerInit();
 
 void _initCharm(int argc, char **argv)
 {
@@ -477,6 +478,7 @@ void _initCharm(int argc, char **argv)
 	CldRegisterEstimator((CldEstimator)_charmLoadEstimator);
 
 	_futuresModuleInit(); // part of futures implementation is a converse module
+	_loadbalancerInit();
 	if(CkMyRank()==0) 
 	{
 		_parseCommandLineOpts(argv);
