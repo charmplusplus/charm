@@ -30,7 +30,7 @@ t="test.cpp"
 #  If failure, prints $3 and sets $pass/clears $fail
 test_cxx() {
         AC_MSG_CHECKING("$1")
-	$CMK_CXX -I../include -c $t -o test.o > /dev/null 2>&1
+	$CMK_CXX -I../include -c $t -o test.o > out 2>&1
 	if test $? -eq 0
 	then
                 AC_MSG_RESULT("$2")
@@ -41,10 +41,21 @@ test_cxx() {
 		pass="0"
 		fail="1"
 	fi
+ 	strictpass=$pass
+	strictfail=$fail
+        if test $pass -eq 1
+	then 
+ 	  if cat out | grep -i "warn" > /dev/null 2>&1
+	  then 
+	    strictpass="0" && strictfail="1"
+          fi
+        fi
+	/bin/rm -f out
 }
 
 test_finish() {
 	rm -f $t test.o	> /dev/null 2>&1
+	/bin/rm -f out
 	exit $1
 }
 
@@ -172,7 +183,7 @@ public:
 };
 EOT
 test_cxx "whether operator delete can be overloaded in same class" "ok" "no"
-AC_DEFINE_UNQUOTED(CMK_MULTIPLE_DELETE, 0)
+AC_DEFINE_UNQUOTED(CMK_MULTIPLE_DELETE, $strictpass)
 
 #test if has poll
 cat > $t <<EOT
