@@ -646,6 +646,55 @@ int maxmsgs;
  
 /*****************************************************************************
  *
+ * Vector Send
+ *
+ ****************************************************************************/
+
+#if CMK_VECTOR_SEND_USES_COMMON_CODE
+
+void CmiSyncVectorSend(destPE, n, sizes, msgs)
+int destPE, n;
+int *sizes;
+char **msgs;
+{
+  int i, total;
+  char *mesg, *tmp;
+  
+  for(i=0,total=0;i<n;i++) total += sizes[i];
+  mesg = (char *) CmiAlloc(total);
+  for(i=0,tmp=mesg;i<n;i++) {
+    memcpy(tmp, msgs[i],sizes[i]);
+    tmp += sizes[i];
+  }
+  CmiSyncSendAndFree(destPE, total, mesg);
+}
+
+CmiCommHandle CmiAsyncVectorSend(destPE, n, sizes, msgs)
+int destPE, n;
+int *sizes;
+char **msgs;
+{
+  CmiSyncVectorSend(destPE,n,sizes,msgs);
+  return NULL;
+}
+
+void CmiSyncVectorSendAndFree(destPE, n, sizes, msgs)
+int destPE, n;
+int *sizes;
+char **msgs;
+{
+  int i;
+
+  CmiSyncVectorSend(destPE,n,sizes,msgs);
+  for(i=0;i<n;i++) CmiFree(msgs[i]);
+  CmiFree(sizes);
+  CmiFree(msgs);
+}
+
+#endif
+
+/*****************************************************************************
+ *
  * Fast Interrupt Blocking Device
  *
  * This is totally portable.  Go figure.  (The rest of it is just macros,
@@ -693,42 +742,4 @@ ConverseExit()
   CmiExit();
 }
 
-void CmiGenericSyncVectorSend(destPE, n, sizes, msgs)
-int destPE, n;
-int *sizes;
-char **msgs;
-{
-  int i, total;
-  char *mesg, *tmp;
-  
-  for(i=0,total=0;i<n;i++) total += sizes[i];
-  mesg = (char *) CmiAlloc(total);
-  for(i=0,tmp=mesg;i<n;i++) {
-    memcpy(tmp, msgs[i],sizes[i]);
-    tmp += sizes[i];
-  }
-  CmiSyncSendAndFree(destPE, total, mesg);
-}
-
-CmiCommHandle CmiGenericAsyncVectorSend(destPE, n, sizes, msgs)
-int destPE, n;
-int *sizes;
-char **msgs;
-{
-  CmiGenericSyncVectorSend(destPE,n,sizes,msgs);
-  return NULL;
-}
-
-void CmiGenericSyncVectorSendAndFree(destPE, n, sizes, msgs)
-int destPE, n;
-int *sizes;
-char **msgs;
-{
-  int i;
-
-  CmiGenericSyncVectorSend(destPE,n,sizes,msgs);
-  for(i=0;i<n;i++) CmiFree(msgs[i]);
-  CmiFree(sizes);
-  CmiFree(msgs);
-}
 
