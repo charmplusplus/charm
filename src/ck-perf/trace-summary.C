@@ -16,6 +16,8 @@
 
 #define VER   3.0
 
+#define INVALIDEP     -2
+
 CkpvStaticDeclare(TraceSummary*, _trace);
 static int _numEvents = 0;
 static int _threadMsg, _threadChare, _threadEP;
@@ -241,7 +243,7 @@ TraceSummary::TraceSummary(char **argv):curevent(0),msgNum(0),binStart(0.0),bin(
   if (CmiGetArgString(argv,"+version",&tmpStr))
   	sscanf(tmpStr,"%lf",&CkpvAccess(version));
   _logPool = new SumLogPool(CkpvAccess(traceRoot));
-  execEp=-2;
+  execEp=INVALIDEP;
 }
 
 int TraceSummary::traceRegisterUserEvent(const char*)
@@ -282,6 +284,11 @@ void TraceSummary::beginExecute(envelope *e)
 
 void TraceSummary::beginExecute(int event,int msgType,int ep,int srcPe, int mlen)
 {
+  if (execEp != INVALIDEP) {
+    CmiPrintf("Warning: TraceSummary two consecutive BEGIN_PROCESSING!\n");
+    return;
+  }
+
   execEp=ep;
   double t = TraceTimer();
 //CmiPrintf("start: %f \n", start);
@@ -304,7 +311,7 @@ void TraceSummary::endExecute(void)
   double ts = start;
   double nts = binStart;
 
-  if (execEp == -2) {
+  if (execEp == INVALIDEP) {
     CmiPrintf("Warning: TraceSummary END_PROCESSING without BEGIN_PROCESSING!\n");
     return;
   }
@@ -323,7 +330,7 @@ void TraceSummary::endExecute(void)
      ts = nts;
   }
   bin += t - ts;
-  execEp = -2;
+  execEp = INVALIDEP;
 }
 
 void TraceSummary::beginPack(void)
