@@ -4,7 +4,7 @@
 Orion Sky Lawlor, olawlor@acm.org, 6/11/2002
 */
 #include "liveViz.h"
-#include "image.h"
+#include "ckimage.h"
 
 static liveVizConfig lv_config;
 static CkCallback clientGetImageCallback;
@@ -55,12 +55,10 @@ static CkReduction::reducerType imageCombineReducer;
 when summing bytes (like image values) together.  On a machine with
 a small cache, it may be better to use an "if" instead of this table.
 */
-static byte *overflowArray;
+static byte *overflowArray=CkImage::newClip();
 
 static void liveVizNodeInit(void) {
 	imageCombineReducer=CkReduction::addReducer(imageCombine);
-	overflowArray=new byte[512];
-	for (int i=0;i<512;i++) overflowArray[i]=(byte)((i<256)?i:255);
 }
 
 #if 1
@@ -79,12 +77,12 @@ or some sort of pup'd object.
 class imageHeader {
 public:
 	liveVizRequest req;
-	Rect r;
-	imageHeader(const liveVizRequest &req_,const Rect &r_)
+	CkRect r;
+	imageHeader(const liveVizRequest &req_,const CkRect &r_)
 		:req(req_), r(r_) {}
 };
 
-static CkReductionMsg *allocateImageMsg(const liveVizRequest &req,const Rect &r,
+static CkReductionMsg *allocateImageMsg(const liveVizRequest &req,const CkRect &r,
 	byte **imgDest)
 {
   imageHeader hdr(req,r);
@@ -108,8 +106,8 @@ void liveVizDeposit(const liveVizRequest &req,
     	startx,starty,sizex,sizey,CkMyPe());
 
 //Allocate a reductionMessage:
-  Rect r(startx,starty, startx+sizex,starty+sizey);
-  r=r.getIntersect(Rect(req.wid,req.ht)); //Never copy out-of-bounds regions
+  CkRect r(startx,starty, startx+sizex,starty+sizey);
+  r=r.getIntersect(CkRect(req.wid,req.ht)); //Never copy out-of-bounds regions
   if (r.isEmpty()) r.zero();
   int bpp=lv_config.getBytesPerPixel();
   byte *dest;
@@ -118,9 +116,9 @@ void liveVizDeposit(const liveVizRequest &req,
 //Copy our image into the reductionMessage:
   if (!r.isEmpty()) {
     //We can't just copy image with memcpy, because we may be clipping user data here:
-    Image srcImage(sizex,sizey,bpp,(byte *)src);
+    CkImage srcImage(sizex,sizey,bpp,(byte *)src);
     srcImage.window(r.getShift(-startx,-starty)); //Portion of src overlapping dest
-    Image destImage(r.wid(),r.ht(),bpp,dest);
+    CkImage destImage(r.wid(),r.ht(),bpp,dest);
     destImage.put(0,0,srcImage);
   }
 
@@ -146,7 +144,7 @@ static CkReductionMsg *imageCombine(int nMsg,CkReductionMsg **msgs)
   imageHeader *firstHdr=(imageHeader *)msgs[0]->getData();
 
 //Determine the size of the output image
-  Rect destRect; destRect.makeEmpty();
+  CkRect destRect; destRect.makeEmpty();
   for (m=0;m<nMsg;m++) destRect=destRect.getUnion(((imageHeader *)msgs[m]->getData())->r);
   
 //Allocate output message of that size
@@ -156,7 +154,7 @@ static CkReductionMsg *imageCombine(int nMsg,CkReductionMsg **msgs)
 //Add each source image to the destination
 // Everything should be pre-clippped, so no further geometric clipping is needed.
 // Brightness clipping, of course, is still necessary.
-  Image destImage(destRect.wid(),destRect.ht(),bpp,dest);
+  CkImage destImage(destRect.wid(),destRect.ht(),bpp,dest);
   destImage.clear();
   for (m=0;m<nMsg;m++) {
   	byte *src=(byte *)msgs[m]->getData();
@@ -165,7 +163,7 @@ static CkReductionMsg *imageCombine(int nMsg,CkReductionMsg **msgs)
 	if (lv_config.getVerbose(2))
 	    CkPrintf("imageCombine>    pe %d  image %d is (%d,%d, %d,%d)\n",
     	          CkMyPe(),m,mHdr->r.l,mHdr->r.t,mHdr->r.r,mHdr->r.b);
-	Image srcImage(mHdr->r.wid(),mHdr->r.ht(),bpp,src);
+	CkImage srcImage(mHdr->r.wid(),mHdr->r.ht(),bpp,src);
 	destImage.addClip(mHdr->r.l-destRect.l,mHdr->r.t-destRect.t,srcImage,overflowArray);
   }
 
@@ -182,14 +180,14 @@ static void vizReductionHandler(void *r_msg)
   imageHeader *hdr=(imageHeader *)msg->getData();
   byte *srcData=sizeof(imageHeader)+(byte *)msg->getData();
   int bpp=lv_config.getBytesPerPixel();
-  Rect destRect(0,0,hdr->req.wid,hdr->req.ht);
+  CkRect destRect(0,0,hdr->req.wid,hdr->req.ht);
   if (destRect==hdr->r) { //Client contributed entire image-- pass along unmodified
     liveViz0Deposit(hdr->req,srcData);
   }
   else 
   { //Client didn't quite cover whole image-- have to pad
-    Image src(hdr->r.wid(),hdr->r.ht(),bpp,srcData);
-    AllocImage dest(hdr->req.wid,hdr->req.ht,bpp);
+    CkImage src(hdr->r.wid(),hdr->r.ht(),bpp,srcData);
+    CkAllocImage dest(hdr->req.wid,hdr->req.ht,bpp);
     dest.clear();
     dest.put(hdr->r.l,hdr->r.t,src);
     liveViz0Deposit(hdr->req,dest.getData());
