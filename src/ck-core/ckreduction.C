@@ -1463,8 +1463,8 @@ void CkNodeReductionMgr::finishReduction(void)
 
 
 void CkNodeReductionMgr::init_BinomialTree(){
-	int depth = (int )ceil((log(CkNumNodes())/log(2)));
-	upperSize = (unsigned )pow(2,depth);
+	int depth = (int )ceil((log((double )CkNumNodes())/log((double)2)));
+	upperSize = (unsigned )pow((double)2,depth);
 	label = upperSize-CkMyNode()-1;
 	int p=label;
 	int count=0;
@@ -1476,14 +1476,14 @@ void CkNodeReductionMgr::init_BinomialTree(){
 			count++;
 		}
 	}
-	parent = label + rint(pow(2,count));
+	parent = label + rint(pow((double)2,count));
 	parent = upperSize -1 -parent;
 	int temp;
 	if(count != 0){
 		kids = new int[count];
 		numKids = 0;
 		for(int i=0;i<count;i++){
-			temp = label - rint(pow(2,i));
+			temp = label - rint(pow((double)2,i));
 			temp = upperSize-1-temp;
 			if(temp <= CkNumNodes()-1){
 				kids[numKids] = temp;
