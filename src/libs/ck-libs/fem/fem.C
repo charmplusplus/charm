@@ -7,6 +7,8 @@ See README.txt for details.
  */
 #include "fem_impl.h"
 
+int femVersion = 1;
+
 /* TCharm semaphore ID, used for mesh startup */
 #define FEM_TCHARM_SEMAID 0x00FE300 /* __FEM__ */
 

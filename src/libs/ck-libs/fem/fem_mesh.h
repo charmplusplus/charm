@@ -341,11 +341,13 @@ public:
 	/// Return the number of rows in our table of data (0 if unknown).
 	/// This value is obtained directly from our owning Entity.
 	int getLength(void) const;
+	int getRealLength(void) const;
 
 	int getMax();
 	
 	/// Return the number of columns in our table of data (0 if unknown)
-	inline int getWidth(void) const { return width; }
+	inline int getWidth(void) const { return width<0?0:width; }
+	inline int getRealWidth(void) const { return width; }
 	
 	/// Return our FEM_* datatype (-1 if unknown)
 	inline int getDatatype(void) const { return datatype; }
@@ -604,7 +606,8 @@ public:
 	const FEM_Entity *getGhost(void) const {return ghost;}
 	
 	/// Return the number of entities of this type
-	inline int size(void) const {return length;}
+	inline int size(void) const {return length==-1?0:length;}
+	inline int realsize(void) const {return length;}
 
 	// return the maximum size 
 	inline int getMax() { if(max > 0) return max; else return length;}
@@ -703,6 +706,7 @@ PUPmarshall(FEM_Entity);
 
 // Now that we have FEM_Entity, we can define attribute lenth, as entity length
 inline int FEM_Attribute::getLength(void) const { return e->size(); }
+inline int FEM_Attribute::getRealLength(void) const { return e->realsize(); }
 inline int FEM_Attribute::getMax(){ return e->getMax();}
 
 /**

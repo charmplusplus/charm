@@ -10,6 +10,7 @@ FEM Implementation file: mesh creation and user-data manipulation.
 #include "fem_impl.h"
 #include "charm-api.h" /*for CDECL, FTN_NAME*/
 
+extern int femVersion;
 
 /*** IDXL Interface ****/
 FEM_Comm_Holder::FEM_Comm_Holder(FEM_Comm *sendComm, FEM_Comm *recvComm)
@@ -365,7 +366,7 @@ FORTRAN_AS_C_RETURN(int,
 void FEM_Mesh_data_layout(int fem_mesh,int entity,int attr, 	
   	void *data, int firstItem,int length, const IDXL_Layout &layout) 
 {
-	// if (length==0) return;
+	if (femVersion == 0 && length==0) return;
 	const char *caller="FEM_Mesh_data";
 	FEMAPI(caller);
 	FEM_Mesh *m=FEM_Mesh_lookup(fem_mesh,caller);
@@ -503,12 +504,13 @@ FEM_Attribute::FEM_Attribute(FEM_Entity *e_,int attr_)
 		:e(e_),ghost(0),attr(attr_),width(0),datatype(-1), allocated(false)
 {
 	tryAllocate();
+	if (femVersion == 0) width=-1;
 }
 void FEM_Attribute::pup(PUP::er &p) {
 	// e, attr, and ghost are always set by the constructor
 	p|width;
+	if (p.isUnpacking() && femVersion > 0 && width<0)  width=0;
 	p|datatype;
-	if (width<0) width=0;
 	if (p.isUnpacking()) tryAllocate();
 }
 FEM_Attribute::~FEM_Attribute() {}
@@ -552,12 +554,14 @@ void FEM_Attribute::set(const void *src, int firstItem,int length,
 			CmiAbort("FEM_Mesh_data: unexpected firstItem");
 	}
 
-	if (getLength()==0) setLength(length);
+	if (femVersion == 0 && getRealLength() == -1) setLength(length);
+	else if (getLength()==0) setLength(length);
 	else if (length!=1 && length!=getLength()) 
 		bad("length",false,getLength(),length, caller);
 	
 	int width=layout.width;
-	if (getWidth()==0) setWidth(width);
+	if (femVersion==0 && getRealWidth()==-1) setWidth(width);
+	else if (getWidth()==0) setWidth(width);
 	else if (width!=getWidth()) 
 		bad("width",false,getWidth(),width, caller);
 	
@@ -594,7 +598,8 @@ void FEM_Attribute::register_data(void *user, int length,int max,
 	const IDXL_Layout &layout, const char *caller){
 	
 		int width=layout.width;
-		if (getWidth()==0){
+		if (femVersion == 0 && getRealWidth()==-1) setWidth(width);
+		else if (getWidth()==0){
 			setWidth(width);
 		}else{
 			if (width!=getWidth()){
@@ -616,7 +621,17 @@ void FEM_Attribute::register_data(void *user, int length,int max,
 //Check if all three of length, width, and datatype are set.
 // If so, call allocate.
 void FEM_Attribute::tryAllocate(void) {
-	if ((!allocated) && getLength()!=0 && getWidth()!=0 && getDatatype()!=-1) {
+	int lenNull, widthNull;
+        if (femVersion == 0) {
+	  // version 0 takes -1 as empty
+	  lenNull = (getRealLength()==-1);
+	  widthNull = (getRealWidth()==-1);
+	}
+	else {
+	  lenNull = (getLength()==0);
+	  widthNull = (getWidth()==0);
+	}
+	if ((!allocated) && !lenNull && !widthNull && getDatatype()!=-1) {
 		allocated=true;
 		allocate(getMax(),getWidth(),getDatatype());
 	}
@@ -906,10 +921,14 @@ FEM_Entity::FEM_Entity(FEM_Entity *ghost_) //Default constructor
 	 ghostIDXL(ghost?&ghostSend:NULL, ghost?&ghost->ghostRecv:NULL),resize(NULL)
 {
 	//No attributes initially
+	if (femVersion == 0) {
+		length=-1;
+		max=-1;
+	}
 } 
 void FEM_Entity::pup(PUP::er &p) {
 	p|length;
-	if (length<0) length=0;
+	if (p.isUnpacking() && femVersion > 0 && length<0)  length=0;
 	p.comment(" Ghosts to send out: ");
 	ghostSend.pup(p);
 	p.comment(" Ghosts to recv: ");
@@ -1478,8 +1497,34 @@ FILE *FEM_openMeshFile(const char *prefix,int chunkNo,int nchunks,bool forRead)
     return fp;
 }
 
+static inline void read_version()
+{
+    FILE *f = fopen("FEMVERSION", "r");
+    if (f!=NULL)  {
+	fscanf(f, "%d", &femVersion);
+	if (CkMyPe()==0) CkPrintf("FEM> femVersion detected: %d\n", femVersion);
+	fclose(f);
+    }
+}
+
+static inline void write_version()
+{
+    FILE *f = fopen("FEMVERSION", "w");
+    if (f!=NULL)  {
+		fprintf(f, "%d", femVersion);
+		fclose(f);
+    }
+}
+
 FEM_Mesh *FEM_readMesh(const char *prefix,int chunkNo,int nChunks)
 {
+	// find FEM file version number
+	static int version_checked = 0;
+	if (!version_checked) {
+	    version_checked=1;
+	    read_version();
+	}
+
 	FEM_Mesh *ret=new FEM_Mesh;
 	ret->becomeGetting();
         FILE *fp = FEM_openMeshFile(prefix,chunkNo,nChunks,true);
@@ -1488,8 +1533,12 @@ FEM_Mesh *FEM_readMesh(const char *prefix,int chunkNo,int nChunks)
   	fclose(fp);
 	return ret;
 }
+
 void FEM_writeMesh(FEM_Mesh *m,const char *prefix,int chunkNo,int nChunks)
 {
+	if (chunkNo == 0) {
+	   write_version();
+	}
         FILE *fp = FEM_openMeshFile(prefix,chunkNo,nChunks,false);
 	PUP::toTextFile p(fp);
 	m->pup(p);
