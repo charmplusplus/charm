@@ -401,6 +401,11 @@ const char *HcgMethod0 = // methodname, messagename
 "    void \01(\02 *);\n"
 ;
 
+// gzheng
+const char *HcgMethods_1 = // methodname, messagename
+"    \02 * \01(\02 *);\n"
+;
+
 const char *CiMethod0 = // returnType, classname, methodname
 "\01 CI\02::\03("
 ;
@@ -414,11 +419,13 @@ const char *CiMethod1 = // msgName
 const char *CiMethod2 = // classname, methodname, messagename
 "  if(isChare()) {\n"
 "    CkChareID cid = cih.ciCID();\n"
-"    CkSendMsg(CProxy_CC\01::__idx_\02_\03,msg,&cid);\n"
+"//    CkSendMsg(CProxy_CC\01::__idx_\02_\03,msg,&cid);\n"
+"    CProxy_CC\01(cid).\02(msg);\n"
 "  } else if(ciGetProc()==CI_PE_ALL) {\n"
 "    CkBroadcastMsgBranch(CProxy_CG\01::__idx_\02_\03,msg,cih.ciGID());\n"
 "  } else {\n"
-"    CkSendMsgBranch(CProxy_CG\01::__idx_\02_\03,msg,cih.ciGID(),ciGetProc());\n"
+"//    CkSendMsgBranch(CProxy_CG\01::__idx_\02_\03,msg,cih.ciGID(),ciGetProc());\n"
+"    CProxy_CG\01(cih.ciGID()).\02(msg, ciGetProc());\n"
 "  }\n"
 "}\n"
 "\n"
@@ -428,11 +435,13 @@ const char *CiMethod2 = // classname, methodname, messagename
 const char *CiMethods_3 = // classname, methodname, messagename
 "  if(isChare()) {\n"
 "    CkChareID cid = cih.ciCID();\n"
-"    msg = (\03 *)CkRemoteCall(CProxy_CC\01::__idx_\02_\03,msg,&cid);\n"
+"//    msg = (\03 *)CkRemoteCall(CProxy_CC\01::__idx_\02_\03,msg,&cid);\n"
+"    msg = CProxy_CC\01(cid).\02(msg);\n"
 "  } else if(ciGetProc()==CI_PE_ALL) {\n"
 "//    CkBroadcastMsgBranch(CProxy_CG\01::__idx_\02_\03,msg,cih.ciGID());\n"
 "  } else {\n"
 "//    CkRemoteBranchCall(CProxy_CG\01::__idx_\02_\03,msg,cih.ciGID(),ciGetProc());\n"
+"    msg = CProxy_CG\01(cih.ciGID()).\02(msg, ciGetProc());\n"
 "  }\n"
 ;
 
@@ -477,12 +486,21 @@ const char *CcgMethod0 = // classname, methodname, messagename
 "{\n"
 ;
 
+// gzheng
+const char *CcgMethods_1 = // classname, methodname, messagename
+"\03 * CG\01::\02(\03 *msg)\n"
+"{\n"
+;
+
 const char *CcgMethod1 = // methodname
 "  obj->\01("
 ;
 
 const char *CcgMethod2 =
 ");\n"
+;
+
+const char *CcgMethod3 =
 "}\n"
 "\n"
 ;
@@ -493,7 +511,7 @@ const char *IccMethod0 = // methodname, messagename
 
 // gzheng
 const char *IccMethods_1 = // methodname, messagename
-"  entry [sync] void \01(\02 *);\n"
+"  entry [sync] \02 * \01(\02 *);\n"
 ;
 
 const char *IcgMethod0 = // methodname, messagename
@@ -502,7 +520,7 @@ const char *IcgMethod0 = // methodname, messagename
 
 // gzheng
 const char *IcgMethods_1 = // methodname, messagename
-"  entry [sync] void \01(\02 *);\n"
+"  entry [sync] \02 * \01(\02 *);\n"
 ;
 
 const char *ImMethod0 = // messagename
@@ -574,15 +592,16 @@ BE_produce_operation(AST_Decl *d_in, AST_Interface *parent_interface)
        spew(Hcc, HccMethod0, methodname, msgName);
        spew(Hcg, HcgMethod0, methodname, msgName);
        spew(Ccc, CccMethod0, classname, methodname, msgName);
+       spew(Ccg, CcgMethod0, classname, methodname, msgName);
     }
     else {
        spew(Icc, IccMethods_1, methodname, msgName);
        spew(Icg, IcgMethods_1, methodname, msgName);
        spew(Hcc, HccMethods_1, methodname, msgName);
-       spew(Hcg, HcgMethod0, methodname, msgName);
+       spew(Hcg, HcgMethods_1, methodname, msgName);
        spew(Ccc, CccMethods_1, classname, methodname, msgName);
+       spew(Ccg, CcgMethods_1, classname, methodname, msgName);
     }
-    spew(Ccg, CcgMethod0, classname, methodname, msgName);
   }
   BE_produce_parameters(bop, 1); // Produce Formals
   spew(Hi, HiMethod1);
@@ -598,6 +617,7 @@ BE_produce_operation(AST_Decl *d_in, AST_Interface *parent_interface)
   if( out_attr == 0 ) {
   	spew(Ci, CiMethod2, classname, methodname, msgName);
   	spew(Ccc, CccMethod3);
+  	spew(Ccg, CcgMethod3);
   }
   else  {
   	spew(Ci, CiMethods_3, classname, methodname, msgName);
@@ -617,6 +637,7 @@ BE_produce_operation(AST_Decl *d_in, AST_Interface *parent_interface)
   			spew(Ci, CiMethod_1, argName);
 			// in CCclass, assign message back
   			spew(Ccc, CccMethod1_1, argName);
+  			spew(Ccg, CccMethod1_1, argName);
  		}
             }
             i->next();
@@ -625,6 +646,7 @@ BE_produce_operation(AST_Decl *d_in, AST_Interface *parent_interface)
 	// add "}" to close the function
   	spew(Ci, CiMethods_4);
   	spew(Ccc, CccMethods_3);
+  	spew(Ccg, CccMethods_3);
   }
 }
 
@@ -713,11 +735,13 @@ const char *CiClass0 = // classname
 "  CIMsgEmpty *msg = new CIMsgEmpty;\n"
 "  if(isChare()) {\n"
 "    CkChareID cid = cih.ciCID();\n"
-"    CkSendMsg(CProxy_CC\01::__idx_ciDelete_CIMsgEmpty,msg,&cid);\n"
+"//    CkSendMsg(CProxy_CC\01::__idx_ciDelete_CIMsgEmpty,msg,&cid);\n"
+"    CProxy_CC\01(cid).ciDelete(msg);\n"
 "  } else if(ciGetProc()==CI_PE_ALL) {\n"
 "    CkBroadcastMsgBranch(CProxy_CG\01::__idx_ciDelete_CIMsgEmpty,msg,cih.ciGID());\n"
 "  } else {\n"
-"    CkSendMsgBranch(CProxy_CG\01::__idx_ciDelete_CIMsgEmpty,msg,cih.ciGID(),ciGetProc());\n"
+"//    CkSendMsgBranch(CProxy_CG\01::__idx_ciDelete_CIMsgEmpty,msg,cih.ciGID(),ciGetProc());\n"
+"    CProxy_CG\01(cih.ciGID()).ciDelete(msg,ciGetProc());\n"
 "  }\n"
 "}\n"
 "\n"
