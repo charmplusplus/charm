@@ -24,7 +24,6 @@ CpvStaticDeclare(void *, debugQueue);
 #include <string.h>
 
 
-extern void CpdContinueFromBreakPoint(void);
 
 static void CpdDebugHandler(char *msg)
 {
@@ -57,16 +56,6 @@ static void CpdDebugHandler(char *msg)
       setBreakPoints(temp);
     }
 #endif
-    else if (strcmp(name, "quit") == 0){
-      //CpdUnFreeze();
-      CpdContinueFromBreakPoint(); 
-      CsdExitScheduler();
-    }
-    else if (strcmp(name, "startgdb") == 0){
-       //start gdb on processor and attach process to it
-       CpdContinueFromBreakPoint(); 
-       CpdStartGdb();
-    }
     else{
       CmiPrintf("bad debugger command:%s received,len=%ld\n",name,strlen(name));
     }
@@ -134,7 +123,6 @@ void CpdFreezeModeScheduler(void)
 #endif
 }
 
-CpvExtern(char *, displayArgument);
 
 void CpdInit(void)
 {
@@ -156,63 +144,9 @@ void CpdInit(void)
   msgListCache();
 #endif
   
-/*  if (CmiGetArgStringDesc(argv, "+DebugDisplay",&displayArgument, "X display for gdb used only in cpd mode"))
-  {
-    if (!displayArgument)
-       CmiPrintf("WARNING> NULL parameter for +DebugDisplay\n***");
-  }
-  else
-  {
-    CmiPrintf("WARNING> x term for gdb needs to be specified as +DebugDisplay by debugger\n***");
-  }*/
 }
 
 
-/* The following code is for only the net-linux version */
-/* Has to be taken care for other versions */
-
-void CpdStartGdb(void)
-{
-  FILE *f;
-  char gdbScript[200];
-  int pid;
-  if (CpvAccess(displayArgument) != NULL)
-  {
-     CmiPrintf("MY NODE IS %d  and process id is %d\n", CmiMyPe(), getpid());
-     sprintf(gdbScript, "/tmp/cpdstartgdb.%d.%d", getpid(), CmiMyPe());
-     f = fopen(gdbScript, "w");
-     fprintf(f,"#!/bin/sh\n");
-     fprintf(f,"cat > /tmp/start_gdb.$$ << END_OF_SCRIPT\n");
-     fprintf(f,"shell /bin/rm -f /tmp/start_gdb.$$\n");
-     //fprintf(f,"handle SIGPIPE nostop noprint\n");
-     fprintf(f,"handle SIGWINCH nostop noprint\n");
-     fprintf(f,"handle SIGWAITING nostop noprint\n");
-     fprintf(f, "attach %d\n", getpid());
-     fprintf(f,"END_OF_SCRIPT\n");
-     fprintf(f, "DISPLAY='%s';export DISPLAY\n",CpvAccess(displayArgument));
-     fprintf(f,"/usr/X11R6/bin/xterm ");
-     fprintf(f," -title 'Node %d ' ",CmiMyPe());
-     fprintf(f," -e /usr/bin/gdb -x /tmp/start_gdb.$$ \n");
-     fprintf(f, "exit 0\n");
-     fclose(f);
-     if( -1 == chmod(gdbScript, 0755))
-     {
-        CmiPrintf("ERROR> chmod on script failed!\n");
-        return;
-     }
-     pid = fork();
-     if (pid < 0)
-        { perror("ERROR> forking to run debugger script\n"); exit(1); }
-     if (pid == 0)
-     {
-         //CmiPrintf("In child process to start script %s\n", gdbScript);
-         if (-1 == execvp(gdbScript, NULL))
-            CmiPrintf ("Error> Could not Execute Debugger Script: %s\n",strerror
-(errno));
-
-      }
-    }
-}
 
 
 
