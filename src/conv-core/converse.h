@@ -69,6 +69,7 @@ extern int Cmi_numpes;
 #define CpvInitialize(t,v) do {} while(0)
 #define CpvInitialized(v) 1
 #define CpvAccess(v) CMK_CONCAT(Cpv_Var_,v)
+#define CpvAccessOther(v, r) CMK_CONCAT(Cpv_Var_,v)
 
 extern void CmiMemLock();
 extern void CmiMemUnlock();
@@ -188,6 +189,7 @@ extern int Cmi_numpes;
   while(0)
 #define CpvInitialized(v) (0!=CMK_CONCAT(Cpv_Var_,v))
 #define CpvAccess(v) CMK_CONCAT(Cpv_Var_,v)[CmiMyPe()]
+#define CpvAccessOther(v, r) CMK_CONCAT(Cpv_Var_,v)[r]
 
 #define CmiMemLock() 0
 #define CmiMemUnlock() 0
@@ -294,6 +296,7 @@ for each processor in the node.
     } while(0)
 #define CpvInitialized(v) (0!=CMK_CONCAT(Cpv_Var_,v))
 #define CpvAccess(v) CMK_CONCAT(Cpv_Var_,v)[CmiMyRank()]
+#define CpvAccessOther(v, r) CMK_CONCAT(Cpv_Var_,v)[r]
 
 #endif
 
