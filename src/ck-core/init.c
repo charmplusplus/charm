@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.2  1995-06-13 14:33:55  gursoy
+ * Revision 2.3  1995-06-18 22:10:34  sanjeev
+ * removed CondSendInit
+ *
+ * Revision 2.2  1995/06/13  14:33:55  gursoy
  * *** empty log message ***
  *
  * Revision 1.16  1995/05/03  20:56:44  sanjeev
@@ -180,8 +183,6 @@ char **argv;
 #endif
         SysBocInit();
         CpvAccess(msgs_created) = CpvAccess(msgs_processed) = 0;
-        CondSendInit();
-
 
 
 	if (CmiMyPe() == 0)
