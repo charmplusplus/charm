@@ -848,17 +848,38 @@ case "$LANGUAGE" in
 "ampif")
         PRE_LIBRARIES="$PRE_LIBRARIES -lampif -lddt"
         POST_LIBRARIES="$POST_LIBRARIES $CMK_F90LIBS"
+        if [ ! -z "$CMK_F90OBJS" ] 
+        then
+          for f90obj in $CMK_F90OBJS
+          do
+            OBJECTFILES="$OBJECTFILES $CHARMLIB/$f90obj"
+          done
+        fi
 	;;
 "fem")
-        PRE_LIBRARIES="$PRE_LIBRARIES -lfem -lmetis"
+        PRE_LIBRARIES="$PRE_LIBRARIES -lfem -lddt -lmetis"
 	;;
 "femf")
-        PRE_LIBRARIES="$PRE_LIBRARIES -lfemf -lmetis"
+        PRE_LIBRARIES="$PRE_LIBRARIES -lfemf -lddt -lmetis"
         POST_LIBRARIES="$POST_LIBRARIES $CMK_F90LIBS"
+        if [ ! -z "$CMK_F90OBJS" ] 
+        then
+          for f90obj in $CMK_F90OBJS
+          do
+            OBJECTFILES="$OBJECTFILES $CHARMLIB/$f90obj"
+          done
+        fi
 	;;
 "f90charm")
         PRE_LIBRARIES="$PRE_LIBRARIES lib/libmain.a"
         POST_LIBRARIES="$POST_LIBRARIES $CMK_F90LIBS"
+        if [ ! -z "$CMK_F90OBJS" ] 
+        then
+          for f90obj in $CMK_F90OBJS
+          do
+            OBJECTFILES="$OBJECTFILES $CHARMLIB/$f90obj"
+          done
+        fi
 	;;
 esac
 
@@ -905,18 +926,4 @@ then
 fi
 
 Copyobj
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
