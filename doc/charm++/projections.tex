@@ -3,12 +3,12 @@
 \subsection{General Introduction}
 \label{introduction}
 \projections{} is a visualization tool to help you understand and analyze what it
-happening in your parallel (Charm++) program. This performance visualization and
-feedback tool has a much more refined understanding of user computation than is 
+happening in your parallel (\charmpp{}) program. This performance visualization and
+feedback tool has a much more refined understanding of user computation than is
 possible in traditional tools.
 
 \projections{} displays information about the request for creation and the
-actual creation of tasks in \charmpp\ programs. \projections{} also provides the
+actual creation of tasks in \charmpp{} programs. \projections{} also provides the
 function of post-mortem clock synchronization. Additionally, it can also
 automatically partition the execution of the running program into logically
 separate units, and automatically analyzes each individual partition.
@@ -26,7 +26,10 @@ directory.
 
 \subsection{Preparation Before Using \projections{}}
 To use \projections{}, you first have to make sure your program is compiled with
-proper \projections{} tracemode. There are 3 tracemodes available:
+proper \projections{} tracemode by giving corresponding compile option. Besides
+compile options, there are a set of command line options for \projections{}.
+
+There are 3 tracemodes available:
 \begin{itemize}
 \item
 Projections mode
@@ -91,6 +94,15 @@ Other command line options valid for all tracemodes and their uses include:
 {\tt +traceroot DIR}: to specify an existing directory for putting log/sum/count/sts
 files.
 
+{\tt +traceoff}: to turn off tracing at the beginning.
+\vskip 2pt
+
+Also, \charmpp{} allows user to start/stop tracing the execution at certain
+point of time by two \charmpp{} function calls {\tt traceBegin()} and {\tt traceEnd()}.
+They set/reset a flag to start/stop dumping tracing data from the local processor,
+so they should be called on all processors. Obviously tracing should be turned
+off at first (by command line option {\tt +traceoff}) if some period of time in
+middle of the execution is of interest to the user.
 
 \subsection{Compiling And Running \projections{}}
 
