@@ -579,21 +579,23 @@ a implemented as a global barrier.
 \subsubsection{Array Section}
 
 \charmpp{} now supports array section. Array section is a subset of array 
-elements in a chare array. You can do multicast in a section proxy.
+elements in a chare array. You can build a special proxy for a section and do 
+multicast via the proxy. Section reduction is not directly supported in the 
+section proxy. However, an optimized section multicast/reduction library called 
+CkMulticast is provided as a separate library module. 
 
-optimized section multicast and reduction library is also provided via 
-CkMulticast module. 
-
-You can construct an array section using:
+For each chare array "A" declared in a ci file, the definition of section proxy 
+of type "CProxySection\_A" is automatically generated. You can create an array 
+section proxy in your application by invoking ckNew() to CProxySection:
 
 \begin{alltt}
-  CkArrayIndexMax *elems;    // array indices
+  CkArrayIndexMax *elems;    // add array indices
   int numElems;
   CProxySection_Hello proxy = CProxySection_Hello::ckNew(helloArrayID, elems, numElems);
 \end{alltt}
 
-Once you have the array section proxy, you can do a multicast to all the 
-elements in the section, or send messages to one element using the index that
+Once you have the array section proxy, you can do multicast to all the 
+section members, or send messages to one member using its index that
 is local to the section, like these:
 
 \begin{alltt}
@@ -605,11 +607,12 @@ is local to the section, like these:
 You can move the section proxy in a message to another processor, and still 
 safely invoke the entry functions in the section proxy.
 
-In the multicast example above, number of section members of the messages are 
-sent to all memebers one by one, which is considered inefficient when multiple 
-section members are at same processor, in which case the messages can be 
-combined into one. To optimize the communication and in order to support the
-section reduction, a separate library(module) CkMulticast is provided.
+In the multicast example above, for a section with k members, total number 
+of k messages will be sent to all the memebers separately, which is considered 
+inefficient when multiple section members are at same processor, in which case 
+the messages can be combined into one. To optimize the communication and in 
+order to support the section reduction, a separate library called CkMulticast 
+is provided.
 
 To use the library, you need to compile and install CkMulticast library and 
 link your applications against the library using -module:
@@ -623,14 +626,19 @@ link your applications against the library using -module:
   charmc  -o hello hello.o -module CkMulticast -language charm++ 
 \end{alltt}
 
-CkMulticast library is implemented as a communication delegation for a 
+CkMulticast library is implemented as a delegation of communication for a 
 section proxy. Once an array section proxy is delegated, all the messages sent
-from the section proxy will be routed to the local delegation branch. 
+from the section proxy will be routed to the local delegation branch and 
+handled by it. 
+
 To use the CkMulticast delegation, you need to create the CkMulticastMgr Group 
-first, and setup the delegation in section proxy:
+first, and setup the delegation relationship between the section proxy and 
+CkMulticastMgr Group. You only need to create one CkMulticastMgr Group though,
+it can serve as multicast/reduction delegation for all array sections you 
+create:
 
 \begin{alltt}
-  CProxySection_Hello sectProxy = CProxySection_Hello::ckNew(helloArrayID, elems, numElems);
+  CProxySection_Hello sectProxy = CProxySection_Hello::ckNew(...);
   CkGroupID mCastGrpId = CProxy_CkMulticastMgr::ckNew();
   CkMulticastMgr *mcastGrp = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
 
@@ -640,8 +648,8 @@ first, and setup the delegation in section proxy:
   sectProxy.someEntry(...)           //multicast via delegation library as before
 \end{alltt}
 
-Note, in CkMulticast library, all messages sent in multicast must inherit 
-from CkMcastBaseMsg:
+Note, to use CkMulticast library, all multicast messages must inherit from 
+CkMcastBaseMsg. You will need multiple inheritance, as following:
 
 \begin{alltt}
 class HiMsg : public CkMcastBaseMsg, public CMessage_HiMsg
@@ -651,11 +659,12 @@ public:
 \};
 \end{alltt}
 
-Because of this restriction, no parameter marshalling can be used for multicast
-with CkMulticast library.
+Due to this restriction, you need to define message explicitly for multicast 
+entry functions and no parameter marshalling can be used for multicast with 
+CkMulticast library.
 
-To use section reduction, you need to first register a reduction callback to
-the CkMulticastMgr delegation:
+To use section reduction, the root of the reduction array element need to 
+ register a reduction callback function to the CkMulticastMgr delegation:
 
 \begin{alltt}
   CProxySection_Hello sectProxy;
@@ -663,25 +672,25 @@ the CkMulticastMgr delegation:
   mcastGrp->setReductionClient(sectProxy, callback, userData);
 \end{alltt}
 
-When array element in a section contributes to the reduction, it need to 
-retrieve the section cookie from the multicast msg, and use the cookie when
-talking to the delegation:
+When an array element in a section contributes to the reduction, it needs to 
+retrieve the section cookie from the multicast message received, and use the 
+cookie when talking to the delegation:
 
 \begin{alltt}
   CkSectionCookie cookie;
 
   void SayHi(HiMsg *msg)
-  {
-    CkGetSectionCookie(cookie, msg);     // get cookie
+  \{
+    CkGetSectionCookie(cookie, msg);     // update section cookie every time
     int data = thisIndex;
     mcastGrp->contribute(sizeof(int), &data, CkReduction::sum_int, cookie);
-  }
+  \}
 \end{alltt}
 
 Note, cookie is retrieved from the multicast message and contains information
 about the multicast section spanning tree information and reduction counter.
 You need to keep this cookie for next uses(i.e. define cookie outside of the 
-entry function).
+entry function instead of a local variable).
 
 \subsubsection{Array Syntax Changes}
 
