@@ -1012,7 +1012,7 @@ ComlibInstanceHandle::ComlibInstanceHandle(const ComlibInstanceHandle &h)
     _dmid = h._dmid;
     toForward = h.toForward;        
 
-    //ComlibPrintf("In Copy Constructor\n");
+    ComlibPrintf("In Copy Constructor\n");
     _srcPe = h._srcPe;
 
     reset();
