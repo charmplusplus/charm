@@ -573,6 +573,10 @@ int   arg_server;
 int   arg_server_port=0;
 char *arg_server_auth=NULL;
 
+#if CMK_SCYLD
+int   arg_startpe;
+#endif
+
 void arg_init(int argc, char **argv)
 {
   static char buf[1024];
@@ -599,6 +603,9 @@ void arg_init(int argc, char **argv)
   pparam_str(&arg_display,        0, "display",       "X Display for xterm");
   pparam_flag(&arg_in_xterm,      0, "in-xterm",      "Run each node in an xterm window");
   pparam_str(&arg_xterm,          0, "xterm",         "which xterm to use");
+#endif
+#ifdef CMK_SCYLD
+  pparam_int(&arg_startpe,   0, "startpe",   "first pe to start job(SCYLD)");
 #endif
   pparam_flag(&arg_help,	0, "help", "print help messages");
 
@@ -1727,6 +1734,7 @@ void nodetab_init_for_scyld()
   for (i=-1; i<maxNodes; i++) {
     char hostname[256];
     if (bproc_nodestatus(i) != bproc_node_up) continue;
+    if (i!= -1 && i<arg_startpe) continue;
     sprintf(hostname, "%d", i);
     nodetab_makehost(hostname, &group);
     if (nodetab_rank0_size == arg_requested_pes) break;
