@@ -39,15 +39,17 @@ class ChareInfo {
     const char *name;
     int size;
     int classIdx;
-    int migCtor;
+    int defCtor,migCtor; //Default (no argument) and migration constructor indices
     int numbases;
     int bases[16];
     ChareInfo(const char *n, int s) : name(n), size(s), classIdx(1) {
-      migCtor=-1;
+      defCtor=migCtor=-1;
       numbases = 0;
     }
     void setClassIdx(int idx) { classIdx = idx; }
     int getClassIdx(void) { return classIdx; }
+    void setDefaultCtor(int idx) { defCtor = idx; }
+    int getDefaultCtor(void) { return defCtor; }
     void setMigCtor(int idx) { migCtor = idx; }
     int getMigCtor(void) { return migCtor; }
     void addBase(int idx) { bases[numbases++] = idx; }

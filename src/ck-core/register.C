@@ -69,6 +69,11 @@ int CkRegisterChare(const char *name, int dataSz)
 }
 
 extern "C"
+void CkRegisterDefaultCtor(int chareIdx, int ctorEpIdx)
+{
+  _chareTable[chareIdx]->setDefaultCtor(ctorEpIdx);
+}
+extern "C"
 void CkRegisterMigCtor(int chareIdx, int ctorEpIdx)
 {
   _chareTable[chareIdx]->setMigCtor(ctorEpIdx);
