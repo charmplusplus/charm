@@ -808,7 +808,7 @@ void comm_thread(threadInfo *tinfo)
   for (;;) {
     char *msg = getFullBuffer();
     if (!msg) { 
-      tCURRTIME += (CmiWallTimer()-tSTARTTIME);
+//      tCURRTIME += (CmiWallTimer()-tSTARTTIME);
       tCOMMTHQ->enq(CthSelf());
       CthSuspend(); 
       tSTARTTIME = CmiWallTimer();
@@ -818,6 +818,7 @@ void comm_thread(threadInfo *tinfo)
     /* schedule a worker thread, if small work do it itself */
     if (CmiBgMsgType(msg) == SMALL_WORK) {
       if (CmiBgMsgRecvTime(msg) > tCURRTIME)  tCURRTIME = CmiBgMsgRecvTime(msg);
+      tSTARTTIME = CmiWallTimer();
       /* call user registered handler function */
       ProcessMessage(msg);
     }
@@ -832,7 +833,7 @@ void comm_thread(threadInfo *tinfo)
       }
     }
     /* let other communication thread do their jobs */
-    tCURRTIME += (CmiWallTimer()-tSTARTTIME);
+//    tCURRTIME += (CmiWallTimer()-tSTARTTIME);
     CthYield();
     tSTARTTIME = CmiWallTimer();
   }
@@ -868,20 +869,22 @@ void work_thread(threadInfo *tinfo)
     }
     /* if no msg is ready, put it to sleep */
     if ( msg == NULL ) {
-      tCURRTIME += (CmiWallTimer()-tSTARTTIME);
+//      tCURRTIME += (CmiWallTimer()-tSTARTTIME);
       CthSuspend();
       tSTARTTIME = CmiWallTimer();
       DEBUGF(("[%d] work thread %d awakened.\n", BgMyNode(), tMYID));
       continue;
     }
     DEBUGF(("[%d] work thread %d has a msg.\n", BgMyNode(), tMYID));
-    if (CmiBgMsgRecvTime(msg) > tCURRTIME)  tCURRTIME = CmiBgMsgRecvTime(msg);
+
+    if (CmiBgMsgRecvTime(msg) > tCURRTIME) tCURRTIME = CmiBgMsgRecvTime(msg);
+    // don't count thread overhead
+    tSTARTTIME = CmiWallTimer();
     DEBUGF(("call ProcessMessage\n"));
     // ProcessMessage may trap into scheduler
     ProcessMessage(msg);
 
     if (fromQ2 == 1) q2.deq();
-
     DEBUGF(("[%d] work thread %d finish a msg.\n", BgMyNode(), tMYID));
 
     /* let other work thread do their jobs */
