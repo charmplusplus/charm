@@ -1,0 +1,144 @@
+
+\section{3D FFT Library}
+\subsection{Introduction and Motivation}
+The 3D FFT library provides an interface to do paralle FFT computation
+in a scalable fashion. 
+
+The parallelization is achieved by splitting the 3D transform into
+multiple phases. There are two possibilities for doing the splitting:
+One is dividing the data space (over which the fft is to be performed)
+into a set of slabs (figure 1). Each slab is essentially a collection
+of planes). First, 2D FFTs are done over the planes in the slab. Then
+a distributed 'transform' will send the data to destination so that
+fft in the third direction is performed. This approach takes two
+computation phases and one 'transform' phase. The second way for
+splitting is dividing the data into collections of pencils. First, 1D
+FFTs are computed over the pencils; then a 'transform' is performed
+and 1D FFTs are done over second dimention; again a 'transform' is
+performed and FFTs are computed over the last dimension. So this
+approach takes three computation phases and two 'transform' phases. In
+first approach, the parallelism is limited by the number of
+planes.While in second approach, it's limited by the number of
+pencils. So the second approach provides finer grained parallelism and
+it's possible to perform better when the number of processing units is
+larger than the number of planes.
+
+\subsection{Compilation and Execution}
+
+To install the FFT library, you will need to have charm++ installed in
+you system. You can follow the Charm++ manual to do that. Also you
+will need to have FFTW (version 2.1.5) installed. FFTW can be
+downloaded from http://www.fftw.org.
+
+The FFT library source is at
+your-charm-dir/src/libs/ck-libs/fftlib. Before installation of the
+library, make sure that the path for FFTW library is consistent with
+your FFTW installation. Then cd to your-charm-dir/tmp, and do 'make
+fftlib'. To compile a program using the fftlib, pass the '-lfftlib
+-L(your-fftwlib-dir) -lfftw' flag to charmc.
+
+\subsection{Library Interfaces}
+There are two types of interfaces provided by the library: Charm++
+based and AMPI based. 
+
+\begin{itemize}
+\item Charm++ based - this is the raw interface of charm++.  
+
+To use the charm++ based library, user has to create their own charm
+arrays which derive from predefined arrays in library. By overiding
+default methods, user can add in additional functions. 
+
+(sample code here)
+\begin{alltt}
+
+.ci File:  
+mainmodule testpencil {
+        extern module fftlib;
+        readonly CProxy_myXLines xlinesProxy;
+        readonly CProxy_myYLines ylinesProxy;
+        readonly CProxy_myZLines zlinesProxy;
+ 
+        mainchare main {
+                entry main();
+        };
+        array [2D] myXLines:XLines {
+                entry myXLines(LineFFTinfo &info);
+                entry void doIt();
+        };
+        array [2D] myYLines:YLines {
+                entry myYLines(LineFFTinfo &info);
+        };
+        array [2D] myZLines:ZLines {
+                entry myZLines(LineFFTinfo &info);
+        };
+};
+
+
+.C File:
+
+...
+class myXLines: public XLines {
+ public:
+  myXLines(CkMigrateMessage *m):XLines(m) {}
+  myXLines(LineFFTinfo &i):XLines(i) {
+    ... // Your stuff here
+  }
+ 
+  void doIt() {
+    ... // Your stuff here
+    doTranspose();  // Inherited method from predefined library class
+    ... // Your stuff here
+  }
+};
+
+// Similarly for myYLines and myZLines
+...
+
+main::main(CkArgMsg *m)
+{
+  ...
+
+  xlinesProxy = CProxy_myXLines::ckNew();  // Create the new arrays
+  ylinesProxy = CProxy_myYLines::ckNew();
+  zlinesProxy = CProxy_myZLines::ckNew();
+
+  zlinesProxy.setReductionClient(reductionHandler, (void *)NULL);
+
+  ...
+                                                                                
+  for (z = 0; z < sizeZ; z++) {
+    for (y = 0; y < sizeY; y++) {
+      xlinesProxy(y, z).insert(info, numPes);  // Dynamically Insert the arrays 
+    }
+    base += numProcForSizeZ;
+  }
+  xlinesProxy.doneInserting();
+  
+  // Similarly for ylinesProxy and zlinesProxy
+  ...
+
+  xlinesProxy.doIt();  // Start the FFT compuation
+
+  ...
+}
+
+\end{alltt}
+
+\item AMPI based - MPI-like interface which facilitates MPI program to
+use the library.
+
+The AMPI interface has five functions:
+\begin{itemize}
+\item init\_fftlib - initialization of library. This will create
+charm++ level data structures, prepare for FFT computation.
+\item start\_fft - start the FFT. 
+\item wait\_fft - wait for the FFT to finish. 
+\item start\_ifft - start the inverse FFT. (similar as start\_fft)
+\item wait\_ifft - wait for the inverse FFT to finish. ( similar as wait\_fft)
+\end{itemize}
+
+(sample code here)
+\begin{alltt}
+\end{alltt}
+
+\end{itemize}
