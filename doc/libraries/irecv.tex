@@ -6,7 +6,7 @@ There are three functions in Irecv library.
 
 1. void send(void *buf, int size, int dest, int tag, int refno);
 "buf" is a message buffer containing the data to be sent; "size" is the total size of the message in byte. 
-Like in MPI_send, the tag is used for matching message with dest. The integer "refno" is a reference number, usually the iteration number.
+Like in MPI\_send, the tag is used for matching message with dest. The integer "refno" is a reference number, usually the iteration number.
   
 
 2. void irecv(void *buf, int size, int source, int tag, int refno);
@@ -15,7 +15,7 @@ irecv will register tags and pointer to the library, that it copy the matching m
 3 void iwaitAll(recvCallBack f, void *data, int refno);
 Wait for all the previously issued irecvs to complete, and then it calls the callback function "f" with "data" as argument.
 
-To use Irecv library, create a chare array which is inherited from class "receiver". The sender jneed to allocate the "receiverMsg" message, fill in fields and invoke 'generic' method in the remote object; The receiver will specify the matching tags and buffer to get the message. After irecv, calling iwaitAll to wait all the receive functions calls complete. However, the iwaitAll is nonblocking and the callback functions will be called after receive calls complete.
+To use Irecv library, create a chare array which is inherited from class "receiver". The sender need to allocate the "receiverMsg" message, fill in fields and invoke 'generic' method in the remote object; The receiver will specify the matching tags and buffer to get the message. After irecv, calling iwaitAll to wait all the receive functions calls complete. However, the iwaitAll is nonblocking and the callback functions will be called after receive calls complete.
 
 Here is an example:
 
