@@ -214,6 +214,7 @@ void Array1D::RecvMigratedElement(ArrayMigrateMessage *msg)
   new_msg->arrayID = thishandle;
   new_msg->groupID = thisgroup;
   new_msg->arrayPtr = this;
+  new_msg->packData = msg->elementData;
   
   CkCreateChare(elementChareType, elementMigrateType, new_msg, &vid, CkMyPe());
 

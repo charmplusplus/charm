@@ -89,6 +89,7 @@ public:
   CkGroupID groupID;
   Array1D *arrayPtr;
   int index;
+  void* packData;
 };
 
 class ArrayElementExitMessage : public CMessage_ArrayElementExitMessage
