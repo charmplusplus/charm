@@ -2,16 +2,13 @@
 ** Greg Koenig (koenig@uiuc.edu)
 **
 ** EFFICIENT DATA STRUCTURES
-**    + pre-allocate array of handles at startup
-**    + use same structure (with unions) for send/receive/persistent handles
-**    + need to update AsyncMsgCount in more cases now
-**
 **    * pass index as context instead of pointers
 **
 **    * fix persistent handles so they send data in chunks
 **      (probably need a "number of chunks" field in rdma/persistent
 **       send and receive handles that we either set to 1 or to
-**       MAX_RDMA_CHUNKS)
+**       MAX_RDMA_CHUNKS; this can be used to get around the max size for
+**       a persistent handle since we just chunk the data like rdma)
 **      (also, allocate MAX_RDMA_CHUNKS in each handle for cacheentries
 **       instead of doing all that dynamic allocation mess we have now)
 **
@@ -439,7 +436,6 @@ void CMI_VMI_Stream_Completion_Handler (PVOID ctxt, VMI_STATUS sstatus)
     CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Deregister()");
 
     handle->allocated = FALSE;
-    // GAK - more needed to deallocate handle?
   }
 }
 
@@ -536,7 +532,6 @@ void CMI_VMI_RDMA_Completion_Handler (PVMI_RDMA_OP op, PVOID ctxt,
   handle->refcount--;
   if (handle->refcount < 1) {
     handle->allocated = FALSE;
-    // GAK - deallocate any more state associated with handle here
   }
 }
 
@@ -570,8 +565,6 @@ void CMI_VMI_RDMA_Publish_Handler (PVMI_CONNECT conn, PVMI_REMOTE_BUFFER rbuf)
   handle = (CMI_VMI_Handle_T *) (VMI_ADDR_CAST) rbuf->lctxt;
 
   if (handle->data.send.send_handle_type == CMI_VMI_SEND_HANDLE_TYPE_RDMA) {
-    //putaddr = handle->msg + handle->data.rdma.bytes_sent;
-    //putlen = handle->msgsize - handle->data.rdma.bytes_sent;
     putaddr = handle->msg + handle->data.send.data.rdma.bytes_sent;
     putlen = handle->msgsize - handle->data.send.data.rdma.bytes_sent;
 
@@ -595,7 +588,6 @@ void CMI_VMI_RDMA_Publish_Handler (PVMI_CONNECT conn, PVMI_REMOTE_BUFFER rbuf)
     rdmaop->rbuffer = rbuf;
     rdmaop->roffset = 0;
 
-    //handle->data.rdma.bytes_sent += putlen;
     handle->data.send.data.rdma.bytes_sent += putlen;
 
     if (complete_flag) {
@@ -624,8 +616,6 @@ void CMI_VMI_RDMA_Publish_Handler (PVMI_CONNECT conn, PVMI_REMOTE_BUFFER rbuf)
     proc = (CMI_VMI_Process_Info_T *) VMI_CONNECT_GET_RECEIVE_CONTEXT (conn);
     rank = proc->rank;
 
-    //putaddr = handle->msg + handle->data.rdmabroad.bytes_sent[rank];
-    //putlen = handle->msgsize - handle->data.rdmabroad.bytes_sent[rank];
     putaddr = handle->msg + handle->data.send.data.rdmabroad.bytes_sent[rank];
     putlen = handle->msgsize - handle->data.send.data.rdmabroad.bytes_sent[rank];
 
@@ -649,7 +639,6 @@ void CMI_VMI_RDMA_Publish_Handler (PVMI_CONNECT conn, PVMI_REMOTE_BUFFER rbuf)
     rdmaop->rbuffer = rbuf;
     rdmaop->roffset = 0;
 
-    //handle->data.rdmabroad.bytes_sent[rank] += putlen;
     handle->data.send.data.rdmabroad.bytes_sent[rank] += putlen;
 
     if (complete_flag) {
@@ -671,9 +660,6 @@ void CMI_VMI_RDMA_Publish_Handler (PVMI_CONNECT conn, PVMI_REMOTE_BUFFER rbuf)
   }
 #if CMK_PERSISTENT_COMM
   else {
-    //handle->data.persistent.rbuf = rbuf;
-    //handle->data.persistent.ready++;
-
     handle->data.send.data.persistent.rbuf = rbuf;
     handle->data.send.data.persistent.ready++;
   }
@@ -1503,6 +1489,8 @@ void CMI_VMI_Send_Spanning_Children (int msgsize, char *msg)
 
     handle.refcount = childcount + 1;
 
+    CMI_VMI_AsyncMsgCount += childcount;
+
     startrank = CMI_BROADCAST_ROOT (msg) - 1;
     for (i = 1; i <= CMI_VMI_BROADCAST_SPANNING_FACTOR; i++) {
       destrank = _Cmi_mype - startrank;
@@ -1541,7 +1529,7 @@ void CMI_VMI_Send_Spanning_Children (int msgsize, char *msg)
     handle.msgsize = msgsize;
     handle.handle_type = CMI_VMI_HANDLE_TYPE_SEND;
     handle.data.send.commhandle = NULL;
-    handle.data.send.send_handle_type = CMI_VMI_SEND_HANDLE_TYPE_RDMA;
+    handle.data.send.send_handle_type = CMI_VMI_SEND_HANDLE_TYPE_RDMABROAD;
 
     status = VMI_Pool_Allocate_Buffer (CMI_VMI_RDMABytesSent_Pool,
 	 (PVOID) &(handle.data.send.data.rdmabroad.bytes_sent), NULL);
@@ -1625,10 +1613,8 @@ void ConverseInit (int argc, char **argv, CmiStartFn startFn,
   char *a;
   int i;
 
-  //char *synckey;
   PUCHAR synckey;
   char *vmikey;
-  //char *initkey;
   PUCHAR initkey;
 
   char *vmiinlinesize;
@@ -1831,6 +1817,12 @@ void ConverseInit (int argc, char **argv, CmiStartFn startFn,
        CMI_VMI_BUCKET5_PREALLOCATE, CMI_VMI_BUCKET5_GROW, VMI_POOL_CLEARONCE,
        &CMI_VMI_Bucket5_Pool);
   CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Create_Buffer_Pool()");
+
+  /* Initialize handle array. */
+  for (i = 0; i < CMI_VMI_MAX_HANDLES; i++) {
+    (&(CMI_VMI_Handle_Array[i]))->index = i;
+    (&(CMI_VMI_Handle_Array[i]))->allocated = FALSE;
+  }
 
   /* Create the FIFOs for holding local and remote messages. */
   CpvAccess (CmiLocalQueue) = CdsFifo_Create ();
@@ -2292,11 +2284,7 @@ CmiCommHandle CmiAsyncSendFn (int destrank, int msgsize, char *msg)
     commhandle->count = 1;
     phandle->data.send.commhandle = commhandle;
 
-    // CANNOT DO THIS -->   CMI_VMI_AsyncMsgCount++;
-    // Because CMI_VMI_RDMA_Completion_Handler() does not properly
-    // decrement for the case of persistent handles.
-    //
-    // UPDATE: Most likely this is fixed with REFACTOR_HANDLES.
+    CMI_VMI_AsyncMsgCount++;
 
     putaddr = msg;
     putlen = msgsize;
