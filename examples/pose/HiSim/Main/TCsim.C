@@ -243,7 +243,7 @@ BGproc::BGproc(BGprocMsg *m)
     CkPrintf("Info> timing factor %e ...\n", (double)factor);
     CkPrintf("Info> invoking startup task from proc 0 ...\n");
     if (config.skip_on)
-      CkPrintf("Info> Skipping startup to %d/%d\n", startEvt, tline.length());
+      CkPrintf("Info> Skipping startup to %d/%d at time %lld\n", startEvt, tline.length(), (CmiInt8)taskList[startEvt].startTime);
   }
 #if 1
     for (int i=startEvt; i<numTasks; i++) {

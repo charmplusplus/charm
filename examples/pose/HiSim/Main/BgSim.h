@@ -57,10 +57,17 @@ class Position {
 	Position(int a,int b,int c): x(a),y(b),z(c){};
 
 	void init(int id) {
+#if 0
 		z = id / (netLength * netHeight);
 		id = id - z*(netLength * netHeight);
 		y = id / (netLength);
 		x = id - y*netLength;
+#else
+		x = id / (netHeight*netWidth);
+		id = id - x*(netHeight*netWidth);
+		y = id/netWidth;
+		z = id - y*netWidth;
+#endif
 	}
 
 	void initnew(int a,int b,int c) { x = a; y = b; z = c; }
