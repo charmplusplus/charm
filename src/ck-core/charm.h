@@ -104,6 +104,7 @@ typedef struct _ckGroupID{
 #endif
 } CkGroupID;
 
+typedef CkGroupID CkNodeGroupID;
 
 typedef int CkFutureID;
 

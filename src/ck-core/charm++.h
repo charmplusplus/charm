@@ -266,6 +266,7 @@ public:
   CkSectionCookie(int e, void *p, int r):  pe(e), val(p), redNo(r) {}
 };
 PUPbytes(CkSectionCookie) //FIXME: write a real pup routine
+PUPmarshall(CkSectionCookie)
 
 class CkSectionID {
 public:
@@ -349,6 +350,7 @@ class IrrGroup : public Chare {
     virtual void pup(PUP::er &p);//<- pack/unpack routine
     inline const CkGroupID &ckGetGroupID(void) const {return thisgroup;}
     inline CkGroupID CkGetGroupID(void) const {return thisgroup;}
+    virtual int isNodeGroup() { return 0; };
 
     ///Map an index (user-defined meaning) to a component:
     virtual CkComponent *ckLookupComponent(int userIndex);
@@ -393,6 +395,27 @@ public:
 	CHARM_INPLACE_NEW
 };
 
+/**************************** CkDelegateMgr **************************/
+
+//an "interface" class-- all delegated messages are routed via a DelegateMgr.
+// The default action is to deliver the message directly.
+class CkDelegateMgr : public IrrGroup {
+  public:
+    virtual ~CkDelegateMgr(); //<- so children can have virtual destructor
+    virtual void ChareSend(int ep,void *m,const CkChareID *c,int onPE);
+
+    virtual void GroupSend(int ep,void *m,int onPE,CkGroupID g);
+    virtual void GroupBroadcast(int ep,void *m,CkGroupID g);
+
+    virtual void NodeGroupSend(int ep,void *m,int onNode,CkNodeGroupID g);
+    virtual void NodeGroupBroadcast(int ep,void *m,CkNodeGroupID g);
+
+    virtual void ArrayCreate(int ep,void *m,const CkArrayIndexMax &idx,int onPE,CkArrayID a);
+    virtual void ArraySend(int ep,void *m,const CkArrayIndexMax &idx,CkArrayID a);
+    virtual void ArrayBroadcast(int ep,void *m,CkArrayID a);
+    virtual void ArraySectionSend(int ep,void *m,CkArrayID a,CkSectionCookie &s);
+};
+
 
 /**************************** Proxies **************************/
 
@@ -427,20 +450,51 @@ class CProxy {
 
 class CProxy {
   private:
-    CkGroupID delegatedTo;
+    CkDelegateMgr *delegatedMgr;      // can be either a group or a nodegroup
   protected: //Never allocate CProxy's-- only subclass them.
-    CProxy() { /*delegatedTo.idx = -1;*/ delegatedTo.setZero(); }
-    CProxy(CkGroupID dTo) { delegatedTo = dTo; }
+    CProxy() { /*delegatedTo.idx = -1;*/ delegatedMgr=NULL; }
+    CProxy(CkGroupID dTo) { delegatedMgr=(dTo.isZero())?NULL:(CkDelegateMgr *)CkLocalBranch(dTo); }
   public:
-    void ckDelegate(CkGroupID to) {delegatedTo=to;}
-    void ckUndelegate(void) {/*delegatedTo.idx = -1;*/ delegatedTo.setZero();}
-    int ckIsDelegated(void) const {/*return (delegatedTo.idx != -1);*/ return(!delegatedTo.isZero());}
-    CkGroupID ckDelegatedIdx(void) const {return delegatedTo;}
-    CkDelegateMgr *ckDelegatedTo(void) const {
-    	return (CkDelegateMgr *)CkLocalBranch(delegatedTo);
+    void ckDelegate(CkDelegateMgr *to) { delegatedMgr = to; }
+#if 0
+    void ckDelegate(CkGroupID to) {	// obsolete
+	delegatedMgr=(CkDelegateMgr *)CkLocalBranch(to);
     }
+    void ckNodeDelegate(CkGroupID to) {	// obsolete
+	delegatedMgr=(CkDelegateMgr *)CkLocalNodeBranch(to);
+    }
+#endif
+    void ckUndelegate(void) {/*delegatedTo.idx = -1;*/ delegatedMgr=NULL;}
+    int ckIsDelegated(void) const {/*return (delegatedTo.idx != -1);*/ return(delegatedMgr!=NULL);}
+    CkGroupID ckDelegatedIdx(void) const {
+    	if (delegatedMgr) return delegatedMgr->CkGetGroupID();
+	else {
+	  CkGroupID gid; gid.setZero();
+	  return gid;
+	}
+    }
+    CkDelegateMgr *ckDelegatedTo(void) const { return delegatedMgr; }
     void pup(PUP::er &p) {
+      CkGroupID delegatedTo;
+      delegatedTo.setZero();
+      int isNodeGroup = 0;
+      if (!p.isUnpacking()) {
+        if (delegatedMgr) {
+          delegatedTo = delegatedMgr->CkGetGroupID();
+ 	  isNodeGroup = delegatedMgr->isNodeGroup();
+        }
+      }
       p|delegatedTo;
+      p|isNodeGroup;
+      if (p.isUnpacking()) {
+	if (!delegatedTo.isZero()) {
+//	  isNodeGroup? ckNodeDelegate(delegatedTo): ckDelegate(delegatedTo);
+	  if (isNodeGroup)
+		delegatedMgr=(CkDelegateMgr *)CkLocalNodeBranch(delegatedTo);
+	  else
+		delegatedMgr=(CkDelegateMgr *)CkLocalBranch(delegatedTo);
+	}
+      }
     }
 };
 
@@ -541,7 +595,6 @@ class CkReductionClientBundle : public CkCallback {
 		{ super::ckSetReductionClient(cb); }\
 
 class CProxy_NodeGroup;
-typedef CkGroupID CkNodeGroupID;
 class CProxy_CkArrayReductionMgr;
 class CProxy_Group : public CProxy {
 
@@ -704,25 +757,6 @@ typedef CProxyElement_Group CProxyElement_IrrGroup;
 
 
 //(CProxy_ArrayBase is defined in ckarray.h)
-
-//an "interface" class-- all delegated messages are routed via a DelegateMgr.
-// The default action is to deliver the message directly.
-class CkDelegateMgr : public IrrGroup {
-  public:
-    virtual ~CkDelegateMgr(); //<- so children can have virtual destructor
-    virtual void ChareSend(int ep,void *m,const CkChareID *c,int onPE);
-
-    virtual void GroupSend(int ep,void *m,int onPE,CkGroupID g);
-    virtual void GroupBroadcast(int ep,void *m,CkGroupID g);
-
-    virtual void NodeGroupSend(int ep,void *m,int onNode,CkNodeGroupID g);
-    virtual void NodeGroupBroadcast(int ep,void *m,CkNodeGroupID g);
-
-    virtual void ArrayCreate(int ep,void *m,const CkArrayIndexMax &idx,int onPE,CkArrayID a);
-    virtual void ArraySend(int ep,void *m,const CkArrayIndexMax &idx,CkArrayID a);
-    virtual void ArrayBroadcast(int ep,void *m,CkArrayID a);
-    virtual void ArraySectionSend(int ep,void *m,CkArrayID a,CkSectionCookie &s);
-};
 
 //Defines the actual "Group"
 #include "ckreduction.h"

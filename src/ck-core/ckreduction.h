@@ -398,6 +398,7 @@ class Group : public CkReductionMgr
  public:
 	Group();
 	Group(CkMigrateMessage *msg):CkReductionMgr(msg) {}
+	virtual int isNodeGroup() { return 0; }
 	virtual void pup(PUP::er &p);
 
 	CK_REDUCTION_CONTRIBUTE_METHODS_DECL
@@ -517,6 +518,7 @@ class NodeGroup : public CkNodeReductionMgr {
     ~NodeGroup();
     inline const CkGroupID &ckGetGroupID(void) const {return thisgroup;}
     inline CkGroupID CkGetNodeGroupID(void) const {return thisgroup;}
+    virtual int isNodeGroup() { return 1; }
 
     virtual void pup(PUP::er &p);
 
