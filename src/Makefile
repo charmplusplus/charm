@@ -474,14 +474,15 @@ yacc-cpm:
 
 clean:
 	rm -f charmreplay charmxlat charmfilter charmxlat++ charmfilter++
-	rm -f conv-host conv-host-notify conv-host-silent
-	rm -f TAGS basics dirs+sources cmk_extras core
+	rm -f conv-host conv-host-notify conv-host-silent charmxi conv-cpm
+	rm -f TAGS basics cmk_extras core
 	rm -f core #*#
 	rm -f core *.a
 	rm -f core *.o
 	rm -f core *~
+
+veryclean: clean
+	rm -rf dirs+sources
 	rm -rf ../bin
 	rm -rf ../lib
 	rm -rf ../include
-
-
