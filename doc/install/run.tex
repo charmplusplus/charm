@@ -12,7 +12,10 @@
 % REVISION HISTORY:
 %
 % $Log$
-% Revision 1.5  1995-11-17 17:19:37  brunner
+% Revision 1.6  1995-11-20 16:47:00  brunner
+% Added comments about simulator only working for Charm/Charm++
+%
+% Revision 1.5  1995/11/17  17:19:37  brunner
 % Incorporated proofreading comments from 11-16 afternoon
 %
 % Revision 1.4  1995/11/16  23:59:02  brunner
@@ -139,13 +142,16 @@ the particular machine.
 \subsection[Running with the simulator]{Running with the simulator}
 
 Converse provides a simple parallel machine simulator for developing
-and debugging purposes. It simulates a message passing system. The
-simulated machine is a collection of processing nodes connected with a
+and debugging purposes.  It simulates a message passing system
+composed of a collection of processing nodes connected with a
 communication network. Each node is composed of an application
 processor, local memory, and a communication coprocessor.  The
 simulator is a beta version, and it is not yet proven that the
 simulator timers for performance measurements produce realistic
-results.
+results. Currently only Charm and Charm++ programs can take advantage
+of the simulator features, although other Converse based systems will
+still function without simulated network delays.
+
 
 In order to run Converse programs with the simulator:
 \begin{itemize}
