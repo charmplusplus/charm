@@ -8,8 +8,9 @@
 #include "ck.h"
 #include "queueing.h"
 
-#ifdef CONVERSE_VERSION_ELAN
-#define ELAN_MESSAGE_SIZE 16384
+#if CONVERSE_VERSION_ELAN
+extern int SMALL_MESSAGE_SIZE;
+#define ELAN_MESSAGE_SIZE SMALL_MESSAGE_SIZE
 #define SIZEFIELD(m) ((int *)((char *)(m)-2*sizeof(int)))[0]
 #define CMI_MSG_TYPE(msg)    ((CmiMsgHeaderBasic *)msg)->type
 
@@ -32,7 +33,7 @@ extern "C"
 void* CkAllocMsg(int msgIdx, int msgBytes, int prioBits)
 {
   register envelope* env;
-#ifdef CONVERSE_VERSION_ELAN
+#if CONVERSE_VERSION_ELAN
   register int tsize = sizeof(envelope) + ALIGN(msgBytes) 
     + sizeof(int)*PW(prioBits);
 
@@ -68,7 +69,7 @@ void* CkAllocBuffer(void *msg, int bufsize)
   register envelope *env = UsrToEnv(msg);
   register envelope *packbuf;
 
-#ifdef CONVERSE_VERSION_ELAN
+#if CONVERSE_VERSION_ELAN
   register int tsize = sizeof(envelope) + ALIGN(bufsize) 
     + sizeof(int)*PW(env->getPriobits());
   
@@ -105,7 +106,7 @@ extern "C"
 void  CkFreeMsg(void *msg)
 {
   if (msg!=NULL) {
-#ifdef CONVERSE_VERSION_ELAN
+#if CONVERSE_VERSION_ELAN
     register envelope *env = UsrToEnv(msg);
     if(SIZEFIELD(env) ==  ELAN_MESSAGE_SIZE) {
       CqsEnqueue(localMsgBuf, env);
