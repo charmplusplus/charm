@@ -12,7 +12,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 1.5  1995-10-30 16:06:49  milind
+# Revision 1.6  1995-11-01 22:04:21  milind
+# Added automatic generation of index.
+#
+# Revision 1.5  1995/10/30  16:06:49  milind
 # Added one more latex stage to remove undefined references.
 #
 # Revision 1.4  1995/10/10  21:40:41  jyelon
@@ -48,14 +51,19 @@ manual/manual.html: $(TEXFILES)
 
 manual.ps: manual.dvi
 	dvips -o manual.ps manual.dvi
+	cp manual.ps /charm/manuals-comp/converse.manual/
 
 manual.dvi: $(TEXFILES)
+	rm -f index.tex
+	echo > index.tex
 	latex manual.tex
+	texindex manual
+	mv manual.ind index.tex
 	latex manual.tex
 
 co:
 	co Makefile $(TEXFILES)
 
 clean:	
-	rm -f *.aux *.log *.dvi *.ps *.idx *.toc *~
+	rm -f *.aux *.log *.dvi *.ps *.idx *.toc *~ index.tex
 	rm -rf manual
