@@ -594,8 +594,5 @@ private:
 
 };
 
-inline CkLocMgr *CProxy_ArrayBase::ckLocMgr(void) const 
-	{return ckLocalBranch()->getLocMgr(); }
-
 
 #endif

@@ -264,6 +264,9 @@ CProxyElement_ArrayBase::CProxyElement_ArrayBase(const ArrayElement *e)
 	:CProxy_ArrayBase(e), _idx(e->ckGetArrayIndex())
 	{}
 
+CkLocMgr *CProxy_ArrayBase::ckLocMgr(void) const 
+	{return ckLocalBranch()->getLocMgr(); }
+
 CK_REDUCTION_CLIENT_DEF(CProxy_ArrayBase,ckLocalBranch());
 
 CkArrayOptions::CkArrayOptions(void) //Default: empty array
