@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1995-06-15 20:28:53  brunner
+ * Revision 2.2  1995-06-22 19:36:13  brunner
+ * Added CMK_COMPILER_LIKES_STATIC_PROTO
+ *
+ * Revision 2.1  1995/06/15  20:28:53  brunner
  * Removed typedefs that I had added to make the HP cc compiler work.
  * It works without them with gcc.
  *
@@ -65,5 +68,8 @@
 
 #define CMK_NO_SHARED_VARS_AT_ALL
 /* #define CMK_SHARED_VARS_EXEMPLAR */
+
+#define CMK_COMPILER_LIKES_STATIC_PROTO
+/* #define CMK_COMPILER_HATES_STATIC_PROTO */
 
 #endif
