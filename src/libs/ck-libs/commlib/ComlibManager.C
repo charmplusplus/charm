@@ -20,6 +20,7 @@ void recv_msg(void *msg){
     ComlibPrintf("%d:In recv_msg\n", CkMyPe());
 
     register envelope* env = (envelope *)msg;
+    env->setUsed(0);
     CProxyElement_ArrayBase ap(env->array_mgr(), env->array_index());
     ComlibPrintf("%d:Array Base created\n", CkMyPe());
     ap.ckSend((CkArrayMessage *)EnvToUsr(env), env->array_ep());
@@ -68,6 +69,15 @@ void initComlibManager(void){
     PUPable_reg(DummyStrategy); 
     PUPable_reg(MPIStrategy); 
     PUPable_reg(StreamingStrategy);     
+
+    CpvInitialize(int, RecvmsgHandle);
+    CpvAccess(RecvmsgHandle) = CmiRegisterHandler((CmiHandler)recv_msg);
+    
+    //CmiPrintf("[%d] Registering Handler %d\n", CmiMyPe(), CpvAccess(RecvmsgHandle));
+    
+    CpvInitialize(int, RecvdummyHandle);
+    CpvAccess(RecvdummyHandle) = CmiRegisterHandler((CmiHandler)recv_dummy);
+
 }
 
 //ComlibManager Constructor with 1 int the strategy id being passed
@@ -114,14 +124,14 @@ void ComlibManager::init(){
     curStratID = 0;
 
     //initialize the strategy table.
-    bzero(strategyTable, MAX_NSTRAT * sizeof(StrategyTable));
-    
-    CpvInitialize(int, RecvmsgHandle);
-    CpvAccess(RecvmsgHandle) = CmiRegisterHandler((CmiHandler)recv_msg);
-
-    CpvInitialize(int, RecvdummyHandle);
-    CpvAccess(RecvdummyHandle) = CmiRegisterHandler((CmiHandler)recv_dummy);
-    
+    //    bzero(strategyTable, MAX_NSTRAT * sizeof(StrategyTable));
+    for(int count = 0; count < MAX_NSTRAT; count ++) {
+      strategyTable[count].strategy = NULL;
+      strategyTable[count].numElements = 0;
+      strategyTable[count].elementCount = 0;
+      strategyTable[count].call_doneInserting = 0;
+    }
+        
     procMap = new int[CkNumPes()];
     for(int count = 0; count < CkNumPes(); count++)
         procMap[count] = count;
@@ -131,7 +141,24 @@ void ComlibManager::init(){
     totalMsgCount = 0;
     totalBytes = 0;
     nIterations = 0;
+    barrierReached = 0;
+
+    CProxy_ComlibManager cgproxy(cmgrID);
+    cgproxy[0].barrier();
 }
+
+void ComlibManager::barrier(){
+  static int bcount = 0;
+  if(CkMyPe() == 0) {
+    bcount ++;
+    //    CkPrintf("In barrier %d\n", bcount);
+    if(bcount == CkNumPes()){
+      barrierReached = 1;
+      doneCreating();
+    }
+  }
+}
+
 
 void ComlibManager::createId(){
     doneCreating();
@@ -158,6 +185,11 @@ int ComlibManager::createInstance(Strategy *strat) {
 }
 
 void ComlibManager::doneCreating() {
+    if(!barrierReached)
+      return;
+
+    //    CmiPrintf("Sending Strategies\n");
+
     StrategyWrapper sw;
     sw.s_table = new Strategy* [nstrats];
     //    Strategy *aStrategy = ListOfStrategies.deq();
@@ -225,8 +257,10 @@ void ComlibManager::endIteration(){
         }
         
         if(receivedTable) {	    
-            strategyTable[curStratID].strategy->doneInserting();
+	    strategyTable[curStratID].strategy->doneInserting();
         }
+	else strategyTable[curStratID].call_doneInserting = 1;
+	
         strategyTable[curStratID].elementCount = 0;
     }
 }
@@ -247,16 +281,20 @@ void ComlibManager::receiveTable(StrategyWrapper sw){
 	if (!strategyTable[count].tmplist.isEmpty()) {
 	  CharmMessageHolder *cptr;
 	  while (!strategyTable[count].tmplist.isEmpty())
-	    strategyTable[count].strategy->insertMessage(strategyTable[count].tmplist.deq());
+	    strategyTable[count].strategy->insertMessage
+	      (strategyTable[count].tmplist.deq());
 	}
 	
-	if (strategyTable[count].numElements == strategyTable[count].elementCount)
+	if (strategyTable[count].call_doneInserting)
 	  strategyTable[count].strategy->doneInserting();
       }
     }
 }
 
 extern int _charmHandlerIdx;
+//extern int _infoIdx;
+//#include "cldb.h"
+
 void ComlibManager::ArraySend(int ep, void *msg, 
                               const CkArrayIndexMax &idx, CkArrayID a){
     
@@ -281,6 +319,7 @@ void ComlibManager::ArraySend(int ep, void *msg,
     env->array_hops()=0;
     env->array_index()=idx;
     env->setUsed(0);
+    
     CkPackMessage(&env);
     //    CmiSetHandler(env, _charmHandlerIdx);
     CmiSetHandler(env, CpvAccess(RecvmsgHandle));

@@ -89,6 +89,7 @@ struct StrategyTable {
     CkQ<CharmMessageHolder*> tmplist;
     int numElements;
     int elementCount;
+    int call_doneInserting;
 };
 
 /*
@@ -120,9 +121,9 @@ class ComlibManager: public CkDelegateMgr{
     int nstrats, curStratID;      //Number of strategies created by the user.
 
     //flags
-    int receivedTable, flushTable; //iterationFinished;
+    int receivedTable, flushTable, barrierReached;
     int totalMsgCount, totalBytes, nIterations;
-
+   
     void init(); //initialization function
 
  public:
@@ -130,6 +131,7 @@ class ComlibManager: public CkDelegateMgr{
     ComlibManager(int s);        //strategy
     ComlibManager(int s, int n); //strategy, nelements
 
+    void barrier(void);
     void localElement();
     void registerElement(int strat);    //Register a chare for an instance
     void unRegisterElement(int strat);  //UnRegister a chare for an instance

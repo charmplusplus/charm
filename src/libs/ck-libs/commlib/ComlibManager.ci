@@ -19,6 +19,7 @@ module ComlibModule {
 //    entry void receiveID(comID id);
 //    entry void receiveID(int n, int p[n], comID id);
 
+    entry void barrier(void);
     entry void receiveTable(StrategyWrapper sw);
     entry void localElement(void);
     entry void ArraySend(int ep, void *msg, CkArrayIndexMax &idx, CkArrayID a);
