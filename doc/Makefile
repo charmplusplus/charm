@@ -1,5 +1,5 @@
 IDIR=../../doc
-LNCMD=ln -f -s ../pplmanual.sty .
+LNCMD=test ! -f pplmanual.sty && ln -f -s ../pplmanual.sty .
 RMCMD=rm -f ./pplmanual.sty
 all: ps pdf html
 
