@@ -154,5 +154,7 @@ int getNeighbor(Graph *g, int node, int i) {
 }
 
 float graph_weightof(Graph *g, int vertex) {
- return 1.0;
+/*   return 1.0 ; */
+  return g->vertices[vertex].weight;
+
 }
