@@ -10,6 +10,7 @@
 #define TEST_GHOST 1 /* Test out ghost layers */
 #define TEST_SERIAL 0 /* Test out bizarre FEM_Serial_split */
 #define TEST_MESHUPDATE 1 /* Test out FEM_Update_mesh */
+#define TEST_SET_PARTITION 0  /* Test out FEM_Set_partition */
 
 //These values are the sum of the node values
 // after each timestep.
@@ -176,6 +177,13 @@ init(void)
   delete[] nodes;
   delete[] elements;
   delete[] noData;
+  
+  if (TEST_SET_PARTITION) {
+    int *part=new int[nelems];
+    int n=FEM_Num_partitions();
+    for (int i=0;i<nelems;i++) part[i]=i%n;
+    FEM_Set_partition(part);
+  }
 
   if (TEST_SERIAL) //Test out the serial split routines
   {
