@@ -652,6 +652,11 @@ then
         LANGUAGE="bgcharm++"
 fi
 
+if [ -n "BUILD_SHARE" -a -n "$CMK_NO_BUILD_SHARED" ]
+then
+	BUILD_SHARE=""
+fi
+
 if [ -n "$BUILD_SHARE" ]
 then
 	# ignore BUILD_SHARE is the target is not .a or .so
