@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.8  1995-10-12 20:14:15  sanjeev
+ * Revision 2.9  1995-10-31 23:06:08  knauff
+ * Changed all size_T's to CMK_SIZE_T
+ *
+ * Revision 2.8  1995/10/12  20:14:15  sanjeev
  * fixed problems while compiling with CC
  *
  * Revision 2.7  1995/10/11  19:30:33  sanjeev
@@ -82,21 +85,21 @@ extern "C" void *CPlus_CallMonoInit(int id, void *msg) ;
 
 
 void *
-comm_object::operator new(size_t size) 
+comm_object::operator new(CMK_SIZE_T size) 
 {
 	CmiPrintf("[%d] ERROR: wrong new operator for message allocation\n",CmiMyPe()) ;
 	return (void *)0;
 }
 
 void *
-_CK_Object::operator new(size_t size) 
+_CK_Object::operator new(CMK_SIZE_T size) 
 {
 	CmiPrintf("[%d] ERROR: wrong new operator for chare object allocation\n",CmiMyPe()) ;
 	return (void *)0;
 }
 
 void * 
-_CK_Object::operator new(size_t size, void *buf) 
+_CK_Object::operator new(CMK_SIZE_T size, void *buf) 
 {
         return buf ;
 }
