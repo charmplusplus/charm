@@ -186,11 +186,11 @@ void GreedyCommLB::work(CentralLB::LDStats* _stats, int count)
          else if (commData.recv_type()==LD_OBJLIST_MSG) {
 		int nobjs;
 		LDObjKey *objs = commData.receiver.get_destObjs(nobjs);
+		xcoord = stats->getHash(commData.sender);
 		for (int i=0; i<nobjs; i++) {
-		  xcoord = stats->getHash(commData.sender);
 		  ycoord = stats->getHash(objs[i]);
 		  if((xcoord == -1)||(ycoord == -1))
-		    if (_lb_args.ignoreBgLoad()) continue;
+		    if (_lb_args.migObjOnly()) continue;
 		    else CkAbort("Error in search\n");
 //printf("Multicast: %d => %d %d %d\n", xcoord, ycoord, commData.bytes, commData.messages);
 		  add_graph(xcoord,ycoord,commData.bytes, commData.messages);
