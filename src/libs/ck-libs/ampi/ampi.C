@@ -11,6 +11,8 @@
 #include <string.h>
 
 //------------- startup -------------
+int isRestart;
+char *restartDir;
 static mpi_comm_worlds mpi_worlds;
 
 int mpi_nworlds; /*Accessed by ampif*/
@@ -39,7 +41,7 @@ CDECL void MPI_Setup_Switch(void) {
   _ampi_fallback_setup_count=0;
   FTN_NAME(MPI_SETUP,mpi_setup)();
   MPI_Setup();
-  if (_ampi_fallback_setup_count==2) 
+  if (_ampi_fallback_setup_count==2)
   { //Missing MPI_Setup in both C and Fortran:
     MPI_Register_main(MPI_Fallback_Main,"default");
   }
@@ -87,7 +89,7 @@ extern "C" void MPI_threadstart(void *data)
 void ampiCreateMain(MPI_MainFn mainFn)
 {
 	int _nchunks=TCHARM_Get_num_chunks();
-	
+	//isRestart = CmiGetArgString(CkGetArgv(), "+restart", &restartDir);
 	//Make a new threads array
 	MPI_threadstart_t s(mainFn);
 	memBuf b; pupIntoBuf(b,s);
@@ -105,39 +107,48 @@ static const char *copyCountedStr(const char *src,int len)
 
 static void ampiAttach(const char *name,int namelen)
 {
-        TCharmSetupCookie *tc=TCharmSetupCookie::get();
+	TCharmSetupCookie *tc=TCharmSetupCookie::get();
 	if (!tc->hasThreads())
 		CkAbort("You must create a thread array with TCharmCreate before calling MPI_Attach!\n");
 	int _nchunks=tc->getNumElements();
 	CkArrayID threads=tc->getThreads();
 
-	//Allocate the next communicator  
+	//Allocate the next communicator
 	if(mpi_nworlds == MPI_MAX_COMM_WORLDS)
 	{
 		CkAbort("AMPI> Number of registered comm_worlds exceeded limit.\n");
 	}
 	int new_idx=mpi_nworlds++;
 	MPI_Comm new_world=MPI_COMM_WORLD+1+new_idx;
-	
+
 	//Create and attach the ampiParent array
         CkArrayOptions opts(_nchunks);
         opts.bindTo(threads);
-        CProxy_ampiParent parent=CProxy_ampiParent::ckNew(new_world,threads,opts);
-        tc->addClient(parent); 
+	CProxy_ampiParent parent;
+	parent=CProxy_ampiParent::ckNew(new_world,threads,opts);
+	tc->addClient(parent);
 
-	//Make a new ampi array	
+	//Make a new ampi array
 	CkArrayID empty;
 	ampiCommStruct emptyComm(new_world,empty,_nchunks);
-	CProxy_ampi arr=CProxy_ampi::ckNew(parent,emptyComm,opts);
-	
+	CProxy_ampi arr;
+	arr=CProxy_ampi::ckNew(parent,emptyComm,opts);
+
 	//Record info. in the mpi_worlds array
 	mpi_worlds[new_idx].comm=ampiCommStruct(new_world,arr,_nchunks);
 	mpi_worlds[new_idx].name = copyCountedStr(name,namelen);
 }
 
 //-------------------- ampiParent -------------------------
-
-ampiParent::ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_) 
+ampiParent::ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_,int isRestart) {
+  worldNo=worldNo_;
+  //threads=threads_;
+  //thread=threads[thisIndex].ckLocal();
+  worldPtr=NULL;
+  myDDT=&myDDTsto;
+  //if (thread==NULL) CkAbort("AMPIParent cannot find its thread!\n");
+}
+ampiParent::ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_)
 {
   worldNo=worldNo_;
   threads=threads_;
@@ -175,22 +186,22 @@ ampiParent::~ampiParent() {
 
 
 //Children call this when they are first created or just migrated
-TCharm *ampiParent::registerAmpi(ampi *ptr,ampiCommStruct s,bool forMigration) 
+TCharm *ampiParent::registerAmpi(ampi *ptr,ampiCommStruct s,bool forMigration)
 {
   if (thread==NULL) prepareCtv(); //Prevents CkJustMigrated race condition
 
-  if (s.getComm()>=MPI_COMM_WORLD) 
+  if (s.getComm()>=MPI_COMM_WORLD)
   { //We now have our COMM_WORLD-- register it
-    //Note that split communicators don't keep a raw pointer, so 
+    //Note that split communicators don't keep a raw pointer, so
     //they don't need to re-register on migration.
      if (worldPtr!=NULL) CkAbort("One ampiParent has two MPI_COMM_WORLDs");
      worldPtr=ptr;
      worldStruct=s;
   }
 
-  if (!forMigration) 
+  if (!forMigration)
   { //Register the new communicator:
-     if (s.getComm()>=MPI_COMM_WORLD) 
+     if (s.getComm()>=MPI_COMM_WORLD)
      { //We finally have our COMM_WORLD--start the thread
        thread->ready();
      }
@@ -200,23 +211,44 @@ TCharm *ampiParent::registerAmpi(ampi *ptr,ampiCommStruct s,bool forMigration)
      else
        CkAbort("ampiParent recieved child with bad communicator");
   }
-  
+
   return thread;
 }
 
+void ampiParent::checkpoint(int len, char dname[]){
+  char str[256];
+  sprintf(str, "%s/%d.cpt",dname, thisIndex);
+  ckCheckpoint(str);
+}
+
+void ampiParent::restart(int len, char dname[]){
+  char str[256];
+  sprintf(str, "%s/%d.cpt",dname, thisIndex);
+  ckRestart(str);
+CkPrintf("[%d]ampiParent::restart this=%p\n",thisIndex,this);
+}
 
 //----------------------- ampi -------------------------
-ampi::ampi(CkArrayID parent_,const ampiCommStruct &s) 
+ampi::ampi()
+{
+  parent=NULL;
+  thread=NULL;
+  msgs=NULL;
+  waitingForGeneric=0;
+  seqEntries=-1;
+}
+
+ampi::ampi(CkArrayID parent_,const ampiCommStruct &s)
    :parentProxy(parent_)
 {
   parent=NULL;
   thread=NULL;
-  
+
   myComm=s; myComm.setArrayID(thisArrayID);
   myRank=myComm.getRankForIndex(thisIndex);
 
   findParent(false);
-  
+
   msgs = CmmNew();
   nbcasts = 0;
   waitingForGeneric=0;
@@ -238,6 +270,7 @@ ampi::ampi(CkMigrateMessage *msg)
   waitingForGeneric=0;
   seqEntries=-1;
 }
+
 void ampi::ckJustMigrated(void)
 {
 	ArrayElement1D::ckJustMigrated();
@@ -259,9 +292,9 @@ void ampi::pup(PUP::er &p)
   p|myRank;
   p|parentProxy;
   p|nbcasts;
-  
+
   msgs=CmmPup((pup_er)&p,msgs);
-  
+
   p|seqEntries;
   if(p.isUnpacking())
   {
@@ -280,18 +313,45 @@ ampi::~ampi()
 }
 
 //------------------- maintainance -----------------
-#if 0
+#if 1
 //Need to figure out how to support checkpoint/restart properly
-void ampi::checkpoint(DirMsg *msg)
-{
-  sprintf(str, "%s/%d", msg->dname, commidx);
-  mkdir(str, 0777);
-  sprintf(str, "%s/%d/%d.cpt", msg->dname, commidx, thisIndex);
-  delete msg;
-  CProxy_ampimain pm(ampimain::handle); 
-  pm.checkpoint(); 
+void ampi::stopthread(){
+  thread->stop();
 }
 
+void ampi::checkpoint(int len, char dname[])
+{
+  char str[256];
+  sprintf(str, "%s/%d.cpt",dname,thisIndex);
+  ckCheckpoint(str);
+}
+
+void ampi::checkpointthread(int len, char dname[]){
+  char str[256];
+  sprintf(str, "%s/thread%d.cpt", dname, thisIndex);
+  thread->ckCheckpoint(str);
+  thread->resume();
+}
+
+void ampi::restart(int len, char dname[]){
+  char str[256];
+  sprintf(str, "%s/%d.cpt",dname,thisIndex);
+  ckRestart(str);
+CkPrintf("[%d]ampi::restart this=%p\n",thisIndex,this);
+}
+
+void ampi::restartthread(int len, char dname[]){
+//CkPrintf("[%d]ampi::restartthread\n",thisIndex);
+  char str[256];
+  sprintf(str, "%s/thread%d.cpt", dname, thisIndex);
+//CkPrintf("[%d] me: %p\n", thisIndex, CthSelf());
+  thread->clear();
+  thread->ckRestart(str);
+  thread->start();
+CkPrintf("[%d]ampi::restartthread end\n",thisIndex);
+}
+
+/*
 CDECL void MPI_Checkpoint(char *dirname)
 {
   mkdir(dirname, 0777);
@@ -307,6 +367,7 @@ CDECL void MPI_Checkpoint(char *dirname)
     CkAbort("cthread_id not 0 upon return !!\n");
   ptr->start_running();
 }
+*/
 #endif
 
 //------------------------ Communicator Splitting ---------------------
@@ -327,9 +388,9 @@ void ampi::split(int color,int key,MPI_Comm *dest)
 	int rootIdx=myComm.getIndexForRank(0);
 	CkCallback cb(CkIndex_ampi::splitPhase1(0),CkArrayIndex1D(rootIdx),myComm.getProxy());
 	contribute(sizeof(splitKey),&splitKey,CkReduction::concat,cb);
-	
+
 	//FIXME: assumes all the new communicators will have the same MPI_Comm
-	// value.  This need not be true anytime after the first split! 
+	// value.  This need not be true anytime after the first split!
 	MPI_Comm newComm=parent->getNextSplit();
 	*dest=newComm;
 	//CkPrintf("[%d (%d)] Split (%d,%d) %d suspend\n",thisIndex,getRank(),color,key,newComm);
@@ -479,7 +540,7 @@ ampi::sendraw(int t, int s, void* buf, int len, CkArrayID aid, int idx)
   pa[idx].generic(msg);
 }
 
-void 
+void
 ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
 {
   int tags[3];
@@ -505,7 +566,7 @@ ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
   delete msg;
 }
 
-void 
+void
 ampi::probe(int t, int s, int comm, int *sts)
 {
   int tags[3];
@@ -584,7 +645,7 @@ CDECL int MPI_Init(int *argc, char*** argv)
     AMPIAPI("MPI_Init");
     return 0;
   }
-  else 
+  else
   { /* Charm hasn't been started yet! */
     CkAbort("Charm Uninitialized!");
   }
@@ -642,7 +703,7 @@ int MPI_Send(void *msg, int count, MPI_Datatype type, int dest,
 
 //FIXME: This doesn't give the semantics of SSEND:
 CDECL
-int MPI_Ssend(void *msg, int count, MPI_Datatype type, int dest, 
+int MPI_Ssend(void *msg, int count, MPI_Datatype type, int dest,
                         int tag, MPI_Comm comm)
 {
   AMPIAPI("MPI_Ssend");
@@ -687,7 +748,7 @@ int MPI_Sendrecv(void *sbuf, int scount, int stype, int dest,
   AMPIAPI("MPI_Sendrecv");
   int se=MPI_Send(sbuf,scount,stype,dest,stag,comm);
   int re=MPI_Recv(rbuf,rcount,rtype,src,rtag,comm,sts);
-  if (se) return se; 
+  if (se) return se;
   else return re;
 }
 
@@ -1197,8 +1258,10 @@ int MPI_Irecv(void *buf, int count, MPI_Datatype type, int src,
   return 0;
 }
 
+CDECL
 int MPI_Ireduce(void *sendbuf, void *recvbuf, int count, int type, MPI_Op op, int root, MPI_Comm comm, MPI_Request *request)
 {
+  AMPIAPI("MPI_Ireduce");
   ampi *ptr = getAmpiInstance(comm);
   CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type),sendbuf,count,type,op);
   int rootIdx=ptr->comm2proxy(comm).getIndexForRank(root);
@@ -1476,6 +1539,54 @@ int MPI_Error_string(int errorcode, char *string, int *resultlen)
 
 
 /* Charm++ Extentions to MPI standard: */
+CDECL
+void MPI_Restart(char *dname)
+{
+  int len;
+  char str[256];
+  AMPIAPI("MPI_Restart");
+  MPI_Barrier(MPI_COMM_WORLD);
+  mkdir(dname,0777);
+
+  ampiParent *parentptr = getAmpiParent();
+  sprintf(str, "%s/ampiParent", dname);
+  len = strlen(str)+1;
+  parentptr->restart(len,str);
+
+  ampi *ampiptr = getAmpiInstance(MPI_COMM_WORLD);
+  sprintf(str, "%s/ampi%d", dname, ampiptr->getComm());
+  len = strlen(str)+1;
+  ampiptr->restart(len,str); //getProxy()[ampiptr->thisIndex].
+//CkPrintf("before me: %p\n", CthSelf());
+  ampiptr->getProxy()[ampiptr->thisIndex].restartthread(len,str);
+  ampiptr->stopthread();
+}
+
+CDECL
+void MPI_Checkpoint(char *dname)
+{
+  int len;
+  char str[256];
+  AMPIAPI("MPI_Checkpoint");
+  MPI_Barrier(MPI_COMM_WORLD);
+  mkdir(dname,0777);
+
+  ampiParent *parentptr = getAmpiParent();
+  sprintf(str, "%s/ampiParent", dname);
+  mkdir(str, 0777);
+  len = strlen(str);
+  parentptr->checkpoint(len,str);
+
+  ampi *ampiptr = getAmpiInstance(MPI_COMM_WORLD);
+  sprintf(str, "%s/ampi%d", dname, ampiptr->getComm());
+  mkdir(str, 0777);
+  len = strlen(str)+1;
+  ampiptr->checkpoint(len,str);
+
+  ampiptr->getProxy()[ampiptr->thisIndex].checkpointthread(len,str);
+  ampiptr->stopthread();
+}
+
 CDECL
 void MPI_Print(char *str)
 {

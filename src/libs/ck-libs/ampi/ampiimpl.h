@@ -295,6 +295,7 @@ class ampiParent : public ArrayElement1D {
     void splitChildRegister(const ampiCommStruct &s);
 
 public:
+    ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_,int isRestart);
     ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_);
     ampiParent(CkMigrateMessage *msg);
     void ckJustMigrated(void);
@@ -331,7 +332,10 @@ public:
       CkAbort("Invalid communicator used!");
     }
 
-    CkDDT myDDTsto ;
+    void checkpoint(int len, char dname[]);
+    void restart(int len, char dname[]);
+
+    CkDDT myDDTsto;
     CkDDT *myDDT;
     ampiPersRequests pers;
 };
@@ -358,25 +362,26 @@ class ampi : public ArrayElement1D {
     void inorder(AmpiMsg *msg);
 
   public: // entry methods
+    ampi();
     ampi(CkArrayID parent_,const ampiCommStruct &s);
     ampi(CkMigrateMessage *msg);
     void ckJustMigrated(void);
     ~ampi();
-    
+
     virtual void pup(PUP::er &p);
     void generic(AmpiMsg *);
     void reduceResult(CkReductionMsg *m);
     void splitPhase1(CkReductionMsg *msg);
-    
+
   public: // to be used by MPI_* functions
-  
+
     inline const ampiCommStruct &comm2proxy(MPI_Comm comm) {
       return parent->comm2proxy(comm);
     }
-    
+
     AmpiMsg *makeAmpiMsg(int t,int s,const void *buf,int count,int type,MPI_Comm destcomm,
       int seqNo);
-    
+
     void send(int t, int s, const void* buf, int count, int type,  int rank, MPI_Comm destcomm);
     static void sendraw(int t, int s, void* buf, int len, CkArrayID aid,
                         int idx);
@@ -387,10 +392,17 @@ class ampi : public ArrayElement1D {
     static void bcastraw(void* buf, int len, CkArrayID aid);
     void split(int color,int key,MPI_Comm *dest);
 
+    void stopthread();
+    void checkpoint(int len, char dname[]);
+    void restart(int len, char dname[]);
+    void checkpointthread(int len, char dname[]);
+    void restartthread(int len, char dname[]);
+
     inline int getRank(void) const {return myRank;}
     inline int getSize(void) const {return myComm.getSize();}
+    inline MPI_Comm getComm(void) const {return myComm.getComm();}
     inline CProxy_ampi getProxy(void) const {return thisArrayID;}
-    
+
     CkDDT *getDDT(void) {return parent->myDDT;}
   public:
     //These are directly used by API routines, which is hideous
@@ -400,7 +412,7 @@ class ampi : public ArrayElement1D {
     */
     CmmTable msgs;
     int nbcasts;
-    
+
 };
 
 //Use this to mark the start of AMPI interface routines:

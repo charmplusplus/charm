@@ -263,7 +263,8 @@ int MPI_Abort(MPI_Comm comm, int errorcode);
 void MPI_Print(char *str);
 int MPI_Register(void *, MPI_PupFn);
 void MPI_Migrate(void);
-void MPI_Checkpoint(char *dirname);
+void MPI_Checkpoint(char *dname);
+void MPI_Restart(char *dname);
 void *MPI_Get_userdata(int);
 
 /*Create a new threads array and attach to it*/
