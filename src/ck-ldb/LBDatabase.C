@@ -47,8 +47,10 @@ private:
     LBDBEntry(const char *n, LBDefaultCreateFn f, const char *h):
       name(n), fn(f), help(h) {};
   };
-  CkVec<LBDBEntry> lbtables;
+  CkVec<LBDBEntry> lbtables;	 // a list of available LBs
+  char *defaultBalancer;		 
 public:
+  LBDBResgistry() { defaultBalancer=NULL; }
   void displayLBs()
   {
     CmiPrintf("\nAvailable load balancers:\n");
@@ -65,6 +67,7 @@ public:
       if (0==strcmp(name, lbtables[i].name)) return lbtables[i].fn;
     return NULL;
   }
+  char *& defaultLB() { return defaultBalancer; };
 };
 
 static LBDBResgistry  lbRegistry;
@@ -81,8 +84,8 @@ LBDBInit::LBDBInit(CkArgMsg *m)
 
   LBDefaultCreateFn lbFn = defaultCreate;
 
-  char *balancer = NULL;
-  if (CmiGetArgString(m->argv, "+balancer", &balancer)) {
+  char *balancer = lbRegistry.defaultLB();
+  if (balancer) {
     LBDefaultCreateFn fn = lbRegistry.search(balancer);
     if (!fn) { 
       lbRegistry.displayLBs(); 
@@ -108,6 +111,12 @@ void _loadbalancerInit()
   CkpvAccess(numLoadBalancers) = 0;
   CkpvInitialize(int, hasNullLB);
   CkpvAccess(hasNullLB) = 0;
+
+  char **argv = CkGetArgv();
+  char *balancer = NULL;
+  if (CmiGetArgString(argv, "+balancer", &balancer)) {
+    lbRegistry.defaultLB() = balancer;
+  }
 }
 
 int LBDatabase::manualOn = 0;

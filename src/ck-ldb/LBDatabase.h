@@ -18,6 +18,8 @@
 
 extern CkGroupID lbdb;
 
+class LBDB;
+
 CkpvExtern(int, numLoadBalancers);
 CkpvExtern(int, hasNullLB);
 CkpvExtern(int, lbdatabaseInited);
@@ -49,6 +51,7 @@ public:
   };
   LBDatabase(CkMigrateMessage *m) { myLDHandle = LDCreate(); }
   inline static LBDatabase * Object() { return CkpvAccess(lbdatabaseInited)?(LBDatabase *)CkLocalBranch(lbdb):NULL; }
+  inline LBDB *getLBDB() {return (LBDB*)(myLDHandle.handle);}
 
   /*
    * Calls from object managers to load database
