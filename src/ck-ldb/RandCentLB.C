@@ -1,5 +1,7 @@
 #include <charm++.h>
 
+#if CMK_LBDB_ON
+
 #if CMK_STL_USE_DOT_H
 #include <deque.h>
 #include <queue.h>
@@ -73,3 +75,5 @@ CLBMigrateMsg* RandCentLB::Strategy(CentralLB::LDStats* stats, int count)
 
   return msg;
 };
+
+#endif
