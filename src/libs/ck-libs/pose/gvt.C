@@ -51,7 +51,7 @@ PVT::PVT()
     if (P==1) reportsExpected = 1;
     else reportsExpected = 1 + (P-2)/4 + (P-2)%2;
   }
-  //CkPrintf("PE %d reports to %d, receives %d reports, reduces and sends to %d, and reports directly to GVT if %d = 1!\n", CkMyPe(), reportTo, reportsExpected, reportReduceTo, reportEnd);
+  //  CkPrintf("PE %d reports to %d, receives %d reports, reduces and sends to %d, and reports directly to GVT if %d = 1!\n", CkMyPe(), reportTo, reportsExpected, reportReduceTo, reportEnd);
 #ifdef POSE_STATS_ON
   localStats->TimerStop();
 #endif
@@ -102,7 +102,7 @@ void PVT::startPhase()
       SendsAndRecvs->Restructure(estGVT, pvt, POSE_UnsetTS);
   }
 
-  //CkPrintf("[%d] pvt=%d gvt=%d optPVT=%d iterMin=%d\n", CkMyPe(), pvt, estGVT, optPVT, iterMin);
+  //  CkPrintf("[%d] pvt=%d gvt=%d optPVT=%d iterMin=%d\n", CkMyPe(), pvt, estGVT, optPVT, iterMin);
   POSE_TimeType xt;
   if (pvt == POSE_UnsetTS) { // all are idle; find max ovt
     POSE_TimeType maxOVT = POSE_UnsetTS;
@@ -123,11 +123,11 @@ void PVT::startPhase()
   um->conPVT = conPVT;
   um->runGVTflag = 0;
 
-  if (um->numEntries > 0)
-    //CkPrintf("PE %d has %d SRs reported to GVT; earliest=%d pvt=%d\n", 
-    //CkMyPe(), um->numEntries, um->SRs[0].timestamp, pvt);
-    // send data to GVT estimation
-    p[reportTo].reportReduce(um);
+  if (um->numEntries > 0) {
+    //CkPrintf("PE %d has %d SRs reported to GVT; earliest=%d pvt=%d\n", CkMyPe(), um->numEntries, um->SRs[0].timestamp, pvt);
+  }
+  // send data to GVT estimation
+  p[reportTo].reportReduce(um);
 
   /*
   if (simdone) // transmit final info to GVT on PE 0
@@ -437,8 +437,7 @@ void GVT::computeGVT(UpdateMsg *m)
     else inactive = 0;
 
     // check the estimate
-    //CkPrintf("opt=%d con=%d lastGVT=%d early=%d lastSR=%d et=%d\n", 
-    //optGVT, conGVT, lastGVT, earliestMsg, lastSR, POSE_endtime);
+    //CkPrintf("opt=%d con=%d lastGVT=%d early=%d lastSR=%d et=%d\n", optGVT, conGVT, lastGVT, earliestMsg, lastSR, POSE_endtime);
     CmiAssert(estGVT >= lastGVT); 
     //if (estGVT % 1000 == 0)
     //CkPrintf("[%d] New GVT = %d\n", CkMyPe(), estGVT);
