@@ -14,14 +14,14 @@ module gvt {
   group PVT {
     entry PVT(void);
     entry void startPhase(void);
-    entry void setGVT(GVTMsg *);
-    entry void reportReduce(UpdateMsg *);
+    entry [expedited] void setGVT(GVTMsg *);
+    entry [expedited] void reportReduce(UpdateMsg *);
   };
 
   /// GVT chare group for estimating GVT
   group GVT {
     entry GVT(void);
     entry void runGVT(UpdateMsg *);
-    entry void computeGVT(UpdateMsg *);
+    entry [expedited] void computeGVT(UpdateMsg *);
   };
 };
