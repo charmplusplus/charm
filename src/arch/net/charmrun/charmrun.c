@@ -2512,6 +2512,15 @@ void start_nodes_rsh()
      char startScript[200];
      sprintf(startScript,"/tmp/charmrun.%d.%d",getpid(),pe);
      f=fopen(startScript,"w");
+     if (f==NULL) {
+       /* now try current directory */
+       sprintf(startScript,"charmrun.%d.%d",getpid(),pe);
+       f=fopen(startScript,"w");
+       if (f==NULL) {
+     	 fprintf(stderr,"Charmrun> Can not write file %s!\n", startScript);
+     	 exit(1);
+       }
+     }
      rsh_script(f,pe,rank0no,arg_argv);
      fclose(f);
      rsh_pids[rank0no]=rsh_fork(pe,startScript);
