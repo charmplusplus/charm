@@ -15,8 +15,8 @@ UChar _defaultQueueing = CK_QUEUEING_FIFO;
 UInt  _printCS = 0;
 UInt  _printSS = 0;
 
-UInt  _numGroups = 0;
-UInt  _numNodeGroups = 0;
+UInt  _numGroups = 1; //<- makes 0 an invalid group number
+UInt  _numNodeGroups = 1;
 UInt  _numInitMsgs = 0;
 UInt  _numInitNodeMsgs = 0;
 int   _infoIdx;
@@ -360,6 +360,9 @@ static void _initHandler(void *msg)
   }
 }
 
+// CkExit: start the termination process, but
+//   then drop into the scheduler so the user's
+//   method never returns (which would be confusing).
 extern "C"
 void CkExit(void) 
 {
@@ -368,7 +371,7 @@ void CkExit(void)
   CmiNumberHandler(_nodeBocHandlerIdx, (CmiHandler)_discardHandler);
   if(CkMyPe()==0) {
     if(_exitStarted)
-      return;
+      CsdScheduler(-1);
     envelope *env = _allocEnv(ReqStatMsg);
     env->setSrcPe(CkMyPe());
     CmiSetHandler(env, _exitHandlerIdx);
@@ -379,6 +382,7 @@ void CkExit(void)
     CmiSetHandler(env, _exitHandlerIdx);
     CmiSyncSendAndFree(0, env->getTotalsize(), env);
   }
+  CsdScheduler(-1);
 }
 
 static void _nullFn(void *, void *)

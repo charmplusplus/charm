@@ -27,7 +27,14 @@ class GroupTable {
       tab[n].pending=0;
       return ret;
     }
-    void *find(CkGroupID n) {return tab[n].obj;}
+    void *find(CkGroupID n) {
+#ifndef CMK_OPTIMIZE
+        if (n<0) CkAbort("Group ID is negative-- invalid!\n");
+        if (n==0) CkAbort("Group ID is zero-- invalid!\n");
+        if (n>=MAXBINS) CkAbort("Group ID is too large!\n");
+#endif
+	return tab[n].obj;
+    }
 };
 
 extern unsigned int    _printCS;
