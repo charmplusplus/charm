@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.14  1996-02-22 21:38:20  sanjeev
+ * Revision 2.15  1996-03-22 17:24:09  sanjeev
+ * modified CSendMsgBranch and CBroadcastMsgBranch
+ *
+ * Revision 2.14  1996/02/22 21:38:20  sanjeev
  * *** empty log message ***
  *
  * Revision 2.13  1996/02/22 21:36:18  sanjeev
@@ -208,9 +211,9 @@
 
 #define CSendMsg(ChareType,EP,msg,ChareId) 	SendMsg(GetEntryPtr(ChareType,EP), msg, ChareId)
 
-#define CSendMsgBranch(ChareType,EP,msg,ChareId,Pe) 	SendMsgBranch(GetEntryPtr(ChareType,EP), msg, ChareId, Pe)
+#define CSendMsgBranch(ChareType,EP,msg,ChareId,Pe) 	GeneralSendMsgBranch(GetEntryPtr(ChareType,EP), msg, ChareId, Pe)
 
-#define CBroadcastMsgBranch(ChareType,EP,msg,ChareId) 	BroadcastMsgBranch(GetEntryPtr(ChareType,EP), msg, ChareId)
+#define CBroadcastMsgBranch(ChareType,EP,msg,ChareId) 	GeneralBroadcastMsgBranch(GetEntryPtr(ChareType,EP), msg, ChareId)
 
 #define CLocalBranch(BocType, BocId)	((BocType *)GetBocDataPtr(BocId))
 
