@@ -378,6 +378,7 @@ class CkArray : public CkReductionMgr {
 	friend class ArrayElement;
 	friend class ArrayElement1D;
 	friend class CProxy_ArrayBase;
+	friend class CProxyElement_ArrayBase;
 	friend class CkArrayRec;
 	friend class CkArrayRec_aging;
 	friend class CkArrayRec_local;

@@ -586,6 +586,7 @@ protected:
 class CkArrayRec_local:public CkArrayRec {
   friend class CkArray;
 private:
+  CProxyElement_CkArray ap; //Local array manager proxy
   ArrayElement *el;//Our local element
   void killElement(void) {
     if (el!=NULL)
@@ -593,7 +594,8 @@ private:
   }
 public:
   CkArrayRec_local() : CkArrayRec() {}
-  CkArrayRec_local(CkArray *Narr,ArrayElement *Nel):CkArrayRec(Narr)
+  CkArrayRec_local(CkArray *Narr,ArrayElement *Nel)
+    :CkArrayRec(Narr),ap(arr->getGroupID(),CkMyPe())
     {el=Nel;arr->num.local++;}
 
   virtual ~CkArrayRec_local() {
@@ -606,7 +608,7 @@ public:
   //Deliver a message to this local element, going via the
   // message queue.
   virtual void send(CkArrayMessage *msg) {
-    CProxy_CkArray(arr->getGroupID())[CkMyPe()].RecvForElement(msg);
+    ap.RecvForElement(msg);
   }
 
   //Deliver a message to this local element.
@@ -923,7 +925,9 @@ void CProxy_ArrayBase::ckInsertIdx(CkArrayMessage *m,int ctorIndex,int onPE,
   if (m==NULL) m=(CkArrayMessage *)new CkArrayElementCreateMsg;
   m->array_index()=idx;
   m->array_ep()=ctorIndex;
+
   CkArray *arr=ckLocalBranch();
+  UsrToEnv((void *)m)->array_broadcastCount()=arr->bcastNo;  
   if (onPE==-1) onPE=arr->homePE(idx);
   if (onPE!=CkMyPe()) //Let the local manager know where this el't is
   	arr->insertRec(new CkArrayRec_remote(arr,onPE),idx);
@@ -1077,7 +1081,10 @@ ArrayElement *CkArray::buildElement(int chareType,int ctor,
   init.thisIndexMax=ind;
   init.thisArray=this;
   init.thisArrayID=thisgroup;
-  init.bcastNo=bcastNo;
+  if (msg!=NULL) {
+    envelope *env=UsrToEnv(msg);
+    init.bcastNo=env->array_broadcastCount();
+  }
   ArrayElement *el=(ArrayElement *)malloc(_chareTable[chareType]->size);
 #if CMK_LBDB_ON
   init.ldHandle=the_lbdb->
@@ -1100,14 +1107,14 @@ ArrayElement *CkArray::newElement(int ctor,
 {
   ArrayElement *el=buildElement(_entryTable[ctor]->chareIdx,ctor,msg,
 				idx,false);
-  if (!curElementIsDead) { 
-    //<- element may have immediately migrated away or died.
-    el->lbRegister();// Register with lb now, *after* usesAtSync set
-    insertRec(new CkArrayRec_local(this,el),el->thisIndexMax);
-    DEBC((AA"  finished adding local element %s\n"AB,idx2str(el)));
-    return el;
-  }
-  return NULL;
+  if (curElementIsDead) return NULL; //Could have left during constructor 
+  el->lbRegister();// Register with lb now, *after* usesAtSync set
+  bringBroadcastUpToDate(el);
+  if (curElementIsDead) return NULL; //Could have left during broadcast catch-up
+  insertRec(new CkArrayRec_local(this,el),el->thisIndexMax);
+  if (curElementIsDead) return NULL; //Could have left during message catch-up
+  DEBC((AA"  finished adding local element %s\n"AB,idx2str(el)));
+  return el;
 }
 
 //This method is called by the user to add an element.
@@ -1145,12 +1152,6 @@ void CkArray::DoneInserting(void)
     the_lbdb->DoneRegisteringObjects(myLBHandle);
 #endif
     CkReductionMgr::doneCreatingContributors();
-    if (bcastNo>0) {
-      //These broadcasts were delayed until all elements were inserted--
-      DEBC((AA"  Delivering insert-delayed broadcasts\n"AB));
-      for (int i=0;i<bcastNo;i++)
-	deliverBroadcast(oldBcasts[i]);
-    }
   }
 }
 
@@ -1270,9 +1271,10 @@ void CkArray::RecvMigratedElement(CkArrayElementMigrateMessage *msg)
   //Catch up on any missed broadcasts
   bringBroadcastUpToDate(el);		
   
-  if (!curElementIsDead)
-    //Put the new guy in the hash table
-    insertRec(new CkArrayRec_local(this,el),el->thisIndexMax);
+  if (curElementIsDead) return; //Don't bother if they left already
+
+  //Put the new guy in the hash table
+  insertRec(new CkArrayRec_local(this,el),el->thisIndexMax);
 }
 
 /*
@@ -1362,6 +1364,7 @@ void CkArray::deliverUnknown(CkArrayMessage *msg)
 			createMsg->array_index()=idx;
 			createMsg->array_ep()=ctor;
 			createMsg->array_hops()=0;
+			UsrToEnv((void *)createMsg)->array_broadcastCount()=bcastNo;
 			insertRec(new CkArrayRec_remote(this,srcPe),idx);
 			thisproxy[srcPe].InsertElement(createMsg);
 			thisproxy[srcPe].RecvForElement(msg);
@@ -1428,7 +1431,9 @@ void CProxyElement_ArrayBase::ckSend(CkArrayMessage *msg, int ep) const
 	{ //Usual case: a direct send
 	  msg_prepareSend(msg,ep);
 	  msg->array_index()=_idx;//Insert array index into message
-	  ckLocalBranch()->Send(msg);
+	  CkArray *arr=ckLocalBranch();
+	  UsrToEnv((void *)msg)->array_broadcastCount()=arr->bcastNo;
+	  arr->Send(msg);
 	}
 }
 
@@ -1467,9 +1472,7 @@ void CkArray::RecvBroadcast(CkArrayMessage *msg)
 	CkArray_MAGIC_CHECK();
 	bcastNo++;
 	DEBB((AA"Received broadcast %d\n"AB,bcastNo));
-	if (!isInserting)
-		deliverBroadcast(msg);
-	
+	deliverBroadcast(msg);
 	oldBcasts.enq(msg);//Stash the message for later
 }
 
@@ -1499,7 +1502,7 @@ void CkArray::deliverBroadcast(CkArrayMessage *bcast,ArrayElement *el)
 	DEBB((AA"Delivering broadcast %d to element %s\n"AB,el->bcastNo,idx2str(el)));
 	deliverLocal((CkArrayMessage *)newMsg,el);
 }
-//Deliver a copy of the given broadcast to the given local element
+//Deliver all needed broadcasts to the given local element
 void CkArray::bringBroadcastUpToDate(ArrayElement *el)
 {
 	if (el->bcastNo<bcastNo)
@@ -1516,6 +1519,7 @@ void CkArray::bringBroadcastUpToDate(ArrayElement *el)
 			CkArrayMessage *msg=oldBcasts.deq();
 			deliverBroadcast(msg,el);
 			oldBcasts.enq(msg);
+			if (curElementIsDead) return;
 		}
 	}
 }
