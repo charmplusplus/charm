@@ -607,7 +607,7 @@ done
 
 
 # Process original command-line arguments
-processArgs $@
+processArgs "$@"
 
 
 ##############################################################################
