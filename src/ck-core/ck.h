@@ -17,10 +17,10 @@
 #include "qd.h"
 #include "register.h"
 #include "stats.h"
+#include "waitqd.h"
 #include "ckfutures.h"
 #include "ckarray.h"
 #include "ckstream.h"
-#include "waitqd.h"
 
 #ifndef CMK_OPTIMIZE
 #define _CHECK_VALID(p, msg) {if((p)==0){CkAbort(msg);}}

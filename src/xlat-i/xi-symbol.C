@@ -220,12 +220,13 @@ Module::generate()
   clist->genDecls(declstr);
   declstr<<"extern void _register"<<name<<"(void);"<<endx;
   if(isMain()) {
-    defstr << "extern \"C\" void CkRegisterMainModule(void);" << endx;
+    declstr << "extern \"C\" void CkRegisterMainModule(void);" << endx;
   }
   declstr<<"#endif"<<endx;
-  defstr<<"#ifndef _DEFS_" << name << "_H_"<<endx;
-  defstr<<"#define _DEFS_" << name << "_H_"<<endx;
+  // defstr<<"#ifndef _DEFS_" << name << "_H_"<<endx;
+  // defstr<<"#define _DEFS_" << name << "_H_"<<endx;
   clist->genDefs(defstr);
+  defstr << "#ifndef CK_TEMPLATES_ONLY\n";
   defstr << "void _register" << name << "(void)" << endx;
   defstr << "{" << endx;
   defstr << "  static int _done = 0; if (_done) return; _done = 1;" << endx;
@@ -237,7 +238,8 @@ Module::generate()
     defstr << "  _REGISTER_DONE();" << endx;
     defstr << "}" << endx;
   }
-  defstr<<"#endif"<<endx;
+  defstr << "#endif\n";
+  // defstr<<"#endif"<<endx;
   XStr topname, botname;
   topname << name << ".decl.h";
   botname << name << ".def.h";
@@ -341,12 +343,27 @@ static const char *CIChareStart = // prefix, name
 "{\n"
 "  public:\n"
 "    static int __idx;\n"
-"    static void __register(const char *s);\n"
 ;
 
 static const char *CIChareEnd =
 "};\n"
 ;
+
+void
+Chare::genRegisterMethod(XStr& str)
+{
+  if(external || type->isTemplated())
+    return;
+  str << "static void __register(const char *s, size_t size) {\n";
+  str << "  __idx = CkRegisterChare(s, size);\n";
+  // register all bases
+  if(bases !=0) {
+    bases->genProxyNames(str, "  _REGISTER_BASE(__idx, ", "::__idx);\n", "");
+  }
+  if(list)
+    list->genReg(str);
+  str << "}\n";
+}
 
 void
 Chare::genChareDecls(XStr& str)
@@ -364,6 +381,7 @@ Chare::genChareDecls(XStr& str)
     bases->genProxyNames(str, "public ", "", ", ");
   }
   str.spew(CIChareStart, chare_prefix(), getBaseName());
+  genRegisterMethod(str);
   if(isAbstract()) {
     str << "    ";
     str<<chare_prefix();
@@ -405,6 +423,7 @@ Chare::genGroupDecls(XStr& str)
     bases->genProxyNames(str, "public ", "", ", ");
   }
   str.spew(CIChareStart, group_prefix(), getBaseName());
+  genRegisterMethod(str);
   if(isAbstract()) {
     str << "    ";
     str<<group_prefix();
@@ -495,6 +514,7 @@ Chare::genArrayDecls(XStr& str)
     bases->genProxyNames(str, "public virtual ", "", ", ");
   }
   str.spew(CIChareStart, array_prefix(), getBaseName());
+  genRegisterMethod(str);
   if(isAbstract()) {
     str << "    ";
     str<<array_prefix();
@@ -566,6 +586,7 @@ Chare::genDefs(XStr& str)
 {
   str << "/* DEFS: "; print(str); str << " */\n";
   if(!templat) {
+    str << "#ifndef CK_TEMPLATES_ONLY\n";
     if(external) {
       str << "extern int ";
       type->genProxyName(str);
@@ -575,36 +596,8 @@ Chare::genDefs(XStr& str)
       type->genProxyName(str);
       str << "::__idx=0;\n";
     }
+    str << "#endif\n";
   }
-  if(external || type->isTemplated())
-    return;
-  if(templat)
-    templat->genSpec(str);
-  str << "void ";
-  if(chareType==SCHARE||chareType==SMAINCHARE) {
-    str << chare_prefix();
-  } else if(chareType==SGROUP || chareType==SNODEGROUP) {
-    str << group_prefix();
-  } else if(chareType==SARRAY) {
-    str << array_prefix();
-  }
-  type->print(str);
-  if(templat)
-    templat->genVars(str);
-  str << "::__register(const char *s)\n";
-  str << "{\n";
-  str << "  __idx = CkRegisterChare(s, sizeof(";
-  type->print(str);
-  if(templat)
-    templat->genVars(str);
-  str << "));\n";
-  // register all bases
-  if(bases !=0) {
-    bases->genProxyNames(str, "_REGISTER_BASE(__idx, ", "::__idx);\n", "");
-  }
-  if(list)
-    list->genReg(str);
-  str << "}\n";
   if(list)
     list->genDefs(str);
 }
@@ -626,14 +619,15 @@ Chare::genReg(XStr& str)
   type->print(str);
   str << "::__register(\"";
   type->print(str);
-  str << "\");\n";
+  str << "\", sizeof(";
+  type->print(str);
+  str << "));\n";
 }
 
 static const char *CIMsgClass =
 "{\n"
 "  public:\n"
 "    static int __idx;\n"
-"    static void __register(const char *s);\n"
 "    void*operator new(size_t s){return CkAllocMsg(__idx,s,0);}\n"
 "    void operator delete(void *p){CkFreeMsg(p);}\n"
 "    void*operator new(size_t,void*p){return p;}\n"
@@ -644,7 +638,6 @@ static const char *CIMsgClassAnsi =
 "{\n"
 "  public:\n"
 "    static int __idx;\n"
-"    static void __register(const char *s);\n"
 "    void*operator new(size_t s){return CkAllocMsg(__idx,s,0);}\n"
 "    void operator delete(void *p){CkFreeMsg(p);}\n"
 "    void*operator new(size_t,void*p){return p;}\n"
@@ -690,6 +683,12 @@ Message::genDecls(XStr& str)
       str.spew(CIAllocDeclAnsi);
     else str.spew(CIAllocDecl);
   }
+  if(!(external||type->isTemplated())) {
+   // generate register function
+    str << "static void __register(const char *s, size_t size, CkPackFnPtr pack, CkUnpackFnPtr unpack) {\n";
+    str << "  __idx = CkRegisterMsg(s, pack, unpack, 0, size);\n";
+    str << "}\n";
+  }
   str << "};\n";
 }
 
@@ -697,40 +696,12 @@ void
 Message::genDefs(XStr& str)
 {
   str << "/* DEFS: "; print(str); str << " */\n";
+  if(!templat) {
+    str << "#ifndef CK_TEMPLATES_ONLY\n";
+  } else {
+    str << "#ifdef CK_TEMPLATES_ONLY\n";
+  }
   if(!(external||type->isTemplated())) {
-    // generate register function
-    if(templat) {
-      templat->genSpec(str);
-      str << " ";
-    }
-    str << "void ";
-    str << msg_prefix();
-    type->print(str);
-    if(templat)
-      templat->genVars(str);
-    str << "::__register(const char *s)\n";
-    str << "{\n";
-    str << "  __idx = CkRegisterMsg(s, ";
-    if(isPacked()||isVarsize()) {
-      str << "(CkPackFnPtr) ";
-      type->print(str);
-      if(templat)
-        templat->genVars(str);
-      str << "::pack, ";
-      str << "(CkUnpackFnPtr) ";
-      type->print(str);
-      if(templat)
-        templat->genVars(str);
-      str << "::unpack, ";
-    } else {
-      str << "0, 0, ";
-    }
-    str << "0, sizeof(";
-    type->print(str);
-    if(templat)
-      templat->genVars(str);
-    str << "));\n";
-    str << "}\n";
     // generate varsize new operator
     if(isVarsize()) {
       if(templat) {
@@ -776,6 +747,7 @@ Message::genDefs(XStr& str)
       str << "::__idx=0;\n";
     }
   }
+  str << "#endif\n";
 }
 
 void
@@ -787,7 +759,23 @@ Message::genReg(XStr& str)
     type->print(str);
     str << "::__register(\"";
     type->print(str);
-    str << "\");\n";
+    str << "\", sizeof(";
+    type->print(str);
+    str << "),";
+    if(isPacked()||isVarsize()) {
+      str << "(CkPackFnPtr) ";
+      type->print(str);
+      if(templat)
+        templat->genVars(str);
+      str << "::pack, ";
+      str << "(CkUnpackFnPtr) ";
+      type->print(str);
+      if(templat)
+        templat->genVars(str);
+      str << "::unpack);\n";
+    } else {
+      str << "0, 0);\n";
+    }
   }
 }
 
@@ -1840,6 +1828,11 @@ void Entry::genGroupDefs(XStr& str)
 void Entry::genDefs(XStr& str)
 {
   str << "/* DEFS: "; print(str); str << " */\n";
+  if(!(container->isTemplated())) {
+    str << "#ifndef CK_TEMPLATES_ONLY\n";
+  } else {
+    str << "#ifdef CK_TEMPLATES_ONLY\n";
+  }
   genEpIdxDef(str);
   if(container->getChareType()==SGROUP||container->getChareType()==SNODEGROUP){
     genGroupDefs(str);
@@ -2162,6 +2155,7 @@ void Entry::genDefs(XStr& str)
     }
     str << "}\n";
   }
+  str << "#endif\n";
 }
 
 void Entry::genReg(XStr& str)

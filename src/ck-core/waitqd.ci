@@ -12,6 +12,8 @@
 
 module waitqd {
 
+  extern module CkFutures;
+
   readonly CkChareID waitqd_qdhandle; 
 
   message ckGroupIDMsg;
