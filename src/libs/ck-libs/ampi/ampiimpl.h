@@ -12,7 +12,14 @@
 #include "ampi.decl.h"
 #include "ddt.h"
 
+#define AMPI_BCAST_TAG  1025
+#define AMPI_BARR_TAG   1026
+#define AMPI_REDUCE_TAG 1027
+#define AMPI_GATHER_TAG 1028
+
 extern CkChareID mainhandle;
+extern int _redntype;
+extern int _rednroot;
 
 class BlockMap : public CkArrayMap {
  public:

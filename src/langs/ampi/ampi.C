@@ -18,6 +18,9 @@ extern "C" void get_size_(int *, int *, int *, int *);
 extern "C" void pack_(char*,int*,int*,int*,float*,int*,int*,int*);
 extern "C" void unpack_(char*,int*,int*,int*,float*,int*,int*,int*);
 
+int _redntype;
+int _rednroot;
+
 void*
 ArgsInfo::pack(ArgsInfo* msg)
 {
@@ -140,11 +143,6 @@ ampi::recv(int t1, int t2, void* buf, int count, int type)
   ddt->serialize((char*)buf, (char*)msg->data, count, (-1));
   delete msg;
 }
-
-#define AMPI_BCAST_TAG  1025
-#define AMPI_BARR_TAG   1026
-#define AMPI_REDUCE_TAG 1027
-#define AMPI_GATHER_TAG 1028
 
 void 
 ampi::barrier(void)
@@ -338,18 +336,8 @@ int AMPI_Bcast(void *buf, int count, AMPI_Datatype type, int root,
   return 0;
 }
 
-extern "C" 
-int AMPI_Reduce(void *inbuf, void *outbuf, int count, int type, AMPI_Op op, 
-                int root, AMPI_Comm comm)
-{
-  ampi *ptr = CtvAccess(ampiPtr);
-  ptr->reduce(root,op,inbuf,outbuf,count,type);
-  return 0;
-}
-
-extern "C" 
-int AMPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
-                   AMPI_Op op, AMPI_Comm comm)
+static CkReduction::reducerType 
+getReductionType(int type, int op)
 {
   CkReduction::reducerType mytype;
   switch(op) {
@@ -397,6 +385,29 @@ int AMPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
       ckerr << "Op " << op << " not supported." << endl;
       CmiAbort("exiting");
   }
+  return mytype;
+}
+
+extern "C" 
+int AMPI_Reduce(void *inbuf, void *outbuf, int count, int type, AMPI_Op op, 
+                int root, AMPI_Comm comm)
+{
+  if(CkMyPe()==0) { _redntype = 1; _rednroot = root;}
+  CkReduction::reducerType mytype = getReductionType(type,op);
+  ampi *ptr = CtvAccess(ampiPtr);
+  int size = ptr->myDDT->getType(type)->getSize(count) ;
+  ptr->contribute(size, inbuf, mytype);
+  if (ptr->thisIndex == root)
+    ptr->recv(0, AMPI_REDUCE_TAG, outbuf, count, type);
+  return 0;
+}
+
+extern "C" 
+int AMPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
+                   AMPI_Op op, AMPI_Comm comm)
+{
+  if(CkMyPe()==0) { _redntype = 0; }
+  CkReduction::reducerType mytype = getReductionType(type,op);
   ampi *ptr = CtvAccess(ampiPtr);
   int size = ptr->myDDT->getType(type)->getSize(count) ;
   ptr->contribute(size, inbuf, mytype);

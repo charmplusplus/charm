@@ -18,9 +18,14 @@ static inline void itersDone(void) { CProxy_ampimain pm(mainhandle); pm.done(); 
 CkChareID mainhandle;
 CkArrayID _ampiAid;
 
-static void allReduceHandler(void *,int dataSize,void *data)
+static void allReduceHandler(void *redtype,int dataSize,void *data)
 {
-  ampi::bcastraw(data, dataSize, _ampiAid);
+  int type = *((int*)redtype);
+  if(type==0) { // allreduce
+    ampi::bcastraw(data, dataSize, _ampiAid);
+  } else { // reduce
+    ampi::sendraw(0, AMPI_REDUCE_TAG, data, dataSize, _ampiAid, _rednroot);
+  }
 }
 
 ampimain::ampimain(CkArgMsg *m)
@@ -47,7 +52,7 @@ ampimain::ampimain(CkArgMsg *m)
   _ampiAid = CProxy_ampi::ckNew(nblocks);
   // CkRegisterArrayReductionHandler(_ampiAid,allReduceHandler,0);
   CProxy_ampi jarray(_ampiAid);
-  jarray.setReductionClient(allReduceHandler,0);
+  jarray.setReductionClient(allReduceHandler,(void*)&_redntype);
   for(i=0; i<nblocks; i++) {
     ArgsInfo *argsinfo = new ArgsInfo(m->argc, m->argv);
     jarray[i].run(argsinfo);
