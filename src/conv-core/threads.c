@@ -759,10 +759,16 @@ CthThread CthUnpackThread(void *buffer)
 #include <sys/stat.h>
 #include <fcntl.h>
 
+typedef struct _slotblock
+{
+  int startslot;
+  int nslots;
+} slotblock;
+
 typedef struct _slotset
 {
   int maxbuf;
-  int *buf;
+  slotblock *buf;
   int emptyslots;
 } slotset;
 
@@ -776,33 +782,34 @@ new_slotset(int startslot, int nslots)
   int i;
   slotset *ss = (slotset*) malloc(sizeof(slotset));
   _MEMCHECK(ss);
-  ss->maxbuf = nslots*2;
-  ss->buf = (int *) malloc(sizeof(int)*ss->maxbuf);
+  ss->maxbuf = 16;
+  ss->buf = (slotblock *) malloc(sizeof(slotblock)*ss->maxbuf);
   _MEMCHECK(ss->buf);
   ss->emptyslots = nslots;
-  for (i=0; i<nslots; i++)
-    ss->buf[i] = startslot+i;
-  for (i=nslots; i<(ss->maxbuf); i++)
-    ss->buf[i] = (-1);
+  ss->buf[0].startslot = startslot;
+  ss->buf[0].nslots = nslots;
+  for (i=1; i<ss->maxbuf; i++)
+    ss->buf[i].nslots = 0;
   return ss;
 }
 
 /*
- * returns a new empty slot. if it cannot find any, returns (-1).
+ * returns new block of empty slots. if it cannot find any, returns (-1).
  */
 static int
-get_slot(slotset *ss)
+get_slots(slotset *ss, int nslots)
 {
   int i;
-  if(ss->emptyslots==0)
+  if(ss->emptyslots < nslots)
     return (-1);
   for(i=0;i<(ss->maxbuf);i++)
   {
-    if(ss->buf[i] >= 0)
+    if(ss->buf[i].nslots >= nslots)
     {
-      int slot = ss->buf[i];
-      ss->buf[i] = (-1);
-      ss->emptyslots--;
+      int slot = ss->buf[i].startslot;
+      ss->buf[i].startslot += nslots;
+      ss->buf[i].nslots -= nslots;
+      ss->emptyslots -= nslots;
       return slot;
     }
   }
@@ -810,34 +817,62 @@ get_slot(slotset *ss)
 }
 
 /*
- * Frees slot by adding it to the list of empty slots.
+ * Frees slot by adding it to one of the blocks of empty slots.
+ * this slotblock is one which is contiguous with the slots to be freed.
+ * if it cannot find such a slotblock, it creates a new slotblock.
  * If the buffer fills up, it adds up extra buffer space.
  */
 static void
-free_slot(slotset *ss, int slot)
+free_slots(slotset *ss, int sslot, int nslots)
 {
-  int pos;
+  int pos, emptypos = (-1);
+  /* eslot is the ending slot of the block to be freed */
+  int eslot = sslot + nslots;
+  ss->emptyslots += nslots;
   for (pos=0; pos < (ss->maxbuf); pos++)
   {
-    if (ss->buf[pos]==(-1))
-      break;
+    if (ss->buf[pos].nslots == 0 && emptypos==(-1))
+    {
+      /* find the first empty slot just in case it is required */
+      emptypos = pos;
+    }
+    else
+    {
+      /* e is the ending slot of pos'th slotblock */
+      int e = ss->buf[pos].startslot + ss->buf[pos].nslots;
+      if (e == sslot)
+      {
+	ss->buf[pos].nslots += nslots;
+	return;
+      }
+      if(eslot == ss->buf[pos].startslot)
+      {
+	ss->buf[pos].startslot = sslot;
+	ss->buf[pos].nslots += nslots;
+	return;
+      }
+    }
   }
-  if (pos == ss->maxbuf)
+  /* if we are here, it means we could not find a slotblock that the */
+  /* block to be freed was combined with. */
+  /* now check if we could not find an empty slotblock */
+  if (emptypos == (-1))
   {
     int i;
     int newsize = ss->maxbuf*2;
-    int *newbuf = (int *) malloc(sizeof(int)*newsize);
+    slotblock *newbuf = (slotblock *) malloc(sizeof(slotblock)*newsize);
     _MEMCHECK(newbuf);
     for (i=0; i<(ss->maxbuf); i++)
       newbuf[i] = ss->buf[i];
     for (i=ss->maxbuf; i<newsize; i++)
-      newbuf[i] = (-1);
+      newbuf[i].nslots  = 0;
     free(ss->buf);
     ss->buf = newbuf;
+    emptypos = ss->maxbuf;
     ss->maxbuf = newsize;
   }
-  ss->buf[pos] = slot;
-  ss->emptyslots++;
+  ss->buf[emptypos].startslot = sslot;
+  ss->buf[emptypos].nslots = nslots;
   return;
 }
 
@@ -854,11 +889,11 @@ delete_slotset(slotset* ss)
 /*
  * this message is used both as a request and a reply message.
  * request:
- *   pe is the processor requesting a slot.
- *   t is the thread for which this slot is requested.
+ *   pe is the processor requesting slots.
+ *   t,fn,arg are the thread-details for which these slots are requested.
  * reply:
  *   pe is the processor that responds
- *   slot is the slot that it sends
+ *   slot is the starting slot that it sends
  *   t is the thread for which this slot is used.
  */
 typedef struct _slotmsg
@@ -866,6 +901,7 @@ typedef struct _slotmsg
   char cmicore[CmiMsgHeaderSizeBytes];
   int pe;
   int slot;
+  int nslots;
   CthThread t;
   CthVoidFn fn;
   void *arg;
@@ -884,6 +920,7 @@ struct CthThreadStruct
   int        Event;
   CthThread  qnext;
   int        slotnum;
+  int        nslots;
   int        awakened;
   qt_t      *stack;
   qt_t      *stackp;
@@ -903,13 +940,13 @@ CpvStaticDeclare(int, zerofd);
  * this handler is invoked by a request for slot.
  */
 static void 
-reqslot(slotmsg *msg)
+reqslots(slotmsg *msg)
 {
   int slot, pe;
   CmiGrabBuffer((void**)&msg);
   if(msg->pe == CmiMyPe())
     CmiAbort("All stack slots have been exhausted!\n");
-  slot = get_slot(CpvAccess(myss));
+  slot = get_slots(CpvAccess(myss),msg->nslots);
   if(slot==(-1))
   {
     CmiSyncSendAndFree((CmiMyPe()+1)%CmiNumPes(), sizeof(slotmsg), msg);
@@ -924,15 +961,16 @@ reqslot(slotmsg *msg)
   }
 }
 
-static void CthStackCreate(CthThread t, CthVoidFn fn, void *arg, int slotnum);
+static void CthStackCreate(CthThread t, CthVoidFn fn, void *arg, 
+			   int slotnum, int nslots);
 
 /*
- * this handler is invoked by a response for slot.
- * it sets the slot number for the thread, and actually awakens it
+ * this handler is invoked by a response for slots.
+ * it sets the slot number and nslots for the thread, and actually awakens it
  * if it was awakened with CthAwaken already.
  */
 static void 
-respslot(slotmsg *msg)
+respslots(slotmsg *msg)
 {
   CthThread t = msg->t;
   if(t->slotnum != (-2))
@@ -940,7 +978,7 @@ respslot(slotmsg *msg)
     CmiError("[%d] requested a slot for a live thread? aborting.\n",CmiMyPe());
     CmiAbort("");
   }
-  CthStackCreate(t, msg->fn, msg->arg, msg->slot);
+  CthStackCreate(t, msg->fn, msg->arg, msg->slot, msg->nslots);
   if(t->awakened)
     CthAwaken(t);
   /* msg will be automatically freed by the scheduler */
@@ -963,6 +1001,7 @@ CthThread t;
   t->autoyield_blocks = 0;
   t->suspendable = 1;
   t->slotnum = (-1);
+  t->nslots = 0;
   t->awakened = 0;
 }
 
@@ -988,13 +1027,13 @@ CthThread t;
  * maps the virtual memory associated with slot using mmap
  */
 static void *
-map_slot(int slot)
+map_slots(int slot, int nslots)
 {
   void *pa;
   char *addr;
   size_t sz = CpvAccess(_stksize);
   addr = (char*) CpvAccess(heapbdry) + slot*sz;
-  pa = mmap((void*) addr, sz, 
+  pa = mmap((void*) addr, sz*nslots, 
             PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED,
             CpvAccess(zerofd), 0);
   if(pa== (void*)(-1))
@@ -1006,11 +1045,11 @@ map_slot(int slot)
  * unmaps the virtual memory associated with slot using munmap
  */
 static void
-unmap_slot(int slot)
+unmap_slots(int slot, int nslots)
 {
   size_t sz = CpvAccess(_stksize);
   char *addr = (char*) CpvAccess(heapbdry) + slot*sz;
-  int retval = munmap((void*) addr, sz);
+  int retval = munmap((void*) addr, sz*nslots);
   if (retval==(-1))
     CmiAbort("munmap call failed to deallocate requested memory.\n");
 }
@@ -1061,8 +1100,10 @@ void CthInit(char **argv)
 #endif
     /* FIXME: Portability for 64bit systems? */
     /* FIXME: Assumes heap grows down */
+    /* Align heap to a 1G boundary to leave space to grow */
     CpvAccess(heapbdry) = (void *)(((size_t)heap+(1<<30))&(~((1<<30)-1)));
     /* FIXME: Assumes stack grows up */
+    /* Align stack to a 256M boundary  to leave space to grow */
     stackbdry = (void *)(((size_t)stack-(1<<28))&(~((1<<28)-1)));
 #if CMK_THREADS_DEBUG
     CmiPrintf("[%d] heapbdry=%p\tstackbdry=%p\n",
@@ -1086,8 +1127,8 @@ void CthInit(char **argv)
   CpvInitialize(int, reqHdlr);
   CpvInitialize(int, respHdlr);
 
-  CpvAccess(reqHdlr) = CmiRegisterHandler((CmiHandler)reqslot);
-  CpvAccess(respHdlr) = CmiRegisterHandler((CmiHandler)respslot);
+  CpvAccess(reqHdlr) = CmiRegisterHandler((CmiHandler)reqslots);
+  CpvAccess(respHdlr) = CmiRegisterHandler((CmiHandler)respslots);
 
   CpvInitialize(int, _numSwitches);
   CpvAccess(_numSwitches) = 0;
@@ -1128,8 +1169,8 @@ CthAbortHelp(qt_t *sp, CthThread old, void *null)
   if (old->data) free(old->data);
   if(old->slotnum >= 0)
   {
-    free_slot(CpvAccess(myss), old->slotnum);
-    unmap_slot(old->slotnum);
+    free_slots(CpvAccess(myss), old->slotnum, old->nslots);
+    unmap_slots(old->slotnum, old->nslots);
   }
   free(old);
   return (void *) 0;
@@ -1157,7 +1198,7 @@ CthThread t;
   } else {
     QT_BLOCK((qt_helper_t*)CthBlockHelp, tc, 0, t->stackp);
   }
-  /*
+  /* NOTE: if thread migrated, CthCurrent will not be equal to tc.
   if (tc!=CthCpvAccess(CthCurrent)) { CmiAbort("Stack corrupted?\n"); }
   */
 }
@@ -1170,12 +1211,13 @@ static void CthOnly(void *arg, void *vt, qt_userf_t fn)
 }
 
 static void
-CthStackCreate(CthThread t, CthVoidFn fn, void *arg, int slotnum)
+CthStackCreate(CthThread t, CthVoidFn fn, void *arg, int slotnum, int nslots)
 {
   qt_t *stack, *stackbase, *stackp;
   int size = CpvAccess(_stksize);
   t->slotnum = slotnum;
-  stack = (qt_t*) map_slot(slotnum);
+  t->nslots = nslots;
+  stack = (qt_t*) map_slots(slotnum, nslots);
   _MEMCHECK(stack);
   stackbase = QT_SP(stack, size);
   stackp = QT_ARGS(stackbase, arg, t, (qt_userf_t *)fn, CthOnly);
@@ -1187,25 +1229,21 @@ CthThread CthCreate(fn, arg, size)
 CthVoidFn fn; void *arg; int size;
 {
   CthThread result; 
-  int slotnum;
-#if CMK_THREADS_DEBUG
-  if(size!=0 && size>CpvAccess(_stksize))
-  {
-    CmiPrintf("[%d] Nonzero stacksize %d bytes specified. Using %d bytes.\n",
-      CmiMyPe(), size, CpvAccess(_stksize));
-  }
-#endif
+  int slotnum, nslots = 1;
+  if(size>CpvAccess(_stksize))
+    nslots = (int) (size/CpvAccess(_stksize)) + 1;
   result = (CthThread)malloc(sizeof(struct CthThreadStruct));
   _MEMCHECK(result);
   CthThreadInit(result);
   CthSetStrategyDefault(result);
-  slotnum = get_slot(CpvAccess(myss));
+  slotnum = get_slots(CpvAccess(myss), nslots);
   if(slotnum == (-1)) /* mype does not have any free slots left */
   {
     slotmsg msg;
     result->slotnum = (-2);
     msg.pe = CmiMyPe();
     msg.slot = (-1); /* just to be safe */
+    msg.nslots = nslots;
     msg.t = result;
     msg.fn = fn;
     msg.arg = arg;
@@ -1214,7 +1252,7 @@ CthVoidFn fn; void *arg; int size;
   }
   else
   {
-    CthStackCreate(result, fn, arg, slotnum);
+    CthStackCreate(result, fn, arg, slotnum, nslots);
   }
   return result;
 }
@@ -1332,7 +1370,7 @@ void CthPackThread(CthThread t, void *buffer)
   stackbase = QT_SP(t->stack, CpvAccess(_stksize));
   ssz = ((char*)(stackbase)-(char*)(t->stackp));
   memcpy((void*)buf, (void *)t->stackp, ssz);
-  unmap_slot(t->slotnum);
+  unmap_slots(t->slotnum, t->nslots);
   free(t);
 }
 
@@ -1349,7 +1387,7 @@ CthThread CthUnpackThread(void *buffer)
   _MEMCHECK(t->data);
   memcpy((void*)t->data, (void*)buf, t->datasize);
   buf += t->datasize;
-  stack = (qt_t*) map_slot(t->slotnum);
+  stack = (qt_t*) map_slots(t->slotnum, t->nslots);
   _MEMCHECK(stack);
   if(stack != t->stack)
     CmiAbort("Stack pointers do not match after migration!!\n");
