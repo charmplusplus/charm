@@ -402,10 +402,15 @@ void CProxySection_ArrayBase::ckSend(CkArrayMessage *msg, int ep)
 	msg_prepareSend(msg,ep,ckGetArrayID());
 	if (ckIsDelegated()) //Just call our delegateMgr
 	  ckDelegatedTo()->ArraySectionSend(ep,msg,ckGetArrayID(),ckGetSectionID());
-	else {// TODO add ckSend to all elements
+	else {
 	  // send through all
-	  for (int i=0; i< _nElems; i++) {
+	  for (int i=0; i< _nElems-1; i++) {
 	    CProxyElement_ArrayBase ap(ckGetArrayID(), _elems[i]);
+	    void *newMsg=CkCopyMsg((void **)&msg);
+	    ap.ckSend((CkArrayMessage *)newMsg,ep);
+	  }
+	  if (_nElems > 0) {
+	    CProxyElement_ArrayBase ap(ckGetArrayID(), _elems[_nElems-1]);
 	    ap.ckSend((CkArrayMessage *)msg,ep);
 	  }
         }
