@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.85  1998-05-06 20:39:47  milind
+ * Revision 2.86  1998-06-09 17:03:11  milind
+ * Added CmiAbort prototype.
+ *
+ * Revision 2.85  1998/05/06 20:39:47  milind
  * Added CmiGrabBuffer prototype.
  *
  * Revision 2.84  1998/04/21 17:32:42  milind
@@ -817,6 +820,8 @@ void      *CmmFind CMK_PROTO((CmmTable t, int ntags, int *tags, int *returntags,
 
 void ConverseInit CMK_PROTO((int, char**, CmiStartFn, int, int));
 void ConverseExit CMK_PROTO((void));
+
+void CmiAbort(char *);
 
 /*********** CPATH ***********/
 
