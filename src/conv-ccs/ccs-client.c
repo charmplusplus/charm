@@ -53,7 +53,7 @@ CCS Reply ----------------------------------
 #include "sockRoutines.c"
 #include "ccs-auth.c"
 
-#define DEBUGF(x) printf x
+#define DEBUGF(x) /*printf x*/
 
 /*Parse list of nodes given to us by conv-host.
 */
@@ -227,7 +227,15 @@ int CcsSendRequest(CcsServer *svr, const char *hdlrID, int pe, unsigned int size
 
 int CcsSendRequestWithTimeout(CcsServer *svr, const char *hdlrID, int pe, unsigned int size, const char *msg, int timeout)
 {
+  const void *bufs[3]; int lens[3]; int nBuffers=0;
   CcsMessageHeader hdr;/*CCS request header*/
+    struct { /*CCS Authentication header*/
+      unsigned char type[4];
+      ChMessageInt_t clientID;
+      ChMessageInt_t replySalt;
+      SHA1_hash_t hash;
+    } auth;
+  
   hdr.len=ChMessageInt_new(size);
   hdr.pe=ChMessageInt_new(pe);
   strncpy(hdr.handler,hdlrID,CCS_HANDLERLEN);
@@ -240,13 +248,6 @@ int CcsSendRequestWithTimeout(CcsServer *svr, const char *hdlrID, int pe, unsign
   
   if (svr->isAuth==1) 
   {/*Authenticate*/
-    struct {
-      unsigned char type[4];
-      ChMessageInt_t clientID;
-      ChMessageInt_t replySalt;
-      SHA1_hash_t hash;
-      CcsMessageHeader hdr;
-    } auth;
     auth.type[0]=0x80; /*SHA-1 authentication*/
     auth.type[1]=0x00; /*Version 0*/
     auth.type[2]=0x00; /*Ordinary message*/   
@@ -256,14 +257,17 @@ int CcsSendRequestWithTimeout(CcsServer *svr, const char *hdlrID, int pe, unsign
     auth.replySalt=ChMessageInt_new(svr->replySalt);
     CCS_AUTH_hash(&svr->key,svr->clientSalt++,
 		  &hdr,&auth.hash);
-    auth.hdr=hdr;
-    if (-1==skt_sendN(svr->replyFd, &auth, sizeof(auth))) return -1;
+    /*Send the authentication header*/
+    bufs[nBuffers]=&auth; lens[nBuffers]=sizeof(auth); nBuffers++;
   }
-  else
-  {/*No authentication*/
-    if (-1==skt_sendN(svr->replyFd, &hdr, sizeof(hdr))) return -1;
-  }
-  if (-1==skt_sendN(svr->replyFd, msg, size)) return -1;
+  /*Send the CCS header*/
+  bufs[nBuffers]=&hdr; lens[nBuffers]=sizeof(hdr); nBuffers++;
+  
+  /*Send the request data*/
+  if (size>0) {bufs[nBuffers]=msg; lens[nBuffers]=size; nBuffers++;}
+  
+  if (-1==skt_sendV(svr->replyFd, nBuffers, bufs,lens)) return -1;
+  DEBUGF(("[%.3f] Request sent\n",CmiWallTimer()));
   /*Leave socket open for reply*/
   return 0;
 }
@@ -308,6 +312,7 @@ int CcsRecvResponse(CcsServer *svr,  unsigned int maxsize, char *recvBuffer,int 
   if (-1==CcsImpl_recvReplyAuth(svr)) return -1;
   if (-1==skt_recvN(fd,(char *)&netLen,sizeof(netLen))) return -1;
   len=ChMessageInt(netLen);
+  DEBUGF(("[%.3f] recv'd reply length\n",CmiWallTimer()));
   if (len>maxsize) 
     {skt_close(fd);return -1;/*Buffer too small*/}
   if (-1==skt_recvN(fd,(char *)recvBuffer,len)) return -1;

@@ -69,49 +69,25 @@ static void CcsServer_writeReply(SOCKET fd,
 			 CcsSecAttr *attr,
 			 int replyLen,char *reply)
 {
-  typedef struct { /*Reply header*/
+  const void *bufs[3]; int lens[3]; int nBuffers=0;
+  struct { /*Authentication header*/
+    SHA1_hash_t hash;
+  } aheader;
+  struct { /*Reply header*/
     ChMessageInt_t len;
   } header;
-  typedef struct { /*Authenticated header*/
-    SHA1_hash_t hash;
-    header h;
-  } aheader;
-#define n 64 /*Maximum data to copy into header*/
-  struct { /*Header plus data-- reply*/
-    header h;
-    char data[n];
-  } r;
-  struct { /*Authenticated version*/
-    aheader h;
-    char data[n];
-  } ar;
-  int hLen;
-  void *hPtr;
   if (attr->auth==1) 
   { /*Compose a reply SHA-1 hash header*/
-    hPtr=(void *)&ar;
-    hLen=sizeof(aheader);
     CCS_AUTH_hash(security->getKey(security,attr),
-		  ChMessageInt(attr->replySalt),NULL,&ar.h.hash);
-    ar.h.h.len=ChMessageInt_new(replyLen);
-    if (replyLen<=n) {
-      memcpy(ar.data,reply,replyLen);
-      hLen+=replyLen; replyLen=0; 
-    }
+		  ChMessageInt(attr->replySalt),NULL,&aheader.hash);
+    bufs[nBuffers]=&aheader; lens[nBuffers]=sizeof(aheader); nBuffers++;
   }
-  else
-  { /*Compose a simple reply header*/
-    hPtr=(void *)&r;
-    hLen=sizeof(header);
-    r.h.len=ChMessageInt_new(replyLen);
-    if (replyLen<=n) {
-      memcpy(r.data,reply,replyLen);
-      hLen+=replyLen; replyLen=0; 
-    }
-  }
-  if (-1==skt_sendN(fd,hPtr,hLen)) return;
-  if (replyLen>0)
-    if (-1==skt_sendN(fd,reply,replyLen)) return;
+  /*Compose a simple reply header*/
+  header.len=ChMessageInt_new(replyLen);
+  bufs[nBuffers]=&header; lens[nBuffers]=sizeof(header); nBuffers++;
+  bufs[nBuffers]=reply; lens[nBuffers]=replyLen; nBuffers++;
+  if (-1==skt_sendV(fd,nBuffers,bufs,lens)) return;
+  skt_close(fd);
 #undef n
 }
 
