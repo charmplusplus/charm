@@ -69,8 +69,6 @@
 #define CMK_SPANTREE_USE_COMMON_CODE                       1
 #define CMK_SPANTREE_USE_SPECIAL_CODE                      0
 
-
-
 #define CMK_SYNCHRONIZE_ON_TCP_CLOSE                       0
 
 #define CMK_THREADS_UNAVAILABLE                            0
@@ -99,10 +97,6 @@
 #define CMK_VECTOR_SEND_USES_COMMON_CODE                   1
 #define CMK_VECTOR_SEND_USES_SPECIAL_CODE                  0
 
-
-#define CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT                   1
-#define CMK_WHEN_PROCESSOR_IDLE_USLEEP                     0
-
 #define CMK_USE_HP_MAIN_FIX                                0
 #define CMK_DONT_USE_HP_MAIN_FIX                           1
 
@@ -112,9 +106,6 @@
 
 #define CMK_LBDB_ON					   1
 #define CMK_LBDB_OFF					   0
-
-
-
 
 
 #endif
