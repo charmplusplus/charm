@@ -157,6 +157,7 @@ private:
       env->totalsize = tsize;
       env->priobits = prio;
       env->setPacked(0);
+      env->setImmediate(0);
       _SET_USED(env, 0);
       return env;
     }
