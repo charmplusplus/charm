@@ -681,25 +681,39 @@ inline void operator|(PUP::er &p,CMK_PUP_LONG_LONG &t) {p(t);}
 inline void operator|(PUP::er &p,unsigned CMK_PUP_LONG_LONG &t) {p(t);}
 #endif
 
-#ifndef CK_STRICT_PUP
-//This byte-by-byte copy catches "p|t" for any
-//  user-defined type T that does not have a normal operator| defined.
-// It is a "convenient but error-prone" class.
+#ifdef CK_DEFAULT_BITWISE_PUP
+/// This defines "p|t" as a byte-by-byte copy, for any
+///  user-defined type T that does not have a normal operator| defined.
+/// It is the old, "convenient but error-prone" definition.
 template <class T>
 inline void operator|(PUP::er &p,T &t)
 {
          p((void *)&t,sizeof(T));
 }
-#endif
 
-//Marshall maps operator| to the classes' ordinary pup routine.
+//Map operator| to this classes' ordinary pup routine.
 #define PUPmarshall(type) \
   inline void operator|(PUP::er &p,type &t) {t.pup(p);}
+
+#else /* The usual case: !CK_DEFAULT_BITWISE_PUP */
+
+/// This defines "p|t" to call t's pup routine, if no
+///  existing operator| is found.
+template <class T>
+inline void operator|(PUP::er &p,T &t) {t.pup(p);}
+
+#define PUPmarshall(type) /* empty, for backward compatability */
+
+#endif
+
 #define PUPmarshal(type) PUPmarshall(type) /*Support this common misspelling*/
 
-//Copy these classes as raw memory
-#define PUPmarshallBytes(type) \
+
+/// Copy these classes as raw memory
+#define PUPbytes(type) \
   inline void operator|(PUP::er &p,type &t) { p((void *)&t,sizeof(type)); }
+
+#define PUPmarshallBytes(type) PUPbytes(type)
 
 
 #endif //def __CK_PUP_H
