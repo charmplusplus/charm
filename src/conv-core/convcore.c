@@ -545,6 +545,11 @@ void CHostGetOne()
   char line[10000];
   char rest[1000];
   int ok, ip, port, fd;  FILE *f;
+#if CMK_WEB_MODE
+  char hndlrId[100];
+  int dont_close = 0;
+  int svrip, svrport;
+#endif
 
   skt_accept(hostskt, &ip, &port, &fd);
   f = fdopen(fd,"r");
@@ -552,7 +557,15 @@ void CHostGetOne()
     if (strncmp(line, "req ", 4)==0) {
       char cmd[5], *msg;
       int pe, size, len;
-
+#if CMK_WEB_MODE   
+      sscanf(line, "%s%d%d%d%d%s", cmd, &pe, &size, &svrip, &svrport, hndlrId);
+      if(strcmp(hndlrId, "MonitorHandler") == 0) {
+	appletFd = fd;
+	dont_close = 1;
+      }
+#else
+      sscanf(line, "%s%d%d", cmd, &pe, &size);
+#endif
       /* DEBUGGING */
       CmiPrintf("Line = %s\n", line);
 
@@ -566,6 +579,11 @@ void CHostGetOne()
       fread(msg+CmiMsgHeaderSizeBytes+len, 1, size, f);
       msg[CmiMsgHeaderSizeBytes+len+size] = '\0';
       CmiSyncSendAndFree(CmiMyPe(), CmiMsgHeaderSizeBytes+len+size+1, msg);
+
+#if CMK_USE_PERSISTENT_CCS
+      if(dont_close == 1) break;
+#endif
+
     }
     else if (strncmp(line, "getinfo ", 8)==0) {
       unsigned int clientIP, clientPort;
@@ -608,8 +626,14 @@ void CHostGetOne()
     }
     else KillEveryoneCode(2932);
   }
+#if CMK_WEB_MODE
+  if(dont_close==0) {
+#endif
   fclose(f);
   close(fd);
+#if CMK_WEB_MODE
+  }
+#endif
 }
 
 static void CommunicationServer()
