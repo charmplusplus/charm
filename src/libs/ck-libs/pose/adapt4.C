@@ -22,10 +22,12 @@ void adapt4::Step()
       timeLeash = avgRBoffset;
     else timeLeash = avgRBoffset/2;
   }
-  if (g_specEventCount > (specTol*g_eventCount + g_eventCount)) {
-    timeLeash = avgRBoffset;
+  if ((g_specEventCount > (specTol*g_eventCount + g_eventCount)) ||
+      (specEventCount > (specTol*eventCount + eventCount))) {
+    timeLeash = 1;
   }
-  else if ((g_specEventCount <= (specTol*g_eventCount + g_eventCount)) &&
+  else if (((g_specEventCount <= (specTol*g_eventCount + g_eventCount)) &&
+	    (specEventCount <= (specTol*eventCount + eventCount))) &&
 	   (timeLeash < (POSE_TimeMax/2 -10))) {
     timeLeash += avgRBoffset;
   }
@@ -63,6 +65,8 @@ void adapt4::Step()
     ev->done = 2;
     localPVT->incSpecEventCount();
     localPVT->incEventCount();
+    specEventCount++;
+    eventCount++;
 #ifdef TRACE_DETAIL
     critStart = CmiWallTimer();  // trace timing
 #endif
