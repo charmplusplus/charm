@@ -14,7 +14,7 @@
 class _CkOStream {
   private:
     int _isErr;
-    int _buflen, _actlen;
+    size_t _buflen, _actlen;
     char _obuf[16384];
     char _tbuf[1024];
   public:
