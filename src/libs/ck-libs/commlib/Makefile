@@ -1,4 +1,4 @@
-CHARMC=$(CDIR)/bin/charmc $(OPTS)
+CHARMC=$(CDIR)/bin/charmc -I../../.. $(OPTS)
 COMMLIBDIR=../../conv-libs/commlib
 CDIR=../../../..
 LIBDIR=$(CDIR)/lib
@@ -6,7 +6,8 @@ LIBDIR=$(CDIR)/lib
 LIB = libmodulecommlib.a
 
 STRATEGY_OBJS = EachToManyStrategy.o MPIStrategy.o StreamingStrategy.o \
-		DummyStrategy.o NodeMulticast.o EachToManyMulticastStrategy.o
+		DummyStrategy.o NodeMulticast.o EachToManyMulticastStrategy.o \
+		MsgPacker.o
 
 CONVERSE_COM_OBJS = $(COMMLIBDIR)/commlib.o $(COMMLIBDIR)/gridrouter.o \
 	$(COMMLIBDIR)/de.o $(COMMLIBDIR)/treerouter.o $(COMMLIBDIR)/petable.o\
@@ -61,6 +62,9 @@ DummyStrategy.o: DummyStrategy.C DummyStrategy.h ComlibManager.h
 
 NodeMulticast.o: NodeMulticast.C NodeMulticast.h ComlibManager.h
 	$(CHARMC) -c NodeMulticast.C
+
+MsgPacker.o: MsgPacker.C MsgPacker.h
+	$(CHARMC) -c MsgPacker.C
 
 cifiles: ComlibManager.ci
 	$(CHARMC) ComlibManager.ci

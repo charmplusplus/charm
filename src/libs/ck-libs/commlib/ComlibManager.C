@@ -6,8 +6,10 @@
 #include "DummyStrategy.h"
 #include "MPIStrategy.h"
 #include "NodeMulticast.h"
+#include "MsgPacker.h"
 
 CpvDeclare(int, RecvmsgHandle);
+CpvDeclare(int, RecvCombinedShortMsgHdlrIdx);
 CpvDeclare(int, RecvdummyHandle);
 CpvDeclare(CkGroupID, cmgrID);
 
@@ -31,6 +33,15 @@ void recv_msg(void *msg){
     return;
 }
 
+void recv_combined_array_msg(void *msg){
+    if(msg == NULL)
+        return;
+    
+    ComlibPrintf("%d:In recv_combined_array_msg\n", CkMyPe());
+
+    MsgPacker::deliver((CombinedMessage *)msg);
+}
+
 //handler for dummy messages
 void recv_dummy(void *msg){
     ComlibPrintf("Received Dummy %d\n", CkMyPe());    
@@ -38,15 +49,17 @@ void recv_dummy(void *msg){
 }
 
 //An initialization routine which does prelimnary initialization of the 
-//communications library and registers the strategies with the 
-//PUP:able interface.
 void initComlibManager(void){
     //comm_debug = 1;
     ComlibInit();
     ComlibPrintf("Init Call\n");
 
     CpvInitialize(int, RecvmsgHandle);
+    CpvInitialize(int, RecvCombinedShortMsgHdlrIdx);
+
     CpvAccess(RecvmsgHandle) = CmiRegisterHandler((CmiHandler)recv_msg);
+    CpvAccess(RecvCombinedShortMsgHdlrIdx) = 
+        CmiRegisterHandler((CmiHandler)recv_combined_array_msg);
     
     //CmiPrintf("[%d] Registering Handler %d\n", CmiMyPe(), CpvAccess(RecvmsgHandle));
     

@@ -6,6 +6,8 @@ class StreamingStrategy : public Strategy {
     CkQ<CharmMessageHolder *> *streamingMsgBuf;
     int *streamingMsgCount;
     int PERIOD, bufferMax;
+    CmiBool shortMsgPackingFlag;
+    
  public:
     /**
      Create a streaming strategy, suitable for passing to ComlibManager.
@@ -31,6 +33,9 @@ class StreamingStrategy : public Strategy {
     virtual void beginProcessing(int ignored);
 
     virtual void pup(PUP::er &p);
+    void enableShortArrayMessagePacking(){shortMsgPackingFlag=CmiTrue;}
+    //Should be used only for array messages
+
     PUPable_decl(StreamingStrategy);
 };
 #endif
