@@ -1,0 +1,3 @@
+
+The lapi version of the charm machine layer is broken. It will compile and build
+but hangs during message passing.
