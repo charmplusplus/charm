@@ -51,6 +51,7 @@ while			{Return(WHILE);}
 forall			{Return(FORALL);}
 for			{Return(FOR);}
 atomic			{Return(ATOMIC);}
+forward                 {Return(FORWARD);}
 int			{Return(INT);}
 short			{Return(SHORT);}
 long			{Return(LONG);}

@@ -22,23 +22,25 @@ void CParseNode::numberNodes(void)
     case SLIST: nodeNum = numSlists++; break;
     case OLIST: nodeNum = numOlists++; break;
     case ATOMIC: nodeNum = numAtomics++; break;
+    case FORWARD: nodeNum = numForwards++; break;
     case ELIST:
     case INT_EXPR:
-    case IDENT:
+    case IDENT: 
     case ENTRY:
     default:
       break;
   }
   CParseNode *cn;
-  for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
-    cn->numberNodes();
+  if (constructs != 0) {
+    for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
+      cn->numberNodes();
+    }
   }
 }
 
 void CParseNode::labelNodes(void)
 {
   char text[128];
-
   switch(type) {
     case ENTRY:
     case SDAGENTRY:
@@ -86,6 +88,10 @@ void CParseNode::labelNodes(void)
       sprintf(text, "_atomic_%d", nodeNum); 
       label = new XStr(text);
       break;
+    case FORWARD: 
+      sprintf(text, "_forward_%d", nodeNum); 
+      label = new XStr(text);
+      break;
     case ELIST:
     case INT_EXPR:
     case IDENT:
@@ -93,8 +99,10 @@ void CParseNode::labelNodes(void)
       break;
   }
   CParseNode *cn;
-  for(cn=(CParseNode *)(constructs->begin()); !constructs->end(); cn=(CParseNode *)(constructs->next())) {
-    cn->labelNodes();
+  if (constructs != 0) {
+    for(cn=(CParseNode *)(constructs->begin()); !constructs->end(); cn=(CParseNode *)(constructs->next())) {
+      cn->labelNodes();
+    }
   }
 }
 
@@ -186,8 +194,10 @@ void CParseNode::generateEntryList(TList<CEntry*>& elist, TList<COverlap*>& olis
       }
       break;
   }
-  for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
-    cn->generateEntryList(elist,olist,thisWhen);
+  if (constructs != 0) {
+    for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
+      cn->generateEntryList(elist,olist,thisWhen);
+    }
   }
 }
 
@@ -311,30 +321,30 @@ void CParseNode::propagateState(int uniqueVarNum)
   for(sv=stateVars->begin(); !stateVars->end(); sv=stateVars->next())
      allstateVars->append(sv);
   CParseNode *cn;
+  TList<CStateVar*> *whensEntryMethodStateVars; 
+  whensEntryMethodStateVars = new TList<CStateVar*>();
   int c1, c2;
-  for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
-    returnStateVars = cn->propagateState(*allstateVars, uniqueVarNum);
-    c1=0; c2=0;
-    for (sv=allstateVars->begin(); !allstateVars->end(); sv=allstateVars->next()) {
-       c1++;
+  if (constructs != 0) {
+    for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
+      returnStateVars = cn->propagateState(*allstateVars, *whensEntryMethodStateVars , uniqueVarNum);
+      c1=0; c2=0;
+      for (sv=allstateVars->begin(); !allstateVars->end(); sv=allstateVars->next()) { c1++; }
+      for (sv=returnStateVars.begin(); !returnStateVars.end(); sv=returnStateVars.next()) { c2++; }
+      if (c2 != 0)
+        sv = returnStateVars.begin();
+      for(int i=2; i<=c1; i++) {
+        sv = returnStateVars.next();
+      }
+      for(int j=1; j<=c2-c1; j++) {
+         sv = returnStateVars.next();
+         allstateVars->append(sv);
+      }
     }
-    for (sv=returnStateVars.begin(); !returnStateVars.end(); sv=returnStateVars.next()) {
-       c2++;
-    }
-    if (c2 != 0)
-      sv = returnStateVars.begin();
-    for(int i=2; i<=c1; i++) {
-      sv = returnStateVars.next();
-    }
-    for(int j=1; j<=c2-c1; j++) {
-       sv = returnStateVars.next();
-       allstateVars->append(sv);
-    }
-  } 
+  }
 
 }
 
-TList<CStateVar*> CParseNode::propagateState(TList<CStateVar*>& list, int uniqueVarNum)
+TList<CStateVar*> CParseNode::propagateState(TList<CStateVar*>& list, TList<CStateVar*>& elist, int uniqueVarNum)
 {
   CStateVar *sv;
   CStateVar *sv1;
@@ -342,6 +352,7 @@ TList<CStateVar*> CParseNode::propagateState(TList<CStateVar*>& list, int unique
   int c2;
   int i, j;
   TList <CStateVar*> *olistTempStateVars;
+  TList<CStateVar*> *whensEntryMethodStateVars; 
   TList<CStateVar*> returnStateVars;
   olistTempStateVars = new TList<CStateVar*>();
   allstateVars = new TList<CStateVar*>();
@@ -368,6 +379,7 @@ TList<CStateVar*> CParseNode::propagateState(TList<CStateVar*>& list, int unique
       }
       break;
     case WHEN:
+      whensEntryMethodStateVars = new TList<CStateVar*>();
       stateVarsChildren = new TList<CStateVar*>();
       int numParameters; 
       int count;
@@ -422,6 +434,7 @@ TList<CStateVar*> CParseNode::propagateState(TList<CStateVar*>& list, int unique
                   allstateVars->append(sv);
 	       }
  	       entry1->stateVars->append(sv);
+               whensEntryMethodStateVars->append(sv); 
        	       entry1->estateVars.append(sv);
             }
             else { 
@@ -476,6 +489,7 @@ TList<CStateVar*> CParseNode::propagateState(TList<CStateVar*>& list, int unique
                         sv = new CStateVar(constStr, 0, vType1, vType2, 0,0 , new XStr(*(parameter1->con2->text)), byRef,new XStr(*(parameter1->con3->text)), isMsg);
                      allstateVars->append(sv);
                      stateVarsChildren->append(sv);
+                     whensEntryMethodStateVars->append(sv); 
  		     entry1->estateVars.append(sv);
  		     entry1->stateVars->append(sv);
 		  }
@@ -509,6 +523,7 @@ TList<CStateVar*> CParseNode::propagateState(TList<CStateVar*>& list, int unique
                      stateVarsChildren->append(sv);
                      allstateVars->append(sv);
  	             entry1->stateVars->append(sv);
+                     whensEntryMethodStateVars->append(sv); 
        	             entry1->estateVars.append(sv);
 		  }
                   if (byRef != 0) {
@@ -530,7 +545,7 @@ TList<CStateVar*> CParseNode::propagateState(TList<CStateVar*>& list, int unique
       stateVarsChildren = stateVars;
       for(sv=stateVars->begin(); !stateVars->end(); sv=stateVars->next())
          allstateVars->append(sv);
-      if(con2 != 0) con2->propagateState(list, uniqueVarNum);
+      if(con2 != 0) con2->propagateState(list, elist, uniqueVarNum);
       break;
     case OLIST:
       stateVarsChildren = new TList<CStateVar*>();
@@ -561,6 +576,17 @@ TList<CStateVar*> CParseNode::propagateState(TList<CStateVar*>& list, int unique
       }
       stateVarsChildren = stateVars;
       break;
+    case FORWARD:
+      stateVarsChildren = new TList<CStateVar*>();
+      for(sv=list.begin(); !list.end(); sv=list.next()) { 
+        stateVars->append(sv);
+        allstateVars->append(sv);
+      }
+      for(sv=elist.begin(); !elist.end(); sv=elist.next()) { 
+        stateVarsChildren->append(sv);
+      }
+
+      break;
     case INT_EXPR:
     case IDENT:
     case ENTRY:
@@ -574,81 +600,80 @@ TList<CStateVar*> CParseNode::propagateState(TList<CStateVar*>& list, int unique
   CParseNode *cn;
   c1 = 0;
   c2 = 0;
-  for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
-    if (type == FORALL)
-       returnStateVars = cn->propagateState(*stateVarsChildren, uniqueVarNum);
-    else
-       returnStateVars = cn->propagateState(*allstateVars, uniqueVarNum);
-    c1=0; c2=0;
-    for (sv=returnStateVars.begin(); !returnStateVars.end(); sv=returnStateVars.next()) {
-       c2++;
-    }
-    for (sv=allstateVars->begin(); !allstateVars->end(); sv=allstateVars->next()) {
-       c1++;
-    }
-    if ((type != FOR) && (type != IF) && (type != ELSE) &&(type != FORALL) 
-        && (type != OLIST) && (type != WHILE)) {
-       if (c2 != 0) {
-         sv = returnStateVars.begin();
-         for(i=2; i<=c1; i++) {
-           sv = returnStateVars.next();
+  if (constructs != 0) {
+    for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
+      if (type == FORALL)
+         returnStateVars = cn->propagateState(*stateVarsChildren, elist,  uniqueVarNum);
+      else if (type == WHEN)
+         returnStateVars = cn->propagateState(*allstateVars, *whensEntryMethodStateVars,  uniqueVarNum);
+      else
+         returnStateVars = cn->propagateState(*allstateVars, elist,  uniqueVarNum);
+      c1=0; c2=0;
+      for (sv=returnStateVars.begin(); !returnStateVars.end(); sv=returnStateVars.next()) { c2++; }
+      for (sv=allstateVars->begin(); !allstateVars->end(); sv=allstateVars->next()) { c1++; }
+      if ((type != FOR) && (type != IF) && (type != ELSE) &&(type != FORALL) 
+          && (type != OLIST) && (type != WHILE)) {
+         if (c2 != 0) {
+           sv = returnStateVars.begin();
+           for(i=2; i<=c1; i++) {
+             sv = returnStateVars.next();
+           }
+           for(j=1; j<=c2-c1; j++) {
+              sv = returnStateVars.next();
+              allstateVars->append(sv);
+           }
          }
-         for(j=1; j<=c2-c1; j++) {
-            sv = returnStateVars.next();
-            allstateVars->append(sv);
-	       
-         }
-       }
-    }
-    else if (type == OLIST) {
-      int foundEnd = 0;
-      sv = returnStateVars.begin();
-      sv1 = olistTempStateVars->begin();
-      if (!returnStateVars.end() && !olistTempStateVars->end()) {
-	while (foundEnd != 1) {
-	     if ((sv->isVoid == 1) && (sv1->isVoid ==1)) {
-                sv = returnStateVars.next();
-	        sv1 = olistTempStateVars->next();
-	        if (returnStateVars.end() || olistTempStateVars->end()) {
-                  foundEnd = 1;
-	        }
-             }
-	     else if (sv->isVoid != sv1->isVoid ) {
-	        foundEnd = 1;
-	     }
-	     else if (*(sv->name) == *(sv1->name)) {
-                sv = returnStateVars.next();
-	        sv1 = olistTempStateVars->next();
-	        if (returnStateVars.end() || olistTempStateVars->end()) {
-                  foundEnd = 1;
-	        }
-	     }
-	     else 
-	       foundEnd = 1;
+      }
+      else if (type == OLIST) {
+        int foundEnd = 0;
+        sv = returnStateVars.begin();
+        sv1 = olistTempStateVars->begin();
+        if (!returnStateVars.end() && !olistTempStateVars->end()) {
+	  while (foundEnd != 1) {
+	      if ((sv->isVoid == 1) && (sv1->isVoid ==1)) {
+                  sv = returnStateVars.next();
+	          sv1 = olistTempStateVars->next();
+	          if (returnStateVars.end() || olistTempStateVars->end()) {
+                    foundEnd = 1;
+	          }
+               }
+	       else if (sv->isVoid != sv1->isVoid ) {
+	          foundEnd = 1;
+	       }
+	       else if (*(sv->name) == *(sv1->name)) {
+                  sv = returnStateVars.next();
+	          sv1 = olistTempStateVars->next();
+	          if (returnStateVars.end() || olistTempStateVars->end()) {
+                    foundEnd = 1;
+	          }
+	       }
+	       else 
+	         foundEnd = 1;
+          }
         }
+        for(; !returnStateVars.end(); sv=returnStateVars.next()) {
+           olistTempStateVars->append(sv);
+        } 
       }
-      for(; !returnStateVars.end(); sv=returnStateVars.next()) {
-         olistTempStateVars->append(sv);
-      }
-    }
 
-  } 
-    if ((type == FORALL) || (type == OLIST)) {
-       sv=allstateVars->begin();
-       i = 0;
-       while (!allstateVars->end() && (i == 0)) {
-          if (sv->isVoid != 1) {
-             if (*(sv->name) == *(counter)) {
-	       allstateVars->remove(sv);
-	       i =1;
-	     }
-	     else
-	       sv= allstateVars->next();
-	  }
-	  else
-	    sv = allstateVars->next();
-       }
     }
+ } 
+  if ((type == FORALL) || (type == OLIST)) {
+     sv=allstateVars->begin();
+     i = 0;
+     while (!allstateVars->end() && (i == 0)) {
+        if (sv->isVoid != 1) {
+           if (*(sv->name) == *(counter)) {
+              allstateVars->remove(sv);
+	      i =1;
+            }
+            else
+               sv= allstateVars->next();
+	 }
+	 else
+	  sv = allstateVars->next();
+     }
+  }
     if (type == OLIST) {
        c2 = 0;
        for (sv=olistTempStateVars->begin(); !olistTempStateVars->end(); sv=olistTempStateVars->next()) {
@@ -709,15 +734,38 @@ void CParseNode::generateCode(XStr& op)
     case WHEN:
       generateWhen(op);
       break;
+    case FORWARD:
+      generateForward(op);
+      break;
     default:
       break;
   }
   CParseNode *cn;
-  for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
-    cn->generateCode(op);
+  if (constructs != 0) {
+    for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
+      cn->generateCode(op);
+    }
   }
 }
 
+void CParseNode::generateForward(XStr& op) {
+  CParseNode *cn;
+  op << "  void " << label->charstar() << "(";
+  generatePrototype(op, *stateVars);
+  op << ") {\n";
+  for (cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
+    op << "    { "<<cn->text->charstar()<<"(";
+    generateCall(op, *stateVarsChildren);
+    op<<"); }\n";
+  }
+  if(nextBeginOrEnd == 1)
+    op << "    " << next->label->charstar() << "(";
+  else
+    op << "    " << next->label->charstar() << "_end(";
+  generateCall(op, *stateVars);
+  op << ");\n";
+  op << "  }\n\n";
+}
 void CParseNode::generateWhen(XStr& op)
 {
   op << "  int " << label->charstar() << "(";
@@ -1601,6 +1649,7 @@ void CParseNode::setNext(CParseNode *n, int boe)
     case FOR:
     case WHILE:
     case ATOMIC:
+    case FORWARD:
     case ELSE:
       next = n;
       nextBeginOrEnd = boe;
@@ -1617,8 +1666,10 @@ void CParseNode::setNext(CParseNode *n, int boe)
       break;
   }
   CParseNode *cn;
-  for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
-    cn->setNext(n, boe);
+  if (constructs != 0) {
+    for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
+      cn->setNext(n, boe);
+    }
   }
 }
 

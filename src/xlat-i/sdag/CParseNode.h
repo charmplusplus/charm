@@ -52,7 +52,7 @@ class CParseNode {
     void generateCode(XStr& output);
     void setNext(CParseNode *, int);
   private:
-    TList<CStateVar*> propagateState(TList<CStateVar*>&, int);
+    TList<CStateVar*> propagateState(TList<CStateVar*>&, TList<CStateVar*>&, int);
     void generateWhen(XStr& op);
     void generateOverlap(XStr& op);
     void generateWhile(XStr& op);
@@ -64,6 +64,7 @@ class CParseNode {
     void generateSdagEntry(XStr& op);
     void generateSlist(XStr& op);
     void generateAtomic(XStr& op);
+    void generateForward(XStr& op);
     void generatePrototype(XStr& op, TList<CStateVar*>&);
     void generateCall(XStr& op, TList<CStateVar*>&);
 };

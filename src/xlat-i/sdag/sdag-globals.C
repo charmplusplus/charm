@@ -26,6 +26,7 @@ int numEntries=0;
 int numOlists=0;
 int numWhiles=0;
 int numAtomics=0;
+int numForwards=0;
 int numForalls=0;
 
 void resetNumbers(void)
@@ -41,6 +42,7 @@ void resetNumbers(void)
   numOlists=0;
   numWhiles=0;
   numAtomics=0;
+  numForwards=0;
   numForalls=0;
 }
 

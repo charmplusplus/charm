@@ -223,6 +223,21 @@ CParseNode::CParseNode(EToken t, CLexer *cLexer, CParser *cParser, int overlaps)
       tok = cLexer->getMatchedCode("{ ", LBRACE, RBRACE);
       text = tok->text;
       break;
+    case FORWARD:
+      tok = cParser->lookForToken(IDENT);
+      tok1 = cLexer->lookAhead();
+      while(tok1->type == COMMA) {
+        constructs->append(new CParseNode(IDENT,  tok->text));
+	tok1 = cParser->lookForToken(COMMA); delete tok1;
+	tok = cParser->lookForToken(IDENT);
+	tok1 = cLexer->lookAhead();
+      }
+      if (tok1->type == SEMICOLON) {
+        constructs->append(new CParseNode(IDENT, tok->text));
+	tok1 = cParser->lookForToken(SEMICOLON); delete tok1;
+      }
+      CParseNode *cn1;
+      break;
     case OLIST:
     case SLIST:
       isOverlaped = overlaps;
@@ -236,6 +251,7 @@ CParseNode::CParseNode(EToken t, CLexer *cLexer, CParser *cParser, int overlaps)
         }
         tok = cLexer->getNextToken();
       }
+      isOverlaped = overlaps;
       break;
     case ELIST:
       isOverlaped = overlaps;
