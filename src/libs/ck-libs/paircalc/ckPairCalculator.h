@@ -33,12 +33,12 @@ class partialResultMsg : public CMessage_partialResultMsg {
   CkCallback cb;
 
   friend class CMessage_partialResultMsg;
-  
+  /*  
   partialResultMsg(unsigned int iN,   complex *iresult, int ipriority, CkCallback icb) : N(iN),  priority(ipriority), cb(icb)
     {
       memcpy(this->result,iresult,N*sizeof(complex));
     }
-
+  */
 };
 
 class priorSumMsg : public CMessage_priorSumMsg {
@@ -49,10 +49,11 @@ class priorSumMsg : public CMessage_priorSumMsg {
   CkCallback cb;
 
   friend class CMessage_priorSumMsg;
-  priorSumMsg(unsigned int iN,  complex *iresult,int ipriority,CkCallback icb) :  N(iN), priority(ipriority), cb(icb)
+  /*  priorSumMsg(unsigned int iN,  complex *iresult,int ipriority,CkCallback icb) :  N(iN), priority(ipriority), cb(icb)
     {
       memcpy(this->result,iresult,N*sizeof(complex));
     }
+  */
 };
 
 class PairCalculator: public CBase_PairCalculator {
@@ -94,6 +95,8 @@ class PairCalculator: public CBase_PairCalculator {
   int kRightCount, kLeftCount, kUnits;
   int *kLeftOffset;
   int *kRightOffset;
+  int *kLeftMark;
+  int *kRightMark;
   int op1, op2;
   FuncType fn1, fn2;
   complex **inDataLeft, **inDataRight;
