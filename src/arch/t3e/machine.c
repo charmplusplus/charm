@@ -313,8 +313,8 @@ void *CmiAlloc(int size)
   if (McMemAllocated > McMemMaxAllocated)
   {
     if (Cmi_mype == 0)
-      CmiPrintf("[%d] Allocating: %d High watermark: %d\n",
-		Cmi_mype,size+8,McMemAllocated);
+/*      CmiPrintf("[%d] Allocating: %d High watermark: %d\n",
+		Cmi_mype,size+8,McMemAllocated); */
     McMemMaxAllocated = McMemAllocated;
   }
   ((int *)res)[0]=size;
