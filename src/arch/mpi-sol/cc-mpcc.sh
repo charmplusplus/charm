@@ -6,4 +6,6 @@ CMK_CXX='mpCC -instances=explicit '
 CMK_CXXPP='mpCC -E '
 CMK_LD='mpcc'
 CMK_LDXX='mpCC -instances=explicit '
-CMK_LIBS="$CMK_LIBS -lnsl -lsocket -lmpi"
+CMK_LIBS="-lckqt -lpmpi -lsocket -lnsl -lmpi"
+CMK_LD_SHARED="-G"
+CMK_LD_LIBRARY_PATH="-R$CHARMLIBSO/"
