@@ -138,14 +138,12 @@ void LogPool::addEventType(int eventType, double time)
 {
    if (eventType >= 256) {
        CkPrintf("Invalid event type %d!\n", eventType);
-       CkExit();
+       return;
    }
-   if (events[eventType].flag == 1) {
-       CkPrintf("Duplicate event type %d!\n", eventType);
-       CkExit();
-   }
-   events[eventType].time = time;
-   events[eventType].flag = 1;
+   MarkEntry *e = new MarkEntry;
+   e->time = time;
+   e->next = events[eventType].marks;
+   events[eventType].marks = e;
    markcount ++;
 }
 
@@ -167,8 +165,10 @@ void LogPool::write(void)
   fprintf(fp, "\n");
   // write marks
   fprintf(fp, "%d ", markcount);
-  for (i=0; i<256; i++)
-    if (events[i].flag) fprintf(fp, "%d %f ", i, events[i].time);
+  for (i=0; i<256; i++) {
+    for(MarkEntry *e = events[i].marks; e; e=e->next)
+        fprintf(fp, "%d %f ", i, e->time);
+  }
   fprintf(fp, "\n");
 }
 

@@ -60,9 +60,13 @@ class LogEntry {
 
 #include <errno.h>
 
-typedef struct _LogMark {
+typedef struct _MarkEntry {
 double time;
-int    flag;
+struct _MarkEntry *next;
+} MarkEntry;
+
+typedef struct _LogMark {
+MarkEntry *marks;
 } LogMark;
 
 class LogPool {
@@ -115,7 +119,7 @@ class LogPool {
       };
 
       // event
-      for (i=0; i<256; i++) events[i].flag = 0;
+      for (i=0; i<256; i++) events[i].marks = NULL;
       markcount = 0;
     }
     ~LogPool() {
