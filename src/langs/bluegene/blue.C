@@ -62,7 +62,15 @@ CpvStaticDeclare(msgQueue *,inBuffer);	/* emulate the bluegene fix-size inbuffer
 CpvStaticDeclare(CmmTable *,msgBuffer);	/* if inBuffer is full, put to this buffer */
 
 CpvDeclare(int, inEmulatorInit);
-static int printTimeLog;
+
+static int arg_argc;
+static char **arg_argv;
+
+int bgSize = 0;
+
+static int printTimeLog = 0;
+static int genTimeLog = 0;
+static int correctTimeLog = 0;
 
 #define ASSERT(x)	if (!(x)) { CmiPrintf("Assert failure at %s:%d\n", __FILE__,__LINE__); CmiAbort("Abort!"); }
 
@@ -756,15 +764,24 @@ double BgGetTime()
 #endif
 }
 
+double BgGetCurTime()
+{
+  return tCURRTIME;
+}
+
 void BgShutdown()
 {
   // timing
 #if BLUEGENE_TIMING
-  if (printTimeLog) {
+  if (1)
+  if (genTimeLog) {
     for (int j=0; j<cva(numNodes); j++)
     for (int i=0; i<cva(numWth); i++) {
       BgTimeLine &log = cva(nodeinfo)[j].timelines[i];	
-      BgPrintThreadTimeLine(nodeInfo::Local2Global(j), i, log);
+//      BgPrintThreadTimeLine(nodeInfo::Local2Global(j), i, log);
+      int x,y,z;
+      nodeInfo::Local2XYZ(j, &x, &y, &z);
+      BgWriteThreadTimeLine(arg_argv, x, y, z, i, log);
     }
   }
 #endif
@@ -839,8 +856,13 @@ static void ProcessMessage(char *msg)
 
   CmiSetHandler(msg, CmiBgMsgHandle(msg));
 
+  // don't count thread overhead and timinmg overhead
+  tSTARTTIME = CmiWallTimer();
+
   entryFunc(msg);
 
+  tCURRTIME += (CmiWallTimer()-tSTARTTIME);
+  tSTARTTIME = CmiWallTimer();
 }
 
 void comm_thread(threadInfo *tinfo)
@@ -939,22 +961,17 @@ void work_thread(threadInfo *tinfo)
     // timing
     BG_ENTRYSTART(CmiBgMsgHandle(msg), msg);
 
-    // don't count thread overhead and timinmg overhead
-    tSTARTTIME = CmiWallTimer();
-
     // ProcessMessage may trap into scheduler
     ProcessMessage(msg);
-
-    /* let other work thread do their jobs */
-    tCURRTIME += (CmiWallTimer()-tSTARTTIME);
 
     // timing
     BG_ENTRYEND();
 
     if (fromQ2 == 1) q2.deq();
+
     DEBUGF(("[%d] work thread %d finish a msg.\n", BgMyNode(), tMYID));
 
-    // suspend work thread, awaken at line 347 - addBgThreadMessage().
+    /* let other work thread do their jobs */
     CthYield();
     tSTARTTIME = CmiWallTimer();
   }
@@ -1031,7 +1048,11 @@ CmiStartFn bgMain(int argc, char **argv)
   CmiGetArgInt(argv, "+z", &cva(numZ));
   CmiGetArgInt(argv, "+cth", &cva(numCth));
   CmiGetArgInt(argv, "+wth", &cva(numWth));
-  printTimeLog = CmiGetArgFlag(argv, "+bglog");
+
+//  printTimeLog = CmiGetArgFlag(argv, "+bglog");
+  genTimeLog = CmiGetArgFlag(argv, "+bglog");
+  correctTimeLog = CmiGetArgFlag(argv, "+bgcorrect");
+  if (correctTimeLog) genTimeLog = 1;
 
   arg_argv = argv;
   arg_argc = CmiGetArgc(argv);

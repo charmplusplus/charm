@@ -1,5 +1,8 @@
 
+#include "stdio.h"
+
 #include "blue.h"
+#include "blue_impl.h"
 #include "blue_timing.h"
 
 #define max(a,b) ((a)>=(b)?(a):(b))
@@ -21,7 +24,7 @@ void BgMsgSetTiming(char *msg)
 bgMsgEntry::bgMsgEntry(char *msg)
 {
   msgID = CmiBgMsgID(msg);
-  sendtime = BgGetTime();
+  sendtime = BgGetCurTime();
   dstPe = CmiBgMsgNodeID(msg);
   tID = CmiBgMsgThreadID(msg);
 }
@@ -31,10 +34,15 @@ void bgMsgEntry::print()
   CmiPrintf("msgID:%d sendtime:%f dstPe:%d\n", msgID, sendtime, dstPe);
 }
 
+void bgMsgEntry::write(FILE *fp)
+{
+  fprintf(fp, "msgID:%d sendtime:%f dstPe:%d\n", msgID, sendtime, dstPe);
+}
+
 bgTimeLog::bgTimeLog(int epc, char *msg)
 {
   ep = epc;
-  startTime = BgGetTime();
+  startTime = BgGetCurTime();
   recvTime = CmiBgMsgRecvTime(msg);
   endTime = 0.0;
   srcpe = msg?CmiBgMsgSrcPe(msg):-1;
@@ -49,7 +57,7 @@ bgTimeLog::~bgTimeLog()
 
 void bgTimeLog::closeLog()
 {
-  endTime = BgGetTime();
+  endTime = BgGetCurTime();
 }
 
 void bgTimeLog::addMsg(char *msg)
@@ -63,6 +71,14 @@ void bgTimeLog::print(int node, int th)
   for (int i=0; i<msgs.length(); i++)
     msgs[i]->print();
   CmiPrintf("==>>\n");
+}
+
+void bgTimeLog::write(FILE *fp)
+{
+  fprintf(fp, "<<== ep:%d startTime:%f endTime:%f srcnode:%d msgID:%d\n", ep, startTime, endTime, srcpe, msgID);
+  for (int i=0; i<msgs.length(); i++)
+    msgs[i]->write(fp);
+  fprintf(fp, "==>>\n");
 }
 
 void bgTimeLog::adjustTimeLog(double tAdjust)
@@ -223,5 +239,17 @@ void BgPrintThreadTimeLine(int pe, int th, BgTimeLine &tline)
   for (int i=0; i<tline.length(); i++)
     tline[i]->print(pe, th);
 }
+
+void BgWriteThreadTimeLine(char **argv, int x, int y, int z, int th, BgTimeLine &tline)
+{
+  char *fname = (char *)malloc(strlen(argv[0])+100);
+  sprintf(fname, "%s-%d-%d-%d.%d.log", argv[0], x,y,z,th);
+  FILE *fp = fopen(fname, "w+");
+  for (int i=0; i<tline.length(); i++)
+    tline[i]->write(fp);
+  fclose(fp);
+  free(fname);
+}
+
 
 

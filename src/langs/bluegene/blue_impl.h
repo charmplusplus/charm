@@ -1,6 +1,8 @@
 #ifndef BLUE_IMPL_H
 #define BLUE_IMPL_H
 
+#include <stdlib.h>
+
 /* alway use handler table per node */
 #if ! defined(CMK_BLUEGENE_NODE) && ! defined(CMK_BLUEGENE_THREAD)
 #define CMK_BLUEGENE_NODE   1
@@ -15,11 +17,6 @@
 /* end of system parameters */
 
 #define MAX_HANDLERS	100
-
-static int arg_argc;
-static char **arg_argv;
-
-static int bgSize = 0;
 
 CpvStaticDeclare(int, numX);	/* size of bluegene nodes in cube */
 CpvStaticDeclare(int, numY);
@@ -54,7 +51,7 @@ const char UNKNOWN_THREAD=0, COMM_THREAD=1, WORK_THREAD=2;
 #define tNODEQ          tMYNODE->nodeQ
 #define tSTARTED        tMYNODE->started
 
-
+extern int bgSize;
 
 /*****************************************************************************
    used internally, define BG Node to real Processor mapping
@@ -298,5 +295,6 @@ public:
   }
 };
 
+extern double BgGetCurTime();
 
 #endif

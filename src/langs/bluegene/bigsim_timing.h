@@ -30,6 +30,7 @@ public:
 public:
   bgMsgEntry(char *msg);
   void print();
+  void write(FILE *fp);
 };
 
 /**
@@ -50,6 +51,7 @@ public:
   void closeLog();
   void addMsg(char *msg);
   void print(int node, int th);
+  void write(FILE *fp);
 
   void adjustTimeLog(double tAdjust);
 };
@@ -65,6 +67,7 @@ CpvExtern(int, bgCorrectionHandler);
 extern void BgInitTiming();
 extern void BgMsgSetTiming(char *msg);
 extern void BgPrintThreadTimeLine(int node, int th, BgTimeLine &tline);
+extern void BgWriteThreadTimeLine(char **argv, int x, int y, int z, int th, BgTimeLine &tline);
 extern void BgGetMsgStartTime(double recvTime, BgTimeLine &tline, double* startTime, int index);
 extern void BgAdjustTimeLineInsert(BgTimeLine &tline);
 extern void BgAdjustTimeLineForward(int msgID, double tAdjust, BgTimeLine &tline);
@@ -72,26 +75,32 @@ extern void BgAdjustTimeLineForward(int msgID, double tAdjust, BgTimeLine &tline
 #if BLUEGENE_TIMING
 
 #define BG_ENTRYSTART(handler, m)  \
-	if (tTHREADTYPE == WORK_THREAD) tMYNODE->timelines[tMYID].enq(new bgTimeLog(handler, m));
+        if (genTimeLog)	\
+	  if (tTHREADTYPE == WORK_THREAD) 	\
+	    tMYNODE->timelines[tMYID].enq(new bgTimeLog(handler, m));
 
 #define BG_ENTRYEND()  \
-	if (tTHREADTYPE == WORK_THREAD) {	\
-          BgTimeLine &log = tMYNODE->timelines[tMYID];	\
-          log[log.length()-1]->closeLog();	\
-		  BgAdjustTimeLineInsert(log);	\
-        }
+        if (genTimeLog)	{ \
+	  if (tTHREADTYPE == WORK_THREAD) {	\
+            BgTimeLine &log = tMYNODE->timelines[tMYID];	\
+            log[log.length()-1]->closeLog();	\
+	    if (correctTimeLog) BgAdjustTimeLineInsert(log);	\
+          }	\
+	}
 
 #define BG_ADDMSG(m)  	\
-	BgMsgSetTiming(m); 	\
-	if (tTHREADTYPE == WORK_THREAD) {	\
-          BgTimeLine &log = tMYNODE->timelines[tMYID];	\
-          int n = log.length();				\
-          if (n>0) {				\
-            bgTimeLog *tline = log[n-1];	\
-            tline->addMsg(m);				\
-          }						\
-	  /* log[log.length()-1]->print(); */		\
-        }
+        if (genTimeLog)	{ \
+	  BgMsgSetTiming(m); 	\
+	  if (tTHREADTYPE == WORK_THREAD) {	\
+            BgTimeLine &log = tMYNODE->timelines[tMYID];	\
+            int n = log.length();				\
+            if (n>0) {				\
+              bgTimeLog *tline = log[n-1];	\
+              tline->addMsg(m);				\
+            }						\
+	    /* log[log.length()-1]->print(); */		\
+          }	\
+	}
 #else
 #define BG_ENTRYSTART(handler, m)
 #define BG_ENTRYEND()
