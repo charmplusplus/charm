@@ -84,6 +84,7 @@ char **argv;
   CpvInitialize(int, threadEp);
   CpvInitialize(int, threadPe);
   CpvInitialize(int, threadEvent);
+  CpvInitialize(CthThread, cThread);
 /* end addition */
   program_name(argv[0]);
 }
