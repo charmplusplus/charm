@@ -20,7 +20,7 @@ EachToManyStrategy::EachToManyStrategy(int substrategy){
 
     ComlibPrintf("Before instance\n");
     comid = ComlibInstance(routerID, CkNumPes());
-    this->npes = npes;
+    this->npes = CkNumPes();
     ComlibPrintf("After instance\n");
 
     procMap = new int[CkNumPes()];
@@ -37,6 +37,7 @@ EachToManyStrategy::EachToManyStrategy(int substrategy, int npes, int *pelist){
 
     comid = ComlibInstance(routerID, CkNumPes());
     comid = ComlibEstablishGroup(comid, npes, pelist);
+    this->npes = npes;
 
     procMap = new int[CkNumPes()];
     setReverseMap(procMap, pelist, npes);
@@ -44,8 +45,12 @@ EachToManyStrategy::EachToManyStrategy(int substrategy, int npes, int *pelist){
 
 void EachToManyStrategy::insertMessage(CharmMessageHolder *cmsg){
 
+    if(messageBuf == NULL) {
+	ComlibPrintf("ERROR MESSAGE BUF IS NULL\n");
+	return;
+    }
     ComlibPrintf("EachToMany: insertMessage\n");
-
+    
     messageBuf->enq(cmsg);
     messageCount ++;
 }
@@ -54,7 +59,7 @@ void EachToManyStrategy::doneInserting(){
     ComlibPrintf("%d: DoneInserting \n", CkMyPe());
     //ComlibPrintf("%d:Setting Num Deposit to %d\n", CkMyPe(), messageCount);
 
-    if((messageCount == 0) && (CkNumPes() > 0)) {
+    if((messageBuf->length() == 0) && (CkNumPes() > 0)) {
         DummyMsg * dummymsg = new DummyMsg;
         
         ComlibPrintf("Creating a dummy message\n");
@@ -66,7 +71,7 @@ void EachToManyStrategy::doneInserting(){
         messageCount ++;
     }
 
-    NumDeposits(comid, messageCount);
+    NumDeposits(comid, messageBuf->length());
     
     while(!messageBuf->isEmpty()) {
 	CharmMessageHolder *cmsg = messageBuf->deq();
@@ -92,12 +97,11 @@ void EachToManyStrategy::pup(PUP::er &p){
     p | routerID;
     p | comid;
     p | npes;
-    p | messageCount;
     
     if(p.isUnpacking()) 
-        procMap = new int[CkNumPes()];
+      procMap = new int[CkNumPes()];
         
-    p | procMap;
+    p(procMap, CkNumPes());
 
     if(p.isUnpacking()){
       messageBuf = new CkQ<CharmMessageHolder *>;
