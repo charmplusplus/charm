@@ -569,6 +569,8 @@ void AMPI_Migrate(void);
 void AMPI_Setmigratable(int comm, int mig);
 #define MPI_Checkpoint AMPI_Checkpoint
 void AMPI_Checkpoint(char *dname);
+#define MPI_MemCheckpoint AMPI_MemCheckpoint
+void AMPI_MemCheckpoint();
 #define MPI_Get_userdata AMPI_Get_userdata
 void *AMPI_Get_userdata(int);
 #define MPI_Datatype_iscontig AMPI_Datatype_iscontig

@@ -650,7 +650,7 @@ public:
   ckptClientStruct(char *s, ampiParent *a): dname(s), ampiPtr(a) {}
 };
 
-static void checkpointClient(void *param,int dataSize,void *data)
+static void checkpointClient(void *param,void *msg)
 {
   ckptClientStruct *client = (ckptClientStruct*)param;
   char *dname = client->dname;
@@ -661,19 +661,28 @@ static void checkpointClient(void *param,int dataSize,void *data)
 
 void ampiParent::startCheckpoint(char* dname){
   //if(thisIndex==0) thisProxy[thisIndex].Checkpoint(strlen(dname),dname);
-  if (CkMyPe()==0) {
+  if (thisIndex==0) {
 	ckptClientStruct *clientData = new ckptClientStruct(dname, this);
-	thisProxy.setReductionClient(checkpointClient,(void *)clientData);
+	CkCallback cb(checkpointClient, clientData);
+  	contribute(0, NULL, CkReduction::sum_int, cb);
   }
-  contribute(0, NULL, CkReduction::sum_int);
+  else
+  	contribute(0, NULL, CkReduction::sum_int);
   thread->stop();
 }
 void ampiParent::Checkpoint(int len, char* dname){
-  char dirname[256];
-  strncpy(dirname,dname,len);
-  dirname[len]='\0';
-  CkCallback cb(CkIndex_ampiParent::ResumeThread(),thisArrayID);
-  CkStartCheckpoint(dirname,cb);
+  if (len == 0) {
+    // memory checkpoint
+    CkCallback cb(CkIndex_ampiParent::ResumeThread(),thisArrayID);
+    CkStartMemCheckpoint(cb);
+  }
+  else {
+    char dirname[256];
+    strncpy(dirname,dname,len);
+    dirname[len]='\0';
+    CkCallback cb(CkIndex_ampiParent::ResumeThread(),thisArrayID);
+    CkStartCheckpoint(dirname,cb);
+  }
 }
 void ampiParent::ResumeThread(void){
   thread->resume();
@@ -820,6 +829,13 @@ void ampi::pup(PUP::er &p)
 
 ampi::~ampi()
 {
+  int tags[3], sts[3];
+  tags[0] = tags[1] = tags[2] = CmmWildCard;
+  AmpiMsg *msg = (AmpiMsg *) CmmGet(msgs, 3, tags, sts);
+  while (msg) {
+    delete msg;
+    msg = (AmpiMsg *) CmmGet(msgs, 3, tags, sts);
+  }
   CmmFree(msgs);
 }
 
@@ -3058,6 +3074,19 @@ void AMPI_Checkpoint(char *dname)
   AMPIAPI("AMPI_Checkpoint");
   AMPI_Barrier(MPI_COMM_WORLD);
   getAmpiParent()->startCheckpoint(dname);
+}
+
+CDECL
+void AMPI_MemCheckpoint()
+{
+#if CMK_MEM_CHECKPOINT
+  AMPIAPI("AMPI_Checkpoint");
+  AMPI_Barrier(MPI_COMM_WORLD);
+  getAmpiParent()->startCheckpoint("");
+#else
+  CmiPrintf("Error: In memory checkpoint/restart is not on! \n");
+  CmiAbort("Error: recompile Charm++ with CMK_MEM_CHECKPOINT. \n");
+#endif
 }
 
 CDECL
