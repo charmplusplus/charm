@@ -231,20 +231,17 @@ void TraceProjections::creation(envelope *e, int num)
 
 void TraceProjections::beginExecute(envelope *e)
 {
+  // no message means thread execution
   if (e==NULL) {
-    execEp = (-1);
+//    execEp = (-1);
+    execEp = _threadEP;
   }
   else {
     execEp = e->getEpIdx();
   }
   double t = CmiTimer();
 //CmiPrintf("start: %f \n", start);
-/*
-  msgNum++;
-  if (start == t) {
-     return;
-  }
-*/
+
   start = t;
   double ts = binStart;
   // fill gaps
@@ -258,11 +255,6 @@ void TraceProjections::beginExecute(envelope *e)
 
 void TraceProjections::endExecute(void)
 {
-/*
-  msgNum --;
-  // duplicate messages
-  if (msgNum != 0) return;
-*/
 //CmiPrintf("end:msgNum: %d bin:%f\n", msgNum, bin);
   double t = CmiTimer();
   double ts = start;
@@ -320,6 +312,11 @@ void TraceProjections::dequeue(envelope *) {}
 
 void TraceProjections::beginComputation(void)
 {
+  if(CmiMyRank()==0) {
+    _threadMsg = CkRegisterMsg("dummy_thread_msg", 0, 0, 0, 0);
+    _threadChare = CkRegisterChare("dummy_thread_chare", 0);
+    _threadEP = CkRegisterEp("dummy_thread_ep", 0, _threadMsg,_threadChare);
+  }
 }
 
 void TraceProjections::endComputation(void)
