@@ -107,7 +107,7 @@ void *CkLocalNodeBranch(CkGroupID groupID)
 extern "C"
 void CkCreateChare(int cIdx, int eIdx, void *msg, CkChareID *pCid, int destPE)
 {
-  assert(cIdx == _entryTable[eIdx]->chareIdx);
+  CkAssert(cIdx == _entryTable[eIdx]->chareIdx);
   envelope *env = UsrToEnv(msg);
   _CHECK_USED(env);
   if(pCid == 0) {
@@ -314,7 +314,7 @@ static void _dynamicNodeGroupCreate(envelope *env, int retEp, CkChareID * retCha
 extern "C"
 CkGroupID CkCreateGroup(int cIdx, int eIdx, void *msg, int retEp,CkChareID *retChare)
 {
-  assert(cIdx == _entryTable[eIdx]->chareIdx);
+  CkAssert(cIdx == _entryTable[eIdx]->chareIdx);
   register envelope *env = UsrToEnv(msg);
   env->setMsgtype(BocInitMsg);
   env->setEpIdx(eIdx);
@@ -331,7 +331,7 @@ CkGroupID CkCreateGroup(int cIdx, int eIdx, void *msg, int retEp,CkChareID *retC
 extern "C"
 CkGroupID CkCreateNodeGroup(int cIdx, int eIdx, void *msg, int retEp,CkChareID *retChare)
 {
-  assert(cIdx == _entryTable[eIdx]->chareIdx);
+  CkAssert(cIdx == _entryTable[eIdx]->chareIdx);
   register envelope *env = UsrToEnv(msg);
   env->setMsgtype(NodeBocInitMsg);
   env->setEpIdx(eIdx);
@@ -462,7 +462,7 @@ static inline void _processForVidMsg(envelope *env)
 
 static inline void _processDBocReqMsg(envelope *env)
 {
-  assert(CkMyPe()==0);
+  CkAssert(CkMyPe()==0);
   register CkGroupID groupNum;
   groupNum = _numGroups++;
   env->setMsgtype(DBocNumMsg);
@@ -475,7 +475,7 @@ static inline void _processDBocReqMsg(envelope *env)
 
 static inline void _processDNodeBocReqMsg(envelope *env)
 {
-  assert(CkMyNode()==0);
+  CkAssert(CkMyNode()==0);
   CmiLock(_nodeLock);
   register CkGroupID groupNum = _numNodeGroups++;
   CmiUnlock(_nodeLock);

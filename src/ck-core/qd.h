@@ -21,16 +21,16 @@ class QdMsg {
   public:
     int getPhase(void) { return phase; }
     void setPhase(int p) { phase = p; }
-    int getEp(void) { assert(phase==0); return u.p0.ep; }
-    void setEp(int e) { assert(phase==0); u.p0.ep = e; }
-    CkChareID getCid(void) { assert(phase==0); return u.p0.cid; }
-    void setCid(CkChareID c) { assert(phase==0); u.p0.cid = c; }
-    int getCreated(void) { assert(phase==1); return u.p2.created; }
-    void setCreated(int c) { assert(phase==1); u.p2.created = c; }
-    int getProcessed(void) { assert(phase==1); return u.p2.processed; }
-    void setProcessed(int p) { assert(phase==1); u.p2.processed = p; }
-    int getDirty(void) { assert(phase==2); return u.p4.dirty; }
-    void setDirty(int d) { assert(phase==2); u.p4.dirty = d; }
+    int getEp(void) { CkAssert(phase==0); return u.p0.ep; }
+    void setEp(int e) { CkAssert(phase==0); u.p0.ep = e; }
+    CkChareID getCid(void) { CkAssert(phase==0); return u.p0.cid; }
+    void setCid(CkChareID c) { CkAssert(phase==0); u.p0.cid = c; }
+    int getCreated(void) { CkAssert(phase==1); return u.p2.created; }
+    void setCreated(int c) { CkAssert(phase==1); u.p2.created = c; }
+    int getProcessed(void) { CkAssert(phase==1); return u.p2.processed; }
+    void setProcessed(int p) { CkAssert(phase==1); u.p2.processed = p; }
+    int getDirty(void) { CkAssert(phase==2); return u.p4.dirty; }
+    void setDirty(int d) { CkAssert(phase==2); u.p4.dirty = d; }
 };
 
 class QdCallback {

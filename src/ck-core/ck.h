@@ -11,12 +11,6 @@
 #include <string.h>
 #include <stdlib.h>
 
-#ifdef CMK_OPTIMIZE
-#define assert(x) ((void *)0)
-#else
-#include <assert.h>
-#endif
-
 #include "charm++.h"
 
 #include "envelope.h"

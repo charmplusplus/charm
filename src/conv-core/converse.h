@@ -569,6 +569,20 @@ void  CmiError(const char *format, ...);
 
 #endif
 
+#if CMK_OPTIMIZE
+#define CmiAssert(expr) ((void) 0)
+#else
+#if defined(__STDC__) || defined(__cplusplus)
+#define __CMK_STRING(x) #x
+#else
+#define __CMK_STRING(x) "x"
+#endif
+extern void __cmi_assert(const char *, const char *, int);
+#define CmiAssert(expr) \
+  ((void) ((expr) ? 0 :                   \
+     (__cmi_assert (__CMK_STRING(expr), __FILE__, __LINE__), 0)))
+#endif
+
 typedef void (*CmiStartFn)(int argc, char **argv);
 
 /********* CSD - THE SCHEDULER ********/

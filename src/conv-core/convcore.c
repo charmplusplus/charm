@@ -1546,3 +1546,10 @@ void CmiError(const char *format, ...)
 }
 
 #endif
+
+void __cmi_assert(const char *expr, const char *file, int line)
+{
+  CmiError("[%d] Assertion \"%s\" failed in file %s line %d.\n",
+      CmiMyPe(), expr, file, line);
+  CmiAbort("");
+}

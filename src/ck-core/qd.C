@@ -37,7 +37,7 @@ static inline void _bcastQD2(QdState* state, QdMsg *msg)
 
 static inline void _handlePhase0(QdState *state, QdMsg *msg)
 {
-  assert(CkMyPe()==0 || state->getStage()==0);
+  CkAssert(CkMyPe()==0 || state->getStage()==0);
   if(CkMyPe()==0) {
     QdCallback *qdcb = new QdCallback(msg->getEp(), msg->getCid());
     _MEMCHECK(qdcb);
@@ -53,7 +53,7 @@ static inline void _handlePhase1(QdState *state, QdMsg *msg)
 {
   switch(state->getStage()) {
     case 0 :
-      assert(CkMyPe()!=0);
+      CkAssert(CkMyPe()!=0);
       _bcastQD2(state, msg);
       break;
     case 1 :
@@ -85,7 +85,7 @@ static inline void _handlePhase1(QdState *state, QdMsg *msg)
 
 static inline void _handlePhase2(QdState *state, QdMsg *msg)
 {
-  assert(state->getStage()==2);
+  CkAssert(state->getStage()==2);
   state->subtreeSetDirty(msg->getDirty());
   state->reported();
   if(state->allReported()) {

@@ -43,8 +43,9 @@ extern "C" {
 
 #define CkPrintf                CmiPrintf
 #define CkScanf                 CmiScanf
-#define CkError			CmiError
+#define CkError                 CmiError
 #define CkAbort                 CmiAbort
+#define CkAssert                CmiAssert
 
 /******************************************************************************
  *

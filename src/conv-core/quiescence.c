@@ -7,7 +7,6 @@
 
 #include "converse.h"
 #include "quiescence.h"
-#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #ifndef  DEBUGF
@@ -26,22 +25,22 @@ void CQdMsgSetPhase(CQdMsg msg, int p)
 { msg->phase = p; }
 
 int  CQdMsgGetCreated(CQdMsg msg) 
-{ assert(msg->phase==1); return msg->u.p1.created; }
+{ CmiAssert(msg->phase==1); return msg->u.p1.created; }
 
 void CQdMsgSetCreated(CQdMsg msg, int c) 
-{ assert(msg->phase==1); msg->u.p1.created = c; }
+{ CmiAssert(msg->phase==1); msg->u.p1.created = c; }
 
 int  CQdMsgGetProcessed(CQdMsg msg) 
-{ assert(msg->phase==1); return msg->u.p1.processed; }
+{ CmiAssert(msg->phase==1); return msg->u.p1.processed; }
 
 void CQdMsgSetProcessed(CQdMsg msg, int p) 
-{ assert(msg->phase==1); msg->u.p1.processed = p; }
+{ CmiAssert(msg->phase==1); msg->u.p1.processed = p; }
 
 int  CQdMsgGetDirty(CQdMsg msg) 
-{ assert(msg->phase==2); return msg->u.p2.dirty; }
+{ CmiAssert(msg->phase==2); return msg->u.p2.dirty; }
 
 void CQdMsgSetDirty(CQdMsg msg, int d) 
-{ assert(msg->phase==2); msg->u.p2.dirty = d; }
+{ CmiAssert(msg->phase==2); msg->u.p2.dirty = d; }
 
 
 int CQdGetCreated(CQdState state)
@@ -165,7 +164,7 @@ static void CQdBcastQD2(CQdState state, CQdMsg msg)
 
 static void CQdHandlePhase0(CQdState state, CQdMsg msg)
 {
-  assert(CmiMyPe()==0 || CQdGetStage(state)==0);
+  CmiAssert(CmiMyPe()==0 || CQdGetStage(state)==0);
   if(CQdGetStage(state)==0)
     CQdBcastQD1(state, msg);
   else
@@ -177,7 +176,7 @@ static void CQdHandlePhase1(CQdState state, CQdMsg msg)
 {
   switch(CQdGetStage(state)) { 		
   case 0 :
-    assert(CmiMyPe()!=0);
+    CmiAssert(CmiMyPe()!=0);
     CQdBcastQD2(state, msg);
     break;
   case 1 :
@@ -214,7 +213,7 @@ static void CQdHandlePhase1(CQdState state, CQdMsg msg)
 
 static void CQdHandlePhase2(CQdState state, CQdMsg msg)
 {
-  assert(CQdGetStage(state)==2);
+  CmiAssert(CQdGetStage(state)==2);
   CQdSubtreeSetDirty(state, CQdMsgGetDirty(msg));    
   CQdReported(state);
   if(CQdAllReported(state)) { 

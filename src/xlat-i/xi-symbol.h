@@ -11,7 +11,6 @@
 #include <iostream.h>
 #include <string.h>
 #include <stdlib.h>
-#include <assert.h>
 //  #include <string>
 //  #include <map>
 //  using std::map;//<-- may cause problems for pre-ISO C++ compilers

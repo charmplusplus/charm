@@ -130,13 +130,13 @@ private:
     void*  getPrioPtr(void) const { 
       return (void *)((char *)this + totalsize - getPrioBytes());
     }
-    UInt   getCount(void) const { assert(getMsgtype()==RODataMsg); return type.roData.count; }
-    void   setCount(const UInt c) { assert(getMsgtype()==RODataMsg); type.roData.count = c; }
-    UInt   getRoIdx(void) const { assert(getMsgtype()==ROMsgMsg); return type.roMsg.roIdx; }
-    void   setRoIdx(const UInt r) { assert(getMsgtype()==ROMsgMsg); type.roMsg.roIdx = r; }
+    UInt   getCount(void) const { CkAssert(getMsgtype()==RODataMsg); return type.roData.count; }
+    void   setCount(const UInt c) { CkAssert(getMsgtype()==RODataMsg); type.roData.count = c; }
+    UInt   getRoIdx(void) const { CkAssert(getMsgtype()==ROMsgMsg); return type.roMsg.roIdx; }
+    void   setRoIdx(const UInt r) { CkAssert(getMsgtype()==ROMsgMsg); type.roMsg.roIdx = r; }
     static envelope *alloc(const UChar type, const UInt size=0, const UShort prio=0)
     {
-      assert(type>=NewChareMsg && type<=DNodeBocNumMsg);
+      CkAssert(type>=NewChareMsg && type<=DNodeBocNumMsg);
       register UInt tsize = sizeof(envelope)+ALIGN(size)+sizeof(int)*PW(prio);
       register envelope *env = (envelope *)CmiAlloc(tsize);
       env->setMsgtype(type);
@@ -147,69 +147,69 @@ private:
       return env;
     }
     UShort getEpIdx(void) const {
-      assert(getMsgtype()==NewChareMsg || getMsgtype()==NewVChareMsg
+      CkAssert(getMsgtype()==NewChareMsg || getMsgtype()==NewVChareMsg
           || getMsgtype()==ForChareMsg || getMsgtype()==ForVidMsg
           || getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg
           || getMsgtype()==ForBocMsg || getMsgtype()==ForNodeBocMsg);
       return epIdx;
     }
     void   setEpIdx(const UShort idx) {
-      assert(getMsgtype()==NewChareMsg || getMsgtype()==NewVChareMsg
+      CkAssert(getMsgtype()==NewChareMsg || getMsgtype()==NewVChareMsg
           || getMsgtype()==ForChareMsg || getMsgtype()==ForVidMsg
           || getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg
           || getMsgtype()==ForBocMsg || getMsgtype()==ForNodeBocMsg);
       epIdx = idx;
     }
     UInt isForAnyPE(void) { 
-      assert(getMsgtype()==NewChareMsg || getMsgtype()==NewVChareMsg); 
+      CkAssert(getMsgtype()==NewChareMsg || getMsgtype()==NewVChareMsg); 
       return type.chare.forAnyPe; 
     }
     void setForAnyPE(UInt f) { 
-      assert(getMsgtype()==NewChareMsg || getMsgtype()==NewVChareMsg); 
+      CkAssert(getMsgtype()==NewChareMsg || getMsgtype()==NewVChareMsg); 
       type.chare.forAnyPe = f; 
     }
     void*  getVidPtr(void) const {
-      assert(getMsgtype()==NewVChareMsg || getMsgtype()==ForVidMsg
+      CkAssert(getMsgtype()==NewVChareMsg || getMsgtype()==ForVidMsg
           || getMsgtype()==FillVidMsg);
       return type.chare.ptr;
     }
     void   setVidPtr(void *p) {
-      assert(getMsgtype()==NewVChareMsg || getMsgtype()==ForVidMsg
+      CkAssert(getMsgtype()==NewVChareMsg || getMsgtype()==ForVidMsg
           || getMsgtype()==FillVidMsg);
       type.chare.ptr = p;
     }
     UInt   getSrcPe(void) const { return pe; }
     void   setSrcPe(const UInt s) { pe = s; }
-    void*  getObjPtr(void) const { assert(getMsgtype()==ForChareMsg); return type.chare.ptr; }
-    void   setObjPtr(void *p) { assert(getMsgtype()==ForChareMsg); type.chare.ptr = p; }
+    void*  getObjPtr(void) const { CkAssert(getMsgtype()==ForChareMsg); return type.chare.ptr; }
+    void   setObjPtr(void *p) { CkAssert(getMsgtype()==ForChareMsg); type.chare.ptr = p; }
     UShort getRetEp(void) const {
-      assert(getMsgtype()==DBocReqMsg || getMsgtype()==DNodeBocReqMsg
+      CkAssert(getMsgtype()==DBocReqMsg || getMsgtype()==DNodeBocReqMsg
           || getMsgtype()==DBocNumMsg || getMsgtype()==DNodeBocNumMsg); 
       return epIdx; 
     }
     void   setRetEp(const UShort e) {
-      assert(getMsgtype()==DBocReqMsg || getMsgtype()==DNodeBocReqMsg
+      CkAssert(getMsgtype()==DBocReqMsg || getMsgtype()==DNodeBocReqMsg
           || getMsgtype()==DBocNumMsg || getMsgtype()==DNodeBocNumMsg); 
       epIdx = e; 
     }
     void*  getUsrMsg(void) const { 
-      assert(getMsgtype()==DBocReqMsg || getMsgtype()==DBocNumMsg
+      CkAssert(getMsgtype()==DBocReqMsg || getMsgtype()==DBocNumMsg
           || getMsgtype()==DNodeBocReqMsg || getMsgtype()==DNodeBocNumMsg); 
       return type.group.gtype.dgroup.usrMsg; 
     }
     void   setUsrMsg(void *p) { 
-      assert(getMsgtype()==DBocReqMsg || getMsgtype()==DBocNumMsg
+      CkAssert(getMsgtype()==DBocReqMsg || getMsgtype()==DBocNumMsg
           || getMsgtype()==DNodeBocReqMsg || getMsgtype()==DNodeBocNumMsg); 
       type.group.gtype.dgroup.usrMsg = p; 
     }
     UInt   getGroupNum(void) const {
-      assert(getMsgtype()==BocInitMsg || getMsgtype()==ForBocMsg
+      CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==ForBocMsg
           || getMsgtype()==DBocNumMsg || getMsgtype()==NodeBocInitMsg
           || getMsgtype()==ForNodeBocMsg || getMsgtype()==DNodeBocNumMsg);
       return type.group.num;
     }
     void   setGroupNum(const UInt g) {
-      assert(getMsgtype()==BocInitMsg || getMsgtype()==ForBocMsg
+      CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==ForBocMsg
           || getMsgtype()==DBocNumMsg || getMsgtype()==NodeBocInitMsg
           || getMsgtype()==ForNodeBocMsg || getMsgtype()==DNodeBocNumMsg);
       type.group.num = g;

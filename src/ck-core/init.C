@@ -155,7 +155,7 @@ static void _exitHandler(envelope *env)
 {
   switch(env->getMsgtype()) {
     case ExitMsg:
-      assert(CkMyPe()==0);
+      CkAssert(CkMyPe()==0);
       if(_exitStarted) {
         CmiFree(env);
         return;
@@ -178,7 +178,7 @@ static void _exitHandler(envelope *env)
         CsdExitScheduler();
       break;
     case StatMsg:
-      assert(CkMyPe()==0);
+      CkAssert(CkMyPe()==0);
 #ifndef CMK_OPTIMIZE
       _allStats[env->getSrcPe()] = (Stats*) EnvToUsr(env);
 #endif
@@ -318,7 +318,7 @@ static inline void _processRODataMsg(envelope *env)
 
 static void _initHandler(void *msg)
 {
-  assert(CkMyPe()!=0);
+  CkAssert(CkMyPe()!=0);
   register envelope *env = (envelope *) msg;
   switch (env->getMsgtype()) {
     case BocInitMsg:
