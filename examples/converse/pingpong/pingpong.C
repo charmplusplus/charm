@@ -12,10 +12,10 @@ CpvDeclare(int,sizeNum);
 CpvDeclare(int,exitHandler);
 CpvDeclare(int,node0Handler);
 CpvDeclare(int,node1Handler);
-CpvDeclare(double,startTime);
-CpvDeclare(double,endTime);
-CpvDeclare(double,startCTime);
-CpvDeclare(double,endCTime);
+CpvStaticDeclare(double,startTime);
+CpvStaticDeclare(double,endTime);
+CpvStaticDeclare(double,startCTime);
+CpvStaticDeclare(double,endCTime);
 
 void startRing()
 {
