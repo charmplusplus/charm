@@ -40,40 +40,66 @@ First, you need to decide which version of charm++ to use. The "build"
 script in charm source directory takes several command line options to
 compile Charm++. The command line syntax is:
 
-build <target> <version> [options ...] [charmc-options ...]
+build <target> <version> [options ...] [--basedir=dir] [--libdir=dir] [--incdir=dir] [charmc-options ...]
 
+REQUIRED:
+---------
 <target> specifies the parts of Charm++ to compile.  The most often used 
   <target> is charm++, which will compile the key Charm++ executables and 
   runtime libraries.
-<versions> defines the CPU, OS and Communication of the machines.  See 
-  "How to choose a <version>" below.
+<versions> defines the CPU, OS and Communication layer of the machines.  See 
+  "How to choose a <version>" below for details.
+
+OPTIONAL:
+---------
 <options> defines more detailed information of the compilations, including 
   compilers, features to support, etc.  See "How to choose <option>"
   below.
+[--libdir=dir] specify additional lib paths for building Charm++.
+[--incdir=dir] specify additional include paths for building Charm++.
+[--basedir=dir] a shortcut to specify additional include and lib paths for 
+               building Charm++, the include path is dir/include and lib path 
+               is dir/lib.
+
+
+Running build script, a directory of the name of combination of version and 
+options like "<version>-<option1>-<option2>-..." will be created and build 
+script will compiler Charm++ under this directory.
+For example:
+
+./build charm++ net-linux scyld icc tcp
+
+will build charm++ in a directory: net-linux-scyld-tcp-icc/.
+for Linux version on Scyld using TCP for communication, compiled with 
+Intel C++ compiler.
+
+You can specify multiple options, however you should only give one compiler 
+option. The sequence of the options are not important given in build script, 
+only one directory name will be generated, following the rules:
+1. compiler option will be at the end;
+2. other options are shorted alphabetically.
 
 **** How to choose a <version> ****
 
-Here is a table for choosing correct version, for the detailed explanation
-of the options see the comments following the table.
+Here is the table for choosing correct version. The default setting of compiler
+in Charm version is gcc/g++. However, one can use <options> to specify other 
+compilers. See the detailed explanation of the <options> below.
 (Note: this isn't a complete list.  Run ./build for a complete listing)
 
 Charm version          OS        Communication     Compiler  
 -------------       ---------    --------------   --------------------
 net-linux            PC Linux       UDP/Myrinet   GNU compiler
 net-linux-ia64       IA64 Linux     UDP/Myrinet   GNU compiler
-net-axp-cc           Alpha          UDP           DIGITAL C++ compiler
+net-axp              Alpha          UDP           GNU compiler
 net-cygwin           Win32/cygwin   UDP           GNU compiler
 net-win32            Win32          UDP           MS Visual C++
-net-sol-cc           Solaris        UDP           Sun WorkShop C++ Compiler
 net-sol              Solaris        UDP           GNU compiler
-net-irix             IRIX	    UDP           SGI C++ compiler
-net-irix-64          IRIX           UDP           SGI 64bits C++ compiler
+net-irix             IRIX	    UDP           GNU compiler
 net-hp               HP-UX          UDP           GNU compiler
-net-hp-cc            HP-UX          UDP           HP-UX C++ compiler
-net-hp-acc           HP-UX          UDP           HP-UX aC++ compiler
 net-ppc-darwin       MacOS X        UDP           GNU C++ compiler
 mpi-linux            PC Linux       MPI           GNU compiler
-mpi-axp-cc           Alpha          MPI           DIGITAL C++ compiler  
+mpi-linux-ia64       IA64 Linux     MPI           GNU compiler
+mpi-axp              Alpha          MPI           GNU compiler
 mpi-linux-axp        Alpha Linux    MPI           GNU compiler
 mpi-origin           Origin2000     MPI           C++ compiler
 mpi-sp               AIX            MPI           AIX xlC Compiler 
@@ -119,7 +145,6 @@ threads; "sim-" switches between processors and counts communications.
 3.)  Some operating systems have other options, such as:
 	"-x86"     For Solaris, use PC hardware (instead of Sun).
 	"-axp"     For Linux, use Alpha hardware (instead of PC).
-	"-64"      For IRIX, use -64 instead of -32. 
 
 Your Charm++ version is made by concatenating the options, e.g.:
 
@@ -135,26 +160,36 @@ your machine, and most of time, it use the GNU gcc as default compiler.
 To use different compiler or demand additional special feature support, you 
 need to choose <options> from the following list:
 
+* gcc3  - GNU GCC/G++ version 3
+* acc  - HP aC++ compiler
 * cc  - For Sun WorkShop C++ compilers;
 * cc64 - For 64 bits Sun WorkShop C++ compilers;
 * cxx - DIGITAL C++ compiler;
 * kcc - KAI C++ compiler;
 * pgcc - Portland Group's C++ compiler;
-* icc - Intel C/C++ compiler
+* icc - Intel C/C++ compiler for Linux IA32
+* ecc - Intel C/C++ compiler for Linux IA64
+* mpcc - SUN Solaris C++ compiler for MPI.
 
 * scyld - support Beowulf Scyld;
 * gm - support MyriCom's Myrinet GM library;
 * vmi - support NCSA's VMI library;
 
+* tcp - for net- version, default communication is via UDP. Using option
+        tcp will switch to TCP. TCP version of CHarm++ is usually slower
+        than UDP, but it is more reliable.
 * smp - Enable direct SMP support.  An "smp" version communicates using
-shared memory within a machine; but normal message passing across machines.
-Because of locking, "smp" may slightly impact non-SMP performance.  Try
-your application to decide if enabling smp mode improves performance.
+        shared memory within a machine; but normal message passing across 
+        machines. Because of locking, "smp" may slightly impact non-SMP 
+        performance. Try your application to decide if enabling smp mode 
+        improves performance.
 
-For a specific version, for example: net-linux, you can use following command 
-to display the supported <options> on this platform:
-> ./build charm++ net-linux help
-supported options: gm icc pgcc scyld smp
+* bluegene - compile Charm++ as running on Blue Gene emulator.
+* help - show supported options for a version. For example, for net-linux, 
+         running:
+         > ./build charm++ net-linux help
+         will give:
+         supported options: gcc3 gm icc kcc pgcc scyld smp bluegene tcp
 
 
 BUILDING THE SOURCE
