@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.25  1997-07-29 16:00:06  milind
+ * Revision 2.26  1997-07-29 16:09:48  milind
+ * Added CmiNodeLock macros and functions to the machine layer for all except
+ * solaris SMP.
+ *
+ * Revision 2.25  1997/07/29 16:00:06  milind
  * changed cmi_nodesize into cmi_mynodesize.
  *
  * Revision 2.24  1997/07/23 18:40:24  milind
@@ -174,6 +178,23 @@ char *blk;
 
 CmiNotifyIdle()
 {
+}
+
+CmiNodeLock_t CmiCreateLock(void)
+{
+  CmiNodeLock_t *plock = (CmiNodeLock_t *)malloc(sizeof(CmiNodeLock_t));
+  cps_mutex_alloc(*plock);
+  return *plock;
+}
+
+int CmiProbeLock(CmiNodeLock_t lock)
+{
+  if(cps_mutex_trylock(lock) == 0){
+    cps_mutex_unlock(lock);
+    return 1;
+  } else {
+    return 0;
+  }
 }
 
 

@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.24  1997-04-25 20:48:12  jyelon
+ * Revision 1.25  1997-07-29 16:09:47  milind
+ * Added CmiNodeLock macros and functions to the machine layer for all except
+ * solaris SMP.
+ *
+ * Revision 1.24  1997/04/25 20:48:12  jyelon
  * Corrected CmiNotifyIdle
  *
  * Revision 1.23  1997/04/24 22:37:02  jyelon
@@ -147,6 +151,13 @@ void CmiFree(blk)
 void *blk;
 {
 free( ((char *)blk)-8);
+}
+
+CmiNodeLock_t CmiCreateLock(void)
+{
+  int *x = malloc(sizeof(int));
+  *x = 0;
+  return (CmiNodeLock_t) x;
 }
 
 /*****************************************************************************

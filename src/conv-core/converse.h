@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.70  1997-07-28 20:13:23  milind
+ * Revision 2.71  1997-07-29 16:09:44  milind
+ * Added CmiNodeLock macros and functions to the machine layer for all except
+ * solaris SMP.
+ *
+ * Revision 2.70  1997/07/28 20:13:23  milind
  * Fixed bugs due to ckfutures declarations in c++interface.h
  * Also, wrote macros for node numbering in exemplar.
  *
@@ -324,11 +328,19 @@ typedef int CmiMutex;
 #define CmiMutexLock(x) 0
 #define CmiMutexUnlock(x) 0
 
+typedef void *CmiNodeLock_t;
+#define CmiCreateLock() (void *) 0
+#define CmiLock(lock) 0
+#define CmiUnlock(lock) 0
+#define CmiProbeLock(lock) 0
+#define CmiDestroyLock(lock) 0
+
 #endif
 
 #if CMK_SHARED_VARS_EXEMPLAR
 
 #include <spp_prog_model.h>
+#include <cps.h>
 
 extern int Cmi_numpes;
 extern int Cmi_mynodesize;
@@ -364,6 +376,13 @@ extern void CmiMemLock();
 extern void CmiMemUnlock();
 extern void CmiNodeBarrier CMK_PROTO((void));
 extern void *CmiSvAlloc CMK_PROTO((int));
+
+typedef cps_mutex_t *CmiNodeLock_t;
+extern CmiNodeLock_t CmiCreateLock(void);
+#define CmiLock(lock) cps_mutex_lock(lock)
+#define CmiUnlock(lock) cps_mutex_unlock(lock)
+extern int CmiProbeLock(CmiNodeLock_t lock);
+#define CmiDestroyLock(lock) cps_mutex_free(lock)
 
 #endif
 
@@ -411,6 +430,13 @@ typedef mutex_t CmiMutex;
 #define CmiMutexLock(m) mutex_lock(m)
 #define CmiMutexUnlock(m) mutex_unlock(m)
 
+typedef ?? CmiNodeLock_t;
+#define CmiCreateLock() ?
+#define CmiLock(lock) ?
+#define CmiUnlock(lock) ?
+#define CmiProbeLock(lock) ?
+#define CmiDestroyLock(lock) ?
+
 #endif
 
 #if CMK_SHARED_VARS_UNIPROCESSOR
@@ -452,6 +478,13 @@ extern void CmiNodeBarrier();
 typedef int CmiMutex;
 #define CmiMutexLock(x) 0
 #define CmiMutexUnlock(x) 0
+
+typedef int *CmiNodeLock_t;
+extern CmiNodeLock_t CmiCreateLock(void);
+#define CmiLock(lock) {if(*(lock)==1)CmiYield();else (*(lock))=1;}
+#define CmiUnlock(lock) {if(*(lock)==1) (*(lock)==0);}
+#define CmiProbeLock(lock) *(lock)
+#define CmiDestroyLock(lock) free(lock)
 
 #endif
 
