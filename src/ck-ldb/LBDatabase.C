@@ -116,7 +116,7 @@ static void createLoadBalancer(const char *lbname)
     if (!fn) {    // invalid lb name
       CmiPrintf("Abort: Unknown load balancer: '%s'!\n", lbname);
       lbRegistry.displayLBs();    // display help page
-      CkExit();
+      CkAbort("Abort");
     }
     // invoke function to create load balancer 
     fn();
