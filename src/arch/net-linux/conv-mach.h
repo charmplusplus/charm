@@ -16,6 +16,8 @@
 #define CMK_ASYNC_USE_FIOSSAIOSTAT_AND_FIOSSAIOOWN         0
 #define CMK_ASYNC_USE_F_SETFL_AND_F_SETOWN                 1
 
+#define CMK_DLL_CC  "g++ -shared -O3 -o "
+
 #define CMK_GETPAGESIZE_AVAILABLE                          0
 
 #define CMK_MALLOC_USE_GNU_MALLOC                          1

@@ -10,6 +10,8 @@
 
 #include "conv-common.h"
 
+#define CMK_DLL_CC   "g++ -shared -O3 -o "
+
 #define CMK_FIX_HP_CONNECT_BUG                             0
 
 #define CMK_GETPAGESIZE_AVAILABLE                          0
