@@ -174,7 +174,7 @@ then
       SUBROUTINE FOO_FOO
       END
 EOF
-  $CMK_CF90 -c conftest.f > /dev/null 2> /dev/null
+  $FCC -c conftest.f > /dev/null 2> /dev/null
 
   NAME=`nm conftest.o | grep "foo_foo__"`
   if test "$NAME" != ""
