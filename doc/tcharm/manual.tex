@@ -438,8 +438,8 @@ thread cannot have two attached AMPI frameworks, since the MPI\_COMM\_WORLD
 for such a thread would be indeterminate.
 
 \vspace{0.2in}
-\function{void TCHARM\_Create\_threads(int nThreads, TCharmThreadStartFn thread\_fn)}
-\function{SUBROUTINE TCHARM\_Create\_threads(nThreads,thread\_fn)}
+\function{void TCHARM\_Create(int nThreads, TCharmThreadStartFn thread\_fn)}
+\function{SUBROUTINE TCHARM\_Create(nThreads,thread\_fn)}
     \args{INTEGER, INTENT(in) :: nThreads}
     \args{SUBROUTINE :: thread\_fn}
 
@@ -484,7 +484,7 @@ routine called \uw{myDriver} would be:
      /* Called to start the program */
      void TCHARM\_User\_setup(void)
      \{
-         TCHARM\_Create\_threads(TCHARM\_Get\_num\_chunks(),myDriver);
+         TCHARM\_Create(TCHARM\_Get\_num\_chunks(),myDriver);
          MPI\_Attach("myAMPIFEM");        
          ... Usual FEM_Set calls, as normally made from init() ...
          FEM\_Attach(0);
@@ -501,11 +501,11 @@ both of which perform AMPI communication, would be:
        include 'ampif.h'
        
     ! First set of threads, running "compute1"
-       call tcharm\_create\_threads(tcharm\_get\_num\_chunks(),compute1)
+       call tcharm\_create(tcharm\_get\_num\_chunks(),compute1)
        call ampi\_attach('part1')
        
     ! Second set of threads, running "compute2"
-       call tcharm\_create\_threads(tcharm\_get\_num\_chunks(),compute2)
+       call tcharm\_create(tcharm\_get\_num\_chunks(),compute2)
        call ampi\_attach('part2')
      END SUBROUTINE
 \end{alltt}
