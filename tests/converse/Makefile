@@ -1,4 +1,4 @@
-DIRS=commbench cthtest
+DIRS=commbench cthtest megacon
 
 test:
 	for d in $(DIRS); do \
