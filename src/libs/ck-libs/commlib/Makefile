@@ -17,7 +17,9 @@ CONVERSE_COM_OBJS = $(COMMLIBDIR)/commlib.o $(COMMLIBDIR)/gridrouter.o \
 
 OBJS = ComlibManager.o $(STRATEGY_OBJS) $(CONVERSE_COM_OBJS)
 
-all: conversecom $(LIB) 
+all: 
+	$(MAKE) conversecom 
+	$(MAKE) $(LIB) 
 
 $(LIB): $(OBJS) $(STRATEGY_OBJS) $(CONVERSE_COM_OBJS)
 	$(CHARMC) -cp $(LIBDIR) -o libmodulecommlib.a $(OBJS)
@@ -41,7 +43,7 @@ $(LIB): $(OBJS) $(STRATEGY_OBJS) $(CONVERSE_COM_OBJS)
 	cp  commlib.def.h $(CDIR)/include
 
 conversecom :
-	(cd ../../conv-libs/commlib; make)
+	(cd ../../conv-libs/commlib; $(MAKE) )
 
 ComlibManager.o: ComlibManager.C ComlibManager.h
 	$(CHARMC) -c ComlibManager.C
