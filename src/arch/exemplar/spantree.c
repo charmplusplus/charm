@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.2  1995-09-20 15:12:09  sanjeev
+ * Revision 2.3  1995-09-29 09:50:07  jyelon
+ * CmiGet-->CmiDeliver, added protos, etc.
+ *
+ * Revision 2.2  1995/09/20  15:12:09  sanjeev
  * CmiSpanTreeChild -> CmiSpanTreeChildren
  *
  * Revision 2.1  1995/06/09  21:22:00  gursoy
@@ -79,6 +82,6 @@ char * msg;
 
     for (node = (CmiNumPe() - 2) / MAXSPAN;   /* integer division */
 	 node < CmiNumPe(); node++)
-        CmiSyncSend(node, size, msg);
+        CmiSyncSendFn(node, size, msg);
 }
 

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.11  1995-09-20 16:01:33  gursoy
+ * Revision 2.12  1995-09-29 09:50:07  jyelon
+ * CmiGet-->CmiDeliver, added protos, etc.
+ *
+ * Revision 2.11  1995/09/20  16:01:33  gursoy
  * this time really made the arg of CmiFree and CmiSize void*
  *
  * Revision 2.10  1995/09/20  15:58:09  gursoy
@@ -51,7 +54,9 @@
  ***************************************************************************/
 static char ident[] = "@(#)$Header$";
 
-#include "machine.h"
+#include <spp_prog_model.h>
+#include <memory.h>
+#include <cps.h>
 #include "converse.h"
 #include "conv-conds.h"
 
@@ -144,12 +149,8 @@ free(blk-8);
 
 
 
-
-
-
-
-BOOLEAN CmiAsyncMsgSent(msgid)
-CommHandle *msgid;
+int CmiAsyncMsgSent(msgid)
+CmiCommHandle msgid;
 {
    return 0;
 }
@@ -177,7 +178,7 @@ char *argv[];
     /* figure out number of processors required */
     i =  0;
     requested_npe = 0; 
-    while (argv[i] != NULL)
+    while (argv[i] != 0)
     {
          if (strcmp(argv[i], "+p") == 0)
            {
@@ -264,71 +265,7 @@ void *CmiGetNonLocal()
 }
 
 
-
-void CmiSyncBroadcast(size, msg)
-unsigned int size;
-void         *msg;
-{
-       int i;
-       for(i=0; i<CmiNumPe(); i++)
-         if (CmiMyPe() != i) CmiSyncSend(i,size,msg);
-}
-
-
-
-void CmiSyncBroadcastAllAndFree(size, msg)
-unsigned int size;
-void         *msg;
-{
-    int i;
-    for(i=0; i<CmiNumPe(); i++)
-       if (CmiMyPe() != i) CmiSyncSend(i,size,msg);
-    FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg);
-}
-
-void CmiSyncBroadcastAll(size, msg)
-unsigned int size;
-void         *msg;
-{
-    void *env;
-    void *buf;
-
-    int i;
-    for(i=0; i<CmiNumPe(); i++)
-       if (CmiMyPe() != i) CmiSyncSend(i,size,msg);
-
-    buf=(void *)CmiAlloc(size);
-
-    if(buf==(void *)0)
-        {
-                printf("Cannot allocate memory!\n");
-                exit(1);
-        }
-
-    mycpy((unsigned long long *)buf,(unsigned long long *)msg,size);
-    FIFO_EnQueue(CpvAccess(CmiLocalQueue),buf);
-}
-
-
-CommHandle CmiAsyncBroadcast(size, msg)
-unsigned int size;
-void         *msg;
-{
-    CmiSyncBroadcast(size, msg);
-    return 0;
-}
-
-
-CommHandle CmiAsyncBroadcastAll(size, msg)
-unsigned int size;
-void         *msg;
-{
-    CmiSyncBroadcastAll(size, msg);
-    return 0; 
-}
-
-
-void CmiSyncSend(destPE, size, msg)
+void CmiSyncSendFn(destPE, size, msg)
 unsigned int destPE;
 unsigned int size;
 void         *msg;
@@ -353,22 +290,92 @@ void         *msg;
 }
 
 
-CommHandle CmiAsyncSend(destPE, size, msg)
+CmiCommHandle CmiAsyncSendFn(destPE, size, msg)
 unsigned int destPE;
 unsigned int size;
 void         *msg;
 {
-    CmiSyncSend(destPE, size, msg); 
+    CmiSyncSendFn(destPE, size, msg); 
     return 0;
 }
 
 
-
-void CmiGrabBuffer(pbuf)
-void **pbuf ;
+void CmiFreeSendFn(destPE, size, msg)
+unsigned int destPE;
+unsigned int size;
+void         *msg;
 {
+    CmiSyncSendFn(destPE,size,msg);
+    CmiFree(msg);
 }
 
+void CmiSyncBroadcastFn(size, msg)
+unsigned int size;
+void         *msg;
+{
+       int i;
+       for(i=0; i<CmiNumPe(); i++)
+         if (CmiMyPe() != i) CmiSyncSendFn(i,size,msg);
+}
+
+CmiCommHandle CmiAsyncBroadcastFn(size, msg)
+unsigned int size;
+void         *msg;
+{
+    CmiSyncBroadcastFn(size, msg);
+    return 0;
+}
+
+void CmiFreeBroadcastFn(size, msg)
+unsigned int size;
+void         *msg;
+{
+    CmiSyncBroadcastFn(size,msg);
+    CmiFree(msg);
+}
+
+void CmiSyncBroadcastAllFn(size, msg)
+unsigned int size;
+void         *msg;
+{
+    void *env;
+    void *buf;
+
+    int i;
+    for(i=0; i<CmiNumPe(); i++)
+       if (CmiMyPe() != i) CmiSyncSendFn(i,size,msg);
+
+    buf=(void *)CmiAlloc(size);
+
+    if(buf==(void *)0)
+        {
+                printf("Cannot allocate memory!\n");
+                exit(1);
+        }
+
+    mycpy((unsigned long long *)buf,(unsigned long long *)msg,size);
+    FIFO_EnQueue(CpvAccess(CmiLocalQueue),buf);
+}
+
+
+CmiCommHandle CmiAsyncBroadcastAllFn(size, msg)
+unsigned int size;
+void         *msg;
+{
+    CmiSyncBroadcastAllFn(size, msg);
+    return 0; 
+}
+
+
+void CmiFreeBroadcastAllFn(size, msg)
+unsigned int size;
+void         *msg;
+{
+    int i;
+    for(i=0; i<CmiNumPe(); i++)
+       if (CmiMyPe() != i) CmiSyncSendFn(i,size,msg);
+    FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg);
+}
 
 
 CmiMyRank()

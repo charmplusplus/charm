@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.3  1995-09-20 16:02:35  gursoy
+ * Revision 2.4  1995-09-29 09:50:07  jyelon
+ * CmiGet-->CmiDeliver, added protos, etc.
+ *
+ * Revision 2.3  1995/09/20  16:02:35  gursoy
  * made the arg of CmiFree and CmiSize void*
  *
  * Revision 2.2  1995/09/08  02:38:26  gursoy
@@ -29,11 +32,27 @@ static char ident[] = "@(#)$Header$";
 
 #include <stdio.h>
 #include <sys/time.h>
-
-#include "machine.h" 
 #include "converse.h"
-
 #include <mpproto.h>
+
+#define MSG_TYPE 1
+
+#define PROCESS_PID 1
+
+#define _CK_VARSIZE_UNIT 8
+#define MAXUSERARGS 20
+#define MAXARGLENGTH 50
+
+#define MAX_OUTSTANDING_MSGS	1024
+
+#define STATIC 
+
+/* Scanf related constants */
+#define SCANFMSGLENGTH  1024
+#define SCANFNVAR       16
+#define SCANFBUFFER     8192
+
+#define WORDSIZE 	sizeof(int)
 
 #define FLIPBIT(node,bitnumber) (node ^ (1 << bitnumber))
 
@@ -53,8 +72,8 @@ static int msglength=0 ;
 static int numpes ;
 static double itime;
 
-static MSG_LIST *sent_msgs=NULL;
-static MSG_LIST *end_sent=NULL;
+static MSG_LIST *sent_msgs=0;
+static MSG_LIST *end_sent=0;
 
 
 /**************************  TIMER FUNCTIONS **************************/
@@ -113,45 +132,11 @@ double CmiHTimer()
 }
 
 
-/********************* MESSAGE SEND FUNCTIONS ******************/
-
-CmiCommHandle CmiAsyncSend(destPE, size, msg)
-     int destPE;
-     int size;
-     char * msg;
-{
-     MSG_LIST *msg_tmp;
-     int msgid;
-     
-     /* Send Async message and add msgid to sent msg list */
-     mpc_send(msg, size, destPE, 0, &msgid);
-     msg_tmp = (MSG_LIST *) CmiAlloc(sizeof(MSG_LIST));
-     msg_tmp->msgid = msgid;
-     msg_tmp->msg = msg;
-     msg_tmp->next = NULL;
-     if(sent_msgs==NULL)
-	  sent_msgs = msg_tmp;
-     else
-	  end_sent->next = msg_tmp;
-     end_sent = msg_tmp;
-}
-
-
-/* Used only from broadcast for now */
-CmiSyncSend(destPE, size, msg)
-     int destPE;
-     int size;
-     char * msg;
-{
-     mpc_bsend(msg, size, destPE, 0);
-}
-
-
 CmiAllAsyncMsgsSent()
 {
      MSG_LIST *msg_tmp = sent_msgs;
      
-     while(msg_tmp!=NULL)
+     while(msg_tmp!=0)
      {
 	  if(mpc_status(msg_tmp->msgid)<0)
 	       return 0;
@@ -182,18 +167,18 @@ void CmiReleaseCommHandle(CmiCommHandle c)
 CmiReleaseSentMessages()
 {
      MSG_LIST *msg_tmp=sent_msgs;
-     MSG_LIST *prev=NULL;
+     MSG_LIST *prev=0;
      MSG_LIST *temp;
      
-     if(sent_msgs==NULL)
+     if(sent_msgs==0)
 	  return;
-     while(msg_tmp!=NULL)
+     while(msg_tmp!=0)
      {
 	  if(mpc_status(msg_tmp->msgid)>=0)
 	  {
 	       /* Release the message */
 	       temp = msg_tmp->next;
-	       if(prev==NULL)	/* first message */
+	       if(prev==0)	/* first message */
 		    sent_msgs = temp;
 	       else
 		    prev->next = temp;
@@ -217,16 +202,16 @@ void *CmiGetNonLocal()
      void *env;
      int msglength;
      
-     if (!McProbe())
-	  return NULL;
-     msglength = McArrivedMsgLength();
+     if (!CmiProbe())
+	  return 0;
+     msglength = CmiArrivedMsgLength();
      env = (void *)  CmiAlloc(msglength);
-     if (env == NULL)
+     if (env == 0)
      {
 	  CmiPrintf("*** ERROR *** Memory Allocation Failed.\n");
 	  fflush(stdout);
      }
-     McSyncReceive(msglength, env);
+     CmiSyncReceive(msglength, env);
      return env;
 }
 
@@ -236,7 +221,7 @@ void *CmiGetNonLocal()
 extern mp_probe();	/* Fortran interface. In EUI-H, not in EUI */
 
 /* Internal functions */
-McProbe()
+CmiProbe()
 {
      int src, type, nbytes;
      
@@ -249,12 +234,12 @@ McProbe()
      return(1) ;
 }
 
-McArrivedMsgLength()
+CmiArrivedMsgLength()
 {
      return msglength;
 }
 
-McSyncReceive(size, buffer)
+CmiSyncReceive(size, buffer)
      int size ;
      char *buffer ;
 {
@@ -265,73 +250,113 @@ McSyncReceive(size, buffer)
      mpc_brecv(buffer, size, &src, &type, &nbytes);
 }
 
-void CmiGrabBuffer(pbuf)
-void **pbuf ;
+/********************* MESSAGE SEND FUNCTIONS ******************/
+
+void CmiSyncSendFn(destPE, size, msg)
+     int destPE;
+     int size;
+     char * msg;
 {
+     mpc_bsend(msg, size, destPE, 0);
 }
+
+
+CmiCommHandle CmiAsyncSendFn(destPE, size, msg)
+     int destPE;
+     int size;
+     char * msg;
+{
+     MSG_LIST *msg_tmp;
+     int msgid;
+     
+     /* Send Async message and add msgid to sent msg list */
+     mpc_send(msg, size, destPE, 0, &msgid);
+     msg_tmp = (MSG_LIST *) CmiAlloc(sizeof(MSG_LIST));
+     msg_tmp->msgid = msgid;
+     msg_tmp->msg = msg;
+     msg_tmp->next = 0;
+     if(sent_msgs==0)
+	  sent_msgs = msg_tmp;
+     else
+	  end_sent->next = msg_tmp;
+     end_sent = msg_tmp;
+}
+
+void CmiFreeSendFn(destPE, size, msg)
+     int destPE, size;
+     char *msg;
+{
+    CmiSyncSendFn(destPE, size, msg);
+    CmiFree(msg);
+}
+
 
 /*********************** BROADCAST FUNCTIONS **********************/
 
-void CmiSyncBroadcast(size, msg)     /* ALL_EXCEPT_ME  */
+void CmiSyncBroadcastFn(size, msg)     /* ALL_EXCEPT_ME  */
      int size;
      char * msg;
 {
      int i ;
      
      for ( i=CpvAccess(Cmi_mype)+1; i<numpes; i++ ) 
-	  CmiSyncSend(i, size,msg) ;
+	  CmiSyncSendFn(i, size,msg) ;
      for ( i=0; i<CpvAccess(Cmi_mype); i++ ) 
-	  CmiSyncSend(i, size,msg) ;
+	  CmiSyncSendFn(i, size,msg) ;
 }
 
 
-CmiSyncBroadcastAllAndFree(size, msg)  /* All including me */
-     int size;
-     char * msg;
-{
-     int i ;
-     
-     for ( i=0; i<numpes; i++ ) 
-	  CmiSyncSend(i,size,msg,0) ;
-     CmiFree(msg) ;
-}
-
-
-CmiSyncBroadcastAll(size, msg)        /* All including me */
-     int size;
-     char * msg;
-{
-     int i ;
-     
-     for ( i=0; i<numpes; i++ ) 
-	  CmiSyncSend(i,size,msg,0) ;
-}
-
-
-
-CmiCommHandle CmiAsyncBroadcast(size, msg)  
+CmiCommHandle CmiAsyncBroadcastFn(size, msg)  
 int size;
 char * msg;
 {
 	int i ;
 
 	for ( i=CpvAccess(Cmi_mype)+1; i<numpes; i++ ) 
-		CmiAsyncSend(i,size,msg) ;
+		CmiAsyncSendFn(i,size,msg) ;
 	for ( i=0; i<CpvAccess(Cmi_mype); i++ ) 
-		CmiAsyncSend(i,size,msg) ;
+		CmiAsyncSendFn(i,size,msg) ;
 	return (CmiCommHandle) (CmiAllAsyncMsgsSent());
 }
 
+void CmiFreeBroadcastFn(size, msg)
+    int size;
+    char *msg;
+{
+    CmiSyncBroadcastFn(size,msg);
+    CmiFree(msg);
+}
+ 
+void CmiSyncBroadcastAllFn(size, msg)        /* All including me */
+     int size;
+     char * msg;
+{
+     int i ;
+     
+     for ( i=0; i<numpes; i++ ) 
+	  CmiSyncSendFn(i,size,msg,0) ;
+}
 
-CmiCommHandle CmiAsyncBroadcastALL(size, msg)  
+CmiCommHandle CmiAsyncBroadcastAllFn(size, msg)  
 int size;
 char * msg;
 {
 	int i ;
 
 	for ( i=1; i<numpes; i++ ) 
-		CmiAsyncSend(i,size,msg) ;
+		CmiAsyncSendFn(i,size,msg) ;
 	return (CmiCommHandle) (CmiAllAsyncMsgsSent());
+}
+
+void CmiFreeBroadcastAllFn(size, msg)  /* All including me */
+     int size;
+     char * msg;
+{
+     int i ;
+     
+     for ( i=0; i<numpes; i++ ) 
+	  CmiSyncSendFn(i,size,msg,0) ;
+     CmiFree(msg) ;
 }
 
 
@@ -386,7 +411,7 @@ int node, neighbour;
     return index;
 }
 
-int McFlushPrintfs()
+int CmiFlushPrintfs()
 { }
 
 

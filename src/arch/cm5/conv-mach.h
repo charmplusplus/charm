@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.4  1995-09-22 17:54:52  sanjeev
+ * Revision 2.5  1995-09-29 09:50:07  jyelon
+ * CmiGet-->CmiDeliver, added protos, etc.
+ *
+ * Revision 2.4  1995/09/22  17:54:52  sanjeev
  * added CMK_MACHINE_NAME
  *
  * Revision 2.3  1995/09/20  13:22:30  jyelon
@@ -32,7 +35,17 @@
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
  
+/* #define CMK_CSDEXITSCHEDULER_IS_A_FUNCTION */
+#define CMK_CSDEXITSCHEDULER_SET_CSDSTOPFLAG
+
+/* #define CMK_COMMHANDLE_IS_A_POINTER */
+#define CMK_COMMHANDLE_IS_AN_INTEGER
+ 
+/* #define CMK_USES_SPECIAL_CMIDELIVERS */ 
+#define CMK_USES_COMMON_CMIDELIVERS
+
 /* #define CMK_SHARED_VARS_EXEMPLAR */
+/* #define CMK_SHARED_VARS_UNIPROCESSOR */
 #define CMK_NO_SHARED_VARS_AT_ALL
 
 /* #define CMK_PREPROCESSOR_USES_K_AND_R_STANDARD_CONCATENATION */

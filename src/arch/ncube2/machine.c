@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.6  1995-09-20 16:00:16  gursoy
+ * Revision 2.7  1995-09-29 09:50:07  jyelon
+ * CmiGet-->CmiDeliver, added protos, etc.
+ *
+ * Revision 2.6  1995/09/20  16:00:16  gursoy
  * made the arg of CmiFree and CmiSize void*
  *
  * Revision 2.5  1995/09/07  22:59:57  gursoy
@@ -46,7 +49,6 @@
 static char ident[] = "@(#)$Header$";
 
 #include <stdio.h>
-#include "machine.h"
 #include "converse.h"
 
 #define FLIPBIT(node,bitnumber) (node ^ (1 << bitnumber))
@@ -107,36 +109,15 @@ static void CmiTimerInit()
 }
 
 
-/********************* MESSAGE SEND FUNCTIONS ******************/
-
-void CmiSyncSend(destPE, size, msg)
-int destPE;
-int size;
-char * msg;
-{
-    nwrite(msg, size, destPE, MSG_TYPE, &cflag);
-}
-
-
-CommHandle CmiAsyncSend(destPE, size, msg)   /* same as sync send for ncube */
-int destPE;
-int size;
-char * msg;
-{
-    nwrite(msg, size, destPE, MSG_TYPE, &cflag);
-    return 0 ;
-}
-
-
 int CmiAsyncMsgSent(c)
-CommHandle c ;
+CmiCommHandle c ;
 {
     return 1;
 }
 
 
 void CmiReleaseCommHandle(c)
-CommHandle c ;
+CmiCommHandle c ;
 {
 }
 
@@ -156,17 +137,17 @@ void *CmiGetNonLocal()
         if ( (msglength = ntest(&source, &type)) > 0)
         {
                env = (void *)  CmiAlloc(msglength); 
-               if (env == NULL) 
+               if (env == 0) 
                   CmiPrintf("*** ERROR *** Memory Allocation Failed.\n");
-               McSyncReceive(msglength, env);
+               CmiSyncReceive(msglength, env);
                return env;
         }
         else
-		return NULL;
+		return 0;
 }
 
 
-McSyncReceive(size, buffer)
+CmiSyncReceive(size, buffer)
 int size;
 char *buffer;
 {
@@ -174,27 +155,39 @@ char *buffer;
 }
 
 
-void CmiGrabBuffer(pbuf)
-void **pbuf ;
+/********************* MESSAGE SEND FUNCTIONS ******************/
+
+void CmiSyncSendFn(destPE, size, msg)
+int destPE;
+int size;
+char * msg;
 {
+    nwrite(msg, size, destPE, MSG_TYPE, &cflag);
 }
 
 
+CmiCommHandle CmiAsyncSendFn(destPE, size, msg)   /* same as sync send for ncube */
+int destPE;
+int size;
+char * msg;
+{
+    nwrite(msg, size, destPE, MSG_TYPE, &cflag);
+    return 0 ;
+}
+
+
+void CmiFreeSendFn(destPE, size, msg)
+     int destPE, size;
+     char *msg;
+{
+    CmiSyncSendFn(destPE, size, msg);
+    CmiFree(msg);
+}
 
 /*********************** BROADCAST FUNCTIONS **********************/
 
 
-void CmiSyncBroadcastAllAndFree(size, msg)
-int size;
-char * msg;
-{
-	int dest = 0xffff;
-	nwrite(msg, size, dest, MSG_TYPE, &cflag); 
-	CmiFree(msg) ; 
-}
-
-
-void CmiSyncBroadcast(size, msg)	/* ALL_EXCEPT_ME  */
+void CmiSyncBroadcastFn(size, msg)	/* ALL_EXCEPT_ME  */
 int size;
 char * msg;
 {
@@ -206,16 +199,7 @@ char * msg;
 }
 
 
-void CmiSyncBroadcastAll(size, msg)
-int size;
-char * msg;
-{
-    	int dest = 0xffff;
-	nwrite(msg, size, dest, MSG_TYPE, &cflag); 
-}
-
-
-CommHandle CmiAsyncBroadcast(size, msg)	/* ALL_EXCEPT_ME  */
+CmiCommHandle CmiAsyncBroadcastFn(size, msg)	/* ALL_EXCEPT_ME  */
 int size;
 char * msg;
 {
@@ -228,8 +212,24 @@ char * msg;
 	return 0 ;
 }
 
+void CmiFreeBroadcastFn(size, msg)
+    int size;
+    char *msg;
+{
+    CmiSyncBroadcastFn(size,msg);
+    CmiFree(msg);
+}
 
-CommHandle CmiAsyncBroadcastAll(size, msg)
+void CmiSyncBroadcastAllFn(size, msg)
+int size;
+char * msg;
+{
+    	int dest = 0xffff;
+	nwrite(msg, size, dest, MSG_TYPE, &cflag); 
+}
+
+
+CmiCommHandle CmiAsyncBroadcastAllFn(size, msg)
 int size;
 char * msg;
 {
@@ -237,6 +237,16 @@ char * msg;
 	nwrite(msg, size, dest, MSG_TYPE, &cflag); 
 	return 0 ;
 }
+
+void CmiFreeBroadcastAllFn(size, msg)
+int size;
+char * msg;
+{
+	int dest = 0xffff;
+	nwrite(msg, size, dest, MSG_TYPE, &cflag); 
+	CmiFree(msg) ; 
+}
+
 
 
 

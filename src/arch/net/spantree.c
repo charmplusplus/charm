@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.2  1995-09-20 15:57:05  sanjeev
+ * Revision 2.3  1995-09-29 09:50:07  jyelon
+ * CmiGet-->CmiDeliver, added protos, etc.
+ *
+ * Revision 2.2  1995/09/20  15:57:05  sanjeev
  * put void before CmiSpanTreeChildren
  *
  * Revision 2.1  1995/06/12  22:49:59  jyelon
@@ -80,7 +83,7 @@ CmiSendToSpanTreeLeaves(size, msg) int size; char * msg; {
 
     for (node = (CmiNumPe() - 2) / MAXSPAN;   /* integer division */
 	 node < CmiNumPe(); node++)
-	CmiSyncSend(node,size,msg);
+	CmiSyncSendFn(node,size,msg);
 }
 
 

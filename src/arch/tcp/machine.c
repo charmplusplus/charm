@@ -1231,8 +1231,8 @@ int destpe;
 }
 
 /* This routine adds the packet to the send window. If the addition is
-   successful, the function returns TRUE. If the window is full, it returns
-   FALSE - the calling function will then have to insert the packet into 
+   successful, the function returns 1. If the window is full, it returns
+   0 - the calling function will then have to insert the packet into 
    the transmit queue */
 
 static int AddToSendWindow(packet, destpe)
@@ -1246,7 +1246,7 @@ int destpe;
     next_seq_num[destpe]++;
     last_window_index[destpe] = (last_window_index[destpe] + 1) % WINDOW_SIZE;
     cur_window_size[destpe]++;
-    return TRUE;
+    return 1;
 }
 
 static SendPackets(destpe)
@@ -1294,7 +1294,7 @@ int sourcepe;
         return;
 
     index = first_window_index[sourcepe];
-    found = FALSE;
+    found = 0;
     count = 0;
     while (count < cur_window_size[sourcepe] && !found) 
     {
@@ -1448,7 +1448,7 @@ static RecvWindowInit()
 	expected_seq_num[i] = 0;
 	recd_messages[i].numpackets = 0;
 	recd_messages[i].packetlist = NULL;
-	needack[i] = FALSE;
+	needack[i] = 0;
     }
     recd_msg_head = NULL;
     recd_msg_tail = NULL;
@@ -1462,8 +1462,8 @@ static RecvWindowInit()
 
 /* This routine tries to add an incoming packet to the recv window. 
    If the packet has already been received, the routine discards it and
-   returns FALSE. Otherwise the routine inserts it into the window and
-   returns TRUE
+   returns 0. Otherwise the routine inserts it into the window and
+   returns 1
 */
 
 static int AddToReceiveWindow(packet, sourcepe)
@@ -1487,9 +1487,9 @@ static int AddToReceiveWindow(packet, sourcepe)
       if (seq_num < expected_seq_num[sourcepe])
 	{
 	  CmiFree(packet);	/* already received */
-	  needack[sourcepe] = TRUE;
+	  needack[sourcepe] = 1;
 	  NumUseless++ ;
-	  return FALSE;
+	  return 0;
 	}
       else 
 	{
@@ -1506,7 +1506,7 @@ static int AddToReceiveWindow(packet, sourcepe)
 	  }
 	}
     }
-  return TRUE;
+  return 1;
 }
 
 /* this routine supplies the next packet in the receive window and updates
@@ -1525,7 +1525,7 @@ static DATA_HDR *ExtractNextPacket(sourcepe)
   if (packet != NULL)
     {
       recv_window[sourcepe][index].packet = NULL;
-      needack[sourcepe] = TRUE;
+      needack[sourcepe] = 1;
       expected_seq_num[sourcepe]++;
       next_window_index[sourcepe] = (next_window_index[sourcepe] + 1) % WINDOW_SIZE;
     }
@@ -1596,7 +1596,7 @@ static void AckReceivedMsgs()
   int i;
   for (i = 0; i < CpvAccess(Cmi_numpe); i++)
     if (needack[i])	{
-      needack[i] = FALSE;
+      needack[i] = 0;
       ack.SourcePeNum = i;
       ack.seq_num = expected_seq_num[i] - 1;
       if (CpvAccess(Cmi_mype) < CpvAccess(Cmi_numpe))
@@ -1612,7 +1612,7 @@ static int data_getone()
   msgspace *recv_buf=NULL;
   struct sockaddr_in src;
   int i, srclen=sizeof(struct sockaddr_in);
-  int arrived = FALSE;
+  int arrived = 0;
   node_info *sender; int kind;
   int AddToReceiveWindow();
   int n;
@@ -1637,7 +1637,7 @@ static int data_getone()
       if((sender->dataport)&&(sender->dataport!=htons(src.sin_port)))
 	KillEveryoneCode(38473);
       sender->dataport = htons(src.sin_port);
-      arrived = TRUE;
+      arrived = 1;
       AddToReceiveWindow(recv_buf, (int) recv_buf->hd.SourcePeNum);
     }
   else KillEveryoneCode(8); /* invalid datagram type. */
@@ -1705,10 +1705,6 @@ static void InterruptInit()
 ** Synchronized send of "msg", of "size" bytes, to "destPE".
 ** Returns the number of bytes of "msg" actually sent.
 ** 
-** This routine differentiates between Chare Kernel messages and machine-level
-** messages by including a msg_type parameter.  It's called by the 
-** CmiSyncSend() macro, defined in conv-mach.h.
-**
 ** -CW
 */
 static int netSend(destPE, size, msg, msg_type) 
@@ -1721,14 +1717,12 @@ static int netSend(destPE, size, msg, msg_type)
   if (!Communication_init) return -1;
   
   if (destPE==CpvAccess(Cmi_mype)) {
-    char *msg1 = (char *)CmiAlloc(size);
-    memcpy(msg1,msg,size);
-    FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg1);
-    return 0;
+    CmiPrintf("netSend to self illegal.\n");
+    exit(1);
   } 
   
   saveflag = Cmi_insidemachine ;
-  Cmi_insidemachine = TRUE ;
+  Cmi_insidemachine = 1 ;
   
   if (size > MAX_FRAG_SIZE) {
     /* Break the message into pieces and send each piece; start numbering
@@ -1759,7 +1753,7 @@ static int CmiProbe()
   void dgram_scan();
 
   saveflag = Cmi_insidemachine ;
-  Cmi_insidemachine = TRUE ;
+  Cmi_insidemachine = 1 ;
 
   dgram_scan();
   RetransmitPackets();
@@ -1781,7 +1775,7 @@ void *CmiGetNonLocal()
   int saveflag;
 
   saveflag = Cmi_insidemachine;
-  Cmi_insidemachine = TRUE;
+  Cmi_insidemachine = 1;
 
   dgram_scan();
   RetransmitPackets();
@@ -1815,46 +1809,65 @@ void *CmiGetNonLocal()
   return newmsg;
 }
 
-
-void CmiSyncSend(destPE, size, msg)
+void CmiSyncSendFn(destPE, size, msg)
 int destPE;
 int size;
 char *msg;
 {
-  netSend(destPE,size,msg,1);
+  if (CpvAccess(Cmi_mype)==destPE) {
+    char *msg1 = (char *)CmiAlloc(size);
+    memcpy(msg1,msg,size);
+    FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg1);
+  } else netSend(destPE,size,msg,1);
 }
 
-void CmiBroadcast(size,msg)
+CmiCommHandle CmiAsyncSendFn(destPE, size, msg)
+     int destPE, size;
+     char *msg;
+{
+  CmiSyncSendFn(destPE, size, msg);
+  return NULL;
+}
+
+void CmiFreeSendFn(destPE, size, msg)
+     int destPE, size;
+     char *msg;
+{
+  if (CpvAccess(Cmi_mype)==destPE) {
+    FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg);
+  } else {
+    CmiSyncSendFn(destPE, size, msg);
+    CmiFree(msg);
+  }
+}
+
+void CmiSyncBroadcastFn(size,msg)
      int size; char *msg;
 {
   int i;
-  for (i=0;i<CpvAccess(Cmi_numpe);i++)
-    {
-      if (i != CpvAccess(Cmi_mype)) netSend(i,size,msg,1);
-    }
-  CmiFree(msg) ;
-}
-
-void CmiSyncBroadcast(size,msg)
-     int size; char *msg;
-{
-  int i;
-  for (i=0;i<CpvAccess(Cmi_numpe);i++)
-    {
-      if (i != CpvAccess(Cmi_mype)) netSend(i,size,msg,1);
-    }
-}
-
-void CmiSyncBroadcastAllAndFree(size,msg)
-     int size; char *msg;
-{
-  int i;
-  for (i=0;i<CpvAccess(Cmi_numpe);i++)
+  for (i=0;i<CpvAccess(Cmi_numpe);i++) {
     if (i != CpvAccess(Cmi_mype)) netSend(i,size,msg,1);
-  FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg);
+  }
 }
 
-void CmiSyncBroadcastAll(size,msg)
+CmiCommHandle CmiAsyncBroadcastFn(size, msg)
+     int size; char *msg;
+{
+  CmiSyncBroadcastFn(size, msg);
+  return 0;
+}
+
+void CmiFreeBroadcastFn(size,msg)
+     int size; char *msg;
+{
+  int i;
+  for (i=0;i<CpvAccess(Cmi_numpe);i++) {
+    if (i != CpvAccess(Cmi_mype)) netSend(i,size,msg,1);
+  }
+  CmiFree(msg);
+}
+
+void CmiSyncBroadcastAllFn(size,msg)
      int size; char *msg;
 {
   int i;
@@ -1866,18 +1879,20 @@ void CmiSyncBroadcastAll(size,msg)
   FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg1);
 }
 
-CmiCommHandle *CmiAsyncBroadcast(size, msg)
+CmiCommHandle CmiAsyncBroadcastAllFn(size, msg)
      int size; char *msg;
 {
-  CmiSyncBroadcast(size, msg);
-  return NULL;
+  CmiSyncBroadcastAllFn(size, msg);
+  return 0;
 }
 
-CmiCommHandle *CmiAsyncBroadcastAll(size, msg)
+void CmiFreeBroadcastAllFn(size,msg)
      int size; char *msg;
 {
-  CmiSyncBroadcastAll(size, msg);
-  return NULL;
+  int i;
+  for (i=0;i<CpvAccess(Cmi_numpe);i++)
+    if (i != CpvAccess(Cmi_mype)) netSend(i,size,msg,1);
+  FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg);
 }
 
 static void CmiSleep()
@@ -1885,30 +1900,16 @@ static void CmiSleep()
   if (Cmi_enableinterrupts) sigpause(0L);
 }
 
-CmiCommHandle *CmiAsyncSend(destPE, size, msg)
-     int destPE, size;
-     char *msg;
+int CmiAsyncMsgSent(handle)
+     CmiCommHandle handle;
 {
-  CmiSyncSend(destPE, size, msg);
-  return NULL;
+  return 1;
 }
 
-int CmiAsyncMsgSent(phandle)
-     CmiCommHandle *phandle;
-{
-  return TRUE;
-}
-
-void CmiReleaseCommHandle(phandle)
-     CmiCommHandle *phandle;
+void CmiReleaseCommHandle(handle)
+     CmiCommHandle handle;
 {
 }
-
-void CmiGrabBuffer(pbuf)
-     char **pbuf;
-{
-}
-
 
 /******************************************************************************
  *
@@ -1921,8 +1922,8 @@ char **argv;
 {
   static int initmc=0;
   void *FIFO_Create();
-  Cmi_insidemachine = TRUE;
-  Communication_init = FALSE;
+  Cmi_insidemachine = 1;
+  Communication_init = 0;
   
   if (initmc==1) KillEveryone("CmiInit called twice");
   initmc=1;
@@ -1939,9 +1940,9 @@ char **argv;
   SendWindowInit();
   RecvWindowInit();
   InterruptInit();
-  Communication_init = TRUE;
+  Communication_init = 1;
 
-  Cmi_insidemachine = FALSE ;
+  Cmi_insidemachine = 0 ;
 }
 
 CmiExit()
@@ -1953,7 +1954,7 @@ CmiExit()
   exited=1;
   
   saveflag = Cmi_insidemachine;
-  Cmi_insidemachine = TRUE;
+  Cmi_insidemachine = 1;
 
   ctrl_sendone(120,"aget %s %d done 0 %d\n",
 	       self_IP_str,ctrl_port,CpvAccess(Cmi_numpe)-1);

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.3  1995-09-20 15:57:05  sanjeev
+ * Revision 2.4  1995-09-29 09:50:07  jyelon
+ * CmiGet-->CmiDeliver, added protos, etc.
+ *
+ * Revision 2.3  1995/09/20  15:57:05  sanjeev
  * put void before CmiSpanTreeChildren
  *
  * Revision 2.2  1995/09/08  02:38:48  gursoy
@@ -28,7 +31,6 @@
 static char ident[] = "@(#)$Header$";
 
 /* This file contains all the spanning tree functions */
-#include "machine.h"
 #include "converse.h"
 
 #define MAXSPAN    4          /* The maximum permitted span on 
@@ -51,7 +53,7 @@ static int numnodes;
 CmiSpanTreeInit()
 {
     int i, j;
-    BOOLEAN visited[MAXNODES];
+    int visited[MAXNODES];
     int next, currentnode;
     int neighbours[MAXCUBEDIM];
     int dim;
@@ -60,12 +62,12 @@ CmiSpanTreeInit()
     dim      = CmiNumNeighbours(0);
     SpanArray = (SpanTreeArray *)CmiAlloc(sizeof(SpanTreeArray) * numnodes);
     NodeStore = (int *) CmiAlloc(sizeof(int) * numnodes);
-    visited[0] = TRUE;
+    visited[0] = 1;
     NodeStore[0] = 0;  /* the root of the spanning tree */
     SpanArray[0].parent = -1;  /* no parent */
 
     for (i = 1; i < numnodes; i++)
-        visited[i] = FALSE;
+        visited[i] = 0;
 
     for (next = 1, i = 0; i < numnodes; i++)
     {
@@ -81,7 +83,7 @@ CmiSpanTreeInit()
 								neighbours[j];
 		SpanArray[currentnode].noofchildren++;
 		SpanArray[neighbours[j]].parent = currentnode;
-		visited[neighbours[j]] = TRUE;
+		visited[neighbours[j]] = 1;
 		
 	    }
 	}
@@ -156,5 +158,5 @@ char * msg;
     /* node 0 cannot be a leaf of a spanning tree: it is the root */
     for (node = 1; node < numnodes; node++)
     if (SpanArray[node].noofchildren == 0)  /* it is a leaf */
-        CmiAsyncSend(node, size, msg, PROCESS_PID);
+        CmiAsyncSendFn(node, size, msg, PROCESS_PID);
 }
