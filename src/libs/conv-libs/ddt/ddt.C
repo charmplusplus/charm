@@ -251,6 +251,24 @@ CkDDT_DataType::CkDDT_DataType(int type):datatype(type)
     case CkDDT_LONG_DOUBLE:
       size = sizeof(long double);
       break ;
+    case CkDDT_FLOAT_INT:
+      size = sizeof(float)+sizeof(int);
+      break;
+    case CkDDT_DOUBLE_INT:
+      size = sizeof(double)+sizeof(int);
+      break;
+    case CkDDT_LONG_INT:
+      size = sizeof(long)+sizeof(int);
+      break;
+    case CkDDT_2INT:
+      size = 2*sizeof(int);
+      break;
+    case CkDDT_SHORT_INT:
+      size = sizeof(short)+sizeof(int);
+      break;
+    case CkDDT_LONG_DOUBLE_INT:
+      size = sizeof(long double)+sizeof(int);
+      break;
     default:
       break;
   }

@@ -5,21 +5,27 @@
 #include <stdio.h>
 #include "charm++.h"
 
-#define CkDDT_DOUBLE         0
-#define CkDDT_INT            1
-#define CkDDT_FLOAT          2
-#define CkDDT_COMPLEX        3
-#define CkDDT_LOGICAL        4
-#define CkDDT_CHAR           5
-#define CkDDT_BYTE           6
-#define CkDDT_PACKED         7
-#define CkDDT_SHORT          8
-#define CkDDT_LONG           9
-#define CkDDT_UNSIGNED_CHAR  10
-#define CkDDT_UNSIGNED_SHORT 11
-#define CkDDT_UNSIGNED       12
-#define CkDDT_UNSIGNED_LONG  13
-#define CkDDT_LONG_DOUBLE    14
+#define CkDDT_DOUBLE          0
+#define CkDDT_INT             1
+#define CkDDT_FLOAT           2
+#define CkDDT_COMPLEX         3
+#define CkDDT_LOGICAL         4
+#define CkDDT_CHAR            5
+#define CkDDT_BYTE            6
+#define CkDDT_PACKED          7
+#define CkDDT_SHORT           8
+#define CkDDT_LONG            9
+#define CkDDT_UNSIGNED_CHAR   10
+#define CkDDT_UNSIGNED_SHORT  11
+#define CkDDT_UNSIGNED        12
+#define CkDDT_UNSIGNED_LONG   13
+#define CkDDT_LONG_DOUBLE     14
+#define CkDDT_FLOAT_INT       15
+#define CkDDT_DOUBLE_INT      16
+#define CkDDT_LONG_INT        17
+#define CkDDT_2INT            18
+#define CkDDT_SHORT_INT       19
+#define CkDDT_LONG_DOUBLE_INT 20
 
 #define CkDDT_TYPE_NULL  -1
 #define CkDDT_PRIMITIVE  14
@@ -33,7 +39,7 @@
 typedef int CkDDT_Type ;
 class CkDDT ;
 
-/* This class maintains the data for primitive data types 
+/* This class maintains the data for primitive data types
  * and also acts as Base Class
    for all derived types.
 
@@ -276,7 +282,7 @@ class CkDDT {
   CkDDT(void*) {} // emulates migration constructor
   CkDDT()
   {
-    max_types = 20;
+    max_types = 40;
     typeTable = new CkDDT_DataType*[max_types];
     types = new int[max_types];
     typeTable[0] = new CkDDT_DataType(CkDDT_DOUBLE);
@@ -294,7 +300,14 @@ class CkDDT {
     typeTable[12] = new CkDDT_DataType(CkDDT_UNSIGNED);
     typeTable[13] = new CkDDT_DataType(CkDDT_UNSIGNED_SHORT);
     typeTable[14] = new CkDDT_DataType(CkDDT_LONG_DOUBLE);
-    num_types = 15;
+    typeTable[15] = new CkDDT_DataType(CkDDT_FLOAT_INT);
+    typeTable[16] = new CkDDT_DataType(CkDDT_DOUBLE_INT);
+    typeTable[17] = new CkDDT_DataType(CkDDT_LONG_INT);
+    typeTable[18] = new CkDDT_DataType(CkDDT_2INT);
+    typeTable[19] = new CkDDT_DataType(CkDDT_SHORT_INT);
+    typeTable[20] = new CkDDT_DataType(CkDDT_LONG_DOUBLE_INT);
+    num_types = 21;
+
     int i;
     for(i=0 ; i < num_types; i++)
       types[i] = CkDDT_PRIMITIVE ;
