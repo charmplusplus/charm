@@ -17,6 +17,11 @@
 #include "conv-ccs.h"
 #include "ccs-server.h"
 
+#if CMK_USE_GM
+#include <gm.h>
+extern struct gm_port *gmport;
+#endif
+
 #if NODE_0_IS_CONVHOST
 extern int ccs_socket_ready;
 extern void CHostInit(int withCCS);
@@ -1144,7 +1149,31 @@ void CmiMulticastInit()
  ***************************************************************************/
 
 #define SIMPLE_CMIALLOC 0
-#if SIMPLE_CMIALLOC
+#if CMK_USE_GM
+void *CmiAlloc(int size)
+{
+        void *ptr = gm_dma_malloc(gmport, size);
+        _MEMCHECK(ptr);
+        return ptr;
+}
+
+void CmiReference(void *blk)
+{
+        CmiAbort("CmiReference not supported!\n");
+}
+
+int CmiSize(void *blk)
+{
+        CmiAbort("CmiSize not supported!\n");
+        return 0;
+}
+
+void CmiFree(void *blk)
+{
+        gm_dma_free(gmport, blk);
+}
+
+#elif SIMPLE_CMIALLOC
 void *CmiAlloc(int size)
 {
 	return malloc(size);
