@@ -8,19 +8,15 @@
 #ifndef _SYMBOL_H
 #define _SYMBOL_H
 
-#include <iostream.h>
+#include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-//  #include <string>
-//  #include <map>
-//  using std::map;//<-- may cause problems for pre-ISO C++ compilers
 
 #include "xi-util.h"
 #include "EToken.h"
 #include "CEntry.h"
 #include "sdag-globals.h"
 #include "CList.h"
-#include <stdio.h>
 #include "CStateVar.h"
 #include "CParsedFile.h"
 
