@@ -56,6 +56,7 @@ public: char *name;
 
 	Entry(char *n, char *m, int t = FALSE, char *r = NULL, int s = 0) ;
 	int isThreaded() { return isthreaded ; }
+	int isMessage() { return msgtype != NULL; }
 	int isReturnMsg() { return returnMsg != NULL; }
 	int get_stackSize() { return stackSize; }
 } ;
