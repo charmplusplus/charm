@@ -52,14 +52,16 @@ int TraceProjector::traceRegisterUserEvent(const char* evt, int e)
 CkAssert(e==-1 || e>=0);
   CkAssert(evt != NULL);
   int event;
-  int biggest = 0;
+  int biggest = -1;
   for (int i=0; i<CkpvAccess(usrEvents).length(); i++) {
     int cur = CkpvAccess(usrEvents)[i]->e;
     if (cur == e) 
       CmiAbort("UserEvent double registered!");
     if (cur > biggest) biggest = cur;
   }
-  if (e==-1) event = biggest;
+  // if biggest is -1, it means no user events were previously registered
+  // hence automatically assigned events will start from id of 0.
+  if (e==-1) event = biggest+1; // automatically assign new event id
   else event = e;
   CkpvAccess(usrEvents).push_back(new UsrEvent(event,(char *)evt));
   return event;

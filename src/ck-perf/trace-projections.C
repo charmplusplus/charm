@@ -565,14 +565,16 @@ int TraceProjections::traceRegisterUserEvent(const char* evt, int e)
   CkAssert(e==-1 || e>=0);
   CkAssert(evt != NULL);
   int event;
-  int biggest = 0;
+  int biggest = -1;
   for (int i=0; i<CkpvAccess(usrEvents)->length(); i++) {
     int cur = (*CkpvAccess(usrEvents))[i]->e;
     if (cur == e) 
       CmiAbort("UserEvent double registered!");
     if (cur > biggest) biggest = cur;
   }
-  if (e==-1) event = biggest;
+  // if no user events have so far been registered. biggest will be -1
+  // and hence newly assigned event numbers will begin from 0.
+  if (e==-1) event = biggest+1;  // automatically assign new event number
   else event = e;
   CkpvAccess(usrEvents)->push_back(new UsrEvent(event,(char *)evt));
   return event;
