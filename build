@@ -12,9 +12,9 @@ syntax() {
   echo '<targets>: converse charm++ libs AMPI IDL TSM SM PVM bluegene'
   echo '<targets>: doc ps-doc pdf-doc html-doc'
   echo '<versions>: ' 
-  ( cd $src ; ls -1 | egrep -v '(^CVS)|(^shmem$)|(^mpi$)|(^sim$)|(^net$)|(^elan$)|(^util$)|(^common$)|(^uth$)|(^conv-mach-fix.sh$)|(^win32$)|(^paragon$)' | pr -3 -t )
+  ( cd $src ; ls -1 | egrep -v '(^CVS)|(^shmem$)|(^mpi$)|(^sim$)|(^net$)|(^elan$)|(^util$)|(^common$)|(^uth$)|(^conv-mach-fix.sh$)|(^win32$)|(^paragon$)|(^vmi$)' | pr -3 -t )
   echo ''
-  echo '<options>: help cc cc64 cxx kcc pgcc acc icc ecc gcc3 mpcc smp gm tcp vmi scyld opteron bluegene --incdir --libdir --basedir --no-shared'
+  echo '<options>: help cc cc64 cxx kcc pgcc acc icc ecc gcc3 mpcc smp gm tcp vmi scyld clustermatic opteron bluegene --incdir --libdir --basedir --no-shared'
   if test $more = 1
   then
   echo ''
@@ -32,13 +32,14 @@ syntax() {
   echo '  gcc3		to use gcc3 - GNU GCC/G++ version 3'
   echo '  mpcc		SUN Solaris C++ compiler for MPI'
   echo ''
-  echo 'Platform specific options (choose multiple):'
+  echo 'Platform specific options (choose multiple if apply):'
   echo '  opteron	compile for AMD Opteron'
   echo '  smp		support for SMP, multithreaded charm on each node'
   echo '  gm		use Myrinet for communication'
   echo '  tcp		use TCP sockets for communication (ony for net version)'
   echo "  vmi		use NCSA's VMI for communication"
-  echo '  scyld		compile for Scyld Beowulf cluster'
+  echo '  scyld		compile for Scyld Beowulf cluster based on bproc'
+  echo '  clustermatic	compile for Clustermatic Beowulf cluster based on bproc'
   echo ''
   echo 'Advanced options:'
   echo '  bluegene	compile for BigSim (Blue Gene) simulator'

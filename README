@@ -183,7 +183,8 @@ need to choose <options> from the following list:
 * ecc - Intel C/C++ compiler for Linux IA64
 * mpcc - SUN Solaris C++ compiler for MPI.
 
-* scyld - support Beowulf Scyld;
+* scyld - support Beowulf Scyld based on bproc;
+* clustermatic - for Clustermatic Beowulf cluster based on bproc;
 * gm - support MyriCom's Myrinet GM library;
 * vmi - support NCSA's VMI library;
 
