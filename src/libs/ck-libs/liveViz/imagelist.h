@@ -46,12 +46,12 @@ class ImageList
 				h1, h2, ..., hn are the image header for n images in the list.
 				#images is an unsigned int.
 		*/
-		void * pack(const liveVizRequest *req);
+		void pack(const liveVizRequest *req,void *dest);
 		/*
 			this function decodes the run of bytes with the structure as shown above and adds all the images to
 			itself (list).
 		*/
-		liveVizRequest* unPack(void *ptr);
+		const liveVizRequest* unPack(void *ptr);
 
 		/*
 			This returns the number of bytes required to pack the image list.
@@ -59,14 +59,10 @@ class ImageList
 		unsigned packedDataSize(void);
 
 		/*
-			This function combines the list of image into one big image and returns the composite image.
+			This function combines the list of image into one big image of the specified size,
+			 and returns the composite image.
 		*/
-		Image * combineImage(void);
-
-		/*
-			This function is used by combineImage() to know the buffer size required store the composite image.
-		*/
-		int getImageSize(Point &ulc, Point &lrc);
+		Image * combineImage(const liveVizRequest *req);
 
 		/*
 			This function checks if the image is within the window, otherwise it clips the image.

@@ -112,14 +112,10 @@ void ImageList::removeNodeFromList(ImageNode* node)
 	}
 }
 
-void * ImageList::pack(const liveVizRequest *req)
+void ImageList::pack(const liveVizRequest *req,void *dest)
 {
 	//CkPrintf("Entering ImageList::pack() \n");
-	unsigned size = packedDataSize();
-	if(size == 0)
-		return NULL;
-
-	byte * ptr = new byte[size];
+	byte * ptr = (byte *)dest;
 	memcpy(ptr,&m_nodeCount,sizeof(unsigned));
 	memcpy(ptr+sizeof(unsigned),req,sizeof(liveVizRequest));
 
@@ -145,23 +141,16 @@ void * ImageList::pack(const liveVizRequest *req)
 		temp = temp->m_next;
 	}
 	//CkPrintf("Exiting ImageList::pack(), nodeCount = %d \n", m_nodeCount);
-
-	return ptr;
 }
 
-liveVizRequest* ImageList::unPack(void *ptr)
+const liveVizRequest* ImageList::unPack(void *ptr)
 {
 	//CkPrintf("Entering ImageList::unPack() \n");
-	liveVizRequest *req = new liveVizRequest;
-
-	if(ptr == NULL)
-		return NULL;
-
 	unsigned nodeCount;
-	nodeCount = ((unsigned*)ptr)[0];
-	memcpy(req,(byte*)ptr + sizeof(unsigned), sizeof(liveVizRequest));
+	nodeCount = ((unsigned int*)ptr)[0];
+	const liveVizRequest *req =(const liveVizRequest *)((byte*)ptr + sizeof(unsigned int));
 
-	byte * headptr = (byte*)ptr + sizeof(unsigned) + sizeof(liveVizRequest);
+	byte * headptr = (byte*)ptr + sizeof(unsigned int) + sizeof(liveVizRequest);
 	byte * imageptr = headptr + sizeof(Rect)*nodeCount;
 
 	Rect rect;
@@ -172,14 +161,10 @@ liveVizRequest* ImageList::unPack(void *ptr)
 	{
 		memcpy(&rect, headptr, sizeof(Rect));
 
+		// Make a new image that *points to* the data in the input reduction message
 		temp = new Image(rect, NULL);
-
 		imageSize = temp->getImageSize(m_bytesPerPixel);
-
-		byte * imgData = new byte[imageSize];
-		memcpy(imgData,imageptr,imageSize);
-
-		temp->m_imgData = imgData; //new Image(image.m_ulc, image.m_lrc, imgData);
+		temp->setData(imageptr,false);
 
 		add(temp, *req);
 
@@ -205,61 +190,47 @@ unsigned ImageList::packedDataSize()
 
 }
 
-Image * ImageList::combineImage(void)
+Image * ImageList::combineImage(const liveVizRequest *req)
 {
-	if(m_nodeCount != 0)
-	{
-		Point ulc,lrc;
+	Point ulc(0,0),lrc(req->wid-1, req->ht-1);
 
-		int i, size = getImageSize(ulc,lrc);
+	int bpp=m_bytesPerPixel;
+	int destWidth = req->wid;
+	int destHeight = req->ht;
+	int i, size = destWidth*destHeight*bpp;
 
-		byte * imageData = new byte[size];
-
-		for(i=0; i<size; i++)
-			imageData[i] = 0;
-		ImageNode *temp = m_list;
-		int newImageWidth = lrc.x - ulc.x + 1;
-
-		for(i=0; i<m_nodeCount; i++)
-		{
-			int width = temp->m_img->m_lrc.x - temp->m_img->m_ulc.x + 1;
-			int height = temp->m_img->m_lrc.y - temp->m_img->m_ulc.y + 1;
-			for(int y=0; y<height; y++)
-				for(int x=0; x<width; x++)
-				{
-					for(int j=0; j<m_bytesPerPixel; j++)
-						imageData[((temp->m_img->m_ulc.y - ulc.y + y)*newImageWidth +
-								(temp->m_img->m_ulc.x - ulc.x + x))*m_bytesPerPixel + j] =
-								temp->m_img->m_imgData[(y*width + x)*m_bytesPerPixel + j];
- 				}
- 			temp = temp->m_next;
- 		}
-		return new Image(ulc, lrc, imageData);
-	}
-	return NULL;
-
-}
-
-int ImageList::getImageSize(Point &ulc, Point &lrc)
-{
-	ulc.x = m_list->m_img->m_ulc.x;
-	ulc.y = m_list->m_img->m_ulc.y;
-	lrc.x = m_list->m_img->m_lrc.x;
-	lrc.y = m_list->m_img->m_lrc.y;
 	ImageNode *temp = m_list;
-	while(temp != NULL)
+	
+/* Early exit for (rather common) case of one big image covering everything: */
+	if (m_nodeCount==1 && temp->m_img->m_ulc==ulc && temp->m_img->m_lrc==lrc)
 	{
-		if(ulc.x > temp->m_img->m_ulc.x)
-			ulc.x = temp->m_img->m_ulc.x;
-		if(ulc.y > temp->m_img->m_ulc.y)
-			ulc.y = temp->m_img->m_ulc.y;
-		if(lrc.x < temp->m_img->m_lrc.x)
-			lrc.x = temp->m_img->m_lrc.x;
-		if(lrc.y < temp->m_img->m_lrc.y)
-			lrc.y = temp->m_img->m_lrc.y;
-		temp = temp->m_next;
+		Image *ret=new Image(ulc,lrc,NULL);
+		ret->setData(temp->m_img->m_imgData,false);
+		return ret;
 	}
-	return ((lrc.y - ulc.y + 1)*(lrc.x - ulc.x + 1)*m_bytesPerPixel);
+	
+/* Normal case: loop over all our source images */
+	byte * destImage = new byte[size];
+	for(i=0; i<size; i++)
+		destImage[i] = 0;
+	
+	for(i=0; i<m_nodeCount; i++)
+	{
+		int srcWidth = temp->m_img->m_lrc.x - temp->m_img->m_ulc.x + 1;
+		int srcHeight = temp->m_img->m_lrc.y - temp->m_img->m_ulc.y + 1;
+		int dx=temp->m_img->m_ulc.x; /* shift to apply to the output image */
+		int dy=temp->m_img->m_ulc.y;
+		const byte *srcImage=temp->m_img->m_imgData;
+		for(int y=0; y<srcHeight; y++)
+			for(int x=0; x<srcWidth; x++)
+			{
+				for(int j=0; j<m_bytesPerPixel; j++)
+					destImage[((dy + y)*destWidth + (dx + x))*bpp + j] =
+							srcImage[(y*srcWidth + x)*bpp + j];
+ 			}
+ 		temp = temp->m_next;
+ 	}
+	return new Image(ulc, lrc, destImage);
 }
 
 Image* ImageList::getClippedImage(Image *img, liveVizRequest const& req)

@@ -10,6 +10,7 @@ Image::Image(Point ulc, Point lrc, byte * imgData)
 	m_ulc.y = ulc.y;
 	m_lrc.y = lrc.y;
 	m_imgData = imgData;
+	m_doFree = true;
 }
 
 Image::Image(Rect rect, byte * imgData)
@@ -19,6 +20,7 @@ Image::Image(Rect rect, byte * imgData)
         m_ulc.y = rect.t;
         m_lrc.y = rect.b;
         m_imgData = imgData;
+	m_doFree = true;
 }
 
 
@@ -29,12 +31,18 @@ Image::Image()
 	m_ulc.y = 0;
 	m_lrc.y = 0;
 	m_imgData = NULL;
+	m_doFree = false;
+}
+
+void Image::setData(byte *data,bool doFree) {
+	m_imgData=data;
+	m_doFree=doFree;
 }
 
 // Destructor Method
 Image::~Image()
 {
-	if(m_imgData != NULL)
+	if(m_imgData != NULL && m_doFree)
 		delete[] m_imgData;
 	m_imgData = NULL;
 }
@@ -47,8 +55,7 @@ unsigned Image::getImageSize(unsigned bytesPerPixel)
 
 void Image::copyImageData(byte *ptr, unsigned bytesPerPixel)
 {
-	for(int i=0; i<getImageSize(bytesPerPixel); i++)
-		ptr[i] = m_imgData[i];
+	memcpy(ptr,m_imgData,getImageSize(bytesPerPixel));
 }
 
 // Image Overlap Resolution Methods
@@ -233,25 +240,43 @@ void Image::addImageData(Image *img, unsigned bytesPerPixel)
 	ulc2.y = img->m_ulc.y;
 	lrc2.y = img->m_lrc.y;
 
-	byte * oldImage1Data = m_imgData;
-	byte * oldImage2Data = img->m_imgData;
+	byte * destImg = m_imgData;
+	int destWidth = img->getImageWidth();
 
-	int index1, index2;
-	int width1, width2;
-	width1 = getImageWidth();
-	width2 = img->getImageWidth();
-
-	for(int y=ulc2.y; y<=lrc2.y; y++)
-		for(int x=ulc2.x; x<=lrc2.x; x++)
+	const byte * srcImg = img->m_imgData;
+	int srcWidth=lrc2.y-ulc2.y+1;
+	int srcHeight=lrc2.x-ulc2.x+1;
+	
+	int dx=ulc2.x-ulc1.x;
+	int dy=ulc2.y-ulc1.y;
+	destImg+=dy*destWidth+dx; /* shift so destImg[0] is aligned with srcImg[0] */
+	
+	/* Add the source array to the dest. */
+	for(int y=0; y<srcWidth; y++) {
+		byte *dest=destImg+y*destWidth*bytesPerPixel; /* start of row y in dest image */
+		const byte *src=srcImg+y*srcWidth*bytesPerPixel; /* start of row y in src image*/
+		if (bytesPerPixel==1) { /* common special case: (about a 20% speedup) */
+			for(int x=0; x<srcHeight; x++)
+			/* no need for a loop over pixel components */
+			{
+				int tmp=*dest+*src;
+				if(tmp > 255) *dest = 255; /* clip out-of-bounds values */
+				else *dest = (byte)tmp;
+				dest++, src++;
+			}
+		} 
+		else /* bytesPerPixel>1 */ 
+		{ 
+			for(int x=0; x<srcHeight; x++)
 			for(int j=0; j<bytesPerPixel; j++)
 			{
-				index1 = ((y-ulc1.y)*width1 + (x-ulc1.x))*bytesPerPixel + j;
-				index2 = ((y-ulc2.y)*width2 + (x-ulc2.x))*bytesPerPixel + j;
-				if(oldImage1Data[index1] + oldImage2Data[index2] > 255)
-					oldImage1Data[index1] = 255;
-				else
-					oldImage1Data[index1] += oldImage2Data[index2];
+				int tmp=*dest+*src;
+				if(tmp > 255) *dest = 255; /* clip out-of-bounds values */
+				else *dest = (byte)tmp;
+				dest++, src++;
 			}
+		}
+	}
 }
 
 Image* Image::partitionImage(Image *&img2, const Point &int_ulc, const Point& int_lrc, unsigned bytesPerPixel)

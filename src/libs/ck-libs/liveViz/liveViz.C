@@ -60,20 +60,6 @@ The contributed data looks like:
 	a list of Images packed into a run of bytes
 */
 
-// This function is not needed in this implementation of image combine!!
-CkReductionMsg *allocateImageMsg(const liveVizRequest &req,const CkRect &r,
-	byte **imgDest)
-{
-  imageHeader hdr(req,r);
-  CkReductionMsg *msg=CkReductionMsg::buildNew(
-  	sizeof(imageHeader)+r.area()*lv_config.getBytesPerPixel(),
-	NULL,imageCombineReducer);
-  byte *dest=(byte *)msg->getData();
-  *(imageHeader *)dest=hdr;
-  *imgDest=dest+sizeof(hdr);
-  return msg;
-}
-
 //Called by clients to deposit a piece of the final image
 void liveVizDeposit(const liveVizRequest &req,
 		    int startx, int starty,
@@ -95,17 +81,13 @@ void liveVizDeposit(const liveVizRequest &req,
      lrc.x = startx + sizex-1;
      lrc.y = starty + sizey-1;
 
-     // copy the image data, so that liveViz lib does not delete the actual pointer passed by the user.
-     byte *imageData = new byte[sizex*sizey*lv_config.getBytesPerPixel()];
-     memcpy(imageData,src,sizex*sizey*lv_config.getBytesPerPixel());
-
-     Image *img = new Image(ulc,lrc,(byte *)imageData);
+     Image *img = new Image(ulc,lrc,NULL);
+     img->setData((byte *)src,false);
      list.add(img, req);
   }
 
-  byte* packedData = (byte*)list.pack(&req);
-
-  CkReductionMsg* msg = CkReductionMsg::buildNew(list.packedDataSize(),packedData, imageCombineReducer);
+  CkReductionMsg* msg = CkReductionMsg::buildNew(list.packedDataSize(),NULL, imageCombineReducer);
+  list.pack(&req,msg->getData());
 
   //Contribute this image to the reduction
   msg->setCallback(CkCallback(vizReductionHandler));
@@ -114,8 +96,8 @@ void liveVizDeposit(const liveVizRequest &req,
 
 void liveVizDeposit(const liveVizRequest &req, LiveVizImageList &list, ArrayElement* client)
 {
-  byte *packedData = (byte*)list.pack(&req);
-  CkReductionMsg* msg = CkReductionMsg::buildNew(list.packedDataSize(), packedData, imageCombineReducer);
+  CkReductionMsg* msg = CkReductionMsg::buildNew(list.packedDataSize(),NULL, imageCombineReducer);
+  list.pack(&req,msg->getData());
 
   // Contribute this list of images to the reduction
   msg->setCallback(CkCallback(vizReductionHandler));
@@ -140,18 +122,16 @@ CkReductionMsg *imageCombine(int nMsg,CkReductionMsg **msgs)
 
   if (lv_config.getVerbose(2))
     CkPrintf("imageCombine> image combine on pe %d\n",CkMyPe());
-
+// double startTime=CmiWallTimer();
   XSortedImageList list(lv_config.getBytesPerPixel());
-  liveVizRequest *req = list.unPack((void *)msgs[0]->getData());
+  const liveVizRequest *req = list.unPack((void *)msgs[0]->getData());
 
   for(int i=1; i<nMsg; i++)
-     delete list.unPack(msgs[i]->getData()); // delete the liveVizRequest* ptr returned by unpack()
+     list.unPack(msgs[i]->getData());
 
-  byte* packedData = (byte*)list.pack(req);
-
-  CkReductionMsg *msg = CkReductionMsg::buildNew(list.packedDataSize(),packedData, imageCombineReducer);
-
-  delete req;
+  CkReductionMsg* msg = CkReductionMsg::buildNew(list.packedDataSize(),NULL, imageCombineReducer);
+  list.pack(req,msg->getData());
+// CkPrintf("Combining %d messages on PE %d took %.6fs\n", nMsg, CkMyPe(), CmiWallTimer()-startTime);
 
   return msg;
 }
@@ -161,44 +141,14 @@ void vizReductionHandler(void *r_msg)
 {
   CkReductionMsg *msg = (CkReductionMsg*)r_msg;
   XSortedImageList list(lv_config.getBytesPerPixel());
-  liveVizRequest * req = list.unPack(msg->getData());
-  Image *image = list.combineImage();
+  const liveVizRequest * req = list.unPack(msg->getData());
+  Image *image = list.combineImage(req);
 
-  if(image != NULL)
-  {
-    if (lv_config.getVerbose(2))
+  if (lv_config.getVerbose(2))
       CkPrintf("vizReductionHandler> pe %d image is (%d,%d, %d,%d)\n", CkMyPe(), image->m_ulc.x, image->m_ulc.y, image->m_lrc.x, image->m_lrc.y);
-
-    int bpp=lv_config.getBytesPerPixel();
-    CkRect destRect(0,0,req->wid-1,req->ht-1);
-    CkRect srcRect(0,0,image->getImageWidth()-1, image->getImageHeight()-1);
-    if (destRect == srcRect)
-    {
-      //Client contributed entire image-- pass along unmodified
-      liveViz0Deposit(*req,image->m_imgData);
-      image->m_imgData = NULL; // don't delete the image buffer.
-      delete image;
-    }
-    else
-    { //Client didn't quite cover whole image-- have to pad
-      CkImage src(image->getImageWidth(), image->getImageHeight(), bpp,image->m_imgData);
-      CkAllocImage dest(req->wid,req->ht,bpp);
-      dest.clear();
-      dest.put(image->m_ulc.x,image->m_ulc.y,src);
-      liveViz0Deposit(*req,dest.getData());
-      delete image;
-    }
-  }
-  else
-  {
-    // Blank Image
-    int imageSize = (req->wid)*(req->ht)*(lv_config.getBytesPerPixel());
-    byte *imageData = new byte[imageSize];
-    for(int i=0; i<imageSize; i++)
-      imageData[i] = 0;
-    liveViz0Deposit(*req, imageData);
-  }
-  delete req;
+  
+  liveViz0Deposit(*req,image->m_imgData);
+  delete image;
   delete msg;
 }
 

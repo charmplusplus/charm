@@ -67,11 +67,13 @@ public:
   networkDouble minZ,maxZ;//range of allowable z values
 };
 
+//static double startTime;
 /*
  A client requests an image from us.
  */
 extern "C" void getImageHandler(char * msg)
 {
+  // startTime=CmiWallTimer();
   networkImageRequest *r=(networkImageRequest *)(msg+CmiMsgHeaderSizeBytes);
   int wid=r->wid,ht=r->ht;
   
@@ -95,11 +97,13 @@ extern "C" void getImageHandler(char * msg)
 
 void liveViz0Deposit(const liveVizRequest &req,byte * imageData)
 {
+  // CkPrintf("LiveViz: sending ccs back %.6f s\n",CmiWallTimer()-startTime);
   int len=req.wid*req.ht*config.getBytesPerPixel();
   if (config.getVerbose(2))
     CmiPrintf("CCS getImage> Reply for (%d x %d) pixel or %d byte image.\n",
 	      req.wid,req.ht,len);
   CcsSendDelayedReply(req.replyToken, len, imageData);
+  // CkPrintf("LiveViz: request took %.6f s\n",CmiWallTimer()-startTime);
 }
 
 //Startup routine-- must be called on processor 0

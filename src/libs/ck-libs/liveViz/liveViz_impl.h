@@ -23,7 +23,6 @@ public:
 extern CkReductionMsg *imageCombine(int nMsg,CkReductionMsg **msgs);
 extern CkReduction::reducerType imageCombineReducer;
 extern void vizReductionHandler(void *r_msg);
-extern CkReductionMsg *allocateImageMsg(const liveVizRequest &req,const CkRect &r, byte **imgDest);
 void liveVizInitComplete(void *rednMessage);
 extern CkCallback clientGetImageCallback;
 

@@ -10,11 +10,15 @@ class Image
 		Point m_ulc; // upper-left coordinate
 		Point m_lrc; // lower-right coordinate
 		byte * m_imgData; // image buffer
+		bool m_doFree; // If true, we will delete[] imgData.
 
 		// Constructor Methods
 		Image(Point ulc, Point lrc, byte * imgData);
 		Image(Rect rect, byte * imgData);
 		Image();
+		
+		// Set our image data
+		void setData(byte *data,bool freeWhenDone);
 
 		// Destructor Method
 		~Image();

@@ -109,36 +109,12 @@ void liveVizPollDeposit(ArrayElement *client,
 		    int startx, int starty, 
 		    int sizex, int sizey, const byte * src)
 {
-  if (lv_config.getVerbose(2))
-    CkPrintf("liveVizDeposit> Deposited image at (%d,%d), (%d x %d) pixels, on pe %d\n",
-    	startx,starty,sizex,sizey,CkMyPe());
-
-//Allocate a reductionMessage:
-  CkRect r(startx,starty, startx+sizex,starty+sizey);
-  r=r.getIntersect(CkRect(req.wid,req.ht)); //Never copy out-of-bounds regions
-  if (r.isEmpty()) r.zero();
-  int bpp=lv_config.getBytesPerPixel();
-  byte *dest;
-  CkReductionMsg *msg=allocateImageMsg(req,r,&dest);
-  
-//Copy our image into the reductionMessage:
-  if (!r.isEmpty()) {
-    //We can't just copy image with memcpy, because we may be clipping user data here:
-    CkImage srcImage(sizex,sizey,bpp,(byte *)src);
-    srcImage.window(r.getShift(-startx,-starty)); //Portion of src overlapping dest
-    CkImage destImage(r.wid(),r.ht(),bpp,dest);
-    destImage.put(0,0,srcImage);
-  }
-
-//Contribute this image to the reduction
-  msg->setCallback(CkCallback(vizReductionHandler));
-
   liveVizPollArray *p = proxy(client->thisIndexMax).ckLocal();
   if ( !p ) {
     CkError("LiveViz error: somehow an element has been created who has"
             " no corresponding proxy member!");
   }
-  p->contribute(msg);
+  liveVizDeposit(req,startx,starty,sizex,sizey,src,p);
 }
 
 #include "liveVizPoll.def.h"
