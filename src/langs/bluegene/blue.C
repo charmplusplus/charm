@@ -32,6 +32,7 @@ typedef bgQueue<char *>     msgQueue;
 //typedef CkQ<char *> 	    ckMsgQueue;
 // use a queue sorted by recv time
 typedef minMsgHeap 	    ckMsgQueue;
+typedef CkQ<bgCorrectionMsg *> 	    bgCorrectionQ;
 
 class nodeInfo;
 class threadInfo;
@@ -180,6 +181,7 @@ public:
 
   // for timing
   BgTimeLine *timelines;
+  bgCorrectionQ cmsg;
 
 public:
   nodeInfo();
@@ -460,12 +462,45 @@ CmiHandler threadBCastMsgHandlerFunc(char *msg)
   return 0;
 }
 
+/****************************************************************************************
+			TimeLog correction
+****************************************************************************************/
+static inline int handleCorrectionMsg(BgTimeLine *logs, bgCorrectionMsg *m)
+{
+	CmiUInt2 tID = m->tID;
+	if (tID == ANYTHREAD) {
+	  int found = 0;
+	  for (tID=0; tID<cva(numWth); tID++) {
+        BgTimeLine &tline = logs[tID];	
+		for (int j=0; j<tline.length(); j++)
+		  if (tline[j]->msgID == m->msgID) { found = 1; break; }
+		if (found) break;    
+	  }
+	  if (!found) {
+//	    CmiPrintf("Correction message arrived early. \n");
+		return 0;
+	  }
+	}
+	BgAdjustTimeLineForward(m->msgID, m->tAdjust, logs[tID]);
+	CmiFree(m);
+	return 1;
+}
+
 void bgCorrectionFunc(char *msg)
 {
+    int i;
 	bgCorrectionMsg* m = (bgCorrectionMsg*)msg;
 	int nodeidx = nodeInfo::Global2Local(m->destNode);	
-    BgTimeLine &log = cva(nodeinfo)[nodeidx].timelines[m->tID];	
-	BgAdjustTimeLineForward(m->msgID, m->tAdjust, log);
+    bgCorrectionQ &cmsg = cva(nodeinfo)[nodeidx].cmsg;
+    BgTimeLine *logs = cva(nodeinfo)[nodeidx].timelines;
+
+	cmsg.enq(m);
+	int len = cmsg.length();
+    for (i=0; i<len; i++) {
+	  bgCorrectionMsg *cm = cmsg.deq();
+	  if (handleCorrectionMsg(logs, cm) == 0)
+	    cmsg.enq(cm);
+	}
 }
 
 #define ABS(x) (((x)<0)? -(x) : (x))
@@ -804,13 +839,7 @@ static void ProcessMessage(char *msg)
 
   CmiSetHandler(msg, CmiBgMsgHandle(msg));
 
-  // timing
-  BG_ENTRYSTART(handler, msg);
-
   entryFunc(msg);
-
-  // timing
-  BG_ENTRYEND();
 
 }
 
@@ -906,17 +935,25 @@ void work_thread(threadInfo *tinfo)
     DEBUGF(("[%d] work thread %d has a msg.\n", BgMyNode(), tMYID));
 
     if (CmiBgMsgRecvTime(msg) > tCURRTIME) tCURRTIME = CmiBgMsgRecvTime(msg);
-    // don't count thread overhead
+
+    // timing
+    BG_ENTRYSTART(CmiBgMsgHandle(msg), msg);
+
+    // don't count thread overhead and timinmg overhead
     tSTARTTIME = CmiWallTimer();
-    DEBUGF(("call ProcessMessage\n"));
+
     // ProcessMessage may trap into scheduler
     ProcessMessage(msg);
+
+    /* let other work thread do their jobs */
+    tCURRTIME += (CmiWallTimer()-tSTARTTIME);
+
+    // timing
+    BG_ENTRYEND();
 
     if (fromQ2 == 1) q2.deq();
     DEBUGF(("[%d] work thread %d finish a msg.\n", BgMyNode(), tMYID));
 
-    /* let other work thread do their jobs */
-    tCURRTIME += (CmiWallTimer()-tSTARTTIME);
     // suspend work thread, awaken at line 347 - addBgThreadMessage().
     CthYield();
     tSTARTTIME = CmiWallTimer();

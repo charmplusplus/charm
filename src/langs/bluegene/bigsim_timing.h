@@ -13,7 +13,7 @@ class bgCorrectionMsg
 public:
   char   core[CmiBlueGeneMsgHeaderSizeBytes];
   int    msgID;	
-  int    tID;		// destination worker thread ID
+  CmiUInt2    tID;		// destination worker thread ID
   double tAdjust;	// correction in recvTime at destPe
   int 	 destNode;
 };
@@ -24,7 +24,7 @@ public:
 class bgMsgEntry {
 public:
   int msgID;
-  int tID;		// destination worker thread ID
+  CmiUInt2 tID;		// destination worker thread ID
   double sendtime;
   int dstPe;
 public:

@@ -115,6 +115,7 @@ void BgAdjustTimeLineInsert(BgTimeLine &tline)
 	/* check is 'bgTimingLog' is for an in-order message */
 	if(tline.length() == 1)
 		return;
+//	CmiPrintf("BgAdjustTimeLineInsert:: last %f secondlast %f\n", tline[tline.length()-1]->recvTime, tline[tline.length()-2]->recvTime); 
 	if(tline[tline.length()-1]->recvTime >= tline[tline.length()-2]->recvTime) {
 		return;
 	}
@@ -148,6 +149,7 @@ void BgAdjustTimeLineForward(int msgID, double tAdjust, BgTimeLine &tline)
 	/* ASSUMPTION: BgAdjustTimeLineForward is called only if necessary */
 	/* ASSUMPTION: no error testing needed */
 
+//	CmiPrintf("BgAdjustTimeLineForward\n"); 
 	if(tAdjust == 0) return;
 
 	//FIXME can this search be made faster than linear search ?
