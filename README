@@ -111,6 +111,7 @@ net-irix             IRIX	    UDP           GNU compiler
 net-axp              Alpha          UDP           GNU compiler
 net-hp               HP-UX          UDP           GNU compiler
 mpi-linux            PC Linux       MPI           GNU compiler
+mpi-ppc-darwin       MacOS X        MPI           GNU C++ compiler
 mpi-linux-ia64       IA64 Linux     MPI           GNU compiler
 mpi-axp              Alpha          MPI           GNU compiler
 mpi-linux-axp        Alpha Linux    MPI           GNU compiler
@@ -264,7 +265,9 @@ net-linux/
    |
    ---  lib_so/			# dynamic libraries
    |
-   ---  pgms/			# all sample programs
+   ---  examples/		# all example programs
+   |
+   ---  tests/			# all test programs
    |
    ---  tmp/			# Charm++ build directory
 
@@ -375,17 +378,8 @@ Fenton, Balkrishna Ramkumar, Vikram Saletore, Amitabh B. Sinha, Manish
 Gupta, Attila Gursoy, Balkrishna Ramkumar, Amitabh B. Sinha, Nimish
 Shah, Sanjeev Krishnan, Jayant DeSouza, Parthasarathy Ramachandran,
 Jeff Wright, Michael Lang, Jackie Wang, Fang Hu, Michael Denardo,
-Joshua Yelon, Narain Jagathesan, Zehra Sura, Krishnan Varadarajan, and
-Sameer Paranjpye.  Current developers include Milind Bhandarkar,
-Robert Brunner, Terry Wilmarth, Gengbin Zheng, Jayant Desouza, Orion
-Lawlor, Karthik Mahesh, and Neelam Saboo.
-
-
-
-
-
-
-
-
-
+Joshua Yelon, Narain Jagathesan, Zehra Sura, Krishnan Varadarajan, 
+Sameer Paranjpye, Milind Bhandarkar, Robert Brunner and Jayant Desouza. 
+Current developers include Terry Wilmarth, Gengbin Zheng, Orion Lawlor, 
+Karthik Mahesh, and Neelam Saboo.
 
