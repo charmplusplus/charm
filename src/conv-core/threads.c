@@ -266,11 +266,6 @@ static void CthBaseResume(CthThread t)
   CthFixData(t); /*Thread-local storage may have changed in other thread.*/
   CthCpvAccess(CthCurrent) = t;
   CthCpvAccess(CthData) = B(t)->data;
-
-#ifndef CMK_OPTIMIZE
-  if(CpvAccess(traceOn))
-    traceResume();
-#endif
 }
 
 
