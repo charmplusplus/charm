@@ -12,7 +12,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 1.13  2000-06-22 15:59:44  milind
+# Revision 1.14  2000-06-22 22:08:15  milind
+# Added a cleanup stage before each make.
+#
+# Revision 1.13  2000/06/22 15:59:44  milind
 # Removed libtemplate, as it has been overtaken by libraries manual.
 #
 # Revision 1.12  2000/06/22 14:31:02  milind
@@ -68,6 +71,8 @@ msgmgr.tex queue.tex scheduler.tex simulator.tex threads.tex\
 thsync.tex ccs.tex
 
 ps:
+	make clean
+	touch index.tex
 	latex manual.tex
 	latex manual.tex
 	makeindex -o index.tex manual.idx
@@ -75,12 +80,16 @@ ps:
 	dvips -o manual.ps manual.dvi
 
 html:
+	make clean
+	touch index.tex
 	latex manual.tex
 	latex2html -local_icons manual.tex
 
 pdf:
-	latex manual.tex
-	latex manual.tex
+	make clean
+	touch index.tex
+	pdflatex manual.tex
+	pdflatex manual.tex
 	makeindex -o index.tex manual.idx
 	pdflatex manual.tex
 
@@ -99,6 +108,7 @@ install:
 all: ps html pdf install
 
 clean:	
-	rm -f *.ilg *.aux *.log *.dvi *.ps *.idx *.toc *~ index.tex *.pdf
-	rm -rf manual
+	rm -f *.ilg *.aux *.log *.dvi *.idx *.toc *~ index.tex
 
+veryclean:
+	rm -rf *.ps *.pdf manual/
