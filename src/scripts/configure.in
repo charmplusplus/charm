@@ -26,23 +26,24 @@ AC_MSG_RESULT($version)
 
 t="test.cpp"
 
-# If the test suceeded, print $2 and set "pass"/clear "fail"
-# If the test failed, print $3 and clear "pass"/set "fail"
+# test result passed in $1
+# If the test suceeded, print $3 and set "pass"/clear "fail"
+# If the test failed, print $2 and clear "pass"/set "fail"
 test_result() {
-	if test $? -eq 0
+	if test $1 -eq 0
 	then
-                AC_MSG_RESULT("$2")
+                AC_MSG_RESULT("$3")
 		pass="1"
 		fail="0"
 	else
-                AC_MSG_RESULT("$3")
+                AC_MSG_RESULT("$4")
 		pass="0"
 		fail="1"
 # For debugging the configure script, just "export autoconf_debug=1"
 #  to get this verbose data on any failed tests:
 		if test ! -z "$autoconf_debug"
 		then
-			echo "------- test script for $1 failed:"
+			echo "------- test script for $2 failed:"
 			cat out
 			echo "------- the test program was:"
 			cat $t
@@ -58,7 +59,7 @@ test_result() {
 test_cxx() {
         AC_MSG_CHECKING("$1")
 	$CMK_CXX -I../include -I. -c $t -o test.o $4 > out 2>&1
-	test_result "$1" "$2" "$3"
+	test_result $? "$1" "$2" "$3"
  	strictpass=$pass
 	strictfail=$fail
         if test $pass -eq 1
@@ -77,7 +78,7 @@ test_cxx() {
 test_link() {
         AC_MSG_CHECKING("$1")
 	$CMK_CXX -I../include -I. $t -o testlink $4 > out 2>&1
-	test_result "$1" "$2" "$3"
+	test_result $? "$1" "$2" "$3"
 	/bin/rm -f out
 }
 

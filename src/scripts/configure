@@ -554,23 +554,24 @@ echo "$ac_t""$version" 1>&6
 
 t="test.cpp"
 
-# If the test suceeded, print $2 and set "pass"/clear "fail"
-# If the test failed, print $3 and clear "pass"/set "fail"
+# test result passed in $1
+# If the test suceeded, print $3 and set "pass"/clear "fail"
+# If the test failed, print $2 and clear "pass"/set "fail"
 test_result() {
-	if test $? -eq 0
+	if test $1 -eq 0
 	then
-                echo "$ac_t"""$2"" 1>&6
+                echo "$ac_t"""$3"" 1>&6
 		pass="1"
 		fail="0"
 	else
-                echo "$ac_t"""$3"" 1>&6
+                echo "$ac_t"""$4"" 1>&6
 		pass="0"
 		fail="1"
 # For debugging the configure script, just "export autoconf_debug=1"
 #  to get this verbose data on any failed tests:
 		if test ! -z "$autoconf_debug"
 		then
-			echo "------- test script for $1 failed:"
+			echo "------- test script for $2 failed:"
 			cat out
 			echo "------- the test program was:"
 			cat $t
@@ -585,9 +586,9 @@ test_result() {
 #  additional arguments to c++ compiler are passed as $4
 test_cxx() {
         echo $ac_n "checking "$1"""... $ac_c" 1>&6
-echo "configure:589: checking "$1"" >&5
+echo "configure:590: checking "$1"" >&5
 	$CMK_CXX -I../include -I. -c $t -o test.o $4 > out 2>&1
-	test_result "$1" "$2" "$3"
+	test_result $? "$1" "$2" "$3"
  	strictpass=$pass
 	strictfail=$fail
         if test $pass -eq 1
@@ -605,9 +606,9 @@ echo "configure:589: checking "$1"" >&5
 #  additional arguments to c++ compiler are passed as $4
 test_link() {
         echo $ac_n "checking "$1"""... $ac_c" 1>&6
-echo "configure:609: checking "$1"" >&5
+echo "configure:610: checking "$1"" >&5
 	$CMK_CXX -I../include -I. $t -o testlink $4 > out 2>&1
-	test_result "$1" "$2" "$3"
+	test_result $? "$1" "$2" "$3"
 	/bin/rm -f out
 }
 
@@ -989,7 +990,7 @@ FCC=`echo $CMK_CF90 | cut -d' ' -f1`
 # Extract the first word of ""$FCC"", so it can be a program name with args.
 set dummy "$FCC"; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:993: checking for $ac_word" >&5
+echo "configure:994: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_FCL'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -1018,7 +1019,7 @@ fi
 if test -n "$FCL"
 then
   echo $ac_n "checking subroutine name used by Fortran compiler""... $ac_c" 1>&6
-echo "configure:1022: checking subroutine name used by Fortran compiler" >&5
+echo "configure:1023: checking subroutine name used by Fortran compiler" >&5
   if eval "test \"`echo '$''{'fortran_postfix'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -1089,7 +1090,7 @@ case $version in
     # Extract the first word of "wget", so it can be a program name with args.
 set dummy wget; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:1093: checking for $ac_word" >&5
+echo "configure:1094: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_WGET'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -1118,7 +1119,7 @@ fi
     # Extract the first word of "lynx", so it can be a program name with args.
 set dummy lynx; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:1122: checking for $ac_word" >&5
+echo "configure:1123: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_LYNX'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -1147,7 +1148,7 @@ fi
     # Extract the first word of "telnet", so it can be a program name with args.
 set dummy telnet; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:1151: checking for $ac_word" >&5
+echo "configure:1152: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_TELNET'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -1176,7 +1177,7 @@ fi
     # Extract the first word of "uudecode", so it can be a program name with args.
 set dummy uudecode; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:1180: checking for $ac_word" >&5
+echo "configure:1181: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_UUDECODE'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
