@@ -60,12 +60,12 @@ LDObjHandle LBDB::AddObj(LDOMHandle _h, LDObjid _id,
 
 void LBDB::UnregisterObj(LDObjHandle _h)
 {
-  ((LBObj*)objs[_h.handle])->registered=CmiFalse;
+  (objs[_h.handle])->registered=CmiFalse;
 }
 
 void LBDB::RegisteringObjects(LDOMHandle _h)
 {
-  LBOM* om = (LBOM*)oms[_h.handle];
+  LBOM* om = oms[_h.handle];
   if (!om->RegisteringObjs()) {
     if (oms_registering == 0)
       localBarrier.TurnOff();
@@ -76,7 +76,7 @@ void LBDB::RegisteringObjects(LDOMHandle _h)
 
 void LBDB::DoneRegisteringObjects(LDOMHandle _h)
 {
-  LBOM* om = (LBOM*)oms[_h.handle];
+  LBOM* om = oms[_h.handle];
   if (om->RegisteringObjs()) {
     oms_registering--;
     if (oms_registering == 0)
@@ -113,10 +113,10 @@ void LBDB::ClearLoads(void)
 {
   int i;
   for(i=0; i < objCount; i++)
-    if (((LBObj*)objs[i])->registered)
+    if ((objs[i])->registered)
     {
-      ((LBObj*)objs[i])->data.wallTime = 
-	((LBObj*)objs[i])->data.cpuTime = 0.;
+      (objs[i])->data.wallTime = 
+	(objs[i])->data.cpuTime = 0.;
     }
   delete commTable;
   commTable = new LBCommTable;
@@ -129,7 +129,7 @@ int LBDB::ObjDataCount()
   int nitems=0;
   int i;
   for(i=0; i < objCount; i++)
-    if (((LBObj*)objs[i])->registered)
+    if ((objs[i])->registered)
       nitems++;
   return nitems;
 }
@@ -137,7 +137,7 @@ int LBDB::ObjDataCount()
 void LBDB::GetObjData(LDObjData *dp)
 {
   for(int i = 0; i < objs.length(); i++) {
-    LBObj* obj = (LBObj*) objs[i];
+    LBObj* obj = objs[i];
     if ( obj->registered )
       *dp++ = obj->ObjData();
   }
@@ -147,12 +147,12 @@ void LBDB::Migrate(LDObjHandle h, int dest)
 {
   if (h.handle > objCount)
     CmiPrintf("[%d] Handle %d out of range 0-%d\n",CmiMyPe(),h.handle,objCount);
-  else if (!((LBObj*)objs[h.handle])->registered)
+  else if (!(objs[h.handle])->registered)
     CmiPrintf("[%d] Handle %d no longer registered, range 0-%d\n",
 	    CmiMyPe(),h.handle,objCount);
 
-  if ((h.handle < objCount) && (((LBObj*)objs[h.handle])->registered)) {
-    LBOM *const om = (LBOM*)oms[((LBObj*)objs[h.handle])->parentOM.handle];
+  if ((h.handle < objCount) && ((objs[h.handle])->registered)) {
+    LBOM *const om = oms[(objs[h.handle])->parentOM.handle];
     om->Migrate(h, dest);
   }
   return;
@@ -176,7 +176,7 @@ void LBDB::NotifyMigrated(LDMigratedFn fn, void* data)
 
   callbk->fn = fn;
   callbk->data = data;
-  migrateCBList.insertAtEnd((void*)callbk);
+  migrateCBList.insertAtEnd(callbk);
 }
 
 void LBDB::BackgroundLoad(double* walltime, double* cputime)
@@ -209,7 +209,7 @@ LDBarrierClient LocalBarrier::AddClient(LDResumeFn fn, void* data)
 
   LDBarrierClient ret_val;
   ret_val.serial = max_client;
-  clients.insertAtEnd((void*)new_client);
+  clients.insertAtEnd(new_client);
   max_client++;
 
   client_count++;
@@ -221,7 +221,7 @@ void LocalBarrier::RemoveClient(LDBarrierClient c)
 {
   const int cnum = c.serial;
   if (cnum < max_client && clients[cnum] != 0) {
-    delete ((client*)clients[cnum]);
+    delete (clients[cnum]);
     clients[cnum] = 0;
     client_count--;
   }
@@ -245,14 +245,14 @@ void LocalBarrier::RemoveReceiver(LDBarrierReceiver c)
 {
   const int cnum = c.serial;
   if (cnum < max_receiver && receivers[cnum] != 0) {
-    delete ((receiver*)receivers[cnum]);
+    delete (receivers[cnum]);
     receivers[cnum] = 0;
   }
 }
 
 void LocalBarrier::AtBarrier(LDBarrierClient h)
 {
-  ((client*)clients[h.serial])->refcount++;
+  (clients[h.serial])->refcount++;
   at_count++;
   CheckBarrier();
 }

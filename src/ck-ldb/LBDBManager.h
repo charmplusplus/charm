@@ -47,8 +47,8 @@ private:
     LDBarrierFn fn;
   };
 
-  CkVec<void*> clients;
-  CkVec<void*> receivers;
+  CkVec<client*> clients;
+  CkVec<receiver*> receivers;
 
   int cur_refcount;
   int max_client;
@@ -81,8 +81,8 @@ public:
   void RegisteringObjects(LDOMHandle _h);
   void DoneRegisteringObjects(LDOMHandle _h);
 
-  LBOM *LbOM(LDOMHandle h) { return (LBOM*)oms[h.handle]; };
-  LBObj *LbObj(LDObjHandle h) { return (LBObj*)objs[h.handle]; };
+  LBOM *LbOM(LDOMHandle h) { return oms[h.handle]; };
+  LBObj *LbObj(LDObjHandle h) { return objs[h.handle]; };
   void DumpDatabase(void);
   void TurnStatsOn(void) { statsAreOn = CmiTrue; machineUtil.StatsOn(); };
   void TurnStatsOff(void) { statsAreOn = CmiFalse; machineUtil.StatsOff(); };
@@ -148,9 +148,9 @@ private:
     void* data;
   };
 
-  typedef CkVec<void*> OMList;
-  typedef CkVec<void*> ObjList;
-  typedef CkVec<void*> MigrateCBList;
+  typedef CkVec<LBOM*> OMList;
+  typedef CkVec<LBObj*> ObjList;
+  typedef CkVec<MigrateCB*> MigrateCBList;
 
   LBCommTable* commTable;
   OMList oms;
