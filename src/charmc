@@ -744,7 +744,8 @@ switch ($LANGUAGE)
         breaksw
     case "converse"
         ($ECHOCMD ; $CMK_LD $OPTS_LD -o $OBJECT -L$CHARMLIB \
-		      $OBJECTFILES $LIBRARIES -lconv-core $CMK_LIBS -lm)
+		      $OBJECTFILES $LIBRARIES -lconv-core -lck-cplus-n \
+		      $CMK_LIBS -lm)
         breaksw
     case "converse++"
         ($ECHOCMD ; $CMK_LDXX $OPTS_LDXX -o $OBJECT -L$CHARMLIB \

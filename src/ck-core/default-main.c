@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.13  1996-07-15 21:03:09  jyelon
+ * Revision 2.14  1996-11-08 22:22:46  brunner
+ * Put _main in for HP-UX CC compilation.  It is ignored according to the
+ * CMK_USE_HP_MAIN_FIX flag.
+ *
+ * Revision 2.13  1996/07/15 21:03:09  jyelon
  * Changed conv-mach flags from #ifdef to #if
  *
  * Revision 2.12  1996/06/28 21:28:09  jyelon
@@ -108,7 +112,6 @@ int argc;
 char *argv[];
 {
   int i;
-
 
   for(i=0; i<CmiNumPes(); i++) 
   {

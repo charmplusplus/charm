@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.16  1996-07-19 17:07:37  jyelon
+ * Revision 1.17  1996-11-08 22:22:53  brunner
+ * Put _main in for HP-UX CC compilation.  It is ignored according to the
+ * CMK_USE_HP_MAIN_FIX flag.
+ *
+ * Revision 1.16  1996/07/19 17:07:37  jyelon
  * *** empty log message ***
  *
  * Revision 1.15  1996/07/15 20:59:22  jyelon
@@ -531,6 +535,9 @@ char *argv[];
 {
   CthThread t; Fifo q; int stacksize, i;
 
+#if CMK_USE_HP_MAIN_FIX
+  _main(argc,argv);
+#endif
   CmiArgv = argv;
   CmiParseArgs(argv);
   

@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-09-06 17:20:37  sanjeev
+ * Revision 2.1  1996-11-08 22:22:48  brunner
+ * Put _main in for HP-UX CC compilation.  It is ignored according to the
+ * CMK_USE_HP_MAIN_FIX flag.
+ *
+ * Revision 2.0  1995/09/06 17:20:37  sanjeev
  * *** empty log message ***
  *
  * Revision 2.2  1995/09/05  21:53:30  sanjeev
@@ -33,6 +37,15 @@
  ***************************************************************************/
 static char ident[] = "@(#)$Header$";
 
+#include "converse.h"
+
+#if CMK_USE_HP_MAIN_FIX
+void _main(argc,argv)
+int argc;
+char *argv[];
+{
+}
+#endif
 
 void CPlus_ChareExit()
 {

@@ -8,7 +8,11 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.1  1996-11-05 21:29:22  brunner
+ * Revision 1.2  1996-11-08 22:23:11  brunner
+ * Put _main in for HP-UX CC compilation.  It is ignored according to the
+ * CMK_USE_HP_MAIN_FIX flag.
+ *
+ * Revision 1.1  1996/11/05 21:29:22  brunner
  * Needs _main in main for C++ compile
  *
  * Revision 1.14  1996/08/08 20:16:53  jyelon
@@ -129,6 +133,9 @@
 
 #define CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT                   1
 #define CMK_WHEN_PROCESSOR_IDLE_USLEEP                     0
+
+#define CMK_USE_HP_MAIN_FIX				   1
+#define CMK_DONT_USE_HP_MAIN_FIX			   0
 
 #endif
 

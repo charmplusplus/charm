@@ -8,7 +8,11 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.2  1996-10-24 19:40:26  milind
+ * Revision 1.3  1996-11-08 22:23:00  brunner
+ * Put _main in for HP-UX CC compilation.  It is ignored according to the
+ * CMK_USE_HP_MAIN_FIX flag.
+ *
+ * Revision 1.2  1996/10/24 19:40:26  milind
  * Added CMK_IS_HETERO to all the net-all versions.
  *
  * Revision 1.1  1996/10/09 19:46:22  milind
@@ -131,6 +135,9 @@
 
 #define CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT                   0
 #define CMK_WHEN_PROCESSOR_IDLE_USLEEP                     1
+
+#define CMK_USE_HP_MAIN_FIX                                0
+#define CMK_DONT_USE_HP_MAIN_FIX                           1
 
 #endif
 

@@ -2118,5 +2118,6 @@ main(argc, argv)
 int argc;
 char **argv;
 {
-user_main(argc, argv);
+  _main(argc,argv);
+  user_main(argc, argv);
 }
