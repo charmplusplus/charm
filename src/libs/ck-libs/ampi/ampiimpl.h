@@ -919,7 +919,7 @@ class ampi : public CBase_ampi {
     static void sendraw(int t, int s, void* buf, int len, CkArrayID aid,
                         int idx);
     void delesend(int t, int s, const void* buf, int count, int type,  int rank, MPI_Comm destcomm, CProxy_ampi arrproxy);
-    void recv(int t,int s,void* buf,int count,int type,int comm,int *sts=0);
+    int recv(int t,int s,void* buf,int count,int type,int comm,int *sts=0);
     void probe(int t,int s,int comm,int *sts);
     int iprobe(int t,int s,int comm,int *sts);
     void bcast(int root, void* buf, int count, int type,MPI_Comm comm);

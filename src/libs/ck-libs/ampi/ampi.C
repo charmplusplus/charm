@@ -1200,7 +1200,7 @@ ampi::delesend(int t, int sRank, const void* buf, int count, int type,  int rank
 #endif
 }
 
-void
+int
 ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
 {
   _LOG_E_END_AMPI_PROCESSING(thisIndex)
@@ -1242,7 +1242,8 @@ ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
             thisIndex,t,s,
 	    len, count, type,
 	    msg->length, msg->srcRank);
-    CkAbort(einfo);
+    CkError(einfo);
+    return -1;
   }else if(msg->length < len){ // only at rare case shall we reset count by using divide
     count = msg->length/(ddt->getSize(1));
   }
@@ -1254,6 +1255,7 @@ ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
 #endif
 
   delete msg;
+  return 0;
 }
 
 void
@@ -1300,7 +1302,7 @@ ampi::bcast(int root, void* buf, int count, int type,MPI_Comm destcomm)
     /* Broadcast my message to the array proxy */
     dest.getProxy().generic(makeAmpiMsg(-1,MPI_BCAST_TAG,0, buf,count,type, MPI_BCAST_COMM));
   }
-  recv(MPI_BCAST_TAG,0, buf,count,type, MPI_BCAST_COMM);
+  if(-1==recv(MPI_BCAST_TAG,0, buf,count,type, MPI_BCAST_COMM)) CkAbort("AMPI> Error in broadcast");
   nbcasts++;
 }
 
@@ -1479,7 +1481,7 @@ int MPI_Recv(void *msg, int count, MPI_Datatype type, int src, int tag,
 	ampi *ptr = getAmpiInstance(comm);
 
 //CkPrintf("dedede%d[[",CpvAccess(_traceCoreOn));if(CpvAccess(_traceCoreOn) !=0) ampi_endProcessing(ptr->thisIndex); else CkPrintf("]]]] %ddededededededede\n",CpvAccess(_traceCoreOn));
-	ptr->recv(tag,src,msg,count,type, comm, (int*) status);
+	if(-1==ptr->recv(tag,src,msg,count,type, comm, (int*) status)) CkAbort("AMPI> Error in MPI_Recv");
 
 	return 0;
 }
@@ -1736,7 +1738,8 @@ int MPI_Reduce(void *inbuf, void *outbuf, int count, int type, MPI_Op op,
   if (ptr->thisIndex == rootIdx){
     if(op==MPI_CONCAT) count*=ptr->getSize();
     /*HACK: Use recv() to block until reduction data comes back*/
-    ptr->recv(MPI_REDUCE_TAG, MPI_REDUCE_SOURCE, outbuf, count, type, MPI_REDUCE_COMM);
+    if(-1==ptr->recv(MPI_REDUCE_TAG, MPI_REDUCE_SOURCE, outbuf, count, type, MPI_REDUCE_COMM))
+      CkAbort("AMPI>MPI_Reduce called with different values on different processors!");
   }
   return 0;
 }
@@ -1755,7 +1758,8 @@ int MPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
   ptr->contribute(msg);
 
   /*HACK: Use recv() to block until the reduction data comes back*/
-  ptr->recv(MPI_REDUCE_TAG, MPI_REDUCE_SOURCE, outbuf, count, type, MPI_REDUCE_COMM);
+  if(-1==ptr->recv(MPI_REDUCE_TAG, MPI_REDUCE_SOURCE, outbuf, count, type, MPI_REDUCE_COMM))
+    CkAbort("AMPI> MPI_Allreduce called with different values on different processors!");
   return 0;
 }
 
@@ -2004,8 +2008,8 @@ int MPI_Startall(int count, MPI_Request *requests){
 
 int PersReq::wait(MPI_Status *sts){
 	if(sndrcv == 2) {
-		getAmpiInstance(comm)->recv(tag, src, buf, count,
-				type, comm, (int*)sts);
+		if(-1==getAmpiInstance(comm)->recv(tag, src, buf, count, type, comm, (int*)sts))
+			CkAbort("AMPI> Error in persistent request wait");
 #if CMK_BLUEGENE_CHARM
   		_TRACE_BG_TLINE_END(&event);
 #endif
@@ -2013,8 +2017,8 @@ int PersReq::wait(MPI_Status *sts){
 	return 0;
 }
 int IReq::wait(MPI_Status *sts){
-	getAmpiInstance(comm)->recv(tag, src, buf, count,
-			type, comm, (int*)sts);
+	if(-1==getAmpiInstance(comm)->recv(tag, src, buf, count, type, comm, (int*)sts))
+		CkAbort("AMPI> Error in non-blocking request wait");
 #if CMK_BLUEGENE_CHARM
   	_TRACE_BG_TLINE_END(&event);
 #endif
@@ -2023,8 +2027,9 @@ int IReq::wait(MPI_Status *sts){
 int ATAReq::wait(MPI_Status *sts){
 	int i;
 	for(i=0;i<count;i++){
-		getAmpiInstance(myreqs[i].comm)->recv(myreqs[i].tag, myreqs[i].src, myreqs[i].buf,
-				myreqs[i].count, myreqs[i].type, myreqs[i].comm, (int *)sts);
+		if(-1==getAmpiInstance(myreqs[i].comm)->recv(myreqs[i].tag, myreqs[i].src, myreqs[i].buf,
+				myreqs[i].count, myreqs[i].type, myreqs[i].comm, (int *)sts))
+			CkAbort("AMPI> Error in alltoall request wait");
 #if CMK_BLUEGENE_CHARM
   		_TRACE_BG_TLINE_END(&myreqs[i].event);
 #endif
@@ -2110,14 +2115,16 @@ CmiBool PersReq::test(MPI_Status *sts){
 
 }
 void PersReq::complete(MPI_Status *sts){
-	getAmpiInstance(comm)->recv(tag, src, buf, count, type, comm, (int*)sts);
+	if(-1==getAmpiInstance(comm)->recv(tag, src, buf, count, type, comm, (int*)sts))
+		CkAbort("AMPI> Error in persistent request complete");
 }
 
 CmiBool IReq::test(MPI_Status *sts){
 	return getAmpiInstance(comm)->iprobe(tag, src, comm, (int*)sts);
 }
 void IReq::complete(MPI_Status *sts){
-	getAmpiInstance(comm)->recv(tag, src, buf, count, type, comm, (int*)sts);
+	if(-1==getAmpiInstance(comm)->recv(tag, src, buf, count, type, comm, (int*)sts))
+		CkAbort("AMPI> Error in non-blocking request complete");
 }
 
 CmiBool ATAReq::test(MPI_Status *sts){
@@ -2131,8 +2138,9 @@ CmiBool ATAReq::test(MPI_Status *sts){
 void ATAReq::complete(MPI_Status *sts){
 	int i;
 	for(i=0;i<count;i++){
-	getAmpiInstance(myreqs[i].comm)->recv(myreqs[i].tag, myreqs[i].src, myreqs[i].buf,
-			myreqs[i].count, myreqs[i].type, myreqs[i].comm, (int*)sts);
+		if(-1==getAmpiInstance(myreqs[i].comm)->recv(myreqs[i].tag, myreqs[i].src, myreqs[i].buf,
+						myreqs[i].count, myreqs[i].type, myreqs[i].comm, (int*)sts))
+			CkAbort("AMPI> Error in alltoall request complete");
 	}
 }
 
