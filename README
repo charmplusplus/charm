@@ -175,7 +175,7 @@ need to choose <options> from the following list:
 * gcc3  - GNU GCC/G++ version 3
 * acc  - HP aC++ compiler
 * cc  - For Sun WorkShop C++ compilers;
-* cc64 - For 64 bits Sun WorkShop C++ compilers;
+* cc64 - For 64 bits Sun WorkShop C++ or IBM xlC compilers;
 * cxx - DIGITAL C++ compiler;
 * kcc - KAI C++ compiler;
 * pgcc - Portland Group's C++ compiler;
