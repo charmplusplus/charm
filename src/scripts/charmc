@@ -51,7 +51,7 @@ POST_LANGUAGE=""
 POST_LIBRARIES=""    
 PRE_LIBRARIES=""  
 USE_F90_LIBRARIES="0"  
-COPIES=""        
+COPYTO=""        
 MODCOPIES=""        
 MODULES=""
 BALANCER=""
@@ -64,6 +64,8 @@ OPTIMIZE_MODE=""
 USE_RELIABLE_CC=""
 USE_FASTEST_CC=""
 PROG_EXT=""
+
+MAKELIBCHARM="0"
 
 ####################################################################
 #
@@ -390,6 +392,13 @@ do
 		OPTS_LDXX="$OPTS_LDXX -rpath $1"
 		shift
 		;;
+	
+	"-makelibcharm")
+		MAKELIBCHARM="1"
+		OBJECT=$1
+		shift
+		;;
+	
 	"-fortran"|"-flib"|"-flibs")
 		USE_F90_LIBRARIES="1" 
 		;;
@@ -408,7 +417,7 @@ do
 		;;
 
 	"-cp")
-		COPIES="$1 $COPIES"
+		COPYTO="$1"
 		shift
 		;;
 
@@ -549,9 +558,12 @@ findModuleDep() {
 	notInList $M $PROCESSED_MODULES || return
 	PROCESSED_MODULES="$PROCESSED_MODULES $M"
 	PRE_LIBRARIES=`AddList $PRE_LIBRARIES -lmodule$M`
+	if [ "$MAKELIBCHARM" = "0" ]
+	then
 # HACK: add modules to both ends of library list, to avoid
 #  undefined symbol CkRegisterMainModule when it's in a module file.
-	POST_LIBRARIES=`AddList $POST_LIBRARIES -lmodule$M`
+		POST_LIBRARIES=`AddList $POST_LIBRARIES -lmodule$M`
+	fi
 	
 	dep=""
 # fixme: should search everything in the -L library paths:
@@ -716,19 +728,16 @@ esac
 
 
 Copyobj() {
-	for COPY in `echo $COPIES`
-	do
-		if [ "a$COPY" != "a$OBJECT" ] 
-		then
-			[ -d $COPY ] && COPY="$COPY/"
-			if [ "a$PROG_EXT" != "a" -a -r "$OBJECT$PROG_EXT" ] ; then
-				Warning "Appending $PROG_EXT to object file name"
-				OBJECT="$OBJECT$PROG_EXT"
-			fi
-			[ ! -d $COPY ] && DoNoErrCheck $RM $COPY 
-			Do $CP $OBJECT $COPY
+	if [ "a$COPYTO" != "a" -a "a$COPYTO" != "a$OBJECT" ] 
+	then
+		[ -d $COPYTO ] && COPYTO="$COPYTO/"
+		if [ "a$PROG_EXT" != "a" -a -r "$OBJECT$PROG_EXT" ] ; then
+			Warning "Appending $PROG_EXT to object file name"
+			OBJECT="$OBJECT$PROG_EXT"
 		fi
-	done
+		[ ! -d $COPYTO ] && DoNoErrCheck $RM $COPYTO 
+		Do $CP $OBJECT $COPYTO
+	fi
 	Success
 }
 
@@ -893,16 +902,24 @@ case "$OBJECT" in
 	;;
 *.so)
 # Make shared library
-	Debugf "Running ldro..."
-	DoNoErrCheck $RM $OBJECT
-	Do $CMK_LD -o $OBJECT $OPTS_LD $OPTS_LDRO $OBJECTFILES \
-		$PRE_LIBRARIES $POST_LIBRARIES
-	Copyobj
+	if [ "$MAKELIBCHARM" = 0 ]
+	then
+		Debugf "Running ldro..."
+		DoNoErrCheck $RM $OBJECT
+		Do $CMK_LD -o $OBJECT $OPTS_LD $OPTS_LDRO $OBJECTFILES \
+			$PRE_LIBRARIES $POST_LIBRARIES
+		Copyobj
+	fi
 	;;
 *.a)
+# Make regular (.a, non-shared) library
 	DoNoErrCheck $RM $OBJECT
 	Do $CMK_AR $OBJECT $OBJECTFILES
 	Do $CMK_RANLIB $OBJECT
+	destDir="$OBJECT.dir"
+	[ -n "$COPYTO" ] && destDir="$COPYTO/$OBJECT.dir"
+	DoNoErrCheck mkdir $destDir
+	Do cp $OBJECTFILES $destDir
 	Copyobj
 	;;
 esac
@@ -1074,47 +1091,106 @@ Do $CMK_CXX $OPTS_CPP $OPTS_CXX -c $modInitSrc -o $modInitObj
 
 Debug "About to perform final link..."
 
-LANG_LIBS="-L$CHARMLIB -I$CHARMINC $BAL_OBJ $OBJECTFILES $modInitObj $PRE_LIBRARIES"
 CORE_LIBS="-lconv-core -lconv-util $TRACE_OBJ $MEM_OBJ "
+
+MAKE_LDXX="0"
+MAKE_LD="0"
 
 case "$LANGUAGE" in
 "charm"|"charm++"|"f90charm"|"ckbluegene"|"bgcharm++")
-	Do $CMK_LDXX $OPTS_LD $OPTS_LDXX -o $OBJECT \
-		$LANG_LIBS -lck -lconv-cplus-y $CORE_LIBS -lm $CMK_LIBS $POST_LIBRARIES
+	MAKE_LDXX="1"
+	MIDDLE_LIBS="-lck -lconv-cplus-y $CORE_LIBS -lm"
 	;;
 "converse")
-	Do $CMK_LD $OPTS_LD -o $OBJECT \
-		$LANG_LIBS -lconv-cplus-n $CORE_LIBS -ltrace-converse -lm $CMK_LIBS $POST_LIBRARIES
+	MAKE_LD="1"
+	MIDDLE_LIBS="-lconv-cplus-n $CORE_LIBS -ltrace-converse -lm"
 	;;
 "converse++"|"bluegene")
-	Do $CMK_LDXX $OPTS_LD $OPTS_LDXX -o $OBJECT \
-		$LANG_LIBS -lconv-cplus-y $CORE_LIBS -ltrace-converse \
-		-lm $CMK_LIBS $POST_LIBRARIES
+	MAKE_LDXX="1"
+	MIDDLE_LIBS="-lconv-cplus-y $CORE_LIBS -ltrace-converse -lm"
 	;;
 *)
 	Abort "Unrecognized choice of language $LANGUAGE"
 	;;
 esac
 
+LANG_LIBS="-L$CHARMLIB -I$CHARMINC $BAL_OBJ $OBJECTFILES $modInitObj $PRE_LIBRARIES"
+ALL_LIBS="$LANG_LIBS $MIDDLE_LIBS $CMK_LIBS $POST_LIBRARIES"
+
+
+if [ "$MAKELIBCHARM" = "1" ]
+then
+# Make a libCharm.so: replace all .a's with their constituent.o's, since 
+#   linkers will remove (for now!) unreferenced .o's from .a's.
+  Debugf "Building shared library: original list of libraries: $ALL_LIBS"
+  OLD_LIBS="$ALL_LIBS"
+  ALL_LIBS=""
+  for l in $OLD_LIBS
+  do
+	SOURCEDIR=""
+	case "$l" in
+	*.a) 
+		Debugf " checking .a library $l "
+		SOURCEDIR="$l.dir"
+		;;
+	-l*) 
+		libbase=`echo $l | sed -e "s/-l//" `
+		libname="$CHARMLIB/lib$libbase.a"
+		Debugf " checking -l library $libname "
+		[ -r "$libname" ] && SOURCEDIR="$libname.dir"
+		;;
+	esac
+	
+  	REPLACEOBJ=""
+	if [ -n "$SOURCEDIR" ]
+	then
+		Debugf "    searching for .o in $SOURCEDIR "
+		if [ -x "$SOURCEDIR" ]
+		then
+			REPLACEOBJ=`echo $SOURCEDIR/*.o`
+		fi
+	fi
+	
+	if [ -n "$REPLACEOBJ" ]
+	then
+# It is a charm library-- add all the .o's instead of the .a
+		Debug "    Found .o: $REPLACEOBJ"
+		ALL_LIBS="$ALL_LIBS $REPLACEOBJ"
+	else
+# It's probably not a charm library-- just keep it (if it's not a duplicate!)
+		ALL_LIBS=`AddList $l $ALL_LIBS`
+	fi
+  done
+  
+  Debugf "Building shared library: final list of libraries: $ALL_LIBS"
+  [ "$MAKE_LDXX" = "1" ] && Do $CMK_LDXX $CMK_LD_SHARED $OPTS_LDXX -o $OBJECT $ALL_LIBS
+  [ "$MAKE_LD" = "1" ] && Do $CMK_LD $CMK_LD_SHARED $OPTS_LD -o $OBJECT $ALL_LIBS
+else
+# Make a regular executable: call the appropriate linker
+  [ "$MAKE_LDXX" = "1" ] && Do $CMK_LDXX $OPTS_LDXX -o $OBJECT $ALL_LIBS
+  [ "$MAKE_LD" = "1" ] && Do $CMK_LD $OPTS_LD -o $OBJECT $ALL_LIBS
+fi
+
 ########################################################################
 #
 # Copy conv-host to user directory if it is present in installation.
 #
 ########################################################################
-
-targ=charmrun$CMK_POST_EXE
-convhost=conv-host$CMK_POST_EXE
-
-if [ -x $CHARMBIN/$targ ]
+if [ "$MAKELIBCHARM" = "0" ]
 then
+  targ=charmrun$CMK_POST_EXE
+  convhost=conv-host$CMK_POST_EXE
+
+  if [ -x $CHARMBIN/$targ ]
+  then
 	DoNoErrCheck $RM $targ
 	Do $CP $CHARMBIN/$targ $targ
-	[ ! -f $convhost ] && Do $LN -f -s $targ $convhost
+  fi
+
+  DoNoErrCheck $RM $modInitSrc $modInitObj > /dev/null 2>&1
+
+  Copyobj
+
 fi
-
-
-DoNoErrCheck $RM $modInitSrc $modInitObj > /dev/null 2>&1
-
-Copyobj
 
 
