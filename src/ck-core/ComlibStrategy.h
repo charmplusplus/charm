@@ -121,9 +121,16 @@ class CharmStrategy : public Strategy {
  public:
     ComlibGroupInfo ginfo;
     ComlibNodeGroupInfo nginfo;
-    ComlibArrayInfo ainfo;    
 
-    CharmStrategy() : Strategy() {setType(GROUP_STRATEGY); forwardOnMigration = 0;}
+    //The communication library array listener watches and monitors
+    //the array elements belonging to ainfo.src_aid
+    ComlibArrayInfo ainfo;
+    
+    CharmStrategy() : Strategy() {
+        setType(GROUP_STRATEGY); 
+        forwardOnMigration = 0;
+    }
+
     CharmStrategy(CkMigrateMessage *m) : Strategy(m){}
 
     //Called for each message

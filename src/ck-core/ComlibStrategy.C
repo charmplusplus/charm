@@ -17,6 +17,7 @@ void CharmStrategy::pup(PUP::er &p) {
     p | nginfo;
     p | ginfo;
     p | ainfo;
+    p | forwardOnMigration;
 }
 
 CharmMessageHolder::CharmMessageHolder(char * msg, int proc) 
@@ -176,7 +177,7 @@ void ComlibArrayInfo::pup(PUP::er &p){
         dest_elements = NULL;
 
     //Insert all local elements into a vector
-    if(p.isUnpacking()) {
+    if(p.isUnpacking() && !dest_aid.isZero()) {
         CkArray *dest_array = CkArrayID::CkLocalBranch(dest_aid);
         
         if(nDestIndices == 0){            

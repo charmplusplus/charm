@@ -13,6 +13,7 @@ Strategy::Strategy() : PUP::able() {
     myInstanceID = 0;
     type = CONVERSE_STRATEGY;
     converseStrategy = this;
+    isStrategyBracketed = 0;
 };
 
 //Each strategy must define his own Pup interface.

@@ -114,7 +114,7 @@ RouterStrategy::RouterStrategy(int stratid, int handle, int _npes,
         router = new D3GridRouter(npes, myPe);
         break;
 
-    case USE_DIRECT:
+    case USE_DIRECT: router = NULL;
         break;
         
     default: CmiAbort("Unknown Strategy\n");

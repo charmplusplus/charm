@@ -148,6 +148,7 @@ extern char *router;
 void EachToManyMulticastStrategy::commonInit() {
 
     setBracketed();
+    setForwardOnMigration(1);
 
     if(CkMyPe() == 0 && router != NULL){
         if(strcmp(router, "USE_MESH") == 0)
@@ -220,16 +221,19 @@ void EachToManyMulticastStrategy::pup(PUP::er &p){
     p | routerID; 
     p | npes; p | ndestpes;     
     
-    if(p.isUnpacking()) {
+    if(p.isUnpacking() && npes > 0) {
         pelist = new int[npes];    
     }
-    p(pelist, npes);
 
-    if(p.isUnpacking()) {
+    if(npes > 0)
+        p(pelist, npes);
+
+    if(p.isUnpacking() && ndestpes > 0) {
         destpelist = new int[ndestpes];    
     }    
 
-    p(destpelist, ndestpes);
+    if(ndestpes > 0)
+        p(destpelist, ndestpes);
 
     if(p.isUnpacking()){
 	handlerId = CkRegisterHandler((CmiHandler)E2MHandler);
