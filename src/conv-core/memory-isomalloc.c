@@ -80,7 +80,7 @@ static void *meta_realloc(void *oldBuffer, size_t newSize)
 		  buffer.  SILLY HACK: muck with internals of blocklist header.*/
 		size_t size=CmiIsomallocLength(((CmiIsomallocBlockList *)oldBuffer)-1)-
 			sizeof(CmiIsomallocBlockList);
-		if (size<newSize) size=newSize;
+		if (size>newSize) size=newSize;
 		if (size > 0)
 			memcpy(newBuffer, oldBuffer, size);
 	}

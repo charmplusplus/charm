@@ -310,7 +310,7 @@ static void *meta_realloc(void *oldBuffer, size_t newSize)
     /*Preserve old buffer contents*/
     Slot *o=Slot_fmUser(oldBuffer);
     size_t size=o->userSize;
-    if (size<newSize) size=newSize;
+    if (size>newSize) size=newSize;
     if (size > 0)
       memcpy(newBuffer, oldBuffer, size);
   }
