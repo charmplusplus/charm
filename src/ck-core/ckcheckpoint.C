@@ -247,7 +247,7 @@ void CkPupNodeGroupData(PUP::er &p)
 	for (i=0;i<numNodeGroups;i++) {
 		CkGroupID gID = tmpInfo[i].gID;
 		if (p.isUnpacking()) {
-			CksvAccess(_nodeGroupIDTable).push_back(gID);
+			//CksvAccess(_nodeGroupIDTable).push_back(gID);
 			int eIdx = tmpInfo[i].MigCtor;
 			void *m = CkAllocSysMsg();
 			envelope* env = UsrToEnv((CkMessage *)m);
