@@ -1054,7 +1054,7 @@ void req_ccs_connect(void)
 {
   ChMessageHeader ch;/*Make a conv-host header*/
   CcsImplHeader hdr;/*Ccs internal header*/
-  char *reqData;/*CCS request data*/
+  void *reqData;/*CCS request data*/
   int pe,reqBytes;
   if (0==CcsServer_recvRequest(&hdr,&reqData))
     return;/*Malformed request*/
@@ -1063,8 +1063,8 @@ void req_ccs_connect(void)
 
   /*Fill out the conv-host header & forward the CCS request*/
   ChMessageHeader_new("req_fw",sizeof(hdr)+reqBytes,&ch);
-  skt_sendN(nodetab_ctrlfd(pe),(const char *)&ch,sizeof(ch));
-  skt_sendN(nodetab_ctrlfd(pe),(const char *)&hdr,sizeof(hdr));
+  skt_sendN(nodetab_ctrlfd(pe),&ch,sizeof(ch));
+  skt_sendN(nodetab_ctrlfd(pe),&hdr,sizeof(hdr));
   skt_sendN(nodetab_ctrlfd(pe),reqData,reqBytes);
   free(reqData);
 }
@@ -1241,15 +1241,15 @@ void req_serve_client(SOCKET fd)
 }
 
 
-void ignore_socket_errors(int c,const char *m)
+int ignore_socket_errors(int c,const char *m)
 {/*Abandon on further socket errors during error shutdown*/
-  exit(2);
+  exit(2);return -1;
 }
 
 /*A socket went bad somewhere!  Immediately disconnect,
 which kills everybody.
 */
-void socket_error_in_poll(int code,const char *msg)
+int socket_error_in_poll(int code,const char *msg)
 {
 	int i;
 	skt_set_abort(ignore_socket_errors);
@@ -1258,6 +1258,7 @@ void socket_error_in_poll(int code,const char *msg)
 	for (i=0;i<req_nClients;i++)
 		skt_close(req_clients[i]);
 	exit(1);
+	return -1;
 }
 
 /*
@@ -1304,11 +1305,12 @@ void req_poll()
 static unsigned int server_ip,server_port;
 static SOCKET server_fd;
 
-void client_connect_problem(int code,const char *msg)
+int client_connect_problem(int code,const char *msg)
 {/*Called when something goes wrong during a client connect*/
 	fprintf(stderr,"conv-host> error attaching to node %d:\n"
 		"%s\n",code,msg);
 	exit(1);
+	return -1;
 }
 
 /*Wait for all the clients to connect to our server port*/
