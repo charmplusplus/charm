@@ -1810,25 +1810,26 @@ int MPI_Reduce_scatter(void* sendbuf, void* recvbuf, int *recvcounts,
 }
 
 extern "C" void applyOp(MPI_Datatype datatype, MPI_Op op, int count, void* a, void* b) { // a[i] = a[i] op b[i]
+  int i;
   switch(datatype){
   case MPI_FLOAT:
     switch(op){
     case MPI_MAX:
-      for(int i=0;i<count;i++)
+      for(i=0;i<count;i++)
         if(((float *)a)[i] < ((float *)b)[i])
           ((float *)a)[i] = ((float *)b)[i];
       break;
     case MPI_MIN:
-      for(int i=0;i<count;i++)
+      for(i=0;i<count;i++)
         if(((float *)a)[i] > ((float *)b)[i]) 
           ((float *)a)[i] = ((float *)b)[i];
       break;
     case MPI_SUM:
-      for(int i=0;i<count;i++)
+      for(i=0;i<count;i++)
         ((float *)a)[i] = (((float *)a)[i]) + (((float *)b)[i]);
       break;
     case MPI_PROD:
-      for(int i=0;i<count;i++)
+      for(i=0;i<count;i++)
         ((float *)a)[i] = (((float *)a)[i]) * (((float *)b)[i]);
       break;
     default:
@@ -1839,21 +1840,21 @@ extern "C" void applyOp(MPI_Datatype datatype, MPI_Op op, int count, void* a, vo
   case MPI_DOUBLE:
     switch(op){
     case MPI_MAX:
-      for(int i=0;i<count;i++)
+      for(i=0;i<count;i++)
         if(((double *)a)[i] < ((double *)b)[i]) 
           ((double *)a)[i] = ((double *)b)[i];
       break;
     case MPI_MIN:
-      for(int i=0;i<count;i++)
+      for(i=0;i<count;i++)
         if(((double *)a)[i] > ((double *)b)[i]) 
           ((double *)a)[i] = ((double *)b)[i];
       break;
     case MPI_SUM:
-      for(int i=0;i<count;i++)
+      for(i=0;i<count;i++)
         ((double *)a)[i] = (((double *)a)[i]) + (((double *)b)[i]);
       break;
     case MPI_PROD:
-      for(int i=0;i<count;i++)
+      for(i=0;i<count;i++)
         ((double *)a)[i] = (((double *)a)[i]) * (((double *)b)[i]);
       break;
     default:
@@ -1864,21 +1865,21 @@ extern "C" void applyOp(MPI_Datatype datatype, MPI_Op op, int count, void* a, vo
   case MPI_INT:
     switch(op){
     case MPI_MAX:
-      for(int i=0;i<count;i++)
+      for(i=0;i<count;i++)
         if(((int *)a)[i] < ((int *)b)[i]) 
           ((int *)a)[i] = ((int *)b)[i];
       break;
     case MPI_MIN:
-      for(int i=0;i<count;i++)
+      for(i=0;i<count;i++)
         if(((int *)a)[i] > ((int *)b)[i]) 
           ((int *)a)[i] = ((int *)b)[i];
       break;
     case MPI_SUM:
-      for(int i=0;i<count;i++)
+      for(i=0;i<count;i++)
         ((int *)a)[i] = (((int *)a)[i]) + (((int *)b)[i]);
       break;
     case MPI_PROD:
-      for(int i=0;i<count;i++)
+      for(i=0;i<count;i++)
         ((int *)a)[i] = (((int *)a)[i]) * (((int *)b)[i]);
       break;
     default:
@@ -2748,7 +2749,8 @@ int MPI_Intercomm_create(MPI_Comm lcomm, int lleader, MPI_Comm pcomm, int rleade
     MPI_Status sts;
 
     // local leader exchanges groupStruct with remote leader
-    for(int i=0;i<lsize;i++)
+    int i;
+    for(i=0;i<lsize;i++)
       larr[i] = lvec[i];
     MPI_Send(&lsize,1,MPI_INT,rleader,tag,pcomm);
     MPI_Recv(&rsize,1,MPI_INT,rleader,tag,pcomm,&sts);
@@ -2756,7 +2758,7 @@ int MPI_Intercomm_create(MPI_Comm lcomm, int lleader, MPI_Comm pcomm, int rleade
     rarr = new int [rsize];
     MPI_Send(larr,lsize,MPI_INT,rleader,tag+1,pcomm);
     MPI_Recv(rarr,rsize,MPI_INT,rleader,tag+1,pcomm,&sts);
-    for(int i=0;i<rsize;i++)
+    for(i=0;i<rsize;i++)
       rvec.push_back(rarr[i]);
 
     delete [] larr;
@@ -3279,12 +3281,13 @@ int MPI_Graph_create(MPI_Comm comm_old, int nnodes, int *index, int *edges,
   CkPupBasicVec<int> index_;
   CkPupBasicVec<int> edges_;
 
-  for (int i = 0; i < nnodes; i++)
+  int i;
+  for (i = 0; i < nnodes; i++)
     index_.push_back(index[i]);
   
   c.setindex(index_);
 
-  for (int i = 0; i < index[nnodes - 1]; i++)
+  for (i = 0; i < index[nnodes - 1]; i++)
     edges_.push_back(edges[i]);
 
   c.setedges(edges_);
@@ -3319,7 +3322,7 @@ int MPI_Cartdim_get(MPI_Comm comm, int *ndims) {
 CDECL
 int MPI_Cart_get(MPI_Comm comm, int maxdims, int *dims, int *periods, 
 		 int *coords){
-  int ndims;
+  int i, ndims;
 
   AMPIAPI("MPI_Cart_get");
 
@@ -3332,12 +3335,12 @@ int MPI_Cart_get(MPI_Comm comm, int maxdims, int *dims, int *periods,
   const CkPupBasicVec<int> &dims_ = c.getdims();
   const CkPupBasicVec<int> &periods_ = c.getperiods();
   
-  for (int i = 0; i < maxdims; i++) {
+  for (i = 0; i < maxdims; i++) {
     dims[i] = dims_[i];
     periods[i] = periods_[i];
   }
 
-  for (int i = ndims - 1; i >= 0; i--) {
+  for (i = ndims - 1; i >= 0; i--) {
     if (i < maxdims)
       coords[i] = rank % dims_[i];
     rank = (int) (rank / dims_[i]);
@@ -3448,10 +3451,11 @@ int MPI_Graph_get(MPI_Comm comm, int maxindex, int maxedges, int *index,
   if (maxindex > index_.size())
     maxindex = index_.size();
 
-  for (int i = 0; i < maxindex; i++)
+  int i;
+  for (i = 0; i < maxindex; i++)
     index[i] = index_[i];
 
-  for (int i = 0; i < maxedges; i++)
+  for (i = 0; i < maxedges; i++)
     edges[i] = edges_[i];
 
   return 0;
@@ -3550,12 +3554,12 @@ CDECL
 int MPI_Dims_create(int nnodes, int ndims, int *dims) {
   AMPIAPI("MPI_Dims_create");
 
-  int n, d, *pdims;
+  int i, n, d, *pdims;
 
   n = nnodes;
   d = ndims;
 
-  for (int i = 0; i < ndims; i++)
+  for (i = 0; i < ndims; i++)
     if (dims[i] != 0)
       if (n % dims[i] != 0)
 	CkAbort("MPI_Dims_Create: Value in dimensions array infeasible!");
@@ -3570,7 +3574,7 @@ int MPI_Dims_create(int nnodes, int ndims, int *dims) {
     CkAbort("MPI_Dims_Create: Factorization failed. Wonder why?");
 
   int j = 0;
-  for (int i = 0; i < ndims; i++)
+  for (i = 0; i < ndims; i++)
     if (dims[i] == 0) {
       dims[i] = pdims[j];
       j++;
@@ -3590,7 +3594,7 @@ CDECL
 int MPI_Cart_sub(MPI_Comm comm, int *remain_dims, MPI_Comm *newcomm) {
   AMPIAPI("MPI_Cart_sub");
 
-  int color, key, *coords, ndims, rank;
+  int i, color, key, *coords, ndims, rank;
 
   MPI_Comm_rank(comm, &rank);
   ampiCommStruct &c = getAmpiParent()->getCart(comm);
@@ -3601,7 +3605,7 @@ int MPI_Cart_sub(MPI_Comm comm, int *remain_dims, MPI_Comm *newcomm) {
   coords = new int [ndims];
   MPI_Cart_coords(comm, rank, ndims, coords);
 
-  for (int i = 0; i < ndims; i++)
+  for (i = 0; i < ndims; i++)
     if (remain_dims[i]) {
       /* key single integer encoding*/
       key = key * dims[i] + coords[i];
@@ -3619,7 +3623,7 @@ int MPI_Cart_sub(MPI_Comm comm, int *remain_dims, MPI_Comm *newcomm) {
   const CkPupBasicVec<int> &periods = c.getperiods();
   CkPupBasicVec<int> periodsv;
 
-  for (int i = 0; i < ndims; i++)
+  for (i = 0; i < ndims; i++)
     if (remain_dims[i]) {
       dimsv.push_back(dims[i]);
       periodsv.push_back(periods[i]);
