@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.7  1995-11-02 21:17:21  sanjeev
+ * Revision 2.8  1995-11-15 21:03:52  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.7  1995/11/02  21:17:21  sanjeev
  * removed CharmExit defn since its already there in ckdefs.h
  *
  * Revision 2.6  1995/11/02  18:24:35  sanjeev
@@ -85,7 +88,6 @@
 #define _CK_9LockAccDataArea(x)
 #define _CK_9GetAccDataArea		GetBocDataPtr
 #define _CK_9UnlockAccDataArea(x)
-
 
 #ifdef STRIP
 #define _CK_BroadcastMsgBranch(ep,msg,boc)  GeneralBroadcastMsgBranch(ep,msg,\
