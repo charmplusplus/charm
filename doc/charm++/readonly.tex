@@ -1,10 +1,12 @@
 \subsection{Read-only Variables, Messages and Arrays}
 
-Since \charmpp\ does not allow global variables, it provides a special
+Since \charmpp\ does not allow global variables for keeping
+programs portable across a wide range of machines, it provides a special
 mechanism for sharing data amongst all objects. {\it Read-only}
 variables, messages and arrays are used to share information that 
 is obtained only after the program begins execution and does not
-change after they are initialized in the {\tt main::main()} function. They
+change after they are initialized in the dynamic scope of 
+{\tt main::main()} function. They
 can be accessed from any \index{chare}chare on any processor as ``global''
 variables. Large data structures containing pointers can be made
 available as read-only variables using read-only messages or
