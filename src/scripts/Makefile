@@ -113,7 +113,7 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h trace.h charm-api.h\
       conv-common.h conv-mach.h conv-mach-opt.h conv-mach.sh conv-mach-opt.sh \
       CkMarshall.decl.h CkArray.decl.h CkLocation.decl.h CkReduction.decl.h \
       CkFutures.decl.h LBDatabase.decl.h CentralLB.decl.h NullLB.decl.h \
-      RandCentLB.decl.h RecBisectBfLB.decl.h \
+      RandCentLB.decl.h RecBisectBfLB.decl.h BaseLB.decl.h \
       MetisLB.decl.h RefineLB.decl.h \
       HeapCentLB.decl.h NborBaseLB.decl.h NeighborLB.decl.h \
       WSLB.decl.h GreedyRefLB.decl.h RandRefLB.decl.h \
@@ -132,7 +132,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  tempo.h waitqd.h LBDatabase.h lbdb.h \
 	  LBDBManager.h LBComm.h LBOM.h LBObj.h LBMachineUtil.h \
 	  Refiner.h ObjGraph.h heap.h elements.h CommLBHeap.h \
-	  CentralLB.h RandCentLB.h RecBisectBfLB.h \
+	  BaseLB.h CentralLB.h RandCentLB.h RecBisectBfLB.h \
 	  RefineLB.h HeapCentLB.h CommLB.h Comm1LB.h manager.h \
 	  MetisLB.h NborBaseLB.h \
 	  NeighborLB.h WSLB.h GreedyRefLB.h RandRefLB.h \
@@ -396,9 +396,9 @@ CK_LIBS_CORE=libck.a
 LIBCK_CORE=init.o register.o qd.o ck.o main.o msgalloc.o ckfutures.o \
            debug-message.o cklocation.o ckarray.o ckreduction.o \
            tempo.o waitqd.o LBDatabase.o lbdb.o \
-           LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o Refiner.o \
-	   CentralLB.o NborBaseLB.o WSLB.o ObjGraph.o graph.o bitvecset.o \
-           Set.o heap.o CommLBHeap.o NullLB.o \
+           LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o \
+	   BaseLB.o CentralLB.o NborBaseLB.o WSLB.o ObjGraph.o graph.o  \
+           Refiner.o bitvecset.o Set.o heap.o CommLBHeap.o NullLB.o \
 	   compat_regmm.o
 
 CHARMLIBS: charm++
@@ -421,6 +421,9 @@ LBDatabase.decl.h LBDatabase.def.h : LBDatabase.ci charmxi
 
 NullLB.decl.h NullLB.def.h : NullLB.ci charmxi
 	$(CHARMC) NullLB.ci
+
+BaseLB.decl.h BaseLB.def.h : BaseLB.ci charmxi
+	$(CHARMC) BaseLB.ci
 
 init.o: init.C $(CKHEADERS)
 	$(CHARMC) -o init.o init.C
@@ -475,6 +478,9 @@ cklocation.o: cklocation.C $(CKHEADERS)
 
 
 ## Charm++ Load balancer (Dynamic load balancer)
+
+BaseLB.o: BaseLB.C $(CKHEADERS)
+	$(CHARMC) -c BaseLB.C
 
 lbdb.o: lbdb.C $(CKHEADERS)
 	$(CHARMC) -o lbdb.o lbdb.C
