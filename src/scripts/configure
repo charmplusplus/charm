@@ -554,14 +554,9 @@ echo "$ac_t""$version" 1>&6
 
 t="test.cpp"
 
-# Test: tries to compile C++ file $t (described by $1).
-#  If successful, prints $2 and sets $pass/clears $fail
-#  If failure, prints $3 and sets $pass/clears $fail
-#  additional arguments to c++ compiler are passed as $4
-test_cxx() {
-        echo $ac_n "checking "$1"""... $ac_c" 1>&6
-echo "configure:564: checking "$1"" >&5
-	$CMK_CXX -I../include -c $t -o test.o $4 > out 2>&1
+# If the test suceeded, print $2 and set "pass"/clear "fail"
+# If the test failed, print $3 and clear "pass"/set "fail"
+test_result() {
 	if test $? -eq 0
 	then
                 echo "$ac_t"""$2"" 1>&6
@@ -571,7 +566,28 @@ echo "configure:564: checking "$1"" >&5
                 echo "$ac_t"""$3"" 1>&6
 		pass="0"
 		fail="1"
+# For debugging the configure script, just "export autoconf_debug=1"
+#  to get this verbose data on any failed tests:
+		if test ! -z "$autoconf_debug"
+		then
+			echo "------- test script for $1 failed:"
+			cat out
+			echo "------- the test program was:"
+			cat $t
+			echo "-------"
+		fi
 	fi
+}
+
+# Test: tries to compile C++ file $t (described by $1).
+#  If successful, prints $2 and sets $pass/clears $fail
+#  If failure, prints $3 and sets $pass/clears $fail
+#  additional arguments to c++ compiler are passed as $4
+test_cxx() {
+        echo $ac_n "checking "$1"""... $ac_c" 1>&6
+echo "configure:589: checking "$1"" >&5
+	$CMK_CXX -I../include -I. -c $t -o test.o $4 > out 2>&1
+	test_result "$1" "$2" "$3"
  	strictpass=$pass
 	strictfail=$fail
         if test $pass -eq 1
@@ -583,9 +599,20 @@ echo "configure:564: checking "$1"" >&5
         fi
 	/bin/rm -f out
 }
+# Testlink: tries to compile and link a C++ file $t (described by $1).
+#  If successful, prints $2 and sets $pass/clears $fail
+#  If failure, prints $3 and sets $pass/clears $fail
+#  additional arguments to c++ compiler are passed as $4
+test_link() {
+        echo $ac_n "checking "$1"""... $ac_c" 1>&6
+echo "configure:609: checking "$1"" >&5
+	$CMK_CXX -I../include -I. $t -o testlink $4 > out 2>&1
+	test_result "$1" "$2" "$3"
+	/bin/rm -f out
+}
 
 test_finish() {
-	rm -f $t test.o	> /dev/null 2>&1
+	rm -f $t testlink test.o	> /dev/null 2>&1
 	/bin/rm -f out
 	exit $1
 }
@@ -665,6 +692,8 @@ cat >> confdefs.h <<EOF
 EOF
 
 
+###################### C++ Compiler Features #####################
+
 #### check explicit ####
 cat > $t <<EOT
 #include <stdlib.h>
@@ -734,7 +763,7 @@ cat >> confdefs.h <<EOF
 EOF
 
 
-
+##### check if the stl headers use .h #####
 cat > $t <<EOT
 #include <iostream>
 void foo(void) {}
@@ -749,6 +778,7 @@ cat >> confdefs.h <<EOF
 EOF
 
 
+#### check if std::vector works ######
 cat > $t <<EOT
 #include <vector>
 
@@ -766,6 +796,7 @@ cat >> confdefs.h <<EOF
 EOF
 
 
+#### check if namespaces can be defined #####
 cat > $t <<EOT
 namespace foo {
 	int x;
@@ -778,6 +809,7 @@ EOF
 
 
 
+#### check if typeinfo exists and works #####
 cat > $t <<EOT
 #include <typeinfo>
 const char *foo(void) {
@@ -791,19 +823,8 @@ cat >> confdefs.h <<EOF
 EOF
 
 
-cat > $t <<EOT
-namespace foo {
-	int x;
-};
-EOT
-test_cxx "whether namespaces work" "ok" "no" ""
-cat >> confdefs.h <<EOF
-#define CMK_NAMESPACES_BROKEN $fail
-EOF
 
-
-
-#test if we can have multiple delete like this
+#### test if we can have multiple delete like this ####
 cat > $t <<EOT
 class foo {
 public:
@@ -817,7 +838,9 @@ cat >> confdefs.h <<EOF
 EOF
 
 
-#test if has poll
+################### Syscalls and Libraries ###################
+
+#### test for poll ###
 cat > $t <<EOT
 #include <poll.h>
 void foo(void) { 
@@ -825,7 +848,7 @@ void foo(void) {
   poll(pos, 1, 1);
 }
 EOT
-test_cxx "whether it has poll" "yes" "no" ""
+test_cxx "whether the poll() syscall exists" "yes" "no" ""
 cat >> confdefs.h <<EOF
 #define CMK_USE_POLL $pass
 EOF
@@ -841,7 +864,7 @@ void *foo(void *a,int l,int fd) {
                  MAP_FIXED+MAP_PRIVATE,fd,0);
 }
 EOT
-test_cxx "whether mmap() exists" "yes" "no" ""
+test_cxx "whether the mmap() syscall exists" "yes" "no" ""
 cat >> confdefs.h <<EOF
 #define CMK_HAS_MMAP $pass
 EOF
@@ -862,17 +885,46 @@ cat >> confdefs.h <<EOF
 EOF
 
 
+#### check if glibc backtrace exists ####
+cat > $t <<EOT
+#include "cmibacktrace.c"
 
-#test if has zlib
+int main() {
+	int nLevels;
+	char **stack=CmiBacktrace(&nLevels);
+	return 0;
+}
+EOT
+TRACE_LINK_FLAG="-rdynamic"
+test_link "whether glibc backtrace works" "yes" "no" "-DCMK_USE_BACKTRACE=1 $TRACE_LINK_FLAG"
+cat >> confdefs.h <<EOF
+#define CMK_USE_BACKTRACE $pass
+EOF
+
+
+if test $pass -eq 1
+then 
+cat >> ./conv-mach-opt.sh << EOT
+
+# Option added by configure script's backtrace section
+CMK_LD="\$CMK_LD $TRACE_LINK_FLAG"
+CMK_LDXX="\$CMK_LDXX $TRACE_LINK_FLAG"
+
+EOT
+fi
+
+
+#### test if has zlib ####
 cat > $t <<EOT
 #include <zlib.h>
-void foo(void) { 
+int main() { 
   gzFile f = gzopen("/tmp/x","r");
   gzprintf(f, "test...\n");
   gzclose(f);
+  return 0;
 }
 EOT
-test_cxx "whether it has zlib" "yes" "no" "-lz"
+test_link "whether it has zlib" "yes" "no" "-lz"
 cat >> confdefs.h <<EOF
 #define CMK_PROJECTIONS_USE_ZLIB $pass
 EOF
@@ -881,18 +933,21 @@ if test $pass -eq 1
 then 
 cat >> ./conv-mach-opt.sh << EOT
 
+# Option added by configure script's zlib section
 CMK_LIBS="\$CMK_LIBS -lz"
 
 EOT
 fi
 
-#test fortran subroutine name
+################## Fortran #########################
+
+### test fortran subroutine name ###
 FCC=`echo $CMK_CF90 | cut -d' ' -f1`
 
 # Extract the first word of ""$FCC"", so it can be a program name with args.
 set dummy "$FCC"; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:896: checking for $ac_word" >&5
+echo "configure:951: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_FCL'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -921,7 +976,7 @@ fi
 if test -n "$FCL"
 then
   echo $ac_n "checking subroutine name used by Fortran compiler""... $ac_c" 1>&6
-echo "configure:925: checking subroutine name used by Fortran compiler" >&5
+echo "configure:980: checking subroutine name used by Fortran compiler" >&5
   if eval "test \"`echo '$''{'fortran_postfix'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -982,7 +1037,7 @@ fi
 fi
 
 
-#go get libpthread.a from charm website
+### go get libpthread.a from charm website ###
 if test "$base_version" = "net-linux" || test "$base_version" = "mpi-linux"
 then
 case $version in
@@ -992,7 +1047,7 @@ case $version in
     # Extract the first word of "wget", so it can be a program name with args.
 set dummy wget; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:996: checking for $ac_word" >&5
+echo "configure:1051: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_WGET'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -1021,7 +1076,7 @@ fi
     # Extract the first word of "lynx", so it can be a program name with args.
 set dummy lynx; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:1025: checking for $ac_word" >&5
+echo "configure:1080: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_LYNX'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -1050,7 +1105,7 @@ fi
     # Extract the first word of "telnet", so it can be a program name with args.
 set dummy telnet; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:1054: checking for $ac_word" >&5
+echo "configure:1109: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_TELNET'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -1079,7 +1134,7 @@ fi
     # Extract the first word of "uudecode", so it can be a program name with args.
 set dummy uudecode; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:1083: checking for $ac_word" >&5
+echo "configure:1138: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_UUDECODE'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else

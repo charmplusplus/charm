@@ -26,13 +26,9 @@ AC_MSG_RESULT($version)
 
 t="test.cpp"
 
-# Test: tries to compile C++ file $t (described by $1).
-#  If successful, prints $2 and sets $pass/clears $fail
-#  If failure, prints $3 and sets $pass/clears $fail
-#  additional arguments to c++ compiler are passed as $4
-test_cxx() {
-        AC_MSG_CHECKING("$1")
-	$CMK_CXX -I../include -c $t -o test.o $4 > out 2>&1
+# If the test suceeded, print $2 and set "pass"/clear "fail"
+# If the test failed, print $3 and clear "pass"/set "fail"
+test_result() {
 	if test $? -eq 0
 	then
                 AC_MSG_RESULT("$2")
@@ -42,7 +38,27 @@ test_cxx() {
                 AC_MSG_RESULT("$3")
 		pass="0"
 		fail="1"
+# For debugging the configure script, just "export autoconf_debug=1"
+#  to get this verbose data on any failed tests:
+		if test ! -z "$autoconf_debug"
+		then
+			echo "------- test script for $1 failed:"
+			cat out
+			echo "------- the test program was:"
+			cat $t
+			echo "-------"
+		fi
 	fi
+}
+
+# Test: tries to compile C++ file $t (described by $1).
+#  If successful, prints $2 and sets $pass/clears $fail
+#  If failure, prints $3 and sets $pass/clears $fail
+#  additional arguments to c++ compiler are passed as $4
+test_cxx() {
+        AC_MSG_CHECKING("$1")
+	$CMK_CXX -I../include -I. -c $t -o test.o $4 > out 2>&1
+	test_result "$1" "$2" "$3"
  	strictpass=$pass
 	strictfail=$fail
         if test $pass -eq 1
@@ -54,9 +70,19 @@ test_cxx() {
         fi
 	/bin/rm -f out
 }
+# Testlink: tries to compile and link a C++ file $t (described by $1).
+#  If successful, prints $2 and sets $pass/clears $fail
+#  If failure, prints $3 and sets $pass/clears $fail
+#  additional arguments to c++ compiler are passed as $4
+test_link() {
+        AC_MSG_CHECKING("$1")
+	$CMK_CXX -I../include -I. $t -o testlink $4 > out 2>&1
+	test_result "$1" "$2" "$3"
+	/bin/rm -f out
+}
 
 test_finish() {
-	rm -f $t test.o	> /dev/null 2>&1
+	rm -f $t testlink test.o	> /dev/null 2>&1
 	/bin/rm -f out
 	exit $1
 }
@@ -124,6 +150,8 @@ EOT
 test_cxx "whether long double works" "ok" "no" ""
 AC_DEFINE_UNQUOTED(CMK_LONG_DOUBLE_DEFINED, $pass)
 
+###################### C++ Compiler Features #####################
+
 #### check explicit ####
 cat > $t <<EOT
 #include <stdlib.h>
@@ -178,7 +206,7 @@ EOT
 test_cxx "whether templated member functions work" "ok" "no" ""
 AC_DEFINE_UNQUOTED(CMK_TEMPLATE_MEMBERS_BROKEN, $fail)
 
-
+##### check if the stl headers use .h #####
 cat > $t <<EOT
 #include <iostream>
 void foo(void) {}
@@ -187,6 +215,7 @@ test_cxx "whether including STL <foo> works" "ok" "no" ""
 AC_DEFINE_UNQUOTED(CMK_STL_USE_DOT_H, $fail)
 AC_DEFINE_UNQUOTED(CMK_STL_DONT_USE_DOT_H, $pass)
 
+#### check if std::vector works ######
 cat > $t <<EOT
 #include <vector>
 
@@ -201,6 +230,7 @@ EOT
 test_cxx "whether the std:: names for STL work" "ok" "no" ""
 AC_DEFINE_UNQUOTED(CMK_USE_STL, $pass)
 
+#### check if namespaces can be defined #####
 cat > $t <<EOT
 namespace foo {
 	int x;
@@ -210,6 +240,7 @@ test_cxx "whether namespaces work" "ok" "no" ""
 AC_DEFINE_UNQUOTED(CMK_NAMESPACES_BROKEN, $fail)
 
 
+#### check if typeinfo exists and works #####
 cat > $t <<EOT
 #include <typeinfo>
 const char *foo(void) {
@@ -220,16 +251,8 @@ EOT
 test_cxx "whether typeinfo/typeid works" "ok" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_TYPEINFO, $pass)
 
-cat > $t <<EOT
-namespace foo {
-	int x;
-};
-EOT
-test_cxx "whether namespaces work" "ok" "no" ""
-AC_DEFINE_UNQUOTED(CMK_NAMESPACES_BROKEN, $fail)
 
-
-#test if we can have multiple delete like this
+#### test if we can have multiple delete like this ####
 cat > $t <<EOT
 class foo {
 public:
@@ -240,7 +263,9 @@ EOT
 test_cxx "whether operator delete can be overloaded in same class" "ok" "no" ""
 AC_DEFINE_UNQUOTED(CMK_MULTIPLE_DELETE, $strictpass)
 
-#test if has poll
+################### Syscalls and Libraries ###################
+
+#### test for poll ###
 cat > $t <<EOT
 #include <poll.h>
 void foo(void) { 
@@ -248,7 +273,7 @@ void foo(void) {
   poll(pos, 1, 1);
 }
 EOT
-test_cxx "whether it has poll" "yes" "no" ""
+test_cxx "whether the poll() syscall exists" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_USE_POLL, $pass)
 
 
@@ -261,7 +286,7 @@ void *foo(void *a,int l,int fd) {
                  MAP_FIXED+MAP_PRIVATE,fd,0);
 }
 EOT
-test_cxx "whether mmap() exists" "yes" "no" ""
+test_cxx "whether the mmap() syscall exists" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_MMAP, $pass)
 
 #### check if mmap accepts MAP_ANON ####
@@ -276,28 +301,57 @@ EOT
 test_cxx "whether mmap() accepts MAP_ANON" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_MMAP_ANON, $pass)
 
+#### check if glibc backtrace exists ####
+cat > $t <<EOT
+#include "cmibacktrace.c"
 
-#test if has zlib
+int main() {
+	int nLevels;
+	char **stack=CmiBacktrace(&nLevels);
+	return 0;
+}
+EOT
+TRACE_LINK_FLAG="-rdynamic"
+test_link "whether glibc backtrace works" "yes" "no" "-DCMK_USE_BACKTRACE=1 $TRACE_LINK_FLAG"
+AC_DEFINE_UNQUOTED(CMK_USE_BACKTRACE, $pass)
+
+if test $pass -eq 1
+then 
+cat >> ./conv-mach-opt.sh << EOT
+
+# Option added by configure script's backtrace section
+CMK_LD="\$CMK_LD $TRACE_LINK_FLAG"
+CMK_LDXX="\$CMK_LDXX $TRACE_LINK_FLAG"
+
+EOT
+fi
+
+
+#### test if has zlib ####
 cat > $t <<EOT
 #include <zlib.h>
-void foo(void) { 
+int main() { 
   gzFile f = gzopen("/tmp/x","r");
   gzprintf(f, "test...\n");
   gzclose(f);
+  return 0;
 }
 EOT
-test_cxx "whether it has zlib" "yes" "no" "-lz"
+test_link "whether it has zlib" "yes" "no" "-lz"
 AC_DEFINE_UNQUOTED(CMK_PROJECTIONS_USE_ZLIB, $pass)
 if test $pass -eq 1
 then 
 cat >> ./conv-mach-opt.sh << EOT
 
+# Option added by configure script's zlib section
 CMK_LIBS="\$CMK_LIBS -lz"
 
 EOT
 fi
 
-#test fortran subroutine name
+################## Fortran #########################
+
+### test fortran subroutine name ###
 FCC=`echo $CMK_CF90 | cut -d' ' -f1`
 
 AC_CHECK_PROG(FCL, "$FCC", "$FCC" )
@@ -348,7 +402,7 @@ EOF
 fi
 
 
-#go get libpthread.a from charm website
+### go get libpthread.a from charm website ###
 if test "$base_version" = "net-linux" || test "$base_version" = "mpi-linux"
 then
 case $version in
