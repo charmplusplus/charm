@@ -1,8 +1,23 @@
+/*
+	File containing the data structures, function declaration 
+	and msa array declarations used during parallel partitioning
+	of the mesh.
+	Author Sayantan Chakravorty
+	05/30/2004
+*/
+
 #ifndef __FEM_PARALLEL_PART_H__
 #define __FEM_PARALLEL_PART_H__
 
-#define MESH_CHUNK_TAG 3000
+//#define PARALLEL_DEBUG
 
+#if PARALLEL_DEBUG
+#define DEBUG(x) x
+#else
+#define DEBUG(x)
+#endif
+
+#define MESH_CHUNK_TAG 3000
 
 template <class T, bool PUP_EVERY_ELEMENT=true >
 class DefaultListEntry {
@@ -18,10 +33,12 @@ public:
 /// MPI_Bcast, but using a T with a pup routine
 template <class T>
 inline void MPI_Bcast_pup(T &t, int root,MPI_Comm comm) {
-	int len=PUP::size(t); char *buf=new char[len];
+	int len=PUP::size(t); 
+	char *buf=new char[len];
 	PUP::toMemBuf(t,buf,len);
 	MPI_Bcast(buf,len,MPI_BYTE, root,comm);
 	PUP::fromMemBuf(t,buf,len);
+	delete [] buf;
 };
 
 template <class T>
@@ -39,6 +56,7 @@ inline void MPI_Bcast_var_pup(T &t, int root,MPI_Comm comm) {
 	}	
 	MPI_Bcast(buf,len,MPI_BYTE, root,comm);
 	PUP::fromMemBuf(t,buf,len);
+	delete [] buf;
 };
 
 
@@ -63,10 +81,11 @@ public:
 		/*
 			add the new unique elements to the List
 		*/
+		int len = vec->size();
 		for(int i=0;i<rhs.vec->length();i++){
 			int flag=0;
-			for(int j=0;j<vec->size();j++){
-				if((*vec)[j] == (*(rhs.vec))[i]){
+			for(int j=0;j<len;j++){
+				if((*vec)[j] == (*(rhs.vec))[i]){					
 					flag = 1;
 					break;
 				}
@@ -90,6 +109,7 @@ public:
 
 class NodeElem {
 public:
+	//global number of this node
 	int global;
 	/*no of chunks that share this node
 		owned by 1 element - numShared 0
@@ -352,6 +372,11 @@ struct partconndata{
 	int startindex;
 	int *eptr,*eind;
 	int *part;
+	~partconndata(){
+		delete [] eptr;
+		delete [] eind;
+		delete [] part;
+	};
 };
 
 /*
@@ -373,6 +398,13 @@ struct ghostdata{
 			layers[i]->pup(p);
 		}
 	}
+	~ghostdata(){
+			printf("destructor on ghostdata called \n");
+			for(int i=0;i<numLayers;i++){
+					delete layers[i];
+			}
+			delete [] layers;
+	};
 };
 
 
@@ -383,13 +415,14 @@ public:
 	MsaHashtable(int _numSlots,int numWorkers):numSlots(_numSlots),table(_numSlots,numWorkers){
 	}
 	MsaHashtable(){};
+
 	virtual void pup(PUP::er &p){
 		p | numSlots;
 		p | table;
 	}
 	int addTuple(int *tuple,int nodesPerTuple,int chunk,int elementNo){
 		//sort the tuples to get a canonical form
-		// bubble sort should do just as well since the 
+		// bubble sort should do just as well since the number
 		// of nodes is less than 10.
 		for(int i=0;i<nodesPerTuple-1;i++){
 			for(int j=i+1;j<nodesPerTuple;j++){
@@ -411,7 +444,7 @@ public:
 		Hashtuple &list=table.accumulate(index);
 		list.vec->push_back(entry);
 		char str[100];
-		printf("[%d] adding tuple %s element %d to index %d \n",chunk,entry.nodes.toString(nodesPerTuple,str),elementNo,index);
+		DEBUG(printf("[%d] adding tuple %s element %d to index %d \n",chunk,entry.nodes.toString(nodesPerTuple,str),elementNo,index));
 		return index;
 	}
 

@@ -870,6 +870,9 @@ public:
 		list.push_back(FEM_Userdata_item(tag));
 		return list[list.size()-1];
 	}
+	int size(){
+		return list.size();
+	}
 	void pup(PUP::er &p) {p|list;}
 };
 

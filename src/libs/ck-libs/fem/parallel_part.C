@@ -7,6 +7,9 @@ the initial mesh into multiple chunks
  Author Sayantan Chakravorty
  05/30/2004
 */
+
+
+#include <assert.h>
 #include "fem_impl.h"
 #include "fem.h"
 #include "fem.decl.h"
@@ -15,6 +18,7 @@ the initial mesh into multiple chunks
 #include "pup.h"
 #include "../parmetis/parmetis.h"
 #include "parallel_part.h"
+
 
 int FEM_Mesh_Parallel_broadcast(int fem_mesh,int masterRank,FEM_Comm_t comm_context){
 	int myRank;
@@ -31,6 +35,7 @@ int FEM_Mesh_Parallel_broadcast(int fem_mesh,int masterRank,FEM_Comm_t comm_cont
 	}
 	//temp to keep stuff from falling apart
 	MPI_Barrier((MPI_Comm)comm_context);
+	printf("[%d] Partitioned mesh number %d \n",myRank,new_mesh);
 	return new_mesh;
 }
 
@@ -44,7 +49,7 @@ int FEM_master_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context
 	int numChunks;
 	MPI_Comm_size((MPI_Comm)comm_context,&numChunks);
 	printf("master -> number of elements %d \n",nelem);
-	m->print(0);
+	DEBUG(m->print(0));
 
 
 	/*load the connectivity information into the eptr and
@@ -152,7 +157,16 @@ int FEM_master_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context
 	printf("[%d] Number of elements in my partitioned mesh %d number of nodes %d \n",masterRank,me.m->nElems(),me.m->node.size());
 	
 	addIDXLists(me.m,lnodes,masterRank);
-
+	
+	/*
+		Broadcast  the user data to all the meshes
+	*/
+	DEBUG(printf("[%d] Length of udata vector in master %d \n",masterRank,m->udata.size()));
+	MPI_Bcast_var_pup(m->udata,masterRank,(MPI_Comm)comm_context);
+	me.m->udata = m->udata;
+	
+	
+	delete partdata;
 	/*
 		collect the ghost data and send it to all the chunks.
 	*/
@@ -164,12 +178,16 @@ int FEM_master_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context
 		make ghosts for this mesh
 	*/
 	makeGhosts(me.m,(MPI_Comm)comm_context,masterRank,gdata->numLayers,gdata->layers);
+	delete gdata;
 	
 	me.m->becomeGetting();
 	FEMchunk *chunk = FEMchunk::get("FEM_Mesh_Parallel_broadcast");
 	int tempMeshNo = chunk->meshes.put(me.m);
 	int new_mesh = FEM_Mesh_copy(tempMeshNo);
 	
+	FEM_Mesh *nmesh = c->lookup(new_mesh,"master_parallel_broadcast");
+	DEBUG(printf("[%d] Length of udata vector in master new_mesh %d \n",masterRank,nmesh->udata.size()));
+		
 	return new_mesh;
 };
 
@@ -185,7 +203,7 @@ int FEM_slave_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context)
 	MPI_Bcast_pup(data,masterRank,(MPI_Comm)comm_context);		
 	data.arr1.enroll(numChunks);
 	data.arr2.enroll(numChunks);
-	printf("Recv -> %d \n",data.nelem);
+	DEBUG(printf("Recv -> %d \n",data.nelem));
 	/*
 		Receive the broken up mesh from the masterRank.
 		These will be used later to give each partitioned mesh
@@ -249,19 +267,29 @@ int FEM_slave_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context)
 	
 	addIDXLists(me.m,lnodes,myRank);
 	
-	struct ghostdata gdata;
-	MPI_Bcast_var_pup(gdata,masterRank,(MPI_Comm)comm_context);
-	printf("[%d] number of ghost layers %d \n",myRank,gdata.numLayers);
+	/*
+		Receive the user data from master
+	*/
+	MPI_Bcast_var_pup(me.m->udata,masterRank,(MPI_Comm)comm_context);
+	DEBUG(printf("[%d] Length of udata vector %d \n",myRank,me.m->udata.size()));
+	
+	delete partdata;
+	
+	struct ghostdata *gdata = new ghostdata;
+	MPI_Bcast_var_pup(*gdata,masterRank,(MPI_Comm)comm_context);
+	printf("[%d] number of ghost layers %d \n",myRank,gdata->numLayers);
 	
 	/*
 		make ghosts
 	*/
-	makeGhosts(me.m,(MPI_Comm )comm_context,masterRank,gdata.numLayers,gdata.layers);
+	makeGhosts(me.m,(MPI_Comm )comm_context,masterRank,gdata->numLayers,gdata->layers);
 	
 	me.m->becomeGetting();
 	FEMchunk *chunk = FEMchunk::get("FEM_Mesh_Parallel_broadcast");
 	int tempMeshNo = chunk->meshes.put(me.m);
 	int new_mesh = FEM_Mesh_copy(tempMeshNo);
+	
+	delete gdata;
 	return new_mesh;
 }
 
@@ -301,7 +329,7 @@ struct partconndata * FEM_call_parmetis(struct conndata &data,FEM_Comm_t comm_co
 	int endConn = data.arr1.get(endindex);
 	int numConn = endConn - startConn;
 	int *eind = new int[numConn];
-	printf("%d startindex %d endindex %d startConn %d endConn %d \n",myRank,startindex,endindex,startConn,endConn);
+	DEBUG(printf("%d startindex %d endindex %d startConn %d endConn %d \n",myRank,startindex,endindex,startConn,endConn));
 	for(int i=startindex;i<endindex;i++){
 		int conn1 = data.arr1.get(i);
 		int conn2 = data.arr1.get(i+1);
@@ -335,9 +363,9 @@ struct partconndata * FEM_call_parmetis(struct conndata &data,FEM_Comm_t comm_co
 	}
 	options[0]=0;
 	ParMETIS_V3_PartMeshKway (elmdist,eptr,eind,NULL,&wgtflag,&numflag,&ncon,&ncommonnodes,&numChunks,tpwgts,&ubvec,options,&edgecut,parts,(MPI_Comm *)&comm_context);
-	CkPrintf("%d partition ",myRank);
+	DEBUG(CkPrintf("%d partition ",myRank);)
 	for(int i=0;i<numindices;i++){
-		CkPrintf("index %d %d",i+startindex,parts[i]);
+		DEBUG(CkPrintf("index %d %d",i+startindex,parts[i]));
 	}
 	CkPrintf("\n");
 	delete []elmdist;
@@ -403,7 +431,7 @@ void FEM_write_part2node(MSA1DINTLIST	&nodepart,MSA1DNODELIST &part2node,struct 
 		}
 	}
 	part2node.sync();
-	printf("done write_part2node\n");
+	DEBUG(printf("done write_part2node\n"));
 }
 
 /*
@@ -537,26 +565,35 @@ void addIDXLists(FEM_Mesh *m,NodeList &lnodes,int myChunk){
 	/*
 		For each node, if it is shared, add it to the IDXL_List of 
 		the correct chunk in my mesh 
+		At the same time, set the priy flag for each node
+		A node is defined as primary if it is not shared with any
+		other chunk, which has a lower chunk number
 	*/
 	/// go through each node
 	for(int i=0;i<vec->size();i++){
-		// check if it is shared with other nodes
+		///global number of this node
+		int global = (*vec)[i].global;
+		///find the local number of this node
+		int local = global2local.get(global);
+		//by default set the node as primary
+		m->node.setPrimary(local,true);
+		// check if it is shared with other nodes		
 		if(((*vec)[i]).numShared > 0){
 			///chunk numbers to which this node belongs
 			int *shared = (*vec)[i].shared;
-			///global number of this node
-			int global = (*vec)[i].global;
-			///find the local number of this node
-			int local = global2local.get(global);
+			
 			for(int j=0;j<((*vec)[i]).numShared;j++){
 				if(shared[j] != myChunk){
 					//add this node to my CommunicatioList for this globalChunk
 					m->node.shared.addList(shared[j]).push_back(local);
 				}
+				if(shared[j] < myChunk){
+					m->node.setPrimary(local,false);
+				}
 			}
 		}
 	}
-	m->node.shared.print();
+	DEBUG(m->node.shared.print());
 
 	/*
 		Fix the connectivity of the elements, replace global numbers by local
@@ -616,8 +653,12 @@ void makeGhosts(FEM_Mesh *m,MPI_Comm comm,int masterRank,int numLayers,FEM_Ghost
 	MPI_Comm_rank((MPI_Comm)comm,&myChunk);
 	MPI_Comm_size((MPI_Comm)comm,&numChunks);
 	
+	if(numChunks == 1){
+		return;
+	}
+	
 	/*
-		Go through the ghost layer and count the number of unique shared nodes owned
+		Go through the shared node list and count the number of unique shared nodes owned
 		by this chunk. If no chunk with a lower id shares a node it is owned by this chunk
 	*/
 	FEM_Comm *shared = &m->node.shared;
@@ -682,10 +723,14 @@ void makeGhosts(FEM_Mesh *m,MPI_Comm comm,int masterRank,int numLayers,FEM_Ghost
 	}
 
 	for(int i=0;i<numLayers;i++){
+		printf("[%d] Making ghost layer %d \n",myChunk,i);
 		makeGhost(m,comm,masterRank,totalShared,layers[i],countedSharedNode,global2local); 
 	}
 };
 
+/* 
+	Does this list contain this entry
+*/
 bool listContains(FEM_Comm_List &list,int entry){
 	for(int i=0;i<list.size();i++){
 		if(entry == list[i]){
@@ -711,13 +756,16 @@ void makeGhost(FEM_Mesh *m,MPI_Comm comm,int masterRank,int totalShared,FEM_Ghos
 	}else{
 		distTab = new MsaHashtable;
 	}
+	printf("[%d] starting ghost generation \n",myChunk);
 	MPI_Bcast_pup(*distTab,masterRank,comm);
 	distTab->table.enroll(numChunks);
+	DEBUG(printf("[%d] distributed table calling sync \n",myChunk));
+//	distTab->table.sync((numChunks == 1));
 	distTab->table.sync();
 	
-	printf("Chunk %d Mesh: *********************************** \n",myChunk);
-	m->print(0);
-	printf("**********************************\n");
+	DEBUG(printf("Chunk %d Mesh: *********************************** \n",myChunk));
+	DEBUG(m->print(0));
+	DEBUG(printf("**********************************\n"));
 	
 	printf("Chunk %d Ghost layer nodesPerTuple %d numSlots %d \n",myChunk,layer->nodesPerTuple,distTab->numSlots);
 	/*
@@ -746,8 +794,19 @@ void makeGhost(FEM_Mesh *m,MPI_Comm comm,int masterRank,int totalShared,FEM_Ghos
 						// unless all the nodes in the tuple are shared
 						// this tuple cant make the element containing it
 						// a ghost element
+						int nodesPerTuple = layer->nodesPerTuple;
 						for(int n = 0;n<layer->nodesPerTuple;n++){
-							int node=conn[(layer->elem[i].elem2tuple)[t*layer->nodesPerTuple+n]];
+							int nodeindex=(layer->elem[i].elem2tuple)[t*layer->nodesPerTuple+n];
+							/*
+								The number of nodes in a tuple might be less than the layer->nodesPerTuple
+								This is represented by having the last nodes marked as -1
+							*/
+							if(nodeindex == -1){
+								nodesPerTuple--;
+								globalNodeTuple[n] =-1;
+								continue;
+							}
+							int node=conn[nodeindex];
 							globalNodeTuple[n]=m->node.getGlobalno(node);
 							if(sharedNode.get(node) == 0){
 								possibleGhost = false;
@@ -756,7 +815,7 @@ void makeGhost(FEM_Mesh *m,MPI_Comm comm,int masterRank,int totalShared,FEM_Ghos
 						}
 						// if the tuple is a possible ghost add it to the distributed hashtable
 						if(possibleGhost){
-							int index=distTab->addTuple(globalNodeTuple,layer->nodesPerTuple,myChunk,m->nElems(i)+e);
+							int index=distTab->addTuple(globalNodeTuple,nodesPerTuple,myChunk,m->nElems(i)+e);
 							tupleVec.push_back(Hashnode::tupledata(globalNodeTuple));
 							indexVec.push_back(index);
 							elementVec.push_back(i);
@@ -767,11 +826,48 @@ void makeGhost(FEM_Mesh *m,MPI_Comm comm,int masterRank,int totalShared,FEM_Ghos
 			}
 		}
 	}
-	distTab->sync();
+	//ghosts added in previous layers shall share tuples with real nodes on other chunks
+	//to form more ghosts for this chunk. However since we never send ghost elements as
+	//ghosts to other chunks, they are not added to the tupleVec or indexVec
+
+	int ghostcount=0;
+	for(int i=0;i<m->elem.size();i++){
+		if(m->elem.has(i)){
+			if(layer->elem[i].add){
+				FEM_Elem *ghostElems = (FEM_Elem *)m->elem[i].getGhost();
+				for(int e=0;e<ghostElems->size();e++){
+					ghostcount++;
+					const int *conn = ghostElems->connFor(e);
+					for(int t=0;t<layer->elem[i].tuplesPerElem;t++){
+						int globalNodeTuple[Hashnode::tupledata::MAX_TUPLE];
+						FEM_Node *ghostNodes = (FEM_Node *)m->node.getGhost();
+						int nodesPerTuple = layer->nodesPerTuple;
+						for(int n=0;n<layer->nodesPerTuple;n++){
+							int nodeindex=(layer->elem[i].elem2tuple)[t*layer->nodesPerTuple+n];
+							if(nodeindex == -1){
+								nodesPerTuple--;
+								globalNodeTuple[n] = -1;
+								continue;
+							}
+							int node=conn[nodeindex];
+							if(FEM_Is_ghost_index(node)){
+								globalNodeTuple[n]=ghostNodes->getGlobalno(FEM_From_ghost_index(node));
+							}else{
+								globalNodeTuple[n]=m->node.getGlobalno(node);
+							}
+						}
+						//all the tuples of a ghost element are possible generators of ghosts
+						distTab->addTuple(globalNodeTuple,nodesPerTuple,myChunk,ghostcount);
+					}
+				}
+			}
+		}
+	}
+	distTab->table.sync();
 	//debug - print the whole table
 /*	printf("Ghosts chunk %d \n",myChunk);*/
 	if(myChunk == masterRank){
-		distTab->print();
+		DEBUG(distTab->print());
 	}
 	distTab->sync();
 	/* create a new FEM_Mesh msa to transfer the ghost elements from the original mesh to target meshes */
@@ -793,33 +889,59 @@ void makeGhost(FEM_Mesh *m,MPI_Comm comm,int masterRank,int totalShared,FEM_Ghos
 	char str[100];
 	for(int i=0;i<tupleVec.size();i++){
 		const Hashtuple &listTuple = distTab->get(indexVec[i]);
-		printf("[%d] Elements for index %d tuple< %s> number %d \n",myChunk,indexVec[i],tupleVec[i].toString(layer->nodesPerTuple,str),listTuple.vec->size());
+//		printf("[%d] Elements for index %d tuple< %s> number %d \n",myChunk,indexVec[i],tupleVec[i].toString(layer->nodesPerTuple,str),listTuple.vec->size());
 		int elType = elementVec[2*i];
 		int elNo = elementVec[2*i+1];
 		for(int j=0;j<listTuple.vec->size();j++){
 			
 			// if the entry  ((*listTuple.vec)[j]) in this slot refers to the same tuple
 			if((*listTuple.vec)[j].equals(tupleVec[i])){
-				printf("[%d] chunk %d element %d \n",myChunk,(*listTuple.vec)[j].chunk,(*listTuple.vec)[j].elementNo);
+				int destChunk=(*listTuple.vec)[j].chunk;
+			//	printf("[%d] chunk %d element %d \n",myChunk,destChunk,(*listTuple.vec)[j].elementNo);
 				
 				//never add a ghost element to your own chunk
-				if((*listTuple.vec)[j].chunk != myChunk){
+				if(destChunk != myChunk){
+					//Check if the element to be marked a ghost is already shared as a ghost with that 
+					//chunk. This is necessary in the case of multiple ghost layers to make sure that the
+					//same element doesnt get added as a ghost twice in the same chunk.
+					
+					FEM_Comm &sendGhostSide = m->elem[elType].setGhostSend();
+					FEM_Comm_List &sendGhostList = sendGhostSide.addList(destChunk);
+					if(listContains(sendGhostList,elNo)){
+						//if this element already exists as a ghost in the destChunk
+						//dont send it again. However even adding ghost nodes are also
+						//being skipped. The assumption is that if there are multiple
+						//ghost layers, the lower layer would have added such a node.
+						continue;
+					}
+
+					//add element elNo of type elType to the sendGhost List for chunk (*listTuple.vec)[j].chunk
+					sendGhostList.push_back(elNo);
+
 					
 					//add an element to the ghost mesh for this chunk
-					MeshElem &myme = ghostmeshes->accumulate((*listTuple.vec)[j].chunk);
+					MeshElem &myme = ghostmeshes->accumulate(destChunk);
 					myme.m->elem[elType].copyShape(m->elem[elType]);
 					int index=myme.m->elem[elType].push_back(m->elem[elType],elNo);
+					int globalelem = m->elem[elType].getGlobalno(elNo);
+					DEBUG(printf("[%d] For chunk %d ghost element global no %d \n",myChunk,destChunk,globalelem));
+
 					
-					//add element elNo of type elType to the sendGhost List for chunk (*listTuple.vec)[j].chunk
-					FEM_Comm &sendGhostSide = m->elem[elType].setGhostSend();
-					FEM_Comm_List &sendGhostList = sendGhostSide.addList((*listTuple.vec)[j].chunk); 
-					sendGhostList.push_back(elNo);
-					
-					//go through the connectivity of the ghost element and check
+					//go through the connectivity of the ghost element (for destChunk) and check
 					//if any of the nodes need to be added as ghost nodes on the destination
 					int *conn = myme.m->elem[elType].connFor(index);
 					for(int k=0;k<m->elem[elType].getNodesPer();k++){
 						int lnode = conn[k];
+						//if a node is a ghost node, we dont send it
+						if(lnode < 0){
+							continue;
+						}
+						// if this real node belongs to an element that is a ghost on
+						// another chunk, then this node can be part of a tuple for 
+						// identifying ghosts in the next layer
+						if(sharedNode.get(lnode) ==  0){
+							sharedNode.put(lnode)=3;
+						}
 						int globalnode = m->node.getGlobalno(lnode);
 						conn[k] = globalnode;
 						assert(conn[k] >= 0);
@@ -839,7 +961,7 @@ void makeGhost(FEM_Mesh *m,MPI_Comm comm,int masterRank,int totalShared,FEM_Ghos
 								if(!listContains(sendNodeGhostList,lnode)){
 									myme.m->node.copyShape(m->node);
 									myme.m->node.push_back(m->node,lnode);
-									
+									DEBUG(printf("[%d] Ghost node (send) global no %d \n",myChunk,globalnode));
 									//add node lnode to the sendGhost list for the destination chunk 
 									sendNodeGhostList.push_back(lnode);
 								}	
@@ -849,10 +971,10 @@ void makeGhost(FEM_Mesh *m,MPI_Comm comm,int masterRank,int totalShared,FEM_Ghos
 				}
 			}
 		}
-		printf("Elements equivalent ----------- \n");
+	//	printf("Elements equivalent ----------- \n");
 	}
 	CmiMemoryCheck();
-	printf("[%d] finished creating ghost mesh \n",myChunk);
+	DEBUG(printf("[%d] finished creating ghost mesh \n",myChunk));
 	ghostmeshes->sync();
 	/*
 		Go through the ghost nodes and check for nodes that dont exist in the hashtable
@@ -861,12 +983,14 @@ void makeGhost(FEM_Mesh *m,MPI_Comm comm,int masterRank,int totalShared,FEM_Ghos
 		ghost nodes.
 	*/	
 	FEM_Mesh *gmesh = ghostmeshes->get(myChunk).m;
+	DEBUG(printf("[%d] my ghost mesh is at %p \n",myChunk,gmesh));
 	
 	FEM_Node *gnodes = (FEM_Node *)m->node.getGhost();
 	gnodes->copyShape(m->node);
 	FEM_IndexAttribute *nodeSrcChunkAttr = (FEM_IndexAttribute *)gmesh->node.lookup(FEM_CHUNK,"makeGhosts");
 	int *nodeSrcChunkNo = nodeSrcChunkAttr->get().getData();
 	
+	DEBUG(printf("[%d] gmesh->node.size() = %d \n",myChunk,gmesh->node.size()));
 	for(int i=0;i<gmesh->node.size();i++){
 		int gnum = gmesh->node.getGlobalno(i);
 		int lindex = global2local.get(gnum);
@@ -874,13 +998,13 @@ void makeGhost(FEM_Mesh *m,MPI_Comm comm,int masterRank,int totalShared,FEM_Ghos
 		if(lindex == 0){
 			int countgnodes = gnodes->push_back(gmesh->node,i);
 			global2local.put(gnum) = -(countgnodes+1);
-			lindex = -(countgnodes+1);
-			CkPrintf("[%d] Global node %d lindex %d \n",myChunk,gnum,lindex);
+			lindex = -(countgnodes+1);			
 		}
+		DEBUG(CkPrintf("[%d] Ghost node (recv) global node %d lindex %d \n",myChunk,gnum,lindex));
 		//: set RecvGhost for node
 		FEM_Comm &recvNodeGhostSide = m->node.setGhostRecv();
 		FEM_Comm_List &recvNodeGhostList = recvNodeGhostSide.addList(nodeSrcChunkNo[i]); 
-		recvNodeGhostList.push_back(-(lindex-1));
+		recvNodeGhostList.push_back(-lindex-1);
 
 	}
 	
@@ -907,8 +1031,10 @@ void makeGhost(FEM_Mesh *m,MPI_Comm comm,int masterRank,int totalShared,FEM_Ghos
 						int lnode = global2local.get(gnode);
 						//unknown node (neither ghost nor real)
 						if(lnode == 0){
-							CkPrintf("[%d]Unknown global number %d \n",myChunk,gnode);
-							CkAbort("Unknown global number for node in ghost element connectivity");
+							if(layer->addNodes){
+								CkPrintf("[%d]Unknown global number %d \n",myChunk,gnode);
+								CkAbort("Unknown global number for node in ghost element connectivity");
+							}	
 							conn[n] = -1;
 						}
 						//real node
@@ -923,7 +1049,6 @@ void makeGhost(FEM_Mesh *m,MPI_Comm comm,int masterRank,int totalShared,FEM_Ghos
 						conn[n] = -1;
 					}
 				}
-				//TODO: setRecvGhost
 				FEM_Comm &recvGhostSide = m->elem[elType].setGhostRecv();
 				FEM_Comm_List &recvGhostList = recvGhostSide.addList(elemSrcChunkNo[e]); 
 				recvGhostList.push_back(lghostelem);
@@ -931,11 +1056,13 @@ void makeGhost(FEM_Mesh *m,MPI_Comm comm,int masterRank,int totalShared,FEM_Ghos
 			}
 		}
 	}
-	printf("[%d] Send ghost nodes \n",myChunk);
-	m->node.getGhostSend().print();
-	printf("[%d] Recv ghost nodes \n",myChunk);
-	m->node.getGhostRecv().print();
+	DEBUG(printf("[%d] Send ghost nodes \n",myChunk));
+	DEBUG(m->node.getGhostSend().print());
+	DEBUG(printf("[%d] Recv ghost nodes \n",myChunk));
+	DEBUG(m->node.getGhostRecv().print());
 	
+	delete distTab;	
+	delete ghostmeshes;
 	MPI_Barrier(comm);
 }
 
