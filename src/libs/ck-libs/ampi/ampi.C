@@ -719,7 +719,6 @@ void ampi::splitPhase1(CkReductionMsg *msg)
 			// (confusingly) re-using the same MPI_Comm number for each.
 			lastComm=ampiCommStruct(newComm,lastAmpi,indices.size(),indices);
 		}
-		int oldRank=keys[c].rank;
 		int newRank=c-lastRoot;
 		int newIdx=lastComm.getIndexForRank(newRank);
 
@@ -820,7 +819,7 @@ MSG_ORDER_DEBUG(
   CkPrintf("AMPI Rank %d arrival: tag=%d, src=%d, comm=%d  (from %d, seq %d)\n",
   	getRank(),msg->tag,msg->srcRank,msg->comm, msg->srcIdx, msg->seq);
 )
-	AmpiMsg *msgcopy = msg;
+//	AmpiMsg *msgcopy = msg;
   if(msg->seq != -1) {
     int srcIdx = msg->srcIdx;
     oorder[srcIdx].put(msg->seq, msg);
@@ -1880,7 +1879,6 @@ int MPI_Iallgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   }
   ptr->getComlib().endIteration();
 
-  MPI_Status status;
   CkDDT_DataType* dttype = ptr->getDDT()->getType(recvtype) ;
   int itemsize = dttype->getSize(recvcount) ;
 
@@ -2524,6 +2522,9 @@ int MPIR_Err_setmsg( int errclass, int errkind,
                      const char *routine_name,
                      const char *generic_string,
                      const char *default_string, ... )
-{ /* empty */ }
+{ 
+  /* empty */ 
+  return 0;
+}
 
 #include "ampi.def.h"
