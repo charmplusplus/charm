@@ -884,7 +884,7 @@ case "$LANGUAGE" in
         POST_LIBRARIES="$POST_LIBRARIES -lmetis "
 	;;
 "femf")
-        PRE_LIBRARIES="$PRE_LIBRARIES -lfemf -lddt -lconv-utilf"
+        PRE_LIBRARIES="$PRE_LIBRARIES -lfemf -lcollide -lampilib -lddt -lconv-utilf"
         POST_LIBRARIES="$POST_LIBRARIES -lmetis $CMK_F90LIBS"
         if [ ! -z "$CMK_F90OBJS" ] 
         then
