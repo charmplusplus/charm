@@ -229,6 +229,28 @@ void CentralLB::ReceiveStats(CLBStatsMsg *m)
 		CkExit();
 		return;
 	}
+	else if(CkpvAccess(doSimulation))
+	{
+		// here we are supposed to read the data from the dump database
+		readStatsMsgs((CkpvAccess(dumpFile) != NULL) ? CkpvAccess(dumpFile) : defaultDumpFileName);
+
+  		CLBSimResults simResults(stats_msg_count);
+
+		// now pass it to the strategy routine
+		LBMigrateMsg* migrateMsg = Strategy(statsDataList, stats_msg_count);
+
+		// now calculate the results of the load balancing simulation
+		FindSimResults(statsDataList, stats_msg_count, migrateMsg, &simResults);
+
+		// now we have the simulation data, so print it and exit
+		CmiPrintf("LBSim: Simulation of one load balancing step done.\n");
+		simResults.PrintSimulationResults();
+
+		delete migrateMsg;
+
+		CkExit();
+		return;
+	}
 
     LBMigrateMsg* migrateMsg = Strategy(statsDataList,clients);
 
@@ -448,13 +470,43 @@ void CentralLB::readStatsMsgs(const char* filename) {
   int i;
   FILE *f = fopen(filename, "r");
 
+  // at this stage, we need to rebuild the statsMsgList and
+  // statsDataList structures. For that first deallocate the
+  // old structures
+  for(int i = 0; i < stats_msg_count; i++)
+  	delete statsMsgsList[i];
+  delete[] statsMsgsList;
+
   PUP::fromDisk p(f);
   p|stats_msg_count;
+
+  // now resbuild new structures
+  statsMsgsList = new CLBStatsMsg*[stats_msg_count];
+  statsDataList = new LDStats[stats_msg_count];
+
   for (i = 0; i < stats_msg_count; i++) {
-    CkPupMessage(p, (void **)&statsMsgsList[i], 0);
+  	statsMsgsList[i] = new CLBStatsMsg;
+    CkPupMessage(p, (void **)&statsMsgsList[i], 1);
+
+	CLBStatsMsg* m = statsMsgsList[i];
+
+    statsDataList[i].total_walltime = m->total_walltime;
+    statsDataList[i].total_cputime = m->total_cputime;
+    statsDataList[i].idletime = m->idletime;
+    statsDataList[i].bg_walltime = m->bg_walltime;
+    statsDataList[i].bg_cputime = m->bg_cputime;
+    statsDataList[i].pe_speed = m->pe_speed;
+    statsDataList[i].utilization = 1.0;
+    statsDataList[i].available = CmiTrue;
+
+    statsDataList[i].n_objs = m->n_objs;
+    statsDataList[i].objData = m->objData;
+    statsDataList[i].n_comm = m->n_comm;
+    statsDataList[i].commData = m->commData;
   }
 
-  fclose(f);
+  // file f is closed in the destructor of PUP::fromDisk
+  CmiPrintf("readStatsMsg from %s\n", filename);
 }
 
 void CentralLB::writeStatsMsgs(const char* filename) {
@@ -464,11 +516,49 @@ void CentralLB::writeStatsMsgs(const char* filename) {
 
   PUP::toDisk p(f);
   p|stats_msg_count;
+
   for (i = 0; i < stats_msg_count; i++) {
-    CkPupMessage(p, (void **)&statsMsgsList[i], 0);
+    CkPupMessage(p, (void **)&statsMsgsList[i], 1);
   }
-  fclose(f);
   CmiPrintf("writeStatsMsgs to %s\n", filename);
+}
+
+void CentralLB::FindSimResults(LDStats* stats, int count, LBMigrateMsg* msg, CLBSimResults* simResults)
+{
+	CkAssert(simResults != NULL && count == simResults->numPes);
+	// estimate the new loads of the processors. As a first approximation, this is the
+	// sum of the cpu times of the objects on that processor
+
+	// first find the load before the migration
+	for(int pe = 0; pe < count; pe++)
+	{
+		simResults->peLoads[pe] = 0.0;
+		for(int obj = 0; obj < stats[pe].n_objs; obj++)
+		{
+			simResults->peLoads[pe] += stats[pe].objData[obj].cpuTime;
+		}
+	}
+
+	// now for each migration, substract the load of the migrating object from the source pe
+	// and add it to the destination pe
+	for(int mig = 0; mig < msg->n_moves; mig++)
+	{
+		int from = msg->moves[mig].from_pe;
+		int to = msg->moves[mig].to_pe;
+		double cpuTime;
+		int oidx;
+
+		// find the cpu time for the object that is migrating
+		for(oidx = 0; oidx < stats[from].n_objs; oidx++)
+			if(stats[from].objData[oidx].handle.id == msg->moves[mig].obj.id)
+			{
+				cpuTime = stats[from].objData[oidx].cpuTime;
+				break;
+			}
+		CkAssert(oidx != stats[from].n_objs);
+		simResults->peLoads[from] -= cpuTime;
+		simResults->peLoads[to] += cpuTime;
+	}
 }
 
 #endif

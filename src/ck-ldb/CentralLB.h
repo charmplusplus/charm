@@ -15,6 +15,7 @@
 
 #include "BaseLB.h"
 #include "CentralLB.decl.h"
+#include "SimResults.h"
 
 extern CkGroupID loadbalancer;
 
@@ -22,6 +23,7 @@ void CreateCentralLB();
 void set_avail_vector(char * bitmap);
 
 class CLBStatsMsg;
+class CLBSimResults;
 
 /// for backward compatibility
 typedef LBMigrateMsg  CLBMigrateMsg;
@@ -88,6 +90,7 @@ protected:
   virtual CmiBool QueryDumpData() { return CmiFalse; };  
   virtual LBMigrateMsg* Strategy(LDStats* stats,int count);
 
+  void FindSimResults(LDStats* stats, int count, LBMigrateMsg* msg, CLBSimResults* simResults);
   void RemoveNonMigratable(LDStats* statsDataList, int count);
 
 private:  
