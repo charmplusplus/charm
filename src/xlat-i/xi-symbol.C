@@ -1500,21 +1500,31 @@ void Entry::setChare(Chare *c) {
 
 // "parameterType *msg" or "void".
 // Suitable for use as the only parameter
-XStr Entry::paramType(int withDefaultVals)
+XStr Entry::paramType(int withDefaultVals,int withEO)
 {
   XStr str;
   param->print(str,withDefaultVals);
+  if (withEO) str<<eo(withDefaultVals,!param->isVoid());
   return str;
 }
 
 // "parameterType *msg," if there is a non-void parameter, 
 // else empty.  Suitable for use with another parameter following.
-XStr Entry::paramComma(int withDefaultVals)
+XStr Entry::paramComma(int withDefaultVals,int withEO)
 {
   XStr str;
   if (!param->isVoid()) {
-  	param->print(str,withDefaultVals);
-  	str << ", ";
+    str << paramType(withDefaultVals,withEO);
+    str << ", ";
+  }
+  return str;
+}
+XStr Entry::eo(int withDefaultVals,int priorComma) {
+  XStr str;
+  if (param->isMarshalled()) {//FIXME: add options for void methods, too...
+    if (priorComma) str<<", ";
+    str<<"const CkEntryOptions *impl_e_opts";
+    if (withDefaultVals) str<<"=NULL";
   }
   return str;
 }
@@ -1589,7 +1599,7 @@ void Entry::genChareDecl(XStr& str)
     genChareStaticConstructorDecl(str);
   } else {
     // entry method declaration
-    str << "    "<<retType<<" "<<name<<"("<<paramType(1)<<");\n";
+    str << "    "<<retType<<" "<<name<<"("<<paramType(1,1)<<");\n";
   }
 }
 
@@ -1602,7 +1612,7 @@ void Entry::genChareDefs(XStr& str)
     XStr params; params<<epIdx()<<", impl_msg, &ckGetChareID()";
     // entry method definition
     XStr retStr; retStr<<retType;
-    str << makeDecl(retStr,1)<<"::"<<name<<"("<<paramType(0)<<")\n";
+    str << makeDecl(retStr,1)<<"::"<<name<<"("<<paramType(0,1)<<")\n";
     str << "{\n  ckCheck();\n"<<marshallMsg();
     if(isSync()) {
       str << syncReturn() << "CkRemoteCall("<<params<<"));\n";
@@ -1619,28 +1629,28 @@ void Entry::genChareDefs(XStr& str)
 
 void Entry::genChareStaticConstructorDecl(XStr& str)
 {
-  str << "    static CkChareID ckNew("<<paramComma(1)<<"int onPE=CK_PE_ANY);\n";
-  str << "    static void ckNew("<<paramComma(1)<<"CkChareID* pcid, int onPE=CK_PE_ANY);\n";
+  str << "    static CkChareID ckNew("<<paramComma(1)<<"int onPE=CK_PE_ANY"<<eo(1)<<");\n";
+  str << "    static void ckNew("<<paramComma(1)<<"CkChareID* pcid, int onPE=CK_PE_ANY"<<eo(1)<<");\n";
   if (!param->isVoid())
-    str << "    "<<container->proxyName(0)<<"("<<paramComma(1)<<"int onPE=CK_PE_ANY);\n";
+    str << "    "<<container->proxyName(0)<<"("<<paramComma(1)<<"int onPE=CK_PE_ANY"<<eo(1)<<");\n";
 }
 
 void Entry::genChareStaticConstructorDefs(XStr& str)
 {
-  str << makeDecl("CkChareID",1)<<"::ckNew("<<paramComma(0)<<"int impl_onPE)\n";
+  str << makeDecl("CkChareID",1)<<"::ckNew("<<paramComma(0)<<"int impl_onPE"<<eo(0)<<")\n";
   str << "{\n"<<marshallMsg();
   str << "  CkChareID impl_ret;\n";
   str << "  CkCreateChare("<<chareIdx()<<", "<<epIdx()<<", impl_msg, &impl_ret, impl_onPE);\n";
   str << "  return impl_ret;\n";
   str << "}\n";
 
-  str << makeDecl("void",1)<<"::ckNew("<<paramComma(0)<<"CkChareID* pcid, int impl_onPE)\n";
+  str << makeDecl("void",1)<<"::ckNew("<<paramComma(0)<<"CkChareID* pcid, int impl_onPE"<<eo(0)<<")\n";
   str << "{\n"<<marshallMsg();
   str << "  CkCreateChare("<<chareIdx()<<", "<<epIdx()<<", impl_msg, pcid, impl_onPE);\n";
   str << "}\n";
   
   if (!param->isVoid()) {
-    str << makeDecl(" ",1)<<"::"<<container->proxyName(0)<<"("<<paramComma(0)<<"int impl_onPE)\n";
+    str << makeDecl(" ",1)<<"::"<<container->proxyName(0)<<"("<<paramComma(0)<<"int impl_onPE"<<eo(0)<<")\n";
     str << "{\n"<<marshallMsg();
     str << "  CkChareID impl_ret;\n";
     str << "  CkCreateChare("<<chareIdx()<<", "<<epIdx()<<", impl_msg, &impl_ret, impl_onPE);\n";
@@ -1657,7 +1667,7 @@ void Entry::genArrayDecl(XStr& str)
     genArrayStaticConstructorDecl(str);
   } else {
     if (isSync() && !container->isForElement()) return; //No sync broadcast
-    str << "    "<<retType<<" "<<name<<"("<<paramType(1)<<") ;\n"; //no const
+    str << "    "<<retType<<" "<<name<<"("<<paramType(1,1)<<") ;\n"; //no const
   }
 }
 
@@ -1674,7 +1684,7 @@ void Entry::genArrayDefs(XStr& str)
     if (isSync() && !container->isForElement()) return; //No sync broadcast
     
     XStr retStr; retStr<<retType;
-    str << makeDecl(retStr,1)<<"::"<<name<<"("<<paramType(0)<<") \n"; //no const
+    str << makeDecl(retStr,1)<<"::"<<name<<"("<<paramType(0,1)<<") \n"; //no const
     str << "{\n  ckCheck();\n"<<marshallMsg();
     str << "  CkArrayMessage *impl_amsg=(CkArrayMessage *)impl_msg;\n";
     str << "  impl_amsg->array_setIfNotThere("<<ifNot<<");\n";
@@ -1699,10 +1709,10 @@ void Entry::genArrayStaticConstructorDecl(XStr& str)
 {
   if (container->getForWhom()==forIndividual)
       str<< //Element insertion routine
-      "    void insert("<<paramComma(1)<<"int onPE=-1);";
+      "    void insert("<<paramComma(1,0)<<"int onPE=-1"<<eo(1)<<");";
   else if (container->getForWhom()==forAll)
       str<< //With options
-      "    static CkArrayID ckNew("<<paramComma(1)<<"const CkArrayOptions &opts);\n";
+      "    static CkArrayID ckNew("<<paramComma(1,0)<<"const CkArrayOptions &opts"<<eo(1)<<");\n";
   else if (container->getForWhom()==forSection);
 }
 
@@ -1710,12 +1720,12 @@ void Entry::genArrayStaticConstructorDefs(XStr& str)
 {
   if (container->getForWhom()==forIndividual)
       str<<
-      makeDecl("void",1)<<"::insert("<<paramComma(0)<<"int onPE)\n"
+      makeDecl("void",1)<<"::insert("<<paramComma(0,0)<<"int onPE"<<eo(0)<<")\n"
       "{ \n"<<marshallMsg()<<
       "   ckInsert((CkArrayMessage *)impl_msg,"<<epIdx()<<",onPE);\n}\n";
   else if (container->getForWhom()==forAll)
       str<<
-      makeDecl("CkArrayID",1)<<"::ckNew("<<paramComma(0)<<"const CkArrayOptions &opts)\n"
+      makeDecl("CkArrayID",1)<<"::ckNew("<<paramComma(0)<<"const CkArrayOptions &opts"<<eo(0)<<")\n"
        "{ \n"<<marshallMsg()<<
 	 "   return ckCreateArray((CkArrayMessage *)impl_msg,"<<epIdx()<<",opts);\n"
        "}\n";
@@ -1741,7 +1751,7 @@ void Entry::genGroupDecl(XStr& str)
 
     if (isSync() && !container->isForElement()) return; //No sync broadcast
     
-    str << "    "<<retType<<" "<<name<<"("<<paramType(1)<<")\n";
+    str << "    "<<retType<<" "<<name<<"("<<paramType(1,1)<<")\n";
     str << "    {\n    ckCheck();\n"<<marshallMsg();
 
     if(isSync()) {
@@ -1771,7 +1781,7 @@ void Entry::genGroupDecl(XStr& str)
 
     // entry method on multiple PEs declaration
     if(!forElement && !isSync() && !container->isNodeGroup()) {
-      str << "    "<<retType<<" "<<name<<"("<<paramComma(1)<<"int npes, int *pes)\n";
+      str << "    "<<retType<<" "<<name<<"("<<paramComma(1,0)<<"int npes, int *pes"<<eo(0)<<")\n";
       str << "    {\n"<<marshallMsg();
       str << "      CkSendMsg"<<node<<"BranchMulti("<<params<<", npes, pes, ckGetGroupID());\n";
       str << "    }\n";
@@ -1791,9 +1801,9 @@ void Entry::genGroupStaticConstructorDecl(XStr& str)
 {
   if (container->isForElement()) return;
   
-  str << "    static CkGroupID ckNew("<<paramType(1)<<");\n";
+  str << "    static CkGroupID ckNew("<<paramType(1,1)<<");\n";
   if (!param->isVoid()) {
-    str << "    "<<container->proxyName(0)<<"("<<paramType(1)<<");\n";
+    str << "    "<<container->proxyName(0)<<"("<<paramType(1,1)<<");\n";
   }
 }
 
@@ -1803,13 +1813,13 @@ void Entry::genGroupStaticConstructorDefs(XStr& str)
   
   //Selects between NodeGroup and Group
   char *node = (char *)(container->isNodeGroup()?"Node":"");
-  str << makeDecl("CkGroupID",1)<<"::ckNew("<<paramType(0)<<")\n";
+  str << makeDecl("CkGroupID",1)<<"::ckNew("<<paramType(0,1)<<")\n";
   str << "{\n"<<marshallMsg();
   str << "  return CkCreate"<<node<<"Group("<<chareIdx()<<", "<<epIdx()<<", impl_msg);\n";
   str << "}\n";
 
   if (!param->isVoid()) {
-    str << makeDecl(" ",1)<<"::"<<container->proxyName(0)<<"("<<paramType(0)<<")\n";
+    str << makeDecl(" ",1)<<"::"<<container->proxyName(0)<<"("<<paramType(0,1)<<")\n";
     str << "{\n"<<marshallMsg();
     str << "  ckSetGroupID(CkCreate"<<node<<"Group("<<chareIdx()<<", "<<epIdx()<<", impl_msg));\n";
     str << "}\n";
@@ -1828,7 +1838,7 @@ void Entry::genIndexDecls(XStr& str)
   str << "    static int ";
   if (isConstructor()) str <<"ckNew";
   else str <<name;
-  str << "("<<paramType(1)<<") { return "<<epIdx(0)<<"; }\n"; 
+  str << "("<<paramType(1,0)<<") { return "<<epIdx(0)<<"; }\n"; 
 
   // call function declaration
   str << "    static void _call_"<<epStr()<<"(void* impl_msg,"<<
@@ -2218,7 +2228,7 @@ void ParamList::marshall(XStr &str)
 		  str<<"    impl_off+=implP.size();\n";
 		str<<"  }\n";
 		//Now that we know the size, allocate the packing buffer
-		str<<"  CkMarshallMsg *impl_msg=new (impl_off,0)CkMarshallMsg;\n";
+		str<<"  CkMarshallMsg *impl_msg=CkAllocateMarshallMsg(impl_off,impl_e_opts);\n";
 		//Second pass: write the data
 		str<<"  { //Copy over the PUP'd data\n";
 		str<<"    PUP::toMem implP((void *)impl_msg->msgBuf);\n";

@@ -648,8 +648,9 @@ class Entry : public Member {
     void genGroupStaticConstructorDefs(XStr& str);
     void genGroupDefs(XStr& str);
     
-    XStr paramType(int withDefaultVals);
-    XStr paramComma(int withDefaultVals);
+    XStr paramType(int withDefaultVals,int withEO=0);
+    XStr paramComma(int withDefaultVals,int withEO=0);
+    XStr eo(int withDefaultVals,int priorComma=1);
     XStr syncReturn(void);
     XStr marshallMsg(void);
     XStr callThread(const XStr &procName,int prependEntryName=0);
