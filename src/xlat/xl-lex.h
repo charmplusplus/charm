@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.2  1995-06-15 20:57:00  jyelon
+ * Revision 2.3  1997-03-25 15:04:58  milind
+ * Made changes suggested by Ed Kornkven to fix bugs in Dagger.
+ *
+ * Revision 2.2  1995/06/15 20:57:00  jyelon
  * *** empty log message ***
  *
  * Revision 2.1  1995/06/15  20:27:11  jyelon
@@ -100,7 +103,7 @@ extern YSNPTR GetYSN();
 
 /* *** Following for writeoutput *** */
 extern int IMPORTFLAG;
-#define MAXLINELENGTH 254
+#define MAXLINELENGTH 1024
 #define WriteString(string)	fprintf(CurrentOut->file,"%s",string)
 
 #define MyModulePrefix(module,name)	Prefix(name,module,CkPrefix_)

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.2  1996-03-09 18:11:20  jyelon
+ * Revision 1.3  1997-03-25 15:04:56  milind
+ * Made changes suggested by Ed Kornkven to fix bugs in Dagger.
+ *
+ * Revision 1.2  1996/03/09 18:11:20  jyelon
  * Fixed Ck --> Cmi
  *
  * Revision 1.1  1995/06/13 11:32:16  jyelon
@@ -494,12 +497,12 @@ _dag3_RLNODE   *rlnode;
                   msgarray = (void **) buffer->msg;
                   if (msgarray) {
                     n = (int) (msgarray[0]);
-                    for(j=1; j<=n; j++) if (msgarray[j]) CmiFreeMsg(msgarray[j]);
+                    for(j=1; j<=n; j++) if (msgarray[j]) CmiFree(msgarray[j]);
                     CmiFree(msgarray);
                    }
                  }
                else {
-                  if (buffer->msg) CmiFreeMsg(buffer->msg);
+                  if (buffer->msg) CmiFree(buffer->msg);
                }
 
                *(buffer->prev) = buffer->next;
@@ -524,7 +527,7 @@ _dag3_RLNODE   *rlnode;
                msgarray = (void **) buffer->msg;
                if (msgarray) {
                    n = (int) (msgarray[0]);
-                   for(i=1; i<=n; i++) if (msgarray[i]) CmiFreeMsg(msgarray[i]);
+                   for(i=1; i<=n; i++) if (msgarray[i]) CmiFree(msgarray[i]);
                    CmiFree(msgarray);
                }
                *(buffer->prev) = buffer->next;

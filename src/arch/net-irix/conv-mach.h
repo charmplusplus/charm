@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.7  1997-03-21 19:23:58  milind
+ * Revision 1.8  1997-03-25 15:04:58  milind
+ * Made changes suggested by Ed Kornkven to fix bugs in Dagger.
+ *
+ * Revision 1.7  1997/03/21 19:23:58  milind
  * removed the alignment bug in Common.uth/machine.c
  *
  * Revision 1.6  1997/03/19 23:17:47  milind
@@ -81,6 +84,7 @@
 #define CMK_CSDEXITSCHEDULER_SET_CSDSTOPFLAG               1
 
 #define CMK_DEFAULT_MAIN_USES_COMMON_CODE                  1
+#define CMK_DEFAULT_MAIN_USES_SIMULATOR_CODE               0
 
 #define CMK_FIX_HP_CONNECT_BUG                             0
 
@@ -129,12 +133,12 @@
 #define CMK_STRINGS_USE_STRINGS_H                          0
 #define CMK_STRINGS_USE_STRING_H                           1
 
-#define CMK_THREADS_REQUIRE_ALLOCA_H                       0
+#define CMK_THREADS_REQUIRE_ALLOCA_H                       1
 #define CMK_THREADS_REQUIRE_PRAGMA_ALLOCA                  0
-#define CMK_THREADS_REQUIRE_NO_CPV                         0
+#define CMK_THREADS_REQUIRE_NO_CPV                         1
 
-#define CMK_THREADS_UNAVAILABLE                            1
-#define CMK_THREADS_USE_ALLOCA                             0
+#define CMK_THREADS_UNAVAILABLE                            0
+#define CMK_THREADS_USE_ALLOCA                             1
 #define CMK_THREADS_USE_JB_TWEAKING                        0
 #define CMK_THREADS_USE_JB_TWEAKING_EXEMPLAR               0
 

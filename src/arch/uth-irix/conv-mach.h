@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.2  1997-03-24 23:24:43  milind
+ * Revision 1.3  1997-03-25 15:04:59  milind
+ * Made changes suggested by Ed Kornkven to fix bugs in Dagger.
+ *
+ * Revision 1.2  1997/03/24 23:24:43  milind
  * MAde uth-irix version to work by tweaking conv-mach.h flags and also
  * modified uth-irix/conv-mach.csh to make megatest and megatest++
  * correctly by removing the nm bugs.
@@ -85,7 +88,7 @@
 
 #define CMK_IS_HETERO                                      1
 
-#define CMK_MACHINE_NAME                                   "net-irix"
+#define CMK_MACHINE_NAME                                   "uth-irix"
 
 #define CMK_MALLOC_USE_GNU_MALLOC                          0
 #define CMK_MALLOC_USE_OS_BUILTIN                          1
