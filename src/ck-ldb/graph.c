@@ -31,6 +31,15 @@ Graph * initGraph(int V, int E) {
   return g;
 }
 
+void freeGraph(Graph* g)
+{
+  free(g->vertices);
+  g->vertices=0;
+  free(g->edges);
+  g->edges = 0;
+  free(g);
+}
+
 void nextVertex(Graph *g, int v, float weight)
 {
   int current;

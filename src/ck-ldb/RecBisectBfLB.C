@@ -13,10 +13,12 @@ IntQueue * fifoInt_create(int size);
 int fifoInt_enqueue(IntQueue *q, int value);
 int fifoInt_empty(IntQueue *q);
 int fifoInt_dequeue(IntQueue *q);
+void fifoInt_destroy(IntQueue* q);
 }
 
 extern "C" {
   Graph * initGraph(int v, int e);
+  void freeGraph(Graph* g);
   void nextVertex(Graph *g, int v, float w);
   void finishVertex(Graph *g);
   void addEdge(Graph *g, int w, float w2);
@@ -31,13 +33,7 @@ extern "C" {
   void bvset_insert(BV_Set *ss1, int t1);
   BV_Set *makeSet(int *nodes, int numNodes, int V);
   BV_Set *makeEmptySet( int V);
-
-
-/*  IntQueue * fifoInt_create(int x);
-  int fifoInt_empty(IntQueue *q);
-  fifoInt_enqueue(IntQueue *q1, int r1);
-  fifoInt_dequeue(IntQueue *q);
-*/
+  void destroySet(BV_Set* s);
 }
 
 
@@ -61,7 +57,8 @@ CmiBool RecBisectBfLB::QueryBalanceNow(int _step)
   return CmiTrue;
 }
 
-CLBMigrateMsg* RecBisectBfLB::Strategy(CentralLB::LDStats* stats, int numPartitions)
+CLBMigrateMsg* RecBisectBfLB::Strategy(CentralLB::LDStats* stats, 
+				       int numPartitions)
 {
   int i;
   PartitionList *partitions;
@@ -70,67 +67,69 @@ CLBMigrateMsg* RecBisectBfLB::Strategy(CentralLB::LDStats* stats, int numPartiti
   CkPrintf("[%d] RecBisectBfLB strategy\n",CkMyPe());
   ObjGraph og(numPartitions, stats);
 
-  CkPrintf("[%d] RecBisectBfLB: og made. numPartitions: %d\n",
-	   CkMyPe(), numPartitions);
-
   Graph *g =  convertGraph( &og);
   CkPrintf("[%d] RecBisectBfLB: graph converted\n",CkMyPe());
     
-//    printGraph(g);
-    int  * nodes = (int *) malloc(sizeof(int)*g->V);
+  //  printGraph(g);
+  int* nodes = (int *) malloc(sizeof(int)*g->V);
 
+  for (i=0; i<g->V; i++)
+    nodes[i] = i;
 
-    for (i=0; i<g->V; i++)
-      nodes[i] = i;
-
-    partitions = (PartitionList *) malloc(sizeof(PartitionList));
-    partitions->next = 0;
-    partitions->max = numPartitions;
-    partitions->partitions = (PartitionRecord *) malloc(sizeof(PartitionRecord)* numPartitions);
+  partitions = (PartitionList *) malloc(sizeof(PartitionList));
+  partitions->next = 0;
+  partitions->max = numPartitions;
+  partitions->partitions = (PartitionRecord *)
+    malloc(sizeof(PartitionRecord)* numPartitions);
     
   recursivePartition(numPartitions, g, nodes, g->V,  partitions);
   
-  CmiPrintf("\ngraph partitioned\n");
+  //  CmiPrintf("\ngraph partitioned\n");
+
+  freeGraph(g);
   
-//  printPartitions(partitions);
+  //  printPartitions(partitions);
 
   CkVector migrateInfo;
 
-
- for (i=0; i<partitions->max; i++) {
-   CmiPrintf("[%d] (%d) : \t", i, partitions->partitions[i].size);
-   int j;
-   for (j=0; j< partitions->partitions[i].size; j++) {
-     CmiPrintf("%d ", partitions->partitions[i].nodeArray[j]);
-     const int objref = partitions->partitions[i].nodeArray[j];
-     ObjGraph::Node n = og.GraphNode(objref);
-/*     CkPrintf("Moving %d(%d) from %d to %d\n",objref,
-		stats[n.proc].objData[n.index].handle.id.id[0],n.proc,i);
-  */
+  for (i=0; i<partitions->max; i++) {
+    //    CmiPrintf("[%d] (%d) : \t", i, partitions->partitions[i].size);
+    int j;
+    for (j=0; j< partitions->partitions[i].size; j++) {
+      //      CmiPrintf("%d ", partitions->partitions[i].nodeArray[j]);
+      const int objref = partitions->partitions[i].nodeArray[j];
+      ObjGraph::Node n = og.GraphNode(objref);
+      /*     CkPrintf("Moving %d(%d) from %d to %d\n",objref,
+	     stats[n.proc].objData[n.index].handle.id.id[0],n.proc,i);
+      */
    
-     if (n.proc != i) {
-       MigrateInfo *migrateMe = new MigrateInfo;
-       migrateMe->obj = stats[n.proc].objData[n.index].handle;
-       migrateMe->from_pe = n.proc;
-       migrateMe->to_pe = i;
-       migrateInfo.push_back((void*)migrateMe);
-     }
-   }
- }
+      if (n.proc != i) {
+	MigrateInfo *migrateMe = new MigrateInfo;
+	migrateMe->obj = stats[n.proc].objData[n.index].handle;
+	migrateMe->from_pe = n.proc;
+	migrateMe->to_pe = i;
+	migrateInfo.push_back((void*)migrateMe);
+      }
+    }
+    free(partitions->partitions[i].nodeArray);
+  }
+  free(partitions->partitions);
+  free(partitions);
 
   int migrate_count=migrateInfo.size();
   CLBMigrateMsg* msg = new(&migrate_count,1) CLBMigrateMsg;
   msg->n_moves = migrate_count;
+  CkPrintf("Moving %d elements\n",migrate_count);
   for(i=0; i < migrate_count; i++) {
     MigrateInfo* item = (MigrateInfo*)migrateInfo[i];
     msg->moves[i] = *item;
     delete item;
     migrateInfo[i] = 0;
   }
-
   CmiPrintf("returning from partitioner strategy\n");
   return msg;
 };
+
 
 Graph *
 RecBisectBfLB::convertGraph(ObjGraph *og) {
@@ -139,14 +138,13 @@ RecBisectBfLB::convertGraph(ObjGraph *og) {
   
   int V, E, i;
 
-
   V = og->NodeCount();
   E = og->EdgeCount();
 
   g = initGraph(V, E);
 
-  CkPrintf("[%d] RecBisectBfLB: convert (v=%d, e=%d, g=%p\n",
-	   CkMyPe(), V, E, g);
+  //  CkPrintf("[%d] RecBisectBfLB: convert (v=%d, e=%d, g=%p\n",
+  //	   CkMyPe(), V, E, g);
 
   for (i =0; i<V; i++) {
     nextVertex(g, i, og->LoadOf(i));
@@ -154,7 +152,7 @@ RecBisectBfLB::convertGraph(ObjGraph *og) {
     ObjGraph::Node n = og->GraphNode(i);
     ObjGraph::Edge *l;
 
-//  CkPrintf("[%d] RecBisectBfLB: convert before addEdge Loop\n");
+    //  CkPrintf("[%d] RecBisectBfLB: convert before addEdge Loop\n");
     
     l = n.edges_from();
     while (l) {
@@ -179,13 +177,15 @@ void RecBisectBfLB::partitionInTwo(Graph *g, int nodes[], int numNodes,
 	       int ratio1, int ratio2)
 {
   int r1, r2, weight1, weight2;
-  BV_Set *all, *s1, *s2; //, *makeSet(int * nodes, int num, int max);
+  BV_Set *all, *s1, *s2; 
   IntQueue * q1, *q2;
   int * p1, *p2;
 
   r1 = nodes[0];
   r2 = nodes[numNodes-1];
-  /* Improvement: select r1 and r2 more carefully: e.g. farthest away from each other. */
+  /* Improvement:
+     select r1 and r2 more carefully: 
+     e.g. farthest away from each other. */
 
   all = makeSet(nodes, numNodes, g->V);
   s1 = makeEmptySet(g->V);
@@ -210,22 +210,28 @@ void RecBisectBfLB::partitionInTwo(Graph *g, int nodes[], int numNodes,
   bvset_enumerate(s2, &p2, numP2);
   *pp1 = p1;
   *pp2 = p2;
+  destroySet(s1);
+  destroySet(s1);
+  fifoInt_destroy(q1);
+  fifoInt_destroy(q2);
 }
 
 int 
-RecBisectBfLB::findNextUnassigned(int max, BV_Set * all, BV_Set * s1, BV_Set * s2) {
+RecBisectBfLB::findNextUnassigned(int max, BV_Set * all, 
+				  BV_Set * s1, BV_Set * s2)
+{
   int i;
-  for (i=0; i<max; i++)
-    { 
-      if (bvset_find(all, i))
-	if ( (!bvset_find(s1,i)) && (!bvset_find(s2,i)) ) 
-	  return i;
-    }
+  for (i=0; i<max; i++) { 
+    if (bvset_find(all, i))
+      if ( (!bvset_find(s1,i)) && (!bvset_find(s2,i)) ) 
+	return i;
+  }
   return (max + 1);
 }
 
 float RecBisectBfLB::addToQ(IntQueue * q, Graph *g, BV_Set * all, 
-	    BV_Set * s1, BV_Set * s2) {
+			    BV_Set * s1, BV_Set * s2)
+{
   int t1, doneUpto;
   float weightAdded;
 
@@ -249,57 +255,61 @@ float RecBisectBfLB::addToQ(IntQueue * q, Graph *g, BV_Set * all,
 }
 
 void RecBisectBfLB::enqChildren(IntQueue * q, Graph *g, BV_Set * all, 
-	    BV_Set * s1, BV_Set * s2, int node) {
-
+				BV_Set * s1, BV_Set * s2, int node)
+{
   int nbrs, i, j;
 
   nbrs = numNeighbors(g, node);
   for (i=0; i<nbrs; i++) {
     j = getNeighbor(g, node, i);
-    if (  (bvset_find(all,j)) && (!bvset_find(s1,j)) && (!bvset_find(s2,j)) ) {
+    if (  (bvset_find(all,j)) && (!bvset_find(s1,j)) 
+	  && (!bvset_find(s2,j)) ) {
       fifoInt_enqueue(q, j);
     }
   } 
 }
 
 
-void RecBisectBfLB::addPartition(PartitionList * partitions, int * nodes, int num) {
+void RecBisectBfLB::addPartition(PartitionList * partitions, 
+				 int * nodes, int num) 
+{
   int i;
   i =  partitions->next++;
   partitions->partitions[i].size = num;
   partitions->partitions[i].nodeArray = nodes ;
 }
 
-void RecBisectBfLB::printPartitions(PartitionList * partitions) {
- int i,j;
+void RecBisectBfLB::printPartitions(PartitionList * partitions)
+{
+  int i,j;
  
 
- CmiPrintf("\n**************************\n The Partitions are: \n");
- for (i=0; i<partitions->max; i++) {
-   CmiPrintf("[%d] (%d) : \t", i, partitions->partitions[i].size);
-   for (j=0; j< partitions->partitions[i].size; j++)
-     CmiPrintf("%d ", partitions->partitions[i].nodeArray[j]);
-   CmiPrintf("\n");
- }
+  CmiPrintf("\n**************************\n The Partitions are: \n");
+  for (i=0; i<partitions->max; i++) {
+    CmiPrintf("[%d] (%d) : \t", i, partitions->partitions[i].size);
+    for (j=0; j< partitions->partitions[i].size; j++)
+      CmiPrintf("%d ", partitions->partitions[i].nodeArray[j]);
+    CmiPrintf("\n");
+  }
 }
 
-void RecBisectBfLB::recursivePartition(int numParts, Graph *g, int nodes[], int numNodes, 
-		   PartitionList *partitions) {
-  
+void RecBisectBfLB::recursivePartition(int numParts, Graph *g, 
+				       int nodes[], int numNodes, 
+				       PartitionList *partitions) 
+{
   int *p1, *p2;
   int first, second;
   int numP1, numP2;
   
   if (numParts < 2) {
     addPartition(partitions, nodes, numNodes);
-  }
-  else {
+  } else {
     first = numParts/2;
     second = numParts - first;
     partitionInTwo(g, nodes, numNodes, &p1, &numP1, &p2, &numP2, first,second);
     recursivePartition(first, g, p1, numP1, partitions);
     recursivePartition(second, g, p2, numP2,  partitions);
-    free( nodes);
+    free(nodes);
   }  
 }
 
