@@ -142,8 +142,15 @@ CkMarshallUnpackFn CkLookupMarshallUnpackFn(int epIndex)
 }
 
 extern "C" 
-void CkDisableTracing(int epIdx) {
+int CkDisableTracing(int epIdx) {
+	int oldStatus = _entryTable[epIdx]->traceEnabled;
 	_entryTable[epIdx]->traceEnabled=false;
+	return oldStatus;
+}
+
+extern "C" 
+void CkEnableTracing(int epIdx) {
+	_entryTable[epIdx]->traceEnabled=true;
 }
 
 

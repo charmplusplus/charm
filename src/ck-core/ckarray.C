@@ -619,7 +619,10 @@ void CkSendMsgArrayInline(int entryIndex, void *msg, CkArrayID aID, const CkArra
   m->array_index()=idx;
   msg_prepareSend(m,entryIndex,aID);
   CkArray *a=(CkArray *)_localBranch(aID);
+  // avoid nested tracing
+  int oldStatus = CkDisableTracing(entryIndex);
   a->deliver(m);
+  if (oldStatus) CkEnableTracing(entryIndex);
 }
 
 
