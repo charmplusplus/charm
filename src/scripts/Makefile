@@ -25,7 +25,7 @@ SHELL=/bin/sh
 
 all: charm++ libs ampi IDL tsm sm pvm sdag
 
-charm++: converse charmxi charmlibs
+charm++: converse charmxi
 
 for-namd: charm++ pvm ampic
 
@@ -39,7 +39,7 @@ pvm: converse libpvmc.a
 
 sdag: charm++ sdagx libsdag.a
 
-ampi: charm++ ampic ampif
+ampi: charm++ libs ampic ampif
 
 ampic: charm++ libampi.a
 
@@ -161,7 +161,7 @@ CVLIBS=libconv-core.a libconv-cplus-n.a libconv-cplus-y.a libldb-rand.o libldb-s
 
 LIBCONV_CORE=threads.o convcore.o conv-conds.o queueing.o fifo.o msgmgr.o memory.o cpm.o cpthreads.o futures.o cldb.o random.o debug-message.o debug-object.o info.o generate.o edgelist.o conv-ccs.o quiescence.o
 
-converse: basics QuickThreads/libckqt.a $(CVLIBS) conv-host-if-needed conv-cpm convlibs
+converse: basics QuickThreads/libckqt.a $(CVLIBS) conv-host-if-needed conv-cpm
 
 conv-host-if-needed:
 	if [ -f conv-host.c ] ; then make conv-host OPTS='$(OPTS)' ; fi
@@ -179,7 +179,7 @@ conv-host: conv-host.c
 	cp conv-host-notify conv-host
 	cp conv-host ../bin/conv-host
 
-convlibs:
+convlibs: converse
 	cd libs; make convlibs OPTS='$(OPTS)'
 
 libconv-core.a: $(LIBCONV_CORE)
@@ -282,7 +282,7 @@ LIBCK_CORE=init.o register.o qd.o ck.o main.o msgalloc.o ckfutures.o \
            HeapCentLB.o heap.o NborBaseLB.o NeighborLB.o WSLB.o \
 	   GreedyRefLB.o RandRefLB.o CommLBHeap.o
 
-charmlibs: converse $(CK_LIBS_CORE)
+charmlibs: charm++
 	cd libs; make charmlibs OPTS='$(OPTS)'
 
 libck.a: $(LIBCK_CORE)
