@@ -1883,10 +1883,6 @@ static void ConverseRunPE(int everReturn)
     	CMK_RANDOMLY_CORRUPT_MESSAGES,rand());
 #endif
 
-  /* Converse initialization finishes, immediate messages can be processed.
-     node barrier previously should take care of the node synchronization */
-  _immediateReady = 1;
-
   /* communication thread */
   if (CmiMyRank() == CmiMyNodeSize()) {
     Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
@@ -1896,6 +1892,9 @@ static void ConverseRunPE(int everReturn)
   else
   if (!everReturn) {
     Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
+    /* turn on immediate messages only now
+     node barrier previously should take care of the node synchronization */
+    _immediateReady = 1;
     if (Cmi_usrsched==0) CsdScheduler(-1);
     ConverseExit();
   }
