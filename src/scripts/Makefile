@@ -112,7 +112,7 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
       trace.h charm-api.h conv-ccs.h ccs-client.c ccs-client.h ccs-auth.c \
       ccs-auth.h CcsServer.java \
       memory-isomalloc.h debug-conv.h debug-charm.h conv-autoconfig.h \
-      conv-common.h conv-mach.h conv-mach-opt.h conv-mach.sh conv-mach-opt.sh \
+      conv-common.h conv-mach.h conv-mach.sh \
       CkMarshall.decl.h CkArray.decl.h CkLocation.decl.h CkReduction.decl.h \
       CkFutures.decl.h LBDatabase.decl.h CentralLB.decl.h NullLB.decl.h \
       RandCentLB.decl.h RecBisectBfLB.decl.h BaseLB.decl.h \
@@ -151,7 +151,7 @@ basics: headers
 # Headers is used only for the dependencies
 headers: dirs+sources headerlinks $(ALLHEADERS)
 
-conv-autoconfig.h:
+conv-autoconfig.h: configure
 	./configure
 
 headerlinks: dirs+sources Makefile $(ALLHEADERS)
@@ -187,6 +187,7 @@ dirs+sources:
 	./gathertree ../../src/libs libs
 	./gathertree ../../src/arch/util      .
 	./gathertree ../../src/langs langs
+	./gathertree ../../src/arch/common           .
 	./gathertree ../../src/arch/`cat .gdir`      .
 	./gatherflat ../../src/arch/`cat .vdir`      .
 	./gathertree ../../pgms ../pgms
@@ -194,9 +195,8 @@ dirs+sources:
 	chmod +x ../bin/charmc
 	rm -f .gdir
 	rm -rf ../include ; mkdir ../include
-	./system_ln  ../tmp/conv-mach.sh ../include
-	./system_ln  ../tmp/conv-mach-opt.sh ../include
-	./system_ln  ../tmp/conv-mach-pre.sh ../include
+	./system_ln  ../tmp/conv-mach*.*h ../include
+	./system_ln  ../tmp/cc-*.*h ../include
 	if [ ! -f conv-common.h ] ; then ( touch conv-common.h ) ; fi
 	touch dirs+sources
 
