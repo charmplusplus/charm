@@ -209,7 +209,9 @@ void ampi::prepareCtv(void)
 
 ampi::~ampi()
 {
-	CmmFree(msgs);
+  delete[] oorder;
+  delete[] nextseq;
+  CmmFree(msgs);
 }
 
 //------------------------ communication -----------------------
@@ -423,9 +425,6 @@ void ampi::pup(PUP::er &p)
     p | oorder[i];
   p(nextseq, numElements);
   myDDT->pup(p);
-  if(p.isDeleting())
-    delete[] oorder;
-    delete[] nextseq;
 }
 
 //------------------ External Interface -----------------
