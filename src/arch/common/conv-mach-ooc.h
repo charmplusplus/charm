@@ -1,0 +1,2 @@
+#undef CMK_OUT_OF_CORE
+#define CMK_OUT_OF_CORE 1
