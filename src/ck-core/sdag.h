@@ -23,7 +23,7 @@ class CMsgBuffer {
 
     CMsgBuffer(int e, void *m, void* l1, int r) : entry(e), msg(m), bgLog1(l1), bgLog2(NULL),refnum(r), next(NULL) {}
     CMsgBuffer(int e, void *m, int r) : entry(e), msg(m), bgLog1(NULL), bgLog2(NULL),refnum(r), next(NULL) {}
-    CMsgBuffer(): next(NULL), bgLog1(NULL), bgLog2(NULL) {}
+    CMsgBuffer(): bgLog1(NULL), bgLog2(NULL), next(NULL) {}
     void pup(PUP::er& p) {
       p|entry;
       CkPupMessage(p, &msg);
