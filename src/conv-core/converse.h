@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.29  1995-10-18 22:20:37  jyelon
+ * Revision 2.30  1995-10-19 18:22:08  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.29  1995/10/18  22:20:37  jyelon
  * Added 'eatstack' threads implementation.
  *
  * Revision 2.28  1995/10/13  22:34:07  jyelon
@@ -365,11 +368,11 @@ void       CthYield               CMK_PROTO((void));
 
 
 #ifdef CMK_THREADS_UNAVAILABLE
-#define CthDeclare(t,v)         CpvDeclare(t,v)
-#define CthStaticDeclare(t,v)   CpvStaticDeclare(t,v)
-#define CthExtern(t,v)          CpvExtern(t,v)
-#define CthAccess(v)            CpvAccess(v)
-#define CthInitialize(t,v)      CpvInitialize(t,v)
+#define CtvDeclare(t,v)         CpvDeclare(t,v)
+#define CtvStaticDeclare(t,v)   CpvStaticDeclare(t,v)
+#define CtvExtern(t,v)          CpvExtern(t,v)
+#define CtvAccess(v)            CpvAccess(v)
+#define CtvInitialize(t,v)      CpvInitialize(t,v)
 #endif
 
 
@@ -378,13 +381,13 @@ void       CthYield               CMK_PROTO((void));
 #ifdef CMK_PREPROCESSOR_USES_ANSI_STANDARD_CONCATENATION
 extern char *CthData;
 extern int CthRegister CMK_PROTO((int));
-#define CthOffs(v) CthOffs##v
-#define CthType(v) CthType##v
-#define CthDeclare(t,v)         typedef t CthType(v); int CthOffs(v)
-#define CthStaticDeclare(t,v)   typedef t CthType(v); static int CthOffs(v)
-#define CthExtern(t,v)          typedef t CthType(v); extern int CthOffs(v)
-#define CthAccess(v)            (*((CthType(v) *)(CthData+CthOffs(v))))
-#define CthInitialize(t,v)      (CthOffs(v)=CthRegister(sizeof(CthType(v))))
+#define CtvOffs(v) CtvOffs##v
+#define CtvType(v) CtvType##v
+#define CtvDeclare(t,v)         typedef t CtvType(v); int CtvOffs(v)
+#define CtvStaticDeclare(t,v)   typedef t CtvType(v); static int CtvOffs(v)
+#define CtvExtern(t,v)          typedef t CtvType(v); extern int CtvOffs(v)
+#define CtvAccess(v)            (*((CtvType(v) *)(CthData+CtvOffs(v))))
+#define CtvInitialize(t,v)      (CtvOffs(v)=CthRegister(sizeof(CtvType(v))))
 #endif /* CMK_PREPROCESSOR_USES_ANSI_STANDARD_CONCATENATION */
 #endif /* CMK_THREADS_USE_ALLOCA */
 
@@ -394,11 +397,11 @@ extern int CthRegister CMK_PROTO((int));
 #ifdef CMK_PREPROCESSOR_CANNOT_DO_CONCATENATION
 extern char *CthData;
 extern int CthRegister CMK_PROTO((int));
-#define CthDeclare(t,v)         int v;          struct v { t data; }
-#define CthStaticDeclare(t,v)   static int v;   struct v { t data; }
-#define CthExtern(t,v)          extern int v;   struct v { t data; }
-#define CthAccess(v)            (((struct v *)(CthData+(v)))->data)
-#define CthInitialize(t,v)      (v=CthRegister(sizeof(struct v)))
+#define CtvDeclare(t,v)         int v;          struct v { t data; }
+#define CtvStaticDeclare(t,v)   static int v;   struct v { t data; }
+#define CtvExtern(t,v)          extern int v;   struct v { t data; }
+#define CtvAccess(v)            (((struct v *)(CthData+(v)))->data)
+#define CtvInitialize(t,v)      (v=CthRegister(sizeof(struct v)))
 #endif /* CMK_PREPROCESSOR_CANNOT_DO_CONCATENATION */
 #endif /* CMK_THREADS_USE_ALLOCA */
 
@@ -408,13 +411,13 @@ extern int CthRegister CMK_PROTO((int));
 #ifdef CMK_PREPROCESSOR_USES_ANSI_STANDARD_CONCATENATION
 CpvExtern(char *, CthData);
 extern int CthRegister CMK_PROTO((int));
-#define CthOffs(v) CthOffs##v
-#define CthType(v) CthType##v
-#define CthDeclare(t,v)      typedef t CthType(v); int CthOffs(v)
-#define CthStaticDeclare(t,v)typedef t CthType(v); static int CthOffs(v)
-#define CthExtern(t,v)       typedef t CthType(v); extern int CthOffs(v)
-#define CthAccess(v)         (*((CthType(v) *)(CpvAccess(CthData)+CthOffs(v))))
-#define CthInitialize(t,v)   (CthOffs(v)=CthRegister(sizeof(CthType(v))))
+#define CtvOffs(v) CtvOffs##v
+#define CtvType(v) CtvType##v
+#define CtvDeclare(t,v)      typedef t CtvType(v); int CtvOffs(v)
+#define CtvStaticDeclare(t,v)typedef t CtvType(v); static int CtvOffs(v)
+#define CtvExtern(t,v)       typedef t CtvType(v); extern int CtvOffs(v)
+#define CtvAccess(v)         (*((CtvType(v) *)(CpvAccess(CthData)+CtvOffs(v))))
+#define CtvInitialize(t,v)   (CtvOffs(v)=CthRegister(sizeof(CtvType(v))))
 #endif /* CMK_PREPROCESSOR_USES_ANSI_STANDARD_CONCATENATION */
 #endif /* CMK_THREADS_USE_EATSTACK */
 
@@ -424,11 +427,11 @@ extern int CthRegister CMK_PROTO((int));
 #ifdef CMK_PREPROCESSOR_CANNOT_DO_CONCATENATION
 CpvDeclare(char *, CthData);
 extern int CthRegister CMK_PROTO((int));
-#define CthDeclare(t,v)         int v;          struct v { t data; }
-#define CthStaticDeclare(t,v)   static int v;   struct v { t data; }
-#define CthExtern(t,v)          extern int v;   struct v { t data; }
-#define CthAccess(v)            (((struct v *)(CpvAccess(CthData)+(v)))->data)
-#define CthInitialize(t,v)      (v=CthRegister(sizeof(struct v)))
+#define CtvDeclare(t,v)         int v;          struct v { t data; }
+#define CtvStaticDeclare(t,v)   static int v;   struct v { t data; }
+#define CtvExtern(t,v)          extern int v;   struct v { t data; }
+#define CtvAccess(v)            (((struct v *)(CpvAccess(CthData)+(v)))->data)
+#define CtvInitialize(t,v)      (v=CthRegister(sizeof(struct v)))
 #endif /* CMK_PREPROCESSOR_CANNOT_DO_CONCATENATION */
 #endif /* CMK_THREADS_USE_EATSTACK */
 
