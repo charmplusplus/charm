@@ -278,6 +278,12 @@ static void KillOnAllSigs(int dummy)
   exit(1);
 }
 
+static void HandleUserSignals(int signum)
+{
+  int condnum = ((signum==SIGUSR1) ? CcdSIGUSR1 : CcdSIGUSR2);
+  CcdRaiseCondition(condnum);
+}
+
 static void KillOnSIGPIPE(int dummy)
 {
   fprintf(stderr,"host exited, terminating.\n");
@@ -2845,6 +2851,10 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int ret)
   signal(SIGTERM, KillOnAllSigs);
   signal(SIGQUIT, KillOnAllSigs);
   signal(SIGABRT, KillOnAllSigs);
+#if CMK_HANDLE_SIGUSR
+  signal(SIGUSR1, HandleUserSignals);
+  signal(SIGUSR2, HandleUserSignals);
+#endif
   skt_datagram(&dataport, &dataskt, Cmi_os_buffer_size);
   skt_server(&ctrlport, &ctrlskt);
   Cmi_host_fd = skt_connect(Cmi_host_IP, Cmi_host_port, 60);

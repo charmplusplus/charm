@@ -1012,6 +1012,8 @@ void CPathMsgFree(void *msg);
 typedef void (*CcdVoidFn)();
 
 #define CcdPROCESSORIDLE 1
+#define CcdSIGUSR1 2
+#define CcdSIGUSR2 3
 
 void CcdCallFnAfter(CcdVoidFn fnp, void *arg, unsigned int msecs);
 void CcdPeriodicallyCall(CcdVoidFn fnp, void *arg);
