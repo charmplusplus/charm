@@ -52,7 +52,9 @@ static void FEMfallbackSetup(void)
 // valid in routines called from driver().
 CtvStaticDeclare(FEMchunk*, _femptr);
 
+PUPable_def(FEM_Sym_Linear);
 void FEMnodeInit(void) {
+	PUPable_reg(FEM_Sym_Linear);
 	CtvInitialize(FEMchunk*, _femptr);
 	TCharmSetFallbackSetup(FEMfallbackSetup);	
 }
@@ -339,7 +341,7 @@ FDECL void FTN_NAME(FEM_SERIAL_BEGIN,fem_serial_begin)(int *pieceNo)
 /*Utility*/
 
 //Make a heap-allocated copy of this (len-item) array, changing the index as spec'd
-static int *copyArray(const int *src,int len,int indexBase)
+int *CkCopyArray(const int *src,int len,int indexBase)
 {
 	int *ret=new int[len];
 	for (int i=0;i<len;i++) ret[i]=src[i]-indexBase;
@@ -386,123 +388,9 @@ static const FEM_Mesh *getMesh(void) {
     return _meshptr;
   }
 }
-
-/********** Symmetries **********/
-static FEM_Ghost &setGhost(void) {
-	if(TCharm::getState()==inDriver)
-		CkAbort("FEM: Cannot call ghost or symmetry routines from driver!");
-	return ghosts;
+const FEM_Mesh *FEM_Get_FEM_Mesh(void) {
+	return getMesh();
 }
-
-
-void FEM_Ghost::setSymmetries(int nNodes_,int *can,const int *sym_src)
-{
-	nodeCanon=can;
-	allocSym(nNodes_);
-	for (int i=0;i<nNodes;i++) 
-		nodeSymmetries[i]=(FEM_Symmetries_t)sym_src[i];
-}
-
-void FEM_Item::setSymmetries(int r,FEM_Symmetries_t s)
-{
-	if (!sym) {
-		if (s==0) return; //Don't bother allocating for nothing
-		sym=new sym_t;
-	}
-	sym->insert(r,s);
-}
-
-CDECL void FEM_Set_Sym_Nodes(const int *canon,const int *sym)
-{
-	FEMAPI("FEM_Set_Sym_Nodes");
-	int n=setMesh()->node.size();
-	setGhost().setSymmetries(n,copyArray(canon,n,0),sym);
-}
-FDECL void FTN_NAME(FEM_SET_SYM_NODES,fem_set_sym_nodes)
-	(const int *canon,const int *sym)
-{
-	FEMAPI("FEM_Set_Sym_Nodes");
-	int n=setMesh()->node.size();
-	setGhost().setSymmetries(n,copyArray(canon,n,1),sym);
-}
-
-CDECL void FEM_Get_Sym(int elTypeOrMinusOne,int *destSym)
-{
-	FEMAPI("FEM_Get_Sym");
-	const FEM_Item &l=getMesh()->getCount(elTypeOrMinusOne);
-	int n=l.size();
-	for (int i=0;i<n;i++) destSym[i]=l.getSymmetries(i);
-}
-FDECL void FTN_NAME(FEM_GET_SYM,fem_get_sym)
-	(int *elTypeOrZero,int *destSym)
-{
-	FEM_Get_Sym(*elTypeOrZero-1,destSym);
-}
-
-#if 0
-/*
- Build symmetries based on faces.
- This is only useful once you have face-face correspondences,
- which we don't immediately have.  Thus this is commented out for now...
-*/
-static FEM_Symmetries_t makeSym(int symNo) 
-{ //Convert a user-input symmetry number (0,1,2,3, ...) to a 
-  //  FEM_Symmetries_t (1,2,4,8,...)
-	if (symNo<0) CkAbort("FEM_Add_Sym_Faces> symmetry number is negative");
-	if (symNo>=(8*sizeof(FEM_Symmetries_t)))
-		CkAbort("FEM_Add_Sym_Faces> symmetry number is too large");
-	return FEM_Symmetries_t(1<<symNo);
-}
-
-static void combineCanon(int &a,int &b) 
-{ //Combine entries in canonicalization array by taking minimum	
-	if (a<b) {b=a;}
-	else /*a>=b*/ {a=b;}
-}
-
-void FEM_Ghost::addFaces(int nNodes_,int nFaces,int nodePerFace,
-		int symA,const int *fA,int symB,const int *fB,int idxBase)
-{
-	initSym(nNodes_);
-	FEM_Symmetries_t mA=makeSym(symA);
-	FEM_Symmetries_t mB=makeSym(symB);
-	
-	int nF=nFaces*nodePerFace;
-	for (int n=0;n<nF;n++) {
-		int a=nodeCheck(fA[n]-idxBase), b=nodeCheck(fB[n]-idxBase);
-		//Check for invalid nodes:
-		if (a==-1 || b==-1) 
-		{ //User marked this as an invalid node: skip it
-			break;
-		}
-		if (a==-2 || b==-2) { //nodeCheck marked as invalid: abort!
-			CkAbort("FEM_Add_Sym_Faces> Bad node index passed in faces array!");
-		}
-		
-		//a is same as b-- paste them together
-		combineCanon(nodeCanon[a],nodeCanon[b]);
-		//a belongs to symmetry mA, likewise b:
-		nodeSymmetries[a]=mA;
-		nodeSymmetries[b]=mB;
-	}
-}
-
-CDECL void FEM_Add_Sym_Faces(int nFaces,int nodePerFace,
-	int symA,const int *fA,int symB,const int *fB)
-{
-	FEMAPI("FEM_Add_Sym_Faces");
-	setGhost().addFaces(setMesh()->node.size(),nFaces,nodePerFace,
-		symA,fA,symB,fB,0);
-}
-FDECL void FTN_NAME(FEM_ADD_SYM_FACES,fem_add_sym_faces)
-	(int *nFaces,int *nodePerFace,
-	int *symA,const int *fA,int *symB,const int *fB)
-{
-	FEMAPI("FEM_Add_Sym_Faces");
-	setGhost().addFaces(setMesh()->node.size(),*nFaces,*nodePerFace,
-		*symA-1,fA,*symB-1,fB,1);
-}
-#endif
 
 /********** Sparse data ********/
 void FEM_Sparse::allocate(int n_) //Allocate storage for data and nodes of n tuples
@@ -566,14 +454,14 @@ CDECL void FEM_Set_Sparse_Elem(int uniqueID,const int *rec2elem)
 {
 	FEMAPI("FEM_Set_Sparse_Elem");
 	FEM_Sparse &s=setMesh()->setSparse(uniqueID);
-	s.setElem(copyArray(rec2elem,2*s.size(),0));
+	s.setElem(CkCopyArray(rec2elem,2*s.size(),0));
 }
 FDECL void FTN_NAME(FEM_SET_SPARSE_ELEM,fem_set_sparse_elem)
 	(const int *uniqueID,int *rec2elem)
 {
 	FEMAPI("FEM_Set_Sparse_Elem");
 	FEM_Sparse &s=setMesh()->setSparse(*uniqueID-1);
-	s.setElem(copyArray(rec2elem,2*s.size(),1));
+	s.setElem(CkCopyArray(rec2elem,2*s.size(),1));
 }
 
 CDECL int  FEM_Get_Sparse_Length(int uniqueID)
@@ -663,7 +551,7 @@ FDECL void FTN_NAME(FEM_COMBINE_ELEM,fem_combine_elem)(
 /****** Custom Partitioning API *******/
 static void Set_Partition(int *elem2chunk,int indexBase) {
 	if (_elem2chunk!=NULL) delete[] _elem2chunk;
-	_elem2chunk=copyArray(elem2chunk,getMesh()->nElems(),indexBase);
+	_elem2chunk=CkCopyArray(elem2chunk,getMesh()->nElems(),indexBase);
 }
 
 //C bindings:
@@ -1839,10 +1727,16 @@ FDECL void FTN_NAME(FEM_GET_NODE_NUMBERS,fem_get_node_numbers)
 }
 
 /******************** Ghost Layers *********************/
+FEM_Ghost &FEM_Set_FEM_Ghost(void) {
+	if(TCharm::getState()==inDriver)
+		CkAbort("FEM: Cannot call ghost or symmetry routines from driver!");
+	return ghosts;
+}
+
 CDECL void FEM_Add_Ghost_Layer(int nodesPerTuple,int doAddNodes)
 {
 	FEMAPI("FEM_Add_Ghost_Layer");
-	curGhostLayer=setGhost().addLayer();
+	curGhostLayer=FEM_Set_FEM_Ghost().addLayer();
 	curGhostLayer->nodesPerTuple=nodesPerTuple;
 	curGhostLayer->addNodes=(doAddNodes!=0);
 	curGhostLayer->elem.makeLonger(getMesh()->elem.size());
@@ -1858,7 +1752,7 @@ CDECL void FEM_Add_Ghost_Elem(int elType,int tuplesPerElem,const int *elem2tuple
 		CkAbort("You must call FEM_Add_Ghost_Layer before calling FEM_Add_Ghost_Elem!\n");
 	curGhostLayer->elem[elType].add=true;
 	curGhostLayer->elem[elType].tuplesPerElem=tuplesPerElem;
-	curGhostLayer->elem[elType].elem2tuple=copyArray(elem2tuple,
+	curGhostLayer->elem[elType].elem2tuple=CkCopyArray(elem2tuple,
 		          tuplesPerElem*curGhostLayer->nodesPerTuple,0);
 }
 FDECL void FTN_NAME(FEM_ADD_GHOST_ELEM,fem_add_ghost_elem)
@@ -1872,7 +1766,7 @@ FDECL void FTN_NAME(FEM_ADD_GHOST_ELEM,fem_add_ghost_elem)
 	getMesh()->chkET(elType);
 	curGhostLayer->elem[elType].add=true;
 	curGhostLayer->elem[elType].tuplesPerElem=tuplesPerElem;
-	curGhostLayer->elem[elType].elem2tuple=copyArray(elem2tuple,
+	curGhostLayer->elem[elType].elem2tuple=CkCopyArray(elem2tuple,
 		          tuplesPerElem*curGhostLayer->nodesPerTuple,1);
 }
 
@@ -2297,6 +2191,9 @@ void FEM_Mesh::pup(PUP::er &p)  //For migration
 	
 	p.comment("-------------- Sparse Data ------------");
 	sparse.pup(p);
+	
+	p.comment("-------------- Symmetries ------------");
+	symList.pup(p);
 }
 void FEM_Item::pup(PUP::er &p) {
 	p.comment("<ghostStart>");

@@ -736,8 +736,10 @@ public:
 //Add all the layers of ghost elements
 void splitter::addGhosts(const FEM_Ghost &ghosts)
 {
+	int c;
+	
 //Set up the ghostStart counts:
-	for (int c=0;c<nchunks;c++) {
+	for (c=0;c<nchunks;c++) {
 		msgs[c]->m.node.startGhosts(dyn[c].node.size());
 		for (int t=0;t<mesh->elem.size();t++) 
 			msgs[c]->m.elem[t].startGhosts(dyn[c].elem[t].size());
@@ -760,7 +762,8 @@ void splitter::addGhosts(const FEM_Ghost &ghosts)
 	  for (n=0;n<nNode;n++)
 	    if (sym[n]!=(FEM_Symmetries_t)0)
 	      ghostNode[n]=1;
-
+	for (c=0;c<nchunks;c++) msgs[c]->m.setSymList(ghosts.getSymList());
+	
 //Add each layer
 	consistencyCheck();
 	for (int i=0;i<nLayers;i++) {

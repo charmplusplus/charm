@@ -38,6 +38,9 @@
        external FEM_Set_Sparse_Elem
        external FEM_Get_Sparse
 
+       external FEM_Add_Linear_Periodicity
+       external FEM_Sym_Coordinates
+
        external FEM_Set_Sym_Nodes
        external FEM_Get_Sym
 

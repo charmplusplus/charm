@@ -11,6 +11,7 @@ Orion Sky Lawlor, olawlor@acm.org, 9/28/00
 
 #include "charm-api.h"
 #include "tcharm.h"
+#include "ckvector3d.h"
 #include "fem.h"
 
 // temporary Datatype representation
@@ -407,6 +408,10 @@ public:
 	int isGhostIndex(int idx) const { return idx>=ghostStart; }
 	
 	//Symmetry array:
+	const FEM_Symmetries_t *getSymmetries(void) const {
+		if (sym==NULL) return NULL;
+		else return sym->getVec();
+	}
 	FEM_Symmetries_t getSymmetries(int r) const { 
 		if (sym==NULL) return FEM_Symmetries_t(0);
 		else return (*sym)[r]; 
@@ -482,11 +487,86 @@ public:
 };
 PUPmarshall(FEM_Sparse);
 
+
+/*Describes one kind of symmetry condition
+*/
+class FEM_Sym_Desc : public PUP::able {
+public:
+	virtual ~FEM_Sym_Desc();
+
+	//Apply this symmetry to this location vector
+	virtual CkVector3d applyLoc(const CkVector3d &loc) const =0;
+	
+	//Apply this symmetry to this relative (vel or acc) vector
+	virtual CkVector3d applyVec(const CkVector3d &vec) const =0;
+	
+	//Make a new copy of this class:
+	virtual FEM_Sym_Desc *clone(void) const =0;
+	
+	//Allows Desc's to be pup'd via | operator:
+	friend inline void operator|(PUP::er &p,FEM_Sym_Desc &a) {a.pup(p);}
+	friend inline void operator|(PUP::er &p,FEM_Sym_Desc* &a) {
+		PUP::able *pa=a;  p(&pa);  a=(FEM_Sym_Desc *)pa;
+	}
+};
+
+//Describes a linear-periodic (space shift) symmetry:
+class FEM_Sym_Linear : public FEM_Sym_Desc {
+	CkVector3d shift; //Offset to add to locations
+public:
+	FEM_Sym_Linear(const CkVector3d &shift_) :shift(shift_) {}
+	FEM_Sym_Linear(CkMigrateMessage *m) {}
+	
+	//Apply this symmetry to this location vector
+	CkVector3d applyLoc(const CkVector3d &loc) const {return loc+shift;}
+	
+	//Apply this symmetry to this relative (vel or acc) vector
+	virtual CkVector3d applyVec(const CkVector3d &vec) const {return vec;}
+	
+	virtual FEM_Sym_Desc *clone(void) const {
+		return new FEM_Sym_Linear(shift);
+	}
+	
+	virtual void pup(PUP::er &p);
+	PUPable_decl(FEM_Sym_Linear);
+};
+
+/*
+Describes all the different kinds of symmetries that apply to
+this mesh.
+*/
+class FEM_Sym_List {
+	//This lists the different kinds of symmetry
+	CkPupAblePtrVec<FEM_Sym_Desc> sym; 
+	
+	FEM_Sym_List(const FEM_Sym_List &src); //NOT DEFINED: copy constructor
+public:
+	FEM_Sym_List();
+	void operator=(const FEM_Sym_List &src); //Assignment operator
+	~FEM_Sym_List();
+	
+	//Add a new kind of symmetry to this list, returning
+	// the way objects with that symmetry should be marked.
+	FEM_Symmetries_t add(FEM_Sym_Desc *desc);
+	
+	//Apply all the listed symmetries to this location
+	void applyLoc(CkVector3d *loc,FEM_Symmetries_t sym) const;
+	
+	//Apply all the listed symmetries to this relative vector
+	void applyVec(CkVector3d *vec,FEM_Symmetries_t sym) const;
+	
+	void pup(PUP::er &p);
+};
+
 /*This class describes the nodes and elements in
   a finite-element mesh or submesh*/
 class FEM_Mesh : public CkNoncopyable {
 	CkPupPtrVec<FEM_Sparse> sparse;
+	FEM_Sym_List symList;
 public:
+	void setSymList(const FEM_Sym_List &src) {symList=src;}
+	const FEM_Sym_List &getSymList(void) const {return symList;}
+
 	int nSparse(void) const {return sparse.size();}
 	void setSparse(int uniqueID,FEM_Sparse *s);
 	FEM_Sparse &setSparse(int uniqueID);
@@ -708,33 +788,16 @@ public:
 	NumberedVec<elemGhostInfo> elem;
 };
 
+//Accumulates all symmetries of the mesh before splitting:
+class FEM_Initial_Symmetries; /*Defined in symmetries.C*/
+
 //Describes all ghost elements
 class FEM_Ghost : public CkNoncopyable {
 	CkVec<ghostLayer *> layers;
-
-//Symmetries:
-	int nNodes;
-	void allocSym(int nNodes_) {
-		nNodes=nNodes_;
-		nodeSymmetries=new FEM_Symmetries_t[nNodes];
-	}
-	void initSym(int nNodes_) {
-		if (nodeCanon!=NULL) return; //Already initialized
-		allocSym(nNodes_);
-		nodeCanon=new int[nNodes];
-		int i;
-		for (i=0;i<nNodes;i++) nodeCanon[i]=i;
-		for (i=0;i<nNodes;i++) nodeSymmetries[i]=0;
-	}
-	int nodeCheck(int n) {
-		if (n<-1 || n>=nNodes) return -2;
-		return n;
-	}
-	intArrayPtr nodeCanon; //Map global node to canonical number
-	ArrayPtrT<FEM_Symmetries_t> nodeSymmetries; //Symmetries each node belongs to
-
+	
+	FEM_Initial_Symmetries *sym;
 public:
-	FEM_Ghost() {nNodes=-1;}
+	FEM_Ghost() {sym=NULL;}
 	~FEM_Ghost() {for (int i=0;i<getLayers();i++) delete layers[i];}
 	
 	int getLayers(void) const {return layers.size();}
@@ -745,11 +808,13 @@ public:
 	}
 	const ghostLayer &getLayer(int layerNo) const {return *layers[layerNo];}
 	
-	void setSymmetries(int nNodes_,int *can,const int *sym_src);
-	void addFaces(int nNodes_,int nFaces,int nodePerFace,
-		int symA,const int *fA,int symB,const int *fB,int idxBase);
-	const int *getCanon(void) const {return nodeCanon;}
-	const FEM_Symmetries_t *getSymmetries(void) const {return nodeSymmetries;}
+	void setSymmetries(int nNodes_,int *new_can,const int *sym_src);
+	void addLinearPeriodic(int nFaces_,int nPer,
+		const int *facesA,const int *facesB,int idxBase,
+		int nNodes_,const CkVector3d *nodeLocs);
+	const int *getCanon(void) const;
+	const FEM_Symmetries_t *getSymmetries(void) const;
+	const FEM_Sym_List &getSymList(void) const;
 };
 
 //Declare this at the start of every API routine:
@@ -774,6 +839,12 @@ void fem_split(FEM_Mesh *mesh,int nchunks,const int *elem2chunk,
 
 /*The inverse of fem_split: reassemble split chunks into a single mesh*/
 FEM_Mesh *fem_assemble(int nchunks,MeshChunk **msgs);
+
+
+//Make a new[]'d copy of this (len-item) array, changing the index as spec'd
+int *CkCopyArray(const int *src,int len,int indexBase);
+const FEM_Mesh *FEM_Get_FEM_Mesh(void);
+FEM_Ghost &FEM_Set_FEM_Ghost(void);
 
 #endif
 
