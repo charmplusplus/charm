@@ -319,45 +319,6 @@ NLBMigrateMsg* NeighborLB::Strategy(LDStats* stats,int count)
   return msg;
 }
 
-// void* NLBStatsMsg::alloc(int msgnum, size_t size, int* array, int priobits)
-// {
-//   int totalsize = size + array[0] * sizeof(LDObjData) 
-//     + array[1] * sizeof(LDCommData);
-
-//   NLBStatsMsg* ret =
-//     static_cast<NLBStatsMsg*>(CkAllocMsg(msgnum,totalsize,priobits));
-
-//   ret->objData = reinterpret_cast<LDObjData*>((reinterpret_cast<char*>(ret) 
-// 					       + size));
-//   ret->commData = reinterpret_cast<LDCommData*>(ret->objData + array[0]);
-
-//   return static_cast<void*>(ret);
-// }
-
-// void* NLBStatsMsg::pack(NLBStatsMsg* m)
-// {
-//   m->objData = 
-//     reinterpret_cast<LDObjData*>(reinterpret_cast<char*>(m->objData)
-//       - reinterpret_cast<char*>(&m->objData));
-//   m->commData = 
-//     reinterpret_cast<LDCommData*>(reinterpret_cast<char*>(m->commData)
-//       - reinterpret_cast<char*>(&m->commData));
-//   return static_cast<void*>(m);
-// }
-
-// NLBStatsMsg* NLBStatsMsg::unpack(void *m)
-// {
-//   NLBStatsMsg* ret_val = static_cast<NLBStatsMsg*>(m);
-
-//   ret_val->objData = 
-//     reinterpret_cast<LDObjData*>(reinterpret_cast<char*>(&ret_val->objData)
-//       + reinterpret_cast<size_t>(ret_val->objData));
-//   ret_val->commData = 
-//     reinterpret_cast<LDCommData*>(reinterpret_cast<char*>(&ret_val->commData)
-//       + reinterpret_cast<size_t>(ret_val->commData));
-//   return ret_val;
-// }
-
 void* NLBMigrateMsg::alloc(int msgnum, size_t size, int* array, int priobits)
 {
   int totalsize = size + array[0] * sizeof(NeighborLB::MigrateInfo);

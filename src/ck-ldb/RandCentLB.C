@@ -2,22 +2,10 @@
 
 #if CMK_LBDB_ON
 
-#if CMK_STL_USE_DOT_H
-#include <deque.h>
-#include <queue.h>
-#else
-#include <deque>
-#include <queue>
-#endif
+#include "CkLists.h"
 
 #include "RandCentLB.h"
 #include "RandCentLB.def.h"
-
-#if CMK_STL_USE_DOT_H
-template class deque<CentralLB::MigrateInfo>;
-#else
-template class std::deque<CentralLB::MigrateInfo>;
-#endif
 
 void CreateRandCentLB()
 {
@@ -41,11 +29,7 @@ CLBMigrateMsg* RandCentLB::Strategy(CentralLB::LDStats* stats, int count)
 {
   CkPrintf("[%d] RandCentLB strategy\n",CkMyPe());
 
-#if CMK_STL_USE_DOT_H
-  queue<MigrateInfo> migrateInfo;
-#else
-  std::queue<MigrateInfo> migrateInfo;
-#endif
+  CkVector migrateInfo;
 
   for(int pe=0; pe < count; pe++) {
     CkPrintf("[%d] PE %d : %d Objects : %d Communication\n",
@@ -55,11 +39,11 @@ CLBMigrateMsg* RandCentLB::Strategy(CentralLB::LDStats* stats, int count)
       if (dest != pe) {
 	CkPrintf("[%d] Obj %d migrating from %d to %d\n",
 		 CkMyPe(),obj,pe,dest);
-	MigrateInfo migrateMe;
-	migrateMe.obj = stats[pe].objData[obj].handle;
-	migrateMe.from_pe = pe;
-	migrateMe.to_pe = dest;
-	migrateInfo.push(migrateMe);
+	MigrateInfo* migrateMe = new MigrateInfo;
+	migrateMe->obj = stats[pe].objData[obj].handle;
+	migrateMe->from_pe = pe;
+	migrateMe->to_pe = dest;
+	migrateInfo.push_back((void*)migrateMe);
       }
     }
   }
@@ -68,8 +52,10 @@ CLBMigrateMsg* RandCentLB::Strategy(CentralLB::LDStats* stats, int count)
   CLBMigrateMsg* msg = new(&migrate_count,1) CLBMigrateMsg;
   msg->n_moves = migrate_count;
   for(int i=0; i < migrate_count; i++) {
-    msg->moves[i] = migrateInfo.front();
-    migrateInfo.pop();
+    MigrateInfo* item = (MigrateInfo*)migrateInfo[i];
+    msg->moves[i] = *item;
+    delete item;
+    migrateInfo[i] = 0;
   }
 
   return msg;

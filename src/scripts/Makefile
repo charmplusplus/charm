@@ -65,7 +65,7 @@ ALLHEADERS=charm++.h ckstream.h charm.h cpthreads.h converse.h \
 	TList.h idl.h ckarray.h tempo.h waitqd.h LBDatabase.h \
 	lbdb.h LBDBManager.h LBComm.h LBOM.h LBObj.h LBMachineUtil.h \
 	CentralLB.h RandCentLB.h RefineLB.h MetisLB.h HeapCentLB.h \
-	Set.h elements.h heap.h conv-ccs.h NeighborLB.h WSLB.h
+	Set.h elements.h heap.h conv-ccs.h NeighborLB.h WSLB.h CkLists.h
 
 ALLINTERFACES=idl.ci
 
@@ -249,7 +249,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h trace.h \
           ckfutures.h ckarray.h tempo.h waitqd.h LBDatabase.h lbdb.h \
 	  LBDBManager.h LBComm.h LBOM.h LBObj.h LBMachineUtil.h \
 	  CentralLB.h RandCentLB.h RefineLB.h HeapCentLB.h MetisLB.h \
-	  NeighborLB.h WSLB.h \
+	  NeighborLB.h WSLB.h CkLists.h \
 	  $(CVHEADERS)
 
 CK_LIBS_CORE=libck.a

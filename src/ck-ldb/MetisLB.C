@@ -2,22 +2,10 @@
 
 #if CMK_LBDB_ON
 
-#if CMK_STL_USE_DOT_H
-#include <deque.h>
-#include <queue.h>
-#else
-#include <deque>
-#include <queue>
-#endif
+#include "CkLists.h"
 
 #include "MetisLB.h"
 #include "MetisLB.def.h"
-
-#if CMK_STL_USE_DOT_H
-template class deque<CentralLB::MigrateInfo>;
-#else
-template class std::deque<CentralLB::MigrateInfo>;
-#endif
 
 void CreateMetisLB()
 {
@@ -83,11 +71,7 @@ CLBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
 {
   // CkPrintf("[%d] MetisLB strategy\n",CkMyPe());
 
-#if CMK_STL_USE_DOT_H
-  queue<MigrateInfo> migrateInfo;
-#else
-  std::queue<MigrateInfo> migrateInfo;
-#endif
+  CkVector migrateInfo;
 
   int i, j;
   int numobjs = 0;
@@ -207,11 +191,11 @@ CLBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
 
   for(i=0; i<numobjs; i++) {
     if(origmap[i] != newmap[i]) {
-      MigrateInfo migrateMe;
-      migrateMe.obj = handles[i];
-      migrateMe.from_pe = origmap[i];
-      migrateMe.to_pe = newmap[i];
-      migrateInfo.push(migrateMe);
+      MigrateInfo* migrateMe = new MigrateInfo;
+      migrateMe->obj = handles[i];
+      migrateMe->from_pe = origmap[i];
+      migrateMe->to_pe = newmap[i];
+      migrateInfo.push_back((void*)migrateMe);
     }
   }
 
@@ -224,8 +208,10 @@ CLBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
   CLBMigrateMsg* msg = new(&migrate_count,1) CLBMigrateMsg;
   msg->n_moves = migrate_count;
   for(i=0; i < migrate_count; i++) {
-    msg->moves[i] = migrateInfo.front();
-    migrateInfo.pop();
+    MigrateInfo* item = (MigrateInfo*)migrateInfo[i];
+    msg->moves[i] = *item;
+    delete item;
+    migrateInfo[i] = 0;
   }
 
   return msg;

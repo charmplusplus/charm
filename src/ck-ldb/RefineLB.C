@@ -2,26 +2,13 @@
 
 #if CMK_LBDB_ON
 
-#if CMK_STL_USE_DOT_H
-#include <deque.h>
-#include <queue.h>
-#else
-#include <deque>
-#include <queue>
-#endif
+#include "CkLists.h"
 
 #include "RefineLB.h"
 #include "RefineLB.def.h"
 
-#if CMK_STL_USE_DOT_H
-template class deque<CentralLB::MigrateInfo>;
-#else
-template class std::deque<CentralLB::MigrateInfo>;
-#endif
-
 void CreateRefineLB()
 {
-  CkPrintf("[%d] creating RefineLB %d\n",CkMyPe(),loadbalancer);
   loadbalancer = CProxy_RefineLB::ckNew();
   CkPrintf("[%d] created RefineLB %d\n",CkMyPe(),loadbalancer);
 }
@@ -33,7 +20,6 @@ RefineLB::RefineLB()
 
 CmiBool RefineLB::QueryBalanceNow(int _step)
 {
-  CkPrintf("[%d] Balancing on step %d\n",CkMyPe(),_step);
   return CmiTrue;
 }
 
@@ -226,59 +212,36 @@ CLBMigrateMsg* RefineLB::Strategy(CentralLB::LDStats* stats, int count)
 
   refine();
 
-#if CMK_STL_USE_DOT_H
-  queue<MigrateInfo> migrateInfo;
-#else
-  std::queue<MigrateInfo> migrateInfo;
-#endif
+  CkVector migrateInfo;
 
   for (int pe=0; pe < P; pe++) {
     Iterator nextCompute;
     nextCompute.id = 0;
     computeInfo *c = (computeInfo *)
          processors[pe].computeSet->iterator((Iterator *)&nextCompute);
-    while(c)
-    {
-      if (c->oldProcessor != c->processor)
-      {
-CkPrintf("Migrate: from %d to %d\n", c->oldProcessor, c->processor);
-	MigrateInfo migrateMe;
-	migrateMe.obj = c->handle;
-	migrateMe.from_pe = c->oldProcessor;
-	migrateMe.to_pe = c->processor;
-	migrateInfo.push(migrateMe);
+    while(c) {
+      if (c->oldProcessor != c->processor)  {
+	CkPrintf("Migrate: from %d to %d\n",c->oldProcessor, c->processor);
+	MigrateInfo* migrateMe = new MigrateInfo;
+	migrateMe->obj = c->handle;
+	migrateMe->from_pe = c->oldProcessor;
+	migrateMe->to_pe = c->processor;
+	migrateInfo.push_back((void*)migrateMe);
       }
-
-        nextCompute.id++;
-        c = (computeInfo *) processors[pe].computeSet->next((Iterator *)&nextCompute);
+      nextCompute.id++;
+      c = (computeInfo *) processors[pe].computeSet->
+	             next((Iterator *)&nextCompute);
     }
   }
-
-/*
-  for(int pe=0; pe < count; pe++) {
-    CkPrintf("[%d] PE %d : %d Objects : %d Communication\n",
-	     CkMyPe(),pe,stats[pe].n_objs,stats[pe].n_comm);
-    for(int obj=0; obj < stats[pe].n_objs; obj++) {
-      const int dest = static_cast<int>(drand48()*(CmiNumPes()-1) + 0.5);
-      if (dest != pe) {
-	CkPrintf("[%d] Obj %d migrating from %d to %d\n",
-		 CkMyPe(),obj,pe,dest);
-	MigrateInfo migrateMe;
-	migrateMe.obj = stats[pe].objData[obj].handle;
-	migrateMe.from_pe = pe;
-	migrateMe.to_pe = dest;
-	migrateInfo.push(migrateMe);
-      }
-    }
-  }
-*/
 
   int migrate_count=migrateInfo.size();
   CLBMigrateMsg* msg = new(&migrate_count,1) CLBMigrateMsg;
   msg->n_moves = migrate_count;
   for(i=0; i < migrate_count; i++) {
-    msg->moves[i] = migrateInfo.front();
-    migrateInfo.pop();
+    MigrateInfo* item = (MigrateInfo*)migrateInfo[i];
+    msg->moves[i] = *item;
+    delete item;
+    migrateInfo[i] = 0;
   }
 
   return msg;

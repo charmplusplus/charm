@@ -1,14 +1,9 @@
 #ifndef LBDB_H
 #define LBDB_H
 
-#if CMK_STL_USE_DOT_H
-#include <vector.h>
-#else  // CMK_STL_NO_DOT_H
-#include <vector>
-#endif
-
 #include "converse.h"
 #include "lbdb.h"
+#include "CkLists.h"
 
 #include "LBObj.h"
 #include "LBOM.h"
@@ -45,13 +40,8 @@ private:
     LDBarrierFn fn;
   };
 
-#if CMK_STL_USE_DOT_H
-  vector<client*> clients;
-  vector<receiver*> receivers;
-#else
-  std::vector<client*> clients;
-  std::vector<receiver*> receivers;
-#endif
+  CkVector clients;
+  CkVector receivers;
 
   int cur_refcount;
   int max_client;
@@ -84,8 +74,8 @@ public:
   void RegisteringObjects(LDOMHandle _h);
   void DoneRegisteringObjects(LDOMHandle _h);
 
-  LBOM *LbOM(LDOMHandle h) { return oms[h.handle]; };
-  LBObj *LbObj(LDObjHandle h) { return objs[h.handle]; };
+  LBOM *LbOM(LDOMHandle h) { return (LBOM*)oms[h.handle]; };
+  LBObj *LbObj(LDObjHandle h) { return (LBObj*)objs[h.handle]; };
   void DumpDatabase(void);
   void TurnStatsOn(void) { statsAreOn = CmiTrue; machineUtil.StatsOn(); };
   void TurnStatsOff(void) { statsAreOn = CmiFalse; machineUtil.StatsOff(); };
@@ -151,15 +141,10 @@ private:
     void* data;
   };
 
-#if CMK_STL_USE_DOT_H
-  typedef vector<LBOM*> OMList;
-  typedef vector<LBObj*> ObjList;
-  typedef vector<MigrateCB*> MigrateCBList;
-#else
-  typedef std::vector<LBOM*> OMList;
-  typedef std::vector<LBObj*> ObjList;
-  typedef std::vector<MigrateCB*> MigrateCBList;
-#endif
+  typedef CkVector OMList;
+  typedef CkVector ObjList;
+  typedef CkVector MigrateCBList;
+
   LBCommTable* commTable;
   OMList oms;
   int omCount;

@@ -2,23 +2,11 @@
 
 #if CMK_LBDB_ON
 
-#if CMK_STL_USE_DOT_H
-#include <deque.h>
-#include <queue.h>
-#else
-#include <deque>
-#include <queue>
-#endif
+#include "CkLists.h"
 
 #include "heap.h"
 #include "WSLB.h"
 #include "WSLB.def.h"
-
-#if CMK_STL_USE_DOT_H
-template class deque<NeighborLB::MigrateInfo>;
-#else
-template class std::deque<NeighborLB::MigrateInfo>;
-#endif
 
 void CreateWSLB()
 {
@@ -50,11 +38,7 @@ NLBMigrateMsg* WSLB::Strategy(NeighborLB::LDStats* stats, int count)
   }
   avgload /= (count+1);
 
-#if CMK_STL_USE_DOT_H
-  queue<MigrateInfo> migrateInfo;
-#else
-  std::queue<MigrateInfo> migrateInfo;
-#endif
+  CkVector migrateInfo;
 
   if (myload < avgload)
     CkPrintf("[%d] Underload My load is %f, average load is %f\n",
@@ -126,11 +110,11 @@ NLBMigrateMsg* WSLB::Strategy(NeighborLB::LDStats* stats, int count)
       CkPrintf("[%d] Obj %d of %d migrating from %d to %d\n",
 	       CkMyPe(),obj->Id,myStats.obj_data_sz,me,p->Id);
 
-      MigrateInfo migrateMe;
-      migrateMe.obj = myStats.objData[obj->Id].handle;
-      migrateMe.from_pe = me;
-      migrateMe.to_pe = p->Id;
-      migrateInfo.push(migrateMe);
+      MigrateInfo* migrateMe = new MigrateInfo;
+      migrateMe->obj = myStats.objData[obj->Id].handle;
+      migrateMe->from_pe = me;
+      migrateMe->to_pe = p->Id;
+      migrateInfo.push_back((void*)migrateMe);
 
       objs_here--;
       
@@ -157,8 +141,10 @@ NLBMigrateMsg* WSLB::Strategy(NeighborLB::LDStats* stats, int count)
   NLBMigrateMsg* msg = new(&migrate_count,1) NLBMigrateMsg;
   msg->n_moves = migrate_count;
   for(int i=0; i < migrate_count; i++) {
-    msg->moves[i] = migrateInfo.front();
-    migrateInfo.pop();
+    MigrateInfo* item = (MigrateInfo*) migrateInfo[i];
+    msg->moves[i] = *item;
+    delete item;
+    migrateInfo[i] = 0;
   }
 
   return msg;

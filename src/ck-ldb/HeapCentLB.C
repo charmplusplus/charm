@@ -2,22 +2,9 @@
 
 #if CMK_LBDB_ON
 
-#if CMK_STL_USE_DOT_H
-#include <deque.h>
-#include <queue.h>
-#else
-#include <deque>
-#include <queue>
-#endif
-
+#include "CkLists.h"
 #include "HeapCentLB.h"
 #include "HeapCentLB.def.h"
-
-#if CMK_STL_USE_DOT_H
-template class deque<CentralLB::MigrateInfo>;
-#else
-template class std::deque<CentralLB::MigrateInfo>;
-#endif
 
 void CreateHeapCentLB()
 {
@@ -63,91 +50,88 @@ void HeapCentLB::Heapify(HeapData *heap, int node, int heapSize)
 
 CLBMigrateMsg* HeapCentLB::Strategy(CentralLB::LDStats* stats, int count)
 {
-	int pe,obj;
+  int pe,obj;
   CkPrintf("[%d] HeapCentLB strategy\n",CkMyPe());
 
-#if CMK_STL_USE_DOT_H
-  queue<MigrateInfo> migrateInfo;
-#else
-  std::queue<MigrateInfo> migrateInfo;
-#endif
-	
-	int totalObjs = 0;
-	HeapData *cpuData = new HeapData[count];
-	HeapData *objData;
+  CkVector migrateInfo;
 
-	for (pe=0; pe < count; pe++) {
-		totalObjs += stats[pe].n_objs;
-		cpuData[pe].cpuTime = 0.;
-		cpuData[pe].pe = cpuData[pe].id = pe;
-	}
+  int totalObjs = 0;
+  HeapData *cpuData = new HeapData[count];
+  HeapData *objData;
 
-	objData = new HeapData[totalObjs];
-	int objCount = 0;
+  for (pe=0; pe < count; pe++) {
+    totalObjs += stats[pe].n_objs;
+    cpuData[pe].cpuTime = 0.;
+    cpuData[pe].pe = cpuData[pe].id = pe;
+  }
+
+  objData = new HeapData[totalObjs];
+  int objCount = 0;
   for(pe=0; pe < count; pe++) {
     CkPrintf("[%d] PE %d : %d Objects : %d Communication\n",
 	     CkMyPe(),pe,stats[pe].n_objs,stats[pe].n_comm);
 
     for(obj=0; obj < stats[pe].n_objs; obj++, objCount++) {
+      objData[objCount].cpuTime = stats[pe].objData[obj].cpuTime;
+      objData[objCount].pe = pe;
+      objData[objCount].id = obj;
+    }
+  }
 
-			objData[objCount].cpuTime = stats[pe].objData[obj].cpuTime;
-			objData[objCount].pe = pe;
-			objData[objCount].id = obj;
-		}
-	}
+  for (obj=1; obj < totalObjs; obj++) {
+    HeapData key = objData[obj];
+    int i = obj-1;
+    while (i >=0 && objData[i].cpuTime < key.cpuTime) {
+      objData[i+1] = objData[i];
+      i--;
+    }
+    objData[i+1] = key;
+  }
+  
+  int heapSize = count-1;
+  HeapData minCpu;	
+  for (obj=0; obj < totalObjs; obj++) {
+    // Operation of extracting the minimum(the least loaded processor)
+    // from the heap
+    minCpu = cpuData[0];
+    cpuData[0] = cpuData[heapSize];
+    heapSize--;
+    Heapify(cpuData, 0, heapSize);		
 
-	for (obj=1; obj < totalObjs; obj++) {
-		HeapData key = objData[obj];
-		int i = obj-1;
-		while (i >=0 && objData[i].cpuTime < key.cpuTime) {
-			objData[i+1] = objData[i];
-			i--;
-		}
-		objData[i+1] = key;
-	}
-
-	int heapSize = count-1;
-	HeapData minCpu;	
-	for (obj=0; obj < totalObjs; obj++) {
-
-		//Operation of extracting the minimum(the least loaded processor) from the heap
-		minCpu = cpuData[0];
-		cpuData[0] = cpuData[heapSize];
-		heapSize--;
-		Heapify(cpuData, 0, heapSize);		
-
-		//Increment the time of the least loaded processor by the cpuTime of the `heaviest' object
-		minCpu.cpuTime += objData[obj].cpuTime;
+    // Increment the time of the least loaded processor by the cpuTime of
+    // the `heaviest' object
+    minCpu.cpuTime += objData[obj].cpuTime;
 
     //Insert object into migration queue if necessary
-		const int dest = minCpu.pe;
-		const int pe   = objData[obj].pe;
-		const int id   = objData[obj].id;
-		if (dest != pe) {
-			CkPrintf("[%d] Obj %d migrating from %d to %d\n",
-							 CkMyPe(),obj,pe,dest);
-			MigrateInfo migrateMe;
-			migrateMe.obj = stats[pe].objData[id].handle;
-			migrateMe.from_pe = pe;
-			migrateMe.to_pe = dest;
-			migrateInfo.push(migrateMe);
-		}
-		
-		//Insert the least loaded processor with load updated back into the heap
-		heapSize++;
-		int location = heapSize;
-		while (location>0 && cpuData[(location-1)/2].cpuTime > minCpu.cpuTime) {
-			cpuData[location] = cpuData[(location-1)/2];
-			location = (location-1)/2;
-		}
-		cpuData[location] = minCpu;
-	}
+    const int dest = minCpu.pe;
+    const int pe   = objData[obj].pe;
+    const int id   = objData[obj].id;
+    if (dest != pe) {
+      CkPrintf("[%d] Obj %d migrating from %d to %d\n",
+	       CkMyPe(),obj,pe,dest);
+      MigrateInfo *migrateMe = new MigrateInfo;
+      migrateMe->obj = stats[pe].objData[id].handle;
+      migrateMe->from_pe = pe;
+      migrateMe->to_pe = dest;
+      migrateInfo.push_back((void*)migrateMe);
+    }
+    //Insert the least loaded processor with load updated back into the heap
+    heapSize++;
+    int location = heapSize;
+    while (location>0 && cpuData[(location-1)/2].cpuTime > minCpu.cpuTime) {
+      cpuData[location] = cpuData[(location-1)/2];
+      location = (location-1)/2;
+    }
+    cpuData[location] = minCpu;
+  }
   int migrate_count=migrateInfo.size();
   CLBMigrateMsg* msg = new(&migrate_count,1) CLBMigrateMsg;
   msg->n_moves = migrate_count;
   for(int i=0; i < migrate_count; i++) {
-    msg->moves[i] = migrateInfo.front();
-    migrateInfo.pop();
+    MigrateInfo* item = (MigrateInfo*) migrateInfo[i];
+    msg->moves[i] = *item;
+    delete item;
+    migrateInfo[i] = 0;
   }
   return msg;
 };

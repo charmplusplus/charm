@@ -7,20 +7,6 @@
 
 struct MigrateCB;
 
-#if CMK_STL_USE_DOT_H
-template class vector<LBOM*>;
-template class vector<LBObj*>;
-template class vector<LBDB::MigrateCB*>;
-template class vector<LocalBarrier::client*>;
-template class vector<LocalBarrier::receiver*>;
-#else
-template class std::vector<LBOM*>;
-template class std::vector<LBObj*>;
-template class std::vector<LBDB::MigrateCB*>;
-template class std::vector<LocalBarrier::client*>;
-template class std::vector<LocalBarrier::receiver*>;
-#endif
-
 /*************************************************************
  * LBDB Code
  *************************************************************/
@@ -67,12 +53,12 @@ LDObjHandle LBDB::AddObj(LDOMHandle _h, LDObjid _id,
 
 void LBDB::UnregisterObj(LDObjHandle _h)
 {
-  objs[_h.handle]->registered=CmiFalse;
+  ((LBObj*)objs[_h.handle])->registered=CmiFalse;
 }
 
 void LBDB::RegisteringObjects(LDOMHandle _h)
 {
-  LBOM* om = oms[_h.handle];
+  LBOM* om = (LBOM*)oms[_h.handle];
   if (!om->RegisteringObjs()) {
     if (oms_registering == 0)
       localBarrier.TurnOff();
@@ -83,7 +69,7 @@ void LBDB::RegisteringObjects(LDOMHandle _h)
 
 void LBDB::DoneRegisteringObjects(LDOMHandle _h)
 {
-  LBOM* om = oms[_h.handle];
+  LBOM* om = (LBOM*)oms[_h.handle];
   if (om->RegisteringObjs()) {
     oms_registering--;
     if (oms_registering == 0)
@@ -131,10 +117,10 @@ void LBDB::ClearLoads(void)
 {
   int i;
   for(i=0; i < objCount; i++)
-    if (objs[i]->registered)
+    if (((LBObj*)objs[i])->registered)
     {
-      objs[i]->data.wallTime = 
-	objs[i]->data.cpuTime = 0.;
+      ((LBObj*)objs[i])->data.wallTime = 
+	((LBObj*)objs[i])->data.cpuTime = 0.;
     }
   delete commTable;
   commTable = new LBCommTable;
@@ -147,28 +133,30 @@ int LBDB::ObjDataCount()
   int nitems=0;
   int i;
   for(i=0; i < objCount; i++)
-    if (objs[i]->registered)
+    if (((LBObj*)objs[i])->registered)
       nitems++;
   return nitems;
 }
 
 void LBDB::GetObjData(LDObjData *dp)
 {
-  for(ObjList::iterator ol = objs.begin(); ol != objs.end(); ol++)
-    if ((*ol)->registered)
-      *dp++ = (*ol)->ObjData();
+  for(int i = 0; i < objs.size(); i++) {
+    LBObj* obj = (LBObj*) objs[i];
+    if ( obj->registered )
+      *dp++ = obj->ObjData();
+  }
 }
 
 void LBDB::Migrate(LDObjHandle h, int dest)
 {
   if (h.handle > objCount)
     CmiPrintf("[%d] Handle %d out of range 0-%d\n",CmiMyPe(),h.handle,objCount);
-  else if (!objs[h.handle]->registered)
+  else if (!((LBObj*)objs[h.handle])->registered)
     CmiPrintf("[%d] Handle %d no longer registered, range 0-%d\n",
 	    CmiMyPe(),h.handle,objCount);
 
-  if ((h.handle < objCount) && (objs[h.handle]->registered)) {
-    LBOM *const om = oms[objs[h.handle]->parentOM.handle];
+  if ((h.handle < objCount) && (((LBObj*)objs[h.handle])->registered)) {
+    LBOM *const om = (LBOM*)oms[((LBObj*)objs[h.handle])->parentOM.handle];
     om->Migrate(h, dest);
   }
   return;
@@ -178,8 +166,10 @@ void LBDB::Migrated(LDObjHandle h)
 {
   // Object migrated, inform load balancers
 
-  for(int i=0; i < migrateCBList.size(); i++)
-    (migrateCBList[i]->fn)(migrateCBList[i]->data,h);
+  for(int i=0; i < migrateCBList.size(); i++) {
+    MigrateCB* cb = (MigrateCB*)migrateCBList[i];
+    (cb->fn)(cb->data,h);
+  }
   
 }
 
@@ -190,7 +180,7 @@ void LBDB::NotifyMigrated(LDMigratedFn fn, void* data)
 
   callbk->fn = fn;
   callbk->data = data;
-  migrateCBList.push_back(callbk);
+  migrateCBList.push_back((void*)callbk);
 }
 
 void LBDB::BackgroundLoad(double* walltime, double* cputime)
@@ -223,7 +213,7 @@ LDBarrierClient LocalBarrier::AddClient(LDResumeFn fn, void* data)
 
   LDBarrierClient ret_val;
   ret_val.serial = max_client;
-  clients.push_back(new_client);
+  clients.push_back((void*)new_client);
   max_client++;
 
   client_count++;
@@ -235,7 +225,7 @@ void LocalBarrier::RemoveClient(LDBarrierClient c)
 {
   const int cnum = c.serial;
   if (cnum < max_client && clients[cnum] != 0) {
-    delete clients[cnum];
+    delete ((client*)clients[cnum]);
     clients[cnum] = 0;
     client_count--;
   }
@@ -259,14 +249,14 @@ void LocalBarrier::RemoveReceiver(LDBarrierReceiver c)
 {
   const int cnum = c.serial;
   if (cnum < max_receiver && receivers[cnum] != 0) {
-    delete receivers[cnum];
+    delete ((receiver*)receivers[cnum]);
     receivers[cnum] = 0;
   }
 }
 
 void LocalBarrier::AtBarrier(LDBarrierClient h)
 {
-  clients[h.serial]->refcount++;
+  ((client*)clients[h.serial])->refcount++;
   at_count++;
   CheckBarrier();
 }
@@ -279,7 +269,7 @@ void LocalBarrier::CheckBarrier()
     CmiBool at_barrier = CmiFalse;
 
     for(int i=0; i < max_client; i++)
-      if (clients[i] != 0 && clients[i]->refcount >= cur_refcount)
+      if (clients[i] != 0 && ((client*)clients[i])->refcount >= cur_refcount)
 	at_barrier = CmiTrue;
 
     if (at_barrier) {
@@ -297,7 +287,7 @@ void LocalBarrier::CallReceivers(void)
 //  for(int i=0; i < max_receiver; i++)
     for (int i=max_receiver-1; i>=0; i--)
     if (receivers[i] != 0) {
-      receivers[i]->fn(receivers[i]->data);
+      ((receiver*)receivers[i])->fn(((receiver*)receivers[i])->data);
       called_receiver = CmiTrue;
     }
 
@@ -310,7 +300,7 @@ void LocalBarrier::ResumeClients(void)
 {
   for(int i=0; i < max_client; i++)
     if (clients[i] != 0) 
-      clients[i]->fn(clients[i]->data);
+      ((client*)clients[i])->fn(((client*)clients[i])->data);
 }
 
 #endif
