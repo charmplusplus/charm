@@ -1554,6 +1554,8 @@ void *CmiAlloc(int size)
 
 #if CONVERSE_VERSION_ELAN
   res = (char *) elan_CmiAlloc(size+sizeof(CmiChunkHeader));
+#elif CONVERSE_VERSION_VMI
+  res = (char *) CMI_VMI_CmiAlloc(size+sizeof(CmiChunkHeader));
 #else
   res =(char *) malloc_nomigrate(size+sizeof(CmiChunkHeader));
 #endif
@@ -1631,6 +1633,8 @@ void CmiFree(void *blk)
 
 #if CONVERSE_VERSION_ELAN
     elan_CmiFree(BLKSTART(parentBlk));
+#elif CONVERSE_VERSION_VMI
+    CMI_VMI_CmiFree(BLKSTART(parentBlk));
 #else
     free_nomigrate(BLKSTART(parentBlk));
 #endif
