@@ -78,6 +78,3 @@ void MPIStrategy::doneInserting(){
     }
 #endif
 }
-
-void MPIStrategy::setID(comID id){
-}

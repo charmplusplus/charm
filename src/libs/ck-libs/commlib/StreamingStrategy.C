@@ -60,8 +60,3 @@ void StreamingStrategy::doneInserting(){
     
     CcdCallFnAfter(call_endIteration, (void *)this, PERIOD);
 }
-
-
-
-void StreamingStrategy::setID(comID id){
-}

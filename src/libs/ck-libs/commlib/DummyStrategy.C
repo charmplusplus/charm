@@ -13,5 +13,3 @@ void DummyStrategy::insertMessage(CharmMessageHolder *cmsg){
 void DummyStrategy::doneInserting(){
 }
 
-void DummyStrategy::setID(comID id){
-}

@@ -5,5 +5,4 @@ class DummyStrategy : public Strategy {
     DummyStrategy(int substrategy);
     void insertMessage(CharmMessageHolder *msg);
     void doneInserting();
-    void setID(comID id);
 };

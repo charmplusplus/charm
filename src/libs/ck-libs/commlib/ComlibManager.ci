@@ -3,13 +3,16 @@ module ComlibModule {
 
   message DummyMsg;
 
-  message ComlibMsg {
-    char data[];
-  };
+//  message ComlibMsg {
+//    char data[];
+//  };
 	
+//  message StrategyMsg;
+
   group ComlibManager{
     entry ComlibManager(int s);
     entry ComlibManager(int s, int n);
+//    entry ComlibManager(StrategyMsg *);
 
     entry void done(void);
 

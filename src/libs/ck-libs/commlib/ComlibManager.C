@@ -9,6 +9,7 @@ CpvDeclare(int, RecvmsgHandle);
 CpvDeclare(int, RecvdummyHandle);
 int *procMap;
 
+//handler to receive array messages
 void recv_msg(void *msg){
 
     if(msg == NULL)
@@ -25,11 +26,14 @@ void recv_msg(void *msg){
     return;
 }
 
+//handler for dummy messages
 void recv_dummy(void *msg){
     ComlibPrintf("Received Dummy %d\n", CkMyPe());    
     CmiFree(msg);
 }
 
+//Creates a strategy, to write a new strategy add the appropriate constructor call!
+//For now the strategy constructor can only receive an int.
 Strategy* createStrategy(int s, int n){
     Strategy *strategy;
     switch (s) {
@@ -50,6 +54,7 @@ Strategy* createStrategy(int s, int n){
     return strategy;
 }
 
+//ComlibManager Constructor with 1 int the strategy id being passed
 //s = Strategy (0 = tree, 1 = tree, 2 = mesh, 3 = hypercube) 
 ComlibManager::ComlibManager(int s){
     strategyID = s;
@@ -57,6 +62,7 @@ ComlibManager::ComlibManager(int s){
     init(str);
 }
 
+//ComlibManager Constructor with 2 ints the strategy id and the number of array elements being passed. For Streaming the second int can be used for 
 ComlibManager::ComlibManager(int s, int n){
     strategyID = s;
     if(s == USE_STREAMING) 
@@ -68,6 +74,12 @@ ComlibManager::ComlibManager(int s, int n){
     Strategy *str = createStrategy(s, n);
     init(str);
 }
+
+/*
+ComlibManager::ComlibManager(Strategy *strat){
+    init(strat);
+}
+*/
 
 void ComlibManager::init(Strategy *s){
     
@@ -414,6 +426,7 @@ void CharmMessageHolder::setRefcount(char *msg){
     REFFIELD(env) = pref;    
 }
 
+/*
 void ComlibMsg::insert(CharmMessageHolder *msg){
     nmessages ++;
     
@@ -436,6 +449,7 @@ CharmMessageHolder * ComlibMsg::next(){
     curSize += cmsg->getSize();
     return cmsg;
 }
+*/
 
 #include "ComlibModule.def.h"
 

@@ -7,36 +7,28 @@
 #include "commlib.h"
 #include <math.h>
 
-#define USE_STREAMING 0
-#define USE_TREE 1
-#define USE_MESH 2
-#define USE_HYPERCUBE 3
-#define USE_DIRECT 4
-#define USE_GRID 5
-#define NAMD_STRAT 6
-#define USE_MPI 7
-
-#define GROUP_SEND 0
-#define ARRAY_SEND 1
-#define CHARE_SEND 2
-#define RECV 4
+#define USE_DIRECT 0          //A dummy strategy that directly forwards 
+                              //messages without any processing.
+#define USE_TREE 1            //Organizes the all to all as a tree
+#define USE_MESH 2            //Virtual topology is a mesh here
+#define USE_HYPERCUBE 3       //Virtual topology is a hypercube
+#define USE_GROUP_BY_PROCESSOR //Groups messages by destination processor 
+                               //(does not work as of now)
+#define USE_GRID 5            //Virtual topology is a 3d grid
+#define NAMD_STRAT 6          //A speciliazed strategy for Namd, commented out
+#define USE_MPI 7             //Calls MPI_Alltoall
+#define USE_STREAMING 8       //Creates a message stream with periodic combining
 
 #define CHARM_MPI 0 
 
-#if CHARM_MPI
-#include "mpi.h"
-#define MPI_MAX_MSG_SIZE 1000
-#define MPI_BUF_SIZE 2000000
-char mpi_sndbuf[MPI_BUF_SIZE];
-char mpi_recvbuf[MPI_BUF_SIZE];
-#endif
-
-#define LEARNING_PERIOD 2
+#define LEARNING_PERIOD 2     //Number of iterations after which the 
+                              //learning framework will discover the appropriate 
+                              //strategy, not completely implemented
 #define ALPHA 5E-6
 #define BETA 3.33E-9
 
-#include "ComlibModule.decl.h"
-
+//An abstract data structure that holds a charm++ message 
+//and provides utility functions to manage it.
 class CharmMessageHolder {
  public:
     int dest_proc;
@@ -51,10 +43,42 @@ class CharmMessageHolder {
     void setRefcount(char * root_msg);
 };
 
+//An abstract class that defines the entry methods that a strategy must define. 
+//To write a new strategy inherit from this class and define the methods. 
+//Notice there is no constructor. Every strategy can define its own 
+//constructor and have any number of arguments.
+//But for now the strategies can only receive an int in their constructor.
+class Strategy {
+ public:
+    //Called for each message
+    virtual void insertMessage(CharmMessageHolder *msg) = 0;
+    //Called after all chares and groups have finished depositing their messages 
+    //on that processor.
+    virtual void doneInserting() = 0;
+
+    //Needed for compatibility with older versions, I will get rid of it soon!
+    virtual void setID(comID id) {}
+
+    //Will enable this later
+    //Each strategy must define his own Pup interface.
+    //    virtual void pup(PUP::er &p) {}
+};
+//PUPmarshall(Strategy);
+
+#include "ComlibModule.decl.h"
+
+//Dummy message to be sent incase there are no messages to send. 
+//Used by only the EachToMany strategy!
 class DummyMsg: public CMessage_DummyMsg {
     int dummy;
 };
-
+/*
+class StrategyMsg : public CMessage_StrategyMsg {
+    
+}
+*/
+/*
+//A wrapper message for many charm++ messages.
 class ComlibMsg: public CMessage_ComlibMsg {
  public:
     int nmessages;
@@ -65,19 +89,13 @@ class ComlibMsg: public CMessage_ComlibMsg {
     void insert(CharmMessageHolder *msg);
     CharmMessageHolder * next();
 };
-
-class Strategy {
- public:
-    virtual void insertMessage(CharmMessageHolder *msg) = 0;
-    virtual void doneInserting() = 0;
-    virtual void setID(comID id) = 0;
-};
+*/
 
 class ComlibManager: public CkDelegateMgr{
 
     CkGroupID cmgrID;
 
-    //int *procMap;
+    //int *procMap; //Should ideally belong to the strategy
 
     int createDone, doneReceived;
 
@@ -102,6 +120,8 @@ class ComlibManager: public CkDelegateMgr{
  public:
     ComlibManager(int s); //strategy, nelements 
     ComlibManager(int s, int n); //strategy, nelements 
+
+    //ComlibManager(Strategy *str); //Needs pup routines for strategies to be written
 
     void done();
     void localElement();

@@ -9,5 +9,4 @@ class StreamingStrategy : public Strategy {
     StreamingStrategy(int period);
     void insertMessage(CharmMessageHolder *msg);
     void doneInserting();
-    void setID(comID);
 };
