@@ -17,7 +17,8 @@
 #define CAN_TIMER 5
 #define CP_TIMER 6
 #define LB_TIMER 7
-#define MISC_TIMER 8
+#define FC_TIMER 8
+#define COMM_TIMER 9
 
 // Global readonly variables to access stats facility from all PEs
 extern CkChareID theGlobalStats;
@@ -26,8 +27,8 @@ extern CkGroupID theLocalStats;
 /// Message to gather local stats from all PEs for printing
 class localStatSummary : public CMessage_localStatSummary {
 public:
-  double doTime, rbTime, gvtTime, simTime, cpTime, canTime, lbTime, miscTime, 
-    maxDo, minDo, maxGRT;
+  double doTime, rbTime, gvtTime, simTime, cpTime, canTime, lbTime, fcTime, 
+    commTime, maxDo, minDo, maxGRT;
   long cpBytes;
   int pe, dos, undos, commits, loops, gvts, maxChkPts, maxGVT;
 };
@@ -42,10 +43,10 @@ private:
   /// Count of bytes checkpointed
   long cpBytes;
   /// Timer start values
-  double dot, rbt, gvtt, simt, cpt, cant, lbt, misct;
+  double dot, rbt, gvtt, simt, cpt, cant, lbt, fct, commt;
   /// Time accumulators
   double rollbackTime, totalTime, gvtTime, simTime, cpTime, canTime, 
-    lbTime, miscTime, maxDo, minDo; 
+    lbTime, fcTime, commTime, maxDo, minDo; 
   /// Maximum values for GVT and real time taken by events
   /* For degree of parallelism calculations */
   int maxGVT;
@@ -55,8 +56,8 @@ public:
   localStat(void) {
     whichStat=rollbacks=dos=undos=commits=loops=gvts=cpBytes=chkPts=maxChkPts=
       maxGVT = 0;
-    rollbackTime=totalTime=gvtTime=simTime=cpTime=canTime=lbTime=miscTime=
-      maxGRT = 0.0;
+    rollbackTime=totalTime=gvtTime=simTime=cpTime=canTime=lbTime=fcTime=
+      commTime=maxGRT = 0.0;
     maxDo = minDo = -1.0;
   }
   localStat(CkMigrateMessage *) { };
@@ -99,7 +100,8 @@ public:
 class globalStat : public Chare {
 private:
   double doAvg, doMax, rbAvg, rbMax, gvtAvg, gvtMax, simAvg, simMax, 
-    cpAvg, cpMax, canAvg, canMax, lbAvg, lbMax, miscAvg, miscMax, maxTime;
+    cpAvg, cpMax, canAvg, canMax, lbAvg, lbMax, fcAvg, fcMax, commAvg, commMax,
+    maxTime;
   double minDo, maxDo, avgDo, GvtTime, maxGRT;
   long cpBytes;
   int reporting, totalDos, totalUndos, totalCommits, totalLoops, totalGvts, 
@@ -135,7 +137,8 @@ inline void localStat::TimerStart(int timer)
   case CP_TIMER: cpt = now; break;
   case CAN_TIMER: cant = now; break;
   case LB_TIMER: lbt = now; break;
-  case MISC_TIMER: misct = now; break;
+  case FC_TIMER: fct = now; break;
+  case COMM_TIMER: commt = now; break;
   default: CkPrintf("ERROR: Invalid timer %d\n", timer);
   }
 }
@@ -162,7 +165,8 @@ inline void localStat::TimerStop()
   case CP_TIMER: cpTime += now - cpt; break;
   case CAN_TIMER: canTime += now - cant; break;
   case LB_TIMER: lbTime += now - lbt; break;
-  case MISC_TIMER: miscTime += now - misct; break;
+  case FC_TIMER: fcTime += now - fct; break;
+  case COMM_TIMER: commTime += now - commt; break;
   default: CkPrintf("ERROR: No timer active.\n");
   }
   whichStat = 0;
@@ -193,7 +197,8 @@ inline void localStat::SwitchTimer(int timer)
   case CP_TIMER: cpTime += now - cpt; break;
   case CAN_TIMER: canTime += now - cant; break;
   case LB_TIMER: lbTime += now - lbt; break;
-  case MISC_TIMER: miscTime += now - misct; break;
+  case FC_TIMER: fcTime += now - fct; break;
+  case COMM_TIMER: commTime += now - commt; break;
   default: CkPrintf("ERROR: No active timer.\n");
   }
   whichStat = timer;
@@ -205,7 +210,8 @@ inline void localStat::SwitchTimer(int timer)
   case CP_TIMER: cpt = now; break;
   case CAN_TIMER: cant = now; break;
   case LB_TIMER: lbt = now; break;
-  case MISC_TIMER: misct = now; break;
+  case FC_TIMER: fct = now; break;
+  case COMM_TIMER: commt = now; break;
   default: CkPrintf("ERROR: Invalid timer %d\n", timer);
   }    
 }

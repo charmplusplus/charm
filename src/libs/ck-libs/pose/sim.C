@@ -114,7 +114,7 @@ void sim::Commit()
 #endif
   localPVT = (PVT *)CkLocalBranch(ThePVT);
 #ifdef POSE_STATS_ON
-  localStats->SwitchTimer(MISC_TIMER);
+  localStats->SwitchTimer(FC_TIMER);
 #endif
   if (localPVT->done()) { // simulation inactive
     eq->CommitEvents(this, -1); // commit all events in queue

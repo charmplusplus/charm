@@ -25,9 +25,9 @@ PVT::PVT()
   specEventCount = eventCount = waitForFirst = 0;
   iterMin = POSE_UnsetTS;
   int P=CkNumPes(), N=CkMyPe();
+  reportReduceTo =  -1;
   if ((N < P-2) && (N%2 == 1)) { //odd
     reportTo = N-1;
-    reportReduceTo =  -1;
     reportsExpected = reportEnd = 0;
   }
   else if (N < P-2) { //even
@@ -35,22 +35,23 @@ PVT::PVT()
     reportsExpected = 2; 
     if (N == P-3)
       reportsExpected = 1;
+    reportEnd = 0;
     if (N < (P-2)/2)
       reportReduceTo = P-2;
     else reportReduceTo = P-1;
-    reportEnd = 0;
   }
   if (N == P-2) {
     reportTo = N;
     reportEnd = 1;
-    reportsExpected = 1 + ((((double)P)-2.0)/4.0)+0.5;
+    reportsExpected = 1 + (P-2)/4 + ((P-2)%4)/2;
   }
   else if (N == P-1) {
     reportTo = N;
     reportEnd = 1;
-    reportsExpected = 1 + (P-2)/4;
+    if (P==1) reportsExpected = 1;
+    else reportsExpected = 1 + (P-2)/4 + (P-2)%2;
   }
-  //  CkPrintf("PE %d reports to %d, receives %d reports, reduces and sends to %d, and reports directly to GVT if %d = 1!\n", CkMyPe(), reportTo, reportsExpected, reportReduceTo, reportEnd);
+  //CkPrintf("PE %d reports to %d, receives %d reports, reduces and sends to %d, and reports directly to GVT if %d = 1!\n", CkMyPe(), reportTo, reportsExpected, reportReduceTo, reportEnd);
 #ifdef POSE_STATS_ON
   localStats->TimerStop();
 #endif
@@ -122,13 +123,11 @@ void PVT::startPhase()
   um->conPVT = conPVT;
   um->runGVTflag = 0;
 
-  /*
   if (um->numEntries > 0)
-    CkPrintf("PE %d has %d SRs reported to GVT; earliest=%d pvt=%d\n", 
-	     CkMyPe(), um->numEntries, um->SRs[0].timestamp, pvt);
-  */
-  // send data to GVT estimation
-  p[reportTo].reportReduce(um);
+    //CkPrintf("PE %d has %d SRs reported to GVT; earliest=%d pvt=%d\n", 
+    //CkMyPe(), um->numEntries, um->SRs[0].timestamp, pvt);
+    // send data to GVT estimation
+    p[reportTo].reportReduce(um);
 
   /*
   if (simdone) // transmit final info to GVT on PE 0
@@ -152,6 +151,7 @@ void PVT::setGVT(GVTMsg *m)
   localStats->TimerStart(GVT_TIMER);
 #endif
   CProxy_PVT p(ThePVT);
+  CkAssert(m->estGVT >= estGVT);
   estGVT = m->estGVT;
   int i, end = objs.getNumSpaces();
 #ifdef POSE_COMM_ON  
@@ -192,8 +192,8 @@ void PVT::objUpdate(POSE_TimeType timestamp, int sr)
   else
     localStats->TimerStart(GVT_TIMER);
 #endif
-  /*  if ((timestamp < estGVT) && (estGVT > POSE_UnsetTS))
-      CkPrintf("timestamp=%d estGVT=%d simdone=%d sr=%d\n", timestamp, estGVT, simdone, sr);*/
+  //if ((timestamp < estGVT) && (estGVT > POSE_UnsetTS))
+  //CkPrintf("timestamp=%d estGVT=%d simdone=%d sr=%d\n", timestamp, estGVT, simdone, sr);
   CmiAssert(simdone || (timestamp >= estGVT) || (estGVT == POSE_UnsetTS));
   CmiAssert((sr == SEND) || (sr == RECV));
   if ((estGVT > POSE_UnsetTS) && 
@@ -218,8 +218,8 @@ void PVT::objUpdateOVT(int pvtIdx, POSE_TimeType safeTime, POSE_TimeType ovt)
 {
   int index = (pvtIdx-CkMyPe())/1000;
   // minimize the non-idle OVT
-  /*  if ((safeTime < estGVT) && (safeTime > POSE_UnsetTS)) 
-      CkPrintf("safeTime=%d estGVT=%d\n", safeTime, estGVT);*/
+  //  if ((safeTime < estGVT) && (safeTime > POSE_UnsetTS)) 
+  //CkPrintf("safeTime=%d estGVT=%d\n", safeTime, estGVT);
   CmiAssert(simdone || (safeTime >= estGVT) || (safeTime == POSE_UnsetTS));
   if ((safeTime == POSE_UnsetTS) && (objs.objs[index].getOVT2() < ovt))
     objs.objs[index].setOVT2(ovt);

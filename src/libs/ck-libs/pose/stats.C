@@ -20,7 +20,8 @@ void localStat::SendStats()
   m->cpTime = cpTime;
   m->canTime = canTime;
   m->lbTime = lbTime;
-  m->miscTime = miscTime;
+  m->fcTime = fcTime;
+  m->commTime = commTime;
   m->cpBytes = cpBytes;
   m->maxDo = maxDo;
   m->minDo = minDo;
@@ -40,7 +41,8 @@ void localStat::SendStats()
 globalStat::globalStat(void)
 {
   doAvg = doMax = rbAvg = rbMax = gvtAvg = gvtMax = simAvg = simMax = 
-    cpAvg = cpMax = canAvg = canMax = lbAvg = lbMax = miscAvg = miscMax = 
+    cpAvg = cpMax = canAvg = canMax = lbAvg = lbMax = fcAvg = fcMax = 
+    commAvg = commMax =
     maxTime = maxDo = minDo = avgDo = GvtTime = maxGRT = 0.0; 
   cpBytes = reporting = totalDos = totalUndos = totalCommits = totalLoops = 
     totalGvts = maxChkPts = maxGVT = 0;
@@ -50,7 +52,6 @@ globalStat::globalStat(void)
 void globalStat::localStatReport(localStatSummary *m)
 {
   double tmpMax;
-  
   // accumulate data from local stats collectors
   totalDos += m->dos;
   totalUndos += m->undos;
@@ -85,12 +86,15 @@ void globalStat::localStatReport(localStatSummary *m)
   lbAvg += m->lbTime;
   if (m->lbTime > lbMax)
     lbMax = m->lbTime;
-  miscAvg += m->miscTime;
-  if (m->miscTime > miscMax)
-    miscMax = m->miscTime;
+  fcAvg += m->fcTime;
+  if (m->fcTime > fcMax)
+    fcMax = m->fcTime;
+  commAvg += m->commTime;
+  if (m->commTime > commMax)
+    commMax = m->commTime;
   cpBytes += m->cpBytes;
   tmpMax = m->doTime + m->rbTime + m->gvtTime + m->simTime + m->cpTime 
-    + m->canTime + m->lbTime + m->miscTime;
+    + m->canTime + m->lbTime + m->fcTime + m->commTime;
   CkFreeMsg(m);
   if (tmpMax > maxTime)
     maxTime = tmpMax;
@@ -113,11 +117,12 @@ void globalStat::localStatReport(localStatSummary *m)
     cpAvg /= CkNumPes();
     canAvg /= CkNumPes();
     lbAvg /= CkNumPes();
-    miscAvg /= CkNumPes();
+    fcAvg /= CkNumPes();
+    commAvg /= CkNumPes();
     maxChkPts /= CkNumPes();
     // print stats table (all one print to avoid breaking up)
-    CkPrintf("----------------------------------------------------------------------------\n   | DO     | RB     | GVT    | SIM    | CP     | CAN    | LB     | MISC   |\n---|--------|--------|--------|--------|--------|--------|--------|--------|\nmax| %7.2f| %7.2f| %7.2f| %7.2f| %7.2f| %7.2f| %7.2f| %7.2f|\navg| %7.2f| %7.2f| %7.2f| %7.2f| %7.2f| %7.2f| %7.2f| %7.2f|\n----------------------------------------------------------------------------\nMax time on a PE:%7.2f, Speculative Events:%d Actual Events:%d Commits:%d\nGRAINSIZE INFO: Avg: %10.6f Max: %10.6f Min: %10.6f\nGVT iterations=%d  Avg time per iteration=%f\ntotalLoops=%d effectiveGS=%10.6f\n", 
-	     doMax, rbMax, gvtMax, simMax, cpMax, canMax, lbMax, miscMax, doAvg, rbAvg, gvtAvg, simAvg, cpAvg, canAvg, lbAvg, miscAvg, maxTime, totalDos, totalDos-totalUndos, totalCommits, avgDo, maxDo, minDo, totalGvts, GvtTime, totalLoops, (doAvg*CkNumPes())/totalLoops);
+    CkPrintf("------------------------------------------------------------------------------------\n   | DO     | RB     | GVT    | SIM    | CP     | CAN    | LB     | FC     | COMM   |\n---|--------|--------|--------|--------|--------|--------|--------|--------|--------|\nmax| %7.2f| %7.2f| %7.2f| %7.2f| %7.2f| %7.2f| %7.2f| %7.2f| %7.2f|\navg| %7.2f| %7.2f| %7.2f| %7.2f| %7.2f| %7.2f| %7.2f| %7.2f| %7.2f|\n------------------------------------------------------------------------------------\nMax time on a PE:%7.2f, Speculative Events:%d Actual Events:%d Commits:%d\nGRAINSIZE INFO: Avg: %10.6f Max: %10.6f Min: %10.6f\nGVT iterations=%d  Avg time per iteration=%f\ntotalLoops=%d effectiveGS=%10.6f\n", 
+	     doMax, rbMax, gvtMax, simMax, cpMax, canMax, lbMax, fcMax, commMax, doAvg, rbAvg, gvtAvg, simAvg, cpAvg, canAvg, lbAvg, fcAvg, commAvg, maxTime, totalDos, totalDos-totalUndos, totalCommits, avgDo, maxDo, minDo, totalGvts, GvtTime, totalLoops, (doAvg*CkNumPes())/totalLoops);
     //CkPrintf("Avg. Max# Checkpoints=%d Bytes checkpointed=%d\n", maxChkPts, cpBytes);
 
 #ifdef POSE_DOP_ON
@@ -130,8 +135,8 @@ void globalStat::localStatReport(localStatSummary *m)
     /*
     reporting = 0;
     doAvg = doMax = rbAvg = rbMax = gvtAvg = gvtMax = simAvg = simMax = 
-      cpAvg = cpMax = canAvg = canMax = lbAvg = lbMax = miscAvg = miscMax = 
-      maxTime = maxDo = minDo = avgDo = GvtTime = 0.0; 
+      cpAvg = cpMax = canAvg = canMax = lbAvg = lbMax = fcAvg = fcMax = 
+      commAvg, commMax, maxTime = maxDo = minDo = avgDo = GvtTime = 0.0; 
     cpBytes = reporting = totalDos = totalUndos = totalCommits = totalLoops = 
       totalGvts = maxChkPts = 0;
     */

@@ -1185,7 +1185,13 @@ sub posefuncmap
 		  $output.="#ifndef CMK_OPTIMIZE\n";
 		  $output.="$msg->sanitize();\n";
 		  $output.="#endif\n";
+		  $output.="#ifdef POSE_STATS_ON\n";
+		  $output.="  parent->localStats->SwitchTimer(COMM_TIMER);\n";
+		  $output.="#endif\n";
 		  $output.="(* (CProxy_".$segments[2]." *)&POSE_Objects)[_POSE_handle].".$segments[1].";\n";
+		  $output.="#ifdef POSE_STATS_ON\n";
+		  $output.="  parent->localStats->SwitchTimer(DO_TIMER);\n";
+		  $output.="#endif\n";
 		  #$output.="int _destPE = POSE_Objects.ckLocalBranch()->lastKnown(CkArrayIndex1D(_POSE_handle));\n";
 
 		  #$output.="parent->srVector[_destPE]++;\n";
@@ -1205,7 +1211,13 @@ sub posefuncmap
 		  $output.="#ifndef CMK_OPTIMIZE\n";
 		  $output.="$msg->sanitize();\n";
 		  $output.="#endif\n";
+		  $output.="#ifdef POSE_STATS_ON\n";
+		  $output.="  parent->localStats->SwitchTimer(COMM_TIMER);\n";
+		  $output.="#endif\n";
 		  $output.="(* (CProxy_".$segments[2]." *)&POSE_Objects)[_POSE_handle].".$segments[1].";\n";
+		  $output.="#ifdef POSE_STATS_ON\n";
+		  $output.="  parent->localStats->SwitchTimer(DO_TIMER);\n";
+		  $output.="#endif\n";
 		  #$output.="int _destPE = POSE_Objects.ckLocalBranch()->lastKnown(CkArrayIndex1D(_POSE_handle));\n";
 		  #$output.="parent->srVector[_destPE]++;\n";
 		  $output.="}\n";
@@ -1236,7 +1248,14 @@ sub posefuncmap
 		    $output.="#ifndef CMK_OPTIMIZE\n";
 		    $output.="$msg->sanitize();\n";
 		    $output.="#endif\n";
+		  $output.="#ifdef POSE_STATS_ON\n";
+		  $output.="  parent->localStats->SwitchTimer(COMM_TIMER);\n";
+		  $output.="#endif\n";
+
 		    $output.="(*(CProxy_".$segments[2]." *)&POSE_Objects)[_POSE_handle].".$segments[1].";\n";
+		  $output.="#ifdef POSE_STATS_ON\n";
+		  $output.="  parent->localStats->SwitchTimer(DO_TIMER);\n";
+		  $output.="#endif\n";
 		    #$output.="int _destPE = POSE_Objects.ckLocalBranch()->lastKnown(CkArrayIndex1D(_POSE_handle));\n";
 		    #$output.="parent->srVector[_destPE]++;\n";
 		    $output.="}\n";
@@ -1258,7 +1277,13 @@ sub posefuncmap
 		    $output.="#ifndef CMK_OPTIMIZE\n";
 		    $output.="$msg->sanitize();\n";
 		    $output.="#endif\n";
+		  $output.="#ifdef POSE_STATS_ON\n";
+		  $output.="  parent->localStats->SwitchTimer(COMM_TIMER);\n";
+		  $output.="#endif\n";
 		    $output.="(* (CProxy_".$segments[2]." *)&POSE_Objects)[_POSE_handle].".$segments[1].";\n";
+		  $output.="#ifdef POSE_STATS_ON\n";
+		  $output.="  parent->localStats->SwitchTimer(DO_TIMER);\n";
+		  $output.="#endif\n";
 		    #$output.="int _destPE = POSE_Objects.ckLocalBranch()->lastKnown(CkArrayIndex1D(_POSE_handle));\n";
 		    #$output.="parent->srVector[_destPE]++;\n";
 		    $output.="}\n";
@@ -1286,7 +1311,13 @@ sub posefuncmap
 		      $output.="#ifndef CMK_OPTIMIZE\n";
 		      $output.="$msg->sanitize();\n";
 		      $output.="#endif\n";
+		  $output.="#ifdef POSE_STATS_ON\n";
+		  $output.="  parent->localStats->SwitchTimer(COMM_TIMER);\n";
+		  $output.="#endif\n";
 		      $output.="(* (CProxy_".$simobjtype." *)&POSE_Objects)[parent->thisIndex].".$segments[1].";\n";
+		  $output.="#ifdef POSE_STATS_ON\n";
+		  $output.="  parent->localStats->SwitchTimer(DO_TIMER);\n";
+		  $output.="#endif\n";
 
 		      #$output.="parent->srVector[CkMyPe()]++;\n";
 		      $output.="}\n";
@@ -1304,7 +1335,13 @@ sub posefuncmap
 		      $output.="#ifndef CMK_OPTIMIZE\n";
 		      $output.="$msg->sanitize();\n";
 		      $output.="#endif\n";
+		  $output.="#ifdef POSE_STATS_ON\n";
+		  $output.="  parent->localStats->SwitchTimer(COMM_TIMER);\n";
+		  $output.="#endif\n";
 		      $output.="(* (CProxy_".$simobjtype." *)&POSE_Objects)[parent->thisIndex].".$segments[1].";\n";
+		  $output.="#ifdef POSE_STATS_ON\n";
+		  $output.="  parent->localStats->SwitchTimer(DO_TIMER);\n";
+		  $output.="#endif\n";
 		      #$output.="parent->srVector[CkMyPe()]++;\n";
 		      $output.="}\n";
 		      $output.="else delete(".$msg.");\n}";
