@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1995-06-08 17:09:41  gursoy
+ * Revision 2.2  1995-07-05 19:38:31  narain
+ * No LdbFillBlock and StripMsg while InsideDataInit
+ *
+ * Revision 2.1  1995/06/08  17:09:41  gursoy
  * Cpv macro changes done
  *
  * Revision 1.8  1995/05/09  20:04:52  milind
@@ -312,7 +315,7 @@ TRACE(CmiPrintf("[%d] GeneralCreateBoc: SizeData=%d, Entry=%d, ReturnEP=%d\n",
 
 		SetEnv_msgType(env, BocInitMsg);
 		trace_creation(GetEnv_msgType(env), Entry, env);
-		CkCheck_and_BroadcastNoFree(env, Entry);
+		CkCheck_and_BroadcastNoFreeNoLdb(env, Entry);
 		/* env becomes the usrMsg, hence should not be freed by us */
 		executing_boc_num = ProcessBocInitMsg(env);
 		if (ReturnEP >= 0)
