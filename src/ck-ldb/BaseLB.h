@@ -15,6 +15,11 @@
 
 #include "LBDatabase.h"
 
+#define PER_MESSAGE_SEND_OVERHEAD_DEFAULT   3.5e-5
+#define PER_BYTE_SEND_OVERHEAD_DEFAULT      8.5e-9
+#define PER_MESSAGE_RECV_OVERHEAD  	    0.0
+#define PER_BYTE_RECV_OVERHEAD      	    0.0
+
 /// Base class for all LB strategies.
 /**
   BaseLB is the base class for all LB strategy class.

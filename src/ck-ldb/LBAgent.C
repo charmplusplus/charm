@@ -5,6 +5,7 @@
 
 
 #include <math.h>
+#include <string.h>
 
 //#include "charm.h"
 
@@ -13,7 +14,7 @@
 
 
 int topoAgent :: compare(const void *p,const void *q){
-	return (((Elem*)p)->Cost - ((Elem*)q)->Cost);
+	return (int)(((Elem*)p)->Cost - ((Elem*)q)->Cost);
 }
 		
 
@@ -112,3 +113,80 @@ Agent::Elem* topoAgent :: my_preferred_procs(int *existing_map,int object,int *t
 	
 	return preferred_list;
 }
+
+/*****************************************************************************
+		Multicast Agent 
+*****************************************************************************/
+
+MulticastAgent::MulticastAgent(BaseLB::LDStats* stats, int p): Agent(p)
+{
+  stats->makeCommHash();
+  // build multicast knowledge
+  nobj = stats->n_objs;
+  objmap = new CkVec<int> [nobj];
+  for (int com = 0; com < stats->n_comm;com++) {
+    LDCommData &commData = stats->commData[com];
+    if (commData.recv_type()!=LD_OBJLIST_MSG) continue;
+    mcastList.push_back(MInfo(commData.bytes, commData.messages));
+    int mID = mcastList.size()-1;
+    MInfo &minfo = mcastList[mID];
+    int sender = stats->getHash(commData.sender);
+    objmap[sender].push_back(mID);
+    minfo.objs.push_back(sender);
+    int nobjs;
+    LDObjKey *objs = commData.receiver.get_destObjs(nobjs);
+    for (int i=0; i<nobjs; i++) {
+       int receiver = stats->getHash(objs[i]);
+       if((sender == -1)||(receiver == -1))
+         if (_lb_args.migObjOnly()) continue;
+         else CkAbort("Error in search\n");
+       objmap[receiver].push_back(mID);
+       minfo.objs.push_back(receiver);
+    }
+  }
+}
+
+Agent::Elem* MulticastAgent::my_preferred_procs(int *existing_map,int object,int *trialpes){ 
+  int i;
+  // check all multicast this object participated
+  CmiAssert(object < nobj);
+
+  CkVec<int> &mlist = objmap[object];
+  double * comcosts = new double [npes];
+  memset(comcosts, 0, sizeof(double)*npes);
+  double alpha = _lb_args.alpha();
+  double beeta = _lb_args.beeta();
+
+  // traverse all multicast participated
+  // find out which processor it communicates the most
+  for (i=0; i<mlist.size(); i++) {
+     MInfo &minfo = mcastList[mlist[i]];
+     for (int obj=0; obj<minfo.objs.size(); obj++) {
+       int pe = existing_map[obj];
+       if (pe == -1) continue;		// not assigned
+       comcosts[pe] += minfo.messages * alpha + minfo.nbytes * beeta;
+     }
+  }
+  // find number of non-0 cost processors
+  int count = 0;
+  for (i=0; i<npes; i++) {
+    if (comcosts[i] != 0.0) count++;
+  }
+  Elem *prefered = new Elem[count+1];
+  for (i=0; i<count; i++) {
+    // find the maximum
+    Elem maxp;
+    for (int j=0; j<npes; j++)
+      if (prefered[j].Cost > maxp.Cost) {
+        maxp = prefered[j];
+      }
+    prefered[i] = maxp;
+  }
+
+  delete [] comcosts;
+  return prefered;
+}
+
+
+
+

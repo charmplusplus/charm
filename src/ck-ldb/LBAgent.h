@@ -13,16 +13,17 @@ class Agent {
 public:
 	int npes;
 	
-	typedef struct{
+	typedef struct _Elem {
 		int pe;
-		int Cost;
+		double Cost;
+		_Elem(): pe(-1), Cost(-1.0) {}
 	}Elem;
 	
 	Elem *preferred_list;
 
 //public:
 	Agent(int p): npes(p) { }
-	~Agent() { }
+	virtual ~Agent() { }
 
 	virtual Elem* my_preferred_procs(int *existing_map,int object,int *trialpes){ }
 };
@@ -102,6 +103,25 @@ class comlibAgent : public Agent {
 
 	Agent::Elem* my_preferred_procs(int *existing_map,int object,int *trialpes);
 
+};
+
+class MulticastAgent : public Agent {
+protected:
+	struct MInfo {
+  	  int nbytes;
+	  int messages;
+          CkVec<int>  objs;
+          MInfo(): nbytes(0), messages(0) {}
+          MInfo(int b, int n): nbytes(b), messages(n) {}
+	};
+	CkVec<MInfo> mcastList;
+        CkVec<int> *objmap;	    // list of mcast involved for every object
+        int  nobj;
+public:
+	MulticastAgent(BaseLB::LDStats* lbDB, int p);
+	virtual ~MulticastAgent() { delete [] objmap; }
+
+	virtual Elem* my_preferred_procs(int *existing_map,int object,int *trialpes);
 };
 
 #endif
