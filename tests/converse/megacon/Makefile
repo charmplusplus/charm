@@ -1,5 +1,5 @@
 OPTS=-g
-CHARMC=../../bin/charmc $(OPTS)
+CHARMC=../../../bin/charmc $(OPTS)
 
 OBJS=blkinhand.o megacon.o ringsimple.o ring.o fibobj.o fibthr.o broadc.o priotest.o deadlock.o vars.o nodenum.o specmsg.o bigmsg.o vecsend.o posixth.o future.o multicast.o multisend.o
 
