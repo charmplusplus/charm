@@ -193,6 +193,7 @@ void DirectMulticastStrategy::remoteMulticast(envelope *env,
     //Collect Multicast Statistics
     RECORD_SENDM_STATS(getInstance(), env->getTotalsize(), pelist, npes);
     
+    CkPackMessage(&env);
     //Sending a remote multicast
     CmiSyncListSendAndFree(npes, pelist, env->getTotalsize(), (char*)env);
 }
@@ -278,13 +279,7 @@ void DirectMulticastStrategy::handleNewMulticastMessage(envelope *env) {
     
     sec_ht.put(key) = new_obj;
 
-    if(new_obj->npes > 0) {
-        CkPackMessage(&env);
-        CmiSyncListSendAndFree(new_obj->npes, new_obj->pelist, 
-                               env->getTotalsize(), (char*)env);  
-    }
-    else        
-        CmiFree(env);                
+    remoteMulticast(env, new_obj);
     
     if(new_obj->indices.size() > 0)
         ComlibArrayInfo::localMulticast(&(new_obj->indices), newenv);    
