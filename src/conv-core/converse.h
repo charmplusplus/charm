@@ -449,7 +449,7 @@ CsvExtern(CmiNodeLock, CsdNodeQueueLock);
 CpvExtern(int,         CsdStopFlag);
 CpvExtern(int,         CsdLocalCount);
 extern int CsdLocalMax;
-#define CSD_LOCAL_MAX_DEFAULT 10
+#define CSD_LOCAL_MAX_DEFAULT 0
 
 extern int CmiRegisterHandler(CmiHandler h);
 extern int CmiRegisterHandlerEx(CmiHandlerEx h,void *userPtr);

@@ -1155,7 +1155,7 @@ void *CsdNextMessage(CsdSchedulerState_t *s) {
         }
 #endif
         if(!CsdLocalMax) {
-            msg=CdsFifo_Dequeue(s->localQ);
+	  CqsDequeue(s->schedQ,(void **)&msg);
             if (msg!=NULL) return msg;	    
         }
 
