@@ -7,4 +7,4 @@ clean:
 	rm -f core *.cpm.h
 	rm -f TAGS *.o
 	rm -f pingpong
-	rm -f conv-host
+	rm -f conv-host charmrun

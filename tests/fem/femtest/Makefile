@@ -15,4 +15,4 @@ fpgm.o: fpgm.f90
 	$(CHARMC) -c fpgm.f90
 
 clean:
-	rm -f pgm fpgm *.o conv-host
+	rm -f pgm fpgm *.o conv-host charmrun

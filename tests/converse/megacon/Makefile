@@ -78,4 +78,4 @@ clean:
 	rm -f core *.cpm.h
 	rm -f TAGS *.o
 	rm -f pgm
-	rm -f conv-host
+	rm -f conv-host charmrun
