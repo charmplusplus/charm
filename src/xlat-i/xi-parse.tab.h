@@ -7,9 +7,10 @@
 #define STACKSIZE 263
 #define TABLE 264
 #define THREADED 265
-#define EXTERN 266
-#define IDENTIFIER 267
-#define NUMBER 268
+#define VARSIZE 266
+#define EXTERN 267
+#define IDENTIFIER 268
+#define NUMBER 269
 typedef union {
 	char *strval;
 	int intval;

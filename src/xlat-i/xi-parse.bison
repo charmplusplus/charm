@@ -52,7 +52,7 @@ ItemList:	Item
 	|	ItemList Item
 	;
 
-Item	:	Boc | Chare | Message | ReadOnly | Table | PackMessage
+Item	:	Boc | Chare | Message | ReadOnly | Table | PackMessage | VarsizeMessage
 	;
 
 OptionalExtern

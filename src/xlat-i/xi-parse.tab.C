@@ -28,67 +28,82 @@ typedef union {
 #define STACKSIZE 263
 #define TABLE 264
 #define THREADED 265
-#define EXTERN 266
-#define IDENTIFIER 267
-#define NUMBER 268
+#define VARSIZE 266
+#define EXTERN 267
+#define IDENTIFIER 268
+#define NUMBER 269
 #define YYERRCODE 256
 short yylhs[] = {                                        -1,
     0,   13,   13,   14,   14,   15,   15,   15,   15,   15,
-   15,   11,   11,   23,   16,   24,   17,    2,    1,   22,
-   22,    9,    9,   10,   10,   12,   12,   25,    3,   18,
-   21,    4,   19,   19,    7,    8,    5,   20,    6,
+   15,   15,   11,   11,   24,   16,   25,   17,    2,    1,
+   23,   23,    9,    9,   10,   10,   12,   12,   26,    3,
+   18,   21,   22,    4,    4,   19,   19,    7,    8,    5,
+   20,    6,
 };
 short yylen[] = {                                         2,
     1,    0,    1,    1,    2,    1,    1,    1,    1,    1,
-    1,    0,    1,    0,    8,    0,    8,    1,    1,    1,
-    2,    0,    2,    0,    1,    0,    2,    9,    1,    4,
-    4,    1,    4,    4,    1,    2,    1,    3,    1,
+    1,    1,    0,    1,    0,    8,    0,    8,    1,    1,
+    1,    2,    0,    2,    0,    1,    0,    2,    9,    1,
+    4,    4,    4,    1,    1,    4,    4,    1,    2,    1,
+    3,    1,
 };
 short yydefred[] = {                                      0,
-    0,    0,   13,    0,    0,    1,    0,    4,    6,    7,
-    8,    9,   10,   11,   19,    0,    0,    0,   39,    0,
-    0,    0,    0,    0,    5,   36,   37,    0,    0,   38,
-   18,    0,    0,   32,    0,    0,   33,   34,   14,   16,
-   30,   31,    0,    0,   25,    0,    0,   20,    0,    0,
-    0,    0,   21,    0,   23,    0,   15,   17,   29,    0,
-    0,    0,    0,    0,    0,   27,   28,
+    0,    0,   14,    0,    0,    1,    0,    4,    6,    7,
+    8,    9,   10,   11,   12,   20,    0,    0,    0,   42,
+    0,    0,    0,    0,    0,    0,    5,   39,   40,    0,
+    0,   41,   19,    0,    0,   34,    0,    0,    0,   36,
+   37,   15,   17,   31,   32,   33,    0,    0,   26,    0,
+    0,   21,    0,    0,    0,    0,   22,    0,   24,    0,
+   16,   18,   30,    0,    0,    0,    0,    0,    0,   28,
+   29,
 };
 short yydgoto[] = {                                       4,
-   34,   32,   60,   50,   28,   20,   17,   18,   51,   46,
-    5,   65,    6,    7,    8,    9,   10,   11,   12,   13,
-   14,   47,   43,   44,   48,
+   36,   34,   64,   54,   30,   21,   18,   19,   55,   50,
+    5,   69,    6,    7,    8,    9,   10,   11,   12,   13,
+   14,   15,   51,   47,   48,   52,
 };
-short yysindex[] = {                                   -248,
- -258, -258,    0,    0, -250,    0, -248,    0,    0,    0,
-    0,    0,    0,    0,    0,  -30, -258, -258,    0,  -34,
- -258, -258, -258, -258,    0,    0,    0,  -33,  -31,    0,
-    0,  -96,  -94,    0,  -29,  -28,    0,    0,    0,    0,
-    0,    0, -233, -233,    0, -258, -125,    0, -123,   -9,
- -225,  -24,    0,  -23,    0, -258,    0,    0,    0,   -3,
- -258,   -1, -224, -230,  -18,    0,    0,
+short yysindex[] = {                                   -245,
+ -242, -242,    0,    0, -251,    0, -245,    0,    0,    0,
+    0,    0,    0,    0,    0,    0,  -19, -242, -242,    0,
+  -32, -242, -242, -242, -242, -242,    0,    0,    0,  -31,
+  -30,    0,    0,  -93,  -92,    0,  -27,  -26,  -25,    0,
+    0,    0,    0,    0,    0,    0, -230, -230,    0, -242,
+ -125,    0, -123,   -6, -222,  -21,    0,  -20,    0, -242,
+    0,    0,    0,    3, -242,   -1, -221, -228,  -15,    0,
+    0,
 };
 short yyrindex[] = {                                      1,
-    0,    0,    0,    0,    0,    0,    6,    0,    0,    0,
-    0,    0,    0,    0,    0, -223,    0,    0,    0,    0,
+    0,    0,    0,    0,    0,    0,    8,    0,    0,    0,
+    0,    0,    0,    0,    0,    0, -223,    0,    0,    0,
     0,    0,    0,    0,    0,    0,    0,    0,    0,    0,
     0,    0,    0,    0,    0,    0,    0,    0,    0,    0,
-    0,    0, -254, -254,    0, -217, -254,    0, -254,    0,
-    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,
-    4,    0,  -16,    0,    0,    0,    0,
+    0,    0,    0,    0,    0,    0, -254, -254,    0, -213,
+ -254,    0, -254,    0,    0,    0,    0,    0,    0,    0,
+    0,    0,    0,    0,    6,    0,  -11,    0,    0,    0,
+    0,
 };
 short yygindex[] = {                                      0,
-    2,   24,    0,   -2,   29,    0,    0,    0,  -13,    0,
-    0,    0,    0,    0,   42,    0,    0,    0,    0,    0,
-    0,    7,    0,    0,  -32,
+    2,   26,    0,  -13,   31,    0,    0,    0,  -14,    0,
+    0,    0,    0,    0,   45,    0,    0,    0,    0,    0,
+    0,    0,    5,    0,    0,  -35,
 };
-#define YYTABLESIZE 267
-short yytable[] = {                                      52,
-    2,   54,   16,   19,   24,    3,   21,   22,   15,   23,
-   24,   26,   24,    1,   53,    2,   53,    3,   27,   27,
-   35,   36,   31,   31,   30,   37,   39,   38,   40,   41,
-   42,   45,   55,   56,   57,   58,   61,   66,   64,   63,
-   67,   22,   26,   35,   22,   33,   29,   62,   25,    0,
-   49,    0,    0,    0,    0,    0,    0,   59,    0,    0,
+#define YYTABLESIZE 274
+short yytable[] = {                                      56,
+    2,   58,   17,   20,   25,   22,   23,    3,   24,   25,
+   37,   38,   39,   25,   26,   57,    1,   57,    2,   29,
+   29,    3,   28,   33,   33,   16,   32,   40,   41,   42,
+   43,   44,   45,   46,   49,   59,   60,   61,   62,   67,
+   70,   68,   65,   71,   38,   23,   23,   27,   35,   31,
+   66,   27,   53,    0,    0,    0,    0,    0,    0,    0,
+    0,   63,    0,    0,    0,    0,    0,    0,    0,    0,
+    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,
+    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,
+    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,
+    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,
+    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,
+    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,
+    0,    0,    0,    0,    0,    0,    0,    0,    0,   49,
+    0,   49,    0,    0,    0,    0,    0,    0,    0,    0,
     0,    0,    0,    0,    0,    0,    0,    0,    0,    0,
     0,    0,    0,    0,    0,    0,    0,    0,    0,    0,
     0,    0,    0,    0,    0,    0,    0,    0,    0,    0,
@@ -96,29 +111,21 @@ short yytable[] = {                                      52,
     0,    0,    0,    0,    0,    0,    0,    0,    0,    0,
     0,    0,    0,    0,    0,    0,    0,    0,    0,    0,
     0,    0,    0,    0,    0,    0,    0,    0,    0,    0,
-    0,    0,    0,    0,    0,    0,    0,    0,    0,   45,
-    0,   45,    0,    0,    0,    0,    0,    0,    0,    0,
     0,    0,    0,    0,    0,    0,    0,    0,    0,    0,
     0,    0,    0,    0,    0,    0,    0,    0,    0,    0,
     0,    0,    0,    0,    0,    0,    0,    0,    0,    0,
-    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,
-    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,
-    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,
-    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,
-    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,
-    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,
-    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,
-    0,    0,    0,    0,    0,    0,    0,   12,   12,    0,
-   12,   12,   12,   12,    0,   12,   12,
+    0,    0,    0,    0,    0,    0,    0,   13,   13,    0,
+   13,   13,    0,    0,   13,   13,   13,   13,   13,    0,
+    0,    0,    0,   13,
 };
 short yycheck[] = {                                     125,
-    0,  125,    1,    2,  259,    0,  257,  258,  267,  260,
-  261,   42,  267,  262,   47,  264,   49,  266,   17,   18,
-   23,   24,   21,   22,   59,   59,  123,   59,  123,   59,
-   59,  265,   42,  259,   59,   59,   40,  268,  263,   41,
-   59,  259,   59,  267,   41,   22,   18,   61,    7,   -1,
-   44,   -1,   -1,   -1,   -1,   -1,   -1,   56,   -1,   -1,
-   -1,   -1,   -1,   -1,   -1,   -1,   -1,   -1,   -1,   -1,
+    0,  125,    1,    2,  259,  257,  258,    0,  260,  261,
+   24,   25,   26,  268,  266,   51,  262,   53,  264,   18,
+   19,  267,   42,   22,   23,  268,   59,   59,   59,  123,
+  123,   59,   59,   59,  265,   42,  259,   59,   59,   41,
+  269,  263,   40,   59,  268,  259,   41,   59,   23,   19,
+   65,    7,   48,   -1,   -1,   -1,   -1,   -1,   -1,   -1,
+   -1,   60,   -1,   -1,   -1,   -1,   -1,   -1,   -1,   -1,
    -1,   -1,   -1,   -1,   -1,   -1,   -1,   -1,   -1,   -1,
    -1,   -1,   -1,   -1,   -1,   -1,   -1,   -1,   -1,   -1,
    -1,   -1,   -1,   -1,   -1,   -1,   -1,   -1,   -1,   -1,
@@ -138,13 +145,14 @@ short yycheck[] = {                                     125,
    -1,   -1,   -1,   -1,   -1,   -1,   -1,   -1,   -1,   -1,
    -1,   -1,   -1,   -1,   -1,   -1,   -1,   -1,   -1,   -1,
    -1,   -1,   -1,   -1,   -1,   -1,   -1,  257,  258,   -1,
-  260,  261,  257,  258,   -1,  260,  261,
+  260,  261,   -1,   -1,  257,  258,  266,  260,  261,   -1,
+   -1,   -1,   -1,  266,
 };
 #define YYFINAL 4
 #ifndef YYDEBUG
 #define YYDEBUG 0
 #endif
-#define YYMAXTOKEN 268
+#define YYMAXTOKEN 269
 #if YYDEBUG
 char *yyname[] = {
 "end-of-file",0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -155,7 +163,7 @@ char *yyname[] = {
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,"BOC",
 "CHARE","ENTRY","MESSAGE","PACKMESSAGE","READONLY","STACKSIZE","TABLE",
-"THREADED","EXTERN","IDENTIFIER","NUMBER",
+"THREADED","VARSIZE","EXTERN","IDENTIFIER","NUMBER",
 };
 char *yyrule[] = {
 "$accept : File",
@@ -170,6 +178,7 @@ char *yyrule[] = {
 "Item : ReadOnly",
 "Item : Table",
 "Item : PackMessage",
+"Item : VarsizeMessage",
 "OptionalExtern :",
 "OptionalExtern : EXTERN",
 "$$1 :",
@@ -190,6 +199,8 @@ char *yyrule[] = {
 "EntryName : Id",
 "Message : OptionalExtern MESSAGE MessageName ';'",
 "PackMessage : OptionalExtern PACKMESSAGE MessageName ';'",
+"VarsizeMessage : OptionalExtern VARSIZE MessageName ';'",
+"MessageName : Id",
 "MessageName : Id",
 "ReadOnly : READONLY SimpleType ReadOnlyName ';'",
 "ReadOnly : READONLY PtrType ReadOnlyName ';'",
@@ -225,7 +236,7 @@ YYSTYPE yylval;
 short yyss[YYSTACKSIZE];
 YYSTYPE yyvs[YYSTACKSIZE];
 #define yystacksize YYSTACKSIZE
-#line 182 "xi-parse.bison"
+#line 192 "xi-parse.bison"
 
 int yyerror(char *mesg)
 {
@@ -233,7 +244,7 @@ int yyerror(char *mesg)
 	return 0;
 }
 
-#line 237 "y.tab.c"
+#line 248 "y.tab.c"
 #define YYABORT goto yyabort
 #define YYACCEPT goto yyaccept
 #define YYERROR goto yyerrlab
@@ -373,107 +384,115 @@ yyreduce:
     yyval = yyvsp[1-yym];
     switch (yyn)
     {
-case 12:
-#line 59 "xi-parse.bison"
+case 13:
+#line 60 "xi-parse.bison"
 { yyval.intval = FALSE; }
 break;
-case 13:
-#line 61 "xi-parse.bison"
+case 14:
+#line 62 "xi-parse.bison"
 { yyval.intval = TRUE; }
 break;
-case 14:
-#line 65 "xi-parse.bison"
+case 15:
+#line 66 "xi-parse.bison"
 {
 			Chare *c = new Chare(yyvsp[-1].strval, BOC, yyvsp[-3].intval) ;
 			delete yyvsp[-1].strval;
 			thismodule->AddChare(c) ;
 		}
 break;
-case 16:
-#line 74 "xi-parse.bison"
+case 17:
+#line 75 "xi-parse.bison"
 {
 			Chare *c = new Chare(yyvsp[-1].strval, CHARE, yyvsp[-3].intval) ;
 			delete yyvsp[-1].strval;
 			thismodule->AddChare(c) ;
 		}
 break;
-case 22:
-#line 94 "xi-parse.bison"
+case 23:
+#line 95 "xi-parse.bison"
 {
 			yyval.strval = NULL;
 		}
 break;
-case 24:
-#line 102 "xi-parse.bison"
+case 25:
+#line 103 "xi-parse.bison"
 { yyval.intval = FALSE; }
 break;
-case 25:
-#line 104 "xi-parse.bison"
+case 26:
+#line 105 "xi-parse.bison"
 { yyval.intval = TRUE; }
 break;
-case 26:
-#line 109 "xi-parse.bison"
+case 27:
+#line 110 "xi-parse.bison"
 { yyval.intval = 0; }
 break;
-case 27:
-#line 111 "xi-parse.bison"
+case 28:
+#line 112 "xi-parse.bison"
 { yyval.intval = yyvsp[0].intval; }
 break;
-case 28:
-#line 115 "xi-parse.bison"
+case 29:
+#line 116 "xi-parse.bison"
 {
 			thismodule->chares->AddEntry(yyvsp[-5].strval, yyvsp[-3].strval, yyvsp[-8].intval, yyvsp[-7].strval, yyvsp[-1].intval) ;
 			delete yyvsp[-5].strval; delete yyvsp[-3].strval;
 		}
 break;
-case 30:
-#line 125 "xi-parse.bison"
+case 31:
+#line 126 "xi-parse.bison"
 {
-			Message *m = new Message(yyvsp[-1].strval, 0, yyvsp[-3].intval) ;
+			Message *m = new Message(yyvsp[-1].strval, 0, 0, yyvsp[-3].intval) ;
 			delete yyvsp[-1].strval;
 			thismodule->AddMessage(m) ;
 		}
 break;
-case 31:
-#line 133 "xi-parse.bison"
+case 32:
+#line 134 "xi-parse.bison"
 {
-			Message *m = new Message(yyvsp[-1].strval, 1, yyvsp[-3].intval) ;
+			Message *m = new Message(yyvsp[-1].strval, 1, 0, yyvsp[-3].intval) ;
 			delete yyvsp[-1].strval;
 			thismodule->AddMessage(m) ;
 		}
 break;
 case 33:
-#line 144 "xi-parse.bison"
+#line 142 "xi-parse.bison"
+{
+			Message *m = new Message(yyvsp[-1].strval, 1, 1, yyvsp[-3].intval) ;
+			delete yyvsp[-1].strval;
+			thismodule->AddMessage(m) ;
+		}
+break;
+case 36:
+#line 154 "xi-parse.bison"
 {
 			ReadOnly *r = new ReadOnly(yyvsp[-1].strval, yyvsp[-2].strval, 0) ;
 			delete yyvsp[-2].strval;
 			thismodule->AddReadOnly(r) ;
 		}
 break;
-case 34:
-#line 150 "xi-parse.bison"
+case 37:
+#line 160 "xi-parse.bison"
 {
 			ReadOnly *r = new ReadOnly(yyvsp[-1].strval, yyvsp[-2].strval, 1) ;
 			delete yyvsp[-2].strval;
 			thismodule->AddReadOnly(r) ;
 		}
 break;
-case 36:
-#line 161 "xi-parse.bison"
+case 39:
+#line 171 "xi-parse.bison"
 {
 			yyval.strval = strcat(strcpy(new char[2+strlen(yyvsp[-1].strval)], yyvsp[-1].strval), "*");
 			delete yyvsp[-1].strval;
 		}
 break;
-case 38:
-#line 171 "xi-parse.bison"
+case 41:
+#line 181 "xi-parse.bison"
 {
 			Table *t = new Table(yyvsp[-1].strval) ;
 			delete yyvsp[-1].strval;
 			thismodule->AddTable(t) ;
 		}
 break;
-#line 477 "y.tab.c"
+#line 496 "y.tab.c"
     }
     yyssp -= yym;
     yystate = *yyssp;
