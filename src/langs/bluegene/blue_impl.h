@@ -66,6 +66,8 @@ public:
   int bgStatCollectHandler;
   // state variables
   int inEmulatorInit;
+  // simulation start timer
+  double simStartTime;
 };
 
 CpvExtern(BGMach, bgMach);	/* BG machine size */

@@ -47,6 +47,7 @@ static void BroadcastShutdown(void *null, double t)
 
   CmiDeliverMsgs(-1);
   CmiPrintf("\nBG> BlueGene emulator shutdown gracefully!\n");
+  CmiPrintf("BG> Emulation took %f seconds!\n", CmiWallTimer()-cva(simState).simStartTime);
   CsdExitScheduler();
 /*
   ConverseExit();
@@ -74,6 +75,7 @@ void BgShutdown()
     // ConverseExit();
     CmiDeliverMsgs(-1);
     CmiPrintf("\nBG> BlueGene emulator shutdown gracefully!\n");
+    CmiPrintf("BG> Emulation took %f seconds!\n", CmiWallTimer()-cva(simState).simStartTime);
     ConverseExit();
     exit(0);
   }
