@@ -16,15 +16,21 @@ class CMsgBuffer {
   public:
     int entry;
     void *msg;
+    void *bgLog1; 
+    void *bgLog2; 
     int refnum;
     CMsgBuffer *next;
 
-    CMsgBuffer(int e, void *m, int r) : entry(e), msg(m), refnum(r), next(NULL) {}
-    CMsgBuffer(): next(NULL) {}
+    CMsgBuffer(int e, void *m, void* l1, int r) : entry(e), msg(m), bgLog1(l1), bgLog2(NULL),refnum(r), next(NULL) {}
+    CMsgBuffer(int e, void *m, int r) : entry(e), msg(m), bgLog1(NULL), bgLog2(NULL),refnum(r), next(NULL) {}
+    CMsgBuffer(): next(NULL), bgLog1(NULL), bgLog2(NULL) {}
     void pup(PUP::er& p) {
       p|entry;
       CkPupMessage(p, &msg);
       p|refnum;
+      if (p.isUnpacking()) {
+        bgLog1 = bgLog2 = NULL;
+      }
     }
 };
 
@@ -55,6 +61,7 @@ class CWhenTrigger {
       p|nEntries;
       p(entries, MAXREF);
       p(refnums, MAXREF);
+      if (p.isUnpacking()) args[1]=0;            // HACK for load balancer
     }
 };
 
@@ -249,6 +256,7 @@ class TListCMsgBuffer
     }
 };
 
+
 /**
  This class hides all the details of dependencies between
  when blocks and entries. It also contains the entry buffers
@@ -367,10 +375,11 @@ class CDep {
 
    // buffer a message for a specific entry point with a specified
    // reference number
-   void bufferMessage(int entry, void *msg, int refnum)
+   CMsgBuffer* bufferMessage(int entry, void *msg, void* log , int refnum)
    {
-     CMsgBuffer *buf = new CMsgBuffer(entry, msg, refnum);
+     CMsgBuffer *buf = new CMsgBuffer(entry, msg, log,refnum);
      buffers[entry]->append(buf);
+     return buf;
    }
 
    // For a specified entry number and reference number,
@@ -444,6 +453,7 @@ class CDep {
      return 1;
    }
 };
+
 
 /** 
  This class hides all of the details of dependencies between
