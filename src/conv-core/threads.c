@@ -111,6 +111,21 @@
 #include "conv-trace.h"
 #include <sys/types.h>
 
+#if ! CMK_THREADS_BUILD_DEFAULT
+#undef CMK_THREADS_USE_CONTEXT
+#undef CMK_THREADS_ARE_WIN32_FIBERS
+#undef CMK_THREADS_USE_PTHREADS
+
+#if CMK_THREADS_BUILD_CONTEXT
+#define CMK_THREADS_USE_CONTEXT       1
+#elif  CMK_THREADS_BUILD_FIBERS
+#define CMK_THREADS_ARE_WIN32_FIBERS  1
+#elif  CMK_THREADS_BUILD_PTHREADS
+#define CMK_THREADS_USE_PTHREADS      1
+#endif
+
+#endif
+
 /**************************** Shared Base Thread Class ***********************/
 typedef struct CthThreadBase
 {
@@ -585,7 +600,6 @@ interface called "Fibers", used here.
 Written by Sameer Paranjpye around October 2000
 */
 #elif  CMK_THREADS_ARE_WIN32_FIBERS
-
 #include <windows.h>
 #include <winbase.h>
 
@@ -884,16 +898,17 @@ void CthResume(CthThread t)
   }
 }
 
-static void *CthOnly(CthThread arg)
+static void *CthOnly(void * arg)
 {
-  arg->inited = 1;
+  CthThread th = (CthThread)arg;
+  th->inited = 1;
   pthread_mutex_lock(&CthCpvAccess(sched_mutex));
-  pthread_cond_signal(arg->creator);
+  pthread_cond_signal(th->creator);
   do {
-  pthread_cond_wait(&(arg->cond), &CthCpvAccess(sched_mutex));
+  pthread_cond_wait(&(th->cond), &CthCpvAccess(sched_mutex));
   } while (arg!=CthCpvAccess(CthCurrent)) ;
-  arg->fn(arg->arg);
-  CthThreadFinished(arg);
+  th->fn(th->arg);
+  CthThreadFinished(th);
   return 0;
 }
 
@@ -929,8 +944,9 @@ CthThread CthCreateMigratable(CthVoidFn fn,void *arg,int size)
 
 /***************************************************************
 Use SysV r3 setcontext/getcontext calls instead of
-quickthreads.  This works on some architectures (such as
-IA64) where quickthreads' setjmp/alloca/longjmp fails.
+quickthreads.  This works on lots of architectures (such as
+SUN, IBM SP, O2K, DEC Alpha, IA64, even Linux with new glibc such as RH9) 
+where quickthreads' setjmp/alloca/longjmp doesnot work.
 
 Written by Gengbin Zheng around April 2001
 */
