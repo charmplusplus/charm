@@ -102,6 +102,7 @@ static void *recdQueueRemoveFromFront(void);
 
 static void ConverseRunPE(int everReturn);
 static void CommunicationServer(int sleepTime);
+static void CommunicationServerThread(int sleepTime);
 
 typedef struct msg_list {
      MPI_Request req;
@@ -456,6 +457,11 @@ static void CommunicationServer(int sleepTime)
   }
 }
 #endif
+
+static void CommunicationServerThread(int sleepTime)
+{
+  CommunicationServer(sleepTime);
+}
 
 #if CMK_NODE_QUEUE_AVAILABLE
 char *CmiGetNonLocalNodeQ(void)
