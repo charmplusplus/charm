@@ -248,7 +248,7 @@ int AMPI_Irecv(void *buf, int count, MPI_Datatype datatype, int src,
 int AMPI_Wait(MPI_Request *request, MPI_Status *sts);
 #define MPI_Test AMPI_Test
 int AMPI_Test(MPI_Request *request, int *flag, MPI_Status *sts);
-#define MPI_Waitan AMPI_Waitan
+#define MPI_Waitany AMPI_Waitany
 int AMPI_Waitany(int count, MPI_Request *request, int *index, MPI_Status *sts);
 #define MPI_Testany AMPI_Testany
 int AMPI_Testany(int count, MPI_Request *request, int *index, int *flag, MPI_Status *status);
