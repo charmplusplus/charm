@@ -12,6 +12,7 @@ void *itrDoneHandler(void *msg){
     comID id = dmsg->id;
     int instid = id.instanceID;
 
+    CmiFree(msg);
     ComlibPrintf("[%d] Iteration finished %d\n", CkMyPe(), instid);
 
     StrategyTable *sentry = 
@@ -19,7 +20,7 @@ void *itrDoneHandler(void *msg){
         ->getStrategyTableEntry(instid);
     int nexpected = sentry->numElements;
     
-    if(nexpected == 0) {               
+    if(nexpected == 0) {     
         nm_mgr = (EachToManyMulticastStrategy *)sentry->strategy;    
         nm_mgr->doneInserting();
     }
@@ -253,11 +254,12 @@ void EachToManyMulticastStrategy::insertMessage(CharmMessageHolder *cmsg){
 void EachToManyMulticastStrategy::doneInserting(){
     ComlibPrintf("%d: DoneInserting \n", CkMyPe());
     
-    if((messageBuf->length() == 0) && (CkNumPes() > 0)) {
+    if(messageBuf->length() == 0) {
+        if(routerID == USE_DIRECT)
+		return; 
+
         ComlibDummyMsg * dummymsg = new ComlibDummyMsg;
-        
         ComlibPrintf("[%d] Creating a dummy message\n", CkMyPe());
-        
         CmiSetHandler(UsrToEnv(dummymsg), 
                       CpvAccess(RecvdummyHandle));
         
@@ -329,6 +331,7 @@ void EachToManyMulticastStrategy::pup(PUP::er &p){
         if(p.isUnpacking())
             destIndices = new CkArrayIndexMax[nDestElements];
         p((char *)destIndices, nDestElements * sizeof(CkArrayIndexMax));
+        //p(destIndices, nDestElements);
     }
     
     ComlibPrintf("[%d] ndestelements = %d\n", CkMyPe(), nDestElements);
