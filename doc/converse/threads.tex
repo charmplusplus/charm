@@ -20,19 +20,19 @@ Therefore, it defines an interface to which all schedulers can comply.
 This makes it possible for users to write blocking code (eg, locks,
 barriers, etc) without knowing exactly how the scheduler will work.
 The scheduler interface consists of an awaken function and a suspend
-function.  The awaken function is called by the thread user to notify
-the scheduler that a particular thread wants the CPU.  The scheduler
-is expected to respond to this by inserting the thread into a
-ready-queue or something similar.  The suspend function tells the
-scheduler that the current thread no longer wants the CPU, whereupon
-the scheduler must choose another thread to execute instead.  No
-stipulation is made about how the scheduler chooses the thread to
-execute next, except that the thread must want the CPU. (Eg, somebody
-must have declared that the thread wants the CPU using the
-awaken-function.)
+function, provided by whomever implements the scheduler.  The awaken
+function is called by the thread user to notify the scheduler that a
+particular thread wants the CPU.  The scheduler is expected to respond
+to this by inserting the thread into a ready-queue or something
+similar.  The suspend function tells the scheduler that the current
+thread no longer wants the CPU, whereupon the scheduler must choose
+another thread to execute instead.  No stipulation is made about how
+the scheduler chooses the thread to execute next, except that the
+thread must want the CPU. (Eg, somebody must have declared that the
+thread wants the CPU using the awaken-function.)
 
 The threads-package makes it possible to associate private data
-with a thread.  to this end, we provide functions for storing and
+with a thread.  To this end, we provide functions for storing and
 retrieving arbitrary user data in the thread-object.
 
 Finally, as a convenience to converse users, we provide a function
@@ -46,9 +46,7 @@ functions described below.}
 \function{typedef struct CthThreadStruct *CthThread;}
 \desc{This is an opaque type defined in {\tt converse.h}.  It represents
 a first-class thread object.  No information is publicized about the
-contents of a CthThreadStruct, {\it except} that it {\it does} include a
-converse header, so you may call {\tt CmiSetHandler} on a {\tt CthThread}
-and subsequently enqueue the thread in the {\tt CsdScheduler} queue.}
+contents of a CthThreadStruct.}
 
 \function{typedef void (CthVoidFn)();}
 \desc{This is a type defined in {\tt threads.h}.  It represents
@@ -116,7 +114,9 @@ being used, this function should be used to notify the scheduler that
 thread {\tt t} wants the CPU.  This will enable the scheduler to
 select thread {\tt t} for execution at some point in the future.
 In actuality, {\tt CthAwaken} simply calls the user-supplied "awaken"
-function (see {\tt CthSetStrategy} below).}
+function (see {\tt CthSetStrategy} below).  It is illegal to call
+{\tt CthAwaken} on a thread which has already been awakened, unless
+the thread has been scheduled since the last awaken.}
 
 \function{void CthSetStrategy(CthThread t, CthVoidFn awakenfn, CthThFn choosefn)}
 \desc{This is part of the scheduler-interface.  It should be used by
@@ -170,6 +170,14 @@ it is intended that this function be used as follows:}
     tinfo = (struct th_info *)malloc(sizeof(struct th_info));
     CthSetVar(t, &current_thread_info, tinfo);
 \end{verbatim}
+
+\desc{Note: you can use CthSetVar multiple times on a thread, thereby
+attaching multiple data items to it.  However, each data item slows
+down context-switch to that thread by a tiny amount.  Therefore, a
+module should ideally attach no more than one data item to a thread.
+We allow multiple data items to be attached so that independent
+modules can attach data to a thread without interfering with each
+other.}
 
 \function{void *CthGetVar(CthThread t, void **var)}
 \desc{This makes it possible to retrieve values previously stored with
