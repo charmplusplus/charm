@@ -856,6 +856,17 @@ void CmiFreeBroadcastAllFn(int size, char *msg)  /* All including me */
   CmiFree(msg) ;
 }
 
+static void registerElanEvents()
+{
+#ifndef CMK_OPTIMIZE 
+#if ! CMK_TRACE_IN_CHARM
+    traceRegisterUserEvent("Pump Messages", 10);
+    traceRegisterUserEvent("Release Sent Messages", 20);
+    traceRegisterUserEvent("ELAN Send", 30);
+#endif
+#endif
+}
+
 void ConverseExit(void)
 {
   while(!CmiAllAsyncMsgsSent() || cur_unsent ) {
@@ -865,6 +876,9 @@ void ConverseExit(void)
   }
 
   elan_gsync(elan_base->allGroup); 
+
+  // register elan events before trace module destoried
+  registerElanEvents();
 
   ConverseCommonExit();
 
@@ -927,13 +941,6 @@ static void ConverseRunPE(int everReturn)
 
   if (!everReturn) {
     Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
-#ifndef CMK_OPTIMIZE 
-#if ! CMK_TRACE_IN_CHARM
-    traceRegisterUserEvent("Pump Messages", 10);
-    traceRegisterUserEvent("Release Sent Messages", 20);
-    traceRegisterUserEvent("ELAN Send", 30);
-#endif
-#endif
     if (Cmi_usrsched==0) CsdScheduler(-1);
     ConverseExit();
   }
