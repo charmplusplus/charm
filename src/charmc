@@ -24,8 +24,6 @@
 #
 ##############################################################################
 
-onintr failure
-
 unsetenv MACHTYPE
 unsetenv SEQUENTIAL
 unsetenv LANGUAGE
@@ -55,6 +53,7 @@ unsetenv DEBUG_MODE
 unsetenv OPTIMIZE_MODE
 unsetenv USE_RELIABLE_CC
 unsetenv USE_FASTEST_CC
+unsetenv ECHOCMD        ; set ECHOCMD=(unset echo)
 
 ##############################################################################
 #
@@ -106,7 +105,8 @@ while ($argindex <= $#argv)
             breaksw
 
         case "-verbose"
-            set VERBOSE=yes
+            set VERBOSE=1
+            set ECHOCMD=(set echo)
             breaksw
 
         case "-save"
@@ -200,7 +200,6 @@ while ($argindex <= $#argv)
         case "-L*"
             set OPTS_LD=  ( $OPTS_LD   "$arg" )
             set OPTS_LDXX=( $OPTS_LDXX "$arg" )
-	    set OPTS_LDRO=( $OPTS_LDRO "$arg" )
             breaksw
 
         case "-g"
@@ -213,6 +212,13 @@ while ($argindex <= $#argv)
 
 	case "-NO"
 	    unset OPTIMIZE_MODE
+            breaksw
+
+	case "-pg"
+	    set OPTS_CC= ( $OPTS_CC $arg )
+	    set OPTS_CXX= ( $OPTS_CC $arg )
+	    set OPTS_LD= ( $OPTS_CC $arg )
+	    set OPTS_LDXX= ( $OPTS_CC $arg )
             breaksw
 
         case "-O*"
@@ -245,7 +251,7 @@ while ($argindex <= $#argv)
         
         default:
             echo "Unrecognized argument $arg"
-            goto failure
+            exit 1
 
     endsw
 end
@@ -299,7 +305,7 @@ if ($?CHARMBIN == 0) then
     echo 'If it searches both these places, and doesnt find the charm'
     echo 'files, it will give up.'
     echo ''
-    goto failure
+    exit 1
     endif
 endif
 
@@ -309,7 +315,7 @@ if ($?MACHTYPE) then
 	set CHARMBIN=`pwd`
     else
         echo 'error - there is no installed charm for "'$MACHTYPE'"'
-        goto failure
+        exit 1
     endif
 endif
 
@@ -398,6 +404,8 @@ endsw
 #
 ##############################################################################
 
+onintr failure
+
 cd $ORIGDIR
 
 foreach FILE ($FILES)
@@ -409,63 +417,40 @@ foreach FILE ($FILES)
   endif
   switch ($FILE)
     case "*.p"
-      if ($?VERBOSE) echo "$CMK_CPP $OPTS_CPP -I$CHARMINC $BASE.p > $TMP.cpp"
-      $CMK_CPP $OPTS_CPP -I$CHARMINC $BASE.p > $TMP.cpp
-      if ($?VERBOSE) echo "$CHARMBIN/charmfilter < $TMP.cpp | $CMK_M4 > $TMP.space"
-      $CHARMBIN/charmfilter < $TMP.cpp | $CMK_M4 > $TMP.space
-      if ($?VERBOSE) echo "$CHARMBIN/charmxlat $TMP.space $TMP.c"
-      $CHARMBIN/charmxlat $TMP.space $TMP.c
+      ($ECHOCMD ; $CMK_CPP $OPTS_CPP -I$CHARMINC $BASE.p > $TMP.cpp)
+      ($ECHOCMD ; $CHARMBIN/charmfilter < $TMP.cpp | $CMK_M4 > $TMP.space)
+      ($ECHOCMD ; $CHARMBIN/charmxlat $TMP.space $TMP.c)
       if ($status) goto failure
-      if ($?VERBOSE) echo "$CMK_CC $OPTS_CC -I$CHARMINC -c $TMP.c"
-      $CMK_CC $OPTS_CC -I$CHARMINC -c $TMP.c
+      ($ECHOCMD ; $CMK_CC $OPTS_CC -I$CHARMINC -c $TMP.c)
       if ($status) goto failure
       if ($?OBJECT == 0) then
-          if ($?VERBOSE) echo "/bin/mv $TMP.o $BASE.o"
-          /bin/mv $TMP.o $BASE.o
+          ($ECHOCMD ; /bin/mv $TMP.o $BASE.o)
       else
           set OBJECTFILES=( $OBJECTFILES $TMP.o )
       endif
       breaksw
     case "*.P"
-# Put pgm.P into pgm.TMP.P.C because CC needs source files to end with .C
+      # Put pgm.P into pgm.TMP.P.C because CC needs source files to end with .C
       echo '#include "ckdefs.h"' > $TMP.P.C
       echo '#include "chare.h"' >> $TMP.P.C
       echo '#include "c++interface.h"' >> $TMP.P.C
       echo '#line 1 "'$BASE.P'"' >> $TMP.P.C
       /bin/cat $BASE.P >> $TMP.P.C
-      if ($?VERBOSE) echo "$CMK_CXXPP $OPTS_CPP -I$CHARMINC $TMP.P.C > $TMP.cpp"
-      $CMK_CXXPP $OPTS_CPP -I$CHARMINC $TMP.P.C > $TMP.cpp
-
-#     if ($?VERBOSE) echo "$CHARMBIN/charmfilter++ $TMP.cpp | $CMK_M4 > $TMP.space"
-#     $CHARMBIN/charmfilter++ $TMP.cpp | $CMK_M4 > $TMP.space
-
-      if ($?VERBOSE) echo "$CHARMBIN/charmxlat++ $TMP.cpp $TMP.xlat"
-      $CHARMBIN/charmxlat++ $TMP.cpp $TMP.xlat
+      ($ECHOCMD ; $CMK_CXXPP $OPTS_CPP -I$CHARMINC $TMP.P.C > $TMP.cpp)
+      ($ECHOCMD ; $CHARMBIN/charmxlat++ $TMP.cpp $TMP.xlat)
       if ($status) goto failure
-
-      if ($?VERBOSE) echo "/bin/cat $BASE.headers > $BASE.$CMK_CPP_SUFFIX"
-      /bin/cat $BASE.headers > $BASE.$CMK_CPP_SUFFIX
-      if ($?VERBOSE) echo "/bin/cat $TMP.xlat >> $BASE.$CMK_CPP_SUFFIX"
-      /bin/cat $TMP.xlat >> $BASE.$CMK_CPP_SUFFIX
-
-      if ($?VERBOSE) echo "$CMK_CXX $OPTS_CXX -I$CHARMINC -c $BASE.$CMK_CPP_SUFFIX"
-      $CMK_CXX $OPTS_CXX -I$CHARMINC -c $BASE.$CMK_CPP_SUFFIX
+      ($ECHOCMD ; /bin/cat $BASE.headers > $TMP.$CMK_CPP_SUFFIX)
+      ($ECHOCMD ; /bin/cat $TMP.xlat >> $TMP.$CMK_CPP_SUFFIX)
+      ($ECHOCMD ; $CMK_CXX $OPTS_CXX -I$CHARMINC -c $TMP.$CMK_CPP_SUFFIX)
       if ($status) goto failure
-
-      if ($?OBJECT != 0) then
-        set OBJECTFILES=( $OBJECTFILES $BASE.o )
+      if ($?OBJECT == 0) then
+        ($ECHOCMD ; /bin/mv $TMP.o $BASE.o)
+      else
+        set OBJECTFILES=( $OBJECTFILES $TMP.o )
       endif
-
-#     if ($?OBJECT == 0) then
-#       if ($?VERBOSE) echo "/bin/mv $TMP.o $BASE.o"
-#       /bin/mv $TMP.o $BASE.o
-#     else
-#       set OBJECTFILES=( $OBJECTFILES $TMP.o )
-#     endif
       breaksw
     case "*.c"
-      if ($?VERBOSE) echo "$CMK_CC $OPTS_CC -I$CHARMINC -c $BASE.c"
-      $CMK_CC $OPTS_CC -I$CHARMINC -c $BASE.c
+      ($ECHOCMD ; $CMK_CC $OPTS_CC -I$CHARMINC -c $BASE.c)
       if ($status) goto failure
       if ($?OBJECT) then
 	if ($OBJECT != $BASE.o) set DELETE=( $DELETE $BASE.o )
@@ -473,8 +458,7 @@ foreach FILE ($FILES)
       endif
       breaksw
     case "*.C"
-      if ($?VERBOSE) echo "$CMK_CXX $OPTS_CXX -I$CHARMINC -c $BASE.C"
-      $CMK_CXX $OPTS_CXX -I$CHARMINC -c $BASE.C
+      ($ECHOCMD ; $CMK_CXX $OPTS_CXX -I$CHARMINC -c $BASE.C)
       if ($status) goto failure
       if ($?OBJECT) then
 	if ($OBJECT != $BASE.o) set DELETE=( $DELETE $BASE.o )
@@ -482,8 +466,7 @@ foreach FILE ($FILES)
       endif
       breaksw
     case "*.cxx"
-      if ($?VERBOSE) echo "$CMK_CXX $OPTS_CXX -I$CHARMINC -c $BASE.cxx"
-      $CMK_CXX $OPTS_CXX -I$CHARMINC -c $BASE.cxx
+      ($ECHOCMD ; $CMK_CXX $OPTS_CXX -I$CHARMINC -c $BASE.cxx)
       if ($status) goto failure
       if ($?OBJECT) then
 	if ($OBJECT != $BASE.o) set DELETE=( $DELETE $BASE.o )
@@ -497,6 +480,7 @@ foreach FILE ($FILES)
       echo "charmc: I'm not yet smart enough to compile $FILE"
       goto failure
     case "*.o"
+    case "*.a"
       set OBJECTFILES=( $OBJECTFILES $BASE.o )
       breaksw
     default:
@@ -522,26 +506,21 @@ switch ($OBJECT)
     if (($#FILES == 1)&&($#OBJECTFILES == 1)) then
         if ($OBJECT != $OBJECTFILES) then
             rm -f $OBJECT
-            if ($?VERBOSE) echo mv $OBJECTFILES $OBJECT
-            mv $OBJECTFILES $OBJECT
+            ($ECHOCMD ; /bin/mv $OBJECTFILES $OBJECT)
             if ($status) goto failure
         endif
     else
         rm -f $OBJECT
-        if ( $?VERBOSE ) echo $CMK_LDRO $OBJECT $OPTS_LDRO $OBJECTFILES
-        $CMK_LDRO $OBJECT $OPTS_LDRO $OBJECTFILES
+        ($ECHOCMD ; $CMK_LDRO $OBJECT $OPTS_LDRO $OBJECTFILES)
         if ($status) goto failure
     endif
     goto copyobj
 
   case "*.a":
-    if ( $?VERBOSE ) echo rm -f $OBJECT
-    rm -f $OBJECT
-    if ( $?VERBOSE ) echo $CMK_AR $OBJECT $OBJECTFILES
-    $CMK_AR $OBJECT $OBJECTFILES
+    ($ECHOCMD ; rm -f $OBJECT)
+    ($ECHOCMD ; $CMK_AR $OBJECT $OBJECTFILES)
     if ($status) goto failure
-    if ( $?VERBOSE ) echo $CMK_RANLIB $OBJECT
-    $CMK_RANLIB $OBJECT
+    ($ECHOCMD ; $CMK_RANLIB $OBJECT)
     if ($status) goto failure
     goto copyobj
 
@@ -565,8 +544,7 @@ endsw
 exelink:
 
 if ($?SEQUENTIAL) then
-    if ($?VERBOSE) $CMK_SEQ_LD $OPTS_LD -o $OBJECT $OBJECTFILES -L$CHARMLIB $LIBRARIES $CMK_SEQ_LIBS
-    $CMK_SEQ_LD $OPTS_LD -o $OBJECT $OBJECTFILES -L$CHARMLIB $LIBRARIES $CMK_SEQ_LIBS
+    ($ECHOCMD ; $CMK_SEQ_LD $OPTS_LD -o $OBJECT $OBJECTFILES -L$CHARMLIB $LIBRARIES $CMK_SEQ_LIBS)
     if ($status) goto failure
     goto copyobj
 endif
@@ -673,8 +651,7 @@ endsw
 echo "linking $OBJECT with -language $LANGUAGE"
 
 set DELETE=(CHARMC-USR.TMP.o CHARMC-USR.TMP.nm $DELETE)
-if ($?VERBOSE) echo $PRELOAD
-$PRELOAD
+($ECHOCMD ; $PRELOAD)
 if ($status) goto failure
 
 $CMK_NM CHARMC-USR.TMP.o | csh -fc "$CMK_NM_FILTER" > CHARMC-USR.TMP.nm
@@ -697,8 +674,7 @@ echo '_CK_module_init_fn()' >> CHARMC-MOD.TMP.c
 echo '{' >> CHARMC-MOD.TMP.c
 awk '{print "_CK_"$1"_init();";}' < CHARMC-MOD.TMP.dat >> CHARMC-MOD.TMP.c
 echo '}' >> CHARMC-MOD.TMP.c
-if ($?VERBOSE) echo $CMK_CC $OPTS_CC -c CHARMC-MOD.TMP.c
-$CMK_CC $OPTS_CC -c CHARMC-MOD.TMP.c
+($ECHOCMD ; $CMK_CC $OPTS_CC -c CHARMC-MOD.TMP.c)
 if ($status) goto failure
 
 ########################################################################
@@ -718,8 +694,7 @@ endif
 #
 ########################################################################
 
-if ($?VERBOSE) echo $LOADER
-$LOADER
+($ECHOCMD ; $LOADER)
 if ($status) goto failure
 
 ########################################################################
@@ -745,8 +720,7 @@ foreach x ($COPIES)
     if ($x != $OBJECT) then
 	set COPY=$x
 	if (-d $COPY) set COPY=$COPY/$OBJECT
-        if ($?VERBOSE) echo rm -f $COPY ";" ln $OBJECT $COPY
-        rm -f $COPY ; cp $OBJECT $COPY
+        ($ECHOCMD ; /bin/rm -f $COPY ; /bin/cp $OBJECT $COPY)
     endif
 end
 
@@ -780,7 +754,7 @@ end:
             # same extension for multiple purposes.)  If it's a temp file,
             # put TMP in its name.
             /bin/rm -f $TMP.P.C $TMP.cpp $TMP.space $TMP.xlat $TMP.o $BASE.headers
-            /bin/rm -f $TMP.c $TMP.c.0.h $TMP.c.1.h $TMP.c.2.h
+            /bin/rm -f $TMP.c $TMP.c.0.h $TMP.c.1.h $TMP.c.2.h $TMP.$CMK_CPP_SUFFIX
         end
         rm -f core $DELETE
     endif
