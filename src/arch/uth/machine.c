@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.31  1997-12-10 21:01:28  jyelon
+ * Revision 1.32  1997-12-10 21:59:23  jyelon
+ * Modified CmiDeliverSpecificMsg so that it works with uth version.
+ *
+ * Revision 1.31  1997/12/10 21:01:28  jyelon
  * *** empty log message ***
  *
  * Revision 1.30  1997/10/10 18:26:23  jyelon
@@ -298,7 +301,14 @@ void CmiExit()
   CmiNext();
 }
 
-void CmiYield()
+void *CmiGetNonLocal()
+{
+  CmiThreads[CmiMyPe()] = CthSelf();
+  CmiNext();
+  return 0;
+}
+
+void CmiNotifyIdle()
 {
   CmiThreads[CmiMyPe()] = CthSelf();
   CmiNext();
@@ -313,7 +323,7 @@ void CmiNodeBarrier()
     for (i=0; i<CmiNumPes(); i++) CmiBarred[i]=0;
     CmiNumBarred=0;
   }
-  CmiYield();
+  CmiGetNonLocal();
 }
 
 CmiNodeLock CmiCreateLock()
@@ -323,7 +333,7 @@ CmiNodeLock CmiCreateLock()
 
 void CmiLock(CmiNodeLock lk)
 {
-  while (*lk) CmiYield();
+  while (*lk) CmiGetNonLocal();
   *lk = 1;
 }
 
@@ -348,147 +358,6 @@ void CmiDestroyLock(CmiNodeLock lk)
 }
 
 
-/*****************************************************************************
- *
- * The following are the CmiDeliverXXX functions.
- *
- * void CmiDeliversInit()
- *
- *      - CmiInit promises to call this before calling CmiDeliverMsgs
- *        or any of the other functions in this section.
- *
- * int CmiDeliverMsgs(int maxmsgs)
- *
- *      - CmiDeliverMsgs will retrieve up to maxmsgs that were transmitted
- *        with the Cmi, and will invoke their handlers.  It does not wait
- *        if no message is unavailable.  Instead, it returns the quantity
- *        (maxmsgs-delivered), where delivered is the number of messages it
- *        delivered.
- *
- * void CmiDeliverSpecificMsg(int handlerno)
- *
- *      - Waits for a message with the specified handler to show up, then
- *        invokes the message's handler.  Note that unlike CmiDeliverMsgs,
- *        This function _does_ wait.
- *
- * void CmiGrabBuffer(void **bufptrptr)
- *
- *      - When CmiDeliverMsgs or CmiDeliverSpecificMsgs calls a handler,
- *        the handler receives a pointer to a buffer containing the message.
- *        The buffer does not belong to the handler, eg, the handler may not
- *        free the buffer.  Instead, the buffer will be automatically reused
- *        or freed as soon as the handler returns.  If the handler wishes to
- *        keep a copy of the data after the handler returns, it may do so by
- *        calling CmiGrabBuffer and passing it a pointer to a variable which
- *        in turn contains a pointer to the system buffer.  The variable will
- *        be updated to contain a pointer to a handler-owned buffer containing
- *        the same data as before.  The handler then has the responsibility of
- *        making sure the buffer eventually gets freed.  Example:
- *
- * void myhandler(void *msg)
- * {
- *    CmiGrabBuffer(&msg);      // Claim ownership of the message buffer
- *    ... rest of handler ...
- *    CmiFree(msg);             // I have the right to free it or
- *                              // keep it, as I wish.
- * }
- *
- *
- * For this common implementation to work, the machine layer must provide the
- * following:
- *
- * void *CmiGetNonLocal()
- *
- *      - returns a message just retrieved from some other PE, not from
- *        local.  If no such message exists, returns 0.
- *
- * CpvExtern(FIFO_Queue, CmiLocalQueue);
- *
- *      - a FIFO queue containing all messages from the local processor.
- *
- *****************************************************************************/
-
-void CmiNotifyIdle()
-{
-#if CMK_WHEN_PROCESSOR_IDLE_USLEEP
-  struct timeval tv;
-  tv.tv_sec=0; tv.tv_usec=5000;
-  select(0,0,0,0,&tv);
-#endif
-}
- 
-CtvStaticDeclare(int, CmiBufferGrabbed);
-CpvExtern(void*, CmiLocalQueue);
-
-void CmiGrabBuffer()
-{
-  CtvAccess(CmiBufferGrabbed) = 1;
-}
-
-void CmiHandleMessage(void *msg)
-{
-  CtvAccess(CmiBufferGrabbed) = 0;
-  (CmiGetHandlerFunction(msg))(msg);
-  if (!CtvAccess(CmiBufferGrabbed)) CmiFree(msg);
-}
-
-int CmiDeliverMsgs(int maxmsgs)
-{
-  return CsdScheduler(maxmsgs);
-}
-
-int CsdScheduler(int maxmsgs)
-{
-  int *msg;
-  int cycle = CpvAccess(CsdStopFlag);
-  void *localqueue = CpvAccess(CmiLocalQueue);
-  
-  while (1) {
-    CmiYield();
-    FIFO_DeQueue(localqueue, &msg);
-    if (msg==0) CqsDequeue(CpvAccess(CsdSchedQueue),&msg);
-    if (msg) {
-      CsdEndIdle();
-      CmiHandleMessage(msg);
-      maxmsgs--; if (maxmsgs==0) return maxmsgs;
-      if (CpvAccess(CsdStopFlag) != cycle) return maxmsgs;
-    } else {
-      CsdBeginIdle();
-      CmiNotifyIdle();
-      CcdRaiseCondition(CcdPROCESSORIDLE) ;
-      if (CpvAccess(CsdStopFlag) != cycle) {
-	CsdEndIdle();
-	return maxmsgs;
-      }
-    }
-  }
-}
-
-void CmiDeliverSpecificMsg(handler)
-int handler;
-{
-  void *tmpqueue = FIFO_Create(); int *msg, *msg1;
-  
-  while (1) {
-    FIFO_DeQueue(CpvAccess(CmiLocalQueue), &msg);
-    if (msg == 0) { CmiYield(); continue; }
-    if (CmiGetHandler(msg)==handler) break;
-    FIFO_EnQueue(tmpqueue, msg);
-  }
-  while (1) {
-    FIFO_DeQueue(tmpqueue, &msg1);
-    if (msg1==0) break;
-    FIFO_EnQueue(CpvAccess(CmiLocalQueue), msg1);
-  }
-  FIFO_Destroy(tmpqueue);
-  CmiHandleMessage(msg);
-}
-
-void CmiDeliversInit()
-{
-  CtvInitialize(int, CmiBufferGrabbed);
-  CtvAccess(CmiBufferGrabbed) = 0;
-}
 
 /********************* MESSAGE SEND FUNCTIONS ******************/
 

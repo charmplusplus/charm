@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.4  1997-08-06 20:36:26  jyelon
+ * Revision 1.5  1997-12-10 21:59:34  jyelon
+ * Modified CmiDeliverSpecificMsg so that it works with uth version.
+ *
+ * Revision 1.4  1997/08/06 20:36:26  jyelon
  * Fixed bugs.
  *
  * Revision 1.3  1997/07/28 19:01:39  jyelon
@@ -83,8 +86,8 @@
 #define CMK_ASYNC_USE_FIOSSAIOSTAT_AND_FIOSSAIOOWN         0
 #define CMK_ASYNC_USE_F_SETFL_AND_F_SETOWN                 0
 
-#define CMK_CMIDELIVERS_USE_COMMON_CODE                    0
-#define CMK_CMIDELIVERS_USE_SPECIAL_CODE                   1
+#define CMK_CMIDELIVERS_USE_COMMON_CODE                    1
+#define CMK_CMIDELIVERS_USE_SPECIAL_CODE                   0
 
 #define CMK_CMIPRINTF_IS_A_BUILTIN                         0
 #define CMK_CMIPRINTF_IS_JUST_PRINTF                       1

@@ -529,17 +529,6 @@ CpvDeclare(CmiHandler, CsdNotifyBusy);
 CpvDeclare(int, CsdStopNotifyFlag);
 CpvStaticDeclare(int, CsdIdleDetectedFlag);
 
-void CsdBeginIdle()
-{
-  if (!CpvAccess(CsdIdleDetectedFlag)) {
-    CpvAccess(CsdIdleDetectedFlag) = 1;
-    if(!CpvAccess(CsdStopNotifyFlag)) {
-      (CpvAccess(CsdNotifyIdle))();
-      trace_begin_idle();
-    }
-  }
-}
-  
 void CsdEndIdle()
 {
   if(CpvAccess(CsdIdleDetectedFlag)) {
@@ -551,6 +540,20 @@ void CsdEndIdle()
   }
 }
 
+void CsdBeginIdle()
+{
+  if (!CpvAccess(CsdIdleDetectedFlag)) {
+    CpvAccess(CsdIdleDetectedFlag) = 1;
+    if(!CpvAccess(CsdStopNotifyFlag)) {
+      (CpvAccess(CsdNotifyIdle))();
+      trace_begin_idle();
+    }
+  }
+
+  CmiNotifyIdle();
+  CcdRaiseCondition(CcdPROCESSORIDLE) ;
+}
+  
 #if CMK_CMIDELIVERS_USE_COMMON_CODE
 
 CpvExtern(void*, CmiLocalQueue);
@@ -582,8 +585,8 @@ int CmiDeliverMsgs(int maxmsgs)
 int CsdScheduler(int maxmsgs)
 {
   int *msg;
-  int cycle = CpvAccess(CsdStopFlag);
   void *localqueue = CpvAccess(CmiLocalQueue);
+  int cycle = CpvAccess(CsdStopFlag);
   
   while (1) {
     msg = CmiGetNonLocal();
@@ -596,8 +599,6 @@ int CsdScheduler(int maxmsgs)
       if (CpvAccess(CsdStopFlag) != cycle) return maxmsgs;
     } else {
       CsdBeginIdle();
-      CmiNotifyIdle();
-      CcdRaiseCondition(CcdPROCESSORIDLE) ;
       if (CpvAccess(CsdStopFlag) != cycle) {
 	CsdEndIdle();
 	return maxmsgs;
@@ -612,37 +613,26 @@ int CsdScheduler(int maxmsgs)
 void CmiDeliverSpecificMsg(handler)
 int handler;
 {
-  int msgType;
-  int *msg, *first ;
-  
-  if ( !FIFO_Empty(CpvAccess(CmiLocalQueue)) ) {
-    FIFO_DeQueue(CpvAccess(CmiLocalQueue), &msg);
-    first = msg;
-    do {
+  int *msg, *t; int side;
+  void *localqueue = CpvAccess(CmiLocalQueue);
+ 
+  side = 0;
+  while (1) {
+    side ^= 1;
+    if (side) msg = CmiGetNonLocal();
+    else      FIFO_DeQueue(localqueue, &msg);
+    if (msg) {
       if (CmiGetHandler(msg)==handler) {
+	CsdEndIdle();
 	CmiHandleMessage(msg);
 	return;
       } else {
-	FIFO_EnQueue(CpvAccess(CmiLocalQueue), msg);
+	FIFO_EnQueue(localqueue, msg);
       }
-      FIFO_DeQueue(CpvAccess(CmiLocalQueue), &msg);
-    } while ( msg != first ) ;
-    FIFO_EnQueue(CpvAccess(CmiLocalQueue), msg);
-  }
-  
-  /* receive message from network */
-  while ( 1 ) { /* Loop till proper message is received */
-    while ((msg=CmiGetNonLocal()) == NULL)
-        ;
-    if ( CmiGetHandler(msg)==handler ) {
-      CmiHandleMessage(msg);
-      return;
-    } else {
-      FIFO_EnQueue(CpvAccess(CmiLocalQueue), msg);
     }
   }
 }
-
+ 
 #endif /* CMK_CMIDELIVERS_USE_COMMON_CODE */
 
 /***************************************************************************
