@@ -205,7 +205,7 @@ dirs+sources:
 #
 ###############################################################################
 CLBLIBS=$(L)/libldb-rand.o $(L)/libldb-spray.o $(L)/libldb-graph.o $(L)/libldb-test.o $(L)/libldb-bluegene.o
-TRACELIBS=$(L)/libtrace-none.a $(L)/libtrace-projections.a $(L)/libtrace-summary.a
+TRACELIBS=$(L)/libtrace-projections.a $(L)/libtrace-summary.a
 MEMLIBS=$(L)/libmemory-default.o $(L)/libmemory-os.o $(L)/libmemory-gnu.o \
    $(L)/libmemory-verbose.o $(L)/libmemory-paranoid.o
 
