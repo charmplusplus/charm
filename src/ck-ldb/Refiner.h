@@ -37,4 +37,4 @@ private:
   processorInfo* processors;
 };
 
-#endif _REFINER_H_
+#endif /* _REFINER_H_ */
