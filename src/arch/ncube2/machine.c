@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.3  1995-07-03 17:58:04  gursoy
+ * Revision 2.4  1995-09-07 22:51:52  gursoy
+ * Cmi_mype Cmi_numpe and CmiLocalQueue are accessed thru macros now
+ *
+ * Revision 2.3  1995/07/03  17:58:04  gursoy
  * changed charm_main to user_main
  *
  * Revision 2.2  1995/06/13  16:01:23  gursoy
@@ -43,11 +46,11 @@ static char ident[] = "@(#)$Header$";
 #define FLIPBIT(node,bitnumber) (node ^ (1 << bitnumber))
 
 
+CpvDeclare(int, Cmi_mype);
+CpvDeclare(int,  Cmi_numpe);
+CpvDeclare(void*, CmiLocalQueue);
 
-int Cmi_mype;
-int Cmi_numpe;
-int Cmi_dim;
-void* CmiLocalQueue;
+static int Cmi_dim;
 
 static int process, host, cflag, source, type;
 static double uclockinitvalue;
@@ -191,8 +194,8 @@ char * msg;
 {
 	int i;
 
-	for (i=0; i<Cmi_numpe; i++)
-		if (i != Cmi_mype)
+	for (i=0; i<CpvAccess(Cmi_numpe); i++)
+		if (i != CpvAccess(Cmi_mype))
 			nwrite(msg, size, i, MSG_TYPE, &cflag);
 }
 
@@ -213,8 +216,8 @@ char * msg;
 /* Same as sync broadcast for now */
 	int i;
 
-	for (i=0; i<Cmi_numpe; i++)
-		if (i != Cmi_mype)
+	for (i=0; i<CpvAccess(Cmi_numpe); i++)
+		if (i != CpvAccess(Cmi_mype))
 			nwrite(msg, size, i, MSG_TYPE, &cflag);
 	return 0 ;
 }
@@ -276,11 +279,11 @@ char *argv[];
 {
     program_name(argv[0], "NCUBE2");
 
-    whoami(&Cmi_mype, &process, &host, &Cmi_dim);
-    Cmi_numpe = (1 << Cmi_dim) ;
+    whoami(&CpvAccess(Cmi_mype), &process, &host, &Cmi_dim);
+    CpvAccess(Cmi_numpe) = (1 << Cmi_dim) ;
 
 
-    CmiLocalQueue= (void *) FIFO_Create();
+    CpvAccess(CmiLocalQueue)= (void *) FIFO_Create();
     CmiSpanTreeInit();
     CmiTimerInit();
 }
