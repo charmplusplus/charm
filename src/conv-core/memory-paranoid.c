@@ -127,8 +127,6 @@ static void checkSlot(Slot *s) {
 		memAbort("Non-heap pointer passed to checkSlot",user);
 	if (s->magic!=SLOTMAGIC && s->magic!=SLOTMAGIC_VALLOC)
 		memAbort("Corrupted slot magic number",user);
-	if (s->userSize==0)
-		memAbort("Corrupted (0) user size field",user);
 	if (s->userSize<0)
 		memAbort("Corrupted (negative) user size field",user);
 	if (s->userSize>=MAX_BLOCKSIZE)
