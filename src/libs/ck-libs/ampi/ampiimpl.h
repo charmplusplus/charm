@@ -20,7 +20,7 @@
 #endif
 
 void applyOp(MPI_Datatype datatype, MPI_Op op, int count, void* invec, void* inoutvec);
-PUPmarshallBytes(MPI_Op);
+PUPfunctionpointer(MPI_Op);
 class AmpiOpHeader {
 public:
   MPI_User_function* func;

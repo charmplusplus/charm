@@ -423,7 +423,7 @@ static void ampiProcInit(void){
   initAmpiProjections();
 }
 
-PUPbytes(MPI_MainFn);
+PUPfunctionpointer(MPI_MainFn);
 
 class MPI_threadstart_t {
 public:
