@@ -280,18 +280,21 @@ static SOCKET       dataskt;
 static int machine_initiated_shutdown=0;
 static int already_in_signal_handler=0;
 
+static void CmiDestoryLocks();
+
 static void machine_exit(int status)
 {
   machine_initiated_shutdown=1;
+
+  CmiDestoryLocks();		/* destory locks to prevent dead locking */
+
 #if CMK_USE_GM
   if (gmport) { 
     gm_close(gmport); gmport = 0;
     gm_finalize();
   }
-  exit(status);
-#else
-  exit(status);
 #endif
+  exit(status);
 }
 
 static void charmrun_abort(const char*);
@@ -319,6 +322,8 @@ static void KillOnAllSigs(int sigNo)
       already_in_signal_handler) 
   	machine_exit(1); /*Don't infinite loop if there's a signal during a signal handler-- just die.*/
   already_in_signal_handler=1;
+
+  CmiDestoryLocks();		/* destory locks */
 
   if (sigNo==SIGSEGV) {
      sig="segmentation violation";
@@ -792,6 +797,12 @@ static void CmiStartThreads(char **argv)
     if (Cmi_charmrun_fd!=-1) CmiEnableAsyncIO(Cmi_charmrun_fd);
   }
 #endif
+}
+
+static void CmiDestoryLocks()
+{
+  comm_flag = 0;
+  memflag = 0;
 }
 
 #endif

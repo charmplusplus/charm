@@ -226,6 +226,13 @@ static void CmiStartThreads(char **argv)
     PerrorExit("TlsSetValue");
 }
 
+static void CmiDestoryLocks()
+{
+  CloseHandle(comm_mutex);
+  CloseHandle(CmiMemLock_lock);
+  CmiMemLock_lock = 0;
+}
+
 /***************** Pthreads kernel SMP threads ******************/
 #elif CMK_SHARED_VARS_POSIX_THREADS_SMP
 
@@ -369,6 +376,13 @@ static void CmiStartThreads(char **argv)
   pthread_setspecific(Cmi_state_key, Cmi_state_vector);
 }
 
+static void CmiDestoryLocks()
+{
+  pthread_mutex_destroy(comm_mutex);
+  pthread_mutex_destroy(CmiMemLock_lock);
+  CmiMemLock_lock = 0;
+}
+
 #endif
 
 #if !CMK_SHARED_VARS_UNAVAILABLE
@@ -469,6 +483,7 @@ static void CmiIdleLock_sleep(CmiIdleLock *l,int msTimeout) {
   MACHSTATE(4,"} Processor awake again")
   l->isSleeping=0;
 }
+
 static void CmiIdleLock_wakeup(CmiIdleLock *l) {
   l->hasMessages=1; 
   MACHSTATE(4,"Waking sleeping processor")
