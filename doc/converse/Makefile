@@ -12,7 +12,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 1.6  1995-11-01 22:04:21  milind
+# Revision 1.7  1995-11-15 18:01:22  brunner
+# Added cpvmacros.tex to Makefile so make co works.
+#
+# Revision 1.6  1995/11/01  22:04:21  milind
 # Added automatic generation of index.
 #
 # Revision 1.5  1995/10/30  16:06:49  milind
@@ -36,7 +39,7 @@
 #
 ############################################################################
 
-TEXFILES=manual.tex threads.tex queue.tex scheduler.tex ldb.tex cmi.tex thsync.tex msgmgr.tex
+TEXFILES=manual.tex threads.tex queue.tex scheduler.tex ldb.tex cmi.tex thsync.tex msgmgr.tex cpvmacros.tex
 
 all: manual.ps manual/manual.html
 
