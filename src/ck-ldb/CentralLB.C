@@ -800,8 +800,8 @@ void CentralLB::readStatsMsgs(const char* filename)
   p|stats_msg_count;
 
   CmiPrintf("readStatsMsgs for %d pes starts ... \n", stats_msg_count);
-  if (LBSimulation::simProcs != stats_msg_count) LBSimulation::procsChanged = true;
   if (LBSimulation::simProcs == 0) LBSimulation::simProcs = stats_msg_count;
+  if (LBSimulation::simProcs != stats_msg_count) LBSimulation::procsChanged = true;
 
   // LBSimulation::simProcs must be set
   statsData->pup(p);
