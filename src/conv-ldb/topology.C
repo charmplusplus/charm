@@ -305,6 +305,22 @@ void LBTopo_graph::neighbors(int mype, int* na, int &nb)
   gengraph(CmiNumPes(), (int)(sqrt(1.0*CmiNumPes())+0.5), 234, na, &nb, 0);
 }
 
+// complete graph
+
+class LBTopo_complete: public LBTopology {
+public:
+  LBTopo_complete(int p): LBTopology(p) {}
+  int max_neighbors() {
+    return npes - 1;
+  }
+  void neighbors(int mype, int* _n, int &nb) {
+    nb = 0;
+    for (int i=0; i<npes; i++)  if (mype != i) _n[nb++] = i;
+  }
+};
+
+LBTOPO_MACRO(LBTopo_complete);
+
 //
 
 class LBTopoMap {
@@ -330,6 +346,7 @@ public:
     lbTopos.push_back(new LBTopoMap("torus_nd_6", createLBTopo_torus_nd_6));
     lbTopos.push_back(new LBTopoMap("torus_nd_7", createLBTopo_torus_nd_7));
     lbTopos.push_back(new LBTopoMap("graph", createLBTopo_graph));
+    lbTopos.push_back(new LBTopoMap("complete", createLBTopo_complete));
   }
   ~LBTopoVec() {
     for (int i=0; i<lbTopos.length(); i++)
