@@ -35,7 +35,7 @@ public:
 
   void migrationsDone(void);
 private:
-  CProxy_NullLB   thisProxy;
+  CProxy_NullLB thisProxy;
   void init();
 };
 

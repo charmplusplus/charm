@@ -56,11 +56,13 @@ class CkMulticastMgr: public CkDelegateMgr {
       IndexPos() {}
       IndexPos(int i): idx(i), pe(i) {}
       IndexPos(CkArrayIndexMax i, int p): idx(i), pe(p) {};
+      void pup(PUP::er &p){ p|idx; p|pe; }
     };
     typedef CkVec<IndexPos>  arrayIndexPosList;
 
   public:
-    CkMulticastMgr()  {};
+    CkMulticastMgr()  { }
+    int useDefCtor(void){ return 1; }
     void setSection(CkSectionInfo &id, CkArrayID aid, CkArrayIndexMax *, int n);
     void setSection(CkSectionInfo &id);
     void setSection(CProxySection_ArrayElement &proxy);

@@ -32,12 +32,13 @@ protected:
   int  startLbFnHdl;
 public:
   BaseLB(const CkLBOptions &) ;
-  BaseLB(CkMigrateMessage *m):IrrGroup(m) { /* empty */ }
+  BaseLB(CkMigrateMessage *m):IrrGroup(m) { theLbdb = CProxy_LBDatabase(_lbdb).ckLocalBranch(); }
   virtual ~BaseLB();
   void unregister(); 
   inline char *lbName() { return lbname; }
   virtual void turnOff() { CmiAbort("turnOff not implemented"); }
   virtual void turnOn()  { CmiAbort("turnOn not implemented"); }
+  void pup(PUP::er &p){ }
 };
 
 /// migration decision for an obj.
