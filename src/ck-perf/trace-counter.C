@@ -35,7 +35,7 @@ extern "C" int read_counters(int e0, long long *c0, int e1, long long *c1);
 // write -1 if not able to calculate
 static const int NUM_EXTRA_PERF = 6;
 
-CpvStaticDeclare(Trace*, _trace);
+CkpvStaticDeclare(Trace*, _trace);
 CpvStaticDeclare(CountLogPool*, _logPool);
 CpvStaticDeclare(char*,  _logName);
 CpvStaticDeclare(char**, _counterNames);
@@ -194,11 +194,11 @@ static TraceCounter::CounterArg COUNTER_ARG[NUM_COUNTER_ARGS] =
 void _createTracecounter(char **argv)
 {
   DEBUGF(("%d/%d DEBUG: createTraceCounter\n", CmiMyPe(), CmiNumPes()));
-  CpvInitialize(Trace*, _trace);
+  CkpvInitialize(Trace*, _trace);
   TraceCounter* tc = new TraceCounter();  _MEMCHECK(tc);
   tc->traceInit(argv);
-  CpvAccess(_trace) = tc;
-  CpvAccess(_traces)->addTrace(CpvAccess(_trace));
+  CkpvAccess(_trace) = tc;
+  CkpvAccess(_traces)->addTrace(CkpvAccess(_trace));
 }
 
 extern "C"
@@ -1052,7 +1052,7 @@ void TraceCounter::traceClose()
     dirty_ = false;
   }
   if (CpvAccess(_logPool)!=NULL) { 
-    CpvAccess(_trace)->endComputation();
+    CkpvAccess(_trace)->endComputation();
     delete CpvAccess(_logPool);
     CpvAccess(_logPool) = NULL;
   }
