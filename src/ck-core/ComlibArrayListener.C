@@ -11,6 +11,8 @@ ComlibArrayListener::ComlibArrayListener ()
 
 ComlibArrayListener::ComlibArrayListener (CkMigrateMessage *m)
     :CkArrayListener(m) {
+    nElements = 0;
+    ht = new CkHashtableT<CkArrayIndexMax, CkArrayIndexMax *>;
 }
 
 void ComlibArrayListener::pup(PUP::er &p) {}
