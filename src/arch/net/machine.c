@@ -870,7 +870,7 @@ static void parse_netstart()
   if (nread!=4) goto abort;
   return;
  abort:
-  fprintf(stderr,"You must run this program with 'conv-host <progName> <args>'.\n");
+  fprintf(stderr,"You must run this program with 'charmrun <progName> <args>'.\n");
   exit(1);
 }
 
@@ -2567,9 +2567,15 @@ char *CmiGetNonLocal()
 void CmiNotifyIdle()
 {
 #if CMK_WHEN_PROCESSOR_IDLE_USLEEP
+#if CMK_USE_NANOSLEEP
+  struct timespec tv;
+  tv.tv_sec = 0; tv.tv_nsec=5000000;
+  nanosleep(&tv, NULL);
+#else
   struct timeval tv;
   tv.tv_sec=0; tv.tv_usec=5000;
   select(0,0,0,0,&tv);
+#endif
 #else
   CommunicationServer(5);
 #endif
