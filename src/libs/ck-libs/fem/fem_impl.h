@@ -30,61 +30,6 @@ class FEMinit {
 };
 PUPmarshall(FEMinit);
 
-//Utility class (don't instantiate)
-template <class T>
-class CkVecPupbase : public CkVec<T> {
- protected:
-	int pupbase(PUP::er &p) {
-		int len=length();
-		p(len);
-		if (p.isUnpacking()) {
-			setSize(len);
-			length()=len;
-		}
-		return len;
-	}
-};
-
-//A vector of derived types, which must be pupped separately
-template <class T>
-class CkPupVec : public CkVecPupbase<T> {
- public:
-	void pup(PUP::er &p) {
-		int len=pupbase(p);
-		for (int i=0;i<len;i++)
-			p|(*this)[i];
-	}
-};
-
-//A vector of basic types, which can be pupped as an array
-// (more restricted but efficient version of above)
-template <class T>
-class CkPupBasicVec : public CkVecPupbase<T> {
- public:
-	void pup(PUP::er &p) {
-		int len=pupbase(p);
-		p(getVec(),len);
-	}
-};
-
-//A vector of heap-allocated objects of type T
-template <class T>
-class CkPupPtrVec : public CkVecPupbase<T *> {
- public:
-	~CkPupPtrVec() {
-		for (int i=0;i<size();i++)
-			delete (*this)[i];
-	}
-	void pup(PUP::er &p) {
-		int len=pupbase(p);
-		for (int i=0;i<len;i++) {
-			if (p.isUnpacking()) (*this)[i]=new T;
-			(*this)[i]->pup(p);
-		}
-	}
-};
-
-
 /*This class describes a local-to-global index mapping.
 The default is the identity mapping.*/
 class l2g_t {
