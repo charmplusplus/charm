@@ -191,7 +191,7 @@ int edge::collapse(elemRef requester, node kNode, node dNode, elemRef kNbr,
     if (nbr.cid != -1) {
       waitingFor = nbr;
       double nbrArea = nbr.getArea();
-      mesh[nbr.cid].coarsenElement(nbr.idx, nbrArea*2.0);
+      mesh[nbr.cid].coarsenElement(nbr.idx, nbrArea*2.0 + 0.00000000000000001);
     }
     else {
       CkPrintf("TMRC2D: moving node %f,%f to %f,%f, deleting %f,%f\n", 

@@ -108,9 +108,10 @@ void chunk::coarseningElements()
     while (i < elementSlots) { // loop through the elements
       if (theElements[i].isPresent()) elCount++;
       if (theElements[i].isPresent() && 
-	  (theElements[i].getTargetArea() > theElements[i].getArea()) && 
-	  (theElements[i].getTargetArea() >= 0.0)) {
-	// element i has higher target area -- needs coarsening
+	  (((theElements[i].getTargetArea() > theElements[i].getArea()) && 
+	    (theElements[i].getTargetArea() >= 0.0)) ||
+	   (theElements[i].getArea() == 0.0))) {
+	// element i has higher target area or no area -- needs coarsening
 	cCount++;
 	CkPrintf("TMRC2D: [%d] Coarsen element %d: area=%f target=%f\n", cid, 
 		 i, theElements[i].getArea(), theElements[i].getTargetArea());
