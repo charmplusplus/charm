@@ -23,6 +23,11 @@ C interface file
 #define FEM_HEXAHEDRAL    8
 #define FEM_QUADRILATERAL 4
 
+/* mesh update types (doWhat parameter for FEM_Update_mesh)*/
+#define FEM_MESH_OUTPUT 0
+#define FEM_MESH_UPDATE 1
+#define FEM_MESH_FINALIZE 2
+
 /* initialization flags */
 #define FEM_INIT_READ    2
 #define FEM_INIT_WRITE   4

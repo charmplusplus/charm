@@ -278,10 +278,10 @@ void FEMcoordinator::updateMesh(marshallUpdateMeshChunk &chk)
       meshUpdated.call();
       TCharm::setState(inDriver);
       
-      if (doWhat==1) { /*repartition the mesh*/
+      if (doWhat==FEM_MESH_UPDATE) { /*repartition the mesh*/
 	MeshChunkOutputUpdate u(femChunks);
 	mesh_split(_nchunks,&u);
-      } else if (doWhat==2) { /*just broadcast meshUpdatedComplete*/
+      } else if (doWhat==FEM_MESH_FINALIZE) { /*just broadcast meshUpdatedComplete*/
         femChunks.meshUpdatedComplete();
       }
 
@@ -1334,7 +1334,7 @@ FEMchunk::updateMesh(int doWhat) {
   coord.updateMesh(updated_mesh);
   delete updated_mesh;
   updated_mesh=NULL;
-  if (doWhat!=0)
+  if (doWhat!=FEM_MESH_OUTPUT)
     thread->suspend();//Sleep until repartitioned mesh arrives
 }
 

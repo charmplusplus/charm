@@ -8,6 +8,10 @@
        integer, parameter :: FEM_MAX=1
        integer, parameter :: FEM_MIN=2
 
+       integer, parameter :: FEM_MESH_OUTPUT=0
+       integer, parameter :: FEM_MESH_UPDATE=1
+       integer, parameter :: FEM_MESH_FINALIZE=2
+
        integer, parameter :: FEM_TRIANGULAR=3
        integer, parameter :: FEM_TETRAHEDRAL=4
        integer, parameter :: FEM_HEXAHEDRAL=8
