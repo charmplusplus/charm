@@ -479,7 +479,7 @@ char *Chare::proxyPrefix(void)
 //Common multiple inheritance disambiguation code
 void Chare::sharedDisambiguation(XStr &str,const XStr &super)
 {
-    str<<"    void ckDelegate(CkGroupID to) {\n";
+    str<<"    void ckDelegate(CkDelegateMgr *to) {\n";
     genProxyNames(str,"      ",NULL,"::ckDelegate(to);\n","");
      str<<"    }\n";
     str<<"    void ckUndelegate(void) {\n";
