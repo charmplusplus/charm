@@ -10,5 +10,6 @@ class RoutingAlgorithm {
         virtual int expectedTime(int src,int dst,POSE_TimeType ovt,POSE_TimeType origovt,int len,int *hops){}
 	//virtual int selectRoute(int,int,const Packet *){}
 	virtual int convertOutputToInputPort(int,Packet *,int)=0;
+	virtual void populateRoutes(Packet *,int){}
 };
 #endif

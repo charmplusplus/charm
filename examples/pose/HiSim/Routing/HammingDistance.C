@@ -16,7 +16,25 @@ int HammingDistance::selectRoute(int c,int d,int numP,Topology *top,Packet *p,ma
         if((portid == numP) && (next[numP-1] != nextNode))
                 CkAssert("Hypercube routing algorithm received incorrect packet\n");
         portid--;
+
         return portid;
+}
+
+void HammingDistance::populateRoutes(Packet *p,int numP) {
+	int current,dst,mask,i,n,xorResult,port;
+
+	current = p->hdr.src;
+	dst = p->hdr.routeInfo.dst;
+	i = 0; mask = 0x01;  n = numP; port = 0;
+
+        xorResult = current ^ dst;
+	while(n--) {
+        if(xorResult & mask) {
+                p->hdr.nextPort[i++] = port;
+        }
+         mask *= 2; port ++;
+	}
+		p->hdr.nextPort[i] = numP; // At the destination, just put into the processor reception FIFO
 }
 
 int HammingDistance::expectedTime(int s,int d,POSE_TimeType ovt,POSE_TimeType origovt,int len,int *hops) {

@@ -8,6 +8,8 @@ RedStorm: $(OBJDIR)/DirectionOrdered3D.o
 
 HypCubeArch: $(OBJDIR)/HammingDistance.o
 
+HypCubeArchOB: $(OBJDIR)/HammingDistance.o
+
 BlueGene: $(OBJDIR)/TorusRouting.o
 
 IB: $(OBJDIR)/UpDown.o

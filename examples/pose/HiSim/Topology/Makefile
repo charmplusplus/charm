@@ -15,6 +15,9 @@ RedStorm: Mesh3D.o
 HypCubeArch: HyperCube.o
 	cp HyperCube.o ../tmp
 
+HypCubeArchOB: HyperCube.o
+	cp HyperCube.o ../tmp
+
 BlueGene: Mesh3D.o
 	cp Mesh3D.o ../tmp
 
