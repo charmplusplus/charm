@@ -414,7 +414,7 @@ void RefinerComm::Refine(int count, CentralLB::LDStats* stats,
     computeInfo *c = (computeInfo *)
       processors[pe].computeSet->iterator((Iterator *)&nextCompute);
     while(c) {
-      new_p[c->originalIdx] = c->processor;
+      new_p[c->Id] = c->processor;
 //      if (c->oldProcessor != c->processor)
 //      CkPrintf("Refiner::Refine: from %d to %d\n", c->oldProcessor, c->processor);
       nextCompute.id++;

@@ -52,9 +52,7 @@ void Refiner::create(int count, CentralLB::LDStats* stats, int* procs)
 	computes[i].Id = i;
         computes[i].id = odata[i].objID();
         computes[i].handle = odata[i].handle;
-        computes[i].load = odata[i].cpuTime;
-        computes[i].originalPE = stats->from_proc[i];
-        computes[i].originalIdx = i;
+        computes[i].load = odata[i].wallTime;     // was cpuTime
         computes[i].processor = -1;
         computes[i].oldProcessor = procs[i];
         computes[i].migratable = odata[i].migratable;
@@ -105,7 +103,7 @@ void  Refiner::deAssign(computeInfo *c, processorInfo *p)
 void Refiner::computeAverage()
 {
   int i;
-  double total = 0;
+  double total = 0.;
   for (i=0; i<numComputes; i++) total += computes[i].load;
 
   for (i=0; i<P; i++)
@@ -294,7 +292,7 @@ void Refiner::Refine(int count, CentralLB::LDStats* stats,
     computeInfo *c = (computeInfo *)
       processors[pe].computeSet->iterator((Iterator *)&nextCompute);
     while(c) {
-      new_p[c->originalIdx] = c->processor;
+      new_p[c->Id] = c->processor;
 //      if (c->oldProcessor != c->processor)
 //      CkPrintf("Refiner::Refine: from %d to %d\n", c->oldProcessor, c->processor);
       nextCompute.id++;

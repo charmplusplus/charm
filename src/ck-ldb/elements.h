@@ -46,8 +46,6 @@ public:
    LDObjid  id;
    int processor; // caller to ReBalancer MAY leave this field -1, 
    int oldProcessor; // stores the current assignment of the compute object.
-   int originalPE;  // These two are used by refiner, but ignored by RefineLB
-   int originalIdx;
    int migratable;
    CkVec<int>  sendmessages;
    CkVec<int>  recvmessages;
