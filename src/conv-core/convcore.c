@@ -405,6 +405,12 @@ int maxmsgs;
 CpvDeclare(int,       CmiInterruptsBlocked);
 CpvDeclare(CthVoidFn, CmiInterruptFuncSaved);
 
+CmiInterruptsInit()
+{
+  CpvInitialize(int, CmiInterruptsBlocked);
+  CpvInitialize(CthVoidFn, CmiInterruptFuncSaved);
+}
+
 /*****************************************************************************
  *
  * ConverseInit and ConverseExit
@@ -420,6 +426,7 @@ char **argv;
   CmiMemoryInit(argv);
   CmiDeliversInit();
   CmiSpanTreeInit(argv);
+  CmiInterruptsInit();
   CmiInitMc(argv);
   CsdInit(argv);
 #ifdef CMK_CTHINIT_IS_IN_CONVERSEINIT
