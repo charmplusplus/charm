@@ -93,6 +93,10 @@ void _createTraceprojections(char **argv)
   DEBUGF(("%d createTraceProjections\n", CkMyPe()));
   CkpvInitialize(CkVec<char *>, usrEventlist);
   CkpvInitialize(CkVec<UsrEvent *>, usrEvents);
+#if CMK_BLUEGENE_CHARM
+  // CthRegister does not call the constructor
+  CkpvAccess(usrEvents) = CkVec<UsrEvent *>();
+#endif
   CkpvInitialize(Trace*, _trace);
   CkpvAccess(_trace) = new  TraceProjections(argv);
   CkpvAccess(_traces)->addTrace(CkpvAccess(_trace));
@@ -118,27 +122,27 @@ LogPool::LogPool(char *pgm) {
   strcpy(pgmname, pgm);
 }
 
-void LogPool::creatFiles(char *logFix, char *stsFix)
+void LogPool::creatFiles(char *fix)
 {
   char pestr[10];
   sprintf(pestr, "%d", CkMyPe());
 #if CMK_PROJECTIONS_USE_ZLIB
   int len;
   if(compressed)
-    len = strlen(pgmname) + strlen(logFix) + strlen(pestr) + strlen(".gz") + 2;
+    len = strlen(pgmname)+strlen(fix)+strlen(".log")+strlen(pestr)+strlen(".gz")+3;
   else
-    len = strlen(pgmname) + strlen(logFix) + strlen(pestr) + 2;
+    len = strlen(pgmname)+strlen(fix)+strlen(".log")+strlen(pestr)+3;
 #else
-  int len = strlen(pgmname) + strlen(logFix) + strlen(pestr) + 2;
+  int len = strlen(pgmname)+strlen(fix)+strlen(".log")+strlen(pestr)+3;
 #endif
   fname = new char[len];
 #if CMK_PROJECTIONS_USE_ZLIB
   if(compressed)
-    sprintf(fname, "%s.%s%s.gz", pgmname, pestr, logFix);
+    sprintf(fname, "%s%s.%s.log.gz", pgmname, fix, pestr);
   else
-    sprintf(fname, "%s.%s%s", pgmname, pestr, logFix);
+    sprintf(fname, "%s%s.%s.log", pgmname, fix, pestr);
 #else
-  sprintf(fname, "%s.%s%s", pgmname, pestr, logFix);
+  sprintf(fname, "%s%s.%s.log", pgmname, fix, pestr);
 #endif
   openLog("w+");
   if(!binary) {
@@ -153,8 +157,8 @@ void LogPool::creatFiles(char *logFix, char *stsFix)
 
   if (CkMyPe() == 0) 
   {
-    char *fname = new char[strlen(CkpvAccess(traceRoot))+strlen(stsFix)+1];
-    sprintf(fname, "%s%s", CkpvAccess(traceRoot), stsFix);
+    char *fname = new char[strlen(CkpvAccess(traceRoot))+strlen(fix)+strlen(".sts")+2];
+    sprintf(fname, "%s%s.sts", CkpvAccess(traceRoot), fix);
     do
     {
       stsfp = fopen(fname, "w");
@@ -172,7 +176,7 @@ LogPool::~LogPool()
 #if CMK_BLUEGENE_CHARM
   extern int correctTimeLog;
   if (correctTimeLog) {
-    creatFiles("-bg.log", "-bg.sts");
+    creatFiles("-bg");
     postProcessLog();
   }
 #endif
@@ -483,7 +487,7 @@ TraceProjections::TraceProjections(char **argv): curevent(0), isIdle(0)
 #if CMK_PROJECTIONS_USE_ZLIB
   _logPool->setCompressed(compressed);
 #endif
-  _logPool->creatFiles(".log", ".sts");
+  _logPool->creatFiles();
 }
 
 /*
