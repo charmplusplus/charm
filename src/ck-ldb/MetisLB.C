@@ -90,6 +90,7 @@ CLBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count,
 */
 CLBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
 {
+  // CkPrintf("entering MetisLB::Strategy...\n");
   // CkPrintf("[%d] MetisLB strategy\n",CkMyPe());
   CkVector migrateInfo;
 
@@ -210,7 +211,17 @@ CLBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
     delete[] edgewt;
     edgewt = 0;
     wgtflag = 2;
+    // CkPrintf("before calling Metis functions. option is %d.\n", option);
     if (0 == option) {
+
+/*  I intended to follow the instruction in the Metis 4.0 manual
+    which said that METIS_PartGraphKway is preferable to 
+    METIS_PartGraphRecursive, when nparts > 8.
+    However, it turned out that there is bug in METIS_PartGraphKway,
+    and the function seg faulted when nparts = 4 or 9.
+    So right now I just comment that function out and always use the other one.
+*/
+/*
       if (count > 8)
 	METIS_PartGraphKway(&numobjs, xadj, adjncy, objwt, edgewt, 
 			    &wgtflag, &numflag, &count, options, 
@@ -219,6 +230,11 @@ CLBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
 	METIS_PartGraphRecursive(&numobjs, xadj, adjncy, objwt, edgewt, 
 				 &wgtflag, &numflag, &count, options, 
 				 &edgecut, newmap);
+*/
+      METIS_PartGraphRecursive(&numobjs, xadj, adjncy, objwt, edgewt,
+                                 &wgtflag, &numflag, &count, options,
+                                 &edgecut, newmap);
+      // CkPrintf("after calling Metis functions.\n");
     }
     else if (WEIGHTED == option) {
       float maxtotal_walltime = stats[0].total_walltime;
