@@ -33,12 +33,12 @@ class ChildInitMsg;
 class AmrUserData:public PUP::able {
   int dimension;
  public:
-  bitvec myIndex;
+  BitVec myIndex;
   AmrUserData(){}
   AmrUserData(CkMigrateMessage *m): PUP::able(m){}
   virtual void init()
     {}
-  static AmrUserData *createDataWrapper(bitvec idx, int dim) {
+  static AmrUserData *createDataWrapper(BitVec idx, int dim) {
     // init(idx,dim);
     AmrUserData* ptr = createData();
     ptr->myIndex = idx;
@@ -46,7 +46,7 @@ class AmrUserData:public PUP::able {
     ptr->init();
     return ptr;
   }
-  static AmrUserData *createDataWrapper(bitvec idx, int dim, void *data, int dataSize)
+  static AmrUserData *createDataWrapper(BitVec idx, int dim, void *data, int dataSize)
     {
       //      init(idx,dim);
       AmrUserData* ptr = createData(data, dataSize);
@@ -135,7 +135,7 @@ class NeighborMsg : public CMessage_NeighborMsg
   int run_until;
   int numbits;
   int dataSize;
-  bitvec nborIdx;
+  BitVec nborIdx;
   void *data;
   NeighborMsg() {
     data = NULL;
@@ -168,10 +168,10 @@ class ChildInitMsg : public CMessage_ChildInitMsg
 
 class _DMsg : public CMessage__DMsg {
  public:
-  bitvec sender;
+  BitVec sender;
   int from;
   _DMsg(){}
-  _DMsg(bitvec sendVec, int pos){
+  _DMsg(BitVec sendVec, int pos){
     sender = sendVec;
     from = pos;
   }
@@ -179,10 +179,10 @@ class _DMsg : public CMessage__DMsg {
 
 class _RefineChkMsg : public CMessage__RefineChkMsg {
  public:
-  bitvec index;
+  BitVec index;
   int run_until;
   _RefineChkMsg() {}
-  _RefineChkMsg(bitvec idx,int run) {
+  _RefineChkMsg(BitVec idx,int run) {
     index = idx;
     run_until = run;
   }
@@ -195,7 +195,7 @@ class _RefineMsg : public CMessage__RefineMsg {
   int autorefine; 
   // index has the return address to which the response is to be sent to
   // for automatic refinement messages
-  bitvec index;
+  BitVec index;
 
   _RefineMsg() { autorefine = 0;}
   _RefineMsg(int reftype) {
@@ -204,7 +204,7 @@ class _RefineMsg : public CMessage__RefineMsg {
       CkError("Automatic refinement message without a return address\n");
     }
   }
-  _RefineMsg(int reftype,bitvec idx) {
+  _RefineMsg(int reftype,BitVec idx) {
     index = idx;
     autorefine = reftype;
   }
@@ -225,7 +225,7 @@ class _RedMsg : public CMessage__RedMsg {
 class _ArrInitMsg : public CMessage__ArrInitMsg 
 {
  public:
-  bitvec parent; //bitvector of the parent
+  BitVec parent; //bitvector of the parent
   char type; //type of the node that is being made ie r (root), n (node)
              // v (virtual leaf) 
   int interval;//synchronisation interval
@@ -308,20 +308,20 @@ class AmrCoordinator: public Chare {
 
 
 
-class Cell : public ArrayElementT <bitvec> {
+class Cell : public ArrayElementT <BitVec> {
  protected:
   int dimension;
   AmrUserData *userData;
   CProxy_Cell arrayProxy; 
   char type;	 //node(n) or a leaf(l) or root(r)..
   
-  bitvec parent; //parent index
+  BitVec parent; //parent index
   
   //children of this node 2 dimensional array ... 2 
   //in each dimension
-  bitvec **children;
+  BitVec **children;
 
-  bitvec myIndex; //my bitvector of the cell
+  BitVec myIndex; //my bitvector of the cell
   
   //member variables used by neighbor data to determine how may neighbors
   //have communicated their data to me and how many intotal are there
@@ -345,7 +345,7 @@ class Cell : public ArrayElementT <bitvec> {
   //for autoreifinement code
   int refined;
   int autorefine;
-  bitvec retidx;
+  BitVec retidx;
 
   //for reduction step
   int synchleavrep;
@@ -395,7 +395,7 @@ class Cell : public ArrayElementT <bitvec> {
   void synchronise(_RedMsg *msg);
   void refineExec(_DMsg *msg);
   void checkRefine(_RefineChkMsg* msg);
-  void refineReady(bitvec retidx,int pos);
+  void refineReady(BitVec retidx,int pos);
   virtual void create_children(_ArrInitMsg** cmsg){}
   virtual void doIterations(void);
   virtual void forwardSplitMsg(NeighborMsg *msg ,int neighbor_side) {}

@@ -156,7 +156,7 @@ void AmrCoordinator :: resetClock()
 
 void AmrCoordinator :: create_tree()
 {
-  bitvec root;
+  BitVec root;
   if(depth < 1) 
     CkError("Initial depth should atleast be 1, Current depth %d\n", depth);
   for(int i = 0; i< dimension;i++)
@@ -241,7 +241,7 @@ void* NeighborMsg :: pack(NeighborMsg *msg)
 {
   int bufSize = msg->dataSize;
   bufSize += (4*sizeof(int));
-  bufSize += sizeof(bitvec);
+  bufSize += sizeof(BitVec);
   char *buf = (char *) CkAllocBuffer(msg,bufSize);
   memcpy(buf,&(msg->which_neighbor),sizeof(int));
   buf += sizeof(int);
@@ -249,13 +249,13 @@ void* NeighborMsg :: pack(NeighborMsg *msg)
   buf += sizeof(int);
   memcpy(buf,&(msg->numbits),sizeof(int));
   buf += sizeof(int);
-  memcpy(buf,&(msg->nborIdx),sizeof(bitvec));
-  buf += sizeof(bitvec);
+  memcpy(buf,&(msg->nborIdx),sizeof(BitVec));
+  buf += sizeof(BitVec);
   memcpy(buf,&(msg->dataSize),sizeof(int));
   buf += sizeof(int);
   memcpy(buf,msg->data,msg->dataSize);
   buf -= 4*sizeof(int);
-  buf -= sizeof(bitvec);
+  buf -= sizeof(BitVec);
   delete msg;
   return (void *) buf;
 }
@@ -281,8 +281,8 @@ NeighborMsg* NeighborMsg :: unpack(void* inbuf)
   buf += sizeof(int);
   memcpy(&(msg->numbits),buf,sizeof(int));
   buf += sizeof(int);
-  memcpy(&(msg->nborIdx),buf,sizeof(bitvec));
-  buf += sizeof(bitvec);
+  memcpy(&(msg->nborIdx),buf,sizeof(BitVec));
+  buf += sizeof(BitVec);
   memcpy(&(msg->dataSize),buf,sizeof(int));
   buf += sizeof(int);
   msg->data = (void *)new char[msg->dataSize];
@@ -476,10 +476,10 @@ void Cell :: init_cell(_ArrInitMsg *msg)
   start_ptr = NULL;
 
   //create children array
-  children = new bitvec* [dimension];
+  children = new BitVec* [dimension];
   for (i = 0; i < dimension; i++) {
     temp = (i==0)? 2: powerOfTwo(i);
-    children[i] = new bitvec [temp];
+    children[i] = new BitVec [temp];
   }
 
   //neighbors array
@@ -586,7 +586,7 @@ int Cell :: sendInDimension(int dim,int side, NeighborMsg *msg)
    *   1   1      send down
    **/
 
-  bitvec nborvec; //bitvec of neighbor
+  BitVec nborvec; //BitVec of neighbor
   unsigned int mask = 0;
   unsigned int mult = 1;
   int i,k;
@@ -1181,7 +1181,7 @@ int Cell :: sendInDimension(int dim,int side)
    *   1   1      send down
    **/
   
-  bitvec nborvec; //bitvec of neighbor
+  BitVec nborvec; //bitvec of neighbor
   unsigned int mask = 0;
   unsigned int mult = 1;
   int i,k;
@@ -1260,7 +1260,7 @@ void Cell :: checkRefine(_RefineChkMsg* msg)
  **at an appropriate level to receive message from its(neighbors) children
  **after refinement is completed
  *********************************************************************/
-void Cell :: refineReady(bitvec retid,int pos)
+void Cell :: refineReady(BitVec retid,int pos)
 {
 
   CkArrayIndexBitVec index(retid);
@@ -1270,7 +1270,7 @@ void Cell :: refineReady(bitvec retid,int pos)
 void Cell :: pup(PUP::er &p)
 {
   DEBUGN(("Puping the array\n")); 
-  ArrayElementT<bitvec>::pup(p);
+  ArrayElementT<BitVec>::pup(p);
   p(dimension);
   p(type);
 
@@ -1279,16 +1279,16 @@ void Cell :: pup(PUP::er &p)
   parent.pup(p);
   //children array
   if (p.isUnpacking()) {
-    children = new bitvec*[dimension];
+    children = new BitVec*[dimension];
     for(int i=0; i< dimension; i++) {
       int size = (i==0)? 2: powerOfTwo(i); 
-      children[i] = new bitvec[size];
+      children[i] = new BitVec[size];
     }
   }
 
   for(int i=0; i < dimension;i++) {
     int size = ((i==0)? 2:powerOfTwo(i));
-    p((char*)children[i], size*sizeof(bitvec));
+    p((char*)children[i], size*sizeof(BitVec));
   }
   
   myIndex.pup(p);
