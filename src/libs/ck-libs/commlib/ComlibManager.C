@@ -20,15 +20,26 @@ void recv_msg(void *msg){
         ((ComlibMsg *)EnvToUsr((envelope *)msg));
 }
 
-//ComlibManager::ComlibManager(int s){
-//    ComlibManager(s, 0);
-//}
+ComlibManager::ComlibManager(int s){
+    init(s, 0, 1000, 50000);
+}
 
 //s = Strategy (0 = tree, 1 = mesh, 2 = hypercube) 
-ComlibManager::ComlibManager(int s/*, int n*/){
-    
-    int n = 0;
+ComlibManager::ComlibManager(int s, int n){
+    init(s, n, 1000, 50000);
+}
 
+
+ComlibManager::ComlibManager(int s, int nmFlush, int bFlush){
+    init(s, 0, nmFlush, bFlush);
+}
+
+ComlibManager::ComlibManager(int s, int n, int nmFlush, int bFlush){
+    init(s, n, nmFlush, bFlush);
+}
+
+void ComlibManager::init(int s, int n, int nmFlush, int bFlush){
+    
     //    CkPrintf("In constructor %d %d\n", CkMyPe(), n);
 
     cmgrID = thisgroup;
@@ -36,7 +47,9 @@ ComlibManager::ComlibManager(int s/*, int n*/){
     ComlibInit();
     
     strategy = s;
-    //    nMessages = n;
+    messagesBeforeFlush = 0;
+    bytesBeforeFlush = 0;
+
     nelements = n;  //number of elements on that processor, 
     //currently pased by the user. Should discover it.
 
@@ -220,6 +233,10 @@ void ComlibManager::ArraySend(int ep, void *msg,
     messageSize[dest_proc] += cmsg->getSize();
     cmsg->next = messageBuf[dest_proc];
     messageBuf[dest_proc] = cmsg;    
+
+    if ((strategy == USE_DIRECT) && ((messageCount[dest_proc] >= messagesBeforeFlush)
+                                     || (messageSize[dest_proc] >= bytesBeforeFlush)))
+        sendMessage(dest_proc);
 }
 
 void ComlibManager::sendMessage(int dest_proc){
@@ -266,8 +283,11 @@ void ComlibManager::sendMessage(int dest_proc){
 
     //    CkPrintf("Calling EachToMany %d %d %d\n", UsrToEnv(newmsg)->getTotalsize(), CkMyPe(), dest_proc);
 
-    EachToManyMulticast(comid, UsrToEnv(newmsg)->getTotalsize(), 
-                        UsrToEnv(newmsg), 1, &dest_proc);
+    if(strategy != USE_DIRECT)
+        EachToManyMulticast(comid, UsrToEnv(newmsg)->getTotalsize(), 
+                            UsrToEnv(newmsg), 1, &dest_proc);
+    else
+        CmiSyncSendAndFree(dest_proc,  UsrToEnv(newmsg)->getTotalsize(), (char *)UsrToEnv(newmsg));
 }
 
 void ComlibManager::receiveMessage(ComlibMsg *msg){

@@ -5,6 +5,11 @@
 
 #include "ComlibModule.decl.h"
 
+#define USE_DIRECT 0
+#define USE_TREE 1
+#define USE_MESH 2
+#define USE_HYPERCUBE 3
+
 class CharmMessageHolder {
  public:
     int ep;
@@ -44,6 +49,9 @@ class ComlibManager: public CkDelegateMgr{
     CharmMessageHolder ** messageBuf;
     ComlibMsg ** receiveBuf;
 
+    int messagesBeforeFlush;
+    int bytesBeforeFlush;
+
     int *messageCount;
     int *messageSize;
     //    int nMessages;
@@ -56,10 +64,13 @@ class ComlibManager: public CkDelegateMgr{
     int idSet, iterationFinished;
     
     void sendMessage(int dest_proc);
+    void init(int s, int n, int Messages, int nBytes); //strategy, nelements 
     
  public:
     ComlibManager(int s); //strategy, nelements 
-    //    ComlibManager(int s, int n); //strategy, nelements 
+    ComlibManager(int s, int n); //strategy, nelements 
+    ComlibManager(int s, int nMessages, int nBytes); //strategy, nelements 
+    ComlibManager(int s, int n, int nMessages, int nBytes); //strategy, nelements 
 
     void done();
     void localElement();

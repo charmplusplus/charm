@@ -3,8 +3,10 @@ module ComlibModule {
   message [varsize] ComlibMsg;
 	
   group ComlibManager{
-//    entry ComlibManager(int s, int n);
     entry ComlibManager(int s);
+    entry ComlibManager(int s, int n);
+    entry ComlibManager(int s, int nMessages, int nBytes); 
+    entry ComlibManager(int s, int n, int nMessages, int nBytes);
 
     entry void done(void);
     entry void receiveID(comID id);
