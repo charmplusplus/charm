@@ -4,11 +4,11 @@ CpvExtern(int, RecvmsgHandle);
 CpvExtern(int, RecvdummyHandle);
 
 void setReverseMap(int *procMap, int *pelist, int npes){
-    
-    for(int pcount = 0; pcount < CkNumPes(); pcount++)
+    int pcount;
+    for(pcount = 0; pcount < CkNumPes(); pcount++)
         procMap[pcount] = -1;
     
-    for(int pcount = 0; pcount < npes; pcount++) 
+    for(pcount = 0; pcount < npes; pcount++) 
         procMap[pelist[pcount]] = pcount;
 }
 

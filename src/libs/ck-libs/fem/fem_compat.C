@@ -268,10 +268,10 @@ CDECL void FEM_Get_sym(int elTypeOrMinusOne,int *destSym)
 	int entity=FEM_ELEM+elTypeOrMinusOne;
 	if (elTypeOrMinusOne==-1) entity=FEM_NODE;
 	FEM_Entity &l=*FEM_Entity_lookup(mesh,entity,callingRoutine);
-	int n=l.size();
-	for (int i=0;i<n;i++) destSym[i]=l.getSymmetries(i);
+	int i,n=l.size();
+	for (i=0;i<n;i++) destSym[i]=l.getSymmetries(i);
 	int g=l.getGhost()->size();
-	for (int i=0;i<g;i++) destSym[n+i]=l.getGhost()->getSymmetries(i);
+	for (i=0;i<g;i++) destSym[n+i]=l.getGhost()->getSymmetries(i);
 }
 FDECL void FTN_NAME(FEM_GET_SYM,fem_get_sym)
 	(int *elTypeOrZero,int *destSym)

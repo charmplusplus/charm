@@ -211,16 +211,16 @@ Image * ImageList::combineImage(void)
 	{
 		Point ulc,lrc;
 
-		int size = getImageSize(ulc,lrc);
+		int i, size = getImageSize(ulc,lrc);
 
 		byte * imageData = new byte[size];
 
-		for(int i=0; i<size; i++)
+		for(i=0; i<size; i++)
 			imageData[i] = 0;
 		ImageNode *temp = m_list;
 		int newImageWidth = lrc.x - ulc.x + 1;
 
-		for(int i=0; i<m_nodeCount; i++)
+		for(i=0; i<m_nodeCount; i++)
 		{
 			int width = temp->m_img->m_lrc.x - temp->m_img->m_ulc.x + 1;
 			int height = temp->m_img->m_lrc.y - temp->m_img->m_ulc.y + 1;

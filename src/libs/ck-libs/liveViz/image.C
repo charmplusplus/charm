@@ -335,13 +335,13 @@ Image* Image::partitionImage(Image *&img2, const Point &int_ulc, const Point& in
 	int width = (newImage_lrc2.x - newImage_ulc2.x + 1);
 	for(unsigned y=newImage_ulc2.y; y<=newImage_lrc2.y; y++)
 	{
-		int startx = 0;
+		int x, startx = 0;
 		int image1Width = oldImage1->getImageWidth();
 
 		if(newImage_ulc2.x < ulc1.x)
 			startx = (int_ulc.x - newImage_ulc2.x);
 
-		for(int x=0; x<image1Width; x++)
+		for(x=0; x<image1Width; x++)
 			for(int j=0; j<bytesPerPixel; j++)
 				image2Data[((y-newImage_ulc2.y)*width+x+startx)*bytesPerPixel + j] += oldImage1Data[((y-ulc1.y)*image1Width+x)*bytesPerPixel + j];
 
@@ -351,7 +351,7 @@ Image* Image::partitionImage(Image *&img2, const Point &int_ulc, const Point& in
 		if(newImage_ulc2.x < ulc2.x)
 			startx = (int_ulc.x - newImage_ulc2.x);
 
-		for(int x=0; x<image2Width; x++)
+		for(x=0; x<image2Width; x++)
 			for(int j=0; j<bytesPerPixel; j++)
 				image2Data[((y-newImage_ulc2.y)*width+x+startx)*bytesPerPixel + j] += oldImage2Data[((y-ulc2.y)*image2Width+x)*bytesPerPixel + j];
  	}
