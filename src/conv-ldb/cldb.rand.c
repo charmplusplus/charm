@@ -53,7 +53,6 @@ void CldEnqueue(int pe, void *msg, int infofn)
   CldInfoFn ifn = (CldInfoFn)CmiHandlerToFunction(infofn);
   CldPackFn pfn;
   if (pe == CLD_ANYWHERE) {
-    /* pe = (((rand()+CmiMyPe())&0x7FFFFFFF)%CmiNumPes()); */
     pe = (((CrnRand()+CmiMyPe())&0x7FFFFFFF)%CmiNumPes());
     if (pe != CmiMyPe())
       CpvAccess(CldRelocatedMessages)++;
@@ -81,7 +80,6 @@ void CldNodeEnqueue(int node, void *msg, int infofn)
   CldInfoFn ifn = (CldInfoFn)CmiHandlerToFunction(infofn);
   CldPackFn pfn;
   if (node == CLD_ANYWHERE) {
-    /* node = (((rand()+CmiMyNode())&0x7FFFFFFF)%CmiNumNodes()); */
     node = (((CrnRand()+CmiMyNode())&0x7FFFFFFF)%CmiNumNodes());
     if (node != CmiMyNode())
       CpvAccess(CldRelocatedMessages)++;

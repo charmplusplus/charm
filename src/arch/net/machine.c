@@ -1359,16 +1359,19 @@ static void CmiStartThreads()
 {
   pthread_t pid;
   int i, ok;
+  pthread_attr_t attr;
   
-  //thr_setconcurrency(Cmi_mynodesize);
   pthread_key_create(&Cmi_state_key, 0);
   Cmi_state_vector =
     (CmiState)calloc(Cmi_mynodesize, sizeof(struct CmiStateStruct));
   for (i=0; i<Cmi_mynodesize; i++)
     CmiStateInit(i+Cmi_nodestart, i, CmiGetStateN(i));
   for (i=1; i<Cmi_mynodesize; i++) {
-    ok = pthread_create(&pid, NULL, call_startfn, (void *)i);
+    pthread_attr_init(&attr);
+    pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
+    ok = pthread_create(&pid, &attr, call_startfn, (void *)i);
     if (ok<0) PerrorExit("pthread_create"); 
+    pthread_attr_destroy(&attr);
   }
   pthread_setspecific(Cmi_state_key, Cmi_state_vector);
   ok = pthread_create(&pid, NULL, (void *(*)(void *))comm_thread, 0);
