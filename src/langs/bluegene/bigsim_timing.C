@@ -358,7 +358,7 @@ int BgAdjustTimeLineFromIndex(int index, BgTimeLineRec &tlinerec, int mynode)
   BgTimeLine &tline = tlinerec.timeline;
 
   processCount ++;
-  if (processCount%1000 == 0) CmiPrintf("[%d:%d] process:%d corrMsg:%d time:%fms curTime:%fms %d:%d\n", CmiMyPe(), mynode, processCount, corrMsgCount, tline[index]->endTime*1000.0, len>0?tlinerec[len-1]->endTime*1000.0:0.0, index, len);
+  if (bgverbose && processCount%1000 == 0) CmiPrintf("[%d:%d] process:%d corrMsg:%d time:%fms curTime:%fms %d:%d\n", CmiMyPe(), mynode, processCount, corrMsgCount, tline[index]->endTime*1000.0, len>0?tlinerec[len-1]->endTime*1000.0:0.0, index, len);
 
   CmiAssert(index >= tlinerec.startIdx);
 
@@ -1089,10 +1089,16 @@ static double findLeastTime()
   	  CthAwakenPrio(threadTable[i], CQS_QUEUEING_IFIFO, sizeof(int), &prio);
 	}
 #endif
+        double minProcT = INVALIDTIME;
 	for(int j=0;j<aQ.length();j++){
           double t = CmiBgMsgRecvTime(aQ[j]);
-	  if(t < minT) { minT = t; }
+	  if(t < minProcT) { minProcT = t; }
 	}
+	if (minProcT < minT) minT = minProcT;
+        if (deadlock && bgverbose && aQ.length()!=0) {
+          CmiPrintf("[%d] affinityQ [%d:%d] len:%d min:%f \n", CmiMyPe(), nodeidx, i, aQ.length(), minProcT);
+	  CmiAssert(minProcT == CmiBgMsgRecvTime(aQ[0]));
+ 	}
     }
     //min in nodeQ
     for(i=0;i<nodeQ.length();i++){
@@ -1183,7 +1189,8 @@ void heartbeatHandlerFunc(char *msg)
       hearbeatInterval=MAX(hearbeatInterval, HEARTBEAT_MIN);
       oldProcessed = processed;
       }
-      CmiPrintf("HEART BEAT %f local:%f Count:r%d p%d e%d cr%d cc%d rc%d ival:%d %d at %f\n", gvt, localGvt==INVALIDTIME?-1:localGvt, newCount.realMsgProcCnt,newCount.corrMsgProcCnt,newCount.corrMsgEnqCnt,newCount.corrMsgCRCnt,newCount.corrMsgCCCnt,newCount.corrMsgRCCnt,hearbeatInterval, programExit,CmiWallTimer());
+      if (bgverbose)
+        CmiPrintf("HEART BEAT gvt:%f local:%f Count:r%d p%d e%d cr%d cc%d rc%d ival:%d %d at %f\n", gvt, localGvt==INVALIDTIME?-1:localGvt, newCount.realMsgProcCnt,newCount.corrMsgProcCnt,newCount.corrMsgEnqCnt,newCount.corrMsgCRCnt,newCount.corrMsgCCCnt,newCount.corrMsgRCCnt,hearbeatInterval, programExit,CmiWallTimer());
       oldCount = newCount; 
 
       HeartBeatMsg *msg = (HeartBeatMsg *)CmiAlloc(sizeof(HeartBeatMsg));
