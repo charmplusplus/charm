@@ -301,7 +301,7 @@ public:
   ArrayElement1D(void);
   ArrayElement1D(CkMigrateMessage *m);
   int getIndex(void) {return thisIndex;}
-  int getSize(void)  {return numElements;}
+  int getArraySize(void)  {return numElements;}
   
 //Pack/unpack routine (called before and after migration)
   virtual void pup(PUP::er &p);
