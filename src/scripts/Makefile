@@ -26,17 +26,17 @@ L=../lib
 
 all: charm++ bluegene LIBS AMPI f90charm TSM SM PVM doc
 
-charm++: converse libck.a loadbalancers charmxi
+charm++: converse $(L)/libck.a loadbalancers charmxi
 
-bluegene: charm++ libconv-bluegene.a METIS multicast
+bluegene: charm++ $(L)/libconv-bluegene.a METIS multicast
 
 for-namd: charm++ pvm AMPIC
 
-TSM: converse libtsm.a
+TSM: converse $(L)/libtsm.a
 
-SM: converse libsm.a
+SM: converse $(L)/libsm.a
 
-PVM: converse libpvmc.a
+PVM: converse $(L)/libpvmc.a
 
 AMR: charm++ LIBS
 	cd libs/ck-libs/amr; make all OPTS='$(OPTS)'
@@ -59,7 +59,7 @@ AMPIC: charm++ LIBS
 
 AMPIF: AMPIC
 
-f90charm: charm++ libf90charm.a
+f90charm: charm++ $(L)/libf90charm.a
 
 multicast: charm++
 	cd libs/ck-libs/multicast && make
@@ -226,10 +226,10 @@ TRACELIBS=$(L)/libtrace-projections.a  $(L)/libtrace-summary.a \
 MEMLIBS=$(L)/libmemory-default.o $(L)/libmemory-os.o $(L)/libmemory-gnu.o \
    $(L)/libmemory-verbose.o $(L)/libmemory-paranoid.o $(L)/libmemory-isomalloc.o
 
-CVLIBS=libconv-core.a \
-	libconv-cplus-n.a libconv-cplus-y.a libconv-util.a libconv-utilf.a \
+CVLIBS=$(L)/libconv-core.a \
+	$(L)/libconv-cplus-n.a $(L)/libconv-cplus-y.a $(L)/libconv-util.a $(L)/libconv-utilf.a \
 	$(CLBLIBS) $(TRACELIBS) $(MEMLIBS) \
-	libccs-client.a
+	$(L)/libccs-client.a
 
 LIBCONV_CORE=threads.o convcore.o conv-conds.o queueing.o msgmgr.o \
 	cpm.o cpthreads.o futures.o cldb.o random.o traceCore.o traceCoreCommon.o \
@@ -265,7 +265,8 @@ QuickThreads/libqt.a:
 	cd QuickThreads;./configure
 	rm -f QuickThreads/libqt.a
 	cd QuickThreads ; make qt  OPTS='$(OPTS)'
-	cp QuickThreads/libqt.a ../lib/libckqt.a
+	cp libqt.a ../lib/libckqt.a
+	cp -r libqt.a.dir ../lib/libckqt.a.dir
 
 METIS:
 	cd libs/conv-libs/metis; make OPTS='$(OPTS)'
@@ -273,23 +274,23 @@ METIS:
 CONVLIBS: converse
 	cd libs; make convlibs OPTS='$(OPTS)'
 
-libconv-core.a: $(LIBCONV_CORE)
-	$(CHARMC) -cp ../lib/ -o $@ $(LIBCONV_CORE)
+$(L)/libconv-core.a: $(LIBCONV_CORE)
+	$(CHARMC) -o $@ $(LIBCONV_CORE)
 
-libconv-cplus-y.a: machine.c $(CVHEADERS)
-	$(CHARMC) -cp ../lib/ -o $@ -DFOR_CPLUS=1 machine.c
+$(L)/libconv-cplus-y.a: machine.c $(CVHEADERS)
+	$(CHARMC) -o $@ -DFOR_CPLUS=1 machine.c
 
-libconv-cplus-n.a: machine.c $(CVHEADERS)
-	$(CHARMC) -cp ../lib/ -o $@ -DFOR_CPLUS=0 machine.c
+$(L)/libconv-cplus-n.a: machine.c $(CVHEADERS)
+	$(CHARMC) -o $@ -DFOR_CPLUS=0 machine.c
 
-libconv-util.a: $(LIBCONV_UTIL)
-	$(CHARMC) -cp ../lib/ -o $@ $(LIBCONV_UTIL)
+$(L)/libconv-util.a: $(LIBCONV_UTIL)
+	$(CHARMC) -o $@ $(LIBCONV_UTIL)
 
-libconv-utilf.a: $(LIBCONV_UTILF)
-	-@$(CHARMC) -cp ../lib/ -o $@ $(LIBCONV_UTILF)
+$(L)/libconv-utilf.a: $(LIBCONV_UTILF)
+	-@$(CHARMC) -o $@ $(LIBCONV_UTILF)
 
-libccs-client.a: ccs-client.o
-	$(CHARMC) -cp ../lib/ -o $@ ccs-client.o
+$(L)/libccs-client.a: ccs-client.o
+	$(CHARMC) -o $@ ccs-client.o
 
 cpm.o: cpm.c $(CVHEADERS)
 	$(CHARMC) cpm.c
@@ -428,7 +429,7 @@ $(L)/libmemory-isomalloc.o: memory-isomalloc.c $(MEM_DEPS)
 #
 ###############################################################################
 
-CK_LIBS_CORE=libck.a
+CK_LIBS_CORE=$(L)/libck.a
 
 LIBCK_CORE=trace-common.o init.o register.o qd.o ck.o main.o msgalloc.o ckfutures.o \
            debug-message.o ckcallback.o cklocation.o ckarray.o ckreduction.o ckarrayreductionmgr.o\
@@ -441,8 +442,8 @@ LIBCK_CORE=trace-common.o init.o register.o qd.o ck.o main.o msgalloc.o ckfuture
 CHARMLIBS: charm++
 	cd libs; make charmlibs OPTS='$(OPTS)'
 
-libck.a: $(LIBCK_CORE)
-	$(CHARMC) -cp ../lib/ -o $@ $(LIBCK_CORE)
+$(L)/libck.a: $(LIBCK_CORE)
+	$(CHARMC) -o $@ $(LIBCK_CORE)
 
 CkFutures.decl.h CkFutures.def.h : ckfutures.ci charmxi
 	$(CHARMC) ckfutures.ci
@@ -872,9 +873,9 @@ loadbalancers: $(LOADBALANCERS) $(L)/libmoduleEveryLB.a
 BlueGene.decl.h BlueGene.def.h : BlueGene.ci charmxi
 	$(CHARMC) BlueGene.ci
 
-libbluegene.a: BlueGene.C BlueGene.h BlueGene.decl.h BlueGene.def.h
+$(L)/libbluegene.a: BlueGene.C BlueGene.h BlueGene.decl.h BlueGene.def.h
 	$(CHARMC) -c BlueGene.C
-	$(CHARMC) -cp ../lib -o libbluegene.a BlueGene.o
+	$(CHARMC) -o $@ BlueGene.o
 
 # (Converse) Blue Gene emulator
 blue.o:  blue_impl.h blue_timing.h blue.C $(CVHEADERS)
@@ -883,8 +884,8 @@ blue.o:  blue_impl.h blue_timing.h blue.C $(CVHEADERS)
 blue_timing.o:  blue_impl.h blue_timing.C blue_timing.h $(CVHEADERS)
 	$(CHARMC) -c blue_timing.C
 
-libconv-bluegene.a:   blue.o blue_timing.o
-	$(CHARMC) -cp ../lib -o libconv-bluegene.a blue.o blue_timing.o
+$(L)/libconv-bluegene.a:   blue.o blue_timing.o
+	$(CHARMC) -o $@ blue.o blue_timing.o
 
 ###############################################################################
 #
@@ -943,11 +944,11 @@ CEntry.o: CEntry.C $(XIHEADERS) $(SDAGHEADERS)
 #
 ###############################################################################
 
-libtsm.a: converse simplemsg.c simplemsg.h
-	$(CHARMC) -cp ../lib/ -o $@ simplemsg.c
+$(L)/libtsm.a: converse simplemsg.c simplemsg.h
+	$(CHARMC) -o $@ simplemsg.c
 
-libsm.a: converse sm.c sm.h
-	$(CHARMC) -cp ../lib/ -o $@ sm.c
+$(L)/libsm.a: converse sm.c sm.h
+	$(CHARMC) -o $@ sm.c
 
 ###############################################################################
 #
@@ -957,8 +958,8 @@ libsm.a: converse sm.c sm.h
 
 PVMC=pvmc_buf.o pvmc_comm.o pvmc_conv.o pvmc_main.o pvmc_pack.o pvmc_groups.o
 
-libpvmc.a: $(PVMC)
-	$(CHARMC) -cp ../lib -o libpvmc.a $(PVMC)
+$(L)/libpvmc.a: $(PVMC)
+	$(CHARMC) -o $@ $(PVMC)
 
 pvmc_buf.o: pvmc_buf.c pvmc.h pvm3.h
 	$(CHARMC) -o $@ pvmc_buf.c
@@ -978,12 +979,12 @@ pvmc_groups.o: pvmc_groups.c pvmc.h pvm3.h
 pvmc_main.o: pvmc_main.c pvmc.h pvm3.h
 	$(CHARMC) -o $@ pvmc_main.c
 
-libf90charm.a: f90main.ci f90main.h f90main.C charmf.h charmf.C futil.f90
+$(L)/libf90charm.a: f90main.ci f90main.h f90main.C charmf.h charmf.C futil.f90
 	$(CHARMC) f90main.ci
 	$(CHARMC) -c -DAMPI_FORTRAN=1 f90main.C
 	$(CHARMC) -c -DAMPI_FORTRAN=1 charmf.C
 	-$(CHARMC) -c futil.f90
-	-$(CHARMC) -cp ../lib -o libf90charm.a f90main.o charmf.o futil.o
+	-$(CHARMC) -o $@ f90main.o charmf.o futil.o
 
 ###############################################################################
 #
