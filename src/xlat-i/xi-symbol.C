@@ -1097,7 +1097,7 @@ void Entry::genArrayDecl(XStr& str)
         str << "msg";
     }
     str<< ") {\n";
-    str << "      if (_elem==(-1)) _array->broadcast(";
+    str << "      if (_elem==(-1)) _array->broadcast((ArrayMessage*) ";
     if(!param->isVoid())
       str << "msg, ";
     else
@@ -1105,7 +1105,7 @@ void Entry::genArrayDecl(XStr& str)
     str << " __idx_";
     genEpIdx(str);
     str << ");\n";
-    str << "      else _array->send(";
+    str << "      else _array->send((ArrayMessage*) ";
     if(!param->isVoid())
       str << "msg, ";
     else
@@ -1124,7 +1124,7 @@ void Entry::genArrayDecl(XStr& str)
       str << "msg, ";
     }
     str<< "int onPE) {\n";
-    str << "      _array->send(";
+    str << "      _array->send((ArrayMessage*) ";
     if(!param->isVoid())
       str << "msg, ";
     else
