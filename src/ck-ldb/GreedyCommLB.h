@@ -20,6 +20,7 @@
 #define CUT_OFF_FACTOR 1.200
 
 void CreateGreedyCommLB();
+BaseLB * AllocateGreedyCommLB();
 
 struct graph{
   int id;
