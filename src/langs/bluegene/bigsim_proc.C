@@ -143,14 +143,14 @@ void workThreadInfo::scheduler(int count)
     correctMsgTime(msg);
 #if THROTTLE_WORK
     if (correctTimeLog) {
-      if (CmiBgMsgRecvTime(msg) > gvt+ LEASH) {
+      if (CmiBgMsgRecvTime(msg) > gvt+ BG_LEASH) {
 	double nextT = CmiBgMsgRecvTime(msg);
 	int prio = (int)(nextT*PRIO_FACTOR)+1;
 	if (prio < 0) {
 	  CmiPrintf("PRIO_FACTOR %e is too small. \n", PRIO_FACTOR);
 	  CmiAbort("BigSim time correction abort!\n");
 	}
-//CmiPrintf("Thread %d YieldPrio: %g gvt: %g leash: %g\n", id, nextT, gvt, LEASH);
+//CmiPrintf("Thread %d YieldPrio: %g gvt: %g leash: %g\n", id, nextT, gvt, BG_LEASH);
 	CthYieldPrio(CQS_QUEUEING_IFIFO, sizeof(int), (unsigned int*)&prio);
 	continue;
       }

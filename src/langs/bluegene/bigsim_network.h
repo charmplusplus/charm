@@ -48,7 +48,7 @@ public:
   }
   inline double latency(int ox, int oy, int oz, int nx, int ny, int nz, int bytes) {
     int numpackets;
-    int xd=ABS(ox-nx), yd=ABS(oy-ny), zd=ABS(oz-nz);
+    int xd=BG_ABS(ox-nx), yd=BG_ABS(oy-ny), zd=BG_ABS(oz-nz);
     int ncorners = 2;
     ncorners -= (xd?0:1 + yd?0:1 + zd?0:1);
     ncorners = (ncorners<0)?0:ncorners;
@@ -78,7 +78,7 @@ public:
     hoplatency = 44.8e-9;
   }
   inline double latency(int ox, int oy, int oz, int nx, int ny, int nz, int bytes) {
-    int xd=ABS(ox-nx), yd=ABS(oy-ny), zd=ABS(oz-nz);
+    int xd=BG_ABS(ox-nx), yd=BG_ABS(oy-ny), zd=BG_ABS(oz-nz);
     CmiAssert(xd>=0 && yd>=0 && zd>=0);
     int hops = xd+yd+zd;
     double packetcost = neighborlatency + hoplatency * hops + bytes * 1e-9;

@@ -128,7 +128,7 @@ public:
 
   inline void setExecTime() {
            execTime = endTime - startTime;
-           if(execTime < EPSILON && execTime > -EPSILON)
+           if(execTime < BG_EPSILON && execTime > -BG_EPSILON)
              execTime = 0.0;
            CmiAssert(execTime >= 0.0);
          }
@@ -155,7 +155,7 @@ public:
     double maxEndTime =0.0;
     for(int i=0;i<backwardDeps.length();i++)
 //    maxEndTime = max(maxEndTime,backwardDeps[i]->endTime);
-      maxEndTime = MAX(maxEndTime,backwardDeps[i]->effRecvTime);
+      maxEndTime = BG_MAX(maxEndTime,backwardDeps[i]->effRecvTime);
       
     return maxEndTime;
   }

@@ -20,7 +20,7 @@
 #define THROTTLE_WORK       1
 #define DELAY_SEND          1
 
-#define LEASH               0.00005         /* 50us leash window */
+#define BG_LEASH               0.00005         /* 50us leash window */
 
 #define CHECK_INTERVAL   10
 #define CHECK_THRESHOLD  80000
@@ -35,19 +35,19 @@
 #define WRITE_TO_DISK 1
 
 
-#define EPSILON      (1e-9)
+#define BG_EPSILON      (1e-9)
 
-#define MAX(a,b) ((a)>=(b)?(a):(b))
-#define MIN(a,b) ((a)<=(b)?(a):(b))
-#define ABS(x)   ((x)>=0?(x):(-(x)))
+#define BG_MAX(a,b) ((a)>=(b)?(a):(b))
+#define BG_MIN(a,b) ((a)<=(b)?(a):(b))
+#define BG_ABS(x)   ((x)>=0?(x):(-(x)))
 
 
 inline int isZero(double input){
-  return (input < EPSILON && input > -EPSILON);
+  return (input < BG_EPSILON && input > -BG_EPSILON);
 }
 
 inline int isLess(double v1, double v2){
-  return (v1 < v2-EPSILON);
+  return (v1 < v2-BG_EPSILON);
 }
 
 inline int isEqual(double v1, double v2){
