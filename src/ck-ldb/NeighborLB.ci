@@ -4,12 +4,13 @@ extern module LBDatabase;
 
 readonly CkGroupID loadbalancer;
 
-message[varsize] NLBStatsMsg;
+message NLBStatsMsg;
 message[varsize] NLBMigrateMsg;
 
 group NeighborLB {
   entry void NeighborLB(void);  
   entry void ReceiveStats(NLBStatsMsg*);
+  entry void ResumeClients(void);
   entry void ReceiveMigration(NLBMigrateMsg*);	
 };
 

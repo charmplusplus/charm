@@ -93,7 +93,7 @@ void CentralLB::Migrated(LDObjHandle h)
 {
   migrates_completed++;
   //  CkPrintf("[%d] An object migrated! %d %d\n",
-  //	   CkMyPe(),migrates_completed,migrates_expected);
+  //  	   CkMyPe(),migrates_completed,migrates_expected);
   if (migrates_completed == migrates_expected) {
     MigrationDone();
   }
@@ -146,13 +146,14 @@ void CentralLB::ReceiveMigration(CLBMigrateMsg *m)
     MigrateInfo& move = m->moves[i];
     const int me = CkMyPe();
     if (move.from_pe == me && move.to_pe != me) {
-      CkPrintf("[%d] migrating object to %d\n",move.from_pe,move.to_pe);
+      //      CkPrintf("[%d] migrating object to %d\n",move.from_pe,move.to_pe);
       theLbdb->Migrate(move.obj,move.to_pe);
     } else if (move.from_pe != me && move.to_pe == me) {
+      //      CkPrintf("[%d] expecting object from %d\n",move.to_pe,move.from_pe);
       migrates_expected++;
     }
   }
-  if (migrates_expected == 0)
+  if (migrates_expected == 0 || migrates_completed == migrates_expected)
     MigrationDone();
   delete m;
 }
@@ -164,6 +165,12 @@ void CentralLB::MigrationDone()
   migrates_expected = -1;
   // Increment to next step
   mystep++;
+  CProxy_CentralLB(thisgroup).ResumeClients(CkMyPe());
+}
+
+void CentralLB::ResumeClients()
+{
+  //  CkPrintf("Resuming clients on PE %d\n",CkMyPe());
   theLbdb->ResumeClients();
 }
 

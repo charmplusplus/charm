@@ -19,6 +19,7 @@ public:
   void AtSync(void); // Everything is at the PE barrier
 
   void ReceiveStats(NLBStatsMsg *); 		// Receive stats on PE 0
+  void ResumeClients();
   void ReceiveMigration(NLBMigrateMsg *); 	// Receive migration data
 
   // Migrated-element callback
@@ -35,15 +36,15 @@ public:
   };
 
   struct LDStats {  // Passed to Strategy
+    int from_pe;
     double total_walltime;
     double total_cputime;
     double idletime;
     double bg_walltime;
     double bg_cputime;
-    int n_objs;
-    LDObjData* objData;
-    int n_comm;
-    LDCommData* commData;
+    double obj_walltime;
+    double obj_cputime;
+    int proc_speed;
   };
 
 protected:
@@ -62,7 +63,9 @@ protected:
 
   LBDatabase* theLbdb;
 
-private:  
+private:
+  NLBStatsMsg* AssembleStats();
+
   int mystep;
   int stats_msg_count;
   NLBStatsMsg** statsMsgsList;
@@ -73,27 +76,26 @@ private:
   int mig_msgs_received;
   int mig_msgs_expected;
   int* neighbor_pes;
+  int proc_speed;
+  LDObjData* myObjData;
+  int obj_data_sz;
+  LDCommData* myCommData;
+  int comm_data_sz;
+  int receive_stats_ready;
 };
 
 class NLBStatsMsg : public CMessage_NLBStatsMsg {
 public:
   int from_pe;
   int serial;
+  int proc_speed;
   double total_walltime;
   double total_cputime;
   double idletime;
   double bg_walltime;
   double bg_cputime;
-  int n_objs;
-  LDObjData *objData;
-  int n_comm;
-  LDCommData *commData;
-
-  // Other methods & data members 
-  
-  static void* alloc(int msgnum, size_t size, int* array, int priobits); 
-  static void* pack(NLBStatsMsg* in); 
-  static NLBStatsMsg* unpack(void* in); 
+  double obj_walltime;
+  double obj_cputime;
 }; 
 
 class NLBMigrateMsg : public CMessage_NLBMigrateMsg {

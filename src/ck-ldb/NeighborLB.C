@@ -52,6 +52,11 @@ NeighborLB::NeighborLB()
   mig_msgs_expected = num_neighbors();
   mig_msgs = new NLBMigrateMsg*[num_neighbors()];
 
+  proc_speed = theLbdb->ProcessorSpeed();
+  obj_data_sz = 0;
+  comm_data_sz = 0;
+  receive_stats_ready = 0;
+
   theLbdb->CollectStatsOn();
 }
 
@@ -69,29 +74,7 @@ void NeighborLB::AtSync()
     return;
   }
 
-  // Send stats
-  int sizes[2];
-  const int osz = sizes[0] = theLbdb->GetObjDataSz();
-  const int csz = sizes[1] = theLbdb->GetCommDataSz();
-  
-  NLBStatsMsg* msg = new(sizes,2) NLBStatsMsg;
-  msg->from_pe = CkMyPe();
-  msg->serial = rand();
-
-  theLbdb->TotalTime(&msg->total_walltime,&msg->total_cputime);
-  theLbdb->IdleTime(&msg->idletime);
-  theLbdb->BackgroundLoad(&msg->bg_walltime,&msg->bg_cputime);
-  CkPrintf(
-	   "Proc %d Total(wall,cpu)=%f %f Idle=%f Bg=%f %f\n",
-	   CkMyPe(),msg->total_walltime,msg->total_cputime,
-	   msg->idletime,msg->bg_walltime,msg->bg_cputime);
-
-  msg->n_objs = osz;
-  theLbdb->GetObjData(msg->objData);
-  msg->n_comm = csz;
-  theLbdb->GetCommData(msg->commData);
-  //  CkPrintf("PE %d sending %d to ReceiveStats %d objs, %d comm\n",
-  //	   CkMyPe(),msg->serial,msg->n_objs,msg->n_comm);
+  NLBStatsMsg* msg = AssembleStats();
 
   int i;
   for(i=1; i < num_neighbors(); i++) {
@@ -100,8 +83,51 @@ void NeighborLB::AtSync()
   }
   if (0 < num_neighbors()) {
     CProxy_NeighborLB(thisgroup).ReceiveStats(msg,neighbor_pes[0]);
-  }
-  else delete msg;
+  } else delete msg;
+
+  //  delete msg;
+  // Tell our own node that we are ready
+  ReceiveStats((NLBStatsMsg*)0);
+  CkPrintf("[%d] done with AtSync\n",CkMyPe());
+}
+
+NLBStatsMsg* NeighborLB::AssembleStats()
+{
+  // Send stats
+  obj_data_sz = theLbdb->GetObjDataSz();
+  myObjData = new LDObjData[obj_data_sz];
+  theLbdb->GetObjData(myObjData);
+
+  comm_data_sz = theLbdb->GetCommDataSz();
+  myCommData = new LDCommData[comm_data_sz];
+  theLbdb->GetCommData(myCommData);
+  
+  NLBStatsMsg* msg = new NLBStatsMsg;
+
+  msg->from_pe = CkMyPe();
+  msg->serial = rand();
+
+  theLbdb->TotalTime(&msg->total_walltime,&msg->total_cputime);
+  theLbdb->IdleTime(&msg->idletime);
+  theLbdb->BackgroundLoad(&msg->bg_walltime,&msg->bg_cputime);
+  msg->proc_speed = proc_speed;
+
+  msg->obj_walltime = msg->obj_cputime = 0;
+
+  for(int i=0; i < obj_data_sz; i++) {
+    msg->obj_walltime += myObjData[i].wallTime;
+    msg->obj_cputime += myObjData[i].cpuTime;
+  }    
+
+  CkPrintf(
+    "Proc %d speed=%d Total(wall,cpu)=%f %f Idle=%f Bg=%f %f Obj=%f %f\n",
+    CkMyPe(),msg->proc_speed,msg->total_walltime,msg->total_cputime,
+    msg->idletime,msg->bg_walltime,msg->bg_cputime,
+    msg->obj_walltime,msg->obj_cputime);
+
+  //  CkPrintf("PE %d sending %d to ReceiveStats %d objs, %d comm\n",
+  //	   CkMyPe(),msg->serial,msg->n_objs,msg->n_comm);
+  return msg;
 }
 
 void NeighborLB::Migrated(LDObjHandle h)
@@ -116,36 +142,40 @@ void NeighborLB::Migrated(LDObjHandle h)
 
 void NeighborLB::ReceiveStats(NLBStatsMsg *m)
 {
-  const int pe = m->from_pe;
-  //  CkPrintf("Stats msg received, %d %d %d %d %p\n",
-  //  	   pe,stats_msg_count,m->n_objs,m->serial,m);
-  int peslot = -1;
-  for(int i=0; i < num_neighbors(); i++) {
-    if (pe == neighbor_pes[i]) {
-      peslot = i;
-      break;
-    }
-  }
-  if (peslot == -1 || statsMsgsList[peslot] != 0) {
-    CkPrintf("*** Unexpected NLBStatsMsg in ReceiveStats from PE %d ***\n",
-	     pe);
+  if (m == 0) { // This is from our own node
+    receive_stats_ready = 1;
   } else {
-    statsMsgsList[peslot] = m;
-    statsDataList[peslot].total_walltime = m->total_walltime;
-    statsDataList[peslot].total_cputime = m->total_cputime;
-    statsDataList[peslot].idletime = m->idletime;
-    statsDataList[peslot].bg_walltime = m->bg_walltime;
-    statsDataList[peslot].bg_cputime = m->bg_cputime;
-    statsDataList[peslot].n_objs = m->n_objs;
-    statsDataList[peslot].n_objs = m->n_objs;
-    statsDataList[peslot].objData = m->objData;
-    statsDataList[peslot].n_comm = m->n_comm;
-    statsDataList[peslot].commData = m->commData;
-    stats_msg_count++;
+    const int pe = m->from_pe;
+    //  CkPrintf("Stats msg received, %d %d %d %d %p\n",
+    //  	   pe,stats_msg_count,m->n_objs,m->serial,m);
+    int peslot = -1;
+    for(int i=0; i < num_neighbors(); i++) {
+      if (pe == neighbor_pes[i]) {
+	peslot = i;
+	break;
+      }
+    }
+    if (peslot == -1 || statsMsgsList[peslot] != 0) {
+      CkPrintf("*** Unexpected NLBStatsMsg in ReceiveStats from PE %d ***\n",
+	       pe);
+    } else {
+      statsMsgsList[peslot] = m;
+      statsDataList[peslot].from_pe = m->from_pe;
+      statsDataList[peslot].total_walltime = m->total_walltime;
+      statsDataList[peslot].total_cputime = m->total_cputime;
+      statsDataList[peslot].idletime = m->idletime;
+      statsDataList[peslot].bg_walltime = m->bg_walltime;
+      statsDataList[peslot].bg_cputime = m->bg_cputime;
+      statsDataList[peslot].proc_speed = m->proc_speed;
+      statsDataList[peslot].obj_walltime = m->obj_walltime;
+      statsDataList[peslot].obj_cputime = m->obj_cputime;
+      stats_msg_count++;
+    }
   }
 
   const int clients = num_neighbors();
-  if (stats_msg_count == clients) {
+  if (stats_msg_count == clients && receive_stats_ready) {
+    receive_stats_ready = 0;
     NLBMigrateMsg* migrateMsg = Strategy(statsDataList,clients);
 
     // Migrate messages from me to elsewhere
@@ -215,7 +245,7 @@ void NeighborLB::ReceiveMigration(NLBMigrateMsg *msg)
   //  CkPrintf("[%d] in ReceiveMigration %d expected\n",
   //	   CkMyPe(),migrates_expected);
   mig_msgs_received = 0;
-  if (migrates_expected == 0)
+  if (migrates_expected == 0 || migrates_expected == migrates_completed)
     MigrationDone();
 }
 
@@ -227,55 +257,29 @@ void NeighborLB::MigrationDone()
   // Increment to next step
   mystep++;
   //  CkPrintf("[%d] Resuming clients\n",CkMyPe());
+  CProxy_NeighborLB(thisgroup).ResumeClients(CkMyPe());
+}
+
+void NeighborLB::ResumeClients()
+{
   theLbdb->ResumeClients();
 }
 
 NLBMigrateMsg* NeighborLB::Strategy(LDStats* stats,int count)
 {
   for(int j=0; j < count; j++) {
-    LDObjData *odata = stats[j].objData;
-    const int osz = stats[j].n_objs;
-
     CkPrintf(
-      "[%d] Proc %d Total(wall,cpu)=%f %f Idle=%f Bg=%f %f\n",
-      CkMyPe(),j,stats[j].total_walltime,stats[j].total_cputime,
-      stats[j].idletime,stats[j].bg_walltime,stats[j].bg_cputime);
-    CkPrintf(
-      "[%d] ------------- Object Data: PE %d: %d objects -------------\n",
-      CkMyPe(),j,osz);
-
-    int i;
-    for(i=0; i < osz; i++) {
-      CkPrintf(
-        "[%d] Object %4d id = %4d OM id = %4d CPU = %8.4f Wall = %8.3f\n",
-	CkMyPe(),i,odata[i].id.id[0],odata[i].omID.id,
-	odata[i].cpuTime,odata[i].wallTime);
-    }
-
-    LDCommData *cdata = stats[j].commData;
-    const int csz = stats[j].n_comm;
-
-    CkPrintf("[%d]------------- Comm Data: PE %d: %d records -------------\n",
-	     CkMyPe(),j,csz);
-    for(i=0; i < csz; i++) {
-      CkPrintf("Link %d ",i);
-      
-      if (cdata[i].from_proc)
-	CkPrintf(" sender PE = %d ",cdata[i].src_proc);
-      else
-	CkPrintf(" sender id = %d:%d ",
-		 cdata[i].senderOM.id,cdata[i].sender.id[0]);
-
-      if (cdata[i].to_proc)
-	CkPrintf(" receiver PE = %d ",cdata[i].dest_proc);
-      else	
-	CkPrintf(" receiver id = %d:%d ",
-		 cdata[i].receiverOM.id,cdata[i].receiver.id[0]);
-      
-      CkPrintf(" messages = %d ",cdata[i].messages);
-      CkPrintf(" bytes = %d\n",cdata[i].bytes);
-    }
+    "[%d] Proc %d Speed %d Total(wall,cpu)=%f %f Idle=%f Bg=%f %f obj=%f %f\n",
+    CkMyPe(),stats[j].from_pe,stats[j].proc_speed,
+    stats[j].total_walltime,stats[j].total_cputime,
+    stats[j].idletime,stats[j].bg_walltime,stats[j].bg_cputime,
+    stats[j].obj_walltime,stats[j].obj_cputime);
   }
+
+  delete [] myObjData;
+  obj_data_sz = 0;
+  delete [] myCommData;
+  comm_data_sz = 0;
 
   int sizes=0;
   NLBMigrateMsg* msg = new(&sizes,1) NLBMigrateMsg;
@@ -284,44 +288,44 @@ NLBMigrateMsg* NeighborLB::Strategy(LDStats* stats,int count)
   return msg;
 }
 
-void* NLBStatsMsg::alloc(int msgnum, size_t size, int* array, int priobits)
-{
-  int totalsize = size + array[0] * sizeof(LDObjData) 
-    + array[1] * sizeof(LDCommData);
+// void* NLBStatsMsg::alloc(int msgnum, size_t size, int* array, int priobits)
+// {
+//   int totalsize = size + array[0] * sizeof(LDObjData) 
+//     + array[1] * sizeof(LDCommData);
 
-  NLBStatsMsg* ret =
-    static_cast<NLBStatsMsg*>(CkAllocMsg(msgnum,totalsize,priobits));
+//   NLBStatsMsg* ret =
+//     static_cast<NLBStatsMsg*>(CkAllocMsg(msgnum,totalsize,priobits));
 
-  ret->objData = reinterpret_cast<LDObjData*>((reinterpret_cast<char*>(ret) 
-					       + size));
-  ret->commData = reinterpret_cast<LDCommData*>(ret->objData + array[0]);
+//   ret->objData = reinterpret_cast<LDObjData*>((reinterpret_cast<char*>(ret) 
+// 					       + size));
+//   ret->commData = reinterpret_cast<LDCommData*>(ret->objData + array[0]);
 
-  return static_cast<void*>(ret);
-}
+//   return static_cast<void*>(ret);
+// }
 
-void* NLBStatsMsg::pack(NLBStatsMsg* m)
-{
-  m->objData = 
-    reinterpret_cast<LDObjData*>(reinterpret_cast<char*>(m->objData)
-      - reinterpret_cast<char*>(&m->objData));
-  m->commData = 
-    reinterpret_cast<LDCommData*>(reinterpret_cast<char*>(m->commData)
-      - reinterpret_cast<char*>(&m->commData));
-  return static_cast<void*>(m);
-}
+// void* NLBStatsMsg::pack(NLBStatsMsg* m)
+// {
+//   m->objData = 
+//     reinterpret_cast<LDObjData*>(reinterpret_cast<char*>(m->objData)
+//       - reinterpret_cast<char*>(&m->objData));
+//   m->commData = 
+//     reinterpret_cast<LDCommData*>(reinterpret_cast<char*>(m->commData)
+//       - reinterpret_cast<char*>(&m->commData));
+//   return static_cast<void*>(m);
+// }
 
-NLBStatsMsg* NLBStatsMsg::unpack(void *m)
-{
-  NLBStatsMsg* ret_val = static_cast<NLBStatsMsg*>(m);
+// NLBStatsMsg* NLBStatsMsg::unpack(void *m)
+// {
+//   NLBStatsMsg* ret_val = static_cast<NLBStatsMsg*>(m);
 
-  ret_val->objData = 
-    reinterpret_cast<LDObjData*>(reinterpret_cast<char*>(&ret_val->objData)
-      + reinterpret_cast<size_t>(ret_val->objData));
-  ret_val->commData = 
-    reinterpret_cast<LDCommData*>(reinterpret_cast<char*>(&ret_val->commData)
-      + reinterpret_cast<size_t>(ret_val->commData));
-  return ret_val;
-}
+//   ret_val->objData = 
+//     reinterpret_cast<LDObjData*>(reinterpret_cast<char*>(&ret_val->objData)
+//       + reinterpret_cast<size_t>(ret_val->objData));
+//   ret_val->commData = 
+//     reinterpret_cast<LDCommData*>(reinterpret_cast<char*>(&ret_val->commData)
+//       + reinterpret_cast<size_t>(ret_val->commData));
+//   return ret_val;
+// }
 
 void* NLBMigrateMsg::alloc(int msgnum, size_t size, int* array, int priobits)
 {

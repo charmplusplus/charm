@@ -19,6 +19,8 @@ public:
   void AtSync(void); // Everything is at the PE barrier
 
   void ReceiveStats(CLBStatsMsg *); 		// Receive stats on PE 0
+  void ResumeClients(void);                     // Resuming clients needs
+	                                        // to be resumed via message
   void ReceiveMigration(CLBMigrateMsg *); 	// Receive migration data
 
   // Migrated-element callback

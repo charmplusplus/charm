@@ -65,7 +65,8 @@ void* CkCopyMsg(void **pMsg)
   if(newenv->isPacked() && _msgTable[msgidx]->unpack) {
     srcMsg = _msgTable[msgidx]->unpack(EnvToUsr(newenv));
     UsrToEnv(srcMsg)->setPacked(0);
-  }
+  } else srcMsg = EnvToUsr(newenv);
+
   return srcMsg;
 }
 
