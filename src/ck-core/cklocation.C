@@ -450,6 +450,20 @@ public:
   CkMapsInit(CkMigrateMessage *m) {}
 };
 
+// given an envelope of a Charm msg, find the recipient object pointer
+CkMigratable * CkArrayMessageObjectPtr(envelope *env) {
+  if (env->getMsgtype()!=ForArrayEltMsg) return NULL;   // not an array msg
+
+  CkArrayID aid = env->getsetArrayMgr();
+  CkArray *mgr=(CkArray *)_localBranch(aid);
+  if (mgr) {
+    CkLocMgr *locMgr = mgr->getLocMgr();
+    if (locMgr) {
+      return locMgr->lookup(env->getsetArrayIndex(),aid);
+    }
+  }
+  return NULL;
+}
 
 /****************************** Out-of-Core support ********************/
 
@@ -464,14 +478,8 @@ CkpvDeclare(int,CkSaveRestorePrefetch);
  */
 int CkArrayPrefetch_msg2ObjId(void *msg) {
   envelope *env=(envelope *)msg;
-  if (env->getMsgtype()!=ForBocMsg) return -1; //Not a group message
-  IrrGroup *dest_g=_localBranch(env->getGroupNum());
-  // FIXME: figure out it's an array message without using unportable dynamic_cast:
-  CkLocMgr *mgr=dynamic_cast<CkLocMgr *>(dest_g);
-  if (mgr==NULL) return -1; //Not destined for a location manager
-  CkMigratable *elt=mgr->lookup(env->array_index(),env->array_mgr());
-  if (elt==NULL) return -1; //Not destined for a local (or extant) array element
-  return elt->prefetchObjID;
+  CkMigratable *elt = CkArrayMessageObjectPtr(env);
+  return elt?elt->prefetchObjID:-1;
 }
 
 /**
