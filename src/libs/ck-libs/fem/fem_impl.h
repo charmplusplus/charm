@@ -83,7 +83,7 @@ public:
 /* Map (user-assigned) numbers to T's */
 template <class T>
 class NumberedVec {
-	CkPupPtrVec<T> vec;
+	CkPupPtrVec<T, CkPupAlwaysAllocatePtr<T> > vec;
 	
 public:
 	//Extend the vector to have up to this element
@@ -115,7 +115,13 @@ public:
 };
 
 
-/*Inner class used by FEM_Comm_Rec:*/
+/**
+ * FEM_Comm_Share describes how one item is shared with one other chunk.
+ * It lists the chunk and the item's location in the communication list;
+ * this location in the communication list is useful because it may be
+ * the *only* way to specify a particular item to another chunk
+ * if we don't have global numbers to identify things with.
+ */
 class FEM_Comm_Share {
  public:
   int chk; //Chunk we're shared with
@@ -126,7 +132,9 @@ class FEM_Comm_Share {
 };
 PUPmarshall(FEM_Comm_Share);
 
-/* List the chunks that share an item */
+/**
+ * FEM_Comm_Rec lists all the chunks that share an item.
+ */
 class FEM_Comm_Rec {
 	int item; //Index of item we describe
 	CkVec<FEM_Comm_Share> shares;
@@ -148,7 +156,11 @@ public:
 	void add(int chk,int idx);
 };
 
-/* Map an item to its FEM_Comm_Rec (if any) */
+/**
+ * Map an item to its FEM_Comm_Rec.  We only bother listing items
+ * that are actually shared with other chunks; completely local items
+ * are not present.
+ */
 class FEM_Comm_Map {
 	CkHashtableT<CkHashtableAdaptorT<int>,FEM_Comm_Rec *> map;
 public:
@@ -163,7 +175,12 @@ public:
 	const FEM_Comm_Rec *get(int item) const;
 };
 
-/* Lists the items we share with one other chunk. */
+/**
+ * FEM_Comm_List lists the items we share with one other chunk. 
+ * This list is used to build outgoing and interpret incoming messages--
+ * for an outgoing message, the listed items are copied into the message;
+ * for an incoming message, the listed items are copied out of the message.
+ */
 class FEM_Comm_List {
 	int pe; //Global number of other chunk	
 	CkPupBasicVec<int> shared; //Local indices of shared items
@@ -184,13 +201,16 @@ public:
 };
 PUPmarshall(FEM_Comm_List)
 
-/*This class describes all the shared items of a given chunk.
-It provides both item->chunks that share it (map)
-and chunk->items shared with it (comm)
-*/
+/**
+ * FEM_Comm describes all the shared items of a given chunk.
+ * It provides both item->chunks that share it (map)
+ * and chunk->items shared with it (comm)
+ */
 class FEM_Comm : public CkNoncopyable {
-	FEM_Comm_Map map; //Indexed by local item number
-	CkPupPtrVec<FEM_Comm_List> comm; //Indexed by (local) chunk number
+	//Indexed by local item number
+	FEM_Comm_Map map;
+	//Indexed by (local) chunk number
+	CkPupPtrVec<FEM_Comm_List, CkPupAlwaysAllocatePtr<FEM_Comm_List> > comm; 
 	
 	//Return the Comm_List associated with processor pe
 	FEM_Comm_List *getListN(int pe) { 
@@ -451,12 +471,13 @@ public:
 };
 PUPmarshall(FEM_Elem);
 
-/*Describes a set of records of sparse data that are all the
-same size and all associated with the same number of nodes.
-Sparse data is associated with some subset of the nodes in the mesh,
-and gets copied to every chunk that has all those nodes.  The canonical
-use of sparse data is to describe boundary conditions.
-*/
+/**
+ * FEM_Sparse describes a set of records of sparse data that are all the
+ * same size and all associated with the same number of nodes.
+ * Sparse data is associated with some subset of the nodes in the mesh,
+ * and gets copied to every chunk that has all those nodes.  The canonical
+ * use of sparse data is to describe boundary conditions.
+ */
 class FEM_Sparse : public CkNoncopyable {
 	AllocTable2d<int> nodes; //Each row is the nodes surrounding a tuple
 	AllocTable2d<char> data; //Each row is the user data for a tuple
@@ -571,7 +592,7 @@ public:
 /*This class describes the nodes and elements in
   a finite-element mesh or submesh*/
 class FEM_Mesh : public CkNoncopyable {
-	CkPupPtrVec<FEM_Sparse> sparse;
+	CkPupPtrVec<FEM_Sparse, CkPupAlwaysAllocatePtr<FEM_Sparse> > sparse;
 	FEM_Sym_List symList;
 public:
 	void setSymList(const FEM_Sym_List &src) {symList=src;}
