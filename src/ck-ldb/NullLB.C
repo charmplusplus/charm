@@ -71,14 +71,17 @@ void NullLB::AtSync()
   // disable the batsyncer if no balancer exists
   // theLbdb->SetLBPeriod(1e10);
 
+  // prevent this message from being traced by QD
+  // so that the QD detection works
+// only for now
+//  CpvAccess(_qd)->create(-1);
   //We don't *do* any migrations, so they're already done!
-  CpvAccess(_qd)->create(-1);
   thisProxy[CkMyPe()].migrationsDone();
 }
 
 void NullLB::migrationsDone(void)
 {
-  CpvAccess(_qd)->process(-1);
+//  CpvAccess(_qd)->process(-1);
   theLbdb->ResumeClients();
 }
 #else
