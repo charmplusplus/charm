@@ -6,7 +6,8 @@ void adapt4::Step()
 {
   Event *ev;
   POSE_TimeType lastGVT = localPVT->getGVT();
-  static int itersAllowed=-1, iter=0, offset=-1;
+  static int itersAllowed=-1, iter=0, offset=-1, theMaxLeash=POSE_TimeMax/2, 
+    objUsage = MAX_USAGE/localPVT->getNumObjs() + STORE_RATE;
   double critStart;
 
   rbFlag = 0;
@@ -20,11 +21,11 @@ void adapt4::Step()
       timeLeash = avgRBoffset;
     else timeLeash = avgRBoffset/2;
   }
-  else if (timeLeash < POSE_TimeMax/2) {
+  else if (timeLeash < theMaxLeash) {
     timeLeash *= 2;
   }
   if (timeLeash > POSE_TimeMax-lastGVT) {
-    timeLeash = POSE_TimeMax/2;
+    timeLeash = theMaxLeash;
   }
 
   if (itersAllowed < 0) {
@@ -54,8 +55,7 @@ void adapt4::Step()
 #ifdef MEM_COARSE
     // note: first part of check below ensures we don't deadlock:
     //       can't advance gvt if we don't execute events with timestamp > gvt
-    if ((ev->prev->timestamp > lastGVT) && 
-	(eq->mem_usage > MAX_USAGE/localPVT->getNumObjs() + STORE_RATE)) {
+    if ((ev->prev->timestamp > lastGVT) && (eq->mem_usage > objUsage)) {
       //      CkPrintf("Object %d waiting for new GVT: mem_usage=%d prev=%d gvt=%d\n", parent->thisIndex, eq->mem_usage, ev->prev->timestamp, lastGVT);
       break;
     }
