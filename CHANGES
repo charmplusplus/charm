@@ -342,7 +342,7 @@ Minor Features:
 12/20/2000	olawlor		More Optimizations: Minor speed tweaks-- ck.C 
 				groups cldEnqueue skip; init.h defines 
 				CkLocalBranch inline; and supporting changes.
-12/22/2000	gzheng		IA-64 support for QuickThreads.
+12/22/2000	gzheng		IA64 support for Converse user level threads.
 01/02/2001	olawlor		CCS: Minor update-- enabled CcsProbe, cleaned 
 				up superflous debug messages in server, added 
 				Java interface (originally written for 
