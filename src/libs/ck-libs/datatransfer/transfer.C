@@ -8,12 +8,40 @@
 #include <vector> //for std::vector 
 #include "cg3d.h" // for intersection and volume calculation
 #include "tetmesh.h" 
+#include "mgc/MgcIntr3DTetrTetr.h"
+using namespace Mgc;
 
+double getSharedVolumeMgc(const TetMesh &srcMesh,const TetMesh &destMesh,const int *sc,const int *ds){
+	Mgc::Tetrahedron kT0,kT1,kT2;
+	std::vector<Tetrahedron> kIntr;
+	for(int i=0;i<4;i++){
+		CkVector3d pts0 = srcMesh.getPoint(sc[i]);
+		kT0[i] = Mgc::Vector3((double)pts0.x,(double)pts0.y,(double)pts0.z);
+		CkVector3d pts1 = destMesh.getPoint(ds[i]);
+		kT1[i] = Mgc::Vector3((double)pts1.x,(double)pts1.y,(double)pts1.z);
+	}
+	Mgc::FindIntersection(kT0,kT1,kIntr);
+	double sumVol = 0;
+	CkVector3d verts[4];
+	std::vector<Mgc::Tetrahedron>::iterator vIter = kIntr.begin();
+	while(vIter != kIntr.end()){
+		kT2 = (*vIter);
+		for(int i=0;i<4;i++){
+			new (&verts[i]) CkVector3d(kT2[i].x,kT2[i].y,kT2[i].z);
+		}
+		sumVol += fabs(cg3d::tetVolume(verts[0],verts[1],verts[2],verts[3]));
+		vIter++;
+	}
+	if(sumVol < 0){
+		printf("volume less than zero \n");
+	}
+	return sumVol;
+}
 
 // Compute the volume shared by cell s of srcMesh
 //   and cell d of destMesh.
 double getSharedVolume(int s,const TetMesh &srcMesh,
-	int d,const TetMesh &destMesh,cg3d::Planar3dDest *dest=NULL) 
+	int d,const TetMesh &destMesh,cg3d::Planar3dDest *dest) 
 {
 	cg3d::PointSet3d ps;
 	const int *sc=srcMesh.getTet(s);
@@ -23,8 +51,13 @@ double getSharedVolume(int s,const TetMesh &srcMesh,
 	cg3d::Tet3d D(&ps,destMesh.getPoint(ds[0]),destMesh.getPoint(ds[1]),
 	           destMesh.getPoint(ds[2]),destMesh.getPoint(ds[3]));
 	
-	if (dest==NULL)
-		return intersectDebug(&ps,S,D);
+	double intVol = getSharedVolumeMgc(srcMesh,destMesh,sc,ds);
+	//double intVol2 = intersectDebug(&ps,S,D);
+	
+	if (dest==NULL){
+		return intVol;
+		//return intersectDebug(&ps,S,D);
+	}
 	else /* user provided a destination */ {
 		cg3d::intersect(&ps,S,D,*dest);
 		return -1;

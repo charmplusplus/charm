@@ -4,7 +4,8 @@ CHARMC=$(CDIR)/bin/charmc $(OPTS)
 HEADERS=
 # datatransfer.h
 HEADDEP=$(HEADERS) cg3d.h
-TOBJS=cg3d.o transfer.o tetmesh.o tetmesh_noboite.o
+MGCOBJS=mgc/MgcIntr3DTetrTetr.o  mgc/MgcMath.o  mgc/MgcPlane.o  mgc/MgcTetrahedron.o  mgc/MgcVector3.o
+TOBJS=$(MGCOBJS) cg3d.o transfer.o tetmesh.o tetmesh_noboite.o
 OBJS=$(TOBJS) tetmesh_fem.o paralleltransfer.o pgm.o
 DEST=pgm
 LIBS=-module collide -module fem -language ampi
