@@ -188,11 +188,17 @@ void ampi::pup(PUP::er &p)
     while(msg = (AmpiMsg*)CmmGet(msgs,2,snum,0))
       ap[thisIndex].generic(msg);
   }
-
-  unsigned int oldPstate=p.setState();//Clear p.isDeleting flag
-  thread_id = CthPup((pup_er) &p, thread_id);
-  p.setState(oldPstate);
-  
+  //This seekBlock allows us to reorder the packing/unpacking--
+  // This is needed because the userData depends on the thread's stack
+  // both at pack and unpack time.
+  PUP::seekBlock s(p,2);
+  if (p.isUnpacking()) 
+  {//In this case, unpack the thread before the user data
+  	s.seek(1);
+  	thread_id = CthPup((pup_er) &p, thread_id);
+  }
+  //Pack all user data
+  s.seek(0);
   p(nudata);
   int i;
   for(i=0;i<nudata;i++) {
@@ -204,6 +210,12 @@ void ampi::pup(PUP::er &p)
     userdata[i] = pup_ud[i]((pup_er) &p, userdata[i]);
 #endif
   }
+  if (p.isPacking()) 
+  {//In this case, pack the thread after the user data
+  	s.seek(1);
+  	thread_id = CthPup((pup_er) &p, thread_id);
+  }
+  s.endBlock(); //End of seeking block
 
   p(nbcasts);
   // persistent comm requests will have to be re-registered after

@@ -1465,12 +1465,19 @@ chunk::pup(PUP::er &p)
       cp[thisIndex].recv(dm);
   }
 
-//Pup the thread and userdata-- but don't let thread die yet
-  unsigned int oldPstate=p.setState();//Clear p.isDeleting flag
-  tid = CthPup((pup_er) &p, tid);
-  p.setState(oldPstate);
-
+  //This seekBlock allows us to reorder the packing/unpacking--
+  // This is needed because the userData depends on the thread's stack
+  // both at pack and unpack time.
+  PUP::seekBlock s(p,2);
+  if (p.isUnpacking()) 
+  {//In this case, unpack the thread before the user data
+    s.seek(1);
+    tid = CthPup((pup_er) &p, tid);
+  }
+  
+  //Pack all user data
   CpvAccess(_fem_state)=inPup;
+  s.seek(0);
   p(nudata);
   for(int i=0;i<nudata;i++) {
     //Save userdata for Fortran-- stack allocated
@@ -1484,6 +1491,14 @@ chunk::pup(PUP::er &p)
 #endif
   }
   CpvAccess(_fem_state)=inDriver;
+
+  if (p.isPacking()) 
+  {//In this case, pack the thread after the user data
+    s.seek(1);
+    tid = CthPup((pup_er) &p, tid);
+  }
+  s.endBlock(); //End of seeking block
+  
 
 // Pup the mesh fields
   m.pup(p);
