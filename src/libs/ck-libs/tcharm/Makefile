@@ -28,7 +28,7 @@ $(COMPAT):
 	done
 
 tcharm.o: tcharm.C $(HEADERS)
-	$(CHARMC) $(CFLAGS) -c tcharm.C
+	$(CHARMC) -c tcharm.C
 
 tcharm.decl.h: tcharm.ci
 	$(CHARMC) tcharm.ci
