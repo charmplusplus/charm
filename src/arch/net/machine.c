@@ -246,6 +246,7 @@ void *FIFO_Peek(void *);
 void  FIFO_Pop(void *);
 void  FIFO_EnQueue(void *, void *);
 void  FIFO_EnQueue_Front(void *, void *);
+void CmiYield();
 
 /*****************************************************************************
  *
@@ -361,7 +362,7 @@ static void jsleep(int sec, int usec)
     tm.tv_usec = 5000;
     while(1) {
       if (select(0,NULL,NULL,NULL,&tm)==0) break;
-      if (errno!=EINTR) return;
+      if ((errno!=EBADF)&&(errno!=EINTR)) return;
     }
   }
 }
@@ -370,7 +371,10 @@ static void writeall(int fd, char *buf, int size)
 {
   int ok;
   while (size) {
+    retry:
+    CmiYield();
     ok = write(fd, buf, size);
+    if ((ok<0)&&(errno==EBADF)) goto retry;
     if (ok<=0) KillEveryone("write on tcp socket failed.");
     size-=ok; buf+=ok;
   }
@@ -389,7 +393,7 @@ static int wait_readable(fd, sec) int fd; int sec;
     tmo.tv_sec = (time(0) - begin) + sec;
     tmo.tv_usec = 0;
     nreadable = select(FD_SETSIZE, &rfds, NULL, NULL, &tmo);
-    if ((nreadable<0)&&(errno==EINTR)) continue;
+    if ((nreadable<0)&&((errno==EINTR)||(errno==EBADF))) continue;
     if (nreadable == 0) { errno=ETIMEDOUT; return -1; }
     return 0;
   }
@@ -435,9 +439,11 @@ unsigned int *pfd;
   int ok, len;
   struct sockaddr_in addr;
   
-  retry: fd = socket(PF_INET, SOCK_STREAM, 0);
-  if ((fd<0)&&(errno==EINTR)) goto retry;
-  if (fd < 0) { perror("socket"); KillEveryoneCode(93483); }
+retry:
+  CmiYield();
+  fd = socket(PF_INET, SOCK_STREAM, 0);
+  if ((fd<0)&&((errno==EINTR)||(errno==EBADF))) goto retry;
+  if (fd < 0) { perror("socket 1"); KillEveryoneCode(93483); }
   memset(&addr, 0, sizeof(addr));
   addr.sin_family = AF_INET;
   ok = bind(fd, (struct sockaddr *)&addr, sizeof(addr));
@@ -461,10 +467,12 @@ unsigned int  bufsize;
   int length, ok, skt;
   
   /* Create data socket */
-  retry: skt = socket(AF_INET,SOCK_DGRAM,0);
-  if ((skt<0)&&(errno==EINTR)) goto retry;
+retry:
+  CmiYield();
+  skt = socket(AF_INET,SOCK_DGRAM,0);
+  if ((skt<0)&&((errno==EINTR)||(errno==EBADF))) goto retry;
   if (skt < 0)
-    { perror("socket"); KillEveryoneCode(8934); }
+    { perror("socket 2"); KillEveryoneCode(8934); }
   name.sin_family = AF_INET;
   name.sin_port = 0;
   name.sin_addr.s_addr = htonl(INADDR_ANY);
@@ -496,8 +504,9 @@ unsigned int *pfd;
   struct sockaddr_in remote;
   i = sizeof(remote);
  acc:
+  CmiYield();
   fd = accept(src, (struct sockaddr *)&remote, &i);
-  if ((fd<0)&&(errno==EINTR)) goto acc;
+  if ((fd<0)&&((errno==EINTR)||(errno==EBADF)||(errno==EPROTO))) goto acc;
   if (fd<0) { perror("accept"); KillEveryoneCode(39489); }
   *pip=htonl(remote.sin_addr.s_addr);
   *ppo=htons(remote.sin_port);
@@ -519,16 +528,17 @@ unsigned int ip; int port; int seconds;
   begin = time(0); ok= -1;
   while (time(0)-begin < seconds) {
   sock:
+    CmiYield();
     fd = socket(AF_INET, SOCK_STREAM, 0);
-    if ((fd<0)&&(errno==EINTR)) goto sock;
-    if (fd < 0) { perror("socket"); exit(1); }
+    if ((fd<0)&&((errno==EINTR)||(errno==EBADF))) goto sock;
+    if (fd < 0) { perror("socket 3"); exit(1); }
     
   conn:
     ok = connect(fd, (struct sockaddr *)&(remote), sizeof(remote));
     if (ok>=0) break;
     close(fd);
     switch (errno) {
-    case EINTR: break;
+    case EINTR: case EBADF: break;
     case ECONNREFUSED: jsleep(1,0); break;
     case EADDRINUSE: jsleep(1,0); break;
     case EADDRNOTAVAIL: jsleep(5,0); break;
@@ -1027,7 +1037,7 @@ static int        ctrlport, dataport, ctrlskt, dataskt;
 static OtherNode *nodes_by_pe;  /* OtherNodes indexed by processor number */
 static OtherNode  nodes;        /* Indexed only by ``node number'' */
 
-static int          Cmi_shutdown_done;
+static int          Cmi_shutdown_initiated;
 static CmiNodeLock  Cmi_scanf_mutex;
 static char        *Cmi_scanf_data;
 static double       Cmi_clock;
@@ -1176,7 +1186,7 @@ void CmiDestroyLock(CmiNodeLock lk)
   free(lk);
 }
 
-#define CmiYield() (thr_yield())
+void CmiYield() { thr_yield(); }
 
 #define CmiGetStateN(n) (Cmi_state_vector+(n))
 
@@ -1187,7 +1197,7 @@ static mutex_t comm_mutex;
 static void comm_thread(void)
 {
   struct timeval tmo; fd_set rfds;
-  while (Cmi_shutdown_done == 0) {
+  while (Cmi_shutdown_initiated == 0) {
     CmiCommLock();
     CommunicationServer();
     CmiCommUnlock();
@@ -1224,14 +1234,21 @@ static void CmiStartThreads()
   for (i=0; i<Cmi_mynodesize; i++)
     CmiStateInit(i+Cmi_nodestart, i, CmiGetStateN(i));
   for (i=1; i<Cmi_mynodesize; i++) {
-    ok = thr_create(0, 256000, call_startfn, (void *)i,
-		    THR_DETACHED|THR_BOUND, &pid);
+    ok = thr_create(0, 256000, call_startfn, (void *)i, THR_BOUND, &pid);
     if (ok<0) { perror("thr_create"); exit(1); }
   }
   thr_setspecific(Cmi_state_key, Cmi_state_vector);
-  ok = thr_create(0, 256000, (void *(*)(void *))comm_thread,
-		  0, THR_DETACHED, &pid);
+  ok = thr_create(0, 256000, (void *(*)(void *))comm_thread, 0, 0, &pid);
   if (ok<0) { perror("thr_create"); exit(1); }
+}
+
+static void CmiJoinThreads()
+{
+  int i, ok; void *status;
+  for(i=0; i<Cmi_mynodesize; i++) {
+    ok = thr_join(0, 0, &status);
+    if (ok<0) perror("thr_join");
+  }
 }
 
 #endif
@@ -1252,7 +1269,7 @@ static int comm_flag;
 #define CmiCommLock() (comm_flag=1)
 #define CmiCommUnlock() (comm_flag=0)
 
-#define CmiYield() (sleep(1))
+void CmiYield() { jsleep(0,100); }
 
 static void CommunicationInterrupt()
 {
@@ -1287,6 +1304,8 @@ static void CmiStartThreads()
   i.it_value.tv_usec = Cmi_tickspeed;
   setitimer(ITIMER_REAL, &i, NULL);
 }
+
+static void CmiJoinThreads() {}
 
 #endif
 
@@ -1439,7 +1458,7 @@ static void ctrl_getone()
       node_addresses_store(line);
     }
     else if (strncmp(line,"aval done ",10)==0) {
-      Cmi_shutdown_done = 1;
+      Cmi_shutdown_initiated = 1;
     }
     else if (strncmp(line,"scanf-data ",11)==0) {
       Cmi_scanf_data=strdupl(line+11);
@@ -2134,9 +2153,12 @@ void ConverseInitPE()
 void ConverseExit()
 {
   ctrl_sendone(120,"aset done %d TRUE\n",CmiMyPe());
-  while (Cmi_shutdown_done == 0) CmiYield();
+  while (Cmi_shutdown_initiated == 0) CmiYield();
   ctrl_sendone(120,"ending\n");
-  if (CmiMyRank()==0) log_done();
+  if (CmiMyRank()==0) {
+    log_done();
+    CmiJoinThreads();
+  }
 }
 
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int ret)

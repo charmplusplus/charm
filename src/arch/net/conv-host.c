@@ -265,6 +265,7 @@ void skt_accept(src,pip,ppo,pfd)
 #endif
   if ((fd<0)&&(errno==EINTR)) goto acc;
   if ((fd<0)&&(errno==EMFILE)) goto acc;
+  if ((fd<0)&&(errno==EPROTO)) goto acc;
   if (fd<0) { perror("accept"); notify_abort(); }
   *pip=htonl(remote.sin_addr.s_addr);
   *ppo=htons(remote.sin_port);

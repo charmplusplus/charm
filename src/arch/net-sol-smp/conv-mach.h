@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.11  1997-08-06 20:35:55  jyelon
+ * Revision 1.12  1997-08-07 04:55:50  jyelon
+ * Fixed all kinds of SMP bugs.
+ *
+ * Revision 1.11  1997/08/06 20:35:55  jyelon
  * Fixed bugs.
  *
  * Revision 1.10  1997/07/28 19:01:05  jyelon
@@ -142,7 +145,7 @@
 #define CMK_STRINGS_USE_STRINGS_H                          0
 #define CMK_STRINGS_USE_STRING_H                           1
 
-#define CMK_SYNCHRONIZE_ON_TCP_CLOSE                       0
+#define CMK_SYNCHRONIZE_ON_TCP_CLOSE                       1
 
 #define CMK_THREADS_REQUIRE_NO_CPV                         0
 
