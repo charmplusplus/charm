@@ -12,7 +12,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 2.19  1997-02-02 07:33:55  milind
+# Revision 2.20  1997-03-14 20:25:43  milind
+# Changed optimization options to compilers and linkers.
+#
+# Revision 2.19  1997/02/02 07:33:55  milind
 # Fixed Bugs in SP1 machine dependent code that made megacon to hang.
 # Consisted of almost 60 percent rewrite.
 #
@@ -86,11 +89,11 @@ set CMK_CXX			= 'mpCC '
 set CMK_CXXPP			= 'xlC -E '
 set CMK_CF77			= 'mpxlf'
 set CMK_C_DEBUG                 = '-g'
-set CMK_C_OPTIMIZE              = '-O3 -qstrict '
+set CMK_C_OPTIMIZE              = '-O3 -qstrict -Q -qarch=pwr -qtune=pwr -qipa '
 set CMK_CXX_DEBUG               = '-g'
-set CMK_CXX_OPTIMIZE            = '-O3 -qstrict '
-set CMK_LD			= 'mpcc -us'
-set CMK_LDXX			= 'mpCC -us'
+set CMK_CXX_OPTIMIZE            = '-O3 -qstrict -Q -qarch=pwr -qtune=pwr -qipa '
+set CMK_LD			= 'mpcc -us -Q -qarch=pwr -qtune=pwr -qipa '
+set CMK_LDXX			= 'mpCC -us -Q -qarch=pwr -qtune=pwr -qipa '
 set CMK_LD77			= ''
 set CMK_M4			= 'm4'
 set CMK_SUF			= 'o'
