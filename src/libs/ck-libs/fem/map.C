@@ -25,6 +25,8 @@ Originally written by Orion Sky Lawlor, olawlor@acm.org, 9/28/2000
 #include <assert.h>
 #include "fem_impl.h"
 
+class elemList;
+
 /*This object maps a single node to a list of the PEs
 that have a copy of it.  For the vast majority
 of nodes, the list will contain exactly one element.
@@ -124,7 +126,7 @@ public:
 class splitter {
 //Inputs:
 	const FEM_Mesh *mesh; //Unsplit source mesh
-	int *elem2chunk; //Maps global element number to destination chunk
+	const int *elem2chunk; //Maps global element number to destination chunk
 	int nchunks; //Number of pieces to divide into
 //Output:
 	MeshChunk **msgs; //Output chunks [nchunks]
@@ -160,6 +162,9 @@ class splitter {
 //---- Used by ghost layer builder ---
 	CkVec<peList *> gElem;//Map global element to owning processors
 	unsigned char *ghostNode; //Flag: this node borders ghost elements [mesh->node.n]
+	const int *canon; //Node canonicalization array (may be NULL)
+	const FEM_Symmetries_t *sym; //Node symmetries array (may be NULL)
+	int totGhostElem,totGhostNode; //For debugging printouts
 
 //Return true if any of these nodes are ghost nodes
 bool hasGhostNodes(const int *conn,int nodesPer) 
@@ -170,6 +175,14 @@ bool hasGhostNodes(const int *conn,int nodesPer)
 	return false;
 }
 
+	//Return an elemList entry if this tuple should be a ghost:
+	bool addTuple(int *dest,FEM_Symmetries_t *destSym,
+		const int *elem2tuple,int nodesPerTuple,const int *conn) const;
+
+	//Check if src should be added as a ghost on dest's chunk
+	void addGhostPair(const elemList *src,const elemList *dest,bool addNodes);
+	void addSymmetryGhost(const elemList *a);
+
 //Add this global number as a new entry in the given dest.
 // Applies to both nodes and elements.
 // Returns false if this is not a good ghost pair.
@@ -177,8 +190,6 @@ bool addGhost(int global,int srcPe,int destPe,
 	      CkVec<int> &destChunk, peList *gDest,
 	      FEM_Item &src,FEM_Item &dest)
 {
-	if (srcPe==destPe) 
-		return false; //Never add ghosts from same pe!
 	if (-1!=gDest[global].localOnPE(destPe))
 		return false; //Dest already has a copy of this item
 	int srcLocal=gDest[global].localOnPE(srcPe);
@@ -193,12 +204,12 @@ bool addGhost(int global,int srcPe,int destPe,
 }
 
 //Add an entire layer of ghost elements
-void add(const ghostLayer &g);
+void addLayer(const ghostLayer &g,const FEM_Ghost &ghosts);
 
 
 
 public:
-splitter(const FEM_Mesh *mesh_,int *elem2chunk_,int nchunks_)
+splitter(const FEM_Mesh *mesh_,const int *elem2chunk_,int nchunks_)
 	:mesh(mesh_), elem2chunk(elem2chunk_),nchunks(nchunks_)
 {
 	msgs=new MeshChunk* [nchunks];
@@ -233,7 +244,7 @@ splitter(const FEM_Mesh *mesh_,int *elem2chunk_,int nchunks_)
 	void buildCommLists(void);
 	
 	//Add the layers of ghost elements
-	void addGhosts(int nLayers,const ghostLayer *g);
+	void addGhosts(const FEM_Ghost &ghost);
 	
 	//Divide up the sparse data lists
 	void separateSparse(void);
@@ -496,17 +507,8 @@ static void checkArrayEntries(const int *arr,int nArr,int max,const char *what)
 #endif
 }
 
-
-/*External entry point:
-Create a sub-mesh for each chunk's elements,
-including communication lists between chunks.
-*/
-void fem_split(const FEM_Mesh *mesh,int nchunks,int *elem2chunk,
-	       int nGhostLayers,const ghostLayer *g,MeshChunkOutput *out)
-{
-	//Check the elem2chunk mapping:
-	checkArrayEntries(elem2chunk,mesh->nElems(),nchunks,
-		"elem2chunk, from FEM_Set_Partition or metis,");
+//Check all user-settable fields in this object for validity
+static void checkMesh(const FEM_Mesh *mesh) {
 	for (int t=0;t<mesh->elem.size();t++) {
 	//Check the user's connectivity array
 		checkArrayEntries(mesh->elem[t].conn,mesh->elem[t].n,
@@ -521,6 +523,27 @@ void fem_split(const FEM_Mesh *mesh,int nchunks,int *elem2chunk,
 		  checkArrayEntries(src.getElem(),src.size()*2,
 			mesh->nElems(),"sparse data elements, from FEM_Set_Sparse_Elem,");
 	}
+}
+static void checkGhost(const FEM_Ghost &ghosts,const FEM_Mesh *mesh) {
+	const int *canon=ghosts.getCanon();
+	if (canon!=NULL)
+	  checkArrayEntries(canon,mesh->node.n,mesh->node.n,
+		"node canonicalization array, from FEM_Set_Symmetries");
+}
+
+
+/*External entry point:
+Create a sub-mesh for each chunk's elements,
+including communication lists between chunks.
+*/
+void fem_split(const FEM_Mesh *mesh,int nchunks,const int *elem2chunk,
+	       const FEM_Ghost &ghosts,MeshChunkOutput *out)
+{
+	//Check the elem2chunk mapping:
+	checkArrayEntries(elem2chunk,mesh->nElems(),nchunks,
+		"elem2chunk, from FEM_Set_Partition or metis,");
+	checkMesh(mesh);
+	checkGhost(ghosts,mesh);
 	
 	splitter s(mesh,elem2chunk,nchunks);
 
@@ -528,7 +551,7 @@ void fem_split(const FEM_Mesh *mesh,int nchunks,int *elem2chunk,
 	
 	s.separateSparse();
 	
-	s.addGhosts(nGhostLayers,g);
+	s.addGhosts(ghosts);
 	
 	//Split up and send out the mesh
 	for (int c=0;c<nchunks;c++)
@@ -566,10 +589,12 @@ public:
 	int pe;
 	int localNo;//Local number of this element on this PE
 	int type; //Kind of element
+	FEM_Symmetries_t sym; //Symmetries this element was reached via
 	elemList *next;
 
-	elemList(int pe_,int localNo_,int type_)
-		:pe(pe_),localNo(localNo_),type(type_) { next=NULL; }
+	elemList(int pe_,int localNo_,int type_,FEM_Symmetries_t sym_)
+		:pe(pe_),localNo(localNo_),type(type_), sym(sym_) 
+		{ next=NULL; }
 	~elemList() {if (next) delete next;}
 	void setNext(elemList *n) {next=n;}
 };
@@ -686,8 +711,9 @@ public:
 };
 
 //Add all the layers of ghost elements
-void splitter::addGhosts(int nLayers,const ghostLayer *g)
+void splitter::addGhosts(const FEM_Ghost &ghosts)
 {
+	int nLayers=ghosts.getLayers();
 	if (nLayers==0) return; //No ghost layers-- nothing to do
 	
 //Build initial ghostNode table-- just the shared nodes
@@ -703,13 +729,18 @@ void splitter::addGhosts(int nLayers,const ghostLayer *g)
 			msgs[c]->m.elem[t].ghostStart=chunks[c].elem[t].size();
 	}
 
-//Mark the symmetry boundaries
-	
+//Mark the symmetry nodes as being ghost-capable
+	canon=ghosts.getCanon();
+	sym=ghosts.getSymmetries();
+	if (sym!=NULL)
+	  for (n=0;n<nNode;n++)
+	    if (sym[n]!=(FEM_Symmetries_t)0)
+	      ghostNode[n]=1;
 
 //Add each layer
 	consistencyCheck();
 	for (int i=0;i<nLayers;i++) {
-		add(g[i]);
+		addLayer(ghosts.getLayer(i),ghosts);
 		consistencyCheck();
 	}
 
@@ -719,98 +750,121 @@ void splitter::addGhosts(int nLayers,const ghostLayer *g)
 	  {delete[] gElem[t];gElem[t]=NULL;}
 }
 
-//Add one layer of ghost elements
-void splitter::add(const ghostLayer &g)
+//Return an elemList entry if this tuple should be a ghost:
+bool splitter::addTuple(int *dest,FEM_Symmetries_t *destSym,const int *elem2tuple,
+	int nodesPerTuple,const int *conn) const
 {
-	int totTuples=0,totGhostElem=0,totGhostNode=0; //For debugging
-	//Build table mapping node-tuples to adjacent elements
+	FEM_Symmetries_t allSym=(FEM_Symmetries_t)(~0);
+	for (int i=0;i<nodesPerTuple;i++) {
+		int eidx=elem2tuple[i];
+		if (eidx==-1) { //"not-there" node--
+			dest[i]=-1; //Don't map via connectivity
+		} else { //Ordinary node
+			int n=conn[eidx];
+			if (!ghostNode[n]) 
+				return false; //This tuple doesn't lie on a ghost boundary
+			if (sym!=NULL) {
+				allSym=allSym & sym[n]; //Collect symmetries
+				n=canon[n]; //Map node via canon array
+			}
+			dest[i]=n;
+		}
+	}
+	//If we get here, it's a good tuple
+	if (sym!=NULL) *destSym=allSym; else *destSym=0;
+	return true;
+}
+
+/* Add a record for this ordered pair of adjacent elements:
+Consider adding src as a ghost element on dest's processor.
+*/
+void splitter::addGhostPair(const elemList *src,const elemList *dest,bool addNodes)
+{
+	//assert(src->sym==dest->sym)
+	int t=src->type;
+	int srcPe=src->pe;
+	int destPe=dest->pe;
+	int gNo=chunks[srcPe].elem[t][src->localNo];
+	if (src->sym==0) 
+	{ //Regular interchunk ghosts-- easy addition
+		if (srcPe==destPe) return; //Never add interchunk ghosts from same processor
+		if (!addGhost(gNo,srcPe,destPe,chunks[destPe].elem[t],gElem[t],
+		     msgs[srcPe]->m.elem[t],msgs[destPe]->m.elem[t])) return;
+		
+		totGhostElem++;
+		//Add this element's nodes as ghost nodes
+		const int *conn=mesh->elem[t].connFor(gNo);
+		for (int i=0;i<mesh->elem[t].nodesPer;i++)
+		{
+			int gnNo=conn[i];
+			ghostNode[gnNo]=1;
+			if (!addNodes) continue;
+			if (addGhost(gnNo,srcPe,destPe,chunks[destPe].node,gNode,
+				     msgs[srcPe]->m.node,msgs[destPe]->m.node))
+				totGhostNode++;
+		}
+	}
+	else
+	{ //Symmetry ghosts-- more complex, since element connectivity has to change:
+		CkAbort("FEM map> Symmetry ghosts not yet supported");
+		
+	}
+}
+
+//Add a record for this single-element tuple list
+void splitter::addSymmetryGhost(const elemList *a)
+{
+	if (a->sym==0) return; //Not a symmetry ghost
+	CkAbort("FEM map> Mirror symmetry ghosts not yet supported");
+}
+
+
+//Add one layer of ghost elements
+void splitter::addLayer(const ghostLayer &g,const FEM_Ghost &ghosts)
+{
 	tupleTable table(g.nodesPerTuple);
+	
+	totGhostElem=0,totGhostNode=0; //For debugging
+	
+	//Build table mapping node-tuples to lists of adjacent elements
 	for (int c=0;c<nchunks;c++) {
 	   for (int t=0;t<mesh->elem.size();t++) {
 		if (!g.elem[t].add) continue;
-		const CkVec<int> &src=chunks[c].elem[t];
-		const int *elem2tuple=g.elem[t].elem2tuple;
 		//For every element of every chunk:
-		for (int e=0;e<src.size();e++) {
-			int i,gNo=src[e];
+		int nEl=chunks[c].elem[t].size();
+		for (int e=0;e<nEl;e++) {
+			int i,gNo=chunks[c].elem[t][e];
 			const int *conn=mesh->elem[t].connFor(gNo);
 			if (hasGhostNodes(conn,mesh->elem[t].nodesPer))
 			{ //Loop over this element's tuples:
 			  for (int u=0;u<g.elem[t].tuplesPerElem;u++) {
-				int tuple[tupleTable::MAX_TUPLE];
-				for (i=0;i<g.nodesPerTuple;i++) {
-					int eidx=elem2tuple[i+u*g.nodesPerTuple];
-					if (eidx==-1) { //"not-there" node--
-					  tuple[i]=-1; //Don't map via connectivity
-					} else { //Ordinary node
-					  int n=conn[eidx];
-					  if (!ghostNode[n]) 
-						break; //This tuple doesn't lie on a ghost boundary
-					  tuple[i]=n;
-					}
-				}
-				if (i==g.nodesPerTuple) 
-				{ //This was a good tuple-- add it
-					table.addTuple(tuple,new elemList(c,e,t));
-					totTuples++;
-				}
+			  	int tuple[tupleTable::MAX_TUPLE];
+				FEM_Symmetries_t allSym;
+				if (addTuple(tuple,&allSym,
+				    &g.elem[t].elem2tuple[u*g.nodesPerTuple],
+				    g.nodesPerTuple,conn))
+					table.addTuple(tuple,new elemList(c,e,t,allSym));
 			  }
 			}
 	        }
 	   }
 	}
 	
-	//Add ghosts due to symmetries:
-	
-       
 	//Loop over all the tuples, connecting adjacent elements
 	table.beginLookup();
 	elemList *l;
 	while (NULL!=(l=table.lookupNext())) {
-		//Find all referenced processors:
-		int pes[20];
-		int nPes=0;
-		for (elemList *b=l;b!=NULL;b=b->next) {
-			int p;
-			for (p=0;p<nPes;p++)
-				if (b->pe==pes[p])
-					break;
-			if (p==nPes) //Not yet in list
-				pes[nPes++]=b->pe;
-		}
-		
-		//Consider adding each element as a ghost on each processor
+		//Consider adding ghosts for all element pairs on this tuple:
 		for (const elemList *a=l;a!=NULL;a=a->next)
-		{
-		  int t=a->type;
-		  int srcPe=a->pe;
-		  int gNo=chunks[srcPe].elem[t][a->localNo];
-		  for (int p=0;p<nPes;p++)
-		  {
-			int destPe=pes[p];
-			if (addGhost(gNo,srcPe,destPe,chunks[destPe].elem[t],gElem[t],
-				     msgs[srcPe]->m.elem[t],msgs[destPe]->m.elem[t]))
-			{
-				totGhostElem++;
-				//Add this element's nodes as ghost nodes
-				const int *conn=mesh->elem[t].connFor(gNo);
-				for (int i=0;i<mesh->elem[t].nodesPer;i++)
-				{
-					int gnNo=conn[i];
-					ghostNode[gnNo]=1;
-					if (g.addNodes) {
-						if (addGhost(gnNo,srcPe,destPe,chunks[destPe].node,gNode,
-							     msgs[srcPe]->m.node,msgs[destPe]->m.node))
-							totGhostNode++;
-					}
-				}
-			}
-		  }
-		}
+		for (const elemList *b=l;b!=NULL;b=b->next) 
+			if (a!=b)
+				addGhostPair(a,b,g.addNodes);
+		if (l->next==NULL) //One-entry list: must be a symmetry
+			addSymmetryGhost(l);
 	}
 	
-	printf("FEM Ghost layer> %d tuples, %d new ghost elements, %d new ghost nodes\n",
-	       totTuples,totGhostElem,totGhostNode);
+	CkPrintf("FEM Ghost layer> %d new ghost elements, %d new ghost nodes\n",
+	       totGhostElem,totGhostNode);
 }
 
 
