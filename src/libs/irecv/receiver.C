@@ -85,7 +85,7 @@ void receiver::generic(receiverMsg *msg)
 void receiver::syncSend(receiverMsg *msg)
 {
   sendTo(msg->tag, msg, msg->size, msg->sendFrom, msg->refno);
-  delete msg;
+//  delete msg;
 }
 
 extern "C" int typesize(int type, int count)
@@ -111,8 +111,8 @@ void receiver::isend(void *buf, int count, int datatype, int dest, int tag, int 
  d->tag = tag;
  d->sendFrom = thisIndex;
  d->refno = refno;
-// memcpy(d->buf, buf, size);
- d->buf = (char *)buf;
+ memcpy(d->buf, buf, size);
+// d->buf = (char *)buf;
  CProxy_receiver B(thisArrayID);
  B[dest].generic(d);
 }
