@@ -75,7 +75,12 @@ void IDXL_List::pup(PUP::er &p)
 	p|chunk;
 	p|shared;
 }
-
+bool doubleeq(double a,double b){
+		if(a-b < 1e-100 && a-b > -1e-100){
+			return true;
+		}
+		return false;
+}
 void IDXL_List::sort2d(double *coord){
 	double *dist = new double[shared.size()];
 	int i;
@@ -85,6 +90,22 @@ void IDXL_List::sort2d(double *coord){
 	}
 	for(i=0;i<shared.size();i++){
 		for(int j=i;j<shared.size();j++){
+			/**
+				if the 2 points are equidistant from the origin,
+				sort by x
+			*/
+			if(doubleeq(dist[i],dist[j])){
+					int idxi = shared[i];
+					int idxj = shared[j];
+					if(coord[2*idxi] > coord[2*idxj]){
+						int k = shared[j];
+						double temp = dist[j];
+						shared[j] = shared[i];
+						dist[j] = dist[i];
+						shared[i] = k;
+						dist[i] = temp;
+					}
+			}
 			if(dist[i] > dist[j]){
 				int k = shared[j];
 				double temp = dist[j];
