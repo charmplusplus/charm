@@ -179,7 +179,7 @@ void CthInit()
   CthCpvInitialize(int,        CthDatasize);
   CthCpvInitialize(int,        CthExiting);
   
-  t = (CthThread)CmiAlloc(sizeof(struct CthThreadStruct));
+  t = (CthThread)malloc(sizeof(struct CthThreadStruct));
   CthThreadInit(t);
   CthCpvAccess(CthData)=0;
   CthCpvAccess(CthCurrent)=t;
