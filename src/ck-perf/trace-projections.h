@@ -15,6 +15,7 @@
 
 #include <stdio.h>
 #include <errno.h>
+#include <unistd.h>
 #include "trace.h"
 #include "ckhashtable.h"
 
