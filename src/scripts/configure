@@ -1300,15 +1300,30 @@ echo $ECHO_N "checking \"$1\"... $ECHO_C" >&6
 test_link() {
         echo "$as_me:$LINENO: checking \"$1\"" >&5
 echo $ECHO_N "checking \"$1\"... $ECHO_C" >&6
+	echo "$CMK_CXX -I../include -I. -c $CMK_INCDIR $t -o test.o $4 > out 2>&1"
 	$CMK_CXX -I../include -I. -c $CMK_INCDIR $t -o test.o $4 > out 2>&1
         if test $? = 1
         then
           test_result 1 "$1" "$2" "$3"
         else
+	  echo "$CMK_LDXX -o testlink test.o $CMK_LIBDIR $4 > out 2>&1"
           $CMK_LDXX -o testlink test.o $CMK_LIBDIR $4 > out 2>&1
           test_result $? "$1" "$2" "$3"
         fi
 	/bin/rm -f out
+}
+
+# Testlink_one: tries to compile and link a C++ file $t (described by $1) in one step.
+#  If successful, prints $2 and sets $pass/clears $fail
+#  If failure, prints $3 and sets $pass/clears $fail
+#  additional arguments to c++ compiler are passed as $4
+test_link_one() {
+        echo "$as_me:$LINENO: checking \"$1\"" >&5
+echo $ECHO_N "checking \"$1\"... $ECHO_C" >&6
+        echo "$CMK_CXX -I../include -I. $CMK_INCDIR $t -o testlink $4 > out 2>&1"
+        $CMK_CXX -I../include -I. $CMK_INCDIR $t -o testlink $4 > out 2>&1
+        test_result $? "$1" "$2" "$3"
+        /bin/rm -f out
 }
 
 # test_linkso $1 $2 $3 $4, where
@@ -1908,6 +1923,31 @@ if test $pass -eq 1
 then
 	add_flag 'CMK_LIBS="$CMK_LIBS -lpapi"' "papi"
 fi
+fi
+
+#### test if Python headers are installed ####
+cat > $t <<EOT
+#include "python/Python.h"
+#include "python/compile.h"
+#include "python/eval.h"
+#include "python/node.h"
+
+int main() {
+    Py_Initialize();
+    PyEval_InitThreads();
+    struct _node* programNode = PyParser_SimpleParseString("return 1\n",Py_file_input);
+    PyCodeObject *program = PyNode_Compile(programNode, "");
+}
+EOT
+test_link_one "whether Python is installed" "yes" "no" "/usr/lib/python/config/libpython2.3.a -lpthread -lutil -ldl"
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_PYTHON $pass
+_ACEOF
+
+if test $pass -eq 1
+then
+	add_flag 'CMK_BUILD_PYTHON=1' "python"
 fi
 
 #### test if it can build shared library ####

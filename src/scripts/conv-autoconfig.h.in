@@ -57,6 +57,9 @@
 /* whether mmap() accepts MAP_ANON */
 #undef CMK_HAS_MMAP_ANON
 
+/* whether Python is installed */
+#undef CMK_HAS_PYTHON
+
 /* whether it has socklen_t */
 #undef CMK_HAS_SOCKLEN
 

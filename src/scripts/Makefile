@@ -249,7 +249,6 @@ dirs+sources:
 	./gatherflat ../../src/xlatcpm          .
 	./gathertree ../../src/QuickThreads QuickThreads
 	./gathertree ../../src/libs libs
-	./gatherflat ../../src/libs/ck-libs/python .
 	./gathertree ../../src/arch/util      .
 	./gathertree ../../src/langs langs
 	./gathertree ../../src/langs/jade langs/jade
