@@ -144,10 +144,8 @@ extern "C"
 void traceClose(void)
 {
   CpvAccess(_trace)->endComputation();
-/*
   if(CmiMyPe()==0)
     CpvAccess(_logPool)->writeSts();
-*/
   delete CpvAccess(_logPool);
   delete CpvAccess(_trace);
   free(CpvAccess(traceRoot));
