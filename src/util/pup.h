@@ -310,6 +310,7 @@ class toDisk : public disk {
  public:
   //Write data to the given file pointer 
   // (must be opened for binary write)
+  // Closes file when deleted.
   toDisk(FILE *f):disk(IS_PACKING,f) {}
 };
 
@@ -321,12 +322,12 @@ class fromDisk : public disk {
  public:
   //Write data to the given file pointer 
   // (must be opened for binary read)
+  // Closes file when deleted.
   fromDisk(FILE *f):disk(IS_UNPACKING,f) {}
 };
 
-
 /************** PUP::er -- Text *****************/
-class textUtil : public er {
+class toTextUtil : public er {
  private:
   char *cur; /*Current output buffer*/
   int level; /*Indentation distance*/
@@ -336,7 +337,7 @@ class textUtil : public er {
   void endLine(void);
  protected:
   virtual char *advance(char *cur)=0; /*Consume current buffer and return next*/
-  textUtil(unsigned int inType,char *buf);
+  toTextUtil(unsigned int inType,char *buf);
  public:
   virtual void comment(const char *message);
   virtual void synchronize(unsigned int m);
@@ -344,7 +345,7 @@ class textUtil : public er {
   virtual void bytes(void *p,int n,size_t itemSize,dataType t);
   virtual void object(able** a);
 };
-class sizerText : public textUtil {
+class sizerText : public toTextUtil {
  private:
   char line[1000];
   int charCount; /*Total characters seen so far*/
@@ -354,7 +355,7 @@ class sizerText : public textUtil {
   sizerText(void);
   int size(void) const {return charCount;}
 };
-class toText : public textUtil {
+class toText : public toTextUtil {
  private:
   char *buf;
   int charCount; /*Total characters written so far*/
@@ -365,6 +366,33 @@ class toText : public textUtil {
   int size(void) const {return charCount;}
 };
 
+class toTextFile : public er {
+  FILE *f;
+ protected:
+  virtual void bytes(void *p,int n,size_t itemSize,dataType t);
+ public:
+  //Begin writing to this file, which should be opened for ascii write.
+  // Closes file when deleted.
+  toTextFile(FILE *f_) :er(IS_PACKING), f(f_) {}
+  ~toTextFile() {fclose(f);}
+  virtual void comment(const char *message);
+};
+class fromTextFile : public er {
+  FILE *f;
+  int readInt(const char *fmt="%d");
+  unsigned int readUint(const char *fmt="%u");
+  double readDouble(void);
+  
+ protected:
+  virtual void bytes(void *p,int n,size_t itemSize,dataType t);
+  virtual void parseError(const char *what);
+ public:
+  //Begin writing to this file, which should be opened for ascii read.
+  // Closes file when deleted.
+  fromTextFile(FILE *f_) :er(IS_UNPACKING), f(f_) {}
+  ~fromTextFile() {fclose(f);}
+  virtual void comment(const char *message);
+};
 
 /********** PUP::er -- Heterogenous machine pack/unpack *********/
 //This object describes the data representation of a machine.

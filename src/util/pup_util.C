@@ -329,16 +329,16 @@ PUP::able::constructor_function PUP::able::get_constructor
 
 /****************** Text Pup ******************/
 
-char *PUP::textUtil::beginLine(void) {
+char *PUP::toTextUtil::beginLine(void) {
   //Indent level tabs over:
   for (int i=0;i<level;i++) cur[i]='\t';
   cur[level]=0;
   return cur+level;
 }
-void PUP::textUtil::endLine(void) {
+void PUP::toTextUtil::endLine(void) {
   cur=advance(cur);
 }
-void PUP::textUtil::beginEnv(const char *type,int n)
+void PUP::toTextUtil::beginEnv(const char *type,int n)
 {
   char *o=beginLine();
   sprintf(o,"begin "); o+=strlen(o);
@@ -347,25 +347,25 @@ void PUP::textUtil::beginEnv(const char *type,int n)
   endLine();
   level++;
 }
-void PUP::textUtil::endEnv(const char *type)
+void PUP::toTextUtil::endEnv(const char *type)
 {
   level--;
   sprintf(beginLine(),"} end %s;\n",type);
   endLine();
 }
-PUP::textUtil::textUtil(unsigned int inType,char *buf)
+PUP::toTextUtil::toTextUtil(unsigned int inType,char *buf)
   :er(inType)
 {
   cur=buf;
   level=0;
 }
 
-void PUP::textUtil::comment(const char *message)
+void PUP::toTextUtil::comment(const char *message)
 {
   sprintf(beginLine(),"//%s\n",message); endLine();
 }
 
-void PUP::textUtil::synchronize(unsigned int m)
+void PUP::toTextUtil::synchronize(unsigned int m)
 {
   char *o=beginLine();
   sprintf(o,"sync=");o+=strlen(o);
@@ -381,7 +381,7 @@ void PUP::textUtil::synchronize(unsigned int m)
   
 }
 
-void PUP::textUtil::bytes(void *p,int n,size_t itemSize,dataType t) {
+void PUP::toTextUtil::bytes(void *p,int n,size_t itemSize,dataType t) {
   if (t==Tchar) 
   { /*Character data is written out directly (rather than numerically)*/
     char *o=beginLine();
@@ -434,15 +434,14 @@ void PUP::textUtil::bytes(void *p,int n,size_t itemSize,dataType t) {
       case Tfloat: sprintf(o,"float=%.7g;\n",((float *)p)[i]); break;
       case Tdouble: sprintf(o,"double=%.15g;\n",((double *)p)[i]); break;
       case Tbool: sprintf(o,"bool=%s;\n",((CmiBool *)p)[i]?"true":"false"); break;
-      default:
-	CmiAbort("Unrecognized numeric type passed to PUP::textUtil::bytes!\n");
+      default: CmiAbort("Unrecognized pup type code!");
       }
       endLine();
     }
     if (n!=1) endEnv("array");
   }
 }
-void PUP::textUtil::object(able** a) {
+void PUP::toTextUtil::object(able** a) {
   beginEnv("object");
   er::object(a);
   endEnv("object");
@@ -456,7 +455,7 @@ char *PUP::sizerText::advance(char *cur) {
 }
 
 PUP::sizerText::sizerText(void)
-  :textUtil(IS_SIZING,line),charCount(0) { }
+  :toTextUtil(IS_SIZING,line),charCount(0) { }
 
 //Text packer
 char *PUP::toText::advance(char *cur) {
@@ -465,7 +464,93 @@ char *PUP::toText::advance(char *cur) {
 }
 
 PUP::toText::toText(char *outBuf)
-  :textUtil(IS_PACKING,outBuf),buf(outBuf),charCount(0) { }
+  :toTextUtil(IS_PACKING,outBuf),buf(outBuf),charCount(0) { }
+
+/************** To/from text FILE ****************/
+void PUP::toTextFile::bytes(void *p,int n,size_t itemSize,dataType t)
+{
+  for (int i=0;i<n;i++) 
+    switch(t) {
+    case Tchar: fprintf(f," '%c'",((char *)p)[i]); break;
+    case Tbyte: fprintf(f," %02X",((unsigned char *)p)[i]); break;
+    case Tshort: fprintf(f," %d",((short *)p)[i]); break;
+    case Tushort: fprintf(f," %u",((unsigned short *)p)[i]); break;
+    case Tint: fprintf(f," %d",((int *)p)[i]); break;
+    case Tuint: fprintf(f," %u",((unsigned int *)p)[i]); break;
+    case Tlong: fprintf(f," %ld",((long *)p)[i]); break;
+    case Tulong: fprintf(f," %lu",((unsigned long *)p)[i]); break;
+    case Tfloat: fprintf(f," %.7g",((float *)p)[i]); break;
+    case Tdouble: fprintf(f," %.15g",((double *)p)[i]); break;
+    case Tbool: fprintf(f," %s",((CmiBool *)p)[i]?"true":"false"); break;
+    default: CmiAbort("Unrecognized pup type code!");
+    };
+  fprintf(f,"\n");
+}
+void PUP::toTextFile::comment(const char *message)
+{
+  fprintf(f,"! %s\n",message);
+}
+
+void PUP::fromTextFile::parseError(const char *what) {
+  fprintf(stderr,"Parse error during pup from text file: %s\n",what);
+  CmiAbort("Parse error during pup from text file!");
+}
+int PUP::fromTextFile::readInt(const char *fmt) {
+  int ret=0;
+  if (1!=fscanf(f,fmt,&ret)) parseError("could not match integer");
+  return ret;
+}
+unsigned int PUP::fromTextFile::readUint(const char *fmt) {
+  unsigned int ret=0;
+  if (1!=fscanf(f,fmt,&ret)) parseError("could not match unsigned integer");
+  return ret;  
+}
+double PUP::fromTextFile::readDouble(void) {
+  double ret=0;
+  if (1!=fscanf(f,"%g",&ret)) parseError("could not match double");
+  return ret;
+}
+void PUP::fromTextFile::bytes(void *p,int n,size_t itemSize,dataType t)
+{
+  for (int i=0;i<n;i++) 
+    switch(t) {
+    case Tchar: 
+      if (1!=fscanf(f," '%c'",&((char *)p)[i]))
+	parseError("Could not match character");
+      break;
+    case Tbyte: ((unsigned char *)p)[i]=(unsigned char)readInt("%02X"); break;
+    case Tshort:((short *)p)[i]=(short)readInt(); break;
+    case Tushort: ((unsigned short *)p)[i]=(unsigned short)readUint(); break;
+    case Tint:  ((int *)p)[i]=readInt(); break;
+    case Tuint: ((unsigned int *)p)[i]=readUint(); break;
+    case Tlong: ((long *)p)[i]=readInt(); break;
+    case Tulong:((unsigned long *)p)[i]=readUint(); break;
+    case Tfloat: ((float *)p)[i]=(float)readDouble(); break;
+    case Tdouble:((double *)p)[i]=readDouble(); break;
+    case Tbool: {
+      char tmp[20];
+      if (1!=fscanf(f," %20s",tmp)) parseError("could not read boolean string");
+      CmiBool val=CmiFalse;
+      if (0==strcmp(tmp,"true")) val=CmiTrue;
+      else if (0==strcmp(tmp,"false")) val=CmiFalse;
+      else parseError("could not recognize boolean string");
+      ((CmiBool *)p)[i]=val; 
+    }
+      break;
+    default: CmiAbort("Unrecognized pup type code!");
+    };
+}
+void PUP::fromTextFile::comment(const char *message)
+{
+  char c;
+  //Skip to the start of the message:
+  while (isspace(c=fgetc(f))) {}
+  
+  if (c!='!') return; //This isn't the start of a comment
+  //Skip over the whole line containing the comment:
+  char commentBuf[1024];
+  fgets(commentBuf,1024,f);
+}
 
 
 
