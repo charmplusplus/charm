@@ -215,6 +215,9 @@ extern "C" {
   void FEM_Serial_split(int nchunks);
   void FEM_Serial_begin(int chunkNo);
   
+  void FEM_Serial_read(int chunkNo,int nChunks);
+  void FEM_Serial_assemble(void);
+  
   int FEM_Get_comm_partners(void);
   int FEM_Get_comm_partner(int partnerNo);
   int FEM_Get_comm_count(int partnerNo);

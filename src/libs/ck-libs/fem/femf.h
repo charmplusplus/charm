@@ -78,8 +78,6 @@
        external FEM_Get_Sym
 
        external FEM_Set_Partition
-       external FEM_Serial_Split
-       external FEM_Serial_Begin
 
        external FEM_Add_Ghost_Layer
        external FEM_Add_Ghost_Elem
@@ -190,6 +188,18 @@
          integer :: FEM_Get_sparse_length
          integer, intent(in) ::sID
        end function
+
+       subroutine FEM_Serial_split(nChunk)
+         integer,intent (in) :: nChunk
+       end subroutine
+       subroutine FEM_Serial_begin(chunk)
+         integer,intent (in) :: chunk
+       end subroutine
+       subroutine FEM_Serial_read(chunk,nChunks)
+         integer,intent (in) :: chunk,nChunks
+       end subroutine
+       subroutine FEM_Serial_assemble()
+       end subroutine
        
        function FEM_Get_comm_partners()
          integer :: FEM_Get_comm_partners

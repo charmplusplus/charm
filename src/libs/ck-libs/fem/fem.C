@@ -94,10 +94,18 @@ _allReduceHandler(void *proxy_v, int datasize, void *data)
 //These fields give the current serial mesh
 // (NULL if none).  They are only valid during
 // init, mesh_updated, and finalize.
-static FEM_Mesh* _meshptr = 0;
+static FEM_Mesh*  _srcSerialMesh = 0; //Mesh user reads from (during mesh_updated)
+static FEM_Mesh* _destSerialMesh = 0; //Mesh user writes into (during init)
 
 //Maps element number to (0-based) chunk number, allocated with new[]
 static int *_elem2chunk=NULL;
+
+// Throw away all the current serial meshes
+static void freeSerialMeshes(void) {
+    delete[] _elem2chunk; _elem2chunk=NULL;
+    delete _srcSerialMesh; _srcSerialMesh=NULL;
+    delete _destSerialMesh; _destSerialMesh=NULL;
+}
 
 
 static FEM_Ghost ghosts;
@@ -105,18 +113,15 @@ static ghostLayer *curGhostLayer=NULL;
 
 //Partitions and splits the current serial mesh into the given number of pieces
 static void mesh_split(int _nchunks,FEM_Mesh_Output *out) {
-    int *elem2chunk=_elem2chunk;
-    if (elem2chunk==NULL) 
+    if (_elem2chunk==NULL) 
     {//Partition the elements ourselves
-    	elem2chunk=new int[_meshptr->nElems()];
-    	FEM_Mesh_partition(_meshptr,_nchunks,elem2chunk);
+    	_elem2chunk=new int[_destSerialMesh->nElems()];
+    	FEM_Mesh_partition(_destSerialMesh,_nchunks,_elem2chunk);
     }
-    _meshptr->setAscendingGlobalno();
+    _destSerialMesh->setAscendingGlobalno();
     //Build communication lists and split mesh data
-    FEM_Mesh_split(_meshptr,_nchunks,elem2chunk,ghosts,out);
-    //Blow away old partitioning
-    delete[] elem2chunk; _elem2chunk=NULL;
-    delete _meshptr; _meshptr=NULL;
+    FEM_Mesh_split(_destSerialMesh,_nchunks,_elem2chunk,ghosts,out);
+    freeSerialMeshes();
 }
 
 class FEM_Mesh_Writer : public FEM_Mesh_Output {
@@ -188,7 +193,7 @@ CDECL void FEM_Attach(int flags)
 	TCHARM_Attach_finish(chunks);
 	
 	//Send the mesh out to the chunks
-	if (_meshptr!=NULL) 
+	if (_destSerialMesh!=NULL) 
 	{ //Partition the serial mesh online
 		FEM_Mesh_Sender s(chunks);
 		mesh_split(_nchunks,&s);
@@ -263,8 +268,8 @@ void FEMcoordinator::updateMesh(marshallUpdateMeshChunk &chk)
 	doWhat=m->doWhat;
       }
       //Assemble the current chunks into a serial mesh
-      delete _meshptr;
-      _meshptr=FEM_Mesh_assemble(_nchunks,cmsgs);
+      freeSerialMeshes();
+      _srcSerialMesh=FEM_Mesh_assemble(_nchunks,cmsgs);
       //Blow away the old chunks
       for (i=0;i<_nchunks;i++) {
       	delete cmsgs[i];
@@ -277,11 +282,13 @@ void FEMcoordinator::updateMesh(marshallUpdateMeshChunk &chk)
       TCharm::setState(inDriver);
       
       if (doWhat==FEM_MESH_UPDATE) { /*repartition the mesh*/
+        if (_srcSerialMesh==NULL) CkAbort("FEM> Never created a new mesh during mesh_updated!");
 	FEM_Mesh_Update u(femChunks);
 	mesh_split(_nchunks,&u);
       } else if (doWhat==FEM_MESH_FINALIZE) { /*just broadcast meshUpdatedComplete*/
         femChunks.meshUpdatedComplete();
       }
+      freeSerialMeshes();
 
       //Check for relevant messages in the future buffer
       updateCount++;
@@ -296,7 +303,7 @@ void FEMcoordinator::updateMesh(marshallUpdateMeshChunk &chk)
 }
 
 /*******************************************************
-  Code used only by serial framework clients-- they want
+  Code used only by serial framework "setup" code-- they want
   to set the mesh, partition, and get the mesh out piece by piece.
 */
 class FEM_Mesh_Storer : public FEM_Mesh_Output {
@@ -318,7 +325,7 @@ public:
     if (i<0 || i>=nchunks) 
     	FEM_Abort("FEM_Serial_begin","Invalid index %d: must be between 0 and %d",i,nchunks);
     FEM_Mesh_write(chks[i],i,nchunks,NULL);
-    _meshptr=chks[i];
+    _srcSerialMesh=chks[i];
   }
 };
 
@@ -342,6 +349,96 @@ CDECL void FEM_Serial_begin(int chunkNo) {
 FDECL void FTN_NAME(FEM_SERIAL_BEGIN,fem_serial_begin)(int *pieceNo)
 {
   FEM_Serial_begin(*pieceNo-1);
+}
+
+
+/*******************************************************
+  Code used only by serial framework "reassembly" code-- they want
+  to setup each mesh partition, then get the whole mesh out at once.
+*/
+
+class FEM_Serial_reassembly {
+	int nChunks; //Number of chunks in the mesh
+	CkVec<FEM_Mesh *> msgs; //Partitioned mesh pieces (or NULL)
+	int lastRead; //Number of last-read chunk
+	
+	//Set the number of global chunks:
+	void setChunks(int n) {
+		nChunks=n;
+		CkPrintf("FEM> Will do serial reassembly for %d chunks\n",n);
+		msgs.setSize(n);
+		for (int i=0;i<n;i++) msgs[i]=NULL;
+	}
+	
+	//Check this chunk number for validity
+	void check(int c) {
+		if (c<0 || c>=nChunks) 
+			FEM_Abort("FEM_Serial reassembly","Invalid chunk number %d",c);
+	}
+	
+	// Read this chunk out of the global mesh:
+	void pushChunk(int c) {
+		check(c);
+		if (msgs[c]!=NULL) 
+			FEM_Abort("FEM_Serial reassembly","Tried to set chunk %d twice!",c);
+		if (_destSerialMesh==NULL) 
+			FEM_Abort("FEM_Serial reassembly","Never created a new mesh for chunk %d",c);
+		//Copy old global numbers into new mesh:
+		_destSerialMesh->copyOldGlobalno(*_srcSerialMesh);
+		msgs[c]=_destSerialMesh; //Mesh the user's set up
+		_destSerialMesh=0;
+	}
+	
+public:
+	FEM_Serial_reassembly() 
+	{
+		lastRead=-1;
+		nChunks=-1;
+	}
+	
+	void read(int chunkNo,int nc) {
+		if (nChunks==-1) setChunks(nc);
+		check(chunkNo);
+		if (lastRead!=-1) pushChunk(lastRead);
+		freeSerialMeshes();
+		_srcSerialMesh=FEM_Mesh_read(chunkNo,nChunks,NULL);
+		_srcSerialMesh->becomeGetting();
+		lastRead=chunkNo;
+	}
+	
+	void reassemble(void) {
+		if (lastRead!=-1) pushChunk(lastRead);
+		freeSerialMeshes();
+		_srcSerialMesh=FEM_Mesh_assemble(nChunks,&msgs[0]);
+		_srcSerialMesh->becomeGetting();
+		for (int i=0;i<nChunks;i++) {
+			delete msgs[i]; msgs[i]=NULL;
+		}
+	}
+	
+	static FEM_Serial_reassembly *get(void) {
+		static FEM_Serial_reassembly *assembler=NULL;
+		if (assembler==NULL) assembler=new FEM_Serial_reassembly();
+		return assembler;
+	}
+};
+
+CDECL void FEM_Serial_read(int chunkNo,int nChunks) {
+  FEMAPI("FEM_Serial_read");
+  FEM_Serial_reassembly::get()->read(chunkNo,nChunks);
+}
+FDECL void FTN_NAME(FEM_SERIAL_READ,fem_serial_read)(int *c,int *n)
+{
+  FEM_Serial_read(*c-1,*n);
+}
+
+CDECL void FEM_Serial_assemble(void) {
+  FEMAPI("FEM_Serial_assemble");
+  FEM_Serial_reassembly::get()->reassemble();
+}
+FDECL void FTN_NAME(FEM_SERIAL_ASSEMBLE,fem_serial_assemble)(void)
+{ 
+  FEM_Serial_assemble(); 
 }
 
 
@@ -375,10 +472,11 @@ static FEM_Mesh *setMesh(void) {
     return &cptr->updated_mesh->m;
   } else {
     //Called from init, finalize, or meshUpdate
-    if (_meshptr==NULL) {
-      _meshptr=new FEM_Mesh;
+    if (_destSerialMesh==NULL) {
+      _destSerialMesh=new FEM_Mesh;
+      _destSerialMesh->becomeSetting();
     }
-    return _meshptr;
+    return _destSerialMesh;
   }
 }
 
@@ -388,10 +486,10 @@ static const FEM_Mesh *getMesh(void) {
     return &cptr->getMesh();
   } else {
     //Called from init, finalize, or meshUpdate
-    if (_meshptr==NULL) {
-      FEM_Abort("FEM: Cannot get mesh-- it was never set!\n");
+    if (_srcSerialMesh==NULL) {
+      FEM_Abort("FEM: Cannot get serial mesh-- it was never set!\n");
     }
-    return _meshptr;
+    return _srcSerialMesh;
   }
 }
 const FEM_Mesh *FEM_Get_FEM_Mesh(void) {
@@ -439,7 +537,7 @@ FEM_Mesh *FEM_Mesh_lookup(int fem_mesh,const char *callingRoutine) {
 /****** Custom Partitioning API *******/
 static void Set_Partition(int *elem2chunk,int indexBase) {
 	if (_elem2chunk!=NULL) delete[] _elem2chunk;
-	_elem2chunk=CkCopyArray(elem2chunk,getMesh()->nElems(),indexBase);
+	_elem2chunk=CkCopyArray(elem2chunk,setMesh()->nElems(),indexBase);
 }
 
 //C bindings:
@@ -803,10 +901,7 @@ static void do_print_partition(int idxBase) {
     FEMchunk *cptr = getCurChunk();
     cptr->print(idxBase);
   } else {
-    if (_meshptr==NULL)
-      CkPrintf("[%d] No serial mesh available.\n",FEM_My_partition());
-    else
-      _meshptr->print(idxBase);
+    ((FEM_Mesh *)getMesh())->print(idxBase);
   }
 }
 
@@ -987,7 +1082,7 @@ CDECL void FEM_Add_ghost_layer(int nodesPerTuple,int doAddNodes)
 	curGhostLayer=FEM_Set_FEM_Ghost().addLayer();
 	curGhostLayer->nodesPerTuple=nodesPerTuple;
 	curGhostLayer->addNodes=(doAddNodes!=0);
-	curGhostLayer->elem.makeLonger(getMesh()->elem.size());
+	curGhostLayer->elem.makeLonger(setMesh()->elem.size());
 }
 FDECL void FTN_NAME(FEM_ADD_GHOST_LAYER,fem_add_ghost_layer)
 	(int *nodesPerTuple,int *doAddNodes)
@@ -1011,7 +1106,7 @@ FDECL void FTN_NAME(FEM_ADD_GHOST_ELEM,fem_add_ghost_elem)
 	int tuplesPerElem=*FtuplesPerElem;
 	if (curGhostLayer==NULL)
 		CkAbort("You must call FEM_Add_Ghost_Layer before calling FEM_Add_Ghost_elem!\n");
-	getMesh()->chkET(elType);
+	setMesh()->chkET(elType);
 	curGhostLayer->elem[elType].add=true;
 	curGhostLayer->elem[elType].tuplesPerElem=tuplesPerElem;
 	curGhostLayer->elem[elType].elem2tuple=CkCopyArray(elem2tuple,
