@@ -238,6 +238,7 @@ private:
 	CmiBool startRequested;//Should we start the next reduction when creation finished?
 	int gcount;//=el't created here - el't deleted here
 	int lcount;//Number of local contributors
+	int maxStartRequest; // the highest future ReductionStarting message received
 
 	//Current local and remote contributions
 	int nContrib,nRemote;

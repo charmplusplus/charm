@@ -1,6 +1,7 @@
 #include "charm++.h"
 #include "ck.h"
 #include "CkArrayReductionMgr.decl.h"
+#define DEBUG 0
 
 
 
@@ -16,7 +17,9 @@ CkArrayReductionMgr::CkArrayReductionMgr(){
 
 void CkArrayReductionMgr::collectAllMessages(){
 	if(count == size){
-			//CkPrintf("[%d] About to call contributewithCounter for %d with %d\n",CkMyNode(),redNo,count);
+#if DEBUG
+			CkPrintf("[%d] CollectAll messages  for %d with %d\n",CkMyNode(),redNo,count);
+#endif			
 			CkReductionMsg *result = reduceMessages();
 			result->redNo = redNo;
 			/**keep a count of elements that contributed to the original reduction***/
@@ -39,7 +42,9 @@ void CkArrayReductionMgr::collectAllMessages(){
 }
 
 void CkArrayReductionMgr::contributeArrayReduction(CkReductionMsg *m){
-	//CkPrintf("[%d]Contribute Array Reduction called for RedNo %d\n",CkMyNode(),m->getRedNo());
+#if DEBUG	
+	CkPrintf("[%d]Contribute Array Reduction called for RedNo %d\n",CkMyNode(),m->getRedNo());
+#endif	
 	/** store the contribution untill all procs have contributed. At that point reduce and
 	carry out a reduction among nodegroups*/
 	CmiLock(lockCount);
