@@ -459,7 +459,7 @@ unsigned int ip; int port; int seconds;
     if (ok>=0) break;
     close(fd);
     switch (errno) {
-    case EINTR: case EBADF: case EALREADY: break;
+    case EINTR: case EBADF: case EALREADY: case EISCONN: break;
     case ECONNREFUSED: jsleep(1,0); break;
     case EADDRINUSE: jsleep(1,0); break;
     case EADDRNOTAVAIL: jsleep(1,0); break;
@@ -1488,7 +1488,7 @@ int CsdScheduler(int maxmsgs)
         }
       } else {
         /* If the debugQueue contains any messages, process them */
-        while(!FIFO_Empty(CpvAccess(debugQueue))){
+        while((!FIFO_Empty(CpvAccess(debugQueue))) && (CpvAccess(freezeModeFlag)==0)){
           char *queuedMsg;
           FIFO_DeQueue(CpvAccess(debugQueue), &queuedMsg);
           CmiHandleMessage(queuedMsg);
@@ -1540,7 +1540,7 @@ int CsdScheduler(int maxmsgs)
       }
     } else {
       /* If the debugQueue contains any messages, process them */
-      while(!FIFO_Empty(CpvAccess(debugQueue))){
+      while(((!FIFO_Empty(CpvAccess(debugQueue))) && (CpvAccess(freezeModeFlag)==0))){
         char *queuedMsg;
 	FIFO_DeQueue(CpvAccess(debugQueue), &queuedMsg);
 	CmiHandleMessage(queuedMsg);

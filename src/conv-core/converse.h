@@ -998,6 +998,8 @@ typedef indirectionFunction indirectionType[MAX_NUM_HANDLERS];
 typedef char* (*symbolTableFunction)(void);
 typedef symbolTableFunction symbolTableType[MAX_NUM_HANDLERS];
 
+void symbolTableFnArrayRegister(int hndlrID, int noOfBreakPoints,
+				symbolTableFunction f, indirectionFunction g);
 char* getSymbolTableInfo();
 int isBreakPoint(char *msg);
 int isEntryPoint(char *msg);
