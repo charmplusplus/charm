@@ -14,7 +14,7 @@
 
 #define USELIB  1
 #define MAXITER 10
-#define NUMPASS 2
+#define NUMPASS 1
 
 /*readonly*/ CkChareID mid;
 /*readonly*/ CProxy_Bench arr;
