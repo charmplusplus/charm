@@ -136,6 +136,9 @@ int RefineLB::refine()
 	      lightProcessors->insert((InfoRecord *) &(processors[i]));
    }
    int done = 0;
+
+   CkPrintf("Enter while loop. \n");
+
    while (!done)
    {
       double bestSize;
@@ -148,7 +151,7 @@ int RefineLB::refine()
       //find the best pair (c,receiver)
       Iterator nextProcessor;
       processorInfo *p = (processorInfo *) 
-      lightProcessors->iterator((Iterator *) &nextProcessor);
+             lightProcessors->iterator((Iterator *) &nextProcessor);
       bestSize = 0;
       bestP = 0;
       bestCompute = 0;
@@ -173,16 +176,25 @@ int RefineLB::refine()
                   bestP = p;
                }
             }
+	 CkPrintf("next nextCompute. \n");
             nextCompute.id++;
             c = (computeInfo *) donor->computeSet->next((Iterator *)&nextCompute);
          }
+	 CkPrintf("next lightProcessors. \n");
          p = (processorInfo *) 
          lightProcessors->next((Iterator *) &nextProcessor);
       }
 
       //we have narrowed the choice to 3 candidates.
-      deAssign(bestCompute, donor);      
-      assign(bestCompute, bestP);
+      if (bestCompute)
+      {
+        deAssign(bestCompute, donor);      
+        assign(bestCompute, bestP);
+      }
+      else {
+	finish = 0;
+	break;
+      }
 
       if (bestP->load > averageLoad)
          lightProcessors->remove(bestP);
@@ -201,14 +213,20 @@ CLBMigrateMsg* RefineLB::Strategy(CentralLB::LDStats* stats, int count)
 
   create(stats, count);
 
+  CkPrintf("[%d] created statastics. \n", CkMyPe());
+
   for (int i=0; i<numComputes; i++)
     assign((computeInfo *) &(computes[i]),
            (processorInfo *) &(processors[computes[i].oldProcessor]));
 
+  CkPrintf("[%d] finished assign. \n", CkMyPe());
+
   computeAverage();
   overLoad = 1.02;
 
+  CkPrintf("[%d] begin refine. \n", CkMyPe());
   refine();
+  CkPrintf("[%d] refine finished. \n", CkMyPe());
 
 #if CMK_STL_USE_DOT_H
   queue<MigrateInfo> migrateInfo;
