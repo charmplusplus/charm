@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.17  1996-03-28 15:25:21  sanjeev
+ * Revision 2.18  1996-03-28 21:53:31  sanjeev
+ * *** empty log message ***
+ *
+ * Revision 2.17  1996/03/28 15:25:21  sanjeev
  * *** empty log message ***
  *
  * Revision 2.16  1996/03/22 17:34:11  sanjeev
@@ -230,7 +233,7 @@
 #define new_chare2(ChareType, msg, vid, pe) 	CreateChare(CMK_CONCAT(_CK_chare_,ChareType), GetEntryPtr(ChareType,ChareType), msg, vid, pe)
 
 
-#define new_group(ChareType, msg)	CreateBoc(CMK_CONCAT(_CK_chare_,ChareType), GetEntryPtr(ChareType,ChareType), msg, 0, 0)
+#define new_group(ChareType, msg)	CreateBoc(CMK_CONCAT(_CK_chare_,ChareType), GetEntryPtr(ChareType,ChareType), msg, -1, 0)
 
 
 #define new_group2(ChareType, msg, returnEP, returnID)	CreateBoc(CMK_CONCAT(_CK_chare_,ChareType), GetEntryPtr(ChareType,ChareType), msg, returnEP, returnID)
