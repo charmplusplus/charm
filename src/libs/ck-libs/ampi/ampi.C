@@ -1500,7 +1500,20 @@ int MPI_Test(MPI_Request *request, int *flag, MPI_Status *sts)
     int index = *request - 100;
     PersReq *req = &(ptr->irequests[index]);
     *flag = getAmpiInstance(req->comm)->iprobe(req->tag, req->proc, req->comm, (int*) sts);
-  } else {  // alltoall request
+    if( *flag )
+    {
+        getAmpiInstance(req->comm)->recv(req->tag, req->proc, req->buf, req->count,
+                                        req->type, req->comm, (int*) sts);
+        // now free the request
+        ptr->nirequests--;
+        PersReq *ireq = &(ptr->irequests[0]);
+        req->nextfree = ptr->firstfree;
+        req->prevfree = ireq[ptr->firstfree].prevfree;
+        ireq[req->prevfree].nextfree = index;
+        ireq[req->nextfree].prevfree = index;
+        ptr->firstfree = index;
+    }
+ } else {  // alltoall request
     int i;
     int index = *request - 200;
     ATAReqs *req = ptr->atarequests[index];
