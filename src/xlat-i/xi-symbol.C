@@ -529,12 +529,14 @@ Array::Array(int ln, NamedType *index,
 		indexType<<"CkArrayIndex"<<indexSuffix;
 	else indexType<<"CkArrayIndex";
 //Add migration constructor entry point to MemberList
-	Entry *e=new Entry(ln,SARRAY_MIGRATE,
-		NULL,
-		(char *)type->getBaseName(),
-		new PtrType(new NamedType("ArrayElementMigrateMessage")));
-	e->setChare(this);
-	list=new MemberList(e,list);
+        if(!t->isTemplated()) {
+	  Entry *e=new Entry(ln,SARRAY_MIGRATE,
+		  NULL,
+		  (char *)type->getBaseName(),
+		  new PtrType(new NamedType("ArrayElementMigrateMessage")));
+	  e->setChare(this);
+	  list=new MemberList(e,list);
+        }
 //Add ArrayElement to the list of bases (if we're not ArrayElement ourselves)
 	if((!bases)&&(0!=strcmp(type->getBaseName(),"ArrayElement")))
 		bases = new TypeList(new NamedType("ArrayElement"), bases);
@@ -673,9 +675,14 @@ Chare::genDefs(XStr& str)
     str << "}\n";
 
   }
-  if(!templat) {
-    str << "#ifndef CK_TEMPLATES_ONLY\n";
+  if(!type->isTemplated()) {
+    if(!templat) {
+      str << "#ifndef CK_TEMPLATES_ONLY\n";
+    } else {
+      str << "#ifdef CK_TEMPLATES_ONLY\n";
+    }
     if(external) str << "extern ";
+    genTSpec(str);
     str << "int "<<proxyName()<<"::__idx";
     if(!external) str << "=0";
     str << ";\n";
@@ -818,7 +825,7 @@ Message::genDefs(XStr& str)
     }
   }
   if(!templat) {
-    if(!external) {
+    if(!external && !type->isTemplated()) {
       str << "int "<<ptype<<"::__idx=0;\n";
 
       // Define the Marshalling message for Fortran
@@ -832,6 +839,11 @@ Message::genDefs(XStr& str)
         str << "};\n";
       }
     }
+  } else {
+    templat->genSpec(str);
+    str << "int "<<proxyPrefix()<<type;
+    templat->genVars(str);
+    str <<"::__idx=0;\n";
   }
   str << "#endif\n";
 }
@@ -1239,6 +1251,8 @@ void Entry::genEpIdxDecl(XStr& str)
 void Entry::genEpIdxDef(XStr& str)
 {
   container->genTSpec(str);
+  // if(container->isTemplated())
+    // return;
   str << "int "<<container->proxyName()<<"::"<<epIdx()<<"=0;\n";
 }
 
@@ -1399,6 +1413,7 @@ void Entry::genArrayDefs(XStr& str)
     genArrayStaticConstructorDefs(str);
   else
   {//Define array entry method
+    container->genTSpec(str);
     str<<retType<<" "<<container->proxyName()<<"::"<<name<<"("<<paramType()<<")\n";
     str<< "{\n";
     if (!param||param->isVoid())
