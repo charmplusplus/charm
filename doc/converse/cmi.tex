@@ -258,6 +258,35 @@ be reused.}
 \desc{Releases the communication handle \param{handle} and
 associated resources. It does not free the message buffer.}
 
+\function{void CmiMultipleSend(unsigned int destPE, int len, int sizes[], char
+*msgComps[])}
+\index{CmiMultipleSend}
+\desc{This function allows the user to send many multiple messages that may be
+destined for the SAME node in one go. This is more efficient than sending
+each message to the destination node separately. This function assumes
+that the handlers that are to receive this message have already been set.
+If this is not done, the behavior of the function is undefined.
+
+In the function, The {\bf destPE} parameter identifies the destination
+processor.
+
+The {\bf len} argument identifies the {\it number} of messages that are to
+be sent in one go. 
+
+The {\bf sizes[]} array is an array of sizes of each of these messages.
+
+The {\bf msgComps[]} array is the array of the messages. 
+
+The indexing in each array is from 0 to len - 1.
+
+{\bf Note:}
+
+Before calling this function, the program needs to initialise the system
+to be able to provide this service. This is done by calling the function
+{\bf void CmiInitMultipleSendRoutine(void) }. Unless this function is
+called, the system will not be able to provide the service to the user.
+}
+
 \section{Broadcasting Messages}
 
 \function{void CmiSyncBroadcast(unsigned int size, void *msg)}
