@@ -400,4 +400,5 @@ CkOutStream& operator<< (CkOutStream& ckos, CkBitVector const b ) {
   
   ckos << buff;
   delete [] buff;
+  return ckos;
 }
