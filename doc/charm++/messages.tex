@@ -88,7 +88,7 @@ assign the size array and allocate the message:
 int size[2];
 size[0] = 10;
 size[1] = 20;
-VarsizeMessage *msg = new (size) VarsizeMessage;
+VarsizeMessage *msg = new (size,0) VarsizeMessage;
 \end{verbatim}
 
 This allocates a {\it VarsizeMessage}, in which (typically) {\it firstArray}
