@@ -298,6 +298,7 @@ void Array1D::RecvForElement(ArrayMessage *msg)
 void Array1D::migrateMe(int index, int where)
 {
   int bufSize = elementIDs[index].element->packsize();
+  //  CkPrintf("[%d] Element %d migrating to %d\n",CkMyPe(),index,where);
 
   ArrayMigrateMessage *msg = new (&bufSize, 0) ArrayMigrateMessage;
 
@@ -339,6 +340,7 @@ void Array1D::RecvMigratedElement(ArrayMigrateMessage *msg)
   elementIDs[index].cameFrom = msg->from;
   elementIDs[index].migrateMsg = msg;
 
+  //  CkPrintf("[%d] Element %d migrated here from %d\n",CkMyPe(),index,msg->from);
 #if CMK_LBDB_ON
   elementIDs[index].uses_barrier = msg->uses_barrier;
 #endif
@@ -376,10 +378,17 @@ void Array1D::RecvMigratedElementID(int index, ArrayElement *elem,
   ack_msg->handle = elementIDs[index].elementHandle;
   ack_msg->deleteElement = 1;
 
+  if (CkMyPe() == elementIDs[index].cameFrom)
+    CkPrintf("[%d] Error: Acknowledging element %d migrating to me!\n",
+	     CkMyPe(),index);
+
   CProxy_Array1D arr(thisgroup);
   arr.AckMigratedElement(ack_msg, elementIDs[index].cameFrom);
+  //  CkPrintf("[%d] Ack element %d to %d\n",
+  //	   CkMyPe(),index, elementIDs[index].cameFrom);
   
-  if (elementIDs[index].cameFrom != elementIDs[index].originalPE) {
+  if ( (elementIDs[index].cameFrom != elementIDs[index].originalPE) 
+       && (CkMyPe() != elementIDs[index].originalPE) ) {
     ack_msg = new ArrayElementAckMessage;
 
     ack_msg->hopCount = elementIDs[index].curHop;
@@ -389,6 +398,8 @@ void Array1D::RecvMigratedElementID(int index, ArrayElement *elem,
     ack_msg->deleteElement = 0;
 
     arr.AckMigratedElement(ack_msg, elementIDs[index].originalPE);
+    //    CkPrintf("[%d] Ack element %d to source %d\n",
+    //	     CkMyPe(),index, elementIDs[index].originalPE);
   }
   numLocalElements++;
   elementIDsReported++;
@@ -413,22 +424,23 @@ void Array1D::AckMigratedElement(ArrayElementAckMessage *msg)
 {
   int index = msg->index;
 
-  // CkPrintf("PE %d Message acknowledged hop=%d curHop=%d\n",
-    // CkMyPe(),msg->hopCount,elementIDs[index].curHop);
+  //  CkPrintf("[%d] element %d acknowledged\n",CkMyPe(),index);
 
   if (msg->hopCount > elementIDs[index].curHop) {
     if (msg->deleteElement) {
       ArrayElementExitMessage *exitmsg = new ArrayElementExitMessage;
-      // CkPrintf("I want to delete the element %d\n",index);
+      //      CkPrintf("[%d] I want to delete the element %d\n",CkMyPe(),index);
       CProxy_ArrayElement elem(elementIDs[index].elementHandle);
       elem.exit(exitmsg);
+      //      CkPrintf("[%d] Element %d deleted\n",CkMyPe(),index);
     }
     elementIDs[index].pe = msg->arrivedAt;
     elementIDs[index].state = at;
     elementIDs[index].elementHandle = msg->handle;
+    elementIDs[index].curHop = msg->hopCount;
   } else if (msg->hopCount <= elementIDs[index].curHop) {
-    // CkPrintf("PE %d STALE Message acknowledged hop=%d curHop=%d\n",
-      // CkMyPe(),msg->hopCount,elementIDs[index].curHop);
+    //    CkPrintf("PE %d index %d STALE Message acknowledged hop=%d curHop=%d\n",
+    //	     CkMyPe(),index,msg->hopCount,elementIDs[index].curHop);
     
   }
   delete msg;
@@ -476,7 +488,7 @@ void Array1D::QueryLoad(LDOMHandle _h)
 
 void Array1D::RegisterElementForSync(int index)
 {
-  CkPrintf("[%d] Registering element %d for barrier\n",CkMyPe(),index);
+  //  CkPrintf("[%d] Registering element %d for barrier\n",CkMyPe(),index);
   if (elementIDsReported == 1) { // This is the first element reported
     // If this is a sync array, register a sync callback so I can
     // inform the db when I start registering objects 
@@ -576,7 +588,7 @@ void ArrayElement::migrate(int where)
 
 void ArrayElement::AtSync(void)
 {
-  CkPrintf("Element %d at sync\n",thisIndex);
+  //  CkPrintf("Element %d at sync\n",thisIndex);
 #if CMK_LBDB_ON
   thisArray->AtSync(thisIndex);
 #endif

@@ -89,7 +89,10 @@ void HashTable::removeObject(Chare* charePtr)
     prev = node;
     node = node -> next;
   }
-  CkError("Erroneous chareIndex supplied in removeObject()\n"); 
+  char err[80];
+  sprintf(err,"[%d] Erroneous chareIndex supplied in removeObject()\n",
+	  CmiMyPe()); 
+  CkError(err);
 }
 
 char* HashTable::getObjectList(void)
