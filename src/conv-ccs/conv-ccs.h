@@ -15,6 +15,7 @@ but it can use the CcsSendReply function.
 
 #include "converse.h"
 #include "sockRoutines.h"
+#include "ccs-server.h" /*for CcsSecAttr*/
 
 #ifdef __cplusplus
 extern "C" {
@@ -26,26 +27,40 @@ extern "C" {
 
 extern int _ccsHandlerIdx;
 
-typedef struct CcsDelayedReply_struct *CcsDelayedReply;
-
-struct CcsDelayedReply_struct {
-	unsigned char val;
-};
-
 #if CMK_CCS_AVAILABLE
-void CcsRegisterHandler(const char *id, CmiHandler fn);
+
+typedef struct CcsDelayedReply_struct {
+	CcsSecAttr     attr; /*Source information*/
+	ChMessageInt_t replyFd;/*Send reply back here*/
+} CcsDelayedReply;
+
+/**
+ * Backward compatability routine: register a regular converse-style handler
+ * to receive CCS requests.  The requests will arrive as a Converse message,
+ * with a (useless) converse header.
+ */
+void CcsRegisterHandler(const char *ccs_handlername, CmiHandler fn);
+
+/**
+ * Register a real Ccs handler function to receive these CCS requests. 
+ * The requests will arrive as a flat, readonly buffer.
+ */
+typedef void (*CcsHandlerFn)(void *userPtr,int reqLen,const void *reqData);
+void CcsRegisterHandlerFn(const char *ccs_handlername, CcsHandlerFn fn, void *userPtr);
 
 void CcsInit(char **argv);
 int CcsEnabled(void);
 int CcsIsRemoteRequest(void);
 void CcsCallerId(skt_ip_t *pip, unsigned int *pport);
-void CcsSendReply(int size, const void *reply);
+void CcsSendReply(int replyLen, const void *replyData);
 CcsDelayedReply CcsDelayReply(void);
-void CcsSendDelayedReply(CcsDelayedReply d,int size, const void *reply);
+void CcsSendDelayedReply(CcsDelayedReply d,int replyLen, const void *replyData);
 
 #else
+typedef void *CcsDelayedReply;
 #define CcsInit(argv) /*empty*/
 #define CcsRegisterHandler(x,y) 0
+#define CcsRegisterHandlerFn(x,y,p) 0
 #define CcsEnabled() 0
 #define CcsIsRemoteRequest() 0
 #define CcsCallerId(x,y)  /*empty*/

@@ -26,7 +26,42 @@
  
 #include "ckhashtable.h"
 
-/*Table maps handler name to handler fn*/
+/* Includes all information stored about a single CCS handler. */
+typedef struct CcsHandlerRec {
+	const char *name; /*Name passed over socket*/
+	CmiHandler fnOld; /*Old converse-style handler, or NULL if new-style*/
+	CcsHandlerFn fn; /*New-style handler function, or NULL if old-style*/
+	void *userPtr;
+	int nCalls; /* Number of times handler has been executed*/
+} CcsHandlerRec;
+
+static void initHandlerRec(CcsHandlerRec *c,const char *name) {
+  if (strlen(name)>=CCS_MAXHANDLER) 
+  	CmiAbort("CCS handler names cannot exceed 32 characters");
+  c->name=strdup(name);
+  c->fn=NULL;
+  c->fnOld=NULL;
+  c->userPtr=NULL;
+  c->nCalls=0;
+}
+
+static void callHandlerRec(CcsHandlerRec *c,int reqLen,const void *reqData) {
+	c->nCalls++;
+	if (c->fnOld) 
+	{ /* Backward compatability version:
+	    Pack user data into a converse message (cripes! why bother?);
+	    user will delete the message. 
+	  */
+		char *cmsg = (char *) CmiAlloc(CmiMsgHeaderSizeBytes+reqLen);
+		memcpy(cmsg+CmiMsgHeaderSizeBytes, reqData, reqLen);
+		(c->fnOld)(cmsg);
+	}
+	else { /* Pass read-only copy of data straight to user */
+		(c->fn)(c->userPtr, reqLen, reqData);
+	}
+}
+
+/*Table maps handler name to CcsHandler object*/
 typedef CkHashtable_c CcsHandlerTable;
 CpvStaticDeclare(CcsHandlerTable, ccsTab);
 
@@ -34,7 +69,18 @@ CpvStaticDeclare(CcsImplHeader*,ccsReq);/*Identifies CCS requestor (client)*/
 
 void CcsRegisterHandler(const char *name, CmiHandler fn)
 {
-  *(CmiHandler *)CkHashtablePut(CpvAccess(ccsTab),(void *)&name)=fn;
+  CcsHandlerRec cp;
+  initHandlerRec(&cp,name);
+  cp.fnOld=fn;
+  *(CcsHandlerRec *)CkHashtablePut(CpvAccess(ccsTab),(void *)&cp.name)=cp;
+}
+void CcsRegisterHandlerFn(const char *name, CcsHandlerFn fn, void *ptr)
+{
+  CcsHandlerRec cp;
+  initHandlerRec(&cp,name);
+  cp.fn=fn;
+  cp.userPtr=ptr;
+  *(CcsHandlerRec *)CkHashtablePut(CpvAccess(ccsTab),(void *)&cp.name)=cp;
 }
 
 int CcsEnabled(void)
@@ -55,24 +101,27 @@ void CcsCallerId(skt_ip_t *pip, unsigned int *pport)
 
 CcsDelayedReply CcsDelayReply(void)
 {
-  CcsImplHeader *ret=(CcsImplHeader *)malloc(sizeof(CcsImplHeader));
-  *ret=*CpvAccess(ccsReq);
+  CcsDelayedReply ret;
+  ret.attr=CpvAccess(ccsReq)->attr;
+  ret.replyFd=CpvAccess(ccsReq)->replyFd;
   CpvAccess(ccsReq)=NULL;
-  return (CcsDelayedReply)ret;
+  return ret;
 }
 
-void CcsSendReply(int size, const void *msg)
+void CcsSendReply(int replyLen, const void *replyData)
 {
   if (CpvAccess(ccsReq)==NULL)
     CmiAbort("CcsSendReply: reply already sent!\n");
-  CcsImpl_reply(CpvAccess(ccsReq),size,msg);
+  CcsImpl_reply(CpvAccess(ccsReq),replyLen,replyData);
   CpvAccess(ccsReq) = NULL;
 }
 
-void CcsSendDelayedReply(CcsDelayedReply d,int size, const void *msg)
+void CcsSendDelayedReply(CcsDelayedReply d,int replyLen, const void *replyData)
 {
-  CcsImpl_reply((CcsImplHeader *)d,size,msg);
-  free(d);
+  CcsImplHeader h;
+  h.attr=d.attr;
+  h.replyFd=d.replyFd;
+  CcsImpl_reply(&h,replyLen,replyData);
 }
 
 
@@ -92,23 +141,17 @@ static void CcsHandleRequest(CcsImplHeader *hdr,const char *reqData)
   int reqLen=ChMessageInt(hdr->len);
 /*Look up handler's converse ID*/
   char *handlerStr=hdr->handler;
-  void *hdlrPtr=CkHashtableGet(CpvAccess(ccsTab),(void *)&handlerStr);
-  CmiHandler fn;
-  if (hdlrPtr==NULL) {
-    CmiPrintf("CCS: Unknown CCS handler name '%s' requested!\n",
+  CcsHandlerRec *fn=(CcsHandlerRec *)CkHashtableGet(CpvAccess(ccsTab),(void *)&handlerStr);
+  if (fn==NULL) {
+    CmiPrintf("CCS: Unknown CCS handler name '%s' requested. Ignoring...\n",
 	      hdr->handler);
     return;
  /*   CmiAbort("CCS: Unknown CCS handler name.\n");*/
   }
-  fn=*(CmiHandler *)hdlrPtr;
-
-/*Pack user data into a converse message (why bother?)*/
-  cmsg = (char *) CmiAlloc(CmiMsgHeaderSizeBytes+reqLen);
-  memcpy(cmsg+CmiMsgHeaderSizeBytes, reqData, reqLen);
 
 /* Call the handler */
   CpvAccess(ccsReq)=hdr;
-  (fn)(cmsg);
+  callHandlerRec(fn,reqLen,reqData);
   
 /*Check if a reply was sent*/
   if (CpvAccess(ccsReq)!=NULL)
@@ -269,7 +312,7 @@ void CcsBuiltinsInit(char **argv);
 void CcsInit(char **argv)
 {
   CpvInitialize(CkHashtable_c, ccsTab);
-  CpvAccess(ccsTab) = CkCreateHashtable_string(sizeof(CmiHandler),5);
+  CpvAccess(ccsTab) = CkCreateHashtable_string(sizeof(CcsHandlerRec),5);
   CpvInitialize(CcsImplHeader *, ccsReq);
   CpvAccess(ccsReq) = NULL;
   _ccsHandlerIdx = CmiRegisterHandler(req_fw_handler);
