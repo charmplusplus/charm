@@ -27,3 +27,4 @@ set CMK_SEQ_LDXX='CC'
 set CMK_CPP_SUFFIX="cc"
 set CMK_XLATPP='charmxlat++ -w -p '
 set CMK_QT='solaris-cc'
+set CMK_XIOPTS=''

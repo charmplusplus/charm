@@ -27,3 +27,5 @@ set CMK_SEQ_LDXX='g++ -static '
 set CMK_CPP_SUFFIX="ii"
 set CMK_XLATPP='charmxlat++ -w'
 set CMK_QT='hpux-gcc'
+set CMK_XIOPTS=''
+

@@ -27,3 +27,5 @@ set CMK_SEQ_LDXX='KCC'
 set CMK_CPP_SUFFIX="ii"
 set CMK_XLATPP='charmxlat++ '
 set CMK_QT='generic'
+set CMK_XIOPTS='-ansi'
+

@@ -112,6 +112,9 @@
 #define CMK_USE_HP_MAIN_FIX                                1
 #define CMK_DONT_USE_HP_MAIN_FIX                           0
 
+#define CMK_COMPILEMODE_ORIG                               1
+#define CMK_COMPILEMODE_ANSI                               0
+
 #define CPP_LOCATION "/lib/cpp"
 
 #endif

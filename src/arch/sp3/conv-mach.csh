@@ -31,3 +31,4 @@ set CMK_NM_FILTER    = "grep ^_CK_ | cut -f 1 -d ' '"
 set CMK_CPP_SUFFIX   = "i"
 set CMK_XLATPP       = 'charmxlat++ '
 set CMK_QT='aix32-gcc'
+set CMK_XIOPTS=''

@@ -471,7 +471,7 @@ foreach FILE ($FILES)
   endif
   switch ($FILE)
     case "*.ci"
-      ($ECHOCMD ; $CHARMBIN/charmxi $BASE.ci)
+      ($ECHOCMD ; $CHARMBIN/charmxi $CMK_XIOPTS $BASE.ci)
       if ($status) goto failure
       breaksw
     case "*.idl"

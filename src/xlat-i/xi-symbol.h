@@ -8,6 +8,9 @@
 
 #include "xi-util.h"
 
+typedef enum { original, ansi } CompileMode;
+extern CompileMode compilemode;
+
 class Value : public Printable {
   private:
     char *val;
@@ -429,7 +432,7 @@ class Module : public Construct {
   public:
     Module(char *n, ConstructList *c) : name(n), clist(c) { _isMain=0; }
     void print(XStr& str);
-    void generate(void);
+    void generate();
     void genDecls(XStr& str);
     void genDefs(XStr& str);
     void genReg(XStr& str);
@@ -443,7 +446,7 @@ class ModuleList : public Printable {
   public:
     ModuleList(Module *m, ModuleList *n=0) : module(m), next(n) {}
     void print(XStr& str);
-    void generate(void);
+    void generate();
 };
 
 class Readonly : public Construct, public Member {

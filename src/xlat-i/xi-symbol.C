@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include "xi-symbol.h"
 
+CompileMode compilemode;
+
 void 
 ConstructList::setExtern(int e) 
 {
@@ -172,9 +174,10 @@ Module::print(XStr& str)
 }
 
 void
-Module::generate(void)
+Module::generate()
 {
   XStr declstr, defstr;
+  
   declstr<<"#ifndef _DECL_" << name << "_H_"<<endx;
   declstr<<"#define _DECL_" << name << "_H_"<<endx;
   declstr<<"#include \"charm++.h\""<<endx;
@@ -216,7 +219,7 @@ ModuleList::print(XStr& str)
 }
 
 void 
-ModuleList::generate(void) 
+ModuleList::generate()
 {
   module->generate();
   if(next)
@@ -525,8 +528,26 @@ static const char *CIMsgClass =
 "    void*operator new(size_t s, int p){return CkAllocMsg(__idx,s,p);}\n"
 ;
 
+static const char *CIMsgClassAnsi =
+"{\n"
+"  public:\n"
+"    static int __idx;\n"
+"    static void __register(const char *s);\n"
+"    void*operator new(size_t s){return CkAllocMsg(__idx,s,0);}\n"
+"    void operator delete(void *p){CkFreeMsg(p);}\n"
+"    void*operator new(size_t,void*p){return p;}\n"
+"    void operator delete(void*,void*){}\n"
+"    void*operator new(size_t s, int p){return CkAllocMsg(__idx,s,p);}\n"
+"    void operator delete(void *,int){}\n"
+;
+
 static const char *CIAllocDecl =
 "    void *operator new(size_t s, int *sz, int p);\n"
+;
+
+static const char *CIAllocDeclAnsi =
+"    void *operator new(size_t s, int *sz, int p);\n"
+"    void operator delete(void*,int *,int);\n"
 ;
 
 void
@@ -546,9 +567,14 @@ Message::genDecls(XStr& str)
     str <<";";
     return;
   }
-  str.spew(CIMsgClass);
+  if (compilemode==ansi)
+    str.spew(CIMsgClassAnsi);
+  else str.spew(CIMsgClass);
+
   if(isVarsize()) {
-    str.spew(CIAllocDecl);
+    if (compilemode==ansi)
+      str.spew(CIAllocDeclAnsi);
+    else str.spew(CIAllocDecl);
   }
   str << "};\n";
 }

@@ -27,3 +27,4 @@ set CMK_SEQ_LDXX='g++'
 set CMK_CPP_SUFFIX="ii"
 set CMK_XLATPP='charmxlat++ -w'
 set CMK_QT='aix32-gcc'
+set CMK_XIOPTS=''

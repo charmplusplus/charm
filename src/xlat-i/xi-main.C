@@ -24,13 +24,42 @@ ModuleList *Parse(char *interfacefile)
   return modlist;
 }
 
+void abortxi(char *name)
+{
+  cout << "Usage : " << name << " [-ansi]  module.ci" << endl;
+  exit(1) ;
+}
+
 main(int argc, char *argv[])
 {
-  if ( argc != 2 ) {
-    cout << "Usage : " << argv[0] << " module.ci" << endl;
-    exit(1) ;
+  char *fname;
+  char *option=0;
+
+  compilemode = original;
+
+  switch (argc) {
+  case 2:
+    fname = argv[1];
+    break;
+
+  case 3:
+    if (*argv[1]=='-') {
+      option = argv[1];
+      fname = argv[2];
+    } else if (*(argv[2]) == '-') {
+      fname = argv[1];
+      option = argv[2];
+    } else abortxi(argv[0]);
+
+    break;
+  default:
+    abortxi(argv[0]);
   }
-  ModuleList *m = Parse(argv[1]) ;
+  
+  if (option != 0 && strcmp(option,"-ansi")==0)
+    compilemode = ansi;
+
+  ModuleList *m = Parse(fname) ;
   m->generate();
   return 0 ;
 }

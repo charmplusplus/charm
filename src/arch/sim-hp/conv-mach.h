@@ -114,5 +114,8 @@
 
 #define CPP_LOCATION "/lib/cpp"
 
+#define CMK_COMPILEMODE_ORIG                               1
+#define CMK_COMPILEMODE_ANSI                               0
+
 #endif
 

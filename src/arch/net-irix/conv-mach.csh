@@ -27,3 +27,5 @@ set CMK_SEQ_LDXX='CC -w -n32 '
 set CMK_CPP_SUFFIX="i"
 set CMK_XLATPP='charmxlat++  '
 set CMK_QT='irix5-cc'
+set CMK_XIOPTS=''
+

@@ -27,3 +27,5 @@ set CMK_SEQ_LDXX='CC -Aa -D_HPUX_SOURCE +DAportable '
 set CMK_CPP_SUFFIX="i"
 set CMK_XLATPP='charmxlat++ '
 set CMK_QT='hpux-cc'
+set CMK_XIOPTS=''
+
