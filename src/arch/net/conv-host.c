@@ -2019,14 +2019,14 @@ int rsh_pump(p, nodeno, rank0no, argv)
   if (arg_debug || arg_debug_no_pause || arg_in_xterm) {
     xstr_printf(ibuf,"foreach dir ($path)\n");
     xstr_printf(ibuf,"  if (-e $dir/xterm) setenv F_XTERM $dir/xterm\n");
-    xstr_printf(ibuf,"  if (-e $dir/xdpyinfo) setenv F_XDPYINFO $dir/xdpyinfo\n");
+    xstr_printf(ibuf,"  if (-e $dir/xrdb) setenv F_XRDB $dir/xrdb\n");
     xstr_printf(ibuf,"end\n");
     xstr_printf(ibuf,"if ($?F_XTERM == 0) then\n");
     xstr_printf(ibuf,"   echo 'xterm not in path --- set your path in your cshrc.'\n");
     xstr_printf(ibuf,"   kill -9 $$\n");
     xstr_printf(ibuf,"endif\n");
-    xstr_printf(ibuf,"if ($?F_XDPYINFO == 0) then\n");
-    xstr_printf(ibuf,"   echo 'xdpyinfo not in path - set your path in your cshrc.'\n");
+    xstr_printf(ibuf,"if ($?F_XRDB == 0) then\n");
+    xstr_printf(ibuf,"   echo 'xrdb not in path - set your path in your cshrc.'\n");
     xstr_printf(ibuf,"   kill -9 $$\n");
     xstr_printf(ibuf,"endif\n");
     prog_flush(p);
@@ -2044,17 +2044,18 @@ int rsh_pump(p, nodeno, rank0no, argv)
   }
 
   if (arg_debug || arg_debug_no_pause || arg_in_xterm) {
-    xstr_printf(ibuf,"xdpyinfo > /dev/null\n");
+    xstr_printf(ibuf,"xrdb -query > /dev/null\n");
     xstr_printf(ibuf,"if ($status != 0) then\n");
-    xstr_printf(ibuf,"   echo 'Run xhost to enable display.'\n");
-    xstr_printf(ibuf,"   echo '(See manual for xhost for security issues)'\n");
-    xstr_printf(ibuf,"   kill -9 $$\n");
+    xstr_printf(ibuf,"  echo 'Cannot contact X Server.  You probably'\n");
+    xstr_printf(ibuf,"  echo 'need to run xhost to authorize connections.'\n");
+    xstr_printf(ibuf,"  echo '(See manual for xhost for security issues)'\n");
+    xstr_printf(ibuf,"  kill -9 $$\n");
     xstr_printf(ibuf,"endif\n");
     prog_flush(p);
   }
   
   xstr_printf(ibuf,"if (! -x %s) then\n",arg_nodeprog_r);
-  xstr_printf(ibuf,"  echo 'Cannot execute this node-program:'\n");
+  xstr_printf(ibuf,"  echo 'Cannot locate this node-program:'\n");
   xstr_printf(ibuf,"  echo '%s'\n",arg_nodeprog_r);
   xstr_printf(ibuf,"  kill -9 $$\n");
   xstr_printf(ibuf,"endif\n");
