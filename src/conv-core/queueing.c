@@ -80,8 +80,11 @@ prioq pq;
   int i;
   pq->heapsize = 100;
   pq->heapnext = 1;
+  pq->hash_key_size = PRIOQ_TABSIZE;
+  pq->hash_entry_size = 0;
   pq->heap = (prioqelt *)CmiAlloc(100 * sizeof(prioqelt));
-  for (i=0; i<PRIOQ_TABSIZE; i++) pq->hashtab[i]=0;
+  pq->hashtab = (prioqelt *)CmiAlloc(pq->hash_key_size * sizeof(prioqelt));
+  for (i=0; i<pq->hash_key_size; i++) pq->hashtab[i]=0;
 }
 
 void CqsPrioqExpand(pq)
@@ -97,6 +100,39 @@ prioq pq;
   CmiFree(oheap);
 }
 
+void CqsPrioqRehash(pq)
+     prioq pq;
+{
+  int oldHsize = pq->hash_key_size;
+  int newHsize = oldHsize * 2;
+  unsigned int hashval;
+  prioqelt pe, pe1;
+  int i,j;
+  pq->hash_key_size = newHsize;
+  prioqelt *ohashtab = pq->hashtab;
+  prioqelt *nhashtab = (prioqelt *)CmiAlloc(newHsize*sizeof(prioqelt));
+
+  for(i=0; i<newHsize; i++)
+    nhashtab[i] = 0;
+
+  for(i=0; i<oldHsize; i++) {
+    for(pe=ohashtab[i]; pe; pe=pe->ht_next) {
+      hashval = pe->pri.bits;
+      for (j=0; j<pe->pri.ints; j++) hashval ^= pe->pri.data[j];
+      hashval = (hashval&0x7FFFFFFF)%newHsize;
+
+      pe1=nhashtab[hashval];
+      pe->ht_next = pe1;
+      pe->ht_handle = (nhashtab+hashval);
+      if (pe1) pe1->ht_handle = &(pe->ht_next);
+      nhashtab[hashval]=pe;
+    }
+  }
+  pq->hashtab = nhashtab;
+  pq->hash_key_size = newHsize;
+  CmiFree(ohashtab);
+}
+
 /*
  * This routine compares priorities. It returns:
  * 
@@ -107,25 +143,41 @@ prioq pq;
  * where prios are treated as unsigned
  */
 
-int CqsPrioGT(prio1, prio2)
+inline int CqsPrioGT(prio1, prio2)
 prio prio1;
 prio prio2;
 {
+#ifndef FASTQ
   unsigned int ints1 = prio1->ints;
   unsigned int ints2 = prio2->ints;
+#endif
   unsigned int *data1 = prio1->data;
   unsigned int *data2 = prio2->data;
+#ifndef FASTQ
   unsigned int val1;
   unsigned int val2;
+#endif
   while (1) {
+#ifndef FASTQ
     if (ints1==0) return 0;
     if (ints2==0) return 1;
+#else
+    if (prio1->ints==0) return 0;
+    if (prio2->ints==0) return 1;
+#endif
+#ifndef FASTQ
     val1 = *data1++;
     val2 = *data2++;
     if (val1 < val2) return 0;
     if (val1 > val2) return 1;
     ints1--;
     ints2--;
+#else
+    if(*data1++ < *data2++) return 0;
+    if(*data1++ > *data2++) return 1;
+    (prio1->ints)--;
+    (prio2->ints)--;
+#endif
   }
 }
 
@@ -136,17 +188,43 @@ unsigned int priobits, *priodata;
   unsigned int prioints = (priobits+CINTBITS-1)/CINTBITS;
   unsigned int hashval, i;
   int heappos; 
-  prioqelt *heap, pe, next;
+  prioqelt *heap, pe, next, parent;
   prio pri;
+  int mem_cmp_res;
+  unsigned int pri_bits_cmp;
+  static int cnt_nilesh=0;
 
+#ifdef FASTQ
+  //  printf("Hi I'm here %d\n",cnt_nilesh++);
+#endif
   /* Scan for priority in hash-table, and return it if present */
   hashval = priobits;
   for (i=0; i<prioints; i++) hashval ^= priodata[i];
   hashval = (hashval&0x7FFFFFFF)%PRIOQ_TABSIZE;
+#ifndef FASTQ
   for (pe=pq->hashtab[hashval]; pe; pe=pe->ht_next)
     if (priobits == pe->pri.bits)
       if (memcmp(priodata, pe->pri.data, sizeof(int)*prioints)==0)
 	return &(pe->data);
+#else
+  parent=NULL;
+  for(pe=pq->hashtab[hashval]; pe; )
+  {
+    parent=pe;
+    pri_bits_cmp=pe->pri.bits;
+    mem_cmp_res=memcmp(priodata,pe->pri.data,sizeof(int)*prioints);
+    if(priobits == pri_bits_cmp && mem_cmp_res==0)
+      return &(pe->data);
+    else if(priobits > pri_bits_cmp || (priobits == pri_bits_cmp && mem_cmp_res>0))
+    {
+      pe=pe->ht_right;
+    }
+    else 
+    {
+      pe=pe->ht_left;
+    }
+  }
+#endif
   
   /* If not present, allocate a bucket for specified priority */
   pe = (prioqelt)CmiAlloc(sizeof(struct prioqelt_struct)+((prioints-1)*sizeof(int)));
@@ -158,10 +236,45 @@ unsigned int priobits, *priodata;
 
   /* Insert bucket into hash-table */
   next = pq->hashtab[hashval];
+#ifndef FASTQ
   pe->ht_next = next;
   pe->ht_handle = (pq->hashtab+hashval);
   if (next) next->ht_handle = &(pe->ht_next);
   pq->hashtab[hashval] = pe;
+#else
+  pe->ht_parent = parent;
+  pe->ht_left = NULL;
+  pe->ht_right = NULL;
+  if(priobits > pri_bits_cmp || (priobits == pri_bits_cmp && mem_cmp_res>0))
+  {
+    if(parent) {
+      parent->ht_right = pe;
+      pe->ht_handle = &(parent->ht_right);
+    }
+    else {
+      pe->ht_handle = (pq->hashtab+hashval);
+      pq->hashtab[hashval] = pe;
+    }
+    //    pe->ht_handle = &(pe);
+  }
+  else
+  {
+    if(parent) {
+      parent->ht_left = pe;
+      pe->ht_handle = &(parent->ht_left);
+    }
+    else {
+      pe->ht_handle = (pq->hashtab+hashval);
+      pq->hashtab[hashval] = pe;
+    }
+    //    pe->ht_handle = &(pe);
+  }
+  if(!next)
+    pq->hashtab[hashval] = pe;
+#endif
+  pq->hash_entry_size++;
+  if(pq->hash_entry_size > 2*pq->hash_key_size)
+    CqsPrioqRehash(pq);
   
   /* Insert bucket into heap */
   heappos = pq->heapnext++;
@@ -174,6 +287,10 @@ unsigned int priobits, *priodata;
     heap[heappos] = parent; heappos=parentpos;
   }
   heap[heappos] = pe;
+
+#ifdef FASTQ
+  //  printf("Hi I'm here222\n");
+#endif
   
   return &(pe->data);
 }
@@ -185,17 +302,163 @@ prioq pq;
   prioqelt pe, old; void *data;
   int heappos, heapnext;
   prioqelt *heap = pq->heap;
+  int left_child;
+  prioqelt temp1_ht_right, temp1_ht_left, temp1_ht_parent;
+  prioqelt *temp1_ht_handle;
+  static int cnt_nilesh1=0;
 
+#ifdef FASTQ
+  //  printf("Hi I'm here too!! %d\n",cnt_nilesh1++);
+#endif
   if (pq->heapnext==1) return 0;
   pe = heap[1];
   data = CqsDeqDequeue(&(pe->data));
   if (pe->data.head == pe->data.tail) {
     /* Unlink prio-bucket from hash-table */
+#ifndef FASTQ
     prioqelt next = pe->ht_next;
     prioqelt *handle = pe->ht_handle;
     if (next) next->ht_handle = handle;
     *handle = next;
     old=pe;
+#else
+    old=pe;
+    prioqelt *handle;
+    if(pe->ht_parent)
+    { 
+      if(pe->ht_parent->ht_left==pe) left_child=1;
+      else left_child=0;
+    }
+    else
+    {  // it is the root in the hashtable entry, so its ht_handle should be used by whoever is the new root
+      handle = pe->ht_handle;
+    }
+    
+    if(!pe->ht_left && !pe->ht_right)
+    {
+      if(pe->ht_parent) {
+	if(left_child) pe->ht_parent->ht_left=NULL;
+	else pe->ht_parent->ht_right=NULL;
+      }
+      else {
+	*handle = NULL;
+      }
+    }
+    else if(!pe->ht_right)
+    {
+      //if the node does not have a right subtree, its left subtree root is the new child of its parent
+      pe->ht_left->ht_parent=pe->ht_parent;
+      if(pe->ht_parent)
+      {
+	if(left_child) {
+	  pe->ht_parent->ht_left = pe->ht_left;
+	  pe->ht_left->ht_handle = &(pe->ht_parent->ht_left);
+	}
+	else {
+	  pe->ht_parent->ht_right = pe->ht_left;
+	  pe->ht_left->ht_handle = &(pe->ht_parent->ht_right);
+	}
+      }
+      else {
+	pe->ht_left->ht_handle = handle;
+	*handle = pe->ht_left;
+      }
+    }
+    else if(!pe->ht_left)
+    {
+      //if the node does not have a left subtree, its right subtree root is the new child of its parent
+      pe->ht_right->ht_parent=pe->ht_parent;
+      //pe->ht_right->ht_left=pe->ht_left;
+      if(pe->ht_parent)
+      {
+	if(left_child) {
+	  pe->ht_parent->ht_left = pe->ht_right;
+	  pe->ht_right->ht_handle = &(pe->ht_parent->ht_left);
+	}
+	else {
+	  pe->ht_parent->ht_right = pe->ht_right;
+	  pe->ht_right->ht_handle = &(pe->ht_parent->ht_right);
+	}
+      }
+      else {
+	pe->ht_right->ht_handle = handle;
+	*handle = pe->ht_right;
+      }
+    }
+    else if(!pe->ht_right->ht_left)
+    {
+      pe->ht_right->ht_parent=pe->ht_parent;
+      if(pe->ht_parent)
+      {
+	if(left_child) {
+	  pe->ht_parent->ht_left = pe->ht_right;
+	  pe->ht_right->ht_handle = &(pe->ht_parent->ht_left);
+	}
+	else {
+	  pe->ht_parent->ht_right = pe->ht_right;
+	  pe->ht_right->ht_handle = &(pe->ht_parent->ht_right);
+	}
+      }
+      else {
+	pe->ht_right->ht_handle = handle;
+	*handle = pe->ht_right;
+      }
+      if(pe->ht_left) {
+	pe->ht_right->ht_left = pe->ht_left;
+	pe->ht_left->ht_parent = pe->ht_right;
+	pe->ht_left->ht_handle = &(pe->ht_right->ht_left);
+      }
+    }
+    else
+    {
+      //if it has both subtrees, swap it with its successor
+      for(pe=pe->ht_right; pe; )
+      {
+	if(pe->ht_left) pe=pe->ht_left;
+	else  //found the sucessor
+	{ //take care of the connections
+	  if(old->ht_parent)
+	  {
+	    if(left_child) {
+	      old->ht_parent->ht_left = pe;
+	      pe->ht_handle = &(old->ht_parent->ht_left);
+	    }
+	    else {
+	      old->ht_parent->ht_right = pe;
+	      pe->ht_handle = &(old->ht_parent->ht_right);
+	    }
+	  }
+	  else {
+	    pe->ht_handle = handle;
+	    *handle = pe;
+	  }
+	  temp1_ht_right = pe->ht_right;
+	  temp1_ht_left = pe->ht_left;
+	  temp1_ht_parent = pe->ht_parent;
+	  temp1_ht_handle = pe->ht_handle;
+
+	  pe->ht_parent = old->ht_parent;
+	  pe->ht_left = old->ht_left;
+	  pe->ht_right = old->ht_right;
+	  if(pe->ht_left) {
+	    pe->ht_left->ht_parent = pe;
+	    pe->ht_right->ht_handle = &(pe->ht_right);
+	  }
+	  if(pe->ht_right) {
+	    pe->ht_right->ht_parent = pe;
+	    pe->ht_right->ht_handle = &(pe->ht_right);
+	  }
+	  temp1_ht_parent->ht_left = temp1_ht_right;
+	  if(temp1_ht_right) {
+	    temp1_ht_right->ht_handle = &(temp1_ht_parent->ht_left);
+	    temp1_ht_right->ht_parent = temp1_ht_parent;
+	  }
+	  break;
+	}
+      }
+    }
+#endif
+    pq->hash_entry_size--;
     
     /* Restore the heap */
     heapnext = (--pq->heapnext);
@@ -234,6 +497,9 @@ Queue CqsCreate(void)
   Queue q = (Queue)CmiAlloc(sizeof(struct Queue_struct));
   q->length = 0;
   q->maxlen = 0;
+#ifdef FASTQ
+  //  printf("\nIN fastq");
+#endif
   CqsDeqInit(&(q->zeroprio));
   CqsPrioqInit(&(q->negprioq));
   CqsPrioqInit(&(q->posprioq));
