@@ -22,7 +22,8 @@ MACHTYPE=""
 SEQUENTIAL=""
 LANGUAGE=""
 BALANCE="rand"
-TRACEMODE="none"
+TRACEMODE=""
+TRACE_OBJ=
 MEMORY="default"
 VERBOSE=""
 DEBUG_SCRIPT=""
@@ -251,7 +252,7 @@ do
 		;;
 
 	"-tracemode")
-		TRACEMODE="$1"
+		TRACEMODE="$TRACEMODE $1"
 		shift
 		;;
 
@@ -834,10 +835,15 @@ Debug "About to check TRACEMODE=$TRACEMODE and BALANCE=$BALANCE..."
 
 # Check for valid choice of TRACEMODE
 
-[ -r $CHARMLIB/libtrace-none.a ] || Abort "trace libraries not installed.  Is Charm++ built properly?"
+[ -r $CHARMLIB/libtrace-projections.a ] || Abort "trace libraries not installed.  Is Charm++ built properly?"
 
-[ ! -r "$CHARMLIB/libtrace-$TRACEMODE.a" ] && Abort "charmc : No such tracemode $TRACEMODE"
-TRACE_OBJ="-ltrace-$TRACEMODE"
+if [ x"$TRACEMODE" != x ]
+then
+for trace in $TRACEMODE; do
+[ ! -r "$CHARMLIB/libtrace-$trace.a" ] && Abort "charmc : No such tracemode $trace"
+TRACE_OBJ="$TRACE_OBJ -ltrace-$trace"
+done
+fi
 
 # Check for valid choice of BALANCE
 if [ "$TRACEMODE" = replay ]
@@ -986,6 +992,16 @@ then
     echo "  LBSetDefaultCreate(Create$BALANCER);" >> $modInitSrc
 fi
 echo "}" >> $modInitSrc
+
+# creating projections
+echo "void _createTraces(void) {" >> $modInitSrc
+for trace in $TRACEMODE; do
+    [ -n "$VERBOSE" ] && echo "Adding registration for trace $trace"
+    echo "extern void _createTrace$trace();" >> $modInitSrc
+    echo "_createTrace$trace();" >> $modInitSrc
+done
+echo "}" >> $modInitSrc
+
 Do $CMK_CXX $OPTSC $OPTS_CXX -c $modInitSrc -o $modInitObj
 
 ###############################################################################
