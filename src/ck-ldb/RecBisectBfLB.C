@@ -70,7 +70,7 @@ CmiBool RecBisectBfLB::QueryBalanceNow(int _step)
   return CmiTrue;
 }
 
-LBMigrateMsg* RecBisectBfLB::Strategy(CentralLB::LDStats* stats, 
+void RecBisectBfLB::work(CentralLB::LDStats* stats, 
 				       int numPartitions)
 {
   int i;
@@ -105,25 +105,18 @@ LBMigrateMsg* RecBisectBfLB::Strategy(CentralLB::LDStats* stats,
   
   //  printPartitions(partitions);
 
-  CkVec<MigrateInfo*> migrateInfo;
-
   for (i=0; i<partitions->max; i++) {
     //    CmiPrintf("[%d] (%d) : \t", i, partitions->partitions[i].size);
-    int j;
-    for (j=0; j< partitions->partitions[i].size; j++) {
+    for (int j=0; j< partitions->partitions[i].size; j++) {
       //      CmiPrintf("%d ", partitions->partitions[i].nodeArray[j]);
       const int objref = partitions->partitions[i].nodeArray[j];
       ObjGraph::Node n = og.GraphNode(objref);
       /*     CkPrintf("Moving %d(%d) from %d to %d\n",objref,
 	     stats[n.proc].objData[n.index].handle.id.id[0],n.proc,i);
       */
-   
       if (n.proc != i) {
-	MigrateInfo *migrateMe = new MigrateInfo;
-	migrateMe->obj = stats->objData[n.index].handle;
-	migrateMe->from_pe = n.proc;
-	migrateMe->to_pe = i;
-	migrateInfo.insertAtEnd(migrateMe);
+	CmiAssert(stats->from_proc[n.index] == n.proc);
+        stats->to_proc[n.index] = i;
       }
     }
     free(partitions->partitions[i].nodeArray);
@@ -131,18 +124,7 @@ LBMigrateMsg* RecBisectBfLB::Strategy(CentralLB::LDStats* stats,
   free(partitions->partitions);
   free(partitions);
 
-  int migrate_count=migrateInfo.length();
-  LBMigrateMsg* msg = new(&migrate_count,1) LBMigrateMsg;
-  msg->n_moves = migrate_count;
-  CkPrintf("Moving %d elements\n",migrate_count);
-  for(i=0; i < migrate_count; i++) {
-    MigrateInfo* item = (MigrateInfo*)migrateInfo[i];
-    msg->moves[i] = *item;
-    delete item;
-    migrateInfo[i] = 0;
-  }
   CmiPrintf("returning from partitioner strategy\n");
-  return msg;
 };
 
 

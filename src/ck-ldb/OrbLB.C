@@ -258,7 +258,7 @@ void OrbLB::mapPartitionsToNodes()
   CmiPrintf("\n");
 }
 
-LBMigrateMsg* OrbLB::Strategy(CentralLB::LDStats* stats, int count)
+void OrbLB::work(CentralLB::LDStats* stats, int count)
 {
   int i,j;
 
@@ -365,32 +365,15 @@ LBMigrateMsg* OrbLB::Strategy(CentralLB::LDStats* stats, int count)
 
   delete [] num;
 
-  CkVec<MigrateInfo*> migrateInfo;
-
   // Save output
-  objIdx = 0;
   for(int obj=0;obj<stats->n_objs;obj++) {
       int frompe = stats->from_proc[obj];
       if (frompe != computeLoad[objIdx].partition->node) {
         //      CkPrintf("[%d] Obj %d migrating from %d to %d\n",
-        //               CkMyPe(),obj,pe,to_procs[pe][obj]);
-        MigrateInfo *migrateMe = new MigrateInfo;
-        migrateMe->obj = stats->objData[obj].handle;
-        migrateMe->from_pe = frompe;
-        migrateMe->to_pe = computeLoad[objIdx].partition->node;
-        migrateInfo.insertAtEnd(migrateMe);
+        //             CkMyPe(),obj,frompe,computeLoad[objIdx].partition->node);
+	CmiAssert(frompe == stats->from_proc[obj]);
+	stats->to_proc[obj] = computeLoad[objIdx].partition->node;
       }
-      objIdx ++;
-  }
-
-  int migrate_count=migrateInfo.length();
-  LBMigrateMsg* msg = new(&migrate_count,1) LBMigrateMsg;
-  msg->n_moves = migrate_count;
-  for(i=0; i < migrate_count; i++) {
-    MigrateInfo* item = (MigrateInfo*)migrateInfo[i];
-    msg->moves[i] = *item;
-    delete item;
-    migrateInfo[i] = 0;
   }
 
   delete [] computeLoad;
@@ -398,54 +381,8 @@ LBMigrateMsg* OrbLB::Strategy(CentralLB::LDStats* stats, int count)
   delete [] partitions;
 
   CmiPrintf("OrbLB finished time: %f\n", CmiWallTimer() - t);
-
-  return msg;
 }
 
-
-#if 0
-/*@}*/
-LBMigrateMsg* OrbLB::Strategy(CentralLB::LDStats* stats, int count)
-{
-  int obj, pe;
-
-  //  CkPrintf("[%d] RefineLB strategy\n",CkMyPe());
-
-  // remove non-migratable objects
-  RemoveNonMigratable(stats, count);
-
-
-  CkVec<MigrateInfo*> migrateInfo;
-
-  // Save output
-  objIdx = 0;
-  for(pe=0;pe < count; pe++) {
-    for(obj=0;obj<stats[pe].n_objs;obj++) {
-      if (to_procs[pe][obj] != pe) {
-	//	CkPrintf("[%d] Obj %d migrating from %d to %d\n",
-	//		 CkMyPe(),obj,pe,to_procs[pe][obj]);
-	MigrateInfo *migrateMe = new MigrateInfo;
-	migrateMe->obj = stats[pe].objData[obj].handle;
-	migrateMe->from_pe = pe;
-	migrateMe->to_pe = to_procs[pe][obj];
-	migrateInfo.insertAtEnd(migrateMe);
-      }
-    }
-  }
-
-  int migrate_count=migrateInfo.length();
-  LBMigrateMsg* msg = new(&migrate_count,1) LBMigrateMsg;
-  msg->n_moves = migrate_count;
-  for(int i=0; i < migrate_count; i++) {
-    MigrateInfo* item = (MigrateInfo*)migrateInfo[i];
-    msg->moves[i] = *item;
-    delete item;
-    migrateInfo[i] = 0;
-  }
-
-  return msg;
-};
-#endif
 
 #endif
 
