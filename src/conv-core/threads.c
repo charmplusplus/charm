@@ -225,7 +225,7 @@ void CthInit()
   p->current = t;
   p->datasize = 0;
   switchbuf = (qt_t*)malloc(QT_STKALIGN + SWITCHBUF_SIZE);
-  switchbuf = (qt_t*)((((size_t)switchbuf)+QT_STKALIGN-1) & (~QT_STKALIGN));
+  switchbuf = (qt_t*)((((size_t)switchbuf)+QT_STKALIGN) & ~(QT_STKALIGN-1));
   p->switchbuf = switchbuf;
   sp = QT_SP(switchbuf, SWITCHBUF_SIZE);
   sp = QT_ARGS(sp,0,0,0,(qt_only_t*)CthDummy);
