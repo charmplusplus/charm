@@ -819,6 +819,7 @@ inline void PUParray(PUP::er &p,T *t,int n) {
 #endif
 #define PUPmarshal(type) PUPmarshall(type) /*Support this common misspelling*/
 
+
 /// Copy this type as raw memory (like memcpy).
 #define PUPbytes(type) \
   inline void operator|(PUP::er &p,type &t) {p((void *)&t,sizeof(type));} \
@@ -827,6 +828,14 @@ inline void PUParray(PUP::er &p,T *t,int n) {
   	public: enum {value=1};  \
   }; };
 #define PUPmarshallBytes(type) PUPbytes(type)
+
+/// Make PUP work with this function pointer type, copied as raw bytes.
+#define PUPfunctionpointer(fnPtrType) \
+  inline void operator|(PUP::er &p,fnPtrType &t) {p((void *)&t,sizeof(fnPtrType));}
+
+/// Make PUP work with this enum type, copied as an "int".
+#define PUPenum(enumType) \
+  inline void operator|(PUP::er &p,enumType &e) { int v=e;  p|v; e=v; }
 
 
 /**
