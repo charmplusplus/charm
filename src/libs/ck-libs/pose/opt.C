@@ -25,6 +25,7 @@ void opt::Step()
     stepCount++;
     parent->ResolveFn(ev->fnIdx, ev->msg); // execute it
     ev->done = 1; // complete the event execution
+    eq->mem_usage++;
     eq->ShiftEvent(); // shift to next event
     if (eq->currentPtr->timestamp > POSE_UnsetTS) { // if more events, schedule the next
       prioMsg *pm = new prioMsg;
@@ -117,6 +118,7 @@ void opt::UndoEvent(Event *e)
     e->done = e->commitBfrLen = 0;
     delete e->cpData;
     e->cpData = NULL;
+    eq->mem_usage--;
   }
 }
 

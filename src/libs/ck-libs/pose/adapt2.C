@@ -32,6 +32,7 @@ void adapt2::Step()
     //CkPrintf("POSE_DO\n");
     parent->ResolveFn(ev->fnIdx, ev->msg); // execute it
     ev->done = 1; // complete the event execution
+    eq->mem_usage++;
     eq->ShiftEvent(); // shift to next event
     ev = eq->currentPtr;
   }

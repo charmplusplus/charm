@@ -25,6 +25,8 @@ class eventQueue {
   char filename[20];
   /// Output file pointer for stats for DOP calculation
   FILE *fp;
+  /// Coarse memory usage
+  unsigned int mem_usage;
   /// Keep track of last logged VT for this object so no duplicates are logged
   POSE_TimeType lastLoggedVT;
   /// Basic Constructor

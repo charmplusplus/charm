@@ -14,6 +14,7 @@ eventQueue::eventQueue()
   Event *e;
   eqh = new EqHeap();  // create the heap for incoming events
   largest = POSE_UnsetTS;
+  mem_usage = 0;
   eventCount = 0;
   // create the front sentinel node
   e = new Event();
@@ -246,6 +247,7 @@ void eventQueue::CommitEvents(sim *obj, POSE_TimeType ts)
     if (commitPtr->cpData) delete commitPtr->cpData;
     commitPtr = commitPtr->prev;
     delete commitPtr->next;
+    mem_usage--;
   }
   frontPtr->next = link;
   link->prev = frontPtr;
@@ -279,6 +281,7 @@ void eventQueue::CommitAll(sim *obj)
   while (commitPtr != frontPtr) {
     if (commitPtr->cpData) delete commitPtr->cpData;
     commitPtr = commitPtr->prev;
+    mem_usage--;
     delete commitPtr->next;
   }
   frontPtr->next = link;
@@ -344,6 +347,7 @@ void eventQueue::DeleteEvent(Event *ev)
   ev->next->prev = ev->prev;
   POSE_TimeType ts = ev->timestamp;
   if (!ev->done) eventCount--;
+  else mem_usage--;
   delete ev; // then delete the event
   if (ts == largest) FindLargest();
 #ifdef EQ_SANITIZE

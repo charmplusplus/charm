@@ -27,12 +27,21 @@ void adapt3::Step()
     timeLeash = POSE_endtime - lastGVT;
   while ((ev->timestamp > POSE_UnsetTS) && 
 	 (ev->timestamp <= lastGVT + timeLeash)) { // do events w/in timeLeash
+#ifdef MEM_COARSE
+    // note: first part of check below ensures we don't deadlock: 
+    //       we can't advance gvt if we don't let objects execute events 
+    //       with timestamp > gvt
+    if (((eq->frontPtr->timestamp > lastGVT) ||
+	 (eq->frontPtr->timestamp < ev->prev->timestamp)) &&
+	(eq->mem_usage > MAX_USAGE)) break;
+#endif
     currentEvent = ev;
     ev->done = 2;
     specEventCount++;
     eventCount++;
     parent->ResolveFn(ev->fnIdx, ev->msg); // execute it
     ev->done = 1; // flag the event as executed
+    eq->mem_usage++;
     eq->ShiftEvent(); // shift to next event
     ev = eq->currentPtr;
     iter++;

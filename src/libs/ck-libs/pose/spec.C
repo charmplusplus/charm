@@ -26,6 +26,7 @@ void spec::Step()
     ev->done = 2;
     parent->ResolveFn(ev->fnIdx, ev->msg); // execute it
     ev->done = 1; // complete the event execution
+    eq->mem_usage++;
     eq->ShiftEvent(); // shift to next event
     ev = eq->currentPtr; // reset ev
   }
