@@ -106,8 +106,10 @@ protected:
 
     CkVec<thread_info_t> threadList;        // a list of all the threads
 
+public:
     typedef CkVec<int> thread_list_t;   // a list of the threads waiting for some event
 
+protected:
     typedef struct
     {
         thread_list_t pageQueues[2];    // 0 for pages, 1 for changes
