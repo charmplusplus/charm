@@ -563,71 +563,65 @@ available if \charmpp{} was compiled with CMK\_OPTIMIZE.
 \section{Writing a library using TCharm}
 \label{sec:tlib}
 
-Until now, things were presented from a client's (one who writes a program that
-depends on a library written using TCharm) perspective. This section gives an
+Until now, things were presented from the perspective of a user---one 
+who writes a program for a library written on TCharm. This section gives an
 overview of how to go about writing a library in Charm++ that uses TCharm.
 
-Using TCharm with your library automatically provides your users with a 
-clean C/F90 API (described in the preceeding chapters) for basic memory 
-managment, I/O, and migration.  It also allows you to use a convenient
+\begin{itemize}
+\item Compared to using plain MPI, TCharm provides the ability to 
+access all of Charm++, including arrays and groups.
+
+\item Compared to using plain Charm++,
+using TCharm with your library automatically provides your users with a 
+clean C/F90 API (described in the preceeding chapters) for basic thread
+memory  managment, I/O, and migration.  It also allows you to use a convenient
 "thread->suspend()" and "thread->resume()" API for blocking a thread,
-which works properly with the load balancer, unlike CthSuspend/CthAwaken.
+and works properly with the load balancer, unlike CthSuspend/CthAwaken.
+\end{itemize}
 
 The overall scheme for writing a TCharm-based library "Foo" is:
 
-\begin{itemize}
-\item Decide how to do a one-time startup initialization.  If the user
-is combining multiple frameworks, you just have to provide a FOO\_Attach
-routine that creates a new array of your objects---the user will call this
-from their TCHARM\_User\_setup routine.  But if the user's only library is 
-Foo, and they don't write a TCHARM\_User\_setup routine, you'd like the 
-thread creation and FOO\_Attach to happen automatically.  The canonical way to do 
-this is to register a \kw{FallbackSetup} routine from an initcall routine. 
-This routine is used if the user doesn't provide a TCHARM\_User\_setup routine,
-and it normally creates the TCharm threads and attaches the library code to them. 
-For instance,
+\begin{enumerate}
+\item You must provide a FOO\_Init routine that creates anything
+you'll need, which normally includes a Chare Array of your own
+objects.  The user will call your FOO\_Init routine
+from their main work routine; and normally FOO\_Init routines 
+are collective.
 
-\begin{alltt}
-void fooDriver(void); //Client implements this routine to carry out the parallel work
+\item In your FOO\_Init routine, create your array bound it to the 
+running TCharm threads, by creating it using the CkArrayOptions 
+returned by TCHARM\_Attach\_start.  Be sure to only create the 
+array once, by checking if you're the master before creating the
+array.  
 
-//Startup routine to if the user does not define their own
-static void fooFallbackSetup(void)
-\{
-  //creates the TCharm threads and attaches client's routine to them
-  TCHARM\_Create(TCHARM\_Get_num_chunks(), fooDriver);
-  //Could call some user routine here to do some startup work
-  FOO\_Attach();
-\}
-
-/*initcall*/ void fooNodeInit(void)
-\{
-  //initialize thread private variable here, mentioned later.
-  .......
-  TCHARM\_Set\_fallback\_setup(fooFallbackSetup);
-\}
-\end{alltt}
-
-\item Create your array and attach it to the TCharm threads using
-TCHARM\_Attach\_start and TCHARM\_Attach\_finish. The user's main 
-parallel routine (fooDriver, or whatever thread routine was registered) 
-will start as soon as you call thread->ready()
+One simple way to make the non-master threads block until the corresponding
+local array element is created is to use TCharm semaphores.  
+These are simply a one-pointer slot you can assign using TCharm::semaPut
+and read with TCharm::semaGet.  They're useful in this context
+because a TCharm::semaGet blocks if a local TCharm::semaGet hasn't
+yet executed.  
 
 \begin{alltt}
 //This is either called by FooFallbackSetuo mentioned above, or by the user
 //directly from TCHARM\_User\_setup (for multi-module programs)
-void FOO\_Attach(void)
+void FOO\_Init(void)
 \{
-  CkArrayID threadsAID; int nchunks;
-  CkArrayOptions opts=TCHARM\_Attach\_start(&threadsAID,&nchunks);
+  if (TCHARM\_Element()==0) \{
+    CkArrayID threadsAID; int nchunks;
+    CkArrayOptions opts=TCHARM\_Attach\_start(&threadsAID,&nchunks);
   
   //actually create your library array here (FooChunk in this case)
-  CkArrayID aid = CProxy\_FooChunk::ckNew(opt);
-  TCHARM\_Attach\_finish(aid);
+    CkArrayID aid = CProxy\_FooChunk::ckNew(opt);
+  \}
+  FooChunk *arr=(FooChunk *)TCharm::semaGet(FOO_TCHARM_SEMAID);
 \}
 \end{alltt}
 
-\item Set up a thread-private variable(Ctv) to point to the library object. 
-This is to regain context when you are called by the user.
+\item Depending on your library API, you may have to
+set up a thread-private variable(Ctv) to point to your library object. 
+This is needed to regain context when you are called by the user.
+A better design is to avoid the Ctv, and instead hand the user 
+an opaque handle that includes your array proxy.
 
 \begin{alltt}
 //\_fooptr is the Ctv that points to the current chunk FooChunk and is only valid in 
@@ -638,7 +632,6 @@ CtvStaticDeclare(FooChunk *, \_fooptr);
 /*initcall*/ void fooNodeInit(void)
 \{
   CtvInitialize(FooChunk*, \_fooptr);
-  TCHARM\_Set\_fallback\_setup(fooFallbackSetup);
 \}
 \end{alltt}
 
@@ -658,8 +651,8 @@ protected:
    \{
       thisProxy = this;
       tCharmClientInit();
+      TCharm::semaPut(FOO_TCHARM_SEMAID,this);
       //add any other initialization here
-      thread->ready(); //starts parallel work  
    \}
 
    virtual void pup(PUP::er &p) \{
@@ -667,7 +660,7 @@ protected:
      //usual pup calls
    \}
    
-   //other calls, defined later
+   // ...any other calls you need...
    int doCommunicate(...);
    void recvReply(someReplyMsg *m);
    ........
@@ -735,7 +728,7 @@ FDECL void FTN\_NAME(FOO_COMMUNICATE, foo_communicate)
 \}
 \end{alltt}
 
-\end{itemize}
+\end{enumerate}
 
 \input{index}
 \end{document}
