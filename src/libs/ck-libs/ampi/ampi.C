@@ -261,7 +261,7 @@ ampi::recv(int t1, int t2, void* buf, int count, int type, int comm, int *sts)
   ampiBlockedThread=0;
   if(sts)
     ((AMPI_Status*)sts)->AMPI_LENGTH = msg->length;
-  if (msg->length < len) {
+  if (msg->length > len) {
     CkError("AMPI: (type=%d, count=%d) Expecting msg of len %d, received %d\n",
             type, count, len, msg->length);
     CkAbort("Exiting.\n");
