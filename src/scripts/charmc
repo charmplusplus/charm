@@ -740,9 +740,9 @@ do
 	*.ci)
 		if [ "$LANGUAGE" = "f90charm" ]
 		then
-		    Do $CHARMBIN/charmxi -f90 $CMK_XIOPTS $BASE.ci
+		    Do $CHARMBIN/charmxi -f90 $CMK_XIOPTS $FILE
 		else
-		    Do $CHARMBIN/charmxi $CMK_XIOPTS $BASE.ci
+		    Do $CHARMBIN/charmxi $CMK_XIOPTS $FILE
 		fi
 		;;
 	*.c|*.s)
