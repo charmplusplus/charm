@@ -252,17 +252,13 @@ int pno;
       }
     else 
       {
-        CcdRaiseCondition(CcdPROCESSORIDLE); 
+	CcdRaiseCondition(CcdPROCESSOR_STILL_IDLE);
         elapsed_time = (REL_TIME) (CsiTimer() - Csi_start_time);
       }
 
     temp_time = CsiTimer(); 
 
-    if (!CpvAccess(disable_sys_msgs)) {
-             if (CpvAccess(CcdCheckNum)-- <=0) {
-                      CcdCallBacks();
-             }
-    }
+    CsdPeriodic();
 
     if (flag == 0)  elapsed_time += num.periodic_interval;
 
