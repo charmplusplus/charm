@@ -144,7 +144,7 @@ void FEM_REFINE2D_Split(int meshID,int nodeID,double *coord,int elemID,double *d
 	AllocTable2d<int> &connTable = ((FEM_IndexAttribute *)connAttr)->get();
 
 	//hashtable to store the new node number as a function of the two old numbers
-	CkHashtableT<intdual,int> newnodes;
+	CkHashtableT<intdual,int> newnodes(nnodes);
 	
 	/*
 		Get the FEM_BOUNDARY data of sparse elements and load it into a hashtable
@@ -155,7 +155,7 @@ void FEM_REFINE2D_Split(int meshID,int nodeID,double *coord,int elemID,double *d
 	CkVec<FEM_Attribute *> *sparseattrs;
 	FEM_Attribute *sparseConnAttr, *sparseBoundaryAttr;
 	AllocTable2d<int> *sparseConnTable, *sparseBoundaryTable;
-	CkHashtableT<intdual,int> nodes2sparse;
+	CkHashtableT<intdual,int> nodes2sparse(nnodes);
 	if(sparseID != -1){
 		sparse = FEM_Entity_lookup(meshID,sparseID,"REFINE2D_Mesh_sparse");
 		sparseattrs = sparse->getAttrVec();

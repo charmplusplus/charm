@@ -728,7 +728,7 @@ void chunk::updateNodeCoords(int nNode, double *coord, int nEl)
     first = 0;
   }
   DEBUGREF(CkPrintf("TMRC2D: [%d] In updateNodeCoords after CkWaitQD: edges sent=%d edge recvd=%d\n", cid, edgesSent, edgesRecvd);)
-  sanityCheck(); // quietly make sure mesh is in shape
+ // sanityCheck(); // quietly make sure mesh is in shape
   // do some error checking
   //CkAssert(nEl == numElements);
   if (nEl != numElements) {
