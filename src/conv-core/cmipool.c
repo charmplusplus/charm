@@ -186,8 +186,8 @@ void CmiPoolPrintList(char *p)
 {
   CmiPrintf("Free list is: -----------\n");
   while (p != 0) {
-    CmiPrintf("next ptr is %d. ", (int) p);
     char ** header = (char **) p-CMI_POOL_HEADER_SIZE;
+    CmiPrintf("next ptr is %d. ", (int) p);
     CmiPrintf("header is at: %d, and contains: %d \n", (int) header, (int) (*header));
     p = *header;
   }
