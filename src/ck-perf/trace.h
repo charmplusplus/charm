@@ -142,7 +142,7 @@ extern "C" {
 CkpvExtern(int, traceOnPe);
 #  define TRACE_CHARM_PE()  (CkpvAccess(traceOnPe))
 #else
-#  define TRACE_CHARM_PE()  1
+#  define TRACE_CHARM_PE()  (CkMyRank() != CkMyNodeSize())
 #endif
 #ifndef CMK_OPTIMIZE
 #  define _TRACE_ONLY(code) do{if(CpvAccess(traceOn)&&TRACE_CHARM_PE()){ code; }} while(0)
