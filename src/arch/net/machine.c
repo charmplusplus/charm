@@ -1438,8 +1438,16 @@ static void CmiStartThreads()
   CmiEnableAsyncIO(Cmi_host_fd);
 #endif
   
+  /* if running on only one node, the only thing an interrupt
+  is used for is to check if conv-host has been killed. And this is
+  done only Cmi_check_delay seconds, so no need to have tickspeed
+  any faster than that. */
+
+  if(Cmi_numnodes==1) Cmi_tickspeed = (int)(Cmi_check_delay*1000000.0);
+
   /*This will send us a SIGALRM every Cmi_tickspeed microseconds,
   which will call the CommunicationInterrupt routine above.*/
+
   i.it_interval.tv_sec = 0;
   i.it_interval.tv_usec = Cmi_tickspeed;
   i.it_value.tv_sec = 0;
