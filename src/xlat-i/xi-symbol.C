@@ -1144,7 +1144,7 @@ void Entry::genArrayDecl(XStr& str)
     if(!param->isVoid())
       str << "msg, ";
     else
-      str << "CkAllocSysMsg(), ";
+      str << "CkAllocMsg(0, sizeof(ArrayMessage),0), ";
     str << " __idx_";
     genEpIdx(str);
     str << ");\n";
@@ -1152,7 +1152,7 @@ void Entry::genArrayDecl(XStr& str)
     if(!param->isVoid())
       str << "msg, ";
     else
-      str << "CkAllocSysMsg(), ";
+      str << "CkAllocMsg(0, sizeof(ArrayMessage),0), ";
     str << "_elem, __idx_";
     genEpIdx(str);
     str << ");\n";
@@ -1171,7 +1171,7 @@ void Entry::genArrayDecl(XStr& str)
     if(!param->isVoid())
       str << "msg, ";
     else
-      str << "CkAllocSysMsg(), ";
+      str << "CkAllocMsg(0, sizeof(ArrayMessage),0), ";
     str << "onPE, __idx_";
     genEpIdx(str);
     str << ");\n";
