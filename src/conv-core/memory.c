@@ -35,6 +35,8 @@
 # if CMK_MALLOC_USE_OS_BUILTIN
 /*Default to the system malloc-- perhaps the only possibility*/
 #  define CMK_MEMORY_BUILD_OS 1
+# elif CMK_MALLOC_USE_GNUOLD_MALLOC
+#  define CMK_MEMORY_BUILD_GNUOLD  1
 # else
 /*Choose a good all-around default malloc*/
 #  define CMK_MEMORY_BUILD_GNU 1
