@@ -36,6 +36,8 @@ public:
   sim *parent;    
   /// Pointer to synchronization strategy; used when creating rep object
   strat *str;
+  /// Relative start time: for computing degree of parallelization
+  double rst;
   /// Basic Constructor
   eventMsg() { }
   /// Destructor
@@ -46,6 +48,7 @@ public:
       message to timestamp - INT_MAX. */
   void Timestamp(int t) { 
     timestamp = t;  evID = GetEventID();  setPriority(t-INT_MAX); 
+    rst = 0.0;
   }
   /// Assignment operator: copies priority too
   eventMsg& operator=(const eventMsg& obj) {
@@ -54,6 +57,7 @@ public:
     parent = obj.parent;
     str = obj.str;
     msgSize = obj.msgSize;
+    rst = obj.rst;
     setPriority(timestamp-INT_MAX);
     return *this;
   }
@@ -171,6 +175,9 @@ class sim : public ArrayElement1D {
   int *srVector;    
   /// Most recent GVT estimate
   int lastGVT;
+  /// Relative start time, start time, end time and current time
+  /** Used to calculate degree of parallelism */
+  double st, et, ct;
 #ifdef POSE_STATS_ON
   /// The local statistics collector
   localStat *localStats; 

@@ -8,6 +8,8 @@ Event::Event()
   next = prev = NULL;
   commitBfrLen = commitErr = done = 0;
   fnIdx = timestamp = -1;
+  srt = 0.0;
+  svt = 0;
 }
 
 /// Destructor
@@ -35,7 +37,7 @@ void Event::pup(PUP::er &p)
   SpawnedEvent *tmp = NULL;
   
   evID.pup(p); p(fnIdx); p(timestamp); p(done); p(commitBfrLen); p(commitErr);
-  
+  p(srt); p(ert); p(svt); p(evt);
   // commitBfr
   if (p.isUnpacking() && (commitBfrLen > 0)) { // unpack non-empty commitBfr
     commitBfr = new char[commitBfrLen];

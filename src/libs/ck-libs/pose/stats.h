@@ -28,9 +28,9 @@ extern CkGroupID theLocalStats;
 class localStatSummary : public CMessage_localStatSummary {
 public:
   double doTime, rbTime, gvtTime, simTime, cpTime, canTime, lbTime, miscTime, 
-    maxDo, minDo;
+    maxDo, minDo, maxGRT;
   long cpBytes;
-  int pe, dos, undos, loops, gvts, maxChkPts;
+  int pe, dos, undos, loops, gvts, maxChkPts, maxGVT;
 };
 
 /// Group to gather stats on a each PE separately
@@ -47,13 +47,17 @@ private:
   /// Time accumulators
   double rollbackTime, totalTime, gvtTime, simTime, cpTime, canTime, 
     lbTime, miscTime, maxDo, minDo; 
-  /// Duration of last event (for use by DOP stats)
-  double lastEventTime;
+  /// Maximum values for GVT and real time taken by events
+  /* For degree of parallelism calculations */
+  int maxGVT;
+  double maxGRT;
 public:
   /// Basic Constructor
   localStat(void) {
-    whichStat=rollbacks=dos=undos=loops=gvts=cpBytes=chkPts=maxChkPts = 0;
-    rollbackTime=totalTime=gvtTime=simTime=cpTime=canTime=lbTime=miscTime= 0.0;
+    whichStat=rollbacks=dos=undos=loops=gvts=cpBytes=chkPts=maxChkPts=
+      maxGVT = 0;
+    rollbackTime=totalTime=gvtTime=simTime=cpTime=canTime=lbTime=miscTime=
+      maxGRT = 0.0;
     maxDo = minDo = -1.0;
   }
   localStat(CkMigrateMessage *) { };
@@ -83,8 +87,11 @@ public:
   void SendStats();
   /// Query which timer is active
   int TimerRunning() { return (whichStat); }
-  /// Return lastEventTime
-  double getLastEventTime() { return lastEventTime; }
+  /// Set maximum times
+  void SetMaximums(int gvt, double grt) { 
+    if (gvt > maxGVT) maxGVT = gvt; 
+    if (grt > maxGRT) maxGRT = grt;
+  }
 };
 
 /// Entity to gather stats from each PE and prepare final report
@@ -92,15 +99,17 @@ class globalStat : public Chare {
 private:
   double doAvg, doMax, rbAvg, rbMax, gvtAvg, gvtMax, simAvg, simMax, 
     cpAvg, cpMax, canAvg, canMax, lbAvg, lbMax, miscAvg, miscMax, maxTime;
-  double minDo, maxDo, avgDo, GvtTime;
+  double minDo, maxDo, avgDo, GvtTime, maxGRT;
   long cpBytes;
-  int reporting, totalDos, totalUndos, totalLoops, totalGvts, maxChkPts;
+  int reporting, totalDos, totalUndos, totalLoops, totalGvts, maxChkPts, 
+    maxGVT;
 public:
   /// Basic Constructor
   globalStat(void);
   globalStat(CkMigrateMessage *) { };
   /// Receive, calculate and print statistics
   void localStatReport(localStatSummary *m); 
+  void DOPcalc(int gvt, double grt);
 };
 
 
@@ -144,7 +153,6 @@ inline void localStat::TimerStop()
 	maxDo = eventTime;
       if ((minDo < 0.0) || (minDo > eventTime))
 	minDo = eventTime;
-      lastEventTime = eventTime;
       break;
     }
   case RB_TIMER: rollbackTime += now - rbt; break;
@@ -176,7 +184,6 @@ inline void localStat::SwitchTimer(int timer)
 	maxDo = eventTime;
       if ((minDo < 0.0) || (minDo > eventTime))
 	minDo = eventTime;
-      lastEventTime = eventTime;
       break;
     }    
   case RB_TIMER: rollbackTime += now - rbt; break;

@@ -31,6 +31,8 @@ void localStat::SendStats()
   m->loops = loops;
   m->gvts = gvts;
   m->maxChkPts = maxChkPts;
+  m->maxGVT = maxGVT;
+  m->maxGRT = maxGRT;
   gstat.localStatReport(m);
 }
 
@@ -39,9 +41,9 @@ globalStat::globalStat(void)
 {
   doAvg = doMax = rbAvg = rbMax = gvtAvg = gvtMax = simAvg = simMax = 
     cpAvg = cpMax = canAvg = canMax = lbAvg = lbMax = miscAvg = miscMax = 
-    maxTime = maxDo = minDo = avgDo = GvtTime = 0.0; 
+    maxTime = maxDo = minDo = avgDo = GvtTime = maxGRT = 0.0; 
   cpBytes = reporting = totalDos = totalUndos = totalLoops = totalGvts = 
-    maxChkPts = 0;
+    maxChkPts = maxGVT = 0;
 }
 
 // Receive, calculate and print statistics
@@ -56,6 +58,8 @@ void globalStat::localStatReport(localStatSummary *m)
   totalGvts += m->gvts;
   maxChkPts += m->maxChkPts;
   doAvg += m->doTime;
+  if (maxGRT < m->maxGRT) maxGRT = m->maxGRT;
+  if (maxGVT < m->maxGVT) maxGVT = m->maxGVT;
   if (m->maxDo > maxDo)
     maxDo = m->maxDo;
   if ((minDo < 0.0) || (m->minDo < minDo))
@@ -104,8 +108,16 @@ void globalStat::localStatReport(localStatSummary *m)
     miscAvg /= CkNumPes();
     maxChkPts /= CkNumPes();
     // print stats table (all one print to avoid breaking up)
-    CkPrintf("----------------------------------------------------------------------------\n   | DO     | RB     | GVT    | SIM    | CP     | CAN    | LB     | MISC   |\n---|--------|--------|--------|--------|--------|--------|--------|--------|\nmax| %7.2f| %7.2f| %7.2f| %7.2f| %7.2f| %7.2f| %7.2f| %7.2f|\navg| %7.2f| %7.2f| %7.2f| %7.2f| %7.2f| %7.2f| %7.2f| %7.2f|\n----------------------------------------------------------------------------\nMax time on a PE: %7.2f,  Speculative Events: %d Actual Events: %d\nGRAINSIZE INFO: Avg: %10.6f Max: %10.6f Min: %10.6f\nGVT iterations=%d  Avg time per iteration=%f\nAvg. Max# Checkpoints=%d Bytes checkpointed=%d\ntotalLoops=%d effectiveGS=%10.6f\n", 
-	     doMax, rbMax, gvtMax, simMax, cpMax, canMax, lbMax, miscMax, doAvg, rbAvg, gvtAvg, simAvg, cpAvg, canAvg, lbAvg, miscAvg, maxTime, totalDos, totalDos-totalUndos, avgDo, maxDo, minDo, totalGvts, GvtTime, maxChkPts, cpBytes, totalLoops, (doAvg*CkNumPes())/totalLoops);
+    CkPrintf("----------------------------------------------------------------------------\n   | DO     | RB     | GVT    | SIM    | CP     | CAN    | LB     | MISC   |\n---|--------|--------|--------|--------|--------|--------|--------|--------|\nmax| %7.2f| %7.2f| %7.2f| %7.2f| %7.2f| %7.2f| %7.2f| %7.2f|\navg| %7.2f| %7.2f| %7.2f| %7.2f| %7.2f| %7.2f| %7.2f| %7.2f|\n----------------------------------------------------------------------------\nMax time on a PE: %7.2f,  Speculative Events: %d Actual Events: %d\nGRAINSIZE INFO: Avg: %10.6f Max: %10.6f Min: %10.6f\nGVT iterations=%d  Avg time per iteration=%f\ntotalLoops=%d effectiveGS=%10.6f\n", 
+	     doMax, rbMax, gvtMax, simMax, cpMax, canMax, lbMax, miscMax, doAvg, rbAvg, gvtAvg, simAvg, cpAvg, canAvg, lbAvg, miscAvg, maxTime, totalDos, totalDos-totalUndos, avgDo, maxDo, minDo, totalGvts, GvtTime, totalLoops, (doAvg*CkNumPes())/totalLoops);
+    //CkPrintf("Avg. Max# Checkpoints=%d Bytes checkpointed=%d\n", maxChkPts, cpBytes);
+
+#ifdef POSE_DOP_ON
+    CkPrintf("Overhead-free maximally parallel runtime=%f  Max GVT=%d\n",
+	     maxGRT, maxGVT);
+    DOPcalc(maxGVT, maxGRT);
+#endif
+
     POSE_exit();
     reporting = 0;
     doAvg = doMax = rbAvg = rbMax = gvtAvg = gvtMax = simAvg = simMax = 
@@ -117,3 +129,58 @@ void globalStat::localStatReport(localStatSummary *m)
 }
 
 
+void globalStat::DOPcalc(int gvt, double grt)
+{
+  int vinStart, vinEnd, gvtp = gvt + 1, i;
+  double rinStart, rinEnd;
+  FILE *fp;
+  char filename[20], line[80];
+  unsigned short int *gvtDOP, *grtDOP;
+  unsigned long int grtp = (unsigned long int)(grt*1000000.0) + 1, j, 
+    usStart, usEnd;
+  int modelPEs=0, simulationPEs=0;
+
+  CkPrintf("Generating DOP measures...\n");
+  gvtDOP = (unsigned short int *)malloc(gvtp*sizeof(unsigned short int));
+  grtDOP = (unsigned short int *)malloc(grtp*sizeof(unsigned short int));
+  for (i=0; i<gvtp; i++) gvtDOP[i] = 0;
+  for (i=0; i<grtp; i++) grtDOP[i] = 0;
+  for (i=0; i<CkNumPes(); i++) { // read each processor's log
+    sprintf(filename, "dop%d.log\0", i);
+    fp = fopen(filename, "r");
+    if (!fp) {
+      CkPrintf("Cannot open file %s... exiting.\n", filename);
+      POSE_exit();
+    }
+    CkPrintf("Reading file %s...\n", filename);
+    while (fgets(line, 80, fp)) {
+      if (sscanf(line, "%lf %lf %d %d\n", &rinStart, &rinEnd, 
+		 &vinStart, &vinEnd) == 4) {
+	usStart = (unsigned long int)(rinStart * 1000000.0);
+	usEnd = (unsigned long int)(rinEnd * 1000000.0) + 1;
+	for (j=usStart; j<usEnd; j++) grtDOP[j]++;
+	if (vinStart > -1)
+	  for (j=vinStart; j<=vinEnd; j++) gvtDOP[j]++;
+      }
+      else CkPrintf("WARNING: file corrupted... skipping line.\n");
+    }
+    fclose(fp);
+  }
+  int avgPEs = 0;
+  fp = fopen("dop_mod.out", "w");
+  for (i=0; i<gvtp; i++) {
+    fprintf(fp, "%d %d\n", i, gvtDOP[i]);
+    avgPEs += gvtDOP[i];
+    if (gvtDOP[i] > modelPEs) modelPEs = gvtDOP[i];
+  }
+  avgPEs /= gvtp;
+  fclose(fp);
+  fp = fopen("dop_sim.out", "w");
+  for (i=0; i<grtp; i++) {
+    fprintf(fp, "%d %d\n", i, grtDOP[i]);
+    if (grtDOP[i] > simulationPEs) simulationPEs = grtDOP[i];
+  } 
+  fclose(fp);
+  CkPrintf("Max model PEs: %d  Max simulation PEs: %d  Recommended #PEs: %d\n",
+	   modelPEs, simulationPEs, avgPEs);
+}

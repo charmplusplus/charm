@@ -15,16 +15,18 @@ class rep
   strat *myStrat;          
  public:
   /// The object's virtual time (OVT)
-  int ovt;                 
+  int ovt;
+  /// The object's real time (ORT)
+  double ort;
   /// the object's unique handle
   /** Initialized to index of poser wrapper in POSE_objects array */
   int myHandle;            
   /// Flag to signify if this is a checkpointed copy of the real object
   int copy;                
   /// Basic Constructor
-  rep() { ovt = 0; copy = 0; parent = NULL; myStrat = NULL; }
+  rep() { ovt = 0; ort = 0.0; copy = 0; parent = NULL; myStrat = NULL; }
   /// Initializing Constructor
-  rep(int init_ovt) { ovt = init_ovt; copy = 0; }
+  rep(int init_ovt) { ovt = init_ovt; ort = 0.0; copy = 0; }
   /// Destructor
   virtual ~rep() { }
   /// Initializer called from poser wrapper constructor
@@ -35,10 +37,10 @@ class rep
   void SetOVT(int t) { ovt = t; }
   /// Elapse time by incrementing the OVT by dt
   void elapse(int dt) { ovt += dt; }
-  /// Update the OVT at start of event to auto-elapse to event timestamp
+  /// Update the OVT and ORT at event start to auto-elapse to event timestamp
   /** If event has timestamp > OVT, OVT elapses to timestamp, otherwise
-      there is no change to OVT */
-  void update(int t) { ovt = (ovt < t) ? t : ovt; }
+      there is no change to OVT. ORT updates similarly. */
+  void update(int t, double rt);
   /// Called on every object at end of simulation
   virtual void terminus() { 
     //CkPrintf("Object %d terminus at time %d\n", myHandle, ovt);
@@ -49,6 +51,7 @@ class rep
   /** Derived classes must provide assignment */
   virtual rep& operator=(const rep& obj) { 
     ovt = obj.ovt; 
+    ort = obj.ort; 
     return *this;
   }
   /// Dump all data fields

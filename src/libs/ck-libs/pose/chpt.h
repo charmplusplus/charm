@@ -56,8 +56,8 @@ void chpt<StateType>::checkpoint(StateType *data)
     *((StateType *)myStrat->currentEvent->cpData) = *data;
     sinceLast = 0;
 #ifdef POSE_STATS_ON
-    localStats->Checkpoint();
-    localStats->CPbytes(sizeof(StateType));
+    //localStats->Checkpoint();
+    //localStats->CPbytes(sizeof(StateType));
 #endif
   }
   else sinceLast++;

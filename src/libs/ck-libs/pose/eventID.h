@@ -27,7 +27,8 @@ class eventID
   int operator<=(const eventID& obj);           
   /// Dump all data fields
   void dump() { CkPrintf("%d.%d", id, pe); }    
-  char * sndump(char *s,size_t n) { snprintf(s,n,"%d.%d", id, pe); return s;}    
+  char *sdump(char *s) { sprintf(s, "%d.%d", id, pe); return s;}    
+  char *sndump(char *s,size_t n) { snprintf(s,n,"%d.%d", id, pe); return s;}    
   /// Pack/unpack/sizing operator
   void pup(class PUP::er &p) { p(id); p(pe); }  
 };

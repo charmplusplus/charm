@@ -13,6 +13,12 @@ class eventQueue {
   Event *currentPtr;
   /// Heap of unexecuted events
   EqHeap *eqh;
+  /// Output file name for stats for DOP calculation
+  char filename[20];
+  /// Output file pointer for stats for DOP calculation
+  FILE *fp;
+  /// Keep track of last logged VT for this object so no duplicates are logged
+  int lastLoggedVT;
   /// Basic Constructor
   /** Creates front and back sentinel nodes, connects them, and inits pointers
       and heap. */

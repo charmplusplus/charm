@@ -4,6 +4,11 @@
 /// Basic Constructor
 eventQueue::eventQueue()
 {
+#ifdef POSE_DOP_ON
+  sprintf(filename, "dop%d.log", CkMyPe());
+  fp = fopen(filename, "a");
+  lastLoggedVT = 0;
+#endif
   Event *e;
   eqh = new EqHeap();  // create the heap for incoming events
   // create the front sentinel node
@@ -95,6 +100,10 @@ void eventQueue::ShiftEvent() {
 void eventQueue::CommitEvents(sim *obj, int ts)
 {
   //sanitize();
+#ifdef POSE_DOP_ON
+  fpos_t fptr;
+  localStat *localStats = (localStat *)CkLocalBranch(theLocalStats);
+#endif
   Event *target = frontPtr->next, *commitPtr = frontPtr->next;
   if (ts == -1) ts = currentPtr->timestamp;  
   if (ts == -1) ts = currentPtr->prev->timestamp;  
@@ -103,6 +112,17 @@ void eventQueue::CommitEvents(sim *obj, int ts)
     while (commitPtr != target) { // commit up to next checkpoint
       CmiAssert(commitPtr->done == 1); // only commit executed events
       obj->ResolveCommitFn(commitPtr->fnIdx, commitPtr->msg); // call commit fn
+#ifdef POSE_DOP_ON
+      if (lastLoggedVT >= commitPtr->svt)
+	commitPtr->svt = commitPtr->evt = -1;
+      else lastLoggedVT = commitPtr->evt;
+      while (!fprintf(fp, "%f %f %d %d\n", commitPtr->srt, commitPtr->ert,
+		      commitPtr->svt, commitPtr->evt)) {
+	fsetpos(fp, &fptr);
+      }
+      fgetpos(fp, &fptr);
+      localStats->SetMaximums(commitPtr->evt, commitPtr->ert);
+#endif
       if (commitPtr->commitBfrLen > 0)  { // print buffered output
 	CkPrintf("%s", commitPtr->commitBfr);
 	if (commitPtr->commitErr) CmiAbort("Commit ERROR");
@@ -116,7 +136,6 @@ void eventQueue::CommitEvents(sim *obj, int ts)
     while (!target->cpData && (target->timestamp <= ts) && (target != backPtr))
       target = target->next;
   }
-
   commitPtr->prev = frontPtr; // reattach front sentinel node
   frontPtr->next = commitPtr;
   //sanitize();

@@ -107,7 +107,6 @@ void PVT::setGVT(GVTMsg *m)
 {
 #ifdef POSE_STATS_ON
   localStats->TimerStart(GVT_TIMER);
-  static int nextQuanta = DOP_QUANTA;
 #endif
   CProxy_PVT p(ThePVT);
   estGVT = m->estGVT;
@@ -117,10 +116,6 @@ void PVT::setGVT(GVTMsg *m)
   objs.Commit();
   p[CkMyPe()].startPhase();
 #ifdef POSE_STATS_ON
-  if (estGVT > nextQuanta) {
-    nextQuanta += DOP_QUANTA;
-    DOPcalc();
-  }
   localStats->TimerStop();
 #endif
 }
@@ -160,29 +155,6 @@ void PVT::objUpdate(int pvtIdx, int safeTime, int timestamp, int sr)
     objs.objs[index].setOVT(safeTime);
   //if ((sr == SEND) || (sr == RECV)) SendsAndRecvs->Insert(timestamp, sr);
   // sr could be -1 in which case we just ignore it here
-}
-
-void PVT::addToObjQdo(int pvtIdx, double t)
-{
-  int index = (pvtIdx-CkMyPe())/1000;
-  objs.objs[index].addQdoTime(t);
-}
-
-void PVT::DOPcalc()
-{
-  double totalDoP=0.0, avg;
-  static double sum=0.0;
-  static int qcount=0;
-  for (int i=0; i<objs.getNumObjs(); i++) {
-    totalDoP += objs.objs[i].getQdo();
-    objs.objs[i].resetQdo();
-  }
-  qcount++;
-  sum += totalDoP;
-  avg = sum/(double)qcount;
-  CkPrintf("[%d] @ quanta %d worked %fs... AVG=%f\n", CkMyPe(), 
-	   estGVT, totalDoP, avg);
-  // localStats->SendStats();
 }
 
 /// Basic Constructor

@@ -14,7 +14,7 @@ class SpawnedEvent {
   /// Handle of the object the spawned event was sent to
   int objIdx;
   /// Timestamp of the spawned event
-  int timestamp;  
+  int timestamp;
   /// Event ID of the spawned event
   eventID evID;           
   /// Next spawned event in list
@@ -40,6 +40,10 @@ class Event {
   int timestamp;    
   /// Execution status: 0=not done, 1=done, 2=executing
   int done;         
+  /// Virtual start and end time
+  int svt, evt;
+  /// Real start and end time
+  double srt, ert;
   /// Length of commitBfr
   int commitBfrLen; 
   /// Flag indicating commit error

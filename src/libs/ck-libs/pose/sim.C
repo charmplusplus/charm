@@ -101,9 +101,9 @@ void sim::Commit()
 {
   if (active < 0)  return; // object is migrating
 #ifdef POSE_STATS_ON
-    int tstat = localStats->TimerRunning();
-    if (!tstat)  localStats->TimerStart(SIM_TIMER);
-    else localStats->SwitchTimer(SIM_TIMER);
+  int tstat = localStats->TimerRunning();
+  if (!tstat)  localStats->TimerStart(SIM_TIMER);
+  else localStats->SwitchTimer(SIM_TIMER);
 #endif
   localPVT = (PVT *)CkLocalBranch(ThePVT);
 #ifdef POSE_STATS_ON

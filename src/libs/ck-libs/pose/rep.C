@@ -5,9 +5,18 @@
 void rep::init(eventMsg *m)
 { 
   ovt = m->timestamp; 
+  ort = 0.0;
   parent = m->parent; 
   myStrat = m->str;
   myHandle = parent->thisIndex;
+}
+
+void rep::update(int t, double rt) 
+{ 
+  ovt = (ovt < t) ? t : ovt;
+  parent->eq->currentPtr->svt = ovt;
+  ort = (ort < rt) ? rt : ort;
+  parent->eq->currentPtr->srt = ort;
 }
 
 /// Timestamps event message, sets priority, and records in spawned list
