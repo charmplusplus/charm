@@ -2,6 +2,7 @@
 #include <math.h>
 #include "machine.h"
 #include "converse.h"
+#include "fifo.h"
 
 #if CMK_TIMER_SIM_USE_TIMES
 #include <sys/times.h>

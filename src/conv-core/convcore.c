@@ -27,6 +27,7 @@
 #include <sys/resource.h>
 #endif
 
+#include "fifo.h"
 
 /*****************************************************************************
  *
@@ -1037,8 +1038,6 @@ static void CpdDebugHandler(char *msg)
   }
 }
 
-void *FIFO_Create(void);
-
 void CpdInit(void)
 {
   CpvInitialize(int, freezeModeFlag);
@@ -1563,13 +1562,13 @@ int CsdScheduler(int maxmsgs)
         /* If the debugQueue contains any messages, process them */
         while((!FIFO_Empty(CpvAccess(debugQueue))) && (CpvAccess(freezeModeFlag)==0)){
           char *queuedMsg;
-          FIFO_DeQueue(CpvAccess(debugQueue), &queuedMsg);
+          FIFO_DeQueue(CpvAccess(debugQueue), (void **)&queuedMsg);
           CmiHandleMessage(queuedMsg);
           maxmsgs--; if (maxmsgs==0) return maxmsgs;
         }
       }
 #endif
-      if (msg==0) FIFO_DeQueue(localqueue, &msg);
+      if (msg==0) FIFO_DeQueue(localqueue, (void **)&msg);
 #if CMK_NODE_QUEUE_AVAILABLE
       if (msg==0) {
 	CmiLock(CsvAccess(NodeQueueLock));
@@ -1616,13 +1615,13 @@ int CsdScheduler(int maxmsgs)
       /* If the debugQueue contains any messages, process them */
       while(((!FIFO_Empty(CpvAccess(debugQueue))) && (CpvAccess(freezeModeFlag)==0))){
         char *queuedMsg;
-	FIFO_DeQueue(CpvAccess(debugQueue), &queuedMsg);
+	FIFO_DeQueue(CpvAccess(debugQueue), (void**)&queuedMsg);
 	CmiHandleMessage(queuedMsg);
 	maxmsgs--; if (maxmsgs==0) return maxmsgs;	
       }
     }
 #endif
-    if (msg==0) FIFO_DeQueue(localqueue, &msg);
+    if (msg==0) FIFO_DeQueue(localqueue, (void**)&msg);
 #if CMK_NODE_QUEUE_AVAILABLE
     if (msg==0) {
       CmiLock(CsvAccess(NodeQueueLock));
@@ -1665,7 +1664,7 @@ int handler;
   while (1) {
     side ^= 1;
     if (side) msg = CmiGetNonLocal();
-    else      FIFO_DeQueue(localqueue, &msg);
+    else      FIFO_DeQueue(localqueue, (void**)&msg);
     if (msg) {
       if (CmiGetHandler(msg)==handler) {
 	CsdEndIdle();

@@ -23,6 +23,7 @@
 #define SUPPRESS_PTHREADS
 #include "cpthreads.h"
 #include <sys/errno.h>
+#include "fifo.h"
 
 /******************************************************************************
  *
@@ -421,7 +422,6 @@ int Cpthread_mutexattr_setpshared(Cpthread_mutexattr_t *mattr, int pshared)
 
 int Cpthread_mutex_init(Cpthread_mutex_t *mutex, Cpthread_mutexattr_t *mattr)
 {
-  extern void *FIFO_Create();
   if (mattr->magic != MATTR_MAGIC) errcode(EINVAL);
   mutex->magic = MUTEX_MAGIC;
   mutex->onpe = CmiMyPe();
@@ -441,7 +441,6 @@ int Cpthread_mutex_destroy(Cpthread_mutex_t *mutex)
 
 int Cpthread_mutex_lock(Cpthread_mutex_t *mutex)
 {
-  extern CthThread FIFO_Peek(void *);
   CthThread self = CthSelf();
   if (mutex->magic != MUTEX_MAGIC) errcode(EINVAL);
   if (mutex->onpe != CmiMyPe()) errspan();
@@ -462,7 +461,6 @@ int Cpthread_mutex_trylock(Cpthread_mutex_t *mutex)
 
 int Cpthread_mutex_unlock(Cpthread_mutex_t *mutex)
 {
-  extern CthThread FIFO_Peek(void *);
   CthThread self = CthSelf();
   CthThread sleeper;
   if (mutex->magic != MUTEX_MAGIC) errcode(EINVAL);
@@ -508,7 +506,6 @@ int Cpthread_condattr_setpshared(Cpthread_condattr_t *cattr, int pshared)
 
 int Cpthread_cond_init(Cpthread_cond_t *cond, Cpthread_condattr_t *cattr)
 {
-  extern void *FIFO_Create();
   if (cattr->magic != CATTR_MAGIC) errcode(EINVAL);
   cond->magic = COND_MAGIC;
   cond->onpe = CmiMyPe();
@@ -527,7 +524,6 @@ int Cpthread_cond_destroy(Cpthread_cond_t *cond)
 
 int Cpthread_cond_wait(Cpthread_cond_t *cond, Cpthread_mutex_t *mutex)
 {
-  extern CthThread FIFO_Peek(void *);
   CthThread self = CthSelf();
   CthThread sleeper;
 
@@ -552,7 +548,7 @@ int Cpthread_cond_signal(Cpthread_cond_t *cond)
   CthThread sleeper;
   if (cond->magic != COND_MAGIC) errcode(EINVAL);
   if (cond->onpe != CmiMyPe()) errspan();
-  FIFO_DeQueue(cond->users, &sleeper);
+  FIFO_DeQueue(cond->users, (void**)&sleeper);
   if (sleeper) CthAwaken(sleeper);
   return 0;
 }
@@ -563,7 +559,7 @@ int Cpthread_cond_broadcast(Cpthread_cond_t *cond)
   if (cond->magic != COND_MAGIC) errcode(EINVAL);
   if (cond->onpe != CmiMyPe()) errspan();
   while (1) {
-    FIFO_DeQueue(cond->users, &sleeper);
+    FIFO_DeQueue(cond->users, (void**)&sleeper);
     if (sleeper==0) break;
     CthAwaken(sleeper);
   }

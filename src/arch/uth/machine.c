@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <math.h>
 #include "converse.h"
+#include "fifo.h"
 
 static char *DeleteArg(argv)
   char **argv;
@@ -37,8 +38,6 @@ void CmiAbort(const char *message)
  * 
  ****************************************************************************/
 
-typedef void *Fifo;
-
 int        Cmi_mype;
 int        Cmi_myrank;
 int        Cmi_numpes;
@@ -48,12 +47,11 @@ char     **CmiArgv;
 CmiStartFn CmiStart;
 int        CmiUsched;
 CthThread *CmiThreads;
-Fifo      *CmiQueues;
+void*      *CmiQueues;
 int       *CmiBarred;
 int        CmiNumBarred=0;
 
-Fifo FIFO_Create();
-CpvDeclare(Fifo, CmiLocalQueue);
+CpvDeclare(void*, CmiLocalQueue);
 
 /******************************************************************************
  *
@@ -377,7 +375,7 @@ int usched, initret;
   CpvInitialize(void*, CmiLocalQueue);
   CmiThreads = (CthThread *)CmiAlloc(CmiNumPes()*sizeof(CthThread));
   CmiBarred  = (int       *)CmiAlloc(CmiNumPes()*sizeof(int));
-  CmiQueues  = (Fifo      *)CmiAlloc(CmiNumPes()*sizeof(Fifo));
+  CmiQueues  = (void**)CmiAlloc(CmiNumPes()*sizeof(void*));
   
   /* Create threads for all PE except PE 0 */
   for(i=0; i<CmiNumPes(); i++) {

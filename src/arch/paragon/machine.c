@@ -1,6 +1,7 @@
 #include <nx.h>
 #include <math.h>
 #include "converse.h"
+#include "fifo.h"
 
 #define MSG_TYPE 1
 #define PROCESS_PID 0

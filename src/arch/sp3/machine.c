@@ -3,6 +3,7 @@
 #include "converse.h"
 #include <mpproto.h>
 #include <sys/systemcfg.h>
+#include "fifo.h"
 
 #define FLIPBIT(node,bitnumber) (node ^ (1 << bitnumber))
 

@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include "converse.h"
+#include "fifo.h"
 
 #define MSG_TYPE 1
 

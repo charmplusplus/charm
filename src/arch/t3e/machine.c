@@ -9,6 +9,7 @@
 #include <malloc.h>
 #include <mpp/shmem.h>
 #include "converse.h"
+#include "fifo.h"
 
 /*
  *  We require statically allocated variables for locks.  This defines
@@ -36,9 +37,6 @@ int Cmi_myrank;
  * to my own node efficiently.  These are used when 
  * CMK_CMIDELIVERS_USE_COMMON_CODE is true.
  */
-extern void *FIFO_Create(void);
-extern void FIFO_EnQueue(void *, void *);
-
 /*
  * Distributed list declarations.  This linked list goes across machines,
  * storing all the messages for this node until this processor copies them

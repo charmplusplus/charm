@@ -8,12 +8,10 @@
 #include <stdlib.h>
 #include "converse.h"
 #include <time.h>
+#include "fifo.h"
 
 usptr_t *arena;
 static barrier_t *barr;
-
-extern void *FIFO_Create(void);
-extern void FIFO_EnQueue(void *, void *);
 
 #define BLK_LEN  512
 typedef struct {

@@ -1,34 +1,30 @@
-
-#include <stdio.h>
+#include <stdlib.h>
 #include "converse.h"
 #include "fifo.h"
 
 
-void *FIFO_Create()
+FIFO_QUEUE *FIFO_Create(void)
 {
   FIFO_QUEUE *queue;
   queue = (FIFO_QUEUE *)malloc(sizeof(FIFO_QUEUE));
-  queue->block = (void **) malloc(BLK_LEN * sizeof(void *));
-  queue->size = BLK_LEN;
+  queue->block = (void **) malloc(_FIFO_BLK_LEN * sizeof(void *));
+  queue->size = _FIFO_BLK_LEN;
   queue->push = queue->pull = 0;
   queue->fill = 0;
-  return (void *)queue;
+  return queue;
 }
 
-int FIFO_Fill(queue)
-     FIFO_QUEUE *queue;
+int FIFO_Fill(FIFO_QUEUE *queue)
 {
   return queue->fill;
 }
 
-int FIFO_Empty(queue)
-     FIFO_QUEUE *queue;
+int FIFO_Empty(FIFO_QUEUE *queue)
 {
-  return (queue->fill == 0) ? 1 : 0;
+  return !(queue->fill);
 }
 
-void FIFO_Expand(queue)
-     FIFO_QUEUE *queue;
+static void FIFO_Expand(FIFO_QUEUE *queue)
 {
   int newsize; void **newblock; int rest;
   int    pull  = queue->pull;
@@ -47,9 +43,7 @@ void FIFO_Expand(queue)
   queue->fill = size;
 }
 
-void FIFO_EnQueue(queue, elt)
-     FIFO_QUEUE *queue;
-     void       *elt;
+void FIFO_EnQueue(FIFO_QUEUE *queue, void *elt)
 {
   if (queue->fill == queue->size) FIFO_Expand(queue);
   queue->block[queue->push] = elt;
@@ -57,9 +51,7 @@ void FIFO_EnQueue(queue, elt)
   queue->fill++;
 }
 
-void FIFO_EnQueue_Front(queue, elt)
-     FIFO_QUEUE *queue;
-     void *elt;
+void FIFO_EnQueue_Front(FIFO_QUEUE *queue, void *elt)
 {
   if (queue->fill == queue->size) FIFO_Expand(queue);
   queue->pull = ((queue->pull + queue->size - 1) % queue->size);
@@ -67,15 +59,13 @@ void FIFO_EnQueue_Front(queue, elt)
   queue->fill++;
 }
 
-void *FIFO_Peek(queue)
-     FIFO_QUEUE *queue;
+void *FIFO_Peek(FIFO_QUEUE *queue)
 {
   if (queue->fill == 0) return 0;
   return queue->block[queue->pull];
 }
 
-void FIFO_Pop(queue)
-     FIFO_QUEUE *queue;
+void FIFO_Pop(FIFO_QUEUE *queue)
 {
   if (queue->fill) {
     queue->pull = (queue->pull+1) % queue->size;
@@ -83,24 +73,21 @@ void FIFO_Pop(queue)
   }
 }
 
-void FIFO_DeQueue(queue, element)
-     FIFO_QUEUE     *queue;
-     void      **element;
+void FIFO_DeQueue(FIFO_QUEUE *queue, void **element)
 {
+  *element = 0;
   if (queue->fill) {
     *element = queue->block[queue->pull];
     queue->pull = (queue->pull+1) % queue->size;
     queue->fill--;
-  } else *element = 0;
+  }
 }
 
 
 /* This assumes the the caller has not allocated
    memory for element 
 */
-void FIFO_Enumerate(queue, element)
-     FIFO_QUEUE     *queue;
-     void      ***element;
+void FIFO_Enumerate(FIFO_QUEUE *queue, void ***element)
 {
   int i = 0;
   int num = queue->fill;
@@ -116,8 +103,7 @@ void FIFO_Enumerate(queue, element)
   }
 }
 
-void FIFO_Destroy(queue)
-     FIFO_QUEUE *queue;
+void FIFO_Destroy(FIFO_QUEUE *queue)
 {
   if (!FIFO_Empty(queue)) {
     CmiError("Tried to FIFO_Destroy a non-empty queue.\n");

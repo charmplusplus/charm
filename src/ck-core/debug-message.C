@@ -33,7 +33,6 @@ extern char* getEnvInfo(envelope *env);
 extern char* getSymbolTableInfo(void);
 
 extern "C" void  CqsEnumerateQueue(Queue, void ***);
-extern "C" void  FIFO_Enumerate(FIFO_QUEUE*, void***);
 
 CpvDeclare(handlerType, handlerArray);
 

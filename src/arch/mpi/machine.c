@@ -2,6 +2,7 @@
 #include <sys/time.h>
 #include "converse.h"
 #include <mpi.h>
+#include "fifo.h"
 
 #define FLIPBIT(node,bitnumber) (node ^ (1 << bitnumber))
 #define MAX_QLEN 200

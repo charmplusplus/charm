@@ -3,6 +3,7 @@
 #include <cps.h>
 #include <math.h>
 #include "converse.h"
+#include "fifo.h"
 
 
 #define BLK_LEN		512

@@ -215,6 +215,8 @@ int  CmiScanf();
 #include <sys/time.h>
 #include <varargs.h>
 
+#include "fifo.h"
+
 #if CMK_STRINGS_USE_STRINGS_H
 #include <strings.h>
 #endif
@@ -233,12 +235,6 @@ static void CommunicationServer();
 extern int CmemInsideMem();
 extern void CmemCallWhenMemAvail();
 void ConverseInitPE(void);
-void *FIFO_Create(void);
-int   FIFO_Fill(void *);
-void *FIFO_Peek(void *);
-void  FIFO_Pop(void *);
-void  FIFO_EnQueue(void *, void *);
-void  FIFO_EnQueue_Front(void *, void *);
 void CmiYield();
 
 /****************************************************************************

@@ -13,9 +13,7 @@
 #include <unistd.h>
 
 #include "converse.h"
-
-extern void *FIFO_Create(void);
-extern void FIFO_EnQueue(void *, void *);
+#include "fifo.h"
 
 #define BLK_LEN  512
 
