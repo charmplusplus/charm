@@ -85,10 +85,9 @@ public:
   char name[20];
 
   friend class BgTimeLineRec;
-private:
-  bgTimeLog(char *msg);
 public:
   bgTimeLog(bgTimeLog *);
+  bgTimeLog(char *msg);
   bgTimeLog(): ep(-1), recvTime(.0), startTime(.0), endTime(.0), msgID(-1), effRecvTime(INVALIDTIME), seqno(0), doCorrect(1) {strcpy(name,"dummyname");}
   bgTimeLog(int epc, char* name, double sTime, double eTime);
   bgTimeLog(int epc, char* name, double sTime);

@@ -66,7 +66,7 @@ static char **arg_argv;
 static int printTimeLog = 0;
 int bgSize = 0;
 static int timingMethod = BG_ELAPSE;
-static int delayCheckFlag = 1;          // when enabled, only check correction 
+int delayCheckFlag = 1;          // when enabled, only check correction 
 					// messages after some interval
 int programExit = 0;
 
@@ -482,6 +482,7 @@ void nodeBCastMsgHandlerFunc(char *msg)
     if (count == 0) dupmsg = msg;
     else dupmsg = CmiCopyMsg(msg, len);
     DEBUGF(("addBgNodeInbuffer to %d\n", i));
+    CmiBgMsgNodeID(dupmsg) = nodeInfo::Local2Global(i);		// updated
     addBgNodeInbuffer(dupmsg, i);
     count ++;
   }
@@ -501,6 +502,7 @@ void threadBCastMsgHandlerFunc(char *msg)
 	lnodeID = nodeInfo::Global2Local(gnodeID);
       else
 	lnodeID = -1;
+      CmiAssert(threadID != ANYTHREAD);
   }
   else {
     ASSERT(gnodeID == -1);
@@ -1060,6 +1062,7 @@ void threadInfo::run_work_thread()
       if (CmiBgMsgRecvTime(msg) > gvt+ LEASH) {
 	double nextT = CmiBgMsgRecvTime(msg);
 	unsigned int prio = (unsigned int)(nextT*PRIO_FACTOR)+1;
+// CmiPrintf("Thread %d YieldPrio: %g gvt: %g leash: %g\n", id, nextT, gvt, LEASH);
 	CthYieldPrio(CQS_QUEUEING_IFIFO, sizeof(int), &prio);
 	continue;
       }
@@ -1464,6 +1467,8 @@ int updateRealMsgs(bgCorrectionMsg *cm, int nodeidx)
   return 0;
 }
 #endif
+
+extern void processBufferCorrectionMsgs(void *ignored);
 
 // Coverse handler for begin exit
 // flush and process all correction messages

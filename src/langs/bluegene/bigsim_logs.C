@@ -111,6 +111,8 @@ bgTimeLog::bgTimeLog(char *msg)
   srcnode = msg?CmiBgMsgSrcPe(msg):-1;
   msgID = msg?CmiBgMsgID(msg):-1;
 
+  CmiAssert(srcnode==-1 || srcnode<BgNumNodes());
+
   oldStartTime=startTime;
   effRecvTime = recvTime;
   seqno = 0;
@@ -197,10 +199,11 @@ void bgTimeLog::addBackwardDeps(CkVec<void*> logs){
     addBackwardDep((bgTimeLog*)(logs[i]));
 }
 
-void BgTimeLineRec::logEntryStart(char *m) {
+void BgTimeLineRec::logEntryStart(char *msg) {
+//CmiPrintf("[%d] BgTimeLineRec::logEntryStart\n", BgGetGlobalWorkerThreadID());
   if (!genTimeLog) return;
   CmiAssert(bgCurLog == NULL);
-  bgCurLog = new bgTimeLog(m);
+  bgCurLog = new bgTimeLog(msg);
   enq(bgCurLog, 1);
 }
 
@@ -223,6 +226,7 @@ void BgTimeLineRec::logEntryCommit() {
 
 void BgTimeLineRec::logEntryInsert(bgTimeLog* log)
 {
+//CmiPrintf("[%d] BgTimeLineRec::logEntryInsert\n", BgGetGlobalWorkerThreadID());
   CmiAssert(bgCurLog == NULL);
   if(timeline[timeline.length()-1]->endTime == 0.0)
     CmiPrintf("\nERROR tried to insert %s after %s\n",log->name,timeline[timeline.length()-1]->name);
@@ -237,6 +241,7 @@ void BgTimeLineRec::logEntryStart(bgTimeLog* log)
 
 void BgTimeLineRec::logEntryClose() {
   if (!genTimeLog) return;
+//CmiPrintf("[%d] BgTimeLineRec::logEntryClose\n", BgGetGlobalWorkerThreadID());
   bgTimeLog *lastlog = timeline[timeline.length()-1];
   CmiAssert(bgCurLog == lastlog);
   lastlog->closeLog();
@@ -245,6 +250,7 @@ void BgTimeLineRec::logEntryClose() {
 
 void BgTimeLineRec::logEntrySplit()
 {
+//CmiPrintf("BgTimeLineRec::logEntrySplit\n");
   if (!genTimeLog) return;
   CmiAssert(bgCurLog != NULL);
   bgTimeLog *rootLog = bgCurLog;

@@ -19,6 +19,7 @@ CpvDeclare(int, heartbeatBcastHandler);
 int traceBluegeneLinked=0;
 extern int programExit;
 static int deadlock = 0;
+extern int delayCheckFlag;
 
 #if USE_MULTISEND
 CkVec<char *>   *corrMsgBucket;
@@ -869,19 +870,19 @@ static inline int batchHandleCorrectionMsg(int mynode, BgTimeLineRec *tlinerecs,
       else {
 //        if (cm->tAdjust< tlinerec.minCorrection) tlinerec.minCorrection=cm->tAdjust;
         if (tlog->doCorrect == 1) {
-	double oldRecvTime = tlog->effRecvTime;
-        tlog->recvTime = cm->tAdjust;
-        double endOfDeps = tlog->getEndOfBackwardDeps();
+	  double oldRecvTime = tlog->effRecvTime;
+          tlog->recvTime = cm->tAdjust;
+          double endOfDeps = tlog->getEndOfBackwardDeps();
 //        double effRecvTime  = max(tlog->recvTime, endOfDeps);
-        double effRecvTime  = tlog->recvTime;
-	if (endOfDeps != INVALIDTIME) effRecvTime =  max(effRecvTime,endOfDeps);
-	effRecvTime = min(oldRecvTime, effRecvTime);
-	if (effRecvTime != INVALIDTIME && (isLess(effRecvTime,minTime) ||
+          double effRecvTime  = tlog->recvTime;
+	  if (endOfDeps != INVALIDTIME) effRecvTime =  max(effRecvTime,endOfDeps);
+	  effRecvTime = min(oldRecvTime, effRecvTime);
+	  if (effRecvTime != INVALIDTIME && (isLess(effRecvTime,minTime) ||
             isEqual(effRecvTime, minTime) && tlog->seqno < minLog->seqno)) {
-	  minTime = effRecvTime; 
-	  minLog = tlog;
-        }
-        worked = 1;
+	    minTime = effRecvTime; 
+	    minLog = tlog;
+          }
+          worked = 1;
         }
       }
       // counter for processed correction message
@@ -1030,22 +1031,36 @@ void bgCorrectionFunc(char *msg)
 
     if (nodeidx < 0) {
       // copy correction msg to each thread of each node
-      CmiAssert(nodeidx == -1);
-      CmiAssert(tID == ANYTHREAD);
+      // broadcast with exception
+      int lnodeID = -1;
+      if (nodeidx < -1) {
+        int gnodeID = - (nodeidx+100);
+        if (nodeInfo::Global2PE(gnodeID) == CmiMyPe())
+          lnodeID = nodeInfo::Global2Local(gnodeID);
+      }
       for (i=0; i<BgNodeSize(); i++) {
-	for (tID=0; tID<cva(numWth); tID++) {
+	for (CmiInt2 j=0; j<cva(numWth); j++) {
+          if (i == lnodeID && (j == tID || tID == ANYTHREAD)) continue;
 	  bgCorrectionMsg *newMsg = (bgCorrectionMsg*)CmiCopyMsg(msg, sizeof(bgCorrectionMsg));
 	  newMsg->destNode = nodeInfo::Local2Global(i);   // global node seqno
-	  newMsg->tID = tID;
+	  newMsg->tID = j;
           enqueueCorrectionMsg(i, newMsg);
 	}
       }
       CmiFree(m);
     }
     else {
-      CmiAssert(nodeidx>=0);
       nodeidx = nodeInfo::Global2Local(nodeidx);	
-      enqueueCorrectionMsg(nodeidx, m);
+      if (tID == ANYTHREAD) {
+	for (CmiInt2 j=0; j<cva(numWth); j++) {
+	  bgCorrectionMsg *newMsg = (bgCorrectionMsg*)CmiCopyMsg(msg, sizeof(bgCorrectionMsg));
+	  newMsg->tID = j;
+          enqueueCorrectionMsg(nodeidx, newMsg);
+        }
+        CmiFree(m);
+      }
+      else
+        enqueueCorrectionMsg(nodeidx, m);
     }
 
 #if DELAY_CHECK
