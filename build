@@ -183,9 +183,6 @@ test -n "$LIBDIR" && echo "CMK_LIBDIR=\"$LIBDIR\"" >> $ConvUsr
 test -n "$INCDIR" && echo "CMK_INCDIR=\"$INCDIR\"" >> $ConvUsr
 chmod +x $ConvUsr
 
-#common options, overwrite by Common.net Common.mpi
-touch $VERSION/tmp/conv-common.h
-
 #special options
 ConvHeader="$VERSION/tmp/conv-mach-opt.h"
 ConvSh="$VERSION/tmp/conv-mach-opt.sh"

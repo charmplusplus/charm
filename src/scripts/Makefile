@@ -195,6 +195,7 @@ dirs+sources:
 	./system_ln  ../tmp/conv-mach.sh ../include
 	./system_ln  ../tmp/conv-mach-opt.sh ../include
 	./system_ln  ../tmp/conv-mach-pre.sh ../include
+	if [ ! -f conv-common.h ] ; then ( touch conv-common.h ) ; fi
 	touch dirs+sources
 
 
