@@ -27,9 +27,7 @@ extern unsigned int _nchunks;
 #define FEM_HEXAHEDRAL    3
 #define FEM_QUADRILATERAL 4
 
-typedef CkPacksizeFn FEM_Packsize_Fn;
-typedef CkPackFn     FEM_Pack_Fn;
-typedef CkUnpackFn   FEM_Unpack_Fn;
+typedef void *(*FEM_PupFn)(pup_er, void*);
 
 // temporary Datatype representation
 // will go away once MPI user-defined datatypes are ready
@@ -104,7 +102,7 @@ class ChunkMsg : public CMessage_ChunkMsg {
 };
 
 #define MAXDT 20
-#define MAXUDATA 20
+#define FEM_MAXUDATA 20
 
 class chunk : public ArrayElement1D
 {
@@ -125,20 +123,15 @@ class chunk : public ArrayElement1D
   int ntypes;
 
   CmmTable messages; // messages to be processed
-  int tblsz; // cached packbuf size for msg table
   int wait_for; // which tag is tid waiting for ? 0 if not waiting
-  int tsize; // cached packbuf size for thread
 
   int seqnum; // sequence number for update operation
   int nRecd; // number of messages received for this seqnum
   void *curbuf; // data addr for current update operation
 
   int nudata;
-  void *userdata[MAXUDATA];
-  CkPacksizeFn pksz[MAXUDATA];
-  CkPackFn pk[MAXUDATA];
-  CkUnpackFn upk[MAXUDATA];
-  int usize[MAXUDATA]; // cached sizes of user's data structures
+  void *userdata[FEM_MAXUDATA];
+  FEM_PupFn pup_ud[FEM_MAXUDATA];
  public:
 
   CthThread tid; // waiting thread, 0 if no one is waiting
@@ -182,13 +175,12 @@ class chunk : public ArrayElement1D
   int *get_elemnums(void) { return gElemNums; }
   int *get_conn(void) { return conn; }
   void *get_userdata(int n) { return userdata[n]; }
-  int register_userdata(void *_userdata, CkPacksizeFn _pksz,
-                         CkPackFn _pk, CkUnpackFn _upk)
+  int register_userdata(void *_userdata, FEM_PupFn _pup_ud)
   {
+    if(nudata==FEM_MAXUDATA)
+      CkAbort("FEM> UserData registration limit exceeded.!\n");
     userdata[nudata] = _userdata;
-    pksz[nudata] = _pksz;
-    pk[nudata] = _pk;
-    upk[nudata] = _upk;
+    pup_ud[nudata] = _pup_ud;
     nudata++;
     return (nudata-1);
   }
@@ -226,8 +218,7 @@ extern "C" {
   void FEM_Set_Mesh_Transform(int nelem, int nnodes, int ctype, int* connmat, 
                               int *permute);
   void FEM_Print_Partition(void);
-  int FEM_Register(void *_userdata, CkPacksizeFn _pksz, CkPackFn _pk,
-                    CkUnpackFn _upk);
+  int FEM_Register(void *_userdata, FEM_PupFn _pup_ud);
   int *FEM_Get_Node_Nums(void);
   int *FEM_Get_Elem_Nums(void);
   int *FEM_Get_Conn(void);

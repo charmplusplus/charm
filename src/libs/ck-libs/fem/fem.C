@@ -825,27 +825,9 @@ chunk::pup(PUP::er &p)
   }
   p(ntypes);
   p((void*)dtypes, MAXDT*sizeof(DType));
-  /*
-  if(p.isUnpacking())
-    messages = CmmNew();
-  if(p.isPacking())
-  {
-    DataMsg *dm;
-    int snum = CmmWildCard;
-    CProxy_chunk cp(thisArrayID);
-    while (dm = (DataMsg*)CmmGet(messages, 1, &snum, 0))
-      cp[thisIndex].recv(dm);
-  }
-  */
   p(wait_for);
-  messages = (CmmTable) pupOpaqueObject(p, (void*)messages, tblsz,
-                                        (CkPacksizeFn) CmmPackBufSize, 
-					(CkPackFn) CmmPackTable,
-                                        (CkUnpackFn) CmmUnpackTable);
-  tid = (CthThread) pupOpaqueObject(p, (void*)tid, tsize, 
-                                    (CkPacksizeFn) CthPackBufSize,
-                                    (CkPackFn) CthPackThread, 
-				    (CkUnpackFn) CthUnpackThread);
+  messages = CmmPup((pup_er) &p, messages);
+  tid = CthPup((pup_er) &p, tid);
   if(p.isUnpacking())
     CtvAccessOther(tid,_femptr) = this;
   p(seqnum);
@@ -855,11 +837,8 @@ chunk::pup(PUP::er &p)
   // fp is not valid, because it has been closed a long time ago
   p(nudata);
   for(i=0;i<nudata;i++) {
-    p((void*)&(pksz[i]),sizeof(CkPacksizeFn));
-    p((void*)&(pk[i]),sizeof(CkPackFn));
-    p((void*)&(upk[i]),sizeof(CkUnpackFn));
-    userdata[i] = pupOpaqueObject(p, userdata[i], usize[i], pksz[i], 
-                                  pk[i], upk[i]);
+    p((void*)&(pup_ud[i]), sizeof(FEM_PupFn));
+    userdata[i] = pup_ud[i]((pup_er) &p, userdata[i]);
   }
 }
 
@@ -916,11 +895,10 @@ chunk::print(void)
 }
 
 extern "C" int 
-FEM_Register(void *_userdata, CkPacksizeFn _pksz, CkPackFn _pk,
-                    CkUnpackFn _upk)
+FEM_Register(void *_userdata, FEM_PupFn _pup_ud)
 {
   chunk *cptr = CtvAccess(_femptr);
-  return cptr->register_userdata(_userdata,_pksz, _pk, _upk);
+  return cptr->register_userdata(_userdata,_pup_ud);
 }
 
 extern "C" int *
