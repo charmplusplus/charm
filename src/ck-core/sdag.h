@@ -10,8 +10,6 @@
 
 #include "charm++.h"
 
-#define DEBUGF(x) // CmiPrintf x
-
 class CMsgBuffer {
   public:
     int entry;
