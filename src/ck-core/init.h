@@ -18,8 +18,7 @@ class TableEntry {
     int defCtor,migCtor; // the index of default and migration constructors in _entryTable,
 			 // to be fed in CkCreateLocalGroup
   public:
-    TableEntry(void) {init();}
-    void init(void) { obj=0; pending=0; cIdx=defCtor=migCtor=-1; }
+    TableEntry(int ignored=0) { obj=0; pending=0; cIdx=defCtor=migCtor=-1; }
     inline IrrGroup* getObj(void) { return obj; }
     inline void setObj(void *_obj) { obj=(IrrGroup *)_obj; }
     PtrQ* getPending(void) { return pending; }
@@ -36,55 +35,59 @@ class TableEntry {
 
 template <class dtype>
 class GroupIdxArray {
-  enum {MAXBINSPE0=256};
-
-  dtype *tab;                           // direct entry table for processor 0
-  CkHashtable_c hashTab;
-  int max;
-
+  // The initial size of the table for groups created on PE 0:
+  enum {INIT_BINS_PE0=16};
+  
+  dtype *tab;         // direct table for groups created on processor 0
+  CkHashtable_c hashTab; // hashtable for groups created on processors >0
+  int max;   // Size of "tab"
+   
   //This non-inline version of "find", below, allows the (much simpler)
   // common case to be inlined.
   dtype& nonInlineFind(CkGroupID n) {
-      dtype *ret;
 #ifndef CMK_OPTIMIZE
-      if (n.idx==0) CkAbort("Group ID is zero-- invalid!\n");
-      else if (n.idx>=max) { CkAbort("Group ID is too large!\n");}
-      else
+      if (n.idx==0) {CkAbort("Group ID is zero-- invalid!\n"); return *(dtype *)0;}
+      else 
 #endif
-      /*n.idx < 0*/
-      { /*Groups created on processors other than 0 go into a hashtable:*/
+      if (n.idx>=max) { /* Extend processor 0's group table */
+        dtype *oldtab=tab;
+	int i, oldmax=max;
+	max=2*n.idx+1;
+	tab=new dtype[max];
+	for (i=0;i<oldmax;i++) tab[i]=oldtab[i];
+	for (i=oldmax;i<max;i++) tab[i]=dtype(0);
+	delete oldtab;
+	return tab[n.idx];
+      }
+      else /*n.idx < 0*/
+      { /*Groups created on processors >0 go into a hashtable:*/
         if(hashTab == NULL)
           hashTab = CkCreateHashtable_int(sizeof(dtype),17);
 
-        ret = (dtype *)CkHashtableGet(hashTab,&(n.idx));
+        dtype *ret = (dtype *)CkHashtableGet(hashTab,&(n.idx));
 
-        if(ret == NULL)               // insert data into the table
+        if(ret == NULL)  // insert new entry into the table
         {
           ret = (dtype *)CkHashtablePut(hashTab,&(n.idx));
-          new (ret) dtype; //Call dtype's constructor (ICK!)
+          new (ret) dtype(0); //Call dtype's constructor (ICK!)
         }
+	return *ret;
       }
-      return *ret;
    }
 
   public:
-     GroupIdxArray() {tab=NULL;max=0;hashTab=NULL;}
-     ~GroupIdxArray() {delete[] tab; if (hashTab!=NULL) CkDeleteHashtable(hashTab);}
-     void init(void) {
-      max = MAXBINSPE0;
+    GroupIdxArray() {tab=NULL;max=0;hashTab=NULL;}
+    ~GroupIdxArray() {delete[] tab; if (hashTab!=NULL) CkDeleteHashtable(hashTab);}
+    void init(void) {
+      max = INIT_BINS_PE0;
       tab = new dtype[max];
       for(int i=0;i<max;i++)
-       tab[i].init();
+       tab[i]=dtype(0);
       hashTab=NULL;
-     }
+    }
 
-     inline dtype& find(CkGroupID n) {
-
-// TODO: make the table extensible. i.e. if (unsigned)n.idx<max then return tab[n.idx]
-// else if (n.idx<0)    then hashtable things
-// else extend the table
-
-      if(n.idx>0 && n.idx<MAXBINSPE0)
+    inline dtype& find(CkGroupID n) {
+      if(n.idx>0 && n.idx<max)
         return tab[n.idx];
       else
         return nonInlineFind(n);
