@@ -243,14 +243,14 @@ void NormalRealSlabArray::pup(PUP::er &p)
 	    
             if (p.isUnpacking()){
 		if (fftinfos[i]->isSrcSlab) {
-		    rfwd1DXPlan = rfftw_create_plan(info.srcSize[0], FFTW_REAL_TO_COMPLEX, FFTW_USE_WISDOM|FFTW_MEASURE|FFTW_OUT_OF_PLACE);
-		    fwd1DYPlan = fftw_create_plan(info.srcSize[1], FFTW_BACKWARD, FFTW_USE_WISDOM|FFTW_MEASURE|FFTW_IN_PLACE); 
-		    rbwd1DXPlan = rfftw_create_plan(info.srcSize[0], FFTW_BACKWARD, FFTW_USE_WISDOM|FFTW_MEASURE|FFTW_OUT_OF_PLACE);
+		    rfwd1DXPlan = rfftw_create_plan(fftinfos[i]->srcSize[0], FFTW_REAL_TO_COMPLEX, FFTW_USE_WISDOM|FFTW_MEASURE|FFTW_OUT_OF_PLACE);
+		    fwd1DYPlan = fftw_create_plan(fftinfos[i]->srcSize[1], FFTW_BACKWARD, FFTW_USE_WISDOM|FFTW_MEASURE|FFTW_IN_PLACE); 
+		    rbwd1DXPlan = rfftw_create_plan(fftinfos[i]->srcSize[0], FFTW_BACKWARD, FFTW_USE_WISDOM|FFTW_MEASURE|FFTW_OUT_OF_PLACE);
 		}
 		else {
-		    bwd1DZPlan = fftw_create_plan(info.destSize[0], FFTW_COMPLEX_TO_REAL, FFTW_USE_WISDOM|FFTW_MEASURE|FFTW_IN_PLACE);
-		    bwd1DYPlan = fftw_create_plan(info.destSize[1], FFTW_BACKWARD, FFTW_USE_WISDOM|FFTW_MEASURE|FFTW_IN_PLACE);
-		    fwd1DZPlan = fftw_create_plan(info.destSize[0], FFTW_FORWARD, FFTW_USE_WISDOM|FFTW_MEASURE|FFTW_IN_PLACE);
+		    bwd1DZPlan = fftw_create_plan(fftinfos[i]->destSize[0], FFTW_COMPLEX_TO_REAL, FFTW_USE_WISDOM|FFTW_MEASURE|FFTW_IN_PLACE);
+		    bwd1DYPlan = fftw_create_plan(fftinfos[i]->destSize[1], FFTW_BACKWARD, FFTW_USE_WISDOM|FFTW_MEASURE|FFTW_IN_PLACE);
+		    fwd1DZPlan = fftw_create_plan(fftinfos[i]->destSize[0], FFTW_FORWARD, FFTW_USE_WISDOM|FFTW_MEASURE|FFTW_IN_PLACE);
 		}
 	    }	    
 	}
