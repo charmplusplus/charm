@@ -1099,6 +1099,7 @@ CmiCommHandle CmiAsyncListSendFn(int npes, int *pes, int len, char *msg)
 void CmiFreeListSendFn(int npes, int *pes, int len, char *msg)
 {
   /*CmiError("ListSend not implemented.");*/
+  int i;
   for(i=0;i<npes;i++) {
     CmiSyncSend(pes[i], len, msg);
   }
