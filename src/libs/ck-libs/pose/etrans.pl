@@ -568,7 +568,9 @@ foreach my $incfile ($inC,@otherfiles)
 	$outChandle->print("    e->spawnedList = NULL;\n");
 	#$outChandle->print("char str[30];\n");
 	#$outChandle->print("CkPrintf(\"[%d] RECV(event) @ %d: Event=%s\\n\", thisIndex, $messagename->timestamp, $messagename->evID.sdump(str));\n");
+	$outChandle->print("#ifndef SEQUENTIAL_POSE\n");	
 	$outChandle->print("    CkAssert(e->timestamp >= pvt->getGVT());\n");
+	$outChandle->print("#endif\n");
 	$outChandle->print("    eq->InsertEvent(e);\n");
 	$outChandle->print("    Step();\n");
 	$outChandle->print("  }\n");
