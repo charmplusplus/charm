@@ -257,6 +257,9 @@ public:
 	T *operator=(T *sto) {storage=sto; return sto;}
 	
 	operator T* () const {return storage;}
+
+	bool operator==(T *t) const {return storage==t;}
+	bool operator!=(T *t) const {return storage!=t;}
 	
 	//Stolen from boost::scoped_ptr:
 	T & operator*() const // never throws
