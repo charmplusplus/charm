@@ -6,16 +6,16 @@ typedef struct _PersistentSendsTable {
   int sizeMax;
   PersistentHandle   destHandle;  
   void *destAddress;
-  void *destSlotFlagAddress;
+  void *destSizeAddress;
   void *messageBuf;
   int messageSize;
   char used;
 } PersistentSendsTable;
 
 typedef struct _PersistentReceivesTable {
+  void *messagePtr;        /* preallocated message buffer of size "sizeMax" */
   int recvSize;
   int sizeMax;
-  void *messagePtr;        /* preallocated message buffer of dssize "sizeMax" */
   struct _PersistentReceivesTable *prev, *next;
 } PersistentReceivesTable;
 
@@ -95,7 +95,7 @@ void initSendSlot(PersistentSendsTable *slot)
   slot->sizeMax = 0;
   slot->destHandle = 0; 
   slot->destAddress = NULL;
-  slot->destSlotFlagAddress = NULL;
+  slot->destSizeAddress = NULL;
   slot->messageBuf = 0;
   slot->messageSize = 0;
 }
@@ -180,11 +180,10 @@ void persistentRequestHandler(void *env)
   PersistentReceivesTable *slot = (PersistentReceivesTable *)h;
   slot->messagePtr = CmiAlloc(msg->maxBytes);
   _MEMCHECK(slot->messagePtr);
-  slot->recvSize = 0;
   slot->sizeMax = msg->maxBytes;
 
   PersistentReqGrantedMsg *gmsg = CmiAlloc(sizeof(PersistentReqGrantedMsg));
-  gmsg->slotFlagAddress = &slot->recvSize;
+  gmsg->slotFlagAddress = &(slot->recvSize);
   gmsg->msgAddr = slot->messagePtr;
   gmsg->sourceHandlerIndex = msg->sourceHandlerIndex;
   gmsg->destHandlerIndex = h;
@@ -200,8 +199,9 @@ void persistentReqGrantedHandler(void *env)
   PersistentReqGrantedMsg *msg = (PersistentReqGrantedMsg *)env;
   PersistentHandle h = msg->sourceHandlerIndex;
   PersistentSendsTable *slot = (PersistentSendsTable *)h;
-  slot->destSlotFlagAddress = msg->slotFlagAddress;
+  CmiAssert(slot->used == 1);
   slot->destAddress = msg->msgAddr;
+  slot->destSizeAddress = msg->slotFlagAddress;
   slot->destHandle = msg->destHandlerIndex;
 
   if (slot->messageBuf) {
@@ -216,14 +216,13 @@ void CmiSendPersistentMsg(PersistentHandle h, int destPE, int size, void *m)
   CmiAssert(h!=NULL);
   PersistentSendsTable *slot = (PersistentSendsTable *)h;
   CmiAssert(slot->used == 1);
+  CmiAssert(slot->destPE == destPE);
   if (size > slot->sizeMax) {
     CmiPrintf("size: %d sizeMax: %d\n", size, slot->sizeMax);
     CmiAbort("Abort: Invalid size\n");
   }
 
-/*
-CmiPrintf("[%d] CmiSendPersistentMsg handle: %d\n", CmiMyPe(), h);
-*/
+//CmiPrintf("[%d] CmiSendPersistentMsg h=%p hdl=%d destAddress=%p size=%d\n", CmiMyPe(), *phs, CmiGetHandler(m), slot->destAddress, size);
 
   if (slot->destAddress) {
     ELAN_EVENT *e1, *e2;
@@ -234,7 +233,7 @@ CmiPrintf("[%d] CmiSendPersistentMsg handle: %d\n", CmiMyPe(), h);
     APPEND_PMSG_LIST(msg_tmp);
 #else
     elan_wait(e1, ELAN_POLL_EVENT);
-    e2 = elan_put(elan_base->state, &size, slot->destSlotFlagAddress, sizeof(int), destPE);
+    e2 = elan_put(elan_base->state, &size, slot->destSizeAddress, sizeof(int), destPE);
     elan_wait(e2, ELAN_POLL_EVENT);
 //CmiPrintf("[%d] elan finished. \n", CmiMyPe());
     CmiFree(m);
@@ -275,7 +274,7 @@ CmiPrintf("remote_put_done on %d\n", CmiMyPe());
       smsg->sent = 1;
       CmiFree(smsg->msg);
       PersistentSendsTable *slot = (PersistentSendsTable *)(smsg->h);
-      smsg->e = elan_put(elan_base->state, &smsg->size, slot->destSlotFlagAddress, sizeof(int), smsg->destpe);
+      smsg->e = elan_put(elan_base->state, &smsg->size, slot->destSizeAddress, sizeof(int), smsg->destpe);
       return 1;
     }
   }
@@ -318,7 +317,7 @@ void PumpPersistent()
       void *msg = slot->messagePtr;
 
 #if 1
-      // should return messagePtr directly and make sure keep it.
+      // return messagePtr directly and user MUST make sure not to delete it.
       void *dupmsg = CmiAlloc(size);
       _MEMCHECK(dupmsg);
       memcpy(dupmsg, msg, size);
@@ -424,6 +423,7 @@ void CmiPersistentInit()
     initSendSlot(&persistentSendsTable[i]);
   }
   persistentSendsTableCount = 0;
+  persistentReceivesTableHead = persistentReceivesTableTail = NULL;
   persistentReceivesTableCount = 0;
 }
 
