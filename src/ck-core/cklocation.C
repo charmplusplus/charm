@@ -8,6 +8,7 @@ Orion Sky Lawlor, olawlor@acm.org 9/29/2001
 #include "charm++.h"
 #include "register.h"
 #include "ck.h"
+#include "trace.h"
 
 #if CMK_LBDB_ON
 #include "LBDatabase.h"
@@ -597,7 +598,13 @@ bool CkLocRec_local::invokeEntry(CkMigratable *obj,void *msg,int epIdx) {
 	CpvAccess(_currentChare) = (void*) obj;
 	CpvAccess(_currentChareType) = _entryTable[epIdx]->chareIdx;
 	startTiming();
+	if (msg) {
+		envelope *env=UsrToEnv(msg);
+		_TRACE_BEGIN_EXECUTE_DETAILED(env->getEvent(),
+		      ForChareMsg,epIdx,env->array_srcPe());
+	}
 	_entryTable[epIdx]->call(msg, obj);
+	if (msg) _TRACE_END_EXECUTE();
 	if (isDeleted) return false;//We were deleted
 	deletedMarker=NULL;
 	stopTiming();
@@ -839,6 +846,7 @@ CkLocMgr::CkLocMgr(CkGroupID mapID_,CkGroupID lbdbID_,int numInitial)
 // moved to _CkMigratable_initInfoInit()
 //	CpvInitialize(CkMigratable_initInfo,mig_initInfo);
 	
+	ckEnableTracing=CmiFalse; //Prevent us from being recorded
 	managers.init();
 	nManagers=0;
   	firstManager=NULL;
