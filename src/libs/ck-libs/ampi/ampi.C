@@ -335,6 +335,7 @@ CkReductionMsg *AmpiReducerFunc(int nMsg, CkReductionMsg **msgs){
   for(int i=1;i<nMsg;i++){
     (*func)((void *)((char *)msgs[i]->getData()+szhdr),(void *)((char *)ret+szhdr),&len,&dtype);
   }
+CkPrintf("AmpiReducerFunc: szhdr=%d, szdata=%d, totalsz=%d,,, msg->getSize()=%d\n",szhdr,szdata,szhdr+szdata,msgs[0]->getSize());
   CkReductionMsg *retmsg = CkReductionMsg::buildNew(szhdr+szdata,ret);
   free(ret);
   return retmsg;
@@ -1702,7 +1703,8 @@ int AMPI_Barrier(MPI_Comm comm)
   AMPIAPI("AMPI_Barrier");
   if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Barrier not allowed for Inter-communicator!");
   //HACK: Use collective operation as a barrier.
-  AMPI_Allreduce(NULL,NULL,0,MPI_INT,MPI_SUM,comm);
+  int dummy=0;
+  AMPI_Allreduce(&dummy,&dummy,1,MPI_INT,MPI_SUM,comm);
   return 0;
 }
 
@@ -1770,7 +1772,7 @@ int AMPI_Reduce(void *inbuf, void *outbuf, int count, int type, MPI_Op op,
   ptr->contribute(msg);
   if (ptr->thisIndex == rootIdx){
     /*HACK: Use recv() to block until reduction data comes back*/
-    if(-1==ptr->recv(MPI_REDUCE_TAG, MPI_REDUCE_SOURCE, outbuf, count, type, MPI_REDUCE_COMM))
+    if(-1==ptr->recv(MPI_REDUCE_TAG, MPI_REDUCE_SOURCE, outbuf, count, type, comm))
       CkAbort("AMPI>MPI_Reduce called with different values on different processors!");
   }
   return 0;
@@ -1791,7 +1793,7 @@ int AMPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
   ptr->contribute(msg);
 
   /*HACK: Use recv() to block until the reduction data comes back*/
-  if(-1==ptr->recv(MPI_REDUCE_TAG, MPI_REDUCE_SOURCE, outbuf, count, type, MPI_REDUCE_COMM))
+  if(-1==ptr->recv(MPI_REDUCE_TAG, MPI_REDUCE_SOURCE, outbuf, count, type, comm))
     CkAbort("AMPI> MPI_Allreduce called with different values on different processors!");
   return 0;
 }
@@ -1815,7 +1817,7 @@ int AMPI_Iallreduce(void *inbuf, void *outbuf, int count, int type,
 
   // using irecv instead recv to non-block the call and get request pointer
   AmpiRequestList* reqs = getReqs();
-  IReq *newreq = new IReq(outbuf,count,type,MPI_REDUCE_SOURCE,MPI_REDUCE_TAG,MPI_REDUCE_COMM);
+  IReq *newreq = new IReq(outbuf,count,type,MPI_REDUCE_SOURCE,MPI_REDUCE_TAG,comm);
   *request = reqs->insert(newreq);
   return 0;
 }
