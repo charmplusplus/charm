@@ -1,7 +1,7 @@
 \documentclass[10pt]{article}
 
-\usepackage{pplmanual}
-\input{pplmanual}
+\usepackage{../pplmanual}
+\input{../pplmanual}
 
 \begin{document}
 
@@ -478,7 +478,6 @@ GeneratorDispatcher::GeneratorDispatcher(eventMsg *m)
   delete(m);
   eventMsg *e = new eventMsg;
   POSE_create(ResourceComponent(e), 1, 0);
-  POSE_creations_complete();
 
   j->complexity = (lrand48() % 10) + 1;
   j->id = 0;
@@ -496,10 +495,7 @@ all initializations are complete, or be placed at the end of the constructor
 for simplicity. 
 
 Inside a POSE module, we can create other posers using the \verb|POSE_create|
-function.  When all posers we plan to create have been created, we indicate
-this by calling \verb|POSE_creations_complete|.
-
-To invoke event methods on an object, we use some form of the
+function.  To invoke event methods on an object, we use some form of the
 \verb|POSE_invoke| function.  The other forms this may take are
 \verb|POSE_invoke_at| and
 \verb|POSE_local_invoke|.  
@@ -958,11 +954,6 @@ Creating a poser from outside the module is somewhat more complex:
 This is similar to what the module code ultimately gets translated to,
 and should be replaced by a macro with similar syntax soon.
 
-When all posers have been created, the following should be called:
-
-~\\
-\noindent {\tt {\bf POSE\_creations\_complete}();}\\
-
 \subsection{Event Method Invocations}
 
 Event method invocations vary significantly from entry method
@@ -1087,10 +1078,6 @@ handle, int atTime)}\\
 	time (in simulation timesteps) at which it should be created.\\ 
 	$\circ$ The handle can be thought of as a chare array element
 	index in Charm++.
-\item {\tt void {\bf POSE\_creations\_complete}()}\\
-	$\circ$ When all posers have been created, this should be
-	called to tell POSE what posers are available for load balancing.\\
-	$\circ$ Similar to {\tt doneInserting} in Charm++.
 \item {\tt void {\bf POSE\_invoke\_at}({\it methodName}(eventMsg *m),
 {\it className}, int handle, int atTime)}\\
 	$\circ$ Send a {\it methodName} event with message $m$ to an
@@ -1120,6 +1107,8 @@ handle, int atTime)}\\
 \item {\tt void {\bf checkpoint}(rep *t)}\\
 	$\circ$ Checkpoints the current state, according to
 	checkpointing frequency.
+\item {\tt void {\bf restore}(rep *t)}\\
+	$\circ$ Restores the state from checkpointed data.
 \item {\tt void {\bf update}(eventMsg *m)}\\
 	$\circ$ Brings OVT into sync with event timestamp: if OVT <
 	timestamp, OVT is set to timestamp.
