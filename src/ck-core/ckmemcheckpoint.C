@@ -23,6 +23,10 @@ Restart phase contains two steps:
 2. CkMemCheckPT gets control and recover array elements and reset all
    states to be consistent.
 
+TODO:
+ checkpoint scheme can be reimplemented based on per processor scheme;
+ restart phase should restore/reset group table, etc on all processors, thus flushStates() can be eliminated.
+
 */
 
 #include "charm++.h"
@@ -112,12 +116,10 @@ CkMemCheckPT::CkMemCheckPT()
     CkPrintf("CkMemCheckPT disabled!\n");
   inRestarting = 0;
   recvCount = peCount = 0;
-  qdCallback = NULL;
 }
 
 CkMemCheckPT::~CkMemCheckPT()
 {
-  if (qdCallback) delete qdCallback;
 }
 
 void CkMemCheckPT::pup(PUP::er& p) 
@@ -130,7 +132,6 @@ void CkMemCheckPT::pup(PUP::er& p)
   p|cpCallback;			// store callback
   if (p.isUnpacking()) {
     recvCount = peCount = 0;
-    qdCallback = NULL;
   }
 }
 
@@ -460,7 +461,7 @@ void CkMemCheckPT::finishUp()
 }
 
 // called only on 0
-void CkMemCheckPT::quiescence(CkCallback cb)
+void CkMemCheckPT::quiescence(CkCallback &cb)
 {
   static int pe_count = 0;
   pe_count ++;
@@ -578,6 +579,13 @@ void CkMemRestart(){
    cur_restart_phase=-1;
 }
 
+// can be called in other files
+// return true if it is in restarting
+int CkInRestart()
+{
+  return CProxy_CkMemCheckPT(ckCheckPTGroupID).ckLocalBranch()->inRestarting;
+}
+
 /*****************************************************************************
                 module initialization
 *****************************************************************************/
@@ -591,12 +599,6 @@ public:
 #endif
   }
 };
-
-// return true if it is in restarting
-int CkInRestart()
-{
-  return CProxy_CkMemCheckPT(ckCheckPTGroupID).ckLocalBranch()->inRestarting;
-}
 
 // initproc
 void CkRegisterRestartHandler( )

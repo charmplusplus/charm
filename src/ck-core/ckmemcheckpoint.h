@@ -64,18 +64,16 @@ public:
   void cpFinish();
   void recoverBuddies();
   void recoverArrayElements();
-  void quiescence(CkCallback);
+  void quiescence(CkCallback &);
   void resetReductionMgr();
   void finishUp();
   void inmem_restore(CkArrayCheckPTMessage *m);
   void resetLB(int diepe);
 public:
   static CkCallback  cpCallback;
-//  static CkCallback  *restartCallback;
 
   int inRestarting;
 private:
-  CkCallback  *qdCallback;
   CkVec<CkMemCheckPTInfo *> ckTable;
 
   int recvCount, peCount;
