@@ -42,5 +42,6 @@
 #define CMK_PERSISTENT_COMM				   0
 
 #define CMK_OBJECT_QUEUE_AVAILABLE		   	   0
+#define CMK_USE_SPECIAL_MESSAGE_QUEUE_CHECK                1
 
 #define CMK_MACHINE_PROGRESS_DEFINED                       1
