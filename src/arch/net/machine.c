@@ -1760,7 +1760,7 @@ static void ConverseRunPE(int everReturn)
   CmiIdleState *s=CmiNotifyGetState();
   CmiState cs;
   char** CmiMyArgv;
-  CmiNodeBarrier();
+  CmiNodeAllBarrier();
   cs = CmiGetState();
   CpvInitialize(void *,CmiLocalQueue);
   CpvAccess(CmiLocalQueue) = cs->localqueue;
@@ -1832,6 +1832,13 @@ static void ConverseRunPE(int everReturn)
   }
 #endif
 
+  /* communication thread */
+  if (CmiMyRank() == CmiMyNodeSize()) {
+    Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
+    if (Cmi_charmrun_fd!=-1)
+          while (1) CommunicationServerThread(5);
+  }
+  else
   if (!everReturn) {
     Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
     if (Cmi_usrsched==0) CsdScheduler(-1);
