@@ -120,8 +120,8 @@ CpvExtern(nodeInfo *, nodeinfo);
 #define tCOMMTHQ	tMYNODE->commThQ
 #define tTIMELINEREC	tMYNODE->timelines[tMYID]
 #define tTIMELINE	tMYNODE->timelines[tMYID].timeline
-#define tINBUFFER	cva(inBuffer)[tMYNODE->id]
-#define tMSGBUFFER	cva(msgBuffer)[tMYNODE->id]
+#define tINBUFFER	tMYNODE->inBuffer
+#define tMSGBUFFER	tMYNODE->msgBuffer
 #define tUSERDATA	tMYNODE->udata
 #define tTHREADTABLE    tMYNODE->threadTable
 #define tAFFINITYQ      tMYNODE->affinityQ[tMYID]
@@ -281,9 +281,11 @@ class nodeInfo: public CyclicMapInfo  {
 public:
   int id;
   int x,y,z;
-  threadQueue *commThQ;		/* suspended comm threads queue */
+  msgQueue     inBuffer;	/* emulate the fix-size inbuffer */
+  CmmTable     msgBuffer;	/* buffer when inBuffer is full */
   CthThread   *threadTable;	/* thread table for both work and comm threads*/
   threadInfo  **threadinfo;
+  threadQueue *commThQ;		/* suspended comm threads queue */
   ckMsgQueue   nodeQ;		/* non-affinity msg queue */
   ckMsgQueue  *affinityQ;	/* affinity msg queue for each work thread */
   double       startTime;	/* start time for a thread */
@@ -301,15 +303,18 @@ public:
 public:
   nodeInfo();
   ~nodeInfo();
-#if 0
-  ~nodeInfo() {
-    if (commThQ) delete commThQ;
-    delete [] affinityQ;
-    delete [] threadTable;
-    delete [] threadinfo;
-  }
-#endif
-  
+  /**
+   *  add a message to this bluegene node's inbuffer queue
+   */
+  void addBgNodeInbuffer(char *msgPtr);
+  /**
+   *  add a message to this bluegene node's non-affinity queue
+   */
+  void addBgNodeMessage(char *msgPtr);
+  /**
+   *  called by comm thread to poll inBuffer
+   */
+  char * getFullBuffer();
 };	// end of nodeInfo
 
 /*****************************************************************************
@@ -341,6 +346,7 @@ public:
   }
   inline void setThread(CthThread t) { me = t; }
   inline const CthThread getThread() const { return me; }
+  void addBgThreadMessage(char *msgPtr);        ///  add msg to affinity queue
 }; 
 
 extern double BgGetCurTime();

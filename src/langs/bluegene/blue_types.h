@@ -1,6 +1,41 @@
 #ifndef _BLUE_TYPES_H_
 #define _BLUE_TYPES_H_
 
+#define ASSERT(x)	if (!(x)) { CmiPrintf("Assert failure at %s:%d\n", __FILE__,__LINE__); CmiAbort("Abort!"); }
+
+/*****************************************************************************
+   used internally, define Queue for scheduler and fixed size msgqueue
+*****************************************************************************/
+
+/* scheduler queue */
+template <class T>
+class bgQueue {
+private:
+  T *data;
+  int fp, count, size;
+public:
+  bgQueue(): data(NULL), fp(0), count(0) {};
+  ~bgQueue() { delete[] data; }
+  inline void initialize(int max) {  size = max; data = new T[max]; }
+  T deq() {
+      if (count > 0) {
+        T ret = data[fp];
+        fp = (fp+1)%size;
+        count --;
+        return ret;
+      }
+      else
+        return 0;
+  }
+  void enq(T item) {
+      ASSERT(count < size);
+      data[(fp+count)%size] = item;
+      count ++;
+  }
+  inline int isFull() { return count == size; }
+  inline int isEmpty() { return count == 0; }
+};
+
 /*****************************************************************************
    used internally, define minHeap of messages
    it use the msg time as key and dequeue the msg with the smallest time.
