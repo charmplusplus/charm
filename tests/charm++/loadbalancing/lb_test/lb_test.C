@@ -25,8 +25,6 @@ Load-balancing test program:
 #include "GreedyLB.h"
 #include "NeighborLB.h"
 #include "WSLB.h"
-#include "GreedyRefLB.h"
-#include "RandRefLB.h"
 #include "OrbLB.h"
 
 #include "lb_test.decl.h"
@@ -102,12 +100,6 @@ static const struct {
   {"orb",
    "orb - Orthogonal Recursive Bisection to partition according to coordinates",
    CreateOrbLB},
-  {"greedyref",
-   "greedyref - Apply greedy, then refine",
-   CreateGreedyRefLB},
-  {"randref",
-   "randref - Apply random, then refine",
-   CreateRandRefLB},
   {"comm",
    "comm - Greedy with communication",
    CreateGreedyCommLB},
