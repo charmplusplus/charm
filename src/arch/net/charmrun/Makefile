@@ -3,7 +3,7 @@ CHARMC=$(BIN)/charmc $(OPTS)
 
 SHELL=/bin/sh
 
-$(BIN)/charmrun: charmrun.c ../conv-mach.h
+$(BIN)/charmrun: charmrun.c ../conv-mach.h ../conv-mach-opt.h
 	$(CHARMC) -c -seq -DSILENT charmrun.c
 	$(CHARMC) -cp $(BIN) -seq -o charmrun-silent charmrun.o
 	$(CHARMC) -c -seq -DNOTIFY charmrun.c
