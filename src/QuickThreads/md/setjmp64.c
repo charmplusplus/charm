@@ -14,10 +14,18 @@
 
 struct helpdesc { qt_helper_t *hfn; qt_t *jb; void *old; void *new; };
 
-#ifdef QT_GROW_DOWN
-#define SHIFTSP(pos) {char *osp=alloca(0); alloca((osp-((char*)pos))+256); }
+#ifdef __CYGWIN__
+# ifdef QT_GROW_DOWN
+#define SHIFTSP(pos) asm ( "mov %0, %%esp\n"::"m"((char*)pos-256));
+# else
+#define SHIFTSP(pos) asm ( "mov %0, %%esp\n"::"m"((char*)pos+256));
+# endif
 #else
+# ifdef QT_GROW_DOWN
+#define SHIFTSP(pos) {char *osp=alloca(0); alloca((osp-((char*)pos))+256); }
+# else
 #define SHIFTSP(pos) {char *osp=alloca(0); alloca((((char*)pos)-osp)+256); }
+# endif
 #endif
 
 #define MAXTABLE 1000
