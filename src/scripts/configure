@@ -1861,7 +1861,6 @@ _ACEOF
 cat > $t <<EOT
 #include <malloc.h>
 int main() {
-  int * d = (int *)malloc(sizeof(int));
   return 0;
 }
 EOT
