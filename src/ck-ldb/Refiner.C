@@ -41,7 +41,7 @@ void Refiner::create(int count, BaseLB::LDStats* stats, int* procs)
     processors[i].computeLoad = 0;
     processors[i].computeSet = new Set();
     processors[i].pe_speed = stats->procs[i].pe_speed;
-    processors[i].utilization = stats->procs[i].utilization;
+//    processors[i].utilization = stats->procs[i].utilization;
     processors[i].available = stats->procs[i].available;
     if (processors[i].available == CmiTrue) numAvail++;
   }

@@ -223,7 +223,6 @@ public:
 class CLBStatsMsg {
 public:
   int from_pe;
-  int serial;
   int pe_speed;
   double total_walltime;
   double total_cputime;

@@ -44,17 +44,17 @@ public:
     double idletime;
     double bg_walltime;
     double bg_cputime;
-    int pe_speed;
-    double utilization;
-    CmiBool available;
+    //double utilization;
     int   n_objs;
+    int   pe_speed;
+    CmiBool available;
     ProcStats(): total_walltime(0.0), total_cputime(0.0), idletime(0.0),
-	   	 bg_walltime(0.0), bg_cputime(0.0), pe_speed(1),
-		 utilization(1.0), available(CmiTrue), n_objs(0)  {}
+	   	 bg_walltime(0.0), bg_cputime(0.0), n_objs(0), 
+		 pe_speed(1), available(CmiTrue)  {}
     inline void pup(PUP::er &p) {
       p|total_walltime;  p|total_cputime; p|idletime;
       p|bg_walltime; p|bg_cputime; p|pe_speed;
-      p|utilization; p|available; p|n_objs;
+      p|available; p|n_objs;
     }
   };
 
