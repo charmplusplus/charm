@@ -1,0 +1,17 @@
+VMI_INCDIR="-I/usr/local/apps/vmi-2.0b-3-gcc/include"
+VMI_LIBDIR="-L/usr/local/apps/vmi-2.0b-3-gcc/lib"
+#
+CMK_CPP_C="icc -E $CMK_INCDIR $VMI_INCDIR "
+CMK_CC="icc $CMK_INCDIR $VMI_INCDIR "
+CMK_CC_RELIABLE="icc $CMK_INCDIR $VMI_INCDIR "
+CMK_CC_FASTEST="icc $CMK_INCDIR $VMI_INCDIR "
+CMK_CXX="icpc $CMK_INCDIR $VMI_INCDIR "
+CMK_CXXPP="icpc -E $CMK_INCDIR $VMI_INCDIR "
+CMK_LD="icc -rdynamic -pthread $VMI_LIBDIR "
+CMK_LDXX="icpc -rdynamic -pthread $VMI_LIBDIR "
+CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
+CMK_SEQ_CC="icc $CMK_INCDIR $VMI_INCDIR "
+CMK_SEQ_LD="icc $CMK_INCDIR $VMI_INCDIR "
+CMK_SEQ_CXX="icpc $CMK_INCDIR $VMI_INCDIR "
+CMK_SEQ_LDXX="icpc $CMK_INCDIR $VMI_INCDIR "
+
