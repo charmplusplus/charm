@@ -92,8 +92,15 @@ public:
         int i;
         for (i=0; i<n; i++) if (tr == traces[i]) break;
         CmiAssert(i<n);
-        traces.remove(i);
+        traces[i] = NULL;
         n--;
+    }
+    inline void clearTrace() {    // remove void Trace from TraceArray
+	int len = traces.length();
+	int removed = 0;
+        for (int i=0; i<len; i++) {
+          if (traces[i] == NULL) { traces.remove(i-removed); removed++; }
+        }
     }
     inline const int length() const { return n; }
 
@@ -129,7 +136,7 @@ public:
     }  
     inline void traceClearEps() {ALLDO(traceClearEps());}
     inline void traceWriteSts() {ALLDO(traceWriteSts());}
-    inline void traceClose() {ALLDO(traceClose());}
+    inline void traceClose() {ALLDO(traceClose()); clearTrace();}
     inline void traceBegin() {ALLDO(traceBegin());}
     inline void traceEnd() {ALLDO(traceEnd());}
 };
