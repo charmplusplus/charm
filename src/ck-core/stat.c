@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.2  1995-06-14 16:31:04  brunner
+ * Revision 2.3  1995-06-29 21:53:35  narain
+ * Changed LdbBocNum to CpvAccess(LdbBocNum)
+ *
+ * Revision 2.2  1995/06/14  16:31:04  brunner
  * Initialized EpLanguageTable in StatAddSysBocEps().  This should probably
  * call RegisterBocEp() instead.
  *
@@ -111,7 +114,7 @@ TRACE(CmiPrintf("Node %d: Enter NodeCollectStatistics() \n", CmiMyPe()));
 		sPtr->nodeMemStat[i] = CstatMemory(i);
 
 	GeneralSendMsgBranch(StatCollectNodes_EP, sPtr, 
-		0, USERcat, BocMsg, LdbBocNum);
+		0, USERcat, BocMsg, CpvAccess(LdbBocNum));
 }
 
 
@@ -125,7 +128,7 @@ CollectStatistics()
 	mPtr = (DUMMY_STAT_MSG *) CkAllocMsg(sizeof(DUMMY_STAT_MSG));
 	CkMemError(mPtr);
 	GeneralBroadcastMsgBranch(StatData_EP, mPtr,
-				 IMMEDIATEcat, BroadcastBocMsg, LdbBocNum);
+				 IMMEDIATEcat, BroadcastBocMsg, CpvAccess(LdbBocNum));
 }
 
 
