@@ -28,6 +28,9 @@
 #  define CmiTmpFree(ptr) free(ptr)
 #endif
 
+#if !CMK_HAS_SOCKLEN
+typedef int socklen_t;
+#endif
 
 /*Just print out error message and exit*/
 static int default_skt_abort(int code,const char *msg)
@@ -281,7 +284,7 @@ SOCKET skt_datagram(int *port, int bufsize)
 {  
   int connPort=(port==NULL)?0:*port;
   struct sockaddr_in addr=skt_build_addr(skt_invalid_ip,connPort);
-  int                len;
+  socklen_t          len;
   SOCKET             ret;
   
 retry:
@@ -294,7 +297,7 @@ retry:
 	  return skt_abort(93491,"Error binding datagram socket.");
   
   len = sizeof(addr);
-  if (getsockname(ret, (struct sockaddr *)&addr , (socklen_t*)&len))
+  if (getsockname(ret, (struct sockaddr *)&addr , &len))
 	  return skt_abort(93492,"Error getting address on datagram socket.");
 
   if (bufsize) 
@@ -317,7 +320,7 @@ SOCKET skt_server(int *port)
 SOCKET skt_server_ip(int *port,skt_ip_t *ip)
 {
   SOCKET             ret;
-  int                len;
+  socklen_t          len;
   int on = 1; /* for setsockopt */
   int connPort=(port==NULL)?0:*port;
   struct sockaddr_in addr=skt_build_addr((ip==NULL)?skt_invalid_ip:*ip,connPort);
@@ -336,7 +339,7 @@ retry:
   if (listen(ret,5) == SOCKET_ERROR) 
 	  return skt_abort(93485,"Error listening on server socket.");
   len = sizeof(addr);
-  if (getsockname(ret, (struct sockaddr *)&addr, (socklen_t*)&len) == SOCKET_ERROR) 
+  if (getsockname(ret, (struct sockaddr *)&addr, &len) == SOCKET_ERROR) 
 	  return skt_abort(93486,"Error getting name on server socket.");
 
   if (port!=NULL) *port = (int)ntohs(addr.sin_port);
@@ -346,12 +349,12 @@ retry:
 
 SOCKET skt_accept(SOCKET src_fd,skt_ip_t *pip, int *port)
 {
-  int len;
+  socklen_t len;
   struct sockaddr_in addr={0};
   SOCKET ret;
   len = sizeof(addr);
 retry:
-  ret = accept(src_fd, (struct sockaddr *)&addr, (socklen_t*)&len);
+  ret = accept(src_fd, (struct sockaddr *)&addr, &len);
   if (ret == SOCKET_ERROR) {
     if (skt_should_retry()) goto retry;
     else return skt_abort(93523,"Error in accept.");
