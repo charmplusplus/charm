@@ -47,7 +47,7 @@ public:
     CkAssert(evID.getPE() < CkNumPes());
     CkAssert(parent == NULL);
     CkAssert(str == NULL);
-    CkAssert(msgSize > 0);
+    CkAssert(msgSize >= 0);
   }
   /// Timestamps this message and generates a unique event ID
   /** Timestamps this message and generates a unique event ID for the event
