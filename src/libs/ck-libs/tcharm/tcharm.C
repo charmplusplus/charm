@@ -365,7 +365,11 @@ CkArrayID TCHARM_Get_threads(void) {
 
 /****** Readonlys *****/
 static int tcharm_readonlygroup_created=0;
-static TCharmReadonlys initial_readonlies;
+static TCharmReadonlys *initial_readonlies=NULL;
+TCharmReadonlys &getInitialReadonlies(void) {
+	if (!initial_readonlies) initial_readonlies=new TCharmReadonlys;
+	return *initial_readonlies;
+}
 CProxy_TCharmReadonlyGroup tcharm_readonlygroup;
 
 class TCharmReadonlyGroup : public CBase_TCharmReadonlyGroup {
@@ -403,7 +407,7 @@ static void send_readonlies(TCharmReadonlys &r) {
 class TCharmReadonlyMain : public CBase_TCharmReadonlyMain {
 public:
     TCharmReadonlyMain(void) {
-    	TCharmReadonlys &r=initial_readonlies;
+    	TCharmReadonlys &r=getInitialReadonlies();
 	int len; {PUP::sizer p; r.pupData(p); len=p.size();}
 	char *data=new char[len];
 	{PUP::toMem p(data); r.pupData(p);}
@@ -447,13 +451,15 @@ void TCharmReadonlys::pupAll(PUP::er &p) {
 
 CDECL void TCHARM_Readonly_globals(TCpupReadonlyGlobal fn)
 {
-	TCHARMAPI("TCHARM_Readonly_globals");
 	if (!tcharm_readonlygroup_created) 
-	{ // Readonly message hasn't gone out yet: just add to list
-		initial_readonlies.add(fn);
+	{ // Readonly message hasn't gone out yet: just add to list.
+	  // Because this routine can be called from nodesetup,
+	  //  TCHARMAPI isn't safe yet.
+		getInitialReadonlies().add(fn);
 	} 
 	else /* tcharm_readonlygroup_created */
 	{ // Late addition: Broadcast our copy of the readonly data:
+		TCHARMAPI("TCHARM_Readonly_globals");
 		TCharmReadonlys r; r.add(fn);
 		send_readonlies(r);
 	}
