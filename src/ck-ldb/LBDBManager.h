@@ -106,8 +106,15 @@ public:
   void Migrated(LDObjHandle h);
   void NotifyMigrated(LDMigratedFn fn, void* data);
 
+  inline void TurnManualLBOn() { useBarrier = CmiFalse; }
+  inline void TurnManualLBOff() { useBarrier = CmiTrue; }
   void AddStartLBFn(LDStartLBFn fn, void* data);
-  void StartLB();
+  inline void StartLB() {
+    if (startLBFn == NULL) {
+      CmiAbort("StartLB is not supported in this LB");
+    }
+    startLBFn->fn(startLBFn->data);
+  }
 
   inline void IdleTime(double* walltime) { 
     machineUtil.IdleTime(walltime); 
@@ -144,7 +151,7 @@ public:
     localBarrier.RemoveReceiver(h);
   };
   inline void AtLocalBarrier(LDBarrierClient h) {
-    localBarrier.AtBarrier(h);
+    if (useBarrier) localBarrier.AtBarrier(h);
   };
   inline void ResumeClients() {
     localBarrier.ResumeClients();
@@ -201,7 +208,9 @@ private:
 
   batsyncer batsync;
 
-  LocalBarrier localBarrier;
+  LocalBarrier localBarrier;    // local barrier to trigger LB automatically
+  CmiBool useBarrier;           // use barrier or not
+
   LBMachineUtil machineUtil;
   double obj_walltime;
   double obj_cputime;

@@ -93,6 +93,12 @@ void LDStartLB(LDHandle _db)
   db->StartLB();
 }
 
+void LDTurnManualLBOn(LDHandle _db)
+{
+  LBDB *const db = (LBDB*)(_db.handle);
+  db->TurnManualLBOn();
+}
+
 extern "C" void LDCollectStatsOn(LDHandle _db)
 {
   LBDB *const db = (LBDB*)(_db.handle);

@@ -52,7 +52,7 @@ void LBDB::batsyncer::init(LBDB *_db,double initPeriod)
  * LBDB Code
  *************************************************************/
 
-LBDB::LBDB()
+LBDB::LBDB(): startLBFn(NULL), useBarrier(CmiTrue)
 {
     statsAreOn = CmiFalse;
     omCount = objCount = oms_registering = 0;
@@ -60,7 +60,6 @@ LBDB::LBDB()
     commTable = new LBCommTable;
     obj_walltime = obj_cputime = 0;
     batsync.init(this,1.0);
-    startLBFn = NULL;
 }
 
 LDOMHandle LBDB::AddOM(LDOMid _userID, void* _userData, 
@@ -234,14 +233,6 @@ void LBDB::AddStartLBFn(LDStartLBFn fn, void* data)
   callbk->fn = fn;
   callbk->data = data;
   startLBFn = callbk;
-}
-
-void LBDB::StartLB()
-{
-  if (startLBFn == NULL) {
-    CmiAbort("StartLB is not supported in this LB");
-  }
-  startLBFn->fn(startLBFn->data);
 }
 
 void LBDB::BackgroundLoad(double* walltime, double* cputime)

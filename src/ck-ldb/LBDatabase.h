@@ -94,6 +94,7 @@ public:
   };
 
   inline void StartLB() { LDStartLB(myLDHandle); }
+  inline void TurnManualLBOn() { LDTurnManualLBOn(myLDHandle); }
  
   inline void CollectStatsOn(void) { LDCollectStatsOn(myLDHandle); };
   inline void CollectStatsOff(void) { LDCollectStatsOff(myLDHandle); };
