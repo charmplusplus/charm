@@ -6,9 +6,6 @@
 
 #include "CommLBHeap.h"
 
-#include "iostream.h"
-// Heap of pointers. The field to be compared is:
-
 ObjectHeap::ObjectHeap(int size)
 {
   this->size = size;
@@ -29,7 +26,7 @@ int ObjectHeap::insert(ObjectRecord *x)
   count++;
 
   if (count >= size) {
-    cout << "Heap overflow. \n" ; 
+    CkPrintf("Heap overflow. \n"); 
     return -1;}
 
   int parent = (current - 1)/2;
