@@ -438,8 +438,11 @@ CkMigratable::~CkMigratable() {
 	*/
 #if CMK_LBDB_ON 
 	if (barrierRegistered) {
-		DEBL((AA"Removing barrier for element %s\n"AB,idx2str(thisIndexMax)));
+	  DEBL((AA"Removing barrier for element %s\n"AB,idx2str(thisIndexMax)));
+	  if (usesAtSync)
 		myRec->getLBDB()->RemoveLocalBarrierClient(ldBarrierHandle);
+	  else
+		myRec->getLBDB()->RemoveLocalBarrierReceiver(ldBarrierRecvHandle);
 	}
 #endif
 	//To detect use-after-delete
@@ -461,7 +464,11 @@ void CkMigratable::ckFinishConstruction(void)
 //	if ((!usesAtSync) || barrierRegistered) return;
 	if (barrierRegistered) return;
 	DEBL((AA"Registering barrier client for %s\n"AB,idx2str(thisIndexMax)));
-	ldBarrierHandle = myRec->getLBDB()->AddLocalBarrierClient(
+        if (usesAtSync)
+	  ldBarrierHandle = myRec->getLBDB()->AddLocalBarrierClient(
+		(LDBarrierFn)staticResumeFromSync,(void*)(this));
+        else
+	  ldBarrierRecvHandle = myRec->getLBDB()->AddLocalBarrierReceiver(
 		(LDBarrierFn)staticResumeFromSync,(void*)(this));
 	barrierRegistered=CmiTrue;
 }

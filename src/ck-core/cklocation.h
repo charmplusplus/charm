@@ -256,6 +256,7 @@ protected:
   void AtSync(void);
 private: //Load balancer state:
   LDBarrierClient ldBarrierHandle;//Transient (not migrated)  
+  LDBarrierReceiver ldBarrierRecvHandle;//Transient (not migrated)  
   static void staticResumeFromSync(void* data);
 public:
   void ckFinishConstruction(void);
