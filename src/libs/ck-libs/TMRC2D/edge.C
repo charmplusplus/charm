@@ -91,6 +91,43 @@ int edge::split(int *m, edgeRef *e_prime, node iNode, node fNode,
   }
 }
 
+int edge::collapse(node *m, elemRef requester, node kNode, node dNode)
+{
+  return -1;
+  // element requester has asked this edge to collapse and give back new node
+  // coordinates resulting node; return value is 1 if successful, 0 if
+  // dNode is the node that is kept
+  elemRef nbr = getNot(requester), nullRef;
+  nullRef.reset();
+  if (pending && (waitingFor == requester)) { 
+    // already collapsed; waiting for requester
+    CkPrintf("TMRC2D: edge::collapse: ** PART 2! ** On edge=%d on chunk=%d, requester=(%d,%d) with nbr=(%d,%d)\n", myRef.idx, myRef.cid, requester.cid, requester.idx, nbr.cid, nbr.idx);
+    *m = newNode;
+    if (dNode == incidentNode) return 1; // incidence as planned
+    else return 0; // incidence is on kNode
+  }
+  else if (pending) { // can't collapse a second time yet; waiting for nbr elem
+  CkPrintf("TMRC2D: edge::collapse: ** Pending on (%d,%d)! ** On edge=%d on chunk=%d, requester=%d on chunk=%d\n", waitingFor.cid, waitingFor.idx, myRef.idx, myRef.cid, requester.idx, requester.cid);
+    return -1;
+  }
+  else { // Need to do the collapse
+  CkPrintf("TMRC2D: edge::collapse: ** PART 1! ** On edge=%d on chunk=%d, requester==(%d,%d) with nbr=(%d,%d)\n", myRef.idx, myRef.cid, requester.cid, requester.idx, nbr.cid, nbr.idx);
+    setPending();
+    present = 0;
+    // should call a "remove edge" operation for the chunk
+    kNode.midpoint(dNode, newNode);
+    incidentNode = dNode;
+    fixNode = kNode;
+    *m = newNode;
+    if (nbr.cid != -1) {
+      waitingFor = nbr;
+      double nbrArea = nbr.getArea();
+      mesh[nbr.cid].coarsenElement(nbr.idx, nbrArea);
+    }
+    return 1;
+  }
+}
+
 void edge::sanityCheck(chunk *c, edgeRef shouldRef) 
 {
   int nonNullElements=0;

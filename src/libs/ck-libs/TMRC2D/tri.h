@@ -72,6 +72,10 @@ class refineResults; //Used by refinement API to store intermediate results
 class chunk : public TCharmClient1D {
   // current sizes of arrays allocated for the mesh
   int sizeElements, sizeEdges, sizeNodes;
+  // first empty slot in each mesh array
+  int firstFreeElement, firstFreeEdge, firstFreeNode;
+  // range of occupied slots in each mesh array
+  int elementSlots, edgeSlots, nodeSlots;
 
   void setupThreadPrivate(CthThread forThread) {
     CtvAccessOther(forThread, _refineChunk) = this;
@@ -150,6 +154,7 @@ class chunk : public TCharmClient1D {
   void setBorder(int n);
   intMsg *safeToMoveNode(int idx, double x, double y);
   splitOutMsg *split(int idx, elemRef e, node in, node fn);
+  collapseOutMsg *collapse(int idx, elemRef e, node kn, node dn);
   void collapseHelp(int idx, edgeRef er, node n1, node n2);
   void checkPending(int idx, objRef aRef);
   void checkPending(int idx, objRef aRef1, objRef aRef2);

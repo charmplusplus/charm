@@ -40,7 +40,7 @@ class element {  // triangular elements defined by three node references,
   chunk *C;
 
   /// Basic element constructor
-  element() {   targetArea = currentArea = -1.0;  present = 1; }
+  element() {   targetArea = currentArea = -1.0; }
   element(int cid, int idx, chunk *C) { set(); set(cid, idx, C); }
   element(int *n) { set();  set(n); }
   element(int *n, edgeRef *e) { set();  set(n, e); }
@@ -150,19 +150,13 @@ class element {  // triangular elements defined by three node references,
   double getTargetArea() { return targetArea; }
   double getCachedArea() { return currentArea; }
 
-  // These methods handle various types and stages of refinements.
   void refine();
   void split(int longEdge);
-
-  // coarsen will delete this element (and possibly a neighbor) by squishing 
-  // its shortest edge to that edge's midpoint.
   void coarsen();
-  //void collapse(int shortEdge, int n1, int n2, int e1, int e2);
-  //void collapseHelp(edgeRef shortEdgeRef, node n1, node n2);
+  void collapse(int shortEdge);
 
-  // These are helper methods.
   int findLongestEdge();
-  //int findShortestEdge();
+  int findShortestEdge();
   int isLongestEdge(edgeRef& e);
 
   // Mesh improvement stuff

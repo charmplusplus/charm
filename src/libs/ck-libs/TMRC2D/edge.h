@@ -15,6 +15,7 @@ class edge {
   chunk *C;
   edgeRef myRef;
   elemRef elements[2];  // the elements on either side of the edge
+  int present;  // indicates this is an edge present in the mesh
   edge() { unsetPending(); }
   edge(int idx, int cid, chunk *myChk) { 
     unsetPending(); myRef.set(cid, idx); C = myChk; 
@@ -56,6 +57,7 @@ class edge {
     myRef = e.myRef;
     return *this; 
   }
+  int isPresent() { return present; }
   void update(elemRef oldval, elemRef newval) {
     CkAssert((elements[0] == oldval) || (elements[1] == oldval));
     if (elements[0] == oldval)  elements[0] = newval;
@@ -76,6 +78,7 @@ class edge {
   void checkPending(elemRef e, elemRef ne);
   int split(int *m, edgeRef *e_prime, node iNode, node fNode,
 	    elemRef requester, int *local, int *first, int *nullNbr);
+  int collapse(node *m, elemRef requester, node kNode, node dNode);
   void sanityCheck(chunk *c, edgeRef shouldRef);
 };
 

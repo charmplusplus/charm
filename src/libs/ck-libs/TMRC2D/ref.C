@@ -42,6 +42,17 @@ int edgeRef::split(int *m, edgeRef *e_prime, node iNode, node fNode,
   return result;
 }
 
+int edgeRef::collapse(node *m, elemRef requester, node kNode, node dNode)
+{
+  collapseOutMsg *com;
+  int result;
+  com = mesh[cid].collapse(idx, requester, kNode, dNode);
+  *m = com->n;
+  result = com->result;
+  CkFreeMsg(com);
+  return result;
+}
+
 void edgeRef::resetEdge()
 {
   mesh[cid].resetEdge(idx);

@@ -170,141 +170,79 @@ void element::split(int longEdge)
 void element::coarsen()
 {
   int shortEdge = findShortestEdge();
-  int n1, n2, e1, e2;
-
-  n1 = (4-shortEdge)%3;
-  n2 = (3-shortEdge)%3;
-  e1 = (shortEdge+2)%3;
-  e2 = (shortEdge+1)%3;
-
-  if (nodes[n1].lock()) {
-    if (nodes[n2].lock()) {
-      collapse(shortEdge, n1, n2, e1, e2);
-      nodes[n2].unlock();
-    }
-    nodes[n1].unlock();
-  }
+  collapse(shortEdge);
 }
 
 
-void element::collapse(int shortEdge, int n1, int n2, int e1, int e2)
+void element::collapse(int shortEdge)
 {
-/*                       @n3
+/*                    opnode
+                         @
                         / \  
-                       /   \
-                    e1/     \e2
+       keepNbr         /   \        delNbr
+              keepEdge/     \delEdge
                      /       \
                     /         \
-                 n1@_____m_____@n2
-                     shortEdge                         */  
+           keepNode@_____m_____@delNode
+                     shortEdge            
+             
+                        nbr                      */  
+  node m;  // midpoint on edge
+  int opnode, delNode, keepNode, delEdge, keepEdge, result;
+  elemRef delNbr;
 
-  CkAbort("NOT IMPLEMENTED! element::collapse()\n");
+  opnode = (shortEdge + 2) % 3;
+  delNode = shortEdge;
+  delEdge = opnode;
+  keepEdge = (shortEdge + 1) % 3;
+  keepNode = keepEdge;
 
-/*
-  node m;  // midpoint on edge to collapse;
-  elemRef elem2, opElem;
-  updateMsg *um = new updateMsg;
-  int n3 = 3 - (n1 + n2), s1, s2;
-
-  edges[shortEdge].midpoint(m); // find midpoint on shortest edge
-
-  // Before we do anything, we need to look at the two nodes whose
-  // positions will change: if a node is on the border, we cannot move
-  // it; if a node causes a pair of incident edges to flip their order
-  // of incidence on the node when it moves, we cannot move it
-  s1 = nodes[n1].safeToMove(m, myRef, edges[shortEdge], edges[e1], nodes[n1], nodes[n2], nodes[n3]);
-  s2 = nodes[n2].safeToMove(m, myRef, edges[shortEdge], edges[e1], nodes[n2], nodes[n2], nodes[n3]);
-  if (!s1 && !s2) { // can't move either node
-    targetArea = -1.0;  // don't bother to coarsen
-    return; // no border movement or flipping elements allowed
+  if ((result=edges[shortEdge].collapse(&m, myRef, 
+					C->theNodes[nodes[keepNode]],
+					C->theNodes[nodes[delNode]])) == 1) {
+    // collapse successful; keepNode is node to keep
+    // tell delNbr to replace delEdge with keepEdge
+    delNbr = edges[delEdge].getNot(myRef);
+    mesh[delNbr.cid].updateElementEdge(delEdge, keepEdge);
+    // tell keepEdge to replace myRef with delNbr
+    edges[keepEdge].update(myRef, delNbr);
+    // remove self
+    C->removeElement(myRef.idx);
+    // remove delEdge
+    edges[delEdge].remove();
+    // edge[shortEdge] handles removal of delNode and shortEdge, as well as
+    // update of keepNode
   }
-  else if (s1 && !s2) {
-    int tmp = shortEdge;
-    shortEdge = e1; 
-    e1 = tmp;
-    tmp = n2;
-    n2 = n3; 
-    n3 = tmp;
-    edges[shortEdge].midpoint(m); // find midpoint on shortest edge
-    s2 = nodes[n2].safeToMove(m, myRef, edges[shortEdge], edges[e1], nodes[n2], nodes[n1], nodes[n3]);
-    if (!s2) { // can't move two of the nodes
-      targetArea = -1.0;  // don't bother to coarsen
-      return; // no border movement or flipping elements allowed
-    }
+  else if (result == 0) {
+    // collapse successful, but first half of collapse decided to keep delNode
+    // remap for sanity
+    keepNode = shortEdge;
+    keepEdge = opnode;
+    delEdge = (shortEdge + 1) % 3;
+    delNode = delEdge;
+    // tell delNbr to replace delEdge with keepEdge
+    delNbr = edges[delEdge].getNot(myRef);
+    mesh[delNbr.cid].updateElementEdge(delEdge, keepEdge);
+    // tell keepEdge to replace myRef with delNbr
+    edges[keepEdge].update(myRef, delNbr);
+    // remove self
+    C->removeElement(myRef.idx);
+    // remove delEdge
+    edges[delEdge].remove();
+    // edge[shortEdge] handles removal of delNode and shortEdge, as well as
+    // update of keepNode
   }
-  else if (s2 && !s1) {
-    int tmp = shortEdge;
-    shortEdge = e2; 
-    e2 = tmp;
-    tmp = n1;
-    n1 = n3; 
-    n3 = tmp;
-    edges[shortEdge].midpoint(m); // find midpoint on shortest edge
-    s1 = nodes[n1].safeToMove(m, myRef, edges[shortEdge], edges[e1], nodes[n1], nodes[n2], nodes[n3]);
-    if (!s1) { // can't move two of the nodes
-      targetArea = -1.0;  // don't bother to coarsen
-      return; // no border movement or flipping elements allowed
-    }
-  }
-  // end of border/edge flip tests
-  
-  elem2 = edges[e2].get(myRef);
-  opElem = edges[shortEdge].get(myRef);
-
-  nodes[n1].update(m);
-  edges[e1].update(myRef, elem2);
-  if (elem2.idx != -1)  elem2.update(edges[e2], edges[e1]);
-  if (opElem.idx != -1) { // need to collapse opElem too
-    opElem.collapseHelp(edges[shortEdge], nodes[n1], nodes[n2]);
-  }
-
-  um->oldval = nodes[n2];
-  um->newval = nodes[n1];
-  mesh.updateReferences(um);
-  nodes[n2].remove();
-  edges[e2].remove();
-  edges[shortEdge].remove();
-  myRef.remove();
-*/
+  // else collapse failed; try again later
 }
 
-
-//void element::collapseHelp(edgeRef shortEdgeRef, nodeRef n1ref, nodeRef n2ref)
-//{
-/*                       @
-                        / \  
-                       /   \
-                    e1/     \e2
-                     /       \
-                    /         \
-                 n1@_____m_____@n2
-                     shortEdge                         */ 
-/*
-  int shortEdge = getEdgeIdx(shortEdgeRef), 
-    n1 = getNodeIdx(n1ref), n2 = getNodeIdx(n2ref), e1, e2;
-  elemRef elem2;
-  e1 = n1 - shortEdge + 1;
-  e2 = n2 - shortEdge + 1;
-  // calculate the above ints
-  elem2 = edges[e2].get(myRef);
-  edges[e1].update(myRef, elem2);
-  if (elem2.idx != -1)  elem2.update(edges[e2], edges[e1]);
-  edges[e2].remove();
-  myRef.remove();
-}
-*/
 int element::findLongestEdge()
 {
   int i, longEdge;
-  node n[3];
   double maxlen = 0.0, len[3];
-
-  for (i=0; i<3; i++)  n[i] = C->theNodes[nodes[i]];
   // fine lengths of sides
-  len[0] = n[0].distance(n[1]);
-  len[1] = n[1].distance(n[2]);
-  len[2] = n[2].distance(n[0]);
-
+  len[0] = C->theNodes[nodes[0]].distance(C->theNodes[nodes[1]]);
+  len[1] = C->theNodes[nodes[0]].distance(C->theNodes[nodes[2]]);
+  len[2] = C->theNodes[nodes[1]].distance(C->theNodes[nodes[2]]);
   for (i=0; i<3; i++) // find max length of a side
     if (len[i] > maxlen) {
       longEdge = i;
@@ -312,19 +250,15 @@ int element::findLongestEdge()
     }
   return longEdge;
 }
-/*
+
 int element::findShortestEdge()
 {
   int i, shortEdge = 0;
-  node n[3];
   double minlen, len[3];
-
-  for (i=0; i<3; i++)  n[i] = nodes[i].get();
   // fine lengths of sides
-  minlen = len[0] = n[0].distance(n[1]);
-  len[1] = n[0].distance(n[2]);
-  len[2] = n[1].distance(n[2]);
-
+  minlen = len[0] = C->theNodes[nodes[0]].distance(C->theNodes[nodes[1]]);
+  len[1] = C->theNodes[nodes[0]].distance(C->theNodes[nodes[2]]);
+  len[2] = C->theNodes[nodes[1]].distance(C->theNodes[nodes[2]]);
   for (i=1; i<3; i++) // find min length of a side
     if (len[i] < minlen) {
       shortEdge = i;
@@ -332,7 +266,7 @@ int element::findShortestEdge()
     }
   return shortEdge;
 }
-*/
+
 int element::isLongestEdge(edgeRef& e)
 {
   int longEdge = findLongestEdge();

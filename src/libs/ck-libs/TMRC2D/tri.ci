@@ -5,6 +5,7 @@ module refine {
   // ----------------------------- Messages ---------------------------------
   message chunkMsg;
   message splitOutMsg;
+  message collapseOutMsg;
   message refMsg; 
   message intMsg;
   message doubleMsg;
@@ -24,7 +25,7 @@ module refine {
     entry [sync] void setBorder(int);
     entry [sync] intMsg *safeToMoveNode(int, double, double);
     entry [sync] splitOutMsg *split(int, elemRef, node, node);
-    entry [sync] void collapseHelp(int, edgeRef, node, node);
+    entry [sync] collapseOutMsg *collapse(int, elemRef, node, node);
     entry void checkPending(int, objRef);
     entry void checkPending(int, objRef, objRef);
     entry [sync] void updateElement(int, objRef, objRef);

@@ -32,6 +32,7 @@ class edgeRef : public objRef {
   void remove();
   int split(int *m, edgeRef *e_prime, node iNode, node fNode,
 	    elemRef requester, int *local, int *first, int *nullNbr);
+  int collapse(node *m, elemRef requester, node kNode, node dNode);
   void resetEdge();
   void checkPending(elemRef e);
   void checkPending(elemRef e, elemRef ne);

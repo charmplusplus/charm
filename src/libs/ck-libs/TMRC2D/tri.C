@@ -15,6 +15,8 @@ void refineChunkInit(void) {
 
 chunk::chunk(chunkMsg *m)
   : TCharmClient1D(m->myThreads), sizeElements(0), sizeEdges(0), sizeNodes(0),
+    firstFreeElement(0), firstFreeEdge(0), firstFreeNode(0),
+    elementSlots(0), edgeSlots(0), nodeSlots(0),
     additions(0), debug_counter(0), refineInProgress(0), coarsenInProgress(0),
     modified(0), meshLock(0), meshExpandFlag(0), 
     numElements(0), numEdges(0), numNodes(0), numGhosts(0), theClient(NULL)
@@ -53,7 +55,7 @@ void chunk::refiningElements()
   while (modified) { // Refine elements until no changes occur
     i = 0;
     modified = 0;
-    while (i < numElements) { // loop through the elements
+    while (i < elementSlots) { // loop through the elements
       if (theElements[i].isPresent() && 
 	  (theElements[i].getTargetArea() <= theElements[i].getArea()) && 
 	  (theElements[i].getTargetArea() >= 0.0)) {
@@ -90,7 +92,7 @@ void chunk::coarseningElements()
   while (modified) { // try to coarsen elements until no changes occur
     i = 0;
     modified = 0;
-    while (i < numElements) { // loop through the elements
+    while (i < elementSlots) { // loop through the elements
       if (theElements[i].isPresent() && 
 	  (theElements[i].getTargetArea() > theElements[i].getArea()) && 
 	  (theElements[i].getTargetArea() >= 0.0)) {
@@ -132,6 +134,15 @@ splitOutMsg *chunk::split(int idx, elemRef e, node in, node fn)
 				    &(som->nullNbr));
   releaseLock();
   return som;
+}
+
+collapseOutMsg *chunk::collapse(int idx, elemRef e, node kn, node dn)
+{
+  collapseOutMsg *com = new collapseOutMsg;
+  accessLock();
+  com->result = theEdges[idx].collapse(&(com->n), e, kn, dn);
+  releaseLock();
+  return com;
 }
 
 void chunk::collapseHelp(int idx, edgeRef er, node n1, node n2)
@@ -312,7 +323,7 @@ void chunk::allocMesh(int nEl)
 
 void chunk::adjustMesh()
 {
-  if (sizeElements <= numElements+100) {
+  if (sizeElements <= elementSlots+100) {
     adjustFlag();
     adjustLock();
     CkPrintf("TMRC2D: [%d] Adjusting mesh size...\n", cid);
@@ -330,29 +341,38 @@ void chunk::adjustMesh()
 intMsg *chunk::addNode(node n)
 {
   intMsg *im = new intMsg;
-  im->anInt = numNodes;
-  theNodes[numNodes] = n;
+  im->anInt = firstFreeNode;
+  theNodes[firstFreeNode] = n;
   numNodes++;
+  firstFreeNode++;
+  if (firstFreeNode-1 == nodeSlots)  nodeSlots++;
+  else  while (theNodes[firstFreeNode].present) firstFreeNode++;
   return im;
 }
 
 edgeRef chunk::addEdge()
 {
   CkPrintf("TMRC2D: Adding edge %d to chunk %d\n", numEdges, cid);
-  edgeRef eRef(cid, numEdges);
-  theEdges[numEdges].set(numEdges, cid, this);
-  theEdges[numEdges].reset();
+  edgeRef eRef(cid, firstFreeEdge);
+  theEdges[firstFreeEdge].set(firstFreeEdge, cid, this);
+  theEdges[firstFreeEdge].reset();
   numEdges++;
+  firstFreeEdge++;
+  if (firstFreeEdge-1 == edgeSlots)  edgeSlots++;
+  else  while (theEdges[firstFreeEdge].present) firstFreeEdge++;
   return eRef;
 }
 
 elemRef chunk::addElement(int n1, int n2, int n3)
 {
-  elemRef eRef(cid, numElements);
-  theElements[numElements].set(cid, numElements, this);
-  theElements[numElements].set(n1, n2, n3);
-  theElements[numElements].calculateArea();
+  elemRef eRef(cid, firstFreeElement);
+  theElements[firstFreeElement].set(cid, firstFreeElement, this);
+  theElements[firstFreeElement].set(n1, n2, n3);
+  theElements[firstFreeElement].calculateArea();
   numElements++;
+  firstFreeElement++;
+  if (firstFreeElement-1 == elementSlots)  elementSlots++;
+  else  while (theElements[firstFreeElement].present) firstFreeElement++;
   modified = 1;
   if (!refineInProgress) {
     refineInProgress = 1;
@@ -381,18 +401,36 @@ elemRef chunk::addElement(int n1, int n2, int n3,
 
 void chunk::removeNode(int n)
 {
+  theEdges[n].present = 0;
   theNodes[n].reset();
+  if (n < firstFreeNode) firstFreeNode = n;
+  else if ((n == firstFreeNode) && (firstFreeNode == nodeSlots)) {
+    firstFreeNode--; nodeSlots--;
+  }
+  numNodes--;
 }
 
 void chunk::removeEdge(int n)
 {
+  theEdges[n].present = 0;
+  theEdges[n].reset();
+  if (n < firstFreeEdge) firstFreeEdge = n;
+  else if ((n == firstFreeEdge) && (firstFreeEdge == edgeSlots)) {
+    firstFreeEdge--; edgeSlots--;
+  }
+  numEdges--;
 }
 
 void chunk::removeElement(int n)
 {
+  theElements[n].present = 0;
   theElements[n].clear();
+  if (n < firstFreeElement) firstFreeElement = n;
+  else if ((n == firstFreeElement) && (firstFreeElement == elementSlots)) {
+    firstFreeElement--; elementSlots--;
+  }
+  numElements--;
 }
-
 
 // these two functions produce debugging output by printing somewhat
 // sychronized versions of the entire mesh to files readable by tkplotter
@@ -474,13 +512,15 @@ void chunk::updateNodeCoords(int nNode, double *coord, int nEl)
   CkAssert(nEl == numElements);
   CkAssert(nNode == numNodes);
   // update node coordinates from coord
-  for (i=0; i<numNodes; i++) {
-    if ((theNodes[i].X() != coord[2*i]) || (theNodes[i].Y() != coord[2*i+1]))
-      CkPrintf("TMRC2D: updateNodeCoords WARNING: coords changed for node %d on chunk %d: Were %f,%f; now %f,%f\n", i, cid, theNodes[i].X(), theNodes[i].Y(), coord[2*i], coord[2*i + 1]);
-    theNodes[i].set(coord[2*i], coord[2*i + 1]);
-  }
+  for (i=0; i<nodeSlots; i++)
+    if (theNodes[i].isPresent()) {
+      if ((theNodes[i].X() != coord[2*i]) || (theNodes[i].Y() != coord[2*i+1]))
+	CkPrintf("TMRC2D: updateNodeCoords WARNING: coords changed for node %d on chunk %d: Were %f,%f; now %f,%f\n", i, cid, theNodes[i].X(), theNodes[i].Y(), coord[2*i], coord[2*i + 1]);
+      theNodes[i].set(coord[2*i], coord[2*i + 1]);
+    }
   // recalculate and cache new areas for each element
-  for (i=0; i<numElements; i++) theElements[i].calculateArea();
+  for (i=0; i<elementSlots; i++) 
+    if (theElements[i].isPresent())  theElements[i].calculateArea();
   CkPrintf("TMRC2D: updateNodeCoords DONE.\n");
 }
 
@@ -493,8 +533,9 @@ void chunk::multipleRefine(double *desiredArea, refineClient *client)
   //dump();
   sanityCheck(); // quietly make sure mesh is in shape
 
-  for (i=0; i<numElements; i++)  // set desired areas for elements
-    if (desiredArea[i] < theElements[i].getArea())
+  for (i=0; i<elementSlots; i++)  // set desired areas for elements
+    if ((theElements[i].isPresent()) && 
+	(desiredArea[i] < theElements[i].getArea()))
       theElements[i].setTargetArea(desiredArea[i]);
   // start refinement
   modified = 1;
@@ -514,8 +555,9 @@ void chunk::multipleCoarsen(double *desiredArea, refineClient *client)
   //dump();
   sanityCheck(); // quietly make sure mesh is in shape
 
-  for (i=0; i<numElements; i++)  // set desired areas for elements
-    if (desiredArea[i] > theElements[i].getArea())
+  for (i=0; i<elementSlots; i++)  // set desired areas for elements
+    if ((theElements[i].isPresent()) &&
+	(desiredArea[i] > theElements[i].getArea()))
       theElements[i].setTargetArea(desiredArea[i]);
   // start coarsening
   modified = 1;
@@ -721,12 +763,15 @@ void chunk::sanityCheck(void)
         CkAbort("-> TMRC2D: numEdges or vector size insane!");
   if (numNodes<0 || (int)theNodes.size()<numNodes)
         CkAbort("-> TMRC2D: numNodes or vector size insane!");
-  for (i=0; i<numElements; i++)
-    theElements[i].sanityCheck(this, elemRef(cid,i));
-  for (i=0; i<numEdges; i++)
-    theEdges[i].sanityCheck(this, edgeRef(cid,i));
-  for (i=0; i<numNodes; i++)
-    theNodes[i].sanityCheck(cid, i);
+  for (i=0; i<elementSlots; i++) 
+    if (theElements[i].isPresent())
+      theElements[i].sanityCheck(this, elemRef(cid,i));
+  for (i=0; i<edgeSlots; i++)
+    if (theEdges[i].isPresent())
+      theEdges[i].sanityCheck(this, edgeRef(cid,i));
+  for (i=0; i<nodeSlots; i++)
+    if (theNodes[i].isPresent())
+      theNodes[i].sanityCheck(cid, i);
   CkPrintf("TMRC2D: sanity check PASSED.\n");
 }
 
@@ -735,12 +780,18 @@ void chunk::dump()
   int i;
   CkPrintf("TMRC2D: Chunk %d, with %d elements, %d nodes and %d edges:\n", cid, 
 	   numElements, numNodes, numEdges);
-  for (i=0; i<numElements; i++)
-    CkPrintf("TMRC2D: Element %d has nodes %d, %d, %d and edges [%d,%d], [%d,%d], [%d,%d]\n", i, theElements[i].nodes[0], theElements[i].nodes[1], theElements[i].nodes[2], theElements[i].edges[0].cid, theElements[i].edges[0].idx, theElements[i].edges[1].cid, theElements[i].edges[1].idx, theElements[i].edges[2].cid, theElements[i].edges[2].idx);
+  for (i=0; i<elementSlots; i++) 
+    if (theElements[i].isPresent())
+      CkPrintf("TMRC2D: Element %d nodes %d %d %d edges [%d,%d] [%d,%d] [%d,%d]\n", i, theElements[i].nodes[0], theElements[i].nodes[1], theElements[i].nodes[2], theElements[i].edges[0].cid, theElements[i].edges[0].idx, theElements[i].edges[1].cid, theElements[i].edges[1].idx, theElements[i].edges[2].cid, theElements[i].edges[2].idx);
   for (i=0; i<numNodes; i++)
-    CkPrintf("TMRC2D: Node %d has coordinates (%f,%f)\n", i, theNodes[i].X(), theNodes[i].Y());
+    if (theNodes[i].isPresent())
+      CkPrintf("TMRC2D: Node %d has coordinates (%f,%f)\n", i, theNodes[i].X(),
+	       theNodes[i].Y());
   for (i=0; i<numEdges; i++)
-    CkPrintf("TMRC2D: Edge %d has elements [%d,%d] and [%d,%d]\n", i, theEdges[i].elements[0].cid, theEdges[i].elements[0].idx, theEdges[i].elements[1].cid, theEdges[i].elements[1].idx);
+    if (theEdges[i].isPresent())
+      CkPrintf("TMRC2D: Edge %d has elements [%d,%d] and [%d,%d]\n", i, 
+	       theEdges[i].elements[0].cid, theEdges[i].elements[0].idx, 
+	       theEdges[i].elements[1].cid, theEdges[i].elements[1].idx);
 }
 
 #include "refine.def.h"

@@ -15,6 +15,7 @@ class node {  // a 2D double coordinate
   int reports;  // for smoothing
   double sumReports[DIM];  // for smoothing
   int theLock; // locking is for coarsening
+  int present;  // indicates this is an edge present in the mesh
  public:
   int border; // mesh boundary info
   
@@ -24,15 +25,15 @@ class node {  // a 2D double coordinate
   }
   node(double a, double b) { 
     x = a;  y = b;  reports = border = theLock = 0; 
-    sumReports[0] = sumReports[1] = 0.0; 
+    sumReports[0] = sumReports[1] = 0.0; present = 1;
   }
   node(const node& n) { 
     x = n.x;  y = n.y;  reports = n.reports; border = n.border; 
-    theLock = n.theLock;
+    theLock = n.theLock; present = 1;
     sumReports[0] = n.sumReports[0];  sumReports[1] = n.sumReports[1];
   }
   void set(double a, double b) { 
-    x = a;  y = b;
+    x = a;  y = b; present = 1;
   }
   void setBorder() { border = 1; }
   void reset() { 
@@ -43,12 +44,15 @@ class node {  // a 2D double coordinate
   node& operator=(const node& n) { 
     x = n.x;  y = n.y;  reports = n.reports;  border = n.border;
     theLock = n.theLock;
+    present = n.present;
     sumReports[0] = n.sumReports[0];  sumReports[1] = n.sumReports[1];
     return *this; 
   }
   void pup(PUP::er &p) {
-    p(x); p(y); p(reports); p(theLock); p(border); p(sumReports, DIM);
+    p(x); p(y); p(present); p(reports); p(theLock); p(border); 
+    p(sumReports, DIM);
   }
+  int isPresent() { return present; }
   double X() { return x; }
   double Y() { return y; }
   int lock() { return (theLock ? 0 : theLock = 1); }
