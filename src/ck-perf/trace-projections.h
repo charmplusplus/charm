@@ -65,7 +65,7 @@ class LogEntry {
     char *fName;
     int flen;
   public:
-    LogEntry() {}
+    LogEntry() {fName=NULL;flen=0;}
     LogEntry(double tm, unsigned char t, unsigned short m=0, unsigned short e=0, int ev=0, int p=0, int ml=0, CmiObjId *d=NULL, double rt=0., double cputm=0.) {
       type = t; mIdx = m; eIdx = e; event = ev; pe = p; time = tm; msglen = ml;
       if (d) id = *d; else {id.id[0]=id.id[1]=id.id[2]=0; };
@@ -104,9 +104,9 @@ class LogEntry {
     void operator delete(void *, void *) { }
 #endif
     void pup(PUP::er &p);
-		~LogEntry(){
-			delete [] fName;
-		}
+    ~LogEntry(){
+      delete [] fName;
+    }
 };
 
 class TraceProjections;
