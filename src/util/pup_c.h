@@ -1,3 +1,6 @@
+#ifndef _PUP_C_H
+#define _PUP_C_H
+
 /*
 Pack/UnPack Library for UIUC Parallel Programming Lab
 C Bindings version
@@ -28,7 +31,7 @@ typedef struct foo {
   float q[3];
 } foo;
 
-void pup_foo(pup_er *p,foo *f)
+void pup_foo(pup_er p,foo *f)
 {
   pup_int(p,&f->x);
   pup_char(p,&f->y);
@@ -43,7 +46,7 @@ typedef struct bar {
   double *arr; <- Heap-allocated array
 } bar;
 
-void pup_bar(pup_er *p,bar *b)
+void pup_bar(pup_er p,bar *b)
 {
   pup_foo(p,&b->f);
   pup_int(p,&b->nArr);
@@ -58,27 +61,22 @@ void pup_bar(pup_er *p,bar *b)
 extern "C" {
 #endif
 
-/*Opaque pup_er type-- this lets us pass 
-around pup_er *'s
-*/
-typedef struct {
-    /*Fields hidden...*/
-} pup_er;
+typedef void *pup_er;
 
 /*Determine what kind of pup_er we have--
 return 1 for true, 0 for false.*/
-int pup_isPacking(const pup_er *p);
-int pup_isUnpacking(const pup_er *p);
-int pup_isSizing(const pup_er *p);
+int pup_isPacking(const pup_er p);
+int pup_isUnpacking(const pup_er p);
+int pup_isSizing(const pup_er p);
 
 /*Pack/unpack data items, declared with macros for brevity.
 The macros expand like:
-void pup_int(pup_er *p,int *i); <- single integer pack/unpack
-void pup_ints(pup_er *p,int *iarr,int nItems); <- array pack/unpack
+void pup_int(pup_er p,int *i); <- single integer pack/unpack
+void pup_ints(pup_er p,int *iarr,int nItems); <- array pack/unpack
 */
 #define PUP_BASIC_DATATYPE(typeName,type) \
-  void pup_##typeName(pup_er *p,type *v); \
-  void pup_##typeName##s(pup_er *p,type *arr,int nItems);
+  void pup_##typeName(pup_er p,type *v); \
+  void pup_##typeName##s(pup_er p,type *arr,int nItems);
 
 PUP_BASIC_DATATYPE(char,char)
 PUP_BASIC_DATATYPE(short,short)
@@ -92,9 +90,10 @@ PUP_BASIC_DATATYPE(float,float)
 PUP_BASIC_DATATYPE(double,double)
 
 /*Pack/unpack untyped byte array:*/
-void pup_bytes(pup_er *p,void *ptr,int nBytes);
+void pup_bytes(pup_er p,void *ptr,int nBytes);
 
 #ifdef __cplusplus
 };
 #endif
 
+#endif

@@ -14,7 +14,7 @@ there's nothing actually happening here.
 
 #define C_CALLABLE extern "C" 
 
-/*This maps the opaque C "pup_er *p" type to 
+/*This maps the opaque C "pup_er p" type to 
 a C++ "PUP::er &" type.  We actually want a 
  "*reinterpret_cast<PUP::er *>(p)"
 */
@@ -22,11 +22,11 @@ a C++ "PUP::er &" type.  We actually want a
 
 /*Determine what kind of pup_er we have--
 return 1 for true, 0 for false.*/
-C_CALLABLE int pup_isPacking(const pup_er *p)
+C_CALLABLE int pup_isPacking(const pup_er p)
   { return (mp.isPacking())?1:0;}
-C_CALLABLE int pup_isUnpacking(const pup_er *p)
+C_CALLABLE int pup_isUnpacking(const pup_er p)
   { return (mp.isUnpacking())?1:0;}
-C_CALLABLE int pup_isSizing(const pup_er *p)
+C_CALLABLE int pup_isSizing(const pup_er p)
   { return (mp.isSizing())?1:0;}
 
 
@@ -34,15 +34,15 @@ C_CALLABLE int pup_isSizing(const pup_er *p)
 
 /*Pack/unpack data items, declared with macros for brevity.
 The macros expand like:
-void pup_int(pup_er *p,int *i) <- single integer pack/unpack
+void pup_int(pup_er p,int *i) <- single integer pack/unpack
   {(PUP::er & cast p)(*i);}
-void pup_ints(pup_er *p,int *iarr,int nItems) <- array pack/unpack
+void pup_ints(pup_er p,int *iarr,int nItems) <- array pack/unpack
   {(PUP::er * cast p)(iarr,nItems);}
 */
 #define PUP_BASIC_DATATYPE(typeName,type) \
- C_CALLABLE void pup_##typeName(pup_er *p,type *v) \
+ C_CALLABLE void pup_##typeName(pup_er p,type *v) \
    {mp(*v);} \
- C_CALLABLE void pup_##typeName##s(pup_er *p,type *arr,int nItems) \
+ C_CALLABLE void pup_##typeName##s(pup_er p,type *arr,int nItems) \
    {mp(arr,nItems);}
 
 PUP_BASIC_DATATYPE(char,char)
@@ -57,7 +57,7 @@ PUP_BASIC_DATATYPE(float,float)
 PUP_BASIC_DATATYPE(double,double)
 
 /*Pack/unpack untyped byte array:*/
-void pup_bytes(pup_er *p,void *ptr,int nBytes)
+void pup_bytes(pup_er p,void *ptr,int nBytes)
 {
   mp(ptr,nBytes);
 }
