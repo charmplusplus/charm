@@ -586,14 +586,14 @@ void SendHypercube(int size, char *msg)
   logp = log(logp)/log(2.0);
   logp = ceil(logp);
   
-  //  CmiPrintf("In hypercube\n");
+  /*  CmiPrintf("In hypercube\n"); */
 
-  //  assert(startpe>=0 && startpe<Cmi_numpes);
+  /* assert(startpe>=0 && startpe<Cmi_numpes); */
 
   for (i = curcycle; i < logp; i++) {
     int p = cs->pe ^ (1 << i);
     
-    //    CmiPrintf("p = %d, logp = %5.1f\n", p, logp);
+    /*   CmiPrintf("p = %d, logp = %5.1f\n", p, logp);*/
 
     if(p < CmiNumPes()) {
       CMI_SET_CYCLE(msg, i + 1);
@@ -622,7 +622,7 @@ void CmiSyncBroadcastFn(int size, char *msg)     /* ALL_EXCEPT_ME  */
     CmiSyncSendFn(i, size,msg) ;
 #endif
 
-  //CmiPrintf("In  SyncBroadcast broadcast\n");
+  /*CmiPrintf("In  SyncBroadcast broadcast\n");*/
 }
 
 
@@ -637,7 +637,7 @@ CmiCommHandle CmiAsyncBroadcastFn(int size, char *msg)
   for ( i=0; i<cs->pe; i++ ) 
     CmiAsyncSendFn(i,size,msg) ;
 
-  //CmiPrintf("In  AsyncBroadcast broadcast\n");
+  /*CmiPrintf("In  AsyncBroadcast broadcast\n");*/
   return (CmiCommHandle) (CmiAllAsyncMsgsSent());
 }
 
@@ -669,7 +669,7 @@ void CmiSyncBroadcastAllFn(int size, char *msg)        /* All including me */
     CmiSyncSendFn(i,size,msg) ;
 #endif
 
-  //CmiPrintf("In  SyncBroadcastAll broadcast\n");
+  /*CmiPrintf("In  SyncBroadcastAll broadcast\n");*/
 }
 
 CmiCommHandle CmiAsyncBroadcastAllFn(int size, char *msg)  
@@ -679,7 +679,7 @@ CmiCommHandle CmiAsyncBroadcastAllFn(int size, char *msg)
   for ( i=1; i<Cmi_numpes; i++ ) 
     CmiAsyncSendFn(i,size,msg) ;
 
-  //CmiPrintf("In  AsyncBroadcastAll broadcast\n");
+  /*CmiPrintf("In  AsyncBroadcastAll broadcast\n");*/
     
   return (CmiCommHandle) (CmiAllAsyncMsgsSent());
 }
@@ -706,7 +706,7 @@ void CmiFreeBroadcastAllFn(int size, char *msg)  /* All including me */
     CmiSyncSendFn(i,size,msg) ;
 #endif
   CmiFree(msg) ;
-  //CmiPrintf("In FreeBroadcastAll broadcast\n");
+  /*CmiPrintf("In FreeBroadcastAll broadcast\n");*/
 }
 
 #if CMK_NODE_QUEUE_AVAILABLE
