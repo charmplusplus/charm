@@ -1,0 +1,16 @@
+module fem{
+  group MSA_CacheGroup<int, DefaultEntry<int>, MSA_DEFAULT_ENTRIES_PER_PAGE>;	
+  array [1D] MSA_PageArray<int, DefaultEntry<int>, MSA_DEFAULT_ENTRIES_PER_PAGE>;	
+  
+	group MSA_CacheGroup<IntList, DefaultListEntry<IntList,true>, MSA_DEFAULT_ENTRIES_PER_PAGE>;	
+  array [1D] MSA_PageArray<IntList, DefaultListEntry<IntList,true>, MSA_DEFAULT_ENTRIES_PER_PAGE>;	
+
+	group MSA_CacheGroup<NodeList, DefaultListEntry<NodeList,true>, MSA_DEFAULT_ENTRIES_PER_PAGE>;	
+  array [1D] MSA_PageArray<NodeList, DefaultListEntry<NodeList,true>, MSA_DEFAULT_ENTRIES_PER_PAGE>;	
+	group MSA_CacheGroup<MeshElem, DefaultEntry<MeshElem,true>,1>;	
+  array [1D] MSA_PageArray<MeshElem, DefaultEntry<MeshElem,true>, 1>;	
+
+	group MSA_CacheGroup<Hashtuple,DefaultListEntry<Hashtuple,true>,MSA_DEFAULT_ENTRIES_PER_PAGE>;
+	array [1D] MSA_PageArray<Hashtuple,DefaultListEntry<Hashtuple,true>,MSA_DEFAULT_ENTRIES_PER_PAGE>;
+	
+};

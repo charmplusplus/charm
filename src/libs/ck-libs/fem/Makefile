@@ -1,10 +1,10 @@
 CDIR=../../../..
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
-HEADERS=fem.h femf.h fem_mesh.h
+HEADERS=fem.h femf.h fem_mesh.h parallel_part.h
 HEADDEP=$(HEADERS) fem_impl.h 
 OBJS=fem.o fem_mesh.o symmetries.o \
-	partition.o map.o fem_compat.o call_init.o
+	partition.o map.o fem_compat.o call_init.o parallel_part.o
 COMPAT=compat_init.o compat_finit.o compat_driver.o compat_fdriver.o 
 LIB=libmodulefem
 
@@ -46,6 +46,12 @@ fem.o: fem.C $(HEADDEP)
 
 partition.o: partition.C $(HEADDEP)
 	$(CHARMC) -c partition.C
+
+fem.decl.h: fem.ci 
+	$(CHARMC) fem.ci
+
+parallel_part.o: parallel_part.C fem.decl.h $(HEADDEP)
+	$(CHARMC) -c parallel_part.C
 
 map.o: map.C $(HEADDEP)
 	$(CHARMC) -c map.C

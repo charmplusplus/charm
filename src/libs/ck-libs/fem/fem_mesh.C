@@ -1071,6 +1071,10 @@ void FEM_Entity::create(int attr,const char *caller) {
 		allocateSym();
 	} else if (attr==FEM_GLOBALNO) {
 		allocateGlobalno();
+	} else if(attr == FEM_CHUNK){
+		FEM_IndexAttribute *chunkNo= new FEM_IndexAttribute(this,FEM_CHUNK,NULL);
+		add(chunkNo);
+		chunkNo->setWidth(1);
 	} else {
 	//It's an unrecognized tag: abort
 		char attrNameStorage[256], msg[1024];
@@ -1121,6 +1125,13 @@ void FEM_Entity::setAscendingGlobalno(void) {
 		allocateGlobalno();
 		int len=size();
 		for (int i=0;i<len;i++) globalno->get()(i,0)=i;
+	}
+}
+void FEM_Entity::setAscendingGlobalno(int base) {
+	if (!globalno) {
+		allocateGlobalno();
+		int len=size();
+		for (int i=0;i<len;i++) globalno->get()(i,0)=i+base;
 	}
 }
 void FEM_Entity::copyOldGlobalno(const FEM_Entity &e) {
@@ -1356,9 +1367,11 @@ int FEM_Mesh::nElems(int t_max) const //Return total number of elements before t
 	}
 #endif
 	int ret=0;
-	for (int t=0;t<t_max;t++) 
-		if (elem.has(t))
+	for (int t=0;t<t_max;t++){ 
+		if (elem.has(t)){
 			ret+=elem.get(t).size();
+		}
+	}	
 	return ret;
 }
 
@@ -1383,6 +1396,13 @@ void FEM_Mesh::setAscendingGlobalno(void) {
 	for (int s=0;s<sparse.size();s++)
 		if (sparse.has(s)) sparse[s].setAscendingGlobalno();
 }
+void FEM_Mesh::setAbsoluteGlobalno(){
+	node.setAscendingGlobalno();
+	for (int e=0;e<elem.size();e++){
+		if (elem.has(e)) elem[e].setAscendingGlobalno(nElems(e));
+	}	
+}
+
 void FEM_Mesh::copyOldGlobalno(const FEM_Mesh &m) {
 	node.copyOldGlobalno(m.node);
 	for (int e=0;e<m.elem.size();e++)

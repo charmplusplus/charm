@@ -27,7 +27,7 @@ void FEM_Abort(const char *caller,const char *sprintf_msg,
 /*******************************************************
   Communication tools
 */
-
+/*
 #define checkMPI(err) checkMPIerr(err,__FILE__,__LINE__);
 inline void checkMPIerr(int mpi_err,const char *file,int line) {
 	if (mpi_err!=MPI_SUCCESS) {
@@ -64,7 +64,7 @@ inline void MPI_Send_pup(T &t, int to,int tag,MPI_Comm comm) {
 	checkMPI(MPI_Send(buf,len,MPI_BYTE, to,tag,comm));
 	delete[] buf;
 }
-
+*/
 /******** Startup and initialization *******/
 
 // This is our TCharm global ID:
@@ -97,8 +97,10 @@ CDECL void FEM_Init(FEM_Comm_t defaultComm)
 }
 FORTRAN_AS_C(FEM_INIT,FEM_Init,fem_init, (int *comm), (*comm))
 
+#ifndef FEM_PARALLEL_PART
 // This lets FEM be a "-module", too.  (Normally comes from .ci file...)
 void _registerfem(void) {}
+#endif
 
 /*******************************************************
   Mesh basics
@@ -326,9 +328,15 @@ FEM_Mesh_reduce(int fem_mesh,int masterRank,FEM_Comm_t comm_context)
 FORTRAN_AS_C_RETURN(int,FEM_MESH_REDUCE,FEM_Mesh_reduce,fem_mesh_reduce, 
 	(int *mesh,int *rank,int *comm),(*mesh,*rank,*comm))
 
+
+#ifdef FEM_PARALLEL_PART
+extern int FEM_Mesh_Parallel_broadcast(int fem_mesh,int masterRank,FEM_Comm_t comm_context);
+#endif
+
 CDECL int 
 FEM_Mesh_broadcast(int fem_mesh,int masterRank,FEM_Comm_t comm_context)
 {
+#ifndef FEM_PARALLEL_PART
 	int tag=89375;
 	int myRank; MPI_Comm_rank((MPI_Comm)comm_context,&myRank);
 	if (myRank==masterRank) 
@@ -350,6 +358,9 @@ FEM_Mesh_broadcast(int fem_mesh,int masterRank,FEM_Comm_t comm_context)
 	{ /* I'm a slave-- recv new mesh from master: */
 		return FEM_Mesh_recv(masterRank,tag,comm_context);
 	}
+#else
+	return FEM_Mesh_Parallel_broadcast(fem_mesh,masterRank,comm_context);
+#endif
 }
 FORTRAN_AS_C_RETURN(int,FEM_MESH_BROADCAST,FEM_Mesh_broadcast,fem_mesh_broadcast, 
 	(int *mesh,int *rank,int *comm),(*mesh,*rank,*comm))

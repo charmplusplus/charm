@@ -675,6 +675,7 @@ public:
 	}
 	void setGlobalno(int r,int g);
 	void setAscendingGlobalno(void);
+	void setAscendingGlobalno(int base);
 	void copyOldGlobalno(const FEM_Entity &e);
 	
 	//Ghost comm. list access
@@ -1016,6 +1017,9 @@ public:
 	int getGlobalElem(int elType,int elNo) const;
 	/// Set our global numbers as 0...n-1 for nodes, elements, and sparse
 	void setAscendingGlobalno(void);
+	///	The global numbers for elements runs across different types
+	void setAbsoluteGlobalno();
+	
 	void copyOldGlobalno(const FEM_Mesh &m);
 	void print(int idxBase);//Write a human-readable description to CkPrintf
 	/// Extract a list of our entities:
