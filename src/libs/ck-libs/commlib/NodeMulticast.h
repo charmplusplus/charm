@@ -2,6 +2,10 @@
 #define NODE_MULTICAST
 #include "ComlibManager.h"
 
+#if CMK_PERSISTENT_COMM
+#include "persistent.h"
+#endif
+
 #define MAX_PES_PER_NODE 4
 #define PROCESSOR_MODE 0
 #define ARRAY_MODE 1
@@ -21,6 +25,10 @@ class NodeMulticast : public Strategy {
     int validRank[MAX_PES_PER_NODE];
     CkCallback cb;
     long handler;
+
+#if CMK_PERSISTENT_COMM
+    PersistentHandle *persistentHandlerArray;
+#endif
 
  public:
     NodeMulticast(){}

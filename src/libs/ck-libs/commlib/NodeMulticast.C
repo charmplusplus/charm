@@ -1,6 +1,8 @@
 #include "NodeMulticast.h"
 #include "converse.h"
 
+#define MAX_BUF_SIZE 165000
+
 NodeMulticast *nm_mgr;
 
 void* NodeMulticastHandler(void *msg){
@@ -195,8 +197,16 @@ void NodeMulticast::doneInserting(){
 		envelope *newenv = UsrToEnv(newcharmmsg);
 		
 		ComlibPrintf("[%d]In cmisyncsend to %d\n", CkMyPe(), count * pes_per_node + myRank);
+#if CMK_PERSISTENT_COMM
+		if(env->getTotalsize() < MAX_BUF_SIZE)
+		  CmiUsePersistentHandle(&persistentHandlerArray[count],1);
+#endif
 		CmiSyncSendAndFree(count * pes_per_node + myRank, env->getTotalsize(), 
 				   (char *)newenv);
+#if CMK_PERSISTENT_COMM
+		if(env->getTotalsize() < MAX_BUF_SIZE)
+		  CmiUsePersistentHandle(NULL, 0);
+#endif          
 	  }
         
         ComlibPrintf("[%d] CmiFree (Code) (%x)\n", CkMyPe(), (char *)env - 2*sizeof(int));
@@ -254,6 +264,14 @@ void NodeMulticast::pup(PUP::er &p){
 	    if(CkMyPe()/pes_per_node == pelist[count] / pes_per_node)
 		validRank[pelist[count] % pes_per_node] = 1;
 	}
+
+#if CMK_PERSISTENT_COMM
+	persistentHandlerArray = new PersistentHandle[numNodes];
+	for(int count = 0; count < numNodes; count ++)
+	  //if(nodeMap[count])
+	  persistentHandlerArray[count] = CmiCreatePersistent(count * pes_per_node 
+							      + myRank, MAX_BUF_SIZE);
+#endif
     }
 }
 
