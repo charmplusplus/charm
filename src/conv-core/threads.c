@@ -146,7 +146,8 @@ typedef struct CthThreadBase
   char      *data;       /* thread private data */
   int        datasize;   /* size of thread-private data, in bytes */
 
-  int isIsomalloc; /* thread stack was isomalloc'd*/
+  int isMigratable; /* thread is migratable (isomalloc or aliased stack) */
+  int aliasStackHandle; /* handle for aliased stack */
   void      *stack; /*Pointer to thread stack*/
   int        stacksize; /*Size of thread stack (bytes)*/
 } CthThreadBase;
@@ -154,6 +155,94 @@ typedef struct CthThreadBase
 /*Macros to convert between base and specific thread types*/
 #define B(t) ((CthThreadBase *)(t))
 #define S(t) ((CthThread)(t))
+
+
+/*********************** Stack Aliasing *********************
+  Stack aliasing: instead of consuming virtual address space
+  with isomalloc, map all stacks to the same virtual addresses
+  (like stack copying), but use the VM hardware to make thread
+  swaps fast.  This implementation uses *files* to store the stacks,
+  and mmap to drop the stack data into the right address.  Despite
+  the presence of files, at least under Linux with local disks context
+  switches are still fast; the mmap overhead is less than 5us per
+  switch, even for multi-megabyte stacks.
+  
+  WARNING: Does NOT work in SMP mode, because all the processors
+      on a node will try to map their stacks to the same place.
+  WARNING: Does NOT work if switching directly from one migrateable
+      thread to another, because it blows away the stack you're currently
+      running on.  The usual Charm approach of switching to the 
+      (non-migratable) scheduler thread on context switch works fine.
+*/
+#define CMK_THREADS_ALIAS_STACK 0
+
+/** Address to map all migratable thread stacks to. */
+#define CMK_THREADS_ALIAS_LOCATION ((void *)0xb0000000)
+
+#if CMK_THREADS_ALIAS_STACK
+#include <stdlib.h> /* for mkstemp */
+#include <sys/mman.h> /* for mmap */
+#include <errno.h> /* for perror */
+#include <unistd.h> /* for unlink, lseek, close */
+
+/** Create an aliasable area of this size.  Returns alias handle. */
+int CthAliasCreate(int stackSize)
+{
+  /* Make a file to contain thread stack */
+  char tmpName[1024];
+  char lastByte=0;
+  int fd;
+  sprintf(tmpName,"/tmp/charmThreadStackXXXXXX");
+  fd=mkstemp(tmpName);
+  if (fd==-1) CmiAbort("threads.c> Cannot create /tmp file to contain thread stack");
+  unlink(tmpName); /* delete file when it gets closed */
+  
+  /* Make file big enough for stack, by writing one byte at end */
+  lseek(fd,stackSize-sizeof(lastByte),SEEK_SET);
+  write(fd,&lastByte,sizeof(lastByte));
+  
+  return fd;
+}
+
+void CthAliasFree(int fd) {
+  close(fd);
+}
+
+#endif
+
+/**
+ CthAliasEnable brings this thread's stack into memory.
+ You must call it before accessing the thread stack, 
+ for example, before running, packing, or unpacking the stack data.
+*/
+#if CMK_THREADS_ALIAS_STACK
+CthThreadBase *_curMappedStack=0;
+void CthAliasEnable(CthThreadBase *t) {
+	void *s;
+	int flags=MAP_FIXED|MAP_SHARED; /* Posix flags */
+	if (!t->isMigratable) return;
+	if (t==_curMappedStack) return; /* don't re-map */
+	_curMappedStack=t;
+	if (0) printf("Mmapping in thread %p from runtime stack %p\n",t,&s);
+	
+	/* Linux mmap flag MAP_POPULATE, to pre-fault in all the pages,
+	   only seems to slow down overall performance. */
+	/* Linux mmap flag MAP_GROWSDOWN is rejected at runtime under 2.4.25 */
+	s=mmap(t->stack,t->stacksize,
+		PROT_READ|PROT_WRITE|PROT_EXEC, /* exec for gcc nested function thunks */
+		flags, t->aliasStackHandle,0);
+	if (s!=t->stack) {
+		perror("threads.c CthAliasEnable mmap");
+		CmiAbort("threads.c CthAliasEnable mmap failed");
+	}
+}
+#else
+#define CthAliasEnable(t) /* empty */
+#endif
+
+
+
+
 
 /*********** Thread-local storage *********/
 
@@ -248,7 +337,8 @@ static void CthThreadBaseInit(CthThreadBase *th)
 
   CthSetStrategyDefault(S(th));
 
-  th->isIsomalloc=0;
+  th->isMigratable=0;
+  th->aliasStackHandle=0;
   th->stack=NULL;
   th->stacksize=0;
 
@@ -257,16 +347,21 @@ static void CthThreadBaseInit(CthThreadBase *th)
   th->tid.id[2] = 0;
 }
 
-static void *CthAllocateStack(CthThreadBase *th,int *stackSize,int useIsomalloc)
+static void *CthAllocateStack(CthThreadBase *th,int *stackSize,int useMigratable)
 {
   void *ret=NULL;
   if (*stackSize==0) *stackSize=CthCpvAccess(_defaultStackSize);
   th->stacksize=*stackSize;
-  if (!useIsomalloc) {
+  if (!useMigratable) {
     ret=malloc(*stackSize); 
   } else {
-    th->isIsomalloc=1;
+    th->isMigratable=1;
+#if CMK_THREADS_ALIAS_STACK
+    th->aliasStackHandle=CthAliasCreate(*stackSize);
+    ret=CMK_THREADS_ALIAS_LOCATION;
+#else /* isomalloc */
     ret=CmiIsomalloc(*stackSize);
+#endif
   }
   _MEMCHECK(ret);
   th->stack=ret;
@@ -275,8 +370,12 @@ static void *CthAllocateStack(CthThreadBase *th,int *stackSize,int useIsomalloc)
 static void CthThreadBaseFree(CthThreadBase *th)
 {
   free(th->data);
-  if (th->isIsomalloc) {
+  if (th->isMigratable) {
+#if CMK_THREADS_ALIAS_STACK
+	  CthAliasFree(th->aliasStackHandle);
+#else /* isomalloc */
 	  CmiIsomallocFree(th->stack);
+#endif
   } 
   else if (th->stack!=NULL) {
 	  free(th->stack);
@@ -311,7 +410,7 @@ CthThread CthSelf()
   return CthCpvAccess(CthCurrent);
 }
 
-void CthPupBase(pup_er p,CthThreadBase *t,int useIsomalloc)
+void CthPupBase(pup_er p,CthThreadBase *t,int useMigratable)
 {
 #ifndef CMK_OPTIMIZE
 	if ((CthThread)t==CthCpvAccess(CthCurrent))
@@ -327,12 +426,21 @@ void CthPupBase(pup_er p,CthThreadBase *t,int useIsomalloc)
 		t->data = (char *) malloc(t->datasize);_MEMCHECK(t->data);
 	}
 	pup_bytes(p,(void *)t->data,t->datasize);
-	pup_int(p,&t->isIsomalloc);
-	pup_int(p,&t->stacksize);	
-	if (t->isIsomalloc) {
+	pup_int(p,&t->isMigratable);
+	pup_int(p,&t->stacksize);
+	if (t->isMigratable) {
+#if CMK_THREADS_ALIAS_STACK
+		if (pup_isUnpacking(p)) { 
+			CthAllocateStack(t,&t->stacksize,1);
+		}
+		CthAliasEnable(t);
+		pup_bytes(p,t->stack,t->stacksize);
+#else /* isomalloc */
 		CmiIsomallocPup(p,&t->stack);
-	} else {
-		if (useIsomalloc)
+#endif
+	} 
+	else {
+		if (useMigratable)
 			CmiAbort("You must use CthCreateMigratable to use CthPup!\n");
 		/*Pup the stack pointer as raw bytes*/
 		pup_bytes(p,&t->stack,sizeof(t->stack));
@@ -370,6 +478,7 @@ static void CthBaseResume(CthThread t)
   CthFixData(t); /*Thread-local storage may have changed in other thread.*/
   CthCpvAccess(CthCurrent) = t;
   CthCpvAccess(CthData) = B(t)->data;
+  CthAliasEnable(B(t));
 }
 
 /**
@@ -547,7 +656,6 @@ void CthInit(char **argv)
   sp = QT_SP(switchbuf, SWITCHBUF_SIZE);
   sp = QT_ARGS(sp,0,0,0,(qt_only_t*)CthDummy);
   p->switchbuf_sp = sp;
-
 }
 
 static void CthOnly(CthThread t, void *dum1, void *dum2)
@@ -1142,12 +1250,14 @@ static CthThread CthCreateInner(CthVoidFn fn,void *arg,int size,int migratable)
   result->context.uc_stack.ss_flags = 0;
   result->context.uc_link = 0;
   
+  CthAliasEnable(B(result)); /* Change to new thread's stack while building context */
   errno = 0;
   makeJcontext(&result->context, (uJcontext_fn_t)CthStartThread, 2, (void *)fn,(void *)arg);
   if(errno !=0) { 
     perror("makecontext"); 
     CmiAbort("CthCreateInner: makecontext failed.\n");
   }
+  CthAliasEnable(B(CthCpvAccess(CthCurrent)));
   return result;  
 }
 
@@ -1296,10 +1406,10 @@ static void CthOnly(void *arg, void *vt, qt_userf_t fn)
   CthThreadFinished(CthSelf());
 }
 
-static CthThread CthCreateInner(CthVoidFn fn, void *arg, int size,int isomalloc)
+static CthThread CthCreateInner(CthVoidFn fn, void *arg, int size,int Migratable)
 {
   CthThread result; qt_t *stack, *stackbase, *stackp;
-  int doProtect=(!isomalloc) && CMK_STACKPROTECT;
+  int doProtect=(!Migratable) && CMK_STACKPROTECT;
   result=CthThreadInit();
   if (doProtect) 
   { /*Can only protect on a page boundary-- allocate an extra page and align stack*/
@@ -1307,9 +1417,11 @@ static CthThread CthCreateInner(CthVoidFn fn, void *arg, int size,int isomalloc)
 	  size = (size+(CMK_MEMORY_PAGESIZE*2)-1) & ~(CMK_MEMORY_PAGESIZE-1);
 	  stack = (qt_t*)CthMemAlign(CMK_MEMORY_PAGESIZE, size);
   } else
-	  stack=CthAllocateStack(&result->base,&size,isomalloc);
+	  stack=CthAllocateStack(&result->base,&size,Migratable);
+  CthAliasEnable(B(result)); /* Change to new thread's stack while setting args */
   stackbase = QT_SP(stack, size);
   stackp = QT_ARGS(stackbase, arg, result, (qt_userf_t *)fn, CthOnly);
+  CthAliasEnable(B(CthCpvAccess(CthCurrent)));
   result->stack = stack;
   result->stackp = stackp;
   if (doProtect) {
@@ -1338,7 +1450,7 @@ CthThread CthPup(pup_er p, CthThread t)
   }
   CthPupBase(p,&t->base,1);
   
-  /*Pup the stack pointer as bytes-- this works because stack is isomalloc'd*/
+  /*Pup the stack pointer as bytes-- this works because stack is migratable*/
   pup_bytes(p,&t->stackp,sizeof(t->stackp));
 
   /*Don't worry about stack protection on migration*/  
