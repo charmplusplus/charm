@@ -76,20 +76,22 @@ class CkMarshalledMessage {
 PUPmarshall(CkMarshalledMessage);
 
 /********************* Superclass of all Chares ******************/
+#define CHARM_INPLACE_NEW \
+    void *operator new(size_t, void *ptr) { return ptr; }; \
+    void operator delete(void*, void*) {}; \
+    void *operator new(size_t s) { return malloc(s); } \
+    void operator delete(void *ptr) { free(ptr); }
+
 class Chare {
   protected:
     CkChareID thishandle;
   public:
     Chare(CkMigrateMessage *m) {}
-    void *operator new(size_t, void *ptr) { return ptr; };
-#if CMK_COMPILEMODE_ANSI
-    void operator delete(void*, void*) {};
-#endif
-    void *operator new(size_t s) { return malloc(s); }
-    void operator delete(void *ptr) { free(ptr); }
     Chare() { CkGetChareID(&thishandle); }
     virtual ~Chare(); //<- needed for *any* child to have a virtual destructor
     virtual void pup(PUP::er &p);//<- pack/unpack routine
+    inline const CkChareID &ckGetChareID(void) const {return thishandle;}
+    CHARM_INPLACE_NEW
 };
 
 class Group : public Chare { //Superclass of all Groups
@@ -104,6 +106,7 @@ class Group : public Chare { //Superclass of all Groups
     virtual ~Group(); //<- needed for *any* child to have a virtual destructor
 
     virtual void pup(PUP::er &p);//<- pack/unpack routine
+    inline const CkGroupID &ckGetGroupID(void) const {return thisgroup;}
 };
 
 class NodeGroup : public Chare { //Superclass of all NodeGroups
@@ -113,7 +116,39 @@ class NodeGroup : public Chare { //Superclass of all NodeGroups
     CmiNodeLock __nodelock;
     NodeGroup() { thisgroup=CkGetNodeGroupID(); __nodelock=CmiCreateLock();}
     ~NodeGroup() { CmiDestroyLock(__nodelock); }
+    inline const CkGroupID &ckGetGroupID(void) const {return thisgroup;}
 };
+
+
+/*Macro implmentation of CBase_* */
+#define CBase_ProxyDecls(Derived) CProxy_##Derived thisProxy;
+#define CBase_ProxyInits(this) thisProxy(this)
+
+/*Templated implementation of CBase_* classes.*/
+template <class Parent,class CProxy_Derived>
+class CBaseT : public Parent {
+public:
+	CBase_ProxyDecls(Derived);
+	CBaseT(void) :Parent(), CBase_ProxyInits(this) {}
+	CBaseT(CkMigrateMessage *m) :Parent(m), CBase_ProxyInits(this) {}
+};
+
+/*Templated version of above for multiple (at least duplicate) inheritance:*/
+template <class Parent1,class Parent2,class CProxy_Derived>
+class CBaseT2 : public Parent1, public Parent2 {
+public:
+	CBase_ProxyDecls(Derived);
+	CBaseT2(void) :Parent1(), Parent2(), 
+		CBase_ProxyInits((Parent1 *)this) {}
+	CBaseT2(CkMigrateMessage *m) :Parent1(m), Parent2(m),
+		CBase_ProxyInits((Parent1 *)this) {} 
+
+//These overloads are needed to prevent ambiguity for multiple inheritance:
+	inline const CkChareID &ckGetChareID(void) const 
+		{return ((Parent1 *)this)->ckGetChareID();}
+	CHARM_INPLACE_NEW
+};
+
 
 /*Message delegation support, where you send a message via
 a proxy normally, but the message ends up routed via a 
@@ -168,6 +203,7 @@ class CProxy_Chare : public CProxy {
 #endif
     }
     CProxy_Chare(const CkChareID &c) : _ck_cid(c) {}
+    CProxy_Chare(const Chare *c) : _ck_cid(c->ckGetChareID()) {}
     const CkChareID &ckGetChareID(void) const {return _ck_cid;}
     operator const CkChareID &(void) const {return ckGetChareID();}
     void ckSetChareID(const CkChareID &c) {_ck_cid=c;}
@@ -197,6 +233,10 @@ class CProxy_Group : public CProxy {
     	:CProxy(),_ck_gid(g) {}
     CProxy_Group(CkGroupID g,CkGroupID dTo) 
     	:CProxy(dTo),_ck_gid(g) {}
+    CProxy_Group(const Group *g) 
+        :CProxy(), _ck_gid(g->ckGetGroupID()) {}
+    CProxy_Group(const NodeGroup *g)  //<- for compatability with NodeGroups
+        :CProxy(), _ck_gid(g->ckGetGroupID()) {}
     CkChareID ckGetChareID(void) const { 
     	CkChareID ret;
     	ret.onPE=CkMyPe();
@@ -230,6 +270,10 @@ class CProxyElement_Group : public CProxy_Group {
 	: CProxy_Group(g),_onPE(onPE) {}
     CProxyElement_Group(CkGroupID g,int onPE,CkGroupID dTo)
 	: CProxy_Group(g,dTo),_onPE(onPE) {}
+    CProxyElement_Group(const Group *g) 
+        :CProxy_Group(g), _onPE(CkMyPe()) {}
+    CProxyElement_Group(const NodeGroup *g)  //<- for compatability with NodeGroups
+        :CProxy_Group(g), _onPE(CkMyPe()) {}
     
     int ckGetGroupPe(void) const {return _onPE;}
     void pup(PUP::er &p) {
@@ -359,3 +403,6 @@ static inline void _CHECK_CID(CkChareID, int){}
 #include "sdag.h"
 
 #endif
+
+
+
