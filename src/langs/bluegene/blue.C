@@ -897,9 +897,10 @@ void work_thread(threadInfo *tinfo)
 
 //  InitHandlerTable();
   if (workStartFunc) {
+    char **Cmi_argvcopy = CmiCopyArgs(arg_argv);
     // timing
     BG_ENTRYSTART(-1, NULL);
-    workStartFunc(arg_argc, arg_argv);
+    workStartFunc(arg_argc, Cmi_argvcopy);
     BG_ENTRYEND();
   }
 
