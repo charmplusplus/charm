@@ -475,7 +475,7 @@ void CmiStateInit(int pe, int rank, CmiState state)
 void CmiNodeStateInit(CmiNodeState *nodeState)
 {
 #if CMK_IMMEDIATE_MSG
-  nodeState->imm = CdsFifo_Create();
+  nodeState->imm = PCQueueCreate();
 #endif
 #if CMK_NODE_QUEUE_AVAILABLE
   nodeState->CmiNodeRecvLock = CmiCreateLock();

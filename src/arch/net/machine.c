@@ -797,7 +797,7 @@ static void CmiPushPE(int pe,void *msg)
 #if CMK_IMMEDIATE_MSG
   if ((CmiGetHandler(msg) == CpvAccessOther(CmiImmediateMsgHandlerIdx,pe))) {
     *(int *)msg = pe;         /* store the rank in msg header */
-    CdsFifo_Enqueue(CsvAccess(NodeState).imm, msg);
+    PCQueuePush(CsvAccess(NodeState).imm, (char *)msg);
     return;
   }
 #endif
@@ -1689,14 +1689,17 @@ void CmiReleaseCommHandle(CmiCommHandle handle)
 #if CMK_IMMEDIATE_MSG
 void CmiHandleImmediate()
 {
-   if (CdsFifo_Empty(CsvAccess(NodeState).imm)) return;
+   static int intr = 0;
+   if (intr) { return; }
+   intr = 1;
+   if (PCQueueEmpty(CsvAccess(NodeState).imm)) { intr=0; return; }
    {
    void *msg;
 #ifdef CMK_CPV_IS_SMP
    CmiState cs = CmiGetState();
    int oldRank = cs->rank;
 #endif
-   while (msg = CdsFifo_Dequeue(CsvAccess(NodeState).imm)) {
+   while (msg = PCQueuePop(CsvAccess(NodeState).imm)) {
 /*CmiPrintf("[%d] CmiHandleMessage\n", CmiMyNode());*/
      /* switch to the worker thread */
 #ifdef CMK_CPV_IS_SMP
@@ -1709,6 +1712,7 @@ void CmiHandleImmediate()
    cs->rank = oldRank;
 #endif
    }
+   intr = 0;
 }
 
 void CmiPollImmediateMsg()
