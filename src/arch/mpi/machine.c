@@ -352,9 +352,9 @@ static int PumpMsgs(void)
 }
 
 /* blocking version */
-static int PumpMsgsBlocking(void)
+static void PumpMsgsBlocking(void)
 {
-  static int maxbytes = 5000000;
+  static int maxbytes = 20000000;
   static char *buf = NULL;
   int nbytes, flg, res;
   MPI_Status sts;
@@ -372,29 +372,26 @@ static int PumpMsgsBlocking(void)
 
   if (buf == NULL) buf = (char *) CmiAlloc(maxbytes);
 
-  while(1) {
-    if (MPI_SUCCESS != PMPI_Recv(buf,maxbytes,MPI_BYTE,MPI_ANY_SOURCE,TAG, MPI_COMM_WORLD,&sts)) 
+  if (MPI_SUCCESS != PMPI_Recv(buf,maxbytes,MPI_BYTE,MPI_ANY_SOURCE,TAG, MPI_COMM_WORLD,&sts)) 
       CmiAbort("PumpMsgs: PMP_Recv failed!\n");
-    PMPI_Get_count(&sts, MPI_BYTE, &nbytes);
-    msg = (char *) CmiAlloc(nbytes);
-    memcpy(msg, buf, nbytes);
+   PMPI_Get_count(&sts, MPI_BYTE, &nbytes);
+   msg = (char *) CmiAlloc(nbytes);
+   memcpy(msg, buf, nbytes);
 
 #if CMK_NODE_QUEUE_AVAILABLE
-    if (CMI_DEST_RANK(msg)==DGRAM_NODEMESSAGE)
+   if (CMI_DEST_RANK(msg)==DGRAM_NODEMESSAGE)
       PCQueuePush(CsvAccess(NodeRecv), msg);
-    else
+   else
 #endif
       CmiPushPE(CMI_DEST_RANK(msg), msg);
 
 #if CMK_BROADCAST_SPANNING_TREE
-    if (CMI_BROADCAST_ROOT(msg))
+   if (CMI_BROADCAST_ROOT(msg))
       SendSpanningChildren(nbytes, msg);
 #elif CMK_BROADCAST_HYPERCUBE
-    if (CMI_GET_CYCLE(msg))
+   if (CMI_GET_CYCLE(msg))
       SendHypercube(nbytes, msg);
 #endif
-    break;
-  }
 }
 
 /********************* MESSAGE RECEIVE FUNCTIONS ******************/
@@ -492,7 +489,7 @@ void CmiSyncSendFn(int destPE, int size, char *msg)
     CmiAsyncSendFn(destPE, size, dupmsg);
 }
 
-static int SendMsgBuf()
+static void SendMsgBuf()
 {
   SMSG_LIST *msg_tmp;
   char *msg;
