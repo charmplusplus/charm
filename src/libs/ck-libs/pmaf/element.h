@@ -30,29 +30,15 @@ class element {
   elemRef myRef;
   chunk *C;
  public:
-  int present, lock;  // indicates this is an element present in the mesh
+  int present;  // indicates this is an element present in the mesh
   nodeRef nodes[4];
   elemRef faceElements[4];
-  elemRef dependents[4];
-  int numDepends;
-
-  element() { 
-    targetVolume = currentVolume = -1.0; present = 1; numDepends = lock = 0; 
-    C = NULL;
-  }
+  element() { targetVolume = currentVolume = -1.0; present = 1; C = NULL; }
   element(nodeRef *n) { 
-    targetVolume=currentVolume=-1.0; present = 1; numDepends = lock = 0; 
-    C = NULL; set(n);
+    targetVolume=currentVolume=-1.0; present = 1; C = NULL; set(n);
   }
-  void set(int cid, int idx, chunk *cptr) {
-    myRef.set(cid, idx); 
-    C = cptr; 
-    numDepends = lock = 0;
-  }
-  void set(nodeRef *n) { 
-    for (int i=0; i<4; i++)  nodes[i] = n[i]; 
-  }
-  
+  void set(int cid, int idx, chunk *cptr) { myRef.set(cid, idx); C = cptr; }
+  void set(nodeRef *n) { for (int i=0; i<4; i++)  nodes[i] = n[i]; }
   void update(nodeRef& oldval, nodeRef& newval);
   int hasNode(nodeRef n);
   int hasNode(node n);
@@ -61,83 +47,34 @@ class element {
   elemRef getFace(int face[3]) {
     return(faceElements[face[0]+face[1]+face[2]-3]);
   }
-  elemRef getFace(int a, int b, int c) {
-    return(faceElements[a+b+c-3]);
+  elemRef getFace(int a, int b, int c) { return(faceElements[a+b+c-3]); }
+  void setFace(int a, int b, int c, elemRef er) { faceElements[a+b+c-3] = er; }
+  void setFace(int idx, elemRef er) { faceElements[idx] = er; }
+  int hasFace(elemRef face);
+  void updateFace(int cid, int idx) {
+    faceElements[0].cid = cid; faceElements[0].idx = idx;
   }
-  void setFace(int a, int b, int c, elemRef er) {
-    faceElements[a+b+c-3] = er;
+  void updateFace(elemRef oldElem, elemRef newElem) {
+    for (int i=0; i<4; i++)
+      if (faceElements[i] == oldElem) {
+	faceElements[i] = newElem;
+	return;
+      }
   }
-  void setFace(int idx, elemRef er) {
-    faceElements[idx] = er;
-  }
-
-  int lockElement() {
-    //CkPrintf("L%d.%dL ", myRef.idx, myRef.cid);
-    if (lock) return 0;
-    else {
-      lock = 1;
-      CkPrintf("LOCKED %d on %d. \n", myRef.idx, myRef.cid);
-    }
-    return 1;
-  }
-  void unlockElement() {
-    //CkPrintf("U%d.%dU ", myRef.idx, myRef.cid);
-    lock = 0;
-  }
-  int lockedElement() {
-    return lock;
-  }
-  void addDepend(elemRef d) {
-    if ((d == dependents[0]) || (d == dependents[1]) || 
-	(d == dependents[2]) || (d == dependents[3]))
-       return;
-    if (numDepends == 4) {
-      CkPrintf("ERROR: can't have more than 4 dependents!\n");
-      return;
-    }
-    dependents[numDepends] = d;
-    numDepends++;
-  }
-  elemRef getDepend() {
-    numDepends--;
-    return dependents[numDepends];
-  }
-  void fireDependents() {
-    elemRef er;
-    while (numDepends > 0) {
-      er = getDepend();
-      CkPrintf(".......Element %d on %d firing dependent %d on %d\n",
-	       myRef.idx, myRef.cid, er.idx, er.cid);
-      mesh[er.cid].refineElement(er.idx);
-    }
-  }
-  
   nodeRef& getNode(int nodeIdx) { return nodes[nodeIdx]; }
   int getNodeIdx(nodeRef n);
   int getNode(node n);
   elemRef& getMyRef() { return myRef; }
-  
   void clear() { present = 0; }
   int isPresent() { return present; }
-  
-  // getVolume & calculateVolume both set currentVolume; getVolume returns it
-  // getTargetVolume & getCachedVolume provide access to targetVolume & currentVolume
   double getVolume();
   void calculateVolume();
   double getArea(int n1, int n2, int n3);
-  void resetTargetVolume(double volume) { 
-    targetVolume = volume; 
-  }
-  void setTargetVolume(double volume);/* { 
-    if (myRef.cid != 0)
-      CkPrintf("Trying to set target volume of element %d on chunk %d to %f\n",
-	       myRef.idx, myRef.cid, volume);
-    if ((volume < targetVolume) || (targetVolume < 0.0)) targetVolume = volume;
-    }*/
+  void resetTargetVolume(double volume) { targetVolume = volume; }
+  void setTargetVolume(double volume);
   double getTargetVolume() { return targetVolume; }
   double getCachedVolume() { return currentVolume; }
   double findLongestEdge(int *le1, int *le2, int *nl1, int *nl2);
-  
   // Delaunay operations
   // perform 2->3 flip on this element with element neighboring on face
   void flip23(int face[3]);
@@ -152,10 +89,13 @@ class element {
   // test if this element should perform 3->2 flip with elements neighboring 
   // on edge
   int test32(int edge[2]);
-  
+  int connectTest();
+
   // Refinement operations
   // Largest face methods
   void refineLF();
+  int lockLF(node n1, node n2, node n3, node n4, elemRef requester, 
+	     double prio);
   splitResponse *element::splitLF(node in1, node in2, node in3, node in4, 
 				  elemRef requester);
   // Longest edge methods
@@ -165,25 +105,14 @@ class element {
 			 elemRef targetElem, node aIn, node bIn);
   lockResult *lockArc(elemRef prioRef, elemRef parentRef, double prio,
 		      elemRef destRef, node aNode, node bNode);
-  void unlockArc1(int prio, elemRef parentRef, elemRef destRef, node aNode, node bNode);
-  void unlockArc2(int prio, elemRef parentRef, elemRef destRef, node aNode, node bNode);
+  void unlockArc1(int prio, elemRef parentRef, elemRef destRef, node aNode, 
+		  node bNode);
+  void unlockArc2(int prio, elemRef parentRef, elemRef destRef, node aNode, 
+		  node bNode);
   // Centerpoint methods
   void refineCP();
 
-  void updateFace(int cid, int idx) {
-    faceElements[0].cid = cid;
-    faceElements[0].idx = idx;
-    lock = 0; CkPrintf("%d on %d lock %d\n", myRef.idx, myRef.cid, lock);
-  }
-  void updateFace(elemRef oldElem, elemRef newElem) {
-    for (int i=0; i<4; i++) {
-      if (faceElements[i] == oldElem) {
-	faceElements[i] = newElem;
-	return;
-      }
-    }
-  }
-  
+
   // Coarsen operations
   void coarsen();
 
@@ -206,8 +135,6 @@ class element {
     return 0;
   }
   int CPtest() { return 1; }
-  int twoNodesLocked();
-  int anyNodeLocked();
 };
 
 #endif

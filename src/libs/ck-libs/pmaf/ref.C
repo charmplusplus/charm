@@ -28,21 +28,6 @@ void nodeRef::update(node& m)
   mesh[cid].updateNodeCoord(nm);
 }
 
-int nodeRef::lock()
-{
-  intMsg *im2;
-  int result;
-  im2 = mesh[cid].lockNode(idx);
-  result = im2->anInt;
-  CkFreeMsg(im2);
-  return result;
-}
-
-void nodeRef::unlock()
-{
-  mesh[cid].unlockNode(idx);
-}
-
 // elemRef methods
 double elemRef::getVolume()
 {

@@ -12,8 +12,6 @@ class chunk;
 class node { 
   /// The 3D Cartesian coordinate
   double coord[3];       
-  /// A node lock to prevent simultaneous operations 
-  int theLock;           
   /// Flag for fixed node
   /** One (1) flags this as fixed node; zero (0) is not fixed; 
       negative (-1) is uninitialized  */
@@ -39,7 +37,7 @@ class node {
   /// Basic constructor
   /** Initializes all data members except for coordinates.  */
   node() {
-    reports = theLock = 0;
+    reports = 0;
     fixed = surface = -1; 
     for (int i=0; i<3; i++) sumReports[i] = 0.0;
     myRef.reset();
@@ -50,7 +48,7 @@ class node {
       to initialize the coordinates.  */
   node(double x, double y, double z) { 
     coord[0] = x; coord[1] = y;  coord[2] = z;
-    reports = theLock = 0;
+    reports = 0;
     fixed = surface = -1; 
     for (int i=0; i<3; i++) sumReports[i] = 0.0;
     myRef.reset();
@@ -60,7 +58,7 @@ class node {
   /** Initializes all data members, accepting an array of three (3) doubles 
       as a parameter to initialize the coordinates.  */
   node(double inNode[3]) { 
-    reports = theLock = 0;
+    reports = 0;
     fixed = surface = -1; 
     for (int i=0; i<3; i++) {
       coord[i] = inNode[i];
@@ -69,12 +67,12 @@ class node {
     myRef.reset();
     C = NULL;
   }
-  /// Pupper.
+  /// Pupper
   /** Packs/unpacks/sizes the node for use in messages via parameter
       marshalling.  myRef and C become irrelevant remotely and are not
       needed here.  */
   void pup(PUP::er &p) { 
-    p|reports; p|theLock; p|fixed; p|surface;
+    p|reports; p|fixed; p|surface;
     p(coord,3);
     p(sumReports,3);
   }
@@ -94,7 +92,7 @@ class node {
   /// Reset operation
   /** Reinitializes all data except for the coordinates.  */
   void reset() { 
-    reports = theLock = 0;
+    reports = 0;
     fixed = surface = -1; 
     for (int i=0; i<3; i++) sumReports[i] = 0.0;
     myRef.reset();
@@ -118,8 +116,7 @@ class node {
   /** Input should be 0, 1 or 2.  Returns the double that is the dth entry
       in the coord array. Prints error message if d is out of range.  */
   double getCoord(int d) { 
-    if ((d>2) || (d<0))
-      CkPrintf("ERROR: node::getCoord: input index %d is out of range.\n", d);
+    CmiAssert((d<=2) && (d>=0));
     return coord[d]; 
   }
   /// Set fixed flag
@@ -134,15 +131,6 @@ class node {
   int onSurface() { return(surface); }
   /// Unset surface flag
   void notSurface() { surface = 0; }
-  /// Lock the node lock
-  /** If the node is not already locked, locks it and returns success (1);
-      otherwise, returns failure (0).  */
-  int lock() { return (theLock ? 0 : theLock = 1); }
-  /// Unlock the node lock
-  void unlock() { theLock = 0; }
-  /// Check the node lock
-  int locked() { return theLock; }
-
   /// Get distance to node n
   double distance(const node& n) {
     double dx = n.coord[0] - coord[0], dy = n.coord[1] - coord[1], 

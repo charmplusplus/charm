@@ -68,6 +68,7 @@ void chunk::refiningElements()
     // continue trying to refine elements until nothing changes
     i = 0;
     modified = 0;
+    /*
     CkPrintf("Chunk %d in refiningElements loop\n", cid);
     while (i < numElements) { // loop through the elements
       if ((theElements[i].getTargetVolume() <= theElements[i].getVolume()) 
@@ -80,12 +81,12 @@ void chunk::refiningElements()
       i++;
       adjustMesh();
     }
-    /*
+    */
     i=0;
     while (i < numElements) { // loop through the elements
       if ((theElements[i].getTargetVolume() <= theElements[i].getVolume()) 
-	    && (theElements[i].getTargetVolume() >= 0.0)
-	  && (theElements[i].LFtest())) {
+	  && (theElements[i].getTargetVolume() >= 0.0)) {
+	//&& (theElements[i].LFtest())) {
 	// the element needs refining
 	modified = 1; // something's bound to change
 	theElements[i].refineLF(); // refine the element
@@ -93,7 +94,6 @@ void chunk::refiningElements()
       i++;
       adjustMesh();
     }
-    */
     i=0;
     while (i < numElements) { // loop through the elements
       if ((theElements[i].getTargetVolume() <= theElements[i].getVolume()) 
@@ -242,8 +242,7 @@ void chunk::insertLock(int lh, double prio)
   newLock->prio = prio;
   newLock->holder = lh;
   newLock->next = NULL;
-  if (!lockList)
-    lockList = newLock;
+  if (!lockList) lockList = newLock;
   else {
     if ((prio > lockList->prio) || 
 	(prio == lockList->prio) && (lh < lockList->holder)) {
@@ -355,20 +354,6 @@ nodeMsg *chunk::getNode(int n)
   return nm;
 }
 
-intMsg *chunk::lockNode(int n)
-{
-  CmiAssert((n < numNodes) && (n >= 0));
-  intMsg *rm = new intMsg;
-  rm->anInt = theNodes[n].lock();
-  return rm;
-}
-
-void chunk::unlockNode(int n)
-{
-  CmiAssert((n < numNodes) && (n >= 0));
-  theNodes[n].unlock();
-}
-
 void chunk::updateNodeCoord(nodeMsg *m)
 {
   CmiAssert((m->idx < numNodes) && (m->idx >= 0));
@@ -451,23 +436,13 @@ flip32response *chunk::remove32element(flip32request *fr)
   return f32r;
 }
 
-lockResult *chunk::lockElement(lockMsg *lm)
+intMsg *chunk::checkFace(int idx, elemRef face)
 {
-  lockResult *lr = new lockResult;
-  lr->result = theElements[lm->idx].lockElement();
-  return lr;
-}
-
-intMsg *chunk::lockedElement(int idx)
-{
-  intMsg *im = new intMsg;
-  im->anInt = theElements[idx].lockedElement();
-  return im;
-}
-
-void chunk::unlockElement(int idx)
-{
-  theElements[idx].unlockElement();
+  intMsg *result = new intMsg;
+  getAccessLock();
+  result->anInt = theElements[idx].hasFace(face);
+  releaseAccessLock();
+  return result;
 }
 
 // local methods
@@ -577,6 +552,16 @@ nodeRef chunk::findNode(node n)
     }
   foo.idx = -1;
   return foo;
+}
+
+intMsg *chunk::lockLF(int idx, node n1, node n2, node n3, node n4, 
+		      elemRef requester, double prio)
+{
+  forcedGetAccessLock();
+  intMsg *result = new intMsg;
+  result->anInt = theElements[idx].lockLF(n1, n2, n3, n4, requester, prio);
+  releaseAccessLock();
+  return result;
 }
 
 splitResponse *chunk::splitLF(int idx, node in1, node in2, node in3, node in4,

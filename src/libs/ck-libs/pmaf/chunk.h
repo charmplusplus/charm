@@ -105,8 +105,6 @@ class chunk : public ArrayElement1D {
   
   // entries to node data
   nodeMsg *getNode(int n);
-  intMsg *lockNode(int n);
-  void unlockNode(int n);
   void updateNodeCoord(nodeMsg *);
   void relocationVote(nodeVoteMsg *);
   
@@ -116,6 +114,9 @@ class chunk : public ArrayElement1D {
   void resetTargetVolume(doubleMsg *);
   elemRef findNeighbor(nodeRef nr1, nodeRef nr2, nodeRef nr3, int lidx);
   refMsg *findRemoteNeighbor(threeNodeMsg *);
+  intMsg *checkFace(int idx, elemRef face);
+  intMsg *lockLF(int idx, node n1, node n2, node n3, node n4, 
+		 elemRef requester, double prio);
   splitResponse *splitLF(int idx,node in1, node in2, node in3, node in4,
 		       elemRef requester);
   LEsplitResult *LEsplit(LEsplitMsg *);
@@ -129,9 +130,6 @@ class chunk : public ArrayElement1D {
   flip23response *flip23remote(flip23request *);
   flip32response *chunk::flip32remote(flip32request *fr);
   flip32response *chunk::remove32element(flip32request *fr);
-  lockResult *lockElement(lockMsg *lm);
-  intMsg *lockedElement(int idx);	
-  void unlockElement(int idx);	
 
   // local methods
   void debug_print(int c); // prints a snapshot of the chunk to file

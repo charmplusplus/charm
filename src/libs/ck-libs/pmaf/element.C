@@ -5,8 +5,6 @@
 #include "matrix.h"
 
 void element::setTargetVolume(double volume) { 
-  //  CkPrintf("Trying to set target volume of element %d on chunk %d to %f\n",
-  //   myRef.idx, myRef.cid, volume);
   if ((volume < targetVolume) || (targetVolume < 0.0)) targetVolume = volume;
 }
 
@@ -473,26 +471,42 @@ int element::test32(int edge[2])
 {
   return 0;
 }
+
+int element::connectTest()
+{
+  intMsg *result;
+  for (int i=0; i<4; i++) {
+    // check if element of faceElement[i] has this element as a neighbor
+    result = mesh[faceElements[i].cid].checkFace(faceElements[i].idx, myRef);
+    if (!result->anInt) return 0;
+    CkPrintf("Face %d is fine...\n", i);
+  }
+  return 1;
+}
   
+int element::hasFace(elemRef face)
+{
+  return((faceElements[0] == face) || (faceElements[1] == face) ||
+	 (faceElements[2] == face) || (faceElements[3] == face));
+}
+
 // Largest face methods
 void element::refineLF()
 {
-  static int start = 0;
+  static int start = 0; // start with a different face each time (if areas =)
   int lf, a, b, c, d;
   node n1, n2, n3, n4, centerpoint;
   elemRef abc, acd, bcd;
-  double f[4];
+  double f[4]; // to store face areas
 
-  CkPrintf("Refine: %d on %d: volume=%lf target=%lf lock=%d\n",
-  	   myRef.idx, myRef.cid, currentVolume, targetVolume, lock);
-  if ((currentVolume == 0.0) || (targetVolume == 0.0)) {
-    CkPrintf("WARNING: %d on %d has dwindled; using bailout!\n", 
-	     myRef.idx, myRef.cid);
+  // CmiAssert(connectTest());
+  CkPrintf("Refine: %d on %d: volume=%lf target=%lf\n",
+  	   myRef.idx, myRef.cid, currentVolume, targetVolume);
+  if ((currentVolume < targetVolume) || (currentVolume == 0.0) 
+      || (targetVolume == 0.0)) { 
     targetVolume = -1.0;
     return;
   }
-  if (currentVolume < targetVolume)
-    return;
 
   // find largest face
   f[0] = getArea(0,1,2);
@@ -502,6 +516,15 @@ void element::refineLF()
   lf = start;
   for (int i=0; i<4; i++) if (f[i] > f[lf]) lf = i;
   start = (start+1) % 4;
+  // lock this chunk first
+  int iResult;
+  intMsg *result;
+  iResult = C->lockLocalChunk(myRef.cid, f[lf]);
+  while (iResult != 1) {
+    if (iResult == 0) return;
+    else if (iResult == -1) CthYield();
+    iResult = C->lockLocalChunk(myRef.cid, f[lf]);
+  }
   // make abc largest face
   a = (lf == 3) ? 1 : 0; 
   b = (lf > 1) ? 2 : 1; 
@@ -510,48 +533,68 @@ void element::refineLF()
   abc = faceElements[a+b+c-3];
   acd = faceElements[a+c+d-3];
   bcd = faceElements[b+c+d-3];
-
   CmiAssert(a+b+c-3 == lf);
-
-  CkPrintf("-> Refine STATUS: a=%d b=%d c=%d d=%d abc=[%d,%d](fe%d) acd=[%d,%d](fe%d) bcd=[%d,%d](fe%d)\n", a, b, c, d, abc.idx, abc.cid, a+b+c-3, acd.idx, acd.cid, a+c+d-3, bcd.idx, bcd.cid, b+c+d-3);
-
-  // build local locking cloud
-  lockResult *lr1, *lr2, *lr3;
-  lockMsg *lm1 = new (8*sizeof(int)) lockMsg,
-    *lm2 = new (8*sizeof(int)) lockMsg, *lm3 = new (8*sizeof(int)) lockMsg;
-  *(int *)CkPriorityPtr(lm1) = *(int *)CkPriorityPtr(lm2) = 
-    *(int *)CkPriorityPtr(lm3) = ((myRef.cid*10000) + myRef.idx) - INT_MAX;
-  CkSetQueueing(lm1, CK_QUEUEING_IFIFO);
-  CkSetQueueing(lm2, CK_QUEUEING_IFIFO);
-  CkSetQueueing(lm3, CK_QUEUEING_IFIFO);
-  lm1->idx = myRef.idx;
-  lm2->idx = acd.idx;
-  lm3->idx = bcd.idx;
-  lr1 = mesh[myRef.cid].lockElement(lm1);
-  if (lr1->result) { // lock acd and bcd face elements
-    if (acd.cid != -1)  lr2 = mesh[acd.cid].lockElement(lm2);
-    if ((acd.idx == -1) || (lr2->result)) {
-      if (bcd.cid != -1)  lr3 = mesh[bcd.cid].lockElement(lm3);
-      if ((bcd.idx == -1) || (lr3->result)) {}	// LOCAL LOCKING CLOUD BUILT
-      else { // couldn't lock bcd
-	mesh[acd.cid].unlockElement(acd.idx);
-	unlockElement();
-	return;
-      }
-    }
-    else { // couldn't lock acd
-      unlockElement();
-      return;
-    }
-  }
-  else  return;  // couldn't lock this element
-
-  // get nodeRefs for nodes
-  CkPrintf("  -> Refine: %d on %d: Local cloud built.\n",myRef.idx,myRef.cid);
   n1 = C->theNodes[nodes[a].idx];
   n2 = C->theNodes[nodes[b].idx];
   n3 = C->theNodes[nodes[c].idx];
   n4 = C->theNodes[nodes[d].idx];
+
+  CkPrintf("-> Refine STATUS: a=%d b=%d c=%d d=%d abc=[%d,%d](fe%d) acd=[%d,%d](fe%d) bcd=[%d,%d](fe%d)\n", a, b, c, d, abc.idx, abc.cid, a+b+c-3, acd.idx, acd.cid, a+c+d-3, bcd.idx, bcd.cid, b+c+d-3);
+
+  // build local locking cloud
+  if (acd.cid != -1) {
+    result = mesh[acd.cid].lockChunk(myRef.cid, f[lf]);
+    while (result->anInt != 1) {
+      if (result->anInt == 0) {
+	C->unlockLocalChunk(myRef.cid);
+	CkFreeMsg(result);
+	return;
+      }
+      else if (result->anInt == -1) {
+	CthYield();
+	CkFreeMsg(result);
+	result = mesh[acd.cid].lockChunk(myRef.cid, f[lf]);
+      }
+    }
+    CkFreeMsg(result);
+  }
+  if (bcd.cid != -1) {
+    result = mesh[bcd.cid].lockChunk(myRef.cid, f[lf]);
+    while (result->anInt != 1) {
+      if (result->anInt == 0) {
+	C->unlockLocalChunk(myRef.cid);
+	if (acd.cid != -1) mesh[acd.cid].unlockChunk(myRef.cid);
+	CkFreeMsg(result);
+	return;
+      }
+      else if (result->anInt == -1) {
+	CthYield();
+	CkFreeMsg(result);
+	result = mesh[bcd.cid].lockChunk(myRef.cid, f[lf]);
+      }
+    }
+    CkFreeMsg(result);
+  }
+  if (abc.cid != -1) {
+    CkPrintf("  -> Refine: %d on %d: Locking %d on %d.\n", myRef.idx, 
+	     myRef.cid, abc.idx, abc.cid);
+    result = mesh[abc.cid].lockLF(abc.idx, n1, n2, n3, n4, myRef, f[lf]);
+    if (result->anInt == 0) {
+      CkPrintf("  -> Refine: %d on %d: Lock %d on %d FAILED.\n", myRef.idx, 
+	       myRef.cid, abc.idx, abc.cid);
+      CkFreeMsg(result);
+      C->unlockLocalChunk(myRef.cid);
+      if (acd.cid != -1) mesh[acd.cid].unlockChunk(myRef.cid);
+      if (bcd.cid != -1) mesh[bcd.cid].unlockChunk(myRef.cid);
+      return;
+    }
+    CkPrintf("  -> Refine: %d on %d: Lock %d on %d SUCCEEDED.\n", myRef.idx, 
+	     myRef.cid, abc.idx, abc.cid);
+    CkFreeMsg(result);
+  }
+
+  // get nodeRefs for nodes
+  CkPrintf("  -> Refine: %d on %d: Cloud locked.\n", myRef.idx, myRef.cid);
   // test if face is on surface of mesh
   if (C->faceOnSurface(nodes[a].idx, nodes[b].idx, nodes[c].idx)) { 
     CkPrintf("   -> Refine %d on %d (%lf -> %lf): face on surface\n", 
@@ -564,11 +607,9 @@ void element::refineLF()
     centerpoint.setSurface();    
     centerpoint.notFixed();
     nodeRef newNode = C->addNode(centerpoint);
-    // modify this tet and add two new ones, locking them
+    // modify this tet and add two new ones
     elemRef newElem1 = C->addElement(nodes[a],newNode,nodes[c],nodes[d]);
-    C->theElements[newElem1.idx].lock = 1;
     elemRef newElem2 = C->addElement(newNode,nodes[b],nodes[c],nodes[d]);
-    C->theElements[newElem2.idx].lock = 1;
     // need to updateFace on elements on acd and bcd faces: abd face
     // still on this element so no changes needed
     if (acd.cid != -1)
@@ -598,10 +639,6 @@ void element::refineLF()
     // update local nodes with new node
     nodes[c] = newNode;
     calculateVolume(); // since this element has changed in size
-    // done: unlock new elements; cloud elements will unlock later
-    C->theElements[newElem1.idx].lock = 0;
-    C->theElements[newElem2.idx].lock = 0;
-    fireDependents();
     CkPrintf("   <- Refine: Done w/ surface element refine of %d on %d\n",
 	     myRef.idx, myRef.cid);
   }
@@ -609,11 +646,9 @@ void element::refineLF()
     CkPrintf("   -> Refine: %d on %d (%lf -> %lf): face NOT on surface; trying to split %d on %d\n", 
 	     myRef.idx, myRef.cid, getVolume(), getTargetVolume(), 
 	     abc.idx, abc.cid);
-    // find neighbor sharing the largest face and attempt to build
-    // locking cloud around it
     splitResponse *theResult = 
       mesh[abc.cid].splitLF(abc.idx, n1, n2, n3, n4, myRef);
-    CkPrintf("    -> Split: result=%d\n", theResult->success);
+    //CkPrintf("    -> Split: result=%d\n", theResult->success);
     if (theResult->success == 1) { // successfully split neighbor
       // extract newNode
       node newNode(theResult->newNode[0], theResult->newNode[1], 
@@ -621,25 +656,13 @@ void element::refineLF()
       newNode.notFixed();
       newNode.notSurface();
       nodeRef newRef = C->addNode(newNode);
-      CkPrintf("     -> Refine: %d on %d: Large face not locked w/(%d,%d)...(%lf,%lf,%lf) (%lf,%lf,%lf) (%lf,%lf,%lf)...\n                 ***** New node: (%lf,%lf,%lf) *****\n",
-	       myRef.idx, myRef.cid, 
-	       faceElements[lf].cid, faceElements[lf].idx,
-	       n1.getCoord(0), n1.getCoord(1), n1.getCoord(2), 
-	       n2.getCoord(0), n2.getCoord(1), n2.getCoord(2), 
-	       n3.getCoord(0), n3.getCoord(1), n3.getCoord(2),
-	       newNode.getCoord(0), newNode.getCoord(1), 
-	       newNode.getCoord(2));
-      // update/create new elements, and lock them
+      // update/create new elements
       elemRef newElem3 = C->addElement(nodes[a],newRef,nodes[c],nodes[d]);
-      C->theElements[newElem3.idx].lock = 1;
       elemRef newElem4 = C->addElement(newRef,nodes[b],nodes[c],nodes[d]);
-      C->theElements[newElem4.idx].lock = 1;
       // need to updateFace on elements on acd and bcd faces: acd face
       // still on this element so no changes needed
-      if (acd.cid != -1)
-	mesh[acd.cid].updateFace(acd.idx, myRef, newElem3);
-      if (bcd.cid != -1)
-	mesh[bcd.cid].updateFace(bcd.idx, myRef, newElem4);
+      if (acd.cid != -1) mesh[acd.cid].updateFace(acd.idx, myRef, newElem3);
+      if (bcd.cid != -1) mesh[bcd.cid].updateFace(bcd.idx, myRef, newElem4);
       // this element has the abd face, so c will be the new node
       nodes[c] = newRef;
       // set faces of the two new elements
@@ -661,16 +684,12 @@ void element::refineLF()
       C->theElements[newElem4.idx].setTargetVolume(targetVolume);
       calculateVolume(); // since this element has changed in size
       // tell remote elems about their new faces
-      CkPrintf("      -> Updating remote faces [%d,%d] and [%d,%d]...\n",
-	       theResult->ance, abc.cid, theResult->bnce, abc.cid);
+      //CkPrintf("      -> Updating remote faces [%d,%d] and [%d,%d]...\n",
+      //theResult->ance, abc.cid, theResult->bnce, abc.cid);
       mesh[abc.cid].updateFace(theResult->ance, newElem3.cid, 
 			       newElem3.idx);
       mesh[abc.cid].updateFace(theResult->bnce, newElem4.cid, 
 			       newElem4.idx);
-      // done: unlock the two new elements; cloud will unlock later
-      C->theElements[newElem3.idx].lock = 0;
-      C->theElements[newElem4.idx].lock = 0;
-      fireDependents();
     }
     else if (theResult->success == 0) { // wait for split
       CkPrintf("    -> Refine: %d on %d: Large face (%d,%d) split failed.\n",
@@ -679,85 +698,105 @@ void element::refineLF()
     }
     else CkPrintf("Refine: %d on %d: WHAT THE FRELL?\n", myRef.idx, myRef.cid);
   }
-  if (bcd.cid != -1)  mesh[bcd.cid].unlockElement(bcd.idx);
-  if (acd.cid != -1)  mesh[acd.cid].unlockElement(acd.idx);
-  unlockElement();
+  if (bcd.cid != -1) mesh[bcd.cid].unlockChunk(myRef.cid);
+  if (acd.cid != -1) mesh[acd.cid].unlockChunk(myRef.cid);
+  C->unlockLocalChunk(myRef.cid);
   CkPrintf("Refine: DONE %d on %d\n", myRef.idx, myRef.cid);
 }
 
+int element::lockLF(node n1, node n2, node n3, node n4, elemRef requester, 
+			double prio)
+{
+  int a=-1, b=-1, c=-1, d=-1;
+  elemRef abc, acd, bcd;
+  // first try to lock this chunk
+  intMsg *result;
+  int iResult = C->lockLocalChunk(requester.cid, prio);
+  while (iResult != 1) {
+    if (iResult == 0) return 0;
+    else if (iResult == -1) CthYield();
+    iResult = C->lockLocalChunk(requester.cid, prio);
+  }
+  // align nodes with requester
+  int found = 0;
+  for (int i=0; i<4; i++)
+    if (faceElements[i] == requester)
+      found = 1;
+  CmiAssert(found);
+  a = getNode(n1);
+  b = getNode(n2);
+  c = getNode(n3);
+  CmiAssert((a != -1) && (b != -1) && (c != -1));
+  // double check abc and get the faces that will need to be locked
+  d = 6-a-b-c;
+  abc = faceElements[a+b+c-3];
+  CmiAssert(abc == requester);
+  acd = faceElements[a+c+d-3];
+  bcd = faceElements[b+c+d-3];
+  // build local locking cloud
+  if (acd.cid != -1) {
+    result = mesh[acd.cid].lockChunk(requester.cid, prio);
+    while (result->anInt != 1) {
+      if (result->anInt == 0) {
+	C->unlockLocalChunk(requester.cid);
+	CkFreeMsg(result);
+	return 0;
+      }
+      else if (result->anInt == -1) {
+	CthYield();
+	CkFreeMsg(result);
+	result = mesh[acd.cid].lockChunk(requester.cid, prio);
+      }
+    }
+    CkFreeMsg(result);
+  }
+  if (bcd.cid != -1) {
+    result = mesh[bcd.cid].lockChunk(requester.cid, prio);
+    while (result->anInt != 1) {
+      if (result->anInt == 0) {
+	C->unlockLocalChunk(requester.cid);
+	if (acd.cid != -1) mesh[acd.cid].unlockChunk(requester.cid);
+	CkFreeMsg(result);
+	return 0;
+      }
+      else if (result->anInt == -1) {
+	CthYield();
+	CkFreeMsg(result);
+	result = mesh[bcd.cid].lockChunk(requester.cid, prio);
+      }
+    }
+    CkFreeMsg(result);
+  }
+  return 1;
+}
+
 splitResponse *element::splitLF(node in1, node in2, node in3, node in4, elemRef requester)
-{ // determine if neighbor face is locked or not; if not, split neighbor and
-  // store data in splitResponse *theResult to transmit back to initiating tet
+{ // split neighbor and store data in splitResponse *theResult to transmit 
+  // back to initiating tet
   splitResponse *theResult = new splitResponse;
   int a=-1, b=-1, c=-1, d=-1;
   node centerpoint;
   elemRef abc, acd, bcd;
 
-  CkPrintf("...... Split: %d on %d\n", myRef.idx, myRef.cid);
-  if (lockedElement()) {
-    theResult->success = 0;
-    CkPrintf("...... Split: %d on %d locked.\n", myRef.idx, myRef.cid);
-    return theResult;
-  }
+  //CkPrintf("...... Split: %d on %d\n", myRef.idx, myRef.cid);
 
   theResult->success = 1;
+  int found = 0;
   // align nodes with requester
   for (int i=0; i<4; i++)
-    if (faceElements[i] == requester) {
-      a = getNode(in1);
-      b = getNode(in2);
-      c = getNode(in3);
-      if ((a == -1) || (b == -1) || (c == -1)) {
-	theResult->success = 0;
-	CkPrintf("WARNING: Split: %d on %d: not all face nodes found!\n",
-		 myRef.idx, myRef.cid);
-	return theResult;
-      }
-    }
-
+    if (faceElements[i] == requester)
+      found = 1;
+  CmiAssert(found);
+  a = getNode(in1);
+  b = getNode(in2);
+  c = getNode(in3);
+  CmiAssert((a != -1) && (b != -1) && (c != -1));
   d = 6-a-b-c;
   abc = faceElements[a+b+c-3];
+  CmiAssert(abc == requester);
   acd = faceElements[a+c+d-3];
   bcd = faceElements[b+c+d-3];
-
-  // build local locking cloud
-  lockResult *lr1, *lr2, *lr3;
-  lockMsg *lm1 = new (8*sizeof(int)) lockMsg, 
-    *lm2 = new (8*sizeof(int)) lockMsg, *lm3 = new (8*sizeof(int)) lockMsg;
-  *(int *)CkPriorityPtr(lm1) = *(int *)CkPriorityPtr(lm2) = 
-    *(int *)CkPriorityPtr(lm3) = ((myRef.cid*10000) + myRef.idx) - INT_MAX;
-  CkSetQueueing(lm1, CK_QUEUEING_IFIFO);
-  CkSetQueueing(lm2, CK_QUEUEING_IFIFO);
-  CkSetQueueing(lm3, CK_QUEUEING_IFIFO);
-  lm1->idx = myRef.idx;
-  lm2->idx = acd.idx;
-  lm3->idx = bcd.idx;
-  lr1 = mesh[myRef.cid].lockElement(lm1);
-  if (lr1->result) { // lock acd and bcd face elements
-    if (acd.cid != -1)  lr2 = mesh[acd.cid].lockElement(lm2);
-    if ((acd.idx == -1) || (lr2->result)) {
-      if (bcd.cid != -1)  lr3 = mesh[bcd.cid].lockElement(lm3);
-      if ((bcd.idx == -1) || (lr3->result)) {}	// LOCAL LOCKING CLOUD BUILT
-      else { // couldn't lock bcd
-	if (acd.cid != -1) mesh[acd.cid].unlockElement(acd.idx);
-	unlockElement();
-	theResult->success = 0;
-	return theResult;
-      }
-    }
-    else { // couldn't lock acd
-      unlockElement();
-      theResult->success = 0;
-      return theResult;
-    }
-  }
-  else {   // couldn't lock this element
-    theResult->success = 0; 
-    return theResult; 
-  }
-
   // find new node in face
-  CkPrintf("....... Split: %d on %d cloud built.\n", myRef.idx, myRef.cid);
   centerpoint.set((C->theNodes[nodes[a].idx].getCoord(0) + 
 		   C->theNodes[nodes[b].idx].getCoord(0) +
 		   C->theNodes[nodes[c].idx].getCoord(0)) / 3.0,
@@ -770,11 +809,9 @@ splitResponse *element::splitLF(node in1, node in2, node in3, node in4, elemRef 
   centerpoint.notSurface();    
   centerpoint.notFixed();
   nodeRef newRef = C->addNode(centerpoint);
-  // modify this tet and add two new ones and lock them
+  // modify this tet and add two new ones
   elemRef newElem1 = C->addElement(nodes[a], newRef, nodes[c], nodes[d]);
   elemRef newElem2 = C->addElement(newRef, nodes[b], nodes[c], nodes[d]);
-  C->theElements[newElem1.idx].lock = 1;
-  C->theElements[newElem2.idx].lock = 1;
   // need to updateFace on elements on acd and bcd faces: abd face
   // still on this element so no changes needed
   if (acd.cid != -1)
@@ -803,14 +840,10 @@ splitResponse *element::splitLF(node in1, node in2, node in3, node in4, elemRef 
   theResult->newNode[0] = centerpoint.getCoord(0);
   theResult->newNode[1] = centerpoint.getCoord(1);
   theResult->newNode[2] = centerpoint.getCoord(2);
-  // done: free up the two new elements
-  //C->theElements[newElem1.idx].lock = 0;
-  //C->theElements[newElem2.idx].lock = 0;
-  fireDependents();
-
-  if (bcd.cid != -1) mesh[bcd.cid].unlockElement(bcd.idx);
-  if (acd.cid != -1) mesh[acd.cid].unlockElement(acd.idx);
-  unlockElement();
+  // done: unlockChunks
+  if (bcd.cid != -1) mesh[bcd.cid].unlockChunk(requester.cid);
+  if (acd.cid != -1) mesh[acd.cid].unlockChunk(requester.cid);
+  C->unlockLocalChunk(requester.cid);
   return theResult;
 }
 
@@ -1369,16 +1402,15 @@ void element::refineCP()
   elemRef abcn, ancd, nbcd, abnd;
   intMsg *result;
 
-  CkPrintf("Refine: %d on %d: volume=%lf target=%lf lock=%d\n",
-  	   myRef.idx, myRef.cid, currentVolume, targetVolume, lock);
+  CkPrintf("Refine: %d on %d: volume=%lf target=%lf\n",
+  	   myRef.idx, myRef.cid, currentVolume, targetVolume);
   if ((currentVolume == 0.0) || (targetVolume == 0.0)) {
     CkPrintf("WARNING: %d on %d has dwindled; using bailout!\n", 
 	     myRef.idx, myRef.cid);
     targetVolume = -1.0;
     return;
   }
-  if (currentVolume < targetVolume)
-    return;
+  if (currentVolume < targetVolume) return;
 
   a = 0;
   b = 1;
@@ -1498,7 +1530,6 @@ void element::refineCP()
   // update local nodes with new node
   nodes[d] = newNode;
   calculateVolume(); // since this element has changed in size
-  fireDependents();
   CkPrintf("   <- Refine: Done %d on %d\n", myRef.idx, myRef.cid);
 
   if (abnd.cid != -1) mesh[abnd.cid].unlockChunk(myRef.cid);
@@ -1622,18 +1653,3 @@ int element::LEtest()
   return 0;
 }
 
-int element::twoNodesLocked() 
-{
-  int lkCount = 0;
-  for (int i=0; i<4; i++)
-    if (C->theNodes[nodes[i].idx].locked()) lkCount++;
-  return (lkCount >= 2);
-}
-
-int element::anyNodeLocked() 
-{
-  int lkCount = 0;
-  for (int i=0; i<4; i++)
-    if (C->theNodes[nodes[i].idx].locked()) lkCount++;
-  return (lkCount >= 1);
-}

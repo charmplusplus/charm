@@ -30,8 +30,6 @@ class nodeRef : public objRef {
   nodeRef(int chunkId, int objIdx) { cid = chunkId; idx = objIdx; }
   node get();
   void update(node& m);
-  int lock();
-  void unlock();
   void pup(PUP::er &p) { p|cid;  p|idx; }
 };
 

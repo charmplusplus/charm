@@ -54,8 +54,6 @@ module PMAF {
 
     // entries to node data
     entry [sync] nodeMsg *getNode(int n);
-    entry [sync] intMsg *lockNode(int n);
-    entry [sync] void unlockNode(int n);
     entry [sync] void updateNodeCoord(nodeMsg *);
     entry void relocationVote(nodeVoteMsg *);
 
@@ -73,6 +71,9 @@ module PMAF {
     entry [sync] void setTargetVolume(doubleMsg *);
     entry [sync] void resetTargetVolume(doubleMsg *);
     entry [sync] refMsg *findRemoteNeighbor(threeNodeMsg *);
+    entry [sync] intMsg *checkFace(int idx, elemRef face);
+    entry [sync] intMsg *lockLF(int idx, node n1, node n2, node n3, node n4, 
+	elemRef myRef, double prio);
     entry [sync] splitResponse *splitLF(int idx, node in1, node in2, node in3,
 	node in4, elemRef requester);
     entry [sync] LEsplitResult *LEsplit(LEsplitMsg *);
@@ -86,9 +87,6 @@ module PMAF {
     entry [sync] flip23response *flip23remote(flip23request *);
     entry [sync] flip32response *flip32remote(flip32request *);
     entry [sync] flip32response *remove32element(flip32request *);
-    entry [sync] lockResult *lockElement(lockMsg *lm);
-    entry [sync] intMsg *lockedElement(int idx);	
-    entry [sync] void unlockElement(int idx);	
     entry void checkRefine();
   };
 };
