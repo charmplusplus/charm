@@ -1,3 +1,13 @@
+#ifdef WIN32
+#include <string.h>
+#include "queueing.h"
+
+extern void CqsDequeue(Queue, void **);
+extern void CqsEnqueueFifo(Queue, void *);
+extern void CqsEnqueueLifo(Queue, void *);
+extern void CqsEnqueueGeneral(Queue, void *, unsigned int, unsigned int, unsigned int*);
+#endif
+
 #include <converse.h>
 
 static void CpmLSend(int pe, int len, void *msg)

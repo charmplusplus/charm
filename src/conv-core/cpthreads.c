@@ -22,7 +22,12 @@
 #define CPTHREAD_IS_HERE
 #define SUPPRESS_PTHREADS
 #include "cpthreads.h"
+#ifndef  WIN32
 #include <sys/errno.h>
+#else
+#include <stdlib.h>
+#include <errno.h>
+#endif
 #include "fifo.h"
 
 /******************************************************************************
