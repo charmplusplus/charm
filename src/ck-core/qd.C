@@ -23,8 +23,21 @@ static inline void _bcastQD1(QdState* state, QdMsg *msg)
   state->propagate(msg);
   msg->setPhase(1);
   DEBUGP(("[%d] State: getCreated:%d getProcessed:%d\n", CmiMyPe(), state->getCreated(), state->getProcessed()));
+#if 1
+  int created = state->getCreated();
+  int processed = state->getProcessed();
+#ifdef CMK_CPV_IS_SMP
+  if (CmiMyRank()==0) {
+    created += CpvAccessOther(_qd, CmiMyNodeSize())->getCreated();
+    processed += CpvAccessOther(_qd, CmiMyNodeSize())->getProcessed();
+  }
+#endif
+  msg->setCreated(created);
+  msg->setProcessed(processed);
+#else
   msg->setCreated(state->getCreated());
   msg->setProcessed(state->getProcessed());
+#endif
   envelope *env = UsrToEnv((void*)msg);
   CmiSyncSendAndFree(CmiMyPe(), env->getTotalsize(), (char *)env);
   state->markProcessed();
