@@ -188,6 +188,7 @@ call its destructor, and release its memory--invoke its
 a3(x,y,z).destroy();
 \end{alltt}
 
+You must ensure that no messages are sent to a deleted element. 
 After destroying an element, you may insert a new element at
 its index.
 
@@ -293,8 +294,9 @@ void myClient(void *param,int dataSize,void *data)
 This simple client prints out the double values received, and does not
 use the \uw{param} value passed in (\kw{NULL}, in this case).  The
 handler can use \uw{param}, \uw{dataSize}, and the data in any
-fashion; but the data will be deleted after the handler returns.
-
+fashion.  The ``void *data'' will be deleted after the handler returns.
+You may register a new reduction client to handle the next reduction;
+the default is to call the same client.
 
 \subsubsection{Built-in Array Reduction Types}
 
@@ -385,14 +387,16 @@ can use a \uw{foo} object as an array index by defining the class:
 \begin{alltt}
 #include <charm++.h>
 class CkArrayIndexFoo:public CkArrayIndex \{
-public:
     foo f;
-
+public:
     CkArrayIndexFoo(const foo \&in) 
     \{
         f=in;
         nInts=sizeof(f)/sizeof(int);
     \}
+    //Not required, but convenient: cast-to-foo operators
+    operator foo &() {return f;}
+    operator const foo &() const {return f;}
 \};
 \end{alltt}
 
@@ -421,11 +425,20 @@ class AF:public ArrayElementT<CkArrayIndexFoo>
 //in the .C file:
     foo f;
     CProxy_AF a=CProxy_AF::ckNew();
-    a[new CkArrayIndexFoo(f)].insert();
+    a[CkArrayIndexFoo(f)].insert();
     ...
 \end{alltt}
 
-\kw{ArrayElementT} is a class templated by the index type \uw{foo}.
+Note that since our CkArrayIndexFoo constructor is not declared
+with the explicit keyword, we can equivalently write the last line as:
+
+\begin{alltt}
+    a[f].insert();
+\end{alltt}
+
+When you implement your array element class, as shown above you 
+can inherit from
+\kw{ArrayElementT}, a class templated by the index type \uw{foo}.
 The array index is then accessible as ``thisIndex'':
 For example:
 
