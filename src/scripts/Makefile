@@ -221,7 +221,7 @@ dirs+sources:
 ###############################################################################
 CLBLIBS=$(L)/libldb-rand.o $(L)/libldb-spray.o $(L)/libldb-graph.o $(L)/libldb-test.o $(L)/libldb-bluegene.o
 TRACELIBS=$(L)/libtrace-projections.a $(L)/libtrace-summary.a $(L)/libtrace-counter.a \
-	$(L)/libtrace-projector.a $(L)/libtrace-all.a
+	$(L)/libtrace-projector.a $(L)/libtrace-all.a $(L)/libtrace-converse.a
 MEMLIBS=$(L)/libmemory-default.o $(L)/libmemory-os.o $(L)/libmemory-gnu.o \
    $(L)/libmemory-verbose.o $(L)/libmemory-paranoid.o $(L)/libmemory-isomalloc.o
 
@@ -231,7 +231,7 @@ CVLIBS=libconv-core.a \
 	libccs-client.a
 
 LIBCONV_CORE=threads.o convcore.o conv-conds.o queueing.o msgmgr.o \
-	cpm.o cpthreads.o futures.o cldb.o random.o trace-common.o traceCore.o traceCoreCommon.o \
+	cpm.o cpthreads.o futures.o cldb.o random.o traceCore.o traceCoreCommon.o \
 	charmProjections.o converseProjections.o machineProjections.o ampiProjections.o\
 	debug-conv.o generate.o edgelist.o conv-ccs.o ccs-builtins.o \
 	quiescence.o isomalloc.o
@@ -429,7 +429,7 @@ $(L)/libmemory-isomalloc.o: memory-isomalloc.c $(MEM_DEPS)
 
 CK_LIBS_CORE=libck.a
 
-LIBCK_CORE=init.o register.o qd.o ck.o main.o msgalloc.o ckfutures.o \
+LIBCK_CORE=trace-common.o init.o register.o qd.o ck.o main.o msgalloc.o ckfutures.o \
            debug-message.o ckcallback.o cklocation.o ckarray.o ckreduction.o ckarrayreductionmgr.o\
            tempo.o waitqd.o LBDatabase.o lbdb.o charisma.o ckcheckpoint.o\
            LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o \
@@ -624,9 +624,16 @@ $(L)/libtrace-all.a: $(LIBTRACE_ALL)
 LIBTRACE_PROJECTOR=trace-projector.o trace-common.o traceCore.o traceCoreCommon.o charmProjections.o converseProjections.o machineProjections.o ampiProjections.o
 $(L)/libtrace-projector.a: $(LIBTRACE_PROJECTOR)
 	$(CHARMC) -o  $@ $(LIBTRACE_PROJECTOR)
-	
+
+LIBTRACE_CONVERSE=trace-converse.o
+$(L)/libtrace-converse.a: $(LIBTRACE_CONVERSE)
+	$(CHARMC) -o  $@ $(LIBTRACE_CONVERSE)
+
 trace-common.o: trace-common.C $(CKHEADERS)
 	$(CHARMC) trace-common.C
+
+trace-converse.o: trace-converse.c $(CKHEADERS)
+	$(CHARMC) trace-converse.c
 
 trace-projections.o: trace-projections.C trace-projections.h trace-common.h  $(CKHEADERS)
 	$(CHARMC) -o trace-projections.o trace-projections.C

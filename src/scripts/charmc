@@ -969,13 +969,6 @@ TRACE_OBJ="$TRACE_OBJ -ltrace-$trace"
 done
 fi
 
-# Check for valid choice of BALANCE
-if [ "$TRACEMODE" = replay ]
-then
-	[ "$BALANCE" != replay ] && echo "Ignoring -balance $BALANCE, incompatible with -tracemode replay"
-    BALANCE=replay
-fi
-
 if test x$LANGUAGE = x"bgcharm++"
 then 
     BALANCE=bluegene
@@ -1077,11 +1070,13 @@ case "$LANGUAGE" in
 	;;
 "converse")
 	Do $CMK_LD $OPTS_LD -o $OBJECT \
-		$LANG_LIBS -lconv-cplus-n $CORE_LIBS -lm $CMK_LIBS $POST_LIBRARIES
+		$LANG_LIBS -lconv-cplus-n $CORE_LIBS -ltrace-converse \
+		-lm $CMK_LIBS $POST_LIBRARIES
 	;;
 "converse++"|"bluegene")
 	Do $CMK_LDXX $OPTS_LD $OPTS_LDXX -o $OBJECT \
-		$LANG_LIBS -lconv-cplus-y $CORE_LIBS -lm $CMK_LIBS $POST_LIBRARIES
+		$LANG_LIBS -lconv-cplus-y $CORE_LIBS -ltrace-converse \
+		-lm $CMK_LIBS $POST_LIBRARIES
 	;;
 *)
 	Abort "Unrecognized choice of language $LANGUAGE"
