@@ -135,14 +135,14 @@ int __malloc_initialized = -1;
 /* atfork support.  */
 
 static __malloc_ptr_t (*save_malloc_hook) __MALLOC_P ((size_t __size,
-						       __const __malloc_ptr_t));
+						       const __malloc_ptr_t));
 # if !defined _LIBC || !defined USE_TLS || (defined SHARED && !USE___THREAD)
 static __malloc_ptr_t (*save_memalign_hook) __MALLOC_P ((size_t __align,
 							 size_t __size,
-						       __const __malloc_ptr_t));
+						       const __malloc_ptr_t));
 # endif
 static void           (*save_free_hook) __MALLOC_P ((__malloc_ptr_t __ptr,
-						     __const __malloc_ptr_t));
+						     const __malloc_ptr_t));
 static Void_t*        save_arena;
 
 /* Magic value for the thread-specific arena pointer when

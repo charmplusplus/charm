@@ -212,15 +212,15 @@ extern int malloc_set_state __MALLOC_P ((__malloc_ptr_t __ptr));
 extern void (*__malloc_initialize_hook) __MALLOC_PMT ((void));
 /* Hooks for debugging and user-defined versions. */
 extern void (*__free_hook) __MALLOC_PMT ((__malloc_ptr_t __ptr,
-					__const __malloc_ptr_t));
+					const __malloc_ptr_t));
 extern __malloc_ptr_t (*__malloc_hook) __MALLOC_PMT ((size_t __size,
-						    __const __malloc_ptr_t));
+						    const __malloc_ptr_t));
 extern __malloc_ptr_t (*__realloc_hook) __MALLOC_PMT ((__malloc_ptr_t __ptr,
 						     size_t __size,
-						     __const __malloc_ptr_t));
+						     const __malloc_ptr_t));
 extern __malloc_ptr_t (*__memalign_hook) __MALLOC_PMT ((size_t __alignment,
 						      size_t __size,
-						      __const __malloc_ptr_t));
+						      const __malloc_ptr_t));
 extern void (*__after_morecore_hook) __MALLOC_PMT ((void));
 
 /* Activate a standard set of debugging hooks. */

@@ -3295,7 +3295,7 @@ public_mALLOc(size_t bytes)
   mstate ar_ptr;
   Void_t *victim;
 
-  __malloc_ptr_t (*hook) __MALLOC_P ((size_t, __const __malloc_ptr_t)) =
+  __malloc_ptr_t (*hook) __MALLOC_P ((size_t, const __malloc_ptr_t)) =
     __malloc_hook;
   if (hook != NULL)
     return (*hook)(bytes, RETURN_ADDRESS (0));
@@ -3335,7 +3335,7 @@ public_fREe(Void_t* mem)
   mstate ar_ptr;
   mchunkptr p;                          /* chunk corresponding to mem */
 
-  void (*hook) __MALLOC_P ((__malloc_ptr_t, __const __malloc_ptr_t)) =
+  void (*hook) __MALLOC_P ((__malloc_ptr_t, const __malloc_ptr_t)) =
     __free_hook;
   if (hook != NULL) {
     (*hook)(mem, RETURN_ADDRESS (0));
@@ -3382,7 +3382,7 @@ public_rEALLOc(Void_t* oldmem, size_t bytes)
   Void_t* newp;             /* chunk to return */
 
   __malloc_ptr_t (*hook) __MALLOC_P ((__malloc_ptr_t, size_t,
-				      __const __malloc_ptr_t)) =
+				      const __malloc_ptr_t)) =
     __realloc_hook;
   if (hook != NULL)
     return (*hook)(oldmem, bytes, RETURN_ADDRESS (0));
@@ -3451,7 +3451,7 @@ public_mEMALIGn(size_t alignment, size_t bytes)
   Void_t *p;
 
   __malloc_ptr_t (*hook) __MALLOC_PMT ((size_t, size_t,
-					__const __malloc_ptr_t)) =
+					const __malloc_ptr_t)) =
     __memalign_hook;
   if (hook != NULL)
     return (*hook)(alignment, bytes, RETURN_ADDRESS (0));
@@ -3529,7 +3529,7 @@ public_cALLOc(size_t n, size_t elem_size)
   unsigned long clearsize;
   unsigned long nclears;
   INTERNAL_SIZE_T* d;
-  __malloc_ptr_t (*hook) __MALLOC_PMT ((size_t, __const __malloc_ptr_t)) =
+  __malloc_ptr_t (*hook) __MALLOC_PMT ((size_t, const __malloc_ptr_t)) =
     __malloc_hook;
 
   /* size_t is unsigned so the behavior on overflow is defined.  */
