@@ -38,7 +38,18 @@ void CpmUnpack_fibobj_chare(fibobj_chare v)
 
 CpmDestination CpmLDB()
 {
-  int pe = ((rand()&0x7FFFFFFF)>>8) % CmiNumPes();
+  // int pe = ((rand()&0x7FFFFFFF)>>8) % CmiNumPes();
+  int pe;
+  static CrnStream str;
+  static int flag = 0;
+  if (0 == flag) {
+    CrnInitStream(&str, 1, 0);  
+    // CrnInitStream(&str, (int)getpid(), 0);
+    // the original call does not call srand(), so the seed by default is 1,
+    flag = 1;
+  }
+  pe = ( (CrnInt(&str) & 0x7FFFFFFF) >>8 ) % CmiNumPes();
+
   return CpmSend(pe);
 }
 
