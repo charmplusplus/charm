@@ -12,7 +12,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 2.10  1995-11-01 23:14:05  knauff
+# Revision 2.11  1995-11-02 21:14:01  milind
+# removed -C from CMK_CPP command.
+#
+# Revision 2.10  1995/11/01  23:14:05  knauff
 # Changed CMK_CPP back to -D_NO_PROTO.
 #
 # Revision 2.9  1995/10/30  20:53:35  jyelon
@@ -47,7 +50,7 @@
 #
 ############################################################################
 
-set CMK_CPP			= '/usr/lib/cpp -C -D_NO_PROTO '
+set CMK_CPP			= '/usr/lib/cpp -D_NO_PROTO '
 
 set CMK_LDRO			= 'ld -r -o '
 set CMK_CC			= 'mpcc'
