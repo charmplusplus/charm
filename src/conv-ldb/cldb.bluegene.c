@@ -103,8 +103,10 @@ void CldEnqueue(int pe, void *msg, int infofn)
   DEBUGF(("[%d>] CldEnqueue pe: %d infofn:%d\n", BgMyNode(), pe, infofn));
   if (pe == CLD_ANYWHERE) {
     pe = (((CrnRand()+BgMyPe())&0x7FFFFFFF)%BgNumPes());
+/*
     while (!CldPresentPE(pe))
       pe = (((CrnRand()+BgMyPe())&0x7FFFFFFF)%BgNumPes());
+*/
     if (pe != BgMyPe())
       CpvAccess(CldRelocatedMessages)++;
     if (pe == BgMyPe()) {
