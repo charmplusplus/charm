@@ -841,7 +841,7 @@ static void CmiPushPE(int pe,void *msg)
   MACHLOCK_ASSERT(comm_flag,"CmiPushPE")
 
 #if CMK_IMMEDIATE_MSG
-  if ((CmiGetHandler(msg) == CpvAccessOther(CmiImmediateMsgHandlerIdx,pe))) {
+  if (CmiIsImmediate(msg)) {
     CmiPushImmediateMsg(msg);
     return;
   }
@@ -861,7 +861,7 @@ static void CmiPushNode(void *msg)
   MACHLOCK_ASSERT(comm_flag,"CmiPushNode")
   
 #if CMK_IMMEDIATE_MSG
-  if ((CmiGetHandler(msg) == CpvAccessOther(CmiImmediateMsgHandlerIdx,0))) {
+  if (CmiIsImmediate(msg)) {
     CmiPushImmediateMsg(msg);
     return;
   }
@@ -1615,6 +1615,11 @@ CmiCommHandle CmiGeneralSend(int pe, int size, int freemode, char *data)
                       The SMP comm thread never gets here, because of the pe test. */
 #endif
   {
+      /* execute the immediate message right away */
+    if (CmiIsImmediate(data)) {
+      CmiHandleImmediateMessage(data);
+      return 0;
+    }
     CdsFifo_Enqueue(cs->localqueue, data);
     if (freemode == 'A') {
       MallocOutgoingMsg(ogm);
@@ -1808,10 +1813,15 @@ static void ConverseRunPE(int everReturn)
   if (Cmi_netpoll == 1 && CmiMyPe() == 0)
     CmiPrintf("Charm++: scheduler running in netpoll mode.\n");
   
+#if CMK_USE_GM
+  if (Cmi_charmrun_fd != -1)
+#endif
+  {
   CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,
       (CcdVoidFn) CmiNotifyBeginIdle, (void *) s);
   CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,
       (CcdVoidFn) CmiNotifyStillIdle, (void *) s);
+  }
 #if CMK_SHARED_VARS_UNAVAILABLE
   if (Cmi_netpoll) /*Repeatedly call CommServer*/
     CcdCallOnConditionKeep(CcdPERIODIC, 
@@ -1856,6 +1866,10 @@ static void ConverseRunPE(int everReturn)
     CmiPrintf("Charm++: Machine layer will randomly corrupt every %d'th message (rand %d)\n",
     	CMK_RANDOMLY_CORRUPT_MESSAGES,rand());
 #endif
+
+  /* Converse initialization finishes, immediate messages can be processed.
+     node barrier previously should take care of the node synchronization */
+  _immediateReady = 1;
 
   /* communication thread */
   if (CmiMyRank() == CmiMyNodeSize()) {
