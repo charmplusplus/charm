@@ -1,4 +1,7 @@
 # input set of strings to match
+# this script removes header files reported from g++ -MM from
+# those directories in the argument to this script
+
 @dontprint = @ARGV;
 @ARGV=();
 
