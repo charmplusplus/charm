@@ -697,8 +697,7 @@ CDECL void
 FEM_Print(const char *str)
 {
   const char *caller="FEM_Print"; FEMAPI(caller);
-  FEMchunk *cptr = FEMchunk::get(caller);
-  CkPrintf("[%d] %s\n", cptr->thisIndex, str);
+  CkPrintf("[%d] %s\n", TCHARM_Element(), str);
 }
 
 static void do_print_partition(int fem_mesh,int idxBase) {
