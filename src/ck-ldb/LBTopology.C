@@ -40,7 +40,7 @@ LBTOPO_MACRO(LBTopo_mesh2d);
 
 LBTopo_mesh2d::LBTopo_mesh2d(int p): LBTopology(p) 
 {
-  width = (int)sqrt(p);
+  width = (int)sqrt(p*1.0);
   if (width * width < npes) width++;
 }
 
@@ -80,7 +80,6 @@ LBTOPO_MACRO(LBTopo_mesh3d);
 
 LBTopo_mesh3d::LBTopo_mesh3d(int p): LBTopology(p) 
 {
-  width = (int)sqrt(p);
   width = 1;
   while ( (width+1) * (width+1) * (width+1) < npes) width++;
   if (width * width * width < npes) width++;
