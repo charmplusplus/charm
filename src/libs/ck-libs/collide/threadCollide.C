@@ -145,39 +145,39 @@ CDECL void CollideList(int chunkNo,int *out) {
 }
 
 /******************* f90 Client API *******************/
-FDECL void FTN_NAME(COLLIDEINIT,collideinit_)
+FDECL void FTN_NAME(COLLIDEINIT,collideinit)
 	(const double *gridStart,const double *gridSize) 
 { 
 	CollideInit(gridStart,gridSize); 
 }
 
-FDECL void FTN_NAME(COLLIDEREGISTER,collideregister_) 
+FDECL void FTN_NAME(COLLIDEREGISTER,collideregister) 
 	(int *chunkNo)
 {
 	CollideRegister(*chunkNo-1);
 }
-FDECL void FTN_NAME(COLLIDEUNREGISTER,collideunregister_) 
+FDECL void FTN_NAME(COLLIDEUNREGISTER,collideunregister) 
 	(int *chunkNo)
 {
 	CollideUnregister(*chunkNo-1);
 }
-FDECL void FTN_NAME(COLLIDE,collide_) 
+FDECL void FTN_NAME(COLLIDE,collide) 
 	(int *chunkNo,int *nBoxes,const double *boxes)
 {
 	Collide(*chunkNo-1,*nBoxes,boxes);
 }
-FDECL int FTN_NAME(COLLIDECOUNT,collidecount_) 
+FDECL int FTN_NAME(COLLIDECOUNT,collidecount) 
 	(int *chunkNo)
 {
 	return CollideCount(*chunkNo-1);
 }
-FDECL void FTN_NAME(COLLIDELIST,collidelist_) 
+FDECL void FTN_NAME(COLLIDELIST,collidelist) 
 	(int *chunkNo, int *arrayLen, int *out)
 {
 	getCollisionList(*chunkNo-1,out,1);
 }
 
-#include "threadCollide.def.h"
+#include "collide.def.h"
 
 
 

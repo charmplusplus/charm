@@ -2,11 +2,11 @@ CDIR=../../../..
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
 HEADERS=collision.h collidef.h \
-	col_aggregate.h parCollide.decl.h threadCollide.decl.h
+	col_aggregate.h parCollide.decl.h collide.decl.h
 OBJS = collision.o parCollide.o threadCollide.o \
 	aggregate.o 
 
-DEST=$(CDIR)/lib/libcollide.a
+DEST=$(CDIR)/lib/libmodulecollide.a
 
 all: $(DEST)
 
@@ -34,7 +34,7 @@ threadCollide.o: threadCollide.C $(HEADERS)
 parCollide.decl.h: parCollide.ci
 	$(CHARMC) parCollide.ci
 
-threadCollide.decl.h: threadCollide.ci
+collide.decl.h: threadCollide.ci
 	$(CHARMC) threadCollide.ci
 
 

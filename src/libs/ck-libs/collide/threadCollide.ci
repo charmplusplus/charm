@@ -1,4 +1,4 @@
-module threadCollide {
+module collide {
   extern module parCollide;
   group threadedCollideMgr : collideMgr {
     entry threadedCollideMgr(CkArrayID cells);
