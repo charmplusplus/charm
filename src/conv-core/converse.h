@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.46  1996-07-16 09:26:46  milind
+ * Revision 2.47  1996-07-16 17:23:18  jyelon
+ * Misc
+ *
+ * Revision 2.46  1996/07/16 09:26:46  milind
  * Added vector send routines declarations.
  *
  * Revision 2.45  1996/07/15  21:02:39  jyelon
@@ -385,21 +388,9 @@ void          CmiFreeBroadcastAllFn   CMK_PROTO((int, char *));
 
 /****** CMI VECTOR MESSAGE TRANSMISSION ******/
 
-void CmiGenericSyncVectorSend CMK_PROTO((int, int, int *, char **));
-CmiCommHandle CmiGenericAsyncVectorSend CMK_PROTO((int, int, int *, char **));
-void CmiGenericSyncVectorSendAndFree CMK_PROTO((int, int, int *, char **));
-
-#if CMK_USE_GENERIC_VECTOR_SEND
-#define CmiSyncVectorSend          CmiGenericSyncVectorSend
-#define CmiAsyncVectorSend         CmiGenericAsyncVectorSend
-#define CmiSyncVectorSendAndFree   CmiGenericSyncVectorSendAndFree
-#endif
-
-#if CMK_USE_SPECIAL_VECTOR_SEND
 void CmiSyncVectorSend CMK_PROTO((int, int, int *, char **));
 CmiCommHandle CmiAsyncVectorSend CMK_PROTO((int, int, int *, char **));
 void CmiSyncVectorSendAndFree CMK_PROTO((int, int, int *, char **));
-#endif
 
 /******** CMI MESSAGE RECEPTION ********/
 
