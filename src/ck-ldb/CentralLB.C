@@ -12,14 +12,14 @@ void CreateCentralLB()
   loadbalancer = CProxy_CentralLB::ckNew();
 }
 
-extern "C" void CentralLB::staticMigrated(void* data, LDObjHandle h)
+void CentralLB::staticMigrated(void* data, LDObjHandle h)
 {
   CentralLB *me = static_cast<CentralLB*>(data);
 
   me->Migrated(h);
 }
 
-extern "C" void CentralLB::staticAtSync(void* data)
+void CentralLB::staticAtSync(void* data)
 {
   CentralLB *me = static_cast<CentralLB*>(data);
 
