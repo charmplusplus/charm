@@ -111,6 +111,7 @@ static void startTCharmThread(TCharmInitMsg *msg)
 TCharm::TCharm(TCharmInitMsg *initMsg_)
 {
   initMsg=initMsg_;
+  initMsg->opts.sanityCheck();
   timeOffset=0.0;
   if (tcharm_nothreads)
   { //Don't even make a new thread-- just use main thread
@@ -429,9 +430,13 @@ FDECL int FTN_NAME(TCHARM_GET_NUM_CHUNKS,tcharm_get_num_chunks)(void)
 // Fill out the default thread options:
 TCHARM_Thread_options::TCHARM_Thread_options(int doDefault)
 {
-	stackSize=tcharm_stacksize; /* default stacksize */
+	stackSize=0; /* default stacksize */
 	exitWhenDone=0; /* don't exit when done by default. */
 }
+void TCHARM_Thread_options::sanityCheck(void) {
+	if (stackSize<=0) stackSize=tcharm_stacksize;
+}
+
 
 TCHARM_Thread_options g_tcharmOptions(1);
 

@@ -33,6 +33,8 @@ public:
 	// Fill out the default thread options:
 	TCHARM_Thread_options(int doDefault);
 	TCHARM_Thread_options() {}
+
+	void sanityCheck(void);
 };
 
 class TCharmInitMsg : public CMessage_TCharmInitMsg {
