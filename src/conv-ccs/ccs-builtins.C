@@ -245,6 +245,21 @@ static void CpdList_ccs_list_items_txt(char *msg)
   CmiFree(msg);
 }
 
+static void CpdList_ccs_list_items_set(char *msg)
+{
+  CpdListItemsRequest req;
+  CpdListAccessor *acc=CpdListHeader_ccs_list_items(msg,req);
+  if(acc == NULL) CmiPrintf("ccs-builtins> Null Accessor--bad list name (set)\n");
+  else {
+    PUP_toNetwork4_unpack p(req.extra);
+    pupCpd(p,acc,req);
+    if (p.size()!=req.extraLen)
+    	CmiPrintf("Size mismatch during ccs_list_items.set: client sent %d bytes, but %d bytes used!\n",
+		req.extraLen,p.size());
+  }
+  CmiFree(msg);
+}
+
 
 /**
   A PUP_fmt inserts a 1-byte data format code 
@@ -463,6 +478,7 @@ static void CpdListInit(void) {
   CcsRegisterHandler("ccs_list_len",(CmiHandler)CpdList_ccs_list_len);
   CcsRegisterHandler("ccs_list_items.txt",(CmiHandler)CpdList_ccs_list_items_txt);
   CcsRegisterHandler("ccs_list_items.fmt",(CmiHandler)CpdList_ccs_list_items_fmt);
+  CcsRegisterHandler("ccs_list_items.set",(CmiHandler)CpdList_ccs_list_items_set);
 }
 
 #if CMK_WEB_MODE
