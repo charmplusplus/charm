@@ -1072,6 +1072,7 @@ static CthThread CthCreateInner(CthVoidFn fn,void *arg,int size,int migratable)
   CthThreadInit(result);
   if (size) size += SIGSTKSZ;
   else size = CthCpvAccess(_defaultStackSize);
+  if (size < MINSIGSTKSZ) size = MINSIGSTKSZ;
 #ifdef CMK_MEMORY_PAGESIZE
   size = (size/CMK_MEMORY_PAGESIZE + 1) * CMK_MEMORY_PAGESIZE;
 #endif
