@@ -59,7 +59,7 @@ static int    _exitHandlerIdx;
 static Stats** _allStats = 0;
 
 static int   _numStatsRecd = 0;
-static int    _exitStarted = 0;
+static int   _exitStarted = 0;
 
 #ifndef CMK_OPTIMIZE
 #define _STATS_ON(x) (x) = 1
@@ -296,7 +296,7 @@ static void _triggerHandler(envelope *env)
   if (_numInitMsgs && CpvAccess(_numInitsRecd) + _numInitNodeMsgs == _numInitMsgs)
   {
     DEBUGF(("Calling Init Done from _triggerHandler\n"));
-	_initDone();
+    _initDone();
   }
   CmiFree(env);
 }
@@ -376,7 +376,8 @@ void CkExit(void)
     CmiSetHandler(env, _exitHandlerIdx);
     CmiSyncSendAndFree(0, env->getTotalsize(), env);
   }
-  CsdScheduler(-1);
+  // if CkExit is called inside main(), it will hang here.
+  if (_mainDone == 1) CsdScheduler(-1);
 }
 
 static void _nullFn(void *, void *)
@@ -493,7 +494,7 @@ void _initCharm(int argc, char **argv)
 			msg->argv = argv;
 			_entryTable[_mainTable[i]->entryIdx]->call(msg, obj);
 		}
-    _mainDone = 1;
+                _mainDone = 1;
 
 		_STATS_RECORD_CREATE_CHARE_N(_numMains);
 		_STATS_RECORD_PROCESS_CHARE_N(_numMains);
