@@ -56,7 +56,7 @@ void CkPupMessage(PUP::er &p,void **atMsg,int fast_and_dirty) {
 	    _entryTable[ep]->pupFn(p,*atMsg);
 	  else
 #endif
-	    ((Message *)*atMsg)->pup(p);
+	    ((CkMessage *)*atMsg)->pup(p);
 	  p.comment("} End Charm++ Message");
 	}
 	if (0==wasPacked) //Restore the packed-ness to previous state-- unpacked
@@ -103,7 +103,7 @@ void envelope::pup(PUP::er &p) {
 	}
 }
 
-void Message::pup(PUP::er &p) {
+void CkMessage::pup(PUP::er &p) {
 	//Default message pup: just copy user portion as bytes
 	envelope *env=UsrToEnv((void *)this);
 	int userSize=env->getTotalsize()-sizeof(envelope)-env->getPrioBytes();
