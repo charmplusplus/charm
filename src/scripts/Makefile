@@ -332,7 +332,7 @@ sockRoutines.o: sockRoutines.c $(CVHEADERS) $(UTILHEADERS)
 	$(CHARMC) -DCMK_USE_CONVERSE=1 sockRoutines.c
 
 sockRoutines-seq.o: sockRoutines.c $(CVHEADERS) $(UTILHEADERS)
-	$(CHARMC) -seq -o sockRoutines-seq.o sockRoutines.c
+	$(SEQCHARMC) -o sockRoutines-seq.o sockRoutines.c
 
 pup_util.o: pup_util.C $(CVHEADERS) $(UTILHEADERS)
 	$(CHARMC) -o pup_util.o pup_util.C
@@ -837,10 +837,10 @@ $(L)/libconv-bluegene-logs.a: $(BLUE_IO_OBJS)
 ###############################################################################
 
 conv-cpm: conv-cpm.o
-	$(SEQCHARMC) -o conv-cpm -cp ../bin/ conv-cpm.o
+	$(NATIVECHARMC) -language c -o conv-cpm -cp ../bin/ conv-cpm.o
 
 conv-cpm.o: conv-cpm.c $(CVHEADERS)
-	$(SEQCHARMC) conv-cpm.c
+	$(NATIVECHARMC) conv-cpm.c
 
 ###############################################################################
 #
