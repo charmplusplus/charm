@@ -129,7 +129,9 @@ should be a pointer that was previously returned by \kw{CmiAlloc}.}
 \index{CmiMsgHeaderSizeBytes}
 \desc{This constant contains the size of the message header.  When one
 allocates a message buffer, one must set aside enough space for the header
-and the data.  This macro helps you to do so.}
+and the data.  This macro helps you to do so. For example, if one want to
+allocate an array of 100 int, he should call the function this way:
+\tt{``char *myMsg = CmiAlloc(100*sizeof(int) + CmiMsgHeaderSizeBytes)''}}
 
 \function {void CmiSetHandler(int *MessageBuffer, int HandlerId)}
 \index{CmiSetHandler}
