@@ -1393,7 +1393,7 @@ int req_handler_dispatch(ChMessage *msg,SOCKET replyFd)
 {
   char *cmd=msg->header.type;
   DEBUGF(("Got request '%s'\n",cmd,replyFd));
-       if (strcmp(cmd,"ping")==0)       return REQ_OK;
+  if (strcmp(cmd,"ping")==0)       return REQ_OK;
 #if CMK_CCS_AVAILABLE
   else if (strcmp(cmd,"reply_fw")==0)   req_ccs_reply_fw(msg);
 #endif
@@ -1408,7 +1408,7 @@ int req_handler_dispatch(ChMessage *msg,SOCKET replyFd)
 #ifndef __FAULT__	
         fprintf(stderr,"Charmrun> Bad control socket request '%s'\n",cmd); 
         abort();
-				return ;
+	return REQ_OK;
 #endif				
   }
   return REQ_OK;
