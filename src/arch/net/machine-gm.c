@@ -132,17 +132,23 @@ static void CmiNotifyStillIdle(CmiIdleState *s)
   /*No comm. thread-- listen on sockets for incoming messages*/
   int nreadable;
   gm_recv_event_t *e;
-  int pollMs = 5;
+  int pollMs = 4;
 
-#define SLEEP_USING_ALARM 1
+#define SLEEP_USING_ALARM 0
 #if SLEEP_USING_ALARM /*Enable the alarm, so we don't sleep forever*/
   gm_set_alarm (gmport, &gmalarm, (gm_u64_t) pollMs*1000, alarmcallback,
                     (void *)NULL );
 #endif
 
+#if SLEEP_USING_ALARM
   MACHSTATE(3,"Blocking on receive {")
   e = gm_blocking_receive_no_spin(gmport);
   MACHSTATE(3,"} receive returned");
+#else
+  MACHSTATE(3,"NonBlocking on receive {")
+  e = gm_receive(gmport);
+  MACHSTATE(3,"} nonblocking receive returned");
+#endif
 
 #if SLEEP_USING_ALARM /*Cancel the alarm*/
   gm_cancel_alarm (&gmalarm);
@@ -442,12 +448,12 @@ void CmiMachineInit()
 
   for (i=1; i<maxsize; i++) {
     int len = gm_max_length_for_size(i);
-    int num = 2;
+    int num = 5;
 
     maxMsgSize = len;
 
-    if (i<5) num = 0;
-    else if (i<11 && i>6)  num = 20;
+    if (i<6) num = 0;
+    else if (i<11)  num = 20;
     else if (i>22) num = 1;
     for (j=0; j<num; j++) {
       buf = gm_dma_malloc(gmport, len);
