@@ -220,7 +220,9 @@ static void CmiPushPE(int pe,void *msg)
   }
 #endif
   CmiIdleLock_addMessage(&cs->idle); 
+  CmiCommLock();
   PCQueuePush(cs->recv,msg);
+  CmiCommUnlock();
 }
 
 #ifndef CmiMyPe
@@ -423,6 +425,7 @@ static int MsgQueueEmpty()
 }
 
 #if CMK_SMP
+static void SendMsgBuf();
 /**
 CommunicationServer calls MPI to send messages in the queues and probe message from network.
 */
