@@ -41,7 +41,7 @@ private:
 	const char *dirName; //Input directory
 	CkLocMgr *dest; //Place to put new array elements
 public:
-	ElementRestorer(const char *dirName_,CkLocMgr *dest_);
+	ElementRestorer(const char *dirName_,CkLocMgr *dest_,int destPe_);
 	~ElementRestorer();
 	CmiBool restore(void);
 };

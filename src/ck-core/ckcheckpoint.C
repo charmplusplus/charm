@@ -19,6 +19,7 @@ More documentation goes here...
 #endif
 
 CkGroupID _sysChkptMgr;
+int flag;
 
 typedef struct _GroupInfo{
 	CkGroupID gID;
@@ -26,8 +27,6 @@ typedef struct _GroupInfo{
 	int useDefCtor;
 	char name[256];
 } GroupInfo;
-
-int flag;
 
 // Print out an array index to this string as decimal fields
 // separated by underscores.
@@ -83,8 +82,8 @@ void CkCheckpointMgr::Checkpoint(const char *dirname,CkCallback& cb){
 			((CkLocMgr*)(obj))->iterate(saver);
 		}
 	}
-	if(CkMyPe()==0)
-		DEBCHK("[%d]CkCheckpointMgr::Checkpoint DONE. ",CkMyPe());
+	if(CkMyPe()!=0)
+		DEBCHK("[%d]CkCheckpointMgr::Checkpoint DONE.\n",CkMyPe());
 	else{
 		DEBCHK("[%d]CkCheckpointMgr::Checkpoint DONE. Invoking callback.\n",CkMyPe());
 		cb.send();
@@ -101,6 +100,8 @@ void CkStartCheckpoint(char* dirname,const CkCallback& cb){
 	sprintf(filename,"%s/RO.dat",dirname);
 	FILE* fRO = fopen(filename,"wb");
 	if(!fRO) CkAbort("Failed to create checkpoint file for readonly data!");
+	int _numPes = CkNumPes();
+	fwrite(&_numPes,sizeof(int),1,fRO);
 	int _numReadonlies=_readonlyTable.size();
 	fwrite(&_numReadonlies,sizeof(int),1,fRO);
 	PUP::toDisk pRO(fRO);
@@ -199,11 +200,11 @@ void CkStartCheckpoint(char* dirname,const CkCallback& cb){
   *          The mechanism exists as converse code and get invoked by
   *          broadcast message.
   **/
-ElementRestorer::ElementRestorer(const char *dirName_,CkLocMgr *dest_)
+ElementRestorer::ElementRestorer(const char *dirName_,CkLocMgr *dest_,int destPe)
 	:dirName(dirName_), dest(dest_)
 {
 	char indexName[1024];
-	sprintf(indexName,"%s/loc_%d_%d.idx",dirName,dest->ckGetGroupID().idx,CkMyPe());
+	sprintf(indexName,"%s/loc_%d_%d.idx",dirName,dest->ckGetGroupID().idx,destPe);
 	indexFile=fopen(indexName,"r");
 	if (indexFile==NULL)  CkAbort("Could not read index file");
 	char ignored[128]; double version; int srcPE; int srcSize;
@@ -211,7 +212,7 @@ ElementRestorer::ElementRestorer(const char *dirName_,CkLocMgr *dest_)
 		CkAbort("Checkpoint index file format error");
 	if (version>=2.0) CkAbort("Checkpoint index file format is too new");
 
-	sprintf(indexName,"%s/arr_%d_%d.dat",dirName,dest->ckGetGroupID().idx,CkMyPe());
+	sprintf(indexName,"%s/arr_%d_%d.dat",dirName,dest->ckGetGroupID().idx,destPe);
 	datFile=fopen(indexName,"rb");
 	if (datFile==NULL)  CkAbort("Could not read data file");
 }
@@ -246,6 +247,8 @@ void CkRestartMain(const char* dirname){
 	sprintf(filename,"%s/RO.dat",dirname);
 	FILE* fRO = fopen(filename,"rb");
 	if(!fRO) CkAbort("Failed to open checkpoint file for readonly data!");
+	int _numPes = -1;
+	fread(&_numPes,sizeof(int),1,fRO);
 	int _numReadonlies=-1;
 	fread(&_numReadonlies,sizeof(int),1,fRO);
 	if (_numReadonlies != _readonlyTable.size())
@@ -316,18 +319,24 @@ void CkRestartMain(const char* dirname){
 	}
 
 	// for each location, restore arrays
-	DEBCHK("[%d]Trying to find location manager\n",CkMyPe());
+	//DEBCHK("[%d]Trying to find location manager\n",CkMyPe());
+	DEBCHK("[%d]Number of PE: %d -> %d\n",CkMyPe(),_numPes,CkNumPes());
 	IrrGroup* obj;
-	for(i=0;i<numGroups;i++) {
-		CkGroupID gID = tmpInfo[i].gID;
-		obj = CkpvAccess(_groupTable)->find(gID).getObj();
-		if(obj->isLocMgr()){
-			CkLocMgr *mgr = (CkLocMgr *)obj;
-			ElementRestorer restorer(dirname,mgr);
-			while (restorer.restore()) {}
+	CkGroupID gID;
+	if(CkMyPe() < _numPes) 	// in normal range: restore, o/w, do nothing
+		for(i=0;i<numGroups;i++) {
+			gID = tmpInfo[i].gID;
+			obj = CkpvAccess(_groupTable)->find(gID).getObj();
+			if(obj->isLocMgr()){
+				CkLocMgr *mgr = (CkLocMgr *)obj;
+				for(int j=0;j<_numPes;j++)
+					if(j%CkNumPes()==CkMyPe()){
+						ElementRestorer restorer(dirname,mgr,j);
+						while (restorer.restore()) {}
+					}
+			}
+			obj->ckJustMigrated();
 		}
-		obj->ckJustMigrated();
-	}
 	delete [] tmpInfo;
 
 	if(CkMyPe()==0) {
