@@ -86,11 +86,11 @@ typedef union {
 
 
 
-#define	YYFINAL		233
+#define	YYFINAL		237
 #define	YYFLAG		-32768
 #define	YYNTBASE	47
 
-#define YYTRANSLATE(x) ((unsigned)(x) <= 287 ? yytranslate[x] : 105)
+#define YYTRANSLATE(x) ((unsigned)(x) <= 287 ? yytranslate[x] : 106)
 
 static const char yytranslate[] = {     0,
      2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
@@ -137,9 +137,9 @@ static const short yyprhs[] = {     0,
    220,   225,   230,   235,   240,   245,   250,   255,   260,   265,
    270,   275,   276,   279,   280,   283,   286,   290,   293,   297,
    299,   303,   308,   311,   314,   317,   320,   323,   325,   330,
-   331,   334,   337,   340,   343,   350,   357,   362,   363,   367,
-   369,   373,   375,   377,   379,   381,   382,   384,   386,   390,
-   391
+   331,   334,   337,   340,   343,   351,   359,   364,   365,   369,
+   371,   375,   377,   379,   381,   383,   384,   386,   388,   392,
+   393,   397,   398
 };
 
 static const short yyrhs[] = {    48,
@@ -177,12 +177,12 @@ static const short yyrhs[] = {    48,
     93,    85,     0,    93,    86,     0,    93,    87,     0,    93,
     88,     0,    34,     0,    35,    96,    36,    50,     0,     0,
     97,    96,     0,    98,    34,     0,    72,    34,     0,    73,
-    34,     0,    22,    99,    19,    51,   103,   104,     0,    22,
-    99,    63,    51,   103,   104,     0,    22,    99,    51,   103,
-     0,     0,    41,   100,    42,     0,   101,     0,   101,    37,
-   100,     0,    14,     0,    16,     0,    17,     0,    18,     0,
-     0,    19,     0,    63,     0,    43,   102,    44,     0,     0,
-    13,    46,    25,     0
+    34,     0,    22,    99,    19,    51,   103,   105,   104,     0,
+    22,    99,    63,    51,   103,   105,   104,     0,    22,    99,
+    51,   103,     0,     0,    41,   100,    42,     0,   101,     0,
+   101,    37,   100,     0,    14,     0,    16,     0,    17,     0,
+    18,     0,     0,    19,     0,    63,     0,    43,   102,    44,
+     0,     0,    13,    46,    25,     0,     0,    46,    25,     0
 };
 
 #endif
@@ -197,12 +197,12 @@ static const short yyrline[] = { 0,
    224,   226,   230,   232,   236,   240,   244,   246,   248,   250,
    252,   256,   258,   260,   264,   268,   270,   274,   278,   282,
    284,   288,   290,   294,   296,   300,   304,   306,   310,   312,
-   316,   318,   323,   327,   331,   335,   338,   343,   348,   353,
-   358,   362,   364,   368,   370,   372,   376,   378,   380,   384,
-   386,   390,   394,   396,   398,   400,   402,   406,   408,   412,
-   414,   418,   420,   422,   426,   428,   430,   434,   436,   440,
-   442,   446,   448,   450,   452,   456,   458,   460,   464,   468,
-   470
+   316,   320,   326,   331,   337,   342,   346,   352,   358,   364,
+   370,   374,   376,   380,   382,   384,   388,   390,   392,   396,
+   398,   402,   406,   408,   410,   412,   414,   418,   420,   424,
+   426,   430,   432,   434,   438,   440,   442,   446,   448,   452,
+   454,   458,   460,   462,   464,   468,   470,   472,   476,   480,
+   482,   486,   488
 };
 #endif
 
@@ -222,7 +222,7 @@ static const char * const yytname[] = {   "$","error","$undefined.","MODULE",
 "BaseList","Chare","Group","NodeGroup","Array","TChare","TGroup","TNodeGroup",
 "TArray","TMessage","OptTypeInit","OptNameInit","TVar","TVarList","TemplateSpec",
 "Template","MemberEList","MemberList","Member","Entry","EAttribs","EAttribList",
-"EAttrib","OptType","EParam","OptStackSize", NULL
+"EAttrib","OptType","EParam","OptStackSize","OptPure", NULL
 };
 #endif
 
@@ -240,7 +240,7 @@ static const short yyr1[] = {     0,
     92,    93,    94,    94,    94,    94,    94,    95,    95,    96,
     96,    97,    97,    97,    98,    98,    98,    99,    99,   100,
    100,   101,   101,   101,   101,   102,   102,   102,   103,   104,
-   104
+   104,   105,   105
 };
 
 static const short yyr2[] = {     0,
@@ -255,9 +255,9 @@ static const short yyr2[] = {     0,
      4,     4,     4,     4,     4,     4,     4,     4,     4,     4,
      4,     0,     2,     0,     2,     2,     3,     2,     3,     1,
      3,     4,     2,     2,     2,     2,     2,     1,     4,     0,
-     2,     2,     2,     2,     6,     6,     4,     0,     3,     1,
+     2,     2,     2,     2,     7,     7,     4,     0,     3,     1,
      3,     1,     1,     1,     1,     0,     1,     1,     3,     0,
-     3
+     3,     0,     2
 };
 
 static const short yydefact[] = {     2,
@@ -282,18 +282,18 @@ static const short yydefact[] = {     2,
     90,    91,    87,    29,     0,    65,    80,     0,     0,   113,
    114,     6,   111,   112,    93,    62,   122,   123,   124,   125,
      0,   120,    46,    32,     0,     0,   109,    63,     0,   119,
-     0,     0,   126,   117,     0,    62,    56,   121,   130,    46,
-   128,     0,   130,    64,     0,   115,   129,   116,     0,   131,
-     0,     0,     0
+     0,     0,   126,   117,     0,    62,    56,   121,   132,    46,
+   128,     0,   132,    64,     0,   130,   129,   130,   133,     0,
+   115,   116,     0,   131,     0,     0,     0
 };
 
-static const short yydefgoto[] = {   231,
+static const short yydefgoto[] = {   235,
      3,    14,    80,    47,     4,    11,    15,    16,   122,   123,
    124,    89,    48,    49,    50,    51,    52,   128,    53,    54,
    108,   209,   131,   132,   166,   167,    61,   103,   104,    29,
     97,   134,    30,    31,    32,    33,    74,    75,    76,    77,
     78,   173,   145,   109,   110,    34,    35,   137,   168,   169,
-   170,   189,   201,   202,   222,   214,   226
+   170,   189,   201,   202,   222,   214,   231,   226
 };
 
 static const short yypact[] = {    77,
@@ -318,22 +318,22 @@ static const short yypact[] = {    77,
 -32768,-32768,-32768,-32768,   137,-32768,-32768,    80,   179,-32768,
 -32768,    69,-32768,-32768,    23,   163,-32768,-32768,-32768,-32768,
    143,   146,    25,    17,    18,    25,-32768,   -16,   140,-32768,
-    80,   154,   194,-32768,   154,   163,-32768,-32768,   173,   155,
--32768,   156,   173,-32768,   158,-32768,-32768,-32768,   164,-32768,
-   214,   215,-32768
+    80,   154,   194,-32768,   154,   163,-32768,-32768,   153,   156,
+-32768,   160,   153,-32768,   161,   176,-32768,   176,-32768,   168,
+-32768,-32768,   190,-32768,   216,   217,-32768
 };
 
 static const short yypgoto[] = {-32768,
-   212,-32768,  -103,    -1,   203,   213,     1,-32768,-32768,    70,
--32768,-32768,-32768,   -14,   -35,  -167,-32768,    89,-32768,   -54,
-   -15,    13,-32768,    99,   217,   218,   161,    92,-32768,-32768,
-   -39,    71,-32768,-32768,-32768,-32768,-32768,-32768,-32768,-32768,
--32768,-32768,    90,-32768,    91,-32768,-32768,   -68,    73,-32768,
--32768,-32768,    26,-32768,-32768,  -153,    16
+   215,-32768,  -103,    -1,   206,   221,     1,-32768,-32768,    71,
+-32768,-32768,-32768,   -14,   -35,  -167,-32768,   100,-32768,   -54,
+   -15,    15,-32768,   101,   219,   220,   164,    95,-32768,-32768,
+   -39,    76,-32768,-32768,-32768,-32768,-32768,-32768,-32768,-32768,
+-32768,-32768,    89,-32768,    91,-32768,-32768,   -68,    70,-32768,
+-32768,-32768,    31,-32768,-32768,  -153,    13,    21
 };
 
 
-#define	YYLAST		242
+#define	YYLAST		244
 
 
 static const short yytable[] = {     6,
@@ -355,13 +355,13 @@ static const short yytable[] = {     6,
     39,   130,   147,   205,   141,     5,   195,   148,    40,    41,
     42,    43,    44,    45,    46,   158,   159,   160,   172,   164,
    144,   190,   186,   185,   188,   191,   192,   205,   194,   196,
-   208,    39,   211,   217,   210,   225,     5,   204,   230,    40,
-    41,    42,    43,    44,    45,    46,   213,   203,  -127,   227,
-   208,   212,     5,   229,   215,    40,    41,    42,    43,    44,
-    45,    46,   220,   232,   233,     8,    26,     5,   162,    12,
-    40,    41,    42,    43,    44,    45,    46,   184,   224,   163,
-    27,    28,   117,   171,   187,   176,   218,   177,   228,     0,
-     0,   193
+   208,    39,   211,   217,   210,   229,     5,   204,   230,    40,
+    41,    42,    43,    44,    45,    46,   213,   203,   225,  -127,
+   208,   212,     5,   227,   215,    40,    41,    42,    43,    44,
+    45,    46,   220,   233,   234,   236,   237,     5,     8,    26,
+    40,    41,    42,    43,    44,    45,    46,    12,   184,   162,
+   224,   163,    27,    28,   176,   117,   171,   177,   193,   187,
+   232,   218,     0,   228
 };
 
 static const short yycheck[] = {     1,
@@ -383,13 +383,13 @@ static const short yycheck[] = {     1,
     19,    41,    37,   189,    42,    24,   172,    39,    27,    28,
     29,    30,    31,    32,    33,    37,    39,    42,    46,    37,
     46,    34,    42,    44,    41,    34,    36,   213,    34,    43,
-   196,    19,    37,    44,    42,    13,    24,   189,    25,    27,
-    28,    29,    30,    31,    32,    33,    43,    19,    44,    44,
-   216,   203,    24,    46,   206,    27,    28,    29,    30,    31,
-    32,    33,    19,     0,     0,     4,    14,    24,   130,     7,
-    27,    28,    29,    30,    31,    32,    33,   158,   216,   131,
-    14,    14,    72,   142,   164,   146,   211,   147,   223,    -1,
-    -1,   169
+   196,    19,    37,    44,    42,    25,    24,   189,    13,    27,
+    28,    29,    30,    31,    32,    33,    43,    19,    46,    44,
+   216,   203,    24,    44,   206,    27,    28,    29,    30,    31,
+    32,    33,    19,    46,    25,     0,     0,    24,     4,    14,
+    27,    28,    29,    30,    31,    32,    33,     7,   158,   130,
+   216,   131,    14,    14,   146,    72,   142,   147,   169,   164,
+   228,   211,    -1,   223
 };
 /* -*-C-*-  Note some compilers choke on comments on `#line' lines.  */
 #line 3 "/usr/dcs/software/supported/encap/bison-1.27/share/bison.simple"
@@ -1256,213 +1256,235 @@ case 80:
     break;}
 case 81:
 #line 317 "xi-grammar.y"
-{ yyval.chare = new Chare(SCHARE, yyvsp[-2].ntype, yyvsp[-1].typelist, yyvsp[0].mbrlist); if(yyvsp[0].mbrlist) yyvsp[0].mbrlist->setChare(yyval.chare);;
+{ yyval.chare = new Chare(SCHARE, yyvsp[-2].ntype, yyvsp[-1].typelist, yyvsp[0].mbrlist); 
+		  if(yyvsp[0].mbrlist) yyvsp[0].mbrlist->setChare(yyval.chare);
+		  if(yyvsp[0].mbrlist && yyvsp[0].mbrlist->isPure()) yyval.chare->setAbstract(1);;
     break;}
 case 82:
-#line 319 "xi-grammar.y"
+#line 321 "xi-grammar.y"
 { yyval.chare = new Chare(SMAINCHARE, yyvsp[-2].ntype, yyvsp[-1].typelist, yyvsp[0].mbrlist); 
-                  if(yyvsp[0].mbrlist) yyvsp[0].mbrlist->setChare(yyval.chare);;
+                  if(yyvsp[0].mbrlist) yyvsp[0].mbrlist->setChare(yyval.chare);
+		  if(yyvsp[0].mbrlist && yyvsp[0].mbrlist->isPure()) yyval.chare->setAbstract(1);;
     break;}
 case 83:
-#line 324 "xi-grammar.y"
-{ yyval.chare = new Chare(SGROUP, yyvsp[-2].ntype, yyvsp[-1].typelist, yyvsp[0].mbrlist); if(yyvsp[0].mbrlist) yyvsp[0].mbrlist->setChare(yyval.chare);;
+#line 327 "xi-grammar.y"
+{ yyval.chare = new Chare(SGROUP, yyvsp[-2].ntype, yyvsp[-1].typelist, yyvsp[0].mbrlist); if(yyvsp[0].mbrlist) yyvsp[0].mbrlist->setChare(yyval.chare);
+		  if(yyvsp[0].mbrlist && yyvsp[0].mbrlist->isPure()) yyval.chare->setAbstract(1);;
     break;}
 case 84:
-#line 328 "xi-grammar.y"
-{ yyval.chare = new Chare(SNODEGROUP, yyvsp[-2].ntype, yyvsp[-1].typelist, yyvsp[0].mbrlist); if(yyvsp[0].mbrlist) yyvsp[0].mbrlist->setChare(yyval.chare);;
+#line 332 "xi-grammar.y"
+{ yyval.chare = new Chare(SNODEGROUP, yyvsp[-2].ntype, yyvsp[-1].typelist, yyvsp[0].mbrlist); 
+		  if(yyvsp[0].mbrlist) yyvsp[0].mbrlist->setChare(yyval.chare);
+		  if(yyvsp[0].mbrlist && yyvsp[0].mbrlist->isPure()) yyval.chare->setAbstract(1);;
     break;}
 case 85:
-#line 332 "xi-grammar.y"
-{ yyval.chare = new Chare(SARRAY, yyvsp[-2].ntype, yyvsp[-1].typelist, yyvsp[0].mbrlist); if(yyvsp[0].mbrlist) yyvsp[0].mbrlist->setChare(yyval.chare);;
+#line 338 "xi-grammar.y"
+{ yyval.chare = new Chare(SARRAY, yyvsp[-2].ntype, yyvsp[-1].typelist, yyvsp[0].mbrlist); if(yyvsp[0].mbrlist) yyvsp[0].mbrlist->setChare(yyval.chare);
+		  if(yyvsp[0].mbrlist && yyvsp[0].mbrlist->isPure()) yyval.chare->setAbstract(1);;
     break;}
 case 86:
-#line 336 "xi-grammar.y"
+#line 343 "xi-grammar.y"
 { yyval.chare = new Chare(SCHARE, new NamedType(yyvsp[-2].strval), yyvsp[-1].typelist, yyvsp[0].mbrlist); 
-                  if(yyvsp[0].mbrlist) yyvsp[0].mbrlist->setChare(yyval.chare);;
+                  if(yyvsp[0].mbrlist) yyvsp[0].mbrlist->setChare(yyval.chare);
+		  if(yyvsp[0].mbrlist && yyvsp[0].mbrlist->isPure()) yyval.chare->setAbstract(1);;
     break;}
 case 87:
-#line 339 "xi-grammar.y"
+#line 347 "xi-grammar.y"
 { yyval.chare = new Chare(SMAINCHARE, new NamedType(yyvsp[-2].strval), yyvsp[-1].typelist, yyvsp[0].mbrlist); 
-                  if(yyvsp[0].mbrlist) yyvsp[0].mbrlist->setChare(yyval.chare);;
+                  if(yyvsp[0].mbrlist) yyvsp[0].mbrlist->setChare(yyval.chare);
+		  if(yyvsp[0].mbrlist && yyvsp[0].mbrlist->isPure()) yyval.chare->setAbstract(1);;
     break;}
 case 88:
-#line 344 "xi-grammar.y"
+#line 353 "xi-grammar.y"
 { yyval.chare = new Chare(SGROUP, new NamedType(yyvsp[-2].strval), yyvsp[-1].typelist, yyvsp[0].mbrlist); 
-                  if(yyvsp[0].mbrlist) yyvsp[0].mbrlist->setChare(yyval.chare);;
+                  if(yyvsp[0].mbrlist) yyvsp[0].mbrlist->setChare(yyval.chare);
+		  if(yyvsp[0].mbrlist && yyvsp[0].mbrlist->isPure()) yyval.chare->setAbstract(1);;
     break;}
 case 89:
-#line 349 "xi-grammar.y"
+#line 359 "xi-grammar.y"
 { yyval.chare = new Chare(SNODEGROUP, new NamedType(yyvsp[-2].strval), yyvsp[-1].typelist, yyvsp[0].mbrlist); 
-                  if(yyvsp[0].mbrlist) yyvsp[0].mbrlist->setChare(yyval.chare);;
+                  if(yyvsp[0].mbrlist) yyvsp[0].mbrlist->setChare(yyval.chare);
+		  if(yyvsp[0].mbrlist && yyvsp[0].mbrlist->isPure()) yyval.chare->setAbstract(1);;
     break;}
 case 90:
-#line 354 "xi-grammar.y"
+#line 365 "xi-grammar.y"
 { yyval.chare = new Chare(SARRAY, new NamedType(yyvsp[-2].strval), yyvsp[-1].typelist, yyvsp[0].mbrlist); 
-                  if(yyvsp[0].mbrlist) yyvsp[0].mbrlist->setChare(yyval.chare);;
+                  if(yyvsp[0].mbrlist) yyvsp[0].mbrlist->setChare(yyval.chare);
+		  if(yyvsp[0].mbrlist && yyvsp[0].mbrlist->isPure()) yyval.chare->setAbstract(1);;
     break;}
 case 91:
-#line 359 "xi-grammar.y"
+#line 371 "xi-grammar.y"
 { yyval.message = new Message(new NamedType(yyvsp[-1].strval), yyvsp[-2].intval); ;
     break;}
 case 92:
-#line 363 "xi-grammar.y"
+#line 375 "xi-grammar.y"
 { yyval.type = 0; ;
     break;}
 case 93:
-#line 365 "xi-grammar.y"
+#line 377 "xi-grammar.y"
 { yyval.type = yyvsp[0].type; ;
     break;}
 case 94:
-#line 369 "xi-grammar.y"
+#line 381 "xi-grammar.y"
 { yyval.strval = 0; ;
     break;}
 case 95:
-#line 371 "xi-grammar.y"
+#line 383 "xi-grammar.y"
 { yyval.strval = yyvsp[0].strval; ;
     break;}
 case 96:
-#line 373 "xi-grammar.y"
+#line 385 "xi-grammar.y"
 { yyval.strval = yyvsp[0].strval; ;
     break;}
 case 97:
-#line 377 "xi-grammar.y"
+#line 389 "xi-grammar.y"
 { yyval.tvar = new TType(new NamedType(yyvsp[-1].strval), yyvsp[0].type); ;
     break;}
 case 98:
-#line 379 "xi-grammar.y"
+#line 391 "xi-grammar.y"
 { yyval.tvar = new TFunc(yyvsp[-1].ftype, yyvsp[0].strval); ;
     break;}
 case 99:
-#line 381 "xi-grammar.y"
+#line 393 "xi-grammar.y"
 { yyval.tvar = new TName(yyvsp[-2].type, yyvsp[-1].strval, yyvsp[0].strval); ;
     break;}
 case 100:
-#line 385 "xi-grammar.y"
+#line 397 "xi-grammar.y"
 { yyval.tvarlist = new TVarList(yyvsp[0].tvar); ;
     break;}
 case 101:
-#line 387 "xi-grammar.y"
+#line 399 "xi-grammar.y"
 { yyval.tvarlist = new TVarList(yyvsp[-2].tvar, yyvsp[0].tvarlist); ;
     break;}
 case 102:
-#line 391 "xi-grammar.y"
+#line 403 "xi-grammar.y"
 { yyval.tvarlist = yyvsp[-1].tvarlist; ;
     break;}
 case 103:
-#line 395 "xi-grammar.y"
+#line 407 "xi-grammar.y"
 { yyval.templat = new Template(yyvsp[-1].tvarlist, yyvsp[0].chare); yyvsp[0].chare->setTemplate(yyval.templat); ;
     break;}
 case 104:
-#line 397 "xi-grammar.y"
+#line 409 "xi-grammar.y"
 { yyval.templat = new Template(yyvsp[-1].tvarlist, yyvsp[0].chare); yyvsp[0].chare->setTemplate(yyval.templat); ;
     break;}
 case 105:
-#line 399 "xi-grammar.y"
+#line 411 "xi-grammar.y"
 { yyval.templat = new Template(yyvsp[-1].tvarlist, yyvsp[0].chare); yyvsp[0].chare->setTemplate(yyval.templat); ;
     break;}
 case 106:
-#line 401 "xi-grammar.y"
+#line 413 "xi-grammar.y"
 { yyval.templat = new Template(yyvsp[-1].tvarlist, yyvsp[0].chare); yyvsp[0].chare->setTemplate(yyval.templat); ;
     break;}
 case 107:
-#line 403 "xi-grammar.y"
+#line 415 "xi-grammar.y"
 { yyval.templat = new Template(yyvsp[-1].tvarlist, yyvsp[0].message); yyvsp[0].message->setTemplate(yyval.templat); ;
     break;}
 case 108:
-#line 407 "xi-grammar.y"
+#line 419 "xi-grammar.y"
 { yyval.mbrlist = 0; ;
     break;}
 case 109:
-#line 409 "xi-grammar.y"
+#line 421 "xi-grammar.y"
 { yyval.mbrlist = yyvsp[-2].mbrlist; ;
     break;}
 case 110:
-#line 413 "xi-grammar.y"
+#line 425 "xi-grammar.y"
 { yyval.mbrlist = 0; ;
     break;}
 case 111:
-#line 415 "xi-grammar.y"
+#line 427 "xi-grammar.y"
 { yyval.mbrlist = new MemberList(yyvsp[-1].member, yyvsp[0].mbrlist); ;
     break;}
 case 112:
-#line 419 "xi-grammar.y"
+#line 431 "xi-grammar.y"
 { yyval.member = yyvsp[-1].entry; ;
     break;}
 case 113:
-#line 421 "xi-grammar.y"
+#line 433 "xi-grammar.y"
 { yyval.member = yyvsp[-1].readonly; ;
     break;}
 case 114:
-#line 423 "xi-grammar.y"
+#line 435 "xi-grammar.y"
 { yyval.member = yyvsp[-1].readonly; ;
     break;}
 case 115:
-#line 427 "xi-grammar.y"
-{ yyval.entry = new Entry(yyvsp[-4].intval, new BuiltinType("void"), yyvsp[-2].strval, yyvsp[-1].rtype, yyvsp[0].val); ;
+#line 439 "xi-grammar.y"
+{ yyval.entry = new Entry(yyvsp[-5].intval|yyvsp[-1].intval, new BuiltinType("void"), yyvsp[-3].strval, yyvsp[-2].rtype, yyvsp[0].val); ;
     break;}
 case 116:
-#line 429 "xi-grammar.y"
-{ yyval.entry = new Entry(yyvsp[-4].intval, yyvsp[-3].ptype, yyvsp[-2].strval, yyvsp[-1].rtype, yyvsp[0].val); ;
+#line 441 "xi-grammar.y"
+{ yyval.entry = new Entry(yyvsp[-5].intval|yyvsp[-1].intval, yyvsp[-4].ptype, yyvsp[-3].strval, yyvsp[-2].rtype, yyvsp[0].val); ;
     break;}
 case 117:
-#line 431 "xi-grammar.y"
+#line 443 "xi-grammar.y"
 { yyval.entry = new Entry(yyvsp[-2].intval, 0, yyvsp[-1].strval, yyvsp[0].rtype, 0); ;
     break;}
 case 118:
-#line 435 "xi-grammar.y"
+#line 447 "xi-grammar.y"
 { yyval.intval = 0; ;
     break;}
 case 119:
-#line 437 "xi-grammar.y"
+#line 449 "xi-grammar.y"
 { yyval.intval = yyvsp[-1].intval; ;
     break;}
 case 120:
-#line 441 "xi-grammar.y"
+#line 453 "xi-grammar.y"
 { yyval.intval = yyvsp[0].intval; ;
     break;}
 case 121:
-#line 443 "xi-grammar.y"
+#line 455 "xi-grammar.y"
 { yyval.intval = yyvsp[-2].intval | yyvsp[0].intval; ;
     break;}
 case 122:
-#line 447 "xi-grammar.y"
+#line 459 "xi-grammar.y"
 { yyval.intval = STHREADED; ;
     break;}
 case 123:
-#line 449 "xi-grammar.y"
+#line 461 "xi-grammar.y"
 { yyval.intval = SSYNC; ;
     break;}
 case 124:
-#line 451 "xi-grammar.y"
+#line 463 "xi-grammar.y"
 { yyval.intval = SLOCKED; ;
     break;}
 case 125:
-#line 453 "xi-grammar.y"
+#line 465 "xi-grammar.y"
 { yyval.intval = SVIRTUAL; ;
     break;}
 case 126:
-#line 457 "xi-grammar.y"
+#line 469 "xi-grammar.y"
 { yyval.rtype = 0; ;
     break;}
 case 127:
-#line 459 "xi-grammar.y"
+#line 471 "xi-grammar.y"
 { yyval.rtype = new BuiltinType("void"); ;
     break;}
 case 128:
-#line 461 "xi-grammar.y"
+#line 473 "xi-grammar.y"
 { yyval.rtype = yyvsp[0].ptype; ;
     break;}
 case 129:
-#line 465 "xi-grammar.y"
+#line 477 "xi-grammar.y"
 { yyval.rtype = yyvsp[-1].rtype; ;
     break;}
 case 130:
-#line 469 "xi-grammar.y"
+#line 481 "xi-grammar.y"
 { yyval.val = 0; ;
     break;}
 case 131:
-#line 471 "xi-grammar.y"
+#line 483 "xi-grammar.y"
 { yyval.val = new Value(yyvsp[0].strval); ;
+    break;}
+case 132:
+#line 487 "xi-grammar.y"
+{ yyval.intval = 0; ;
+    break;}
+case 133:
+#line 489 "xi-grammar.y"
+{ if(strcmp(yyvsp[0].strval, "0")) { yyerror("expected 0"); exit(1); }
+		  yyval.intval = SPURE; 
+		;
     break;}
 }
    /* the action file gets copied in in place of this dollarsign */
@@ -1686,7 +1708,7 @@ yyerrhandle:
     }
   return 1;
 }
-#line 473 "xi-grammar.y"
+#line 493 "xi-grammar.y"
 
 void yyerror(const char *mesg)
 {

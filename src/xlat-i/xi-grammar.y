@@ -63,7 +63,7 @@ ModuleList *modlist;
 %type <strval>		Name OptNameInit 
 %type <val>		OptStackSize
 %type <intval>		OptExtern OptSemiColon MAttribs MAttribList MAttrib
-%type <intval>		EAttribs EAttribList EAttrib
+%type <intval>		EAttribs EAttribList EAttrib OptPure
 %type <tparam>		TParam
 %type <tparlist>	TParamList TParamEList OptTParams
 %type <type>		Type SimpleType OptTypeInit 
@@ -314,45 +314,57 @@ BaseList	: NamedType
 		;
 
 Chare		: CHARE NamedType OptBaseList MemberEList
-		{ $$ = new Chare(SCHARE, $2, $3, $4); if($4) $4->setChare($$);}
+		{ $$ = new Chare(SCHARE, $2, $3, $4); 
+		  if($4) $4->setChare($$);
+		  if($4 && $4->isPure()) $$->setAbstract(1);}
 		| MAINCHARE NamedType OptBaseList MemberEList
 		{ $$ = new Chare(SMAINCHARE, $2, $3, $4); 
-                  if($4) $4->setChare($$);}
+                  if($4) $4->setChare($$);
+		  if($4 && $4->isPure()) $$->setAbstract(1);}
 		;
 
 Group		: GROUP NamedType OptBaseList MemberEList
-		{ $$ = new Chare(SGROUP, $2, $3, $4); if($4) $4->setChare($$);}
+		{ $$ = new Chare(SGROUP, $2, $3, $4); if($4) $4->setChare($$);
+		  if($4 && $4->isPure()) $$->setAbstract(1);}
 		;
 
 NodeGroup	: NODEGROUP NamedType OptBaseList MemberEList
-		{ $$ = new Chare(SNODEGROUP, $2, $3, $4); if($4) $4->setChare($$);}
+		{ $$ = new Chare(SNODEGROUP, $2, $3, $4); 
+		  if($4) $4->setChare($$);
+		  if($4 && $4->isPure()) $$->setAbstract(1);}
 		;
 
 Array		: ARRAY NamedType OptBaseList MemberEList
-		{ $$ = new Chare(SARRAY, $2, $3, $4); if($4) $4->setChare($$);}
+		{ $$ = new Chare(SARRAY, $2, $3, $4); if($4) $4->setChare($$);
+		  if($4 && $4->isPure()) $$->setAbstract(1);}
 		;
 
 TChare		: CHARE Name OptBaseList MemberEList
 		{ $$ = new Chare(SCHARE, new NamedType($2), $3, $4); 
-                  if($4) $4->setChare($$);}
+                  if($4) $4->setChare($$);
+		  if($4 && $4->isPure()) $$->setAbstract(1);}
 		| MAINCHARE Name OptBaseList MemberEList
 		{ $$ = new Chare(SMAINCHARE, new NamedType($2), $3, $4); 
-                  if($4) $4->setChare($$);}
+                  if($4) $4->setChare($$);
+		  if($4 && $4->isPure()) $$->setAbstract(1);}
 		;
 
 TGroup		: GROUP Name OptBaseList MemberEList
 		{ $$ = new Chare(SGROUP, new NamedType($2), $3, $4); 
-                  if($4) $4->setChare($$);}
+                  if($4) $4->setChare($$);
+		  if($4 && $4->isPure()) $$->setAbstract(1);}
 		;
 
 TNodeGroup	: NODEGROUP Name OptBaseList MemberEList
 		{ $$ = new Chare(SNODEGROUP, new NamedType($2), $3, $4); 
-                  if($4) $4->setChare($$);}
+                  if($4) $4->setChare($$);
+		  if($4 && $4->isPure()) $$->setAbstract(1);}
 		;
 
 TArray		: ARRAY Name OptBaseList MemberEList
 		{ $$ = new Chare(SARRAY, new NamedType($2), $3, $4); 
-                  if($4) $4->setChare($$);}
+                  if($4) $4->setChare($$);
+		  if($4 && $4->isPure()) $$->setAbstract(1);}
 		;
 
 TMessage	: MESSAGE MAttribs Name ';'
@@ -423,10 +435,10 @@ Member		: Entry ';'
 		{ $$ = $1; }
 		;
 
-Entry		: ENTRY EAttribs VOID Name EParam OptStackSize
-		{ $$ = new Entry($2, new BuiltinType("void"), $4, $5, $6); }
-		| ENTRY EAttribs OnePtrType Name EParam OptStackSize
-		{ $$ = new Entry($2, $3, $4, $5, $6); }
+Entry		: ENTRY EAttribs VOID Name EParam OptPure OptStackSize
+		{ $$ = new Entry($2|$6, new BuiltinType("void"), $4, $5, $7); }
+		| ENTRY EAttribs OnePtrType Name EParam OptPure OptStackSize
+		{ $$ = new Entry($2|$6, $3, $4, $5, $7); }
 		| ENTRY EAttribs Name EParam
 		{ $$ = new Entry($2, 0, $3, $4, 0); }
 		;
@@ -469,6 +481,14 @@ OptStackSize	: /* Empty */
 		{ $$ = 0; }
 		| STACKSIZE '=' NUMBER
 		{ $$ = new Value($3); }
+		;
+
+OptPure		: /* Empty */
+		{ $$ = 0; }
+		| '=' NUMBER
+		{ if(strcmp($2, "0")) { yyerror("expected 0"); exit(1); }
+		  $$ = SPURE; 
+		}
 		;
 %%
 void yyerror(const char *mesg)

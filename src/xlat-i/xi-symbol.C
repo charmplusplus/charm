@@ -293,6 +293,16 @@ MemberList::setChare(Chare *c)
     next->setChare(c);
 }
 
+int
+MemberList::isPure(void)
+{
+  if(member->isPure())
+    return 1;
+  if(next)
+    return next->isPure();
+  return 0;
+}
+
 void
 ConstructList::genDecls(XStr& str)
 {
@@ -978,6 +988,8 @@ void Entry::genEpIdxDecl(XStr& str)
 
 void Entry::genChareStaticConstructorDecl(XStr& str)
 {
+  if(container->isAbstract())
+    return;
   str << "    static void ckNew(";
   if(param) {
     if(!param->isVoid()) {
@@ -1017,6 +1029,8 @@ void Entry::genChareStaticConstructorDecl(XStr& str)
 
 void Entry::genGroupStaticConstructorDecl(XStr& str)
 {
+  if(container->isAbstract())
+    return;
   str << "    static CkGroupID ckNew(";
   if(param) {
     param->print(str);
@@ -1057,6 +1071,8 @@ void Entry::genGroupStaticConstructorDecl(XStr& str)
 
 void Entry::genArrayStaticConstructorDecl(XStr& str)
 {
+  if(container->isAbstract())
+    return;
   str << "    static CkAID ckNew(int numElements)\n";
   str << "{\n";
   str << "  return CkAID(Array1D::CreateArray(numElements,ChareIndex(RRMap),\n";
@@ -1121,7 +1137,10 @@ void Entry::genChareDecl(XStr& str)
       exit(1);
     }
     param->print(str);
-    str<< ");\n";
+    str<< ")";
+    if(isPure())
+      str << "=0";
+    str << ";\n";
     // entry ptr declaration
     str << "    static int ckIdx_" << name << "(";
     param->print(str);
@@ -1154,22 +1173,27 @@ void Entry::genGroupDecl(XStr& str)
         if(!param->isVoid())
           str << "msg";
       }
-      str<< ") {\n";
-      if(container->getChareType()==SGROUP)
-        str << "      CkBroadcastMsgBranch(__idx_";
-      else
-        str << "      CkBroadcastMsgNodeBranch(__idx_";
-      genEpIdx(str);
-      str << ", ";
-      if(!param->isVoid())
-        str << "msg, ";
-      else
-        str << "CkAllocSysMsg(), ";
-      if(container->getChareType()==SGROUP)
-        str << "_ck_gid);\n";
-      else
-        str << "_ck_ngid);\n";
-      str << "    }\n";
+      str<< ")";
+      if(isPure())
+        str << "=0;\n";
+      else {
+        str << "{\n";
+        if(container->getChareType()==SGROUP)
+          str << "      CkBroadcastMsgBranch(__idx_";
+        else
+          str << "      CkBroadcastMsgNodeBranch(__idx_";
+        genEpIdx(str);
+        str << ", ";
+        if(!param->isVoid())
+          str << "msg, ";
+        else
+          str << "CkAllocSysMsg(), ";
+        if(container->getChareType()==SGROUP)
+          str << "_ck_gid);\n";
+        else
+          str << "_ck_ngid);\n";
+        str << "    }\n";
+      }
     }
     // entry method onPE declaration
     str << "    ";
@@ -1182,45 +1206,50 @@ void Entry::genGroupDecl(XStr& str)
       param->print(str);
       str << "msg, ";
     }
-    str<< "int onPE) {\n";
-    if(isSync()) {
-      if(retType->isVoid()) {
-        if(container->getChareType()==SGROUP)
-          str << "    CkFreeSysMsg(CkRemoteBranchCall(__idx_";
+    str<< "int onPE)";
+    if(isPure())
+      str << "=0;\n";
+    else {
+      str << " {\n";
+      if(isSync()) {
+        if(retType->isVoid()) {
+          if(container->getChareType()==SGROUP)
+            str << "    CkFreeSysMsg(CkRemoteBranchCall(__idx_";
+          else
+            str << "    CkFreeSysMsg(CkRemoteNodeBranchCall(__idx_";
+        } else {
+          str << "      return (";
+          retType->print(str);
+          if(container->getChareType()==SGROUP)
+            str << ") (CkRemoteBranchCall(__idx_";
+          else
+            str << ") (CkRemoteNodeBranchCall(__idx_";
+        }
+        genEpIdx(str);
+        str << ", ";
+        if(!param->isVoid())
+          str << "msg, ";
         else
-          str << "    CkFreeSysMsg(CkRemoteNodeBranchCall(__idx_";
+          str << "CkAllocSysMsg(), ";
+        str << "_ck_gid, onPE));\n";
+        str << "    }\n";
       } else {
-        str << "      return (";
-        retType->print(str);
         if(container->getChareType()==SGROUP)
-          str << ") (CkRemoteBranchCall(__idx_";
+          str << "      CkSendMsgBranch(__idx_";
         else
-          str << ") (CkRemoteNodeBranchCall(__idx_";
+          str << "      CkSendMsgNodeBranch(__idx_";
+        genEpIdx(str);
+        str << ", ";
+        if(!param->isVoid())
+          str << "msg, ";
+        else
+          str << "CkAllocSysMsg(), ";
+        if(container->getChareType()==SGROUP)
+          str << "onPE, _ck_gid);\n";
+        else
+          str << "onPE, _ck_ngid);\n";
+        str << "    }\n";
       }
-      genEpIdx(str);
-      str << ", ";
-      if(!param->isVoid())
-        str << "msg, ";
-      else
-        str << "CkAllocSysMsg(), ";
-      str << "_ck_gid, onPE));\n";
-      str << "    }\n";
-    } else {
-      if(container->getChareType()==SGROUP)
-        str << "      CkSendMsgBranch(__idx_";
-      else
-        str << "      CkSendMsgNodeBranch(__idx_";
-      genEpIdx(str);
-      str << ", ";
-      if(!param->isVoid())
-        str << "msg, ";
-      else
-        str << "CkAllocSysMsg(), ";
-      if(container->getChareType()==SGROUP)
-        str << "onPE, _ck_gid);\n";
-      else
-        str << "onPE, _ck_ngid);\n";
-      str << "    }\n";
     }
     // entry ptr declaration
     str << "    static int ckIdx_" << name << "(";
@@ -1254,24 +1283,29 @@ void Entry::genArrayDecl(XStr& str)
       if(!param->isVoid())
         str << "msg";
     }
-    str<< ") {\n";
-    str << "      if (_elem==(-1)) _array->broadcast((ArrayMessage*) ";
-    if(!param->isVoid())
-      str << "msg, ";
-    else
-      str << "CkAllocMsg(0, sizeof(ArrayMessage),0), ";
-    str << " __idx_";
-    genEpIdx(str);
-    str << ");\n";
-    str << "      else _array->send((ArrayMessage*) ";
-    if(!param->isVoid())
-      str << "msg, ";
-    else
-      str << "CkAllocMsg(0, sizeof(ArrayMessage),0), ";
-    str << "_elem, __idx_";
-    genEpIdx(str);
-    str << ");\n";
-    str << "    }\n";
+    str<< ")";
+    if(isPure())
+      str << "=0;\n";
+    else {
+      str << " {\n";
+      str << "      if (_elem==(-1)) _array->broadcast((ArrayMessage*) ";
+      if(!param->isVoid())
+        str << "msg, ";
+      else
+        str << "CkAllocMsg(0, sizeof(ArrayMessage),0), ";
+      str << " __idx_";
+      genEpIdx(str);
+      str << ");\n";
+      str << "      else _array->send((ArrayMessage*) ";
+      if(!param->isVoid())
+        str << "msg, ";
+      else
+        str << "CkAllocMsg(0, sizeof(ArrayMessage),0), ";
+      str << "_elem, __idx_";
+      genEpIdx(str);
+      str << ");\n";
+      str << "    }\n";
+    }
     // entry method onPE declaration
     str << "    ";
     if(isVirtual())
@@ -1283,16 +1317,21 @@ void Entry::genArrayDecl(XStr& str)
       param->print(str);
       str << "msg, ";
     }
-    str<< "int onPE) {\n";
-    str << "      _array->send((ArrayMessage*) ";
-    if(!param->isVoid())
-      str << "msg, ";
-    else
-      str << "CkAllocMsg(0, sizeof(ArrayMessage),0), ";
-    str << "onPE, __idx_";
-    genEpIdx(str);
-    str << ");\n";
-    str << "    }\n";
+    str<< "int onPE)";
+    if(isPure())
+      str << "=0;\n";
+    else {
+      str << " {\n";
+      str << "      _array->send((ArrayMessage*) ";
+      if(!param->isVoid())
+        str << "msg, ";
+      else
+        str << "CkAllocMsg(0, sizeof(ArrayMessage),0), ";
+      str << "onPE, __idx_";
+      genEpIdx(str);
+      str << ");\n";
+      str << "    }\n";
+    }
     // entry ptr declaration
     str << "    static int ckIdx_" << name << "(";
     assert(param!=0);
@@ -1315,6 +1354,10 @@ void Entry::genDecls(XStr& str)
     genChareDecl(str);
   }
   // call function declaration
+  if(isPure())
+    return;
+  if(isConstructor() && container->isAbstract())
+    return;
   if(container->getChareType()==SARRAY && !param && isConstructor()) {
     str << "    static void ";
     str << " _call_" << name << "_ArrayElementCreateMessage(void* msg, ";
@@ -1391,6 +1434,8 @@ void Entry::genEpIdxDef(XStr& str)
 
 void Entry::genChareStaticConstructorDefs(XStr& str)
 {
+  if(container->isAbstract())
+    return;
   if(container->isTemplated())
     container->genSpec(str);
   str << "void ";
@@ -1459,6 +1504,8 @@ void Entry::genChareStaticConstructorDefs(XStr& str)
 
 void Entry::genGroupStaticConstructorDefs(XStr& str)
 {
+  if(container->isAbstract())
+    return;
   if(container->isTemplated())
     container->genSpec(str);
   str << "CkGroupID ";
@@ -1546,7 +1593,9 @@ void Entry::genChareDefs(XStr& str)
   if(isConstructor()) {
     genChareStaticConstructorDefs(str);
   } else {
-    // entry method declaration
+    if(isPure())
+      return;
+    // entry method definition
     if(container->isTemplated())
       container->genSpec(str);
     assert(retType!=0);
@@ -1601,6 +1650,10 @@ void Entry::genDefs(XStr& str)
   } else
     genChareDefs(str);
   // call function
+  if(isPure())
+    return;
+  if(isConstructor() && container->isAbstract())
+    return; // no call function for a constructor of an abstract chare
   if(container->getChareType()==SARRAY && !param && isConstructor()) {
     if(container->isTemplated())
       container->genSpec(str);
@@ -1919,6 +1972,10 @@ void Entry::genDefs(XStr& str)
 void Entry::genReg(XStr& str)
 {
   str << "/* REG: "; print(str); str << " */\n";
+  if(isPure())
+    return;
+  if(isConstructor() && container->isAbstract())
+    return;
   if(container->getChareType()==SARRAY && !param && isConstructor()) {
     str << "  __idx_" << name << "_ArrayElementCreateMessage";
     str << " = CkRegisterEp(\"" << name << "\", "

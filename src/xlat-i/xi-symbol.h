@@ -218,6 +218,7 @@ class Member : public Printable {
     Chare *container;
   public:
     void setChare(Chare *c) { container = c; }
+    virtual int isPure(void) { return 0; }
     virtual void genDecls(XStr& str) = 0;
     virtual void genDefs(XStr& str) = 0;
     virtual void genReg(XStr& str) = 0;
@@ -232,6 +233,7 @@ class MemberList : public Printable {
     MemberList(Member *m, MemberList *n=0) : member(m), next(n) {}
     void print(XStr& str);
     void setChare(Chare *c);
+    int isPure(void);
     void genDecls(XStr& str);
     void genDefs(XStr& str);
     void genReg(XStr& str);
@@ -283,9 +285,10 @@ class Chare : public TEntity, public Construct {
     NamedType *type;
     MemberList *list;
     TypeList *bases;
+    int abstract;
   public:
     Chare(int c, NamedType *t, TypeList *b=0, MemberList *l=0) : 
-      chareType(c), type(t), bases(b), list(l) {setTemplate(0);}
+      chareType(c), type(t), bases(b), list(l) {setTemplate(0); abstract=0;}
     int  getChareType(void) { return chareType; }
     void genProxyName(XStr& str){type->genProxyName(str);}
     void genProxyBases(XStr& str,const char* p,const char* s,const char* sep) {
@@ -294,6 +297,8 @@ class Chare : public TEntity, public Construct {
     const char *getBaseName(void) { return type->getBaseName(); }
     int  isTemplated(void) { return (templat!=0); }
     int  isDerived(void) { return (bases!=0); }
+    int  isAbstract(void) { return abstract; }
+    int  setAbstract(int a) { abstract = a; }
     void print(XStr& str);
     void genChareDecls(XStr& str);
     void genGroupDecls(XStr& str);
@@ -382,6 +387,7 @@ class TVarList : public Printable {
 #define SSYNC     0x02
 #define SLOCKED   0x04
 #define SVIRTUAL  0x08
+#define SPURE     0x10
 
 class Entry : public Member {
   private:
@@ -407,6 +413,10 @@ class Entry : public Member {
     Entry(int a, EnType *r, char *n, EnType *p, Value *sz=0) :
       attribs(a), retType(r), name(n), param(p), stacksize(sz)
     { setChare(0); 
+      if(!isVirtual() && isPure()) {
+        cerr << "Non-virtual methods cannot be pure virtual!!\n";
+        abort();
+      }
       if(!isThreaded() && stacksize) {
         cerr << "Non-Threaded methods cannot have stacksize spec.!!\n";
         abort();
@@ -422,6 +432,7 @@ class Entry : public Member {
     int isConstructor(void) { return !strcmp(name, container->getBaseName());}
     int isExclusive(void) { return (attribs & SLOCKED); }
     int isVirtual(void) { return (attribs & SVIRTUAL); }
+    int isPure(void) { return (attribs & SPURE); }
     void print(XStr& str);
     void genDecls(XStr& str);
     void genDefs(XStr& str);
