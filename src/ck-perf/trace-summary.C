@@ -26,7 +26,7 @@ static int _unpackMsg, _unpackChare, _unpackEP;
 CpvDeclare(double, binSize);
 CpvDeclare(double, version);
 
-void _createTracesummary()
+void _createTracesummary(char **argv)
 {
   DEBUGF(("%d createTraceSummary\n", CkMyPe()));
   CpvInitialize(Trace*, _trace);

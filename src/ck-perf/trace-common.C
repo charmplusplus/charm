@@ -81,7 +81,7 @@ extern "C" void traceEnd(void) {
 }
 
 /// defined in moduleInit.C
-void _createTraces();
+void _createTraces(char **argv);
 
 /// initialize trace framework, also create the trace module(s).
 extern "C" void traceInit(char **argv) 
@@ -89,7 +89,7 @@ extern "C" void traceInit(char **argv)
   CpvInitialize(TraceArray *, _traces);
   CpvAccess(_traces) = new TraceArray;
   // in moduleInit.C
-  _createTraces();
+  _createTraces(argv);
 
   traceCommonInit(argv);
   CpvAccess(_traces)->traceInit(argv);

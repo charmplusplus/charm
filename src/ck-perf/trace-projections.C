@@ -46,7 +46,7 @@ On T3E, we need to have file number control by open/close files only when needed
 #define CLOSE_LOG
 #endif
 
-void _createTraceprojections()
+void _createTraceprojections(char **argv)
 {
   DEBUGF(("%d createTraceProjections\n", CkMyPe()));
   CpvInitialize(Trace*, _trace);

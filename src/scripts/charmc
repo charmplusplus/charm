@@ -981,7 +981,7 @@ then
     echo "extern void LBSetDefaultCreate(void (*fn)(void));" >> $modInitSrc
     echo "extern void Create$BALANCER();" >> $modInitSrc
 fi
-echo "void _registerExternalModules(void) {" >> $modInitSrc
+echo "void _registerExternalModules(char **argv) {" >> $modInitSrc
 for module in $MODULES; do
     [ -n "$VERBOSE" ] && echo "Adding registration for module $module"
     echo "  _register$module();" >> $modInitSrc
@@ -994,11 +994,11 @@ fi
 echo "}" >> $modInitSrc
 
 # creating projections
-echo "void _createTraces(void) {" >> $modInitSrc
+echo "void _createTraces(char **argv) {" >> $modInitSrc
 for trace in $TRACEMODE; do
     [ -n "$VERBOSE" ] && echo "Adding registration for trace $trace"
-    echo "extern void _createTrace$trace();" >> $modInitSrc
-    echo "_createTrace$trace();" >> $modInitSrc
+    echo "extern void _createTrace$trace(char **argv);" >> $modInitSrc
+    echo "_createTrace$trace(argv);" >> $modInitSrc
 done
 echo "}" >> $modInitSrc
 
