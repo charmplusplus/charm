@@ -54,6 +54,7 @@ static int createFuture(void)
     origsize = fs->max;
     fs->max = fs->max * 2;
     fs->array = (Future*)realloc(fs->array, sizeof(Future)*(fs->max));
+    _MEMCHECK(fs->array);
     addedFutures(origsize, fs->max);
   }
   handle = fs->freelist;
@@ -96,6 +97,7 @@ void *CkWaitFuture(CkFutureID handle)
     fut->waiters = self;
     CthSuspend();
   }
+  fut = (fs->array)+handle;
   value = fut->value;
   return value;
 }
