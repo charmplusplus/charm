@@ -2624,6 +2624,7 @@ int rsh_pump(p, nodeno, rank0no, argv)
 #endif
     xstr_printf(ibuf,"echo 'remote responding...'\n");
 
+  xstr_printf(ibuf,"if ( -x ~/.conv-hostrc )   source ~/.conv-hostrc\n");
   if (arg_display)
     xstr_printf(ibuf,"setenv DISPLAY %s\n",arg_display);
   xstr_printf(ibuf,"setenv NETSTART '%d %d %d %d %d %d %d %d %d'\n",
