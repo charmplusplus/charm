@@ -2099,17 +2099,17 @@ void Entry::genArrayDefs(XStr& str)
     } 
     else 
     {
+      char *opts = "";
+      if (isSkipscheduler())  opts=",CK_MSG_SKIPSCHEDULER";
       if (container->isForElement() || container->isForSection()) {
 /*
         if (isImmediate())
           str << "  impl_amsg->array_setImmediate(CmiTrue);\n";
 */
-        char *opts = "";
-        if (isSkipscheduler())  opts=",CK_MSG_SKIPSCHEDULER";
         str << "  ckSend(impl_amsg, "<<epIdx()<<opts<<");\n";
       }
       else
-        str << "  ckBroadcast(impl_amsg, "<<epIdx()<<");\n";
+        str << "  ckBroadcast(impl_amsg, "<<epIdx()<<opts<<");\n";
     }
     str << "}\n";
   }
@@ -2192,7 +2192,7 @@ void Entry::genGroupDecl(XStr& str)
         str << "      if (ckIsDelegated()) {\n";
         str << "         Ck"<<node<<"GroupMsgPrep("<<paramg<<");\n";
         str << "         ckDelegatedTo()->"<<node<<"GroupBroadcast(ckDelegatedPtr(),"<<paramg<<");\n";
-        str << "      } else CkBroadcastMsg"<<node<<"Branch("<<paramg<<");\n";
+        str << "      } else CkBroadcastMsg"<<node<<"Branch("<<paramg<<opts<<");\n";
       }
     }
     str << "    }\n";
