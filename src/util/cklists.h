@@ -5,8 +5,17 @@
 #include <stdlib.h> // for size_t
 #include <string.h> // for memcpy
 
+//"Documentation" class: prevents people from using copy constructors 
+class CkNoncopyable {
+	//These aren't defined anywhere-- don't use them!
+	CkNoncopyable(const CkNoncopyable &c);
+	CkNoncopyable &operator=(const CkNoncopyable &c);
+public:
+	CkNoncopyable(void) {}
+};
+
 template <class T>
-class CkQ {
+class CkQ : private CkNoncopyable {
     T *block;
     int blklen;
     int first;
@@ -68,7 +77,7 @@ class CkQ {
 };
 
 template <class T>
-class CkVec {
+class CkVec : private CkNoncopyable {
     T *block;
     int blklen,len;
   public:
@@ -77,6 +86,7 @@ class CkVec {
     int &length(void) { return len; }
     int length(void) const {return len;}
     T *getVec(void) { return block; }
+    const T *getVec(void) const { return block; }
     T& operator[](size_t n) { return block[n]; }
     const T& operator[](size_t n) const { return block[n]; }
     void setSize(int newlen) {
@@ -96,7 +106,10 @@ class CkVec {
       block[pos] = elt;
     }
     void insertAtEnd(const T &elt) {insert(length(),elt);}
+
+//STL-compatability:
     void push_back(const T &elt) {insert(length(),elt);}
+    int size(void) const {return len;}
 };
 
 #endif
