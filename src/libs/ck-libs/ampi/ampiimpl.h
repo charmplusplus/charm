@@ -10,6 +10,7 @@
 
 #include "ampi.h"
 #include "charm++.h"
+#include <string.h> // for strlen
 
 class CProxy_ampi;
 class CProxyElement_ampi;
@@ -71,12 +72,30 @@ PUPmarshall(ampiCommStruct);
 struct mpi_comm_world
 {
   ampiCommStruct comm;
-  const char *name;
+  char *name; //new'd human-readable zero-terminated string name, or NULL
+  mpi_comm_world() {
+    name=NULL;
+  }
+  ~mpi_comm_world() {
+    if (name) delete[] name;
+  }
+  void pup(PUP::er &p) {
+    p|comm;
+    int len=0;
+    if (name!=NULL) len=strlen(name)+1;
+    p|len;
+    if (p.isUnpacking()) name=new char[len];
+    p(name,len);
+  }
 };
 class mpi_comm_worlds {
 	mpi_comm_world s[MPI_MAX_COMM_WORLDS];
 public:
 	mpi_comm_world &operator[](int i) {return s[i];}
+	void pup(PUP::er &p) {
+		for (int i=0;i<MPI_MAX_COMM_WORLDS;i++)
+			s[i].pup(p);
+	}
 };
 
 typedef CkPupBasicVec<int> groupStruct;

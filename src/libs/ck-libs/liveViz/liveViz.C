@@ -7,6 +7,8 @@ Orion Sky Lawlor, olawlor@acm.org, 6/11/2002
 #include "liveViz.h"
 #include "liveViz_impl.h"
 
+PUPbytes(liveVizConfig)
+
 liveVizConfig lv_config;
 CProxy_liveVizGroup lvG;
 CkReduction::reducerType imageCombineReducer;

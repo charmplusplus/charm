@@ -9,6 +9,7 @@ class cookieMsg;
 class CkMcastBaseMsg;
 
 typedef mCastEntry * mCastEntryPtr;
+PUPbytes(mCastEntryPtr);
 
 #include "CkMulticast.decl.h"
 

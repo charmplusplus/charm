@@ -8,8 +8,6 @@
 #define exit exit /*Supress definition of exit in ampi.h*/
 #include <iostream.h>
 #include "ampiimpl.h"
-// for strlen
-#include <string.h>
 #include "../../../ampiEvents.h" /*** for trace generation for projector *****/
 
 //------------- startup -------------
@@ -191,6 +189,8 @@ static void ampiNodeInit(void)
   nodeinit_has_been_called=1;
 }
 
+PUPbytes(MPI_MainFn);
+
 class MPI_threadstart_t {
 public:
 	MPI_MainFn fn;
@@ -225,7 +225,7 @@ void ampiCreateMain(MPI_MainFn mainFn)
 			  b.getData(), b.getSize());
 }
 
-static const char *copyCountedStr(const char *src,int len)
+static char *copyCountedStr(const char *src,int len)
 {
 	char *ret=new char[len+1];
 	memcpy(ret,src,len);

@@ -8,6 +8,8 @@ Rather complete interval and box classes.
 #ifndef __OSL_BBOX_H
 #define __OSL_BBOX_H
 
+#include "pup.h"
+
 //A closed segment of 1d space-- [min,max]
 template <class T>
 class seg1dT {
@@ -94,6 +96,11 @@ public:
 	bool intersectsHalf(const seg1d &b) const {
 		return containsHalf(b.min)||b.containsHalf(min);
 	}
+	
+	inline void pup(PUP::er &p) {
+		p|min;
+		p|max;
+	}
 };
 typedef seg1dT<real> rSeg1d;
 typedef seg1dT<int> iSeg1d;
@@ -177,6 +184,9 @@ public:
 		return vector3d(segs[0].getMin(),
 			segs[1].getMin(),
 			segs[2].getMin());
+	}
+	inline void pup(PUP::er &p) {
+		p|segs[0]; p|segs[1]; p|segs[2];
 	}
 };
 

@@ -8,6 +8,7 @@ data structure.
 #ifndef _CHARM_IDXL_LAYOUT_H
 #define _CHARM_IDXL_LAYOUT_H
 #include "idxlc.h" /* for IDXL_ datatypes and IDXL_Layout_t */
+#include "pup.h"
 
 /**
  * This class represents the layout of a user data structure in user memory.
@@ -32,6 +33,9 @@ public:
     if (skew==0) skew=type_size(type);
   }
   //Default copy constructor, assignment operator
+  void pup(PUP::er &p) {
+    p|type; p|width; p|offset; p|distance; p|skew;
+  }
 
   /// Return the total number of bytes required by this IDXL_* data type
   static int type_size(int dataType,const char *callingRoutine="");

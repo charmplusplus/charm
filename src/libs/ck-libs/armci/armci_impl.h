@@ -6,7 +6,7 @@
 
 //Types needed for remote method parameters:
 typedef void* pointer;
-PUPmarshallBytes(pointer); //Pointers get sent as raw bytes
+PUPbytes(pointer); //Pointers get sent as raw bytes
 
 #include "armci.decl.h"
 #include "armci.h"

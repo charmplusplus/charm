@@ -128,7 +128,7 @@ public:
 		if (ffn) { ffn(&val); }
 	}
 };
-PUPmarshallBytes(CallMeshUpdated);
+PUPbytes(CallMeshUpdated);
 
 class UpdateMeshChunk {
 public:
@@ -150,7 +150,7 @@ public:
 		p(doWhat);
 	}
 };
-PUPmarshallBytes(UpdateMeshChunk);
+PUPbytes(UpdateMeshChunk);
 
 /* Unmarshall into a heap-allocated copy */
 template<class T>

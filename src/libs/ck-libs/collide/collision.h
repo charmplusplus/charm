@@ -33,6 +33,14 @@ class gridMapping {
 	#endif
 public:
 	gridMapping() {}
+	void pup(PUP::er &p) {
+		p|origin; p|scales; p|sizes;
+#if COLLISION_USE_FLOAT_HACK
+		p(hakShift,3);
+		p(hakStart,3);
+#endif
+	}
+	
 	void init(const vector3d &Norigin,//Grid cell corner 0,0,0
 		const vector3d &desiredSize);//Size of each cell
 	
