@@ -58,12 +58,17 @@ extern char *sys_errlist[];
 
 static void jsleep(int sec, int usec)
 {
+  int ntimes,i;
   struct timeval tm;
-  tm.tv_sec = sec;
-  tm.tv_usec = usec;
-  while (1) {
-    if (select(0,0,0,0,&tm)==0) break;
-    if (errno!=EINTR) break;
+
+  ntimes = (sec*1000000+usec)/5000;
+  for(i=0;i<ntimes;i++) {
+    tm.tv_sec = 0;
+    tm.tv_usec = 5000;
+    while(1) {
+      if (select(0,NULL,NULL,NULL,&tm)==0) break;
+      if (errno!=EINTR) return;
+    }
   }
 }
 

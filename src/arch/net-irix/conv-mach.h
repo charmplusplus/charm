@@ -8,7 +8,11 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.5  1997-03-19 17:45:59  milind
+ * Revision 1.6  1997-03-19 23:17:47  milind
+ * Got net-irix to work. Had to modify jsleep to deal with restaring
+ * system calls on interrupts.
+ *
+ * Revision 1.5  1997/03/19 17:45:59  milind
  * Switched to the SGI native compilers for better performance.
  *
  * Revision 1.3  1997/02/13 09:31:45  jyelon
@@ -81,8 +85,8 @@
 
 #define CMK_MACHINE_NAME                                   "net-irix"
 
-#define CMK_MALLOC_USE_GNU_MALLOC                          0
-#define CMK_MALLOC_USE_OS_BUILTIN                          1
+#define CMK_MALLOC_USE_GNU_MALLOC                          1
+#define CMK_MALLOC_USE_OS_BUILTIN                          0
 
 #define CMK_MSG_HEADER_SIZE_BYTES                         16
 #define CMK_MSG_HEADER_BLANK_SPACE                        12

@@ -12,7 +12,11 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 1.5  1997-03-17 23:40:28  milind
+# Revision 1.6  1997-03-19 23:17:46  milind
+# Got net-irix to work. Had to modify jsleep to deal with restaring
+# system calls on interrupts.
+#
+# Revision 1.5  1997/03/17 23:40:28  milind
 # Added Idle Notification Functionality:
 # The new Macros in converse.h for this are:
 # CsdSetNotifyIdle(fn1, fn2)
@@ -46,9 +50,9 @@ set CMK_CXX='CC -D_HPUX_SOURCE '
 set CMK_CXXPP='CC -Aa -D_HPUX_SOURCE -E '
 set CMK_CF77=''
 set CMK_C_DEBUG='-g'
-set CMK_C_OPTIMIZE='-O'
+set CMK_C_OPTIMIZE='+O3 +Onolimit '
 set CMK_CXX_DEBUG='-g'
-set CMK_CXX_OPTIMIZE='-O'
+set CMK_CXX_OPTIMIZE='+O3 +Onolimit '
 set CMK_LD='cc -Aa -D_HPUX_SOURCE '
 set CMK_LDXX='CC '
 set CMK_LD77=''

@@ -11,7 +11,11 @@
  ***************************************************************************
  * REVISION HISTORY:
  *      $Log$
- *      Revision 2.10  1995-10-30 22:29:57  sanjeev
+ *      Revision 2.11  1997-03-19 23:17:38  milind
+ *      Got net-irix to work. Had to modify jsleep to deal with restaring
+ *      system calls on interrupts.
+ *
+ *      Revision 2.10  1995/10/30 22:29:57  sanjeev
  *      converted static variable in CollectPerfFromNodes to Cpv
  *
  * Revision 2.9  1995/10/30  14:31:12  jyelon
@@ -55,7 +59,7 @@ static char ident[] = "@(#)$Header$";
 #include "stat.h"
 
 CpvDeclare(char*,pgm);
-CpvDeclare(int,RecdPerfMsg); 
+CpvExtern(int,RecdPerfMsg); 
 
 CpvDeclare(int,display_index);
 CpvDeclare(int,last_time_interval);
@@ -78,7 +82,6 @@ char *prog_name;
   char nodename[80];
 
   CpvInitialize(char*,pgm);
-  CpvInitialize(int,RecdPerfMsg);
   CpvInitialize(int,display_index);
   CpvInitialize(int,last_time_interval);
   CpvInitialize(int,current_time_interval);

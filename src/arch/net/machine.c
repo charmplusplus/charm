@@ -363,11 +363,29 @@ static int CountArgs(char **argv)
 
 static void jsleep(int sec, int usec)
 {
+  int ntimes,i;
+  struct timeval tm;
+
+  ntimes = (sec*1000000+usec)/5000;
+  for(i=0;i<ntimes;i++) {
+    tm.tv_sec = 0;
+    tm.tv_usec = 5000;
+    while(1) {
+      if (select(0,NULL,NULL,NULL,&tm)==0) break;
+      if (errno!=EINTR) return;
+    }
+  }
+}
+
+/* old jsleep - buggy
+static void jsleep(int sec, int usec)
+{
   struct timeval tm;
   tm.tv_sec = sec;
   tm.tv_usec = usec;
-  select(0,0,0,0,&tm);
+  select(0,NULL,NULL,NULL,&tm);
 }
+*/
 
 static void writeall(int fd, char *buf, int size)
 {
@@ -1010,7 +1028,6 @@ static OtherNode  nodes;        /* Indexed only by ``node number'' */
 static int        Cmi_shutdown_done;
 static CmiMutex   Cmi_scanf_mutex;
 static char      *Cmi_scanf_data;
-static int        Cmi_shutdown_done; 
 static double     Cmi_clock;
 
 static void *transmit_queue;
