@@ -89,12 +89,11 @@ class LBPredictorFunction {
 public:
   int num_params;
 
-  void initialize_params(double *x) {double normall=1.0/pow((double)2,31); for (int i=0; i<num_params; ++i) x[i]=rand()*normall;}
+  virtual void initialize_params(double *x) {double normall=1.0/pow((double)2,31); for (int i=0; i<num_params; ++i) x[i]=rand()*normall;}
 
   virtual double predict(double x, double *params) =0;
   virtual void print(double *params) {PredictorPrintf("LB: unknown model\n");};
   virtual void function(double x, double *param, double &y, double *dyda) =0;
-  LBPredictorFunction* constructor();
 };
 
 // a default implementation for a FuturePredictor function
@@ -102,8 +101,6 @@ class DefaultFunction : public LBPredictorFunction {
  public:
   // constructor
   DefaultFunction() {num_params=6;};
-
-  DefaultFunction* constructor() {return new DefaultFunction();}
 
   // compute the prediction function for the variable x with parameters param
   double predict(double x, double *param) {return (param[0] + param[1]*x + param[2]*x*x + param[3]*sin(param[4]*(x+param[5])));}
