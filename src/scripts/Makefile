@@ -659,8 +659,8 @@ pvmc_main.o: pvmc_main.c pvmc.h pvm3.h
 libampi.a: ampi.o
 	$(CHARMC) -cp ../lib -o libampi.a ampi.o
 
-libampif.a: ampif.o ampimain.o futil.o
-	$(CHARMC) -cp ../lib -o libampif.a ampimain.o ampif.o futil.o
+libampif.a: ampif.o ampimain.o
+	$(CHARMC) -cp ../lib -o libampif.a ampimain.o ampif.o
 
 ampi.o: ampi.C ampi.h ampiimpl.h ampi.decl.h ampi.def.h ampimain.decl.h ampimain.def.h
 	$(CHARMC) -c ampi.C
@@ -670,9 +670,6 @@ ampif.o: ampi.C ampi.h ampiimpl.h ampi.decl.h ampi.def.h
 
 ampimain.o: ampimain.C ampi.h ampiimpl.h ampi.decl.h ampi.def.h ampimain.decl.h ampimain.def.h
 	$(CHARMC) -c ampimain.C
-
-futil.o: futil.f90 ampif.h
-	$(CHARMC) -c futil.f90
 
 libsdag.a: CDep.o
 	$(CHARMC) -cp ../lib -o libsdag.a CDep.o
