@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.25  1995-09-26 22:36:55  jyelon
+ * Revision 2.26  1995-09-29 09:51:12  jyelon
+ * Many small corrections.
+ *
+ * Revision 2.25  1995/09/26  22:36:55  jyelon
  * Fixed a bug pertaining to CkInitPhase.
  *
  * Revision 2.24  1995/09/26  22:23:17  sanjeev
@@ -193,7 +196,6 @@ extern void CkProcess_DynamicBocInitMsg();
 extern void CkProcess_NewChareMsg();
 extern void CkProcess_VidSendOverMsg();
 
-
 void initModuleInit()
 {
     CpvInitialize(char*, ReadBufIndex);
@@ -287,9 +289,10 @@ static void EndInitPhase()
   
   /* process all the non-init messages arrived during the 
      initialization */
-  while ( !FIFO_Empty(CpvAccess(CkBuffQueue))  ) {
-    FIFO_DeQueue(CpvAccess(CkBuffQueue), &buffMsg); 
-    HANDLE_INCOMING_MSG(buffMsg); 
+  while (!FIFO_Empty(CpvAccess(CkBuffQueue))  ) {
+    FIFO_DeQueue(CpvAccess(CkBuffQueue), &buffMsg);
+    CmiSetHandler(buffMsg, CsvAccess(HANDLE_INCOMING_MSG_Index));
+    CmiSyncSendAndFree(CmiMyPe(), GetEnv_TotalSize(buffMsg), buffMsg);
   }
 }
 
@@ -452,7 +455,7 @@ ENVELOPE *env;
   int          type;
   void         *usrMsg;
   
-  
+  CmiGrabBuffer(&env);
   if ((GetEnv_msgType(env) == BocInitMsg) ||
       (GetEnv_msgType(env) == ReadMsgMsg))
     UNPACK(env);
@@ -769,7 +772,8 @@ InitializeEPTables()
 
   /* set the main message handler to buffering handler */
   /* after initialization phase, it will be assigned to regular handler */
-  CsvAccess(HANDLE_INCOMING_MSG_Index) = CsvAccess(BUFFER_INCOMING_MSG_Index);
+  CsvAccess(HANDLE_INCOMING_MSG_Index)
+    = CsvAccess(BUFFER_INCOMING_MSG_Index);
 
 
 

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.8  1995-09-01 02:13:17  jyelon
+ * Revision 2.9  1995-09-29 09:51:12  jyelon
+ * Many small corrections.
+ *
+ * Revision 2.8  1995/09/01  02:13:17  jyelon
  * VID_BLOCK, CHARE_BLOCK, BOC_BLOCK consolidated.
  *
  * Revision 2.7  1995/07/27  20:29:34  jyelon
@@ -109,7 +112,6 @@ typedef struct envelope {
 
   unsigned char  queueing;
   unsigned char  packid;
-  unsigned char  LdbFull;
 
 } ENVELOPE;
 
@@ -157,10 +159,6 @@ typedef struct envelope {
 
 #define GetEnv_isPACKED(e)      (env(e)->isPACKED)
 #define SetEnv_isPACKED(e,x)    (env(e)->isPACKED=(x))
-
-#define GetEnv_LdbFull(e)       (env(e)->LdbFull)
-#define SetEnv_LdbFull(e)       (env(e)->LdbFull=1) 
-#define ClrEnv_LdbFull(e)       (env(e)->LdbFull=0)
 
 /*********************************************************/
 /** These fields are alone currently, and accessed	**/

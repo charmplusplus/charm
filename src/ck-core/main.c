@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.19  1995-09-20 16:36:26  jyelon
+ * Revision 2.20  1995-09-29 09:51:12  jyelon
+ * Many small corrections.
+ *
+ * Revision 2.19  1995/09/20  16:36:26  jyelon
  * *** empty log message ***
  *
  * Revision 2.18  1995/09/20  15:41:38  gursoy
@@ -246,10 +249,12 @@ void CheckMagicNumber(CHARE_BLOCK *chare, ENVELOPE *env)
 void BUFFER_INCOMING_MSG(env)
 ENVELOPE *env;
 {
-   if (CpvAccess(CkInitPhase))
+   if (CpvAccess(CkInitPhase)) {
+      CmiGrabBuffer(&env);
       FIFO_EnQueue(CpvAccess(CkBuffQueue),(void *)env);
-   else
+   } else {
       HANDLE_INCOMING_MSG(env);
+   }
 }
 
 
@@ -264,9 +269,9 @@ ENVELOPE *env;
   CHARE_BLOCK *chare;
   int ep, type = GetEnv_msgType(env);  
 
+  CmiGrabBuffer(&env);
   UNPACK(env);
-  if (GetEnv_LdbFull(env))
-    if(CpvAccess(InsideDataInit))
+  if(CpvAccess(InsideDataInit))
       CldStripLdb(LDB_ELEMENT_PTR(env));
   switch (type)
     {

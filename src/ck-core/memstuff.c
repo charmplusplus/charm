@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.12  1995-09-14 21:23:52  jyelon
+ * Revision 2.13  1995-09-29 09:51:12  jyelon
+ * Many small corrections.
+ *
+ * Revision 2.12  1995/09/14  21:23:52  jyelon
  * Added "globals.h"
  *
  * Revision 2.11  1995/09/14  20:49:17  jyelon
@@ -120,7 +123,6 @@ unsigned int msgbytes;
   envptr = (ENVELOPE *)CmiAlloc(totalsize);
   CkMemError(envptr);
   SetEnv_isPACKED(envptr, NO_PACK);
-  ClrEnv_LdbFull(envptr);
   SetEnv_TotalSize(envptr, totalsize);
   SetEnv_packid(envptr, 0);
   SetEnv_queueing(envptr, CpvAccess(QueueingDefault));
@@ -221,7 +223,6 @@ unsigned int priobits;
 
     SetEnv_priosize(env, priobits);
     SetEnv_queueing(env, CpvAccess(QueueingDefault));
-    ClrEnv_LdbFull(env);
 
     if (CsvAccess(MsgToStructTable)[msgno].packfn != NULL)
     {
