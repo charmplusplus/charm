@@ -1607,8 +1607,8 @@ CDECL int AMPI_Init(int *p_argc, char*** p_argv)
 
 CDECL int AMPI_Initialized(int *isInit)
 {
-  AMPIAPI("AMPI_Initialized");
   if (nodeinit_has_been_called) {
+        AMPIAPI("AMPI_Initialized");     /* in case charm init not called */
   	*isInit=CtvAccess(ampiInitDone);
   }
   else /* !nodeinit_has_been_called */ {
