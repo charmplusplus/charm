@@ -4,10 +4,11 @@
 Orion Sky Lawlor, olawlor@acm.org, 6/11/2002
 */
 #include "liveViz.h"
-#include "ckimage.h"
 
-static liveVizConfig lv_config;
-static CkCallback clientGetImageCallback;
+liveVizConfig lv_config;
+CProxy_liveVizGroup lvG;
+CkReduction::reducerType imageCombineReducer;
+CkCallback clientGetImageCallback;
 
 //Called by clients to start liveViz.
 void liveVizInit(const liveVizConfig &cfg, CkArrayID a, CkCallback c)
@@ -18,22 +19,12 @@ void liveVizInit(const liveVizConfig &cfg, CkArrayID a, CkCallback c)
   //  lv_config can't be a readonly because we may be called after
   //  main::main (because, e.g., communication is needed to find the
   //  bounding box inside cfg).
-  CProxy_liveVizGroup::ckNew(cfg);
+  lvG = CProxy_liveVizGroup::ckNew(cfg);
 }
 
-static void liveVizInitComplete(void *rednMessage);
-
-//The liveVizGroup is only used to set lv_config on every processor.
-class liveVizGroup : public Group {
-public:
-	liveVizGroup(const liveVizConfig &cfg) {
-		lv_config=cfg;
-		contribute(0,0,CkReduction::sum_int,CkCallback(liveVizInitComplete));
-	}
-};
 
 //Called by reduction handler once every processor has the lv_config object
-static void liveVizInitComplete(void *rednMessage) {
+void liveVizInitComplete(void *rednMessage) {
   delete (CkReductionMsg *)rednMessage;
   liveViz0Init(lv_config);
 }
@@ -45,11 +36,6 @@ void liveViz0Get(const liveVizRequest3d &req)
 {
   clientGetImageCallback.send(new liveVizRequestMsg(req));
 }
-
-//Image combining reduction type: defined below.
-static CkReductionMsg *imageCombine(int nMsg,CkReductionMsg **msgs);
-static void vizReductionHandler(void *r_msg);
-static CkReduction::reducerType imageCombineReducer;
 
 /*This array has 512 entries-- it's used to clip off large values
 when summing bytes (like image values) together.  On a machine with
@@ -74,15 +60,8 @@ I'm considering changing the reduction interface to use messages,
 or some sort of pup'd object.
 */
 
-class imageHeader {
-public:
-	liveVizRequest req;
-	CkRect r;
-	imageHeader(const liveVizRequest &req_,const CkRect &r_)
-		:req(req_), r(r_) {}
-};
 
-static CkReductionMsg *allocateImageMsg(const liveVizRequest &req,const CkRect &r,
+CkReductionMsg *allocateImageMsg(const liveVizRequest &req,const CkRect &r,
 	byte **imgDest)
 {
   imageHeader hdr(req,r);
@@ -130,7 +109,7 @@ void liveVizDeposit(const liveVizRequest &req,
 /*Called by the reduction manager to combine all the source images 
 received on one processor.
 */
-static CkReductionMsg *imageCombine(int nMsg,CkReductionMsg **msgs)
+CkReductionMsg *imageCombine(int nMsg,CkReductionMsg **msgs)
 {
   if (nMsg==1) { //Don't bother copying if there's only one source
         if (lv_config.getVerbose(2))
@@ -174,7 +153,7 @@ static CkReductionMsg *imageCombine(int nMsg,CkReductionMsg **msgs)
 Called once final image has been assembled (reduction handler).
 Unpacks image, and passes it on to layer 0.
 */
-static void vizReductionHandler(void *r_msg)
+void vizReductionHandler(void *r_msg)
 {
   CkReductionMsg *msg = (CkReductionMsg*)r_msg;
   imageHeader *hdr=(imageHeader *)msg->getData();
