@@ -7,7 +7,7 @@ C interface file
 #include "pup_c.h"
 
 /* datatypes: keep in sync with femf.h */
-#define FEM_FIRST_DATATYPE 0 /*first valid FEM datatype (zero is a STUPID value)*/
+#define FEM_FIRST_DATATYPE 11000000 /*first valid FEM datatype (zero is a STUPID value)*/
 #define FEM_BYTE   (FEM_FIRST_DATATYPE+0)
 #define FEM_INT    (FEM_FIRST_DATATYPE+1) 
 #define FEM_REAL   (FEM_FIRST_DATATYPE+2)
@@ -99,20 +99,18 @@ extern "C" {
   	void *data, int firstItem, int length, int width, int base_type);
   
   int FEM_Mesh_get_length(int fem_mesh,int entity);
-  int FEM_Mesh_get_width(int fem_mesh,int entity,int attribute,int tag);
-  int FEM_Mesh_get_datatype(int fem_mesh,int entity,int attribute,int tag);
-  
+  int FEM_Mesh_get_width(int fem_mesh,int entity,int attr,int tag);
+  int FEM_Mesh_get_datatype(int fem_mesh,int entity,int attr,int tag);
   
   /* Advanced/rarely used: */
+  void FEM_Mesh_attr(int fem_mesh,int entity,int attr, int tag,
+  	void *data, int firstItem, int length, int width, int base_type);
+  void FEM_Mesh_offset(int fem_mesh,int entity, int attr,int tag,
+  	void *data, int firstItem, int length, int width, int base_type, int off, int distL,int distW);
+  
   void FEM_Mesh_set_length(int fem_mesh,int entity,int newLength);
   void FEM_Mesh_set_width(int fem_mesh,int entity,int attribute,int tag,int newWidth);
   void FEM_Mesh_set(int fem_mesh,int entity,int attribute,int tag,int newLength,int newWidth);
-  
-  void FEM_Mesh_attr(int fem_mesh,int entity,int attribute, int tag,
-  	void *data, int firstItem, int length, int width, int base_type);
-  void FEM_Mesh_offset(int fem_mesh,int entity, int attribute,int tag,
-  	void *data, int firstItem, int length, int width, int base_type, int off, int distL,int distW);
-  
 
 /* ghosts and spatial symmetries */
   void FEM_Add_ghost_layer(int nodesPerTuple,int doAddNodes);
@@ -133,7 +131,7 @@ extern "C" {
                        int distance);
   
   /*FIXME: design a non-blocking send*/
-  
+  void FEM_Update_ghost_field(int fid, int elTypeOrMinusOne, void *nodes);
   void FEM_Exchange_ghost_lists(int who,int nIdx,const int *localIdx);
   int FEM_Get_ghost_list_length(void);
   void FEM_Get_ghost_list(int *dest);

@@ -12,40 +12,8 @@ Orion Sky Lawlor, olawlor@acm.org, 9/28/00
 #include "charm-api.h"
 #include "tcharm.h"
 #include "ckvector3d.h"
+#include "datatype.h"
 #include "fem.h"
-
-// temporary Datatype representation
-// will go away once MPI user-defined datatypes are ready
-struct DType {
-  int base_type; //FEM_* datatype
-  int vec_len; //Number of items of this datatype
-  int init_offset; // offset of field in bytes from the beginning of data
-  int distance; // distance in bytes between successive field values
-  DType(void) {}
-  DType( const int b,  const int v=1,  const int i=0,  const int d=0)
-    : base_type(b), vec_len(v), init_offset(i) 
-  {
-    distance = (d ? d : length());
-  }
-  //Default copy constructor, assignment operator
-
-  //Return the total number of bytes required by this FEM_* data type
-  static int type_size(int dataType) {
-    switch(dataType) {
-      case FEM_BYTE : return 1; break;
-      case FEM_INT : return sizeof(int); break;
-      case FEM_REAL : return sizeof(float); break;
-      case FEM_DOUBLE : return sizeof(double); break;
-      default: CkAbort("Unrecognized data type field passed to FEM framework!\n");
-    }
-    return -1;
-  }
-  
-  //Return the total number of bytes required by the data stored in this DType
-  int length(const int nitems=1) const {
-    return type_size(base_type) * vec_len * nitems;
-  }
-};
 
 //This datatype is how the framework stores symmetries internally.
 //  Each bit of this type describes a different symmetry.

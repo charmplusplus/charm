@@ -20,8 +20,6 @@ user's driver thread when communication is needed,
 then resume the thread when the results arrive.
  */
 #include "fem_impl.h"
-#include <limits.h>
-#include <float.h> /*for FLT_MIN on non-Suns*/
 
 CDECL void fem_impl_call_init(void);
 
@@ -767,289 +765,6 @@ FDECL void FTN_NAME(FEM_GET_ELEM_CONN_C,fem_get_elem_conn_c)
 	getMesh()->getElem(*elType-1).getConn().getTranspose(conn,1);
 }
 
-/******************** Reduction Support **********************/
-
-template<class d>
-void sumFn(const int len, d* lhs, const d* rhs)
-{
-  int i;
-  for(i=0;i<len;i++) {
-    *lhs++ += *rhs++;
-  }
-}
-
-/*Several compilers "helpfully" define max and min-- confusing us completely*/
-#undef max 
-#undef min
-
-template<class d>
-void maxFn(const int len, d* lhs, const d* rhs)
-{
-  int i;
-  for(i=0;i<len;i++) {
-    *lhs = (*lhs > *rhs) ? *lhs : *rhs;
-    lhs++; rhs++;
-  }
-}
-
-template<class d>
-void minFn(const int len, d* lhs, const d* rhs)
-{
-  int i;
-  for(i=0;i<len;i++) {
-    *lhs = (*lhs < *rhs) ? *lhs : *rhs;
-    lhs++; rhs++;
-  }
-}
-
-template<class d>
-void assignFn(const int len, d* lhs, d val)
-{
-  int i;
-  for(i=0;i<len;i++) {
-    *lhs = val;
-  }
-}
-
-//Force template-fn instantiations (for compilers too stupid to figure them out)
-
-//Instantiate this routine for these arguments:
-#define force_routine(fnName,tempParam,args) \
-	template void fnName<tempParam> args
-
-//Instaniate all routines for this data type
-#define force_instantiate(datatype) \
-	force_routine(sumFn,datatype,(const int len,datatype *lhs,const datatype *rhs));\
-	force_routine(minFn,datatype,(const int len,datatype *lhs,const datatype *rhs));\
-	force_routine(maxFn,datatype,(const int len,datatype *lhs,const datatype *rhs));\
-	force_routine(assignFn,datatype,(const int len,datatype *lhs,datatype val));
-
-force_instantiate(unsigned char);
-force_instantiate(int);
-force_instantiate(float);
-force_instantiate(double);
-
-static inline void
-initialize(const DType& dt, void *lhs, int op)
-{
-  switch(op) {
-    case FEM_SUM:
-      switch(dt.base_type) {
-        case FEM_BYTE : 
-          assignFn(dt.vec_len,(unsigned char*)lhs, (unsigned char)0); 
-          break;
-        case FEM_INT : assignFn(dt.vec_len,(int*)lhs, 0); break;
-        case FEM_REAL : assignFn(dt.vec_len,(float*)lhs, (float)0.0); break;
-        case FEM_DOUBLE : assignFn(dt.vec_len,(double*)lhs, 0.0); break;
-      }
-      break;
-    case FEM_MAX:
-      switch(dt.base_type) {
-        case FEM_BYTE : 
-          assignFn(dt.vec_len,(unsigned char*)lhs, (unsigned char)CHAR_MIN); 
-          break;
-        case FEM_INT : assignFn(dt.vec_len,(int*)lhs, INT_MIN); break;
-        case FEM_REAL : assignFn(dt.vec_len,(float*)lhs, FLT_MIN); break;
-        case FEM_DOUBLE : assignFn(dt.vec_len,(double*)lhs, DBL_MIN); break;
-      }
-      break;
-    case FEM_MIN:
-      switch(dt.base_type) {
-        case FEM_BYTE : 
-          assignFn(dt.vec_len,(unsigned char*)lhs, (unsigned char)CHAR_MAX); 
-          break;
-        case FEM_INT : assignFn(dt.vec_len,(int*)lhs, INT_MAX); break;
-        case FEM_REAL : assignFn(dt.vec_len,(float*)lhs, FLT_MAX); break;
-        case FEM_DOUBLE : assignFn(dt.vec_len,(double*)lhs, DBL_MAX); break;
-      }
-      break;
-  }
-}
-
-typedef void (*combineFn)(const int len,void *lhs,const void *rhs);
-
-typedef void (*combineFn_BYTE)(const int len,unsigned char *lhs,const unsigned char *rhs);
-typedef void (*combineFn_INT)(const int len,int *lhs,const int *rhs);
-typedef void (*combineFn_REAL)(const int len,float *lhs,const float *rhs);
-typedef void (*combineFn_DOUBLE)(const int len,double *lhs,const double *rhs);
-
-//This odd-looking define selects the appropriate templated type
-    // of "fn", casts it to a void* type, and returns it.
-#define combine_switch(fn) \
-      switch(dt.base_type) {\
-        case FEM_BYTE : return (combineFn)(combineFn_BYTE)fn;\
-        case FEM_INT : return (combineFn)(combineFn_INT)fn;\
-        case FEM_REAL : return (combineFn)(combineFn_REAL)fn;\
-        case FEM_DOUBLE : return (combineFn)(combineFn_DOUBLE)fn;\
-      }\
-      break;
-
-static combineFn
-combine(const DType& dt, int op)
-{
-  switch(op) {
-    case FEM_SUM: combine_switch(sumFn);
-    case FEM_MIN: combine_switch(minFn);
-    case FEM_MAX: combine_switch(maxFn);
-  }
-  return NULL;
-}
-
-
-/************************************************
-"Gather" routines extract data distributed (nodeIdx)
-through the user's array (in) and collect it into a message (out).
- */
-#define gather_args (int nVal,int valLen, \
-		    const int *nodeIdx,int nodeScale, \
-		    const char *in,char *out)
-
-static void gather_general gather_args
-{
-  for(int i=0;i<nVal;i++) {
-      const void *src = (const void *)(in+nodeIdx[i]*nodeScale);
-      memcpy(out, src, valLen);
-      out +=valLen;
-  }
-}
-
-#define gather_doubles(n,copy) \
-static void gather_double##n gather_args \
-{ \
-  double *od=(double *)out; \
-  for(int i=0;i<nVal;i++) { \
-      const double *src = (const double *)(in+nodeIdx[i]*nodeScale); \
-      copy \
-      od+=n; \
-  } \
-}
-
-gather_doubles(1,od[0]=src[0];)
-gather_doubles(2,od[0]=src[0];od[1]=src[1];)
-gather_doubles(3,od[0]=src[0];od[1]=src[1];od[2]=src[2];)
-
-//Gather (into out) the given data type from in for each node
-static void gather(const DType &dt,
-		   int nNodes,const int *nodes,
-		   const void *v_in,void *v_out)
-{
-  const char *in=(const char *)v_in;
-  char *out=(char *)v_out;
-  in += dt.init_offset;
-  //Try for a more specialized version if possible:
-  if (dt.base_type == FEM_DOUBLE) {
-      switch(dt.vec_len) {
-      case 1: gather_double1(nNodes,dt.length(),nodes,dt.distance,in,out); return;
-      case 2: gather_double2(nNodes,dt.length(),nodes,dt.distance,in,out); return;
-      case 3: gather_double3(nNodes,dt.length(),nodes,dt.distance,in,out); return;
-      }
-  }
-  //Otherwise, use the general version
-  gather_general(nNodes,dt.length(),nodes,dt.distance,in,out);
-}
-
-/************************************************
-"Scatter" routines are the opposite of gather.
- */
-#define scatter_args (int nVal,int valLen, \
-		    const int *nodeIdx,int nodeScale, \
-		    const char *in,char *out)
-
-static void scatter_general scatter_args
-{
-  for(int i=0;i<nVal;i++) {
-      void *dest = (void *)(out+nodeIdx[i]*nodeScale);
-      memcpy(dest,in, valLen);
-      in +=valLen;
-  }
-}
-
-#define scatter_doubles(n,copy) \
-static void scatter_double##n scatter_args \
-{ \
-  const double *src=(const double *)in; \
-  for(int i=0;i<nVal;i++) { \
-      double *od = (double *)(out+nodeIdx[i]*nodeScale); \
-      copy \
-      src+=n; \
-  } \
-}
-
-scatter_doubles(1,od[0]=src[0];)
-scatter_doubles(2,od[0]=src[0];od[1]=src[1];)
-scatter_doubles(3,od[0]=src[0];od[1]=src[1];od[2]=src[2];)
-
-//Scatter (into out) the given data type from in for each node
-static void scatter(const DType &dt,
-		   int nNodes,const int *nodes,
-		   const void *v_in,void *v_out)
-{
-  const char *in=(const char *)v_in;
-  char *out=(char *)v_out;
-  out += dt.init_offset;
-  //Try for a more specialized version if possible:
-  if (dt.base_type == FEM_DOUBLE) {
-      switch(dt.vec_len) {
-      case 1: scatter_double1(nNodes,dt.length(),nodes,dt.distance,in,out); return;
-      case 2: scatter_double2(nNodes,dt.length(),nodes,dt.distance,in,out); return;
-      case 3: scatter_double3(nNodes,dt.length(),nodes,dt.distance,in,out); return;
-      }
-  }
-  //Otherwise, use the general version
-  scatter_general(nNodes,dt.length(),nodes,dt.distance,in,out);
-}
-
-
-/***********************************************
-"ScatterAdd" routines add the message data (in) to the
-shared nodes distributed through the user's data (out).
- */
-#define scatteradd_args (int nVal, \
-		    const int *nodeIdx,int nodeScale, \
-		    const char *in,char *out)
-
-#define scatteradd_doubles(n,copy) \
-static void scatteradd_double##n scatteradd_args \
-{ \
-  const double *id=(const double *)in; \
-  for(int i=0;i<nVal;i++) { \
-      double *targ = (double *)(out+nodeIdx[i]*nodeScale); \
-      copy \
-      id+=n; \
-  } \
-}
-
-scatteradd_doubles(1,targ[0]+=id[0];)
-scatteradd_doubles(2,targ[0]+=id[0];targ[1]+=id[1];)
-scatteradd_doubles(3,targ[0]+=id[0];targ[1]+=id[1];targ[2]+=id[2];)
-
-//ScatterAdd (into out) the given data type, from in, for each node
-static void scatteradd(const DType &dt,
-		   int nNodes,const int *nodes,
-		   const void *v_in,void *v_out)
-{
-  const char *in=(const char *)v_in;
-  char *out=(char *)v_out;
-  out += dt.init_offset;
-  //Try for a more specialized version if possible:
-  if (dt.base_type == FEM_DOUBLE) {
-      switch(dt.vec_len) {
-      case 1: scatteradd_double1(nNodes,nodes,dt.distance,in,out); return;
-      case 2: scatteradd_double2(nNodes,nodes,dt.distance,in,out); return;
-      case 3: scatteradd_double3(nNodes,nodes,dt.distance,in,out); return;
-      }
-  }
-
-  /*Otherwise we need the slow, general version*/
-  combineFn fn=combine(dt,FEM_SUM);
-  int length=dt.length();
-  for(int i=0;i<nNodes;i++) {
-    void *cnode = (void*) (out+nodes[i]*dt.distance);
-    fn(dt.vec_len, cnode, in);
-    in += length;
-  }
-}
-
 
 /******************************* CHUNK *********************************/
 
@@ -1059,10 +774,6 @@ FEMchunk::FEMchunk(const FEMinit &init_)
   initFields();
 
   ntypes = 0;
-  new_DT(FEM_BYTE);
-  new_DT(FEM_INT);
-  new_DT(FEM_REAL);
-  new_DT(FEM_DOUBLE);
 
   updated_mesh=NULL;
   cur_mesh=NULL;
@@ -1132,7 +843,7 @@ void FEMchunk::update_node(FEM_DataMsg *msg)
   const FEM_Comm_List &l = updateComm->getList(msg->from);
   if (l.size()*dt.length()!=msg->length)
 	  CkAbort("Wrong-length message recv'd by FEM update node!  Have communication lists been corrupted?\n");
-  scatteradd(dt,l.size(),l.getVec(),msg->data,updateBuf);
+  dt.scatteradd(l.size(),l.getVec(),msg->data,updateBuf);
 }
 
 void FEMchunk::update_ghost(FEM_DataMsg *msg)
@@ -1141,7 +852,7 @@ void FEMchunk::update_ghost(FEM_DataMsg *msg)
   const FEM_Comm_List &l = updateComm->getList(msg->from);
   if (l.size()*dt.length()!=msg->length)
 	  CkAbort("Wrong-length message recv'd by FEM update ghost!  Have communication lists been corrupted?\n");
-  scatter(dt,l.size(),l.getVec(),msg->data,updateBuf);
+  dt.scatter(l.size(),l.getVec(),msg->data,updateBuf);
 }
 
 //Received a message for the current update
@@ -1189,7 +900,7 @@ FEMchunk::beginUpdate(void *buf,int fid,
     int msgLen=l.size()*dt.length();
     FEM_DataMsg *msg = new (&msgLen, 0) FEM_DataMsg(updateSeqnum, 
 	      thisIndex, fid,msgLen); CHK(msg);
-    gather(dt,l.size(),l.getVec(),buf,msg->data);
+    dt.gather(l.size(),l.getVec(),buf,msg->data);
     thisproxy[l.getDest()].recv(msg);
   }  
 }
@@ -1230,13 +941,13 @@ FEMchunk::reduce_field(int fid, const void *nodes, void *outbuf, int op)
   // first reduce over local nodes
   const DType &dt = dtypes[fid];
   const void *src = (const void *) ((const char *) nodes + dt.init_offset);
-  initialize(dt,outbuf,op);
-  combineFn fn=combine(dt,op);
+  reduction_initialize(dt,outbuf,op);
+  reduction_combine_fn fn=reduction_combine(dt,op);
   for(int i=0; i<cur_mesh->m.node.size(); i++) {
     if(getPrimary(i)) {
       fn(dt.vec_len,outbuf, src);
     }
-    src = (const void *)((const char *)src + dt.distance);
+    src = (const void *)((const char *)src + dt.fdistance);
   }
   // and now reduce over partitions
   reduce(fid, outbuf, outbuf, op);
@@ -1355,7 +1066,7 @@ FEMchunk::readField(int fid, void *nodes, const char *fname)
   int typelen = dtypes[fid].vec_len;
   int btypelen = dtypes[fid].length()/typelen;
   char *data = (char *)nodes + dtypes[fid].init_offset;
-  int distance = dtypes[fid].distance;
+  int distance = dtypes[fid].fdistance;
   FILE *fp = fopen(fname, "r");
   if(fp==0) {
     CkError("Cannot open file %s for reading.\n", fname);
