@@ -54,6 +54,7 @@ class EachToManyMulticastStrategy: public Strategy {
     virtual void pup(PUP::er &p);    
     virtual void beginProcessing(int nelements);
     void localMulticast(void *msg);
+    void setDestArray(CkArrayID dest) {destArrayID=dest;}
 
     PUPable_decl(EachToManyMulticastStrategy);
 };
