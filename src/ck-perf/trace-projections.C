@@ -267,7 +267,7 @@ void LogPool::add(UChar type,UShort mIdx,UShort eIdx,double time,int event,int p
     case END_PACK:
     case BEGIN_UNPACK:
     case END_UNPACK:
-      bgAddProjEvent(&pool[numEntries-1], time);
+      bgAddProjEvent(&pool[numEntries-1], time, updateProjLog);
   }
 #endif
 }
@@ -286,7 +286,7 @@ static void updateProjLog(void *data, double t, double recvT, void *ptr)
 void LogPool::postProcessLog()
 {
 #if CMK_BLUEGENE_CHARM
-  bgUpdateProj(updateProjLog, fp);
+  bgUpdateProj(fp);
 #endif
 }
 
