@@ -26,7 +26,7 @@ then resume the thread when the results arrive.
 /*STUPID HACK for AMPIlib: define its globals here.
 */
 CkChareID ampimain::handle;
-ampi_comm_struct ampimain::ampi_comms[AMPI_MAX_COMM];
+ampi_comm_structs ampimain::ampi_comms;
 int ampimain::ncomms = 0;
 
 
@@ -608,7 +608,9 @@ combine(const DType& dt, int op)
 chunk::chunk(void)
 	:ampi(new AmpiStartMsg(0))
 {
+#if CMK_LBDB_ON
   usesAtSync = CmiTrue;
+#endif
   ntypes = 0;
   new_DT(FEM_BYTE);
   new_DT(FEM_INT);
@@ -720,7 +722,40 @@ chunk::recv(DataMsg *dm)
   }
 }
 
-//Send the values for my shared nodes out
+/************************************************
+"Gather" routines extract data distributed (sharedNodeIdx)
+through the user's array (in) and collect it into a message (out).
+ */
+#define gather_args (int nVal,int valLen, \
+		    const int *nodeIdx,int nodeScale, \
+		    const char *in,char *out)
+typedef void (*gather_fn) gather_args;
+
+static void gather_general gather_args
+{
+  for(int i=0;i<nVal;i++) {
+      const void *src = (const void *)(in+nodeIdx[i]*nodeScale);
+      memcpy(out, src, valLen);
+      out +=valLen;
+  }
+}
+
+#define gather_doubles(n,copy) \
+static void gather_double##n gather_args \
+{ \
+  double *od=(double *)out; \
+  for(int i=0;i<nVal;i++) { \
+      const double *src = (const double *)(in+nodeIdx[i]*nodeScale); \
+      copy \
+      od+=n; \
+  } \
+}
+
+gather_doubles(1,od[0]=src[0];)
+gather_doubles(2,od[0]=src[0];od[1]=src[1];)
+gather_doubles(3,od[0]=src[0];od[1]=src[1];od[2]=src[2];)
+
+//Gather and send the values for my shared nodes out
 void
 chunk::send(int fid, const void *nodes)
 {
@@ -729,24 +764,48 @@ chunk::send(int fid, const void *nodes)
   int len = dt.length();
   const char *fStart=(const char *)nodes;
   fStart+=dt.init_offset;
+  gather_fn gather=gather_general;
+  if (dt.base_type == FEM_DOUBLE) {
+    switch(dt.vec_len) {
+    case 1: gather=gather_double1;break;
+    case 2: gather=gather_double2;break;
+    case 3: gather=gather_double3;break;
+    }
+  }
   for(p=0;p<comm.nPes;p++) {
     int dest = comm.peNums[p];
-    int num = comm.numNodesPerPe[p];
-    const int *nodeIdx=comm.nodesPerPe[p];
+    int num=comm.numNodesPerPe[p];
     int msgLen=len*num;
     DataMsg *msg = new (&msgLen, 0) DataMsg(seqnum, thisIndex, fid); CHK(msg);
-    void *data = msg->data;
-    const void *src;
-    for(int i=0;i<num;i++) {
-      src = (const void *)(fStart+nodeIdx[i]*dt.distance);
-      memcpy(data, src, len);
-      data = (void*) ((char*)data + len);
-    }
+    gather(num,len,comm.nodesPerPe[p],dt.distance,
+	   fStart,(char *)msg->data);
     CProxy_chunk cp(thisArrayID);
     cp[dest].recv(msg);
   }
 }
 
+/************************************************
+"Scatter" routines add the message data (in) to the
+shared nodes distributed through the user's data (out).
+ */
+#define scatter_args (int nVal, \
+		    const int *nodeIdx,int nodeScale, \
+		    const char *in,char *out)
+
+#define scatter_doubles(n,copy) \
+static void scatter_double##n scatter_args \
+{ \
+  const double *id=(const double *)in; \
+  for(int i=0;i<nVal;i++) { \
+      double *targ = (double *)(out+nodeIdx[i]*nodeScale); \
+      copy \
+      id+=n; \
+  } \
+}
+
+scatter_doubles(1,targ[0]+=id[0];)
+scatter_doubles(2,targ[0]+=id[0];targ[1]+=id[1];)
+scatter_doubles(3,targ[0]+=id[0];targ[1]+=id[1];targ[2]+=id[2];)
 
 //Update my shared nodes based on these values
 void
@@ -757,15 +816,27 @@ chunk::update_field(DataMsg *msg)
   int length=dt.length();
   char *fStart=(char *)curbuf;
   fStart+=dt.init_offset;
-  void *data = msg->data;
+  const char *data = (const char *)msg->data;
   int from = gPeToIdx[msg->from];
   int num = comm.numNodesPerPe[from];
   const int *nodeIdx=comm.nodesPerPe[from];
+#if 1
+  /*First try for an accellerated version*/
+  if (dt.base_type==FEM_DOUBLE) {
+    switch(dt.vec_len) {
+    case 1: scatter_double1(num,nodeIdx,dt.distance,data,fStart); return;
+    case 2: scatter_double2(num,nodeIdx,dt.distance,data,fStart); return;
+    case 3: scatter_double3(num,nodeIdx,dt.distance,data,fStart); return;
+    }    
+  }
+#endif
+
+  /*Otherwise we need the slow, general version*/
   combineFn fn=combine(dtypes[msg->dtype],FEM_SUM);
   for(i=0;i<num;i++) {
     void *cnode = (void*) (fStart+nodeIdx[i]*dt.distance);
     fn(dt.vec_len,cnode, data);
-    data = (void *)((char*)data+length);
+    data +=length;
   }
 }
 
