@@ -1012,6 +1012,10 @@ void CthInit(char **argv)
   CthThreadInit(t);
   CpvInitialize(void *, stackPool);
   CpvAccess(stackPool) = NULL;
+
+  /* don't trust the _defaultStackSize */
+  if (CthCpvAccess(_defaultStackSize) < MINSIGSTKSZ) 
+    CthCpvAccess(_defaultStackSize) = MINSIGSTKSZ;
 }
 
 static void CthThreadFree(CthThread t)
@@ -1072,7 +1076,6 @@ static CthThread CthCreateInner(CthVoidFn fn,void *arg,int size,int migratable)
   CthThreadInit(result);
   if (size) size += SIGSTKSZ;
   else size = CthCpvAccess(_defaultStackSize);
-  if (size < MINSIGSTKSZ) size = MINSIGSTKSZ;
 #ifdef CMK_MEMORY_PAGESIZE
   size = (size/CMK_MEMORY_PAGESIZE + 1) * CMK_MEMORY_PAGESIZE;
 #endif
