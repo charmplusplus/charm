@@ -30,7 +30,6 @@ testnocorr:jacobi
 	./charmrun +p8 ./jacobi 2000 4 1000 +x10 +y5 +z2 +cth1 +wth1 +bglog +stacksize 4000 +logsize 20000
 
 test: jacobi
-	#./charmrun +p8 ./jacobi 2000 4 1000 +x10 +y5 +z2 +cth1 +wth1 +bgcorrect +stacksize 4000 +logsize 20000
 	./charmrun +p4 ./jacobi 64 10 32
 
 big: jacobi
