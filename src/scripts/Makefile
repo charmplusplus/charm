@@ -898,10 +898,9 @@ conv-cpm.o: conv-cpm.c
 
 XIHEADERS=xi-symbol.h xi-util.h xi-grammar.tab.h
 CHARMXI=xi-main.o xi-symbol.o xi-grammar.tab.o xi-scan.o xi-util.o
-SDAGOBJ=sdag-main.o sdag-trans.o CLexer.o CParser.o CParsedFile.o CParseNode.o \
-	sdag-globals.o CParseNodeProcess.o CEntry.o COverlap.o
-SDAGHEADERS=CLexer.h CToken.h EToken.h CParser.h CParsedFile.h CParseNode.h \
-	sdag-globals.h CEntry.h COverlap.h
+SDAGOBJ=sdag-globals.o CSdagConstruct.o CEntry.o
+SDAGHEADERS= CToken.h EToken.h CParsedFile.h \
+	sdag-globals.h CEntry.h
 
 charmxi: $(CHARMXI) $(SDAGOBJ)
 	$(SEQCHARMC) -language c++ -cp ../bin/ -o charmxi $(CHARMXI) $(SDAGOBJ)
@@ -921,35 +920,15 @@ xi-grammar.tab.o: xi-grammar.tab.C $(XIHEADERS) $(SDAGHEADERS)
 xi-scan.o: xi-scan.C $(XIHEADERS) $(SDAGHEADERS)
 	$(SEQCHARMC) -I. -DYY_NEVER_INTERACTIVE xi-scan.C
 
-sdag-main.o: sdag-main.C $(XIHEADERS) $(SDAGHEADERS)
-	$(SEQCHARMC) -c sdag-main.C
-
-sdag-trans.o: sdag-trans.c $(XIHEADERS) $(SDAGHEADERS)
-	$(SEQCHARMC) -I. -c sdag-trans.c
-
-CLexer.o: CLexer.C $(XIHEADERS) $(SDAGHEADERS)
-	$(SEQCHARMC) -c CLexer.C
-
-CParser.o: CParser.C $(XIHEADERS) $(SDAGHEADERS)
-	$(SEQCHARMC) -c CParser.C
-
-CParsedFile.o: CParsedFile.C $(XIHEADERS) $(SDAGHEADERS)
-	$(SEQCHARMC) -c CParsedFile.C
-
-CParseNode.o: CParseNode.C $(XIHEADERS) $(SDAGHEADERS)
-	$(SEQCHARMC) -c CParseNode.C
-
 sdag-globals.o: sdag-globals.C $(XIHEADERS) $(SDAGHEADERS)
 	$(SEQCHARMC) -c sdag-globals.C
 
-CParseNodeProcess.o: CParseNodeProcess.C $(XIHEADERS) $(SDAGHEADERS)
-	$(SEQCHARMC) -c CParseNodeProcess.C
+CSdagConstruct.o: CSdagConstruct.C $(XIHEADERS) $(SDAGHEADERS)
+	$(SEQCHARMC) -c CSdagConstruct.C
 
 CEntry.o: CEntry.C $(XIHEADERS) $(SDAGHEADERS)
 	$(SEQCHARMC) -c CEntry.C
 
-COverlap.o: COverlap.C $(XIHEADERS) $(SDAGHEADERS)
-	$(SEQCHARMC) -c COverlap.C
 
 ###############################################################################
 #
