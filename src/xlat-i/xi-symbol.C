@@ -599,14 +599,14 @@ Array::genSubDecls(XStr& str)
 	"            CkArrayMessage *msg)\n"
 	"    {\n"
 	"        CkGroupID id=buildArrayGroup(mapID,numInitial);\n"
-	"        CProxy_CkArrayBase(id).create1Dinitial(ctorIndex,__idx,numInitial,msg);\n"
+	"        CProxy_CkArrayBase(id).base_insert1D(ctorIndex,__idx,numInitial,msg);\n"
 	"        return id;\n"
 	"    }\n";
   }
   
   //This constructor is used for array indexing
   str << "  protected:\n"
-         "    "<<ptype<<"(const CkArrayID &aid,"<<indexType<<" *idx)\n"
+         "    "<<ptype<<"(const CkArrayID &aid,const "<<indexType<<" &idx)\n"
          "        :";bases->genProxyNames(str, "", "(aid,idx)", ", ");str<<" {}\n";
 //         "      :CProxy_CkArrayBase(aid,idx) {}\n";
   str << "  public:\n"
@@ -623,9 +623,9 @@ Array::genSubDecls(XStr& str)
   {
     str <<
     "//Generalized array indexing: (these KEEP the index you pass in!)\n"
-    "    "<<ptype<<" operator [] ("<<indexType<<" *idx) const\n"
+    "    "<<ptype<<" operator [] (const "<<indexType<<" &idx) const\n"
     "        {return "<<ptype<<"(_aid, idx);}\n"
-    "    "<<ptype<<" operator() ("<<indexType<<" *idx) const\n"
+    "    "<<ptype<<" operator() (const "<<indexType<<" &idx) const\n"
     "        {return "<<ptype<<"(_aid, idx);}\n";
   }
   
@@ -634,21 +634,17 @@ Array::genSubDecls(XStr& str)
   {
     str << 
     "    "<<ptype<<" operator [] (int idx) const \n"
-    "        {return "<<ptype<<"(_aid, new CkArrayIndex1D(idx));}\n"
+    "        {return "<<ptype<<"(_aid, CkArrayIndex1D(idx));}\n"
     "    "<<ptype<<" operator () (int idx) const \n"
-    "        {return "<<ptype<<"(_aid, new CkArrayIndex1D(idx));}\n";
+    "        {return "<<ptype<<"(_aid, CkArrayIndex1D(idx));}\n";
   } else if (indexSuffix==(const char*)"2D") {
     str << 
     "    "<<ptype<<" operator () (int i0,int i1) const \n"
-    "        {return "<<ptype<<"(_aid, new CkArrayIndex2D(i0,i1));}\n";
+    "        {return "<<ptype<<"(_aid, CkArrayIndex2D(i0,i1));}\n";
   } else if (indexSuffix==(const char*)"3D") {
     str << 
     "    "<<ptype<<" operator () (int i0,int i1,int i2) const \n"
-    "        {return "<<ptype<<"(_aid, new CkArrayIndex3D(i0,i1,i2));}\n";
-  } else if (indexSuffix==(const char*)"4D") {
-    str << 
-    "    "<<ptype<<" operator () (int i0,int i1,int i2,int i3) const \n"
-    "        {return "<<ptype<<"(_aid, new CkArrayIndex4D(i0,i1,i2,i3));}\n";
+    "        {return "<<ptype<<"(_aid, CkArrayIndex3D(i0,i1,i2));}\n";
   }
   if (fakeBase) bases=NULL;//<- return bases to original value
 
@@ -1385,7 +1381,7 @@ void Entry::genArrayDecl(XStr& str)
     genArrayStaticConstructorDecl(str);
   } else {
     // entry method broadcast declaration
-    str << "    "<<Virtual()<<retType<<" "<<name<<"("<<paramType()<<");\n";
+    str << "    "<<Virtual()<<retType<<" "<<name<<"("<<paramType()<<") const;\n";
   }
 }
 
@@ -1396,14 +1392,14 @@ void Entry::genArrayDefs(XStr& str)
   else
   {//Define array entry method
     container->genTSpec(str);
-    str<<retType<<" "<<container->proxyName()<<"::"<<name<<"("<<paramType()<<")\n";
+    str<<retType<<" "<<container->proxyName()<<"::"<<name<<"("<<paramType()<<") const\n";
     str<< "{\n";
     if (!param||param->isVoid())
       str << "      CkArrayMessage *msg=(CkArrayMessage*)CkAllocMsg(0, sizeof(CkArrayMessage),0);\n";
-    str << "      if(_idx==NULL) \n";
-    str << "        broadcast(msg, "<<epIdx()<<");\n";
+    str << "      if(_idx.nInts==-1) \n";
+    str << "        base_broadcast(msg, "<<epIdx()<<");\n";
     str << "      else\n";
-    str << "        send(msg, "<<epIdx()<<");\n";
+    str << "        base_send(msg, "<<epIdx()<<");\n";
     str << "}\n";
   }
 }
@@ -1435,7 +1431,7 @@ void Entry::genArrayStaticConstructorDefs(XStr& str)
        "{ return CkArrayID(buildArrayGroup("<<epIdx()<<",numElements,mapID,"<<callMsg<<"));}\n";
     str<<
     makeDecl("void")<<"::insert("<<paramComma()<<"int onPE)\n"
-    "{ doInsert("<<epIdx()<<",__idx,onPE,"<<callMsg<<");}\n";
+    "{ base_insert("<<epIdx()<<",__idx,onPE,"<<callMsg<<");}\n";
 }
 
 
