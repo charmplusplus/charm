@@ -120,7 +120,7 @@ int LBCommData::compute_key()
     kptr += pcount;
   }
 
-  CmiAssert(destObj.get_type() == LD_OBJ_MSG);
+  //CmiAssert(destObj.get_type() == LD_OBJ_MSG);
   switch (destObj.get_type()) {
   case LD_PROC_MSG:
        pcount += sprintf(kptr,"%d", destObj.proc());
@@ -185,8 +185,6 @@ void LBCommTable::GetCommData(LDCommData* data)
         out->sender.omID() = curtable->srcObj.omID();
         out->sender.objID() = curtable->srcObj.objID();
       }
-      // so far, the receiver must be an object
-      CmiAssert(curtable->destObj.get_type() == LD_OBJ_MSG);
       out->receiver = curtable->destObj;
       out->messages = curtable->n_messages;
       out->bytes = curtable->n_bytes;

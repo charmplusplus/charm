@@ -212,6 +212,13 @@ extern "C" void LDSend(const LDOMHandle &destOM, const LDObjid &destid, unsigned
     db->Send(destOM,destid,bytes, destObjProc);
 }
 
+extern "C" void LDMulticastSend(const LDOMHandle &destOM, LDObjid *destids, int ndests, unsigned int bytes)
+{
+  LBDB *const db = (LBDB*)(destOM.ldb.handle);
+  if (db->StatsOn() && _lb_args.traceComm())
+    db->MulticastSend(destOM,destids,ndests,bytes);
+}
+
 extern "C" void LDBackgroundLoad(LDHandle _db,
 				 double* walltime, double* cputime)
 {

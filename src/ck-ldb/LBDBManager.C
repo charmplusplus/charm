@@ -183,6 +183,20 @@ void LBDB::Send(const LDOMHandle &destOM, const LDObjid &destid, unsigned int by
   item_ptr->addMessage(bytes);
 }
 
+void LBDB::MulticastSend(const LDOMHandle &destOM, LDObjid *destids, int ndests, unsigned int bytes)
+{
+  LBCommData* item_ptr;
+
+  //CmiAssert(obj_running);
+  if (obj_running) {
+    const LDObjHandle &runObj = RunningObj();
+
+    LBCommData item(runObj,destOM.id,destids, ndests);
+    item_ptr = commTable->HashInsertUnique(item);
+    item_ptr->addMessage(bytes);
+  } 
+}
+
 void LBDB::ClearLoads(void)
 {
   int i;
@@ -208,7 +222,7 @@ int LBDB::ObjDataCount()
 {
   int nitems=0;
   int i;
-  if (_lb_args.ignoreBgLoad()) {
+  if (_lb_args.migObjOnly()) {
   for(i=0; i < objCount; i++)
     if (objs[i] && (objs[i])->data.migratable)
       nitems++;
@@ -223,7 +237,7 @@ int LBDB::ObjDataCount()
 
 void LBDB::GetObjData(LDObjData *dp)
 {
-  if (_lb_args.ignoreBgLoad()) {
+  if (_lb_args.migObjOnly()) {
   for(int i = 0; i < objs.length(); i++) {
     LBObj* obj = objs[i];
     if ( obj && obj->data.migratable)

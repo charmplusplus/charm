@@ -39,6 +39,16 @@ public:
     mykey = compute_key();
   };
 
+  // multicast
+  LBCommData(LDObjHandle _srcObj, LDOMid _destOM, LDObjid *_destObjs, int _nobjs) {
+    src_proc = -1;
+    srcObj = _srcObj;
+    destObj.init_mcastmsg(_destOM, _destObjs, _nobjs);
+    n_messages = 0;
+    n_bytes = 0;
+    mykey = compute_key();
+  };
+
   LBCommData(const LBCommData& d) {
     src_proc = d.src_proc;
     if (!from_proc()) {

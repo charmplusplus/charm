@@ -235,8 +235,11 @@ void _loadbalancerInit()
   					     "Turn on LB debugging printouts");
 
   // to ignore baclground load
-  _lb_args.ignoreBgLoad() = CmiGetArgFlagDesc(argv, "+LBObjOnly", 
+  _lb_args.ignoreBgLoad() = CmiGetArgFlagDesc(argv, "+LBNoBackground", 
                       "Load balancer ignores the background load.");
+  _lb_args.migObjOnly() = CmiGetArgFlagDesc(argv, "+LBObjOnly", 
+                      "Only load balancing migratable objects, ignoring all others.");
+  if (_lb_args.migObjOnly()) _lb_args.ignoreBgLoad() = 1;
 
   // assume all CPUs are identical
   _lb_args.samePeSpeed() = CmiGetArgFlagDesc(argv, "+LBSameCpus", 
@@ -276,6 +279,8 @@ void _loadbalancerInit()
       CkPrintf("LB> Load balancing instrumentation is off.\n");
     if (_lb_args.traceComm()==0)
       CkPrintf("LB> Load balancing instrumentation for communication is off.\n");
+    if (_lb_args.migObjOnly())
+      CkPrintf("LB> Load balancing strategy ignores non-migtabale objects.\n");
   }
 }
 

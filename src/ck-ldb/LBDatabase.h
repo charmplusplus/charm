@@ -23,6 +23,7 @@ private:
   double _autoLbPeriod;		// in seconds
   int _lb_debug;		// 1 or greater
   int _lb_ignoreBgLoad;
+  int _lb_migObjOnly;		// only consider migratable objs
   int _lb_syncResume;
   int _lb_samePeSpeed;		// ignore cpu speed
   int _lb_useCpuTime;           // use cpu instead of wallclock time
@@ -34,11 +35,13 @@ public:
   CkLBArgs() {
     _autoLbPeriod = 1.0;
     _lb_debug = _lb_ignoreBgLoad = _lb_syncResume = _lb_useCpuTime = 0;
+    _lb_migObjOnly = 0;
     _lb_statson = _lb_traceComm = 1;
   }
   inline double & lbperiod() { return _autoLbPeriod; }
   inline int & debug() { return _lb_debug; }
   inline int & ignoreBgLoad() { return _lb_ignoreBgLoad; }
+  inline int & migObjOnly() { return _lb_migObjOnly; }
   inline int & syncResume() { return _lb_syncResume; }
   inline int & samePeSpeed() { return _lb_samePeSpeed; }
   inline int & useCpuTime() { return _lb_useCpuTime; }
@@ -187,6 +190,9 @@ public:
   inline void ObjectStop(const LDObjHandle &_h) { LDObjectStop(_h); };
   inline void Send(const LDOMHandle &_om, const LDObjid _id, unsigned int _b, int _p) {
     LDSend(_om, _id, _b, _p);
+  };
+  inline void MulticastSend(const LDOMHandle &_om, LDObjid *_ids, int _n, unsigned int _b) {
+    LDMulticastSend(_om, _ids, _n, _b);
   };
 
   inline void EstObjLoad(LDObjHandle h, double load) { LDEstObjLoad(h,load); };

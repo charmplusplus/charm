@@ -915,6 +915,7 @@ void getLoadInfo(CentralLB::LDStats* stats, int count,
 	  for(i = 0; i < count; i++)
 	    msgSentCount[i] = msgRecvCount[i] = byteSentCount[i] = byteRecvCount[i] = 0;
 
+	  int mcast_count = 0;
           for (int cidx=0; cidx < stats->n_comm; cidx++) {
 	    LDCommData& cdata = stats->commData[cidx];
 	    int senderPE, receiverPE;
@@ -926,25 +927,50 @@ void getLoadInfo(CentralLB::LDStats* stats, int count,
 	      senderPE = stats->to_proc[idx];
 	      CmiAssert(senderPE != -1);
 	    }
-	    if (cdata.receiver.get_type() == LD_PROC_MSG)
-	      receiverPE = cdata.receiver.proc();
-	    else {
-	      int idx = stats->getHash(cdata.receiver.get_destObj());
-	      if (idx == -1) continue;    // receiver has just been removed?
-	      receiverPE = stats->to_proc[idx];
-	      CmiAssert(receiverPE != -1);
-	    }
-	    if(senderPE != receiverPE)
-	    {
-		CmiAssert(senderPE < count && senderPE >= 0);
-		CmiAssert(receiverPE < count && receiverPE >= 0);
+	    CmiAssert(senderPE < count && senderPE >= 0);
+
+            // find receiver: point-to-point and multicast two cases
+	    int receiver_type = cdata.receiver.get_type();
+	    if (receiver_type == LD_PROC_MSG || receiver_type == LD_OBJ_MSG) {
+              if (receiver_type == LD_PROC_MSG)
+	        receiverPE = cdata.receiver.proc();
+              else  {  // LD_OBJ_MSG
+	        int idx = stats->getHash(cdata.receiver.get_destObj());
+	        if (idx == -1) continue;    // receiver has just been removed?
+	        receiverPE = stats->to_proc[idx];
+	        CmiAssert(receiverPE != -1);
+              }
+              CmiAssert(receiverPE < count && receiverPE >= 0);
+	      if(senderPE != receiverPE)
+	      {
 	  	msgSentCount[senderPE] += cdata.messages;
 		byteSentCount[senderPE] += cdata.bytes;
-
 		msgRecvCount[receiverPE] += cdata.messages;
 		byteRecvCount[receiverPE] += cdata.bytes;
+	      }
 	    }
-	  }
+            else if (receiver_type == LD_OBJLIST_MSG) {
+              int nobjs;
+              LDObjKey *objs = cdata.receiver.get_destObjs(nobjs);
+	      mcast_count ++;
+	      for (i=0; i<nobjs; i++) {
+	        int idx = stats->getHash(objs[i]);
+		CmiAssert(idx != -1);
+	        if (idx == -1) continue;    // receiver has just been removed?
+	        receiverPE = stats->to_proc[idx];
+		CmiAssert(receiverPE < count && receiverPE >= 0);
+	        if(senderPE != receiverPE)
+	        {
+	  	msgSentCount[senderPE] += cdata.messages;
+		byteSentCount[senderPE] += cdata.bytes;
+		msgRecvCount[receiverPE] += cdata.messages;
+		byteRecvCount[receiverPE] += cdata.bytes;
+	        }
+              }
+	    }
+	  }   // end of for
+          if (_lb_args.debug())
+             CkPrintf("Number of MULTICAST: %d\n", mcast_count);
 
 	  // now for each processor, add to its load the send and receive overheads
 	  for(i = 0; i < count; i++)

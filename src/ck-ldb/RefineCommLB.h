@@ -25,6 +25,7 @@ class maxheap;
 #include "heap.h"
 
 void CreateRefineCommLB();
+BaseLB *AllocateRefineCommLB();
 
 class RefineCommLB : public RefineLB {
 public:
