@@ -1065,7 +1065,7 @@ public:
 		if (isStale()) {
 			/*This indicates something is seriously wrong--
 			  buffers should be short-lived.*/
-			CkPrintf("%d stale array message(s) found!\n",buffer.length());
+			CkPrintf("WARNING: %d stale array message(s) found!\n",buffer.length());
 			CkArrayMessage *msg=buffer.deq();
 			CkPrintf("Addressed to: ");
 			CkPrintEntryMethod(msg->array_ep());
@@ -1075,7 +1075,7 @@ public:
 			else //Idx is a remote-home index
 				CkPrintf("why weren't they forwarded?\n");
 			
-			CkAbort("Stale array manager message(s)!\n");
+			// CkAbort("Stale array manager message(s)!\n");
 		}
 		return CmiFalse;
 	}
