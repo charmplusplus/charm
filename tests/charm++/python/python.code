@@ -1,0 +1,3 @@
+ck.printstr('python')
+value=charm.runhigh()
+ck.printstr('python value: '+repr(value))

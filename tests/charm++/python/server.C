@@ -59,7 +59,7 @@ MyArray::MyArray (CkMigrateMessage *msg) {}
 
 void MyArray::run() {
   CkPrintf("[%d] in run %d\n",thisIndex,mynumber);
-  sleep(1);
+  //sleep(1);
   mainProxy.arrayResult(mynumber);
 }
 

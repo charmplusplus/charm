@@ -28,8 +28,8 @@ server.o: server.C server.decl.h server.h
 
 test: all
 	./charmrun ./server ++remote-shell ssh ++server ++server-port 1234 +p2 $(OPTS) &
-	./client localhost 1234
+	./client localhost 1234 <python.code
 	sleep 2
-	./client localhost 1234
+	./client localhost 1234 <python.code
 	sleep 2
-	./client localhost 1234 kill
+	./client localhost 1234 kill <python.code
