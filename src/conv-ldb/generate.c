@@ -131,7 +131,6 @@ static void AddEdges(EdgeListType *EdgeList, int V, int n)
 {int i,j,w,x,y;
 /* first add edges for a C-way spanning tree.*/
 int c1;
-int varr[V];
 if (C>1) c1 = C-1;
 
 for (i=0; i< V/c1; i++)
