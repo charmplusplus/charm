@@ -1169,10 +1169,10 @@ public:
         CkAssert( offset < ENTRIES_PER_PAGE );
 
         ckout << "p" << CkMyPe() << "ID" << ID;
-        if (pageTable[pageNum] == 0)
-            ckout << "emitBufferValue: page " << pageNum << " not available in local cache." << endl;
-        else
-            ckout << "emitBufferValue: [" << pageNum << "," << offset << "] = " << pageTable[pageNum][offset] << endl;
+//         if (pageTable[pageNum] == 0)
+//             ckout << "emitBufferValue: page " << pageNum << " not available in local cache." << endl;
+//         else
+//             ckout << "emitBufferValue: [" << pageNum << "," << offset << "] = " << pageTable[pageNum][offset] << endl;
     }
 };
 
@@ -1332,10 +1332,10 @@ public:
     inline void emit(int ID, int index)
     {
         ckout << "p" << CkMyPe() << "ID" << ID;
-        if(epage == NULL)
-            ckout << "emit: epage is NULL" << endl;
-        else
-            ckout << "emit: " << epage[index] << endl;
+//         if(epage == NULL)
+//             ckout << "emit: epage is NULL" << endl;
+//         else
+//             ckout << "emit: " << epage[index] << endl;
     }
 };
 
