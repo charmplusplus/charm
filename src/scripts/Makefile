@@ -506,7 +506,7 @@ cklocation.o: cklocation.C $(CKHEADERS)
 ckcallback.o: ckcallback.C $(CKHEADERS) CkCallback.decl.h
 	$(CHARMC) -c ckcallback.C
 
-CkCallback.decl.h: ckcallback.ci $(CHARMXI)
+CkCallback.decl.h: ckcallback.ci charmxi
 	$(CHARMC) ckcallback.ci
 
 charisma.decl.h charisma.def.h : charisma.ci charmxi
