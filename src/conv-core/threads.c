@@ -117,6 +117,8 @@
 
 static void CthNoStrategy(void);
 
+CpvDeclare(int, _numSwitches);
+
 #if CMK_THREADS_COPY_STACK
 
 #define SWITCHBUF_SIZE 16384
@@ -259,6 +261,9 @@ void CthInit()
 {
   CthThread t; CthProcInfo p; qt_t *switchbuf, *sp;
 
+  CpvInitialize(int, _numSwitches);
+  CpvAccess(_numSwitches) = 0;
+
   CthCpvInitialize(char *, CthData);
   CthCpvInitialize(CthProcInfo, CthProc);
 
@@ -345,6 +350,7 @@ void CthResume(t)
 CthThread t;
 {
   CthProcInfo proc = CthCpvAccess(CthProc);
+  CpvAccess(_numSwitches)++;
   QT_BLOCK((qt_helper_t*)CthResume1, proc, t, proc->switchbuf_sp);
 }
 
@@ -518,6 +524,8 @@ void CthInit()
   CthThread t;
   LPVOID    fiber;
 
+  CpvInitialize(int, _numSwitches);
+  CpvAccess(_numSwitches) = 0;
 
   CthCpvInitialize(char *,     CthData);
   CthCpvInitialize(CthThread,  CthCurrent);
@@ -581,6 +589,7 @@ void CthResume(CthThread t)
   CthThread tc;
   tc = CthCpvAccess(CthCurrent);
   if (t == tc) return;
+  CpvAccess(_numSwitches)++;
   CthFixData(t);
   CthCpvAccess(CthCurrent) = t;
   CthCpvAccess(CthData) = t->data;
@@ -788,6 +797,9 @@ void CthInit()
 {
   CthThread t;
 
+  CpvInitialize(int, _numSwitches);
+  CpvAccess(_numSwitches) = 0;
+
   CthCpvInitialize(char *,     CthData);
   CthCpvInitialize(CthThread,  CthCurrent);
   CthCpvInitialize(int,        CthDatasize);
@@ -842,6 +854,7 @@ CthThread t;
   CthThread tc;
   tc = CthCpvAccess(CthCurrent);
   if (t == tc) return;
+  CpvAccess(_numSwitches)++;
   CthFixData(t);
   CthCpvAccess(CthCurrent) = t;
   CthCpvAccess(CthData) = t->data;
