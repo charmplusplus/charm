@@ -85,6 +85,9 @@ jade: charm++ msa
 #	make the lib, include
 	cd langs/jade && $(MAKE)
 
+fftlib: charm++
+	cd libs/cklibs/fftlib && $(MAKE)
+
 # This should be done offline, since the user does not need to compile
 # parser files, etc.  All they need is the libjade + include files,
 # antlr.jar, jade.jar, and a few scripts which the jade target takes
@@ -94,6 +97,9 @@ jadeall: jade
 	cd langs/jade && $(MAKE) p
 #	make the jade.jar file
 	cd ../../java/charm/jade && $(MAKE)
+
+fftlib: charm++
+	cd libs//ck-libs/fftlib/ && $(MAKE)
 
 LIBS: CONVLIBS CHARMLIBS
 	cd libs; $(MAKE) otherlibs
