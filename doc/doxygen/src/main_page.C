@@ -45,14 +45,24 @@ Converse tracing, parameter marshalling (CPM),
 quiescence.
 
 </td></tr><tr><td>
-Converse Machine Layer:
+<a href="group__Machine.html">Converse Machine Layer</a>:
 <ul>
-<li>net
+<li><a href="group__NET.html">net</a>
   <ul>
-  <li>net-smp
+  <li>smp
   <li>gm
+  <li>tcp
+  <li>udp
   </ul>
 <li>mpi
+<li>elan
+<li>vmi
+<li>shmem
+<li>sp3
+<li>t3e
+<li>uth (user-level threads)
+<li>ncube2
+<li>origin
 </ul>
 
 </td></tr><tr><td>
@@ -62,7 +72,7 @@ build system, charmc, configure script, conv-mach.h/.sh.
 </td></tr></table>
 
 \section utilities Utility Code
-PUP, CkBitvector, CkDll, CkHashtable, 
+PUP, CkBitVector, CkDll, CkHashtable, 
 CkImage, CkVec, CkQ, CkStatistics, CkVector3d,
 sockets.
 
