@@ -602,7 +602,8 @@ Chare::genDefs(XStr& str)
     str << "\n";
     str << "extern \"C\" void " << fortranify(baseName()) << "_cknew_(int *numElem, long *aindex)\n";
     str << "{\n";
-    str << "    CkArrayID *aid = &CProxy_" << baseName() << "::ckNew(*numElem); \n";
+    str << "    CkArrayID *aid = new CkArrayID;\n";
+    str << "    *aid = CProxy_" << baseName() << "::ckNew(*numElem); \n";
     str << "    *aindex = (long)aid;\n";
     str << "}\n";
 
@@ -1616,6 +1617,7 @@ void Entry::genDefs(XStr& str)
       str << "extern \"C\" void "
         //<< container->proxyName() << "_" 
           << fortranify("SendTo")
+          << fortranify(container->baseName())
           << fortranify(name)
           << "_(long* aindex, int *index, ";
       msg_contents->genUnmarshalList3(str);
