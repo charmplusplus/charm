@@ -226,7 +226,7 @@ void CentralLB::Migrated(LDObjHandle h, int waitBarrier)
   }
   else {
     future_migrates_completed ++;
-    DEBUGF(("[%d] An object migrated with no barrier! %d %d\n",
+    DEBUGF(("[%d] An object migrated with no barrier! %d expected: %d\n",
     	   CkMyPe(),future_migrates_completed,future_migrates_expected));
     if (future_migrates_completed == future_migrates_expected)  {
 	CheckMigrationComplete();
@@ -345,7 +345,14 @@ void CentralLB::LoadBalance()
 
 //    CkPrintf("Before Calling Strategy\n");
 
+  double strat_start_time = CkWallTimer();
   LBMigrateMsg* migrateMsg = Strategy(statsData, clients);
+  if (_lb_args.debug()) {
+    CkPrintf("Strategy took %f seconds.\n", CkWallTimer()-strat_start_time);
+    double lbdbMemsize = LBDatabase::Object()->useMem()/1000;
+    CkPrintf("[%s] memUsage: LBManager:%dKB CentralLB:%dKB\n", 
+  	      lbName(), (int)lbdbMemsize, (int)(useMem()/1000));
+  }
 
 //    CkPrintf("returned successfully\n");
   LBDatabaseObj()->get_avail_vector(migrateMsg->avail_vector);
@@ -540,12 +547,8 @@ void CentralLB::ResumeClients(int balancing)
   DEBUGF(("[%d] Resuming clients. balancing:%d.\n",CkMyPe(),balancing));
   if (balancing && _lb_args.debug() && CkMyPe() == cur_ld_balancer) {
     double end_lb_time = CkWallTimer();
-    CkPrintf("[%s] Load balancing step %d finished at %f\n",
-  	      lbName(), step()-1,end_lb_time);
-    double lbdbMemsize = LBDatabase::Object()->useMem()/1000;
-    CkPrintf("[%s] duration %fs memUsage: LBManager:%dKB CentralLB:%dKB\n", 
-  	      lbName(), end_lb_time - start_lb_time,
-	      (int)lbdbMemsize, (int)(useMem()/1000));
+    CkPrintf("[%s] Load balancing step %d finished at %f (duration %fs)\n",
+  	      lbName(), step()-1,end_lb_time, end_lb_time - start_lb_time);
   }
 
   ComlibNotifyMigrationDone();  
@@ -583,6 +586,7 @@ void CentralLB::CheckMigrationComplete()
     h.id.id.idx = 0;
     theLbdb->getLBDB()->DoneRegisteringObjects(h);
     // switch to the next load balancer in the list
+    // subtle: called from Migrated() may result in Migrated() called in next LB
     theLbdb->nextLoadbalancer(seqno);
   }
 #endif
@@ -609,6 +613,13 @@ LBMigrateMsg* CentralLB::Strategy(LDStats* stats,int count)
 {
 #if CMK_LBDB_ON
   work(stats, count);
+
+  if (_lb_args.debug()>1)  {
+    CkPrintf("Obj Map:\n");
+    for (int i=0; i<stats->n_objs; i++) CkPrintf("%d ", stats->to_proc[i]);
+    CkPrintf("\n");
+  }
+
   return createMigrateMsg(stats, count);
 #else
   return NULL;
