@@ -1618,6 +1618,8 @@ skip_dl=0
 case "$CMK_CXX" in
 pgCC*) skip_dl=1 ;;
 esac
+# for bproc, ignore -ldl
+test -n "$CMK_BPROC" && skip_dl=1
 
 if test $skip_dl -eq 0
 then
@@ -1647,7 +1649,6 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 fi
-
 
 #### check if getProcAddress works ####
 cat > $t <<EOT
@@ -1740,6 +1741,10 @@ fi
 
 
 #### test if has zlib ####
+# bproc doesnot like -lz in any case
+if test -z "$CMK_BPROC"
+then
+
 cat > $t <<EOT
 #include <zlib.h>
 int main() {
@@ -1760,6 +1765,8 @@ then
 	add_flag 'CMK_LIBS="$CMK_LIBS -lz"' "zlib"
 fi
 
+fi
+
 #### test if has values.h ####
 cat > $t <<EOT
 #include <values.h>
@@ -1775,20 +1782,6 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
-#### test if has alloca.h ####
-cat > $t <<EOT
-#include <alloca.h>
-int main() {
-//  char *osp=(char *)alloca(0);
-}
-EOT
-test_cxx "whether has alloca.h " "yes" "no" ""
-
-cat >>confdefs.h <<_ACEOF
-#define CMK_HAS_ALLOCA $pass
-_ACEOF
-
-
 #### test if has elf.h ####
 cat > $t <<EOT
 #include <elf.h>
@@ -1800,6 +1793,20 @@ test_cxx "whether has elf.h " "yes" "no" ""
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_HAS_ELF_H $pass
+_ACEOF
+
+
+#### test if has stdint.h ####
+cat > $t <<EOT
+#include <stdint.h>
+int main() {
+  return 0;
+}
+EOT
+test_cxx "whether has stdint.h " "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_STDINT_H $pass
 _ACEOF
 
 

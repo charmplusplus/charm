@@ -344,6 +344,8 @@ skip_dl=0
 case "$CMK_CXX" in
 pgCC*) skip_dl=1 ;;
 esac
+# for bproc, ignore -ldl
+test -n "$CMK_BPROC" && skip_dl=1
 
 if test $skip_dl -eq 0 
 then
@@ -369,7 +371,6 @@ then
 # One version or another of dlopen worked: compile it in
 	AC_DEFINE_UNQUOTED(CMK_DLL_USE_DLOPEN, 1, [dlopen])
 fi
-
 
 #### check if getProcAddress works ####
 cat > $t <<EOT
@@ -442,6 +443,10 @@ fi
 
 
 #### test if has zlib ####
+# bproc doesnot like -lz in any case
+if test -z "$CMK_BPROC"
+then
+
 cat > $t <<EOT
 #include <zlib.h>
 int main() { 
@@ -456,6 +461,8 @@ AC_DEFINE_UNQUOTED(CMK_PROJECTIONS_USE_ZLIB, $pass, [whether it has zlib])
 if test $pass -eq 1
 then 
 	add_flag 'CMK_LIBS="$CMK_LIBS -lz"' "zlib"
+fi
+
 fi
 
 #### test if has values.h ####
