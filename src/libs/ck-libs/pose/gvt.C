@@ -290,7 +290,7 @@ void GVT::computeGVT(UpdateMsg *m)
     //optGVT, conGVT, lastGVT, earliestMsg, lastSR, POSE_endtime);
     CmiAssert(estGVT >= lastGVT); 
     //if (estGVT % 100 == 0)
-    CkPrintf("[%d] New GVT = %d\n", CkMyPe(), estGVT);
+    //CkPrintf("[%d] New GVT = %d\n", CkMyPe(), estGVT);
 
     // check for termination conditions
     int term = 0;

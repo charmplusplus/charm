@@ -6,7 +6,7 @@
 #include <limits.h>
 
 /// Uncomment to run POSE is sequential mode
-#define SEQUENTIAL_POSE 1
+//#define SEQUENTIAL_POSE 1
 
 /// Uncomment to gather and print POSE statistics set
 #define POSE_STATS_ON 1

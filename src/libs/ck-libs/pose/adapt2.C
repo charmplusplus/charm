@@ -6,6 +6,7 @@ void adapt2::Step()
 {
   Event *ev;
   static POSE_TimeType lastGVT = POSE_UnsetTS;
+  int iter=0;
 
   lastGVT = localPVT->getGVT();
   if (!parent->cancels.IsEmpty()) CancelUnexecutedEvents();
@@ -21,9 +22,6 @@ void adapt2::Step()
   // Shorten the leash as we near POSE_endtime
   if ((POSE_endtime > POSE_UnsetTS) && (lastGVT + timeLeash > POSE_endtime))
     timeLeash = POSE_endtime - lastGVT;
-
-  //cpRate = (MAX_LEASH - timeLeash + MIN_LEASH)/5;
-  int iter=0;
   while ((ev->timestamp > POSE_UnsetTS) && (ev->timestamp <= lastGVT + timeLeash)
 	 && (iter < MAX_ITERATIONS)) {
     // do all events at under timeLeash

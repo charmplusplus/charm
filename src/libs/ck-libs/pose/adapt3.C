@@ -1,7 +1,7 @@
 /// Adaptive Synchronization Strategy No. 2
 #include "pose.h"
 
-//#define RANDOM_OBJECT -1
+#define RANDOM_OBJECT 42
 /// Single forward execution step
 void adapt3::Step()
 {
@@ -13,15 +13,18 @@ void adapt3::Step()
   rbFlag = 0;
   lastGVT = localPVT->getGVT();
   if (!parent->cancels.IsEmpty()) CancelUnexecutedEvents();
-  if (eq->RBevent) Rollback(); 
+  if (eq->RBevent) {
+    timeLeash = eq->RBevent->timestamp - lastGVT;
+    Rollback(); 
+  }
   if (!parent->cancels.IsEmpty()) CancelEvents();
 
+  if (!rbFlag) timeLeash = (timeLeash + avgRBoffset)/2;
   // Prepare to execute an event
   ev = eq->currentPtr;
   // Shorten the leash as we near POSE_endtime
   if ((POSE_endtime > POSE_UnsetTS) && (lastGVT + timeLeash > POSE_endtime))
     timeLeash = POSE_endtime - lastGVT;
-  if (rbFlag) timeLeash = avgRBoffset;
   while ((ev->timestamp > POSE_UnsetTS) && 
 	 (ev->timestamp <= lastGVT + timeLeash) && 
 	 (iter < MAX_ITERATIONS)) { // do all events at & under timeLeash
@@ -57,13 +60,12 @@ void adapt3::Step()
   if (!rbFlag && (ev->timestamp > -1)) timeLeash = eq->largest - lastGVT;
   else if (!rbFlag && (timeLeash < avgTimeLeash)) timeLeash += LEASH_FLEX;
   if (timeLeash > lastGVT) timeLeash = lastGVT;
+  // Uh oh!  Too much speculation going on!  Pull in the leash...
+  if (specEventCount > (1.25*eventCount)) timeLeash = avgTimeLeash/2;
   /*
   if (parent->thisIndex == RANDOM_OBJECT)
     CkPrintf("New leash=%d\n", timeLeash);
-  */
-  // Uh oh!  Too much speculation going on!  Pull in the leash...
-  if (specEventCount > (1.25*eventCount)) timeLeash = avgTimeLeash/2;
-  
+  */  
   rbFlag = 0;
 }
 
