@@ -1,13 +1,16 @@
 #ifndef BLUE_TIMING_H
 #define BLUE_TIMING_H
 
-#include "values.h"
 #include "cklists.h"
 
 #define BLUEGENE_TIMING     	1
 
-//#define INVALIDTIME  (9999999999.99)
-#define INVALIDTIME  MAXDOUBLE
+#if CMK_HAS_VALUES_H
+#   include <values.h>
+#   define INVALIDTIME  MAXDOUBLE
+#else
+#   define INVALIDTIME  (9999999999.99)
+#endif
 
 /* optimization parameters */
 #define SCHEDULE_WORK       1
