@@ -405,16 +405,16 @@ void CcdCancelCallOnConditionKeep(int condnum, int idx)
 
 /* Call the function with the provided argument after a minimum delay of deltaT
  */
-void CcdCallFnAfterOnPE(CcdVoidFn fnp, void *arg, unsigned int deltaT, int pe)
+void CcdCallFnAfterOnPE(CcdVoidFn fnp, void *arg, double deltaT, int pe)
 {
-  double ctime  = CmiWallTimer();
-  double tcall = ctime + (double)deltaT/1000.0;
-  ccd_heap_insert(tcall, fnp, arg, pe);
+    double ctime  = CmiWallTimer();
+    double tcall = ctime + deltaT/1000.0;
+    ccd_heap_insert(tcall, fnp, arg, pe);
 } 
 
-void CcdCallFnAfter(CcdVoidFn fnp, void *arg, unsigned int deltaT)
+void CcdCallFnAfter(CcdVoidFn fnp, void *arg, double deltaT)
 {
-  CcdCallFnAfterOnPE(fnp, arg, deltaT, CcdIGNOREPE);
+    CcdCallFnAfterOnPE(fnp, arg, deltaT, CcdIGNOREPE);
 } 
 
 /* Call all the functions that are waiting for this condition to be raised

@@ -1146,10 +1146,10 @@ extern CmiSwitchToPEFnPtr CmiSwitchToPE;
 #else
 #define CmiSwitchToPE(pe)  pe
 #endif
-void CcdCallFnAfter(CcdVoidFn fnp, void *arg, unsigned int msecs);
+void CcdCallFnAfter(CcdVoidFn fnp, void *arg, double msecs);
 int CcdCallOnCondition(int condnum, CcdVoidFn fnp, void *arg);
 int CcdCallOnConditionKeep(int condnum, CcdVoidFn fnp, void *arg);
-void CcdCallFnAfterOnPE(CcdVoidFn fnp, void *arg, unsigned int msecs, int pe);
+void CcdCallFnAfterOnPE(CcdVoidFn fnp, void *arg, double msecs, int pe);
 int CcdCallOnConditionOnPE(int condnum, CcdVoidFn fnp, void *arg, int pe);
 int CcdCallOnConditionKeepOnPE(int condnum, CcdVoidFn fnp, void *arg, int pe);
 void CcdCancelCallOnCondition(int condnum, int idx);
