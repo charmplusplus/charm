@@ -834,7 +834,7 @@ if test $pass -eq 1
 then 
 cat >> ./conv-mach-opt.sh << EOT
 
-CMK_LIBS="$CMK_LIBS -lz"
+CMK_LIBS="\$CMK_LIBS -lz"
 
 EOT
 fi
