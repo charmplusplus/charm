@@ -2041,8 +2041,7 @@ void __cmi_assert(const char *expr, const char *file, int line)
 char *CmiCopyMsg(char *msg, int len)
 {
   char *copy = (char *)CmiAlloc(len);
-  if (!copy)
-      fprintf(stderr, "Out of memory\n");
+  _MEMCHECK(copy);
   memcpy(copy, msg, len);
   return copy;
 }
