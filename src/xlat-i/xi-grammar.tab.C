@@ -47,27 +47,28 @@ typedef union
 # define READONLY 260
 # define CHARE 261
 # define GROUP 262
-# define MESSAGE 263
-# define CLASS 264
-# define STACKSIZE 265
-# define THREADED 266
-# define TEMPLATE 267
-# define SYNC 268
-# define VOID 269
-# define PACKED 270
-# define VARSIZE 271
-# define ENTRY 272
-# define MAINCHARE 273
-# define IDENT 274
-# define NUMBER 275
-# define LITERAL 276
-# define INT 277
-# define LONG 278
-# define SHORT 279
-# define CHAR 280
-# define FLOAT 281
-# define DOUBLE 282
-# define UNSIGNED 283
+# define ARRAY 263
+# define MESSAGE 264
+# define CLASS 265
+# define STACKSIZE 266
+# define THREADED 267
+# define TEMPLATE 268
+# define SYNC 269
+# define VOID 270
+# define PACKED 271
+# define VARSIZE 272
+# define ENTRY 273
+# define MAINCHARE 274
+# define IDENT 275
+# define NUMBER 276
+# define LITERAL 277
+# define INT 278
+# define LONG 279
+# define SHORT 280
+# define CHAR 281
+# define FLOAT 282
+# define DOUBLE 283
+# define UNSIGNED 284
 
 #ifdef __STDC__
 #include <stdlib.h>
@@ -115,7 +116,7 @@ YYSTYPE *yyv;
 static int yymaxdepth = YYMAXDEPTH;
 # define YYERRCODE 256
 
-# line 443 "xi-grammar.y"
+# line 456 "xi-grammar.y"
 
 int yyerror(char *mesg)
 {
@@ -135,154 +136,158 @@ static const yytabelem yyexca[] ={
 -1, 20,
 	125, 13,
 	-2, 4,
--1, 104,
-	44, 88,
-	62, 88,
-	-2, 59,
--1, 200,
-	41, 117,
-	-2, 44,
+-1, 111,
+	44, 91,
+	62, 91,
+	-2, 60,
+-1, 210,
+	41, 121,
+	-2, 45,
 	};
-# define YYNPROD 122
-# define YYLAST 282
+# define YYNPROD 126
+# define YYLAST 297
 static const yytabelem yyact[]={
 
-    57,    82,    83,    84,    85,     8,   119,   120,    50,    51,
-    52,    53,    55,    56,    54,   103,    20,    80,   162,   163,
-    57,    81,     8,   108,    74,     8,   205,   209,    50,    51,
-    52,    53,    55,    56,    54,    42,    67,    69,    70,     8,
-   185,    57,   186,    91,    92,    28,     8,    17,    68,    50,
-    51,    52,    53,    55,    56,    54,    57,   153,     4,     5,
-   105,     8,   204,   187,    50,    51,    52,    53,    55,    56,
-    54,   200,    58,    43,   183,    73,     8,     7,     9,    50,
-    51,    52,    53,    55,    56,    54,   179,   191,    44,    41,
-    35,     8,   148,   126,    50,    51,    52,    53,    55,    56,
-    54,    49,   116,   137,   123,    47,   168,    72,   101,    89,
-    18,   124,   107,   193,    75,    11,    76,   111,    93,    74,
-   166,   140,   121,   196,   174,   113,    60,    59,   145,    74,
-   134,   208,    61,    62,    63,   138,   161,   192,    87,    36,
-    97,    98,    99,    71,   172,   171,   109,   170,   118,   158,
-     4,     5,    40,    28,    30,    32,    29,    87,    39,    38,
-    34,    88,    94,   106,   194,   154,    31,   146,   135,   122,
-    73,    77,   114,   133,   110,   125,   136,   104,   139,    12,
-    73,    95,    96,   141,    79,    78,   109,   144,   207,   195,
-   165,   192,   177,    14,   152,   151,   127,   112,   100,    33,
-   128,   129,     3,    10,     2,   102,   149,   118,     6,    19,
-    27,    23,    22,    13,    37,   150,   130,   131,   132,    21,
-    65,    64,   176,    26,    25,    66,   143,    24,    45,    46,
-   142,    48,   147,   199,   160,   155,   156,   157,   188,    86,
-   115,   104,   169,   164,   159,   117,   181,   182,   175,   167,
-   184,   173,   189,   190,    90,    16,   127,   188,     8,   178,
-   203,   206,   180,    15,     1,     0,   182,     0,     0,   202,
-     0,     0,     0,     0,     0,     0,     0,   197,   198,     0,
-     0,   201 };
+    59,    87,    88,    89,    90,     8,   126,   127,    52,    53,
+    54,    55,    57,    58,    56,   110,    20,    85,   172,   173,
+    59,    86,     8,   115,    79,     8,    29,   219,    52,    53,
+    54,    55,    57,    58,    56,    44,     8,    17,   197,   162,
+   195,    59,   196,    96,    97,   215,     8,     4,     5,    52,
+    53,    54,    55,    57,    58,    56,    59,   193,   214,   112,
+    46,     8,    45,    37,    52,    53,    54,    55,    57,    58,
+    56,   210,   201,   133,   157,    78,     8,   108,   123,    52,
+    53,    54,    55,    57,    58,    56,   189,   146,   178,    43,
+    94,     8,    77,    49,    52,    53,    54,    55,    57,    58,
+    56,    71,    73,    74,    75,    60,    18,    81,   131,    11,
+     7,     9,    51,    79,    72,   118,   203,   206,   176,   149,
+   128,   184,   114,   120,    79,    62,    61,   154,   143,   218,
+   147,   171,    92,    99,    76,    38,   182,   181,   130,   202,
+   180,   113,   168,   217,    63,    64,    65,    66,    42,    80,
+     4,     5,   125,    29,    31,    33,    34,    30,   204,    92,
+    41,    36,    40,   163,    78,   155,   144,    32,   129,    82,
+   111,   121,   132,    12,    93,    78,   117,   103,   104,   105,
+   106,    84,    83,   205,   116,   175,    98,   202,   187,    14,
+   161,   160,     3,    10,     2,   119,    35,   109,     6,   158,
+    28,   159,   107,    13,    69,    19,    68,    23,    22,    21,
+    39,    67,   134,   142,    27,   125,   145,    26,   148,    25,
+   156,    70,   169,   150,    24,    47,   116,   153,    48,    50,
+   209,   186,   170,   179,   177,   151,   174,   185,   111,   135,
+   136,   137,   188,   152,   190,   213,   192,   198,    91,   122,
+   124,   100,   101,   102,   194,   183,    95,    16,    15,     8,
+     1,     0,   212,   211,     0,   192,   198,   216,     0,     0,
+     0,     0,   207,   208,     0,     0,   134,   164,   165,   166,
+   167,     0,     0,     0,     0,     0,     0,     0,     0,   191,
+   138,   139,   140,   141,     0,   199,   200 };
 static const yytabelem yypact[]={
 
-  -199,-10000000,-10000000,  -199,  -235,  -235,-10000000,    56,-10000000,    56,
--10000000,-10000000,  -212,-10000000,   -15,  -212,  -107,-10000000,    80,-10000000,
-  -212,-10000000,   100,    99,    93,-10000000,-10000000,-10000000,  -228,    35,
-  -235,  -235,  -235,  -225,    83,-10000000,-10000000,   -18,-10000000,-10000000,
--10000000,   -16,  -213,   129,   143,   142,-10000000,-10000000,-10000000,-10000000,
--10000000,  -261,-10000000,-10000000,  -276,-10000000,-10000000,-10000000,    78,  -235,
-  -227,   104,   104,   104,-10000000,-10000000,-10000000,  -235,  -235,  -235,
-    35,  -249,    80,  -252,   132,    34,   130,-10000000,-10000000,-10000000,
--10000000,-10000000,-10000000,-10000000,-10000000,-10000000,-10000000,  -269,-10000000,    29,
-   125,-10000000,-10000000,    52,  -235,    52,    52,   104,   104,   104,
-  -235,    68,   124,  -235,    74,   -16,-10000000,    28,-10000000,-10000000,
-  -235,-10000000,    34,  -252,  -235,    66,-10000000,   123,    89,-10000000,
--10000000,-10000000,  -227,-10000000,-10000000,  -215,-10000000,   121,-10000000,-10000000,
-    52,    52,    52,    90,-10000000,  -249,    75,-10000000,  -257,    74,
--10000000,   149,-10000000,    27,-10000000,-10000000,  -269,-10000000,   -19,  -215,
-    88,    86,    85,    33,  -235,-10000000,-10000000,-10000000,-10000000,-10000000,
--10000000,  -213,-10000000,-10000000,-10000000,   152,-10000000,-10000000,    80,-10000000,
--10000000,-10000000,-10000000,  -183,  -226,-10000000,    89,  -213,-10000000,  -235,
-  -235,    97,   129,    20,   120,-10000000,-10000000,   148,    79,   151,
-   151,-10000000,  -198,-10000000,  -226,-10000000,  -213,  -239,  -239,   147,
--10000000,-10000000,-10000000,-10000000,-10000000,    70,-10000000,-10000000,  -248,-10000000 };
+  -210,-10000000,-10000000,  -210,  -239,  -239,-10000000,    50,-10000000,    50,
+-10000000,-10000000,  -222,-10000000,   -19,  -222,  -107,-10000000,    76,-10000000,
+  -222,-10000000,   103,   101,    89,-10000000,-10000000,-10000000,-10000000,  -229,
+    34,  -239,  -239,  -239,  -239,  -160,    74,-10000000,-10000000,   -33,
+-10000000,-10000000,-10000000,   -16,  -214,   127,   140,   139,-10000000,-10000000,
+-10000000,-10000000,-10000000,  -262,-10000000,-10000000,  -277,-10000000,-10000000,-10000000,
+    72,  -239,  -228,    75,    75,    75,    75,-10000000,-10000000,-10000000,
+-10000000,  -239,  -239,  -239,  -239,    34,  -250,    76,  -253,   134,
+    32,   129,-10000000,-10000000,-10000000,-10000000,-10000000,-10000000,-10000000,-10000000,
+-10000000,-10000000,  -270,-10000000,    27,   124,-10000000,-10000000,    49,  -239,
+    49,    49,    49,    75,    75,    75,    75,  -239,    66,   122,
+  -239,    69,   -16,-10000000,    26,-10000000,-10000000,  -239,-10000000,    32,
+  -253,  -239,    65,-10000000,   121,    84,-10000000,-10000000,-10000000,  -228,
+-10000000,-10000000,  -234,-10000000,   119,-10000000,-10000000,-10000000,    49,    49,
+    49,    49,    83,-10000000,  -250,    70,-10000000,  -258,    69,-10000000,
+   144,-10000000,    25,-10000000,-10000000,  -270,-10000000,   -37,  -234,    81,
+    78,    77,    30,  -239,-10000000,-10000000,-10000000,-10000000,-10000000,-10000000,
+-10000000,  -214,-10000000,-10000000,-10000000,   148,-10000000,-10000000,    76,-10000000,
+-10000000,-10000000,-10000000,  -184,  -227,-10000000,    84,  -214,-10000000,  -239,
+  -239,    99,   127,    23,   114,-10000000,-10000000,   142,    73,   147,
+   147,-10000000,  -199,-10000000,  -227,-10000000,  -214,  -221,  -221,   102,
+-10000000,-10000000,-10000000,-10000000,-10000000,    68,-10000000,-10000000,  -249,-10000000 };
 static const yytabelem yypgo[]={
 
-     0,   204,   264,   202,   203,   193,   263,    72,   103,    62,
-   255,    90,   127,   109,   254,   251,    74,   250,   245,   102,
-   240,   239,    60,    73,   234,   233,    87,   231,   229,   105,
-   101,   228,    88,   195,   194,   227,   225,   224,   223,   221,
-   220,   215,   210,    93,   118,    63,   104,    92,   206,   205,
-   108,   199,   112,   197,   117 };
+     0,   194,   260,   192,   193,   189,   258,   105,    87,    58,
+   257,    63,   126,    90,   256,   255,    57,   254,   250,    78,
+   249,   248,    59,    62,   232,   230,    72,   229,   228,    93,
+   112,   225,    60,   191,   190,   224,   221,   219,   217,   214,
+   211,   206,   204,   201,   200,    73,   186,    38,   138,    74,
+   199,   197,    77,   196,   122,   195,   115 };
 static const yytabelem yyr1[]={
 
      0,     2,     1,     1,    10,    10,    11,    11,     7,     3,
      3,     4,     4,     5,     5,     6,     6,     6,     6,     6,
-     6,     6,     6,    18,    18,    18,    19,    19,    20,    20,
-    21,    21,    27,    27,    27,    27,    27,    27,    27,    27,
-    27,    27,    27,    27,    27,    30,    23,    23,    32,    31,
-    31,    52,    52,    28,    29,    22,    22,    22,    22,    22,
-    45,    45,    45,    53,    54,    54,    33,    34,    12,    12,
-    13,    13,    14,    14,    35,    44,    44,    43,    43,    37,
-    37,    38,    39,    39,    40,    36,    24,    24,     8,     8,
-     8,    49,    49,    49,    50,    50,    51,    42,    42,    42,
-    46,    46,    47,    47,    48,    48,    48,    41,    41,    41,
-    15,    15,    16,    16,    17,    17,    25,    25,    25,    26,
-     9,     9 };
+     6,     6,     6,     6,    18,    18,    18,    19,    19,    20,
+    20,    21,    21,    27,    27,    27,    27,    27,    27,    27,
+    27,    27,    27,    27,    27,    27,    30,    23,    23,    32,
+    31,    31,    54,    54,    28,    29,    22,    22,    22,    22,
+    22,    47,    47,    47,    55,    56,    56,    33,    34,    12,
+    12,    13,    13,    14,    14,    35,    46,    46,    45,    45,
+    37,    37,    38,    39,    40,    40,    41,    42,    36,    24,
+    24,     8,     8,     8,    51,    51,    51,    52,    52,    53,
+    44,    44,    44,    44,    48,    48,    49,    49,    50,    50,
+    50,    43,    43,    43,    15,    15,    16,    16,    17,    17,
+    25,    25,    25,    26,     9,     9 };
 static const yytabelem yyr2[]={
 
      0,     3,     1,     5,     1,     3,     1,     3,     3,     7,
      7,     3,     9,     1,     5,    11,     5,     7,     7,     7,
-     5,     5,     5,     3,     3,     3,     3,     7,     1,     3,
-     1,     7,     3,     3,     3,     3,     5,     5,     5,     5,
-     5,     3,     3,     5,     3,     5,     3,     3,     5,     5,
-     5,     3,     3,     9,    17,     3,     3,     3,     3,     3,
-     1,     3,     7,     7,     1,     5,     9,    11,     1,     7,
-     3,     7,     3,     3,     7,     1,     5,     3,     7,     9,
-     9,     9,     9,     9,     9,     9,     1,     5,     1,     5,
-     5,     7,     5,     7,     3,     7,     9,     5,     5,     5,
-     3,     9,     1,     5,     5,     5,     5,    13,    13,     9,
-     1,     7,     3,     7,     3,     3,     1,     3,     3,     7,
-     1,     7 };
+     5,     5,     5,     5,     3,     3,     3,     3,     7,     1,
+     3,     1,     7,     3,     3,     3,     3,     5,     5,     5,
+     5,     5,     3,     3,     5,     3,     5,     3,     3,     5,
+     5,     5,     3,     3,     9,    17,     3,     3,     3,     3,
+     3,     1,     3,     7,     7,     1,     5,     9,    11,     1,
+     7,     3,     7,     3,     3,     7,     1,     5,     3,     7,
+     9,     9,     9,     9,     9,     9,     9,     9,     9,     1,
+     5,     1,     5,     5,     7,     5,     7,     3,     7,     9,
+     5,     5,     5,     5,     3,     9,     1,     5,     5,     5,
+     5,    13,    13,     9,     1,     7,     3,     7,     3,     3,
+     1,     3,     3,     7,     1,     7 };
 static const yytabelem yychk[]={
 
--10000000,    -2,    -1,    -3,   257,   258,    -1,    -7,   274,    -7,
+-10000000,    -2,    -1,    -3,   257,   258,    -1,    -7,   275,    -7,
     -4,    59,   123,    -4,    -5,    -6,   -10,   259,   125,    -5,
-   123,    -3,   -33,   -34,   -35,   -37,   -38,   -42,   260,   263,
-   261,   273,   262,   -51,   267,   -11,    59,    -5,    59,    59,
-    59,   -22,   263,   -23,   -32,   -31,   -28,   -29,   -27,   -30,
-   277,   278,   279,   280,   283,   281,   282,   269,    -7,   -12,
-    91,   -30,   -30,   -30,   -39,   -40,   -36,   261,   273,   262,
-   263,    60,   125,    91,    40,    -7,   -23,    42,    42,    42,
-   278,   282,   277,   278,   279,   280,   -21,    60,   -30,   -13,
-   -14,   270,   271,   -44,    58,   -44,   -44,    -7,    -7,    -7,
-   -12,   -50,   -49,   264,   -29,   -22,   -11,   -52,   275,    -7,
-    42,   -54,   -53,    91,    42,   -20,   -19,   -18,   -22,   275,
-   276,    93,    44,   -46,    59,   123,   -43,   -30,   -46,   -46,
-   -44,   -44,   -44,    -7,    62,    44,    -7,    -8,    61,    -7,
-    93,    -7,   -54,   -52,    -7,    62,    44,   -13,   -47,   -48,
-   -41,   -33,   -34,   272,    44,   -46,   -46,   -46,    59,   -50,
-   -24,    61,   275,   276,    -8,    41,    93,   -19,   125,   -47,
-    59,    59,    59,   -15,    91,   -43,   -22,    40,   -11,   269,
-   -32,    -7,   -23,   -16,   -17,   266,   268,   -45,   -22,    -7,
+   123,    -3,   -33,   -34,   -35,   -37,   -38,   -39,   -44,   260,
+   264,   261,   274,   262,   263,   -53,   268,   -11,    59,    -5,
+    59,    59,    59,   -22,   264,   -23,   -32,   -31,   -28,   -29,
+   -27,   -30,   278,   279,   280,   281,   284,   282,   283,   270,
+    -7,   -12,    91,   -30,   -30,   -30,   -30,   -40,   -41,   -42,
+   -36,   261,   274,   262,   263,   264,    60,   125,    91,    40,
+    -7,   -23,    42,    42,    42,   279,   283,   278,   279,   280,
+   281,   -21,    60,   -30,   -13,   -14,   271,   272,   -46,    58,
+   -46,   -46,   -46,    -7,    -7,    -7,    -7,   -12,   -52,   -51,
+   265,   -29,   -22,   -11,   -54,   276,    -7,    42,   -56,   -55,
+    91,    42,   -20,   -19,   -18,   -22,   276,   277,    93,    44,
+   -48,    59,   123,   -45,   -30,   -48,   -48,   -48,   -46,   -46,
+   -46,   -46,    -7,    62,    44,    -7,    -8,    61,    -7,    93,
+    -7,   -56,   -54,    -7,    62,    44,   -13,   -49,   -50,   -43,
+   -33,   -34,   273,    44,   -48,   -48,   -48,   -48,    59,   -52,
+   -24,    61,   276,   277,    -8,    41,    93,   -19,   125,   -49,
+    59,    59,    59,   -15,    91,   -45,   -22,    40,   -11,   270,
+   -32,    -7,   -23,   -16,   -17,   267,   269,   -47,   -22,    -7,
     -7,   -26,    40,    93,    44,    41,    44,   -26,   -26,   -25,
-   269,   -32,   -16,   -45,    -9,   265,    -9,    41,    61,   275 };
+   270,   -32,   -16,   -47,    -9,   266,    -9,    41,    61,   276 };
 static const yytabelem yydef[]={
 
      2,    -2,     1,     2,     0,     0,     3,     0,     8,     0,
      9,    11,    -2,    10,     0,    -2,     0,     5,     6,    14,
-    -2,    16,     0,     0,     0,    20,    21,    22,     0,    68,
-     0,     0,     0,     0,     0,    12,     7,     0,    17,    18,
-    19,     0,     0,    55,    56,    57,    58,    59,    46,    47,
-    32,    33,    34,    35,     0,    41,    42,    44,    30,     0,
-     0,    75,    75,    75,    97,    98,    99,     0,     0,     0,
-    68,     0,     6,     0,     0,    64,     0,    48,    49,    50,
-    40,    43,    36,    37,    38,    39,    45,    28,    74,     0,
-    70,    72,    73,     0,     0,     0,     0,    75,    75,    75,
-     0,     0,    94,     0,    -2,     0,    15,     0,    51,    52,
-     0,    66,    64,     0,     0,     0,    29,    26,    23,    24,
-    25,    69,     0,    79,   100,   102,    76,    77,    80,    81,
-     0,     0,     0,     0,    96,     0,    86,    92,     0,    88,
-    53,     0,    65,     0,    67,    31,     0,    71,     0,   102,
-     0,     0,     0,   110,     0,    82,    83,    84,    85,    95,
-    91,     0,    89,    90,    93,     0,    63,    27,     6,   103,
-   104,   105,   106,     0,     0,    78,    87,    60,   101,    44,
-     0,    30,     0,     0,   112,   114,   115,     0,    61,     0,
-     0,   109,   116,   111,     0,    54,    60,   120,   120,     0,
-    -2,   118,   113,    62,   107,     0,   108,   119,     0,   121 };
+    -2,    16,     0,     0,     0,    20,    21,    22,    23,     0,
+    69,     0,     0,     0,     0,     0,     0,    12,     7,     0,
+    17,    18,    19,     0,     0,    56,    57,    58,    59,    60,
+    47,    48,    33,    34,    35,    36,     0,    42,    43,    45,
+    31,     0,     0,    76,    76,    76,    76,   100,   101,   102,
+   103,     0,     0,     0,     0,    69,     0,     6,     0,     0,
+    65,     0,    49,    50,    51,    41,    44,    37,    38,    39,
+    40,    46,    29,    75,     0,    71,    73,    74,     0,     0,
+     0,     0,     0,    76,    76,    76,    76,     0,     0,    97,
+     0,    -2,     0,    15,     0,    52,    53,     0,    67,    65,
+     0,     0,     0,    30,    27,    24,    25,    26,    70,     0,
+    80,   104,   106,    77,    78,    81,    82,    83,     0,     0,
+     0,     0,     0,    99,     0,    89,    95,     0,    91,    54,
+     0,    66,     0,    68,    32,     0,    72,     0,   106,     0,
+     0,     0,   114,     0,    84,    85,    86,    87,    88,    98,
+    94,     0,    92,    93,    96,     0,    64,    28,     6,   107,
+   108,   109,   110,     0,     0,    79,    90,    61,   105,    45,
+     0,    31,     0,     0,   116,   118,   119,     0,    62,     0,
+     0,   113,   120,   115,     0,    55,    61,   124,   124,     0,
+    -2,   122,   117,    63,   111,     0,   112,   123,     0,   125 };
 typedef struct
 #ifdef __cplusplus
 	yytoktype
@@ -302,27 +307,28 @@ yytoktype yytoks[] =
 	"READONLY",	260,
 	"CHARE",	261,
 	"GROUP",	262,
-	"MESSAGE",	263,
-	"CLASS",	264,
-	"STACKSIZE",	265,
-	"THREADED",	266,
-	"TEMPLATE",	267,
-	"SYNC",	268,
-	"VOID",	269,
-	"PACKED",	270,
-	"VARSIZE",	271,
-	"ENTRY",	272,
-	"MAINCHARE",	273,
-	"IDENT",	274,
-	"NUMBER",	275,
-	"LITERAL",	276,
-	"INT",	277,
-	"LONG",	278,
-	"SHORT",	279,
-	"CHAR",	280,
-	"FLOAT",	281,
-	"DOUBLE",	282,
-	"UNSIGNED",	283,
+	"ARRAY",	263,
+	"MESSAGE",	264,
+	"CLASS",	265,
+	"STACKSIZE",	266,
+	"THREADED",	267,
+	"TEMPLATE",	268,
+	"SYNC",	269,
+	"VOID",	270,
+	"PACKED",	271,
+	"VARSIZE",	272,
+	"ENTRY",	273,
+	"MAINCHARE",	274,
+	"IDENT",	275,
+	"NUMBER",	276,
+	"LITERAL",	277,
+	"INT",	278,
+	"LONG",	279,
+	"SHORT",	280,
+	"CHAR",	281,
+	"FLOAT",	282,
+	"DOUBLE",	283,
+	"UNSIGNED",	284,
 	"-unknown-",	-1	/* ends search */
 };
 
@@ -350,6 +356,7 @@ char * yyreds[] =
 	"Construct : OptExtern Message ';'",
 	"Construct : OptExtern Chare",
 	"Construct : OptExtern Group",
+	"Construct : OptExtern Array",
 	"Construct : OptExtern Template",
 	"TParam : Type",
 	"TParam : NUMBER",
@@ -410,9 +417,11 @@ char * yyreds[] =
 	"Chare : CHARE NamedType OptBaseList MemberEList",
 	"Chare : MAINCHARE NamedType OptBaseList MemberEList",
 	"Group : GROUP NamedType OptBaseList MemberEList",
+	"Array : ARRAY NamedType OptBaseList MemberEList",
 	"TChare : CHARE Name OptBaseList MemberEList",
 	"TChare : MAINCHARE Name OptBaseList MemberEList",
 	"TGroup : GROUP Name OptBaseList MemberEList",
+	"TArray : ARRAY Name OptBaseList MemberEList",
 	"TMessage : MESSAGE MAttribs Name ';'",
 	"OptTypeInit : /* empty */",
 	"OptTypeInit : '=' Type",
@@ -427,6 +436,7 @@ char * yyreds[] =
 	"TemplateSpec : TEMPLATE '<' TVarList '>'",
 	"Template : TemplateSpec TChare",
 	"Template : TemplateSpec TGroup",
+	"Template : TemplateSpec TArray",
 	"Template : TemplateSpec TMessage",
 	"MemberEList : ';'",
 	"MemberEList : '{' MemberList '}' OptSemiColon",
@@ -1048,307 +1058,320 @@ case 21:
 { yypvt[-0].chare->setExtern(yypvt[-1].intval); yyval.construct = yypvt[-0].chare; } break;
 case 22:
 # line 149 "xi-grammar.y"
-{ yypvt[-0].templat->setExtern(yypvt[-1].intval); yyval.construct = yypvt[-0].templat; } break;
+{ yypvt[-0].chare->setExtern(yypvt[-1].intval); yyval.construct = yypvt[-0].chare; } break;
 case 23:
-# line 153 "xi-grammar.y"
-{ yyval.tparam = new TParamType(yypvt[-0].type); } break;
+# line 151 "xi-grammar.y"
+{ yypvt[-0].templat->setExtern(yypvt[-1].intval); yyval.construct = yypvt[-0].templat; } break;
 case 24:
 # line 155 "xi-grammar.y"
-{ yyval.tparam = new TParamVal(yypvt[-0].strval); } break;
+{ yyval.tparam = new TParamType(yypvt[-0].type); } break;
 case 25:
 # line 157 "xi-grammar.y"
 { yyval.tparam = new TParamVal(yypvt[-0].strval); } break;
 case 26:
-# line 161 "xi-grammar.y"
-{ yyval.tparlist = new TParamList(yypvt[-0].tparam); } break;
+# line 159 "xi-grammar.y"
+{ yyval.tparam = new TParamVal(yypvt[-0].strval); } break;
 case 27:
 # line 163 "xi-grammar.y"
-{ yyval.tparlist = new TParamList(yypvt[-2].tparam, yypvt[-0].tparlist); } break;
+{ yyval.tparlist = new TParamList(yypvt[-0].tparam); } break;
 case 28:
-# line 167 "xi-grammar.y"
-{ yyval.tparlist = 0; } break;
+# line 165 "xi-grammar.y"
+{ yyval.tparlist = new TParamList(yypvt[-2].tparam, yypvt[-0].tparlist); } break;
 case 29:
 # line 169 "xi-grammar.y"
-{ yyval.tparlist = yypvt[-0].tparlist; } break;
-case 30:
-# line 173 "xi-grammar.y"
 { yyval.tparlist = 0; } break;
+case 30:
+# line 171 "xi-grammar.y"
+{ yyval.tparlist = yypvt[-0].tparlist; } break;
 case 31:
 # line 175 "xi-grammar.y"
-{ yyval.tparlist = yypvt[-1].tparlist; } break;
+{ yyval.tparlist = 0; } break;
 case 32:
-# line 179 "xi-grammar.y"
-{ yyval.type = new BuiltinType("int"); } break;
+# line 177 "xi-grammar.y"
+{ yyval.tparlist = yypvt[-1].tparlist; } break;
 case 33:
 # line 181 "xi-grammar.y"
-{ yyval.type = new BuiltinType("long"); } break;
+{ yyval.type = new BuiltinType("int"); } break;
 case 34:
 # line 183 "xi-grammar.y"
-{ yyval.type = new BuiltinType("short"); } break;
+{ yyval.type = new BuiltinType("long"); } break;
 case 35:
 # line 185 "xi-grammar.y"
-{ yyval.type = new BuiltinType("char"); } break;
+{ yyval.type = new BuiltinType("short"); } break;
 case 36:
 # line 187 "xi-grammar.y"
-{ yyval.type = new BuiltinType("unsigned int"); } break;
+{ yyval.type = new BuiltinType("char"); } break;
 case 37:
 # line 189 "xi-grammar.y"
-{ yyval.type = new BuiltinType("long"); } break;
+{ yyval.type = new BuiltinType("unsigned int"); } break;
 case 38:
 # line 191 "xi-grammar.y"
-{ yyval.type = new BuiltinType("short"); } break;
+{ yyval.type = new BuiltinType("long"); } break;
 case 39:
 # line 193 "xi-grammar.y"
-{ yyval.type = new BuiltinType("char"); } break;
+{ yyval.type = new BuiltinType("short"); } break;
 case 40:
 # line 195 "xi-grammar.y"
-{ yyval.type = new BuiltinType("long long"); } break;
+{ yyval.type = new BuiltinType("char"); } break;
 case 41:
 # line 197 "xi-grammar.y"
-{ yyval.type = new BuiltinType("float"); } break;
+{ yyval.type = new BuiltinType("long long"); } break;
 case 42:
 # line 199 "xi-grammar.y"
-{ yyval.type = new BuiltinType("double"); } break;
+{ yyval.type = new BuiltinType("float"); } break;
 case 43:
 # line 201 "xi-grammar.y"
-{ yyval.type = new BuiltinType("long double"); } break;
+{ yyval.type = new BuiltinType("double"); } break;
 case 44:
 # line 203 "xi-grammar.y"
-{ yyval.type = new BuiltinType("void"); } break;
+{ yyval.type = new BuiltinType("long double"); } break;
 case 45:
-# line 207 "xi-grammar.y"
-{ yyval.ntype = new NamedType(yypvt[-1].strval, yypvt[-0].tparlist); } break;
+# line 205 "xi-grammar.y"
+{ yyval.type = new BuiltinType("void"); } break;
 case 46:
-# line 211 "xi-grammar.y"
-{ yyval.type = yypvt[-0].type; } break;
+# line 209 "xi-grammar.y"
+{ yyval.ntype = new NamedType(yypvt[-1].strval, yypvt[-0].tparlist); } break;
 case 47:
 # line 213 "xi-grammar.y"
-{ yyval.type = yypvt[-0].ntype; } break;
+{ yyval.type = yypvt[-0].type; } break;
 case 48:
-# line 217 "xi-grammar.y"
-{ yyval.ptype = new PtrType(yypvt[-1].type); } break;
+# line 215 "xi-grammar.y"
+{ yyval.type = yypvt[-0].ntype; } break;
 case 49:
-# line 221 "xi-grammar.y"
-{ yypvt[-1].ptype->indirect(); yyval.ptype = yypvt[-1].ptype; } break;
+# line 219 "xi-grammar.y"
+{ yyval.ptype = new PtrType(yypvt[-1].type); } break;
 case 50:
 # line 223 "xi-grammar.y"
 { yypvt[-1].ptype->indirect(); yyval.ptype = yypvt[-1].ptype; } break;
 case 51:
-# line 227 "xi-grammar.y"
-{ yyval.val = new Value(yypvt[-0].strval); } break;
+# line 225 "xi-grammar.y"
+{ yypvt[-1].ptype->indirect(); yyval.ptype = yypvt[-1].ptype; } break;
 case 52:
 # line 229 "xi-grammar.y"
 { yyval.val = new Value(yypvt[-0].strval); } break;
 case 53:
-# line 233 "xi-grammar.y"
-{ yyval.type = new ArrayType(yypvt[-3].type, yypvt[-1].val); } break;
+# line 231 "xi-grammar.y"
+{ yyval.val = new Value(yypvt[-0].strval); } break;
 case 54:
-# line 237 "xi-grammar.y"
-{ yyval.ftype = new FuncType(yypvt[-7].type, yypvt[-4].strval, yypvt[-1].typelist); } break;
+# line 235 "xi-grammar.y"
+{ yyval.type = new ArrayType(yypvt[-3].type, yypvt[-1].val); } break;
 case 55:
-# line 241 "xi-grammar.y"
-{ yyval.type = yypvt[-0].type; } break;
+# line 239 "xi-grammar.y"
+{ yyval.ftype = new FuncType(yypvt[-7].type, yypvt[-4].strval, yypvt[-1].typelist); } break;
 case 56:
 # line 243 "xi-grammar.y"
-{ yyval.type = (Type*) yypvt[-0].ptype; } break;
+{ yyval.type = yypvt[-0].type; } break;
 case 57:
 # line 245 "xi-grammar.y"
 { yyval.type = (Type*) yypvt[-0].ptype; } break;
 case 58:
 # line 247 "xi-grammar.y"
-{ yyval.type = yypvt[-0].type; } break;
+{ yyval.type = (Type*) yypvt[-0].ptype; } break;
 case 59:
 # line 249 "xi-grammar.y"
-{ yyval.type = yypvt[-0].ftype; } break;
+{ yyval.type = yypvt[-0].type; } break;
 case 60:
-# line 253 "xi-grammar.y"
-{ yyval.typelist = 0; } break;
+# line 251 "xi-grammar.y"
+{ yyval.type = yypvt[-0].ftype; } break;
 case 61:
 # line 255 "xi-grammar.y"
-{ yyval.typelist = new TypeList(yypvt[-0].type); } break;
+{ yyval.typelist = 0; } break;
 case 62:
 # line 257 "xi-grammar.y"
-{ yyval.typelist = new TypeList(yypvt[-2].type, yypvt[-0].typelist); } break;
+{ yyval.typelist = new TypeList(yypvt[-0].type); } break;
 case 63:
-# line 261 "xi-grammar.y"
-{ yyval.val = yypvt[-1].val; } break;
+# line 259 "xi-grammar.y"
+{ yyval.typelist = new TypeList(yypvt[-2].type, yypvt[-0].typelist); } break;
 case 64:
-# line 265 "xi-grammar.y"
-{ yyval.vallist = 0; } break;
+# line 263 "xi-grammar.y"
+{ yyval.val = yypvt[-1].val; } break;
 case 65:
 # line 267 "xi-grammar.y"
-{ yyval.vallist = new ValueList(yypvt[-1].val, yypvt[-0].vallist); } break;
+{ yyval.vallist = 0; } break;
 case 66:
-# line 271 "xi-grammar.y"
-{ yyval.readonly = new Readonly(yypvt[-2].type, yypvt[-1].strval, yypvt[-0].vallist); } break;
+# line 269 "xi-grammar.y"
+{ yyval.vallist = new ValueList(yypvt[-1].val, yypvt[-0].vallist); } break;
 case 67:
-# line 275 "xi-grammar.y"
-{ yyval.readonly = new Readonly(yypvt[-2].type, yypvt[-0].strval, 0, 1); } break;
+# line 273 "xi-grammar.y"
+{ yyval.readonly = new Readonly(yypvt[-2].type, yypvt[-1].strval, yypvt[-0].vallist); } break;
 case 68:
-# line 279 "xi-grammar.y"
-{ yyval.intval = 0; } break;
+# line 277 "xi-grammar.y"
+{ yyval.readonly = new Readonly(yypvt[-2].type, yypvt[-0].strval, 0, 1); } break;
 case 69:
 # line 281 "xi-grammar.y"
-{ yyval.intval = yypvt[-1].intval; } break;
+{ yyval.intval = 0; } break;
 case 70:
-# line 285 "xi-grammar.y"
-{ yyval.intval = yypvt[-0].intval; } break;
+# line 283 "xi-grammar.y"
+{ yyval.intval = yypvt[-1].intval; } break;
 case 71:
 # line 287 "xi-grammar.y"
-{ yyval.intval = yypvt[-2].intval | yypvt[-0].intval; } break;
+{ yyval.intval = yypvt[-0].intval; } break;
 case 72:
-# line 291 "xi-grammar.y"
-{ yyval.intval = SPACKED; } break;
+# line 289 "xi-grammar.y"
+{ yyval.intval = yypvt[-2].intval | yypvt[-0].intval; } break;
 case 73:
 # line 293 "xi-grammar.y"
-{ yyval.intval = SVARSIZE; } break;
+{ yyval.intval = SPACKED; } break;
 case 74:
-# line 297 "xi-grammar.y"
-{ yyval.message = new Message(yypvt[-0].ntype, yypvt[-1].intval); } break;
+# line 295 "xi-grammar.y"
+{ yyval.intval = SVARSIZE; } break;
 case 75:
-# line 301 "xi-grammar.y"
-{ yyval.typelist = 0; } break;
+# line 299 "xi-grammar.y"
+{ yyval.message = new Message(yypvt[-0].ntype, yypvt[-1].intval); } break;
 case 76:
 # line 303 "xi-grammar.y"
-{ yyval.typelist = yypvt[-0].typelist; } break;
+{ yyval.typelist = 0; } break;
 case 77:
-# line 307 "xi-grammar.y"
-{ yyval.typelist = new TypeList(yypvt[-0].ntype); } break;
+# line 305 "xi-grammar.y"
+{ yyval.typelist = yypvt[-0].typelist; } break;
 case 78:
 # line 309 "xi-grammar.y"
-{ yyval.typelist = new TypeList(yypvt[-2].ntype, yypvt[-0].typelist); } break;
+{ yyval.typelist = new TypeList(yypvt[-0].ntype); } break;
 case 79:
-# line 313 "xi-grammar.y"
-{ yyval.chare = new Chare(SCHARE, yypvt[-2].ntype, yypvt[-1].typelist, yypvt[-0].mbrlist); if(yypvt[-0].mbrlist) yypvt[-0].mbrlist->setChare(yyval.chare);} break;
+# line 311 "xi-grammar.y"
+{ yyval.typelist = new TypeList(yypvt[-2].ntype, yypvt[-0].typelist); } break;
 case 80:
 # line 315 "xi-grammar.y"
+{ yyval.chare = new Chare(SCHARE, yypvt[-2].ntype, yypvt[-1].typelist, yypvt[-0].mbrlist); if(yypvt[-0].mbrlist) yypvt[-0].mbrlist->setChare(yyval.chare);} break;
+case 81:
+# line 317 "xi-grammar.y"
 { yyval.chare = new Chare(SMAINCHARE, yypvt[-2].ntype, yypvt[-1].typelist, yypvt[-0].mbrlist); 
                   if(yypvt[-0].mbrlist) yypvt[-0].mbrlist->setChare(yyval.chare);} break;
-case 81:
-# line 320 "xi-grammar.y"
-{ yyval.chare = new Chare(SGROUP, yypvt[-2].ntype, yypvt[-1].typelist, yypvt[-0].mbrlist); if(yypvt[-0].mbrlist) yypvt[-0].mbrlist->setChare(yyval.chare);} break;
 case 82:
-# line 324 "xi-grammar.y"
+# line 322 "xi-grammar.y"
+{ yyval.chare = new Chare(SGROUP, yypvt[-2].ntype, yypvt[-1].typelist, yypvt[-0].mbrlist); if(yypvt[-0].mbrlist) yypvt[-0].mbrlist->setChare(yyval.chare);} break;
+case 83:
+# line 326 "xi-grammar.y"
+{ yyval.chare = new Chare(SARRAY, yypvt[-2].ntype, yypvt[-1].typelist, yypvt[-0].mbrlist); if(yypvt[-0].mbrlist) yypvt[-0].mbrlist->setChare(yyval.chare);} break;
+case 84:
+# line 330 "xi-grammar.y"
 { yyval.chare = new Chare(SCHARE, new NamedType(yypvt[-2].strval), yypvt[-1].typelist, yypvt[-0].mbrlist); 
                   if(yypvt[-0].mbrlist) yypvt[-0].mbrlist->setChare(yyval.chare);} break;
-case 83:
-# line 327 "xi-grammar.y"
+case 85:
+# line 333 "xi-grammar.y"
 { yyval.chare = new Chare(SMAINCHARE, new NamedType(yypvt[-2].strval), yypvt[-1].typelist, yypvt[-0].mbrlist); 
                   if(yypvt[-0].mbrlist) yypvt[-0].mbrlist->setChare(yyval.chare);} break;
-case 84:
-# line 332 "xi-grammar.y"
+case 86:
+# line 338 "xi-grammar.y"
 { yyval.chare = new Chare(SGROUP, new NamedType(yypvt[-2].strval), yypvt[-1].typelist, yypvt[-0].mbrlist); 
                   if(yypvt[-0].mbrlist) yypvt[-0].mbrlist->setChare(yyval.chare);} break;
-case 85:
-# line 337 "xi-grammar.y"
-{ yyval.message = new Message(new NamedType(yypvt[-1].strval), yypvt[-2].intval); } break;
-case 86:
-# line 341 "xi-grammar.y"
-{ yyval.type = 0; } break;
 case 87:
 # line 343 "xi-grammar.y"
-{ yyval.type = yypvt[-0].type; } break;
+{ yyval.chare = new Chare(SARRAY, new NamedType(yypvt[-2].strval), yypvt[-1].typelist, yypvt[-0].mbrlist); 
+                  if(yypvt[-0].mbrlist) yypvt[-0].mbrlist->setChare(yyval.chare);} break;
 case 88:
-# line 347 "xi-grammar.y"
-{ yyval.strval = 0; } break;
+# line 348 "xi-grammar.y"
+{ yyval.message = new Message(new NamedType(yypvt[-1].strval), yypvt[-2].intval); } break;
 case 89:
-# line 349 "xi-grammar.y"
-{ yyval.strval = yypvt[-0].strval; } break;
+# line 352 "xi-grammar.y"
+{ yyval.type = 0; } break;
 case 90:
-# line 351 "xi-grammar.y"
-{ yyval.strval = yypvt[-0].strval; } break;
+# line 354 "xi-grammar.y"
+{ yyval.type = yypvt[-0].type; } break;
 case 91:
-# line 355 "xi-grammar.y"
-{ yyval.tvar = new TType(new NamedType(yypvt[-1].strval), yypvt[-0].type); } break;
+# line 358 "xi-grammar.y"
+{ yyval.strval = 0; } break;
 case 92:
-# line 357 "xi-grammar.y"
-{ yyval.tvar = new TFunc(yypvt[-1].ftype, yypvt[-0].strval); } break;
+# line 360 "xi-grammar.y"
+{ yyval.strval = yypvt[-0].strval; } break;
 case 93:
-# line 359 "xi-grammar.y"
-{ yyval.tvar = new TName(yypvt[-2].type, yypvt[-1].strval, yypvt[-0].strval); } break;
+# line 362 "xi-grammar.y"
+{ yyval.strval = yypvt[-0].strval; } break;
 case 94:
-# line 363 "xi-grammar.y"
-{ yyval.tvarlist = new TVarList(yypvt[-0].tvar); } break;
+# line 366 "xi-grammar.y"
+{ yyval.tvar = new TType(new NamedType(yypvt[-1].strval), yypvt[-0].type); } break;
 case 95:
-# line 365 "xi-grammar.y"
-{ yyval.tvarlist = new TVarList(yypvt[-2].tvar, yypvt[-0].tvarlist); } break;
+# line 368 "xi-grammar.y"
+{ yyval.tvar = new TFunc(yypvt[-1].ftype, yypvt[-0].strval); } break;
 case 96:
-# line 369 "xi-grammar.y"
-{ yyval.tvarlist = yypvt[-1].tvarlist; } break;
+# line 370 "xi-grammar.y"
+{ yyval.tvar = new TName(yypvt[-2].type, yypvt[-1].strval, yypvt[-0].strval); } break;
 case 97:
-# line 373 "xi-grammar.y"
-{ yyval.templat = new Template(yypvt[-1].tvarlist, yypvt[-0].chare); yypvt[-0].chare->setTemplate(yyval.templat); } break;
+# line 374 "xi-grammar.y"
+{ yyval.tvarlist = new TVarList(yypvt[-0].tvar); } break;
 case 98:
-# line 375 "xi-grammar.y"
-{ yyval.templat = new Template(yypvt[-1].tvarlist, yypvt[-0].chare); yypvt[-0].chare->setTemplate(yyval.templat); } break;
+# line 376 "xi-grammar.y"
+{ yyval.tvarlist = new TVarList(yypvt[-2].tvar, yypvt[-0].tvarlist); } break;
 case 99:
-# line 377 "xi-grammar.y"
-{ yyval.templat = new Template(yypvt[-1].tvarlist, yypvt[-0].message); yypvt[-0].message->setTemplate(yyval.templat); } break;
+# line 380 "xi-grammar.y"
+{ yyval.tvarlist = yypvt[-1].tvarlist; } break;
 case 100:
-# line 381 "xi-grammar.y"
-{ yyval.mbrlist = 0; } break;
+# line 384 "xi-grammar.y"
+{ yyval.templat = new Template(yypvt[-1].tvarlist, yypvt[-0].chare); yypvt[-0].chare->setTemplate(yyval.templat); } break;
 case 101:
-# line 383 "xi-grammar.y"
-{ yyval.mbrlist = yypvt[-2].mbrlist; } break;
+# line 386 "xi-grammar.y"
+{ yyval.templat = new Template(yypvt[-1].tvarlist, yypvt[-0].chare); yypvt[-0].chare->setTemplate(yyval.templat); } break;
 case 102:
-# line 387 "xi-grammar.y"
-{ yyval.mbrlist = 0; } break;
+# line 388 "xi-grammar.y"
+{ yyval.templat = new Template(yypvt[-1].tvarlist, yypvt[-0].chare); yypvt[-0].chare->setTemplate(yyval.templat); } break;
 case 103:
-# line 389 "xi-grammar.y"
-{ yyval.mbrlist = new MemberList(yypvt[-1].member, yypvt[-0].mbrlist); } break;
+# line 390 "xi-grammar.y"
+{ yyval.templat = new Template(yypvt[-1].tvarlist, yypvt[-0].message); yypvt[-0].message->setTemplate(yyval.templat); } break;
 case 104:
-# line 393 "xi-grammar.y"
-{ yyval.member = yypvt[-1].entry; } break;
+# line 394 "xi-grammar.y"
+{ yyval.mbrlist = 0; } break;
 case 105:
-# line 395 "xi-grammar.y"
-{ yyval.member = yypvt[-1].readonly; } break;
+# line 396 "xi-grammar.y"
+{ yyval.mbrlist = yypvt[-2].mbrlist; } break;
 case 106:
-# line 397 "xi-grammar.y"
-{ yyval.member = yypvt[-1].readonly; } break;
+# line 400 "xi-grammar.y"
+{ yyval.mbrlist = 0; } break;
 case 107:
-# line 401 "xi-grammar.y"
-{ yyval.entry = new Entry(yypvt[-4].intval, new BuiltinType("void"), yypvt[-2].strval, yypvt[-1].rtype, yypvt[-0].val); } break;
+# line 402 "xi-grammar.y"
+{ yyval.mbrlist = new MemberList(yypvt[-1].member, yypvt[-0].mbrlist); } break;
 case 108:
-# line 403 "xi-grammar.y"
-{ yyval.entry = new Entry(yypvt[-4].intval, yypvt[-3].ptype, yypvt[-2].strval, yypvt[-1].rtype, yypvt[-0].val); } break;
+# line 406 "xi-grammar.y"
+{ yyval.member = yypvt[-1].entry; } break;
 case 109:
-# line 405 "xi-grammar.y"
-{ yyval.entry = new Entry(yypvt[-2].intval, 0, yypvt[-1].strval, yypvt[-0].rtype, 0); } break;
+# line 408 "xi-grammar.y"
+{ yyval.member = yypvt[-1].readonly; } break;
 case 110:
-# line 409 "xi-grammar.y"
-{ yyval.intval = 0; } break;
+# line 410 "xi-grammar.y"
+{ yyval.member = yypvt[-1].readonly; } break;
 case 111:
-# line 411 "xi-grammar.y"
-{ yyval.intval = yypvt[-1].intval; } break;
+# line 414 "xi-grammar.y"
+{ yyval.entry = new Entry(yypvt[-4].intval, new BuiltinType("void"), yypvt[-2].strval, yypvt[-1].rtype, yypvt[-0].val); } break;
 case 112:
-# line 415 "xi-grammar.y"
-{ yyval.intval = yypvt[-0].intval; } break;
+# line 416 "xi-grammar.y"
+{ yyval.entry = new Entry(yypvt[-4].intval, yypvt[-3].ptype, yypvt[-2].strval, yypvt[-1].rtype, yypvt[-0].val); } break;
 case 113:
-# line 417 "xi-grammar.y"
-{ yyval.intval = yypvt[-2].intval | yypvt[-0].intval; } break;
+# line 418 "xi-grammar.y"
+{ yyval.entry = new Entry(yypvt[-2].intval, 0, yypvt[-1].strval, yypvt[-0].rtype, 0); } break;
 case 114:
-# line 421 "xi-grammar.y"
-{ yyval.intval = STHREADED; } break;
+# line 422 "xi-grammar.y"
+{ yyval.intval = 0; } break;
 case 115:
-# line 423 "xi-grammar.y"
-{ yyval.intval = SSYNC; } break;
+# line 424 "xi-grammar.y"
+{ yyval.intval = yypvt[-1].intval; } break;
 case 116:
-# line 427 "xi-grammar.y"
-{ yyval.rtype = 0; } break;
+# line 428 "xi-grammar.y"
+{ yyval.intval = yypvt[-0].intval; } break;
 case 117:
-# line 429 "xi-grammar.y"
-{ yyval.rtype = new BuiltinType("void"); } break;
+# line 430 "xi-grammar.y"
+{ yyval.intval = yypvt[-2].intval | yypvt[-0].intval; } break;
 case 118:
-# line 431 "xi-grammar.y"
-{ yyval.rtype = yypvt[-0].ptype; } break;
+# line 434 "xi-grammar.y"
+{ yyval.intval = STHREADED; } break;
 case 119:
-# line 435 "xi-grammar.y"
-{ yyval.rtype = yypvt[-1].rtype; } break;
+# line 436 "xi-grammar.y"
+{ yyval.intval = SSYNC; } break;
 case 120:
-# line 439 "xi-grammar.y"
-{ yyval.val = 0; } break;
+# line 440 "xi-grammar.y"
+{ yyval.rtype = 0; } break;
 case 121:
-# line 441 "xi-grammar.y"
+# line 442 "xi-grammar.y"
+{ yyval.rtype = new BuiltinType("void"); } break;
+case 122:
+# line 444 "xi-grammar.y"
+{ yyval.rtype = yypvt[-0].ptype; } break;
+case 123:
+# line 448 "xi-grammar.y"
+{ yyval.rtype = yypvt[-1].rtype; } break;
+case 124:
+# line 452 "xi-grammar.y"
+{ yyval.val = 0; } break;
+case 125:
+# line 454 "xi-grammar.y"
 { yyval.val = new Value(yypvt[-0].strval); } break;
 # line	531 "/usr/ccs/bin/yaccpar"
 	}

@@ -374,6 +374,42 @@ Chare::genGroupDecls(XStr& str)
 }
 
 void
+Chare::genArrayDecls(XStr& str)
+{
+  str <<"class "<< array_prefix();
+  type->print(str);
+  if(external || type->isTemplated()) {
+    str <<";";
+    return;
+  }
+  str << ": ";
+  str <<" public virtual _CK_AID";
+  if(bases!=0) {
+    str << ", ";
+    bases->genProxyNames(str);
+  }
+  str.spew(CIChareStart, array_prefix(), getBaseName());
+  str << "    ";
+  str<<array_prefix();
+  type->print(str);
+  str << "(CkAID _aid) { ckSetArrayId(_aid); }\n";
+  str << "    CkAID ckGetArrayId(void) { return CkAID(_ck_aid, _elem); }\n";
+  str << "    void ckSetArrayId(CkAID _aid) { \n";
+  str << "      setAid(_aid._ck_aid); _elem = _aid._elem; \n";
+  str << "    }\n";
+  str << "    " << array_prefix();
+  type->print(str);
+  str << " operator [] (int idx) {\n";
+  str << "      return " << array_prefix();
+  type->print(str);
+  str << "(CkAID(_ck_aid, idx));\n";
+  str << "    }\n";
+  if(list)
+    list->genDecls(str);
+  str.spew(CIChareEnd);
+}
+
+void
 Chare::genDecls(XStr& str)
 {
   str << "/* DECLS: "; print(str); str << " */\n";
@@ -388,6 +424,8 @@ Chare::genDecls(XStr& str)
     genChareDecls(str);
   } else if(chareType==SGROUP) {
     genGroupDecls(str);
+  } else if(chareType==SARRAY) {
+    genArrayDecls(str);
   }
 }
 
@@ -411,10 +449,13 @@ Chare::genDefs(XStr& str)
   if(templat)
     templat->genSpec(str);
   str << "void ";
-  if(chareType==SCHARE||chareType==SMAINCHARE)
+  if(chareType==SCHARE||chareType==SMAINCHARE) {
     str << chare_prefix();
-  else
+  } else if(chareType==SGROUP) {
     str << group_prefix();
+  } else if(chareType==SARRAY) {
+    str << array_prefix();
+  }
   type->print(str);
   if(templat)
     templat->genVars(str);
@@ -439,10 +480,13 @@ Chare::genReg(XStr& str)
   if(external || templat)
     return;
   str << "  ";
-  if(chareType==SCHARE||chareType==SMAINCHARE)
+  if(chareType==SCHARE||chareType==SMAINCHARE) {
     str << chare_prefix();
-  else
+  } else if (chareType==SGROUP) {
     str << group_prefix();
+  } else if (chareType==SARRAY) {
+    str << array_prefix();
+  }
   type->print(str);
   str << "::__register(\"";
   type->print(str);
@@ -815,9 +859,14 @@ Entry::genEpIdx(XStr& str)
 
 void Entry::genEpIdxDecl(XStr& str)
 {
-  str << "    static int __idx_";
-  genEpIdx(str);
-  str << ";\n";
+  if(container->getChareType()==SARRAY && !param && isConstructor()) {
+    str << "    static int __idx_" << name << "_ArrayElementCreateMessage;\n";
+    str << "    static int __idx_" << name << "_ArrayElementMigrateMessage;\n";
+  } else {
+    str << "    static int __idx_";
+    genEpIdx(str);
+    str << ";\n";
+  }
 }
 
 void Entry::genChareStaticConstructorDecl(XStr& str)
@@ -897,6 +946,27 @@ void Entry::genGroupStaticConstructorDecl(XStr& str)
   str<< ") { return __idx_"; 
   genEpIdx(str); 
   str << "; }\n";
+}
+
+void Entry::genArrayStaticConstructorDecl(XStr& str)
+{
+  str << "    static CkAID ckNew(int numElements);\n";
+  str << "    ";
+  container->genProxyName(str);
+  str << "(int numElements);\n";
+  // entry ptr declaration
+  str << "    static int ckIdx_" << name << "(";
+  if(param!=0)
+    param->print(str);
+  else
+    str << "ArrayElementCreateMessage*";
+  str<< ") { return __idx_" << name << "_ArrayElementCreateMessage; }\n"; 
+  str << "    static int ckIdx_" << name << "(";
+  if(param!=0)
+    param->print(str);
+  else
+    str << "ArrayElementMigrateMessage*";
+  str<< ") { return __idx_" << name << "_ArrayElementMigrateMessage; }\n"; 
 }
 
 void Entry::genChareDecl(XStr& str)
@@ -986,42 +1056,144 @@ void Entry::genGroupDecl(XStr& str)
   }
 }
 
+void Entry::genArrayDecl(XStr& str)
+{
+  if(isConstructor()) {
+    genArrayStaticConstructorDecl(str);
+  } else {
+    // entry method broadcast declaration
+    str << "    ";
+    if(retType==0) {
+      cerr << "Entry methods must specify a return type: ";
+      cerr << "use void if necessary\n";
+      exit(1);
+    }
+    retType->print(str);
+    str << " " << name;
+    str << "(";
+    if(param) {
+      param->print(str);
+      if(!param->isVoid())
+        str << "msg";
+    }
+    str<< ") {\n";
+    str << "      if (_elem==(-1)) _array->broadcast(";
+    if(!param->isVoid())
+      str << "msg, ";
+    else
+      str << "CkAllocSysMsg(), ";
+    str << " __idx_";
+    genEpIdx(str);
+    str << ");\n";
+    str << "      else _array->send(";
+    if(!param->isVoid())
+      str << "msg, ";
+    else
+      str << "CkAllocSysMsg(), ";
+    str << "_elem, __idx_";
+    genEpIdx(str);
+    str << ");\n";
+    str << "    }\n";
+    // entry method onPE declaration
+    str << "    ";
+    retType->print(str);
+    str << " " << name;
+    str << "(";
+    if(param && !param->isVoid()) {
+      param->print(str);
+      str << "msg, ";
+    }
+    str<< "int onPE) {\n";
+    str << "      _array->send(";
+    if(!param->isVoid())
+      str << "msg, ";
+    else
+      str << "CkAllocSysMsg(), ";
+    str << "onPE, __idx_";
+    genEpIdx(str);
+    str << ");\n";
+    str << "    }\n";
+    // entry ptr declaration
+    str << "    static int ckIdx_" << name << "(";
+    assert(param!=0);
+    param->print(str);
+    str<< ") { return __idx_"; 
+    genEpIdx(str); 
+    str << "; }\n";
+  }
+}
+
 void Entry::genDecls(XStr& str)
 {
   str << "/* DECLS: "; print(str); str << " */\n";
   genEpIdxDecl(str);
-  if(container->getChareType()==SGROUP)
+  if(container->getChareType()==SGROUP) {
     genGroupDecl(str);
-  else
+  } else if(container->getChareType()==SARRAY) {
+    genArrayDecl(str);
+  } else { // chare or mainchare
     genChareDecl(str);
-  // call function declaration
-  str << "    static void ";
-  str << " _call_";
-  genEpIdx(str);
-  str << "(";
-  if(param) {
-    str << "void* msg, ";
-  } else {
-    assert(isConstructor());
-    str << "CkArgMsg* msg, ";
   }
-  str << container->getBaseName();
-  if(container->isTemplated())
-    container->genVars(str);
-  str<< "* obj);\n";
+  // call function declaration
+  if(container->getChareType()==SARRAY && !param && isConstructor()) {
+    str << "    static void ";
+    str << " _call_" << name << "_ArrayElementCreateMessage(void* msg, ";
+    str << container->getBaseName();
+    if(container->isTemplated())
+      container->genVars(str);
+    str<< "* obj);\n";
+    str << "    static void ";
+    str << " _call_" << name << "_ArrayElementMigrateMessage(void* msg, ";
+    str << container->getBaseName();
+    if(container->isTemplated())
+      container->genVars(str);
+    str<< "* obj);\n";
+  } else {
+    str << "    static void ";
+    str << " _call_";
+    genEpIdx(str);
+    str << "(";
+    if(param) {
+      str << "void* msg, ";
+    } else {
+      assert(isConstructor());
+      str << "CkArgMsg* msg, ";
+    }
+    str << container->getBaseName();
+    if(container->isTemplated())
+      container->genVars(str);
+    str<< "* obj);\n";
+  }
 }
 
 void Entry::genEpIdxDef(XStr& str)
 {
-  if(container->isTemplated())
-    container->genSpec(str);
-  str << "int ";
-  container->genProxyName(str);
-  if(container->isTemplated())
-    container->genVars(str);
-  str << "::__idx_";
-  genEpIdx(str);
-  str << "=0;\n";
+  if(container->getChareType()==SARRAY && isConstructor() && !param) {
+    if(container->isTemplated())
+      container->genSpec(str);
+    str << "int ";
+    container->genProxyName(str);
+    if(container->isTemplated())
+      container->genVars(str);
+    str << "::__idx_" << name << "_ArrayElementCreateMessage=0;\n";
+    if(container->isTemplated())
+      container->genSpec(str);
+    str << "int ";
+    container->genProxyName(str);
+    if(container->isTemplated())
+      container->genVars(str);
+    str << "::__idx_" << name << "_ArrayElementMigrateMessage=0;\n";
+  } else {
+    if(container->isTemplated())
+      container->genSpec(str);
+    str << "int ";
+    container->genProxyName(str);
+    if(container->isTemplated())
+      container->genVars(str);
+    str << "::__idx_";
+    genEpIdx(str);
+    str << "=0;\n";
+  }
 }
 
 void Entry::genChareStaticConstructorDefs(XStr& str)
@@ -1167,6 +1339,46 @@ void Entry::genGroupStaticConstructorDefs(XStr& str)
   str << "}\n";
 }
 
+void Entry::genArrayStaticConstructorDefs(XStr& str)
+{
+  if(container->isTemplated())
+    container->genSpec(str);
+  str << "CkAID ";
+  container->genProxyName(str);
+  if(container->isTemplated())
+    container->genVars(str);
+  str << "::ckNew(int numElements)\n";
+  assert(param==0);
+  str << "{\n";
+  str << "  return CkAID(Array1D::CreateArray(numElements,ChareIndex(RRMap),\n";
+  str << "    ConstructorIndex(RRMap,ArrayMapCreateMessage),\n";
+  str << "    __idx, ConstructorIndex(";
+  str << name;
+  str << ", ArrayElementCreateMessage), ConstructorIndex(";
+  str << name;
+  str << ", ArrayElementMigrateMessage)),-1);\n";
+  str << "}\n";
+
+  if(container->isTemplated())
+    container->genSpec(str);
+  str << " ";
+  container->genProxyName(str);
+  if(container->isTemplated())
+    container->genVars(str);
+  str << "::";
+  container->genProxyName(str);
+  str << "(int numElements)\n";
+  str << "{\n";
+  str << "  setAid(Array1D::CreateArray(numElements, ChareIndex(RRMap),\n";
+  str << "    ConstructorIndex(RRMap,ArrayMapCreateMessage),\n";
+  str << "    __idx, ConstructorIndex(";
+  str << name;
+  str << ", ArrayElementCreateMessage), ConstructorIndex(";
+  str << name;
+  str << ", ArrayElementMigrateMessage))); _elem=-1;\n";
+  str << "}\n";
+}
+
 void Entry::genChareDefs(XStr& str)
 {
   if(isConstructor()) {
@@ -1204,84 +1416,142 @@ void Entry::genGroupDefs(XStr& str)
   }
 }
 
+void Entry::genArrayDefs(XStr& str)
+{
+  if(isConstructor()) {
+    genArrayStaticConstructorDefs(str);
+  } else {
+  }
+}
+
 void Entry::genDefs(XStr& str)
 {
   str << "/* DEFS: "; print(str); str << " */\n";
   genEpIdxDef(str);
-  if(container->getChareType()==SGROUP)
+  if(container->getChareType()==SGROUP) {
     genGroupDefs(str);
-  else
+  } else if (container->getChareType()==SARRAY) {
+    genArrayDefs(str);
+  } else
     genChareDefs(str);
   // call function
-  if(container->isTemplated())
-    container->genSpec(str);
-  str << " void ";
-  container->genProxyName(str);
-  if(container->isTemplated())
-    container->genVars(str);
-  str << "::_call_";
-  genEpIdx(str);
-  str << "(";
-  if(param) {
-    str << "void* msg, ";
-  } else {
-    assert(isConstructor());
-    str << "CkArgMsg* msg, ";
-  }
-  str << container->getBaseName();
-  if(container->isTemplated())
-    container->genVars(str);
-  str<< "* obj)\n";
-  str << "{\n";
-  if(isConstructor()) {
+  if(container->getChareType()==SARRAY && !param && isConstructor()) {
+    if(container->isTemplated())
+      container->genSpec(str);
+    str << " void ";
+    container->genProxyName(str);
+    if(container->isTemplated())
+      container->genVars(str);
+    str << "::_call_" << name << "_ArrayElementCreateMessage(void* msg,";
+    str << container->getBaseName();
+    if(container->isTemplated())
+      container->genVars(str);
+    str<< "* obj)\n";
+    str << "{\n";
     str << "  new (obj) " << container->getBaseName();
     if(container->isTemplated())
       container->genVars(str);
+    str << "((ArrayElementCreateMessage*)msg);\n}\n";
+    if(container->isTemplated())
+      container->genSpec(str);
+    str << " void ";
+    container->genProxyName(str);
+    if(container->isTemplated())
+      container->genVars(str);
+    str << "::_call_" << name << "_ArrayElementMigrateMessage(void* msg,";
+    str << container->getBaseName();
+    if(container->isTemplated())
+      container->genVars(str);
+    str<< "* obj)\n";
+    str << "{\n";
+    str << "  new (obj) " << container->getBaseName();
+    if(container->isTemplated())
+      container->genVars(str);
+    str << "((ArrayElementMigrateMessage*)msg);\n}\n";
+  } else {
+    if(container->isTemplated())
+      container->genSpec(str);
+    str << " void ";
+    container->genProxyName(str);
+    if(container->isTemplated())
+      container->genVars(str);
+    str << "::_call_";
+    genEpIdx(str);
+    str << "(";
     if(param) {
-      if(!param->isVoid()) {
-        str << "((";
-        param->print(str);
-        str << ")msg);\n";
+      str << "void* msg, ";
+    } else {
+      assert(isConstructor());
+      str << "CkArgMsg* msg, ";
+    }
+    str << container->getBaseName();
+    if(container->isTemplated())
+      container->genVars(str);
+    str<< "* obj)\n";
+    str << "{\n";
+    if(isConstructor()) {
+      str << "  new (obj) " << container->getBaseName();
+      if(container->isTemplated())
+        container->genVars(str);
+      if(param) {
+        if(!param->isVoid()) {
+          str << "((";
+          param->print(str);
+          str << ")msg);\n";
+        } else {
+          str << "();\n";
+          str<< "  CkFreeSysMsg(msg);\n";
+        }
       } else {
-        str << "();\n";
-        str<< "  CkFreeSysMsg(msg);\n";
+        str << "((CkArgMsg*)msg);\n";
       }
     } else {
-      str << "((CkArgMsg*)msg);\n";
+      str << "  obj->" << name << "(";
+      if(param->isVoid()) {
+        str << ");\n";
+        str << "  CkFreeSysMsg(msg);\n";
+      } else {
+        str << "(";
+        param->print(str);
+        str << ") msg);\n";
+      }
     }
-  } else {
-    str << "  obj->" << name << "(";
-    if(param->isVoid()) {
-      str << ");\n";
-      str << "  CkFreeSysMsg(msg);\n";
-    } else {
-      str << "(";
-      param->print(str);
-      str << ") msg);\n";
-    }
+    str << "}\n";
   }
-  str << "}\n";
 }
 
 void Entry::genReg(XStr& str)
 {
   str << "/* REG: "; print(str); str << " */\n";
-  str << "  __idx_";
-  genEpIdx(str);
-  str << " = CkRegisterEp(\"" << name << "\", "
-      << "(CkCallFnPtr)_call_";
-  genEpIdx(str);
-  str << ", ";
-  if(param && !param->isVoid()) {
-    param->genMsgProxyName(str);
-    str << "::__idx, ";
+  if(container->getChareType()==SARRAY && !param && isConstructor()) {
+    str << "  __idx_" << name << "_ArrayElementCreateMessage";
+    str << " = CkRegisterEp(\"" << name << "\", "
+        << "(CkCallFnPtr)_call_" << name << "_ArrayElementCreateMessage,";
+    str << "CMessage_ArrayElementCreateMessage::__idx, ";
+    str << "__idx);\n";
+    str << "  __idx_" << name << "_ArrayElementMigrateMessage";
+    str << " = CkRegisterEp(\"" << name << "\", "
+        << "(CkCallFnPtr)_call_" << name << "_ArrayElementMigrateMessage,";
+    str << "CMessage_ArrayElementMigrateMessage::__idx, ";
+    str << "__idx);\n";
   } else {
-    str << "0, ";
-  }
-  str << "__idx);\n";
-  if(container->getChareType()==SMAINCHARE && isConstructor()) {
-    str << "  CkRegisterMainChare(__idx, __idx_";
+    str << "  __idx_";
     genEpIdx(str);
-    str << ");\n";
+    str << " = CkRegisterEp(\"" << name << "\", "
+        << "(CkCallFnPtr)_call_";
+    genEpIdx(str);
+    str << ", ";
+    if(param && !param->isVoid()) {
+      param->genMsgProxyName(str);
+      str << "::__idx, ";
+    } else {
+      str << "0, ";
+    }
+    str << "__idx);\n";
+    if(container->getChareType()==SMAINCHARE && isConstructor()) {
+      str << "  CkRegisterMainChare(__idx, __idx_";
+      genEpIdx(str);
+      str << ");\n";
+    }
   }
 }

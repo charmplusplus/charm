@@ -41,7 +41,7 @@ ModuleList *modlist;
 %token MAINMODULE
 %token EXTERN
 %token READONLY
-%token <intval> CHARE GROUP
+%token <intval> CHARE GROUP ARRAY
 %token MESSAGE
 %token CLASS
 %token STACKSIZE
@@ -74,7 +74,7 @@ ModuleList *modlist;
 %type <ptype>		PtrType OnePtrType
 %type <readonly>	Readonly ReadonlyMsg
 %type <message>		Message TMessage
-%type <chare>		Chare Group TChare TGroup
+%type <chare>		Chare Group Array TChare TGroup TArray
 %type <entry>		Entry
 %type <templat>		Template
 %type <typelist>	BaseList OptBaseList TypeList
@@ -144,6 +144,8 @@ Construct	: OptExtern '{' ConstructList '}' OptSemiColon
 		| OptExtern Chare
 		{ $2->setExtern($1); $$ = $2; }
 		| OptExtern Group
+		{ $2->setExtern($1); $$ = $2; }
+		| OptExtern Array
 		{ $2->setExtern($1); $$ = $2; }
 		| OptExtern Template
 		{ $2->setExtern($1); $$ = $2; }
@@ -320,6 +322,10 @@ Group		: GROUP NamedType OptBaseList MemberEList
 		{ $$ = new Chare(SGROUP, $2, $3, $4); if($4) $4->setChare($$);}
 		;
 
+Array		: ARRAY NamedType OptBaseList MemberEList
+		{ $$ = new Chare(SARRAY, $2, $3, $4); if($4) $4->setChare($$);}
+		;
+
 TChare		: CHARE Name OptBaseList MemberEList
 		{ $$ = new Chare(SCHARE, new NamedType($2), $3, $4); 
                   if($4) $4->setChare($$);}
@@ -330,6 +336,11 @@ TChare		: CHARE Name OptBaseList MemberEList
 
 TGroup		: GROUP Name OptBaseList MemberEList
 		{ $$ = new Chare(SGROUP, new NamedType($2), $3, $4); 
+                  if($4) $4->setChare($$);}
+		;
+
+TArray		: ARRAY Name OptBaseList MemberEList
+		{ $$ = new Chare(SARRAY, new NamedType($2), $3, $4); 
                   if($4) $4->setChare($$);}
 		;
 
@@ -372,6 +383,8 @@ TemplateSpec	: TEMPLATE '<' TVarList '>'
 Template	: TemplateSpec TChare
 		{ $$ = new Template($1, $2); $2->setTemplate($$); }
 		| TemplateSpec TGroup
+		{ $$ = new Template($1, $2); $2->setTemplate($$); }
+		| TemplateSpec TArray
 		{ $$ = new Template($1, $2); $2->setTemplate($$); }
 		| TemplateSpec TMessage
 		{ $$ = new Template($1, $2); $2->setTemplate($$); }

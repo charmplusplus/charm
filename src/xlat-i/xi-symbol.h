@@ -128,6 +128,7 @@ class NamedType : public SimpleType {
     void genProxyName(XStr& str) { genChareProxyName(str); }
     void genChareProxyName(XStr& str) { str << chare_prefix() << name; }
     void genGroupProxyName(XStr& str) { str << group_prefix() << name; }
+    void genArrayProxyName(XStr& str) { str << array_prefix() << name; }
     void genMsgProxyName(XStr& str) { str << msg_prefix() << name; }
 };
 
@@ -267,6 +268,7 @@ class TEntity : public Printable {
 #define SCHARE 1
 #define SMAINCHARE 2
 #define SGROUP 3
+#define SARRAY 4
 
 /* Chare or group is a templated entity */
 
@@ -285,6 +287,7 @@ class Chare : public TEntity, public Construct {
     void print(XStr& str);
     void genChareDecls(XStr& str);
     void genGroupDecls(XStr& str);
+    void genArrayDecls(XStr& str);
     void genDecls(XStr& str);
     void genDefs(XStr& str);
     void genReg(XStr& str);
@@ -381,11 +384,15 @@ class Entry : public Member {
     void genChareStaticConstructorDecl(XStr& str);
     void genChareDecl(XStr& str);
     void genGroupStaticConstructorDecl(XStr& str);
+    void genArrayStaticConstructorDecl(XStr& str);
     void genGroupDecl(XStr& str);
+    void genArrayDecl(XStr& str);
     void genChareStaticConstructorDefs(XStr& str);
     void genChareDefs(XStr& str);
     void genGroupStaticConstructorDefs(XStr& str);
+    void genArrayStaticConstructorDefs(XStr& str);
     void genGroupDefs(XStr& str);
+    void genArrayDefs(XStr& str);
   public:
     Entry(int a, EnType *r, char *n, EnType *p, Value *sz=0) :
       attribs(a), retType(r), name(n), param(p), stacksize(sz)

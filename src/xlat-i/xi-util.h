@@ -31,6 +31,8 @@ static inline char *chare_prefix(void) { return "CProxy_"; }
 
 static inline char *group_prefix(void) { return "CProxy_"; }
 
+static inline char *array_prefix(void) { return "CProxy_"; }
+
 static inline char *msg_prefix(void) { return "CMessage_"; }
 
 class Printable {
