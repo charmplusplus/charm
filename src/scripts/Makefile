@@ -123,7 +123,7 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h trace.h charm-api.h\
 
 # The .c files are there to be #included by clients whole
 # This is a bit unusual, but makes client linking simpler.
-UTILHEADERS=pup.h pup_c.h ckhashtable.h cklists.h conv-lists.h \
+UTILHEADERS=pup.h pupf.h pup_c.h ckhashtable.h cklists.h conv-lists.h \
 	sockRoutines.h sockRoutines.c
 
 CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
