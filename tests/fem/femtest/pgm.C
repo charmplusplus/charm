@@ -292,6 +292,8 @@ printargs();
       int *nodes=new int[2*nSparse];
       double *data=new double[3*nSparse];
       FEM_Get_sparse(sparseNo,nodes,data);
+      //Clip off the ghost sparse elements:
+      nSparse=FEM_Mesh_get_length(FEM_Mesh_default_read(), FEM_SPARSE+sparseNo);
       double sum=0.0;
       for (int y=0;y<nSparse;y++) {
     	testAssert(nodes[2*y]>=0 && nodes[2*y]<nnodes,"Sparse nodes");
@@ -452,6 +454,7 @@ printargs();
       int *nodes=new int[2*nSparse];
       double *data=new double[3*nSparse];
       FEM_Get_sparse(sparseNo,nodes,data);
+      nSparse=FEM_Mesh_get_length(FEM_Mesh_default_read(), FEM_SPARSE+sparseNo);
       FEM_Set_sparse(sparseNo,nSparse,nodes,2,data,3,FEM_DOUBLE);
       delete[] nodes;
       delete[] data;
