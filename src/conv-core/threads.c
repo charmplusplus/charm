@@ -147,7 +147,7 @@ typedef struct CthThreadStruct
 
 char *CthGetData(CthThread t) { return t->data; }
 
-CthThread CthPup(pup_er p, CthThread t)
+CthThread CthPup(pup_er p, CthThread t, int *psz)
 {
   if(pup_isSizing(p)||pup_isPacking(p))
   {
@@ -157,16 +157,13 @@ CthThread CthPup(pup_er p, CthThread t)
     if (t->insched)
       CmiAbort("Trying to pack a thread in scheduler queue!!\n");
 #endif
-    pup_bytes(p, (void*) t, sizeof(CthThreadStruct));
+    *psz = 0;
+    pup_bytes(p, (void*) t, sizeof(CthThreadStruct)); 
+    *psz += sizeof(CthThreadStruct);
     pup_bytes(p, (void*) t->data, t->datasize);
+    *psz += t->datasize;
     pup_bytes(p, (void*) t->savedstack, t->savedsize);
-    if(pup_isPacking(p))
-    {
-      free((void*)(t->data));
-      free((void*)(t->savedstack));
-      free(t);
-      t = 0;
-    }
+    *psz += t->savedsize;
   }
   if(pup_isUnpacking(p))
   {
@@ -571,7 +568,9 @@ void CthFree(CthThread t)
   } 
   else 
   {
-    CmiAbort("Not implemented CthFree.\n");
+    if (t->data) free(t->data);
+    DeleteFiber(t->fiber);
+    free(t);
   }
 }
 
@@ -730,7 +729,7 @@ void CthAutoYieldUnblock()
   CthCpvAccess(CthCurrent)->autoyield_blocks --;
 }
 
-CthThread CthPup(pup_er p, CthThread t)
+CthThread CthPup(pup_er p, CthThread t, int *psz)
 {
   CmiAbort("CthPup not implemented.\n");
   return 0;
@@ -1146,7 +1145,13 @@ CthThread t;
   if (t==CthCpvAccess(CthCurrent)) {
     CthCpvAccess(CthExiting) = 1;
   } else {
-    CmiAbort("Not implemented CthFree.\n");
+    if (t->data) free(t->data);
+    if(t->slotnum >= 0)
+    {
+      free_slots(CpvAccess(myss), t->slotnum, t->nslots);
+      unmap_slots(t->slotnum, t->nslots);
+    }
+    free(t);
   }
 }
 
@@ -1320,13 +1325,14 @@ int size;
   return result;
 }
 
-CthThread CthPup(pup_er p, CthThread t)
+CthThread CthPup(pup_er p, CthThread t, int *psz)
 {
   qt_t *stackbase;
   int ssz;
 
   if(pup_isSizing(p)||pup_isPacking(p))
   {
+    *psz = 0;
 #ifndef CMK_OPTIMIZE
     if (CthCpvAccess(CthCurrent) == t)
       CmiAbort("Trying to pack a running thread!!\n");
@@ -1334,18 +1340,14 @@ CthThread CthPup(pup_er p, CthThread t)
       CmiAbort("Trying to pack a thread that is not migratable!!\n");
 #endif
     pup_bytes(p, (void*)t, sizeof(struct CthThreadStruct));
+    *psz += sizeof(struct CthThreadStruct);
     pup_bytes(p, (void*)t->data, t->datasize);
+    *psz += t->datasize;
     /* FIXME: Assumption stackp < stackbase */
     stackbase = QT_SP(t->stack, CpvAccess(_stksize));
     ssz = ((char*)(stackbase)-(char*)(t->stackp));
     pup_bytes(p, (void*)t->stackp, ssz);
-    if(pup_isPacking(p))
-    {
-      free((void *)t->data);
-      unmap_slots(t->slotnum, t->nslots);
-      free(t);
-      t = 0;
-    }
+    *psz += ssz;
   }
   if(pup_isUnpacking(p))
   {
@@ -1491,7 +1493,10 @@ CthThread t;
   if (t==CthCpvAccess(CthCurrent)) {
     CthCpvAccess(CthExiting) = 1;
   } else {
-    CmiAbort("Not implemented CthFree.\n");
+    CthMemoryUnprotect(t->protect, t->protlen);
+    if (t->data) free(t->data);
+    free(t->stack);
+    free(t);
   }
 }
 
@@ -1632,7 +1637,7 @@ int size;
   return result;
 }
 
-CthThread CthPup(pup_er p, CthThread t)
+CthThread CthPup(pup_er p, CthThread t, int *psz)
 {
   CmiAbort("CthPup not implemented.\n");
   return 0;

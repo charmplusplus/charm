@@ -774,7 +774,7 @@ typedef CthThread   (*CthThFn)();
 
 int        CthImplemented(void);
 
-CthThread  CthPup(pup_er, CthThread);
+CthThread  CthPup(pup_er, CthThread, int *);
 
 CthThread  CthSelf(void);
 CthThread  CthCreate(CthVoidFn, void *, int);
