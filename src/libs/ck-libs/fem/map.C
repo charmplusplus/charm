@@ -39,27 +39,29 @@ public:
 	int chunk;//Chunk number; or -1 if the list is empty
 	int localNo;//Local number of this entity on this chunk (if negative, is a ghost)
 	FEM_Symmetries_t sym; //Symmetries this entity was reached via
+	int layerNo; // -1 if real; if a ghost, our ghost layer number
 	chunkList *next;
 	chunkList() {chunk=-1;next=NULL;}
-	chunkList(int chunk_,int localNo_,FEM_Symmetries_t sym_) {
+	chunkList(int chunk_,int localNo_,FEM_Symmetries_t sym_,int ln_=-1) {
 		chunk=chunk_;
 		localNo=localNo_;
 		sym=sym_;
+		layerNo=ln_;
 		next=NULL;
 	}
 	~chunkList() {delete next;}
-	void set(int c,int l,FEM_Symmetries_t s) {
-		chunk=c; localNo=l; sym=s;
+	void set(int c,int l,FEM_Symmetries_t s,int ln) {
+		chunk=c; localNo=l; sym=s; layerNo=ln;
 	}
 	//Is this chunk in the list?  If so, return false.
 	// If not, add it and return true.
-	bool addchunk(int c,int l,FEM_Symmetries_t s) {
+	bool addchunk(int c,int l,FEM_Symmetries_t s,int ln) {
 		//Add chunk c to the list with local index l,
 		// if it's not there already
 		if (chunk==c && sym==s) return false;//Already in the list
-		if (chunk==-1) {set(c,l,s);return true;}
-		if (next==NULL) {next=new chunkList(c,l,s);return true;}
-		else return next->addchunk(c,l,s);
+		if (chunk==-1) {set(c,l,s,ln);return true;}
+		if (next==NULL) {next=new chunkList(c,l,s,ln);return true;}
+		else return next->addchunk(c,l,s,ln);
 	}
 	//Return this node's local number on chunk c (or -1 if none)
 	int localOnChunk(int c,FEM_Symmetries_t s) const {
@@ -248,7 +250,11 @@ class splitter {
 	unsigned char *ghostNode; //Flag: this node borders ghost elements [mesh->node.size()]
 	const int *canon; //Node canonicalization array (may be NULL)
 	const FEM_Symmetries_t *sym; //Node symmetries array (may be NULL)
+	int curGhostLayerNo; // For preventing duplicate ghost adds
 	int totGhostElem,totGhostNode; //For debugging printouts
+
+	///Add a ghost stencil: an explicit list of needed ghosts
+	void addStencil(const FEM_Ghost_Stencil &s,const FEM_Partition &partition);
 
 	/// Add an entire layer of ghost elements
 	void addLayer(const FEM_Ghost_Layer &g,const FEM_Partition &partition);
@@ -386,11 +392,11 @@ void splitter::buildCommLists(void)
 		for (e=0;e<src.size();e++) {
 			int c=elem2chunk[typeStart+e];
 			const int *srcConn=src.getConn().getRow(e);
-			gElem[t][e].set(c,dyn[c].addRealElement(t,e),noSymmetries);
+			gElem[t][e].set(c,dyn[c].addRealElement(t,e),noSymmetries,-1);
 			int lNo=dyn[c].node.size();
 			for (n=0;n<src.getNodesPer();n++) {
 				int gNo=srcConn[n];
-				if (gNode[gNo].addchunk(c,lNo,noSymmetries)) {
+				if (gNode[gNo].addchunk(c,lNo,noSymmetries,-1)) {
 					//Found a new local node
 					dyn[c].addRealNode(gNo);
 					lNo++;
@@ -737,8 +743,7 @@ public:
 //Add all the layers of ghost elements
 void splitter::addGhosts(const FEM_Partition &partition)
 {
-	int nLayers=partition.getLayers();
-	if (nLayers==0) return; //No ghost layers-- nothing to do
+	if (partition.getRegions()==0) return; //No ghost region-- nothing to do
 	
 //Build initial ghostNode table-- just the shared nodes
 	ghostNode=new unsigned char[mesh->node.size()];
@@ -755,46 +760,78 @@ void splitter::addGhosts(const FEM_Partition &partition)
 	    if (sym[n]!=(FEM_Symmetries_t)0)
 	      ghostNode[n]=1;
 
-// Add any stencils 
-	totGhostElem=0,totGhostNode=0; //For debugging
-
-	for (int t=0;t<mesh->elem.size();t++) 
-	  if (mesh->elem.has(t)) {
-		const FEM_Ghost_Stencil *s=partition.getGhostStencil(t);
-		if (s==NULL) continue;
-		s->check(*mesh);
-		int i,j,n=mesh->elem[t].size();
-		for (i=0;i<n;i++) {
-			const int *nbor;
-			j=0;
-			while (NULL!= (nbor=s->getNeighbor(i,j++))) {
-				/* Element i depends on element nbor[1],
-				   which is of type nbor[0]. */
-				addGlobalGhost(nbor[0],nbor[1],t,i, s->wantNodes());
-			}
+// Add all the ghost regions
+	curGhostLayerNo=0;
+	for (int regNo=0;regNo<partition.getRegions();regNo++)
+	{
+		const FEM_Ghost_Region &r=partition.getRegion(regNo);
+		totGhostElem=0,totGhostNode=0; //For debugging
+		int thisLayer=curGhostLayerNo;
+		
+		if (r.layer!=0) {
+			addLayer(*r.layer,partition);
+			curGhostLayerNo++;
 		}
-	}
-	
-	if (totGhostElem>0)
-	  CkPrintf("FEM Ghost stencil> %d new ghost elements, %d new ghost nodes\n",
-	       totGhostElem,totGhostNode);
-	
-//Add each layer
-	consistencyCheck();
-	for (int i=0;i<nLayers;i++) {
-		addLayer(partition.getLayer(i),partition);
-		consistencyCheck();
+		else if (r.stencil!=0) 
+		{ /* HACK: stencils don't update layer number until marker */
+			addStencil(*r.stencil,partition);
+		}
+		else {/* layer and stencil==0: a stencil layer marker */
+			curGhostLayerNo++;
+		}
+		
+		if (totGhostElem>0)
+		  CkPrintf("FEM Ghost %s %d> %d new ghost elements, %d new ghost nodes\n",
+		       r.layer?"layer":"stencil",
+		       1+thisLayer,
+		       totGhostElem,totGhostNode);
 	}
 	
 	delete[] ghostNode; ghostNode=NULL;
+}
+
+//Add a ghost stencil: an explicit list of needed ghosts
+void splitter::addStencil(const FEM_Ghost_Stencil &s,const FEM_Partition &partition)
+{
+	int t=s.getType();
+	s.check(*mesh);
+	int i,j,n=mesh->elem[t].size();
+	for (i=0;i<n;i++) {
+		const int *nbor;
+		j=0;
+		while (NULL!= (nbor=s.getNeighbor(i,j++))) {
+			/* Element i (of type t) depends on 
+			   element nbor[1] (of type nbor[0]) */
+			addGlobalGhost(nbor[0],nbor[1],t,i, s.wantNodes());
+		}
+	}
+}
+
+/// Add the real element (srcType,srcNum) as a ghost for use by (destType,destNum).
+///  This routine is used in adding stencils.
+void splitter::addGlobalGhost(
+	int srcType,int srcNum,  int destType,int destNum, bool doAddNodes)
+{
+	// Source is the real element
+	chunkList &srcC=gElem[srcType][srcNum];
+	// Loop over the list of real and ghost elements for dest:
+	for (chunkList *destC=&gElem[destType][destNum];
+		destC!=NULL;
+		destC=destC->next)
+	if (srcC.chunk!=destC->chunk // We're not on the same chunk
+	  && destC->layerNo<curGhostLayerNo  //I wasn't just added
+	)
+	{ // Add src as a ghost on the chunk of dest.
+		elemList src(srcC.chunk, srcC.localNo, srcType, (FEM_Symmetries_t)0);
+		elemList dest(destC->chunk, destC->localNo, destType, (FEM_Symmetries_t)0);
+		addGhostPair(src,dest,doAddNodes);
+	}
 }
 
 //Add one layer of ghost elements
 void splitter::addLayer(const FEM_Ghost_Layer &g,const FEM_Partition &partition)
 {
 	tupleTable table(g.nodesPerTuple);
-	
-	totGhostElem=0,totGhostNode=0; //For debugging
 	
 	//Build table mapping node-tuples to lists of adjacent elements
 	for (int t=0;t<mesh->elem.size();t++) 
@@ -836,9 +873,6 @@ void splitter::addLayer(const FEM_Ghost_Layer &g,const FEM_Partition &partition)
 					addGhostPair(*a,*b,g.addNodes);
 		}
 	}
-	
-	CkPrintf("FEM Ghost layer> %d new ghost elements, %d new ghost nodes\n",
-	       totGhostElem,totGhostNode);
 }
 
 
@@ -875,18 +909,6 @@ void splitter::addSymmetryGhost(const elemList &a)
 	CkAbort("FEM map> Mirror symmetry ghosts not yet supported");
 }
 
-/// Add the real element (srcType,srcNum) as a ghost for use by (destType,destNum).
-void splitter::addGlobalGhost(
-	int srcType,int srcNum,  int destType,int destNum, bool doAddNodes)
-{
-	chunkList &srcC=gElem[srcType][srcNum];
-	chunkList &destC=gElem[destType][destNum];
-	if (srcC.chunk!=destC.chunk) { // On separate chunks-- try to add them:
-		elemList src(srcC.chunk, srcC.localNo, srcType, (FEM_Symmetries_t)0);
-		elemList dest(destC.chunk, destC.localNo, destType, (FEM_Symmetries_t)0);
-		addGhostPair(src,dest,doAddNodes);
-	}
-}
 
 /**
  * Add a record for this ordered pair of adjacent elements:
@@ -1011,7 +1033,7 @@ int splitter::addGhostInner(const FEM_Entity &gEnt,int gNo, chunkList &gDest,
 	// hence hasn't been copied yet (it's sitting in the dyn array).
 	int destNo=destEnt.push_back(gEnt,gNo);
 	destEnt.setSymmetries(destNo,sym);
-	gDest.addchunk(destChunk,FEM_To_ghost_index(destNo),sym);
+	gDest.addchunk(destChunk,FEM_To_ghost_index(destNo),sym,curGhostLayerNo);
 	srcEnt.setGhostSend().add(srcChunk,srcNo,destChunk,destNo,
 		destEnt.setGhostRecv());
 	return destNo;

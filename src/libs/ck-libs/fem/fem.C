@@ -224,12 +224,14 @@ FEM_Partition::FEM_Partition()
 {
 	elem2chunk=NULL;
 	sym=NULL; 
-	for (int t=0;t<FEM_MAX_ELTYPE;t++) stencils[t]=0;
+	lastLayer=0;
 }
 FEM_Partition::~FEM_Partition() {
 	if (elem2chunk) {delete[] elem2chunk;elem2chunk=NULL;}
-	for (int i=0;i<getLayers();i++) delete layers[i];
-	for (int t=0;t<FEM_MAX_ELTYPE;t++) delete stencils[t];
+	for (int i=0;i<getRegions();i++) {
+		delete regions[i].layer;
+		delete regions[i].stencil;
+	}
 }
 
 void FEM_Partition::setPartition(const int *e, int nElem, int idxBase) {
@@ -915,7 +917,7 @@ CDECL void FEM_Add_ghost_stencil_type(int elType,int nElts,int addNodes,
 	FEMAPI("FEM_Add_ghost_stencil_type");
 	FEM_Ghost_Stencil *s=new FEM_Ghost_Stencil(
 		elType, nElts, addNodes==1, ends, adj2, 0);
-	FEM_curPartition().addGhostStencil(elType,s);
+	FEM_curPartition().addGhostStencil(s);
 }
 FDECL void FTN_NAME(FEM_ADD_GHOST_STENCIL_TYPE,fem_add_ghost_stencil_type)(
 	int *elType,int *nElts,int *addNodes,
@@ -924,7 +926,7 @@ FDECL void FTN_NAME(FEM_ADD_GHOST_STENCIL_TYPE,fem_add_ghost_stencil_type)(
 	FEMAPI("FEM_Add_ghost_stencil_type");
 	FEM_Ghost_Stencil *s=new FEM_Ghost_Stencil(
 		*elType, *nElts, *addNodes==1, ends, adj2, 1);
-	FEM_curPartition().addGhostStencil(*elType,s);
+	FEM_curPartition().addGhostStencil(s);
 }
 
 
@@ -981,6 +983,7 @@ CDECL void FEM_Add_ghost_stencil(int nElts,int addNodes,
 		CkError("FEM_Add_ghost_stencil: FEM thinks there are %d elements, but nElts is %d!\n",endsSrc,nElts);
 		CkAbort("FEM_Add_ghost_stencil elements mismatch!");
 	}
+	FEM_curPartition().markGhostStencilLayer();
 }
 FDECL void FTN_NAME(FEM_ADD_GHOST_STENCIL,fem_add_ghost_stencil)(
 	int *nElts,int *addNodes,

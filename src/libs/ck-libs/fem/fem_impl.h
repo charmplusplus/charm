@@ -293,6 +293,9 @@ public:
 	/// Make sure this stencil makes sense for this mesh.
 	void check(const FEM_Mesh &mesh) const;
 	
+	/// Return the type of element we describe
+	inline int getType(void) const {return elType;}
+	
 	/**
 	  Return a pair consisting of the i'th element's
 	  j'th neighbor: the return value's first int is an element type,
@@ -309,6 +312,17 @@ public:
 	inline bool wantNodes(void) const {return addNodes;}
 };
 
+/// Describes a way to grow a set of ghosts.
+class FEM_Ghost_Region {
+public:	
+	FEM_Ghost_Layer *layer;
+	FEM_Ghost_Stencil *stencil;
+	
+	FEM_Ghost_Region() {layer=0; stencil=0;}
+	FEM_Ghost_Region(FEM_Ghost_Layer *l) {layer=l; stencil=0;}
+	FEM_Ghost_Region(FEM_Ghost_Stencil *s) {layer=0; stencil=s;}
+};
+
 
 //Accumulates all symmetries of the mesh before splitting:
 class FEM_Initial_Symmetries; /*Defined in symmetries.C*/
@@ -318,10 +332,9 @@ class FEM_Partition : public CkNoncopyable {
 	/// Maps element number to (0-based) chunk number, allocated with new[]
 	int *elem2chunk;
 	
-	/// Describes the different layers of ghost elements:
-	CkVec<FEM_Ghost_Layer *> layers;
-	/// Describes explicit ghost stencils, for different element types
-	FEM_Ghost_Stencil *stencils[FEM_MAX_ELTYPE];
+	/// Describes the different regions of ghost elements:
+	CkVec<FEM_Ghost_Region> regions;
+	FEM_Ghost_Layer *lastLayer;
 	
 	/// Describes the problem domain's spatial symmetries.
 	FEM_Initial_Symmetries *sym;
@@ -335,25 +348,27 @@ public:
 	
 // Manipulate ghost layers
 	FEM_Ghost_Layer *addLayer(void) {
-		FEM_Ghost_Layer *l=new FEM_Ghost_Layer();
-		layers.push_back(l);
-		return l;
+		lastLayer=new FEM_Ghost_Layer();
+		regions.push_back(lastLayer);
+		return lastLayer;
 	}
 	FEM_Ghost_Layer *curLayer(void) {
-		if (layers.size()==0) CkAbort("Must call FEM_Add_ghost_layer before FEM_Add_ghost_elem\n");
-		return layers[layers.size()-1];
+		if (lastLayer==0) CkAbort("Must call FEM_Add_ghost_layer before FEM_Add_ghost_elem\n");
+		return lastLayer;
 	}
 	
-	int getLayers(void) const {return layers.size();}
-	const FEM_Ghost_Layer &getLayer(int layerNo) const {return *layers[layerNo];}
-
 // Manipulate ghost stencils
-	void addGhostStencil(int elType,FEM_Ghost_Stencil *s) {
-		stencils[elType]=s;
+	void addGhostStencil(FEM_Ghost_Stencil *s) {
+		regions.push_back(s);
+		lastLayer=0;
 	}
-	const FEM_Ghost_Stencil *getGhostStencil(int elType) const {
-		return stencils[elType];
+	void markGhostStencilLayer(void) {
+		regions.push_back(FEM_Ghost_Region());
 	}
+	
+// Read back ghost regions
+	int getRegions(void) const {return regions.size();}
+	const FEM_Ghost_Region &getRegion(int regNo) const {return regions[regNo];}
 	
 // Manipulate spatial symmetries:
 	void setSymmetries(int nNodes_,int *new_can,const int *sym_src);
