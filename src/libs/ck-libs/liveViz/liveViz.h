@@ -117,7 +117,7 @@ void liveVizPollDeposit(ArrayElement *from,
 
 inline void liveVizPollDeposit(ArrayElement *from,
                         double timestep,
-			const liveVizPollRequestMsg *reqMsg,
+			liveVizPollRequestMsg *reqMsg,
 			int startx, int starty,
 			int sizex, int sizey, const byte * imageData)
 {
