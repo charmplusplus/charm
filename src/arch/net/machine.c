@@ -1136,14 +1136,14 @@ static void CmiStdoutInit(void) {
 		
 		/*First, save a copy of the original stdout*/
 		writeStdout[i]=dup(srcFd);
-	#if 0
+#if 0
 		/*Build a pipe to connect to stdout (4kb buffer, but no SIGIO...)*/
 		if (-1==pipe(pair)) {perror("building stdio redirection pipe"); exit(1);}
-	#else
+#else
 	       /* UNIX socket (16kb default buffer, and works with SIGIO!) */
 		if (-1==socketpair(PF_UNIX,SOCK_STREAM,0,pair)) 
 			{perror("building stdio redirection socketpair"); exit(1);}
-	#endif
+#endif
 		readStdout[i]=pair[0]; /*We get the read end of pipe*/
 		if (-1==dup2(pair[1],srcFd)) {perror("dup2 redirection pipe"); exit(1);}
 		
