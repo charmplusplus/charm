@@ -15,6 +15,7 @@ Orion Sky Lawlor, olawlor@acm.org, 11/19/2001
 #include "charm-api.h"
 #include "tcharmc.h"
 #include "cklists.h"
+#include "isomalloc.h"
 
 //User's readonly global variables, set exactly once after initialization
 class TCharmReadonlys {
@@ -26,6 +27,8 @@ class TCharmReadonlys {
 	void pup(PUP::er &p);
 };
 PUPmarshall(TCharmReadonlys);
+
+class TCharmTraceLibList;
 
 #include "tcharm.decl.h"
 
@@ -82,7 +85,7 @@ class TCharm: public ArrayElement1D
 		void *getData(void) {return data;}
 		void pup(PUP::er &p);
 	};
-
+	
 	//One-time initialization
 	static void nodeInit(void);
  private:
@@ -96,6 +99,9 @@ class TCharm: public ArrayElement1D
 	
 	TCharmInitMsg *initMsg; //Thread initialization data
 	CthThread tid; //Our migratable thread
+	friend class TCharmAPIRoutine; //So he can get to heapBlocks:
+	CmiIsomallocBlockList *heapBlocks; //Migratable heap data
+	
 	bool isStopped;
 	ThreadInfo threadInfo;
 
@@ -164,6 +170,11 @@ class TCharm: public ArrayElement1D
 
 	//Go to sync, block, possibly migrate, and then resume
 	void migrate(void);
+
+	//Make subsequent malloc's go into our list:
+	inline void activateHeap(void) {
+		CmiIsomallocBlockListActivate(heapBlocks);
+	}
 };
 
 //Controls array startup, ready, run and shutdown
@@ -227,6 +238,40 @@ class TCharmSetupCookie {
 
 	static TCharmSetupCookie *get(void) {return theCookie;}
 };
+
+//Created in all API routines: disables/enables migratable malloc
+class TCharmAPIRoutine {
+ public:
+	TCharmAPIRoutine() { //Entering Charm++ from user code
+		//Disable migratable memory allocation while in Charm++:
+		CmiIsomallocBlockListActivate(NULL);
+	}
+	~TCharmAPIRoutine() { //Returning to user code from Charm++:
+		//Reenable migratable memory allocation
+		TCharm *tc=CtvAccess(_curTCharm);
+		if (tc!=NULL) tc->activateHeap();
+	}
+};
+
+#ifndef CMK_OPTIMIZE
+#  define TCHARM_API_TRACE(routineName,libraryName) \
+	TCharmAPIRoutine apiRoutineSentry;\
+	TCharmApiTrace(routineName,libraryName)
+#else
+#  define TCHARM_API_TRACE(routineName,libraryName) \
+	TCharmAPIRoutine apiRoutineSentry
+#endif
+void TCharmApiTrace(const char *routineName,const char *libraryName);
+
+/*The pattern:
+  TCHARMAPI("routineName");
+should be put at the start of every
+user-callable library routine.  The string name is
+used for debugging printouts, and eventually for
+tracing (once tracing is generalized).
+*/
+#define TCHARMAPI(routineName) TCHARM_API_TRACE(routineName,"tcharm");
+
 
 //Node setup callbacks: called at startup on each node
 FDECL void FTN_NAME(TCHARM_USER_NODE_SETUP,tcharm_user_node_setup)(void);

@@ -4,6 +4,7 @@ Threaded Charm++ "Framework Framework"
 Orion Sky Lawlor, olawlor@acm.org, 11/19/2001
  */
 #include "tcharm.h"
+#include <ctype.h>
 
 #if 0
     /*Many debugging statements:*/
@@ -24,6 +25,7 @@ static int lastNumChunks=0;
 void TCharm::nodeInit(void)
 {
   CtvInitialize(TCharm *,_curTCharm);
+  CtvAccess(_curTCharm)=NULL;
   CpvInitialize(inState,_stateTCharm);
   TCharm::setState(inNodeSetup);
   TCharmUserNodeSetup();
@@ -31,9 +33,45 @@ void TCharm::nodeInit(void)
   TCharm::setState(inInit);
 }
 
+class TCharmTraceLibList {
+	enum {maxLibs=20,maxLibNameLen=15};
+	//List of libraries we want to trace:
+	int curLibs;
+	char libNames[maxLibs][maxLibNameLen];
+public:
+	TCharmTraceLibList() {curLibs=0;}
+	void addTracing(const char *lib) 
+	{ //We want to trace this library-- add its name to the list.
+		CkPrintf("TCHARM> Will trace calls to library %s\n",lib);
+		int i;
+		for (i=0;0!=*lib;i++,lib++)
+			libNames[curLibs][i]=tolower(*lib);
+		libNames[curLibs][i]=0;
+		curLibs++;
+	}
+	int isTracing(const char *lib) const {
+		for (int i=0;i<curLibs;i++) 
+			if (0==strcmp(lib,libNames[i]))
+				return 1;
+		return 0;
+	}
+};
+TCharmTraceLibList tcharm_tracelibs;
+
+void TCharmApiTrace(const char *routineName,const char *libraryName)
+{
+	if (!tcharm_tracelibs.isTracing(libraryName)) return;
+	TCharm *tc=CtvAccess(_curTCharm);
+	char where[100];
+	if (tc==NULL) sprintf(where,"[serial context on %d]",CkMyPe());
+	else sprintf(where,"[vp %d, p %d]",tc->getElement(),CkMyPe());
+	CmiPrintf("%s Called routine %s\n",where,routineName);
+}
+
 static void startTCharmThread(TCharmInitMsg *msg)
 {
 	TCharm::setState(inDriver);
+	CtvAccess(_curTCharm)->activateHeap();
 	typedef void (*threadFn_t)(void *);
 	((threadFn_t)msg->threadFn)(msg->data);
 	CtvAccess(_curTCharm)->done();
@@ -59,6 +97,7 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
   threadInfo.tProxy=CProxy_TCharm(thisArrayID);
   threadInfo.thisElement=thisIndex;
   threadInfo.numElements=initMsg->numElements;
+  heapBlocks=CmiIsomallocBlockListNew();
   nUd=0;
   usesAtSync=CmiTrue;
   ready();
@@ -90,13 +129,14 @@ void TCharm::pup(PUP::er &p) {
 //Pup thread (EVIL & UGLY):
   //This seekBlock allows us to reorder the packing/unpacking--
   // This is needed because the userData depends on the thread's stack
-  // both at pack and unpack time.
+  // and heap data both at pack and unpack time.
   PUP::seekBlock s(p,2);
   if (p.isUnpacking()) 
-  {//In this case, unpack the thread before the user data
+  {//In this case, unpack the thread & heap before the user data
     s.seek(1);
     tid = CthPup((pup_er) &p, tid);
     CtvAccessOther(tid,_curTCharm)=this;
+    CmiIsomallocBlockListPup((pup_er) &p,&heapBlocks);
   }
   
   //Pack all user data
@@ -111,6 +151,7 @@ void TCharm::pup(PUP::er &p) {
   {//In this case, pack the thread after the user data
     s.seek(1);
     tid = CthPup((pup_er) &p, tid);
+    CmiIsomallocBlockListPup((pup_er) &p,&heapBlocks);
   }
   s.endBlock(); //End of seeking block
 }
@@ -136,6 +177,7 @@ void TCharm::UserData::pup(PUP::er &p)
 
 TCharm::~TCharm() 
 {
+  CmiIsomallocBlockListFree(heapBlocks);
   CthFree(tid);
   delete initMsg;
 }
@@ -265,6 +307,7 @@ void TCharmReadonlys::pup(PUP::er &p) {
 
 CDECL void TCharmReadonlyGlobals(TCpupReadonlyGlobal fn)
 {
+	TCHARMAPI("TCharmReadonlyGlobals");
 	if (TCharm::getState()!=inNodeSetup)
 		CkAbort("Can only call TCharmReadonlyGlobals from in TCharmUserNodeSetup!\n");
 	TCharmReadonlys::add(fn);
@@ -397,7 +440,10 @@ public:
     tcharm_nothreads|=CmiGetArgFlag(msg->argv,"+tcharm_nothreads");
     if (0!=tcharm_nothreads)
        CmiPrintf("TCHARM> Disabling thread support, for debugging\n");
-    
+    char *traceLibName=NULL;
+    while (CmiGetArgString(msg->argv,"+tcharm_trace",&traceLibName))
+       tcharm_tracelibs.addTracing(traceLibName);
+
     TCharmSetupCookie cookie(msg->argv);
     TCharmSetupCookie::theCookie=&cookie;
     g_numDefaultSetups=0;
@@ -445,9 +491,10 @@ void TCharmSetupCookie::setThreads(const CkArrayID &aid,int nel)
 TCharmSetupCookie::TCharmSetupCookie(char **argv_)
 {
 	magic=correctMagic;
-	stackSize=0;
 	argv=argv_;
 	coord=NULL;
+	stackSize=1*1024*1024; /*Default stack size is 1MB*/
+	CmiGetArgInt(argv,"+tcharm_stacksize",&stackSize);
 }
 
 
@@ -462,6 +509,7 @@ Callable from UserSetup:
 /*Set the size of the thread stack*/
 CDECL void TCharmSetStackSize(int newStackSize)
 {
+	TCHARMAPI("TCharmSetStackSize");
 	if (TCharm::getState()!=inInit)
 		CkAbort("TCharm> Can only set stack size from in init!\n");
 	cookie.setStackSize(newStackSize);
@@ -475,6 +523,7 @@ FDECL void FTN_NAME(TCHARM_SET_STACK_SIZE,tcharm_set_stack_size)
 CDECL void TCharmCreate(int nThreads,
 			TCharmThreadStartFn threadFn)
 {
+	TCHARMAPI("TCharmCreate");
 	TCharmCreateData(nThreads,
 			 (TCharmThreadDataStartFn)threadFn,NULL,0);
 }
@@ -488,6 +537,7 @@ CDECL void TCharmCreateData(int nThreads,
 		  TCharmThreadDataStartFn threadFn,
 		  void *threadData,int threadDataLen)
 {
+	TCHARMAPI("TCharmCreateData");
 	if (TCharm::getState()!=inInit)
 		CkAbort("TCharm> Can only create threads from in init!\n");
 	TCharmSetupCookie &cook=cookie;
@@ -508,12 +558,14 @@ FDECL void FTN_NAME(TCHARM_CREATE_DATA,tcharm_create_data)
 /*Get the unconsumed command-line arguments*/
 CDECL char **TCharmArgv(void)
 {
+	TCHARMAPI("TCharmArgv");
 	if (TCharm::getState()!=inInit)
 		CkAbort("TCharm> Can only get arguments from in init!\n");
 	return cookie.getArgv();
 }
 CDECL int TCharmArgc(void)
 {
+	TCHARMAPI("TCharmArgc");
 	if (TCharm::getState()!=inInit)
 		CkAbort("TCharm> Can only get arguments from in init!\n");
 	return CmiGetArgc(cookie.getArgv());
@@ -521,6 +573,7 @@ CDECL int TCharmArgc(void)
 
 CDECL int TCharmGetNumChunks(void)
 {
+	TCHARMAPI("TCharmGetNumChunks");
 	int nChunks=CkNumPes();
 	char **argv=TCharmArgv();
 	CmiGetArgInt(argv,"-vp",&nChunks);
@@ -538,9 +591,13 @@ FDECL int FTN_NAME(TCHARM_GET_NUM_CHUNKS,tcharm_get_num_chunks)(void)
 Callable from worker thread
 */
 CDECL int TCharmElement(void)
-{ return TCharm::get()->getElement();}
+{ 
+	TCHARMAPI("TCharmElement");
+	return TCharm::get()->getElement();
+}
 CDECL int TCharmNumElements(void)
 { 
+	TCHARMAPI("TCharmNumElements");
 	if (TCharm::getState()==inDriver)
 		return TCharm::get()->getNumElements();
 	else
@@ -562,12 +619,14 @@ static void checkAddress(void *data)
 
 CDECL int TCharmRegister(void *data,TCharmPupFn pfn)
 { 
+	TCHARMAPI("TCharmRegister");
 	checkAddress(data);
 	return TCharm::get()->add(TCharm::UserData(pfn,data));
 }
 FDECL int FTN_NAME(TCHARM_REGISTER,tcharm_register)
 	(void *data,TCpupUserDataF pfn)
 { 
+	TCHARMAPI("TCharm_Register");
 	checkAddress(data);
 	return TCharm::get()->add(TCharm::UserData(
 		pfn,data,TCharm::UserData::isFortran()));
@@ -575,6 +634,7 @@ FDECL int FTN_NAME(TCHARM_REGISTER,tcharm_register)
 
 CDECL void *TCharmGetUserdata(int id)
 {
+	TCHARMAPI("TCharmGetUserdata");
 	return TCharm::get()->lookupUserData(id);
 }
 FDECL void *FTN_NAME(TCHARM_GET_USERDATA,tcharm_get_userdata)(int *id)
@@ -582,15 +642,18 @@ FDECL void *FTN_NAME(TCHARM_GET_USERDATA,tcharm_get_userdata)(int *id)
 
 CDECL void TCharmMigrate(void)
 {
+	TCHARMAPI("TCharmMigrate");
 	TCharm::get()->migrate();
 }
 FDECL void FTN_NAME(TCHARM_MIGRATE,tcharm_migrate)(void)
 {
+	TCHARMAPI("TCharmMigrate");
 	TCharm::get()->migrate();
 }
 
 CDECL void TCharmBarrier(void)
 {
+	TCHARMAPI("TCharmBarrier");
 	TCharm::get()->barrier();
 }
 FDECL void FTN_NAME(TCHARM_BARRIER,tcharm_barrier)(void)
@@ -600,6 +663,7 @@ FDECL void FTN_NAME(TCHARM_BARRIER,tcharm_barrier)(void)
 
 CDECL void TCharmDone(void)
 {
+	TCHARMAPI("TCharmDone");
 	TCharm::get()->done();
 }
 FDECL void FTN_NAME(TCHARM_DONE,tcharm_done)(void)
