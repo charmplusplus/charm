@@ -44,6 +44,7 @@ public:
   inline complex conj(void) { return complex(re, -im); }
   inline void operator+=(complex a) { re+=a.re; im+=a.im; }
   inline bool operator==(complex a) const { return(re==a.re && im==a.im); }
+  inline bool operator!=(complex a) const { return(re!=a.re || im!=a.im); }
   inline void operator*=(complex a) {        
     double treal, tim;
     treal = re * a.re - im * a.im;

@@ -178,13 +178,13 @@ PairCalculator::acceptResult(int size, complex *matrix, int rowNum, CkCallback c
     complex *newiNdata=&mynewData[iN];
     for (int j = 0; j < grainSize; j++){ 
       m = matrix[iSindex + j];
-      if(!(m==zero))
+      if(m!=zero)
 	for (int p = 0; p < N; p++)
-	  if(!(inDataLeft[j][p]==zero))
+	  if(inDataLeft[j][p]!=zero)
 	    newiNdata[p] += inDataLeft[j][p] * m;
     }
   }
-  /*
+  /*  this one reads better but takes twice as long
   for (int i = 0; i < grainSize; i++) {
     for (int j = 0; j < grainSize; j++){ 
       m = matrix[index + j + i*S];
@@ -235,21 +235,6 @@ PairCalculator::sumPartialResult(int size, complex *result, int offset, CkCallba
       newData[k] = complex(0,0);
     }
   }
-}
-
-complex
-PairCalculator::compute_entry(int n, complex *psi1, complex *psi2, int op)
-{
-  // FIXME: should do 'op1' here!!!
-  double re=0, im = 0;
-  double *ptr1 = (double*)psi1;
-  double *ptr2 = (double*)psi2;
-  for (int i = 0; i < 2*n; i+=2){
-    re += ptr1[i]*ptr2[i] - ptr1[i+1]*ptr2[i+1];
-    im += ptr1[i+1]*ptr2[i] + ptr1[i]*ptr2[i+1];
-  }
-  complex sum(re,im);
-  return sum;
 }
 
 

@@ -32,7 +32,19 @@ class PairCalculator: public CBase_PairCalculator {
   void acceptResult(int size, complex *matrix, int rowNum, CkCallback cb);
   void sumPartialResult(int size, complex *result, int offset, CkCallback cb);
   void pup(PUP::er &);
-  inline complex compute_entry(int n, complex *psi1, complex *psi2, int op);
+  inline complex compute_entry(int n, complex *psi1, complex *psi2, int op) 
+    {
+      double re=0, im = 0;
+      double *ptr1 = (double*)psi1;
+      double *ptr2 = (double*)psi2;
+      for (int i = 0; i < 2*n; i+=2){
+	re += ptr1[i]*ptr2[i] - ptr1[i+1]*ptr2[i+1];
+	im += ptr1[i+1]*ptr2[i] + ptr1[i]*ptr2[i+1];
+      }
+  complex sum(re,im);
+  return sum;
+
+  }
  private:
   int numRecd, numExpected, grainSize, S, blkSize, N;
   int op1, op2;
