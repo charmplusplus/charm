@@ -219,7 +219,7 @@ MEMLIBS=$(L)/libmemory-default.o $(L)/libmemory-os.o $(L)/libmemory-gnu.o \
    $(L)/libmemory-verbose.o $(L)/libmemory-paranoid.o $(L)/libmemory-isomalloc.o
 
 CVLIBS=libconv-core.a \
-	libconv-cplus-n.a libconv-cplus-y.a libconv-util.a \
+	libconv-cplus-n.a libconv-cplus-y.a libconv-util.a libconv-utilf.a \
 	$(CLBLIBS) $(TRACELIBS) $(MEMLIBS) \
 	libccs-client.a
 
@@ -272,7 +272,7 @@ libconv-cplus-y.a: machine.c $(CVHEADERS)
 libconv-cplus-n.a: machine.c $(CVHEADERS)
 	$(CHARMC) -cp ../lib/ -o $@ -DFOR_CPLUS=0 machine.c
 
-libconv-util.a: $(LIBCONV_UTIL) libconv-utilf.a
+libconv-util.a: $(LIBCONV_UTIL) 
 	$(CHARMC) -cp ../lib/ -o $@ $(LIBCONV_UTIL)
 
 libconv-utilf.a: $(LIBCONV_UTILF)
