@@ -9,6 +9,8 @@
 
 #include "../sockRoutines.h"
 #include "../sockRoutines.c"
+#include "../ccs-auth.h"
+#include "../ccs-auth.c"
 #include "../ccs-server.h"
 #include "../ccs-server.c"
 
@@ -117,7 +119,10 @@ void ping_developers()
 {
 #ifdef NOTIFY
   char               info[1000];
-  struct sockaddr_in addr=skt_build_addr(0x80aef1d3,6571);
+  /*This is the resolved IP address of elegance.cs.uiuc.edu */
+  skt_ip_t destination_ip=skt_lookup_ip("128.174.241.211");
+  unsigned int destination_port=6571;
+  struct sockaddr_in addr=skt_build_addr(destination_ip,destination_port);
   SOCKET             skt;
   
   skt = socket(AF_INET, SOCK_DGRAM, 0);
@@ -218,17 +223,6 @@ char *skipstuff(char *p)
   return p;
 }
 
-char *text_ip(unsigned int ip)
-{
-  static char buffer[100];
-  sprintf(buffer,"%d.%d.%d.%d",
-	  (ip>>24)&0xFF,
-	  (ip>>16)&0xFF,
-	  (ip>>8)&0xFF,
-	  (ip>>0)&0xFF);
-  return buffer;
-}
-
 #if CMK_USE_RSH
 char *getenv_rsh()
 {
@@ -242,7 +236,7 @@ char *getenv_rsh()
 #if !defined(_WIN32) || defined(__CYGWIN__)
 char *getenv_display()
 {
-  static char result[100];
+  static char result[100],ipBuf[200];
   char *e, *p;
   
   e = getenv("DISPLAY");
@@ -250,7 +244,7 @@ char *getenv_display()
   p = strrchr(e, ':');
   if (p==0) return NULL;
   if ((e[0]==':')||(strncmp(e,"unix:",5)==0)) {
-    sprintf(result,"%s:%s",text_ip(skt_my_ip()),p+1);
+    sprintf(result,"%s:%s",skt_print_ip(ipBuf,skt_my_ip()),p+1);
   }
   else strcpy(result, e);
   return result;
@@ -558,6 +552,7 @@ int   arg_debug_no_pause;
 int   arg_local;	/* start node programs directly by exec on localhost */
 
 int   arg_help;		/* print help message */
+int   arg_usehostname;
 
 #if CMK_USE_RSH
 int   arg_maxrsh;
@@ -576,6 +571,7 @@ char *arg_currdir_r;
 
 int   arg_server;
 int   arg_server_port;
+char *arg_server_auth;
 
 void arg_init(int argc, char **argv)
 {
@@ -590,8 +586,10 @@ void arg_init(int argc, char **argv)
 #if CMK_CCS_AVAILABLE
   pparam_flag(&arg_server,       0, "server",        "Enable client-server (CCS) mode");
   pparam_int(&arg_server_port,   0, "server-port",   "Port to listen for CCS requests");
+  pparam_str(&arg_server_auth,   0, "server-auth",   "CCS Authentication file");
 #endif
   pparam_flag(&arg_local,	0, "local", "Start node programs locally without daemon");
+  pparam_flag(&arg_usehostname,  0, "usehostname", "Send nodes our symbolic hostname instead of IP address");
 #if CMK_USE_RSH
   pparam_flag(&arg_debug,         0, "debug",         "Run each node under gdb in an xterm window");
   pparam_flag(&arg_debug_no_pause,0, "debug-no-pause","Like debug, except doesn't pause at beginning");
@@ -719,7 +717,7 @@ char *nodetab_file_find()
 
 typedef struct nodetab_host {
   char    *name;  /*Host DNS name*/
-  unsigned int ip; /*IP address of host*/
+  skt_ip_t ip; /*IP address of host*/
   pathfixlist pathfixes;
   char    *ext;  /*FIXME: What the heck is this?  OSL 9/8/00*/
   int      cpus;  /* # of physical CPUs*/
@@ -747,7 +745,7 @@ int           nodetab_rank0_size;
 void nodetab_reset(nodetab_host *h)
 {
   h->name="SET_H->NAME";
-  h->ip=0;
+  h->ip=skt_invalid_ip;
   h->pathfixes = 0;
   h->ext = "*";
   h->speed = 1.0;
@@ -765,15 +763,6 @@ void nodetab_reset(nodetab_host *h)
 #endif
 }
 
-void showIP(unsigned int ip, char *str)
-{
-  int a1 = ip >> 24;
-  int a2 = (ip & 0xFF0000) >> 16;
-  int a3 = (ip & 0xFF00) >> 8;
-  int a4 = (ip & 0x00FF) ;
-  sprintf(str, "%d.%d.%d.%d", a1,a2,a3,a4);
-}
-
 void nodetab_add(nodetab_host *h)
 {
   if (h->rank == 0)
@@ -781,8 +770,8 @@ void nodetab_add(nodetab_host *h)
   nodetab_table[nodetab_size] = (nodetab_host *) malloc(sizeof(nodetab_host));
 
   if (arg_verbose) {
-    char ips[100];
-    showIP(h->ip, ips);
+    char ips[200];
+    skt_print_ip(ips,h->ip);
     printf("Charmrun> adding client %d: \"%s\", IP:%s\n", nodetab_size, h->name, ips);
   }
 
@@ -793,7 +782,7 @@ void nodetab_makehost(char *name,nodetab_host *h)
 {
   h->name=strdup(name);
   h->ip = skt_innode_lookup_ip(name);
-  if (h->ip==-1) {
+  if (skt_ip_match(h->ip,skt_invalid_ip)) {
     fprintf(stderr,"ERROR> Cannot obtain IP address of %s\n", name);
     exit(1);
   }
@@ -946,17 +935,13 @@ nodetab_host *nodetab_getinfo(int i)
     fprintf(stderr,"ERROR> Node table not initialized.\n");
     exit(1);
   }
-  if ((i<0)||(i>=nodetab_size)) {
-    fprintf(stderr,"ERROR> No such node %d\n",i);
-    exit(1);
-  }
   return nodetab_table[i];
 }
 
 char        *nodetab_name(int i)     { return nodetab_getinfo(i)->name; }
 pathfixlist  nodetab_pathfixes(int i){ return nodetab_getinfo(i)->pathfixes; }
 char        *nodetab_ext(int i)      { return nodetab_getinfo(i)->ext; }
-unsigned int nodetab_ip(int i)       { return nodetab_getinfo(i)->ip; }
+skt_ip_t     nodetab_ip(int i)       { return nodetab_getinfo(i)->ip; }
 unsigned int nodetab_cpus(int i)     { return nodetab_getinfo(i)->cpus; }
 unsigned int nodetab_rank(int i)     { return nodetab_getinfo(i)->rank; }
 int          nodetab_dataport(int i) { return nodetab_getinfo(i)->dataport; }
@@ -980,35 +965,28 @@ char        *nodetab_passwd(int i)   { return nodetab_getinfo(i)->passwd; }
  *
  ****************************************************************************/
 
-typedef struct {
-	ChMessageInt_t nPE,IP,dataport;
-} single_nodeinfo;
-
-static single_nodeinfo *nodeinfo_arr;/*Indexed by node number.*/
+static ChNodeinfo *nodeinfo_arr;/*Indexed by node number.*/
 
 void nodeinfo_allocate(void)
 {
-	nodeinfo_arr=(single_nodeinfo *)malloc(nodetab_rank0_size*sizeof(single_nodeinfo));
+	nodeinfo_arr=(ChNodeinfo *)malloc(nodetab_rank0_size*sizeof(ChNodeinfo));
 }
-void nodeinfo_add(const ChMessageInt_t *nodeInfo,SOCKET ctrlfd)
+void nodeinfo_add(const ChSingleNodeinfo *in,SOCKET ctrlfd)
 {
-	single_nodeinfo i;
-	int node=ChMessageInt(nodeInfo[0]);
+	int node=ChMessageInt(in->nodeNo);
+	ChNodeinfo i=in->info;
 	int nt,pe;
 	if (node<0 || node>=nodetab_rank0_size)
 		{fprintf(stderr,"Unexpected node %d registered!\n",node);exit(1);}
 	nt=nodetab_rank0_table[node];/*Nodetable index for this node*/
 	i.nPE=ChMessageInt_new(nodetab_cpus(nt));
+	i.IP=nodetab_ip(node);
 #if CMK_USE_GM
-        i.IP=nodeInfo[1];
-        i.dataport=ChMessageInt_new(nodetab_dataport(nt));
-        if (ChMessageInt(i.IP) == 0) {
+        if (ChMessageInt(in->dataport)==0) {
           fprintf(stderr, "Error> Node %d:%s, cannot open GM gm_port %d!\n", nt, nodetab_name(nt), nodetab_dataport(nt));
           portOk = 0;
         }
-#else
-	i.IP=ChMessageInt_new(nodetab_ip(nt));
-	i.dataport=nodeInfo[1];
+        i.dataport=ChMessageInt_new(nodetab_dataport(nt));
 #endif
 	nodeinfo_arr[node]=i;
 	for (pe=0;pe<nodetab_cpus(nt);pe++)
@@ -1017,9 +995,9 @@ void nodeinfo_add(const ChMessageInt_t *nodeInfo,SOCKET ctrlfd)
 	    nodetab_table[nt+pe]->ctrlfd=ctrlfd;
 	  }
         if (arg_verbose) {
-	  char ips[100];
-	  showIP(nodetab_ip(nt), ips);
-	  printf("Charmrun> client %d connected: IP:%s port:%d\n", nt, ips, ChMessageInt(nodeInfo[1]));
+	  char ips[200];
+	  skt_print_ip(ips,nodetab_ip(nt));
+	  printf("Charmrun> client %d connected (IP=%s)\n", nt, ips);
 	}
 }
 
@@ -1128,19 +1106,26 @@ by forwarding the request to the appropriate node.
  */
 void req_ccs_connect(void)
 {
-  ChMessageHeader ch;/*Make a charmrun header*/
-  CcsImplHeader hdr;/*Ccs internal header*/
+  struct {
+   ChMessageHeader ch;/*Make a charmrun header*/
+   CcsImplHeader hdr;/*Ccs internal header*/
+  } h;
   void *reqData;/*CCS request data*/
   int pe,reqBytes;
-  if (0==CcsServer_recvRequest(&hdr,&reqData))
+  if (0==CcsServer_recvRequest(&h.hdr,&reqData))
     return;/*Malformed request*/
-  pe=ChMessageInt(hdr.pe);
-  reqBytes=ChMessageInt(hdr.len);
+  pe=ChMessageInt(h.hdr.pe);
+  reqBytes=ChMessageInt(h.hdr.len);
+
+  if (pe<0 || pe>=nodetab_size) {
+	pe=0;
+	h.hdr.pe=ChMessageInt_new(pe);
+  }
 
   /*Fill out the charmrun header & forward the CCS request*/
-  ChMessageHeader_new("req_fw",sizeof(hdr)+reqBytes,&ch);
-  skt_sendN(nodetab_ctrlfd(pe),&ch,sizeof(ch));
-  skt_sendN(nodetab_ctrlfd(pe),&hdr,sizeof(hdr));
+  ChMessageHeader_new("req_fw",sizeof(h.hdr)+reqBytes,&h.ch);  
+
+  skt_sendN(nodetab_ctrlfd(pe),&h,sizeof(h));
   skt_sendN(nodetab_ctrlfd(pe),reqData,reqBytes);
   free(reqData);
 }
@@ -1150,9 +1135,9 @@ Forward the CCS reply (if any) back to the original requestor,
 on the original request socket.
  */
 void req_ccs_reply_fw(ChMessage *msg) {
-  SOCKET fd=(SOCKET)ChMessageInt(*(ChMessageInt_t *)msg->data);
-  CcsServer_sendReply(fd,msg->len-sizeof(ChMessageInt_t),
-		      msg->data+sizeof(ChMessageInt_t));
+  CcsImplHeader *hdr=(CcsImplHeader *)msg->data;
+  CcsServer_sendReply(hdr,msg->len-sizeof(CcsImplHeader),
+		      msg->data+sizeof(CcsImplHeader));
   ChMessage_free(msg);
 }
 
@@ -1199,12 +1184,12 @@ routines that actually respond to the request.
  */
 int req_handle_initnode(ChMessage *msg,SOCKET fd)
 {
-  if (msg->len!=2*sizeof(ChMessageInt_t)) {
-    fprintf(stderr,"Charmrun: Bad initnode data. Aborting\n");
+  if (msg->len!=sizeof(ChSingleNodeinfo)) {
+    fprintf(stderr,"Charmrun: Bad initnode data length. Aborting\n");
     fprintf(stderr,"Charmrun: possibly because: %s.\n", msg->data);
     exit(1);
   }
-  nodeinfo_add((ChMessageInt_t *)msg->data,fd);
+  nodeinfo_add((ChSingleNodeinfo *)msg->data,fd);
   return REQ_OK;
 }
 
@@ -1215,12 +1200,12 @@ int req_handle_initnodetab(ChMessage *msg,SOCKET fd)
 {
 	ChMessageHeader hdr;
 	ChMessageInt_t nNodes=ChMessageInt_new(nodetab_rank0_size);
-	ChMessageHeader_new("initnodetab",sizeof(ChMessageInt_t)*(1+3*nodetab_rank0_size),
-		&hdr);
+	ChMessageHeader_new("initnodetab",sizeof(ChMessageInt_t)+
+			    sizeof(ChNodeinfo)*nodetab_rank0_size,&hdr);
 	skt_sendN(fd,(const char *)&hdr,sizeof(hdr));
 	skt_sendN(fd,(const char *)&nNodes,sizeof(nNodes));
 	skt_sendN(fd,(const char *)nodeinfo_arr,
-		  sizeof(ChMessageInt_t)*3*nodetab_rank0_size);
+		  sizeof(ChNodeinfo)*nodetab_rank0_size);
 	return REQ_OK;
 }
 
@@ -1400,7 +1385,8 @@ void req_poll()
 
 
 
-static unsigned int server_ip,server_port;
+static unsigned int server_port;
+static char server_addr[1024];/* IP address or hostname of charmrun*/
 static SOCKET server_fd;
 
 int client_connect_problem(int code,const char *msg)
@@ -1421,7 +1407,8 @@ void req_client_connect(void)
 	skt_set_abort(client_connect_problem);
 	for (client=0;client<req_nClients;client++)
 	{/*Wait for the next client to connect to our server port.*/
-		unsigned int clientIP,clientPort;/*These are actually ignored*/
+		unsigned int clientPort;/*These are actually ignored*/
+		skt_ip_t clientIP;
 		if (arg_verbose) printf("Charmrun> Waiting for %d-th client to connect.\n",client);
 		if (0==skt_select1(server_fd,arg_timeout*1000))
 			client_connect_problem(client,"Timeout waiting for node-program to connect");
@@ -1448,18 +1435,22 @@ void req_client_connect(void)
 /*Start the server socket the clients will connect to.*/
 void req_start_server(void)
 {
+  skt_ip_t ip=skt_innode_my_ip();
+  if (arg_usehostname || skt_ip_match(ip,skt_lookup_ip("127.0.0.1")))
+    /*Use symbolic host name as charmrun address*/
+    gethostname(server_addr,sizeof(server_addr));
+  else
+    skt_print_ip(server_addr,ip);
+
   server_port = 0;
-  server_ip=skt_innode_my_ip();
   server_fd=skt_server(&server_port);
 
   if (arg_verbose) {
-    char ips[100];
-    showIP(server_ip, ips);
-    printf("Charmrun> Charmrun node IP = %s, port = %d\n", ips, server_port);
+    printf("Charmrun> Charmrun = %s, port = %d\n", server_addr, server_port);
   }
   
 #if CMK_CCS_AVAILABLE
-  if(arg_server == 1) CcsServer_new(NULL,&arg_server_port);
+  if(arg_server == 1) CcsServer_new(NULL,&arg_server_port,arg_server_auth);
 #endif
 }
 
@@ -1540,13 +1531,13 @@ string return idiom.
 */
 char *create_netstart(int node)
 {
-  static char dest[80];
+  static char dest[1024];
   int port = 0;
 #if CMK_USE_GM
   /* send myrinet port to node program */
   port = nodetab_dataport(node);
 #endif
-  sprintf(dest,"%d %d %d %d %d",node,server_ip,server_port,getpid()&0x7FFF, port);
+  sprintf(dest,"%d %s %d %d %d",node,server_addr,server_port,getpid()&0x7FFF, port);
   return dest;
 }
 
