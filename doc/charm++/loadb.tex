@@ -324,9 +324,8 @@ Please note that linking a load balancing module is different from activating it
 \begin{itemize}
 \item link a LB module: is to link a Load Balancer module(library) at 
    compile time; You can link against multiple LB libraries as candidates.
-\item activate a LB: is to actually ask to create a LB strategy and 
-   start it. You can only activate one LB either at compile time or at
-   run-time and the LB module must be one of the LB module linked at 
+\item activate a LB: is to actually ask tun-time to create a LB strategy and 
+   start it. You can only activate load balancers that have been linked at
    compile time.
 \end{itemize}
 
