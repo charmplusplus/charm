@@ -230,11 +230,11 @@ void LogPool::add(UChar type,UShort mIdx,UShort eIdx,double time,int event,int p
   new (&pool[numEntries++])
     LogEntry(time, type, mIdx, eIdx, event, pe, ml);
   if(poolSize==numEntries) {
-    double writeTime = CkTimer();
+    double writeTime = TraceTimer();
     writeLog();
     numEntries = 0;
     new (&pool[numEntries++]) LogEntry(writeTime, BEGIN_INTERRUPT);
-    new (&pool[numEntries++]) LogEntry(CkTimer(), END_INTERRUPT);
+    new (&pool[numEntries++]) LogEntry(TraceTimer(), END_INTERRUPT);
   }
 }
 
