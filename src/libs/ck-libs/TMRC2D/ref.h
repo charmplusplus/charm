@@ -2,6 +2,9 @@
 #define REF_H
 #include <charm++.h>
 
+#define TMRDEBUG(x) x
+//#define TMRDEBUG(x) 
+
 class objRef { // a reference to a piece of data that may be remotely located
  public:
   int cid, idx;

@@ -15,8 +15,8 @@
 #include "messages.h"
 #include "mpi.h"
 
-//#define DEBUGREF(x) x
-#define DEBUGREF(x) 
+#define DEBUGREF(x) x
+//#define DEBUGREF(x) 
 
 // ------------------------ Global Read-only Data ---------------------------
 extern CProxy_chunk mesh;
@@ -91,6 +91,12 @@ public:
 class refineResults; //Used by refinement API to store intermediate results
 class coarsenResults; 
 
+typedef struct prioLockStruct {
+  int holder;
+  double prio;
+  prioLockStruct *next;
+} *prioLockRequests;
+
 // ---------------------------- Chare Arrays -------------------------------
 class chunk : public TCharmClient1D {
   // current sizes of arrays allocated for the mesh
@@ -149,6 +155,10 @@ class chunk : public TCharmClient1D {
 
   // range of occupied slots in each mesh array
   int elementSlots, edgeSlots, nodeSlots;
+
+  int lock, lockHolder, lockCount;
+  double lockPrio;
+  prioLockRequests lockList;
 
   // Basic constructors
   chunk(chunkMsg *);
@@ -252,6 +262,13 @@ class chunk : public TCharmClient1D {
   void debug_print(int c);
   void out_print();
   void dump();
+
+  intMsg *lockChunk(int lh, double prio);
+  void unlockChunk(int lh);
+  int lockLocalChunk(int lh, double prio);
+  void unlockLocalChunk(int lh);
+  void removeLock(int lh);
+  void insertLock(int lh, double prio);
 };
 
 #endif

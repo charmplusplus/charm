@@ -53,5 +53,7 @@ module refine {
     entry [sync] void removeNode(int);
     entry [sync] void removeEdge(int);
     entry [sync] void removeElement(int);
+    entry [sync] intMsg *lockChunk(int lh, double prio);
+    entry [sync] void unlockChunk(int lh);
   };
 };
