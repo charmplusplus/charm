@@ -3,7 +3,7 @@ module MetisLB {
 extern module CentralLB;
 initnode void lbinit(void);
 group [migratable] MetisLB : CentralLB {
-  entry void MetisLB(void);  
+  entry void MetisLB(const CkLBOptions &);  
 };
 
 };

@@ -22,7 +22,7 @@ void CreateNeighborLB();
 
 class NeighborLB : public NborBaseLB {
 public:
-  NeighborLB();
+  NeighborLB(const CkLBOptions &);
   NeighborLB(CkMigrateMessage *m):NborBaseLB(m) {}
 private:
   CmiBool QueryBalanceNow(int step) { return CmiTrue; };

@@ -19,6 +19,8 @@
 #include "CommLBHeap.h"
 #define CUT_OFF_FACTOR 1.200
 
+void CreateCommLB();
+
 struct graph{
   int id;
   int data;
@@ -26,14 +28,12 @@ struct graph{
   struct graph * next;
 };
 
-void CreateCommLB();
-
 class CommLB : public CentralLB {
 public:
   int nobj,npe, nmigobj;
   double ** alloc_array;
   graph * object_graph;
-  CommLB();
+  CommLB(const CkLBOptions &);
   CommLB(CkMigrateMessage *m);
 private:
   CentralLB::LDStats* stats;

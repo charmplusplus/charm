@@ -27,7 +27,7 @@ public:
     int    id;
   };
 
-  GreedyLB();
+  GreedyLB(const CkLBOptions &);
   GreedyLB(CkMigrateMessage *m):CentralLB(m) {}
   void work(LDStats* stats,int count);
 private:

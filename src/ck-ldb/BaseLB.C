@@ -15,12 +15,16 @@
 
 #if CMK_LBDB_ON
 
-BaseLB::BaseLB() {
+BaseLB::BaseLB(const CkLBOptions &opt) {
+  seqno = opt.getSeqNo();
   CkpvAccess(numLoadBalancers) ++;
+/*
   if (CkpvAccess(numLoadBalancers) - CkpvAccess(hasNullLB) > 1)
     CmiAbort("Error: try to create more than one load balancer strategies!");
+*/
   theLbdb = CProxy_LBDatabase(lbdb).ckLocalBranch();
   lbname = "Unknown";
+  theLbdb->addLoadbalancer(this, seqno);
 }
 
 void BaseLB::unregister() {
@@ -30,7 +34,7 @@ void BaseLB::unregister() {
 }
 
 #else
-BaseLB::BaseLB() {}
+BaseLB::BaseLB(int seq) {}
 void BaseLB::unregister() {}
 #endif
 

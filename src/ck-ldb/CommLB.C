@@ -32,13 +32,9 @@ Status:
 #define alpha PER_MESSAGE_SEND_OVERHEAD  /*Startup time per message, seconds*/
 #define beeta PER_BYTE_SEND_OVERHEAD     /*Long-message time per byte, seconds*/
 
-void CreateCommLB()
-{
-    loadbalancer = CProxy_CommLB::ckNew();
-}
+CreateLBFunc_Def(CommLB);
 
 static void lbinit(void) {
-//        LBSetDefaultCreate(CreateCommLB);        
   LBRegisterBalancer("CommLB", CreateCommLB, "Greedy algorithm which takes communication graph into account");
 }
 
@@ -46,7 +42,7 @@ static void lbinit(void) {
 
 #include "manager.h"
 
-CommLB::CommLB()
+CommLB::CommLB(const CkLBOptions &opt): CentralLB(opt)
 {
     lbname = "CommLB";
     if (CkMyPe() == 0)

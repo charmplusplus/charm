@@ -32,23 +32,25 @@ class LBSimulation;
 /// for backward compatibility
 typedef LBMigrateMsg  CLBMigrateMsg;
 
-class CentralLB : public CBase_CentralLB
+class CentralLB : public BaseLB
 {
 public:
-  CentralLB();
+  CentralLB(const CkLBOptions &);
   virtual ~CentralLB();
-  CentralLB(CkMigrateMessage *m):CBase_CentralLB(m) {}
+  CentralLB(CkMigrateMessage *m):BaseLB(m) {}
 
   void turnOn();
   void turnOff();
+  inline int step() { return theLbdb->step(); }
   int useDefCtor(void){ return 1; }
+
   static void staticAtSync(void*);
   void AtSync(void); // Everything is at the PE barrier
   void ProcessAtSync(void); // Receive a message from AtSync to avoid
                             // making projections output look funny
 
   void ReceiveStats(CkMarshalledCLBStatsMessage &msg);	// Receive stats on PE 0
-  void ResumeClients(void);                     // Resuming clients needs
+  void ResumeClients(int);                     // Resuming clients needs
 	                                        // to be resumed via message
   void ReceiveMigration(LBMigrateMsg *); 	// Receive migration data
 
@@ -61,7 +63,6 @@ public:
   void Migrated(LDObjHandle h);
 
   void MigrationDone(int balancing);  // Call when migration is complete
-  int step() { return mystep; };
 
   struct ProcStats {  // per processor data
     double total_walltime;
@@ -135,8 +136,7 @@ protected:
 //  void removeNonMigratable(LDStats* statsDataList, int count);
 
 private:  
-
-  int mystep;
+  CProxy_CentralLB thisProxy;
   int myspeed;
   int stats_msg_count;
   CLBStatsMsg **statsMsgsList;

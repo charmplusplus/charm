@@ -19,12 +19,7 @@
 
 #include "RandRefLB.h"
 
-void CreateRandRefLB()
-{
-  //  CkPrintf("[%d] creating RandRefLB %d\n",CkMyPe(),loadbalancer);
-  loadbalancer = CProxy_RandRefLB::ckNew();
-  //  CkPrintf("[%d] created RandRefLB %d\n",CkMyPe(),loadbalancer);
-}
+CreateLBFunc_Def(RandRefLB);
 
 static void lbinit(void) {
 //        LBSetDefaultCreate(CreateRandRefLB);
@@ -33,7 +28,7 @@ static void lbinit(void) {
 
 #include "RandRefLB.def.h"
 
-RandRefLB::RandRefLB()
+RandRefLB::RandRefLB(const CkLBOptions &opt): RandCentLB(opt)
 {
   lbname = "RandRefLB";
   if (CkMyPe() == 0)

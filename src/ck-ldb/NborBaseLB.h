@@ -16,8 +16,6 @@
 #include <BaseLB.h>
 #include "NborBaseLB.decl.h"
 
-extern CkGroupID nborBaselb;
-
 void CreateNborBaseLB();
 
 /// for backward compatibility
@@ -25,11 +23,13 @@ typedef LBMigrateMsg NLBMigrateMsg;
 
 class NLBStatsMsg;
 
-class NborBaseLB : public CBase_NborBaseLB
+class NborBaseLB : public BaseLB
 {
+private:
+  CProxy_NborBaseLB  thisProxy;
 public:
-  NborBaseLB();
-  NborBaseLB(CkMigrateMessage *m):CBase_NborBaseLB(m) {}
+  NborBaseLB(const CkLBOptions &);
+  NborBaseLB(CkMigrateMessage *m):BaseLB(m) {}
   ~NborBaseLB();
 
   int useDefCtor(void){ return 1; }

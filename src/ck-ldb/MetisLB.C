@@ -18,12 +18,7 @@
 
 #include "MetisLB.h"
 
-void CreateMetisLB()
-{
-  // CkPrintf("[%d] creating MetisLB %d\n",CkMyPe(),loadbalancer);
-  loadbalancer = CProxy_MetisLB::ckNew();
-  // CkPrintf("[%d] created MetisLB %d\n",CkMyPe(),loadbalancer);
-}
+CreateLBFunc_Def(MetisLB);
 
 static void lbinit(void) {
 //        LBSetDefaultCreate(CreateMetisLB);
@@ -32,7 +27,7 @@ static void lbinit(void) {
 
 #include "MetisLB.def.h"
 
-MetisLB::MetisLB()
+MetisLB::MetisLB(const CkLBOptions &opt): CentralLB(opt)
 {
   lbname = "MetisLB";
   if (CkMyPe() == 0)

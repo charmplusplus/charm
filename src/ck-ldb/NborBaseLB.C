@@ -18,14 +18,9 @@
 #include "NborBaseLB.h"
 #include "NborBaseLB.def.h"
 
-CkGroupID nborBaselb;
-
 #if CMK_LBDB_ON
 
-void CreateNborBaseLB()
-{
-  nborBaselb = CProxy_NborBaseLB::ckNew();
-}
+//CreateLBFunc_Def(NborBaseLB);
 
 void NborBaseLB::staticMigrated(void* data, LDObjHandle h)
 {
@@ -41,10 +36,11 @@ void NborBaseLB::staticAtSync(void* data)
   me->AtSync();
 }
 
-NborBaseLB::NborBaseLB()
+NborBaseLB::NborBaseLB(const CkLBOptions &opt): BaseLB(opt)
 {
   lbname = "NborBaseLB";
   mystep = 0;
+  thisProxy = CProxy_NborBaseLB(thisgroup);
   theLbdb->
     AddLocalBarrierReceiver((LDBarrierFn)(staticAtSync),
 			    (void*)(this));

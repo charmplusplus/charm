@@ -20,7 +20,7 @@ void CreateDummyLB();
 
 class DummyLB : public CentralLB {
 public:
-  DummyLB();
+  DummyLB(const CkLBOptions &);
   DummyLB(CkMigrateMessage *m):CentralLB(m) {}
 private:
   CmiBool QueryBalanceNow(int step);

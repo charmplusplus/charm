@@ -21,7 +21,7 @@ void CreateRandRefLB();
 
 class RandRefLB : public RandCentLB {
 public:
-  RandRefLB();
+  RandRefLB(const CkLBOptions &);
   RandRefLB(CkMigrateMessage *m):RandCentLB(m) {}
   void work(CentralLB::LDStats* stats, int count);
 };

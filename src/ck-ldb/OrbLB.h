@@ -72,7 +72,7 @@ public:
   double overLoad;
 
 public:
-  OrbLB();
+  OrbLB(const CkLBOptions &);
   OrbLB(CkMigrateMessage *m):CentralLB(m) {}
 private:
   CmiBool QueryBalanceNow(int step);

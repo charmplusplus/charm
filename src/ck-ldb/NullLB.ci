@@ -2,10 +2,11 @@ module NullLB {
 
 extern module LBDatabase;
 extern module BaseLB;
-initnode void initNullLB(void);
+
+initnode void lbinit(void);
 
 group [migratable] NullLB: BaseLB {
-  entry void NullLB(void);  
+  entry void NullLB(const CkLBOptions &);  
   entry void migrationsDone(void);
 };
 

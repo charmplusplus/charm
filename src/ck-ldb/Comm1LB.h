@@ -21,20 +21,20 @@
 
 #define CUT_OFF_FACTOR 1.200
 
+void CreateComm1LB();
+
 struct alloc_struct{
   double load;
   int nbyte;
   int nmsg;
 };
 
-void CreateComm1LB();
-
 class Comm1LB : public CentralLB {
 public:
   int nobj,npe;
   alloc_struct ** alloc_array;
   graph * object_graph;
-  Comm1LB();
+  Comm1LB(const CkLBOptions &);
   Comm1LB(CkMigrateMessage *m):CentralLB(m) {}
 private:
   CmiBool QueryBalanceNow(int step);

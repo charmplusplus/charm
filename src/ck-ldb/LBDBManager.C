@@ -34,10 +34,11 @@ void LBDB::batsyncer::gotoSync(void *bs)
 void LBDB::batsyncer::resumeFromSync(void *bs)
 {
   LBDB::batsyncer *s=(LBDB::batsyncer *)bs;
-  // CmiPrintf("[%d] with PERIOD: %f\n", CkMyPe(), s->period);
+//  CmiPrintf("[%d] LBDB::batsyncer::resumeFromSync with %gs\n", CkMyPe(), s->period);
   CcdCallFnAfterOnPE((CcdVoidFn)gotoSync,(void *)s,(int)(1000*s->period), CkMyPe());
 }
 
+// initPeriod in seconds
 void LBDB::batsyncer::init(LBDB *_db,double initPeriod)
 {
   db=_db;
@@ -59,8 +60,8 @@ LBDB::LBDB(): useBarrier(CmiTrue)
     obj_running = CmiFalse;
     commTable = new LBCommTable;
     obj_walltime = obj_cputime = 0;
-    batsync.init(this, autoLbPeriod);		// original 1.0
     startLBFn_count = 0;
+    batsync.init(this, autoLbPeriod);		// original 1.0 second
 }
 
 LDOMHandle LBDB::AddOM(LDOMid _userID, void* _userData, 
@@ -242,7 +243,7 @@ void LBDB::Migrated(LDObjHandle h)
 
   for(int i=0; i < migrateCBList.length(); i++) {
     MigrateCB* cb = (MigrateCB*)migrateCBList[i];
-    if (cb) (cb->fn)(cb->data,h);
+    if (cb && cb->on) (cb->fn)(cb->data,h);
   }
   
 }
@@ -299,7 +300,7 @@ void LBDB::StartLB()
   }
   for (int i=0; i<startLBFnList.length(); i++) {
     StartLBCB *startLBFn = startLBFnList[i];
-    if (startLBFn) startLBFn->fn(startLBFn->data);
+    if (startLBFn && startLBFn->on) startLBFn->fn(startLBFn->data);
   }
 }
 
@@ -438,11 +439,13 @@ void LocalBarrier::CallReceivers(void)
   CmiBool called_receiver=CmiFalse;
 
 //  for(int i=0; i < max_receiver; i++)
-    for (int i=max_receiver-1; i>=0; i--)
-      if (receivers[i] != 0) {
-        ((receiver*)receivers[i])->fn(((receiver*)receivers[i])->data);
+   for (int i=max_receiver-1; i>=0; i--) {
+      receiver *recv = receivers[i];
+      if (recv != 0 && recv->on) {
+        recv->fn(recv->data);
         called_receiver = CmiTrue;
       }
+  }
 
   if (!called_receiver)
     ResumeClients();

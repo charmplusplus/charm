@@ -48,12 +48,7 @@ extern "C" {
 
 
 
-void CreateRecBisectBfLB()
-{
-  //  CkPrintf("[%d] creating RecBisectBfLB %d\n",CkMyPe(),loadbalancer);
-  loadbalancer = CProxy_RecBisectBfLB::ckNew();
-  //  CkPrintf("[%d] created RecBisectBfLB %d\n",CkMyPe(),loadbalancer);
-}
+CreateLBFunc_Def(RecBisectBfLB);
 
 static void lbinit(void) {
 //        LBSetDefaultCreate(CreateRecBisectBfLB);
@@ -62,7 +57,7 @@ static void lbinit(void) {
 
 #include "RecBisectBfLB.def.h"
 
-RecBisectBfLB::RecBisectBfLB()
+RecBisectBfLB::RecBisectBfLB(const CkLBOptions &opt): CentralLB(opt)
 {
   lbname = "RecBisectBfLB";
   if (CkMyPe() == 0)

@@ -5,7 +5,7 @@ extern module LBDatabase;
 message LBMigrateMsg;
 
 group [migratable] BaseLB {
-  entry void BaseLB(void);  
+  entry void BaseLB(const CkLBOptions &);  
   entry void unregister(void);
 };
 

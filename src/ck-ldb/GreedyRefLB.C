@@ -17,12 +17,7 @@
 #include "cklists.h"
 #include "GreedyRefLB.h"
 
-void CreateGreedyRefLB()
-{
-  //  CkPrintf("[%d] creating GreedyRefLB %d\n",CkMyPe(),loadbalancer);
-  loadbalancer = CProxy_GreedyRefLB::ckNew();
-  //  CkPrintf("[%d] created GreedyRefLB %d\n",CkMyPe(),loadbalancer);
-}
+CreateLBFunc_Def(GreedyRefLB);
 
 static void lbinit(void) {
 //        LBSetDefaultCreate(CreateGreedyRefLB);        
@@ -31,7 +26,7 @@ static void lbinit(void) {
 
 #include "GreedyRefLB.def.h"
 
-GreedyRefLB::GreedyRefLB()
+GreedyRefLB::GreedyRefLB(const CkLBOptions &opt): GreedyLB(opt)
 {
   lbname = "GreedyRefLB";
   if (CkMyPe()==0)

@@ -19,10 +19,7 @@
 #include "heap.h"
 #include "NeighborLB.h"
 
-void CreateNeighborLB()
-{
-  nborBaselb = CProxy_NeighborLB::ckNew();
-}
+CreateLBFunc_Def(NeighborLB);
 
 static void lbinit(void) {
 //  LBSetDefaultCreate(CreateNeighborLB);        
@@ -31,7 +28,7 @@ static void lbinit(void) {
 
 #include "NeighborLB.def.h"
 
-NeighborLB::NeighborLB()
+NeighborLB::NeighborLB(const CkLBOptions &opt):NborBaseLB(opt)
 {
   lbname = "NeighborLB";
   if (CkMyPe() == 0)

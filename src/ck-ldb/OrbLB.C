@@ -23,10 +23,7 @@
 
 //#define DEBUG
 
-void CreateOrbLB()
-{
-  loadbalancer = CProxy_OrbLB::ckNew();
-}
+CreateLBFunc_Def(OrbLB);
 
 static void lbinit(void) {
   LBRegisterBalancer("OrbLB", CreateOrbLB, "partition objects based on coordinates");
@@ -34,7 +31,7 @@ static void lbinit(void) {
 
 #include "OrbLB.def.h"
 
-OrbLB::OrbLB()
+OrbLB::OrbLB(const CkLBOptions &opt): CentralLB(opt)
 {
   lbname = "OrbLB";
   if (CkMyPe() == 0)

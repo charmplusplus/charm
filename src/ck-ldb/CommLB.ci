@@ -3,7 +3,7 @@ module CommLB {
 extern module CentralLB;
 initnode void lbinit(void);
 group [migratable] CommLB : CentralLB {
-  entry void CommLB(void);  
+  entry void CommLB(const CkLBOptions &);  
 };
 
 };

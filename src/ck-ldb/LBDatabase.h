@@ -14,6 +14,18 @@
 #define LBDATABASE_H
 
 #include "lbdb.h"
+
+class CkLBOptions
+{
+private:
+  int seqno;
+public:
+  CkLBOptions(): seqno(-1) {}
+  CkLBOptions(int s): seqno(s) {}
+  int getSeqNo() const { return seqno; }
+};
+PUPbytes(CkLBOptions);
+                                                                                
 #include "LBDatabase.decl.h"
 
 extern CkGroupID lbdb;
@@ -28,10 +40,10 @@ extern double autoLbPeriod;
 extern int lb_debug;
 extern int lb_ignoreBgLoad;
 
-typedef void (*LBDefaultCreateFn)(void);
-void LBSetDefaultCreate(LBDefaultCreateFn f);
+typedef void (*LBCreateFn)();
+void LBDefaultCreate(LBCreateFn f);
 
-void LBRegisterBalancer(const char *, LBDefaultCreateFn, const char *);
+void LBRegisterBalancer(const char *, LBCreateFn, const char *, int shown=1);
 
 void _LBDBInit();
 
@@ -43,8 +55,6 @@ class LBDBInit : public Chare {
 
 
 class LBDatabase : public IrrGroup {
-public:
-  static int manualOn;
 public:
   LBDatabase(void)  { init(); }
   LBDatabase(CkMigrateMessage *m)  { init(); }
@@ -118,6 +128,7 @@ public:
     LDRemoveStartLBFn(myLDHandle,fn);
   };
 
+public:
   inline void StartLB() { LDStartLB(myLDHandle); }
   inline void TurnManualLBOn() { LDTurnManualLBOn(myLDHandle); }
   inline void TurnManualLBOff() { LDTurnManualLBOff(myLDHandle); }
@@ -172,16 +183,24 @@ public:
   inline int ProcessorSpeed() { return LDProcessorSpeed(); };
   inline void SetLBPeriod(double s) { LDSetLBPeriod(myLDHandle, s);}
   inline double GetLBPeriod() { return LDGetLBPeriod(myLDHandle);}
+
 private:
+  int mystep;
   LDHandle myLDHandle;
   char *avail_vector;			// processor bit vector
   int new_ld_balancer;		// for Node 0
+  CkVec<BaseLB *>   loadbalancers;
+  int nloadbalancers;
+
+public:
+  static int manualOn;
+
 public:
   char *availVector() { return avail_vector; }
   void get_avail_vector(char * bitmap);
   void set_avail_vector(char * bitmap, int new_ld=-1);
   int & new_lbbalancer() { return new_ld_balancer; }
-public:
+
   struct LastLBInfo {
     double *expectedLoad;
     LastLBInfo() { expectedLoad=new double[CkNumPes()]; 
@@ -191,6 +210,13 @@ public:
   inline double myExpectedLoad() { return lastLBInfo.expectedLoad[CkMyPe()]; }
   inline double* expectedLoad() { return lastLBInfo.expectedLoad; }
   inline int useMem() { return LDMemusage(myLDHandle); }
+
+  int getLoadbalancerTicket();
+  void addLoadbalancer(BaseLB *lb, int seq);
+  void nextLoadbalancer(int seq);
+
+  inline int step() { return mystep; }
+  inline void incStep() { mystep++; }
 };
 
 void TurnManualLBOn();

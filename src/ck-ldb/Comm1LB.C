@@ -37,19 +37,15 @@
 #define UPPER_FACTOR 0.67
 #define MAX_WEIGHT 5.0
 
-void CreateComm1LB()
-{
-  loadbalancer = CProxy_Comm1LB::ckNew();
-}
+CreateLBFunc_Def(Comm1LB);
 
 static void lbinit(void) {
-//        LBSetDefaultCreate(CreateComm1LB);        
   LBRegisterBalancer("Comm1LB", CreateComm1LB, "another variation of CommLB");
 }
 
 #include "Comm1LB.def.h"
 
-Comm1LB::Comm1LB()
+Comm1LB::Comm1LB(const CkLBOptions &opt): CentralLB(opt)
 {
   if (CkMyPe() == 0)
     CkPrintf("[%d] Comm1LB created\n",CkMyPe());

@@ -7,22 +7,24 @@
 
 /**
  * \addtogroup CkLdb
+
+NullLB is a place holder load balancer, it does nothing but resume from 
+atSync so that application won't hang in the case where there is no other
+load balancer around.
 */
 /*@{*/
 
 #include <charm++.h>
 #include <BaseLB.h>
 #include "NullLB.h"
+#include "ck.h"
 
-void CreateNullLB(void)
-{
-  CProxy_NullLB::ckNew();
+void CreateNullLB(void) {
+  CProxy_NullLB::ckNew(-1);
 }
 
-static void initNullLB(void) {
-#if CMK_LBDB_ON
-//  LBSetDefaultCreate(CreateNullLB);
-#endif
+static void lbinit(void) {
+  LBRegisterBalancer("NullLB", CreateNullLB, "should not be shown", 0);
 }
 
 #if CMK_LBDB_ON
@@ -31,11 +33,11 @@ static void staticStartLB(void* data)
   CmiPrintf("[%d] LB Info: StartLB called in NullLB.\n", CkMyPe());
 }
 
-void NullLB::init(void)
+void NullLB::init()
 {
   // if (CkMyPe() == 0) CkPrintf("[%d] NullLB created\n",CkMyPe());
+  thisProxy = CProxy_NullLB(thisgroup);
   CkpvAccess(hasNullLB) = 1;
-  theLbdb=CProxy_LBDatabase(lbdb).ckLocalBranch();
   receiver = theLbdb->
     AddLocalBarrierReceiver((LDBarrierFn)(staticAtSync),
 			    (void*)(this));
@@ -45,7 +47,6 @@ void NullLB::init(void)
 
 NullLB::~NullLB()
 {
-  theLbdb=CProxy_LBDatabase(lbdb).ckLocalBranch();
   theLbdb->RemoveLocalBarrierReceiver(receiver);
   theLbdb->RemoveStartLBFn((LDStartLBFn)(staticStartLB));
 }
@@ -63,14 +64,21 @@ void NullLB::staticAtSync(void* data)
 void NullLB::AtSync()
 {
   //Reset the database so it doesn't waste memory
-  theLbdb->ClearLoads();
+  // if nobody else is here, the stat collection is not even turned on
+  // so I should not have to clear loads.
+//  theLbdb->ClearLoads();
   
+  // disable the batsyncer if no balancer exists
+  theLbdb->SetLBPeriod(1e10);
+
   //We don't *do* any migrations, so they're already done!
+  CpvAccess(_qd)->create(-1);
   thisProxy[CkMyPe()].migrationsDone();
 }
 
 void NullLB::migrationsDone(void)
 {
+  CpvAccess(_qd)->process(-1);
   theLbdb->ResumeClients();
 }
 #else

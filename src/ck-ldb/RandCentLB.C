@@ -24,20 +24,14 @@ Status:
 
 #include "RandCentLB.h"
 
-void CreateRandCentLB()
-{
-  //  CkPrintf("[%d] creating RandCentLB %d\n",CkMyPe(),loadbalancer);
-  loadbalancer = CProxy_RandCentLB::ckNew();
-  //  CkPrintf("[%d] created RandCentLB %d\n",CkMyPe(),loadbalancer);
-}
+CreateLBFunc_Def(RandCentLB);
 
 static void lbinit(void) {
-//	LBSetDefaultCreate(CreateRandCentLB);
   LBRegisterBalancer("RandCentLB", CreateRandCentLB, "Assign objects to processors randomly");
 }
 #include "RandCentLB.def.h"
 
-RandCentLB::RandCentLB()
+RandCentLB::RandCentLB(const CkLBOptions &opt): CentralLB(opt)
 {
   lbname = "RandCentLB";
   if (CkMyPe() == 0)

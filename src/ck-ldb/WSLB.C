@@ -19,8 +19,6 @@
 #include "heap.h"
 #include "WSLB.h"
 
-CkGroupID wslb;
-
 #if CMK_LBDB_ON
 
 // Temporary vacating flags
@@ -31,10 +29,7 @@ CkGroupID wslb;
 #define VACATE_AFTER 30
 #define UNVACATE_AFTER 15
 
-void CreateWSLB()
-{
-  wslb = CProxy_WSLB::ckNew();
-}
+CreateLBFunc_Def(WSLB);
 
 void WSLB::staticMigrated(void* data, LDObjHandle h)
 {
@@ -50,8 +45,9 @@ void WSLB::staticAtSync(void* data)
   me->AtSync();
 }
 
-WSLB::WSLB()  
+WSLB::WSLB(const CkLBOptions &opt) : BaseLB(opt) 
 {
+  thisProxy = CProxy_WSLB(thisgroup);
   lbname = "WSLB";
   if (CkMyPe() == 0)
     CkPrintf("[%d] WSLB created\n",CkMyPe());

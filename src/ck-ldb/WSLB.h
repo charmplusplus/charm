@@ -20,11 +20,11 @@ void CreateWSLB();
 
 class WSLBStatsMsg;
 
-class WSLB : public CBase_WSLB
+class WSLB : public BaseLB
 {
 public:
-  WSLB();
-  WSLB(CkMigrateMessage *m):CBase_WSLB(m) {}
+  WSLB(const CkLBOptions &);
+  WSLB(CkMigrateMessage *m):BaseLB(m) {}
   ~WSLB();
   static void staticAtSync(void*);
   void AtSync(void); // Everything is at the PE barrier
@@ -97,6 +97,7 @@ private:
   void FindNeighbors();
   WSLBStatsMsg* AssembleStats();
 
+  CProxy_WSLB   thisProxy;
   int mystep;
   int stats_msg_count;
   WSLBStatsMsg** statsMsgsList;

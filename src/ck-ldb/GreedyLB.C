@@ -23,21 +23,15 @@
 #include "cklists.h"
 #include "GreedyLB.h"
 
-void CreateGreedyLB()
-{
-  //  CkPrintf("[%d] creating GreedyLB %d\n",CkMyPe(),loadbalancer);
-  loadbalancer = CProxy_GreedyLB::ckNew();
-  //  CkPrintf("[%d] created GreedyLB %d\n",CkMyPe(),loadbalancer);
-}
+CreateLBFunc_Def(GreedyLB);
 
 static void lbinit(void) {
-//        LBSetDefaultCreate(CreateGreedyLB);        
   LBRegisterBalancer("GreedyLB", CreateGreedyLB, "always assign the heaviest obj onto lightest loaded processor.");
 }
 
 #include "GreedyLB.def.h"
 
-GreedyLB::GreedyLB()
+GreedyLB::GreedyLB(const CkLBOptions &opt): CentralLB(opt)
 {
   lbname = "GreedyLB";
   if (CkMyPe()==0)

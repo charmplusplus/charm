@@ -24,16 +24,19 @@
 class BaseLB: public IrrGroup
 {
 protected:
+  int  seqno;
   char *lbname;
   LBDatabase *theLbdb;
   LDBarrierReceiver receiver;
   int  notifier;
   int  startLbFnHdl;
 public:
-  BaseLB() ;
+  BaseLB(const CkLBOptions &) ;
   BaseLB(CkMigrateMessage *m):IrrGroup(m) { /* empty */ }
   void unregister(); 
   inline char *lbName() { return lbname; }
+  virtual void turnOff() { CmiAbort("turnOff not implemented"); }
+  virtual void turnOn()  { CmiAbort("turnOn not implemented"); }
 };
 
 /// migration decision for an obj.
@@ -63,6 +66,12 @@ public:
   static void* pack(LBMigrateMsg* in);
   static LBMigrateMsg* unpack(void* in);
 };
+
+#define CreateLBFunc_Def(x)		\
+void Create##x(void) { 	\
+  int seqno = LBDatabaseObj()->getLoadbalancerTicket();	\
+  CProxy_##x::ckNew(CkLBOptions(seqno)); 	\
+}
 
 #endif
 

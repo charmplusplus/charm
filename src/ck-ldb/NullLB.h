@@ -16,25 +16,27 @@
 #include <BaseLB.h>
 #include "NullLB.decl.h"
 
-void CreateNullLB(void);
-
 /**
  NullLB is inherited from BaseLB. It has all the strategy's API, 
  but doing nothing but resume from sync
  NullLB only is functioning when there is no other strategy created.
 */
-class NullLB : public CBase_NullLB
+class NullLB : public BaseLB
 {
-  void init(void);
 public:
-  NullLB() {init(); lbname="NullLB";}
-  NullLB(CkMigrateMessage *m):CBase_NullLB(m) {init(); lbname="NullLB";}
+  NullLB(const CkLBOptions &opt): BaseLB(opt) 
+	{init(); lbname="NullLB";}
+  NullLB(CkMigrateMessage *m):BaseLB(m) 
+	{init(); lbname="NullLB";}
   ~NullLB();
 
   static void staticAtSync(void*);
   void AtSync(void); // Everything is at the PE barrier
 
   void migrationsDone(void);
+private:
+  CProxy_NullLB   thisProxy;
+  void init();
 };
 
 #endif /* def(thisHeader) */

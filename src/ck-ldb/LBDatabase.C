@@ -28,58 +28,78 @@ CkpvDeclare(int, numLoadBalancers);  /**< num of lb created */
 CkpvDeclare(int, hasNullLB);         /**< true if NullLB is created */
 CkpvDeclare(int, lbdatabaseInited);  /**< true if lbdatabase is inited */
 
-double autoLbPeriod = 1.0;
+// command line options
+double autoLbPeriod = 0.0;		// in seconds
 int lb_debug=0;
 int lb_ignoreBgLoad=0;
 
-static LBDefaultCreateFn defaultCreate=NULL;
-void LBSetDefaultCreate(LBDefaultCreateFn f)
-{
-  if (defaultCreate) CmiAbort("Error: try to create multiple load balancer strategies!");
-  defaultCreate=f;
-}
-
 class LBDBResgistry {
+friend class LBDBInit;
 private:
-  class LBDBEntry {
-  public:
+  // table for all available LBs linked in
+  struct LBDBEntry {
     const char *name;
-    LBDefaultCreateFn  fn;
+    LBCreateFn  fn;
     const char *help;
-
-    LBDBEntry(): name(0), fn(0), help(0) {}
+    int 	shown;		// if 0, donot show in help page
+    LBDBEntry(): name(0), fn(0), help(0), shown(1) {}
     LBDBEntry(int) {}
-    LBDBEntry(const char *n, LBDefaultCreateFn f, const char *h):
-      name(n), fn(f), help(h) {};
+    LBDBEntry(const char *n, LBCreateFn f, const char *h, int show=1):
+      name(n), fn(f), help(h), shown(show) {};
   };
-  CkVec<LBDBEntry> lbtables;	 // a list of available LBs
-  char *defaultBalancer;
+  CkVec<LBDBEntry> lbtables;	 	// a list of available LBs linked
+  CkVec<const char *>   compile_lbs;	// load balancers at compile time
+  CkVec<const char *>   runtime_lbs;	// load balancers at run time
 public:
-  LBDBResgistry() { defaultBalancer=NULL; }
+  LBDBResgistry() {}
   void displayLBs()
   {
     CmiPrintf("\nAvailable load balancers:\n");
     for (int i=0; i<lbtables.length(); i++) {
-      CmiPrintf("* %s:	%s\n", lbtables[i].name, lbtables[i].help);
+      LBDBEntry &entry = lbtables[i];
+      if (entry.shown) CmiPrintf("* %s:	%s\n", entry.name, entry.help);
     }
     CmiPrintf("\n");
   }
-  void add(const char *name, LBDefaultCreateFn fn, const char *help) {
-    lbtables.push_back(LBDBEntry(name, fn, help));
+  void addEntry(const char *name, LBCreateFn fn, const char *help, int shown) {
+    lbtables.push_back(LBDBEntry(name, fn, help, shown));
   }
-  LBDefaultCreateFn search(const char *name) {
+  void addCompiletimeBalancer(const char *name) {
+    compile_lbs.push_back(name); 
+  }
+  void addRuntimeBalancer(const char *name) {
+    runtime_lbs.push_back(name); 
+  }
+  LBCreateFn search(const char *name) {
     for (int i=0; i<lbtables.length(); i++)
       if (0==strcmp(name, lbtables[i].name)) return lbtables[i].fn;
     return NULL;
   }
-  char *& defaultLB() { return defaultBalancer; };
 };
 
-static LBDBResgistry  lbRegistry;
+static LBDBResgistry lbRegistry;
 
-void LBRegisterBalancer(const char *name, LBDefaultCreateFn fn, const char *help)
+void LBDefaultCreate(const char *lbname)
 {
-  lbRegistry.add(name, fn, help);
+  lbRegistry.addCompiletimeBalancer(lbname);
+}
+
+// default is to show the helper
+void LBRegisterBalancer(const char *name, LBCreateFn fn, const char *help, int shown)
+{
+  lbRegistry.addEntry(name, fn, help, shown);
+}
+
+// create a load balancer group using the strategy name
+static void createLoadBalancer(const char *lbname)
+{
+    LBCreateFn fn = lbRegistry.search(lbname);
+    if (!fn) {
+      CmiPrintf("Abort: Unknown load balancer: '%s'!\n", lbname);
+      lbRegistry.displayLBs();
+      CkExit();
+    }
+    fn();
 }
 
 LBDBInit::LBDBInit(CkArgMsg *m)
@@ -87,23 +107,25 @@ LBDBInit::LBDBInit(CkArgMsg *m)
 #if CMK_LBDB_ON
   lbdb = CProxy_LBDatabase::ckNew();
 
-  LBDefaultCreateFn lbFn = defaultCreate;
-
-  char *balancer = lbRegistry.defaultLB();
-  if (balancer) {
-    LBDefaultCreateFn fn = lbRegistry.search(balancer);
-    if (!fn) {
-      lbRegistry.displayLBs();
-      CmiPrintf("Abort: Unknown load balancer: '%s'!\n", balancer);
-      CkExit();
+  // runtime specified load balancer
+  if (lbRegistry.runtime_lbs.size() > 0) {
+    for (int i=0; i<lbRegistry.runtime_lbs.size(); i++) {
+      const char *balancer = lbRegistry.runtime_lbs[i];
+      createLoadBalancer(balancer);
     }
-    else  // overwrite defaultCreate.
-      lbFn = fn;
   }
-
-  // NullLB is the default
-  if (!lbFn) lbFn = CreateNullLB;
-  (lbFn)();
+  else if (lbRegistry.compile_lbs.size() > 0) {
+    for (int i=0; i<lbRegistry.compile_lbs.size(); i++) {
+      const char* balancer = lbRegistry.compile_lbs[i];
+      createLoadBalancer(balancer);
+    }
+  }
+  else {
+    // NullLB is the default
+    // user may create his own load balancer in his code, but never mind
+    // NullLB can disable itself if there is a non NULL LB.
+    createLoadBalancer("NullLB");
+  }
 
   if (LBSimulation::doSimulation) {
     CmiPrintf("Charm++> Entering Load Balancer Simulation Mode ... \n");
@@ -126,13 +148,13 @@ void _loadbalancerInit()
   char **argv = CkGetArgv();
   char *balancer = NULL;
   CmiArgGroup("Charm++","Load Balancer");
-  if (CmiGetArgStringDesc(argv, "+balancer", &balancer, "Use this load balancer")) {
-    lbRegistry.defaultLB() = balancer;
+  while (CmiGetArgStringDesc(argv, "+balancer", &balancer, "Use this load balancer")) {
+    lbRegistry.addRuntimeBalancer(balancer);
   }
 
-  // set up init value for LBPeriod time in milliseconds
+  // set up init value for LBPeriod time in seconds
   // it can also be set calling LDSetLBPeriod()
-  CmiGetArgDoubleDesc(argv,"+LBPeriod", &autoLbPeriod,"specify the period for automatic load balancing (non atSync mode)");
+  CmiGetArgDoubleDesc(argv,"+LBPeriod", &autoLbPeriod,"specify the period for automatic load balancing in seconds (for non atSync mode)");
 
   /******************* SIMULATION *******************/
   // get the step number at which to dump the LB database
@@ -147,7 +169,7 @@ void _loadbalancerInit()
   lb_ignoreBgLoad = CmiGetArgFlagDesc(argv, "+LBObjOnly", "Load balancer only balance migratable object without considering the background load, etc");
   if (CkMyPe() == 0) {
     if (lb_debug) {
-      CmiPrintf("LB> Load balancer running with verbose mode, period time: %gms.\n", autoLbPeriod);
+      CmiPrintf("LB> Load balancer running with verbose mode, period time: %gs.\n", autoLbPeriod);
     }
     if (lb_ignoreBgLoad)
       CmiPrintf("LB> Load balancer only balance migratable object.\n");
@@ -161,6 +183,9 @@ int LBDatabase::manualOn = 0;
 void LBDatabase::init(void) 
 {
   myLDHandle = LDCreate();
+
+  mystep = 0;
+  nloadbalancers = 0;
 
   int num_proc = CkNumPes();
   avail_vector = new char[num_proc];
@@ -202,6 +227,44 @@ void LBDatabase::set_avail_vector(char * bitmap, int new_ld){
     }
 }
 
+int LBDatabase::getLoadbalancerTicket()  { 
+  int seq = nloadbalancers;
+  nloadbalancers ++;
+  loadbalancers.growAtLeast(nloadbalancers); 
+  loadbalancers[seq] = NULL;
+  return seq; 
+}
+
+void LBDatabase::addLoadbalancer(BaseLB *lb, int seq) {
+//  CmiPrintf("[%d] addLoadbalancer for seq %d\n", CkMyPe(), seq);
+  if (seq == -1) return;
+  if (CkMyPe() == 0) {
+    CmiAssert(seq < nloadbalancers);
+    if (loadbalancers[seq]) {
+      CmiPrintf("Duplicate load balancer created at %d\n", seq);
+      CmiAbort("LBDatabase");
+    }
+  }
+  else
+    nloadbalancers ++;
+  loadbalancers.growAtLeast(seq); 
+  loadbalancers[seq] = lb;
+}
+
+void LBDatabase::nextLoadbalancer(int seq) {
+  if (seq == -1) return;		// -1 means this is the only LB
+  int next = seq+1;
+  if (next == nloadbalancers) next --;
+  CmiAssert(loadbalancers[next]);
+  if (seq != next) {
+    loadbalancers[seq]->turnOff();
+    loadbalancers[next]->turnOn();
+  }
+}
+
+/*
+  callable from user's code
+*/
 void TurnManualLBOn()
 {
 #if CMK_LBDB_ON

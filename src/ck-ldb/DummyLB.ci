@@ -3,7 +3,7 @@ module DummyLB {
 extern module CentralLB;
 initnode void lbinit(void);
 group [migratable] DummyLB : CentralLB {
-  entry void DummyLB(void);  
+  entry void DummyLB(const CkLBOptions &);  
 };
 
 };

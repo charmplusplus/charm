@@ -18,20 +18,15 @@
 
 #include "RefineLB.h"
 
-void CreateRefineLB()
-{
-  loadbalancer = CProxy_RefineLB::ckNew();
-  //  CkPrintf("[%d] created RefineLB %d\n",CkMyPe(),loadbalancer);
-}
+CreateLBFunc_Def(RefineLB);
 
 static void lbinit(void) {
-//  LBSetDefaultCreate(CreateRefineLB);        
   LBRegisterBalancer("RefineLB", CreateRefineLB, "Move objects away from overloaded processor to reach average");
 }
 
 #include "RefineLB.def.h"
 
-RefineLB::RefineLB()
+RefineLB::RefineLB(const CkLBOptions &opt): CentralLB(opt)
 {
   lbname = "RefineLB";
   if (CkMyPe() == 0)

@@ -30,7 +30,7 @@ static void getPredictedLoad(CentralLB::LDStats* stats, int count,
 
 void CreateCentralLB()
 {
-  loadbalancer = CProxy_CentralLB::ckNew();
+  CProxy_CentralLB::ckNew(0);
 }
 
 void CentralLB::staticStartLB(void* data)
@@ -51,10 +51,10 @@ void CentralLB::staticAtSync(void* data)
   me->AtSync();
 }
 
-CentralLB::CentralLB()
+CentralLB::CentralLB(const CkLBOptions &opt): BaseLB(opt)
 {
   lbname = "CentralLB";
-  mystep = 0;
+  thisProxy = CProxy_CentralLB(thisgroup);
   //  CkPrintf("Construct in %d\n",CkMyPe());
 
   // create and turn on by default
@@ -65,7 +65,8 @@ CentralLB::CentralLB()
   startLbFnHdl = theLbdb->getLBDB()->
     AddStartLBFn((LDStartLBFn)(staticStartLB),(void*)(this));
 
-//  turnOff();
+  // CkPrintf("[%d] CentralLB seq %d\n",CkMyPe(), seq);
+  if (opt.getSeqNo()) turnOff();
 
   stats_msg_count = 0;
   statsMsgsList = new CLBStatsMsg*[CkNumPes()];
@@ -422,14 +423,15 @@ void CentralLB::MigrationDone(int balancing)
   // clear load stats
   if (balancing) theLbdb->ClearLoads();
   // Increment to next step
-  mystep++;
-  thisProxy [CkMyPe()].ResumeClients();
+  theLbdb->incStep();
+  thisProxy [CkMyPe()].ResumeClients(balancing);
 }
 
-void CentralLB::ResumeClients()
+void CentralLB::ResumeClients(int balancing)
 {
   DEBUGF(("Resuming clients on PE %d\n",CkMyPe()));
   theLbdb->ResumeClients();
+  if (balancing) theLbdb->nextLoadbalancer(seqno);
 }
 
 // default load balancing strategy

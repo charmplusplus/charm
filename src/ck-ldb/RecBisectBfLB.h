@@ -40,7 +40,7 @@ typedef struct {
 
 class RecBisectBfLB : public CentralLB {
 public:
-  RecBisectBfLB();
+  RecBisectBfLB(const CkLBOptions &);
   RecBisectBfLB(CkMigrateMessage *m):CentralLB(m) {}
 private:
   CmiBool QueryBalanceNow(int step);

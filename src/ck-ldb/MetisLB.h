@@ -20,7 +20,7 @@ void CreateMetisLB();
 
 class MetisLB : public CentralLB {
 public:
-  MetisLB();
+  MetisLB(const CkLBOptions &);
   MetisLB(CkMigrateMessage *m):CentralLB(m) {}
 private:
   CmiBool QueryBalanceNow(int step);

@@ -22,7 +22,7 @@ void CreateGreedyRefLB();
 
 class GreedyRefLB : public GreedyLB {
 public:
-  GreedyRefLB();
+  GreedyRefLB(const CkLBOptions &);
   GreedyRefLB(CkMigrateMessage *m):GreedyLB(m) {}
 private:
   void work(CentralLB::LDStats* stats, int count);

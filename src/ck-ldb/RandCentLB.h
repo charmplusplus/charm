@@ -20,7 +20,7 @@ void CreateRandCentLB();
 
 class RandCentLB : public CentralLB {
 public:
-  RandCentLB();
+  RandCentLB(const CkLBOptions &);
   RandCentLB(CkMigrateMessage *m):CentralLB(m) {}
   void work(CentralLB::LDStats* stats, int count);
 private:

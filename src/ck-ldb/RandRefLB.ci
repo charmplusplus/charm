@@ -3,7 +3,7 @@ module RandRefLB {
 extern module CentralLB;
 initnode void lbinit(void);
 group [migratable] RandRefLB : CentralLB {
-  entry void RandRefLB(void);  
+  entry void RandRefLB(const CkLBOptions &);  
 };
 
 };

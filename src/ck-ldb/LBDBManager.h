@@ -49,7 +49,7 @@ private:
     LDResumeFn fn;
     int refcount;
   };
-   struct receiver {
+  struct receiver {
     void* data;
     LDBarrierFn fn;
     int on;
@@ -84,17 +84,24 @@ public:
   void RegisteringObjects(LDOMHandle _h);
   void DoneRegisteringObjects(LDOMHandle _h);
 
-  inline void LocalBarrierOn() { localBarrier.TurnOn();}
-  inline void LocalBarrierOff() { localBarrier.TurnOff();}
+  inline void LocalBarrierOn() 
+       { localBarrier.TurnOn();}
+  inline void LocalBarrierOff() 
+       { localBarrier.TurnOff();}
 
-  inline LBOM *LbOM(LDOMHandle h) { return oms[h.handle]; };
-  inline LBObj *LbObj(const LDObjHandle &h) const { return objs[h.handle]; };
+  inline LBOM *LbOM(LDOMHandle h) 
+       { return oms[h.handle]; };
+  inline LBObj *LbObj(const LDObjHandle &h) const 
+       { return objs[h.handle]; };
   void DumpDatabase(void);
+
   inline void TurnStatsOn(void) 
        {statsAreOn = CmiTrue; machineUtil.StatsOn();}
   inline void TurnStatsOff(void) 
        {statsAreOn = CmiFalse;machineUtil.StatsOff();}
-  inline CmiBool StatsOn(void) const { return statsAreOn; };
+  inline CmiBool StatsOn(void) const 
+       { return statsAreOn; };
+
   void Send(const LDOMHandle &destOM, const LDObjid &destid, unsigned int bytes);
   int ObjDataCount();
   void GetObjData(LDObjData *data);
@@ -115,8 +122,11 @@ public:
        { migrateCBList[handle]->on = 0; }
   void RemoveNotifyMigrated(int handle);
 
-  inline void TurnManualLBOn() { useBarrier = CmiFalse; }
-  inline void TurnManualLBOff() { useBarrier = CmiTrue; }
+  inline void TurnManualLBOn() 
+       { useBarrier = CmiFalse; }
+  inline void TurnManualLBOff() 
+       { useBarrier = CmiTrue; }
+
   int AddStartLBFn(LDStartLBFn fn, void* data);
   void TurnOnStartLBFn(int handle)
        { startLBFnList[handle]->on = 1; }

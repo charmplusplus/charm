@@ -16,11 +16,8 @@
 
 #include "DummyLB.h"
 
-void CreateDummyLB()
-{
-  loadbalancer = CProxy_DummyLB::ckNew();
-  //  CkPrintf("[%d] created DummyLB %d\n",CkMyPe(),loadbalancer);
-}
+
+CreateLBFunc_Def(DummyLB);
 
 static void lbinit(void) {
   LBRegisterBalancer("DummyLB", CreateDummyLB, "Dummy load balancer, like a normal one but with empty strategy");
@@ -28,7 +25,7 @@ static void lbinit(void) {
 
 #include "DummyLB.def.h"
 
-DummyLB::DummyLB()
+DummyLB::DummyLB(const CkLBOptions &opt): CentralLB(opt)
 {
   lbname = "DummyLB";
   if (CkMyPe() == 0)

@@ -39,7 +39,7 @@ public:
   double overLoad;
 
 public:
-  RefineLB();
+  RefineLB(const CkLBOptions &);
   RefineLB(CkMigrateMessage *m):CentralLB(m) {}
 private:
   CmiBool QueryBalanceNow(int step);
