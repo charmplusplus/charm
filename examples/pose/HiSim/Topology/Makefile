@@ -1,10 +1,6 @@
 OPTS=-g #-DCMK_OPTIMIZE=1 -DCMK_MEMCHECKS_OFF=1
 
-CHARMBASE=../../../../
-CHARMBIN=$(CHARMBASE)/bin
-CHARMINC=$(CHARMBASE)/include
-
-CHARMC=$(CHARMBIN)/charmc -I$(CHARMINC)/pose $(OPTS) -Dcompile
+include ../Makefile.common
 
 LIBS=-Lstdc++ -lm
 

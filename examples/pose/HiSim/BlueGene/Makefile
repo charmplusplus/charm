@@ -39,7 +39,7 @@ OTHER = -lconv-bluegene-logs
 LIBS = -Lstdc++ -lm
 MACHINE = BlueGene
 
-all:  
+all:  sqtest
 	@echo
 	test -d ../tmp || mkdir ../tmp;
 	for i in $(SUBDIRS) ; do \
@@ -55,6 +55,16 @@ $(OBJDIR)/InitNetwork.o: InitNetwork.C
 
 $(OBJDIR)/util.o: util.C
 	$(CHARMC) -o $@ -seq util.C
+
+
+sqtest:
+ifeq ($(SEQUENTIAL),1)
+	cp  $(CHARMBASE)/lib/libmoduleseqpose.a $(CHARMBASE)/lib/libmodulepose.a
+	cp  $(CHARMBASE)/lib_so/libmoduleseqpose.so $(CHARMBASE)/lib_so/libmodulepose.so
+else
+	cp  $(CHARMBASE)/lib/libmoduleorigpose.a $(CHARMBASE)/lib/libmodulepose.a
+	cp  $(CHARMBASE)/lib_so/libmoduleorigpose.so $(CHARMBASE)/lib_so/libmodulepose.so
+endif
 
 clean:
 	@echo
