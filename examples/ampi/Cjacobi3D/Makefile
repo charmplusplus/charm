@@ -7,7 +7,7 @@ mpi: jacobi.C
 
 jacobi: jacobi.C
 	$(CHARMC) -c jacobi.C
-	$(CHARMC) -o jacobi jacobi.o -language ampi 
+	$(CHARMC) -o jacobi jacobi.o -language ampi -module EveryLB
 
 jacobi.iso: jacobi.C
 	$(CHARMC) -c -DNO_PUP jacobi.C
