@@ -225,13 +225,14 @@ TRACELIBS=$(L)/libtrace-projections.a  $(L)/libtrace-summary.a \
 	  $(L)/libtrace-projector.a $(L)/libtrace-all.a $(L)/libtrace-converse.a
 MEMLIBS=$(L)/libmemory-default.o $(L)/libmemory-os.o $(L)/libmemory-gnu.o \
    $(L)/libmemory-verbose.o $(L)/libmemory-paranoid.o $(L)/libmemory-isomalloc.o
+THREADLIBS=$(L)/libthreads-default.o $(L)/libthreads-qt.o $(L)/libthreads-context.o $(L)/libthreads-pthreads.o $(L)/libthreads-fibers.o
 
 CVLIBS=$(L)/libconv-core.a \
 	$(L)/libconv-cplus-n.a $(L)/libconv-cplus-y.a $(L)/libconv-util.a $(L)/libconv-utilf.a \
-	$(CLBLIBS) $(TRACELIBS) $(MEMLIBS) \
+	$(CLBLIBS) $(TRACELIBS) $(MEMLIBS) $(THREADLIBS) \
 	$(L)/libccs-client.a
 
-LIBCONV_CORE=threads.o convcore.o conv-conds.o queueing.o msgmgr.o \
+LIBCONV_CORE= convcore.o conv-conds.o queueing.o msgmgr.o \
 	cpm.o cpthreads.o futures.o cldb.o random.o traceCore.o traceCoreCommon.o \
 	charmProjections.o converseProjections.o machineProjections.o ampiProjections.o\
 	debug-conv.o generate.o edgelist.o conv-ccs.o ccs-builtins.o \
@@ -305,9 +306,6 @@ cpm.o: cpm.c $(CVHEADERS)
 
 isomalloc.o: isomalloc.c $(CVHEADERS)
 	$(CHARMC) isomalloc.c
-
-threads.o: threads.c $(CVHEADERS)
-	$(CHARMC) -IQuickThreads threads.c
 
 convcore.o: convcore.c $(CVHEADERS)
 	$(CHARMC) convcore.c
@@ -430,6 +428,23 @@ $(L)/libmemory-cache.o: memory-cache.c $(MEM_DEPS)
 
 $(L)/libmemory-isomalloc.o: memory-isomalloc.c $(MEM_DEPS)
 	-$(CHARMC) -o $@ -DCMK_MEMORY_BUILD_ISOMALLOC memory.c
+
+## Thread libraries (-thread)
+$(L)/libthreads-default.o: threads.c $(CVHEADERS)
+	$(CHARMC) -o $@ -DCMK_THREADS_BUILD_DEFAULT=1 -IQuickThreads threads.c
+
+$(L)/libthreads-qt.o: threads.c $(CVHEADERS)
+	$(CHARMC) -o $@ -IQuickThreads -DCMK_THREADS_BUILD_QT=1 threads.c
+
+$(L)/libthreads-context.o: threads.c $(CVHEADERS)
+	$(CHARMC) -o $@ -DCMK_THREADS_BUILD_CONTEXT=1 -IQuickThreads threads.c
+
+$(L)/libthreads-pthreads.o: threads.c $(CVHEADERS)
+	$(CHARMC) -o $@ -DCMK_THREADS_BUILD_PTHREADS=1 -IQuickThreads threads.c
+
+$(L)/libthreads-fibers.o: threads.c $(CVHEADERS)
+	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_FIBERS=1 -IQuickThreads threads.c
+
 
 ###############################################################################
 #

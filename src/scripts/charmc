@@ -25,6 +25,7 @@ BALANCE="rand"
 TRACEMODE=""
 TRACE_OBJ=
 MEMORY="default"
+THREAD="default"
 VERBOSE=""
 DEBUG_SCRIPT=""
 SAVE=""
@@ -316,6 +317,11 @@ do
 
 	"-memory")
 	        MEMORY="$1"
+		shift
+		;;
+
+	"-thread")
+	        THREAD="$1"
 		shift
 		;;
 
@@ -1119,6 +1125,16 @@ MEM_OBJ="$CHARMLIB/libmemory-$MEMORY.o"
 
 [ ! -r $MEM_OBJ ] && Abort "charmc : No such memory mode $MEMORY"
 
+# Check for valid choice of THREAD
+
+if [ "$CHARM_SHARED" = "1" -a -n "$CMK_LD_SHARED_THREAD" -a "$THREAD" = "default" ]
+then
+  THREAD=$CMK_LD_SHARED_THREAD
+fi
+THREAD_OBJ="$CHARMLIB/libthreads-$THREAD.o"
+
+[ ! -r $THREAD_OBJ ] && Abort "charmc : No such thread mode $THREAD"
+
 ################# Build the module initialization function ##################
 modInitName="moduleinit"
 modInitSrc="$modInitName.C"
@@ -1200,7 +1216,7 @@ esac
 
 if [ "$MAKELIBCHARM" = "0" -a "$BUILD_SHARE" = "0" ]
 then
-	MIDDLE_LIBS="$MEM_OBJ $MIDDLE_LIBS"
+	MIDDLE_LIBS="$MEM_OBJ $THREAD_OBJ $MIDDLE_LIBS"
 fi
 
 if [ "$CHARM_SHARED" = "1" ]
