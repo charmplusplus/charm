@@ -6,7 +6,6 @@ class mCastEntry;
 class multicastSetupMsg;
 class multicastGrpMsg;
 class cookieMsg;
-class CkMcastReductionMsg;
 class CkMcastBaseMsg;
 
 typedef mCastEntry * mCastEntryPtr;
@@ -32,6 +31,7 @@ public:
   inline void *&cookie(void) { return _cookie.val; }
 };
 
+#if 0
 class CkMcastReductionMsg: public CMessage_CkMcastReductionMsg {
 friend class CkMulticastMgr;
 public:
@@ -52,6 +52,7 @@ public:
   inline int getSize(void) const {return dataSize;}
   inline void *getData(void) {return data;}
 };
+#endif
 
 typedef void (*redClientFn)(CkSectionCookie sid, void *param,int dataSize,void *data);
 
@@ -95,18 +96,18 @@ class CkMulticastMgr: public CkDelegateMgr {
     void contribute(int dataSize,void *data,CkReduction::reducerType type, CkSectionCookie &sid, CkCallback &cb);
     void rebuild(CkSectionCookie &);
     // entry
-    void recvRedMsg(CkMcastReductionMsg *msg);
+    void recvRedMsg(CkReductionMsg *msg);
     void updateRedNo(mCastEntryPtr, int red);
   public:
-    typedef CkMcastReductionMsg *(*reducerFn)(int nMsg,CkMcastReductionMsg **msgs);
+//    typedef CkMcastReductionMsg *(*reducerFn)(int nMsg,CkMcastReductionMsg **msgs);
   private:
     void initCookie(CkSectionCookie sid);
     void resetCookie(CkSectionCookie sid);
     enum {MAXREDUCERS=256};
-    static reducerFn reducerTable[MAXREDUCERS];
+//    static CkReduction::reducerFn reducerTable[MAXREDUCERS];
     void releaseFutureReduceMsgs(mCastEntryPtr entry);
     void releaseBufferedReduceMsgs(mCastEntryPtr entry);
-    inline CkMcastReductionMsg *buildContributeMsg(int dataSize,void *data,CkReduction::reducerType type, CkSectionCookie &id, CkCallback &cb);
+    inline CkReductionMsg *buildContributeMsg(int dataSize,void *data,CkReduction::reducerType type, CkSectionCookie &id, CkCallback &cb);
 };
 
 
