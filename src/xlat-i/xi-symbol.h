@@ -533,6 +533,7 @@ class Chare : public TEntity {
     TypeList *bases_CBase; //Base classes used by CBase (or NULL)
     
     int entryCount;
+    int hasSdagEntry;
 
     void genTypedefs(XStr& str);
     void genRegisterMethodDef(XStr& str);
@@ -561,6 +562,8 @@ class Chare : public TEntity {
     int  isNodeGroup(void) {return attrib&CNODEGROUP;}
     int  isForElement(void) const {return forElement==forIndividual;}
     int  isForSection(void) const {return forElement==forSection;}
+    int  hasSdag() const { return hasSdagEntry; }
+    void  setSdag(int f) { hasSdagEntry = f; }
     forWhom getForWhom(void) const {return forElement;}
     void print(XStr& str);
     void genDefs(XStr& str);
@@ -881,11 +884,18 @@ private:
   void generatePrototype(XStr& op, ParamList *list);
   void generatePrototype(XStr& op, TList<CStateVar*>&);
   void generateCall(XStr& op, TList<CStateVar*>&);
+
+  void generateTraceBeginCall(XStr& op);          // for trace
+  void generateBeginTime(XStr& op);               //for Event Bracket
+  void generateEventBracket(XStr& op, int eventType);     //for Event Bracket
+  void generateListEventBracket(XStr& op, int eventType);
 public:
   int nodeNum;
   XStr *label;
   XStr *counter;
   EToken type;
+  char nameStr[128];
+  XStr *traceName;	
   TList<SdagConstruct *> *constructs;
   TList<SdagConstruct *> *publishesList;
   TList<CStateVar *> *stateVars;
@@ -909,11 +919,11 @@ public:
                   publishesList = new TList<SdagConstruct*>(); }
                                              
  
-  SdagConstruct(EToken t) : type(t), con1(0), con2(0), con3(0), con4(0) 
+  SdagConstruct(EToken t) : type(t), traceName(NULL), con1(0), con2(0), con3(0), con4(0) 
 		{ publishesList = new TList<SdagConstruct*>();
 		  constructs = new TList<SdagConstruct*>(); }
 
-  SdagConstruct(EToken t, XStr *txt) : type(t), text(txt), con1(0), con2(0), con3(0), con4(0) 
+  SdagConstruct(EToken t, XStr *txt) : type(t), traceName(NULL), text(txt), con1(0), con2(0), con3(0), con4(0) 
                 { publishesList = new TList<SdagConstruct*>();
 		  constructs = new TList<SdagConstruct*>();  }
   SdagConstruct(EToken t, const char *entryStr, const char *codeStr, ParamList *pl);
@@ -926,6 +936,19 @@ public:
   void propagateState(TList<CStateVar*>&, TList<CStateVar*>&, TList<SdagConstruct*>&, int);
   void generateCode(XStr& output);
   void setNext(SdagConstruct *, int);
+
+  // for trace
+  void generateTrace();          
+  void generateRegisterEp(XStr& output);          
+  void generateTraceEpDecl(XStr& output);         
+  void generateTraceEpDef(XStr& output);          
+  void generateTraceEndCall(XStr& op);            
+  void generateTlineEndCall(XStr& op);
+  void generateBeginExec(XStr& op, char *name);
+  void generateEndExec(XStr& op);
+  void generateEndSeq(XStr& op);
+  void generateDummyBeginExecute(XStr& op);
+
 };
 
 extern void RemoveSdagComments(char *);

@@ -535,6 +535,7 @@ Chare::Chare(int ln, attrib_t Nattr, NamedType *t, TypeList *b, MemberList *l)
 	forElement=forAll;
 	bases_CBase=NULL;
 	setTemplate(0); 
+	hasSdagEntry=0;
 	if (list)
 	{
 		list->setChare(this);
@@ -570,6 +571,9 @@ Chare::genRegisterMethodDef(XStr& str)
   genSubRegisterMethodDef(str);
   if(list)
     list->genReg(str);
+  if (hasSdagEntry) {
+      str << "  " << baseName(0) << "::__sdag_register(); \n";
+  }
   str << "}\n";
   str << "#endif\n";
 }
@@ -1088,6 +1092,10 @@ Chare::genDefs(XStr& str)
   }
   if(!external && !type->isTemplated())
     genRegisterMethodDef(str);
+  if (hasSdagEntry) {
+    str << "\n";
+    str << baseName(0) << "_SDAG_CODE_DEF\n\n";
+  }
 }
 
 void
@@ -1645,6 +1653,8 @@ void Chare::lookforCEntry(CEntry *centry)
   }
 }
 */
+XStr *CParsedFile::className = NULL;
+
 void CParsedFile::numberNodes(void)
 {
   for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
@@ -1657,8 +1667,9 @@ void CParsedFile::numberNodes(void)
 void CParsedFile::labelNodes(void)
 {
   for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
-    if (cn->sdagCon != 0) 
+    if (cn->sdagCon != 0) {
       cn->sdagCon->labelNodes();
+    }
   }
 }
 
@@ -1732,11 +1743,52 @@ void CParsedFile::generatePupFunction(XStr& op)
   op << "  }\n";
 }
 
+void CParsedFile::generateTrace()
+{
+  for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
+    if (cn->sdagCon != 0) {
+      cn->sdagCon->generateTrace();
+    }
+  }
+}
+
+void CParsedFile::generateRegisterEp(XStr& op)
+{
+  op << "  static void __sdag_register() {\n\n";
+  
+  for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
+    if (cn->sdagCon != 0) {
+      cn->sdagCon->generateRegisterEp(op);
+    }
+  }
+  op << "  }\n";
+}
+
+void CParsedFile::generateTraceEpDecl(XStr& op)
+{
+  for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
+    if (cn->sdagCon != 0) {
+      cn->sdagCon->generateTraceEpDecl(op);
+    }
+  }
+}
+
+void CParsedFile::generateTraceEpDef(XStr& op)
+{
+  for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
+    if (cn->sdagCon != 0) {
+      cn->sdagCon->generateTraceEpDef(op);
+    }
+  }
+}
+
+
 ////////////////////////// SDAGCONSTRUCT ///////////////////////
 SdagConstruct::SdagConstruct(EToken t, SdagConstruct *construct1)
 {
   con1 = 0;  con2 = 0; con3 = 0; con4 = 0;
   type = t;
+  traceName=NULL;
   publishesList = new TList<SdagConstruct*>();
   constructs = new TList<SdagConstruct*>();
   constructs->append(construct1);
@@ -1746,6 +1798,7 @@ SdagConstruct::SdagConstruct(EToken t, SdagConstruct *construct1, SdagConstruct 
 {
   con1=0; con2=0; con3=0; con4=0;
   type = t;
+  traceName=NULL;
   publishesList = new TList<SdagConstruct*>();
   constructs = new TList<SdagConstruct*>();
   constructs->append(construct1);
@@ -1759,6 +1812,7 @@ SdagConstruct::SdagConstruct(EToken t, XStr *txt, SdagConstruct *c1, SdagConstru
 {
   text = txt;
   type = t; 
+  traceName=NULL;
   con1 = c1; con2 = c2; con3 = c3; con4 = c4;
   publishesList = new TList<SdagConstruct*>();
   constructs = new TList<SdagConstruct*>();
@@ -1773,6 +1827,7 @@ SdagConstruct::SdagConstruct(EToken t, XStr *txt, SdagConstruct *c1, SdagConstru
 SdagConstruct::SdagConstruct(EToken t, const char *entryStr, const char *codeStr, ParamList *pl)
 {
   type = t;
+  traceName=NULL;
   text = new XStr(codeStr);
   connectEntry = new XStr(entryStr);
   con1 = 0; con2 = 0; con3 = 0; con4 =0; 
@@ -1821,6 +1876,7 @@ void Entry::setChare(Chare *c) {
 	
 	//Make a special "callmarshall" method, for communication optimizations to use:
 	hasCallMarshall=param->isMarshalled() && !isThreaded() && !isSync() && !isExclusive() && !fortranMode;
+	if (isSdag()) container->setSdag(1);
 }
 
 // "parameterType *msg" or "void".
