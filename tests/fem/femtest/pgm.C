@@ -213,6 +213,7 @@ driver(void)
   double *nodeData=new double[nnodeData*nnodes];
   FEM_Get_Node_Data(nodeData);  
 
+  const int *elGnum=FEM_Get_Elem_Nums();
   FEM_Get_Elem(0,&nelems,&nelemData,&np);
   int *conn=new int[np*nelems];
   FEM_Get_Elem_Conn(0,conn);
@@ -285,7 +286,7 @@ driver(void)
   for (i=0;i<ngelems;i++)
 	  testEqual(elements[i].val,elData[i],"update element ghost field test");
 
-  int *elList=new int[ngelems];
+  int *elList=new int[100+ngelems];
 
 //Time loop
   for (int t=0;t<tsteps;t++)
@@ -318,7 +319,11 @@ driver(void)
     testEqual(sum,reduceValues[t],"reduce_field");
 
     //Communicate our ghost elements:
+    for (i=nelems;i<ngelems;i++) elements[i].val=-1;
     FEM_Update_Ghost_Field(efid,0,elements);
+    for (i=nelems;i<ngelems;i++) {
+      testAssert(elements[i].val!=-1,"update_ghost_field");
+    }
 
     //Communicate our ghost nodes:
     FEM_Update_Ghost_Field(fid,-1,nodes);
@@ -327,12 +332,14 @@ driver(void)
 	   "update_ghost_node_field");
 
 
-    //Make a list of elements with large values
+    //Make a list of elements with odd global numbers
     int elListLen=0;
     double thresh=2.0;
     for (i=0;i<nelems;i++) 
-	    if (elements[i].val>thresh)
+	    if (elGnum[i]%2) {
+	    	    //CkPrintf("[%d] List: Local %d, global %d)\n",myId,i,elGnum[i]);
 		    elList[elListLen++]=i;
+	    }
 
     //Get a list of ghost elements with large values
     FEM_Exchange_Ghost_Lists(0,elListLen,elList);
@@ -344,7 +351,7 @@ driver(void)
     for (i=0;i<elListLen;i++) {
 	    testAssert(elList[i]<ngelems,"Ghost list ghost test (upper)");
 	    testAssert(elList[i]>=nelems,"Ghost list ghost test (lower)");
-	    testAssert(elements[elList[i]].val>thresh,"Ghost list contents test");
+	    testAssert(elGnum[elList[i]]%2,"Ghost list contents test");
     }
 
 #if 0 /*FIXME: This fails on more than two processors*/
