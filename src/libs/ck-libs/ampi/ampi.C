@@ -2812,26 +2812,27 @@ int MPI_Cart_shift(MPI_Comm comm, int direction, int disp, int *rank_source,
   int ndims = c.getndims();
   CkPupBasicVec<int> dims = c.getdims();
   CkPupBasicVec<int> periods = c.getperiods();
-  int coords[ndims];
+  int *coords = new int[ndims];
 
   MPI_Comm_rank(comm, rank_source);
   MPI_Cart_coords(comm, *rank_source, ndims, coords);
 
   if ((direction < 0) || (direction >= ndims))
     CkAbort("MPI_Cart_shift: direction not within dimensions range");
-		       
+
   coords[direction] += disp;
   if (coords[direction] < 0)
-    if (periods[direction] == 1) {     
+    if (periods[direction] == 1) {
       coords[direction] += dims[direction];
       MPI_Cart_rank(comm, coords, rank_dest);
     }
-    else 
+    else
       *rank_dest = MPI_PROC_NULL;
   else
     MPI_Cart_rank(comm, coords, rank_dest);
 
-return 0;
+  delete [] coords;
+  return 0;
 }
 
 CDECL
@@ -2917,7 +2918,7 @@ int MPI_Graph_neighbors(MPI_Comm comm, int rank, int maxneighbors,
 }
 
 /* Factorization code by Orion. Idea thrashed out by Orion and Prakash */
- 
+
 /**
   Return the integer "d'th root of n"-- the largest
   integer r such that
@@ -2974,9 +2975,9 @@ int MPI_Dims_create(int nnodes, int ndims, int *dims) {
 	n = n / dims[i];
 	d--;
       }
-  
-  pdims = (int *) malloc(sizeof(int) * d);
-  
+
+  pdims = new int[d];
+
   if (!factors(n, d, pdims, 1))
     CkAbort("MPI_Dims_Create: Factorization failed. Wonder why?");
 
@@ -2986,12 +2987,14 @@ int MPI_Dims_create(int nnodes, int ndims, int *dims) {
       dims[i] = pdims[j];
       j++;
     }
-	 
+
+  delete [] pdims;
+
   return 0;
 }
 
 /* Implemented with call to MPI_Comm_Split. Color and key are single integer
-   encodings of the lost and preserved dimensions, respectively, 
+   encodings of the lost and preserved dimensions, respectively,
    of the subgraphs.
 */
 
@@ -3000,14 +3003,14 @@ int MPI_Cart_sub(MPI_Comm comm, int *remain_dims, MPI_Comm *newcomm) {
   AMPIAPI("MPI_Cart_sub");
 
   int color, key, *coords, ndims, rank;
-  
+
   MPI_Comm_rank(comm, &rank);
   ampiCommStruct &c = getAmpiParent()->getCart(comm);
   ndims = c.getndims();
   CkPupBasicVec<int> dims = c.getdims();
   int num_remain_dims = 0;
 
-  coords = (int *) malloc(sizeof(int) * ndims);
+  coords = new int [ndims];
   MPI_Cart_coords(comm, rank, ndims, coords);
 
   for (int i = 0; i < ndims; i++)
@@ -3019,8 +3022,8 @@ int MPI_Cart_sub(MPI_Comm comm, int *remain_dims, MPI_Comm *newcomm) {
     else
       /* color */
       color = color * dims[i] + coords[i];
-  
-  getAmpiInstance(comm)->split(color, key, newcomm, CART_TOPOL); 
+
+  getAmpiInstance(comm)->split(color, key, newcomm, CART_TOPOL);
 
   ampiCommStruct &newc = getAmpiParent()->getCart(*newcomm);
   newc.setndims(num_remain_dims);
@@ -3028,15 +3031,16 @@ int MPI_Cart_sub(MPI_Comm comm, int *remain_dims, MPI_Comm *newcomm) {
   CkPupBasicVec<int> periods = c.getperiods();
   CkPupBasicVec<int> periodsv;
 
-  for (int i = 0; i < ndims; i++) 
+  for (int i = 0; i < ndims; i++)
     if (remain_dims[i]) {
       dimsv.push_back(dims[i]);
       periodsv.push_back(periods[i]);
     }
-  
+
   newc.setdims(dimsv);
   newc.setperiods(periodsv);
 
+  delete [] coords;
   return 0;
 }
 
