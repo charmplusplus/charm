@@ -85,7 +85,7 @@ int FoundLBrace=0, FoundRBrace=0 ;
 #include "xp-t.tab.h" /* YACC generated definitions based on C++ grammar */
 #include "xp-lexer.h"
 #include "xp-extn.h"
-
+extern YYSTYPE yylval;
 
 #define WHITE_RETURN(x) if ( shouldprint ) strcat(OutBuf,prevtoken) ; \
 			strcpy(prevtoken,x);
