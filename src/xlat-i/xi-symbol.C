@@ -397,13 +397,22 @@ Chare::genGroupDecls(XStr& str)
   str<<group_prefix();
   type->print(str);
   if(chareType==SGROUP) {
-    str << "(CkGroupID _gid) { _ck_gid = _gid; }\n";
-    str << "    CkGroupID ckGetGroupId(void) { return _ck_gid; }\n";
-    str << "    void ckSetGroupId(CkGroupID _gid) { _ck_gid = _gid; }\n";
+    str << "(CkGroupID _gid) { _ck_gid = _gid; _setChare(0); }\n";
   } else {
-    str << "(CkGroupID _gid) { _ck_ngid = _gid; }\n";
+    str << "(CkGroupID _gid) { _ck_ngid = _gid; _setChare(0); }\n";
+  }
+  str << "    ";
+  str<<group_prefix();
+  type->print(str);
+  str << "(CkChareID _cid) { _ck_cid = _cid; _setChare(1); }\n";
+  str << "    CkChareID ckGetChareId(void) { return _ck_cid; }\n";
+  str << "    void ckSetChareId(CkChareID _cid){_ck_cid=_cid;_setChare(1);}\n";
+  if(chareType==SGROUP) {
+    str << "    CkGroupID ckGetGroupId(void) { return _ck_gid; }\n";
+    str << "   void ckSetGroupId(CkGroupID _gid){_ck_gid=_gid;_setChare(0);}\n";
+  } else {
     str << "    CkGroupID ckGetGroupId(void) { return _ck_ngid; }\n";
-    str << "    void ckSetGroupId(CkGroupID _gid) { _ck_ngid = _gid; }\n";
+    str << "  void ckSetGroupId(CkGroupID _gid){_ck_ngid=_gid;_setChare(0);}\n";
   }
   str << "    ";
   type->print(str);
@@ -1141,6 +1150,21 @@ void Entry::genChareDecl(XStr& str)
     if(isPure())
       str << "=0";
     str << ";\n";
+    // entry method declaration with future
+    if(isSync()) {
+      str << "    ";
+      if(isVirtual())
+        str << "virtual ";
+      str << " void " << name << "(";
+      if(!param->isVoid()) {
+        param->print(str);
+        str << ",";
+      }
+      str<< "CkFutureID*)";
+      if(isPure())
+        str << "=0";
+      str << ";\n";
+    }
     // entry ptr declaration
     str << "    static int ckIdx_" << name << "(";
     param->print(str);
@@ -1178,10 +1202,19 @@ void Entry::genGroupDecl(XStr& str)
         str << "=0;\n";
       else {
         str << "{\n";
-        if(container->getChareType()==SGROUP)
-          str << "      CkBroadcastMsgBranch(__idx_";
+        str << "        if(_isChare()) {\n";
+        str << "          CkSendMsg(__idx_";
+        genEpIdx(str);
+        str << ", ";
+        if(!param->isVoid())
+          str << "msg, &_ck_cid);\n";
         else
-          str << "      CkBroadcastMsgNodeBranch(__idx_";
+          str << "CkAllocSysMsg(), &_ck_cid);\n";
+        str << "        } else {\n";
+        if(container->getChareType()==SGROUP)
+          str << "        CkBroadcastMsgBranch(__idx_";
+        else
+          str << "        CkBroadcastMsgNodeBranch(__idx_";
         genEpIdx(str);
         str << ", ";
         if(!param->isVoid())
@@ -1192,6 +1225,7 @@ void Entry::genGroupDecl(XStr& str)
           str << "_ck_gid);\n";
         else
           str << "_ck_ngid);\n";
+        str << "      }\n";
         str << "    }\n";
       }
     }
@@ -1248,6 +1282,63 @@ void Entry::genGroupDecl(XStr& str)
           str << "onPE, _ck_gid);\n";
         else
           str << "onPE, _ck_ngid);\n";
+        str << "    }\n";
+      }
+    }
+    // entry method onPE declaration with future
+    if(isSync()) {
+      str << "    ";
+      if(isVirtual())
+        str << "virtual ";
+      str << "void " << name << "(";
+      if(param && !param->isVoid()) {
+        param->print(str);
+        str << "msg, ";
+      }
+      str<< "int onPE, CkFutureID *fut)";
+      if(isPure())
+        str << "=0;\n";
+      else {
+        str << " {\n";
+        str << "      *fut = ";
+        if(container->getChareType()==SGROUP)
+          str << "CkRemoteBranchCallAsync(__idx_";
+        else
+          str << "CkRemoteNodeBranchCallAsync(__idx_";
+        genEpIdx(str);
+        str << ", ";
+        if(!param->isVoid())
+          str << "msg, ";
+        else
+          str << "CkAllocSysMsg(), ";
+        str << "_ck_gid, onPE));\n";
+        str << "    }\n";
+      }
+    }
+    // entry method forChare declaration with future
+    if(isSync()) {
+      str << "    ";
+      if(isVirtual())
+        str << "virtual ";
+      str << "void " << name << "(";
+      if(param && !param->isVoid()) {
+        param->print(str);
+        str << "msg, ";
+      }
+      str<< "CkFutureID *fut)";
+      if(isPure())
+        str << "=0;\n";
+      else {
+        str << " {\n";
+        str << "      *fut = ";
+        str << "CkRemoteCallAsync(__idx_";
+        genEpIdx(str);
+        str << ", ";
+        if(!param->isVoid())
+          str << "msg, ";
+        else
+          str << "CkAllocSysMsg(), ";
+        str << "&_ck_cid));\n";
         str << "    }\n";
       }
     }
@@ -1557,6 +1648,7 @@ void Entry::genGroupStaticConstructorDefs(XStr& str)
     str << "  _ck_ngid = CkCreateNodeGroup(__idx, __idx_";
   genEpIdx(str);
   str << ", msg, retEP, cid);\n";
+  str << "  _setChare(0);\n";
   str << "}\n";
 
   if(container->isTemplated())
@@ -1585,6 +1677,7 @@ void Entry::genGroupStaticConstructorDefs(XStr& str)
     str << "  _ck_ngid = CkCreateNodeGroup(__idx, __idx_";
   genEpIdx(str);
   str << ", msg, 0, 0);\n";
+  str << "  _setChare(0);\n";
   str << "}\n";
 }
 
@@ -1629,6 +1722,28 @@ void Entry::genChareDefs(XStr& str)
       str << ", msg, &_ck_cid);\n";
     }
     str << "}\n";
+    // entry method definition with future
+    if(isSync()) {
+      if(container->isTemplated())
+        container->genSpec(str);
+      str << " void ";
+      container->genProxyName(str);
+      if(container->isTemplated())
+        container->genVars(str);
+      str << "::" << name << "(";
+      assert(param!=0);
+      if(!param->isVoid()) {
+        param->print(str);
+        str << "msg,";
+      }
+      str << "CkFutureID *fut)\n{\n";
+      if(param->isVoid())
+        str << "  void *msg = CkAllocSysMsg();\n";
+      str << "  *fut = CkRemoteCallAsync(__idx_";
+      genEpIdx(str);
+      str << ", msg, &_ck_cid);\n";
+      str << "}\n";
+    }
   }
 }
 
