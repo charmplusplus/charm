@@ -449,15 +449,6 @@ inline void operator|(PUP::er &p,T &t)
          p((void *)&t,sizeof(T));
 }
 
-class PUPableTbase : public PUP::able {
-public:
-	virtual const ID &get_PUP_ID(void) const;
-};
-template <class T> class PUPableT : public PUPableTbase {
-public:
-	friend void operator|(PUP::er &p,T &t) {t.pup(p);}
-};
-
 //These more specific versions map p|t to p(t) for all handled types
 inline void operator|(PUP::er &p,signed char &t) {p(t);}
 #if CMK_SIGNEDCHAR_DIFF_CHAR
@@ -473,8 +464,9 @@ inline void operator|(PUP::er &p,unsigned long &t) {p(t);}
 inline void operator|(PUP::er &p,float &t) {p(t);}
 inline void operator|(PUP::er &p,double &t) {p(t);}
 inline void operator|(PUP::er &p,CmiBool &t) {p(t);}
-/*These don't seem to get called for subclasses (oh well...)
- *inline void operator|(PUP::er &p,PUP::able& t) {p(t);}
- *inline void operator|(PUP::er &p,PUP::able** t) {p(t);}
- */
+
+#define PUPmarshall(type) \
+  inline void operator|(PUP::er &p,type &t) {t.pup(p);}
+#define PUPmarshal(type) PUPmarshall(type) /*Support this common misspelling*/
+
 #endif //def __CK_PUP_H
