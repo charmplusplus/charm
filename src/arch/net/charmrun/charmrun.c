@@ -1201,6 +1201,7 @@ int req_handle_initnode(ChMessage *msg,SOCKET fd)
 {
   if (msg->len!=2*sizeof(ChMessageInt_t)) {
     fprintf(stderr,"Charmrun: Bad initnode data. Aborting\n");
+    fprintf(stderr,"Charmrun: possibly because: %s.\n", msg->data);
     exit(1);
   }
   nodeinfo_add((ChMessageInt_t *)msg->data,fd);
