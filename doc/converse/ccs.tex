@@ -27,21 +27,22 @@ charmrun pgmname +pN charmrun-opts pgm-opts
 
 {\tt ++server-port}=$port$: open the given TCP port as a CCS server   
 
+{\tt ++server-auth}=$authfile$: accept authenticated queries
+
 As the parallel job starts, it will print a line giving the 
 IP address and TCP port number of the new CCS server.
 The format is: ``ccs: Server IP = $ip$, Server port = $port$ \$'',
-where $ip$ is a decimal version of the native byte order 
+where $ip$ is a dotted decimal version of the 
 server IP address, and $port$ is the decimal port number.
-
 
 \section{CCS: Client-Side}
 
 A CCS client connects to a CCS server, asks a server PE to 
 execute a pre-registered handler, and receives the response data.
 The CCS client may be written in any language (see CCS network protocol,
-below), but a C interface (files ``ccs.c'' and ``ccs.h'') and Java
-interface (file ``CcsServer.java'') are available at 
-charm/pgms/converse/ccstest/.
+below), but a C interface (files ``ccs-client.c'' and ``ccs-client.h'') 
+and Java interface (file ``CcsServer.java'') are available in 
+the charm include directory.
 
 The C routines use the skt\_abort error-reporting strategy;
 see ``sockRoutines.h'' for details.  The C client API is:
@@ -129,8 +130,8 @@ actually open.
 Return 1 if this handler was called via CCS; 0 if it was
 called as the result of a normal \converse{} message.
 
-\function{void CcsCallerId(unsigned int *pip, unsigned int *pport);}
-Return the IP address (native byte order) and TCP port number
+\function{void CcsCallerId(skt\_ip\_t *pip, unsigned int *pport);}
+Return the IP address and TCP port number
 of the CCS client that invoked this method.
 Can only be called from a CCS handler invoked remotely.
 
@@ -195,4 +196,32 @@ is passed directly to the CCS handler.
 The response header consists of a single network binary integer-- the 
 length in bytes of the response data to follow.  The header is thus 4 
 bytes long.  If there is no response data, this field has value 0.
+
+
+\section{CCS: Authentication}
+By default, CCS provides no authentication-- this means any
+client anywhere on the internet can interact with the server.
+$authfile$, passed to '++server-auth', is a configuration file
+that enables authentication and describes the authentication to 
+perform.
+
+The configuration file is line-oriented ASCII text,
+consisting of security level / key pairs.  The security
+level is an integer from 0 (the default) to 255.
+Any security levels not listed in the file are disallowed.
+
+The key is the 128-bit secret key used to authenticate CCS
+clients for that security level.  It is either up 
+to 32 hexadecimal digits of key data or the string "OTP".
+"OTP" stands for One Time Pad, which will generate a random
+key when the server is started.  This key is printed out
+at job startup with the format "CCS\_OTP\_KEY$>$ Level $i$ key: $hexdigits$"
+where $i$ is the security level in decimal and $hexdigits$ is
+32 hexadecimal digits of key data.
+
+For example, a valid CCS authentication file might consist of
+the single line "0 OTP", indicating that the default security
+level 0 requires a randomly generated key.  All other security
+levels are disallowed.
+
 
