@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.4  1998-04-17 17:18:10  milind
+ * Revision 1.5  1998-05-03 11:03:56  milind
+ * Fixed some linux-specific bugs.
+ *
+ * Revision 1.4  1998/04/17 17:18:10  milind
  * Added CMK_CCS_AVAILABLE flag.
  *
  * Revision 1.3  1998/02/19 08:40:08  jyelon
@@ -159,8 +162,8 @@
 #define CMK_STATIC_PROTO_FAILS                             0
 #define CMK_STATIC_PROTO_WORKS                             1
 
-#define CMK_STRERROR_IS_A_BUILTIN                          0
-#define CMK_STRERROR_USE_SYS_ERRLIST                       1
+#define CMK_STRERROR_IS_A_BUILTIN                          1
+#define CMK_STRERROR_USE_SYS_ERRLIST                       0
 
 #define CMK_STRINGS_USE_OWN_DECLARATIONS                   1
 #define CMK_STRINGS_USE_STRINGS_H                          0

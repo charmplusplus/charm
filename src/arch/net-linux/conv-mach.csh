@@ -14,7 +14,7 @@
 #
 ############################################################################
 
-set CMK_CPP_CHARM='cpp -P'
+set CMK_CPP_CHARM='/lib/cpp -P'
 set CMK_CPP_C='gcc -E'
 set CMK_CC='gcc '
 set CMK_CC_RELIABLE='gcc '
