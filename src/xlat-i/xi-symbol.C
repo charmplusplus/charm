@@ -1038,8 +1038,7 @@ void
 Readonly::genDefs(XStr& str)
 {
   str << "/* DEFS: "; print(str); str << " */\n";
-  if(container) { // local static var
-  } else { // global var
+  if(!container && !strchr(name, ':')) {
     str << "extern ";
     type->print(str);
     if(msg)

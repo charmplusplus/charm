@@ -61,7 +61,7 @@ ModuleList *modlist;
 %type <module>		Module
 %type <conslist>	ConstructEList ConstructList
 %type <construct>	Construct
-%type <strval>		Name OptNameInit
+%type <strval>		Name QualName OptNameInit
 %type <val>		OptStackSize
 %type <intval>		OptExtern OptSemiColon MAttribs MAttribList MAttrib
 %type <intval>		EAttribs EAttribList EAttrib OptPure
@@ -113,6 +113,16 @@ OptSemiColon	: /* Empty */
 
 Name		: IDENT
 		{ $$ = $1; }
+		;
+
+QualName	: IDENT
+		{ $$ = $1; }
+		| QualName ':'':' IDENT
+		{
+		  char *tmp = new char[strlen($1)+strlen($4)+3];
+		  sprintf(tmp,"%s::%s", $1, $4);
+		  $$ = tmp;
+		}
 		;
 
 Module		: MODULE Name ConstructEList
@@ -273,7 +283,7 @@ DimList		: /* Empty */
 		{ $$ = new ValueList($1, $2); }
 		;
 
-Readonly	: READONLY Type Name DimList
+Readonly	: READONLY Type QualName DimList
 		{ $$ = new Readonly(lineno, $2, $3, $4); }
 		;
 
