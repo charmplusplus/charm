@@ -72,6 +72,8 @@ USE_RELIABLE_CC=""
 USE_FASTEST_CC=""
 PROG_EXT=""
 
+COPY_CHARMRUN=true
+
 COPY_EXIT="true"
 CHARM_SHARED="0"
 BUILD_SHARE="1"
@@ -594,7 +596,9 @@ do
 	-s)
 		OPTS_LD="$OPTS_LD   $arg"
 		;;
-
+	-no-charmrun)
+		COPY_CHARMRUN=false
+		;;
         -h|--help)
 	        printUsage
 		;;
@@ -1444,6 +1448,8 @@ fi
 #
 ########################################################################
 
+if test "$COPY_CHARMRUN" = "true"
+then
 targ=charmrun$CMK_POST_EXE
 convhost=conv-host$CMK_POST_EXE
 
@@ -1451,6 +1457,7 @@ if [ -x $CHARMBIN/$targ ]
 then
 	DoNoErrCheck $RM $targ
 	Do $CP $CHARMBIN/$targ $targ
+fi
 fi
 
 DoNoErrCheck $RM $modInitSrc $modInitObj > /dev/null 2>&1
