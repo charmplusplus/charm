@@ -1,3 +1,6 @@
+#ifndef COMMLIBMANAGER_H
+#define COMMLIBMANAGER_H
+
 #include "charm++.h"
 #include "converse.h"
 #include "envelope.h"
@@ -9,36 +12,34 @@
 #define USE_TREE 1
 #define USE_MESH 2
 #define USE_HYPERCUBE 3
+#define USE_GRID 4
+#define NAMD_STRAT 5
+
+#define GROUP_SEND 0
+#define ARRAY_SEND 1
+#define CHARE_SEND 2
+#define RECV 4
 
 class CharmMessageHolder {
  public:
-    int ep;
-    CkArrayIndexMax idx;
-    CkArrayID a;
-    int size;
+    int dest_proc;
     char *data;
-    CharmMessageHolder *next;
+    CharmMessageHolder *next; // also used for the refield at the receiver
 
-    CharmMessageHolder(int ep, void *charm_message, 
-                       CkArrayIndexMax &idx, CkArrayID a);
+    CharmMessageHolder(char * msg, int dest_proc);
+    char * getCharmMessage();
     void copy(char *buf);
-    void init();
     int getSize();
-    CkArrayMessage * getCharmMessage();
-    void CharmMessageHolder::setRefcount(void *msg);
+    void init(char *root);
+    void setRefcount(char * root_msg);
 };
 
 class ComlibMsg: public CMessage_ComlibMsg {
  public:
     int nmessages;
     int curSize;
-    int src;
-    int isDummy;
-    char *data;
-
-    static void *alloc(int mnum, size_t size, int *sizes, int priobits);
-    static void *pack(ComlibMsg *msg);
-    static ComlibMsg *unpack(void *buf);
+    int destPE;
+    char* data;
     
     void insert(CharmMessageHolder *msg);
     CharmMessageHolder * next();
@@ -46,15 +47,15 @@ class ComlibMsg: public CMessage_ComlibMsg {
 
 class ComlibManager: public CkDelegateMgr{
     
-    CharmMessageHolder ** messageBuf;
-    ComlibMsg ** receiveBuf;
+    CharmMessageHolder * messageBuf;
+
+    int *procMap;
 
     int messagesBeforeFlush;
     int bytesBeforeFlush;
 
-    int *messageCount;
-    int *messageSize;
-    //    int nMessages;
+    int messageCount;
+
     int nelements; //number of array elements on one processor
     int elementCount; //counter for the above
     int strategy;
@@ -63,7 +64,6 @@ class ComlibManager: public CkDelegateMgr{
     //flags
     int idSet, iterationFinished;
     
-    void sendMessage(int dest_proc);
     void init(int s, int n, int Messages, int nBytes); //strategy, nelements 
     
  public:
@@ -76,9 +76,13 @@ class ComlibManager: public CkDelegateMgr{
     void localElement();
     void receiveID(comID id);
     void ArraySend(int ep, void *msg, const CkArrayIndexMax &idx, CkArrayID a);
-    void receiveMessage(ComlibMsg *);
+    void GroupSend(int ep, void *msg, int onpe, CkGroupID gid);
     void setNumMessages(int nmessages);
-
+    
     void beginIteration();
     void endIteration();
+
+    void ComlibManager::receiveNamdMessage(ComlibMsg * msg);
 };
+
+#endif

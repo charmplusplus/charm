@@ -6,7 +6,7 @@ LIB = libcomm.a
 OBJS = ComlibManager.o $(COMMLIBDIR)/commlib.o $(COMMLIBDIR)/gridrouter.o \
 	$(COMMLIBDIR)/de.o $(COMMLIBDIR)/treerouter.o $(COMMLIBDIR)/petable.o \
 	$(COMMLIBDIR)/overlapper.o $(COMMLIBDIR)/rsend.o $(COMMLIBDIR)/bcast.o \
-	$(COMMLIBDIR)/charm_bind.o 
+	$(COMMLIBDIR)/charm_bind.o $(COMMLIBDIR)/3dgridrouter.o
 
 all: cifiles conversecom $(LIB) 
 	rm -f $(CDIR)/include/ComlibManager.h
@@ -17,6 +17,8 @@ all: cifiles conversecom $(LIB)
 	cp  ComlibModule.def.h $(CDIR)/include
 	rm -f $(CDIR)/tmp/ComlibManager.ci
 	cp  ComlibManager.ci $(CDIR)/tmp
+	rm -f $(CDIR)/lib/libcomm.a
+	cp libcomm.a $(CDIR)/lib/
 
 conversecom :
 	(cd ../../conv-libs/commlib; make)
@@ -24,7 +26,7 @@ conversecom :
 libcomm.a: $(OBJS)
 	$(CHARMC) -cp ../../../../../lib -o libcomm.a $(OBJS)
 
-ComlibManager.o:
+ComlibManager.o: ComlibManager.C ComlibManager.h
 	$(CHARMC) ComlibManager.C
 
 cifiles: ComlibManager.ci
