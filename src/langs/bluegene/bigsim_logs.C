@@ -1,17 +1,18 @@
 #include "blue.h"
 #include "blue_impl.h"
+
 #include "blue_logs.h"
 
-#if SEQ_CORRECT
-
+int genTimeLog = 0;			// was 1 for guna 's seq correction
 int correctTimeLog = 0;
-int genTimeLog = 1;
 int bgcorroff = 0;
 extern BgTimeLineRec* currTline;
 extern int currTlineIdx;
-double BgGetCurTime(){return 0;}
 
-#endif
+double BgGetCurTime()
+{
+  return tCURRTIME;
+}
 
 // dstNode is the dest bg node, can be -1
 bgMsgEntry::bgMsgEntry(char *msg, int dstNode, int tid, int local)
@@ -103,7 +104,6 @@ bgTimeLog::bgTimeLog(int epc, char* namestr, double sTime, double eTime)
   doCorrect = 1;
 }
 
-
 bgTimeLog::bgTimeLog(int epc, char *msg)
 {
   strcpy(name,"msgep");
@@ -122,11 +122,9 @@ bgTimeLog::bgTimeLog(int epc, char *msg)
   doCorrect = 1;
 
   if (genTimeLog && !doCorrect) {
-//CmiPrintf("TIME: %f\n", startTime);
       recvTime = effRecvTime = startTime;
   }
 }
-
 
 bgTimeLog::~bgTimeLog()
 {
@@ -295,9 +293,7 @@ void bgTimeLog::pup(PUP::er &p){
     */
 
     if(p.isUnpacking()){
-#if SEQ_CORRECT
       threadNum = currTlineIdx;
-#endif
     }
 
     double rTime;int destNode,msgID;CmiUInt2 tID;
@@ -325,10 +321,8 @@ void bgTimeLog::pup(PUP::er &p){
 
     for(int i=0;i<l;i++){
       if(p.isUnpacking()){
-#if SEQ_CORRECT
 	p|idx;
 	addBackwardDep(currTline->timeline[idx]);
-#endif
       }
       else{
 	p|backwardDeps[i]->index;

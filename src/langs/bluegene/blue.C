@@ -64,14 +64,11 @@ static char **arg_argv;
 
 static int printTimeLog = 0;
 int bgSize = 0;
-int genTimeLog = 0;
-int correctTimeLog = 0;
 static int timingMethod = BG_ELAPSE;
 static int delayCheckFlag = 1;          // when enabled, only check correction 
 					// messages after some interval
 int programExit = 0;
 
-int bgcorroff = 0;
 int bgstats = 0;
 FILE *bgDebugLog;			// for debugging
 
@@ -877,10 +874,13 @@ double BgGetTime()
 #endif
 }
 
+#if 0
+// moved to blue_logs.C
 double BgGetCurTime()
 {
   return tCURRTIME;
 }
+#endif
 
 extern "C" 
 void BgElapse(double t)

@@ -69,9 +69,7 @@ public:
   double effRecvTime;
 
   int index;		// by guna, need to verify, need to use sequence number
-#ifdef SEQ_CORRECT
-  int threadNum;
-#endif
+  int threadNum;	// by guna, for seq load balancing  ???
 
   CkVec< bgMsgEntry * > msgs;
   CkVec< bgEvents * > evts;
@@ -79,11 +77,14 @@ public:
   CkVec< bgTimeLog* > forwardDeps;
   char doCorrect;
   char name[20];
+
+  friend class BgTimeLineRec;
+private:
+  bgTimeLog(int epc, char *msg);
 public:
   bgTimeLog(bgTimeLog *);
   bgTimeLog(): ep(-1), recvTime(.0), startTime(.0), endTime(.0), msgID(-1), effRecvTime(INVALIDTIME), seqno(0), doCorrect(1) {strcpy(name,"dummyname");}
   bgTimeLog(int epc, char* name, double sTime, double eTime);
-  bgTimeLog(int epc, char *msg);
   bgTimeLog(int epc, char* name, double sTime);
   ~bgTimeLog();
 
@@ -203,8 +204,6 @@ public:
   void logEntryClose();
   void logEntrySplit();
 
-#if 1
-  //#if SEQ_CORRECT
   void pup(PUP::er &p){
     int l=length();
     p|l;
@@ -229,9 +228,9 @@ public:
         }
     }
   }
-#endif
 };
 
-
+void readProc(int procNum, int numWth ,int numPes, int totalProcs, int* allNodeOffsets, BgTimeLineRec& tlinerec);
+int* loadOffsets(int totalProcs, int numPes);
 
 #endif
