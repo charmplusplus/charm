@@ -884,7 +884,7 @@ sub getcodeline
 	$lastline{$inhandle}.=$thisline;
       }
       $retline.=$thisline;
-      last if ($retline =~ /^\s*\#/);
+#      last if ($retline =~ /^\s*\#/);
       if ($retline =~ m:^\s*/\*.*\*/\s*$:m ) {
 	#pure comment line
 	# throw it out
@@ -895,15 +895,16 @@ sub getcodeline
 	$lastline{$inhandle}.="\n";
 	next;
     }
-      elsif ($retline =~ m:^\s*\#:m ) {
+#      elsif ($retline =~ m:^\s*\#:m ) {
 	# precompile line
 	# pass it without consideration
-	$closecomment{$inhandle}=0;
-	$opencomment{$inhandle}=0;
-	$incomment{$inhandle}=0;
-	$lastline{$inhandle}.="\n";
-	last;
-      } elsif ($retline =~ m:/\*.*\*/:m) { # line containing comment plus other stuff
+#	$closecomment{$inhandle}=0;
+#	$opencomment{$inhandle}=0;
+#	$incomment{$inhandle}=0;
+#	$lastline{$inhandle}.="\n";
+#	last;
+#      }
+ elsif ($retline =~ m:/\*.*\*/:m) { # line containing comment plus other stuff
 	#strip comments out
 	while ($retline =~ m:/\*.*\*/:m) {
 	  $retline=$PREMATCH.$POSTMATCH;
