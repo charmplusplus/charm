@@ -572,7 +572,10 @@ case "$LANGUAGE" in
 "c"|"C"|"c++"|"C++")
 	[ -z "$SEQUENTIAL" ] && Abort "Language $LANGUAGE is for sequential programs"
 	;;
-"charm"|"charm++"|"converse"|"converse++"|"idl"|"ampi"|"ampif"|"f90charm")
+"charm"|"charm++"|"converse"|"converse++"|"idl")
+	[ -z "$SEQUENTIAL" ] || Abort "Language $LANGUAGE is for parallel programs"
+	;;
+"fem"|"femf"|"ampi"|"ampif"|"f90charm")
 	[ -z "$SEQUENTIAL" ] || Abort "Language $LANGUAGE is for parallel programs"
 	;;
 *)
@@ -834,9 +837,20 @@ case "$LANGUAGE" in
 "ampi")
         PRE_LIBRARIES="$PRE_LIBRARIES -lampi"
 	;;
+"ampif")
+        PRE_LIBRARIES="$PRE_LIBRARIES -lampif"
+        POST_LIBRARIES="$POST_LIBRARIES $CMK_F90LIBS"
+	;;
+"fem")
+        PRE_LIBRARIES="$PRE_LIBRARIES -lfem"
+	;;
+"femf")
+        PRE_LIBRARIES="$PRE_LIBRARIES -lfem"
+        POST_LIBRARIES="$POST_LIBRARIES $CMK_F90LIBS"
+	;;
 "f90charm")
         PRE_LIBRARIES="$PRE_LIBRARIES lib/libmain.a"
-        POST_LIBRARIES="$POST_LIBRARIES -lfsu -lsunmath"
+        POST_LIBRARIES="$POST_LIBRARIES $CMK_F90LIBS"
 	;;
 esac
 
@@ -856,15 +870,9 @@ case "$LANGUAGE" in
 	Do $CMK_LDXX $OPTS_LDXX -o $OBJECT \
 		$LANG_LIBS -lconv-cplus-y $CORE_LIBS -lidl -lm $CMK_LIBS
 	;;
-"ampi")
-        echo language: $LANG_LIBS
-	echo objects: $OBJECT
+"ampi"|"ampif"|"fem"|"femf")
 	Do $CMK_LDXX $OPTS_LDXX -o $OBJECT \
 		$LANG_LIBS -lconv-cplus-y $CORE_LIBS -lm $CMK_LIBS
-	;;
-"ampif")
-	Do $CMK_LDXX $OPTS_LDXX -o $OBJECT \
-		$LANG_LIBS -lconv-cplus-y $CORE_LIBS -lampif -lm $CMK_LIBS
 	;;
 "converse")
 	Do $CMK_LD $OPTS_LD -o $OBJECT \
