@@ -6,23 +6,14 @@
 
 class ObjGraph {
 public:
-  class Edge;
-  class Node;
-  
-  ObjGraph(int count, CentralLB::LDStats* stats);
-  ~ObjGraph();
-  int NodeCount() { return n_objs; };
-  Node* Start() { return nodelist; };
-
   class Edge {
-  friend class ObjGraph;
+    friend class ObjGraph;
   public:
+    int edge_index;
     int proc;
     int index;
-    int from_proc;
-    int from_index;
-    int to_proc;
-    int to_index;
+    int from_node;
+    int to_node;
     Edge* next_from() { return nxt_out; };
     Edge* next_to() { return nxt_in; };
   private:
@@ -31,21 +22,35 @@ public:
   };
 
   class Node {
-  friend class ObjGraph;
+    friend class ObjGraph;
   public:
+    int node_index;
     int proc;
     int index;
     int n_out;
     int n_in;
-    Node* next() { return nxt; };
     Edge* edges_from() { return outEdge; };
     Edge* edges_to() { return inEdge; };
 
   private:
     Edge* outEdge;
     Edge* inEdge;
-    Node* nxt;
     Node* nxt_hash;
+  };
+
+  ObjGraph(int count, CentralLB::LDStats* stats);
+  ~ObjGraph();
+
+  int NodeCount() { return n_objs; };
+  int EdgeCount() { return n_edges; };
+  Node* Start() { return nodelist; };
+  Node GraphNode(int i) { return nodelist[i]; };
+
+  double LoadOf(int i) {
+    const Node n = GraphNode(i);
+    const int pe = n.proc;
+    const int index = n.index;
+    return stats[pe].objData[index].wallTime;
   };
 
 private:
@@ -55,9 +60,12 @@ private:
   Node* find_node(LDOMid, LDObjid);
 
   CentralLB::LDStats* stats;
-  Node* nodelist;
-  int n_objs;
+  Edge* edgelist;
   Node* node_table[hash_max];
+
+  int n_objs;
+  int n_edges;
+  Node* nodelist;
 };
 
 #endif
