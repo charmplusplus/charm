@@ -316,7 +316,7 @@ public:
   int registerArray(CkArrayMapRegisterMessage *msg)
   {
     int idx = arrs.length();
-    arrs[idx] = new arrInfo(msg->numElements, speeds);
+    arrs.insertAtEnd(new arrInfo(msg->numElements, speeds));
     delete msg;
     return idx;
   }
