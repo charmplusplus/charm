@@ -19,7 +19,8 @@ CpmDeclareSimple(accum);
 
 int randpe()
 {
-  return ((rand()&0x7FFFFFFF)>>11) % CmiNumPes();
+  /* return ((rand()&0x7FFFFFFF)>>11) % CmiNumPes(); */
+  return ((CrnRand()&0x7FFFFFFF)>>11) % CmiNumPes();
 }
 
 /* a function to add a number to an accumulator */
