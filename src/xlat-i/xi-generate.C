@@ -231,6 +231,7 @@ void GenerateStructsFns(ofstream& top, ofstream& bot)
     sprintf(str,"\tout = %s::alloc(msgno,size,array,prio);\n}\n",m->name) ;
     bot << str ;
     sprintf(str, "\treturn out;\n}\n");
+    bot << str ;
   }
 
   /* for packable MsgTypes output the pack - unpack stub functions */
