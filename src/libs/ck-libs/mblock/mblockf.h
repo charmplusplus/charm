@@ -24,7 +24,6 @@
        external :: MBLK_Get_myblock
        external :: MBLK_Get_blocksize
        external :: MBLK_Get_nodelocs
-       external :: MBLK_Get_extent
        real*8, external :: MBLK_Timer
        external :: MBLK_Print
        external :: MBLK_Print_block
@@ -39,7 +38,7 @@
        external :: MBLK_Reduce
 
        external :: MBLK_Register_bc
-       external :: MBLK_Aply_bc
+       external :: MBLK_Apply_bc
        external :: MBLK_Apply_bc_all
 
        external :: MBLK_Register
