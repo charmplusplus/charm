@@ -173,13 +173,9 @@ void
 ampi::run(ArgsInfo *msg)
 {
 #ifdef AMPI_FORTRAN
-  static int initCtv = 0;
 
-  if(!initCtv) {
-    CtvInitialize(ampi *, ampiPtr);
-    CtvInitialize(int, numMigrateCalls);
-    initCtv = 1;
-  }
+  CtvInitialize(ampi *, ampiPtr);
+  CtvInitialize(int, numMigrateCalls);
 
   CtvAccess(ampiPtr) = this;
   CtvAccess(numMigrateCalls) = 0;
@@ -199,13 +195,8 @@ ampi::run(ArgsInfo *msg)
 void
 ampi::run(void)
 {
-  static int initCtv = 0;
-
-  if(!initCtv) {
-    CtvInitialize(ampi *, ampiPtr);
-    CtvInitialize(int, numMigrateCalls);
-    initCtv = 1;
-  }
+  CtvInitialize(ampi *, ampiPtr);
+  CtvInitialize(int, numMigrateCalls);
 
   CtvAccess(ampiPtr) = this;
   CtvAccess(numMigrateCalls) = 0;
