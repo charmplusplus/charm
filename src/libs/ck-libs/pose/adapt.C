@@ -5,9 +5,9 @@
 void adapt::Step()
 {
   Event *ev;
-  static POSE_TimeType lastGVT = 0;
+  static POSE_TimeType lastGVT = localPVT->getGVT();
+  int iter=0;
 
-  lastGVT = localPVT->getGVT();
   if (!parent->cancels.IsEmpty()) CancelUnexecutedEvents();
   if (eq->RBevent) {
     timeLeash = MIN_LEASH; // shrink speculative window
@@ -15,16 +15,14 @@ void adapt::Step()
   }
   if (!parent->cancels.IsEmpty()) CancelEvents();
 
-  // Prepare to execute an event
-  ev = eq->currentPtr;
   // Shorten the leash as we near POSE_endtime
   if ((POSE_endtime > POSE_UnsetTS) && (lastGVT + timeLeash > POSE_endtime))
     timeLeash = POSE_endtime - lastGVT + 1;
 
-  int iter=0;
+  // Prepare to execute an event
+  ev = eq->currentPtr;
   while ((ev->timestamp >= 0) && (ev->timestamp <= lastGVT + timeLeash)) {
     // do all events within speculative window
-    idle = 0;
     currentEvent = ev;
     ev->done = 2;
     parent->ResolveFn(ev->fnIdx, ev->msg); // execute it

@@ -5,23 +5,21 @@
 void spec::Step()
 {
   Event *ev;
-  static POSE_TimeType lastGVT = POSE_UnsetTS;
+  static POSE_TimeType lastGVT = localPVT->getGVT();
+  int iter = 0;
 
-  lastGVT = localPVT->getGVT();
   if (!parent->cancels.IsEmpty()) CancelUnexecutedEvents();
   if (eq->RBevent) Rollback(); 
   if (!parent->cancels.IsEmpty()) CancelEvents();
 
-  // Prepare to execute an event
-  ev = eq->currentPtr;
   // Shorten the leash as we near POSE_endtime
   if ((POSE_endtime > POSE_UnsetTS) && (lastGVT + timeLeash > POSE_endtime))
     timeLeash = POSE_endtime - lastGVT + 1;
 
-  int iter = 0;
+  // Prepare to execute an event
+  ev = eq->currentPtr;
   while ((ev->timestamp >= 0) && (ev->timestamp <= lastGVT + timeLeash)) {
     // do all events within the speculative window
-    idle = 0;
     iter++;
     currentEvent = ev;
     ev->done = 2;

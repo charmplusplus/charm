@@ -44,11 +44,13 @@ void POSE_init(int IDflag, int ET) // can specify both
   POSE_commlib_insthndl = CkGetComlibInstance();
   // Create the communication strategy for POSE
   //DummyStrategy *strategy = new DummyStrategy();
+  //StreamingStrategy *strategy =new StreamingStrategy(COMM_TIMEOUT,COMM_MAXMSG);
   PrioStreaming *strategy =new PrioStreaming(COMM_TIMEOUT,COMM_MAXMSG);
   //Register the strategy
   POSE_commlib_insthndl.setStrategy(strategy);
   //comm_debug=1;
   CkPrintf("Simulation run with PrioStreaming(%d,%d) for communication optimization...\n", COMM_TIMEOUT, COMM_MAXMSG);
+  //CkPrintf("Simulation run with StreamingStrategy(%d,%d) for communication optimization...\n", COMM_TIMEOUT, COMM_MAXMSG);
 #endif
   // Create a MemoryPool with global handle for memory recycling 
   MemPoolID = CProxy_MemoryPool::ckNew();

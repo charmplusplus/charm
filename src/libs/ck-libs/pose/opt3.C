@@ -4,9 +4,9 @@
 void opt3::Step()
 {
   Event *ev;
-  static POSE_TimeType lastGVT = POSE_UnsetTS;
+  static POSE_TimeType lastGVT = localPVT->getGVT();
+  int iter = 0;
 
-  lastGVT = localPVT->getGVT();
   if (!parent->cancels.IsEmpty()) CancelUnexecutedEvents();
   if (eq->RBevent) Rollback(); 
   if (!parent->cancels.IsEmpty()) CancelEvents();
@@ -17,10 +17,8 @@ void opt3::Step()
   if ((POSE_endtime > POSE_UnsetTS) && (lastGVT + timeLeash > POSE_endtime))
     timeLeash = POSE_endtime - lastGVT + 1;
   
-  if ((ev->timestamp >= 0) && (ev->timestamp <= lastGVT + timeLeash)) {
+  if ((ev->timestamp > POSE_UnsetTS) && (ev->timestamp <= lastGVT + timeLeash)) {
     POSE_TimeType fix_time = ev->timestamp;
-    int iter = 0;
-    idle = 0;
     while (ev->timestamp == fix_time) {
       // do all events at the first available timestamp
       iter++;
@@ -35,7 +33,7 @@ void opt3::Step()
 #ifdef POSE_STATS_ON
     if (iter > 0) localStats->Loop();
 #endif  
-    if (eq->currentPtr->timestamp >= 0) {
+    if (eq->currentPtr->timestamp > POSE_UnsetTS) {
       // execute next event if there is one
       prioMsg *pm = new prioMsg;
       pm->setPriority(eq->currentPtr->timestamp-POSE_TimeMax);

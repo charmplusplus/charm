@@ -1,65 +1,38 @@
 /// Adaptive Synchronization Strategy No. 2
 #include "pose.h"
-
+ 
 #define RANDOM_OBJECT 42
 /// Single forward execution step
 void adapt3::Step()
 {
   Event *ev;
-  static POSE_TimeType lastGVT = POSE_UnsetTS;
-  static int advances=0;
+  static POSE_TimeType lastGVT = localPVT->getGVT();
   int iter=0;
   double critStart;
-
   rbFlag = 0;
-  lastGVT = localPVT->getGVT();
-
-  if (!parent->cancels.IsEmpty()) {
-#ifdef TRACE_DETAIL
-    critStart = CmiWallTimer();  // trace timing
-#endif
-    CancelUnexecutedEvents();
-#ifdef TRACE_DETAIL
-    traceUserBracketEvent(20, critStart, CmiWallTimer());
-#endif
-  }
+ 
+  if (!parent->cancels.IsEmpty()) CancelUnexecutedEvents();
   if (eq->RBevent) {
-#ifdef TRACE_DETAIL
-    critStart = CmiWallTimer();  // trace timing
-#endif
     timeLeash = eq->RBevent->timestamp - lastGVT;
-    Rollback(); 
-#ifdef TRACE_DETAIL
-    traceUserBracketEvent(40, critStart, CmiWallTimer());
-#endif
+    Rollback();
   }
-  if (!parent->cancels.IsEmpty()) {
-#ifdef TRACE_DETAIL
-    critStart = CmiWallTimer();  // trace timing
-#endif
-    CancelEvents();
-#ifdef TRACE_DETAIL
-    traceUserBracketEvent(20, critStart, CmiWallTimer());
-#endif
-  }
-
+  if (!parent->cancels.IsEmpty()) CancelEvents();
+ 
   if (!rbFlag) timeLeash = (timeLeash + avgRBoffset)/2;
-  // Prepare to execute an event
-  ev = eq->currentPtr;
   // Shorten the leash as we near POSE_endtime
   if ((POSE_endtime > POSE_UnsetTS) && (lastGVT + timeLeash > POSE_endtime))
     timeLeash = POSE_endtime - lastGVT;
-  while ((ev->timestamp > POSE_UnsetTS) && 
-	 (ev->timestamp <= lastGVT + timeLeash)) { // do events w/in timeLeash
+  // Prepare to execute an event
+  ev = eq->currentPtr;
+  while ((ev->timestamp > POSE_UnsetTS) &&
+         (ev->timestamp <= lastGVT + timeLeash)) { // do events w/in timeLeash
 #ifdef MEM_COARSE
-    // note: first part of check below ensures we don't deadlock: 
-    //       we can't advance gvt if we don't let objects execute events 
-    //       with timestamp > gvt
+    // note: first part of check below ensures we don't deadlock:
+    //       can't advance gvt if we don't execute events with timestamp > gvt
     if (((eq->frontPtr->timestamp > lastGVT) ||
-	 (eq->frontPtr->timestamp < ev->prev->timestamp)) &&
-	(eq->mem_usage > MAX_USAGE)) break;
+         (eq->frontPtr->timestamp < ev->prev->timestamp)) &&
+        (eq->mem_usage > MAX_USAGE)) break;
 #endif
-    idle = 0;
     currentEvent = ev;
     ev->done = 2;
     specEventCount++;
@@ -89,21 +62,21 @@ void adapt3::Step()
   /*
   if (parent->thisIndex == RANDOM_OBJECT) {
     CkPrintf("%d STATS: leash:%d work:%d max:%d gvt:%d\n",
-	     parent->thisIndex, timeLeash, ev->timestamp, eq->largest,lastGVT);
-    CkPrintf(" avgLeash:%d RB:%d:%d specEvents=%d events=%d\n", 
-	     avgTimeLeash, avgRBoffset, rbFlag, specEventCount, eventCount);
+             parent->thisIndex, timeLeash, ev->timestamp, eq->largest,lastGVT);
+    CkPrintf(" avgLeash:%d RB:%d:%d specEvents=%d events=%d\n",
+             avgTimeLeash, avgRBoffset, rbFlag, specEventCount, eventCount);
   }
   */
   // Revise behavior for next run
-  if (!rbFlag && (ev->timestamp > -1)) timeLeash = eq->largest - lastGVT;
+  if (!rbFlag && (ev->timestamp > POSE_UnsetTS)) 
+    timeLeash = eq->largest - lastGVT;
   else if (!rbFlag && (timeLeash < avgTimeLeash)) timeLeash += LEASH_FLEX;
   // Uh oh!  Too much speculation going on!  Pull in the leash...
   if (specEventCount > (1.1*eventCount)) timeLeash = 1;
+  rbFlag = 0;
   /*
   if (parent->thisIndex == RANDOM_OBJECT)
     CkPrintf("New leash=%d\n", timeLeash);
   */
-  rbFlag = 0;
 }
-
-
+ 

@@ -7,10 +7,6 @@ void opt::Step()
   Event *ev;
   static POSE_TimeType lastGVT = localPVT->getGVT();
 
-  CmiAssert(this == parent->myStrat);
-  CmiAssert(eq == parent->eq);
-  CmiAssert(userObj == parent->objID);
-
   if (!parent->cancels.IsEmpty()) CancelUnexecutedEvents();
   if (eq->RBevent) Rollback(); 
   if (!parent->cancels.IsEmpty()) CancelEvents();
@@ -42,6 +38,10 @@ void opt::Step()
 /// Rollback to predetermined RBevent
 void opt::Rollback()
 {
+#ifdef TRACE_DETAIL
+  double critStart;
+  critStart = CmiWallTimer();  // trace timing
+#endif
 #ifdef POSE_STATS_ON
   localStats->SwitchTimer(RB_TIMER);      
 #endif
@@ -55,6 +55,12 @@ void opt::Rollback()
   if (recoveryPoint == eq->currentPtr) {
     eq->SetCurrentPtr(eq->RBevent);
     eq->RBevent = NULL;
+#ifdef POSE_STATS_ON
+    localStats->SwitchTimer(SIM_TIMER);      
+#endif
+#ifdef TRACE_DETAIL
+    traceUserBracketEvent(40, critStart, CmiWallTimer());
+#endif
     return;
   }
   CmiAssert(recoveryPoint != eq->back());
@@ -96,6 +102,9 @@ void opt::Rollback()
 #ifdef POSE_STATS_ON
   localStats->SwitchTimer(SIM_TIMER);      
 #endif
+#ifdef TRACE_DETAIL
+    traceUserBracketEvent(40, critStart, CmiWallTimer());
+#endif
 }
 
 /// Undo a single event, cancelling its spawned events
@@ -126,6 +135,10 @@ void opt::UndoEvent(Event *e)
 /// Cancel events in cancellation list that have arrived
 void opt::CancelEvents() 
 {
+#ifdef TRACE_DETAIL
+  double critStart;
+  critStart = CmiWallTimer();  // trace timing
+#endif
 #ifdef POSE_STATS_ON
   localStats->SwitchTimer(CAN_TIMER);      
 #endif
@@ -167,7 +180,15 @@ void opt::CancelEvents()
 	}
       }
       if (!found) { // "it" event has not arrived yet
-	if (it == last) return;  // seen all cancellations during this call
+	if (it == last) {
+#ifdef POSE_STATS_ON
+	  localStats->SwitchTimer(SIM_TIMER);      
+#endif
+#ifdef TRACE_DETAIL
+	  traceUserBracketEvent(20, critStart, CmiWallTimer());
+#endif
+	  return;  // seen all cancellations during this call
+	}
 	it = parent->cancels.GetItem(); // try the next cancellation
       }
     }
@@ -222,6 +243,12 @@ void opt::CancelEvents()
     }
     if (it == last) {
       parent->cancels.RemoveItem(it); // Clean up
+#ifdef POSE_STATS_ON
+  localStats->SwitchTimer(SIM_TIMER);      
+#endif
+#ifdef TRACE_DETAIL
+    traceUserBracketEvent(20, critStart, CmiWallTimer());
+#endif
       return;
     }
     else parent->cancels.RemoveItem(it); // Clean up
@@ -229,13 +256,20 @@ void opt::CancelEvents()
 #ifdef POSE_STATS_ON
   localStats->SwitchTimer(SIM_TIMER);      
 #endif
+#ifdef TRACE_DETAIL
+    traceUserBracketEvent(20, critStart, CmiWallTimer());
+#endif
 }
 
 /// Cancel events in cancellation list that have arrived
 void opt::CancelUnexecutedEvents() 
 {
+#ifdef TRACE_DETAIL
+  double critStart;
+  critStart = CmiWallTimer();  // trace timing
+#endif
 #ifdef POSE_STATS_ON
-    localStats->SwitchTimer(CAN_TIMER);      
+  localStats->SwitchTimer(CAN_TIMER);      
 #endif
   Event *ev, *tmp, *recoveryPoint;
   int found;
@@ -274,7 +308,15 @@ void opt::CancelUnexecutedEvents()
 	}
       }
       if (!found) { // "it" event has not arrived yet
-	if (it == last) return;  // seen all cancellations during this call
+	if (it == last) {
+#ifdef POSE_STATS_ON
+  localStats->SwitchTimer(SIM_TIMER);      
+#endif
+#ifdef TRACE_DETAIL
+    traceUserBracketEvent(20, critStart, CmiWallTimer());
+#endif
+	  return;  // seen all cancellations during this call
+	}
 	it = parent->cancels.GetItem(); // try the next cancellation
       }
     }
@@ -284,14 +326,36 @@ void opt::CancelUnexecutedEvents()
       eq->DeleteEvent(ev); // delete the event
       if (it == last) {
 	parent->cancels.RemoveItem(it); // Clean up
+#ifdef POSE_STATS_ON
+  localStats->SwitchTimer(SIM_TIMER);      
+#endif
+#ifdef TRACE_DETAIL
+    traceUserBracketEvent(20, critStart, CmiWallTimer());
+#endif
 	return;
       }
       else parent->cancels.RemoveItem(it); // Clean up
     }
-    else if (ev && (ev->done == 1)) { if (it == last) return; }
+    else if (ev && (ev->done == 1)) { 
+      if (it == last) {
+#ifdef POSE_STATS_ON
+  localStats->SwitchTimer(SIM_TIMER);      
+#endif
+#ifdef TRACE_DETAIL
+    traceUserBracketEvent(20, critStart, CmiWallTimer());
+#endif
+	return; 
+      }
+    }
     else if (!ev) {
       if (it == last) {
 	parent->cancels.RemoveItem(it); // Clean up
+#ifdef POSE_STATS_ON
+  localStats->SwitchTimer(SIM_TIMER);      
+#endif
+#ifdef TRACE_DETAIL
+    traceUserBracketEvent(20, critStart, CmiWallTimer());
+#endif
 	return;
       }
       else parent->cancels.RemoveItem(it); // Clean up
@@ -299,6 +363,9 @@ void opt::CancelUnexecutedEvents()
   } // end outer while which loops through entire cancellations list
 #ifdef POSE_STATS_ON
   localStats->SwitchTimer(SIM_TIMER);      
+#endif
+#ifdef TRACE_DETAIL
+    traceUserBracketEvent(20, critStart, CmiWallTimer());
 #endif
 }
 

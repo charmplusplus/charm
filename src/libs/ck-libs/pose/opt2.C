@@ -4,20 +4,18 @@
 void opt2::Step()
 {
   Event *ev;
-  static POSE_TimeType lastGVT = POSE_UnsetTS;
+  static POSE_TimeType lastGVT = localPVT->getGVT();
+  int iter = 0;
 
-  lastGVT = localPVT->getGVT();
   if (!parent->cancels.IsEmpty()) CancelUnexecutedEvents();
   if (eq->RBevent) Rollback(); 
   if (!parent->cancels.IsEmpty()) CancelEvents();
 
   // Prepare to execute an event
   ev = eq->currentPtr;
-  if ((ev->timestamp >= 0) && 
+  if ((ev->timestamp > POSE_UnsetTS) && 
       ((POSE_endtime == POSE_UnsetTS) || (ev->timestamp <= POSE_endtime))){
     POSE_TimeType fix_time = ev->timestamp;
-    int iter = 0;
-    idle = 0;
     while (ev->timestamp == fix_time) {
       // do all events at the first available timestamp
       iter++;

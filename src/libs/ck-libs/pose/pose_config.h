@@ -32,19 +32,19 @@
 //#define POSE_COMM_ON 1
 
 /// Uncomment to turn on POSE load balancer
-#define LB_ON 1
+//#define LB_ON 1
 
 #include <StreamingStrategy.h>
 #include <PrioStreaming.h>
-#define COMM_TIMEOUT 1
+#define COMM_TIMEOUT 2
 #define COMM_MAXMSG 20
 
 /// Synchronization strategy constants
 #define MAX_ITERATIONS 100  // maximum forward executions per Step call
 #define STORE_RATE 10       // default checkpoint rate: 1 for every n events
-#define SPEC_WINDOW 100      // speculative event window size
+#define SPEC_WINDOW 1000      // speculative event window size
 #define MIN_LEASH 10        // min speculative window for adaptive strategy
-#define MAX_LEASH 500        // max  "     "     "     "        "     "
+#define MAX_LEASH 5000        // max  "     "     "     "        "     "
 #define LEASH_FLEX 10        // leash increment
 
 /// Load balancer constants
