@@ -187,6 +187,7 @@ void CentralLB::buildStats()
     statsData->commData = new LDCommData[statsData->n_comm];
     int nobj = 0;
     int ncom = 0;
+    int nmigobj = 0;
     // copy all data in individule message to this big structure
     for (int pe=0; pe<stats_msg_count; pe++) {
        int i;
@@ -194,6 +195,7 @@ void CentralLB::buildStats()
        for (i=0; i<msg->n_objs; i++) {
          statsData->from_proc[nobj] = statsData->to_proc[nobj] = pe;
 	 statsData->objData[nobj] = msg->objData[i];
+         if (msg->objData[i].migratable) nmigobj++;
 	 nobj++;
        }
        for (i=0; i<msg->n_comm; i++) {
@@ -203,6 +205,10 @@ void CentralLB::buildStats()
        // free the memory
        delete msg;
        statsMsgsList[pe]=0;
+    }
+    statsData->n_migrateobjs = nmigobj;
+    if (lb_debug) {
+      CmiPrintf("n_obj:%d migratable:%d ncom:%d\n", nobj, nmigobj, ncom);
     }
 }
 

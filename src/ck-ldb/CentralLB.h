@@ -76,7 +76,7 @@ public:
     int   n_objs;
     ProcStats(): total_walltime(0.0), total_cputime(0.0), idletime(0.0),
 	   	 bg_walltime(0.0), bg_cputime(0.0), pe_speed(1),
-		 utilization(1.0), available(1), n_objs(0) {}
+		 utilization(1.0), available(1), n_objs(0)  {}
   };
 
   struct LDStats {  // Passed to Strategy
@@ -84,6 +84,7 @@ public:
     int count;
     
     int n_objs;
+    int   n_migrateobjs;
     LDObjData* objData;
     int  *from_proc, *to_proc;
     int n_comm;
@@ -92,8 +93,9 @@ public:
     int *objHash; 
     int  hashSize;
 
-    LDStats(): n_objs(0), n_comm(0) { objData = NULL; commData = NULL; 
-		from_proc = NULL; to_proc = NULL; objHash = NULL; }
+    LDStats(): n_objs(0), n_migrateobjs(0), n_comm(0), 
+               objData(NULL), commData(NULL), from_proc(NULL), to_proc(NULL), 
+               objHash(NULL) {}
     void assign(int oid, int pe) { CmiAssert(procs[pe].available); to_proc[oid] = pe; }
       // build hash table
     void makeCommHash();
