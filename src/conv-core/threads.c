@@ -999,25 +999,11 @@ static CthThread CthCreateInner(CthVoidFn fn,void *arg,int size,int migratable)
   result = (CthThread)malloc(sizeof(struct CthThreadStruct));
   _MEMCHECK(result);
   CthThreadInit(result);
-  size = 16384*2;
+  size += MINSIGSTKSZ;
   CthAllocateStack(&result->base,&size,migratable);
-  /* 
-   these changes are necessary for getcontext to work at various conditions.
-   I cannot figure out why the number is set this way, it was from experiments.
-   DON'T MOVE !!! 
-  */
-  stack = result->base.stack;
-  stack = STP_STKALIGN(stack, 16);
-#if CMK_STACK_GROWDOWN
-  stack = stack+size-2048;
-#elif CMK_STACK_GROWUP
-/*  stack = stack+8192; */
-#else
-  #error "Must define stack grow up or down in conv-mach.h!"
-  CmiAbort("Must define stack grow up or down in conv-mach.h!\n");
-#endif
-  getcontext(&result->context);
-  result->context.uc_stack.ss_sp = stack;   /* result->base.stack; */
+  if (0 != getcontext(&result->context))
+    CmiAbort("CthCreateInner: getcontext failed.\n");
+  result->context.uc_stack.ss_sp = result->base.stack;
   result->context.uc_stack.ss_size = size;
   result->context.uc_stack.ss_flags = 0;
   result->context.uc_link = 0;
