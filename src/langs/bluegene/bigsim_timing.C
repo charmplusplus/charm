@@ -36,16 +36,6 @@ bgMsgEntry::bgMsgEntry(char *msg)
   tID = CmiBgMsgThreadID(msg);
 }
 
-void bgMsgEntry::print()
-{
-  CmiPrintf("msgID:%d sendtime:%f dstPe:%d\n", msgID, sendtime, dstPe);
-}
-
-void bgMsgEntry::write(FILE *fp)
-{
-  fprintf(fp, "msgID:%d sendtime:%f dstPe:%d\n", msgID, sendtime, dstPe);
-}
-
 bgTimeLog::bgTimeLog(int epc, char *msg)
 {
   ep = epc;
@@ -60,11 +50,6 @@ bgTimeLog::~bgTimeLog()
 {
   for (int i=0; i<msgs.length(); i++)
     delete msgs[i];
-}
-
-void bgTimeLog::closeLog()
-{ 
-  endTime = BgGetCurTime(); 
 }
 
 void bgTimeLog::print(int node, int th)
@@ -186,19 +171,18 @@ int BgAdjustTimeLineForward(int msgID, double tAdjustAbs, BgTimeLine &tline)
   /* ASSUMPTION: no error testing needed */
 
 
-  // CmiPrintf("BgAdjustTimeLineForward\n"); 
-  testCount++;
-  if((testCount%1000)==0)
-  		CmiPrintf("BgAdjustTimeLineForward\n");
-
-
   // FIXME can this search be made faster than linear search ?
   // It cannot be made binary search, since there is no ordering for msgIDs
   int idxOld = tline.length()-1;
   while((idxOld >= 0) && (tline[idxOld]->msgID != msgID))
   	idxOld--;
   // msg come earlier
+  // CmiPrintf("msg come earlier\n");
   if (idxOld == -1) return 0;
+
+  testCount++;
+  if((testCount%1000)==0)
+  	CmiPrintf("BgAdjustTimeLineForward\n");
 
   int idx=0;
   double startTime=0;
@@ -208,9 +192,11 @@ int BgAdjustTimeLineForward(int msgID, double tAdjustAbs, BgTimeLine &tline)
   BgGetMsgStartTime(tlog->recvTime, tline, &startTime, &idx);
   tline.insert(idx, tlog);
   double tAdjust = startTime - tlog->startTime;
-  tline[idx]->adjustTimeLog(tAdjust);
 
   if(tAdjust==0) return 1;
+
+  tline[idx]->adjustTimeLog(tAdjust);
+
   if(tAdjust<0) {
   	// move log forward if required.
   	while(idx < idxOld) {

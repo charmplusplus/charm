@@ -30,8 +30,13 @@ public:
   int dstPe;
 public:
   bgMsgEntry(char *msg);
-  void print();
-  void write(FILE *fp);
+  inline void print() {
+    CmiPrintf("msgID:%d sendtime:%f dstPe:%d\n", msgID, sendtime, dstPe);
+  }
+  void write(FILE *fp) {
+    fprintf(fp, "msgID:%d sendtime:%f dstPe:%d\n", msgID, sendtime, dstPe);
+  }
+
 };
 
 /**
@@ -49,7 +54,7 @@ public:
 public:
   bgTimeLog(int epc, char *msg);
   ~bgTimeLog();
-  void closeLog(); 
+  inline void closeLog() { endTime = BgGetCurTime(); }
   inline void addMsg(char *msg) { msgs.push_back(new bgMsgEntry(msg)); }
   void print(int node, int th);
   void write(FILE *fp);

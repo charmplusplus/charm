@@ -1200,7 +1200,7 @@ extern "C" int CmiSwitchToPE(int pe)
 			TimeLog correction
 *****************************************************************************/
 
-static inline int handleCorrectionMsg(BgTimeLine *logs, bgCorrectionMsg *m)
+static inline int handleCorrectionMsg(BgTimeLine *logs, bgCorrectionMsg *m, int del)
 {
 	CmiUInt2 tID = m->tID;
 	if (tID == ANYTHREAD) {
@@ -1216,27 +1216,56 @@ static inline int handleCorrectionMsg(BgTimeLine *logs, bgCorrectionMsg *m)
 		return 0;
 	  }
 	}
+//CmiPrintf("tAdjust: %f\n", m->tAdjust);
 	if (BgAdjustTimeLineForward(m->msgID, m->tAdjust, logs[tID]) == 0)
           return 0;
-	CmiFree(m);
+	if (del) CmiFree(m);
 	return 1;
 }
 
 // entry function for correction msgs
 void bgCorrectionFunc(char *msg)
 {
-    int i;
+    int i, j;
     bgCorrectionMsg* m = (bgCorrectionMsg*)msg;
     int nodeidx = nodeInfo::Global2Local(m->destNode);	
-    CmiAssert(nodeidx != -1);
+if (nodeidx < 0)
+CmiPrintf("destNode: %d ignored\n", m->destNode);
+    if (nodeidx == BG_BROADCASTALL) {
+      CmiFree(m);
+      return;
+      for (i=0; i<BgNumNodes(); i++) {
+        bgCorrectionQ &cmsg = cva(nodeinfo)[i].cmsg;
+        BgTimeLine *logs = cva(nodeinfo)[i].timelines;
+
+        cmsg.enq(m);
+        int len = cmsg.length();
+        for (j=0; j<len; j++) {
+          bgCorrectionMsg *cm = cmsg.deq();
+          if (handleCorrectionMsg(logs, cm, 0) == 0) cmsg.enq(cm);
+        }
+      }
+      return;
+    }
+    CmiAssert(nodeidx >= 0);
     bgCorrectionQ &cmsg = cva(nodeinfo)[nodeidx].cmsg;
     BgTimeLine *logs = cva(nodeinfo)[nodeidx].timelines;
+
+    int removed = 0;
+    for (i=0; i<cmsg.length(); i++) {
+      bgCorrectionMsg* cm = cmsg[i-removed];
+      if (cm->msgID == m->msgID) {
+        cmsg.remove(i-removed);
+	removed++;
+        CmiFree(cm);
+      }
+    }
 
     cmsg.enq(m);
     int len = cmsg.length();
     for (i=0; i<len; i++) {
       bgCorrectionMsg *cm = cmsg.deq();
-      if (handleCorrectionMsg(logs, cm) == 0) cmsg.enq(cm);
+      if (handleCorrectionMsg(logs, cm, 1) == 0) cmsg.enq(cm);
     }
 }
 
@@ -1255,6 +1284,7 @@ void correctTime(char *msg)
 	CmiBgMsgRecvTime(msg) = m->tAdjust;
         cmsg.remove(i-removed);
 	removed++;
+        CmiFree(m);
      }
    }
 }
