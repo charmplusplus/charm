@@ -90,7 +90,7 @@ class CkQ : private CkSTLHelper<T>, private CkNoncopyable {
       return ret;
     }
     //Peek at the n'th item from the queue
-    T& operator[](size_t n) 
+    T& operator[](size_t n)
     {
     	n=(n+first)%blklen;
     	return block[n];
@@ -107,16 +107,32 @@ class CkQ : private CkSTLHelper<T>, private CkNoncopyable {
     }
 };
 
+/// Default pup routine for CkQ: pup each of the elements
+template <class T>
+inline void operator|(PUP::er &p,CkQ<T> &q) {
+    int l=q.length();
+    p|l;
+    for (int i=0;i<l;i++) {
+    	if (p.isUnpacking()) {
+		T t;
+		p|t;
+		q.enq(t);
+	} else {
+		p|q[i];
+	}
+    }
+}
+
 
 /// A typesafe, automatically growing array.
 /// Classes used must have a default constructor and working copy constructor.
-/// This class is modelled after, but *not* identical to, the 
-/// (still nonportable) std::vector. 
+/// This class is modelled after, but *not* identical to, the
+/// (still nonportable) std::vector.
 ///   The elements of the array are pup'd using plain old "p|elt;".
 template <class T>
 class CkVec : private CkSTLHelper<T> {
     typedef CkVec<T> this_type;
-    
+
     T *block; //Elements of vector
     int blklen; //Allocated size of block 
     int len; //Number of used elements in block
