@@ -1,7 +1,7 @@
 module DummyLB {
 
 extern module CentralLB;
-initcall void lbinit(void);
+initnode void lbinit(void);
 group [migratable] DummyLB : CentralLB {
   entry void DummyLB(void);  
 };

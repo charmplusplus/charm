@@ -2,7 +2,7 @@ module NullLB {
 
 extern module LBDatabase;
 extern module BaseLB;
-initcall void initNullLB(void);
+initnode void initNullLB(void);
 
 group [migratable] NullLB: BaseLB {
   entry void NullLB(void);  

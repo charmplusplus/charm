@@ -1,7 +1,7 @@
 module RefineLB {
 
 extern module CentralLB;
-initcall void lbinit(void);
+initnode void lbinit(void);
 group [migratable] RefineLB : CentralLB {
   entry void RefineLB(void);  
 };
