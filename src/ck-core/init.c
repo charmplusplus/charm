@@ -12,8 +12,8 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1995-06-08 17:07:12  gursoy
- * Cpv macro changes done
+ * Revision 2.2  1995-06-13 14:33:55  gursoy
+ * *** empty log message ***
  *
  * Revision 1.16  1995/05/03  20:56:44  sanjeev
  * bug fixes for finding uninitialized modules
@@ -126,7 +126,7 @@ void initModuleInit()
     CpvInitialize(BOCINIT_QUEUE*, BocInitQueueHead);
     CpvInitialize(int, userArgc);
     CpvInitialize(char**, userArgv);
-    CsvAccess(ReadBuffSize) = 0;
+    if (CmiMyRank() == 0) CsvAccess(ReadBuffSize) = 0;
 }
 
 

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.2  1995-06-09 16:37:40  gursoy
+ * Revision 2.3  1995-06-13 14:33:55  gursoy
+ * *** empty log message ***
+ *
+ * Revision 2.2  1995/06/09  16:37:40  gursoy
  * Csv accesses modified
  *
  * Revision 1.4  1995/04/13  20:54:18  sanjeev
@@ -45,7 +48,7 @@ void defaultmainModuleInit()
    CpvAccess(disable_sys_msgs) = 0; 
 }
 
-main(argc, argv)
+charm_main(argc, argv)
 int argc;
 char *argv[];
 {

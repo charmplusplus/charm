@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1995-06-08 17:09:41  gursoy
+ * Revision 2.2  1995-06-13 14:33:55  gursoy
+ * *** empty log message ***
+ *
+ * Revision 2.1  1995/06/08  17:09:41  gursoy
  * Cpv macro changes done
  *
  * Revision 1.5  1995/04/23  21:21:52  sanjeev
@@ -76,7 +79,9 @@
 #define McNumSpanTreeChildren(node) CmiNumSpanTreeChildren(node)
 #define McSendToSpanTreeLeaves(size, msg) CmiSendToSpanTreeLeaves(size, msg)
 
+#define CkPrintf                CmiPrintf
 #define CPrintf                 CmiPrintf
+#define CkScanf                 CmiScanf
 #define CScanf                  CmiScanf
 #define CMyPeNum                CmiMyPe
 #define CharmExit               CkExit

@@ -12,8 +12,8 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1995-06-08 17:07:12  gursoy
- * Cpv macro changes done
+ * Revision 2.2  1995-06-13 14:33:55  gursoy
+ * *** empty log message ***
  *
  * Revision 1.7  1995/05/04  22:03:51  jyelon
  * *** empty log message ***
@@ -175,5 +175,5 @@ void globalsModuleInit()
    CpvAccess(PrintSummaryStat)       = 0;
    CpvAccess(numHeapEntries)         = 0;  
    CpvAccess(numCondChkArryElts)     = 0; 
-   CsvAccess(MainChareLanguage)      = -1;
+   if (CmiMyRank() == 0) CsvAccess(MainChareLanguage)  = -1;
 }
