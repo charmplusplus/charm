@@ -46,7 +46,11 @@ class GroupIdxArrayEntry {
 
 template <class dtype> 
 class GroupIdxArray {
+#if CMK_BLUEGENE_CHARM
+  enum {MAXBINSPE0=256,MAXBINSOTHER=0};
+#else
   enum {MAXBINSPE0=256,MAXBINSOTHER=16};
+#endif
   GroupIdxArrayEntry<dtype> *tab;
   public:
      GroupIdxArray() {}
