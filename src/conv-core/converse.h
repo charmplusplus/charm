@@ -65,7 +65,11 @@ typedef void *CmiNodeLock;
 #define CmiLock(lock) 0
 #define CmiUnlock(lock) 0
 #define CmiTryLock(lock) 0
-#define CmiDestroyLock(lock) 0
+#define CmiDestroyLock(lock) {}
+  /* Used to be:
+     #define CmiDestroyLock(lock) 0
+     But this caused lots of compiler warnings
+  */
 
 #endif
 
