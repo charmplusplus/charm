@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.22  1995-10-13 18:15:53  jyelon
+ * Revision 2.23  1995-11-06 00:17:26  sanjeev
+ * in CkProcess_ForChareMsg, magic number taken from chareblock, not env
+ *
+ * Revision 2.22  1995/10/13  18:15:53  jyelon
  * K&R changes.
  *
  * Revision 2.21  1995/10/11  17:54:40  sanjeev
@@ -161,7 +164,7 @@ ENVELOPE *env;
   int          current_ep      = GetEnv_EP(env);
   EP_STRUCT   *current_epinfo  = CsvAccess(EpInfoTable) + current_ep;
   void        *current_usr     = USER_MSG_PTR(env);
-  int          current_magic   = GetEnv_chare_magic_number(env);
+  int          current_magic   = chareblock->selfID.magic;
   int          current_msgType = GetEnv_msgType(env);
 
   CpvAccess(currentChareBlock) = (void *)chareblock;
