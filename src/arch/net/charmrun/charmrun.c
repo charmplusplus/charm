@@ -1767,7 +1767,7 @@ int rsh_start(int nodeno,const char *startScript)
       int fdScript=open(startScript,O_RDONLY);
   /**/  unlink(startScript); /**/
       dup2(fdScript,0);/*Open script as standard input*/
-      unsetenv("DISPLAY"); /*Disables ssh X forwarding, which hangs ssh*/
+      putenv("DISPLAY="); /*Disables ssh X forwarding, which hangs ssh*/
       for(i=3; i<1024; i++) close(i);
       execvp(rshargv[0], rshargv);
       exit(1);
