@@ -40,17 +40,17 @@ pvm: converse libpvmc.a
 
 sdag: charm++ sdagx libsdag.a
 
+fem: femc femf
+
+femc: charm++ libs
+
+femf: femc libconv-utilf.a
+
 ampi: ampic ampif
-	@touch ampi.tmp
-	@rm -f ampi.tmp
 
 ampic: charm++ libs libampi.a
-	@touch ampif.tmp
-	@rm -f ampif.tmp
 
 ampif: charm++ libconv-utilf.a libs libampif.a
-	@touch ampif.tmp
-	@rm -f ampif.tmp
 
 translators: sdagx charmxi conv-cpm charmidl
 
@@ -184,7 +184,7 @@ CVLIBS=libconv-core.a libconv-cplus-n.a libconv-cplus-y.a libconv-util.a libldb-
 
 LIBCONV_CORE=threads.o convcore.o conv-conds.o queueing.o fifo.o msgmgr.o memory.o cpm.o cpthreads.o futures.o cldb.o random.o debug-message.o debug-object.o info.o generate.o edgelist.o conv-ccs.o quiescence.o 
 
-LIBCONV_UTIL=pup_util.o pup_xlater.o pup_c.o ckhashtable.o
+LIBCONV_UTIL=pup_util.o pup_xlater.o pup_c.o ckhashtable.o sockRoutines.o
 
 LIBCONV_UTILF=pup_f.o
 
