@@ -859,7 +859,11 @@ void Entry::genChareDecl(XStr& str)
   } else {
     // entry method declaration
     str << "    ";
-    assert(retType!=0);
+    if(retType==0) {
+      cerr << "Entry methods must specify a return type: ";
+      cerr << "use void if necessary\n";
+      exit(1);
+    }
     retType->print(str);
     str << " " << name;
     str << "(";
@@ -883,8 +887,12 @@ void Entry::genGroupDecl(XStr& str)
   } else {
     // entry method broadcast declaration
     str << "    ";
-    if(retType)
-     retType->print(str);
+    if(retType==0) {
+      cerr << "Entry methods must specify a return type: ";
+      cerr << "use void if necessary\n";
+      exit(1);
+    }
+    retType->print(str);
     str << " " << name;
     str << "(";
     if(param) {
@@ -904,8 +912,7 @@ void Entry::genGroupDecl(XStr& str)
     str << "    }\n";
     // entry method onPE declaration
     str << "    ";
-    if(retType)
-     retType->print(str);
+    retType->print(str);
     str << " " << name;
     str << "(";
     if(param && !param->isVoid()) {
