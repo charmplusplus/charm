@@ -697,6 +697,42 @@ void
 Chare::genDefs(XStr& str)
 {
   str << "/* DEFS: "; print(str); str << " */\n";
+  if (fortranMode) { // For Fortran90
+    if (!isArray()) { // Currently, only arrays are supported
+      cerr << (char *)baseName() << ": only chare arrays are currently supported\n";
+      exit(1);
+    }
+    // We have to generate the chare array itself
+    str << "/* FORTRAN */\n";
+    str << "extern \"C\" void " << fortranify(baseName()) << "_allocate_(char **, void *, int *);\n";
+    str << "\n";
+    str << "class " << baseName() << " : public ArrayElement1D\n";
+    str << "{\n";
+    str << "public:\n";
+    str << "  char user_data[64];\n";
+    str << "public:\n";
+    str << "  " << baseName() << "()\n";
+    str << "  {\n";
+//    str << "    CkPrintf(\"" << baseName() << " %d created\\n\",thisIndex);\n";
+    str << "    CkArrayID *aid = &thisArrayID;\n";
+    str << "    " << fortranify(baseName()) << "_allocate_((char **)&user_data, &aid, &thisIndex);\n";
+    str << "  }\n";
+    str << "\n";
+    str << "  " << baseName() << "(CkMigrateMessage *m)\n";
+    str << "  {\n";
+    str << "    CkPrintf(\"" << baseName() << " %d migrating\\n\",thisIndex);\n";
+    str << "  }\n";
+    str << "\n";
+    str << "};\n";
+    str << "\n";
+    str << "extern \"C\" void " << fortranify(baseName()) << "_cknew_(int *numElem, long *aindex)\n";
+    str << "{\n";
+    str << "    CkArrayID *aid = new CkArrayID;\n";
+    str << "    *aid = CProxy_" << baseName() << "::ckNew(*numElem); \n";
+    str << "    *aindex = (long)aid;\n";
+    str << "}\n";
+
+  }
   if(!type->isTemplated()) {
     if(!templat) {
       str << "#ifndef CK_TEMPLATES_ONLY\n";
