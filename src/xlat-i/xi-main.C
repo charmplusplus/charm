@@ -46,8 +46,9 @@ main(int argc, char *argv[])
 
   for (int i=1; i<argc; i++) {
     if (*argv[i]=='-') {
-      if (strcmp(argv[i],"-f90")==0)  fortranMode = 1;
-      if (strcmp(argv[i],"-intrinsic")==0)  internalMode = 1;
+      if (strcmp(argv[i],"-ansi")==0);
+      else if (strcmp(argv[i],"-f90")==0)  fortranMode = 1;
+      else if (strcmp(argv[i],"-intrinsic")==0)  internalMode = 1;
       else abortxi(argv[0]);
     }
     else
