@@ -138,6 +138,8 @@ void StreamingStrategy::beginProcessing(int ignored) {
 }
 
 void StreamingStrategy::pup(PUP::er &p){
+
+  CharmStrategy::pup(p);
   p | PERIOD;
   p | bufferMax;
   p | shortMsgPackingFlag;
