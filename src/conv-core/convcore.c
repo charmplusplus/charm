@@ -727,9 +727,11 @@ int maxmsgs;
         if(!CpvAccess(CsdStopNotifyFlag)) (CpvAccess(CsdNotifyIdle))();
       }
 #if CMK_WHEN_PROCESSOR_IDLE_USLEEP
-      struct timeval tv;
-      tv.tv_usec=10000; tv.tv_sec=0;
-      select(0,0,0,0,&tv);
+      {
+        struct timeval tv;
+        tv.tv_usec=10000; tv.tv_sec=0;
+        select(0,0,0,0,&tv);
+      }
 #endif
       CcdRaiseCondition(CcdPROCESSORIDLE) ;
       if (CpvAccess(CsdStopFlag)) { 
