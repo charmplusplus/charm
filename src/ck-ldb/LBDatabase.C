@@ -158,10 +158,28 @@ void _loadbalancerInit()
 
   /******************* SIMULATION *******************/
   // get the step number at which to dump the LB database
-  CmiGetArgIntDesc(argv, "+LBDump", &LBSimulation::dumpStep, "Dump the LB state at this step");
+  CmiGetArgIntDesc(argv, "+LBDump", &LBSimulation::dumpStep, "Dump the LB state from this step");
+  CmiGetArgIntDesc(argv, "+LBDumpSteps", &LBSimulation::dumpStepSize, "Dump the LB state for this amount of steps");
+  if (LBSimulation::dumpStepSize <= 0) {
+    CmiPrintf("LB> Argument LBDumpSteps (%d) too small, setting to 1\n",LBSimulation::dumpStepSize);
+    LBSimulation::dumpStepSize = 1;
+  }
   CmiGetArgStringDesc(argv, "+LBDumpFile", &LBSimulation::dumpFile, "Set the LB state file name");
-  // get the simulation flag
-  LBSimulation::doSimulation = CmiGetArgFlagDesc(argv, "+LBSim", "Read LB state from LBDumpFile");
+  // get the simulation flag and number. Now the flag can also be avoided by the presence of the number
+  LBSimulation::doSimulation = CmiGetArgIntDesc(argv, "+LBSim", &LBSimulation::simStep, "Read LB state from LBDumpFile since this step");
+  // check for stupid LBSim parameter
+  if (LBSimulation::doSimulation && LBSimulation::simStep < 0) {
+    CmiPrintf("LB> Argument LBSim (%d) invalid, should be >= 0\n");
+    CkExit();
+    return;
+  }
+  CmiGetArgIntDesc(argv, "+LBSimSteps", &LBSimulation::simStepSize, "Read LB state for this number of steps");
+  if (LBSimulation::simStepSize <= 0) {
+    CmiPrintf("LB> Argument LBSimSteps (%d) too small, setting to 1\n",LBSimulation::simStepSize);
+    LBSimulation::simStepSize = 1;
+  }
+
+
   LBSimulation::simProcs = 0;
   CmiGetArgIntDesc(argv, "+LBSimProcs", &LBSimulation::simProcs, "Number of target processors.");
 

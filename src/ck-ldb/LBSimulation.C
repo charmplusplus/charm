@@ -10,10 +10,14 @@
 		Sequentail Simulation 
 *****************************************************************************/
 
-int LBSimulation::dumpStep = -1;  	     /// step number to dump
-char* LBSimulation::dumpFile = "lbdata.dat";   /// dump file name
+int LBSimulation::dumpStep = -1;  	     /// first step number to dump
+int LBSimulation::dumpStepSize = 1;          /// number of steps to dump 
+char* LBSimulation::dumpFile = "lbdata.dat"; /// dump file name
 int LBSimulation::doSimulation = 0; 	     /// flag if do simulation
+int LBSimulation::simStep = -1;              /// first step number to simulate
+int LBSimulation::simStepSize = 1;           /// number of steps to simulate
 int LBSimulation::simProcs = 0; 	     /// simulation target procs
+int LBSimulation::procsChanged = 0;          /// flag if the number of procs has been changed
 
 LBSimulation::LBSimulation(int numPes_) : numPes(numPes_)
 {
@@ -27,6 +31,12 @@ LBSimulation::~LBSimulation()
 {
  	delete [] peLoads;
  	delete [] bgLoads;
+}
+
+void LBSimulation::reset()
+{
+  for(int i = 0; i < numPes; i++)
+    peLoads[i] = bgLoads[i] = 0.0;
 }
 
 void LBSimulation::SetProcessorLoad(int pe, double load, double bgload)
@@ -58,4 +68,15 @@ void LBSimulation::PrintSimulationResults()
   CmiPrintf("MinObj : %f	MaxObj : %f\n", minObjLoad, maxObjLoad, average);
 }
 
-
+void LBSimulation::PrintDifferences(LBSimulation *realSim, CentralLB::LDStats *stats)
+{
+  // the number of procs during the simulation and the real execution must be checked by the caller!
+  int i;
+  // here to print the differences between the predicted (this) and the real (real)
+  CmiPrintf("Differences between predicted and real balance:\n");
+  CmiPrintf("PE   (Predicted Load) (Real Predicted)  (Difference)  (Real CPU)  (Prediction Error)\n");
+  for(i = 0; i < numPes; ++i) {
+    CmiPrintf("%-4d %13f %16f %15f %12f %14f\n", i, peLoads[i], realSim->peLoads[i], peLoads[i]-realSim->peLoads[i],
+	      stats->procs[i].total_walltime-stats->procs[i].idletime, realSim->peLoads[i]-(stats->procs[i].total_walltime-stats->procs[i].idletime));
+  }
+}

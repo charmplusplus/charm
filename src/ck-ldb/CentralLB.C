@@ -15,6 +15,7 @@
 #include "CentralLB.h"
 #include "CentralLB.def.h"
 #include "LBDBManager.h"
+#include "LBSimulation.h"
 
 #define  DEBUGF(x)    // CmiPrintf x;
 
@@ -268,8 +269,8 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
     // build data
     buildStats();
 
-    // if this is the step at which we need to dump the database
-    simulation();
+    // if we are in simulation mode read data
+    if (LBSimulation::doSimulation) simulationRead();
 
     char *availVector = LBDatabaseObj()->availVector();
     for(proc = 0; proc < clients; proc++)
@@ -281,6 +282,9 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
 //    CkPrintf("returned successfully\n");
     LBDatabaseObj()->get_avail_vector(migrateMsg->avail_vector);
     migrateMsg->next_lb = LBDatabaseObj()->new_lbbalancer();
+
+    // if this is the step at which we need to dump the database
+    simulationWrite();
 
 //  calculate predicted load
 //  very time consuming though, so only happen when debugging is on
@@ -525,22 +529,65 @@ LBMigrateMsg * CentralLB::createMigrateMsg(LDStats* stats,int count)
   return msg;
 }
 
-void CentralLB::simulation() {
+void CentralLB::simulationWrite() {
   if(step() == LBSimulation::dumpStep)
   {
     // here we are supposed to dump the database
-    writeStatsMsgs(LBSimulation::dumpFile);
-    CmiPrintf("LBDump: Dumped the load balancing data.\n");
-    CmiPrintf("Charm++> Exiting...\n");
-    CkExit();
+    int dumpFileSize = strlen(LBSimulation::dumpFile) + 4;
+    char *dumpFileName = (char *)malloc(dumpFileSize);
+    while (sprintf(dumpFileName, "%s.%d", LBSimulation::dumpFile, LBSimulation::dumpStep) >= dumpFileSize) {
+      free(dumpFileName);
+      dumpFileSize+=3;
+      dumpFileName = (char *)malloc(dumpFileSize);
+    }
+    writeStatsMsgs(dumpFileName);
+    free(dumpFileName);
+    CmiPrintf("LBDump: Dumped the load balancing data at step %d.\n",LBSimulation::dumpStep);
+    ++LBSimulation::dumpStep;
+    --LBSimulation::dumpStepSize;
+    if (LBSimulation::dumpStepSize <= 0) { // prevent stupid step sizes
+      CmiPrintf("Charm++> Exiting...\n");
+      CkExit();
+    }
     return;
   }
-  else if(LBSimulation::doSimulation)
-  {
-    // here we are supposed to read the data from the dump database
-    readStatsMsgs(LBSimulation::dumpFile);
+}
 
-    LBSimulation simResults(LBSimulation::simProcs);
+void CentralLB::simulationRead() {
+  LBSimulation *simResults = NULL, *realResults;
+  LBMigrateMsg *voidMessage = new (0,0,0,0) LBMigrateMsg();
+  voidMessage->n_moves=0;
+  for ( ;LBSimulation::simStepSize > 0; --LBSimulation::simStepSize, ++LBSimulation::simStep) {
+    // here we are supposed to read the data from the dump database
+    int simFileSize = strlen(LBSimulation::dumpFile) + 4;
+    char *simFileName = (char *)malloc(simFileSize);
+    while (sprintf(simFileName, "%s.%d", LBSimulation::dumpFile, LBSimulation::simStep) >= simFileSize) {
+      free(simFileName);
+      simFileSize+=3;
+      simFileName = (char *)malloc(simFileSize);
+    }
+    readStatsMsgs(simFileName);
+    free(simFileName);
+
+    // allocate simResults (only the first step
+    if (simResults == NULL) {
+      simResults = new LBSimulation(LBSimulation::simProcs);
+      realResults = new LBSimulation(LBSimulation::simProcs);
+    }
+    else {
+      // should be the same number of procs of the original simulation!
+      if (!LBSimulation::procsChanged) {
+	// it means we have a previous step, so in simResults there is data.
+	// we can now print the real effects of the load balancer during the simulation
+	// or print the difference between the predicted data and the real one.
+	realResults->reset();
+	// reset to_proc of statsData to be equal to from_proc
+	for (int k=0; k < statsData->n_objs; ++k) statsData->to_proc[k] = statsData->from_proc[k];
+	findSimResults(statsData, LBSimulation::simProcs, voidMessage, realResults);
+	simResults->PrintDifferences(realResults,statsData);
+      }
+      simResults->reset();
+    }
 
     // now pass it to the strategy routine
     double startT = CmiWallTimer();
@@ -549,16 +596,19 @@ void CentralLB::simulation() {
     CmiPrintf("%s> Strategy took %fs. \n", lbname, CmiWallTimer()-startT);
 
     // now calculate the results of the load balancing simulation
-    findSimResults(statsData, LBSimulation::simProcs, migrateMsg, &simResults);
+    findSimResults(statsData, LBSimulation::simProcs, migrateMsg, simResults);
 
-    // now we have the simulation data, so print it and exit
-    CmiPrintf("Charm++> LBSim: Simulation of one load balancing step done.\n");
-    simResults.PrintSimulationResults();
+    // now we have the simulation data, so print it and loop
+    CmiPrintf("Charm++> LBSim: Simulation of load balancing step %d done.\n",LBSimulation::simStep);
+    simResults->PrintSimulationResults();
 
     delete migrateMsg;
-    CmiPrintf("Charm++> Exiting...\n");
-    CkExit();
+    CmiPrintf("Charm++> LBSim: Passing to the next step\n");
   }
+  // deallocate simResults
+  delete simResults;
+  CmiPrintf("Charm++> Exiting...\n");
+  CkExit();
 }
 
 void CentralLB::readStatsMsgs(const char* filename) {
@@ -570,18 +620,23 @@ void CentralLB::readStatsMsgs(const char* filename) {
   // at this stage, we need to rebuild the statsMsgList and
   // statsDataList structures. For that first deallocate the
   // old structures
-  for(i = 0; i < stats_msg_count; i++)
-  	delete statsMsgsList[i];
-  delete[] statsMsgsList;
+  if (statsMsgsList) {
+    for(i = 0; i < stats_msg_count; i++)
+      delete statsMsgsList[i];
+    delete[] statsMsgsList;
+    statsMsgsList=0;
+  }
 
   PUP::fromDisk pd(f);
   PUP::machineInfo machInfo;
+
   pd((char *)&machInfo, sizeof(machInfo));	// read machine info
   PUP::xlater p(machInfo, pd);
 
   p|stats_msg_count;
 
   CmiPrintf("readStatsMsgs for %d pes starts ... \n", stats_msg_count);
+  if (LBSimulation::simProcs != stats_msg_count) LBSimulation::procsChanged = true;
   if (LBSimulation::simProcs == 0) LBSimulation::simProcs = stats_msg_count;
 
   // LBSimulation::simProcs must be set
@@ -808,8 +863,9 @@ void CentralLB::LDStats::pup(PUP::er &p)
     to_proc = new int[n_objs];
     objHash = NULL;
   }
-  // ignore the background load when unpacking
-  if (p.isUnpacking()) {
+  // ignore the background load when unpacking if the user change the # of procs
+  // otherwise load everything
+  if (p.isUnpacking() && LBSimulation::procsChanged) {
     ProcStats dummy;
     for (i=0; i<count; i++) p|dummy; 
   }

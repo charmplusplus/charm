@@ -10,20 +10,24 @@
 #include <charm++.h>
 #include "CentralLB.h"
 
-class CentralLB;
-
 class LBSimulation
 {
 public:
   static int doSimulation;
   static char* dumpFile;
   static int dumpStep;
+  static int dumpStepSize;
+  static int simStep;
+  static int simStepSize;
   static int simProcs;
+  static int procsChanged;
 public:
   LBSimulation(int numPes_);
   ~LBSimulation();
+  void reset();
   void SetProcessorLoad(int pe, double load, double bgload);
   void PrintSimulationResults();
+  void PrintDifferences(LBSimulation *realSim, CentralLB::LDStats *stats);
 private:
   double* peLoads;
   double* bgLoads;

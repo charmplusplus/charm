@@ -15,7 +15,6 @@
 
 #include "BaseLB.h"
 #include "CentralLB.decl.h"
-#include "LBSimulation.h"
 
 extern CkGroupID loadbalancer;
 
@@ -136,7 +135,8 @@ protected:
   virtual void work(LDStats* stats,int count);
   virtual LBMigrateMsg * createMigrateMsg(LDStats* stats,int count);
 
-  void simulation();
+  void simulationRead();
+  void simulationWrite();
   void findSimResults(LDStats* stats, int count, 
                       LBMigrateMsg* msg, LBSimulation* simResults);
 //  void removeNonMigratable(LDStats* statsDataList, int count);
