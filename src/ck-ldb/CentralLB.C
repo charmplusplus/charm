@@ -202,7 +202,15 @@ void CentralLB::ProcessAtSync()
     msg->next_lb = LBDatabaseObj()->new_lbbalancer();
   }
 
+#ifdef __BLUEGENE__
+  BgStartStreaming();
+#endif
+
   thisProxy[cur_ld_balancer].ReceiveStats(msg);
+
+#ifdef __BLUEGENE__
+  BgEndStreaming();
+#endif
 
   {
   // enfore the barrier to wait until centralLB says no
