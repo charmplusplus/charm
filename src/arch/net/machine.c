@@ -365,10 +365,8 @@ int size;
 {
   cmi_state cs = CmiState();
   char *res;
-  CmiInterruptsBlock();
   cs->NumAlloc++;
   res =(char *)malloc(size+8);
-  CmiInterruptsRelease();
   if (res==0) KillEveryone("Memory allocation failed.");
   ((int *)res)[0]=size;
   return (void *)(res+8);
@@ -384,10 +382,8 @@ void CmiFree(blk)
 void *blk;
 {
   cmi_state cs = CmiState();
-  CmiInterruptsBlock();
   cs->NumFree++;
   free(((char *)blk)-8);
-  CmiInterruptsRelease();
 }
 
 /*****************************************************************************
