@@ -20,7 +20,6 @@ struct MSA_WriteSpan_t {
     }
 };
 
-template<class T, bool PUP_EVERY_ELEMENT> class DefaultEntry;
 template <class ENTRY, class MERGER,
           unsigned int ENTRIES_PER_PAGE>
          class MSA_PageT;
@@ -356,40 +355,6 @@ public:
         } while (victim!=last_victim);
         return MSA_INVALID_PAGE_NO;  /* nobody is pageable */
     }
-};
-
-
-//================================================================
-
-/** This is the interface used to perform the accumulate operation on
-    an Entry.  T is the data type.  It may be a primitive one or a
-    class.  It must support the default constructor, assignment, +=
-    operator if yiu use accumulate, typecast from int 0, 1, and pup.
-*/
-
-template <class T, bool PUP_EVERY_ELEMENT=true >
-class DefaultEntry {
-public:
-    inline void accumulate(T& a, const T& b) { a += b; }
-    // identity for initializing at start of accumulate
-    inline T getIdentity() { return (T)0; }
-    inline bool pupEveryElement(){ return PUP_EVERY_ELEMENT; }
-};
-
-template <class T, bool PUP_EVERY_ELEMENT=true >
-class ProductEntry {
-public:
-    inline void accumulate(T& a, const T& b) { a *= b; }
-    inline T getIdentity() { return (T)1; }
-    inline bool pupEveryElement(){ return PUP_EVERY_ELEMENT; }
-};
-
-template <class T, T minVal, bool PUP_EVERY_ELEMENT=true >
-class MaxEntry {
-public:
-    inline void accumulate(T& a, const T& b) { a = (a<b)?b:a; }
-    inline T getIdentity() { return minVal; }
-    inline bool pupEveryElement(){ return PUP_EVERY_ELEMENT; }
 };
 
 //================================================================
