@@ -298,7 +298,7 @@ TraceLogger::TraceLogger(char* program, int b):
 
   
 
-  poolSize = CkpvAccess(CtrLogBufSize);
+  poolSize = 10000; // CkpvAccess(CtrLogBufSize);
   pool = new TraceEntry[poolSize+5];
 //  CmiPrintf("CtrLogBufSize %d \n",CkpvAccess(CtrLogBufSize));
  // CmiPrintf("PoolSize = %d \n",poolSize);
