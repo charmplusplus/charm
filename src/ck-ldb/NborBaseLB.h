@@ -67,6 +67,11 @@ protected:
   virtual CmiBool QueryBalanceNow(int) { return CmiTrue; };  
   virtual NLBMigrateMsg* Strategy(LDStats* stats,int count);
 
+  virtual int max_neighbors() {
+    if (CmiNumPes() > 2) return 2;
+    else return (CmiNumPes()-1);
+  }
+
   virtual int num_neighbors() {
     if (CmiNumPes() > 2) return 2;
     else return (CmiNumPes()-1);

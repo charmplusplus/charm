@@ -21,6 +21,9 @@ public:
   NeighborLB(CkMigrateMessage *m) {}
 private:
   CmiBool QueryBalanceNow(int step) { return CmiTrue; };
+  virtual int max_neighbors() {
+    return (CkNumPes() > 5) ? 4 : (CkNumPes()-1);
+  };
   virtual int num_neighbors() {
     return (CkNumPes() > 5) ? 4 : (CkNumPes()-1);
   };

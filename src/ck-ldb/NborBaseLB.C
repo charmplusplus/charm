@@ -84,12 +84,12 @@ void NborBaseLB::FindNeighbors()
   if (neighbor_pes == 0) { // Neighbors never initialized, so init them
                            // and other things that depend on the number
                            // of neighbors
-    statsMsgsList = new NLBStatsMsg*[num_neighbors()];
-    for(int i=0; i < num_neighbors(); i++)
+    statsMsgsList = new NLBStatsMsg*[max_neighbors()];
+    for(int i=0; i < max_neighbors(); i++)
       statsMsgsList[i] = 0;
-    statsDataList = new LDStats[num_neighbors()];
+    statsDataList = new LDStats[max_neighbors()];
 
-    neighbor_pes = new int[num_neighbors()];
+    neighbor_pes = new int[max_neighbors()];
     neighbors(neighbor_pes);
     mig_msgs_expected = num_neighbors();
     mig_msgs = new NLBMigrateMsg*[num_neighbors()];
