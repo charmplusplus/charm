@@ -268,7 +268,7 @@ int skt_ip_match(skt_ip_t a,skt_ip_t b)
 {
   return 0==memcmp(&a,&b,sizeof(a));
 }
-struct sockaddr_in skt_build_addr(skt_ip_t IP,unsigned int port)
+struct sockaddr_in skt_build_addr(skt_ip_t IP,int port)
 {
   struct sockaddr_in ret={0};
   ret.sin_family=AF_INET;
@@ -277,7 +277,7 @@ struct sockaddr_in skt_build_addr(skt_ip_t IP,unsigned int port)
   return ret;  
 }
 
-SOCKET skt_datagram(unsigned int *port, unsigned int bufsize)
+SOCKET skt_datagram(int *port, int bufsize)
 {  
   int connPort=(port==NULL)?0:*port;
   struct sockaddr_in addr=skt_build_addr(skt_invalid_ip,connPort);
@@ -294,7 +294,7 @@ retry:
 	  return skt_abort(93491,"Error binding datagram socket.");
   
   len = sizeof(addr);
-  if (getsockname(ret, (struct sockaddr *)&addr , &len))
+  if (getsockname(ret, (struct sockaddr *)&addr , (socklen_t*)&len))
 	  return skt_abort(93492,"Error getting address on datagram socket.");
 
   if (bufsize) 
@@ -306,15 +306,15 @@ retry:
 		return skt_abort(93496,"Error on SNDBUF sockopt for datagram socket.");
   }
   
-  if (port!=NULL) *port = ntohs(addr.sin_port);
+  if (port!=NULL) *port = (int)ntohs(addr.sin_port);
   return ret;
 }
-SOCKET skt_server(unsigned int *port)
+SOCKET skt_server(int *port)
 {
   return skt_server_ip(port,NULL);
 }
 
-SOCKET skt_server_ip(unsigned int *port,skt_ip_t *ip)
+SOCKET skt_server_ip(int *port,skt_ip_t *ip)
 {
   SOCKET             ret;
   int                len;
@@ -336,22 +336,22 @@ retry:
   if (listen(ret,5) == SOCKET_ERROR) 
 	  return skt_abort(93485,"Error listening on server socket.");
   len = sizeof(addr);
-  if (getsockname(ret, (struct sockaddr *)&addr, &len) == SOCKET_ERROR) 
+  if (getsockname(ret, (struct sockaddr *)&addr, (socklen_t*)&len) == SOCKET_ERROR) 
 	  return skt_abort(93486,"Error getting name on server socket.");
 
-  if (port!=NULL) *port = ntohs(addr.sin_port);
+  if (port!=NULL) *port = (int)ntohs(addr.sin_port);
   if (ip!=NULL) memcpy(ip, &addr.sin_addr, sizeof(*ip));
   return ret;
 }
 
-SOCKET skt_accept(SOCKET src_fd,skt_ip_t *pip, unsigned int *port)
+SOCKET skt_accept(SOCKET src_fd,skt_ip_t *pip, int *port)
 {
   int len;
   struct sockaddr_in addr={0};
   SOCKET ret;
   len = sizeof(addr);
 retry:
-  ret = accept(src_fd, (struct sockaddr *)&addr, &len);
+  ret = accept(src_fd, (struct sockaddr *)&addr, (socklen_t*)&len);
   if (ret == SOCKET_ERROR) {
     if (skt_should_retry()) goto retry;
     else return skt_abort(93523,"Error in accept.");
@@ -457,7 +457,7 @@ int skt_sendV(SOCKET fd,int nBuffers,const void **bufs,int *lens)
 	int b,len=0;
 	for (b=0;b<nBuffers;b++) len+=lens[b];
 	if (len<=skt_sendV_max) { /*Short message: Copy and do one big send*/
-		char *buf=CmiTmpAlloc(skt_sendV_max);
+		char *buf=(char *)CmiTmpAlloc(skt_sendV_max);
 		char *dest=buf;
 		int ret;
 		for (b=0;b<nBuffers;b++) {
@@ -520,7 +520,7 @@ unsigned int ChMessageInt(ChMessageInt_t src)
 { /*Convert bytes to integer*/
   int i; unsigned int ret=0;
   for (i=0;i<4;i++) {ret<<=8;ret+=src.data[i];}
-  return ret;
+  return (int)ret;
 }
 
 int ChMessage_recv(SOCKET fd,ChMessage *dst)
@@ -541,15 +541,13 @@ void ChMessage_free(ChMessage *doomed)
   doomed->data=NULL;
   doomed->len=-1234;
 }
-void ChMessageHeader_new(const char *type,unsigned int len,
-		   ChMessageHeader *dst)
+void ChMessageHeader_new(const char *type,int len,ChMessageHeader *dst)
 {
   dst->len=ChMessageInt_new(len);
   if (type==NULL) type="default";
   strncpy(dst->type,type,CH_TYPELEN);
 }
-void ChMessage_new(const char *type,unsigned int len,
-		   ChMessage *dst)
+void ChMessage_new(const char *type,int len,ChMessage *dst)
 {
   ChMessageHeader_new(type,len,&dst->header);
   dst->len=len;

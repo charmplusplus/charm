@@ -57,7 +57,7 @@ CCS Reply ----------------------------------
 
 /*Parse list of nodes given to us by conv-host.
 */
-static void parseInfo(CcsServer *svr,const char *data)
+static void parseInfo(CcsServer *svr,const void *data)
 {
   /*Data conv-host sends us is just a big list of integers*/
   const ChMessageInt_t *d=(const ChMessageInt_t *)data;
@@ -149,7 +149,7 @@ int CcsConnectIp(CcsServer *svr, skt_ip_t ip, int port,const CcsSec_secretKey *k
 int CcsConnectIpWithTimeout(CcsServer *svr, skt_ip_t ip, int port,
 	const CcsSec_secretKey *key, int timeout)
 {
-  unsigned int msg_len;char *msg_data;/*Reply message*/
+  int msg_len;void *msg_data;/*Reply message*/
   skt_init();
   svr->hostIP = ip;
   svr->hostPort = port;
@@ -221,11 +221,11 @@ int CcsNodeSize(CcsServer *svr,int node)
   return svr->numProcs[node];
 }
 
-int CcsSendRequest(CcsServer *svr, const char *hdlrID, int pe, unsigned int size, const char *msg){
+int CcsSendRequest(CcsServer *svr, const char *hdlrID, int pe, int size, const void *msg){
     return CcsSendRequestWithTimeout(svr, hdlrID, pe, size, msg, 120);
 }
 
-int CcsSendRequestWithTimeout(CcsServer *svr, const char *hdlrID, int pe, unsigned int size, const char *msg, int timeout)
+int CcsSendRequestWithTimeout(CcsServer *svr, const char *hdlrID, int pe, int size, const void *msg, int timeout)
 {
   const void *bufs[3]; int lens[3]; int nBuffers=0;
   CcsMessageHeader hdr;/*CCS request header*/
@@ -286,17 +286,17 @@ int CcsImpl_recvReplyAuth(CcsServer *svr)
 
 /*Receive data back from the server. (Arbitrary length response)
 */
-int CcsRecvResponseMsg(CcsServer *svr, unsigned int *size,char **newBuf, int timeout)
+int CcsRecvResponseMsg(CcsServer *svr, int *size,void **newBuf, int timeout)
 {
   ChMessageInt_t netLen;
   unsigned int len;  
   SOCKET fd=svr->replyFd;
   if (-1==CcsImpl_recvReplyAuth(svr)) return -1;
   if (1!=skt_select1(fd,1000*timeout)) return -1;
-  if (-1==skt_recvN(fd,(char *)&netLen,sizeof(netLen))) return -1;
+  if (-1==skt_recvN(fd,&netLen,sizeof(netLen))) return -1;
   *size=len=ChMessageInt(netLen);
-  *newBuf=(char *)malloc(len);
-  if (-1==skt_recvN(fd,(char *)*newBuf,len)) return -1;
+  *newBuf=malloc(len);
+  if (-1==skt_recvN(fd,*newBuf,len)) return -1;
 
   /*Close the connection*/
   skt_close(svr->replyFd);svr->replyFd=-1;
@@ -305,19 +305,19 @@ int CcsRecvResponseMsg(CcsServer *svr, unsigned int *size,char **newBuf, int tim
 
 /*Receive data from the server. (In-place receive)
 */
-int CcsRecvResponse(CcsServer *svr,  unsigned int maxsize, char *recvBuffer,int timeout)
+int CcsRecvResponse(CcsServer *svr,  int maxsize, void *recvBuffer,int timeout)
 {
   ChMessageInt_t netLen;
   unsigned int len;
   SOCKET fd=svr->replyFd;
   if (-1==CcsImpl_recvReplyAuth(svr)) return -1;
   if (1!=skt_select1(fd,1000*timeout)) return -1;
-  if (-1==skt_recvN(fd,(char *)&netLen,sizeof(netLen))) return -1;
+  if (-1==skt_recvN(fd,&netLen,sizeof(netLen))) return -1;
   len=ChMessageInt(netLen);
   DEBUGF(("[%.3f] recv'd reply length\n",CmiWallTimer()));
   if (len>maxsize) 
     {skt_close(fd);return -1;/*Buffer too small*/}
-  if (-1==skt_recvN(fd,(char *)recvBuffer,len)) return -1;
+  if (-1==skt_recvN(fd,recvBuffer,len)) return -1;
 
   /*Close the connection*/
   skt_close(svr->replyFd);svr->replyFd=-1;

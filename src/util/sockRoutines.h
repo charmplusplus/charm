@@ -164,14 +164,15 @@ skt_ip_t skt_innode_lookup_ip(const char *name);
 
 char *skt_print_ip(char *dest,skt_ip_t addr);
 int skt_ip_match(skt_ip_t a,skt_ip_t b);
-struct sockaddr_in skt_build_addr(skt_ip_t IP,unsigned int port);
+struct sockaddr_in skt_build_addr(skt_ip_t IP,int port);
 
 /*UDP*/
-SOCKET skt_datagram(unsigned int *port, unsigned int bufsize);
+SOCKET skt_datagram(int *port, int bufsize);
 
 /*TCP*/
-SOCKET skt_server(unsigned int *port);
-SOCKET skt_accept(SOCKET src_fd, skt_ip_t *pip, unsigned int *port);
+SOCKET skt_server(int *port);
+SOCKET skt_server_ip(int *port,skt_ip_t *ip);
+SOCKET skt_accept(SOCKET src_fd, skt_ip_t *pip, int *port);
 SOCKET skt_connect(skt_ip_t ip, int port, int timeout);
 
 /*Utility*/
@@ -245,10 +246,8 @@ typedef struct ChMessage {
 } ChMessage;
 int ChMessage_recv(SOCKET fd,ChMessage *dst);
 void ChMessage_free(ChMessage *doomed);
-void ChMessageHeader_new(const char *type,unsigned int len,
-		   ChMessageHeader *dst);
-void ChMessage_new(const char *type,unsigned int len,
-		   ChMessage *dst);
+void ChMessageHeader_new(const char *type,int len,ChMessageHeader *dst);
+void ChMessage_new(const char *type,int len,ChMessage *dst);
 int ChMessage_send(SOCKET fd,const ChMessage *src); /*You must free after send*/
 
 typedef struct {

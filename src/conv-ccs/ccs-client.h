@@ -51,14 +51,14 @@ int CcsConnectIp(CcsServer *svr,skt_ip_t ip, int port,const CcsSec_secretKey *ke
 int CcsConnectIpWithTimeout(CcsServer *svr,skt_ip_t ip, int port,const CcsSec_secretKey *key, int timeout);
 
 int CcsSendRequest(CcsServer *svr, const char *hdlrID, int pe, 
-		    unsigned int size, const char *msg);
+		    int size, const void *msg);
 int CcsSendRequestWithTimeout(CcsServer *svr, const char *hdlrID, int pe, 
-		    unsigned int size, const char *msg, int timeout);
+		    int size, const void *msg, int timeout);
 
 int CcsRecvResponse(CcsServer *svr, 
-		    unsigned int maxsize, char *recvBuffer, int timeout);
+		    int maxsize, void *recvBuffer, int timeout);
 int CcsRecvResponseMsg(CcsServer *svr, 
-		    unsigned int *retSize,char **newBuf, int timeout);
+		    int *retSize,void **newBuf, int timeout);
 int CcsNumNodes(CcsServer *svr);
 int CcsNumPes(CcsServer *svr);
 int CcsNodeFirst(CcsServer *svr, int node);
