@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.1  1995-06-14 19:35:24  gursoy
+ * Revision 1.2  1995-07-07 14:10:01  gursoy
+ * eplanguage table fro qd enrypints is filled
+ *
+ * Revision 1.1  1995/06/14  19:35:24  gursoy
  * Initial revision
  *
  * Revision 2.2  1995/06/13  14:33:55  gursoy
@@ -532,12 +535,16 @@ here we set up the entry points so we can call our boc ep functions
 ****************************************************************************/
 void QDAddSysBocEps()
 {
-	CsvAccess(EpTable)[QDInit_EP]   = (FUNCTION_PTR) QDBocInit;
-	CsvAccess(EpTable)[QDInsertQuiescenceList_EP] = (FUNCTION_PTR) InsertQuiescenceList;
-	CsvAccess(EpTable)[QDPhaseIBroadcast_EP] = (FUNCTION_PTR) PhaseIBroadcast;
-	CsvAccess(EpTable)[QDPhaseIMsg_EP] = (FUNCTION_PTR) HandlePhaseIMsg;
-	CsvAccess(EpTable)[QDPhaseIIBroadcast_EP] = (FUNCTION_PTR) PhaseIIBroadcast;
-	CsvAccess(EpTable)[QDPhaseIIMsg_EP] = (FUNCTION_PTR) HandlePhaseIIMsg;
+        CsvAccess(EpTable)[QDInit_EP]   = (FUNCTION_PTR) QDBocInit;
+        CsvAccess(EpLanguageTable)[QDInit_EP] = CHARM;
+        CsvAccess(EpTable)[QDInsertQuiescenceList_EP] = (FUNCTION_PTR) InsertQuiescenceList;
+        CsvAccess(EpLanguageTable)[QDInsertQuiescenceList_EP] = CHARM;
+        CsvAccess(EpTable)[QDPhaseIBroadcast_EP] = (FUNCTION_PTR) PhaseIBroadcast;
+        CsvAccess(EpLanguageTable)[QDPhaseIBroadcast_EP] = CHARM;
+        CsvAccess(EpTable)[QDPhaseIMsg_EP] = (FUNCTION_PTR) HandlePhaseIMsg;
+        CsvAccess(EpLanguageTable)[QDPhaseIMsg_EP] = CHARM;
+        CsvAccess(EpTable)[QDPhaseIIBroadcast_EP] = (FUNCTION_PTR) PhaseIIBroadcast;
+        CsvAccess(EpLanguageTable)[QDPhaseIIBroadcast_EP] = CHARM;
+        CsvAccess(EpTable)[QDPhaseIIMsg_EP] = (FUNCTION_PTR) HandlePhaseIIMsg;
+        CsvAccess(EpLanguageTable)[QDPhaseIIMsg_EP] = CHARM;
 }
-
-
