@@ -665,7 +665,7 @@ Chare::genDefs(XStr& str)
     }
     // We have to generate the chare array itself
     str << "/* FORTRAN */\n";
-    str << "extern \"C\" void " << fortranify(baseName()) << "_allocate_(char **, void *);\n";
+    str << "extern \"C\" void " << fortranify(baseName()) << "_allocate_(char **, void *, int *);\n";
     str << "\n";
     str << "class " << baseName() << " : public ArrayElement1D\n";
     str << "{\n";
@@ -676,7 +676,7 @@ Chare::genDefs(XStr& str)
     str << "  {\n";
 //    str << "    CkPrintf(\"" << baseName() << " %d created\\n\",thisIndex);\n";
     str << "    CkArrayID *aid = &thisArrayID;\n";
-    str << "    " << fortranify(baseName()) << "_allocate_((char **)&user_data, &aid);\n";
+    str << "    " << fortranify(baseName()) << "_allocate_((char **)&user_data, &aid, &thisIndex);\n";
     str << "  }\n";
     str << "\n";
     str << "  " << baseName() << "(CkMigrateMessage *m)\n";
@@ -844,6 +844,18 @@ Message::genDefs(XStr& str)
     str << "#ifdef CK_TEMPLATES_ONLY\n";
   }
   if(!(external||type->isTemplated())) {
+
+    // Define the Marshalling message for Fortran
+    if (fortranMode)
+    {
+      str << "/* FORTRAN message */\n";
+      str << "class " << type 
+          << " : public CMessage_" << type << "\n";
+      str << "{\npublic:\n";
+      contents->genUnmarshalList2(str);
+      str << "};\n\n";
+    }
+
     // new (size_t)
     str << tspec << "void *" << ptype << "::operator new(size_t s){\n";
     str << "  return " << mtype << "::alloc(__idx, s, 0, 0);\n}\n";
@@ -912,17 +924,6 @@ Message::genDefs(XStr& str)
   if(!templat) {
     if(!external && !type->isTemplated()) {
       str << "int "<< ptype <<"::__idx=0;\n";
-
-      // Define the Marshalling message for Fortran
-      if (fortranMode)
-      {
-        str << "/* FORTRAN */\n";
-        str << "class " << type 
-            << " : public CMessage_" << type << "\n";
-        str << "{\npublic:\n";
-        contents->genUnmarshalList2(str);
-        str << "};\n";
-      }
     }
   } else {
     str << tspec << "int "<< ptype <<"::__idx=0;\n";
