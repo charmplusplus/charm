@@ -1,7 +1,7 @@
 #ifndef BRAODCAST_STRATEGY
 #define BRAODCAST_STRATEGY
 
-#define BROADCAST_SPANNING_FACTOR 8
+#define DEFAULT_BROADCAST_SPANNING_FACTOR 4
 
 #include "ComlibManager.h"
 
@@ -13,12 +13,11 @@
 
 class BroadcastStrategy : public Strategy {
 
-    CkGroupID _gid;
-    int _epid;
     int handlerId;
+    int spanning_factor;
 
  public:
-    BroadcastStrategy(CkGroupID dest_gid, int epid);
+    BroadcastStrategy();
     BroadcastStrategy(CkMigrateMessage *){}
     void insertMessage(CharmMessageHolder *msg);
     void doneInserting();

@@ -720,12 +720,17 @@ void ComlibDoneCreating(){
 }
 
 char *router;
+int sfactor=0;
+
 class ComlibManagerMain {
 public:
     ComlibManagerMain(CkArgMsg *msg) {
         
         if(CkMyPe() == 0 && msg !=  NULL)
             CmiGetArgString(msg->argv, "+strategy", &router);         
+
+        if(CkMyPe() == 0 && msg !=  NULL)
+            CmiGetArgInt(msg->argv, "+spanning_factor", &sfactor);
         
         CProxy_ComlibManager::ckNew();
     }

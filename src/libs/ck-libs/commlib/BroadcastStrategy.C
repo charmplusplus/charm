@@ -7,6 +7,7 @@
 #include "BroadcastStrategy.h"
 
 CkpvExtern(CkGroupID, cmgrID);
+extern int sfactor;
 
 static void recv_bcast_handler(void *msg) {
     int instid = CmiGetXHandler(msg);
@@ -16,9 +17,13 @@ static void recv_bcast_handler(void *msg) {
     bstrat->handleMessage((char *)msg);    
 }
 
-//Constructor
-BroadcastStrategy::BroadcastStrategy(CkGroupID gid, int epid)
-    : Strategy(), _gid(gid), _epid(epid){
+//Constructor, 
+//Can read spanning factor from command line
+BroadcastStrategy::BroadcastStrategy() : Strategy() {
+    spanning_factor = DEFAULT_BROADCAST_SPANNING_FACTOR;
+    if(sfactor > 0)
+        spanning_factor = sfactor;
+    
 }
 
 
@@ -56,13 +61,13 @@ void BroadcastStrategy::handleMessage(char *msg)
     //Sending along the spanning tree
     //Gengbins tree building code stolen from the MPI machine layer    
     int i;
-    for (i=1; i<=BROADCAST_SPANNING_FACTOR; i++) {
+    for (i=1; i<=spanning_factor; i++) {
         
         int p = CkMyPe() - startpe;
         if (p<0) 
             p += CkNumPes();
 
-        p = BROADCAST_SPANNING_FACTOR*p + i;
+        p = spanning_factor*p + i;
 
         if (p > CkNumPes() - 1) break;
 
@@ -74,13 +79,12 @@ void BroadcastStrategy::handleMessage(char *msg)
         CmiSyncSend(p, size, msg);
     }
 
-    CkSendMsgBranch(_epid, EnvToUsr(env), CkMyPe(), _gid);
+    CkSendMsgBranch(env->getEpIdx(), EnvToUsr(env), CkMyPe(), 
+                    env->getGroupNum());
 }
 
 //Pack the group id and the entry point of the user message
 void BroadcastStrategy::pup(PUP::er &p){
-    Strategy::pup(p);
-    
-    p | _gid;
-    p | _epid;
+    Strategy::pup(p);    
+    p | spanning_factor;
 }
