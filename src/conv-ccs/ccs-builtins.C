@@ -338,8 +338,13 @@ CCS Client->CWebHandler->...  (processor 0)
 ...->CWeb_Reduce->CWeb_Deliver (processor 0 again)
 */
 
+#if 0
+#  define WEBDEBUG(x) CmiPrintf x
+#else
+#  define WEBDEBUG(x) /*empty*/
+#endif
 
-#define WEB_INTERVAL 2000 /*Time, in milliseconds, between performance snapshots*/
+#define WEB_INTERVAL 1000 /*Time, in milliseconds, between performance snapshots*/
 #define MAXFNS 20 /*Largest number of performance functions to expect*/
 
 typedef struct {
@@ -368,6 +373,7 @@ static void CWeb_Deliver(void)
   int i,j;
 
   if (hasApplet) {
+    WEBDEBUG(("CWeb_Deliver to applet\n"));
     /*Send the performance data off to the applet*/
     char *reply=(char *)malloc(6+14*CmiNumPes()*CWebNoOfFns);
     sprintf(reply,"perf");
@@ -384,6 +390,8 @@ static void CWeb_Deliver(void)
     free(reply);
     hasApplet=0;
   }
+  else
+    WEBDEBUG(("CWeb_Deliver (NO APPLET)\n"));
   
   /* Free saved performance data */
   for(i = 0; i < CmiNumPes(); i++){
@@ -398,10 +406,10 @@ static void CWeb_Deliver(void)
 static void CWeb_Reduce(void *msg){
   CWeb_CollectedData *cur,*prev;
   int src;
-
   if(CmiMyPe() != 0){
     CmiAbort("CWeb performance data sent to wrong processor...\n");
   }
+  WEBDEBUG(("CWeb_Reduce"));
   cur=(CWeb_CollectedData *)msg;
   src=cur->fromPE;
   prev = collectedValues[src]; /* Previous value, ideally 0 */
@@ -422,6 +430,7 @@ static void CWeb_Collect(void)
   CWeb_CollectedData *msg;
   int i;
 
+  WEBDEBUG(("CWeb_Collect on %d\n",CmiMyPe()));
   msg = (CWeb_CollectedData *)CmiAlloc(sizeof(CWeb_CollectedData));
   msg->fromPE = CmiMyPe();
   
@@ -450,10 +459,12 @@ static void CWebHandler(void){
   if(CcsIsRemoteRequest()) {
     static int startedCollection=0;
     
+    WEBDEBUG(("CWebHandler request on %d\n",CmiMyPe()));    
     hasApplet=1;
     appletReply=CcsDelayReply();
     
     if(startedCollection == 0){
+      WEBDEBUG(("Starting data collection on every processor\n"));    
       int i;
       startedCollection=1;
       collectedCount=0;
