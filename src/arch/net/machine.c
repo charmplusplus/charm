@@ -1058,7 +1058,7 @@ static void CmiStdoutInit(void) {
 		if (-1==pipe(pair)) {perror("building stdio redirection pipe"); exit(1);}
 	#else
 	       /* UNIX socket (16kb default buffer, and works with SIGIO!) */
-		if (-1==socketpair(PF_LOCAL,SOCK_STREAM,0,pair)) 
+		if (-1==socketpair(PF_UNIX,SOCK_STREAM,0,pair)) 
 			{perror("building stdio redirection socketpair"); exit(1);}
 	#endif
 		readStdout[i]=pair[0]; /*We get the read end of pipe*/
@@ -1067,7 +1067,8 @@ static void CmiStdoutInit(void) {
 #if 0 /*Keep writes from blocking.  This just drops excess output, which is bad.*/
 		CmiEnableNonblockingIO(srcFd);
 #endif
-#if 1	/*Get a SIGIO on each write(), which keeps the buffer clean*/
+#if CMK_SHARED_VARS_UNAVAILABLE 
+  /*No communication thread-- get a SIGIO on each write(), which keeps the buffer clean*/
 		CmiEnableAsyncIO(readStdout[i]);
 #endif
 	}
