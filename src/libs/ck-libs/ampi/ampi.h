@@ -204,7 +204,7 @@ extern MPI_Comm MPI_COMM_UNIVERSE[MPI_MAX_COMM_WORLDS];
 
 typedef int MPI_Request;
 typedef struct {
-  int MPI_TAG, MPI_SOURCE, MPI_COMM, MPI_LENGTH, dummy;  // dummy is for tags[5]
+  int MPI_TAG, MPI_SOURCE, MPI_COMM, MPI_LENGTH, dummy; /*dummy is for tags[5]*/
 } MPI_Status;
 #define stsempty(sts) (sts).MPI_TAG=(sts).MPI_SOURCE=(sts).MPI_COMM=(sts).MPI_LENGTH=0
 #define MPI_STATUS_IGNORE (MPI_Status *)0
@@ -609,7 +609,8 @@ int AMPI_Type_get_contents(MPI_Datatype datatype, int max_integers, int max_addr
 
 /*********************One sided communication routines *****************/ 
 /*  MPI_Win : an index into a list in ampiParent (just like MPI_Group) */
-#define MPI_MAX_OBJECT_NAME 255  // name length for COMM, TYPE and WIN
+/* name length for COMM, TYPE and WIN */
+#define MPI_MAX_OBJECT_NAME 255
 #define MPI_MAX_INFO_KEY 255
 #define MPI_MAX_INFO_VAL 1024
 #define MPI_LOCK_SHARED  54   
