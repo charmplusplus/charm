@@ -1,30 +1,3 @@
-/***************************************************************************
- * RCS INFORMATION:
- *
- *	$RCSfile$
- *	$Author$	$Locker$		$State$
- *	$Revision$	$Date$
- *
- ***************************************************************************
- * DESCRIPTION:
- *
- ***************************************************************************
- * REVISION HISTORY:
- *
- * $Log$
- * Revision 2.3  1997-12-22 21:57:22  jyelon
- * Changed LDB initialization scheme.
- *
- * Revision 2.2  1995/10/27 22:09:16  jyelon
- * Changed Cmi to Ck in all charm files.
- *
- * Revision 2.1  1995/10/27  21:35:54  jyelon
- * changed NumPe --> NumPes
- *
- * Revision 2.0  1995/06/29  21:19:36  narain
- * *** empty log message ***
- *
- ***************************************************************************/
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 /* * * * * * * * The NAVG Load Balancing Strategy* * * * * * * * */

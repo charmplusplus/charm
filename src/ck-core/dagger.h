@@ -1,27 +1,3 @@
-/***************************************************************************
- * RCS INFORMATION:
- *
- *	$RCSfile$
- *	$Author$	$Locker$		$State$
- *	$Revision$	$Date$
- *
- ***************************************************************************
- * DESCRIPTION:
- *
- ***************************************************************************
- * REVISION HISTORY:
- *
- * $Log$
- * Revision 2.1  1995-06-08 17:07:12  gursoy
- * Cpv macro changes done
- *
- * Revision 1.2  1994/11/11  05:31:32  brunner
- * Removed ident added by accident with RCS header
- *
- * Revision 1.1  1994/11/07  15:39:58  brunner
- * Initial revision
- *
- ***************************************************************************/
 #ifndef DAGGER_H
 #define DAGGER_H
 

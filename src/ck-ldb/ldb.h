@@ -1,25 +1,3 @@
-/***************************************************************************
- * RCS INFORMATION:
- *
- *	$RCSfile$
- *	$Author$	$Locker$		$State$
- *	$Revision$	$Date$
- *
- ***************************************************************************
- * DESCRIPTION:
- *
- ***************************************************************************
- * REVISION HISTORY:
- *
- * $Log$
- * Revision 2.1  1995-07-06 22:40:05  narain
- * LdbBocNum, interface to newseed fns.
- *
- * Revision 2.0  1995/06/29  21:19:36  narain
- * *** empty log message ***
- *
- ***************************************************************************/
-
 readonly int LdbBocNum;
 
 extern int CmiNumNeighbours();
