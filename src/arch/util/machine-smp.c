@@ -189,7 +189,7 @@ void CmiNodeBarrierCount(int nThreads) {
   ReleaseMutex(barrier_mutex);
 
   if (doWait)
-      while(barrier_wait[which] != Cmi_mynodesize)
+      while(barrier_wait[which] != nThreads)
 		  sleep(0);/*<- could also just spin here*/
 }
 
