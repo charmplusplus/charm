@@ -1,9 +1,28 @@
 #!/bin/sh
-src=$1
-dest=$2
+srcs=` echo $* | awk '{ for (i=1; i<NF; i++) printf "%s ", $i}'`
+dest=` echo $* | awk '{ printf $NF}'`
+test -z "$srcs" && exit 0
+test -z "$dest" && exit 0
+
+#if multiple sources, target must be a directory
+num=`echo $srcs | awk '{ printf NF }'`
+if test $num -gt 1
+then
+  if test ! -d $dest 
+  then
+    echo "The target is not a directory or does not exist!"
+    exit 1;
+  fi
+fi
+
+for src in $srcs
+do
 while [ ! -r $src ] 
 do
 #Strip one ../ from the source path
 	src=`echo $src | awk -F/ '{printf "%s",$2;for (i=3;i<=NF;i++) printf "/%s",$i}'`
 done
-cp -f $src $dest
+test -n "$src" && cp -f $src $dest
+done
+
+
