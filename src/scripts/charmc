@@ -362,8 +362,8 @@ do
 		;;
 
 	"-balancer")
-                test -n "$BALANCER" && Abort "More than one -balancer specified!"
-		BALANCER="$1"
+#                test -n "$BALANCER" && Abort "More than one -balancer specified!"
+		BALANCER="$BALANCER $1"
 		mod=`echo $1| sed -e 's/:/ /' -e 's/,/ /g'`
 		AddModules $mod
 		shift
@@ -1370,7 +1370,10 @@ done
 if test -n "$BALANCER"
 then
     [ -n "$VERBOSE" ] && echo "Adding load balancer for $BALANCER"
-    echo "  LBDefaultCreate(\"$BALANCER\");" >> $modInitSrc
+    for deflb in $BALANCER
+    do
+      echo "  LBDefaultCreate(\"$deflb\");" >> $modInitSrc
+    done
 fi
 echo "}" >> $modInitSrc
 
