@@ -9,7 +9,7 @@ use FileHandle;
 use English;
 use strict; 
 
-my $infile = $ARGV[0];
+my $infile = shift @ARGV;
 my $inci = "$infile.ci";
 my $inh = "$infile.h";
 my $inC = "$infile.C";
@@ -553,7 +553,7 @@ while (@line=split(' ',($thisline=getcodeline($inChandle)))) {
       $outChandle->print("  myStrat = new ".$strat{$class}."();\n");
       $outChandle->print("  $messagename->parent = this;\n");
       $outChandle->print("  $messagename->str = myStrat;\n");
-      $outChandle->print("  int _ts = $messagename->timestamp;\n");
+      $outChandle->print("  POSE_TimeType _ts = $messagename->timestamp;\n");
       $outChandle->print("#ifdef POSE_STATS_ON\n  localStats->SwitchTimer(DO_TIMER);\n#endif\n");
       $outChandle->print("  objID = new state_$method($messagename);\n");
       $outChandle->print("#ifdef POSE_STATS_ON\n  localStats->SwitchTimer(SIM_TIMER);\n#endif\n");
@@ -1061,7 +1061,7 @@ sub posefuncmap
 	    $msg=$2;
 	    $output=$preline."\n{\n";
 	    $output.="int _POSE_handle = ".$segments[3].";\n";
-	    $output.="int _POSE_atTime = ".$segments[4].";\n" if ($#segments>=4);
+	    $output.="POSE_TimeType _POSE_atTime = ".$segments[4].";\n" if ($#segments>=4);
 	    $output.=$msg."->Timestamp(_POSE_handle);\n";
 	    $output.="$msg->rst = 0.0;\n";
 	    $output.="(*(CProxy_".$sim." *)&POSE_Objects)[".$segments[2]."].insert(".$msg;
@@ -1087,7 +1087,7 @@ sub posefuncmap
 		if ($isconstructor) {
 		  $output=$preline."\n{\n";
 		  $output.="int _POSE_handle = ".$segments[3].";\n";
-		  $output.="unsigned int _POSE_timeOffset = ".$segments[4].";\n" if ($#segments>=4);
+		  $output.="POSE_TimeType _POSE_timeOffset = ".$segments[4].";\n" if ($#segments>=4);
 		  $output.="PVT *pvt = (PVT *)CkLocalBranch(ThePVT);\n";
 		  $output.=$msg."->Timestamp(ovt+(_POSE_timeOffset));\n";
 		  $output.="pvt->objUpdate(ovt+(_POSE_timeOffset), SEND);\n";
@@ -1102,7 +1102,7 @@ sub posefuncmap
 		  $output=$preline."\n{\n";
 		  $output.="if (!CpvAccess(stateRecovery)) {\n";
 		  $output.="int _POSE_handle = ".$segments[3].";\n";
-		  $output.="unsigned int _POSE_timeOffset = ".$segments[4].";\n";
+		  $output.="POSE_TimeType _POSE_timeOffset = ".$segments[4].";\n";
 		  $output.="registerTimestamp(_POSE_handle, ".$msg.",_POSE_timeOffset);\n";
 		  $output.="$msg->fromPE = CkMyPe();\n";
 		  $output.="#ifdef POSE_DOP_ON\n";
@@ -1129,7 +1129,7 @@ sub posefuncmap
 		    print "warning: should use POSE_invoke instead of POSE_invoke_at inside sim object constructors\n" if ($issim && $isconstructor);
 		    $output=$preline."\n{\n";
 		    $output.="int _POSE_handle = ".$segments[3].";\n";
-		    $output.="int _POSE_atTime = ".$segments[4].";\n";
+		    $output.="POSE_TimeType _POSE_atTime = ".$segments[4].";\n";
 		    $output.="PVT *pvt = (PVT *)CkLocalBranch(ThePVT);\n";
 		    $output.=$msg."->Timestamp(_POSE_atTime);\n";
 		    $output.="pvt->objUpdate(_POSE_atTime, SEND);\n";
@@ -1172,7 +1172,7 @@ sub posefuncmap
 		    $msg=$2;
 		    if ($issim && $isconstructor) {
 		      $output=$preline."\n{\n";
-		      $output.="unsigned int _POSE_timeOffset = ".$segments[2].";\n";
+		      $output.="POSE_TimeType _POSE_timeOffset = ".$segments[2].";\n";
 		      $output.="PVT *pvt = (PVT *)CkLocalBranch(ThePVT);\n";
 		      $output.=$msg."->Timestamp(ovt+(_POSE_timeOffset));\n";
 		      $output.="pvt->objUpdate(ovt+(_POSE_timeOffset), SEND);\n";
@@ -1184,7 +1184,7 @@ sub posefuncmap
 		      $output.="}\n";
 		    } elsif ($issim) {
 		      $output=$preline."\n{\n";
-		      $output.="unsigned int _POSE_timeOffset = ".$segments[2].";\n";
+		      $output.="POSE_TimeType _POSE_timeOffset = ".$segments[2].";\n";
 		      $output.="if (!CpvAccess(stateRecovery)) {\n";
 		      $output.="registerTimestamp(parent->thisIndex, ".$msg.", _POSE_timeOffset);\n";
 		      $output.="$msg->fromPE = CkMyPe();\n";
