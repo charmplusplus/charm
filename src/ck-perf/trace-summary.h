@@ -37,15 +37,15 @@ class BinEntry {
 #ifdef WIN32
     void operator delete(void *, void *) { }
 #endif
-    BinEntry(): rep(0) {}
-    BinEntry(double t): time(t), rep(1) {}
+    BinEntry() {}
+    BinEntry(double t): time(t) {}
     inline double getTime() { return time; }
     void setTime(double t) { time = t; }
     void write(FILE *fp);
-    int &repeat() { return rep; }
+    void writeU(FILE *fp, int u);
+    int  getU();
   private:
     double time;
-    int    rep;
 };
 
 /// a phase entry for trace summary
@@ -127,7 +127,7 @@ class PhaseTable {
 /// summary log pool
 class SumLogPool {
   private:
-    UInt poolSize, poolCount;
+    UInt poolSize;
     UInt numEntries;
     BinEntry *pool;	/**< bins */
     FILE *fp, *stsfp ;

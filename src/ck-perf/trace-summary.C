@@ -97,7 +97,6 @@ SumLogPool::SumLogPool(char *pgm) : phaseTab(MAX_PHASES)
    pool = new BinEntry[poolSize];
    _MEMCHECK(pool);
    numEntries = 0;
-   poolCount = 0;
    char pestr[10];
    sprintf(pestr, "%d", CkMyPe());
    int len = strlen(pgm) + strlen(".sum.") + strlen(pestr) + 1;
@@ -148,10 +147,31 @@ void SumLogPool::write(void)
     fprintf(fp, " phases:%d", phaseTab.numPhasesCalled());
   }
   fprintf(fp, "\n");
+
   // write bin time
-  for(j=0; j<poolCount; j++)
-    pool[j].write(fp);
+#if 1
+  int last=pool[0].getU();
+  pool[0].writeU(fp, last);
+  int count=1;
+  for(j=1; j<numEntries; j++) {
+    int u = pool[j].getU();
+    if (last == u) {
+      count++;
+    }
+    else {
+      if (count > 1) fprintf(fp, "+%d", count);
+      pool[j].writeU(fp, u);
+      last = u;
+      count = 1;
+    }
+  }
+  if (count > 1) fprintf(fp, "+%d", count);
+#else
+  for(j=0; j<numEntries; j++) 
+      pool[j].write(fp);
+#endif
   fprintf(fp, "\n");
+
   // write entry execution time
   for (i=0; i<_numEntries; i++)
     fprintf(fp, "%ld ", (long)(epTime[i]*1.0e6));
@@ -202,14 +222,8 @@ void SumLogPool::writeSts(void)
 
 void SumLogPool::add(double time, int pe) 
 {
-  numEntries++;
-  if (poolCount>0 && pool[poolCount-1].getTime() == time) {
-    pool[poolCount-1].repeat()++;
-  }
-  else {
-    new (&pool[poolCount++]) BinEntry(time);
-    if(poolSize==poolCount) shrink();
-  }
+  new (&pool[numEntries++]) BinEntry(time);
+  if(poolSize==numEntries) shrink();
 }
 
 void SumLogPool::setEp(int epidx, double time) 
@@ -226,23 +240,32 @@ void SumLogPool::setEp(int epidx, double time)
 
 void SumLogPool::shrink(void)
 {
-  int entries = poolCount/2;
+//  double t = CmiWallTimer();
+
+  int entries = numEntries/2;
   for (int i=0; i<entries; i++)
   {
      pool[i].setTime(pool[i*2].getTime() + pool[i*2+1].getTime());
   }
-  poolCount = entries;
+  numEntries = entries;
   CkpvAccess(binSize) *= 2;
 
-//CkPrintf("Shrinked binsize: %f entries:%d!!!!\n", CkpvAccess(binSize), numEntries);
+//CkPrintf("Shrinked binsize: %f entries:%d takes %fs!!!!\n", CkpvAccess(binSize), numEntries, CmiWallTimer()-t);
+}
+
+int  BinEntry::getU() { 
+  return (int)(time * 100.0 / CkpvAccess(binSize)); 
 }
 
 void BinEntry::write(FILE* fp)
 {
   int per = (int)(time * 100.0 / CkpvAccess(binSize));
   fprintf(fp, "%4d", per);
-  if (rep > 1)
-    fprintf(fp, "+%d", rep);
+}
+
+void BinEntry::writeU(FILE* fp, int u)
+{
+  fprintf(fp, "%4d", u);
 }
 
 TraceSummary::TraceSummary(char **argv):curevent(0),msgNum(0),binStart(0.0),bin(0.0)
