@@ -907,11 +907,12 @@ EOF
 echo "$as_me:907: checking machine name" >&5
 echo $ECHO_N "checking machine name... $ECHO_C" >&6
 version=`pwd | awk -F/ '{print $(NF-1)}'`
+base_version=`cat .vdir`
 cat >>confdefs.h <<EOF
 #define CMK_MACHINE_NAME "$version"
 EOF
 
-echo "$as_me:914: result: $version" >&5
+echo "$as_me:915: result: $version" >&5
 echo "${ECHO_T}$version" >&6
 
 t="test.cpp"
@@ -920,17 +921,17 @@ t="test.cpp"
 #  If successful, prints $2 and sets $pass/clears $fail
 #  If failure, prints $3 and sets $pass/clears $fail
 test_cxx() {
-        echo "$as_me:923: checking \"$1\"" >&5
+        echo "$as_me:924: checking \"$1\"" >&5
 echo $ECHO_N "checking \"$1\"... $ECHO_C" >&6
 	$CMK_CXX -I../include -c $t -o test.o > out 2>&1
 	if test $? -eq 0
 	then
-                echo "$as_me:928: result: \"$2\"" >&5
+                echo "$as_me:929: result: \"$2\"" >&5
 echo "${ECHO_T}\"$2\"" >&6
 		pass="1"
 		fail="0"
 	else
-                echo "$as_me:933: result: \"$3\"" >&5
+                echo "$as_me:934: result: \"$3\"" >&5
 echo "${ECHO_T}\"$3\"" >&6
 		pass="0"
 		fail="1"
@@ -1133,7 +1134,7 @@ FCC=`echo $CMK_CF90 | cut -d' ' -f1`
 
 # Extract the first word of ""$FCC"", so it can be a program name with args.
 set dummy "$FCC"; ac_word=$2
-echo "$as_me:1136: checking for $ac_word" >&5
+echo "$as_me:1137: checking for $ac_word" >&5
 echo $ECHO_N "checking for $ac_word... $ECHO_C" >&6
 if test "${ac_cv_prog_FCL+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
@@ -1148,7 +1149,7 @@ for ac_dir in $ac_dummy; do
   test -z "$ac_dir" && ac_dir=.
   $as_executable_p "$ac_dir/$ac_word" || continue
 ac_cv_prog_FCL=""$FCC" "
-echo "$as_me:1151: found $ac_dir/$ac_word" >&5
+echo "$as_me:1152: found $ac_dir/$ac_word" >&5
 break
 done
 
@@ -1156,16 +1157,16 @@ fi
 fi
 FCL=$ac_cv_prog_FCL
 if test -n "$FCL"; then
-  echo "$as_me:1159: result: $FCL" >&5
+  echo "$as_me:1160: result: $FCL" >&5
 echo "${ECHO_T}$FCL" >&6
 else
-  echo "$as_me:1162: result: no" >&5
+  echo "$as_me:1163: result: no" >&5
 echo "${ECHO_T}no" >&6
 fi
 
 if test -n "$FCL"
 then
-  echo "$as_me:1168: checking subroutine name used by Fortran compiler" >&5
+  echo "$as_me:1169: checking subroutine name used by Fortran compiler" >&5
 echo $ECHO_N "checking subroutine name used by Fortran compiler... $ECHO_C" >&6
   if test "${fortran_postfix+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
@@ -1223,18 +1224,20 @@ EOF
 
 fi
 
-  echo "$as_me:1226: result: $fortran_postfix" >&5
+  echo "$as_me:1227: result: $fortran_postfix" >&5
 echo "${ECHO_T}$fortran_postfix" >&6
 fi
 
 #go get libpthread.a from charm website
+if test "$base_version" = "net-linux" || test "$base_version" = "mpi-linux"
+then
 case $version in
 *linux*smp*|*linux*vmi*)
   if test ! -r ../lib/libpthread.a
   then
     # Extract the first word of "wget", so it can be a program name with args.
 set dummy wget; ac_word=$2
-echo "$as_me:1237: checking for $ac_word" >&5
+echo "$as_me:1240: checking for $ac_word" >&5
 echo $ECHO_N "checking for $ac_word... $ECHO_C" >&6
 if test "${ac_cv_prog_WGET+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
@@ -1249,7 +1252,7 @@ for ac_dir in $ac_dummy; do
   test -z "$ac_dir" && ac_dir=.
   $as_executable_p "$ac_dir/$ac_word" || continue
 ac_cv_prog_WGET="wget "
-echo "$as_me:1252: found $ac_dir/$ac_word" >&5
+echo "$as_me:1255: found $ac_dir/$ac_word" >&5
 break
 done
 
@@ -1257,16 +1260,16 @@ fi
 fi
 WGET=$ac_cv_prog_WGET
 if test -n "$WGET"; then
-  echo "$as_me:1260: result: $WGET" >&5
+  echo "$as_me:1263: result: $WGET" >&5
 echo "${ECHO_T}$WGET" >&6
 else
-  echo "$as_me:1263: result: no" >&5
+  echo "$as_me:1266: result: no" >&5
 echo "${ECHO_T}no" >&6
 fi
 
     # Extract the first word of "lynx", so it can be a program name with args.
 set dummy lynx; ac_word=$2
-echo "$as_me:1269: checking for $ac_word" >&5
+echo "$as_me:1272: checking for $ac_word" >&5
 echo $ECHO_N "checking for $ac_word... $ECHO_C" >&6
 if test "${ac_cv_prog_LYNX+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
@@ -1281,7 +1284,7 @@ for ac_dir in $ac_dummy; do
   test -z "$ac_dir" && ac_dir=.
   $as_executable_p "$ac_dir/$ac_word" || continue
 ac_cv_prog_LYNX="lynx "
-echo "$as_me:1284: found $ac_dir/$ac_word" >&5
+echo "$as_me:1287: found $ac_dir/$ac_word" >&5
 break
 done
 
@@ -1289,16 +1292,16 @@ fi
 fi
 LYNX=$ac_cv_prog_LYNX
 if test -n "$LYNX"; then
-  echo "$as_me:1292: result: $LYNX" >&5
+  echo "$as_me:1295: result: $LYNX" >&5
 echo "${ECHO_T}$LYNX" >&6
 else
-  echo "$as_me:1295: result: no" >&5
+  echo "$as_me:1298: result: no" >&5
 echo "${ECHO_T}no" >&6
 fi
 
     # Extract the first word of "telnet", so it can be a program name with args.
 set dummy telnet; ac_word=$2
-echo "$as_me:1301: checking for $ac_word" >&5
+echo "$as_me:1304: checking for $ac_word" >&5
 echo $ECHO_N "checking for $ac_word... $ECHO_C" >&6
 if test "${ac_cv_prog_TELNET+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
@@ -1313,7 +1316,7 @@ for ac_dir in $ac_dummy; do
   test -z "$ac_dir" && ac_dir=.
   $as_executable_p "$ac_dir/$ac_word" || continue
 ac_cv_prog_TELNET="telnet "
-echo "$as_me:1316: found $ac_dir/$ac_word" >&5
+echo "$as_me:1319: found $ac_dir/$ac_word" >&5
 break
 done
 
@@ -1321,16 +1324,16 @@ fi
 fi
 TELNET=$ac_cv_prog_TELNET
 if test -n "$TELNET"; then
-  echo "$as_me:1324: result: $TELNET" >&5
+  echo "$as_me:1327: result: $TELNET" >&5
 echo "${ECHO_T}$TELNET" >&6
 else
-  echo "$as_me:1327: result: no" >&5
+  echo "$as_me:1330: result: no" >&5
 echo "${ECHO_T}no" >&6
 fi
 
     # Extract the first word of "uudecode", so it can be a program name with args.
 set dummy uudecode; ac_word=$2
-echo "$as_me:1333: checking for $ac_word" >&5
+echo "$as_me:1336: checking for $ac_word" >&5
 echo $ECHO_N "checking for $ac_word... $ECHO_C" >&6
 if test "${ac_cv_prog_UUDECODE+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
@@ -1345,7 +1348,7 @@ for ac_dir in $ac_dummy; do
   test -z "$ac_dir" && ac_dir=.
   $as_executable_p "$ac_dir/$ac_word" || continue
 ac_cv_prog_UUDECODE="uudecode "
-echo "$as_me:1348: found $ac_dir/$ac_word" >&5
+echo "$as_me:1351: found $ac_dir/$ac_word" >&5
 break
 done
 
@@ -1353,10 +1356,10 @@ fi
 fi
 UUDECODE=$ac_cv_prog_UUDECODE
 if test -n "$UUDECODE"; then
-  echo "$as_me:1356: result: $UUDECODE" >&5
+  echo "$as_me:1359: result: $UUDECODE" >&5
 echo "${ECHO_T}$UUDECODE" >&6
 else
-  echo "$as_me:1359: result: no" >&5
+  echo "$as_me:1362: result: no" >&5
 echo "${ECHO_T}no" >&6
 fi
 
@@ -1410,6 +1413,7 @@ EOT
   fi
   ;;
 esac
+fi
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -1490,7 +1494,7 @@ DEFS=-DHAVE_CONFIG_H
 : ${CONFIG_STATUS=./config.status}
 ac_clean_files_save=$ac_clean_files
 ac_clean_files="$ac_clean_files $CONFIG_STATUS"
-{ echo "$as_me:1493: creating $CONFIG_STATUS" >&5
+{ echo "$as_me:1497: creating $CONFIG_STATUS" >&5
 echo "$as_me: creating $CONFIG_STATUS" >&6;}
 cat >$CONFIG_STATUS <<_ACEOF
 #! $SHELL
@@ -1657,7 +1661,7 @@ cat >>$CONFIG_STATUS <<\EOF
     echo "$ac_cs_version"; exit 0 ;;
   --he | --h)
     # Conflict between --help and --header
-    { { echo "$as_me:1660: error: ambiguous option: $1
+    { { echo "$as_me:1664: error: ambiguous option: $1
 Try \`$0 --help' for more information." >&5
 echo "$as_me: error: ambiguous option: $1
 Try \`$0 --help' for more information." >&2;}
@@ -1676,7 +1680,7 @@ Try \`$0 --help' for more information." >&2;}
     ac_need_defaults=false;;
 
   # This is an error.
-  -*) { { echo "$as_me:1679: error: unrecognized option: $1
+  -*) { { echo "$as_me:1683: error: unrecognized option: $1
 Try \`$0 --help' for more information." >&5
 echo "$as_me: error: unrecognized option: $1
 Try \`$0 --help' for more information." >&2;}
@@ -1712,7 +1716,7 @@ do
   case "$ac_config_target" in
   # Handling of arguments.
   "conv-autoconfig.h" ) CONFIG_HEADERS="$CONFIG_HEADERS conv-autoconfig.h" ;;
-  *) { { echo "$as_me:1715: error: invalid argument: $ac_config_target" >&5
+  *) { { echo "$as_me:1719: error: invalid argument: $ac_config_target" >&5
 echo "$as_me: error: invalid argument: $ac_config_target" >&2;}
    { (exit 1); exit 1; }; };;
   esac
@@ -1782,7 +1786,7 @@ for ac_file in : $CONFIG_HEADERS; do test "x$ac_file" = x: && continue
   * )   ac_file_in=$ac_file.in ;;
   esac
 
-  test x"$ac_file" != x- && { echo "$as_me:1785: creating $ac_file" >&5
+  test x"$ac_file" != x- && { echo "$as_me:1789: creating $ac_file" >&5
 echo "$as_me: creating $ac_file" >&6;}
 
   # First look for the input files in the build tree, otherwise in the
@@ -1793,7 +1797,7 @@ echo "$as_me: creating $ac_file" >&6;}
       -) echo $tmp/stdin ;;
       [\\/$]*)
          # Absolute (can't be DOS-style, as IFS=:)
-         test -f "$f" || { { echo "$as_me:1796: error: cannot find input file: $f" >&5
+         test -f "$f" || { { echo "$as_me:1800: error: cannot find input file: $f" >&5
 echo "$as_me: error: cannot find input file: $f" >&2;}
    { (exit 1); exit 1; }; }
          echo $f;;
@@ -1806,7 +1810,7 @@ echo "$as_me: error: cannot find input file: $f" >&2;}
            echo $srcdir/$f
          else
            # /dev/null tree
-           { { echo "$as_me:1809: error: cannot find input file: $f" >&5
+           { { echo "$as_me:1813: error: cannot find input file: $f" >&5
 echo "$as_me: error: cannot find input file: $f" >&2;}
    { (exit 1); exit 1; }; }
          fi;;
@@ -1923,7 +1927,7 @@ cat >>$CONFIG_STATUS <<\EOF
   rm -f $tmp/in
   if test x"$ac_file" != x-; then
     if cmp -s $ac_file $tmp/config.h 2>/dev/null; then
-      { echo "$as_me:1926: $ac_file is unchanged" >&5
+      { echo "$as_me:1930: $ac_file is unchanged" >&5
 echo "$as_me: $ac_file is unchanged" >&6;}
     else
       ac_dir=`$as_expr X"$ac_file" : 'X\(.*[^/]\)//*[^/][^/]*/*$' \| \

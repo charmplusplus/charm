@@ -19,6 +19,7 @@ AC_DEFINE_UNQUOTED(CHARM_VERSION, $VERSION)
 
 AC_MSG_CHECKING(machine name)
 version=`pwd | awk -F/ '{print $(NF-1)}'`
+base_version=`cat .vdir`
 AC_DEFINE_UNQUOTED(CMK_MACHINE_NAME, "$version")
 AC_MSG_RESULT($version)
 
@@ -257,6 +258,8 @@ fi
 
 
 #go get libpthread.a from charm website
+if test "$base_version" = "net-linux" || test "$base_version" = "mpi-linux"
+then
 case $version in
 *linux*smp*|*linux*vmi*)
   if test ! -r ../lib/libpthread.a
@@ -316,5 +319,6 @@ EOT
   fi
   ;;
 esac
+fi
 
 AC_OUTPUT()
