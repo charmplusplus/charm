@@ -548,44 +548,49 @@ static void recvBarrierMessage()
   }
 }
 
+/* happen at node level */
 void CmiBarrier()
 {
   int len, size, i;
   int status;
   int count = 0;
   OtherNode node;
-  /* every one send to pe 0 */
-  if (CmiMyPe() != 0) {
-    sendBarrierMessage(0);
-  }
-  /* printf("[%d] HERE\n", CmiMyPe()); */
-  if (CmiMyPe() == 0) 
-  {
-    for (count = 1; count < CmiNumPes(); count ++) 
+  int numnodes = CmiNumNodes();
+  if (CmiMyRank() == 0) {
+    /* every one send to pe 0 */
+    if (CmiMyNode() != 0) {
+      sendBarrierMessage(0);
+    }
+    /* printf("[%d] HERE\n", CmiMyPe()); */
+    if (CmiMyNode() == 0) 
+    {
+      for (count = 1; count < numnodes; count ++) 
+      {
+        recvBarrierMessage();
+      }
+      /* pe 0 broadcast */
+      for (i=1; i<=BROADCAST_SPANNING_FACTOR; i++) {
+        int p = i;
+        if (p > numnodes - 1) break;
+        /* printf("[%d] BD => %d \n", CmiMyPe(), p); */
+        sendBarrierMessage(p);
+      }
+    }
+    /* non 0 node waiting */
+    if (CmiMyNode() != 0) 
     {
       recvBarrierMessage();
-    }
-    /* pe 0 broadcast */
-    for (i=1; i<=BROADCAST_SPANNING_FACTOR; i++) {
-      int p = i;
-      if (p > _Cmi_numpes - 1) break;
-      /* printf("[%d] BD => %d \n", CmiMyPe(), p); */
-      sendBarrierMessage(p);
-    }
-  }
-  /* non 0 pe waiting */
-  if (CmiMyPe() != 0) 
-  {
-    recvBarrierMessage();
-    for (i=1; i<=BROADCAST_SPANNING_FACTOR; i++) {
-      int p = CmiMyPe();
-      p = BROADCAST_SPANNING_FACTOR*p + i;
-      if (p > _Cmi_numpes - 1) break;
-      p = p%_Cmi_numpes;
-      /* printf("[%d] RELAY => %d \n", CmiMyPe(), p); */
-      sendBarrierMessage(p);
+      for (i=1; i<=BROADCAST_SPANNING_FACTOR; i++) {
+        int p = CmiMyNode();
+        p = BROADCAST_SPANNING_FACTOR*p + i;
+        if (p > numnodes - 1) break;
+        p = p%numnodes;
+        /* printf("[%d] RELAY => %d \n", CmiMyPe(), p); */
+        sendBarrierMessage(p);
+      }
     }
   }
+  CmiNodeAllBarrier();
   /* printf("[%d] OUT of barrier \n", CmiMyPe()); */
 }
 
@@ -594,15 +599,18 @@ void CmiBarrierZero()
 {
   int i;
 
-  if (CmiMyPe()) {
+  if (CmiMyRank() == 0) {
+    if (CmiMyNode()) {
       sendBarrierMessage(0);
-  }
-  else {
-    for (i=0; i<CmiNumPes()-1; i++)
-    {
-      recvBarrierMessage();
+    }
+    else {
+      for (i=0; i<CmiNumNodes()-1; i++)
+      {
+        recvBarrierMessage();
+      }
     }
   }
+  CmiNodeAllBarrier();
 }
 
 /***********************************************************************
