@@ -265,8 +265,8 @@ char *ArrayElement::ckDebugChareName(void) {
 /// A more verbose form of abort
 void ArrayElement::CkAbort(const char *str) const
 {
-	CkError("Array element at index %s aborting:\n",
-		idx2str(thisIndexMax));
+	CkError("[%d] Array element at index %s aborting:\n",
+		CkMyPe(), idx2str(thisIndexMax));
 	CkMigratable::CkAbort(str);
 }
 
