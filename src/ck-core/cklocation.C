@@ -841,7 +841,7 @@ CmiBool CkLocRec_local::invokeEntry(CkMigratable *obj,void *msg,
 	return CmiTrue;
 }
 
-CmiBool CkLocRec_local::deliver(CkArrayMessage *msg,CkDeliver_t type)
+CmiBool CkLocRec_local::deliver(CkArrayMessage *msg,CkDeliver_t type,CmiBool doFree)
 {
 	if (type==CkDeliver_queue) { /*Send via the message queue */
 		CkArrayManagerDeliver(CkMyPe(),msg);
@@ -864,7 +864,7 @@ CmiBool CkLocRec_local::deliver(CkArrayMessage *msg,CkDeliver_t type)
 			
 		if (msg->array_hops()>1)
 			myLocMgr->multiHop(msg);
-		return invokeEntry(obj,(void *)msg,msg->array_ep(),CmiTrue);
+		return invokeEntry(obj,(void *)msg,msg->array_ep(),doFree);
 	}
 }
 
@@ -932,7 +932,7 @@ public:
   
 	virtual RecType type(void) {return dead;}
   
-	virtual CmiBool deliver(CkArrayMessage *msg,CkDeliver_t type) {
+	virtual CmiBool deliver(CkArrayMessage *msg,CkDeliver_t type,CmiBool doFree=CmiTrue) {
 		CkPrintf("Dead array element is %s.\n",idx2str(msg->array_index()));
 		CkAbort("Send to dead array element!\n");
 		return CmiFalse;
@@ -994,7 +994,7 @@ public:
 	virtual RecType type(void) {return remote;}
   
 	//Send a message for this element.
-	virtual CmiBool deliver(CkArrayMessage *msg,CkDeliver_t type) {
+	virtual CmiBool deliver(CkArrayMessage *msg,CkDeliver_t type,CmiBool doFree=CmiTrue) {
 		access();//Update our modification date
 		msg->array_hops()++;
 		DEBS((AA"   Forwarding message for element %s to %d (REMOTE)\n"AB,
@@ -1041,7 +1041,7 @@ public:
 	virtual RecType type(void) {return buffering;}
   
 	//Buffer a message for this element.
-	virtual CmiBool deliver(CkArrayMessage *msg,CkDeliver_t type) {
+	virtual CmiBool deliver(CkArrayMessage *msg,CkDeliver_t type,CmiBool doFree=CmiTrue) {
 		DEBS((AA" Queued message for %s\n"AB,idx2str(msg->array_index())));
 		buffer.enq(msg);
 		return CmiTrue;
@@ -1389,7 +1389,7 @@ void CkLocMgr::removeFromTable(const CkArrayIndex &idx) {
 
 /************************** LocMgr: MESSAGING *************************/
 /// Deliver message to this element, going via the scheduler if local
-void CkLocMgr::deliver(CkMessage *m,CkDeliver_t type) {
+void CkLocMgr::deliver(CkMessage *m,CkDeliver_t type,CmiBool doFree) {
 	CK_MAGICNUMBER_CHECK
 	CkArrayMessage *msg=(CkArrayMessage *)m;
 	const CkArrayIndex &idx=msg->array_index();
@@ -1403,7 +1403,7 @@ void CkLocMgr::deliver(CkMessage *m,CkDeliver_t type) {
 		else /*rec==NULL*/ the_lbdb->Send(myLBHandle,idx2LDObjid(idx),UsrToEnv(msg)->getTotalsize(),homePe(msg->array_index()));
 	}
 #endif
-	if (rec!=NULL) rec->deliver(msg,type);
+	if (rec!=NULL) rec->deliver(msg,type,doFree);
 	else /* rec==NULL*/ deliverUnknown(msg,type);
 }
 

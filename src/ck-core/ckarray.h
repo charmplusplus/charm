@@ -355,8 +355,8 @@ PUPmarshall(CProxySection_ArrayBase);
 	  { return super::ckGetNumElements(); }  \
 
 //Simple C-like API:
-void CkSendMsgArray(int entryIndex, void *msg, CkArrayID aID, const CkArrayIndex &idx);
-void CkSendMsgArrayInline(int entryIndex, void *msg, CkArrayID aID, const CkArrayIndex &idx);
+void CkSendMsgArray(int entryIndex, void *msg, CkArrayID aID, const CkArrayIndex &idx, CmiBool doFree=CmiTrue);
+void CkSendMsgArrayInline(int entryIndex, void *msg, CkArrayID aID, const CkArrayIndex &idx, CmiBool doFree=CmiTrue);
 void CkBroadcastMsgArray(int entryIndex, void *msg, CkArrayID aID);
 
 /************************ Array Element *********************/
@@ -568,8 +568,9 @@ public:
   inline int lastKnown(const CkArrayIndex &idx) const
 	  {return locMgr->lastKnown(idx);}
   /// Deliver message to this element (directly if local)
-  inline void deliver(CkMessage *m,CkDeliver_t type)
-	  {locMgr->deliver(m,type);}
+  /// doFree if is local
+  inline void deliver(CkMessage *m,CkDeliver_t type,CmiBool doFree=CmiTrue)
+	  {locMgr->deliver(m,type,doFree);}
   /// Fetch a local element via its index (return NULL if not local)
   inline ArrayElement *lookup(const CkArrayIndex &index)
 	  {return (ArrayElement *)locMgr->lookup(index,thisgroup);}

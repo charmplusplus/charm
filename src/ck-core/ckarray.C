@@ -689,15 +689,15 @@ void CProxySection_ArrayBase::ckSend(CkArrayMessage *msg, int ep)
         }
 }
 
-void CkSendMsgArray(int entryIndex, void *msg, CkArrayID aID, const CkArrayIndex &idx)
+void CkSendMsgArray(int entryIndex, void *msg, CkArrayID aID, const CkArrayIndex &idx, CmiBool doFree)
 {
   CkArrayMessage *m=(CkArrayMessage *)msg;
   m->array_index()=idx;
   msg_prepareSend(m,entryIndex,aID);
   CkArray *a=(CkArray *)_localBranch(aID);
-  a->deliver(m,CkDeliver_queue);
+  a->deliver(m,CkDeliver_queue,doFree);
 }
-void CkSendMsgArrayInline(int entryIndex, void *msg, CkArrayID aID, const CkArrayIndex &idx)
+void CkSendMsgArrayInline(int entryIndex, void *msg, CkArrayID aID, const CkArrayIndex &idx, CmiBool doFree)
 {
   CkArrayMessage *m=(CkArrayMessage *)msg;
   m->array_index()=idx;
@@ -705,7 +705,7 @@ void CkSendMsgArrayInline(int entryIndex, void *msg, CkArrayID aID, const CkArra
   CkArray *a=(CkArray *)_localBranch(aID);
   // avoid nested tracing
   int oldStatus = CkDisableTracing(entryIndex);
-  a->deliver(m,CkDeliver_inline);
+  a->deliver(m,CkDeliver_inline,doFree);
   if (oldStatus) CkEnableTracing(entryIndex);
 }
 
