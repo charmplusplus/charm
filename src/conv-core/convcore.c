@@ -1558,10 +1558,10 @@ void ConverseCommonInit(char **argv)
   CmiTimerInit();
   CstatsInit(argv);
   CcdModuleInit(argv);
+  CmiHandlerInit();
 #ifndef CMK_OPTIMIZE
   traceInit(argv);
 #endif
-  CmiHandlerInit();
 #if CMK_CCS_AVAILABLE
   CcsInit(argv);
 #endif
