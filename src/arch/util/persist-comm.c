@@ -140,7 +140,7 @@ void persistentRequestHandler(void *env)
 
   PersistentHandle h = getFreeRecvSlot();
   PersistentReceivesTable *slot = (PersistentReceivesTable *)h;
-  //slot->messagePtr = elan_CmiStaticAlloc(msg->maxBytes);
+  /*slot->messagePtr = elan_CmiStaticAlloc(msg->maxBytes);*/
 
   slot->messagePtr = PerAlloc(msg->maxBytes);
 
@@ -162,7 +162,7 @@ void persistentRequestHandler(void *env)
 void persistentReqGrantedHandler(void *env)
 {
 
-  //CmiPrintf("Persistent handler granted\n");
+  /*CmiPrintf("Persistent handler granted\n");*/
   PersistentReqGrantedMsg *msg = (PersistentReqGrantedMsg *)env;
   PersistentHandle h = msg->sourceHandlerIndex;
   PersistentSendsTable *slot = (PersistentSendsTable *)h;
@@ -203,7 +203,7 @@ void persistentDestoryHandler(void *env)
   else
     persistentReceivesTableTail = slot->prev;
 
-  if (slot->messagePtr) //elan_CmiStaticFree(slot->messagePtr);
+  if (slot->messagePtr) /*elan_CmiStaticFree(slot->messagePtr);*/
       CmiFree(slot->messagePtr);
 
   CmiFree(slot);
