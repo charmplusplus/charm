@@ -54,7 +54,7 @@ LBDB::LBDB()
     obj_running = CmiFalse;
     commTable = new LBCommTable;
     obj_walltime = obj_cputime = 0;
-//    batsync.init(this,1.0);
+    batsync.init(this,1.0);
 }
 
 LDOMHandle LBDB::AddOM(LDOMid _userID, void* _userData, 
