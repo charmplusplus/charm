@@ -269,10 +269,10 @@ LIBCONV_UTIL=pup_util.o pup_xlater.o pup_c.o pup_paged.o\
 LIBCONV_UTILF=pup_f.o
 
 converse: basics 
+	$(MAKE) QuickThreads/libqt.a
 	$(MAKE) converse-target
 
-converse-target: QuickThreads/libqt.a 
-	$(MAKE) $(CVLIBS) fmain-ok charmrun-target swapglobal-target conv-cpm
+converse-target:  $(CVLIBS) fmain-ok charmrun-target swapglobal-target conv-cpm
 
 charmrun-target: daemon-target sockRoutines.c sockRoutines.h ccs-server.c ccs-server.h
 	if [ -d charmrun ] ; then ( cd charmrun ; $(MAKE) OPTS='$(OPTS)' ) ; fi
@@ -347,8 +347,7 @@ pup_paged.o: pup_paged.C $(CVHEADERS) $(UTILHEADERS)
 	$(CHARMC) -o pup_paged.o pup_paged.C
 	
 pup_f.o: pup_f.f90 $(CVHEADERS)
-	-$(CHARMC) -c pup_f.f90
-	-$(CHARMC) -cpmod ../include pupmod.M
+	-$(CHARMC) -c pup_f.f90 && $(CHARMC) -cpmod ../include pupmod.M
 
 ckhashtable.o: ckhashtable.C ckhashtable.h $(CVHEADERS)
 	$(CHARMC) -o ckhashtable.o ckhashtable.C
