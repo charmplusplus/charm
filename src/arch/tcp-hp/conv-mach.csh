@@ -12,7 +12,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 2.12  1995-11-13 16:36:19  jyelon
+# Revision 2.13  1996-04-09 22:56:35  jyelon
+# *** empty log message ***
+#
+# Revision 2.12  1995/11/13 16:36:19  jyelon
 # repaired CMK_NM_FILTER
 #
 # Revision 2.11  1995/11/02  23:29:09  sanjeev
@@ -65,8 +68,10 @@ set CMK_AR='ar q'
 set CMK_RANLIB='true'
 set CMK_LIBS=''
 set CMK_SEQ_LIBS=''
-set CMK_SEQ_CC='gcc '
-set CMK_SEQ_LD='gcc '
+set CMK_SEQ_CC='gcc'
+set CMK_SEQ_LD='gcc'
+set CMK_SEQ_CXX='g++'
+set CMK_SEQ_LDXX='g++'
 set CMK_NM='nm'
 set CMK_NM_FILTER="grep '|extern|' | sed -e 's@ *|.*@@'"
 set CMK_CPP_SUFFIX="ii"

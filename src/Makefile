@@ -32,9 +32,9 @@ all: charm++
 
 charm: converse charmxlat charmlibs libcharm
 
-charm++: converse charmxlat charmlibs charmxlat++ libcharm libck-cplus-y.a
+charm++: converse charmxlat charmlibs charmxlat++ charmfilter++ charmxi libcharm libck-cplus-y.a
 
-translators: charmxlat charmfilter charmxlat++ charmfilter++
+translators: charmxlat charmfilter charmxlat++ charmfilter++ charmxi
 
 test-converse: converse
 	(cd ../pgms ; make test-converse)
@@ -96,6 +96,7 @@ dirs+sources:
 	rm -rf ../src ; mkdir ../src
 	cp xl-*.c xl-*.h ../src
 	cp xp-*.c xp-*.h ../src
+	cp xi-*.c xi-*.h ../src
 	cp Maketrans ../src/Makefile
 	@echo
 	@rm -f .vdir .gdir
@@ -411,6 +412,8 @@ XLFILES= xl-dag.c xl-lex.c xl-lex.h xl-lexspecs xl-lexyy.c xl-main.c xl-outh.c x
 
 XPFILES=xp-extn.h xp-lexyy.c xp-process.c xp-sfilter xp-space.c xp-t.h xp-t.l xp-t.y xp-table.c xp-ycode.c xp-ytab.c xp-ytab.h
 
+XIFILES=xi-generate.C xi-parse.y xi-parse.C xi-parse.h xi-scan.l xi-scan.C xi-symbol.C xi-symbol.h xi-main.C
+
 charmxlat: $(XLFILES)
 	make -f Maketrans charmxlat OPTS='$(OPTS)'
 
@@ -446,6 +449,12 @@ xlat++lex: $(XPFILES)
 
 sfilter++lex: $(XPFILES)
 	make -f Maketrans sfilter++lex OPTS='$(OPTS)'
+
+charmxi: $(XIFILES)
+	make -f Maketrans charmxi OPTS='$(OPTS)'
+
+yacci: $(XIFILES)
+	make -f Maketrans yacci OPTS='$(OPTS)'
 
 ###############################################################################
 #

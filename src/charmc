@@ -347,6 +347,8 @@ endif
 if ($?SEQUENTIAL) then
     set CMK_CC=( $CMK_SEQ_CC )
     set CMK_LD=( $CMK_SEQ_LD )
+    set CMK_CXX=( $CMK_SEQ_CXX )
+    set CMK_LDXX=( $CMK_SEQ_LDXX )
 endif
 
 if ($?OVERRIDE_CC) then
@@ -388,8 +390,12 @@ endif
 if ($?LANGUAGE == 0) set LANGUAGE=charm
 
 switch ($LANGUAGE)
-    case "charm"
-    case "charm++"
+    case "c"
+    case "C"
+    case "c++"
+    case "C++"
+    case "charm" 
+    case "charm++" 
     case "converse"
         breaksw
     default:
@@ -448,6 +454,10 @@ foreach FILE ($FILES)
       else
         set OBJECTFILES=( $OBJECTFILES $TMP.o )
       endif
+      breaksw
+    case "*.ci"
+      ($ECHOCMD ; $CHARMBIN/charmxi $BASE.ci)
+      if ($status) goto failure
       breaksw
     case "*.c"
       ($ECHOCMD ; $CMK_CC $OPTS_CC -I$CHARMINC -c $BASE.c)
@@ -544,7 +554,19 @@ endsw
 exelink:
 
 if ($?SEQUENTIAL) then
-    ($ECHOCMD ; $CMK_SEQ_LD $OPTS_LD -o $OBJECT $OBJECTFILES -L$CHARMLIB $LIBRARIES $CMK_SEQ_LIBS)
+    switch ($LANGUAGE)
+        case "c"
+        case "C"
+            ($ECHOCMD ; $CMK_SEQ_LD $OPTS_LD -o $OBJECT $OBJECTFILES -L$CHARMLIB $LIBRARIES $CMK_SEQ_LIBS)
+            breaksw
+        case "c++"
+        case "C++"    
+            ($ECHOCMD ; $CMK_SEQ_LDXX $OPTS_LD -o $OBJECT $OBJECTFILES -L$CHARMLIB $LIBRARIES $CMK_SEQ_LIBS)
+            breaksw
+        default
+            echo 'Illegal choice of language for sequential program'
+            goto failure
+    endsw
     if ($status) goto failure
     goto copyobj
 endif
@@ -610,6 +632,12 @@ endif
 ########################################################################
 
 switch ($LANGUAGE)
+    case "c"
+    case "C"
+    case "c++"
+    case "C++"
+        echo 'Illegal choice of language for parallel program'
+        goto failure
     case "charm++"
         set PRELOAD=($CMK_LDRO CHARMC-USR.TMP.o $OPTS_LDRO -L$CHARMLIB \
                       $OBJECTFILES $LIBRARIES $BAL_OBJ)

@@ -12,7 +12,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 2.13  1995-11-08 22:27:49  milind
+# Revision 2.14  1996-04-09 22:56:22  jyelon
+# *** empty log message ***
+#
+# Revision 2.13  1995/11/08 22:27:49  milind
 # changed CMK_CXXPP to xlC -E.
 #
 # Revision 2.12  1995/11/02  22:45:43  sanjeev
@@ -80,6 +83,8 @@ set CMK_LIBS			= '-bnso -bI:/lib/syscalls.exp'
 set CMK_SEQ_LIBS                = ''
 set CMK_SEQ_CC			= 'gcc'
 set CMK_SEQ_LD			= 'gcc'
+set CMK_SEQ_CXX			= 'g++'
+set CMK_SEQ_LDXX		= 'g++'
 set CMK_NM			= 'nm'
 set CMK_NM_FILTER		= "colrm 1 11 | sed -e 's/\.//'"
 set CMK_CPP_SUFFIX="i"
