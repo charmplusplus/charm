@@ -19,7 +19,7 @@ LIBDEST =  $(CDIR)/lib/$(LIB)
 # *******************************
 $(LIBDEST):	$(OBJECTS)
 	$(CHARMC) -o $(LIBDEST) $(OBJECTS) 
-	[ ! -d $(POSEINCDIR) ] && mkdir $(POSEINCDIR) || true
+	test ! -d $(POSEINCDIR) && mkdir $(POSEINCDIR) || true
 	/bin/cp -f  *.h $(POSEINCDIR)
 	/bin/cp -f  etrans.pl $(POSEBINDIR)
 
