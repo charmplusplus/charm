@@ -26,6 +26,8 @@ enum { MSA_DEFAULT_ENTRIES_PER_PAGE = 1024 };
 // Size of cache on each PE
 enum { MSA_DEFAULT_MAX_BYTES = 16*1024*1024 };
 
+typedef enum { MSA_COL_MAJOR=0, MSA_ROW_MAJOR=1 } MSA_Array_Layout_t;
+
 #define DEBUG_PRINTS
 
 #endif

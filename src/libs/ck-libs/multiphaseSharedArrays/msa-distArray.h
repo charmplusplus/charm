@@ -247,7 +247,7 @@ public:
 
 // define a 2d distributed array based on the 1D array, support row major and column
 // major arrangement of data
-template<class ENTRY, class ENTRY_OPS_CLASS, unsigned int ENTRIES_PER_PAGE=MSA_DEFAULT_ENTRIES_PER_PAGE, int ROW_MAJOR=1>
+template<class ENTRY, class ENTRY_OPS_CLASS, unsigned int ENTRIES_PER_PAGE=MSA_DEFAULT_ENTRIES_PER_PAGE, MSA_Array_Layout_t ROW_MAJOR=MSA_ROW_MAJOR>
 class MSA2D : public MSA1D<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>
 {
 public:
