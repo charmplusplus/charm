@@ -1810,6 +1810,37 @@ void CmiReleaseCommHandle(CmiCommHandle handle)
   FreeOutgoingMsg(((OutgoingMsg)handle));
 }
 
+/*****************************************************************************
+ *
+ * NET version List-Cast and Multicast Code
+ *
+ ****************************************************************************/
+                                                                                
+void CmiSyncListSendFn(int npes, int *pes, int len, char *msg)
+{
+  CmiError("ListSend not implemented.");
+}
+                                                                                
+CmiCommHandle CmiAsyncListSendFn(int npes, int *pes, int len, char *msg)
+{
+  CmiError("ListSend not implemented.");
+  return (CmiCommHandle) 0;
+}
+                                                                                
+/* 
+  because in all net versions, the message buffer after CmiSyncSendAndFree
+  returns is not changed, we can use memory reference trick to avoid 
+  memory copying here
+*/
+void CmiFreeListSendFn(int npes, int *pes, int len, char *msg)
+{
+  int i;
+  for(i=0;i<npes;i++) {
+    CmiReference(msg);
+    CmiSyncSendAndFree(pes[i], len, msg);
+  }
+  CmiFree(msg);
+}
 
 #if CMK_IMMEDIATE_MSG
 void CmiProbeImmediateMsg()

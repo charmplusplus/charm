@@ -13,7 +13,7 @@
 
 #define CMK_MULTICAST_GROUP_TYPE                struct { unsigned pe, id; }
 #define CMK_MULTICAST_DEF_USE_COMMON_CODE                  1
-#define CMK_MULTICAST_LIST_USE_COMMON_CODE                 1
+#define CMK_MULTICAST_LIST_USE_COMMON_CODE                 0
 #define CMK_MULTICAST_GROUP_USE_COMMON_CODE                1
 
 #define CMK_MSG_HEADER_BASIC  { CmiUInt2 d0,d1,d2,d3,d4,d5,hdl,d7; }
