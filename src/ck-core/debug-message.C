@@ -21,23 +21,6 @@
 
 #define NUM_MESSAGES 100
 
-extern "C" void  CpdInitializeHandlerArray(void);
-extern void handlerArrayRegister(int, hndlrIDFunction, hndlrIDFunction);
-extern char* genericViewMsgFunction(char *msg, int type);
-extern char* getMsgListSched(void);
-extern char* getMsgListPCQueue(void);
-extern char* getMsgListFIFO(void);
-extern char* getMsgListDebug(void);
-extern char* getMsgContentsSched(int index);
-extern char* getMsgContentsPCQueue(int index);
-extern char* getMsgContentsFIFO(int index);
-extern char* getMsgContentsDebug(int index);
-extern void  msgListCache(void);
-extern void  msgListCleanup(void);
-extern int   getCharmMsgHandlers(int *handleArray);
-extern char* getEnvInfo(envelope *env);
-extern char* getSymbolTableInfo(void);
-
 extern "C" void  CqsEnumerateQueue(Queue, void ***);
 
 CpvDeclare(handlerType, handlerArray);
