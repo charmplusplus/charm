@@ -37,9 +37,10 @@ typedef struct { char data[DGRAM_HEADER_SIZE]; } DgramHeader;
 typedef struct { DgramHeader head; char window[1024]; } DgramAck;
 
 #define DgramHeaderMake(ptr, dstrank, srcpe, magic, seqno) { \
+   unsigned char tmp = (magic) & DGRAM_MAGIC_MASK; \
    ((unsigned int *)ptr)[0] = seqno; \
    ((unsigned short *)ptr)[2] = srcpe; \
-   ((unsigned short *)ptr)[3] = ((magic & DGRAM_MAGIC_MASK)<<8) | dstrank; \
+   ((unsigned short *)ptr)[3] = dstrank | (tmp<<8); \
 }
 
 #define DgramHeaderBreak(ptr, dstrank, srcpe, magic, seqno) { \
