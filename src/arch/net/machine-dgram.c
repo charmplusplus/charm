@@ -26,7 +26,7 @@
 typedef struct { char data[DGRAM_HEADER_SIZE]; } DgramHeader;
 
 /* the window size needs to be Cmi_window_size + sizeof(unsigned int) bytes) */
-typedef struct { DgramHeader head; } DgramAck;
+typedef struct { DgramHeader head; char window[1024]; } DgramAck;
 
 #define DgramHeaderMake(ptr, dstrank, srcpe, magic, seqno) { \
    ((unsigned short *)ptr)[0] = srcpe; \
@@ -172,6 +172,7 @@ typedef struct OtherNodeStruct
   unsigned int             send_next;    /* next seqno to go into queue */
   unsigned int             send_good;    /* last acknowledged seqno */
   double                   send_primer;  /* time to send retransmit */
+  unsigned int             send_ack_seqno; /* next ack seqno to send */
   int                      retransmit_leash; /*Maximum number of packets to retransmit*/
 
   int                      asm_rank;
@@ -181,9 +182,11 @@ typedef struct OtherNodeStruct
   
   int                      recv_ack_cnt; /* number of unacked dgrams */
   double                   recv_ack_time;/* time when ack should be sent */
+  unsigned int             recv_expect;  /* next dgram to expect */
   ExplicitDgram           *recv_window;  /* Packets received, not integrated */
   int                      recv_winsz;   /* Number of packets in recv window */
   unsigned int             recv_next;    /* Seqno of first missing packet */
+  unsigned int             recv_ack_seqno; /* last ack seqno received */
 
   unsigned int             stat_total_intr; /* Total Number of Interrupts */
   unsigned int             stat_proc_intr;  /* Processed Interrupts */
@@ -407,6 +410,7 @@ static ImplicitDgram Cmi_freelist_implicit;
 
 static int ctrlskt_ready_read;
 static int dataskt_ready_read;
+static int dataskt_ready_write;
 
 int CheckSocketsReady(int withDelayMs)
 {   
@@ -420,8 +424,11 @@ int CheckSocketsReady(int withDelayMs)
   FD_ZERO(&rfds);FD_ZERO(&wfds);
   if (Cmi_charmrun_fd!=-1)
   	FD_SET(Cmi_charmrun_fd, &rfds);
-  if (dataskt!=-1)
+  if (dataskt!=-1) {
   	FD_SET(dataskt, &rfds);
+  	if (writeableDgrams || writeableAcks)
+  	  FD_SET(dataskt, &wfds); /*Outgoing queue is nonempty*/
+  }
   tmo.tv_sec = 0;
   tmo.tv_usec = withDelayMs*1000;
   nreadable = select(FD_SETSIZE, &rfds, &wfds, NULL, &tmo);
@@ -437,6 +444,7 @@ int CheckSocketsReady(int withDelayMs)
   if (dataskt!=-1) {
     fds[n].fd = dataskt;
     fds[n].events = POLLIN;
+    if (writeableDgrams || writeableAcks)  fds[n].events |= POLLOUT;
     n++;
   }
   nreadable = poll(fds, n, withDelayMs);
@@ -456,12 +464,15 @@ int CheckSocketsReady(int withDelayMs)
 #if !CMK_USE_POLL
   if (Cmi_charmrun_fd!=-1)
 	ctrlskt_ready_read = (FD_ISSET(Cmi_charmrun_fd, &rfds));
-  if (dataskt!=-1)
+  if (dataskt!=-1) {
   	dataskt_ready_read = (FD_ISSET(dataskt, &rfds));
+	dataskt_ready_write = (FD_ISSET(dataskt, &wfds));
+  }
 #else
   if (dataskt!=-1) {
     n--;
     dataskt_ready_read = fds[n].revents & POLLIN;
+    dataskt_ready_write = fds[n].revents & POLLOUT;
   }
   if (Cmi_charmrun_fd!=-1) {
     n--;
