@@ -367,6 +367,9 @@ typedef struct {
 CpvExtern(CmiHandlerInfo*, CmiHandlerTable);
 CpvExtern(int,         CmiHandlerMax);
 CpvExtern(void*,       CsdSchedQueue);
+#if CMK_OBJECT_QUEUE_AVAILABLE
+CpvExtern(void*,       CsdObjQueue);
+#endif
 #if CMK_NODE_QUEUE_AVAILABLE
 CsvExtern(void*,       CsdNodeQueue);
 CsvExtern(CmiNodeLock, CsdNodeQueueLock);
@@ -563,6 +566,9 @@ typedef struct {
   void *localQ;
   void *nodeQ;
   void *schedQ;
+#if CMK_OBJECT_QUEUE_AVAILABLE
+  void *objQ;
+#endif
   CmiNodeLock nodeLock;
 } CsdSchedulerState_t;
 extern void CsdSchedulerState_new(CsdSchedulerState_t *state);

@@ -994,8 +994,15 @@ int CmiDeliverMsgs(int maxmsgs)
   return CsdScheduler(maxmsgs);
 }
 
+#if CMK_OBJECT_QUEUE_AVAILABLE
+CpvDeclare(void *, CsdObjQueue);
+#endif
+
 void CsdSchedulerState_new(CsdSchedulerState_t *s)
 {
+#if CMK_OBJECT_QUEUE_AVAILABLE
+	s->objQ=CpvAccess(CsdObjQueue);
+#endif
 	s->localQ=CpvAccess(CmiLocalQueue);
 	s->schedQ=CpvAccess(CsdSchedQueue);
 #if CMK_NODE_QUEUE_AVAILABLE
@@ -1021,6 +1028,11 @@ void *CsdNextMessage(CsdSchedulerState_t *s) {
 	  CmiUnlock(s->nodeLock);
 	  if (msg!=NULL) return msg;
 	}
+#endif
+#if CMK_OBJECT_QUEUE_AVAILABLE
+	if (NULL!=(msg=CdsFifo_Dequeue(s->objQ))) {
+          return msg;
+        }
 #endif
 	CqsDequeue(s->schedQ,(void **)&msg);
 	if (msg!=NULL) return msg;
@@ -1267,6 +1279,11 @@ void CsdInit(argv)
   CpvInitialize(int,   CsdStopFlag);
   
   CpvAccess(CsdSchedQueue) = (void *)CqsCreate();
+
+#if CMK_OBJECT_QUEUE_AVAILABLE
+  CpvInitialize(void *,CsdObjQueue);
+  CpvAccess(CsdObjQueue) = CdsFifo_Create();
+#endif
 
 #if CMK_NODE_QUEUE_AVAILABLE
   CsvInitialize(CmiLock, CsdNodeQueueLock);
@@ -2000,7 +2017,6 @@ static void CIdleTimeoutInit(char **argv)
     CcdCallOnCondition(CcdPROCESSOR_BEGIN_BUSY, (CcdVoidFn)on_busy, rec);
   }
 }
-
 
 /*****************************************************************************
  *
