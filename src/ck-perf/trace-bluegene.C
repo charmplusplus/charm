@@ -24,7 +24,7 @@
 void _createTracebluegene(char** argv)
 {
   DEBUGF(("%d createTraceBluegene\n", CkMyPe()));
-  CkpvInitialize(Trace*, _tracebg);
+  CkpvInitialize(TraceBluegene*, _tracebg);
   CkpvAccess(_tracebg) = new  TraceBluegene(argv);
   CkpvAccess(_traces)->addTrace(CkpvAccess(_tracebg));
   traceBluegeneLinked = 1;
