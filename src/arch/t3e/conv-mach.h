@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.12  1998-06-15 22:12:04  jyelon
+ * Revision 1.13  1998-06-16 21:57:56  milind
+ * Fixed typedefs for t3e.
+ *
+ * Revision 1.12  1998/06/15 22:12:04  jyelon
  * changed the way converse headers are done.
  *
  * Revision 1.11  1998/06/15 19:52:43  jyelon
@@ -185,14 +188,14 @@
 #define CMK_TIMER_USE_SPECIAL                              0
 #define CMK_TIMER_USE_TIMES                                1
 
-#define CMK_TYPEDEF_INT2 unknown
-#define CMK_TYPEDEF_INT4 unknown
-#define CMK_TYPEDEF_INT8 unknown
-#define CMK_TYPEDEF_UINT2 unknown
-#define CMK_TYPEDEF_UINT4 unknown
-#define CMK_TYPEDEF_UINT8 unknown
-#define CMK_TYPEDEF_FLOAT4 unknown
-#define CMK_TYPEDEF_FLOAT8 unknown
+#define CMK_TYPEDEF_INT2 short
+#define CMK_TYPEDEF_INT4 int
+#define CMK_TYPEDEF_INT8 long
+#define CMK_TYPEDEF_UINT2 unsigned short
+#define CMK_TYPEDEF_UINT4 unsigned int
+#define CMK_TYPEDEF_UINT8 unsigned long
+#define CMK_TYPEDEF_FLOAT4 float
+#define CMK_TYPEDEF_FLOAT8 double
 
 #define CMK_VECTOR_SEND_USES_COMMON_CODE                        1
 #define CMK_VECTOR_SEND_USES_SPECIAL_CODE                        0
