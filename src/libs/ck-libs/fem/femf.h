@@ -13,6 +13,8 @@
        integer, parameter :: FEM_HEXAHEDRAL=8
        integer, parameter :: FEM_QUADRILATERAL=4
 
+       external FEM_Attach
+
        external FEM_Set_Mesh
 
        external FEM_Set_Node
