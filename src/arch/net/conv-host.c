@@ -387,6 +387,7 @@ char *getenv_display()
 char *mylogin()
 {
   struct passwd *self;
+
   self = getpwuid(getuid());
   if (self==0) { perror("getpwuid"); exit(1); }
   return self->pw_name;
