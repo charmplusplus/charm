@@ -167,10 +167,11 @@ public:
 
     void changePredictor(LBPredictorFunction *new_predictor) {
       delete predictor;
+      int i;
       // gain control of the provided predictor;
       predictor = new_predictor;
-      for (int i=0;i<n_objs;++i) delete[] parameters[i];
-      for (int i=0;i<n_objs;++i) {
+      for (i=0;i<n_objs;++i) delete[] parameters[i];
+      for (i=0;i<n_objs;++i) {
 	parameters[i] = new double[new_predictor->num_params];
 	model_valid = false;
       }

@@ -81,7 +81,7 @@ public:
   virtual double predict(double x, double *params) =0;
   virtual void print(double *params) {PredictorPrintf("LB: unknown model\n");};
   virtual void function(double x, double *param, double &y, double *dyda) =0;
-  virtual LBPredictorFunction* constructor() =0;
+  LBPredictorFunction* constructor();
 };
 
 // a default implementation for a FuturePredictor function
