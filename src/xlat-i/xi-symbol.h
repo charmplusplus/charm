@@ -88,7 +88,7 @@ class TParamList : public Printable {
     void print(XStr& str);
     void genSpec(XStr& str);
 };
-
+class Message;
 class Type : public Printable {
   public:
     virtual void print(XStr&) = 0;
@@ -309,6 +309,11 @@ class Chare : public TEntity, public Construct {
       line = ln;
       setTemplate(0); 
       abstract=0;
+      if (l)
+      {
+      	l->setChare(this);
+      	if (l->isPure()) abstract=1;
+      }
     }
     void genProxyBases(XStr& str,const char* p,const char* s,const char* sep) {
       bases->genProxyNames(str, p, s, sep);
@@ -353,10 +358,14 @@ class MainChare : public Chare {
 };
 
 class Array : public Chare {
+  protected:
+    XStr indexSuffix;
+    XStr indexType;//"CkArrayIndex"+indexSuffix;
   public:
-    Array(int ln, NamedType *t, TypeList *b=0, MemberList *l=0):
-	    Chare(ln,t,b,l) {}
+    Array(int ln, NamedType *index,
+    	NamedType *t, TypeList *b=0, MemberList *l=0);
     virtual int isArray(void) {return 1;}
+    virtual int is1D(void) {return indexSuffix=="1D";}
     virtual void genSubDecls(XStr& str);
     virtual char *chareTypeName(void) {return (char *) "array";}
 };
@@ -422,9 +431,6 @@ class Message : public TEntity, public Construct {
     NamedType *type;
     TypeList *contents;
   public:
-  /*    Message(int l, NamedType *t, int a)
-      : attrib(a), type(t), contents(0)
-      { line=l; setTemplate(0); }*/
     Message(int l, NamedType *t, int a, TypeList *c=0)
       : attrib(a), type(t), contents(c) 
       { line=l; setTemplate(0);
@@ -503,6 +509,7 @@ class TVarList : public Printable {
 #define SLOCKED   0x04
 #define SVIRTUAL  0x08
 #define SPURE     0x10
+#define SARRAY_MIGRATE 0x20 //<- is magic migration constructor
 
 class Entry : public Member {
   private:
@@ -515,14 +522,19 @@ class Entry : public Member {
     XStr epIdx(int include__idx_=1);
     void genEpIdxDecl(XStr& str);
     void genEpIdxDef(XStr& str);
-    void genChareStaticConstructorDecl(XStr& str);
+    
     void genChareDecl(XStr& str);
-    void genGroupStaticConstructorDecl(XStr& str);
-    void genArrayStaticConstructorDecl(XStr& str);
-    void genGroupDecl(XStr& str);
-    void genArrayDecl(XStr& str);
+    void genChareStaticConstructorDecl(XStr& str);
     void genChareStaticConstructorDefs(XStr& str);
     void genChareDefs(XStr& str);
+    
+    void genArrayDefs(XStr& str);
+    void genArrayStaticConstructorDecl(XStr& str);
+    void genArrayStaticConstructorDefs(XStr& str);
+    void genArrayDecl(XStr& str);
+    
+    void genGroupDecl(XStr& str);
+    void genGroupStaticConstructorDecl(XStr& str);
     void genGroupStaticConstructorDefs(XStr& str);
     void genGroupDefs(XStr& str);
     
@@ -531,22 +543,7 @@ class Entry : public Member {
     XStr voidParamDecl(void);
     XStr callThread(const XStr &procName,int prependEntryName=0);
   public:
-    Entry(int l, int a, EnType *r, char *n, EnType *p, Value *sz=0) :
-      attribs(a), retType(r), name(n), param(p), stacksize(sz)
-    { line=l; setChare(0); 
-      if(!isVirtual() && isPure()) {
-        cerr << "Non-virtual methods cannot be pure virtual!!\n";
-        abort();
-      }
-      if(!isThreaded() && stacksize) {
-        cerr << "Non-Threaded methods cannot have stacksize spec.!!\n";
-        abort();
-      }
-      if(retType && !isSync() && !retType->isVoid()) {
-        cerr << "Async methods cannot have non-void return type!!\n";
-        abort();
-      }
-    }
+    Entry(int l, int a, EnType *r, char *n, EnType *p, Value *sz=0);
     int getStackSize(void) { return (stacksize ? stacksize->getIntVal() : 0); }
     int isThreaded(void) { return (attribs & STHREADED); }
     int isSync(void) { return (attribs & SSYNC); }

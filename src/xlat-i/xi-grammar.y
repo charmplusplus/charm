@@ -60,7 +60,7 @@ ModuleList *modlist;
 %type <module>		Module
 %type <conslist>	ConstructEList ConstructList
 %type <construct>	Construct
-%type <strval>		Name OptNameInit 
+%type <strval>		Name OptNameInit
 %type <val>		OptStackSize
 %type <intval>		OptExtern OptSemiColon MAttribs MAttribList MAttrib
 %type <intval>		EAttribs EAttribList EAttrib OptPure
@@ -70,7 +70,7 @@ ModuleList *modlist;
 %type <rtype>		OptType EParam
 %type <type>		BuiltinType ArrayType
 %type <ftype>		FuncType
-%type <ntype>		NamedType
+%type <ntype>		NamedType ArrayIndexType
 %type <ptype>		PtrType OnePtrType
 %type <readonly>	Readonly ReadonlyMsg
 %type <message>		Message TMessage
@@ -316,61 +316,49 @@ BaseList	: NamedType
 		;
 
 Chare		: CHARE NamedType OptBaseList MemberEList
-		{ $$ = new Chare(lineno, $2, $3, $4); 
-		  if($4) $4->setChare($$);
-		  if($4 && $4->isPure()) $$->setAbstract(1);}
+		{ $$ = new Chare(lineno, $2, $3, $4); }
 		| MAINCHARE NamedType OptBaseList MemberEList
-		{ $$ = new MainChare(lineno, $2, $3, $4); 
-                  if($4) $4->setChare($$);
-		  if($4 && $4->isPure()) $$->setAbstract(1);}
+		{ $$ = new MainChare(lineno, $2, $3, $4); }
 		;
 
 Group		: GROUP NamedType OptBaseList MemberEList
-		{ $$ = new Group(lineno, $2, $3, $4); if($4) $4->setChare($$);
-		  if($4 && $4->isPure()) $$->setAbstract(1);}
+		{ $$ = new Group(lineno, $2, $3, $4); }
 		;
 
 NodeGroup	: NODEGROUP NamedType OptBaseList MemberEList
-		{ $$ = new NodeGroup(lineno, $2, $3, $4); 
-		  if($4) $4->setChare($$);
-		  if($4 && $4->isPure()) $$->setAbstract(1);}
+		{ $$ = new NodeGroup(lineno, $2, $3, $4); }
 		;
 
-Array		: ARRAY NamedType OptBaseList MemberEList
-		{ if(strcmp($2->getBaseName(), "ArrayElement"))
-                    $3 = new TypeList(new NamedType("ArrayElement"), $3);
-                  $$ = new Array(lineno, $2, $3, $4); if($4) $4->setChare($$);
-		  if($4 && $4->isPure()) $$->setAbstract(1);}
+ArrayIndexType	: '[' NUMBER Name ']'
+		{/*Stupid special case for [1D] indices*/
+			char *buf=new char[40];
+			sprintf(buf,"%sD",$2);
+			$$ = new NamedType(buf); 
+		}
+		| '[' Name ']'
+		{ $$ = new NamedType($2); }
+		;
+
+Array		: ARRAY ArrayIndexType NamedType OptBaseList MemberEList
+		{ $$ = new Array(lineno, $2, $3, $4, $5); }
 		;
 
 TChare		: CHARE Name OptBaseList MemberEList
-		{ $$ = new Chare(lineno, new NamedType($2), $3, $4); 
-                  if($4) $4->setChare($$);
-		  if($4 && $4->isPure()) $$->setAbstract(1);}
+		{ $$ = new Chare(lineno, new NamedType($2), $3, $4);}
 		| MAINCHARE Name OptBaseList MemberEList
-		{ $$ = new MainChare(lineno, new NamedType($2), $3, $4); 
-                  if($4) $4->setChare($$);
-		  if($4 && $4->isPure()) $$->setAbstract(1);}
+		{ $$ = new MainChare(lineno, new NamedType($2), $3, $4); }
 		;
 
 TGroup		: GROUP Name OptBaseList MemberEList
-		{ $$ = new Group(lineno, new NamedType($2), $3, $4); 
-                  if($4) $4->setChare($$);
-		  if($4 && $4->isPure()) $$->setAbstract(1);}
+		{ $$ = new Group(lineno, new NamedType($2), $3, $4); }
 		;
 
 TNodeGroup	: NODEGROUP Name OptBaseList MemberEList
-		{ $$ = new NodeGroup( lineno, new NamedType($2), $3, $4); 
-                  if($4) $4->setChare($$);
-		  if($4 && $4->isPure()) $$->setAbstract(1);}
+		{ $$ = new NodeGroup( lineno, new NamedType($2), $3, $4); }
 		;
 
-TArray		: ARRAY Name OptBaseList MemberEList
-		{ if(strcmp($2, "ArrayElement"))
-		    $3 = new TypeList(new NamedType("ArrayElement"), $3);
-		  $$ = new Array( lineno, new NamedType($2), $3, $4); 
-                  if($4) $4->setChare($$);
-		  if($4 && $4->isPure()) $$->setAbstract(1);}
+TArray		: ARRAY ArrayIndexType Name OptBaseList MemberEList
+		{ $$ = new Array( lineno, $2, new NamedType($3), $4, $5); }
 		;
 
 TMessage	: MESSAGE MAttribs Name ';'
