@@ -1707,6 +1707,7 @@ CkLocRec *CkLocMgr::elementNrec(const CkArrayIndex &idx) {
 #if !CMK_LBDB_ON
 //Empty versions of all load balancer calls
 void CkLocMgr::initLB(CkGroupID lbdbID_) {}
+void CkLocMgr::startInserting(void) {}
 void CkLocMgr::doneInserting(void) {}
 void CkLocMgr::dummyAtSync(void) {}
 #endif
