@@ -61,14 +61,7 @@ CkDDT::pup(PUP::er &p)
     if(types[i] != CkDDT_TYPE_NULL)
     {
       typeTable[i]->pupType(p, this);
-      if(p.isDeleting())
-        delete typeTable[i];
     }
-  }
-  if(p.isDeleting())
-  {
-    delete[] typeTable;
-    delete[] types;
   }
 }
 
@@ -116,6 +109,13 @@ CkDDT::freeType(int* index)
 
 CkDDT::~CkDDT()
 {
+  for(int i=0; i < max_types ; i++)
+  {
+    if(types[i] != CkDDT_TYPE_NULL)
+    {
+       delete typeTable[i];
+    }
+  }
   delete[] typeTable ;
   delete[] types;
 }
