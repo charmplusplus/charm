@@ -52,7 +52,7 @@ cleanlib:
 
 #================================================================
 
-parsers: cleanparsers t0 t1 t2
+parsers: cleanparsers t0 t1 t2 t3
 
 #Call Antlr to compile a .g file
 Antlr = java -classpath $(ADDIR) antlr.Tool
@@ -71,6 +71,11 @@ t1:
 
 #The second pass tree parser
 t2:
+	$(Antlr) java.tree2.g
+	$(CP) JavaTreeParser2.java JavaTreeParser2TokenTypes.java $(JAVADEST)
+#	$(javacA) JavaTreeParser2.java JavaTreeParser2TokenTypes.java
+
+t3:
 	$(Antlr) java.tree.g
 	$(CP) JavaTreeParser.java JavaTreeParserTokenTypes.java $(JAVADEST)
 #	$(javacA) JavaTreeParser.java JavaTreeParserTokenTypes.java
@@ -78,4 +83,5 @@ t2:
 cleanparsers:
 	rm -f JavaLexer.java JavaTokenTypes.java JavaTokenTypes.txt JavaRecognizer.java
 	rm -f JavaTreeParser1.java JavaTreeParser1TokenTypes.java JavaTreeParser1TokenTypes.txt
+	rm -f JavaTreeParser2.java JavaTreeParser2TokenTypes.java JavaTreeParser2TokenTypes.txt
 	rm -f JavaTreeParser.java JavaTreeParserTokenTypes.java JavaTreeParserTokenTypes.txt

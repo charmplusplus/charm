@@ -1,39 +1,13 @@
 header {
 //header
+package jade;
 }
 
 {
 //class preamble
-import JJ.*;
+import jade.JJ.ASTJ;
+import jade.JJ.J;
 import java.io.*;
-
-class C
-{
-    public static AST parseString(String s) {
-        String f = "<string>";
-        StringReader r = new StringReader(s);
-
-        // Create a scanner that reads from the input stream passed to us
-        JavaLexer lexer = new JavaLexer(r);
-        lexer.setFilename(f);
-
-        // Create a parser that reads from the scanner
-        JavaRecognizer parser = new JavaRecognizer(lexer);
-        parser.setFilename(f);
-        parser.setASTNodeClass("JJ.ASTJ");
-
-        // start parsing at the compoundStatement rule
-        try {
-            parser.compoundStatement();
-        }
-        catch (Exception e) {
-            System.err.println("parser exception: "+e);
-            e.printStackTrace();   // so we can get stack trace
-        }
-
-        return parser.getAST();
-    }
-}
 
 }
 
@@ -728,24 +702,6 @@ stat
 
 	|	#(	fo:"for"
             {
-                if (J.isMSAAccessAnywhere(fo)) {
-                    System.out.println("Found a loop which accesses an MSA");
-                    String s = "{ int i = 0; for (i=0; i<10; i++) ; }";
-                    AST ttt = C.parseString(s);
-                    System.out.println(ttt.toStringTree());
-                    System.out.println();
-
-//                     AST _e1 = #(#[LITERAL_for,"for"],
-//                             #(#[FOR_INIT,"FOR_INIT"], #[EXPR,"EXPR"]),
-//                             #[FOR_CONDITION,"FOR_CONDITION"],
-//                             #[FOR_ITERATOR,"FOR_ITERATOR"],
-//                             #[EXPR,"EXPR"]);
-//                     System.out.println(fo.toStringTree());
-//                     System.out.println();
-//                     System.out.println(_e1.toStringTree());
-//                     System.out.println(_e1.toStringList());
-//                     System.out.println();
-                }
                 J.c.append(J.indent() + "for(");
             }
 			#(f:FOR_INIT (variableDef[false,false] | e1:elist)?)

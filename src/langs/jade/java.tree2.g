@@ -1,15 +1,13 @@
 header {
 //header
-//Pass1:
-// build global syntax table
-// mark if class is a mainchare
+//Pass2:
+// strip-mine MSA for loops
 package jade;
 }
 
 {
 //class preamble
 import jade.JJ.J;
-import jade.JJ.ASTJ;
 }
 
 /** Java 1.3 AST Recognizer Grammar
@@ -18,10 +16,11 @@ import jade.JJ.ASTJ;
  * Author: J. DeSouza
  *
  */
-class JavaTreeParser1 extends TreeParser;
+class JavaTreeParser2 extends TreeParser;
 
 options {
 	importVocab = Java;
+    buildAST = true;
 }
 
 compilationUnit
@@ -43,13 +42,7 @@ importDefinition
 
 typeDefinition[AST parent]
 	:	#(c:CLASS_DEF modifiers IDENT { J.tmp.push(#IDENT.getText()); } extendsClause implementsClause
-            o:objBlock {
-                if ( ((ASTJ)o).hasMain() ) {
-                    ((ASTJ)c).status = true; // is a mainchare
-                    ((ASTJ)parent).status = true; // is a mainmodule
-                }
-            }
-        ) { J.tmp.pop(); }
+            o:objBlock) { J.tmp.pop(); }
 	|	#(INTERFACE_DEF modifiers IDENT extendsClause interfaceBlock )
 	;
 
@@ -112,7 +105,7 @@ implementsClause
 interfaceBlock
 	:	#(	OBJBLOCK
 			(	methodDecl
-			|	variableDef
+			|	variableDef[true]
 			)*
 		)
 	;
@@ -121,7 +114,7 @@ objBlock
 	:	#(	OBJBLOCK
 			(	ctorDef
 			|	methodDef
-			|	variableDef
+			|	variableDef[true]
 			|	typeDefinition[null]
 			|	#(STATIC_INIT slist)
 			|	#(INSTANCE_INIT slist)
@@ -130,41 +123,53 @@ objBlock
 	;
 
 ctorDef
-	:	#(CTOR_DEF modifiers methodHead {J.tmp.push("");} ctorSList {J.tmp.pop();})
+	:	#(CTOR_DEF modifiers
+            { J.startBlock(); }
+            methodHead
+            {J.tmp.push("");}
+            ctorSList
+            {
+                J.endBlock();
+                J.tmp.pop();
+            })
 	;
 
 methodDecl
-	:	#(METHOD_DEF modifiers typeSpec methodHead)
+	:	#(METHOD_DEF modifiers typeSpec { J.startBlock(); } methodHead { J.endBlock(); })
 	;
 
 methodDef
-	:	#(METHOD_DEF modifiers typeSpec mh:methodHead
+	:	#(METHOD_DEF modifiers typeSpec
+            { J.startBlock(); }
+            mh:methodHead
             {
-                J.globalStack.push(new String(J.fullName(mh.getText())));
-                J.globalStackShadow.push(#METHOD_DEF);
                 J.tmp.push(new String(mh.getText()));
             }
-            (slist)? { J.tmp.pop(); })
+            (slist)?
+            {
+                J.tmp.pop();
+                J.endBlock();
+            })
 	;
 
-variableDef
-	:	#(VARIABLE_DEF m:modifiers typeSpec 
-            v:variableDeclarator {
-                //System.out.println("pass1: " + v.getText() + J.tmp + "\n");
-                if (J.tmp.size() == 2) {
-                    J.globalStack.push(new String(J.fullName(v.getText())));
-                    J.globalStackShadow.push(#VARIABLE_DEF);
-                } else {
-                    // should print this only for public static final
-                    if ( ((ASTJ)m).isX("static") )
-                      J.warning(v, "static variable " + v.getText() + " not accessible outside class.");
+variableDef[boolean classVarq]
+	:	#(v:VARIABLE_DEF m:modifiers typeSpec 
+            vd:variableDeclarator
+            varInitializer
+            {
+                String varName = J.printVariableDeclarator(vd);
+                if (!classVarq){
+                    J.localStack.push(varName);
+                    J.localStackShadow.push(v);
                 }
-            }
-            varInitializer)
+            })
 	;
 
 parameterDef
-	:	#(PARAMETER_DEF modifiers typeSpec IDENT )
+	:	#(p:PARAMETER_DEF modifiers typeSpec i:IDENT {
+                    J.localStack.push(i.getText());
+                    J.localStackShadow.push(p);
+            })
 	;
 
 objectinitializer
@@ -217,12 +222,32 @@ slist
 	;
 
 stat:	typeDefinition[null]
-	|	variableDef
+	|	variableDef[false]
 	|	expression
 	|	#(LABELED_STAT IDENT stat)
 	|	#("if" expression stat (stat)? )
-	|	#(	"for"
-			#(FOR_INIT (variableDef | elist)?)
+	|	#(	fo:"for"
+            {
+                if (J.isMSAAccessAnywhere(fo)) {
+                    System.out.println("Found a loop which accesses an MSA");
+                    String s = "{ int i = 0; for (i=0; i<10; i++) ; }";
+                    AST ttt = J.parseString(s);
+                    System.out.println(ttt.toStringTree());
+                    System.out.println();
+
+//                     AST _e1 = #(#[LITERAL_for,"for"],
+//                             #(#[FOR_INIT,"FOR_INIT"], #[EXPR,"EXPR"]),
+//                             #[FOR_CONDITION,"FOR_CONDITION"],
+//                             #[FOR_ITERATOR,"FOR_ITERATOR"],
+//                             #[EXPR,"EXPR"]);
+//                     System.out.println(fo.toStringTree());
+//                     System.out.println();
+//                     System.out.println(_e1.toStringTree());
+//                     System.out.println(_e1.toStringList());
+//                     System.out.println();
+                }
+            }
+			#(FOR_INIT (variableDef[false] | elist)?)
 			#(FOR_CONDITION (expression)?)
 			#(FOR_ITERATOR (elist)?)
 			stat
@@ -236,7 +261,7 @@ stat:	typeDefinition[null]
 	|	#("throw" expression)
 	|	#("synchronized" expression stat)
 	|	tryBlock
-	|	slist // nested SLIST
+	|	{ J.startBlock(); } slist { J.endBlock(); } // nested SLIST
 	|	EMPTY_STAT
 	;
 
@@ -249,7 +274,7 @@ tryBlock
 	;
 
 handler
-	:	#( "catch" parameterDef slist )
+	:	#( "catch" { J.startBlock(); } parameterDef slist { J.endBlock(); } )
 	;
 
 elist

@@ -1,5 +1,11 @@
+header {
+// java.g header
+package jade;
+}
+
 {
-import JJ.*;
+// java.g class preamble
+import jade.JJ.*;
 }
 
 /** Java 1.3 Recognizer
@@ -1000,6 +1006,9 @@ constant
 //----------------------------------------------------------------------------
 // The Java scanner
 //----------------------------------------------------------------------------
+{
+// lexer preamble
+}
 class JavaLexer extends Lexer;
 
 options {
