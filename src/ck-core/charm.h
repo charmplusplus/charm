@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1998-03-02 14:58:04  jyelon
+ * Revision 2.2  1998-03-07 09:07:51  jyelon
+ * Added stdio.h --- this gets us NULL and size_t the right way.
+ *
+ * Revision 2.1  1998/03/02 14:58:04  jyelon
  * Forgot to check these in last time.
  *
  *
@@ -21,6 +24,7 @@
 #ifndef CHARM_H
 #define CHARM_H
 
+#include "stdio.h"
 #include "converse.h"
 
 /******************************************************************************
@@ -54,10 +58,6 @@
 #define TRACE(p) p
 #else
 #define TRACE(p)
-#endif
-
-#ifndef NULL
-#define NULL 0
 #endif
 
 #define CHARRED(x) ((char *) (x))
