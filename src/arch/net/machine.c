@@ -156,6 +156,15 @@ void *blk;
  *
  *****************************************************************************/
 
+static void writeall(int fd, char *buf, int size)
+{
+  int ok;
+  while (size) {
+    ok = write(fd, buf, size);
+    if (ok<=0) KillEveryone("write on tcp socket failed.");
+    size-=ok; buf+=ok;
+  }
+}
 
 static void zap_newline(s) char *s;
 {
@@ -549,7 +558,7 @@ char *cmd; unsigned int ip; unsigned int port; int sec;
   int fd;
   fd = skt_connect(ip, port, sec);
   if (fd<0) return -1;
-  write(fd, cmd, strlen(cmd));
+  writeall(fd, cmd, strlen(cmd));
   close(fd);
   return 0;  
 }
@@ -628,7 +637,7 @@ static void ctrl_sendone(va_alist) va_dcl
   vsprintf(buffer, f, p);
   fd = skt_connect(host_IP, host_port, delay);
   if (fd<0) KillEveryone("cannot contact host");
-  write(fd, buffer, strlen(buffer));
+  writeall(fd, buffer, strlen(buffer));
   shutdown(fd, 1);
   while (read(fd, buffer, 1023)>0);
   close(fd);
