@@ -23,7 +23,7 @@ OBJS = coarsen.o fm.o initpart.o match.o ccgraph.o \
 DEST=$(LIBDIR)/libmetis.a
 
 $(DEST): $(OBJS)
-	$(CC) -o $@ $(OBJS)
+	$(CC) $(CFLAGS) -o $@ $(OBJS)
 
 clean:
 	rm -f *.o 
