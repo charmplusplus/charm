@@ -238,6 +238,7 @@ static void CmiParseArgs(argv)
 char **argv;
 {
   CmiGetArgInt(argv,"++stacksize",&Cmi_stacksize);
+  Cmi_numpes=1;
   CmiGetArgInt(argv,"+p",&Cmi_numpes);
   if (CmiNumPes()<1) {
     printf("Error: must specify number of processors to simulate with +pXXX\n",CmiNumPes());
@@ -289,8 +290,8 @@ int usched, initret;
   CmiArgv = CmiCopyArgs(argv);
   CmiStart = fn;
   CmiUsched = usched;
-  CmiParseArgs(argv);
-  CthInit(argv);
+  CmiParseArgs(CmiArgv);
+  CthInit(CmiArgv);
   CpvInitialize(void*, CmiLocalQueue);
   CmiThreads = (CthThread *)CmiAlloc(CmiNumPes()*sizeof(CthThread));
   CmiBarred  = (int       *)CmiAlloc(CmiNumPes()*sizeof(int));
