@@ -39,5 +39,58 @@ extra="-N $nodes -n $pes "
 # Prepend path to executable
 args=`pwd`/"$args"
 
-echo "Running> prun $extra $args"
+if [ ! "$PBS_JOBID" = "" ]
+then
+# Running from a batch script: just use prun
+	echo "Charmrun running> prun $extra $args"
+	prun $extra $args	
+else
+# Interactive mode: create, and submit a batch job
+	script="charmrun_script.$$.sh"
+	output=`pwd`"charmrun_script.$$.stdout"
+	echo "Submitting batch job for> prun $extra $args"
+	echo " using the command> qsub $script"
+	cat > $script << EOF
+#!/bin/sh
+# This is a charmrun-generated PBS batch job script.
+# The lines starting with #PBS are queuing system flags:
+
+# This determines the number of nodes and pes (here $nodes and $pes):
+#PBS -l rmsnodes=$nodes:$pes
+
+# This determines the wall-clock time limit (here 5 minutes):
+#PBS -l walltime=5:00
+
+# This specifies we don't want e-mail info. on this job:
+#PBS -m n
+
+# This combines stdout and stderr into one file:
+#PBS -j oe
+
+# This specifies the file to write stdout information to:
+#PBS -o $output
+
+# This is the actual command to run the job:
 prun $extra $args
+EOF
+	chmod 755 $script
+	jobid=`qsub $script`
+	echo "Job enqueued under job ID $jobid"
+# Wait for the job to complete, by checking its status
+	while [ true ]
+	do
+		qstat $jobid > tmp.$$
+		if [ ! $? -eq 0 ]
+		then
+# The job is done-- print its output
+			cat $output
+			rm tmp.$$
+			exit 1
+		fi
+# The job is still queued or running-- print status and wait
+		tail -1 tmp.$$
+		rm tmp.$$
+		sleep 5
+	done
+fi
+
