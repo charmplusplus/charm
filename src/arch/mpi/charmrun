@@ -36,7 +36,11 @@ echo "Running on $pes processors: $args"
 if [ -n "$PBS_NODEFILE" ]
 then
   mpirun -np $pes $args
-elif [ -n "$PBS_QUEUE" ]
+elif [ -n "$LSB_HOSTS" ]
+then
+# Tungsten
+  cmpirun -lsf -poll -no_smp $args
+elif [ -n "$PBS_QUEUE" -o -n "$LSF_QUEUE" ]
 then
 # Interactive mode: create, and submit a batch job
         script="charmrun_script.$$.sh"
@@ -46,8 +50,10 @@ then
 	rm -f $result
         echo "Submitting batch job for> mpirun -np $pes $args"
         echo " using the command> qsub $script"
-	mpirun=`which mpirun`
 # Some machine specific 
+	USE_LSF=0
+	queue_stat=qstat
+	queue_qsub=qsub
 	hostname=`hostname`
 	case "$hostname" in
 	turing*.turing.uiuc.edu|tg-login*) 
@@ -58,11 +64,19 @@ then
 		mem='#PBS -l mem=500mb'
 		ncpus="#PBS -l ncpus=$pes"
 		;;
+	tun*)
+		USE_LSF=1
+		queue_stat=bjobs
+		queue_qsub=bsub
+		;;
 	*)
 		ncpus="#PBS -l ncpus=$pes"
 		;;
 	esac
-        cat > $script << EOF
+	if test $USE_LSF -eq 0
+	then
+	  mpirun=`which mpirun`
+          cat > $script << EOF
 #!/bin/sh
 # This is a charmrun-generated PBS batch job script.
 # The lines starting with #PBS are queuing system flags:
@@ -97,18 +111,40 @@ $mpirun -np $pes $extra $args
 status=\$?
 echo \$status > $result
 EOF
+	else
+#  use LSF
+          cat > $script << EOF
+#!/bin/sh
+# This is a charmrun-generated PBS batch job script.
+# The lines starting with #PBS are queuing system flags:
+
+#BSUB -J autobuild
+#BSUB -W 0:20
+#BSUB -n $pes
+# Filename for standard output (default = <job_name>.o<job_id>)
+#BSUB -o $output
+
+cd $indir
+echo \$LSB_MCPU_HOSTS
+cmpirun -lsf -poll -no_smp $args
+# Save mpirun exit status
+status=\$?
+echo \$status > $result
+EOF
+	fi
         chmod 755 $script
 	while [ -z "$jobid" ]
 	do
-          jobid=`qsub $script|tail -1`
+	  [ $USE_LSF = 0 ] && jobid=`$queue_qsub $script|tail -1`
+	  [ $USE_LSF = 1 ] && jobid=`$queue_qsub < $script|tail -1|sed -e 's/[^0-9]*//g'`
 	done
 	echo "Job enqueued under job ID $jobid"
 # Wait for the job to complete, by checking its status
         while [ true ]
         do
-                qstat $jobid > tmp.$$
+                $queue_stat $jobid > tmp.$$
 # Job ID does not exist now
-                if test $? -ne 0 -a -f $output
+                if test $? -ne 0 -o -f $output
                 then
 # The job is done-- print its output
                         rm tmp.$$
