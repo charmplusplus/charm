@@ -19,7 +19,7 @@ int topoAgent :: compare(const void *p,const void *q){
 		
 
 Agent::Elem* topoAgent :: my_preferred_procs(int *existing_map,int object,int *trialpes) {
-
+	int tp;   // tmp var
 	int *procs_list;
 	
 	//int *preferred_list;
@@ -29,8 +29,10 @@ Agent::Elem* topoAgent :: my_preferred_procs(int *existing_map,int object,int *t
 		preferred_list[i].Cost = 0;
 	}
 
-	if(trialpes == NULL)
+	if(trialpes == NULL) {
+		procs_list = &tp;
 		*procs_list = -1;
+	}
 	else
 		procs_list = trialpes;
 

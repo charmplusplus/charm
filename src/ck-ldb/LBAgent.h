@@ -45,23 +45,24 @@ public:
 	int **hopCount;
 //public:			
 	topoAgent(CentralLB::LDStats* lbDB,void* comlibDB,LBTopology *topology,int p): stats(lbDB), topo(topology), Agent(p){
+		int i;
 		stats->makeCommHash();
 		preferred_list = new Elem[p];
 		commObjs = new int*[stats->n_objs];
-		for(int i=0;i<stats->n_objs;i++){
+		for(i=0;i<stats->n_objs;i++){
 			commObjs[i] = new int[stats->n_objs];
 			for(int j=0;j<stats->n_objs;j++)
 				commObjs[i][j] = 0;
 		}
 
 		hopCount = new int*[npes];
-		for(int i=0;i<npes;i++){
+		for(i=0;i<npes;i++){
 			hopCount[i] = new int[npes];
 			for(int j=0;j<npes;j++)
 				hopCount[i][j] = 0;
 		}
 
-		for(int i=0;i<stats->n_comm;i++){
+		for(i=0;i<stats->n_comm;i++){
 			//DO I consider other comm too....i.e. to or from a processor
 			//CkPrintf("in loop..\n");
 			LDCommData &cdata = stats->commData[i];
