@@ -84,7 +84,9 @@ class er {
  private:
   er(const er &p);//You don't want to copy PUP::er's.
  protected:
-  er() {}//You don't want to create raw PUP::er's.
+  enum {IS_DELETING=8};
+  unsigned int PUP_er_state;
+  er() {PUP_er_state=0;}//You don't want to create raw PUP::er's.
  protected:
   //Generic bottleneck: pack/unpack n items of size itemSize 
   // and data type t from p.  Desc describes the data item
@@ -97,8 +99,18 @@ class er {
   virtual CmiBool isSizing(void) const;
   virtual CmiBool isPacking(void) const;//<- these all default to false
   virtual CmiBool isUnpacking(void) const;
-  virtual void *getBuf(int n) { return 0; }
 
+  //State maintainance
+  unsigned int setState(unsigned int newState=0) {
+	unsigned int oldState=PUP_er_state;
+	PUP_er_state=newState;
+	return oldState;
+  }
+
+  //This indicates that the pup routine should free memory during packing.
+  void becomeDeleting(void) {PUP_er_state|=IS_DELETING;}
+  CmiBool isDeleting(void) const {return PUP_er_state&IS_DELETING;}
+  
 //For single elements, pretend it's an array containing one element
   void operator()(signed char &v,const char *desc=NULL)     {(*this)(&v,1,desc);}
   void operator()(char &v,const char *desc=NULL)            {(*this)(&v,1,desc);}
@@ -191,12 +203,6 @@ class toMem : public packer {
  public:
   //Write data to the given buffer
   toMem(void *Nbuf) {buf=(myByte *)Nbuf;}
-  virtual void *getBuf(int n)
-  {
-    void *ret = (void*) buf; 
-    buf += n; 
-    return ret;
-  }
 };
 
 //For unpacking from a memory buffer

@@ -28,6 +28,8 @@ C_CALLABLE int pup_isUnpacking(const pup_er p)
   { return (mp.isUnpacking())?1:0;}
 C_CALLABLE int pup_isSizing(const pup_er p)
   { return (mp.isSizing())?1:0;}
+C_CALLABLE int pup_isDeleting(const pup_er p)
+  { return (mp.isDeleting())?1:0;}
 
 #if CMK_FORTRAN_USES_ALLCAPS
 C_CALLABLE int PUP_ISPACKING(const pup_er p)
@@ -36,6 +38,8 @@ C_CALLABLE int PUP_ISUNPACKING(const pup_er p)
   { return (mp.isUnpacking())?1:0;}
 C_CALLABLE int PUP_ISSIZING(const pup_er p)
   { return (mp.isSizing())?1:0;}
+C_CALLABLE int PUP_ISDELETING(const pup_er p)
+  { return (mp.isDeleting())?1:0;}
 
 #else
 C_CALLABLE int pup_ispacking_(const pup_er p)
@@ -44,6 +48,8 @@ C_CALLABLE int pup_isunpacking_(const pup_er p)
   { return (mp.isUnpacking())?1:0;}
 C_CALLABLE int pup_issizing_(const pup_er p)
   { return (mp.isSizing())?1:0;}
+C_CALLABLE int pup_isdeleting_(const pup_er p)
+  { return (mp.isDeleting())?1:0;}
 
 #endif
 
