@@ -13,9 +13,11 @@
 
 */
 
+#if !defined(_WIN32) || defined(__CYGWIN__)
 #include <netinet/tcp.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#endif
 
 #define NO_NAGLE_ALG		1
 #define FRAGMENTATION		0
@@ -476,8 +478,10 @@ static void open_tcp_sockets()
     ok = skt_recvN(skt, &pe, sizeof(int));
     if (ok<0) KillEveryoneCode(98246556);
     nodes[pe].sock = skt;
+#if !defined(_WIN32) || defined(__CYGWIN__)
     if ((val = fcntl(skt, F_GETFL, 0)) < 0) KillEveryoneCode(98246557);
     if (fcntl(skt, F_SETFL, val|O_NONBLOCK) < 0) KillEveryoneCode(98246558);
+#endif
   }
   for (pe=mype+1; pe<numpes; pe++) {
     skt = skt_connect(nodes[pe].IP, nodes[pe].dataport, 300);
@@ -489,8 +493,10 @@ static void open_tcp_sockets()
     ok = skt_sendN(skt, &mype, sizeof(int));
     if (ok<0) KillEveryoneCode(98246556);
     nodes[pe].sock = skt;
+#if !defined(_WIN32) || defined(__CYGWIN__)
     if ((val = fcntl(skt, F_GETFL, 0)) < 0) KillEveryoneCode(98246557);
     if (fcntl(skt, F_SETFL, val|O_NONBLOCK) < 0) KillEveryoneCode(98246558);
+#endif
   }
 }
 
