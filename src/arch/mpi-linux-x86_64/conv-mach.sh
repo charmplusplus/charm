@@ -24,6 +24,7 @@ CMK_NATIVE_LIBS=""
 CMK_CF77="f77"
 CMK_CF90="f90"
 CMK_F90LIBS="-L/usr/absoft/lib -L/opt/absoft/lib -lf90math -lfio -lU77 -lf77math "
+CMK_F77LIBS="-lg2c "
 CMK_MOD_NAME_ALLCAPS=1
 CMK_MOD_EXT="mod"
 CMK_F90_USE_MODDIR=1
