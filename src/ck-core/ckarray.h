@@ -81,43 +81,34 @@ public:
 
 //This class is as large as any CkArrayIndex
 class CkArrayIndexMax : public CkArrayIndex {
-	 void copyFrom(const CkArrayIndex &that)
-	 {
-		  nInts=that.nInts;
-		  for (int i=0;i<nInts;i++) index[i]=that.data()[i];
-	 }
+	struct {
+		int data[CK_ARRAYINDEX_MAXLEN];
+	} index;
 public:
-	int index[CK_ARRAYINDEX_MAXLEN];
-	CkArrayIndexMax() {}
-	CkArrayIndexMax(const CkArrayIndex &that) {copyFrom(that);}
 	CkArrayIndexMax &operator=(const CkArrayIndex &that) 
-	  {copyFrom(that);return *this;}
+	{
+		nInts=that.nInts;
+		index=((const CkArrayIndexMax *)&that)->index;
+		//for (int i=0;i<nInts;i++) index[i]=that.data()[i];
+		return *this;
+	}
+};
+
+class CkArrayIndexStruct {
+public:
+	int nInts;
+	int index[CK_ARRAYINDEX_MAXLEN];
 };
 
 /*********************** Array Messages ************************/
-//This is a superclass of all the messages which contain array indices.
-class CkArrayIndexMsg
-{
+class CkArrayMessage {
 public:
-  CkArrayIndexMax index; //Message's destination array index
-};
-
-class CkArrayMessage:public CkArrayIndexMsg  {
-public:
-  union {
-	struct {
-		//Used for regular messages:
-		short entryIndex;//Destination entry method
-		short fromPE;//Original sender
-		unsigned char hopCount;//number of hops since
-	} msg;
-	struct {
-		//Used for creation/migration messages:
-		short ctorIndex;//Entry index of array constructor
-		short chareType;//Kind of chare to create
-		short fromPE;//the source PE (for migrators)
-  	} create;
-  } type;
+  //These routines are implementation utilities
+  CkArrayIndexMax &array_index(void);
+  unsigned short &array_ep(void);
+  unsigned char &array_hops(void);
+  unsigned int array_getSrcPe(void);
+  void array_setSrcPe(void);
   
   //This allows us to delete bare CkArrayMessages
   void operator delete(void *p){CkFreeMsg(p);}
@@ -171,13 +162,13 @@ public:
 	CProxy_CkArrayBase() {}
 	CProxy_CkArrayBase(const CkArrayID &aid) {_aid=aid._aid;_idx.nInts=-1;}
 	CProxy_CkArrayBase(const CkArrayID &aid,const CkArrayIndex &idx)
-		:_idx(idx) {_aid=aid._aid;}
+		{_aid=aid._aid;_idx=idx;}
 
 	//Create 1D initial elements
-	void base_insert1D(int ctorIndex,int chareType,int numElements,CkArrayMessage *m=NULL);
+	void base_insert1D(int ctorIndex,int numElements,CkArrayMessage *m=NULL);
 protected:
-	void base_insert(int ctorIndex,int chareType,int onPE,CkArrayMessage *m=NULL);
-	void base_insert(int ctorIndex,int chareType,int onPE,const CkArrayIndex &idx,CkArrayMessage *m=NULL);
+	void base_insert(int ctorIndex,int onPE,CkArrayMessage *m=NULL);
+	void base_insert(int ctorIndex,int onPE,const CkArrayIndex &idx,CkArrayMessage *m=NULL);
 	
 //Messaging:
 	void base_send(CkArrayMessage *msg, int entryIndex) const;
@@ -312,7 +303,6 @@ class CkArray : public CkReductionMgr {
 	friend class CkArrayRec_local;
 	friend class CkArrayRec_remote;
 	friend class CkArrayRec_buffering;
-	friend class CkArrayRec_buffering_migrated;
 public:
 //Array Creation:
   static  CkGroupID CreateArray(CkGroupID mapID,int numInitial=0);
@@ -467,7 +457,7 @@ public:
 //Message: Remove the array element at the given index.
 class CkArrayRemoveMsg : public CMessage_CkArrayRemoveMsg 
 {public:
-	CkArrayRemoveMsg(const CkArrayIndex &idx) {index=idx;}
+	CkArrayRemoveMsg(const CkArrayIndex &idx) {array_index()=idx;}
 };
 
 //Message: Direct future messages for this array element to this PE.
