@@ -49,6 +49,9 @@ public:
 };
 
 //////////////////////// Array Reduction Library //////////////
+#define CK_ARRAY_REDUCTIONS 1
+#ifdef CK_ARRAY_REDUCTIONS
+
 class ArrayReductionMessage;//See definition at end of file
 
 //An ArrayReductionFn is used to combine the contributions
@@ -64,7 +67,7 @@ typedef ArrayReductionMessage *(*ArrayReductionFn)(int nMsg,ArrayReductionMessag
 //  data gives the reduced contributions of all array elements.  
 //       It will be disposed of by the Array BOC when this procedure returns.
 typedef void (*ArrayReductionClientFn)(void *param,int dataSize,void *data);
-
+#endif //CK_ARRAY_REDUCTIONS
 
 
 class ArrayElement : public Chare
@@ -153,10 +156,14 @@ public:
   ArrayElement *getElement(int idx) { return elementIDs[idx].element; }
   void DummyAtSync(void);
 
+#ifdef CK_ARRAY_REDUCTIONS
   //Register a function to be called once the reduction is complete--
   //  need only be called on PE 0 (but is harmless otherwise).
+#define CkRegisterArrayReductionHandler(aid,handler,param) \
+      (aid)._array->registerReductionHandler(handler,param)
   void registerReductionHandler(ArrayReductionClientFn handler,void *param);
   void RecvReductionMessage(ArrayReductionMessage *msg);
+#endif
 
 #if CMK_LBDB_ON
   static void staticMigrate(LDObjHandle _h, int _dest);
@@ -225,6 +232,7 @@ private:
   PtrQ *bufferedForElement;
   PtrQ *bufferedMigrated; 
  
+#ifdef CK_ARRAY_REDUCTIONS
 // Array Reduction Implementation:
 	ArrayReductionClientFn reductionClient;//Will be called when reduction is complete
 	void *reductionClientParam;//Parameter to pass to reduction client
@@ -255,6 +263,7 @@ private:
 	int expectedLocalMessages(void);//How many messages do we still need from locals?
 	void tryEndReduction(void);//Check if we're done, and if so, finish.
 	void endReduction(void);//Combine msgs array and send off, set finished flag
+#endif //CK_ARRAY_REDUCTIONS
 };
 
 #include "CkArray.decl.h"
@@ -365,6 +374,7 @@ public:
   int dummy;
 };
 
+#ifdef CK_ARRAY_REDUCTIONS
 //An ArrayReductionMessage is sent up the reduction tree-- it
 // carries the contribution of one 
 // (or reduced contributions of several) array elements.
@@ -402,6 +412,63 @@ public:
   static void *pack(ArrayReductionMessage *);
   static ArrayReductionMessage *unpack(void *in);
 };
+
+//Reduction Library:
+/*
+A small library of oft-used reductions for use with the 
+Array Reduction Manager.
+
+Parallel Programming Lab, University of Illinois at Urbana-Champaign
+Orion Sky Lawlor, 11/13/1999, olawlor@acm.org
+
+*/
+
+//Compute the sum the integers passed by each element.
+ArrayReductionMessage *CkReduction_sum_int(int nMsg,ArrayReductionMessage **msg);
+
+//Compute the logical AND of the integers passed by each element.
+// The resulting integer will be zero if any source integer is zero.
+ArrayReductionMessage *CkReduction_and(int nMsg,ArrayReductionMessage **msg);
+
+//Compute the logical OR of the integers passed by each element.
+// The resulting integer will be 1 if any source integer is nonzero.
+ArrayReductionMessage *CkReduction_or(int nMsg,ArrayReductionMessage **msg);
+
+//Compute the largest integer passed by any element.
+ArrayReductionMessage *CkReduction_max_int(int nMsg,ArrayReductionMessage **msg);
+
+//Compute the smallest integer passed by any element.
+ArrayReductionMessage *CkReduction_min_int(int nMsg,ArrayReductionMessage **msg);
+
+
+//Compute the sum the doubles passed by each element.
+ArrayReductionMessage *CkReduction_sum_double(int nMsg,ArrayReductionMessage **msg);
+
+//Compute the largest double passed by any element.
+ArrayReductionMessage *CkReduction_max_double(int nMsg,ArrayReductionMessage **msg);
+
+//Compute the smallest double passed by any element.
+ArrayReductionMessage *CkReduction_min_double(int nMsg,ArrayReductionMessage **msg);
+
+
+//This structure contains the contribution of one array element.
+typedef struct {
+	int sourceElement;//The element number from which this contribution came
+	int dataSize;//The length of the data array below
+	char data[1];//The (dataSize-long) array of data
+} CkReduction_set_element;
+
+//Combine the data passed by each element into an list of reduction_set_elements.
+// Each element may contribute arbitrary data (with arbitrary length).
+ArrayReductionMessage *CkReduction_set(int nMsg,ArrayReductionMessage **msg);
+
+//Utility routine: get the next reduction_set_element in the list
+// if there is one, or return NULL if there are none.
+//To get all the elements, just keep feeding this procedure's output back to
+// its input until it returns NULL.
+CkReduction_set_element *CkReduction_set_element_next(CkReduction_set_element *cur);
+
+#endif //CK_ARRAY_REDUCTIONS
 
 
 #endif

@@ -76,6 +76,7 @@ Array1D::Array1D(ArrayCreateMessage *msg)
   elementConstType = msg->elementConstType;
   elementMigrateType = msg->elementMigrateType;
 
+#ifdef CK_ARRAY_REDUCTIONS
 //Set reduction state variables
   nFuture=0;reductionClient=NULL;
   reductionNo=0;//We'll claim we were just doing reduction number zero...
@@ -83,6 +84,7 @@ Array1D::Array1D(ArrayCreateMessage *msg)
   curReducer=NULL;
   curMsgs=NULL;
   curMax=nCur=nComposite=expectedComposite=0;
+#endif
 
 #if CMK_LBDB_ON
   the_lbdb = CProxy_LBDatabase(msg->loadbalancer).ckLocalBranch();
@@ -369,8 +371,10 @@ void Array1D::migrateMe(int index, int where)
 
   CProxy_Array1D arr(thisgroup);
   arr.RecvMigratedElement(msg, where);
-  
+
+#ifdef CK_ARRAY_REDUCTIONS
   tryEndReduction();//This may have been the guy we were waiting on...
+#endif
 }
 
 void Array1D::RecvMigratedElement(ArrayMigrateMessage *msg)
@@ -745,9 +749,13 @@ void RRMap::registerArray(ArrayMapRegisterMessage *msg)
   array->RecvMapID(this, hdl);
 }
 
+#ifdef CK_ARRAY_REDUCTIONS
 /////////////////////////////////////////////////////////////////////////////
 /////////////////////// Array Reduction Implementation //////////////////////
 // Orion Sky Lawlor, olawlor@acm.org, 11/15/1999
+
+#include "ckarray_reductions.C" //Include reduction implementations
+
 
 //Debugging defines-- set this to 1 for tons of (useless?) debugging output.
 #define GIVE_DEBUGGING_OUTPUT 0
@@ -1024,3 +1032,6 @@ ArrayReductionMessage::unpack(void *in)
 	ret->data=(void *)(ARM_DATASTART+(char *)ret);
 	return ret;
 }
+
+#endif //CK_ARRAY_REDUCTIONS
+
