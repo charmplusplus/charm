@@ -18,7 +18,7 @@ generalized by Orion Lawlor November 2001.
 #include "converse.h"
 #include "memory-isomalloc.h"
 
-/*#define CMK_THREADS_DEBUG 1*/
+/* #define CMK_THREADS_DEBUG 1 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -273,7 +273,7 @@ map_slots(int slot, int nslots)
   pa = mmap(addr, slotsize*nslots, 
             PROT_READ|PROT_WRITE, 
 #if CMK_HAS_MMAP_ANON
-	    MAP_PRIVATE|MAP_ANONYMOUS,-1,
+	    MAP_PRIVATE|MAP_ANON,-1,
 #else
 	    MAP_PRIVATE|MAP_FIXED,CpvAccess(zerofd),
 #endif
@@ -320,7 +320,9 @@ unmap_slots(int slot, int nslots)
 static void 
 init_map(char **argv)
 {
-#if ! CMK_HAS_MMAP_ANON
+#if CMK_HAS_MMAP_ANON
+  /*Don't need /dev/zero*/
+#else
   CpvInitialize(int, zerofd);  
   CpvAccess(zerofd) = open("/dev/zero", O_RDWR);
   if(CpvAccess(zerofd)<0)
@@ -711,7 +713,7 @@ int CmiIsomallocInRange(void *addr)
 void CmiIsomallocInit(char **argv)
 {
   init_comm(argv);
-  init_ranges(argv);
   init_map(argv);
+  init_ranges(argv);
 }
 
