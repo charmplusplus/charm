@@ -664,7 +664,8 @@ static void CmiSendSelf(char *msg)
 #if CMK_IMMEDIATE_MSG
     if (CmiIsImmediate(msg)) {
       /* CmiBecomeNonImmediate(msg); */
-      CmiHandleImmediateMessage(msg);
+      CmiPushImmediateMsg(msg);
+      CmiHandleImmediate();
       return;
     }
 #endif
@@ -995,8 +996,10 @@ void CmiFreeBroadcastAllFn(int size, char *msg)  /* All including me */
 static void CmiSendNodeSelf(char *msg)
 {
 #if CMK_IMMEDIATE_MSG
-    if (CmiIsImmediate(msg)) {
-      CmiHandleImmediateMessage(msg);
+    if (CmiIsImmediate(msg) && !_immRunning) {
+      /*CmiHandleImmediateMessage(msg); */
+      CmiPushImmediateMsg(msg);
+      CmiHandleImmediate();
       return;
     }
 #endif
