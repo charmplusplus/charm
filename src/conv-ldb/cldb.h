@@ -4,7 +4,6 @@
 #define MAXMSGBFRSIZE 100000
 
 CpvExtern(int, CldHandlerIndex);
-CpvExtern(int, CldPEBitVector);
 CpvExtern(int, CldBalanceHandlerIndex);
 
 CpvExtern(int, CldRelocatedMessages);
@@ -13,4 +12,4 @@ CpvExtern(int, CldMessageChunks);
 CpvExtern(int, CldLoadNotify);
 
 void CldMultipleSend(int pe, int numToSend);
-void CldSetPEBitVector(int);
+void CldSetPEBitVector(unsigned int);
