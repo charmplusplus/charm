@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.5  1995-10-23 22:37:48  jyelon
+ * Revision 2.6  1995-10-25 19:56:05  jyelon
+ * Changed CmiSyncSendFn --> CmiSyncSend
+ *
+ * Revision 2.5  1995/10/23  22:37:48  jyelon
  * Removed references to Ck, again.
  *
  * Revision 2.4  1995/10/18  22:22:15  jyelon
@@ -160,5 +163,5 @@ char * msg;
     /* node 0 cannot be a leaf of a spanning tree: it is the root */
     for (node = 1; node < numnodes; node++)
     if (SpanArray[node].noofchildren == 0)  /* it is a leaf */
-        CmiSyncSendFn(node, size, msg);
+        CmiSyncSend(node, size, msg);
 }

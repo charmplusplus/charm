@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.2  1995-10-19 18:18:24  jyelon
+ * Revision 1.3  1995-10-25 19:56:05  jyelon
+ * Changed CmiSyncSendFn --> CmiSyncSend
+ *
+ * Revision 1.2  1995/10/19  18:18:24  jyelon
  * added "converse.h"
  *
  * Revision 1.1  1995/09/30  15:00:00  jyelon
@@ -87,6 +90,6 @@ char * msg;
 
     for (node = (CmiNumPe() - 2) / MAXSPAN;   /* integer division */
 	 node < CmiNumPe(); node++)
-        CmiSyncSendFn(node, size, msg);
+        CmiSyncSend(node, size, msg);
 }
 

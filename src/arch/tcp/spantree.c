@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.4  1995-10-19 18:18:24  jyelon
+ * Revision 2.5  1995-10-25 19:56:05  jyelon
+ * Changed CmiSyncSendFn --> CmiSyncSend
+ *
+ * Revision 2.4  1995/10/19  18:18:24  jyelon
  * added "converse.h"
  *
  * Revision 2.3  1995/09/29  09:50:07  jyelon
@@ -87,7 +90,7 @@ CmiSendToSpanTreeLeaves(size, msg) int size; char * msg; {
 
     for (node = (CmiNumPe() - 2) / MAXSPAN;   /* integer division */
 	 node < CmiNumPe(); node++)
-	CmiSyncSendFn(node,size,msg);
+	CmiSyncSend(node,size,msg);
 }
 
 
