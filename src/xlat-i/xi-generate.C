@@ -13,7 +13,7 @@ extern Module *thismodule ;
 int moduleHasMain = 0;
 
 void GenerateStructsFns(ofstream& top, ofstream& bot) ;
-void GenerateRegisterCalls(ofstream& top, ofstream& bot) ;
+void GenerateRegisterCalls(ofstream& bot) ;
 void GenerateProxies(ofstream& top, ofstream& bot);
 
 
@@ -72,45 +72,39 @@ void Generate(char *interfacefile)
   spew(bot, CIBotIfndef, thismodule->name);
 
   GenerateStructsFns(top, bot) ;
-  GenerateRegisterCalls(top, bot) ;
+  GenerateRegisterCalls(bot) ;
   GenerateProxies(top, bot);
 
   spew(top, CIEndif);
   spew(bot, CIEndif);
 }
 
+static const char *CIBotConsEP = // charename, msgname
+"  new (obj) \1((\2 *)m);\n"
+;
 
-void commonStuff(ofstream& top, ofstream& bot, Chare *c, Entry *e)
+static const char *CIBotRetEP = // charname, epname, msgname, retmsgname
+"  ENVELOPE *env = ENVELOPE_UPTR(m);\n"
+"  int i = GetEnv_ref(env);\n"
+"  int j = GetEnv_pe(env);\n"
+"  \4 *m2 = ((\1 *)obj)->\2((\3 *)m);\n"
+"  SetRefNumber((void*) m2, i);\n"
+"  CSendToFuture((void*) m2, j);\n"
+;
+
+static const char *CIBotRegularEP = // charename, epname, msgname
+"  ((\1 *)obj)->\2((\3 *)m);\n"
+;
+
+
+void commonStuff(ofstream& bot, Chare *c, Entry *e)
 {
-  char str[2048] ;
-
-  /* This is the constructor EP */
-  if ( strcmp(c->name, e->name) == 0 ) {
-
-    if (e->isMessage())
-      sprintf(str,"\tnew (obj) %s((%s *)m) ;",
-	      c->name, e->msgtype->name) ;
-    else
-      sprintf(str,"\tnew (obj) %s() ;", c->name);
-
-    bot << str << endl ;
-
-    // ERROR if isReturnMsg()
-
+  if ( strcmp(c->name, e->name) == 0 ) { // constructor EP
+    spew(bot, CIBotConsEP, c->name, e->msgtype->name);
   } else if (e->isReturnMsg()){ // Returns a message
-    bot << "ENVELOPE *env = ENVELOPE_UPTR(m);" << endl;
-    bot << "\tint i = GetEnv_ref(env);" << endl;
-    bot << "\tint j = GetEnv_pe(env);" << endl;
-    sprintf(str, "\t%s *m2 = ((%s *)obj)->%s((%s *)m);",
-      e->returnMsg->name, c->name, e->name, e->msgtype->name);
-    bot << str << endl ;
-    bot << "\tSetRefNumber( (void*) m2, i);" << endl;
-    bot << "\tCSendToFuture( (void*) m2, j);" << endl;
-
+    spew(bot, CIBotRetEP, c->name,e->name,e->msgtype->name,e->returnMsg->name);
   } else { // Regular EP
-    sprintf(str,"\t((%s *)obj)->%s((%s *)m) ;",
-      c->name,e->name,e->msgtype->name) ;
-    bot << str << endl ;
+    spew(bot, CIBotRegularEP, c->name, e->name, e->msgtype->name);
   }
 }
 
@@ -252,9 +246,46 @@ static const char *CIBotToROMCopy = // readonlyMsgName
 static const char *CIBotToROEnd =
 "}\n"
 ;
+
+static const char *CIBotCallThreadedEP1 = // charename, epname, msgname
+"void _CK_call_threaded_\1_\2_\3(void *velt)\n"
+"{\n"
+"  _CI_Element_struct *elt = (_CI_Element_struct *) velt;\n"
+"  void *obj = elt->obj;\n"
+"  void *m = elt->m;\n"
+"  CpvAccess(currentChareBlock) = elt->chareblock;\n"
+;
+
+static const char *CIBotCallThreadedEP2 = // charename, epname, msgname, stacksz
+"  CmiFree(elt);\n"
+"  CthFree(CthSelf());\n"
+"  CthSuspend();\n"
+"}\n"
+"void _CK_call_\1_\2_\3(void *m, void *obj)\n"
+"{\n"
+"  CthThread t;\n"
+"  _CI_Element_struct *element = \n"
+"      (_CI_Element_struct *) CmiAlloc(sizeof(_CI_Element_struct));\n"
+"  element->m = m;\n"
+"  element->obj = obj;\n"
+"  element->chareblock = CpvAccess(currentChareBlock);\n"
+"  t = CthCreate( (CthVoidFn)_CK_call_threaded_\1_\2_\3,(void *)element,\4);\n"
+"  CthSetStrategyDefault(t);\n"
+"  CthAwaken(t);\n"
+"}\n"
+;
+
+static const char *CIBotCallEP1 = // charename, epname, msgname
+"void _CK_call_\1_\2_\3(void *m, void *obj)\n"
+"{\n"
+;
+
+static const char *CIBotCallEP2 =
+"}\n"
+;
+
 void GenerateStructsFns(ofstream& top, ofstream& bot)
 {
-  char str[2048] ;
   Chare *c; 
   Entry *e;
 
@@ -278,8 +309,6 @@ void GenerateStructsFns(ofstream& top, ofstream& bot)
     }
   }
 
-
-
   /* Output EP stub functions. Note : we assume main::main always
      has argc-argv. */
   for ( c=thismodule->chares; c!=0; c=c->next ) {
@@ -292,76 +321,18 @@ void GenerateStructsFns(ofstream& top, ofstream& bot)
       }
       // If this is a threaded EP
       if (e->isThreaded()){
-        if(e->isMessage()) {
-          sprintf(str,"void _CK_call_threaded_%s_%s_%s(void *velt)",
-            c->name,e->name,e->msgtype->name);
-        } else {
-          sprintf(str,"void _CK_call_threaded_%s_%s(void *velt)",
-            c->name,e->name);
-        }
-        bot << str << endl ;
-        bot << "{" << endl ;
-        bot << "\t_CI_Element_struct *elt = (_CI_Element_struct *) velt;" << endl;
-        bot << "\tvoid *obj = elt->obj;" << endl;
-        bot << "\tvoid *m = elt->m;" << endl;
-        bot << "\tCpvAccess(currentChareBlock) = elt->chareblock;" << endl;
-
-        commonStuff(top, bot, c, e);
-
-        bot << "\tCmiFree(elt);" << endl;
-        bot << "\tCthFree(CthSelf());" << endl;
-        bot << "\tCthSuspend();" << endl;
-        bot << "}" << endl ;
-
-        if(e->isMessage()) {
-          sprintf(str,"void _CK_call_%s_%s_%s(void *m, void *obj)",
-            c->name,e->name,e->msgtype->name);
-        } else {
-          sprintf(str,"void _CK_call_%s_%s(void *m, void *obj)",
-            c->name,e->name);
-        }
-        bot << str << endl ;
-        bot << "{" << endl ;
-        bot << "\tCthThread t;" << endl;
-        bot << "\t_CI_Element_struct *element = (_CI_Element_struct *) CmiAlloc(sizeof(_CI_Element_struct));" ;
-	bot << endl;
-        bot << "\telement->m = m;\n\telement->obj = obj;" << endl;
-        bot << "\telement->chareblock = CpvAccess(currentChareBlock) ;"
-            << endl;
-
-        if(e->isMessage()) {
-          sprintf(str,
-            "\tt = CthCreate( (CthVoidFn) _CK_call_threaded_%s_%s_%s, (void *) element,%d);",
-            c->name,e->name,e->msgtype->name,e->get_stackSize()) ;
-        } else {
-          sprintf(str,
-            "\tt = CthCreate( (CthVoidFn) _CK_call_threaded_%s_%s, (void *) element,%d);",
-            c->name,e->name,e->get_stackSize()) ;
-        }
-        bot << str << endl;
-        bot << "\tCthSetStrategyDefault(t);" << endl;
-        bot << "\tCthAwaken(t);" << endl;
-
-        bot << "}" << endl ;
-
+        spew(bot, CIBotCallThreadedEP1, c->name, e->name, e->msgtype->name);
+        commonStuff(bot, c, e);
+        char str[16];
+        sprintf(str, "%d", e->get_stackSize());
+        spew(bot, CIBotCallThreadedEP2, c->name, e->name, e->msgtype->name,str);
       } else { // NOT threaded
-        if(e->isMessage()) {
-          sprintf(str,"void _CK_call_%s_%s_%s(void *m, void *obj)",
-            c->name,e->name,e->msgtype->name);
-        } else {
-          sprintf(str,"void _CK_call_%s_%s(void *m, void *obj)",
-            c->name,e->name);
-        }
-        bot << str << endl ;
-        bot << "{" << endl ;
-
-        commonStuff(top, bot, c, e);
-
-        bot << "}" << endl ;
+        spew(bot, CIBotCallEP1, c->name, e->name, e->msgtype->name);
+        commonStuff(bot, c, e);
+        spew(bot, CIBotCallEP2);
       }
-
-    } // endfor e =
-  } // endfor c =
+    }
+  }
 
 
   ReadOnly *r;
@@ -454,84 +425,78 @@ static const char *CIBotRegisterRO = // moduleName
 "                                 (FUNCTION_PTR)&_CK_\1_CopyToBuffer);\n"
 ;
 
-/* now register readonlies and readonli messages */
-void GenerateRegisterCalls(ofstream& top, ofstream& bot)
-{
-  char str[2048] ;
+static const char *CIBotRegisterPackedMsg = // msgname
+"  _CK_msg_\1 = registerMsg(\"\1\", (FUNCTION_PTR)&GenericCkAlloc,\n"
+"    (FUNCTION_PTR)&_CK_pack_\1, (FUNCTION_PTR)&_CK_unpack_\1,\n"
+"    (FUNCTION_PTR) &_CK_coerce_\1, sizeof(\1));\n"
+;
 
+static const char *CIBotRegisterVarsizeMsg = //msgname
+"  _CK_msg_\1 = registerMsg(\"\1\", (FUNCTION_PTR)&_CK_alloc_\1,\n"
+"    (FUNCTION_PTR)&_CK_pack_\1, (FUNCTION_PTR)&_CK_unpack_\1,\n"
+"    (FUNCTION_PTR) &_CK_coerce_\1, sizeof(\1));\n"
+;
+
+static const char *CIBotRegisterMsg = // msgname
+"  _CK_msg_\1 = registerMsg(\"\1\", (FUNCTION_PTR)&GenericCkAlloc,\n"
+"0, 0, (FUNCTION_PTR) &_CK_coerce_\1, sizeof(\1));\n"
+;
+
+
+static const char *CIBotRegisterChare = // charename
+"  _CK_chare_\1 = registerChare(\"\1\", sizeof(\1), 0);\n"
+;
+
+static const char *CIBotRegisterMainMain =
+"  _CK_ep_main_main=registerEp(\"main\",(FUNCTION_PTR)&_CK_call_main_main,1,\n"
+"    0, _CK_chare_main);\n"
+;
+
+static const char *CIBotRegisterChareEP = //charename, epname, msgname
+"  _CK_ep_\1_\2_\3 = registerEp(\"\2\", (FUNCTION_PTR)&_CK_call_\1_\2_\3, 1,\n"
+"    _CK_msg_\3, _CK_chare_\1);\n"
+;
+
+static const char *CIBotRegisterBocEP = //bocname, epname, msgname
+"  _CK_ep_\1_\2_\3=registerBocEp(\"\2\",(FUNCTION_PTR)&_CK_call_\1_\2_\3, 1,\n"
+"    _CK_msg_\3, _CK_chare_\1);\n"
+;
+
+/* now register readonlies and readonli messages */
+void GenerateRegisterCalls(ofstream& bot)
+{
   spew(bot, CIBotRegisterStart, thismodule->name);
 
 /* first register all messages */
   for ( Message *m=thismodule->messages; m!=0; m=m->next ) {
-    if( m->allocked)
-      sprintf(str,
-        "_CK_msg_%s = registerMsg(\"%s\", (FUNCTION_PTR)&_CK_alloc_%s, ",
-        m->name, m->name, m->name) ;
-    else
-      sprintf(str,
-        "_CK_msg_%s = registerMsg(\"%s\", (FUNCTION_PTR)&GenericCkAlloc, ",
-        m->name, m->name) ;
-    bot << str ;
-
-    if ( !m->packable ) 
-      sprintf(str,"0, 0, ") ; 
-    else 
-      sprintf(str,
-        "(FUNCTION_PTR)&_CK_pack_%s, (FUNCTION_PTR)&_CK_unpack_%s, ",
-        m->name, m->name) ;
-    bot << str ;
-
-    sprintf(str,"(FUNCTION_PTR) &_CK_coerce_%s, sizeof(%s)) ;\n\n",
-                m->name, m->name) ;
-    bot << str ;
+    if( m->allocked) {
+      spew(bot, CIBotRegisterVarsizeMsg, m->name);
+      continue;
+    } else if (!m->packable)  {
+      spew(bot, CIBotRegisterMsg, m->name);
+      continue;
+    } else {
+      spew(bot, CIBotRegisterPackedMsg, m->name);
+    }
   }
-  sprintf(str,"\n\n") ;
-
 
 /* now register all chares and BOCs and their EPs */
-  for ( Chare *chare=thismodule->chares; chare!=0; chare=chare->next )
-  {
-    sprintf(str,"_CK_chare_%s = registerChare(\"%s\", sizeof(%s), 0) ;\n\n",
-      chare->name,chare->name,chare->name) ;
-    bot << str ;
-
+  for ( Chare *chare=thismodule->chares; chare!=0; chare=chare->next ) {
+    spew(bot, CIBotRegisterChare, chare->name);
     for  ( Entry *ep=chare->entries; ep!=0; ep=ep->next ) {
-
-      if ( chare->chareboc == CHARE ) {
-        if(ep->isMessage()) {
-          sprintf(str,
-           "_CK_ep_%s_%s_%s = registerEp(\"%s\", (FUNCTION_PTR)&_CK_call_%s_%s_%s, 1,",
-           chare->name, ep->name, ep->msgtype->name, ep->name, chare->name,ep->name,ep->msgtype->name) ;
-        } else {
-          sprintf(str,
-           "_CK_ep_%s_%s = registerEp(\"%s\", (FUNCTION_PTR)&_CK_call_%s_%s, 1,",
-           chare->name, ep->name, ep->name, chare->name,ep->name) ;
-        }
+      if(strcmp(chare->name, "main")==0 && strcmp(ep->name, "main")==0) {
+        spew(bot, CIBotRegisterMainMain);
+        continue;
+      } else if(chare->chareboc == CHARE) {
+        spew(bot, CIBotRegisterChareEP, chare->name, ep->name, 
+             ep->msgtype->name);
+        continue;
       } else {
-       if(ep->isMessage()) {
-         sprintf(str,
-         "_CK_ep_%s_%s_%s = registerBocEp(\"%s\", (FUNCTION_PTR)&_CK_call_%s_%s_%s, 1,",
-           chare->name, ep->name, ep->msgtype->name, ep->name, chare->name,ep->name, ep->msgtype->name) ;
-       } else {
-         sprintf(str,
-         "_CK_ep_%s_%s = registerBocEp(\"%s\", (FUNCTION_PTR)&_CK_call_%s_%s, 1,",
-           chare->name, ep->name, ep->name, chare->name,ep->name) ;
-       }
+        spew(bot, CIBotRegisterBocEP, chare->name, ep->name, ep->msgtype->name);
+        continue;
       }
-
-      bot << str ;
-
-      if ( strcmp(chare->name,"main")==0 && strcmp(ep->name,"main")==0 ) 
-        sprintf(str,"0, _CK_chare_%s) ;\n\n",chare->name) ;
-      else if (ep->isMessage())
-        sprintf(str,"_CK_msg_%s, _CK_chare_%s) ;\n\n",
-          ep->msgtype->name, chare->name) ;
-      else
-        sprintf(str,"0, _CK_chare_%s) ;\n\n", chare->name) ;
-      bot << str ;
-    } // end for ep =
-  } // end for chare =
-  bot << "\n\n" ;
+    }
+  }
 
   if (moduleHasMain)
     spew(bot, CIBotRegisterMainChare);
