@@ -1,13 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
-#ifndef _MPIF_H
-#define _MPIF_H
-
   integer, parameter :: AMPI_COMM_WORLD=0
   integer, parameter :: AMPI_STATUS_SIZE=3
 
@@ -32,5 +22,3 @@
   integer, parameter :: AMPI_MIN=2
   integer, parameter :: AMPI_SUM=3
   integer, parameter :: AMPI_PROD=4
-
-#endif

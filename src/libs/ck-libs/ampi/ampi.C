@@ -11,7 +11,7 @@
 
 #if AMPI_FORTRAN
 #include "ampimain.decl.h"
-extern "C" void main_(int, char **);
+extern "C" void ampimain_(int, char **);
 #endif
 // FIXME: find good names for these user-provided functions
 extern "C" void get_size_(int *, int *, int *, int *);
@@ -191,7 +191,7 @@ ampi::run(ArgsInfo *msg)
   CtvInitialize(int, numMigrateCalls);
   CtvAccess(numMigrateCalls) = 0;
 
-  main_(msg->argc, msg->argv);
+  ampimain_(msg->argc, msg->argv);
 
   CProxy_ampimain mp(mainhandle);
   mp.done();
