@@ -8,7 +8,7 @@
 #include "ck.h"
 #include "trace.h"
 
-#define  DEBUGF(x)   // CmiPrintf x;
+#define  DEBUGF(x)    // CmiPrintf x;
 
 UChar _defaultQueueing = CK_QUEUEING_FIFO;
 
@@ -392,7 +392,9 @@ void CkExit(void)
     CmiSyncSendAndFree(0, env->getTotalsize(), (char *)env);
   }
   // if CkExit is called inside main(), it will hang here.
+#if defined(__BLUEGENE__) && CMK_BLUEGENE_NODE
   if (_mainDone == 1) CsdScheduler(-1);
+#endif
 }
 
 static void _nullFn(void *, void *)
@@ -567,14 +569,20 @@ void _initCharm(int argc, char **argv)
 }
 
 #ifdef __BLUEGENE__
-void BgEmulatorInit(int argc, char **argv)
-{
-}
 
+#if  CMK_BLUEGENE_THREAD
+void BgEmulatorInit(int argc, char **argv) 
+{
+  BgSetWorkerThreadStart(_initCharm);
+}
+void BgNodeStart(int argc, char **argv) {}
+#else
+void BgEmulatorInit(int argc, char **argv) {}
 void BgNodeStart(int argc, char **argv)
 {
   _initCharm(argc, argv);
 }
+#endif
 #endif
 
 // this is needed because on o2k, f90 programs have to have main in
