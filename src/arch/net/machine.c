@@ -1112,9 +1112,29 @@ void CmiNodeBarrier(void)
 #define CmiGetStateN(n) (Cmi_state_vector+(n))
 
 static CmiNodeLock comm_mutex;
+
 #define CmiCommLockOrElse(x) /*empty*/
-#define CmiCommLock() CmiLock(comm_mutex)
-#define CmiCommUnlock() CmiUnlock(comm_mutex)
+
+#if 1
+/*Regular comm. lock*/
+#  define CmiCommLock() CmiLock(comm_mutex)
+#  define CmiCommUnlock() CmiUnlock(comm_mutex)
+#else
+/*Verbose debugging comm. lock*/
+static int comm_mutex_isLocked=0;
+void CmiCommLock(void) {
+	if (comm_mutex_isLocked) 
+		CmiAbort("CommLock: already locked!\n");
+	CmiLock(comm_mutex);
+	comm_mutex_isLocked=1;
+}
+void CmiCommUnlock(void) {
+	if (!comm_mutex_isLocked)
+		CmiAbort("CommUnlock: double unlock!\n");
+	comm_mutex_isLocked=0;
+	CmiUnlock(comm_mutex);
+}
+#endif
 
 static void comm_thread(void)
 {
@@ -1386,18 +1406,14 @@ static void InternalPrintf(f, l) char *f; va_list l;
   ChMessage replymsg;
   char *buffer = CpvAccess(internal_printf_buffer);
   vsprintf(buffer, f, l);
-  if (Cmi_charmrun_fd!=-1) {
-    if(Cmi_syncprint) {
+  if(Cmi_syncprint) {
   	  ctrl_sendone_locking("printsync", buffer,strlen(buffer)+1,NULL,0);
-      CmiCommLock();
+	  CmiCommLock();
   	  ChMessage_recv(Cmi_charmrun_fd,&replymsg);
   	  ChMessage_free(&replymsg);
-      CmiCommUnlock();
-    } else {
-  	  ctrl_sendone_locking("print", buffer,strlen(buffer)+1,NULL,0);
-    }
+	  CmiCommUnlock();
   } else {
-  	fprintf(stdout,"%s",buffer);
+  	  ctrl_sendone_locking("print", buffer,strlen(buffer)+1,NULL,0);
   }
 }
 
@@ -1406,18 +1422,14 @@ static void InternalError(f, l) char *f; va_list l;
   ChMessage replymsg;
   char *buffer = CpvAccess(internal_printf_buffer);
   vsprintf(buffer, f, l);
-  if (Cmi_charmrun_fd!=-1) {
-    if(Cmi_syncprint) {
+  if(Cmi_syncprint) {
   	  ctrl_sendone_locking("printerrsync", buffer,strlen(buffer)+1,NULL,0);
-      CmiCommLock();
+	  CmiCommLock();
   	  ChMessage_recv(Cmi_charmrun_fd,&replymsg);
   	  ChMessage_free(&replymsg);
-      CmiCommUnlock();
-    } else {
-  	  ctrl_sendone_locking("printerr", buffer,strlen(buffer)+1,NULL,0);
-    }
+	  CmiCommUnlock();
   } else {
-  	fprintf(stderr,"%s",buffer);
+  	  ctrl_sendone_locking("printerr", buffer,strlen(buffer)+1,NULL,0);
   }
 }
 
@@ -1439,24 +1451,17 @@ static int InternalScanf(fmt, l)
   if (nargs > 18) KillEveryone("CmiScanf only does 18 args.\n");
   for (i=0; i<nargs; i++) ptr[i]=va_arg(l, char *);
   CmiLock(Cmi_scanf_mutex);
-  if (Cmi_charmrun_fd!=-1)
-  {/*Send charmrun the format string*/
-  	ctrl_sendone_locking("scanf", fmt, strlen(fmt)+1,NULL,0);
-  	/*Wait for the reply (characters to scan) from charmrun*/
-  	CmiCommLock();
-  	ChMessage_recv(Cmi_charmrun_fd,&replymsg);
-  	i = sscanf((char*)replymsg.data, fmt,
-		     ptr[ 0], ptr[ 1], ptr[ 2], ptr[ 3], ptr[ 4], ptr[ 5],
-		     ptr[ 6], ptr[ 7], ptr[ 8], ptr[ 9], ptr[10], ptr[11],
-		     ptr[12], ptr[13], ptr[14], ptr[15], ptr[16], ptr[17]);
-  	ChMessage_free(&replymsg);
-  	CmiCommUnlock();
-  } else 
-  {/*Just do the scanf normally*/
-  	i=scanf(fmt, ptr[ 0], ptr[ 1], ptr[ 2], ptr[ 3], ptr[ 4], ptr[ 5],
-		     ptr[ 6], ptr[ 7], ptr[ 8], ptr[ 9], ptr[10], ptr[11],
-		     ptr[12], ptr[13], ptr[14], ptr[15], ptr[16], ptr[17]);
-  }
+  /*Send charmrun the format string*/
+  ctrl_sendone_locking("scanf", fmt, strlen(fmt)+1,NULL,0);
+  /*Wait for the reply (characters to scan) from charmrun*/
+  CmiCommLock();
+  ChMessage_recv(Cmi_charmrun_fd,&replymsg);
+  i = sscanf((char*)replymsg.data, fmt,
+	     ptr[ 0], ptr[ 1], ptr[ 2], ptr[ 3], ptr[ 4], ptr[ 5],
+	     ptr[ 6], ptr[ 7], ptr[ 8], ptr[ 9], ptr[10], ptr[11],
+	     ptr[12], ptr[13], ptr[14], ptr[15], ptr[16], ptr[17]);
+  ChMessage_free(&replymsg);
+  CmiCommUnlock();
   CmiUnlock(Cmi_scanf_mutex);
   return i;
 }
@@ -1465,21 +1470,30 @@ static int InternalScanf(fmt, l)
 void CmiPrintf(const char *fmt, ...)
 {
   va_list p; va_start(p, fmt);
-  InternalPrintf(fmt, p);
+  if (Cmi_charmrun_fd!=-1)
+    InternalPrintf(fmt, p);
+  else
+    vfprintf(stdout,fmt,p);
   va_end(p);
 }
 
 void CmiError(const char *fmt, ...)
 {
   va_list p; va_start (p, fmt);
-  InternalError(fmt, p);
+  if (Cmi_charmrun_fd!=-1)
+    InternalError(fmt, p);
+  else
+    vfprintf(stderr,fmt,p);
   va_end(p);
 }
 
 int CmiScanf(const char *fmt, ...)
 {
   va_list p; int i; va_start(p, fmt);
-  i = InternalScanf(fmt, p);
+  if (Cmi_charmrun_fd!=-1)
+    i=InternalScanf(fmt, p);
+  else
+    i=vscanf(fmt,p);
   va_end(p);
   return i;
 }
@@ -2026,11 +2040,11 @@ static void ConverseRunPE(int everReturn)
     i.it_value.tv_sec = 1;
     i.it_value.tv_usec = 0;
     setitimer(ITIMER_REAL, &i, NULL);
-#endif
-    
+
     /*Occasionally check for retransmissions, outgoing acks, etc.*/
     CcdCallFnAfter(CommunicationsClockCaller,NULL,Cmi_comm_clock_delay);
-
+#endif
+    
     /*Initialize the clock*/
     Cmi_clock=GetClock();
   }
