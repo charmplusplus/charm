@@ -761,6 +761,68 @@ double CmiCpuTimer()
 
 #endif
 
+#if CMK_TIMER_USE_BLUEGENEL
+
+#include <rts.h>
+
+/*
+#define SPRN_TBRL 0x10C  // Time Base Read Lower Register (user & sup R/O)
+#define SPRN_TBRU 0x10D  // Time Base Read Upper Register (user & sup R/O)
+#define SPRN_PIR  0x11E  // CPU id
+
+static inline unsigned long long BGLTimebase(void)
+{
+  unsigned volatile u1, u2, lo;
+  union
+  {
+    struct { unsigned hi, lo; } w;
+    unsigned long long d;
+  } result;
+                                                                                
+  do {
+    asm volatile ("mfspr %0,%1" : "=r" (u1) : "i" (SPRN_TBRU));
+    asm volatile ("mfspr %0,%1" : "=r" (lo) : "i" (SPRN_TBRL));
+    asm volatile ("mfspr %0,%1" : "=r" (u2) : "i" (SPRN_TBRU));
+  } while (u1!=u2);
+                                                                                
+  result.w.lo = lo;
+  result.w.hi = u2;
+  return result.d;
+}
+*/
+
+static long inittime_wallclock;
+CpvStaticDeclare(double, clocktick);
+
+void CmiTimerInit()
+{
+  CpvInitialize(double, clocktick);
+  BGLPersonality dst;
+  int size = sizeof(BGLPersonality);
+  rts_get_personality(&dst, size);
+  CpvAccess(clocktick) = 1.0 / dst.clockHz;
+  inittime_wallclock = rts_get_timebase();
+}
+
+double CmiWallTimer()
+{
+  long currenttime;
+  currenttime = rts_get_timebase();
+  return (currenttime-inittime_wallclock)*CpvAccess(clocktick);
+}
+
+double CmiCpuTimer()
+{
+  return CmiWallTimer();
+}
+
+double CmiTimer()
+{
+	return CmiCpuTimer();
+}
+
+#endif
+
 #if CMK_TIMER_USE_WIN32API
 
 CpvStaticDeclare(double, inittime_wallclock);
