@@ -42,6 +42,8 @@
 
 static gm_alarm_t gmalarm;
 
+/*#define CMK_USE_CHECKSUM*/
+
 /******************************************************************************
  *
  *  GM layer network statistics collection
@@ -66,7 +68,7 @@ static int   maxQueueLength = 0;	/* maximum send queue length */
 
 
 /* max length of pending messages */
-#define MAXPENDINGSEND  200
+#define MAXPENDINGSEND  300
 
 typedef struct PendingMsgStruct
 {
@@ -346,18 +348,40 @@ static void processMessage(char *msg, int len)
   char *newmsg;
   int rank, srcpe, seqno, magic, i;
   int size;
+  unsigned char checksum;
   
   if (len >= DGRAM_HEADER_SIZE) {
     DgramHeaderBreak(msg, rank, srcpe, magic, seqno);
-    if (magic == (Cmi_charmrun_pid&DGRAM_MAGIC_MASK)) {
+#ifdef CMK_USE_CHECKSUM
+    checksum = computeCheckSum(msg, len);
+    if (checksum == 0)
+#else
+    if (magic == (Cmi_charmrun_pid&DGRAM_MAGIC_MASK))
+#endif
+    {
       OtherNode node = nodes_by_pe[srcpe];
+      /* check seqno */
+      if (seqno == node->recv_expect) {
+	node->recv_expect = ((seqno+1)&DGRAM_SEQNO_MASK);
+      }
+      else if (seqno < node->recv_expect) {
+        CmiPrintf("[%d] Warning: Past packet received from PE %d, something wrong with GM hardware? (expecting: %d seqno: %d)\n", CmiMyPe(), srcpe, node->recv_expect, seqno);
+	CmiPrintf("\n\n\t\t[%d] packet ignored!\n\n");
+	return;
+      }
+      else {
+         CmiPrintf("[%d] Error detected - Packet out of order from PE %d, something wrong with GM hardware? (expecting: %d got: %d)\n", CmiMyPe(), srcpe, node->recv_expect, seqno);
+         CmiAbort("\n\n\t\tPacket out of order!!\n\n");
+      }
       newmsg = node->asm_msg;
       if (newmsg == 0) {
         size = CmiMsgHeaderGetLength(msg);
         newmsg = (char *)CmiAlloc(size);
-        if (!newmsg)
-          fprintf(stderr, "%d: Out of mem\n", _Cmi_mynode);
-        if (size < len) KillEveryoneCode(4559312);
+  	_MEMCHECK(newmsg);
+        if (len > size) {
+         CmiPrintf("size: %d, len:%d.\n", size, len);
+         CmiAbort("\n\n\t\tLength mismatch!!\n\n");
+        }
         memcpy(newmsg, msg, len);
         node->asm_rank = rank;
         node->asm_total = size;
@@ -365,11 +389,13 @@ static void processMessage(char *msg, int len)
         node->asm_msg = newmsg;
       } else {
         size = len - DGRAM_HEADER_SIZE;
+        if (node->asm_fill+size > node->asm_total) {
+         CmiPrintf("asm_total: %d, asm_fill: %d, len:%d.\n", node->asm_total, node->asm_fill, len);
+         CmiAbort("\n\n\t\tLength mismatch!!\n\n");
+        }
         memcpy(newmsg + node->asm_fill, msg+DGRAM_HEADER_SIZE, size);
         node->asm_fill += size;
       }
-      if (node->asm_fill > node->asm_total)
-         CmiAbort("\n\n\t\tLength mismatch!!\n\n");
       if (node->asm_fill == node->asm_total) {
         if (rank == DGRAM_BROADCAST) {
           for (i=1; i<_Cmi_mynodesize; i++)
@@ -388,11 +414,18 @@ static void processMessage(char *msg, int len)
       }
     } 
     else {
-      CmiPrintf("[%d] message ignored1: magic not agree:%d != %d!\n", CmiMyPe(), magic, Cmi_charmrun_pid&DGRAM_MAGIC_MASK);
-      CmiPrintf("recv: rank:%d src:%d mag:%d\n", rank, srcpe, magic);
+#ifdef CMK_USE_CHECKSUM
+      CmiPrintf("[%d] message ignored: checksum (%d) not 0!\n", CmiMyPe(), checksum);
+#else
+      CmiPrintf("[%d] message ignored: magic not agree:%d != %d!\n", CmiMyPe(), magic, Cmi_charmrun_pid&DGRAM_MAGIC_MASK);
+#endif
+      CmiPrintf("recved: rank:%d src:%d mag:%d seqno:%d len:%d\n", rank, srcpe, magic, seqno, len);
     }
   } 
-  else CmiPrintf("message ignored2!\n");
+  else {
+      CmiPrintf("[%d] message ignored: size is too small: %d!\n", CmiMyPe(), len);
+      CmiPrintf("[%d] possible size: %d\n", CmiMsgHeaderGetLength(msg));
+  }
 }
 
 /* return 1 - recv'ed  0 - no msg */
@@ -443,6 +476,7 @@ void send_callback(struct gm_port *p, void *context, gm_status_t status)
 {
   PendingMsg out = (PendingMsg)context;
   void *msg = out->msg;
+  unsigned char cksum;
 
   if (status != GM_SUCCESS) { 
     int srcpe, seqno, magic;
@@ -489,6 +523,18 @@ void send_callback(struct gm_port *p, void *context, gm_status_t status)
 #endif
     }
   }
+
+#ifdef CMK_USE_CHECKSUM
+/*
+  {
+  cksum = computeCheckSum((unsigned char*)msg, out->length);
+  if (cksum != 0) {
+    CmiPrintf("[%d] Message altered during send, checksum (%d) does not agree!\n", CmiMyPe(), cksum);
+    CmiAbort("Myrinet error was detected!\n");
+  }
+  }
+*/
+#endif
 
 #if !CMK_MSGPOOL
   gm_dma_free(gmport, msg);
@@ -550,7 +596,7 @@ void EnqueueOutgoingDgram
         (OutgoingMsg ogm, char *ptr, int dlen, OtherNode node, int rank)
 {
   char *buf;
-  int size, len;
+  int size, len, seqno;
   int alloclen, allocSize;
 
 /* CmiPrintf("DeliverViaNetwork: size:%d\n", size); */
@@ -567,8 +613,16 @@ void EnqueueOutgoingDgram
 #endif
   _MEMCHECK(buf);
 
-  DgramHeaderMake(buf, rank, ogm->src, Cmi_charmrun_pid, node->send_next);
+  seqno = node->send_next;
+  DgramHeaderMake(buf, rank, ogm->src, Cmi_charmrun_pid, seqno);
+  node->send_next = ((seqno+1)&DGRAM_SEQNO_MASK);
   memcpy(buf+DGRAM_HEADER_SIZE, ptr, dlen);
+#ifdef CMK_USE_CHECKSUM
+  {
+  DgramHeader *head = (DgramHeader *)buf;
+  head->magic ^= computeCheckSum(buf, len);
+  }
+#endif
   size = gm_min_size_for_length(len);
 
   /* if queue is not empty, enqueue msg. this is to guarantee the order */
@@ -781,7 +835,7 @@ void CmiMachineInit(char **argv)
   maxsize = gm_min_size_for_length(4096);
   Cmi_dgram_max_data = 4096 - DGRAM_HEADER_SIZE;
 */
-  maxsize = 18;
+  maxsize = 16;
   CmiGetArgIntDesc(argv,"+gm_maxsize",&maxsize,"maximum packet size in rank (2^maxsize)");
 
 #if GM_STATS
@@ -789,7 +843,7 @@ void CmiMachineInit(char **argv)
   for (i=0; i<maxsize; i++) gm_stats[i] = 0;
 #endif
 
-  for (i=1; i<maxsize; i++) {
+  for (i=1; i<=maxsize; i++) {
     int len = gm_max_length_for_size(i);
     int num = 2;
 
@@ -797,7 +851,8 @@ void CmiMachineInit(char **argv)
 
     if (i<5) num = 0;
     else if (i<7)  num = 4;
-    else if (i<17)  num = 20;
+    else if (i<13)  num = 20;
+    else if (i<17)  num = 10;
     else if (i>22) num = 1;
     for (j=0; j<num; j++) {
       buf = gm_dma_malloc(gmport, len);
@@ -807,7 +862,7 @@ void CmiMachineInit(char **argv)
   }
   Cmi_dgram_max_data = maxMsgSize - DGRAM_HEADER_SIZE;
 
-  status = gm_set_acceptable_sizes (gmport, GM_LOW_PRIORITY, (1<<(maxsize))-1);
+  status = gm_set_acceptable_sizes (gmport, GM_LOW_PRIORITY, (1<<(maxsize+1))-1);
 
   gm_free_send_tokens (gmport, GM_LOW_PRIORITY,
                        gm_num_send_tokens (gmport));
