@@ -28,7 +28,7 @@
 # To compile a version of Converse, SUPER_INSTALL performs the following
 # actions:
 #
-#    * Create directory $VERSION and its subdirectories.
+#    * Create directory $VERSION and $VERSION/tmp.
 #
 #    * Copy all source files from src/Common          to $VERSION/tmp
 #    * Copy all source files from src/Common.$GROUP   to $VERSION/tmp
@@ -36,12 +36,8 @@
 #
 #    * Perform "make $PROGRAM" in $VERSION/tmp
 #
-#    * Copy the results to $VERSION/bin, $VERSION/lib, $VERSION/include.
-#
-#    * Rebuild central "bin" directory.
-#
 # That's all SUPER_INSTALL does.  The rest is handled by the Makefile.
-# 
+#
 
 set PROGRAM=$1
 set VERSION=$2
@@ -97,34 +93,9 @@ install:
        cd ../..
     endif
 
-    if (( $OPERATION == install ) || ( $OPERATION == all )) then
-      echo "Copying libconv-*   from $VERSION/tmp to $VERSION/lib"
-      find $VERSION/tmp -type f -name "libconv-*"   -exec cp {} $VERSION/lib \;
-      echo "Copying libck?-*    from $VERSION/tmp to $VERSION/lib"
-      find $VERSION/tmp -type f -name "libck?-*"    -exec cp {} $VERSION/lib \;
-      echo "Copying libcharm.a  from $VERSION/tmp to $VERSION/lib"
-      find $VERSION/tmp -type f -name "libcharm.a"  -exec cp {} $VERSION/lib \;
-      echo "Copying *.h         from $VERSION/tmp to $VERSION/include"
-      find $VERSION/tmp -name "*.h"       -exec cp {} $VERSION/include \;
-      echo "Copying *.int       from $VERSION/tmp to $VERSION/include"
-      find $VERSION/tmp -name "*.int"     -exec cp {} $VERSION/include \;
-      echo "Copying conv-*.mk   from $VERSION/tmp to $VERSION/include"
-      find $VERSION/tmp -name "conv-*.mk" -exec cp {} $VERSION/include \;
-      echo "Copying conv-*.sh   from $VERSION/tmp to $VERSION/include"
-      find $VERSION/tmp -name "conv-*.sh" -exec cp {} $VERSION/include \;
-      echo "Copying conv-*.csh  from $VERSION/tmp to $VERSION/include"
-      find $VERSION/tmp -name "conv-*.csh" -exec cp {} $VERSION/include \;
-      echo "Copying conv*       from $VERSION/tmp to $VERSION/bin"
-      find $VERSION/tmp -type f -name "conv*" -perm -500 -exec cp {} $VERSION/bin \;
-      echo "Copying charm*      from $VERSION/tmp to $VERSION/bin"
-      find $VERSION/tmp -type f -name "charm*" -perm -500 -exec cp {} $VERSION/bin \;
-      echo "Copying charmc      from $VERSION/tmp to $VERSION/bin"
-      cp $VERSION/tmp/charmc $VERSION/bin/charmc
-
-      echo "Relinking central bin directory."
-      rm -f bin 
-      ln -s $VERSION/bin bin
-    endif
+    echo "Relinking central bin directory."
+    rm -f bin 
+    ln -s $VERSION/bin bin
 
     exit
 
