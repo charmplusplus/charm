@@ -124,9 +124,9 @@ void * ImageList::pack(const liveVizRequest *req)
 	memcpy(ptr+sizeof(unsigned),req,sizeof(liveVizRequest));
 
 	byte * headptr = ptr + sizeof(unsigned)+sizeof(liveVizRequest);
-	byte * imageptr = headptr + m_nodeCount*sizeof(CkRect);
+	byte * imageptr = headptr + m_nodeCount*sizeof(Rect);
 
-	CkRect rect;
+	Rect rect;
 	ImageNode *temp = m_list;
 
 	while(temp != NULL)
@@ -136,11 +136,11 @@ void * ImageList::pack(const liveVizRequest *req)
 		rect.t = temp->m_img->m_ulc.y;
 		rect.b = temp->m_img->m_lrc.y;
 
-		memcpy(headptr, &rect, sizeof(CkRect));
+		memcpy(headptr, &rect, sizeof(Rect));
 
 		temp->m_img->copyImageData(imageptr, m_bytesPerPixel);
 
-		headptr += sizeof(CkRect);
+		headptr += sizeof(Rect);
 		imageptr += temp->m_img->getImageSize(m_bytesPerPixel);
 		temp = temp->m_next;
 	}
@@ -162,15 +162,15 @@ liveVizRequest* ImageList::unPack(void *ptr)
 	memcpy(req,(byte*)ptr + sizeof(unsigned), sizeof(liveVizRequest));
 
 	byte * headptr = (byte*)ptr + sizeof(unsigned) + sizeof(liveVizRequest);
-	byte * imageptr = headptr + sizeof(CkRect)*nodeCount;
+	byte * imageptr = headptr + sizeof(Rect)*nodeCount;
 
-	CkRect rect;
+	Rect rect;
 	Image *temp = NULL;
 	unsigned imageSize;
 
 	for(int i=0; i<nodeCount; i++)
 	{
-		memcpy(&rect, headptr, sizeof(CkRect));
+		memcpy(&rect, headptr, sizeof(Rect));
 
 		temp = new Image(rect, NULL);
 
@@ -183,7 +183,7 @@ liveVizRequest* ImageList::unPack(void *ptr)
 
 		add(temp, *req);
 
-		headptr += sizeof(CkRect);
+		headptr += sizeof(Rect);
 		imageptr += imageSize;
 	}
 	//CkPrintf("Exiting ImageList::unPack(), nodeCount = %d \n", nodeCount);
@@ -201,7 +201,7 @@ unsigned ImageList::packedDataSize()
 		temp = temp->m_next;
 	}
 
-	return(size + m_nodeCount*sizeof(CkRect) + sizeof(unsigned) + sizeof(liveVizRequest));
+	return(size + m_nodeCount*sizeof(Rect) + sizeof(unsigned) + sizeof(liveVizRequest));
 
 }
 

@@ -2,7 +2,6 @@
 #define _IMAGE
 
 #include "ckimage.h"
-#include "point.h"
 #include "defines.h"
 
 class Image
@@ -14,7 +13,7 @@ class Image
 
 		// Constructor Methods
 		Image(Point ulc, Point lrc, byte * imgData);
-		Image(CkRect rect, byte * imgData);
+		Image(Rect rect, byte * imgData);
 		Image();
 
 		// Destructor Method
