@@ -2510,7 +2510,8 @@ int MPI_Pack_size(int incount,MPI_Datatype datatype,MPI_Comm comm,int *sz)
 CDECL
 int MPI_Get_processor_name(char *name, int *resultlen){
   AMPIAPI("MPI_Get_processor_name");
-  sprintf(name,"AMPI VP#%d\n",getAmpiParent()->thisIndex);
+  ampiParent *ptr = getAmpiParent();
+  sprintf(name,"AMPI_VP[%d]_PE[%d]\n",ptr->thisIndex,ptr->getMyPe());
   *resultlen = strlen(name);
   return 0;
 }

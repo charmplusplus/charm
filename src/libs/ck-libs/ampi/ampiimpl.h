@@ -742,7 +742,9 @@ public:
     inline ComlibInstanceHandle getComlib(void) {
     	return comlib;
     }
-
+    inline int getMyPe(void){
+        return CkMyPe();
+    }
     inline int hasWorld(void) const {
         return worldPtr!=NULL;
     }
