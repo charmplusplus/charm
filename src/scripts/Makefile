@@ -98,8 +98,10 @@ CVHEADERS=cpthreads.h converse.h conv-mach.h conv-mach.sh \
 	  CommLB.decl.h Comm1LB.decl.h  \
 	  ampi.decl.h ampimain.decl.h
 
+# The .c files are there to be #included by clients whole
+# This is a bit unusual, but makes client linking simpler.
 UTILHEADERS=pup.h pup_c.h ckhashtable.h \
-	sockRoutines.h
+	sockRoutines.h sockRoutines.c
 
 CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
       ckfutures.h ckarray.h ckreduction.h $(UTILHEADERS) \
