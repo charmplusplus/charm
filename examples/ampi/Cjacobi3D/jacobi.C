@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 #include "mpi.h"
 
 #if CMK_BLUEGENE_CHARM
@@ -9,9 +10,11 @@ extern void BgPrintf(char *);
 #define BGPRINTF(x)
 #endif
 
+#ifndef DIMX
 #define DIMX 100
 #define DIMY 100
 #define DIMZ 100
+#endif
 
 int NX, NY, NZ;
 
@@ -112,7 +115,9 @@ int main(int ac, char** av)
   double error, tval, maxerr, tmpmaxerr, starttime, endtime, itertime;
   chunk *cp;
   int thisIndex, ierr, nblocks;
-
+  double *times;
+  double avgtime = 1.0;
+  
   MPI_Init(&ac, &av);
   MPI_Comm_rank(MPI_COMM_WORLD, &thisIndex);
   MPI_Comm_size(MPI_COMM_WORLD, &nblocks);
@@ -134,6 +139,7 @@ int main(int ac, char** av)
     niter = atoi(av[4]);
   else
     niter = 20;
+  times = (double*)malloc(sizeof(double)*niter);
 
 /*
   if(thisIndex == 0)
@@ -222,15 +228,26 @@ int main(int ac, char** av)
     MPI_Allreduce(&itertime, &it, 1, MPI_DOUBLE, MPI_SUM,
                    MPI_COMM_WORLD);
     itertime = it/nblocks;
-    if (thisIndex == 0)
+    if (thisIndex == 0){
       printf("iter %d time: %lf maxerr: %lf\n", iter, itertime, maxerr);
+      times[iter-1] = itertime;
+    }
     starttime = MPI_Wtime();
+#if 0
 #ifdef AMPI
     if(iter%20 == 10) {
       MPI_Migrate();
     }
 #endif
+#endif
   }
+  for(iter=0;iter<niter;iter++){
+    avgtime *= times[iter];
+  }
+  avgtime = pow(avgtime, 1.0/(double)niter);
+  if (thisIndex == 0){
+    printf("average time %lf\n", avgtime);
+  }  
   MPI_Finalize();
   return 0;
 }
