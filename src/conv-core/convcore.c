@@ -1030,14 +1030,6 @@ static void CpdDebugHandler(char *msg)
     else if (strcmp(name, "quit") == 0){
       CpdUnFreeze();
       CsdExitScheduler();
-#if NODE_0_IS_CONVHOST
-      if((CmiMyPe() == 0) && (clientIP != 0)){
-	int fd;
-	fd = skt_connect(clientIP, clientKillPort);
-	if (fd>0) 
-	  write(fd, "die\n", strlen("die\n"));
-      }
-#endif
     }
     else{
       CmiPrintf("incorrect command:%s received,len=%d\n",name,strlen(name));
@@ -2584,6 +2576,14 @@ void ConverseCommonInit(char **argv)
 
 void ConverseCommonExit(void)
 {
+#if NODE_0_IS_CONVHOST
+  if((CmiMyPe() == 0) && (clientIP != 0)){
+    int fd;
+    fd = skt_connect(clientIP, clientKillPort, 120);
+    if (fd>0) 
+      write(fd, "die\n", strlen("die\n"));
+  }
+#endif
   traceClose();
 }
 
