@@ -49,6 +49,7 @@ unsetenv FILES          ; set FILES = ()
 unsetenv OBJECTFILES    ; set OBJECTFILES = ()
 unsetenv DELETE         ; set DELETE = ()
 unsetenv MAINOBJ        ; set MAINOBJ = ()
+unsetenv GENCPM         ; set GENCPM = ()
 unsetenv DEBUG_MODE
 unsetenv OPTIMIZE_MODE
 unsetenv USE_RELIABLE_CC
@@ -183,6 +184,11 @@ while ($argindex <= $#argv)
 	case "-cp"
 	    set COPIES=($argv[$argindex] $COPIES)
 	    @ argindex = $argindex + 1
+            breaksw
+
+        case "-gen-cpm"
+            set GENCPM=($GENCPM $argv[$argindex])
+            @ argindex = $argindex + 1
             breaksw
 
         case "-D*"
@@ -402,6 +408,29 @@ switch ($LANGUAGE)
         echo "charmc: Unrecognized choice of language $LANGUAGE"
 endsw
 
+onintr failure
+
+cd $ORIGDIR
+
+##############################################################################
+#
+# Preprocess the GEN-CPM files
+#
+##############################################################################
+
+foreach FILE ($GENCPM)
+    set BASE=$FILE:r
+    set TMP=$BASE:t.TMP
+    set DELETE=($DELETE $TMP.c $TMP.i)
+    ($ECHOCMD ; /bin/rm -f $BASE.cpm.h $TMP.c)
+    ($ECHOCMD ; /usr/bin/touch $BASE.cpm.h)
+    ($ECHOCMD ; /bin/ln -s $FILE $TMP.c)
+    ($ECHOCMD ; $CMK_CPP_C $OPTS_CPP -I$CHARMINC $TMP.c > $TMP.i)
+    if ($status) goto failure
+    ($ECHOCMD ; $CHARMBIN/conv-cpm $TMP.i $BASE.cpm.h)
+    if ($status) goto failure
+end
+
 ##############################################################################
 #
 # Compile all specified files
@@ -409,10 +438,6 @@ endsw
 # All temporary files named *.TMP.* for easy cleanup.
 #
 ##############################################################################
-
-onintr failure
-
-cd $ORIGDIR
 
 foreach FILE ($FILES)
   set BASE=$FILE:r
@@ -423,6 +448,7 @@ foreach FILE ($FILES)
   endif
   switch ($FILE)
     case "*.p"
+      set DELETE=($DELETE $BASE.headers)
       ($ECHOCMD ; $CMK_CPP_CHARM $OPTS_CPP -I$CHARMINC $BASE.p > $TMP.cpp)
       ($ECHOCMD ; $CHARMBIN/charmfilter < $TMP.cpp | $CMK_M4 > $TMP.space)
       ($ECHOCMD ; $CHARMBIN/charmxlat $TMP.space $TMP.c)
@@ -453,20 +479,6 @@ foreach FILE ($FILES)
         ($ECHOCMD ; /bin/mv $TMP.o $BASE.o)
       else
         set OBJECTFILES=( $OBJECTFILES $TMP.o )
-      endif
-      breaksw
-    case "*.cpm"
-      ($ECHOCMD ; /bin/rm -f $BASE.cpm.h $TMP.c)
-      ($ECHOCMD ; /usr/bin/touch $BASE.cpm.h ; /bin/ln -s $BASE.cpm $TMP.c)
-      ($ECHOCMD ; $CMK_CPP_C $OPTS_CPP -I$CHARMINC $TMP.c > $TMP.i)
-      ($ECHOCMD ; $CHARMBIN/conv-cpm $TMP.i $BASE.cpm.h)
-      if ($status) goto failure
-      ($ECHOCMD ; $CMK_CC $OPTS_CC -I$CHARMINC -c $TMP.c)
-      if ($status) goto failure
-      if ($?OBJECT == 0) then
-          ($ECHOCMD ; /bin/mv $TMP.o $BASE.o)
-      else
-          set OBJECTFILES=( $OBJECTFILES $TMP.o )
       endif
       breaksw
     case "*.ci"
@@ -797,8 +809,8 @@ end:
         foreach FILE ($FILES)
             set BASE=$FILE:r
             set TMP=$BASE:t.TMP
-            /bin/rm -f $TMP.P.C $TMP.cpp $TMP.space $TMP.xlat $TMP.o $BASE.headers
-            /bin/rm -f $TMP.c $TMP.c.0.h $TMP.c.1.h $TMP.c.2.h $BASE.cpm.h
+            /bin/rm -f $TMP.P.C $TMP.cpp $TMP.space $TMP.xlat $TMP.o
+            /bin/rm -f $TMP.c $TMP.c.0.h $TMP.c.1.h $TMP.c.2.h
             /bin/rm -f $TMP.i $TMP.$CMK_CPP_SUFFIX
         end
         rm -f core $DELETE

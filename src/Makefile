@@ -97,6 +97,7 @@ dirs+sources:
 	cp xl-*.c xl-*.h ../src
 	cp xp-*.c xp-*.h ../src
 	cp xi-*.C xi-*.h ../src
+	cp conv-cpm.c ../src
 	cp Maketrans ../src/Makefile
 	@echo
 	@rm -f .vdir .gdir
