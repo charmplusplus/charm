@@ -741,7 +741,7 @@ Due to this restriction, you need to define message explicitly for multicast
 entry functions and no parameter marshalling can be used for multicast with 
 CkMulticast library.
 
-\paragraph{\bf Array Section Reduction:} 
+\paragraph{Array Section Reduction} 
 
 Since an array element can be members for multiple array sections, 
 there has to be a way for each array element to tell for which array
@@ -793,7 +793,7 @@ must delete the message when done.
   mcastGrp->setReductionClient(sectProxy, new CkCallback(...));
 \end{alltt}
 
-\paragraph{\bf Array section multicast/reduction when migration happens:}
+\paragraph{Array section multicast/reduction when migration happens}
 Using multicast/reduction, you don't need to worry about array migrations.
 When migration happens, you can still use the \kw{CkSectionCookie} for
 reduction. Reduction messages will be correctly delivered but 
