@@ -951,8 +951,11 @@ void bgAddProjEvent(void *data, double t, bgEventCallBackFn fn, void *uPtr, int 
   //if ((tlog->endTime == 0.0) ||(t <= tlog->endTime)) 
   // if the last log is closed, this is a standalone event
   if (tlog->endTime != 0.0) {
+    // ignore standalone event
+    return;
     double endT = tlog->endTime;
     tlog = new bgTimeLog(-1, "standalone", endT, endT);	
+    tlog->recvTime = tlog->effRecvTime = endT;
     tlinerec.enq(tlog, 0);
   }
   tlog->addEvent(data, t, fn, uPtr, eType);
@@ -990,7 +993,7 @@ void BgStartCorrection()
 // handle one correction mesg
 static inline int handleCorrectionMsg(int mynode, BgTimeLineRec *logs, bgCorrectionMsg *m, int delmsg)
 {
-	CmiUInt2 tID = m->tID;
+	CmiInt2 tID = m->tID;
 	if (tID == ANYTHREAD) {
 	  int found = 0;
 	  for (tID=0; tID<cva(numWth); tID++) {
@@ -1208,7 +1211,7 @@ void bgCorrectionFunc(char *msg)
 
     bgCorrectionMsg* m = (bgCorrectionMsg*)msg;
     int nodeidx = m->destNode;
-    CmiUInt2 tID = m->tID;
+    CmiInt2 tID = m->tID;
 
     if (nodeidx < 0) {
       // copy correction msg to each thread of each node

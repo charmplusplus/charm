@@ -93,7 +93,7 @@ class bgCorrectionMsg
 public:
   char     core[CmiBlueGeneMsgHeaderSizeBytes];
   int      msgID;	
-  CmiUInt2 tID;		// destination worker thread ID
+  CmiInt2 tID;		// destination worker thread ID
 			// it can be:  -1:   for any thread which was not known
 			//            < -100: for each thread except one
   double   tAdjust;	// new absolute value of recvTime at destPe
@@ -120,7 +120,7 @@ public:
 #if DELAY_SEND
   char *sendMsg;	// real msg
 #endif
-  CmiUInt2 tID;		// destination worker thread ID
+  CmiInt2 tID;		// destination worker thread ID
 //  double sendtime;
 public:
   bgMsgEntry(char *msg, int node, int tid, int local);

@@ -44,7 +44,7 @@ typedef struct CMK_MSG_HEADER_BLUEGENE   CmiBlueGeneMsgHeader;
    indicate a message is for any thread;
    when send packets, this means it is a non-affinity message 
 */
-#define ANYTHREAD   ((CmiUInt2)-1)
+#define ANYTHREAD   ((CmiInt2)-1)
 
 /**
    indicate a message is a broacast to all message
@@ -162,7 +162,7 @@ void BgBroadcastAllPacket(int handlerID, WorkType type, int numbytes,
   Broadcast a packet to all Blue Gene nodes except to "node" and "threadID";
   each BG node receive one message.
 */
-void BgBroadcastPacketExcept(int node, CmiUInt2 threadID, int handlerID, 
+void BgBroadcastPacketExcept(int node, CmiInt2 threadID, int handlerID, 
                              WorkType type, int numbytes, char * data);
 /**
   Broadcast a packet to all Blue Gene threads 
@@ -174,7 +174,7 @@ void BgThreadBroadcastAllPacket(int handlerID, WorkType type, int numbytes,
   Broadcast a packet to all Blue Gene threads except to "node" and "threadID"
   each BG thread receive one message.
 */
-void BgThreadBroadcastPacketExcept(int node, CmiUInt2 threadID, int handlerID, 
+void BgThreadBroadcastPacketExcept(int node, CmiInt2 threadID, int handlerID, 
                                    WorkType type, int numbytes, char * data);
 
 /************************ utility functions ************************/

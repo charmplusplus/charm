@@ -280,13 +280,19 @@ void nodeInfo::addBgNodeMessage(char *msgPtr)
   nodeQ.enq(msgPtr);
 #if SCHEDULE_WORK
   DEBUGF(("[N%d] activate all work threads on N%d.\n", id));
+  double nextT = CmiBgMsgRecvTime(msgPtr);
+  unsigned int prio = (unsigned int)(nextT*PRIO_FACTOR)+1;
+#if 0
   for (i=0; i<cva(numWth); i++) 
   {
-      double nextT = CmiBgMsgRecvTime(msgPtr);
       CthThread tid = threadTable[i];
-      unsigned int prio = (unsigned int)(nextT*PRIO_FACTOR)+1;
       CthAwakenPrio(tid, CQS_QUEUEING_IFIFO, sizeof(int), &prio);
   }
+#else
+    // only awake rank 0 thread
+  CthThread tid = threadTable[0];
+  CthAwakenPrio(tid, CQS_QUEUEING_IFIFO, sizeof(int), &prio);
+#endif
 #endif
 }
 
@@ -447,7 +453,7 @@ void nodeBCastMsgHandlerFunc(char *msg)
 {
   /* bgmsg is CmiMsgHeaderSizeBytes offset of original message pointer */
   int gnodeID = CmiBgMsgNodeID(msg);
-  CmiUInt2 threadID = CmiBgMsgThreadID(msg);
+  CmiInt2 threadID = CmiBgMsgThreadID(msg);
   int lnodeID;
 
   if (gnodeID < -1) {
@@ -482,7 +488,7 @@ void threadBCastMsgHandlerFunc(char *msg)
 {
   /* bgmsg is CmiMsgHeaderSizeBytes offset of original message pointer */
   int gnodeID = CmiBgMsgNodeID(msg);
-  CmiUInt2 threadID = CmiBgMsgThreadID(msg);
+  CmiInt2 threadID = CmiBgMsgThreadID(msg);
   int lnodeID;
   if (gnodeID < -1) {
       gnodeID = - (gnodeID+100);
@@ -558,7 +564,7 @@ void sendPacket_(int x, int y, int z, int threadID, int handlerID, WorkType type
 }
 
 /* broadcast will copy data to msg buffer */
-static inline void nodeBroadcastPacketExcept_(int node, CmiUInt2 threadID, int handlerID, WorkType type, int numbytes, char* sendmsg)
+static inline void nodeBroadcastPacketExcept_(int node, CmiInt2 threadID, int handlerID, WorkType type, int numbytes, char* sendmsg)
 {
   CmiSetHandler(sendmsg, cva(nBcastMsgHandler));	
   if (node >= 0)
@@ -584,7 +590,7 @@ static inline void nodeBroadcastPacketExcept_(int node, CmiUInt2 threadID, int h
 }
 
 /* broadcast will copy data to msg buffer */
-static inline void threadBroadcastPacketExcept_(int node, CmiUInt2 threadID, int handlerID, WorkType type, int numbytes, char* sendmsg)
+static inline void threadBroadcastPacketExcept_(int node, CmiInt2 threadID, int handlerID, WorkType type, int numbytes, char* sendmsg)
 {
   CmiSetHandler(sendmsg, cva(tBcastMsgHandler));	
   if (node >= 0)
@@ -650,7 +656,7 @@ void BgSendPacket(int x, int y, int z, int threadID, int handlerID, WorkType typ
     BgSendNonLocalPacket(x,y,z,threadID,handlerID, type, numbytes, data);
 }
 
-void BgBroadcastPacketExcept(int node, CmiUInt2 threadID, int handlerID, WorkType type, int numbytes, char * data)
+void BgBroadcastPacketExcept(int node, CmiInt2 threadID, int handlerID, WorkType type, int numbytes, char * data)
 {
   nodeBroadcastPacketExcept_(node, threadID, handlerID, type, numbytes, data);
 }
@@ -660,7 +666,7 @@ void BgBroadcastAllPacket(int handlerID, WorkType type, int numbytes, char * dat
   nodeBroadcastPacketExcept_(BG_BROADCASTALL, ANYTHREAD, handlerID, type, numbytes, data);
 }
 
-void BgThreadBroadcastPacketExcept(int node, CmiUInt2 threadID, int handlerID, WorkType type, int numbytes, char * data)
+void BgThreadBroadcastPacketExcept(int node, CmiInt2 threadID, int handlerID, WorkType type, int numbytes, char * data)
 {
   threadBroadcastPacketExcept_(node, threadID, handlerID, type, numbytes, data);
 }
@@ -1102,10 +1108,12 @@ void work_thread(threadInfo *tinfo)
     int fromQ2 = 0;		// delay the deq of msg from affinity queue
 
     if (e1 && !e2) { msg = q2[0]; fromQ2 = 1;}
-    else if (e2 && !e1) { msg = q1.deq(); }
+//    else if (e2 && !e1) { msg = q1.deq(); }
+    else if (e2 && !e1) { msg = q1[0]; }
     else if (!e1 && !e2) {
       if (CmiBgMsgRecvTime(q1[0]) < CmiBgMsgRecvTime(q2[0])) {
-        msg = q1.deq();
+//        msg = q1.deq();
+        msg = q1[0];
       }
       else {
         msg = q2[0];
@@ -1150,6 +1158,7 @@ void work_thread(threadInfo *tinfo)
     stateCounters.realMsgProcCnt++;
 
     if (fromQ2 == 1) q2.deq();
+    else q1.deq();
 
     DEBUGF(("[N%d] work thread T%d finish a msg.\n", BgMyNode(), tMYID));
 
@@ -1447,6 +1456,7 @@ extern void processCorrectionMsg(int nodeidx);
 
 int updateRealMsgs(bgCorrectionMsg *cm, int nodeidx)
 {
+  CmiAssert(cm->tID!=ANYTHREAD);
   ckMsgQueue &affinityQ = cva(nodeinfo)[nodeidx].affinityQ[cm->tID];
   for (int i=0; i<affinityQ.length(); i++)  {
     char *msg = affinityQ[i];
@@ -1609,7 +1619,7 @@ void correctMsgTime(char *msg)
 
    int msgID = CmiBgMsgID(msg);
    int srcnode = CmiBgMsgSrcPe(msg);
-   CmiUInt2 tid = CmiBgMsgThreadID(msg);
+   CmiInt2 tid = CmiBgMsgThreadID(msg);
 
    bgCorrectionQ &cmsg = cva(nodeinfo)[tMYNODEID].cmsg;
    int len = cmsg.length();
