@@ -267,8 +267,8 @@ int MPI_File_open(MPI_Comm comm, char *filename, int amode,
 }
 
 
-// define this missing function as empty, since
-// we don't care about error handling in AMPI
+/* define this missing function as empty, since
+   we don't care about error handling in AMPI */
 int MPIR_Err_setmsg( int a, int b, const char *c, const char *d, const char *e, ...){
   return 0;
 }
