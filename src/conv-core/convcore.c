@@ -427,7 +427,7 @@ char **argv;
   CmiHandlerInit();
   CmiMemoryInit(argv);
   CmiDeliversInit();
-  CmiSpanTreeInit(argv);
+  /* CmiSpanTreeInit(argv); done in CmiInitMc()  -- Sanjeev 3/5/96 */
   CmiInterruptsInit();
   CmiInitMc(argv);
   CsdInit(argv);
