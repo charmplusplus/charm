@@ -13,7 +13,7 @@
 // http://www.scl.ameslab.gov/Projects/Rabbit/
 // http://www.support.compaq.com/nttools
 
-#include "conv-mach.h"
+#include "charm++.h"
 #ifdef CMK_ORIGIN2000
 #include "trace-counter.h"
 #include "ck.h"
