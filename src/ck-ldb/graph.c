@@ -54,7 +54,7 @@ void freeGraph(Graph* g)
   free(g);
 }
 
-void nextVertex(Graph *g, int v, float weight)
+static void nextVertex(Graph *g, int v, float weight)
 {
   int current;
 
@@ -71,7 +71,7 @@ void nextVertex(Graph *g, int v, float weight)
 }
 
 
-void addEdge(Graph *g, int w, float weight)
+static void addEdge(Graph *g, int w, float weight)
 {
   /* for now , ignore weight */
   int v, i;
@@ -97,7 +97,7 @@ void addEdge(Graph *g, int w, float weight)
 
 }
 
-void finishVertex(Graph *g) {
+static void finishVertex(Graph *g) {
 
 if (g->vertices[g->currentVertex].numEdges != g->currentEdge - g->vertices[g->currentVertex].firstEdge)
  printf("Error in finishVertex\n");

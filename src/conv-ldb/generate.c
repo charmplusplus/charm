@@ -23,8 +23,9 @@ Modified from the original: changed output format, and converted main to a param
 
 int addEdge(EdgeListType *l,int fm,int to);
 int edgeExists(int fm, int to);
-int isEmpty(Q*);
-int dequeue(Q*);
+static Q * makeQueue();
+static int isEmpty(Q*);
+static int dequeue(Q*);
 
 #define VMAX 2050
 int V; /* no. of vertices */
@@ -44,10 +45,10 @@ main(int argc, char **argv)
 }
 */
 
-void printOut(VerticesListType *vertices);
-void initGraph(void);
-void diameter(void);
-void AddEdges(EdgeListType *EdgeList, int V, int n);
+static void printOut(VerticesListType *vertices);
+static void initGraph(void);
+static void diameter(void);
+static void AddEdges(EdgeListType *EdgeList, int V, int n);
 
 void gengraph(int pV, int pC, int pseed)
 { int i;
@@ -82,7 +83,7 @@ void gengraph(int pV, int pC, int pseed)
 }
 
 
-void AddEdges(EdgeListType *EdgeList, int V, int n)
+static void AddEdges(EdgeListType *EdgeList, int V, int n)
    /* Add more edges to make up a total of E edges */
 {int i,j,w,x,y;
 /* first add edges for a C-way spanning tree.*/
@@ -119,7 +120,7 @@ n -= (V-1);
 
 void fillAdjArray(Edge *edges, VerticesListType *vlist, int V, int E);
 void sortAdjArrays(VerticesListType *vlist);
-void sort(int *adj, int fromIndex, int toIndex);
+static void sort(int *adj, int fromIndex, int toIndex);
 void countDegrees(Edge *edges, Vertex *vertRecs, int V, int E);
 
 VerticesListType * 
@@ -230,7 +231,7 @@ if ((dupcount % 2) != 0) {printf("error. duplicates not even.\n"); }
 E -= dupcount/2;
 }
 
-void sort(int *adj, int fromIndex, int toIndex)
+static void sort(int *adj, int fromIndex, int toIndex)
 { int i,j, tmp;
   short changed;
   changed = 1;
@@ -248,7 +249,7 @@ void sort(int *adj, int fromIndex, int toIndex)
     }
 }
 
-void printOut(VerticesListType *vertices)
+static void printOut(VerticesListType *vertices)
 {int i,j;
  int * adj;
  Vertex * vertexRecs;
@@ -271,7 +272,7 @@ void printOut(VerticesListType *vertices)
    }
 }
 
-void initGraph(void)
+static void initGraph(void)
 { int i;
   graph.numVertices = V;
   graph.vertexArray = (Vertex *) malloc(V*sizeof(Vertex));
@@ -286,9 +287,9 @@ void initGraph(void)
   }
 }
 
-void enqueue(Q *q, int i);
+static void enqueue(Q *q, int i);
 
-void diameter(void)
+static void diameter(void)
 {
   Q * makeQueue();
   int i,j, k, v, w, start;
@@ -340,7 +341,7 @@ void diameter(void)
 /* ------------------------------------------------- */
 /* The queue ADT */
 
-Q * makeQueue()
+static Q * makeQueue()
 {
   Q *q = (Q *) malloc(sizeof(Q));
   _MEMCHECK(q);
@@ -352,14 +353,14 @@ Q * makeQueue()
   return q;
 }
 
-void enqueue(Q * q, int i) {
+static void enqueue(Q * q, int i) {
   q->tail++;
   if (q->tail == q->size) q->tail = 0; /* no overflows possible */
   q->buf[q->tail] = i;
   q->numElements++;
 }
 
-int dequeue(Q *q) {
+static int dequeue(Q *q) {
   int r;
   r = q->buf[q->head++];
   if (q->head == q->size) q->head = 0;
@@ -367,6 +368,6 @@ int dequeue(Q *q) {
   return r;
 }
 
-int isEmpty(Q * q) {
+static int isEmpty(Q * q) {
   return (q->numElements == 0) ;
 }
