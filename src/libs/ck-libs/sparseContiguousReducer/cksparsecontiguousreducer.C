@@ -96,11 +96,13 @@ static CkReductionMsg *name(int nMsg, CkReductionMsg ** msg){\
     }\
   }\
 \
- /* number of non-null data blocks and total number of elements in them is known.\
-    Now pack the input data into one buffer resolving the overlap.*/\
+ /* number of non-null data blocks and total number of elements in them is
+    known. Now pack the input data into one buffer resolving the overlap.*/\
 \
-  unsigned char *data = new unsigned char[sizeof(int) +\
-       sizeof(CkDataSegHeader)*count + sizeof(dataType)*numElements];\
+  int dataSize = sizeof(int) + sizeof(CkDataSegHeader)*count + \
+                 sizeof(dataType)*numElements;\
+  CkReductionMsg* m = CkReductionMsg::buildNew(dataSize, NULL); \
+  unsigned char *data = (unsigned char*)(m->getData ());\
 \
   memset(flag, 0,count*sizeof(unsigned char));\
   memcpy(data, &count, sizeof(int));\
@@ -144,12 +146,8 @@ static CkReductionMsg *name(int nMsg, CkReductionMsg ** msg){\
     }\
   }\
 \
-  CkReductionMsg* m = CkReductionMsg::buildNew(sizeof(int) + \
-    sizeof(CkDataSegHeader)*count + sizeof(dataType)*numElements, (void*)data);\
-\
   delete[] headerArray;\
   delete[] size;\
-  delete[] data;\
   delete[] flag;\
 \
   return m;\
