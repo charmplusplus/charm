@@ -550,7 +550,7 @@ Message::genDefs(XStr& str)
     str << "::__register(char *s)\n";
     str << "{\n";
     str << "  __idx = CkRegisterMsg(s, ";
-    if(isPacked()) {
+    if(isPacked()||isVarsize()) {
       str << "(CkPackFnPtr) ";
       type->print(str);
       if(templat)
