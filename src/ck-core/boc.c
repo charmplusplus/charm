@@ -12,7 +12,12 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.14  1997-10-29 23:52:43  milind
+ * Revision 2.15  1997-12-03 21:36:08  rbrunner
+ * I fixed a bug with nested BOC creation.  The BOC number returned would
+ * be incorrect for BOC X if the constructor for BOC X creates a second
+ * BOC.
+ *
+ * Revision 2.14  1997/10/29 23:52:43  milind
  * Fixed CthInitialize bug on uth machines.
  *
  * Revision 2.13  1997/07/18 21:21:02  milind
@@ -361,7 +366,7 @@ ChareIDType *ReturnID;
 	  *msg = CpvAccess(currentBocNum);
 	  SendMsg(ReturnEP, msg, ReturnID); 
 	}
-      return(CpvAccess(currentBocNum));
+      return(executing_boc_num);
     }
   else
     /* dynamic boc creation */
