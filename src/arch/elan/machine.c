@@ -26,6 +26,7 @@
 
 #define CMI_BROADCAST_ROOT(msg)          ((CmiMsgHeaderBasic *)msg)->root
 #define CMI_DEST_RANK(msg)               ((CmiMsgHeaderBasic *)msg)->rank
+#define CMI_MSG_TYPE(msg)                ((CmiMsgHeaderBasic *)msg)->type
 
 #if CMK_BROADCAST_SPANNING_TREE
 #  define CMI_SET_BROADCAST_ROOT(msg, root)  CMI_BROADCAST_ROOT(msg) = (root);
@@ -39,10 +40,15 @@ ELAN_QUEUE    *elan_q;
 #define SMALL_MESSAGE_SIZE 8192       /* Message sizes greater will be 
 					  probe received adding 5us overhead*/
 #define SYNC_MESSAGE_SIZE 8192        /* Message sizes greater will be 
-					  sent synchronously thus avoiding copying*/
+					sent synchronously thus avoiding copying*/
+
+
+//#define NAMD_MESSAGE_SIZE 4096      /* NAMD Pme messages should not be freed*/
+
+
 #define NON_BLOCKING_MSG 128           /* Message sizes greater 
 					  than this will be sent asynchronously*/
-#define RECV_MSG_Q_SIZE 64
+#define RECV_MSG_Q_SIZE 1
 
 ELAN_EVENT *esmall[RECV_MSG_Q_SIZE], *elarge;
 #define TAG_SMALL 0x69
@@ -63,7 +69,11 @@ CpvDeclare(void*, CmiLocalQueue);
 static int MsgQueueLen=0;
 static int request_max;
 
-static void* localMsgBuf;
+#include "queueing.h"
+
+Queue localMsgBuf;
+Queue namdMsgBuf;
+
 static void ConverseRunPE(int everReturn);
 
 typedef struct msg_list {
@@ -255,12 +265,18 @@ static void CmiReleaseSentMessages(void)
       else
         prev->next = temp;
       
-      if(CMI_DEST_RANK(msg_tmp->msg) != 1000) {
+      if(CMI_MSG_TYPE(msg_tmp->msg)) {
 	if(SIZEFIELD(msg_tmp->msg) == SMALL_MESSAGE_SIZE)
 	  CqsEnqueue(localMsgBuf, msg_tmp->msg);
+	/*
+	  else if (SIZEFIELD(msg_tmp->msg) == NAMD_MESSAGE_SIZE)
+	  CqsEnqueue(namdMsgBuf, msg_tmp->msg);
+	*/
 	else
 	  CmiFree(msg_tmp->msg);
       }
+      else
+	CmiFree(msg_tmp->msg);
       
       CmiFree(msg_tmp);
       msg_tmp = temp;
@@ -731,6 +747,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   putenv("LIBELAN_SHM_ENABLE=0");
 
   localMsgBuf = CqsCreate();
+  namdMsgBuf = CqsCreate();
 
   if (!(elan_base = elan_baseInit())) {
     perror("Failed elan_baseInit()");
