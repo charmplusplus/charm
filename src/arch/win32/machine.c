@@ -3043,7 +3043,7 @@ void CmiReleaseCommHandle(CmiCommHandle handle)
  *
  *****************************************************************************/
 
-extern void CthInit();
+extern void CthInit(char **argv);
 extern void ConverseCommonInit(char **);
 
 void ConverseInitPE()
@@ -3057,7 +3057,7 @@ void ConverseInitPE()
   _MEMCHECK(CpvAccess(internal_printf_buffer));
   if (CmiMyRank()) CpvAccess(CmiMyArgv) = CopyArgs(Cmi_argv);
   else CpvAccess(CmiMyArgv) = Cmi_argv;
-  CthInit();
+  CthInit(CpvAccess(CmiMyArgv));
   ConverseCommonInit(CpvAccess(CmiMyArgv));
   CpvInitialize(void *,CmiLocalQueue);
   CpvAccess(CmiLocalQueue) = cs->localqueue;

@@ -257,7 +257,7 @@ CthThread t;
 
 void CthDummy() { }
 
-void CthInit()
+void CthInit(char **argv)
 {
   CthThread t; CthProcInfo p; qt_t *switchbuf, *sp;
 
@@ -533,7 +533,7 @@ void CthFixData(CthThread t)
   }
 }
 
-void CthInit()
+void CthInit(char **argv)
 {
   CthThread t;
   LPVOID    fiber;
@@ -754,6 +754,7 @@ CthThread CthUnpackThread(void *buffer)
 #else
 
 #define STACKSIZE (32768)
+static int _stksize = 0;
 
 #if CMK_MEMORY_PROTECTABLE
 
@@ -824,10 +825,22 @@ CthThread t;
   }
 }
 
-void CthInit()
+void CthInit(char **argv)
 {
   CthThread t;
+  int i;
 
+  for(i=0;argv[i];i++) {
+    if(strncmp("+stacksize",argv[i],10)==0) {
+      if (strlen(argv[i]) > 10) {
+        sscanf(argv[i], "+stacksize%d", &_stksize);
+      } else {
+        if (argv[i+1]) {
+          sscanf(argv[i+1], "%d", &_stksize);
+        }
+      }
+    }
+  }
   CpvInitialize(int, _numSwitches);
   CpvAccess(_numSwitches) = 0;
 
@@ -909,7 +922,7 @@ CthThread CthCreate(fn, arg, size)
 CthVoidFn fn; void *arg; int size;
 {
   CthThread result; qt_t *stack, *stackbase, *stackp;
-  if (size==0) size = STACKSIZE;
+  size = (size) ? size : ((_stksize) ? _stksize : STACKSIZE);
   size = (size+(CMK_MEMORY_PAGESIZE*2)-1) & ~(CMK_MEMORY_PAGESIZE-1);
   stack = (qt_t*)CthMemAlign(CMK_MEMORY_PAGESIZE, size);
   _MEMCHECK(stack);
