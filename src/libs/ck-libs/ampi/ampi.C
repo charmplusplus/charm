@@ -1339,7 +1339,7 @@ static ampiParent *getAmpiParent(void) {
 }
 
 ampi *getAmpiInstance(MPI_Comm comm) {
-  ampi *ptr=getAmpiParent()->comm2ampi(comm);
+  ampi *ptr=getAmpiInstance(comm);
 #ifndef CMK_OPTIMIZE
   if (ptr==NULL) CkAbort("AMPI's getAmpiInstance> null pointer\n");
 #endif
@@ -1361,6 +1361,13 @@ CDECL void MPI_Migrate(void)
   TRACE_BG_AMPI_START(getAmpiInstance(MPI_COMM_WORLD)->getThread(), "AMPI_MIGRATE")
 #endif
 }
+
+CDECL void MPI_Setmigratable(MPI_Comm comm, int mig){
+  AMPIAPI("MPI_Setmigratable");
+  ampi *ptr=getAmpiInstance(comm);
+  ptr->setMigratable(mig);
+}
+
 
 CDECL int MPI_Init(int *p_argc, char*** p_argv)
 {

@@ -427,6 +427,7 @@ int MPI_Resume(int dest, int comm);
 void MPI_Print(char *str);
 int MPI_Register(void *, MPI_PupFn);
 void MPI_Migrate(void);
+void MPI_Setmigratable(int comm, int mig);
 void MPI_Checkpoint(char *dname);
 void *MPI_Get_userdata(int);
 void MPI_Datatype_iscontig(MPI_Datatype datatype, int *flag);
