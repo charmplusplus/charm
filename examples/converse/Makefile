@@ -3,15 +3,15 @@ DIRS=pingpong
 
 all:
 	for d in $(DIRS); do \
-		(cd $$d; make OPTS='$(OPTS)' || exit 1) || exit 1; \
+		(cd $$d; $(MAKE) OPTS='$(OPTS)' || exit 1) || exit 1; \
 	done
 
 test:
 	for d in $(DIRS); do \
-		(cd $$d; make test OPTS='$(OPTS)' || exit 1) || exit 1; \
+		(cd $$d; $(MAKE) test OPTS='$(OPTS)' || exit 1) || exit 1; \
 	done
 
 clean:
-	for d in $(DIRS); do (cd $$d; make clean OPTS='$(OPTS)'); done
+	for d in $(DIRS); do (cd $$d; $(MAKE) clean OPTS='$(OPTS)'); done
 	rm -f TAGS #*#
 	rm -f core *~
