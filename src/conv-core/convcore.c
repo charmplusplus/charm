@@ -2013,11 +2013,11 @@ extern void CmiIsomallocInit(char **argv);
 
 static void CmiProcessPriority(char **argv)
 {
-#ifndef _WIN32
   int nicelevel=-100;      /* process priority */
   CmiGetArgIntDesc(argv,"+nice",&nicelevel,"Set the process priority level");
   /* call setpriority once on each process to set process's priority */
   if (CmiMyRank() == 0 && nicelevel != -100)  {
+#ifndef _WIN32
     if (0!=setpriority(PRIO_PROCESS, 0, nicelevel))  {
       CmiPrintf("[%d] setpriority failed with value %d. \n", CmiMyPe(), nicelevel);
       perror("setpriority");
@@ -2025,8 +2025,54 @@ static void CmiProcessPriority(char **argv)
     }
     else
       CmiPrintf("[%d] Charm++: setpriority %d\n", CmiMyPe(), nicelevel);
-  }
+#else
+    HANDLE hProcess = GetCurrentProcess();
+    DWORD dwPriorityClass = NORMAL_PRIORITY_CLASS;
+    char *prio_str = "NORMAL_PRIORITY_CLASS";
+    BOOL status;
+    /*
+       <-20:      real time
+       -20--10:   high 
+       -10-0:     above normal
+       0:         normal
+       0-10:      below normal
+       10-:       idle
+    */
+    if (0) ;
+#ifdef BELOW_NORMAL_PRIORITY_CLASS
+    else if (nicelevel<10 && nicelevel>0) {
+      dwPriorityClass = BELOW_NORMAL_PRIORITY_CLASS;
+      prio_str = "BELOW_NORMAL_PRIORITY_CLASS";
+    }
 #endif
+    else if (nicelevel>0) {
+      dwPriorityClass = IDLE_PRIORITY_CLASS;
+      prio_str = "IDLE_PRIORITY_CLASS";
+    }
+    else if (nicelevel<=-20) {
+      dwPriorityClass = REALTIME_PRIORITY_CLASS;
+      prio_str = "REALTIME_PRIORITY_CLASS";
+    }
+#ifdef ABOVE_NORMAL_PRIORITY_CLASS
+    else if (nicelevel>-10 && nicelevel<0) {
+      dwPriorityClass = ABOVE_NORMAL_PRIORITY_CLASS;
+      prio_str = "ABOVE_NORMAL_PRIORITY_CLASS";
+    }
+#endif
+    else if (nicelevel<0) {
+      dwPriorityClass = HIGH_PRIORITY_CLASS;
+      prio_str = "HIGH_PRIORITY_CLASS";
+    }
+    status = SetPriorityClass(hProcess, dwPriorityClass);
+    if (!status)  {
+        int err=GetLastError();
+        CmiPrintf("SetPriorityClass failed errno=%d, WSAerr=%d\n",errno, err);
+        CmiAbort("SetPriorityClass failed.");
+    }
+    else
+      CmiPrintf("[%d] Charm++: setpriority %s\n", CmiMyPe(), prio_str);
+#endif
+  }
 }
 
 void CommunicationServerInit()
