@@ -16,4 +16,4 @@ void DummyStrategy::doneInserting(){
 
 void DummyStrategy::pup(PUP::er &p){}
 
-PUPable_def(DummyStrategy);
+//PUPable_def(DummyStrategy);

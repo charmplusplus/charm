@@ -38,4 +38,9 @@ module ComlibModule {
 
     entry void learnPattern(int, int);
   }
+
+  PUPable Strategy;
+  PUPable DummyStrategy;
+  PUPable EachToManyStrategy;
+  PUPable NodeMulticast;
 };

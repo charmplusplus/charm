@@ -10,7 +10,7 @@ CpvDeclare(int, RecvmsgHandle);
 CpvDeclare(int, RecvdummyHandle);
 //int *procMap;
 
-PUPable_def(Strategy);
+//PUPable_def(Strategy);
 
 //handler to receive array messages
 void recv_msg(void *msg){
@@ -61,9 +61,10 @@ Strategy* createStrategy(int s, int n){
 //An initialization routine which does prelimnary initialization of the 
 //communications library and registers the strategies with the PUP:able interface.
 void initComlibManager(void){
-  //    comm_debug = 1;
+    //comm_debug = 1;
     ComlibInit();
     ComlibPrintf("Init Call\n");
+    /*
     //Called once on each processor 
     PUPable_reg(Strategy); 
     PUPable_reg(EachToManyStrategy); 
@@ -71,6 +72,7 @@ void initComlibManager(void){
     PUPable_reg(MPIStrategy); 
     PUPable_reg(StreamingStrategy);     
     PUPable_reg(NodeMulticast);     
+    */
 
     CpvInitialize(int, RecvmsgHandle);
     CpvAccess(RecvmsgHandle) = CmiRegisterHandler((CmiHandler)recv_msg);
@@ -204,7 +206,7 @@ void ComlibManager::doneCreating() {
     if(!barrierReached)
       return;
 
-    ComlibPrintf("Sending Strategies\n");
+    ComlibPrintf("Sending Strategies %d, %d\n", nstrats, ListOfStrategies.length());
 
     StrategyWrapper sw;
     sw.s_table = new Strategy* [nstrats];

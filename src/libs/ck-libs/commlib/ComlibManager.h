@@ -21,7 +21,7 @@
 
 #define CHARM_MPI 0 
 #define MAX_NSTRAT 1024
-#define LEARNING_PERIOD 2     //Number of iterations after which the 
+#define LEARNING_PERIOD 1000     //Number of iterations after which the 
                               //learning framework will discover the appropriate 
                               //strategy, not completely implemented
 #define ALPHA 5E-6
