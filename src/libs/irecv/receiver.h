@@ -63,6 +63,7 @@ private:
   void *cb_data;
 
   typedef struct _tblEntry {
+    receiverMsg *msg;
     char *buf;
     int size;
   } tblEntry;
@@ -89,7 +90,7 @@ public:
   void ready2go();
 
 private:
-  void sendTo(int tag, char *pointer, int size, int from, int refno);
+  void sendTo(int tag, receiverMsg *m, int size, int from, int refno);
   void recvAlready();
   void pupCmmTable(CmmTable &t, PUP::er &p);
 

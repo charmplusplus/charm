@@ -44,7 +44,7 @@ receiver::~receiver()
 #define MIN(a,b) (a)<(b)?(a):(b)
 
 // other receiver send message here (active send)
-void receiver::sendTo(int tag, char *pointer, int size, int from, int refno)
+void receiver::sendTo(int tag, receiverMsg *m, int size, int from, int refno)
 {
   int tags[3], ret_tags[3];
 
@@ -54,36 +54,41 @@ void receiver::sendTo(int tag, char *pointer, int size, int from, int refno)
 
   if (req) {
     //  irecv called before; copy buffer
-    memcpy(req->buf, pointer, MIN(size, req->size)); 
+    memcpy(req->buf, m->buf, MIN(size, req->size)); 
     delete req;
+    delete m;
 
     recvAlready();
   }
   else {
     // msg come before irecv called
     tags[0] = tag; tags[1] = from; tags[2] = refno;
+    CmmPut(msgTbl, 3, tags, m);
+/*
     req = new tblEntry;
+    req->msg = m;
     req->buf = new char[size];
     memcpy(req->buf, pointer, size); 
     req->size = size;
     CmmPut(msgTbl, 3, tags, req);
+*/
   }
 
 }
 
 void receiver::generic(receiverMsg *msg)
 {
-  sendTo(msg->tag, msg->buf, msg->size, msg->sendFrom, msg->refno);
-  delete msg;
+  sendTo(msg->tag, msg, msg->size, msg->sendFrom, msg->refno);
+//  delete msg;
 }
 
 void receiver::syncSend(receiverMsg *msg)
 {
-  sendTo(msg->tag, msg->buf, msg->size, msg->sendFrom, msg->refno);
+  sendTo(msg->tag, msg, msg->size, msg->sendFrom, msg->refno);
   delete msg;
 }
 
-static int typesize(int type, int count)
+extern "C" int typesize(int type, int count)
 {
   switch(type) {
     case CMPI_DOUBLE_PRECISION : return count*sizeof(double);
@@ -106,7 +111,8 @@ void receiver::isend(void *buf, int count, int datatype, int dest, int tag, int 
  d->tag = tag;
  d->sendFrom = thisIndex;
  d->refno = refno;
- memcpy(d->buf, buf, size);
+// memcpy(d->buf, buf, size);
+ d->buf = (char *)buf;
  CProxy_receiver B(thisArrayID);
  B[dest].generic(d);
 }
@@ -117,30 +123,32 @@ void receiver::irecv(void *buf, int count, int datatype, int source, int tag, in
   int size = typesize(datatype, count);
 
   tags[0] = tag; tags[1] = source; tags[2] = refno;
-  tblEntry *req = (tblEntry *)CmmGet(msgTbl, 3, tags, ret_tags);
+//  tblEntry *req = (tblEntry *)CmmGet(msgTbl, 3, tags, ret_tags);
+  receiverMsg *msg = (receiverMsg *)CmmGet(msgTbl, 3, tags, ret_tags);
 
-  if (req) {
+  if (msg) {
     // send called before; copy buffer into
-    memcpy(buf, req->buf, MIN(size, req->size));
-    delete [] req->buf;
-    delete req;
+    memcpy(buf, msg->buf, MIN(size, msg->size));
+    delete msg;
   }
   else {
 //CkPrintf("irecv (reqtbl): tag:%d, senderTag:%d, refno:%d. \n", tag, senderTag, refno);
    // recv called before send
     tags[0] = tag; tags[1] = source; tags[2] = refno;
-    req = new tblEntry;
+    tblEntry *req = new tblEntry;
     req->buf = (char *)buf;
     req->size = size;
     CmmPut(reqTbl, 3, tags, req);
   }
 }
 
+#define GATHER_TAG   65535;
+
 int receiver::iAlltoAll(void *sendbuf, int sendcount, int sendtype, 
 	      void *recvbuf, int recvcount, int recvtype, int refno)
 {
   int nPe = getSize();  // should be number of elements in array1D
-  int tag = 65535;	// special tag
+  int tag = GATHER_TAG;	// special tag
   int i;
   for (i=0; i<nPe; i++) 
       isend(((char *)sendbuf)+i*typesize(sendtype, sendcount), sendcount, sendtype, i, tag, refno);
@@ -152,7 +160,7 @@ int receiver::iAlltoAll(void *sendbuf, int sendcount, int sendtype,
 int receiver::iAlltoAllv(void *sendbuf, int *sendcount, int *sdispls, int sendtype, void *recvbuf, int *recvcount, int *rdispls, int recvtype, int refno)
 {
   int nPe = getSize();  // should be number of elements in array1D
-  int tag = 65535;	// special tag
+  int tag = GATHER_TAG;	// special tag
   int i;
   for (i=0; i<nPe; i++) 
       isend(((char *)sendbuf)+sdispls[i]*typesize(sendtype, 1), sendcount[i], sendtype, i, tag, refno);
