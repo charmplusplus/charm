@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.9  1995-09-07 05:24:58  gursoy
+ * Revision 2.10  1995-10-27 21:31:25  jyelon
+ * changed NumPe --> NumPes
+ *
+ * Revision 2.9  1995/09/07  05:24:58  gursoy
  * necessary changes done related to CharmInitLoop--> handler fuction
  *
  * Revision 2.8  1995/09/06  21:48:50  jyelon
@@ -431,11 +434,11 @@ TRACE(CmiPrintf("[%d] GeneralBroadcast: type=%d, msgType=%d\n",
 		CmiMyPe(), type, GetEnv_msgType(env)));
 
 	if (bocnum >= NumSysBoc)
-        	CpvAccess(nodebocMsgsCreated)+=CmiNumPe();
+        	CpvAccess(nodebocMsgsCreated)+=CmiNumPes();
 
 	trace_creation(GetEnv_msgType(env), ep, env);
 	CkCheck_and_BroadcastAll(env); /* Asynchronous broadcast */
-	QDCountThisCreation(ep, category, type, CmiNumPe());
+	QDCountThisCreation(ep, category, type, CmiNumPes());
 }
 
 
@@ -494,7 +497,7 @@ TRACE(CmiPrintf("[%d] InitiateDynamicBocBroadcast: ref=%d, boc=%d, ep=%d\n",
 	trace_creation(GetEnv_msgType(env), ep, env);
         CkCheck_and_BroadcastAll(env);
 
-        QDCountThisCreation(ep, USERcat, DynamicBocInitMsg,CmiNumPe());
+        QDCountThisCreation(ep, USERcat, DynamicBocInitMsg,CmiNumPes());
 
 }
 

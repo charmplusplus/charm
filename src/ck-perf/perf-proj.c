@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.7  1995-09-26 19:47:51  sanjeev
+ * Revision 2.8  1995-10-27 21:37:45  jyelon
+ * changed NumPe --> NumPes
+ *
+ * Revision 2.7  1995/09/26  19:47:51  sanjeev
  * *** empty log message ***
  *
  * Revision 2.6  1995/09/22  20:44:02  sanjeev
@@ -133,7 +136,7 @@ ENVELOPE *envelope;
 		msg_type == BroadcastBocMsg || 
 		msg_type == QdBroadcastBocMsg ||
 		msg_type==DynamicBocInitMsg)
-                	CpvAccess(iteration) = CmiNumPe();
+                	CpvAccess(iteration) = CmiNumPes();
 
 	SetEnv_event(envelope, CpvAccess(current_event));
 	SetEnv_pe(envelope, CmiMyPe());
@@ -305,7 +308,7 @@ log_init()
 
 	/* build log file name from pgm name and pe number */
 
-	length = strlen(CpvAccess(pgm)) + strlen(".") + CmiNumPe() +
+	length = strlen(CpvAccess(pgm)) + strlen(".") + CmiNumPes() +
 		 strlen(".log") + 1;
 	CpvAccess(log_file_name) = (char *) CmiAlloc(length);
 	sprintf(CpvAccess(log_file_name), "%s.%d.log", CpvAccess(pgm), pe);
@@ -347,7 +350,7 @@ close_log()
 		CpvAccess(state_file_fd) = (FILE *) fopen(state_file, "w");
 		
 		fprintf(CpvAccess(state_file_fd), "MACHINE %s\n",CMK_MACHINE_NAME );
-		fprintf(CpvAccess(state_file_fd), "PROCESSORS %d\n", CmiNumPe());
+		fprintf(CpvAccess(state_file_fd), "PROCESSORS %d\n", CmiNumPes());
 		fprintf(CpvAccess(state_file_fd), "TOTAL_CHARES %d\n", 
 													CpvAccess(chareCount));
 		fprintf(CpvAccess(state_file_fd), "TOTAL_EPS %d\n", 

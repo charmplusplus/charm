@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.29  1995-10-25 15:48:43  gursoy
+ * Revision 2.30  1995-10-27 21:31:25  jyelon
+ * changed NumPe --> NumPes
+ *
+ * Revision 2.29  1995/10/25  15:48:43  gursoy
  * added BocInitQueueDestroy function to realese the memory
  *
  * Revision 2.28  1995/10/11  17:52:51  sanjeev
@@ -571,7 +574,7 @@ char          **argv;
    */
   int             i, j, numSysOpts = 0, foundSysOpt = 0, end;
   int             mainflag = 0, memflag = 0;
-  int             numPe;
+  int             NumPes;
   if (argc < 1)
     {
       CmiPrintf("Too few arguments. Usage> host_prog node_prog [...]\n");
@@ -617,9 +620,9 @@ char          **argv;
       CpvAccess(QueueingDefault) = CK_QUEUEING_BLIFO;
       foundSysOpt = 1;
     } else if (strcmp(argv[i], "+p") == 0 && i + 1 < argc) {
-      sscanf(argv[i + 1], "%d", &numPe);
+      sscanf(argv[i + 1], "%d", &NumPes);
       foundSysOpt = 2;
-    } else if (sscanf(argv[i], "+p%d", &numPe) == 1) {
+    } else if (sscanf(argv[i], "+p%d", &NumPes) == 1) {
       foundSysOpt = 1;
     }
     if (foundSysOpt) {

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-29 21:19:36  narain
+ * Revision 2.1  1995-10-27 21:35:54  jyelon
+ * changed NumPe --> NumPes
+ *
+ * Revision 2.0  1995/06/29  21:19:36  narain
  * *** empty log message ***
  *
  ***************************************************************************/
@@ -403,8 +406,8 @@ entry BranchInit : (message DUMMYMSG * dmsg)
   TRACE(CkPrintf("Enter Node LdbInit()\n"));
   CpvAccess(LDB_ELEM_SIZE) = sizeof(LDB_ELEMENT);
   CpvAccess(LdbBocNum) = LdbBoc = MyBocNum();
-  numPe = CmiNumPe();
-  myPE = CmiMyPe();
+  numPe = CkNumPes();
+  myPE = CkMyPe();
   numNeighbours = CmiNumNeighbours(myPE);
   
   lastPeZeroLoadIndex = 0;
@@ -479,7 +482,7 @@ public StripLDB(ldb)
 private rand_strategy(msg) /* From rand */
 void *msg;
 {
-    int pe = rand() % CmiNumPe();
+    int pe = rand() % CkNumPes();
     if (pe == myPE)
       QsEnqUsrMsg(msg);
     else

@@ -11,8 +11,11 @@
  ***************************************************************************
  * REVISION HISTORY:
  *      $Log$
- *      Revision 2.7  1995-07-27 20:48:27  jyelon
- *      *** empty log message ***
+ *      Revision 2.8  1995-10-27 21:37:45  jyelon
+ *      changed NumPe --> NumPes
+ *
+ * Revision 2.7  1995/07/27  20:48:27  jyelon
+ * *** empty log message ***
  *
  * Revision 2.6  1995/07/22  23:44:01  jyelon
  * *** empty log message ***
@@ -217,14 +220,14 @@ close_log()
 		if((log_file_desc = fopen(log_file_name, "w+")) == NULL)
 			printf("*** ERROR *** Cannot Create %s",
 					log_file_name);
-		fprintf(log_file_desc, "%d %d %d\n", CmiNumPe(),
+		fprintf(log_file_desc, "%d %d %d\n", CmiNumPes(),
 			CpvAccess(timestep), CpvAccess(current_time_interval)+1);
 			
 
 		for (j=0; j<CpvAccess(current_time_interval)+1; j++)
 			CpvAccess(display_table)[IDLE_TIME][j] =
 				(CpvAccess(display_table)[IDLE_TIME][j]*100)/
-				(CmiNumPe()*CpvAccess(timestep));
+				(CmiNumPes()*CpvAccess(timestep));
 		for (i=0; i<NUMBER_DISPLAYS; i++)
 		{
 			for (j=0; j<CpvAccess(current_time_interval)+1; j++)

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.2  1995-07-19 22:15:20  jyelon
+ * Revision 2.3  1995-10-27 21:35:54  jyelon
+ * changed NumPe --> NumPes
+ *
+ * Revision 2.2  1995/07/19  22:15:20  jyelon
  * *** empty log message ***
  *
  * Revision 2.1  1995/07/06  22:40:05  narain
@@ -70,8 +73,8 @@ export_to_C CldNewSeedFromLocal(msgst,ldb,sendfn,queueing,priolen,prioptr)
      void (*sendfn)();
      unsigned int queueing, priolen, *prioptr;
 {
-  int pe = rand() % CmiNumPe();
-  if (pe == CmiMyPe())
+  int pe = rand() % CkNumPes();
+  if (pe == CkMyPe())
     CsdEnqueueGeneral(msgst, queueing, priolen, prioptr);
   else
     (*sendfn)(msgst, pe);

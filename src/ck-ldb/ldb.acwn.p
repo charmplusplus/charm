@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.3  1995-08-14 18:39:44  brunner
+ * Revision 2.4  1995-10-27 21:35:54  jyelon
+ * changed NumPe --> NumPes
+ *
+ * Revision 2.3  1995/08/14  18:39:44  brunner
  * Oops, forgot to take out debugging printfs
  *
  * Revision 2.2  1995/08/14  16:08:02  brunner
@@ -354,8 +357,8 @@ entry BranchInit : (message DUMMYMSG * dmsg)
 	TRACE(CkPrintf("Enter Node LdbInit()\n"));
 	LdbBocNum = LdbBoc = MyBocNum();
 	ReadInit(LdbBocNum);
-	numPe = CmiNumPe();
-	myPE = CmiMyPe();
+	numPe = CkNumPes();
+	myPE = CkMyPe();
 	numNeighbours = CmiNumNeighbours(myPE);
 	lastPeZeroLoadIndex = 0;
 
@@ -429,7 +432,7 @@ public StripLDB(ldb)
 LDB_ELEMENT *ldb;
 {
     if ((numPe > 1) && (ldb->srcPE != myPE) 
-        &&  (ldb->srcPE != CmiNumPe()))
+        &&  (ldb->srcPE != CkNumPes()))
     		PrivateCall(RecvUpdateStatus(ldb));
 }
 
@@ -467,7 +470,7 @@ LDB_ELEMENT *ldb;
     ldb->piggybackLoad = CldMyLoad();
     /* ldb->msgHops = 0; shouldn't be here. Moved to NewChare From Local
 	on 5/22/93 by Sanjay */
-    if ((destPe >= 0) && (destPe < CmiNumPe()))
+    if ((destPe >= 0) && (destPe < CkNumPes()))
       PrivateCall(SentUpdateStatus(destPe));
 }
 

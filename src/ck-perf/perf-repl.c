@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-02 17:40:29  brunner
+ * Revision 2.1  1995-10-27 21:37:45  jyelon
+ * changed NumPe --> NumPes
+ *
+ * Revision 2.0  1995/06/02  17:40:29  brunner
  * Reorganized directory structure
  *
  * Revision 1.2  1995/04/13  20:55:09  sanjeev
@@ -161,7 +164,7 @@ log_init()
 	pe = CmiMyPe();
 
 	/* build log file name from pgm name and pe number */
-	length = strlen(pgm) + strlen(".") + CmiNumPe() + strlen(".log") + 1;
+	length = strlen(pgm) + strlen(".") + CmiNumPes() + strlen(".log") + 1;
 	event_file_name = (char *) CkAlloc(length);
 	sprintf(event_file_name, "%s.%d.rpy", pgm, pe);
 
@@ -304,7 +307,7 @@ int msg_type;
 	creation_index++;
  	if (msg_type==BocInitMsg || msg_type==BroadcastBocMsg ||
 			msg_type==DynamicBocInitMsg)
-		 creation_index += CmiNumPe()-1;
+		 creation_index += CmiNumPes()-1;
 
 	if (projections_replay)  {
 		int index = creation_index%MAXEVENTBUFSIZE;

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.9  1995-09-07 05:27:47  gursoy
+ * Revision 2.10  1995-10-27 21:31:25  jyelon
+ * changed NumPe --> NumPes
+ *
+ * Revision 2.9  1995/09/07  05:27:47  gursoy
  * fixed some missing CpvAccess usages.
  *
  * Revision 2.8  1995/09/06  21:48:50  jyelon
@@ -67,7 +70,7 @@ static char ident[] = "@(#)$Header$";
 typedef int **ARRAY_;
 CpvStaticDeclare(ARRAY_, HostStat);
 CpvStaticDeclare(ARRAY_, HostMemStatistics);
-CpvStaticDeclare(int, NumPe);
+CpvStaticDeclare(int, NumPes);
 
 extern CollectPerfFromNodes();
 extern CHARE_BLOCK *CreateChareBlock();
@@ -77,7 +80,7 @@ void statModuleInit()
 {
     CpvInitialize(ARRAY_, HostStat);
     CpvInitialize(ARRAY_, HostMemStatistics);
-    CpvInitialize(int, NumPe);
+    CpvInitialize(int, NumPes);
 }
 
 
@@ -89,7 +92,7 @@ StatInit()
 	CHARE_BLOCK *bocBlock;
 	int i;
 
-	CpvAccess(NumPe) = CmiNumPe();
+	CpvAccess(NumPes) = CmiNumPes();
 	CpvAccess(RecdStatMsg) = 1;
 	if (CmiMyPe() == 0)
 		CpvAccess(RecdStatMsg) = 0;
@@ -157,28 +160,28 @@ void *msgPtr, *localdataptr;
 	int i,j,k;
 	STAT_MSG *mPtr = (STAT_MSG *) msgPtr;
 
-TRACE(CmiPrintf("Host %d: Enter CollectFromNodes(): NumPe %d\n",
-	 CmiMyPe(), CpvAccess(NumPe)));
-	if (CpvAccess(NumPe) == CmiNumPe())
+TRACE(CmiPrintf("Host %d: Enter CollectFromNodes(): NumPes %d\n",
+	 CmiMyPe(), CpvAccess(NumPes)));
+	if (CpvAccess(NumPes) == CmiNumPes())
 	{
 	       CpvAccess(HostMemStatistics)=
-                              (int **) CmiAlloc(sizeof(int)*CpvAccess(NumPe));
+                              (int **) CmiAlloc(sizeof(int)*CpvAccess(NumPes));
 	       CkMemError(CpvAccess(HostMemStatistics));
-		for (i=0; i<CpvAccess(NumPe); i++)
+		for (i=0; i<CpvAccess(NumPes); i++)
 		{
 			CpvAccess(HostMemStatistics)[i] = 
                            (int *) CmiAlloc(sizeof(int)*MAXMEMSTAT);
 			CkMemError(CpvAccess(HostMemStatistics)[i]);
 		}
 		CpvAccess(HostStat) = 
-                           (int **) CmiAlloc(sizeof(int)*CpvAccess(NumPe));
+                           (int **) CmiAlloc(sizeof(int)*CpvAccess(NumPes));
 		CkMemError(CpvAccess(HostStat));
-		for (i=0; i<CpvAccess(NumPe); i++)
+		for (i=0; i<CpvAccess(NumPes); i++)
 		{
 			CpvAccess(HostStat)[i]=(int *)CmiAlloc(sizeof(int)*10);
 			CkMemError(CpvAccess(HostStat)[i]);
 		}
-		for (i=0; i<CpvAccess(NumPe); i++)
+		for (i=0; i<CpvAccess(NumPes); i++)
 		{
 			for (j=0; j<MAXMEMSTAT; j++)
 				CpvAccess(HostMemStatistics)[i][j] = 0;
@@ -186,7 +189,7 @@ TRACE(CmiPrintf("Host %d: Enter CollectFromNodes(): NumPe %d\n",
 				CpvAccess(HostStat)[i][j] = 0;
 		}
 	}
-	CpvAccess(NumPe)--;
+	CpvAccess(NumPes)--;
 
 	CpvAccess(HostStat)[mPtr->srcPE][0] = mPtr->chareQueueLength;
 	CpvAccess(HostStat)[mPtr->srcPE][1] = mPtr->forChareQueueLength;
@@ -202,7 +205,7 @@ TRACE(CmiPrintf("Host %d: Enter CollectFromNodes(): NumPe %d\n",
 	  CpvAccess(HostMemStatistics)[mPtr->srcPE][k] = mPtr->nodeMemStat[k];
 	
 	/* Exit when statistics from all the nodes have been received */
-	if (CpvAccess(NumPe) == 0)
+	if (CpvAccess(NumPes) == 0)
 	{
 		CpvAccess(RecdStatMsg) = 1;
 		if (CpvAccess(RecdPerfMsg)) ExitNode();
@@ -227,15 +230,15 @@ PrintOutStatistics()
 	if (CstatPrintQueueStats())
 	{
 		CmiPrintf("Queue Statistics: (NODE)[MaxChareQ, MaxForChareQ, MaxFixedChareQ]\n");
-		for (k=0; k < CmiNumPe(); k++)
+		for (k=0; k < CmiNumPes(); k++)
 		{
 			totalChareQ += CpvAccess(HostStat)[k][0];
 			totalForChareQ += CpvAccess(HostStat)[k][1];
 		}
 		CmiPrintf("Average Queue Sizes: [AvgMaxChareQ %d, AvgMaxForChareQ %d]\n",
-		    totalChareQ/CmiNumPe(), totalForChareQ/CmiNumPe());
+		    totalChareQ/CmiNumPes(), totalForChareQ/CmiNumPes());
 
-		for (k=0; k < CmiNumPe(); k++)
+		for (k=0; k < CmiNumPes(); k++)
 			CmiPrintf("(%d)[%d, %d, %d], ", k, 
                                    CpvAccess(HostStat)[k][0], 
                                    CpvAccess(HostStat)[k][1], 
@@ -245,7 +248,7 @@ PrintOutStatistics()
 
 
         if (CpvAccess(PrintChareStat) || CpvAccess(PrintSummaryStat))
-		for (k=0; k < CmiNumPe(); k++)
+		for (k=0; k < CmiNumPes(); k++)
 		{
 			totalCharesCrea += CpvAccess(HostStat)[k][3];
 			totalCharesProc += CpvAccess(HostStat)[k][4];
@@ -264,17 +267,17 @@ PrintOutStatistics()
 	{
 		CmiPrintf("\nPrinting Chare Statistics:\n");
 		CmiPrintf("Individual Chare Info: (NODE)[Created, Processed]\n");
-		for (k=0; k < CmiNumPe(); k++)
+		for (k=0; k < CmiNumPes(); k++)
 			CmiPrintf("(%d)[%d, %d], ", k, 
                           CpvAccess(HostStat)[k][3], CpvAccess(HostStat)[k][4]);
 		CmiPrintf("\nFor Chare Messages: ");
-		for (k=0; k < CmiNumPe(); k++)
+		for (k=0; k < CmiNumPes(); k++)
 			CmiPrintf("(%d)[%d, %d], ", k, 
                           CpvAccess(HostStat)[k][5],CpvAccess(HostStat)[k][6]);
 		CmiPrintf("\n");
 
 		CmiPrintf("For Boc Messages: ");
-		for (k=0; k < CmiNumPe(); k++)
+		for (k=0; k < CmiNumPes(); k++)
 			CmiPrintf("(%d)[%d, %d], ", k, 
                           CpvAccess(HostStat)[k][7], CpvAccess(HostStat)[k][8]);
 		CmiPrintf("\n\n");
@@ -289,7 +292,7 @@ PrintOutStatistics()
                 CmiPrintf(" Node     Unused         Allocated                   Freed\n");
                 CmiPrintf(" Node     (words)     (no.req, words)            (no.req, words)\n");
                 CmiPrintf("------   --------    ---------------------      ---------------------\n");
-		for (k=0; k < CmiNumPe(); k++)
+		for (k=0; k < CmiNumPes(); k++)
                         CmiPrintf("%4d    %8d     [%8d,%10d]      [%8d,%10d]\n",
                         k,CpvAccess(HostMemStatistics)[k][1],
                         CpvAccess(HostMemStatistics)[k][2],

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.12  1995-10-11 17:52:51  sanjeev
+ * Revision 2.13  1995-10-27 21:31:25  jyelon
+ * changed NumPe --> NumPes
+ *
+ * Revision 2.12  1995/10/11  17:52:51  sanjeev
  * fixed Charm++ chare creation
  *
  * Revision 2.11  1995/09/20  16:07:56  jyelon
@@ -43,7 +46,7 @@
  * Changes for LDB interface revision
  *
  * Revision 2.2  1995/06/29  21:32:35  narain
- * Added Extern declarations for LdbBocNum, numPe and LDB_ELEM_SIZE
+ * Added Extern declarations for LdbBocNum, NumPes and LDB_ELEM_SIZE
  *
  * Revision 2.1  1995/06/08  17:07:12  gursoy
  * Cpv macro changes done

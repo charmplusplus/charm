@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.14  1995-10-27 09:09:31  jyelon
+ * Revision 2.15  1995-10-27 21:31:25  jyelon
+ * changed NumPe --> NumPes
+ *
+ * Revision 2.14  1995/10/27  09:09:31  jyelon
  * *** empty log message ***
  *
  * Revision 2.13  1995/10/11  17:54:40  sanjeev
@@ -66,7 +69,7 @@
  * Now includes converse.h, to get declaration of sysDone
  *
  * Revision 1.10  1995/04/14  21:05:01  milind
- * Changed HostPeNum to NumPe
+ * Changed HostPeNum to NumPes
  *
  * Revision 1.9  1995/04/13  20:53:15  sanjeev
  * Changed Mc to Cmi

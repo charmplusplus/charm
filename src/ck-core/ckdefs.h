@@ -12,12 +12,15 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.9  1995-10-27 09:09:31  jyelon
+ * Revision 2.10  1995-10-27 21:31:25  jyelon
+ * changed NumPe --> NumPes
+ *
+ * Revision 2.9  1995/10/27  09:09:31  jyelon
  * *** empty log message ***
  *
  * Revision 2.8  1995/10/24  19:48:42  brunner
- * Added Ck* defines for all Mc functions.  For example, McTotalNumPe() ->
- * CkNumPe().
+ * Added Ck* defines for all Mc functions.  For example, McTotalNumPes() ->
+ * CkNumPes().
  *
  * Revision 2.7  1995/07/06  22:42:11  narain
  * Changes for LDB interface revision
@@ -109,8 +112,8 @@
 #define CkMyPe                  CmiMyPe
 #define  CMyPe                  CmiMyPe
 
-#define CkNumPe                 CmiNumPe
-#define  CNumPe                 CmiNumPe
+#define CkNumPes                 CmiNumPes
+#define  CNumPes                 CmiNumPes
 
 #define CkPrintf                CmiPrintf
 #define  CPrintf                CmiPrintf
@@ -172,11 +175,11 @@
 /* obsolete names */
 
 #define CMyPeNum                CmiMyPe
-#define CMaxPeNum               CmiNumPe
+#define CMaxPeNum               CmiNumPes
 
 #define McMyPeNum() CmiMyPe()
-#define McMaxPeNum() CmiNumPe()
-#define McTotalNumPe() CmiNumPe()   
+#define McMaxPeNum() CmiNumPes()
+#define McTotalNumPe() CmiNumPes()   
 #define McSpanTreeInit() CmiSpanTreeInit()
 #define McSpanTreeParent(node) CmiSpanTreeParent(node)
 #define McSpanTreeRoot() CmiSpanTreeRoot()

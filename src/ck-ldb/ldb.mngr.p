@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.2  1995-08-21 15:10:34  brunner
+ * Revision 2.3  1995-10-27 21:35:54  jyelon
+ * changed NumPe --> NumPes
+ *
+ * Revision 2.2  1995/08/21  15:10:34  brunner
  * Made changes to accomodate naming scheme and ldbcfnc.c.
  * The code compiles and seems to run ok, but I have not verified
  * whether any load balancing is actually being done.
@@ -91,7 +94,7 @@ extern void *CqsCreate();
 
 export_to_C CldGetLdbSize()
 {
-       printf("%d:CldGetLdbSize()\n",CmiMyPe());
+       printf("%d:CldGetLdbSize()\n",CkMyPe());
        return sizeof(LDB_ELEMENT);
 }
 
@@ -100,7 +103,7 @@ export_to_C CldCreateBoc()
 {
   DUMMYMSG *msg;
   
-  printf("%d:CldCreateBoc()\n",CmiMyPe());
+  printf("%d:CldCreateBoc()\n",CkMyPe());
   msg = (DUMMYMSG *)CkAllocMsg(DUMMYMSG);	
   CreateBoc(LDB, LDB@BranchInit, msg);
 }
@@ -110,14 +113,14 @@ export_to_C CldFillLdb(destPe, ldb)
   int destPe;
   void *ldb;
 {
-  printf("%d:CldFillLdb(%d,%x)\n",CmiMyPe(),destPe,ldb);
+  printf("%d:CldFillLdb(%d,%x)\n",CkMyPe(),destPe,ldb);
   BranchCall(ReadValue(LdbBocNum), LDB@FillLDB(destPe, (LDB_ELEMENT *)ldb));
 }
 
 export_to_C CldStripLdb(ldb)
      void *ldb;
 {
-  printf("%d:CldStripLdb(%x)\n",CmiMyPe(),ldb);
+  printf("%d:CldStripLdb(%x)\n",CkMyPe(),ldb);
   BranchCall(ReadValue(LdbBocNum), LDB@StripLDB((LDB_ELEMENT *)ldb));
 }
 
@@ -127,7 +130,7 @@ export_to_C CldNewSeedFromNet(msgst, ldb, sendfn)
      void *msgst, *ldb;
      void (*sendfn)();
 {
-  printf("%d:CldNewSeedFromNet(%x,%x,%x)\n",CmiMyPe(),msgst,ldb,sendfn);
+  printf("%d:CldNewSeedFromNet(%x,%x,%x)\n",CkMyPe(),msgst,ldb,sendfn);
   BranchCall(ReadValue(LdbBocNum), LDB@NewMsg_FromNet(msgst, ldb, sendfn) );
 }
 
@@ -135,33 +138,33 @@ export_to_C CldNewSeedFromLocal( msgst, ldb, sendfn)
      void *msgst, *ldb;
      void (*sendfn)();
 {
-  printf("%d:CldNewSeedFromLocal(%x,%x,%x)\n",CmiMyPe(),msgst,ldb,sendfn);
+  printf("%d:CldNewSeedFromLocal(%x,%x,%x)\n",CkMyPe(),msgst,ldb,sendfn);
   BranchCall(ReadValue(LdbBocNum), LDB@NewMsg_FromLocal(msgst, ldb, sendfn) );
 }
 
 export_to_C CldProcessMsg(msgPtr, localdataPtr)
      void *msgPtr, *localdataPtr;
 {
-  printf("%d:CldProcessMsg(%x,%x)\n",CmiMyPe(),msgPtr,localdataPtr);
+  printf("%d:CldProcessMsg(%x,%x)\n",CkMyPe(),msgPtr,localdataPtr);
   BranchCall(ReadValue(LdbBocNum), LDB@ProcessMsg(msgPtr, localdataPtr));
 }
 
 export_to_C CldProcessorIdle()
 {
-  printf("%d:CldProcessorIdle()\n",CmiMyPe());
+  printf("%d:CldProcessorIdle()\n",CkMyPe());
   BranchCall(ReadValue(LdbBocNum), LDB@ProcessorIdle());
 }
 
 
 export_to_C CldPeriodicCheckInit()
 {
-  printf("%d:CldPeriodicCheckInit()\n",CmiMyPe());
+  printf("%d:CldPeriodicCheckInit()\n",CkMyPe());
   BranchCall(ReadValue(LdbBocNum), LDB@PeriodicCheckInit());
 }
 
 export_to_C void CldPeriodicBossesRedist()
 {
-  printf("%d:CldPeriodicBossesRedist()\n",CmiMyPe());
+  printf("%d:CldPeriodicBossesRedist()\n",CkMyPe());
   BranchCall(ReadValue(LdbBocNum), LDB@PeriodicBossesRedist());
 }
 
@@ -182,7 +185,7 @@ export_to_C void CldPeriodicRedist()
   /*
     LdbPeriodicBossesRedist(bocNum);
     */
-  printf("%d:CldPeriodicRedist()\n",CmiMyPe());
+  printf("%d:CldPeriodicRedist()\n",CkMyPe());
   BranchCall(ReadValue(LdbBocNum), LDB@PeriodicKidsRedist());
   CallBocAfter(CldPeriodicRedist, ReadValue(LdbBocNum), 
 	       BOSS_REDIST_UPDATE_INTERVAL);
@@ -506,8 +509,8 @@ BranchOffice LDB {
       LdbBocNum = LdbBoc;
       ReadInit(LdbBocNum);
       
-      numPe = CmiNumPe();
-      myPE = CmiMyPe();
+      numPe = CkNumPes();
+      myPE = CkMyPe();
       controller = CONTROLLER(myPE);
       mycontroller = PrivateCall(MyController(myPE));
       exchanges = numBoss = 0;
@@ -554,7 +557,7 @@ BranchOffice LDB {
   {
     /*possible Neighbour update status from piggyback info from Node only*/
     if ((numPe > 1) && (ldb->srcPE != myPE) 
-	&&  (ldb->srcPE != CmiNumPe()) && controller)
+	&&  (ldb->srcPE != CkNumPes()) && controller)
       PrivateCall(RecvUpdateStatus(ldb));
   }
   
@@ -650,7 +653,7 @@ BranchOffice LDB {
     {
       statusMsg = (DUMMYMSG *) CkAllocMsg(DUMMYMSG);
 /*      CkMemError(statusMsg); */
-      statusMsg->srcPe = CmiMyPe();
+      statusMsg->srcPe = CkMyPe();
       ImmSendMsgBranch(RecvStatus, statusMsg, mycontroller);
       CallBocAfter(CldPeriodicKidStatus, LdbBoc,
 		   KID_STATUS_UPDATE_INTERVAL);
@@ -664,7 +667,7 @@ BranchOffice LDB {
 
       boss_statusMsg = (DUMMYMSG *) CkAllocMsg(DUMMYMSG);
 /*      CkMemError(boss_statusMsg); */
-      boss_statusMsg->srcPe = CmiMyPe();
+      boss_statusMsg->srcPe = CkMyPe();
       ImmSendMsgBranch(RecvStatus, boss_statusMsg, nbr_boss[index]);
       index = (index+1) % exchanges;
       CallBocAfter(CldPeriodicBossStatus, LdbBoc, 

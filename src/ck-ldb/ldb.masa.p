@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-29 21:19:36  narain
+ * Revision 2.1  1995-10-27 21:35:54  jyelon
+ * changed NumPe --> NumPes
+ *
+ * Revision 2.0  1995/06/29  21:19:36  narain
  * *** empty log message ***
  *
  ***************************************************************************/
@@ -143,8 +146,8 @@ entry BranchInit : (message DUMMYMSG * dmsg)
 
 	CpvAccess(LdbBocNum) = LdbBoc = MyBocNum();
 	CpvAccess(LDB_ELEM_SIZE) = sizeof(LDB_ELEMENT);
-	numPe = CmiNumPe();
-	myPE = CmiMyPe();
+	numPe = CkNumPes();
+	myPE = CkMyPe();
 	numNeighbours = CmiNumNeighbours(myPE);
 	SendingIdleMsg = 0;	
 }
@@ -214,7 +217,7 @@ int idlePE;
   else
     {				 /* Try to send chares */
       TRACE(CkPrintf("Give chares %3d =>%3d,NofChare=%3d\n",
-		     CmiMyPe(),idlePE,NofChares));
+		     CkMyPe(),idlePE,NofChares));
       cmsg = (CharesMsg *)CkAllocMsg(CharesMsg);
       CkMemError(cmsg);
       if(NofSent = CkMakeFreeCharesMessage(NofChares, cmsg))
@@ -270,7 +273,7 @@ public ProcessorIdle()
 
   if (SendingIdleMsg) 
     TRACE(CkPrintf("Idle count is%4d on PE#%3d(#ofPEs=%3d)\n",
-		   SendingIdleMsg,CmiMyPe(),numPe));
+		   SendingIdleMsg,CkMyPe(),numPe));
   
   SendingIdleMsg++;
   

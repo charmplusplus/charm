@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.7  1995-09-06 21:48:50  jyelon
+ * Revision 2.8  1995-10-27 21:31:25  jyelon
+ * changed NumPe --> NumPes
+ *
+ * Revision 2.7  1995/09/06  21:48:50  jyelon
  * Eliminated 'CkProcess_BocMsg', using 'CkProcess_ForChareMsg' instead.
  *
  * Revision 2.6  1995/09/01  02:13:17  jyelon
@@ -213,7 +216,7 @@ int tbl, key;
 	i = 83*key;
 	value = (map *) CmiAlloc(sizeof(map));
 	CkMemError(value);
-	value->penum = absolute(p % CmiNumPe());
+	value->penum = absolute(p % CmiNumPes());
 	value->index = absolute(i % MAX_TBL_SIZE);
 	return(value);
 }

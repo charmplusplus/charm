@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-02 17:40:29  brunner
+ * Revision 2.1  1995-10-27 21:37:45  jyelon
+ * changed NumPe --> NumPes
+ *
+ * Revision 2.0  1995/06/02  17:40:29  brunner
  * Reorganized directory structure
  *
  * Revision 1.2  1995/04/13  20:55:09  sanjeev
@@ -73,7 +76,7 @@ ENVELOPE *envelope;
 	if (msg_type==BocInitMsg ||
 			msg_type==BroadcastBocMsg ||
 			msg_type==DynamicBocInitMsg)
-				iteration = CmiNumPe(); 
+				iteration = CmiNumPes(); 
 
     SetEnv_event(envelope, current_event);
     SetEnv_pe(envelope, CmiMyPe());
@@ -186,7 +189,7 @@ log_init()
 
 	/* build log file name from pgm name and pe number */
 
-	length = strlen(pgm) + strlen(".") + CmiNumPe() +
+	length = strlen(pgm) + strlen(".") + CmiNumPes() +
 		 strlen(".log") + 1;
 	log_file_name = (char *) CkAlloc(length);
 	sprintf(log_file_name, "%s.%d.log", pgm, pe);
@@ -227,7 +230,7 @@ close_log()
         state_file_fd = (FILE *) fopen(state_file, "w");
 
         fprintf(state_file_fd, "MACHINE %s\n", machine);
-        fprintf(state_file_fd, "PROCESSORS %d\n", CmiNumPe());
+        fprintf(state_file_fd, "PROCESSORS %d\n", CmiNumPes());
         fprintf(state_file_fd, "END\n");
         fflush(state_file_fd);
         fclose(state_file_fd);

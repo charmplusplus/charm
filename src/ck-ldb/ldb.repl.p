@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-29 21:19:36  narain
+ * Revision 2.1  1995-10-27 21:35:54  jyelon
+ * changed NumPe --> NumPes
+ *
+ * Revision 2.0  1995/06/29  21:19:36  narain
  * *** empty log message ***
  *
  ***************************************************************************/
@@ -117,11 +120,11 @@ void *msg;
     destPE = determine_msg_trans(msg);
 /*
     TRACE(CkPrintf("[%d] Translation for event=%d, pe=%d, to %d\n",
-		   CmiMyPe(), GetEnv_event(x), GetEnv_pe(x), 
+		   CkMyPe(), GetEnv_event(x), GetEnv_pe(x), 
 		   destPE));
 */
   }
-  if (destPE == CmiMyPe())
+  if (destPE == CkMyPe())
     QsEnqUsrMsg(msg);
   else
     SEND_TO(msg, destPE);
@@ -151,8 +154,8 @@ entry BranchInit : (message DUMMYMSG * dmsg)
 	CpvAccess(LDB_ELEM_SIZE) = 0;
 	LdbBoc = MyBocNum();
 	CpvAccess(LdbBocNum) = LdbBoc;
-	NumPE = CmiNumPe();
-	myPE = CmiMyPe();
+	NumPE = CkNumPes();
+	myPE = CkMyPe();
 	numNeighbours = CmiNumNeighbours(myPE);
 	TRACE(CkPrintf("Node LdbInit() Done: NumPE %d, numNeighbours %d\n",
 		NumPE, numNeighbours));

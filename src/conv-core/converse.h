@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.32  1995-10-23 23:09:05  jyelon
+ * Revision 2.33  1995-10-27 21:39:32  jyelon
+ * changed NumPe --> NumPes
+ *
+ * Revision 2.32  1995/10/23  23:09:05  jyelon
  * *** empty log message ***
  *
  * Revision 2.31  1995/10/20  17:29:10  jyelon
@@ -262,21 +265,21 @@ double   CmiTimer  CMK_PROTO(());
 
 #ifdef CMK_CMIMYPE_IS_A_BUILTIN
 int CmiMyPe CMK_PROTO((void));
-int CmiNumPe CMK_PROTO((void));
+int CmiNumPes CMK_PROTO((void));
 #endif
 
 #ifdef CMK_CMIMYPE_IS_A_VARIABLE
 CpvExtern(int, Cmi_mype);
 CpvExtern(int, Cmi_numpe);
 #define CmiMyPe() CpvAccess(Cmi_mype)
-#define CmiNumPe() CpvAccess(Cmi_numpe)
+#define CmiNumPes() CpvAccess(Cmi_numpes)
 #endif
 
 #ifdef CMK_CMIMYPE_UNIPROCESSOR
 extern int Cmi_mype;
 extern int Cmi_numpe;
 #define CmiMyPe() Cmi_mype
-#define CmiNumPe() Cmi_numpe
+#define CmiNumPes() Cmi_numpes
 #endif
 
 #ifdef CMK_CMIPRINTF_IS_A_BUILTIN
