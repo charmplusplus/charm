@@ -2,6 +2,75 @@ What's New Since Charm/Converse 5.0
 ===================================
 
 --------------------------------------------------------------------------------
+New Supported Platforms:
+--------------------------------------------------------------------------------
+
+1. Win9x/2000/NT:  with Visual C++ or Cygwin gcc/g++, you can compile and run 
+   Charm++ programs on all Win32 platforms.
+   
+2. Scyld Beowulf:  Charm++ has been ported to the Linux-based Scyld Beowulf 
+   operating system. For more information on Scyld, see <http://www.scyld.com>
+
+3. MPI with VMI:   Charm++ has been ported to NCSA's Virtual Machine Interface,
+   which is an efficient messaging library for heterogeneous cluster 
+   communication.
+
+
+--------------------------------------------------------------------------------
+Summary of New Features:
+--------------------------------------------------------------------------------
+1. Dynamic Load balancing:
+   Chare migration is supported in the new release. Migration-based dynamic 
+   load balancing framework with various load balancing strategies library has 
+   been added.
+
+2. Chare Array
+   Charm++ array is supported. You can now create an array of Chare objects
+   and use array index to refer the Charm++ array elements. A reduction
+   library on top of Chare array has been implemented and included.
+
+3. Projections
+   Projections, a Java application for Charm++ program performance analysis and 
+   visualization, has been included and distributed in the new release. Two
+   trace modes are available: trace-projections and trace-summary. Trace-summary
+   is a light-weight trace library compared to trace-projections.
+
+4. AMPI
+   AMPI is a load-balancing based library for porting legacy MPI applications 
+   to Charm++. With few changes in the original MPI code to AMPI, the new
+   legacy MPI application on Charm++ will gain from Charm++'s adptive 
+   load balancing ability.
+
+5. Easy running
+   Charm++ is making running Charm++ program easier in this new release. 
+   "Charmrun" now available on all platforms with uniform command line syntax.
+   You can forget the difference between net-* versions and MPI versions,
+   and run charm++ application with this same charmrun command syntax. 
+   ++local option is added in charmrun for net-* version, it provides
+   simple local use of Charm and no longer require the ability to 
+   "rsh localhost" or a nodelist file in order to run charm only on the local
+   machine. This is especially attractive when you run Charm++ on Windows.
+
+6. New libraries:
+   Many new libraries have been added in this release. They include:
+   1) master-slave library: for writing manager-worker paradigm programs.
+   2) receiver library: provide asynchronous communication mode for chare array.
+   3) f90charm:  provides Fortran90 bindings for Charm++ Array.
+   4) BlueGene:  a Charm++/Converse emulator for IBM BlueGene.
+
+--------------------------------------------------------------------------------
+Summary of Changes:
+--------------------------------------------------------------------------------
+1. message declaration syntax in .ci file:
+   The message declaration syntax for packed/varsize messages has been changed.
+   The packed/varsize keywords are eliminated, and you can specify the actual
+   actual varsize arrays in the interface file and have the translator generate
+   alloc, pack and unpack.
+
+
+Here is the detailed list of Changes:
+
+--------------------------------------------------------------------------------
 Major Features:
 --------------------------------------------------------------------------------
 
