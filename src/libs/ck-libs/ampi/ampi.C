@@ -2037,6 +2037,7 @@ inline void sortedIndex(int n, int* arr, int* idx){
 	swapInt(idx[j+1],idx[j]);
 }
 CkVec<CkVec<int> > vecIndex(int count, int* arr){
+  CkAssert(count!=0);
   int *newidx = new int [count];
   int flag;
   sortedIndex(count,arr,newidx);
@@ -2132,6 +2133,7 @@ CDECL
 int AMPI_Waitall(int count, MPI_Request request[], MPI_Status sts[])
 {
   AMPIAPI("AMPI_Waitall");
+  if(count==0) return MPI_SUCCESS;
   int i,j;
   AmpiRequestList* reqs = getReqs();
   CkVec<CkVec<int> > reqvec = vecIndex(count,request);
@@ -2163,6 +2165,7 @@ CDECL
 int AMPI_Waitany(int count, MPI_Request *request, int *idx, MPI_Status *sts)
 {
   AMPIAPI("AMPI_Waitany");
+  if(count==0) return MPI_SUCCESS;
   int flag=0;
   CkVec<CkVec<int> > reqvec = vecIndex(count,request);
   while(count>0){
@@ -2183,6 +2186,7 @@ int AMPI_Waitsome(int incount, MPI_Request *array_of_requests, int *outcount,
                  int *array_of_indices, MPI_Status *array_of_statuses)
 {
   AMPIAPI("AMPI_Waitsome");
+  if(incount==0) return MPI_SUCCESS;
   MPI_Status sts;
   int i;
   int flag=0, realflag=0;
@@ -2263,6 +2267,7 @@ int AMPI_Test(MPI_Request *request, int *flag, MPI_Status *sts)
 CDECL
 int AMPI_Testany(int count, MPI_Request *request, int *index, int *flag, MPI_Status *sts){
   AMPIAPI("AMPI_Testany");
+  if(count==0) return MPI_SUCCESS;
   CkVec<CkVec<int> > reqvec = vecIndex(count,request);
   *flag=0;
   for(int i=0;i<reqvec.size();i++){
@@ -2280,6 +2285,7 @@ CDECL
 int AMPI_Testall(int count, MPI_Request *request, int *flag, MPI_Status *sts)
 {
   AMPIAPI("AMPI_Testall");
+  if(count==0) return MPI_SUCCESS;
   int tmpflag;
   int i,j;
   AmpiRequestList* reqs = getReqs();
@@ -2303,6 +2309,7 @@ int AMPI_Testsome(int incount, MPI_Request *array_of_requests, int *outcount,
                  int *array_of_indices, MPI_Status *array_of_statuses)
 {
   AMPIAPI("AMPI_Testsome");
+  if(incount==0) return MPI_SUCCESS;
   MPI_Status sts;
   int flag;
   int i;
