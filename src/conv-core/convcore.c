@@ -847,6 +847,7 @@ void ConverseCommonInit(char **argv)
   CmiDeliversInit();
   CsdInit(argv);
   CthSchedInit();
+  CldModuleInit();
 }
 
 void ConverseCommonExit(void)

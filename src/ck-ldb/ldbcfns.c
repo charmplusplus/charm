@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.7  1997-10-29 23:52:57  milind
+ * Revision 2.8  1997-12-22 21:57:26  jyelon
+ * Changed LDB initialization scheme.
+ *
+ * Revision 2.7  1997/10/29 23:52:57  milind
  * Fixed CthInitialize bug on uth machines.
  *
  * Revision 2.6  1997/07/30 17:31:04  jyelon
@@ -60,7 +63,7 @@ CpvDeclare(CldTOK_HOLDER*, Cldtokenlist);
 CpvDeclare(CldTOK_HOLDER*, Cldlasttoken);
 CpvDeclare(int, Cldhandlerid);
 
-void CldModuleInit()
+void CldCommonInit()
 {
   CpvInitialize(int, LDB_ELEM_SIZE);
   CpvInitialize(int, Cldnumseeds);

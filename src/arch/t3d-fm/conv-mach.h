@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.1  1997-07-30 22:22:19  rbrunner
+ * Revision 1.2  1997-12-22 21:58:29  jyelon
+ * Changed LDB initialization scheme.
+ *
+ * Revision 1.1  1997/07/30 22:22:19  rbrunner
  * Old t3d port, probably not working.
  *
  * Revision 1.21  1997/07/28 19:01:27  jyelon
@@ -103,6 +106,9 @@
 
 #define CMK_MALLOC_USE_GNU_MALLOC                          0
 #define CMK_MALLOC_USE_OS_BUILTIN                          1
+
+#define CMK_MEMORY_PAGESIZE                                8192
+#define CMK_MEMORY_PROTECTABLE                             0
 
 #define CMK_MSG_HEADER_SIZE_BYTES                          8
 #define CMK_MSG_HEADER_BLANK_SPACE                         0

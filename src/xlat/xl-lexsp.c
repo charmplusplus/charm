@@ -236,7 +236,7 @@ void yy_flush_buffer YY_PROTO(( YY_BUFFER_STATE b ));
 #define YY_FLUSH_BUFFER yy_flush_buffer( yy_current_buffer )
 
 YY_BUFFER_STATE yy_scan_buffer YY_PROTO(( char *base, yy_size_t size ));
-YY_BUFFER_STATE yy_scan_string YY_PROTO(( yyconst char *str ));
+YY_BUFFER_STATE yy_scan_string YY_PROTO(( yyconst char *yy_str ));
 YY_BUFFER_STATE yy_scan_bytes YY_PROTO(( yyconst char *bytes, int len ));
 
 static void *yy_flex_alloc YY_PROTO(( yy_size_t ));
@@ -282,27 +282,27 @@ static void yy_fatal_error YY_PROTO(( yyconst char msg[] ));
 	*yy_cp = '\0'; \
 	yy_c_buf_p = yy_cp;
 
-#define YY_NUM_RULES 65
-#define YY_END_OF_BUFFER 66
+#define YY_NUM_RULES 66
+#define YY_END_OF_BUFFER 67
 static yyconst short int yy_accept[157] =
     {   0,
-        0,    0,   66,   64,   60,   61,   17,   64,   64,   11,
-        5,   64,   12,   13,    9,    7,   43,    8,   16,   10,
-       56,   55,    3,   46,   24,   32,   25,    2,    1,   50,
-       14,   15,    6,   44,    4,   45,   18,   60,   29,    0,
-       59,    0,    0,    0,    0,    0,    0,   37,   30,   40,
+        0,    0,   67,   65,   61,   62,   17,   65,   65,   11,
+        5,   65,   12,   13,    9,    7,   43,    8,   16,   10,
+       57,   56,    3,   46,   24,   32,   25,    2,    1,   51,
+       14,   15,    6,   44,    4,   45,   18,   61,   29,    0,
+       60,    0,    0,   50,    0,    0,    0,   37,   30,   40,
         0,    0,   35,   20,   33,    0,   47,   48,   21,   34,
-       19,   53,   36,   52,   56,    0,    0,   56,   56,    0,
-       55,   55,   55,   22,   26,   28,   27,   23,    0,   50,
+       19,   54,   36,   53,   57,    0,    0,   57,   57,    0,
+       56,   56,   56,   22,   26,   28,   27,   23,    0,   51,
         0,   42,   41,   31,    0,    0,    0,    0,    0,    0,
-        0,   58,    0,    0,    0,   53,   52,    0,   52,    0,
+        0,   59,    0,    0,    0,   54,   53,    0,   53,    0,
 
-       54,   56,   56,   57,   55,   55,   39,   38,    0,    0,
+       55,   57,   57,   58,   56,   56,   39,   38,    0,    0,
         0,    0,   49,    0,    0,    0,    0,    0,    0,    0,
-       53,    0,   52,   54,   57,   57,    0,   51,    0,    0,
-        0,    0,    0,    0,    0,    0,    0,   57,   57,   51,
-        0,    0,    0,   63,    0,    0,    0,    0,    0,   63,
-       63,   62,    0,   62,   62,    0
+       54,    0,   53,   55,   58,   58,    0,   52,    0,    0,
+        0,    0,    0,    0,    0,    0,    0,   58,   58,   52,
+        0,    0,    0,   64,    0,    0,    0,    0,    0,   64,
+       64,   63,    0,   63,   63,    0
     } ;
 
 static yyconst int yy_ec[256] =
@@ -556,9 +556,9 @@ static char *yy_last_accepting_cpos;
 #define YY_MORE_ADJ 0
 #define YY_RESTORE_YY_MORE_OFFSET
 char *yytext;
-#line 1 "xl-lexsp.l"
+#line 1 "xl-lexsp.flex"
 #define INITIAL 0
-#line 3 "xl-lexsp.l"
+#line 3 "xl-lexsp.flex"
 #define YYSTYPE YSNPTR
 #include "xl-lex.h"
 #include "xl-yacc.tab.h"
@@ -585,7 +585,6 @@ int PrevToken=0;
 #ifdef yywrap
 #undef yywrap
 #endif
-#line 589 "lex.yy.c"
 
 /* Macros after this point can all be overridden by user definitions in
  * section 1.
@@ -736,9 +735,8 @@ YY_DECL
 	register char *yy_cp, *yy_bp;
 	register int yy_act;
 
-#line 43 "xl-lexsp.l"
+#line 43 "xl-lexsp.flex"
 
-#line 742 "lex.yy.c"
 
 	if ( yy_init )
 		{
@@ -823,237 +821,237 @@ do_action:	/* This label is used only to access EOF actions. */
 
 case 1:
 YY_RULE_SETUP
-#line 44 "xl-lexsp.l"
+#line 44 "xl-lexsp.flex"
 { strcpy(token,yytext);return(PrevToken=AT); }
 	YY_BREAK
 case 2:
 YY_RULE_SETUP
-#line 45 "xl-lexsp.l"
+#line 45 "xl-lexsp.flex"
 { mywriteoutput("?",NOCREATE);strcpy(token,yytext);return(PrevToken=QUESTION); }
 	YY_BREAK
 case 3:
 YY_RULE_SETUP
-#line 46 "xl-lexsp.l"
+#line 46 "xl-lexsp.flex"
 { strcpy(token,yytext);return(PrevToken=COLON); }
 	YY_BREAK
 case 4:
 YY_RULE_SETUP
-#line 47 "xl-lexsp.l"
+#line 47 "xl-lexsp.flex"
 { mywriteoutput("|",NOCREATE);strcpy(token,yytext);return(PrevToken=OR); }
 	YY_BREAK
 case 5:
 YY_RULE_SETUP
-#line 48 "xl-lexsp.l"
+#line 48 "xl-lexsp.flex"
 { mywriteoutput("&",NOCREATE);strcpy(token,yytext);return(PrevToken=AND); }
 	YY_BREAK
 case 6:
 YY_RULE_SETUP
-#line 49 "xl-lexsp.l"
+#line 49 "xl-lexsp.flex"
 { mywriteoutput("^",NOCREATE);strcpy(token,yytext);return(PrevToken=HAT); }
 	YY_BREAK
 case 7:
 YY_RULE_SETUP
-#line 50 "xl-lexsp.l"
+#line 50 "xl-lexsp.flex"
 { mywriteoutput("+",NOCREATE);strcpy(token,yytext);return(PrevToken=PLUS); }
 	YY_BREAK
 case 8:
 YY_RULE_SETUP
-#line 51 "xl-lexsp.l"
+#line 51 "xl-lexsp.flex"
 { mywriteoutput("-",NOCREATE);strcpy(token,yytext);return(PrevToken=MINUS); }
 	YY_BREAK
 case 9:
 YY_RULE_SETUP
-#line 52 "xl-lexsp.l"
+#line 52 "xl-lexsp.flex"
 { mywriteoutput("*",NOCREATE);strcpy(token,yytext);return(PrevToken=MULT); }
 	YY_BREAK
 case 10:
 YY_RULE_SETUP
-#line 53 "xl-lexsp.l"
+#line 53 "xl-lexsp.flex"
 { mywriteoutput("/",NOCREATE);strcpy(token,yytext);return(PrevToken=DIV); }
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
-#line 54 "xl-lexsp.l"
+#line 54 "xl-lexsp.flex"
 { mywriteoutput("%",NOCREATE);strcpy(token,yytext);return(PrevToken=MOD); }
 	YY_BREAK
 case 12:
 YY_RULE_SETUP
-#line 55 "xl-lexsp.l"
+#line 55 "xl-lexsp.flex"
 { mywriteoutput("(",NOCREATE);strcpy(token,yytext);return(PrevToken=L_PAREN); }
 	YY_BREAK
 case 13:
 YY_RULE_SETUP
-#line 56 "xl-lexsp.l"
+#line 56 "xl-lexsp.flex"
 { mywriteoutput(")",NOCREATE);strcpy(token,yytext);return(PrevToken=R_PAREN); }
 	YY_BREAK
 case 14:
 YY_RULE_SETUP
-#line 57 "xl-lexsp.l"
+#line 57 "xl-lexsp.flex"
 { mywriteoutput("[",NOCREATE);strcpy(token,yytext);return(PrevToken=L_SQUARE); }
 	YY_BREAK
 case 15:
 YY_RULE_SETUP
-#line 58 "xl-lexsp.l"
+#line 58 "xl-lexsp.flex"
 { mywriteoutput("]",NOCREATE);strcpy(token,yytext);return(PrevToken=R_SQUARE); }
 	YY_BREAK
 case 16:
 YY_RULE_SETUP
-#line 59 "xl-lexsp.l"
+#line 59 "xl-lexsp.flex"
 { mywriteoutput(".",NOCREATE);strcpy(token,yytext);return(PrevToken=DOT); }
 	YY_BREAK
 case 17:
 YY_RULE_SETUP
-#line 60 "xl-lexsp.l"
+#line 60 "xl-lexsp.flex"
 { mywriteoutput("!",NOCREATE);strcpy(token,yytext);return(PrevToken=EXCLAIM); }
 	YY_BREAK
 case 18:
 YY_RULE_SETUP
-#line 61 "xl-lexsp.l"
+#line 61 "xl-lexsp.flex"
 { mywriteoutput("~",NOCREATE);strcpy(token,yytext);return(PrevToken=TILDE); }
 	YY_BREAK
 case 19:
 YY_RULE_SETUP
-#line 62 "xl-lexsp.l"
+#line 62 "xl-lexsp.flex"
 { mywriteoutput("->",NOCREATE);strcpy(token,yytext);return(PrevToken=POINTERREF); }
 	YY_BREAK
 case 20:
 YY_RULE_SETUP
-#line 63 "xl-lexsp.l"
+#line 63 "xl-lexsp.flex"
 { mywriteoutput("++",CREATE);strcpy(token,yytext);return(PrevToken=INCDEC); }
 	YY_BREAK
 case 21:
 YY_RULE_SETUP
-#line 64 "xl-lexsp.l"
+#line 64 "xl-lexsp.flex"
 { mywriteoutput("--",CREATE);strcpy(token,yytext);return(PrevToken=INCDEC); }
 	YY_BREAK
 case 22:
 YY_RULE_SETUP
-#line 65 "xl-lexsp.l"
+#line 65 "xl-lexsp.flex"
 { mywriteoutput("<<",CREATE);strcpy(token,yytext);return(PrevToken=SHIFT); }
 	YY_BREAK
 case 23:
 YY_RULE_SETUP
-#line 66 "xl-lexsp.l"
+#line 66 "xl-lexsp.flex"
 { mywriteoutput(">>",CREATE);strcpy(token,yytext);return(PrevToken=SHIFT); }
 	YY_BREAK
 case 24:
 YY_RULE_SETUP
-#line 67 "xl-lexsp.l"
+#line 67 "xl-lexsp.flex"
 { mywriteoutput("<",CREATE);strcpy(token,yytext);return(PrevToken=COMPARE); }
 	YY_BREAK
 case 25:
 YY_RULE_SETUP
-#line 68 "xl-lexsp.l"
+#line 68 "xl-lexsp.flex"
 { mywriteoutput(">",CREATE);strcpy(token,yytext);return(PrevToken=COMPARE); }
 	YY_BREAK
 case 26:
 YY_RULE_SETUP
-#line 69 "xl-lexsp.l"
+#line 69 "xl-lexsp.flex"
 { mywriteoutput("<=",CREATE);strcpy(token,yytext);return(PrevToken=COMPARE); }
 	YY_BREAK
 case 27:
 YY_RULE_SETUP
-#line 70 "xl-lexsp.l"
+#line 70 "xl-lexsp.flex"
 { mywriteoutput(">=",CREATE);strcpy(token,yytext);return(PrevToken=COMPARE); }
 	YY_BREAK
 case 28:
 YY_RULE_SETUP
-#line 71 "xl-lexsp.l"
+#line 71 "xl-lexsp.flex"
 { mywriteoutput("==",NOCREATE);strcpy(token,yytext);return(PrevToken=EQUALEQUAL); }
 	YY_BREAK
 case 29:
 YY_RULE_SETUP
-#line 72 "xl-lexsp.l"
+#line 72 "xl-lexsp.flex"
 { mywriteoutput("!=",NOCREATE);strcpy(token,yytext);return(PrevToken=NOTEQUAL); }
 	YY_BREAK
 case 30:
 YY_RULE_SETUP
-#line 73 "xl-lexsp.l"
+#line 73 "xl-lexsp.flex"
 { mywriteoutput("&&",NOCREATE);strcpy(token,yytext);return(PrevToken=ANDAND); }
 	YY_BREAK
 case 31:
 YY_RULE_SETUP
-#line 74 "xl-lexsp.l"
+#line 74 "xl-lexsp.flex"
 { mywriteoutput("||",NOCREATE);strcpy(token,yytext);return(PrevToken=OROR); }
 	YY_BREAK
 case 32:
 YY_RULE_SETUP
-#line 75 "xl-lexsp.l"
+#line 75 "xl-lexsp.flex"
 { mywriteoutput("=",NOCREATE);strcpy(token,yytext);return(PrevToken=EQUAL); }
 	YY_BREAK
 case 33:
 YY_RULE_SETUP
-#line 76 "xl-lexsp.l"
+#line 76 "xl-lexsp.flex"
 { mywriteoutput("+=",CREATE);strcpy(token,yytext);return(PrevToken=ASGNOP); }
 	YY_BREAK
 case 34:
 YY_RULE_SETUP
-#line 77 "xl-lexsp.l"
+#line 77 "xl-lexsp.flex"
 { mywriteoutput("-=",CREATE);strcpy(token,yytext);return(PrevToken=ASGNOP); }
 	YY_BREAK
 case 35:
 YY_RULE_SETUP
-#line 78 "xl-lexsp.l"
+#line 78 "xl-lexsp.flex"
 { mywriteoutput("*=",CREATE);strcpy(token,yytext);return(PrevToken=ASGNOP); }
 	YY_BREAK
 case 36:
 YY_RULE_SETUP
-#line 79 "xl-lexsp.l"
+#line 79 "xl-lexsp.flex"
 { mywriteoutput("/=",CREATE);strcpy(token,yytext);return(PrevToken=ASGNOP); }
 	YY_BREAK
 case 37:
 YY_RULE_SETUP
-#line 80 "xl-lexsp.l"
+#line 80 "xl-lexsp.flex"
 { mywriteoutput("%=",CREATE);strcpy(token,yytext);return(PrevToken=ASGNOP); }
 	YY_BREAK
 case 38:
 YY_RULE_SETUP
-#line 81 "xl-lexsp.l"
+#line 81 "xl-lexsp.flex"
 { mywriteoutput(">>=",CREATE);strcpy(token,yytext);return(PrevToken=ASGNOP); }
 	YY_BREAK
 case 39:
 YY_RULE_SETUP
-#line 82 "xl-lexsp.l"
+#line 82 "xl-lexsp.flex"
 { mywriteoutput("<<=",CREATE);strcpy(token,yytext);return(PrevToken=ASGNOP); }
 	YY_BREAK
 case 40:
 YY_RULE_SETUP
-#line 83 "xl-lexsp.l"
+#line 83 "xl-lexsp.flex"
 { mywriteoutput("&=",CREATE);strcpy(token,yytext);return(PrevToken=ASGNOP); }
 	YY_BREAK
 case 41:
 YY_RULE_SETUP
-#line 84 "xl-lexsp.l"
+#line 84 "xl-lexsp.flex"
 { mywriteoutput("|=",CREATE);strcpy(token,yytext);return(PrevToken=ASGNOP); }
 	YY_BREAK
 case 42:
 YY_RULE_SETUP
-#line 85 "xl-lexsp.l"
+#line 85 "xl-lexsp.flex"
 { mywriteoutput("^=",CREATE);strcpy(token,yytext);return(PrevToken=ASGNOP); }
 	YY_BREAK
 case 43:
 YY_RULE_SETUP
-#line 86 "xl-lexsp.l"
+#line 86 "xl-lexsp.flex"
 { mywriteoutput(",",NOCREATE);strcpy(token,yytext);return(PrevToken=COMMA); }
 	YY_BREAK
 case 44:
 YY_RULE_SETUP
-#line 87 "xl-lexsp.l"
+#line 87 "xl-lexsp.flex"
 { strcpy(token,yytext);return(PrevToken=L_BRACE); }
 	YY_BREAK
 case 45:
 YY_RULE_SETUP
-#line 88 "xl-lexsp.l"
+#line 88 "xl-lexsp.flex"
 { strcpy(token,yytext);return(PrevToken=R_BRACE); }
 	YY_BREAK
 case 46:
 YY_RULE_SETUP
-#line 89 "xl-lexsp.l"
+#line 89 "xl-lexsp.flex"
 { mywriteoutput(";",NOCREATE);strcpy(token,yytext);return(PrevToken=SEMICOLON); }
 	YY_BREAK
 case 47:
 YY_RULE_SETUP
-#line 90 "xl-lexsp.l"
+#line 90 "xl-lexsp.flex"
 { int i,count=0;
 		
 		  strcpy(token,yytext);
@@ -1065,7 +1063,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 48:
 YY_RULE_SETUP
-#line 98 "xl-lexsp.l"
+#line 98 "xl-lexsp.flex"
 { int i,count=0;
 		
 		  for (i=0;i<yyleng;i++)
@@ -1075,7 +1073,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 49:
 YY_RULE_SETUP
-#line 105 "xl-lexsp.l"
+#line 106 "xl-lexsp.flex"
 { int i=0,j=0;
 						  char temp[FILENAMELENGTH];
 
@@ -1097,7 +1095,24 @@ YY_RULE_SETUP
 	YY_BREAK
 case 50:
 YY_RULE_SETUP
-#line 124 "xl-lexsp.l"
+#line 125 "xl-lexsp.flex"
+{ int i=0,j=0;
+						  char temp[FILENAMELENGTH];
+
+						  while ((yytext[i]<'0')||
+						         (yytext[i]>'9')) 
+							i++;
+						  while ((yytext[i]>='0') &&
+							 (yytext[i]<='9'))
+							temp[j++]=yytext[i++];
+						  temp[j]='\0';
+						  CurrentInputLineNo = 
+							atoi(temp);
+						}
+	YY_BREAK
+case 51:
+YY_RULE_SETUP
+#line 139 "xl-lexsp.flex"
 { int retvalue;
 		
 			      strcpy(token,yytext);
@@ -1119,9 +1134,9 @@ YY_RULE_SETUP
 				   }
 			    }
 	YY_BREAK
-case 51:
+case 52:
 YY_RULE_SETUP
-#line 145 "xl-lexsp.l"
+#line 160 "xl-lexsp.flex"
 { SYMTABPTR worksymtab;
 			  char *modname,*name,*string;
 			  int i;char ch;
@@ -1151,74 +1166,73 @@ YY_RULE_SETUP
 			  }
 			}
 	YY_BREAK
-case 52:
-#line 175 "xl-lexsp.l"
 case 53:
-#line 176 "xl-lexsp.l"
+#line 190 "xl-lexsp.flex"
 case 54:
-#line 177 "xl-lexsp.l"
+#line 191 "xl-lexsp.flex"
 case 55:
-#line 178 "xl-lexsp.l"
+#line 192 "xl-lexsp.flex"
 case 56:
-#line 179 "xl-lexsp.l"
+#line 193 "xl-lexsp.flex"
 case 57:
+#line 194 "xl-lexsp.flex"
+case 58:
 YY_RULE_SETUP
-#line 179 "xl-lexsp.l"
+#line 194 "xl-lexsp.flex"
 { mywriteoutput(yytext,CREATE);
 				  strcpy(token,yytext);return(PrevToken=NUMBER);                
 				}
 	YY_BREAK
-case 58:
+case 59:
 YY_RULE_SETUP
-#line 183 "xl-lexsp.l"
+#line 198 "xl-lexsp.flex"
 {
 				mywriteoutput(yytext,CREATE);
 		                  strcpy(token,yytext);return(PrevToken=CHAR_CONST);              }
 	YY_BREAK
-case 59:
+case 60:
 YY_RULE_SETUP
-#line 187 "xl-lexsp.l"
+#line 202 "xl-lexsp.flex"
 { mywriteoutput(yytext,CREATE);
                                   strcpy(token,yytext);return(PrevToken=STRING);
                                 }
 	YY_BREAK
-case 60:
-YY_RULE_SETUP
-#line 191 "xl-lexsp.l"
-{ writeoutput(yytext,NOFREE); }        /* Skip whitespace...*/
-	YY_BREAK
 case 61:
 YY_RULE_SETUP
-#line 192 "xl-lexsp.l"
+#line 206 "xl-lexsp.flex"
+{ writeoutput(yytext,NOFREE); }        /* Skip whitespace...*/
+	YY_BREAK
+case 62:
+YY_RULE_SETUP
+#line 207 "xl-lexsp.flex"
 { CurrentInputLineNo++; WriteReturn(); 
 		/*printf("%d Line\n",yylineno);*/
 		}
 	YY_BREAK
-case 62:
-YY_RULE_SETUP
-#line 196 "xl-lexsp.l"
-{writeoutput(yytext,NOFREE);
-				 	CurrentInputLineNo++;
-					WriteReturn();}
-	YY_BREAK
 case 63:
 YY_RULE_SETUP
-#line 200 "xl-lexsp.l"
+#line 211 "xl-lexsp.flex"
 {writeoutput(yytext,NOFREE);
 				 	CurrentInputLineNo++;
 					WriteReturn();}
 	YY_BREAK
 case 64:
 YY_RULE_SETUP
-#line 204 "xl-lexsp.l"
-{ error("Lexical Oddity",EXIT); }
+#line 215 "xl-lexsp.flex"
+{writeoutput(yytext,NOFREE);
+				 	CurrentInputLineNo++;
+					WriteReturn();}
 	YY_BREAK
 case 65:
 YY_RULE_SETUP
-#line 206 "xl-lexsp.l"
+#line 219 "xl-lexsp.flex"
+{ error("Lexical Oddity",EXIT); }
+	YY_BREAK
+case 66:
+YY_RULE_SETUP
+#line 221 "xl-lexsp.flex"
 ECHO;
 	YY_BREAK
-#line 1222 "lex.yy.c"
 case YY_STATE_EOF(INITIAL):
 	yyterminate();
 
@@ -1402,7 +1416,7 @@ static int yy_get_next_buffer()
 		/* don't do the read, it's not guaranteed to return an EOF,
 		 * just force an EOF
 		 */
-		yy_n_chars = 0;
+		yy_current_buffer->yy_n_chars = yy_n_chars = 0;
 
 	else
 		{
@@ -1457,6 +1471,8 @@ static int yy_get_next_buffer()
 		/* Read in more data. */
 		YY_INPUT( (&yy_current_buffer->yy_ch_buf[number_to_move]),
 			yy_n_chars, num_to_read );
+
+		yy_current_buffer->yy_n_chars = yy_n_chars;
 		}
 
 	if ( yy_n_chars == 0 )
@@ -1581,7 +1597,8 @@ register char *yy_bp;
 
 		yy_cp += (int) (dest - source);
 		yy_bp += (int) (dest - source);
-		yy_n_chars = yy_current_buffer->yy_buf_size;
+		yy_current_buffer->yy_n_chars =
+			yy_n_chars = yy_current_buffer->yy_buf_size;
 
 		if ( yy_cp < yy_current_buffer->yy_ch_buf + 2 )
 			YY_FATAL_ERROR( "flex scanner push-back overflow" );
@@ -1624,13 +1641,26 @@ static int input()
 
 			switch ( yy_get_next_buffer() )
 				{
+				case EOB_ACT_LAST_MATCH:
+					/* This happens because yy_g_n_b()
+					 * sees that we've accumulated a
+					 * token and flags that we need to
+					 * try matching the token before
+					 * proceeding.  But for input(),
+					 * there's no matching to consider.
+					 * So convert the EOB_ACT_LAST_MATCH
+					 * to EOB_ACT_END_OF_FILE.
+					 */
+
+					/* Reset buffer status. */
+					yyrestart( yyin );
+
+					/* fall through */
+
 				case EOB_ACT_END_OF_FILE:
 					{
 					if ( yywrap() )
-						{
-						yy_c_buf_p = yytext_ptr + offset;
 						return EOF;
-						}
 
 					if ( ! yy_did_buffer_switch_on_eof )
 						YY_NEW_FILE;
@@ -1644,15 +1674,6 @@ static int input()
 				case EOB_ACT_CONTINUE_SCAN:
 					yy_c_buf_p = yytext_ptr + offset;
 					break;
-
-				case EOB_ACT_LAST_MATCH:
-#ifdef __cplusplus
-					YY_FATAL_ERROR(
-					"unexpected last match in yyinput()" );
-#else
-					YY_FATAL_ERROR(
-					"unexpected last match in input()" );
-#endif
 				}
 			}
 		}
@@ -1816,6 +1837,9 @@ YY_BUFFER_STATE b;
 #endif
 
 	{
+	if ( ! b )
+		return;
+
 	b->yy_n_chars = 0;
 
 	/* We always need two end-of-buffer characters.  The first causes
@@ -1875,17 +1899,17 @@ yy_size_t size;
 
 #ifndef YY_NO_SCAN_STRING
 #ifdef YY_USE_PROTOS
-YY_BUFFER_STATE yy_scan_string( yyconst char *str )
+YY_BUFFER_STATE yy_scan_string( yyconst char *yy_str )
 #else
-YY_BUFFER_STATE yy_scan_string( str )
-yyconst char *str;
+YY_BUFFER_STATE yy_scan_string( yy_str )
+yyconst char *yy_str;
 #endif
 	{
 	int len;
-	for ( len = 0; str[len]; ++len )
+	for ( len = 0; yy_str[len]; ++len )
 		;
 
-	return yy_scan_bytes( str, len );
+	return yy_scan_bytes( yy_str, len );
 	}
 #endif
 
@@ -2094,7 +2118,7 @@ int main()
 	return 0;
 	}
 #endif
-#line 206 "xl-lexsp.l"
+#line 221 "xl-lexsp.flex"
 
 
 yywrap(){ PrevToken=0; return(1); }

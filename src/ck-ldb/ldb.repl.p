@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.2  1995-10-27 22:09:16  jyelon
+ * Revision 2.3  1997-12-22 21:57:25  jyelon
+ * Changed LDB initialization scheme.
+ *
+ * Revision 2.2  1995/10/27 22:09:16  jyelon
  * Changed Cmi to Ck in all charm files.
  *
  * Revision 2.1  1995/10/27  21:35:54  jyelon
@@ -31,6 +34,10 @@ message {
     int dummy;
 } DUMMYMSG;
 
+export_to_C CldModuleInit()
+{
+  CldCommonInit();
+}
 
 export_to_C setLdbSize()
 {

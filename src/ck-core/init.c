@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.49  1997-12-12 05:03:41  jyelon
+ * Revision 2.50  1997-12-22 21:57:09  jyelon
+ * Changed LDB initialization scheme.
+ *
+ * Revision 2.49  1997/12/12 05:03:41  jyelon
  * Fixed bug, wasn't doing CmiGrabBuffer.
  *
  * Revision 2.48  1997/10/29 23:52:47  milind
@@ -334,7 +337,6 @@ char **argv;
   registerModuleInit();
   statModuleInit();
   tblModuleInit(); 
-  CldModuleInit();
   futuresModuleInit();
 
   if (CmiMyRank() == 0) CmiNodeBarrier();
@@ -653,9 +655,6 @@ ENVELOPE       *envelope;
 
 void SysPeriodicCheckInit(void)
 {
-	/*
-	CldPeriodicCheckInit();
-	*/
 }
 
 

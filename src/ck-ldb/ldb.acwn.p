@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.12  1997-07-30 17:31:02  jyelon
+ * Revision 2.13  1997-12-22 21:57:17  jyelon
+ * Changed LDB initialization scheme.
+ *
+ * Revision 2.12  1997/07/30 17:31:02  jyelon
  * *** empty log message ***
  *
  * Revision 2.11  1996/02/08 23:52:06  sanjeev
@@ -147,6 +150,11 @@ extern int CldPickSeedAndSend();
 #define LIGHT 1
 #define MODERATE 2
 #define HEAVY 3
+
+export_to_C CldModuleInit()
+{
+  CldCommonInit();
+}
 
 export_to_C CldGetLdbSize()
 {

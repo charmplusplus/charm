@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.3  1995-10-27 21:35:54  jyelon
+ * Revision 2.4  1997-12-22 21:57:23  jyelon
+ * Changed LDB initialization scheme.
+ *
+ * Revision 2.3  1995/10/27 21:35:54  jyelon
  * changed NumPe --> NumPes
  *
  * Revision 2.2  1995/07/19  22:15:20  jyelon
@@ -36,8 +39,9 @@
 module ldb {
 #include "ldb.h"
 
-export_to_C CldInit()
+export_to_C CldModuleInit()
 {
+  CldCommonInit();
 }
 
 export_to_C CldGetLdbSize()

@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.1  1997-08-06 14:57:37  milind
+ * Revision 1.2  1997-12-22 21:58:16  jyelon
+ * Changed LDB initialization scheme.
+ *
+ * Revision 1.1  1997/08/06 14:57:37  milind
  * Added net-linux and sim-linux versions.
  * Fixed some bugs in Makefile.
  * Fixed a bug in machine.c in common.sim.
@@ -108,6 +111,9 @@
 
 #define CMK_MALLOC_USE_GNU_MALLOC                          0
 #define CMK_MALLOC_USE_OS_BUILTIN                          1
+
+#define CMK_MEMORY_PAGESIZE                                8192
+#define CMK_MEMORY_PROTECTABLE                             1
 
 #define CMK_MSG_HEADER_SIZE_BYTES                          4
 #define CMK_MSG_HEADER_BLANK_SPACE                         0

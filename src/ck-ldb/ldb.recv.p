@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.2  1995-10-27 22:09:16  jyelon
+ * Revision 2.3  1997-12-22 21:57:24  jyelon
+ * Changed LDB initialization scheme.
+ *
+ * Revision 2.2  1995/10/27 22:09:16  jyelon
  * Changed Cmi to Ck in all charm files.
  *
  * Revision 2.1  1995/10/27  21:35:54  jyelon
@@ -61,11 +64,15 @@ typedef struct {
 	int srcPE;
 } LDB_ELEMENT;
 
-export_to_C setLdbSize()
+export_to_C CldModuleInit()
 {
-       CpvAccess(LDB_ELEM_SIZE) = sizeof(LDB_ELEMENT);
+  CldCommonInit();
 }
 
+export_to_C setLdbSize()
+{
+  CpvAccess(LDB_ELEM_SIZE) = sizeof(LDB_ELEMENT);
+}
 
 export_to_C LdbCreateBoc()
 {

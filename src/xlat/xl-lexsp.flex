@@ -102,6 +102,7 @@ WS     [ \t\n]*
 		  CurrentInputLineNo += count;
 		  mywriteoutput(",} ",NOCREATE);return(PrevToken=COMMA_R_BRACE); }
 
+
 "#"{WhiteSpace}("line")?{WhiteSpace}[0-9]+{WhiteSpace}\"{ASTRNG}\" { int i=0,j=0;
 						  char temp[FILENAMELENGTH];
 
@@ -119,6 +120,20 @@ WS     [ \t\n]*
 						  yytext[yyleng-1]='\0';
 						  strcpy(CurrentFileName,
 								yytext+i+1);
+						}
+
+"#"{WhiteSpace}("line")?{WhiteSpace}[0-9]+ { int i=0,j=0;
+						  char temp[FILENAMELENGTH];
+
+						  while ((yytext[i]<'0')||
+						         (yytext[i]>'9')) 
+							i++;
+						  while ((yytext[i]>='0') &&
+							 (yytext[i]<='9'))
+							temp[j++]=yytext[i++];
+						  temp[j]='\0';
+						  CurrentInputLineNo = 
+							atoi(temp);
 						}
 
 {ID}		           { int retvalue;

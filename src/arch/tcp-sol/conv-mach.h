@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 2.39  1997-08-06 20:36:20  jyelon
+ * Revision 2.40  1997-12-22 21:58:35  jyelon
+ * Changed LDB initialization scheme.
+ *
+ * Revision 2.39  1997/08/06 20:36:20  jyelon
  * Fixed bugs.
  *
  * Revision 2.38  1997/07/28 19:01:32  jyelon
@@ -100,6 +103,9 @@
 
 #define CMK_MALLOC_USE_GNU_MALLOC                          1
 #define CMK_MALLOC_USE_OS_BUILTIN                          0
+
+#define CMK_MEMORY_PAGESIZE                                8192
+#define CMK_MEMORY_PROTECTABLE                             1
 
 #define CMK_MSG_HEADER_SIZE_BYTES                          8
 #define CMK_MSG_HEADER_BLANK_SPACE                         0

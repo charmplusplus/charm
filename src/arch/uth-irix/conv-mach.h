@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.10  1997-12-10 21:59:33  jyelon
+ * Revision 1.11  1997-12-22 21:58:40  jyelon
+ * Changed LDB initialization scheme.
+ *
+ * Revision 1.10  1997/12/10 21:59:33  jyelon
  * Modified CmiDeliverSpecificMsg so that it works with uth version.
  *
  * Revision 1.9  1997/08/06 20:36:25  jyelon
@@ -117,6 +120,9 @@
 
 #define CMK_MALLOC_USE_GNU_MALLOC                          0
 #define CMK_MALLOC_USE_OS_BUILTIN                          1
+
+#define CMK_MEMORY_PAGESIZE                                8192
+#define CMK_MEMORY_PROTECTABLE                             0
 
 #define CMK_MSG_HEADER_SIZE_BYTES                          4
 #define CMK_MSG_HEADER_BLANK_SPACE                         0

@@ -117,6 +117,19 @@
 
 #define STACKSIZE (32768)
 
+#if CMK_MEMORY_PROTECTABLE
+
+#include "sys/mman.h"
+#define CthMemoryProtect(p,l) mprotect(p,l,PROT_NONE)
+#define CthMemoryUnprotect(p,l) mprotect(p,l,PROT_READ | PROT_WRITE)
+
+#else
+
+#define CthMemoryProtect(p,l) 
+#define CthMemoryUnprotect(p,l)
+
+#endif
+
 struct CthThreadStruct
 {
   char cmicore[CmiMsgHeaderSizeBytes];
@@ -130,7 +143,9 @@ struct CthThreadStruct
   int        Event;
 /** End Addition */
   CthThread  qnext;
-  int       *magic;
+  char      *protect;
+  int        protlen;
+  qt_t      *stack;
   qt_t      *stackp;
 };
 
@@ -196,18 +211,17 @@ CthThread t;
 
 void CthInit()
 {
-  static unsigned int fakemagic;
   CthThread t;
 
   CthCpvInitialize(char *,     CthData);
   CthCpvInitialize(CthThread,  CthCurrent);
   CthCpvInitialize(int,        CthDatasize);
   CthCpvInitialize(int,        CthExiting);
-  
+
   t = (CthThread)malloc(sizeof(struct CthThreadStruct));
+  t->protect = 0;
+  t->protlen = 0;
   CthThreadInit(t);
-  fakemagic = 0x12345678;
-  t->magic = &fakemagic;
   CthCpvAccess(CthData)=0;
   CthCpvAccess(CthCurrent)=t;
   CthCpvAccess(CthDatasize)=1;
@@ -233,7 +247,9 @@ CthThread t;
 
 static void *CthAbortHelp(qt_t *sp, CthThread old, void *null)
 {
+  CthMemoryUnprotect(old->protect, old->protlen);
   if (old->data) free(old->data);
+  free(old->stack);
   free(old);
   return (void *) 0;
 }
@@ -250,10 +266,6 @@ CthThread t;
   CthThread tc;
   tc = CthCpvAccess(CthCurrent);
   if (t == tc) return;
-  if ((*(tc->magic) != 0x12345678)||(*(t->magic) != 0x12345678)) {
-    CmiError("Thread corruption: probably, a thread overflowed its stack.\n");
-    exit(1);
-  }
   CthFixData(t);
   CthCpvAccess(CthCurrent) = t;
   CthCpvAccess(CthData) = t->data;
@@ -277,24 +289,25 @@ static void CthOnly(void *arg, void *vt, qt_userf_t fn)
 CthThread CthCreate(fn, arg, size)
 CthVoidFn fn; void *arg; int size;
 {
-  CthThread result; qt_t *stack, *stacka, *stackb; CMK_SIZE_T magic;
+  CthThread result; qt_t *stack, *stackbase, *stackp;
   if (size==0) size = STACKSIZE;
-  size += QT_STKALIGN;
-  result = (CthThread)malloc(sizeof(struct CthThreadStruct)+size);
-  if (result==0) { CmiError("Out of memory."); exit(1); }
-  stack = (qt_t*)(((char*)result)+sizeof(struct CthThreadStruct));
-  stack = (qt_t*)QT_STKROUNDUP(((CMK_SIZE_T)stack));
+  size = (size+(CMK_MEMORY_PAGESIZE*2)-1) & ~(CMK_MEMORY_PAGESIZE-1);
+  stack = (qt_t*)memalign(CMK_MEMORY_PAGESIZE, size);
+  result = (CthThread)malloc(sizeof(struct CthThreadStruct));
+  if ((stack==0)||(result==0)) { CmiError("Out of memory."); exit(1); }
   CthThreadInit(result);
-  stacka = QT_SP(stack, size - QT_STKALIGN);
-  stackb = QT_ARGS(stacka, arg, result, (qt_userf_t *)fn, CthOnly);
-  result->stackp = stackb;
-  if (stack==stacka) {
-    magic = ((CMK_SIZE_T)stack) + (size*7)/8;
+  stackbase = QT_SP(stack, size);
+  stackp = QT_ARGS(stackbase, arg, result, (qt_userf_t *)fn, CthOnly);
+  result->stack = stack;
+  result->stackp = stackp;
+  if (stack==stackbase) {
+    result->protect = ((char*)stack) + size - CMK_MEMORY_PAGESIZE;
+    result->protlen = CMK_MEMORY_PAGESIZE;
   } else {
-    magic = ((CMK_SIZE_T)stack) + (size/8);
+    result->protect = ((char*)stack);
+    result->protlen = CMK_MEMORY_PAGESIZE;
   }
-  result->magic = (int*)(magic & ~0xF);
-  *result->magic = 0x12345678;
+  CthMemoryProtect(result->protect, result->protlen);
   CthSetStrategyDefault(result);
   return result;
 }
