@@ -390,9 +390,11 @@ static void CmiReleaseSentMessages(void)
 
 #ifndef CMK_OPTIMIZE 
 #if ! CMK_TRACE_IN_CHARM
+  {
   double rel_end_time = CmiWallTimer();
   if(rel_end_time > rel_start_time + 50/1e6)
       traceUserBracketEvent(20, rel_start_time, rel_end_time);
+  }
 #endif
 #endif
 }
@@ -732,6 +734,7 @@ void CmiSyncSendFn(int destPE, int size, char *msg)
 
 void ElanBasicSendFn(SMSG_LIST * ptr){
     int tag = 0, sync_mode = 0;
+    int tiny_msg = 0;
     
     if (ptr->size <= SMALL_MESSAGE_SIZE)
         tag = TAG_SMALL;
@@ -743,9 +746,9 @@ void ElanBasicSendFn(SMSG_LIST * ptr){
     if(ptr->size > SYNC_MESSAGE_SIZE)
         sync_mode = ELAN_TPORT_TXSYNC;
     
-    int tiny_msg = 0; //A sizeof(int) byte message 
+    tiny_msg = 0; //A sizeof(int) byte message 
     //sent to wake up a blocked process
-
+    
     if(ptr->size > SMALL_MESSAGE_SIZE && blockingReceiveFlag) {
         elan_tportTxWait(elan_tportTxStart(elan_port, 0, ptr->destpe, 
                                            CmiMyPe(), TAG_LARGE_HEADER, 
@@ -873,11 +876,13 @@ void CmiFreeSendFn(int destPE, int size, char *msg)
     
 #ifndef CMK_OPTIMIZE 
 #if ! CMK_TRACE_IN_CHARM
+    {
     double snd_end_time = CmiWallTimer();
     if(snd_end_time > snd_start_time + 5/1e6) 
         traceUserBracketEvent(30, snd_start_time, snd_end_time);
     if((snd_end_time > snd_start_time + 5/1e3) && stretchFlag)
         CmiPrintf("%d:Stretched Send to %d at %5.3lfs of %5.5lf ms\n", CmiMyPe(), destPE, snd_end_time, (snd_end_time - snd_start_time)*1e3);
+    }
 #endif
 #endif
 }
@@ -1169,6 +1174,8 @@ void elan_CmiStaticFree(void *res){
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 {
   int n,i ;
+  int nslots;
+
 #if CMK_USE_HP_MAIN_FIX
 #if FOR_CPLUS
   _main(argc,argv);
@@ -1193,7 +1200,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     exit (1);
   }
   
-  int nslots = 32; //elan_base->tport_nslots * 2;
+  nslots = 32; //elan_base->tport_nslots * 2;
   
   //if(nslots < elan_base->state->nvp)
   //  nslots = elan_base->state->nvp;
@@ -1296,6 +1303,10 @@ extern void CmiReference(void *blk);
 void CmiFreeListSendFn(int npes, int *pes, int len, char *msg)
 {  
     static int ppn = 0;
+    char* elan_buf = NULL;
+    char *msg_start;
+    int rflag;
+    int i;
 
     if(ppn == 0) {
         int rms_nodes = 1;
@@ -1312,11 +1323,8 @@ void CmiFreeListSendFn(int npes, int *pes, int len, char *msg)
         //CmiPrintf("CmiListSyncSendAndFree PPN=%d\n", ppn);
     }    
 
-    char* elan_buf = NULL;
-    int i;
-
-    char *msg_start = USER_BUF_START(msg);
-    int rflag = REF_FIELD(msg_start); 
+    msg_start = USER_BUF_START(msg);
+    rflag = REF_FIELD(msg_start); 
 
     if(rflag != 1) {   
         //Is being referenced by the application dont mess around
