@@ -163,29 +163,26 @@ PUPmarshall(CProxyElement_ArrayBase);
 class CProxySection_ArrayBase:public CProxy_ArrayBase {
 private:
 	CkSectionID _sid;
-	CkArrayIndexMax *_elems;
-	int _nElems;
 public:
 	CProxySection_ArrayBase() { }
 	CProxySection_ArrayBase(const CkArrayID &aid,
 		const CkArrayIndexMax *elems, const int nElems, CkGroupID dTo)
-		:CProxy_ArrayBase(aid,dTo), _nElems(nElems) { 
-		_elems = new CkArrayIndexMax[nElems];
-		for (int i=0; i<nElems; i++) _elems[i] = elems[i]; }
+		:CProxy_ArrayBase(aid,dTo), _sid(elems, nElems) { }
 	CProxySection_ArrayBase(const CkArrayID &aid, 
 		const CkArrayIndexMax *elems, const int nElems) 
-		:CProxy_ArrayBase(aid), _nElems(nElems) { 
-		_elems = new CkArrayIndexMax[nElems];
-		for (int i=0; i<nElems; i++) _elems[i] = elems[i]; }
-        ~CProxySection_ArrayBase() { delete [] _elems; }
+		:CProxy_ArrayBase(aid), _sid(elems, nElems) { }
+	CProxySection_ArrayBase(const CkSectionID &sid)
+		:CProxy_ArrayBase(sid.cookie.aid), _sid(sid){}
+	CProxySection_ArrayBase(const CkSectionID &sid, CkGroupID dTo)
+		:CProxy_ArrayBase(sid.cookie.aid, dTo), _sid(sid){}
 	
 	void ckInsert(CkArrayMessage *m,int ctor,int onPe);
-	void ckSend(CkArrayMessage *m, int ep) const;
+	void ckSend(CkArrayMessage *m, int ep) ;
 
 //	ArrayElement *ckLocal(void) const;
-	const CkSectionID &ckGetSectionID() const {return _sid;}
-        inline const CkArrayIndexMax *ckGetArrayElements() const { return _elems; }
-	inline int ckGetNumElements() const { return _nElems; }
+	inline CkSectionCookie &ckGetSectionID() {return _sid.cookie;}
+        inline CkArrayIndexMax *ckGetArrayElements() const {return _sid._elems;}
+	inline int ckGetNumElements() const { return _sid._nElems; }
 	void pup(PUP::er &p);
 };
 PUPmarshall(CProxySection_ArrayBase);
@@ -193,14 +190,8 @@ PUPmarshall(CProxySection_ArrayBase);
 	CK_DISAMBIG_ARRAY(super) \
 	inline void ckInsert(CkArrayMessage *m,int ctor,int onPe) \
 	  { super::ckInsert(m,ctor,onPe); }\
-	inline void ckSend(CkArrayMessage *m, int ep) const\
+	inline void ckSend(CkArrayMessage *m, int ep) \
 	  { super::ckSend(m,ep); }\
-	inline const CkSectionID &ckGetSectionID() const \
-		{return super::ckGetSectionID();} \
-        inline const CkArrayIndexMax *ckGetArrayElements() const \
-		{ return super::ckGetArrayElements(); }\
-	inline int ckGetNumElements() const \
-		{ return ckGetNumElements(); }
 
 
 /************************ Array Element *********************/

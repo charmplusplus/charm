@@ -262,16 +262,16 @@ public:
 };
 PUPmarshall(CkArrayID)
 
-class CkSectionID {
+class CkSectionCookie {
 public:
   CkArrayID aid;
   int pe;
   void *val;    // point to mCastCookie
   int redNo;
 public:
-  CkSectionID(): redNo(0) {val = NULL; pe = CmiMyPe();}
-  CkSectionID(void *p): val(p), redNo(0) { pe = CmiMyPe();};
-  CkSectionID(int e, void *p, int r):  pe(e), val(p), redNo(r) { }
+  CkSectionCookie(): redNo(0) {val = NULL; pe = CmiMyPe();}
+  CkSectionCookie(void *p): val(p), redNo(0) { pe = CmiMyPe();};
+  CkSectionCookie(int e, void *p, int r):  pe(e), val(p), redNo(r) { }
 /*
   void pup(PUP::er &p) {
     p | aid; 
@@ -282,6 +282,18 @@ public:
 */
 };
 
+class CkSectionID {
+public:
+  CkSectionCookie cookie;
+  CkArrayIndexMax *_elems;
+  int _nElems;
+public:
+  CkSectionID() {}
+  CkSectionID(const CkSectionID &sid);
+  CkSectionID(const CkArrayIndexMax *elems, const int nElems);
+  ~CkSectionID();
+  void pup(PUP::er &p);
+};
 
 //(CProxy_ArrayBase is defined in ckarray.h)
 
@@ -298,7 +310,7 @@ class CkDelegateMgr : public Group {
     virtual void ArrayCreate(int ep,void *m,const CkArrayIndexMax &idx,int onPE,CkArrayID a);
     virtual void ArraySend(int ep,void *m,const CkArrayIndexMax &idx,CkArrayID a);
     virtual void ArrayBroadcast(int ep,void *m,CkArrayID a);
-    virtual void ArraySectionSend(int ep,void *m,CkArrayID a,const CkSectionID &s);
+    virtual void ArraySectionSend(int ep,void *m,CkArrayID a,CkSectionCookie &s);
 };
 
 

@@ -61,7 +61,8 @@ void CkDelegateMgr::ArrayBroadcast(int ep,void *m,CkArrayID a)
 	CProxy_ArrayBase ap(a);
 	ap.ckBroadcast((CkArrayMessage *)m,ep);
 }
-void CkDelegateMgr::ArraySectionSend(int ep,void *m, CkArrayID a,const CkSectionID &s)
+
+void CkDelegateMgr::ArraySectionSend(int ep,void *m, CkArrayID a,CkSectionCookie &s)
 {
 	CmiAbort("ArraySectionSend is not implemented!\n");
 /*
@@ -70,6 +71,26 @@ void CkDelegateMgr::ArraySectionSend(int ep,void *m, CkArrayID a,const CkSection
 */
 }
 
+CkSectionID::CkSectionID(const CkArrayIndexMax *elems, const int nElems): _nElems(nElems) {
+  _elems = new CkArrayIndexMax[nElems];
+  for (int i=0; i<nElems; i++) _elems[i] = elems[i];
+}
+
+CkSectionID::CkSectionID(const CkSectionID &sid) {
+  cookie = sid.cookie;
+  _nElems = sid._nElems;
+  _elems = new CkArrayIndexMax[_nElems];
+  for (int i=0; i<_nElems; i++) _elems[i] = sid._elems[i];
+}
+
+CkSectionID::~CkSectionID() { delete [] _elems; }
+
+void CkSectionID::pup(PUP::er &p) {
+    p | cookie;
+    p(_nElems);
+    if (p.isUnpacking()) _elems = new CkArrayIndexMax[_nElems];
+    for (int i=0; i< _nElems; i++) p(_elems[i].data(),_elems[i].nInts);
+}
 
 extern "C"
 void CkSetRefNum(void *msg, int ref)

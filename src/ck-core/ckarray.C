@@ -276,9 +276,6 @@ void CProxySection_ArrayBase::pup(PUP::er &p)
 {
   CProxy_ArrayBase::pup(p);
   p | _sid;
-  p(_nElems);
-  if (p.isUnpacking()) _elems = new CkArrayIndexMax[_nElems];
-  for (int i=0; i< _nElems; i++) p(_elems[i].data(),_elems[i].nInts);
 }
 
 /*********************** CkArray Creation *************************/
@@ -417,20 +414,20 @@ void *CProxyElement_ArrayBase::ckSendSync(CkArrayMessage *msg, int ep) const
 	return CkWaitReleaseFuture(f);
 }
 
-void CProxySection_ArrayBase::ckSend(CkArrayMessage *msg, int ep) const
+void CProxySection_ArrayBase::ckSend(CkArrayMessage *msg, int ep)
 {
 	msg_prepareSend(msg,ep,ckGetArrayID());
 	if (ckIsDelegated()) //Just call our delegateMgr
 	  ckDelegatedTo()->ArraySectionSend(ep,msg,ckGetArrayID(),ckGetSectionID());
 	else {
 	  // send through all
-	  for (int i=0; i< _nElems-1; i++) {
-	    CProxyElement_ArrayBase ap(ckGetArrayID(), _elems[i]);
+	  for (int i=0; i< _sid._nElems-1; i++) {
+	    CProxyElement_ArrayBase ap(ckGetArrayID(), _sid._elems[i]);
 	    void *newMsg=CkCopyMsg((void **)&msg);
 	    ap.ckSend((CkArrayMessage *)newMsg,ep);
 	  }
-	  if (_nElems > 0) {
-	    CProxyElement_ArrayBase ap(ckGetArrayID(), _elems[_nElems-1]);
+	  if (_sid._nElems > 0) {
+	    CProxyElement_ArrayBase ap(ckGetArrayID(), _sid._elems[_sid._nElems-1]);
 	    ap.ckSend((CkArrayMessage *)msg,ep);
 	  }
         }
