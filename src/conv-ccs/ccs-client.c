@@ -180,7 +180,12 @@ int CcsConnectIpWithTimeout(CcsServer *svr, skt_ip_t ip, int port,CcsSec_secretK
   
   /*Wait for conv-host to get back to us*/
   DEBUGF(("Waiting for conv-host to call us back...\n"));
-  CcsRecvResponseMsg(svr,&msg_len,&msg_data,timeout);
+
+  if(CcsRecvResponseMsg(svr,&msg_len,&msg_data,timeout) == -1){
+      fprintf(stderr,"CCS Client Not Alive\n");
+      return -1;
+  }
+
   parseInfo(svr,msg_data);
   free(msg_data);
   
