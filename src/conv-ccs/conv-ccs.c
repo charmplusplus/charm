@@ -342,11 +342,9 @@ void CcsInit(char **argv)
     }
   }
 #endif
-  //if in parallel debug mode i.e ++cpd, freeze
-  //cmiArgDebugFlag = CmiGetArgFlagDesc(argv, "+cpd", "Used *only* in conjunction with parallel debugger");
+  /* if in parallel debug mode i.e ++cpd, freeze */
   if (CmiGetArgFlagDesc(argv, "+cpd", "Used *only* in conjunction with parallel debugger"))
   {
-     //CmiPrintf("Running in parallel debug mode\n");
      CpvAccess(cmiArgDebugFlag) = 1;
      if (CmiGetArgStringDesc(argv, "+DebugDisplay",&(CpvAccess(displayArgument)), "X display for gdb used only in cpd mode"))
      {
