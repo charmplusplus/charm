@@ -208,7 +208,7 @@ ampi::ampi(CkArrayID parent_,const ampiCommStruct &s)
   
   myComm=s; myComm.setArrayID(thisArrayID);
   myRank=myComm.getRankForIndex(thisIndex);
-  
+
   findParent(false);
   
   msgs = CmmNew();
@@ -450,21 +450,21 @@ AmpiMsg *ampi::makeAmpiMsg(int t,int s,const void *buf,int count,int type,MPI_Co
   return msg;
 }
 
-void 
+void
 ampi::send(int t, int s, const void* buf, int count, int type,  int rank, MPI_Comm destcomm)
 {
   const ampiCommStruct &dest=comm2proxy(destcomm);
   int idx = dest.getIndexForRank(rank);
   int seq = -1;
-  if (destcomm<=MPI_COMM_WORLD && t<=MPI_TAG_UB) 
+  if (destcomm<=MPI_COMM_WORLD && t<=MPI_TAG_UB)
   { //Not cross-module: set seqno
      seq = nextseq[idx]++;
   }
-  
+
   dest.getProxy()[idx].generic(makeAmpiMsg(t,s,buf,count,type,destcomm,seq));
 }
 
-void 
+void
 ampi::sendraw(int t, int s, void* buf, int len, CkArrayID aid, int idx)
 {
   AmpiMsg *msg = new (&len, 0) AmpiMsg(-1, t, s, len, MPI_COMM_WORLD);
@@ -625,7 +625,7 @@ int MPI_Finalize(void)
 }
 
 CDECL
-int MPI_Send(void *msg, int count, MPI_Datatype type, int dest, 
+int MPI_Send(void *msg, int count, MPI_Datatype type, int dest,
                         int tag, MPI_Comm comm)
 {
   AMPIAPI("MPI_Send");
@@ -646,7 +646,7 @@ int MPI_Ssend(void *msg, int count, MPI_Datatype type, int dest,
 }
 
 CDECL
-int MPI_Recv(void *msg, int count, MPI_Datatype type, int src, int tag, 
+int MPI_Recv(void *msg, int count, MPI_Datatype type, int src, int tag,
               MPI_Comm comm, MPI_Status *status)
 {
   AMPIAPI("MPI_Recv");
@@ -674,7 +674,7 @@ int MPI_Iprobe(int src,int tag,MPI_Comm comm,int *flag,MPI_Status *status)
 }
 
 CDECL
-int MPI_Sendrecv(void *sbuf, int scount, int stype, int dest, 
+int MPI_Sendrecv(void *sbuf, int scount, int stype, int dest,
                   int stag, void *rbuf, int rcount, int rtype,
                   int src, int rtag, MPI_Comm comm, MPI_Status *sts)
 {
@@ -705,7 +705,7 @@ int MPI_Bcast(void *buf, int count, MPI_Datatype type, int root,
   return 0;
 }
 
-static CkReduction::reducerType 
+static CkReduction::reducerType
 getReductionType(int type, int op)
 {
   CkReduction::reducerType mytype;
@@ -759,7 +759,7 @@ getReductionType(int type, int op)
 
 void ampi::reduceResult(CkReductionMsg *msg)
 {
-  ampi::sendraw(MPI_REDUCE_TAG, 0, msg->getData(), msg->getSize(), 
+  ampi::sendraw(MPI_REDUCE_TAG, 0, msg->getData(), msg->getSize(),
              thisArrayID,thisIndex);
   delete msg;
 }
@@ -774,7 +774,7 @@ static CkReductionMsg *makeRednMsg(CkDDT_DataType *ddt,const void *inbuf,int cou
 }
 
 CDECL
-int MPI_Reduce(void *inbuf, void *outbuf, int count, int type, MPI_Op op, 
+int MPI_Reduce(void *inbuf, void *outbuf, int count, int type, MPI_Op op,
                 int root, MPI_Comm comm)
 {
   AMPIAPI("MPI_Reduce");
@@ -783,9 +783,9 @@ int MPI_Reduce(void *inbuf, void *outbuf, int count, int type, MPI_Op op,
   int rootIdx=ptr->comm2proxy(comm).getIndexForRank(root);
   CkCallback reduceCB(CkIndex_ampi::reduceResult(0),CkArrayIndex1D(rootIdx),ptr->getProxy(),true);
   msg->setCallback(reduceCB);
-  ptr->contribute(msg); 
-  
-  if (ptr->thisIndex == rootIdx) 
+  ptr->contribute(msg);
+
+  if (ptr->thisIndex == rootIdx)
   /*HACK: Use recv() to block until reduction data comes back*/
     ptr->recv(MPI_REDUCE_TAG, 0, outbuf, count, type, MPI_COMM_WORLD);
   return 0;
@@ -802,7 +802,7 @@ int MPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
   msg->setCallback(allreduceCB);
   ptr->contribute(msg);
   
-  /*HACK: Use recv() to block until the reduction data comes back*/ 
+  /*HACK: Use recv() to block until the reduction data comes back*/
   ptr->recv(MPI_REDUCE_TAG, 0, outbuf, count, type, MPI_COMM_WORLD);
   return 0;
 }
@@ -854,7 +854,7 @@ int MPI_Start(MPI_Request *reqnum)
   &(ptr->requests[*reqnum]);
   if(req->sndrcv == 1) { // send request
     ampi *aptr=getAmpiInstance(req->comm);
-    aptr->send(req->tag, aptr->getRank(), req->buf, req->count, req->type, 
+    aptr->send(req->tag, aptr->getRank(), req->buf, req->count, req->type,
               req->proc, req->comm);
   }
   return 0;
@@ -872,13 +872,13 @@ int MPI_Waitall(int count, MPI_Request *request, MPI_Status *sts)
     if(request[i] < 100) { // persistent request
       PersReq *req = &(ptr->requests[request[i]]);
       if(req->sndrcv == 2) { // recv request
-        getAmpiInstance(req->comm)->recv(req->tag, req->proc, req->buf, req->count, 
+        getAmpiInstance(req->comm)->recv(req->tag, req->proc, req->buf, req->count,
                   req->type, req->comm, (int*)(sts+i));
       }
     } else { // irecv request
       int index = request[i] - 100;
       PersReq *req = &(ptr->irequests[index]);
-      getAmpiInstance(req->comm)->recv(req->tag, req->proc, req->buf, req->count, 
+      getAmpiInstance(req->comm)->recv(req->tag, req->proc, req->buf, req->count,
                 req->type, req->comm, (int*) (sts+i));
       // now free the request
       ptr->nirequests--;
@@ -907,7 +907,7 @@ int MPI_Waitany(int count, MPI_Request *request, int *idx, MPI_Status *sts)
         if(req->sndrcv == 2) { // recv request
 	  ampi *aptr=getAmpiInstance(req->comm);
           if(aptr->iprobe(req->tag, req->proc, req->comm, (int*) sts)) {
-           aptr->recv(req->tag, req->proc, req->buf, req->count, 
+           aptr->recv(req->tag, req->proc, req->buf, req->count,
                       req->type, req->comm, (int*)sts);
             return 0;
           }
@@ -917,7 +917,7 @@ int MPI_Waitany(int count, MPI_Request *request, int *idx, MPI_Status *sts)
         PersReq *req = &(ptr->irequests[index]);
 	ampi *aptr=getAmpiInstance(req->comm);
         if(aptr->iprobe(req->tag, req->proc, req->comm, (int*) sts)) {
-          aptr->recv(req->tag, req->proc, req->buf, req->count, 
+          aptr->recv(req->tag, req->proc, req->buf, req->count,
                     req->type, req->comm, (int*)sts);
           // now free the request
           ptr->nirequests--;
@@ -946,13 +946,13 @@ int MPI_Wait(MPI_Request *request, MPI_Status *sts)
   if(*request < 100) { // persistent request
     PersReq *req = &(ptr->requests[*request]);
     if(req->sndrcv == 2) { // recv request
-      getAmpiInstance(req->comm)->recv(req->tag, req->proc, req->buf, req->count, 
+      getAmpiInstance(req->comm)->recv(req->tag, req->proc, req->buf, req->count,
                 req->type, req->comm, (int*)sts);
     }
   } else { // irecv request
     int index = *request - 100;
     PersReq *req = &(ptr->irequests[index]);
-    getAmpiInstance(req->comm)->recv(req->tag, req->proc, req->buf, req->count, 
+    getAmpiInstance(req->comm)->recv(req->tag, req->proc, req->buf, req->count,
               req->type, req->comm, (int*) sts);
     // now free the request
     ptr->nirequests--;
@@ -1139,35 +1139,35 @@ int MPI_Type_size(MPI_Datatype datatype, int *size)
 }
 
 CDECL
-int MPI_Isend(void *buf, int count, MPI_Datatype type, int dest, 
+int MPI_Isend(void *buf, int count, MPI_Datatype type, int dest,
               int tag, MPI_Comm comm, MPI_Request *request)
 {
   AMPIAPI("MPI_Isend");
   ampi *ptr = getAmpiInstance(comm);
-  
+
   ptr->send(tag, ptr->getRank(), buf, count, type, dest, comm);
   *request = (-1);
   return 0;
 }
 
 CDECL
-int MPI_Issend(void *buf, int count, MPI_Datatype type, int dest, 
+int MPI_Issend(void *buf, int count, MPI_Datatype type, int dest,
               int tag, MPI_Comm comm, MPI_Request *request)
 {
   AMPIAPI("MPI_Issend");
   ampi *ptr = getAmpiInstance(comm);
-  
+
   ptr->send(tag, ptr->getRank(), buf, count, type, dest, comm);
   *request = (-1);
   return 0;
 }
 
 CDECL
-int MPI_Irecv(void *buf, int count, MPI_Datatype type, int src, 
+int MPI_Irecv(void *buf, int count, MPI_Datatype type, int src,
               int tag, MPI_Comm comm, MPI_Request *request)
 {
   AMPIAPI("MPI_Irecv");
-  
+
   ampiPersRequests *ptr = getPers();
   if(ptr->nirequests == 100) {
     CmiAbort("Too many Irecv requests.\n");
@@ -1191,8 +1191,43 @@ int MPI_Irecv(void *buf, int count, MPI_Datatype type, int src,
   return 0;
 }
 
+int AMPI_Async_reduce(void *sendbuf, void *recvbuf, int count, int type, MPI_Op op, int root, MPI_Comm comm, MPI_Request *request)
+{
+  ampi *ptr = getAmpiInstance(comm);
+  CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type),sendbuf,count,type,op);
+  int rootIdx=ptr->comm2proxy(comm).getIndexForRank(root);
+  CkCallback reduceCB(CkIndex_ampi::reduceResult(0),CkArrayIndex1D(rootIdx),ptr->getProxy(),true);
+  msg->setCallback(reduceCB);
+  ptr->contribute(msg);
+
+  if (ptr->thisIndex == rootIdx){
+  ampiPersRequests *ptr = getPers();
+  if(ptr->nirequests == 100) {
+    CmiAbort("Too many Irecv requests in AMPI_Async_reduce.\n");
+  }
+
+  // using irecv instead recv to non-block the call and get request pointer
+  PersReq *req = &(ptr->irequests[ptr->firstfree]);
+    req->sndrcv = 2;
+    req->buf = recvbuf;
+    req->count = count;
+    req->type = type;
+    req->proc = 0;
+    req->tag = MPI_REDUCE_TAG;
+    req->comm = MPI_COMM_WORLD;
+    *request = ptr->firstfree + 100;
+    ptr->nirequests ++;
+    // remove this request from the free list
+    PersReq *ireq = &(ptr->irequests[0]);
+    ptr->firstfree = ireq[ptr->firstfree].nextfree;
+    ireq[req->nextfree].prevfree = req->prevfree;
+    ireq[req->prevfree].nextfree = req->nextfree;
+  }
+  return 0;
+}
+
 CDECL
-int MPI_Allgatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype, 
+int MPI_Allgatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                    void *recvbuf, int *recvcounts, int *displs, 
                    MPI_Datatype recvtype, MPI_Comm comm) 
 {
@@ -1467,21 +1502,20 @@ FDECL void FTN_NAME(MPI_REGISTER_MAIN,mpi_register_main)
 	(MPI_MainFn mainFn,const char *name,int nameLen)
 {
 	AMPIAPI("MPI_register_main");
-	ampiCreateMain(mainFn);	
+	ampiCreateMain(mainFn);
 	ampiAttach(name,nameLen);
 }
 
 CDECL void MPI_Attach(const char *name)
 {
 	AMPIAPI("MPI_Attach");
-	ampiAttach(name,strlen(name));	
+	ampiAttach(name,strlen(name));
 }
 FDECL void FTN_NAME(MPI_ATTACH,mpi_attach)(const char *name,int nameLen)
 {
 	AMPIAPI("MPI_attach");
 	ampiAttach(name,nameLen);
 }
-
 
 void _registerampif(void)
 {

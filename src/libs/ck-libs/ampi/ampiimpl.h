@@ -21,23 +21,23 @@ class ampiCommStruct {
 	int size; //Number of processes in communicator
 	int isWorld; //1 if ranks are 0..size-1?
 	//indices[r] gives the array index for rank r
-	CkPupBasicVec<int> indices; 
+	CkPupBasicVec<int> indices;
 public:
 	ampiCommStruct(int ignored=0) {size=-1;isWorld=-1;}
-	ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_,int size_) 
+	ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_,int size_)
 		:comm(comm_), ampiID(id_),size(size_), isWorld(1) {}
 	ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_,
-		int size_,const CkPupBasicVec<int> &indices_) 
-		:comm(comm_), ampiID(id_),size(size_), 
+		int size_,const CkPupBasicVec<int> &indices_)
+		:comm(comm_), ampiID(id_),size(size_),
 		 isWorld(0), indices(indices_) {}
-	
+
 	void setArrayID(const CkArrayID &nID) {ampiID=nID;}
-	
+
 	MPI_Comm getComm(void) const {return comm;}
-	
+
 	//Get the proxy for the entire array
 	CProxy_ampi getProxy(void) const;
-	
+
 	//Get the array index for rank r in this communicator
 	int getIndexForRank(int r) const {
 #ifndef CMK_OPTIMIZE
@@ -55,9 +55,9 @@ public:
 		  return -1; /*That index isn't in this communicator*/
 		}
 	}
-	
+
 	int getSize(void) const {return size;}
-	
+
 	void pup(PUP::er &p) {
 		p|comm;
 		p|ampiID;
@@ -147,7 +147,7 @@ class memBuf {
 	//No copy semantics:
 	memBuf(memBuf &b);
 	memBuf &operator=(memBuf &b);
- public:
+public:
 	memBuf() {buf=NULL; bufSize=0;}
 	memBuf(int size) {buf=NULL; make(size);}
 	~memBuf() {clear();}
@@ -161,7 +161,7 @@ template <class T>
 inline void pupIntoBuf(memBuf &b,T &t) {
 	PUP::sizer ps;ps|t;
 	b.setSize(ps.size());
-	PUP::toMem pm(b.getData()); pm|t;	
+	PUP::toMem pm(b.getData()); pm|t;
 }
 
 template <class T>
@@ -179,7 +179,7 @@ class AmpiMsg : public CMessage_AmpiMsg {
   void *data;
 
   AmpiMsg(void) { data = (char *)this + sizeof(AmpiMsg); }
-  AmpiMsg(int _s, int t, int s, int l, int c) : 
+  AmpiMsg(int _s, int t, int s, int l, int c) :
     seq(_s), tag(t),src(s),comm(c), length(l) {
     data = (char *)this + sizeof(AmpiMsg);
   }
@@ -260,7 +260,7 @@ class ampiPersRequests {
 public:
     ampiPersRequests();
     void pup(PUP::er &p);
-    
+
     PersReq requests[100];
     int nrequests;
     PersReq irequests[100];
@@ -274,15 +274,16 @@ An ampiParent holds all the communicators and the TCharm thread
 for its children, which are bound to it.
 */
 class ampiParent : public ArrayElement1D {
-    CProxy_TCharm threads;  
+    CProxy_TCharm threads;
     TCharm *thread;
     void prepareCtv(void);
-    
+
     MPI_Comm worldNo; //My MPI_COMM_WORLD
     ampi *worldPtr; //AMPI element corresponding to MPI_COMM_WORLD
     ampiCommStruct worldStruct;
-    
+
     CkPupPtrVec<ampiCommStruct> splitComm; //Communicators from MPI_Comm_split
+    CkPupPtrVec<ampiCommStruct> groupComm; //Communicators from MPI_Comm_group
     inline int isSplit(MPI_Comm comm) const {
       return (comm>=MPI_COMM_FIRST_SPLIT && comm<MPI_COMM_FIRST_GROUP);
     }
@@ -292,27 +293,27 @@ class ampiParent : public ArrayElement1D {
       return *splitComm[idx];
     }
     void splitChildRegister(const ampiCommStruct &s);
-    
+
 public:
     ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_);
     ampiParent(CkMigrateMessage *msg);
     void ckJustMigrated(void);
     ~ampiParent();
-    
+
     ampi *lookupComm(MPI_Comm comm) {
-       if (comm!=worldStruct.getComm()) 
+       if (comm!=worldStruct.getComm())
           CkAbort("ampiParent::lookupComm> Bad communicator!");
        return worldPtr;
     }
-    
+
     //Children call this when they are first created, or just migrated
     TCharm *registerAmpi(ampi *ptr,ampiCommStruct s,bool forMigration);
-    
+
     //Grab the next available split communicator
     MPI_Comm getNextSplit(void) const {return MPI_COMM_FIRST_SPLIT+splitComm.size();}
-    
+
     void pup(PUP::er &p);
-    
+
     inline const ampiCommStruct &comm2proxy(MPI_Comm comm) {
       if (comm==MPI_COMM_WORLD) return worldStruct;
       if (comm==worldNo) return worldStruct;
@@ -329,7 +330,7 @@ public:
       if (comm>MPI_COMM_WORLD) return worldPtr; //Use MPI_WORLD ampi for cross-world messages:
       CkAbort("Invalid communicator used!");
     }
-    
+
     CkDDT myDDTsto ;
     CkDDT *myDDT;
     ampiPersRequests pers;
@@ -347,15 +348,15 @@ class ampi : public ArrayElement1D {
     ampiParent *parent;
     TCharm *thread;
     int waitingForGeneric;
-    
-    ampiCommStruct myComm; 
+
+    ampiCommStruct myComm;
     int myRank;
-    
+
     int seqEntries; //Number of elements in below arrays
     int *nextseq;
     AmpiSeqQ *oorder;
     void inorder(AmpiMsg *msg);
-    
+
   public: // entry methods
     ampi(CkArrayID parent_,const ampiCommStruct &s);
     ampi(CkMigrateMessage *msg);
@@ -377,7 +378,7 @@ class ampi : public ArrayElement1D {
       int seqNo);
     
     void send(int t, int s, const void* buf, int count, int type,  int rank, MPI_Comm destcomm);
-    static void sendraw(int t, int s, void* buf, int len, CkArrayID aid, 
+    static void sendraw(int t, int s, void* buf, int len, CkArrayID aid,
                         int idx);
     void recv(int t,int s,void* buf,int count,int type,int comm,int *sts=0);
     void probe(int t,int s,int comm,int *sts);
