@@ -1,0 +1,39 @@
+Now you can compile charm++ under Windows9x/2000/NT with Cygwin.
+Note: This version of cygwin is still under testing.
+
+To compile charm on cygwin:
+1. install cygwin from: http://sourceware.cygnus.com/cygwin
+   with inetutils, openssh and w32api packages. 
+
+2. before compiling, make sure you have /bin/sh correctly installed, otherwise
+   make a link from /bin/bash:  ln -s /bin/bash /bin/sh
+   compile charm++:    ./build charm++ net-cygwin
+
+3. setting up running environment:
+   There are two ways to do this, using rsh or ssh. 
+   Under Windows2000/NT, ssh is recommended, I once had difficulty to have 
+   inetd working.
+
+ ** RSH **
+   setup /etc/inetd.conf and /etc/services to start rshd, 
+   Here is an example of /etc/inetd.conf:
+
+###
+shell stream tcp nowait.1000  root /usr/sbin/in.rshd  in.rshd
+###
+
+   and an example of /etc/services:
+
+###   
+shell     514/tcp    cmd
+###
+
+   before running charm program, start 'inetd' first to get rshd running.
+
+ ** SSH **
+   Check /etc/passwd, make sure your home directory is correct.
+   run "/usr/bin/ssh-config" to setup all ssh config files.
+   Setup ~/.shosts, or add your public key to your ~/.ssh/authorized_keys to 
+   login without password authentication.
+   now you can start sshd before you run charm programs.
+
