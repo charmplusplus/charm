@@ -101,8 +101,15 @@ extern "C" {
 #include "conv-trace.h"
 }
 
+// traceOnPe controls if charm pe will generate trace logs
+#if CMK_TRACE_IN_CHARM
+CkpvExtern(int, traceOnPe);
+#  define TRACE_CHARM_PE()  (CkpvAccess(traceOnPe))
+#else
+#  define TRACE_CHARM_PE()  1
+#endif
 #ifndef CMK_OPTIMIZE
-#  define _TRACE_ONLY(code) do{if(CpvAccess(traceOn)){ code; }} while(0)
+#  define _TRACE_ONLY(code) do{if(CpvAccess(traceOn)&&TRACE_CHARM_PE()){ code; }} while(0)
 #else
 #  define _TRACE_ONLY(code) /*empty*/
 #endif

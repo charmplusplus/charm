@@ -30,6 +30,9 @@ CkpvDeclare(TraceArray*, _traces);
 
 CkpvDeclare(double, traceInitTime);
 CpvDeclare(int, traceOn);
+#if CMK_TRACE_IN_CHARM
+CkpvDeclare(int, traceOnPe);
+#endif
 CkpvDeclare(int, CtrLogBufSize);
 CkpvDeclare(char*, traceRoot);
 
@@ -43,6 +46,10 @@ static void traceCommonInit(char **argv)
   CkpvInitialize(int, CtrLogBufSize);
   CkpvInitialize(char*, traceRoot);
   CpvAccess(traceOn) = 0;
+#if CMK_TRACE_IN_CHARM
+  CkpvInitialize(int, traceOnPe);
+  CkpvAccess(traceOnPe) = 1;
+#endif
   CkpvAccess(CtrLogBufSize) = LogBufSize;
   CmiGetArgInt(argv,"+logsize",&CkpvAccess(CtrLogBufSize));
   char *root;
@@ -132,7 +139,7 @@ extern "C"
 void traceResume(void)
 {
 #if ! CMK_TRACE_IN_CHARM
-  CkpvAccess(_traces)->beginExecute(0);
+    CkpvAccess(_traces)->beginExecute(0);
 #endif
 }
 

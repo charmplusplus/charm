@@ -382,6 +382,7 @@ void LogEntry::writeBinary(FILE* fp)
 
 TraceProjections::TraceProjections(char **argv): curevent(0), isIdle(0)
 {
+  if (TRACE_CHARM_PE() == 0) return;
   CtvInitialize(int,curThreadEvent);
   CtvAccess(curThreadEvent)=0;
   int binary = CmiGetArgFlag(argv,"+binary-trace");
@@ -421,11 +422,13 @@ void TraceProjections::traceWriteSts(void)
 
 void TraceProjections::traceClose(void)
 {
-  CkpvAccess(_trace)->endComputation();
   if(CkMyPe()==0)
     _logPool->writeSts();
-  delete _logPool;		// will write
-  delete CkpvAccess(_trace);
+  if (TRACE_CHARM_PE()) {
+    CkpvAccess(_trace)->endComputation();
+    delete _logPool;		// will write
+    delete CkpvAccess(_trace);
+  }
 //  free(CkpvAccess(traceRoot));
 }
 

@@ -90,6 +90,7 @@ void SumLogPool::addEventType(int eventType, double time)
 
 SumLogPool::SumLogPool(char *pgm) : phaseTab(MAX_PHASES) 
 {
+    if (TRACE_CHARM_PE() == 0) return;
     int i;
     poolSize = CkpvAccess(CtrLogBufSize);
     if (poolSize % 2) poolSize++;	// make sure it is even
@@ -264,11 +265,13 @@ void TraceSummary::traceWriteSts(void)
 
 void TraceSummary::traceClose(void)
 {
-  CkpvAccess(_trace)->endComputation();
   if(CkMyPe()==0)
       _logPool->writeSts();
-  // destructor call the write()
-  delete _logPool;
+  if (TRACE_CHARM_PE()) {
+    CkpvAccess(_trace)->endComputation();
+    // destructor call the write()
+    delete _logPool;
+  }
 }
 
 void TraceSummary::beginExecute(envelope *e)
