@@ -59,6 +59,16 @@ public:
     p|re;
     p|im;
   }
+
+  complex * operator new[] (size_t size){
+    void *buf = CmiAlloc(size);
+    memset(buf, 0, size);
+    return (complex *)buf;
+  }
+  
+  void operator delete[] (void *buf){
+    CmiFree(buf);    
+  }
 };
 
 #endif //__PAIRUTIL_H__
