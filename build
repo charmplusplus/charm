@@ -9,7 +9,7 @@ syntax() {
   echo '<versions>: ' 
   ( cd src ; ls -1 | egrep -v '(^Common)|(^CVS)|(^QuickThreads)|(^ccs-client)' | pr -3 -t )
   echo ''
-  echo '<options>: help cc cc64 cxx kcc pgcc acc icc gcc3 mpcc smp gm tcp vmi scyld '
+  echo '<options>: help cc cc64 cxx kcc pgcc acc icc gcc3 mpcc smp gm tcp vmi scyld bluegene'
   echo ''
   echo '<charmc-options>: e.g. -g -save -verbose'
   echo 'Note: This script:'
@@ -88,7 +88,7 @@ do
                 TestIfSupported $1
                 COMPILER=$1; shift
 	        ;;
-            "gm"|"vmi"|"scyld"|"smp"|"tcp")
+            "gm"|"vmi"|"scyld"|"smp"|"tcp"|"bluegene")
                 TestIfSupported $1
                 MORE="$MORE $1"; shift
 		;;
