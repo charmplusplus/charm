@@ -101,7 +101,7 @@ typedef struct {
   double cpuTime;
   double wallTime;
   CmiBool migratable;
-  CmiBool ignoreArrival;
+  CmiBool asyncArrival;
 #ifdef __cplusplus
   inline const LDOMHandle &omHandle() const { return handle.omhandle; }
   inline const LDOMid &omID() const { return handle.omhandle.id; }
@@ -238,13 +238,13 @@ void LDMessage(LDObjHandle from,
 void LDEstObjLoad(LDObjHandle h, double load);
 void LDNonMigratable(const LDObjHandle &h);
 void LDMigratable(const LDObjHandle &h);
-void LDReadyMigrate(const LDObjHandle &h, CmiBool);
+void LDAsyncMigrate(const LDObjHandle &h, CmiBool);
 void LDDumpDatabase(LDHandle _lbdb);
 
 /*
  * Calls from load balancer to load database
  */  
-typedef void (*LDMigratedFn)(void* data, LDObjHandle handle);
+typedef void (*LDMigratedFn)(void* data, LDObjHandle handle, int waitBarrier=1);
 void LDNotifyMigrated(LDHandle _lbdb, LDMigratedFn fn, void* data);
 
 typedef void (*LDStartLBFn)(void *user_ptr);
@@ -277,8 +277,8 @@ void LDIdleTime(LDHandle _lbdb, double *walltime);
 void LDTotalTime(LDHandle _lbdb, double *walltime, double *cputime);
 
 void LDClearLoads(LDHandle _lbdb);
-void LDMigrate(LDObjHandle h, int dest);
-void LDMigrated(LDObjHandle h);
+int  LDMigrate(LDObjHandle h, int dest);
+void LDMigrated(LDObjHandle h, int waitBarrier);
 
 /*
  * Local Barrier calls
@@ -372,7 +372,7 @@ inline void LDObjData::pup(PUP::er &p) {
   p|cpuTime;
   p|wallTime;
   p|migratable;
-  p|ignoreArrival;
+  p|asyncArrival;
 }
 PUPmarshall(LDObjData);
 inline void LDCommDesc::pup(PUP::er &p) {

@@ -253,12 +253,12 @@ extern "C" void LDMigratable(const LDObjHandle &h)
   obj->SetMigratable(CmiTrue);
 }
 
-extern "C" void LDReadyMigrate(const LDObjHandle &h, CmiBool isReady)
+extern "C" void LDAsyncMigrate(const LDObjHandle &h, CmiBool async)
 {
   LBDB *const db = (LBDB*)(h.omhandle.ldb.handle);
   LBObj *const obj = db->LbObj(h);
 
-  obj->SetReadyMigrate(isReady);
+  obj->UseAsyncMigrate(async);
 }
 
 extern "C" void LDClearLoads(LDHandle _db)
@@ -297,18 +297,18 @@ extern "C" void LDGetCommData(LDHandle _db, LDCommData *data)
   return;
 }
 
-extern "C" void LDMigrate(LDObjHandle _h, int dest)
+extern "C" int LDMigrate(LDObjHandle _h, int dest)
 {
   LBDB *const db = (LBDB*)(_h.omhandle.ldb.handle);
 
-  db->Migrate(_h,dest);
+  return db->Migrate(_h,dest);
 }
 
-extern "C" void LDMigrated(LDObjHandle _h)
+extern "C" void LDMigrated(LDObjHandle _h, int waitBarrier)
 {
   LBDB *const db = (LBDB*)(_h.omhandle.ldb.handle);
 
-  db->Migrated(_h);
+  db->Migrated(_h, waitBarrier);
 }
 
 extern "C" LDBarrierClient 
