@@ -389,6 +389,7 @@ void HybridBaseLB::Loadbalancing(int atlevel)
     double strat_end_time = CkWallTimer();
     if (_lb_args.debug()>1)
         CkPrintf("[%d] Level %d Strat elapsed time %f\n", CkMyPe(), atlevel, strat_end_time-start_lb_time);
+    CkPrintf("[%d] %s memUsage: %.2fKB\n", CkMyPe(), lbName(), (1.0*useMem())/1024);
   }
 
   // send to children 
@@ -892,6 +893,16 @@ int HybridBaseLB::NeighborIndex(int pe, int atlevel)
       }
     }
     return peslot;
+}
+
+int HybridBaseLB::useMem()
+{
+  int i;
+  int memused = 0;
+  for (i=0; i<levelData.size(); i++)
+    if (levelData[i]) memused+=levelData[i]->useMem();
+  memused += newObjs.size() * sizeof(Location);
+  return memused;
 }
 
 #include "HybridBaseLB.def.h"

@@ -143,6 +143,7 @@ protected:
   virtual void work(LDStats* stats,int count);
   virtual LBMigrateMsg * createMigrateMsg(LDStats* stats,int count);
 
+  virtual int     useMem();
   int NeighborIndex(int pe, int atlevel);   // return the neighbor array index
 
   MyHierarchyTree  *tree;
@@ -191,6 +192,13 @@ protected:
       outObjs.free();
       matchedObjs.free();
       unmatchedObjs.free();
+    }
+    int useMem() {
+      int memused = sizeof(LevelData);
+      if (statsData) memused += statsData->useMem();
+      memused += outObjs.size() * sizeof(MigrationRecord);
+      memused += (unmatchedObjs.size()+matchedObjs.size()) * sizeof(Location);
+      return memused;
     }
   };
 

@@ -118,7 +118,8 @@ public:
   inline int step() { return theLbdb->step(); }
   virtual void turnOff() { CmiAbort("turnOff not implemented"); }
   virtual void turnOn()  { CmiAbort("turnOn not implemented"); }
-  void pup(PUP::er &p);
+  virtual int  useMem()  { return 0; }
+  virtual void pup(PUP::er &p);
   virtual void flushStates();
 };
 
