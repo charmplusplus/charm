@@ -6,3 +6,8 @@ CMK_CXX='ecpc '
 CMK_CXXPP='ecpc -E '
 CMK_LD='ecc '
 CMK_LDXX='ecpc '
+CMK_SEQ_CC='ecc '
+CMK_SEQ_LD='ecc '
+CMK_SEQ_CXX='ecpc '
+CMK_SEQ_LDXX='ecpc '
+
