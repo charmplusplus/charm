@@ -1190,7 +1190,7 @@ CHARMINC="."
 test -r ./conv-config.sh && . ./conv-config.sh
 
 #turn out to be in octal number, don't use digit >= 8
-VERSION=050800
+VERSION=051000
 
 cat >>confdefs.h <<_ACEOF
 #define CHARM_VERSION $VERSION
