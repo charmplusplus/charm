@@ -31,44 +31,44 @@ module AMPI
   integer, external :: AMPI_Register
   double precision, external :: AMPI_Wtime
 
-  external :: AMPI_Init_universe
-  external :: AMPI_Comm_rank
-  external :: AMPI_Comm_size
-  external :: AMPI_Finalize
-  external :: AMPI_Send
-  external :: AMPI_Recv
-  external :: AMPI_Isend
-  external :: AMPI_Irecv
-  external :: AMPI_Sendrecv
-  external :: AMPI_Barrier
-  external :: AMPI_Bcast
-  external :: AMPI_Reduce
-  external :: AMPI_Allreduce
-  external :: AMPI_Start
-  external :: AMPI_Waitall
-  external :: AMPI_Send_init
-  external :: AMPI_Recv_init
-  external :: AMPI_Type_contiguous
-  external :: AMPI_Type_vector
-  external :: AMPI_Type_hvector
-  external :: AMPI_Type_indexed
-  external :: AMPI_Type_hindexed
-  external :: AMPI_Type_struct
-  external :: AMPI_Type_commit
-  external :: AMPI_Type_free
-  external :: AMPI_Type_extent
-  external :: AMPI_Type_size
-  external :: AMPI_Allgatherv
-  external :: AMPI_Allgather
-  external :: AMPI_Gatherv
-  external :: AMPI_Gather
-  external :: AMPI_Alltoallv
-  external :: AMPI_Alltoall
-  external :: AMPI_Comm_dup
-  external :: AMPI_Comm_free
-  external :: AMPI_Abort
-  external :: AMPI_Print
-  external :: AMPI_Migrate
+  external AMPI_Init_universe
+  external AMPI_Comm_rank
+  external AMPI_Comm_size
+  external AMPI_Finalize
+  external AMPI_Send
+  external AMPI_Recv
+  external AMPI_Isend
+  external AMPI_Irecv
+  external AMPI_Sendrecv
+  external AMPI_Barrier
+  external AMPI_Bcast
+  external AMPI_Reduce
+  external AMPI_Allreduce
+  external AMPI_Start
+  external AMPI_Waitall
+  external AMPI_Send_init
+  external AMPI_Recv_init
+  external AMPI_Type_contiguous
+  external AMPI_Type_vector
+  external AMPI_Type_hvector
+  external AMPI_Type_indexed
+  external AMPI_Type_hindexed
+  external AMPI_Type_struct
+  external AMPI_Type_commit
+  external AMPI_Type_free
+  external AMPI_Type_extent
+  external AMPI_Type_size
+  external AMPI_Allgatherv
+  external AMPI_Allgather
+  external AMPI_Gatherv
+  external AMPI_Gather
+  external AMPI_Alltoallv
+  external AMPI_Alltoall
+  external AMPI_Comm_dup
+  external AMPI_Comm_free
+  external AMPI_Abort
+  external AMPI_Print
+  external AMPI_Migrate
   
 contains
 
