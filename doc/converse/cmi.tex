@@ -4,11 +4,12 @@
 \section{Initialization and Wrap-Up}
 
 \function{void CmiInit(int argc, char *argv[])}
-\desc{ This function initializes the machine interface. It should be
+\desc{This function initializes the machine interface. It should be
 called prior to any other CMI functions. 
 Multiple calls to this function in a process should
 be avoided. \param{argc} and \param{argv} are in similar format as passed to
-\param{main()}. They would be utilized by \param{CmiInit()} to initialize
+\param{main(argc, argv)}. 
+They would be utilized by \param{CmiInit()} to initialize
 machine specific parameters such as number of processors.}
 
 \function{void CmiExit(void)}
