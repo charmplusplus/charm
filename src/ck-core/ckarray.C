@@ -232,6 +232,7 @@ void Array1D::RecvMigratedElementID(int index, ArrayElement *elem,
   elementIDs[index].element = elem;
   elementIDs[index].elementHandle = handle;
   delete elementIDs[index].migrateMsg;
+  elementIDs[index].migrateMsg = NULL;
 
   ArrayElementAckMessage *ack_msg = new ArrayElementAckMessage;
 
