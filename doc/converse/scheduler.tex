@@ -1,17 +1,21 @@
 \chapter{Initialization and Completion}
 
 
-\function {void ConverseInit(void)}
-This call initializes all Converse components, such as the scheduler,
-machine interface, and other libraries. This must be the first Converse
-call in the entire program.
+\function{void ConverseInit(char *argv[])}
+\desc{This function initializes the machine interface. It should be
+called prior to any other Converse functions. 
+Multiple calls to this function in a process should
+be avoided. \param{argv} is in similar format as passed to
+\param{main(argc, argv)}. 
+It would be utilized by \param{ConverseInit()} to initialize
+machine specific parameters such as number of processors.}
 
-
-\function {void ConverseExit(void)}
-This call wraps up all Converse components. No Converse call may be made
-after this call.
-
-
+\function{void ConverseExit(void)}
+\desc{This function frees the resources acquired by Converse and wraps up. 
+Any other Converse function should not be called after a call to this function.
+\note{It does not terminate the calling
+process. A separate call to \param{exit()} is needed after 
+\param{ConverseExit()} to achieve this.}}
 
 
 \chapter{Scheduler Calls}
@@ -26,19 +30,52 @@ ConverseInit().
 }
 
 \function {void CsdScheduler(int NumberOfMessages)}
-This call invokes the Converse scheduler. The {\tt NumberOfMessages}
+\desc{This call invokes the Converse scheduler. The {\tt NumberOfMessages}
 parameter specifies how many messages should be processed (i.e. delivered
 to their handlers). If set to -1, the scheduler continues processing
-messages until CsdExitScheduler() is called from a message handler.
+messages until CsdExitScheduler() is called from a message handler.}
 
 \function {void CsdExitScheduler(void)}
-This call causes the scheduler
+\desc{This call causes the scheduler
 to stop processing messages when control has returned back to it.
-The scheduler then returns to its calling routine.
+The scheduler then returns to its calling routine.}
 
-\function {void CsdEnqueue(void *Message)}
-This call enqueues a message in the scheduler's queue, to be processed
-in accordance with the queueing strategy. This call is usually made from
+\function{void CsdEnqueueGeneral(void *Message, int strategy, int priobits, int *prioptr)}
+\desc{This call enqueues a message to the scheduler's queue, to be processed in 
+accordance with the queueing \param{strategy}. \param{priobits} and
+\param{prioptr} specify information about priority associated with the message
+if prioritized queueing strategies are used. \param{strategy} can take values 
+defined in {\tt converse.h} depending upon the queueing strategy (FIFO or LIFO)
+and the nature of priority information used (none, integer or bit-vector).
+These predefined constants are: 
+{\tt CQS\_QUEUEING\_FIFO}, {\tt CQS\_QUEUEING\_LIFO},
+{\tt CQS\_QUEUEING\_IFIFO}, {\tt CQS\_QUEUEING\_ILIFO},
+{\tt CQS\_QUEUEING\_BFIFO}, {\tt CQS\_QUEUEING\_BLIFO}.
+This call is usually made from
 a message handler when the message is not to be processed immediately,
 but may be processed later (e.g. depending on the message's priority).
 Also, it is used to enqueue local ready entities, such as threads.
+\note{It is necessary to grab the ownership of the message buffer before queuing
+because on returning from the handler, the system can reuse the buffer.}}
+
+\function {void CsdEnqueue(void *Message)}
+\function{void CsdEnqueueFifo(void *Message)}
+\desc{
+	This macro is a shorthand for 
+	{\tt CsdEnqueueGeneral(Message, CQS\_QUEUEING\_FIFO,0, NULL)} 
+	provided here for backward compatibility.
+}
+
+
+\function{void CsdEnqueueLifo(void *Message)}
+\desc{
+	This macro is a shorthand for
+	{\tt CsdEnqueueGeneral(Message, CQS\_QUEUEING\_LIFO,0, NULL)} 
+	provided here for backward compatibility.
+}
+
+\function{int CsdEmpty()}
+\desc{
+	This function returns non-zero integer when the scheduler's queue
+	is empty, zero otherwise.
+}
