@@ -67,6 +67,13 @@ CpvDeclare(void*, CmiLocalQueue);
 
 #define BLK_LEN  512
 
+#if CMK_NODE_QUEUE_AVAILABLE
+#define DGRAM_NODEMESSAGE   (0xFB)
+
+#define NODE_BROADCAST_OTHERS (-1)
+#define NODE_BROADCAST_ALL    (-2)
+#endif
+
 static int MsgQueueLen=0;
 static int request_max;
 #if 0
@@ -110,6 +117,16 @@ static void PerrorExit(const char *msg)
   exit(1);
 }
 
+
+char *CopyMsg(char *msg, int len)
+{
+  char *copy = (char *)CmiAlloc(len);
+  if (!copy)
+      fprintf(stderr, "Out of memory\n");
+  memcpy(copy, msg, len);
+  return copy;
+}
+
 /**************************  TIMER FUNCTIONS **************************/
 
 void CmiTimerInit(void)
@@ -140,6 +157,11 @@ static PCQueue  *msgBuf;
  *
  ************************************************************/
 
+#if CMK_NODE_QUEUE_AVAILABLE
+CsvStaticDeclare(CmiNodeLock, CmiNodeRecvLock);
+CsvStaticDeclare(PCQueue, NodeRecv);
+#endif
+
 #include "machine-smp.c"
 
 #if ! CMK_SMP
@@ -161,7 +183,6 @@ static void CmiStartThreads(char **argv)
   Cmi_myrank = 0;
 }      
 #endif
-
 
 /*Add a message to this processor's receive queue */
 static void CmiPushPE(int pe,void *msg)
@@ -289,6 +310,12 @@ static int PumpMsgs(void)
     msg = (char *) CmiAlloc(nbytes);
     if (MPI_SUCCESS != MPI_Recv(msg,nbytes,MPI_BYTE,sts.MPI_SOURCE,TAG, MPI_COMM_WORLD,&sts)) 
       CmiAbort("PumpMsgs: MPI_Recv failed!\n");
+#if CMK_NODE_QUEUE_AVAILABLE
+    if (CMI_DEST_RANK(msg)==DGRAM_NODEMESSAGE) {
+      PCQueuePush(CsvAccess(NodeRecv), msg);
+    }
+    else
+#endif
     CmiPushPE(CMI_DEST_RANK(msg), msg);
 #if CMK_BROADCAST_SPANNING_TREE
     if (CMI_BROADCAST_ROOT(msg))
@@ -331,6 +358,19 @@ static void CommunicationServer(int sleepTime)
     exit(0);   
   }
 }
+
+#if CMK_NODE_QUEUE_AVAILABLE
+char *CmiGetNonLocalNodeQ(void)
+{
+  char *result = 0;
+  if(!PCQueueEmpty(CsvAccess(NodeRecv))) {
+    CmiLock(CsvAccess(CmiNodeRecvLock));
+    result = (char *) PCQueuePop(CsvAccess(NodeRecv));
+    CmiUnlock(CsvAccess(CmiNodeRecvLock));
+  }
+  return result;
+}
+#endif
 
 void *CmiGetNonLocal(void)
 {
@@ -407,6 +447,15 @@ static int SendMsgBuf()
   } 
 }
 
+#if CMK_SMP
+#define EnqueueMsg(m, size, node)	\
+  msg_tmp = (SMSG_LIST *) CmiAlloc(sizeof(SMSG_LIST));	\
+  msg_tmp->msg = m;	\
+  msg_tmp->size = size;	\
+  msg_tmp->destpe = node;	\
+  PCQueuePush(msgBuf[CmiMyRank()],(char *)msg_tmp);
+#endif
+
 CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg)
 {
   CmiState cs = CmiGetState();
@@ -428,11 +477,7 @@ CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg)
     return 0;
   }
   CMI_DEST_RANK(msg) = rank;
-  msg_tmp = (SMSG_LIST *) CmiAlloc(sizeof(SMSG_LIST));
-  msg_tmp->msg = msg;
-  msg_tmp->size = size;
-  msg_tmp->destpe = node;
-  PCQueuePush(msgBuf[CmiMyRank()],(char *)msg_tmp);
+  EnqueueMsg(msg, size, node);
   return 0;
 #else
   msg_tmp = (SMSG_LIST *) CmiAlloc(sizeof(SMSG_LIST));
@@ -467,7 +512,6 @@ void CmiFreeSendFn(int destPE, int size, char *msg)
     CmiAsyncSendFn(destPE, size, msg);
   }
 }
-
 
 /*********************** BROADCAST FUNCTIONS **********************/
 
@@ -581,6 +625,86 @@ void CmiFreeBroadcastAllFn(int size, char *msg)  /* All including me */
 #endif
   CmiFree(msg) ;
 }
+
+#if CMK_NODE_QUEUE_AVAILABLE
+
+CmiCommHandle CmiAsyncNodeSendFn(int dstNode, int size, char *msg)
+{
+  int i;
+  SMSG_LIST *msg_tmp;
+  char *dupmsg;
+     
+  CMI_DEST_RANK(msg) = DGRAM_NODEMESSAGE;
+  switch (dstNode) {
+  case NODE_BROADCAST_ALL:
+    CQdCreate(CpvAccess(cQdState), 1);
+    PCQueuePush(CsvAccess(NodeRecv),(char *)CopyMsg(msg,size));
+  case NODE_BROADCAST_OTHERS:
+    CQdCreate(CpvAccess(cQdState), Cmi_mynode-1);
+    for (i=0; i<Cmi_numnodes; i++)
+      if (i!=Cmi_mynode) {
+	dupmsg = (char *)CopyMsg(msg,size);
+        EnqueueMsg(dupmsg, size, i);
+      }
+    CmiFree(msg);
+    break;
+  default:
+    CQdCreate(CpvAccess(cQdState), 1);
+    if(dstNode == Cmi_mynode) {
+      char *dupmsg = (char *) CmiAlloc(size);
+      memcpy(dupmsg, msg, size);
+      PCQueuePush(CsvAccess(NodeRecv), dupmsg);
+      return 0;
+    }
+    else {
+      EnqueueMsg(msg, size, dstNode);
+    }
+  }
+  return 0;
+}
+
+void CmiSyncNodeSendFn(int p, int s, char *m)
+{
+}
+
+/* need */
+void CmiFreeNodeSendFn(int p, int s, char *m)
+{
+  CmiAsyncNodeSendFn(p, s, m);
+}
+
+/* need */
+void CmiSyncNodeBroadcastFn(int s, char *m)
+{
+  char *dupmsg = (char *) CmiAlloc(s);
+  memcpy(dupmsg, m, s);
+  CmiAsyncNodeSendFn(NODE_BROADCAST_OTHERS, s, dupmsg);
+}
+
+CmiCommHandle CmiAsyncNodeBroadcastFn(int s, char *m)
+{
+}
+
+/* need */
+void CmiFreeNodeBroadcastFn(int s, char *m)
+{
+  CmiAsyncNodeSendFn(NODE_BROADCAST_OTHERS, s, m);
+}
+
+void CmiSyncNodeBroadcastAllFn(int s, char *m)
+{
+}
+
+CmiCommHandle CmiAsyncNodeBroadcastAllFn(int s, char *m)
+{
+}
+
+/* need */
+void CmiFreeNodeBroadcastAllFn(int s, char *m)
+{
+  CmiAsyncNodeSendFn(NODE_BROADCAST_ALL, s, m);
+}
+#endif
 
 /************************** MAIN ***********************************/
 #define MPI_REQUEST_MAX 1024*10 
