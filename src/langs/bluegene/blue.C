@@ -913,9 +913,13 @@ static void sanityCheck()
     BgShutdown(); 
   } 
   else if (cva(bgMach).numCth==0 || cva(bgMach).numWth==0) { 
+#if 1
+    cva(bgMach).numCth = cva(bgMach).numWth = 1;
+#else
     if (CmiMyPe() == 0)
       CmiPrintf("\nMissing parameters for number of communication/worker threads!\n<tip> use command line options: +cth or +wth.\n");
     BgShutdown(); 
+#endif
   }
   else if (cva(bgMach).getNodeSize()<CmiNumPes()) {
     CmiAbort("\nToo few BlueGene nodes!\n");
