@@ -60,7 +60,6 @@ TraceBluegene::TraceBluegene(char** argv)
 }
 
 void TraceBluegene::traceClose() {
-CmiPrintf("TraceBluegene::traceClose pn %d\n", CkMyPe());
   bgUpdateProj(2);
   if(pfp != 0)
     fclose(pfp);
