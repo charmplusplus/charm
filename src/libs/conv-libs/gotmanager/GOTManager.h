@@ -6,7 +6,7 @@
  *  by ngot is moved to the register %ebx.
  *
  *  To compile on Linux IA-32
- *  gcc -fpic *.c
+ *  gcc -fpic *.c 
  *
  *  Developed by Sameer Kumar (sameer@ks.uiuc.edu) 8/25/03
  *
@@ -49,6 +49,8 @@ class GOTManager{
     
     //Creates a new global offset table
     void createNewGOT();
+
+    int isValidSymbol(char *name);
 
  public:
     //Creates a new GOT and a data segment

@@ -49,15 +49,6 @@ void GOTManager::createNewGOT(){
         count ++;
     }
 
-#if DEBUG_GOT_MANAGER   
-    for(count = 0; count < 600; count ++){
-    }    
-#endif
-
-    /*Compute the size of the got and allocate memory for the new got*/
-    total_size = 3 + relt_size + pltrelt_size;
-    ngot = (ELF_TYPE_Addr *)malloc(total_size * sizeof(ELF_TYPE_Addr));
-
     /*Compute the Number of global relocation data entries*/
     for(count = 0; count < relt_size; count ++){
         type = ELF32_R_TYPE(relt[count].r_info);
@@ -73,7 +64,8 @@ void GOTManager::createNewGOT(){
                 got_pos = count;
             else {
                 //Look for data and not function symbols
-                if(ELF32_ST_TYPE(symt[symindx].st_info) == STT_OBJECT) {
+                if(ELF32_ST_TYPE(symt[symindx].st_info) == STT_OBJECT &&
+                   isValidSymbol(sym_name) ) {
 #if DEBUG_GOT_MANAGER   
                     sym_name = str_tab + symt[symindx].st_name;
                     printf("%d %s %d %d\n", symindx, sym_name, 
@@ -96,9 +88,9 @@ void GOTManager::createNewGOT(){
 
         if(type == R_386_JMP_SLOT){
 #if DEBUG_GOT_MANAGER   
-            sym_name = str_tab + symt[symindx].st_name;
-            printf("%d %s %d %d\n", symindx, sym_name, 
-                   symt[symindx].st_size, symt[symindx].st_value);
+            //sym_name = str_tab + symt[symindx].st_name;
+            //printf("%d %s %d %d\n", symindx, sym_name, 
+            //     symt[symindx].st_size, symt[symindx].st_value);
 #endif
             global_pltrelt_size ++;
         }
@@ -111,14 +103,18 @@ void GOTManager::createNewGOT(){
     printf("Creating data segment of size %d\n", seg_size);
 #endif
 
-    //Allocating memory for the new data segment
-    new_data_seg = (char *)malloc(seg_size);
-    pos = 3 + pltrelt_size;
-    off = 0;
-
+    /*Compute the size of the got and allocate memory for the new got*/
+    total_size = 3 + relt_size + pltrelt_size;
+    ngot = (ELF_TYPE_Addr *) calloc(total_size * sizeof(ELF_TYPE_Addr), 1);
+    total_size = 3 + global_relt_size + global_pltrelt_size;
     //Copying the global offset table to the new global offset table
     for(count = 0; count < total_size; count ++)
         ngot[count] =  _GLOBAL_OFFSET_TABLE_[count];
+
+    //Allocating memory for the new data segment
+    new_data_seg = (char *) malloc(seg_size);
+    pos = 3 + global_pltrelt_size;
+    off = 0;
 
     //Copy Global offset table and global data
     for(count = 0; count < global_relt_size; count ++){
@@ -131,12 +127,13 @@ void GOTManager::createNewGOT(){
             else if(count == got_pos){
                 ngot[pos ++] = (ELF_TYPE_Addr)ngot;
             }
-            //A strange wierdness,
+            //A strange weirdness,
             //this variable is not present in the GOT
-            else if(count == gmon_pos); 
-
+            else if(count == gmon_pos);
+            
             else {
-                if(ELF32_ST_TYPE(symt[symindx].st_info) == STT_OBJECT) {
+                if(ELF32_ST_TYPE(symt[symindx].st_info) == STT_OBJECT
+                   && isValidSymbol(sym_name) ) {
                     ngot[pos ++] = (ELF_TYPE_Addr)
                         ((char *)new_data_seg + off);
                     off += ALIGN8(symt[symindx].st_size);
@@ -146,24 +143,41 @@ void GOTManager::createNewGOT(){
                            symt[symindx].st_size);
                 }
                 else pos ++; //Leave all function pointers alone
+                             //and Charm++ system globals alone
             }
         }
     }
 
 #if DEBUG_GOT_MANAGER
-    for(count = 0; count < 3 + global_relt_size + global_pltrelt_size; 
-        count ++)
-        printf("[%d] GOT = %u  NGOT = %u\n", count, 
-               _GLOBAL_OFFSET_TABLE_[count], ngot[count]);
+    /*
+      for(count = 0; count < 3 + global_relt_size + global_pltrelt_size; 
+      count ++)
+      printf("[%d] GOT = %u  NGOT = %u\n", count, 
+      _GLOBAL_OFFSET_TABLE_[count], ngot[count]);
+    */
 #endif
-
 }
 
+int GOTManager::isValidSymbol(char *name){
+    
+    if((strncmp("_Z", name, 2) == 0) || (strncmp("Cpv_", name, 4) == 0)
+       || (strncmp("Csv_", name, 4) == 0) || (strncmp("Ctv_", name, 4) == 0))
+        return 0;
+    
+    return 1;
+}
+
+ELF_TYPE_Addr *temp;
+
 void * GOTManager::swapGOT(){
-    ELF_TYPE_Addr *oldgot;
-    /*
-    asm("movl %ebx, oldgot");
-    asm("movl ngot, %ebx;");
-    */
+    ELF_TYPE_Addr *oldgot= 0, *new_got = 0;
+    
+    oldgot = _GLOBAL_OFFSET_TABLE_;    
+
+    temp = ngot;
+    asm("movl temp, %ebx;");        
+    
+    //printf("testing values %d, %d\n", oldgot, new_got);
+
     return (void *)oldgot;
 }
