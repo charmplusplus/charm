@@ -457,14 +457,11 @@ static const char *CIMsgClass =
 "    void*operator new(size_t s){return CkAllocMsg(__idx,s,0);}\n"
 "    void operator delete(void *p){CkFreeMsg(p);}\n"
 "    void*operator new(size_t,void*p){return p;}\n"
-"    void operator delete(void*,void*){ }\n"
 "    void*operator new(size_t s, int p){return CkAllocMsg(__idx,s,p);}\n"
-"    void operator delete(void *p,int){CkFreeMsg(p);}\n"
 ;
 
 static const char *CIAllocDecl =
 "    void *operator new(size_t s, int *sz, int p);\n"
-"    void operator delete(void *, int *, int);\n"
 ;
 
 void
