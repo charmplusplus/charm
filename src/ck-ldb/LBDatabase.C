@@ -28,6 +28,7 @@ CkpvDeclare(int, hasNullLB);         /**< true if NullLB is created */
 CkpvDeclare(int, lbdatabaseInited);  /**< true if lbdatabase is inited */
 CkpvDeclare(int, dumpStep);			 /**< the load balancing step at which to dump data */
 CkpvDeclare(char*, dumpFile);		 /**< the name of the file in which the data will be dumped */
+CkpvDeclare(int, doSimulation);		 /**< true if the program is running under "simulation" mode for load balancing */
 
 static LBDefaultCreateFn defaultCreate=NULL;
 void LBSetDefaultCreate(LBDefaultCreateFn f)
@@ -50,7 +51,7 @@ private:
       name(n), fn(f), help(h) {};
   };
   CkVec<LBDBEntry> lbtables;	 // a list of available LBs
-  char *defaultBalancer;		 
+  char *defaultBalancer;
 public:
   LBDBResgistry() { defaultBalancer=NULL; }
   void displayLBs()
@@ -65,7 +66,7 @@ public:
     lbtables.push_back(LBDBEntry(name, fn, help));
   }
   LBDefaultCreateFn search(const char *name) {
-    for (int i=0; i<lbtables.length(); i++) 
+    for (int i=0; i<lbtables.length(); i++)
       if (0==strcmp(name, lbtables[i].name)) return lbtables[i].fn;
     return NULL;
   }
@@ -89,9 +90,9 @@ LBDBInit::LBDBInit(CkArgMsg *m)
   char *balancer = lbRegistry.defaultLB();
   if (balancer) {
     LBDefaultCreateFn fn = lbRegistry.search(balancer);
-    if (!fn) { 
-      lbRegistry.displayLBs(); 
-      CmiPrintf("Abort: Unknown load balancer: '%s'!\n", balancer); 
+    if (!fn) {
+      lbRegistry.displayLBs();
+      CmiPrintf("Abort: Unknown load balancer: '%s'!\n", balancer);
       CkExit();
     }
     else  // overwrite defaultCreate.
@@ -117,6 +118,8 @@ void _loadbalancerInit()
   CkpvAccess(dumpStep) = -1;
   CkpvInitialize(char*, dumpFile);
   CkpvAccess(dumpFile) = NULL;
+  CkpvInitialize(int, doSimulation);
+  CkpvAccess(doSimulation) = 0;
 
   char **argv = CkGetArgv();
   char *balancer = NULL;
@@ -127,6 +130,9 @@ void _loadbalancerInit()
   // get the step number at which to dump the LB database
   CmiGetArgInt(argv, "+LBDump", &CkpvAccess(dumpStep));
   CmiGetArgString(argv, "+LBDumpFile", &CkpvAccess(dumpFile));
+
+  // get the simulation flag
+  CkpvAccess(doSimulation) = CmiGetArgFlag(argv, "+LBSim");
 }
 
 int LBDatabase::manualOn = 0;
