@@ -40,7 +40,7 @@ void LBMachineUtil::IdleEnd()
 LBMachineUtil::LBMachineUtil()
 {
   state = off;
-  total_walltime = total_cputime = -1.;
+  total_walltime = total_cputime = 0.0;
   total_idletime = 0;
   start_totalwall = start_totalcpu = -1.;
   total_idletime = 0;
