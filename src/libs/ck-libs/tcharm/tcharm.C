@@ -295,10 +295,14 @@ void TCharm::stop(void)
   DBG("thread suspended");
   CthSuspend();
   DBG("thread resumed");
-  isStopped=false;
-  /*We have to do the get() because "this" may have changed
-    during a migration-suspend.*/
-  TCharm::get()->startTiming();
+  /*SUBTLE: We have to do the get() because "this" may have changed
+    during a migration-suspend.  If you access *any* members
+    from this point onward, you'll cause heap corruption if
+    we're resuming from migration!  (OSL 2003/9/23)
+   */
+  TCharm *dis=TCharm::get();
+  dis->isStopped=false;
+  dis->startTiming();
 }
 
 //Resume the waiting thread
