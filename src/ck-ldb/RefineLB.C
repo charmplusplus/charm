@@ -50,8 +50,10 @@ void RefineLB::work(BaseLB::LDStats* stats, int count)
   for(obj=0;obj<stats->n_objs;obj++) {
       int pe = stats->from_proc[obj];
       if (to_procs[obj] != pe) {
-	// CkPrintf("[%d] Obj %d migrating from %d to %d\n",
-	//	 CkMyPe(),obj,pe,to_procs[obj]);
+        if (_lb_args.debug()>=2)  {
+	  CkPrintf("[%d] Obj %d migrating from %d to %d\n",
+		 CkMyPe(),obj,pe,to_procs[obj]);
+        }
 	stats->to_proc[obj] = to_procs[obj];
       }
   }
