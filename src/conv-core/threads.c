@@ -108,7 +108,7 @@ typedef struct CthProcInfo *CthProcInfo;
 
 CthThread x;
 
-struct CthThreadStruct
+typedef struct CthThreadStruct
 {
   char cmicore[CmiMsgHeaderSizeBytes];
   CthVoidFn  awakenfn;
@@ -126,7 +126,40 @@ struct CthThreadStruct
   qt_t      *savedstack; /* pointer to saved stack (null when running) */
   int        savedsize;  /* length of saved stack (zero when running) */
   qt_t      *savedptr;   /* stack pointer (null when running) */
-};
+} CthThreadStruct;
+
+int CthPackBufSize(CthThread t)
+{
+  if (t->savedstack == 0)
+    CmiAbort("Trying to pack a running thread!!\n");
+  return sizeof(CthThreadStruct) + t->datasize + t->savedsize;
+}
+
+void CthPackThread(CthThread t, void *buffer)
+{
+  if (t->savedstack == 0)
+    CmiAbort("Trying to pack a running thread!!\n");
+  if (t->insched)
+    CmiAbort("Trying to pack a thread in scheduler queue!!\n");
+  memcpy(buffer, (void *)t, sizeof(CthThreadStruct));
+  memcpy(((char*)buffer)+sizeof(CthThreadStruct), 
+         (void *)t->data, t->datasize);
+  memcpy(((char*)buffer)+sizeof(CthThreadStruct)+t->datasize, 
+         (void *)t->savedstack, t->savedsize);
+}
+
+CthThread CthUnpackThread(void *buffer)
+{
+  CthThread t = (CthThread) malloc(sizeof(CthThreadStruct));
+  memcpy((void*) t, buffer, sizeof(CthThreadStruct));
+  t->data = (char *) malloc(t->datasize);
+  memcpy((void*)t->data, ((char*)buffer)+sizeof(CthThreadStruct),
+         t->datasize);
+  t->savedstack = (qt_t*) malloc(t->savedsize);
+  memcpy((void*)t->savedstack, 
+         ((char*)buffer)+sizeof(CthThreadStruct)+t->datasize, t->savedsize);
+  return t;
+}
 
 /** addition for tracing */
 void setEvent(CthThread t, int event)
