@@ -4,6 +4,7 @@ module lv3d0 {
 	readonly int LV3D_disable_ship_replace;
 	readonly int LV3D_disable_ship_throttle;
 	readonly int LV3D_disable_ship;
+	readonly int LV3D_dosave_views;
 	readonly int LV3D0_toMaster_bytesPer;
 	readonly int LV3D0_toMaster_bytesMax;
 	readonly int LV3D0_toClient_bytesPer;

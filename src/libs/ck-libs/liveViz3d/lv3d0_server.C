@@ -18,6 +18,7 @@ void _registerliveViz(void);
 // #include "lv3d1.decl.h" //For LV3D1 registration (for .def file)
 
 static /* readonly */ CProxy_LV3D0_Manager mgrProxy;
+static /* readonly */ int LV3D_dosave_views=0; ///< Write views to file (not network).
 static /* readonly */ int LV3D_disable_ship_prio=0; ///< Set priorities to zero
 static /* readonly */ int LV3D_disable_ship_replace=0; ///< Don't replace old images from same impostor
 static /* readonly */ int LV3D_disable_ship_throttle=0; ///< Don't send a limited number at once
@@ -431,8 +432,10 @@ static char *LV3D_copy_view_src=0, *LV3D_copy_view_dest=0;
 static stats::op_t op_save=stats::time_op("save.time","Time spent saving views to disk");
 
 static void LV3D_save_init(void) {
-	if (CkpvAccess(LV3D_save_views)) return;
 	if (LV3D_copy_view_src==0) return;
+	if (CkpvAccess(LV3D_save_views)) { /* file already open: close and re-open */
+		fclose(CkpvAccess(LV3D_save_views));
+	}
 	
 	char fName[1024];
 	sprintf(fName,LV3D_copy_view_src,CkMyPe());
@@ -444,20 +447,40 @@ static void LV3D_save_init(void) {
 
 static void LV3D_save_start(void)
 {
+	if (!LV3D_dosave_views) return;
 	LV3D_save_init();
 	LV3D_save_viewStart=CkWallTimer(); //< HACK!
 }
 
-static void LV3D_save_view(LV3D0_ViewMsg *v) {
+struct savedViewRecord {
+public:
+	double t; /* Time view was rendered */
+	int view_size; /* size, in bytes, of view buffer */
+	void pup(PUP::er &p) {
+		p|t;
+		p|view_size;
+	}
+};
+
+static int LV3D_save_view(LV3D0_ViewMsg *v) {
+	if (!LV3D_dosave_views) return 0;
+	if (!CkpvAccess(LV3D_save_views)) return 0;
 	stats::op_sentry stats_sentry(op_save);
-	double t=CkWallTimer()-LV3D_save_viewStart;
+	savedViewRecord rec;
+	rec.t=CkWallTimer()-LV3D_save_viewStart;
+	rec.view_size=v->view_size;
+	enum {bufLen=sizeof(rec)};
+	char buf[bufLen];
+	PUP_toNetwork_pack p(buf); p|rec;
 	FILE *f=CkpvAccess(LV3D_save_views);
-	if (1!=fwrite(&t,sizeof(t),1,f)) CmiAbort("Can't write to saved view file!\n");
-	if (1!=fwrite(v->view,v->view_size,1,f)) CmiAbort("Can't write to saved view file!\n");
+	if (1!=fwrite(buf,p.size(),1,f)) CmiAbort("Can't write header to saved view file!\n");
+	if (1!=fwrite(v->view,v->view_size,1,f)) CmiAbort("Can't write view to saved view file!\n");
 	delete v;
+	return 1;
 }
 
 static void LV3D_save_finish(void) {
+	if (!LV3D_dosave_views) return;
 	if (!CkpvAccess(LV3D_save_views)) return;
 	fclose(CkpvAccess(LV3D_save_views));
 	CkpvAccess(LV3D_save_views)=0;
@@ -483,7 +506,7 @@ void LV3D0_Deposit(CkView *v,int clientID) {
 	s->add(1.0,op_deposit_views);
 	s->add(v->pixels,op_deposit_pixels);
 	LV3D0_ViewMsg *vm=LV3D0_ViewMsg::new_(v);
-	if (CkpvAccess(LV3D_save_views)) {LV3D_save_view(vm); return;}
+	if (LV3D_save_view(vm)) return;
 	s->add(vm->view_size,op_deposit_bytes);
 	if (LV3D_disable_ship) {delete vm; return;}
 	vm->clientID=clientID;
@@ -560,7 +583,9 @@ public:
 			bitmap[i]=(i!=masterProcessor);
 		set_avail_vector(bitmap);
 	}
-	void zero(void) { /* zero out collected statistics */
+	/** Zero out collected statistics.  This is broadcast before each run. 
+	*/
+	void zero(void) { 
 		stats::stats *s=stats::get();
 		stats::swap(op_unknown); // so unknown gets zerod out
 		s->zero();
@@ -569,15 +594,17 @@ public:
 		stats::swap(op_unknown);
 		LV3D_save_start();
 	}
-	void collect(void) { /* contribute current stats to reduction */
+	/** Contribute current stats to reduction 
+	*/
+	void collect(void) { 
 		stats::stats *s=stats::get();
 		if (CkMyPe()==0) s->set(stats::time()-startTime,op_time);
 		else s->set(0,op_time);
 		stats::swap(op_unknown);
 		contribute(sizeof(double)*stats::op_len,&s->t[0],CkReduction::sum_double,
 			CkCallback(printStats));
-		zero();
 		LV3D_save_finish();
+		zero();
 	}
 	void traceOn(void) {
 		traceBegin();
