@@ -195,7 +195,7 @@ extremely verbose, 2 shows most procedure entrance/exits,
 3 shows most communication, and 5 only shows rare or unexpected items.
 Displaying lower priority messages doesn't stop higher priority ones.
 */
-#define MACHINE_DEBUG_PRIO 3
+#define MACHINE_DEBUG_PRIO 4
 #define MACHINE_DEBUG_LOG 0 /*Controls whether output goes to log file*/
 
 FILE *debugLog;
@@ -207,11 +207,14 @@ FILE *debugLog;
 	MACHSTATE_I(prio,(debugLog,"[%d %.3f]> "str"\n",CmiMyPe(),CmiWallTimer(),a))
 # define MACHSTATE2(prio,str,a,b) \
 	MACHSTATE_I(prio,(debugLog,"[%d %.3f]> "str"\n",CmiMyPe(),CmiWallTimer(),a,b))
+# define MACHSTATE3(prio,str,a,b,c) \
+	MACHSTATE_I(prio,(debugLog,"[%d %.3f]> "str"\n",CmiMyPe(),CmiWallTimer(),a,b,c))
 #else
 # define MACHINE_DEBUG_LOG 0
 # define MACHSTATE(n,x) /*empty*/
 # define MACHSTATE1(n,x,a) /*empty*/
 # define MACHSTATE2(n,x,a,b) /*empty*/
+# define MACHSTATE3(n,x,a,b,c) /*empty*/
 #endif
 
 #if CMK_USE_POLL
@@ -2010,7 +2013,7 @@ static void ConverseRunPE(int everReturn)
   if (Cmi_netpoll) /*Repeatedly call CommServer*/
     CcdPeriodicCallKeep(CommunicationPeriodic,NULL);
   else /*Only need this for retransmits*/
-    CcdCallFnAfter(CommunicationPeriodicCaller,NULL,100);
+    CcdCallFnAfter(CommunicationPeriodicCaller,NULL,Cmi_comm_periodic_delay);
 #endif
 
   if (CmiMyRank()==0 && Cmi_charmrun_fd!=-1) {
@@ -2026,7 +2029,10 @@ static void ConverseRunPE(int everReturn)
 #endif
     
     /*Occasionally check for retransmissions, outgoing acks, etc.*/
-    CcdCallFnAfter(CommunicationsClockCaller,NULL,100);
+    CcdCallFnAfter(CommunicationsClockCaller,NULL,Cmi_comm_clock_delay);
+
+    /*Initialize the clock*/
+    Cmi_clock=GetClock();
   }
 
   if (!everReturn) {

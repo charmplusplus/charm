@@ -13,7 +13,7 @@
 
 #define DGRAM_SRCPE_MASK    (0xFFFF)
 #define DGRAM_MAGIC_MASK    (0xFF)
-#define DGRAM_SEQNO_MASK    (0xFFFFFFFF)
+#define DGRAM_SEQNO_MASK    (0xFFFFFFFFu)
 
 #if CMK_NODE_QUEUE_AVAILABLE
 #define DGRAM_NODEMESSAGE   (0xFB)
@@ -58,7 +58,8 @@ static int    Cmi_half_window;
 static double Cmi_delay_retransmit;
 static double Cmi_ack_delay;
 static int    Cmi_dgram_max_data;
-static int    Cmi_tickspeed;
+static int    Cmi_comm_periodic_delay;
+static int    Cmi_comm_clock_delay;
 static int writeableAcks,writeableDgrams;/*Write-queue counts (to know when to sleep)*/
 
 static void setspeed_atm()
@@ -68,7 +69,6 @@ static void setspeed_atm()
   Cmi_window_size      = 20;
   Cmi_delay_retransmit = 0.0150;
   Cmi_ack_delay        = 0.0035;
-  Cmi_tickspeed        = 10000;
 }
 
 static void setspeed_eth()
@@ -76,9 +76,8 @@ static void setspeed_eth()
   Cmi_max_dgram_size   = 1400;
   Cmi_window_size      = 40;
   Cmi_os_buffer_size   = Cmi_window_size*Cmi_max_dgram_size;
-  Cmi_delay_retransmit = 0.0500;
-  Cmi_ack_delay        = 0.0050;
-  Cmi_tickspeed        = 10000;
+  Cmi_delay_retransmit = 0.1000;
+  Cmi_ack_delay        = 0.0200;
 }
 
 static void extract_args(char **argv)
@@ -93,6 +92,25 @@ static void extract_args(char **argv)
   Cmi_half_window = Cmi_window_size >> 1;
   if ((Cmi_window_size * Cmi_max_dgram_size) > Cmi_os_buffer_size)
     KillEveryone("Window size too big for OS buffer.");
+  Cmi_comm_periodic_delay=(int)(1000*Cmi_delay_retransmit);
+  if (Cmi_comm_periodic_delay>60) Cmi_comm_periodic_delay=60;
+  Cmi_comm_clock_delay=(int)(1000*Cmi_ack_delay);
+}
+
+/* Compare seqnos using modular arithmetic */
+static int seqno_in_window(unsigned int seqno,unsigned int winStart)
+{
+  return ((DGRAM_SEQNO_MASK&(seqno-winStart)) < Cmi_window_size);
+}
+static int seqno_lt(unsigned int seqA,unsigned int seqB)
+{
+  unsigned int del=seqB-seqA;
+  return (del>0u) && (del<(DGRAM_SEQNO_MASK/2));
+}
+static int seqno_le(unsigned int seqA,unsigned int seqB)
+{
+  unsigned int del=seqB-seqA;
+  return (del>=0u) && (del<(DGRAM_SEQNO_MASK/2));
 }
 
 /*****************************************************************************
@@ -139,12 +157,14 @@ typedef struct OtherNodeStruct
   unsigned int dataport;
   struct sockaddr_in addr;
 
-  double                   send_primer;  /* time to send primer packet */
   unsigned int             send_last;    /* seqno of last dgram sent */
   ImplicitDgram           *send_window;  /* datagrams sent, not acked */
   ImplicitDgram            send_queue_h; /* head of send queue */
   ImplicitDgram            send_queue_t; /* tail of send queue */
   unsigned int             send_next;    /* next seqno to go into queue */
+  unsigned int             send_good;    /* last acknowledged seqno */
+  double                   send_primer;  /* time to send retransmit */
+  int                      retransmit_leash; /*Maximum number of packets to retransmit*/
 
   int                      asm_rank;
   int                      asm_total;
@@ -165,7 +185,8 @@ typedef struct OtherNodeStruct
   unsigned int             stat_recv_pkt;   /* number of packets received */
   unsigned int             stat_recv_ack;   /* number of acks received */
   unsigned int             stat_ack_pkts;   /* packets acked */
- 
+  unsigned int             stat_consec_resend; /*Packets retransmitted since last ack*/ 
+
   int sent_msgs;
   int recd_msgs;
   int sent_bytes;
@@ -176,13 +197,15 @@ typedef struct OtherNodeStruct
 static void OtherNode_init(OtherNode node)
 {
     int i;
-    node->send_primer = 1.0e30; /*Don't send primer until needed*/
+    node->send_primer = 1.0e30; /*Don't retransmit until needed*/
+    node->retransmit_leash = 1; /*Start with short leash*/
     node->send_last=0;
     node->send_window =
       (ImplicitDgram*)malloc(Cmi_window_size*sizeof(ImplicitDgram));
     for (i=0;i<Cmi_window_size;i++) node->send_window[i]=NULL;
     node->send_queue_h=node->send_queue_t=NULL;
     node->send_next=0;
+    node->send_good=(unsigned int)(-1);
 
     node->asm_rank=0;
     node->asm_total=0;
@@ -474,13 +497,13 @@ static void CommunicationsClock(void)
   MACHSTATE(3,"CommunicationsClock");
   Cmi_clock = GetClock();
   if (Cmi_clock > Cmi_ack_last + 0.5*Cmi_ack_delay) {
-    MACHSTATE(2,"CommunicationsClock timing out acks");    
+    MACHSTATE(4,"CommunicationsClock timing out acks");    
     Cmi_ack_last=Cmi_clock;
     writeableAcks=1; /*Some acks may be ready*/
     writeableDgrams=1; /*Some dgrams may be retransmitted*/
   }
   if (Cmi_clock > Cmi_check_last + Cmi_check_delay) {
-    MACHSTATE(1,"CommunicationsClock pinging charmrun");       
+    MACHSTATE(4,"CommunicationsClock pinging charmrun");       
     Cmi_check_last = Cmi_clock; 
     ctrl_sendone_locking("ping",NULL,0,NULL,0); /*Charmrun may have died*/
   }
@@ -489,7 +512,7 @@ static void CommunicationsClock(void)
 static void CommunicationsClockCaller(void *ignored)
 {
   CommunicationsClock();
-  CcdCallFnAfter(CommunicationsClockCaller,NULL,100);  
+  CcdCallFnAfter(CommunicationsClockCaller,NULL,Cmi_comm_clock_delay);  
 }
 
 #if CMK_SHARED_VARS_UNAVAILABLE
@@ -501,7 +524,7 @@ static void CommunicationPeriodic(void)
 static void CommunicationPeriodicCaller(void *ignored)
 {
   CommunicationPeriodic();
-  CcdCallFnAfter(CommunicationPeriodicCaller,NULL,100);
+  CcdCallFnAfter(CommunicationPeriodicCaller,NULL,Cmi_comm_periodic_delay);
 }
 #endif
 
