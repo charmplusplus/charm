@@ -27,6 +27,7 @@ module ckPairCalculator {
 		entry PairCalcReducer();
 		entry void acceptPartialResult(int size, complex matrix[size], int fromRow, int fromCol);
 		entry void broadcastEntireResult(int size, double matrix[size], bool symmtype);			
+		entry void startMachineReduction(void);
 	};
 
 

@@ -145,12 +145,18 @@ class PairCalcReducer : public Group {
 
   void acceptContribute(int size, double* matrix, CkCallback cb, bool isAllReduce, bool symmtype);
   
+  void startMachineReduction();
+
  private:
   CkVec<PairCalculator *> localElements[2];
   int numRegistered[2];
   int acceptCount;
   int reduction_elementCount;
   double *tmp_matrix;
+  bool isAllReduce;
+  int size;
+  bool symmtype;
+  CkCallback cb;
 }; 
 
 

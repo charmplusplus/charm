@@ -10,7 +10,11 @@ void createPairCalculator(bool sym, int s, int grainSize, int numZ, int* z, int 
   //CkPrintf("create pair calculator %d, %d\n", s, grainSize);
 
   CProxy_PairCalcReducer pairCalcReducerProxy = CProxy_PairCalcReducer::ckNew();
-  pairCalcReducerProxy.ckSetReductionClient(&cb); 
+
+  CkCallback rcb = CkCallback(CkIndex_PairCalcReducer::__idx_startMachineReduction_void,
+                              pairCalcReducerProxy.ckGetGroupID());
+  
+  pairCalcReducerProxy.ckSetReductionClient(&rcb); 
 
   // FIXME: to choose grain size and block size instead of hard-coding
   int blkSize = 1;

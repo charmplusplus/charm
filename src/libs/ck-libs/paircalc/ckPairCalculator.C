@@ -6,6 +6,7 @@
 
 PairCalculator::PairCalculator(CkMigrateMessage *m) { }
 	
+
 PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int op1,  FuncType fn1, int op2,  FuncType fn2, CkCallback cb, CkGroupID gid, CkArrayID cb_aid, int cb_ep) 
 {
     //CkPrintf("Create Pair Calculator\n");
@@ -48,7 +49,7 @@ PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int
   memset(outData, 0 , sizeof(double)* grainSize * grainSize);
 #else
   outData = new double[S * S];
-  memset(outData, 0 , sizeof(double)* S *S);
+  //memset(outData, 0 , sizeof(double)* S *S);
 #endif
 
   newData = NULL;
@@ -272,11 +273,10 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
 #if 1 //!CONVERSE_VERSION_ELAN
       contribute(S * S *sizeof(double), outData, CkReduction::sum_double);
 #else
-
-      CkPrintf("ELAN VERSION\n");
+      //CkPrintf("[%d] ELAN VERSION %d\n", CkMyPe(), symmetric);
       CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id); 
-      pairCalcReducerProxy.ckLocalBranch()->acceptContribute(S * S, outData, cb,
-                                                             false, symmetric);
+      pairCalcReducerProxy.ckLocalBranch()->acceptContribute(S * S, outData, 
+                                                             cb, !symmetric, symmetric);
 #endif
 #endif
   }
@@ -356,12 +356,10 @@ PairCalculator::acceptResult(int size, double *matrix, int rowNum)
   CkPrintf("[%d %d %d %d]: Accept Result with size %d\n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z, size);
 #endif
   complex *mynewData = new complex[N*grainSize];
-  memset(mynewData, 0, sizeof(complex)*N*grainSize);
 
   complex *othernewData;
   if(symmetric && thisIndex.x != thisIndex.y){
       othernewData = new complex[N*grainSize];
-      memset(othernewData, 0, sizeof(complex)*N*grainSize);
   }
 
   int offset = 0, index = thisIndex.y*S + thisIndex.x;
@@ -656,11 +654,12 @@ PairCalcReducer::acceptPartialResult(int size, complex* matrix, int fromRow, int
 }
 
 
-void add_double(void *in, void *inout, int *size, void *handle) {
+void add_double(void *in, void *inout, int *red_size, void *handle) {
     double * matrix1 = (double *)in;
     double * matrix2 = (double *)inout;
-
-    for(int i = 0; i < *size; i ++){
+    int size = *red_size / sizeof(double);
+    
+    for(int i = 0; i < size; i ++){
         matrix2[i] += matrix1[i];
     }
 }
@@ -679,50 +678,65 @@ extern "C" void elan_machine_allreduce(int nelem, int size, void * data,
 void PairCalcReducer::acceptContribute(int size, double* matrix, CkCallback cb, 
                                        bool isAllReduce, bool symmtype)
 {
+    this->isAllReduce = isAllReduce;
+    this->size = size;
+    this->symmtype = symmtype;
+    this->cb = cb;
+
 #if CONVERSE_VERSION_ELAN
     reduction_elementCount ++;
     
+    int red_size = size *sizeof(double);
     if(tmp_matrix == NULL) {
-        tmp_matrix = new double[size];
-        memset(matrix, 0, size * sizeof(double));
+        tmp_matrix = matrix;
     }
+    else
+        add_double(matrix, tmp_matrix, &red_size, NULL);
     
-    add_double(matrix, tmp_matrix, &size, NULL);
-
     if(reduction_elementCount == localElements[symmtype].length()) {
         reduction_elementCount = 0;
-        double * dst_matrix =  NULL;
         
-        if(isAllReduce) {
+        contribute(sizeof(int),&reduction_elementCount,CkReduction::sum_int);
+    }
+#else
+    CkAbort("Converse Version Is not ELAN, h/w reduction is not supported");
+#endif
+}
+
+
+void PairCalcReducer::startMachineReduction() {
+#if CONVERSE_VERSION_ELAN
+    double * dst_matrix =  NULL;
+    
+    if(isAllReduce) {
+        dst_matrix = new double[size];
+        memset(dst_matrix, 0, size * sizeof(double));
+        elan_machine_allreduce(size, sizeof(double), tmp_matrix, dst_matrix, add_double);
+    }
+    else {     
+        int pe = CkNumPes()/2; //HACK FOO BAR, GET IT FROM CALLBACK cb
+        
+        if(pe == CkMyPe()) {
             dst_matrix = new double[size];
-            memset(matrix, 0, size * sizeof(double));
-            elan_machine_allreduce(size, sizeof(double), tmp_matrix, dst_matrix, add_double);
-        }
-        else {     
-            CkPrintf("HERE\n");
-            int pe = CkNumPes()/2; //HACK FOO BAR, GET IT FROM CALLBACK cb
-            
-            if(pe == CkMyPe()) {
-                dst_matrix = new double[size];
-                memset(matrix, 0, size * sizeof(double));
-            }
-            
-            elan_machine_reduce(size, sizeof(double), tmp_matrix, dst_matrix, add_double, pe);
+            memset(dst_matrix, 0, size * sizeof(double));
         }
         
-        if(isAllReduce) {
-            broadcastEntireResult(size, dst_matrix,  symmtype);
+        elan_machine_reduce(size, sizeof(double), tmp_matrix, dst_matrix, add_double, pe);
+    }
+    
+    if(isAllReduce) {
+        //CkPrintf("Calling BroadcastEntire\n");
+        broadcastEntireResult(size, dst_matrix,  symmtype);
+        delete [] dst_matrix;
+    }
+    else {
+        if(dst_matrix != NULL) {
+            cb.send(size *sizeof(double), dst_matrix);
             delete [] dst_matrix;
         }
-        else {
-            cb.send(size *sizeof(double), dst_matrix);
-            if(dst_matrix)
-                delete [] dst_matrix;
-        }        
-        
-        delete [] tmp_matrix;
-        tmp_matrix = NULL;
-    }
+    }        
+    
+    tmp_matrix = NULL;
 #else
     CkAbort("Converse Version Is not ELAN, h/w reduction is not supported");
 #endif
