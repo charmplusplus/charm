@@ -13,7 +13,7 @@ but it can use the CcsSendReply function.
 #ifndef CONV_CCS_H
 #define CONV_CCS_H
 
-#include "converse.h"
+#include "converse.h" /* for CMK_CCS_AVAILABLE and CmiHandler */
 #include "sockRoutines.h"
 #include "ccs-server.h" /*for CcsSecAttr*/
 
