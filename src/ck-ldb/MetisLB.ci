@@ -1,0 +1,9 @@
+module MetisLB {
+
+extern module CentralLB;
+
+group MetisLB : CentralLB {
+  entry void MetisLB(void);  
+};
+
+};
