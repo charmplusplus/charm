@@ -40,9 +40,16 @@ typedef struct CcsServer {
 
 /*All routines return -1 on failure*/
 int CcsConnect(CcsServer *svr, char *host, int port,CcsSec_secretKey *key);
+int CcsConnectWithTimeout(CcsServer *svr, char *host, int port,CcsSec_secretKey *key, int timeout);
+
 int CcsConnectIp(CcsServer *svr,skt_ip_t ip, int port,CcsSec_secretKey *key);
+int CcsConnectIpWithTimeout(CcsServer *svr,skt_ip_t ip, int port,CcsSec_secretKey *key, int timeout);
+
 int CcsSendRequest(CcsServer *svr, char *hdlrID, int pe, 
 		    unsigned int size, const char *msg);
+int CcsSendRequestWithTimeout(CcsServer *svr, char *hdlrID, int pe, 
+		    unsigned int size, const char *msg, int timeout);
+
 int CcsRecvResponse(CcsServer *svr, 
 		    unsigned int maxsize, char *recvBuffer, int timeout);
 int CcsRecvResponseMsg(CcsServer *svr, 

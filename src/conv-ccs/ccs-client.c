@@ -129,12 +129,22 @@ static const char *CcsImpl_authInit(SOCKET fd,CcsServer *svr)
 /**
  * Converse Client-Server Module: Client Side
  */
-int CcsConnect(CcsServer *svr, char *host, int port,CcsSec_secretKey *key)
+
+int CcsConnect(CcsServer *svr, char *host, int port,CcsSec_secretKey *key){
+    CcsConnectWithtimeout(svr, host, port, key, 120);
+}
+
+int CcsConnectWithtimeout(CcsServer *svr, char *host, int port,CcsSec_secretKey *key, int timeout)
 {
   skt_init();
-  return CcsConnectIp(svr,skt_lookup_ip(host),port,key);
+  return CcsConnectIpWithTimeout(svr,skt_lookup_ip(host),port,key, timeout);
 }
-int CcsConnectIp(CcsServer *svr, skt_ip_t ip, int port,CcsSec_secretKey *key)
+
+int CcsConnectIp(CcsServer *svr, skt_ip_t ip, int port,CcsSec_secretKey *key){
+    CcsConnectIpWithTimeout(svr, ip, port, key, 120);
+}
+
+int CcsConnectIpWithTimeout(CcsServer *svr, skt_ip_t ip, int port,CcsSec_secretKey *key, int timeout)
 {
   unsigned int msg_len;char *msg_data;/*Reply message*/
   skt_init();
@@ -153,7 +163,7 @@ int CcsConnectIp(CcsServer *svr, skt_ip_t ip, int port,CcsSec_secretKey *key)
     svr->level=0; /*HACK: hardcoded at security level 0*/
     svr->key=*key;
     CCS_RAND_new(&svr->rand);
-    fd=skt_connect(svr->hostIP, svr->hostPort,120);
+    fd=skt_connect(svr->hostIP, svr->hostPort,timeout);
     if (NULL!=(err=CcsImpl_authInit(fd,svr))) {
       fprintf(stderr,"CCS Client error> %s\n",err);
       skt_close(fd);
@@ -199,7 +209,11 @@ int CcsNodeSize(CcsServer *svr,int node)
   return svr->numProcs[node];
 }
 
-int CcsSendRequest(CcsServer *svr, char *hdlrID, int pe, unsigned int size, const char *msg)
+int CcsSendRequest(CcsServer *svr, char *hdlrID, int pe, unsigned int size, const char *msg){
+    CcsSendRequestWithTimeout(svr, hdlrID, pe, size, msg, 120);
+}
+
+int CcsSendRequestWithTimeout(CcsServer *svr, char *hdlrID, int pe, unsigned int size, const char *msg, int timeout)
 {
   CcsMessageHeader hdr;/*CCS request header*/
   hdr.len=ChMessageInt_new(size);
@@ -210,7 +224,7 @@ int CcsSendRequest(CcsServer *svr, char *hdlrID, int pe, unsigned int size, cons
   if (svr->replyFd!=-1) {skt_close(svr->replyFd);svr->replyFd=-1;}
 
   /*Connect to conv-host, and send the message */
-  svr->replyFd=skt_connect(svr->hostIP, svr->hostPort,120);
+  svr->replyFd=skt_connect(svr->hostIP, svr->hostPort,timeout);
   if (svr->replyFd==-1) return -1;
   
   if (svr->isAuth==1) 
