@@ -825,10 +825,7 @@ void CHostInit(int CCS_server_port)
 {
   struct itimerval i;
   CcsServer_new(NULL,&CCS_server_port);
-  CmiSignal(SIGALRM, SIGIO, 0, CommunicationInterrupt);
-#if !CMI_ASYNC_NOT_NEEDED
-  CmiEnableAsyncIO(CcsServer_fd());
-#endif
+  CmiSignal(SIGALRM, 0, 0, CommunicationInterrupt);
   /*We will receive alarm signals at 10Hz*/
   i.it_interval.tv_sec = 0;
   i.it_interval.tv_usec = 100000;
@@ -841,7 +838,7 @@ void CHostProcess(void)
 {
   CcsImplHeader hdr;
   char *data;
-  if (ccs_socket_ready==0) return;
+  if (1!=skt_select1(CcsServer_fd(),0)) return;
   inside_comm=1;
   printf("Got CCS connect...\n");
   if (CcsServer_recvRequest(&hdr,&data))
