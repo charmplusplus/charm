@@ -301,7 +301,7 @@ void CpdStartGdb(void)
 #endif
 }
 
-CpvExtern(void *,debugQueue);
+CpvCExtern(void *,debugQueue);
 
 
 //following function should interpret data in a message
