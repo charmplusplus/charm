@@ -292,7 +292,6 @@ static inline void _initDone(void)
   DEBUGF(("[%d] _initDone.\n", CkMyPe()));
   if (!_triggersSent) _sendTriggers(); 
   CkNumberHandler(_triggerHandlerIdx, (CmiHandler)_discardHandler); 
-  CkNumberHandler(_exitHandlerIdx, (CmiHandler)_exitHandler);
   _processBufferedBocInits();
   if(CkMyRank() == 0) {
     _processBufferedNodeBocInits();
@@ -391,11 +390,8 @@ void CkExit(void)
   }
 #if ! CMK_BLUEGENE_THREAD
   _TRACE_END_EXECUTE();
-  if (_mainDone == 1) { //Not called from inside main-- wait for stats:
-    CsdScheduler(-1);
-  } else { //Called from inside main-- just give up
-    ConverseExit();
-  }
+  //Wait for stats, which will call ConverseExit when finished:
+  CsdScheduler(-1);
 #endif
 }
 
@@ -465,7 +461,7 @@ void _initCharm(int argc, char **argv)
 
 	_charmHandlerIdx = CkRegisterHandler((CmiHandler)_bufferHandler);
 	_initHandlerIdx = CkRegisterHandler((CmiHandler)_initHandler);
-	_exitHandlerIdx = CkRegisterHandler((CmiHandler)_bufferHandler);
+	_exitHandlerIdx = CkRegisterHandler((CmiHandler)_exitHandler);
 	_bocHandlerIdx = CkRegisterHandler((CmiHandler)_initHandler);
 	_nodeBocHandlerIdx = CkRegisterHandler((CmiHandler)_initHandler);
 #ifdef __BLUEGENE__
