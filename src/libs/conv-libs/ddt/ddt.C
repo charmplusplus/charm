@@ -3,7 +3,7 @@
 DDT_DataType* 
 DDT::getType(int nIndex)
 {
-  if( (nIndex > 0) && (nIndex < MAX_TYPES))
+  if( (nIndex >= 0) && (nIndex < MAX_TYPES))
     return typeTable[nIndex] ;
   else
     return 0 ;
