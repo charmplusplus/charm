@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.3  1998-02-19 08:39:35  jyelon
+ * Revision 1.4  1998-03-16 19:52:53  milind
+ * small changes to machine params.
+ *
+ * Revision 1.3  1998/02/19 08:39:35  jyelon
  * Added multicast code.
  *
  * Revision 1.2  1997/12/22 21:57:53  jyelon
@@ -155,12 +158,12 @@
 #define CMK_STATIC_PROTO_FAILS                             0
 #define CMK_STATIC_PROTO_WORKS                             1
 
-#define CMK_STRERROR_IS_A_BUILTIN                          0
-#define CMK_STRERROR_USE_SYS_ERRLIST                       1
+#define CMK_STRERROR_IS_A_BUILTIN                          1
+#define CMK_STRERROR_USE_SYS_ERRLIST                       0
 
-#define CMK_STRINGS_USE_OWN_DECLARATIONS                   1
+#define CMK_STRINGS_USE_OWN_DECLARATIONS                   0
 #define CMK_STRINGS_USE_STRINGS_H                          0
-#define CMK_STRINGS_USE_STRING_H                           0
+#define CMK_STRINGS_USE_STRING_H                           1
 
 #define CMK_THREADS_REQUIRE_NO_CPV                         0
 
