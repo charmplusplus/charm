@@ -576,6 +576,7 @@ void CentralLB::readStatsMsgs(const char* filename) {
 
   PUP::fromDisk pd(f);
   PUP::machineInfo machInfo;
+  pd((char *)&machInfo, sizeof(machInfo));	// read machine info
   PUP::xlater p(machInfo, pd);
 
   p|stats_msg_count;
@@ -818,6 +819,9 @@ void CentralLB::LDStats::pup(PUP::er &p)
   for (i=0; i<n_comm; i++) p|commData[i];
   if (p.isUnpacking())
     count = LBSimulation::simProcs;
+  if (p.isUnpacking()) {
+    objHash = NULL;
+  }
 }
 
 int CentralLB::LDStats::useMem() { 

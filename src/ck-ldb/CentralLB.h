@@ -77,6 +77,11 @@ public:
     ProcStats(): total_walltime(0.0), total_cputime(0.0), idletime(0.0),
 	   	 bg_walltime(0.0), bg_cputime(0.0), pe_speed(1),
 		 utilization(1.0), available(CmiTrue), n_objs(0)  {}
+    inline void pup(PUP::er &p) {
+      p|total_walltime;  p|total_cputime; p|idletime;
+      p|bg_walltime; p|bg_cputime; p|pe_speed;
+      p|utilization; p|available; p|n_objs;
+    }
   };
 
   struct LDStats {  // Passed to Strategy
@@ -151,8 +156,6 @@ private:
 public:
   int useMem();
 };
-
-PUPbytes(CentralLB::ProcStats);
 
 // CLBStatsMsg is not directly sent in the entry function
 // CkMarshalledCLBStatsMessage is used instead to use the pup defined here.
