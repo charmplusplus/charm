@@ -130,6 +130,7 @@ struct CthThreadStruct
   int        Event;
 /** End Addition */
   CthThread  qnext;
+  int       *magic;
   qt_t      *stackp;
 };
 
@@ -193,6 +194,7 @@ CthThread t;
 
 void CthInit()
 {
+  static unsigned int fakemagic;
   CthThread t;
 
   CthCpvInitialize(char *,     CthData);
@@ -202,6 +204,8 @@ void CthInit()
   
   t = (CthThread)malloc(sizeof(struct CthThreadStruct));
   CthThreadInit(t);
+  fakemagic = 0x12345678;
+  t->magic = &fakemagic;
   CthCpvAccess(CthData)=0;
   CthCpvAccess(CthCurrent)=t;
   CthCpvAccess(CthDatasize)=1;
@@ -244,6 +248,10 @@ CthThread t;
   CthThread tc;
   tc = CthCpvAccess(CthCurrent);
   if (t == tc) return;
+  if ((*(tc->magic) != 0x12345678)||(*(t->magic) != 0x12345678)) {
+    CmiError("Thread corruption: probably, a thread overflowed its stack.\n");
+    exit(1);
+  }
   CthFixData(t);
   CthCpvAccess(CthCurrent) = t;
   CthCpvAccess(CthData) = t->data;
@@ -267,17 +275,24 @@ static void CthOnly(void *arg, void *vt, qt_userf_t fn)
 CthThread CthCreate(fn, arg, size)
 CthVoidFn fn; void *arg; int size;
 {
-  CthThread result; char *stack;
+  CthThread result; qt_t *stack, *stacka, *stackb; size_t magic;
   if (size==0) size = STACKSIZE;
   size += QT_STKALIGN;
   result = (CthThread)malloc(sizeof(struct CthThreadStruct)+size);
   if (result==0) { CmiError("Out of memory."); exit(1); }
-  stack = ((char*)result)+sizeof(struct CthThreadStruct);
-  stack = (char *)QT_STKROUNDUP(((CMK_SIZE_T)stack));
+  stack = (qt_t*)(((char*)result)+sizeof(struct CthThreadStruct));
+  stack = (qt_t*)QT_STKROUNDUP(((CMK_SIZE_T)stack));
   CthThreadInit(result);
-  result->stackp = QT_SP(stack, size - QT_STKALIGN);
-  result->stackp = 
-    QT_ARGS(result->stackp, arg, result, (qt_userf_t *)fn, CthOnly);
+  stacka = QT_SP(stack, size - QT_STKALIGN);
+  stackb = QT_ARGS(stacka, arg, result, (qt_userf_t *)fn, CthOnly);
+  result->stackp = stackb;
+  if (stack==stacka) {
+    magic = ((size_t)stack) + (size*7)/8;
+  } else {
+    magic = ((size_t)stack) + (size/8);
+  }
+  result->magic = (int*)(magic & ~0xF);
+  *result->magic = 0x12345678;
   CthSetStrategyDefault(result);
   return result;
 }
