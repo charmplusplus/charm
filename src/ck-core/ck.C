@@ -1122,7 +1122,7 @@ void CkArrayManagerInsert(int pe,void *msg,CkGroupID aID) {
   register envelope *env = UsrToEnv(msg);
   env->getsetArrayMgr()=aID;
   _prepareOutgoingArrayMsg(env,ArrayEltInitMsg);
-  _skipCldEnqueue(pe, env, _infoIdx);
+  CldEnqueue(pe, env, _infoIdx);
 }
 extern "C"
 void CkArrayManagerDeliver(int pe,void *msg) {
