@@ -42,6 +42,7 @@ TraceProjector::TraceProjector(char **argv)
 int TraceProjector::traceRegisterUserEvent(const char* evt, int e)
 {
 	/** Projector doesn't have it at the moment **/
+	return 0;
 }
 
 void TraceProjector::traceClearEps(void)
@@ -136,6 +137,12 @@ void TraceProjector::beginExecute(envelope *e)
 	//CmiPrintf("TraceProjector:iData in beginExecute %d %d \n",e->getEvent(),e->getSrcPe());
 	charm_beginExecute(e);
 }
+
+void TraceProjector::beginExecute(CmiObjId  *tid)
+{
+	// FIXME-- log this
+}
+
 
 void TraceProjector::beginExecute(int event,int msgType,int ep,int srcPe, int mlen)
 {

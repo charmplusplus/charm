@@ -27,7 +27,7 @@ class TraceProjector : public Trace {
     void creation(envelope *e, int num=1);
     void creation(envelope *e);
     void beginExecute(envelope *e);
- //   void beginExecute(CmiObjId  *tid);
+    void beginExecute(CmiObjId  *tid);
     void beginExecute(int event,int msgType,int ep,int srcPe,int ml);
     void endExecute(void);
     void messageRecv(char *env, int pe);
