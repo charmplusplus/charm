@@ -28,6 +28,7 @@ typedef struct _ccd_cblist {
   int first, last;
   int first_free;
   ccd_cblist_elem *elems;
+  int flag;
 } ccd_cblist;
 
 /* initializes a callback list to the maximum length of ml.
@@ -46,6 +47,7 @@ static void init_cblist(ccd_cblist *l, unsigned int ml)
   l->maxlen = ml;
   l->first = l->last = -1;
   l->first_free = 0;
+  l->flag = 0;
 }
 
 /* expand the callback list to a max length of ml
@@ -153,6 +155,9 @@ static void call_cblist_keep(ccd_cblist *l,double curWallTime)
 static void call_cblist_remove(ccd_cblist *l,double curWallTime)
 {
   int i, len = l->len, idx;
+  /* reentrant */
+  if (l->flag) return;
+  l->flag = 1;
 #if ! CMK_BLUEGENE_CHARM
   for(i=0, idx=l->first;i<len;i++) {
     int old = CmiSwitchToPE(l->elems[idx].cb.pe);
@@ -169,6 +174,7 @@ static void call_cblist_remove(ccd_cblist *l,double curWallTime)
   }
 #endif
   remove_n_elems(l,len);
+  l->flag = 0;
 }
 
 #define CBLIST_INIT_LEN   8
