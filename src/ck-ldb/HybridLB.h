@@ -121,15 +121,20 @@ public:
   void CollectInfo(Location *loc, int n, int fromlevel);
   void PropagateInfo(Location *loc, int n, int fromlevel);
 
+  struct MigrationRecord {
+    LDObjHandle handle;
+    int      fromPe;		// real from pe
+    int      toPe;
+    MigrationRecord(): fromPe(-1), toPe(-1) {}
+    MigrationRecord(LDObjHandle &k, int f, int t): handle(k), fromPe(f), toPe(t) {}
+    void pup(PUP::er &p) { p|handle; p|fromPe; p|toPe; }
+  };
+
 private:
   CProxy_HybridLB  thisProxy;
-//  int              parent;
-//  CkVec<int>       children;
-//  CkVec<int>       group;
-//  CkVec<int>       migrateIn;
   int              foundNeighbors;
   int		   recvslot;
-//  int		   loadbalancing;
+
 protected:
   virtual CmiBool QueryBalanceNow(int) { return CmiTrue; };  
   virtual CmiBool QueryMigrateStep(int) { return CmiTrue; };  
@@ -155,16 +160,7 @@ private:
   CentralLB *greedy;
   CentralLB *refine;
 
-  ThreeLevelTree  *tree;
-
-  struct MigrationRecord {
-    LDObjHandle handle;
-    int      fromPe;		// real from pe
-    int      toPe;
-    MigrationRecord(): fromPe(-1), toPe(-1) {}
-    MigrationRecord(LDObjHandle &k, int f, int t): handle(k), fromPe(f), toPe(t) {}
-    void pup(PUP::er &p) { p|handle; p|fromPe; p|toPe; }
-  };
+  MyHierarchyTree  *tree;
 
   class LevelData {
   public:
