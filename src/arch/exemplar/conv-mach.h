@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 2.18  1996-07-16 17:23:37  jyelon
+ * Revision 2.19  1996-07-24 22:06:49  milind
+ * set CMK_THREADS_USE_ALLOCA
+ *
+ * Revision 2.18  1996/07/16 17:23:37  jyelon
  * Renamed a flag.
  *
  * Revision 2.17  1996/07/16 05:20:41  milind
@@ -100,7 +103,7 @@
 #define CMK_STRINGS_USE_STRING_H                           1
 
 #define CMK_THREADS_UNAVAILABLE                            0
-#define CMK_THREADS_USE_ALLOCA                             0
+#define CMK_THREADS_USE_ALLOCA                             1
 #define CMK_THREADS_USE_ALLOCA_WITH_HEADER_FILE            0
 #define CMK_THREADS_USE_ALLOCA_WITH_PRAGMA                 0
 #define CMK_THREADS_USE_JB_TWEAKING                        0
