@@ -46,7 +46,7 @@ test-charm++: charm++
 	(cd ../pgms ; make test-charm++)
 
 OPTS=-g
-CHARMC=../bin/charmc $(OPTS)
+CHARMC=../bin/charmc $(CHARMOPTS) $(OPTS)
 
 
 ###############################################################################
@@ -425,7 +425,7 @@ charmfilter++: $(XPFILES)
 	make -f Maketrans charmfilter++ OPTS='$(OPTS)'
 
 yacc: $(XLFILES)
-	make -f Maketrans yacc OPTS='($OPTS)'
+	make -f Maketrans yacc OPTS='$(OPTS)'
 
 xlatyacc: $(XLFILES)
 	make -f Maketrans xlatyacc OPTS='$(OPTS)'
@@ -437,7 +437,7 @@ sfilterlex: $(XLFILES)
 	make -f Maketrans sfilterlex OPTS='$(OPTS)'
 
 yacc++: $(XPFILES)
-	make -f Maketrans yacc++ OPTS='($OPTS)'
+	make -f Maketrans yacc++ OPTS='$(OPTS)'
 
 xlat++yacc: $(XPFILES)
 	make -f Maketrans xlat++yacc OPTS='$(OPTS)'
