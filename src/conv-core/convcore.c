@@ -883,3 +883,240 @@ void ConverseCommonExit(void)
 {
   close_log();
 }
+
+/***************************************************************************
+ *
+ *  Memory Allocation routines 
+ *
+ *
+ ***************************************************************************/
+
+void *CmiAlloc(size)
+int size;
+{
+  char *res;
+  res =(char *)malloc(size+8);
+  if (res==0) CmiAbort("Memory allocation failed.");
+  ((int *)res)[0]=size;
+  ((int *)((char *)res + 4))[0]=-1;    /* Reference count value */
+  return (void *)(res+8);
+
+}
+
+int CmiSize(blk)
+void *blk;
+{
+  return ((int *)(((char *)blk)-8))[0];
+}
+
+void CmiFree(blk)
+void *blk;
+{
+  int offset;
+  int refCount;
+
+  refCount = ((int *)((char *)blk - 4))[0];
+
+  /* Check if the reference count is -1 */
+  if(refCount == -1){
+    free(((char *)blk)-8);
+  }
+  else{
+    CmiPrintf("Calling CmiFree in special case :\n");
+
+    /* if the value is positive then it is a header having the actual refernce count value */
+    /* else it is the actual offset to go all the way back */
+
+    if(refCount >= 0){ /* This is the Header for the Multiple messages */
+
+      CmiPrintf("in CmiFree (for header) : refCount = %d\n", refCount);
+      
+      if(((int *)((char *)blk - 4))[0] == 0){
+	free(((char *)blk - 8));
+	return;
+      }
+      ((int *)((char *)blk - 4))[0]--;
+      if(((int *)((char *)blk - 4))[0] == 0){
+	free(((char *)blk - 8));
+      }
+    }
+    else {
+      offset = refCount;
+      
+      CmiPrintf("in CmiFree : offset = %d\n", offset);
+      CmiPrintf("in CmiFree : size = %d\n",((int *)((char *)blk - 8))[0]); 
+      
+      ((int *)((char *)blk + offset - 4))[0]--;
+      
+      CmiPrintf("in CmiFree : Ref Count : %d\n",((int *)((char *)blk + offset - 4))[0]);
+
+      if(((int *)((char *)blk + offset - 4))[0] == 0){
+	free(((char *)blk + offset - 8));
+      }
+    }
+  }
+}
+
+/*********************************************************************************
+
+  Multiple Send function                               
+
+  ********************************************************************************/
+
+CpvDeclare(int, CmiMainHandlerIDP); /* Main handler that is run on every node */
+
+/****************************************************************************
+* DESCRIPTION : This function call allows the user to send multiple messages
+*               from one processor to another, all intended for differnet 
+*	        handlers.
+*
+*	        Parameters :
+*
+*	        destPE, len, int sizes[], char *messages[]
+*
+* ASSUMPTION  : The sizes[] and the messages[] array begin their indexing FROM 1.
+*               (i.e They should have memory allocated for n + 1)
+*               This is important to ensure that the call works correctly
+*
+****************************************************************************/
+
+void CmiMultipleSend(unsigned int destPE, int len, int sizes[], char *msgComps[])
+{
+  char *header;
+  int i;
+  int *newSizes;
+  char **newMsgComps;
+  int mask = ~7; /* to mask off the last 3 bits */
+  char *pad = "                 "; /* padding required - 16 bytes long w.case */
+
+  /* Allocate memory for the newSizes array and the newMsgComps array*/
+  newSizes = (int *)CmiAlloc(2 * (len + 1) * sizeof(int));
+  newMsgComps = (char **)CmiAlloc(2 * (len + 1) * sizeof(char *));
+
+  /* Construct the newSizes array from the old sizes array */
+  newSizes[0] = (CmiMsgHeaderSizeBytes + (len + 1)*sizeof(int));
+  newSizes[1] = ((CmiMsgHeaderSizeBytes + (len + 1)*sizeof(int) + 7)&mask) - newSizes[0] + 8;
+                     /* To allow the extra 8 bytes for the CmiSize & the Ref Count */
+
+  for(i = 1; i < len + 1; i++){
+    newSizes[2*i] = (sizes[i - 1]);
+    newSizes[2*i + 1] = ((sizes[i -1] + 7)&mask) - newSizes[2*i] + 8; 
+             /* To allow the extra 8 bytes for the CmiSize & the Ref Count */
+  }
+    
+  header = (char *)CmiAlloc(newSizes[0]*sizeof(char));
+
+  /* Set the len field in the buffer */
+  *(int *)(header + CmiMsgHeaderSizeBytes) = len;
+
+  /* and the induvidual lengths */
+  for(i = 1; i < len + 1; i++){
+    *((int *)(header + CmiMsgHeaderSizeBytes) + i) = newSizes[2*i] + newSizes[2*i + 1];
+  }
+
+  /* This message shd be recd by the main handler */
+  CmiSetHandler(header, CpvAccess(CmiMainHandlerIDP));
+  newMsgComps[0] = header;
+  newMsgComps[1] = pad;
+
+  for(i = 1; i < (len + 1); i++){
+    newMsgComps[2*i] =  msgComps[i - 1];
+    newMsgComps[2*i + 1] = pad;
+  }
+
+  CmiSyncVectorSend(destPE, 2*(len + 1), newSizes, newMsgComps);
+}
+
+/****************************************************************************
+* DESCRIPTION : This function initializes the main handler required for the
+*               CmiMultipleSendP() function to work. 
+*	        
+*               This function should be called once in any Converse program
+*	        that uses CmiMultipleSendP()
+*
+****************************************************************************/
+
+void CmiInitMultipleSendRoutine(void)
+{
+  CpvInitialize(int,CmiMainHandlerIDP); 
+  CpvAccess(CmiMainHandlerIDP) = CmiRegisterHandler(CmiMultiMsgHandler);
+}
+
+/****************************************************************************
+* DESCRIPTION : This function is the main handler required for the
+*               CmiMultipleSendP() function to work. 
+*
+****************************************************************************/
+
+static CmiHandler CmiMultiMsgHandler(char *msgWhole)
+{
+  int len;
+  int *sizes;
+  int i;
+  int offset;
+  int mask = ~7; /* to mask off the last 3 bits */
+  
+  /* Number of messages */
+  offset = CmiMsgHeaderSizeBytes;
+  len = *(int *)(msgWhole + offset);
+  offset += sizeof(int);
+
+  /* Allocate array to store sizes */
+  sizes = (int *)(msgWhole + offset);
+  offset += sizeof(int)*len;
+
+  /* This is needed since the header may or may not be aligned on an 8 bit boundary */
+  offset = (offset + 7)&mask;
+
+  /* To cross the 8 bytes inserted in between */
+  offset += 8;
+
+  /* Call memChop() */
+  memChop(msgWhole);
+
+  /* Send the messages to their respective handlers (on the same machine) */
+  /* Currently uses CmiSyncSend(), later modify to use Scheduler enqueuing */
+  for(i = 0; i < len; i++){
+    CmiSyncSendAndFree(CmiMyPe(), sizes[i], ((char *)(msgWhole + offset))); 
+    offset += sizes[i];
+  }
+}
+
+static void memChop(char *msgWhole)
+{
+  int len;
+  int *sizes;
+  int i;
+  int offset;
+  int mask = ~7; /* to mask off the last 3 bits */
+  
+  /* Number of messages */
+  offset = CmiMsgHeaderSizeBytes;
+  len = *(int *)(msgWhole + offset);
+  offset += sizeof(int);
+
+  /* Set Reference count in the CmiAlloc header*/
+  /* Reference Count includes the header also, hence (len + 1) */
+  ((int *)(msgWhole - 4))[0] = len + 1;
+
+  /* Allocate array to store sizes */
+  sizes = (int *)(msgWhole + offset);
+  offset += sizeof(int)*len;
+
+  /* This is needed since the header may or may not be aligned on an 8 bit boundary */
+  offset = (offset + 7)&mask;
+
+  /* To cross the 8 bytes inserted in between */
+  offset += 8;
+
+  /* update the sizes and offsets for all the chunks */
+  for(i = 0; i < len; i++){
+    /* put in the size value for that part */
+    ((int *)(msgWhole + offset - 8))[0] = sizes[i] - 8;
+    
+    /* now put in the offset (a negative value) to get right back to the begining */
+    ((int *)(msgWhole + offset - 4))[0] = (-1)*offset;
+    
+    offset += sizes[i];
+  }
+}

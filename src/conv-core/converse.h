@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.77  1998-01-16 18:03:02  milind
+ * Revision 2.78  1998-02-13 23:54:19  pramacha
+ * CmiAlloc, CmiFree, and CmiSize are now part of convcore.c.
+ * CmiMultipleSend() has been added
+ *
+ * Revision 2.77  1998/01/16 18:03:02  milind
  * Fixed Ctv bug on shared memory machines.
  * Made latencyBWtest conformant with Converse.
  * Added high resolution timers to Origin2000.
@@ -42,6 +46,8 @@
 #ifndef _conv_mach_h
 #include "conv-mach.h"
 #endif
+
+
 
 /**** DEAL WITH DIFFERENCES: KERNIGHAN-RITCHIE-C, ANSI-C, AND C++ ****/
 
@@ -765,3 +771,7 @@ void CcdCallBacks();
 
 #endif /* CONVERSE_H */
 
+/** Declarations for the Converse Multiple Send Routine */
+
+static CmiHandler CmiMultiMsgHandler(char *msgWhole);
+static void memChop(char *);
