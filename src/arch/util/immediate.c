@@ -5,15 +5,15 @@
 
 static int immRunning=0; /* if set, somebody's inside an immediate message */
 
-int CmiIsImmRunning()
+#if CMK_IMMEDIATE_MSG
+
+int CmiImmIsRunning()
 {
-#if CMK_IMMEDIATE_MSG && CMK_NET_VERSION && ! defined(CMK_CPV_IS_SMP)
+#if CMK_NET_VERSION && ! defined(CMK_CPV_IS_SMP)
   if (!Cmi_netpoll) return immRunning;
 #endif
   return 0;
 }
-
-#if CMK_IMMEDIATE_MSG
 
 /* SMP: These variables are protected by immRecvLock. */
 static void *currentImmediateMsg=NULL; /* immediate message currently being executed */
