@@ -6,8 +6,7 @@ libraries written in Charm for other languages.
 #ifndef __CHARM_API_H
 #define __CHARM_API_H
 
-#include "conv-mach.h"
-#include "conv-autoconfig.h"
+#include "conv-config.h" /* for CMK_FORTRAN symbols */
 
 #ifdef __cplusplus
 #  define CLINKAGE extern "C"

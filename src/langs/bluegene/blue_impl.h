@@ -1,7 +1,7 @@
 #ifndef BLUE_IMPL_H
 #define BLUE_IMPL_H
 
-#include "conv-mach.h"
+#include "conv-config.h"
 #include <stdlib.h>
 
 #include "blue_types.h"

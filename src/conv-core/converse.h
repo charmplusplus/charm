@@ -8,10 +8,7 @@
 #ifndef CONVERSE_H
 #define CONVERSE_H
 
-#ifndef _CONV_MACH_H
-#include "conv-mach.h"
-#include "conv-autoconfig.h"
-#endif
+#include "conv-config.h"
 
 /* Paste the tokens x and y together, without any space between them.
    The ANSI C way to do this is the bizarre ## "token-pasting" 

@@ -104,7 +104,7 @@
 #ifndef __SOCK_ROUTINES_H
 #define __SOCK_ROUTINES_H
 
-#include "conv-mach.h" /*<- for CMK_NO_SOCKETS*/
+#include "conv-config.h" /*<- for CMK_NO_SOCKETS*/
 
 #ifdef CMK_NO_SOCKETS
 #define SOCKET int
