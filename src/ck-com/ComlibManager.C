@@ -483,13 +483,12 @@ void ComlibManager::ArraySend(CkDelegateData *pd,int ep, void *msg,
         return;
     }
 
-    /*
+    //Any bug here? FOO BAR??
     if(dest_proc == CkMyPe()){
         CProxyElement_ArrayBase ap(a,idx);
         ap.ckSend((CkArrayMessage *)msg, ep);
         return;
     }
-    */
 
     //totalMsgCount ++;
     //totalBytes += UsrToEnv(msg)->getTotalsize();
@@ -599,7 +598,7 @@ void ComlibManager::ArrayBroadcast(CkDelegateData *pd,int ep,void *m,CkArrayID a
 }
 
 void ComlibManager::ArraySectionSend(CkDelegateData *pd,int ep, void *m, 
-                                     CkArrayID a, CkSectionID &s) {
+                                     CkArrayID a, CkSectionID &s, int opts) {
 
 #ifndef CMK_OPTIMIZE
     traceUserEvent(section_send_event);

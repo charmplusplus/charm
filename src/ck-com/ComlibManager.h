@@ -200,7 +200,7 @@ class ComlibManager: public CkDelegateMgr {
     virtual void ArrayBroadcast(CkDelegateData *pd,int ep,void *m,CkArrayID a);
     virtual void GroupBroadcast(CkDelegateData *pd,int ep,void *m,CkGroupID g);
     virtual void ArraySectionSend(CkDelegateData *pd, int ep ,void *m, 
-                                  CkArrayID a, CkSectionID &s);
+                                  CkArrayID a, CkSectionID &s, int opts);
 
     CharmStrategy *getStrategy(int instid)
         {return (CharmStrategy *)(* strategyTable)[instid].strategy;}
