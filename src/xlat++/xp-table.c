@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1995-09-06 04:20:54  sanjeev
+ * Revision 2.2  1995-09-07 17:04:33  sanjeev
+ * changed NULL_PE to CK_PE_ANY
+ *
+ * Revision 2.1  1995/09/06  04:20:54  sanjeev
  * new Charm++ syntax, CHARE_BLOCK changes
  *
  * Revision 2.0  1995/06/05  19:01:24  brunner
@@ -1285,7 +1288,7 @@ OutputNewChareMsg(char *name, char *arg, char *placement)
 		
 		if ( type == CHARE ) {
 			if ( placement == NULL || *placement=='\0' ) 
-				fprintf(outfile,"_CK_CreateChare(_CK_chare_%s, _CK_ep_%s_%s, %s, NULL_VID, NULL_PE",name, name, name, arg) ;
+				fprintf(outfile,"_CK_CreateChare(_CK_chare_%s, _CK_ep_%s_%s, %s, NULL_VID, CK_PE_ANY",name, name, name, arg) ;
 			else 
 				fprintf(outfile,"_CK_CreateChare(_CK_chare_%s, _CK_ep_%s_%s, %s, %s",name, name, name, arg, placement) ;
 		}
