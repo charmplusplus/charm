@@ -34,7 +34,10 @@ CmiBool HeapCentLB::QueryBalanceNow(int _step)
 
 CmiBool  HeapCentLB::Compare(double x, double y, HeapCmp cmp)
 {
-	return ((cmp == GT) ? (x > y) : (x < y));
+  const int test =  ((cmp == GT) ? (x > y) : (x < y));
+
+  if (test) return CmiTrue; 
+  else return CmiFalse;
 }
 
 

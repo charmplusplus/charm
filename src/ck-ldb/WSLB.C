@@ -531,9 +531,11 @@ WSLBMigrateMsg* WSLB::Strategy(WSLB::LDStats* stats, int count)
     } while(vacate || myload > avgload);
 
     // Now empty out the heaps
-    while (InfoRecord* p=procs.deleteMin())
+    InfoRecord* p;
+    while (p=procs.deleteMin())
       delete p;
-    while (InfoRecord* obj=objs.deleteMax())
+    InfoRecord* obj;
+    while (obj=objs.deleteMax())
       delete obj;
   }  
 

@@ -34,7 +34,9 @@ CmiBool GreedyRefLB::QueryBalanceNow(int _step)
 
 CmiBool GreedyRefLB::Compare(double x, double y, GreedyCmp cmp)
 {
-	return ((cmp == GT) ? (x > y) : (x < y));
+  int test = ((cmp == GT) ? (x > y) : (x < y));
+  if (test) return CmiTrue;
+  else return CmiFalse;
 }
 
 

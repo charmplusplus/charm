@@ -73,7 +73,7 @@ private:
   LBCommData() {};
   
   int compute_key();
-  int hash(int i, int m) const;
+  int hash(const int i, const int m) const;
 
   int mykey;
   CmiBool from_proc;
