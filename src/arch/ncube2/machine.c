@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.8  1995-10-10 06:10:58  jyelon
+ * Revision 2.9  1995-10-18 22:23:05  jyelon
+ * added MSG_TYPE = 1
+ *
+ * Revision 2.8  1995/10/10  06:10:58  jyelon
  * removed program_name
  *
  * Revision 2.7  1995/09/29  09:50:07  jyelon
@@ -54,6 +57,8 @@ static char ident[] = "@(#)$Header$";
 #include <stdio.h>
 #include "converse.h"
 
+#define MSG_TYPE 1
+
 #define FLIPBIT(node,bitnumber) (node ^ (1 << bitnumber))
 
 
@@ -83,7 +88,7 @@ return (void *)(res+8);
 int CmiSize(blk)
 void *blk;
 {
-return ((int *)( (char *)blk)  -8))[0];
+return ((int *)(((char *)blk)- 8))[0];
 }
 
 void CmiFree(blk)
