@@ -350,7 +350,7 @@ const void *ArrayElement::unpack(const void *fromBuf)
 #if CMK_LBDB_ON
 	int atSyncUnpack;//<- needed to keep everything int-aligned
 	NPACK(int,atSyncUnpack);
-	usesAtSync=atSyncUnpack;
+	usesAtSync=(CmiBool)atSyncUnpack;
 #endif
 	buf=(const char *)reductionInfo.unpack((const void *)buf);
 	thisArray->contributorArriving(&reductionInfo);
