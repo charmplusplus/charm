@@ -1,0 +1,16 @@
+#!/bin/sh
+
+CC="cc -I. -O"
+
+ln -s md/sparc.h qtmd.h
+$CC -c -o qt.o qt.c
+as -o qtmds.o md/sparc.s
+ar crv libqt.a qt.o qtmds.o
+
+$CC -c stp.c
+ar crv libstp.a stp.o
+
+$CC -c meas.c
+as -o qtmdb.o md/sparc_b.s
+$CC -o run qtmdb.o libstp.a libqt.a
+

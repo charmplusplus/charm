@@ -1,0 +1,15 @@
+#!/bin/sh -x
+
+CC="gcc -I. -O2"
+
+ln -s md/mips.h qtmd.h
+$CC -pedantic -Wall -c -o qt.o qt.c
+as -o qtmds.o md/mips-irix5.s
+ar q libqt.a qt.o qtmds.o
+
+$CC -c stp.c
+ar q libstp.a stp.o
+
+$CC -c meas.c
+as -o qtmdb.o md/mips_b.s
+$CC -o run meas.o qtmdb.o libstp.a libqt.a

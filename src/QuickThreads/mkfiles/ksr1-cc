@@ -1,0 +1,16 @@
+#!/bin/sh -x
+
+CC="cc -ansi -I. -O"
+
+ln -s md/ksr1.h qtmd.h
+$CC -c -o qt.o qt.c
+as -o qtmds.o md/ksr1.s
+ar crv libqt.a qt.o qtmds.o
+
+$CC -c stp.c
+ar crv libstp.a stp.o
+
+$CC -c meas.c
+as -o qtmdb.o md/ksr1_b.s
+$CC -o run qtmdb.o libstp.a libqt.a
+

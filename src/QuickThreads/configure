@@ -1,0 +1,15 @@
+#!/bin/sh
+
+if [ ! -f mkfiles/$1 ] ; then
+    echo "Usage: configure <version>"
+    echo ""
+    echo "Available versions are:"
+    echo ""
+    (cd mkfiles ; ls -C)
+    echo ""
+    exit 1
+fi
+
+rm -f Makescript
+ln -s mkfiles/$1 Makescript
+echo "You're ready to do a make now."

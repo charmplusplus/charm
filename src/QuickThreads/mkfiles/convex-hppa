@@ -1,0 +1,15 @@
+#!/bin/sh -x
+
+CC="/usr/convex/bin/cc -I. -O"
+
+ln -s md/hppa.h qtmd.h
+$CC -pedantic -Wall -c -o qt.o qt.c
+as -o qtmds.o md/hppa.s
+ar q libqt.a qt.o qtmds.o
+
+$CC -c stp.c
+ar q libstp.a stp.o
+
+$CC -c meas.c
+as -o qtmdb.o md/hppa_b.s
+$CC -o run meas.o qtmdb.o libstp.a libqt.a
