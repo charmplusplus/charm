@@ -233,9 +233,7 @@ LIBCONV_CORE=threads.o convcore.o conv-conds.o queueing.o msgmgr.o \
 	cpm.o cpthreads.o futures.o cldb.o random.o trace-common.o traceCore.o traceCoreCommon.o \
 	charmProjections.o converseProjections.o machineProjections.o\
 	debug-conv.o generate.o edgelist.o conv-ccs.o ccs-builtins.o \
-	quiescence.o isomalloc.o \
-	
-
+	quiescence.o isomalloc.o
 
 LIBCONV_UTIL=pup_util.o pup_xlater.o pup_c.o \
 	ckimage.o ckdll.o ckhashtable.o sockRoutines.o conv-lists.o
