@@ -3,8 +3,9 @@ CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
 HEADERS=ampi.h
 HEADDEP=$(HEADERS) ampiimpl.h ampi.decl.h
-OBJS=ampi.o ampif.o $(COMPAT) 
 COMPAT=compat_ampius.o compat_ampifus.o
+OBJS=ampi.o ampif.o compat_ampius.o
+OBJSF=ampi.o ampif.o compat_ampifus.o
 
 DEST=$(CDIR)/lib/libmoduleampi.a
 DESTF=$(CDIR)/lib/libmoduleampif.a
@@ -16,14 +17,14 @@ AMPI: $(DEST)
 AMPIF: $(DESTF)
 
 $(DEST): $(OBJS) headers
-	$(CHARMC) -DAMPI_FORTRAN=0 -c ampisetup.C
+	$(CHARMC) -DMPI_FORTRAN=0 -c ampisetup.C
 	$(CHARMC) $(OBJS) ampisetup.o -o $@
 
-$(DESTF): $(OBJS) headers
-	$(CHARMC) -DAMPI_FORTRAN=1 -c ampisetup.C
+$(DESTF): $(OBJSF) headers
+	$(CHARMC) -DMPI_FORTRAN=1 -c ampisetup.C
 	-$(CHARMC) -c ampimod.f90
 	-$(CHARMC) -cpmod ../../../../include ampi.M
-	-$(CHARMC) $(OBJS) ampimod.o ampisetup.o -o $@
+	-$(CHARMC) $(OBJSF) ampimod.o ampisetup.o -o $@
 
 headers: $(HEADERS)
 	cp $(HEADERS) $(CDIR)/include/

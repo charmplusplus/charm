@@ -1266,4 +1266,8 @@ FDECL void FTN_NAME(MPI_ATTACH,mpi_attach)(const char *name,int nameLen)
 }
 
 
+void _registerampif(void)
+{
+  _registerampi();
+}
 #include "ampi.def.h"

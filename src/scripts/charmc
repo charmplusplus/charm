@@ -931,7 +931,7 @@ case "$LANGUAGE" in
 	;;
 "tcharmf")
 	MODULES="$MODULES tcharm"
-        POST_LIBRARIES="$POST_LIBRARIES $CMK_F90LIBS"
+        POST_LIBRARIES="$POST_LIBRARIES -lconv-utilf $CMK_F90LIBS"
 	IS_F90="y"
 	;;
 "f90charm")
