@@ -394,9 +394,6 @@ WSLBMigrateMsg* WSLB::Strategy(WSLB::LDStats* stats, int count)
   const double load_factor = 1.05;
   double objload;
 
-  double myobjcpu=0;
-  double myobjwall=0;
-
   double myload = myStats.total_walltime - myStats.idletime;
   double avgload = myload;
   int unvacated_neighbors = 0;

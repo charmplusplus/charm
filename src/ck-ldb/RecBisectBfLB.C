@@ -301,17 +301,10 @@ void RecBisectBfLB::addPartition(PartitionList * partitions,
 				 int * nodes, int num) 
 {
   int i;
-  int j;
-  float w = 0.0;
 
   i =  partitions->next++;
   partitions->partitions[i].size = num;
   partitions->partitions[i].nodeArray = nodes ;
-  /*  CkPrintf("addition partition %d :", i);
-  for (j=0; j<num; j++) {
-    CkPrintf("%d,", nodes[j]);
-  }
-  CkPrintf("\n"); */
 }
 
 void RecBisectBfLB::printPartitions(PartitionList * partitions)

@@ -63,7 +63,7 @@ void Comm1LB::alloc(int pe , int id, double load, int nmsg, int nbyte){
 }
 
 double Comm1LB::compute_cost(int id, int pe, int n_alloc, int &com_msg, int &com_data){
-  int i,j;
+  int j;
   double total_cost, com_cost, weight=0.0;
   graph * ptr;
   double bound1,bound2;
@@ -98,7 +98,6 @@ double Comm1LB::compute_cost(int id, int pe, int n_alloc, int &com_msg, int &com
 }
 
 void Comm1LB::add_graph(int x, int y, int data, int nmsg){
-  int i,j;
   graph * ptr, *temp;
 
 //  CkPrintf("Add graph : %d,%d", data, nmsg);
@@ -128,7 +127,7 @@ void Comm1LB::add_graph(int x, int y, int data, int nmsg){
 }
   
 void Comm1LB::make_hash(){
-  int i, hash,j;
+  int i, hash;
   LDObjid oid;
   
   htable = new int[nobj];
