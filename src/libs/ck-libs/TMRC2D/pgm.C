@@ -485,6 +485,7 @@ void repeat_after_split(void *data){
 	calcMasses(*g);
 };
 
+void outputMesh(int *elem,double *node,int ne,int nn,char *str);
 
 extern "C" void
 driver(void)
@@ -552,6 +553,7 @@ CkPrintf("[%d] end init\n",myChunk);
   int tSteps=0x70FF00FF;
   calcMasses(g);
   double startTime=CkWallTimer();
+	tSteps = 10;
   double curArea=2.0e-5;
   for (int t=0;t<tSteps;t++) {
     if (1) { //Structural mechanics
@@ -583,13 +585,13 @@ CkPrintf("[%d] end init\n",myChunk);
 //    if (t%512==0)
 //      FEM_Migrate();
 
-    if (t%128==0) { //Refinement:
+ //   if (t%128==0) { //Refinement:
       vector2d *loc=new vector2d[2*g.nnodes];
       for (i=0;i<g.nnodes;i++) {
 				loc[i]=g.coord[i];//+g.d[i];
       }
       double *areas=new double[g.nelems];
-      curArea=curArea*0.98;
+      curArea=curArea*0.5;
       for (i=0;i<g.nelems;i++) {
       #if 0
         double origArea=8e-8; //Typical triangle size
@@ -607,6 +609,8 @@ CkPrintf("[%d] end init\n",myChunk);
 			FEM_REFINE2D_Split(FEM_Mesh_default_read(),FEM_NODE,(double *)loc,FEM_ELEM,areas,FEM_SPARSE);
 			repeat_after_split((void *)&g);
 
+			delete [] loc;
+			delete [] areas;
 			
       g.nelems = FEM_Mesh_get_length(FEM_Mesh_default_read(),FEM_ELEM);
 			g.nnodes = FEM_Mesh_get_length(FEM_Mesh_default_read(),FEM_NODE);
@@ -614,7 +618,7 @@ CkPrintf("[%d] end init\n",myChunk);
       CkPrintf("[%d] Done with refinement step: %d nodes, %d elements\n",
 	       myChunk,g.nnodes,g.nelems);
       
-    }
+//    }
     
     if (1) { //Publish data to the net
 	    NetFEM n=NetFEM_Begin(myChunk,t,2,NetFEM_POINTAT);
@@ -631,9 +635,32 @@ CkPrintf("[%d] end init\n",myChunk);
 	    NetFEM_End(n);
     }
   }
-
+	char str[100];
+	sprintf(str,"output.%d",myChunk+1);
+	outputMesh(g.conn,(double *)g.coord,g.nelems,g.nnodes,str);
   if (CkMyPe()==0)
     CkPrintf("Driver finished\n");
+}
+
+
+void outputMesh(int *elem,double *node,int ne,int nn,char *str){
+	char fEle[100];
+	char fNode[100];
+	sprintf(fEle,"%s.ele",str);
+	FILE *fp = fopen(fEle,"w");
+	fprintf(fp,"%d 3 0\n",ne);
+	for(int i=0;i<ne;i++){
+		fprintf(fp,"%d %d %d %d \n",i+1,elem[3*i]+1,elem[3*i+1]+1,elem[3*i+2]+1);
+	}
+	fclose(fp);
+	
+	sprintf(fNode,"%s.node",str);
+	fp = fopen(fNode,"w");
+	fprintf(fp,"%d 2 0 0\n",nn);
+	for(int i=0;i<nn;i++){
+		fprintf(fp,"%d %.10lf %.10lf \n",i+1,node[2*i],node[2*i+1]);
+	}
+	fclose(fp);
 }
 
 

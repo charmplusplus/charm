@@ -5,6 +5,7 @@
 #include "fem_mesh.h"
 #include "femrefine.h"
 #include "ckhashtable.h"
+#include <assert.h>
 
 class intdual{
 	private:
@@ -329,7 +330,25 @@ void FEM_REFINE2D_Split(int meshID,int nodeID,double *coord,int elemID,double *d
 	}
 	printf("Cordinate list length %d \n",coordVec.size()/2);
 	IDXL_Sort_2d(FEM_Comm_shared(meshID,nodeID),coordVec.getVec());
+	int read = FEM_Mesh_is_get(meshID) ;
+	assert(read);
 	
+	IDXL_t sharedid = FEM_Comm_shared(meshID,nodeID);
+	IDXL_Side_t sharedsendid = IDXL_Get_send(sharedid);
+	int numshared = IDXL_Get_count(sharedsendid,0);
+	int *list = new int[numshared];
+	
+	char str[100];
+	sprintf(str,"shared_%d",FEM_My_partition());
+	FILE *fp = fopen(str,"a");
+	IDXL_Get_list(sharedsendid,0,list);
+	fprintf(fp,"*********************************\n");
+	for(int i=0;i<numshared;i++){
+		fprintf(fp,"id %d (%.6lf %.6lf) \n",list[i],coordVec[2*list[i]],coordVec[2*list[i]+1]);
+	}
+	fprintf(fp,"*********************************\n");	
+	fclose(fp);
+	delete [] list;
 }
 
 FDECL void FTN_NAME(FEM_REFINE2D_SPLIT,fem_refine2d_split)(int *meshID,int *nodeID,double *coord,int *elemID,double *desiredAreas){
