@@ -113,4 +113,4 @@ Worker_sim.C Worker_sim.h Worker_sim.ci: Worker.C Worker.h Worker.ci
 	$(CHARMBIN)/etrans.pl Worker
 
 test:
-	./pgm 1000 10 1 RANDOM SPARSE 50 -gf 344
+	./pgm 1000 10 1 RANDOM SPARSE 50 50 -gf 344
