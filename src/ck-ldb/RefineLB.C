@@ -47,8 +47,16 @@ void RefineLB::create(CentralLB::LDStats* stats, int count)
   for(j=0; j < P; j++) numComputes+= stats[j].n_objs;
   computes = new computeInfo[numComputes];
 
+  processors = new processorInfo[count];
+
   int index = 0;
   for(j=0; j < count; j++) {
+    processors[j].Id = i;
+    processors[j].backgroundLoad = 0;
+    processors[j].load = processors[i].backgroundLoad;
+    processors[j].computeLoad = 0;
+    processors[j].computeSet = new Set();
+
     LDObjData *odata = stats[j].objData;
     const int osz = stats[j].n_objs;  
     for(i=0; i < osz; i++) {
@@ -61,15 +69,6 @@ void RefineLB::create(CentralLB::LDStats* stats, int count)
       computes[index].oldProcessor = j;
       index ++;
     }
-  }
-
-  processors = new processorInfo[count];
-  for(i=0; i < count; i++) {
-    processors[i].Id = i;
-    processors[i].backgroundLoad = 0;
-    processors[i].load = processors[i].backgroundLoad;
-    processors[i].computeLoad = 0;
-    processors[i].computeSet = new Set();
   }
 
 //  for (i=0; i < numComputes; i++)
@@ -189,7 +188,6 @@ CkPrintf("Processor %d is LIGHT: load:%f averageLoad:%f!\n", i, processors[i].lo
          lightProcessors->next((Iterator *) &nextProcessor);
       }
 
-      //we have narrowed the choice to 3 candidates.
       if (bestCompute)
       {
 CkPrintf("Assign: [%d] with load: %f from %d to %d \n", bestCompute->id.id[0], bestCompute->load, donor->Id, bestP->Id);
