@@ -571,7 +571,10 @@ void parallelTransfer_c::transfer(progress_t &progress) {
 				d,trueVolume,destVolumes[d],volErr);
 			// abort();
 		}
-		for (int v=0;v<valsPerTet;v++) destTet[d*valsPerTet+v]*=accumScale;
+		// Compensate for partially-filled cells: divide out volume
+		if (destVolumes[d]>1.0e-12)
+			for (int v=0;v<valsPerTet;v++) 
+				destTet[d*valsPerTet+v]*=accumScale;
 	}
 }
 
