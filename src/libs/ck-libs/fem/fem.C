@@ -1,5 +1,5 @@
 /*
-Finite Element Method Framework for Charm++
+Finite Element Method (FEM) Framework for Charm++
 Parallel Programming Lab, Univ. of Illinois 2000
 
 This file implements a C, C++, or Fortran-callable
@@ -63,8 +63,10 @@ void FEMnodeInit(void) {
 	TCHARM_Set_fallback_setup(FEMfallbackSetup);
 	CmiArgGroup("Library","FEM Framework");
 	char **argv=CkGetArgv();
-	if (CmiGetArgFlagDesc(argv,"-read","Skip init()--read mesh from files")) initFlags|=FEM_INIT_READ;
-	if (CmiGetArgFlagDesc(argv,"-write","Skip driver()--write mesh to files")) initFlags|=FEM_INIT_WRITE;	
+	if (CmiGetArgFlagDesc(argv,"-read","Skip init()--read mesh from files")) 
+		initFlags|=FEM_INIT_READ;
+	if (CmiGetArgFlagDesc(argv,"-write","Skip driver()--write mesh to files")) 
+		initFlags|=FEM_INIT_WRITE;
 }
 
 static void 
@@ -351,7 +353,7 @@ FDECL void FTN_NAME(FEM_SERIAL_BEGIN,fem_serial_begin)(int *pieceNo)
 /********************** Mesh Creation ************************/
 /*Utility*/
 
-//Make a heap-allocated copy of this (len-item) array, changing the index as spec'd
+//Make a heap-allocated copy of this (len-entity) array, changing the index as spec'd
 int *CkCopyArray(const int *src,int len,int indexBase)
 {
 	int *ret=new int[len];
@@ -359,16 +361,16 @@ int *CkCopyArray(const int *src,int len,int indexBase)
 	return ret;
 }
 
-void FEM_Item::allocate(int nItems,int dataPer)
+void FEM_Entity::allocate(int nEntitys,int dataPer)
 {
-	udata.allocate(dataPer,nItems);
-	if (sym) sym->setSize(nItems);
+	udata.allocate(dataPer,nEntitys);
+	if (sym) sym->setSize(nEntitys);
 }
 
-void FEM_Elem::allocate(int nItems,int dataPer,int nodesPer)
+void FEM_Elem::allocate(int nEntitys,int dataPer,int nodesPer)
 {
-	FEM_Item::allocate(nItems,dataPer);
-	conn.allocate(nodesPer,nItems);
+	FEM_Entity::allocate(nEntitys,dataPer);
+	conn.allocate(nodesPer,nEntitys);
 }
 
 /***** Mesh getting and setting state ****/
@@ -518,7 +520,7 @@ FDECL void FTN_NAME(FEM_COMPOSITE_ELEM,fem_composite_elem)(int *elType) {
 }
 
 
-//Add all of src's items into dest, shifting by idxShift
+//Add all of src's entities into dest, shifting by idxShift
 static void combineList(const FEM_Comm &src,FEM_Comm &dest,
 	int idxShift)
 {
@@ -542,8 +544,8 @@ CDECL void FEM_Combine_elem(
 {
 	FEMAPI("FEM_Combine_elem");
 	FEM_Mesh &m=getRenumber();
-	const FEM_Item &src=m.getCount(srcType);
-	FEM_Item &dest=m.setCount(destType);
+	const FEM_Entity &src=m.getCount(srcType);
+	FEM_Entity &dest=m.setCount(destType);
 	//Interior nodes are all sent off, shifted to startInt:
 	combineList(src.ghostSend,dest.ghostSend,startInt);
 	//Ghost nodes are all received:
@@ -1215,7 +1217,7 @@ FEMchunk::update(int fid, void *nodes)
 void
 FEMchunk::updateGhost(int fid, int elemType, void *nodes)
 {
-  const FEM_Item &cnt=cur_mesh->m.getCount(elemType);
+  const FEM_Entity &cnt=cur_mesh->m.getCount(elemType);
   beginUpdate(nodes,fid,&cnt.ghostSend,&cnt.ghostRecv,GHOST_UPDATE);
   waitForUpdate();
 }
@@ -1859,7 +1861,7 @@ FDECL void FTN_NAME(FEM_ADD_NODE,fem_add_node)
 	addNode(*localIdx-1,*nBetween,betweenNodes,1);	
 }
 
-//Item list exchange:
+//Entity list exchange:
 // FIXME: I assume only one outstanding list exchange.
 // This implies the presence of a global barrier before or after the exchange.
 void FEMchunk::exchangeGhostLists(int elemType,
@@ -1874,8 +1876,8 @@ void FEMchunk::exchangeGhostLists(int elemType,
 	for (int i=0;i<inLen;i++) {
 		int localNo=inList[i]-idxbase;
 		const FEM_Comm_Rec *rec=cnt.getRec(localNo);
-		if (NULL==rec) continue; //This item isn't shared
-		//This item is shared-- add its comm. idx to each chk
+		if (NULL==rec) continue; //This entity isn't shared
+		//This entity is shared-- add its comm. idx to each chk
 		for (int s=0;s<rec->getShared();s++) {
 			int localChk=cnt.findLocalList(rec->getChk(s));
 			outIdx[localChk].push_back(rec->getIdx(s));
@@ -1962,7 +1964,7 @@ FDECL void FTN_NAME(FEM_GET_GHOST_LIST,fem_get_ghost_list)
 /********* Debugging mesh printouts *******/
 # define ARRSTART 0
 
-void FEM_Item::print(const char *type,const l2g_t &l2g)
+void FEM_Entity::print(const char *type,const l2g_t &l2g)
 {
   CkPrintf("Number of %ss = %d\n", type, size());
   CkPrintf("User data doubles per %s = %d\n", type, getDataPer());
@@ -2068,15 +2070,15 @@ int FEM_Mesh::chkET(int elType) const {
 }
 
 
-/*CommRec: lists the chunks that share a single item.
+/*CommRec: lists the chunks that share a single entity.
  */
-FEM_Comm_Rec::FEM_Comm_Rec(int item_) {
-	item=item_; 
+FEM_Comm_Rec::FEM_Comm_Rec(int entity_) {
+	entity=entity_; 
 }
 FEM_Comm_Rec::~FEM_Comm_Rec() {}
 void FEM_Comm_Rec::pup(PUP::er &p)
 {
-	p(item); 
+	p(entity); 
 	shares.pup(p);
 }
 void FEM_Comm_Rec::add(int chk,int idx) 
@@ -2090,13 +2092,13 @@ void FEM_Comm_Rec::add(int chk,int idx)
 	shares.push_back(FEM_Comm_Share(chk,idx));
 }
 
-/*CommMap: map item number to FEM_Comm_Rec.  
+/*CommMap: map entity number to FEM_Comm_Rec.  
  */
 FEM_Comm_Map::FEM_Comm_Map() { }
 void FEM_Comm_Map::pup(PUP::er &p) 
 {
 	int keepGoing=1;
-	p.comment("Communication map object: maps item number to shared elements");
+	p.comment("Communication map object: maps entity number to shared elements");
 	if (!p.isUnpacking()) 
 	{ //Pack the table, by iterating through its elements:
 		CkHashtableIterator *it=map.iterator();
@@ -2115,7 +2117,7 @@ void FEM_Comm_Map::pup(PUP::er &p)
 			if (!keepGoing) break; //No more
 			FEM_Comm_Rec *rec=new FEM_Comm_Rec;
 			rec->pup(p);
-			map.put(rec->getItem())=rec;
+			map.put(rec->getEntity())=rec;
 		}
 	}
 }
@@ -2127,26 +2129,26 @@ FEM_Comm_Map::~FEM_Comm_Map() {
 	delete it;
 }
 
-//Add a comm. entry for this item
-void FEM_Comm_Map::add(int item,int chk,int idx)
+//Add a comm. entry for this entity
+void FEM_Comm_Map::add(int entity,int chk,int idx)
 {
 	FEM_Comm_Rec *rec;
-	if (NULL!=(rec=map.get(item))) 
+	if (NULL!=(rec=map.get(entity))) 
 	{ //Already have a record in the table
 		rec->add(chk,idx);
 	}
 	else
-	{ //Make new record for this item
-		rec=new FEM_Comm_Rec(item);
+	{ //Make new record for this entity
+		rec=new FEM_Comm_Rec(entity);
 		rec->add(chk,idx);
-		map.put(item)=rec;
+		map.put(entity)=rec;
 	}
 }
 
-//Look up this item's FEM_Comm_Rec.  Returns NULL if item is not shared.
-const FEM_Comm_Rec *FEM_Comm_Map::get(int item) const
+//Look up this entity's FEM_Comm_Rec.  Returns NULL if entity is not shared.
+const FEM_Comm_Rec *FEM_Comm_Map::get(int entity) const
 {
-	return map.get(item);
+	return map.get(entity);
 }
 
 FEM_Comm_List::FEM_Comm_List()
@@ -2209,7 +2211,7 @@ void FEM_Mesh::pup(PUP::er &p)  //For migration
 	p.comment("-------------- Symmetries ------------");
 	symList.pup(p);
 }
-void FEM_Item::pup(PUP::er &p) {
+void FEM_Entity::pup(PUP::er &p) {
 	p.comment("<ghostStart>");
 	p|ghostStart;
 	p.comment(" Ghosts to send out: ");
@@ -2227,7 +2229,7 @@ void FEM_Item::pup(PUP::er &p) {
 }
 void FEM_Elem::pup(PUP::er &p) {
 	p.comment(" ------------- Element data ---------- ");
-	FEM_Item::pup(p);
+	FEM_Entity::pup(p);
 	p.comment(" element connectivity array: ");
 	conn.pup(p);
 }

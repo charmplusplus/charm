@@ -29,15 +29,15 @@ class elemList;
 
 static FEM_Symmetries_t noSymmetries=(FEM_Symmetries_t)0;
 
-/*This object maps a single item to a list of the PEs
+/*This object maps a single entity to a list of the PEs
 that have a copy of it.  For the vast majority
-of items, the list will contain exactly one element.
+of entities, the list will contain exactly one element.
 */
 class peList : public CkNoncopyable {
 public:
 	int pe;//Processor number or -1 if the list is empty
-	int localNo;//Local number of this item on this PE
-	FEM_Symmetries_t sym; //Symmetries this item was reached via
+	int localNo;//Local number of this entity on this PE
+	FEM_Symmetries_t sym; //Symmetries this entity was reached via
 	peList *next;
 	peList() {pe=-1;next=NULL;}
 	peList(int pe_,int localNo_,FEM_Symmetries_t sym_) {
@@ -151,20 +151,16 @@ static void checkGhost(const FEM_Ghost &ghosts,const FEM_Mesh *mesh) {
 
 /************************ Splitter *********************/
 
-//A dynamic representation for an item (node or element)
-class dynItem {
+//A dynamic representation for an entity (node or element)
+class dynEntity {
 public:
-	int gNo; //Global item number
-	FEM_Symmetries_t sym; //Symmetries item belongs to
-	dynItem(int g_,FEM_Symmetries_t s_) :gNo(g_), sym(s_) {}
-#if CMK_EXPLICIT
-	explicit 
-#endif
-	dynItem(int sillyConstructorNeededByCkVec) {gNo=-1;sym=noSymmetries;}
-	dynItem() {}
+	int gNo; //Global entity number
+	FEM_Symmetries_t sym; //Symmetries entity belongs to
+	dynEntity(int g_,FEM_Symmetries_t s_) :gNo(g_), sym(s_) {}
+	dynEntity() {gNo=-1;sym=noSymmetries;}
 };
 
-typedef CkVec<dynItem> dynList;
+typedef CkVec<dynEntity> dynList;
 
 //A dynamic (growing) representation of a chunk.  
 // Lists the global numbers of the chunk.
@@ -184,11 +180,11 @@ public:
 	
 	//Add an element to this list
 	int addElement(int type,int globalNo,FEM_Symmetries_t sym) {
-		elem[type].push_back(dynItem(globalNo,sym));
+		elem[type].push_back(dynEntity(globalNo,sym));
 		return elem[type].size()-1;
 	}
 	int addNode(int globalNo,FEM_Symmetries_t sym) {
-		node.push_back(dynItem(globalNo,sym));
+		node.push_back(dynEntity(globalNo,sym));
 		return node.size()-1;
 	}
 };
@@ -284,17 +280,17 @@ class splitter {
 	// Returns false if this is not a good ghost pair.
 	bool addGhost(int global,int srcPe,int destPe,
 		      dynList &destChunk, peList *gDest,
-		      FEM_Item &src,FEM_Item &dest,FEM_Symmetries_t sym)
+		      FEM_Entity &src,FEM_Entity &dest,FEM_Symmetries_t sym)
 	{
 		if (gDest[global].onPE(destPe,sym))
-			return false; //Dest already has a copy of this item
+			return false; //Dest already has a copy of this entity
 		int srcLocal=gDest[global].localOnPE(srcPe,noSymmetries);
 		if (srcLocal==-1) 
 			return false; //"src" is not actually local (no second-generation ghosts)
 		if (src.isGhostIndex(srcLocal))
 			return false; //Never add ghosts of ghosts!
 		int destLocal=destChunk.size();
-		destChunk.push_back(dynItem(global,sym));
+		destChunk.push_back(dynEntity(global,sym));
 		gDest[global].addPE(destPe,destLocal,sym);
 		src.ghostSend.add(srcPe,srcLocal,destPe,destLocal,
 				  dest.ghostRecv);

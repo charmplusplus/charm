@@ -416,7 +416,7 @@ CDECL void FEM_Sym_coordinates(int elType,double *d_locs)
 	FEMAPI("FEM_Sym_coordinates");
 	
 	const FEM_Mesh *m=FEM_Get_FEM_Mesh();
-	const FEM_Item &c=m->getCount(elType);
+	const FEM_Entity &c=m->getCount(elType);
 	const FEM_Symmetries_t *sym=c.getSymmetries();
 	if (sym==NULL) return; //Nothing to do-- no symmetries apply
 	CkVector3d *locs=(CkVector3d *)d_locs;
@@ -450,7 +450,7 @@ FDECL void FTN_NAME(FEM_SET_SYM_NODES,fem_set_sym_nodes)
 }
 
 
-void FEM_Item::setSymmetries(int r,FEM_Symmetries_t s)
+void FEM_Entity::setSymmetries(int r,FEM_Symmetries_t s)
 {
 	if (!sym) {
 		if (s==0) return; //Don't bother allocating for nothing
@@ -461,7 +461,7 @@ void FEM_Item::setSymmetries(int r,FEM_Symmetries_t s)
 CDECL void FEM_Get_sym(int elTypeOrMinusOne,int *destSym)
 {
 	FEMAPI("FEM_Get_sym");
-	const FEM_Item &l=FEM_Get_FEM_Mesh()->getCount(elTypeOrMinusOne);
+	const FEM_Entity &l=FEM_Get_FEM_Mesh()->getCount(elTypeOrMinusOne);
 	int n=l.size();
 	for (int i=0;i<n;i++) destSym[i]=l.getSymmetries(i);
 }

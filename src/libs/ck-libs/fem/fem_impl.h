@@ -116,10 +116,10 @@ public:
 
 
 /**
- * FEM_Comm_Share describes how one item is shared with one other chunk.
- * It lists the chunk and the item's location in the communication list;
+ * FEM_Comm_Share describes how one entity is shared with one other chunk.
+ * It lists the chunk and the entity's location in the communication list;
  * this location in the communication list is useful because it may be
- * the *only* way to specify a particular item to another chunk
+ * the *only* way to specify a particular entity to another chunk
  * if we don't have global numbers to identify things with.
  */
 class FEM_Comm_Share {
@@ -133,18 +133,18 @@ class FEM_Comm_Share {
 PUPmarshall(FEM_Comm_Share);
 
 /**
- * FEM_Comm_Rec lists all the chunks that share an item.
+ * FEM_Comm_Rec lists all the chunks that share an entity.
  */
 class FEM_Comm_Rec {
-	int item; //Index of item we describe
+	int entity; //Index of entity (node or element) we describe
 	CkVec<FEM_Comm_Share> shares;
 public:
-	FEM_Comm_Rec(int item_=-1);
+	FEM_Comm_Rec(int entity_=-1);
 	~FEM_Comm_Rec();
 
 	void pup(PUP::er &p);
 	
-	inline int getItem(void) const {return item;}
+	inline int getEntity(void) const {return entity;}
 	inline int getShared(void) const {return shares.size();}
 	inline int getChk(int shareNo) const {return shares[shareNo].chk;}
 	inline int getIdx(int shareNo) const {return shares[shareNo].idx;}
@@ -157,8 +157,8 @@ public:
 };
 
 /**
- * Map an item to its FEM_Comm_Rec.  We only bother listing items
- * that are actually shared with other chunks; completely local items
+ * Map an entity to its FEM_Comm_Rec.  We only bother listing entities
+ * that are actually shared with other chunks; completely local entities
  * are not present.
  */
 class FEM_Comm_Map {
@@ -168,22 +168,22 @@ public:
 	void pup(PUP::er &p);
 	~FEM_Comm_Map();
 
-	//Add a FEM_Comm_. entry for this item
-	void add(int item,int chk,int idx);
+	//Add a FEM_Comm_. entry for this entity
+	void add(int entity,int chk,int idx);
 	
-	//Look up this item's FEM_Comm_Rec.  Returns NULL if item is not shared.
-	const FEM_Comm_Rec *get(int item) const;
+	//Look up this entity's FEM_Comm_Rec.  Returns NULL if entity is not shared.
+	const FEM_Comm_Rec *get(int entity) const;
 };
 
 /**
- * FEM_Comm_List lists the items we share with one other chunk. 
+ * FEM_Comm_List lists the entities we share with one other chunk. 
  * This list is used to build outgoing and interpret incoming messages--
- * for an outgoing message, the listed items are copied into the message;
- * for an incoming message, the listed items are copied out of the message.
+ * for an outgoing message, the listed entities are copied into the message;
+ * for an incoming message, the listed entities are copied out of the message.
  */
 class FEM_Comm_List {
 	int pe; //Global number of other chunk	
-	CkPupBasicVec<int> shared; //Local indices of shared items
+	CkPupBasicVec<int> shared; //Local indices of shared entities
 public:
 	FEM_Comm_List();
 	FEM_Comm_List(int otherPe);
@@ -202,12 +202,12 @@ public:
 PUPmarshall(FEM_Comm_List)
 
 /**
- * FEM_Comm describes all the shared items of a given chunk.
- * It provides both item->chunks that share it (map)
- * and chunk->items shared with it (comm)
+ * FEM_Comm describes all the shared entities of a given chunk.
+ * It provides both entity->chunks that share it (map)
+ * and chunk->entities shared with it (comm)
  */
 class FEM_Comm : public CkNoncopyable {
-	//Indexed by local item number
+	//Indexed by local entity number
 	FEM_Comm_Map map;
 	//Indexed by (local) chunk number
 	CkPupPtrVec<FEM_Comm_List, CkPupAlwaysAllocatePtr<FEM_Comm_List> > comm; 
@@ -251,10 +251,10 @@ public:
 		return *ret;
 	}
 	
-	//Look up an item's FEM_Comm_Rec
-	const FEM_Comm_Rec *getRec(int item) const {return map.get(item);}
+	//Look up an entity's FEM_Comm_Rec
+	const FEM_Comm_Rec *getRec(int entity) const {return map.get(entity);}
 	
-	//This item is shared with the given (local) chunk
+	//This entity is shared with the given (local) chunk
 	void addNode(int localNo,int sharedWithChk) {
 		map.add(localNo,sharedWithChk,
 			comm[sharedWithChk]->push_back(localNo));
@@ -402,27 +402,27 @@ public:
 typedef ArrayPtrT<int> intArrayPtr;
 
 
-/* Describes an FEM item-- a set of nodes or elements */
-class FEM_Item : public CkNoncopyable {
+/* Describes an FEM entity-- a set of nodes or elements */
+class FEM_Entity : public CkNoncopyable {
 public:
 	typedef AllocTable2d<double> udata_t;
 	typedef CkPupBasicVec<FEM_Symmetries_t> sym_t;
 protected:
 	int ghostStart; //Index of first ghost object
-	udata_t udata; //Uninterpreted item-associated user data (one row per item)
-	sym_t *sym; //Symmetries of each item (or NULL if all 0)
+	udata_t udata; //Uninterpreted entity-associated user data (one row per entity)
+	sym_t *sym; //Symmetries of each entity (or NULL if all 0)
 public:
 	FEM_Comm ghostSend; //Non-ghosts we send out
 	FEM_Comm ghostRecv; //Ghosts we recv into
 	
-	FEM_Item() //Default constructor
+	FEM_Entity() //Default constructor
 	  {ghostStart=0;sym=NULL;}
-	~FEM_Item() {if (sym) delete sym;}
+	~FEM_Entity() {if (sym) delete sym;}
 	void pup(PUP::er &p);
 	void print(const char *type,const l2g_t &l2g);
 	
 	//Manipulate the user data array:
-	void allocate(int nItems,int dataPer);
+	void allocate(int nEntity,int dataPer);
 	udata_t &setUdata(void) {return udata;}
 	const udata_t &getUdata(void) const {return udata;}
 	inline int size(void) const {return udata.size();}
@@ -446,21 +446,21 @@ public:
 	}
 	void setSymmetries(int r,FEM_Symmetries_t s);
 };
-PUPmarshall(FEM_Item);
+PUPmarshall(FEM_Entity);
 
 /* Describes one kind of FEM elements */
-class FEM_Elem:public FEM_Item {
+class FEM_Elem:public FEM_Entity {
 public:
 	typedef AllocTable2d<int> conn_t;
 private:
 	conn_t conn; //Connectivity data (one row per element)
 public:
-	FEM_Elem():FEM_Item() {}
+	FEM_Elem():FEM_Entity() {}
 	
 	void pup(PUP::er &p);
 	void print(const char *type,const l2g_t &l2g);
 	
-	void allocate(int nItems,int dataPer,int nodesPer);
+	void allocate(int nEntitys,int dataPer,int nodesPer);
 	conn_t &setConn(void) {return conn;}
 	const conn_t &getConn(void) const {return conn;}
 	int getConn(int elem,int nodeNo) const {return conn(elem,nodeNo);}
@@ -603,7 +603,7 @@ public:
 	FEM_Sparse &setSparse(int uniqueID);
 	const FEM_Sparse &getSparse(int uniqueID) const;
 	
-	FEM_Item node; //Describes the nodes in the mesh
+	FEM_Entity node; //Describes the nodes in the mesh
 	NumberedVec<FEM_Elem> elem; //Describes the different types of elements in the mesh
 	
 	//Set up our fields based on this mesh:
@@ -613,11 +613,11 @@ public:
 	}
 	
 	//Return this type of element, given an element type
-	FEM_Item &setCount(int elTypeOrMinusOne) {
+	FEM_Entity &setCount(int elTypeOrMinusOne) {
 		if (elTypeOrMinusOne==-1) return node;
 		else return elem[chkET(elTypeOrMinusOne)];
 	}
-	const FEM_Item &getCount(int elTypeOrMinusOne) const {
+	const FEM_Entity &getCount(int elTypeOrMinusOne) const {
 		if (elTypeOrMinusOne==-1) return node;
 		else return elem[chkET(elTypeOrMinusOne)];
 	}
@@ -634,11 +634,11 @@ public:
 	int getGlobalElem(int elType,int elNo) const;
 	void pup(PUP::er &p); //For migration
 	void print(const l2g_t &l2g);//Write human-readable description to CkPrintf
-};
+}; 
 
 //Describes a single chunk of the finite-element mesh
 class MeshChunk : public CkNoncopyable {
- public:
+public:
 	FEM_Mesh m; //The chunk mesh
 	FEM_Comm comm; //Shared nodes
 	int *elemNums; // Maps local elem#-> global elem#  [m.nElems()]
@@ -784,7 +784,7 @@ private:
 
   void *reductionBuf; //Place to return reduction result
 
-  CkVec<int> listTmp;//List of local items 
+  CkVec<int> listTmp;//List of local entities 
   int listCount; //Number of lists received
   bool listSuspended;
   bool finishListExchange(const FEM_Comm &l);
@@ -917,7 +917,7 @@ void fem_split(FEM_Mesh *mesh,int nchunks,const int *elem2chunk,
 FEM_Mesh *fem_assemble(int nchunks,MeshChunk **msgs);
 
 
-//Make a new[]'d copy of this (len-item) array, changing the index as spec'd
+//Make a new[]'d copy of this (len-entry) array, changing the index as spec'd
 int *CkCopyArray(const int *src,int len,int indexBase);
 const FEM_Mesh *FEM_Get_FEM_Mesh(void);
 FEM_Ghost &FEM_Set_FEM_Ghost(void);
