@@ -221,9 +221,9 @@ void Refiner::Refine(int count, CentralLB::LDStats* stats,
       processors[pe].computeSet->iterator((Iterator *)&nextCompute);
     while(c) {
       new_p[c->originalPE][c->originalIdx] = c->processor;
-      if (c->oldProcessor != c->processor)
-	//	CkPrintf("Refiner::Refine: from %d to %d\n",
-	//		 c->oldProcessor, c->processor);
+      // if (c->oldProcessor != c->processor)
+      //	CkPrintf("Refiner::Refine: from %d to %d\n",
+      //		 c->oldProcessor, c->processor);
       nextCompute.id++;
       c = (computeInfo *) processors[pe].computeSet->
 	             next((Iterator *)&nextCompute);
