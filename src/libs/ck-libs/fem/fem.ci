@@ -1,6 +1,4 @@
 module fem {
-  message FEM_DataMsg;
-
   initcall void FEMnodeInit(void);
 
   chare FEMcoordinator {
@@ -13,8 +11,7 @@ module fem {
     entry FEMchunk(FEMinit f);
     entry void run(void);
     entry void run(marshallMeshChunk);
-    entry void recv(FEM_DataMsg *);
-    entry void reductionResult(FEM_DataMsg *);
+    entry void reductionResult(int nBytes,char data[nBytes]);
     entry void meshUpdated(marshallMeshChunk);
     entry void meshUpdatedComplete(void);
     entry void recvList(int elType,int fmChk,int nidx,int idx[nidx]);

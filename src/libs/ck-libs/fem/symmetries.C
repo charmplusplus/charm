@@ -416,10 +416,11 @@ CDECL void FEM_Sym_coordinates(int elType,double *d_locs)
 	FEMAPI("FEM_Sym_coordinates");
 	
 	const FEM_Mesh *m=FEM_Get_FEM_Mesh();
-	const FEM_Entity &c=m->getCount(elType);
+	const FEM_Entity &real_c=m->getCount(elType);
+	const FEM_Entity &c=real_c.getGhost()[0];
 	const FEM_Symmetries_t *sym=c.getSymmetries();
 	if (sym==NULL) return; //Nothing to do-- no symmetries apply
-	CkVector3d *locs=(CkVector3d *)d_locs;
+	CkVector3d *locs=real_c.size()+(CkVector3d *)d_locs;
 	int n=c.size();
 	const FEM_Sym_List &sl=m->getSymList();
 	for (int i=0;i<n;i++) 
@@ -429,7 +430,7 @@ CDECL void FEM_Sym_coordinates(int elType,double *d_locs)
 FDECL void FTN_NAME(FEM_SYM_COORDINATES,fem_sym_coordinates)
 	(int *elType,double *locs)
 {
-	FEM_Sym_coordinates(*elType-1,locs);
+	FEM_Sym_coordinates(zeroToMinusOne(*elType),locs);
 }
 
 
@@ -448,29 +449,6 @@ FDECL void FTN_NAME(FEM_SET_SYM_NODES,fem_set_sym_nodes)
 	int n=FEM_Get_FEM_Mesh()->node.size();
 	FEM_Set_FEM_Ghost().setSymmetries(n,CkCopyArray(canon,n,1),sym);
 }
-
-
-void FEM_Entity::setSymmetries(int r,FEM_Symmetries_t s)
-{
-	if (!sym) {
-		if (s==0) return; //Don't bother allocating for nothing
-		sym=new sym_t;
-	}
-	sym->insert(r,s);
-}
-CDECL void FEM_Get_sym(int elTypeOrMinusOne,int *destSym)
-{
-	FEMAPI("FEM_Get_sym");
-	const FEM_Entity &l=FEM_Get_FEM_Mesh()->getCount(elTypeOrMinusOne);
-	int n=l.size();
-	for (int i=0;i<n;i++) destSym[i]=l.getSymmetries(i);
-}
-FDECL void FTN_NAME(FEM_GET_SYM,fem_get_sym)
-	(int *elTypeOrZero,int *destSym)
-{
-	FEM_Get_sym(*elTypeOrZero-1,destSym);
-}
-
 
 /*******************************************************************/
 #if STANDALONE

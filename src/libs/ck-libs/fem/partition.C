@@ -168,7 +168,8 @@ void mesh2graph(const FEM_Mesh *m, Graph *g)
 
   //Build an inverse mapping, from node to list of surrounding elements
   int globalCount=0,t,e,n;
-  for(t=0;t<m->elem.size();t++) {
+  for(t=0;t<m->elem.size();t++) 
+  if (m->elem.has(t)) {
     const FEM_Elem &k=m->elem[t];
     for(e=0;e<k.size();e++,globalCount++)
       for(n=0;n<k.getNodesPer();n++)
@@ -207,7 +208,7 @@ METIS_PartGraphKway (int* nv, int* xadj, int* adjncy, int* vwgt, int* adjwgt,
 /*Partition this mesh's elements into n chunks,
  writing each element's 0-based chunk number to elem2chunk.
 */
-void fem_partition(const FEM_Mesh *mesh,int nchunks,int *elem2chunk)
+void FEM_Mesh_partition(const FEM_Mesh *mesh,int nchunks,int *elem2chunk)
 {
 	int nelems=mesh->nElems();
 	if (nchunks==1) {//Metis can't handle this case (!)
