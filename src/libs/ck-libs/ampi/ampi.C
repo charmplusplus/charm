@@ -6,7 +6,6 @@
  *****************************************************************************/
 
 #define exit exit /*Supress definition of exit in ampi.h*/
-#include <iostream.h>
 #include "ampiimpl.h"
 #include "tcharm.h"
 #include "ampiEvents.h" /*** for trace generation for projector *****/
@@ -2182,8 +2181,7 @@ int ATAReq::wait(MPI_Status *sts){
 	return 0;
 }
 
-CDECL
-int AMPI_Wait(MPI_Request *request, MPI_Status *sts)
+inline static int _AMPI_Wait(MPI_Request *request, MPI_Status *sts, int freereq=1)
 {
   AMPIAPI("AMPI_Wait");
   if(*request == MPI_REQUEST_NULL)
@@ -2191,21 +2189,34 @@ int AMPI_Wait(MPI_Request *request, MPI_Status *sts)
   AmpiRequestList* reqs = getReqs();
   AMPI_DEBUG("MPI_Wait: request=%d, reqs.size=%d, &reqs=%d\n",*request,reqs->size(),reqs);
   (*reqs)[*request]->wait(sts);
-  reqs->free(*request);
+  if (freereq) reqs->free(*request);
   return 0;
+}
+
+CDECL
+int AMPI_Wait(MPI_Request *request, MPI_Status *sts)
+{
+  return _AMPI_Wait(request, sts, 1);
 }
 
 CDECL
 int AMPI_Waitall(int count, MPI_Request request[], MPI_Status sts[])
 {
+  int i;
   AMPIAPI("AMPI_Waitall");
-  for(int i=0;i<count;i++) {
-    AMPI_Wait(&request[i], sts+i);
-  }
 #if CMK_BLUEGENE_CHARM
-  // in Blue Gene simulator, setup forward and backward dependence
-  TRACE_BG_AMPI_WAITALL();
+  TRACE_BG_AMPI_SUSPEND();       // end the current BG event
 #endif
+  for(i=0;i<count;i++) {
+    _AMPI_Wait(&request[i], sts+i, 0);    // delay the free of memory
+  }
+  AmpiRequestList* reqs = getReqs();
+#if CMK_BLUEGENE_CHARM
+  TRACE_BG_AMPI_WAITALL(reqs);   // setup forward and backward dependence
+#endif
+  // free memory of requests
+  for(i=0;i<count;i++)
+    reqs->free(request[i]);
   return 0;
 }
 
