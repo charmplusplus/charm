@@ -97,7 +97,10 @@ static inline void _processForBocMsg(envelope *env)
 {
   register CkGroupID groupID = env->getGroupNum();
   register void *obj = CpvAccess(_groupTable)->find(groupID);
-  _CHECK_VALID(obj, "ForGroupMsg: Not a valid groupID\n");
+  if(!obj) { // groupmember not yet created
+    CpvAccess(_groupTable)->enqmsg(groupID, env);
+    return;
+  }
   env->setMsgtype(ForChareMsg);
   env->setObjPtr(obj);
   CpvAccess(_currentGroup) = groupID;
@@ -110,8 +113,12 @@ static inline void _processForNodeBocMsg(envelope *env)
   register void *obj;
   CmiLock(_nodeLock);
   obj = _nodeGroupTable->find(groupID);
+  if(!obj) { // groupmember not yet created
+    _nodeGroupTable->enqmsg(groupID, env);
+    CmiUnlock(_nodeLock);
+    return;
+  }
   CmiUnlock(_nodeLock);
-  _CHECK_VALID(obj, "ForNodeGroupMsg: Not a valid groupID\n");
   env->setMsgtype(ForChareMsg);
   env->setObjPtr(obj);
   CpvAccess(_currentNodeGroup) = groupID;
@@ -375,6 +382,12 @@ void _createGroupMember(CkGroupID groupID, int eIdx, void *msg)
   register void *obj = malloc(_chareTable[gIdx]->size);
   _MEMCHECK(obj);
   CpvAccess(_groupTable)->add(groupID, obj);
+  PtrQ *ptrq = CpvAccess(_groupTable)->getPending(groupID);
+  if(ptrq) {
+    void *pending;
+    while((pending=ptrq->deq())!=0)
+      CldEnqueue(CkMyPe(), pending, _infoIdx);
+  }
   register void *prev = CpvAccess(_currentChare);
   CpvAccess(_currentChare) = obj;
   register int prevGrp = CpvAccess(_currentGroup);
@@ -394,6 +407,12 @@ void _createNodeGroupMember(CkGroupID groupID, int eIdx, void *msg)
   CmiLock(_nodeLock);
   _nodeGroupTable->add(groupID, obj);
   CmiUnlock(_nodeLock);
+  PtrQ *ptrq = _nodeGroupTable->getPending(groupID);
+  if(ptrq) {
+    void *pending;
+    while((pending=ptrq->deq())!=0)
+      CldNodeEnqueue(CkMyNode(), pending, _infoIdx);
+  }
   register void *prev = CpvAccess(_currentChare);
   CpvAccess(_currentChare) = obj;
   register int prevGrp = CpvAccess(_currentNodeGroup);

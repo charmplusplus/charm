@@ -47,26 +47,51 @@ class GroupTable {
     public:
       CkGroupID num;
       void *obj;
+      PtrQ *pending;
       TableEntry *next;
       TableEntry(CkGroupID _num, void *_obj, TableEntry* _next=0) :
-        num(_num), obj(_obj), next(_next) {}
+        num(_num), obj(_obj), next(_next) { 
+        pending = ((obj)?0:(new PtrQ()));
+      }
   };
   TableEntry *bins[MAXBINS];
   public:
     GroupTable();
     void add(CkGroupID n, void *obj) {
+      TableEntry *ptr = locate(n);
+      if(ptr) {
+        ptr->obj = obj;
+        return;
+      }
       int slot = n%MAXBINS;
       bins[slot] = new TableEntry(n, obj, bins[slot]);
       _MEMCHECK(bins[slot]);
     }
-    void *find(CkGroupID n) {
+    void enqmsg(CkGroupID n, void *msg) {
+      TableEntry *ptr = locate(n);
+      if(!ptr) {
+        int slot = n%MAXBINS;
+        ptr = bins[slot] = new TableEntry(n, 0, bins[slot]);
+        _MEMCHECK(bins[slot]);
+      }
+      ptr->pending->enq(msg);
+    }
+    PtrQ *getPending(CkGroupID n) {
+      TableEntry *ptr = locate(n);
+      return ((ptr)?(ptr->pending):0);
+    }
+    TableEntry *locate(CkGroupID n) {
       TableEntry *next = bins[n%MAXBINS];
       while(next!=0) {
         if(next->num == n)
-          return next->obj;
+          return next;
         next = next->next;
       }
       return 0;
+    }
+    void *find(CkGroupID n) {
+      TableEntry *ptr = locate(n);
+      return ((ptr)? ptr->obj : 0);
     }
 };
 
