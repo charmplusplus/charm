@@ -293,42 +293,113 @@ void CmiFreeBroadcastAllFn(int size, char *msg)
   CmiFree(msg);
 }
 
-<<<<<<< machine.c
+void CmiSyncListSendFn(int npes, int *pes, int size, char *msg)
+{
+  int i;
+  McMsgHdr *dup_msg;
+  McMsgHdr bcast_msg_tok;
+  McMsgHdr *dup_tok;
+  int hdr_size;
+  int n_remote_pes;
+
+  /*
+   * Count how many remote PEs, and send to the local PE if it is in the list
+   */
+  n_remote_pes = 0;
+  for (i=0; i < npes; i++)
+  {
+    if (pes[i] == Cmi_mype)
+      CmiSyncSendFn(Cmi_mype, size, msg);
+    else
+      n_remote_pes++;
+  }
+  if (n_remote_pes == 0)  // Nothing to do
+    return;
+  
+  /*
+   * Copy user's message, and set count to the correct number of recients
+   */
+  dup_msg = (McMsgHdr *)CmiAlloc(ALIGN8(size));
+  memcpy(dup_msg,msg,size);
+  dup_msg->bcast.count = n_remote_pes;
+  /*
+  CmiPrintf("PE %d broadcast handler=%d\n",Cmi_mype,dup_msg->handler);
+  */
+  /*
+   * Make the broadcast token point to the copied message
+   */
+  bcast_msg_tok.msg_type = BcastMessage;
+  bcast_msg_tok.bcast.ptr = dup_msg;
+  bcast_msg_tok.bcast_msg_size = size;
+
+  hdr_size = ALIGN8(sizeof(McMsgHdr));
+
+  /*
+   * Enqueue copies of the token message on other nodes.  This code should
+   * be similar to CmiSyncSend
+   */
+  for(i=0; i<n_remote_pes; i++)
+    if (pes[i] != Cmi_mype)
+    {
+      dup_tok = (McMsgHdr *)CmiAlloc(hdr_size);
+      memcpy(dup_tok,&bcast_msg_tok,hdr_size);
+      McEnqueueRemote(dup_tok,hdr_size,pes[i]); 
+    }
+  /*
+   * The token message will be deleted as a normal message,
+   * but the message being broadcast needs to be saved for future
+   * garbage collection.
+   */
+  McQueueAddToBack(broadcast_queue,dup_msg);
+}
+
+CmiCommHandle CmiAsyncListSendFn(int npes, int *pes, int size, char *msg)
+{
+  CmiSyncListSendFn(npes, pes, size, msg);
+  return 1;
+}
+
+void CmiFreeListSendFn(int npes, int *pes, int size, char *msg)
+{
+  CmiSyncListSendFn(npes,pes,size,msg);
+  CmiFree(msg);
+}
+
+void CmiSyncMulticastFn(CmiGroup grp, int size, char *msg)
+{
+  int npes;
+  int *pes;
+  
+  /*
+   *  Check for group, and busy-wait, if necessary, for group info
+   */
+  CmiLookupGroup(grp, &npes, &pes);
+  while (pes == 0)
+  {
+    McRetrieveRemote();
+    CmiLookupGroup(grp, &npes, &pes);
+  }
+  CmiSyncListSendFn( npes, pes, size, msg);
+}
+
+CmiCommHandle CmiAsyncMulticastFn(CmiGroup grp, int size, char *msg)
+{
+  CmiSyncMulticastFn(grp, size, msg);
+  return 1;
+}
+
+void CmiFreeMulticastFn(CmiGroup grp, int size, char *msg)
+{
+  CmiSyncMulticastFn(grp, size, msg);
+  CmiFree(msg);
+}
+
+
 /***********************************************************************
  *
  * Abort function:
  *
  ************************************************************************/
-=======
-/**********************************************************************
- * CMI memory calls
- */
-
-static int McMemAllocated=0;
-static int McMemMaxAllocated=0;
-
-void *CmiAlloc(int size)
-{
-  char *res;
-
-  res =(char *) malloc(size+8);
-  if (res==(char *)0) { 
-    CmiError("%d:Memory allocation failed.",CmiMyPe()); 
-    abort();
-  }
-  McMemAllocated += (size + 8);
-  if (McMemAllocated > McMemMaxAllocated)
-  {
-    if (Cmi_mype == 0)
-/*      CmiPrintf("[%d] Allocating: %d High watermark: %d\n",
-		Cmi_mype,size+8,McMemAllocated); */
-    McMemMaxAllocated = McMemAllocated;
-  }
-  ((int *)res)[0]=size;
-  /*  printf("[%d] Allocating %d at %d\n",Cmi_mype,size,res+8); */
-
-  return (void *)(res+8);
-}
 
 void CmiAbort(char *message)
 {
