@@ -99,9 +99,9 @@ static CkViewpoint chooseViewpoint(const CkInterestSet &univ,
 		CkAbort("liveViz3d> Absurdly large projected screen rectangle!\n");
 	
 //Determine the texture size (OpenGL textures *MUST* be a power of two in both directions)
-	const int start_sz=4, max_sz=256;
-	wid=4; while (wid<r.wid()) wid*=2;
-	ht =4; while (ht<r.ht()) ht*=2;
+	const int start_sz=4, max_sz=64;
+	wid=start_sz; while (wid<r.wid()/4) wid*=2;
+	ht =start_sz; while (ht<r.ht()/4) ht*=2;
 	if (wid>max_sz) wid=max_sz;
 	if (ht>max_sz) ht=max_sz;
 

@@ -133,7 +133,7 @@ public:
 	//Return true if we're out of date under this view:
 	bool outOfDate(const CkViewpoint &vp) {
 		if (lastView==NULL) return true; 
-		double viewTol=10.0; //Accept up to this many pixels of error:
+		double viewTol=2.0; //Accept up to this many pixels of error:
 		if (lastView->rmsError(vp)>viewTol) return true;
 		return false;
 	}
