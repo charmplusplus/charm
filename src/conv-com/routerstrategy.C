@@ -64,7 +64,7 @@ void RouterStrategy::setReverseMap(){
     //All processors not in the domain will point to -1
     for(pcount = 0; pcount < npes; pcount++) {
         if (pelist[pcount] == CkMyPe())
-            myPe = pelist[pcount];
+            myPe = pcount;
 
         procMap[pelist[pcount]] = pcount;
     }
@@ -106,8 +106,8 @@ RouterStrategy::RouterStrategy(int stratid, int handle, int _npes,
     memcpy(pelist, _pelist, sizeof(int) * npes);    
     setReverseMap();
 
-    //CkPrintf("Router Strategy : %d, MYPE = %d, NUMPES = %d \n", stratid, 
-    //       myPe, npes);
+    ComlibPrintf("Router Strategy : %d, MYPE = %d, NUMPES = %d \n", stratid, 
+           myPe, npes);
 
     switch(stratid) {
     case USE_TREE: 
@@ -188,7 +188,7 @@ void RouterStrategy::doneInserting(){
         CmiSetHandler(dummymsg, CkpvAccess(RecvdummyHandle));
         
         MessageHolder *cmsg = new MessageHolder((char *)dummymsg, 
-                                                     CkMyPe(), 
+                                                     myPe, 
                                                      sizeof(DummyMsg));
         cmsg->isDummy = 1;
         msgQ.push(cmsg);
@@ -211,7 +211,9 @@ void RouterStrategy::doneInserting(){
                                             numToDeposit > 1);
             }            
             else {                                
-                router->EachToManyMulticast(id, cmsg->size, msg, 1,
+                
+                ComlibPrintf("%d: Insert Pers. Message to %d\n", CkMyPe(), procMap[cmsg->dest_proc]);
+                             router->EachToManyMulticast(id, cmsg->size, msg, 1,
                                             &procMap[cmsg->dest_proc],
                                             numToDeposit > 1);
             }            

@@ -81,7 +81,7 @@ GridRouter::GridRouter(int n, int me)
   int count = 0;
   int pos = 0;
 
-  for(count = myrow; count < ROWLEN+myrow; count ++){
+  for(count = mycol; count < ROWLEN+mycol; count ++){
       int nextpe= myrep + count%ROWLEN;
       
       if (nextpe >= NumPes) {
@@ -90,18 +90,20 @@ GridRouter::GridRouter(int n, int me)
           if(new_row >= myrow)
               new_row = 0;
           
-          nextpe = COLLEN * new_row + count;
+          nextpe = COLLEN * new_row + count%ROWLEN;
       }
       
       if(nextpe == MyPe)
           continue;
+
+      ComlibPrintf("Row[%d] = %d\n", MyPe, nextpe);
 
       rowVector[pos ++] = nextpe;
   }
   rvecSize = pos;
 
   pos = 0;
-  for(count = mycol; count < COLLEN+mycol; count ++){
+  for(count = myrow; count < COLLEN+myrow; count ++){
       int nextrowrep = (count % COLLEN) *COLLEN;
       int nextpe = nextrowrep+mycol;
       
@@ -184,12 +186,13 @@ void GridRouter::EachToManyMulticast(comID id, int size, void *msg, int numpes, 
   //int MYROW  =MyPe/COLLEN;
   //int MYCOL = MyPe%COLLEN;
   int myrep= myrow*COLLEN; 
-  int length = (NumPes - 1)/COLLEN + 1;
- 
+  int maxlength = (NumPes - 1)/COLLEN + 1;
+
   for (int colcount = 0; colcount < rvecSize; ++colcount) {
       int nextpe = rowVector[colcount];
       i = nextpe % COLLEN;
-      
+
+      int length = maxlength;
       if((length - 1)* COLLEN + i >= NumPes)
           length --;
       
@@ -197,14 +200,13 @@ void GridRouter::EachToManyMulticast(comID id, int size, void *msg, int numpes, 
           onerow[j]=j * COLLEN + i;
       }
       
+      ComlibPrintf("%d: before gmap sending to %d of column %d for %d procs,  %d,%d,%d,%d\n",
+                   MyPe, nextpe, i, length, onerow[0], onerow[1], onerow[2], onerow[3]);
+
       gmap(nextpe);
 
-      ComlibPrintf("%d: before gmap sending to %d of column %d\n",
-                   MyPe, nextpe, i);
-
+      GRIDSENDFN(id, 0, 0,length, onerow, CkpvAccess(RecvHandle), nextpe); 
       ComlibPrintf("%d:sending to %d of column %d\n", MyPe, nextpe, i);
-      
-      GRIDSENDFN(id, 0, 0, length, onerow, CkpvAccess(RecvHandle), nextpe); 
   }
   RecvManyMsg(id, NULL);
 }
@@ -219,8 +221,10 @@ void GridRouter::RecvManyMsg(comID id, char *msg)
   }
 
   recvCount++;
+
+  ComlibPrintf("%d recvcount=%d recvexpected = %d\n", MyPe, recvCount, recvExpected);
+
   if (recvCount == recvExpected) {
-      ComlibPrintf("%d recvcount=%d recvexpected = %d\n", MyPe, recvCount, recvExpected);
       
       char *a2amsg;
       int a2a_len;
@@ -269,6 +273,8 @@ void GridRouter::DummyEP(comID id, int magic)
 
 void GridRouter:: ProcManyMsg(comID id, char *m)
 {
+    ComlibPrintf("%d: ProcManyMsg\n", MyPe);
+    
     if(id.isAllToAll)
         PeMesh2->UnpackAndInsertAll(m, 1, &MyPe);
     else
@@ -282,12 +288,15 @@ void GridRouter:: LocalProcMsg(comID id)
 {
     LPMsgCount++;
     PeMesh->ExtractAndDeliverLocalMsgs(MyPe);
-    PeMesh2->ExtractAndDeliverLocalMsgs(MyPe);
+    if(id.isAllToAll)
+        PeMesh2->ExtractAndDeliverLocalMsgs(MyPe);
     
-    ComlibPrintf("%d local procmsg called\n", MyPe);
+    ComlibPrintf("%d local procmsg called, %d, %d\n", MyPe, 
+                 LPMsgCount, LPMsgExpected);
     if (LPMsgCount==LPMsgExpected) {
         PeMesh->Purge();
-        PeMesh2->Purge();
+        if(id.isAllToAll)
+            PeMesh2->Purge();
         
         InitVars();
         Done(id);

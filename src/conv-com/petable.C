@@ -272,10 +272,12 @@ char * PeTable ::ExtractAndPack(comID id, int ufield, int npe,
 
         if (msgnum[index]<=0) {
             lesspe++;
+            
+            ComlibPrintf("msgnum[index]<=0 !!!!!\n");
             continue;
         }
         
-        //ComlibPrintf("%d Packing pelist[%d]\n", CkMyPe(), i);
+        ComlibPrintf("%d Packing pelist[%d]\n", CkMyPe(), index);
         register int newval=-1*pelist[i];
         PACKINT(newval); 
         for (j=0;j<msgnum[index];j++) {

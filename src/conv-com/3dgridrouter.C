@@ -32,10 +32,9 @@
 #define RowLen(pe) ColLen3D(pe)
 #define PELISTSIZE ((ROWLEN-1)/sizeof(int)+1)
 
-double cubeRoot(double d) {
+inline double cubeRoot(double d) {
   return pow(d,1.0/3.0);
 }
-
 
 inline int ColLen3D(int npes)
 {
@@ -202,11 +201,11 @@ void D3GridRouter::EachToManyMulticast(comID id, int size, void *msg, int numpes
     int firstproc = MyPe - (MyPe % (ROWLEN * COLLEN));
     for (i=0;i<COLLEN;i++) {
         
-        ComlibPrintf("ROWLEN = %d, COLLEN =%d first proc = %d\n", ROWLEN, COLLEN, firstproc);
+        ComlibPrintf("ROWLEN = %d, COLLEN =%d first proc = %d\n", 
+                     ROWLEN, COLLEN, firstproc);
         
-        int MYROW = (MyPe % (ROWLEN * COLLEN))/ROWLEN;
+        //int MYROW = (MyPe % (ROWLEN * COLLEN))/ROWLEN;
         int nextrowrep = firstproc + i*ROWLEN;
-        
         int nextpe = (MyPe % (ROWLEN * COLLEN)) % ROWLEN + nextrowrep;
         int nummappedpes=NumPes-nextrowrep;
         
@@ -224,17 +223,17 @@ void D3GridRouter::EachToManyMulticast(comID id, int size, void *msg, int numpes
         int nplanes = (int)ceil(((double)NumPes) / (ROWLEN * COLLEN));
         int idx = 0;
         
-        ComlibPrintf("%d->%d:(", MyPe, nextpe);
+        //ComlibPrintf("%d->%d:(", MyPe, nextpe);
         for (int j=0;j< ROWLEN;j++) 
             for(int k = 0; k < nplanes; k++) {
                 int dest = i * ROWLEN + j + ROWLEN * COLLEN * k;
                 if(dest < NumPes) {
                     oneplane[idx++] = dest;
-                    ComlibPrintf("%d,", oneplane[idx-1]);
+                    //ComlibPrintf("%d,", oneplane[idx-1]);
                 }
                 else break;
             }
-        ComlibPrintf(")\n");
+        //ComlibPrintf(")\n");
         
         if (nextpe == MyPe) {
             ComlibPrintf("%d calling recv directly\n", MyPe);
@@ -243,7 +242,7 @@ void D3GridRouter::EachToManyMulticast(comID id, int size, void *msg, int numpes
             continue;
         }
         
-        ComlibPrintf("nummappedpes = %d, NumPes = %d, nextrowrep = %d, nextpe = %d, mype = %d\n", nummappedpes, NumPes, nextrowrep,  nextpe, MyPe);
+        //ComlibPrintf("nummappedpes = %d, NumPes = %d, nextrowrep = %d, nextpe = %d, mype = %d\n", nummappedpes, NumPes, nextrowrep,  nextpe, MyPe);
         
         gmap(nextpe);
         ComlibPrintf("sending to column %d and dest %d in %d\n", i, nextpe, CkMyPe());
@@ -285,23 +284,22 @@ void D3GridRouter::RecvManyMsg(comID id, char *msg)
             int nplanes = (int)ceil(((double)NumPes) / (ROWLEN * COLLEN));
             int k = 0;
             
-            ComlibPrintf("recv:myrow = %d, nplanes = %d\n", myrow, nplanes);
-            ComlibPrintf("recv:%d->%d:", MyPe, nextpe);
+            //ComlibPrintf("recv:myrow = %d, nplanes = %d\n", myrow, nplanes);
+            //ComlibPrintf("recv:%d->%d:", MyPe, nextpe);
             for(k = 0; k < nplanes; k++) {
                 int dest = myrow * ROWLEN + i + ROWLEN * COLLEN * k;
-                ComlibPrintf("%d,", dest);
+                //ComlibPrintf("%d,", dest);
                 if(dest >= NumPes)
                     break;
                 zline[k] = dest;
             }
-            ComlibPrintf(")\n");
+            //ComlibPrintf(")\n");
 
             ComlibPrintf("Before gmap %d\n", nextpe);
             
             gmap(nextpe);
             
-            ComlibPrintf("After gmap %d\n", nextpe);
-            
+            //ComlibPrintf("After gmap %d\n", nextpe);
             ComlibPrintf("%d:sending recv message %d %d\n", MyPe, nextpe, myrep);
             GRIDSENDFN(id, 1, 1, k, pelist, CkpvAccess(RecvHandle), nextpe);
         }
@@ -322,7 +320,7 @@ void D3GridRouter::RecvManyMsg(comID id, char *msg)
             
             gmap(nextpe);
             
-            ComlibPrintf("After gmap %d\n", nextpe);
+            //ComlibPrintf("After gmap %d\n", nextpe);
             
             ComlibPrintf("%d:sending proc message %d %d\n", MyPe, nextpe, nplanes);
             GRIDSENDFN(id, 2, 2, 1, pelist, CkpvAccess(ProcHandle), nextpe);
@@ -370,8 +368,5 @@ void D3GridRouter:: LocalProcMsg(comID id)
 void D3GridRouter :: SetMap(int *pes)
 {
     gpes=pes;
-    
-    //ComlibPrintf("%d:GPES[1] = %d\n", CkMyPe(), gpes[1]);
-    //gpes[1] = 4;
 }
 

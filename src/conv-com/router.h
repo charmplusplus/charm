@@ -68,7 +68,7 @@ class Router
 
     void Done(comID id) {
 
-        ComlibPrintf("Router Iteration Finished %d", CkMyPe());
+        //ComlibPrintf("Router Iteration Finished %d", CkMyPe());
 
         if(doneHandle == 0)
             return;
