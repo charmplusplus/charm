@@ -80,6 +80,7 @@ class CkArrayIndexMax : public CkArrayIndex {
 	}
 public:
 	CkArrayIndexMax(void) { }
+	CkArrayIndexMax(int i) {copyFrom(CkArrayIndex3D(i,i,i)); }
 	CkArrayIndexMax(const CkArrayIndex &that) 
 		{copyFrom(that);}
 	CkArrayIndexMax &operator=(const CkArrayIndex &that) 
