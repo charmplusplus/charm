@@ -945,7 +945,6 @@ clean:
 	rm -f core *.o
 	rm -f core #*#
 	rm -f core *~
-	rm -f ../include/*
 	if [ -d conv-host ] ; then ( cd conv-host ; make clean ) ; fi
 	( cd doc; make clean )
 	( cd libs; make clean )
