@@ -34,50 +34,39 @@ An Array Index cannot be modified once it is created.
 
 #include "ckhashtable.h"
 
-class CkArrayIndex : public HashKey 
+#ifndef CK_ARRAYINDEX_MAXLEN 
+#define CK_ARRAYINDEX_MAXLEN 3 /*Max. # of integers in an array index*/
+#endif
+
+class CkArrayIndex
 {
 public:
-	// This method returns the length of and a pointer to the key data.
-	//The returned pointer must be aligned to at least an integer boundary.
-	virtual const unsigned char *getKey(/*out*/ int &len) const =0;
+	//Length of index in *integers*
+	int nInts;
 	
-	//These utility routines just call getKey, above
-	// (they're slightly less efficient, but easier to use)
-	int len(void) const {int len;getKey(len);return len;}
-	const unsigned char *data(void) const {int len;return getKey(len);}
+	//Index data immediately follows...
 	
-	//Returns a new heap copy of this key
-	CkArrayIndex *newIndex(void) const {return (CkArrayIndex *)newKey();}
-	static CkArrayIndex *newIndex(int nBytes,const void *data)
-		{return (CkArrayIndex *)newKey(nBytes,data);}
-	virtual void pup(PUP::er &p) { }
+	int *data(void) {return (&nInts)+1;}
+	const int *data(void) const {return (&nInts)+1;}
+	
+	void pup(PUP::er &p);
+	CkHashCode hash(void) const;
 };
 
 //Simple ArrayIndex classes: the key is just integer indices.
 class CkArrayIndex1D : public CkArrayIndex {
 public: int index;
-	CkArrayIndex1D(int i0) {index=i0;}
-	virtual const unsigned char *getKey(/*out*/ int &len) const;
-	virtual void pup(PUP::er &p);
+	CkArrayIndex1D(int i0) {index=i0;nInts=1;}
 };
 class CkArrayIndex2D : public CkArrayIndex {
 public: int index[2];
-	CkArrayIndex2D(int i0,int i1) {index[0]=i0;index[1]=i1;}
-	virtual const unsigned char *getKey(/*out*/ int &len) const;
-	virtual void pup(PUP::er &p);
+	CkArrayIndex2D(int i0,int i1) {index[0]=i0;index[1]=i1;
+		nInts=2;}
 };
 class CkArrayIndex3D : public CkArrayIndex {
 public: int index[3];
-	CkArrayIndex3D(int i0,int i1,int i2) {index[0]=i0;index[1]=i1;index[2]=i2;}
-	virtual const unsigned char *getKey(/*out*/ int &len) const;
-	virtual void pup(PUP::er &p);
-};
-class CkArrayIndex4D : public CkArrayIndex {
-public: int index[4];
-	CkArrayIndex4D(int i0,int i1,int i2,int i3) 
-	  {index[0]=i0;index[1]=i1;index[2]=i2;index[3]=i3;}
-	virtual const unsigned char *getKey(/*out*/ int &len) const;
-	virtual void pup(PUP::er &p);
+	CkArrayIndex3D(int i0,int i1,int i2) {index[0]=i0;index[1]=i1;index[2]=i2;
+		nInts=3;}
 };
 
 //A slightly more complex array index: the key is an object
@@ -86,58 +75,34 @@ template <class object> //Key object
 class CkArrayIndexT : public CkArrayIndex {
 public:
 	object obj;
-	CkArrayIndexT(const object &srcObj) {obj=srcObj;}
-	virtual const unsigned char *getKey(/*out*/ int &len) const 
-	  {len=sizeof(object);return (const unsigned char *)&obj;}
-	virtual void pup(PUP::er &p) { int len = sizeof(object); p(len); p((void *)obj, len); }
+	CkArrayIndexT(const object &srcObj) {obj=srcObj; 
+		nInts=sizeof(obj)/sizeof(int);}
 };
 
-//Here the key is a run of bytes whose length can vary at run time;
-// the data does not belong to us, and is not deleted when we are.
-class CkArrayIndexConst : public CkArrayIndex {
-protected:
-	int nBytes;//Length of key in bytes
-	const unsigned char *constData;//Data array, which we do not own
+//This class is as large as any CkArrayIndex
+class CkArrayIndexMax : public CkArrayIndex {
+	 void copyFrom(const CkArrayIndex &that)
+		  {*this=*(CkArrayIndexMax *)&that;}
+		  /*  nInts=that.nInts;
+		  for (int i=0;i<nInts;i++) index[i]=that.data()[i];
+		  }*/
 public:
-	CkArrayIndexConst(int len,const void *srcData);//Copy given data
-	CkArrayIndexConst(const CkArrayIndex &that); //Copy given index's data
-	virtual const unsigned char *getKey(/*out*/ int &len) const;
-	virtual void pup(PUP::er &p);
+	int index[CK_ARRAYINDEX_MAXLEN];
+	CkArrayIndexMax() {}
+	CkArrayIndexMax(const CkArrayIndex &that) {copyFrom(that);}
+	CkArrayIndexMax &operator=(const CkArrayIndex &that) 
+	  {copyFrom(that);return *this;}
 };
-
 
 /*********************** Array Messages ************************/
 //This is a superclass of all the messages which contain array indices.
 class CkArrayIndexMsg
 {
-private:
-  //This array keeps the array index of the destination if it fits,
-  //  otherwise the array index gets appended at the end of the message.
-#define CKARRAYINDEX_STORELEN_INTS 3 //Store 3 ints in indexStore
-#define CKARRAYINDEX_STORELEN sizeof(int)*CKARRAYINDEX_STORELEN_INTS
-  int indexStore[CKARRAYINDEX_STORELEN_INTS];
-  int indexLength;//Bytes in destination array index
-
 public:
-  CkArrayIndexMsg();//<- sets indexLength to zero
-
-  //Allocate and return a new CkArrayIndexGeneric with this message's index
-  CkArrayIndex *copyIndex(void);
-  
-  //Return a CkArrayIndexConst with this message's index
-  const CkArrayIndexConst index(void) const;
-
-  //Writes the given index into this array message,
-  // reallocating and copying if needed-- it may not be possible
-  // to do this "in place".
-  CkArrayIndexMsg *insertArrayIndex(const CkArrayIndex &idx);
+  CkArrayIndexMax index; //Message's destination array index
 };
 
-#define CkArrayIndexMsg_insert(M) M *insert(const CkArrayIndex &idx) {return (M *)(void *)insertArrayIndex(idx);}
-
 class CkArrayMessage:public CkArrayIndexMsg  {
-protected:
-  CkArrayMessage() {} //<- prevents us from creating bare CkArrayMessages
 public:
   union {
 	struct {
@@ -153,7 +118,7 @@ public:
 		short fromPE;//the source PE (for migrators)
   	} create;
   } type;
-  CkArrayIndexMsg_insert(CkArrayMessage)
+  
   //This allows us to delete bare CkArrayMessages
   void operator delete(void *p){CkFreeMsg(p);}
 };
@@ -200,28 +165,29 @@ class CkArrayUpdateMsg;
 // job simpler, and the translated code smaller. 
 class CProxy_CkArrayBase :public CkArrayID {
 protected:
-	CkArrayIndex *_idx;//<- our element's array index, or NULL
-public:// <- should be protected, but causes errors.
+	CkArrayIndexMax _idx;//<- our element's array index; nInts=-1 if none
+
+public:
 	CProxy_CkArrayBase() {}
-	CProxy_CkArrayBase(const CkArrayID &aid) {_aid=aid._aid;_idx=NULL;}
-	CProxy_CkArrayBase(const CkArrayID &aid,CkArrayIndex *idx)
-	  {_aid=aid._aid;_idx=idx;}
-        virtual ~CProxy_CkArrayBase() { if(_idx) { delete _idx; _idx=0; } }
-	
-	void insertAtIdx(int ctorIndex,int chareType,int onPE,const CkArrayIndex &idx,CkArrayMessage *m=NULL);
+	CProxy_CkArrayBase(const CkArrayID &aid) {_aid=aid._aid;_idx.nInts=-1;}
+	CProxy_CkArrayBase(const CkArrayID &aid,const CkArrayIndex &idx)
+		:_idx(idx) {_aid=aid._aid;}
 
 	//Create 1D initial elements
-	void create1Dinitial(int ctorIndex,int chareType,int numElements,CkArrayMessage *m=NULL);
-	void doInsert(int ctorIndex,int chareType=-1,int onPE=-1,CkArrayMessage *m=NULL);
+	void base_insert1D(int ctorIndex,int chareType,int numElements,CkArrayMessage *m=NULL);
+protected:
+	void base_insert(int ctorIndex,int chareType,int onPE,CkArrayMessage *m=NULL);
+	void base_insert(int ctorIndex,int chareType,int onPE,const CkArrayIndex &idx,CkArrayMessage *m=NULL);
+	
+//Messaging:
+	void base_send(CkArrayMessage *msg, int entryIndex) const;
+	void base_broadcast(CkArrayMessage *msg, int entryIndex) const;
 public:
 	CkGroupID ckGetGroupID(void) { return _aid; }
-//Messaging:
-	void send(CkArrayMessage *msg, int entryIndex);
-	void broadcast(CkArrayMessage *msg, int entryIndex);
 	
 	void doneInserting(void);//Call on after last insert (for load balancer)
 	
-//Register the given reduction client:
+//Register the given reduction client
 	void setReductionClient(CkReductionMgr::clientFn fn,void *param=NULL);
 	void pup(PUP::er &p);
 };
@@ -257,8 +223,8 @@ public:
 
   virtual ~ArrayElement();//Deletes heap-allocated array index
   
-  CkArrayIndex *thisindex;//Array index (allocated on heap)
-
+  CkArrayIndexMax thisindex;//Index of this element
+  
   void destroy(void);
   
 //Contribute to the given reduction type.  Data is copied, not deleted.
@@ -319,8 +285,8 @@ template <class T>
 class ArrayElementT : public ArrayElement
 {
 public:
-  ArrayElementT(void) {thisIndex=*(T *)thisindex->data();}
-  ArrayElementT(CkMigrateMessage *msg) {thisIndex=*(T *)thisindex->data();}
+  ArrayElementT(void) {thisIndex=*(T *)thisindex.data();}
+  ArrayElementT(CkMigrateMessage *msg) {thisIndex=*(T *)thisindex.data();}
   
   T thisIndex;//Object array index
 };
@@ -352,7 +318,7 @@ public:
   static  CkGroupID CreateArray(CkGroupID mapID,int numInitial=0);
 
   CkArray(CkArrayCreateMsg *);
-  CkArray(CkMigrateMessage *) {}
+  CkArray(CkMigrateMessage *);
   CkGroupID &getGroupID(void) {return thisgroup;}
 
 //Element creation/destruction:
@@ -411,18 +377,22 @@ private:
   void queryLoad(LDOMHandle _h);
   
   LDOMHandle myLBHandle;
+  void initLB(LBDatabase *Nlbdb);
 #endif
+
   //This flag lets us detect element suicide, so we can stop timing
   CmiBool curElementIsDead;
+  void localElementDying(ArrayElement *e);
 
-  Hashtable hash;//Maps array index to array element records (CkArrayRec)
+  //Maps array index to array element records (CkArrayRec)
+  CkHashtableT<CkArrayIndexMax,CkArrayRec *> hash;
+  
   //Add given element array record (which then owns it) at idx.
   void insertRec(CkArrayRec *rec,const CkArrayIndex &idx);
   //Look up array element in hash table.  Index out-of-bounds if not found.
   CkArrayRec *elementRec(const CkArrayIndex &idx);
   //Look up array element in hash table.  Return NULL if not there.
-  CkArrayRec *elementNrec(const CkArrayIndex &idx) 
-  	{return (CkArrayRec *)hash.get(idx);}
+  CkArrayRec *elementNrec(const CkArrayIndex &idx);
   
   //This structure keeps counts of numbers of array elements:
   struct {
@@ -435,7 +405,7 @@ private:
 
   //Allocate a new, uninitialized array element of the given (chare) type
   // and owning the given index.
-  ArrayElement *newElement(int type,CkArrayIndex *ind);
+  ArrayElement *newElement(int type,const CkArrayIndex &ind);
   //Call the user's given constructor, passing the given message.
   // Add the element to the hashtable.
   void ctorElement(ArrayElement *el,int ctor,void *msg);
@@ -452,7 +422,6 @@ private:
 
 //For houscleaning:
   int nSprings;//Number of times "SpringCleaning" has been broadcast
-  double lastCleaning;//Wall time that last springcleaning was broadcast
 
 ///// Map support:
   CkGroupID mapID;
@@ -480,6 +449,7 @@ public:
 
 #include "CkArray.decl.h"
 
+
 //This is the default creation message sent to a new array element
 class CkArrayElementCreateMsg:public CMessage_CkArrayElementCreateMsg {};
 
@@ -492,21 +462,18 @@ public:
 	static void *alloc(int msgnum, int size, int *array, int priobits);
 	static void *pack(CkArrayElementMigrateMessage *);
 	static CkArrayElementMigrateMessage *unpack(void *in);
-
-	CkArrayIndexMsg_insert(CkArrayElementMigrateMessage)
 };
 
 //Message: Remove the array element at the given index.
 class CkArrayRemoveMsg : public CMessage_CkArrayRemoveMsg 
 {public:
-	CkArrayIndexMsg_insert(CkArrayRemoveMsg)
+	CkArrayRemoveMsg(const CkArrayIndex &idx) {index=idx;}
 };
 
 //Message: Direct future messages for this array element to this PE.
 class CkArrayUpdateMsg : public CMessage_CkArrayUpdateMsg 
 {public:
-	CkArrayUpdateMsg(void);
-	CkArrayIndexMsg_insert(CkArrayUpdateMsg)
+	CkArrayUpdateMsg(const CkArrayIndex &idx);
 };
 
 #endif

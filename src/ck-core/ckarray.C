@@ -29,39 +29,29 @@ Orion Sky Lawlor, olawlor@acm.org
 //For debugging: convert given index to a string
 static const char *idx2str(const CkArrayIndex &ind)
 {
-  static char retBuf[500];
-  const char *hexTable="0123456789abcdef";
-  char *r=retBuf;//Write into retBuf
-  int i,len;
-  const unsigned char *d=ind.getKey(len);
-  *r='{';*++r='0';*++r='x';
-  for (i=0;i<len;i++)
-    {
-      *++r=hexTable[(*d)>>4];
-      *++r=hexTable[(*d)&0x0f];
-      *++r=' ';
-      if ((i%4)==3) 
-	*r='/';//Overwrite last space with slash
-      d++;
-    }
-  *r='}';//Overwrite last space with a closing brace
-  *++r=0;//Append trailing NULL
+  static char retBuf[80];
+  retBuf[0]=0;
+  for (int i=0;i<ind.nInts;i++)
+  {
+  	if (i>0) strcat(retBuf,";");
+  	sprintf(&retBuf[strlen(retBuf)],"%d",ind.data()[i]);
+  }
   return retBuf;
 }
 static const char *idx2str(const ArrayElement *el)
-  {return idx2str(*el->thisindex);}
+  {return idx2str(el->thisindex);}
 
 #define ARRAY_DEBUG_OUTPUT 0
 
 #if ARRAY_DEBUG_OUTPUT 
 #   define DEB(x) CkPrintf x  //General debug messages
-#   define DEBI(x) //CkPrintf x  //Index debug messages
-#   define DEBC(x) //CkPrintf x  //Construction debug messages
+#   define DEBI(x) CkPrintf x  //Index debug messages
+#   define DEBC(x) CkPrintf x  //Construction debug messages
 #   define DEBS(x) CkPrintf x  //Send/recv/broadcast debug messages
 #   define DEBM(x) CkPrintf x  //Migration debug messages
 #   define DEBL(x) CkPrintf x  //Load balancing debug messages
-#   define DEBK(x) //CkPrintf x  //Spring Cleaning debug messages
-#   define DEBB(x) //CkPrintf x  //Broadcast debug messages
+#   define DEBK(x) CkPrintf x  //Spring Cleaning debug messages
+#   define DEBB(x) CkPrintf x  //Broadcast debug messages
 #   define AA "ArrayBOC on %d: "
 #   define AB ,CkMyPe()
 #else
@@ -77,90 +67,72 @@ static const char *idx2str(const ArrayElement *el)
 #endif
 
 /************************* Array Index *********************
-Array Index class.  An array index is just a HashKey-- 
+Array Index class.  An array index is just a 
 a run of bytes used to look up an object in a hash table.
-An Array Index cannot be modified once it is created.
 */
 typedef unsigned char uc;
 
-//Simple array indices:
-const uc *CkArrayIndex1D::getKey(/*out*/ int &len) const
-{len=1*sizeof(int);return (const uc *)&index;}
-
-void CkArrayIndex1D::pup(PUP::er &p) 
-{ int len = 1*sizeof(int); p(len); p(index); }
-
-const uc *CkArrayIndex2D::getKey(/*out*/ int &len) const
-{len=2*sizeof(int);return (const uc *)index;}
-
-void CkArrayIndex2D::pup(PUP::er &p) 
-{ int len = 2*sizeof(int); p(len); p((void *)index, len); }
-
-const uc *CkArrayIndex3D::getKey(/*out*/ int &len) const
-{len=3*sizeof(int);return (const uc *)index;}
-
-void CkArrayIndex3D::pup(PUP::er &p) 
-{ int len = 3*sizeof(int); p(len); p((void *)index, len); }
-
-const uc *CkArrayIndex4D::getKey(/*out*/ int &len) const
-{len=4*sizeof(int);return (const uc *)index;}
-
-void CkArrayIndex4D::pup(PUP::er &p) 
-{ int len = 4*sizeof(int); p(len); p((void *)index, len); }
-
-///// ArrayIndexConst ////
-//Finally, here the key is a run of bytes whose length can vary at run time.  
-// Is generic because it can contain the data of *any* kind of ArrayIndex.
-
-CkArrayIndexConst::CkArrayIndexConst(int len,const void *srcData)//Copy given data
+inline CkHashCode CkArrayIndex::hash(void) const
 {
-  nBytes=len; 
-  constData=(const unsigned char *)srcData;
+        register int i;
+	register const int *d=data();
+	register CkHashCode ret=d[0];
+	for (i=1;i<nInts;i++)
+		ret +=circleShift(d[i],10+11*i)+circleShift(d[i],9+7*i);
+	return ret;
 }
 
-CkArrayIndexConst::CkArrayIndexConst(const CkArrayIndex &that)//Copy given index's data
+//General (length-independent) hash/compare functions
+inline CkHashCode CkArrayIndex_hashN(const void *keyData,size_t /*len*/)
 {
-  constData=that.getKey(nBytes);
-}
-const unsigned char *CkArrayIndexConst::getKey(/*out*/ int &len) const
-{
-  len=nBytes;
-  return constData;
+	return ((CkArrayIndexMax *)keyData)->hash();
 }
 
-void CkArrayIndexConst::pup(PUP::er &p)
+inline int CkArrayIndex_compareN(const void *k1,const void *k2,size_t /*len*/)
 {
-  p(nBytes);
-  p((void *) constData, nBytes);
+	const CkArrayIndexMax &i1=*(CkArrayIndexMax *)k1;
+	const CkArrayIndexMax &i2=*(CkArrayIndexMax *)k2;
+	const int *d1=i1.data();
+	const int *d2=i2.data();
+	int l=i1.nInts;
+	if (l!=i2.nInts) return 0;
+	for (int i=0;i<l;i++)
+		if (d1[i]!=d2[i])
+			return 0;
+	//If we got here, the two keys must have exactly the same data
+	return 1;
+}
+
+void CkArrayIndex::pup(PUP::er &p) 
+{
+	p(nInts);
+	p(data(),nInts);
 }
 
 #if CMK_LBDB_ON
-/*One problem with the LBDB is that the object handles 
-(the nordic-sounding LBObjid) are fixed-sized-- they are 
-always 4 ints.  Of course, this means it's possible that 
-two distinct array indices will hash to the same handle, 
-thus counting the messages and CPU time for those array 
-elements together instead of separately.  Since there are 
-(for 32-bit ints) 2^128 LBObjid's, this should be rare enough 
-not to seriously impact the load balance.
+/*LBDB object handles are fixed-sized, and not necc.
+the same size as ArrayIndices.
 */
-static unsigned int circularLeftShift(unsigned int x,int dist)
-{/*Return x circular-left-shifted by dist bits*/
-	const int bits=8*sizeof(int);/*Bits in an int*/
-	dist%=bits;/*Prevent wraparound*/
-	return (x<<dist)|(x>>(bits-dist)); 
-}
 static LDObjid idx2LDObjid(const CkArrayIndex &idx)
 {
-  int i,len, lenInInts;
   LDObjid r;
-  for (i=0;i<OBJ_ID_SZ;i++)
-    r.id[i]=0;
-  const unsigned char *data=idx.getKey(len);
-  const int *id=(const int *)data;
-  lenInInts = len/sizeof(int);
-  for (i=0;i<lenInInts;i++)
-    r.id[i%OBJ_ID_SZ]^=circularLeftShift(id[i],11*i);
+  int i;
+  const int *data=idx.data();
+  if (OBJ_ID_SZ>=idx.nInts) {
+    for (i=0;i<idx.nInts;i++)
+      r.id[i]=data[i];
+    for (i=idx.nInts;i<OBJ_ID_SZ;i++)
+      r.id[i]=0;
+  } else {
+    //Must hash array index into LBObjid
+    int j;
+    for (j=0;j<OBJ_ID_SZ;j++)
+    	r.id[j]=data[j];
+    for (i=0;i<idx.nInts;i++)
+      for (j=0;j<OBJ_ID_SZ;j++)
+        r.id[j]+=circleShift(data[i],22+11*i*(j+1))+
+          circleShift(data[i],21-9*i*(j+1));
+  }
   return r;
 }
 #endif
@@ -196,15 +168,15 @@ public:
   int procNum(int /*arrayHdl*/, const CkArrayIndex &i)
   {
 #if 1
-    if (i.len()==sizeof(int)) {
+    if (i.nInts==1) {
       //Map 1D integer indices in simple round-robin fashion
-      return (*(int *)i.data())%CkNumPes();
+      return (i.data()[0])%CkNumPes();
     }
     else 
 #endif
       {
 	//Map other indices based on their hash code, mod a big prime.
-	unsigned int hash=(i.getHashCode()+739)%1280107;
+	unsigned int hash=(i.hash()+739)%1280107;
 	return (hash % CkNumPes());
       }
   }
@@ -218,7 +190,6 @@ public:
     delete msg;
   }
   CkArrayInit(CkMigrateMessage *m) {}
-  virtual void pup(PUP::er &p) { Chare::pup(p); }
 };
 
 /************************** ArrayElement *******************
@@ -237,12 +208,11 @@ void ArrayElement::destroy(void)
 //Destructor (virtual)
 ArrayElement::~ArrayElement()
 {
-  thisArray->ElementDying((new CkArrayRemoveMsg)->insert(*thisindex));
+  thisArray->localElementDying(this);
   lbUnregister();
-  delete thisindex;//Delete heap-allocated index object
   //To detect use-after-delete: 
   thisArray=(CkArray *)0xDEADa7a1;
-  thisindex=(CkArrayIndex *)0xDEAD1de9;
+  thisindex.nInts=-123456;
 }
 
 
@@ -265,6 +235,11 @@ void ArrayElement::pup(PUP::er &p)
 {
   DEBM((AA"  ArrayElement::pup()\n"AB));
   Chare::pup(p);
+  thisArrayID.pup(p);
+  if (p.isUnpacking())
+  	thisArray=thisArrayID.ckLocalBranch();
+  thisindex.pup(p);
+  p(thisChareType);
   p(bcastNo);
   reductionInfo.pup(p);
 #if CMK_LBDB_ON
@@ -301,7 +276,7 @@ void ArrayElement::lbRegister(void)//Connect to load balancer
   DEBL((AA"Registering element %s with load balancer (%s AtSync)\n"AB,idx2str(this),usesAtSync?"and":"without"));	
   ldHandle = thisArray->the_lbdb->
     RegisterObj(thisArray->myLBHandle,
-		idx2LDObjid(*thisindex),(void *)this,1);
+		idx2LDObjid(thisindex),(void *)this,1);
   
   if (usesAtSync)
     ldBarrierHandle = thisArray->the_lbdb->AddLocalBarrierClient(
@@ -312,6 +287,7 @@ void ArrayElement::lbRegister(void)//Connect to load balancer
 void ArrayElement::lbUnregister(void)//Disconnect from load balancer
 {
   DEBL((AA"Unregistering element %s from load balancer (%s AtSync)\n"AB,idx2str(this),usesAtSync?"and":"without"));	
+  thisArray->the_lbdb->ObjectStop(ldHandle);
   thisArray->the_lbdb->UnregisterObj(ldHandle);
   if (usesAtSync)
     thisArray->the_lbdb->RemoveLocalBarrierClient(ldBarrierHandle);
@@ -326,12 +302,12 @@ void ArrayElement::lbUnregister(void) {}//Disconnect from load balancer
 ArrayElement1D::ArrayElement1D(void)
 {
   numElements=thisArray->numInitial;
-  thisIndex=*(int *)thisindex->data();
+  thisIndex=thisindex.data()[0];
 }
 ArrayElement1D::ArrayElement1D(CkMigrateMessage *msg)
 {
   numElements=thisArray->numInitial;
-  thisIndex=*(int *)thisindex->data();
+  thisIndex=thisindex.data()[0];
 }
 
 void ArrayElement1D::pup(PUP::er &p)
@@ -422,9 +398,7 @@ public:
   }
 
   //Deliver a message to this local element.
-  virtual void recv(CkArrayMessage *msg) {
-    arr->deliverLocal(msg,el);
-  }
+  virtual void recv(CkArrayMessage *msg);
 
   //Return if this element is now obsolete (it isn't)
   virtual CmiBool isObsolete(int nSprings,const CkArrayIndex &idx) {return CmiFalse;}
@@ -446,7 +420,7 @@ public:
   virtual RecType type(void) {return dead;}
   
   virtual void send(CkArrayMessage *msg) {
-    CkPrintf("Dead array element is %s.\n",idx2str(msg->index()));
+    CkPrintf("Dead array element is %s.\n",idx2str(msg->index));
     CkAbort("Send to dead array element!\n");
   }
   virtual void yourSuccessorIs(CkArrayRec *nextGuy) 
@@ -464,7 +438,7 @@ private:
   int lastAccess;//Age when last accessed
  protected:
   //Update our access time
-  void access(void) {
+  inline void access(void) {
     lastAccess=arr->nSprings;
   }
   //Return if we are "stale"-- we were last accessed a while ago
@@ -551,7 +525,7 @@ class CkArrayRec_buffering:public CkArrayRec_aging {
     DEBS((AA" Delivering queued messages\n"AB));
     CkArrayMessage *m;
     while (NULL!=(m=buffer.deq())) {
-      DEBS((AA"Sending buffered message to %s\n"AB,idx2str(m->index())));
+      DEBS((AA"Sending buffered message to %s\n"AB,idx2str(m->index)));
       arr->RecvForElement(m);
     }
   }
@@ -598,7 +572,9 @@ class CkArrayRec_buffering_migrated:public CkArrayRec_buffering {
 //Add given element array record (which then owns it) at idx.
 void CkArray::insertRec(CkArrayRec *rec,const CkArrayIndex &idx)
 {
-  CkArrayRec *old=(CkArrayRec *)hash.put(idx,rec);
+  CkArrayRec *old=NULL;
+  old=elementNrec(idx);
+  hash.put(idx)=rec;
   if (old!=NULL) {
     //There was an old element at this location
     if (old->type()==CkArrayRec::local && rec->type()==CkArrayRec::local) {
@@ -621,9 +597,19 @@ static void abort_out_of_bounds(const CkArrayIndex &idx)
 // Aborts with index out-of-bounds error if not found.
 CkArrayRec *CkArray::elementRec(const CkArrayIndex &idx)
 {
-  CkArrayRec *ret=(CkArrayRec *)hash.get(idx);
-  if (ret==NULL) abort_out_of_bounds(idx);
-  return ret;
+	CkArrayRec *rec=elementNrec(idx);
+	if (rec==NULL) abort_out_of_bounds(idx);
+	return rec;
+}
+
+
+CkArrayRec *CkArray::elementNrec(const CkArrayIndex &idx)
+{
+#if CMK_TEMPLATE_MEMBERS_BROKEN
+	return hash.get(idx); //Slower version
+#else
+	return hash.template get_fast<CkArrayIndex_hashN,CkArrayIndex_compareN >(idx);
+#endif
 }
 
 /*********************** Spring Cleaning *****************
@@ -640,22 +626,13 @@ remote element pointers might be valid and used some time in
 the future.
 */
 
-#define SECONDS_Btw_SPRINGS 60
-#define springCheck() \
-	if ((CkMyPe()==0) && (CmiWallTimer()-lastCleaning>SECONDS_Btw_SPRINGS))\
-	{\
-		thisproxy.SpringCleaning();\
-		lastCleaning=CmiWallTimer();\
-	}
-
 //Housecleaning: called periodically from node zero--
 // Remove old broadcasts.
 // Look for, and remove, old ArrayRec's.
-void CkArray::SpringCleaning(void)
+inline void CkArray::SpringCleaning(void)
 {
   DEBK((AA"Starting spring cleaning #%d (%.0f s since last)\n"AB,nSprings,CmiWallTimer()-lastCleaning));
   nSprings++;
-  lastCleaning=CmiWallTimer();
   //Remove old broadcast messages
   int nDelete=oldBcasts.length()-(bcastNo-oldBcastNo);
   if (nDelete>0) {
@@ -666,15 +643,15 @@ void CkArray::SpringCleaning(void)
   oldBcastNo=bcastNo;
   
   //Poke through the hash table for old ArrayRecs.
-  void *obj;
-  HashKey *key;
-  HashtableIterator *it=hash.objects();
-  while (NULL!=(obj=it->next(&key))) {
-    CkArrayRec *rec=(CkArrayRec *)obj;
-    CkArrayIndex &idx=*(CkArrayIndex *)key;
+  void *objp;
+  void *keyp;
+  CkHashtableIterator *it=hash.iterator();
+  while (NULL!=(objp=it->next(&keyp))) {
+    CkArrayRec *rec=*(CkArrayRec **)objp;
+    CkArrayIndex &idx=*(CkArrayIndex *)keyp;
     if (rec->isObsolete(nSprings,idx)) {
       //This record is obsolete-- remove it from the table
-      DEBK((AA"Cleaning out old record for %s\n"AB,idx2str(idx)));
+      DEBK((AA"Cleaning out old record %s\n"AB,idx2str(idx)));
       hash.remove(idx);
       delete rec;
       it->seek(-1);//retry this hash slot
@@ -683,10 +660,18 @@ void CkArray::SpringCleaning(void)
   delete it;
 }
 
+#define SECONDS_Btw_SPRINGS 60
+
+static void springCheck(void *forArray) {
+	//Broadcast a "spring cleaning" message for this array
+	CProxy_CkArray(*(int *)forArray).SpringCleaning();
+	CcdCallFnAfter((CcdVoidFn)springCheck,forArray,SECONDS_Btw_SPRINGS*1000);
+}
+
 /********************* Little CkArray Utilities ******************/
 
 void CProxy_CkArrayBase::setReductionClient(CkReductionMgr::clientFn fn,void *param)
-{ ((CkArray *)CkLocalBranch(_aid))->setClient(fn,param); }
+{ ckLocalBranch()->setClient(fn,param); }
 
 //Fetch a local element via its index (return NULL if not local)
 ArrayElement *CkArray::getElement(const CkArrayIndex &idx)
@@ -697,6 +682,47 @@ ArrayElement *CkArray::getElement(const CkArrayIndex &idx)
   else
     return NULL;
 }  
+
+//Create 1D initial array elements
+void CProxy_CkArrayBase::base_insert1D(int ctorIndex,int chareType,int numInitial,
+	CkArrayMessage *inM)
+{
+  DEBC(("In createInitial-- will build %d elements\n",numInitial));
+  if (numInitial>0) {
+    //Build some 1D elements: (mostly for backward compatability)
+    for (int i=0;i<numInitial;i++) {
+      CkArrayMessage *m=NULL;
+      if (inM!=NULL) { 
+	if (i!=numInitial-1)
+	  m=(CkArrayMessage *)CkCopyMsg((void **)&inM);
+	else
+	  m=inM;//Last time around, send off the original message
+      }
+      base_insert(ctorIndex,chareType,-1,CkArrayIndex1D(i),m);
+    }
+    DEBC(("Done building elements\n"));
+    doneInserting();
+  }
+}
+
+void CProxy_CkArrayBase::base_insert(int ctorIndex,int chareType,int onPE,CkArrayMessage *m)
+{
+  if (_idx.nInts==-1) CkAbort("Must use arrayProxy[index].insert()!\n"); 
+  base_insert(ctorIndex,chareType,onPE,_idx,m);
+}
+
+//pack-unpack method for CProxy_CkArrayBase
+void CProxy_CkArrayBase::pup(PUP::er &p)
+{
+  CkArrayID::pup(p);
+  
+  p(_aid);
+  p(_idx.nInts);
+  if (_idx.nInts!=-1)
+  	p(_idx.data(),_idx.nInts);
+}
+
+
 
 /*********************** CkArray Creation ************************
 CkArray creation is a several-step process:
@@ -729,7 +755,16 @@ CkGroupID CkArray::CreateArray(CkGroupID mapID,int numInitial)
   return group;
 }
 
-CkArray::CkArray(CkArrayCreateMsg *msg) : CkReductionMgr()
+
+CkArray::CkArray(CkMigrateMessage *) :CkReductionMgr(),
+	hash(17,0.75,CkArrayIndex_hashN,CkArrayIndex_compareN)
+{
+  if (CkMyPe()==0) CcdCallFnAfter((CcdVoidFn)springCheck,
+  	(void *)&thisgroup,SECONDS_Btw_SPRINGS*1000);
+}
+
+CkArray::CkArray(CkArrayCreateMsg *msg) :CkReductionMgr(),
+	hash(17,0.75,CkArrayIndex_hashN,CkArrayIndex_compareN)
 {
   //Set class variables
   numInitial=msg->numInitial;
@@ -737,46 +772,13 @@ CkArray::CkArray(CkArrayCreateMsg *msg) : CkReductionMgr()
   bcastNo=oldBcastNo=0;
   nSprings=0;
   isInserting=CmiTrue;
-  lastCleaning=CmiWallTimer();   
-  
+  if (CkMyPe()==0) CcdCallFnAfter((CcdVoidFn)springCheck,
+  	(void *)&thisgroup,SECONDS_Btw_SPRINGS*1000);
+
 #if CMK_LBDB_ON
-  DEBL((AA"Connecting to load balancer...\n"AB));
-  //Find and register with the load balancer
-  the_lbdb = CProxy_LBDatabase(msg->loadbalancer).ckLocalBranch();
-  if (the_lbdb == 0)
-    CkPrintf("[%d] LBDatabase not created?\n",CkMyPe());
-  DEBL((AA"Connected to load balancer %p\n"AB,the_lbdb));
-
-  // Register myself as an object manager
-  LDOMid myId;
-  myId.id = (int)thisgroup;
-  LDCallbacks myCallbacks;
-  myCallbacks.migrate = (LDMigrateFn)ArrayElement::staticMigrate;
-  myCallbacks.setStats = (LDStatsFn)staticSetStats;
-  myCallbacks.queryEstLoad = (LDQueryEstLoadFn)staticQueryLoad;
-  myLBHandle = the_lbdb->RegisterOM(myId,this,myCallbacks);  
-
-  // Tell the lbdb that I'm registering objects
-  the_lbdb->RegisteringObjects(myLBHandle);  
-  
-  //Add a barrier reciever so we can fake Registering/DoneRegister calls
-  the_lbdb->AddLocalBarrierReceiver(
-    	(LDBarrierFn)staticRecvAtSync,(void*)(this));
-    	
-  /*Set up the dummy barrier-- the load balancer needs somebody
-  to call AtSync on each PE, so if there are no array elements 
-  the array BOC has to do it.
-  */
-  dummyBarrierHandle = the_lbdb->AddLocalBarrierClient(
-    (LDResumeFn)staticDummyResumeFromSync,(void*)(this));
-
-  // Activate the AtSync for this one immediately.  Note, that since
-  // we have not yet called DoneRegisteringObjects(), nothing
-  // will happen yet.
-  thisproxy.DummyAtSync(CkMyPe());
-  
+  initLB(CProxy_LBDatabase(msg->loadbalancer).ckLocalBranch());
 #endif
-
+ 
   mapID=msg->mapID;map=NULL;
   delete msg;
   
@@ -809,76 +811,9 @@ void CkArray::initAfterMap(void)
   CkReductionMgr::creatingContributors();
 }
 
-//Create 1D initial array elements
-void CProxy_CkArrayBase::create1Dinitial(int ctorIndex,int chareType,int numInitial,
-	CkArrayMessage *inM)
-{
-  DEBC(("In createInitial-- will build %d elements\n",numInitial));
-  if (numInitial>0) {
-    //Build some 1D elements: (mostly for backward compatability)
-    for (int i=0;i<numInitial;i++) {
-      CkArrayMessage *m=NULL;
-      if (inM!=NULL) { 
-	if (i!=numInitial-1)
-	  m=(CkArrayMessage *)CkCopyMsg((void **)&inM);
-	else
-	  m=inM;//Last time around, send off the original message
-      }
-      insertAtIdx(ctorIndex,chareType,-1,CkArrayIndex1D(i),m);
-    }
-    DEBC(("Done building elements\n"));
-    doneInserting();
-  }
-}
-
-void CProxy_CkArrayBase::doInsert(int ctorIndex,int chareType,int onPE,CkArrayMessage *m)
-{
-  if (_idx==NULL) CkAbort("Must use arrayProxy[index].insert()!\n"); 
-  insertAtIdx(ctorIndex,chareType,onPE,*_idx,m);
-}
-
-void CProxy_CkArrayBase::insertAtIdx(int ctorIndex,int chareType,int onPE,
-	const CkArrayIndex &idx,CkArrayMessage *m)
-{
-  if (m==NULL) m=new CkArrayElementCreateMsg;
-  m->type.create.ctorIndex=ctorIndex;
-  m->type.create.chareType=chareType;
-  CkArray *aMgr=(CkArray *)CkLocalBranch(_aid);
-  if (onPE==-1) onPE=aMgr->homePE(idx);
-  
-  DEBC((AA"Proxy inserting element %s on PE %d\n"AB,idx2str(idx),onPE));
-  CProxy_CkArray(_aid).InsertElement(m->insert(idx),onPE);
-}
-
-//pack-unpack method for CProxy_CkArrayBase
-void CProxy_CkArrayBase::pup(PUP::er &p)
-{
-  int idxPresent, length;
-  unsigned char *data;
-
-  CkArrayID::pup(p);
-  if (p.isPacking()) 
-    idxPresent = (_idx == NULL) ? 0 : 1;  
-  p(idxPresent);
-  
-  if (idxPresent) {
-    if (p.isPacking()) 
-      data = (unsigned char *) _idx->getKey(length);
-    p(length);
-    if (p.isUnpacking())
-      data = new unsigned char[length];
-    p((void *) data, length);
-    if (p.isUnpacking()) {
-      _idx = CkArrayIndex::newIndex(length, data);
-      delete [] data;
-    }
-  }
-  else if (p.isUnpacking()) _idx = NULL;
-}
-
 //Allocate a new, uninitialized array element of the given (chare) type
 // and owning the given index.
-ArrayElement *CkArray::newElement(int chareType,CkArrayIndex *ind)
+ArrayElement *CkArray::newElement(int chareType,const CkArrayIndex &ind)
 {
   ArrayElement *el=(ArrayElement *)malloc(_chareTable[chareType]->size);
   el->thisindex=ind;
@@ -904,19 +839,17 @@ void CkArray::ctorElement(ArrayElement *el,int ctor,void *msg)
 //This method is called by the user to add an element.
 void CkArray::InsertElement(CkArrayMessage *m)
 {
-  const CkArrayIndexConst &idx=m->index();
+  const CkArrayIndex &idx=m->index;
   int homePe=homePE(idx);
   //Create the element on this PE
   DEBC((AA"  adding local element %s\n"AB,idx2str(idx)));
   if (homePe!=CkMyPe()) {
     //Let this element's home PE know it lives here now
     DEBC((AA"  Telling %s's home %d that it lives here.\n"AB,idx2str(idx),homePe));
-    thisproxy.UpdateLocation((new CkArrayUpdateMsg)->insert(idx),
-			     homePe);
+    thisproxy.UpdateLocation(new CkArrayUpdateMsg(idx),homePe);
   }
   //Build the element
-  CkArrayIndex *elIdx=m->copyIndex();
-  ArrayElement *el=newElement(m->type.create.chareType,elIdx);
+  ArrayElement *el=newElement(m->type.create.chareType,idx);
 #if CMK_LBDB_ON //Load balancer utilities:
   el->usesAtSync=CmiFalse;
 #endif
@@ -929,7 +862,7 @@ void CkArray::InsertElement(CkArrayMessage *m)
   if (!curElementIsDead) { 
     //<- element may have immediately migrated away or died.
     el->lbRegister();// Register the object with the load balancer
-    insertRec(new CkArrayRec_local(this,el),*elIdx);
+    insertRec(new CkArrayRec_local(this,el),el->thisindex);
   }	
   /*Was: 
     CkCreateChare(type.chareType,m->type.create.ctorIndex,m, 0, CkMyPe());*/
@@ -966,36 +899,39 @@ void CkArray::DoneInserting(void)
   element from hash table, notifies family, etc.
 */
 
-void CkArray::ElementDying(CkArrayRemoveMsg *m)
+void CkArray::localElementDying(ArrayElement *el)
 {
-  //Remove the element from our hashtable
-  const CkArrayIndex &idx=m->index();
-  CkArrayRec *rec=elementNrec(idx);
-  if (rec==NULL) {delete m;return; }//<- ignore this one.  We never knew him.
-  CkArrayRec::RecType rtype=rec->type();
+  const CkArrayIndex &idx=el->thisindex;
   curElementIsDead=CmiTrue;
-	
-  if (rtype==CkArrayRec::buffering_migrated) {
-    //This is just the old copy of a migrator-- ignore him
-    DEBC((AA"Ignoring death of migrating element %s\n"AB,idx2str(idx)));
-    delete m;
-    return;
-  }
-  hash.remove(idx);
-  if (rtype==CkArrayRec::local) {
-    //This is a local element dying a natural death
-    //Detach him from his arrayRec (prevents double-delete)
-    ((CkArrayRec_local *)rec)->releaseElement();
-    //Forward the death notice to the home
-    if (homePE(idx)!=CkMyPe())
-      thisproxy.ElementDying(m,homePE(idx));
-    else delete m;
-  } 
-  else delete m;
-  delete rec;
+  CkArrayRec *rec=elementNrec(idx);
+  if (rec!=NULL) {
+    CkArrayRec::RecType rtype=rec->type();
+    if (rtype==CkArrayRec::buffering_migrated) {
+      //This is just the old copy of a migrator-- ignore him
+      DEBC((AA"Ignoring death of migrating element %s\n"AB,idx2str(idx)));
+    }
+    else if (rtype==CkArrayRec::local) {
+      //This is a local element dying a natural death
+      //Detach him from his arrayRec (prevents double-delete)
+      ((CkArrayRec_local *)rec)->releaseElement();
+      //Forward a death notice to his home
+      int home=homePE(idx);
+      if (home!=CkMyPe())
+        thisproxy.ElementDying(new CkArrayRemoveMsg(idx),home);
+    }
+    hash.remove(idx);
+    delete rec;
   /*	//Install a zombie to keep the living from re-using this index.
 	insertRec(new CkArrayRec_dead(this),idx); */
-  springCheck();//Check if it's spring cleaning time
+  }
+}
+
+void CkArray::ElementDying(CkArrayRemoveMsg *m)
+{
+  //Remove this (non-local) element from our hashtable
+  const CkArrayIndex &idx=m->index;
+  delete elementNrec(idx);
+  delete m;
 }
 
 
@@ -1003,7 +939,7 @@ void CkArray::ElementDying(CkArrayRemoveMsg *m)
 
 void CkArray::migrateMe(ArrayElement *el, int where)
 {
-  const CkArrayIndex &idx=*el->thisindex;
+  const CkArrayIndex &idx=el->thisindex;
   DEBM((AA"Migrating element %s to %d\n"AB,idx2str(idx),where));
   
   //Pack the element and send it off
@@ -1015,8 +951,8 @@ void CkArray::migrateMe(ArrayElement *el, int where)
   msg->type.create.chareType=el->thisChareType;
   msg->type.create.ctorIndex=_chareTable[el->thisChareType]->getMigCtor();
   { PUP::toMem p(msg->packData); p.becomeDeleting(); el->pup(p);}
-  msg =msg->insert(idx);
-  DEBM((AA"Migrated index size %s\n"AB,idx2str(msg->index())));
+  msg->index=idx;
+  DEBM((AA"Migrated index size %s\n"AB,idx2str(msg->index)));
   contributorLeaving(&el->reductionInfo);
   
   thisproxy.RecvMigratedElement(msg,where);
@@ -1024,35 +960,34 @@ void CkArray::migrateMe(ArrayElement *el, int where)
   //Switch this element's CkArrayRec to buffering--
   // This will store his messages until he arrives safely.
   insertRec(new CkArrayRec_buffering_migrated(this),idx);
+  curElementIsDead=true;
 }
 
 void CkArray::RecvMigratedElement(CkArrayElementMigrateMessage *msg)
 {
+  const CkArrayIndex &idx=msg->index;
   {
-    const CkArrayIndexConst &idx=msg->index();
     int srcPE=msg->type.create.fromPE;
     DEBM((AA"Recv'd migrating element %s from %d\n"AB,idx2str(idx),srcPE));
     
     //Send update to home & sender to let him know the migration came out OK
     int home=homePE(idx);
     if (home!=srcPE && home!=CkMyPe())
-      thisproxy.UpdateLocation((new CkArrayUpdateMsg)->insert(idx),home);
-    thisproxy.UpdateLocation((new CkArrayUpdateMsg)->insert(idx),srcPE);
+      thisproxy.UpdateLocation(new CkArrayUpdateMsg(idx),home);
+    thisproxy.UpdateLocation(new CkArrayUpdateMsg(idx),srcPE);
   }
 
   /*Was: CkCreateChare(type.chareType, type.migrateType, msg, 0, CkMyPe());*/
   //Create the new element on this PE (passing on the msg)
-  CkArrayIndex *elIdx=msg->copyIndex();
-  ArrayElement *el=newElement(msg->type.create.chareType,elIdx);
+  ArrayElement *el=newElement(msg->type.create.chareType,idx);
   ctorElement(el,msg->type.create.ctorIndex,(CkMigrateMessage *)NULL);
   
-  if (curElementIsDead) 
-    //<- element may have immediately migrated away or died.
-    {CkFreeMsg((void *)msg);return;}
+  if (curElementIsDead) {CkFreeMsg((void *)msg);return;}
   
   //Unpack the element's fields (must be *after* ctor since this is a virtual function)
   el->bcastNo=-1;//<- to make sure they call their superclass's pup
   { PUP::fromMem p(msg->packData); el->pup(p); }
+  if (curElementIsDead) {CkFreeMsg((void *)msg);return;}
   if (el->bcastNo==-1) CkAbort("You forgot to call ArrayElement1D::pup from your array element's pup routine!\n");
   CkFreeMsg((void *)msg);//<- delete the old message
   contributorArriving(&el->reductionInfo);
@@ -1067,7 +1002,7 @@ void CkArray::RecvMigratedElement(CkArrayElementMigrateMessage *msg)
   
   if (!curElementIsDead)
     //Put the new guy in the hash table
-    insertRec(new CkArrayRec_local(this,el),*elIdx);
+    insertRec(new CkArrayRec_local(this,el),el->thisindex);
 }
 
 /*
@@ -1077,7 +1012,7 @@ void CkArray::RecvMigratedElement(CkArrayElementMigrateMessage *msg)
 */
 void CkArray::UpdateLocation(CkArrayUpdateMsg *msg)
 {
-  const CkArrayIndexConst &idx=msg->index();
+  const CkArrayIndex &idx=msg->index;
   int onPE=msg->type.msg.fromPE;
   DEBM((AA"Recv'd location update for %s from %d\n"AB,idx2str(idx),onPE));
   if (onPE!=CkMyPe()) {
@@ -1093,183 +1028,9 @@ void CkArray::UpdateLocation(CkArrayUpdateMsg *msg)
   delete msg;
 }
 
-/********************* Checkpointing **********************/
-
-//static
-void CkArray::pupArrayMsgQ(CkQ<CkArrayMessage *> &q, PUP::er &p)
-{
-  CkArrayMessage *msg;
-  envelope *env;
-  int nMsgs, size;
-  
-  if (p.isPacking()) nMsgs = q.length();
-  p(nMsgs);
-  for(int i = 0; i < nMsgs; i++) {
-    if (p.isPacking()) {
-      msg = q.deq();
-      env = UsrToEnv(msg);
-      _packFn((void **)&env);
-      size = env->getTotalsize();
-    }
-    p(size);
-    if (p.isUnpacking()) env = (envelope *) CmiAlloc(size);
-    p((void *) env, size);
-    _unpackFn((void **)&env);
-    q.enq((CkArrayMessage *)EnvToUsr(env));
-  }
-}
-
-CkArrayRec* CkArray::pupArrayRec(PUP::er &p, CkArrayRec *rec, CkArrayIndex *idx)
-{
-  CkArrayRec::RecType type;
-  char    ch, *rtypes;
-  ArrayElement *el;
-  CkArrayRec_local *lrec;
-  
-  rtypes = (char *) "0lrbmd";
-  
-  if (p.isPacking()) {
-    type = rec->type();
-    ch = rtypes[type];
-  }
-  p(ch);
-  switch(ch) {
-  case 'l':
-    if (p.isUnpacking()) {
-      int elType;
-      lrec = new CkArrayRec_local();
-      p(elType);
-	  el = newElement(elType, idx);
-	  ctorElement(el, _chareTable[elType]->getMigCtor(), 0);
-      rec = lrec;
-    }
-    else {
-      el = rec->element();
-      p(el->thisChareType);
-    }
-    rec->pup(p);
-    el->pup(p);
-    if (p.isUnpacking()) {
-	  el->lbRegister();
-      lrec->el = el;
-	}
-  case 'r':
-    if (p.isUnpacking()) 
-      rec = new CkArrayRec_remote();
-    rec->pup(p);
-  case 'b':
-    if (p.isUnpacking())
-      rec = new CkArrayRec_buffering();
-    rec->pup(p);
-  case 'm':
-    rec = new CkArrayRec_buffering_migrated();
-    rec->pup(p);
-  case 'd':
-    rec = new CkArrayRec_dead();
-    rec->pup(p);
-  }
-  if (p.isUnpacking()) rec->arr = this;
-  
-  return rec;
-}
-
-void CkArray::pupHashTable(PUP::er &p)
-{
-  HashtableIterator *it;
-  CkArrayIndex *idx;
-  HashKey *key;
-  CkArrayRec *rec;
-  int nElem, len;
-  unsigned char *data;
-  
-  if (p.isPacking()) 
-    nElem = hash.numElements();
-  
-  p(nElem);
-  if (p.isPacking()) {
-    it = hash.objects();
-    it->seekStart();
-  }
-  for(int i=0; i < nElem; i++) {
-    if (p.isPacking()) {
-      rec = (CkArrayRec *) it->next(&key);
-      data = (unsigned char *) key->getKey(len);
-    }
-    p(len);
-    if (p.isUnpacking()) 
-	  data = new unsigned char[len];
-    p((void *) data, len);
-    if (p.isUnpacking()) {
-      idx = CkArrayIndex::newIndex(len, data);
-	  key = idx;
-      delete [] data;
-    }
-	else idx = NULL;
-    rec = pupArrayRec(p, rec, idx);
-    if (p.isUnpacking()) 
-      hash.put(*key, rec);
-  }
-}
-
-void CkArray::pup(PUP::er &p) 
-{
-  CkReductionMgr::pup(p);
-  
-#if CMK_LBDB_ON
-  if (p.isUnpacking()) {
-    the_lbdb = CProxy_LBDatabase(lbdb).ckLocalBranch();
-    LDOMid myId;
-	myId.id = (int) thisgroup;
-    LDCallbacks myCallbacks;
-    myCallbacks.migrate = (LDMigrateFn)ArrayElement::staticMigrate;
-    myCallbacks.setStats = (LDStatsFn)staticSetStats;
-    myCallbacks.queryEstLoad = (LDQueryEstLoadFn)staticQueryLoad;
-    myLBHandle = the_lbdb->RegisterOM(myId,this,myCallbacks);  
-    
-    // Tell the lbdb that I'm registering objects
-    the_lbdb->RegisteringObjects(myLBHandle);  
-    
-    //Add a barrier reciever so we can fake Registering/DoneRegister calls
-    the_lbdb->AddLocalBarrierReceiver(
-				      (LDBarrierFn)staticRecvAtSync,(void*)(this));
-    
-    /*
-      Set up the dummy barrier-- the load balancer needs somebody
-      to call AtSync on each PE, so if there are no array elements 
-      the array BOC has to do it.
-    */
-    dummyBarrierHandle = the_lbdb->AddLocalBarrierClient(
-							 (LDResumeFn)staticDummyResumeFromSync,(void*)(this));
-    
-    // Activate the AtSync for this one immediately.  Note, that since
-    // we have not yet called DoneRegisteringObjects(), nothing
-    // will happen yet.
-    thisproxy.DummyAtSync(CkMyPe());
-  }
-#endif
-  p(numInitial);
-  p(curElementIsDead);
-  p(num.local);
-  p(num.migrating);
-  CmiBool oldIsInserting;
-  p(nSprings);
-  if (p.isUnpacking())
-	isInserting = CmiTrue;
-  else
-	oldIsInserting = isInserting;
-  p(oldIsInserting);
-  p(bcastNo);
-  p(oldBcastNo);
-  if (p.isUnpacking()) lastCleaning = CmiWallTimer();
-  p(mapID);
-  p(mapHandle);
-  map = (CkArrayMap *) CkLocalBranch(mapID);
-  pupArrayMsgQ(oldBcasts, p);
-  pupHashTable(p);
-}
 /********************* CkArray Messaging ******************/
 
-void CkArray::deliverLocal(CkArrayMessage *msg,ArrayElement *el)
+inline void CkArray::deliverLocal(CkArrayMessage *msg,ArrayElement *el)
 {//This is a local element-- deliver a message to him
 	DEBS((AA"Delivering local message for element %s\n"AB,idx2str(el)));
 	int hopCount=msg->type.msg.hopCount;
@@ -1281,32 +1042,36 @@ void CkArray::deliverLocal(CkArrayMessage *msg,ArrayElement *el)
 		else
 		{//Send a routing message letting original sender know new element location
 			DEBS((AA"Sending update back to %d for element %s\n"AB,srcPE,idx2str(el)));
-			thisproxy.UpdateLocation((new CkArrayUpdateMsg)->insert(*el->thisindex),srcPE);
+			thisproxy.UpdateLocation(new CkArrayUpdateMsg(el->thisindex),srcPE);
 		}
 	}
 	curElementIsDead=CmiFalse;
 	
 	int entry=msg->type.msg.entryIndex;
 #if CMK_LBDB_ON
-	LDObjHandle ldHandle=el->ldHandle;/*In case el suicides*/
-	the_lbdb->ObjectStart(ldHandle);
+	the_lbdb->ObjectStart(el->ldHandle);
 	_entryTable[entry]->call(msg, el);
-	the_lbdb->ObjectStop(ldHandle);
+	if (!curElementIsDead)
+		 the_lbdb->ObjectStop(el->ldHandle);
 #else
 	_entryTable[entry]->call(msg, el);
 #endif
 }
+void CkArrayRec_local::recv(CkArrayMessage *msg) {
+    arr->deliverLocal(msg,el);
+}
 
-void CkArray::deliverRemote(CkArrayMessage *msg,int onPE)
+inline void CkArray::deliverRemote(CkArrayMessage *msg,int onPE)
 {//This element is on another PE-- forward message there
-	DEBS((AA"Forwarding message for %s to %d\n"AB,idx2str(msg->index()),onPE));
+	DEBS((AA"Forwarding message for %s to %d\n"AB,idx2str(msg->index),onPE));
 	msg->type.msg.hopCount++;
 	thisproxy.RecvForElement(msg, onPE);
 }
 
-void CkArray::deliverUnknown(CkArrayMessage *msg)
+
+inline void CkArray::deliverUnknown(CkArrayMessage *msg)
 {//This index is not hashed-- send to its "home" processor
-	const CkArrayIndexConst &idx=msg->index();
+	const CkArrayIndex &idx=msg->index;
 	int onPE=homePE(idx);
 	if (onPE!=CkMyPe())
 		deliverRemote(msg,onPE);
@@ -1319,18 +1084,11 @@ void CkArray::deliverUnknown(CkArrayMessage *msg)
 	}
 }
 
-void CProxy_CkArrayBase::send(CkArrayMessage *msg, int entryIndex)
-{
-	msg->type.msg.fromPE = CkMyPe();
-	msg->type.msg.entryIndex = entryIndex;
-	msg->type.msg.hopCount = 0;
-	msg=msg->insert(*_idx);//Insert array index into message
-	CProxy_CkArray(_aid).ckLocalBranch()->Send(msg);
-}
+
 //Deliver given (pre-addressed) message 
-void CkArray::Send(CkArrayMessage *msg)
+inline void CkArray::Send(CkArrayMessage *msg)
 {
-	const CkArrayIndex &idx=msg->index();
+	const CkArrayIndex &idx=msg->index;
 #if CMK_LBDB_ON
 	the_lbdb->Send(myLBHandle,idx2LDObjid(idx),UsrToEnv(msg)->getTotalsize());
 #endif
@@ -1342,20 +1100,42 @@ void CkArray::Send(CkArrayMessage *msg)
 
 //This receives a message from the net destined for a 
 // (probably) local element.  
-void CkArray::RecvForElement(CkArrayMessage *msg)
+inline void CkArray::RecvForElement(CkArrayMessage *msg)
 {
-	springCheck();//Check if it's spring cleaning time
-	const CkArrayIndexConst &idx=msg->index();
+	const CkArrayIndex &idx=msg->index;
 	DEBS((AA"RecvForElement %s\n"AB,idx2str(idx)));
 	CkArrayRec *rec=elementNrec(idx);
 	if (rec!=NULL)
-	        rec->recv(msg);
+		rec->recv(msg);
 	else deliverUnknown(msg);
 }
 
+void CProxy_CkArrayBase::base_insert(int ctorIndex,int chareType,int onPE,
+	const CkArrayIndex &idx,CkArrayMessage *m)
+{
+  if (m==NULL) m=new CkArrayElementCreateMsg;
+  m->index=idx;
+  m->type.create.ctorIndex=ctorIndex;
+  m->type.create.chareType=chareType;
+  if (onPE==-1) onPE=ckLocalBranch()->homePE(idx);
+  
+  DEBC((AA"Proxy inserting element %s on PE %d\n"AB,idx2str(idx),onPE));
+  CProxy_CkArray(_aid).InsertElement(m,onPE);
+}
+
+void CProxy_CkArrayBase::base_send(CkArrayMessage *msg, int entryIndex) const
+{
+	msg->type.msg.fromPE = CkMyPe();
+	msg->type.msg.entryIndex = entryIndex;
+	msg->type.msg.hopCount = 0;
+	msg->index=_idx;//Insert array index into message
+	ckLocalBranch()->Send(msg);
+}
+
+
 /*********************** CkArray Broadcast ******************/
 
-void CProxy_CkArrayBase::broadcast(CkArrayMessage *msg, int entryIndex)
+void CProxy_CkArrayBase::base_broadcast(CkArrayMessage *msg, int entryIndex) const
 {
 	msg->type.msg.fromPE = CkMyPe();
 	msg->type.msg.entryIndex=entryIndex;
@@ -1385,18 +1165,17 @@ void CkArray::RecvBroadcast(CkArrayMessage *msg)
 		deliverBroadcast(msg);
 	
 	oldBcasts.enq(msg);//Stash the message for later
-	springCheck();//Check if it's time for spring cleaning
 }
 
 //Deliver a copy of the given broadcast to all local elements
 void CkArray::deliverBroadcast(CkArrayMessage *bcast)
 {
 	//Poke through the hash table for local elements.
-	void *obj;HashKey *key;
-	HashtableIterator *it=hash.objects();
-	while (NULL!=(obj=it->next(&key)))
+	void **objp;
+	CkHashtableIterator *it=hash.iterator();
+	while (NULL!=(objp=(void **)it->next()))
 	{
-		CkArrayRec *rec=(CkArrayRec *)obj;
+		CkArrayRec *rec=*(CkArrayRec **)objp;
 		ArrayElement *el=rec->element();
 		if (el!=NULL && el->bcastNo<bcastNo)
 		//el hasn't heard this broadcast yet--
@@ -1439,6 +1218,45 @@ void CkArray::bringBroadcastUpToDate(ArrayElement *el)
 #if !CMK_LBDB_ON
 void CkArray::DummyAtSync(void) {}
 #else //CMK_LBDB_ON
+
+void CkArray::initLB(LBDatabase *Nlbdb)
+{
+  DEBL((AA"Connecting to load balancer...\n"AB));
+  //Find and register with the load balancer
+  the_lbdb = Nlbdb;
+  if (the_lbdb == 0)
+    CkPrintf("[%d] LBDatabase not created?\n",CkMyPe());
+  DEBL((AA"Connected to load balancer %p\n"AB,the_lbdb));
+
+  // Register myself as an object manager
+  LDOMid myId;
+  myId.id = (int)thisgroup;
+  LDCallbacks myCallbacks;
+  myCallbacks.migrate = (LDMigrateFn)ArrayElement::staticMigrate;
+  myCallbacks.setStats = (LDStatsFn)staticSetStats;
+  myCallbacks.queryEstLoad = (LDQueryEstLoadFn)staticQueryLoad;
+  myLBHandle = the_lbdb->RegisterOM(myId,this,myCallbacks);  
+
+  // Tell the lbdb that I'm registering objects
+  the_lbdb->RegisteringObjects(myLBHandle);  
+  
+  //Add a barrier reciever so we can fake Registering/DoneRegister calls
+  the_lbdb->AddLocalBarrierReceiver(
+    	(LDBarrierFn)staticRecvAtSync,(void*)(this));
+    	
+  /*Set up the dummy barrier-- the load balancer needs somebody
+  to call AtSync on each PE, so if there are no array elements 
+  the array BOC has to do it.
+  */
+  dummyBarrierHandle = the_lbdb->AddLocalBarrierClient(
+    (LDResumeFn)staticDummyResumeFromSync,(void*)(this));
+
+  // Activate the AtSync for this one immediately.  Note, that since
+  // we have not yet called DoneRegisteringObjects(), nothing
+  // will happen yet.
+  thisproxy.DummyAtSync(CkMyPe());
+}
+
 
 /*
 The DummyAtSync is needed because the LBDB needs to get
@@ -1510,115 +1328,9 @@ void CkArray::queryLoad(LDOMHandle _h)
 
 /************************ Messages **********************/
 
-CkArrayIndexMsg::CkArrayIndexMsg() //Index message constructor-- length is zero
+CkArrayUpdateMsg::CkArrayUpdateMsg(const CkArrayIndex &idx) 
 {
-/*//This code seems to trash *some* received messages
-// (e.g. migration messages), which is pretty odd.
-	DEBI((AA"In message %p constructor\n"AB,this));
-	indexLength=-123654;
-
-//It goes along with this snippet, which should go in insert, below
-	else if (idxLen<=indexLength)
-	{//We've already allocated a spot for this (big) index at the end of this message
-		DEBI((AA"Stuffing large index %s in pre-allocated end of message %p\n"AB,idx2str(idx),this));
-		dest=this;
-		store=(int *)((char *)dest+dest->indexStore[0]);
-	}
-*/
-}
-
-//Extract a heap-allocated copy of this message's array index
-CkArrayIndex *CkArrayIndexMsg::copyIndex(void)
-{
-	int len=indexLength;const void *data;
-	if (indexLength<=(int)CKARRAYINDEX_STORELEN)
-		data=(const void *)indexStore;//Index data located in indexStore array
-	else //Data is stored at end of this message
-		data=(const void *)((char *)this+indexStore[0]);
-	CkArrayIndex *ret=CkArrayIndex::newIndex(len,data);
-	DEBI((AA"Extracting heap copy of index %s from message %p\n"AB,idx2str(*ret),this));
-	return ret;
-}
-
-//Extract a read-only pointer to this message's array index
-const CkArrayIndexConst CkArrayIndexMsg::index(void) const
-{
-	int len=indexLength;const void *data;
-	if (indexLength<=(int)CKARRAYINDEX_STORELEN)
-		data=(const void *)indexStore;//Index data in indexStore array
-	else //Data is stored at end of this message
-		data=(const void *)((char *)this+indexStore[0]);
-	DEBI((AA"R/O copy of index %s pulled from message %p\n"AB,idx2str(CkArrayIndexConst(len,(const unsigned char *)data)),this));
-	return CkArrayIndexConst(len,(const unsigned char *)data);
-}
-
-/*Store the given index into this message (somewhere).
-We'd like messages to be fixed-sized, but we'd also
-like to allow an arbitrarily-long array index.  The compromise
-is to always reserve CKARRRAYINDEX_STORELEN bytes for the index--
-if the actual index can fit in this space, it's copied in.
-If the index is too long to fit in this array, we have to
-reallocate the message and copy the index in at the end.
-(in this case, indexStore[0] gives the offset to the index data)
-Hence we want to pick CKARRRAYINDEX_STORELEN big enough that
-this slow reallocation is rare, but small enough not to waste space.
-
-This procedure is normally wrapped by the templated version
-CkArrayIndexMsgT<MESG>::insert(), which just calls this and then
-does a type cast to a MESG pointer.
-*/
-CkArrayIndexMsg *CkArrayIndexMsg::insertArrayIndex(const CkArrayIndex &idx)
-{
-	DEBI((AA"Inserting index %s into message %p\n"AB,idx2str(idx),this));
-	int idxLen;
-	const void *idxData=(const void *)idx.getKey(idxLen);
-	CkArrayIndexMsg *dest;//Message to return
-	int *store;//Location to store the index data
-	if (idxLen<=(int)CKARRAYINDEX_STORELEN)
-		{dest=this;store=dest->indexStore;}
-	else
-	{//Index too big to fit in start of this message-- allocate a new, bigger
-	// message and copy the index in at the end.
-		DEBI((AA"Resizing message %p to make room for index %s\n"AB,this,idx2str(idx)));
-		register void *srcMsg = (void *)this;
-		register envelope *srcEnv = UsrToEnv(srcMsg);
-		register unsigned char msgidx = srcEnv->getMsgIdx();
-		if(!srcEnv->isPacked() && _msgTable[msgidx]->pack)
-		{//Turn source into a flat array of bytes
-			srcMsg = _msgTable[msgidx]->pack(srcMsg);srcEnv=UsrToEnv(srcMsg);
-			srcEnv->setPacked(1);
-		}
-		//Make a message big enough to hold the old message and new index
-		register int newSize = srcEnv->getTotalsize()+idxLen;
-		DEBI((AA"New message will be %d bytes long\n"AB,newSize));
-		register envelope *newEnv = (envelope *) CmiAlloc(newSize);
-		memcpy(newEnv, srcEnv, srcEnv->getTotalsize());
-		newEnv->setTotalsize(newSize);//<- this is the only field that differs from srcEnv
-		
-		if(srcEnv->isPacked() && _msgTable[msgidx]->unpack)
-		{//Turn source back into a message
-			srcMsg = _msgTable[msgidx]->unpack(srcMsg);srcEnv=UsrToEnv(srcMsg);
-			srcEnv->setPacked(0);
-		}
-		register void *newMsg = EnvToUsr(newEnv);
-		if(newEnv->isPacked() && _msgTable[msgidx]->unpack) 
-		{//Turn duplicate back into a message
-			newMsg = _msgTable[msgidx]->unpack(newMsg);newEnv=UsrToEnv(newMsg);
-			newEnv->setPacked(0);
-		}
-		dest=(CkArrayIndexMsg *)newMsg;
-		dest->indexStore[0]=newSize-idxLen-sizeof(envelope);
-		store=(int *)((char *)dest+dest->indexStore[0]);
-		CkFreeMsg((void *)this);//We're not needed any more
-	}
-	//Write the index into the destination message
-	dest->indexLength=idxLen;
-	memcpy(store,idxData,idxLen);
-	return dest;
-}
-
-CkArrayUpdateMsg::CkArrayUpdateMsg(void)
-{
+	index=idx;
 	type.msg.fromPE=CkMyPe();
 }
 
@@ -1647,6 +1359,155 @@ CkArrayElementMigrateMessage::unpack(void *in)
   CkArrayElementMigrateMessage *me = new (in) CkArrayElementMigrateMessage;
   me->packData = (char *)&(me->packData) + (size_t)me->packData;
   return me;
+}
+
+/********************* Checkpointing **********************/
+
+//static
+void CkArray::pupArrayMsgQ(CkQ<CkArrayMessage *> &q, PUP::er &p)
+{
+  CkArrayMessage *msg;
+  envelope *env;
+  int nMsgs, size;
+  
+  if (p.isPacking()) nMsgs = q.length();
+  p(nMsgs);
+  for(int i = 0; i < nMsgs; i++) {
+    if (p.isPacking()) {
+      msg = q.deq();
+      env = UsrToEnv(msg);
+      _packFn((void **)&env);
+      size = env->getTotalsize();
+    }
+    p(size);
+    if (p.isUnpacking()) env = (envelope *) CmiAlloc(size);
+    p((void *) env, size);
+    _unpackFn((void **)&env);
+    q.enq((CkArrayMessage *)EnvToUsr(env));
+  }
+}
+
+CkArrayRec* CkArray::pupArrayRec(PUP::er &p, CkArrayRec *rec, CkArrayIndex *idx)
+{
+  CkArrayRec::RecType type;
+  char    ch, *rtypes;
+  ArrayElement *el;
+  CkArrayRec_local *lrec;
+  
+  rtypes = (char *) "0lrbmd";
+  
+  if (p.isPacking()) {
+    type = rec->type();
+    ch = rtypes[type];
+  }
+  p(ch);
+  switch(ch) {
+  case 'l':
+    if (p.isUnpacking()) {
+      int elType;
+      lrec = new CkArrayRec_local();
+      p(elType);
+	  el = newElement(elType, *idx);
+	  ctorElement(el, _chareTable[elType]->getMigCtor(), 0);
+      rec = lrec;
+    }
+    else {
+      el = rec->element();
+      p(el->thisChareType);
+    }
+    rec->pup(p);
+    el->pup(p);
+    if (p.isUnpacking()) {
+	  el->lbRegister();
+      lrec->el = el;
+	}
+  case 'r':
+    if (p.isUnpacking()) 
+      rec = new CkArrayRec_remote();
+    rec->pup(p);
+  case 'b':
+    if (p.isUnpacking())
+      rec = new CkArrayRec_buffering();
+    rec->pup(p);
+  case 'm':
+    rec = new CkArrayRec_buffering_migrated();
+    rec->pup(p);
+  case 'd':
+    rec = new CkArrayRec_dead();
+    rec->pup(p);
+  }
+  if (p.isUnpacking()) rec->arr = this;
+  
+  return rec;
+}
+
+void CkArray::pupHashTable(PUP::er &p)
+{
+/***** FIXME
+  CkHashtableIterator *it=NULL;
+  CkArrayIndex *idx;
+  HashKey *key;
+  CkArrayRec *rec;
+  int nElem, len;
+  unsigned char *data;
+  
+  if (p.isPacking()) 
+    nElem = hash.numElements();
+  
+  p(nElem);
+  if (p.isPacking()) {
+    it = hash.iterator();
+    it->seekStart();
+  }
+  for(int i=0; i < nElem; i++) {
+    if (p.isPacking()) {
+      rec = (CkArrayRec *) it->next(&key);
+      data = (unsigned char *) key->getKey(len);
+    }
+    p(len);
+    if (p.isUnpacking()) 
+	  data = new unsigned char[len];
+    p((void *) data, len);
+    if (p.isUnpacking()) {
+      idx = CkArrayIndex::newIndex(len, data);
+	  key = idx;
+      delete [] data;
+    }
+	else idx = NULL;
+    rec = pupArrayRec(p, rec, idx);
+    if (p.isUnpacking()) 
+      hash.put(*key, rec);
+  }
+*/
+}
+
+void CkArray::pup(PUP::er &p) 
+{
+  CkReductionMgr::pup(p);
+  
+#if CMK_LBDB_ON
+  if (p.isUnpacking()) {
+    initLB(CProxy_LBDatabase(lbdb).ckLocalBranch());
+  }
+#endif
+  p(numInitial);
+  p(curElementIsDead);
+  p(num.local);
+  p(num.migrating);
+  CmiBool oldIsInserting;
+  p(nSprings);
+  if (p.isUnpacking())
+	isInserting = CmiTrue;
+  else
+	oldIsInserting = isInserting;
+  p(oldIsInserting);
+  p(bcastNo);
+  p(oldBcastNo);
+  p(mapID);
+  p(mapHandle);
+  map = (CkArrayMap *) CkLocalBranch(mapID);
+  pupArrayMsgQ(oldBcasts, p);
+  pupHashTable(p);
 }
 
 #include "CkArray.def.h"
