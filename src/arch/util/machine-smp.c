@@ -231,6 +231,7 @@ static void CmiDestoryLocks()
   CloseHandle(comm_mutex);
   CloseHandle(CmiMemLock_lock);
   CmiMemLock_lock = 0;
+  CloseHandle(barrier_mutex);
 }
 
 /***************** Pthreads kernel SMP threads ******************/
@@ -381,6 +382,7 @@ static void CmiDestoryLocks()
   pthread_mutex_destroy(comm_mutex);
   pthread_mutex_destroy(CmiMemLock_lock);
   CmiMemLock_lock = 0;
+  pthread_mutex_destroy(&barrier_mutex);
 }
 
 #endif
