@@ -2,12 +2,14 @@
   TCP implementation of Converse NET version
   contains only TCP specific code for:
   * CmiMachineInit()
+  * CheckSocketsReady()
   * CmiNotifyIdle()
   * DeliverViaNetwork()
   * CommunicationServer()
 
   written by 
-  Gengbin Zheng, gzheng@uiuc.edu  12/21/2001
+  Gengbin Zheng, 12/21/2001
+  gzheng@uiuc.edu
 
 */
 
@@ -47,12 +49,23 @@ void CmiNotifyIdle(void) {
   CmiNotifyStillIdle(NULL);
 }
 
-#if CMK_USE_POLL
-struct pollfd *fds=0;
-int numSocks=0;
-int numDataSocks=0;
+/****************************************************************************
+ *                                                                          
+ * CheckSocketsReady
+ *
+ * Checks both sockets to see which are readable and which are writeable.
+ * We check all these things at the same time since this can be done for
+ * free with ``select.'' The result is stored in global variables, since
+ * this is essentially global state information and several routines need it.
+ *
+ ***************************************************************************/
 
-int CmiSetupSockets()
+#if CMK_USE_POLL
+static struct pollfd *fds=0;
+static int numSocks=0;
+static int numDataSocks=0;
+
+static int CmiSetupSockets()
 {
   int i;
   numSocks = 0;
@@ -77,7 +90,7 @@ int CmiSetupSockets()
   }
 }
 
-void checkSocks()
+static void CmiCheckSocks()
 {
   int n = 0, pe;
   if (dataskt!=-1) {
@@ -101,26 +114,57 @@ void checkSocks()
     n++;
   }
 }
+#else
+
+static fd_set rfds; 
+static fd_set wfds; 
+
+static int CmiSetupSockets()
+{
+  int i;
+  FD_ZERO(&rfds);FD_ZERO(&wfds);
+  if (Cmi_charmrun_fd!=-1)
+  	FD_SET(Cmi_charmrun_fd, &rfds);
+  if (dataskt!=-1) {
+    for (i=0; i<CmiNumPes(); i++)
+    {
+/*CmiPrintf("[%d] %d - %d\n", CmiMyPe(), i, nodes[i].sock);*/
+      if (i == CmiMyPe()) continue;
+      FD_SET(nodes[i].sock, &rfds);
+      if (nodes[i].send_queue_h) FD_SET(nodes[i].sock, &wfds);
+    }
+  }  
+}
+
+static void CmiCheckSocks()
+{
+  int i;
+  if (Cmi_charmrun_fd!=-1)
+	ctrlskt_ready_read = (FD_ISSET(Cmi_charmrun_fd, &rfds));
+  if (dataskt!=-1) {
+    for (i=0; i<Cmi_numnodes; i++)
+    {
+      if (i == CmiMyPe()) continue;
+      if (FD_ISSET(nodes[i].sock, &rfds)) {
+  	dataskt_ready_read = 1;
+	ReceiveDatagram(nodes[i].sock);
+      }
+      if (FD_ISSET(nodes[i].sock, &wfds)) {
+	TransmitDatagram(i);
+      }
+    }
+  }
+}
 #endif
 
 int CheckSocketsReady(int withDelayMs)
 {   
   int nreadable,i;
 #if !CMK_USE_POLL
-  static fd_set rfds; 
-  static fd_set wfds; 
   struct timeval tmo;
   
   MACHSTATE(2,"CheckSocketsReady {")
-  FD_ZERO(&rfds);FD_ZERO(&wfds);
-  if (Cmi_charmrun_fd!=-1)
-  	FD_S1T(Cmi_charmrun_fd, &rfds);
-  if (dataskt!=-1) {
-  for (i=0; i<Cmi_numnodes-1; i++)
-  {
-    FD_SET(nodes[i].recvsock, &rfds);
-  }
-  }
+  CmiSetupSockets();
   tmo.tv_sec = 0;
   tmo.tv_usec = withDelayMs*1000;
   nreadable = select(FD_SETSIZE, &rfds, &wfds, NULL, &tmo);
@@ -154,22 +198,7 @@ here-- WSAEINVAL, WSAENOTSOCK-- yet everything is actually OK.
     MACHSTATE(2,"} CheckSocketsReady (INTERRUPTED!)")
     return CheckSocketsReady(0);
   }
-#if !CMK_USE_POLL
-  if (Cmi_charmrun_fd!=-1)
-	ctrlskt_ready_read = (FD_ISSET(Cmi_charmrun_fd, &rfds));
-  if (dataskt!=-1) {
-	dataskt_ready_write = (FD_ISSET(dataskt, &wfds));
-  for (i=0; i<Cmi_numnodes-1; i++)
-  {
-    if (FD_ISSET(nodes[i].recvsock, &rfds)) {
-	dataskt_ready_read = 1;
-	ReceiveDatagram(nodes[i].recvsock);
-    }
-  }
-  }
-#else
-  checkSocks();
-#endif
+  CmiCheckSocks();
   MACHSTATE(1,"} CheckSocketsReady")
   return nreadable;
 }
@@ -414,18 +443,8 @@ static void open_tcp_sockets()
   int mype, numpes;
   SOCKET skt;
 
-/*
-  FILE *fp;
-  char file[100];
-  sprintf(file, "out.%d", Cmi_mynode);
-  fp = fopen(file, "a");
-  fprintf(fp, "%d %d\n", Cmi_mynode, Cmi_numnodes);
-  fclose(fp);
   mype = Cmi_mynode;
   numpes = Cmi_numnodes;
-*/
-  mype = CmiMyPe();
-  numpes = CmiNumPes();
   MACHSTATE2(2,"  open_tcp_sockets (%d:%d)", mype, numpes);
   for (i=0; i<mype; i++) {
     unsigned int clientPort;
@@ -434,7 +453,6 @@ static void open_tcp_sockets()
     if (skt<0) KillEveryoneCode(98246554);
     ok = skt_recvN(skt, &pe, sizeof(int));
     if (ok<0) KillEveryoneCode(98246556);
-/*printf("recv %d %d\n", mype, pe);*/
     nodes[pe].sock = skt;
   }
   for (pe=mype+1; pe<numpes; pe++) {
@@ -442,7 +460,6 @@ static void open_tcp_sockets()
     if (skt<0) KillEveryoneCode(894788843);
     ok = skt_sendN(skt, &mype, sizeof(int));
     if (ok<0) KillEveryoneCode(98246556);
-/*printf("send %d %d\n", mype, pe); */
     nodes[pe].sock = skt;
   }
 }
