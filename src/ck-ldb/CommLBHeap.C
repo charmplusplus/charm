@@ -5,6 +5,7 @@
 **/
 
 #include "CommLBHeap.h"
+#include "charm++.h"
 
 ObjectHeap::ObjectHeap(int size)
 {

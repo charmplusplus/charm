@@ -148,7 +148,7 @@ CLBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* stats, int count)
       nobj++;
   CkPrintf("OBJ: Before \n");
 
-  ObjectHeap maxh(nobj);
+  ObjectHeap maxh(nobj+1);
   nobj =0;
   for(pe=0; pe < count; pe++) {
     CkPrintf("[%d] PE %d : %d Objects : %d Communication\n",
