@@ -1,0 +1,126 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% RCS INFORMATION:
+%
+%       $RCSfile$
+%       $Author$        $Locker$                $State$
+%       $Revision$      $Date$
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% DESCRIPTION:
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% REVISION HISTORY:
+%
+% $Log$
+% Revision 1.1  1995-10-26 21:08:23  gursoy
+% Initial revision
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Global Variable Usage:
+
+Global variables are allowed in Converse via specific macros.  These macros 
+ensure that the program runs portably on various parallel machines. 
+Three classes of global variables are supported: node-private,
+process-private, and thread-private variables. These classes are
+strongly related to the machine model described in Section x.
+
+\begin{description}
+\item[Node-private global variables] are specific to a node. They are
+     shared among all the processes within the node.
+\item[Process-private global variables]  are specific to a process. They are
+     shared among all the threads within the process.
+\item[Thread-private global variables] are specific to a thread. They are 
+     truely private.
+\end{description}
+
+There are five macros for each class. These macros are for
+declaration, static declaration, extern declaration, initialization, and
+access. The declaration, static and extern specifications have the same
+meaning as in C. In order to support portability, however, the global
+variables must be installed properly, by using the initialization macros.
+For example, if the underlying machine is a simulator for the machine model 
+supported by Converse, then the thread-private variables must be turned into 
+arrays of variables.  Initialize and Access macros hide these details from 
+the user.  It is possible to use global variables without these macros, 
+as supported by the underlying machine, but at the expense of portability.
+
+
+Macros for node-private variables:
+\begin{verbatim}
+CsvDeclare(type,variable)
+CsvStaticDeclare(type,variable)
+CsvExtern(type,variable)
+CsvInitialize(type,variable)
+CsvAccess(variable)
+\end{verbatim}
+
+
+Macros for process-private variables:
+\begin{verbatim
+CpvDeclare(type,variable)
+CpvStaticDeclare(type,variable)
+CpvExtern(type,variable)
+CpvInitialize(type,variable)
+CpvAccess(variable)
+\end{verbatim}
+
+Macros for thread-private variables:
+\begin{verbatim}
+CthDeclare(type,variable)
+CthStaticDeclare(type,variable)
+CthExtern(type,variable)
+CthInitialize(type,variable)
+CthAccess(variable)
+\end{verbatim}
+
+
+Example of Usage:
+
+    A sample code to illustrate the usage of the macros is provided
+    in Figure~\ref{fig:cpv}.
+    There are a few rules that user must pay attention: The
+    {\tt type} and {\tt variable} fields of the macros must be a single
+    word. Therefore, structures or pointer types can be used by defining
+    new types with the {\tt typedef}. In the sample code, for example,
+    a {\tt struct point} type is redefined with a {\tt typedef} as {\tt Point}
+    in order to use it in the macros. Similarly,  the access macros contain
+    only the name of the global variable. Any indexing or member access
+    must be outside of the macro as shown in the sample code 
+    (function {\tt func1}). Finally, all the global variables must be
+    installed before they are used. One way to do this systematically is
+    to provide a module-init function for each file (in the sample code - 
+    {\tt ModuleInit()}. The module-init functions of each file, then, can be 
+    called at the beginning of execution to complete the installations of 
+    all global variables.
+    
+\begin{figure}
+\begin{verbatim}
+File Module1.c
+
+    typedef struct point
+    {
+         float x,y;
+    } Point;
+
+
+    CpvDeclare(int, a);
+    CpvDeclare(Point, p);
+
+    void ModuleInit()
+    {
+         CpvInitialize(int, a)
+         CpvInitialize(Point, p);
+
+         CpvAccess(a) = 0;
+    }
+
+    int func1() 
+    {
+         CpvAccess(p).x = 0;
+         CpvAccess(p).y = 0;
+    }
+\end{verbatim}
+\caption{An example code for global variable usage}
+\label{fig:cpv}
+\end{figure}
