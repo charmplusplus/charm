@@ -144,6 +144,10 @@ extern CmiNodeLock CmiCreateLock(void);
 
 #include <pthread.h>
 #include <sched.h>
+#ifdef CMK_FAKE_SCHED_YIELD
+#include <unistd.h>
+#define sched_yield() sleep(0)
+#endif
 
 extern int Cmi_numpes;
 extern int Cmi_mynodesize;
