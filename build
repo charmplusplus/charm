@@ -3,13 +3,14 @@
 syntax() {
   echo ''
   echo 'Usage: build <target> <version> <options> [charmc-options ...]'
-#  echo ''
+  echo ''
   echo '<targets>: converse, charm++ libs AMPI IDL tsm sm pvm sdag bluegene'
   echo '<targets>: doc ps-doc pdf-doc html-doc'
   echo '<versions>: ' 
   ( cd src ; ls -1 | egrep -v '(^Common)|(^CVS)|(^QuickThreads)|(^ccs-client)' | pr -3 -t )
-#  echo ''
+  echo ''
   echo '<options>: help cc cc64 cxx kcc pgcc acc icc smp gm vmi scyld '
+  echo ''
   echo '<charmc-options>: e.g. -g -save -verbose'
   echo 'Note: This script is trivial.  It'
   echo ' 1. Creates directories <version> and <version>/tmp';
