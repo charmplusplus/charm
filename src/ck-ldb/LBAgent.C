@@ -276,11 +276,14 @@ MulticastAgent::MulticastAgent(BaseLB::LDStats* stats, int p): Agent(p)
   for (int com = 0; com < stats->n_comm;com++) {
     LDCommData &commData = stats->commData[com];
     if (commData.recv_type()!=LD_OBJLIST_MSG) continue;
+      // create a multicast instance
     mcastList.push_back(MInfo(commData.bytes, commData.messages));
     int mID = mcastList.size()-1;
     MInfo &minfo = mcastList[mID];
     int sender = stats->getHash(commData.sender);
+      // stores all multicast that this object (sender) participated
     objmap[sender].push_back(mID);
+      // stores all objects that belong to this multicast
     minfo.objs.push_back(sender);
     int nobjs;
     LDObjKey *objs = commData.receiver.get_destObjs(nobjs);
@@ -300,23 +303,24 @@ Agent::Elem* MulticastAgent::my_preferred_procs(int *existing_map,int object,int
   // check all multicast this object participated
   CmiAssert(object < nobj);
 
-  CkVec<int> &mlist = objmap[object];
   double * comcosts = new double [npes];
   memset(comcosts, 0, sizeof(double)*npes);
   double alpha = _lb_args.alpha();
   double beeta = _lb_args.beeta();
 
+    // all multicast this object belongs to
+  CkVec<int> &mlist = objmap[object];
   // traverse all multicast participated
   // find out which processor it communicates the most
   for (i=0; i<mlist.size(); i++) {
      MInfo &minfo = mcastList[mlist[i]];
      for (int obj=0; obj<minfo.objs.size(); obj++) {
        int pe = existing_map[obj];
-       if (pe == -1) continue;		// not assigned
+       if (pe == -1) continue;		// not assigned yet
        comcosts[pe] += minfo.messages * alpha + minfo.nbytes * beeta;
      }
   }
-  // find number of non-0 cost processors
+  // find number of processors with non-0 cost
   int count = 0;
   for (i=0; i<npes; i++) {
     if (comcosts[i] != 0.0) count++;
@@ -324,12 +328,15 @@ Agent::Elem* MulticastAgent::my_preferred_procs(int *existing_map,int object,int
   Elem *prefered = new Elem[count+1];
   for (i=0; i<count; i++) {
     // find the maximum
-    Elem maxp;
+    Elem maxp;	  // cost default -1
     for (int j=0; j<npes; j++)
-      if (prefered[j].Cost > maxp.Cost) {
-        maxp = prefered[j];
+      if (comcosts[j] != 0.0 && comcosts[j] > maxp.Cost) {
+        maxp.pe = j;
+        maxp.Cost = comcosts[j];
       }
+    CmiAssert(maxp.pe!=-1);
     prefered[i] = maxp;
+    comcosts[maxp.pe] = 0.0;
   }
 
   delete [] comcosts;
