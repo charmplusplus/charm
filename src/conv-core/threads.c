@@ -13,7 +13,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.19  1995-10-20 17:29:10  jyelon
+ * Revision 1.20  1995-10-31 19:49:30  jyelon
+ * Added 'pragma alloca'
+ *
+ * Revision 1.19  1995/10/20  17:29:10  jyelon
  * *** empty log message ***
  *
  * Revision 1.18  1995/10/19  18:21:39  jyelon
@@ -198,6 +201,7 @@
 #include <stdio.h>
 #include <setjmp.h>
 #include <sys/types.h>
+#pragma alloca
 
 #define STACKSIZE (32768)
 #define SLACK     256
