@@ -11,8 +11,12 @@
  ***************************************************************************
  * REVISION HISTORY:
  *      $Log$
- *      Revision 2.3  1995-07-10 22:29:40  brunner
- *      Created perfModuleInit() to handle CPV macros
+ *      Revision 2.4  1995-07-12 20:23:47  brunner
+ *      Changed global variable time to now, to avoid conflict with
+ *      system function time.
+ *
+ * Revision 2.3  1995/07/10  22:29:40  brunner
+ * Created perfModuleInit() to handle CPV macros
  *
  * Revision 2.2  1995/07/06  22:42:54  narain
  * Corrected usage of LdbBocNum to StatisticBocNum
@@ -41,7 +45,7 @@ CpvDeclare(int,current_time_interval);
 typedef int display_table_type[NUMBER_DISPLAYS][MAXLOGMSGSIZE];
 CpvDeclare(display_table_type,display_table);
 
-CpvDeclare(int,time);
+CpvDeclare(int,now);
 CpvDeclare(int,timestep);
 CpvDeclare(int,init_time);
 CpvDeclare(int,start_processing_time);
@@ -56,7 +60,7 @@ perfModuleInit()
   CpvInitialize(int,last_time_interval);
   CpvInitialize(int,current_time_interval);
   CpvInitialize(display_table_type,display_table);
-  CpvInitialize(int,time);
+  CpvInitialize(int,now);
   CpvInitialize(int,timestep);
   CpvInitialize(int,init_time);
   CpvInitialize(int,start_processing_time);
@@ -66,8 +70,8 @@ trace_creation(msg_type, entry, envelope)
 int msg_type, entry;
 ENVELOPE *envelope;
 {
-	CpvAccess(time) = CkTimer(); 
-	adjust_time_interval(CpvAccess(time));
+	CpvAccess(now) = CkTimer(); 
+	adjust_time_interval(CpvAccess(now));
 	CpvAccess(display_index) = get_creation_display_index(msg_type); 
 	if (CpvAccess(display_index) >=0)
 		CpvAccess(display_table)[CpvAccess(display_index)][CpvAccess(current_time_interval)] += 1;
@@ -82,9 +86,9 @@ ENVELOPE *envelope;
 		(GetEnv_EP(envelope) < NumSysBocEps))
 		return;
 
-	CpvAccess(time) = CkTimer(); 
-	adjust_time_interval(CpvAccess(time));
-	CpvAccess(start_processing_time) = CpvAccess(time);
+	CpvAccess(now) = CkTimer(); 
+	adjust_time_interval(CpvAccess(now));
+	CpvAccess(start_processing_time) = CpvAccess(now);
 	CpvAccess(last_time_interval) = CpvAccess(current_time_interval);
 }
 
@@ -94,10 +98,10 @@ int id, msg_type, entry;
 {
 	if (CpvAccess(start_processing_time) == -1)
 		return;
-	CpvAccess(time) = CkTimer(); 
-	adjust_time_interval(CpvAccess(time));
+	CpvAccess(now) = CkTimer(); 
+	adjust_time_interval(CpvAccess(now));
    	CpvAccess(display_index) = get_processing_display_index(msg_type);
-	compute_busy(CpvAccess(start_processing_time), CpvAccess(time), CpvAccess(last_time_interval), 
+	compute_busy(CpvAccess(start_processing_time), CpvAccess(now), CpvAccess(last_time_interval), 
 			CpvAccess(current_time_interval));
 	if (CpvAccess(display_index) >= 0) 
 		update_display(CpvAccess(display_index), CpvAccess(last_time_interval),
