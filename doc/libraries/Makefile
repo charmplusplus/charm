@@ -1,4 +1,4 @@
-TEXFILES=manual.tex intro.tex
+TEXFILES=manual.tex intro.tex irecv.tex
 
 ps: $(TEXFILES)
 	touch index.tex
@@ -11,23 +11,31 @@ ps: $(TEXFILES)
 
 html: $(TEXFILES)
 	latex manual.tex
-	latex2html manual.tex
+	latex2html -local_icons manual.tex
+
+pdf: $(TEXFILES)
+	touch index.tex
+	pdflatex manual.tex
+	bibtex manual
+	makeindex -o index.tex manual.idx
+	pdflatex manual.tex
+	pdflatex manual.tex
 
 install:
 	rm -f /expand1/groupMosaic/distrib/libraries.manual.ps.gz
 	cp manual.ps /expand1/groupMosaic/distrib/libraries.manual.ps
 	gzip /expand1/groupMosaic/distrib/libraries.manual.ps
 	chmod 664 /expand1/groupMosaic/distrib/libraries.manual.ps.gz
+	rm -f /expand1/groupMosaic/distrib/libraries.manual.pdf
+	cp manual.pdf /expand1/groupMosaic/distrib/libraries.manual.pdf
+	chmod 664 /expand1/groupMosaic/distrib/libraries.manual.pdf
 	rm -f /expand1/groupMosaic/html-manuals/libraries.manual/*
 	cp manual/* /expand1/groupMosaic/html-manuals/libraries.manual/
 	chmod 664 /expand1/groupMosaic/html-manuals/libraries.manual/*
 
-all: ps html install
-
-co:
-	co Makefile
-	co $(TEXFILES)
+all: ps pdf html install
 
 clean:	
-	rm -f *.aux *.log *.dvi *.ps *.idx *.toc
+	rm -f *.aux *.log *.dvi *.ps *.idx *.toc *.bbl *.blg *.pdf *.ilg
+	rm -rf index.tex manual/
 

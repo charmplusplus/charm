@@ -1,4 +1,18 @@
 \documentclass[11pt]{article}
+
+\newif\ifpdf
+\ifx\pdfoutout\undefined
+  \pdffalse
+\else
+  \pdfoutput=1
+  \pdftrue
+\fi
+
+\ifpdf
+  \pdfcompresslevel=9
+\else
+\fi
+
 \usepackage{fullpage}
 \pagestyle{headings}
 \setlength{\parskip}{0.1in}
