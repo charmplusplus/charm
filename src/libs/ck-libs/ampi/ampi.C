@@ -450,7 +450,7 @@ static ampi *ampiInit(char **argv)
 			strat = USE_HYPERCUBE;
 		}
   }
-
+  
   MPI_Comm new_world;
   int _nchunks;
   CkArrayOptions opts;
@@ -476,7 +476,7 @@ static ampi *ampiInit(char **argv)
 #endif
         
         //Create and attach the ampiParent array
-	CkArrayID threads;
+        CkArrayID threads;
         opts=TCHARM_Attach_start(&threads,&_nchunks);
 	parent=CProxy_ampiParent::ckNew(new_world,threads,cinst, opts);
 	STARTUP_DEBUG("ampiInit> array size "<<_nchunks);
@@ -551,15 +551,22 @@ ampiParent::ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_, ComlibInstanceH
 
   thread->semaPut(AMPI_BARRIER_SEMAID,&barrier);
 }
+
 ampiParent::ampiParent(CkMigrateMessage *msg):CBase_ampiParent(msg) {
   thread=NULL;
   worldPtr=NULL;
   myDDT=&myDDTsto;
 }
+
 void ampiParent::pup(PUP::er &p) {
   ArrayElement1D::pup(p);
   p|threads;
   p|comlib;
+
+  if(p.isUnpacking())
+      comlib.setSourcePe();
+  comlib.setSourcePe();
+
   p|worldStruct;
   myDDT->pup(p);
   p|splitComm;
