@@ -4,7 +4,7 @@ extern int currTlineIdx;
 
 #define ALLTHREAD -1
 
-// the applicaiton name to simulate
+// the application name to simulate
 extern roarray<char, 1024>  appname;
 
 int Task::convertToInt(double inp) 
@@ -199,12 +199,13 @@ BGproc::BGproc(BGprocMsg *m)
 #endif
 
   //CkPrintf("bgProc %d has %d tasks\n", myHandle, tline.length());
-  taskList = new Task[tline.length()];
   numTasks = tline.length();
+  CmiAssert(numTasks>0);
+  taskList = new Task[tline.length()];
   int startEvt = 0;		// start event, to skip startup
   for(i=0;i<tline.length();i++) {
     taskList[i].convertFrom(tline[i],myHandle,numWth);
-    if (config.skip_on && tline[i]->isStartEvent()) { 
+    if (config.skip_on && tline[i]->isStartEvent() && startEvt== 0) { 
 	CmiAssert(procNum==0); 
 	startEvt = i; 
     }
@@ -227,7 +228,7 @@ BGproc::BGproc(BGprocMsg *m)
   if (procNum == 0) {
     TaskMsg *tm = new TaskMsg(-1,-1,startEvt);
     POSE_invoke(executeTask(tm), BGproc, myHandle, taskList[startEvt].startTime);
-    CkPrintf("Info> timing factor %e ...\n", factor);
+    CkPrintf("Info> timing factor %e ...\n", (double)factor);
     CkPrintf("Info> invoking startup task from proc 0 ...\n");
     if (config.skip_on)
       CkPrintf("Info> Skipping startup to %d/%d\n", startEvt, tline.length());
@@ -235,7 +236,10 @@ BGproc::BGproc(BGprocMsg *m)
 #if 1
     for (int i=startEvt; i<numTasks; i++) {
       if (!strcmp(taskList[i].name, "addMsg") ||
-          !strcmp(taskList[i].name, "AMPI_START"))  {
+          !strcmp(taskList[i].name, "AMPI_START"))  
+      {
+	// skip if it has any backward dependency
+        if (taskList[i].bDepsLen != 0) continue;
         TaskMsg *tm = new TaskMsg(taskList[i].taskID.srcNode,
 		       taskList[i].taskID.msgID,
 		       taskList[i].taskID.index,
@@ -274,20 +278,20 @@ void BGproc::pup(PUP::er &p)
 // Event methods
 void BGproc::executeTask(TaskMsg *m)
 {
-  /*
+/*
   CkPrintf("[%d Received TaskID: %d %d %d]\n", procNum, m->taskID.srcNode,
-	   m->taskID.msgID, m->taskID.index, parent->thisIndex);
-  parent->CommitPrintf("Received %d from %d on %d\n", m->taskID.msgID, 
-		       m->taskID.srcNode, parent->thisIndex);
-  */
+	   m->taskID.msgID, m->taskID.index, locateTask(m->taskID));
+  parent->CommitPrintf("Received %d from %d on %d at %d\n", m->taskID.msgID, 
+		       m->taskID.srcNode, parent->thisIndex, ovt);
+*/
 //  CmiAssert(done[locateTask(m->taskID)] == 0);
   int taskLoc = locateTask(m->taskID);
   if (taskLoc == -1) return; // user was warned in locateTask
   if (done[taskLoc] == 1) {
     char str[1024];
-    sprintf(str, "[%d] Event %d '%s' already done!\n", procNum, taskLoc, taskList[taskLoc].name);
+    sprintf(str, "[%d] Event #%d '%s' already done!\n", procNum, taskLoc, taskList[taskLoc].name);
     parent->CommitError(str);
-    //    CkPrintf("POTENTIALLY: [%d] Event %d '%s' already done! %d %d %d at %d evID=", procNum, taskLoc, taskList[taskLoc].name, m->taskID.srcNode, m->taskID.msgID, m->taskID.index, m->timestamp); m->evID.dump(); CkPrintf("\n");
+    CkPrintf("POTENTIAL ERROR: [%d] Event %d '%s' already done! %d %d %d at %d evID=", procNum, taskLoc, taskList[taskLoc].name, m->taskID.srcNode, m->taskID.msgID, m->taskID.index, m->timestamp); m->evID.dump(); CkPrintf("\n");
     return;
   }
 
@@ -400,10 +404,17 @@ void BGproc::enableGenTasks(TaskID* taskID, int oldStartTime, int newStartTime)
       }
     }
     else CkPrintf("ERROR: enableGenTasks: bad destNodeCode %d\n",destNodeCode);
+/*
+    tm = &generatedTasks[i];
+    POSE_TimeType recvTime = tm->receiveTime;	// store old value
+*/
     tm = new TaskMsg();
     *tm = generatedTasks[i];
     tm->receiveTime = newStartTime + taskOffset;
     SendMessage(tm, myNode, srcSwitch, destNodeCode, destTID, taskOffset);
+/*
+    tm->receiveTime = recvTime;    // we can not change it
+*/
     delete tm;
   }
 }
@@ -499,7 +510,8 @@ void BGproc::executeTask_anti(TaskMsg *m)
   restore(this);
   if (usesAntimethods()) {
     int taskLoc = locateTask(m->taskID);
-    //    CmiPrintf("[%d] executeTask_anti %d for %d %d %d\n", procNum, taskLoc, m->taskID.srcNode, m->taskID.msgID, m->taskID.index);
+    CmiAssert(taskLoc >= 0);
+    //CmiPrintf("[%d] executeTask_anti %d for %d %d %d\n", procNum, taskLoc, m->taskID.srcNode, m->taskID.msgID, m->taskID.index);
     done[taskLoc] = 0;
   }
 }

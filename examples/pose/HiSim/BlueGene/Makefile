@@ -46,12 +46,12 @@ MACHINE = BlueGene
 all:
 	@echo
 	for i in $(SUBDIRS) ; do \
-	( cd $$i ; make $(MACHINE) MACHINE="../$(MACHINE)" ) ; \
+	( cd $$i ; make $(MACHINE) MACHINE="../$(MACHINE)" ) || exit 1; \
 	done
 
 	$(CHARMC) -o InitNetwork.o -seq InitNetwork.C -I../Main -I./
 	$(CHARMC) -o util.o -seq util.C
-	cp *.o ../tmp
+	test -d ../tmp || mkdir ../tmp; cp *.o ../tmp
 
 	cd ../tmp;$(CHARMC) *.o $(OTHER) $(LIBS) -o $(PGM) -lpose -ltrace-projections -language charm++ -module commlib
 

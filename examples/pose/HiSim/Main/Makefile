@@ -49,7 +49,7 @@ OB: $(PGM).o
 
 $(PGM).o :  $(SIM_OBJECTS)	$(PGM).C $(PGM).h $(PGM_MODULE).def.h $(PGM_MODULE).decl.h
 	$(CHARMC) -c -I$(CHARMINC) $(INCLUDES) $(LIBS) $(PGM).C -I$(MACHINE)
-	cp *.o ../tmp
+	test -d ../tmp || mkdir ../tmp; cp *.o ../tmp
  
 $(PGM_MODULE).def.h $(PGM_MODULE).decl.h : $(PGM).ci
 	$(CHARMC) $(INCLUDES) $(LIBS) $(PGM).ci -I$(MACHINE)
