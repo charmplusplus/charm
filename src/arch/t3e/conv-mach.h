@@ -91,7 +91,7 @@
 #define CMK_DONT_USE_HP_MAIN_FIX                           0
 
 #define NODE_0_IS_CONVHOST                                 1
-#define CMK_DEBUG_MODE                                     1
+#define CMK_DEBUG_MODE                                     0
 #define CMK_WEB_MODE                                       1
 
 
