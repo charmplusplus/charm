@@ -10,11 +10,11 @@ class edge {
  public:
   int pending, newNodeIdx;
   double length;
-  elemRef waitingFor;
+  elemRef waitingFor, delNbr, keepNbr;
   node newNode, incidentNode, fixNode;
   edgeRef newEdgeRef; // half of this edge: from newNode to incidentNode
   chunk *C;
-  edgeRef myRef;
+  edgeRef myRef, keepEdge, delEdge;
   elemRef elements[2];  // the elements on either side of the edge
   int present;  // indicates this is an edge present in the mesh
   edge() { unsetPending(); present = 0; }
@@ -33,6 +33,10 @@ class edge {
     newNodeIdx = e.newNodeIdx;
     C = e.C;
     waitingFor = e.waitingFor;
+    keepNbr = e.keepNbr;
+    delNbr = e.delNbr;
+    keepEdge = e.keepEdge;
+    delEdge = e.delEdge;
     newNode = e.newNode;
     incidentNode = e.incidentNode;
     fixNode = e.fixNode;
@@ -53,6 +57,10 @@ class edge {
     newNodeIdx = e.newNodeIdx;
     C = e.C;
     waitingFor = e.waitingFor;
+    keepNbr = e.keepNbr;
+    delNbr = e.delNbr;
+    keepEdge = e.keepEdge;
+    delEdge = e.delEdge;
     newNode = e.newNode;
     incidentNode = e.incidentNode;
     fixNode = e.fixNode;
@@ -83,11 +91,13 @@ class edge {
   void checkPending(elemRef e, elemRef ne);
   int split(int *m, edgeRef *e_prime, node iNode, node fNode,
 	    elemRef requester, int *local, int *first, int *nullNbr);
-  int collapse(elemRef requester, node kNode, node dNode);
+  int collapse(elemRef requester, node kNode, node dNode, elemRef kNbr,
+	       elemRef dNbr, edgeRef kEdge, edgeRef dEdge, int *local, 
+	       int *first);
   void sanityCheck(chunk *c, edgeRef shouldRef);
   int nodeLockup(node n, edgeRef start, elemRef from, elemRef end, double l);
   int nodeUpdate(node n, elemRef from, elemRef end, node newNode);
-  int nodeDelete(node n, elemRef from, elemRef end);
+  int nodeDelete(node n, elemRef from, elemRef end, node ndReplace);
 };
 
 #endif

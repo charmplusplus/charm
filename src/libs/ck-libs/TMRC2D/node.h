@@ -39,7 +39,7 @@ class node {  // a 2D double coordinate
   }
   void setBorder() { border = 1; }
   void reset() { 
-    x = -1.0; y = -1.0;  theLock = reports = border = 0;
+    theLock = reports = border = 0;
     sumReports[0] = sumReports[1] = 0.0; present = 0;
   }
   int operator==(const node& n) { return ((x == n.x) && (y == n.y)); }

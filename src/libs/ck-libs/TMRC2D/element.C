@@ -190,7 +190,8 @@ void element::collapse(int shortEdge)
                         nbr                      */  
 
   int opnode, delNode, keepNode, delEdge, keepEdge, result;
-  elemRef delNbr;
+  elemRef keepNbr, delNbr;
+  int local, first, flag;
 
   if (edges[shortEdge].isPending(myRef)) {
   }
@@ -206,12 +207,20 @@ void element::collapse(int shortEdge)
   delEdge = opnode;
   keepEdge = (shortEdge + 1) % 3;
   keepNode = keepEdge;
+  
+  keepNbr = edges[keepEdge].getNbr(myRef);
+  delNbr = edges[delEdge].getNbr(myRef);
+  node newNode = 
+    C->theNodes[nodes[keepNode]].midpoint(C->theNodes[nodes[delNode]]);
 
-  if ((result=edges[shortEdge].collapse(myRef, C->theNodes[nodes[keepNode]],
-					C->theNodes[nodes[delNode]])) == 1) {
+  result = edges[shortEdge].collapse(myRef, C->theNodes[nodes[keepNode]],
+				     C->theNodes[nodes[delNode]], keepNbr,
+				     delNbr, edges[keepEdge], edges[delEdge], 
+				     &local, &first);
+  if (result == 1) {
     // collapse successful; keepNode is node to keep
     // tell delNbr to replace delEdge with keepEdge
-    delNbr = edges[delEdge].getNbr(myRef);
+    CkPrintf("In collapse[%d](a) shortEdge=%d delEdge=%d keepEdge=%d opnode=%d delNode=%d keepNode=%d delNbr=%d keepNbr=%d\n", myRef.idx, edges[shortEdge].idx, edges[delEdge].idx, edges[keepEdge].idx, nodes[opnode], nodes[delNode], nodes[keepNode], delNbr.idx, keepNbr.idx);
     if (delNbr.cid != -1)
       mesh[delNbr.cid].updateElementEdge(delNbr.idx, edges[delEdge], 
 					 edges[keepEdge]);
@@ -223,6 +232,12 @@ void element::collapse(int shortEdge)
     edges[delEdge].remove();
     // edge[shortEdge] handles removal of delNode and shortEdge, as well as
     // update of keepNode
+    if (local && first) flag = LOCAL_FIRST;
+    if (local && !first) flag = LOCAL_SECOND;
+    if (!local && first) flag = BOUND_FIRST;
+    if (!local && !first) flag = BOUND_SECOND;
+    C->theClient->collapse(myRef.idx, shortEdge, keepNode, newNode.X(), 
+			   newNode.Y(), flag);
   }
   else if (result == 0) {
     // collapse successful, but first half of collapse decided to keep delNode
@@ -232,7 +247,9 @@ void element::collapse(int shortEdge)
     delEdge = (shortEdge + 1) % 3;
     delNode = delEdge;
     // tell delNbr to replace delEdge with keepEdge
+    keepNbr = edges[keepEdge].getNbr(myRef);
     delNbr = edges[delEdge].getNbr(myRef);
+    CkPrintf("In collapse[%d](b) shortEdge=%d delEdge=%d keepEdge=%d opnode=%d delNode=%d keepNode=%d delNbr=%d keepNbr=%d\n", myRef.idx, edges[shortEdge].idx, edges[delEdge].idx, edges[keepEdge].idx, nodes[opnode], nodes[delNode], nodes[keepNode], delNbr.idx, keepNbr.idx);
     if (delNbr.cid != -1)
       mesh[delNbr.cid].updateElementEdge(delNbr.idx, edges[delEdge], 
 					 edges[keepEdge]);
@@ -244,6 +261,12 @@ void element::collapse(int shortEdge)
     edges[delEdge].remove();
     // edge[shortEdge] handles removal of delNode and shortEdge, as well as
     // update of keepNode
+    if (local && first) flag = LOCAL_FIRST;
+    if (local && !first) flag = LOCAL_SECOND;
+    if (!local && first) flag = BOUND_FIRST;
+    if (!local && !first) flag = BOUND_SECOND;
+    C->theClient->collapse(myRef.idx, shortEdge, keepNode, newNode.X(), 
+			   newNode.Y(), flag);
   }
 }
 
@@ -296,20 +319,42 @@ int element::nodeUpdate(node n, edgeRef from, elemRef end, node newNode)
   return im->anInt;
 }
 
-int element::nodeDelete(node n, edgeRef from, elemRef end)
+int element::nodeDelete(node n, edgeRef from, elemRef end, node ndReplace)
 {
-  int nIdx, fIdx, nextIdx;
+  int nIdx = -1, fIdx, nextIdx;
   for (int i=0; i<3; i++) {
     if (n == C->theNodes[nodes[i]]) nIdx = i;
     if (from == edges[i]) fIdx = i;
   }
+  int found = 0;
+  for (int j=0; j<C->nodeSlots; j++)
+    if (C->theNodes[j] == ndReplace) {
+      if (nIdx == -1) {
+	if (nodes[0] == j) nIdx = 0;
+	else if (nodes[1] == j) nIdx = 1;
+	else if (nodes[2] == j) nIdx = 2;
+      }
+      CkAssert((nIdx > -1) && (nIdx < 3));
+      found = 1;
+      CkPrintf("TMRC2D: about to remove node %d\n", nodes[nIdx]);
+      C->removeNode(nodes[nIdx]);
+      nodes[nIdx] = j;
+      break;
+    }
+  CkAssert((nIdx > -1) && (nIdx < 3));      
+  CkAssert((fIdx > -1) && (fIdx < 3));
   C->theNodes[nodes[nIdx]].unlock();
-  C->removeNode(nIdx);
+  if (!found) {
+    CkPrintf("TMRC2D: about to replace node %d\n", nodes[nIdx]);
+    C->theNodes[nodes[nIdx]] = ndReplace;
+  }
   if (myRef == end) return 1;
   if (nIdx == fIdx) nextIdx = (nIdx + 2) % 3;
   else nextIdx = nIdx;
+  CkPrintf("TMRC2D: In element[%d]::nodeDelete: from=%d nodes[nIdx]=%d fIdx=%d nextIdx=%d\n", 
+	   myRef.idx, from.idx, nodes[nIdx], fIdx, nextIdx);
   edgeRef nextRef = edges[nextIdx];
-  intMsg *im = mesh[nextRef.cid].nodeDeleteER(nextRef.idx, n, myRef, end);
+  intMsg *im = mesh[nextRef.cid].nodeDeleteER(nextRef.idx, n, myRef, end, ndReplace);
   return im->anInt;
 }
 
@@ -335,8 +380,8 @@ int element::findShortestEdge()
   double minlen, len[3];
   // fine lengths of sides
   minlen = len[0] = C->theNodes[nodes[0]].distance(C->theNodes[nodes[1]]);
-  len[1] = C->theNodes[nodes[0]].distance(C->theNodes[nodes[2]]);
-  len[2] = C->theNodes[nodes[1]].distance(C->theNodes[nodes[2]]);
+  len[1] = C->theNodes[nodes[1]].distance(C->theNodes[nodes[2]]);
+  len[2] = C->theNodes[nodes[2]].distance(C->theNodes[nodes[0]]);
   for (i=1; i<3; i++) // find min length of a side
     if (len[i] < minlen) {
       shortEdge = i;

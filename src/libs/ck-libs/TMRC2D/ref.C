@@ -42,13 +42,18 @@ int edgeRef::split(int *m, edgeRef *e_prime, node iNode, node fNode,
   return result;
 }
 
-int edgeRef::collapse(elemRef requester, node kNode, node dNode)
+int edgeRef::collapse(elemRef requester, node kNode, node dNode, elemRef kNbr, 
+		      elemRef dNbr, edgeRef kEdge, edgeRef dEdge, int *local, 
+		      int *first)
 {
-  intMsg *im;
+  splitOutMsg *som;
   int result;
-  im = mesh[cid].collapse(idx, requester, kNode, dNode);
-  result = im->anInt;
-  CkFreeMsg(im);
+  som = mesh[cid].collapse(idx, requester, kNode, dNode, kNbr, dNbr, kEdge, 
+			  dEdge);
+  *local = som->local;
+  *first = som->first;
+  result = som->result;
+  CkFreeMsg(som);
   return result;
 }
 

@@ -75,8 +75,6 @@ class chunk : public TCharmClient1D {
   int sizeElements, sizeEdges, sizeNodes;
   // first empty slot in each mesh array
   int firstFreeElement, firstFreeEdge, firstFreeNode;
-  // range of occupied slots in each mesh array
-  int elementSlots, edgeSlots, nodeSlots;
 
   void setupThreadPrivate(CthThread forThread) {
     CtvAccessOther(forThread, _refineChunk) = this;
@@ -113,6 +111,8 @@ class chunk : public TCharmClient1D {
   // edges, and nodes located on this chunk; numGhosts is numElements
   // plus number of ghost elements surrounding this chunk
   int cid, numElements, numEdges, numNodes, numGhosts, numChunks;
+  // range of occupied slots in each mesh array
+  int elementSlots, edgeSlots, nodeSlots;
 
   refineResults *refineResultsStorage;
   coarsenResults *coarsenResultsStorage;
@@ -156,7 +156,8 @@ class chunk : public TCharmClient1D {
   void setBorder(int n);
   intMsg *safeToMoveNode(int idx, double x, double y);
   splitOutMsg *split(int idx, elemRef e, node in, node fn);
-  intMsg *collapse(int idx, elemRef e, node kn, node dn);
+  splitOutMsg *collapse(int idx, elemRef e, node kn, node dn, elemRef kNbr, 
+		   elemRef dNbr, edgeRef kEdge, edgeRef dEdge);
   void collapseHelp(int idx, edgeRef er, node n1, node n2);
   intMsg *nodeLockup(int idx, node n, edgeRef from, edgeRef start, elemRef end,
 		     double l);
@@ -164,8 +165,10 @@ class chunk : public TCharmClient1D {
 		       elemRef end, double l);
   intMsg *nodeUpdate(int idx, node n, edgeRef from, elemRef end, node newNode);
   intMsg *nodeUpdateER(int idx, node n, elemRef from, elemRef end, node newNode);
-  intMsg *nodeDelete(int idx, node n, edgeRef from, elemRef end);
-  intMsg *nodeDeleteER(int idx, node n, elemRef from, elemRef end);
+  intMsg *nodeDelete(int idx, node n, edgeRef from, elemRef end, 
+		     node ndReplace);
+  intMsg *nodeDeleteER(int idx, node n, elemRef from, elemRef end, 
+		       node ndReplace);
   intMsg *isPending(int idx, objRef e);
   void checkPending(int idx, objRef aRef);
   void checkPending(int idx, objRef aRef1, objRef aRef2);
