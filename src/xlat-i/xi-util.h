@@ -9,23 +9,12 @@
 #define _XI_UTIL_H
 
 #include <string.h>
-//Jay, this include may cause problems--
-//not all compilers support ISO C++ include files (OSL, 4/3/2000)
-//  #include <string>
-//  using std::string;//<- and not all compilers support namespaces
-
-#include <iostream.h>
+#include <iostream>
+using std::cout;
+using std::cerr;
+using std::endl;
 #include <stdlib.h>
 #include <stdio.h>
-
-/*HACK: Define bool as int; false as 0; true as 1.  
-This lets us compile on machines without a "bool" type.
-*/
-#ifndef bool
-# define bool int
-# define false 0
-# define true 1
-#endif
 
 #define SZ 1024
 
