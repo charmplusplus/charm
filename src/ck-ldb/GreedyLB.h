@@ -17,6 +17,7 @@
 #include "GreedyLB.decl.h"
 
 void CreateGreedyLB();
+BaseLB * AllocateGreedyLB();
 
 class GreedyLB : public CentralLB {
 

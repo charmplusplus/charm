@@ -57,13 +57,22 @@ ComboCentLB::ComboCentLB(const CkLBOptions &opt): CentralLB(opt)
 void ComboCentLB::work(CentralLB::LDStats* stats, int count)
 {
   int nlbs = clbs.length();
+  int n_objs = stats->n_objs;
+  int *from_orig = new int[n_objs];
+  int obj;
+
+  // stats->from_proc should remain untouched at end
+  for (obj=0; obj<n_objs; obj++) from_orig[obj] = stats->from_proc[obj];
+
   for (int i=0; i<nlbs; i++) {
     clbs[i]->work(stats, count);
     if (i!=nlbs-1) {
-      for (int obj=0; obj<stats->n_objs; obj++) 
+      for (obj=0; obj<stats->n_objs; obj++) 
         stats->from_proc[obj] = stats->to_proc[obj];
     }
   }
+
+  for (obj=0; obj<n_objs; obj++) stats->from_proc[obj] = from_orig[obj];
 }
 
 #include "ComboCentLB.def.h"
