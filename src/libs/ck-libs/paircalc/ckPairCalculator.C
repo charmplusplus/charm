@@ -1,5 +1,7 @@
 #include "ckPairCalculator.h"
 
+#define PARTITION_SIZE 500
+
 PairCalculator::PairCalculator(CkMigrateMessage *m) { }
 	
 PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int op1,  FuncType fn1, int op2,  FuncType fn2, CkCallback cb, CkGroupID gid) 
@@ -118,19 +120,42 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
 #endif
     numRecd = 0;
     int i, j, idxOffset;
+    
     if(symmetric && thisIndex.x == thisIndex.y) {
-      for (i = 0; i < grainSize; i++)
-	for (j = 0; j < grainSize; j++) 
-	  outData[i * grainSize + j] = compute_entry(size, inDataLeft[i],
-						     inDataLeft[j], op1);
+        int size1 = 0;
+        for(size1 = 0; size1 + PARTITION_SIZE < size; size1 += PARTITION_SIZE) {
+            for (i = 0; i < grainSize; i++)
+                for (j = 0; j < grainSize; j++) 
+                    outData[i * grainSize + j] += compute_entry(PARTITION_SIZE, inDataLeft[i]+size1,
+                                                                inDataLeft[j]+size1, op1);
+        }        
+        
+        if(size1 < size) {
+            int cur_size = size - size1;
+            for (i = 0; i < grainSize; i++)
+                for (j = 0; j < grainSize; j++) 
+                    outData[i * grainSize + j] += compute_entry(cur_size, inDataLeft[i]+size1,
+                                                               inDataLeft[j]+size1, op1);        
+        }
     }     
     else {                                                        
       // compute a square region of the matrix. The correct part of the
       // region will be used by the reduction.
-      for (i = 0; i < grainSize; i++)
-	for (j = 0; j < grainSize; j++) 
-	  outData[i * grainSize + j] = compute_entry(size, inDataLeft[i],
-						     inDataRight[j], op1);
+        int size1 = 0;
+        for(size1 = 0; size1 + PARTITION_SIZE < size; size1 += PARTITION_SIZE) {
+            for (i = 0; i < grainSize; i++)
+                for (j = 0; j < grainSize; j++) 
+                    outData[i * grainSize + j] += compute_entry(PARTITION_SIZE, inDataLeft[i]+size1,
+                                                               inDataRight[j]+size1, op1);      
+        }
+
+        if(size1 < size) {
+            int cur_size = size - size1;
+            for (i = 0; i < grainSize; i++)
+                for (j = 0; j < grainSize; j++) 
+                    outData[i * grainSize + j] += compute_entry(cur_size, inDataLeft[i]+size1,
+                                                                inDataRight[j]+size1, op1);
+        }        
     }
 
     // FIXME: should do 'op2' here!!!
@@ -138,6 +163,7 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
    r.add((int)thisIndex.y, (int)thisIndex.x, (int)(thisIndex.y+grainSize-1), (int)(thisIndex.x+grainSize-1), (CkTwoDoubles*)outData);
     r.contribute(this, sparse_sum_TwoDoubles);
 
+    memset(outData, 0, sizeof(complex) * grainSize * grainSize);
   }
 }
 
@@ -177,13 +203,13 @@ PairCalculator::acceptResult(int size, complex *matrix, int rowNum, CkCallback c
     int iN=i*N;
     complex *newiNdata=&mynewData[iN];
     for (int j = 0; j < grainSize; j++){ 
-      if(matrix[iSindex + j].notzero())
-	{
-	  m = matrix[iSindex + j];
-	  for (int p = 0; p < N; p++)
-	    if(inDataLeft[j][p].notzero())
-	      newiNdata[p] += inDataLeft[j][p] * m;
-	}
+        //if(matrix[iSindex + j].notzero())
+        //  {
+        m = matrix[iSindex + j];
+        for (int p = 0; p < N; p++)
+            if(inDataLeft[j][p].notzero())
+                newiNdata[p] += inDataLeft[j][p] * m;
+        //}
     }
   }
   /*  this one reads better but takes twice as long
