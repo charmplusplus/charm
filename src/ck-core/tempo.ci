@@ -1,5 +1,5 @@
 module tempo  {
-  message [packed] TempoMessage;
+  message [varsize] TempoMessage;
 
   chare TempoChare
   {

@@ -10,22 +10,24 @@
 #define BARR_TAG   1026
 #define REDUCE_TAG 1027
 
+#define TempoAlign(x) (((x)+7)&~7)
+
 class TempoMessage : public ArrayMessage, public CMessage_TempoMessage
 {
   public:
     int tag1, tag2, length;
     void *data;
   
-    TempoMessage(void) { data = 0; length = 0; }
+    TempoMessage(void) { data = (char *)this + sizeof(TempoMessage); }
     TempoMessage(int t1, int t2, int l, void *d):tag1(t1),tag2(t2),length(l) {
-      data = malloc(l);
+      data = (char *)this + sizeof(TempoMessage);
       memcpy(data, d, l);
     }
-    ~TempoMessage() {
-      if(data) free(data);
+    static void *alloc(int msgnum, size_t size, int *sizes, int pbits) {
+      return CkAllocMsg(msgnum, size+sizes[0], pbits);
     }
-    static void *pack(TempoMessage *);
-    static TempoMessage *unpack(void *);
+    static void *pack(TempoMessage *in) { return (void *) in; }
+    static TempoMessage *unpack(void *in) { return new (in) TempoMessage; }
 };
 
 class Tempo 
