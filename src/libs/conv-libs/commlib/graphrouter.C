@@ -30,11 +30,12 @@ void GraphRouter::init(int n, int me, TopologyDescriptor *tp)
     recvExpected = new int[nstages];
     recvCount = new int[nstages];
 
-    bzero(stageComplete, nstages * sizeof(int));
-    bzero(recvCount, nstages *sizeof(int));
+    memset(stageComplete, 0, nstages * sizeof(int));
+    memset(recvCount, 0, nstages * sizeof(int));
+    
     for(int count = 1; count < nstages; count++)
         recvExpected[count] = tp->getNumMessagesExpected(count);
-
+    
     curStage = 0;
     ComlibPrintf("me=%d NUMPES=%d nstages=%d\n", MyPe, n, nstages);
 }
