@@ -258,12 +258,12 @@ Type		: SimpleType
 		{ $$ = $1; }
 		| FuncType
 		{ $$ = $1; }
-		| Type '[' ArrayDim ']'
-		{ $$ = new ArrayType($1,$3); }
 		| Type '&'
 		{ $$ = new ReferenceType($1); }
 /*		| CONST Type   ...Causes ambiguity somehow...
 		{ $$ = new ConstType($2); }  */
+/*		| Type '[' ArrayDim ']' ...Not a valid C type string...
+		{ $$ = new ArrayType($1,$3); } */
 		;
 		
 ArrayDim	: NUMBER
@@ -526,7 +526,7 @@ CCode		: /* Empty */
 		{ $$ = ""; }
 		| CPROGRAM
 		{ $$ = $1; }
-		| CPROGRAM '[' CPROGRAM ']' CPROGRAM
+		| CPROGRAM '[' CCode ']' CCode
 		{  /*Returned only when in_bracket*/
 			char *tmp = new char[strlen($1)+strlen($3)+strlen($5)+3];
 			sprintf(tmp,"%s[%s]%s", $1, $3, $5);

@@ -1789,6 +1789,8 @@ void ParamList::print(XStr &str,int withDefaultValues)
 }
 void Parameter::print(XStr &str,int withDefaultValues) 
 {
+	if (arrLen!=NULL || type->isReference())
+		str<<"const ";
     	type->print(str);
     	if (arrLen!=NULL)
     		str<<"*";
