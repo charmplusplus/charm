@@ -261,7 +261,6 @@ CDECL int
 FEM_Mesh_get_length(int fem_mesh,int entity) {
 	const char *caller="FEM_Mesh_get_length"; FEMAPI(caller);
 	int len=FEM_Entity_lookup(fem_mesh,entity,caller)->size();
-	if (len==-1) return 0; //Special marker value-- shouldn't make it outside...
 	return len;
 }
 FORTRAN_AS_C_RETURN(int,
@@ -366,7 +365,7 @@ FORTRAN_AS_C_RETURN(int,
 void FEM_Mesh_data_layout(int fem_mesh,int entity,int attr, 	
   	void *data, int firstItem,int length, const IDXL_Layout &layout) 
 {
-	if (length==0) return;
+	// if (length==0) return;
 	const char *caller="FEM_Mesh_data";
 	FEMAPI(caller);
 	FEM_Mesh *m=FEM_Mesh_lookup(fem_mesh,caller);
@@ -501,7 +500,7 @@ void FEM_Attribute::bad(const char *field,bool forRead,int cur,int next,const ch
 
 
 FEM_Attribute::FEM_Attribute(FEM_Entity *e_,int attr_)
-		:e(e_),ghost(0),attr(attr_),width(-1),datatype(-1), allocated(false)
+		:e(e_),ghost(0),attr(attr_),width(0),datatype(-1), allocated(false)
 {
 	tryAllocate();
 }
@@ -516,7 +515,7 @@ FEM_Attribute::~FEM_Attribute() {}
 void FEM_Attribute::setLength(int next,const char *caller) {
 	int cur=getLength();
 	if (next==cur) return; //Already set--nothing to do 
-	if (cur!=-1) bad("length",false,cur,next, caller);
+	if (cur>0) bad("length",false,cur,next, caller);
 	e->setLength(next);
 	tryAllocate();
 }
@@ -524,7 +523,7 @@ void FEM_Attribute::setLength(int next,const char *caller) {
 void FEM_Attribute::setWidth(int next,const char *caller) {
 	int cur=getWidth();
 	if (next==cur) return; //Already set--nothing to do 
-	if (cur!=-1) bad("width",false,cur,next, caller);
+	if (cur>0) bad("width",false,cur,next, caller);
 	width=next;
 	tryAllocate();
 	if (ghost) ghost->setWidth(width,caller);
@@ -552,12 +551,12 @@ void FEM_Attribute::set(const void *src, int firstItem,int length,
 			CmiAbort("FEM_Mesh_data: unexpected firstItem");
 	}
 
-	if (getLength()==-1) setLength(length);
+	if (getLength()==0) setLength(length);
 	else if (length!=1 && length!=getLength()) 
 		bad("length",false,getLength(),length, caller);
 	
 	int width=layout.width;
-	if (getWidth()==-1) setWidth(width);
+	if (getWidth()==0) setWidth(width);
 	else if (width!=getWidth()) 
 		bad("width",false,getWidth(),width, caller);
 	
@@ -594,7 +593,7 @@ void FEM_Attribute::register_data(void *user, int length,int max,
 	const IDXL_Layout &layout, const char *caller){
 	
 		int width=layout.width;
-		if (getWidth()==-1){
+		if (getWidth()==0){
 			setWidth(width);
 		}else{
 			if (width!=getWidth()){
@@ -616,7 +615,7 @@ void FEM_Attribute::register_data(void *user, int length,int max,
 //Check if all three of length, width, and datatype are set.
 // If so, call allocate.
 void FEM_Attribute::tryAllocate(void) {
-	if ((!allocated) && getLength()!=-1 && getWidth()!=-1 && getDatatype()!=-1) {
+	if ((!allocated) && getLength()!=0 && getWidth()!=0 && getDatatype()!=-1) {
 		allocated=true;
 		allocate(getMax(),getWidth(),getDatatype());
 	}
@@ -902,7 +901,7 @@ CDECL const char *FEM_Get_entity_name(int entity,char *storage)
 }
 
 FEM_Entity::FEM_Entity(FEM_Entity *ghost_) //Default constructor
-	:length(-1), max(-1),ghost(ghost_), coord(0), sym(0), globalno(0), 
+	:length(0), max(0),ghost(ghost_), coord(0), sym(0), globalno(0), 
 	 ghostIDXL(ghost?&ghostSend:NULL, ghost?&ghost->ghostRecv:NULL),resize(NULL)
 {
 	//No attributes initially
@@ -1024,7 +1023,7 @@ void FEM_Entity::copyEntity(int dstEntity,const FEM_Entity &src,int srcEntity) {
 /// Add room for one more entity, with initial values from src[srcEntity],
 /// and return the new entity's index.
 int FEM_Entity::push_back(const FEM_Entity &src,int srcEntity) {
-	int dstEntity=size(); if (dstEntity<0) dstEntity=0; //length starts out at -1!
+	int dstEntity=size();
 	setLength(dstEntity+1);
 	copyEntity(dstEntity,src,srcEntity);
 	return dstEntity;

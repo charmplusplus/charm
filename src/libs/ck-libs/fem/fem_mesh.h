@@ -338,13 +338,13 @@ public:
 	/// Return our attribute code
 	inline int getAttr(void) const {return attr;}
 	
-	/// Return the number of rows in our table of data (-1 if unknown).
+	/// Return the number of rows in our table of data (0 if unknown).
 	/// This value is obtained directly from our owning Entity.
 	int getLength(void) const;
 
 	int getMax();
 	
-	/// Return the number of columns in our table of data (-1 if unknown)
+	/// Return the number of columns in our table of data (0 if unknown)
 	inline int getWidth(void) const { return width; }
 	
 	/// Return our FEM_* datatype (-1 if unknown)
