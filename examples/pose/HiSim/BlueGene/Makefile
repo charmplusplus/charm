@@ -34,7 +34,7 @@ OUTPUT_VCSELECTIONDIR = ../OutputVcSelection
 INPUT_VCSELECTIONDIR = ../InputVcSelection
 MAINDIR = ../Main
 SUBDIRS = $(MAINDIR) $(ROUTINGDIR) $(TOPOLOGYDIR) $(OUTPUT_VCSELECTIONDIR) $(INPUT_VCSELECTIONDIR)
-PGM = pgm
+PGM = BGHiSim
 OTHER = -lconv-bluegene-logs
 LIBS = -Lstdc++ -lm
 MACHINE = BlueGene
@@ -48,7 +48,7 @@ all:
 
 	make $(OBJDIR)/InitNetwork.o  $(OBJDIR)/util.o
 
-	cd ../tmp; /bin/rm -f moduleinit.o; $(CHARMC) *.o $(OTHER) $(LIBS) -o $(PGM) -lpose -ltrace-projections -language charm++ -module commlib
+	cd ../tmp; /bin/rm -f moduleinit.o; $(CHARMC) *.o $(OTHER) $(LIBS) -o $(PGM) -module pose -ltrace-projections -language charm++ -module commlib
 
 $(OBJDIR)/InitNetwork.o: InitNetwork.C
 	$(CHARMC) -o $@ -seq InitNetwork.C -I../Main -I./
