@@ -18,8 +18,6 @@ Status:
 
 #include <charm++.h>
 
-#if CMK_LBDB_ON
-
 #include "ComboCentLB.h"
 
 extern LBAllocFn getLBAllocFn(char *lbname);
@@ -69,8 +67,6 @@ void ComboCentLB::work(CentralLB::LDStats* stats, int count)
 }
 
 #include "ComboCentLB.def.h"
-
-#endif
 
 
 /*@}*/
