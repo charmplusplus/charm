@@ -1,4 +1,4 @@
-DIRS=tcharm armci collide netfem fem ampi mblock barrier \
+DIRS=tcharm armci collide netfem idxl fem ifem ampi mblock barrier \
 	multicast irecv liveViz liveViz3d taskGraph
 CHARMC=../../bin/charmc $(OPTS)
 
