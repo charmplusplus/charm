@@ -2627,10 +2627,10 @@ char *CmiGetNonLocalNodeQ()
 }
 #endif
 
-char *CmiGetNonLocal()
+void *CmiGetNonLocal(void)
 {
   CmiState cs = CmiGetState();
-  return (char *) PCQueuePop(cs->recv);
+  return (void *) PCQueuePop(cs->recv);
 }
 
 /******************************************************************************
@@ -2639,7 +2639,7 @@ char *CmiGetNonLocal()
  *
  *****************************************************************************/
 
-void CmiNotifyIdle()
+void CmiNotifyIdle(void)
 {
   struct timeval tv;
 #if CMK_SHARED_VARS_UNAVAILABLE
@@ -2899,15 +2899,14 @@ static void ConverseRunPE(int everReturn)
   char** CmiMyArgv;
   CmiNodeBarrier();
   cs = CmiGetState();
-  CpvInitialize(char *, internal_printf_buffer);
-  
+  CpvInitialize(char *, internal_printf_buffer);  
   CpvAccess(internal_printf_buffer) = (char *) malloc(PRINTBUFSIZE);
   _MEMCHECK(CpvAccess(internal_printf_buffer));
+  CpvInitialize(void *,CmiLocalQueue);
+  CpvAccess(CmiLocalQueue) = cs->localqueue;
   CmiMyArgv=CmiCopyArgs(Cmi_argv);
   CthInit(CmiMyArgv);
   ConverseCommonInit(CmiMyArgv);
-  CpvInitialize(void *,CmiLocalQueue);
-  CpvAccess(CmiLocalQueue) = cs->localqueue;
 
   /* better to show the status here */
   if (Cmi_netpoll == 1 && CmiMyPe() == 0)
