@@ -1091,7 +1091,12 @@ Do $CMK_CXX $OPTS_CPP $OPTS_CXX -c $modInitSrc -o $modInitObj
 
 Debug "About to perform final link..."
 
+if [ "$MAKELIBCHARM" = "1" ]
+then
+CORE_LIBS="-lconv-core -lconv-util $TRACE_OBJ "
+else
 CORE_LIBS="-lconv-core -lconv-util $TRACE_OBJ $MEM_OBJ "
+fi
 
 MAKE_LDXX="0"
 MAKE_LD="0"
