@@ -12,8 +12,8 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.6  1995-09-20 14:51:25  sanjeev
- * *** empty log message ***
+ * Revision 2.7  1995-09-21 16:39:22  sanjeev
+ * changes in message allocation
  *
  * Revision 2.0  1995/06/05  19:01:24  brunner
  * Reorganized directory structure
@@ -35,9 +35,9 @@
  *
  ***************************************************************************/
 static char ident[] = "@(#)$Header$";
-#include "xp-ytab.h"
-#include "xp-t.h"
-#include "xp-extn.h"
+#include "y.tab.h"
+#include "t.h"
+#include "externs.h"
 
 
 char *CheckSendError() ;
@@ -1269,7 +1269,7 @@ OutputNewChareMsg(char *name, char *arg, char *placement)
 		type = CHARE ;
 	else if ( FoundInChareTable(BOCTable,boccount+1,name) != -1 )
 		type = BRANCHED ;
-	else if ( FoundInMsgTable(name) != -1 )
+	else if ( FoundInMsgTable(name) != -1 ) 
 		type = MESSAGE ;
 	else if ( FoundInAccTable(AccTable,TotalAccs,name) != -1 ) 
 		type = ACCUMULATOR ;
@@ -1323,20 +1323,12 @@ OutputNewChareMsg(char *name, char *arg, char *placement)
 			fprintf(outfile,"_CK_CreateMono(_CK_mono_%s, %s, %s",name, arg, placement) ;
 	}
 	else { /* type == MESSAGE */
-		if ( arg != NULL ) 
-			fprintf(stderr,"ERROR : %s, line %d : arguments not supported for message creation\n",CurrentFileName,CurrentLine) ;
-
-		if ( placement == NULL || *placement=='\0' ) {
-			fprintf(outfile,"(%s *)GenericCkAlloc(_CK_%s._CK_msg_%s,sizeof(%s),0)", name, CoreName, name, name) ;
-		}
-		else { /* handle placement = "sizes, prio" */
-			fprintf(outfile,"(%s *)((ALLOCFNPTR)(CsvAccess(MsgToStructTable)[_CK_%s._CK_msg_%s].alloc))(_CK_%s._CK_msg_%s,sizeof(%s),", name, CoreName, name, CoreName, name, name) ;
-
-			if ( strchr(placement,',') != NULL ) /* sizes, prio */
-				fprintf(outfile,"%s)",placement) ;
-			else /* only sizes */
-				fprintf(outfile,"%s,0)",placement) ;
-		}
+		if ( placement == NULL || *placement=='\0' ) 
+			fprintf(outfile,"new (_CK_%s._CK_msg_%s) %s", CoreName, name, name) ;
+		else  /* handle placement = "sizes, prio" */
+			fprintf(outfile,"new (_CK_%s._CK_msg_%s, %s) %s", CoreName, name, placement, name) ;
+		if ( arg != NULL && *arg!='\0' ) 
+			fprintf(outfile,"(%s",arg) ;
 	}
 }
 
