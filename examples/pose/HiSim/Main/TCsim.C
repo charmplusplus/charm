@@ -248,7 +248,8 @@ BGproc::BGproc(BGprocMsg *m)
 #if 1
     for (int i=startEvt; i<numTasks; i++) {
       if (!strcmp(taskList[i].name, "addMsg") ||
-          !strcmp(taskList[i].name, "AMPI_START"))  
+          !strcmp(taskList[i].name, "AMPI_START") ||
+          !strcmp(taskList[i].name, "AMPI_MIGRATE"))  
       {
 	// skip if it has any backward dependency
         if (taskList[i].bDepsLen != 0) continue;
@@ -823,7 +824,7 @@ void BGnode::recvIncomingMsg(TaskMsg *m)
   // 1) send message to one worker thread on this node
   // 2) send message to all worker threads on this node
   // 3) send messages to all but one worker threads on this node
-  elapse(2*CPU_OVERHEAD);
+  if (config.netsim_on) elapse(2*CPU_OVERHEAD);
   CmiAssert(m->destNode == myNodeIndex);
 
   int destNodeCode = m->destNodeCode;
