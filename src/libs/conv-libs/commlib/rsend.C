@@ -14,12 +14,6 @@
  *****************************************/
 #include "rsend.h"
 
-#define PERSISTENT_BUFSIZE 65536
-
-#ifndef NULL
-#define NULL 0
-#endif
-
 #define gmap(pe) {if (gpes) pe=gpes[pe];}
 
 RsendRouter::RsendRouter(int n, int me)

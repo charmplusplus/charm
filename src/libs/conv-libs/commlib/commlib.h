@@ -22,11 +22,13 @@ enum{BCAST=0,TREE, GRID, HCUBE, RSEND};
 #define MAXNUMSTRATEGY 10
 #define MSGSIZETHRESHOLD 5000000
 #define MAXBUFSIZE 65536
+#define PERSISTENT_BUFSIZE 131072
 
 typedef struct {
   int srcpe;
-  int ImplType;
-  int ImplIndex;
+  short ImplType;
+  short ImplIndex;
+  int callbackHandler;
   int SwitchVal;
   int NumMembers;
   CmiGroup grp;
@@ -42,8 +44,6 @@ class Router;
 
 /*************** Interface to the User **********************/
 void ComlibInit();
-
-void RegisterCallbackHandler(int handler);
 
 comID ComlibInstance(int ImplType, int numParticipants);
 void NumDeposits(comID  id, int num);

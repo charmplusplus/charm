@@ -31,8 +31,7 @@ Router * newtreeobject(int, int);
 Router * newhcubeobject(int, int);
 Router * newrsendobject(int, int);
 Router * newbcastobject(int, int);
-
-int callBackHandler;
+Router * newgraphobject(int, int);
 
 /********************************************
  * Internal utility functions
@@ -96,21 +95,21 @@ void ComlibInit()
   CpvAccess(ImplTable)=(Overlapper ***) CmiAlloc(sizeof(Overlapper *)*CmiNumPes());
   
   for (int i=0;i<CmiNumPes();i++) {
-	CpvAccess(ImplTable)[i]=NULL;
-	//CpvAccess(ImplTable)[i]=(Overlapper **) CmiAlloc(sizeof(Overlapper *)*MAXINSTANCE);
-        //for (int j=0;j<MAXINSTANCE;j++) CpvAccess(ImplTable)[i][j]=0;
+      CpvAccess(ImplTable)[i]=NULL;
   }
+  
   ComlibRegisterStrategy(newbcastobject);
   ComlibRegisterStrategy(newtreeobject);
   ComlibRegisterStrategy(newgridobject);
   ComlibRegisterStrategy(newhcubeobject);
   ComlibRegisterStrategy(newrsendobject);
   ComlibRegisterStrategy(newd3gridobject);
+  ComlibRegisterStrategy(newgraphobject);
 }
 
 Router * GetStrategyObject(int n, int me, int indx)
 {
-  return((CpvAccess(StrategyTable)[indx])(n, me));
+    return((CpvAccess(StrategyTable)[indx])(n, me));
 }
 
 //comID CreateInstance(int ImplType, int numpart)
@@ -121,6 +120,8 @@ comID ComlibInstance(int ImplType, int numpart)
   id.ImplIndex=CpvAccess(ImplIndex);
   id.srcpe=CmiMyPe();
   id.SwitchVal=-1;
+  id.callbackHandler = 0;
+
   id.NumMembers=numpart;
   UpdateImplTable(id);
 
@@ -133,9 +134,6 @@ comID ComlibEstablishGroup(comID id, int npes, int *pes)
   id.NumMembers=-1;
   id.grp=CmiEstablishGroup(npes, pes);
   UpdateImplTable(id);
-  
-  //int gnpe, *gpes = NULL;
-  //CmiLookupGroup(id.grp, &gnpe, &gpes); // Permanent memory locations
   
   CpvAccess(ImplTable)[id.srcpe][id.ImplIndex]->GroupMap(npes, pes);
   CpvAccess(ImplTable)[id.srcpe][id.ImplIndex]->SetID(id);
@@ -248,17 +246,13 @@ int KMyActiveRefno(comID id)
   return(CpvAccess(ImplTable)[id.srcpe][id.ImplIndex]->MyActiveIndex());
 }
 
-void RegisterCallbackHandler(int handle){
-    callBackHandler = handle;
-}
-
 void KDoneEP(DummyMsg *m)
 {
   comID id=m->id;
   CpvAccess(ImplTable)[id.srcpe][id.ImplIndex]->Done();
   
-  if(callBackHandler != 0) {
-      CmiSetHandler(m, callBackHandler);
+  if(id.callbackHandler != 0) {
+      CmiSetHandler(m, id.callbackHandler);
       CmiSyncSendAndFree(CmiMyPe(), sizeof(DummyMsg), m);
   }
   else 

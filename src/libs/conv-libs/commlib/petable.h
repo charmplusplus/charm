@@ -12,7 +12,7 @@
 #define NULL 0
 #endif
 
-#define MSGQLEN 500
+#define MSGQLEN 32
 
 typedef struct ptinfo {
   int refCount;
@@ -61,12 +61,12 @@ class PeTable {
 	~PeTable();
 	void InsertMsgs(int npe, int *pelist, int nmsgs, void **msglist);
 	void InsertMsgs(int npe, int *pelist, int size, void *msg);
-	int ExtractMsgs(int npe, int *pelist, int *nmsgs, void **msglist);
+	//int ExtractMsgs(int npe, int *pelist, int *nmsgs, void **msglist);
 	void ExtractAndDeliverLocalMsgs(int pe);
 	int UnpackAndInsert(void *in);
 	char * ExtractAndPack(comID, int, int, int *pelist, int *length);
-	int ExtractAsVector(comID, int, int, int *, int **, char ***) 
-			{ return(0);}
+	//int ExtractAsVector(comID, int, int, int *, int **, char ***) 
+        //	{ return(0);}
 	void GarbageCollect();
 	void Purge();
 };

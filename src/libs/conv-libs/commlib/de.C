@@ -18,7 +18,9 @@
 
 /**The only communication op used. Modify this to use
  ** vector send */
-//CmiPrintf("[%d]DE sending message of size %d to %d\n", CmiMyPe(), len, knextpe); 
+
+//if(CmiMyPe() == 0) \
+//CmiPrintf("[%d]DE sending message of size %d to %d\n", CmiMyPe(), len, knextpe); \
 
 #define HCUBESENDFN(kid, u1, u2, knpe, kpelist, khndl, knextpe)  \
   	{int len;\

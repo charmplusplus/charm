@@ -13,11 +13,6 @@
  * Grid (mesh) based router
  ***********************************************************/
 #include "gridrouter.h"
-//#include "globals.h"
-
-//#define NULL 0
-
-#define PERSISTENT_BUFSIZE 65536
 
 #define gmap(pe) {if (gpes) pe=gpes[pe];}
 
@@ -158,12 +153,8 @@ void GridRouter::EachToManyMulticast(comID id, int size, void *msg, int numpes, 
 {
   int i;
   static int step = 0;
-
-  //Buffer the message
-  if (size) {
-  	PeMesh->InsertMsgs(numpes, destpes, size, msg);
-  }
-
+  PeMesh->InsertMsgs(numpes, destpes, size, msg);
+  
   if (more) return;
 
   ComlibPrintf("All messages received %d %d\n", MyPe, COLLEN);
@@ -220,48 +211,48 @@ void GridRouter::RecvManyMsg(comID id, char *msg)
 {
   static int step = 0;
   if (msg)
-    PeMesh->UnpackAndInsert(msg);
+      PeMesh->UnpackAndInsert(msg);
 
   recvCount++;
   if (recvCount == recvExpected) {
-    step ++;
-    ComlibPrintf("%d recvcount=%d recvexpected = %d refno=%d\n", MyPe, recvCount, recvExpected, KMyActiveRefno(MyID));
-
-    int myrow=MyPe/COLLEN;
-    int mycol=MyPe%COLLEN;
-    
-    for (int rowcount= myrow; rowcount < COLLEN + myrow; rowcount++) {
-      int i = rowcount % COLLEN;
-      int nextrowrep=i*COLLEN;
-      int nextpe=nextrowrep+mycol;
+      step ++;
+      ComlibPrintf("%d recvcount=%d recvexpected = %d refno=%d\n", MyPe, recvCount, recvExpected, KMyActiveRefno(MyID));
       
-      ComlibPrintf("sending message %d %d %d\n", nextpe, NumPes, MyPe);
-
-      if (nextpe >= NumPes || nextpe==MyPe) continue;
-
-      int gnextpe = nextpe;
-      int *pelist=&gnextpe;
-
-      ComlibPrintf("Before gmap %d\n", nextpe);
-
-      gmap(nextpe);
-
-      ComlibPrintf("After gmap %d\n", nextpe);
-
-#if CMK_PERSISTENT_COMM
-      if(step % 2 == 1)
-          CmiUsePersistentHandle(&columnHandleArray[i], 1);
-      else
-          CmiUsePersistentHandle(&columnHandleArrayEven[i], 1);
-#endif          
+      int myrow=MyPe/COLLEN;
+      int mycol=MyPe%COLLEN;
       
-      GRIDSENDFN(MyID, 0, 1, 1, pelist, CpvAccess(ProcHandle), nextpe);
-
+      for (int rowcount= myrow; rowcount < COLLEN + myrow; rowcount++) {
+          int i = rowcount % COLLEN;
+          int nextrowrep=i*COLLEN;
+          int nextpe=nextrowrep+mycol;
+          
+          ComlibPrintf("sending message %d %d %d\n", nextpe, NumPes, MyPe);
+          
+          if (nextpe >= NumPes || nextpe==MyPe) continue;
+          
+          int gnextpe = nextpe;
+          int *pelist=&gnextpe;
+          
+          ComlibPrintf("Before gmap %d\n", nextpe);
+          
+          gmap(nextpe);
+          
+          ComlibPrintf("After gmap %d\n", nextpe);
+          
 #if CMK_PERSISTENT_COMM
-      CmiUsePersistentHandle(NULL, 0);
+          if(step % 2 == 1)
+              CmiUsePersistentHandle(&columnHandleArray[i], 1);
+          else
+              CmiUsePersistentHandle(&columnHandleArrayEven[i], 1);
 #endif          
-    }
-    LocalProcMsg();
+          
+          GRIDSENDFN(MyID, 0, 1, 1, pelist, CpvAccess(ProcHandle), nextpe);
+          
+#if CMK_PERSISTENT_COMM
+          CmiUsePersistentHandle(NULL, 0);
+#endif          
+      }
+      LocalProcMsg();
   }
 }
 
@@ -292,11 +283,10 @@ void GridRouter:: LocalProcMsg()
 
   if (LPMsgCount==LPMsgExpected) {
     //    CkPrintf("%d local procmsg called\n", MyPe);
-    PeMesh->Purge();
-    InitVars();
-    KDone(MyID);
+      PeMesh->Purge();
+      InitVars();
+      KDone(MyID);
   }
-
 }
 
 Router * newgridobject(int n, int me)
