@@ -248,11 +248,11 @@ static inline void _processRODataMsg(envelope *env)
 static void _initHandler(void *msg)
 {
   assert(CkMyPe()!=0);
-  CpvAccess(_numInitsRecd)++;
   CmiGrabBuffer(&msg);
   register envelope *env = (envelope *) msg;
   switch (env->getMsgtype()) {
     case BocInitMsg:
+      CpvAccess(_numInitsRecd)++;
       CpvAccess(_qd)->process();
       CpvAccess(_bocInitQ)->enq(msg);
       break;
@@ -261,11 +261,13 @@ static void _initHandler(void *msg)
       CpvAccess(_nodeBocInitQ)->enq(msg);
       break;
     case ROMsgMsg:
+      CpvAccess(_numInitsRecd)++;
       CpvAccess(_qd)->process();
       if(env->isPacked()) _unpackFn((void **)&env);
       _processROMsgMsg(env);
       break;
     case RODataMsg:
+      CpvAccess(_numInitsRecd)++;
       CpvAccess(_qd)->process();
       _numInitMsgs = env->getCount();
       _processRODataMsg(env);
