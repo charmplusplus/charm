@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.2  1995-09-14 18:41:43  gursoy
+ * Revision 2.3  1995-09-14 18:43:47  gursoy
+ * fixed the paranthesis error which showed up after the previous fix
+ *
+ * Revision 2.2  1995/09/14  18:41:43  gursoy
  * fixed a cpv wrong usage
  *
  * Revision 2.1  1995/09/07  21:26:02  jyelon
@@ -63,7 +66,7 @@ extern "C" void *CPlus_CallMonoInit(int id, void *msg) ;
 
 void CPlus_ChareExit()
 {
-	_CK_Object *temp = (_CK_Object *)CpvAccess(currentChareBlock)->chareptr) ;
+	_CK_Object *temp = (_CK_Object *)CpvAccess(currentChareBlock)->chareptr;
 	delete temp ;
 
         SetID_chare_magic_number(CpvAccess(currentChareBlock)->selfID,0) ;
