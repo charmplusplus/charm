@@ -29,7 +29,8 @@ applications with irregular domains, from elastic deformation problems to
 crack propagation to fluid flow.  Charm++ is a free message-passing parallel
 runtime system for machines from clusters of workstations to tightly-coupled
 SMPs.  The Charm++ FEM framework allows you to write a parallel FEM program,
-in C or Fortran 90, with minor additional effort over the serial version.
+in C or Fortran 90, that closely resembles a serial version but includes
+a few framework calls.
 Using the FEM framework also allows you to take advantage of all the
 features of Charm++, including run-time load balancing,  performance
 monitoring and visualization, and checkpoint/restart, with no additional
@@ -183,6 +184,9 @@ downloading the latest source version of Charm++ from
 {\tt version/tmp}, and type {\tt make FEM}.
 To compile a FEM program, pass the {\tt -language fem} (for C) or 
 {\tt -language femf} (for Fortran) option to {\tt charmc}.
+
+In a charm installation, see charm/version/pgms/charm++/fem/
+for several example and test programs.
 
 
 \section{FEM Framework API Reference}
@@ -593,9 +597,9 @@ which will automatically monitor the performance of your parallel program.
 If needed, the load balancer can ``migrate'' mesh chunks from heavily-loaded
 processors to more lightly-loaded processors, improving the load balance and
 speeding up the program.  For this to be useful, pass the \kw{+vpN} argument
-with a larger number of chunks \kw{N} than processors-- typically, between 4 and
-32 chunks per processor acheive a good trade-off between ability to load
-balance and communication overhead.  Because this is somewhat involved, you
+with a larger number of chunks \kw{N} than processors-- a few thousand
+finite elements per chunk acheives a good trade-off between overhead and
+ability to load balance.  Because this is somewhat involved, you
 may refrain from calling \kw{FEM\_Migrate} and migration will never take place.
 
 The runtime system can automatically move your thread stack to the new
