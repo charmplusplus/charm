@@ -1,92 +1,26 @@
-\documentclass[11pt]{article}
+\documentclass[10pt]{article}
+\usepackage{../pplmanual}
 
-\newif\ifpdf
-\ifx\pdfoutput\undefined
-  \pdffalse
-\else
-  \pdfoutput=1
-  \pdftrue
-\fi
-
-\ifpdf
-  \pdfcompresslevel=9
-  %\usepackage[pdftex,colorlinks=true,plainpages=false]{hyperref}
-\else
-\fi
-
-\usepackage{graphicx,calc}
-\usepackage{makeidx}
-\usepackage{alltt}
-
-\setcounter{topnumber}{2}
-\def\topfraction{1}
-\setcounter{bottomnumber}{1}
-\def\bottomfraction{1}
-\setcounter{totalnumber}{3}
-\def\textfraction{0.2}
-\def\floatpagefraction{0.8}
-
-\setlength{\parindent}{0.0in}
-\setlength{\parskip}{0.1in}
-\setlength{\textwidth}{6.5in}
-\setlength{\itemindent}{1in}
-\setlength{\textheight}{9.5in}
-\addtolength{\oddsidemargin}{0in}
-\addtolength{\topmargin}{-0.4in}
-
-\parskip 0.05in
-
-\newcommand{\internal}[1]{}
-\newcommand{\function}[1]{{\noindent{\textsf{\textbf{#1}}}\\}}
-\newcommand{\args}[1]{\hspace*{2em}{\textsf{#1}}\\}
-\newcommand{\param}[1]{{\textsf{#1}}}
-\newcommand{\kw}[1]{{\textsf{\textbf{#1}}}}
-\newcommand{\note}[1]{\noindent{(Note: {\em {#1}})}}
-
-\newcommand{\basea}{\renewcommand{\baselinestretch}{1.2}}
-\newcommand{\baseb}{\renewcommand{\baselinestretch}{1.0}}
-\newcommand{\mycomment}[1]{}
-
-\textwidth 6.4in
-\textheight 8.9in
-\topmargin -.4in
-\oddsidemargin 0.25in
-\evensidemargin 0.25in
-\parskip 0.1in
+\newcommand{\function}[1]{{\noindent{\textsf{#1}}\\}}
+\newcommand{\args}[1]{\hspace*{2em}{\texttt{#1}}\\}
+\newcommand{\param}[1]{{\texttt{#1}}}
+\newcommand{\kw}[1]{{\textsf{#1}}}
+\newcommand{\uw}[1]{{\textsl{#1}}}
 
 \makeindex
 
-\begin{document}
-
-\begin{titlepage}
-\begin{flushright}
-{\Large 
-  Parallel Programming Laboratory\\
-  University of Illinois at Urbana-Champaign\\
-}
-\end{flushright}
-\rule{\textwidth}{3pt}
-\vspace{\fill}
-\begin{flushright}
-\textsf{
- {\Huge Charm++\\ Finite Element Framework\\ Manual \\}
-}
-\end{flushright}
-\vspace{\fill}
+\title{Charm++\\ Finite Element Framework\\ Manual}
+\version{1.0}
+\credits{
 Initial version of Charm++ Finite Element Framework was developed
 by Milind Bhandarkar with inputs from Timothy Hinrichs and Kathikeyan
 Mahesh. The current version is almost completely rewritten by
 Orion Lawlor.
+}
 
-\rule{\textwidth}{3pt}
+\begin{document}
 
-\begin{flushright}
-{\large Version 1.0}
-\end{flushright}
-\end{titlepage}
-
-\tableofcontents
-\newpage
+\maketitle
 
 \section{Motivation}
 
@@ -104,13 +38,13 @@ effort.
 
 \section{Introduction/Terminology}
 
-A FEM program manipulates elements and nodes.  An element is a portion of
+A FEM program manipulates elements and nodes. An element is a portion of
 the problem domain, typically in the shape of a triangle, square, or hexagon
 in 2D; or tetrahedron or rectangular solid in 3D.  A node is a point in the
 domain.  An element knows which nodes surround it via the connectivity
 table, which lists adjacent nodes.
 
-\begin{figure}
+\begin{figure}[h]
 \begin{center}
 \includegraphics[width=4in]{simple_mesh}
 \end{center}
@@ -118,7 +52,7 @@ table, which lists adjacent nodes.
 \label{fig:simplemesh}
 \end{figure}
 
-\begin{table}
+\begin{table}[h]
 \begin{center}
 \begin{tabular}{||l||r|r|r||}\hline
 Element & \multicolumn{3}{c||}{Adjacent Nodes} \\\hline
@@ -151,7 +85,7 @@ even more).  During partitioning, we give nodes and elements new,
 chunk-local numbers.  Below, we partition the mesh above into two chunks, A
 and B.
 
-\begin{figure}
+\begin{figure}[h]
 \begin{center}
 \includegraphics[width=4in]{partitioned_mesh}
 \end{center}
@@ -159,7 +93,7 @@ and B.
 \label{fig:partitionedmesh}
 \end{figure}
 
-\begin{table}
+\begin{table}[h]
 \begin{center}
 \begin{tabular}{||l||r|r|r||}\hline
 Element & \multicolumn{3}{c||}{Adjacent Nodes} \\\hline
@@ -172,7 +106,7 @@ e2 & n1 & n2 & n4 \\
 \label{table:chunkA}
 \end{table}
 
-\begin{table}
+\begin{table}[h]
 \begin{center}
 \begin{tabular}{||l||r|r|r||}\hline
 Element & \multicolumn{3}{c||}{Adjacent Nodes}\\\hline
@@ -517,7 +451,7 @@ with shared nodes (for \kw{FEM\_Update\_Field}) and primary nodes (for
      \kw{dist} is the byte offset from the first node's data item to the
      second, a positive integer.
 
-\begin{figure}
+\begin{figure}[h]
 \begin{center}
 \includegraphics[width=4in]{create_field}
 \end{center}
