@@ -1133,21 +1133,22 @@ void CthInit(char **argv)
 #if CMK_THREADS_DEBUG
     CmiPrintf("[%d] heap=%p\tstack=%p\n",CmiMyPe(),heap,stack);
 #endif
-    /* FIXME: Portability for 64bit systems? */
-    /* FIXME: Assumes heap grows down */
     /* Align heap to a 1G boundary to leave space to grow */
-    CpvAccess(heapbdry) = (void *)(((size_t)heap+(1<<30))&(~((1<<30)-1)));
-    /* FIXME: Assumes stack grows up */
     /* Align stack to a 256M boundary  to leave space to grow */
+#ifdef QT_GROW_UP
+    CpvAccess(heapbdry) = (void *)(((size_t)heap-(1<<30))&(~((1<<30)-1)));
+    stackbdry = (void *)(((size_t)stack+(1<<28))&(~((1<<28)-1)));
+    numslots = (((size_t)CpvAccess(heapbdry)-(size_t)stackbdry)/stacksize)
+                 / CmiNumPes();
+#else
+    CpvAccess(heapbdry) = (void *)(((size_t)heap+(1<<30))&(~((1<<30)-1)));
     stackbdry = (void *)(((size_t)stack-(1<<28))&(~((1<<28)-1)));
+    numslots = (((size_t)stackbdry-(size_t)CpvAccess(heapbdry))/stacksize)
+                 / CmiNumPes();
+#endif
 #if CMK_THREADS_DEBUG
     CmiPrintf("[%d] heapbdry=%p\tstackbdry=%p\n",
               CmiMyPe(),CpvAccess(heapbdry),stackbdry);
-#endif
-    /* FIXME: assumes stackbdry > heapbdry, also assumes heapbdry as base */
-    numslots = (((size_t)stackbdry-(size_t)CpvAccess(heapbdry))/stacksize)
-                 / CmiNumPes();
-#if CMK_THREADS_DEBUG
     CmiPrintf("[%d] numthreads per pe=%d\n",CmiMyPe(),numslots);
 #endif
     CpvAccess(zerofd) = open("/dev/zero", O_RDWR);
@@ -1404,10 +1405,14 @@ CthThread CthPup(pup_er p, CthThread t)
   }
   pup_bytes(p, (void*)t->data, t->datasize);
 
-  /* FIXME: Assumption stackp < stackbase */
   stackbase = QT_SP(t->stack, CpvAccess(_stksize));
+#ifdef QT_GROW_UP
+  ssz = ((char*)(t->stackp)-(char*)(stackbase));
+  pup_bytes(p, (void*)stackbase, ssz);
+#else
   ssz = ((char*)(stackbase)-(char*)(t->stackp));
   pup_bytes(p, (void*)t->stackp, ssz);
+#endif
 
   if(pup_isDeleting(p))
   {
