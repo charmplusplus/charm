@@ -734,12 +734,20 @@ static double readMHz(void)
 
 double _cpu_speed_factor;
 CpvStaticDeclare(double, inittime_virtual);
+CpvStaticDeclare(double, inittime_walltime);
+
+double  CmiStartTimer(void)
+{
+  return CpvAccess(inittime_walltime);
+}
 
 void CmiTimerInit()
 {
   struct rusage ru;
   _cpu_speed_factor = 1.0/(readMHz()*1.0e6); 
   rdtsc(); rdtsc(); rdtsc(); rdtsc(); rdtsc();
+  CpvInitialize(double, inittime_walltime);
+  CpvAccess(inittime_walltime) = CmiWallTimer();
   CpvInitialize(double, inittime_virtual);
   getrusage(0, &ru); 
   CpvAccess(inittime_virtual) =

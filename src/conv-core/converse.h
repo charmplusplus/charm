@@ -472,10 +472,12 @@ static __inline__ unsigned long long int rdtsc(void)
 
 #define CmiWallTimer() ((double)rdtsc()*(_cpu_speed_factor))
 #define CmiTimer CmiCpuTimer
+double   CmiStartTimer(void);
 
 #else
 double   CmiTimer(void);
 double   CmiWallTimer(void);
+#define  CmiStartTimer()                (0.0)
 #endif
 
 #if CMK_NODE_QUEUE_AVAILABLE
