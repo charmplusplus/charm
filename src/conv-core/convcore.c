@@ -1184,7 +1184,7 @@ void CsdInit(argv)
 	CsvAccess(CsdNodeQueueLock) = CmiCreateLock();
 	CsvAccess(CsdNodeQueue) = (void *)CqsCreate();
   }
-  CmiNodeBarrier();
+  CmiNodeAllBarrier();
 #endif
 
   CpvAccess(CsdStopFlag)  = 0;

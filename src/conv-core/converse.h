@@ -87,6 +87,7 @@ extern int Cmi_myrank; /* Normally zero; only 1 during SIGIO handling */
 extern void CmiMemLock();
 extern void CmiMemUnlock();
 #define CmiNodeBarrier() /*empty*/
+#define CmiNodeAllBarrier() /*empty*/
 #define CmiSvAlloc CmiAlloc
 
 typedef int CmiNodeLock;
@@ -126,6 +127,7 @@ extern int CmiRankOf(int pe);
 #define CMK_CPV_IS_SMP sched_yield();
 
 extern void CmiNodeBarrier(void);
+extern void CmiNodeAllBarrier(void);
 #define CmiSvAlloc CmiAlloc
 
 typedef pthread_mutex_t *CmiNodeLock;

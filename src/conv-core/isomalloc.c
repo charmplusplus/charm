@@ -612,7 +612,7 @@ static void init_ranges(char **argv)
     }
   }
   /*SMP Mode: wait here for rank 0 to initialize numslots so we can set up myss*/
-  CmiNodeBarrier(); 
+  CmiNodeAllBarrier(); 
   
   if (isomallocStart!=NULL) {
     CpvInitialize(slotset *, myss);
