@@ -12,7 +12,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 2.10  1995-11-02 22:45:43  sanjeev
+# Revision 2.11  1995-11-02 23:29:09  sanjeev
+# removed -x c++
+#
+# Revision 2.10  1995/11/02  22:45:43  sanjeev
 # added CMK_CPP_SUFFIX
 #
 # Revision 2.9  1995/10/30  20:53:35  jyelon
@@ -43,7 +46,7 @@ set CMK_LDRO='ld -r -o'
 set CMK_CC='gcc '
 set CMK_CC_RELIABLE='gcc '
 set CMK_CC_FASTEST='gcc '
-set CMK_CXX='g++ '
+set CMK_CXX='g++'
 set CMK_CXXPP='g++ -E '
 set CMK_CF77=''
 set CMK_C_DEBUG='-g'
