@@ -20,7 +20,7 @@
 #define CHARE_SEND 2
 #define RECV 4
 
-#define CHARM_MPI 1
+#define CHARM_MPI 0 
 
 #ifdef CHARM_MPI
 #include "mpi.h"
