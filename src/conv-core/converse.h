@@ -772,6 +772,8 @@ void   CmiHandleMessage(void *msg);
 #define CQS_QUEUEING_ILIFO 5
 #define CQS_QUEUEING_BFIFO 6
 #define CQS_QUEUEING_BLIFO 7
+#define CQS_QUEUEING_LFIFO 8
+#define CQS_QUEUEING_LLIFO 9
 
 /****** Isomalloc: Migratable Memory Allocation ********/
 /*Simple block-by-block interface:*/

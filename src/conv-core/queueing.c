@@ -99,11 +99,12 @@ prioq pq;
 
 /*
  * This routine compares priorities. It returns:
- *
+ * 
  * 1 if prio1 > prio2
  * ? if prio1 == prio2
  * 0 if prio1 < prio2
  *
+ * where prios are treated as unsigned
  */
 
 int CqsPrioGT(prio1, prio2)
@@ -265,6 +266,7 @@ void CqsEnqueueGeneral(Queue q, void *data, int strategy,
            int priobits,unsigned int *prioptr)
 {
   deq d; int iprio;
+  CmiInt8 *lprio;
   switch (strategy) {
   case CQS_QUEUEING_FIFO: 
     CqsDeqEnqueueFifo(&(q->zeroprio), data); 
@@ -296,6 +298,28 @@ void CqsEnqueueGeneral(Queue q, void *data, int strategy,
     if (priobits&&(((int)(prioptr[0]))<0))
        d=CqsPrioqGetDeq(&(q->posprioq), priobits, prioptr);
     else d=CqsPrioqGetDeq(&(q->negprioq), priobits, prioptr);
+    CqsDeqEnqueueLifo(d, data);
+    break;
+
+  case CQS_QUEUEING_LFIFO:     
+    // allow signed priority queueing on 64 bit integers
+    lprio =(CmiInt8 *)prioptr;
+    if (*lprio<0)
+      {
+	d=CqsPrioqGetDeq(&(q->negprioq), priobits, prioptr);
+      }
+    else
+      {
+	d=CqsPrioqGetDeq(&(q->posprioq), priobits, prioptr);
+      }
+    CqsDeqEnqueueFifo(d, data);
+    break;
+  case CQS_QUEUEING_LLIFO:
+    lprio =(CmiInt8 *)prioptr;
+    if (*lprio<0)
+      d=CqsPrioqGetDeq(&(q->negprioq), priobits, prioptr);
+    else
+      d=CqsPrioqGetDeq(&(q->posprioq), priobits, prioptr);
     CqsDeqEnqueueLifo(d, data);
     break;
   default:

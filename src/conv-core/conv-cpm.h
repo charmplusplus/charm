@@ -41,6 +41,8 @@ CpmDestination CpmEnqueueIFIFO(int pe, int prio);
 CpmDestination CpmEnqueueILIFO(int pe, int prio);
 CpmDestination CpmEnqueueBFIFO(int pe, int priobits, unsigned int *prioptr);
 CpmDestination CpmEnqueueBLIFO(int pe, int priobits, unsigned int *prioptr);
+CpmDestination CpmEnqueueLFIFO(int pe, int priobits, unsigned int *prioptr);
+CpmDestination CpmEnqueueLLIFO(int pe, int priobits, unsigned int *prioptr);
 CpmDestination CpmEnqueue(int pe,int qs,int priobits,unsigned int *prioptr);
 
 /***********************************************************************

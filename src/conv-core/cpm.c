@@ -129,6 +129,16 @@ CpmDestination CpmEnqueueBLIFO(int pe, int priobits,unsigned int *prioptr)
   return CpmEnqueue(pe, CQS_QUEUEING_BLIFO, priobits, prioptr);
 }
 
+CpmDestination CpmEnqueueLFIFO(int pe, int priobits,unsigned int *prioptr)
+{
+  return CpmEnqueue(pe, CQS_QUEUEING_LFIFO, priobits, prioptr);
+}
+
+CpmDestination CpmEnqueueLLIFO(int pe, int priobits,unsigned int *prioptr)
+{
+  return CpmEnqueue(pe, CQS_QUEUEING_LLIFO, priobits, prioptr);
+}
+
 /******************************************************************************
  *
  * Control for Enqueue-FIFO
