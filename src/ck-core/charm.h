@@ -663,6 +663,9 @@ FUNCTION_PTR _CK_9GetMonoCompareFn();
 
 #define GetEntryPtr(ChareType,EP, MsgType) 	_CK_ep_##ChareType##_##EP##_##MsgType
 
+#define CkEstablishGroup(npes, pes)     CmiEstablishGroup(npes, pes)
+#define CMulticastMsgBranch(ChareType,EP,MsgType,msg,ChareId,grp) GeneralMulticastMsgBranch(GetEntryPtr(ChareType,EP,MsgType), msg, -1, ChareId, grp)
+
 #define CSendMsg(ChareType,EP,MsgType,msg,ChareId) 	SendMsg(GetEntryPtr(ChareType,EP,MsgType), msg, ChareId)
 
 #define CSendMsgBranch(ChareType,EP,MsgType,msg,ChareId,Pe) 	GeneralSendMsgBranch(GetEntryPtr(ChareType,EP,MsgType), msg, Pe, -1, ChareId)

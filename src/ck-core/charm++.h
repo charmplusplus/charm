@@ -70,6 +70,7 @@ extern "C" int CreateMono(int, void *, int, ChareIDType *) ;
 extern "C" void CkExit() ;
 extern "C" void ChareExit() ;
 extern "C" void CkFreeMsg(void *) ;
+extern "C" void GeneralMulticastMsgBranch(int, void *, int, int, CmiGroup) ;
 extern "C" void GeneralSendMsgBranch(int, void *, int, int, int) ;
 extern "C" void GeneralBroadcastMsgBranch(int, void *, int, int) ;
 extern "C" void SendMsg(int, void *, ChareIDType *) ;
