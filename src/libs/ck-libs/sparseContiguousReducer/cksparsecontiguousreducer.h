@@ -74,7 +74,7 @@ class CkDataSegHeader{
     ey = r.ey;
   }
 
-  bool operator==(const CkDataSegHeader &r){
+  inline bool operator==(const CkDataSegHeader &r){
     if((r.sx == sx)&&(r.sy == sy)&&(r.ex == ex)&&(r.ey == ey))
       return true;
 
@@ -84,7 +84,7 @@ class CkDataSegHeader{
   /* 
      overloaded '<' and '>' operators to keep the headers x-aligned
   */
-  bool operator<(const CkDataSegHeader &r){
+  inline bool operator<(const CkDataSegHeader &r){
     if(sx < r.sx)
       return true;
     else
@@ -100,7 +100,7 @@ class CkDataSegHeader{
     return false;
   }
 
-  bool operator>(const CkDataSegHeader &r){
+  inline bool operator>(const CkDataSegHeader &r){
     if(sx > r.sx)
       return true;
     else
@@ -113,7 +113,7 @@ class CkDataSegHeader{
   /* 
      returns the number of elements in this data segment 
   */
-  int getNumElements(){
+  inline int getNumElements(){
     return (ex-sx+1)*(ey-sy+1);
   }
 };
@@ -137,7 +137,7 @@ class CkSparseContiguousReducer
      the data buffer accepted by this function must be on row 
      major order. This function must be called once.
   */
-  void add(int _sx, int _sy, int _ex, int _ey, T *_data){
+  inline void add(int _sx, int _sy, int _ex, int _ey, T *_data){
     r.sx = _sx;
     r.sy = _sy;
     r.ex = _ex;
@@ -173,20 +173,6 @@ class CkSparseContiguousReducer
   void contribute(ArrayElement *elem, CkReduction::reducerType type){
     CkCallback cb;
     contribute (elem, type, cb);
-
-//    int size = r.getNumElements()*sizeof(T) + sizeof(int) + sizeof(CkDataSegHeader);
-//    unsigned char *ptr = new unsigned char[size];
-//    int count = 1;
-         // pack data 
-//    memcpy(ptr, &count, sizeof(int));
-//    memcpy(ptr + sizeof(int), &r, sizeof(CkDataSegHeader));
-//    memcpy(ptr + sizeof(int) + sizeof(CkDataSegHeader), data,
-//    r.getNumElements()*sizeof(T));
-        // contribute on behalf of chare calling this function 
-//    elem->contribute(size, ptr, type);
-    
-//    delete [] ptr;
-
   }
 };
 

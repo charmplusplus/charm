@@ -283,9 +283,15 @@ dataType *decompressMsg(CkReductionMsg *m, CkDataSegHeader &h, dataType nullVal)
   dataType *msgDataptr = (dataType *)getDataPtr(msg);\
   for(i=0; i<numSegs; i++){\
     head = getDataSegHeader(i, msg);\
-    for(int y=(head.sy - h.sy); y<=(head.ey-h.sy); y++)\
-      for(int x=(head.sx - h.sx); x<=(head.ex-h.sx); x++)\
-        data[x+y*sizeX] = *msgDataptr++;\
+    int startY = head.sy - h.sy;\
+    int endY   = head.ey - h.sy;\
+    int startX = head.sx - h.sx;\
+    int endX   = head.ex - h.sx;\
+    for(int y=startY; y<=endY; y++){\
+      int inc = y*sizeX;\
+      for(int x=startX; x<=endX; x++)\
+        data[x+inc] = *msgDataptr++;\
+    }\
   }\
   return data;\
 }
