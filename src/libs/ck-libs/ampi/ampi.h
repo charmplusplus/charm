@@ -126,7 +126,7 @@ int MPI_Get_count(MPI_Status *sts, MPI_Datatype dtype, int *count);
 #define MPI_Bsend MPI_Send
 int MPI_Ssend(void *msg, int count, MPI_Datatype type, int dest,
              int tag, MPI_Comm comm);
-//MPI_Rsend
+/* MPI_Rsend */
 #define MPI_Buffer_attach(buf,len) /*LIE: emtpy*/ /*Silly: default send is buffering in Charm++*/
 #define MPI_Buffer_detach(buf,len) /*LIE: emtpy*/
 int MPI_Isend(void *buf, int count, MPI_Datatype datatype, int dest,
@@ -141,22 +141,22 @@ int MPI_Waitany(int count, MPI_Request *request, int *index, MPI_Status *sts);
 int MPI_Waitall(int count, MPI_Request *request, MPI_Status *sts);
 int MPI_Test(MPI_Request *request, int *flag, MPI_Status *sts);
 int MPI_Testall(int count, MPI_Request *request, int *flag, MPI_Status *sts);
-//MPI_Testsome
-//MPI_Testany
-//MPI_Request_free
-//MPI_Cancel
-//MPI_Test_cancel
+/* MPI_Testsome */
+/* MPI_Testany */
+/* MPI_Request_free */
+/* MPI_Cancel */
+/* MPI_Test_cancel */
 int MPI_Iprobe(int src, int tag, MPI_Comm comm, int *flag, MPI_Status *sts);
 int MPI_Probe(int source, int tag, MPI_Comm comm, MPI_Status *sts);
 int MPI_Send_init(void *buf, int count, int type, int dest, int tag,
                   MPI_Comm comm, MPI_Request *req);
-//MPI_Bsend_init
-//MPI_Ssend_init
-//MPI_Rsend_init
+/* MPI_Bsend_init */
+/* MPI_Ssend_init */
+/* MPI_Rsend_init */
 int MPI_Recv_init(void *buf, int count, int type, int src, int tag,
                   MPI_Comm comm, MPI_Request *req);
 int MPI_Start(MPI_Request *reqnum);
-//MPI_Startall
+/* MPI_Startall */
 int MPI_Sendrecv(void *sbuf, int scount, int stype, int dest,
                  int stag, void *rbuf, int rcount, int rtype,
                  int src, int rtag, MPI_Comm comm, MPI_Status *sts);
@@ -179,10 +179,10 @@ int MPI_Type_commit(MPI_Datatype *datatype);
 int MPI_Type_free(MPI_Datatype *datatype);
 int  MPI_Type_extent(MPI_Datatype datatype, MPI_Aint *extent);
 int  MPI_Type_size(MPI_Datatype datatype, int *size);
-//MPI_Type_lb
-//MPI_Type_ub
-//MPI_Get_elements
-//MPI_Address
+/* MPI_Type_lb */
+/* MPI_Type_ub */
+/* MPI_Get_elements */
+/* MPI_Address */
 int MPI_Pack(void *inbuf, int incount, MPI_Datatype dtype, void *outbuf,
               int outsize, int *position, MPI_Comm comm);
 int MPI_Unpack(void *inbuf, int insize, int *position, void *outbuf,
@@ -227,9 +227,9 @@ int MPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
 int MPI_Reduce_scatter(void* sendbuf, void* recvbuf, int *recvcounts,
                        MPI_Datatype datatype, MPI_Op op, MPI_Comm comm);
 
-//MPI_Scan
-//MPI_Op_create
-//MPI_Op_free
+/* MPI_Scan */
+/* MPI_Op_create */
+/* MPI_Op_free */
 
 /***groups,contexts and communicators***/
 int MPI_Group_size(MPI_Group group, int *size);
@@ -254,45 +254,45 @@ int MPI_Comm_rank(MPI_Comm comm, int *rank);
 int MPI_Comm_dup(MPI_Comm src, MPI_Comm *dest);
 int MPI_Comm_split(MPI_Comm src, int color, int key, MPI_Comm *dest);
 int MPI_Comm_free(MPI_Comm *comm);
-//MPI_Comm_test_inter
-//MPI_Comm_remote_size
-//MPI_Comm_remote_group
-//MPI_Intercomm_create
-//MPI_Intercomm_merge
-//MPI_Keyval_create
-//MPI_Keyval_free
-//MPI_Attr_put
-//MPI_Attr_get
-//MPI_Attr_delete
+/* MPI_Comm_test_inter */
+/* MPI_Comm_remote_size */
+/* MPI_Comm_remote_group */
+/* MPI_Intercomm_create */
+/* MPI_Intercomm_merge */
+/* MPI_Keyval_create */
+/* MPI_Keyval_free */
+/* MPI_Attr_put */
+/* MPI_Attr_get */
+/* MPI_Attr_delete */
 
 /***topologies***/
-//MPI_Cart_create
-//MPI_Dims_create
-//MPI_Graph_create
-//MPI_Topo_test
-//MPI_Cartdim_get
-//MPI_Cart_get
-//MPI_Cart_rank
-//MPI_Cart_coords
-//MPI_Cart_shift
-//MPI_Cart_sub
-//MPI_Cart_map
-//MPI_Graphdims_get
-//MPI_Graph_get
-//MPI_Graph_neighbors_count
-//MPI_Graph_neighbors
-//MPI_Graph_map
+/* MPI_Cart_create */
+/* MPI_Dims_create */
+/* MPI_Graph_create */
+/* MPI_Topo_test */
+/* MPI_Cartdim_get */
+/* MPI_Cart_get */
+/* MPI_Cart_rank */
+/* MPI_Cart_coords */
+/* MPI_Cart_shift */
+/* MPI_Cart_sub */
+/* MPI_Cart_map */
+/* MPI_Graphdims_get */
+/* MPI_Graph_get */
+/* MPI_Graph_neighbors_count */
+/* MPI_Graph_neighbors */
+/* MPI_Graph_map */
 
 /***environment management***/
-//MPI_Get_processor_name
-//MPI_Errhandler_create
-//MPI_Errhandler_set
-//MPI_Errhandler_get
-//MPI_Errhandler_free
+/* MPI_Get_processor_name */
+/* MPI_Errhandler_create */
+/* MPI_Errhandler_set */
+/* MPI_Errhandler_get */
+/* MPI_Errhandler_free */
 int MPI_Error_string(int errorcode, char *string, int *resultlen);
-//MPI_Error_class
+/* MPI_Error_class */
 double MPI_Wtime(void);
-//double MPI_Wtick(void);
+/* double MPI_Wtick(void); */
 int MPI_Init(int *argc, char*** argv); /* FORTRAN VERSION MISSING */
 int MPI_Initialized(int *isInit); /* FORTRAN VERSION MISSING */
 int MPI_Finalize(void);
