@@ -354,7 +354,7 @@ void ReceiveDatagram(SOCKET fd)
   if (-1==skt_recvN(fd, buf+1, size-sizeof(int)))
     CmiAbort("Error in ReceiveDatagram.");
 
-  IntegrateMessageDatagram(buf, size);
+  IntegrateMessageDatagram((char *)buf, size);
 }
 
 

@@ -250,6 +250,7 @@ int  portFinish = 0;
 
 static void CommunicationServer(int withDelayMs);
 static void CommunicationServerThread(int withDelayMs);
+void CmiHandleImmediate();
 extern int CmemInsideMem();
 extern void CmemCallWhenMemAvail();
 static void ConverseRunPE(int everReturn);
