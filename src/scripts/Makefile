@@ -981,8 +981,8 @@ veryclean:
 	rm -rf .[a-z]* .[A-Z]*
 
 
-configure: configure.in
-	-autoconf && autoheader
+config: configure.in
+	autoconf && autoheader
 
 depends: basics 
 	echo "Creating " $(DEPENDFILE) " ..."; 
