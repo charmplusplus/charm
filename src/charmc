@@ -308,12 +308,8 @@ if ($?LANGUAGE == 0) set LANGUAGE=charm
 
 switch ($LANGUAGE)
     case "charm"
-	set LIBCPLUS=cplus-n
-	set LOADER=($CMK_LD)
-        breaksw
     case "charm++"
-        set LIBCPLUS=cplus-y
-	set LOADER=($CMK_LDXX)
+    case "converse"
         breaksw
     default:
         echo "charmc: Unrecognized choice of language $LANGUAGE"
@@ -565,18 +561,38 @@ set OBJECTFILES = ($OBJECTFILES MODULES.TMP.o)
 
 # Identify the libraries to use
 
-set OBJECTFILES = ($OBJECTFILES \
-	$CHARMLIB/lib${LIBCLASS}-core-$EXECMODE.o \
-	$CHARMLIB/lib${LIBCLASS}-ldb-$BALANCE.o \
-	$CHARMLIB/lib${LIBCLASS}-$LIBCPLUS.o \
-	$CHARMLIB/libconv-core.o \
-	$CHARMLIB/libconv-qs-$QUEUE.o )
+switch ($LANGUAGE)
+    case "charm"
+        if ($?MAINOBJ == 0) set MAINOBJ=$CHARMLIB/lib${LIBCLASS}-defmain.o
+        set OBJECTFILES = ($OBJECTFILES \
+        	$CHARMLIB/lib${LIBCLASS}-core-$EXECMODE.o \
+        	$CHARMLIB/lib${LIBCLASS}-ldb-$BALANCE.o \
+        	$CHARMLIB/lib${LIBCLASS}-cplus-n.o \
+        	$CHARMLIB/libconv-core.o \
+        	$CHARMLIB/libconv-qs-$QUEUE.o \
+		$MAINOBJ )
+	set LOADER=($CMK_LD)
+        breaksw
+    case "charm++"
+        if ($?MAINOBJ == 0) set MAINOBJ=$CHARMLIB/lib${LIBCLASS}-defmain.o
+        set OBJECTFILES = ($OBJECTFILES \
+        	$CHARMLIB/lib${LIBCLASS}-core-$EXECMODE.o \
+        	$CHARMLIB/lib${LIBCLASS}-ldb-$BALANCE.o \
+        	$CHARMLIB/lib${LIBCLASS}-cplus-y.o \
+        	$CHARMLIB/libconv-core.o \
+        	$CHARMLIB/libconv-qs-$QUEUE.o \
+		$MAINOBJ )
+	set LOADER=($CMK_LDXX)
+        breaksw
+    case "converse"
+        set OBJECTFILES = ($OBJECTFILES \
+        	$CHARMLIB/libconv-core.o \
+        	$CHARMLIB/libconv-qs-$QUEUE.o )
+	set LOADER=($CMK_LD)
+        breaksw
+endsw
 
 set LIBRARIES = ($LIBRARIES $CMK_LIBS -lm)
-
-if ($?MAINOBJ == 0) set MAINOBJ=$CHARMLIB/lib${LIBCLASS}-defmain.o
-
-set OBJECTFILES=($MAINOBJ $OBJECTFILES)
 
 # Perform the Linkage
 
