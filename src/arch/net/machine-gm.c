@@ -473,7 +473,14 @@ void CmiMachineInit()
   int mlen;
 
   gmport = NULL;
-  if (dataport == -1) return;
+  if (dataport == -1) 
+  { /* Can't do standalone mode without mucking with broadcast, etc. */
+    fprintf(stderr,
+    "ERROR: Standalone mode not supported under net-linux gm.\n"
+    "You must either run using charmrun or rebuild using just net-linux.\n");
+    machine_initiated_shutdown=1;
+    exit(1);
+  }
 
   status = gm_init();
   if (status != GM_SUCCESS) { gm_perror("gm_init", status); return; }
