@@ -81,7 +81,7 @@ public:
 #endif
 
 
-void PUP::sizer::bytes(void * /*p*/,int n,size_t itemSize,dataType /*t*/,const char *desc)
+void PUP::sizer::bytes(void * /*p*/,int n,size_t itemSize,dataType /*t*/)
 {
 #ifdef CK_CHECK_PUP
 	nBytes+=sizeof(pupCheckRec);
@@ -90,7 +90,7 @@ void PUP::sizer::bytes(void * /*p*/,int n,size_t itemSize,dataType /*t*/,const c
 }
 
 /*Memory PUP::er's*/
-void PUP::toMem::bytes(void *p,int n,size_t itemSize,dataType t,const char *desc)
+void PUP::toMem::bytes(void *p,int n,size_t itemSize,dataType t)
 {
 #ifdef CK_CHECK_PUP
 	((pupCheckRec *)buf)->write(t,n);
@@ -100,7 +100,7 @@ void PUP::toMem::bytes(void *p,int n,size_t itemSize,dataType t,const char *desc
 	memcpy((void *)buf,p,n); 
 	buf+=n;
 }
-void PUP::fromMem::bytes(void *p,int n,size_t itemSize,dataType t,const char *desc)
+void PUP::fromMem::bytes(void *p,int n,size_t itemSize,dataType t)
 {
 #ifdef CK_CHECK_PUP
 	((pupCheckRec *)buf)->check(t,n);
@@ -114,9 +114,9 @@ void PUP::fromMem::bytes(void *p,int n,size_t itemSize,dataType t,const char *de
 /*Disk PUP::er's*/
 PUP::disk::~disk() 
 	{fclose(F);}
-void PUP::toDisk::bytes(void *p,int n,size_t itemSize,dataType /*t*/,const char *desc)
+void PUP::toDisk::bytes(void *p,int n,size_t itemSize,dataType /*t*/)
 	{fwrite(p,itemSize,n,F);}
-void PUP::fromDisk::bytes(void *p,int n,size_t itemSize,dataType /*t*/,const char *desc)
+void PUP::fromDisk::bytes(void *p,int n,size_t itemSize,dataType /*t*/)
 	{fread(p,itemSize,n,F);}
 
 /****************** Seek support *******************
@@ -230,39 +230,41 @@ additional effort, even if C has virtual methods or is actually
 a subclass of C.  There is no space or time overhead for C 
 objects other than the virtual function.
 
-This is implemented by registering a constructor and PUP::ID
-for each PUP::able class.  A packer can then write the PUP::ID
+This is implemented by registering a constructor and ID
+for each PUP::able class.  A packer can then write the ID
 before the class; and unpacker can look up the constructor
-from the PUP::ID.
+from the ID.
  */
 
+static PUP::able::PUP_ID null_PUP_ID(0); /*ID of null object*/
+
 //For allocatable objects: new/delete object and call pup routine
-void PUP::er::object(able** a,const char *desc)
+void PUP::er::object(able** a)
 {
 	if (isUnpacking()) 
-	{ //Find the object type; create the object
-		PUP::able::ID id;//The object's id
-		(*this)(id.hash,PUP::able::ID::len,desc);
+	{ //Find the object type & create the object
+		PUP::able::PUP_ID id;//The object's id
+		id.pup(*this);
+		if (id==null_PUP_ID) {*a=NULL; return;}
 		//Find the object's constructor and invoke it (calls new)
 		*a=PUP::able::get_constructor(id) ();
-	} else //Just write out the object type
-		(*this)((unsigned char *)((*a)->get_PUP_ID().hash),
-			PUP::able::ID::len,desc);
-	(*a)->pup(*this);
-	if (isDeleting())
-	{
-		delete *a;
-		*a=0;
+	} else {//Just write out the object type
+		if (*a==NULL) {
+			null_PUP_ID.pup(*this);
+			return;
+		} else
+			(*a)->get_PUP_ID().pup(*this);
 	}
+	(*a)->pup(*this);
 }
 
-//Empty destructor
+//Empty destructor & pup routine
 PUP::able::~able() {}
 void PUP::able::pup(PUP::er &p) {}
 
 //Compute a good hash of the given string 
 // (registration-time only-- allowed to be slow)
-void PUP::able::ID::setName(const char *name)
+void PUP::able::PUP_ID::setName(const char *name)
 {
 	int i,o,n=strlen(name);
 	int t[len]={0};
@@ -280,18 +282,18 @@ void PUP::able::ID::setName(const char *name)
 //Registration routines-- called at global initialization time
 class PUP_regEntry {
 public:
-	PUP::able::ID id;
+	PUP::able::PUP_ID id;
 	const char *name;
 	PUP::able::constructor_function ctor;
 	PUP_regEntry(const char *Nname,
-		const PUP::able::ID &Nid,PUP::able::constructor_function Nctor)
+		const PUP::able::PUP_ID &Nid,PUP::able::constructor_function Nctor)
 		:name(Nname),id(Nid),ctor(Nctor) {}
 	PUP_regEntry(int zero) {
 		name=NULL; //For marking "not found"
 	}
 };
 
-typedef CkHashtableT<PUP::able::ID,PUP_regEntry> PUP_registry;
+typedef CkHashtableT<PUP::able::PUP_ID,PUP_regEntry> PUP_registry;
 
 static PUP_registry *PUP_getRegistry(void) {
 	static PUP_registry *reg=NULL;
@@ -300,20 +302,20 @@ static PUP_registry *PUP_getRegistry(void) {
 	return reg;
 }
 
-PUP::able::ID PUP::able::register_constructor
+PUP::able::PUP_ID PUP::able::register_constructor
 	(const char *className,constructor_function fn)
 {
-	PUP::able::ID id(className);
+	PUP::able::PUP_ID id(className);
 	PUP_getRegistry()->put(id)=PUP_regEntry(className,id,fn);
 	return id;
 }
 PUP::able::constructor_function PUP::able::get_constructor
-	(const PUP::able::ID &id)
+	(const PUP::able::PUP_ID &id)
 {
 	const PUP_regEntry &cur=PUP_getRegistry()->get(id);
 	if (cur.name!=NULL)
 		return cur.ctor; 
 	//Error! ID not in list-- unknown class
-	CmiAbort("Unrecognzied PUP::able::ID passed to get_constructor!");
+	CmiAbort("Unrecognzied PUP::able::PUP_ID passed to get_constructor!");
 	return NULL;
 }

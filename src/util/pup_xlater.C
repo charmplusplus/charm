@@ -268,17 +268,17 @@ PUP::xlater::xlater(const PUP::machineInfo &src,PUP::er &fromData)
 }
 
 //Generic bottleneck: unpack n items of size itemSize from p.
-void PUP::xlater::bytes(void *p,int n,size_t itemSize,dataType t,const char *desc)
+void PUP::xlater::bytes(void *p,int n,size_t itemSize,dataType t)
 {
 	if (convertSize[t]==itemSize)
 	{//Do conversion in-place
-		myUnpacker.bytes(p,n,itemSize,t,desc);
+		myUnpacker.bytes(p,n,itemSize,t);
 		convertFn[t](itemSize,(const myByte *)p,(myByte *)p,n);//Convert in-place
 	}
 	else 
 	{//Read into temporary buffer, unpack, and then convert
 		void *buf=(void *)malloc(convertSize[t]*n);
-		myUnpacker.bytes(buf,n,convertSize[t],t,desc);
+		myUnpacker.bytes(buf,n,convertSize[t],t);
 		convertFn[t](convertSize[t],(const myByte *)buf,(myByte *)p,n);
 		free(buf);
 	}

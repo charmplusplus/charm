@@ -83,6 +83,11 @@ typedef bool CmiBool;
 #endif
 
 
+//We need CkMigrateMessage only to distinguish the migration
+// constructor from all other constructors-- the type
+// itself has no meaningful fields.
+typedef struct {int is_only_a_name;} CkMigrateMessage;
+
 class PUP {//<- Should be "namespace", once all compilers support them
  public:
  
@@ -165,74 +170,74 @@ class er {
   CmiBool isDeleting(void) const {return (PUP_er_state&IS_DELETING)!=0?CmiTrue:CmiFalse;}
   
 //For single elements, pretend it's an array containing one element
-  void operator()(signed char &v,const char *desc=NULL)     {(*this)(&v,1,desc);}
+  void operator()(signed char &v)     {(*this)(&v,1);}
 #if CMK_SIGNEDCHAR_DIFF_CHAR
-  void operator()(char &v,const char *desc=NULL)            {(*this)(&v,1,desc);}
+  void operator()(char &v)            {(*this)(&v,1);}
 #endif
-  void operator()(short &v,const char *desc=NULL)           {(*this)(&v,1,desc);}
-  void operator()(int &v,const char *desc=NULL)             {(*this)(&v,1,desc);}
-  void operator()(long &v,const char *desc=NULL)            {(*this)(&v,1,desc);}
-  void operator()(unsigned char &v,const char *desc=NULL)   {(*this)(&v,1,desc);}
-  void operator()(unsigned short &v,const char *desc=NULL)  {(*this)(&v,1,desc);}
-  void operator()(unsigned int &v,const char *desc=NULL)    {(*this)(&v,1,desc);}
-  void operator()(unsigned long &v,const char *desc=NULL)   {(*this)(&v,1,desc);}
-  void operator()(float &v,const char *desc=NULL)           {(*this)(&v,1,desc);}
-  void operator()(double &v,const char *desc=NULL)          {(*this)(&v,1,desc);}
-  void operator()(CmiBool &v,const char *desc=NULL)            {(*this)(&v,1,desc);}
+  void operator()(short &v)           {(*this)(&v,1);}
+  void operator()(int &v)             {(*this)(&v,1);}
+  void operator()(long &v)            {(*this)(&v,1);}
+  void operator()(unsigned char &v)   {(*this)(&v,1);}
+  void operator()(unsigned short &v)  {(*this)(&v,1);}
+  void operator()(unsigned int &v)    {(*this)(&v,1);}
+  void operator()(unsigned long &v)   {(*this)(&v,1);}
+  void operator()(float &v)           {(*this)(&v,1);}
+  void operator()(double &v)          {(*this)(&v,1);}
+  void operator()(CmiBool &v)            {(*this)(&v,1);}
 
 //For arrays:
   //Integral types:
-  void operator()(signed char *a,int nItems,const char *desc=NULL) 
-    {bytes((void *)a,nItems,sizeof(signed char),Tchar,desc);}
+  void operator()(signed char *a,int nItems) 
+    {bytes((void *)a,nItems,sizeof(signed char),Tchar);}
 #if CMK_SIGNEDCHAR_DIFF_CHAR
-  void operator()(char *a,int nItems,const char *desc=NULL) 
-    {bytes((void *)a,nItems,sizeof(char),Tchar,desc);}
+  void operator()(char *a,int nItems) 
+    {bytes((void *)a,nItems,sizeof(char),Tchar);}
 #endif
-  void operator()(short *a,int nItems,const char *desc=NULL) 
-    {bytes((void *)a,nItems,sizeof(short),Tshort,desc);}
-  void operator()(int *a,int nItems,const char *desc=NULL)
-    {bytes((void *)a,nItems,sizeof(int),Tint,desc);}
-  void operator()(long *a,int nItems,const char *desc=NULL)
-    {bytes((void *)a,nItems,sizeof(long),Tlong,desc);}
+  void operator()(short *a,int nItems) 
+    {bytes((void *)a,nItems,sizeof(short),Tshort);}
+  void operator()(int *a,int nItems)
+    {bytes((void *)a,nItems,sizeof(int),Tint);}
+  void operator()(long *a,int nItems)
+    {bytes((void *)a,nItems,sizeof(long),Tlong);}
   
   //Unsigned integral types:
-  void operator()(unsigned char *a,int nItems,const char *desc=NULL) 
-    {bytes((void *)a,nItems,sizeof(unsigned char),Tuchar,desc);}
-  void operator()(unsigned short *a,int nItems,const char *desc=NULL)
-    {bytes((void *)a,nItems,sizeof(unsigned short),Tushort,desc);}
-  void operator()(unsigned int *a,int nItems,const char *desc=NULL)
-    {bytes((void *)a,nItems,sizeof(unsigned int),Tuint,desc);}
-  void operator()(unsigned long *a,int nItems,const char *desc=NULL)
-    {bytes((void *)a,nItems,sizeof(unsigned long),Tulong,desc);}
+  void operator()(unsigned char *a,int nItems) 
+    {bytes((void *)a,nItems,sizeof(unsigned char),Tuchar);}
+  void operator()(unsigned short *a,int nItems)
+    {bytes((void *)a,nItems,sizeof(unsigned short),Tushort);}
+  void operator()(unsigned int *a,int nItems)
+    {bytes((void *)a,nItems,sizeof(unsigned int),Tuint);}
+  void operator()(unsigned long *a,int nItems)
+    {bytes((void *)a,nItems,sizeof(unsigned long),Tulong);}
   
   //Floating-point types:
-  void operator()(float *a,int nItems,const char *desc=NULL)
-    {bytes((void *)a,nItems,sizeof(float),Tfloat,desc);}
-  void operator()(double *a,int nItems,const char *desc=NULL)
-    {bytes((void *)a,nItems,sizeof(double),Tdouble,desc);}
+  void operator()(float *a,int nItems)
+    {bytes((void *)a,nItems,sizeof(float),Tfloat);}
+  void operator()(double *a,int nItems)
+    {bytes((void *)a,nItems,sizeof(double),Tdouble);}
   
   //For bools:
-  void operator()(CmiBool *a,int nItems,const char *desc=NULL)
-    {bytes((void *)a,nItems,sizeof(CmiBool),Tbool,desc);}
+  void operator()(CmiBool *a,int nItems)
+    {bytes((void *)a,nItems,sizeof(CmiBool),Tbool);}
   
   //For raw memory (n gives number of bytes)
-  void operator()(void *a,int nBytes,const char *desc=NULL)
-    {bytes((void *)a,nBytes,1,Tbyte,desc);}
+  void operator()(void *a,int nBytes)
+    {bytes((void *)a,nBytes,1,Tbyte);}
   
   //For allocatable objects (system will new/delete object and call pup routine)
-  void operator()(able** a,const char *desc=NULL)
-    {object(a,desc);}
+  void operator()(able** a)
+    {object(a);}
   //For pre- or stack-allocated PUP::able objects-- just call object's pup
-  void operator()(able& a,const char *desc=NULL)
+  void operator()(able& a)
     {a.pup(*this);}
  
  protected:
   //Generic bottleneck: pack/unpack n items of size itemSize 
   // and data type t from p.  Desc describes the data item
   friend class xlater;
-  virtual void bytes(void *p,int n,size_t itemSize,dataType t,const char *desc) =0;
-  virtual void object(able** a,const char *desc);
-   
+  virtual void bytes(void *p,int n,size_t itemSize,dataType t) =0;
+  virtual void object(able** a);
+  
   //For seeking (pack/unpack in different orders)
   friend class seekBlock;
   virtual void impl_startSeek(seekBlock &s); /*Begin a seeking block*/
@@ -241,66 +246,13 @@ class er {
   virtual void impl_endSeek(seekBlock &s);/*End a seeking block*/
 };
 
-/*************** PUP::able support ***************/
-
-//The base class of all allocatable objects with pup routines
-class able {
-public:
-	//A globally-unique, persistent identifier for an allocatable object
-	class ID {
-	public:
-		enum {len=4};
-		unsigned char hash[len];
-		ID() {}
-		ID(const char *name) {setName(name);}
-		void setName(const char *name);//Write name into hash
-		CmiBool operator==(const ID &other) const {
-			for (int i=0;i<len;i++) 
-				if (hash[i]!=other.hash[i])
-					return CmiFalse;
-			return CmiTrue;
-		}
-	};
-	
-	//Tag for identifying PUP::able migration constructors
-	struct constructor {};
-	typedef able* (*constructor_function)(void);
-	static ID register_constructor(const char *className,
-		constructor_function fn);
-	static constructor_function get_constructor(const ID &id);
-	
-	able() {}
-	able(constructor *) {}
-	virtual ~able();//Virtual destructor may be needed by some child
-	virtual void pup(er &p);
-	virtual const ID &get_PUP_ID(void) const=0;
-	friend void operator|(er &p,able &a) {p(a);}
-};
-
-//Declarations to include in a PUP::able's body
-#define DECLARE_PUPable(className,superName) \
-	className(PUP::able::constructor *c) :superName(c) {} \
-	static PUP::able *call_PUP_constructor(void); \
-	static PUP::able::ID my_PUP_ID;\
-	virtual const PUP::able::ID &get_PUP_ID(void) const;
-
-//Definitions to include exactly once at the top level
-#define DEFINE_PUPable(className) \
-	PUP::able *className::call_PUP_constructor(void) \
-		{ return new className((PUP::able::constructor *)0);}\
-	PUP::able::ID className::my_PUP_ID=\
-		PUP::able::register_constructor(\
-		  #className,className::call_PUP_constructor);\
-	const PUP::able::ID &className::get_PUP_ID(void) const\
-		{ return className::my_PUP_ID; }
-
 /************** PUP::er -- Sizer ******************/
 //For finding the number of bytes to pack (e.g., to preallocate a memory buffer)
 class sizer : public er {
  protected:
   int nBytes;
   //Generic bottleneck: n items of size itemSize
-  virtual void bytes(void *p,int n,size_t itemSize,dataType t,const char *desc);
+  virtual void bytes(void *p,int n,size_t itemSize,dataType t);
  public:
   //Write data to the given buffer
   sizer(void):er(IS_SIZING) {nBytes=0;}
@@ -329,7 +281,7 @@ class mem : public er { //Memory-buffer packers and unpackers
 class toMem : public mem {
  protected:
   //Generic bottleneck: pack n items of size itemSize from p.
-  virtual void bytes(void *p,int n,size_t itemSize,dataType t,const char *desc);
+  virtual void bytes(void *p,int n,size_t itemSize,dataType t);
  public:
   //Write data to the given buffer
   toMem(void *Nbuf):mem(IS_PACKING,(myByte *)Nbuf) {}
@@ -339,7 +291,7 @@ class toMem : public mem {
 class fromMem : public mem {
  protected:
   //Generic bottleneck: unpack n items of size itemSize from p.
-  virtual void bytes(void *p,int n,size_t itemSize,dataType t,const char *desc);
+  virtual void bytes(void *p,int n,size_t itemSize,dataType t);
  public:
   //Read data from the given buffer
   fromMem(const void *Nbuf):mem(IS_UNPACKING,(myByte *)Nbuf) {}
@@ -362,7 +314,7 @@ class disk : public er {
 class toDisk : public disk {
  protected:
   //Generic bottleneck: pack n items of size itemSize from p.
-  virtual void bytes(void *p,int n,size_t itemSize,dataType t,const char *desc);
+  virtual void bytes(void *p,int n,size_t itemSize,dataType t);
  public:
   //Write data to the given file pointer 
   // (must be opened for binary write)
@@ -373,7 +325,7 @@ class toDisk : public disk {
 class fromDisk : public disk {
  protected:
   //Generic bottleneck: unpack n items of size itemSize from p.
-  virtual void bytes(void *p,int n,size_t itemSize,dataType t,const char *desc);
+  virtual void bytes(void *p,int n,size_t itemSize,dataType t);
  public:
   //Write data to the given file pointer 
   // (must be opened for binary read)
@@ -426,7 +378,7 @@ class xlater : public er {
   
   er &myUnpacker;//Raw data unpacker
   //Generic bottleneck: unpack n items of size itemSize from p.
-  virtual void bytes(void *p,int n,size_t itemSize,dataType t,const char *desc);
+  virtual void bytes(void *p,int n,size_t itemSize,dataType t);
  public:
   xlater(const machineInfo &fromMachine, er &fromData);
  protected:
@@ -437,6 +389,81 @@ class xlater : public er {
   virtual void impl_seek(seekBlock &s,int off); /*Seek to the given offset*/
   virtual void impl_endSeek(seekBlock &s);/*End a seeking block*/
 };
+
+/*************** PUP::able support ***************/
+//The base class of system-allocatable objects with pup routines
+class able {
+public:
+	//A globally-unique, persistent identifier for an allocatable object
+	class PUP_ID {
+	public:
+		enum {len=8};
+		unsigned char hash[len];
+		PUP_ID() {}
+		PUP_ID(int val) {for (int i=0;i<len;i++) hash[i]=val;}
+		PUP_ID(const char *name) {setName(name);}
+		void setName(const char *name);//Write name into hash
+		CmiBool operator==(const PUP_ID &other) const {
+			for (int i=0;i<len;i++) 
+				if (hash[i]!=other.hash[i])
+					return CmiFalse;
+			return CmiTrue;
+		}
+		void pup(er &p) {
+			 p((void *)hash,sizeof(unsigned char)*len);
+		}
+		void pup(er &p) const {
+			 p((void *)hash,sizeof(unsigned char)*len);
+		}
+	};
+
+protected:
+	able() {}
+	able(CkMigrateMessage *) {}
+	virtual ~able();//Virtual destructor may be needed by some child
+
+public:
+//Constructor function registration:
+	typedef able* (*constructor_function)(void);
+	static PUP_ID register_constructor(const char *className,
+		constructor_function fn);
+	static constructor_function get_constructor(const PUP_ID &id);
+
+//Target methods:
+	virtual void pup(er &p);
+	virtual const PUP_ID &get_PUP_ID(void) const=0;
+
+    friend inline void operator|(er &p,able &a) {a.pup(p);}
+    friend inline void operator|(er &p,able* &a) {p(&a);}
+};
+
+//Declarations to include in a PUP::able's body
+#define PUPable_decl(className) \
+private: \
+    static PUP::able *call_PUP_constructor(void); \
+    static PUP::able::PUP_ID my_PUP_ID;\
+public:\
+    virtual const PUP::able::PUP_ID &get_PUP_ID(void) const; \
+    static void register_PUP_ID(void); \
+    friend inline void operator|(PUP::er &p,className &a) {a.pup(p);}\
+    friend inline void operator|(PUP::er &p,className* &a) {\
+	PUP::able *pa=a;  p(&pa);  a=(className *)pa;\
+    }
+
+//Definitions to include exactly once at file scope
+#define PUPable_def(className) \
+	PUP::able *className##::call_PUP_constructor(void) \
+		{ return new className((CkMigrateMessage *)0);}\
+	const PUP::able::PUP_ID &className##::get_PUP_ID(void) const\
+		{ return className##::my_PUP_ID; }\
+	PUP::able::PUP_ID className##::my_PUP_ID;\
+	void className##::register_PUP_ID(void)\
+		{my_PUP_ID=register_constructor(#className,\
+		              className##::call_PUP_constructor);}\
+
+//Code to execute exactly once at program start time
+#define PUPable_reg(className) \
+    className##::register_PUP_ID();
 
 };//<- End "namespace" PUP
 
@@ -470,3 +497,5 @@ inline void operator|(PUP::er &p,CmiBool &t) {p(t);}
 #define PUPmarshal(type) PUPmarshall(type) /*Support this common misspelling*/
 
 #endif //def __CK_PUP_H
+
+
