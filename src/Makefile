@@ -26,10 +26,22 @@ all: charm++
 #	@echo '  make converse'
 #	@echo '  make charm'
 #	@echo '  make charm++'
+#	@echo '  make test-converse'
+#	@echo '  make test-charm'
+#	@echo '  make test-charm++'
 
 charm: converse charmxlat charmlibs libcharm
 
 charm++: converse charmxlat charmlibs charmxlat++ libcharm libck-cplus-y.a
+
+test-converse: converse
+	(cd ../pgms ; make test-converse)
+
+test-charm: charm
+	(cd ../pgms ; make test-charm)
+
+test-charm++: charm++
+	(cd ../pgms ; make test-charm++)
 
 OPTS=-g
 CHARMC=../bin/charmc $(OPTS)
