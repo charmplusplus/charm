@@ -8,6 +8,7 @@ all:
 	cd ampi; make all OPTS='$(OPTS)'
 	cd mblock; make all OPTS='$(OPTS)'
 	cd barrier; make all OPTS='$(OPTS)'
+	cd multicast; make all OPTS='$(OPTS)'
 	cd irecv; make all OPTS='$(OPTS)'
 
 clean:
@@ -19,5 +20,6 @@ clean:
 	cd amr; make clean
 	cd mblock; make clean
 	cd barrier; make clean
+	cd multicast; make clean
 	cd irecv; make clean
 
