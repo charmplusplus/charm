@@ -91,6 +91,7 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback& cb){
 	char fileName[1024];
 	// save groups into Groups.dat
 	// content of the file: numGroups, GroupInfo[numGroups], _groupTable(PUP'ed), groups(PUP'ed)
+	CmiMkdir(dirname);
 	sprintf(fileName,"%s/Groups_%d.dat",dirname,CkMyPe());
 	FILE* fGroups = fopen(fileName,"wb");
 	if(!fGroups) CkAbort("Failed to create checkpoint file for group table!");
