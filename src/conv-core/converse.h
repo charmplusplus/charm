@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.53  1997-02-06 19:53:37  jyelon
+ * Revision 2.54  1997-02-07 02:15:37  jyelon
+ * Added stuff for byte-order conversion.
+ *
+ * Revision 2.53  1997/02/06 19:53:37  jyelon
  * Fifo: added peek and pop.  Convcore: added support for new network version.
  *
  * Revision 2.52  1997/01/17 15:49:06  jyelon
@@ -386,6 +389,22 @@ typedef int    CmiCommHandle;
 
 typedef void (*CmiHandler)();
 
+/******** Basic Types ********/
+
+#ifdef CMK_NUMBERS_NORMAL
+
+typedef short                   CInt2;
+typedef int                     CInt4;
+typedef long long               CInt8;
+typedef unsigned short          CUInt2;
+typedef unsigned int            CUInt4;
+typedef unsigned long long      CUInt8;
+typedef float                   CFloat4;
+typedef double                  CFloat8;
+typedef struct { char c[16]; }  CFloat16;
+
+#endif
+
 /******** CMI, CSD: MANY LOW-LEVEL OPERATIONS ********/
 
 CpvExtern(CmiHandler*, CmiHandlerTable);
@@ -397,21 +416,56 @@ extern int CmiRegisterHandlerLocal CMK_PROTO((CmiHandler));
 extern int CmiRegisterHandlerGlobal CMK_PROTO((CmiHandler));
 extern void CmiNumberHandler CMK_PROTO((int, CmiHandler));
 
+/*
+ * I'm planning on doing the byte-order conversion slightly differently
+ * now.  The repair of the header will be done in the machine layer,
+ * just after receiving a message.  This will be cheaper than doing it
+ * here.  Since the CMI can only repair the header and not the contents
+ * of the message, we provide these functions that the user can use to
+ * repair the contents of the message.
+ *
+ * CmiConvertInt2(msg, p)
+ * CmiConvertInt4(msg, p)
+ * CmiConvertInt8(msg, p)
+ * CmiConvertFloat4(msg, p)
+ * CmiConvertFloat8(msg, p)
+ * CmiConvertFloat16(msg, p)
+ *
+ *   Given a message and a pointer to a number in that message,
+ *   converts the number in-place.  This accounts for the byte-order
+ *   and other format peculiarities of the sender.
+ *
+ * CmiConversionNeeded(msg)
+ *
+ *   When speed is of the essence, this function may make it possible
+ *   to skip some conversions.  It returns a combination of the following
+ *   flags:
+ *
+ *   CMI_CONVERT_INTS_BACKWARD   - ints are in backward byte-order.
+ *   CMI_CONVERT_INTS_FOREIGN    - ints are in a wildly different format.
+ *   CMI_CONVERT_FLOATS_BACKWARD - floats are in backward byte-order.
+ *   CMI_CONVERT_FLOATS_FOREIGN  - floats are in a wildly different format.
+ *
+ * If neither bit is set, the numbers are in local format, and no
+ * conversion is needed whatsoever.  Thus, a value of 0 indicates that
+ * the message is entirely in local format.  If the values are in wildly
+ * different order, one has no choice but to use the CmiConvert functions.
+ *
+ */
+
+#define CmiConversionNeeded(m) 0
+#define CmiConvertInt2(m,p) 0
+#define CmiConvertInt4(m,p) 0
+#define CmiConvertInt8(m,p) 0
+#define CmiConvertFloat4(m,p) 0
+#define CmiConvertFloat8(m,p) 0
+#define CmiConvertFloat16(m,p) 0
+
 #define CmiHandlerAccess(m)\
   (*((int*)(((char *)(m))+CMK_MSG_HEADER_BLANK_SPACE)))
 
-#if CMK_IS_HETERO
-
-#include <netinet/in.h>
-#define CmiGetHandler(env)  (ntohl(CmiHandlerAccess(env)))
-#define CmiSetHandler(env,x)  (CmiHandlerAccess(env) = (htonl(x)))
-
-#else
-
 #define CmiGetHandler(env)  (CmiHandlerAccess(env))
 #define CmiSetHandler(env,x)  (CmiHandlerAccess(env) = (x))
-
-#endif
 
 #define CmiGetHandlerFunction(env)\
     (CpvAccess(CmiHandlerTable)[CmiGetHandler(env)])
