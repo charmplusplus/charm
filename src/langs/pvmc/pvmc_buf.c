@@ -183,7 +183,7 @@ int pvm_freebuf(int bufid)
     CpvAccess(pvmc_freebufs)=cur_buf;
   }
 
-  #ifdef PVM_DEBUG
+#ifdef PVM_DEBUG
   {
     int x;
     int Counter=0;
@@ -205,7 +205,7 @@ int pvm_freebuf(int bufid)
     PRINTF("Pe(%d) tid=%d:%s:%d unused=(%d) sizeof(freelist)=%d\n",
 	   MYPE(),pvm_mytid(),__FILE__,__LINE__,Counter,FreeCounter);
   }
-  #endif
+#endif
 
   return result;
 }  
