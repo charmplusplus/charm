@@ -1595,43 +1595,10 @@ static int data_getone()
     UpdateSendWindow(recv_buf, (int) recv_buf->hd.PeNum);
     CmiFree(recv_buf);
   } else if (kind == SEND) {
-    /*Milind*/
-    if(recv_buf->hd.PeNum & (1<<31)) {
-      int root, srcnode, d1, d2;
-      msgspace *m1=NULL, *m2=NULL;
-      
-      root = (recv_buf->hd.PeNum >> 16) & (~(1<<15));
-      srcnode = (recv_buf->hd.PeNum ^ (root<<16)) & (~(1<<31));
-      my_children(root, &d1, &d2);
-      if(d1!=(-1)){
-	int tmp = recv_buf->hd.PeNum;
-	m1 = (msgspace *)CmiAlloc(CMK_DGRAM_MAX_SIZE);
-	memcpy(m1, recv_buf, CMK_DGRAM_MAX_SIZE);
-	tmp = ((tmp >> 16) << 16) | CmiMyPe();
-	m1->hd.PeNum = tmp;
-	InsertInTransmitQueue(m1, d1);
-	SendPackets(d1);
-      }
-      if(d2!=(-1)){
-	int tmp = recv_buf->hd.PeNum;
-	m2 = (msgspace *)CmiAlloc(CMK_DGRAM_MAX_SIZE);
-	memcpy(m2, recv_buf, CMK_DGRAM_MAX_SIZE);
-	tmp = ((tmp >> 16) << 16) | CmiMyPe();
-	m2->hd.PeNum = tmp;
-	InsertInTransmitQueue(m2, d2);
-	SendPackets(d2);
-      }
-      recv_buf->hd.PeNum = srcnode;
       sender = cs->node_table + recv_buf->hd.PeNum;
       if((sender->dataport)&&(sender->dataport!=htons(src.sin_port)))
         KillEveryoneCode(38473);
       AddToReceiveWindow(recv_buf, (int) recv_buf->hd.PeNum);
-    } else {
-      sender = cs->node_table + recv_buf->hd.PeNum;
-      if((sender->dataport)&&(sender->dataport!=htons(src.sin_port)))
-        KillEveryoneCode(38473);
-      AddToReceiveWindow(recv_buf, (int) recv_buf->hd.PeNum);
-    }
   } 
   return kind;
 }
@@ -1788,58 +1755,6 @@ static int netSend(destPE, size, msg)
   InsertInTransmitQueue(hd, destPE);
   
   SendPackets(destPE);
-  
-  CmiInterruptsRelease();
-}
-
-static int netBcast(size, msg) 
-     int size; 
-     char * msg; 
-{
-  cmi_state cs = CmiState();
-  DATA_HDR *hd,*hd2;
-  unsigned int pktnum = 0;
-  unsigned int numfrag = ((size-1)/MAXDSIZE) + 1;
-  unsigned int destPE1, destPE2;
-
-  my_children(CmiMyPe(), &destPE1, &destPE2);
-  if(destPE1==(-1) || destPE2==(-1)){
-	 if(destPE1!=(-1))
-		netSend(destPE1, size, msg);
-    if(destPE2!=(-1))
-		netSend(destPE2, size, msg);
-    return 1;
-  }
-
-  CmiInterruptsBlock();
-  
-  if (!cs->Communication_init) return -1;
-  
-  for(;pktnum<(numfrag-1);pktnum++) {
-    hd = (DATA_HDR *)CmiAlloc(CMK_DGRAM_MAX_SIZE);
-    hd->pktidx = pktnum;
-    hd->rem_size = size;
-    hd->PeNum = (1<<31) | (CmiMyPe()<<16) | (CmiMyPe());
-    memcpy((hd+1), msg, MAXDSIZE);
-	 hd2 = (DATA_HDR *)CmiAlloc(CMK_DGRAM_MAX_SIZE);
-	 memcpy(hd2,hd,CMK_DGRAM_MAX_SIZE);
-    InsertInTransmitQueue(hd, destPE1);
-    InsertInTransmitQueue(hd2, destPE2);
-    msg += MAXDSIZE;
-    size -= MAXDSIZE;
-  }
-  hd = (DATA_HDR *)CmiAlloc(sizeof(DATA_HDR)+size);
-  hd->pktidx = pktnum;
-  hd->rem_size = size;
-  hd->PeNum = (1<<31) | (CmiMyPe()<<16) | (CmiMyPe());
-  memcpy((hd+1), msg, size);
-  hd2 = (DATA_HDR *)CmiAlloc(sizeof(DATA_HDR)+size);
-  memcpy(hd2,hd,sizeof(DATA_HDR)+size);
-  InsertInTransmitQueue(hd, destPE1);
-  InsertInTransmitQueue(hd2, destPE2);
-  
-  SendPackets(destPE1);
-  SendPackets(destPE2);
   
   CmiInterruptsRelease();
 }
@@ -2042,14 +1957,11 @@ void CmiFreeSendFn(destPE, size, msg)
 void CmiSyncBroadcastFn(size,msg)
      int size; char *msg;
 {
-  netBcast(size,msg);
-  /*
   int i;
   for (i=0;i<CmiNumPes();i++) {
     if (i != CmiMyPe()) 
       netSend(i,size,msg);
   }
-  */
 }
 
 CmiCommHandle CmiAsyncBroadcastFn(size, msg)
@@ -2062,14 +1974,11 @@ CmiCommHandle CmiAsyncBroadcastFn(size, msg)
 void CmiFreeBroadcastFn(size,msg)
      int size; char *msg;
 {
-  netBcast(size,msg);
-  /*
   int i;
   for (i=0;i<CmiNumPes();i++) {
     if (i != CmiMyPe()) 
       netSend(i,size,msg);
   }
-  */
   CmiFree(msg);
 }
 
@@ -2078,12 +1987,9 @@ void CmiSyncBroadcastAllFn(size,msg)
 {
   int i;
   char *msg1;
-  netBcast(size,msg);
-  /*
   for (i=0;i<CmiNumPes();i++)
     if (i != CmiMyPe()) 
       netSend(i,size,msg);
-  */
   msg1 = (char *)CmiAlloc(size);
   memcpy(msg1,msg,size);
   FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg1);
@@ -2099,13 +2005,10 @@ CmiCommHandle CmiAsyncBroadcastAllFn(size, msg)
 void CmiFreeBroadcastAllFn(size,msg)
      int size; char *msg;
 {
-  netBcast(size,msg);
-  /*
   int i;
   for (i=0;i<CmiNumPes();i++)
     if (i != CmiMyPe()) 
       netSend(i,size,msg);
-  */
   FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg);
 }
 
