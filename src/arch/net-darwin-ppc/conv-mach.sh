@@ -9,5 +9,5 @@ CMK_RANLIB='ranlib'
 CMK_LIBS='-lckqt'
 CMK_QT='generic'
 CMK_XIOPTS=''
-CMK_F90LIBS='-lvast90 -lg2c'
-CMK_MOD_EXT="vo"
+# Assumes IBM xlf90 compiler:
+CMK_F90LIBS="-L/opt/ibmcmp/xlf/8.1/lib -lxlf90 -lxlopt -lxl -lxlfmath"
