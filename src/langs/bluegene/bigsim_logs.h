@@ -47,12 +47,12 @@ public:
 class bgEvents {
 private:
   void*   data;         // e.g. can be pointer to trace projection log entry
-  double  rTime;	// relative time from the start entry
   bgEventCallBackFn  callbackFn;
   void* usrPtr;
 public:
-  char   eType;
   int     index;		// index of the event to its original log pool.
+  double  rTime;	// relative time from the start entry
+  char   eType;
   bgEvents(): index(-1) {}
   bgEvents(void *d, int idx, double t, bgEventCallBackFn fn, void *ptr, char e):
 	data(d), index(idx), rTime(t), callbackFn(fn), usrPtr(ptr), eType(e) {}
