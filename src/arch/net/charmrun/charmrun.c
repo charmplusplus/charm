@@ -606,8 +606,13 @@ void arg_init(int argc, char **argv)
     pparam_printdocs();
     exit(1);
   }
-  arg_argv = argv+2; /*Skip over charmrun (0) and program name (1)*/
+  arg_argv = argv+1; /*Skip over charmrun (0) here and program name (1) later*/
   arg_argc = pparam_countargs(arg_argv);
+  if (arg_argc<1) {
+    fprintf(stderr,"ERROR> You must specify a node-program.\n");
+    exit(1);
+  }
+  arg_argv++; arg_argc--;
 
   arg_verbose = arg_verbose || arg_debug || arg_debug_no_pause;
 
@@ -637,10 +642,6 @@ void arg_init(int argc, char **argv)
   arg_currdir_a = strdup(buf);
   
   /* find the node-program, absolute version */
-  if (argc<2) {
-    fprintf(stderr,"ERROR> You must specify a node-program.\n");
-    exit(1);
-  }
   arg_nodeprog_r = argv[1];
 
 #if defined(_WIN32) && !defined(__CYGWIN__)
