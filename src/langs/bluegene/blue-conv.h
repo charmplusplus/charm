@@ -56,6 +56,9 @@ static inline void BgSyncBroadcastAllAndFree(int nb, char *m)
   This version of Blue Gene Charm++ use a Blue Gene thread as 
   a Charm PE.
 */
+#ifndef __cplusplus
+#define inline 
+#endif
 static inline void BgSyncSendAndFree(int pe, int nb, char *m)
 {
   int x,y,z,t;
