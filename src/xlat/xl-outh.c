@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.4  1995-10-25 19:58:49  jyelon
+ * Revision 2.5  1995-10-30 19:42:48  jyelon
+ * Fixed cast on lvalue problem.
+ *
+ * Revision 2.4  1995/10/25  19:58:49  jyelon
  * corrected a warning.
  *
  * Revision 2.3  1995/10/20  17:29:32  jyelon
@@ -610,7 +613,7 @@ char           *module;
 		temp = MyModulePrefix(module, table->name);
 		fprintf(outh, "  %s%s = registerFunction(", temp, REFSUFFIX);
 		fprintf(outh, "(%s) %s);\n", FunctionType, table->name);
-		fprintf(outh, "  (%s) %s = (%s) %s;\n", FunctionType, temp, FunctionType,
+		fprintf(outh, "  %s = (%s) %s;\n", FunctionType, temp, FunctionType,
 			table->name);
 		dontfree(temp);
 	}
