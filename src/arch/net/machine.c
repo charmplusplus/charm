@@ -1451,17 +1451,24 @@ static int InternalScanf(fmt, l)
   if (nargs > 18) KillEveryone("CmiScanf only does 18 args.\n");
   for (i=0; i<nargs; i++) ptr[i]=va_arg(l, char *);
   CmiLock(Cmi_scanf_mutex);
-  /*Send charmrun the format string*/
-  ctrl_sendone_locking("scanf", fmt, strlen(fmt)+1,NULL,0);
-  /*Wait for the reply (characters to scan) from charmrun*/
-  CmiCommLock();
-  ChMessage_recv(Cmi_charmrun_fd,&replymsg);
-  i = sscanf((char*)replymsg.data, fmt,
-	     ptr[ 0], ptr[ 1], ptr[ 2], ptr[ 3], ptr[ 4], ptr[ 5],
-	     ptr[ 6], ptr[ 7], ptr[ 8], ptr[ 9], ptr[10], ptr[11],
-	     ptr[12], ptr[13], ptr[14], ptr[15], ptr[16], ptr[17]);
-  ChMessage_free(&replymsg);
-  CmiCommUnlock();
+  if (Cmi_charmrun_fd!=-1)
+  {/*Send charmrun the format string*/
+        ctrl_sendone_locking("scanf", fmt, strlen(fmt)+1,NULL,0);
+        /*Wait for the reply (characters to scan) from charmrun*/
+        CmiCommLock();
+        ChMessage_recv(Cmi_charmrun_fd,&replymsg);
+        i = sscanf((char*)replymsg.data, fmt,
+                     ptr[ 0], ptr[ 1], ptr[ 2], ptr[ 3], ptr[ 4], ptr[ 5],
+                     ptr[ 6], ptr[ 7], ptr[ 8], ptr[ 9], ptr[10], ptr[11],
+                     ptr[12], ptr[13], ptr[14], ptr[15], ptr[16], ptr[17]);
+        ChMessage_free(&replymsg);
+        CmiCommUnlock();
+  } else
+  {/*Just do the scanf normally*/
+        i=scanf(fmt, ptr[ 0], ptr[ 1], ptr[ 2], ptr[ 3], ptr[ 4], ptr[ 5],
+                     ptr[ 6], ptr[ 7], ptr[ 8], ptr[ 9], ptr[10], ptr[11],
+                     ptr[12], ptr[13], ptr[14], ptr[15], ptr[16], ptr[17]);
+  }
   CmiUnlock(Cmi_scanf_mutex);
   return i;
 }
@@ -1490,10 +1497,7 @@ void CmiError(const char *fmt, ...)
 int CmiScanf(const char *fmt, ...)
 {
   va_list p; int i; va_start(p, fmt);
-  if (Cmi_charmrun_fd!=-1)
-    i=InternalScanf(fmt, p);
-  else
-    i=scanf(fmt,p);
+  i = InternalScanf(fmt, p);
   va_end(p);
   return i;
 }
