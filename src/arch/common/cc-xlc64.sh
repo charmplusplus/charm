@@ -13,5 +13,5 @@ CMK_CF90_FIXED='xlf90_r -q64 '
 CMK_C_OPTIMIZE='-O3 -qstrict -Q  '
 CMK_CXX_OPTIMIZE='-O3 -qstrict -Q '
 CMK_AR='ar -X 64 cq'
-CMK_QT='aix64-xlc'
 CMK_NM='nm -X 64'
+CMK_CC64=true
