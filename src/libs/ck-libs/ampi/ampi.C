@@ -2071,10 +2071,12 @@ int AMPI_Waitall(int count, MPI_Request request[], MPI_Status sts[])
   TRACE_BG_AMPI_WAITALL(reqs);   // setup forward and backward dependence
 #endif
   // free memory of requests
-  for(i=0;i<count;i++){ // only free non-blocking request
+  for(i=0;i<count;i++){ 
     if(request[i] == MPI_REQUEST_NULL) continue;
-    reqs->free(request[i]);
-    request[i] = MPI_REQUEST_NULL;
+    if((*reqs)[request[i]]->getType() != 1) { // only free non-blocking request
+      reqs->free(request[i]);
+      request[i] = MPI_REQUEST_NULL;
+    }
   }
   return 0;
 }
@@ -2166,7 +2168,7 @@ int AMPI_Test(MPI_Request *request, int *flag, MPI_Status *sts)
   AmpiRequestList* reqs = getReqs();
   if(1 == (*flag = (*reqs)[*request]->test(sts))){
     if((*reqs)[*request]->getType() != 1) { // only free non-blocking request
-      (*reqs)[*request]->complete(sts);
+      (*reqs)g[*request]->complete(sts);
       reqs->free(*request);
       *request = MPI_REQUEST_NULL;
     }
