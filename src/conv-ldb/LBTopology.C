@@ -58,6 +58,11 @@ int LBTopo_mesh2d::goodcoor(int x, int y)
   return -1;
 }
 
+static int checkuniq(int *arr, int nb, int val) {
+  for (int i=0;i<nb;i++) if (arr[i]==val) return 0;
+  return 1;
+}
+
 void LBTopo_mesh2d::neighbors(int mype, int* _n, int &nb)
 {
   int next;
@@ -73,11 +78,7 @@ void LBTopo_mesh2d::neighbors(int mype, int* _n, int &nb)
     else if (goodcoor(x1, y) == -1) x1=0;
     next = goodcoor(x1, y);
     CmiAssert(next != -1);
-    if (next != mype) {
-      int j;
-      for (j=0; j<nb; j++) if (_n[j] == next) break;
-      if (j==nb) _n[nb++] = next;
-    }
+    if (next != mype && checkuniq(_n, nb, next)) _n[nb++] = next;
 
     int y1 = y+i;
     if (y1 == -1) {
@@ -87,11 +88,7 @@ void LBTopo_mesh2d::neighbors(int mype, int* _n, int &nb)
     else if (goodcoor(x, y1) == -1) y1=0;
     next = goodcoor(x, y1);
     CmiAssert(next != -1);
-    if (next != mype) {
-      int j;
-      for (j=0; j<nb; j++) if (_n[j] == next) break;
-      if (j==nb) _n[nb++] = next;
-    }
+    if (next != mype && checkuniq(_n, nb, next)) _n[nb++] = next;
   }
 }
 
@@ -139,11 +136,7 @@ void LBTopo_mesh3d::neighbors(int mype, int* _n, int &nb)
     else if (goodcoor(x1, y, z) == -1) x1=0;
     next = goodcoor(x1, y, z);
     CmiAssert(next != -1);
-    if (next != mype) {
-      int j;
-      for (j=0; j<nb; j++) if (_n[j] == next) break;
-      if (j==nb) _n[nb++] = next;
-    }
+    if (next != mype && checkuniq(_n, nb, next)) _n[nb++] = next;
 
     int y1 = y+i;
     if (y1 == -1) {
@@ -153,11 +146,7 @@ void LBTopo_mesh3d::neighbors(int mype, int* _n, int &nb)
     else if (goodcoor(x, y1, z) == -1) y1=0;
     next = goodcoor(x, y1, z);
     CmiAssert(next != -1);
-    if (next != mype) {
-      int j;
-      for (j=0; j<nb; j++) if (_n[j] == next) break;
-      if (j==nb) _n[nb++] = next;
-    }
+    if (next != mype && checkuniq(_n, nb, next)) _n[nb++] = next;
 
     int z1 = z+i;
     if (z1 == -1) {
@@ -167,12 +156,7 @@ void LBTopo_mesh3d::neighbors(int mype, int* _n, int &nb)
     else if (goodcoor(x, y, z1) == -1) z1=0;
     next = goodcoor(x, y, z1);
     CmiAssert(next != -1);
-    if (next != mype) {
-      int j;
-      for (j=0; j<nb; j++) if (_n[j] == next) break;
-      if (j==nb) _n[nb++] = next;
-    }
-
+    if (next != mype && checkuniq(_n, nb, next)) _n[nb++] = next;
   }
 }
 
