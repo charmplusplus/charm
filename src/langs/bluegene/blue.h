@@ -202,6 +202,7 @@ void BgElapse(double t);
 void *BgCreateEvent(int eidx);
 void bgAddProjEvent(void *data, double t, bgEventCallBackFn fn);
 void bgUpdateProj(void *ptr);
+double BgGetRecvTime();
 
 #if defined(__cplusplus)
 }

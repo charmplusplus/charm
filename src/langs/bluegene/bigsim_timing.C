@@ -29,6 +29,16 @@ void *BgInsertEvent(int eidx)
   return (void *)entry;
 }
 
+// must be called inside a timelog 
+double BgGetRecvTime() 
+{
+  if (genTimeLog)  {
+    int len = tTIMELINE.length();
+    if (len) return tTIMELINE[len-1]->recvTime;
+  }
+  return 0.0;
+}
+
 /**
   init Cpvs of timing module
 */

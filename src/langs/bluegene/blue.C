@@ -708,7 +708,7 @@ void BgShutdown()
 {
   // timing
 #if BLUEGENE_TIMING
-  if (1)
+  if (0)
   if (genTimeLog) {
     for (int j=0; j<cva(numNodes); j++)
     for (int i=0; i<cva(numWth); i++) {
@@ -742,6 +742,8 @@ void BgShutdown()
   }
   else {
     CmiStartQD(BroadcastShutdown, NULL);
+    // trapped here, close the log
+    BG_ENTRYEND();
     CmiDeliverMsgs(-1);
   }
 }
@@ -973,7 +975,23 @@ void BgNodeInitialize(nodeInfo *ninfo)
 CmiHandler exitHandlerFunc(char *msg)
 {
   // TODO: free memory before exit
-  int i;
+  int i,j;
+
+#if BLUEGENE_TIMING
+  // timing
+  if (1)
+  if (genTimeLog) {
+    for (j=0; j<cva(numNodes); j++)
+    for (i=0; i<cva(numWth); i++) {
+      BgTimeLine &log = cva(nodeinfo)[j].timelines[i];
+//      BgPrintThreadTimeLine(nodeInfo::Local2Global(j), i, log);
+      int x,y,z;
+      nodeInfo::Local2XYZ(j, &x, &y, &z);
+      BgWriteThreadTimeLine(arg_argv, x, y, z, i, log);
+    }
+  }
+#endif
+
   delete [] cva(nodeinfo);
   delete [] cva(inBuffer);
   for (i=0; i<cva(numNodes); i++) CmmFree(cva(msgBuffer)[i]);
