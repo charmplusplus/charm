@@ -164,6 +164,9 @@ typedef struct OtherNodeStruct
   skt_ip_t IP;
   unsigned int dataport;
   struct sockaddr_in addr;
+#if CMK_USE_TCP
+  SOCKET	sock;		/* for TCP */
+#endif
 
   unsigned int             send_last;    /* seqno of last dgram sent */
   ImplicitDgram           *send_window;  /* datagrams sent, not acked */
@@ -288,6 +291,9 @@ static void node_addresses_store(ChMessage *msg)
     }
     nodes[i].dataport = ChMessageInt(d[i].dataport);
     nodes[i].addr = skt_build_addr(nodes[i].IP,nodes[i].dataport);
+#if CMK_USE_TCP
+    nodes[i].sock = INVALID_SOCKET;
+#endif
     nodestart+=nodes[i].nodesize;
   }
   Cmi_numpes=nodestart;
@@ -415,87 +421,6 @@ static int ctrlskt_ready_read;
 static int dataskt_ready_read;
 static int dataskt_ready_write;
 
-int CheckSocketsReady(int withDelayMs)
-{   
-  int nreadable;
-#if !CMK_USE_POLL
-  static fd_set rfds; 
-  static fd_set wfds; 
-  struct timeval tmo;
-  
-  MACHSTATE(1,"CheckSocketsReady {")
-  FD_ZERO(&rfds);FD_ZERO(&wfds);
-  if (Cmi_charmrun_fd!=-1)
-  	FD_SET(Cmi_charmrun_fd, &rfds);
-  if (dataskt!=-1) {
-  	FD_SET(dataskt, &rfds);
-  	if (writeableDgrams || writeableAcks)
-  	  FD_SET(dataskt, &wfds); /*Outgoing queue is nonempty*/
-  }
-  tmo.tv_sec = 0;
-  tmo.tv_usec = withDelayMs*1000;
-  nreadable = select(FD_SETSIZE, &rfds, &wfds, NULL, &tmo);
-#else
-  struct pollfd fds[3]; 
-  int n = 0;
-  MACHSTATE(1,"CheckSocketsReady {")
-  if (Cmi_charmrun_fd!=-1) {
-    fds[n].fd = Cmi_charmrun_fd;
-    fds[n].events = POLLIN;
-    n++;
-  }
-  if (dataskt!=-1) {
-    fds[n].fd = dataskt;
-    fds[n].events = POLLIN;
-    if (writeableDgrams || writeableAcks)  fds[n].events |= POLLOUT;
-    n++;
-  }
-  nreadable = poll(fds, n, withDelayMs);
-#endif
-  ctrlskt_ready_read = 0;
-  dataskt_ready_read = 0;
-  dataskt_ready_write = 0;
-
-  if (nreadable == 0) {
-    MACHSTATE(1,"} CheckSocketsReady (nothing readable)")
-    return nreadable;
-  }
-  if (nreadable==-1) {
-#if defined(_WIN32) && !defined(__CYGWIN__)
-/* Win32 socket seems to randomly return inexplicable errors
-here-- WSAEINVAL, WSAENOTSOCK-- yet everything is actually OK. 
-	int err=WSAGetLastError();
-	CmiPrintf("(%d)Select returns -1; errno=%d, WSAerr=%d\n",withDelayMs,errno,err);
-*/
-#else
-	if (errno!=EINTR)
-		KillEveryone("Socket error in CheckSocketsReady!\n");
-#endif
-    MACHSTATE(2,"} CheckSocketsReady (INTERRUPTED!)")
-    return CheckSocketsReady(0);
-  }
-#if !CMK_USE_POLL
-  if (Cmi_charmrun_fd!=-1)
-	ctrlskt_ready_read = (FD_ISSET(Cmi_charmrun_fd, &rfds));
-  if (dataskt!=-1) {
-  	dataskt_ready_read = (FD_ISSET(dataskt, &rfds));
-	dataskt_ready_write = (FD_ISSET(dataskt, &wfds));
-  }
-#else
-  if (dataskt!=-1) {
-    n--;
-    dataskt_ready_read = fds[n].revents & POLLIN;
-    dataskt_ready_write = fds[n].revents & POLLOUT;
-  }
-  if (Cmi_charmrun_fd!=-1) {
-    n--;
-    ctrlskt_ready_read = fds[n].revents & POLLIN;
-  }
-#endif
-  MACHSTATE(1,"} CheckSocketsReady")
-  return nreadable;
-}
-
 /******************************************************************************
  *
  * Transmission Code
@@ -567,12 +492,16 @@ static void CommunicationPeriodicCaller(void *ignored)
 }
 #endif
 
-#if !CMK_USE_GM
+#if CMK_USE_GM
 
-#include "machine-eth.c"
+#include "machine-gm.c"
+
+#elif CMK_USE_TCP
+
+#include "machine-tcp.c"
 
 #else
 
-#include "machine-gm.c"
+#include "machine-eth.c"
 
 #endif

@@ -2050,7 +2050,7 @@ static void ConverseRunPE(int everReturn)
     setitimer(ITIMER_REAL, &i, NULL);
     }
 
-#if ! CMK_USE_GM
+#if ! CMK_USE_GM && ! CMK_USE_TCP
     /*Occasionally check for retransmissions, outgoing acks, etc.*/
     /*no need in GM case */
     CcdCallFnAfter(CommunicationsClockCaller,NULL,Cmi_comm_clock_delay);
@@ -2163,7 +2163,9 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
   skt_set_idle(obtain_idleFn);
   if (!skt_ip_match(Cmi_charmrun_IP,skt_invalid_ip)) {
   	set_signals();
-#if !CMK_USE_GM
+#if CMK_USE_TCP
+  	dataskt=skt_server(&dataport);
+#elif !CMK_USE_GM
   	dataskt=skt_datagram(&dataport, Cmi_os_buffer_size);
 #else
         dataskt=-1;
@@ -2178,6 +2180,11 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
   CmiMachineInit();
 
   node_addresses_obtain(argv);
+
+#if CMK_USE_TCP
+  open_tcp_sockets();
+#endif
+
   skt_set_idle(CmiYield);
   Cmi_check_delay = 2.0+0.5*Cmi_numnodes;
   if (Cmi_charmrun_fd==-1) /*Don't bother with check in standalone mode*/
@@ -2185,17 +2192,6 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
   CmiStartThreads(argv);
   ConverseRunPE(everReturn);
 }
-
-
-
-
-
-
-
-
-
-
-
 
 
 

@@ -171,6 +171,78 @@ void CmiNotifyIdle(void) {
   CmiNotifyStillIdle(NULL);
 }
 
+/****************************************************************************
+ *                                                                          
+ * CheckSocketsReady
+ *
+ * Checks both sockets to see which are readable and which are writeable.
+ * We check all these things at the same time since this can be done for
+ * free with ``select.'' The result is stored in global variables, since
+ * this is essentially global state information and several routines need it.
+ *
+ ***************************************************************************/
+
+int CheckSocketsReady(int withDelayMs)
+{   
+  int nreadable;
+#if !CMK_USE_POLL
+  static fd_set rfds; 
+  static fd_set wfds; 
+  struct timeval tmo;
+  
+  MACHSTATE(1,"CheckSocketsReady {")
+  FD_ZERO(&rfds);FD_ZERO(&wfds);
+  if (Cmi_charmrun_fd!=-1)
+  	FD_SET(Cmi_charmrun_fd, &rfds);
+  tmo.tv_sec = 0;
+  tmo.tv_usec = withDelayMs*1000;
+  nreadable = select(FD_SETSIZE, &rfds, &wfds, NULL, &tmo);
+#else
+  struct pollfd fds[3]; 
+  int n = 0;
+  MACHSTATE(1,"CheckSocketsReady {")
+  if (Cmi_charmrun_fd!=-1) {
+    fds[n].fd = Cmi_charmrun_fd;
+    fds[n].events = POLLIN;
+    n++;
+  }
+  nreadable = poll(fds, n, withDelayMs);
+#endif
+  ctrlskt_ready_read = 0;
+  dataskt_ready_read = 0;
+  dataskt_ready_write = 0;
+
+  if (nreadable == 0) {
+    MACHSTATE(1,"} CheckSocketsReady (nothing readable)")
+    return nreadable;
+  }
+  if (nreadable==-1) {
+#if defined(_WIN32) && !defined(__CYGWIN__)
+/* Win32 socket seems to randomly return inexplicable errors
+here-- WSAEINVAL, WSAENOTSOCK-- yet everything is actually OK. 
+	int err=WSAGetLastError();
+	CmiPrintf("(%d)Select returns -1; errno=%d, WSAerr=%d\n",withDelayMs,errno,err);
+*/
+#else
+	if (errno!=EINTR)
+		KillEveryone("Socket error in CheckSocketsReady!\n");
+#endif
+    MACHSTATE(2,"} CheckSocketsReady (INTERRUPTED!)")
+    return CheckSocketsReady(0);
+  }
+#if !CMK_USE_POLL
+  if (Cmi_charmrun_fd!=-1)
+	ctrlskt_ready_read = (FD_ISSET(Cmi_charmrun_fd, &rfds));
+#else
+  if (Cmi_charmrun_fd!=-1) {
+    n--;
+    ctrlskt_ready_read = fds[n].revents & POLLIN;
+  }
+#endif
+  MACHSTATE(1,"} CheckSocketsReady")
+  return nreadable;
+}
+
 /***********************************************************************
  * CommunicationServer()
  * 
