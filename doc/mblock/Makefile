@@ -28,17 +28,17 @@ doc:
 	if [ ! -d $(DOCDIR)/ps ] ; then mkdir $(DOCDIR)/ps ; fi
 	if [ ! -d $(DOCDIR)/pdf ] ; then mkdir $(DOCDIR)/pdf ; fi
 	if [ ! -d $(DOCDIR)/html ] ; then mkdir $(DOCDIR)/html ; fi
-	/bin/cp manual.ps $(DOCDIR)/ps/fem.ps
-	/bin/cp manual.pdf $(DOCDIR)/pdf/fem.pdf
-	/bin/rm -rf $(DOCDIR)/html/fem
-	/bin/cp -R manual $(DOCDIR)/html/fem
+	/bin/cp manual.ps $(DOCDIR)/ps/mblock.ps
+	/bin/cp manual.pdf $(DOCDIR)/pdf/mblock.pdf
+	/bin/rm -rf $(DOCDIR)/html/mblock
+	/bin/cp -R manual $(DOCDIR)/html/mblock
 
 web:
 	make all
-	/bin/cp manual.ps $(WEBDIR)/ps/fem.ps
-	/bin/cp manual.pdf $(WEBDIR)/pdf/fem.pdf
-	/bin/rm -rf $(WEBDIR)/html/fem
-	/bin/cp -R manual $(WEBDIR)/html/fem
+	/bin/cp manual.ps $(WEBDIR)/ps/mblock.ps
+	/bin/cp manual.pdf $(WEBDIR)/pdf/mblock.pdf
+	/bin/rm -rf $(WEBDIR)/html/mblock
+	/bin/cp -R manual $(WEBDIR)/html/mblock
 	find $(WEBDIR) -type f -exec chmod 664 {} \;
 	find $(WEBDIR) -type d -exec chmod 775 {} \;
 

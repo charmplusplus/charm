@@ -15,6 +15,7 @@ ps:
 	( cd fem; $(LNCMD); make ps )
 	( cd ampi; $(LNCMD); make ps )
 	( cd bluegene; $(LNCMD); make ps )
+	( cd mblock; $(LNCMD); make ps )
 
 pdf:
 	if [ ! -d $(IDIR)/pdf ] ; then mkdir $(IDIR)/pdf ; fi
@@ -28,6 +29,7 @@ pdf:
 	( cd fem; $(LNCMD); make pdf )
 	( cd ampi; $(LNCMD); make pdf )
 	( cd bluegene; $(LNCMD); make pdf )
+	( cd mblock; $(LNCMD); make pdf )
 
 html:
 	if [ ! -d $(IDIR)/html ] ; then mkdir $(IDIR)/html ; fi
@@ -41,6 +43,7 @@ html:
 	( cd fem; $(LNCMD); make html )
 	( cd ampi; $(LNCMD); make html )
 	( cd bluegene; $(LNCMD); make html )
+	( cd mblock; $(LNCMD); make html )
 
 doc:
 	( cd install; $(LNCMD); make doc )
@@ -53,6 +56,7 @@ doc:
 	( cd fem; $(LNCMD); make doc )
 	( cd ampi; $(LNCMD); make doc )
 	( cd bluegene; $(LNCMD); make doc )
+	( cd mblock; $(LNCMD); make doc )
 
 web:
 	( cd install; $(LNCMD); make web )
@@ -65,6 +69,7 @@ web:
 	( cd fem; $(LNCMD); make web )
 	( cd ampi; $(LNCMD); make web )
 	( cd bluegene; $(LNCMD); make web )
+	( cd mblock; $(LNCMD); make web )
 
 clean:
 	( cd install; $(RMCMD); make clean )
@@ -77,3 +82,4 @@ clean:
 	( cd fem; $(RMCMD); make clean )
 	( cd ampi; $(RMCMD); make clean )
 	( cd bluegene; $(RMCMD); make clean )
+	( cd mblock; $(RMCMD); make clean )
