@@ -12,6 +12,8 @@
 /*@{*/
 
 #include "charm++.h"
+#include "ck.h"
+#include "trace-common.h"
 #include "trace-projections.h"
 
 #define DEBUGF(x)           // CmiPrintf x
@@ -231,27 +233,6 @@ void LogPool::creatFiles(char *fix)
   }
 #endif
   openLog("w+");
-  if(!binary) {
-#if CMK_PROJECTIONS_USE_ZLIB
-    if(compressed) {
-      if (nonDeltaLog) {
-	gzprintf(zfp, "PROJECTIONS-RECORD\n");
-      }
-      if (deltaLog) {
-	gzprintf(deltazfp, "PROJECTIONS-RECORD DELTA\n");
-      }
-    } 
-    else /* else clause is below... */
-#endif
-    /*... may hang over from else above */ {
-      if (nonDeltaLog) {
-	fprintf(fp, "PROJECTIONS-RECORD\n");
-      }
-      if (deltaLog) {
-	fprintf(deltafp, "PROJECTIONS-RECORD DELTA\n");
-      }
-    }
-  }
   CLOSE_LOG 
 
   if (CkMyPe() == 0) 
@@ -266,6 +247,7 @@ void LogPool::creatFiles(char *fix)
       CmiAbort("Cannot open projections sts file for writing.\n");
     delete[] fname;
   }
+  headerWritten = 0;
 }
 
 LogPool::~LogPool() 
@@ -277,6 +259,7 @@ LogPool::~LogPool()
   if (correctTimeLog) {
     closeLog();
     creatFiles("-bg");
+    writeHeader();
     if (CkMyPe() == 0) writeSts();
     postProcessLog();
   }
@@ -289,9 +272,45 @@ LogPool::~LogPool()
   delete [] fname;
 }
 
+void LogPool::writeHeader()
+{
+  if (headerWritten) return;
+  headerWritten = 1;
+  if(!binary) {
+#if CMK_PROJECTIONS_USE_ZLIB
+    if(compressed) {
+      if (nonDeltaLog) {
+	gzprintf(zfp, "PROJECTIONS-RECORD %d\n", numEntries);
+      }
+      if (deltaLog) {
+	gzprintf(deltazfp, "PROJECTIONS-RECORD %d DELTA\n", numEntries);
+      }
+    } 
+    else /* else clause is below... */
+#endif
+    /*... may hang over from else above */ {
+      if (nonDeltaLog) {
+	fprintf(fp, "PROJECTIONS-RECORD %d\n", numEntries);
+      }
+      if (deltaLog) {
+	fprintf(deltafp, "PROJECTIONS-RECORD %d DELTA\n", numEntries);
+      }
+    }
+  }
+  else { // binary
+      if (nonDeltaLog) {
+        fwrite(&numEntries,sizeof(numEntries),1,fp);
+      }
+      if (deltaLog) {
+        fwrite(&numEntries,sizeof(numEntries),1,deltafp);
+      }
+  }
+}
+
 void LogPool::writeLog(void)
 {
   OPEN_LOG
+  writeHeader();
   if(binary) writeBinary();
 #if CMK_PROJECTIONS_USE_ZLIB
   else if(compressed) writeCompressed();
@@ -306,9 +325,10 @@ void LogPool::write(void)
   // prevTime has to be maintained as an object variable because
   // LogPool::write may be called several times depending on the
   // +logsize value.
+  toProjectionsFile p(fp);
   for(UInt i=0; i<numEntries; i++) {
     if (nonDeltaLog) {
-      pool[i].write(fp); // for non-delta implementation
+      pool[i].pup(p);
     }
     if (deltaLog) {
       prevTime = pool[i].write(deltafp, prevTime, &timeErr);
@@ -319,8 +339,15 @@ void LogPool::write(void)
 void LogPool::writeBinary(void) {
   // **CW** The binary format does not benefit from delta encoding
   // hence it will not employ prevTime.
+#if 0
   for(UInt i=0; i<numEntries; i++)
     pool[i].writeBinary(fp);
+#else
+  PUP::toDisk p(fp);
+  for(UInt i=0; i<numEntries; i++) {
+      pool[i].pup(p);
+  }
+#endif
 }
 
 #if CMK_PROJECTIONS_USE_ZLIB
@@ -355,7 +382,9 @@ static void updateProjLog(void *data, double t, double recvT, void *ptr)
   FILE *fp = *(FILE **)ptr;
   log->time = t;
   log->recvTime = recvT<0.0?0:recvT;
-  log->write(fp);
+//  log->write(fp);
+  toProjectionsFile p(fp);
+  log->pup(p);
 }
 #endif
 
@@ -387,7 +416,7 @@ void LogPool::add(UChar type,UShort mIdx,UShort eIdx,double time,int event,int p
     case BEGIN_UNPACK:
     case END_UNPACK:
     case USER_EVENT_PAIR:
-      bgAddProjEvent(&pool[numEntries-1], time, updateProjLog, &fp, 1);
+      bgAddProjEvent(&pool[numEntries-1], numEntries-1, time, updateProjLog, &fp, 1);
   }
 #endif
 }
@@ -422,6 +451,99 @@ void LogPool::postProcessLog()
 #endif
 }
 
+LogEntry::LogEntry(double tm, unsigned short m, unsigned short e, int ev, int p,
+	     int ml, CmiObjId *d, double rt, int num, int *pelist) 
+{
+    type = CREATION_MULTICAST; mIdx = m; eIdx = e; event = ev; pe = p; time = tm; msglen = ml;
+    if (d) id = *d; else {id.id[0]=id.id[1]=id.id[2]=0; };
+    recvTime = rt; 
+    numpes = num;
+    if (pelist != NULL) {
+	pes = new int[num];
+	for (int i=0; i<num; i++) {
+	  pes[i] = pelist[i];
+	}
+    } else {
+	pes= NULL;
+    }
+}
+
+void LogEntry::pup(PUP::er &p)
+{
+  int itime, irecvtime;
+  char ret = '\n';
+
+  p|type;
+  if (p.isPacking()) itime = (int)(1.0e6*time);
+  switch (type) {
+    case USER_EVENT:
+    case USER_EVENT_PAIR:
+      p|mIdx; p|itime; p|event; p|pe;
+      break;
+    case BEGIN_IDLE:
+    case END_IDLE:
+    case BEGIN_PACK:
+    case END_PACK:
+    case BEGIN_UNPACK:
+    case END_UNPACK:
+      p|itime; p|pe; 
+      break;
+    case BEGIN_PROCESSING:
+      if (p.isPacking()) irecvtime = (int)(1.0e6*recvTime);
+      p|mIdx; p|eIdx; p|itime; p|event; p|pe; 
+      p|msglen; p|irecvtime; p|id.id[0]; p|id.id[1]; p|id.id[2];
+      if (p.isUnpacking()) recvTime = irecvtime/1.0e6;
+      break;
+    case CREATION:
+      if (p.isPacking()) irecvtime = (int)(1.0e6*recvTime);
+      p|mIdx; p|eIdx; p|itime;
+      p|event; p|pe; p|msglen; p|irecvtime;
+      if (p.isUnpacking()) recvTime = irecvtime/1.0e6;
+      break;
+    case CREATION_MULTICAST:
+      if (p.isPacking()) irecvtime = (int)(1.0e6*recvTime);
+      p|mIdx; p|eIdx; p|itime;
+      p|event; p|pe; p|msglen; p|irecvtime; p|numpes;
+      if (pes == NULL) {
+        int n=-1;
+        p(n);
+      }
+      else {
+	for (int i=0; i<numpes; i++) p|pes[i];
+      }
+      if (p.isUnpacking()) recvTime = irecvtime/1.0e6;
+      break;
+    case END_PROCESSING:
+    case MESSAGE_RECV:
+      p|mIdx; p|eIdx; p|itime; p|event; p|pe; p|msglen;
+      break;
+
+    case ENQUEUE:
+    case DEQUEUE:
+      p|mIdx; p|itime; p|event; p|pe;
+      break;
+
+    case BEGIN_INTERRUPT:
+    case END_INTERRUPT:
+      p|itime; p|event; p|pe;
+      break;
+
+      // **CW** absolute timestamps are used here to support a quick
+      // way of determining the total time of a run in projections
+      // visualization.
+    case BEGIN_COMPUTATION:
+    case END_COMPUTATION:
+      p|itime;
+      break;
+
+    default:
+      CmiError("***Internal Error*** Wierd Event %d.\n", type);
+      break;
+  }
+  if (p.isUnpacking()) time = itime/1.0e6;
+  p|ret;
+}
+
 // **CW** Wrapper method for backward compatible signature (and behavior)
 // of the write method.
 void LogEntry::write(FILE* fp)
@@ -433,82 +555,86 @@ void LogEntry::write(FILE* fp)
 
 // **CW** Simple delta encoding implementation. The timestamp of the current
 // entry is returned and passed to the next entry's write call.
+#define write_LogEntry(fp, printfn) 	\
+{  \
+  printfn(fp, "%d ", type);  \
+  \
+  double timeDiff = (time-prevTime)*1.0e6;  \
+  UInt intTimeDiff = (UInt)timeDiff;  \
+  *timeErr += timeDiff - intTimeDiff; /* timeErr is never >= 2.0 */ \
+  if (*timeErr > 1.0) {  \
+    *timeErr -= 1.0;  \
+    intTimeDiff++;  \
+  }  \
+  \
+  switch (type) {  \
+    case USER_EVENT:  \
+    case USER_EVENT_PAIR:  \
+      printfn(fp, "%d %u %d %d\n", mIdx, intTimeDiff, event, pe);  \
+      break;  \
+    case BEGIN_IDLE:  \
+    case END_IDLE:  \
+    case BEGIN_PACK:  \
+    case END_PACK:  \
+    case BEGIN_UNPACK:  \
+    case END_UNPACK:  \
+      printfn(fp, "%u %d\n", intTimeDiff, pe);  \
+      break;  \
+    case BEGIN_PROCESSING:  \
+      printfn(fp, "%d %d %u %d %d %d %d %d %d %d\n", mIdx, eIdx,   \
+	      intTimeDiff, event, pe, msglen, (UInt)(recvTime*1.e6),   \
+	      id.id[0], id.id[1], id.id[2]);  \
+      break;  \
+    case CREATION:  \
+      printfn(fp, "%d %d %u %d %d %d %d\n", mIdx, eIdx, intTimeDiff,   \
+	      event, pe, msglen, (UInt)(recvTime*1.e6));  \
+      break;  \
+    case CREATION_MULTICAST:  \
+      printfn(fp, "%d %d %u %d %d %d %d %d ", mIdx, eIdx, intTimeDiff,   \
+	      event, pe, msglen, (UInt)(recvTime*1.e6), numpes);  \
+      if (pes == NULL) {  \
+	printfn(fp, "-1\n");  \
+      } else {  \
+	for (int i=0; i<numpes; i++) {  \
+	  printfn(fp, "%d ", pes[i]);  \
+	}  \
+	printfn(fp, "\n");  \
+      }  \
+      break;  \
+    case END_PROCESSING:  \
+    case MESSAGE_RECV:  \
+      printfn(fp, "%d %d %u %d %d %d\n", mIdx, eIdx, intTimeDiff,  \
+	      event, pe, msglen);  \
+      break;  \
+  \
+    case ENQUEUE:  \
+    case DEQUEUE:  \
+      printfn(fp, "%d %u %d %d\n", mIdx, intTimeDiff, event, pe);  \
+      break;  \
+  \
+    case BEGIN_INTERRUPT:  \
+    case END_INTERRUPT:  \
+      printfn(fp, "%u %d %d\n", intTimeDiff, event, pe);  \
+      break;  \
+  \
+      /* **CW** absolute timestamps are used here to support a quick  \
+      // way of determining the total time of a run in projections  \
+      // visualization.  */ \
+    case BEGIN_COMPUTATION:  \
+    case END_COMPUTATION:  \
+      printfn(fp, "%u\n", (UInt)(time*1.e6));  \
+      break;  \
+  \
+    default:  \
+      CmiError("***Internal Error*** Wierd Event %d.\n", type);  \
+      break;  \
+  }  \
+  return time;  \
+}
+
 double LogEntry::write(FILE* fp, double prevTime, double *timeErr)
 {
-  fprintf(fp, "%d ", type);
-
-  // **CW** Hopefully a correct time correction algorithm
-  double timeDiff = (time-prevTime)*1.0e6;
-  UInt intTimeDiff = (UInt)timeDiff;
-  *timeErr += timeDiff - intTimeDiff; // timeErr is never >= 2.0
-  if (*timeErr > 1.0) {
-    *timeErr -= 1.0;
-    intTimeDiff++;
-  }
-
-  switch (type) {
-    case USER_EVENT:
-    case USER_EVENT_PAIR:
-      fprintf(fp, "%d %u %d %d\n", mIdx, intTimeDiff, event, pe);
-      break;
-    case BEGIN_IDLE:
-    case END_IDLE:
-    case BEGIN_PACK:
-    case END_PACK:
-    case BEGIN_UNPACK:
-    case END_UNPACK:
-      fprintf(fp, "%u %d\n", intTimeDiff, pe);
-      break;
-    case BEGIN_PROCESSING:
-      fprintf(fp, "%d %d %u %d %d %d %d %d %d %d\n", mIdx, eIdx, 
-	      intTimeDiff, event, pe, msglen, (UInt)(recvTime*1.e6), 
-	      id.id[0], id.id[1], id.id[2]);
-      break;
-    case CREATION:
-      fprintf(fp, "%d %d %u %d %d %d %d\n", mIdx, eIdx, intTimeDiff, 
-	      event, pe, msglen, (UInt)(recvTime*1.e6));
-      break;
-    case CREATION_MULTICAST:
-      fprintf(fp, "%d %d %u %d %d %d %d %d ", mIdx, eIdx, intTimeDiff, 
-	      event, pe, msglen, (UInt)(recvTime*1.e6), numpes);
-      if (pes == NULL) {
-	fprintf(fp, "-1\n");
-      } else {
-	for (int i=0; i<numpes; i++) {
-	  fprintf(fp, "%d ", pes[i]);
-	}
-	fprintf(fp, "\n");
-      }
-      break;
-    case END_PROCESSING:
-    case MESSAGE_RECV:
-      fprintf(fp, "%d %d %u %d %d %d\n", mIdx, eIdx, intTimeDiff,
-	      event, pe, msglen);
-      break;
-
-    case ENQUEUE:
-    case DEQUEUE:
-      fprintf(fp, "%d %u %d %d\n", mIdx, intTimeDiff, event, pe);
-      break;
-
-    case BEGIN_INTERRUPT:
-    case END_INTERRUPT:
-      fprintf(fp, "%u %d %d\n", intTimeDiff, event, pe);
-      break;
-
-      // **CW** absolute timestamps are used here to support a quick
-      // way of determining the total time of a run in projections
-      // visualization.
-    case BEGIN_COMPUTATION:
-    case END_COMPUTATION:
-      fprintf(fp, "%u\n", (UInt)(time*1.e6));
-      break;
-
-    default:
-      CmiError("***Internal Error*** Wierd Event %d.\n", type);
-      break;
-  }
-  return time;
+  write_LogEntry(fp, fprintf);
 }
 
 #if CMK_PROJECTIONS_USE_ZLIB
@@ -521,70 +647,12 @@ void LogEntry::writeCompressed(gzFile zfp)
 
 double LogEntry::writeCompressed(gzFile zfp, double prevTime, double *timeErr)
 {
-  gzprintf(zfp, "%d ", type);
-
-  // **CW** Hopefully a correct time correction algorithm
-  double timeDiff = (time-prevTime)*1.0e6;
-  UInt intTimeDiff = (UInt)timeDiff;
-  *timeErr += timeDiff - intTimeDiff; // timeErr is never >= 2.0
-  if (*timeErr > 1.0) {
-    *timeErr -= 1.0;
-    intTimeDiff++;
-  }
-
-  switch (type) {
-    case USER_EVENT:
-    case USER_EVENT_PAIR:
-      gzprintf(zfp, "%d %u %d %d\n", mIdx, intTimeDiff, event, pe);
-      break;
-
-    case BEGIN_IDLE:
-    case END_IDLE:
-    case BEGIN_PACK:
-    case END_PACK:
-    case BEGIN_UNPACK:
-    case END_UNPACK:
-      gzprintf(zfp, "%u %d\n", intTimeDiff, pe);
-      break;
-
-    case CREATION:
-      gzprintf(zfp, "%d %d %u %d %d %d %d\n", mIdx, eIdx, intTimeDiff, event, 
-	       pe, msglen, (UInt)(recvTime*1.e6));
-      break;
-      
-    case BEGIN_PROCESSING:
-    case END_PROCESSING:
-    case MESSAGE_RECV:
-      gzprintf(zfp, "%d %d %u %d %d %d\n", mIdx, eIdx, intTimeDiff, event, 
-	       pe, msglen);
-      break;
-
-    case ENQUEUE:
-    case DEQUEUE:
-      gzprintf(zfp, "%d %u %d %d\n", mIdx, intTimeDiff, event, pe);
-      break;
-      
-    case BEGIN_INTERRUPT:
-    case END_INTERRUPT:
-      gzprintf(zfp, "%u %d %d\n", intTimeDiff, event, pe);
-      break;
-
-      // **CW** absolute timestamps are used here to support a quick
-      // way of determining the total time of a run in projections
-      // visualization.
-    case BEGIN_COMPUTATION:
-    case END_COMPUTATION:
-      gzprintf(zfp, "%u\n", (UInt)(time*1.e6));
-      break;
-
-    default:
-      CmiError("***Internal Error*** Wierd Event %d.\n", type);
-      break;
-  }
-  return time;
+  write_LogEntry(zfp, gzprintf);
 }
 #endif
 
+#if 0
+// use pup now
 void LogEntry::writeBinary(FILE* fp)
 {
   UInt ttime = (UInt) (time*1.0e6);
@@ -657,6 +725,7 @@ void LogEntry::writeBinary(FILE* fp)
       break;
   }
 }
+#endif
 
 TraceProjections::TraceProjections(char **argv): curevent(0), isIdle(0), inEntry(0)
 {
@@ -694,22 +763,6 @@ TraceProjections::TraceProjections(char **argv): curevent(0), isIdle(0), inEntry
 #endif
   _logPool->creatFiles();
 }
-
-/*
-old version
-int TraceProjections::traceRegisterUserEvent(const char* evt, int e=-1)
-{
-  OPTIMIZED_VERSION
-  if(CkMyPe()==0) {
-    CkAssert(evt != NULL);
-    CkAssert(CkpvAccess(usrEventlist).length() ==  _numEvents);
-    CkpvAccess(usrEventlist).push_back((char *)evt);
-    return _numEvents++;
-  }
-  else
-    return 0;
-}
-*/
 
 int TraceProjections::traceRegisterUserEvent(const char* evt, int e)
 {
@@ -959,4 +1012,49 @@ void TraceProjections::endComputation(void)
   _logPool->add(END_COMPUTATION, 0, 0, TraceTimer(), -1, -1);
 }
 
+// special PUP:ers for handling trace projections logs
+void toProjectionsFile::bytes(void *p,int n,size_t itemSize,dataType t)
+{
+  for (int i=0;i<n;i++) 
+    switch(t) {
+    case Tchar: fprintf(f,"%c",((char *)p)[i]); break;
+    case Tuchar:
+    case Tbyte: fprintf(f,"%d",((unsigned char *)p)[i]); break;
+    case Tshort: fprintf(f," %d",((short *)p)[i]); break;
+    case Tushort: fprintf(f," %u",((unsigned short *)p)[i]); break;
+    case Tint: fprintf(f," %d",((int *)p)[i]); break;
+    case Tuint: fprintf(f," %u",((unsigned int *)p)[i]); break;
+    case Tlong: fprintf(f," %ld",((long *)p)[i]); break;
+    case Tulong: fprintf(f," %lu",((unsigned long *)p)[i]); break;
+    case Tfloat: fprintf(f," %.7g",((float *)p)[i]); break;
+    case Tdouble: fprintf(f," %.15g",((double *)p)[i]); break;
+    default: CmiAbort("Unrecognized pup type code!");
+    };
+}
+
+void fromProjectionsFile::bytes(void *p,int n,size_t itemSize,dataType t)
+{
+  for (int i=0;i<n;i++) 
+    switch(t) {
+    case Tchar: { 
+      char c = fgetc(f);
+      if (c==EOF)
+	parseError("Could not match character");
+      else
+        ((char *)p)[i] = c;
+      break;
+    }
+    case Tuchar:
+    case Tbyte: ((unsigned char *)p)[i]=(unsigned char)readInt("%d"); break;
+    case Tshort:((short *)p)[i]=(short)readInt(); break;
+    case Tushort: ((unsigned short *)p)[i]=(unsigned short)readUint(); break;
+    case Tint:  ((int *)p)[i]=readInt(); break;
+    case Tuint: ((unsigned int *)p)[i]=readUint(); break;
+    case Tlong: ((long *)p)[i]=readInt(); break;
+    case Tulong:((unsigned long *)p)[i]=readUint(); break;
+    case Tfloat: ((float *)p)[i]=(float)readDouble(); break;
+    case Tdouble:((double *)p)[i]=readDouble(); break;
+    default: CmiAbort("Unrecognized pup type code!");
+    };
+}
 /*@}*/

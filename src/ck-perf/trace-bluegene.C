@@ -192,7 +192,7 @@ void TraceBluegene::traceWriteSts(){
 
 void TraceBluegene::bgPrint(char* str){
   if (!genTimeLog) return;
-  bgAddProjEvent(strdup(str), BgGetTime(), writeData, this, 2);
+  bgAddProjEvent(strdup(str), -1, BgGetTime(), writeData, this, 2);
 
 }
 

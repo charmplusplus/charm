@@ -54,6 +54,8 @@ extern int traceBluegeneLinked;
 #  define _TRACE_BG_ONLY(code) /*empty*/
 #endif
 
+/* tracing for Blue Gene - before trace projector era */
+#if !defined(CMK_OPTIMIZE) && CMK_TRACE_IN_CHARM
 // for Sdag only
 // fixme - think of better api for tracing sdag code
 #define BgPrint(x)  _TRACE_BG_ONLY(CkpvAccess(_tracebg)->bgPrint(x))
@@ -66,8 +68,6 @@ extern int traceBluegeneLinked;
 #define _TRACE_BG_USER_EVENT_BRACKET(x,bt,et,pLogPtr) _TRACE_BG_ONLY(CkpvAccess(_tracebg)->userBracketEvent(x,bt,et,pLogPtr))
 #define _TRACE_BGLIST_USER_EVENT_BRACKET(x,bt,et,pLogPtr,bgLogList) _TRACE_BG_ONLY(CkpvAccess(_tracebg)->userBracketEvent(x,bt,et,pLogPtr,bgLogList))
 
-/* tracing for Blue Gene - before trace projector era */
-#if !defined(CMK_OPTIMIZE) && CMK_TRACE_IN_CHARM
 # define TRACE_BG_SUSPEND()     \
         if(CpvAccess(traceOn)) traceSuspend();  \
         _TRACE_BG_END_EXECUTE(1);
@@ -87,6 +87,8 @@ extern int traceBluegeneLinked;
         }	\
 	}
 #else
+# define _TRACE_BG_TLINE_END(x)
+
 # define TRACE_BG_SUSPEND()
 # define TRACE_BG_RESUME(t, msg)
 # define TRACE_BG_START(t, str)

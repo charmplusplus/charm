@@ -14,7 +14,6 @@
 #define _PROJECTIONS_H
 
 #include "trace.h"
-#include "ck.h"
 #include "stdio.h"
 #include "errno.h"
 
@@ -22,10 +21,9 @@
 #include <zlib.h>
 #endif
 
-#include "trace-common.h"
-#include "trace-projector.h"
+#include "pup.h"
 
-#define PROJECTION_VERSION  "5.0"
+#define PROJECTION_VERSION  "6.0"
 
 /// a log entry in trace projection
 class LogEntry {
@@ -33,9 +31,9 @@ class LogEntry {
     double time;
     int event;
     int pe;
-    UShort mIdx;
-    UShort eIdx;
-    UChar type; 
+    unsigned short mIdx;
+    unsigned short eIdx;
+    unsigned char type; 
     int msglen;
     double recvTime;
     CmiObjId   id;
@@ -43,27 +41,14 @@ class LogEntry {
     int *pes;
   public:
     LogEntry() {}
-    LogEntry(double tm, UChar t, UShort m=0, UShort e=0, int ev=0, int p=0, int ml=0, CmiObjId *d=NULL, double rt=0.) {
+    LogEntry(double tm, unsigned char t, unsigned short m=0, unsigned short e=0, int ev=0, int p=0, int ml=0, CmiObjId *d=NULL, double rt=0.) {
       type = t; mIdx = m; eIdx = e; event = ev; pe = p; time = tm; msglen = ml;
       if (d) id = *d; else {id.id[0]=id.id[1]=id.id[2]=0; };
       recvTime = rt; 
     }
     // **CW** new constructor for multicast data
-    LogEntry(double tm, UShort m, UShort e, int ev, int p,
-	     int ml, CmiObjId *d, double rt, int num, int *pelist) {
-      type = CREATION_MULTICAST; mIdx = m; eIdx = e; event = ev; pe = p; time = tm; msglen = ml;
-      if (d) id = *d; else {id.id[0]=id.id[1]=id.id[2]=0; };
-      recvTime = rt; 
-      numpes = num;
-      if (pelist != NULL) {
-	pes = new int[num];
-	for (int i=0; i<num; i++) {
-	  pes[i] = pelist[i];
-	}
-      } else {
-	pes= NULL;
-      }
-    }
+    LogEntry(double tm, unsigned short m, unsigned short e, int ev, int p,
+	     int ml, CmiObjId *d, double rt, int num, int *pelist);
     void *operator new(size_t s) {void*ret=malloc(s);_MEMCHECK(ret);return ret;}
     void *operator new(size_t, void *ptr) { return ptr; }
     void operator delete(void *ptr) { free(ptr); }
@@ -81,14 +66,15 @@ class LogEntry {
     // **CW** Simple delta encoding implementation
     double writeCompressed(gzFile fp, double prevTime, double *timeErr);
 #endif
+    void pup(PUP::er &p);
 };
 
 /// log pool in trace projection
 class LogPool {
   friend class TraceProjections;
   private:
-    UInt poolSize;
-    UInt numEntries;
+    unsigned int poolSize;
+    unsigned int numEntries;
     LogEntry *pool;
     FILE *fp;
     FILE *deltafp;
@@ -108,6 +94,9 @@ class LogPool {
     // writing out logs.
     double prevTime;
     double timeErr;
+
+    int headerWritten;
+    void writeHeader();
   public:
     LogPool(char *pgm);
     ~LogPool();
@@ -125,8 +114,8 @@ class LogPool {
     void writeCompressed(void);
 #endif
     void writeSts(void);
-    void add(UChar type,UShort mIdx,UShort eIdx,double time,int event,int pe, int ml=0, CmiObjId* id=0, double recvT=0.);
-    void addCreationMulticast(UShort mIdx,UShort eIdx,double time,int event,int pe, int ml=0, CmiObjId* id=0, double recvT=0., int num=0, int *pelist=NULL);
+    void add(unsigned char type,unsigned short mIdx,unsigned short eIdx,double time,int event,int pe, int ml=0, CmiObjId* id=0, double recvT=0.);
+    void addCreationMulticast(unsigned short mIdx,unsigned short eIdx,double time,int event,int pe, int ml=0, CmiObjId* id=0, double recvT=0., int num=0, int *pelist=NULL);
     void postProcessLog();
 };
 
@@ -173,6 +162,25 @@ class TraceProjections : public Trace {
     void traceClose();
     void traceBegin();
     void traceEnd();
+};
+
+using namespace PUP;
+
+class toProjectionsFile : public toTextFile {
+ protected:
+  virtual void bytes(void *p,int n,size_t itemSize,dataType t);
+ public:
+  //Begin writing to this file, which should be opened for ascii write.
+  // Closes file when deleted.
+  toProjectionsFile(FILE *f_) :toTextFile(f_) {}
+};
+class fromProjectionsFile : public fromTextFile {
+ protected:
+  virtual void bytes(void *p,int n,size_t itemSize,dataType t);
+ public:
+  //Begin writing to this file, which should be opened for ascii read.
+  // Closes file when deleted.
+  fromProjectionsFile(FILE *f_) :fromTextFile(f_) {}
 };
 
 
