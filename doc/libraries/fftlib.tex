@@ -44,7 +44,7 @@ constructor of 'NormalFFTinfo' is defined as:
 
 \begin{alltt}
         NormalFFTinfo(CProxy_NormalSlabArray &srcProxy, CProxy_NormalSlabArray &destProxy,
-                      int srcDim[2], int destDim[2], int isSrc, complex *dptr, 
+                      int srcDim[2], int destDim[2], int isSrcArray, complex *dataptr, 
                       int srcPlanesPerSlab=1, int destPlanesPerSlab=1)
 
         Where: 
@@ -61,7 +61,7 @@ constructor of 'NormalFFTinfo' is defined as:
             to be stored in a contiguous one-dimensional array in
             row-major order. For example, in source array, data is
             {\it srcPlanesPerSlab} planes, each plane is {\it
-            srcSize[0]} rows of size {\it srcSize[0]} numbers. Similar
+            srcDim[0]} rows of size {\it srcDim[1]} numbers. Similar
             rules apply to destination side.
 
 
