@@ -97,6 +97,7 @@ SumLogPool::SumLogPool(char *pgm) : phaseTab(MAX_PHASES)
    pool = new BinEntry[poolSize];
    _MEMCHECK(pool);
    numEntries = 0;
+   poolCount = 0;
    char pestr[10];
    sprintf(pestr, "%d", CkMyPe());
    int len = strlen(pgm) + strlen(".sum.") + strlen(pestr) + 1;
@@ -148,7 +149,7 @@ void SumLogPool::write(void)
   }
   fprintf(fp, "\n");
   // write bin time
-  for(j=0; j<numEntries; j++)
+  for(j=0; j<poolCount; j++)
     pool[j].write(fp);
   fprintf(fp, "\n");
   // write entry execution time
@@ -201,8 +202,14 @@ void SumLogPool::writeSts(void)
 
 void SumLogPool::add(double time, int pe) 
 {
-  new (&pool[numEntries++]) BinEntry(time);
-  if(poolSize==numEntries) shrink();
+  numEntries++;
+  if (poolCount>0 && pool[poolCount-1].getTime() == time) {
+    pool[poolCount-1].repeat()++;
+  }
+  else {
+    new (&pool[poolCount++]) BinEntry(time);
+    if(poolSize==poolCount) shrink();
+  }
 }
 
 void SumLogPool::setEp(int epidx, double time) 
@@ -219,12 +226,12 @@ void SumLogPool::setEp(int epidx, double time)
 
 void SumLogPool::shrink(void)
 {
-  int entries = numEntries/2;
+  int entries = poolCount/2;
   for (int i=0; i<entries; i++)
   {
      pool[i].setTime(pool[i*2].getTime() + pool[i*2+1].getTime());
   }
-  numEntries = entries;
+  poolCount = entries;
   CkpvAccess(binSize) *= 2;
 
 //CkPrintf("Shrinked binsize: %f entries:%d!!!!\n", CkpvAccess(binSize), numEntries);
@@ -234,6 +241,8 @@ void BinEntry::write(FILE* fp)
 {
   int per = (int)(time * 100.0 / CkpvAccess(binSize));
   fprintf(fp, "%4d", per);
+  if (rep > 1)
+    fprintf(fp, "+%d", rep);
 }
 
 TraceSummary::TraceSummary(char **argv):curevent(0),msgNum(0),binStart(0.0),bin(0.0)
