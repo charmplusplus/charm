@@ -34,7 +34,7 @@ void traceInit(int* argc, char **argv)
   CpvInitialize(int, CtrLogBufSize);
   CpvInitialize(char*, pgmName);
   CpvInitialize(double, binSize);
-  CpvInitialize(int, version);
+  CpvInitialize(double, version);
   CpvAccess(_trace) = new TraceProjections();
   CpvAccess(traceOn) = 1;
   CpvAccess(pgmName) = (char *) malloc(strlen(argv[0])+1);
