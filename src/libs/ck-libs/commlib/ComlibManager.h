@@ -27,6 +27,8 @@
 #define ALPHA 5E-6
 #define BETA 3.33E-9
 
+PUPbytes(comID);
+
 //An abstract data structure that holds a charm++ message 
 //and provides utility functions to manage it.
 class CharmMessageHolder {

@@ -572,7 +572,7 @@ void StrategyWrapper::pup (PUP::er &p) {
 
     p | nstrats;
     if(p.isUnpacking())
-        s_table = new Strategy * [nstrats];
+	s_table = new Strategy * [nstrats];
     
     for(int count = 0; count < nstrats; count ++)
         p | s_table[count];

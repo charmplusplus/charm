@@ -1,23 +1,11 @@
 module ComlibModule { 
-//  readonly CkGroupID cmgrID;
-
   initcall void initComlibManager();
   message DummyMsg;
-
-//  message ComlibMsg {
-//    char data[];
-//  };
-	
-//  message StrategyMsg;
 
   group ComlibManager{
     entry ComlibManager(int s);
     entry ComlibManager(int s, int n);
     entry ComlibManager();
-
-//    entry void done(void);
-//    entry void receiveID(comID id);
-//    entry void receiveID(int n, int p[n], comID id);
 
     entry void barrier(void);
     entry void barrier2(void);
@@ -25,16 +13,14 @@ module ComlibModule {
 
     entry void receiveTable(StrategyWrapper sw);
     entry void localElement(void);
-    entry void ArraySend(int ep, void *msg, CkArrayIndexMax &idx, CkArrayID a);
-    entry void GroupSend(int ep, void *msg, int onpe, CkGroupID gid);
 
     //Called by each array element
     entry void beginIteration();
     entry void endIteration();
 
     //entry void receiveNamdMessage(ComlibMsg * msg);
-    entry void createId(void);
-    entry void createId(int *, int);
+    //entry void createId(void);
+    //entry void createId(int *, int);
 
     entry void learnPattern(int, int);
   }
