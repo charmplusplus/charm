@@ -1,7 +1,7 @@
 -------------------------------------------------------------------------------
 How to convert an old version of converse into a new version of converse:
 
-   1. Convert machine.mk into conv-mach.mk.
+   1. Convert machine.mk into conv-mach.csh
    2. Create a conv-mach.h for the version.
    3. Reduce the machine layer to machine.c, spantree.c, and the header-files.
    4. Deal with the contents of machine.h
@@ -14,9 +14,11 @@ How to convert an old version of converse into a new version of converse:
 
 Details on this process described below.
 -------------------------------------------------------------------------------
-1. Converting machine.mk into conv-mach.mk.  This is easy.  Basically, I
+1. Converting machine.mk into conv-mach.csh.  This is easy.  Basically, I
 just changed the names of the variables so that they all start with CMK_.
-See the net-linux version for an example.
+See the net-linux version for an example.  Also, if the version needs
+any special utilities compiled (like a host program), just set CMK_EXTRAS
+to a command that compiles the utilities.
 -------------------------------------------------------------------------------
 2. Converting an old machine.h to a new conv-mach.h.  Copy the conv-mach.h
 from the net-linux version, then change the flag-settings.  Each conv-mach.h

@@ -22,14 +22,16 @@
 #
 ##############################################################################
 
-set OPTS_CC=
-set OPTS_CPLUS=
-set OPTS_LD=
-set OPTS_CPP=
-set FILES=
-set OBJECTFILES=
-set LIBRARIES=
-set DELETE=
+set OPTS_CC=()
+set OPTS_CPLUS=()
+set OPTS_LD=()
+set OPTS_CPP=()
+set FILES=()
+set OBJECTFILES=()
+set LIBRARIES=()
+set DELETE=()
+set COPIES=()
+unset OBJECT
 unset SEQUENTIAL
 unset VERBOSE
 onintr failure
@@ -128,6 +130,11 @@ while ($argindex <= $#argv)
 	case "-o":
             set OBJECT=$argv[$argindex]
             @ argindex = $argindex + 1
+            breaksw
+
+	case "-cp"
+	    set COPIES=($argv[$argindex] $COPIES)
+	    @ argindex = $argindex + 1
             breaksw
 
 	case "-modules":
@@ -449,7 +456,7 @@ switch ($OBJECT)
         $CMK_LDRO $OBJECT $OBJECTFILES
         if ($status) goto failure
     endif
-    goto success
+    goto copyobj
 
   case "*.a":
     if ( $?VERBOSE ) echo rm -f $OBJECT
@@ -460,7 +467,7 @@ switch ($OBJECT)
     if ( $?VERBOSE ) echo $CMK_RANLIB $OBJECT
     $CMK_RANLIB $OBJECT
     if ($status) goto failure
-    goto success
+    goto copyobj
 
   default:
     goto exelink
@@ -486,7 +493,7 @@ if ($?SEQUENTIAL) then
     if ($?VERBOSE) $CMK_SEQ_LD $OPTS_LD -o $OBJECT $OBJECTFILES -L$CHARMLIB $LIBRARIES
     $CMK_SEQ_LD $OPTS_LD -o $OBJECT $OBJECTFILES -L$CHARMLIB $LIBRARIES
     if ($status) goto failure
-    goto success
+    goto copyobj
 endif
 
 # Check for valid choice of EXECMODE
@@ -613,6 +620,23 @@ if (-e $CHARMBIN/conv-host) then
     /bin/ln -s $CHARMBIN/conv-host conv-host
 endif
 
+########################################################################
+#
+# copyobj: if more than one -o specified, copy the resulting object file.
+#
+########################################################################
+
+copyobj:
+
+foreach x ($COPIES)
+    if ($x != $OBJECT) then
+	set COPY=$x
+	if (-d $COPY) set COPY=$COPY/$OBJECT
+        if ($?VERBOSE) echo rm -f $COPY ";" ln $OBJECT $COPY
+        rm -f $COPY ; ln $OBJECT $COPY
+    endif
+end
+
 goto success
 
 ########################################################################
@@ -622,15 +646,18 @@ goto success
 ########################################################################
 
 success:
+
     set STATUS=0
     goto end
 
 failure:
+
     echo 'charmc: aborting.'
     set STATUS=1
     goto end
 
 end:
+
     if ($?SAVE == 0) then
         foreach FILE ($FILES)
             set BASE=$FILE:r
