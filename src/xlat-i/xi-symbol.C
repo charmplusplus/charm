@@ -619,7 +619,7 @@ Chare::genDecls(XStr& str)
       Entry *etemp = new Entry(0,0,new BuiltinType("void"),"execute",new ParamList(new Parameter(0,new PtrType(new NamedType("CkCcsRequestMsg",0)),"msg")),0,0,0,0);
       list->appendMember(etemp);
       etemp->setChare(this);
-      etemp = new Entry(0,0,new BuiltinType("void"),"iterate",new ParamList(new Parameter(0,new PtrType(new NamedType("CkCcsRequestMsg",0)),"msg")),0,0,0,0);
+      etemp = new Entry(0,0,new BuiltinType("void"),"getPrint",new ParamList(new Parameter(0,new PtrType(new NamedType("CkCcsRequestMsg",0)),"msg")),0,0,0,0);
       list->appendMember(etemp);
       etemp->setChare(this);
     }
