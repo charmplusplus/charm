@@ -1896,14 +1896,16 @@ void req_poll()
   FD_ZERO(&rfds);
   for (i=0; i<req_numworkers; i++)
     FD_SET(req_pipes[i].fd[0], &rfds);
-  FD_SET(myFd, &rfds);
+  if (arg_server == 1) FD_SET(myFd, &rfds);
   status = select(FD_SETSIZE, &rfds, 0, 0, 0);
   for (i=0; i<req_numworkers; i++)
     if (FD_ISSET(req_pipes[i].fd[0], &rfds))
       req_serve_client(i);
-  if(FD_ISSET(myFd, &rfds)){
-    skt_accept(myFd, &clientIP, &clientPortNo, &CcsClientFd);
-    req_serve_client(-1);
+  if (arg_server ==1) {
+  	if(FD_ISSET(myFd, &rfds)){
+    		skt_accept(myFd, &clientIP, &clientPortNo, &CcsClientFd);
+    		req_serve_client(-1);
+  	}
   }
 }
 
