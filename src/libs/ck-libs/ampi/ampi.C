@@ -8,6 +8,7 @@
 #include "ampiimpl.h"
 // for strlen
 #include <string.h>
+#include <sys/stat.h> // for mkdir
 
 int AMPI_COMM_UNIVERSE[AMPI_MAX_COMM];
 
@@ -193,7 +194,7 @@ ampi::bcastraw(void* buf, int len, CkArrayID aid)
 
 void ampi::pup(PUP::er &p)
 {
-  ArrayElement1D::pup(p);//Pack superclass
+  // ArrayElement1D::pup(p);//Pack superclass
   p(commidx);
   if(p.isDeleting())
   {//Resend saved messages to myself
@@ -270,12 +271,21 @@ ampi::get_userdata(int idx)
   return userdata[idx];
 }
 
+void
+ampi::restart(DirMsg *m)
+{
+  CkPrintf("[%d] restarting...\n", thisIndex);
+  restartThread(m->dname);
+  delete m;
+}
+
 // This is invoked in the Fortran (and C ?) version of AMPI
 void
 ampi::run(ArgsInfo *msg)
 {
   int argc = msg->argc;
   char **argv = msg->argv;
+  char *dname;
   delete msg;
   CtvInitialize(ampi *, ampiPtr);
   CtvAccess(ampiPtr) = this;
@@ -307,6 +317,21 @@ AMPI_Migrate(void)
   int idx = ptr->thisIndex;
   CProxy_ampi aproxy(ampimain::ampi_comms[ptr->commidx].aid);
   aproxy[idx].migrate();
+  ptr->stop_running();
+  CthSuspend();
+  ptr = CtvAccess(ampiPtr);
+  ptr->start_running();
+}
+
+extern "C" void
+AMPI_Checkpoint(char *dirname)
+{
+  mkdir(dirname, 0777);
+  ampi *ptr = CtvAccess(ampiPtr);
+  ptr->thread_id = CthSelf();
+  int idx = ptr->thisIndex;
+  CProxy_ampi aproxy(ampimain::ampi_comms[ptr->commidx].aid);
+  aproxy[idx].checkpoint(new DirMsg(dirname));
   ptr->stop_running();
   CthSuspend();
   ptr = CtvAccess(ampiPtr);

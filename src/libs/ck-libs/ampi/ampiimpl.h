@@ -105,6 +105,27 @@ class ArgsInfo : public CMessage_ArgsInfo {
     static ArgsInfo* unpack(void*);
 };
 
+class DirMsg : public CMessage_DirMsg {
+  public:
+    char *dname;
+    DirMsg(char* d) { dname = d; }
+    static void *pack(DirMsg *m)
+    {
+      void *buf = CkAllocBuffer(m, strlen(m->dname)+1);
+      strcpy((char*)buf, m->dname);
+      delete m;
+      return buf;
+    }
+    static DirMsg* unpack(void *buf)
+    {
+      DirMsg *m = (DirMsg*) CkAllocBuffer(buf, sizeof(DirMsg));
+      m->dname = new char[strlen((char*)buf)+1];
+      strcpy(m->dname, (char*)buf);
+      CkFreeMsg(buf);
+      return m;
+    }
+};
+
 class AmpiMsg : public CMessage_AmpiMsg {
  public:
   int tag1, tag2, comm, length;
@@ -134,6 +155,46 @@ class ampi : public ArrayElement1D {
     void migrate(void)
     {
       AtSync();
+    }
+    void checkpoint(DirMsg *msg)
+    {
+      char str[128];
+      char idxstr[16];
+      strcpy(str, msg->dname);
+      sprintf(idxstr, "/%d.cpt", thisIndex);
+      strcat(str, idxstr);
+      delete msg;
+      FILE *fp = fopen(str, "wb");
+      if(fp!=0) {
+        PUP::toDisk p(fp);
+        pup(p);
+        fclose(fp);
+      } else {
+        CkError("Cannot checkpoint to file %s! Continuing...\n");
+      }
+      CthAwaken(thread_id);
+      thread_id = 0;
+      return;
+    }
+    void restart(DirMsg *);
+    void restartThread(char *dname)
+    {
+      char str[128];
+      char idxstr[16];
+      strcpy(str, dname);
+      sprintf(idxstr, "/%d.cpt", thisIndex);
+      strcat(str, idxstr);
+      FILE *fp = fopen(str, "rb");
+      if(fp!=0) {
+        PUP::fromDisk p(fp);
+        pup(p);
+        fclose(fp);
+        CthAwaken(thread_id);
+        thread_id = 0;
+      } else {
+        CkAbort("Canot open restart file for reading!\n");
+      }
+      return;
     }
     void start_running(void)
     {

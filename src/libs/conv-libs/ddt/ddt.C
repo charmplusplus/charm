@@ -61,11 +61,11 @@ DDT::pup(PUP::er &p)
     if(types[i] != DDT_TYPE_NULL)
     {
       typeTable[i]->pupType(p, this);
-      if(p.isPacking())
+      if(p.isDeleting())
         delete typeTable[i];
     }
   }
-  if(p.isPacking())
+  if(p.isDeleting())
   {
     delete[] typeTable;
     delete[] types;

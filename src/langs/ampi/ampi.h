@@ -128,6 +128,7 @@ int AMPI_Abort(AMPI_Comm comm, int errorcode);
 void AMPI_Print(char *str);
 int AMPI_Register(void *, AMPI_PupFn);
 void AMPI_Migrate(void);
+void AMPI_Checkpoint(char *dirname);
 void *AMPI_Get_userdata(int);
 #if AMPI_FORTRAN
 #if CMK_FORTRAN_USES_ALLCAPS

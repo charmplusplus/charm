@@ -51,6 +51,9 @@ ampimain::ampimain(CkArgMsg *m)
   AMPI_Setup();
 #endif
   nobjs = 0;
+  char *dname;
+  int isRestart;
+  isRestart = CmiGetArgString(m->argv, "+restart", &dname);
   for(i=0;i<ncomms;i++)
   {
     nobjs += ampi_comms[i].nobj;
@@ -58,11 +61,19 @@ ampimain::ampimain(CkArgMsg *m)
                                            ampi_comms[i].nobj);
     CProxy_ampi jarray(ampi_comms[i].aid);
     jarray.setReductionClient(allReduceHandler,(void*)&ampi_comms[i]);
-    int j;
-    for(j=0; j<ampi_comms[i].nobj; j++) {
-      ArgsInfo *argsinfo = new ArgsInfo(CmiGetArgc(m->argv), 
-                                        CmiCopyArgs(m->argv));
-      jarray[j].run(argsinfo);
+    if(isRestart) {
+      int j;
+      for(j=0; j<ampi_comms[i].nobj; j++) {
+        DirMsg *dmsg = new DirMsg(dname);
+        jarray[j].restart(dmsg);
+      }
+    } else {
+      int j;
+      for(j=0; j<ampi_comms[i].nobj; j++) {
+        ArgsInfo *argsinfo = new ArgsInfo(CmiGetArgc(m->argv), 
+                                          CmiCopyArgs(m->argv));
+        jarray[j].run(argsinfo);
+      }
     }
   }
   delete m;
