@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.6  1997-07-30 17:31:04  jyelon
+ * Revision 2.7  1997-10-29 23:52:57  milind
+ * Fixed CthInitialize bug on uth machines.
+ *
+ * Revision 2.6  1997/07/30 17:31:04  jyelon
  * *** empty log message ***
  *
  * Revision 2.5  1995/11/06 17:55:09  milind
@@ -93,7 +96,7 @@ CldTOK_HOLDER *new_CldTOK_HOLDER(sendfn, msgptr)
 /******************************************************************
  * This function adds a token to the end of the token list 
  ******************************************************************/
-int CldAddToken(msg, sendfn, queuing, priolen, prioptr)
+void CldAddToken(msg, sendfn, queuing, priolen, prioptr)
     void *msg; void (*sendfn)();
     unsigned int queuing, priolen, *prioptr;
 {

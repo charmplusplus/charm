@@ -17,7 +17,7 @@ typedef struct CfutureValue_s
 }
 *CfutureValue;
 
-#define field_offset(t, f) ((int)(((t)0)->f))
+#define field_offset(t, f) ((size_t)(((t)0)->f))
 #define void_to_value(v) ((CfutureValue)(((char*)v)-field_offset(CfutureValue,rest)))
 
 CpvDeclare(int, CfutureStoreIndex);

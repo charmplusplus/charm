@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.47  1997-10-03 19:51:35  milind
+ * Revision 2.48  1997-10-29 23:52:47  milind
+ * Fixed CthInitialize bug on uth machines.
+ *
+ * Revision 2.47  1997/10/03 19:51:35  milind
  * Made charmc to work again, after inserting trace calls in converse part,
  * i.e. threads and user events.
  *
@@ -279,6 +282,13 @@ extern void CkProcess_DynamicBocInitMsg();
 extern void CkProcess_NewChareMsg();
 extern void CkProcess_VidSendOverMsg();
 
+void SysPeriodicCheckInit(void);
+void CharmRegisterHandlers();
+void InitializeEPTables();
+void AddSysBocEps(void);
+void BroadcastCount(void);
+void SysBocInit(void);
+
 void initModuleInit()
 {
     CpvInitialize(char*, ReadBufIndex);
@@ -308,7 +318,7 @@ void _CkNullFunc()
 
 
 
-InitializeCharm(argc, argv)
+void InitializeCharm(argc, argv)
 int argc;
 char **argv;
 {
@@ -397,7 +407,7 @@ static void PropagateInitBarrier()
 }
 
 
-StartCharm(argc, argv, donehandler)
+void StartCharm(argc, argv, donehandler)
 int argc;
 char **argv;
 FUNCTION_PTR donehandler;
@@ -642,7 +652,7 @@ ENVELOPE       *envelope;
 
 /* this call can only be made after the clock has been initialized */
 
-SysPeriodicCheckInit()
+void SysPeriodicCheckInit(void)
 {
 	/*
 	CldPeriodicCheckInit();
@@ -732,7 +742,7 @@ char          **argv;
 
 #define TABLE_SIZE 256
 
-CharmRegisterHandlers()
+void CharmRegisterHandlers()
 {
   /* Register the Charm handlers with Converse */
   CsvAccess(BUFFER_INCOMING_MSG_Index)
@@ -751,7 +761,7 @@ CharmRegisterHandlers()
     = CmiRegisterHandler(CkProcess_VidSendOverMsg);
 }
 
-InitializeEPTables()
+void InitializeEPTables(void)
 {
   int             i;
   int             TotalFns;
@@ -886,7 +896,7 @@ InitializeEPTables()
 }
 
 /* Adding entry points for system branch office chares. */
-AddSysBocEps()
+void AddSysBocEps(void)
 {
 	QDAddSysBocEps();
 	WOVAddSysBocEps();
@@ -899,7 +909,7 @@ AddSysBocEps()
 
 
 /* Broadcast the count of messages that are received during initialization. */
-BroadcastCount()
+void BroadcastCount(void)
 {
 	ENVELOPE       *env;
 	void           *dummy_msg;
@@ -988,7 +998,7 @@ static ENVELOPE *DeQueueBocInitMsgs()
 		return NULL ;
 }
 
-SysBocInit()
+void SysBocInit(void)
 {
 	QDBocInit();
 	TblBocInit();
@@ -999,7 +1009,7 @@ SysBocInit()
 
 
 
-hostep_error(msg, mydata)
+void hostep_error(msg, mydata)
 void           *msg, *mydata;
 {
 	CmiPrintf("****error*** main chare ep called on node %d.\n",

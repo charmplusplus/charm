@@ -1,64 +1,68 @@
 #include "chare.h"
 
 CpvExtern(int, CtrRecdTraceMsg);
+CpvExtern(CthThread, cThread);
 
-void traceModuleInit(pargc, argv) int *pargc; char **argv; {}
+void traceModuleInit(pargc, argv) int *pargc; char **argv; 
+{
+  CpvInitialize(CthThread, cThread);
+}
 
-program_name(s,m) char *s, *m; {}
+void program_name(s,m) char *s, *m; {}
 
-log_init() {CpvAccess(CtrRecdTraceMsg) = 1;}
+void log_init(void) {CpvAccess(CtrRecdTraceMsg) = 1;}
 
-trace_user_event(int eventNum)
+void trace_user_event(int eventNum)
 {}
 
-trace_creation(msg_type,entry,envelope)
+void trace_creation(msg_type,entry,envelope)
 int msg_type, entry;
 void *envelope;
 {}
 
-trace_begin_execute(envelope)
+void trace_begin_execute(envelope)
 void *envelope;
 {}
 
-trace_end_execute(id,msg_type,entry)
+void trace_end_execute(id,msg_type,entry)
 int id, msg_type, entry;
 {}
 
-trace_begin_charminit()
+void trace_begin_charminit(void)
 {}
 
-trace_end_charminit()
+void trace_end_charminit(void)
 {}
 
-trace_begin_idle()
+void trace_begin_idle(void)
 {}
 
-trace_end_idle()
+void trace_end_idle(void)
 {}
 
-trace_begin_computation()
+void trace_begin_computation(void)
 {}
 
-trace_enqueue(envelope)
+void trace_enqueue(envelope)
 void *envelope;
 {}
 
-trace_dequeue(envelope)
+void trace_dequeue(envelope)
 void *envelope;
 {}
 
-trace_table(type,tbl,key,pe)
+void trace_table(type,tbl,key,pe)
 int type,tbl,key,pe;
 {}
 
 
-send_log() {}
+void send_log(void) {}
 
-CollectTraceFromNodes(msg, data)
+void CollectTraceFromNodes(msg, data)
 char msg, data;
 {}
 
-close_log(){}
+void close_log(void){}
 
 void PrintStsFile(str)
 char *str ;

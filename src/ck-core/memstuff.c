@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.15  1997-03-24 23:09:35  milind
+ * Revision 2.16  1997-10-29 23:52:48  milind
+ * Fixed CthInitialize bug on uth machines.
+ *
+ * Revision 2.15  1997/03/24 23:09:35  milind
  * Corrected alignment problems on 64-bit machines.
  *
  * Revision 2.14  1995/10/27 09:09:31  jyelon
@@ -137,7 +140,7 @@ unsigned int msgbytes;
 
 
 
-CkFreeMsg(ptr)
+void CkFreeMsg(ptr)
 char *ptr;
 {
     ENVELOPE *envptr;
@@ -207,7 +210,7 @@ allocfn(id, msgsize, sizearray, prio)
 
 - Sanjeev
 
-/*****************************************************************/
+*****************************************************************/
 
 void *GenericCkAlloc(msgno, msgbytes, priobits)
 int msgno;

@@ -707,7 +707,7 @@ CthThread t;
  * 
  ***************************************************************************/
 
-CsdInit(argv)
+void CsdInit(argv)
   char **argv;
 {
   void *CqsCreate();
@@ -852,7 +852,7 @@ char **msgs;
  *
  *****************************************************************************/
 
-ConverseCommonInit(char *argv)
+void ConverseCommonInit(char **argv)
 {
   CstatsInit(argv);
   CcdModuleInit(argv);
@@ -863,7 +863,7 @@ ConverseCommonInit(char *argv)
   CthSchedInit();
 }
 
-ConverseCommonExit()
+void ConverseCommonExit(void)
 {
   close_log();
 }

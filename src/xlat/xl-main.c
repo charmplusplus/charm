@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.2  1996-08-01 21:03:16  jyelon
+ * Revision 2.3  1997-10-29 23:53:11  milind
+ * Fixed CthInitialize bug on uth machines.
+ *
+ * Revision 2.2  1996/08/01 21:03:16  jyelon
  * Updated everything to bison and flex.
  *
  * Revision 2.1  1995/06/15 20:27:11  jyelon
@@ -53,6 +56,11 @@ extern void InitMapHead();
 
 char outhfilename[FILENAMELENGTH];
 int InPass1=0;
+
+void CreateTempFile(void);
+void CopyFile(void);
+void SkipInterface(void);
+void RealDummy();
 
 void ParseCommandLine(argc,argv)
 int argc;
@@ -131,7 +139,7 @@ char *argv[];
 #define IsModule 1
 #define IsInterface 2
 
-CreateTempFile()
+void CreateTempFile(void)
 { char ch;
   int filechar;
 
@@ -170,7 +178,7 @@ char ch;
   else 	{ if (IsToken("nterface")) return(IsInterface); else return(0); }
 }
 
-CopyFile()
+void CopyFile(void)
 { char ch;
   int index=0;
   int filechar;
@@ -192,7 +200,7 @@ CopyFile()
 	{ putc(ch,outh2); ch=filechar=getc(yyin); }
 }
 
-SkipInterface()
+void SkipInterface(void)
 { int count;
   char ch;
   int filechar;
@@ -210,6 +218,6 @@ SkipInterface()
 
 #undef free
 
-RealDummy(a)
+void RealDummy(a)
 {}
 

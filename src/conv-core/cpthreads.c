@@ -131,6 +131,7 @@ deleted:
   key->magic = FKEY_MAGIC;
   key->next = keys_inactive;
   keys_inactive = key;
+  return 0;
 }
 
 int Cpthread_setspecific(Cpthread_key_t key, void *val)
@@ -373,6 +374,7 @@ int Cpthread_once(Cpthread_once_t *once, void (*fn)(void))
   if (once->flag[rank]) return 0;
   once->flag[rank] = 1;
   fn();
+  return 1;
 }
 
 /******************************************************************************

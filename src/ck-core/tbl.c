@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.10  1997-07-18 21:21:12  milind
+ * Revision 2.11  1997-10-29 23:52:53  milind
+ * Fixed CthInitialize bug on uth machines.
+ *
+ * Revision 2.10  1997/07/18 21:21:12  milind
  * all files of the form perf-*.c have been changed to trace-*.c, with
  * name expansions. For example, perf-proj.c has been changed to
  * trace-projections.c.
@@ -77,6 +80,10 @@ extern CHARE_BLOCK *CreateChareBlock();
 typedef struct tbl_element *TBL_ELEMENT_[MAX_TBL_SIZE];
 CpvStaticDeclare(TBL_ELEMENT_, table);
 
+void TblInsert();
+void TblDelete();
+void TblFind();
+
 
 void tblModuleInit()
 {
@@ -87,7 +94,7 @@ void tblModuleInit()
 
 
 
-TblBocInit()
+void TblBocInit(void)
 {
     	CHARE_BLOCK *bocBlock;
 	int i;
@@ -206,7 +213,7 @@ int i;
 /*	This function copies structures.				*/
 /************************************************************************/
 
-structure_copy(x, y, size)
+void structure_copy(x, y, size)
 char *x, *y;
 int size;
 {
@@ -269,7 +276,7 @@ TBL_ELEMENT * ptr;
 /************************************************************************/
 /*	This function packs the key, data etc for an entry 		*/
 /************************************************************************/
-char *
+void
 pack(operation, tbl, index, penum, key, data, size_data, entry,chareid, option)
 char *operation, *tbl, *index;
 int  penum;
@@ -338,7 +345,7 @@ TRACE(CmiPrintf("[%d] Pack:: size_chareid=%d, total_size=%d\n",
 		}
 		structure_copy(ptr, entry, size);
 		ptr += size;
-		structure_copy(ptr, &size_chareid, size);
+		structure_copy(ptr, (char *) &size_chareid, size);
 		ptr += size;
 		structure_copy(ptr, option, size);
 		ptr += size;
@@ -362,7 +369,7 @@ TRACE(CmiPrintf("[%d] Pack:: size_chareid=%d, total_size=%d\n",
 /*	to be inserted.							*/
 /************************************************************************/
 
-TblInsert(tbl, index, key, data, size_data, entry, chareid, option)
+void TblInsert(tbl, index, key, data, size_data, entry, chareid, option)
 int tbl;
 int index;
 int key;
@@ -392,8 +399,8 @@ int option;
 		return;
 	}
 	if ( (index == -1) && (place->penum != CmiMyPe()))
-		pack(&operation, &tbl, &(place->index), place->penum,
-			 &key,  data, &size_data, &entry, chareid, &option);
+		pack((char *) &operation, (char *) &tbl, (char *) &(place->index), place->penum,
+			 (char *) &key,  data, (char *) &size_data, (char *) &entry, (char *) chareid, (char *) &option);
 	else
 	{
 		if (index == -1) index = place->index;
@@ -423,24 +430,24 @@ TRACE(CmiPrintf("TblInsert :: table entry created with key %d\n", key));
 			{
 TRACE(CmiPrintf("TblInsert :: Pending request key is %d  - data is %d\n",
 		ptr->key, *((int *) data)));
-				pack(&operation, &tbl, &index, GetID_onPE(temp->chareid),
-						&ptr->key, ptr->data, &size_data,
-						&temp->entry, &temp->chareid, &option);
+				pack((char *) &operation, (char *) &tbl, (char *) &index, GetID_onPE(temp->chareid),
+						(char *) &ptr->key, ptr->data, (char *) &size_data,
+						(char *) &temp->entry, (char *) &temp->chareid, (char *) &option);
 				temp = temp->next;
 			};
 			if ((entry != -1) && (chareid != NULL))
-				pack(&operation, &tbl, &index, GetID_onPE((*chareid)),
-						&ptr->key, ptr->data, &size_data,  
-						&entry, chareid, &option);
+				pack((char *) &operation, (char *) &tbl, (char *) &index, GetID_onPE((*chareid)),
+						(char *) &ptr->key, ptr->data, (char *) &size_data,  
+						(char *) &entry, (char *) chareid, (char *) &option);
 		}
 		else
 		{
 			if ((entry != -1) && (chareid != NULL))
 			{
-				pack(&operation, &tbl, &index,
+				pack((char *) &operation, (char *) &tbl, (char *) &index,
 					GetID_onPE((*chareid)),
-					 &ptr->key, ptr->data, &ptr->size_data,
-					 &entry, chareid, &option);
+					 (char *) &ptr->key, ptr->data, (char *)&ptr->size_data,
+					 (char *)&entry, (char *) chareid, (char *)&option);
 			} 
 		}
 	}
@@ -454,7 +461,7 @@ TRACE(CmiPrintf("TblInsert :: Pending request key is %d  - data is %d\n",
 /*	to be deleted.							*/
 /************************************************************************/
 
-TblDelete(tbl, index, key, entry, chareid, option)
+void TblDelete(tbl, index, key, entry, chareid, option)
 int tbl;
 int index;
 int key;
@@ -479,8 +486,8 @@ int option;
 		trace_table(DELETE, tbl, key, CmiMyPe());
 
 	if ( (index == -1) && ( place->penum != CmiMyPe()))
-		pack(&operation, &tbl, &(place->index), place->penum,
-			 &key, data, &size,  &entry, chareid, &option);
+		pack((char *) &operation, (char *) &tbl, (char *) &(place->index), place->penum,
+			 (char *) &key, data, (char *) &size,  (char *) &entry, (char *) chareid, (char *) &option);
 	else
 	{
 		if (index == -1) index  = place->index;
@@ -495,14 +502,14 @@ int option;
 		}
 		operation = 3;
 		if ( (ptr1 != NULL) && (entry != -1) && (chareid != NULL)) 
-			pack(&operation, &tbl, &index, 
+			pack((char *) &operation, (char *) &tbl, (char *) &index, 
 				GetID_onPE((*chareid)),
-				&ptr1->key, ptr1->data, &ptr1->size_data,
-				&entry, chareid, &option);
+				(char *) &ptr1->key, ptr1->data, (char *) &ptr1->size_data,
+				(char *) &entry, (char *) chareid, (char *) &option);
 		if ( (ptr1 == NULL) && (entry != -1) && (chareid != NULL) 
 				    && (option == TBL_REPLY))
-			pack(&operation, &tbl, &index, GetID_onPE((*chareid)),
-				 &key, data, &size, &entry, chareid, &option);
+			pack((char *) &operation, (char *) &tbl, (char *) &index, GetID_onPE((*chareid)),
+				 (char *) &key, data, (char *) &size, (char *) &entry, (char *) chareid, (char *) &option);
 		if (ptr2 == NULL) 
 			if (ptr1 != NULL)
 			{
@@ -529,7 +536,7 @@ int option;
 /* 	the element may exist with information about element to be found*/
 /************************************************************************/
 
-TblFind( tbl, index, key, entry, chareid, option)
+void TblFind( tbl, index, key, entry, chareid, option)
 int tbl;
 int index;
 int key;
@@ -556,8 +563,8 @@ int option;
 
 
 	if ( (index == -1) && (place->penum != CmiMyPe()))
-		pack(&operation, &tbl, &(place->index), place->penum,
-			 &key, data, &size, &entry, chareid, &option);
+		pack((char *) &operation, (char *) &tbl, (char *) &(place->index), place->penum,
+			 (char *) &key, data, (char *) &size, (char *) &entry, (char *) chareid, (char *) &option);
 	else
 	{
 		if (index == -1) index = place->index;
@@ -571,20 +578,20 @@ TRACE(CmiPrintf("[%d] TblFind: ptr=0x%x, entry=%d, option=%d, index=%d\n",
 			if (ptr->isDefined)
 				{
 				if ((entry != -1) && (chareid != NULL))
-					pack(&operation, &tbl, &index, 
-						GetID_onPE((*chareid)), &key, 
-						ptr->data, &ptr->size_data,
-						&entry, chareid, &option);
+					pack((char *) &operation, (char *) &tbl, (char *) &index, 
+						GetID_onPE((*chareid)), (char *) &key, 
+						ptr->data, (char *) &ptr->size_data,
+						(char *) &entry, (char *) chareid, (char *) &option);
 				}
 			else
 			{
 			   if (option == TBL_NEVER_WAIT)
 			   {
 				if ((entry != -1) && (chareid != NULL))
-					pack(&operation, &tbl, &index, 
-						GetID_onPE((*chareid)), &key,
-						data, &size,
-						&entry, chareid, &option);
+					pack((char *) &operation, (char *) &tbl, (char *) &index, 
+						GetID_onPE((*chareid)), (char *) &key,
+						data, (char *) &size,
+						(char *) &entry, (char *) chareid, (char *) &option);
 			   }
 			   else
 			   {
@@ -630,17 +637,17 @@ TRACE(CmiPrintf("[%d] TblFind: Going to send message.\n"));
 			}
 			else
 			   if ((entry != -1) && (chareid != NULL)) 
-				pack(&operation, &tbl, &index, 
+				pack((char *) &operation, (char *) &tbl, (char *) &index, 
 					GetID_onPE((*chareid)),
-					&key, data, &size, &entry, chareid,
-					&option);
+					(char *) &key, data, (char *) &size, (char *) &entry, (char *) chareid,
+					(char *) &option);
 TRACE(CmiPrintf("[%d] TblFind: Sent message.\n"));
 
 		}
 	}
 }
 
-TblAddSysBocEps()
+void TblAddSysBocEps(void)
 {
   CsvAccess(CkEp_Tbl_Unpack) =
     registerBocEp("CkEp_Tbl_Unpack",

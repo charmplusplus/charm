@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.8  1997-07-18 21:21:10  milind
+ * Revision 2.9  1997-10-29 23:52:51  milind
+ * Fixed CthInitialize bug on uth machines.
+ *
+ * Revision 2.8  1997/07/18 21:21:10  milind
  * all files of the form perf-*.c have been changed to trace-*.c, with
  * name expansions. For example, perf-proj.c has been changed to
  * trace-projections.c.
@@ -74,7 +77,7 @@ CpvExtern(char *, ReadFromBuffer);
 /* The following functions are used to copy the read-buffer out of and 	*/
 /* into the read only variables. 					*/
 /************************************************************************/
-_CK_13CopyToBuffer(srcptr, var_size) 
+void _CK_13CopyToBuffer(srcptr, var_size) 
 char *srcptr;
 int var_size;
 {
@@ -84,7 +87,7 @@ int var_size;
     *CpvAccess(ReadBufIndex)++ = *srcptr++;
 }
 
-_CK_13CopyFromBuffer(destptr, var_size) 
+void _CK_13CopyFromBuffer(destptr, var_size) 
 char *destptr;
 int var_size;
 {
@@ -95,7 +98,7 @@ int var_size;
 }
 
 
-BroadcastReadBuffer(ReadBuffer, size, mainChareBlock)
+void BroadcastReadBuffer(ReadBuffer, size, mainChareBlock)
 char *ReadBuffer;
 int size;
 struct chare_block * mainChareBlock;
@@ -115,7 +118,7 @@ struct chare_block * mainChareBlock;
 }
 
 
-ReadMsgInit(msg, id)
+void ReadMsgInit(msg, id)
 char *msg;
 int id;
 {

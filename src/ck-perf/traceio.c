@@ -37,7 +37,7 @@ int *event, *dest,  *pe;
 }
 
 
-write_out_debug_line(fp, type, mtype, entry, time, event, pe)
+void write_out_debug_line(fp, type, mtype, entry, time, event, pe)
 FILE *fp;
 int type, mtype, entry;
 unsigned int time;
@@ -86,28 +86,23 @@ int *event, *dest, *pe;
 			if (replay && *type==CREATION && *mtype==NewChareMsg) 
 				value = fscanf(fp, "%d", dest);
 			return value;
-          	break;
 
        	case ENQUEUE:
        	case DEQUEUE:
            	return fscanf(fp, "%d %u %d %d", mtype, time, event, pe);
-           	break;
 	
        	case INSERT:
        	case FIND:
        	case DELETE:
            	return fscanf(fp, "%d %d %u %d", mtype, entry, time, pe);
-           	break;
 
        	case BEGIN_INTERRUPT:
        	case END_INTERRUPT:
            	return fscanf(fp, "%u %d %d", time, event, pe);
-           	break;
 	
        	case BEGIN_COMPUTATION:
        	case END_COMPUTATION:
            	return fscanf(fp, "%u", &time);
-           	break;
 	
        	default:
            	printf("***ERROR*** Wierd Event %d.\n", *type);
@@ -115,7 +110,7 @@ int *event, *dest, *pe;
     }
 }
 
-write_out_projections_line(fp, type, mtype, entry, time, event, pe)
+void write_out_projections_line(fp, type, mtype, entry, time, event, pe)
 FILE *fp;
 int type, mtype, entry;
 unsigned int time;

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.6  1995-09-07 21:21:38  jyelon
+ * Revision 2.7  1997-10-29 23:52:55  milind
+ * Fixed CthInitialize bug on uth machines.
+ *
+ * Revision 2.6  1995/09/07 21:21:38  jyelon
  * Added prefixes to Cpv and Csv macros, fixed bugs thereby revealed.
  *
  * Revision 2.5  1995/09/06  21:48:50  jyelon
@@ -52,6 +55,8 @@ static char ident[] = "@(#)$Header$";
 #include "wrtone.h"
 
 extern CHARE_BLOCK *CreateChareBlock();
+void HostReceiveAcknowledge();
+
 
 /*****************************************************************************
 *****************************************************************************/
@@ -215,7 +220,7 @@ TRACE(CmiPrintf("Host::  HostAddWriteOnceVar...wovID %d, size %d\n",
  in question. We can then send a message to the user program on the originating
  node, telling the user that it is now ok to access the WOV, or to broadcast
  the id to other nodes, or whatever.  ***************************************************************************/ 
-HostReceiveAcknowledge(msgptr_,localdataptr_)
+void HostReceiveAcknowledge(msgptr_,localdataptr_)
 void *msgptr_,*localdataptr_;
 {
 	Ack_To_Host_Msg *ackMessage    = (Ack_To_Host_Msg *) msgptr_;
@@ -266,14 +271,14 @@ ChareIDType    cid;
 		*dest++ = *src++;
 	/* here we bypass the SendMsg function and just call directly */
 	if (CmiMyPe() == 0)
-		HostAddWriteOnceVar(newWov,GetBocDataPtr(WOVBocNum));
+		HostAddWriteOnceVar((void *)newWov,(void *)GetBocDataPtr(WOVBocNum));
 	else
 		GeneralSendMsgBranch(CsvAccess(CkEp_WOV_HostAddWOV), newWov,
 		    0, ImmBocMsg, WOVBocNum);
 }
 
 
-WOVAddSysBocEps()
+void WOVAddSysBocEps(void)
 {
   CsvAccess(CkEp_WOV_AddWOV) =
     registerBocEp("CkEp_WOV_AddWOV",

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.4  1995-09-01 02:13:17  jyelon
+ * Revision 2.5  1997-10-29 23:52:49  milind
+ * Fixed CthInitialize bug on uth machines.
+ *
+ * Revision 2.4  1995/09/01 02:13:17  jyelon
  * VID_BLOCK, CHARE_BLOCK, BOC_BLOCK consolidated.
  *
  * Revision 2.3  1995/07/27  20:29:34  jyelon
@@ -46,6 +49,8 @@ extern void * CPlus_GetMonoMsgPtr() ;
 extern void CPlus_CallUpdateFn() ;
 extern void CPlus_SetMonoId() ;
 
+void _CK_BroadcastMono();
+
 
 void * MonoValue(bocnum)
 int bocnum;
@@ -70,7 +75,7 @@ ChareIDType *ReturnID;
 }
 
 
-MONO_BranchInit_Fn(msg, mydata)
+void MONO_BranchInit_Fn(msg, mydata)
 void *msg;
 MONO_DATA *mydata;
 {
@@ -90,7 +95,7 @@ MONO_DATA *mydata;
 
 
 
-_CK_9MONO_BranchNewValue(mydata, x)
+void _CK_9MONO_BranchNewValue(mydata, x)
 MONO_DATA *mydata; 
 char *x;
 {
@@ -102,7 +107,7 @@ char *x;
 }
 
 
-MONO_BranchUpdate_Fn(msg, mydata)
+void MONO_BranchUpdate_Fn(msg, mydata)
 char *msg;
 MONO_DATA *mydata;
 {
@@ -136,7 +141,7 @@ MONO_DATA *mydata ;
 		return(mydata->dataptr) ;
 }
 
-_CK_BroadcastMono(msg, bocnum)
+void _CK_BroadcastMono(msg, bocnum)
 void *msg ; 
 int bocnum ;
 {
@@ -148,7 +153,7 @@ int bocnum ;
 }
 
 
-MonoAddSysBocEps()
+void MonoAddSysBocEps(void)
 {
   CsvAccess(CkChare_MONO) =
     registerChare("CkChare_MONO",sizeof(MONO_DATA),NULL);

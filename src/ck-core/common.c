@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.2  1997-07-18 21:21:04  milind
+ * Revision 2.3  1997-10-29 23:52:44  milind
+ * Fixed CthInitialize bug on uth machines.
+ *
+ * Revision 2.2  1997/07/18 21:21:04  milind
  * all files of the form perf-*.c have been changed to trace-*.c, with
  * name expansions. For example, perf-proj.c has been changed to
  * trace-projections.c.
@@ -54,7 +57,7 @@ various offsets again and again, they have been made into variables,
 computed only once at initialization. Any changes made to the layout
 of the message must be reflected here. */
 /**********************************************************************/
-InitializeMessageMacros()
+void InitializeMessageMacros(void)
 {
 /* The message format is as follows :
         -------------------------------------

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.15  1997-10-03 19:51:36  milind
+ * Revision 2.16  1997-10-29 23:52:53  milind
+ * Fixed CthInitialize bug on uth machines.
+ *
+ * Revision 2.15  1997/10/03 19:51:36  milind
  * Made charmc to work again, after inserting trace calls in converse part,
  * i.e. threads and user events.
  *
@@ -117,7 +120,7 @@ void statModuleInit()
 
 
 
-StatInit()
+void StatInit(void)
 {
 	CHARE_BLOCK *bocBlock;
 	int i;
@@ -128,7 +131,7 @@ StatInit()
 		CpvAccess(RecdStatMsg) = 0;
 }
 
-StatisticBocInit()
+void StatisticBocInit(void)
 {
 	CHARE_BLOCK *bocBlock;
 
@@ -138,7 +141,7 @@ StatisticBocInit()
 }
 
 
-NodeCollectStatistics(msgPtr, localdataPtr)
+void NodeCollectStatistics(msgPtr, localdataPtr)
 void *msgPtr;
 void *localdataPtr;
 {
@@ -181,7 +184,7 @@ TRACE(CmiPrintf("Node %d: Enter NodeCollectStatistics() \n", CmiMyPe()));
 
 
 
-CollectStatistics()
+void CollectStatistics(void)
 {
 	DUMMY_STAT_MSG *mPtr;
 
@@ -194,7 +197,7 @@ CollectStatistics()
 }
 
 
-CollectFromNodes(msgPtr, localdataptr)
+void CollectFromNodes(msgPtr, localdataptr)
 void *msgPtr, *localdataptr;
 {
 	int i,j,k;
@@ -254,7 +257,7 @@ TRACE(CmiPrintf("Host %d: Enter CollectFromNodes(): NumPes %d\n",
 
 
 
-PrintOutStatistics()
+void PrintOutStatistics(void)
 {
 	int i,j,k;
 	int col = 0;
@@ -352,7 +355,7 @@ PrintOutStatistics()
 	}
 }
 
-StatAddSysBocEps()
+void StatAddSysBocEps(void)
 {
   extern BroadcastExitMessage(), ExitMessage();
 

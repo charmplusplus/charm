@@ -53,7 +53,11 @@ extern void setEvent(CthThread t, int event);
 extern int getEvent(CthThread t);
 /* end addition */
 
-traceModuleInit(pargc, argv)
+void add_to_buffer();
+void program_name();
+void wrtlog();
+
+void traceModuleInit(pargc, argv)
 int *pargc;
 char **argv;
 {
@@ -92,7 +96,7 @@ char *str ;
 
 
 /**********All the trace functions *****************/
-trace_user_event(int eventNum)
+void trace_user_event(int eventNum)
 {
     add_to_buffer(USER_EVENT, eventNum, -1,
                             CkUTimer(), CpvAccess(current_event),
@@ -100,7 +104,7 @@ trace_user_event(int eventNum)
     CpvAccess(current_event) += 1;
 }
 
-trace_creation(msg_type, entry, envelope)
+void trace_creation(msg_type, entry, envelope)
 int msg_type, entry;
 ENVELOPE *envelope;
 {
@@ -130,7 +134,7 @@ ENVELOPE *envelope;
   CpvAccess(current_event) += CpvAccess(iteration);  
 }
 
-trace_begin_execute(envelope)
+void trace_begin_execute(envelope)
 ENVELOPE *envelope;
 {
   int msg_type;
@@ -156,7 +160,7 @@ ENVELOPE *envelope;
          CpvAccess(begin_event), CpvAccess(begin_pe));
 }
 
-trace_end_execute(id, msg_type, entry)
+void trace_end_execute(id, msg_type, entry)
 int id, msg_type, entry;
 {
 /* Addition for threads tracing */
@@ -171,19 +175,19 @@ int id, msg_type, entry;
             CpvAccess(begin_event), CpvAccess(begin_pe));
 }
 
-trace_begin_idle()
+void trace_begin_idle(void)
 {
   /* msgtype, entry, and event are not used */
   add_to_buffer(BEGIN_IDLE, 0, 0, CkUTimer(), 0, CmiMyPe());
 }
 
-trace_end_idle()
+void trace_end_idle(void)
 {
   /* msgtype, entry, and event are not used */
   add_to_buffer(END_IDLE, 0, 0, CkUTimer(), 0, CmiMyPe());
 }
 
-trace_begin_charminit() 
+void trace_begin_charminit(void) 
 {
     int *msg;
     ENVELOPE *envelope;
@@ -197,14 +201,14 @@ trace_begin_charminit()
 
 }
 
-trace_end_charminit() 
+void trace_end_charminit(void) 
 {
     add_to_buffer(END_PROCESSING, NewChareMsg, -1, CkUTimer(),
       CpvAccess(store_event), CpvAccess(store_pe));
 }
 
 
-trace_enqueue(envelope)
+void trace_enqueue(envelope)
 ENVELOPE *envelope;
 {
   int add=0;
@@ -218,7 +222,7 @@ ENVELOPE *envelope;
           GetEnv_event(envelope)+add, GetEnv_pe(envelope));
 }
 
-trace_dequeue(envelope)
+void trace_dequeue(envelope)
 ENVELOPE *envelope;
 {
   int add=0;
@@ -232,13 +236,13 @@ ENVELOPE *envelope;
           GetEnv_event(envelope), GetEnv_pe(envelope));
 }
 
-trace_table(type, tbl, key, pe)
+void trace_table(type, tbl, key, pe)
 int type, tbl, key, pe;
 {
   add_to_buffer(type, tbl, key, CkUTimer(), -1, pe);
 }
 
-trace_begin_computation()
+void trace_begin_computation(void)
 {
 /* Addition for threads tracing */
   CpvAccess(threadMsg) = registerMsg("dummy_thread_msg", 0, 0, 0, 0);
@@ -250,7 +254,7 @@ trace_begin_computation()
   add_to_buffer(BEGIN_COMPUTATION, -1, -1, CkUTimer(), -1, -1);
 }
 
-trace_end_computation()
+void trace_end_computation(void)
 {
   add_to_buffer(END_COMPUTATION, -1, -1, CkUTimer(), -1, -1, -1);
 }
@@ -260,7 +264,7 @@ trace_end_computation()
 /***   out on the output file.                **/
 /***********************************************************************/ 
 
-add_to_buffer(type, msg_type, entry, t1, event, pe)
+void add_to_buffer(type, msg_type, entry, t1, event, pe)
 int type;
 int msg_type;
 int entry;
@@ -313,7 +317,7 @@ CmiMyPe(), CpvAccess(logcnt), type, msg_type, entry, t1, t2, event));
 /***   set up the log files.                **/
 /***********************************************************************/ 
 
-log_init()
+void log_init(void)
 { 
   int pe;
   int length;
@@ -357,7 +361,7 @@ log_init()
 /*** the log files.                  **/
 /***********************************************************************/ 
 
-close_log()
+void close_log(void)
 {
   int i;
   int pe;
@@ -433,7 +437,7 @@ close_log()
 /***********************************************************************/ 
 /***  This function is used to determine the name of the program.     **/
 /***********************************************************************/ 
-program_name(s)
+void program_name(s)
 char *s;
 {
   CpvAccess(pgm) = (char *) malloc(strlen(s) + 1);
@@ -446,7 +450,7 @@ char *s;
 /***  buffer is full, or the program has terminated.          **/
 /***********************************************************************/ 
 
-wrtlog(pe, buffer, count)
+void wrtlog(pe, buffer, count)
 int pe;
 LOGSTR *buffer;
 int count;
@@ -471,10 +475,9 @@ int count;
 }
 
 
+void send_log(void) {}
 
-send_log() {}
-
-CollectTraceFromNodes(msg, data)
+void CollectTraceFromNodes(msg, data)
 char  msg, data;
 {}
 

@@ -13,7 +13,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.6  1995-10-19 18:21:18  jyelon
+ * Revision 2.7  1997-10-29 23:52:45  milind
+ * Fixed CthInitialize bug on uth machines.
+ *
+ * Revision 2.6  1995/10/19 18:21:18  jyelon
  * added typecasts to remove warnings.
  *
  * Revision 2.5  1995/10/13  18:15:53  jyelon
@@ -55,7 +58,7 @@ void condsendModuleInit()
   This function sends out a message using fields that it extracts from its one
   argument
  *****************************************************************************/
-static int SendMsgFn(arg)
+static void SendMsgFn(arg)
     void *arg;
 {
   SendMsgStuff *sendstruct;
@@ -70,7 +73,7 @@ static int SendMsgFn(arg)
   This function makes a BOC call using fields that it extracts from its one
   argument
  *****************************************************************************/
-static int CallBocFn(arg)
+static void CallBocFn(arg)
     void *arg;
 {
   CallBocStuff *cbocstruct;

@@ -229,11 +229,13 @@ static void *CthAbortHelp(qt_t *sp, CthThread old, void *null)
 {
   if (old->data) free(old->data);
   free(old);
+  return (void *) 0;
 }
 
 static void *CthBlockHelp(qt_t *sp, CthThread old, void *null)
 {
   old->stackp = sp;
+  return (void *) 0;
 }
 
 void CthResume(t)
@@ -271,7 +273,7 @@ CthVoidFn fn; void *arg; int size;
   result = (CthThread)malloc(sizeof(struct CthThreadStruct)+size);
   if (result==0) { CmiError("Out of memory."); exit(1); }
   stack = ((char*)result)+sizeof(struct CthThreadStruct);
-  stack = (char *)QT_STKROUNDUP(((int)stack));
+  stack = (char *)QT_STKROUNDUP(((size_t)stack));
   CthThreadInit(result);
   result->stackp = QT_SP(stack, size - QT_STKALIGN);
   result->stackp = 

@@ -168,6 +168,8 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     wait(0);
 }
 
+static void neighbour_init(int);
+
 static void threadInit(void *arg)
 {
   USER_PARAMETERS *usrparam;
@@ -204,7 +206,7 @@ void ConverseExit(void)
 }
 
 
-CmiDeclareArgs()
+void CmiDeclareArgs(void)
 {
 }
 
@@ -324,7 +326,7 @@ long CmiNumNeighbours(int node)
 }
 
 
-CmiGetNodeNeighbours(int node, int *neighbours)
+void CmiGetNodeNeighbours(int node, int *neighbours)
 {
   int i;
 
@@ -344,7 +346,7 @@ int CmiNeighboursIndex(int node, int neighbour)
 }
 
 
-static neighbour_init(int p)
+static void neighbour_init(int p)
 {
   int a,b,n;
 

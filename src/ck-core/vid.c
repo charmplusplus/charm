@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.10  1997-07-18 21:21:13  milind
+ * Revision 2.11  1997-10-29 23:52:54  milind
+ * Fixed CthInitialize bug on uth machines.
+ *
+ * Revision 2.10  1997/07/18 21:21:13  milind
  * all files of the form perf-*.c have been changed to trace-*.c, with
  * name expansions. For example, perf-proj.c has been changed to
  * trace-projections.c.
@@ -88,7 +91,7 @@ EpLanguageTable to be indexed by 65535 in CallProcessMsg.
 #include "trace.h"
 #include "vid.h"
 
-VidEnqueueMsg(env)
+void VidEnqueueMsg(env)
 ENVELOPE *env;
 {
   CHARE_BLOCK *vid = GetEnv_chareBlockPtr(env);
@@ -96,7 +99,7 @@ ENVELOPE *env;
   FIFO_EnQueue(vidqueue, env);
 }
 
-VidForwardMsg(env)
+void VidForwardMsg(env)
 ENVELOPE *env;
 {
   CHARE_BLOCK *vid = GetEnv_chareBlockPtr(env);
@@ -116,7 +119,7 @@ ENVELOPE *env;
 /*      to the processor on which the chare was finally created.        */
 /************************************************************************/
 
-VidSendOverMessages(msgPtr, data_area)
+void VidSendOverMessages(msgPtr, data_area)
 CHARE_ID_MSG *msgPtr;
 void *data_area;
 {
@@ -160,7 +163,7 @@ void *data_area;
 /*      messages that were stored in its VID                            */
 /************************************************************************/
 
-VidRetrieveMessages(chareblockPtr,vidPE,vidBlockPtr)
+void VidRetrieveMessages(chareblockPtr,vidPE,vidBlockPtr)
 CHARE_BLOCK * chareblockPtr;
 PeNumType  vidPE;
 CHARE_BLOCK *vidBlockPtr;

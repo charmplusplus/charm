@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.13  1997-07-18 21:21:02  milind
+ * Revision 2.14  1997-10-29 23:52:43  milind
+ * Fixed CthInitialize bug on uth machines.
+ *
+ * Revision 2.13  1997/07/18 21:21:02  milind
  * all files of the form perf-*.c have been changed to trace-*.c, with
  * name expansions. For example, perf-proj.c has been changed to
  * trace-projections.c.
@@ -130,8 +133,10 @@ CpvStaticDeclare(BOCID_MESSAGE_COUNT_, BocIDMessageCountTable);
 
 CHARE_BLOCK *CreateChareBlock();
 
+void GeneralSendMsgBranch();
 
-void bocModuleInit()
+
+void bocModuleInit(void)
 {
    CpvInitialize(int, number_dynamic_boc);
    CpvInitialize(MSG_ELEMENT_, DynamicBocMsgList);
@@ -144,12 +149,12 @@ void bocModuleInit()
 
 
 
-InitializeDynamicBocMsgList()
+void InitializeDynamicBocMsgList(void)
 {
 	CpvAccess(DynamicBocMsgList) = (MSG_ELEMENT *) NULL;
 }
 
-InitializeBocDataTable()
+void InitializeBocDataTable(void)
 {
 	int i;
 
@@ -157,7 +162,7 @@ InitializeBocDataTable()
 	    CpvAccess(BocDataTable)[i] = (BOCDATA_QUEUE_ELEMENT *) NULL;
 }
 
-InitializeBocIDMessageCountTable()
+void InitializeBocIDMessageCountTable(void)
 {
 	int i;
 
@@ -165,7 +170,7 @@ InitializeBocIDMessageCountTable()
 	    CpvAccess(BocIDMessageCountTable)[i] = (BOCID_MESSAGE_COUNT *) NULL;
 }
 
-GetDynamicBocMsg(ref, msg, ep)
+void GetDynamicBocMsg(ref, msg, ep)
 int ref;
 void **msg;
 ChareNumType *ep;
@@ -224,6 +229,7 @@ TRACE(CmiPrintf("[%d] GetBocBlockPtr: bocNum=%d, index=%d, element=0x%x\n",
 	}
 	CmiPrintf("[%d] *** ERROR *** Unable to locate BOC %d data ptr.\n",
 		CmiMyPe(),  bocNum);
+  return (CHARE_BLOCK *) 0;
 }
 
 
@@ -273,7 +279,7 @@ TRACE(CmiPrintf("[%d] SetDynamicBocMsg: ref=%d, ep=%d\n",
 	return (new->ref);
 }
 
-SetBocBlockPtr(bocNum, ptr)
+void SetBocBlockPtr(bocNum, ptr)
 ChareNumType bocNum;
 CHARE_BLOCK *ptr;
 {
@@ -372,9 +378,10 @@ ChareIDType *ReturnID;
       GeneralSendMsgBranch(CsvAccess(CkEp_DBOC_OtherCreateBoc), msg,
 			   0, ImmBocMsg, DynamicBocNum);
     }
+    return 0;
 }
 
-OtherCreateBoc(msg, mydata)
+void OtherCreateBoc(msg, mydata)
 DYNAMIC_BOC_REQUEST_MSG *msg;
 char *mydata;
 {
@@ -402,7 +409,7 @@ void *mydata;
         return chare->x.boc_num;
 }
 
-MyBranchID(pChareID, mydata)
+void MyBranchID(pChareID, mydata)
 ChareIDType *pChareID;
 void *mydata;
 {
@@ -410,7 +417,7 @@ void *mydata;
         *pChareID = chare->selfID;
 }
 
-GeneralSendMsgBranch(ep, msg, destPE, type, bocnum)
+void GeneralSendMsgBranch(ep, msg, destPE, type, bocnum)
 EntryPointType ep;
 void *msg;
 PeNumType destPE;
@@ -443,7 +450,7 @@ TRACE(CmiPrintf("[%d] GeneralSend: type=%d, msgType=%d\n",
 
 
 
-GeneralBroadcastMsgBranch(ep, msg, type, bocnum)
+void GeneralBroadcastMsgBranch(ep, msg, type, bocnum)
 EntryPointType ep;
 void *msg;
 MsgTypes type;
@@ -474,7 +481,7 @@ TRACE(CmiPrintf("[%d] GeneralBroadcast: type=%d, msgType=%d\n",
 }
 
 
-RegisterDynamicBocInitMsg(bocnumptr, mydata)
+void RegisterDynamicBocInitMsg(bocnumptr, mydata)
 ChareNumType *bocnumptr;
 void *mydata;
 {
@@ -501,13 +508,13 @@ TRACE(CmiPrintf("[%d] RegisterDynamicBoc: bocnum=%d, bocdata=0x%x\n",
 					&bocdata->ReturnID);
 		}
 		else
-			GeneralSendMsgBranch(CsvAccess(CkEp_DBOC_RegisterDynamicBocInitMsg), msg,
+			GeneralSendMsgBranch(CsvAccess(CkEp_DBOC_RegisterDynamicBocInitMsg), (void *) msg,
                            CmiSpanTreeParent(mype), ImmBocMsg, DynamicBocNum);
 	}
 }
 
 
-InitiateDynamicBocBroadcast(msg, mydata)
+void InitiateDynamicBocBroadcast(msg, mydata)
 DYNAMIC_BOC_NUM_MSG *msg;
 char *mydata;
 {
@@ -533,7 +540,7 @@ TRACE(CmiPrintf("[%d] InitiateDynamicBocBroadcast: ref=%d, boc=%d, ep=%d\n",
 
 }
 
-DynamicBocInit()
+void DynamicBocInit(void)
 {
     	CHARE_BLOCK *bocBlock;
 
@@ -544,7 +551,7 @@ DynamicBocInit()
 }
 
 
-DynamicAddSysBocEps()
+void DynamicAddSysBocEps(void)
 {
   CsvAccess(CkEp_DBOC_RegisterDynamicBocInitMsg) =
     registerBocEp("CkEp_DBOC_RegisterDynamicBocInitMsg",

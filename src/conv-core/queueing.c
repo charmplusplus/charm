@@ -17,7 +17,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.4  1996-04-24 22:44:16  jyelon
+ * Revision 1.5  1997-10-29 23:53:08  milind
+ * Fixed CthInitialize bug on uth machines.
+ *
+ * Revision 1.4  1996/04/24 22:44:16  jyelon
  * *** empty log message ***
  *
  * Revision 1.3  1995/10/12 18:14:52  jyelon
@@ -43,7 +46,7 @@
 static char ident[] = "@(#)$Header$";
 
 #include <converse.h>
-#define INTBITS (sizeof(int)*8)
+#define INTBITS ((unsigned int) (sizeof(int)*8))
 
 typedef struct prio
 {
@@ -317,7 +320,7 @@ Queue CqsCreate()
   Queue q = (Queue)CmiAlloc(sizeof(struct Queue));
   q->length = 0;
   q->maxlen = 0;
-  CqsDeqInit(&(q->zeroprio), 100);
+  CqsDeqInit(&(q->zeroprio));
   CqsPrioqInit(&(q->negprioq));
   CqsPrioqInit(&(q->posprioq));
   return q;

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.1  1997-03-28 17:38:25  milind
+ * Revision 1.2  1997-10-29 23:53:14  milind
+ * Fixed CthInitialize bug on uth machines.
+ *
+ * Revision 1.1  1997/03/28 17:38:25  milind
  * Added Origin2000 version.
  *
  * Revision 2.6  1995/10/27 21:45:35  jyelon
@@ -46,7 +49,7 @@ static char ident[] = "@(#)$Header$";
 #define MAXSPAN    4          /* The maximum permitted span on 
 				 each node of the spanning tree */
 
-CmiSpanTreeInit()
+void CmiSpanTreeInit(void)
 {
 }
 
@@ -86,7 +89,7 @@ int node;
     else return ((CmiNumPes() - 1) - node * MAXSPAN);
 }
 
-CmiSendToSpanTreeLeaves(size, msg)
+void CmiSendToSpanTreeLeaves(size, msg)
 int size;
 char * msg;
 {

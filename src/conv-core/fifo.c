@@ -103,7 +103,7 @@ void FIFO_DeQueue(queue, element)
   } else *element = 0;
 }
 
-FIFO_Destroy(queue)
+void FIFO_Destroy(queue)
      FIFO_QUEUE *queue;
 {
   if (!FIFO_Empty(queue)) {

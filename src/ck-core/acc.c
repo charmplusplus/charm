@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.5  1995-10-13 18:15:53  jyelon
+ * Revision 2.6  1997-10-29 23:52:42  milind
+ * Fixed CthInitialize bug on uth machines.
+ *
+ * Revision 2.5  1995/10/13 18:15:53  jyelon
  * K&R changes.
  *
  * Revision 2.4  1995/09/01  02:13:17  jyelon
@@ -51,13 +54,13 @@ extern void CPlus_SetAccId() ;
 
 
 /* internal functions */
-static ACC_CollectFromNode_Fn();
-static ACC_LeafNodeCollect_Fn();
-static ACC_InteriorNodeCollect_Fn();
-static ACC_BranchInit_Fn();
+static void ACC_CollectFromNode_Fn();
+static void ACC_LeafNodeCollect_Fn();
+static void ACC_InteriorNodeCollect_Fn();
+static void ACC_BranchInit_Fn();
 
 
-AccAddSysBocEps()
+void AccAddSysBocEps(void)
 {
   CsvAccess(CkChare_ACC) =
     registerChare("CkChare_ACC", sizeof(ACC_DATA), NULL);
@@ -84,7 +87,7 @@ AccAddSysBocEps()
 
 
 
-CollectValue(bocnum, EP, CID)
+void CollectValue(bocnum, EP, CID)
 int bocnum;
 int EP;
 ChareIDType *CID;
@@ -102,7 +105,7 @@ ChareIDType *CID;
 }
 
 
-static ACC_CollectFromNode_Fn(msg, mydata)
+static void ACC_CollectFromNode_Fn(msg, mydata)
 ACC_COLLECT_MSG *msg;
 ACC_DATA *mydata;
 {
@@ -126,7 +129,7 @@ ACC_DATA *mydata;
 
 
 
-static ACC_LeafNodeCollect_Fn(msg, mydata)
+static void ACC_LeafNodeCollect_Fn(msg, mydata)
 DummyMsg *msg;
 ACC_DATA *mydata;
 {
@@ -151,7 +154,7 @@ TRACE(CmiPrintf("[%d] ACC_NodeCollect : Sent message to parent\n",
 
 
 
-static ACC_InteriorNodeCollect_Fn(msg, mydata)
+static void ACC_InteriorNodeCollect_Fn(msg, mydata)
 char *msg;
 ACC_DATA *mydata;
 {
@@ -198,7 +201,7 @@ TRACE(CmiPrintf("[%d] CreateAcc: boc = %d\n", CmiMyPe(), (AccIDType ) boc));
 }
 
 
-static ACC_BranchInit_Fn(msg, mydata)
+static void ACC_BranchInit_Fn(msg, mydata)
 void *msg;
 ACC_DATA *mydata; 
 {

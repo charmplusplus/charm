@@ -779,8 +779,8 @@ static mchunkptr malloc_from_sys(nb) size_t nb;
     return 0;
   sbrked_mem += sbrk_size;
 
-  if (((int)cp) & MALLOC_ALIGN_MASK) {
-    offs = ((int)cp) & MALLOC_ALIGN_MASK;
+  if (((size_t)cp) & MALLOC_ALIGN_MASK) {
+    offs = ((size_t)cp) & MALLOC_ALIGN_MASK;
     cp += MALLOC_MIN_OVERHEAD - offs;
     sbrk_size -= MALLOC_MIN_OVERHEAD;
     sbrk(- offs);

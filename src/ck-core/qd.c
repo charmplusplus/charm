@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.5  1997-02-13 17:32:40  milind
+ * Revision 1.6  1997-10-29 23:52:50  milind
+ * Fixed CthInitialize bug on uth machines.
+ *
+ * Revision 1.5  1997/02/13 17:32:40  milind
  * Fixed a minor typo in CmiSignal in convcore.c.
  * Changed net-hp-cc/conv-mach.h to set ASYNC_NOT_NEEDED.
  *
@@ -144,9 +147,10 @@ CpvStaticDeclare(int, QDdirty);
 
 CpvStaticDeclare(int, countResponses); /* # of rspnses received from children in this phase. */
 
+void InsertQuiescenceList();
 
 
-void quiesModuleInit()
+void quiesModuleInit(void)
 {
    CpvInitialize(LIST_, creation_list);
    CpvInitialize(LIST_, process_list);
@@ -225,7 +229,7 @@ The next two procedures start quiescence and insert every request into
 quiescence list, so that when quiescence is detected a message can be 
 sent back to the user at every requested entry point.
 ***************************************************************************/
-StartQuiescence(ep, chareid)
+void StartQuiescence(ep, chareid)
 EntryPointType ep;
 ChareIDType *chareid;
 {
@@ -243,7 +247,7 @@ ChareIDType *chareid;
 }
 
 
-InsertQuiescenceList(msgptr, localdataptr)
+void InsertQuiescenceList(msgptr, localdataptr)
 START_QUIESCENCE_MSG *msgptr;
 void *localdataptr;
 {

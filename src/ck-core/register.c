@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.9  1997-08-22 19:29:07  milind
+ * Revision 2.10  1997-10-29 23:52:52  milind
+ * Fixed CthInitialize bug on uth machines.
+ *
+ * Revision 2.9  1997/08/22 19:29:07  milind
  * Added user-event tracing.
  *
  * Revision 2.8  1996/03/28 14:45:11  kale
@@ -121,8 +124,8 @@ int size ;
 	return(CpvAccess(msgCount)-1) ;
 }
 
-setThreadedEp( int entry) {
-(CsvAccess(EpInfoTable)+ entry)->threaded = 1;
+void setThreadedEp( int entry) {
+  (CsvAccess(EpInfoTable)+ entry)->threaded = 1;
 }
 
 void SetEp(ep,name,function,language,messageindex,chareindex,chare_or_boc)

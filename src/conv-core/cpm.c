@@ -79,6 +79,7 @@ void *CpmEnqueue1(CpmDestinationEnq ctrl, int len, void *msg)
   memcpy(env+3, ctrl->prioptr, prioints*sizeof(int));
   CmiSetHandler(msg, CpvAccess(CpmEnqueue2_Index));
   CpmLSend(ctrl->pe, len, msg);
+  return (void *) 0;
 }
 
 CpmDestination CpmEnqueue(int pe, int qs, int priobits, int *prioptr)
@@ -141,6 +142,7 @@ void *CpmEnqueueFIFO1(CpmDestinationSend ctrl, int len, void *msg)
   env[0] = CmiGetHandler(msg);
   CmiSetHandler(msg, CpvAccess(CpmEnqueueFIFO2_Index));
   CpmLSend(ctrl->pe, len, msg);
+  return (void *) 0;
 }
 
 CpvStaticDeclare(DestinationSend, ctrlFIFO);
@@ -176,6 +178,7 @@ void *CpmEnqueueLIFO1(CpmDestinationSend ctrl, int len, void *msg)
   env[0] = CmiGetHandler(msg);
   CmiSetHandler(msg, CpvAccess(CpmEnqueueLIFO2_Index));
   CpmLSend(ctrl->pe, len, msg);
+  return (void *) 0;
 }
 
 CpvStaticDeclare(DestinationSend, ctrlLIFO);
