@@ -105,6 +105,9 @@
 /* whether glibc backtrace works */
 #undef CMK_USE_BACKTRACE
 
+/* whether it has mkstemp */
+#undef CMK_USE_MKSTEMP
+
 /* whether the poll() syscall exists */
 #undef CMK_USE_POLL
 
