@@ -132,6 +132,14 @@ class Trace {
 #define ALLDO(x) for (int i=0; i<length(); i++) if (traces[i]->traceOnPE()) traces[i]->x
 #define ALLREVERSEDO(x) for (int i=length()-1; i>=0; i--) if (traces[i]->traceOnPE()) traces[i]->x
 
+#ifndef CMK_OPTIMIZE
+#  define _TRACE_ONLY(code) do{if(CpvAccess(traceOn)){ code; }} while(0)
+#  define _TRACE_ALWAYS(code) do{ code; } while(0)
+#else
+#  define _TRACE_ONLY(code) /*empty*/
+#  define _TRACE_ALWAYS(code) /*empty*/
+#endif
+
 /// Array of Traces modules,  every event raised will go through every Trace module.
 class TraceArray {
 private:
@@ -210,9 +218,7 @@ public:
 
     /* calls for thread listener registration for each trace module */
     inline void traceAddThreadListeners(CthThread tid, envelope *e) {
-#ifndef CMK_OPTIMIZE /* do nothing if optimized codes are used */
-      ALLDO(traceAddThreadListeners(tid, e));
-#endif
+	_TRACE_ONLY(ALLDO(traceAddThreadListeners(tid, e)));
     }
 };
 
@@ -221,14 +227,6 @@ CkpvExtern(TraceArray*, _traces);
 extern "C" {
 #include "conv-trace.h"
 }
-
-#ifndef CMK_OPTIMIZE
-#  define _TRACE_ONLY(code) do{if(CpvAccess(traceOn)){ code; }} while(0)
-#  define _TRACE_ALWAYS(code) do{ code; } while(0)
-#else
-#  define _TRACE_ONLY(code) /*empty*/
-#  define _TRACE_ALWAYS(code) /*empty*/
-#endif
 
 #define _TRACE_USER_EVENT(x) _TRACE_ONLY(CkpvAccess(_traces)->userEvent(x))
 #define _TRACE_USER_EVENT_BRACKET(x,bt,et) _TRACE_ONLY(CkpvAccess(_traces)->userBracketEvent(x,bt,et))
