@@ -1842,7 +1842,10 @@ int main(int argc, char **argv, char **envp)
   if(arg_verbose) fprintf(stderr, "Charmrun> charmrun started...\n");
 #if CMK_BPROC
   /* check scyld configuration */
-  nodetab_init_for_scyld();
+  if (arg_nodelist)
+    nodetab_init();
+  else
+    nodetab_init_for_scyld();
 #else
   /* Initialize the node-table by reading nodesfile */
   nodetab_init();
