@@ -91,9 +91,14 @@ class SRtable {
   /// The buckets to sort sends/recvs into
   /** Only entries [0..b-1] are used */
   SRentry *buckets[MAX_B];
+  /// Pointers to the last entry of each bucket
+  /** Only entries [0..b-1] are used */
+  SRentry *end_bucket[MAX_B];
   /// The overflow bucket
   /** What doesn't fit in buckets goes here */
   SRentry *overflow;
+  /// End entry of overflow
+  SRentry *end_overflow;
   /// Number of distinct timestamp entries per bucket
   /** This is computed in CompressAndSortBucket */
   int numEntries[MAX_B];

@@ -37,15 +37,21 @@ void SRtable::Insert(POSE_TimeType ts, int sr)
 #endif
   CmiAssert(ts >= offset);
   CmiAssert((sr == 0) || (sr == 1));
-  int destBkt = (int)(((float)(ts-offset))/((float)size_b));  // which bucket?
-  SRentry *e;
+  int destBkt = (ts-offset)/size_b;  // which bucket?
+  SRentry *e = new SRentry(ts, sr, NULL);
   if (destBkt >= b) { // put in overflow bucket
-    e = new SRentry(ts, sr, overflow);
-    overflow = e;
+    if (overflow) {
+      end_overflow->next = e;
+      end_overflow = e;
+    }
+    else overflow = end_overflow = e;
   }
   else { // put in buckets[destBkt]
-    e = new SRentry(ts, sr, buckets[destBkt]);
-    buckets[destBkt] = e;
+    if (buckets[destBkt]) {
+      end_bucket[destBkt]->next = e;
+      end_bucket[destBkt] = e;
+    }
+    else buckets[destBkt] = end_bucket[destBkt] = e;
   }
 #ifdef SR_SANITIZE
   sanitize();
@@ -60,14 +66,21 @@ void SRtable::Insert(SRentry *e)
 #endif
   CmiAssert(e != NULL);
   CmiAssert(e->timestamp >= offset);
-  int destBkt = (int)(((float)(e->timestamp-offset))/((float)size_b));
+  int destBkt = (e->timestamp-offset)/size_b;
+  e->next = NULL;
   if (destBkt >= b) { // put in overflow bucket
-    e->next = overflow;
-    overflow = e;
+    if (overflow) {
+      end_overflow->next = e;
+      end_overflow = e;
+    }
+    else overflow = end_overflow = e;
   }
   else { // put in buckets[destBkt]
-    e->next = buckets[destBkt];
-    buckets[destBkt] = e;
+    if (buckets[destBkt]) {
+      end_bucket[destBkt]->next = e;
+      end_bucket[destBkt] = e;
+    }
+    else buckets[destBkt] = end_bucket[destBkt] = e;
   }
 #ifdef SR_SANITIZE
   sanitize();
@@ -77,14 +90,16 @@ void SRtable::Insert(SRentry *e)
 /// Restructure the table according to new GVT estimate and first send/recv
 /** Number of buckets and bucket size are determined from firstTS, and
     entries below newGVTest are discarded. */
-void SRtable::Restructure(POSE_TimeType newGVTest, POSE_TimeType firstTS, int firstSR)
+void SRtable::Restructure(POSE_TimeType newGVTest, POSE_TimeType firstTS, 
+			  int firstSR)
 {
 #ifdef SR_SANITIZE
   sanitize();
 #endif
-  //CkPrintf("SRtable::Restructure(%d, %d, %d)\n", newGVTest, firstTS, firstSR);
+  //CkPrintf("SRtable::Restructure(%d, %d, %d)\n", newGVTest,firstTS,firstSR);
   // Backup the table to make new one in its place
   int b_old = b, size_b_old = size_b, offset_old = offset;
+  int keepBkt = (newGVTest-offset)/size_b;
   SRentry *buckets_old[MAX_B], *overflow_old = overflow, *tmp;
   for (int i=0; i<b_old; i++) {
     buckets_old[i] = buckets[i];
@@ -95,24 +110,52 @@ void SRtable::Restructure(POSE_TimeType newGVTest, POSE_TimeType firstTS, int fi
   offset = newGVTest;
   b = firstTS - offset;
   if ((b > MAX_B) || (b == 0)) b = MAX_B;
-  size_b = (int)(1.0 + (((float)(firstTS - offset))/((float)b)));
+  size_b = 1 + (firstTS - offset)/b;
 
-  for (int j=0; j<b_old; j++) {
+  for (int j=0; j<keepBkt; j++) { // throw all these away
     tmp = buckets_old[j];
     while (tmp) {
       buckets_old[j] = tmp->next;
-      if (tmp->timestamp < offset) delete tmp;
-      else Insert(tmp);
+      delete tmp;
       tmp = buckets_old[j];
     }
   }
-  tmp = overflow_old;
+
+  // carefully sort through this bucket
+  tmp = buckets_old[keepBkt];
   while (tmp) {
-    overflow_old = tmp->next;
+    buckets_old[keepBkt] = tmp->next;
     if (tmp->timestamp < offset) delete tmp;
     else Insert(tmp);
-    tmp = overflow_old;
+    tmp = buckets_old[keepBkt];
   }
+
+  for (int j=keepBkt+1; j<b_old; j++) { // keep all of these
+    tmp = buckets_old[j];
+    while (tmp) {
+      buckets_old[j] = tmp->next;
+      Insert(tmp);
+      tmp = buckets_old[j];
+    }
+  }
+
+  tmp = overflow_old;
+  if (keepBkt < b_old) { // keep all of overflow
+    while (tmp) {
+      overflow_old = tmp->next;
+      Insert(tmp);
+      tmp = overflow_old;
+    }
+  }
+  else { // carefully sort through overflow
+    while (tmp) {
+      overflow_old = tmp->next;
+      if (tmp->timestamp < offset) delete tmp;
+      else Insert(tmp);
+      tmp = overflow_old;
+    }
+  }
+
   if (firstSR != -1) Insert(firstTS, firstSR);
 #ifdef SR_SANITIZE
   sanitize();
@@ -126,7 +169,7 @@ UpdateMsg *SRtable::PackTable(POSE_TimeType pvt)
   sanitize();
 #endif
   int packSize = 0, nEntries = 0, entryIdx = 0, nBkts = 0;
-  int destBkt = (int)(((float)(pvt-offset))/((float)size_b));  // which bucket?
+  int destBkt = (pvt-offset)/size_b;  // which bucket?
   SRentry *tmp;
 
   PartialSortTable(pvt);
@@ -169,8 +212,7 @@ void SRtable::PartialSortTable(POSE_TimeType pvt)
 #ifdef SR_SANITIZE
   sanitize();
 #endif
-  int sortall = 0, sortTo,
-    destBkt = (int)(((float)(pvt-offset))/((float)size_b));  // which bucket?
+  int sortall = 0, sortTo, destBkt = (pvt-offset)/size_b;  // which bucket?
   sortTo = destBkt;
   if (destBkt >= b) {
     sortall = 1; 
