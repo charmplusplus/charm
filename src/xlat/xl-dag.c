@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-05 18:52:05  brunner
+ * Revision 2.1  1995-06-13 07:56:43  jyelon
+ * Fixed silly warnings.
+ *
+ * Revision 2.0  1995/06/05  18:52:05  brunner
  * Reorganized file structure
  *
  * Revision 1.2  1995/05/04  21:26:44  milind
@@ -52,9 +55,18 @@ static fill_charenum();
 /* define in dagger.h also */ 
 #define DAG_NOREF   0
 
+#ifndef NULL
 #define NULL 0
+#endif
+
+#ifndef TRUE
 #define TRUE 1
+#endif
+
+#ifndef FALSE
 #define FALSE 0
+#endif
+
 #define NOFREE 0
 #define EXIT 1
 
@@ -135,8 +147,8 @@ typedef struct S_WCONDLIST WCONDLIST;
 
 
 
-ELIST *is_entry();
-CLIST *insert_cond();
+static ELIST *is_entry();
+static CLIST *insert_cond();
 
 
 char *wcounter="_dag3_wcounter";
@@ -232,7 +244,7 @@ char *name;
      strcpy(e_list->name,name);
      e_list->wlist   = NULL;
      e_list->eno     = current_eno++;
-     e_list->etype   = NULL;
+     e_list->etype   = 0;
      e_list->wlist   = (EWLIST *) NULL;
      e_list->numofwhen = 0;
      if (e_list->eno == 0) sprintf(base_name,"%s",name);
@@ -296,7 +308,7 @@ _dag_newwhen()
      new_when->clist = NULL;
      new_when->position_count = 0;
      new_when->wno   = current_wno++;
-     new_when->wtype = NULL;
+     new_when->wtype = 0;
      new_when->count = 0;
      first_cond_flag = TRUE;
 }    
