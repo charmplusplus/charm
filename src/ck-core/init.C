@@ -479,6 +479,7 @@ extern void _registerLBDatabase(void);
 extern void _registerExternalModules(char **argv);
 extern void _ckModuleInit(void);
 extern void _loadbalancerInit();
+extern "C" void initCharmProjections();
 
 void _registerInitCall(CkInitCallFn fn, int isNodeCall)
 {
