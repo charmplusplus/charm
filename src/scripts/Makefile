@@ -136,14 +136,12 @@ basics: headers
 # Headers is used only for the dependencies
 headers: dirs+sources headerlinks $(ALLHEADERS)
 
-
-headerlinks: dirs+sources Makefile
-	rm -f ../bin/charmc ; cp charmc ../bin/
-	chmod +x ../bin/charmc
-	rm -rf ../include ; mkdir ../include
+conv-autoconfig.h:
 	./charmconfig
-	-echo "Soft-linking headers..."
-	-for hdr in $(ALLHEADERS) ; do test ! -f "../include/$$hdr" && ln -f -s "../tmp/$$hdr" ../include ; done
+
+headerlinks: dirs+sources Makefile $(ALLHEADERS)
+	@echo "Soft-linking headers..."
+	-@for hdr in $(ALLHEADERS) ; do test ! -f "../include/$$hdr" && ./system_ln "../tmp/$$hdr" ../include ; done
 	touch headerlinks	
 
 dirs+sources:
@@ -179,7 +177,11 @@ dirs+sources:
 	./gatherflat ../../src/`cat .vdir`             .
 	./gathertree ../../pgms ../pgms
 	./gathertree ../../doc doc
+	rm -f ../bin/charmc ; cp charmc ../bin/
+	chmod +x ../bin/charmc
 	rm -f .vdir .gdir
+	rm -rf ../include ; mkdir ../include
+	cp -f conv-mach.sh ../include
 	touch dirs+sources
 
 
@@ -201,9 +203,16 @@ LIBCONV_UTILF=pup_f.o
 
 converse: basics QuickThreads/libckqt.a $(CVLIBS) charmrun-target conv-cpm
 
-charmrun-target: 
+charmrun-target: daemon-target
 	if [ -d charmrun ] ; then ( cd charmrun ; make OPTS='$(OPTS)' ) ; fi
 	if [ -f charmrun ] ; then ( cp charmrun ../bin ) ; fi
+
+daemon-target: sockRoutines.o
+	[ -f daemon.c ] && $(CHARMC) -seq daemon.c \
+		sockRoutines.o -o ../bin/daemon 
+	[ -f daemon.c ] && $(CHARMC) -DFACELESS -seq daemon.c \
+		sockRoutines.o -o ../bin/daemon_faceless 
+	touch daemon-target
 
 QuickThreads/libckqt.a:
 	. ./conv-mach.sh;cd QuickThreads;./configure $$CMK_QT
@@ -589,7 +598,7 @@ xi-grammar.tab.o: xi-grammar.tab.C $(XIHEADERS)
 	$(SEQCHARMC) xi-grammar.tab.C
 
 xi-scan.o: xi-scan.C $(XIHEADERS)
-	$(SEQCHARMC) xi-scan.C
+	$(SEQCHARMC) -DYY_NEVER_INTERACTIVE xi-scan.C
 
 ###############################################################################
 #
