@@ -75,7 +75,8 @@ void CentralLB::AtSync()
   
   CLBStatsMsg* msg = new(sizes,2) CLBStatsMsg;
   msg->from_pe = CkMyPe();
-  msg->serial = rand();
+  // msg->serial = rand();
+  msg->serial = CrnRand();
 
   theLbdb->TotalTime(&msg->total_walltime,&msg->total_cputime);
   theLbdb->IdleTime(&msg->idletime);

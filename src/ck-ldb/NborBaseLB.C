@@ -142,7 +142,8 @@ NLBStatsMsg* NborBaseLB::AssembleStats()
   NLBStatsMsg* msg = new NLBStatsMsg;
 
   msg->from_pe = CkMyPe();
-  msg->serial = rand();
+  // msg->serial = rand();
+  msg->serial = CrnRand();
   msg->proc_speed = myStats.proc_speed;
   msg->total_walltime = myStats.total_walltime;
   msg->total_cputime = myStats.total_cputime;

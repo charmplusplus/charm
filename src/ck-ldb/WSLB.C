@@ -185,7 +185,8 @@ WSLBStatsMsg* WSLB::AssembleStats()
   //	   CkMyPe(),myload,myusage,usage);
 
   msg->from_pe = CkMyPe();
-  msg->serial = rand();
+  // msg->serial = rand();
+  msg->serial = CrnRand();
   msg->proc_speed = myStats.proc_speed;
   msg->total_walltime = myStats.total_walltime;
   msg->total_cputime = myStats.total_cputime;
