@@ -327,9 +327,16 @@ PUPmarshall(CkArrayID)
     void operator delete(void *ptr) { free(ptr); }
 #endif
 
+#if CMK_OBJECT_QUEUE_AVAILABLE
+#include "ckobjQ.h"
+#endif
+
 class Chare {
   protected:
     CkChareID thishandle;
+#if CMK_OBJECT_QUEUE_AVAILABLE
+    CkObjectMsgQ objQ;                // object message queue
+#endif
   public:
     Chare(CkMigrateMessage *m);
     Chare();
@@ -337,6 +344,11 @@ class Chare {
     virtual void pup(PUP::er &p);//<- pack/unpack routine
     inline const CkChareID &ckGetChareID(void) const {return thishandle;}
     inline void CkGetChareID(CkChareID *dest) const {*dest=thishandle;}
+    // object message queue
+    void  CkEnableObjQ();
+#if CMK_OBJECT_QUEUE_AVAILABLE
+    inline CkObjectMsgQ &CkGetObjQueue() { return objQ; }
+#endif
     CHARM_INPLACE_NEW
 };
 
