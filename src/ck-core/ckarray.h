@@ -1,3 +1,8 @@
+/*
+Charm++ File: Chare Arrays
+Array Reduction Library section
+added 11/11/1999 by Orion Sky Lawlor, olawlor@acm.org
+*/
 #ifndef _CKARRAY_H
 #define _CKARRAY_H
 
@@ -12,7 +17,7 @@ extern void _registerCkArray(void);
 class PtrQ;
 class PtrVec;
 
-#define ALIGN8(x)       (int)(8*(((x)+7)/8))
+#define ALIGN8(x)       (int)((~7)&((x)+7))
 
 #define MessageIndex(mt)        CMessage_##mt##::__idx
 #define ChareIndex(ct)          CProxy_##ct##::__idx
@@ -35,12 +40,31 @@ class ArrayElementCreateMessage;
 class ArrayElementMigrateMessage;
 class ArrayElementExitMessage;
 
+
 class ArrayMap : public Group
 {
 public:
   virtual int procNum(int arrayHdl, int element) = 0;
   virtual void registerArray(ArrayMapRegisterMessage *) = 0;
 };
+
+//////////////////////// Array Reduction Library //////////////
+class ArrayReductionMessage;//See definition at end of file
+
+//An ArrayReductionFn is used to combine the contributions
+//of several array elements into a single summed contribution:
+//  nMsg gives the number of messages to reduce.
+//  msgs[i] contains a contribution from a local element or remote branch.
+typedef ArrayReductionMessage *(*ArrayReductionFn)(int nMsg,ArrayReductionMessage **msgs);
+
+//An ArrayReductionClientFn is called on PE 0 when the contributions
+// from all array elements have been received and reduced.
+//  param can be ignored, or used to pass any client-specific data you wish
+//  dataSize gives the size (in bytes) of the data array
+//  data gives the reduced contributions of all array elements.  
+//       It will be disposed of by the Array BOC when this procedure returns.
+typedef void (*ArrayReductionClientFn)(void *param,int dataSize,void *data);
+
 
 
 class ArrayElement : public Chare
@@ -54,6 +78,13 @@ private:
   ArrayElement(void) {};
 
 protected:
+	//Call contribute to add your contribution to a new global reduction.
+	// The array BOC will keep a copy the data. reducer must be the same on all PEs.
+	void contribute(int dataSize,void *data,ArrayReductionFn reducer);
+	//This value is used by Array1D to keep track of which ArrayElements have contribute()'d.
+	// It is simply the number of times contribute has been called.
+	int nContributions;
+	
 
   // For Backward compatibility:
   void finishConstruction(void) { finishConstruction(CmiFalse); };
@@ -117,6 +148,11 @@ public:
   int ckGetGroupId(void) { return thisgroup; }
   ArrayElement *getElement(int idx) { return elementIDs[idx].element; }
 
+  //Register a function to be called once the reduction is complete--
+  //  need only be called on PE 0 (but is harmless otherwise).
+  void registerReductionHandler(ArrayReductionClientFn handler,void *param);
+  void RecvReductionMessage(ArrayReductionMessage *msg);
+
 #if CMK_LBDB_ON
   static void staticMigrate(LDObjHandle _h, int _dest);
   static void staticSetStats(LDOMHandle _h, int _state);
@@ -179,7 +215,38 @@ private:
   LBDatabase *the_lbdb;
 #endif
   PtrQ *bufferedForElement;
-  PtrQ *bufferedMigrated;
+  PtrQ *bufferedMigrated; 
+ 
+// Array Reduction Implementation:
+	ArrayReductionClientFn reductionClient;//Will be called when reduction is complete
+	void *reductionClientParam;//Parameter to pass to reduction client
+
+#define ARRAY_RED_TREE_LOG 2 //Log-base-2 of fan-out of reduction tree (for binary tree, 1)
+#define ARRAY_RED_TREE (1<<ARRAY_RED_TREE_LOG) //Number of kids of each tree node
+
+//This is used to hold messages that arrive for reductions we haven't started yet
+#define ARRAY_RED_FUTURE_MAX 250 //The length of the out-of-order-reduction-message buffer
+	int nFuture;//Number of messages waiting in queue below
+	ArrayReductionMessage *futureBuffer[ARRAY_RED_FUTURE_MAX];
+	
+	int reductionNo;//The number of the current reduction (starts at -1)
+	int reductionFinished;//Flag: is the current reduction (above) complete? (as far as we are concerned)
+	ArrayReductionFn curReducer;//Current reduction function (or NULL)
+	ArrayReductionMessage **curMsgs;//Buffered message array for the current reduction
+	int curMax;//Dimentions of above array
+	int nCur;//Number of reduction messages we have received so far.
+	int nComposite;//Number of messages recieved up the reduction tree
+	int expectedComposite;//Number of messages we expect to receive from our kids
+
+//This is called by ArrayElement::contribute() and RcvReductionMessage.
+// reducer may be NULL. The given message is kept by Array1D.
+	void addReductionContribution(ArrayReductionMessage *m,ArrayReductionFn reducer);
+
+//These two are called by addReductionContribution, above
+	void beginReduction(int extraLocal);//Allocate msgs array above, increment reductionNo
+	int expectedLocalMessages(void);//How many messages do we still need from locals?
+	void tryEndReduction(void);//Check if we're done, and if so, finish.
+	void endReduction(void);//Combine msgs array and send off, set finished flag
 };
 
 #include "CkArray.decl.h"
@@ -218,7 +285,7 @@ class ArrayMigrateMessage : public CMessage_ArrayMigrateMessage
 {
 public:
   int from;
-  int index;
+  int index,nContributions;
   int elementSize;
   void *elementData;
   int hopCount;
@@ -271,7 +338,7 @@ public:
   CkChareID arrayID;
   CkGroupID groupID;
   Array1D *arrayPtr;
-  int index;
+  int index,nContributions;
   void* packData;
 };
 
@@ -280,5 +347,44 @@ class ArrayElementExitMessage : public CMessage_ArrayElementExitMessage
 public:
   int dummy;
 };
+
+//An ArrayReductionMessage is sent up the reduction tree-- it
+// carries the contribution of one 
+// (or reduced contributions of several) array elements.
+class ArrayReductionMessage : public CMessage_ArrayReductionMessage
+{
+private:
+  //Default constructor is private-- use "buildNew", below
+  ArrayReductionMessage();
+public:
+//External fields
+  //Length of array below, in bytes
+  int dataSize;
+  //Reduction data
+  void *data;
+  //Index of array element which made this contribution,
+  //  or -n, where n is the number of contributing elements
+  int source;
+  
+  //Return the number of array elements from which this message's data came
+  int getSources();
+  
+  //"Constructor"-- builds and returns a new ArrayReductionMessage.
+  //  the "srcData" array you specify will be copied into this object (unless NULL).
+  static ArrayReductionMessage *buildNew(int NdataSize,void *srcData);
+
+
+//Internal fields
+  //The number of this reduction (0, 1, ...)
+  int reductionNo;
+  //(non-packed field) Used only if this message needs to be buffered in the future buffer.
+  ArrayReductionFn futureReducer;
+ 
+  //Message runtime support
+  static void *alloc(int msgnum, int size, int *reqSize, int priobits);
+  static void *pack(ArrayReductionMessage *);
+  static ArrayReductionMessage *unpack(void *in);
+};
+
 
 #endif

@@ -4,12 +4,16 @@ module CkArray {
   message ArrayMessage;
   message ArrayElementAckMessage;
   message [varsize] ArrayMigrateMessage;
+  
+  message [varsize] ArrayReductionMessage;
 
   group Array1D {
     entry Array1D(ArrayCreateMessage *);
     entry void RecvForElement(ArrayMessage *);
     entry void RecvMigratedElement(ArrayMigrateMessage *);
     entry void AckMigratedElement(ArrayElementAckMessage *);
+    
+    entry void RecvReductionMessage(ArrayReductionMessage *);
   };
 
   message ArrayElementCreateMessage;
