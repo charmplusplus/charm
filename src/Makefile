@@ -97,8 +97,8 @@ dirs+sources:
 	cp xl-*.c xl-*.h ../src
 	cp xp-*.c xp-*.h ../src
 	cp xi-*.C xi-*.h ../src
-	cp conv-cpm.c ../src
-	cp Maketrans ../src/Makefile
+	cp conv-cpm.* ../src
+	cp Makefile ../src/Makefile
 	@echo
 	@rm -f .vdir .gdir
 	touch dirs+sources
@@ -405,35 +405,147 @@ dcountredn.o: dcountredn.int $(GENERIC_REDN_H)
 
 ###############################################################################
 #
-# charmxlat, charmfilter, charmxlat++, charmfilter++, yacc, yacc++
 #
 ###############################################################################
 
-XLFILES= xl-dag.c xl-lex.c xl-lex.h xl-lexspecs xl-lexyy.c xl-main.c xl-outh.c xl-parse.c xl-rdtok.c xl-sfspec xl-space.c xl-srch.c xl-str.c xl-sym.c xl-sym.h xl-yacc xl-ydef.h xl-ytab.c
+CHARMXLAT=xl-main.o xl-yacc.tab.o xl-sym.o xl-str.o xl-lex.o xl-lexsp.l.o xl-rdtok.o xl-parse.o xl-outh.o xl-srch.o xl-dag.o
 
-XPFILES=xp-extn.h xp-lexyy.c xp-process.c xp-sfilter xp-space.c xp-t.h xp-t.l xp-t.y xp-table.c xp-ycode.c xp-ytab.c xp-ytab.h
+charmxlat charmfilter: $(CHARMXLAT) xl-sfspec.l.o
+	$(CHARMC) -seq -o charmxlat   -cp ../bin/ $(CHARMXLAT)
+	$(CHARMC) -seq -o charmfilter -cp ../bin/ xl-sfspec.l.o
 
-XIFILES=xi-generate.C xi-parse.y xi-parse.C xi-parse.h xi-scan.l xi-scan.C xi-symbol.C xi-symbol.h xi-main.C
+xl-main.o: xl-main.c
+	$(CHARMC) -seq xl-main.c
 
-CPMFILES=conv-cpm.c conv-cpm-lex
+xl-sym.o: xl-sym.c xl-sym.h
+	$(CHARMC) -seq xl-sym.c
 
-charmxlat: $(XLFILES)
-	make -f Maketrans charmxlat OPTS='$(OPTS)'
+xl-str.o: xl-str.c
+	$(CHARMC) -seq xl-str.c
 
-charmfilter: $(XLFILES)
-	make -f Maketrans charmfilter OPTS='$(OPTS)'
+xl-lex.o: xl-lex.c xl-lex.h xl-sym.h
+	$(CHARMC) -seq xl-lex.c
 
-charmxlat++: $(XPFILES)
-	make -f Maketrans charmxlat++ OPTS='$(OPTS)'
+xl-rdtok.o: xl-rdtok.c xl-lex.h xl-sym.h
+	$(CHARMC) -seq xl-rdtok.c
 
-charmfilter++: $(XPFILES)
-	make -f Maketrans charmfilter++ OPTS='$(OPTS)'
+xl-parse.o: xl-parse.c xl-lex.h xl-sym.h
+	$(CHARMC) -seq xl-parse.c
 
-charmxi: $(XIFILES)
-	make -f Maketrans charmxi OPTS='$(OPTS)'
+xl-outh.o: xl-outh.c xl-lex.h xl-sym.h
+	$(CHARMC) -seq xl-outh.c
 
-conv-cpm: $(CPMFILES)
-	make -f Maketrans conv-cpm OPTS='$(OPTS)'
+xl-srch.o: xl-srch.c xl-lex.h xl-sym.h
+	$(CHARMC) -seq xl-srch.c
+
+xl-dag.o: xl-dag.c
+	$(CHARMC) -seq xl-dag.c
+
+xl-yacc.tab.o: xl-yacc.tab.c xl-lex.h xl-sym.h
+	$(CHARMC) -seq xl-yacc.tab.c
+
+xl-lexsp.l.o: xl-lexsp.l.c	
+	$(CHARMC) -seq xl-lexsp.l.c
+
+xl-sfspec.l.o: xl-sfspec.l.c
+	$(CHARMC) -seq xl-sfspec.l.c
+
+xl-sfspec.l.c: xl-sfspec.l
+	flex -t xl-sfspec.l > xl-sfspec.l.c
+
+xl-yacc.tab.c xl-yacc.tab.h: xl-yacc.y
+	bison -d xl-yacc.y
+
+xl-lexsp.l.c: xl-lexsp.l
+	flex -t xl-lexsp.l > xl-lexsp.l.c
+
+###############################################################################
+#
+# charmxlat++ and charmfilter++
+#
+###############################################################################
+
+XPHEADERS=xp-extn.h xp-t.tab.h
+
+CHARMXLATXX=xp-process.o xp-table.o xp-t.tab.o xp-lexer.l.o
+
+charmxlat++: $(CHARMXLATXX) xp-sfilter.l.o
+	$(CHARMC) -seq -o charmxlat++   -cp ../bin/ $(CHARMXLATXX)
+	$(CHARMC) -seq -o charmfilter++ -cp ../bin/ xp-sfilter.l.o
+
+xp-process.o: xp-process.c $(XPHEADERS)
+	$(CHARMC) -seq xp-process.c
+
+xp-table.o: xp-table.c $(XPHEADERS)
+	$(CHARMC) -seq xp-table.c
+
+xp-t.tab.o: xp-t.tab.c $(XPHEADERS)
+	$(CHARMC) -seq -DYYDEBUG xp-t.tab.c
+
+xp-lexer.l.o: xp-lexer.l.c $(XPHEADERS)
+	$(CHARMC) -seq xp-lexer.l.c
+
+xp-sfilter.l.o: xp-sfilter.l.c $(XPHEADERS)
+	$(CHARMC) -seq xp-sfilter.l.c
+
+xp-t.tab.h xp-t.tab.c: xp-t.y
+	bison -d xp-t.y
+
+xp-lexer.l.c: xp-lexer.l
+	flex -t xp-lexer.l > xp-lexer.l.c
+
+xp-sfilter.l.c: xp-sfilter.l
+	flex -t xp-sfilter.l > xp-sfilter.l.c
+
+###############################################################################
+#
+# The CPM scanner
+#
+###############################################################################
+
+conv-cpm: conv-cpm.l.o
+	$(CHARMC) -seq -o conv-cpm -cp ../bin/ conv-cpm.l.o
+
+conv-cpm.l.o: conv-cpm.l.c
+	$(CHARMC) -seq conv-cpm.l.c
+
+conv-cpm.l.c: conv-cpm.l
+	flex -t conv-cpm.l > conv-cpm.l.c
+
+###############################################################################
+#
+# The interface translator
+#
+###############################################################################
+
+XIHEADERS=xi-symbol.h xi-parse.tab.h
+CHARMXI=xi-main.o xi-symbol.o xi-generate.o xi-parse.tab.o xi-scan.l.o
+
+charmxi: $(CHARMXI)
+	$(CHARMC) -seq -language c++ -cp ../bin/ -o charmxi $(CHARMXI)
+
+xi-main.o: xi-main.C $(XIHEADERS)
+	$(CHARMC) -seq xi-main.C
+
+xi-symbol.o: xi-symbol.C $(XIHEADERS)
+	$(CHARMC) -seq xi-symbol.C
+
+xi-generate.o: xi-generate.C $(XIHEADERS)
+	$(CHARMC) -seq xi-generate.C
+
+xi-parse.tab.o: xi-parse.tab.c $(XIHEADERS)
+	cp xi-parse.tab.c xi-parse.tab.C
+	$(CHARMC) -seq xi-parse.tab.C
+
+xi-scan.l.o: xi-scan.l.c $(XIHEADERS)
+	cp xi-scan.l.c xi-scan.l.C
+	$(CHARMC) -seq xi-scan.l.C
+
+xi-parse.tab.h xi-parse.tab.c: xi-parse.y
+	bison -d xi-parse.y
+
+xi-scan.l.c: xi-scan.l
+	flex -t xi-scan.l > xi-scan.l.c
 
 ###############################################################################
 #

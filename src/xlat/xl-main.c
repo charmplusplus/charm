@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1995-06-15 20:27:11  jyelon
+ * Revision 2.2  1996-08-01 21:03:16  jyelon
+ * Updated everything to bison and flex.
+ *
+ * Revision 2.1  1995/06/15 20:27:11  jyelon
  * got rid of myfree.
  *
  * Revision 2.0  1995/06/05  18:52:05  brunner
@@ -39,7 +42,6 @@ extern yyparse();
 extern void ReadTokens();
 extern void ReadKeys();
 
-extern int yylineno;
 extern int CurrentInputLineNo;
 extern char CurrentFileName[],*MakeString();
 extern FILE *yyin,*outfile,*outh1,*outh2,*outh0;
@@ -83,7 +85,7 @@ void InitOutputFile()
 }
 
 void ReInitializeParameters()
-{ yylineno=1;
+{ 
   RealDummy(SavedLineNo);
   CurrentInputLineNo=SavedLineNo-1;
   strcpy(CurrentFileName,SavedFileName);
@@ -92,7 +94,8 @@ void ReInitializeParameters()
 main(argc,argv)
 int argc;
 char *argv[];
-{ ParseCommandLine(argc,argv);
+{ 
+  ParseCommandLine(argc,argv);
   InitMapHead();
   ReadTokens();ReadKeys();
   InitSymTable(); 
