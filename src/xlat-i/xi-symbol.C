@@ -492,7 +492,7 @@ Chare::genArrayDecls(XStr& str)
   str <<" public virtual _CK_AID";
   if(bases!=0) {
     str << ", ";
-    bases->genProxyNames(str, "public ", "", ", ");
+    bases->genProxyNames(str, "public virtual ", "", ", ");
   }
   str.spew(CIChareStart, array_prefix(), getBaseName());
   if(isAbstract()) {
