@@ -279,7 +279,7 @@ public:
  * kept by the array managers. 
  */
 class CkMigratableList {
-	CkVec<CkMigratable *> el;
+	CkVec< CkZeroPtr<CkMigratable> > el;
  public:
 	CkMigratableList();
 	~CkMigratableList();

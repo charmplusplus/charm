@@ -6,7 +6,8 @@
 #include "ckhashtable.h"
 
 typedef CkQ<void *> PtrQ;
-typedef CkVec<void *> PtrVec;
+class envelope;
+typedef CkVec<CkZeroPtr<envelope> > PtrVec;
 
 class IrrGroup;
 class TableEntry {

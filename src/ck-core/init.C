@@ -215,36 +215,34 @@ static void _exitHandler(envelope *env)
 
 static inline void _processBufferedBocInits(void)
 {
-  register envelope *env;
   CkNumberHandler(_bocHandlerIdx, (CmiHandler)_processHandler);
   register int i = 0;
-  register int len = CkpvAccess(_bocInitVec)->length();
-  register void **vec = CkpvAccess(_bocInitVec)->getVec();
+  PtrVec &inits=*CkpvAccess(_bocInitVec);
+  register int len = inits.size();
   for(i=0; i<len; i++) {
-    env = (envelope *) vec[i];
+    envelope *env = inits[i];
     if(env==0) continue;
     if(env->isPacked()) 
       CkUnpackMessage(&env);
     _processBocInitMsg(env);
   }
-  delete CkpvAccess(_bocInitVec);
+  delete &inits;
 }
 
 static inline void _processBufferedNodeBocInits(void)
 {
-  register envelope *env;
   CkNumberHandler(_nodeBocHandlerIdx, (CmiHandler)_processHandler);
   register int i = 0;
-  register int len = _nodeBocInitVec->length();
-  register void **vec = _nodeBocInitVec->getVec();
+  PtrVec &inits=*_nodeBocInitVec;
+  register int len = inits.size();
   for(i=0; i<len; i++) {
-    env = (envelope *) vec[i];
+    envelope *env = inits[i];
     if(env==0) continue;
     if(env->isPacked())
       CkUnpackMessage(&env);
     _processNodeBocInitMsg(env);
   }
-  delete _nodeBocInitVec;
+  delete &inits;
 }
 
 static inline void _processBufferedMsgs(void)
@@ -335,12 +333,12 @@ static void _initHandler(void *msg)
     case BocInitMsg:
       CkpvAccess(_numInitsRecd)++;
       CpvAccess(_qd)->process();
-      CkpvAccess(_bocInitVec)->insert(env->getGroupNum().idx, msg);
+      CkpvAccess(_bocInitVec)->insert(env->getGroupNum().idx, env);
       break;
     case NodeBocInitMsg:
       CmiLock(_nodeLock);
       _numInitNodeMsgs++;
-      _nodeBocInitVec->insert(env->getGroupNum().idx, msg);
+      _nodeBocInitVec->insert(env->getGroupNum().idx, env);
       CmiUnlock(_nodeLock);
       CpvAccess(_qd)->process();
       break;

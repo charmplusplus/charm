@@ -150,7 +150,7 @@ class CkArrayOptions {
 	int numInitial;/// Number of elements to create
 	CkGroupID map;/// Array location map object
 	CkGroupID locMgr;/// Location manager to bind to
-	CkPupVec<CkComponentID> arrayListeners; //CkArrayListeners for this array
+	CkVec<CkComponentID> arrayListeners; //CkArrayListeners for this array
  public:
  //Used by external world:
 	CkArrayOptions(void); /// Default: empty array
