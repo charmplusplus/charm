@@ -17,7 +17,7 @@
 #undef log2
 #endif
 
-typedef unsigned int prio_t;
+typedef CmiUInt4 prio_t;
 
 class CkBitVector {
  protected:
@@ -30,7 +30,10 @@ class CkBitVector {
   static prio_t chunks(prio_t n) { return (n + chunkBits()-1) / chunkBits(); }
   prio_t offset(prio_t bit) const { return chunks(usedBits-bit)-1; }
   prio_t mask(prio_t bit) const {
-    return (0x1<<(chunkBits()-(usedBits%chunkBits())+(bit%chunkBits()))); }
+    unsigned int shift = (chunkBits()-(usedBits%chunkBits())+(bit%chunkBits()));
+    shift %= chunkBits();
+    return (((prio_t)0x1)<<shift); 
+  }
 
  public:
   static prio_t log2(prio_t val) {
@@ -99,7 +102,7 @@ class CkBitVector {
 
   // For debugging in megatest
 #ifdef DEBUGGING
-  unsigned int * getData() { return data; }
+  CmiUInt4 * getData() { return data; }
   unsigned int getDataLength() { return chunks(usedBits); }
 #endif
 
