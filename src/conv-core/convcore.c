@@ -2602,3 +2602,24 @@ void ConverseCommonExit(void)
 }
 
 
+#if CMK_CMIPRINTF_IS_JUST_PRINTF
+
+void CmiPrintf(const char *format, ...)
+{
+  va_list args;
+  va_start(args,format);
+  vprintf(format, args);
+  fflush(stdout);
+  va_end(args);
+}
+
+void CmiError(const char *format, ...)
+{
+  va_list args;
+  va_start(args,format);
+  vfprintf(stderr,format, args);
+  fflush(stderr);
+  va_end(args);
+}
+
+#endif

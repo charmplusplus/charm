@@ -490,9 +490,19 @@ int   CmiScanf(const char *, ...);
 #if CMK_CMIPRINTF_IS_JUST_PRINTF
 #include <stdio.h>
 
-#define CmiPrintf printf
-#define CmiError  printf
+/*
+ * I made vprintf functions for CmiPrintf and CmiError, but on the
+ * O2K, there is no equivalent vscanf!
+
+ #define CmiPrintf printf
+ #define CmiError  printf
+*/
+#include <stdarg.h>
+
+void  CmiPrintf(const char *format, ...);
+void  CmiError(const char *format, ...);
 #define CmiScanf  scanf
+
 #endif
 
 typedef void (*CmiStartFn)(int argc, char **argv);
