@@ -989,7 +989,7 @@ Message::genDefs(XStr& str)
       for(i=0;i<num;i++)
         str << "int sz" << i << ", ";
       str << "const int p) {\n";
-      str << "  int i; int sizes[" << num << "];\n";
+      str << "  int sizes[" << num << "];\n";
       for(i=0;i<num;i++)
         str << "  sizes[" << i << "] = sz" << i << ";\n";
       str << "  return " << mtype << "::alloc(__idx, s, sizes, p);\n";
