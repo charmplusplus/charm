@@ -887,7 +887,10 @@ void CkArray::ctorElement(ArrayElement *el,int ctor,void *msg)
   curElementIsDead=CmiFalse;
   
   //Call the user's constructor
+  void *tmpobj = CpvAccess(_currentChare);
+  CpvAccess(_currentChare) = (void*) el;
   _entryTable[ctor]->call(msg, (void *)el);
+  CpvAccess(_currentChare) = tmpobj;
 }
 
 
