@@ -318,6 +318,19 @@ static int CmemInit(argv)
   }
 }
 
+
+/*****************************************************************************
+ *
+ * Fast Interrupt Blocking Device
+ *
+ * This is totally portable.  Go figure.  (The rest of it is just macros,
+ * see converse.h)
+ *
+ *****************************************************************************/
+
+CpvDeclare(int,       CmiInterruptsBlocked);
+CpvDeclare(CthVoidFn, CmiInterruptFuncSaved);
+
 ConverseInit(argv)
 char **argv;
 {
@@ -336,3 +349,4 @@ ConverseExit()
 {
   CmiExit();
 }
+

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.23  1995-09-30 15:03:15  jyelon
+ * Revision 2.24  1995-10-11 00:36:39  jyelon
+ * Added CmiInterrupt stuff.
+ *
+ * Revision 2.23  1995/09/30  15:03:15  jyelon
  * A few changes for threaded-uniprocessor version.
  *
  * Revision 2.22  1995/09/29  09:51:44  jyelon
@@ -348,6 +351,26 @@ void      *CmmFind(CmmTable t, int ntags, int *tags, int *returntags, int del);
 #define    CmmGet(t,nt,tg,rt)   (CmmFind(t,nt,tg,rt,1))
 #define    CmmProbe(t,nt,tg,rt) (CmmFind(t,nt,tg,rt,0))
 
+
+/****** FAST INTERRUPT BLOCKING FACILITY ********/
+
+CpvExtern(int,       CmiInterruptsBlocked);
+CpvExtern(CthVoidFn, CmiInterruptFuncSaved);
+
+#define CmiInterruptHeader(fn) \
+    if (CpvAccess(CmiInterruptsBlocked)) \
+        { CpvAccess(CmiInterruptFuncSaved)=(CthVoidFn)(fn); return; }
+
+#define CmiInterruptsBlock()\
+    { CpvAccess(CmiInterruptsBlocked)++; }
+
+#define CmiInterruptsRelease() { \
+    CpvAccess(CmiInterruptsBlocked)--; \
+    if (CpvAccess(CmiInterruptsBlocked)==0) {\
+        CthVoidFn f = CpvAccess(CmiInterruptFuncSaved);\
+        if (f) { CpvAccess(CmiInterruptFuncSaved)=0; (f)(); }\
+    }\
+}
 
 /**** DEAL WITH DIFFERENCES: KERNIGHAN-RITCHIE-C, ANSI-C, AND C++ ****/
 
