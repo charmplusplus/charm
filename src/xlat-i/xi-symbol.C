@@ -2264,7 +2264,20 @@ Parameter::Parameter(int Nline,Type *Ntype,const char *Nname,
 		name=new char[50];
 		sprintf((char *)name,"impl_noname_%x",unnamedCount++);
 	}
-	byReference=(type->isNamed())&&(arrLen==NULL)&&(val==NULL);
+	byReference=false;
+	if ((arrLen==NULL)&&(val==NULL)) 
+	{ /* Consider passing type by reference: */
+		if (type->isNamed()) 
+		{ /* Some user-defined type: pass by reference */
+			byReference=true;
+		}
+		if (type->isReference()) {
+			byReference=true;
+			/* Clip off the ampersand--we'll add
+			   it back ourselves in Parameter::print. */
+			type=type->deref();
+		}
+	}
 }
 
 void ParamList::print(XStr &str,int withDefaultValues)
