@@ -17,7 +17,6 @@
 
 #define ConverseExit             BgCharmExit
 
-
 /**
   This version Blue Gene Charm++ use a whole Blue Gene node as 
   a Charm PE.
@@ -29,6 +28,7 @@
 #define CkpvStaticDeclare  BnvStaticDeclare
 #define CkpvInitialize 	BnvInitialize
 #define CkpvAccess	BnvAccess
+#define CkpvAccessOther	BnvAccessOther
 
 namespace BGConverse {
 
@@ -94,11 +94,12 @@ static inline void CmiSyncBroadcastAllAndFree(int nb, char *m)
   a Charm PE.
 */
 
-#define CkpvDeclare 	CtvDeclare
-#define CkpvExtern 	CtvExtern
-#define CkpvStaticDeclare  CtvStaticDeclare
-#define CkpvInitialize 	CtvInitialize
-#define CkpvAccess	CtvAccess
+#define CkpvDeclare 	   BpvDeclare
+#define CkpvExtern 	   BpvExtern
+#define CkpvStaticDeclare  BpvStaticDeclare
+#define CkpvInitialize 	   BpvInitialize
+#define CkpvAccess	   BpvAccess
+#define CkpvAccessOther	   BpvAccessOther
 
 
 namespace BGConverse {

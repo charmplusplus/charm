@@ -5,6 +5,7 @@
 #define CkpvStaticDeclare  CpvStaticDeclare
 #define CkpvInitialize 	CpvInitialize
 #define CkpvAccess	CpvAccess
+#define CkpvAccessOther	CpvAccessOther
 
 #undef CkMyPe
 #undef CkNumPes
