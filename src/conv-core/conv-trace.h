@@ -16,6 +16,7 @@
  */
 
 void traceInit(char **argv);
+void traceCharmInit(char **argv);	/* init trace module in ck */
 void traceBeginIdle(void);
 void traceEndIdle(void);
 void traceResume(void);
@@ -24,6 +25,7 @@ void traceAwaken(CthThread t);
 void traceUserEvent(int);
 int  traceRegisterUserEvent(const char*);
 void traceClose(void);
+void traceCharmClose(void);          /* close trace in ck */
 void traceBegin(void);
 void traceEnd(void);
 void traceWriteSts(void);
