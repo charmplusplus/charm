@@ -12,7 +12,7 @@ $n = @dontprint;
 while (<>) {
 # if line ends with : it is the start of a dependency
   chop;
-  if ( ($target,$other) = /([a-zA-Z0-9_]*\.o:)(.*)$/ ) {
+  if ( ($target,$other) = /([a-zA-Z0-9_-]*\.o:)(.*)$/ ) {
     print $target;
     $go=1;
     $first=1;
