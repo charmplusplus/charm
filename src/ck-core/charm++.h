@@ -233,6 +233,9 @@ public:
 	static CkArray *CkLocalBranch(CkArrayID id) 
 		{ return (CkArray *)::CkLocalBranch(id); }
 	void pup(PUP::er &p) {p | _gid; }
+	int operator == (const CkArrayID& other) const {
+		return (_gid == other._gid);
+	}
 };
 PUPmarshall(CkArrayID)
 
