@@ -116,15 +116,15 @@
        integer, external :: MPI_Register
        double precision, external :: MPI_WTIME
        double precision, external :: MPI_WTICK
-       external :: MPI_MAX    
-       external :: MPI_MIN    
-       external :: MPI_SUM    
-       external :: MPI_PROD   
-       external :: MPI_LAND   
-       external :: MPI_BAND   
-       external :: MPI_LOR    
-       external :: MPI_BOR    
-       external :: MPI_LXOR   
-       external :: MPI_BXOR   
-       external :: MPI_MAXLOC 
-       external :: MPI_MINLOC 
+       integer, external :: MPI_MAX    
+       integer, external :: MPI_MIN    
+       integer, external :: MPI_SUM    
+       integer, external :: MPI_PROD   
+       integer, external :: MPI_LAND   
+       integer, external :: MPI_BAND   
+       integer, external :: MPI_LOR    
+       integer, external :: MPI_BOR    
+       integer, external :: MPI_LXOR   
+       integer, external :: MPI_BXOR   
+       integer, external :: MPI_MAXLOC 
+       integer, external :: MPI_MINLOC 
