@@ -37,9 +37,8 @@ void IDXL_Abort(const char *callingRoutine,const char *msg,int m0=0,int m1=0,int
  *   -recv(msg) until isDone returns true
  */
 class IDXL_Comm {
-public: //<- Sun CC demands op_t be public for use in inner class
+public: //<- Sun CC demands these types be public for use from an inner class
 	typedef enum { send_t=17,recv_t,sum_t} op_t;
-private:
 	class sto_t { public:
 		const IDXL_Side *idx; //Indices to read from/write to
 		const IDXL_Layout *dtype; //Format of user data
@@ -50,10 +49,6 @@ private:
 			:idx(idx_), dtype(dtype_), data(data_), op(op_) {}
 		sto_t(void) {}
 	};
-	enum {maxSto=20};
-	sto_t sto[maxSto]; //Stuff to send/receive
-	int nSto;
-	
 	class msg_t { public:
 		sto_t *sto; /* Indices to send/receive */
 		int ll; /* Local processor to communicate with */
@@ -67,6 +62,12 @@ private:
 		msg_t() :buf(NULL) {}
 		~msg_t() {if (buf) {delete[] buf;}}
 	};
+
+private:
+	enum {maxSto=20};
+	sto_t sto[maxSto]; //Stuff to send/receive
+	int nSto;
+	
 	enum {maxMsg=50};
 	msg_t msg[maxMsg]; //Messages to each processor
 	MPI_Request msgReq[maxMsg];

@@ -233,16 +233,16 @@ void IDXL_Comm::wait(void) {
 	//Process all received messages:
 	for (int im=0;im<nMsg;im++) {
 		msg_t *m=&msg[im];
-		sto_t *sto=m->sto;
-		const IDXL_List &l=sto->idx->getLocalList(m->ll);
-		switch (sto->op) {
+		sto_t *s=m->sto;
+		const IDXL_List &l=s->idx->getLocalList(m->ll);
+		switch (s->op) {
 		case send_t: /* nothing else to do */
 			break;
 		case recv_t:
-			sto->dtype->scatter(l.size(),l.getVec(),m->buf,sto->data);
+			s->dtype->scatter(l.size(),l.getVec(),m->buf,s->data);
 			break;
 		case sum_t:
-			sto->dtype->scatteradd(l.size(),l.getVec(),m->buf,sto->data);
+			s->dtype->scatteradd(l.size(),l.getVec(),m->buf,s->data);
 			break;
 		};
 	}
