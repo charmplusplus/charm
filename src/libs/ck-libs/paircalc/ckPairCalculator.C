@@ -160,10 +160,10 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
     }
 
     // FIXME: should do 'op2' here!!!
-/*    
+    
     double *ptr = new double[S*S*2];
-    for(int i=0; i<S*S*2; i++)
-      ptr[i] =0; 
+    memset((void*)ptr, 0, sizeof(double)*S*S*2);
+
     //    for(int i=0; i<grainSize; i++)
     //      memcpy(ptr+(thisIndex.y+thisIndex.x*S+i*S)*2, outData+i*grainSize, grainSize*sizeof(complex));
     for(int i=0; i<grainSize; i++) {
@@ -188,11 +188,11 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
     
     contribute(S*S*sizeof(double) * 2, ptr, CkReduction::sum_double);
     delete [] ptr;
-*/
 
+/*
    r.add((int)thisIndex.y, (int)thisIndex.x, (int)(thisIndex.y+grainSize-1), (int)(thisIndex.x+grainSize-1), (CkTwoDoubles*)outData);
     r.contribute(this, sparse_sum_TwoDoubles);
-
+*/
   }
 }
 
@@ -313,10 +313,14 @@ complex
 PairCalculator::compute_entry(int n, complex *psi1, complex *psi2, int op)
 {
   // FIXME: should do 'op1' here!!!
-  int i;
-  complex sum(0,0);
-  for (i = 0; i < n; i++)
-    sum += psi1[i] * psi2[i].conj();
+  double re=0, im = 0;
+  double *ptr1 = (double*)psi1;
+  double *ptr2 = (double*)psi2;
+  for (int i = 0; i < 2*n; i+=2){
+    re += ptr1[i]*ptr2[i] - ptr1[i+1]*ptr2[i+1];
+    im += ptr1[i+1]*ptr2[i] + ptr1[i]*ptr2[i+1];
+  }
+  complex sum(re,im);
   return sum;
 }
 
