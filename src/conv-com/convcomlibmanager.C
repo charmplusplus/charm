@@ -55,7 +55,7 @@ void initComlibManager(){
     CkpvInitialize(ConvComlibManager *, conv_comm_ptr);
     CkpvAccess(conv_comm_ptr) = conv_com;
 
-    //comm_debug = 1;
+    comm_debug = 0;
     ComlibPrintf("Init Call\n");
 
     CkpvInitialize(int, RecvmsgHandle);

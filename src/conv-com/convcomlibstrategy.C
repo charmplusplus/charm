@@ -13,6 +13,7 @@ Strategy::Strategy() : PUP::able() {
     myInstanceID = 0;
     type = CONVERSE_STRATEGY;
     converseStrategy = this;
+    higherLevel = this;
     isStrategyBracketed = 0;
 };
 
@@ -23,6 +24,11 @@ void Strategy::pup(PUP::er &p){
 
     p | isStrategyBracketed;
     p | type;
+
+    if (p.isUnpacking()) {
+      converseStrategy = this;
+      higherLevel = this;
+    }
 }
 
 //Message holder functions. Message holder is a wrapper around a

@@ -76,11 +76,13 @@ class Strategy : public PUP::able{
     //them.  For the code to work in both Charm and converse, this
     //variable can be used.    
     Strategy *converseStrategy;
+    Strategy *higherLevel;
 
  public:
     Strategy();
     Strategy(CkMigrateMessage *m) : PUP::able(m) {
         converseStrategy = this;
+	higherLevel = this;
     }
 
     void setBracketed(){isStrategyBracketed = 1;}
@@ -105,6 +107,19 @@ class Strategy : public PUP::able{
     Strategy * getConverseStrategy() {
         return converseStrategy;
     }
+
+    void setHigherLevel(Strategy *s) {
+      higherLevel = s;
+    }
+
+    Strategy * getHigherLevel() {
+      return higherLevel;
+    }
+
+    //This method can be used to deliver a message through the correct class
+    //when converse does not know if the message was originally sent from
+    //converse itself of from a higher level language like charm
+    virtual void deliverer(char*) {CmiAbort("Strategy::deliverer: If used, should be first redefined\n");};
 
     //Each strategy must define his own Pup interface.
     virtual void pup(PUP::er &p);
