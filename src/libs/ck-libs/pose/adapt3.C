@@ -5,15 +5,16 @@
 void adapt3::Step()
 {
   Event *ev;
-  static POSE_TimeType lastGVT = localPVT->getGVT();
-  int iter=0;
+  POSE_TimeType lastGVT = localPVT->getGVT();
+  int iter=0, offset;
   double critStart;
 
   //rbFlag = 0;
   if (!parent->cancels.IsEmpty()) CancelUnexecutedEvents();
   if (eq->RBevent) Rollback();
   if (!parent->cancels.IsEmpty()) CancelEvents();
- 
+  parent->Status();
+
   if (eq->currentPtr->timestamp > POSE_UnsetTS) {
     timeLeash = eq->largest - lastGVT;
     //if (rbFlag) timeLeash = (timeLeash + avgRBoffset)/2;
@@ -24,9 +25,9 @@ void adapt3::Step()
   if ((POSE_endtime > POSE_UnsetTS) && (lastGVT + timeLeash > POSE_endtime))
     timeLeash = POSE_endtime - lastGVT;
   // Prepare to execute an event
+  offset = lastGVT + timeLeash;
   ev = eq->currentPtr;
-  while ((ev->timestamp > POSE_UnsetTS) && 
-	 (ev->timestamp <= lastGVT + timeLeash)) { 
+  while ((ev->timestamp > POSE_UnsetTS) && (ev->timestamp <= offset)) { 
 #ifdef MEM_COARSE
     // note: first part of check below ensures we don't deadlock:
     //       can't advance gvt if we don't execute events with timestamp > gvt
@@ -51,14 +52,8 @@ void adapt3::Step()
     eq->ShiftEvent(); // shift to next event
     ev = eq->currentPtr;
   }
-  // Calculate statistics for this run
-  if (iter > 0) {
-    avgTimeLeash = ((avgTimeLeash * stepCount) + timeLeash)/(stepCount+1);
-    stepCount++;
-    avgEventsPerStep = specEventCount/stepCount;
 #ifdef POSE_STATS_ON
-    localStats->Loop();
+  if (iter > 0) localStats->Loop();
 #endif
-  }
 }
  

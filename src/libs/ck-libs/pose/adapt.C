@@ -5,13 +5,14 @@
 void adapt::Step()
 {
   Event *ev;
-  static POSE_TimeType lastGVT = localPVT->getGVT();
+  POSE_TimeType lastGVT = localPVT->getGVT();
   int iter=0;
 
   rbFlag = 0;
   if (!parent->cancels.IsEmpty()) CancelUnexecutedEvents();
   if (eq->RBevent) Rollback(); 
   if (!parent->cancels.IsEmpty()) CancelEvents();
+  parent->Status();
 
   if (rbFlag) timeLeash = MIN_LEASH;
   else if (timeLeash < MAX_LEASH) timeLeash += LEASH_FLEX; //expand spec window

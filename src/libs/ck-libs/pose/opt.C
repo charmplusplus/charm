@@ -5,11 +5,12 @@
 void opt::Step()
 {
   Event *ev;
-  static POSE_TimeType lastGVT = localPVT->getGVT();
+  POSE_TimeType lastGVT = localPVT->getGVT();
 
   if (!parent->cancels.IsEmpty()) CancelUnexecutedEvents();
   if (eq->RBevent) Rollback(); 
   if (!parent->cancels.IsEmpty()) CancelEvents();
+  parent->Status();
 
   // Execute an event
   ev = eq->currentPtr;

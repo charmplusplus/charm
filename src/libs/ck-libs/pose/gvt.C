@@ -70,7 +70,7 @@ void PVT::startPhase()
     SendsAndRecvs->Restructure(estGVT, pvt, POSE_UnsetTS);
   }
 
-  //CkPrintf("[%d] pvt=%d gvt=%d\n", CkMyPe(), pvt, estGVT);
+  //CkPrintf("[%d] pvt=%d gvt=%d optPVT=%d iterMin=%d\n", CkMyPe(), pvt, estGVT, optPVT, iterMin);
   int xt;
   if (pvt == POSE_UnsetTS) { // all are idle; find max ovt
     POSE_TimeType maxOVT = POSE_UnsetTS;
@@ -151,9 +151,13 @@ void PVT::objUpdate(POSE_TimeType timestamp, int sr)
   else
     localStats->TimerStart(GVT_TIMER);
 #endif
+  if ((timestamp < estGVT) && (estGVT > POSE_UnsetTS))
+    CkPrintf("timestamp=%d estGVT=%d simdone=%d sr=%d\n", timestamp, estGVT, simdone, sr);
   CmiAssert(simdone || (timestamp >= estGVT) || (estGVT == POSE_UnsetTS));
   CmiAssert((sr == SEND) || (sr == RECV));
-  if ((timestamp < iterMin) || (iterMin == POSE_UnsetTS)) iterMin = timestamp;
+  if ((estGVT > POSE_UnsetTS) && 
+      ((timestamp < iterMin) || (iterMin == POSE_UnsetTS))) 
+    iterMin = timestamp;
   if (waitForFirst) {
     waitForFirst = 0;
     SendsAndRecvs->Restructure(estGVT, timestamp, sr);

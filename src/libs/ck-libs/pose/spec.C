@@ -5,12 +5,13 @@
 void spec::Step()
 {
   Event *ev;
-  static POSE_TimeType lastGVT = localPVT->getGVT();
+  POSE_TimeType lastGVT = localPVT->getGVT();
   int iter = 0;
 
   if (!parent->cancels.IsEmpty()) CancelUnexecutedEvents();
   if (eq->RBevent) Rollback(); 
   if (!parent->cancels.IsEmpty()) CancelEvents();
+  parent->Status();
 
   // Shorten the leash as we near POSE_endtime
   if ((POSE_endtime > POSE_UnsetTS) && (lastGVT + timeLeash > POSE_endtime))
