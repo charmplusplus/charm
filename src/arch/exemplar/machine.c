@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.8  1995-09-07 22:40:22  gursoy
+ * Revision 2.9  1995-09-14 18:50:10  milind
+ * fixed a small bug - a typo
+ *
+ * Revision 2.8  1995/09/07  22:40:22  gursoy
  * Cmi_mype, Cmi_numpe and CmiLocalQueuea are accessed thru macros now
  *
  * Revision 2.7  1995/07/05  23:15:29  gursoy
@@ -182,8 +185,7 @@ char *argv[];
 
     if (requested_npe <= 0)
     {
-       printf("Error: requested number of processors is invalid %d\n",requested_
-npe);
+       printf("Error: requested number of processors is invalid %d\n",requested_npe);
        exit();
     }
 
