@@ -2,17 +2,13 @@ CDIR=../../../..
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
 MODULE=msa
-LIB = libmodule$(MODULE).a
+LIB = $(CDIR)/lib/libmodule$(MODULE).a
 LIBOBJ = msa-distArray.o
 
 HEADERS = msa.h msa-common.h msa-distArray.h msa-DistPageMgr.h $(MODULE).decl.h \
 		$(MODULE).def.h
-LIBDEST =  $(CDIR)/lib/
 
 all: $(LIBDEST)$(LIB)
-
-$(LIBDEST)$(LIB) : $(LIB)
-	/bin/cp $(LIB) $(LIBDEST)
 
 $(LIB): $(LIBOBJ)
 	$(CHARMC) -o $(LIB) $(LIBOBJ) 
