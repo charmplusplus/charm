@@ -12,6 +12,20 @@
 #include <memory.h>
 #include "charm.h"
 
+#if CMK_NAMESPACES_BROKEN
+# if CMK_BLUEGENE_CHARM
+#  error "BLUEGENE Charm++ cannot be compiled without namespace support"
+# endif
+#else
+# if CMK_BLUEGENE_CHARM
+#  include "middle-blue.h"
+   using namespace BGConverse;
+# else
+#  include "middle.h"
+   using namespace Converse;
+# endif
+#endif
+
 class CMessage_CkArgMsg {
 public: static int __idx;
 };
