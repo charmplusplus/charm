@@ -1028,6 +1028,7 @@ int handler;
 	CdsFifo_Enqueue(localqueue, msg);
       }
     }
+    CsdPeriodic();
   }
 }
  
