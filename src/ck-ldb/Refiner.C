@@ -1,3 +1,6 @@
+// This code is derived from RefineLB.C, and RefineLB.C should
+// be rewritten to use this, so there is no code duplication
+
 #include "Refiner.h"
 
 int** Refiner::AllocProcs(int count, CentralLB::LDStats* stats)
