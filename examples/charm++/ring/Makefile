@@ -1,0 +1,10 @@
+CHARMC=../../../../bin/charmc $(OPTS)
+
+pgm:  ring.o
+	$(CHARMC) ring.o  -o pgm -language charm++
+
+ring.o : ring.C ring.h ring.ci
+	$(CHARMC) -c ring.ci ring.C
+
+clean:
+	rm -f conv-host pgm *.def.h *.decl.h *.o *~ charmrun
