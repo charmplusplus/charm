@@ -10,12 +10,14 @@
 
 #include "lbdb.h"
 
+class LBDB;
+
 class LBObj
 {
 friend class LBDB;
 
 public:
-  LBObj(LBDB* _parentDB, LDOMHandle _omhandle, LDObjid _id,
+  LBObj(LBDB *_parentDB, LDOMHandle _omhandle, LDObjid _id,
 	void *_userData = 0, CmiBool _migratable=CmiTrue) {
     parentDB = _parentDB;
     parentOM = _omhandle;
