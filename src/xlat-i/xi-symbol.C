@@ -1255,6 +1255,14 @@ void Entry::genDecls(XStr& str)
     if(container->isTemplated())
       container->genVars(str);
     str<< "* obj);\n";
+    if(isThreaded()) {
+      str << "    static void ";
+      str << " _callthr_" << name;
+      str << "_ArrayElementCreateMessage(CkThrCallArg *);\n";
+      str << "    static void ";
+      str << " _callthr_" << name;
+      str << "_ArrayElementMigrateMessage(CkThrCallArg *);\n";
+    }
   } else {
     str << "    static void ";
     str << " _call_";
@@ -1270,6 +1278,11 @@ void Entry::genDecls(XStr& str)
     if(container->isTemplated())
       container->genVars(str);
     str<< "* obj);\n";
+    if(isThreaded()) {
+      str << "    static void _callthr_";
+      genEpIdx(str);
+      str << "(CkThrCallArg *);\n";
+    }
   }
 }
 
@@ -1581,6 +1594,30 @@ void Entry::genDefs(XStr& str)
       container->genVars(str);
     str<< "* obj)\n";
     str << "{\n";
+    if(isThreaded()) {
+      str << "  CthAwaken(CthCreate((CthVoidFn)_callthr_" << name;
+      str << "_ArrayElementCreateMessage, new CkThrCallArg(msg,obj), 0));\n}\n";
+      if(container->isTemplated())
+        container->genSpec(str);
+      str << " void ";
+      container->genProxyName(str);
+      if(container->isTemplated())
+        container->genVars(str);
+      str << "::_callthr_" << name;
+      str << "_ArrayElementCreateMessage(CkThrCallArg *arg)\n";
+      str << "{\n";
+      str << "  void *msg = arg->msg;\n";
+      str << "  ";
+      str << container->getBaseName();
+      if(container->isTemplated())
+        container->genVars(str);
+      str << " *obj = (";
+      str << container->getBaseName();
+      if(container->isTemplated())
+        container->genVars(str);
+      str << " *) arg->obj;\n";
+      str << "  delete arg;\n";
+    }
     str << "  new (obj) " << container->getBaseName();
     if(container->isTemplated())
       container->genVars(str);
@@ -1597,6 +1634,30 @@ void Entry::genDefs(XStr& str)
       container->genVars(str);
     str<< "* obj)\n";
     str << "{\n";
+    if(isThreaded()) {
+      str << "  CthAwaken(CthCreate((CthVoidFn)_callthr_" << name;
+      str << "_ArrayElementMigrateMessage, new CkThrCallArg(msg,obj), 0));\n}\n";
+      if(container->isTemplated())
+        container->genSpec(str);
+      str << " void ";
+      container->genProxyName(str);
+      if(container->isTemplated())
+        container->genVars(str);
+      str << "::_callthr_" << name;
+      str << "_ArrayElementMigrateMessage(CkThrCallArg *arg)\n";
+      str << "{\n";
+      str << "  void *msg = arg->msg;\n";
+      str << "  ";
+      str << container->getBaseName();
+      if(container->isTemplated())
+        container->genVars(str);
+      str << " *obj = (";
+      str << container->getBaseName();
+      if(container->isTemplated())
+        container->genVars(str);
+      str << " *) arg->obj;\n";
+      str << "  delete arg;\n";
+    }
     str << "  new (obj) " << container->getBaseName();
     if(container->isTemplated())
       container->genVars(str);
@@ -1620,6 +1681,32 @@ void Entry::genDefs(XStr& str)
       container->genVars(str);
     str<< "* obj)\n";
     str << "{\n";
+    if(isThreaded()) {
+      str << "  CthAwaken(CthCreate((CthVoidFn)_callthr_";
+      genEpIdx(str);
+      str << ", new CkThrCallArg(msg, obj), 0));\n}\n";
+      if(container->isTemplated())
+        container->genSpec(str);
+      str << " void ";
+      container->genProxyName(str);
+      if(container->isTemplated())
+        container->genVars(str);
+      str << "::_callthr_";
+      genEpIdx(str);
+      str << "(CkThrCallArg *arg)\n";
+      str << "{\n";
+      str << "  void *msg = arg->msg;\n";
+      str << "  ";
+      str << container->getBaseName();
+      if(container->isTemplated())
+        container->genVars(str);
+      str << "* obj = (";
+      str << container->getBaseName();
+      if(container->isTemplated())
+        container->genVars(str);
+      str << " *) arg->obj;\n";
+      str << "  delete arg;\n";
+    }
     str << "  int ref = CkGetRefNum(msg);\n";
     str << "  int src = CkGetSrcPe(msg);\n";
     str << "  void *retMsg;\n";
@@ -1670,6 +1757,32 @@ void Entry::genDefs(XStr& str)
       container->genVars(str);
     str<< "* obj)\n";
     str << "{\n";
+    if(isThreaded()) {
+      str << "  CthAwaken(CthCreate((CthVoidFn)_callthr_";
+      genEpIdx(str);
+      str << ", new CkThrCallArg(msg, obj), 0));\n}\n";
+      if(container->isTemplated())
+        container->genSpec(str);
+      str << " void ";
+      container->genProxyName(str);
+      if(container->isTemplated())
+        container->genVars(str);
+      str << "::_callthr_";
+      genEpIdx(str);
+      str << "(CkThrCallArg *arg)\n";
+      str << "{\n";
+      str << "  void *msg = arg->msg;\n";
+      str << "  ";
+      str << container->getBaseName();
+      if(container->isTemplated())
+        container->genVars(str);
+      str << " *obj = (";
+      str << container->getBaseName();
+      if(container->isTemplated())
+        container->genVars(str);
+      str << " *) arg->obj;\n";
+      str << "  delete arg;\n";
+    }
     str << "  if(CmiTryLock(obj->__nodelock)) {\n";
     str << "    "; 
     container->genProxyName(str);
@@ -1719,6 +1832,31 @@ void Entry::genDefs(XStr& str)
       container->genVars(str);
     str<< "* obj)\n";
     str << "{\n";
+    if(isThreaded()) {
+      str << "  CthAwaken(CthCreate((CthVoidFn)_callthr_";
+      genEpIdx(str);
+      str << ", new CkThrCallArg(msg, obj), 0));\n}\n";
+      if(container->isTemplated())
+        container->genSpec(str);
+      str << " void ";
+      container->genProxyName(str);
+      if(container->isTemplated())
+        container->genVars(str);
+      str << "::_callthr_";
+      genEpIdx(str);
+      str << "(CkThrCallArg *arg)\n{\n";
+      str << "  void *msg = arg->msg;\n";
+      str << "  ";
+      str << container->getBaseName();
+      if(container->isTemplated())
+        container->genVars(str);
+      str << " *obj = (";
+      str << container->getBaseName();
+      if(container->isTemplated())
+        container->genVars(str);
+      str << " *) arg->obj;\n";
+      str << "  delete arg;\n";
+    }
     if(isConstructor()) {
       str << "  new (obj) " << container->getBaseName();
       if(container->isTemplated())
