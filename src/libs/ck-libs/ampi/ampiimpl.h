@@ -803,6 +803,7 @@ class ampi : public CBase_ampi {
     virtual void pup(PUP::er &p);
     void block(void);
     void unblock(void);
+    void yield(void);
     void generic(AmpiMsg *);
     void reduceResult(CkReductionMsg *m);
     void splitPhase1(CkReductionMsg *msg);

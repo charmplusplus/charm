@@ -980,6 +980,10 @@ void ampi::block(void){
 	thread->suspend();
 }
 
+void ampi::yield(void){
+	thread->schedule();
+}
+
 void ampi::unblock(void){
 	thread->resume();
 }
@@ -3280,9 +3284,16 @@ int MPI_Type_get_contents(MPI_Datatype datatype, int ni, int na, int nd, int i[]
 }
 
 CDECL
+int MPI_Suspend(int comm) {
+	AMPIAPI("MPI_Suspend");
+	getAmpiInstance(comm)->block();
+	return 0;
+}
+
+CDECL
 int MPI_Yield(int comm) {
 	AMPIAPI("MPI_Yield");
-	getAmpiInstance(comm)->block();
+	getAmpiInstance(comm)->yield();
 	return 0;
 }
 
