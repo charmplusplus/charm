@@ -488,7 +488,7 @@ static void CommunicationServer(int sleepTime)
     exit(0);   
   }
 }
-#endif
+
 
 static void CommunicationServerThread(int sleepTime)
 {
@@ -497,6 +497,8 @@ static void CommunicationServerThread(int sleepTime)
   CmiHandleImmediate();
 #endif
 }
+
+#endif
 
 
 #if CMK_NODE_QUEUE_AVAILABLE
