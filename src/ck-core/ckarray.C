@@ -209,6 +209,7 @@ void Array1D::RecvMigratedElement(ArrayMigrateMessage *msg)
   elementIDs[index].pe = CkMyPe();
   elementIDs[index].curHop = msg->hopCount;
   elementIDs[index].cameFrom = msg->from;
+  elementIDs[index].migrateMsg = msg;
 
   ArrayElementMigrateMessage *new_msg = new ArrayElementMigrateMessage;
 
@@ -220,8 +221,6 @@ void Array1D::RecvMigratedElement(ArrayMigrateMessage *msg)
   new_msg->packData = msg->elementData;
   
   CkCreateChare(elementChareType, elementMigrateType, new_msg, &vid, CkMyPe());
-
-  delete msg;
 }
 
 void Array1D::RecvMigratedElementID(int index, ArrayElement *elem,
@@ -232,6 +231,7 @@ void Array1D::RecvMigratedElementID(int index, ArrayElement *elem,
   elementIDs[index].state = here;
   elementIDs[index].element = elem;
   elementIDs[index].elementHandle = handle;
+  delete elementIDs[index].migrateMsg;
 
   ArrayElementAckMessage *ack_msg = new ArrayElementAckMessage;
 

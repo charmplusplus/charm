@@ -141,6 +141,7 @@ private:
     CkChareID elementHandle;
     int cameFrom;
     int curHop;
+    void *migrateMsg;
   };
 
   int numElements;
