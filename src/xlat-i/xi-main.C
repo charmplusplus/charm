@@ -43,6 +43,7 @@ main(int argc, char *argv[])
   char *option=0;
 
   compilemode = original;
+  fortranMode = 0;
 
   switch (argc) {
   case 2:
@@ -65,6 +66,9 @@ main(int argc, char *argv[])
   
   if (option != 0 && strcmp(option,"-ansi")==0)
     compilemode = ansi;
+
+  if (option != 0 && strcmp(option,"-f90")==0)
+    fortranMode = 1;
 
   ModuleList *m = Parse(fname) ;
   m->generate();

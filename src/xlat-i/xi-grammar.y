@@ -299,6 +299,8 @@ MAttrib		: PACKED
 
 Message		: MESSAGE MAttribs NamedType
 		{ $$ = new Message(lineno, $3, $2); }
+		| MESSAGE MAttribs NamedType '{' TypeList '}'
+		{ $$ = new Message(lineno, $3, $2, $5); }
 		;
 
 OptBaseList	: /* Empty */

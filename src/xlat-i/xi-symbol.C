@@ -7,11 +7,25 @@
 
 #include <iostream.h>
 #include <fstream.h>
-#include <string.h>
+#include <string>
 #include <stdlib.h>
 #include "xi-symbol.h"
+#include <ctype.h> // for tolower()
 
 CompileMode compilemode;
+MessageList message_list;
+int fortranMode;
+
+// Make the name lower case
+string fortranify(const char *s)
+{
+  string retVal;
+  int i;
+  for(i = 0; i < strlen(s); i++)
+    retVal += tolower(s[i]);
+
+  return retVal;
+}
 
 Value::Value(char *s)
 {
@@ -551,6 +565,42 @@ void
 Chare::genDefs(XStr& str)
 {
   str << "/* DEFS: "; print(str); str << " */\n";
+  if (fortranMode) { // For Fortran90
+    if (!isArray()) { // Currently, only arrays are supported
+      cerr << baseName() << ": only chare arrays are currently supported\n";
+      exit(1);
+    }
+    // We have to generate the chare array itself
+    str << "extern \"C\" " << fortranify(baseName()) << "_allocate_(char **, void *);\n";
+    str << "\n";
+    str << "class " << baseName() << " : public ArrayElement\n";
+    str << "{\n";
+    str << "public:\n";
+    str << "  char user_data[64];\n";
+    str << "public:\n";
+    str << "  " << baseName() << "(ArrayElementCreateMessage *m) : ArrayElement(m)\n";
+    str << "  {\n";
+    str << "    CkPrintf(\"" << baseName() << " %d created\\n\",thisIndex);\n";
+    str << "    CkArrayID *aid = &thisAID;\n";
+    str << "    " << fortranify(baseName()) << "_allocate_((char **)&user_data, &aid);\n";
+    str << "    finishConstruction();\n";
+    str << "  }\n";
+    str << "\n";
+    str << "  " << baseName() << "(ArrayElementMigrateMessage *m) : ArrayElement(m)\n";
+    str << "  {\n";
+    str << "    CkPrintf(\"" << baseName() << " %d migrating\\n\",thisIndex);\n";
+    str << "    finishMigration();\n";
+    str << "  }\n";
+    str << "\n";
+    str << "};\n";
+    str << "\n";
+    str << "extern \"C\" void " << fortranify(baseName()) << "_cknew_(int *numElem, long *aindex)\n";
+    str << "{\n";
+    str << "    CkArrayID *aid = &CProxy_" << baseName() << "::ckNew(*numElem); \n";
+    str << "    *aindex = (long)aid;\n";
+    str << "}\n";
+
+  }
   if(!templat) {
     str << "#ifndef CK_TEMPLATES_ONLY\n";
     if(external) str << "extern ";
@@ -943,6 +993,60 @@ void TypeList::genProxyNames2(XStr& str, const char *prefix,
   if(next) {
     str << sep;
     next->genProxyNames2(str, prefix, middle, suffix, sep);
+  }
+}
+
+void TypeList::genUnmarshalList0(XStr& str, int depth)
+{
+  if(type) {
+    type->print(str);
+    str << "*";
+  }
+  if(next) {
+    str << ", ";
+    next->genUnmarshalList0(str, depth+1);
+  }
+}
+
+void TypeList::genUnmarshalList1(XStr& str, const char* message_name, int depth)
+{
+  if(type) {
+    str << "&((" << message_name << "*)msg)->p" << depth;
+  }
+  if(next) {
+    str << ", ";
+    next->genUnmarshalList1(str, message_name, depth+1);
+  }
+}
+
+void TypeList::genUnmarshalList2(XStr& str, int depth)
+{
+  if(type) {
+    str << "  " << type->getBaseName() << " p" << depth << ";\n";
+  }
+  if(next) {
+    next->genUnmarshalList2(str, depth+1);
+  }
+}
+
+void TypeList::genUnmarshalList3(XStr& str, int depth)
+{
+  if(type) {
+    str << type->getBaseName() << " *p" << depth;
+  }
+  if(next) {
+    str << ", ";
+    next->genUnmarshalList3(str, depth+1);
+  }
+}
+
+void TypeList::genUnmarshalList4(XStr& str, int depth)
+{
+  if(type) {
+    str << "  msg->p" << depth << " = *p" << depth << ";\n";
+  }
+  if(next) {
+    next->genUnmarshalList4(str, depth+1);
   }
 }
 
@@ -1477,6 +1581,45 @@ void Entry::genDefs(XStr& str)
     str << "  CmiUnlock(obj->__nodelock);\n";
     str << "}\n";
   } else {//Not sync, exclusive, or an array constructor-- just a regular method
+
+    if (fortranMode) { // Fortran90
+      const char* msg_name = param->getBaseName();
+      TypeList *msg_contents = (message_list[msg_name])->getContents();
+
+      // Declare the Fortran Entry Function
+      // This is called from C++
+      str << "extern \"C\" void " << fortranify(name) << "_(char **, int*, ";
+      msg_contents->genUnmarshalList0(str);
+      str << ");\n";
+
+      // Define the Marshalling message
+      str << "class " << msg_name 
+          << " : public ArrayMessage, public CMessage_" << msg_name << "\n";
+      str << "{\npublic:\n";
+      msg_contents->genUnmarshalList2(str);
+      str << "};\n";
+
+      // Define the Fortran interface function
+      // This is called from Fortran to send the message to a chare.
+      str << "extern \"C\" void "
+        //<< container->proxyName() << "_" 
+          << fortranify("SendTo")
+          << fortranify(name)
+          << "_(long* aindex, int *index, ";
+      msg_contents->genUnmarshalList3(str);
+      str << ")\n";
+      str << "{\n";
+      str << "  CkArrayID *aid = (CkArrayID *)*aindex;\n";
+      str << "\n";
+      str << "  // marshalling\n";
+      str << "  " << container->proxyName() << " h(*aid);\n";
+      str << "  " << msg_name <<" *msg = new " << msg_name <<";\n";
+      //      str << "    msg->data = *data;\n";
+      msg_contents->genUnmarshalList4(str);
+      str << "  h[*index]." << name << "(msg);\n";
+      str << "}\n";
+    }
+
     str << makeDecl("void")<<"::_call_"<<epIdx(0)
       <<"("<<((param)?"void":"CkArgMsg")<<"* msg, "<<containerType<<"* obj)\n";
     str << "{\n";
@@ -1494,7 +1637,17 @@ void Entry::genDefs(XStr& str)
         str << "((CkArgMsg*)msg);\n";
       }
     } else {//Not a constructor
-      str << "  obj->"<<name<<"("<<cpType<<");\n"<<freeMsgVoid;
+      if (fortranMode) { // Fortran90
+        str << "  int index = obj->getIndex();\n";
+        str << "  " << fortranify(name)
+            << "_((char **)(obj->user_data), &index, ";
+        const char* msg_name = param->getBaseName();
+        TypeList *msg_contents = (message_list[msg_name])->getContents();
+        msg_contents->genUnmarshalList1(str, param->getBaseName());
+        str << ");\n";
+      } else {
+        str << "  obj->"<<name<<"("<<cpType<<");\n"<<freeMsgVoid;
+      }
     }
     str << "}\n";
   }

@@ -12,11 +12,14 @@
 #include <string.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <string>
+#include <map>
 
 #include "xi-util.h"
 
 typedef enum { original, ansi } CompileMode;
 extern CompileMode compilemode;
+extern int fortranMode;
 
 class Value : public Printable {
   private:
@@ -102,6 +105,11 @@ class TypeList : public Printable {
     void genProxyNames(XStr& str, const char*, const char*, const char*);
     void genProxyNames2(XStr& str, const char*, const char*, 
                         const char*, const char*);
+    void genUnmarshalList0(XStr& str, int depth = 1);
+    void genUnmarshalList1(XStr& str, const char* message_name, int depth = 1);
+    void genUnmarshalList2(XStr& str, int depth=1);
+    void genUnmarshalList3(XStr& str, int depth=1);
+    void genUnmarshalList4(XStr& str, int depth=1);
 };
 
 /* EnType is the type of an entry method parameter, 
@@ -373,12 +381,22 @@ class NodeGroup : public Group {
 #define SPACKED  0x01
 #define SVARSIZE 0x02
 
+class Message; // forward declaration
+typedef map< string, Message* > MessageList;
+extern MessageList message_list;
+
 class Message : public TEntity, public Construct {
     int attrib;
     NamedType *type;
+    TypeList *contents;
   public:
-    Message(int l, NamedType *t, int a) : attrib(a), type(t) 
-      { line=l; setTemplate(0); }
+  /*    Message(int l, NamedType *t, int a)
+      : attrib(a), type(t), contents(0)
+      { line=l; setTemplate(0); }*/
+    Message(int l, NamedType *t, int a, TypeList *c=0)
+      : attrib(a), type(t), contents(c) 
+      { line=l; setTemplate(0);
+        message_list[type->getBaseName()] = this; }
     void print(XStr& str);
     void genDecls(XStr& str);
     void genDefs(XStr& str);
@@ -386,6 +404,7 @@ class Message : public TEntity, public Construct {
     int  isPacked(void) { return attrib&SPACKED; }
     int  isVarsize(void) { return attrib&SVARSIZE; }
     virtual char *proxyPrefix(void) {return msg_prefix();}
+    TypeList *getContents(void) const { return contents; }
 };
 
 /* A formal argument of a template */

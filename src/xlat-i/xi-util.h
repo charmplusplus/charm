@@ -9,6 +9,7 @@
 #define _XI_UTIL_H
 
 #include <string.h>
+#include <string>
 #include <iostream.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -32,6 +33,7 @@ class XStr {
     //This operator allows us to use XStr's interchangably with char *'s:
     operator char *() {return get_string();}
     XStr& operator << (const char *_s) { append(_s); return *this;}
+    XStr& operator << (const string & _s) { append(_s.c_str()); return *this;}
     XStr& operator << (char c) { append(c); return *this;}
     XStr& operator << (int i) ;
     XStr& operator << (const XStr& x) { append(x.get_string_const()); return *this; }
