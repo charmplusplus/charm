@@ -2413,6 +2413,10 @@ static void ConverseRunPE(int everReturn)
   if (Cmi_netpoll == 1 && CmiMyPe() == 0)
     CmiPrintf("Charm++: scheduler running in netpoll mode.\n");
 
+#if CMK_USE_GM
+  CmiCheckGmStatus();
+#endif
+
   ConverseCommonInit(CmiMyArgv);
 
   if (!everReturn) {
@@ -2523,9 +2527,6 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
   CmiMachineInit();
 
   node_addresses_obtain(argv);
-#if CMK_USE_GM
-  if (gmport == NULL) machine_exit(1);
-#endif
   skt_set_idle(CmiYield);
   Cmi_check_delay = 2.0+0.5*Cmi_numnodes;
   CmiStartThreads();

@@ -10,8 +10,8 @@
   Gengbin Zheng, gzheng@uiuc.edu  4/22/2001
 
   TODO:
-  1. DMAable buffer reuse;
-  2. packetizing;
+  1. packetizing;
+  2. DMAable buffer reuse;
 */
 
 
@@ -79,6 +79,8 @@ static void alarmcallback (void *context);
 static int processEvent(gm_recv_event_t *e);
 static void send_progress();
 static void alarmInterrupt(int arg);
+static int gmExit(int code,const char *msg);
+static char *getErrorMsg(gm_status_t status);
 
 /******************************************************************************
  *
@@ -116,15 +118,6 @@ void CmiNotifyIdle(void)
   struct timeval tv;
 #if CMK_SHARED_VARS_UNAVAILABLE
   /*No comm. thread-- listen on sockets for incoming messages*/
-#if !CMK_USE_POLL
-  static fd_set rfds;
-  tv.tv_sec=0; tv.tv_usec=5000;
-  FD_ZERO(&rfds); 
-  if (Cmi_charmrun_fd!=-1)
-    FD_SET(Cmi_charmrun_fd, &rfds);
-  select(FD_SETSIZE,&rfds,NULL,0,&tv);
-#else
-  struct pollfd fds[2]; int n = 0;
   int nreadable;
   gm_recv_event_t *e;
   int pollMs = 5;
@@ -145,17 +138,6 @@ void CmiNotifyIdle(void)
     return;
   }
   if (Cmi_netpoll) CommunicationServer(5);
-  return;
-
-  pollMs = 0;
-  if (Cmi_charmrun_fd!=-1) {
-    fds[n].fd = Cmi_charmrun_fd;
-    fds[n].events = POLLIN;
-    n++;
-  }
-  poll(fds, n, pollMs);
-#endif
-  if (Cmi_netpoll) CommunicationServer(5);
 #else
   /*Comm. thread will listen on sockets-- just sleep*/
   tv.tv_sec=0; tv.tv_usec=1000;
@@ -164,6 +146,48 @@ void CmiNotifyIdle(void)
 }
 
 static void alarmcallback (void *context) {}
+
+/***********************************************************************
+ * CommunicationServer()
+ * 
+ * This function does the scheduling of the tasks related to the
+ * message sends and receives. 
+ * It first check the charmrun port for message, and poll the gm event
+ * for send complete and outcoming messages.
+ *
+ ***********************************************************************/
+
+static void CommunicationServer(int withDelayMs)
+{
+  gm_recv_event_t *e;
+  int size, len;
+  char *msg, *buf;
+
+  LOG(GetClock(), Cmi_nodestart, 'I', 0, 0);
+  if (Cmi_charmrun_fd==-1) return; /*Standalone mode*/
+#if CMK_SHARED_VARS_UNAVAILABLE
+  if (terrupt)
+  {
+      return;
+  }
+  terrupt++;
+#endif
+  CmiCommLock();
+
+  while (1) {
+    CheckSocketsReady(0);
+    if (ctrlskt_ready_read) { ctrl_getone(); }
+    e = gm_receive(gmport);
+    if (!processEvent(e)) break;
+  }
+
+  CmiCommUnlock();
+#if CMK_SHARED_VARS_UNAVAILABLE
+  terrupt--;
+#endif
+
+}
+
 
 static void processMessage(char *msg, int len)
 {
@@ -227,63 +251,15 @@ static int processEvent(gm_recv_event_t *e)
     return status;
 }
 
-static void CommunicationServer(int withDelayMs)
-{
-  gm_recv_event_t *e;
-  int size, len;
-  char *msg, *buf;
-
-  LOG(GetClock(), Cmi_nodestart, 'I', 0, 0);
-  if (Cmi_charmrun_fd==-1) return; /*Standalone mode*/
-#if CMK_SHARED_VARS_UNAVAILABLE
-  if (terrupt)
-  {
-      return;
-  }
-  terrupt++;
-#endif
-  CmiCommLock();
-
-  /* ping moved to alarmInterrupt */
-/*
-  Cmi_clock = GetClock();
-  if (Cmi_clock > Cmi_check_last + Cmi_check_delay) {
-    ctrl_sendone_nolock("ping",NULL,0,NULL,0);
-    Cmi_check_last = Cmi_clock;
-  }
-*/
-
-  while (1) {
-    CheckSocketsReady(0);
-    if (ctrlskt_ready_read) { ctrl_getone(); }
-    e = gm_receive(gmport);
-    if (!processEvent(e)) break;
-  }
-
-  CmiCommUnlock();
-#if CMK_SHARED_VARS_UNAVAILABLE
-  terrupt--;
-#endif
-
-}
-
 
 void send_callback(struct gm_port *p, void *msg, gm_status_t status)
 {
   if (status != GM_SUCCESS) { 
-    int rank, srcpe, seqno, magic;
+    int srcpe, seqno, magic;
+    char rank;
     char *errmsg;
     DgramHeaderBreak(msg, rank, srcpe, magic, seqno);
-    switch (status) {
-    case GM_SEND_TIMED_OUT:
-      errmsg = "send time out"; break;
-    case GM_SEND_REJECTED:
-      errmsg = "send rejected"; break;
-    case GM_SEND_TARGET_NODE_UNREACHABLE:
-      errmsg = "target node unreachable"; break;
-    default:
-      errmsg = ""; break;
-    }
+    errmsg = getErrorMsg(status);
     CmiPrintf("GM Error> PE:%d send to %d failed to complete (error %d): %s\n", srcpe, rank, status, errmsg); 
     CmiAbort("");
   }
@@ -370,6 +346,13 @@ void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank)
                         send_callback, buf);
 }
 
+/***********************************************************************
+ * CmiMachineInit()
+ *
+ * This function intialize the GM board. Set receive buffer
+ *
+ ***********************************************************************/
+
 void CmiMachineInit()
 {
   gm_status_t status;
@@ -388,6 +371,9 @@ void CmiMachineInit()
   sprintf(portname, "port%d%d", Cmi_charmrun_pid, Cmi_mynode);
   status = gm_open(&gmport, device, dataport, portname, GM_API_VERSION_1_1);
   if (status != GM_SUCCESS) { return; }
+
+  /* default abort will take care of gm clean up */
+  skt_set_abort(gmExit);
 
   /* set up recv buffer */
   maxsize = 24;
@@ -412,23 +398,24 @@ void CmiMachineInit()
   gm_free_send_tokens (gmport, GM_LOW_PRIORITY,
                        gm_num_send_tokens (gmport));
 
-  gm_initialize_alarm(&gmalarm);
-
 #if CMK_MSGPOOL
   msgpool[msgNums++]  = gm_dma_malloc(gmport, maxMsgSize);
 #endif
 
+  /* alarm will ping charmrun */
+  gm_initialize_alarm(&gmalarm);
+
   CmiSignal(SIGALRM, 0, 0, alarmInterrupt);
 
   {
-    struct itimerval i;
-    /*This will send us a SIGALRM every Cmi_tickspeed microseconds,
-    which will call the alarmInterrupt routine above.*/
-    i.it_interval.tv_sec = 0;
-    i.it_interval.tv_usec = Cmi_tickspeed;
-    i.it_value.tv_sec = 0;
-    i.it_value.tv_usec = Cmi_tickspeed;
-    setitimer(ITIMER_REAL, &i, NULL);
+  struct itimerval i;
+   /*This will send us a SIGALRM every Cmi_tickspeed microseconds,
+   which will call the alarmInterrupt routine above.*/
+   i.it_interval.tv_sec = 0;
+   i.it_interval.tv_usec = Cmi_tickspeed;
+   i.it_value.tv_sec = 0;
+   i.it_value.tv_usec = Cmi_tickspeed;
+   setitimer(ITIMER_REAL, &i, NULL);
   }
 }
 
@@ -447,3 +434,45 @@ static void alarmInterrupt(int arg)
   CmiCommUnlock();
 }
 
+/* make sure other gm nodes are accessible in routing table */
+void CmiCheckGmStatus()
+{
+  int i;
+  int doabort = 0;
+  if (gmport == NULL) machine_exit(1);
+  for (i=0; i<Cmi_numnodes; i++) {
+    gm_status_t status;
+    char uid[6];
+    status = gm_node_id_to_unique_id(gmport, nodes[i].IP, uid);
+    if (status != GM_SUCCESS || ( uid[0]==0 && uid[1]== 0 
+         && uid[2]==0 && uid[3]==0 && uid[4]==0 && uid[5]==0)) { 
+      CmiPrintf("Error> gm node %d doesn't know node %d. \n", CmiMyPe(), i);
+      doabort = 1;
+    }
+//    CmiPrintf("%d: ip:%d %d %d %d\n", CmiMyPe(), nodes[i].IP,uid[0], uid[3], uid[5]);
+  }
+  if (doabort) CmiAbort("");
+}
+
+static int gmExit(int code,const char *msg)
+{
+  fprintf(stderr,"Fatal socket error: code %d-- %s\n",code,msg);
+  machine_exit(code);
+}
+
+
+static char *getErrorMsg(gm_status_t status)
+{
+  char *errmsg;
+  switch (status) {
+  case GM_SEND_TIMED_OUT:
+    errmsg = "send time out"; break;
+  case GM_SEND_REJECTED:
+    errmsg = "send rejected"; break;
+  case GM_SEND_TARGET_NODE_UNREACHABLE:
+    errmsg = "target node unreachable"; break;
+  default:
+    errmsg = ""; break;
+  }
+  return errmsg;
+}
