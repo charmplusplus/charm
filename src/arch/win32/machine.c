@@ -397,6 +397,19 @@ static int CountArgs(char **argv)
   return count;
 }
 
+static char** CopyArgs(char **argv) 
+{
+	int  i, count;
+	char **tmp;
+	
+	count = CountArgs(argv);
+	tmp   = (char **) malloc(sizeof(char *)*(count+1));
+	for (i=0; i <= count; i++)
+		tmp[i] = argv[i];
+
+	return tmp;
+}
+
 
 static void jsleep(int sec, int usec)
 {
@@ -1730,6 +1743,7 @@ void CmiMemUnlock() { ReleaseMutex(memmutex); }
 
 static DWORD Cmi_state_key = 0xFFFFFFFF;
 static CmiState     Cmi_state_vector = 0;
+CpvDeclare(char**, CmiMyArgv);
 
 CmiState CmiGetState()
 {
@@ -1849,8 +1863,8 @@ static DWORD WINAPI call_startfn(LPVOID vindex)
     exit(1);
   }
 
-   ConverseInitPE();
-  Cmi_startfn(CountArgs(Cmi_argv), Cmi_argv);
+  ConverseInitPE();
+  Cmi_startfn(CountArgs(CpvAccess(CmiMyArgv)), CpvAccess(CmiMyArgv));
   if (Cmi_usrsched == 0) CsdScheduler(-1);
   ConverseExit();
   proc_done++;
@@ -3396,10 +3410,13 @@ void ConverseInitPE()
   CmiNodeBarrier();
   cs = CmiGetState();
   CpvInitialize(char *, internal_printf_buffer);
+  CpvInitialize(char**, CmiMyArgv);
   CpvAccess(internal_printf_buffer) = (char *) malloc(PRINTBUFSIZE);
   _MEMCHECK(CpvAccess(internal_printf_buffer));
+  if (CmiMyRank()) CpvAccess(CmiMyArgv) = CopyArgs(Cmi_argv);
+  else CpvAccess(CmiMyArgv) = Cmi_argv;
   CthInit();
-  ConverseCommonInit(Cmi_argv);
+  ConverseCommonInit(CpvAccess(CmiMyArgv));
   CpvInitialize(void *,CmiLocalQueue);
   CpvAccess(CmiLocalQueue) = cs->localqueue;
 #if CMK_CCS_AVAILABLE
@@ -3498,7 +3515,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int ret)
   ConverseInitPE();
   if (ret==0) 
   {
-    fn(CountArgs(argv), argv);
+    fn(CountArgs(CpvAccess(CmiMyArgv)), CpvAccess(CmiMyArgv));
     DEBUGF(("ConverseInit: about to start scheduler\n"));
     if (usc==0) CsdScheduler(-1);
     DEBUGF(("ConverseInit: scheduler finished (!?)\n"));
