@@ -1,0 +1,41 @@
+\section{Irecv Library}
+
+{\sc Irecv} library provides asynchronous communication mode for chare array. The program breaks into two parts("split phase" structure): nonblocking send, receives and iwait, and callback functions. It provides a style that mpi programmers may find intuitive. 
+
+There are there functions in Irecv library.
+
+1 void generic(receiverMsg *);
+Message type "receiverMsg" is a varsize message. There are four fields need to be filled after allocating the message:
+int tag: regular tag;
+int sendFrom: sending object index;
+int refno: reference number, usually the iteration number.
+char *buf:   message buffer
+  
+
+2 void irecv(int tag, char *pointer, int size, int senderTag, int refno);
+irecv will register tags and pointer to the library, that it copy the matching message(with tags) into the location given by the "pointer".
+
+3 void iwaitAll(recvCallBack f, void *data, int refno);
+Wait for all the previously issued irecvs to complete, and then it calls the callback function "f" with "data" as argument.
+
+To use Irecv library, create a chare array which is inherited from class "receiver". The sender jneed to allocate the "receiverMsg" message, fill in fields and invoke 'generic' method in the remote object; The receiver will specify the matching tags and buffer to get the message. After irecv, calling iwaitAll to wait all the receive functions calls complete. However, the iwaitAll is nonblocking and the callback functions will be called after receive calls complete.
+
+Here is an example:
+
+\begin{verbatim}
+     int size = 100;
+     for (int i=0; i<size; i++) buf[i] = data[i];
+     send(buf, size*sizeof(double), neighbor, tag, iter);
+
+     irecv(buf, size*sizeof(double), neighbor, tag, iter);
+
+     iwaitAll(callfunc, this, iter);
+\end{verbatim}
+
+and callback function can be declared as:
+
+\begin{verbatim}
+     void callfunc(void *obj)
+     {
+     }
+\end{verbatim}
