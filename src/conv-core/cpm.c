@@ -87,12 +87,16 @@ CpmDestination CpmEnqueue(int pe, int qs, int priobits, int *prioptr)
 
 CpmDestination CpmEnqueueIFIFO(int pe, int prio)
 {
-  return CpmEnqueue(pe, CQS_QUEUEING_IFIFO, sizeof(int)*8, &prio);
+  static int iprio;
+  iprio = prio;
+  return CpmEnqueue(pe, CQS_QUEUEING_IFIFO, sizeof(int)*8, &iprio);
 }
 
 CpmDestination CpmEnqueueILIFO(int pe, int prio)
 {
-  return CpmEnqueue(pe, CQS_QUEUEING_ILIFO, sizeof(int)*8, &prio);
+  static int iprio;
+  iprio = prio;
+  return CpmEnqueue(pe, CQS_QUEUEING_ILIFO, sizeof(int)*8, &iprio);
 }
 
 CpmDestination CpmEnqueueBFIFO(int pe, int priobits, int *prioptr)
