@@ -325,10 +325,11 @@ static PUP_registry *PUP_getRegistry(void) {
 
 const PUP_regEntry *PUP_getRegEntry(const PUP::able::PUP_ID &id)
 {
-	const PUP_regEntry &cur=PUP_getRegistry()->get(id);
-	if (cur.name==NULL)
+	const PUP_regEntry *cur=(const PUP_regEntry *)(
+		PUP_getRegistry()->CkHashtable::get((const void *)&id) );
+	if (cur==NULL)
 		CmiAbort("Unrecognized PUP::able::PUP_ID. is there an unregistered module?");
-	return &cur;
+	return cur;
 }
 
 PUP::able::PUP_ID PUP::able::register_constructor
@@ -345,7 +346,6 @@ PUP::able::constructor_function PUP::able::get_constructor
 	return PUP_getRegEntry(id)->ctor;
 }
 
-
 //For allocatable objects: new/delete object and call pup routine
 void PUP::er::object(able** a)
 {
@@ -358,6 +358,7 @@ void PUP::er::object(able** a)
 		r=PUP_getRegEntry(id);
 		//Invoke constructor (calls new)
 		*a=(r->ctor)();
+		
 	} else {//Just write out the object type
 		if (*a==NULL) {
 			null_PUP_ID.pup(*this);
