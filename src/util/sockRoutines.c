@@ -27,7 +27,12 @@ static int default_skt_abort(int code,const char *msg)
 static skt_idleFn idleFunc=NULL;
 static skt_abortFn skt_abort=default_skt_abort;
 void skt_set_idle(skt_idleFn f) {idleFunc=f;}
-skt_abortFn skt_set_abort(skt_abortFn f) {skt_abort=f;}
+skt_abortFn skt_set_abort(skt_abortFn f) 
+{
+	skt_abortFn old=skt_abort;
+	skt_abort=f;
+	return old;
+}
 
 
 #ifdef _WIN32 /*Windows systems:*/
@@ -67,12 +72,12 @@ static int skt_should_retry(void)
 #ifdef _WIN32 /*Windows systems-- check Windows Sockets Error*/
 	int err=WSAGetLastError();
 	if (err==WSAEINTR) isinterrupt=1;
-	if (err==WSATRY_AGAIN||err==WSAECONNREFUSED||err==WSAEADDRINUSE||err==WSAEADDRNOTAVAIL)
+	if (err==WSATRY_AGAIN||err==WSAECONNREFUSED)
 		istransient=1;
 #else /*UNIX systems-- check errno*/
 	int err=errno;
 	if (err==EINTR) isinterrupt=1;
-	if (err==EAGAIN||err==ECONNREFUSED||err==EADDRINUSE||err==EADDRNOTAVAIL)
+	if (err==EAGAIN||err==ECONNREFUSED)
 		istransient=1;
 #endif
 	if (isinterrupt) {
@@ -134,15 +139,16 @@ unsigned long skt_my_ip(void)
 
 unsigned long skt_lookup_ip(const char *name)
 {
+  const unsigned int inval=0xffFFffFFu;
   unsigned long ret;
   ret=inet_addr(name);/*Try dotted decimal*/
-  if (ret!=(unsigned long)(-1) && ntohl(ret)!=-1) 
+  if (ret!=inval && ntohl(ret)!=inval) 
 	  return ntohl(ret);
   else {/*Try a DNS lookup*/
     struct hostent *h = gethostbyname(name);
     unsigned long ip;
     if (h==0) return 0;
-    ip=ntohl(*((unsigned long *)(h->h_addr_list[0])));
+    ip=ntohl(*((unsigned int *)(h->h_addr_list[0])));
     return ip;
   }
 }
