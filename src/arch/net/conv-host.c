@@ -1357,7 +1357,6 @@ char *arg_rshprog;
 char *arg_currdir_a;
 char *arg_currdir_r;
 char *arg_mylogin;
-char *arg_myhome;
 char *arg_shell;
 
 #if CMK_CCS_AVAILABLE
@@ -1469,8 +1468,6 @@ void arg_init(int argc, char **argv)
   }
 
   arg_mylogin = mylogin();
-  arg_myhome = (char *)malloc(MAXPATHLEN);
-  strcpy(arg_myhome, getenv("HOME"));
 }
 
 /****************************************************************************
@@ -1502,7 +1499,7 @@ char *nodetab_file_find()
     sprintf(buffer,"%s/.nodelist",getenv("HOME"));
     if (probefile(buffer)) return strdup(buffer);
   }
-  fprintf(stderr,"ERROR> Cannot find a nodes file.\n");
+  fprintf(stderr,"ERROR> Env. Var. HOME not set. Cannot find a nodes file.\n");
   exit(1);
 }
 
