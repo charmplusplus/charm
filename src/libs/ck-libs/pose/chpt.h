@@ -45,24 +45,30 @@ void chpt<StateType>::checkpoint(StateType *data)
   localStat *localStats = (localStat *)CkLocalBranch(theLocalStats);
   localStats->SwitchTimer(CP_TIMER);
 #endif
-  CmiAssert(!(parent->myStrat->currentEvent->cpData));
-  //  if ((myStrat->currentEvent->timestamp > 
-  //myStrat->currentEvent->prev->timestamp) || (sinceLast == STORE_RATE)) {
-  if ((sinceLast == ((opt *)myStrat)->cpRate) || 
-      (CpvAccess(stateRecovery) == 1) || 
-      (myStrat->currentEvent->prev == parent->eq->front())) {
-    myStrat->currentEvent->cpData = new StateType;
-    myStrat->currentEvent->cpData->copy = 1;
-    *((StateType *)myStrat->currentEvent->cpData) = *data;
-    sinceLast = 0;
-#ifdef POSE_STATS_ON
-    //localStats->Checkpoint();
-    //localStats->CPbytes(sizeof(StateType));
-#endif
+  if (usesAntimethods()) {
+    myStrat->currentEvent->cpData = new rep;
+    *(myStrat->currentEvent->cpData) = *(rep *)data;
   }
-  else sinceLast++;
+  else {
+    CmiAssert(!(parent->myStrat->currentEvent->cpData));
+    //  if ((myStrat->currentEvent->timestamp > 
+    //myStrat->currentEvent->prev->timestamp) || (sinceLast == STORE_RATE)) {
+    if ((sinceLast == ((opt *)myStrat)->cpRate) || 
+	(CpvAccess(stateRecovery) == 1) || 
+	(myStrat->currentEvent->prev == parent->eq->front())) {
+      myStrat->currentEvent->cpData = new StateType;
+      myStrat->currentEvent->cpData->copy = 1;
+      *((StateType *)myStrat->currentEvent->cpData) = *data;
+      sinceLast = 0;
 #ifdef POSE_STATS_ON
-  localStats->SwitchTimer(SIM_TIMER);
+      //localStats->Checkpoint();
+      //localStats->CPbytes(sizeof(StateType));
+#endif
+    }
+    else sinceLast++;
+  }
+#ifdef POSE_STATS_ON
+    localStats->SwitchTimer(SIM_TIMER);
 #endif
 }
 
@@ -70,16 +76,23 @@ void chpt<StateType>::checkpoint(StateType *data)
 template<class StateType> 
 void chpt<StateType>::restore(StateType *data) 
 {
-  if (myStrat->currentEvent == myStrat->targetEvent) {
-    if (myStrat->targetEvent->cpData) {
-      *data = *((StateType *)myStrat->targetEvent->cpData);
-      delete myStrat->targetEvent->cpData;
-      myStrat->targetEvent->cpData = NULL;
-    }
-  }
-  if (myStrat->currentEvent->cpData) {
+  if (usesAntimethods()) { 
+    *(rep *)data = *(myStrat->currentEvent->cpData);
     delete myStrat->currentEvent->cpData;
     myStrat->currentEvent->cpData = NULL;
+  }
+  else {
+    if (myStrat->currentEvent == myStrat->targetEvent) {
+      if (myStrat->targetEvent->cpData) {
+	*data = *((StateType *)myStrat->targetEvent->cpData);
+	delete myStrat->targetEvent->cpData;
+	myStrat->targetEvent->cpData = NULL;
+      }
+    }
+    if (myStrat->currentEvent->cpData) {
+      delete myStrat->currentEvent->cpData;
+      myStrat->currentEvent->cpData = NULL;
+    }
   }
 }
 

@@ -69,13 +69,19 @@ void opt::Rollback()
   }
 
   // ev is now at recovery point
-  if (!recoveryPoint->cpData) { // no checkpoint, must recover state
-    UndoEvent(recoveryPoint); // undo the recovery point
-    RecoverState(recoveryPoint); // recover the state prior to target
-  }
-  else { // checkpoint available, simply undo
+  if (userObj->usesAntimethods()) {
     targetEvent = recoveryPoint;
     UndoEvent(recoveryPoint); // undo the recovery point
+  }
+  else {
+    if (!recoveryPoint->cpData) { // no checkpoint, must recover state
+      UndoEvent(recoveryPoint); // undo the recovery point
+      RecoverState(recoveryPoint); // recover the state prior to target
+    }
+    else { // checkpoint available, simply undo
+      targetEvent = recoveryPoint;
+      UndoEvent(recoveryPoint); // undo the recovery point
+    }
   }
 
   eq->SetCurrentPtr(RBevent); // adjust currentPtr
@@ -86,6 +92,7 @@ void opt::Rollback()
 void opt::UndoEvent(Event *e)
 {
   if (e->done == 1) {
+    //CkPrintf("Undoing event "); e->evID.dump(); CkPrintf("...\n");
     currentEvent = e;
     CancelSpawn(e); // cancel spawned events
 #ifdef POSE_STATS_ON
@@ -116,6 +123,7 @@ void opt::CancelEvents()
     // search cancellations list for a cancellation that has a corresponding
     // event in the event queue
     while (!found) {  // loop until one is found, or exit fn if all examined
+      //CkPrintf("Trying to cancel "); it->evID.dump(); CkPrintf(" at %d...\n", it->timestamp);
       ev = eq->currentPtr;               // set search start point
       if (ev == eq->back()) ev = ev->prev;
       if (ev->timestamp <= it->timestamp) {
@@ -127,7 +135,10 @@ void opt::CancelEvents()
 	}
 	if (!found) { // not in linked list; check the heap
 	  found = eq->eqh->DeleteEvent(it->evID, it->timestamp);
-	  if (found) ev = NULL; // make ev NULL so we know it was deleted
+	  if (found) {
+	    //CkPrintf("Cancelled event "); it->evID.dump(); CkPrintf(" deleted!\n");
+	    ev = NULL; // make ev NULL so we know it was deleted
+	  }
 	}
       }
       if (!found) { 
@@ -150,6 +161,7 @@ void opt::CancelEvents()
     // something was found!
     if (ev && (ev->done == 0)) { // found it to be unexecuted; get rid of it
       if (ev == eq->currentPtr) eq->ShiftEvent(); // adjust currentPtr
+      //CkPrintf("Cancelled event "); ev->evID.dump(); CkPrintf(" deleted!\n");
       eq->DeleteEvent(ev); // delete the event
     }
     else if (ev) { // it's been executed, so rollback
@@ -165,15 +177,22 @@ void opt::CancelEvents()
 	UndoEvent(tmp); // undo the event
 	tmp = tmp->prev;
       }
-      if (!recoveryPoint->cpData) { // no checkpoint, must recover state
-	UndoEvent(recoveryPoint); // undo the recovery point
-	RecoverState(recoveryPoint); // recover the state prior to target
-      }
-      else { // checkpoint available, simply undo
+      if (userObj->usesAntimethods()) {
 	targetEvent = recoveryPoint;
 	UndoEvent(recoveryPoint); // undo the recovery point
       }
-      eq->SetCurrentPtr(recoveryPoint->next); // adjust currentPtr
+      else {
+	if (!recoveryPoint->cpData) { // no checkpoint, must recover state
+	  UndoEvent(recoveryPoint); // undo the recovery point
+	  RecoverState(recoveryPoint); // recover the state prior to target
+	}
+	else { // checkpoint available, simply undo
+	  targetEvent = recoveryPoint;
+	  UndoEvent(recoveryPoint); // undo the recovery point
+	}
+      }
+      eq->SetCurrentPtr(recoveryPoint->next); // adjust currentPtr 
+      //CkPrintf("Cancelled event "); ev->evID.dump(); CkPrintf(" deleted!\n");
       eq->DeleteEvent(recoveryPoint); // delete the targetEvent
       targetEvent = NULL;
       // currentPtr may have unexecuted events in front of it

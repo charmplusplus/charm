@@ -15,6 +15,7 @@ void eventID::incEventID()
 /// Assignment operator
 eventID& eventID::operator=(const eventID& e) 
 { 
+  CmiAssert((e.pe >= 0) || (e.pe < CkNumPes()));
   id = e.id;  pe = e.pe;  return *this;
 }
 

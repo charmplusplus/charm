@@ -26,9 +26,12 @@ class eventID
   /** Provides a way to sort events by event ID */
   int operator<=(const eventID& obj);           
   /// Dump all data fields
-  void dump() { CkPrintf("%d.%d", id, pe); }    
+  void dump() { 
+    CmiAssert((pe >= 0) && (pe < CkNumPes())); 
+    CkPrintf("%d.%d", id, pe); 
+  }    
   char *sdump(char *s) { sprintf(s, "%d.%d", id, pe); return s;}    
-  char *sndump(char *s,size_t n) { snprintf(s,n,"%d.%d", id, pe); return s;}    
+  char *sndump(char *s,size_t n) { snprintf(s,n,"%d.%d", id, pe); return s;}
   /// Pack/unpack/sizing operator
   void pup(class PUP::er &p) { p(id); p(pe); }  
 };

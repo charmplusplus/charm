@@ -9,6 +9,7 @@ void rep::init(eventMsg *m)
   parent = m->parent; 
   myStrat = m->str;
   myHandle = parent->thisIndex;
+  anti_methods = 0;
 }
 
 void rep::update(int t, double rt) 

@@ -4,7 +4,7 @@
 #ifndef POSE_CONFIG_H
 #define POSE_CONFIG_H
 /// Uncomment to gather and print POSE statistics set
-//#define POSE_STATS_ON 1
+#define POSE_STATS_ON 1
 //#define POSE_DOP_ON 1
 //#define PRIO_MSGS 1 // timestep type must be int
 #define MSG_RECYCLING 1
@@ -20,11 +20,11 @@
 #endif 
 
 /// Synchronization strategy constants
-#define MAX_ITERATIONS 100  // maximum forward executions per Step call
-#define STORE_RATE 5       // default checkpoint rate: 1 for every n events
-#define SPEC_WINDOW 5      // speculative event window size
+#define MAX_ITERATIONS 10000  // maximum forward executions per Step call
+#define STORE_RATE 10       // default checkpoint rate: 1 for every n events
+#define SPEC_WINDOW 10      // speculative event window size
 #define MIN_LEASH 5        // min speculative window for adaptive strategy
-#define MAX_LEASH 20        // max  "     "     "     "        "     "
+#define MAX_LEASH 50        // max  "     "     "     "        "     "
 #define LEASH_FLEX 1        // leash increment
 
 /// Load balancer constants
@@ -33,7 +33,7 @@
 #define LB_DIFF 10000       // min diff between min and max load PEs
 
 // MISC
-#define MAX_POOL_SIZE 10    // maximum size of a memory pool
+#define MAX_POOL_SIZE 40    // maximum size of a memory pool
 #define MAX_RECYCLABLE 1000 // maximum size of a recyclable block
 #define SEND 0
 #define RECV 1

@@ -12,6 +12,7 @@ void adapt2::Step()
 #ifdef POSE_STATS_ON
     localStats->SwitchTimer(CAN_TIMER);      
 #endif
+    //CkPrintf("Trying to cancel events...\n");
     CancelEvents();
 #ifdef POSE_STATS_ON
     localStats->SwitchTimer(SIM_TIMER);      
@@ -44,6 +45,7 @@ void adapt2::Step()
     iter++;
     currentEvent = ev;
     ev->done = 2;
+    //CkPrintf("About to do event "); ev->evID.dump(); CkPrintf("...\n");
     parent->ResolveFn(ev->fnIdx, ev->msg); // execute it
     ev->done = 1; // complete the event execution
     eq->ShiftEvent(); // shift to next event

@@ -70,6 +70,7 @@ public:
       m->timestamp = ev->timestamp;
       m->setPriority(m->timestamp - INT_MAX);
       localPVT->objUpdate(ev->timestamp, SEND);
+      //CkPrintf("Cancelling a spawned event...\n");
       POSE_Objects[ev->objIdx].Cancel(m); // send the cancellation
       delete ev; // delete the spawn
       ev = e->spawnedList; // move on to next in list

@@ -23,10 +23,15 @@ class rep
   int myHandle;            
   /// Flag to signify if this is a checkpointed copy of the real object
   int copy;                
+  /// Flag indicating this object uses anti-methods rather than checkpoints
+  int anti_methods;
   /// Basic Constructor
-  rep() { ovt = 0; ort = 0.0; copy = 0; parent = NULL; myStrat = NULL; }
+  rep() { 
+    ovt = 0; ort = 0.0; copy = 0; parent = NULL; myStrat = NULL; 
+    anti_methods = 0;
+  }
   /// Initializing Constructor
-  rep(int init_ovt) { ovt = init_ovt; ort = 0.0; copy = 0; }
+  rep(int init_ovt) { ovt = init_ovt; ort = 0.0; copy = 0; anti_methods = 0; }
   /// Destructor
   virtual ~rep() { }
   /// Initializer called from poser wrapper constructor
@@ -35,6 +40,12 @@ class rep
   int OVT() { return ovt; }
   /// Set the OVT to t
   void SetOVT(int t) { ovt = t; }
+  /// Make object use anti-methods rather than checkpointing
+  void useAntimethods() { anti_methods = 1; }
+  /// Make object use checkpointing rather than anti-methods
+  void turnOffAntimethods() { anti_methods = 0; }
+  /// Check if this object uses anti-methods rather than checkpointing
+  int usesAntimethods() { return anti_methods; }
   /// Elapse time by incrementing the OVT by dt
   void elapse(int dt) { ovt += dt; }
   /// Update the OVT and ORT at event start to auto-elapse to event timestamp
@@ -51,14 +62,18 @@ class rep
   /** Derived classes must provide assignment */
   virtual rep& operator=(const rep& obj) { 
     ovt = obj.ovt; 
-    ort = obj.ort; 
+    ort = obj.ort;
+    myHandle = obj.myHandle;
+    anti_methods = obj.anti_methods;
     return *this;
   }
   /// Dump all data fields
   virtual void dump() { CkPrintf("[REP: ovt=%d]\n", ovt); }
   /// Pack/unpack/sizing operator
   /** Derived classes must provide pup */
-  virtual void pup(PUP::er &p) { p(ovt); p(ort); p(myHandle); p(copy); }
+  virtual void pup(PUP::er &p) { 
+    p(ovt); p(ort); p(myHandle); p(copy); p(anti_methods); 
+  }
 };
 
 #endif
