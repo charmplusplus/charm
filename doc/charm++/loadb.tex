@@ -395,14 +395,15 @@ This is to make sure program does not hang because of {\em AtSync()}.
 The {\em NullLB} is smart enough to keep silent if there is any other 
 load balancer is created.
 
-\item {\bf Other Useful Run-time options}
+\item {\bf Other Useful Run-time Options}
 
-There are a few other run-time options that may be useful:
+There are a few other run-time options for load balancing that may be useful:
 
 \begin{itemize}
 \item {\em +LBDebug <verbose level>} \\
-     ask load balancer to output more information to the stdout at load 
-balancing time. The bigger the verbose level, the more verbose the output is.
+     <verbose level> can be an integer. 0 to turn off. 
+     This option asks load balancer to output more information to stdout 
+about load balancing. The bigger the verbose level, the more verbose the output is.
 \item {\em +LBPeriod <seconds>} \\
      <seconds> can be any float number. This sets the minimum period time in 
 seconds between two consecutive load balancing steps. The default value is 
