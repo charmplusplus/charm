@@ -129,7 +129,8 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
 
 # The .c files are there to be #included by clients whole
 # This is a bit unusual, but makes client linking simpler.
-UTILHEADERS=pup.h pupf.h pup_c.h pup_stl.h ckhashtable.h cklists.h \
+UTILHEADERS=pup.h pupf.h pup_c.h pup_stl.h pup_toNetwork4.h \
+	ckimage.h ckhashtable.h cklists.h \
 	ckvector3d.h conv-lists.h \
 	sockRoutines.h sockRoutines.c
 
@@ -227,7 +228,8 @@ LIBCONV_CORE=threads.o convcore.o conv-conds.o queueing.o msgmgr.o \
 	debug-conv.o generate.o edgelist.o conv-ccs.o ccs-builtins.o \
 	quiescence.o isomalloc.o
 
-LIBCONV_UTIL=pup_util.o pup_xlater.o pup_c.o ckhashtable.o sockRoutines.o conv-lists.o
+LIBCONV_UTIL=pup_util.o pup_xlater.o pup_c.o \
+	ckimage.o ckhashtable.o sockRoutines.o conv-lists.o
 
 LIBCONV_UTILF=pup_f.o
 
@@ -354,6 +356,9 @@ pup_f.o: pup_f.f90
 
 ckhashtable.o: ckhashtable.C ckhashtable.h
 	$(CHARMC) -o ckhashtable.o ckhashtable.C
+
+ckimage.o: ckimage.C ckimage.h
+	$(CHARMC) -o ckimage.o ckimage.C
 
 conv-lists.o: conv-lists.C $(UTILHEADERS)
 	$(CHARMC) -o conv-lists.o conv-lists.C
