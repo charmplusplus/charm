@@ -34,6 +34,8 @@ void Refiner::create(int count, CentralLB::LDStats* stats, int** procs)
 
   P = count;
 
+  // now numComputes is all the computes: migratable and not.
+  // afterwards, nonmigratable computes will be taken off
   numComputes = 0;
   for(j=0; j < P; j++) numComputes+= stats[j].n_objs;
   computes = new computeInfo[numComputes];
@@ -54,16 +56,22 @@ void Refiner::create(int count, CentralLB::LDStats* stats, int** procs)
     LDObjData *odata = stats[j].objData;
     const int osz = stats[j].n_objs;  
     for(i=0; i < osz; i++) {
-//      computes[index].omID = odata[i].omID;
-//      computes[index].id = odata[i].id;
-      computes[index].id = odata[i].id;
-      computes[index].handle = odata[i].handle;
-      computes[index].load = odata[i].cpuTime;
-      computes[index].originalPE = j;
-      computes[index].originalIdx = i;
-      computes[index].processor = -1;
-      computes[index].oldProcessor = procs[j][i];
-      index ++;
+      if (odata[i].migratable)
+      {
+        computes[index].id = odata[i].id;
+        computes[index].handle = odata[i].handle;
+        computes[index].load = odata[i].cpuTime;
+        computes[index].originalPE = j;
+        computes[index].originalIdx = i;
+        computes[index].processor = -1;
+        computes[index].oldProcessor = procs[j][i];
+        index ++;
+      }
+      else {
+	// if not migratable, add load to processor background
+        processors[j].backgroundLoad += odata[i].cpuTime;
+	numComputes --;
+      }
     }
   }
 //  for (i=0; i < numComputes; i++)
