@@ -113,7 +113,13 @@ CVLIBS=libconv-core.a $(CVLIBS_QS)
 
 LIBCONV_CORE=threads.o convcore.o conv-conds.o machine.o spantree.o queueing.o fifo.o msgmgr.o memory.o
 
-converse: basics $(CVLIBS) cmk_extras
+converse: basics $(CVLIBS) conv-host
+
+conv-host: conv-host.c
+	../bin/charmc -cp ../bin -seq -DNOTIFY -o conv-host-notify conv-host.c
+	../bin/charmc -cp ../bin -seq -DSILENT -o conv-host-silent conv-host.c
+	cp conv-host-notify conv-host
+	cp conv-host ../bin/conv-host
 
 libconv-core.a: $(LIBCONV_CORE)
 	$(CHARMC) -cp ../lib/ -o $@ $(LIBCONV_CORE)
@@ -144,14 +150,6 @@ msgmgr.o: msgmgr.c $(CVHEADERS)
 
 memory.o: memory.c $(CVHEADERS)
 	$(CHARMC) memory.c
-
-cmk_extras:
-	csh -fc 'source conv-mach.csh ; set echo ; $$CMK_EXTRAS'
-	touch cmk_extras
-
-cmk_clean:
-	csh -fc 'source conv-mach.csh ; set echo ; $$CMK_CLEAN'
-	rm -f cmk_extras
 
 ###############################################################################
 #
@@ -401,40 +399,44 @@ dcountredn.o: dcountredn.int $(GENERIC_REDN_H)
 #
 ###############################################################################
 
-charmxlat:
+XLFILES= xl-dag.c xl-lex.c xl-lex.h xl-lexspecs xl-lexyy.c xl-main.c xl-outh.c xl-parse.c xl-rdtok.c xl-sfspec xl-space.c xl-srch.c xl-str.c xl-sym.c xl-sym.h xl-yacc xl-ydef.h xl-ytab.c
+
+XPFILES=xp-extn.h xp-lexyy.c xp-process.c xp-sfilter xp-space.c xp-t.h xp-t.l xp-t.y xp-table.c xp-ycode.c xp-ytab.c xp-ytab.h
+
+charmxlat: $(XLFILES)
 	make -f Maketrans charmxlat OPTS='$(OPTS)'
 
-charmfilter:
+charmfilter: $(XLFILES)
 	make -f Maketrans charmfilter OPTS='$(OPTS)'
 
-charmxlat++:
+charmxlat++: $(XPFILES)
 	make -f Maketrans charmxlat++ OPTS='$(OPTS)'
 
-charmfilter++:
+charmfilter++: $(XPFILES)
 	make -f Maketrans charmfilter++ OPTS='$(OPTS)'
 
-yacc:
+yacc: $(XLFILES)
 	make -f Maketrans yacc OPTS='($OPTS)'
 
-xlatyacc:
+xlatyacc: $(XLFILES)
 	make -f Maketrans xlatyacc OPTS='$(OPTS)'
 
-xlatlex:
+xlatlex: $(XLFILES)
 	make -f Maketrans xlatlex OPTS='$(OPTS)'
 
-sfilterlex:
+sfilterlex: $(XLFILES)
 	make -f Maketrans sfilterlex OPTS='$(OPTS)'
 
-yacc++:
+yacc++: $(XPFILES)
 	make -f Maketrans yacc++ OPTS='($OPTS)'
 
-xlat++yacc:
+xlat++yacc: $(XPFILES)
 	make -f Maketrans xlat++yacc OPTS='$(OPTS)'
 
-xlat++lex:
+xlat++lex: $(XPFILES)
 	make -f Maketrans xlat++lex OPTS='$(OPTS)'
 
-sfilter++lex:
+sfilter++lex: $(XPFILES)
 	make -f Maketrans sfilter++lex OPTS='$(OPTS)'
 
 ###############################################################################
@@ -443,9 +445,9 @@ sfilter++lex:
 #
 ###############################################################################
 
-clean: cmk_clean
+clean:
 	rm -f charmreplay charmxlat charmfilter charmxlat++ charmfilter++
-	rm -f conv-host
+	rm -f conv-host conv-host-notify conv-host-silent
 	rm -f TAGS basics dirs+sources cmk_extras core
 	rm -f core #*#
 	rm -f core *.a
