@@ -664,7 +664,7 @@ Chare::genDefs(XStr& str)
     }
     // We have to generate the chare array itself
     str << "/* FORTRAN */\n";
-    str << "extern \"C\" " << fortranify(baseName()) << "_allocate_(char **, void *);\n";
+    str << "extern \"C\" void " << fortranify(baseName()) << "_allocate_(char **, void *);\n";
     str << "\n";
     str << "class " << baseName() << " : public ArrayElement1D\n";
     str << "{\n";
