@@ -1005,8 +1005,17 @@ MakeSO() {
 	Debugf "Running ldro..."
 	DoNoErrCheck $RM $OBJECT
 	Warning "Warning: creating $OBJECT "
-	Do $CMK_LD -o $OBJECT $OPTS_LD $OPTS_LDRO $OBJECTFILES \
-		$PRE_LIBRARIES $POST_LIBRARIES
+	soCmd="$CMK_LD -o $OBJECT $OPTS_LD $OPTS_LDRO $OBJECTFILES $PRE_LIBRARIES $POST_LIBRARIES"
+	DoNoErrCheck $soCmd
+	Do_res=$?
+	if [ $Do_res -ne 0 ] 
+	then
+	echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+	echo "!!      Failed to compile Charm++ shared library               !!"
+	echo "!!      compile Charm++ again with -no-build-shared option     !!"
+	echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+	 Abort "Command $soCmd returned error code $Do_res"
+	fi
 	Copyobj
 }
 
