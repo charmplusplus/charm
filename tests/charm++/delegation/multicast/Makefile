@@ -1,5 +1,5 @@
 OPTS=-g
-CHARMC=../../../bin/charmc $(OPTS)
+CHARMC=../../../../bin/charmc $(OPTS)
 
 hello:   hello.o
 	$(CHARMC) hello.o -o hello -lckmulticast -language charm++ #-memory paranoid
