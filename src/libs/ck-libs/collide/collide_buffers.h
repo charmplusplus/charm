@@ -107,24 +107,17 @@ public:
 	void atLeast(int min) {//More conservative version of grow
 		if (min>max) resize(min);
 	}
-	void resize(int Len);
-	void reallocate(int Len);
+	void resize(int Len) {
+		buf.resize(Len*sT);
+		setData((T*)buf.getData());
+		max=Len;
+	}
+	void reallocate(int Len) {
+		buf.reallocate(Len*sT);
+		setData((T*)buf.getData());
+		setLength(0);
+		max=Len;
+	}
 };
-
-template <class T> void growableBufferT<T>::resize(int Len) 
-{
-	buf.resize(Len*sT);
-	setData((T*)buf.getData());
-	max=Len;
-}
-template <class T> void growableBufferT<T>::reallocate(int Len) 
-{
-	buf.reallocate(Len*sT);
-	setData((T*)buf.getData());
-	setLength(0);
-	max=Len;
-}
-
-
 
 #endif
