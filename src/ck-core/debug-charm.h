@@ -12,32 +12,65 @@
 #include "pup.h"
 
 //These pup functions are useful in CpdLists, as they document the name
-//  of the variable.  Your object must be named "c" (a hack).
+//  of the variable.  Your object must be named "c" (a stupid hack).
 #define PCOM(field) p.comment(#field); p(c->field);
 #define PCOMS(field) p.comment(#field); p((char *)c->field,strlen(c->field));
 
-/* CpdList functions for C++ */
-class CpdListAccessor { /* Abstract superclass */
+/**
+  A CpdListAccessor responds to CCS requests for a single CpdList.
+  To make some data available via the CpdList interface, you 
+  make a subclass of this class (possibly CpdSimpleListAccessor),
+  and pass it to CpdListRegister, below.
+*/
+class CpdListAccessor {
 protected:
+  /**
+    Subclasses must call this before pupping each requested item.
+    This inserts a marker to allow the client to distinguish between
+    different CpdList items. 
+  */
   void beginItem(PUP::er &p,int itemNo);
 public:
   virtual ~CpdListAccessor(); 
+  /// Return the CpdList path CCS clients should use to access this data.
   virtual const char *getPath(void) const =0;
+  /// Return the length of this CpdList.
   virtual int getLength(void) const =0;
+  /// Pup the items listed in this request.  Be sure to call beginItem between items!
   virtual void pup(PUP::er &p,CpdListItemsRequest &req) =0;
 };
+
+/**
+  Register this CpdListAccessor with Cpd.  The accessor
+  will then be called to respond to CCS requests for its path.
+  CpdList will eventually delete this object.
+*/
 void CpdListRegister(CpdListAccessor *acc);
 
-/*A typical accessor: length is stored at some fixed location,
-path is a constant, pup is random-access.*/
+/**
+  A typical CpdList accessor: length is stored at some fixed 
+   location in memory, path is a constant string, and the 
+   pup routine is completely random-access.
+*/
 class CpdSimpleListAccessor : public CpdListAccessor {
 public:
+	/// This routine is called to pup each item of the list.
+	///  beginItem has already been called before this function.
 	typedef void (*pupFn)(PUP::er &p,int itemNo);
 private:
 	const char *path;
 	int &length;
 	pupFn pfn;
 public:
+	/**
+	  Create a new CpdSimpleListAccessor.
+	     \param path_ CpdList path CCS clients should use.
+	     \param length_ Reference to number of elements in the list.
+	                    This class keeps the reference, so as the list length
+			    changes, Cpd always has the latest value.
+			    In particular, this means length must not be moved!
+	     \param pfn_ Function to pup the items in the list.
+	*/
 	CpdSimpleListAccessor(const char *path_,int &length_,pupFn pfn_)
 		:path(path_),length(length_),pfn(pfn_) { }
 	virtual ~CpdSimpleListAccessor();
