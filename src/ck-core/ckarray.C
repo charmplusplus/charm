@@ -71,7 +71,7 @@ Array1D::Array1D(ArrayCreateMessage *msg)
     mapMsg->numElements = numElements;
     mapMsg->arrayID = thishandle;
     mapMsg->groupID = thisgroup;
-    CkCreateGroup(msg->mapChareType,msg->mapConstType,mapMsg,-1,0);
+    CkCreateGroup(msg->mapChareType,msg->mapConstType,mapMsg,0,0);
   }
   /*
   CkPrintf("Array1D constructed\n");
