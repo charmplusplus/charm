@@ -754,9 +754,6 @@ void RRMap::registerArray(ArrayMapRegisterMessage *msg)
 /////////////////////// Array Reduction Implementation //////////////////////
 // Orion Sky Lawlor, olawlor@acm.org, 11/15/1999
 
-#include "ckarray_reductions.C" //Include reduction implementations
-
-
 //Debugging defines-- set this to 1 for tons of (useless?) debugging output.
 #define GIVE_DEBUGGING_OUTPUT 0
 #if GIVE_DEBUGGING_OUTPUT
@@ -766,6 +763,9 @@ void RRMap::registerArray(ArrayMapRegisterMessage *msg)
 #endif
 #define RA "PE_%d/reduction %d: "
 #define RB ,CkMyPe(),reductionNo
+
+#include "ckarray_reductions.C" //Include reduction implementations
+
 
 //Call contribute to add your contribution to a new global reduction.
 // The array BOC will keep a copy the data. reducer must be the same on all PEs.
